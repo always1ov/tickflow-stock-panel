@@ -94,3 +94,21 @@
 
 **已知注意事项 / 遗留：**
 - 提交 `d8ed2b5` 触发的 build 因 `hatchling` 校验 `readme = "../README.md"` 越界而失败 —— 修复方案已提出（同时改 `backend/pyproject.toml` 的 `readme` 字段和 `Dockerfile` 的 `COPY README.md` 目标），**等待用户确认后推送**
+
+### 2026-08-11 — 修复 hatchling readme 路径越界导致构建失败
+
+**改动文件：**
+- `Dockerfile` —— `COPY README.md /README.md` 改为 `COPY README.md ./README.md`（让 README 落在 `/app/` 即项目根，与 pyproject.toml 同目录）
+- `backend/pyproject.toml` —— `readme = "../README.md"` 改为 `readme = "README.md"`（hatchling 要求 readme 路径必须在项目目录内，不能用 `..` 跳出）
+
+**关键决策：**
+- 两个文件必须**同时**改：只改 pyproject 不改 Dockerfile → uv sync 时找不到 readme 文件；只改 Dockerfile 不改 pyproject → hatchling 校验仍然报错
+- README 物理位置由 `/README.md`（项目外）改回 `/app/README.md`（项目内），回到 hatchling 期望的标准布局
+- 用户决策授权："你决定" → 自主推进
+
+**提交：**
+- `76fa3a2` fix(docker): place README in project root so hatchling readme path resolves inside project dir
+- `2d7f6d8` fix(backend): point pyproject readme to in-project README.md (hatchling requires project-relative path)
+
+**验证状态：**
+- 待触发新一轮 Actions build（任一 push 即触发）观察是否通过 `uv sync`
