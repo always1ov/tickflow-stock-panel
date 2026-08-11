@@ -112,3 +112,30 @@
 
 **验证状态：**
 - 待触发新一轮 Actions build（任一 push 即触发）观察是否通过 `uv sync`
+
+### 2026-08-11 — 修复 ghcr push 被拒 (user-scoped package 需用 PAT)
+
+**改动文件：**
+- 修改 `.github/workflows/docker.yml` —— `password: ${{ secrets.GITHUB_TOKEN }}` 改为 `password: ${{ secrets.GHCR_PAT }}`
+- 创建 repo secret `GHCR_PAT`（封入用户提供的 PAT，该 PAT 含 `write:packages` scope）
+- 通过 API 调高仓库 `default_workflow_permissions` 为 `write`（保险措施，与本次修复不直接相关，但补上避免未来错觉）
+
+**根因：**
+- `ghcr.io/always1ov/tickflow-stock-panel` 是**用户作用域**的 ghcr 包（owner_type=User，非 Org）
+- `GITHUB_TOKEN` 在仓库级别只能写入**同一 Org 的包**，对 user-scoped ghcr 包始终 `permission_denied: write_package`
+- 即使 workflow YAML 声明 `permissions: packages: write` 也无效 —— GitHub 2023 安全策略默认 `GITHUB_TOKEN` 为读权限
+
+**补充验证过程：**
+- 修 default_workflow_permissions 后首次 build (run 31507912613) 仍失败，错误不变
+- run `b0379f5`（GHCR_PAT 替换后）✅ 成功，image `b0379f5` + `:latest` 均已推送到 ghcr.io
+
+**提交：**
+- `b0379f5` fix(ci): use GHCR_PAT instead of GITHUB_TOKEN (user-scoped ghcr package requires PAT)
+
+**验证状态：**
+- 镜像 tags 验证：`['b0379f5', 'latest']`，updated_at=2026-08-11T16:14:24Z
+- 后续 `docker pull ghcr.io/always1ov/tickflow-stock-panel:latest` 即可获取最新镜像
+
+**安全提示：**
+- `GHCR_PAT` secret 现已存于仓库。任何能 push 仓代码的人不会泄漏 secret 值（GitHub 加密），但本身有 repo 写权限的人可以改 workflow 使用该 secret
+- 用户后续推荐：rotate PAT 或改用 GitHub App Token 以缩短 token 生命周期
