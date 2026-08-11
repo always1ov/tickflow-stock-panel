@@ -80,3 +80,17 @@
 - ghcr.io 包默认私有，首次部署需在 GitHub 把包设为 Public（或本地 `docker login ghcr.io`）
 - 用户曾在前轮 compose 草稿中明文暴露过 AI API key，已建议作废并重新签发
 - **GitHub PAT 安全管理**：本轮用户向 AI 临时提供了一个 PAT 用于一次性写文件，AI 已声明**不持久化**该 PAT；后续如需自动化写回本文件，建议改用 GitHub App / `gh-actions` 短期 token 方案
+
+### 2026-08-11 — 排除 AGENTS.md 出 Docker 构建上下文
+
+**改动文件：**
+- 修改 `.dockerignore` —— 在「文档 / 截图」节追加 `AGENTS.md`，分节注释更新为「文档 / 截图 / AI 协作元数据」
+
+**关键决策：**
+- AGENTS.md 是 AI 协作用的元数据文件（变更日志 / 接手说明），不属于运行时工件
+- 不放入 `.gitignore`（仍需保留在 git 里供后续 AI 读取）
+- 单独放入 `.dockerignore`（不进入 Docker 构建上下文）
+- 用户原话："记录回写那个文档别一起构建，这是给ai看的，算是个多余的文件"
+
+**已知注意事项 / 遗留：**
+- 提交 `d8ed2b5` 触发的 build 因 `hatchling` 校验 `readme = "../README.md"` 越界而失败 —— 修复方案已提出（同时改 `backend/pyproject.toml` 的 `readme` 字段和 `Dockerfile` 的 `COPY README.md` 目标），**等待用户确认后推送**
