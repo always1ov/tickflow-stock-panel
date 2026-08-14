@@ -51,6 +51,7 @@ import {
   WifiOff,
   PanelLeftClose,
   PanelLeftOpen,
+  Sunrise,
 } from 'lucide-react'
 import { Logo } from './Logo'
 import { api, type IndexQuote } from '@/lib/api'
@@ -75,6 +76,8 @@ const CORE_INDEXES = [
 type CoreIndex = (typeof CORE_INDEXES)[number]
 
 const nav = [
+  // [fork 增强] 今日总览: 决策汇聚层, 放首位
+  { to: '/today',           label: '今日总览', icon: Sunrise },
   { to: '/',                label: '看板',     icon: LayoutDashboard },
   { to: '/watchlist',  label: '自选',   icon: Star },
   { to: '/screener',   label: '策略',   icon: ScanSearch },

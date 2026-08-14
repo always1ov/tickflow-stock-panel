@@ -148,6 +148,25 @@ export interface AiFinancialReport {
 // ===== 个股分析 =====
 export type LevelType = 'sr' | 'pivot' | 'extreme' | 'boll' | 'keltner_s' | 'keltner_m' | 'keltner_l' | 'atr_stop' | 'gap' | 'fib' | 'round' | 'livermore' | 'exit'
 
+// [fork 增强] 今日总览(决策汇聚层)
+export interface TodayActionItem { kind: string; severity: 'high' | 'mid'; symbol: string; name: string; text: string }
+export interface TodayOpportunity { kind: string; symbol: string; name: string; text: string }
+export interface TodayHolding {
+  symbol: string; name: string; close: number | null; cost: number | null; pnl_pct: number | null
+  stage_cn: string | null; line: number | null; line_cn: string | null; distance_pct: number | null
+  exit_triggered: boolean; trend_cn: string | null; trend_duration: number | null
+  trend_side: string | null; signal: string | null
+}
+export interface TodayOverview {
+  as_of: string | null
+  watchlist_total: number
+  trend_total: number
+  actions: TodayActionItem[]
+  opportunities: TodayOpportunity[]
+  weather: { bull: number; bear: number; new_bull: number; new_bear: number; posture: string; posture_reason: string }
+  holdings: TodayHolding[]
+}
+
 // [fork 增强] 持仓出场线(ATR 三阶段)
 export interface ExitLine {
   stage: 'risk' | 'breakeven' | 'trail'
@@ -2309,6 +2328,10 @@ export const api = {
   // ===== 个股分析 =====
   stockAnalysisLevels: (symbol: string, days = 120) =>
     request<StockLevels>(`/api/stock-analysis/levels?symbol=${encodeURIComponent(symbol)}&days=${days}`),
+
+  // [fork 增强] 今日总览(决策汇聚层)
+  todayOverview: () => request<TodayOverview>('/api/today'),
+  todayBrief: () => request<{ brief?: string; error?: string }>('/api/today/brief', { method: 'POST' }),
 
   // [fork 增强] 持仓出场线
   watchlistExitLines: () =>

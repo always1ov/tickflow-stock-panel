@@ -33,12 +33,15 @@ const Settings = lazy(() => import('./pages/Settings').then(m => ({ default: m.S
 const Indices = lazy(() => import('./pages/Indices').then(m => ({ default: m.Indices })))
 const Regime = lazy(() => import('./pages/Regime').then(m => ({ default: m.Regime })))
 const Dev = lazy(() => import('./pages/Dev').then(m => ({ default: m.Dev })))
+// [fork 增强] 今日总览(决策汇聚层)
+const Today = lazy(() => import('./pages/Today').then(m => ({ default: m.Today })))
 
 const CORE_ROUTE_PATHS = new Set([
   '/',
   '/onboarding',
   '/login',
   '/overview',
+  '/today',
   '/analysis',
   '/analysis/:menuId',
   '/concept-analysis',
@@ -110,6 +113,7 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <Dashboard /> },
       { path: 'overview', element: <Navigate to="/" replace /> },
+      { path: 'today', element: <Today /> },
       { path: 'analysis', element: <Navigate to="/settings?tab=ext-pages" replace /> },
       { path: 'analysis/:menuId', element: <AnalysisDetail /> },
       { path: 'concept-analysis', element: <ConceptAnalysis /> },

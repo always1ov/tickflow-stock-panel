@@ -39,7 +39,15 @@ export function StockAnalysis() {
   useEffect(() => { loadHistory() }, [])
 
   // 自动恢复上次选中的股票(切走再回来不丢)。useLastStock 的 last 来自 localStorage, 同步可用。
+  // [fork 增强] URL 带 ?symbol= 时优先(今日总览等页面点击跳转直达该票)。
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const urlSym = (params.get('symbol') || '').trim().toUpperCase()
+    if (urlSym) {
+      setSymbol(urlSym)
+      setName(params.get('name') || urlSym)
+      return
+    }
     if (!symbol && lastStock) {
       setSymbol(lastStock.symbol)
       setName(lastStock.name)
