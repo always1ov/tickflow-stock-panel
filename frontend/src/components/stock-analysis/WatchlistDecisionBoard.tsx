@@ -1,11 +1,12 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ChevronDown, Star, Wallet, Sparkles, Loader2, ArrowUp, ArrowDown, RefreshCw, FileText } from 'lucide-react'
+import { ChevronDown, Star, Wallet, Sparkles, Loader2, ArrowUp, ArrowDown, RefreshCw, FileText, TrendingUp } from 'lucide-react'
 import { api, type TrendInfo } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { toast } from '@/components/Toast'
 import { useHistoryReports, openHistoryReport, loadHistory } from '@/lib/stockAnalysisStore'
 import { trendBadgeCls } from '@/components/stock-analysis/TrendStateBar'
+import { TrendSummaryDialog } from '@/components/stock-analysis/TrendSummaryDialog'
 
 type Position = { held: boolean; cost: number | null; updated_at: string }
 type WatchPoint = { direction: 'up' | 'down'; price: number; label?: string; action?: string; reason?: string }
@@ -41,6 +42,8 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
   const qc = useQueryClient()
   const [open, setOpen] = useState(true)
   const [heldOnly, setHeldOnly] = useState(false)
+  // [fork 增强] 六态汇总弹窗
+  const [showTrendSummary, setShowTrendSummary] = useState(false)
   // 排序:默认按置信度降序(信号最强的排前面;未分析的始终垫底)
   const [sort, setSort] = useState<{ key: SortKey; dir: 'asc' | 'desc' }>({ key: 'confidence', dir: 'desc' })
   const toggleSort = (key: SortKey) =>
@@ -227,6 +230,14 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
           刷新
         </button>
         <button
+          onClick={() => setShowTrendSummary(true)}
+          title="全部自选的六态趋势纵览(零 AI 成本),可导出 HTML"
+          className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border border-sky-400/30 bg-sky-400/10 text-sky-300 hover:bg-sky-400/20 transition-colors cursor-pointer"
+        >
+          <TrendingUp className="h-3 w-3" />
+          六态汇总
+        </button>
+        <button
           onClick={() => setHeldOnly((v) => !v)}
           className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors cursor-pointer ${
             heldOnly ? 'border-accent/40 bg-accent/10 text-accent' : 'border-border bg-base text-muted hover:text-foreground'
@@ -255,6 +266,19 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
           {progress ? `分析中 ${progress.done}/${progress.total}` : 'AI 分析全部'}
         </button>
       </div>
+
+      {/* [fork 增强] 六态汇总弹窗:全部自选(不受"只看持有"过滤)+ 批量趋势 */}
+      {showTrendSummary && (
+        <TrendSummaryDialog
+          items={((enriched.data?.rows ?? []) as any[]).map((r: any) => ({
+            symbol: String(r.symbol),
+            name: String(r.name ?? r.symbol),
+            close: typeof r.close === 'number' ? r.close : null,
+          }))}
+          trends={trends}
+          onClose={() => setShowTrendSummary(false)}
+        />
+      )}
 
       {open && (
         <div className="max-h-[280px] overflow-auto border-t border-border/60">
