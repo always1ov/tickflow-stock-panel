@@ -36,6 +36,28 @@ STATE_ACTION: dict[str, str] = {
     "DT": "顺势持有空头 / 跌破关键点可加空",
 }
 
+
+def action_text(state: str | None, up_pivot: float | None, dn_pivot: float | None) -> str:
+    """操作建议代入具体关键点价位(语义沿用 STATE_ACTION 原版,拒绝"上一关键点"式模糊指代)。
+
+    关键点缺失时回退原版模板文案。
+    """
+    up = f"{up_pivot:.2f}" if up_pivot is not None else None
+    dn = f"{dn_pivot:.2f}" if dn_pivot is not None else None
+    if state == "UT":
+        return f"顺势持有多头 / 突破 {up} 可金字塔加仓" if up else STATE_ACTION["UT"]
+    if state == "NR":
+        return f"观望,上破 {up} 确认转多" if up else STATE_ACTION["NR"]
+    if state == "SR":
+        return f"不动作(上破 {up} 才确认转多)" if up else STATE_ACTION["SR"]
+    if state == "SREA":
+        return f"不动作(下破 {dn} 才确认转空)" if dn else STATE_ACTION["SREA"]
+    if state == "NREA":
+        return f"观望,下破 {dn} 确认转空" if dn else STATE_ACTION["NREA"]
+    if state == "DT":
+        return f"顺势持有空头 / 跌破 {dn} 可加空" if dn else STATE_ACTION["DT"]
+    return ""
+
 # 多头 = 上涨趋势 + 自然回升 + 次级回升;其余为空头(与代码包 BULLISH 口径一致)
 BULLISH = frozenset({"UT", "NR", "SR"})
 
