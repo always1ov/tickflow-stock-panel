@@ -274,26 +274,85 @@ def put_prefs(body: PrefsModel):
     return today_prefs.save(min_score=body.min_score, max_show=body.max_show)
 
 
-_SELECT_SYSTEM = (
-    "你是用户的选股参谋。下面是若干候选买入机会(已含六态趋势、信号出现第几天、规则把握分、AI 信号与置信度)。"
-    "请精选当下最值得优先盯的 1-3 只,宁缺毋滥:刚转强、入场窗口没过、多个信号互相印证的优先;"
-    "信号已出现好几天、现在进场等于追高的,即使置信度高也要降级或放弃。"
-    '只输出一个 JSON 对象,不要任何其他文字: {"picks": [{"symbol": "代码", "reason": "不超过30字的大白话理由"}]}。'
-    "没有值得买的就返回空 picks。仅供个人参考。"
-)
+_SELECT_SYSTEM = """你是一位有 15 年 A 股一线经验的交易员,正在帮用户从几只候选股里挑出**今天最值得优先出手**的。
+
+## 你要做的事
+
+对每只候选,**看它的日 K 数据做独立判断**,再横向对比,选出 1-3 只。判断依据只能是量价本身:
+
+1. **突破的量能质量**:突破当天有没有放量?量比多少?缩量突破是假突破,放量才是真金
+2. **突破后的持续性**:突破后回踩了没有?回踩守住关键位是好事,直接掉回去就是失败突破
+3. **当前位置的风险**:现价离突破点多远?已经拉开一大截的,现在追等于给前面的人抬轿;紧贴突破点的才有好的风险收益比
+4. **上方阻力空间**:离上方压力位还有多少空间?空间太小的机会不值得占用仓位
+5. **K 线形态质量**:是干净利落的放量长阳,还是上影线很长、量价背离、连续跳空的透支形态
+
+## 硬性要求
+
+- **不许拿"规则分高""AI 看多""信号共振"当理由** —— 这些是筛选前就知道的,把它们复述一遍等于没分析。理由必须来自你在 K 线数据里**实际看到的东西**,带上具体数字(量比、涨幅、距离、价位)
+- **规则分只是粗筛门票,不是排序依据**。分低但量价扎实的可以选,分高但量能虚、位置差的要果断放弃
+- 几只都不理想就少选甚至不选(picks 给空数组)。**宁缺毋滥,空仓等待也是决策**
+- 每只理由 ≤35 字,大白话,让不懂术语的人看懂
+
+## 输出
+
+只输出一个 JSON 对象,不要任何其他文字:
+{"picks": [{"symbol": "代码", "reason": "基于量价的具体理由"}]}
+
+仅供用户个人参考,不构成投资建议。"""
+
+# 优选送审的候选上限与每只的日 K 窗口(控制单次调用成本)
+_SELECT_MAX_CANDIDATES = 8
+_SELECT_KLINE_DAYS = 20
+# 横向对比够用的精简列(比四维分析窄, 8 只 × 20 根仍在可控 token 内)
+_SELECT_COLS = [
+    "date", "open", "high", "low", "close", "change_pct",
+    "volume", "vol_ratio_5d", "turnover_rate",
+    "ma5", "ma10", "ma20", "ma60", "macd_hist", "rsi_14", "atr_14",
+]
+
+
+def _candidate_market_data(repo, cands: list[dict]) -> list[dict]:
+    """给每只候选附上真实日 K 与关键价位, 供 AI 做量价层面的横向对比。
+
+    取不到数据的候选仍然保留(标注 kline_error), 让 AI 知道它无从判断而不是凭空编。
+    """
+    from app.indicators.levels import compute_levels, summarize_levels
+    from app.services.stock_analyzer import _clean_rows, _load_kline
+
+    out: list[dict] = []
+    for c in cands:
+        item = {
+            "symbol": c["symbol"], "name": c["name"],
+            "规则分": c["score"], "规则依据": c["why"], "信号摘要": c["text"],
+        }
+        try:
+            df = _load_kline(repo, c["symbol"])
+            if df.is_empty():
+                item["kline_error"] = "暂无日 K 数据"
+            else:
+                close = float(df.tail(1)["close"][0]) if "close" in df.columns else None
+                item["关键价位"] = summarize_levels(compute_levels(df), close)
+                item[f"最近{_SELECT_KLINE_DAYS}日K"] = _clean_rows(
+                    df.tail(_SELECT_KLINE_DAYS), _SELECT_COLS)
+        except Exception as e:  # noqa: BLE001
+            logger.warning("select kline load failed for %s: %s", c["symbol"], e)
+            item["kline_error"] = "行情读取失败"
+        out.append(item)
+    return out
 
 
 @router.post("/select")
 async def today_select(request: Request):
-    """AI 优选: 从规则筛选后的机会里精选 1-3 只(未配 AI 返回 error 而非 500)。"""
+    """AI 优选: 基于真实量价对候选做横向对比(未配 AI 返回 error 而非 500)。"""
     from app.services.ai_provider import ai_configured, generate_ai_text
     if not ai_configured():
         return {"error": "未配置 AI"}
-    data = _build_overview(request.app.state.repo)
-    cands = data["opportunities"]
+    repo = request.app.state.repo
+    data = _build_overview(repo)
+    cands = data["opportunities"][:_SELECT_MAX_CANDIDATES]
     if not cands:
         return {"picks": []}
-    payload = [{k: c[k] for k in ("symbol", "name", "score", "why", "text")} for c in cands]
+    payload = _candidate_market_data(repo, cands)
     try:
         text = await generate_ai_text(
             [
@@ -301,7 +360,7 @@ async def today_select(request: Request):
                 {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
             ],
             temperature=0.2,
-            max_tokens=400,
+            max_tokens=600,
         )
         m = re.search(r"\{.*\}", text or "", re.S)
         obj = json.loads(m.group(0)) if m else {}
@@ -311,7 +370,7 @@ async def today_select(request: Request):
             s = str(p.get("symbol", "")).upper()
             if s in valid:
                 picks.append({"symbol": s, "reason": str(p.get("reason") or "").strip()[:60]})
-        return {"picks": picks}
+        return {"picks": picks, "analyzed": len(cands)}
     except Exception as e:  # noqa: BLE001
         logger.warning("today select failed: %s", e)
         return {"error": f"AI 调用失败: {e}"}

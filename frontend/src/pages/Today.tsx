@@ -127,11 +127,13 @@ export function Today() {
     onError: (e: Error) => toast(`导读生成失败: ${e.message}`, 'error'),
   })
   const [picks, setPicks] = useState<TodayPick[] | null>(null)
+  const [analyzed, setAnalyzed] = useState(0)
   const selectMut = useMutation({
     mutationFn: () => api.todaySelect(),
     onSuccess: (r) => {
-      if (r.error) toast(r.error, 'error')
-      else setPicks(r.picks ?? [])
+      if (r.error) { toast(r.error, 'error'); return }
+      setPicks(r.picks ?? [])
+      setAnalyzed(r.analyzed ?? 0)
     },
     onError: (e: Error) => toast(`AI 优选失败: ${e.message}`, 'error'),
   })
@@ -295,7 +297,7 @@ export function Today() {
                   <button
                     onClick={() => selectMut.mutate()}
                     disabled={selectMut.isPending}
-                    title="让 AI 从这些候选里再精选 1-3 只当下最值得优先盯的"
+                    title="让 AI 调取候选的日 K 与量能数据做横向对比,挑出量价最扎实的 1-3 只(耗时约十几秒)"
                     className="inline-flex items-center gap-1 rounded-full border border-amber-400/30 bg-amber-400/10 px-2.5 py-1 text-[10px] text-amber-300 hover:bg-amber-400/20 disabled:opacity-50 transition-colors cursor-pointer"
                   >
                     {selectMut.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
@@ -341,10 +343,17 @@ export function Today() {
             {picks && (
               <div className="border-b border-amber-400/20 bg-amber-400/[0.06] px-4 py-2.5 text-xs">
                 {picks.length === 0 ? (
-                  <span className="text-muted">AI 看完这批候选,认为今天没有值得优先出手的 —— 空仓等待也是决策</span>
+                  <span className="text-muted">
+                    AI 逐一看过这 {analyzed} 只的量价后,认为都不够理想 —— 空仓等待也是决策
+                  </span>
                 ) : (
                   <>
-                    <span className="text-[10px] font-medium text-amber-300">AI 优选 {picks.length} 只</span>
+                    <span className="text-[10px] font-medium text-amber-300">
+                      AI 优选 {picks.length} 只
+                      <span className="ml-1.5 font-normal text-muted">
+                        · 已对比 {analyzed} 只的日 K 与量能后选出
+                      </span>
+                    </span>
                     <ul className="mt-1 space-y-1">
                       {picks.map((p) => {
                         const o = d.opportunities.find((x) => x.symbol === p.symbol)
