@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 
 from fastapi import APIRouter, Request
 
@@ -23,6 +24,87 @@ router = APIRouter(prefix="/api/today", tags=["today"])
 _NEAR_EXIT_PCT = -0.03
 # 机会区: 现价距上方突破预案价 2% 以内
 _NEAR_BREAKOUT_PCT = 0.02
+# 机会区筛选: 把握分低于此值不显示; 最多显示条数
+_OPP_MIN_SCORE = 60
+_OPP_MAX_SHOW = 10
+# 信号新鲜度加减分: 刚出现窗口最佳, 拖到第 4-5 天已错过入场时机
+_FRESH_BONUS = {1: 15, 2: 10, 3: 0, 4: -12, 5: -22}
+
+
+def rank_opportunities(
+    trends: dict[str, dict], signals: dict[str, dict], names: dict[str, str],
+) -> tuple[list[dict], int]:
+    """给买入机会打"把握分"并筛选, 返回 (显示列表, 被滤掉条数)。
+
+    纯函数, 无 IO —— 打分口径:
+      · 趋势刚转强底分最高, 按信号出现第几天加减(第 1-2 天最佳, 第 4 天起判定
+        为已过入场窗口而扣分), 这样"陈年老信号"不会因置信度高就一直占着榜首;
+      · AI 信号同向加分、反向重扣(自相矛盾的机会宁可不看);
+      · 逼近买入触发价的按距离与置信度打分, 一到价就能行动的最优先。
+    低于 _OPP_MIN_SCORE 或排在 _OPP_MAX_SHOW 之后的都不显示, 只报数量。
+    """
+    opp_by_sym: dict[str, dict] = {}
+
+    def add(sym: str, kind: str, score: int, text: str, why: list[str]) -> None:
+        cur = opp_by_sym.get(sym)
+        if cur is None:
+            opp_by_sym[sym] = {
+                "kind": kind, "symbol": sym, "name": names.get(sym, sym),
+                "score": score, "why": why, "text": text,
+            }
+            return
+        if score > cur["score"]:  # 同票命中多个来源: 取更高分的表述, 理由合并
+            cur["score"], cur["kind"], cur["text"] = score, kind, text
+        cur["why"] += [w for w in why if w not in cur["why"]]
+
+    for sym, t in trends.items():
+        if t.get("signal") not in ("转多", "回升"):
+            continue
+        dur = int(t.get("duration") or 1)
+        score = (70 if t["signal"] == "转多" else 55) + _FRESH_BONUS.get(dur, -30)
+        note = "(刚出现,入场窗口最佳)" if dur <= 2 else "(已过最佳入场时机)" if dur >= 4 else ""
+        why = [f"{t['signal']}第 {dur} 天{note}"]
+        sig = signals.get(sym) or {}
+        conf = sig.get("confidence")
+        if sig.get("signal") == "buy":
+            score += round(int(conf or 50) * 0.2)
+            why.append(f"AI 也看多(把握 {conf})" if conf is not None else "AI 也看多")
+        elif sig.get("signal") == "sell":
+            score -= 40
+            why.append("但 AI 看空,信号互相矛盾")
+        add(sym, "trend_signal", score,
+            f"{t['signal']}:{t['signal_desc']}(第 {dur} 天)", why)
+
+    for sym, sig in signals.items():
+        if sym not in names or sig.get("signal") != "buy":
+            continue
+        t = trends.get(sym)
+        close = (t or {}).get("close") or sig.get("close")
+        for p in sig.get("watch_points") or []:
+            if p.get("direction") != "up" or not close:
+                continue
+            try:
+                price = float(p["price"])
+            except (TypeError, ValueError, KeyError):
+                continue
+            gap = (price - close) / close
+            if 0 <= gap <= _NEAR_BREAKOUT_PCT:
+                conf = sig.get("confidence")
+                score = 62 + round(int(conf or 50) * 0.25) + (8 if gap <= 0.005 else 0)
+                why = [f"现价距买入触发价仅 {gap * 100:.1f}%,一到价就能按预案行动"]
+                if conf is not None:
+                    why.append(f"AI 看多(把握 {conf})")
+                add(sym, "near_breakout", score,
+                    f"AI 看多,现价 {close:.2f} 距触发价 {price:.2f} 仅 {gap * 100:.1f}%"
+                    f" — 到价{p.get('action') or '关注'}", why)
+                break
+
+    for o in opp_by_sym.values():
+        o["score"] = max(0, min(100, o["score"]))
+    ranked = sorted(opp_by_sym.values(), key=lambda o: (-o["score"], o["symbol"]))
+    shown = [dict(o, why=" · ".join(o["why"]))
+             for o in ranked if o["score"] >= _OPP_MIN_SCORE][:_OPP_MAX_SHOW]
+    return shown, len(ranked) - len(shown)
 
 
 def _build_overview(repo) -> dict:
@@ -88,34 +170,8 @@ def _build_overview(repo) -> dict:
     sev_rank = {"high": 0, "mid": 1}
     actions.sort(key=lambda a: sev_rank.get(a["severity"], 9))
 
-    # ---- ② 机会区 ----
-    opportunities: list[dict] = []
-    for sym, t in trends.items():
-        if t.get("signal") in ("转多", "回升"):
-            opportunities.append({
-                "kind": "trend_signal", "symbol": sym, "name": names.get(sym, sym),
-                "text": f"{t['signal']}:{t['signal_desc']}(第 {t['duration']} 天)",
-            })
-    for sym, sig in signals.items():
-        if sym not in names or sig.get("signal") != "buy":
-            continue
-        t = trends.get(sym)
-        close = (t or {}).get("close") or sig.get("close")
-        for p in sig.get("watch_points") or []:
-            if p.get("direction") != "up" or not close:
-                continue
-            try:
-                price = float(p["price"])
-            except (TypeError, ValueError, KeyError):
-                continue
-            gap = (price - close) / close
-            if 0 <= gap <= _NEAR_BREAKOUT_PCT:
-                opportunities.append({
-                    "kind": "near_breakout", "symbol": sym, "name": names.get(sym, sym),
-                    "text": f"AI 看多,现价 {close:.2f} 距触发价 {price:.2f} 仅 {gap * 100:.1f}%"
-                            f" — 到价{p.get('action') or '关注'}",
-                })
-                break
+    # ---- ② 机会区(卖出提醒都在行动区, 永不过滤) ----
+    opportunities, opp_filtered = rank_opportunities(trends, signals, names)
 
     # ---- ③ 市场天气(自选口径)----
     bull = sum(1 for t in trends.values() if t["side"] == "多头")
@@ -165,6 +221,7 @@ def _build_overview(repo) -> dict:
         "trend_total": len(trends),
         "actions": actions,
         "opportunities": opportunities,
+        "opportunities_filtered": opp_filtered,
         "weather": {
             "bull": bull, "bear": bear, "new_bull": new_bull, "new_bear": new_bear,
             "posture": posture, "posture_reason": posture_reason,
@@ -182,10 +239,54 @@ def get_today(request: Request):
 _BRIEF_SYSTEM = (
     "你是用户的盘前助理。基于给定的今日总览 JSON(行动区/机会区/市场天气/持仓体检),"
     "用 3-4 句中文写一段导读:先说仓位姿态与原因,再点名最需要处理的 1-2 件事(带具体价位),"
-    "最后提最值得盯的 1 个机会。不写空话,每句话都要落到具体标的或数字。"
+    "最后提最值得盯的 1 个机会(机会区已按把握分从高到低排好, 优先说分高的, 别翻出低分的凑数)。"
+    "不写空话,每句话都要落到具体标的或数字。"
     "全程用大白话,不用'胶着''博弈''多空拉锯'这类行话,让不懂术语的人也能一眼看懂。"
     "只输出导读正文,不要标题、列表或任何格式标记。仅供个人参考。"
 )
+
+
+_SELECT_SYSTEM = (
+    "你是用户的选股参谋。下面是若干候选买入机会(已含六态趋势、信号出现第几天、规则把握分、AI 信号与置信度)。"
+    "请精选当下最值得优先盯的 1-3 只,宁缺毋滥:刚转强、入场窗口没过、多个信号互相印证的优先;"
+    "信号已出现好几天、现在进场等于追高的,即使置信度高也要降级或放弃。"
+    '只输出一个 JSON 对象,不要任何其他文字: {"picks": [{"symbol": "代码", "reason": "不超过30字的大白话理由"}]}。'
+    "没有值得买的就返回空 picks。仅供个人参考。"
+)
+
+
+@router.post("/select")
+async def today_select(request: Request):
+    """AI 优选: 从规则筛选后的机会里精选 1-3 只(未配 AI 返回 error 而非 500)。"""
+    from app.services.ai_provider import ai_configured, generate_ai_text
+    if not ai_configured():
+        return {"error": "未配置 AI"}
+    data = _build_overview(request.app.state.repo)
+    cands = data["opportunities"]
+    if not cands:
+        return {"picks": []}
+    payload = [{k: c[k] for k in ("symbol", "name", "score", "why", "text")} for c in cands]
+    try:
+        text = await generate_ai_text(
+            [
+                {"role": "system", "content": _SELECT_SYSTEM},
+                {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
+            ],
+            temperature=0.2,
+            max_tokens=400,
+        )
+        m = re.search(r"\{.*\}", text or "", re.S)
+        obj = json.loads(m.group(0)) if m else {}
+        valid = {c["symbol"] for c in cands}
+        picks = []
+        for p in (obj.get("picks") or [])[:3]:
+            s = str(p.get("symbol", "")).upper()
+            if s in valid:
+                picks.append({"symbol": s, "reason": str(p.get("reason") or "").strip()[:60]})
+        return {"picks": picks}
+    except Exception as e:  # noqa: BLE001
+        logger.warning("today select failed: %s", e)
+        return {"error": f"AI 调用失败: {e}"}
 
 
 @router.post("/brief")

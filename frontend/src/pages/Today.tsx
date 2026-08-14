@@ -11,7 +11,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   AlertTriangle, CheckCircle2, Compass, Download, Loader2, RefreshCw, Sparkles, Sunrise, Target,
 } from 'lucide-react'
-import { api, type TodayOverview } from '@/lib/api'
+import { api, type TodayOverview, type TodayPick } from '@/lib/api'
 import { toast } from '@/components/Toast'
 
 // ===== 自包含 HTML 导出(内联样式浅色排版, 无脚本无外链, 可存档/分享) =====
@@ -30,8 +30,9 @@ function buildTodayHtml(d: TodayOverview, brief: string | null): string {
       <li><i style="background:${a.severity === 'high' ? bull : '#c78326'}"></i>
         <b>${esc(a.name)}</b>${sym(a.name, a.symbol)} ${esc(a.text)}</li>`).join('')
   const oppRows = d.opportunities.map(o => `
-      <li><i style="background:${bull}"></i>
-        <b>${esc(o.name)}</b>${sym(o.name, o.symbol)} ${esc(o.text)}</li>`).join('')
+      <li><b class="score">${o.score}</b>
+        <span><b>${esc(o.name)}</b>${sym(o.name, o.symbol)} ${esc(o.text)}
+        <span class="why">${esc(o.why)}</span></span></li>`).join('')
   const holdRows = d.holdings.map(h => `
       <tr>
         <td>${esc(h.name)}${sym(h.name, h.symbol)}</td>
@@ -69,6 +70,8 @@ function buildTodayHtml(d: TodayOverview, brief: string | null): string {
   .num{font-variant-numeric:tabular-nums;text-align:right}
   th.num,td.num{text-align:right}
   .sym{color:#a0a6b1;font-size:11px}
+  .score{flex:none;background:#f0f1f3;color:#4e5666;border-radius:3px;padding:1px 5px;font-size:11px;font-variant-numeric:tabular-nums}
+  .why{display:block;color:#8a919f;font-size:11px;margin-top:2px}
   .foot{margin-top:18px;color:#a0a6b1;font-size:11px}
   @media print{body{background:#fff;padding:0}}
 </style>
@@ -85,8 +88,8 @@ function buildTodayHtml(d: TodayOverview, brief: string | null): string {
   ${brief ? `<div class="brief">✦ ${esc(brief)}</div>` : ''}
   <h2>⚠️ 需要行动(${d.actions.length})</h2>
   ${d.actions.length ? `<ul class="items">${actionRows}</ul>` : '<div class="empty">今日无需操作 —— 管住手</div>'}
-  <h2>🎯 值得关注(${d.opportunities.length})</h2>
-  ${d.opportunities.length ? `<ul class="items">${oppRows}</ul>` : '<div class="empty">暂无新信号 —— 等待比出手更常见</div>'}
+  <h2>🎯 值得关注(${d.opportunities.length}·已按把握分筛选${d.opportunities_filtered > 0 ? `,滤掉 ${d.opportunities_filtered} 只` : ''})</h2>
+  ${d.opportunities.length ? `<ul class="items">${oppRows}</ul>` : '<div class="empty">今日没有把握足够的买入机会 —— 等待比出手更常见</div>'}
   <h2>💼 持仓体检(${d.holdings.length})</h2>
   ${d.holdings.length ? `<table>
     <thead><tr><th>标的</th><th class="num">现价</th><th class="num">浮盈</th><th class="num">出场线</th><th>阶段</th><th>趋势</th></tr></thead>
@@ -121,6 +124,15 @@ export function Today() {
       else setBrief(r.brief ?? null)
     },
     onError: (e: Error) => toast(`导读生成失败: ${e.message}`, 'error'),
+  })
+  const [picks, setPicks] = useState<TodayPick[] | null>(null)
+  const selectMut = useMutation({
+    mutationFn: () => api.todaySelect(),
+    onSuccess: (r) => {
+      if (r.error) toast(r.error, 'error')
+      else setPicks(r.picks ?? [])
+    },
+    onError: (e: Error) => toast(`AI 优选失败: ${e.message}`, 'error'),
   })
 
   const goStock = (symbol: string, name: string) =>
@@ -241,32 +253,90 @@ export function Today() {
             )}
           </section>
 
-          {/* ② 机会区 */}
+          {/* ② 机会区(已按把握分筛选排序; AI 优选可再精选) */}
           <section className="rounded-lg border border-border/60 bg-surface/40 overflow-hidden">
-            <div className="flex items-center gap-2 border-b border-border/40 px-4 py-2.5">
+            <div className="flex flex-wrap items-center gap-2 border-b border-border/40 px-4 py-2.5">
               <Target className="h-4 w-4 text-red-400" />
               <span className="text-sm font-medium text-foreground">值得关注</span>
-              <span className="text-[10px] text-muted">{d.opportunities.length} 项 · 刚开始走强的票 + 接近买入触发价的票</span>
+              <span className="text-[10px] text-muted">
+                {d.opportunities.length} 项 · 按把握打分排序,把握不足的已隐藏
+                {d.opportunities_filtered > 0 && `(已滤掉 ${d.opportunities_filtered} 只)`}
+              </span>
+              {d.opportunities.length > 0 && (
+                <button
+                  onClick={() => selectMut.mutate()}
+                  disabled={selectMut.isPending}
+                  title="让 AI 从这些候选里再精选 1-3 只当下最值得优先盯的"
+                  className="ml-auto inline-flex items-center gap-1 rounded-full border border-amber-400/30 bg-amber-400/10 px-2.5 py-1 text-[10px] text-amber-300 hover:bg-amber-400/20 disabled:opacity-50 transition-colors cursor-pointer"
+                >
+                  {selectMut.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+                  AI 优选
+                </button>
+              )}
             </div>
+            {picks && (
+              <div className="border-b border-amber-400/20 bg-amber-400/[0.06] px-4 py-2.5 text-xs">
+                {picks.length === 0 ? (
+                  <span className="text-muted">AI 看完这批候选,认为今天没有值得优先出手的 —— 空仓等待也是决策</span>
+                ) : (
+                  <>
+                    <span className="text-[10px] font-medium text-amber-300">AI 优选 {picks.length} 只</span>
+                    <ul className="mt-1 space-y-1">
+                      {picks.map((p) => {
+                        const o = d.opportunities.find((x) => x.symbol === p.symbol)
+                        return (
+                          <li key={p.symbol}>
+                            <button
+                              onClick={() => goStock(p.symbol, o?.name ?? p.symbol)}
+                              className="text-left hover:underline cursor-pointer"
+                            >
+                              <span className="font-medium text-foreground">{o?.name ?? p.symbol}</span>
+                              <span className="ml-2 text-foreground/80">{p.reason}</span>
+                            </button>
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  </>
+                )}
+              </div>
+            )}
             {d.opportunities.length === 0 ? (
-              <div className="px-4 py-5 text-xs text-muted">暂无新信号 —— 等待比出手更常见</div>
+              <div className="px-4 py-5 text-xs text-muted">
+                今日没有把握足够的买入机会 —— 等待比出手更常见
+                {d.opportunities_filtered > 0 && `(有 ${d.opportunities_filtered} 只信号把握不足,已替你滤掉)`}
+              </div>
             ) : (
               <ul className="grid lg:grid-cols-2 -mb-px">
-                {d.opportunities.map((o, i) => (
-                  <li key={i} className="border-b border-border/30 lg:odd:border-r">
-                    <button
-                      onClick={() => goStock(o.symbol, o.name)}
-                      className="flex w-full items-start gap-2.5 px-4 py-2.5 text-left hover:bg-elevated/40 transition-colors cursor-pointer"
-                    >
-                      <span className="mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full bg-red-400/70" />
-                      <span className="text-xs leading-relaxed">
-                        <span className="font-medium text-foreground">{o.name}</span>
-                        {o.symbol !== o.name && <span className="ml-1.5 text-[9px] font-mono text-muted">{o.symbol}</span>}
-                        <span className="ml-2 text-foreground/80">{o.text}</span>
-                      </span>
-                    </button>
-                  </li>
-                ))}
+                {d.opportunities.map((o, i) => {
+                  const picked = picks?.some((p) => p.symbol === o.symbol)
+                  return (
+                    <li key={i} className={`border-b border-border/30 lg:odd:border-r ${picked ? 'bg-amber-400/[0.07]' : ''}`}>
+                      <button
+                        onClick={() => goStock(o.symbol, o.name)}
+                        className="flex w-full items-start gap-2.5 px-4 py-2.5 text-left hover:bg-elevated/40 transition-colors cursor-pointer"
+                      >
+                        <span
+                          title={`把握分 ${o.score}(综合信号新鲜度与 AI 置信度)`}
+                          className={`mt-0.5 shrink-0 rounded px-1.5 py-0.5 text-[9px] font-mono font-semibold ${
+                            o.score >= 80 ? 'bg-red-400/20 text-red-300'
+                              : o.score >= 70 ? 'bg-amber-400/20 text-amber-300'
+                                : 'bg-border/40 text-muted'
+                          }`}
+                        >
+                          {o.score}
+                        </span>
+                        <span className="text-xs leading-relaxed">
+                          <span className="font-medium text-foreground">{o.name}</span>
+                          {o.symbol !== o.name && <span className="ml-1.5 text-[9px] font-mono text-muted">{o.symbol}</span>}
+                          {picked && <span className="ml-1.5 text-[9px] text-amber-300">★ AI 优选</span>}
+                          <span className="ml-2 text-foreground/80">{o.text}</span>
+                          <span className="mt-0.5 block text-[10px] text-muted">{o.why}</span>
+                        </span>
+                      </button>
+                    </li>
+                  )
+                })}
               </ul>
             )}
           </section>
