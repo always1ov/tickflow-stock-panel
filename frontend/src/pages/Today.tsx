@@ -24,15 +24,17 @@ function buildTodayHtml(d: TodayOverview, brief: string | null): string {
   const bull = '#d03050'
   const bear = '#18a058'
   const postureColor: Record<string, string> = { 进攻: bull, 谨慎: '#c78326', 防守: bear, 观察: '#8a919f' }
+  const sym = (name: string, symbol: string) =>
+    symbol && symbol !== name ? ` <span class="sym">${esc(symbol)}</span>` : ''
   const actionRows = d.actions.map(a => `
       <li><i style="background:${a.severity === 'high' ? bull : '#c78326'}"></i>
-        <b>${esc(a.name)}</b> <span class="sym">${esc(a.symbol)}</span> ${esc(a.text)}</li>`).join('')
+        <b>${esc(a.name)}</b>${sym(a.name, a.symbol)} ${esc(a.text)}</li>`).join('')
   const oppRows = d.opportunities.map(o => `
       <li><i style="background:${bull}"></i>
-        <b>${esc(o.name)}</b> <span class="sym">${esc(o.symbol)}</span> ${esc(o.text)}</li>`).join('')
+        <b>${esc(o.name)}</b>${sym(o.name, o.symbol)} ${esc(o.text)}</li>`).join('')
   const holdRows = d.holdings.map(h => `
       <tr>
-        <td>${esc(h.name)} <span class="sym">${esc(h.symbol)}</span></td>
+        <td>${esc(h.name)}${sym(h.name, h.symbol)}</td>
         <td class="num">${h.close?.toFixed(2) ?? '—'}</td>
         <td class="num" style="color:${h.pnl_pct == null ? '#8a919f' : h.pnl_pct > 0 ? bull : bear}">${h.pnl_pct != null ? (h.pnl_pct * 100).toFixed(1) + '%' : '—'}</td>
         <td class="num" style="color:${h.exit_triggered ? bull : '#1f2329'}">${h.line != null ? h.line.toFixed(2) + (h.exit_triggered ? ' 已触发' : '') : '—'}</td>
@@ -229,7 +231,7 @@ export function Today() {
                       <span className={`mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full ${a.severity === 'high' ? 'bg-red-400' : 'bg-amber-300'}`} />
                       <span className="text-xs leading-relaxed">
                         <span className="font-medium text-foreground">{a.name}</span>
-                        <span className="ml-1.5 text-[9px] font-mono text-muted">{a.symbol}</span>
+                        {a.symbol && a.symbol !== a.name && <span className="ml-1.5 text-[9px] font-mono text-muted">{a.symbol}</span>}
                         <span className="ml-2 text-foreground/80">{a.text}</span>
                       </span>
                     </button>
@@ -259,7 +261,7 @@ export function Today() {
                       <span className="mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full bg-red-400/70" />
                       <span className="text-xs leading-relaxed">
                         <span className="font-medium text-foreground">{o.name}</span>
-                        <span className="ml-1.5 text-[9px] font-mono text-muted">{o.symbol}</span>
+                        {o.symbol !== o.name && <span className="ml-1.5 text-[9px] font-mono text-muted">{o.symbol}</span>}
                         <span className="ml-2 text-foreground/80">{o.text}</span>
                       </span>
                     </button>
@@ -302,7 +304,7 @@ export function Today() {
                       >
                         <td className="px-4 py-1.5">
                           <span className="font-medium text-foreground">{h.name}</span>
-                          <span className="ml-1.5 text-[9px] font-mono text-muted">{h.symbol}</span>
+                          {h.symbol !== h.name && <span className="ml-1.5 text-[9px] font-mono text-muted">{h.symbol}</span>}
                         </td>
                         <td className="px-2 py-1.5 text-right font-mono">{h.close?.toFixed(2) ?? '—'}</td>
                         <td className={`px-2 py-1.5 text-right font-mono ${h.pnl_pct == null ? 'text-muted' : h.pnl_pct > 0 ? 'text-red-400' : h.pnl_pct < 0 ? 'text-emerald-400' : 'text-muted'}`}>

@@ -32,8 +32,10 @@ def _build_overview(repo) -> dict:
     from app.services.position_exit import exit_lines_for_positions
 
     entries = watchlist.list_symbols()
-    names = {str(e.get("symbol", "")).upper(): str(e.get("name") or e.get("symbol", ""))
-             for e in entries}
+    syms_raw = [str(e.get("symbol", "")).upper() for e in entries if e.get("symbol")]
+    # 自选表只存代码; 中文名走 instruments 统一名称入口(股票+ETF+指数), 查不到再退回代码
+    name_map = repo.get_name_map(syms_raw)
+    names = {s: str(name_map.get(s) or s) for s in syms_raw}
     syms = sorted(names)
 
     trends = trends_for_symbols(repo, syms) if syms else {}
