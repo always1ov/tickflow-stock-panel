@@ -122,13 +122,13 @@ def _build_overview(repo) -> dict:
     new_bear = sum(1 for t in trends.values() if t.get("signal") in ("转空", "回撤"))
     ratio = bull / len(trends) if trends else 0.0
     if len(trends) < 5:
-        posture, posture_reason = "观察", "自选样本不足,暂不判定姿态"
+        posture, posture_reason = "观察", "自选股票太少,暂不下结论"
     elif ratio >= 0.7 and new_bear <= max(1, len(trends) // 20):
-        posture, posture_reason = "进攻", f"多头占比 {ratio:.0%},新转空仅 {new_bear} 只"
+        posture, posture_reason = "进攻", f"{ratio:.0%} 的自选在涨势中,今天刚转弱的只有 {new_bear} 只,大环境偏暖"
     elif ratio <= 0.4 or new_bear > new_bull * 2:
-        posture, posture_reason = "防守", f"多头占比 {ratio:.0%},新转空 {new_bear} 只 > 新转多 {new_bull} 只"
+        posture, posture_reason = "防守", f"在涨势中的自选只剩 {ratio:.0%},今天转弱的({new_bear} 只)明显多于转强的({new_bull} 只),大环境偏冷"
     else:
-        posture, posture_reason = "谨慎", f"多头占比 {ratio:.0%},多空转换胶着(新转多 {new_bull} / 新转空 {new_bear})"
+        posture, posture_reason = "谨慎", f"{ratio:.0%} 的自选在涨势中,但今天转强({new_bull} 只)和转弱({new_bear} 只)的数量差不多,涨跌方向还不明朗"
 
     # ---- ④ 持仓体检 ----
     holdings: list[dict] = []
@@ -181,6 +181,7 @@ _BRIEF_SYSTEM = (
     "你是用户的盘前助理。基于给定的今日总览 JSON(行动区/机会区/市场天气/持仓体检),"
     "用 3-4 句中文写一段导读:先说仓位姿态与原因,再点名最需要处理的 1-2 件事(带具体价位),"
     "最后提最值得盯的 1 个机会。不写空话,每句话都要落到具体标的或数字。"
+    "全程用大白话,不用'胶着''博弈''多空拉锯'这类行话,让不懂术语的人也能一眼看懂。"
     "只输出导读正文,不要标题、列表或任何格式标记。仅供个人参考。"
 )
 

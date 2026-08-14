@@ -74,11 +74,11 @@ function buildTodayHtml(d: TodayOverview, brief: string | null): string {
 <body>
 <div class="wrap">
   <h1>今日总览</h1>
-  <div class="meta">数据截至 ${esc(d.as_of ?? '—')} · 自选 ${d.watchlist_total} 只(六态判定 ${d.trend_total})· 生成于 ${genAt}</div>
+  <div class="meta">数据截至 ${esc(d.as_of ?? '—')} · 自选 ${d.watchlist_total} 只(其中 ${d.trend_total} 只有趋势判定)· 生成于 ${genAt}</div>
   <div class="weather">
     <span class="posture" style="background:${postureColor[d.weather.posture] ?? '#8a919f'}">${esc(d.weather.posture)}</span>
     <span style="font-size:13px;color:#4e5666">${esc(d.weather.posture_reason)}</span>
-    <span style="margin-left:auto;font-size:12px;color:#8a919f">多头 <b style="color:${bull}">${d.weather.bull}</b> / 空头 <b style="color:${bear}">${d.weather.bear}</b> · 新转多 ${d.weather.new_bull} · 新转空 ${d.weather.new_bear}</span>
+    <span style="margin-left:auto;font-size:12px;color:#8a919f">涨势 <b style="color:${bull}">${d.weather.bull}</b> / 跌势 <b style="color:${bear}">${d.weather.bear}</b> · 刚转强 ${d.weather.new_bull} · 刚转弱 ${d.weather.new_bear}</span>
   </div>
   ${brief ? `<div class="brief">✦ ${esc(brief)}</div>` : ''}
   <h2>⚠️ 需要行动(${d.actions.length})</h2>
@@ -127,12 +127,12 @@ export function Today() {
   const d = q.data
 
   return (
-    <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-4">
+    <div className="p-4 md:p-6 max-w-[1500px] mx-auto space-y-4">
       {/* 头部 */}
       <div className="flex flex-wrap items-center gap-3">
         <Sunrise className="h-5 w-5 text-amber-300" />
         <h1 className="text-base font-semibold text-foreground">今日总览</h1>
-        {d?.as_of && <span className="text-[10px] text-muted">数据截至 {d.as_of} · 自选 {d.watchlist_total} 只(六态判定 {d.trend_total})</span>}
+        {d?.as_of && <span className="text-[10px] text-muted">数据截至 {d.as_of} · 自选 {d.watchlist_total} 只(其中 {d.trend_total} 只有趋势判定)</span>}
         <div className="ml-auto flex items-center gap-2">
           <button
             onClick={() => {
@@ -198,11 +198,11 @@ export function Today() {
             </span>
             <span className="text-xs text-muted">{d.weather.posture_reason}</span>
             <span className="ml-auto text-[11px] font-mono text-muted">
-              多头 <span className="text-red-400 font-semibold">{d.weather.bull}</span>
+              涨势 <span className="text-red-400 font-semibold">{d.weather.bull}</span>
               <span className="mx-1 text-muted/40">/</span>
-              空头 <span className="text-emerald-400 font-semibold">{d.weather.bear}</span>
+              跌势 <span className="text-emerald-400 font-semibold">{d.weather.bear}</span>
               <span className="mx-2 text-muted/40">·</span>
-              新转多 {d.weather.new_bull} · 新转空 {d.weather.new_bear}
+              刚转强 {d.weather.new_bull} · 刚转弱 {d.weather.new_bear}
             </span>
           </div>
 
@@ -219,9 +219,9 @@ export function Today() {
                 今日无需操作 —— 这本身就是有价值的信息,管住手
               </div>
             ) : (
-              <ul className="divide-y divide-border/30">
+              <ul className="grid lg:grid-cols-2 -mb-px">
                 {d.actions.map((a, i) => (
-                  <li key={i}>
+                  <li key={i} className="border-b border-border/30 lg:odd:border-r">
                     <button
                       onClick={() => a.symbol && goStock(a.symbol, a.name)}
                       className="flex w-full items-start gap-2.5 px-4 py-2.5 text-left hover:bg-elevated/40 transition-colors cursor-pointer"
@@ -244,14 +244,14 @@ export function Today() {
             <div className="flex items-center gap-2 border-b border-border/40 px-4 py-2.5">
               <Target className="h-4 w-4 text-red-400" />
               <span className="text-sm font-medium text-foreground">值得关注</span>
-              <span className="text-[10px] text-muted">{d.opportunities.length} 项 · 刚转多/回升 + 逼近突破预案</span>
+              <span className="text-[10px] text-muted">{d.opportunities.length} 项 · 刚开始走强的票 + 接近买入触发价的票</span>
             </div>
             {d.opportunities.length === 0 ? (
               <div className="px-4 py-5 text-xs text-muted">暂无新信号 —— 等待比出手更常见</div>
             ) : (
-              <ul className="divide-y divide-border/30">
+              <ul className="grid lg:grid-cols-2 -mb-px">
                 {d.opportunities.map((o, i) => (
-                  <li key={i}>
+                  <li key={i} className="border-b border-border/30 lg:odd:border-r">
                     <button
                       onClick={() => goStock(o.symbol, o.name)}
                       className="flex w-full items-start gap-2.5 px-4 py-2.5 text-left hover:bg-elevated/40 transition-colors cursor-pointer"
