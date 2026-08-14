@@ -27,10 +27,15 @@ _SYSTEM_PROMPT = """你是 A 股交易信号助手。基于给定的行情、技
 **只输出一个 JSON 对象**,不要任何多余文字、解释或 markdown 代码块:
 {"signal": "buy|sell|hold|watch", "confidence": 0-100, "reason": "一句话中文理由", "watch_points": [{"direction": "up|down", "price": 数字, "label": "引用的关键价位名", "action": "具体操作", "confidence": 0-100, "reason": "一句话为何盯这个点"}]}
 
-- signal: buy=偏多可关注买入 / sell=偏空可关注卖出 / hold=已持有可继续持有 / watch=观望等待
+- signal: buy=偏多可关注买入 / sell=偏空可关注卖出 / hold=已持有可继续持有 / watch=观望等待。
+    **watch 只在多空条件都不成熟时使用,禁止因保守而滥用**——只要存在明确的触发条件
+    (如突破某压力可追、跌破某支撑该走),就应给出对应倾向信号,把条件写进 watch_points。
 - confidence: 你对该信号的把握(0-100 整数)
-- reason: **一句话**(≤40 字),必须引用具体数值/价位/形态(如「站上 60 日线且放量,近压力位 12.5」)
-- watch_points: 从上面「关键价位概览」里挑 **1-3 个**当前最该设提醒的价位:
+- reason: **一句话**(≤40 字),引用具体数值/价位/形态,**并点明下一步触发条件**
+    (如「RSI 超买贴上轨,回落 17.5 企稳再接;上破 17.96 转追」)——让用户看完就有预案,而非只陈述现状
+- watch_points: 从上面「关键价位概览」里挑 **1-3 个**当前最该设提醒的价位。
+    **只要关键价位存在,必须至少给 1 个 up + 1 个 down**——上方到哪做什么、下方到哪做什么,
+    到价时用户不至于毫无准备:
     · direction=up 表示「涨至该价提醒」(通常上方压力/突破确认位);down 表示「跌至该价提醒」(通常下方支撑/风险位)。
     · price 必须用关键价位里的**实际数值**;label 写对应关键价位名。
     · **action**:到这个价位时**具体该怎么操作**,≤8 字、明确可执行,如「突破关注买入」「站稳可加仓」「跌破止损」「反弹减仓」「支撑企稳观察」;**突出动作,不要含糊**。
@@ -129,8 +134,23 @@ async def generate_signal(repo, data_dir: Path, symbol: str) -> dict:
     levels = compute_levels(df)
     close = float(df.tail(1)["close"][0]) if "close" in df.columns else None
     kline_tail = _clean_rows(df.tail(_SIGNAL_WINDOW), _KLINE_KEEP_COLS)
+    # [fork 增强] 六态趋势作为方向锚喂给信号 AI(零额外成本,失败静默跳过)
+    trend_line = ""
+    try:
+        from app.services.livermore_service import trend_for_symbol
+        t = trend_for_symbol(repo, sym)
+        if "error" not in t:
+            trend_line = (
+                f"六态趋势(利弗莫尔): {t['state_cn']} 第{t['duration']}天"
+                f", 上关键点 {t['up_pivot'] if t['up_pivot'] is not None else '—'}"
+                f", 下关键点 {t['dn_pivot'] if t['dn_pivot'] is not None else '—'}"
+                f", 参考动作: {t['action']}\n"
+            )
+    except Exception as e:  # noqa: BLE001
+        logger.debug("trend context for signal skipped: %s", e)
     user_prompt = (
         f"标的: {sym}\n"
+        f"{trend_line}"
         f"关键价位概览: {summarize_levels(levels, close)}\n"
         f"最近 {_SIGNAL_WINDOW} 日 K(JSON,含指标):\n{json.dumps(kline_tail, ensure_ascii=False)}"
     )

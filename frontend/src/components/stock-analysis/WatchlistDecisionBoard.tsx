@@ -8,7 +8,8 @@ import { useHistoryReports, openHistoryReport, loadHistory } from '@/lib/stockAn
 import { trendBadgeCls } from '@/components/stock-analysis/TrendStateBar'
 
 type Position = { held: boolean; cost: number | null; updated_at: string }
-type Signal = { signal: string; confidence: number; reason: string; close: number | null; created_at: string }
+type WatchPoint = { direction: 'up' | 'down'; price: number; label?: string; action?: string; reason?: string }
+type Signal = { signal: string; confidence: number; reason: string; close: number | null; created_at: string; watch_points?: WatchPoint[] }
 type SortKey = 'name' | 'close' | 'changePct' | 'held' | 'pnl' | 'confidence' | 'signal' | 'report' | 'trend'
 const SIGNAL_RANK: Record<string, number> = { buy: 0, sell: 1, hold: 2, watch: 3 }
 // [fork 增强] 六态排序权重:多头在前(上涨趋势 → 下跌趋势)
@@ -370,6 +371,23 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
                           </div>
                           {r.sig.reason && (
                             <span className="text-[10px] text-muted/80 leading-snug whitespace-normal break-words">{r.sig.reason}</span>
+                          )}
+                          {/* [fork 增强] 到价预案:AI watch_points(涨至/跌至 → 对应操作),提前有准备 */}
+                          {(r.sig.watch_points ?? []).length > 0 && (
+                            <div className="flex flex-wrap gap-x-2.5 gap-y-0.5 mt-0.5">
+                              {(r.sig.watch_points ?? []).map((p, i) => (
+                                <span
+                                  key={i}
+                                  className="inline-flex items-center gap-1 text-[10px] font-mono whitespace-nowrap"
+                                  title={p.reason ? `${p.label ?? ''} — ${p.reason}` : p.label}
+                                >
+                                  <span className={p.direction === 'up' ? 'text-red-400' : 'text-emerald-400'}>
+                                    {p.direction === 'up' ? '↑涨至' : '↓跌至'} {p.price.toFixed(2)}
+                                  </span>
+                                  {p.action && <span className="text-foreground/80">{p.action}</span>}
+                                </span>
+                              ))}
+                            </div>
                           )}
                         </div>
                       ) : (
