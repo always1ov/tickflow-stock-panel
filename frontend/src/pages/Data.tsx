@@ -31,6 +31,7 @@ import {
 import { useToggleRealtimeQuotes, useUpdateQuoteInterval } from '@/lib/useSharedMutations'
 import { QK } from '@/lib/queryKeys'
 import { PageHeader } from '@/components/PageHeader'
+import { toast } from '@/components/Toast'
 import { formatScheduleDatePart, formatScheduleTimePart, isToday } from '@/lib/format'
 
 // 拆分出的子组件
@@ -267,6 +268,11 @@ export function Data() {
 
   useEffect(() => {
     if (job.data && (job.data.status === 'succeeded' || job.data.status === 'failed')) {
+      // [fork 增强] 盘后完整性提示: 同步"成功"但今日全市场日线没出齐(免费源盘后延迟发布)
+      // → 弹明显提示, 否则用户只看到成功、却发现梯队/概念还停在昨天而不知原因。
+      if (job.data.status === 'succeeded' && job.data.result?.today_daily_incomplete) {
+        toast(`今日全市场日线尚未出齐(仅 ${job.data.result?.today_daily_rows ?? 0} 只)。数据源一般 17:30~20:00 发布当日数据, 届时再点「立即同步」即可补到今天`, 'error')
+      }
       qc.invalidateQueries({ queryKey: QK.dataStatus })
       qc.invalidateQueries({ queryKey: QK.pipelineJobs })
       // 同步任务结束后 regime 覆盖范围可能变化, 一并刷新画像

@@ -146,6 +146,26 @@ def run_now(
     latest_daily = repo.latest_daily_date()
     today = _date.today()
     today_exists = latest_daily and latest_daily >= today
+
+    # [fork 增强] 历史稀疏检测: 全局 max(date) 会被部分写入(自选实时快照落的当日行 /
+    # 被中断的首次拉取)拉高, 让下方"补缺口"分支误以为已是最新, 起点=今天 → 一年历史
+    # 永远不会回补(涨跌幅/指标全算不出)。近一年正常应有 ~240 个交易日分区, 远低于此
+    # (<120)即判定存在历史大洞 → 强制走首次拉取分支从一年前重拉(merge-upsert 幂等)。
+    history_sparse = False
+    if latest_daily and not override_start_date:
+        try:
+            _res = repo.execute_one(
+                "SELECT count(DISTINCT date) FROM kline_daily WHERE date >= ?",
+                [(today - _td(days=365)).isoformat()],
+            )
+            _n_dates = int(_res[0]) if _res and _res[0] is not None else 0
+            if _n_dates < 120:
+                history_sparse = True
+                logger.warning(
+                    "日K历史稀疏: 近一年仅 %d 个交易日分区(正常约 240), 判定存在历史缺口, 将从一年前重拉",
+                    _n_dates)
+        except Exception as e:  # noqa: BLE001
+            logger.warning("history sparse detection failed: %s", e)
     new_daily_days = 0
     # 日K范围拉取的起点(分支3补缺口/分支4首次/数据修正); 实时增量/跳过时为 None。
     # 供 Step 1.5 除权因子回溯范围对齐: 范围拉取→用日K范围, 非范围→最近N天兜底。
@@ -177,7 +197,7 @@ def run_now(
         new_daily_days = gap_days
         emit("sync_daily", 45, f"日K 完成,覆盖 {gap_days} 天")
         logger.info("sync_daily: [%s ~ %s] done, %d days", start_date, today, gap_days)
-    elif today_exists and capset.has(Cap.QUOTE_POOL) and _prefs.get_daily_data_provider() == "tickflow":
+    elif today_exists and not history_sparse and capset.has(Cap.QUOTE_POOL) and _prefs.get_daily_data_provider() == "tickflow":
         # 付费档:今天有数据(QuoteService 已落盘)→ 实时行情覆写,确保最新。
         # free/none 档无 quote.pool 能力,即便今天已有数据(如从 expert 降级),
         # 也降级到下方 batch 路径刷新,避免调用无权限的实时行情接口。
@@ -186,7 +206,7 @@ def run_now(
         new_daily_days = 1
         emit("sync_daily", 45, f"日K 完成,{written_daily} 只标的")
         logger.info("sync_daily: [%s ~ %s] live quotes, %d symbols", today, today, written_daily)
-    elif latest_daily:
+    elif latest_daily and not history_sparse:
         # 有历史 → batch 补齐缺口。
         # 也覆盖"今天已有数据但无实时行情权限(free/none)"的降级场景:
         #   此时 start_date = latest_daily = today,batch 刷新当天日K。
@@ -210,10 +230,11 @@ def run_now(
         emit("sync_daily", 45, f"日K 完成,覆盖 {gap_days} 天")
         logger.info("sync_daily: [%s ~ %s] done, %d days", start_date, today, gap_days)
     else:
-        # 首次：无任何数据 → batch 拉 1 年
+        # 首次(无任何数据) 或 历史稀疏(近一年分区远少于正常, 存在大洞) → batch 拉 1 年
         start_date = today - _td(days=365)
         daily_range_start = start_date
-        emit("sync_daily", 12, f"获取日K [{start_date} ~ {today}]…")
+        _why = "检测到历史缺口,重拉一年" if history_sparse else "首次拉取"
+        emit("sync_daily", 12, f"获取日K [{start_date} ~ {today}]({_why})…")
         logger.info("sync_daily: [%s ~ %s] initial fetch", start_date, today)
 
         def _daily_chunk_progress(cur: int, tot: int) -> None:
@@ -546,11 +567,38 @@ def run_now(
     emit("refresh_views", 95, "刷新 DuckDB 视图…")
     _refresh_views(repo)
 
-    emit("done", 100, "完成")
+    # [fork 增强] 盘后完整性提示: 交易日收盘后同步, 若今日全市场日线未出齐
+    # (免费数据服务器一般 17:30~20:00 才发布当日数据, 过早同步只有实时落盘的少数几只),
+    # 完成消息与 result 带标记, 前端弹 toast —— 不再"同步成功却还是昨天、不知为何"。
+    # 阈值 max(100, 标的池一半): 不误伤停牌缺口。
+    today_daily_rows = 0
+    today_incomplete = False
+    try:
+        from datetime import time as _dtime
+        from app.market_time import cn_now, cn_today
+        _now = cn_now()
+        if pull_a_share and _now.weekday() < 5 and _now.time() >= _dtime(15, 30):
+            row = repo.execute_one(
+                "SELECT count(*) FROM kline_daily WHERE date = CAST(? AS DATE)",
+                [str(cn_today())],
+            )
+            today_daily_rows = int(row[0]) if row and row[0] else 0
+            today_incomplete = today_daily_rows < max(100, len(universe) // 2)
+    except Exception as e:  # noqa: BLE001
+        logger.debug("今日日线完整性检测跳过: %s", e)
+
+    if today_incomplete:
+        emit("done", 100,
+             f"完成 · ⚠ 今日全市场日线尚未出齐(仅 {today_daily_rows}/{len(universe)} 只)。"
+             f"数据源一般 17:30~20:00 发布当日数据, 届时再点「立即同步」即可补到今天")
+    else:
+        emit("done", 100, "完成")
     _invalidate(None)  # 兜底:全清
 
     result = {
         "universe_size": len(universe),
+        "today_daily_rows": today_daily_rows,
+        "today_daily_incomplete": today_incomplete,
         "daily_days": new_daily_days,
         "adj_factor_symbols": len(affected_symbols),
         "enriched_days": written_enriched,

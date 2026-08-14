@@ -2561,6 +2561,8 @@ export interface PipelineJob {
   duration_s: number | null
   result: {
     universe_size: number
+    today_daily_rows?: number
+    today_daily_incomplete?: boolean
     daily_days: number
     adj_factor_symbols: number
     enriched_days: number

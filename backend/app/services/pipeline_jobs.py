@@ -200,6 +200,9 @@ class JobStore:
             j = self._active_jobs.get(job_id)
             if not j:
                 return
+            # [fork 增强] 活性心跳: reap_stale 按「最后一次进度距今」判卡死, 而非
+            # 总运行时长(首次全量拉取可远超阈值但一直在推进, 不该被误杀)
+            j["progress_at"] = datetime.utcnow().isoformat(timespec="seconds") + "Z"
             j["stage"] = stage
             j["progress"] = max(0, min(100, int(pct)))
             if stage_pct is not None:
@@ -271,20 +274,23 @@ class JobStore:
             started = j.get("started_at")
             if not started:
                 return
+            # [fork 增强] 活性基准: 最后一次进度心跳(progress() 写入), 无心跳用启动时间。
+            # 有心跳就是活的(首次全量拉取跑多久都不杀); 真卡死(不再回报)仍在阈值内回收。
+            last_beat = j.get("progress_at") or started
             # 优先用显式传入, 其次 job 自身阈值, 最后默认值
             effective_timeout = timeout_s if timeout_s is not None else j.get("timeout_s", DEFAULT_JOB_TIMEOUT_S)
         # 时间计算放到锁外(避免 datetime 解析持锁)。
-        # started_at 形如 "2026-07-04T12:00:00Z"(start() 用 datetime.utcnow 存)。
+        # 时间戳形如 "2026-07-04T12:00:00Z"(datetime.utcnow 存)。
         # 两端都用 timezone-aware UTC 比较,避免 naive/aware 混用导致 TypeError。
         try:
-            start_dt = datetime.fromisoformat(started.replace("Z", "+00:00"))
-            elapsed = (datetime.now(start_dt.tzinfo) - start_dt).total_seconds()
+            beat_dt = datetime.fromisoformat(last_beat.replace("Z", "+00:00"))
+            elapsed = (datetime.now(beat_dt.tzinfo) - beat_dt).total_seconds()
         except Exception:  # noqa: BLE001
             return
         if elapsed > effective_timeout:
-            logger.warning("reap_stale: 强制取消卡死 job %s (已运行 %.0fs, 阈值 %ss)",
+            logger.warning("reap_stale: 强制取消卡死 job %s (无进展 %.0fs, 阈值 %ss)",
                            jid, elapsed, effective_timeout)
-            self.fail(jid, f"超时自动取消 (运行 {int(elapsed)}s, 疑似卡死)")
+            self.fail(jid, f"超时自动取消 (无进展 {int(elapsed)}s, 疑似卡死)")
             # 强制释放重任务锁: 卡死的线程无法被中断, 锁永远不会自然释放。
             # job 已标记 failed, 即使僵尸线程后续写入 parquet, 下次拉取会覆盖, 安全。
             try:
