@@ -152,6 +152,7 @@ export type LevelType = 'sr' | 'pivot' | 'extreme' | 'boll' | 'keltner_s' | 'kel
 export interface TodayActionItem { kind: string; severity: 'high' | 'mid'; symbol: string; name: string; text: string }
 export interface TodayOpportunity { kind: string; symbol: string; name: string; text: string; score: number; why: string }
 export interface TodayPick { symbol: string; reason: string }
+export interface TodayPrefs { min_score: number; max_show: number }
 export interface TodayHolding {
   symbol: string; name: string; close: number | null; cost: number | null; pnl_pct: number | null
   stage_cn: string | null; line: number | null; line_cn: string | null; distance_pct: number | null
@@ -165,6 +166,7 @@ export interface TodayOverview {
   actions: TodayActionItem[]
   opportunities: TodayOpportunity[]
   opportunities_filtered: number
+  prefs: TodayPrefs
   weather: { bull: number; bear: number; new_bull: number; new_bear: number; posture: string; posture_reason: string }
   holdings: TodayHolding[]
 }
@@ -2336,6 +2338,8 @@ export const api = {
   todayOverview: () => request<TodayOverview>('/api/today'),
   todayBrief: () => request<{ brief?: string; error?: string }>('/api/today/brief', { method: 'POST' }),
   todaySelect: () => request<{ picks?: TodayPick[]; error?: string }>('/api/today/select', { method: 'POST' }),
+  todaySavePrefs: (body: Partial<TodayPrefs>) =>
+    request<TodayPrefs>('/api/today/prefs', { method: 'PUT', body: JSON.stringify(body) }),
 
   // [fork 增强] 持仓出场线
   watchlistExitLines: () =>

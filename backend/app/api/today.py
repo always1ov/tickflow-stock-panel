@@ -15,6 +15,7 @@ import logging
 import re
 
 from fastapi import APIRouter, Request
+from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
@@ -33,15 +34,18 @@ _FRESH_BONUS = {1: 15, 2: 10, 3: 0, 4: -12, 5: -22}
 
 def rank_opportunities(
     trends: dict[str, dict], signals: dict[str, dict], names: dict[str, str],
+    min_score: int = _OPP_MIN_SCORE, max_show: int = _OPP_MAX_SHOW,
 ) -> tuple[list[dict], int]:
     """给买入机会打"把握分"并筛选, 返回 (显示列表, 被滤掉条数)。
+
+    门槛 min_score / max_show 由用户偏好传入(见 services.today_prefs), 默认值即常量。
 
     纯函数, 无 IO —— 打分口径:
       · 趋势刚转强底分最高, 按信号出现第几天加减(第 1-2 天最佳, 第 4 天起判定
         为已过入场窗口而扣分), 这样"陈年老信号"不会因置信度高就一直占着榜首;
       · AI 信号同向加分、反向重扣(自相矛盾的机会宁可不看);
       · 逼近买入触发价的按距离与置信度打分, 一到价就能行动的最优先。
-    低于 _OPP_MIN_SCORE 或排在 _OPP_MAX_SHOW 之后的都不显示, 只报数量。
+    低于 min_score 或排在 max_show 之后的都不显示, 只报数量。
     """
     opp_by_sym: dict[str, dict] = {}
 
@@ -103,13 +107,13 @@ def rank_opportunities(
         o["score"] = max(0, min(100, o["score"]))
     ranked = sorted(opp_by_sym.values(), key=lambda o: (-o["score"], o["symbol"]))
     shown = [dict(o, why=" · ".join(o["why"]))
-             for o in ranked if o["score"] >= _OPP_MIN_SCORE][:_OPP_MAX_SHOW]
+             for o in ranked if o["score"] >= min_score][:max_show]
     return shown, len(ranked) - len(shown)
 
 
 def _build_overview(repo) -> dict:
     from app.services import positions as positions_svc
-    from app.services import stock_signal, watchlist
+    from app.services import stock_signal, today_prefs, watchlist
     from app.services.livermore_service import trends_for_symbols
     from app.services.position_exit import exit_lines_for_positions
 
@@ -170,8 +174,10 @@ def _build_overview(repo) -> dict:
     sev_rank = {"high": 0, "mid": 1}
     actions.sort(key=lambda a: sev_rank.get(a["severity"], 9))
 
-    # ---- ② 机会区(卖出提醒都在行动区, 永不过滤) ----
-    opportunities, opp_filtered = rank_opportunities(trends, signals, names)
+    # ---- ② 机会区(门槛可由用户调; 卖出提醒都在行动区, 永不过滤) ----
+    prefs = today_prefs.load()
+    opportunities, opp_filtered = rank_opportunities(
+        trends, signals, names, prefs["min_score"], prefs["max_show"])
 
     # ---- ③ 市场天气(自选口径)----
     bull = sum(1 for t in trends.values() if t["side"] == "多头")
@@ -222,6 +228,7 @@ def _build_overview(repo) -> dict:
         "actions": actions,
         "opportunities": opportunities,
         "opportunities_filtered": opp_filtered,
+        "prefs": prefs,
         "weather": {
             "bull": bull, "bear": bear, "new_bull": new_bull, "new_bear": new_bear,
             "posture": posture, "posture_reason": posture_reason,
@@ -244,6 +251,27 @@ _BRIEF_SYSTEM = (
     "全程用大白话,不用'胶着''博弈''多空拉锯'这类行话,让不懂术语的人也能一眼看懂。"
     "只输出导读正文,不要标题、列表或任何格式标记。仅供个人参考。"
 )
+
+
+class PrefsModel(BaseModel):
+    """机会区筛选门槛(两项都可选, 只改传入的)。"""
+
+    min_score: int | None = Field(default=None, ge=0, le=100)
+    max_show: int | None = Field(default=None, ge=1, le=50)
+
+
+@router.get("/prefs")
+def get_prefs():
+    """读取当前筛选门槛。"""
+    from app.services import today_prefs
+    return today_prefs.load()
+
+
+@router.put("/prefs")
+def put_prefs(body: PrefsModel):
+    """修改筛选门槛, 立即对下次总览生效。"""
+    from app.services import today_prefs
+    return today_prefs.save(min_score=body.min_score, max_show=body.max_show)
 
 
 _SELECT_SYSTEM = (

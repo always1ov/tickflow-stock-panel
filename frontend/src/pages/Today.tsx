@@ -9,9 +9,10 @@ import { useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import {
-  AlertTriangle, CheckCircle2, Compass, Download, Loader2, RefreshCw, Sparkles, Sunrise, Target,
+  AlertTriangle, CheckCircle2, Compass, Download, Loader2, RefreshCw, SlidersHorizontal,
+  Sparkles, Sunrise, Target,
 } from 'lucide-react'
-import { api, type TodayOverview, type TodayPick } from '@/lib/api'
+import { api, type TodayOverview, type TodayPick, type TodayPrefs } from '@/lib/api'
 import { toast } from '@/components/Toast'
 
 // ===== 自包含 HTML 导出(内联样式浅色排版, 无脚本无外链, 可存档/分享) =====
@@ -133,6 +134,22 @@ export function Today() {
       else setPicks(r.picks ?? [])
     },
     onError: (e: Error) => toast(`AI 优选失败: ${e.message}`, 'error'),
+  })
+  const [prefsOpen, setPrefsOpen] = useState(false)
+  // 滑块拖动中的即时值(null = 用服务端返回的偏好); 松手才落库
+  const [minScore, setMinScore] = useState<number | null>(null)
+  const prefsMut = useMutation({
+    mutationFn: (body: Partial<TodayPrefs>) => api.todaySavePrefs(body),
+    onSuccess: (p) => {
+      toast(`门槛已保存:把握分 ≥ ${p.min_score},最多 ${p.max_show} 条`, 'success')
+      setMinScore(null)
+      setPicks(null)  // 候选集变了, 旧的 AI 优选结果不再对应
+      q.refetch()
+    },
+    onError: (e: Error) => {
+      toast(`保存失败: ${e.message}`, 'error')
+      setMinScore(null)
+    },
   })
 
   const goStock = (symbol: string, name: string) =>
@@ -259,21 +276,68 @@ export function Today() {
               <Target className="h-4 w-4 text-red-400" />
               <span className="text-sm font-medium text-foreground">值得关注</span>
               <span className="text-[10px] text-muted">
-                {d.opportunities.length} 项 · 按把握打分排序,把握不足的已隐藏
+                {d.opportunities.length} 项 · 把握分 ≥ {d.prefs.min_score} 才显示
                 {d.opportunities_filtered > 0 && `(已滤掉 ${d.opportunities_filtered} 只)`}
               </span>
-              {d.opportunities.length > 0 && (
+              <div className="ml-auto flex items-center gap-2">
                 <button
-                  onClick={() => selectMut.mutate()}
-                  disabled={selectMut.isPending}
-                  title="让 AI 从这些候选里再精选 1-3 只当下最值得优先盯的"
-                  className="ml-auto inline-flex items-center gap-1 rounded-full border border-amber-400/30 bg-amber-400/10 px-2.5 py-1 text-[10px] text-amber-300 hover:bg-amber-400/20 disabled:opacity-50 transition-colors cursor-pointer"
+                  onClick={() => setPrefsOpen((v) => !v)}
+                  title="调整显示门槛(把握分下限与最多显示条数)"
+                  className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] transition-colors cursor-pointer ${
+                    prefsOpen ? 'border-sky-400/40 bg-sky-400/15 text-sky-300'
+                      : 'border-border bg-base text-muted hover:text-foreground'
+                  }`}
                 >
-                  {selectMut.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
-                  AI 优选
+                  <SlidersHorizontal className="h-3 w-3" />
+                  门槛
                 </button>
-              )}
+                {d.opportunities.length > 0 && (
+                  <button
+                    onClick={() => selectMut.mutate()}
+                    disabled={selectMut.isPending}
+                    title="让 AI 从这些候选里再精选 1-3 只当下最值得优先盯的"
+                    className="inline-flex items-center gap-1 rounded-full border border-amber-400/30 bg-amber-400/10 px-2.5 py-1 text-[10px] text-amber-300 hover:bg-amber-400/20 disabled:opacity-50 transition-colors cursor-pointer"
+                  >
+                    {selectMut.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+                    AI 优选
+                  </button>
+                )}
+              </div>
             </div>
+            {prefsOpen && (
+              <div className="flex flex-wrap items-center gap-x-5 gap-y-3 border-b border-border/40 bg-base/40 px-4 py-3">
+                <label className="flex items-center gap-2 text-[11px] text-muted">
+                  <span className="whitespace-nowrap">最低把握分</span>
+                  <input
+                    type="range" min={0} max={100} step={5}
+                    value={minScore ?? d.prefs.min_score}
+                    onChange={(e) => setMinScore(Number(e.target.value))}
+                    onPointerUp={() => {
+                      if (minScore != null && minScore !== d.prefs.min_score) prefsMut.mutate({ min_score: minScore })
+                    }}
+                    className="w-36 accent-sky-400 cursor-pointer"
+                  />
+                  <span className="w-6 font-mono text-foreground">{minScore ?? d.prefs.min_score}</span>
+                </label>
+                <label className="flex items-center gap-2 text-[11px] text-muted">
+                  <span className="whitespace-nowrap">最多显示</span>
+                  <input
+                    type="number" min={1} max={50}
+                    defaultValue={d.prefs.max_show}
+                    onBlur={(e) => {
+                      const v = Number(e.target.value)
+                      if (v && v !== d.prefs.max_show) prefsMut.mutate({ max_show: v })
+                    }}
+                    className="w-14 rounded border border-border bg-surface px-2 py-1 font-mono text-foreground outline-none focus:border-sky-400/50"
+                  />
+                  <span>条</span>
+                </label>
+                <span className="text-[10px] text-muted/70">
+                  调高更严格(只看最有把握的),调低看得更全。卖出提醒不受影响,永远全显示。
+                </span>
+                {prefsMut.isPending && <Loader2 className="h-3 w-3 animate-spin text-muted" />}
+              </div>
+            )}
             {picks && (
               <div className="border-b border-amber-400/20 bg-amber-400/[0.06] px-4 py-2.5 text-xs">
                 {picks.length === 0 ? (
