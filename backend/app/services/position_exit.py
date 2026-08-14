@@ -34,9 +34,12 @@ BREAKEVEN_AT = 1.0   # 浮盈 ≥ 1×ATR 进入保本阶段
 TRAIL_AT = 2.0       # 浮盈 ≥ 2×ATR 进入利润保护阶段
 _CALENDAR_SPAN_DAYS = 400
 
-STAGE_CN = {"risk": "止损阶段", "breakeven": "保本阶段", "trail": "利润保护阶段"}
-STAGE_LINE_CN = {"risk": "止损线", "breakeven": "保本线", "trail": "移动止盈线"}
-STAGE_ACTION = {"risk": "跌破止损", "breakeven": "保本离场", "trail": "止盈了结"}
+STAGE_CN = {"risk": "止损阶段", "breakeven": "保本阶段", "trail": "利润保护阶段",
+            "fatal": "生命线跌破", "lifeline": "仅盯生命线"}
+STAGE_LINE_CN = {"risk": "止损线", "breakeven": "保本线", "trail": "移动止盈线",
+                 "fatal": "生命线"}
+STAGE_ACTION = {"risk": "跌破止损", "breakeven": "保本离场", "trail": "止盈了结",
+                "fatal": "无条件清仓离场"}
 
 
 def k_for(symbol: str) -> float:
@@ -76,15 +79,44 @@ def compute_exit(
     entry_date: str,
     k: float,
     dn_pivot: float | None = None,
+    lifeline: float | None = None,
 ) -> dict | None:
-    """计算当前出场线。数据升序;entry_date 为 YYYY-MM-DD。数据不足返回 None。"""
-    if len(closes) < ATR_WINDOW + 1 or cost <= 0:
+    """计算当前出场线。数据升序;entry_date 为 YYYY-MM-DD。数据不足返回 None。
+
+    lifeline(生命线)为用户手划的绝对底线,优先级最高:跌破 → fatal(无条件清仓);
+    未跌破但高于阶段线 → 生效线取生命线(保护线不允许低于用户底线)。
+    """
+    has_cost = bool(cost and cost > 0)
+    has_life = bool(lifeline and lifeline > 0)
+    if len(closes) < ATR_WINDOW + 1 or not (has_cost or has_life):
         return None
     atr = _atr_series(highs, lows, closes)
     last_atr = atr[-1]
     if not last_atr or last_atr <= 0:
         return None
     last_close = closes[-1]
+
+    # 只划了生命线、没记成本 → 跳过阶段机,仅盯底线
+    if not has_cost:
+        stage = "fatal" if last_close < lifeline else "lifeline"
+        return {
+            "stage": stage,
+            "stage_cn": STAGE_CN[stage],
+            "line_cn": "生命线",
+            "action": STAGE_ACTION["fatal"],
+            "lifeline": round(lifeline, 3),
+            "line": round(lifeline, 3),
+            "atr": round(last_atr, 3),
+            "profit_atr": None,
+            "highest_close": None,
+            "k": k,
+            "close": round(last_close, 3),
+            "distance_pct": round((lifeline - last_close) / last_close, 4),
+            "triggered": last_close < lifeline,
+            "as_of": dates[-1],
+            "entry_date": entry_date,
+            "cost": None,
+        }
 
     # 入场起点(找不到 ≥ entry_date 的行 = 今天刚标记,从最后一日起算)
     start = next((i for i, d in enumerate(dates) if d >= entry_date), len(dates) - 1)
@@ -111,11 +143,26 @@ def compute_exit(
         # 六态下关键点更近(仍在现价下方)时,以趋势否决位为准——两道防线取先触者
         if dn_pivot is not None and last_close > dn_pivot > line:
             line = dn_pivot
+    # [生命线] 用户绝对底线, 优先级最高
+    line_cn = STAGE_LINE_CN[stage]
+    action = STAGE_ACTION[stage]
+    if lifeline is not None and lifeline > 0:
+        if last_close < lifeline:
+            stage = "fatal"
+            line = lifeline
+            line_cn = STAGE_LINE_CN["fatal"]
+            action = STAGE_ACTION["fatal"]
+        elif lifeline > line:
+            # 阶段线低于用户底线 → 生效线抬到生命线(保护线不允许低于底线)
+            line = lifeline
+            line_cn = "生命线"
+            action = "无条件清仓离场"
     return {
         "stage": stage,
         "stage_cn": STAGE_CN[stage],
-        "line_cn": STAGE_LINE_CN[stage],
-        "action": STAGE_ACTION[stage],
+        "line_cn": line_cn,
+        "action": action,
+        "lifeline": round(lifeline, 3) if lifeline else None,
         "line": round(line, 3),
         "atr": round(last_atr, 3),
         "profit_atr": round(profit_atr, 2),
@@ -164,7 +211,7 @@ def exit_lines_for_positions(repo) -> dict[str, dict]:
     """全部「持有+已填成本」自选的出场线 {SYMBOL: {...}}。"""
     from app.services import positions
     pos_all = {s: p for s, p in positions.load_all().items()
-               if p.get("held") and p.get("cost")}
+               if p.get("held") and (p.get("cost") or p.get("lifeline"))}
     if not pos_all:
         return {}
     syms = sorted(pos_all)
@@ -213,47 +260,48 @@ def exit_lines_for_positions(repo) -> dict[str, dict]:
         if not data:
             continue
         dts, highs, lows, closes = data
-        res = compute_exit(dts, highs, lows, closes, float(pos["cost"]),
-                           _entry_date_of(pos), k_for(sym), pivots.get(sym))
+        res = compute_exit(dts, highs, lows, closes,
+                           float(pos["cost"]) if pos.get("cost") else 0.0,
+                           _entry_date_of(pos), k_for(sym), pivots.get(sym),
+                           lifeline=float(pos["lifeline"]) if pos.get("lifeline") else None)
         if res:
             out[sym] = res
     return out
 
 
 def sync_exit_rules(lines: dict[str, dict], engine=None) -> None:
-    """把出场线落成价格监控规则(id: exit_<symbol>),并清掉已平仓票的旧规则。
+    """把出场线落成价格监控规则,并清掉已平仓票的旧规则。
 
-    复用现有监控引擎盘中评估 + 通知链路;cooldown 1 天(触发一次提醒即够)。
+    每票最多两条:
+      exit_<sym>      生效出场线(阶段线或生命线, 生命线生效时 critical)
+      exitlife_<sym>  生命线独立规则(仅当生命线低于生效线时另立, 时刻盯底线,
+                      不依赖每日重算; critical)
+    复用现有监控引擎盘中评估 + 通知链路;cooldown 1 天。
     """
     from app.strategy import monitor_rules
     data_dir = settings.data_dir
     try:
         existing = {r["id"]: r for r in monitor_rules.load_all(data_dir)
-                    if str(r.get("id", "")).startswith("exit_")}
+                    if str(r.get("id", "")).startswith(("exit_", "exitlife_"))}
     except Exception as e:  # noqa: BLE001
         logger.warning("load exit rules failed: %s", e)
         existing = {}
 
     wanted: set[str] = set()
     changed = False
-    for sym, res in lines.items():
-        rid = "exit_" + sym.lower().replace(".", "_")[:35]
+
+    def upsert(rid: str, name: str, sym: str, line: float, severity: str, message: str) -> None:
+        nonlocal changed
         wanted.add(rid)
         old = existing.get(rid)
-        line = float(res["line"])
         # 值没变(±0.001)且已存在 → 不重写,避免无谓 IO
         if old and old.get("conditions") and abs(float(old["conditions"][0].get("value", 0)) - line) < 0.001:
-            continue
+            return
         rule = monitor_rules.normalize({
-            "id": rid,
-            "name": f"持仓出场 · {sym} · {res['line_cn']} {line:.2f}",
-            "type": "price",
-            "scope": "symbols",
+            "id": rid, "name": name, "type": "price", "scope": "symbols",
             "symbols": [sym],
             "conditions": [{"field": "close", "op": "<=", "value": line}],
-            "cooldown_seconds": 86400,
-            "severity": "warn",
-            "message": f"{sym} 跌破{res['line_cn']} {line:.2f}({res['stage_cn']}),可考虑{res['action']}",
+            "cooldown_seconds": 86400, "severity": severity, "message": message,
         })
         try:
             monitor_rules.validate(rule)
@@ -261,6 +309,30 @@ def sync_exit_rules(lines: dict[str, dict], engine=None) -> None:
             changed = True
         except Exception as e:  # noqa: BLE001
             logger.warning("save exit rule %s failed: %s", rid, e)
+
+    for sym, res in lines.items():
+        sym_id = sym.lower().replace(".", "_")[:30]
+        line = float(res["line"])
+        life = float(res["lifeline"]) if res.get("lifeline") else None
+        line_is_life = life is not None and abs(line - life) < 0.001
+        line_cn = res["line_cn"]
+        upsert(
+            "exit_" + sym_id,
+            f"持仓出场 · {sym} · {line_cn} {line:.2f}",
+            sym, line,
+            "critical" if line_is_life else "warn",
+            (f"{sym} 跌破生命线 {line:.2f}!按纪律无条件清仓离场,此票不再看"
+             if line_is_life else
+             f"{sym} 跌破{line_cn} {line:.2f}({res['stage_cn']}),可考虑{res['action']}"),
+        )
+        # 生命线低于生效线 → 另立一条 critical 独立盯底线
+        if life is not None and not line_is_life and life < line:
+            upsert(
+                "exitlife_" + sym_id,
+                f"生命线 · {sym} · {life:.2f}",
+                sym, life, "critical",
+                f"{sym} 跌破生命线 {life:.2f}!按纪律无条件清仓离场,此票不再看",
+            )
 
     for rid in set(existing) - wanted:
         try:
@@ -281,7 +353,7 @@ def exit_for_symbol(repo, symbol: str) -> dict | None:
     from app.services import positions
     sym = (symbol or "").strip().upper()
     pos = positions.load_all().get(sym)
-    if not pos or not pos.get("held") or not pos.get("cost"):
+    if not pos or not pos.get("held") or not (pos.get("cost") or pos.get("lifeline")):
         return None
     end = date.today()
     start = end - timedelta(days=_CALENDAR_SPAN_DAYS)
@@ -297,5 +369,7 @@ def exit_for_symbol(repo, symbol: str) -> dict | None:
         dts,
         df["high"].to_list() if "high" in df.columns else [None] * df.height,
         df["low"].to_list() if "low" in df.columns else [None] * df.height,
-        closes, float(pos["cost"]), _entry_date_of(pos), k_for(sym), pivots.get(sym),
+        closes, float(pos["cost"]) if pos.get("cost") else 0.0,
+        _entry_date_of(pos), k_for(sym), pivots.get(sym),
+        lifeline=float(pos["lifeline"]) if pos.get("lifeline") else None,
     )

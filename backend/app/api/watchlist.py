@@ -138,6 +138,8 @@ def clear_group(group_id: str, request: Request):
 class PositionIn(BaseModel):
     held: bool = False
     cost: float | None = None
+    # [fork 增强] 生命线: 绝对底线价, 跌破无条件离场
+    lifeline: float | None = None
 
 
 @router.get("/positions")
@@ -151,7 +153,7 @@ def list_positions():
 def set_position(symbol: str, req: PositionIn):
     """标记某只自选:是否持有 + 可选成本价。"""
     from app.services import positions
-    return {"symbol": symbol.strip().upper(), "position": positions.set_position(symbol, req.held, req.cost)}
+    return {"symbol": symbol.strip().upper(), "position": positions.set_position(symbol, req.held, req.cost, req.lifeline)}
 
 
 @router.delete("/positions/{symbol}")

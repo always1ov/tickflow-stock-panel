@@ -158,6 +158,13 @@ def get_levels(
                 "label": f"{ex['line_cn']}({ex['stage_cn']})",
                 "type": "exit", "side": "support", "strength": "strong",
             }]
+            # 生命线独立于生效线时单独画(用户绝对底线)
+            if ex.get("lifeline") and abs(float(ex["lifeline"]) - float(ex["line"])) > 0.001:
+                levels["exit"].append({
+                    "value": float(ex["lifeline"]),
+                    "label": "生命线(绝对底线)",
+                    "type": "exit", "side": "support", "strength": "strong",
+                })
     except Exception as e:  # noqa: BLE001
         logger.debug("exit level skipped: %s", e)
     close = float(df.tail(1)["close"][0]) if "close" in df.columns else None

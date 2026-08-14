@@ -167,9 +167,10 @@ export interface TodayOverview {
   holdings: TodayHolding[]
 }
 
-// [fork 增强] 持仓出场线(ATR 三阶段)
+// [fork 增强] 持仓出场线(ATR 三阶段 + 生命线)
 export interface ExitLine {
-  stage: 'risk' | 'breakeven' | 'trail'
+  stage: 'risk' | 'breakeven' | 'trail' | 'fatal' | 'lifeline'
+  lifeline?: number | null
   stage_cn: string
   line_cn: string
   action: string
@@ -1820,11 +1821,11 @@ export const api = {
         : '/api/watchlist/enriched',
     ),
   watchlistPositions: () =>
-    request<{ positions: Record<string, { held: boolean; cost: number | null; updated_at: string }> }>('/api/watchlist/positions'),
-  setWatchlistPosition: (symbol: string, held: boolean, cost: number | null) =>
-    request<{ symbol: string; position: { held: boolean; cost: number | null; updated_at: string } }>(
+    request<{ positions: Record<string, { held: boolean; cost: number | null; lifeline?: number | null; updated_at: string }> }>('/api/watchlist/positions'),
+  setWatchlistPosition: (symbol: string, held: boolean, cost: number | null, lifeline?: number | null) =>
+    request<{ symbol: string; position: { held: boolean; cost: number | null; lifeline?: number | null; updated_at: string } }>(
       `/api/watchlist/positions/${encodeURIComponent(symbol)}`,
-      { method: 'PUT', body: JSON.stringify({ held, cost }) },
+      { method: 'PUT', body: JSON.stringify({ held, cost, lifeline: lifeline ?? null }) },
     ),
   stockSignals: () =>
     request<{ signals: Record<string, { signal: string; confidence: number; reason: string; close: number | null; created_at: string; watch_points?: { direction: 'up' | 'down'; price: number; label: string; action?: string; confidence?: number; reason: string }[] }> }>('/api/stock-analysis/signals'),

@@ -48,6 +48,9 @@ _SYSTEM_PROMPT = """你是一位拥有 15 年 A 股一线交易经验的信号�
 7. **持仓出场线优先**:若提供了「持仓出场线」(系统按 ATR 三阶段规则算好的止损线/保本线/移动止盈线),
    watch_points **必须包含该线作为 down 方向预案**,action 按其阶段用「跌破止损」「保本离场」或「止盈了结」;
    该线是确定性计算结果,你不得修改其数值,只能围绕它解释与补充其他预案
+8. **生命线不可动摇**:若提供了「生命线」,这是用户亲划的绝对底线。已跌破生命线时 signal 必须为 sell,
+   reason 必须明确"纪律性清仓离场",**禁止任何"再观察""等反弹"类表述**;未跌破时不得建议把仓位风险
+   放到生命线之下
 
 仅供用户个人决策参考,不构成投资建议。"""
 
@@ -162,10 +165,14 @@ async def generate_signal(repo, data_dir: Path, symbol: str) -> dict:
         from app.services.position_exit import exit_for_symbol
         ex = exit_for_symbol(repo, sym)
         if ex:
+            life_part = (
+                f"; 生命线 {ex['lifeline']}(用户绝对底线, 跌破必须无条件清仓离场)"
+                if ex.get("lifeline") else ""
+            )
             exit_line = (
                 f"持仓出场线: 成本 {ex['cost']}, 浮盈 {ex['profit_atr']}×ATR, {ex['stage_cn']},"
                 f" {ex['line_cn']} {ex['line']}(跌破则{ex['action']}; ATR14={ex['atr']},"
-                f" 持仓最高收盘 {ex['highest_close']}, k={ex['k']})\n"
+                f" 持仓最高收盘 {ex['highest_close']}, k={ex['k']}){life_part}\n"
             )
     except Exception as e:  # noqa: BLE001
         logger.debug("exit context for signal skipped: %s", e)

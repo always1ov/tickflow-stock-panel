@@ -45,7 +45,12 @@ def _build_overview(repo) -> dict:
     actions: list[dict] = []
     for sym, ex in exit_lines.items():
         nm = names.get(sym, sym)
-        if ex["triggered"]:
+        if ex["stage"] == "fatal":
+            actions.append({
+                "kind": "lifeline_broken", "severity": "high", "symbol": sym, "name": nm,
+                "text": f"已跌破生命线 {ex['line']:.2f}!按纪律无条件清仓离场 —— 这票不看了",
+            })
+        elif ex["triggered"]:
             actions.append({
                 "kind": "exit_triggered", "severity": "high", "symbol": sym, "name": nm,
                 "text": f"已跌破{ex['line_cn']} {ex['line']:.2f}({ex['stage_cn']}),可考虑{ex['action']}",

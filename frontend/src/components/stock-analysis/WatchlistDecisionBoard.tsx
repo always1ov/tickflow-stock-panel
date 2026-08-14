@@ -8,7 +8,7 @@ import { useHistoryReports, openHistoryReport, loadHistory } from '@/lib/stockAn
 import { trendBadgeCls } from '@/components/stock-analysis/TrendStateBar'
 import { TrendSummaryDialog } from '@/components/stock-analysis/TrendSummaryDialog'
 
-type Position = { held: boolean; cost: number | null; updated_at: string }
+type Position = { held: boolean; cost: number | null; lifeline?: number | null; updated_at: string }
 type WatchPoint = { direction: 'up' | 'down'; price: number; label?: string; action?: string; reason?: string }
 type Signal = { signal: string; confidence: number; reason: string; close: number | null; created_at: string; watch_points?: WatchPoint[] }
 type SortKey = 'name' | 'close' | 'changePct' | 'held' | 'pnl' | 'confidence' | 'signal' | 'report' | 'trend'
@@ -118,8 +118,8 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
   }
 
   const setPos = useMutation({
-    mutationFn: ({ symbol, held, cost }: { symbol: string; held: boolean; cost: number | null }) =>
-      api.setWatchlistPosition(symbol, held, cost),
+    mutationFn: ({ symbol, held, cost, lifeline }: { symbol: string; held: boolean; cost: number | null; lifeline?: number | null }) =>
+      api.setWatchlistPosition(symbol, held, cost, lifeline),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['watchlist-positions'] })
       qc.invalidateQueries({ queryKey: ['watchlist-exit-lines'] })
@@ -189,7 +189,8 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
         const pnl = pos?.held && cost && cost > 0 && close != null ? (close - cost) / cost : null
         const trend: TrendInfo | undefined = trends[symbol]
         const exit: ExitLine | undefined = exitLines[symbol]
-        return { symbol, name: r.name ?? symbol, close, changePct: r.change_pct ?? null, held: !!pos?.held, cost, pnl, sig, trend, exit }
+        const lifeline = pos?.lifeline ?? null
+        return { symbol, name: r.name ?? symbol, close, changePct: r.change_pct ?? null, held: !!pos?.held, cost, lifeline, pnl, sig, trend, exit }
       })
       .filter((r) => (heldOnly ? r.held : true))
   }, [enriched.data, positions, signals, heldOnly, trends, exitLines])
@@ -336,7 +337,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
                     {/* 仓位:持有/空仓 切换 */}
                     <td className="px-2 py-1.5 text-center">
                       <button
-                        onClick={() => setPos.mutate({ symbol: r.symbol, held: !r.held, cost: r.cost })}
+                        onClick={() => setPos.mutate({ symbol: r.symbol, held: !r.held, cost: r.cost, lifeline: r.lifeline })}
                         className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors cursor-pointer ${
                           r.held ? 'border-amber-400/40 bg-amber-400/10 text-amber-400' : 'border-border bg-base text-muted hover:border-amber-400/30'
                         }`}
@@ -344,19 +345,32 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
                         {r.held ? '持有' : '空仓'}
                       </button>
                     </td>
-                    {/* 成本:仅持有时可填 */}
+                    {/* 成本 + 生命线:仅持有时可填。生命线=绝对底线, 跌破无条件离场 */}
                     <td className="px-2 py-1.5 text-right">
                       {r.held ? (
-                        <input
-                          type="number"
-                          defaultValue={r.cost ?? ''}
-                          placeholder="成本"
-                          onBlur={(e) => {
-                            const v = e.target.value === '' ? null : Number(e.target.value)
-                            if (v !== r.cost) setPos.mutate({ symbol: r.symbol, held: true, cost: v })
-                          }}
-                          className="w-16 h-6 px-1 rounded bg-base border border-border text-[11px] font-mono text-right text-foreground focus:outline-none focus:border-accent/50"
-                        />
+                        <span className="inline-flex flex-col gap-0.5">
+                          <input
+                            type="number"
+                            defaultValue={r.cost ?? ''}
+                            placeholder="成本"
+                            onBlur={(e) => {
+                              const v = e.target.value === '' ? null : Number(e.target.value)
+                              if (v !== r.cost) setPos.mutate({ symbol: r.symbol, held: true, cost: v, lifeline: r.lifeline })
+                            }}
+                            className="w-16 h-6 px-1 rounded bg-base border border-border text-[11px] font-mono text-right text-foreground focus:outline-none focus:border-accent/50"
+                          />
+                          <input
+                            type="number"
+                            defaultValue={r.lifeline ?? ''}
+                            placeholder="生命线"
+                            title="生命线: 你的绝对底线价, 跌破无条件清仓离场(critical 级推送)"
+                            onBlur={(e) => {
+                              const v = e.target.value === '' ? null : Number(e.target.value)
+                              if (v !== r.lifeline) setPos.mutate({ symbol: r.symbol, held: true, cost: r.cost, lifeline: v })
+                            }}
+                            className="w-16 h-6 px-1 rounded bg-base border border-red-400/30 text-[11px] font-mono text-right text-red-300 placeholder:text-red-300/40 focus:outline-none focus:border-red-400/60"
+                          />
+                        </span>
                       ) : <span className="text-muted">—</span>}
                     </td>
                     {/* 浮盈 */}
@@ -374,7 +388,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
                         >
                           <span>{r.exit.line.toFixed(2)}</span>
                           <span className="text-[9px] opacity-80">
-                            {r.exit.triggered ? '已触发' : `距 ${(r.exit.distance_pct * 100).toFixed(1)}%`}
+                            {r.exit.stage === 'fatal' ? '生命线破位!' : r.exit.triggered ? '已触发' : `距 ${(r.exit.distance_pct * 100).toFixed(1)}%`}
                           </span>
                         </span>
                       ) : (
