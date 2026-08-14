@@ -86,6 +86,8 @@ export function TickFlowKeyConfig() {
                 <ExternalLink className="h-3 w-3 self-center" />
               </a>{' '}
               注册获取。API Key 存放为本地文件,不会上传任何第三方,请妥善保管。
+              <br />
+              <span className="text-[10px] text-muted">多个免费 Key 用英文逗号分隔(如 <code>tk_aaa,tk_bbb</code>):每个免费 Key 各加 5 只自选实时额度,凑成 5×N 只。填单个付费 Key 则直接走付费额度。</span>
             </p>
 
             {/* 当前状态 */}
@@ -136,7 +138,7 @@ export function TickFlowKeyConfig() {
               <div className="relative">
                 <input
                   type={revealing ? 'text' : 'password'}
-                  placeholder={mode === 'none' ? '粘贴 TickFlow API Key' : '粘贴新 Key 替换当前'}
+                  placeholder={mode === 'none' ? '粘贴 TickFlow API Key(多个免费 Key 用逗号分隔)' : '粘贴新 Key 替换当前(多个用逗号分隔)'}
                   value={keyInput}
                   onChange={(e) => { setKeyInput(e.target.value); if (saved) setSaved(false) }}
                   className="w-full px-3 py-2 pr-9 rounded-input bg-base border border-border text-sm font-mono focus:outline-none focus:border-accent transition-colors duration-150 ease-smooth"

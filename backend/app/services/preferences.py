@@ -59,7 +59,12 @@ def get_realtime_quote_interval() -> float:
 
 
 def get_realtime_watchlist_symbols() -> list[str]:
-    """Free 档自选实时监控标的:直接取自选页前 5 个。"""
+    """Free 档自选实时监控标的:返回**全部**自选(去重、大写)。
+
+    [fork 增强] 上游取前 5 个;多 key 池化后, 盘中每轮容量为 5×key 数,
+    并通过**轮转窗口**覆盖全部自选(见 quote_service._fetch_watchlist_quotes),
+    故此处不再截断, 由行情层做窗口轮转。单 key 时轮转退化为 5 只一轮循环刷新。
+    """
     try:
         from app.services import watchlist
         rows = watchlist.list_symbols()
@@ -71,8 +76,6 @@ def get_realtime_watchlist_symbols() -> list[str]:
         symbol = str((row or {}).get("symbol") or "").strip().upper()
         if symbol and symbol not in out:
             out.append(symbol)
-        if len(out) >= 5:
-            break
     return out
 
 

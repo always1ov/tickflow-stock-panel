@@ -745,7 +745,6 @@ class QuoteService:
     def _fetch_watchlist_quotes(self) -> None:
         """Free 档自选股实时: 按 capability batch 上限分批拉取。"""
         from app.services import preferences
-        from app.tickflow.client import get_paid_realtime_client
         from app.tickflow.capabilities import Cap
         from app.tickflow.policy import detect_capabilities
         from app.tickflow.rate_limits import chunked, resolve_limit, sleep_between_batches
@@ -763,25 +762,43 @@ class QuoteService:
             logger.info("自选实时未配置标的, 跳过行情拉取")
             return
 
-        tf = get_paid_realtime_client()
-        if tf is None:
+        # [fork 增强] 免费多 key 池化: 每个 key 各 5 只额度, 批次轮流分给池中不同
+        # key(总额度 5×N); 自选超过单轮容量时用「轮转窗口」——每轮拉一个窗口,
+        # 下一轮接着往后, ⌈总数/容量⌉ 轮内所有自选都刷新一遍。
+        # 单 key 时池为单元素, 除轮转外行为与上游一致。
+        from app.tickflow.client import get_realtime_client_pool
+        pool = get_realtime_client_pool()
+        if not pool:
             logger.warning("自选实时拉取失败:未配置付费服务器 API Key")
             return
 
         # 按 capability batch 上限分批: 股票+指数共享额度, 超过上限会导致整轮失败
         capset = detect_capabilities()
         lim = resolve_limit(capset, Cap.QUOTE_BY_SYMBOL, default_batch=5)
-        batches = chunked(symbols, lim.batch)
+        n_keys = len(pool)
+        cap = lim.batch * n_keys
+        total = len(symbols)
+        if total > cap:
+            offset = getattr(self, "_rt_rotate_offset", 0) % total
+            window = (symbols[offset:] + symbols[:offset])[:cap]
+            self._rt_rotate_offset = (offset + cap) % total
+        else:
+            window = symbols
+            self._rt_rotate_offset = 0
+        batches = chunked(window, lim.batch)
 
         t0 = time.perf_counter()
         now_ts = time.perf_counter()
         resp = []
         for i, batch in enumerate(batches):
-            sleep_between_batches(i, lim.rpm)
+            # 限速按「每个 key 自己的第几次调用」(i // n_keys)计算 ——
+            # 不同 key 额度独立可同轮并发, 只有同一 key 的连续调用才需间隔
+            sleep_between_batches(i // n_keys, lim.rpm)
             try:
-                resp.extend(tf.quotes.get(symbols=batch) or [])
+                resp.extend(pool[i % n_keys].quotes.get(symbols=batch) or [])
             except Exception as e:  # noqa: BLE001
-                logger.warning("自选实时批次 %d/%d 拉取失败: %s", i + 1, len(batches), e)
+                logger.warning("自选实时批次 %d/%d 拉取失败(key #%d): %s",
+                               i + 1, len(batches), i % n_keys + 1, e)
 
         if not resp:
             logger.warning("自选实时行情数据为空")
