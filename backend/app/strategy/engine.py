@@ -157,6 +157,10 @@ class StrategyDataContext:
     history: pl.DataFrame | None = None
     market: Any | None = None
     cache_key: str | None = None
+    # 自选股 symbol 集合 (供 basic_filter 的 watchlist_only 使用)。
+    # None = 未知/未注入 (如监控引擎), 此时 watchlist_only 退化为不过滤 (全市场), 避免静默漏掉;
+    # 空集合 = 已知且自选为空, watchlist_only 会过滤出 0 只。
+    watchlist_symbols: frozenset[str] | None = None
 
 
 @dataclass(frozen=True)
@@ -899,7 +903,17 @@ class StrategyEngine:
 
         # Stage 1: 基础过滤（enabled 默认开启; 显式 enabled=false 才跳过）
         if bf and bf.get("enabled", True):
-            df = self._apply_basic_filter(df, bf)
+            # watchlist_only=只看自选: 优先用 context 注入的自选集合; 未注入时 (如监控引擎
+            # 直接构造 context) 惰性从自选服务取 (带 3s 缓存), 让"只作用于自选"在选股与实时
+            # 监控里都生效。读取失败 → None → 不过滤 (退化为全市场, 不误清零)。
+            wl = context.watchlist_symbols
+            if wl is None and bf.get("watchlist_only"):
+                try:
+                    from app.services import watchlist as _wl
+                    wl = _wl.symbol_set()
+                except Exception:  # noqa: BLE001
+                    wl = None
+            df = self._apply_basic_filter(df, bf, wl)
 
         # Pool 过滤
         if pool:
@@ -1342,7 +1356,7 @@ class StrategyEngine:
     # ================================================================
 
     @staticmethod
-    def _basic_filter_expr(df: pl.DataFrame, bf: dict) -> pl.Expr | None:
+    def _basic_filter_expr(df: pl.DataFrame, bf: dict, watchlist: frozenset[str] | None = None) -> pl.Expr | None:
         """构建基础过滤表达式。回测可复用为买入候选 mask，不删除行情行。"""
         exprs: list[pl.Expr] = []
         if bf.get("price_min") is not None:
@@ -1400,14 +1414,19 @@ class StrategyEngine:
                     board_exprs.append(pl.col("symbol").str.contains(r"\.BJ$"))
             if board_exprs:
                 exprs.append(pl.any_horizontal(board_exprs))
+        # 只看自选: watchlist_only=True 时仅保留在自选集合里的标的。
+        # watchlist=None 表示上下文未注入自选 (如监控引擎) → 不过滤, 退化为全市场,
+        # 避免"本该全市场的告警被静默限到自选"。watchlist 为空集合则会过滤出 0 只。
+        if bf.get("watchlist_only") and watchlist is not None and "symbol" in df.columns:
+            exprs.append(pl.col("symbol").is_in(list(watchlist)))
         if exprs:
             return pl.all_horizontal(exprs)
         return None
 
     @staticmethod
-    def _apply_basic_filter(df: pl.DataFrame, bf: dict) -> pl.DataFrame:
+    def _apply_basic_filter(df: pl.DataFrame, bf: dict, watchlist: frozenset[str] | None = None) -> pl.DataFrame:
         """Stage 1: 基础参数过滤"""
-        expr = StrategyEngine._basic_filter_expr(df, bf)
+        expr = StrategyEngine._basic_filter_expr(df, bf, watchlist)
         if expr is not None:
             return df.filter(expr)
         return df

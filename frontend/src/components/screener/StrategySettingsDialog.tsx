@@ -1,7 +1,7 @@
 ﻿import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Settings2, RotateCcw, Save, ChevronDown, Filter, Star, TrendingUp, Sparkles, Download, Layers, Plus, Trash2 } from 'lucide-react'
-import { api, type StrategyDetail, type StrategyParamDef, type CompositeChildInfo, type ScoringDirection } from '@/lib/api'
+import { api, paramOptionValue, paramOptionLabel, type StrategyDetail, type StrategyParamDef, type CompositeChildInfo, type ScoringDirection } from '@/lib/api'
 import { BUILTIN_COLUMNS } from '@/lib/watchlist-columns'
 import { color } from '@/lib/colors'
 import { SignalPicker } from './SignalPicker'
@@ -149,7 +149,10 @@ function ParamField({ def, value, onChange }: {
           onChange={e => onChange(e.target.value)}
           className="w-24 px-1.5 py-0.5 rounded bg-base border border-border text-[11px] font-mono text-foreground focus:outline-none focus:border-accent/50"
         >
-          {def.options.map(o => <option key={o} value={o}>{o}</option>)}
+          {def.options.map(o => {
+            const val = paramOptionValue(o)
+            return <option key={String(val)} value={val}>{paramOptionLabel(o)}</option>
+          })}
         </select>
       </div>
     )
@@ -521,6 +524,12 @@ export function StrategySettingsDialog({ strategyId, onClose, onSaved, onAiModif
                           <span className="text-[11px] text-secondary w-16 shrink-0 text-right">ST</span>
                           <button onClick={() => setBF('exclude_st', !basicFilter.exclude_st)}
                             className={`px-1.5 py-0.5 rounded text-[10px] font-medium border transition-colors cursor-pointer ${basicFilter.exclude_st ? 'border-danger/40 bg-danger/10 text-danger' : 'border-border bg-base text-muted hover:border-danger/30'}`}>{basicFilter.exclude_st ? '排除' : '包含'}</button>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[11px] text-secondary w-16 shrink-0 text-right">自选</span>
+                          <button onClick={() => setBF('watchlist_only', !basicFilter.watchlist_only)}
+                            title="开启后本策略只作用于你的自选股：选股 (命中数/结果) 与实时监控都限定在自选范围内 (回测仍按全市场，因自选是当下概念)"
+                            className={`px-1.5 py-0.5 rounded text-[10px] font-medium border transition-colors cursor-pointer ${basicFilter.watchlist_only ? `${color.select.border} ${color.select.bgLight} ${color.select.text}` : 'border-border bg-base text-muted hover:border-accent/30'}`}>{basicFilter.watchlist_only ? '只看自选' : '不限'}</button>
                         </div>
                       </div>
                     </div>

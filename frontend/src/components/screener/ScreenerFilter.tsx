@@ -20,6 +20,7 @@ export interface ScreenerFilter {
   rsiMax: string
   boards: string[]       // 板块筛选: 空数组=不筛选, 否则只保留选中的板块
   excludeST: boolean     // 是否排除 ST/*ST/退市股
+  watchlistOnly: boolean // 只保留在「自选」里的标的
 }
 
 export const defaultFilter: ScreenerFilter = {
@@ -33,13 +34,15 @@ export const defaultFilter: ScreenerFilter = {
   rsiMin: '', rsiMax: '',
   boards: [],
   excludeST: false,
+  watchlistOnly: false,
 }
 
 export function filterActive(f: ScreenerFilter): boolean {
   if (f.boards.length > 0) return true
   if (f.excludeST) return true
+  if (f.watchlistOnly) return true
   return Object.entries(f).some(([k, v]) =>
-    k !== 'boards' && k !== 'excludeST' && v !== '' && v !== false,
+    k !== 'boards' && k !== 'excludeST' && k !== 'watchlistOnly' && v !== '' && v !== false,
   )
 }
 
@@ -55,13 +58,16 @@ export function countActiveFilters(f: ScreenerFilter): number {
   if (f.rsiMin || f.rsiMax) n++
   if (f.boards.length > 0) n++
   if (f.excludeST) n++
+  if (f.watchlistOnly) n++
   return n
 }
 
-export function applyFilter(rows: any[], f: ScreenerFilter): any[] {
+export function applyFilter(rows: any[], f: ScreenerFilter, watchlistSet?: Set<string>): any[] {
   if (!filterActive(f)) return rows
   const num = (v: string) => v === '' ? null : Number(v)
   return rows.filter((r) => {
+    // 只看自选: 仅保留在自选集合里的标的。集合未加载时 (undefined) 不过滤, 避免闪空。
+    if (f.watchlistOnly && watchlistSet && !watchlistSet.has(String(r.symbol))) return false
     // 板块: 用 symbol 判定板块, 必须在选中列表里
     // 全选 5 个板块 = 不过滤 (等价于 boards:[]), 避免 getBoardType 返回 null 的边缘品种被误删
     if (f.boards.length > 0 && f.boards.length < BOARDS.length) {
@@ -202,6 +208,17 @@ export function FilterPanel({ value, onChange, onClose, onReset }: {
           }`}
         >
           排除ST
+        </button>
+        <button
+          onClick={() => onChange({ ...value, watchlistOnly: !value.watchlistOnly })}
+          title="只保留在「自选」里的标的"
+          className={`px-2 py-0.5 rounded text-[11px] transition-colors ${
+            value.watchlistOnly
+              ? 'bg-accent/15 text-accent'
+              : 'bg-elevated text-secondary hover:text-foreground hover:bg-elevated/80'
+          }`}
+        >
+          只看自选
         </button>
       </div>
 

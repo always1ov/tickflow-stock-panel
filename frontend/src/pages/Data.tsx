@@ -20,6 +20,7 @@ import {
 import { Link } from 'react-router-dom'
 import { EndpointTestDialog } from '@/components/EndpointTestDialog'
 import { api, type ExtDataConfig } from '@/lib/api'
+import { toast } from '@/components/Toast'
 import {
   useCapabilities,
   useSettings,
@@ -31,7 +32,6 @@ import {
 import { useToggleRealtimeQuotes, useUpdateQuoteInterval } from '@/lib/useSharedMutations'
 import { QK } from '@/lib/queryKeys'
 import { PageHeader } from '@/components/PageHeader'
-import { toast } from '@/components/Toast'
 import { formatScheduleDatePart, formatScheduleTimePart, isToday } from '@/lib/format'
 
 // 拆分出的子组件
@@ -188,16 +188,33 @@ export function Data() {
     minute: 'minute',
     financials: 'financial',
   }
-  // 当前 custom 源支持的数据集集合
-  const activeCustomDatasets = activeProvider !== 'tickflow'
-    ? new Set(dataSources.data?.custom?.find(s => s.name === activeProvider)?.datasets || [])
-    : new Set<string>()
-  // 给定 tierKey, 返回 custom provider 显示名 (走 custom 时) 或 null (走 TickFlow)
+  // 数据源按数据集独立路由 (日线/分钟/实时/财务各有偏好, 除权跟随日线),
+  // 每张卡片按自己数据集的路由取显示名, 而非统一按日线源。
+  const allSourceItems = [
+    ...(dataSources.data?.custom ?? []),
+    ...(dataSources.data?.plugins ?? []),
+  ]
+  const getDatasetProvider = (ds: string): string => {
+    const p = prefs.data as Record<string, unknown> | undefined
+    let name = 'tickflow'
+    if (ds === 'daily') name = (p?.daily_data_provider as string) || 'tickflow'
+    else if (ds === 'minute') name = (p?.minute_data_provider as string) || 'tickflow'
+    else if (ds === 'financial') name = (p?.financial_data_provider as string) || 'tickflow'
+    else if (ds === 'adj_factor') {
+      name = (p?.adj_factor_provider as string) || 'same_as_daily'
+      if (name === 'same_as_daily') name = (p?.daily_data_provider as string) || 'tickflow'
+    }
+    return name.toLowerCase()
+  }
+  // 给定 tierKey, 返回该数据集实际路由到的自定义源显示名, 走 TickFlow 时返回 null
   const getCustomProviderName = (tierKey: string): string | null => {
-    if (activeProvider === 'tickflow') return null
     const ds = TIERKEY_TO_DATASET[tierKey]
-    if (ds && activeCustomDatasets.has(ds)) return activeDataSourceName
-    return null
+    if (!ds) return null
+    const provider = getDatasetProvider(ds)
+    if (provider === 'tickflow') return null
+    const item = allSourceItems.find(s => s.name === provider)
+    if (!item || !item.datasets.includes(ds)) return null
+    return item.display_name || provider
   }
 
   const minuteAuto = prefs.data?.minute_sync_enabled ?? false
@@ -268,8 +285,8 @@ export function Data() {
 
   useEffect(() => {
     if (job.data && (job.data.status === 'succeeded' || job.data.status === 'failed')) {
-      // [fork 增强] 盘后完整性提示: 同步"成功"但今日全市场日线没出齐(免费源盘后延迟发布)
-      // → 弹明显提示, 否则用户只看到成功、却发现梯队/概念还停在昨天而不知原因。
+      // 盘后完整性提示: 同步"成功"但今日全市场日线没出齐(免费源盘后延迟发布) →
+      // 弹明显提示, 否则用户只看到成功、却发现梯队/概念还停在昨天而不知原因。
       if (job.data.status === 'succeeded' && job.data.result?.today_daily_incomplete) {
         toast(`今日全市场日线尚未出齐(仅 ${job.data.result?.today_daily_rows ?? 0} 只)。数据源一般 17:30~20:00 发布当日数据, 届时再点「立即同步」即可补到今天`, 'error')
       }
@@ -659,6 +676,17 @@ export function Data() {
       />
 
       <div className="px-8 py-6 space-y-6 max-w-6xl">
+        {/* 数据持久化警告 —— 容器内数据目录未挂卷, 重建容器(拉新镜像)会丢全部数据 */}
+        {s?.data_dir_persistent === false && (
+          <div className="flex items-start gap-2 rounded-card border border-danger/40 bg-danger/10 px-3 py-2.5 text-xs">
+            <AlertTriangle className="h-4 w-4 shrink-0 text-danger mt-0.5" />
+            <span className="text-danger leading-relaxed">
+              <span className="font-semibold">数据目录未挂载持久化卷!</span>
+              当前数据写在容器内部({s?.data_dir_path}),拉新镜像重建容器时会<span className="font-semibold">丢失全部数据</span>。
+              请在 docker-compose 的 volumes 中挂载该路径(如 <code className="font-mono bg-danger/15 rounded px-1">./data:{s?.data_dir_path}</code>)后重建容器。
+            </span>
+          </div>
+        )}
         {/* None 档提示 —— 非阻断: 无需 Key 也可获取历史日K, 仅实时行情等扩展能力受限 */}
         {isNoKey && (
           <div className="flex items-center gap-2 rounded-card border border-border bg-elevated/40 px-3 py-2 text-xs">

@@ -4,6 +4,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Play, FlaskConical, Clock, Loader2, Square, Search, Plus, X, SlidersHorizontal, BarChart3, Gauge, Zap, ListPlus, HelpCircle, ChevronRight, AlertTriangle, Layers, BookmarkPlus } from 'lucide-react'
 import {
   api,
+  paramOptionValue,
+  paramOptionLabel,
   type StrategyBacktestResult,
   type StrategyBacktestTrade,
   type StrategyDetail,
@@ -707,7 +709,10 @@ function StrategyParamInput({ param, value, onChange }: {
       <label className="block">
         <span className="mb-1 block text-[11px] text-secondary">{param.label}</span>
         <select value={value ?? param.default} onChange={e => onChange(e.target.value)} className={INPUT_CLS}>
-          {(param.options ?? []).map(opt => <option key={opt} value={opt}>{opt}</option>)}
+          {(param.options ?? []).map(opt => {
+            const val = paramOptionValue(opt)
+            return <option key={String(val)} value={val}>{paramOptionLabel(opt)}</option>
+          })}
         </select>
       </label>
     )

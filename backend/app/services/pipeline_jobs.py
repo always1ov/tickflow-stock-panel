@@ -38,6 +38,10 @@ LONG_JOB_TIMEOUT_S = 1800
 STALE_JOB_TIMEOUT_S = DEFAULT_JOB_TIMEOUT_S
 
 
+class JobCancelled(Exception):
+    """协作式取消信号: progress 心跳发现 job 已被取消时抛出。"""
+
+
 def _default_store_dir() -> Path:
     from app.config import settings
     return settings.data_dir / "job_store"
@@ -194,14 +198,25 @@ class JobStore:
 
     # ===== progress =====
 
+    def is_cancelled(self, job_id: str) -> bool:
+        """job 是否已被取消/判死(状态 failed)。
+
+        供协作式中断: 各同步任务的 progress 闭包在每次心跳时检查,
+        已取消则抛 JobCancelled, 让管道在最近的批次边界立即退出
+        (线程无法强杀, 这是唯一能"真中断"的方式; 落盘增量幂等, 中断无害,
+        下次同步从已写入处自动续)。
+        """
+        j = self.get(job_id)
+        return j is None or j.get("status") == "failed"
+
     def progress(self, job_id: str, stage: str, pct: int, msg: str,
                  stage_pct: int | None = None, skip_log: bool = False) -> None:
         with self._lock:
             j = self._active_jobs.get(job_id)
             if not j:
                 return
-            # [fork 增强] 活性心跳: reap_stale 按「最后一次进度距今」判卡死, 而非
-            # 总运行时长(首次全量拉取可远超阈值但一直在推进, 不该被误杀)
+            # 活性心跳: reap_stale 按「最后一次进度距今」判卡死, 而非总运行时长
+            # (首次全量拉取可远超阈值但一直在推进, 不该被误杀)
             j["progress_at"] = datetime.utcnow().isoformat(timespec="seconds") + "Z"
             j["stage"] = stage
             j["progress"] = max(0, min(100, int(pct)))
@@ -254,7 +269,12 @@ class JobStore:
         return self._active_id
 
     def reap_stale(self, timeout_s: int | None = None) -> None:
-        """回收运行超过阈值(卡死)的 running job(标记为 failed)。
+        """回收**无进展**超过阈值(卡死)的 running job(标记为 failed)。
+
+        判定基准是「最后一次进度心跳距今」而非总运行时长: 首次全量拉取
+        (清库后逐日拉一年日线 + 全史除权)总时长可远超阈值, 但只要还在
+        持续汇报进度就是活的, 不误杀; 真卡死(线程挂在一个调用上不再回报)
+        依然在阈值内被回收。旧 job 无 progress_at 时回退 started_at。
 
         在 /run 和 /jobs/{id} 轮询端点都会调用 — 保证卡死后任意轮询都能自愈,
         无需用户再次手动触发同步。reload 后的孤儿 task(内存里已无 job 记录)
@@ -274,8 +294,7 @@ class JobStore:
             started = j.get("started_at")
             if not started:
                 return
-            # [fork 增强] 活性基准: 最后一次进度心跳(progress() 写入), 无心跳用启动时间。
-            # 有心跳就是活的(首次全量拉取跑多久都不杀); 真卡死(不再回报)仍在阈值内回收。
+            # 活性基准: 最后一次进度心跳(progress() 写入), 无心跳记录用启动时间
             last_beat = j.get("progress_at") or started
             # 优先用显式传入, 其次 job 自身阈值, 最后默认值
             effective_timeout = timeout_s if timeout_s is not None else j.get("timeout_s", DEFAULT_JOB_TIMEOUT_S)
@@ -284,13 +303,13 @@ class JobStore:
         # 两端都用 timezone-aware UTC 比较,避免 naive/aware 混用导致 TypeError。
         try:
             beat_dt = datetime.fromisoformat(last_beat.replace("Z", "+00:00"))
-            elapsed = (datetime.now(beat_dt.tzinfo) - beat_dt).total_seconds()
+            stalled = (datetime.now(beat_dt.tzinfo) - beat_dt).total_seconds()
         except Exception:  # noqa: BLE001
             return
-        if elapsed > effective_timeout:
+        if stalled > effective_timeout:
             logger.warning("reap_stale: 强制取消卡死 job %s (无进展 %.0fs, 阈值 %ss)",
-                           jid, elapsed, effective_timeout)
-            self.fail(jid, f"超时自动取消 (无进展 {int(elapsed)}s, 疑似卡死)")
+                           jid, stalled, effective_timeout)
+            self.fail(jid, f"超时自动取消 (无进展 {int(stalled)}s, 疑似卡死)")
             # 强制释放重任务锁: 卡死的线程无法被中断, 锁永远不会自然释放。
             # job 已标记 failed, 即使僵尸线程后续写入 parquet, 下次拉取会覆盖, 安全。
             try:

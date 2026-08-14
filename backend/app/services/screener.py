@@ -102,6 +102,27 @@ class ScreenerService:
         df_full = self._compute_enriched_full(df, target_date)
         return df_full
 
+    def prior_partition_info(self, as_of: date) -> tuple[date | None, int]:
+        """向前(1~9 天)找最近一个存在的日分区, 返回 (日期, 行数)。
+
+        用于「部分数据日」判定: 当日行数远小于前一交易日(如免费档盘后
+        辅助源未发布、当日只有自选实时写入的少数股票)时, 调用方可回退或标注。
+        行数用 scan+len 谓词下推, 不加载数据列。
+        """
+        enriched_dir = self.repo.store.data_dir / self._enriched_dirname
+        for delta in range(1, 10):
+            candidate = as_of - timedelta(days=delta)
+            p = enriched_dir / f"date={candidate.isoformat()}" / "part.parquet"
+            if not p.exists():
+                continue
+            try:
+                n = pl.scan_parquet(p).select(pl.len()).collect().item()
+            except Exception as e:  # noqa: BLE001
+                logger.warning("prior_partition_info scan failed for %s: %s", candidate, e)
+                return candidate, 0
+            return candidate, int(n)
+        return None, 0
+
     def load_prior_consecutive(self, as_of: date, consec_col: str) -> pl.DataFrame:
         """窄读: 仅取前一交易日的 [symbol, consec_col] 两列 (谓词下推到单日 parquet)。
 
@@ -394,6 +415,14 @@ class ScreenerService:
         history = None
         if history_bars > 1:
             history = self._load_enriched_history(as_of, history_bars)
+        # 注入自选集合 (带缓存), 供策略 basic_filter 的 watchlist_only 使用 (只看自选)。
+        # 失败静默 → None, watchlist_only 退化为不过滤 (全市场)。
+        watchlist_symbols: frozenset[str] | None
+        try:
+            from app.services import watchlist as watchlist_svc
+            watchlist_symbols = watchlist_svc.symbol_set()
+        except Exception:  # noqa: BLE001
+            watchlist_symbols = None
         return StrategyDataContext(
             asset_type=self.asset_type,
             timeframe=timeframe,
@@ -402,6 +431,7 @@ class ScreenerService:
             history=history,
             market=market,
             cache_key=cache_key,
+            watchlist_symbols=watchlist_symbols,
         )
 
     def latest_date(self) -> date | None:

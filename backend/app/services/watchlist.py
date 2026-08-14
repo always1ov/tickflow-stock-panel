@@ -9,6 +9,7 @@ import json
 import logging
 import os
 import threading
+import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FuturesTimeout
@@ -77,11 +78,42 @@ def _read_entries() -> pl.DataFrame:
     return df.select(list(_ENTRY_SCHEMA))
 
 
+# 自选 symbol 集合的短 TTL 缓存 —— 供策略引擎 basic_filter 的 watchlist_only 使用。
+# 监控每几秒跑一轮、每轮多策略都要用, 直接每次读 parquet 太浪费; 3s 缓存足够新鲜。
+# (fork #10; v0.2 合并后失效点收敛到 _write_entries 单点, 覆盖所有自选变更路径)
+_symbol_set_cache: tuple[float, frozenset[str]] | None = None
+
+
+def symbol_set(ttl_s: float = 3.0) -> frozenset[str]:
+    """返回自选 symbol 集合 (带 3s 缓存)。读盘失败/为空则返回空集合。
+
+    自选任何变更都经 _write_entries 落盘并主动失效缓存, 故正常使用无需等 TTL。
+    """
+    global _symbol_set_cache
+    now = time.time()
+    if _symbol_set_cache is not None and now - _symbol_set_cache[0] < ttl_s:
+        return _symbol_set_cache[1]
+    try:
+        s = frozenset(str(r["symbol"]) for r in list_symbols() if r.get("symbol"))
+    except Exception:  # noqa: BLE001
+        s = frozenset()
+    _symbol_set_cache = (now, s)
+    return s
+
+
+def _invalidate_symbol_set_cache() -> None:
+    """自选变更后清空缓存, 让 watchlist_only 立即反映最新自选。"""
+    global _symbol_set_cache
+    _symbol_set_cache = None
+
+
 def _write_entries(df: pl.DataFrame) -> None:
     p = _path()
     tmp = p.with_suffix(p.suffix + ".tmp")
     df.select(list(_ENTRY_SCHEMA)).write_parquet(tmp)
     os.replace(tmp, p)
+    # 所有自选变更(add/remove/clear/分组调整)都经此落盘 → 单点失效 watchlist_only 缓存
+    _invalidate_symbol_set_cache()
 
 
 def _read_groups() -> list[dict]:

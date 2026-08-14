@@ -129,6 +129,36 @@ export function SettingsDataSourcesPanel() {
 
   const selectedCustom = customList.find(s => s.name === selected)
 
+  // ===== 按数据集逐项路由 =====
+  // 后端本就支持 5 个数据集各自选源(daily/minute/realtime/financial + 除权跟随日线),
+  // 原「使用」按钮只是"整组切换"的快捷方式, 把逐项能力藏住了。这里显式暴露:
+  // 每个数据集一个下拉, 只列出声明了该数据集且可用(插件已装)的源, TickFlow 始终兜底可选。
+  const datasetRoutes = [
+    { field: 'daily_data_provider', ds: 'daily', label: '日线' },
+    { field: 'minute_data_provider', ds: 'minute', label: '分钟K' },
+    { field: 'realtime_data_provider', ds: 'realtime', label: '实时' },
+    { field: 'financial_data_provider', ds: 'financial', label: '财务' },
+  ] as const
+  const setDatasetProvider = useMutation({
+    mutationFn: (patch: Parameters<typeof api.updateDataProviders>[0]) =>
+      api.updateDataProviders(patch),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: QK.preferences })
+      toast('数据集路由已更新', 'success')
+    },
+  })
+  const providerLabel = (name?: string) =>
+    !name || name === 'tickflow' ? 'TickFlow' : (allItems.find(s => s.name === name)?.display_name || name)
+  const optionsFor = (ds: string) => [
+    { name: 'tickflow', label: 'TickFlow' },
+    ...allItems
+      .filter(i => i.name !== 'tickflow'
+        && i.datasets.includes(ds)
+        && !(pluginMap.get(i.name) && !pluginMap.get(i.name)!.available))
+      .map(i => ({ name: i.name, label: i.display_name })),
+  ]
+  const routeMixed = new Set(datasetRoutes.map(r => prefs.data?.[r.field] || 'tickflow')).size > 1
+
   return (
     <div className="space-y-5 max-w-5xl">
       {/* ===== 顶部: 当前数据源 + 数据源选择 (一个大卡片) ===== */}
@@ -154,13 +184,33 @@ export function SettingsDataSourcesPanel() {
           </button>
         </div>
 
-        {/* 当前数据源状态 */}
-        <div className="flex items-center gap-2 mb-4 px-3 py-2.5 rounded-lg bg-elevated/30">
+        {/* 当前数据源状态 + 按数据集逐项路由(可混搭: 每个数据集独立选源, TickFlow 兜底) */}
+        <div className="flex items-center gap-2 mb-4 px-3 py-2.5 rounded-lg bg-elevated/30 flex-wrap">
           <span className="text-[10px] uppercase tracking-widest text-muted">当前</span>
           <span className="h-2 w-2 rounded-full bg-accent animate-pulse" />
           <span className="text-sm font-medium text-foreground">
-            {activeName === 'tickflow' ? 'TickFlow' : customList.find(s => s.name === activeName)?.display_name || activeName}
+            {routeMixed ? '混合' : providerLabel(activeName)}
           </span>
+          <span className="mx-1 h-4 w-px bg-border/60 hidden sm:block" />
+          {datasetRoutes.map(r => {
+            const value = prefs.data?.[r.field] || 'tickflow'
+            const opts = optionsFor(r.ds)
+            return (
+              <label key={r.field} className="flex items-center gap-1 text-[11px] text-muted">
+                {r.label}
+                <select
+                  value={opts.some(o => o.name === value) ? value : 'tickflow'}
+                  disabled={setDatasetProvider.isPending || opts.length <= 1}
+                  onChange={e => setDatasetProvider.mutate({ [r.field]: e.target.value } as Parameters<typeof api.updateDataProviders>[0])}
+                  title={`「${r.label}」数据由谁提供(仅列出支持该数据集的源)`}
+                  className="h-6 max-w-[150px] truncate rounded border border-border bg-base px-1 text-[11px] text-foreground focus:outline-none focus:border-accent/50 disabled:opacity-50 cursor-pointer"
+                >
+                  {opts.map(o => <option key={o.name} value={o.name}>{o.label}</option>)}
+                </select>
+              </label>
+            )
+          })}
+          <span className="text-[10px] text-muted/40">除权跟随日线</span>
         </div>
 
         {/* 数据源选择 - 横向卡片列表 */}
@@ -304,10 +354,12 @@ export function SettingsDataSourcesPanel() {
           </div>
         )}
 
-        <div className="mt-3 flex items-center gap-3 text-[10px] text-muted/50">
+        <div className="mt-3 flex items-center gap-3 text-[10px] text-muted/50 flex-wrap">
           <span>单击编辑</span>
           <span className="text-muted/30">·</span>
-          <span>点「使用」切换为当前数据源</span>
+          <span>点「使用」= 整组切到该源(快捷)</span>
+          <span className="text-muted/30">·</span>
+          <span>上方每个数据集也可单独选源, 随意混搭</span>
           <span className="text-muted/30">·</span>
           <span>未启用的数据集自动回退 TickFlow</span>
         </div>

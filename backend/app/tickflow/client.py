@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 _sync_client: TickFlow | None = None
 _async_client: AsyncTickFlow | None = None
 _paid_realtime_client: TickFlow | None = None
-_realtime_client_pool: list[TickFlow] | None = None  # [fork 增强] 多 key 实时池
+_realtime_client_pool: list[TickFlow] | None = None
 
 
 # ===== 服务器归属判定 =====
@@ -100,13 +100,11 @@ def get_paid_realtime_client() -> TickFlow | None:
 
 
 def get_realtime_client_pool() -> list[TickFlow]:
-    """[fork 增强] 实时行情客户端池 —— 每个配置的 key 建一个 client。
+    """实时行情客户端池 —— 每个配置的 key 建一个 client。
 
     用于「免费多 key 池化」:N 个免费 key,把自选按 5 只一组轮流分给不同 key 拉取,
-    突破单免费 key 的 5 只上限(总额度 5×N)。付费单 key 时就是单元素列表,
-    行为与 get_paid_realtime_client 等价。无 key 返回空列表。
-    仅用于实时行情(与 get_paid_realtime_client 同为付费端点);
-    历史日K等 free-api 路径**不得**使用本池(免费 key 打付费端点会被拒)。
+    突破单免费 key 的 5 只上限(总额度 5×N)。付费单 key 时就是单元素列表。
+    无 key 返回空列表。
     """
     global _realtime_client_pool
     keys = secrets_store.get_tickflow_keys()

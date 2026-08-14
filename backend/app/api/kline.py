@@ -964,6 +964,10 @@ async def sync_minute(request: Request):
         loop = asyncio.get_event_loop()
 
         def progress(stage: str, pct: int, msg: str) -> None:
+            # 协作式取消: 用户点了取消(或被判死)→ 在最近的批次边界立即退出
+            from app.services.pipeline_jobs import JobCancelled
+            if job_store.is_cancelled(job_id):
+                raise JobCancelled(job_id)
             job_store.progress(job_id, stage, pct, msg)
 
         try:
@@ -1010,7 +1014,12 @@ async def sync_minute(request: Request):
             job_store.succeed(job_id, {"minute_rows": written, "universe_size": len(universe)})
             invalidate_storage_cache()
         except Exception as e:  # noqa: BLE001
-            job_store.fail(job_id, str(e))
+            from app.services.pipeline_jobs import JobCancelled
+            if isinstance(e, JobCancelled):
+                # 已在 cancel 端点标记 failed; 已写入分段保留, 下次同步自动续
+                logger.info("minute sync cancelled by user (job %s)", job_id)
+            else:
+                job_store.fail(job_id, str(e))
             invalidate_storage_cache()
         finally:
             release_run_slot()

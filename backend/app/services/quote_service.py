@@ -742,68 +742,9 @@ class QuoteService:
         # ---- 策略监控 + 告警评估 ----
         self._evaluate_monitors(daily_df, quote_extra)
 
-    def _fetch_watchlist_quotes(self) -> None:
-        """Free 档自选股实时: 按 capability batch 上限分批拉取。"""
-        from app.services import preferences
-        from app.tickflow.capabilities import Cap
-        from app.tickflow.policy import detect_capabilities
-        from app.tickflow.rate_limits import chunked, resolve_limit, sleep_between_batches
-
-        symbols = preferences.get_realtime_watchlist_symbols()
-        # 指数监控规则标的并入轮询 (与股票共享 batch 额度)
-        engine = getattr(self._app_state, "monitor_engine", None) if self._app_state else None
-        if engine:
-            for _r in list(engine.rules.values()):
-                if _r.get("enabled", True) and _r.get("asset_type") == "index" and _r.get("scope") == "symbols":
-                    for _s in _r.get("symbols", []):
-                        if _s and _s not in symbols:
-                            symbols.append(_s)
-        if not symbols:
-            logger.info("自选实时未配置标的, 跳过行情拉取")
-            return
-
-        # [fork 增强] 免费多 key 池化: 每个 key 各 5 只额度, 批次轮流分给池中不同
-        # key(总额度 5×N); 自选超过单轮容量时用「轮转窗口」——每轮拉一个窗口,
-        # 下一轮接着往后, ⌈总数/容量⌉ 轮内所有自选都刷新一遍。
-        # 单 key 时池为单元素, 除轮转外行为与上游一致。
-        from app.tickflow.client import get_realtime_client_pool
-        pool = get_realtime_client_pool()
-        if not pool:
-            logger.warning("自选实时拉取失败:未配置付费服务器 API Key")
-            return
-
-        # 按 capability batch 上限分批: 股票+指数共享额度, 超过上限会导致整轮失败
-        capset = detect_capabilities()
-        lim = resolve_limit(capset, Cap.QUOTE_BY_SYMBOL, default_batch=5)
-        n_keys = len(pool)
-        cap = lim.batch * n_keys
-        total = len(symbols)
-        if total > cap:
-            offset = getattr(self, "_rt_rotate_offset", 0) % total
-            window = (symbols[offset:] + symbols[:offset])[:cap]
-            self._rt_rotate_offset = (offset + cap) % total
-        else:
-            window = symbols
-            self._rt_rotate_offset = 0
-        batches = chunked(window, lim.batch)
-
-        t0 = time.perf_counter()
-        now_ts = time.perf_counter()
-        resp = []
-        for i, batch in enumerate(batches):
-            # 限速按「每个 key 自己的第几次调用」(i // n_keys)计算 ——
-            # 不同 key 额度独立可同轮并发, 只有同一 key 的连续调用才需间隔
-            sleep_between_batches(i // n_keys, lim.rpm)
-            try:
-                resp.extend(pool[i % n_keys].quotes.get(symbols=batch) or [])
-            except Exception as e:  # noqa: BLE001
-                logger.warning("自选实时批次 %d/%d 拉取失败(key #%d): %s",
-                               i + 1, len(batches), i % n_keys + 1, e)
-
-        if not resp:
-            logger.warning("自选实时行情数据为空")
-            return
-
+    @staticmethod
+    def _quotes_to_records(resp: list[dict]) -> list[dict]:
+        """TickFlow quotes.get 响应 → 统一 record 形状(与自定义源 get_realtime 对齐)。"""
         records = []
         for q in resp:
             ext = q.get("ext") or {}
@@ -833,6 +774,75 @@ class QuoteService:
                 "timestamp": q.get("timestamp"),
                 "session": q.get("session"),
             })
+        return records
+
+    def _fetch_watchlist_quotes(self) -> None:
+        """Free 档自选股实时: 按 capability batch 上限分批拉取。"""
+        from app.services import preferences
+        from app.tickflow.client import get_realtime_client_pool
+        from app.tickflow.capabilities import Cap
+        from app.tickflow.policy import detect_capabilities
+        from app.tickflow.rate_limits import chunked, resolve_limit, sleep_between_batches
+
+        symbols = preferences.get_realtime_watchlist_symbols()
+        # 指数监控规则标的并入轮询 (与股票共享 batch 额度)
+        engine = getattr(self._app_state, "monitor_engine", None) if self._app_state else None
+        if engine:
+            for _r in list(engine.rules.values()):
+                if _r.get("enabled", True) and _r.get("asset_type") == "index" and _r.get("scope") == "symbols":
+                    for _s in _r.get("symbols", []):
+                        if _s and _s not in symbols:
+                            symbols.append(_s)
+        if not symbols:
+            logger.info("自选实时未配置标的, 跳过行情拉取")
+            return
+
+        pool = get_realtime_client_pool()
+        if not pool:
+            logger.warning("自选实时拉取失败:未配置付费服务器 API Key")
+            return
+
+        # 按 capability batch 上限分批: 股票+指数共享额度, 超过上限会导致整轮失败
+        capset = detect_capabilities()
+        lim = resolve_limit(capset, Cap.QUOTE_BY_SYMBOL, default_batch=5)
+
+        # 每轮容量 cap = batch × key数(5×N)。自选超过容量时, 用「轮转窗口」覆盖全部:
+        # 每轮拉 cap 只, 下一轮从上次结尾接着拉, ⌈总数/cap⌉ 轮内所有自选都刷新一遍。
+        # 代价是每只的实时刷新周期变为 ⌈总数/cap⌉ × 轮询间隔(多 key、大自选时的取舍)。
+        # 自选 ≤ cap 时窗口即全部, 退化为每轮全刷(与原行为一致)。
+        n_keys = len(pool)
+        cap = lim.batch * n_keys
+        total = len(symbols)
+        if total > cap:
+            offset = getattr(self, "_rt_rotate_offset", 0) % total
+            window = (symbols[offset:] + symbols[:offset])[:cap]
+            self._rt_rotate_offset = (offset + cap) % total
+        else:
+            window = symbols
+            self._rt_rotate_offset = 0
+        batches = chunked(window, lim.batch)
+
+        # 免费多 key 池化: 把每组(≤5 只)轮流分给池中不同的 key,突破单免费 key 的
+        # 5 只上限(总额度 5×key数)。单 key 时 pool 只有 1 个,退化为原逻辑。
+        t0 = time.perf_counter()
+        now_ts = time.perf_counter()
+        resp = []
+        for i, batch in enumerate(batches):
+            # 按「每个 key 自己的第几次调用」限速(i // n_keys),而非全局批次序号 ——
+            # 不同 key 之间额度独立,可同轮并发,不该互相拖慢;只有同一 key 的连续调用才需间隔。
+            sleep_between_batches(i // n_keys, lim.rpm)
+            client = pool[i % n_keys]
+            try:
+                resp.extend(client.quotes.get(symbols=batch) or [])
+            except Exception as e:  # noqa: BLE001
+                logger.warning("自选实时批次 %d/%d 拉取失败(key #%d): %s",
+                               i + 1, len(batches), i % n_keys + 1, e)
+
+        if not resp:
+            logger.warning("自选实时行情数据为空")
+            return
+
+        records = self._quotes_to_records(resp)
 
         index_set = self._repo.get_index_symbol_set() if self._repo else set()
         etf_set = self._repo.get_etf_symbol_set() if self._repo else set()
@@ -860,7 +870,11 @@ class QuoteService:
                 self._repo.merge_live_daily_asset("stock", daily_df)
             except Exception as e:  # noqa: BLE001
                 logger.warning("自选实时日K写盘失败: %s", e)
-            self._flush_live_enriched(daily_df, quote_extra, asset_type="stock", merge=True)
+            # overlay=True: 自选实时只进「自选实时叠加层」, 不碰全市场盘后快照 (_enriched_cache)。
+            # 于是看板/概念/行业/连板/策略统一显示上一完整交易日(盘后)全市场; 自选页/决策台/
+            # 自选监控把这层叠加上去拿到自选的实时值。(旧实现把只含自选的 enriched 覆盖进全市场
+            # 快照, 导致这些全市场页面坍缩成只剩自选。)
+            self._flush_live_enriched(daily_df, quote_extra, asset_type="stock", overlay=True)
 
         # ETF/指数进自选前5时按各自资产落盘, 不污染股票表
         etf_daily_df = self._build_daily(etf_records)
@@ -1082,6 +1096,13 @@ class QuoteService:
                 return
             # 获取 enriched 数据 (刚算好的)
             enriched_today, enriched_date = self.get_enriched_today()
+            # 自选实时档 (watchlist): 全市场快照是上一交易日(盘后), 自选的实时行在叠加层里。
+            # 监控要基于自选实时值, 故此档用叠加层(当天)作为股票评估快照 —— 只含自选, 但正是
+            # 该档唯一有实时数据的标的; 全市场规则在盘后价上静态(不会误触发陈旧价)。
+            if self._repo is not None and self.realtime_mode() == "watchlist":
+                ov = self._repo.get_watchlist_live("stock")
+                if not ov.is_empty():
+                    enriched_today, enriched_date = ov, cn_today()
             # 股票快照就绪 = 非空 + 日期为当日。未就绪时仅跳过股票轮,
             # ETF/指数轮有各自的空表+日期守卫, 不受影响 (纯指数行情/自选场景可独立评估)。
             stock_ready = (not enriched_today.is_empty()) and (enriched_date == cn_today())
@@ -1399,8 +1420,10 @@ class QuoteService:
             feishu_url = preferences.get_feishu_webhook_url()
             feishu_secret = preferences.get_feishu_webhook_secret()
             wecom_url = preferences.get_wecom_webhook_url()
-            # 两个通道都没配置才跳过
-            if not feishu_url and not wecom_url:
+            dingtalk_url = preferences.get_dingtalk_webhook_url()
+            dingtalk_keyword = preferences.get_dingtalk_keyword()
+            # 所有通道都没配置才跳过
+            if not feishu_url and not wecom_url and not dingtalk_url:
                 return
 
             # 反查规则, 过滤出启用推送的事件
@@ -1434,6 +1457,9 @@ class QuoteService:
                     enqueued += 1
                 if wecom_url and "wecom" in channels:
                     _WEBHOOK_EXECUTOR.submit(webhook_adapter.send_wecom, wecom_url, title, body)
+                    enqueued += 1
+                if dingtalk_url and "dingtalk" in channels:
+                    _WEBHOOK_EXECUTOR.submit(webhook_adapter.send_dingtalk, dingtalk_url, title, body, dingtalk_keyword)
                     enqueued += 1
             if enqueued:
                 logger.info("Webhook 已提交 %d 条 (异步投递, 按渠道独立投递, 失败记 WARNING)", enqueued)
@@ -1487,7 +1513,7 @@ class QuoteService:
     # enriched 增量计算
     # ================================================================
 
-    def _flush_live_enriched(self, daily_df: pl.DataFrame, quote_extra: pl.DataFrame = None, asset_type: str = "stock", merge: bool = False) -> None:
+    def _flush_live_enriched(self, daily_df: pl.DataFrame, quote_extra: pl.DataFrame = None, asset_type: str = "stock", merge: bool = False, overlay: bool = False) -> None:
         """增量计算今天的 enriched: 用昨天的递推状态 + 今天 OHLCV → 只算今天 5500 行。
 
         quote_extra: API 直接提供的补充字段 (prev_close, change_pct 等),
@@ -1592,7 +1618,12 @@ class QuoteService:
                 return
 
             # ---- 写盘 + 更新缓存 ----
-            if merge:
+            if overlay:
+                # 自选实时叠加层: 不碰全市场盘后快照 (_enriched_cache), 只存自选实时行,
+                # 供自选页/决策台/自选监控叠加。全市场页面(看板/概念/行业/连板/策略)因此
+                # 统一读到上一完整交易日(盘后)全市场, 与自选实时互不干扰。
+                self._repo.update_watchlist_live(asset_type, enriched_today)
+            elif merge:
                 self._repo.merge_live_enriched_asset(asset_type, enriched_today)
             else:
                 self._repo.flush_live_enriched_asset(asset_type, enriched_today)

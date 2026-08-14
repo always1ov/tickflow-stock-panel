@@ -309,6 +309,11 @@ class KlineRepository:
         # ---- Polars 缓存 ----
         self._enriched_cache: pl.DataFrame | None = None       # 最新一天 (~5500行)
         self._enriched_cache_date: date | None = None
+        # 自选实时叠加层 (watchlist 档): {asset_type: 自选实时 enriched 行(当天)}。
+        # 与 _enriched_cache(全市场盘后快照)分开存 —— 自选实时不覆盖全市场快照,
+        # 从而看板/概念/行业/连板/策略统一显示上一完整交易日(盘后)全市场;
+        # 只有自选页/决策台/自选监控把这层叠加上去, 拿到自选的实时值。
+        self._watchlist_live: dict[str, pl.DataFrame] = {}
         self._live_agg_cache: pl.DataFrame | None = None       # 预计算聚合表 (~5500行)
         self._live_agg_cache_date: date | None = None
         self._live_agg_check_date: date | None = None          # 上次跨日校验时的 today (快路径节流)
@@ -500,6 +505,63 @@ class KlineRepository:
         self._index_enriched_cache = None
         self._index_enriched_cache_date = None
 
+    def _prune_partial_today_enriched(self) -> None:
+        """删除磁盘上「只含自选」的当天 enriched 分区 (旧版自选实时污染的残留)。
+
+        旧实现在自选(watchlist)实时档把「只含自选」的 enriched 落成 date=today 分区,
+        使全市场快照坍缩成只剩自选。新版已改为「自选实时叠加层」不再写该分区, 但历史残留
+        仍会让 _refresh_enriched 把这份稀疏分区当成最新全市场快照。此处在刷新前自愈一次。
+
+        **精确判据(不用行数阈值,避免误删盘后同步的部分结果)**: 仅当「最新 enriched 分区
+        就是今天」且「该分区的 symbol 全部落在自选(watchlist)集合内」时, 才判定为自选实时
+        残留并删除。盘后管道的当天分区(哪怕免费档只拉到一部分)一定含大量**非自选**个股
+        (universe = instruments 全表), 不是自选子集 → 永不误删。自选为空时不删(无从判定)。
+        """
+        try:
+            from datetime import date as _date, timedelta
+            from app.market_time import cn_today
+            today = cn_today()
+            with self._lock:
+                row = self.db.execute(
+                    "SELECT max(date) FROM kline_enriched WHERE date >= ?",
+                    [today - timedelta(days=15)],
+                ).fetchone()
+            if not row or not row[0]:
+                return
+            top_date = row[0]
+            top_date = top_date if isinstance(top_date, _date) else _date.fromisoformat(str(top_date))
+            if top_date != today:
+                return  # 最新分区不是今天 → 无自选残留风险
+            # 自选集合: 残留分区的 symbol 必须全部落在自选内才算「只含自选」
+            try:
+                from app.services import watchlist as _wl
+                wl_syms = set(_wl.symbol_set())
+            except Exception:  # noqa: BLE001
+                wl_syms = set()
+            if not wl_syms:
+                return  # 自选为空 → 无从判定, 保守不删
+            ds = today.isoformat()
+            part_dir = self.store.data_dir / "kline_daily_enriched" / f"date={ds}"
+            part = part_dir / "part.parquet"
+            if not part.exists():
+                return
+            try:
+                syms = set(pl.read_parquet(part, columns=["symbol"])["symbol"].to_list())
+            except Exception:  # noqa: BLE001
+                return
+            # 全部是自选 → 自选实时残留; 含任一非自选个股 → 是(部分)盘后数据, 不动
+            if not syms or not syms.issubset(wl_syms):
+                return
+            import shutil
+            with self._write_lock:
+                shutil.rmtree(part_dir, ignore_errors=True)
+            logger.warning(
+                "已删除只含自选的当天 enriched 分区 date=%s (%d 只, 全部为自选, 疑似旧版自选实时残留); "
+                "全市场快照回落到上一完整交易日(盘后)", ds, len(syms),
+            )
+        except Exception as e:  # noqa: BLE001
+            logger.debug("prune partial today enriched 跳过 (不影响主流程): %s", e)
+
     def _refresh_enriched(self) -> None:
         """从 parquet 加载 enriched 最新日到内存 + 构建聚合表。
 
@@ -511,6 +573,10 @@ class KlineRepository:
         try:
             started = time.perf_counter()
             logger.info("enriched refresh start")
+
+            # 先自愈: 清掉旧版自选实时可能残留的「只含自选」当天 enriched 分区,
+            # 否则会被当成最新全市场快照, 使看板/策略等坍缩成只剩自选。
+            self._prune_partial_today_enriched()
 
             step = time.perf_counter()
             logger.info("enriched refresh step start: latest date")
@@ -2115,8 +2181,48 @@ class KlineRepository:
         )
         return df.join(metadata, on="symbol", how="left")
 
+    # ================================================================
+    # 自选实时叠加层 (watchlist 档) —— 与全市场盘后快照分开, 不互相污染
+    # ================================================================
+
+    def update_watchlist_live(self, asset_type: str, df: pl.DataFrame) -> None:
+        """把自选实时 enriched 行存入叠加层 (按 symbol 累积, 保留最新)。
+
+        **不触碰** `_enriched_cache`/`_enriched_cache_date`(全市场盘后快照)。轮转窗口下
+        多轮累积成完整自选集合。仅供自选页/决策台/自选监控叠加读取。"""
+        if df is None or df.is_empty() or "symbol" not in df.columns:
+            return
+        df = self._with_instrument_metadata(asset_type, df)
+        prev = self._watchlist_live.get(asset_type)
+        if prev is not None and not prev.is_empty():
+            df = pl.concat([prev, df], how="diagonal_relaxed").unique(subset=["symbol"], keep="last")
+        self._watchlist_live[asset_type] = df.sort(["symbol"])
+
+    def get_watchlist_live(self, asset_type: str = "stock") -> pl.DataFrame:
+        """返回自选实时叠加层 (当天自选实时行); 无则空表。"""
+        df = self._watchlist_live.get(asset_type)
+        return df if df is not None else pl.DataFrame()
+
+    def overlay_watchlist_live(self, df: pl.DataFrame, asset_type: str = "stock") -> pl.DataFrame:
+        """把自选实时叠加层覆盖到给定 df 上 (按 symbol 用实时行替换)。
+
+        供自选页读取: df 是全市场盘后快照, 覆盖后自选那几只拿到实时值, 其余不变。
+        叠加层为空 (非 watchlist 档 / 尚未拉到) 时原样返回。"""
+        ov = self._watchlist_live.get(asset_type)
+        if ov is None or ov.is_empty() or df is None or df.is_empty() or "symbol" not in df.columns:
+            return df
+        keep = df.filter(~pl.col("symbol").is_in(ov["symbol"].to_list()))
+        return pl.concat([keep, ov], how="diagonal_relaxed").sort(["symbol"])
+
+    def clear_watchlist_live(self, asset_type: str | None = None) -> None:
+        """清空自选实时叠加层 (asset_type=None 清全部)。"""
+        if asset_type is None:
+            self._watchlist_live = {}
+        else:
+            self._watchlist_live.pop(asset_type, None)
+
     def merge_live_enriched_asset(self, asset_type: str, df: pl.DataFrame) -> None:
-        """按 symbol 合并当天 enriched 分区和内存缓存。用于少量自选实时。"""
+        """按 symbol 合并当天 enriched 分区和内存缓存。用于少量自选实时 (ETF/指数)。"""
         if df.is_empty() or "date" not in df.columns:
             return
         dt = df["date"][0]
@@ -2172,8 +2278,38 @@ class KlineRepository:
             return
         self.flush_live_daily_asset("stock", df)
 
+    @staticmethod
+    def _partition_rows(path: Path) -> int:
+        """读某分区文件的行数 (仅元数据, 不加载数据); 失败返回 0。"""
+        try:
+            return int(pl.scan_parquet(path).select(pl.len()).collect().item())
+        except Exception:  # noqa: BLE001
+            return 0
+
+    def _overwrite_would_lose_data(self, out: Path, new_rows: int, what: str) -> bool:
+        """完整性守卫: 覆盖写只允许「完整数据覆盖」。
+
+        新数据行数远小于既有分区(<50%)时判定为残缺(如 API 半途失败只回了一部分),
+        覆盖会把完整分区打残 —— 返回 True, 调用方应降级为按 symbol 合并。
+        50% 阈值远低于正常波动(停牌/退市每日仅个位数百分比), 只拦截灾难性残缺。
+        """
+        if not out.exists():
+            return False
+        existing = self._partition_rows(out)
+        if existing > 0 and new_rows < existing * 0.5:
+            logger.warning(
+                "%s 覆盖被拦截: 新数据仅 %d 行, 远少于既有分区 %d 行(疑似残缺响应), "
+                "降级为合并写入以保护完整数据", what, new_rows, existing,
+            )
+            return True
+        return False
+
     def flush_live_daily_asset(self, asset_type: str, df: pl.DataFrame) -> None:
-        """覆写当天指定资产日K分区 (实时行情落盘, 非merge)。"""
+        """覆写当天指定资产日K分区 (实时行情落盘, 非merge)。
+
+        带完整性守卫: 新数据行数远小于既有分区时(残缺响应), 降级为 merge,
+        绝不用残缺数据覆盖完整分区(「覆盖必须完整, 否则增量」)。
+        """
         if df.is_empty() or "date" not in df.columns:
             return
         table = {
@@ -2187,6 +2323,9 @@ class KlineRepository:
         dt = df["date"][0]
         ds = dt.isoformat() if hasattr(dt, "isoformat") else str(dt)
         out = base / f"date={ds}" / "part.parquet"
+        if self._overwrite_would_lose_data(out, df.height, f"{table} date={ds}"):
+            self.merge_live_daily_asset(asset_type, df)
+            return
         out.parent.mkdir(parents=True, exist_ok=True)
         with self._write_lock:
             self._atomic_write_parquet(df.sort(["symbol", "date"]), out)
@@ -2199,10 +2338,22 @@ class KlineRepository:
         self.flush_live_enriched_asset("stock", df)
 
     def flush_live_enriched_asset(self, asset_type: str, df: pl.DataFrame) -> None:
-        """覆写当天指定资产 enriched 分区 (实时 enriched 落盘, 非merge)。"""
+        """覆写当天指定资产 enriched 分区 (实时 enriched 落盘, 非merge)。
+
+        带完整性守卫: 新数据远少于既有分区时(残缺响应), 降级为 merge_live_enriched_asset
+        (内存缓存与磁盘都按 symbol 合并), 绝不用残缺数据覆盖完整快照。
+        """
         if df.is_empty() or "date" not in df.columns:
             return
         dt = df["date"][0]
+        _table = {"stock": "kline_daily_enriched", "etf": "kline_etf_enriched",
+                  "index": "kline_index_enriched"}.get(asset_type)
+        if _table:
+            _ds = dt.isoformat() if hasattr(dt, "isoformat") else str(dt)
+            _out = self.store.data_dir / _table / f"date={_ds}" / "part.parquet"
+            if self._overwrite_would_lose_data(_out, df.height, f"{_table} date={_ds}"):
+                self.merge_live_enriched_asset(asset_type, df)
+                return
         cache_df = self._with_instrument_metadata(asset_type, df).sort(["symbol"])
         if asset_type == "stock":
             self._enriched_cache = cache_df

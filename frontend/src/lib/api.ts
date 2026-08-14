@@ -507,10 +507,25 @@ export interface AiReviewReport {
   summary?: string
   emotion_score?: number | null
   emotion_label?: string
+  /** 生成时用的复盘模式(today/continuity/week); 旧存档无此字段 */
+  mode?: 'today' | 'continuity' | 'week'
   created_at: string
 }
 
 // ===== Strategy Engine =====
+/** select 参数的单个选项：可为纯字符串, 或 AI/自定义策略常用的 {label, value} 对象。 */
+export type StrategyParamOption = string | { label: string; value: string | number }
+
+/** 取选项的实际取值 (提交给后端 / 作为 <option value>)。 */
+export function paramOptionValue(o: StrategyParamOption): string | number {
+  return o != null && typeof o === 'object' ? o.value : o
+}
+
+/** 取选项的显示文案 (渲染为 <option> 子节点, 必须是字符串以免 React 直接渲染对象报错)。 */
+export function paramOptionLabel(o: StrategyParamOption): string {
+  return o != null && typeof o === 'object' ? o.label : String(o)
+}
+
 export interface StrategyParamDef {
   id: string
   label: string
@@ -519,7 +534,8 @@ export interface StrategyParamDef {
   min?: number
   max?: number
   step?: number
-  options?: string[]
+  // 兼容两种形态: string[] 或 [{label, value}]（后者是 AI 策略生成器的约定格式）
+  options?: StrategyParamOption[]
 }
 
 export interface CompositeChildInfo {
@@ -666,7 +682,7 @@ export interface MonitorRule {
   message: string
   webhook_url?: string
   webhook_enabled?: boolean  // 兼容老规则, 已由 webhook_channels 取代
-  webhook_channels?: string[]  // 命中时推送的外部渠道 (合法值 'feishu' | 'wecom')
+  webhook_channels?: string[]  // 命中时推送的外部渠道 (合法值 'feishu' | 'wecom' | 'dingtalk')
   created_at?: string
   runtime_warning?: string
   // ladder 专属: 封单监控
@@ -758,6 +774,10 @@ export interface LimitLadderTier {
 
 export interface LimitLadderResult {
   as_of: string
+  /** 部分数据日标注: 不完整的原始日期(默认日期已自动回退到 as_of 所示的上一完整交易日) */
+  partial_from?: string | null
+  /** 显式选择了部分数据日时: 该日仅有的股票数; null=已回退 */
+  partial_count?: number | null
   tiers: LimitLadderTier[]
   /** 双方向涨跌停计数(修正后, 不论当前 direction) */
   counts?: { up: number; down: number }
@@ -1121,6 +1141,8 @@ export interface Preferences {
   feishu_webhook_url?: string
   feishu_webhook_secret?: string
   wecom_webhook_url?: string
+  dingtalk_webhook_url?: string
+  dingtalk_keyword?: string
   wecom_bot_id?: string
   wecom_bot_secret?: string
   wecom_bot_enabled?: boolean
@@ -1384,6 +1406,16 @@ export const api = {
     request<{ wecom_webhook_url: string }>('/api/settings/preferences/wecom-webhook', {
       method: 'PUT',
       body: JSON.stringify({ url }),
+    }),
+  updateDingtalkWebhook: (url: string, keyword: string = '') =>
+    request<{ dingtalk_webhook_url: string; dingtalk_keyword: string }>('/api/settings/preferences/dingtalk-webhook', {
+      method: 'PUT',
+      body: JSON.stringify({ url, keyword }),
+    }),
+  testWebhook: (channel: 'feishu' | 'wecom' | 'dingtalk') =>
+    request<{ ok: boolean; channel: string }>('/api/settings/preferences/webhook-test', {
+      method: 'POST',
+      body: JSON.stringify({ channel }),
     }),
   updateWecomBot: (botId: string, secret: string, enabled: boolean = true) =>
     request<{
@@ -1691,6 +1723,20 @@ export const api = {
         ? `/api/watchlist/enriched?ext_columns=${encodeURIComponent(extColumns)}`
         : '/api/watchlist/enriched',
     ),
+  watchlistPositions: () =>
+    request<{ positions: Record<string, { held: boolean; cost: number | null; updated_at: string }> }>('/api/watchlist/positions'),
+  setWatchlistPosition: (symbol: string, held: boolean, cost: number | null) =>
+    request<{ symbol: string; position: { held: boolean; cost: number | null; updated_at: string } }>(
+      `/api/watchlist/positions/${encodeURIComponent(symbol)}`,
+      { method: 'PUT', body: JSON.stringify({ held, cost }) },
+    ),
+  stockSignals: () =>
+    request<{ signals: Record<string, { signal: string; confidence: number; reason: string; close: number | null; created_at: string; watch_points?: { direction: 'up' | 'down'; price: number; label: string; action?: string; confidence?: number; reason: string }[] }> }>('/api/stock-analysis/signals'),
+  generateStockSignal: (symbol: string) =>
+    request<{ symbol: string; signal?: string; confidence?: number; reason?: string; close?: number | null; created_at?: string; error?: string }>(
+      `/api/stock-analysis/signal/${encodeURIComponent(symbol)}`,
+      { method: 'POST' },
+    ),
 
   screenerStrategies: async (assetType?: 'stock' | 'etf' | 'index') => {
     const data = await request<{ strategies: StrategyDetail[]; load_errors?: StrategyLoadError[] }>(
@@ -1868,10 +1914,46 @@ export const api = {
       body: JSON.stringify(payload),
     }),
 
+  // 策略体检: 把胜率对比表交给 AI 解读(留谁/调谁/怎么调); messages 传既有对话可继续追问
+  backtestHealthInterpret: (rows: Record<string, unknown>[], windowLabel: string, messages: { role: 'user' | 'assistant'; content: string }[] = []) =>
+    request<{ text: string }>('/api/backtest/strategy/health-interpret', {
+      method: 'POST',
+      body: JSON.stringify({ rows, window_label: windowLabel, messages }),
+    }),
+
+  // 连板梯队 AI 战法清单: 梯队快照 → 龙头/二进三/反包候选分组(带置信度);
+  // messages 传对话可追问; reportId 传历史报告 id 可对旧报告续问(复用其存档快照)
+  ladderAiReview: (payload: { date: string; stats: Record<string, unknown>; tiers: unknown[] }, messages: { role: 'user' | 'assistant'; content: string }[] = [], reportId?: string) =>
+    request<{ text: string; report_id: string | null }>('/api/screener/ladder-ai', {
+      method: 'POST',
+      body: JSON.stringify({ ...payload, messages, report_id: reportId ?? '' }),
+    }),
+  ladderAiReports: () =>
+    request<{ reports: { id: string; date: string; created_at: string; text: string }[] }>('/api/screener/ladder-ai/reports'),
+  ladderAiDeleteReport: (id: string) =>
+    request<{ ok: boolean }>(`/api/screener/ladder-ai/reports/${id}`, { method: 'DELETE' }),
+
+  // 策略诊断: 配置+回测证据(出场原因分布/基准) → AI 归析死因与具体改法
+  backtestDiagnose: (payload: {
+    name: string
+    window_label: string
+    scope_label: string
+    config: Record<string, unknown>
+    stats: Record<string, unknown>
+    exit_reasons: { reason: string; count: number; avg_pnl: number }[]
+    benchmark_return: number | null
+  }) =>
+    request<{ text: string }>('/api/backtest/strategy/diagnose', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
   pipelineRun: () => request<{ job_id: string; reused: boolean }>(
     '/api/pipeline/run', { method: 'POST' },
   ),
   pipelineJob: (id: string) => request<PipelineJob>(`/api/pipeline/jobs/${id}`),
+  pipelineJobCancel: (id: string) =>
+    request<{ cancelled: string }>(`/api/pipeline/jobs/${id}/cancel`, { method: 'POST' }),
   pipelineJobs: (limit = 20) =>
     request<{ active_id: string | null; jobs: PipelineJobSummary[] }>(
       `/api/pipeline/jobs?limit=${limit}`,
@@ -2220,6 +2302,7 @@ export const api = {
   reviewReportSave: (r: {
     as_of: string; focus?: string; content: string
     summary?: string; emotion_score?: number | null; emotion_label?: string
+    mode?: 'today' | 'continuity' | 'week'
   }) =>
     request<{ ok: boolean; report: AiReviewReport }>('/api/market-recap/reports', {
       method: 'POST', body: JSON.stringify(r),
@@ -2232,7 +2315,7 @@ export const api = {
    * AI 大盘复盘 — 流式调用(NDJSON,与个股/财务分析同协议)。
    * meta 里带 as_of / emotion_score / emotion_label / summary,供前端先渲染信号灯。
    */
-  async *reviewStream(asOf?: string, focus?: string): AsyncGenerator<{
+  async *reviewStream(asOf?: string, focus?: string, mode: 'today' | 'continuity' | 'week' = 'today'): AsyncGenerator<{
     type: 'meta' | 'delta' | 'error' | 'done'
     as_of?: string
     emotion_score?: number
@@ -2244,7 +2327,7 @@ export const api = {
     const res = await fetch('/api/market-recap/analyze', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ as_of: asOf ?? null, focus: focus ?? '' }),
+      body: JSON.stringify({ as_of: asOf ?? null, focus: focus ?? '', mode }),
     })
     if (!res.ok) {
       let detail = ''
@@ -2642,6 +2725,9 @@ export interface DataStatus {
   last_instruments_run: string | null
   checked_at: string
   indicators_ready?: boolean
+  /** 数据目录持久化自检: false = 容器内未挂载卷, 重建容器会丢全部数据 */
+  data_dir_persistent?: boolean
+  data_dir_path?: string
 }
 
 export interface EnrichedField {

@@ -615,6 +615,9 @@ def status(request: Request) -> dict:
         "checked_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
         # 指标缓存就绪标志 (启动时 enriched 异步预热, 完成前为 false)
         "indicators_ready": getattr(request.app.state, "indicators_ready", True),
+        # 数据目录持久化自检 (启动时检测; false = 容器内未挂卷, 重建容器丢全部数据)
+        "data_dir_persistent": getattr(request.app.state, "data_dir_persistent", True),
+        "data_dir_path": str(data_dir),
     }
 
 

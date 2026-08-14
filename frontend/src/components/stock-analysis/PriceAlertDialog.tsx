@@ -34,6 +34,16 @@ function levelGroupLabel(level: PriceLevel) {
   return LEVEL_GROUPS.find(group => group.key === level.type)?.label ?? level.type
 }
 
+// 推荐点位 → 告警 message:站在"收到通知那一刻"的视角,直接告诉你此刻该考虑什么操作。
+// 推送正文是「{代码} {名称} {message}」,所以把动作写进 message,通知里就会带上。
+function recoAlertMessage(p: { action: string; price: number; label: string; reason: string }): string {
+  return [
+    `到${p.label || '目标价'} ${p.price.toFixed(2)}`,
+    p.action ? `可考虑${p.action}` : '',
+    p.reason,
+  ].filter(Boolean).join(' · ')
+}
+
 export function PriceAlertDialog({
   symbol,
   name,
@@ -91,6 +101,35 @@ export function PriceAlertDialog({
     }
   }, [currentPrice, levelsQuery.data?.levels])
 
+  // 缓存的 AI 信号(含 watch_points 推荐点位)
+  const signalsQ = useQuery({ queryKey: ['stock-signals'], queryFn: () => api.stockSignals(), staleTime: 30_000 })
+
+  // 推荐点位:优先 AI signal 的 watch_points;无则规则兜底(上方最近压力涨至 + 下方最近支撑跌至)
+  const recoPoints = useMemo(() => {
+    type Reco = { direction: PriceAlertDirection; price: number; label: string; action: string; confidence: number | null; reason: string; ai: boolean }
+    if (currentPrice == null) return [] as Reco[]
+    const wp = signalsQ.data?.signals?.[symbol]?.watch_points ?? []
+    if (wp.length > 0) {
+      return wp
+        .filter(p => Number.isFinite(p.price) && p.price > 0)
+        .map((p): Reco => ({
+          direction: p.direction,
+          price: p.price,
+          label: p.label,
+          action: p.action || (p.direction === 'up' ? '突破关注' : '跌破防守'),
+          confidence: typeof p.confidence === 'number' ? p.confidence : null,
+          reason: p.reason,
+          ai: true,
+        }))
+    }
+    const out: Reco[] = []
+    const above = recommended.above[0]
+    const below = recommended.below[0]
+    if (above) out.push({ direction: 'up', price: above.value, label: above.label, action: '突破关注', confidence: null, reason: '上方最近压力,突破需放量', ai: false })
+    if (below) out.push({ direction: 'down', price: below.value, label: below.label, action: '跌破防守', confidence: null, reason: '下方最近支撑,跌破转弱', ai: false })
+    return out
+  }, [currentPrice, signalsQ.data, symbol, recommended])
+
   useEffect(() => {
     if (target || currentPrice == null) return
     const initial = recommended.above[0] ?? recommended.below[0]
@@ -106,6 +145,7 @@ export function PriceAlertDialog({
     const configured = new Set<string>()
     if (prefs.feishu_webhook_url) configured.add('feishu')
     if (prefs.wecom_webhook_url) configured.add('wecom')
+    if (prefs.dingtalk_webhook_url) configured.add('dingtalk')
     setChannels((prefs.webhook_default_channels ?? []).filter(channel => configured.has(channel)))
   }, [prefs])
 
@@ -159,6 +199,39 @@ export function PriceAlertDialog({
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: QK.monitorRules })
       toast('点位提醒已创建', 'success')
+      onClose()
+    },
+    onError: error => toast(String((error as Error)?.message || '创建失败'), 'error'),
+  })
+
+  // 一键创建全部推荐点位(逐个建 price 规则)
+  const createReco = useMutation({
+    mutationFn: async () => {
+      for (const p of recoPoints) {
+        await api.monitorRuleSave({
+          id: genRuleId(),
+          name: `点位提醒 · ${name || symbol} · ${p.direction === 'up' ? '涨至' : '跌至'}${p.label || p.price.toFixed(2)}`,
+          enabled: true,
+          type: 'price',
+          asset_type: 'stock',
+          scope: 'symbols',
+          symbols: [symbol],
+          sector: null,
+          strategy_id: null,
+          direction: 'entry',
+          conditions: [{ field: 'close', op: p.direction === 'up' ? '>=' : '<=', value: p.price }],
+          logic: 'and',
+          cooldown_seconds: cooldown,
+          severity: 'warn',
+          // 通知正文带上"到价可考虑的操作",收到推送即知此刻该做什么;用户填了自定义提示则以它为准
+          message: message.trim() || recoAlertMessage(p),
+          webhook_channels: channels,
+        })
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: QK.monitorRules })
+      toast(`已创建 ${recoPoints.length} 个推荐点位提醒`, 'success')
       onClose()
     },
     onError: error => toast(String((error as Error)?.message || '创建失败'), 'error'),
@@ -270,6 +343,52 @@ export function PriceAlertDialog({
               </label>
             </div>
 
+            {recoPoints.length > 0 && (
+              <section className="mt-4 rounded-lg border border-sky-400/25 bg-sky-400/[0.05] p-3">
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-[11px] font-medium text-sky-300">
+                    🎯 推荐点位配置 {recoPoints.some(p => p.ai) ? '· AI' : '· 规则(未跑AI)'}
+                  </span>
+                  <button
+                    onClick={() => createReco.mutate()}
+                    disabled={createReco.isPending}
+                    className="inline-flex items-center gap-1 rounded-md border border-sky-400/40 bg-sky-400/10 px-2 py-1 text-[10px] font-medium text-sky-300 transition-colors hover:bg-sky-400/20 disabled:opacity-50"
+                  >
+                    {createReco.isPending && <Loader2 className="h-3 w-3 animate-spin" />}
+                    一键创建全部
+                  </button>
+                </div>
+                <div className="space-y-1">
+                  {recoPoints.map((p, i) => (
+                    <button
+                      key={i}
+                      onClick={() => { setTarget(p.price.toFixed(2)); setDirection(p.direction); setSelectedLabel(p.label); setMessage(recoAlertMessage(p)) }}
+                      title="点击填入下方表单微调(含到价操作提示,会随通知一起推送)"
+                      className="flex w-full flex-col gap-0.5 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-elevated/50"
+                    >
+                      <div className="flex items-center gap-2">
+                        {/* 操作:最突出 */}
+                        <span className={`shrink-0 rounded px-1.5 py-0.5 text-[11px] font-semibold ${p.direction === 'up' ? 'bg-bull/15 text-bull' : 'bg-bear/15 text-bear'}`}>
+                          {p.action}
+                        </span>
+                        <span className={`inline-flex shrink-0 items-center gap-0.5 text-[10px] ${p.direction === 'up' ? 'text-bull' : 'text-bear'}`}>
+                          {p.direction === 'up' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}
+                          {p.direction === 'up' ? '涨至' : '跌至'}
+                        </span>
+                        <span className="shrink-0 font-mono text-xs text-foreground">{p.price.toFixed(2)}</span>
+                        {p.label && <span className="shrink-0 text-[10px] text-secondary">{p.label}</span>}
+                        {p.confidence != null && (
+                          <span className="ml-auto shrink-0 text-[10px] tabular-nums text-muted">置信 {p.confidence}%</span>
+                        )}
+                      </div>
+                      {p.reason && <span className="text-[10px] leading-snug text-muted/70">{p.reason}</span>}
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-1.5 text-[9px] text-muted/60">到价时推送会带上"可考虑的操作"(如「可考虑突破关注买入」),收到通知即知此刻该做什么。点单条可微调,「一键创建全部」直接建这几个提醒。</p>
+              </section>
+            )}
+
             <section className="mt-5">
               <div className="mb-2 flex items-center justify-between">
                 <span className="text-[11px] font-medium text-secondary">关键价位</span>
@@ -330,6 +449,7 @@ export function PriceAlertDialog({
                 {([
                   { key: 'feishu', label: '飞书', configured: !!prefs?.feishu_webhook_url },
                   { key: 'wecom', label: '企业微信', configured: !!prefs?.wecom_webhook_url },
+                  { key: 'dingtalk', label: '钉钉', configured: !!prefs?.dingtalk_webhook_url },
                 ]).map(channel => (
                   <label key={channel.key} className={`inline-flex items-center gap-2 text-xs ${channel.configured ? 'text-foreground' : 'text-muted/60'}`}>
                     <input type="checkbox" checked={channels.includes(channel.key)} disabled={!channel.configured} onChange={() => toggleChannel(channel.key)} className="h-3.5 w-3.5 accent-sky-500" />

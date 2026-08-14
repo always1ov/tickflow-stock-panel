@@ -1,9 +1,10 @@
-import { useRef, useMemo, useEffect } from 'react'
+import { useRef, useMemo, useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Loader2, CheckCircle2, XCircle } from 'lucide-react'
+import { Loader2, CheckCircle2, XCircle, Square } from 'lucide-react'
 import { formatDuration, formatLogTime } from '@/lib/format'
 import { Pill } from './StatCard'
-import type { PipelineJob } from '@/lib/api'
+import { api, type PipelineJob } from '@/lib/api'
+import { toast } from '@/components/Toast'
 
 export const STAGE_LABELS: Record<string, string> = {
   init: '初始化',
@@ -70,6 +71,21 @@ export function ActiveJobCard({ job }: { job: PipelineJob }) {
   const isDone = job.status === 'succeeded' || job.status === 'failed'
   const stageLabel = isDone ? meta.label : (STAGE_LABELS[job.stage] ?? job.stage)
 
+  // 取消同步: 协作式中断, 后端在最近的批次边界退出;
+  // 已写入的增量数据保留, 下次同步(手动或定时)从断点自动续拉
+  const [cancelling, setCancelling] = useState(false)
+  const cancelJob = async () => {
+    if (cancelling) return
+    setCancelling(true)
+    try {
+      await api.pipelineJobCancel(job.id)
+      toast('已请求中断,任务将在当前批次结束后停止;已拉取的数据保留,下次同步自动续', 'success')
+    } catch (e: any) {
+      toast(`取消失败: ${e?.message ?? e}`, 'error')
+      setCancelling(false)
+    }
+  }
+
   return (
     <div className={`rounded-card border ${meta.border} ${meta.bg} p-5`}>
       <div className="flex items-center justify-between mb-3">
@@ -85,8 +101,19 @@ export function ActiveJobCard({ job }: { job: PipelineJob }) {
           </div>
         </div>
         {!isDone && (
-          <div className="font-mono text-2xl font-bold tracking-tight">
-            {job.progress}<span className="text-base text-muted">%</span>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={cancelJob}
+              disabled={cancelling}
+              title="中断同步:任务在当前批次结束后停止;已拉取的数据保留,下次同步自动从断点续拉"
+              className="inline-flex items-center gap-1 rounded-btn border border-danger/40 bg-danger/10 px-2.5 py-1 text-[11px] text-danger transition-colors hover:bg-danger/20 disabled:opacity-50"
+            >
+              <Square className="h-3 w-3" />
+              {cancelling ? '停止中…' : '取消'}
+            </button>
+            <div className="font-mono text-2xl font-bold tracking-tight">
+              {job.progress}<span className="text-base text-muted">%</span>
+            </div>
           </div>
         )}
       </div>

@@ -147,9 +147,9 @@ def run_now(
     today = _date.today()
     today_exists = latest_daily and latest_daily >= today
 
-    # [fork 增强] 历史稀疏检测: 全局 max(date) 会被部分写入(自选实时快照落的当日行 /
-    # 被中断的首次拉取)拉高, 让下方"补缺口"分支误以为已是最新, 起点=今天 → 一年历史
-    # 永远不会回补(涨跌幅/指标全算不出)。近一年正常应有 ~240 个交易日分区, 远低于此
+    # 历史稀疏检测: 全局 max(date) 会被部分写入(自选实时快照落的当日行 / 被中断的
+    # 首次拉取)拉高, 让下方"补缺口"分支误以为已是最新, 起点=今天 → 一年历史永远
+    # 不会回补(涨跌幅/指标全算不出)。近一年正常应有 ~240 个交易日分区, 远低于此
     # (<120)即判定存在历史大洞 → 强制走首次拉取分支从一年前重拉(merge-upsert 幂等)。
     history_sparse = False
     if latest_daily and not override_start_date:
@@ -235,7 +235,8 @@ def run_now(
         daily_range_start = start_date
         _why = "检测到历史缺口,重拉一年" if history_sparse else "首次拉取"
         emit("sync_daily", 12, f"获取日K [{start_date} ~ {today}]({_why})…")
-        logger.info("sync_daily: [%s ~ %s] initial fetch", start_date, today)
+        logger.info("sync_daily: [%s ~ %s] %s", start_date, today,
+                    "sparse backfill" if history_sparse else "initial fetch")
 
         def _daily_chunk_progress(cur: int, tot: int) -> None:
             emit("sync_daily", 12 + int(33 * cur / tot),
@@ -266,25 +267,18 @@ def run_now(
             logger.warning("laggard detection failed: %s", e)
             stage_errors.append(f"laggard detection: {e}")
 
-    # Step 1.5: 同步除权因子 — 范围与日K拉取方式对齐
-    #   日K范围拉取(补缺口/首次) → 除权用日K范围 [daily_range_start, now]
-    #     首次会覆盖整个日K区间内的历史除权事件; 补缺口天然只增量(起点=latest_daily≈昨天)
-    #   日K实时增量/跳过(分支2/分支1) → 除权兜底拉最近 30 天, 补可能遗漏的新除权
-    #     (这两类分支不拉历史日K, 除权不能用日K范围, 只能兜底最近几日)
+    # Step 1.5: 同步除权因子 — 范围与日K拉取方式对齐(TickFlow 路径, 需 Starter+;
+    # 免费档无该能力时跳过, 复权指标按不复权价计算)
     written_adj = 0
     affected_symbols: list[str] = []
-    adj_provider = _prefs.get_adj_factor_provider()
-    if adj_provider == "same_as_daily":
-        adj_provider = _prefs.get_daily_data_provider()
-    can_sync_adj = capset.has(Cap.ADJ_FACTOR) or adj_provider != "tickflow"
-    if can_sync_adj:
+    if capset.has(Cap.ADJ_FACTOR):
         from datetime import datetime, timedelta
         adj_end = datetime.now()
         if daily_range_start is not None:
             adj_start = datetime.combine(daily_range_start, datetime.min.time())
         else:
-            # 日K实时增量/跳过时, 除权兜底拉最近 N 天, 覆盖周末/长假/停机期间的新除权事件。
-            # 15 天: 覆盖春节/国庆最长约10天长假 + 故障恢复缓冲; sync_adj_factor 内部 merge+unique 幂等, 多拉无副作用。
+            # 兜底拉最近 15 天: 覆盖春节/国庆最长约10天长假 + 故障恢复缓冲;
+            # sync_adj_factor 内部 merge+unique 幂等, 多拉无副作用。
             adj_start = adj_end - timedelta(days=15)
         adj_start_str = adj_start.strftime("%Y-%m-%d")
         adj_end_str = adj_end.strftime("%Y-%m-%d")
@@ -302,10 +296,8 @@ def run_now(
         if affected_symbols:
             _refresh_single_view(repo, "adj_factor")
             emit("sync_adj", 60, f"除权因子完成,新增 {len(affected_symbols)} 只个股")
-            logger.info("sync_adj: [%s ~ %s] done, %d symbols", adj_start_str, adj_end_str, len(affected_symbols))
         else:
             emit("sync_adj", 60, "除权因子完成,无新增")
-            logger.info("sync_adj: [%s ~ %s] no new factors", adj_start_str, adj_end_str)
         _invalidate("adj_factor")
     else:
         skipped.append("sync_adj")
@@ -567,10 +559,10 @@ def run_now(
     emit("refresh_views", 95, "刷新 DuckDB 视图…")
     _refresh_views(repo)
 
-    # [fork 增强] 盘后完整性提示: 交易日收盘后同步, 若今日全市场日线未出齐
-    # (免费数据服务器一般 17:30~20:00 才发布当日数据, 过早同步只有实时落盘的少数几只),
-    # 完成消息与 result 带标记, 前端弹 toast —— 不再"同步成功却还是昨天、不知为何"。
-    # 阈值 max(100, 标的池一半): 不误伤停牌缺口。
+    # 盘后完整性检测: 交易日收盘后同步, 但今日全市场日线未出齐(免费源如 BaoStock
+    # 一般 17:30~20:00 才发布当日数据) → 明示"稍后再手动同步", 不再静默显示"成功"
+    # 却让梯队/概念等停在昨天而用户不知原因。阈值 = max(100, 标的池一半), 只拦
+    # "基本没出数"(如仅自选实时那几只), 不误伤停牌等正常缺口。
     today_daily_rows = 0
     today_incomplete = False
     try:
@@ -693,6 +685,10 @@ def _run_tracked(fn, job_label: str) -> None:
 
     def progress(stage: str, pct: int, msg: str, stage_pct: int | None = None,
                  skip_log: bool = False) -> None:
+        # 协作式取消: 用户点了取消(或被判死)→ 在最近的批次边界立即退出
+        from app.services.pipeline_jobs import JobCancelled
+        if job_store.is_cancelled(job_id):
+            raise JobCancelled(job_id)
         job_store.progress(job_id, stage, pct, msg, stage_pct=stage_pct, skip_log=skip_log)
 
     try:
@@ -700,9 +696,14 @@ def _run_tracked(fn, job_label: str) -> None:
         result = fn(on_progress=progress)
         job_store.succeed(job_id, result)
         logger.info("scheduled %s completed: job_id=%s", job_label, job_id)
-    except Exception:
-        logger.exception("scheduled %s failed: job_id=%s", job_label, job_id)
-        job_store.fail(job_id, f"scheduled {job_label} failed")
+    except Exception as e:
+        from app.services.pipeline_jobs import JobCancelled
+        if isinstance(e, JobCancelled):
+            # 已在 cancel 端点标记 failed; 已写入的增量保留, 下次调度自动续
+            logger.info("scheduled %s cancelled by user: job_id=%s", job_label, job_id)
+        else:
+            logger.exception("scheduled %s failed: job_id=%s", job_label, job_id)
+            job_store.fail(job_id, f"scheduled {job_label} failed")
     finally:
         release_run_slot()
 
@@ -756,6 +757,7 @@ async def _run_scheduled_review(repo) -> None:
             "summary": meta.get("summary", ""),
             "emotion_score": meta.get("emotion_score"),
             "emotion_label": meta.get("emotion_label", ""),
+            "mode": "today",  # 定时复盘固定走当日模式
         })
         logger.info("scheduled review saved: as_of=%s", meta.get("as_of"))
 
@@ -882,6 +884,17 @@ def _maybe_push_review(content: str, meta: dict) -> None:
                     url, "每日复盘", full_body
                 )
                 logger.info("review push(wecom) %s", "sent" if ok else "failed")
+            elif ch == "dingtalk":
+                url = preferences.get_dingtalk_webhook_url()
+                if not url:
+                    logger.info("review push(dingtalk) skipped: webhook not configured")
+                    continue
+                keyword = preferences.get_dingtalk_keyword()
+                full_body = (f"**{subtitle}**\n\n{content}" if subtitle else content)
+                ok = webhook_adapter.send_dingtalk_markdown(
+                    url, "每日复盘", full_body, keyword
+                )
+                logger.info("review push(dingtalk) %s", "sent" if ok else "failed")
             # 未来更多渠道在此追加分支
     except Exception as e:  # noqa: BLE001
         logger.warning("review push error: %s", e)

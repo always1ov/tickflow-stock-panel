@@ -74,7 +74,7 @@ export function JobTimeoutCard() {
           <div>
             <h2 className="text-sm font-medium text-foreground">超时设置</h2>
             <p className="text-[11px] text-muted mt-1 leading-relaxed">
-              后台任务运行超过对应时间后将判定为疑似卡死。保存时自动换算为秒，修改后对新建任务生效。
+              后台任务<span className="text-foreground/80">无进展</span>超过对应时间后将判定为疑似卡死（持续汇报进度的长时间任务不会被误杀，如首次全量拉取）。保存时自动换算为秒，修改后对新建任务生效。
             </p>
           </div>
         </div>

@@ -257,6 +257,98 @@ def _recap_summary(overview: dict) -> str:
 # 流式主入口
 # ================================================================
 
+def _prev_recap_section(as_of_str: str) -> str:
+    """连读模式: 取最近一份早于本日的历史复盘, 拼成回顾指令段。找不到则返回降级说明。"""
+    try:
+        from app.services import market_recap_reports
+        prev = next(
+            (r for r in market_recap_reports.list_reports()
+             if str(r.get("as_of", "")) < as_of_str and r.get("content")),
+            None,
+        )
+    except Exception:  # noqa: BLE001
+        prev = None
+    if not prev:
+        return "\n\n(连读模式: 未找到更早的历史复盘, 请按当日模式复盘。)"
+    content = str(prev.get("content", ""))[:4000]
+    return (
+        f"\n\n【上一份复盘回顾({prev.get('as_of')})· 全文(可能截断)】\n{content}\n\n"
+        "连读要求: 先用一小节【昨日观察要点兑现情况】——逐条对照上一份复盘的"
+        "『后续观察要点』, 用今日数据核对 兑现/落空/待定; 再按常规结构复盘今日,"
+        "重点写与上一份复盘相比的变化与延续(主线是否切换、量能与情绪的边际方向)。"
+    )
+
+
+def _week_digest_section(repo, as_of_str: str) -> str:
+    """近7交易日模式: 用 DuckDB 汇总逐日 涨跌家数/涨停数/成交额 + 核心指数日涨跌。
+
+    涨停/跌停用 enriched 存储列 consecutive_limit_ups/downs >= 1 判定(精确);
+    涨跌家数用相邻收盘对比(窗口函数)。失败时返回降级说明, 不阻断复盘。
+    """
+    try:
+        rows = repo.execute_all(
+            """
+            WITH d AS (
+                SELECT symbol, date, close, amount,
+                       consecutive_limit_ups AS clu, consecutive_limit_downs AS cld,
+                       LAG(close) OVER (PARTITION BY symbol ORDER BY date) AS prev_close
+                FROM kline_enriched
+                WHERE date > CAST(? AS DATE) - INTERVAL 20 DAY AND date <= CAST(? AS DATE)
+            )
+            SELECT date,
+                   count(*) AS total,
+                   sum(CASE WHEN prev_close IS NOT NULL AND close > prev_close THEN 1 ELSE 0 END) AS up,
+                   sum(CASE WHEN prev_close IS NOT NULL AND close < prev_close THEN 1 ELSE 0 END) AS down,
+                   sum(CASE WHEN clu >= 1 THEN 1 ELSE 0 END) AS limit_up,
+                   sum(CASE WHEN cld >= 1 THEN 1 ELSE 0 END) AS limit_down,
+                   round(sum(amount) / 1e8, 0) AS amount_yi
+            FROM d GROUP BY date ORDER BY date
+            """,
+            [as_of_str, as_of_str],
+        )
+        days = [
+            {"日期": str(r[0]), "上涨": int(r[2] or 0), "下跌": int(r[3] or 0),
+             "涨停": int(r[4] or 0), "跌停": int(r[5] or 0), "成交额亿": float(r[6] or 0)}
+            for r in (rows or [])
+        ][-7:]
+        if len(days) < 2:
+            return "\n\n(近7日模式: 历史数据不足 2 个交易日, 请按当日模式复盘。)"
+        idx_rows = repo.execute_all(
+            """
+            SELECT symbol, date, close FROM kline_index_daily
+            WHERE symbol IN ('000001.SH', '399006.SZ')
+              AND date > CAST(? AS DATE) - INTERVAL 20 DAY AND date <= CAST(? AS DATE)
+            ORDER BY symbol, date
+            """,
+            [as_of_str, as_of_str],
+        )
+        idx: dict[str, list] = {}
+        for sym, dt, close in idx_rows or []:
+            idx.setdefault(str(sym), []).append((str(dt), float(close or 0)))
+        idx_pct: dict[str, dict[str, float]] = {}
+        for sym, series in idx.items():
+            name = "上证指数" if sym == "000001.SH" else "创业板指"
+            m: dict[str, float] = {}
+            for i in range(1, len(series)):
+                if series[i - 1][1]:
+                    m[series[i][0]] = round((series[i][1] / series[i - 1][1] - 1) * 100, 2)
+            idx_pct[name] = m
+        for d in days:
+            for name, m in idx_pct.items():
+                if d["日期"] in m:
+                    d[f"{name}%"] = m[d["日期"]]
+        digest = json.dumps(days, ensure_ascii=False)
+        return (
+            f"\n\n【近7个交易日逐日概览】(涨停/跌停按连板递推精确判定)\n{digest}\n\n"
+            "7日复盘要求: 以这 7 日为主时间轴——1) 情绪周期逐日演变脉络(哪天转折、依据什么);"
+            "2) 主线题材的切换与持续性; 3) 量能趋势与量价配合; 4) 把今日放进 7 日脉络中定位"
+            "(是延续、转折还是背离)。当日盘面细节可精简, 结构服务于\"看一周\"而非\"看一天\"。"
+        )
+    except Exception as e:  # noqa: BLE001
+        logger.warning("近7日概览构建失败(降级为当日模式): %s", e)
+        return "\n\n(近7日模式: 概览数据构建失败, 请按当日模式复盘。)"
+
+
 async def recap_market_stream(
     repo,
     quote_service=None,
@@ -264,6 +356,7 @@ async def recap_market_stream(
     as_of: date | None = None,
     focus: str = "",
     news: list[dict] | None = None,
+    mode: str = "today",
 ) -> AsyncIterator[str]:
     """流式大盘复盘:yield 出每个 NDJSON 事件。
 
@@ -301,6 +394,12 @@ async def recap_market_stream(
         from app.services.ai_provider import stream_ai_text
 
         user_prompt = _build_user_prompt(overview, news or [], focus)
+        # 复盘模式: today=当日直接复盘(原行为) / continuity=连读上一份复盘对照今日 /
+        # week=近7交易日纵览。附加段拼在 prompt 末尾, 指令就近生效。
+        if mode == "continuity":
+            user_prompt += _prev_recap_section(as_of_str)
+        elif mode == "week":
+            user_prompt += _week_digest_section(repo, as_of_str)
         async for delta in stream_ai_text(
             [
                 {"role": "system", "content": _SYSTEM_PROMPT},

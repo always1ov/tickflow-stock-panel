@@ -100,6 +100,21 @@ async def lifespan(app: FastAPI):
     except Exception as e:  # noqa: BLE001
         logger.warning("custom data sources init failed: %s", e)
 
+    # [fork 增强] 数据持久化自检: 容器内 data_dir 不是挂载点 → 数据写在容器层,
+    # 重建容器(拉新镜像)会丢全部数据。数据页据此显示红色警告横幅。
+    # 仅容器环境判定(/.dockerenv); bind mount 与 named volume 都是挂载点。
+    app.state.data_dir_persistent = True
+    try:
+        import os as _os
+        if Path("/.dockerenv").exists():
+            app.state.data_dir_persistent = _os.path.ismount(str(settings.data_dir))
+            if not app.state.data_dir_persistent:
+                logger.warning(
+                    "数据目录 %s 未挂载持久化卷! 容器重建将丢失全部数据 — "
+                    "请在 compose 的 volumes 挂载该路径", settings.data_dir)
+    except Exception as e:  # noqa: BLE001
+        logger.debug("data dir persistence check skipped: %s", e)
+
     # 全局行情服务
     qs = QuoteService()
     app.state.quote_service = qs

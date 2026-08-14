@@ -8,7 +8,7 @@ import logging
 from fastapi import APIRouter, HTTPException, Request
 
 from app.jobs import daily_pipeline
-from app.services.pipeline_jobs import job_store, release_run_slot, try_acquire_run_slot
+from app.services.pipeline_jobs import JobCancelled, job_store, release_run_slot, try_acquire_run_slot
 from app.api.data import invalidate_storage_cache
 
 # 长时间任务专用线程池（隔离于 FastAPI 默认线程池，防止阻塞请求处理）
@@ -52,6 +52,9 @@ async def run_now(request: Request) -> dict:
 
             def progress(stage: str, pct: int, msg: str, stage_pct: int | None = None,
                          skip_log: bool = False) -> None:
+                # 协作式取消: 用户点了取消(或被判死)→ 在最近的批次边界立即退出
+                if job_store.is_cancelled(job_id):
+                    raise JobCancelled(job_id)
                 job_store.progress(job_id, stage, pct, msg, stage_pct=stage_pct, skip_log=skip_log)
 
             def _run() -> dict:
@@ -64,6 +67,12 @@ async def run_now(request: Request) -> dict:
             job_store.succeed(job_id, result)
             invalidate_storage_cache()
             repo.refresh_cache()  # 刷新 Polars 缓存
+        except JobCancelled:
+            # job 已在 cancel 端点标记 failed, 这里只收尾: 已写入的增量数据保留,
+            # 下次同步从断点自动续(merge-upsert 幂等 + 缺口/稀疏检测)
+            logger.info("pipeline cancelled by user (job %s)", job_id)
+            invalidate_storage_cache()
+            repo.refresh_cache()
         except Exception as e:  # noqa: BLE001
             logger.exception("pipeline failed")
             job_store.fail(job_id, str(e))

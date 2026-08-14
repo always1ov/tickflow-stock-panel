@@ -210,7 +210,9 @@ async function opRealtime(sdk, job) {
       open: q.open,
       high: q.high,
       low: q.low,
-      volume: q.volume,
+      // sdk 实时快照的成交量单位是「股」, 项目全局约定「手」(1手=100股) —
+      // 不换算会让 换手率/量比 全部 ×100 (换手率公式 volume(手)*10000/float_shares)
+      volume: q.volume != null ? q.volume / 100 : q.volume,
       amount: q.amount,
       change_pct: q.changePercent,
     })

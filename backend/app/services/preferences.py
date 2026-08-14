@@ -61,9 +61,10 @@ def get_realtime_quote_interval() -> float:
 def get_realtime_watchlist_symbols() -> list[str]:
     """Free 档自选实时监控标的:返回**全部**自选(去重、大写)。
 
-    [fork 增强] 上游取前 5 个;多 key 池化后, 盘中每轮容量为 5×key 数,
-    并通过**轮转窗口**覆盖全部自选(见 quote_service._fetch_watchlist_quotes),
-    故此处不再截断, 由行情层做窗口轮转。单 key 时轮转退化为 5 只一轮循环刷新。
+    盘中每轮只能拉 5×key 数 只(容量),但通过**轮转刷新**覆盖全部 —— 每轮拉一个
+    窗口,下一轮接着往后拉,⌈总数/容量⌉ 轮内所有自选都刷新一遍(见
+    quote_service._fetch_watchlist_quotes)。因此这里不再截断,返回全量,
+    由行情层做窗口轮转。
     """
     try:
         from app.services import watchlist
@@ -448,7 +449,7 @@ def set_depth_finalize_time(hour: int, minute: int) -> dict:
 
 # 复盘推送可选渠道白名单 (企业微信已实现, 与飞书并列)
 # 多选: 不推送 = 空数组, 而非 'none'
-REVIEW_PUSH_CHANNELS = {"feishu", "wecom"}
+REVIEW_PUSH_CHANNELS = {"feishu", "wecom", "dingtalk"}
 
 
 def get_review_schedule() -> dict:
@@ -656,6 +657,36 @@ def set_wecom_webhook_url(url: str) -> str:
     from app.services.webhook_adapter import normalize_wecom_url
     save({"wecom_webhook_url": normalize_wecom_url(url)})
     return get_wecom_webhook_url()
+
+
+# ===== 钉钉群机器人 Webhook (仅关键词模式) =====
+
+
+def get_dingtalk_webhook_url() -> str:
+    """钉钉群机器人 Webhook 地址 — 与飞书 / 企业微信并列的推送通道。
+
+    存储完整 URL (https://oapi.dingtalk.com/robot/send?access_token=xxx);
+    用户也可只填 access_token, 由 webhook_adapter.normalize_dingtalk_url 自动补全。
+    """
+    return load().get("dingtalk_webhook_url", "")
+
+
+def set_dingtalk_webhook_url(url: str) -> str:
+    """保存钉钉 Webhook 地址。传入空串表示清空配置。存储时统一补全为完整 URL。"""
+    from app.services.webhook_adapter import normalize_dingtalk_url
+    save({"dingtalk_webhook_url": normalize_dingtalk_url(url)})
+    return get_dingtalk_webhook_url()
+
+
+def get_dingtalk_keyword() -> str:
+    """钉钉群机器人「自定义关键词」之一 — 关键词安全模式下, 推送正文须含此词。"""
+    return load().get("dingtalk_keyword", "")
+
+
+def set_dingtalk_keyword(keyword: str) -> str:
+    """保存钉钉关键词。传入空串表示不自动补关键词 (机器人未设关键词校验时可留空)。"""
+    save({"dingtalk_keyword": (keyword or "").strip()})
+    return get_dingtalk_keyword()
 
 
 # ===== 企业微信智能机器人 (API 模式 / 长连接) =====

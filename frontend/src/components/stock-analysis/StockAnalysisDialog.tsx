@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   X, Sparkles, Loader2, AlertTriangle, Copy, Check, RefreshCw,
-  Settings2, Send, Wand2, Minimize2, History, LineChart,
+  Settings2, Send, Wand2, Minimize2, History, LineChart, Trash2,
 } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { copyText } from '@/lib/clipboard'
@@ -10,7 +10,7 @@ import { toast } from '@/components/Toast'
 import { MarkdownRenderer } from '@/components/financials/MarkdownRenderer'
 import {
   type ActiveTask, type HistoryReport,
-  minimizeDialog, closeDialog, startAnalysis,
+  minimizeDialog, closeDialog, startAnalysis, deleteReport,
 } from '@/lib/stockAnalysisStore'
 import { useDialogBackdrop } from '@/lib/useDialogBackdrop'
 
@@ -137,6 +137,14 @@ export function StockAnalysisDialog({ task, mode, minimized }: Props) {
                   <button onClick={handleCopy} title="复制全文"
                     className="p-1.5 rounded-lg hover:bg-elevated text-muted hover:text-foreground transition-colors">
                     {copied ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
+                  </button>
+                )}
+                {isHistory && task && 'id' in task && (
+                  <button
+                    onClick={() => { deleteReport(task.id); toast('报告已删除', 'success'); closeDialog() }}
+                    title="删除这份报告"
+                    className="p-1.5 rounded-lg hover:bg-danger/10 text-muted hover:text-danger transition-colors">
+                    <Trash2 className="h-4 w-4" />
                   </button>
                 )}
                 {!isHistory && isWorking && (

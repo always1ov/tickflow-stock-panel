@@ -135,6 +135,32 @@ def clear_group(group_id: str, request: Request):
     return {"symbols": _with_names(rows, request)}
 
 
+class PositionIn(BaseModel):
+    held: bool = False
+    cost: float | None = None
+
+
+@router.get("/positions")
+def list_positions():
+    """全部自选的持仓标记 {SYMBOL: {held, cost, updated_at}} —— 供决策台浮盈/纵观对比。"""
+    from app.services import positions
+    return {"positions": positions.load_all()}
+
+
+@router.put("/positions/{symbol}")
+def set_position(symbol: str, req: PositionIn):
+    """标记某只自选:是否持有 + 可选成本价。"""
+    from app.services import positions
+    return {"symbol": symbol.strip().upper(), "position": positions.set_position(symbol, req.held, req.cost)}
+
+
+@router.delete("/positions/{symbol}")
+def clear_position(symbol: str):
+    """移除某只自选的持仓标记。"""
+    from app.services import positions
+    return {"symbol": symbol.strip().upper(), "removed": positions.clear_position(symbol)}
+
+
 @router.get("/ocr-status")
 def ocr_status():
     """当前 OCR 引擎是否可用（前端可据此提示安装依赖）。"""
@@ -260,6 +286,9 @@ def watchlist_enriched(
     stock_symbols = [s for s in symbols if s not in etf_set and s not in index_set]
 
     df_e, cache_date = repo.get_enriched_latest()
+    # 自选实时档: 全市场快照是盘后, 把自选实时叠加层覆盖上去, 让自选那几只显示实时值。
+    # 非该档 (全市场实时/盘后) 叠加层为空, 原样返回。
+    df_e = repo.overlay_watchlist_live(df_e, "stock")
 
     # 以自选列表为主表 LEFT JOIN enriched, 保证自选的每一只都返回一行;
     # 不在 enriched 缓存里的标的 (新股/冷门股/新用户未同步) 指标为 null, 前端渲染为 "—".

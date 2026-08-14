@@ -340,3 +340,134 @@ def send_wecom_markdown(webhook_url: str, title: str, body_md: str) -> bool:
     payload: dict = {"msgtype": "markdown", "markdown": {"content": content}}
     return _post_wecom(webhook_url, payload)
 
+
+# ================================================================
+# 钉钉群机器人 Webhook (仅「自定义关键词」安全模式)
+# ================================================================
+#
+# 与飞书 / 企业微信同构: 群机器人 + POST JSON。本项目按用户需求只支持
+# 「自定义关键词」安全模式 (不做加签 / IP 白名单):
+#   1. 钉钉群 → 群设置 → 智能群助手 → 添加「自定义」机器人
+#   2. 安全设置勾选「自定义关键词」, 填 1~10 个关键词 (消息含任一即可通过)
+#   3. 复制 Webhook 地址 (形如 https://oapi.dingtalk.com/robot/send?access_token=xxx)
+#   4. 把地址 + 你设的某个关键词填入设置页「钉钉」配置
+#
+# 关键词模式要求: 每条消息正文必须包含至少一个关键词, 否则钉钉拒收
+# (errcode=310000, "keywords not in content")。因此推送前会在正文前自动补上
+# 配置的关键词, 保证送达。
+#
+# 成功响应: {"errcode":0,"errmsg":"ok"}。限流: 每机器人每分钟最多 20 条,
+# 依赖 MonitorRuleEngine cooldown 去重即可。
+
+DINGTALK_HOOK_PREFIX = "https://oapi.dingtalk.com/robot/send"
+
+# 钉钉 markdown 单条上限约 2 万字符, 保守截断留余量给标题 / 关键词。
+_DINGTALK_MD_MAX_LEN = 18000
+
+
+def is_valid_dingtalk_url(url: str) -> bool:
+    """校验是否为合法钉钉群机器人 Webhook 地址。
+
+    允许两种写法 (与企业微信一致):
+      - 完整: https://oapi.dingtalk.com/robot/send?access_token=xxx
+      - 仅 access_token: xxx (无空格 / 斜杠 / 问号, 长度 >= 20)
+    """
+    if not url:
+        return False
+    if url.startswith(DINGTALK_HOOK_PREFIX):
+        return True
+    url = url.strip()
+    if " " in url or "/" in url or "?" in url:
+        return False
+    return len(url) >= 20
+
+
+def normalize_dingtalk_url(url: str) -> str:
+    """把纯 access_token 补全为完整 Webhook URL。已是完整 URL 则原样返回。"""
+    url = (url or "").strip()
+    if not url:
+        return ""
+    if url.startswith(DINGTALK_HOOK_PREFIX):
+        return url
+    return f"{DINGTALK_HOOK_PREFIX}?access_token={url}"
+
+
+def _ensure_keyword(text: str, keyword: str) -> str:
+    """关键词模式: 正文不含关键词时在最前面补上, 保证钉钉不拒收。"""
+    keyword = (keyword or "").strip()
+    if not keyword or keyword in text:
+        return text
+    return f"【{keyword}】{text}"
+
+
+def _post_dingtalk(webhook_url: str, payload: dict) -> bool:
+    """发送一次钉钉 webhook 请求并判定成败。
+
+    成功响应: HTTP 200 且 errcode=0。失败静默返回 False (与企业微信一致)。
+    """
+    try:
+        import httpx
+
+        resp = httpx.post(webhook_url, json=payload, timeout=5.0)
+        if resp.status_code == 200:
+            try:
+                data = resp.json()
+                if isinstance(data, dict):
+                    if data.get("errcode") == 0:
+                        return True
+                    # 310000 = 关键词不匹配 / 安全设置未通过, 其它非零 = 业务失败
+                    logger.warning("钉钉推送业务失败: %s", data)
+                    return False
+            except ValueError:
+                return True
+        logger.warning("钉钉推送 HTTP %s: %s", resp.status_code, resp.text[:200])
+        return False
+    except Exception as e:  # noqa: BLE001
+        logger.warning("钉钉 Webhook 推送失败: %s", e)
+        return False
+
+
+def send_dingtalk(webhook_url: str, title: str, body: str, keyword: str = "") -> bool:
+    """推送一条文本消息到钉钉群机器人 (关键词安全模式)。
+
+    Args:
+        webhook_url: 钉钉机器人 Webhook 地址 (或纯 access_token, 自动补全)
+        title:       消息标题 (与正文拼接为一条文本)
+        body:        消息正文
+        keyword:     群机器人「自定义关键词」之一; 正文不含时自动补上以通过校验
+
+    Returns:
+        True=成功送达, False=失败或 URL 非法。失败静默, 不抛异常。
+    """
+    webhook_url = normalize_dingtalk_url(webhook_url)
+    if not is_valid_dingtalk_url(webhook_url):
+        return False
+
+    text = _ensure_keyword(_truncate(f"{title}\n{body}".strip()), keyword)
+    if not text.strip():
+        return False
+
+    payload: dict = {"msgtype": "text", "text": {"content": text}}
+    return _post_dingtalk(webhook_url, payload)
+
+
+def send_dingtalk_markdown(webhook_url: str, title: str, body_md: str, keyword: str = "") -> bool:
+    """推送一条 Markdown 消息到钉钉群机器人 (关键词安全模式) —— 承载完整复盘报告。
+
+    钉钉 markdown 的 title 仅用于通知栏摘要, 正文在 text 字段; 关键词校验针对
+    整条消息, 这里确保关键词出现在 text 中。
+    """
+    webhook_url = normalize_dingtalk_url(webhook_url)
+    if not is_valid_dingtalk_url(webhook_url):
+        return False
+
+    body = (body_md or "").strip()
+    if len(body) > _DINGTALK_MD_MAX_LEN:
+        body = body[:_DINGTALK_MD_MAX_LEN] + "…"
+    text = _ensure_keyword(f"## {title}\n\n{body}".strip(), keyword)
+    if not text.strip():
+        return False
+
+    payload: dict = {"msgtype": "markdown", "markdown": {"title": title or keyword or "通知", "text": text}}
+    return _post_dingtalk(webhook_url, payload)
+

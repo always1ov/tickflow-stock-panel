@@ -8,13 +8,13 @@ import { StockPreviewDialog } from '@/components/StockPreviewDialog'
 import { LastStockChip } from '@/components/LastStockChip'
 import { AnalysisKChart, type PriceLevel, type LevelType } from '@/components/stock-analysis/AnalysisKChart'
 import { PriceAlertDialog } from '@/components/stock-analysis/PriceAlertDialog'
+import { WatchlistDecisionBoard } from '@/components/stock-analysis/WatchlistDecisionBoard'
 import { api } from '@/lib/api'
 import { useLastStock } from '@/lib/useLastStock'
 import { QK } from '@/lib/queryKeys'
 import { toast } from '@/components/Toast'
 import {
-  startAnalysis, findTodayReport, useHistoryReports,
-  deleteReport, openHistoryReport, loadHistory,
+  startAnalysis, findTodayReport, openHistoryReport, loadHistory,
 } from '@/lib/stockAnalysisStore'
 
 /**
@@ -34,7 +34,7 @@ export function StockAnalysis() {
   const [showPriceAlerts, setShowPriceAlerts] = useState(false)
   const { last: lastStock, remember: rememberStock } = useLastStock('stock-analysis')
 
-  // 进入页面立即加载历史报告(供右侧常驻列表)。store 内部有 historyLoaded 去重, 重复调用安全。
+  // 进入页面立即加载历史报告(供决策台「报告」列)。store 内部有 historyLoaded 去重, 重复调用安全。
   useEffect(() => { loadHistory() }, [])
 
   // 自动恢复上次选中的股票(切走再回来不丢)。useLastStock 的 last 来自 localStorage, 同步可用。
@@ -126,20 +126,20 @@ export function StockAnalysis() {
           )}
         </div>
 
-        {/* 主体:左侧当前个股看板 + 右侧常驻历史报告 */}
-        <div className="grid grid-cols-[1fr_288px] gap-6 items-start">
-          <div className="min-w-0">
-            {!symbol ? (
-              <EmptyState
-                icon={LineChart}
-                title="选择一只股票开始分析"
-                hint="搜索代码或名称,查看日 K 与关键价位,并可让 AI 进行技术面 / 基本面 / 财务面 / 消息面四维综合分析。"
-              />
-            ) : (
-              <StockAnalysisBoard symbol={symbol} />
-            )}
-          </div>
-          <HistorySidebar />
+        {/* 自选决策台:点行即切换分析(免逐个搜索)+ 仓位标记 + 纵观对比浮盈 */}
+        <WatchlistDecisionBoard currentSymbol={symbol} onSelect={onSelect} />
+
+        {/* 主体:关键价位分析占满全宽(历史报告已整合进决策台「报告」列, 侧栏移除) */}
+        <div className="min-w-0">
+          {!symbol ? (
+            <EmptyState
+              icon={LineChart}
+              title="选择一只股票开始分析"
+              hint="搜索代码或名称,查看日 K 与关键价位,并可让 AI 进行技术面 / 基本面 / 财务面 / 消息面四维综合分析。"
+            />
+          ) : (
+            <StockAnalysisBoard symbol={symbol} />
+          )}
         </div>
       </div>
 
@@ -245,72 +245,6 @@ function StockAnalysisBoard({ symbol }: { symbol: string }) {
         />
       </div>
     </div>
-  )
-}
-
-// ===== 左侧常驻:历史报告侧栏(所有股票,按时间倒序平铺) =====
-function HistorySidebar() {
-  const { reports, loaded } = useHistoryReports()
-
-  return (
-    <aside className="self-start sticky top-0">
-      <div className="rounded-card border border-border/60 bg-surface/40 overflow-hidden">
-        <div className="px-3 py-2.5 border-b border-border/40 flex items-center gap-2">
-          <HistoryIcon className="h-3.5 w-3.5 text-sky-400 shrink-0" />
-          <span className="text-xs font-medium text-foreground">历史报告</span>
-          {loaded && reports.length > 0 && (
-            <span className="ml-auto text-[10px] text-muted">{reports.length}</span>
-          )}
-        </div>
-
-        {!loaded ? (
-          <div className="flex items-center justify-center py-16">
-            <Loader2 className="h-4 w-4 animate-spin text-muted" />
-          </div>
-        ) : reports.length === 0 ? (
-          <div className="px-3 py-10 text-center">
-            <p className="text-xs text-muted">还没有任何个股分析报告</p>
-            <p className="text-[10px] text-muted/60 mt-1">选一只股票,点「AI 个股分析」生成</p>
-          </div>
-        ) : (
-          <div className="max-h-[calc(100vh-220px)] overflow-y-auto p-2 space-y-1.5">
-            {reports.map(r => (
-              <div
-                key={r.id}
-                className="group rounded-lg border border-border/40 bg-elevated/20 p-2.5 hover:border-border hover:bg-elevated/40 transition-colors"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <button
-                    onClick={() => openHistoryReport(r.id)}
-                    className="flex-1 text-left min-w-0"
-                  >
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <span className="text-xs font-medium text-foreground truncate">{r.name || r.symbol}</span>
-                      <span className="text-[10px] font-mono text-muted shrink-0">{r.symbol}</span>
-                    </div>
-                    <div className="mt-0.5 flex items-center gap-2 text-[10px] text-muted">
-                      <span>{fmtRelative(r.created_at)}</span>
-                      {r.close != null && <span className="font-mono">价 {r.close.toFixed(2)}</span>}
-                      {r.focus && <span className="text-sky-300/70 truncate">关注: {r.focus}</span>}
-                    </div>
-                    {r.summary && (
-                      <div className="mt-1 text-[11px] text-muted truncate">{r.summary}</div>
-                    )}
-                  </button>
-                  <button
-                    onClick={() => { deleteReport(r.id); toast('已删除', 'success') }}
-                    className="shrink-0 text-[10px] text-muted/60 hover:text-danger transition-colors px-1 py-0.5 opacity-0 group-hover:opacity-100"
-                    title="删除"
-                  >
-                    删除
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </aside>
   )
 }
 

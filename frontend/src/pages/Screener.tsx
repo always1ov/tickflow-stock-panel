@@ -1,12 +1,11 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
-import { ScanSearch, Clock, TrendingUp, Star, Filter, Layers, Network, Sparkles, RefreshCw, Settings2, Store, RotateCcw, X } from 'lucide-react'
+import { ScanSearch, Clock, TrendingUp, Filter, Layers, Network, Sparkles, RefreshCw, Settings2, Store, RotateCcw, X, Activity } from 'lucide-react'
 import { api, genRuleId, type ScreenerStrategy, type ScreenerResult } from '@/lib/api'
 import { DEFAULT_STRATEGY_NOTIFY_EVENTS } from '@/lib/strategyMonitorEvents'
 import { toast } from '@/components/Toast'
 import { useDataStatus, usePreferences, useCapabilities, useQuoteStatus } from '@/lib/useSharedQueries'
-import { useWatchlistBatchAdd } from '@/lib/useSharedMutations'
 import { isExpertOrAbove } from '@/lib/capability-labels'
 import { QK } from '@/lib/queryKeys'
 import { storage } from '@/lib/storage'
@@ -14,12 +13,12 @@ import { PageHeader } from '@/components/PageHeader'
 import { EmptyState } from '@/components/EmptyState'
 import { DatePicker } from '@/components/DatePicker'
 import { StockPreviewDialog } from '@/components/StockPreviewDialog'
-import { WatchlistAddMenu } from '@/components/WatchlistAddMenu'
 import { useStrategyPool } from '@/lib/useStrategyPool'
 import { StrategyCard, CardSize, loadCardSize, cardWrapCls } from '@/components/screener/StrategyCard'
 import { ScreenerTable } from '@/components/screener/ScreenerTable'
 import { ScreenerFilter as ScreenerFilterType, defaultFilter, filterActive, countActiveFilters, applyFilter, FilterPanel } from '@/components/screener/ScreenerFilter'
 import { StrategySettingsDialog } from '@/components/screener/StrategySettingsDialog'
+import { StrategyHealthDialog } from '@/components/screener/StrategyHealthDialog'
 import { StrategyPoolDialog } from '@/components/screener/StrategyPoolDialog'
 import { StrategyBuilderDialog } from '@/components/screener/StrategyBuilderDialog'
 import { StrategyStoreDialog } from '@/components/screener/StrategyStoreDialog'
@@ -41,12 +40,12 @@ export function Screener() {
   const [activeStrategy, setActiveStrategy] = useState<string | null>(null)
   const [result, setResult] = useState<ScreenerResult | null>(null)
   const [asOf, setAsOf] = useState<string>('')
-  const [batchMsg, setBatchMsg] = useState<string>('')
   const [previewSymbol, setPreviewSymbol] = useState<string | null>(null)
   const [previewName, setPreviewName] = useState<string>('')
   const closePreview = useCallback(() => { setPreviewSymbol(null); setPreviewName('') }, [])
   const [settingsStrategyId, setSettingsStrategyId] = useState<string | null>(null)
   const [showPoolDialog, setShowPoolDialog] = useState(false)
+  const [showHealth, setShowHealth] = useState(false)
   const [showBuilder, setShowBuilder] = useState(false)
   const [builderMode, setBuilderMode] = useState<'create' | 'modify'>('create')
   const [showStore, setShowStore] = useState(false)
@@ -115,9 +114,20 @@ export function Screener() {
     setFilter(filterMap.current.get(strategyId) ?? { ...defaultFilter })
   }, [])
 
+  // 自选集合 — 供筛选面板「只看自选」过滤策略命中结果 (客户端过滤)
+  const watchlistQuery = useQuery({
+    queryKey: QK.watchlist,
+    queryFn: () => api.watchlistList(),
+    staleTime: 60_000,
+  })
+  const watchlistSet = useMemo(
+    () => new Set((watchlistQuery.data?.symbols ?? []).map(s => s.symbol)),
+    [watchlistQuery.data],
+  )
+
   // 对原始结果应用过滤
   const filteredRows = result
-    ? applyFilter(result.rows, filter)
+    ? applyFilter(result.rows, filter, watchlistSet)
     : []
 
   const { data: prefs } = usePreferences()
@@ -343,7 +353,7 @@ export function Screener() {
   // 当前显示的行数据 (全部模式 或 单策略模式) + 失效行
   const displayRows = useMemo(() => {
     let rows = showAll
-      ? applyFilter(allRows, filter)
+      ? applyFilter(allRows, filter, watchlistSet)
       : filteredRows
     // 排序：用户点了表头则按该列，否则默认评分降序
     rows = sort
@@ -361,7 +371,7 @@ export function Screener() {
       }
     }
     return mainRows
-  }, [showAll, allRows, filteredRows, filter, activeStrategy, strategyLimits, expiredRows, sort, sortRows, columns])
+  }, [showAll, allRows, filteredRows, filter, watchlistSet, activeStrategy, strategyLimits, expiredRows, sort, sortRows, columns])
 
   // 日k列是否启用 → 决定是否加载批量 kline 数据
   const candleColumn = useMemo(() =>
@@ -496,17 +506,6 @@ export function Screener() {
   const minDate = dataStatus.data?.enriched?.earliest_date ?? ''
   const maxDate = dataStatus.data?.enriched?.latest_date ?? ''
 
-  const batchAdd = useWatchlistBatchAdd()
-
-  // 自选股列表 (用于判断是否在自选中)
-  const watchlist = useQuery({
-    queryKey: QK.watchlist,
-    queryFn: api.watchlistList,
-  })
-  const watchlistSet = useMemo(() => {
-    const symbols = watchlist.data?.symbols ?? []
-    return new Set(symbols.map((s: any) => s.symbol))
-  }, [watchlist.data])
 
   // 单只股票加入/移出自选
   const toggleWatchlist = useMutation({
@@ -575,21 +574,6 @@ export function Screener() {
         message: '',
       }).then(() => qc.invalidateQueries({ queryKey: QK.monitorRules }))
     }
-  }
-
-  const handleBatchAdd = (groupId: string | null) => {
-    if (!displayRows.length) return
-    const symbols = displayRows.map((r: any) => r.symbol)
-    batchAdd.mutate({ symbols, groupId }, {
-      onSuccess: (data) => {
-        setBatchMsg(`已添加 ${data.added} 只到自选`)
-        setTimeout(() => setBatchMsg(''), 3000)
-      },
-      onError: () => {
-        setBatchMsg('添加失败')
-        setTimeout(() => setBatchMsg(''), 3000)
-      },
-    })
   }
 
 
@@ -665,6 +649,17 @@ export function Screener() {
                 </button>
               ))}
             </div>
+            {/* 策略体检: 零配置批量回测, 出胜率对比表 */}
+            <button
+              onClick={() => setShowHealth(true)}
+              title="策略池零配置批量回测: 胜率/盈亏比/回撤对比 + AI 解读"
+              className="inline-flex items-center gap-1.5 h-7 px-3 rounded-btn
+                text-xs font-medium text-emerald-400 border border-emerald-400/20 bg-emerald-400/5
+                hover:bg-emerald-400/15 transition-colors cursor-pointer"
+            >
+              <Activity className="h-3.5 w-3.5" />
+              策略体检
+            </button>
             {/* 策略池按钮 */}
             <button
               onClick={() => setShowPoolDialog(true)}
@@ -824,21 +819,6 @@ export function Screener() {
                       )}
                     </div>
                   )}
-                  {displayRows.length > 0 && (
-                    <WatchlistAddMenu
-                      onSelect={handleBatchAdd}
-                      disabled={batchAdd.isPending}
-                      align="right"
-                      title="批量加自选"
-                      ariaLabel="批量加入自选"
-                      triggerClassName="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-btn
-                        border border-accent/40 bg-accent/10 text-accent text-xs font-medium
-                        hover:bg-accent/20 disabled:opacity-50 transition-colors duration-150 cursor-pointer"
-                    >
-                      <Star className="h-3 w-3" />
-                      {batchAdd.isPending ? '添加中…' : '批量加自选'}
-                    </WatchlistAddMenu>
-                  )}
                   <button
                     onClick={() => setCustomizerOpen(true)}
                     title="列表配置"
@@ -850,9 +830,6 @@ export function Screener() {
                   >
                     <Settings2 className="h-3 w-3" />
                   </button>
-                  {batchMsg && (
-                    <span className="text-xs text-accent animate-pulse">{batchMsg}</span>
-                  )}
                   {!showAll && result && result.elapsed_ms > 0 && (
                     <div className="flex items-center gap-2 text-xs text-muted">
                       <Clock className="h-3 w-3" />
@@ -996,6 +973,13 @@ export function Screener() {
             qc.invalidateQueries({ queryKey: ['screener-strategies'] })
           }
         }}
+      />
+
+      <StrategyHealthDialog
+        open={showHealth}
+        onClose={() => setShowHealth(false)}
+        strategyIds={visiblePool}
+        nameOf={(id) => strategyIdToName[id] ?? id}
       />
 
       {showPoolDialog && (

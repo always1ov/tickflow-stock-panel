@@ -468,6 +468,8 @@ def get_preferences() -> dict:
         "feishu_webhook_url": preferences.get_feishu_webhook_url(),
         "feishu_webhook_secret": preferences.get_feishu_webhook_secret(),
         "wecom_webhook_url": preferences.get_wecom_webhook_url(),
+        "dingtalk_webhook_url": preferences.get_dingtalk_webhook_url(),
+        "dingtalk_keyword": preferences.get_dingtalk_keyword(),
         "wecom_bot_id": preferences.get_wecom_bot_id(),
         "wecom_bot_secret": preferences.get_wecom_bot_secret(),
         "wecom_bot_enabled": preferences.get_wecom_bot_enabled(),
@@ -1005,6 +1007,72 @@ def update_wecom_webhook(req: WecomWebhookPrefsIn) -> dict:
         )
     saved_url = preferences.set_wecom_webhook_url(url)
     return {"wecom_webhook_url": saved_url}
+
+
+class DingtalkWebhookPrefsIn(BaseModel):
+    url: str
+    keyword: str = ""
+
+
+@router.put("/preferences/dingtalk-webhook")
+def update_dingtalk_webhook(req: DingtalkWebhookPrefsIn) -> dict:
+    """钉钉群机器人 Webhook 地址 + 自定义关键词 — 只支持「关键词」安全模式。
+
+    - url: 传入空串表示清空配置; 非空需为合法钉钉机器人地址, 或纯 access_token。
+    - keyword: 机器人「自定义关键词」之一; 推送正文不含时后端自动补上以通过校验。
+      机器人未启用关键词校验时可留空。
+    """
+    from app.services import preferences
+    from app.services import webhook_adapter
+
+    url = (req.url or "").strip()
+    if url and not webhook_adapter.is_valid_dingtalk_url(url):
+        raise HTTPException(
+            status_code=400,
+            detail="Webhook 地址非法, 需为钉钉群机器人地址 "
+                   "(https://oapi.dingtalk.com/robot/send?access_token=... 或纯 access_token)",
+        )
+    saved_url = preferences.set_dingtalk_webhook_url(url)
+    saved_keyword = preferences.set_dingtalk_keyword((req.keyword or "").strip())
+    return {"dingtalk_webhook_url": saved_url, "dingtalk_keyword": saved_keyword}
+
+
+class WebhookTestIn(BaseModel):
+    channel: str  # feishu | wecom | dingtalk
+
+
+@router.post("/preferences/webhook-test")
+def test_webhook(req: WebhookTestIn) -> dict:
+    """向指定渠道发送一条测试消息, 用已保存的配置。返回 {ok} 供前端提示成败。
+
+    同步发送 (走 webhook_adapter 的重试/静默逻辑); 未配置该渠道时返回 400。
+    """
+    from app.services import preferences
+    from app.services import webhook_adapter
+
+    ch = (req.channel or "").strip()
+    title = "TickFlow 测试推送"
+    body = "这是一条测试消息，收到即表示 Webhook 配置成功。"
+
+    if ch == "feishu":
+        url = preferences.get_feishu_webhook_url()
+        if not url:
+            raise HTTPException(status_code=400, detail="飞书 Webhook 未配置")
+        ok = webhook_adapter.send_feishu(url, title, body, preferences.get_feishu_webhook_secret())
+    elif ch == "wecom":
+        url = preferences.get_wecom_webhook_url()
+        if not url:
+            raise HTTPException(status_code=400, detail="企业微信 Webhook 未配置")
+        ok = webhook_adapter.send_wecom(url, title, body)
+    elif ch == "dingtalk":
+        url = preferences.get_dingtalk_webhook_url()
+        if not url:
+            raise HTTPException(status_code=400, detail="钉钉 Webhook 未配置")
+        ok = webhook_adapter.send_dingtalk(url, title, body, preferences.get_dingtalk_keyword())
+    else:
+        raise HTTPException(status_code=400, detail=f"未知渠道: {ch}")
+
+    return {"ok": bool(ok), "channel": ch}
 
 
 class WecomBotPrefsIn(BaseModel):

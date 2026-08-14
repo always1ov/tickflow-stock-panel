@@ -176,6 +176,29 @@ async def analyze_stock(request: Request, req: AnalyzeRequest):
 
 
 # ================================================================
+# AI 买卖信号(自选决策台 P2)—— 结构化操作倾向, 与四维客观分析分开
+# ================================================================
+
+
+@router.get("/signals")
+def list_signals():
+    """全部已缓存的 AI 买卖信号 {SYMBOL: {signal, confidence, reason, close, created_at}}。"""
+    from app.services import stock_signal
+    return {"signals": stock_signal.load_all()}
+
+
+@router.post("/signal/{symbol}")
+async def generate_signal(symbol: str, request: Request):
+    """为单只标的生成(并缓存)一个 AI 买卖信号。前端「分析全部自选」逐只并发调用本接口。"""
+    if not symbol.strip():
+        raise HTTPException(400, "symbol 不能为空")
+    from app.services import stock_signal
+    repo = request.app.state.repo
+    data_dir = repo.store.data_dir
+    return await stock_signal.generate_signal(repo, data_dir, symbol)
+
+
+# ================================================================
 # 报告 CRUD(历史报告持久化)
 # ================================================================
 

@@ -270,6 +270,7 @@ async def _run_openai_once(
     model = current_ai_model()
     req_messages = list(messages)
     kwargs = _openai_kwargs(temperature=temperature, max_tokens=max_tokens)
+    transient_left = 2  # 瞬时错误(429/5xx/连接超时)自动重试: 2s → 5s 退避
     while True:
         try:
             resp = await client.chat.completions.create(
@@ -282,6 +283,10 @@ async def _run_openai_once(
             retry_kwargs = _openai_retry_kwargs(exc, kwargs)
             if retry_kwargs is not None:
                 kwargs = retry_kwargs
+                continue
+            if transient_left > 0 and _is_transient_ai_error(exc):
+                await asyncio.sleep(2.0 if transient_left == 2 else 5.0)
+                transient_left -= 1
                 continue
             if _is_openai_transport_error(exc):
                 raise RuntimeError(_format_openai_error(exc)) from exc
@@ -313,6 +318,7 @@ async def _stream_openai(
                 yield delta.content
 
     kwargs = _openai_kwargs(temperature=temperature, max_tokens=max_tokens)
+    transient_left = 2  # 瞬时错误(429/5xx/连接超时)自动重试: 2s → 5s 退避
     while True:
         try:
             stream = await client.chat.completions.create(
@@ -327,6 +333,10 @@ async def _stream_openai(
             retry_kwargs = _openai_retry_kwargs(exc, kwargs)
             if retry_kwargs is not None:
                 kwargs = retry_kwargs
+                continue
+            if transient_left > 0 and _is_transient_ai_error(exc):
+                await asyncio.sleep(2.0 if transient_left == 2 else 5.0)
+                transient_left -= 1
                 continue
             if _is_openai_transport_error(exc):
                 raise RuntimeError(_format_openai_error(exc)) from exc
@@ -412,6 +422,19 @@ def _openai_kwargs(*, temperature: float | None, max_tokens: int) -> dict:
         if reasoning_effort:
             kwargs["reasoning_effort"] = reasoning_effort
     return kwargs
+
+
+def _is_transient_ai_error(exc: Exception) -> bool:
+    """瞬时可重试错误: 提供商过载/限流/网关抖动。
+
+    429(限流) 与 5xx(如 MiniMax 偶发 503 Service temporarily unavailable)
+    以及连接建立/超时类错误 —— 这类错误换个时间点重试大概率成功,
+    不该直接把失败甩给用户。
+    """
+    status = getattr(exc, "status_code", None)
+    if isinstance(status, int) and (status == 429 or 500 <= status <= 504):
+        return True
+    return type(exc).__name__ in ("APIConnectionError", "APITimeoutError")
 
 
 def _is_openai_transport_error(exc: Exception) -> bool:

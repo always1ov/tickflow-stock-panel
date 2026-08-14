@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import type { StrategyDetail, StrategyParamDef } from '@/lib/api'
+import { paramOptionValue, type StrategyDetail, type StrategyParamDef } from '@/lib/api'
 
 /** 参数扫描配置的共享逻辑与 UI — 优化器与 walk-forward 复用。 */
 
@@ -105,7 +105,7 @@ export function useParamSweep(strategies: StrategyDetail[], onStrategyChange?: (
       const s = sweeps[p.id]
       if (!s?.enabled) continue
       if (p.type === 'bool') grid[p.id] = [true, false]
-      else if (p.type === 'select') grid[p.id] = p.options ?? []
+      else if (p.type === 'select') grid[p.id] = (p.options ?? []).map(paramOptionValue)
       else grid[p.id] = { min: Number(s.min), max: Number(s.max), step: Number(s.step) }
     }
     return grid

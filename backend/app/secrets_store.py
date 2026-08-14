@@ -70,7 +70,7 @@ def _raw_tickflow_key_str() -> str:
 
 
 def get_tickflow_keys() -> list[str]:
-    """[fork 增强] 所有配置的 TickFlow key。
+    """所有配置的 TickFlow key。
 
     支持在同一字段里填多个 key(逗号 / 换行 / 空格分隔),用于「免费多 key 池化」——
     每个免费 key 各给 5 只自选实时额度,凑成 5×N 只。去重保序。
@@ -85,9 +85,8 @@ def get_tickflow_keys() -> list[str]:
 
 
 def get_tickflow_key() -> str:
-    """取当前 TickFlow Key:secrets.json 优先,否则 .env。
+    """取主 key(多 key 时取第一个);单 key 时行为不变。
 
-    [fork 增强] 多 key 时取第一个(主 key);单 key 时行为与上游完全一致。
     档位探测、付费端点、历史日K 等单 key 逻辑一律用主 key。
     """
     keys = get_tickflow_keys()

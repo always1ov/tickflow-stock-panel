@@ -78,6 +78,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
   const { data: prefs } = usePreferences()
   const feishuConfigured = !!(prefs?.feishu_webhook_url)
   const wecomConfigured = !!(prefs?.wecom_webhook_url)
+  const dingtalkConfigured = !!(prefs?.dingtalk_webhook_url)
   const [editing] = useState(!!rule)
   // 新建规则: 预填全局「默认推送渠道」(多选数组), preset 显式指定时以 preset 为准。
   // 编辑规则: 完全沿用规则自身配置, 不受默认值影响。
@@ -996,6 +997,23 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
             )}
           </label>
 
+          {/* 钉钉 (可用) */}
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={(draft.webhook_channels ?? []).includes('dingtalk')}
+              onChange={() => toggleChannel('dingtalk')}
+              className="h-3 w-3 accent-accent cursor-pointer"
+            />
+            <span className="text-[11px] text-foreground">钉钉</span>
+            <span className="text-[9px] text-muted">群机器人 · 关键词</span>
+            {(draft.webhook_channels ?? []).includes('dingtalk') && (
+              <span className={`ml-auto text-[9px] ${dingtalkConfigured ? 'text-emerald-500' : 'text-warning'}`}>
+                {dingtalkConfigured ? '已配置' : '未配置'}
+              </span>
+            )}
+          </label>
+
         </div>
 
         {/* 勾选了某渠道但该渠道地址未配置 → 提示前往设置 */}
@@ -1004,6 +1022,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
           const unconfigured: string[] = []
           if (selected.includes('feishu') && !feishuConfigured) unconfigured.push('飞书')
           if (selected.includes('wecom') && !wecomConfigured) unconfigured.push('企业微信')
+          if (selected.includes('dingtalk') && !dingtalkConfigured) unconfigured.push('钉钉')
           if (unconfigured.length === 0) return null
           return (
             <p className="text-[10px] leading-relaxed text-warning/80">
@@ -1017,6 +1036,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
           const ready: string[] = []
           if (selected.includes('feishu') && feishuConfigured) ready.push('飞书')
           if (selected.includes('wecom') && wecomConfigured) ready.push('企业微信')
+          if (selected.includes('dingtalk') && dingtalkConfigured) ready.push('钉钉')
           if (ready.length === 0) return null
           return (
             <p className="text-[10px] leading-relaxed text-muted">

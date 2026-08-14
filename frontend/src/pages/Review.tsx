@@ -71,6 +71,8 @@ export function Review() {
   // 复盘日期:当前固定取最新交易日(后续如需日期选择可改回 useState)
   const asOf: string | undefined = undefined
   const [focus, setFocus] = useState('')
+  // 复盘模式: 当日 / 连读昨日(对照上一份复盘) / 近7交易日纵览
+  const [recapMode, setRecapMode] = useState<'today' | 'continuity' | 'week'>('today')
   // 生成状态走全局 store:切走页面流不中断,回来可恢复
   const { phase, content, error, meta } = useReviewState()
   const [viewing, setViewing] = useState<AiReviewReport | null>(null)  // 查看历史报告
@@ -105,6 +107,7 @@ export function Review() {
   const reviewSched = prefs.data?.review_schedule ?? { enabled: false, hour: 15, minute: 10 }
   const feishuConfigured = !!(prefs.data?.feishu_webhook_url)
   const wecomConfigured = !!(prefs.data?.wecom_webhook_url)
+  const dingtalkConfigured = !!(prefs.data?.dingtalk_webhook_url)
   // 推送渠道是独立的顶层偏好(多选), 与定时 / 实时行情无关, 常驻可单独设置
   // []=不推送, ['feishu']=飞书, ['wecom']=企业微信
   const reviewPushChannels = prefs.data?.review_push_channels ?? []
@@ -167,10 +170,11 @@ export function Review() {
         summary: doneMeta?.summary,
         emotion_score: doneMeta?.emotion_score ?? null,
         emotion_label: doneMeta?.emotion_label ?? '',
+        mode: recapMode,
       })
       qc.invalidateQueries({ queryKey: QK.reviewReports })
     } catch { /* 静默 */ }
-  }, [focus, asOf, marketQuery.data, qc])
+  }, [focus, asOf, marketQuery.data, qc, recapMode])
 
   // 主流程:生成复盘(委托给全局 store,流在后台独立运行)
   const generate = useCallback(() => {
@@ -179,8 +183,8 @@ export function Review() {
     resetReview()
     startReviewGeneration(asOf, focus, (full, doneMeta) => {
       onGenerationDone(full, doneMeta).catch(() => { /* 静默 */ })
-    })
-  }, [asOf, focus, onGenerationDone])
+    }, recapMode)
+  }, [asOf, focus, onGenerationDone, recapMode])
 
   // 复制全文到剪贴板(viewing 优先,与主区域显示一致)
   const copyContent = useCallback(async () => {
@@ -249,6 +253,16 @@ export function Review() {
             >
               <Clock className="h-3 w-3" />定时
             </button>
+            {/* 复盘模式: 当日 / 连读昨日(对照上一份) / 近7交易日纵览 */}
+            <div className="flex items-center rounded-full bg-elevated/60 p-0.5">
+              {([['today', '当日'], ['continuity', '连读昨日'], ['week', '近7日']] as const).map(([k, label]) => (
+                <button key={k} onClick={() => setRecapMode(k)}
+                  title={k === 'continuity' ? '先回顾上一份复盘的观察要点是否兑现, 再结合今日复盘' : k === 'week' ? '以近7个交易日为主时间轴: 情绪演变/主线切换/量能趋势' : '按当日盘面直接复盘(原模式)'}
+                  className={`px-2.5 h-7 rounded-full text-xs transition-all cursor-pointer ${recapMode === k ? 'bg-accent/15 text-accent font-medium' : 'text-muted hover:text-foreground'}`}>
+                  {label}
+                </button>
+              ))}
+            </div>
             <button
               onClick={generate}
               disabled={isGenerating}
@@ -465,10 +479,31 @@ export function Review() {
                       {wecomConfigured ? '已配置' : '未配置'}
                     </span>
                   </button>
+                  {/* 钉钉(可用, 多选) */}
+                  <button
+                    type="button"
+                    disabled={pushMut.isPending}
+                    onClick={() => togglePushChannel('dingtalk')}
+                    className={cn(
+                      'flex w-full items-center gap-2 rounded-btn border px-2.5 py-1.5 text-left transition-colors disabled:opacity-50',
+                      reviewPushChannels.includes('dingtalk')
+                        ? 'border-accent/40 bg-accent/10'
+                        : 'border-border/60 bg-base/40 hover:bg-base/60',
+                    )}
+                  >
+                    <span className={cn('flex h-3 w-3 shrink-0 items-center justify-center rounded border', reviewPushChannels.includes('dingtalk') ? 'border-accent bg-accent text-white' : 'border-border')}>
+                      {reviewPushChannels.includes('dingtalk') && <Check className="h-2.5 w-2.5" />}
+                    </span>
+                    <span className="text-[11px] text-foreground">钉钉</span>
+                    <span className="text-[9px] text-muted">群机器人 · 关键词</span>
+                    <span className={cn('ml-auto text-[9px]', dingtalkConfigured ? 'text-emerald-500' : 'text-warning')}>
+                      {dingtalkConfigured ? '已配置' : '未配置'}
+                    </span>
+                  </button>
                 </div>
                 <p className="mt-1.5 text-[10px] leading-relaxed text-muted/70">
                   手动或定时生成的复盘都会推送完整报告。复用「设置 → 实时监控」的 Webhook 配置。
-                  {((reviewPushChannels.includes('feishu') && !feishuConfigured) || (reviewPushChannels.includes('wecom') && !wecomConfigured)) && (
+                  {((reviewPushChannels.includes('feishu') && !feishuConfigured) || (reviewPushChannels.includes('wecom') && !wecomConfigured) || (reviewPushChannels.includes('dingtalk') && !dingtalkConfigured)) && (
                     <Link to="/settings?tab=monitoring" className="ml-1 text-accent hover:underline" onClick={() => setShowSchedule(false)}>
                       前往配置 →
                     </Link>
@@ -691,7 +726,9 @@ function ReportPanel({
         <div className="flex items-center gap-1.5">
           {isGenerating ? <RefreshCw className="h-3.5 w-3.5 animate-spin text-accent" /> : <BookOpenCheck className="h-3.5 w-3.5 text-accent" />}
           <span className="text-xs font-medium text-foreground">
-            {showViewingTag ? `历史复盘 · ${viewing!.as_of}` : isGenerating ? 'AI 正在复盘…' : '复盘报告'}
+            {showViewingTag
+              ? `历史复盘 · ${viewing!.as_of}${viewing!.mode && MODE_LABEL[viewing!.mode] ? ` · ${MODE_LABEL[viewing!.mode]}` : ''}`
+              : isGenerating ? 'AI 正在复盘…' : '复盘报告'}
           </span>
         </div>
         {showActions && (
@@ -734,6 +771,10 @@ function ReportPanel({
 // ================================================================
 // 历史面板
 // ================================================================
+
+/** 复盘模式的显示标签(与顶部模式选择器一致); 旧存档无 mode 字段则不显示 */
+const MODE_LABEL: Record<string, string> = { today: '当日', continuity: '连读昨日', week: '近7日' }
+
 function HistoryPanel({
   reports, loading, viewingId, generating, onView, onBackToGenerating, onDelete,
 }: {
@@ -803,6 +844,11 @@ function HistoryPanel({
                     <div className="flex items-center gap-1.5">
                       <span className="truncate text-[11px] font-medium text-foreground">{r.emotion_label ?? '—'}</span>
                       <span className="font-mono text-[10px] text-secondary">{r.as_of}</span>
+                      {r.mode && MODE_LABEL[r.mode] && (
+                        <span className="shrink-0 rounded border border-accent/30 bg-accent/10 px-1 py-px text-[9px] text-accent">
+                          {MODE_LABEL[r.mode]}
+                        </span>
+                      )}
                     </div>
                     <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
                       {r.summary
