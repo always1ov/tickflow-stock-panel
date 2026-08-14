@@ -55,6 +55,9 @@ LEVEL_TYPES = {
     # [fork 增强] 六态关键点(利弗莫尔上/下关键点)。不在 compute_levels 内计算 ——
     # 需要每票各自的阈值配置,由 API 层(stock_analysis.get_levels)注入。
     "livermore": "六态关键点",
+    # [fork 增强] 持仓出场线(ATR 三阶段: 止损/保本/移动止盈)。仅持有+已填成本的票有,
+    # 依赖仓位数据,由 API 层注入。
+    "exit": "持仓止盈",
 }
 
 

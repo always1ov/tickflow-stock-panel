@@ -587,6 +587,13 @@ def run_now(
         emit("done", 100, "完成")
     _invalidate(None)  # 兜底:全清
 
+    # [fork 增强] 用最新日线刷新持仓出场线并同步监控规则(线只会上移, 失败不影响管道)
+    try:
+        from app.services import position_exit
+        position_exit.sync_exit_rules(position_exit.exit_lines_for_positions(repo))
+    except Exception as e:  # noqa: BLE001
+        logger.debug("持仓出场线刷新跳过: %s", e)
+
     result = {
         "universe_size": len(universe),
         "today_daily_rows": today_daily_rows,

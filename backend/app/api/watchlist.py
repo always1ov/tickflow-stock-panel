@@ -433,3 +433,24 @@ def _parse_ext_columns(ext_columns: str) -> list[tuple[str, str]]:
         if config_id and field_name and is_valid_ext_ident(config_id):
             result.append((config_id, field_name))
     return result
+
+
+# ================================================================
+# [fork 增强] 持仓出场线(ATR 三阶段: 止损/保本/移动止盈)
+# ================================================================
+
+
+@router.get("/exit-lines")
+def watchlist_exit_lines(request: Request):
+    """全部「持有+已填成本」自选的出场线,并把线同步为价格监控规则(盘中推送)。
+
+    返回 {lines: {SYMBOL: {stage, stage_cn, line_cn, line, atr, profit_atr,
+    highest_close, k, close, distance_pct, triggered, action, as_of, entry_date, cost}}}。
+    """
+    from app.services import position_exit
+    lines = position_exit.exit_lines_for_positions(request.app.state.repo)
+    try:
+        position_exit.sync_exit_rules(lines, getattr(request.app.state, "monitor_engine", None))
+    except Exception as e:  # noqa: BLE001
+        logger.warning("sync exit rules failed (lines still returned): %s", e)
+    return {"lines": lines}

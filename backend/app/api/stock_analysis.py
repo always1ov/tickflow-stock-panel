@@ -147,6 +147,19 @@ def get_levels(
     except Exception as e:  # noqa: BLE001
         logger.debug("livermore levels skipped: %s", e)
         levels["livermore"] = []
+    # [fork 增强] 持仓出场线(仅持有+已填成本的票才有;ATR 三阶段)
+    levels["exit"] = []
+    try:
+        from app.services.position_exit import exit_for_symbol
+        ex = exit_for_symbol(request.app.state.repo, symbol)
+        if ex:
+            levels["exit"] = [{
+                "value": float(ex["line"]),
+                "label": f"{ex['line_cn']}({ex['stage_cn']})",
+                "type": "exit", "side": "support", "strength": "strong",
+            }]
+    except Exception as e:  # noqa: BLE001
+        logger.debug("exit level skipped: %s", e)
     close = float(df.tail(1)["close"][0]) if "close" in df.columns else None
     # 日期 + 带状曲线序列(供前端画 Keltner/ATR/布林带曲线)
     dates = df["date"].to_list()

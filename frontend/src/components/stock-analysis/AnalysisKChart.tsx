@@ -31,7 +31,7 @@ const THEME = {
 const CT = () => chartTheme(getTheme())
 
 // ===== 价位类型(与后端 levels.py 的 LEVEL_TYPES 对齐) =====
-export type LevelType = 'sr' | 'pivot' | 'extreme' | 'boll' | 'keltner_s' | 'keltner_m' | 'keltner_l' | 'atr_stop' | 'gap' | 'fib' | 'round' | 'livermore'
+export type LevelType = 'sr' | 'pivot' | 'extreme' | 'boll' | 'keltner_s' | 'keltner_m' | 'keltner_l' | 'atr_stop' | 'gap' | 'fib' | 'round' | 'livermore' | 'exit'
 
 export interface PriceLevel {
   value: number
@@ -58,6 +58,8 @@ export const LEVEL_GROUPS: { key: LevelType; label: string; color: string }[] = 
   { key: 'round',    label: '整数关口',  color: '#71717A' },   // 灰(心理位,弱视觉)
   // [fork 增强] 六态关键点(利弗莫尔上/下关键点,趋势确认/否决价)
   { key: 'livermore', label: '六态关键点', color: '#A78BFA' },  // 淡紫
+  // [fork 增强] 持仓出场线(ATR 三阶段:止损/保本/移动止盈;仅持有+填成本的票有)
+  { key: 'exit',      label: '持仓止盈',   color: '#FBBF24' },  // 琥珀(仓位管理线)
 ]
 
 // 通道曲线元数据(单一数据源):供 buildOption 画线 + 右侧面板取最新值共用。

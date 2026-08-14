@@ -146,7 +146,26 @@ export interface AiFinancialReport {
 }
 
 // ===== 个股分析 =====
-export type LevelType = 'sr' | 'pivot' | 'extreme' | 'boll' | 'keltner_s' | 'keltner_m' | 'keltner_l' | 'atr_stop' | 'gap' | 'fib' | 'round' | 'livermore'
+export type LevelType = 'sr' | 'pivot' | 'extreme' | 'boll' | 'keltner_s' | 'keltner_m' | 'keltner_l' | 'atr_stop' | 'gap' | 'fib' | 'round' | 'livermore' | 'exit'
+
+// [fork 增强] 持仓出场线(ATR 三阶段)
+export interface ExitLine {
+  stage: 'risk' | 'breakeven' | 'trail'
+  stage_cn: string
+  line_cn: string
+  action: string
+  line: number
+  atr: number
+  profit_atr: number
+  highest_close: number | null
+  k: number
+  close: number
+  distance_pct: number
+  triggered: boolean
+  as_of: string
+  entry_date: string
+  cost: number
+}
 
 // [fork 增强] 六态趋势(利弗莫尔 Market Key)
 export type LivermoreState = 'UT' | 'NR' | 'SR' | 'SREA' | 'NREA' | 'DT'
@@ -2290,6 +2309,10 @@ export const api = {
   // ===== 个股分析 =====
   stockAnalysisLevels: (symbol: string, days = 120) =>
     request<StockLevels>(`/api/stock-analysis/levels?symbol=${encodeURIComponent(symbol)}&days=${days}`),
+
+  // [fork 增强] 持仓出场线
+  watchlistExitLines: () =>
+    request<{ lines: Record<string, ExitLine> }>('/api/watchlist/exit-lines'),
 
   // [fork 增强] 六态趋势
   stockTrend: (symbol: string) =>

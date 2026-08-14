@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ChevronDown, Star, Wallet, Sparkles, Loader2, ArrowUp, ArrowDown, RefreshCw, FileText, TrendingUp } from 'lucide-react'
-import { api, type TrendInfo } from '@/lib/api'
+import { api, type ExitLine, type TrendInfo } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { toast } from '@/components/Toast'
 import { useHistoryReports, openHistoryReport, loadHistory } from '@/lib/stockAnalysisStore'
@@ -84,6 +84,16 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
   })
   const trends: Record<string, TrendInfo> = trendsQ.data?.trends ?? {}
 
+  // [fork 增强] 持仓出场线(仅持有+填成本的票有;后端顺带把线同步为监控规则)
+  const heldWithCost = Object.values(positions).some((p) => p.held && p.cost)
+  const exitLinesQ = useQuery({
+    queryKey: ['watchlist-exit-lines'],
+    queryFn: () => api.watchlistExitLines(),
+    enabled: heldWithCost,
+    staleTime: 5 * 60_000,
+  })
+  const exitLines: Record<string, ExitLine> = exitLinesQ.data?.lines ?? {}
+
   // 历史报告整合: 每只自选显示最近一份 AI 分析报告(时间+份数), 点击直接打开报告弹窗。
   // 数据来自 stockAnalysisStore(个股分析页挂载时已 loadHistory, 此处再调一次是安全去重)。
   const { reports } = useHistoryReports()
@@ -110,7 +120,10 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
   const setPos = useMutation({
     mutationFn: ({ symbol, held, cost }: { symbol: string; held: boolean; cost: number | null }) =>
       api.setWatchlistPosition(symbol, held, cost),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['watchlist-positions'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['watchlist-positions'] })
+      qc.invalidateQueries({ queryKey: ['watchlist-exit-lines'] })
+    },
   })
 
   // 「分析全部/持有」—— 逐只并发(限 3)调用信号接口, 每完成一只即刷新, 显示进度。
@@ -175,10 +188,11 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
         const cost = pos?.cost ?? null
         const pnl = pos?.held && cost && cost > 0 && close != null ? (close - cost) / cost : null
         const trend: TrendInfo | undefined = trends[symbol]
-        return { symbol, name: r.name ?? symbol, close, changePct: r.change_pct ?? null, held: !!pos?.held, cost, pnl, sig, trend }
+        const exit: ExitLine | undefined = exitLines[symbol]
+        return { symbol, name: r.name ?? symbol, close, changePct: r.change_pct ?? null, held: !!pos?.held, cost, pnl, sig, trend, exit }
       })
       .filter((r) => (heldOnly ? r.held : true))
-  }, [enriched.data, positions, signals, heldOnly, trends])
+  }, [enriched.data, positions, signals, heldOnly, trends, exitLines])
 
   const sortedRows = useMemo(() => {
     const val = (r: (typeof rows)[number]): string | number | null => {
@@ -291,6 +305,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
                 <th className="px-2 py-1.5 font-normal text-center"><button onClick={() => toggleSort('held')} className={thBtn}>仓位{caret('held')}</button></th>
                 <th className="px-2 py-1.5 font-normal text-right">成本</th>
                 <th className="px-2 py-1.5 font-normal text-right"><button onClick={() => toggleSort('pnl')} className={thBtn}>浮盈{caret('pnl')}</button></th>
+                <th className="px-2 py-1.5 font-normal text-right" title="ATR 三阶段出场线(止损/保本/移动止盈),仅持有+填成本的票有;跌破自动推送">止盈线</th>
                 <th className="px-2 py-1.5 font-normal text-center"><button onClick={() => toggleSort('trend')} className={thBtn} title="六态趋势(利弗莫尔,日线收盘价判定):多头在前">趋势{caret('trend')}</button></th>
                 <th className="px-2 py-1.5 font-normal text-right"><button onClick={() => toggleSort('confidence')} className={thBtn}>置信{caret('confidence')}</button></th>
                 <th className="px-2 py-1.5 font-normal text-center"><button onClick={() => toggleSort('report')} className={thBtn} title="最近一份 AI 分析报告(点击单元格直接打开)">报告{caret('report')}</button></th>
@@ -299,7 +314,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
             </thead>
             <tbody>
               {rows.length === 0 ? (
-                <tr><td colSpan={10} className="px-4 py-6 text-center text-muted">自选为空 —— 去自选页添加标的</td></tr>
+                <tr><td colSpan={11} className="px-4 py-6 text-center text-muted">自选为空 —— 去自选页添加标的</td></tr>
               ) : sortedRows.map((r) => {
                 const active = r.symbol === currentSymbol
                 const up = (r.changePct ?? 0) > 0
@@ -347,6 +362,24 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
                     {/* 浮盈 */}
                     <td className={`px-2 py-1.5 text-right font-mono tabular-nums ${r.pnl == null ? 'text-muted' : r.pnl > 0 ? 'text-red-400' : r.pnl < 0 ? 'text-emerald-400' : 'text-muted'}`}>
                       {r.pnl != null ? `${(r.pnl * 100).toFixed(1)}%` : '—'}
+                    </td>
+                    {/* [fork 增强] 持仓出场线:当前生效线位 + 距离; 逼近变琥珀, 跌破变红 */}
+                    <td className="px-2 py-1.5 text-right">
+                      {r.exit ? (
+                        <span
+                          className={`inline-flex flex-col items-end text-[10px] font-mono leading-tight ${
+                            r.exit.triggered ? 'text-red-400' : r.exit.distance_pct > -0.03 ? 'text-amber-300' : 'text-muted'
+                          }`}
+                          title={`${r.exit.stage_cn} · ${r.exit.line_cn}\n成本 ${r.exit.cost} · 浮盈 ${r.exit.profit_atr}×ATR · 持仓最高 ${r.exit.highest_close ?? '—'}\n跌破 ${r.exit.line.toFixed(2)} → ${r.exit.action}(k=${r.exit.k}, ATR14=${r.exit.atr})`}
+                        >
+                          <span>{r.exit.line.toFixed(2)}</span>
+                          <span className="text-[9px] opacity-80">
+                            {r.exit.triggered ? '已触发' : `距 ${(r.exit.distance_pct * 100).toFixed(1)}%`}
+                          </span>
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-muted/40">—</span>
+                      )}
                     </td>
                     {/* [fork 增强] 六态趋势(利弗莫尔):状态全名 + 持续天数, 悬停看关键点/操作建议 */}
                     <td className="px-2 py-1.5 text-center">

@@ -45,6 +45,9 @@ _SYSTEM_PROMPT = """你是一位拥有 15 年 A 股一线交易经验的信号�
 4. **风险入置信度**:超买/超卖、量价背离、临近关键压力等风险因素,体现在调低 confidence 和收紧 watch_points,而不是一律退回观望
 5. **预案完备**:只要关键价位存在,watch_points **必须至少给 1 个 up + 1 个 down**——上方到哪做什么、下方到哪做什么,到价时用户不至于毫无准备
 6. **价位精确**:预案价位必须落到给定关键价位的具体数值,不许自造价格
+7. **持仓出场线优先**:若提供了「持仓出场线」(系统按 ATR 三阶段规则算好的止损线/保本线/移动止盈线),
+   watch_points **必须包含该线作为 down 方向预案**,action 按其阶段用「跌破止损」「保本离场」或「止盈了结」;
+   该线是确定性计算结果,你不得修改其数值,只能围绕它解释与补充其他预案
 
 仅供用户个人决策参考,不构成投资建议。"""
 
@@ -153,9 +156,23 @@ async def generate_signal(repo, data_dir: Path, symbol: str) -> dict:
             )
     except Exception as e:  # noqa: BLE001
         logger.debug("trend context for signal skipped: %s", e)
+    # [fork 增强] 持仓出场线上下文(仅持有+已填成本时有;规则算好, AI 不得改数值)
+    exit_line = ""
+    try:
+        from app.services.position_exit import exit_for_symbol
+        ex = exit_for_symbol(repo, sym)
+        if ex:
+            exit_line = (
+                f"持仓出场线: 成本 {ex['cost']}, 浮盈 {ex['profit_atr']}×ATR, {ex['stage_cn']},"
+                f" {ex['line_cn']} {ex['line']}(跌破则{ex['action']}; ATR14={ex['atr']},"
+                f" 持仓最高收盘 {ex['highest_close']}, k={ex['k']})\n"
+            )
+    except Exception as e:  # noqa: BLE001
+        logger.debug("exit context for signal skipped: %s", e)
     user_prompt = (
         f"标的: {sym}\n"
         f"{trend_line}"
+        f"{exit_line}"
         f"关键价位概览: {summarize_levels(levels, close)}\n"
         f"最近 {_SIGNAL_WINDOW} 日 K(JSON,含指标):\n{json.dumps(kline_tail, ensure_ascii=False)}"
     )
