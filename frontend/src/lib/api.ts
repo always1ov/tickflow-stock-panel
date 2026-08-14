@@ -1821,11 +1821,11 @@ export const api = {
         : '/api/watchlist/enriched',
     ),
   watchlistPositions: () =>
-    request<{ positions: Record<string, { held: boolean; cost: number | null; lifeline?: number | null; updated_at: string }> }>('/api/watchlist/positions'),
-  setWatchlistPosition: (symbol: string, held: boolean, cost: number | null, lifeline?: number | null) =>
-    request<{ symbol: string; position: { held: boolean; cost: number | null; lifeline?: number | null; updated_at: string } }>(
+    request<{ positions: Record<string, { held: boolean; cost: number | null; updated_at: string }> }>('/api/watchlist/positions'),
+  setWatchlistPosition: (symbol: string, held: boolean, cost: number | null) =>
+    request<{ symbol: string; position: { held: boolean; cost: number | null; updated_at: string } }>(
       `/api/watchlist/positions/${encodeURIComponent(symbol)}`,
-      { method: 'PUT', body: JSON.stringify({ held, cost, lifeline: lifeline ?? null }) },
+      { method: 'PUT', body: JSON.stringify({ held, cost }) },
     ),
   stockSignals: () =>
     request<{ signals: Record<string, { signal: string; confidence: number; reason: string; close: number | null; created_at: string; watch_points?: { direction: 'up' | 'down'; price: number; label: string; action?: string; confidence?: number; reason: string }[] }> }>('/api/stock-analysis/signals'),

@@ -9,10 +9,93 @@ import { useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import {
-  AlertTriangle, CheckCircle2, Compass, Loader2, RefreshCw, Sparkles, Sunrise, Target,
+  AlertTriangle, CheckCircle2, Compass, Download, Loader2, RefreshCw, Sparkles, Sunrise, Target,
 } from 'lucide-react'
-import { api } from '@/lib/api'
+import { api, type TodayOverview } from '@/lib/api'
 import { toast } from '@/components/Toast'
+
+// ===== 自包含 HTML 导出(内联样式浅色排版, 无脚本无外链, 可存档/分享) =====
+
+function esc(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
+function buildTodayHtml(d: TodayOverview, brief: string | null): string {
+  const bull = '#d03050'
+  const bear = '#18a058'
+  const postureColor: Record<string, string> = { 进攻: bull, 谨慎: '#c78326', 防守: bear, 观察: '#8a919f' }
+  const actionRows = d.actions.map(a => `
+      <li><i style="background:${a.severity === 'high' ? bull : '#c78326'}"></i>
+        <b>${esc(a.name)}</b> <span class="sym">${esc(a.symbol)}</span> ${esc(a.text)}</li>`).join('')
+  const oppRows = d.opportunities.map(o => `
+      <li><i style="background:${bull}"></i>
+        <b>${esc(o.name)}</b> <span class="sym">${esc(o.symbol)}</span> ${esc(o.text)}</li>`).join('')
+  const holdRows = d.holdings.map(h => `
+      <tr>
+        <td>${esc(h.name)} <span class="sym">${esc(h.symbol)}</span></td>
+        <td class="num">${h.close?.toFixed(2) ?? '—'}</td>
+        <td class="num" style="color:${h.pnl_pct == null ? '#8a919f' : h.pnl_pct > 0 ? bull : bear}">${h.pnl_pct != null ? (h.pnl_pct * 100).toFixed(1) + '%' : '—'}</td>
+        <td class="num" style="color:${h.exit_triggered ? bull : '#1f2329'}">${h.line != null ? h.line.toFixed(2) + (h.exit_triggered ? ' 已触发' : '') : '—'}</td>
+        <td>${esc(h.stage_cn ?? '—')}</td>
+        <td style="color:${h.trend_side === '多头' ? bull : bear}">${h.trend_cn ? `${esc(h.trend_cn)} ${h.trend_duration}天` : '—'}</td>
+      </tr>`).join('')
+  const genAt = new Date().toLocaleString('zh-CN')
+  return `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>今日总览 · ${esc(d.as_of ?? '')}</title>
+<style>
+  body{margin:0;padding:32px 24px;background:#f7f8fa;color:#1f2329;font:14px/1.6 -apple-system,'PingFang SC','Microsoft YaHei',sans-serif}
+  .wrap{max-width:860px;margin:0 auto}
+  h1{font-size:20px;margin:0 0 4px}
+  h2{font-size:14px;margin:22px 0 8px;display:flex;align-items:center;gap:6px}
+  .meta{color:#8a919f;font-size:12px;margin-bottom:18px}
+  .posture{display:inline-block;border-radius:999px;padding:2px 14px;font-weight:600;color:#fff}
+  .weather{background:#fff;border:1px solid #e5e6eb;border-radius:8px;padding:12px 16px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+  .brief{background:#f3efff;border:1px solid #ddd0fa;border-radius:8px;padding:12px 16px;font-size:13px;margin-top:14px}
+  ul.items{list-style:none;margin:0;padding:0;background:#fff;border:1px solid #e5e6eb;border-radius:8px}
+  ul.items li{padding:9px 14px;border-bottom:1px solid #f0f1f3;font-size:13px;display:flex;gap:8px;align-items:baseline}
+  ul.items li:last-child{border-bottom:none}
+  ul.items i{width:7px;height:7px;border-radius:50%;display:inline-block;flex:none;position:relative;top:-1px}
+  .empty{background:#fff;border:1px solid #e5e6eb;border-radius:8px;padding:14px 16px;font-size:13px;color:#8a919f}
+  table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #e5e6eb;border-radius:8px;overflow:hidden}
+  th{font-size:12px;font-weight:500;color:#8a919f;text-align:left;padding:8px 12px;border-bottom:1px solid #e5e6eb;background:#fafbfc}
+  td{padding:8px 12px;border-bottom:1px solid #f0f1f3;font-size:13px}
+  tr:last-child td{border-bottom:none}
+  .num{font-variant-numeric:tabular-nums;text-align:right}
+  th.num,td.num{text-align:right}
+  .sym{color:#a0a6b1;font-size:11px}
+  .foot{margin-top:18px;color:#a0a6b1;font-size:11px}
+  @media print{body{background:#fff;padding:0}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>今日总览</h1>
+  <div class="meta">数据截至 ${esc(d.as_of ?? '—')} · 自选 ${d.watchlist_total} 只(六态判定 ${d.trend_total})· 生成于 ${genAt}</div>
+  <div class="weather">
+    <span class="posture" style="background:${postureColor[d.weather.posture] ?? '#8a919f'}">${esc(d.weather.posture)}</span>
+    <span style="font-size:13px;color:#4e5666">${esc(d.weather.posture_reason)}</span>
+    <span style="margin-left:auto;font-size:12px;color:#8a919f">多头 <b style="color:${bull}">${d.weather.bull}</b> / 空头 <b style="color:${bear}">${d.weather.bear}</b> · 新转多 ${d.weather.new_bull} · 新转空 ${d.weather.new_bear}</span>
+  </div>
+  ${brief ? `<div class="brief">✦ ${esc(brief)}</div>` : ''}
+  <h2>⚠️ 需要行动(${d.actions.length})</h2>
+  ${d.actions.length ? `<ul class="items">${actionRows}</ul>` : '<div class="empty">今日无需操作 —— 管住手</div>'}
+  <h2>🎯 值得关注(${d.opportunities.length})</h2>
+  ${d.opportunities.length ? `<ul class="items">${oppRows}</ul>` : '<div class="empty">暂无新信号 —— 等待比出手更常见</div>'}
+  <h2>💼 持仓体检(${d.holdings.length})</h2>
+  ${d.holdings.length ? `<table>
+    <thead><tr><th>标的</th><th class="num">现价</th><th class="num">浮盈</th><th class="num">出场线</th><th>阶段</th><th>趋势</th></tr></thead>
+    <tbody>${holdRows}</tbody>
+  </table>` : '<div class="empty">暂无持仓标记</div>'}
+  <p class="foot">TickFlow Stock Panel · 六态趋势 + ATR 出场线 + 生命线(20日线) · 仅个人参考,不构成投资建议</p>
+</div>
+</body>
+</html>
+`
+}
 
 const POSTURE_STYLE: Record<string, string> = {
   进攻: 'border-red-400/40 bg-red-400/10 text-red-400',
@@ -51,6 +134,25 @@ export function Today() {
         <h1 className="text-base font-semibold text-foreground">今日总览</h1>
         {d?.as_of && <span className="text-[10px] text-muted">数据截至 {d.as_of} · 自选 {d.watchlist_total} 只(六态判定 {d.trend_total})</span>}
         <div className="ml-auto flex items-center gap-2">
+          <button
+            onClick={() => {
+              if (!d) return
+              const html = buildTodayHtml(d, brief)
+              const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
+              const url = URL.createObjectURL(blob)
+              const a = document.createElement('a')
+              a.href = url
+              a.download = `今日总览_${(d.as_of ?? new Date().toISOString().slice(0, 10)).replace(/-/g, '')}.html`
+              a.click()
+              URL.revokeObjectURL(url)
+            }}
+            disabled={!d}
+            title="导出为自包含 HTML 页面(可存档/分享;已生成 AI 导读会一并带上)"
+            className="inline-flex items-center gap-1 rounded-full border border-sky-400/30 bg-sky-400/10 px-2.5 py-1 text-[10px] text-sky-300 hover:bg-sky-400/20 disabled:opacity-50 transition-colors cursor-pointer"
+          >
+            <Download className="h-3 w-3" />
+            导出 HTML
+          </button>
           <button
             onClick={() => briefMut.mutate()}
             disabled={briefMut.isPending || !d}

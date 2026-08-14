@@ -158,11 +158,11 @@ def get_levels(
                 "label": f"{ex['line_cn']}({ex['stage_cn']})",
                 "type": "exit", "side": "support", "strength": "strong",
             }]
-            # 生命线独立于生效线时单独画(用户绝对底线)
+            # 生命线独立于生效线时单独画(绝对底线: 20日线或手填价)
             if ex.get("lifeline") and abs(float(ex["lifeline"]) - float(ex["line"])) > 0.001:
                 levels["exit"].append({
                     "value": float(ex["lifeline"]),
-                    "label": "生命线(绝对底线)",
+                    "label": "生命线(20日线)" if ex.get("lifeline_src") == "ma20" else "生命线(手动)",
                     "type": "exit", "side": "support", "strength": "strong",
                 })
     except Exception as e:  # noqa: BLE001

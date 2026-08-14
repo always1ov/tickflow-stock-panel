@@ -38,12 +38,10 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
-def set_position(symbol: str, held: bool, cost: float | None,
-                 lifeline: float | None = None) -> dict:
+def set_position(symbol: str, held: bool, cost: float | None) -> dict:
     """标记某只自选的持仓:是否持有 + 可选成本价。cost 传 None/空 表示不记成本。
 
-    [fork 增强] lifeline: 用户手划的「生命线」绝对底线价 —— 跌破即无条件清仓离场,
-    优先级高于 ATR 三阶段出场线。None/空 表示未设。
+    [fork 增强] 生命线不在此存储 —— 恒为 20 日均线,由 position_exit 每日自动计算。
     """
     sym = (symbol or "").strip().upper()
     if not sym:
@@ -53,13 +51,7 @@ def set_position(symbol: str, held: bool, cost: float | None,
         cost_val = float(cost) if cost not in (None, "") else None
     except (TypeError, ValueError):
         cost_val = None
-    try:
-        life_val = float(lifeline) if lifeline not in (None, "") else None
-    except (TypeError, ValueError):
-        life_val = None
-    if life_val is not None and life_val <= 0:
-        life_val = None
-    entry = {"held": bool(held), "cost": cost_val, "lifeline": life_val, "updated_at": _now_iso()}
+    entry = {"held": bool(held), "cost": cost_val, "updated_at": _now_iso()}
     data[sym] = entry
     _path().write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
     return entry

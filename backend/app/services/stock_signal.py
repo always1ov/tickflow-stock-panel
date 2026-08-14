@@ -165,8 +165,9 @@ async def generate_signal(repo, data_dir: Path, symbol: str) -> dict:
         from app.services.position_exit import exit_for_symbol
         ex = exit_for_symbol(repo, sym)
         if ex:
+            life_label = "生命线(20日线)" if ex.get("lifeline_src") == "ma20" else "生命线"
             life_part = (
-                f"; 生命线 {ex['lifeline']}(用户绝对底线, 跌破必须无条件清仓离场)"
+                f"; {life_label} {ex['lifeline']}(用户绝对底线, 跌破必须无条件清仓离场)"
                 if ex.get("lifeline") else ""
             )
             exit_line = (

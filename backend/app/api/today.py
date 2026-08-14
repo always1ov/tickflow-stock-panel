@@ -46,9 +46,10 @@ def _build_overview(repo) -> dict:
     for sym, ex in exit_lines.items():
         nm = names.get(sym, sym)
         if ex["stage"] == "fatal":
+            life_cn = "生命线(20日线)" if ex.get("lifeline_src") == "ma20" else "生命线"
             actions.append({
                 "kind": "lifeline_broken", "severity": "high", "symbol": sym, "name": nm,
-                "text": f"已跌破生命线 {ex['line']:.2f}!按纪律无条件清仓离场 —— 这票不看了",
+                "text": f"已跌破{life_cn} {ex['line']:.2f}!按纪律无条件清仓离场 —— 这票不看了",
             })
         elif ex["triggered"]:
             actions.append({
