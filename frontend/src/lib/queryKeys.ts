@@ -63,6 +63,9 @@ export const QK = {
   kline:                (symbol: string, start: string, end: string, extColumns?: string) =>
                            ['kline', symbol, start, end, extColumns ?? ''] as const,
   stockLevels:          (symbol: string, days?: number) => ['stock-levels', symbol, days ?? 120] as const,
+  // [fork 增强] 六态趋势
+  stockTrend:           (symbol: string) => ['stock-trend', symbol] as const,
+  stockTrends:          (symbols: string) => ['stock-trends', symbols] as const,
   klineMinute:          (symbol: string, date: string) =>
                              ['kline-minute', symbol, date] as const,
   klineMinuteRange:     (symbol: string, days: number) =>

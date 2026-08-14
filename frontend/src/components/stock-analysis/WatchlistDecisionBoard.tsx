@@ -1,15 +1,18 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ChevronDown, Star, Wallet, Sparkles, Loader2, ArrowUp, ArrowDown, RefreshCw, FileText } from 'lucide-react'
-import { api } from '@/lib/api'
+import { api, type TrendInfo } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { toast } from '@/components/Toast'
 import { useHistoryReports, openHistoryReport, loadHistory } from '@/lib/stockAnalysisStore'
+import { trendBadgeCls } from '@/components/stock-analysis/TrendStateBar'
 
 type Position = { held: boolean; cost: number | null; updated_at: string }
 type Signal = { signal: string; confidence: number; reason: string; close: number | null; created_at: string }
-type SortKey = 'name' | 'close' | 'changePct' | 'held' | 'pnl' | 'confidence' | 'signal' | 'report'
+type SortKey = 'name' | 'close' | 'changePct' | 'held' | 'pnl' | 'confidence' | 'signal' | 'report' | 'trend'
 const SIGNAL_RANK: Record<string, number> = { buy: 0, sell: 1, hold: 2, watch: 3 }
+// [fork 增强] 六态排序权重:多头在前(上涨趋势 → 下跌趋势)
+const TREND_RANK: Record<string, number> = { UT: 0, NR: 1, SR: 2, SREA: 3, NREA: 4, DT: 5 }
 
 // AI 信号 → 展示标签/配色。买入=红(A股涨红), 卖出=绿, 持有=琥珀, 观望=灰。
 const SIGNAL_META: Record<string, { label: string; cls: string }> = {
@@ -63,6 +66,19 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
     staleTime: 30_000,
   })
   const signals = signalsQ.data?.signals ?? {}
+
+  // [fork 增强] 六态趋势列 —— 批量一次拉取,零 AI 成本,基于日线收盘价
+  const trendSyms = useMemo(
+    () => ((enriched.data?.rows ?? []) as any[]).map((r) => String(r.symbol)).sort().join(','),
+    [enriched.data],
+  )
+  const trendsQ = useQuery({
+    queryKey: QK.stockTrends(trendSyms),
+    queryFn: () => api.stockTrends(trendSyms.split(',')),
+    enabled: trendSyms.length > 0,
+    staleTime: 5 * 60_000,
+  })
+  const trends: Record<string, TrendInfo> = trendsQ.data?.trends ?? {}
 
   // 历史报告整合: 每只自选显示最近一份 AI 分析报告(时间+份数), 点击直接打开报告弹窗。
   // 数据来自 stockAnalysisStore(个股分析页挂载时已 loadHistory, 此处再调一次是安全去重)。
@@ -154,10 +170,11 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
         const close = typeof r.close === 'number' ? r.close : null
         const cost = pos?.cost ?? null
         const pnl = pos?.held && cost && cost > 0 && close != null ? (close - cost) / cost : null
-        return { symbol, name: r.name ?? symbol, close, changePct: r.change_pct ?? null, held: !!pos?.held, cost, pnl, sig }
+        const trend: TrendInfo | undefined = trends[symbol]
+        return { symbol, name: r.name ?? symbol, close, changePct: r.change_pct ?? null, held: !!pos?.held, cost, pnl, sig, trend }
       })
       .filter((r) => (heldOnly ? r.held : true))
-  }, [enriched.data, positions, signals, heldOnly])
+  }, [enriched.data, positions, signals, heldOnly, trends])
 
   const sortedRows = useMemo(() => {
     const val = (r: (typeof rows)[number]): string | number | null => {
@@ -167,6 +184,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
         case 'changePct': return r.changePct
         case 'held': return r.held ? 1 : 0
         case 'pnl': return r.pnl
+        case 'trend': return r.trend ? -(TREND_RANK[r.trend.state] ?? 9) : null
         case 'confidence': return r.sig?.confidence ?? null
         case 'signal': return r.sig ? (SIGNAL_RANK[r.sig.signal] ?? 9) : null
         case 'report': {
@@ -248,6 +266,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
                 <th className="px-2 py-1.5 font-normal text-center"><button onClick={() => toggleSort('held')} className={thBtn}>仓位{caret('held')}</button></th>
                 <th className="px-2 py-1.5 font-normal text-right">成本</th>
                 <th className="px-2 py-1.5 font-normal text-right"><button onClick={() => toggleSort('pnl')} className={thBtn}>浮盈{caret('pnl')}</button></th>
+                <th className="px-2 py-1.5 font-normal text-center"><button onClick={() => toggleSort('trend')} className={thBtn} title="六态趋势(利弗莫尔,日线收盘价判定):多头在前">趋势{caret('trend')}</button></th>
                 <th className="px-2 py-1.5 font-normal text-right"><button onClick={() => toggleSort('confidence')} className={thBtn}>置信{caret('confidence')}</button></th>
                 <th className="px-2 py-1.5 font-normal text-center"><button onClick={() => toggleSort('report')} className={thBtn} title="最近一份 AI 分析报告(点击单元格直接打开)">报告{caret('report')}</button></th>
                 <th className="px-4 py-1.5 font-normal text-left"><button onClick={() => toggleSort('signal')} className={thBtn}>AI 信号{caret('signal')}</button></th>
@@ -255,7 +274,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
             </thead>
             <tbody>
               {rows.length === 0 ? (
-                <tr><td colSpan={9} className="px-4 py-6 text-center text-muted">自选为空 —— 去自选页添加标的</td></tr>
+                <tr><td colSpan={10} className="px-4 py-6 text-center text-muted">自选为空 —— 去自选页添加标的</td></tr>
               ) : sortedRows.map((r) => {
                 const active = r.symbol === currentSymbol
                 const up = (r.changePct ?? 0) > 0
@@ -303,6 +322,19 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
                     {/* 浮盈 */}
                     <td className={`px-2 py-1.5 text-right font-mono tabular-nums ${r.pnl == null ? 'text-muted' : r.pnl > 0 ? 'text-red-400' : r.pnl < 0 ? 'text-emerald-400' : 'text-muted'}`}>
                       {r.pnl != null ? `${(r.pnl * 100).toFixed(1)}%` : '—'}
+                    </td>
+                    {/* [fork 增强] 六态趋势(利弗莫尔):状态全名 + 持续天数, 悬停看关键点/操作建议 */}
+                    <td className="px-2 py-1.5 text-center">
+                      {r.trend ? (
+                        <span
+                          className={`inline-flex whitespace-nowrap rounded border px-1.5 py-0.5 text-[10px] ${trendBadgeCls(r.trend.state)}`}
+                          title={`${r.trend.state_cn}(${r.trend.state_en})· 第 ${r.trend.duration} 天,自 ${r.trend.since}\n上关键点 ${r.trend.up_pivot?.toFixed(2) ?? '—'} / 下关键点 ${r.trend.dn_pivot?.toFixed(2) ?? '—'}\n${r.trend.action}${r.trend.signal ? `\n近期信号:${r.trend.signal} — ${r.trend.signal_desc}` : ''}`}
+                        >
+                          {r.trend.state_cn} {r.trend.duration}天
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-muted/40">—</span>
+                      )}
                     </td>
                     {/* 置信度(独立列, 可排序) */}
                     <td className="px-2 py-1.5 text-right font-mono tabular-nums text-muted">

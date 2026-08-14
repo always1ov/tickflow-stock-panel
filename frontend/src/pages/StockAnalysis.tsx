@@ -9,6 +9,7 @@ import { LastStockChip } from '@/components/LastStockChip'
 import { AnalysisKChart, type PriceLevel, type LevelType } from '@/components/stock-analysis/AnalysisKChart'
 import { PriceAlertDialog } from '@/components/stock-analysis/PriceAlertDialog'
 import { WatchlistDecisionBoard } from '@/components/stock-analysis/WatchlistDecisionBoard'
+import { TrendStateBar, useStockTrend } from '@/components/stock-analysis/TrendStateBar'
 import { api } from '@/lib/api'
 import { useLastStock } from '@/lib/useLastStock'
 import { QK } from '@/lib/queryKeys'
@@ -189,6 +190,9 @@ function StockAnalysisBoard({ symbol }: { symbol: string }) {
     staleTime: 60_000,
   })
 
+  // [fork 增强] 六态趋势(利弗莫尔)—— 趋势条 + K 线多空分段着色
+  const trendQ = useStockTrend(symbol)
+
   if (kline.isLoading) {
     return <div className="flex items-center justify-center py-20"><Loader2 className="h-5 w-5 animate-spin text-muted" /></div>
   }
@@ -209,6 +213,13 @@ function StockAnalysisBoard({ symbol }: { symbol: string }) {
   }
 
   const levels = (levelsQ.data?.levels ?? {}) as Record<LevelType, PriceLevel[]>
+
+  // [fork 增强] 六态多空分段 → K 线背景着色(多头段淡红、空头段淡绿,A 股惯例)
+  const trendRanges = (trendQ.data?.segments ?? []).map(s => ({
+    start: s.start_date,
+    end: s.end_date,
+    color: s.side === 'bull' ? 'rgba(239,68,68,0.05)' : 'rgba(34,197,94,0.05)',
+  }))
 
   // 涨跌色:最后一根 K 线收 vs 前一根收(无前日则按开收判断)
   const last = rows[rows.length - 1]
@@ -234,13 +245,16 @@ function StockAnalysisBoard({ symbol }: { symbol: string }) {
           </div>
         </div>
       </div>
-      <div className="p-3">
+      <div className="p-3 space-y-2">
+        {/* [fork 增强] 六态趋势条(利弗莫尔 Market Key) */}
+        <TrendStateBar symbol={symbol} trend={trendQ.data} />
         <AnalysisKChart
           rows={rows}
           levels={levels}
           series={levelsQ.data?.series}
           seriesDates={levelsQ.data?.dates}
           defaultLevelTypes={['sr', 'pivot', 'keltner_s']}
+          ranges={trendRanges}
           height={480}
         />
       </div>

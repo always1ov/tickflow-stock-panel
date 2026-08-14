@@ -52,6 +52,9 @@ LEVEL_TYPES = {
     "gap": "缺口位",          # 未回补跳空缺口
     "fib": "斐波那契",        # 回撤位 0.236~0.786
     "round": "整数关口",      # 心理整数位
+    # [fork 增强] 六态关键点(利弗莫尔上/下关键点)。不在 compute_levels 内计算 ——
+    # 需要每票各自的阈值配置,由 API 层(stock_analysis.get_levels)注入。
+    "livermore": "六态关键点",
 }
 
 

@@ -126,11 +126,27 @@ def get_levels(
     if df.is_empty():
         return {"levels": {"sr": [], "pivot": [], "extreme": [],
                            "boll": [], "keltner_s": [], "keltner_m": [], "keltner_l": [],
-                           "atr_stop": [], "gap": [], "fib": [], "round": []},
+                           "atr_stop": [], "gap": [], "fib": [], "round": [],
+                           "livermore": []},
                 "close": None, "summary": "无数据", "symbol": symbol,
                 "dates": [], "series": {}}
 
     levels = compute_levels(df)
+    # [fork 增强] 六态关键点 —— 上/下关键点作为一组关键价位(markLine + 点位提醒可用)
+    try:
+        from app.services.livermore_service import trend_for_symbol
+        trend = trend_for_symbol(request.app.state.repo, symbol)
+        lv_points = []
+        if trend.get("up_pivot"):
+            lv_points.append({"value": float(trend["up_pivot"]), "label": "六态上关键点",
+                              "type": "livermore", "side": "resistance", "strength": "strong"})
+        if trend.get("dn_pivot"):
+            lv_points.append({"value": float(trend["dn_pivot"]), "label": "六态下关键点",
+                              "type": "livermore", "side": "support", "strength": "strong"})
+        levels["livermore"] = lv_points
+    except Exception as e:  # noqa: BLE001
+        logger.debug("livermore levels skipped: %s", e)
+        levels["livermore"] = []
     close = float(df.tail(1)["close"][0]) if "close" in df.columns else None
     # 日期 + 带状曲线序列(供前端画 Keltner/ATR/布林带曲线)
     dates = df["date"].to_list()
@@ -239,3 +255,61 @@ def delete_report(request: Request, report_id: str):
     """删除一条报告。"""
     ok = stock_reports.delete_report(report_id)
     return {"ok": ok}
+
+
+# ================================================================
+# [fork 增强] 六态趋势(利弗莫尔 Market Key)—— 趋势判定 + 回测调参
+# ================================================================
+
+
+@router.get("/trend")
+def get_trend(request: Request, symbol: str = Query(...)):
+    """单只六态趋势详情(含多空分段,K 线背景着色用)。"""
+    if not symbol.strip():
+        raise HTTPException(400, "symbol 不能为空")
+    from app.services import livermore_service
+    return livermore_service.trend_for_symbol(request.app.state.repo, symbol, with_segments=True)
+
+
+@router.get("/trends")
+def get_trends(request: Request, symbols: str = Query(..., description="逗号分隔,最多 200 只")):
+    """批量六态趋势(决策台「趋势」列)。返回 {trends: {SYMBOL: {...}}}。"""
+    syms = [s for s in symbols.split(",") if s.strip()][:200]
+    if not syms:
+        raise HTTPException(400, "symbols 不能为空")
+    from app.services import livermore_service
+    return {"trends": livermore_service.trends_for_symbols(request.app.state.repo, syms)}
+
+
+class TrendBacktestRequest(BaseModel):
+    """六态阈值网格回测请求。"""
+    symbol: str
+    use_ai: bool = True
+
+
+@router.post("/trend/backtest")
+async def trend_backtest(request: Request, req: TrendBacktestRequest):
+    """阈值网格回测(纯计算,毫秒级)+ 规则建议 + 可选 AI 调参顾问(一次调用)。"""
+    if not req.symbol.strip():
+        raise HTTPException(400, "symbol 不能为空")
+    from app.services import livermore_service
+    return await livermore_service.run_backtest(request.app.state.repo, req.symbol, req.use_ai)
+
+
+class TrendThresholdRequest(BaseModel):
+    """设置六态阈值。symbol 为空 = 改全局默认;threshold=null = 清除该票覆盖。"""
+    symbol: str = ""
+    threshold: float | None = None
+    source: str = "manual"  # manual / ai / rule
+
+
+@router.put("/trend/threshold")
+def set_trend_threshold(req: TrendThresholdRequest):
+    """应用回测调参结果:写入该票的阈值覆盖(或全局默认)。"""
+    from app.services import livermore_service
+    if req.source not in ("manual", "ai", "rule"):
+        raise HTTPException(400, "source 无效")
+    try:
+        return livermore_service.set_threshold(req.symbol, req.threshold, req.source)
+    except ValueError as e:
+        raise HTTPException(400, str(e))

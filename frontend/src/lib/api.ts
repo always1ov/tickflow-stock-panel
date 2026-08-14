@@ -146,7 +146,65 @@ export interface AiFinancialReport {
 }
 
 // ===== 个股分析 =====
-export type LevelType = 'sr' | 'pivot' | 'extreme' | 'boll' | 'keltner_s' | 'keltner_m' | 'keltner_l' | 'atr_stop' | 'gap' | 'fib' | 'round'
+export type LevelType = 'sr' | 'pivot' | 'extreme' | 'boll' | 'keltner_s' | 'keltner_m' | 'keltner_l' | 'atr_stop' | 'gap' | 'fib' | 'round' | 'livermore'
+
+// [fork 增强] 六态趋势(利弗莫尔 Market Key)
+export type LivermoreState = 'UT' | 'NR' | 'SR' | 'SREA' | 'NREA' | 'DT'
+
+export interface TrendInfo {
+  state: LivermoreState
+  state_cn: string
+  state_en: string
+  action: string
+  side: '多头' | '空头'
+  duration: number
+  since: string
+  entered_from: LivermoreState | null
+  entered_from_cn: string | null
+  up_pivot: number | null
+  dn_pivot: number | null
+  close: number
+  as_of: string
+  signal: '转多' | '转空' | '回升' | '回撤' | null
+  signal_desc: string | null
+  threshold: number
+  threshold_source: 'override' | 'default'
+  window_days: number
+}
+
+export interface TrendDetail extends TrendInfo {
+  symbol: string
+  segments?: { side: 'bull' | 'bear'; start_date: string; end_date: string }[]
+  error?: string
+}
+
+export interface TrendBacktestRow {
+  threshold: number
+  flips: number
+  seg_count: number
+  bull_segs: number
+  false_rate: number | null
+  avg_seg_days: number
+  strategy_return: number
+  buyhold_return: number
+  excess: number
+  first_half: number
+  second_half: number
+}
+
+export interface TrendBacktestResult {
+  symbol: string
+  window_days: number
+  from: string
+  to: string
+  grid: TrendBacktestRow[]
+  rule_suggestion: { threshold: number; reason: string; sample_insufficient: boolean }
+  current_threshold: number
+  current_source: 'override' | 'default'
+  ai: { threshold: number; confidence: number; reason: string } | null
+  ai_error?: string
+  error?: string
+}
 
 export interface PriceLevel {
   value: number
@@ -2232,6 +2290,24 @@ export const api = {
   // ===== 个股分析 =====
   stockAnalysisLevels: (symbol: string, days = 120) =>
     request<StockLevels>(`/api/stock-analysis/levels?symbol=${encodeURIComponent(symbol)}&days=${days}`),
+
+  // [fork 增强] 六态趋势
+  stockTrend: (symbol: string) =>
+    request<TrendDetail>(`/api/stock-analysis/trend?symbol=${encodeURIComponent(symbol)}`),
+
+  stockTrends: (symbols: string[]) =>
+    request<{ trends: Record<string, TrendInfo> }>(
+      `/api/stock-analysis/trends?symbols=${encodeURIComponent(symbols.join(','))}`),
+
+  stockTrendBacktest: (symbol: string, useAi = true) =>
+    request<TrendBacktestResult>('/api/stock-analysis/trend/backtest', {
+      method: 'POST', body: JSON.stringify({ symbol, use_ai: useAi }),
+    }),
+
+  stockTrendSetThreshold: (symbol: string, threshold: number | null, source: 'manual' | 'ai' | 'rule' = 'manual') =>
+    request<{ symbol: string | null; threshold: number; source: string }>('/api/stock-analysis/trend/threshold', {
+      method: 'PUT', body: JSON.stringify({ symbol, threshold, source }),
+    }),
 
   stockAnalysisReportsList: () =>
     request<{ reports: AiStockReport[] }>('/api/stock-analysis/reports'),
