@@ -2,6 +2,7 @@
 # 可选:构建网络无法直连官方源时,传入 --build-arg USE_CN_MIRROR=1 启用国内镜像
 # 可选:stock-sdk 插件默认不打包(它抓取第三方财经网站接口,存在版权与反爬风险)。
 #       如确需启用,传入 --build-arg INCLUDE_STOCKSDK=1 显式开启,使用风险自负。
+#       (fork 2026-08 决定: 系统只用 TickFlow, 不打包任何第三方数据源插件。)
 ARG USE_CN_MIRROR=1
 ARG INCLUDE_STOCKSDK=0
 ARG NPM_REGISTRY=https://registry.npmmirror.com
@@ -99,7 +100,7 @@ RUN if [ "$USE_CN_MIRROR" = "1" ]; then \
     fi
 
 # Backend deps
-COPY README.md /README.md
+COPY README.md ./README.md
 COPY backend/pyproject.toml backend/uv.lock* ./
 # uv 原生支持同时挂多个 index(主源 + 备用源),会自动在两源中查找,
 # 比逐个重试更稳健 —— 任一源缺包时另一源补位。

@@ -6,7 +6,7 @@ name: Build and Push Docker Image
 #   - 手动:         网页 Actions → Run workflow
 on:
   push:
-    branches: [main]
+    branches: [main, claude/upstream-clean]
     tags: ['v*']
   workflow_dispatch:
 
@@ -37,7 +37,7 @@ jobs:
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          password: ${{ secrets.GHCR_PAT }}
 
       - name: Extract metadata (tags, labels) for Docker
         id: meta
