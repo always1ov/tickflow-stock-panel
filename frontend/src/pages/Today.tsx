@@ -83,6 +83,7 @@ function buildTodayHtml(d: TodayOverview, brief: string | null): string {
   <div class="meta">数据截至 ${esc(d.as_of ?? '—')} · 自选 ${d.watchlist_total} 只(其中 ${d.trend_total} 只有趋势判定)· 生成于 ${genAt}</div>
   <div class="weather">
     <span class="posture" style="background:${postureColor[d.weather.posture] ?? '#8a919f'}">${esc(d.weather.posture)}</span>
+    ${d.weather.market ? `<span class="posture" style="background:${postureColor[d.weather.market.mode] ?? '#8a919f'};font-size:11px;padding:1px 10px">大盘${esc(d.weather.market.mode)}</span>` : ''}
     <span style="font-size:13px;color:#4e5666">${esc(d.weather.posture_reason)}</span>
     <span style="margin-left:auto;font-size:12px;color:#8a919f">涨势 <b style="color:${bull}">${d.weather.bull}</b> / 跌势 <b style="color:${bear}">${d.weather.bear}</b> · 刚转强 ${d.weather.new_bull} · 刚转弱 ${d.weather.new_bear}</span>
   </div>
@@ -224,6 +225,21 @@ export function Today() {
             <span className={`inline-flex rounded-full border px-3 py-0.5 text-sm font-medium ${POSTURE_STYLE[d.weather.posture] ?? POSTURE_STYLE['观察']}`}>
               {d.weather.posture}
             </span>
+            {d.weather.market && (
+              <span
+                title={
+                  `基准 ${d.weather.market.benchmark_name ?? '—'}(${d.weather.market.as_of ?? '—'})` +
+                  (d.weather.market.metrics.close != null
+                    ? ` · 收盘 ${d.weather.market.metrics.close} / 50日线 ${d.weather.market.metrics.ma50} / 年线 ${d.weather.market.metrics.ma200} / 年动量 ${((d.weather.market.metrics.momentum_12m ?? 0) * 100).toFixed(1)}%`
+                    : '') +
+                  ` —— 最终姿态取大盘与自选中更保守的一方`
+                }
+                className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] ${POSTURE_STYLE[d.weather.market.mode] ?? POSTURE_STYLE['观察']}`}
+              >
+                大盘{d.weather.market.mode}
+                {d.weather.market.pending && <span className="opacity-70">(将转{d.weather.market.pending.mode} {d.weather.market.pending.streak}/{d.weather.market.pending.need})</span>}
+              </span>
+            )}
             <span className="text-xs text-muted">{d.weather.posture_reason}</span>
             <span className="ml-auto text-[11px] font-mono text-muted">
               涨势 <span className="text-red-400 font-semibold">{d.weather.bull}</span>

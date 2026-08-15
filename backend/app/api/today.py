@@ -195,6 +195,18 @@ def _build_overview(repo) -> dict:
     else:
         posture, posture_reason = "谨慎", f"{ratio:.0%} 的自选在涨势中,但今天转强({new_bull} 只)和转弱({new_bear} 只)的数量差不多,涨跌方向还不明朗"
 
+    # [R11] 大盘红绿灯: 基准指数(沪深300)模式判定, 最终姿态与自选广度取更保守者。
+    # 失败只降级不拦路 —— 指数数据缺失时保持纯广度姿态。
+    breadth_posture, breadth_reason = posture, posture_reason
+    market = None
+    try:
+        from app.services.market_mode import combine_posture, get_market_mode
+        market = get_market_mode(repo)
+        posture = combine_posture(market["mode"], breadth_posture)
+        posture_reason = f"大盘:{market['reason']};自选:{breadth_reason}"
+    except Exception as e:  # noqa: BLE001
+        logger.warning("today market mode skipped: %s", e)
+
     # ---- ④ 持仓体检 ----
     holdings: list[dict] = []
     for sym, pos in pos_all.items():
@@ -233,6 +245,8 @@ def _build_overview(repo) -> dict:
         "weather": {
             "bull": bull, "bear": bear, "new_bull": new_bull, "new_bear": new_bear,
             "posture": posture, "posture_reason": posture_reason,
+            "breadth_posture": breadth_posture,
+            "market": market,
         },
         "holdings": holdings,
     }

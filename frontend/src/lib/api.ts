@@ -167,7 +167,16 @@ export interface TodayOverview {
   opportunities: TodayOpportunity[]
   opportunities_filtered: number
   prefs: TodayPrefs
-  weather: { bull: number; bear: number; new_bull: number; new_bear: number; posture: string; posture_reason: string }
+  weather: {
+    bull: number; bear: number; new_bull: number; new_bear: number
+    posture: string; posture_reason: string
+    breadth_posture?: string
+    market?: {
+      mode: string; reason: string; benchmark_name: string | null; as_of: string | null
+      pending: { mode: string; streak: number; need: number; raw_reason: string } | null
+      metrics: { close?: number; ma50?: number; ma200?: number; momentum_12m?: number }
+    } | null
+  }
   holdings: TodayHolding[]
 }
 
