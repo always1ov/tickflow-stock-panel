@@ -150,9 +150,12 @@ export type LevelType = 'sr' | 'pivot' | 'extreme' | 'boll' | 'keltner_s' | 'kel
 
 // [fork 增强] 今日总览(决策汇聚层)
 export interface TodayActionItem { kind: string; severity: 'high' | 'mid'; symbol: string; name: string; text: string }
-export interface TodayOpportunity { kind: string; symbol: string; name: string; text: string; score: number; why: string }
+export interface TodayOpportunity {
+  kind: string; symbol: string; name: string; text: string; score: number; why: string
+  advice?: { fraction: number; text: string; why: string } | null
+}
 export interface TodayPick { symbol: string; reason: string }
-export interface TodayPrefs { min_score: number; max_show: number }
+export interface TodayPrefs { min_score: number; max_show: number; max_single: number; target_vol: number }
 export interface TodayHolding {
   symbol: string; name: string; close: number | null; cost: number | null; pnl_pct: number | null
   stage_cn: string | null; line: number | null; line_cn: string | null; distance_pct: number | null
@@ -167,6 +170,7 @@ export interface TodayOverview {
   opportunities: TodayOpportunity[]
   opportunities_filtered: number
   prefs: TodayPrefs
+  position_hint?: { posture_cap: number; max_single: number; target_vol: number }
   weather: {
     bull: number; bear: number; new_bull: number; new_bear: number
     posture: string; posture_reason: string

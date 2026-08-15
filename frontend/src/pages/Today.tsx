@@ -32,7 +32,7 @@ function buildTodayHtml(d: TodayOverview, brief: string | null): string {
         <b>${esc(a.name)}</b>${sym(a.name, a.symbol)} ${esc(a.text)}</li>`).join('')
   const oppRows = d.opportunities.map(o => `
       <li><b class="score">${o.score}</b>
-        <span><b>${esc(o.name)}</b>${sym(o.name, o.symbol)} ${esc(o.text)}
+        <span><b>${esc(o.name)}</b>${sym(o.name, o.symbol)}${o.advice ? ` <span class="adv">${esc(o.advice.text)}</span>` : ''} ${esc(o.text)}
         <span class="why">${esc(o.why)}</span></span></li>`).join('')
   const holdRows = d.holdings.map(h => `
       <tr>
@@ -73,6 +73,7 @@ function buildTodayHtml(d: TodayOverview, brief: string | null): string {
   .sym{color:#a0a6b1;font-size:11px}
   .score{flex:none;background:#f0f1f3;color:#4e5666;border-radius:3px;padding:1px 5px;font-size:11px;font-variant-numeric:tabular-nums}
   .why{display:block;color:#8a919f;font-size:11px;margin-top:2px}
+  .adv{background:#e8f3fb;color:#1c6ea4;border-radius:3px;padding:1px 5px;font-size:11px}
   .foot{margin-top:18px;color:#a0a6b1;font-size:11px}
   @media print{body{background:#fff;padding:0}}
 </style>
@@ -291,6 +292,11 @@ export function Today() {
               <span className="text-[10px] text-muted">
                 {d.opportunities.length} 项 · 把握分 ≥ {d.prefs.min_score} 才显示
                 {d.opportunities_filtered > 0 && `(已滤掉 ${d.opportunities_filtered} 只)`}
+                {d.position_hint && (
+                  <span title="由当前姿态决定的总仓位建议上限(进攻8成/谨慎5成/防守2成/观察3成)——所有持仓加起来别超过这个数">
+                    {' '}· 总仓位基调 ≤{d.position_hint.posture_cap * 10}成
+                  </span>
+                )}
               </span>
               <div className="ml-auto flex items-center gap-2">
                 <button
@@ -334,8 +340,34 @@ export function Today() {
                   />
                   <span>条</span>
                 </label>
+                <label className="flex items-center gap-2 text-[11px] text-muted" title="单只票最多占总资金的比例;建议仓位 = 上限 × 把握分系数 × 波动率压缩">
+                  <span className="whitespace-nowrap">单票上限</span>
+                  <input
+                    type="number" min={5} max={100} step={5}
+                    defaultValue={d.prefs.max_single}
+                    onBlur={(e) => {
+                      const v = Number(e.target.value)
+                      if (v && v !== d.prefs.max_single) prefsMut.mutate({ max_single: v })
+                    }}
+                    className="w-14 rounded border border-border bg-surface px-2 py-1 font-mono text-foreground outline-none focus:border-sky-400/50"
+                  />
+                  <span>%</span>
+                </label>
+                <label className="flex items-center gap-2 text-[11px] text-muted" title="能接受的单日波动;票的日波幅(ATR/价)超过它时按比例压低建议仓位,只压不加">
+                  <span className="whitespace-nowrap">目标日波动</span>
+                  <input
+                    type="number" min={1} max={10}
+                    defaultValue={d.prefs.target_vol}
+                    onBlur={(e) => {
+                      const v = Number(e.target.value)
+                      if (v && v !== d.prefs.target_vol) prefsMut.mutate({ target_vol: v })
+                    }}
+                    className="w-14 rounded border border-border bg-surface px-2 py-1 font-mono text-foreground outline-none focus:border-sky-400/50"
+                  />
+                  <span>%</span>
+                </label>
                 <span className="text-[10px] text-muted/70">
-                  调高更严格(只看最有把握的),调低看得更全。卖出提醒不受影响,永远全显示。
+                  把握分调高更严格;单票上限与目标日波动决定「建议仓位」。卖出提醒不受任何门槛影响。
                 </span>
                 {prefsMut.isPending && <Loader2 className="h-3 w-3 animate-spin text-muted" />}
               </div>
@@ -403,6 +435,14 @@ export function Today() {
                           <span className="font-medium text-foreground">{o.name}</span>
                           {o.symbol !== o.name && <span className="ml-1.5 text-[9px] font-mono text-muted">{o.symbol}</span>}
                           {picked && <span className="ml-1.5 text-[9px] text-amber-300">★ AI 优选</span>}
+                          {o.advice && (
+                            <span
+                              title={`${o.advice.why} —— 仅供参考的上限建议, 不是操作指令`}
+                              className="ml-1.5 rounded bg-sky-400/15 px-1.5 py-0.5 text-[9px] text-sky-300"
+                            >
+                              {o.advice.text}
+                            </span>
+                          )}
                           <span className="ml-2 text-foreground/80">{o.text}</span>
                           <span className="mt-0.5 block text-[10px] text-muted">{o.why}</span>
                         </span>

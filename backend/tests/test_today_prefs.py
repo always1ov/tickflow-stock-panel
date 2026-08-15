@@ -19,18 +19,24 @@ def test_defaults_when_unset(prefs):
 
 
 def test_save_and_reload_roundtrip(prefs):
-    assert prefs.save(min_score=75, max_show=5) == {"min_score": 75, "max_show": 5}
-    assert prefs.load() == {"min_score": 75, "max_show": 5}
+    saved = prefs.save(min_score=75, max_show=5, max_single=30, target_vol=4)
+    assert saved == {"min_score": 75, "max_show": 5, "max_single": 30, "target_vol": 4}
+    assert prefs.load() == saved
 
 
 def test_partial_update_keeps_other_field(prefs):
-    prefs.save(min_score=75, max_show=5)
-    assert prefs.save(min_score=40) == {"min_score": 40, "max_show": 5}
+    prefs.save(min_score=75, max_show=5, max_single=30)
+    after = prefs.save(min_score=40)
+    assert after["min_score"] == 40
+    assert after["max_show"] == 5
+    assert after["max_single"] == 30
 
 
 def test_values_are_clamped_to_valid_range(prefs):
-    assert prefs.save(min_score=999, max_show=999) == {"min_score": 100, "max_show": 50}
-    assert prefs.save(min_score=-50, max_show=0) == {"min_score": 0, "max_show": 1}
+    up = prefs.save(min_score=999, max_show=999, max_single=999, target_vol=999)
+    assert up == {"min_score": 100, "max_show": 50, "max_single": 100, "target_vol": 10}
+    dn = prefs.save(min_score=-50, max_show=0, max_single=1, target_vol=0)
+    assert dn == {"min_score": 0, "max_show": 1, "max_single": 5, "target_vol": 1}
 
 
 def test_corrupt_file_falls_back_to_defaults(prefs):
@@ -42,7 +48,10 @@ def test_corrupt_file_falls_back_to_defaults(prefs):
 def test_garbage_values_fall_back_per_field(prefs):
     prefs._store_path().write_text(
         json.dumps({"min_score": "高一点", "max_show": 7}), encoding="utf-8")
-    assert prefs.load() == {"min_score": prefs.DEFAULTS["min_score"], "max_show": 7}
+    loaded = prefs.load()
+    assert loaded["min_score"] == prefs.DEFAULTS["min_score"]
+    assert loaded["max_show"] == 7
+    assert loaded["max_single"] == prefs.DEFAULTS["max_single"]
 
 
 def _trend(duration):

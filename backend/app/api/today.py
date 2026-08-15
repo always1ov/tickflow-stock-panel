@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+from datetime import date, timedelta
 
 from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
@@ -31,6 +32,39 @@ _OPP_MIN_SCORE = 60
 _OPP_MAX_SHOW = 10
 # 信号新鲜度加减分: 刚出现窗口最佳, 拖到第 4-5 天已错过入场时机
 _FRESH_BONUS = {1: 15, 2: 10, 3: 0, 4: -12, 5: -22}
+# [R12] 姿态 → 总仓位基调(占总资金比例上限, 展示用基调而非强制)
+POSTURE_CAPS = {"进攻": 0.8, "谨慎": 0.5, "防守": 0.2, "观察": 0.3}
+# 把握分 → 单票仓位系数(相对单票上限; 取自 AI-TIS PRD 6.4 的映射思路)
+_SCORE_COEF = [(80, 1.0), (60, 0.7), (40, 0.3), (20, 0.1)]
+
+
+def suggest_position(score: int, atr_pct: float | None,
+                     max_single: float, target_vol: float) -> dict | None:
+    """把握分 + 波动率 → 单票建议仓位(占总资金比例)。纯函数。
+
+    仓位 = 单票上限 × 把握分系数 × 波动率压缩系数(只降不升, PRD 6.5),
+    向下取整到半成; 低于半成给"仅观察仓"。atr_pct 缺失时跳过波动率项。
+    """
+    coef = 0.0
+    for lo, c in _SCORE_COEF:
+        if score >= lo:
+            coef = c
+            break
+    if coef <= 0:
+        return None
+    vol_factor = 1.0
+    if atr_pct and atr_pct > 0:
+        vol_factor = min(1.0, target_vol / atr_pct)
+    frac = max_single * coef * vol_factor
+    frac = int(frac / 0.05) * 0.05  # 向下取整到半成, 宁少勿多
+    why = f"单票上限{max_single * 10:.0f}成 × 把握系数{coef:.0%}"
+    if vol_factor < 1.0:
+        why += f" × 波动压缩{vol_factor:.0%}(日波幅 {atr_pct:.1%} 超目标 {target_vol:.0%})"
+    if frac < 0.05:
+        return {"fraction": 0.0, "text": "仅观察仓", "why": why + " → 不足半成"}
+    cheng = frac * 10
+    text = f"建议 ≤{cheng:g}成"
+    return {"fraction": round(frac, 2), "text": text, "why": why}
 
 
 def rank_opportunities(
@@ -233,6 +267,25 @@ def _build_overview(repo) -> dict:
         })
     holdings.sort(key=lambda h: (not h["exit_triggered"], h["distance_pct"] if h["distance_pct"] is not None else -9))
 
+    # [R12] 仓位建议: 姿态定总仓位基调, 把握分×波动率定单票建议(仅展示, 不是指令)
+    for o in opportunities:
+        atr_pct = None
+        try:
+            df = repo.get_daily_asset(
+                repo.resolve_asset_type(o["symbol"]), o["symbol"],
+                date.today() - timedelta(days=30), date.today(),
+                columns=["date", "close", "atr_14"],
+            )
+            if not df.is_empty() and "atr_14" in df.columns and "close" in df.columns:
+                last = df.sort("date").tail(1)
+                c, a = last["close"][0], last["atr_14"][0]
+                if c and a:
+                    atr_pct = float(a) / float(c)
+        except Exception as e:  # noqa: BLE001
+            logger.debug("today atr load skipped for %s: %s", o["symbol"], e)
+        o["advice"] = suggest_position(
+            o["score"], atr_pct, prefs["max_single"] / 100, prefs["target_vol"] / 100)
+
     as_of = max((t["as_of"] for t in trends.values()), default=None)
     return {
         "as_of": as_of,
@@ -242,6 +295,10 @@ def _build_overview(repo) -> dict:
         "opportunities": opportunities,
         "opportunities_filtered": opp_filtered,
         "prefs": prefs,
+        "position_hint": {
+            "posture_cap": POSTURE_CAPS.get(posture, 0.3),
+            "max_single": prefs["max_single"], "target_vol": prefs["target_vol"],
+        },
         "weather": {
             "bull": bull, "bear": bear, "new_bull": new_bull, "new_bear": new_bear,
             "posture": posture, "posture_reason": posture_reason,
@@ -263,6 +320,8 @@ class PrefsModel(BaseModel):
 
     min_score: int | None = Field(default=None, ge=0, le=100)
     max_show: int | None = Field(default=None, ge=1, le=50)
+    max_single: int | None = Field(default=None, ge=5, le=100)
+    target_vol: int | None = Field(default=None, ge=1, le=10)
 
 
 @router.get("/prefs")
@@ -276,7 +335,8 @@ def get_prefs():
 def put_prefs(body: PrefsModel):
     """修改筛选门槛, 立即对下次总览生效。"""
     from app.services import today_prefs
-    return today_prefs.save(min_score=body.min_score, max_show=body.max_show)
+    return today_prefs.save(min_score=body.min_score, max_show=body.max_show,
+                            max_single=body.max_single, target_vol=body.target_vol)
 
 
 _AI_SYSTEM = """你是用户的盘前参谋,有 15 年 A 股一线交易经验。输入分两部分:今日总览 JSON(市场天气/需要行动/持仓体检),和每只候选买入机会的真实日 K 数据。一次调用完成两件事:先做任务二(优选),再基于优选结果写任务一(导读),两者结论必须一致。
@@ -364,7 +424,8 @@ async def today_ai(request: Request):
     # 总览瘦身: 候选明细单独带 K 线送审, 机会区在总览里只留给导读定位用的短句
     overview = {k: v for k, v in data.items() if k != "opportunities"}
     overview["机会区摘要"] = [
-        {"symbol": c["symbol"], "name": c["name"], "text": c["text"]} for c in cands]
+        {"symbol": c["symbol"], "name": c["name"], "text": c["text"],
+         "建议仓位": (c.get("advice") or {}).get("text")} for c in cands]
     payload = {
         "今日总览": overview,
         "候选买入机会(含真实日K)": _candidate_market_data(repo, cands) if cands else [],
