@@ -160,6 +160,8 @@ def _trend_payload(closes: list[float], dates: list[str], threshold: float, sour
         "threshold": threshold,
         "threshold_source": source,
         "window_days": len(closes),
+        # [R13] 近 20 交易日收益, 供今日总览算相对强度(个股 vs 大盘); 窗口不足给 None
+        "ret_20d": (closes[-1] / closes[-21] - 1) if len(closes) >= 21 and closes[-21] else None,
     }
 
 

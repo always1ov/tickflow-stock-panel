@@ -42,6 +42,7 @@ function buildTodayHtml(d: TodayOverview, brief: string | null): string {
         <td class="num" style="color:${h.exit_triggered ? bull : '#1f2329'}">${h.line != null ? h.line.toFixed(2) + (h.exit_triggered ? ' 已触发' : '') : '—'}</td>
         <td>${esc(h.stage_cn ?? '—')}</td>
         <td style="color:${h.trend_side === '多头' ? bull : bear}">${h.trend_cn ? `${esc(h.trend_cn)} ${h.trend_duration}天` : '—'}</td>
+        <td style="color:${h.stance === '离场' ? bull : h.stance === '减仓' ? '#c78326' : '#4e5666'};font-weight:${h.stance === '离场' ? 700 : 400}">${esc(h.stance)}</td>
       </tr>`).join('')
   const genAt = new Date().toLocaleString('zh-CN')
   return `<!DOCTYPE html>
@@ -93,9 +94,9 @@ function buildTodayHtml(d: TodayOverview, brief: string | null): string {
   ${d.actions.length ? `<ul class="items">${actionRows}</ul>` : '<div class="empty">今日无需操作 —— 管住手</div>'}
   <h2>🎯 值得关注(${d.opportunities.length}·已按把握分筛选${d.opportunities_filtered > 0 ? `,滤掉 ${d.opportunities_filtered} 只` : ''})</h2>
   ${d.opportunities.length ? `<ul class="items">${oppRows}</ul>` : '<div class="empty">今日没有把握足够的买入机会 —— 等待比出手更常见</div>'}
-  <h2>💼 持仓体检(${d.holdings.length})</h2>
+  <h2>💼 持仓体检(${d.holdings.length})${d.portfolio ? `<span style="font-weight:400;font-size:12px;color:#8a919f;margin-left:8px">组合:平均浮盈 ${d.portfolio.avg_pnl != null ? (d.portfolio.avg_pnl * 100).toFixed(1) + '%' : '—'} · 已触发 ${d.portfolio.triggered} · 逼近出场线 ${d.portfolio.near_exit} · 空头趋势 ${d.portfolio.bearish}</span>` : ''}</h2>
   ${d.holdings.length ? `<table>
-    <thead><tr><th>标的</th><th class="num">现价</th><th class="num">浮盈</th><th class="num">出场线</th><th>阶段</th><th>趋势</th></tr></thead>
+    <thead><tr><th>标的</th><th class="num">现价</th><th class="num">浮盈</th><th class="num">出场线</th><th>阶段</th><th>趋势</th><th>操作建议</th></tr></thead>
     <tbody>${holdRows}</tbody>
   </table>` : '<div class="empty">暂无持仓标记</div>'}
   <p class="foot">TickFlow Stock Panel · 六态趋势 + ATR 出场线 + 生命线(20日线) · 仅个人参考,不构成投资建议</p>
@@ -456,9 +457,18 @@ export function Today() {
 
           {/* ④ 持仓体检 */}
           <section className="rounded-lg border border-border/60 bg-surface/40 overflow-hidden">
-            <div className="flex items-center gap-2 border-b border-border/40 px-4 py-2.5">
+            <div className="flex flex-wrap items-center gap-2 border-b border-border/40 px-4 py-2.5">
               <span className="text-sm font-medium text-foreground">持仓体检</span>
               <span className="text-[10px] text-muted">{d.holdings.length} 只(已触发/最接近出场线的排前面)</span>
+              {d.portfolio && (
+                <span className={`ml-auto text-[10px] ${d.portfolio.triggered > 0 ? 'text-red-400' : 'text-muted'}`}>
+                  组合:平均浮盈{' '}
+                  <span className={d.portfolio.avg_pnl == null ? '' : d.portfolio.avg_pnl > 0 ? 'text-red-400' : 'text-emerald-400'}>
+                    {d.portfolio.avg_pnl != null ? `${(d.portfolio.avg_pnl * 100).toFixed(1)}%` : '—'}
+                  </span>
+                  {' '}· 已触发出场 {d.portfolio.triggered} · 逼近出场线 {d.portfolio.near_exit} · 空头趋势 {d.portfolio.bearish}
+                </span>
+              )}
             </div>
             {d.holdings.length === 0 ? (
               <div className="px-4 py-5 text-xs text-muted">
@@ -466,7 +476,7 @@ export function Today() {
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[640px] text-xs">
+                <table className="w-full min-w-[720px] text-xs">
                   <thead className="text-[10px] text-muted">
                     <tr className="text-left">
                       <th className="px-4 py-1.5 font-normal">标的</th>
@@ -475,7 +485,8 @@ export function Today() {
                       <th className="px-2 py-1.5 font-normal text-right">出场线</th>
                       <th className="px-2 py-1.5 font-normal text-center">阶段</th>
                       <th className="px-2 py-1.5 font-normal text-center">趋势</th>
-                      <th className="px-4 py-1.5 font-normal text-center">AI 信号</th>
+                      <th className="px-2 py-1.5 font-normal text-center">AI 信号</th>
+                      <th className="px-4 py-1.5 font-normal text-center">操作建议</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -504,7 +515,17 @@ export function Today() {
                             </span>
                           ) : '—'}
                         </td>
-                        <td className="px-4 py-1.5 text-center text-[10px] text-muted">{h.signal ?? '—'}</td>
+                        <td className="px-2 py-1.5 text-center text-[10px] text-muted">{h.signal ?? '—'}</td>
+                        <td className="px-4 py-1.5 text-center text-[10px]" title={h.stance_why}>
+                          <span className={
+                            h.stance === '离场' ? 'font-semibold text-red-400'
+                              : h.stance === '减仓' ? 'text-amber-300'
+                                : h.stance === '加仓' ? 'text-red-300'
+                                  : 'text-muted'
+                          }>
+                            {h.stance}
+                          </span>
+                        </td>
                       </tr>
                     ))}
                   </tbody>

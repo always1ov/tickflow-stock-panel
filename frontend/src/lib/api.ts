@@ -161,6 +161,10 @@ export interface TodayHolding {
   stage_cn: string | null; line: number | null; line_cn: string | null; distance_pct: number | null
   exit_triggered: boolean; trend_cn: string | null; trend_duration: number | null
   trend_side: string | null; signal: string | null
+  stance: string; stance_why: string
+}
+export interface TodayPortfolio {
+  count: number; avg_pnl: number | null; triggered: number; near_exit: number; bearish: number
 }
 export interface TodayOverview {
   as_of: string | null
@@ -182,6 +186,7 @@ export interface TodayOverview {
     } | null
   }
   holdings: TodayHolding[]
+  portfolio?: TodayPortfolio | null
 }
 
 // [fork 增强] 持仓出场线(ATR 三阶段 + 生命线)

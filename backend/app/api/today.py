@@ -70,6 +70,7 @@ def suggest_position(score: int, atr_pct: float | None,
 def rank_opportunities(
     trends: dict[str, dict], signals: dict[str, dict], names: dict[str, str],
     min_score: int = _OPP_MIN_SCORE, max_show: int = _OPP_MAX_SHOW,
+    bench_ret: float | None = None,
 ) -> tuple[list[dict], int]:
     """给买入机会打"把握分"并筛选, 返回 (显示列表, 被滤掉条数)。
 
@@ -79,6 +80,8 @@ def rank_opportunities(
       · 趋势刚转强底分最高, 按信号出现第几天加减(第 1-2 天最佳, 第 4 天起判定
         为已过入场窗口而扣分), 这样"陈年老信号"不会因置信度高就一直占着榜首;
       · AI 信号同向加分、反向重扣(自相矛盾的机会宁可不看);
+      · [R13] 相对强度: 传入大盘 20 日收益(bench_ret)时, 跑赢大盘加分、
+        跑输扣分 —— 跑输大盘的"突破"多半是补涨陷阱;
       · 逼近买入触发价的按距离与置信度打分, 一到价就能行动的最优先。
     低于 min_score 或排在 max_show 之后的都不显示, 只报数量。
     """
@@ -111,6 +114,18 @@ def rank_opportunities(
         elif sig.get("signal") == "sell":
             score -= 40
             why.append("但 AI 看空,信号互相矛盾")
+        r20 = t.get("ret_20d")
+        if bench_ret is not None and r20 is not None:
+            rs = r20 - bench_ret
+            if rs >= 0.05:
+                score += 8
+                why.append(f"近20日跑赢大盘 {rs * 100:.0f} 个点")
+            elif rs < -0.05:
+                score -= 15
+                why.append(f"近20日跑输大盘 {abs(rs) * 100:.0f} 个点,比市场还弱")
+            elif rs < 0:
+                score -= 8
+                why.append("近20日略跑输大盘")
         add(sym, "trend_signal", score,
             f"{t['signal']}:{t['signal_desc']}(第 {dur} 天)", why)
 
@@ -144,6 +159,29 @@ def rank_opportunities(
     shown = [dict(o, why=" · ".join(o["why"]))
              for o in ranked if o["score"] >= min_score][:max_show]
     return shown, len(ranked) - len(shown)
+
+
+def holding_stance(exit_triggered: bool, distance_pct: float | None,
+                   trend_side: str | None, ai_signal: str | None,
+                   trend_signal: str | None) -> tuple[str, str]:
+    """[R13] 持仓操作档位: 离场/减仓/加仓/持有(规则版, 只用已有字段)。
+
+    离场纪律由出场线/生命线兜底(最高优先); 减仓是"趋势或 AI 转坏但还没破线"
+    的中间档; 加仓要求趋势多头 + AI 看多 + 离出场线还有安全距离, 三者缺一不可。
+    """
+    if exit_triggered:
+        return "离场", "已跌破出场线,按纪律执行,不猜反弹"
+    if trend_side == "空头":
+        return "减仓", "持有票已处于空头趋势,先降低暴露"
+    if ai_signal == "sell":
+        return "减仓", "AI 转看空,与持仓方向矛盾"
+    if distance_pct is not None and distance_pct >= -0.015:
+        return "减仓", "距出场线不足 1.5%,提前减一部分比破线再动手从容"
+    if (trend_side == "多头" and ai_signal == "buy"
+            and trend_signal in ("转多", "回升")
+            and (distance_pct is None or distance_pct < -0.05)):
+        return "加仓", "趋势刚走强 + AI 看多 + 离出场线还有安全距离"
+    return "持有", "无触发条件,按既定计划持有"
 
 
 def _build_overview(repo) -> dict:
@@ -210,9 +248,17 @@ def _build_overview(repo) -> dict:
     actions.sort(key=lambda a: sev_rank.get(a["severity"], 9))
 
     # ---- ② 机会区(门槛可由用户调; 卖出提醒都在行动区, 永不过滤) ----
+    # [R11/R13] 大盘模式提前取: 姿态合成与相对强度都要用; 失败只降级不拦路
+    market = None
+    try:
+        from app.services.market_mode import get_market_mode
+        market = get_market_mode(repo)
+    except Exception as e:  # noqa: BLE001
+        logger.warning("today market mode skipped: %s", e)
+    bench_ret = ((market or {}).get("metrics") or {}).get("ret_20d")
     prefs = today_prefs.load()
     opportunities, opp_filtered = rank_opportunities(
-        trends, signals, names, prefs["min_score"], prefs["max_show"])
+        trends, signals, names, prefs["min_score"], prefs["max_show"], bench_ret)
 
     # ---- ③ 市场天气(自选口径)----
     bull = sum(1 for t in trends.values() if t["side"] == "多头")
@@ -229,17 +275,12 @@ def _build_overview(repo) -> dict:
     else:
         posture, posture_reason = "谨慎", f"{ratio:.0%} 的自选在涨势中,但今天转强({new_bull} 只)和转弱({new_bear} 只)的数量差不多,涨跌方向还不明朗"
 
-    # [R11] 大盘红绿灯: 基准指数(沪深300)模式判定, 最终姿态与自选广度取更保守者。
-    # 失败只降级不拦路 —— 指数数据缺失时保持纯广度姿态。
+    # [R11] 大盘红绿灯: 最终姿态与自选广度取更保守者(market 已在机会区前取好)
     breadth_posture, breadth_reason = posture, posture_reason
-    market = None
-    try:
-        from app.services.market_mode import combine_posture, get_market_mode
-        market = get_market_mode(repo)
+    if market:
+        from app.services.market_mode import combine_posture
         posture = combine_posture(market["mode"], breadth_posture)
         posture_reason = f"大盘:{market['reason']};自选:{breadth_reason}"
-    except Exception as e:  # noqa: BLE001
-        logger.warning("today market mode skipped: %s", e)
 
     # ---- ④ 持仓体检 ----
     holdings: list[dict] = []
@@ -251,6 +292,9 @@ def _build_overview(repo) -> dict:
         sig = signals.get(sym)
         close = (ex or {}).get("close") or (t or {}).get("close")
         cost = pos.get("cost")
+        stance, stance_why = holding_stance(
+            (ex or {}).get("triggered", False), (ex or {}).get("distance_pct"),
+            (t or {}).get("side"), (sig or {}).get("signal"), (t or {}).get("signal"))
         holdings.append({
             "symbol": sym, "name": names.get(sym, sym),
             "close": close, "cost": cost,
@@ -264,8 +308,23 @@ def _build_overview(repo) -> dict:
             "trend_duration": (t or {}).get("duration"),
             "trend_side": (t or {}).get("side"),
             "signal": (sig or {}).get("signal"),
+            "stance": stance, "stance_why": stance_why,
         })
     holdings.sort(key=lambda h: (not h["exit_triggered"], h["distance_pct"] if h["distance_pct"] is not None else -9))
+
+    # [R13] 组合汇总: 逐票之上的整体视角
+    portfolio = None
+    if holdings:
+        pnls = [h["pnl_pct"] for h in holdings if h["pnl_pct"] is not None]
+        portfolio = {
+            "count": len(holdings),
+            "avg_pnl": round(sum(pnls) / len(pnls), 4) if pnls else None,
+            "triggered": sum(1 for h in holdings if h["exit_triggered"]),
+            "near_exit": sum(1 for h in holdings
+                             if not h["exit_triggered"] and h["distance_pct"] is not None
+                             and h["distance_pct"] >= _NEAR_EXIT_PCT),
+            "bearish": sum(1 for h in holdings if h["trend_side"] == "空头"),
+        }
 
     # [R12] 仓位建议: 姿态定总仓位基调, 把握分×波动率定单票建议(仅展示, 不是指令)
     for o in opportunities:
@@ -306,6 +365,7 @@ def _build_overview(repo) -> dict:
             "market": market,
         },
         "holdings": holdings,
+        "portfolio": portfolio,
     }
 
 

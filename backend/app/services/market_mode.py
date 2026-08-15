@@ -78,6 +78,8 @@ def raw_mode(closes: list[float]) -> dict:
     metrics = {
         "close": round(close, 2), "ma50": round(ma50, 2), "ma200": round(ma200, 2),
         "momentum_12m": round(momentum, 4),
+        # [R13] 近 20 交易日收益, 供个股相对强度对比
+        "ret_20d": round(close / closes[-21] - 1, 4) if closes[-21] else None,
     }
     # 防守一票否决
     if close < ma200:
