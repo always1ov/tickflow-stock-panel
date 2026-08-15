@@ -2336,9 +2336,9 @@ export const api = {
 
   // [fork 增强] 今日总览(决策汇聚层)
   todayOverview: () => request<TodayOverview>('/api/today'),
-  todayBrief: () => request<{ brief?: string; error?: string }>('/api/today/brief', { method: 'POST' }),
-  todaySelect: () =>
-    request<{ picks?: TodayPick[]; analyzed?: number; error?: string }>('/api/today/select', { method: 'POST' }),
+  todayAi: () =>
+    request<{ brief?: string; picks?: TodayPick[]; analyzed?: number; error?: string }>(
+      '/api/today/ai', { method: 'POST' }),
   todaySavePrefs: (body: Partial<TodayPrefs>) =>
     request<TodayPrefs>('/api/today/prefs', { method: 'PUT', body: JSON.stringify(body) }),
 

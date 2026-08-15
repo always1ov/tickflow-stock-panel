@@ -6,7 +6,8 @@
 
 端点:
   GET  /api/today        聚合总览
-  POST /api/today/brief  AI 三句话导读(未配 AI 返回 error)
+  GET/PUT /api/today/prefs  机会区筛选门槛
+  POST /api/today/ai     AI 导读+优选合一(未配 AI 返回 error)
 """
 from __future__ import annotations
 
@@ -243,16 +244,6 @@ def get_today(request: Request):
     return _build_overview(request.app.state.repo)
 
 
-_BRIEF_SYSTEM = (
-    "你是用户的盘前助理。基于给定的今日总览 JSON(行动区/机会区/市场天气/持仓体检),"
-    "用 3-4 句中文写一段导读:先说仓位姿态与原因,再点名最需要处理的 1-2 件事(带具体价位),"
-    "最后提最值得盯的 1 个机会(机会区已按把握分从高到低排好, 优先说分高的, 别翻出低分的凑数)。"
-    "不写空话,每句话都要落到具体标的或数字。"
-    "全程用大白话,不用'胶着''博弈''多空拉锯'这类行话,让不懂术语的人也能一眼看懂。"
-    "只输出导读正文,不要标题、列表或任何格式标记。仅供个人参考。"
-)
-
-
 class PrefsModel(BaseModel):
     """机会区筛选门槛(两项都可选, 只改传入的)。"""
 
@@ -274,9 +265,9 @@ def put_prefs(body: PrefsModel):
     return today_prefs.save(min_score=body.min_score, max_show=body.max_show)
 
 
-_SELECT_SYSTEM = """你是一位有 15 年 A 股一线经验的交易员,正在帮用户从几只候选股里挑出**今天最值得优先出手**的。
+_AI_SYSTEM = """你是用户的盘前参谋,有 15 年 A 股一线交易经验。输入分两部分:今日总览 JSON(市场天气/需要行动/持仓体检),和每只候选买入机会的真实日 K 数据。一次调用完成两件事:先做任务二(优选),再基于优选结果写任务一(导读),两者结论必须一致。
 
-## 你要做的事
+## 任务二: 优选(picks)
 
 对每只候选,**看它的日 K 数据做独立判断**,再横向对比,选出 1-3 只。判断依据只能是量价本身:
 
@@ -286,17 +277,20 @@ _SELECT_SYSTEM = """你是一位有 15 年 A 股一线经验的交易员,正在�
 4. **上方阻力空间**:离上方压力位还有多少空间?空间太小的机会不值得占用仓位
 5. **K 线形态质量**:是干净利落的放量长阳,还是上影线很长、量价背离、连续跳空的透支形态
 
-## 硬性要求
-
+硬性要求:
 - **不许拿"规则分高""AI 看多""信号共振"当理由** —— 这些是筛选前就知道的,把它们复述一遍等于没分析。理由必须来自你在 K 线数据里**实际看到的东西**,带上具体数字(量比、涨幅、距离、价位)
 - **规则分只是粗筛门票,不是排序依据**。分低但量价扎实的可以选,分高但量能虚、位置差的要果断放弃
 - 几只都不理想就少选甚至不选(picks 给空数组)。**宁缺毋滥,空仓等待也是决策**
 - 每只理由 ≤35 字,大白话,让不懂术语的人看懂
 
+## 任务一: 导读(brief)
+
+用 3-4 句大白话写一段盘前导读:先说仓位姿态与原因;再点名最需要处理的 1-2 件事(带具体价位;行动区为空就明说今天无需操作);最后落到你在任务二选出的头号机会,说清为什么是它、等什么触发条件(picks 为空就如实说今天没有值得出手的)。每句话都落到具体标的或数字,不写空话;不用"胶着""博弈""多空拉锯"这类行话;正文不要标题、列表或格式标记。
+
 ## 输出
 
 只输出一个 JSON 对象,不要任何其他文字:
-{"picks": [{"symbol": "代码", "reason": "基于量价的具体理由"}]}
+{"brief": "导读正文", "picks": [{"symbol": "代码", "reason": "基于量价的具体理由"}]}
 
 仅供用户个人参考,不构成投资建议。"""
 
@@ -341,26 +335,34 @@ def _candidate_market_data(repo, cands: list[dict]) -> list[dict]:
     return out
 
 
-@router.post("/select")
-async def today_select(request: Request):
-    """AI 优选: 基于真实量价对候选做横向对比(未配 AI 返回 error 而非 500)。"""
+@router.post("/ai")
+async def today_ai(request: Request):
+    """AI 导读+优选合一: 一次调用生成盘前导读, 并基于真实量价从候选里精选 1-3 只。
+
+    未配 AI 返回 error 而非 500。导读末尾提的机会即优选结果, 两者不会互相矛盾。
+    """
     from app.services.ai_provider import ai_configured, generate_ai_text
     if not ai_configured():
         return {"error": "未配置 AI"}
     repo = request.app.state.repo
     data = _build_overview(repo)
     cands = data["opportunities"][:_SELECT_MAX_CANDIDATES]
-    if not cands:
-        return {"picks": []}
-    payload = _candidate_market_data(repo, cands)
+    # 总览瘦身: 候选明细单独带 K 线送审, 机会区在总览里只留给导读定位用的短句
+    overview = {k: v for k, v in data.items() if k != "opportunities"}
+    overview["机会区摘要"] = [
+        {"symbol": c["symbol"], "name": c["name"], "text": c["text"]} for c in cands]
+    payload = {
+        "今日总览": overview,
+        "候选买入机会(含真实日K)": _candidate_market_data(repo, cands) if cands else [],
+    }
     try:
         text = await generate_ai_text(
             [
-                {"role": "system", "content": _SELECT_SYSTEM},
+                {"role": "system", "content": _AI_SYSTEM},
                 {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
             ],
             temperature=0.2,
-            max_tokens=600,
+            max_tokens=800,
         )
         m = re.search(r"\{.*\}", text or "", re.S)
         obj = json.loads(m.group(0)) if m else {}
@@ -370,29 +372,11 @@ async def today_select(request: Request):
             s = str(p.get("symbol", "")).upper()
             if s in valid:
                 picks.append({"symbol": s, "reason": str(p.get("reason") or "").strip()[:60]})
-        return {"picks": picks, "analyzed": len(cands)}
+        return {
+            "brief": str(obj.get("brief") or "").strip(),
+            "picks": picks,
+            "analyzed": len(cands),
+        }
     except Exception as e:  # noqa: BLE001
-        logger.warning("today select failed: %s", e)
-        return {"error": f"AI 调用失败: {e}"}
-
-
-@router.post("/brief")
-async def today_brief(request: Request):
-    """AI 三句话导读(可选;未配 AI 返回 error 而非 500)。"""
-    from app.services.ai_provider import ai_configured, generate_ai_text
-    if not ai_configured():
-        return {"error": "未配置 AI"}
-    data = _build_overview(request.app.state.repo)
-    try:
-        text = await generate_ai_text(
-            [
-                {"role": "system", "content": _BRIEF_SYSTEM},
-                {"role": "user", "content": json.dumps(data, ensure_ascii=False)},
-            ],
-            temperature=0.3,
-            max_tokens=300,
-        )
-        return {"brief": (text or "").strip()}
-    except Exception as e:  # noqa: BLE001
-        logger.warning("today brief failed: %s", e)
+        logger.warning("today ai failed: %s", e)
         return {"error": f"AI 调用失败: {e}"}

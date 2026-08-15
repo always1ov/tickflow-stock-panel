@@ -100,8 +100,17 @@ def test_kline_load_failure_is_contained(cands):
 
 def test_prompt_forbids_restating_the_rule_score():
     """提示词必须明确禁止用'规则分高/AI 看多'当理由, 否则 AI 会复述分数。"""
-    sys_prompt = today_api._SELECT_SYSTEM
+    sys_prompt = today_api._AI_SYSTEM
     assert "不许拿" in sys_prompt and "规则分高" in sys_prompt
     assert "粗筛门票" in sys_prompt, "必须说明规则分不是排序依据"
     for kw in ("量比", "回踩", "阻力"):
         assert kw in sys_prompt, f"提示词应引导看量价维度: {kw}"
+
+
+def test_prompt_merges_brief_and_picks_consistently():
+    """导读与优选合一: 提示词要求先优选后导读, 且输出同时含 brief 与 picks。"""
+    sys_prompt = today_api._AI_SYSTEM
+    assert '"brief"' in sys_prompt and '"picks"' in sys_prompt
+    assert "两者结论必须一致" in sys_prompt, "导读末尾的机会必须来自优选结果"
+    # 导读侧的通俗化要求不能在合并时丢掉
+    assert "胶着" in sys_prompt and "大白话" in sys_prompt

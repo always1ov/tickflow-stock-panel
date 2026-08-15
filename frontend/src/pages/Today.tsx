@@ -117,25 +117,19 @@ export function Today() {
     queryFn: () => api.todayOverview(),
     staleTime: 60_000,
   })
+  // AI 导读+优选合一: 一次调用同时产出导读正文与量价优选结果
   const [brief, setBrief] = useState<string | null>(null)
-  const briefMut = useMutation({
-    mutationFn: () => api.todayBrief(),
-    onSuccess: (r) => {
-      if (r.error) toast(r.error, 'error')
-      else setBrief(r.brief ?? null)
-    },
-    onError: (e: Error) => toast(`导读生成失败: ${e.message}`, 'error'),
-  })
   const [picks, setPicks] = useState<TodayPick[] | null>(null)
   const [analyzed, setAnalyzed] = useState(0)
-  const selectMut = useMutation({
-    mutationFn: () => api.todaySelect(),
+  const aiMut = useMutation({
+    mutationFn: () => api.todayAi(),
     onSuccess: (r) => {
       if (r.error) { toast(r.error, 'error'); return }
+      setBrief(r.brief || null)
       setPicks(r.picks ?? [])
       setAnalyzed(r.analyzed ?? 0)
     },
-    onError: (e: Error) => toast(`AI 优选失败: ${e.message}`, 'error'),
+    onError: (e: Error) => toast(`AI 分析失败: ${e.message}`, 'error'),
   })
   const [prefsOpen, setPrefsOpen] = useState(false)
   // 滑块拖动中的即时值(null = 用服务端返回的偏好); 松手才落库
@@ -187,12 +181,13 @@ export function Today() {
             导出 HTML
           </button>
           <button
-            onClick={() => briefMut.mutate()}
-            disabled={briefMut.isPending || !d}
+            onClick={() => aiMut.mutate()}
+            disabled={aiMut.isPending || !d}
+            title="一次生成盘前导读, 并调取候选的日 K 与量能做横向对比选出 1-3 只(耗时约十几秒)"
             className="inline-flex items-center gap-1 rounded-full border border-violet-400/30 bg-violet-400/10 px-2.5 py-1 text-[10px] text-violet-300 hover:bg-violet-400/20 disabled:opacity-50 transition-colors cursor-pointer"
           >
-            {briefMut.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
-            AI 导读
+            {aiMut.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+            AI 导读·优选
           </button>
           <button
             onClick={() => q.refetch()}
@@ -293,17 +288,6 @@ export function Today() {
                   <SlidersHorizontal className="h-3 w-3" />
                   门槛
                 </button>
-                {d.opportunities.length > 0 && (
-                  <button
-                    onClick={() => selectMut.mutate()}
-                    disabled={selectMut.isPending}
-                    title="让 AI 调取候选的日 K 与量能数据做横向对比,挑出量价最扎实的 1-3 只(耗时约十几秒)"
-                    className="inline-flex items-center gap-1 rounded-full border border-amber-400/30 bg-amber-400/10 px-2.5 py-1 text-[10px] text-amber-300 hover:bg-amber-400/20 disabled:opacity-50 transition-colors cursor-pointer"
-                  >
-                    {selectMut.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
-                    AI 优选
-                  </button>
-                )}
               </div>
             </div>
             {prefsOpen && (
