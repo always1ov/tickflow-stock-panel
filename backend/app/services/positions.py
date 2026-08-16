@@ -38,9 +38,12 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
-def set_position(symbol: str, held: bool, cost: float | None) -> dict:
-    """标记某只自选的持仓:是否持有 + 可选成本价。cost 传 None/空 表示不记成本。
+def set_position(symbol: str, held: bool, cost: float | None,
+                 weight: float | None = None) -> dict:
+    """标记某只自选的持仓:是否持有 + 可选成本价 + 可选仓位比例(占总资金 %)。
 
+    cost/weight 传 None/空 表示不记。weight 用于组合层面(总仓位 vs 姿态基调、
+    组合回撤)与"当前→目标"差额提示; 不填只是拿不到这些, 其余功能不受影响。
     [fork 增强] 生命线不在此存储 —— 恒为 20 日均线,由 position_exit 每日自动计算。
     """
     sym = (symbol or "").strip().upper()
@@ -51,7 +54,12 @@ def set_position(symbol: str, held: bool, cost: float | None) -> dict:
         cost_val = float(cost) if cost not in (None, "") else None
     except (TypeError, ValueError):
         cost_val = None
-    entry = {"held": bool(held), "cost": cost_val, "updated_at": _now_iso()}
+    try:
+        weight_val = max(0.0, min(100.0, float(weight))) if weight not in (None, "") else None
+    except (TypeError, ValueError):
+        weight_val = None
+    entry = {"held": bool(held), "cost": cost_val, "weight": weight_val,
+             "updated_at": _now_iso()}
     data[sym] = entry
     _path().write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
     return entry

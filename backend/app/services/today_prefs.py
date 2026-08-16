@@ -17,11 +17,14 @@ DEFAULTS = {
     "min_score": 60, "max_show": 10,
     # [R12] 仓位建议: 单票仓位上限(%)与目标日波动率(%); ATR 波幅超过目标时按比例压缩
     "max_single": 20, "target_vol": 3,
+    # [缺口④] 组合回撤纪律线(%): 组合净值从高点回撤超过此值 → 行动区置顶降仓提醒
+    "max_drawdown": 10,
 }
 _MIN_SCORE_RANGE = (0, 100)
 _MAX_SHOW_RANGE = (1, 50)
 _MAX_SINGLE_RANGE = (5, 100)
 _TARGET_VOL_RANGE = (1, 10)
+_MAX_DRAWDOWN_RANGE = (3, 30)
 
 
 def _store_path() -> Path:
@@ -54,10 +57,12 @@ def load() -> dict:
         "max_show": _clamp(data.get("max_show"), *_MAX_SHOW_RANGE, DEFAULTS["max_show"]),
         "max_single": _clamp(data.get("max_single"), *_MAX_SINGLE_RANGE, DEFAULTS["max_single"]),
         "target_vol": _clamp(data.get("target_vol"), *_TARGET_VOL_RANGE, DEFAULTS["target_vol"]),
+        "max_drawdown": _clamp(data.get("max_drawdown"), *_MAX_DRAWDOWN_RANGE, DEFAULTS["max_drawdown"]),
     }
 
 
-def save(min_score=None, max_show=None, max_single=None, target_vol=None) -> dict:
+def save(min_score=None, max_show=None, max_single=None, target_vol=None,
+         max_drawdown=None) -> dict:
     """更新偏好(只改传入的字段), 返回生效后的完整偏好。"""
     cur = load()
     if min_score is not None:
@@ -68,5 +73,7 @@ def save(min_score=None, max_show=None, max_single=None, target_vol=None) -> dic
         cur["max_single"] = _clamp(max_single, *_MAX_SINGLE_RANGE, cur["max_single"])
     if target_vol is not None:
         cur["target_vol"] = _clamp(target_vol, *_TARGET_VOL_RANGE, cur["target_vol"])
+    if max_drawdown is not None:
+        cur["max_drawdown"] = _clamp(max_drawdown, *_MAX_DRAWDOWN_RANGE, cur["max_drawdown"])
     _store_path().write_text(json.dumps(cur, indent=2, ensure_ascii=False), encoding="utf-8")
     return cur

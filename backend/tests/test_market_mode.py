@@ -2,7 +2,7 @@
 import pytest
 
 from app.services.market_mode import (
-    CONFIRM_DAYS, MIN_BARS, apply_stickiness, combine_posture, raw_mode,
+    CONFIRM_DAYS, MIN_BARS, apply_stickiness, combine_posture, decide_mode, raw_mode,
 )
 
 
@@ -58,13 +58,41 @@ def test_insufficient_history_says_so():
 
 # ---------- 黏性 ----------
 
-def test_defense_applies_immediately():
+def test_hard_defense_applies_immediately():
     state = {"mode": "进攻", "raw_mode": "进攻", "raw_streak": 1, "as_of": "2026-08-14"}
-    out = apply_stickiness({"mode": "防守", "reason": "跌破年线", "metrics": {}},
+    out = apply_stickiness({"mode": "防守", "veto": True, "reason": "跌破年线", "metrics": {}},
                            state, "2026-08-15")
     assert out["mode"] == "防守"
     assert out["pending"] is None
     assert state["mode"] == "防守"
+
+
+def test_soft_defense_needs_confirmation():
+    """[缺口①] 年线拐头的软防守走确认流程, 不立即切换。"""
+    state = {"mode": "进攻", "raw_mode": "进攻", "raw_streak": 1, "as_of": "2026-08-14"}
+    out = apply_stickiness({"mode": "防守", "veto": False, "reason": "年线拐头", "metrics": {}},
+                           state, "2026-08-15")
+    assert out["mode"] == "进攻", "软防守第 1 天应保持原模式"
+    assert out["pending"]["mode"] == "防守"
+
+
+# ---------- decide_mode 分支(缺口①: 年线斜率) ----------
+
+def test_decide_below_ma50_rising_ma200_is_caution():
+    out = decide_mode(close=100, ma50=105, ma200=95, momentum=0.1, ma200_rising=True)
+    assert out["mode"] == "谨慎" and out["veto"] is False
+
+
+def test_decide_below_ma50_falling_ma200_is_soft_defense():
+    """PRD 4.4.2: 年线向上是中性的必要条件; 不成立 → 防守(软, 走确认)。"""
+    out = decide_mode(close=100, ma50=105, ma200=95, momentum=0.1, ma200_rising=False)
+    assert out["mode"] == "防守" and out["veto"] is False
+    assert "拐头向下" in out["reason"]
+
+
+def test_decide_hard_conditions_have_veto():
+    assert decide_mode(90, 105, 95, 0.1, True)["veto"] is True   # 破年线
+    assert decide_mode(100, 95, 96, -0.05, True)["veto"] is True  # 年动量为负
 
 
 def test_non_defense_switch_needs_confirmation():

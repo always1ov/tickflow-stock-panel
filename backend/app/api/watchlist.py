@@ -138,6 +138,7 @@ def clear_group(group_id: str, request: Request):
 class PositionIn(BaseModel):
     held: bool = False
     cost: float | None = None
+    weight: float | None = None  # 仓位比例(占总资金 %), 可选
 
 
 @router.get("/positions")
@@ -149,9 +150,10 @@ def list_positions():
 
 @router.put("/positions/{symbol}")
 def set_position(symbol: str, req: PositionIn):
-    """标记某只自选:是否持有 + 可选成本价。"""
+    """标记某只自选:是否持有 + 可选成本价 + 可选仓位比例(%)。"""
     from app.services import positions
-    return {"symbol": symbol.strip().upper(), "position": positions.set_position(symbol, req.held, req.cost)}
+    return {"symbol": symbol.strip().upper(),
+            "position": positions.set_position(symbol, req.held, req.cost, req.weight)}
 
 
 @router.delete("/positions/{symbol}")

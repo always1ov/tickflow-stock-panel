@@ -38,6 +38,7 @@ function buildTodayHtml(d: TodayOverview, brief: string | null): string {
       <tr>
         <td>${esc(h.name)}${sym(h.name, h.symbol)}</td>
         <td class="num">${h.close?.toFixed(2) ?? '—'}</td>
+        <td class="num">${h.weight != null ? h.weight + '%' : '—'}</td>
         <td class="num" style="color:${h.pnl_pct == null ? '#8a919f' : h.pnl_pct > 0 ? bull : bear}">${h.pnl_pct != null ? (h.pnl_pct * 100).toFixed(1) + '%' : '—'}</td>
         <td class="num" style="color:${h.exit_triggered ? bull : '#1f2329'}">${h.line != null ? h.line.toFixed(2) + (h.exit_triggered ? ' 已触发' : '') : '—'}</td>
         <td>${esc(h.stage_cn ?? '—')}</td>
@@ -94,9 +95,9 @@ function buildTodayHtml(d: TodayOverview, brief: string | null): string {
   ${d.actions.length ? `<ul class="items">${actionRows}</ul>` : '<div class="empty">今日无需操作 —— 管住手</div>'}
   <h2>🎯 值得关注(${d.opportunities.length}·已按把握分筛选${d.opportunities_filtered > 0 ? `,滤掉 ${d.opportunities_filtered} 只` : ''})</h2>
   ${d.opportunities.length ? `<ul class="items">${oppRows}</ul>` : '<div class="empty">今日没有把握足够的买入机会 —— 等待比出手更常见</div>'}
-  <h2>💼 持仓体检(${d.holdings.length})${d.portfolio ? `<span style="font-weight:400;font-size:12px;color:#8a919f;margin-left:8px">组合:平均浮盈 ${d.portfolio.avg_pnl != null ? (d.portfolio.avg_pnl * 100).toFixed(1) + '%' : '—'} · 已触发 ${d.portfolio.triggered} · 逼近出场线 ${d.portfolio.near_exit} · 空头趋势 ${d.portfolio.bearish}</span>` : ''}</h2>
+  <h2>💼 持仓体检(${d.holdings.length})${d.portfolio ? `<span style="font-weight:400;font-size:12px;color:#8a919f;margin-left:8px">组合:平均浮盈 ${d.portfolio.avg_pnl != null ? (d.portfolio.avg_pnl * 100).toFixed(1) + '%' : '—'} · 已触发 ${d.portfolio.triggered} · 逼近出场线 ${d.portfolio.near_exit} · 空头趋势 ${d.portfolio.bearish}${d.portfolio.total_weight != null ? ` · 总仓位 ${(d.portfolio.total_weight / 10).toFixed(1)}成${d.portfolio.drawdown != null ? ` · 距净值高点 -${(d.portfolio.drawdown * 100).toFixed(1)}%` : ''}` : ''}</span>` : ''}</h2>
   ${d.holdings.length ? `<table>
-    <thead><tr><th>标的</th><th class="num">现价</th><th class="num">浮盈</th><th class="num">出场线</th><th>阶段</th><th>趋势</th><th>操作建议</th></tr></thead>
+    <thead><tr><th>标的</th><th class="num">现价</th><th class="num">仓位</th><th class="num">浮盈</th><th class="num">出场线</th><th>阶段</th><th>趋势</th><th>操作建议</th></tr></thead>
     <tbody>${holdRows}</tbody>
   </table>` : '<div class="empty">暂无持仓标记</div>'}
   <p class="foot">TickFlow Stock Panel · 六态趋势 + ATR 出场线 + 生命线(20日线) · 仅个人参考,不构成投资建议</p>
@@ -367,6 +368,19 @@ export function Today() {
                   />
                   <span>%</span>
                 </label>
+                <label className="flex items-center gap-2 text-[11px] text-muted" title="组合净值从高点回撤超过此值 → 需要行动区置顶'纪律性降仓'提醒(需在决策台填各持仓的仓位%)">
+                  <span className="whitespace-nowrap">回撤纪律线</span>
+                  <input
+                    type="number" min={3} max={30}
+                    defaultValue={d.prefs.max_drawdown}
+                    onBlur={(e) => {
+                      const v = Number(e.target.value)
+                      if (v && v !== d.prefs.max_drawdown) prefsMut.mutate({ max_drawdown: v })
+                    }}
+                    className="w-14 rounded border border-border bg-surface px-2 py-1 font-mono text-foreground outline-none focus:border-sky-400/50"
+                  />
+                  <span>%</span>
+                </label>
                 <span className="text-[10px] text-muted/70">
                   把握分调高更严格;单票上限与目标日波动决定「建议仓位」。卖出提醒不受任何门槛影响。
                 </span>
@@ -467,6 +481,13 @@ export function Today() {
                     {d.portfolio.avg_pnl != null ? `${(d.portfolio.avg_pnl * 100).toFixed(1)}%` : '—'}
                   </span>
                   {' '}· 已触发出场 {d.portfolio.triggered} · 逼近出场线 {d.portfolio.near_exit} · 空头趋势 {d.portfolio.bearish}
+                  {d.portfolio.total_weight != null && (
+                    <span title="由各持仓「仓位%」汇总;超过姿态基调或回撤超纪律线会进「需要行动」">
+                      {' '}· 总仓位 {(d.portfolio.total_weight / 10).toFixed(1)}成
+                      {d.portfolio.posture_cap != null && `(基调≤${d.portfolio.posture_cap * 10}成)`}
+                      {d.portfolio.drawdown != null && ` · 距净值高点 -${(d.portfolio.drawdown * 100).toFixed(1)}%`}
+                    </span>
+                  )}
                 </span>
               )}
             </div>
@@ -481,6 +502,7 @@ export function Today() {
                     <tr className="text-left">
                       <th className="px-4 py-1.5 font-normal">标的</th>
                       <th className="px-2 py-1.5 font-normal text-right">现价</th>
+                      <th className="px-2 py-1.5 font-normal text-right">仓位</th>
                       <th className="px-2 py-1.5 font-normal text-right">浮盈</th>
                       <th className="px-2 py-1.5 font-normal text-right">出场线</th>
                       <th className="px-2 py-1.5 font-normal text-center">阶段</th>
@@ -501,6 +523,9 @@ export function Today() {
                           {h.symbol !== h.name && <span className="ml-1.5 text-[9px] font-mono text-muted">{h.symbol}</span>}
                         </td>
                         <td className="px-2 py-1.5 text-right font-mono">{h.close?.toFixed(2) ?? '—'}</td>
+                        <td className="px-2 py-1.5 text-right font-mono text-muted" title="在决策台持有标记旁填「仓%」后显示">
+                          {h.weight != null ? `${h.weight}%` : '—'}
+                        </td>
                         <td className={`px-2 py-1.5 text-right font-mono ${h.pnl_pct == null ? 'text-muted' : h.pnl_pct > 0 ? 'text-red-400' : h.pnl_pct < 0 ? 'text-emerald-400' : 'text-muted'}`}>
                           {h.pnl_pct != null ? `${(h.pnl_pct * 100).toFixed(1)}%` : '—'}
                         </td>

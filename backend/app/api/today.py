@@ -275,12 +275,34 @@ def _build_overview(repo) -> dict:
     else:
         posture, posture_reason = "谨慎", f"{ratio:.0%} 的自选在涨势中,但今天转强({new_bull} 只)和转弱({new_bear} 只)的数量差不多,涨跌方向还不明朗"
 
+    # [缺口②] 全市场宽度: 复用市场环境(regime)历史的涨跌家数, 普跌日压制进攻姿态。
+    # regime 未跑批/数据过旧时静默跳过, 不新增任何计算源。
+    market_breadth = None
+    try:
+        from app.services.regime_builder import load_regime_history
+        rh = load_regime_history(repo.store.data_dir)
+        if not rh.is_empty() and {"date", "up_count", "down_count"} <= set(rh.columns):
+            last = rh.sort("date").tail(1)
+            b_date = str(last["date"][0])
+            up_n, dn_n = int(last["up_count"][0]), int(last["down_count"][0])
+            fresh = (date.today() - date.fromisoformat(b_date[:10])).days <= 7
+            if fresh and (up_n + dn_n) > 0:
+                market_breadth = {"date": b_date[:10], "up": up_n, "down": dn_n, "capped": False}
+                if dn_n > up_n * 2 and posture == "进攻":
+                    posture = "谨慎"
+                    posture_reason += f";全市场 {up_n}涨/{dn_n}跌,普跌日不冒进"
+                    market_breadth["capped"] = True
+    except Exception as e:  # noqa: BLE001
+        logger.debug("today market breadth skipped: %s", e)
+
     # [R11] 大盘红绿灯: 最终姿态与自选广度取更保守者(market 已在机会区前取好)
     breadth_posture, breadth_reason = posture, posture_reason
     if market:
         from app.services.market_mode import combine_posture
         posture = combine_posture(market["mode"], breadth_posture)
         posture_reason = f"大盘:{market['reason']};自选:{breadth_reason}"
+    if market_breadth and not market_breadth["capped"]:
+        posture_reason += f";全市场 {market_breadth['up']}涨/{market_breadth['down']}跌"
 
     # ---- ④ 持仓体检 ----
     holdings: list[dict] = []
@@ -309,8 +331,11 @@ def _build_overview(repo) -> dict:
             "trend_side": (t or {}).get("side"),
             "signal": (sig or {}).get("signal"),
             "stance": stance, "stance_why": stance_why,
+            "weight": pos.get("weight"),
         })
     holdings.sort(key=lambda h: (not h["exit_triggered"], h["distance_pct"] if h["distance_pct"] is not None else -9))
+
+    as_of = max((t["as_of"] for t in trends.values()), default=None)
 
     # [R13] 组合汇总: 逐票之上的整体视角
     portfolio = None
@@ -324,7 +349,40 @@ def _build_overview(repo) -> dict:
                              if not h["exit_triggered"] and h["distance_pct"] is not None
                              and h["distance_pct"] >= _NEAR_EXIT_PCT),
             "bearish": sum(1 for h in holdings if h["trend_side"] == "空头"),
+            "total_weight": None, "nav": None, "drawdown": None,
+            "posture_cap": POSTURE_CAPS.get(posture, 0.3),
         }
+        # [缺口③④] 填了仓位比例才有组合层视角: 总仓位 vs 姿态基调 + 净值回撤纪律
+        weighted = [h for h in holdings if h.get("weight")]
+        if weighted:
+            total_weight = round(sum(h["weight"] for h in weighted), 1)
+            nav = 1.0 + sum(h["weight"] / 100 * (h["pnl_pct"] or 0) for h in weighted)
+            portfolio["total_weight"] = total_weight
+            try:
+                from app.services import portfolio_history
+                snap = portfolio_history.update(as_of or str(date.today()), nav)
+                portfolio["nav"] = snap["nav"]
+                portfolio["drawdown"] = snap["drawdown"]
+                dd_limit = prefs["max_drawdown"] / 100
+                if snap["drawdown"] >= dd_limit:
+                    actions.append({
+                        "kind": "portfolio_drawdown", "severity": "high",
+                        "symbol": "", "name": "组合整体",
+                        "text": f"组合净值从高点回撤 {snap['drawdown'] * 100:.1f}%,已过纪律线 {prefs['max_drawdown']}%"
+                                f" —— 按纪律整体降仓,至少降到防守档(≤2成),别跟亏损讲道理",
+                    })
+            except Exception as e:  # noqa: BLE001
+                logger.warning("portfolio history skipped: %s", e)
+            cap = POSTURE_CAPS.get(posture, 0.3)
+            if total_weight / 100 > cap + 0.001:
+                actions.append({
+                    "kind": "over_allocated", "severity": "mid",
+                    "symbol": "", "name": "组合整体",
+                    "text": f"当前总仓位 {total_weight / 10:.1f}成,超过{posture}姿态的基调上限 {cap * 10:.0f}成"
+                            f" —— 建议把差额 {(total_weight / 100 - cap) * 10:.1f}成 减下来",
+                })
+            sev_rank = {"high": 0, "mid": 1}
+            actions.sort(key=lambda a: sev_rank.get(a["severity"], 9))
 
     # [R12] 仓位建议: 姿态定总仓位基调, 把握分×波动率定单票建议(仅展示, 不是指令)
     for o in opportunities:
@@ -345,7 +403,6 @@ def _build_overview(repo) -> dict:
         o["advice"] = suggest_position(
             o["score"], atr_pct, prefs["max_single"] / 100, prefs["target_vol"] / 100)
 
-    as_of = max((t["as_of"] for t in trends.values()), default=None)
     return {
         "as_of": as_of,
         "watchlist_total": len(syms),
@@ -363,6 +420,7 @@ def _build_overview(repo) -> dict:
             "posture": posture, "posture_reason": posture_reason,
             "breadth_posture": breadth_posture,
             "market": market,
+            "market_breadth": market_breadth,
         },
         "holdings": holdings,
         "portfolio": portfolio,
@@ -382,6 +440,7 @@ class PrefsModel(BaseModel):
     max_show: int | None = Field(default=None, ge=1, le=50)
     max_single: int | None = Field(default=None, ge=5, le=100)
     target_vol: int | None = Field(default=None, ge=1, le=10)
+    max_drawdown: int | None = Field(default=None, ge=3, le=30)
 
 
 @router.get("/prefs")
@@ -396,7 +455,8 @@ def put_prefs(body: PrefsModel):
     """修改筛选门槛, 立即对下次总览生效。"""
     from app.services import today_prefs
     return today_prefs.save(min_score=body.min_score, max_show=body.max_show,
-                            max_single=body.max_single, target_vol=body.target_vol)
+                            max_single=body.max_single, target_vol=body.target_vol,
+                            max_drawdown=body.max_drawdown)
 
 
 _AI_SYSTEM = """你是用户的盘前参谋,有 15 年 A 股一线交易经验。输入分两部分:今日总览 JSON(市场天气/需要行动/持仓体检),和每只候选买入机会的真实日 K 数据。一次调用完成两件事:先做任务二(优选),再基于优选结果写任务一(导读),两者结论必须一致。

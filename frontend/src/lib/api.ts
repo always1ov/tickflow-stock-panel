@@ -155,16 +155,18 @@ export interface TodayOpportunity {
   advice?: { fraction: number; text: string; why: string } | null
 }
 export interface TodayPick { symbol: string; reason: string }
-export interface TodayPrefs { min_score: number; max_show: number; max_single: number; target_vol: number }
+export interface TodayPrefs { min_score: number; max_show: number; max_single: number; target_vol: number; max_drawdown: number }
 export interface TodayHolding {
   symbol: string; name: string; close: number | null; cost: number | null; pnl_pct: number | null
   stage_cn: string | null; line: number | null; line_cn: string | null; distance_pct: number | null
   exit_triggered: boolean; trend_cn: string | null; trend_duration: number | null
   trend_side: string | null; signal: string | null
   stance: string; stance_why: string
+  weight?: number | null
 }
 export interface TodayPortfolio {
   count: number; avg_pnl: number | null; triggered: number; near_exit: number; bearish: number
+  total_weight?: number | null; nav?: number | null; drawdown?: number | null; posture_cap?: number
 }
 export interface TodayOverview {
   as_of: string | null
@@ -182,8 +184,9 @@ export interface TodayOverview {
     market?: {
       mode: string; reason: string; benchmark_name: string | null; as_of: string | null
       pending: { mode: string; streak: number; need: number; raw_reason: string } | null
-      metrics: { close?: number; ma50?: number; ma200?: number; momentum_12m?: number }
+      metrics: { close?: number; ma50?: number; ma200?: number; momentum_12m?: number; ma200_rising?: boolean; ret_20d?: number }
     } | null
+    market_breadth?: { date: string; up: number; down: number; capped: boolean } | null
   }
   holdings: TodayHolding[]
   portfolio?: TodayPortfolio | null
@@ -1843,11 +1846,11 @@ export const api = {
         : '/api/watchlist/enriched',
     ),
   watchlistPositions: () =>
-    request<{ positions: Record<string, { held: boolean; cost: number | null; updated_at: string }> }>('/api/watchlist/positions'),
-  setWatchlistPosition: (symbol: string, held: boolean, cost: number | null) =>
-    request<{ symbol: string; position: { held: boolean; cost: number | null; updated_at: string } }>(
+    request<{ positions: Record<string, { held: boolean; cost: number | null; weight?: number | null; updated_at: string }> }>('/api/watchlist/positions'),
+  setWatchlistPosition: (symbol: string, held: boolean, cost: number | null, weight?: number | null) =>
+    request<{ symbol: string; position: { held: boolean; cost: number | null; weight?: number | null; updated_at: string } }>(
       `/api/watchlist/positions/${encodeURIComponent(symbol)}`,
-      { method: 'PUT', body: JSON.stringify({ held, cost }) },
+      { method: 'PUT', body: JSON.stringify({ held, cost, weight }) },
     ),
   stockSignals: () =>
     request<{ signals: Record<string, { signal: string; confidence: number; reason: string; close: number | null; created_at: string; watch_points?: { direction: 'up' | 'down'; price: number; label: string; action?: string; confidence?: number; reason: string }[] }> }>('/api/stock-analysis/signals'),

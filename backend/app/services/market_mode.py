@@ -73,43 +73,56 @@ def raw_mode(closes: list[float]) -> dict:
     close = closes[-1]
     ma50 = sum(closes[-50:]) / 50
     ma200 = sum(closes[-200:]) / 200
+    # 年线斜率: 与 20 个交易日前的 MA200 比(PRD 4.4.2 "MA200 趋势仍向上"是中性的必要条件)
+    ma200_prev = sum(closes[-220:-20]) / 200 if n >= 220 else None
+    ma200_rising = ma200 > ma200_prev if ma200_prev is not None else True
     mom_window = min(n, MOMENTUM_BARS)
     momentum = close / closes[-mom_window] - 1
     metrics = {
         "close": round(close, 2), "ma50": round(ma50, 2), "ma200": round(ma200, 2),
         "momentum_12m": round(momentum, 4),
+        "ma200_rising": ma200_rising,
         # [R13] 近 20 交易日收益, 供个股相对强度对比
         "ret_20d": round(close / closes[-21] - 1, 4) if closes[-21] else None,
     }
-    # 防守一票否决
+    out = decide_mode(close, ma50, ma200, momentum, ma200_rising)
+    out["metrics"] = metrics
+    return out
+
+
+def decide_mode(close: float, ma50: float, ma200: float,
+                momentum: float, ma200_rising: bool) -> dict:
+    """模式决策核心(纯函数, 与均线口径解耦, 供单测覆盖每个分支)。"""
+    # 防守一票否决(硬条件, veto=True 立即生效)
     if close < ma200:
-        return {"mode": "防守",
-                "reason": f"大盘收盘 {close:.0f} 已跌破年线 {ma200:.0f},大环境转坏",
-                "metrics": metrics}
+        return {"mode": "防守", "veto": True,
+                "reason": f"大盘收盘 {close:.0f} 已跌破年线 {ma200:.0f},大环境转坏"}
     if momentum < 0:
-        return {"mode": "防守",
-                "reason": f"大盘比一年前还低({momentum:+.1%}),长期方向向下",
-                "metrics": metrics}
+        return {"mode": "防守", "veto": True,
+                "reason": f"大盘比一年前还低({momentum:+.1%}),长期方向向下"}
     if close > ma50:
-        return {"mode": "进攻",
-                "reason": f"大盘站在年线 {ma200:.0f} 和 50日线 {ma50:.0f} 之上,环境健康",
-                "metrics": metrics}
-    return {"mode": "谨慎",
-            "reason": f"大盘跌破 50日线 {ma50:.0f} 但仍守住年线 {ma200:.0f},短期转弱",
-            "metrics": metrics}
+        return {"mode": "进攻", "veto": False,
+                "reason": f"大盘站在年线 {ma200:.0f} 和 50日线 {ma50:.0f} 之上,环境健康"}
+    if ma200_rising:
+        return {"mode": "谨慎", "veto": False,
+                "reason": f"大盘跌破 50日线 {ma50:.0f} 但仍守住向上的年线 {ma200:.0f},短期转弱"}
+    # 软防守: 破 50日线且年线已拐头向下 —— 中性的必要条件(年线向上, PRD 4.4.2)
+    # 不成立, 按防守处理, 但走确认流程而非立即切换(区别于硬条件)
+    return {"mode": "防守", "veto": False,
+            "reason": f"大盘跌破 50日线 {ma50:.0f} 且年线 {ma200:.0f} 已拐头向下,趋势在变坏"}
 
 
 def apply_stickiness(raw: dict, state: dict, as_of: str) -> dict:
     """把黏性规则套在原始模式上, 返回生效模式并更新 state(调用方负责持久化)。
 
-    - 防守: 立即生效, 不等确认
-    - 其他模式: 与当前生效模式不同时, 需连续 CONFIRM_DAYS 个交易日成立;
-      未满期间保持原模式, 标注 pending
+    - 硬防守(veto=True: 破年线/年动量为负): 立即生效, 不等确认
+    - 其他模式(含"年线拐头"软防守): 与当前生效模式不同时, 需连续
+      CONFIRM_DAYS 个交易日成立; 未满期间保持原模式, 标注 pending
     - 同一交易日重复调用不重复累计天数
     """
     effective = state.get("mode")
     rm = raw["mode"]
-    if rm == "防守" or effective is None:
+    if (rm == "防守" and raw.get("veto")) or effective is None:
         state.update({"mode": rm, "raw_mode": rm, "raw_streak": 1, "as_of": as_of})
         return {"mode": rm, "reason": raw["reason"], "pending": None,
                 "metrics": raw["metrics"]}
@@ -169,11 +182,39 @@ def get_market_mode(repo) -> dict:
         }
     raw = raw_mode(closes)
     state = _load_state()
+    prev_mode = state.get("mode")
     out = apply_stickiness(raw, state, as_of or "")
     _save_state(state)
     names = {"000300.SH": "沪深300", "000001.SH": "上证指数"}
     out.update({"benchmark": used, "benchmark_name": names.get(used, used), "as_of": as_of})
+    if prev_mode is not None and out["mode"] != prev_mode:
+        _announce_switch(repo, prev_mode, out, names.get(used, used or "大盘"))
     return out
+
+
+def _announce_switch(repo, prev_mode: str, out: dict, bench_name: str) -> None:
+    """模式切换 → 落监控告警(进今日总览行动区与监控中心)+ 桌面推送。全程 best-effort。"""
+    msg = f"大盘模式切换: {prev_mode} → {out['mode']}({out['reason']})"
+    severity = "critical" if out["mode"] == "防守" else "info"
+    try:
+        import time as _time
+
+        from app.services import alert_store
+        alert_store.append(repo.store.data_dir, {
+            "ts": int(_time.time() * 1000),
+            "source": "market_mode", "type": "mode_switch",
+            "symbol": out.get("benchmark") or "", "name": bench_name,
+            "message": msg, "severity": severity,
+            "price": (out.get("metrics") or {}).get("close"),
+            "change_pct": None, "signals": [],
+        })
+    except Exception as e:  # noqa: BLE001
+        logger.warning("market mode alert append failed: %s", e)
+    try:
+        from app.services.notify_adapter import notify
+        notify(f"大盘{out['mode']}", msg)
+    except Exception as e:  # noqa: BLE001
+        logger.debug("market mode notify skipped: %s", e)
 
 
 def combine_posture(market_mode_cn: str, breadth_posture: str) -> str:

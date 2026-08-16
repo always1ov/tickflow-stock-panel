@@ -19,8 +19,9 @@ def test_defaults_when_unset(prefs):
 
 
 def test_save_and_reload_roundtrip(prefs):
-    saved = prefs.save(min_score=75, max_show=5, max_single=30, target_vol=4)
-    assert saved == {"min_score": 75, "max_show": 5, "max_single": 30, "target_vol": 4}
+    saved = prefs.save(min_score=75, max_show=5, max_single=30, target_vol=4, max_drawdown=8)
+    assert saved == {"min_score": 75, "max_show": 5, "max_single": 30,
+                     "target_vol": 4, "max_drawdown": 8}
     assert prefs.load() == saved
 
 
@@ -33,10 +34,13 @@ def test_partial_update_keeps_other_field(prefs):
 
 
 def test_values_are_clamped_to_valid_range(prefs):
-    up = prefs.save(min_score=999, max_show=999, max_single=999, target_vol=999)
-    assert up == {"min_score": 100, "max_show": 50, "max_single": 100, "target_vol": 10}
-    dn = prefs.save(min_score=-50, max_show=0, max_single=1, target_vol=0)
-    assert dn == {"min_score": 0, "max_show": 1, "max_single": 5, "target_vol": 1}
+    up = prefs.save(min_score=999, max_show=999, max_single=999, target_vol=999,
+                    max_drawdown=999)
+    assert up == {"min_score": 100, "max_show": 50, "max_single": 100,
+                  "target_vol": 10, "max_drawdown": 30}
+    dn = prefs.save(min_score=-50, max_show=0, max_single=1, target_vol=0, max_drawdown=1)
+    assert dn == {"min_score": 0, "max_show": 1, "max_single": 5,
+                  "target_vol": 1, "max_drawdown": 3}
 
 
 def test_corrupt_file_falls_back_to_defaults(prefs):

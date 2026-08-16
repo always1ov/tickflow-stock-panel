@@ -8,7 +8,7 @@ import { useHistoryReports, openHistoryReport, loadHistory } from '@/lib/stockAn
 import { trendBadgeCls } from '@/components/stock-analysis/TrendStateBar'
 import { TrendSummaryDialog } from '@/components/stock-analysis/TrendSummaryDialog'
 
-type Position = { held: boolean; cost: number | null; updated_at: string }
+type Position = { held: boolean; cost: number | null; weight?: number | null; updated_at: string }
 type WatchPoint = { direction: 'up' | 'down'; price: number; label?: string; action?: string; reason?: string }
 type Signal = { signal: string; confidence: number; reason: string; close: number | null; created_at: string; watch_points?: WatchPoint[] }
 type SortKey = 'name' | 'close' | 'changePct' | 'held' | 'pnl' | 'confidence' | 'signal' | 'report' | 'trend'
@@ -118,8 +118,8 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
   }
 
   const setPos = useMutation({
-    mutationFn: ({ symbol, held, cost }: { symbol: string; held: boolean; cost: number | null }) =>
-      api.setWatchlistPosition(symbol, held, cost),
+    mutationFn: ({ symbol, held, cost, weight }: { symbol: string; held: boolean; cost: number | null; weight?: number | null }) =>
+      api.setWatchlistPosition(symbol, held, cost, weight),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['watchlist-positions'] })
       qc.invalidateQueries({ queryKey: ['watchlist-exit-lines'] })
@@ -189,7 +189,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
         const pnl = pos?.held && cost && cost > 0 && close != null ? (close - cost) / cost : null
         const trend: TrendInfo | undefined = trends[symbol]
         const exit: ExitLine | undefined = exitLines[symbol]
-        return { symbol, name: r.name ?? symbol, close, changePct: r.change_pct ?? null, held: !!pos?.held, cost, pnl, sig, trend, exit }
+        return { symbol, name: r.name ?? symbol, close, changePct: r.change_pct ?? null, held: !!pos?.held, cost, weight: pos?.weight ?? null, pnl, sig, trend, exit }
       })
       .filter((r) => (heldOnly ? r.held : true))
   }, [enriched.data, positions, signals, heldOnly, trends, exitLines])
@@ -336,7 +336,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
                     {/* 仓位:持有/空仓 切换 */}
                     <td className="px-2 py-1.5 text-center">
                       <button
-                        onClick={() => setPos.mutate({ symbol: r.symbol, held: !r.held, cost: r.cost })}
+                        onClick={() => setPos.mutate({ symbol: r.symbol, held: !r.held, cost: r.cost, weight: r.weight })}
                         className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors cursor-pointer ${
                           r.held ? 'border-amber-400/40 bg-amber-400/10 text-amber-400' : 'border-border bg-base text-muted hover:border-amber-400/30'
                         }`}
@@ -344,19 +344,34 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
                         {r.held ? '持有' : '空仓'}
                       </button>
                     </td>
-                    {/* 成本:仅持有时可填。生命线=20日线, 自动计算无需手填 */}
+                    {/* 成本+仓位%:仅持有时可填。生命线=20日线, 自动计算无需手填;
+                        仓位% 供今日总览算组合总仓位/净值回撤, 不填不影响其他功能 */}
                     <td className="px-2 py-1.5 text-right">
                       {r.held ? (
-                        <input
-                          type="number"
-                          defaultValue={r.cost ?? ''}
-                          placeholder="成本"
-                          onBlur={(e) => {
-                            const v = e.target.value === '' ? null : Number(e.target.value)
-                            if (v !== r.cost) setPos.mutate({ symbol: r.symbol, held: true, cost: v })
-                          }}
-                          className="w-16 h-6 px-1 rounded bg-base border border-border text-[11px] font-mono text-right text-foreground focus:outline-none focus:border-accent/50"
-                        />
+                        <span className="inline-flex items-center gap-1">
+                          <input
+                            type="number"
+                            defaultValue={r.cost ?? ''}
+                            placeholder="成本"
+                            onBlur={(e) => {
+                              const v = e.target.value === '' ? null : Number(e.target.value)
+                              if (v !== r.cost) setPos.mutate({ symbol: r.symbol, held: true, cost: v, weight: r.weight })
+                            }}
+                            className="w-16 h-6 px-1 rounded bg-base border border-border text-[11px] font-mono text-right text-foreground focus:outline-none focus:border-accent/50"
+                          />
+                          <input
+                            type="number"
+                            min={0} max={100}
+                            defaultValue={r.weight ?? ''}
+                            placeholder="仓%"
+                            title="仓位比例(占总资金 %),可选 —— 填了之后今日总览能算组合总仓位、净值回撤纪律与超配提醒"
+                            onBlur={(e) => {
+                              const v = e.target.value === '' ? null : Number(e.target.value)
+                              if (v !== r.weight) setPos.mutate({ symbol: r.symbol, held: true, cost: r.cost, weight: v })
+                            }}
+                            className="w-12 h-6 px-1 rounded bg-base border border-border text-[11px] font-mono text-right text-foreground focus:outline-none focus:border-accent/50"
+                          />
+                        </span>
                       ) : <span className="text-muted">—</span>}
                     </td>
                     {/* 浮盈 */}
