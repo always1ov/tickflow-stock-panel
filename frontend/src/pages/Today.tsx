@@ -33,7 +33,7 @@ function buildTodayHtml(d: TodayOverview, brief: string | null): string {
   const oppRows = d.opportunities.map(o => `
       <li><b class="score">${o.score}</b>
         <span><b>${esc(o.name)}</b>${sym(o.name, o.symbol)}${o.advice ? ` <span class="adv">${esc(o.advice.text)}</span>` : ''} ${esc(o.text)}
-        <span class="why">${esc(o.why)}</span></span></li>`).join('')
+        <span class="why">${esc(o.why)}</span>${o.advice?.plan ? `<span class="why" style="color:#1c6ea4">建仓路径:${esc(o.advice.plan)}</span>` : ''}</span></li>`).join('')
   const holdRows = d.holdings.map(h => `
       <tr>
         <td>${esc(h.name)}${sym(h.name, h.symbol)}</td>
@@ -381,8 +381,47 @@ export function Today() {
                   />
                   <span>%</span>
                 </label>
+                <label className="flex items-center gap-2 text-[11px] text-muted" title="建仓路径第一步: 试仓占目标仓位的比例(买'对不对')">
+                  <span className="whitespace-nowrap">试仓</span>
+                  <input
+                    type="number" min={10} max={60} step={5}
+                    defaultValue={d.prefs.pyramid_probe}
+                    onBlur={(e) => {
+                      const v = Number(e.target.value)
+                      if (v && v !== d.prefs.pyramid_probe) prefsMut.mutate({ pyramid_probe: v })
+                    }}
+                    className="w-14 rounded border border-border bg-surface px-2 py-1 font-mono text-foreground outline-none focus:border-sky-400/50"
+                  />
+                  <span>%</span>
+                </label>
+                <label className="flex items-center gap-2 text-[11px] text-muted" title="建仓路径第二步: 站稳关键点 N 日后加至目标仓位的比例(买'稳不稳'), 第三步回踩不破上满">
+                  <span className="whitespace-nowrap">确认加至</span>
+                  <input
+                    type="number" min={40} max={90} step={5}
+                    defaultValue={d.prefs.pyramid_confirm}
+                    onBlur={(e) => {
+                      const v = Number(e.target.value)
+                      if (v && v !== d.prefs.pyramid_confirm) prefsMut.mutate({ pyramid_confirm: v })
+                    }}
+                    className="w-14 rounded border border-border bg-surface px-2 py-1 font-mono text-foreground outline-none focus:border-sky-400/50"
+                  />
+                  <span>%</span>
+                </label>
+                <label className="flex items-center gap-2 text-[11px] text-muted" title="'站稳'的定义: 收盘连续 N 日守住关键点才执行加仓">
+                  <span className="whitespace-nowrap">站稳</span>
+                  <input
+                    type="number" min={1} max={5}
+                    defaultValue={d.prefs.pyramid_days}
+                    onBlur={(e) => {
+                      const v = Number(e.target.value)
+                      if (v && v !== d.prefs.pyramid_days) prefsMut.mutate({ pyramid_days: v })
+                    }}
+                    className="w-14 rounded border border-border bg-surface px-2 py-1 font-mono text-foreground outline-none focus:border-sky-400/50"
+                  />
+                  <span>日</span>
+                </label>
                 <span className="text-[10px] text-muted/70">
-                  把握分调高更严格;单票上限与目标日波动决定「建议仓位」。卖出提醒不受任何门槛影响。
+                  把握分调高更严格;单票上限与目标日波动决定「建议仓位」;试仓/确认加至/站稳决定「建仓路径」。卖出提醒不受任何门槛影响。
                 </span>
                 {prefsMut.isPending && <Loader2 className="h-3 w-3 animate-spin text-muted" />}
               </div>
@@ -460,6 +499,14 @@ export function Today() {
                           )}
                           <span className="ml-2 text-foreground/80">{o.text}</span>
                           <span className="mt-0.5 block text-[10px] text-muted">{o.why}</span>
+                          {o.advice?.plan && (
+                            <span
+                              title="金字塔建仓:每一步由价格确认驱动;假突破最多损失一个试仓(比例可在「门槛」面板调)"
+                              className="mt-0.5 block text-[10px] text-sky-300/90"
+                            >
+                              建仓路径:{o.advice.plan}
+                            </span>
+                          )}
                         </span>
                       </button>
                     </li>

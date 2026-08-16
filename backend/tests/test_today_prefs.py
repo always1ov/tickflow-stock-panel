@@ -20,8 +20,9 @@ def test_defaults_when_unset(prefs):
 
 def test_save_and_reload_roundtrip(prefs):
     saved = prefs.save(min_score=75, max_show=5, max_single=30, target_vol=4, max_drawdown=8)
-    assert saved == {"min_score": 75, "max_show": 5, "max_single": 30,
-                     "target_vol": 4, "max_drawdown": 8}
+    expect = {"min_score": 75, "max_show": 5, "max_single": 30,
+              "target_vol": 4, "max_drawdown": 8}
+    assert expect.items() <= saved.items()  # 子集断言: 未传字段保持默认即可
     assert prefs.load() == saved
 
 
@@ -35,12 +36,16 @@ def test_partial_update_keeps_other_field(prefs):
 
 def test_values_are_clamped_to_valid_range(prefs):
     up = prefs.save(min_score=999, max_show=999, max_single=999, target_vol=999,
-                    max_drawdown=999)
-    assert up == {"min_score": 100, "max_show": 50, "max_single": 100,
-                  "target_vol": 10, "max_drawdown": 30}
-    dn = prefs.save(min_score=-50, max_show=0, max_single=1, target_vol=0, max_drawdown=1)
-    assert dn == {"min_score": 0, "max_show": 1, "max_single": 5,
-                  "target_vol": 1, "max_drawdown": 3}
+                    max_drawdown=999, pyramid_probe=999, pyramid_confirm=999,
+                    pyramid_days=999)
+    assert {"min_score": 100, "max_show": 50, "max_single": 100, "target_vol": 10,
+            "max_drawdown": 30, "pyramid_probe": 60, "pyramid_confirm": 90,
+            "pyramid_days": 5}.items() <= up.items()
+    dn = prefs.save(min_score=-50, max_show=0, max_single=1, target_vol=0,
+                    max_drawdown=1, pyramid_probe=1, pyramid_confirm=1, pyramid_days=0)
+    assert {"min_score": 0, "max_show": 1, "max_single": 5, "target_vol": 1,
+            "max_drawdown": 3, "pyramid_probe": 10, "pyramid_confirm": 40,
+            "pyramid_days": 1}.items() <= dn.items()
 
 
 def test_corrupt_file_falls_back_to_defaults(prefs):

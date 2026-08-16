@@ -87,16 +87,17 @@ def rank_opportunities(
     """
     opp_by_sym: dict[str, dict] = {}
 
-    def add(sym: str, kind: str, score: int, text: str, why: list[str]) -> None:
+    def add(sym: str, kind: str, score: int, text: str, why: list[str],
+            pivot: float | None = None) -> None:
         cur = opp_by_sym.get(sym)
         if cur is None:
             opp_by_sym[sym] = {
                 "kind": kind, "symbol": sym, "name": names.get(sym, sym),
-                "score": score, "why": why, "text": text,
+                "score": score, "why": why, "text": text, "pivot": pivot,
             }
             return
         if score > cur["score"]:  # 同票命中多个来源: 取更高分的表述, 理由合并
-            cur["score"], cur["kind"], cur["text"] = score, kind, text
+            cur["score"], cur["kind"], cur["text"], cur["pivot"] = score, kind, text, pivot
         cur["why"] += [w for w in why if w not in cur["why"]]
 
     for sym, t in trends.items():
@@ -126,8 +127,12 @@ def rank_opportunities(
             elif rs < 0:
                 score -= 8
                 why.append("近20日略跑输大盘")
+        try:
+            t_pivot = float(t["up_pivot"]) if t.get("up_pivot") else None
+        except (TypeError, ValueError):
+            t_pivot = None
         add(sym, "trend_signal", score,
-            f"{t['signal']}:{t['signal_desc']}(第 {dur} 天)", why)
+            f"{t['signal']}:{t['signal_desc']}(第 {dur} 天)", why, t_pivot)
 
     for sym, sig in signals.items():
         if sym not in names or sig.get("signal") != "buy":
@@ -150,7 +155,7 @@ def rank_opportunities(
                     why.append(f"AI 看多(把握 {conf})")
                 add(sym, "near_breakout", score,
                     f"AI 看多,现价 {close:.2f} 距触发价 {price:.2f} 仅 {gap * 100:.1f}%"
-                    f" — 到价{p.get('action') or '关注'}", why)
+                    f" — 到价{p.get('action') or '关注'}", why, price)
                 break
 
     for o in opp_by_sym.values():
@@ -159,6 +164,35 @@ def rank_opportunities(
     shown = [dict(o, why=" · ".join(o["why"]))
              for o in ranked if o["score"] >= min_score][:max_show]
     return shown, len(ranked) - len(shown)
+
+
+def build_pyramid_plan(fraction: float, pivot: float | None,
+                       probe_pct: int, confirm_pct: int, days: int) -> str | None:
+    """[R15] 金字塔建仓路径(利弗莫尔式): 终点仓位拆成 试仓 → 确认加 → 上满。
+
+    每一步由价格确认驱动而非时间驱动: 试仓买"对不对", 站稳加仓买"稳不稳",
+    回踩不破上满买"强不强"; 跌回关键点下方清掉试仓、整个计划作废 ——
+    快速上满有约束, 假突破最多损失一个试仓。
+    目标不足 1 成时不拆步(一步到位没必要分批), 返回 None。纯函数。
+    """
+    if fraction < 0.1:
+        return None
+    confirm_pct = max(confirm_pct, probe_pct + 10)
+
+    def half_cheng(x: float) -> float:  # 向下取整到半成
+        return int(x / 0.05) * 0.05
+
+    def cheng(x: float) -> str:
+        return f"{x * 10:g}成"
+
+    probe = max(0.05, half_cheng(fraction * probe_pct / 100))
+    confirm = max(probe + 0.05, half_cheng(fraction * confirm_pct / 100))
+    px = f" {pivot:.2f} " if pivot else "突破价"
+    if confirm >= fraction:  # 目标较小, 两步走
+        return (f"先试 {cheng(probe)} → 站稳{px}{days} 日上满 {cheng(fraction)};"
+                f"收盘跌回{px}下方,清掉试仓、计划作废")
+    return (f"先试 {cheng(probe)} → 站稳{px}{days} 日加至 {cheng(confirm)}"
+            f" → 回踩不破上满 {cheng(fraction)};收盘跌回{px}下方,清掉试仓、计划作废")
 
 
 def holding_stance(exit_triggered: bool, distance_pct: float | None,
@@ -402,6 +436,11 @@ def _build_overview(repo) -> dict:
             logger.debug("today atr load skipped for %s: %s", o["symbol"], e)
         o["advice"] = suggest_position(
             o["score"], atr_pct, prefs["max_single"] / 100, prefs["target_vol"] / 100)
+        # [R15] 建仓路径: 有仓位建议才有路径; 关键点价位来自六态上关键点/AI 触发价
+        if o["advice"]:
+            o["advice"]["plan"] = build_pyramid_plan(
+                o["advice"]["fraction"], o.get("pivot"),
+                prefs["pyramid_probe"], prefs["pyramid_confirm"], prefs["pyramid_days"])
 
     return {
         "as_of": as_of,
@@ -441,6 +480,9 @@ class PrefsModel(BaseModel):
     max_single: int | None = Field(default=None, ge=5, le=100)
     target_vol: int | None = Field(default=None, ge=1, le=10)
     max_drawdown: int | None = Field(default=None, ge=3, le=30)
+    pyramid_probe: int | None = Field(default=None, ge=10, le=60)
+    pyramid_confirm: int | None = Field(default=None, ge=40, le=90)
+    pyramid_days: int | None = Field(default=None, ge=1, le=5)
 
 
 @router.get("/prefs")
@@ -456,7 +498,10 @@ def put_prefs(body: PrefsModel):
     from app.services import today_prefs
     return today_prefs.save(min_score=body.min_score, max_show=body.max_show,
                             max_single=body.max_single, target_vol=body.target_vol,
-                            max_drawdown=body.max_drawdown)
+                            max_drawdown=body.max_drawdown,
+                            pyramid_probe=body.pyramid_probe,
+                            pyramid_confirm=body.pyramid_confirm,
+                            pyramid_days=body.pyramid_days)
 
 
 _AI_SYSTEM = """你是用户的盘前参谋,有 15 年 A 股一线交易经验。输入分两部分:今日总览 JSON(市场天气/需要行动/持仓体检),和每只候选买入机会的真实日 K 数据。一次调用完成两件事:先做任务二(优选),再基于优选结果写任务一(导读),两者结论必须一致。
@@ -545,7 +590,8 @@ async def today_ai(request: Request):
     overview = {k: v for k, v in data.items() if k != "opportunities"}
     overview["机会区摘要"] = [
         {"symbol": c["symbol"], "name": c["name"], "text": c["text"],
-         "建议仓位": (c.get("advice") or {}).get("text")} for c in cands]
+         "建议仓位": (c.get("advice") or {}).get("text"),
+         "建仓路径": (c.get("advice") or {}).get("plan")} for c in cands]
     payload = {
         "今日总览": overview,
         "候选买入机会(含真实日K)": _candidate_market_data(repo, cands) if cands else [],

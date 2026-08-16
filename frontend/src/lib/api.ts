@@ -152,10 +152,13 @@ export type LevelType = 'sr' | 'pivot' | 'extreme' | 'boll' | 'keltner_s' | 'kel
 export interface TodayActionItem { kind: string; severity: 'high' | 'mid'; symbol: string; name: string; text: string }
 export interface TodayOpportunity {
   kind: string; symbol: string; name: string; text: string; score: number; why: string
-  advice?: { fraction: number; text: string; why: string } | null
+  advice?: { fraction: number; text: string; why: string; plan?: string | null } | null
 }
 export interface TodayPick { symbol: string; reason: string }
-export interface TodayPrefs { min_score: number; max_show: number; max_single: number; target_vol: number; max_drawdown: number }
+export interface TodayPrefs {
+  min_score: number; max_show: number; max_single: number; target_vol: number; max_drawdown: number
+  pyramid_probe: number; pyramid_confirm: number; pyramid_days: number
+}
 export interface TodayHolding {
   symbol: string; name: string; close: number | null; cost: number | null; pnl_pct: number | null
   stage_cn: string | null; line: number | null; line_cn: string | null; distance_pct: number | null

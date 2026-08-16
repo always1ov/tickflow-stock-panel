@@ -19,12 +19,18 @@ DEFAULTS = {
     "max_single": 20, "target_vol": 3,
     # [缺口④] 组合回撤纪律线(%): 组合净值从高点回撤超过此值 → 行动区置顶降仓提醒
     "max_drawdown": 10,
+    # [R15] 金字塔建仓路径(利弗莫尔式, 由价格确认驱动):
+    # 试仓占目标仓位 % → 站稳 N 日加至 % → 回踩不破上满
+    "pyramid_probe": 35, "pyramid_confirm": 70, "pyramid_days": 2,
 }
 _MIN_SCORE_RANGE = (0, 100)
 _MAX_SHOW_RANGE = (1, 50)
 _MAX_SINGLE_RANGE = (5, 100)
 _TARGET_VOL_RANGE = (1, 10)
 _MAX_DRAWDOWN_RANGE = (3, 30)
+_PYRAMID_PROBE_RANGE = (10, 60)
+_PYRAMID_CONFIRM_RANGE = (40, 90)
+_PYRAMID_DAYS_RANGE = (1, 5)
 
 
 def _store_path() -> Path:
@@ -58,11 +64,15 @@ def load() -> dict:
         "max_single": _clamp(data.get("max_single"), *_MAX_SINGLE_RANGE, DEFAULTS["max_single"]),
         "target_vol": _clamp(data.get("target_vol"), *_TARGET_VOL_RANGE, DEFAULTS["target_vol"]),
         "max_drawdown": _clamp(data.get("max_drawdown"), *_MAX_DRAWDOWN_RANGE, DEFAULTS["max_drawdown"]),
+        "pyramid_probe": _clamp(data.get("pyramid_probe"), *_PYRAMID_PROBE_RANGE, DEFAULTS["pyramid_probe"]),
+        "pyramid_confirm": _clamp(data.get("pyramid_confirm"), *_PYRAMID_CONFIRM_RANGE, DEFAULTS["pyramid_confirm"]),
+        "pyramid_days": _clamp(data.get("pyramid_days"), *_PYRAMID_DAYS_RANGE, DEFAULTS["pyramid_days"]),
     }
 
 
 def save(min_score=None, max_show=None, max_single=None, target_vol=None,
-         max_drawdown=None) -> dict:
+         max_drawdown=None, pyramid_probe=None, pyramid_confirm=None,
+         pyramid_days=None) -> dict:
     """更新偏好(只改传入的字段), 返回生效后的完整偏好。"""
     cur = load()
     if min_score is not None:
@@ -75,5 +85,11 @@ def save(min_score=None, max_show=None, max_single=None, target_vol=None,
         cur["target_vol"] = _clamp(target_vol, *_TARGET_VOL_RANGE, cur["target_vol"])
     if max_drawdown is not None:
         cur["max_drawdown"] = _clamp(max_drawdown, *_MAX_DRAWDOWN_RANGE, cur["max_drawdown"])
+    if pyramid_probe is not None:
+        cur["pyramid_probe"] = _clamp(pyramid_probe, *_PYRAMID_PROBE_RANGE, cur["pyramid_probe"])
+    if pyramid_confirm is not None:
+        cur["pyramid_confirm"] = _clamp(pyramid_confirm, *_PYRAMID_CONFIRM_RANGE, cur["pyramid_confirm"])
+    if pyramid_days is not None:
+        cur["pyramid_days"] = _clamp(pyramid_days, *_PYRAMID_DAYS_RANGE, cur["pyramid_days"])
     _store_path().write_text(json.dumps(cur, indent=2, ensure_ascii=False), encoding="utf-8")
     return cur
