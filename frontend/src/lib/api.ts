@@ -2366,6 +2366,9 @@ export const api = {
 
   // [fork 增强] 今日总览(决策汇聚层)
   todayOverview: () => request<TodayOverview>('/api/today'),
+  intradayRefreshFull: () =>
+    request<{ full_coverage?: boolean; rounds?: number; live_count?: number | null; error?: string }>(
+      '/api/intraday/refresh-full', { method: 'POST' }),
   todayAi: () =>
     request<{ brief?: string; picks?: TodayPick[]; analyzed?: number; error?: string }>(
       '/api/today/ai', { method: 'POST' }),

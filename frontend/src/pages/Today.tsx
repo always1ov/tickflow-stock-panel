@@ -187,6 +187,28 @@ export function Today() {
     },
   })
 
+  // [R19] 确定性刷新: 先全量拉一遍自选实时(轮转覆盖到每一只), 再刷新总览
+  const refreshMut = useMutation({
+    mutationFn: async () => {
+      let live: Awaited<ReturnType<typeof api.intradayRefreshFull>> | null = null
+      try {
+        live = await api.intradayRefreshFull()
+      } catch { /* 实时服务不可用(未开实时/未配 key)→ 只刷收盘数据 */ }
+      await q.refetch()
+      return live
+    },
+    onSuccess: (live) => {
+      if (live?.live_count) {
+        toast(
+          live.full_coverage === false
+            ? `实时已拉取 ${live.live_count} 只(额度有限未全覆盖,其余轮转中)`
+            : `实时已全量同步 ${live.live_count} 只`,
+          'success',
+        )
+      }
+    },
+  })
+
   const goStock = (symbol: string, name: string) =>
     navigate(`/stock-analysis?symbol=${encodeURIComponent(symbol)}&name=${encodeURIComponent(name)}`)
 
@@ -245,12 +267,13 @@ export function Today() {
             AI 导读·优选
           </button>
           <button
-            onClick={() => q.refetch()}
-            disabled={q.isFetching}
+            onClick={() => refreshMut.mutate()}
+            disabled={refreshMut.isPending || q.isFetching}
+            title="先把全部自选的实时行情立即拉一遍(轮转全覆盖),再刷新本页 —— 实时行情未开启时仅刷新收盘数据"
             className="inline-flex items-center gap-1 rounded-full border border-border bg-base px-2.5 py-1 text-[10px] text-muted hover:text-foreground disabled:opacity-50 transition-colors cursor-pointer"
           >
-            <RefreshCw className={`h-3 w-3 ${q.isFetching ? 'animate-spin' : ''}`} />
-            刷新
+            <RefreshCw className={`h-3 w-3 ${(refreshMut.isPending || q.isFetching) ? 'animate-spin' : ''}`} />
+            {refreshMut.isPending ? '同步中…' : '刷新'}
           </button>
         </div>
       </div>

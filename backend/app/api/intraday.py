@@ -199,3 +199,21 @@ def refresh_quotes(request: Request):
     if qs:
         return qs.refresh()
     return {"error": "QuoteService not available"}
+
+
+@router.post("/refresh-full")
+def refresh_quotes_full(request: Request):
+    """[R19] 全量立即刷新: 连续轮转直到全部自选覆盖一遍, 供「刷新」按钮做确定性同步。
+
+    返回 status + full_coverage/rounds + 实时叠加层覆盖数, 前端据此给出明确反馈。
+    """
+    qs = _get_quote_service(request)
+    if not qs:
+        return {"error": "QuoteService not available"}
+    st = qs.refresh_full()
+    try:
+        from app.services.live_quotes import watchlist_live_map
+        st["live_count"] = len(watchlist_live_map(request.app.state.repo))
+    except Exception:  # noqa: BLE001
+        st["live_count"] = None
+    return st

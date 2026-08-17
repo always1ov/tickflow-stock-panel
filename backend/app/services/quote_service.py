@@ -504,6 +504,32 @@ class QuoteService:
         self._fetch_quotes()
         return self.status()
 
+    def refresh_full(self, max_rounds: int = 12) -> dict:
+        """[R19] 全量立即刷新: 连续拉取直到轮转窗口把全部自选覆盖一遍(有界)。
+
+        自选 ≤ 每轮容量时一轮即全量; 超过时按轮转推进, 以偏移量回绕判定覆盖完成。
+        每轮内部自带按 key 限速(sleep_between_batches), 压缩的是轮询等待不是限速,
+        请求总量与后台轮询跑同样轮数完全一致。max_rounds 防免费额度极小 +
+        自选极大时的长阻塞(此时返回 full_coverage=False, 前端如实提示)。
+        """
+        covered_all = False
+        rounds = 0
+        for _ in range(max(1, max_rounds)):
+            before = getattr(self, "_rt_rotate_offset", 0)
+            self._fetch_quotes()
+            rounds += 1
+            after = getattr(self, "_rt_rotate_offset", 0)
+            if after == before == 0:
+                covered_all = True  # 一轮全量(自选未超容量 / 全市场档)
+                break
+            if after <= before:
+                covered_all = True  # 轮转越过起点 → 所有自选都刷过一遍
+                break
+        st = self.status()
+        st["full_coverage"] = covered_all
+        st["rounds"] = rounds
+        return st
+
     # ================================================================
     # 后台轮询
     # ================================================================
