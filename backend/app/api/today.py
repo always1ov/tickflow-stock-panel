@@ -71,6 +71,7 @@ def rank_opportunities(
     trends: dict[str, dict], signals: dict[str, dict], names: dict[str, str],
     min_score: int = _OPP_MIN_SCORE, max_show: int = _OPP_MAX_SHOW,
     bench_ret: float | None = None,
+    extras: dict[str, dict] | None = None,
 ) -> tuple[list[dict], int]:
     """给买入机会打"把握分"并筛选, 返回 (显示列表, 被滤掉条数)。
 
@@ -82,6 +83,11 @@ def rank_opportunities(
       · AI 信号同向加分、反向重扣(自相矛盾的机会宁可不看);
       · [R13] 相对强度: 传入大盘 20 日收益(bench_ret)时, 跑赢大盘加分、
         跑输扣分 —— 跑输大盘的"突破"多半是补涨陷阱;
+      · [R20] 量能质量(extras[sym]["vol_ratio"]): 放量突破加分,
+        缩量突破重扣 —— 没有量的突破多半是假突破;
+      · [R20] 该票自身历史胜率(extras[sym]["win"] = {rate, n}): 同一套
+        六态在这只票上历史转强后 5 日为正的比例 —— 胜率高的票信号更可信,
+        胜率差的票即使这次形态漂亮也要压分;
       · 逼近买入触发价的按距离与置信度打分, 一到价就能行动的最优先。
     低于 min_score 或排在 max_show 之后的都不显示, 只报数量。
     """
@@ -127,6 +133,26 @@ def rank_opportunities(
             elif rs < 0:
                 score -= 8
                 why.append("近20日略跑输大盘")
+        ext = (extras or {}).get(sym) or {}
+        vr = ext.get("vol_ratio")
+        if vr:
+            if vr >= 1.5:
+                score += 8
+                why.append(f"放量突破(量比 {vr:.1f})")
+            elif vr < 0.8:
+                score -= 12
+                why.append(f"缩量(量比 {vr:.1f}),假突破风险")
+        win = ext.get("win")
+        if win:
+            wr, wn = win["rate"], win["n"]
+            if wr >= 0.6:
+                score += 8
+                why.append(f"这票历史转强信号胜率 {wr:.0%}({wn} 次)")
+            elif wr <= 0.4:
+                score -= 12
+                why.append(f"这票历史转强信号胜率仅 {wr:.0%}({wn} 次),信号在它身上不好使")
+            else:
+                why.append(f"历史转强信号胜率 {wr:.0%}({wn} 次)")
         try:
             t_pivot = float(t["up_pivot"]) if t.get("up_pivot") else None
         except (TypeError, ValueError):
@@ -310,8 +336,45 @@ def _build_overview(repo) -> dict:
         logger.warning("today market mode skipped: %s", e)
     bench_ret = ((market or {}).get("metrics") or {}).get("ret_20d")
     prefs = today_prefs.load()
+
+    # [R20] 量价与历史胜率因子: 只为带新信号的候选算(远小于自选总数, 上限 40 只保护)
+    extras: dict[str, dict] = {}
+    cand_syms = [s for s, t in trends.items() if t.get("signal") in ("转多", "回升")][:40]
+    if cand_syms:
+        vol_map: dict[str, float] = {}
+        try:
+            import polars as pl
+            frames = []
+            df_e, _ed = repo.get_enriched_latest()
+            if df_e is not None:
+                frames.append(df_e)
+            for asset in ("stock", "etf"):  # 实时叠加层的量比后写入 → 盘中覆盖盘后快照
+                frames.append(repo.get_watchlist_live(asset))
+            for df in frames:
+                if df is None or df.is_empty() or not {"symbol", "vol_ratio_5d"} <= set(df.columns):
+                    continue
+                sub = df.filter(pl.col("symbol").is_in(cand_syms))
+                for r in sub.select(["symbol", "vol_ratio_5d"]).to_dicts():
+                    if r.get("vol_ratio_5d"):
+                        vol_map[str(r["symbol"]).upper()] = float(r["vol_ratio_5d"])
+        except Exception as e:  # noqa: BLE001
+            logger.debug("today vol factor skipped: %s", e)
+        for s in cand_syms:
+            ent: dict = {}
+            if s in vol_map:
+                ent["vol_ratio"] = vol_map[s]
+            try:
+                from app.services.livermore_service import bullish_win_rate_for_symbol
+                win = bullish_win_rate_for_symbol(repo, s)
+                if win:
+                    ent["win"] = win
+            except Exception as e:  # noqa: BLE001
+                logger.debug("today win rate skipped for %s: %s", s, e)
+            if ent:
+                extras[s] = ent
+
     opportunities, opp_filtered = rank_opportunities(
-        trends, signals, names, prefs["min_score"], prefs["max_show"], bench_ret)
+        trends, signals, names, prefs["min_score"], prefs["max_show"], bench_ret, extras)
     # [R18] 盘中口径标注: 实时价确实参与了判定的趋势类新信号是"临时信号",
     # 收盘价可能收回去 —— 标记出来, 前端提示"待收盘确认", 防止盘中追假信号
     for o in opportunities:

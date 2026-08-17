@@ -188,6 +188,42 @@ def trend_for_symbol(repo, symbol: str, with_segments: bool = False,
     return out
 
 
+def _bullish_event_win_rate(states: list[str], closes: list[float],
+                            horizon: int = 5, min_events: int = 3) -> dict | None:
+    """[R20] 历史"转入多头侧"事件的胜率: 事件日后 horizon 个交易日收益为正的比例。
+
+    事件 = 状态从空头侧转入多头侧的那一天; 距末尾不足 horizon 的事件(含刚发生的
+    当前信号)不计入, 只统计已有完整结果的历史事件。样本 < min_events 返回 None
+    (小样本胜率没有统计意义, 宁缺毋滥)。纯函数。
+    """
+    events = [i for i in range(1, len(states))
+              if states[i] in BULLISH and states[i - 1] not in BULLISH]
+    wins = 0
+    n = 0
+    for i in events:
+        j = i + horizon
+        if j >= len(closes):
+            continue
+        n += 1
+        if closes[j] > closes[i]:
+            wins += 1
+    if n < min_events:
+        return None
+    return {"rate": round(wins / n, 3), "n": n}
+
+
+def bullish_win_rate_for_symbol(repo, symbol: str, horizon: int = 5) -> dict | None:
+    """该票在自身窗口与生效阈值下, 历史转强信号的胜率。数据不足返回 None。"""
+    sym = (symbol or "").strip().upper()
+    closes, dates = _load_symbol_window(repo, sym)
+    if len(closes) < _MIN_DAYS:
+        return None
+    thr, _src = get_effective_threshold(sym)
+    res = compute(closes, dates, thr)
+    states = [s["state"] for s in res["steps"]]
+    return _bullish_event_win_rate(states, closes, horizon=horizon)
+
+
 def append_live_bar(closes: list[float], dates: list[str],
                     live_entry: tuple[str, float] | None) -> tuple[list[float], list[str]]:
     """[R16] 盘中实时: 把当天实时价作为"临时收盘"追加到窗口末尾。
