@@ -544,6 +544,7 @@ _AI_SYSTEM = """你是用户的盘前参谋,有 15 年 A 股一线交易经验�
 
 硬性要求:
 - **不许拿"规则分高""AI 看多""信号共振"当理由** —— 这些是筛选前就知道的,把它们复述一遍等于没分析。理由必须来自你在 K 线数据里**实际看到的东西**,带上具体数字(量比、涨幅、距离、价位)
+- 标注"盘中待收盘确认"的候选是盘中临时信号(收盘可能收回去): 优选时降级处理, 若仍选中, 理由里必须注明"等收盘确认"
 - **规则分只是粗筛门票,不是排序依据**。分低但量价扎实的可以选,分高但量能虚、位置差的要果断放弃
 - 几只都不理想就少选甚至不选(picks 给空数组)。**宁缺毋滥,空仓等待也是决策**
 - 每只理由 ≤35 字,大白话,让不懂术语的人看懂
@@ -617,7 +618,9 @@ async def today_ai(request: Request):
     overview["机会区摘要"] = [
         {"symbol": c["symbol"], "name": c["name"], "text": c["text"],
          "建议仓位": (c.get("advice") or {}).get("text"),
-         "建仓路径": (c.get("advice") or {}).get("plan")} for c in cands]
+         "建仓路径": (c.get("advice") or {}).get("plan"),
+         # [R18] 盘中临时信号如实告知 AI, 优选时应降级处理而非当定稿推荐
+         "盘中待收盘确认": bool(c.get("intraday"))} for c in cands]
     payload = {
         "今日总览": overview,
         "候选买入机会(含真实日K)": _candidate_market_data(repo, cands) if cands else [],
