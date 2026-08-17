@@ -175,6 +175,8 @@ export interface TodayOverview {
   as_of: string | null
   watchlist_total: number
   trend_total: number
+  live?: boolean
+  live_count?: number
   actions: TodayActionItem[]
   opportunities: TodayOpportunity[]
   opportunities_filtered: number

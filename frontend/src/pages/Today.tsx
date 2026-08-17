@@ -163,7 +163,23 @@ export function Today() {
       <div className="flex flex-wrap items-center gap-3">
         <Sunrise className="h-5 w-5 text-amber-300" />
         <h1 className="text-base font-semibold text-foreground">今日总览</h1>
-        {d?.as_of && <span className="text-[10px] text-muted">数据截至 {d.as_of} · 自选 {d.watchlist_total} 只(其中 {d.trend_total} 只有趋势判定)</span>}
+        {d?.as_of && (
+          <span className="text-[10px] text-muted">
+            数据截至 {d.as_of} · 自选 {d.watchlist_total} 只(其中 {d.trend_total} 只有趋势判定)
+            {d.live ? (
+              <span
+                className="ml-1.5 text-emerald-400"
+                title={`实时叠加层已覆盖 ${d.live_count} 只自选;六态/距离为盘中临时口径,纪律判定(生命线/出场线触发)仍以收盘为准`}
+              >
+                ● 实时中({d.live_count} 只)
+              </span>
+            ) : (
+              <span className="ml-1.5 text-amber-300/80" title="当前为上一交易日收盘数据">
+                收盘口径 —— 打开左下角「实时行情」开关后,盘中这里就是实时数据
+              </span>
+            )}
+          </span>
+        )}
         <div className="ml-auto flex items-center gap-2">
           <button
             onClick={() => {

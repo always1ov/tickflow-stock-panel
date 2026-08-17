@@ -165,10 +165,12 @@ def _trend_payload(closes: list[float], dates: list[str], threshold: float, sour
     }
 
 
-def trend_for_symbol(repo, symbol: str, with_segments: bool = False) -> dict:
+def trend_for_symbol(repo, symbol: str, with_segments: bool = False,
+                     live_entry: tuple[str, float] | None = None) -> dict:
     """单只趋势详情。with_segments=True 附带多空分段(K 线背景着色用)。"""
     sym = (symbol or "").strip().upper()
     closes, dates = _load_symbol_window(repo, sym)
+    closes, dates = append_live_bar(closes, dates, live_entry)
     if len(closes) < _MIN_DAYS:
         return {"symbol": sym, "error": f"日 K 不足 {_MIN_DAYS} 天,无法判定趋势"}
     thr, src = get_effective_threshold(sym)
@@ -182,8 +184,32 @@ def trend_for_symbol(repo, symbol: str, with_segments: bool = False) -> dict:
     return out
 
 
-def trends_for_symbols(repo, symbols: list[str]) -> dict[str, dict]:
-    """批量趋势(决策台「趋势」列)。股票走一次批量 scan;ETF/指数逐只回退。"""
+def append_live_bar(closes: list[float], dates: list[str],
+                    live_entry: tuple[str, float] | None) -> tuple[list[float], list[str]]:
+    """[R16] 盘中实时: 把当天实时价作为"临时收盘"追加到窗口末尾。
+
+    仅当实时行日期新于最后一根已存日 K 时追加(收盘后日线落盘则天然跳过,
+    不会重复); 由此得到的六态是盘中临时判定, 收盘口径以真实收盘为准。纯函数。
+    """
+    if not live_entry or not dates:
+        return closes, dates
+    d, c = live_entry
+    try:
+        c = float(c)
+    except (TypeError, ValueError):
+        return closes, dates
+    if d and c > 0 and str(d) > str(dates[-1]):
+        return closes + [c], dates + [str(d)]
+    return closes, dates
+
+
+def trends_for_symbols(repo, symbols: list[str],
+                       live: dict[str, tuple[str, float]] | None = None) -> dict[str, dict]:
+    """批量趋势(决策台「趋势」列)。股票走一次批量 scan;ETF/指数逐只回退。
+
+    live: {symbol: (date, close)} 自选实时行(可选) —— 传入时当天实时价参与
+    六态判定(盘中临时口径), 见 append_live_bar。
+    """
     out: dict[str, dict] = {}
     syms = [s.strip().upper() for s in symbols if s and s.strip()]
     if not syms:
@@ -203,6 +229,7 @@ def trends_for_symbols(repo, symbols: list[str]) -> dict[str, dict]:
             for sym, part in df.group_by("symbol"):
                 key = str(sym[0] if isinstance(sym, tuple) else sym)
                 closes, dts = _closes_window(part)
+                closes, dts = append_live_bar(closes, dts, (live or {}).get(key))
                 if len(closes) < _MIN_DAYS:
                     continue
                 thr, src = get_effective_threshold(key)
@@ -210,7 +237,7 @@ def trends_for_symbols(repo, symbols: list[str]) -> dict[str, dict]:
 
     for sym in other_syms:
         try:
-            r = trend_for_symbol(repo, sym)
+            r = trend_for_symbol(repo, sym, live_entry=(live or {}).get(sym))
             if "error" not in r:
                 r.pop("symbol", None)
                 out[sym] = r
