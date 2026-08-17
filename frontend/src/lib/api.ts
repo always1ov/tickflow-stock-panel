@@ -153,6 +153,7 @@ export interface TodayActionItem { kind: string; severity: 'high' | 'mid'; symbo
 export interface TodayOpportunity {
   kind: string; symbol: string; name: string; text: string; score: number; why: string
   advice?: { fraction: number; text: string; why: string; plan?: string | null } | null
+  intraday?: boolean
 }
 export interface TodayPick { symbol: string; reason: string }
 export interface TodayPrefs {

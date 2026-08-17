@@ -107,6 +107,41 @@ function buildTodayHtml(d: TodayOverview, brief: string | null): string {
 `
 }
 
+/** [R18] 时段感知: 盘前/盘中/盘后各自该怎么用这页(北京时间) */
+function sessionPhaseHint(live: boolean | undefined): { label: string; hint: string } {
+  const now = new Date()
+  const bj = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Shanghai' }))
+  const day = bj.getDay()
+  const mins = bj.getHours() * 60 + bj.getMinutes()
+  if (day === 0 || day === 6) {
+    return { label: '休市', hint: '周末休市 —— 复盘与做下周计划的时间,数据为上一交易日定稿。' }
+  }
+  if (mins < 9 * 60 + 30) {
+    return {
+      label: '盘前',
+      hint: '计划时段:以昨收定稿数据定今天的计划 —— 该卖的(行动区)、该盯的(触发价+建仓路径)、买多少(建议仓位)。',
+    }
+  }
+  if (mins < 15 * 60) {
+    return live
+      ? {
+          label: '盘中',
+          hint: '执行时段:按盘前计划执行到价预案;实时数字用来盯距离。盘中冒出的新信号只记录,等收盘确认再动手。',
+        }
+      : {
+          label: '盘中',
+          hint: '执行时段(实时行情未开):当前为昨收数据,打开左下角「实时行情」后可盘中盯距离。',
+        }
+  }
+  if (mins < 20 * 60) {
+    return {
+      label: '盘后',
+      hint: '日线一般 17:30~20:00 落盘;落盘后刷新,这里就是当日定稿 —— 纪律判定(生命线/出场线/六态)以定稿为准,顺手做明天的计划。',
+    }
+  }
+  return { label: '盘后', hint: '当日数据应已定稿 —— 按定稿数据复盘,并做好明天的计划。' }
+}
+
 const POSTURE_STYLE: Record<string, string> = {
   进攻: 'border-red-400/40 bg-red-400/10 text-red-400',
   谨慎: 'border-amber-400/40 bg-amber-400/10 text-amber-300',
@@ -219,6 +254,19 @@ export function Today() {
           </button>
         </div>
       </div>
+
+      {/* [R18] 时段提示条: 现在处于哪个时段、这页该怎么用 */}
+      {d && (() => {
+        const phase = sessionPhaseHint(d.live)
+        return (
+          <div className="flex items-start gap-2 rounded-lg border border-border/40 bg-base/40 px-3 py-2 text-[11px] text-muted">
+            <span className="mt-[1px] shrink-0 rounded border border-border/60 bg-elevated/50 px-1.5 py-0.5 text-[10px] font-medium text-foreground">
+              {phase.label}
+            </span>
+            <span className="leading-relaxed">{phase.hint}</span>
+          </div>
+        )
+      })()}
 
       {brief && (
         <div className="rounded-lg border border-violet-400/20 bg-violet-400/[0.06] px-4 py-3 text-xs leading-relaxed text-foreground/90">
@@ -505,6 +553,14 @@ export function Today() {
                           <span className="font-medium text-foreground">{o.name}</span>
                           {o.symbol !== o.name && <span className="ml-1.5 text-[9px] font-mono text-muted">{o.symbol}</span>}
                           {picked && <span className="ml-1.5 text-[9px] text-amber-300">★ AI 优选</span>}
+                          {o.intraday && (
+                            <span
+                              title="这个信号由盘中实时价触发,收盘可能收回去 —— 只记录观察,收盘确认后再动手"
+                              className="ml-1.5 rounded bg-amber-400/15 px-1 py-0.5 text-[9px] text-amber-300"
+                            >
+                              盘中·待收盘确认
+                            </span>
+                          )}
                           {o.advice && (
                             <span
                               title={`${o.advice.why} —— 仅供参考的上限建议, 不是操作指令`}

@@ -303,6 +303,12 @@ def _build_overview(repo) -> dict:
     prefs = today_prefs.load()
     opportunities, opp_filtered = rank_opportunities(
         trends, signals, names, prefs["min_score"], prefs["max_show"], bench_ret)
+    # [R18] 盘中口径标注: 实时价参与了判定的趋势类新信号是"临时信号",
+    # 收盘价可能收回去 —— 标记出来, 前端提示"待收盘确认", 防止盘中追假信号
+    if live:
+        for o in opportunities:
+            if o["kind"] == "trend_signal" and o["symbol"] in live:
+                o["intraday"] = True
 
     # ---- ③ 市场天气(自选口径)----
     bull = sum(1 for t in trends.values() if t["side"] == "多头")
