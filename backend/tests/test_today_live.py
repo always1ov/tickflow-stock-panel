@@ -1,7 +1,7 @@
 """[fork 增强] R16 今日总览实时化: 实时行作为临时收盘参与判定。"""
 import polars as pl
 
-from app.api.today import _watchlist_live_map
+from app.services.live_quotes import as_live_entries, watchlist_live_map as _watchlist_live_map
 from app.services.livermore_service import append_live_bar
 
 
@@ -63,3 +63,8 @@ def test_live_map_survives_broken_overlay():
         def get_watchlist_live(self, asset_type="stock"):
             raise RuntimeError("boom")
     assert _watchlist_live_map(_Boom()) == {}
+
+
+def test_as_live_entries_shape():
+    entries = as_live_entries({"000001.SZ": {"date": "2026-08-17", "close": 11.2}})
+    assert entries == {"000001.SZ": ("2026-08-17", 11.2)}

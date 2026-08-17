@@ -284,21 +284,34 @@ def delete_report(request: Request, report_id: str):
 
 @router.get("/trend")
 def get_trend(request: Request, symbol: str = Query(...)):
-    """单只六态趋势详情(含多空分段,K 线背景着色用)。"""
+    """单只六态趋势详情(含多空分段,K 线背景着色用)。
+
+    [R16] 实时行情开着时, 当天实时价作为临时收盘参与判定(盘中口径)。
+    """
     if not symbol.strip():
         raise HTTPException(400, "symbol 不能为空")
     from app.services import livermore_service
-    return livermore_service.trend_for_symbol(request.app.state.repo, symbol, with_segments=True)
+    from app.services.live_quotes import as_live_entries, watchlist_live_map
+    live = as_live_entries(watchlist_live_map(request.app.state.repo))
+    return livermore_service.trend_for_symbol(
+        request.app.state.repo, symbol, with_segments=True,
+        live_entry=live.get(symbol.strip().upper()))
 
 
 @router.get("/trends")
 def get_trends(request: Request, symbols: str = Query(..., description="逗号分隔,最多 200 只")):
-    """批量六态趋势(决策台「趋势」列)。返回 {trends: {SYMBOL: {...}}}。"""
+    """批量六态趋势(决策台「趋势」列)。返回 {trends: {SYMBOL: {...}}}。
+
+    [R16] 实时行情开着时, 当天实时价作为临时收盘参与判定(盘中口径)。
+    """
     syms = [s for s in symbols.split(",") if s.strip()][:200]
     if not syms:
         raise HTTPException(400, "symbols 不能为空")
     from app.services import livermore_service
-    return {"trends": livermore_service.trends_for_symbols(request.app.state.repo, syms)}
+    from app.services.live_quotes import as_live_entries, watchlist_live_map
+    live = as_live_entries(watchlist_live_map(request.app.state.repo))
+    return {"trends": livermore_service.trends_for_symbols(
+        request.app.state.repo, syms, live=live)}
 
 
 class TrendBacktestRequest(BaseModel):

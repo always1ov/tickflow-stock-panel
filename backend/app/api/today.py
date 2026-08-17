@@ -218,29 +218,6 @@ def holding_stance(exit_triggered: bool, distance_pct: float | None,
     return "持有", "无触发条件,按既定计划持有"
 
 
-def _watchlist_live_map(repo) -> dict[str, dict]:
-    """[R16] 读自选实时叠加层 → {symbol: {date, close}}。
-
-    实时行情开关关闭/尚未拉到数据时返回空 dict, 整个总览自动退回收盘口径。
-    """
-    out: dict[str, dict] = {}
-    for asset in ("stock", "etf"):
-        try:
-            df = repo.get_watchlist_live(asset)
-        except Exception as e:  # noqa: BLE001
-            logger.debug("watchlist live overlay skipped (%s): %s", asset, e)
-            continue
-        if df is None or df.is_empty() or not {"symbol", "close"} <= set(df.columns):
-            continue
-        cols = [c for c in ("symbol", "date", "close") if c in df.columns]
-        for row in df.select(cols).to_dicts():
-            sym = str(row.get("symbol") or "").upper()
-            close = row.get("close")
-            if sym and close:
-                out[sym] = {"date": str(row.get("date") or ""), "close": float(close)}
-    return out
-
-
 def _build_overview(repo) -> dict:
     from app.services import positions as positions_svc
     from app.services import stock_signal, today_prefs, watchlist
@@ -256,10 +233,9 @@ def _build_overview(repo) -> dict:
 
     # [R16] 自选实时: 叠加层有数据时, 当天实时价参与六态判定与所有距离计算(盘中口径);
     # 开关关闭则为空 dict, 一切保持收盘口径, 行为与从前完全一致
-    live = _watchlist_live_map(repo)
-    trends = trends_for_symbols(
-        repo, syms,
-        live={s: (v["date"], v["close"]) for s, v in live.items()}) if syms else {}
+    from app.services.live_quotes import as_live_entries, watchlist_live_map
+    live = watchlist_live_map(repo)
+    trends = trends_for_symbols(repo, syms, live=as_live_entries(live)) if syms else {}
     signals = stock_signal.load_all()
     pos_all = positions_svc.load_all()
     exit_lines = exit_lines_for_positions(repo)

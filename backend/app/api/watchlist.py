@@ -455,4 +455,16 @@ def watchlist_exit_lines(request: Request):
         position_exit.sync_exit_rules(lines, getattr(request.app.state, "monitor_engine", None))
     except Exception as e:  # noqa: BLE001
         logger.warning("sync exit rules failed (lines still returned): %s", e)
+    # [R16] 决策台展示实时化: 现价/距离改用实时价; 线位与 triggered(纪律口径, 收盘判)不动。
+    # 监控规则同步在覆盖前完成 —— 规则值仍是收盘口径的线位, 不受实时价影响。
+    try:
+        from app.services.live_quotes import watchlist_live_map
+        live = watchlist_live_map(request.app.state.repo)
+        for sym, ex in lines.items():
+            lv = live.get(sym)
+            if lv and ex.get("line"):
+                ex["close"] = lv["close"]
+                ex["distance_pct"] = round((ex["line"] - lv["close"]) / lv["close"], 4)
+    except Exception as e:  # noqa: BLE001
+        logger.debug("exit lines live overlay skipped: %s", e)
     return {"lines": lines}
