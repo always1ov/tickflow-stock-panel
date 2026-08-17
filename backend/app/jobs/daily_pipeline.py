@@ -569,7 +569,9 @@ def run_now(
         from datetime import time as _dtime
         from app.market_time import cn_now, cn_today
         _now = cn_now()
-        if pull_a_share and _now.weekday() < 5 and _now.time() >= _dtime(15, 30):
+        # 下限 15:00(A股收盘): 收盘后跑的管道都该检测。此前写 15:30 会让
+        # 15:10 调度的管道(15:2x 跑完)恰好躲过检测 —— 不提示也不触发当晚重试
+        if pull_a_share and _now.weekday() < 5 and _now.time() >= _dtime(15, 0):
             row = repo.execute_one(
                 "SELECT count(*) FROM kline_daily WHERE date = CAST(? AS DATE)",
                 [str(cn_today())],
@@ -983,8 +985,42 @@ def start_scheduler(repo: KlineRepository, capset: CapabilitySet) -> AsyncIOSche
             repo.refresh_cache()
         return result
 
+    # [R21] 当日数据未出齐 → 当晚自动重试: 数据源一般 17:30~20:00 才发布当日全量,
+    # 盘后管道跑得早(默认 15:30)时日K/enriched 抓不全, 此前只提示"稍后手动同步",
+    # 下一次自动跑要等次日 —— 现在检测到未出齐就每 90 分钟自动重跑(当晚最多 3 次),
+    # 补齐即停; 连板梯队/概念/行业等指标层消费方当晚自动追上, 无需人工守着点同步。
+    _RETRY_DELAY_MIN = 90
+    _RETRY_MAX = 3
+
+    def _pipeline_with_retry(on_progress=None, _attempt: int = 0):
+        result = _pipeline_then_refresh(on_progress=on_progress)
+        try:
+            if result and result.get("today_daily_incomplete"):
+                if _attempt < _RETRY_MAX:
+                    from datetime import timedelta
+
+                    from app.market_time import cn_now
+                    run_at = cn_now() + timedelta(minutes=_RETRY_DELAY_MIN)
+                    nxt = _attempt + 1
+                    scheduler.add_job(
+                        lambda: _run_tracked(
+                            lambda on_progress=None: _pipeline_with_retry(on_progress, nxt),
+                            "daily_pipeline"),
+                        trigger="date", run_date=run_at,
+                        id="daily_pipeline_incomplete_retry",
+                        misfire_grace_time=3600,
+                        replace_existing=True,
+                    )
+                    logger.info("今日日线未出齐, 已安排 %s 自动重试(第 %d/%d 次)",
+                                run_at.strftime("%H:%M"), nxt, _RETRY_MAX)
+                else:
+                    logger.warning("今日日线重试 %d 次仍未出齐, 交由次日调度补齐", _RETRY_MAX)
+        except Exception as e:  # noqa: BLE001
+            logger.warning("安排未出齐自动重试失败(不影响本次结果): %s", e)
+        return result
+
     scheduler.add_job(
-        lambda: _run_tracked(_pipeline_then_refresh, "daily_pipeline"),
+        lambda: _run_tracked(_pipeline_with_retry, "daily_pipeline"),
         trigger=CronTrigger(day_of_week="mon-fri",
                             hour=sched["hour"], minute=sched["minute"],
                             timezone="Asia/Shanghai"),
