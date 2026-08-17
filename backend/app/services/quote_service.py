@@ -246,8 +246,18 @@ class QuoteService:
         return True
 
     def disable(self) -> None:
-        """关闭自动行情。"""
+        """关闭自动行情。
+
+        [R16 修补] 同时清空自选实时叠加层: 否则残留的当日实时行会让今日总览/
+        决策台/K线在开关已关的情况下仍显示"实时中"与盘中口径标记 —— 用户关掉
+        开关的语义就是"回到收盘口径", 叠加层必须一起归零。
+        """
         self.stop()
+        try:
+            if self._repo is not None:
+                self._repo.clear_watchlist_live()
+        except Exception as e:  # noqa: BLE001
+            logger.warning("清空自选实时叠加层失败: %s", e)
         logger.info("行情服务已关闭")
 
     # ================================================================
