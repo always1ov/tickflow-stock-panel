@@ -78,18 +78,24 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
+# 部分厂家模型会用中文回信号词 —— 宽进严出, 映射回标准值
+_SIGNAL_ALIASES = {
+    "买入": "buy", "买": "buy", "卖出": "sell", "卖": "sell",
+    "持有": "hold", "观望": "watch", "观察": "watch",
+}
+
+
 def _parse_signal(text: str) -> dict | None:
-    """从模型输出里抽取 {signal, confidence, reason};非法返回 None。"""
-    m = re.search(r"\{.*\}", text or "", re.S)
-    if not m:
-        return None
-    try:
-        obj = json.loads(m.group(0))
-    except Exception:  # noqa: BLE001
-        return None
-    if not isinstance(obj, dict):
+    """从模型输出里抽取 {signal, confidence, reason};非法返回 None。
+
+    [R22] 解析走跨厂家容错器(围栏/解说文字/截断都能救), 信号词兼容中文。
+    """
+    from app.services.ai_json import extract_json_object
+    obj = extract_json_object(text)
+    if obj is None:
         return None
     sig = str(obj.get("signal", "")).strip().lower()
+    sig = _SIGNAL_ALIASES.get(sig, sig)
     if sig not in _VALID_SIGNALS:
         return None
     try:
@@ -191,7 +197,7 @@ async def generate_signal(repo, data_dir: Path, symbol: str) -> dict:
                 {"role": "user", "content": user_prompt},
             ],
             temperature=0.2,
-            max_tokens=300,
+            max_tokens=800,  # [R22] 300 会掐断带 watch_points 的中文 JSON → "无法解析"
         )
     except Exception as e:  # noqa: BLE001
         logger.warning("signal gen failed for %s: %s", sym, e)
@@ -199,7 +205,9 @@ async def generate_signal(repo, data_dir: Path, symbol: str) -> dict:
 
     parsed = _parse_signal(text)
     if not parsed:
-        return {"symbol": sym, "error": "AI 返回无法解析为信号"}
+        snippet = (text or "").replace("\n", " ").strip()[:100]
+        return {"symbol": sym,
+                "error": f"AI 返回无法解析为信号(原文开头: {snippet or '空'}…)——可重试或换模型"}
 
     entry = {**parsed, "close": close, "created_at": _now_iso()}
     data = load_all()

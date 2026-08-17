@@ -385,14 +385,14 @@ async def run_backtest(repo, symbol: str, use_ai: bool = True) -> dict:
 
 
 def _parse_ai_reco(text: str) -> dict | None:
-    import re
-    m = re.search(r"\{.*\}", text or "", re.DOTALL)
-    if not m:
+    # [R22] 跨厂家容错解析(围栏/解说文字/截断都能救)
+    from app.services.ai_json import extract_json_object
+    obj = extract_json_object(text)
+    if obj is None:
         return None
     try:
-        obj = json.loads(m.group(0))
         thr = float(obj.get("threshold"))
-    except (TypeError, ValueError, json.JSONDecodeError):
+    except (TypeError, ValueError):
         return None
     # 只认网格里出现过的阈值,防 AI 幻觉出格值
     valid = min(GRID_THRESHOLDS, key=lambda t: abs(t - thr))

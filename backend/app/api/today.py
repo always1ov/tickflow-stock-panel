@@ -671,24 +671,9 @@ def parse_ai_brief_response(text: str | None, valid_symbols: set[str]) -> dict:
     全部失败时把原文清理后当导读正文返回 —— 模型不守格式/被截断时,
     用户至少能看到它写了什么, 而不是'点了没反应'。纯函数。
     """
+    from app.services.ai_json import extract_json_object
     raw = (text or "").strip()
-    obj: dict = {}
-    candidates_json = []
-    m = re.search(r"\{.*\}", raw, re.S)
-    if m:
-        candidates_json.append(m.group(0))
-        # 截断修复: 输出被 max_tokens 掐断时右括号缺失, 逐级补 } ] 尝试
-        frag = raw[raw.find("{"):]
-        for suffix in ("}", "]}", "\"}]}", "\"}"):
-            candidates_json.append(frag + suffix)
-    for cand in candidates_json:
-        try:
-            parsed = json.loads(cand)
-            if isinstance(parsed, dict):
-                obj = parsed
-                break
-        except Exception:  # noqa: BLE001
-            continue
+    obj = extract_json_object(raw) or {}
     picks = []
     for p in (obj.get("picks") or [])[:3]:
         if not isinstance(p, dict):
