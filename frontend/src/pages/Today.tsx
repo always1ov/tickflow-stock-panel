@@ -346,6 +346,14 @@ export function Today() {
               <AlertTriangle className="h-4 w-4 text-red-400" />
               <span className="text-sm font-medium text-foreground">需要行动</span>
               <span className="text-[10px] text-muted">{d.actions.length} 项</span>
+              <span
+                title={d.live
+                  ? '距离/价格按盘中最新价计算;"已跌破→清仓"的纪律判定仍以收盘为准'
+                  : `所有距离/价格为 ${d.as_of ?? '上一交易日'} 收盘快照 —— 盘中已变化的不会反映,打开左下角「实时行情」后自动实时`}
+                className={`rounded border px-1.5 py-0.5 text-[9px] ${d.live ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-400' : 'border-amber-400/30 bg-amber-400/10 text-amber-300'}`}
+              >
+                {d.live ? '实时口径' : `昨收快照 ${d.as_of ?? ''}`}
+              </span>
             </div>
             {d.actions.length === 0 ? (
               <div className="flex items-center gap-2 px-4 py-5 text-xs text-muted">
@@ -378,6 +386,14 @@ export function Today() {
             <div className="flex flex-wrap items-center gap-2 border-b border-border/40 px-4 py-2.5">
               <Target className="h-4 w-4 text-red-400" />
               <span className="text-sm font-medium text-foreground">值得关注</span>
+              <span
+                title={d.live
+                  ? '现价与距触发价按盘中最新价计算;带「盘中·待收盘确认」标的信号等收盘定稿'
+                  : `所有现价/距离为 ${d.as_of ?? '上一交易日'} 收盘快照 —— 打开左下角「实时行情」后自动实时`}
+                className={`rounded border px-1.5 py-0.5 text-[9px] ${d.live ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-400' : 'border-amber-400/30 bg-amber-400/10 text-amber-300'}`}
+              >
+                {d.live ? '实时口径' : `昨收快照 ${d.as_of ?? ''}`}
+              </span>
               <span className="text-[10px] text-muted">
                 {d.opportunities.length} 项 · 把握分 ≥ {d.prefs.min_score} 才显示
                 {d.opportunities_filtered > 0 && `(已滤掉 ${d.opportunities_filtered} 只)`}
