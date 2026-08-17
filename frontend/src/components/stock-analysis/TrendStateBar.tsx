@@ -51,10 +51,18 @@ export function TrendStateBar({ symbol, trend }: { symbol: string; trend: TrendD
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg border border-border/50 bg-elevated/20 px-3 py-2">
       <span
         className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs ${trendBadgeCls(trend.state)}`}
-        title={`${trend.state_en} · 窗口 ${trend.window_days} 个交易日`}
+        title={`${trend.state_en} · 窗口 ${trend.window_days} 个交易日${trend.intraday ? '\n⚠ 盘中临时口径:实时价参与判定,收盘确认为准' : ''}`}
       >
         {trend.state_cn}
       </span>
+      {trend.intraday && (
+        <span
+          className="inline-flex rounded border border-amber-400/30 bg-amber-400/10 px-1.5 py-0.5 text-[10px] text-amber-300"
+          title="实时价参与了六态判定,收盘价可能改变结论 —— 定稿以收盘为准"
+        >
+          盘中口径
+        </span>
+      )}
       <span className="text-xs text-foreground/90">
         第 <span className="font-mono font-semibold">{trend.duration}</span> 天
         <span className="text-muted"> · 自 {trend.since}</span>

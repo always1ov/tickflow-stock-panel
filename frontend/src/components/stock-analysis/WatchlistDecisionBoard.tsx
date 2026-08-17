@@ -401,9 +401,9 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
                       {r.trend ? (
                         <span
                           className={`inline-flex whitespace-nowrap rounded border px-1.5 py-0.5 text-[10px] ${trendBadgeCls(r.trend.state)}`}
-                          title={`${r.trend.state_cn}(${r.trend.state_en})· 第 ${r.trend.duration} 天,自 ${r.trend.since}\n上关键点 ${r.trend.up_pivot?.toFixed(2) ?? '—'} / 下关键点 ${r.trend.dn_pivot?.toFixed(2) ?? '—'}\n${r.trend.action}${r.trend.signal ? `\n近期信号:${r.trend.signal} — ${r.trend.signal_desc}` : ''}`}
+                          title={`${r.trend.state_cn}(${r.trend.state_en})· 第 ${r.trend.duration} 天,自 ${r.trend.since}\n上关键点 ${r.trend.up_pivot?.toFixed(2) ?? '—'} / 下关键点 ${r.trend.dn_pivot?.toFixed(2) ?? '—'}\n${r.trend.action}${r.trend.signal ? `\n近期信号:${r.trend.signal} — ${r.trend.signal_desc}` : ''}${r.trend.intraday ? '\n⚠ 盘中临时口径:实时价参与判定,收盘确认为准' : ''}`}
                         >
-                          {r.trend.state_cn} {r.trend.duration}天
+                          {r.trend.state_cn} {r.trend.duration}天{r.trend.intraday ? <span className="ml-0.5 opacity-70">*</span> : null}
                         </span>
                       ) : (
                         <span className="text-[10px] text-muted/40">—</span>

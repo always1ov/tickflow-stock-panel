@@ -170,11 +170,15 @@ def trend_for_symbol(repo, symbol: str, with_segments: bool = False,
     """单只趋势详情。with_segments=True 附带多空分段(K 线背景着色用)。"""
     sym = (symbol or "").strip().upper()
     closes, dates = _load_symbol_window(repo, sym)
+    n_stored = len(closes)
     closes, dates = append_live_bar(closes, dates, live_entry)
     if len(closes) < _MIN_DAYS:
         return {"symbol": sym, "error": f"日 K 不足 {_MIN_DAYS} 天,无法判定趋势"}
     thr, src = get_effective_threshold(sym)
     out = {"symbol": sym, **_trend_payload(closes, dates, thr, src)}
+    # [R18] 实时价确实参与了判定 → 标记盘中临时口径, 前端据此提示"待收盘确认"
+    if len(closes) > n_stored:
+        out["intraday"] = True
     if with_segments:
         res = compute(closes, dates, thr)
         out["segments"] = [
@@ -229,11 +233,14 @@ def trends_for_symbols(repo, symbols: list[str],
             for sym, part in df.group_by("symbol"):
                 key = str(sym[0] if isinstance(sym, tuple) else sym)
                 closes, dts = _closes_window(part)
+                n_stored = len(closes)
                 closes, dts = append_live_bar(closes, dts, (live or {}).get(key))
                 if len(closes) < _MIN_DAYS:
                     continue
                 thr, src = get_effective_threshold(key)
                 out[key] = _trend_payload(closes, dts, thr, src)
+                if len(closes) > n_stored:  # [R18] 实时价参与判定 → 盘中临时口径
+                    out[key]["intraday"] = True
 
     for sym in other_syms:
         try:

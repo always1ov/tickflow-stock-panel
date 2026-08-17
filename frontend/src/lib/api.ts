@@ -240,6 +240,9 @@ export interface TrendInfo {
   threshold: number
   threshold_source: 'override' | 'default'
   window_days: number
+  ret_20d?: number | null
+  /** [R18] 实时价参与了判定 → 盘中临时口径, 收盘确认为准 */
+  intraday?: boolean
 }
 
 export interface TrendDetail extends TrendInfo {

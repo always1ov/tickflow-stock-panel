@@ -269,10 +269,19 @@ def _build_overview(repo) -> dict:
     for sym, pos in pos_all.items():
         t = trends.get(sym)
         if pos.get("held") and t and t["state"] == "DT":
-            actions.append({
-                "kind": "trend_break", "severity": "high", "symbol": sym, "name": names.get(sym, sym),
-                "text": f"持有票已转入下跌趋势(第 {t['duration']} 天,{t['action']})",
-            })
+            # [R18] 结论类走收盘: 盘中临时判定降级为预警, 收盘定稿才是纪律指令
+            if t.get("intraday"):
+                actions.append({
+                    "kind": "trend_break", "severity": "mid", "symbol": sym,
+                    "name": names.get(sym, sym),
+                    "text": f"持有票盘中处于下跌趋势(盘中口径,收盘确认后升级为纪律指令)",
+                })
+            else:
+                actions.append({
+                    "kind": "trend_break", "severity": "high", "symbol": sym,
+                    "name": names.get(sym, sym),
+                    "text": f"持有票已转入下跌趋势(第 {t['duration']} 天,{t['action']})",
+                })
     # 近 24h 监控触发记录(含出场线规则与用户自建提醒)
     try:
         from app.services import alert_store
@@ -303,12 +312,11 @@ def _build_overview(repo) -> dict:
     prefs = today_prefs.load()
     opportunities, opp_filtered = rank_opportunities(
         trends, signals, names, prefs["min_score"], prefs["max_show"], bench_ret)
-    # [R18] 盘中口径标注: 实时价参与了判定的趋势类新信号是"临时信号",
+    # [R18] 盘中口径标注: 实时价确实参与了判定的趋势类新信号是"临时信号",
     # 收盘价可能收回去 —— 标记出来, 前端提示"待收盘确认", 防止盘中追假信号
-    if live:
-        for o in opportunities:
-            if o["kind"] == "trend_signal" and o["symbol"] in live:
-                o["intraday"] = True
+    for o in opportunities:
+        if o["kind"] == "trend_signal" and (trends.get(o["symbol"]) or {}).get("intraday"):
+            o["intraday"] = True
 
     # ---- ③ 市场天气(自选口径)----
     bull = sum(1 for t in trends.values() if t["side"] == "多头")
