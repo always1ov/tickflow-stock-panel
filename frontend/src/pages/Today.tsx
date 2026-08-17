@@ -160,15 +160,21 @@ export function Today() {
   const [brief, setBrief] = useState<string | null>(null)
   const [picks, setPicks] = useState<TodayPick[] | null>(null)
   const [analyzed, setAnalyzed] = useState(0)
+  // 失败必须在页面上留痕(toast 一闪即逝, 用户会以为"点了没反应")
+  const [aiError, setAiError] = useState<string | null>(null)
   const aiMut = useMutation({
     mutationFn: () => api.todayAi(),
+    onMutate: () => setAiError(null),
     onSuccess: (r) => {
-      if (r.error) { toast(r.error, 'error'); return }
+      if (r.error) { setAiError(r.error); toast(r.error, 'error'); return }
       setBrief(r.brief || null)
       setPicks(r.picks ?? [])
       setAnalyzed(r.analyzed ?? 0)
     },
-    onError: (e: Error) => toast(`AI 分析失败: ${e.message}`, 'error'),
+    onError: (e: Error) => {
+      setAiError(`AI 分析失败: ${e.message}`)
+      toast(`AI 分析失败: ${e.message}`, 'error')
+    },
   })
   const [prefsOpen, setPrefsOpen] = useState(false)
   // 滑块拖动中的即时值(null = 用服务端返回的偏好); 松手才落库
@@ -291,6 +297,18 @@ export function Today() {
         )
       })()}
 
+      {aiError && (
+        <div className="flex items-start justify-between gap-3 rounded-lg border border-red-400/30 bg-red-400/[0.07] px-4 py-3 text-xs text-red-300">
+          <span>AI 导读·优选没有成功:{aiError}</span>
+          <button
+            onClick={() => aiMut.mutate()}
+            disabled={aiMut.isPending}
+            className="shrink-0 rounded border border-red-400/40 px-2 py-0.5 text-[10px] hover:bg-red-400/10 disabled:opacity-50 cursor-pointer"
+          >
+            重试
+          </button>
+        </div>
+      )}
       {brief && (
         <div className="rounded-lg border border-violet-400/20 bg-violet-400/[0.06] px-4 py-3 text-xs leading-relaxed text-foreground/90">
           <Sparkles className="mr-1.5 inline h-3.5 w-3.5 text-violet-300" />

@@ -664,6 +664,48 @@ def _candidate_market_data(repo, cands: list[dict]) -> list[dict]:
     return out
 
 
+def parse_ai_brief_response(text: str | None, valid_symbols: set[str]) -> dict:
+    """[R22] 解析 AI 导读·优选输出, 保证永远给出可展示的结果。
+
+    依次尝试: 整体 JSON → 文中最大 JSON 块 → 截断修复(补右花括号) →
+    全部失败时把原文清理后当导读正文返回 —— 模型不守格式/被截断时,
+    用户至少能看到它写了什么, 而不是'点了没反应'。纯函数。
+    """
+    raw = (text or "").strip()
+    obj: dict = {}
+    candidates_json = []
+    m = re.search(r"\{.*\}", raw, re.S)
+    if m:
+        candidates_json.append(m.group(0))
+        # 截断修复: 输出被 max_tokens 掐断时右括号缺失, 逐级补 } ] 尝试
+        frag = raw[raw.find("{"):]
+        for suffix in ("}", "]}", "\"}]}", "\"}"):
+            candidates_json.append(frag + suffix)
+    for cand in candidates_json:
+        try:
+            parsed = json.loads(cand)
+            if isinstance(parsed, dict):
+                obj = parsed
+                break
+        except Exception:  # noqa: BLE001
+            continue
+    picks = []
+    for p in (obj.get("picks") or [])[:3]:
+        if not isinstance(p, dict):
+            continue
+        s = str(p.get("symbol", "")).upper()
+        if s in valid_symbols:
+            picks.append({"symbol": s, "reason": str(p.get("reason") or "").strip()[:60]})
+    brief = str(obj.get("brief") or "").strip()
+    if not brief and not picks:
+        # 完全没解析出结构 → 原文兜底(剥掉代码围栏), 绝不空手而归
+        fallback = re.sub(r"```[a-zA-Z]*|```", "", raw).strip()
+        brief = fallback[:600] if fallback else ""
+        if not brief:
+            return {"error": "AI 返回了空内容, 请重试(或到设置页检查 AI 配置)"}
+    return {"brief": brief, "picks": picks}
+
+
 @router.post("/ai")
 async def today_ai(request: Request):
     """AI 导读+优选合一: 一次调用生成盘前导读, 并基于真实量价从候选里精选 1-3 只。
@@ -695,21 +737,11 @@ async def today_ai(request: Request):
                 {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
             ],
             temperature=0.2,
-            max_tokens=800,
+            max_tokens=1500,
         )
-        m = re.search(r"\{.*\}", text or "", re.S)
-        obj = json.loads(m.group(0)) if m else {}
-        valid = {c["symbol"] for c in cands}
-        picks = []
-        for p in (obj.get("picks") or [])[:3]:
-            s = str(p.get("symbol", "")).upper()
-            if s in valid:
-                picks.append({"symbol": s, "reason": str(p.get("reason") or "").strip()[:60]})
-        return {
-            "brief": str(obj.get("brief") or "").strip(),
-            "picks": picks,
-            "analyzed": len(cands),
-        }
+        out = parse_ai_brief_response(text, {c["symbol"] for c in cands})
+        out["analyzed"] = len(cands)
+        return out
     except Exception as e:  # noqa: BLE001
         logger.warning("today ai failed: %s", e)
         return {"error": f"AI 调用失败: {e}"}
