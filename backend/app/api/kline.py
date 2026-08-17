@@ -444,30 +444,54 @@ def _maybe_inject_live_candle(request: Request, symbol: str, rows: list[dict], a
     stock 走 QuoteService 的股票实时缓存; etf 走 ETF enriched 缓存 (开启实时 ETF
     拉取时为盘中数据, 否则为磁盘最新日, 由下方"非今日不注入"守卫自然跳过)。
     """
-    if asset_type == "stock":
-        qs = getattr(request.app.state, "quote_service", None)
-        if not qs:
+    import polars as pl
+
+    def _overlay_row(asset: str) -> tuple[dict | None, date | None]:
+        """[R16] 自选实时叠加层里找该票的当日行 —— 免费自选档实时数据的唯一去处。"""
+        try:
+            ov = request.app.state.repo.get_watchlist_live(asset)
+        except Exception:  # noqa: BLE001
+            return None, None
+        if ov is None or ov.is_empty() or not {"symbol", "date"} <= set(ov.columns):
+            return None, None
+        m = ov.filter(pl.col("symbol") == symbol)
+        if m.is_empty():
+            return None, None
+        row = m.to_dicts()[0]
+        d = row.get("date")
+        try:
+            d = d if isinstance(d, date) else date.fromisoformat(str(d)[:10])
+        except (TypeError, ValueError):
+            return None, None
+        return row, d
+
+    # 取实时行: 叠加层优先(免费自选档); 没有再退回全市场实时缓存(付费档)
+    q: dict | None = None
+    enriched_date = None
+    if asset_type in ("stock", "etf"):
+        q, enriched_date = _overlay_row(asset_type)
+    if q is None:
+        if asset_type == "stock":
+            qs = getattr(request.app.state, "quote_service", None)
+            if not qs:
+                return rows
+            df_today, enriched_date = qs.get_enriched_today()
+        elif asset_type == "etf":
+            df_today, enriched_date = request.app.state.repo.get_enriched_latest_asset("etf")
+        else:
             return rows
-        df_today, enriched_date = qs.get_enriched_today()
-    elif asset_type == "etf":
-        df_today, enriched_date = request.app.state.repo.get_enriched_latest_asset("etf")
-    else:
-        return rows
-    if df_today.is_empty():
-        return rows
+        if df_today.is_empty():
+            return rows
+        try:
+            m = df_today.filter(pl.col("symbol") == symbol).to_dicts()
+            if not m:
+                return rows
+            q = m[0]
+        except Exception:  # noqa: BLE001
+            return rows
 
     # 非交易日（周末/假日）缓存的行情日期 != 今天，跳过注入避免产生重复蜡烛
     if not enriched_date or enriched_date != date.today():
-        return rows
-
-    # 查找该 symbol 的实时 enriched 行
-    import polars as pl
-    try:
-        q = df_today.filter(pl.col("symbol") == symbol).to_dicts()
-        if not q:
-            return rows
-        q = q[0]
-    except Exception:  # noqa: BLE001
         return rows
 
     close_price = q.get("close")
