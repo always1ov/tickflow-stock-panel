@@ -15,6 +15,7 @@
 
 | # | 改动 | 涉及文件 | 冲突风险 | 单独回退 |
 |---|------|---------|:---:|---------|
+| R21 | **当日数据未出齐自动重试**: 盘后管道(默认15:30)早于数据源发布(17:30~20:00)时 enriched 缺当日分区、梯队/概念/行业停昨日且要等次日调度——现在调度管道检测到 today_daily_incomplete 每 90 分钟自动重跑(当晚≤3次, 补齐即停, replace_existing 不堆积); 完整性检测下限 15:30→15:00(修"15:10 调度恰好躲过检测"漏洞) | 改 `jobs/daily_pipeline.py` | 低(仅调度包装+阈值) | 还原 _pipeline_with_retry 包装与 15:30 下限 |
 | R20 | **把握分量价+胜率因子**(对齐"选最值得关注胜率最好"初衷): ①量能质量——候选量比(盘后快照批取+实时叠加层覆盖)≥1.5 放量+8 / <0.8 缩量-12; ②个股历史胜率——livermore `_bullish_event_win_rate` 纯函数(历史转入多头侧后 5 日为正比例, 未完整事件不计, 样本<3 不给), ≥60% +8 / ≤40% -12, 中间只展示; 仅带新信号候选计算(≤40 只), 缺数据静默跳过。规则层粗筛=新鲜度+AI+RS+量能+个股胜率, 形态识别归 AI 优选。测试 +6 | 改 `api/today.py`、`services/livermore_service.py`;新增 `tests/test_today_r20_quality.py` | 低 | 删 extras 段+两个胜率函数 |
 | R19 | **确定性刷新**: `QuoteService.refresh_full`(连续拉取至轮转偏移回绕=全自选覆盖一遍, 每轮保留按 key 限速, max_rounds=12 防阻塞, 没转完如实报 partial)+ POST `/api/intraday/refresh-full`(带覆盖轮数与叠加层覆盖数); 今日总览「刷新」= 先全量同步实时('同步中…')再刷页面, toast 报'全量同步 N 只'/'未全覆盖'; 实时不可用静默退回收盘刷新。测试 +3 | 改 `services/quote_service.py`、`api/intraday.py`、前端 `api.ts`、`Today.tsx`;新增 `tests/test_quote_refresh_full.py` | 低 | 删 refresh_full/端点/按钮逻辑 |
 | R18 | **盘中使用框架进页面**("盘中是执行层, 收盘是决策层"固化进 UI): 今日总览时段提示条(北京时间: 盘前=计划/盘中=执行·新信号等收盘/盘后=落盘定稿·纪律以定稿为准/周末=复盘); livermore 在实时价确实参与判定时给 trend 标 `intraday`(收盘落盘后自然消失)——今日总览机会标"盘中·待收盘确认"、决策台趋势徽章带 * 角标、个股趋势条琥珀"盘中口径"徽章; "持有票转跌"行动项盘中降级 mid 预警, 收盘定稿才是 high 纪律 | 改 `api/today.py`、`services/livermore_service.py`、前端 `api.ts`、`Today.tsx`、`WatchlistDecisionBoard.tsx`、`TrendStateBar.tsx` | 低 | 删 intraday 标注段+提示条组件 |
