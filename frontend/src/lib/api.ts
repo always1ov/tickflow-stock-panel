@@ -2636,6 +2636,10 @@ export const api = {
 
   monitorRuleDelete: (id: string) =>
     request<{ ok: boolean }>(`/api/monitor-rules/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  monitorRulesBatchChannels: (body: { rule_ids?: string[] | null; channels: string[]; mode: 'set' | 'add' | 'remove' }) =>
+    request<{ ok: boolean; updated: number }>('/api/monitor-rules/batch-channels', {
+      method: 'POST', body: JSON.stringify(body),
+    }),
 
   /** 模拟触发 ladder 封单监控 (Dev 调试, 不落盘不推送) */
   monitorRuleTestLadder: () =>

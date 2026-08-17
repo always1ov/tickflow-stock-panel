@@ -358,6 +358,32 @@ export function PriceAlertDialog({
                     一键创建全部
                   </button>
                 </div>
+                {/* [fork 增强] 一键创建带哪些推送渠道, 就地可选(与下方「通知渠道」同一状态) */}
+                <div className="mb-2 flex flex-wrap items-center gap-1.5 text-[10px]">
+                  <span className="text-muted">推送到:</span>
+                  <span className="rounded border border-border/60 bg-elevated/40 px-1.5 py-0.5 text-muted">站内 ✓</span>
+                  {([
+                    { key: 'feishu', label: '飞书', configured: !!prefs?.feishu_webhook_url },
+                    { key: 'wecom', label: '企微', configured: !!prefs?.wecom_webhook_url },
+                    { key: 'dingtalk', label: '钉钉', configured: !!prefs?.dingtalk_webhook_url },
+                  ]).map(c => (
+                    <button
+                      key={c.key}
+                      disabled={!c.configured}
+                      onClick={() => toggleChannel(c.key)}
+                      title={c.configured ? '「一键创建全部」建出的每个提醒都带上所选渠道' : '未配置 webhook —— 到 设置 页配置后可用'}
+                      className={`rounded border px-1.5 py-0.5 transition-colors ${
+                        channels.includes(c.key)
+                          ? 'border-sky-400/50 bg-sky-400/15 text-sky-300 cursor-pointer'
+                          : c.configured
+                            ? 'border-border/60 bg-surface text-muted hover:text-foreground cursor-pointer'
+                            : 'border-border/40 text-muted/40 cursor-not-allowed'
+                      }`}
+                    >
+                      {c.label}{channels.includes(c.key) ? ' ✓' : ''}
+                    </button>
+                  ))}
+                </div>
                 <div className="space-y-1">
                   {recoPoints.map((p, i) => (
                     <button

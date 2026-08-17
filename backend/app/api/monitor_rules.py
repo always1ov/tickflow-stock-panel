@@ -304,6 +304,37 @@ def save_rule(req: RuleModel, request: Request):
     return {"ok": True, "rule": rule}
 
 
+# ── 批量设置推送渠道 ────────────────────────────────────
+_VALID_CHANNELS = {"feishu", "wecom", "dingtalk"}
+
+
+class BatchChannelsIn(BaseModel):
+    """[fork 增强] 批量改推送渠道: 不传 rule_ids 即作用于全部规则。"""
+
+    rule_ids: list[str] | None = None
+    channels: list[str] = []
+    mode: str = "set"  # set=设为所选 | add=追加所选 | remove=移除所选
+
+
+@router.post("/batch-channels")
+def batch_channels(req: BatchChannelsIn, request: Request):
+    """批量设置规则的 webhook 推送渠道, 免去逐条打开编辑。
+
+    mode: set 用所选渠道整体替换 / add 在原有基础上追加 / remove 移除所选。
+    渠道值仅限 feishu/wecom/dingtalk; 站内通知不受影响(恒开)。
+    """
+    if req.mode not in ("set", "add", "remove"):
+        raise HTTPException(status_code=400, detail="mode 仅支持 set/add/remove")
+    channels = [c for c in req.channels if c in _VALID_CHANNELS]
+    if req.mode in ("add", "remove") and not channels:
+        raise HTTPException(status_code=400, detail="追加/移除模式必须至少选一个渠道")
+    updated = monitor_rules.batch_set_channels(
+        _data_dir(request), req.rule_ids, channels, req.mode)
+    if updated:
+        _sync_engine(request)
+    return {"ok": True, "updated": updated}
+
+
 # ── 删除 ───────────────────────────────────────────────
 @router.delete("/{rule_id}")
 def delete_rule(rule_id: str, request: Request):

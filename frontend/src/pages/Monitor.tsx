@@ -16,6 +16,7 @@ import { LEGACY_STRATEGY_NOTIFY_EVENTS, STRATEGY_NOTIFY_EVENT_OPTIONS, strategyE
 import { boardTag } from '@/components/stock-table/primitives'
 import { markSeen, resetBadge, leaveMonitorPage } from '@/lib/monitorBadge'
 import { RuleEditor } from '@/components/monitor/RuleEditor'
+import { toast } from '@/components/Toast'
 import { StockPreviewDialog } from '@/components/StockPreviewDialog'
 import { DimensionMembersDialog, type DimensionKind, type DimensionMembersTarget } from '@/components/DimensionMembersDialog'
 import { usePreferences } from '@/lib/useSharedQueries'
@@ -119,6 +120,8 @@ export function Monitor() {
   const [filter, setFilter] = useState<'all' | 'strategy' | 'signal' | 'price' | 'market' | 'sector'>('all')
   const [confirmClear, setConfirmClear] = useState(false)
   const [confirmClearRules, setConfirmClearRules] = useState(false)
+  // [fork 增强] 批量设置推送渠道
+  const [batchChannelsOpen, setBatchChannelsOpen] = useState(false)
 
   // 全局 ext 字段配置 (监控中心个股通知带行业/概念标签)
   const { data: prefs } = usePreferences()
@@ -225,6 +228,14 @@ export function Monitor() {
               <span className="rounded-md bg-elevated/50 px-1.5 py-0.5 text-[10px] font-medium text-muted">{rulesCount}</span>
               <div className="ml-auto flex items-center gap-1">
                 <button
+                  onClick={() => setBatchChannelsOpen(true)}
+                  disabled={rulesCount === 0}
+                  title="批量设置推送渠道(飞书/企微/钉钉)—— 一次改所有规则, 不用逐条打开"
+                  className="inline-flex h-6 w-6 items-center justify-center rounded-lg border border-border/60 bg-surface text-muted transition-all hover:border-sky-400/40 hover:text-sky-300 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                >
+                  <BellRing className="h-3.5 w-3.5" />
+                </button>
+                <button
                   onClick={() => { setEditingRule(null); setEditorOpen(true) }}
                   title="新建规则"
                   className="inline-flex h-6 w-6 items-center justify-center rounded-lg border border-border/60 bg-surface text-muted transition-all hover:border-accent/40 hover:text-accent hover:shadow-sm cursor-pointer"
@@ -255,6 +266,13 @@ export function Monitor() {
         open={editorOpen}
         rule={editingRule}
         onClose={() => { setEditorOpen(false); setEditingRule(null) }}
+      />
+
+      <BatchChannelsDialog
+        open={batchChannelsOpen}
+        rulesCount={rulesCount}
+        prefs={prefs}
+        onClose={() => setBatchChannelsOpen(false)}
       />
 
       <ConfirmDialog
@@ -860,6 +878,103 @@ function RuleEditorDialog({ open, rule, onClose }: { open: boolean; rule: Monito
 }
 
 // ── 确认对话框 ────────────────────────────────────────
+/** [fork 增强] 批量设置推送渠道: 一次改所有监控规则, 不用逐条打开点钉钉 */
+function BatchChannelsDialog({ open, rulesCount, prefs, onClose }: {
+  open: boolean
+  rulesCount: number
+  prefs: ReturnType<typeof usePreferences>['data']
+  onClose: () => void
+}) {
+  const qc = useQueryClient()
+  const [channels, setChannels] = useState<string[]>([])
+  const [mode, setMode] = useState<'set' | 'add' | 'remove'>('add')
+  const mut = useMutation({
+    mutationFn: () => api.monitorRulesBatchChannels({ channels, mode }),
+    onSuccess: (r) => {
+      qc.invalidateQueries({ queryKey: QK.monitorRules })
+      toast(`已更新 ${r.updated} 条规则的推送渠道`, 'success')
+      onClose()
+    },
+    onError: (e: Error) => toast(`批量设置失败: ${e.message}`, 'error'),
+  })
+  const channelDefs = [
+    { key: 'feishu', label: '飞书', configured: !!prefs?.feishu_webhook_url },
+    { key: 'wecom', label: '企业微信', configured: !!prefs?.wecom_webhook_url },
+    { key: 'dingtalk', label: '钉钉', configured: !!prefs?.dingtalk_webhook_url },
+  ]
+  const modeDefs = [
+    { key: 'add' as const, label: '追加所选', hint: '在各规则原有渠道上加上所选(最常用)' },
+    { key: 'set' as const, label: '设为所选', hint: '所有规则的渠道整体替换为所选(可清空)' },
+    { key: 'remove' as const, label: '移除所选', hint: '从各规则里去掉所选渠道' },
+  ]
+  const canApply = mode === 'set' || channels.length > 0
+  return (
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+          onClick={onClose}
+        >
+          <motion.div
+            initial={{ opacity: 0, scale: 0.96 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.96 }}
+            transition={{ duration: 0.15 }}
+            className="w-full max-w-sm rounded-2xl border border-border bg-surface p-5 shadow-2xl"
+            onClick={e => e.stopPropagation()}
+          >
+            <h3 className="text-sm font-medium text-foreground">批量设置推送渠道</h3>
+            <p className="mt-1.5 text-xs text-muted">作用于全部 {rulesCount} 条监控规则;站内通知恒开,不受影响。</p>
+            <div className="mt-3 flex flex-wrap gap-3">
+              {channelDefs.map(c => (
+                <label key={c.key} className={cn('inline-flex items-center gap-2 text-xs', c.configured ? 'text-foreground' : 'text-muted/50')}>
+                  <input
+                    type="checkbox"
+                    checked={channels.includes(c.key)}
+                    disabled={!c.configured}
+                    onChange={() => setChannels(cur => cur.includes(c.key) ? cur.filter(x => x !== c.key) : [...cur, c.key])}
+                    className="h-3.5 w-3.5 accent-sky-500"
+                  />
+                  {c.label}
+                  {!c.configured && <span className="text-[9px]">未配置</span>}
+                </label>
+              ))}
+            </div>
+            <div className="mt-3 space-y-1.5">
+              {modeDefs.map(m => (
+                <label key={m.key} className="flex items-start gap-2 text-xs text-foreground cursor-pointer">
+                  <input type="radio" name="batch-ch-mode" checked={mode === m.key} onChange={() => setMode(m.key)} className="mt-0.5 h-3.5 w-3.5 accent-sky-500" />
+                  <span>
+                    {m.label}
+                    <span className="ml-1.5 text-[10px] text-muted">{m.hint}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+            {mode === 'set' && channels.length === 0 && (
+              <p className="mt-2 text-[10px] text-amber-300">当前选择会清空所有规则的外部推送渠道(只留站内)。</p>
+            )}
+            <div className="mt-4 flex justify-end gap-2">
+              <button onClick={onClose} className="px-3 py-1.5 rounded-btn bg-elevated text-secondary text-xs cursor-pointer">取消</button>
+              <button
+                onClick={() => mut.mutate()}
+                disabled={mut.isPending || !canApply}
+                className="px-3 py-1.5 rounded-btn bg-accent text-base text-xs font-medium disabled:opacity-50 cursor-pointer"
+              >
+                {mut.isPending ? '应用中…' : `应用到 ${rulesCount} 条规则`}
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  )
+}
+
+
 function ConfirmDialog({ open, title, message, confirmText, danger, pending, onCancel, onConfirm }: {
   open: boolean
   title: string

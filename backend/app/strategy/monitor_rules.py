@@ -87,6 +87,33 @@ def save_one(data_dir: Path, rule: dict) -> None:
     p.write_text(json.dumps(rule, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
+def batch_set_channels(data_dir: Path, rule_ids: list[str] | None,
+                       channels: list[str], mode: str = "set") -> int:
+    """[fork 增强] 批量改推送渠道, 返回实际改动条数。
+
+    rule_ids=None 作用于全部规则; mode: set=整体替换 / add=追加 / remove=移除。
+    渠道值由调用方过滤(feishu/wecom/dingtalk); 未变化的规则不重写文件。
+    """
+    wanted = set(rule_ids) if rule_ids else None
+    updated = 0
+    for rule in load_all(data_dir):
+        if wanted is not None and rule.get("id") not in wanted:
+            continue
+        cur = list(rule.get("webhook_channels") or [])
+        if mode == "set":
+            new = list(channels)
+        elif mode == "add":
+            new = cur + [c for c in channels if c not in cur]
+        else:
+            new = [c for c in cur if c not in channels]
+        if new == cur:
+            continue
+        rule["webhook_channels"] = new
+        save_one(data_dir, rule)
+        updated += 1
+    return updated
+
+
 def delete_one(data_dir: Path, rule_id: str) -> bool:
     p = _path(data_dir, rule_id)
     if p.exists():
