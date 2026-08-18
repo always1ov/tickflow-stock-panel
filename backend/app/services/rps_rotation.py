@@ -95,13 +95,17 @@ def _load_concept_map_df(repo, kind: str = "concept") -> tuple[pl.DataFrame, int
         ).unique()
     else:
         map_df = pl.DataFrame(schema={"_sym_up": pl.Utf8, kind: pl.Utf8})
-    _map_cache[kind] = map_df
+    # [fork 修复] 缓存必须存 (map_df, count) 元组与返回值同构 —— 此前只存 df,
+    # 命中时调用方 `map_df, _ = ...` 把两列 DataFrame 解包成两个 Series,
+    # 后续 map_df.group_by() 报 "'Series' object has no attribute 'group_by'"
+    # (表现为: 首次调用成功, 600s 缓存窗口内第二次起必失败)
+    _map_cache[kind] = (map_df, len(members_seen))
     _map_ts[kind] = now
     return map_df, len(members_seen)
 
 
 # 维度映射缓存: {kind: (map_df, count)}。按 kind 隔离(概念/行业分别缓存)。
-_map_cache: dict[str, pl.DataFrame] = {}
+_map_cache: dict[str, tuple[pl.DataFrame, int]] = {}
 _map_ts: dict[str, float] = {}
 
 
