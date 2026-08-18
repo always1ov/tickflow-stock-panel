@@ -19,6 +19,13 @@ def extract_json_object(text: str | None) -> dict | None:
     raw = (text or "").strip()
     if not raw:
         return None
+    # 思考型模型(<think>…</think>)先剥掉推理段 —— 里面的英文散文/花括号会干扰抽取;
+    # <think> 未闭合说明输出在思考段内就被 max_tokens 掐断, 后面没有正文可救
+    raw = re.sub(r"<think>.*?</think>", "", raw, flags=re.S).strip()
+    if "<think>" in raw:
+        raw = raw.split("<think>", 1)[0].strip()
+    if not raw:
+        return None
     candidates = [raw]
     m = re.search(r"\{.*\}", raw, re.S)
     if m:

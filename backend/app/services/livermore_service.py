@@ -373,11 +373,12 @@ async def run_backtest(repo, symbol: str, use_ai: bool = True) -> dict:
                 {"role": "user", "content": user_prompt},
             ],
             temperature=0.2,
-            max_tokens=300,
+            max_tokens=1500,  # [R22] 思考型模型需给推理段留余量, 300 会掐死在 <think> 里
         )
         out["ai"] = _parse_ai_reco(text)
         if out["ai"] is None:
-            out["ai_error"] = "AI 返回无法解析"
+            snippet = (text or "").replace("\n", " ").strip()[:80]
+            out["ai_error"] = f"AI 返回无法解析(原文开头: {snippet or '空'}…)"
     except Exception as e:  # noqa: BLE001
         logger.warning("livermore ai reco failed for %s: %s", sym, e)
         out["ai_error"] = f"AI 调用失败: {e}"

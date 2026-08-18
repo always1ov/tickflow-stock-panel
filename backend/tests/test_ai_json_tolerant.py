@@ -36,6 +36,25 @@ def test_garbage_returns_none():
     assert extract_json_object(None) is None
 
 
+def test_think_block_stripped_before_parsing():
+    """思考型模型: <think>推理段</think> 后才是 JSON 正文 → 剥掉推理段再解析。"""
+    text = ('<think>Let me analyze. The trend is {strong} maybe...</think>\n'
+            '{"signal": "buy", "confidence": 70, "reason": "放量突破"}')
+    assert extract_json_object(text) == {"signal": "buy", "confidence": 70, "reason": "放量突破"}
+
+
+def test_unclosed_think_block_returns_none():
+    """输出在思考段内就被掐断(没有正文)→ None, 由调用方报错并提示。"""
+    text = "<think>Let me analyze this data carefully. **标的**: 002463.SZ (沪电股份"
+    assert extract_json_object(text) is None
+
+
+def test_think_block_with_braces_does_not_confuse():
+    """推理段里出现花括号也不能被误抽成结果。"""
+    text = '<think>maybe {"signal": "sell"}? no wait...</think>{"signal": "hold", "confidence": 55, "reason": "等"}'
+    assert extract_json_object(text)["signal"] == "hold"
+
+
 # ---------- 信号解析(中文信号词 + 容错) ----------
 
 def test_chinese_signal_word_accepted():

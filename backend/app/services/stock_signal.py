@@ -197,7 +197,8 @@ async def generate_signal(repo, data_dir: Path, symbol: str) -> dict:
                 {"role": "user", "content": user_prompt},
             ],
             temperature=0.2,
-            max_tokens=800,  # [R22] 300 会掐断带 watch_points 的中文 JSON → "无法解析"
+            max_tokens=2000,  # [R22] 思考型模型(<think>)先烧一段推理 token, 上限太小时
+                              # JSON 正文根本没机会输出 → "无法解析"; 普通模型不受影响
         )
     except Exception as e:  # noqa: BLE001
         logger.warning("signal gen failed for %s: %s", sym, e)
