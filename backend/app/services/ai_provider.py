@@ -293,7 +293,14 @@ async def _run_openai_once(
             raise
     if not resp.choices:
         return ""
-    return (resp.choices[0].message.content or "").strip()
+    msg = resp.choices[0].message
+    text = (msg.content or "").strip()
+    if not text:
+        # [R22] 部分思考型模型把推理放 reasoning_content 而 content 为空(答案没
+        # 输出完就被掐断时尤甚)—— 取推理段返回, 让上层报错能带上原文摘录,
+        # 用户可判断是 token 不够还是模型没回, 而不是一句"空内容"
+        text = (getattr(msg, "reasoning_content", None) or "").strip()
+    return text
 
 
 async def _stream_openai(
