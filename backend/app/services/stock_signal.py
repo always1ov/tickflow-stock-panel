@@ -190,12 +190,13 @@ async def generate_signal(repo, data_dir: Path, symbol: str) -> dict:
         f"关键价位概览: {summarize_levels(levels, close)}\n"
         f"最近 {_SIGNAL_WINDOW} 日 K(JSON,含指标):\n{json.dumps(kline_tail, ensure_ascii=False)}"
     )
+    msgs = [
+        {"role": "system", "content": _SYSTEM_PROMPT},
+        {"role": "user", "content": user_prompt},
+    ]
     try:
         text = await generate_ai_text(
-            [
-                {"role": "system", "content": _SYSTEM_PROMPT},
-                {"role": "user", "content": user_prompt},
-            ],
+            msgs,
             temperature=0.2,
             max_tokens=3000,  # [R22] 思考型模型(<think>)先烧一段推理 token, 上限太小时
                               # JSON 正文根本没机会输出 → "无法解析"; 上限非目标,
@@ -207,9 +208,24 @@ async def generate_signal(repo, data_dir: Path, symbol: str) -> dict:
 
     parsed = _parse_signal(text)
     if not parsed:
+        # [R22] 思考型模型偶发思考过长/格式跑偏 → 带明确指令自动重试一次,
+        # 批量分析里的零星失败大多能自愈, 不必用户手点重试
+        logger.info("signal parse failed for %s, retrying with strict instruction", sym)
+        try:
+            text = await generate_ai_text(
+                msgs + [{"role": "user", "content":
+                         "重要:只输出一个 JSON 对象本身,第一个字符必须是 {,"
+                         "不要任何思考过程、解释或代码块围栏。"}],
+                temperature=0.1,
+                max_tokens=3000,
+            )
+            parsed = _parse_signal(text)
+        except Exception as e:  # noqa: BLE001
+            logger.warning("signal retry failed for %s: %s", sym, e)
+    if not parsed:
         snippet = (text or "").replace("\n", " ").strip()[:100]
         return {"symbol": sym,
-                "error": f"AI 返回无法解析为信号(原文开头: {snippet or '空'}…)——可重试或换模型"}
+                "error": f"AI 返回无法解析为信号(已自动重试一次;原文开头: {snippet or '空'}…)——建议换非思考型模型"}
 
     entry = {**parsed, "close": close, "created_at": _now_iso()}
     data = load_all()
