@@ -4,6 +4,7 @@
 """
 from __future__ import annotations
 
+import logging
 import threading
 import time
 from datetime import date
@@ -13,6 +14,8 @@ import polars as pl
 from fastapi import APIRouter, Query, Request
 
 from app.services import regime_builder
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/regime", tags=["regime"])
 
@@ -149,26 +152,43 @@ def regime_recompute(request: Request, start: date | None = None, end: date | No
     repo = request.app.state.repo
     data_dir = _data_dir(request)
     end = end or date.today()
-    if start is None:
-        # 全量: 从 enriched 最早日强制重算到今天
-        earliest = regime_builder.earliest_enriched_date(repo)
-        if earliest is None:
-            invalidate_regime_cache()
-            return {"ok": True, "computed": 0}
-        start = earliest
-    new_rows = regime_builder.run_regime_batch(repo, start=start, end=end)
-    if not new_rows.is_empty():
-        regime_builder.upsert_regime_history(data_dir, new_rows)
-    phase_days = regime_builder.refresh_phase_labels(data_dir)
+    # [fork 增强] 分段兜错: 核心重算失败带真实原因返回(而非裸 500);
+    # 阶段重标/主线回填是附加步骤, 单独失败降级为 warning, 不拖垮核心结果
+    try:
+        if start is None:
+            # 全量: 从 enriched 最早日强制重算到今天
+            earliest = regime_builder.earliest_enriched_date(repo)
+            if earliest is None:
+                invalidate_regime_cache()
+                return {"ok": True, "computed": 0}
+            start = earliest
+        new_rows = regime_builder.run_regime_batch(repo, start=start, end=end)
+        if not new_rows.is_empty():
+            regime_builder.upsert_regime_history(data_dir, new_rows)
+    except Exception as e:  # noqa: BLE001
+        logger.exception("regime recompute failed [%s ~ %s]", start, end)
+        invalidate_regime_cache()
+        return {"ok": False, "error": f"环境重算失败: {type(e).__name__}: {e}"}
 
-    from app.services import market_mainline
+    warnings: list[str] = []
+    phase_days = 0
+    try:
+        phase_days = regime_builder.refresh_phase_labels(data_dir)
+    except Exception as e:  # noqa: BLE001
+        logger.exception("phase relabel failed")
+        warnings.append(f"情绪周期阶段重标失败: {type(e).__name__}: {e}")
 
     mainline_rows = 0
-    for kind in ("concept", "industry"):
-        rows = market_mainline.compute_mainline_range(repo, data_dir, start, end, kind=kind)
-        if not rows.is_empty():
-            market_mainline.upsert_mainline_history(data_dir, rows)
-            mainline_rows += rows.height
+    try:
+        from app.services import market_mainline
+        for kind in ("concept", "industry"):
+            rows = market_mainline.compute_mainline_range(repo, data_dir, start, end, kind=kind)
+            if not rows.is_empty():
+                market_mainline.upsert_mainline_history(data_dir, rows)
+                mainline_rows += rows.height
+    except Exception as e:  # noqa: BLE001
+        logger.exception("mainline backfill failed")
+        warnings.append(f"主线回填失败: {type(e).__name__}: {e}")
 
     invalidate_regime_cache()
     return {
@@ -176,6 +196,7 @@ def regime_recompute(request: Request, start: date | None = None, end: date | No
         "computed": new_rows.height if not new_rows.is_empty() else 0,
         "phase_days": phase_days,
         "mainline_rows": mainline_rows,
+        "warnings": warnings or None,
     }
 
 

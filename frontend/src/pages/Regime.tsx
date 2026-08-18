@@ -633,7 +633,16 @@ export function Regime() {
     setRecomputing(true)
     try {
       const r = await api.regimeRecompute()
-      toast(r.computed > 0 ? `重算完成 · 新增 ${r.computed} 天` : '重算完成 · 数据已是最新', 'success')
+      if ((r as any).ok === false) {
+        toast(`重算失败 · ${(r as any).error ?? '未知原因'}`, 'error')
+        return
+      }
+      const warn = (r as any).warnings as string[] | null | undefined
+      if (warn?.length) {
+        toast(`重算完成(附加步骤有失败):${warn.join(';')}`, 'error')
+      } else {
+        toast(r.computed > 0 ? `重算完成 · 新增 ${r.computed} 天` : '重算完成 · 数据已是最新', 'success')
+      }
       await Promise.all([
         qc.invalidateQueries({ queryKey: ['regime-history'] }),
         qc.invalidateQueries({ queryKey: ['regime-states'] }),
