@@ -198,9 +198,9 @@ async def generate_signal(repo, data_dir: Path, symbol: str) -> dict:
         text = await generate_ai_text(
             msgs,
             temperature=0.2,
-            max_tokens=3000,  # [R22] 思考型模型(<think>)先烧一段推理 token, 上限太小时
-                              # JSON 正文根本没机会输出 → "无法解析"; 上限非目标,
-                              # 普通模型不多产出不多花钱
+            # [上游标准] 分析类调用不限制输出: 推理模型思考 token 计入 max_tokens
+            # 预算, 显式限制会挤占正文(见 ai_provider.generate_ai_text)
+            max_tokens=None,
         )
     except Exception as e:  # noqa: BLE001
         logger.warning("signal gen failed for %s: %s", sym, e)
@@ -217,7 +217,7 @@ async def generate_signal(repo, data_dir: Path, symbol: str) -> dict:
                          "重要:只输出一个 JSON 对象本身,第一个字符必须是 {,"
                          "不要任何思考过程、解释或代码块围栏。"}],
                 temperature=0.1,
-                max_tokens=3000,
+                max_tokens=None,  # [上游标准] 同上, 不限制输出
             )
             parsed = _parse_signal(text)
         except Exception as e:  # noqa: BLE001

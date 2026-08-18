@@ -373,7 +373,7 @@ async def run_backtest(repo, symbol: str, use_ai: bool = True) -> dict:
                 {"role": "user", "content": user_prompt},
             ],
             temperature=0.2,
-            max_tokens=1500,  # [R22] 思考型模型需给推理段留余量, 300 会掐死在 <think> 里
+            max_tokens=None,  # [上游标准] 分析类调用不限制输出(推理模型思考计入预算)
         )
         out["ai"] = _parse_ai_reco(text)
         if out["ai"] is None:

@@ -722,7 +722,7 @@ async def today_ai(request: Request):
                 {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
             ],
             temperature=0.2,
-            max_tokens=2500,  # 思考型模型需给推理段留余量
+            max_tokens=None,  # [上游标准] 分析类调用不限制输出(推理模型思考计入预算)
         )
         out = parse_ai_brief_response(text, {c["symbol"] for c in cands})
         out["analyzed"] = len(cands)

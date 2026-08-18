@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, Suspense } from 'react'
+import { useEffect, useMemo, useRef, useState, Suspense } from 'react'
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
@@ -25,6 +25,7 @@ import {
   Star,
   ScanSearch,
   History,
+  Pickaxe,
   FileText,
   Settings,
   Key,
@@ -57,6 +58,8 @@ import { Logo } from './Logo'
 import { api, type IndexQuote } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import { resolveWatchlistGroupColor } from '@/lib/watchlist-group-colors'
+import { computeGroupPcts, groupPctColor, groupPctTitle } from '@/lib/watchlistGroupStats'
+import { fmtPct } from '@/lib/format'
 import { toggleTheme, useTheme } from '@/lib/theme'
 import { setCurrentTotal as setAlertTotal, useUnreadAlerts } from '@/lib/monitorBadge'
 import { ExtensionSlot } from '@/extensions/ExtensionSlot'
@@ -82,6 +85,7 @@ const nav = [
   { to: '/watchlist',  label: '自选',   icon: Star },
   { to: '/screener',   label: '策略',   icon: ScanSearch },
   { to: '/backtest',   label: '回测', icon: History },
+  { to: '/mining',     label: '挖掘', icon: Pickaxe },
   { to: '/stock-analysis',    label: '个股分析', icon: TrendingUp },
   { to: '/limit-ladder', label: '连板梯队', icon: Flame },
   { to: '/concept-analysis', label: '概念分析', icon: Layers3 },
@@ -305,6 +309,36 @@ export function Layout() {
   // 自选二级菜单展开状态 — 默认当前在自选页时展开
   const [watchlistNavExpanded, setWatchlistNavExpanded] = useState(location.pathname === '/watchlist')
 
+  // 侧边栏收起状态 — 持久化到 localStorage
+  const [navCollapsed, setNavCollapsed] = useState(() => {
+    if (typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches) return true
+    try { return localStorage.getItem('tf-nav-collapsed') === '1' } catch { return false }
+  })
+
+  // 分组等权平均涨跌幅 — 复用 watchlist/enriched 查询缓存(与自选页同 key,
+  // 盘中随 SSE 刷新)。可见性门控: 子菜单实际可见(侧栏展开 + 二级菜单展开)
+  // 时才拉取, 收起状态下不为隐藏 UI 发请求。
+  const navGroupPctVisible = groupsInNav && !navCollapsed && watchlistNavExpanded
+  const { data: navWatchlist } = useQuery({
+    queryKey: QK.watchlist,
+    queryFn: api.watchlistList,
+    enabled: navGroupPctVisible,
+    staleTime: 60_000,
+  })
+  const { data: navEnriched } = useQuery({
+    queryKey: QK.watchlistEnriched(undefined),
+    queryFn: () => api.watchlistEnriched(),
+    enabled: navGroupPctVisible,
+    staleTime: 60_000,
+  })
+  const navGroupPcts = useMemo(
+    () => computeGroupPcts(
+      navWatchlist?.symbols ?? [],
+      new Map((navEnriched?.rows ?? []).map((r: any) => [r.symbol as string, r])),
+    ),
+    [navWatchlist, navEnriched],
+  )
+
   // 数据同步状态轮询: 有活跃 job 时「数据」菜单项显示转圈
   const { data: pipelineJobs } = useQuery({
     queryKey: QK.pipelineJobs,
@@ -335,11 +369,6 @@ export function Layout() {
   const realtimeEnabled = prefs?.realtime_quotes_enabled ?? false
   // Free 档监控限制提示: 可手动关闭, 不持久化 (刷新后恢复显示)
   const [dismissFreeHint, setDismissFreeHint] = useState(false)
-  // 侧边栏收起状态 — 持久化到 localStorage
-  const [navCollapsed, setNavCollapsed] = useState(() => {
-    if (typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches) return true
-    try { return localStorage.getItem('tf-nav-collapsed') === '1' } catch { return false }
-  })
   useEffect(() => {
     const compact = window.matchMedia('(max-width: 767px)')
     const syncSidebarWithViewport = (event: MediaQueryListEvent | MediaQueryList) => {
@@ -427,12 +456,11 @@ export function Layout() {
     : (dataSources?.custom?.find(s => s.name === activeProvider)?.display_name || activeProvider)
   const isCustomActive = activeProvider !== 'tickflow'
 
-  // 轮询触发记录总数 → 更新监控中心徽标 (每 15 秒)
+  // 轮询触发记录总数 → 更新监控中心徽标 (每 15 秒; 后台标签页由 SSE 事件驱动, 不轮询)
   const alertsTotalQuery = useQuery({
     queryKey: ['alerts-total'],
     queryFn: () => api.alertsList({ days: 7, limit: 1 }),
     refetchInterval: 15000,
-    refetchIntervalInBackground: true,
     select: (data) => data.total,
   })
   // 只在拿到真实总数时同步徽标 (避免 data=undefined 时传 0 重置 lastSeen)
@@ -459,11 +487,27 @@ export function Layout() {
   const navItems = savedOrder.length > 0
     ? (() => {
         const byTo = new Map(allNav.map(n => [n.to, n]))
-        const ordered = savedOrder
+        const ordered = (savedOrder
           .map(id => byTo.get(id) ?? byTo.get(`/analysis/${id}`))
-          .filter(Boolean)
-        const seen = new Set(ordered.map(n => n!.to))
-        return [...ordered as typeof allNav, ...allNav.filter(n => !seen.has(n.to))]
+          .filter(Boolean)) as typeof allNav
+        const seen = new Set(ordered.map(n => n.to))
+        const merged = [...ordered]
+        for (const item of allNav) {
+          if (seen.has(item.to)) continue
+          // 未保存过排序的新条目: 内置页插回默认位置(排在已保存的默认前驱之后),
+          // 分析/扩展菜单仍追加到末尾
+          const defaultIndex = nav.findIndex(n => n.to === item.to)
+          let anchor = -1
+          if (defaultIndex > 0) {
+            for (let i = defaultIndex - 1; i >= 0 && anchor < 0; i -= 1) {
+              anchor = merged.findIndex(n => n.to === nav[i].to)
+            }
+          }
+          if (anchor >= 0) merged.splice(anchor + 1, 0, item)
+          else if (defaultIndex >= 0) merged.unshift(item)
+          else merged.push(item)
+        }
+        return merged
       })()
     : allNav
 
@@ -636,11 +680,20 @@ export function Layout() {
                     >
                       <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-muted" />
                       <span>全部</span>
+                      {(() => {
+                        const info = navGroupPcts['all']
+                        return info && info.pct != null ? (
+                          <span className={`ml-auto font-mono text-[10px] tabular-nums ${groupPctColor(info.pct)}`} title={groupPctTitle(info)}>
+                            {fmtPct(info.pct)}
+                          </span>
+                        ) : null
+                      })()}
                     </NavLink>
                     {watchlistGroups.map(group => {
                       const color = resolveWatchlistGroupColor(group.color)
                       const groupPath = `/watchlist?group=${group.id}`
                       const isGroupActive = location.pathname === '/watchlist' && location.search === `?group=${group.id}`
+                      const pctInfo = navGroupPcts[group.id]
                       return (
                         <NavLink
                           key={group.id}
@@ -654,6 +707,11 @@ export function Layout() {
                         >
                           <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${color.dot}`} />
                           <span className="truncate">{group.name}</span>
+                          {pctInfo && pctInfo.pct != null && (
+                            <span className={`ml-auto font-mono text-[10px] tabular-nums ${groupPctColor(pctInfo.pct)}`} title={groupPctTitle(pctInfo)}>
+                              {fmtPct(pctInfo.pct)}
+                            </span>
+                          )}
                         </NavLink>
                       )
                     })}

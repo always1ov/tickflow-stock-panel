@@ -40,13 +40,13 @@ const SOURCE_BADGE_STYLE: Record<string, string> = {
 }
 
 /**
- * 渲染策略类消息 — 策略名黄色、新入选绿、移出红、其余白色。
+ * 渲染策略类消息 — 策略名黄色、进入红/移出绿 (A 股红涨绿跌惯例)、其余白色。
  */
 function renderMessage(source: string, message: string) {
   if (source !== 'strategy') {
     return <span className="text-secondary">{message}</span>
   }
-  const m = message.match(/^(策略「)([^」]+)(」)(新入选|移出)( .*)$/)
+  const m = message.match(/^(策略「)([^」]+)(」)(新入选|进入|移出)( .*)$/)
   if (!m) return <span className="text-foreground">{message}</span>
   const [, pre, strategyName, mid, direction, post] = m
   return (
@@ -54,7 +54,7 @@ function renderMessage(source: string, message: string) {
       <span className="text-foreground/80">{pre}</span>
       <span className="text-amber-400 font-medium">{strategyName}</span>
       <span className="text-foreground/80">{mid}</span>
-      <span className={direction === '新入选' ? 'text-emerald-400 font-medium' : 'text-danger font-medium'}>{direction}</span>
+      <span className={direction === '移出' ? 'text-bear font-medium' : 'text-danger font-medium'}>{direction}</span>
       <span className="text-foreground/80">{post}</span>
     </>
   )
@@ -138,8 +138,8 @@ export function Monitor() {
   const alertsQuery = useQuery({
     queryKey: [...QK.alerts(filter === 'all' ? undefined : filter), extColumnsParam ?? ''],
     queryFn: () => api.alertsList({ days: 7, limit: 500, source: filter === 'all' ? undefined : filter, extColumns: extColumnsParam }),
+    // 10s 轮询仅作 SSE strategy_alert 事件的兜底; 后台标签页不再拉 500 条全量
     refetchInterval: 10000,
-    refetchIntervalInBackground: true,
   })
   const total = alertsQuery.data?.total ?? 0
 
@@ -369,7 +369,7 @@ function AlertsList({ alertsQuery, confirmClear, setConfirmClear, total, enterTs
             const isNew = ev.ts > enterTs
             return (
               <motion.div
-                key={`${ev.ts}-${i}`}
+                key={`${ev.ts}-${ev.symbol ?? ''}-${ev.rule_name ?? ''}`}
                 initial={isNew ? { opacity: 0, y: -8, scale: 0.98 } : { opacity: 0, y: 4 }}
                 animate={isNew ? {
                   opacity: [0, 1, 1, 0.85, 1],
