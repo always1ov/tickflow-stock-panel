@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Sparkles, LineChart, History as HistoryIcon, Loader2, ExternalLink, Bell, AlertTriangle, X } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { Sparkles, LineChart, History as HistoryIcon, Loader2, ExternalLink, Bell, AlertTriangle, X, Maximize2, Minimize2 } from 'lucide-react'
 import { PageHeader } from '@/components/PageHeader'
 import { EmptyState } from '@/components/EmptyState'
 import { StockFinancialSearch } from '@/components/financials/StockFinancialSearch'
@@ -11,6 +12,7 @@ import { PriceAlertDialog } from '@/components/stock-analysis/PriceAlertDialog'
 import { WatchlistDecisionBoard } from '@/components/stock-analysis/WatchlistDecisionBoard'
 import { TrendStateBar, useStockTrend } from '@/components/stock-analysis/TrendStateBar'
 import { api } from '@/lib/api'
+import { cn } from '@/lib/cn'
 import { useDialogBackdrop } from '@/lib/useDialogBackdrop'
 import { useLastStock } from '@/lib/useLastStock'
 import { QK } from '@/lib/queryKeys'
@@ -145,10 +147,13 @@ export function StockAnalysis() {
         <WatchlistDecisionBoard currentSymbol={symbol} onSelect={onSelect} />
       </div>
 
-      {/* [R28] 关键价位分析弹窗:日 K + 压力支撑 + 六态趋势条 */}
-      {showLevels && symbol && (
-        <LevelsDialog symbol={symbol} name={name} onClose={() => setShowLevels(false)} />
-      )}
+      {/* [R28] 关键价位分析弹窗:日 K + 压力支撑 + 六态趋势条。
+          常驻挂载、由 symbol 是否为 null 驱动, 这样关闭时退场动画能播完 */}
+      <LevelsDialog
+        symbol={showLevels && symbol ? symbol : null}
+        name={name}
+        onClose={() => setShowLevels(false)}
+      />
 
       {/* 二次确认:已有历史报告 */}
       {confirmReport && (
@@ -181,9 +186,11 @@ export function StockAnalysis() {
 }
 
 // ===== [R28] 关键价位分析弹窗 =====
-// 决策台占满整页后, 关键价位不再内联切换, 而是像点股票名那样弹窗查看:
-// 列表不会被推走, 看完一只关掉即可继续扫下一只。
-function LevelsDialog({ symbol, name, onClose }: { symbol: string; name: string; onClose: () => void }) {
+// 决策台占满整页后, 关键价位不再内联切换, 而是弹窗查看: 列表不会被推走,
+// 看完一只关掉即可继续扫下一只。动效/尺寸/可放大都对齐个股日 K 详情弹窗
+// (StockPreviewDialog), 两个弹窗手感一致, 不会一个丝滑一个生硬。
+function LevelsDialog({ symbol, name, onClose }: { symbol: string | null; name: string; onClose: () => void }) {
+  const [maximized, setMaximized] = useState(false)
   const backdrop = useDialogBackdrop(onClose)
 
   // Esc 关闭 —— 弹窗高频开关, 键盘退出比找关闭按钮快
@@ -193,31 +200,99 @@ function LevelsDialog({ symbol, name, onClose }: { symbol: string; name: string;
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
 
+  // 关掉时重置放大态, 下次开回到常规尺寸
+  useEffect(() => { if (!symbol) setMaximized(false) }, [symbol])
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" {...backdrop}>
-      <div className="w-full max-w-[1180px] max-h-[92vh] flex flex-col bg-surface border border-border rounded-2xl shadow-2xl overflow-hidden">
-        <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border/60 shrink-0">
-          <LineChart className="h-4 w-4 text-sky-400 shrink-0" />
-          <span className="text-sm font-medium text-foreground truncate">{name || symbol}</span>
-          <span className="text-[10px] font-mono text-muted">{symbol}</span>
-          <button
-            onClick={onClose}
-            title="关闭(Esc)"
-            className="ml-auto p-1 rounded-md text-muted hover:text-foreground hover:bg-elevated transition-colors cursor-pointer"
+    <AnimatePresence>
+      {symbol && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            {...backdrop}
+          />
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 12 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.97, y: 8 }}
+            transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+            className={cn(
+              'relative rounded-card border border-border bg-base shadow-2xl overflow-hidden flex flex-col transition-all duration-200 ease-smooth',
+              maximized ? 'w-screen h-screen max-w-none max-h-none' : 'w-[92vw] max-w-[1100px] max-h-[95vh]',
+            )}
           >
-            <X className="h-4 w-4" />
-          </button>
+            {/* 顶栏: 与个股日 K 弹窗同款 —— 代码 + 名称在左, 行情摘要与操作在右 */}
+            <div className="flex shrink-0 items-center justify-between gap-3 px-4 py-3 sm:px-5">
+              <div className="flex min-w-0 items-center gap-2">
+                <LineChart className="h-4 w-4 shrink-0 text-sky-400" />
+                <span className="shrink-0 font-mono text-sm font-medium text-foreground">{symbol}</span>
+                {name && <span className="truncate text-xs text-muted">{name}</span>}
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <LevelsPriceTag symbol={symbol} />
+                <button
+                  onClick={() => setMaximized(v => !v)}
+                  title={maximized ? '缩小' : '放大'}
+                  className="rounded-md p-1 text-muted transition-colors hover:bg-elevated hover:text-foreground"
+                >
+                  {maximized ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+                </button>
+                <button
+                  onClick={onClose}
+                  title="关闭(Esc)"
+                  className="rounded-md p-1 text-muted transition-colors hover:bg-elevated hover:text-foreground"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-auto px-4 pb-4 sm:px-5">
+              {/* bare: 去掉内层卡片外框与标题条 —— 弹窗里再套一层框正是"辣眼睛"的来源 */}
+              <StockAnalysisBoard symbol={symbol} bare height={maximized ? 720 : 520} />
+            </div>
+          </motion.div>
         </div>
-        <div className="p-3 overflow-auto">
-          <StockAnalysisBoard symbol={symbol} height={520} />
-        </div>
-      </div>
-    </div>
+      )}
+    </AnimatePresence>
+  )
+}
+
+/** 顶栏右侧的行情摘要(交易日数 + 当前价)。查询键与看板一致, TanStack 直接命中缓存, 不产生额外请求。 */
+function LevelsPriceTag({ symbol }: { symbol: string }) {
+  const kline = useQuery({
+    queryKey: ['kline', symbol, ''],
+    queryFn: () => api.klineDaily(symbol, 250),
+    enabled: !!symbol,
+    staleTime: 60_000,
+  })
+  const levelsQ = useQuery({
+    queryKey: QK.stockLevels(symbol),
+    queryFn: () => api.stockAnalysisLevels(symbol, 250),
+    enabled: !!symbol,
+    staleTime: 60_000,
+  })
+  const rows = kline.data?.rows ?? []
+  if (rows.length === 0) return null
+  const last = rows[rows.length - 1]
+  const prev = rows[rows.length - 2]
+  const isUp = prev ? (last.close >= prev.close) : (last.close >= last.open)
+  return (
+    <span className="hidden items-baseline gap-2 sm:flex">
+      <span className="text-[10px] text-muted">{rows.length} 个交易日</span>
+      <span className="text-[10px] text-muted/60">·</span>
+      <span className={`font-mono text-base font-bold ${isUp ? 'text-bull' : 'text-bear'}`}>
+        {levelsQ.data?.close?.toFixed(2) ?? '—'}
+      </span>
+    </span>
   )
 }
 
 // ===== 分析看板:日 K + 关键价位 =====
-function StockAnalysisBoard({ symbol, height = 480 }: { symbol: string; height?: number }) {
+function StockAnalysisBoard({ symbol, height = 480, bare = false }: { symbol: string; height?: number; bare?: boolean }) {
   const kline = useQuery({
     queryKey: ['kline', symbol, ''],
     queryFn: () => api.klineDaily(symbol, 250),
@@ -269,6 +344,25 @@ function StockAnalysisBoard({ symbol, height = 480 }: { symbol: string; height?:
   const curClose = levelsQ.data?.close
   const isUp = prev ? (last.close >= prev.close) : (last.close >= last.open)
 
+  const body = (
+    <div className={bare ? 'space-y-2' : 'p-3 space-y-2'}>
+      {/* [fork 增强] 六态趋势条(利弗莫尔 Market Key) */}
+      <TrendStateBar symbol={symbol} trend={trendQ.data} />
+      <AnalysisKChart
+        rows={rows}
+        levels={levels}
+        series={levelsQ.data?.series}
+        seriesDates={levelsQ.data?.dates}
+        defaultLevelTypes={['sr', 'pivot', 'keltner_s']}
+        ranges={trendRanges}
+        height={height}
+      />
+    </div>
+  )
+
+  // bare: 弹窗里用 —— 卡片外框与标题条由弹窗自己提供, 再套一层就是双层边框
+  if (bare) return body
+
   return (
     <div className="rounded-card border border-border/60 bg-surface/40 overflow-hidden">
       <div className="px-4 py-3 border-b border-border/40">
@@ -287,19 +381,7 @@ function StockAnalysisBoard({ symbol, height = 480 }: { symbol: string; height?:
           </div>
         </div>
       </div>
-      <div className="p-3 space-y-2">
-        {/* [fork 增强] 六态趋势条(利弗莫尔 Market Key) */}
-        <TrendStateBar symbol={symbol} trend={trendQ.data} />
-        <AnalysisKChart
-          rows={rows}
-          levels={levels}
-          series={levelsQ.data?.series}
-          seriesDates={levelsQ.data?.dates}
-          defaultLevelTypes={['sr', 'pivot', 'keltner_s']}
-          ranges={trendRanges}
-          height={height}
-        />
-      </div>
+      {body}
     </div>
   )
 }
