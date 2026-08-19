@@ -7,6 +7,7 @@ import { toast } from '@/components/Toast'
 import { useHistoryReports, openHistoryReport, loadHistory } from '@/lib/stockAnalysisStore'
 import { trendBadgeCls } from '@/components/stock-analysis/TrendStateBar'
 import { TrendSummaryDialog } from '@/components/stock-analysis/TrendSummaryDialog'
+import { storage } from '@/lib/storage'
 
 type Position = { held: boolean; cost: number | null; weight?: number | null; updated_at: string }
 type WatchPoint = { direction: 'up' | 'down'; price: number; label?: string; action?: string; reason?: string }
@@ -40,7 +41,8 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
   onSelect: (symbol: string, name: string) => void
 }) {
   const qc = useQueryClient()
-  const [open, setOpen] = useState(true)
+  // 展开状态持久化: 想让 K 线占满首屏的用户收起一次即可, 不必每次进页面都收
+  const [open, setOpen] = useState(() => storage.decisionBoardOpen.get(true))
   const [heldOnly, setHeldOnly] = useState(false)
   // [fork 增强] 六态汇总弹窗
   const [showTrendSummary, setShowTrendSummary] = useState(false)
@@ -228,7 +230,10 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
   return (
     <div className="rounded-xl border border-border/60 bg-surface/40 overflow-hidden">
       <div className="flex items-center gap-2 px-4 py-2.5">
-        <button onClick={() => setOpen((v) => !v)} className="flex items-center gap-2 cursor-pointer">
+        <button
+          onClick={() => setOpen((v) => { storage.decisionBoardOpen.set(!v); return !v })}
+          className="flex items-center gap-2 cursor-pointer"
+        >
           <ChevronDown className={`h-3.5 w-3.5 text-muted transition-transform ${open ? '' : '-rotate-90'}`} />
           <Wallet className="h-3.5 w-3.5 text-sky-400" />
           <span className="text-xs font-medium text-foreground">自选决策台</span>
@@ -294,8 +299,10 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
         />
       )}
 
+      {/* 表格高度随屏自适应: 固定 280px 在常见屏上只露 3 行且上下都是半截行,
+          观感差也不便扫读; 上限 520px 保证 K 线图仍在首屏内 */}
       {open && (
-        <div className="max-h-[280px] overflow-auto border-t border-border/60">
+        <div className="max-h-[min(48vh,520px)] overflow-auto border-t border-border/60">
           <table className="w-full min-w-[720px] text-xs">
             <thead className="sticky top-0 bg-surface/95 backdrop-blur text-[10px] text-muted">
               <tr className="text-left">

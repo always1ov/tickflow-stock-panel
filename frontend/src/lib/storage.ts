@@ -48,6 +48,9 @@ export const storage = {
   /** 自选列表日K蜡烛图显示状态 */
   watchlistCandle:      kv<boolean>('watchlist_showCandle'),
 
+  /** [fork 增强] 个股分析页决策台展开状态(收起后下次进来保持, 让 K 线占满首屏) */
+  decisionBoardOpen:    kv<boolean>('stock_analysis_board_open'),
+
   /** 自选列表分时图显示状态 */
   watchlistIntraday:    kv<boolean>('watchlist_showIntraday'),
 

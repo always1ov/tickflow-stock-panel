@@ -98,7 +98,7 @@ export function StockAnalysis() {
         }
       />
 
-      <div className="w-full px-8 py-6 space-y-6">
+      <div className="w-full px-6 py-4 space-y-4">
         {/* 搜索栏 */}
         <div className="flex items-center gap-3">
           <div className="w-72">
