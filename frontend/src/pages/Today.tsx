@@ -1,8 +1,9 @@
 /**
  * [fork 增强] 今日总览 —— 决策汇聚层。
  *
- * 把六态趋势/AI 信号预案/持仓出场线/监控触发按"需要行动的紧迫度"聚合成一屏:
- * ① 行动区(必须处理) ② 机会区(值得看) ③ 市场天气(定基调) ④ 持仓体检。
+ * 把六态趋势/AI 信号预案/持仓出场线/监控触发聚合成一屏, 版面顺序:
+ * 市场天气(定基调) → 值得关注(买什么) → 需要行动(持仓风险) → 持仓体检。
+ * 行动区与持仓体检相邻 —— 两者都是持仓管理, 连着看不用来回滚。
  * 数据全部来自既有模块,零新计算;AI 导读可选(手动点击,一次调用)。
  */
 import { useState } from 'react'
@@ -91,10 +92,10 @@ function buildTodayHtml(d: TodayOverview, brief: string | null): string {
     <span style="margin-left:auto;font-size:12px;color:#8a919f">涨势 <b style="color:${bull}">${d.weather.bull}</b> / 跌势 <b style="color:${bear}">${d.weather.bear}</b> · 刚转强 ${d.weather.new_bull} · 刚转弱 ${d.weather.new_bear}</span>
   </div>
   ${brief ? `<div class="brief">✦ ${esc(brief)}</div>` : ''}
-  <h2>⚠️ 需要行动(${d.actions.length})</h2>
-  ${d.actions.length ? `<ul class="items">${actionRows}</ul>` : '<div class="empty">今日无需操作 —— 管住手</div>'}
   <h2>🎯 值得关注(${d.opportunities.length}·已按把握分筛选${d.opportunities_filtered > 0 ? `,滤掉 ${d.opportunities_filtered} 只` : ''})</h2>
   ${d.opportunities.length ? `<ul class="items">${oppRows}</ul>` : '<div class="empty">今日没有把握足够的买入机会 —— 等待比出手更常见</div>'}
+  <h2>⚠️ 需要行动(${d.actions.length})</h2>
+  ${d.actions.length ? `<ul class="items">${actionRows}</ul>` : '<div class="empty">今日无需操作 —— 管住手</div>'}
   <h2>💼 持仓体检(${d.holdings.length})${d.portfolio ? `<span style="font-weight:400;font-size:12px;color:#8a919f;margin-left:8px">组合:平均浮盈 ${d.portfolio.avg_pnl != null ? (d.portfolio.avg_pnl * 100).toFixed(1) + '%' : '—'} · 已触发 ${d.portfolio.triggered} · 逼近出场线 ${d.portfolio.near_exit} · 空头趋势 ${d.portfolio.bearish}${d.portfolio.total_weight != null ? ` · 总仓位 ${(d.portfolio.total_weight / 10).toFixed(1)}成${d.portfolio.drawdown != null ? ` · 距净值高点 -${(d.portfolio.drawdown * 100).toFixed(1)}%` : ''}` : ''}</span>` : ''}</h2>
   ${d.holdings.length ? `<table>
     <thead><tr><th>标的</th><th class="num">现价</th><th class="num">仓位</th><th class="num">浮盈</th><th class="num">出场线</th><th>阶段</th><th>趋势</th><th>操作建议</th></tr></thead>
@@ -327,77 +328,45 @@ export function Today() {
 
       {d && (
         <>
-          {/* ③ 市场天气(放最上面一条横幅, 定基调) */}
-          <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border/60 bg-surface/40 px-4 py-3">
-            <Compass className="h-4 w-4 text-sky-400" />
-            <span className={`inline-flex rounded-full border px-3 py-0.5 text-sm font-medium ${POSTURE_STYLE[d.weather.posture] ?? POSTURE_STYLE['观察']}`}>
-              {d.weather.posture}
-            </span>
-            {d.weather.market && (
-              <span
-                title={
-                  `基准 ${d.weather.market.benchmark_name ?? '—'}(${d.weather.market.as_of ?? '—'})` +
-                  (d.weather.market.metrics.close != null
-                    ? ` · 收盘 ${d.weather.market.metrics.close} / 50日线 ${d.weather.market.metrics.ma50} / 年线 ${d.weather.market.metrics.ma200} / 年动量 ${((d.weather.market.metrics.momentum_12m ?? 0) * 100).toFixed(1)}%`
-                    : '') +
-                  ` —— 最终姿态取大盘与自选中更保守的一方`
-                }
-                className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] ${POSTURE_STYLE[d.weather.market.mode] ?? POSTURE_STYLE['观察']}`}
-              >
-                {d.weather.market.benchmark_name ?? '大盘'}·{d.weather.market.mode}
-                {d.weather.market.pending && <span className="opacity-70">(将转{d.weather.market.pending.mode} {d.weather.market.pending.streak}/{d.weather.market.pending.need})</span>}
-              </span>
-            )}
-            <span className="text-xs text-muted">{d.weather.posture_reason}</span>
-            <span className="ml-auto text-[11px] font-mono text-muted">
-              涨势 <span className="text-red-400 font-semibold">{d.weather.bull}</span>
-              <span className="mx-1 text-muted/40">/</span>
-              跌势 <span className="text-emerald-400 font-semibold">{d.weather.bear}</span>
-              <span className="mx-2 text-muted/40">·</span>
-              刚转强 {d.weather.new_bull} · 刚转弱 {d.weather.new_bear}
-            </span>
+          {/* ③ 市场天气(最上面一条横幅, 定基调) —— 左侧徽章+理由, 右侧统计定宽对齐,
+              避免理由长短不一时统计块被挤得忽上忽下 */}
+          <div className="flex items-start gap-4 rounded-lg border border-border/60 bg-surface/40 px-4 py-3">
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <Compass className="h-4 w-4 shrink-0 text-sky-400" />
+                <span className={`inline-flex rounded-full border px-3 py-0.5 text-sm font-medium ${POSTURE_STYLE[d.weather.posture] ?? POSTURE_STYLE['观察']}`}>
+                  {d.weather.posture}
+                </span>
+                {d.weather.market && (
+                  <span
+                    title={
+                      `基准 ${d.weather.market.benchmark_name ?? '—'}(${d.weather.market.as_of ?? '—'})` +
+                      (d.weather.market.metrics.close != null
+                        ? ` · 收盘 ${d.weather.market.metrics.close} / 50日线 ${d.weather.market.metrics.ma50} / 年线 ${d.weather.market.metrics.ma200} / 年动量 ${((d.weather.market.metrics.momentum_12m ?? 0) * 100).toFixed(1)}%`
+                        : '') +
+                      ` —— 最终姿态取大盘与自选中更保守的一方`
+                    }
+                    className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] ${POSTURE_STYLE[d.weather.market.mode] ?? POSTURE_STYLE['观察']}`}
+                  >
+                    {d.weather.market.benchmark_name ?? '大盘'}·{d.weather.market.mode}
+                    {d.weather.market.pending && <span className="opacity-70">(将转{d.weather.market.pending.mode} {d.weather.market.pending.streak}/{d.weather.market.pending.need})</span>}
+                  </span>
+                )}
+              </div>
+              <p className="mt-1.5 text-xs leading-relaxed text-muted">{d.weather.posture_reason}</p>
+            </div>
+            <div className="shrink-0 space-y-0.5 text-right font-mono text-[11px] text-muted">
+              <div title="自选中处于涨势/跌势的只数">
+                涨势 <span className="font-semibold text-red-400">{d.weather.bull}</span>
+                <span className="mx-1 text-muted/40">/</span>
+                跌势 <span className="font-semibold text-emerald-400">{d.weather.bear}</span>
+              </div>
+              <div title="今天新转强/新转弱的只数">
+                刚转强 {d.weather.new_bull} · 刚转弱 {d.weather.new_bear}
+              </div>
+            </div>
           </div>
 
-          {/* ① 行动区 */}
-          <section className="rounded-lg border border-border/60 bg-surface/40 overflow-hidden">
-            <div className="flex items-center gap-2 border-b border-border/40 px-4 py-2.5">
-              <AlertTriangle className="h-4 w-4 text-red-400" />
-              <span className="text-sm font-medium text-foreground">需要行动</span>
-              <span className="text-[10px] text-muted">{d.actions.length} 项</span>
-              <span
-                title={d.live
-                  ? '距离/价格按盘中最新价计算;"已跌破→清仓"的纪律判定仍以收盘为准'
-                  : `所有距离/价格为 ${d.as_of ?? '上一交易日'} 收盘快照 —— 盘中已变化的不会反映,打开左下角「实时行情」后自动实时`}
-                className={`rounded border px-1.5 py-0.5 text-[9px] ${d.live ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-400' : 'border-amber-400/30 bg-amber-400/10 text-amber-300'}`}
-              >
-                {d.live ? '实时口径' : `昨收快照 ${d.as_of ?? ''}`}
-              </span>
-            </div>
-            {d.actions.length === 0 ? (
-              <div className="flex items-center gap-2 px-4 py-5 text-xs text-muted">
-                <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-                今日无需操作 —— 这本身就是有价值的信息,管住手
-              </div>
-            ) : (
-              <ul className="grid lg:grid-cols-2 -mb-px">
-                {d.actions.map((a, i) => (
-                  <li key={i} className="border-b border-border/30 lg:odd:border-r">
-                    <button
-                      onClick={() => a.symbol && goStock(a.symbol, a.name)}
-                      className="flex w-full items-start gap-2.5 px-4 py-2.5 text-left hover:bg-elevated/40 transition-colors cursor-pointer"
-                    >
-                      <span className={`mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full ${a.severity === 'high' ? 'bg-red-400' : 'bg-amber-300'}`} />
-                      <span className="text-xs leading-relaxed">
-                        <span className="font-medium text-foreground">{a.name}</span>
-                        {a.symbol && a.symbol !== a.name && <span className="ml-1.5 text-[9px] font-mono text-muted">{a.symbol}</span>}
-                        <span className="ml-2 text-foreground/80">{a.text}</span>
-                      </span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
 
           {/* ② 机会区(已按把握分筛选排序; AI 优选可再精选) */}
           <section className="rounded-lg border border-border/60 bg-surface/40 overflow-hidden">
@@ -641,6 +610,47 @@ export function Today() {
                     </li>
                   )
                 })}
+              </ul>
+            )}
+          </section>
+
+          {/* ① 行动区 */}
+          <section className="rounded-lg border border-border/60 bg-surface/40 overflow-hidden">
+            <div className="flex items-center gap-2 border-b border-border/40 px-4 py-2.5">
+              <AlertTriangle className="h-4 w-4 text-red-400" />
+              <span className="text-sm font-medium text-foreground">需要行动</span>
+              <span className="text-[10px] text-muted">{d.actions.length} 项</span>
+              <span
+                title={d.live
+                  ? '距离/价格按盘中最新价计算;"已跌破→清仓"的纪律判定仍以收盘为准'
+                  : `所有距离/价格为 ${d.as_of ?? '上一交易日'} 收盘快照 —— 盘中已变化的不会反映,打开左下角「实时行情」后自动实时`}
+                className={`rounded border px-1.5 py-0.5 text-[9px] ${d.live ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-400' : 'border-amber-400/30 bg-amber-400/10 text-amber-300'}`}
+              >
+                {d.live ? '实时口径' : `昨收快照 ${d.as_of ?? ''}`}
+              </span>
+            </div>
+            {d.actions.length === 0 ? (
+              <div className="flex items-center gap-2 px-4 py-5 text-xs text-muted">
+                <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                今日无需操作 —— 这本身就是有价值的信息,管住手
+              </div>
+            ) : (
+              <ul className="grid lg:grid-cols-2 -mb-px">
+                {d.actions.map((a, i) => (
+                  <li key={i} className="border-b border-border/30 lg:odd:border-r">
+                    <button
+                      onClick={() => a.symbol && goStock(a.symbol, a.name)}
+                      className="flex w-full items-start gap-2.5 px-4 py-2.5 text-left hover:bg-elevated/40 transition-colors cursor-pointer"
+                    >
+                      <span className={`mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full ${a.severity === 'high' ? 'bg-red-400' : 'bg-amber-300'}`} />
+                      <span className="text-xs leading-relaxed">
+                        <span className="font-medium text-foreground">{a.name}</span>
+                        {a.symbol && a.symbol !== a.name && <span className="ml-1.5 text-[9px] font-mono text-muted">{a.symbol}</span>}
+                        <span className="ml-2 text-foreground/80">{a.text}</span>
+                      </span>
+                    </button>
+                  </li>
+                ))}
               </ul>
             )}
           </section>
