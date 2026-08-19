@@ -2117,6 +2117,17 @@ export const api = {
     }),
   watchlistGroups: () =>
     request<{ groups: WatchlistGroup[] }>('/api/watchlist/groups'),
+  // [fork 增强] AI 一键分组: suggest 只出方案不落库, apply 才写入
+  watchlistAiGroupSuggest: () =>
+    request<{
+      groups?: { name: string; symbols: string[]; names: string[]; reason: string }[]
+      ungrouped?: string[]; ungrouped_names?: string[]; total?: number; error?: string
+    }>('/api/watchlist/ai-group', { method: 'POST' }),
+  watchlistAiGroupApply: (groups: { name: string; symbols: string[] }[], replaceExisting: boolean) =>
+    request<{ ok: boolean; groups_created: number; symbols_assigned: number; groups: WatchlistGroup[] }>(
+      '/api/watchlist/ai-group/apply',
+      { method: 'POST', body: JSON.stringify({ groups, replace_existing: replaceExisting }) },
+    ),
   watchlistGroupCreate: (name: string, color: WatchlistGroupColor) =>
     request<{ groups: WatchlistGroup[]; group: WatchlistGroup }>('/api/watchlist/groups', {
       method: 'POST',
