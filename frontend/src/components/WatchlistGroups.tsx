@@ -89,13 +89,15 @@ export function WatchlistGroupBar({
 
   return (
     <>
-      <div className="flex h-10 items-stretch border-b border-border bg-surface/40 px-5">
+      {/* [fork 增强] 分组多了自动换行, 不再横向滚动: 分组一多时横滚要左右拖才能
+          看全, 且被遮住的分组容易被忘掉。右侧操作按钮固定在首行不随行数漂移。 */}
+      <div className="flex min-h-10 items-start border-b border-border bg-surface/40 px-5">
         <div
           ref={tablistRef}
           role="tablist"
           aria-label="自选分组"
           onDragOver={dragIndex != null ? e => autoScroll(e.clientX) : undefined}
-          className="flex min-w-0 flex-1 items-stretch gap-1 overflow-x-auto"
+          className="flex min-w-0 flex-1 flex-wrap items-stretch gap-1 py-0.5"
         >
           {tabs.map((tab, tabIndex) => {
             const active = selected === tab.id
@@ -171,7 +173,7 @@ export function WatchlistGroupBar({
         <button
           type="button"
           onClick={() => setManagerOpen(true)}
-          className="ml-2 inline-flex w-8 shrink-0 items-center justify-center text-muted hover:text-accent"
+          className="ml-2 inline-flex h-10 w-8 shrink-0 items-center justify-center text-muted hover:text-accent"
           title="管理自选分组"
           aria-label="管理自选分组"
         >
@@ -182,7 +184,7 @@ export function WatchlistGroupBar({
           <button
             type="button"
             onClick={() => setConfirmClear(true)}
-            className="inline-flex w-8 shrink-0 items-center justify-center text-muted hover:text-warning"
+            className="inline-flex h-10 w-8 shrink-0 items-center justify-center text-muted hover:text-warning"
             title="清空当前分组"
             aria-label="清空当前分组"
           >
