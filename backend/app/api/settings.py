@@ -1657,6 +1657,93 @@ def update_review_schedule(req: ReviewScheduleIn, request: Request) -> dict:
     return sched
 
 
+class TodayAiScheduleIn(BaseModel):
+    enabled: bool = False
+    hour: int = 18
+    minute: int = 30
+
+
+class SignalAiScheduleIn(BaseModel):
+    enabled: bool = False
+    hour: int = 19
+    minute: int = 0
+    scope: str = "held"          # held=只跑持有 / watchlist=全部自选
+    gap_seconds: int = 20        # 每只之间的间隔, 防打满 AI 接口
+
+
+def _require_ai_key(what: str) -> None:
+    from app import secrets_store
+    if not secrets_store.get_ai_key():
+        raise HTTPException(
+            status_code=400,
+            detail=f"{what}依赖 AI,请先在「设置 → AI」配置 API Key 后再开启定时",
+        )
+
+
+@router.get("/preferences/today-ai-schedule")
+def get_today_ai_schedule() -> dict:
+    """[fork 增强] 今日总览 AI 导读·优选定时配置。"""
+    from app.services import preferences
+    return preferences.get_today_ai_schedule()
+
+
+@router.put("/preferences/today-ai-schedule")
+def update_today_ai_schedule(req: TodayAiScheduleIn, request: Request) -> dict:
+    """保存今日总览 AI 定时并立即更新 APScheduler job(同复盘的动态注册模式)。"""
+    from app.services import preferences
+    if req.enabled:
+        _require_ai_key("导读·优选")
+    sched = preferences.set_today_ai_schedule(req.enabled, req.hour, req.minute)
+
+    from app.jobs.daily_pipeline import TODAY_AI_JOB_ID, _register_today_ai_job
+    scheduler = getattr(request.app.state, "scheduler", None)
+    if scheduler:
+        if sched["enabled"]:
+            _register_today_ai_job(scheduler, request.app.state.repo,
+                                   sched["hour"], sched["minute"])
+            logger.info("scheduled_today_ai enabled @%02d:%02d", sched["hour"], sched["minute"])
+        else:
+            try:
+                scheduler.remove_job(TODAY_AI_JOB_ID)
+                logger.info("scheduled_today_ai disabled (job removed)")
+            except Exception:  # noqa: BLE001  job 本就不存在
+                pass
+    return sched
+
+
+@router.get("/preferences/signal-ai-schedule")
+def get_signal_ai_schedule() -> dict:
+    """[fork 增强] 个股 AI 信号批量定时配置。"""
+    from app.services import preferences
+    return preferences.get_signal_ai_schedule()
+
+
+@router.put("/preferences/signal-ai-schedule")
+def update_signal_ai_schedule(req: SignalAiScheduleIn, request: Request) -> dict:
+    """保存个股 AI 信号批量定时并立即更新 job。"""
+    from app.services import preferences
+    if req.enabled:
+        _require_ai_key("个股 AI 信号")
+    sched = preferences.set_signal_ai_schedule(
+        req.enabled, req.hour, req.minute, req.scope, req.gap_seconds)
+
+    from app.jobs.daily_pipeline import SIGNAL_AI_JOB_ID, _register_signal_ai_job
+    scheduler = getattr(request.app.state, "scheduler", None)
+    if scheduler:
+        if sched["enabled"]:
+            _register_signal_ai_job(scheduler, request.app.state.repo,
+                                    sched["hour"], sched["minute"])
+            logger.info("scheduled_signal_ai enabled @%02d:%02d scope=%s gap=%ss",
+                        sched["hour"], sched["minute"], sched["scope"], sched["gap_seconds"])
+        else:
+            try:
+                scheduler.remove_job(SIGNAL_AI_JOB_ID)
+                logger.info("scheduled_signal_ai disabled (job removed)")
+            except Exception:  # noqa: BLE001
+                pass
+    return sched
+
+
 class ReviewPushIn(BaseModel):
     channels: list[str]  # 多选: ['feishu'] 等; 空数组=不推送。微信等开发中
 

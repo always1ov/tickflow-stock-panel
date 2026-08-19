@@ -70,6 +70,8 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
     queryKey: ['stock-signals'],
     queryFn: () => api.stockSignals(),
     staleTime: 30_000,
+    // [R27] 每小时自动拉一次: 定时任务批量刷完信号后, 页面开着也能自动看到新结果
+    refetchInterval: 60 * 60 * 1000,
   })
   const signals = signalsQ.data?.signals ?? {}
 

@@ -1005,6 +1005,98 @@ def _register_review_job(scheduler, repo, hour: int, minute: int) -> None:
     )
 
 
+# ================================================================
+# [R27] 定时 AI: 今日总览导读·优选 / 个股信号批量
+# ================================================================
+
+TODAY_AI_JOB_ID = "scheduled_today_ai"
+SIGNAL_AI_JOB_ID = "scheduled_signal_ai"
+
+
+async def _run_scheduled_today_ai(repo) -> None:
+    """定时生成今日总览 AI 导读·优选并落盘。异常只记日志, 不影响调度器。"""
+    try:
+        from app import secrets_store as ss
+        if not ss.get_ai_key():
+            logger.info("scheduled today-ai skipped: AI key not configured")
+            return
+        from app.api.today import _build_overview, generate_today_ai
+        from app.services import today_ai_store
+
+        data = _build_overview(repo)
+        out = await generate_today_ai(repo, data)
+        if out.get("error"):
+            logger.warning("scheduled today-ai failed: %s", out["error"])
+            return
+        today_ai_store.save(out, as_of=data.get("as_of"), source="scheduled")
+        logger.info("scheduled today-ai done: %d picks", len(out.get("picks") or []))
+    except Exception:
+        logger.exception("scheduled today-ai crashed")
+
+
+async def _run_scheduled_signal_ai(repo) -> None:
+    """定时批量刷新个股 AI 信号。逐只串行 + 固定间隔, 避免打满 AI 接口。"""
+    import asyncio
+
+    try:
+        from app import secrets_store as ss
+        if not ss.get_ai_key():
+            logger.info("scheduled signal-ai skipped: AI key not configured")
+            return
+        from app.services import positions as positions_svc
+        from app.services import preferences as prefs
+        from app.services import stock_signal, watchlist
+
+        cfg = prefs.get_signal_ai_schedule()
+        syms = [str(e.get("symbol") or "").upper() for e in watchlist.list_symbols()]
+        syms = [s for s in syms if s]
+        if cfg["scope"] == "held":
+            held = {s for s, p in positions_svc.load_all().items() if p.get("held")}
+            syms = [s for s in syms if s in held]
+        if not syms:
+            logger.info("scheduled signal-ai: no symbols in scope=%s", cfg["scope"])
+            return
+        gap = cfg["gap_seconds"]
+        ok = failed = 0
+        for i, sym in enumerate(syms):
+            try:
+                res = await stock_signal.generate_signal(repo, repo.store.data_dir, sym)
+                if res.get("error"):
+                    failed += 1
+                    logger.debug("scheduled signal-ai %s: %s", sym, res["error"])
+                else:
+                    ok += 1
+            except Exception as e:  # noqa: BLE001
+                failed += 1
+                logger.debug("scheduled signal-ai %s crashed: %s", sym, e)
+            if i < len(syms) - 1:
+                await asyncio.sleep(gap)
+        logger.info("scheduled signal-ai done: %d ok, %d failed (scope=%s)",
+                    ok, failed, cfg["scope"])
+    except Exception:
+        logger.exception("scheduled signal-ai crashed")
+
+
+def _register_today_ai_job(scheduler, repo, hour: int, minute: int) -> None:
+    """注册/更新今日总览 AI 定时 job(协程函数直接传入, 不可用 lambda 包)。"""
+    scheduler.add_job(
+        _run_scheduled_today_ai, args=[repo],
+        trigger=CronTrigger(day_of_week="mon-fri", hour=hour, minute=minute,
+                            timezone="Asia/Shanghai"),
+        id=TODAY_AI_JOB_ID, misfire_grace_time=7200, replace_existing=True,
+    )
+
+
+def _register_signal_ai_job(scheduler, repo, hour: int, minute: int) -> None:
+    """注册/更新个股 AI 信号批量定时 job。"""
+    scheduler.add_job(
+        _run_scheduled_signal_ai, args=[repo],
+        trigger=CronTrigger(day_of_week="mon-fri", hour=hour, minute=minute,
+                            timezone="Asia/Shanghai"),
+        id=SIGNAL_AI_JOB_ID, misfire_grace_time=7200, replace_existing=True,
+    )
+
+
 def start_scheduler(repo: KlineRepository, capset: CapabilitySet) -> AsyncIOScheduler:
     """启动调度器。
 
@@ -1162,6 +1254,20 @@ def start_scheduler(repo: KlineRepository, capset: CapabilitySet) -> AsyncIOSche
         _register_review_job(scheduler, repo, review_sched["hour"], review_sched["minute"])
         logger.info("scheduled_review enabled @%02d:%02d mon-fri",
                     review_sched["hour"], review_sched["minute"])
+
+    # [R27] 今日总览 AI 导读·优选 / 个股 AI 信号批量: 到点自动跑, 结果落盘常驻。
+    # 默认关闭, 用户在页面开启后才注册。
+    today_ai_sched = preferences.get_today_ai_schedule()
+    if today_ai_sched["enabled"]:
+        _register_today_ai_job(scheduler, repo, today_ai_sched["hour"], today_ai_sched["minute"])
+        logger.info("scheduled_today_ai enabled @%02d:%02d mon-fri",
+                    today_ai_sched["hour"], today_ai_sched["minute"])
+    signal_sched = preferences.get_signal_ai_schedule()
+    if signal_sched["enabled"]:
+        _register_signal_ai_job(scheduler, repo, signal_sched["hour"], signal_sched["minute"])
+        logger.info("scheduled_signal_ai enabled @%02d:%02d mon-fri (scope=%s gap=%ss)",
+                    signal_sched["hour"], signal_sched["minute"],
+                    signal_sched["scope"], signal_sched["gap_seconds"])
 
     scheduler.start()
     logger.info("scheduler started; instruments@%02d:%02d, pipeline@%02d:%02d, depth@%02d:%02d mon-fri",

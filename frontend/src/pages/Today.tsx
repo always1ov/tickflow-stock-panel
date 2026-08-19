@@ -13,7 +13,10 @@ import {
   AlertTriangle, CheckCircle2, Compass, Download, Loader2, RefreshCw, SlidersHorizontal,
   Sparkles, Sunrise, Target,
 } from 'lucide-react'
-import { api, type TodayOverview, type TodayPick, type TodayPrefs } from '@/lib/api'
+import {
+  api, type SignalAiSchedule, type TodayAiSchedule, type TodayOverview,
+  type TodayPick, type TodayPrefs,
+} from '@/lib/api'
 import { toast } from '@/components/Toast'
 
 // ===== 自包含 HTML 导出(内联样式浅色排版, 无脚本无外链, 可存档/分享) =====
@@ -156,8 +159,13 @@ export function Today() {
     queryKey: ['today-overview'],
     queryFn: () => api.todayOverview(),
     staleTime: 60_000,
+    // [R27] 每小时自动刷新一次: 盘后数据落盘/定时 AI 跑完后不必手点
+    refetchInterval: 60 * 60 * 1000,
+    refetchOnWindowFocus: true,
   })
-  // AI 导读+优选合一: 一次调用同时产出导读正文与量价优选结果
+  // AI 导读+优选合一: 一次调用同时产出导读正文与量价优选结果。
+  // [R27] 结果已落盘, 页面进来先显示缓存(state 为 null 时回落到 q.data.ai),
+  // 刷新/次日进来不再空白, 定时任务的产出也能直接看到。
   const [brief, setBrief] = useState<string | null>(null)
   const [picks, setPicks] = useState<TodayPick[] | null>(null)
   const [analyzed, setAnalyzed] = useState(0)
@@ -177,6 +185,38 @@ export function Today() {
       toast(`AI 分析失败: ${e.message}`, 'error')
     },
   })
+  // [R27] AI 定时配置(门槛面板内)
+  const todayAiSched = useQuery({
+    queryKey: ['today-ai-schedule'],
+    queryFn: () => api.todayAiScheduleGet(),
+    staleTime: 5 * 60_000,
+  })
+  const signalAiSched = useQuery({
+    queryKey: ['signal-ai-schedule'],
+    queryFn: () => api.signalAiScheduleGet(),
+    staleTime: 5 * 60_000,
+  })
+  const todayAiSchedMut = useMutation({
+    mutationFn: (body: TodayAiSchedule) => api.todayAiScheduleSet(body),
+    onSuccess: (r) => {
+      todayAiSched.refetch()
+      toast(r.enabled
+        ? `定时导读·优选已开启:工作日 ${String(r.hour).padStart(2, '0')}:${String(r.minute).padStart(2, '0')}`
+        : '定时导读·优选已关闭', 'success')
+    },
+    onError: (e: Error) => toast(e.message, 'error'),
+  })
+  const signalAiSchedMut = useMutation({
+    mutationFn: (body: SignalAiSchedule) => api.signalAiScheduleSet(body),
+    onSuccess: (r) => {
+      signalAiSched.refetch()
+      toast(r.enabled
+        ? `定时个股信号已开启:工作日 ${String(r.hour).padStart(2, '0')}:${String(r.minute).padStart(2, '0')} · ${r.scope === 'held' ? '只跑持有' : '全部自选'} · 间隔 ${r.gap_seconds}秒`
+        : '定时个股信号已关闭', 'success')
+    },
+    onError: (e: Error) => toast(e.message, 'error'),
+  })
+
   const [prefsOpen, setPrefsOpen] = useState(false)
   // 滑块拖动中的即时值(null = 用服务端返回的偏好); 松手才落库
   const [minScore, setMinScore] = useState<number | null>(null)
@@ -220,6 +260,12 @@ export function Today() {
     navigate(`/stock-analysis?symbol=${encodeURIComponent(symbol)}&name=${encodeURIComponent(name)}`)
 
   const d = q.data
+  // 本次会话生成过就用 state, 否则用服务端缓存(手动/定时生成的都在里面)
+  const aiCache = d?.ai ?? null
+  const shownBrief = brief ?? aiCache?.brief ?? null
+  const shownPicks = picks ?? aiCache?.picks ?? null
+  const shownAnalyzed = picks ? analyzed : (aiCache?.analyzed ?? 0)
+  const aiMeta = brief ? null : aiCache   // 缓存来源与时间(自己刚生成的不必标注)
 
   return (
     <div className="p-4 md:p-6 max-w-[1500px] mx-auto space-y-4">
@@ -248,7 +294,7 @@ export function Today() {
           <button
             onClick={() => {
               if (!d) return
-              const html = buildTodayHtml(d, brief)
+              const html = buildTodayHtml(d, shownBrief)
               const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
               const url = URL.createObjectURL(blob)
               const a = document.createElement('a')
@@ -310,10 +356,19 @@ export function Today() {
           </button>
         </div>
       )}
-      {brief && (
+      {shownBrief && (
         <div className="rounded-lg border border-violet-400/20 bg-violet-400/[0.06] px-4 py-3 text-xs leading-relaxed text-foreground/90">
           <Sparkles className="mr-1.5 inline h-3.5 w-3.5 text-violet-300" />
-          {brief}
+          {shownBrief}
+          {aiMeta && (
+            <span
+              className="ml-2 whitespace-nowrap text-[10px] text-muted"
+              title={`生成于 ${new Date(aiMeta.created_at).toLocaleString('zh-CN')}${aiMeta.as_of ? ` · 基于 ${aiMeta.as_of} 数据` : ''}`}
+            >
+              ({aiMeta.source === 'scheduled' ? '定时生成' : '上次生成'}
+              {aiMeta.as_of && aiMeta.as_of !== d?.as_of ? ' · 数据已更新,建议重新生成' : ''})
+            </span>
+          )}
         </div>
       )}
 
@@ -513,25 +568,98 @@ export function Today() {
                 <span className="text-[10px] text-muted/70">
                   把握分调高更严格;单票上限与目标日波动决定「建议仓位」;试仓/确认加至/站稳决定「建仓路径」。卖出提醒不受任何门槛影响。
                 </span>
+                {/* [R27] AI 定时自动运行 */}
+                <div className="flex w-full flex-wrap items-center gap-x-5 gap-y-2 border-t border-border/40 pt-3">
+                  <label className="flex items-center gap-2 text-[11px] text-muted" title="工作日到点自动生成导读·优选并存下来, 次日进页面直接看结果">
+                    <input
+                      type="checkbox"
+                      checked={todayAiSched.data?.enabled ?? false}
+                      onChange={(e) => todayAiSchedMut.mutate({
+                        enabled: e.target.checked,
+                        hour: todayAiSched.data?.hour ?? 18,
+                        minute: todayAiSched.data?.minute ?? 30,
+                      })}
+                      className="h-3.5 w-3.5 accent-violet-500"
+                    />
+                    <span className="whitespace-nowrap">定时导读·优选</span>
+                    <input
+                      type="time"
+                      value={`${String(todayAiSched.data?.hour ?? 18).padStart(2, '0')}:${String(todayAiSched.data?.minute ?? 30).padStart(2, '0')}`}
+                      onChange={(e) => {
+                        const [h, m] = e.target.value.split(':').map(Number)
+                        if (!Number.isNaN(h)) todayAiSchedMut.mutate({
+                          enabled: todayAiSched.data?.enabled ?? false, hour: h, minute: m,
+                        })
+                      }}
+                      className="rounded border border-border bg-surface px-1.5 py-0.5 font-mono text-foreground outline-none focus:border-violet-400/50"
+                    />
+                  </label>
+                  <label className="flex items-center gap-2 text-[11px] text-muted" title="工作日到点批量刷新个股 AI 信号; 每只之间留间隔, 不会打满接口">
+                    <input
+                      type="checkbox"
+                      checked={signalAiSched.data?.enabled ?? false}
+                      onChange={(e) => signalAiSchedMut.mutate({
+                        ...(signalAiSched.data ?? { hour: 19, minute: 0, scope: 'held' as const, gap_seconds: 20 }),
+                        enabled: e.target.checked,
+                      })}
+                      className="h-3.5 w-3.5 accent-violet-500"
+                    />
+                    <span className="whitespace-nowrap">定时个股信号</span>
+                    <input
+                      type="time"
+                      value={`${String(signalAiSched.data?.hour ?? 19).padStart(2, '0')}:${String(signalAiSched.data?.minute ?? 0).padStart(2, '0')}`}
+                      onChange={(e) => {
+                        const [h, m] = e.target.value.split(':').map(Number)
+                        if (!Number.isNaN(h) && signalAiSched.data) {
+                          signalAiSchedMut.mutate({ ...signalAiSched.data, hour: h, minute: m })
+                        }
+                      }}
+                      className="rounded border border-border bg-surface px-1.5 py-0.5 font-mono text-foreground outline-none focus:border-violet-400/50"
+                    />
+                    <select
+                      value={signalAiSched.data?.scope ?? 'held'}
+                      onChange={(e) => signalAiSched.data && signalAiSchedMut.mutate({
+                        ...signalAiSched.data, scope: e.target.value as 'held' | 'watchlist',
+                      })}
+                      className="rounded border border-border bg-surface px-1.5 py-0.5 text-foreground outline-none focus:border-violet-400/50"
+                    >
+                      <option value="held">只跑持有</option>
+                      <option value="watchlist">全部自选</option>
+                    </select>
+                    <span className="whitespace-nowrap">间隔</span>
+                    <input
+                      type="number" min={5} max={300}
+                      value={signalAiSched.data?.gap_seconds ?? 20}
+                      onChange={(e) => signalAiSched.data && signalAiSchedMut.mutate({
+                        ...signalAiSched.data, gap_seconds: Number(e.target.value) || 20,
+                      })}
+                      className="w-14 rounded border border-border bg-surface px-1.5 py-0.5 font-mono text-foreground outline-none focus:border-violet-400/50"
+                    />
+                    <span>秒/只</span>
+                  </label>
+                  <span className="text-[10px] text-muted/70">
+                    建议放在盘后日线落盘之后(17:30~20:00);个股多时用「只跑持有」更省
+                  </span>
+                </div>
                 {prefsMut.isPending && <Loader2 className="h-3 w-3 animate-spin text-muted" />}
               </div>
             )}
-            {picks && (
+            {shownPicks && (
               <div className="border-b border-amber-400/20 bg-amber-400/[0.06] px-4 py-2.5 text-xs">
-                {picks.length === 0 ? (
+                {shownPicks.length === 0 ? (
                   <span className="text-muted">
-                    AI 逐一看过这 {analyzed} 只的量价后,认为都不够理想 —— 空仓等待也是决策
+                    AI 逐一看过这 {shownAnalyzed} 只的量价后,认为都不够理想 —— 空仓等待也是决策
                   </span>
                 ) : (
                   <>
                     <span className="text-[10px] font-medium text-amber-300">
-                      AI 优选 {picks.length} 只
+                      AI 优选 {shownPicks.length} 只
                       <span className="ml-1.5 font-normal text-muted">
-                        · 已对比 {analyzed} 只的日 K 与量能后选出
+                        · 已对比 {shownAnalyzed} 只的日 K 与量能后选出
                       </span>
                     </span>
                     <ul className="mt-1 space-y-1">
-                      {picks.map((p) => {
+                      {shownPicks.map((p) => {
                         const o = d.opportunities.find((x) => x.symbol === p.symbol)
                         return (
                           <li key={p.symbol}>
@@ -558,7 +686,7 @@ export function Today() {
             ) : (
               <ul className="grid lg:grid-cols-2 -mb-px">
                 {d.opportunities.map((o, i) => {
-                  const picked = picks?.some((p) => p.symbol === o.symbol)
+                  const picked = shownPicks?.some((p) => p.symbol === o.symbol)
                   return (
                     <li key={i} className={`border-b border-border/30 lg:odd:border-r ${picked ? 'bg-amber-400/[0.07]' : ''}`}>
                       <button

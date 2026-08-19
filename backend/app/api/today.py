@@ -558,8 +558,19 @@ def _build_overview(repo) -> dict:
 
 @router.get("")
 def get_today(request: Request):
-    """今日总览聚合(行动区/机会区/市场天气/持仓体检)。"""
-    return _build_overview(request.app.state.repo)
+    """今日总览聚合(行动区/机会区/市场天气/持仓体检)。
+
+    [R27] 顺带带出已缓存的 AI 导读·优选(ai 字段), 前端进页面即常驻显示,
+    不必每次手点; 缓存过期(数据日已推进)时前端据 as_of 提示。
+    """
+    data = _build_overview(request.app.state.repo)
+    try:
+        from app.services import today_ai_store
+        data["ai"] = today_ai_store.load()
+    except Exception as e:  # noqa: BLE001
+        logger.debug("today ai cache skipped: %s", e)
+        data["ai"] = None
+    return data
 
 
 class PrefsModel(BaseModel):
@@ -692,17 +703,14 @@ def parse_ai_brief_response(text: str | None, valid_symbols: set[str]) -> dict:
     return {"brief": brief, "picks": picks}
 
 
-@router.post("/ai")
-async def today_ai(request: Request):
-    """AI 导读+优选合一: 一次调用生成盘前导读, 并基于真实量价从候选里精选 1-3 只。
+async def generate_today_ai(repo, data: dict) -> dict:
+    """[R27] 生成导读+优选(纯逻辑, 不落盘)。手动端点与定时任务共用。
 
-    未配 AI 返回 error 而非 500。导读末尾提的机会即优选结果, 两者不会互相矛盾。
+    data 为 _build_overview 的结果; 返回 {brief, picks, analyzed} 或 {error}。
     """
     from app.services.ai_provider import ai_configured, generate_ai_text
     if not ai_configured():
         return {"error": "未配置 AI"}
-    repo = request.app.state.repo
-    data = _build_overview(repo)
     cands = data["opportunities"][:_SELECT_MAX_CANDIDATES]
     # 总览瘦身: 候选明细单独带 K 线送审, 机会区在总览里只留给导读定位用的短句
     overview = {k: v for k, v in data.items() if k != "opportunities"}
@@ -731,3 +739,20 @@ async def today_ai(request: Request):
     except Exception as e:  # noqa: BLE001
         logger.warning("today ai failed: %s", e)
         return {"error": f"AI 调用失败: {e}"}
+
+
+@router.post("/ai")
+async def today_ai(request: Request):
+    """AI 导读+优选合一: 一次调用生成盘前导读, 并基于真实量价从候选里精选 1-3 只。
+
+    未配 AI 返回 error 而非 500。生成成功即落盘缓存(刷新页面仍在, 见 today_ai_store)。
+    """
+    repo = request.app.state.repo
+    data = _build_overview(repo)
+    out = await generate_today_ai(repo, data)
+    if not out.get("error"):
+        from app.services import today_ai_store
+        saved = today_ai_store.save(out, as_of=data.get("as_of"), source="manual")
+        out["created_at"] = saved["created_at"]
+        out["source"] = saved["source"]
+    return out

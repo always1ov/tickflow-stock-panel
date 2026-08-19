@@ -592,6 +592,61 @@ def set_review_schedule(enabled: bool, hour: int, minute: int) -> dict:
     return {"enabled": bool(enabled), "hour": h, "minute": m}
 
 
+# ---- [fork 增强] 今日总览 AI 导读·优选 / 个股 AI 信号 的定时自动运行 ----
+
+def get_today_ai_schedule() -> dict:
+    """今日总览 AI 导读·优选定时 {"enabled": False, "hour": 18, "minute": 30}。
+
+    默认 18:30 —— 数据源一般 17:30~20:00 落盘, 此时多半已是当日定稿。
+    """
+    d = load().get("today_ai_schedule") or {}
+    return {
+        "enabled": bool(d.get("enabled", False)),
+        "hour": max(0, min(23, int(d.get("hour", 18) or 0))),
+        "minute": max(0, min(59, int(d.get("minute", 30) or 0))),
+    }
+
+
+def set_today_ai_schedule(enabled: bool, hour: int, minute: int) -> dict:
+    cfg = {
+        "enabled": bool(enabled),
+        "hour": max(0, min(23, int(hour))),
+        "minute": max(0, min(59, int(minute))),
+    }
+    save({"today_ai_schedule": cfg})
+    return cfg
+
+
+def get_signal_ai_schedule() -> dict:
+    """个股 AI 信号批量定时 {"enabled", "hour", "minute", "scope", "gap_seconds"}。
+
+    scope: held=只跑持有 / watchlist=跑全部自选。个股数量多, gap_seconds 为每只
+    之间的间隔(默认 20 秒), 避免连续打满 AI 接口。默认 19:00 且只跑持有。
+    """
+    d = load().get("signal_ai_schedule") or {}
+    scope = str(d.get("scope", "held"))
+    return {
+        "enabled": bool(d.get("enabled", False)),
+        "hour": max(0, min(23, int(d.get("hour", 19) or 0))),
+        "minute": max(0, min(59, int(d.get("minute", 0) or 0))),
+        "scope": scope if scope in ("held", "watchlist") else "held",
+        "gap_seconds": max(5, min(300, int(d.get("gap_seconds", 20) or 20))),
+    }
+
+
+def set_signal_ai_schedule(enabled: bool, hour: int, minute: int,
+                           scope: str, gap_seconds: int) -> dict:
+    cfg = {
+        "enabled": bool(enabled),
+        "hour": max(0, min(23, int(hour))),
+        "minute": max(0, min(59, int(minute))),
+        "scope": scope if scope in ("held", "watchlist") else "held",
+        "gap_seconds": max(5, min(300, int(gap_seconds))),
+    }
+    save({"signal_ai_schedule": cfg})
+    return cfg
+
+
 MINING_BUDGET_PROFILES = frozenset({"balanced", "strict"})
 
 

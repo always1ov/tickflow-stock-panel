@@ -156,6 +156,21 @@ export interface TodayOpportunity {
   intraday?: boolean
 }
 export interface TodayPick { symbol: string; reason: string }
+/** [fork 增强] 缓存的 AI 导读·优选(刷新页面仍在) */
+export interface TodayAiCache {
+  as_of: string | null
+  brief: string
+  picks: TodayPick[]
+  analyzed: number
+  created_at: string
+  source: 'manual' | 'scheduled'
+}
+export interface TodayAiSchedule { enabled: boolean; hour: number; minute: number }
+export interface SignalAiSchedule {
+  enabled: boolean; hour: number; minute: number
+  scope: 'held' | 'watchlist'; gap_seconds: number
+}
+
 export interface TodayPrefs {
   min_score: number; max_show: number; max_single: number; target_vol: number; max_drawdown: number
   pyramid_probe: number; pyramid_confirm: number; pyramid_days: number
@@ -183,6 +198,7 @@ export interface TodayOverview {
   opportunities_filtered: number
   prefs: TodayPrefs
   position_hint?: { posture_cap: number; max_single: number; target_vol: number }
+  ai?: TodayAiCache | null
   weather: {
     bull: number; bear: number; new_bull: number; new_bear: number
     posture: string; posture_reason: string
@@ -2783,6 +2799,15 @@ export const api = {
   intradayRefreshFull: () =>
     request<{ full_coverage?: boolean; rounds?: number; live_count?: number | null; error?: string }>(
       '/api/intraday/refresh-full', { method: 'POST' }),
+  // [fork 增强] AI 定时配置(今日总览导读·优选 / 个股信号批量)
+  todayAiScheduleGet: () => request<TodayAiSchedule>('/api/settings/preferences/today-ai-schedule'),
+  todayAiScheduleSet: (body: TodayAiSchedule) =>
+    request<TodayAiSchedule>('/api/settings/preferences/today-ai-schedule',
+      { method: 'PUT', body: JSON.stringify(body) }),
+  signalAiScheduleGet: () => request<SignalAiSchedule>('/api/settings/preferences/signal-ai-schedule'),
+  signalAiScheduleSet: (body: SignalAiSchedule) =>
+    request<SignalAiSchedule>('/api/settings/preferences/signal-ai-schedule',
+      { method: 'PUT', body: JSON.stringify(body) }),
   todayAi: () =>
     request<{ brief?: string; picks?: TodayPick[]; analyzed?: number; error?: string }>(
       '/api/today/ai', { method: 'POST' }),
