@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Sparkles, LineChart, History as HistoryIcon, Loader2, ExternalLink, Bell, AlertTriangle } from 'lucide-react'
+import { Sparkles, LineChart, History as HistoryIcon, Loader2, ExternalLink, Bell, AlertTriangle, X } from 'lucide-react'
 import { PageHeader } from '@/components/PageHeader'
 import { EmptyState } from '@/components/EmptyState'
 import { StockFinancialSearch } from '@/components/financials/StockFinancialSearch'
@@ -11,6 +11,7 @@ import { PriceAlertDialog } from '@/components/stock-analysis/PriceAlertDialog'
 import { WatchlistDecisionBoard } from '@/components/stock-analysis/WatchlistDecisionBoard'
 import { TrendStateBar, useStockTrend } from '@/components/stock-analysis/TrendStateBar'
 import { api } from '@/lib/api'
+import { useDialogBackdrop } from '@/lib/useDialogBackdrop'
 import { useLastStock } from '@/lib/useLastStock'
 import { QK } from '@/lib/queryKeys'
 import { toast } from '@/components/Toast'
@@ -19,10 +20,11 @@ import {
 } from '@/lib/stockAnalysisStore'
 
 /**
- * 个股分析页 —— 日 K + 关键价位(压力/支撑/密集区/枢轴/前高前低)+ AI 四维分析。
+ * 个股分析页 —— 自选决策台(主体)+ 关键价位弹窗 + AI 四维分析。
  *
  * 与财务分析页的区别:
- *  - 以【行情 + 关键价位】为视觉主体(专用日 K 图表,不复用个股对话框图表)
+ *  - 以【自选决策台】为视觉主体:一屏纵览全部自选的现价/仓位/浮盈/出场线/六态/AI 信号
+ *  - 关键价位(日 K + 压力支撑)改为点击标的后弹窗查看,不再挤占列表高度([R28])
  *  - AI 分析输出客观技术状态与风险提示(非买卖建议、非财务质量评级)
  *  - 报告胶囊用蓝色系,与财务分析(紫色)并存
  */
@@ -33,6 +35,8 @@ export function StockAnalysis() {
   const [confirmReport, setConfirmReport] = useState<{ id: string; created_at: string; focus: string } | null>(null)
   const [previewSymbol, setPreviewSymbol] = useState<string | null>(null)
   const [showPriceAlerts, setShowPriceAlerts] = useState(false)
+  // [R28] 关键价位分析弹窗:点决策台里的标的即弹出,关掉后列表原样还在
+  const [showLevels, setShowLevels] = useState(false)
   const { last: lastStock, remember: rememberStock } = useLastStock('stock-analysis')
 
   // 进入页面立即加载历史报告(供决策台「报告」列)。store 内部有 historyLoaded 去重, 重复调用安全。
@@ -61,6 +65,8 @@ export function StockAnalysis() {
     setConfirmReport(null)
     setShowPriceAlerts(false)
     rememberStock(sym, nm)
+    // [R28] 选中即弹出关键价位分析 —— 页面主体已让给决策台, 不弹就等于点了没反应
+    setShowLevels(true)
   }
 
   const handleAnalyze = async () => {
@@ -116,6 +122,14 @@ export function StockAnalysis() {
                 <ExternalLink className="h-3 w-3 text-muted opacity-0 group-hover:opacity-100 transition-opacity" />
               </button>
               <button
+                onClick={() => setShowLevels(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-btn border border-border bg-elevated text-secondary text-xs font-medium hover:text-foreground hover:border-sky-400/30 transition-all"
+                title="打开关键价位分析(日 K + 压力支撑 + 六态趋势)"
+              >
+                <LineChart className="h-3.5 w-3.5" />
+                关键价位
+              </button>
+              <button
                 onClick={handleAnalyze}
                 disabled={checking}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-btn bg-gradient-to-r from-sky-500/25 to-blue-500/15 border border-sky-400/30 text-sky-300 text-xs font-medium hover:from-sky-500/35 hover:to-blue-500/25 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
@@ -135,22 +149,14 @@ export function StockAnalysis() {
           )}
         </div>
 
-        {/* 自选决策台:点行即切换分析(免逐个搜索)+ 仓位标记 + 纵观对比浮盈 */}
-        <WatchlistDecisionBoard currentSymbol={symbol} onSelect={onSelect} />
-
-        {/* 主体:关键价位分析占满全宽(历史报告已整合进决策台「报告」列, 侧栏移除) */}
-        <div className="min-w-0">
-          {!symbol ? (
-            <EmptyState
-              icon={LineChart}
-              title="选择一只股票开始分析"
-              hint="搜索代码或名称,查看日 K 与关键价位,并可让 AI 进行技术面 / 基本面 / 财务面 / 消息面四维综合分析。"
-            />
-          ) : (
-            <StockAnalysisBoard symbol={symbol} />
-          )}
-        </div>
+        {/* 主体:自选决策台铺满整页 —— 点标的弹出关键价位分析([R28]) */}
+        <WatchlistDecisionBoard currentSymbol={symbol} onSelect={onSelect} fullPage />
       </div>
+
+      {/* [R28] 关键价位分析弹窗:日 K + 压力支撑 + 六态趋势条 */}
+      {showLevels && symbol && (
+        <LevelsDialog symbol={symbol} name={name} onClose={() => setShowLevels(false)} />
+      )}
 
       {/* 二次确认:已有历史报告 */}
       {confirmReport && (
@@ -182,8 +188,44 @@ export function StockAnalysis() {
   )
 }
 
+// ===== [R28] 关键价位分析弹窗 =====
+// 决策台占满整页后, 关键价位不再内联切换, 而是像点股票名那样弹窗查看:
+// 列表不会被推走, 看完一只关掉即可继续扫下一只。
+function LevelsDialog({ symbol, name, onClose }: { symbol: string; name: string; onClose: () => void }) {
+  const backdrop = useDialogBackdrop(onClose)
+
+  // Esc 关闭 —— 弹窗高频开关, 键盘退出比找关闭按钮快
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" {...backdrop}>
+      <div className="w-full max-w-[1180px] max-h-[92vh] flex flex-col bg-surface border border-border rounded-2xl shadow-2xl overflow-hidden">
+        <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border/60 shrink-0">
+          <LineChart className="h-4 w-4 text-sky-400 shrink-0" />
+          <span className="text-sm font-medium text-foreground truncate">{name || symbol}</span>
+          <span className="text-[10px] font-mono text-muted">{symbol}</span>
+          <button
+            onClick={onClose}
+            title="关闭(Esc)"
+            className="ml-auto p-1 rounded-md text-muted hover:text-foreground hover:bg-elevated transition-colors cursor-pointer"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="p-3 overflow-auto">
+          <StockAnalysisBoard symbol={symbol} height={520} />
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ===== 分析看板:日 K + 关键价位 =====
-function StockAnalysisBoard({ symbol }: { symbol: string }) {
+function StockAnalysisBoard({ symbol, height = 480 }: { symbol: string; height?: number }) {
   const kline = useQuery({
     queryKey: ['kline', symbol, ''],
     queryFn: () => api.klineDaily(symbol, 250),
@@ -263,7 +305,7 @@ function StockAnalysisBoard({ symbol }: { symbol: string }) {
           seriesDates={levelsQ.data?.dates}
           defaultLevelTypes={['sr', 'pivot', 'keltner_s']}
           ranges={trendRanges}
-          height={480}
+          height={height}
         />
       </div>
     </div>

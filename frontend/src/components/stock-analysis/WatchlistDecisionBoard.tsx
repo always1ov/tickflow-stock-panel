@@ -35,10 +35,13 @@ function fmtAgo(iso?: string): string {
 }
 
 /** 自选决策台 —— 一行一只自选:点行即切换分析(免搜索)、标记仓位/成本、纵观对比浮盈。
- *  AI 买卖信号列为 P2,后续接入(留位)。 */
-export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
+ *  AI 买卖信号列为 P2,后续接入(留位)。
+ *  [R28] fullPage: 个股分析页把决策台当主体铺满整页(关键价位改为弹窗),
+ *        此时表格高度按视口撑开,而不再让位给下方的 K 线图。 */
+export function WatchlistDecisionBoard({ currentSymbol, onSelect, fullPage = false }: {
   currentSymbol: string
   onSelect: (symbol: string, name: string) => void
+  fullPage?: boolean
 }) {
   const qc = useQueryClient()
   // 展开状态持久化: 想让 K 线占满首屏的用户收起一次即可, 不必每次进页面都收
@@ -302,9 +305,12 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
       )}
 
       {/* 表格高度随屏自适应: 固定 280px 在常见屏上只露 3 行且上下都是半截行,
-          观感差也不便扫读; 上限 520px 保证 K 线图仍在首屏内 */}
+          观感差也不便扫读; 上限 520px 保证 K 线图仍在首屏内。
+          [R28] fullPage 模式下页面里已没有 K 线图要让位, 直接吃满剩余视口高度。 */}
       {open && (
-        <div className="max-h-[min(48vh,520px)] overflow-auto border-t border-border/60">
+        <div className={`overflow-auto border-t border-border/60 ${
+          fullPage ? 'max-h-[calc(100vh-210px)]' : 'max-h-[min(48vh,520px)]'
+        }`}>
           <table className="w-full min-w-[720px] text-xs">
             <thead className="sticky top-0 bg-surface/95 backdrop-blur text-[10px] text-muted">
               <tr className="text-left">
