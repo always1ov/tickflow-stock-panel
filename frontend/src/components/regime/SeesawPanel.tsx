@@ -103,16 +103,17 @@ export function SeesawPanel({ kind }: { kind: 'concept' | 'industry' }) {
 
   return (
     <div className={cn(CARD, 'p-3')}>
-      <div className="flex items-center gap-2">
-        <span className="h-3 w-0.5 rounded-full bg-gradient-to-b from-accent to-accent/30" />
-        <Repeat className="h-3.5 w-3.5 text-accent" />
-        <h2 className="text-xs font-semibold text-foreground">板块跷跷板</h2>
+      {/* 窄屏时按钮整块换行, 不挤成一条横向滚动 */}
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+        <span className="h-3 w-0.5 shrink-0 rounded-full bg-gradient-to-b from-accent to-accent/30" />
+        <Repeat className="h-3.5 w-3.5 shrink-0 text-accent" />
+        <h2 className="shrink-0 text-xs font-semibold text-foreground">板块跷跷板</h2>
         <span className="hidden text-[9px] text-muted sm:inline">
           一边熄火往往就是另一边点火 · 近 {q.data?.window ?? 0} 个交易日
         </span>
         <button
           onClick={() => setShowHistory(v => !v)}
-          className={cn('ml-auto inline-flex items-center gap-1 rounded-btn border px-2 py-0.5 text-[10px] transition-colors',
+          className={cn('ml-auto inline-flex shrink-0 whitespace-nowrap items-center gap-1 rounded-btn border px-2 py-0.5 text-[10px] transition-colors',
             showHistory ? 'border-accent/50 text-accent' : 'border-border bg-base text-secondary hover:text-accent')}
           title="最近 30 天的识别留档 —— 看这对板块来回切了几轮、上一轮哪天换的手"
         >
@@ -121,7 +122,7 @@ export function SeesawPanel({ kind }: { kind: 'concept' | 'industry' }) {
         <button
           onClick={() => detect.mutate()}
           disabled={detect.isPending}
-          className="inline-flex items-center gap-1 rounded-btn border border-accent/40 bg-accent/10 px-2 py-0.5 text-[10px] text-accent transition-colors hover:bg-accent/20 disabled:opacity-60"
+          className="inline-flex shrink-0 whitespace-nowrap items-center gap-1 rounded-btn border border-accent/40 bg-accent/10 px-2 py-0.5 text-[10px] text-accent transition-colors hover:bg-accent/20 disabled:opacity-60"
           title="让 AI 看真实日度强度序列, 甄别哪几对是真跷跷板、当下轮到谁(会调用 AI)"
         >
           {detect.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}

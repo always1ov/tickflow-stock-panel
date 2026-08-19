@@ -105,9 +105,9 @@ export function StockAnalysis() {
       />
 
       <div className="w-full px-6 py-4 space-y-4">
-        {/* 搜索栏 */}
-        <div className="flex items-center gap-3">
-          <div className="w-72">
+        {/* 搜索栏 —— 窄屏时按钮整块换行, 不把「点位提醒」挤出可视区 */}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <div className="w-72 shrink-0">
             <StockFinancialSearch onSelect={onSelect} assetTypes="stock,index" />
           </div>
           {symbol && (
@@ -115,7 +115,7 @@ export function StockAnalysis() {
               <button
                 onClick={() => setPreviewSymbol(symbol)}
                 title="查看个股日 K 详情"
-                className="group flex items-center gap-2 text-sm rounded-md px-1.5 py-0.5 -mx-1.5 hover:bg-elevated transition-colors"
+                className="group flex shrink-0 items-center gap-2 text-sm rounded-md px-1.5 py-0.5 -mx-1.5 hover:bg-elevated transition-colors"
               >
                 <span className="text-foreground font-medium group-hover:text-sky-300 transition-colors">{name || symbol}</span>
                 <span className="text-[10px] font-mono text-muted">{symbol}</span>
@@ -123,7 +123,7 @@ export function StockAnalysis() {
               </button>
               <button
                 onClick={() => setShowLevels(true)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-btn border border-border bg-elevated text-secondary text-xs font-medium hover:text-foreground hover:border-sky-400/30 transition-all"
+                className="inline-flex shrink-0 whitespace-nowrap items-center gap-1.5 px-3 py-1.5 rounded-btn border border-border bg-elevated text-secondary text-xs font-medium hover:text-foreground hover:border-sky-400/30 transition-all"
                 title="打开关键价位分析(日 K + 压力支撑 + 六态趋势)"
               >
                 <LineChart className="h-3.5 w-3.5" />
@@ -132,14 +132,14 @@ export function StockAnalysis() {
               <button
                 onClick={handleAnalyze}
                 disabled={checking}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-btn bg-gradient-to-r from-sky-500/25 to-blue-500/15 border border-sky-400/30 text-sky-300 text-xs font-medium hover:from-sky-500/35 hover:to-blue-500/25 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                className="inline-flex shrink-0 whitespace-nowrap items-center gap-1.5 px-3 py-1.5 rounded-btn bg-gradient-to-r from-sky-500/25 to-blue-500/15 border border-sky-400/30 text-sky-300 text-xs font-medium hover:from-sky-500/35 hover:to-blue-500/25 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {checking ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
                 AI 个股分析
               </button>
               <button
                 onClick={() => setShowPriceAlerts(true)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-btn border border-sky-400/25 bg-sky-400/[0.08] text-sky-300 text-xs font-medium hover:border-sky-400/40 hover:bg-sky-400/[0.12] transition-all"
+                className="inline-flex shrink-0 whitespace-nowrap items-center gap-1.5 px-3 py-1.5 rounded-btn border border-sky-400/25 bg-sky-400/[0.08] text-sky-300 text-xs font-medium hover:border-sky-400/40 hover:bg-sky-400/[0.12] transition-all"
                 title="设置价格点位提醒"
               >
                 <Bell className="h-3.5 w-3.5" />

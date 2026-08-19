@@ -494,14 +494,15 @@ export function AnalysisKChart({
 
   return (
     <div className={className}>
-      {/* 价位开关按钮组 */}
+      {/* 价位开关按钮组: 14 个价位组全排开, 一行放不下就整块换行
+          (chip 自身 nowrap, 只在 chip 之间断行) */}
       {levels && (
-        <div className="flex flex-wrap items-center gap-1.5 mb-2">
-          <span className="text-[10px] text-muted mr-1">关键价位</span>
+        <div className="flex flex-wrap content-start items-center gap-1.5 mb-2">
+          <span className="text-[10px] text-muted mr-1 shrink-0">关键价位</span>
           <button
             onClick={smartSelect}
             title="按当前行情状态(趋势/震荡)和档位与现价的距离,自动勾选最值得看的价位组;之后仍可手动增删"
-            className="inline-flex items-center gap-1 h-6 px-2 rounded-md text-[10px] font-medium border transition-all text-[#a5f3fc] bg-[#06B6D4]/10 border-[#06B6D4]/40 hover:bg-[#06B6D4]/20"
+            className="inline-flex shrink-0 whitespace-nowrap items-center gap-1 h-6 px-2 rounded-md text-[10px] font-medium border transition-all text-[#a5f3fc] bg-[#06B6D4]/10 border-[#06B6D4]/40 hover:bg-[#06B6D4]/20"
           >
             ✨ 智能选择
           </button>
@@ -519,7 +520,7 @@ export function AnalysisKChart({
                 onClick={() => toggleType(g.key)}
                 disabled={raw.length === 0}
                 title={`${g.label} (${count} 个)`}
-                className={`inline-flex items-center gap-1 h-6 px-2 rounded-md text-[10px] font-medium border transition-all disabled:opacity-30 disabled:cursor-not-allowed ${
+                className={`inline-flex shrink-0 whitespace-nowrap items-center gap-1 h-6 px-2 rounded-md text-[10px] font-medium border transition-all disabled:opacity-30 disabled:cursor-not-allowed ${
                   active
                     ? 'text-foreground'
                     : 'text-muted bg-base/40 border-border/30 hover:border-border/60'
@@ -535,7 +536,7 @@ export function AnalysisKChart({
 
           {/* 枢轴点档位选择器 —— 仅当枢轴点开启时显示 */}
           {activeTypes.has('pivot') && (levels.pivot?.length ?? 0) > 0 && (
-            <div className="inline-flex items-center gap-0.5 ml-1 pl-2 border-l border-border/40">
+            <div className="inline-flex shrink-0 items-center gap-0.5 ml-1 pl-2 border-l border-border/40">
               <span className="text-[10px] text-muted mr-1">档位</span>
               {([1, 2, 3] as const).map(r => (
                 <button
