@@ -122,14 +122,6 @@ export function StockAnalysis() {
                 <ExternalLink className="h-3 w-3 text-muted opacity-0 group-hover:opacity-100 transition-opacity" />
               </button>
               <button
-                onClick={() => setShowLevels(true)}
-                className="inline-flex shrink-0 whitespace-nowrap items-center gap-1.5 px-3 py-1.5 rounded-btn border border-border bg-elevated text-secondary text-xs font-medium hover:text-foreground hover:border-sky-400/30 transition-all"
-                title="打开关键价位分析(日 K + 压力支撑 + 六态趋势)"
-              >
-                <LineChart className="h-3.5 w-3.5" />
-                关键价位
-              </button>
-              <button
                 onClick={handleAnalyze}
                 disabled={checking}
                 className="inline-flex shrink-0 whitespace-nowrap items-center gap-1.5 px-3 py-1.5 rounded-btn bg-gradient-to-r from-sky-500/25 to-blue-500/15 border border-sky-400/30 text-sky-300 text-xs font-medium hover:from-sky-500/35 hover:to-blue-500/25 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
