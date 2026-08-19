@@ -62,11 +62,6 @@ export const LEVEL_GROUPS: { key: LevelType; label: string; color: string }[] = 
   { key: 'exit',      label: '持仓止盈',   color: '#FBBF24' },  // 琥珀(仓位管理线)
 ]
 
-// [fork 增强] 价位开关分主次: 常用的直接排开, 冷门的收进「更多价位」——
-// 14 个筹码挤一长条既难扫读又把图表推到屏幕外。折叠态下若某冷门组已勾选,
-// 仍会单独显示(不能让"开着的开关"藏起来找不到)。
-const PRIMARY_LEVEL_KEYS: LevelType[] = ['sr', 'pivot', 'extreme', 'livermore', 'exit']
-
 // 通道曲线元数据(单一数据源):供 buildOption 画线 + 右侧面板取最新值共用。
 //   alignedKey: alignedSeries 中的 key(由 series.boll/keltner/atr 对齐而来)
 //   group:      属于哪个价位开关组(开关该组即开关这条曲线)
@@ -208,8 +203,6 @@ export function AnalysisKChart({
   const [activeTypes, setActiveTypes] = useState<Set<LevelType>>(new Set(defaultLevelTypes))
   /** 枢轴点显示到第几档:1=只P+R1/S1, 2=到R2/S2, 3=全档(R3/S3) */
   const [pivotRank, setPivotRank] = useState<1 | 2 | 3>(1)
-  /** 次要价位组是否展开(默认收起, 见 PRIMARY_LEVEL_KEYS) */
-  const [moreLevelsOpen, setMoreLevelsOpen] = useState(false)
   /** 双向联动高亮: hover 价位标签 ↔ hover 下方文字行。值为 levelKey, null=无高亮 */
   const [hoveredKey, setHoveredKey] = useState<string | null>(null)
   /** 智能选择后的说明文案; 手动改开关即清除, 避免文案与实际勾选不符 */
@@ -512,9 +505,8 @@ export function AnalysisKChart({
           >
             ✨ 智能选择
           </button>
-          {LEVEL_GROUPS.filter(g =>
-            PRIMARY_LEVEL_KEYS.includes(g.key) || moreLevelsOpen || activeTypes.has(g.key),
-          ).map(g => {
+          {/* 全部价位组一次排开(不折叠)—— 开关本身就是一眼扫过去挑, 藏起来反而要多点一次 */}
+          {LEVEL_GROUPS.map(g => {
             const active = activeTypes.has(g.key)
             // 枢轴点数量按当前档位过滤显示;其他组显示原始数量
             const raw = levels[g.key] ?? []
@@ -540,24 +532,6 @@ export function AnalysisKChart({
               </button>
             )
           })}
-
-          {/* 更多价位: 折叠 Keltner/ATR/缺口/斐波那契/整数关口等次要组 */}
-          {(() => {
-            const hiddenCount = LEVEL_GROUPS.filter(
-              g => !PRIMARY_LEVEL_KEYS.includes(g.key) && !activeTypes.has(g.key)
-                && (levels[g.key]?.length ?? 0) > 0,
-            ).length
-            if (!moreLevelsOpen && hiddenCount === 0) return null
-            return (
-              <button
-                onClick={() => setMoreLevelsOpen(v => !v)}
-                title={moreLevelsOpen ? '收起次要价位组' : 'Keltner / ATR通道 / 缺口位 / 斐波那契 / 整数关口'}
-                className="inline-flex items-center gap-1 h-6 px-2 rounded-md text-[10px] font-medium border border-border/30 bg-base/40 text-muted hover:border-border/60 hover:text-foreground transition-all"
-              >
-                {moreLevelsOpen ? '收起' : `更多价位 ${hiddenCount}`}
-              </button>
-            )
-          })()}
 
           {/* 枢轴点档位选择器 —— 仅当枢轴点开启时显示 */}
           {activeTypes.has('pivot') && (levels.pivot?.length ?? 0) > 0 && (
