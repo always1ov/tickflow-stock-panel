@@ -753,6 +753,50 @@ export interface MainlineResult {
   filter: MainlineFilter
 }
 
+// ===== [fork 增强] R28 板块跷跷板 =====
+export interface SeesawPair {
+  pair: string
+  a: string
+  b: string
+  score: number
+  corr: number
+  flips: number
+  active_a: number
+  active_b: number
+  recent_a: number
+  recent_b: number
+  leader: string
+  lead_days: number
+  hint: string
+  series_a?: number[]
+  series_b?: number[]
+}
+export interface SeesawAi {
+  summary: string
+  picks: { pair: string; verdict: string; leader: string; note: string }[]
+}
+export interface SeesawEntry {
+  as_of: string | null
+  kind: string
+  pairs: SeesawPair[]
+  ai: SeesawAi | null
+  created_at: string
+  source: string
+}
+export interface SeesawResult {
+  as_of?: string | null
+  kind?: string
+  window?: number
+  dates?: string[]
+  pairs: SeesawPair[]
+  ai?: SeesawAi
+  latest?: SeesawEntry | null
+  history?: SeesawEntry[]
+  error?: string
+  created_at?: string
+  source?: string
+}
+
 // ===== 大盘复盘 =====
 export interface AiReviewReport {
   id: string
@@ -2297,6 +2341,11 @@ export const api = {
   },
   regimeMainlineRecompute: () =>
     request<{ ok: boolean; rows: number }>('/api/regime/mainline/recompute', { method: 'POST' }),
+  // [fork 增强] R28 板块跷跷板: GET 走规则(免费, 每次开页都算), POST 才调 AI 甄别并留档
+  regimeSeesaw: (kind: 'concept' | 'industry' = 'concept') =>
+    request<SeesawResult>(`/api/regime/seesaw?kind=${kind}`),
+  regimeSeesawDetect: (kind: 'concept' | 'industry' = 'concept') =>
+    request<SeesawResult>(`/api/regime/seesaw/detect?kind=${kind}`, { method: 'POST' }),
   mainlineFilterUpdate: (payload: { min_members?: number; max_members?: number; blacklist?: string[]; exclude_st?: boolean }) =>
     request<MainlineFilter>('/api/settings/preferences/mainline-filter', {
       method: 'PUT',

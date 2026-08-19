@@ -455,3 +455,47 @@ def regime_mainline(
         "membership_note": MEMBERSHIP_NOTE,
         "filter": filter_cfg,
     }
+
+
+# ── [fork 增强] R28 板块跷跷板: 规则识别(免费) + AI 甄别 + 30 天留档 ──
+
+@router.get("/seesaw")
+def regime_seesaw(
+    request: Request,
+    kind: Annotated[str, Query(pattern="^(concept|industry)$")] = "concept",
+    history: Annotated[int, Query(ge=0, le=30)] = 30,
+):
+    """当前跷跷板候选(规则算, 不花 AI)+ 最近一次 AI 结论 + 30 天留档。"""
+    from app.services import seesaw, seesaw_store
+
+    try:
+        current = seesaw.compute(_data_dir(request), kind=kind)
+    except Exception as e:  # noqa: BLE001
+        logger.exception("seesaw compute failed")
+        return {"pairs": [], "dates": [], "error": f"跷跷板计算失败: {e}",
+                "latest": None, "history": []}
+    return {
+        **current,
+        "latest": seesaw_store.load_latest(kind=kind),
+        "history": seesaw_store.load_history(kind=kind, limit=history) if history else [],
+    }
+
+
+@router.post("/seesaw/detect")
+async def regime_seesaw_detect(
+    request: Request,
+    kind: Annotated[str, Query(pattern="^(concept|industry)$")] = "concept",
+):
+    """AI 一键识别跷跷板: 规则出候选 → AI 甄别哪几对成立 + 当下轮到谁。
+
+    成功即留档(滚动 30 天); 未配 AI / 无候选返回 error 而非 500。
+    """
+    from app.services import seesaw, seesaw_store
+
+    out = await seesaw.generate(_data_dir(request), kind=kind)
+    if not out.get("error"):
+        saved = seesaw_store.save(out, source="manual")
+        out["created_at"] = saved["created_at"]
+        out["source"] = saved["source"]
+    out["history"] = seesaw_store.load_history(kind=kind)
+    return out

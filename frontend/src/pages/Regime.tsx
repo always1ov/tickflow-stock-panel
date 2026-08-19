@@ -23,6 +23,7 @@ import { QK } from '@/lib/queryKeys'
 import { useChartTheme } from '@/lib/theme'
 import { toast } from '@/components/Toast'
 import { Modal } from '@/components/Modal'
+import { SeesawPanel } from '@/components/regime/SeesawPanel'
 import { cn } from '@/lib/cn'
 
 const STATE_ORDER: RegimeState[] = ['strong', 'lean_strong', 'range', 'lean_weak', 'weak']
@@ -1003,6 +1004,9 @@ export function Regime() {
           </div>
         </div>
       )}
+
+      {/* ── [fork 增强] R28 板块跷跷板 (紧挨主线排行: 排行看谁强, 跷跷板看资金在谁和谁之间来回) ── */}
+      <SeesawPanel kind={mainlineKind} />
 
       {/* ── 主线排行 (窗口内持续性 + 过滤设置) ── */}
       <div className={cn(cardCls, 'p-3')}>
