@@ -1,13 +1,12 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ChevronDown, Star, Wallet, Sparkles, Loader2, ArrowUp, ArrowDown, RefreshCw, FileText, TrendingUp } from 'lucide-react'
+import { Star, Wallet, Sparkles, Loader2, ArrowUp, ArrowDown, RefreshCw, FileText, TrendingUp } from 'lucide-react'
 import { api, type ExitLine, type TrendInfo } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { toast } from '@/components/Toast'
 import { useHistoryReports, openHistoryReport, loadHistory } from '@/lib/stockAnalysisStore'
 import { trendBadgeCls } from '@/components/stock-analysis/TrendStateBar'
 import { TrendSummaryDialog } from '@/components/stock-analysis/TrendSummaryDialog'
-import { storage } from '@/lib/storage'
 
 type Position = { held: boolean; cost: number | null; weight?: number | null; updated_at: string }
 type WatchPoint = { direction: 'up' | 'down'; price: number; label?: string; action?: string; reason?: string }
@@ -34,18 +33,13 @@ function fmtAgo(iso?: string): string {
   return `${Math.floor(s / 86400)}天前`
 }
 
-/** 自选决策台 —— 一行一只自选:点行即切换分析(免搜索)、标记仓位/成本、纵观对比浮盈。
- *  AI 买卖信号列为 P2,后续接入(留位)。
- *  [R28] fullPage: 个股分析页把决策台当主体铺满整页(关键价位改为弹窗),
- *        此时表格高度按视口撑开,而不再让位给下方的 K 线图。 */
-export function WatchlistDecisionBoard({ currentSymbol, onSelect, fullPage = false }: {
+/** 自选决策台 —— 个股分析页的整页主体: 一行一只自选, 点标的即弹出关键价位分析,
+ *  并可标记仓位/成本、纵观对比浮盈。[R28] 起不再折叠(整页就它一个, 没有要让位的东西)。 */
+export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
   currentSymbol: string
   onSelect: (symbol: string, name: string) => void
-  fullPage?: boolean
 }) {
   const qc = useQueryClient()
-  // 展开状态持久化: 想让 K 线占满首屏的用户收起一次即可, 不必每次进页面都收
-  const [open, setOpen] = useState(() => storage.decisionBoardOpen.get(true))
   const [heldOnly, setHeldOnly] = useState(false)
   // [fork 增强] 六态汇总弹窗
   const [showTrendSummary, setShowTrendSummary] = useState(false)
@@ -234,16 +228,13 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, fullPage = fal
 
   return (
     <div className="rounded-xl border border-border/60 bg-surface/40 overflow-hidden">
-      <div className="flex items-center gap-2 px-4 py-2.5">
-        <button
-          onClick={() => setOpen((v) => { storage.decisionBoardOpen.set(!v); return !v })}
-          className="flex items-center gap-2 cursor-pointer"
-        >
-          <ChevronDown className={`h-3.5 w-3.5 text-muted transition-transform ${open ? '' : '-rotate-90'}`} />
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 px-4 py-2.5">
+        {/* 决策台就是整页主体, 没有要让位的东西 —— 不再提供折叠 */}
+        <span className="flex shrink-0 items-center gap-2">
           <Wallet className="h-3.5 w-3.5 text-sky-400" />
           <span className="text-xs font-medium text-foreground">自选决策台</span>
           <span className="text-[10px] text-muted">{rows.length} 只 · 持有 {heldCount}</span>
-        </button>
+        </span>
         <button
           onClick={refreshAll}
           disabled={refreshing}
@@ -304,13 +295,8 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, fullPage = fal
         />
       )}
 
-      {/* 表格高度随屏自适应: 固定 280px 在常见屏上只露 3 行且上下都是半截行,
-          观感差也不便扫读; 上限 520px 保证 K 线图仍在首屏内。
-          [R28] fullPage 模式下页面里已没有 K 线图要让位, 直接吃满剩余视口高度。 */}
-      {open && (
-        <div className={`overflow-auto border-t border-border/60 ${
-          fullPage ? 'max-h-[calc(100vh-210px)]' : 'max-h-[min(48vh,520px)]'
-        }`}>
+      {/* [R28] 关键价位改弹窗后, 页面里已没有 K 线图要让位 —— 表格直接吃满剩余视口高度 */}
+      <div className="overflow-auto border-t border-border/60 max-h-[calc(100vh-210px)]">
           <table className="w-full min-w-[720px] text-xs">
             <thead className="sticky top-0 bg-surface/95 backdrop-blur text-[10px] text-muted">
               <tr className="text-left">
@@ -486,8 +472,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, fullPage = fal
               })}
             </tbody>
           </table>
-        </div>
-      )}
+      </div>
     </div>
   )
 }
