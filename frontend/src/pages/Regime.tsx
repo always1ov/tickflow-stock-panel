@@ -188,21 +188,39 @@ export function Regime() {
   const [recomputing, setRecomputing] = useState(false)
 
   const rows: RegimeRow[] = history.data?.rows ?? []
-  const latest = rows.length > 0 ? rows[rows.length - 1] : null
-  const hasPhaseData = rows.length > 0 && rows.some(r => r.phase != null)
+  // [fork 增强] 当日数据未落盘时, 末行是重算产生的"空数据行"(0板0家) ——
+  // 若拿它判阶段会凭空得出"退潮"。当前阶段卡改用最近一个"数据齐"的定稿日。
+  const lastRaw = rows.length > 0 ? rows[rows.length - 1] : null
+  const lastUnsettled = !!(lastRaw
+    && (lastRaw.max_consecutive ?? 0) === 0
+    && (lastRaw.first_board ?? 0) === 0
+    && (lastRaw.ge2_count ?? 0) === 0
+    && (lastRaw.limit_up ?? 0) === 0)
+  const settledRows = lastUnsettled ? rows.slice(0, -1) : rows
+  const latest = settledRows.length > 0 ? settledRows[settledRows.length - 1] : null
+  const hasPhaseData = settledRows.length > 0 && settledRows.some(r => r.phase != null)
   const segments = phases.data?.segments ?? []
+
+  // [fork 增强] 盘中实时阶段(付费全市场档才 available; 免费档静默不可用)
+  const phaseLive = useQuery({
+    queryKey: ['regime-phase-live'],
+    queryFn: () => api.regimePhaseLive(),
+    refetchInterval: 60_000,
+    staleTime: 55_000,
+  })
+  const live = phaseLive.data?.available && phaseLive.data.phase ? phaseLive.data : null
 
   // 当前阶段持续天数(末尾连续同阶段) + 当前主线(最新交易日 top3)
   const phaseStreak = useMemo(() => {
     if (!hasPhaseData) return null
-    const lastPhase = rows[rows.length - 1].phase
+    const lastPhase = settledRows[settledRows.length - 1].phase
     let streak = 1
-    for (let i = rows.length - 2; i >= 0; i--) {
-      if (rows[i].phase === lastPhase) streak++
+    for (let i = settledRows.length - 2; i >= 0; i--) {
+      if (settledRows[i].phase === lastPhase) streak++
       else break
     }
     return { phase: lastPhase as MarketPhase, streak }
-  }, [rows, hasPhaseData])
+  }, [settledRows, hasPhaseData])
   const latestMainlines = useMemo(() => {
     const mlRows = mainline.data?.rows ?? []
     if (mlRows.length === 0) return []
@@ -735,26 +753,55 @@ export function Regime() {
       {/* ── 市场阶段概览 (情绪周期 + 梯队指标 + 当前主线) ── */}
       {hasPhaseData && latest ? (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-          {/* 当前阶段 */}
+          {/* 当前阶段 — 付费档实时时显示盘中临时阶段, 否则显示最近定稿 */}
           <div className={cn(cardCls, 'p-3')}>
             <div className="flex items-center gap-1.5 text-[10px] text-muted">
-              <Flame className="h-3 w-3" /> 当前阶段 · {latest.date}
+              <Flame className="h-3 w-3" /> 当前阶段 · {live ? `${live.as_of}` : latest.date}
+              {live ? (
+                <span
+                  className="rounded border border-amber-400/30 bg-amber-400/10 px-1 py-px text-[9px] text-amber-300"
+                  title={`盘中口径(每分钟刷新), 收盘定稿为准\n首板 ${live.metrics?.first_board ?? '—'} · 2板+ ${live.metrics?.ge2_count ?? '—'} · 高度 ${live.metrics?.max_consecutive ?? '—'}板 · 封板率 ${live.metrics?.seal_rate != null ? (live.metrics.seal_rate * 100).toFixed(0) + '%' : '—'} · 晋级率 ${live.metrics?.promo_rate != null ? (live.metrics.promo_rate * 100).toFixed(0) + '%' : '—'}`}
+                >
+                  盘中
+                </span>
+              ) : lastUnsettled ? (
+                <span
+                  className="rounded border border-border/60 bg-elevated/40 px-1 py-px text-[9px] text-muted"
+                  title="今日日线尚未落盘, 显示最近定稿阶段; 盘后数据出齐自动更新(盘中实时阶段需 Starter+ 全市场行情)"
+                >
+                  定稿口径
+                </span>
+              ) : null}
             </div>
             <div className="mt-1.5 flex items-baseline gap-2">
               <span
                 className="text-2xl font-bold cursor-help"
-                style={{ color: MARKET_PHASE_COLORS[phaseStreak?.phase ?? 'repair'] }}
-                title={phaseStreak ? `${MARKET_PHASE_GUIDE[phaseStreak.phase].meaning}\n应对: ${MARKET_PHASE_GUIDE[phaseStreak.phase].action}` : undefined}
+                style={{ color: MARKET_PHASE_COLORS[(live?.phase as MarketPhase) ?? phaseStreak?.phase ?? 'repair'] ?? MARKET_PHASE_COLORS.repair }}
+                title={(() => {
+                  const p = (live?.phase as MarketPhase) ?? phaseStreak?.phase
+                  return p && MARKET_PHASE_GUIDE[p] ? `${MARKET_PHASE_GUIDE[p].meaning}\n应对: ${MARKET_PHASE_GUIDE[p].action}` : undefined
+                })()}
               >
-                {MARKET_PHASE_LABELS[phaseStreak?.phase ?? 'repair']}
+                {live
+                  ? (MARKET_PHASE_LABELS[live.phase as MarketPhase] ?? live.phase_label ?? live.phase)
+                  : MARKET_PHASE_LABELS[phaseStreak?.phase ?? 'repair']}
               </span>
-              {phaseStreak && <span className="text-xs text-muted">第 {phaseStreak.streak} 天</span>}
+              {live ? (
+                <span className="text-xs text-muted">
+                  {phaseStreak && live.phase === phaseStreak.phase ? `第 ${phaseStreak.streak + 1} 天(盘中)` : '盘中·收盘定稿为准'}
+                </span>
+              ) : (
+                phaseStreak && <span className="text-xs text-muted">第 {phaseStreak.streak} 天</span>
+              )}
             </div>
-            {phaseStreak && (
-              <div className="mt-0.5 text-[9px] text-muted/90 truncate" title={MARKET_PHASE_GUIDE[phaseStreak.phase].meaning}>
-                {MARKET_PHASE_GUIDE[phaseStreak.phase].action}
-              </div>
-            )}
+            {(() => {
+              const p = (live?.phase as MarketPhase) ?? phaseStreak?.phase
+              return p && MARKET_PHASE_GUIDE[p] ? (
+                <div className="mt-0.5 text-[9px] text-muted/90 truncate" title={MARKET_PHASE_GUIDE[p].meaning}>
+                  {MARKET_PHASE_GUIDE[p].action}
+                </div>
+              ) : null
+            })()}
             <div className="mt-1.5 flex flex-wrap gap-1">
               {latestMainlines.length > 0 ? latestMainlines.map(m => (
                 <span key={m.member} className="rounded px-1.5 py-px text-[9px] font-medium"

@@ -579,6 +579,20 @@ export const REGIME_STATE_COLORS: Record<RegimeState, string> = {
   weak: '#10b981',        // 绿(弱)
 }
 
+// [fork 增强] 盘中实时阶段(付费全市场档专属; 免费档 available=false)
+export interface RegimePhaseLive {
+  available: boolean
+  reason?: string
+  as_of?: string
+  intraday?: boolean
+  phase?: string | null
+  phase_label?: string | null
+  metrics?: {
+    first_board: number; ge2_count: number; max_consecutive: number
+    seal_rate: number | null; promo_rate: number | null
+  }
+}
+
 export interface RegimeRow {
   date: string
   state: RegimeState
@@ -2228,6 +2242,7 @@ export const api = {
   regimeLatest: () => request<{ row: RegimeRow | null }>('/api/regime/latest'),
   regimeStates: (days = 60) => request<RegimeStates>(`/api/regime/states?days=${days}`),
   regimeCoverage: () => request<RegimeCoverage>('/api/regime/coverage'),
+  regimePhaseLive: () => request<RegimePhaseLive>('/api/regime/phase/live'),
   regimeRecompute: (start?: string, end?: string) => {
     const params = new URLSearchParams()
     if (start) params.set('start', start)

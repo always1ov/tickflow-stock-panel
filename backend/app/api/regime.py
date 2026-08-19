@@ -200,6 +200,83 @@ def regime_recompute(request: Request, start: date | None = None, end: date | No
     }
 
 
+@router.get("/phase/live")
+def regime_phase_live(request: Request):
+    """[fork 增强] 盘中实时阶段 —— 付费全市场实时档专属, 免费档如实返回不可用。
+
+    口径: 全市场实时 enriched 快照聚合当日涨停生态(首板/2板+/最高板/封板率,
+    晋级率用昨日定稿涨停家数做分母)→ 构造当日临时行 → 与 <今日 的定稿序列
+    拼接, 跑与盘后完全相同的 classify_phase_series → 当日"盘中临时阶段"。
+    收盘定稿为准, 前端须标注盘中口径。免费档/实时未开/快照未就绪时返回
+    available=False + 原因, 不影响任何既有功能。
+    """
+    import polars as pl
+
+    from app.market_time import cn_today
+    from app.tickflow.capabilities import Cap
+
+    capset = getattr(request.app.state, "capabilities", None)
+    if capset is None or not capset.has(Cap.QUOTE_POOL):
+        return {"available": False, "reason": "盘中实时阶段需 Starter+(全市场实时行情)"}
+    qs = getattr(request.app.state, "quote_service", None)
+    if qs is None:
+        return {"available": False, "reason": "行情服务未启动"}
+    try:
+        df_today, snap_date = qs.get_enriched_today()
+    except Exception as e:  # noqa: BLE001
+        return {"available": False, "reason": f"实时快照读取失败: {e}"}
+    today = cn_today()
+    if df_today is None or df_today.is_empty() or snap_date != today:
+        return {"available": False, "reason": "今日全市场实时快照未就绪(需开启实时行情)"}
+    if "consecutive_limit_ups" not in df_today.columns:
+        return {"available": False, "reason": "实时快照缺少连板数据列"}
+
+    clu = df_today["consecutive_limit_ups"].fill_null(0)
+    first_board = int((clu == 1).sum())
+    ge2_count = int((clu >= 2).sum())
+    max_consecutive = int(clu.max() or 0)
+    seal_rate = None
+    if {"signal_limit_up", "signal_broken_limit_up"} <= set(df_today.columns):
+        sealed = int(df_today["signal_limit_up"].fill_null(False).sum())
+        broken = int(df_today["signal_broken_limit_up"].fill_null(False).sum())
+        if sealed + broken > 0:
+            seal_rate = round(sealed / (sealed + broken), 4)
+
+    hist = regime_builder.load_regime_history(_data_dir(request))
+    required = {"date", "max_consecutive", "first_board", "ge2_count", "promo_rate", "seal_rate"}
+    if hist.is_empty() or not required.issubset(hist.columns):
+        return {"available": False, "reason": "阶段历史不足(先在市场环境页重算一次)"}
+    base = hist.sort("date").filter(pl.col("date") < today)
+    if base.is_empty():
+        return {"available": False, "reason": "阶段历史不足"}
+    prev = base.tail(1).to_dicts()[0]
+    y_limit = int(prev.get("first_board") or 0) + int(prev.get("ge2_count") or 0)
+    promo_rate = round(ge2_count / y_limit, 4) if y_limit > 0 else None
+
+    metrics = {
+        "first_board": first_board, "ge2_count": ge2_count,
+        "max_consecutive": max_consecutive,
+        "seal_rate": seal_rate, "promo_rate": promo_rate,
+    }
+    try:
+        from app.services.market_phase import PHASE_LABELS, classify_phase_series
+        cols = sorted(required)
+        live_row = pl.DataFrame({
+            "date": [today], "max_consecutive": [max_consecutive],
+            "first_board": [first_board], "ge2_count": [ge2_count],
+            "promo_rate": [promo_rate], "seal_rate": [seal_rate],
+        })
+        seq = pl.concat([base.select(cols), live_row.select(cols)], how="vertical_relaxed")
+        labeled = classify_phase_series(seq)
+        phase = labeled.sort("date").tail(1)["phase"][0]
+    except Exception as e:  # noqa: BLE001
+        logger.warning("live phase classify failed: %s", e)
+        return {"available": False, "reason": f"盘中阶段判定失败: {e}"}
+    return {"available": True, "as_of": str(today), "intraday": True,
+            "phase": phase, "phase_label": PHASE_LABELS.get(phase, phase),
+            "metrics": metrics}
+
+
 @router.get("/phases")
 def regime_phases(
     request: Request,
