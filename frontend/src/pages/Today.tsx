@@ -344,7 +344,7 @@ export function Today() {
                 }
                 className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] ${POSTURE_STYLE[d.weather.market.mode] ?? POSTURE_STYLE['观察']}`}
               >
-                大盘{d.weather.market.mode}
+                {d.weather.market.benchmark_name ?? '大盘'}·{d.weather.market.mode}
                 {d.weather.market.pending && <span className="opacity-70">(将转{d.weather.market.pending.mode} {d.weather.market.pending.streak}/{d.weather.market.pending.need})</span>}
               </span>
             )}

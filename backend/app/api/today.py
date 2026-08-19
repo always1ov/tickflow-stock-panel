@@ -421,7 +421,8 @@ def _build_overview(repo) -> dict:
     if market:
         from app.services.market_mode import combine_posture
         posture = combine_posture(market["mode"], breadth_posture)
-        posture_reason = f"大盘:{market['reason']};自选:{breadth_reason}"
+        # 理由已含基准指数名(如"沪深300 收盘…"), 此处不再重复"大盘"前缀
+        posture_reason = f"{market['reason']};自选:{breadth_reason}"
     if market_breadth and not market_breadth["capped"]:
         posture_reason += f";全市场 {market_breadth['up']}涨/{market_breadth['down']}跌"
 

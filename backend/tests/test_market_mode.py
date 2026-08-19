@@ -53,7 +53,7 @@ def test_below_ma50_above_ma200_is_caution():
 def test_insufficient_history_says_so():
     r = raw_mode(_closes(n=MIN_BARS - 1))
     assert r["mode"] == "观察"
-    assert "指数历史仅" in r["reason"]
+    assert "历史仅" in r["reason"] and "个交易日" in r["reason"]
 
 
 # ---------- 黏性 ----------
@@ -88,6 +88,27 @@ def test_decide_below_ma50_falling_ma200_is_soft_defense():
     out = decide_mode(close=100, ma50=105, ma200=95, momentum=0.1, ma200_rising=False)
     assert out["mode"] == "防守" and out["veto"] is False
     assert "拐头向下" in out["reason"]
+
+
+def test_reason_names_the_benchmark_index():
+    """理由必须点名基准指数 —— 用户看到'跌破年线'要知道是哪个指数的年线。"""
+    for out in (
+        decide_mode(90, 105, 95, 0.1, True, "沪深300"),      # 硬防守
+        decide_mode(100, 95, 96, -0.05, True, "沪深300"),    # 年动量为负
+        decide_mode(110, 100, 95, 0.2, True, "沪深300"),     # 进攻
+        decide_mode(100, 105, 95, 0.1, True, "沪深300"),     # 谨慎
+        decide_mode(100, 105, 95, 0.1, False, "沪深300"),    # 软防守
+    ):
+        assert out["reason"].startswith("沪深300"), out["reason"]
+    # 回退到上证指数时同样点名
+    assert decide_mode(90, 105, 95, 0.1, True, "上证指数")["reason"].startswith("上证指数")
+
+
+def test_raw_mode_passes_benchmark_name_through():
+    r = raw_mode(_closes(), "沪深300")
+    assert r["reason"].startswith("沪深300")
+    short = raw_mode(_closes(n=MIN_BARS - 1), "上证指数")
+    assert short["reason"].startswith("上证指数")
 
 
 def test_decide_hard_conditions_have_veto():

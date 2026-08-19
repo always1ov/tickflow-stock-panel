@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 
 # 基准指数: 沪深300; 数据缺失时按序回退(上证指数几乎必有)
 BENCHMARKS = ["000300.SH", "000001.SH"]
+BENCHMARK_NAMES = {"000300.SH": "沪深300", "000001.SH": "上证指数"}
 # 完整判定所需最少交易日(MA200); 年动量窗口
 MIN_BARS = 200
 MOMENTUM_BARS = 240
@@ -58,16 +59,18 @@ def _save_state(state: dict) -> None:
         logger.warning("save market mode state failed: %s", e)
 
 
-def raw_mode(closes: list[float]) -> dict:
+def raw_mode(closes: list[float], bench_name: str = "大盘") -> dict:
     """按当日数据算"原始模式"(不含黏性)。closes 按日期升序, 最后一个为最新收盘。
 
+    bench_name: 基准指数名(如"沪深300"), 写进理由文案 —— 用户看到"跌破年线"
+    时必须知道是哪个指数的年线, 否则无从核对。
     返回 {mode, reason, metrics}; 数据不足时 mode="观察" 并明说。
     """
     n = len(closes)
     if n < MIN_BARS:
         return {
             "mode": "观察",
-            "reason": f"指数历史仅 {n} 个交易日(需 {MIN_BARS}),先按观察处理 —— 到指数页同步更长日K后生效",
+            "reason": f"{bench_name}历史仅 {n} 个交易日(需 {MIN_BARS}),先按观察处理 —— 到指数页同步更长日K后生效",
             "metrics": {},
         }
     close = closes[-1]
@@ -85,31 +88,35 @@ def raw_mode(closes: list[float]) -> dict:
         # [R13] 近 20 交易日收益, 供个股相对强度对比
         "ret_20d": round(close / closes[-21] - 1, 4) if closes[-21] else None,
     }
-    out = decide_mode(close, ma50, ma200, momentum, ma200_rising)
+    out = decide_mode(close, ma50, ma200, momentum, ma200_rising, bench_name)
     out["metrics"] = metrics
     return out
 
 
 def decide_mode(close: float, ma50: float, ma200: float,
-                momentum: float, ma200_rising: bool) -> dict:
-    """模式决策核心(纯函数, 与均线口径解耦, 供单测覆盖每个分支)。"""
+                momentum: float, ma200_rising: bool,
+                bench_name: str = "大盘") -> dict:
+    """模式决策核心(纯函数, 与均线口径解耦, 供单测覆盖每个分支)。
+
+    bench_name 只影响文案措辞, 不影响判定。
+    """
     # 防守一票否决(硬条件, veto=True 立即生效)
     if close < ma200:
         return {"mode": "防守", "veto": True,
-                "reason": f"大盘收盘 {close:.0f} 已跌破年线 {ma200:.0f},大环境转坏"}
+                "reason": f"{bench_name} 收盘 {close:.0f} 已跌破年线(200日均线){ma200:.0f},大环境转坏"}
     if momentum < 0:
         return {"mode": "防守", "veto": True,
-                "reason": f"大盘比一年前还低({momentum:+.1%}),长期方向向下"}
+                "reason": f"{bench_name} 比一年前还低({momentum:+.1%}),长期方向向下"}
     if close > ma50:
         return {"mode": "进攻", "veto": False,
-                "reason": f"大盘站在年线 {ma200:.0f} 和 50日线 {ma50:.0f} 之上,环境健康"}
+                "reason": f"{bench_name} {close:.0f} 站在年线 {ma200:.0f} 和 50日线 {ma50:.0f} 之上,环境健康"}
     if ma200_rising:
         return {"mode": "谨慎", "veto": False,
-                "reason": f"大盘跌破 50日线 {ma50:.0f} 但仍守住向上的年线 {ma200:.0f},短期转弱"}
+                "reason": f"{bench_name} {close:.0f} 跌破 50日线 {ma50:.0f} 但仍守住向上的年线 {ma200:.0f},短期转弱"}
     # 软防守: 破 50日线且年线已拐头向下 —— 中性的必要条件(年线向上, PRD 4.4.2)
     # 不成立, 按防守处理, 但走确认流程而非立即切换(区别于硬条件)
     return {"mode": "防守", "veto": False,
-            "reason": f"大盘跌破 50日线 {ma50:.0f} 且年线 {ma200:.0f} 已拐头向下,趋势在变坏"}
+            "reason": f"{bench_name} {close:.0f} 跌破 50日线 {ma50:.0f} 且年线 {ma200:.0f} 已拐头向下,趋势在变坏"}
 
 
 def apply_stickiness(raw: dict, state: dict, as_of: str) -> dict:
@@ -180,15 +187,15 @@ def get_market_mode(repo) -> dict:
             "reason": "读不到基准指数日K(沪深300/上证指数),先按观察处理 —— 到指数页同步指数日K后生效",
             "pending": None, "metrics": {}, "as_of": None,
         }
-    raw = raw_mode(closes)
+    bench_name = BENCHMARK_NAMES.get(used, used or "大盘")
+    raw = raw_mode(closes, bench_name)
     state = _load_state()
     prev_mode = state.get("mode")
     out = apply_stickiness(raw, state, as_of or "")
     _save_state(state)
-    names = {"000300.SH": "沪深300", "000001.SH": "上证指数"}
-    out.update({"benchmark": used, "benchmark_name": names.get(used, used), "as_of": as_of})
+    out.update({"benchmark": used, "benchmark_name": bench_name, "as_of": as_of})
     if prev_mode is not None and out["mode"] != prev_mode:
-        _announce_switch(repo, prev_mode, out, names.get(used, used or "大盘"))
+        _announce_switch(repo, prev_mode, out, bench_name)
     return out
 
 
