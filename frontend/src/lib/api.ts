@@ -809,6 +809,57 @@ export interface SeesawResult {
   source?: string
 }
 
+
+// ===== [fork 增强] R31 AI 自动挖掘 =====
+/** AI 每轮的判断。satisfied=true 时循环收工, 由人工决定要不要发布。 */
+export interface AutopilotPlan {
+  satisfied: boolean
+  verdict: string
+  pick: string | null
+  reason: string | null
+  next: {
+    factor_names: string[]
+    budget_profile: 'balanced' | 'strict'
+    max_combination_factors: number
+    beam_width: number
+    correlation_threshold: number
+  } | null
+  error?: string
+}
+export interface AutopilotIteration {
+  iteration: number
+  run_id: string | null
+  status: string
+  config: Record<string, unknown>
+  candidates: Record<string, unknown>[]
+  ai: AutopilotPlan | null
+  created_at: string
+}
+export interface AutopilotSession {
+  session_id: string
+  asset_type: 'stock' | 'etf'
+  /** 搜索窗口: AI 循环只在这里试 */
+  search_start: string
+  search_end: string
+  /** 终检窗口: 循环全程看不到, 发布后才在这上面跑一次 */
+  holdout_start: string
+  holdout_end: string
+  max_iterations: number
+  base_config: Record<string, unknown>
+  iterations: AutopilotIteration[]
+  status: 'open' | 'satisfied' | 'exhausted' | 'failed'
+  winner: (Record<string, unknown> & { signature?: string; name?: string; run_id?: string }) | null
+  final_check: Record<string, unknown> | null
+  confidence_note?: string
+  fail_reason?: string
+  created_at: string
+  updated_at: string
+}
+export interface AutopilotStepResult {
+  action: 'running' | 'iterated' | 'done' | 'error'
+  message: string
+  session: AutopilotSession
+}
 // ===== 大盘复盘 =====
 export interface AiReviewReport {
   id: string
@@ -2459,6 +2510,25 @@ export const api = {
       body: JSON.stringify(payload),
     }),
 
+  // [fork 增强] R31 AI 自动挖掘: step 是唯一入口 —— 手动点一次调一次, 自动就是轮询它
+  miningAutopilotSessions: () =>
+    request<{ items: AutopilotSession[] }>('/api/backtest/mining/autopilot/sessions'),
+  miningAutopilotSession: (id: string) =>
+    request<AutopilotSession>(`/api/backtest/mining/autopilot/sessions/${encodeURIComponent(id)}`),
+  miningAutopilotStart: (payload: {
+    asset_type?: 'stock' | 'etf'; start: string; end: string
+    holdout_days?: number; budget_profile?: 'balanced' | 'strict'
+    max_iterations?: number; factor_names?: string[]
+  }) =>
+    request<AutopilotSession>('/api/backtest/mining/autopilot/sessions', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  miningAutopilotStep: (id: string) =>
+    request<AutopilotStepResult>(
+      `/api/backtest/mining/autopilot/sessions/${encodeURIComponent(id)}/step`,
+      { method: 'POST' },
+    ),
   miningResult: (runId: string) =>
     request<MiningResult>(`/api/backtest/mining/runs/${encodeURIComponent(runId)}/result`),
 

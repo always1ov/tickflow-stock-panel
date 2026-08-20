@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { BookmarkCheck } from 'lucide-react'
 import { PageHeader } from '@/components/PageHeader'
+import { MiningAutopilot } from './backtest/MiningAutopilot'
 import { MiningWorkbench } from './backtest/MiningWorkbench'
 import { ResearchCandidatesDialog } from './backtest/ResearchCandidatesDialog'
 
@@ -27,7 +28,9 @@ export function Mining() {
         )}
       />
 
-      <main className="min-h-0 flex-1 px-3 pb-3 pt-3 lg:px-4 lg:pb-4">
+      <main className="min-h-0 flex-1 space-y-3 overflow-auto px-3 pb-3 pt-3 lg:px-4 lg:pb-4">
+        {/* [fork 增强] R31 AI 自动挖掘: 放在工作台上方 —— 不会用手工挖掘的人先看这个 */}
+        <MiningAutopilot />
         <MiningWorkbench />
       </main>
 
