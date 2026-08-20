@@ -423,3 +423,33 @@ async def step(*, session: dict, factor_catalog: list[dict],
     }) or session
     return {"action": STEP_ITERATED, "session": session,
             "message": f"第 {len(session['iterations'])} 轮已开跑"}
+
+
+def explain_insufficient_data(*, avail_search: dict, avail_all: dict, windows: dict,
+                              budget_profile: str, holdout_days: int) -> str:
+    """数据不够时给一句人能看懂的话。
+
+    preflight 的原文是 "requires at least 786 enriched trading bars ... effective range
+    2025-08-18 to 2025-08-20 has 3" —— 用户看了只会懵: 我明明填了 2021 到 2026。
+    真相通常是本地 enriched 只有一年, 而终检窗口又把最近那一年锁走了, 搜索窗口落在
+    数据开始之前, 于是"有效区间"只剩几天。这里把真实数字摆出来并给出路。
+    """
+    have_all = int(avail_all.get("trading_bars") or 0)
+    have_search = int(avail_search.get("trading_bars") or 0)
+    need = int(avail_search.get("required_bars") or 0)
+    a_start = avail_all.get("available_start") or "—"
+    a_end = avail_all.get("available_end") or "—"
+    holdout_bars = max(0, have_all - have_search)
+    parts = [
+        f"数据不够开自动挖掘。本地日线只有 {have_all} 个交易日({a_start} ~ {a_end});",
+        f"{budget_profile} 档的搜索窗口需要 {need} 个交易日, "
+        f"而切走 {holdout_days} 天终检窗口(约 {holdout_bars} 个交易日)后, "
+        f"搜索窗口 {windows['search_start']} ~ {windows['search_end']} 只剩 {have_search} 个。",
+    ]
+    if have_all < need:
+        parts.append(
+            f"即使不留终检窗口也还差 {need - have_all} 个交易日 —— "
+            f"请先到数据页补历史日线(至少补到 {need + 245} 个交易日, 才够搜索+终检)。")
+    else:
+        parts.append("把开始日期往前挪, 或调小终检窗口(下限 180 天), 让搜索窗口落进有数据的区间。")
+    return "".join(parts)

@@ -389,3 +389,34 @@ def test_step_is_noop_on_closed_session(store, monkeypatch):
     store.set_status(s["session_id"], "satisfied")
     out = _run_step(store.get(s["session_id"]), start_run=lambda cfg: pytest.fail("不该再跑"))
     assert out["action"] == ap.STEP_DONE
+
+
+# ---------- 数据不够时的说明 (用户实测踩到的那个报错) ----------
+
+def test_explain_insufficient_data_when_history_too_short():
+    """本地只有 243 根、均衡档要 786 根 —— 要说清还差多少、去哪补。"""
+    w = ap.split_windows(date(2021, 8, 20), date(2026, 8, 20), holdout_days=365)
+    msg = ap.explain_insufficient_data(
+        avail_search={"trading_bars": 3, "required_bars": 786},
+        avail_all={"trading_bars": 243, "available_start": "2025-08-18",
+                   "available_end": "2026-08-20", "required_bars": 786},
+        windows={k: str(v) for k, v in w.items()},
+        budget_profile="balanced", holdout_days=365)
+    assert "243 个交易日" in msg and "2025-08-18" in msg
+    assert "786 个交易日" in msg
+    assert "还差 543 个交易日" in msg, "要算出差多少, 别只说'不够'"
+    assert "数据页" in msg, "要给出路"
+    assert "只剩 3 个" in msg, "解释清楚为什么有效区间那么短"
+
+
+def test_explain_points_at_window_when_data_is_enough_overall():
+    """总量够、只是被终检窗口切偏了 —— 出路是挪日期而不是补数据。"""
+    w = ap.split_windows(date(2021, 8, 20), date(2026, 8, 20), holdout_days=365)
+    msg = ap.explain_insufficient_data(
+        avail_search={"trading_bars": 700, "required_bars": 786},
+        avail_all={"trading_bars": 900, "available_start": "2023-01-03",
+                   "available_end": "2026-08-20", "required_bars": 786},
+        windows={k: str(v) for k, v in w.items()},
+        budget_profile="balanced", holdout_days=365)
+    assert "往前挪" in msg and "调小终检窗口" in msg
+    assert "数据页" not in msg, "数据总量够就别叫人去补数据"

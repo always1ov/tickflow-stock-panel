@@ -798,16 +798,24 @@ def autopilot_start(payload: AutopilotStartRequest, request: Request) -> dict[st
         windows = mining_autopilot.split_windows(
             payload.start, payload.end,
             holdout_days=payload.holdout_days, budget_profile=payload.budget_profile)
-        # 粗筛过了还要按 enriched 真实交易日精确核验(docs §置信度: balanced/strict 需 3 个 outer 折)
-        require_mining_availability(
-            request.app.state.repo.store.data_dir,
-            asset_type=payload.asset_type,
-            budget_profile=payload.budget_profile,
-            start=windows["search_start"],
-            end=windows["search_end"],
-        )
     except (ValueError, MiningRunValidationError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    # 粗筛过了还要按 enriched 真实交易日精确核验(docs §置信度: balanced/strict 需 3 个 outer 折)。
+    # 不够时不要直接把 preflight 原文抛给用户 —— 它只会说"有效区间 xx 到 yy 只有 3 根",
+    # 而用户明明填了四年区间, 看不懂。换成带真实数字和出路的中文说明。
+    data_dir = request.app.state.repo.store.data_dir
+    avail_search = mining_availability(
+        data_dir, asset_type=payload.asset_type, budget_profile=payload.budget_profile,
+        start=windows["search_start"], end=windows["search_end"]).to_dict()
+    if not avail_search.get("eligible"):
+        avail_all = mining_availability(
+            data_dir, asset_type=payload.asset_type,
+            budget_profile=payload.budget_profile).to_dict()
+        raise HTTPException(status_code=400, detail=mining_autopilot.explain_insufficient_data(
+            avail_search=avail_search, avail_all=avail_all,
+            windows={k: str(v) for k, v in windows.items()},
+            budget_profile=payload.budget_profile, holdout_days=payload.holdout_days))
 
     factors = [f for f in payload.factor_names if f in _FACTOR_IDS]
     base_config = {

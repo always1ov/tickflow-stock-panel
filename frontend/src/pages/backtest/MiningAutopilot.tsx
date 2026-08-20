@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useSearchParams } from 'react-router-dom'
 import {
-  Bot, ChevronDown, Info, LoaderCircle, Lock, Play, Rocket, Square,
+  Bot, ChevronDown, ExternalLink, Info, LoaderCircle, Lock, Play, Rocket, Square,
 } from 'lucide-react'
 import { toast } from '@/components/Toast'
 import { api, type AutopilotIteration, type AutopilotSession } from '@/lib/api'
@@ -51,6 +52,7 @@ function pct(v: unknown, digits = 1) {
 
 export function MiningAutopilot() {
   const queryClient = useQueryClient()
+  const [, setSearchParams] = useSearchParams()
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [auto, setAuto] = useState(false)
   const [openIter, setOpenIter] = useState<number | null>(null)
@@ -219,9 +221,24 @@ export function MiningAutopilot() {
                     </p>
                   )}
                   <p className="mt-1.5 text-[10px] leading-4 text-secondary">
-                    下一步：到上方「策略候选」里找到这个候选，点<span className="text-foreground">「显式发布」</span>人工确认。
+                    下一步：在下方工作台里打开这一轮，点<span className="text-foreground">「显式发布」</span>人工确认。
                     系统不会替你发布；发布后才会在终检窗口跑一次定生死。
                   </p>
+                  {/* 直达: 工作台的 run/candidate 都由 URL 驱动, 一键定位到赢家那一轮 */}
+                  {active.winner.run_id && (
+                    <button type="button"
+                      onClick={() => {
+                        const params = new URLSearchParams()
+                        params.set('run', String(active.winner?.run_id ?? ''))
+                        if (active.winner?.signature) params.set('candidate', String(active.winner.signature))
+                        setSearchParams(params, { replace: true })
+                        toast('已在下方工作台定位到赢家候选', 'success')
+                      }}
+                      className="mt-2 inline-flex h-7 items-center gap-1.5 rounded-btn border border-accent/40 bg-accent/10 px-2.5 text-[10px] font-medium text-accent transition-colors hover:bg-accent/20">
+                      <ExternalLink className="h-3 w-3" />
+                      在工作台里打开这个候选
+                    </button>
+                  )}
                 </>
               ) : (
                 <p className="text-[10px] text-danger">
