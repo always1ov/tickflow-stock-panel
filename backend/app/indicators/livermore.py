@@ -53,7 +53,10 @@ def action_text(state: str | None, up_pivot: float | None, dn_pivot: float | Non
     fu = f"{flip_up:.2f}" if flip_up is not None else None
     if state == "UT":
         if fd:
-            return f"顺势持有多头 / 收盘跌破 {fd} 才转弱" + (f",跌破 {dn} 转空" if dn else "")
+            # ADD 语义必须留着(PRD §6.6 五种信号含 ADD): 只说"跌破多少转弱"会让
+            # 上涨趋势里唯一的动作变成"等着别动", 加仓提示丢失。
+            return f"顺势持有多头 / 可按金字塔计划加仓 · 收盘跌破 {fd} 才转弱" + (
+                f",跌破 {dn} 转空" if dn else "")
         return f"顺势持有多头 / 突破 {up} 可金字塔加仓" if up else STATE_ACTION["UT"]
     if state == "NR":
         base = f"观望,上破 {up} 确认转多" if up else STATE_ACTION["NR"]

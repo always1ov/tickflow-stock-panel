@@ -157,10 +157,17 @@ async def generate_signal(repo, data_dir: Path, symbol: str) -> dict:
         from app.services.livermore_service import trend_for_symbol
         t = trend_for_symbol(repo, sym)
         if "error" not in t:
+            def _px(v):
+                return f"{v:.2f}" if isinstance(v, (int, float)) else "—"
+            # [R29] 翻转触发价与界面主打口径保持一致 —— AI 看的数必须是用户看的数,
+            # 否则 AI 的理由和界面的价位对不上(PRD §10.2 决策可解释性)。
             trend_line = (
-                f"六态趋势(利弗莫尔): {t['state_cn']} 第{t['duration']}天"
-                f", 上关键点 {t['up_pivot'] if t['up_pivot'] is not None else '—'}"
-                f", 下关键点 {t['dn_pivot'] if t['dn_pivot'] is not None else '—'}"
+                f"六态趋势(利弗莫尔, 只认收盘价): {t['state_cn']} 第{t['duration']}天"
+                f", 收盘跌破 {_px(t.get('flip_down'))} 转弱"
+                f", 收盘站上 {_px(t.get('flip_up'))} 转强"
+                f"(参考: 本轮最高收盘 {_px(t.get('leg_high'))}"
+                f", 上关键点 {_px(t['up_pivot'])}"
+                f", 下关键点 {_px(t['dn_pivot'])})"
                 f", 参考动作: {t['action']}\n"
             )
     except Exception as e:  # noqa: BLE001

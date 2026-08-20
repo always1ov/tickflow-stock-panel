@@ -94,6 +94,7 @@ def test_action_text_uptrend_uses_flip_not_pivot():
     txt = action_text("UT", up_pivot=13.6, dn_pivot=11.4, flip_down=12.78, flip_up=None)
     assert "12.78" in txt and "跌破" in txt
     assert "突破 13.60" not in txt, "不再让用户'突破今天的收盘价再加仓'"
+    assert "加仓" in txt, "PRD §6.6 的 ADD 语义不能因为换价位而丢掉"
 
 
 def test_action_text_downtrend_uses_flip():
