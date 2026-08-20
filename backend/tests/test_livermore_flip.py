@@ -111,3 +111,71 @@ def test_action_text_falls_back_without_flip_prices():
     """老调用方(不传翻转价)行为不变。"""
     assert action_text("UT", 13.6, 11.4) == "顺势持有多头 / 突破 13.60 可金字塔加仓"
     assert action_text(None, None, None) == ""
+
+
+# ---------- [R30] 建仓锚点不漂移 (PRD §10.1 决策可复盘) ----------
+
+def test_entry_pivot_is_frozen_at_state_start():
+    """进入上涨趋势后, entry_pivot 停在突破那天; up_pivot 随新高天天上移。"""
+    dates = [f"d{i:02d}" for i in range(len(SERIES))]
+    r = compute(SERIES, dates, THR)
+    assert r["steps"][-1]["state"] == "UT"
+    assert r["entry_up_pivot"] == 13.0, "突破当日收盘 13.00 就是锚"
+    assert r["last"]["up_pivot"] == 13.6, "而 up_pivot 已随新高走到 13.60"
+    assert r["entry_up_pivot"] != r["last"]["up_pivot"], "两者必须是不同的东西"
+
+
+def test_entry_pivot_stable_across_days_within_state():
+    """同一段趋势内, 无论看到第几天, 锚都是同一个数 —— 复盘才对得上。"""
+    dates = [f"d{i:02d}" for i in range(len(SERIES))]
+    anchors = {compute(SERIES[:n], dates[:n], THR)["entry_up_pivot"]
+               for n in range(14, len(SERIES) + 1)}
+    assert anchors == {13.0}, "第 1 天到第 6 天看到的作废价必须一致"
+
+
+# ---------- [R30] 盘中价位走收盘口径 (PRD §7.5 风险参考价=正式收盘价) ----------
+
+def test_intraday_spike_does_not_lift_flip_down(monkeypatch):
+    """盘中冲高不得抬高转弱线 —— 那等于用没成立的高点放松出场纪律。"""
+    from app.services import livermore_service as svc
+    monkeypatch.setattr(svc, "_MIN_DAYS", 5)  # 用例序列短, 放开天数护栏
+
+    dates = [f"d{i:02d}" for i in range(len(SERIES))]
+    thr, src = THR, "default"
+    # 已收盘序列 = SERIES; 盘中再冲一根 15.00(未收盘)
+    live_closes = SERIES + [15.0]
+    live_dates = dates + ["d18"]
+    out = svc._trend_payload(live_closes, live_dates, thr, src)
+    assert out["flip_down"] == pytest.approx(15.0 * (1 - THR)), "未修正前会被盘中高点顶上去"
+
+    svc._overlay_closing_prices(out, SERIES, dates, thr, src)
+    assert out["flip_down"] == pytest.approx(13.6 * (1 - THR)), "修正后回到收盘口径"
+    assert out["leg_high"] == 13.6
+    assert out["price_basis"] == "closing"
+    assert out["closing_as_of"] == "d17"
+
+
+def test_overlay_keeps_intraday_state_but_closing_prices(monkeypatch):
+    """状态仍可以是盘中临时的(用户要看当前阶段), 只有价位强制收盘口径。"""
+    from app.services import livermore_service as svc
+    monkeypatch.setattr(svc, "_MIN_DAYS", 5)
+
+    dates = [f"d{i:02d}" for i in range(len(SERIES))]
+    out = svc._trend_payload(SERIES + [15.0], dates + ["d18"], THR, "default")
+    state_before = out["state"]
+    svc._overlay_closing_prices(out, SERIES, dates, THR, "default")
+    assert out["state"] == state_before, "状态不被覆盖"
+    assert out["close"] == 15.0, "现价仍是实时价"
+    assert out["closing_state"] is not None, "另附收盘口径状态供对照"
+
+
+def test_overlay_noop_when_history_too_short():
+    """收盘序列不够长时保持原值, 不制造空洞(PRD §9.4)。护栏 _MIN_DAYS 生效。"""
+    from app.services import livermore_service as svc
+
+    dates = [f"d{i:02d}" for i in range(len(SERIES))]
+    out = svc._trend_payload(SERIES, dates, THR, "default")
+    before = dict(out)
+    svc._overlay_closing_prices(out, SERIES[:3], dates[:3], THR, "default")
+    assert out["flip_down"] == before["flip_down"]
+    assert "price_basis" not in out

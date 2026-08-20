@@ -153,8 +153,12 @@ def rank_opportunities(
                 why.append(f"这票历史转强信号胜率仅 {wr:.0%}({wn} 次),信号在它身上不好使")
             else:
                 why.append(f"历史转强信号胜率 {wr:.0%}({wn} 次)")
+        # [R30] 建仓计划的锚用「进入当前状态那天的关键点」, 不用会随新高上移的
+        # up_pivot —— 否则"站稳 X 上满 / 跌回 X 作废"里的 X 天天变, 事后无从复盘
+        # (PRD §10.1 决策日志)。取不到时回退 up_pivot, 不制造空洞。
         try:
-            t_pivot = float(t["up_pivot"]) if t.get("up_pivot") else None
+            raw_pivot = t.get("entry_pivot") or t.get("up_pivot")
+            t_pivot = float(raw_pivot) if raw_pivot else None
         except (TypeError, ValueError):
             t_pivot = None
         add(sym, "trend_signal", score,

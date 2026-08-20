@@ -51,7 +51,7 @@ export function TrendStateBar({ symbol, trend }: { symbol: string; trend: TrendD
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg border border-border/50 bg-elevated/20 px-3 py-2">
       <span
         className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs ${trendBadgeCls(trend.state)}`}
-        title={`${trend.state_en} · 窗口 ${trend.window_days} 个交易日${trend.intraday ? '\n⚠ 盘中临时口径:实时价参与判定,收盘确认为准' : ''}`}
+        title={`${trend.state_en} · 窗口 ${trend.window_days} 个交易日${trend.intraday ? '\n⚠ 盘中临时口径:实时价参与状态判定,收盘确认为准\n(价位仍按已收盘日线算, 盘中冲高不会抬高转弱线)' : ''}`}
       >
         {trend.state_cn}
       </span>
@@ -81,7 +81,7 @@ export function TrendStateBar({ symbol, trend }: { symbol: string; trend: TrendD
           关键点降级为悬停可见的参考信息。 */}
       <span
         className="text-[11px] font-mono text-muted"
-        title={`本轮最高收盘 ${trend.leg_high?.toFixed(2) ?? '—'} · 本轮最低收盘 ${trend.leg_low?.toFixed(2) ?? '—'}\n上关键点 ${trend.up_pivot?.toFixed(2) ?? '—'} · 下关键点 ${trend.dn_pivot?.toFixed(2) ?? '—'}\n阈值 ${(trend.threshold * 100).toFixed(0)}%`}
+        title={`本轮最高收盘 ${trend.leg_high?.toFixed(2) ?? '—'} · 本轮最低收盘 ${trend.leg_low?.toFixed(2) ?? '—'}\n上关键点 ${trend.up_pivot?.toFixed(2) ?? '—'} · 下关键点 ${trend.dn_pivot?.toFixed(2) ?? '—'}\n阈值 ${(trend.threshold * 100).toFixed(0)}%${trend.price_basis === 'closing' ? `\n价位按已收盘日线算(不含盘中实时价), 截至 ${trend.closing_as_of ?? '—'}` : ''}`}
       >
         {trend.flip_down != null && (
           <>跌破 <span className="text-bear/90">{trend.flip_down.toFixed(2)}</span> 转弱</>

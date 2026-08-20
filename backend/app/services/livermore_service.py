@@ -159,6 +159,9 @@ def _trend_payload(closes: list[float], dates: list[str], threshold: float, sour
         "flip_up": last.get("flip_up"),
         "leg_high": last.get("leg_high"),
         "leg_low": last.get("leg_low"),
+        # [R30] 建仓/作废计划的锚: 进入当前状态那天的关键点, 不随新高漂移
+        "entry_pivot": res.get("entry_up_pivot"),
+        "entry_dn_pivot": res.get("entry_dn_pivot"),
         "close": last["close"],
         "as_of": last["date"],
         "signal": kind[0] if kind else None,
@@ -169,6 +172,36 @@ def _trend_payload(closes: list[float], dates: list[str], threshold: float, sour
         # [R13] 近 20 交易日收益, 供今日总览算相对强度(个股 vs 大盘); 窗口不足给 None
         "ret_20d": (closes[-1] / closes[-21] - 1) if len(closes) >= 21 and closes[-21] else None,
     }
+
+
+_CLOSING_PRICE_KEYS = ("flip_down", "flip_up", "leg_high", "leg_low",
+                       "up_pivot", "dn_pivot", "entry_pivot", "entry_dn_pivot")
+
+
+def _overlay_closing_prices(out: dict, closes: list[float], dates: list[str],
+                            thr: float, src: str) -> None:
+    """[R30] 盘中时把所有决策价位换成"只用已收盘日线"算的版本。
+
+    状态/持续天数/信号仍是盘中临时口径(用户要的就是"当前阶段状态"),
+    但价位是纪律线, 必须收盘口径 —— 否则盘中一根长上影就能把转弱线抬高,
+    等于用没成立的高点放松出场标准。
+
+    另附 action_closing: 按收盘口径价位重写的操作建议, 前端盘中展示这一条。
+    价位算不出来时保持原值不动, 不制造空洞(PRD §9.4 数据不确定宁可不动)。
+    """
+    if len(closes) < _MIN_DAYS:
+        return
+    try:
+        base = _trend_payload(closes, dates, thr, src)
+    except Exception as e:  # noqa: BLE001
+        logger.debug("closing-price overlay skipped: %s", e)
+        return
+    for k in _CLOSING_PRICE_KEYS:
+        out[k] = base.get(k)
+    out["action"] = base.get("action")
+    out["price_basis"] = "closing"
+    out["closing_state"] = base.get("state")
+    out["closing_as_of"] = base.get("as_of")
 
 
 def trend_for_symbol(repo, symbol: str, with_segments: bool = False,
@@ -185,6 +218,11 @@ def trend_for_symbol(repo, symbol: str, with_segments: bool = False,
     # [R18] 实时价确实参与了判定 → 标记盘中临时口径, 前端据此提示"待收盘确认"
     if len(closes) > n_stored:
         out["intraday"] = True
+        # [R30] 但价位一律走收盘口径(PRD §7.5: 风险参考价统一用正式收盘价)。
+        # 盘中冲高会把 leg_high 顶上去, 跟着算出的转弱线随之虚高 —— 那是拿一个
+        # 未成立的高点去放松出场纪律, 方向正好反了。状态可以是盘中临时的,
+        # 价位不行。
+        _overlay_closing_prices(out, closes[:n_stored], dates[:n_stored], thr, src)
     if with_segments:
         res = compute(closes, dates, thr)
         out["segments"] = [
@@ -283,6 +321,8 @@ def trends_for_symbols(repo, symbols: list[str],
                 out[key] = _trend_payload(closes, dts, thr, src)
                 if len(closes) > n_stored:  # [R18] 实时价参与判定 → 盘中临时口径
                     out[key]["intraday"] = True
+                    # [R30] 价位回落到收盘口径, 与单只路径一致
+                    _overlay_closing_prices(out[key], closes[:n_stored], dts[:n_stored], thr, src)
 
     for sym in other_syms:
         try:

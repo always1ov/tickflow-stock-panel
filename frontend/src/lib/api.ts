@@ -266,6 +266,11 @@ export interface TrendInfo {
   ret_20d?: number | null
   /** [R18] 实时价参与了判定 → 盘中临时口径, 收盘确认为准 */
   intraday?: boolean
+  /** [R30] 'closing' = 上面的价位一律按已收盘日线算(盘中也不含实时价, PRD §7.5) */
+  price_basis?: 'closing'
+  /** [R30] 收盘口径下的状态(与盘中临时状态对照用) */
+  closing_state?: LivermoreState | null
+  closing_as_of?: string | null
 }
 
 export interface TrendDetail extends TrendInfo {

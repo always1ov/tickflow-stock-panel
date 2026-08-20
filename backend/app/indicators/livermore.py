@@ -187,6 +187,11 @@ def compute(closes: list[float], dates: list[str], threshold: float = DEFAULT_TH
         "duration": last["i"] - start + 1,
         "since": steps[start]["date"],
         "entered_from": steps[start]["prev"],
+        # [R30] 进入当前状态那一天的关键点 —— 建仓计划的锚必须钉死在这里。
+        # last["up_pivot"] 在上涨趋势里随新高天天上移, 拿它当"站稳价/作废价",
+        # 昨天说跌回 13.00 作废、今天变成 13.40 作废, 事后没法复盘(PRD §10.1)。
+        "entry_up_pivot": steps[start]["up_pivot"],
+        "entry_dn_pivot": steps[start]["dn_pivot"],
         "threshold": threshold,
     }
 
