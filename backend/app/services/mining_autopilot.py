@@ -335,6 +335,19 @@ def _iter_status(iteration: dict | None) -> str | None:
     return (iteration or {}).get("status")
 
 
+# [R38] run 状态的中文说法。消息里直接插英文状态("第 1 轮挖掘 failed")对用户没意义。
+_RUN_STATUS_CN = {
+    "cancelled": "已取消",
+    "failed": "失败",
+    "interrupted": "被中断(进程重启)",
+    "skipped_prerequisite": "前置条件不满足被跳过",
+}
+
+
+def status_cn(status: str | None) -> str:
+    return _RUN_STATUS_CN.get(str(status or ""), str(status or "未知状态"))
+
+
 async def step(*, session: dict, factor_catalog: list[dict],
                run_status: str | None, run_result: dict | None,
                start_run: Any, base_config: dict) -> dict:
@@ -369,10 +382,19 @@ async def step(*, session: dict, factor_catalog: list[dict],
     # 上一轮跑完但还没让 AI 判过 → 判它
     if last is not None and not last.get("ai"):
         if _iter_status(last) not in ("succeeded", "succeeded_with_budget_exhausted"):
-            store.set_status(sid, "failed",
-                             winner=None, fail_reason=f"第 {last['iteration']} 轮 {last['status']}")
-            return {"action": STEP_ERROR, "session": store.get(sid) or session,
-                    "message": f"第 {last['iteration']} 轮挖掘 {last['status']}, 会话中止"}
+            # [R38] "我按了停"和"它自己崩了"要分开记: 混成同一个 failed,
+            # 以后翻会话历史会以为这轮挖掘出过问题
+            cancelled = _iter_status(last) == "cancelled"
+            cn = status_cn(_iter_status(last))
+            store.set_status(
+                sid, "stopped" if cancelled else "failed",
+                winner=None,
+                fail_reason=(f"你中止了第 {last['iteration']} 轮" if cancelled
+                             else f"第 {last['iteration']} 轮{cn}"))
+            return {"action": STEP_DONE if cancelled else STEP_ERROR,
+                    "session": store.get(sid) or session,
+                    "message": (f"第 {last['iteration']} 轮已取消, 会话结束" if cancelled
+                                else f"第 {last['iteration']} 轮挖掘{cn}, 会话中止")}
         last["candidates"] = summarize_candidates(run_result)
         session = store._replace(session)
 

@@ -856,6 +856,15 @@ export interface AutopilotIteration {
   candidates: Record<string, unknown>[]
   ai: AutopilotPlan | null
   created_at: string
+  /** [R38] 正在跑的那一轮才有: run 的实时进度, 用来区分"排队/在算/卡住" */
+  live?: {
+    status: MiningRunStatus
+    progress: MiningRunProgress | null
+    queued_at: string | null
+    started_at: string | null
+    updated_at: string | null
+    error: string | null
+  } | null
 }
 export interface AutopilotSession {
   session_id: string
@@ -869,7 +878,7 @@ export interface AutopilotSession {
   max_iterations: number
   base_config: Record<string, unknown>
   iterations: AutopilotIteration[]
-  status: 'open' | 'satisfied' | 'exhausted' | 'failed'
+  status: 'open' | 'satisfied' | 'exhausted' | 'failed' | 'stopped'
   winner: (Record<string, unknown> & { signature?: string; name?: string; run_id?: string }) | null
   final_check: Record<string, unknown> | null
   confidence_note?: string
@@ -2646,6 +2655,12 @@ export const api = {
   miningAutopilotStep: (id: string) =>
     request<AutopilotStepResult>(
       `/api/backtest/mining/autopilot/sessions/${encodeURIComponent(id)}/step`,
+      { method: 'POST' },
+    ),
+  /** [R38] 中止会话: 顺带取消正在跑的那一轮挖掘 */
+  miningAutopilotStop: (id: string) =>
+    request<{ session: AutopilotSession; message: string }>(
+      `/api/backtest/mining/autopilot/sessions/${encodeURIComponent(id)}/stop`,
       { method: 'POST' },
     ),
   miningResult: (runId: string) =>

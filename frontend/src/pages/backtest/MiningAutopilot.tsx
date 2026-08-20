@@ -22,18 +22,33 @@ import { api, type AutopilotIteration, type AutopilotSession } from '@/lib/api'
 const INPUT = 'h-8 w-full rounded-input border border-border bg-surface px-2 text-xs text-foreground outline-none transition-colors focus:border-accent'
 const LABEL = 'mb-1 block text-[10px] font-medium text-secondary'
 const POLL_MS = 15_000
+/** [R38] 有 run 在跑时会话本身也要勤刷, 否则进度条 15 秒才动一次, 看着还是像卡住 */
+const LIVE_POLL_MS = 4_000
 
 const STATUS_LABEL: Record<AutopilotSession['status'], string> = {
   open: '进行中',
   satisfied: 'AI 认为够好了',
   exhausted: '已用满轮数',
   failed: '中止',
+  stopped: '你中止了',
 }
 const STATUS_CLS: Record<AutopilotSession['status'], string> = {
   open: 'bg-accent/10 text-accent',
   satisfied: 'bg-success/10 text-success',
   exhausted: 'bg-warning/10 text-warning',
   failed: 'bg-danger/10 text-danger',
+  stopped: 'bg-muted/10 text-muted',
+}
+
+/** 已跑多久。后端给的是 ISO 串, 解析不了就不显示, 不编一个 0 秒出来。 */
+function since(iso: string | null | undefined): string | null {
+  if (!iso) return null
+  const t = Date.parse(iso)
+  if (!Number.isFinite(t)) return null
+  const sec = Math.max(0, Math.round((Date.now() - t) / 1000))
+  if (sec < 60) return `${sec} 秒`
+  if (sec < 3600) return `${Math.floor(sec / 60)} 分 ${sec % 60} 秒`
+  return `${Math.floor(sec / 3600)} 小时 ${Math.floor((sec % 3600) / 60)} 分`
 }
 
 function yearsAgo(years: number) {
@@ -64,10 +79,13 @@ export function MiningAutopilot() {
     maxIterations: 6,
   })
 
+  // [R38] 有 run 在跑时勤刷: 进度、阶段、已跑多久都在这个响应里, 刷得慢就看不出在动
+  const [livePolling, setLivePolling] = useState(false)
   const sessions = useQuery({
     queryKey: ['mining-autopilot-sessions'],
     queryFn: () => api.miningAutopilotSessions(),
-    staleTime: 30_000,
+    staleTime: livePolling ? 0 : 30_000,
+    refetchInterval: livePolling ? LIVE_POLL_MS : false,
   })
   // 未手动选择时跟随最新会话 —— 刷新页面回来还是这一个
   const active: AutopilotSession | undefined = useMemo(() => {
@@ -76,6 +94,15 @@ export function MiningAutopilot() {
   }, [sessions.data, sessionId])
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['mining-autopilot-sessions'] })
+
+  // 最后一轮还在跑吗 —— 决定要不要开勤刷, 也决定「中止本轮」按不按得动
+  const liveIter = useMemo(() => {
+    const last = active?.iterations?.[active.iterations.length - 1]
+    if (!last || !['queued', 'running', 'cancelling'].includes(last.status)) return null
+    return last
+  }, [active])
+  useEffect(() => { setLivePolling(!!liveIter && active?.status === 'open') },
+    [liveIter, active?.status])
 
   const start = useMutation({
     mutationFn: () => api.miningAutopilotStart({
@@ -94,6 +121,15 @@ export function MiningAutopilot() {
       else if (res.action === 'done') { setAuto(false); toast(res.message, 'success') }
     },
     onError: e => { setAuto(false); toast(String((e as Error).message || e), 'error') },
+  })
+
+  // [R38] 中止: 先停自动轮询, 再让后端取消正在跑的 run 并把会话收成 stopped。
+  // 顺序不能反 —— 先调后端的话, 中间那一下轮询可能又把 step 推进一格。
+  const stop = useMutation({
+    mutationFn: (id: string) => api.miningAutopilotStop(id),
+    onMutate: () => { setAuto(false) },
+    onSuccess: res => { refresh(); toast(res.message, 'success') },
+    onError: e => toast(String((e as Error).message || e), 'error'),
   })
 
   // 自动模式 = 定时轮询同一个 step; 上一轮还在跑时后端返回 running, 不会重复起 run。
@@ -181,6 +217,21 @@ export function MiningAutopilot() {
               {auto ? <Square className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
               {auto ? '停止自动' : '自动跑到满意'}
             </button>
+            {/* [R38] 中止: 「停止自动」只是不再推进, 正在跑的那一轮还在烧 CPU;
+                这个才是真的把 run 掐掉并把会话收掉 */}
+            <button type="button" disabled={stop.isPending}
+              onClick={() => {
+                if (window.confirm(liveIter
+                  ? `确定中止？第 ${liveIter.iteration} 轮正在跑的挖掘会被取消，这一轮的结果拿不到了。`
+                  : '确定中止这个会话？之前跑完的轮次会保留。')) stop.mutate(active.session_id)
+              }}
+              title={liveIter
+                ? '取消正在跑的这一轮挖掘, 并结束会话'
+                : '结束会话(当前没有正在跑的挖掘)'}
+              className="inline-flex h-8 items-center gap-1.5 rounded-btn border border-danger/40 px-3 text-xs text-danger transition-colors hover:bg-danger/10 disabled:opacity-50">
+              {stop.isPending ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Square className="h-3.5 w-3.5" />}
+              中止
+            </button>
           </>
         )}
         {active && (
@@ -246,8 +297,10 @@ export function MiningAutopilot() {
                   )}
                 </>
               ) : (
-                <p className="text-[10px] text-danger">
-                  没有产生可用赢家{active.fail_reason ? ` —— ${active.fail_reason}` : ''}
+                <p className={`text-[10px] ${active.status === 'stopped' ? 'text-muted' : 'text-danger'}`}>
+                  {active.status === 'stopped'
+                    ? `会话已中止${active.fail_reason ? ` —— ${active.fail_reason}` : ''}。已跑完的轮次都在下面，想接着挖就「开新会话」。`
+                    : `没有产生可用赢家${active.fail_reason ? ` —— ${active.fail_reason}` : ''}`}
                 </p>
               )}
             </div>
@@ -276,6 +329,19 @@ function IterationRow({ it, open, onToggle }: {
 }) {
   const running = ['queued', 'running', 'cancelling'].includes(it.status)
   const factors = (it.config.factor_names as string[] | undefined) ?? []
+  // [R38] 跑起来到底在干什么 —— 只有一个转圈图标的话, "排队等槽位"、"正在算第 3 折"
+  // 和"真卡死了"长得一模一样, 用户只能干等
+  const live = it.live ?? null
+  const queued = live?.status === 'queued'
+  const elapsed = since(queued ? live?.queued_at : live?.started_at)
+  const pct0 = live?.progress?.percent
+  const liveText = running
+    ? (queued
+        ? `排队中${elapsed ? `(已等 ${elapsed})` : ''} —— 挖掘要独占全部重任务槽位，得等前面的跑完`
+        : [live?.progress?.label || live?.progress?.phase || '挖掘进行中',
+           typeof pct0 === 'number' ? `${Math.round(pct0)}%` : null,
+           elapsed ? `已跑 ${elapsed}` : null].filter(Boolean).join(' · '))
+    : null
   return (
     <div className="border-b border-border/60 last:border-0">
       <button type="button" onClick={onToggle}
@@ -283,13 +349,20 @@ function IterationRow({ it, open, onToggle }: {
         <ChevronDown className={`h-3 w-3 shrink-0 text-muted transition-transform ${open ? '' : '-rotate-90'}`} />
         <span className="shrink-0 text-[10px] font-semibold text-foreground">第 {it.iteration} 轮</span>
         {running && <LoaderCircle className="h-3 w-3 shrink-0 animate-spin text-accent" />}
-        <span className="min-w-0 flex-1 truncate text-[10px] text-secondary">
-          {it.ai?.verdict || (running ? '挖掘进行中…' : it.status)}
+        <span className="min-w-0 flex-1 truncate text-[10px] text-secondary" title={liveText ?? undefined}>
+          {it.ai?.verdict || liveText || it.status}
         </span>
         <span className="shrink-0 font-mono text-[9px] text-muted">
           {String(it.config.budget_profile ?? '')} · {factors.length} 因子
         </span>
       </button>
+      {/* 进度条: 后端给了百分比才画; 给不出就只有上面那行文字, 不画一根假的匀速条 */}
+      {running && typeof pct0 === 'number' && (
+        <div className="mx-3 mb-2 h-1 overflow-hidden rounded-full bg-border">
+          <div className="h-full rounded-full bg-accent transition-[width] duration-500"
+            style={{ width: `${Math.min(100, Math.max(0, pct0))}%` }} />
+        </div>
+      )}
       {open && (
         <div className="space-y-2 bg-base/40 px-3 py-2">
           <div className="text-[10px] text-muted">

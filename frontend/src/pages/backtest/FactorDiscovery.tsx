@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { BookmarkPlus, ChevronRight, Clock, Layers3, ListFilter, ListPlus, Loader2, Play, Search, Sparkles } from 'lucide-react'
+import { BookmarkPlus, ChevronRight, Clock, Layers3, ListFilter, ListPlus, Loader2, Play, Search, Sparkles, Square } from 'lucide-react'
 import { DatePicker } from '@/components/DatePicker'
 import { EmptyState } from '@/components/EmptyState'
 import { toast } from '@/components/Toast'
@@ -106,16 +106,22 @@ function BatchDiscovery({ onInspect }: { onInspect: (factorName: string) => void
   const [pilotStep, setPilotStep] = useState('')
   const [conclusion, setConclusion] = useState<string | null>(null)
   const MAX_ROUNDS = 5
+  // [R38] 中止: 循环跑在前端, 用 ref 而不是 state —— 闭包里读 state 拿到的是
+  // 点开跑那一刻的旧值, 永远读不到"后来点了停"
+  const abortRef = useRef(false)
 
   const runAutopilot = async () => {
     if (pilotBusy) return
+    abortRef.current = false
     setPilotBusy(true)
     setRounds([]); setConclusion(null); setReading(null)
     const history: FactorAiRound[] = []
     try {
       for (let i = 1; i <= MAX_ROUNDS; i++) {
+        if (abortRef.current) { setConclusion(`已中止 —— 跑完了 ${history.length} 轮`); break }
         setPilotStep(`第 ${i} 轮 · AI 正在决定用哪些因子…`)
         const plan = await api.factorAiPlan({ rounds: history, max_rounds: MAX_ROUNDS })
+        if (abortRef.current) { setConclusion(`已中止 —— 跑完了 ${history.length} 轮`); break }
         if (plan.error) { toast(plan.error, 'error'); break }
         if (plan.satisfied) {
           setConclusion(plan.conclusion || plan.note || '已完成')
@@ -132,6 +138,10 @@ function BatchDiscovery({ onInspect }: { onInspect: (factorName: string) => void
         // 走同一个 mutation —— 结果自动进原来那张结果表, 不另开一套展示
         const res = await run.mutateAsync(plan.next)
         if (res.error) { toast(res.error, 'error'); break }
+        if (abortRef.current) {
+          setConclusion(`已中止 —— 第 ${i} 轮的结果已经在下面的表里, 但没让 AI 再往下判`)
+          break
+        }
 
         setPilotStep(`第 ${i} 轮 · AI 正在看结果…`)
         const digest = await api.factorAiReading({
@@ -352,16 +362,30 @@ function BatchDiscovery({ onInspect }: { onInspect: (factorName: string) => void
         </div>
 
         {/* [R33] 不会填表就点这个 —— AI 自己挑因子、自己定参数、自己跑, 跑不好自己换一批再跑 */}
-        <button
-          type="button"
-          onClick={() => void runAutopilot()}
-          disabled={pilotBusy || run.isPending}
-          title="AI 全程代劳: 挑因子 → 填表 → 跑 → 看结果 → 不行就换一批再跑, 最多 5 轮"
-          className="inline-flex w-full items-center justify-center gap-1.5 rounded-btn bg-gradient-to-r from-accent to-accent/70 px-3 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {pilotBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-          {pilotBusy ? 'AI 代跑中…' : '不会选? 让 AI 帮我跑'}
-        </button>
+        {pilotBusy ? (
+          /* [R38] 中止: 在轮与轮之间停。当前这一轮的请求已经发出去了, 停不掉,
+             所以按钮上直接写清楚"跑完这轮就停", 不假装能立刻断 */
+          <button
+            type="button"
+            onClick={() => { abortRef.current = true; toast('会在当前这一轮跑完后停下', 'success') }}
+            title="因子筛选是一次性请求, 发出去就断不掉了 —— 这里是在下一轮开始前停住"
+            className="inline-flex w-full items-center justify-center gap-1.5 rounded-btn border border-danger/40 px-3 py-2 text-sm font-medium text-danger transition-colors hover:bg-danger/10"
+          >
+            <Square className="h-3.5 w-3.5" />
+            中止代跑(跑完这轮就停)
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => void runAutopilot()}
+            disabled={run.isPending}
+            title="AI 全程代劳: 挑因子 → 填表 → 跑 → 看结果 → 不行就换一批再跑, 最多 5 轮"
+            className="inline-flex w-full items-center justify-center gap-1.5 rounded-btn bg-gradient-to-r from-accent to-accent/70 px-3 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Sparkles className="h-3.5 w-3.5" />
+            不会选? 让 AI 帮我跑
+          </button>
+        )}
         <button
           type="button"
           onClick={() => run.mutate(undefined)}

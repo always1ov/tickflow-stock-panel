@@ -374,6 +374,33 @@ def test_step_failed_run_aborts_session(store, monkeypatch):
     assert out["session"]["status"] == "failed"
 
 
+def test_step_cancelled_run_closes_as_stopped_not_failed(store, monkeypatch):
+    """[R38] "我按了停"和"它自己崩了"要分开记 —— 混成同一个 failed,
+    以后翻会话历史会以为这轮挖掘出过问题。"""
+    s = _open(store)
+    _run_step(s, start_run=lambda cfg: "runA")
+    s = store.get(s["session_id"])
+    out = _run_step(s, run_status="cancelled")
+    assert out["action"] == ap.STEP_DONE, "用户主动停不是错误路径"
+    assert out["session"]["status"] == "stopped"
+    assert "中止" in out["session"]["fail_reason"]
+
+
+def test_step_message_uses_chinese_status(store, monkeypatch):
+    """消息里直接插英文状态("第 1 轮挖掘 failed")对用户没意义。"""
+    s = _open(store)
+    _run_step(s, start_run=lambda cfg: "runA")
+    s = store.get(s["session_id"])
+    out = _run_step(s, run_status="failed")
+    assert "失败" in out["message"] and "failed" not in out["message"]
+
+
+def test_status_cn_falls_back_to_raw_value():
+    assert ap.status_cn("cancelled") == "已取消"
+    assert ap.status_cn("something_new") == "something_new"
+    assert ap.status_cn(None) == "未知状态"
+
+
 def test_step_surfaces_ai_error_without_closing(store, monkeypatch):
     s = _open(store)
     _run_step(s, start_run=lambda cfg: "runA")

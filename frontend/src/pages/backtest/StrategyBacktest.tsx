@@ -1111,18 +1111,31 @@ export function StrategyBacktest() {
   const [pilotStep, setPilotStep] = useState('')
   const [pilotConclusion, setPilotConclusion] = useState<string | null>(null)
   const PILOT_MAX = 5
+  // [R38] 中止: 循环跑在前端, 用 ref 不用 state —— 闭包里读 state 拿到的是
+  // 点开跑那一刻的旧值, 永远读不到"后来点了停"
+  const pilotAbortRef = useRef(false)
+
+  /** 停代跑: 先掐掉正在跑的那个回测(后端 cancel_event), 再让循环在下一个检查点退出 */
+  const stopAutopilot = () => {
+    pilotAbortRef.current = true
+    void stopBacktest()
+    setPilotStep('正在停…')
+  }
 
   const runAutopilot = async () => {
     if (pilotBusy || isPending) return
+    pilotAbortRef.current = false
     setPilotBusy(true)
     setPilotRounds([]); setPilotConclusion(null)
     const history: BacktestAiRound[] = []
     try {
       for (let i = 1; i <= PILOT_MAX; i++) {
+        if (pilotAbortRef.current) break
         setPilotStep(`第 ${i} 轮 · AI 正在选策略、定参数…`)
         const plan = await api.strategyAiPlan({
           rounds: history, max_rounds: PILOT_MAX, asset_type: assetType,
         })
+        if (pilotAbortRef.current) break
         if (plan.error) { toast(plan.error, 'error'); break }
         if (plan.satisfied) { setPilotConclusion(plan.conclusion || plan.note || '已完成'); break }
         if (!plan.next) { toast('AI 没给出下一轮配置, 可重试或换模型', 'error'); break }
@@ -1173,8 +1186,11 @@ export function StrategyBacktest() {
           setPilotConclusion('已用满 5 轮 —— 上面是每轮的结果，可以自己再调调看，或去「验证」tab 做稳健性检验')
         }
       }
+      if (pilotAbortRef.current) setPilotConclusion(`已中止 —— 跑完了 ${history.length} 轮，上面是已有的结果`)
     } catch (e) {
-      toast(`代跑中断 · ${String((e as Error).message || e)}`, 'error')
+      // 中止时 waitForBacktest 会以"已取消"reject —— 那是预期内的, 不该报成错误
+      if (pilotAbortRef.current) setPilotConclusion(`已中止 —— 跑完了 ${history.length} 轮，上面是已有的结果`)
+      else toast(`代跑中断 · ${String((e as Error).message || e)}`, 'error')
     } finally {
       setPilotBusy(false); setPilotStep('')
     }
@@ -1831,17 +1847,31 @@ export function StrategyBacktest() {
         )}
 
         {/* [R34] 不会填表就点这个 —— AI 选策略、定风控参数、跑、看结果、不行再换 */}
-        <button
-          onClick={() => void runAutopilot()}
-          disabled={pilotBusy || isPending || backtestDataUnavailable}
-          title="AI 全程代劳: 选策略 → 定环境过滤/持仓上限/总仓位/区间 → 跑 → 看结果 → 不行就换一个再跑, 最多 5 轮"
-          className="mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-btn border border-accent/40
-            bg-accent/10 px-3 py-2 text-sm font-medium text-accent transition-colors hover:bg-accent/20
-            disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {pilotBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-          {pilotBusy ? 'AI 代跑中…' : '不会选? 让 AI 帮我跑'}
-        </button>
+        {pilotBusy ? (
+          /* [R38] 中止代跑: 回测本身能真取消(后端 cancel_event), 所以这里是即刻停,
+             不是"跑完这轮再停" */
+          <button
+            onClick={stopAutopilot}
+            title="立刻停掉正在跑的这轮回测, 并结束代跑循环"
+            className="mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-btn border border-danger/40
+              px-3 py-2 text-sm font-medium text-danger transition-colors hover:bg-danger/10"
+          >
+            <Square className="h-3.5 w-3.5 fill-current" />
+            中止代跑
+          </button>
+        ) : (
+          <button
+            onClick={() => void runAutopilot()}
+            disabled={isPending || backtestDataUnavailable}
+            title="AI 全程代劳: 选策略 → 定环境过滤/持仓上限/总仓位/区间 → 跑 → 看结果 → 不行就换一个再跑, 最多 5 轮"
+            className="mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-btn border border-accent/40
+              bg-accent/10 px-3 py-2 text-sm font-medium text-accent transition-colors hover:bg-accent/20
+              disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Sparkles className="h-3.5 w-3.5" />
+            不会选? 让 AI 帮我跑
+          </button>
+        )}
       </section>
 
       {/* 结果面板 */}

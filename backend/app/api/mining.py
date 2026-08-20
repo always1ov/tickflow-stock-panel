@@ -22,6 +22,7 @@ from app.backtest.mining import (
 )
 from app.services import preferences
 from app.services.mining_jobs import (
+    ACTIVE_RUN_STATUSES,
     RUN_STATUSES,
     SUCCESS_RUN_STATUSES,
     TERMINAL_RUN_STATUSES,
@@ -781,14 +782,87 @@ def _autopilot_session_or_404(session_id: str) -> dict[str, Any]:
     return session
 
 
+def _attach_live_run(manager: Any, session: dict[str, Any]) -> dict[str, Any]:
+    """[R38] 给还在跑的那一轮补上 run 的实时进度。
+
+    会话档案只记 queued/running 这种粗状态, 界面上就只能转个圈 —— 用户没法区分
+    "排队等槽位"、"正在算第 3 折"和"真卡死了"。这里把 run manifest 里已有的
+    progress/started_at 挂到最后一轮上, 让界面能显示阶段、百分比和已跑多久。
+    只读, 取不到就不挂(绝不因为进度读失败而让整个会话接口挂掉)。
+    """
+    iterations = session.get("iterations") or []
+    if session.get("status") != "open" or not iterations:
+        return session
+    last = iterations[-1]
+    run_id = last.get("run_id")
+    if not run_id or last.get("status") not in ACTIVE_RUN_STATUSES:
+        return session
+    try:
+        manifest = manager.store.get(str(run_id))
+        if not manifest:
+            return session
+        summary = manager.store.read_summary(str(run_id))
+        progress = summary.get("progress")
+        last["live"] = {
+            "status": manifest.get("status"),
+            "progress": progress if isinstance(progress, Mapping) else None,
+            "queued_at": manifest.get("created_at"),
+            "started_at": manifest.get("started_at"),
+            "updated_at": manifest.get("updated_at"),
+            "error": manifest.get("error"),
+        }
+    except Exception:  # noqa: BLE001
+        return session
+    return session
+
+
 @router.get("/autopilot/sessions")
-def autopilot_sessions() -> dict[str, Any]:
-    return {"items": mining_autopilot_store.list_sessions()}
+def autopilot_sessions(request: Request) -> dict[str, Any]:
+    manager = _manager(request)
+    return {"items": [_attach_live_run(manager, s)
+                      for s in mining_autopilot_store.list_sessions()]}
 
 
 @router.get("/autopilot/sessions/{session_id}")
-def autopilot_session(session_id: str) -> dict[str, Any]:
-    return _autopilot_session_or_404(session_id)
+def autopilot_session(session_id: str, request: Request) -> dict[str, Any]:
+    return _attach_live_run(_manager(request), _autopilot_session_or_404(session_id))
+
+
+@router.post("/autopilot/sessions/{session_id}/stop")
+def autopilot_stop(session_id: str, request: Request) -> dict[str, Any]:
+    """[R38] 中止会话: 先取消正在跑的那一轮, 再把会话收成 stopped。
+
+    收成独立的 stopped 而不是 failed —— "我按了停"和"它自己崩了"在复盘时是两件事,
+    混成一个状态以后看历史会以为这轮挖掘出过问题。
+    幂等: 已经收工的会话直接原样返回, 重复点不会把已完成的结果抹掉。
+    """
+    session = _autopilot_session_or_404(session_id)
+    if session.get("status") != "open":
+        return {"session": session, "message": "本会话已经收工, 无需中止"}
+
+    manager = _manager(request)
+    cancelled_run: str | None = None
+    iterations = session.get("iterations") or []
+    if iterations and iterations[-1].get("run_id"):
+        last = iterations[-1]
+        run_id = str(last["run_id"])
+        manifest = manager.store.get(run_id)
+        if manifest and manifest.get("status") in ACTIVE_RUN_STATUSES:
+            try:
+                manager.cancel(run_id)
+                cancelled_run = run_id
+            except (MiningRunStoreError, KeyError, ValueError) as exc:
+                raise HTTPException(status_code=409, detail=str(exc)) from exc
+        # 会话档案里的这一轮同步落成 cancelled, 否则下次 step 还会以为它在跑
+        last["status"] = "cancelled"
+        mining_autopilot_store._replace(session)
+
+    updated = mining_autopilot_store.set_status(
+        session_id, "stopped",
+        fail_reason="你中止了这个会话" + (f"(第 {len(iterations)} 轮挖掘已取消)" if cancelled_run else ""),
+    ) or session
+    return {"session": _attach_live_run(manager, updated),
+            "message": "已中止" + (", 正在跑的那一轮也停了" if cancelled_run else "")}
 
 
 @router.post("/autopilot/sessions")
