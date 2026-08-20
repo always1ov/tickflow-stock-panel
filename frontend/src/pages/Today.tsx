@@ -10,8 +10,8 @@ import { useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import {
-  AlertTriangle, CheckCircle2, Compass, Download, Loader2, RefreshCw, SlidersHorizontal,
-  Sparkles, Sunrise, Target,
+  AlertTriangle, CheckCircle2, Compass, Download, Layers, Loader2, RefreshCw,
+  SlidersHorizontal, Sparkles, Sunrise, Target,
 } from 'lucide-react'
 import {
   api, type SignalAiSchedule, type TodayAiSchedule, type TodayOverview,
@@ -36,7 +36,7 @@ function buildTodayHtml(d: TodayOverview, brief: string | null): string {
         <b>${esc(a.name)}</b>${sym(a.name, a.symbol)} ${esc(a.text)}</li>`).join('')
   const oppRows = d.opportunities.map(o => `
       <li><b class="score">${o.score}</b>
-        <span><b>${esc(o.name)}</b>${sym(o.name, o.symbol)}${o.advice ? ` <span class="adv">${esc(o.advice.text)}</span>` : ''} ${esc(o.text)}
+        <span><b>${esc(o.name)}</b>${sym(o.name, o.symbol)}${o.mainline ? ` <span class="adv" style="background:#f4e6f7;color:#8b3fa0">主线${o.mainline.rank}·${esc(o.mainline.member)}</span>` : ''}${o.advice ? ` <span class="adv">${esc(o.advice.text)}</span>` : ''} ${esc(o.text)}
         <span class="why">${esc(o.why)}</span>${o.advice?.plan ? `<span class="why" style="color:#1c6ea4">建仓路径:${esc(o.advice.plan)}</span>` : ''}</span></li>`).join('')
   const holdRows = d.holdings.map(h => `
       <tr>
@@ -94,6 +94,16 @@ function buildTodayHtml(d: TodayOverview, brief: string | null): string {
     <span style="font-size:13px;color:#4e5666">${esc(d.weather.posture_reason)}</span>
     <span style="margin-left:auto;font-size:12px;color:#8a919f">涨势 <b style="color:${bull}">${d.weather.bull}</b> / 跌势 <b style="color:${bear}">${d.weather.bear}</b> · 刚转强 ${d.weather.new_bull} · 刚转弱 ${d.weather.new_bear}</span>
   </div>
+  ${(() => {
+    // [R37] 中观一行: 钱在往哪儿聚 —— 导出件里同样保留, 否则打印出来只剩大盘与个股两层
+    const m = d.meso
+    if (!m || !(m.amount || m.breadth || m.mainline)) return ''
+    const parts: string[] = []
+    if (m.amount) parts.push(`成交额 <b>${esc(m.amount.text)}</b>${m.amount.pct_rank != null ? ` (${(m.amount.pct_rank * 100).toFixed(0)}% 分位·${esc(m.amount.label ?? '')})` : ''}`)
+    if (m.breadth) parts.push(`<b style="color:${bull}">${m.breadth.up}</b> 涨 / <b style="color:${bear}">${m.breadth.down}</b> 跌`)
+    if (m.mainline) parts.push(`${m.mainline.stale ? '主线(已停更)' : '今日主线'} ${m.mainline.rows.slice(0, 3).map(x => `${esc(x.member)}(${x.limit_up_count})`).join('、')}`)
+    return `<div class="meta" style="margin-top:-6px">中观 · ${parts.join(' · ')}</div>`
+  })()}
   ${brief ? `<div class="brief">✦ ${esc(brief)}</div>` : ''}
   <h2>🎯 值得关注(${d.opportunities.length}·已按把握分筛选${d.opportunities_filtered > 0 ? `,滤掉 ${d.opportunities_filtered} 只` : ''})</h2>
   ${d.opportunities.length ? `<ul class="items">${oppRows}</ul>` : '<div class="empty">今日没有把握足够的买入机会 —— 等待比出手更常见</div>'}
@@ -266,6 +276,9 @@ export function Today() {
   const shownPicks = picks ?? aiCache?.picks ?? null
   const shownAnalyzed = picks ? analyzed : (aiCache?.analyzed ?? 0)
   const aiMeta = brief ? null : aiCache   // 缓存来源与时间(自己刚生成的不必标注)
+  // [R37] 中观快照。提出来是为了在 JSX 的 map 回调里也保住类型收窄
+  const meso = d?.meso ?? null
+  const mainline = meso?.mainline ?? null
 
   return (
     <div className="p-4 md:p-6 max-w-[1500px] mx-auto space-y-4">
@@ -421,6 +434,73 @@ export function Today() {
               </div>
             </div>
           </div>
+
+          {/* [R37] 中观快照 —— 三层推导 大盘 → 主线 → 个股 里缺的那一层。
+              上面那条横幅是"大盘"层, 下面机会区是"个股"层, 这一条回答
+              "今天的钱在往哪儿聚" */}
+          {meso && (meso.amount || meso.breadth || mainline) && (
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 rounded-lg border border-border/60 bg-surface/40 px-4 py-2 text-[11px]">
+              <span className="flex shrink-0 items-center gap-1.5 text-muted">
+                <Layers className="h-3.5 w-3.5 text-fuchsia-400" />
+                中观
+              </span>
+              {meso.amount && (
+                <span
+                  title={
+                    `两市成交额 ${meso.amount.text}${meso.amount.date ? `(${meso.amount.date})` : ''}` +
+                    (meso.amount.pct_rank != null
+                      ? ` —— 在最近 ${meso.amount.sample} 个交易日里排在 ${(meso.amount.pct_rank * 100).toFixed(0)}% 分位`
+                      : ` —— 历史样本只有 ${meso.amount.sample} 天, 不足以给出分位`)
+                  }
+                  className="font-mono text-muted"
+                >
+                  成交额 <span className="font-semibold text-foreground">{meso.amount.text}</span>
+                  {meso.amount.pct_rank != null && (
+                    <span className="ml-1 text-muted/80">
+                      {(meso.amount.pct_rank * 100).toFixed(0)}% 分位 · {meso.amount.label}
+                    </span>
+                  )}
+                </span>
+              )}
+              {meso.breadth && (
+                <span title={`全市场涨跌家数(${meso.breadth.date})`} className="font-mono text-muted">
+                  <span className="font-semibold text-red-400">{meso.breadth.up}</span> 涨
+                  <span className="mx-1 text-muted/40">/</span>
+                  <span className="font-semibold text-emerald-400">{meso.breadth.down}</span> 跌
+                </span>
+              )}
+              {mainline && (
+                <span className="flex min-w-0 flex-wrap items-center gap-1.5">
+                  <span className="shrink-0 text-muted">
+                    {mainline.stale ? '主线(数据已停更)' : '今日主线'}
+                  </span>
+                  {mainline.rows.slice(0, 3).map((m) => (
+                    <span
+                      key={m.member}
+                      title={`第 ${m.rank} 名 · ${m.limit_up_count} 家涨停 · 最高 ${m.max_boards} 连板${m.leader_symbol ? ` · 龙头 ${m.leader_symbol}` : ''}`}
+                      className={`shrink-0 rounded px-1.5 py-0.5 ${
+                        mainline.stale ? 'bg-border/40 text-muted' : 'bg-fuchsia-400/15 text-fuchsia-300'
+                      }`}
+                    >
+                      {m.member}
+                      <span className="ml-1 font-mono opacity-70">{m.limit_up_count} 家涨停</span>
+                    </span>
+                  ))}
+                  <span
+                    title={
+                      (mainline.stale
+                        ? `主线数据停在 ${mainline.date},已经 ${mainline.age_days} 天没更新 —— 只作展示, 不参与机会区打分。到「数据」页重跑一次涨停梯队相关批次即可恢复。`
+                        : `按 ${mainline.date} 的涨停梯队聚合:同一概念内涨停家数多、最高连板高、梯队不断层的排在前面。`) +
+                      ` ${meso.membership_note}`
+                    }
+                    className="shrink-0 cursor-help text-muted/50"
+                  >
+                    ⓘ
+                  </span>
+                </span>
+              )}
+            </div>
+          )}
 
 
           {/* ② 机会区(已按把握分筛选排序; AI 优选可再精选) */}
@@ -713,6 +793,18 @@ export function Today() {
                               className="ml-1.5 rounded bg-amber-400/15 px-1 py-0.5 text-[9px] text-amber-300"
                             >
                               盘中·待收盘确认
+                            </span>
+                          )}
+                          {o.mainline && (
+                            <span
+                              title={
+                                `今日第 ${o.mainline.rank} 主线「${o.mainline.member}」,该概念今日 ${o.mainline.limit_up_count} 家涨停` +
+                                (o.mainline.also.length ? `;同时还属于 ${o.mainline.also.join('、')}` : '') +
+                                ' —— 板块效应是佐证不是理由:量价不扎实的票在第一主线里也不该买。没有这个标只说明它单打独斗,不扣分'
+                              }
+                              className="ml-1.5 rounded bg-fuchsia-400/15 px-1.5 py-0.5 text-[9px] text-fuchsia-300"
+                            >
+                              主线{o.mainline.rank}·{o.mainline.member}
                             </span>
                           )}
                           {o.advice && (

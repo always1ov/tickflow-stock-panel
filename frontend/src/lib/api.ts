@@ -150,10 +150,31 @@ export type LevelType = 'sr' | 'pivot' | 'extreme' | 'boll' | 'keltner_s' | 'kel
 
 // [fork 增强] 今日总览(决策汇聚层)
 export interface TodayActionItem { kind: string; severity: 'high' | 'mid'; symbol: string; name: string; text: string }
+/** [fork 增强] R37 主线归属(候选票所属的今日主线, 不在主线内则字段缺席) */
+export interface TodayMainlineTag {
+  member: string; rank: number; limit_up_count: number; also: string[]
+}
 export interface TodayOpportunity {
   kind: string; symbol: string; name: string; text: string; score: number; why: string
   advice?: { fraction: number; text: string; why: string; plan?: string | null } | null
   intraday?: boolean
+  mainline?: TodayMainlineTag | null
+}
+/** [fork 增强] R37 中观快照: 三层推导 大盘 → 主线 → 个股 里缺的那一层 */
+export interface TodayMeso {
+  amount: {
+    total: number; text: string
+    pct_rank: number | null; label: string | null; sample: number; date?: string
+  } | null
+  breadth: { up: number; down: number; date: string } | null
+  mainline: {
+    date: string; age_days: number; stale: boolean
+    rows: {
+      member: string; rank: number; score: number | null
+      limit_up_count: number; max_boards: number; leader_symbol: string | null
+    }[]
+  } | null
+  membership_note: string
 }
 export interface TodayPick { symbol: string; reason: string }
 /** [fork 增强] 缓存的 AI 导读·优选(刷新页面仍在) */
@@ -210,6 +231,7 @@ export interface TodayOverview {
     } | null
     market_breadth?: { date: string; up: number; down: number; capped: boolean } | null
   }
+  meso?: TodayMeso | null
   holdings: TodayHolding[]
   portfolio?: TodayPortfolio | null
 }

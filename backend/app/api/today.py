@@ -88,6 +88,10 @@ def rank_opportunities(
       · [R20] 该票自身历史胜率(extras[sym]["win"] = {rate, n}): 同一套
         六态在这只票上历史转强后 5 日为正的比例 —— 胜率高的票信号更可信,
         胜率差的票即使这次形态漂亮也要压分;
+      · [R37] 主线归属(extras[sym]["mainline"]): 三层推导里缺的中间层 ——
+        同样是转强, 站在今天最强那条主线上的和单打独斗的不是一回事。
+        **只加分不减分**: 主线由涨停梯队推出, 只覆盖市场最躁动的一小撮,
+        扣"不在主线内"的分等于系统性偏向妖股;
       · 逼近买入触发价的按距离与置信度打分, 一到价就能行动的最优先。
     低于 min_score 或排在 max_show 之后的都不显示, 只报数量。
     """
@@ -187,6 +191,22 @@ def rank_opportunities(
                     f"AI 看多,现价 {close:.2f} 距触发价 {price:.2f} 仅 {gap * 100:.1f}%"
                     f" — 到价{p.get('action') or '关注'}", why, price)
                 break
+
+    # [R37] 主线加成放在两个来源合并之后统一加: 趋势转强与逼近突破都该享受同一份
+    # 加成, 且同一只票命中两个来源时只能加一次
+    from app.services.today_mainline import mainline_bonus
+    for sym, o in opp_by_sym.items():
+        ml = ((extras or {}).get(sym) or {}).get("mainline")
+        if not ml:
+            continue
+        o["score"] += mainline_bonus(ml.get("rank"))
+        o["mainline"] = ml
+        also = ml.get("also") or []
+        o["why"].append(
+            f"属于今日第 {ml['rank']} 主线「{ml['member']}」"
+            f"(该概念今日 {ml['limit_up_count']} 家涨停)"
+            + (f",同时还在{'、'.join(also)}" if also else "")
+        )
 
     for o in opp_by_sym.values():
         o["score"] = max(0, min(100, o["score"]))
@@ -377,6 +397,17 @@ def _build_overview(repo) -> dict:
             if ent:
                 extras[s] = ent
 
+    # [R37] 中观层: 主线归属 + 中观快照。给全部自选打标(不止趋势候选) ——
+    # 逼近突破那一路的候选来自 AI 信号, 不在 cand_syms 里, 也该享受同一份加成。
+    meso = None
+    try:
+        from app.services import today_mainline
+        meso = today_mainline.build_meso(repo)
+        for s, tag in today_mainline.tags_for(repo, syms, (meso or {}).get("mainline")).items():
+            extras.setdefault(s, {})["mainline"] = tag
+    except Exception as e:  # noqa: BLE001
+        logger.debug("today meso skipped: %s", e)
+
     opportunities, opp_filtered = rank_opportunities(
         trends, signals, names, prefs["min_score"], prefs["max_show"], bench_ret, extras)
     # [R18] 盘中口径标注: 实时价确实参与了判定的趋势类新信号是"临时信号",
@@ -555,6 +586,7 @@ def _build_overview(repo) -> dict:
             "market": market,
             "market_breadth": market_breadth,
         },
+        "meso": meso,
         "holdings": holdings,
         "portfolio": portfolio,
     }
@@ -623,6 +655,7 @@ _AI_SYSTEM = """你是用户的盘前参谋,有 15 年 A 股一线交易经验�
 
 硬性要求:
 - **不许拿"规则分高""AI 看多""信号共振"当理由** —— 这些是筛选前就知道的,把它们复述一遍等于没分析。理由必须来自你在 K 线数据里**实际看到的东西**,带上具体数字(量比、涨幅、距离、价位)
+- **主线归属是佐证,不是理由**。候选带"主线归属"字段时,它只说明这只票背后有板块效应,不能单独拿来当选中的理由;量价不扎实的票在第一主线里也不选。只有当两只候选量价质量相当时,才优先选站在主线里的那只,并在理由里连同量价一起说
 - 标注"盘中待收盘确认"的候选是盘中临时信号(收盘可能收回去): 优选时降级处理, 若仍选中, 理由里必须注明"等收盘确认"
 - **规则分只是粗筛门票,不是排序依据**。分低但量价扎实的可以选,分高但量能虚、位置差的要果断放弃
 - 几只都不理想就少选甚至不选(picks 给空数组)。**宁缺毋滥,空仓等待也是决策**
@@ -664,6 +697,10 @@ def _candidate_market_data(repo, cands: list[dict]) -> list[dict]:
             "symbol": c["symbol"], "name": c["name"],
             "规则分": c["score"], "规则依据": c["why"], "信号摘要": c["text"],
         }
+        if c.get("mainline"):
+            ml = c["mainline"]
+            item["主线归属"] = (f"今日第 {ml['rank']} 主线「{ml['member']}」"
+                                f"({ml['limit_up_count']} 家涨停)")
         try:
             df = _load_kline(repo, c["symbol"])
             if df.is_empty():
