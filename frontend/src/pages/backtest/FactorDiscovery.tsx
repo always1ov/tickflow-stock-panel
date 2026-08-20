@@ -49,7 +49,7 @@ function BatchDiscovery({ onInspect }: { onInspect: (factorName: string) => void
     queryFn: api.watchlistList,
     staleTime: 30_000,
   })
-  const watchlistEntries = watchlist.data?.symbols ?? []
+  const watchlistEntries = useMemo(() => watchlist.data?.symbols ?? [], [watchlist.data])
   const watchlistCounts = useMemo(() => {
     const counts: Record<string, number> = { ungrouped: 0 }
     for (const entry of watchlistEntries) {

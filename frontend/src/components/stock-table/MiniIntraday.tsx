@@ -20,6 +20,12 @@ export function MiniIntraday({ rows, prevClose, changePct, width = 100, height =
   width?: number
   height?: number
 }) {
+  // 渐变 id 唯一化(自选列表同屏多张图, 避免互相覆盖)。
+  // [fork 修复] 必须在下面的空数据早退**之前**调用: 分时数据从无到有时,
+  // 本组件的 hook 数会 0 → 1, React 会抛 "Rendered more hooks than during
+  // the previous render" 直接崩掉整棵子树。
+  const gradId = useId().replace(/:/g, '')
+
   // 空数据：返回等尺寸占位
   if (!rows || rows.length < 2) {
     return <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} className="block" aria-label="暂无分时" />
@@ -88,9 +94,6 @@ export function MiniIntraday({ rows, prevClose, changePct, width = 100, height =
 
   // 昨收参考线 y 坐标
   const prevCloseY = yScale(baseline)
-
-  // 渐变 id 唯一化(自选列表同屏多张图, 避免互相覆盖)
-  const gradId = useId().replace(/:/g, '')
 
   return (
     <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} className="block">

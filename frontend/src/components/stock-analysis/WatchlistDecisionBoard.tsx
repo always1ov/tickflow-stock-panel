@@ -61,7 +61,9 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
     queryFn: () => api.watchlistPositions(),
     staleTime: 30_000,
   })
-  const positions = positionsQ.data?.positions ?? {}
+  // 下面这几个 `?? {}` 都要包 useMemo: 否则每次渲染都是新对象,
+  // 会让 rows 的 useMemo 依赖每帧都变, 记忆化等于没做。
+  const positions = useMemo(() => positionsQ.data?.positions ?? {}, [positionsQ.data])
 
   const signalsQ = useQuery({
     queryKey: ['stock-signals'],
@@ -70,7 +72,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
     // [R27] 每小时自动拉一次: 定时任务批量刷完信号后, 页面开着也能自动看到新结果
     refetchInterval: 60 * 60 * 1000,
   })
-  const signals = signalsQ.data?.signals ?? {}
+  const signals = useMemo(() => signalsQ.data?.signals ?? {}, [signalsQ.data])
 
   // [fork 增强] 六态趋势列 —— 批量一次拉取,零 AI 成本,基于日线收盘价
   const trendSyms = useMemo(
@@ -83,7 +85,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
     enabled: trendSyms.length > 0,
     staleTime: 5 * 60_000,
   })
-  const trends: Record<string, TrendInfo> = trendsQ.data?.trends ?? {}
+  const trends: Record<string, TrendInfo> = useMemo(() => trendsQ.data?.trends ?? {}, [trendsQ.data])
 
   // [fork 增强] 持仓出场线(仅持有+填成本的票有;后端顺带把线同步为监控规则)
   const heldWithCost = Object.values(positions).some((p) => p.held && p.cost)
@@ -93,7 +95,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
     enabled: heldWithCost,
     staleTime: 5 * 60_000,
   })
-  const exitLines: Record<string, ExitLine> = exitLinesQ.data?.lines ?? {}
+  const exitLines: Record<string, ExitLine> = useMemo(() => exitLinesQ.data?.lines ?? {}, [exitLinesQ.data])
 
   // 历史报告整合: 每只自选显示最近一份 AI 分析报告(时间+份数), 点击直接打开报告弹窗。
   // 数据来自 stockAnalysisStore(个股分析页挂载时已 loadHistory, 此处再调一次是安全去重)。
