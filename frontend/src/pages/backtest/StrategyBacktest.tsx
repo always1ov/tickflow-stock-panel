@@ -962,24 +962,33 @@ export function StrategyBacktest() {
   const filteredStrategyList = useMemo(() => (
     strategyGroup === 'all' ? strategyList : strategyList.filter(st => st.source === strategyGroup)
   ), [strategyGroup, strategyList])
-  // 校验 localStorage 里保存的上次选中策略是否仍存在(本地开发残留的自定义策略
-  // 拉新代码后会失效,导致 strategyGet 一直 404/加载中)。列表就绪后若失效,
-  // 连带清除其专属的 params/overrides/result(这些是该策略的运行配置/产物,
-  // 策略失效后留着会造成"孤儿"状态:界面显示旧回测结果却无对应策略)。
+  // 校验 localStorage 里保存的上次选中策略是否仍存在(删掉的 AI 策略、本地开发
+  // 残留的自定义策略拉新代码后都会失效)。连带清除其专属的 params/overrides/result
+  // (这些是该策略的运行配置/产物, 策略失效后留着会造成"孤儿"状态:界面显示旧回测
+  // 结果却无对应策略)。
+  // 用 isSuccess 而不是 !isLoading: 列表请求失败时 strategyList 也是空的, 那时清空
+  // 会把一个有效选择误删; 只有确实拿到了列表、里面没有它, 才判定失效。
+  const strategyExists = useMemo(
+    () => !!selectedStrategy && strategyList.some(st => st.id === selectedStrategy),
+    [strategyList, selectedStrategy],
+  )
   useEffect(() => {
-    if (strategies.isLoading || strategyList.length === 0) return
-    if (selectedStrategy && !strategyList.some(st => st.id === selectedStrategy)) {
+    if (!strategies.isSuccess) return
+    if (selectedStrategy && !strategyExists) {
       setSelectedStrategy(null)
       setStrategyParams({})
       setOverrides({})
       setResult(null)
     }
-  }, [strategies.isLoading, strategyList, selectedStrategy])
+  }, [strategies.isSuccess, strategyExists, selectedStrategy])
 
+  // 必须等列表确认这个 id 还在, 才去拉详情。此前只看 !!selectedStrategy, 详情请求
+  // 与列表请求同时发出 —— 失效 id 的 404 先到, 全局错误 toast 已经弹出
+  // ("unknown strategy: xxx"), 上面的清理才姗姗来迟, 用户一进页面就吃一个红条。
   const strategyDetail = useQuery({
     queryKey: QK.strategyDetail(selectedStrategy ?? ''),
     queryFn: () => api.strategyGet(selectedStrategy!),
-    enabled: !!selectedStrategy,
+    enabled: strategyExists,
   })
 
   const backtestTask = useBacktestTask()
