@@ -1259,6 +1259,29 @@ export interface FactorAiRound {
   satisfied: boolean
 }
 
+// ===== [fork 增强] R34 策略回测 AI 代跑 =====
+export interface BacktestAiPlan {
+  satisfied: boolean
+  note: string
+  conclusion: string | null
+  next: {
+    strategy_id: string
+    regime_states: string[]
+    max_positions: number
+    max_exposure_pct: number
+    days: number
+  } | null
+  error?: string
+}
+/** 代跑的一轮: 配置 + 关键指标 + 是否达标 + AI 当时的判断 */
+export interface BacktestAiRound {
+  round: number
+  config: Record<string, unknown>
+  digest: Record<string, number | null>
+  passed: boolean
+  note: string
+}
+
 export interface FactorBatchResult {
   run_id: string
   config: Record<string, any>
@@ -2536,6 +2559,14 @@ export const api = {
     rounds: FactorAiRound[]; max_rounds?: number; sample?: Record<string, unknown>
   }) =>
     request<FactorAiPlan>('/api/backtest/factor/ai-plan', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  // [fork 增强] R34 AI 代跑策略回测: 要下一轮配置或"够了"+结论; 回测本身仍走原入口
+  strategyAiPlan: (payload: {
+    rounds: BacktestAiRound[]; max_rounds?: number; asset_type?: 'stock' | 'etf'
+  }) =>
+    request<BacktestAiPlan>('/api/backtest/strategy/ai-plan', {
       method: 'POST',
       body: JSON.stringify(payload),
     }),

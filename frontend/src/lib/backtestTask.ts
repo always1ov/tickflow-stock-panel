@@ -276,3 +276,42 @@ export function tryReconnect(): boolean {
 export function useBacktestTask(): BacktestTask | null {
   return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
 }
+
+/**
+ * [fork 增强] R34 等当前回测跑完 —— AI 代跑要串行跑好几轮, 必须能 await。
+ *
+ * startBacktest 是 fire-and-forget 的(结果通过 SSE 回填到全局任务), 代跑循环
+ * 没法直接等。这里订阅任务变化, 在任务进入终态时结束等待。
+ *
+ * 只认"发起后新产生的那个任务"(id 大于调用时的 id), 免得把上一轮的旧结果
+ * 当成本轮的; 超时兜底防止 SSE 卡死时循环永远挂着。
+ */
+export function waitForBacktest(
+  sinceId: number,
+  timeoutMs = 10 * 60_000,
+): Promise<BacktestTask> {
+  return new Promise((resolve, reject) => {
+    const settle = (fn: () => void) => {
+      clearTimeout(timer)
+      unsub()
+      fn()
+    }
+    const check = () => {
+      const task = current
+      if (!task || task.id <= sinceId || task.isPending) return
+      if (task.error) settle(() => reject(new Error(task.error as string)))
+      else settle(() => resolve(task))
+    }
+    const unsub = subscribe(check)
+    const timer = setTimeout(
+      () => settle(() => reject(new Error('回测超时未返回'))),
+      timeoutMs,
+    )
+    check()  // 可能在订阅前就已经跑完
+  })
+}
+
+/** 当前任务 id(代跑用它区分"这一轮"和"上一轮") */
+export function currentBacktestId(): number {
+  return current?.id ?? 0
+}

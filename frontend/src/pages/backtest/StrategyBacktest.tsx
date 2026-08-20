@@ -1,12 +1,13 @@
 import { useState, useMemo, useEffect, useRef, type ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Play, FlaskConical, Clock, Loader2, Square, Search, Plus, X, SlidersHorizontal, BarChart3, Gauge, Zap, ListPlus, HelpCircle, ChevronRight, AlertTriangle, Layers, BookmarkPlus } from 'lucide-react'
+import { Play, FlaskConical, Clock, Loader2, Square, Search, Plus, X, SlidersHorizontal, BarChart3, Gauge, Zap, ListPlus, HelpCircle, ChevronRight, AlertTriangle, Layers, BookmarkPlus, Sparkles } from 'lucide-react'
 import {
   api,
   paramOptionValue,
   paramOptionLabel,
   type StrategyBacktestResult,
+  type BacktestAiRound,
   type StrategyBacktestTrade,
   type StrategyDetail,
   type StrategyParamDef,
@@ -22,7 +23,7 @@ import { boardTag as boardBadge } from '@/components/stock-table/primitives'
 import { BUILTIN_COLUMNS } from '@/lib/watchlist-columns'
 import { cnSignal } from '@/lib/signals'
 import { SignalPicker } from '@/components/screener/SignalPicker'
-import { startBacktest, stopBacktest, tryReconnect, useBacktestTask } from '@/lib/backtestTask'
+import { currentBacktestId, startBacktest, stopBacktest, tryReconnect, useBacktestTask, waitForBacktest } from '@/lib/backtestTask'
 import { useDataStatus, useCapabilities } from '@/lib/useSharedQueries'
 import { EmptyState } from '@/components/EmptyState'
 import { WarmupBadge } from '@/components/WarmupBadge'
@@ -1103,6 +1104,82 @@ export function StrategyBacktest() {
     }
   }, [backtestTask])
 
+  // [fork 增强] R34 AI 代跑 —— 用户不会填表, AI 来选策略、定风控参数、跑、判断。
+  // 每轮都真的把配置灌进左侧表单再跑, 用户看得见它在操作; 严格串行, 一次一个回测。
+  const [pilotRounds, setPilotRounds] = useState<BacktestAiRound[]>([])
+  const [pilotBusy, setPilotBusy] = useState(false)
+  const [pilotStep, setPilotStep] = useState('')
+  const [pilotConclusion, setPilotConclusion] = useState<string | null>(null)
+  const PILOT_MAX = 5
+
+  const runAutopilot = async () => {
+    if (pilotBusy || isPending) return
+    setPilotBusy(true)
+    setPilotRounds([]); setPilotConclusion(null)
+    const history: BacktestAiRound[] = []
+    try {
+      for (let i = 1; i <= PILOT_MAX; i++) {
+        setPilotStep(`第 ${i} 轮 · AI 正在选策略、定参数…`)
+        const plan = await api.strategyAiPlan({
+          rounds: history, max_rounds: PILOT_MAX, asset_type: assetType,
+        })
+        if (plan.error) { toast(plan.error, 'error'); break }
+        if (plan.satisfied) { setPilotConclusion(plan.conclusion || plan.note || '已完成'); break }
+        if (!plan.next) { toast('AI 没给出下一轮配置, 可重试或换模型', 'error'); break }
+
+        // 真的填表: 策略、环境过滤、持仓上限、总仓位、区间当场变, 用户看得见
+        const cfg = plan.next
+        const from = new Date(Date.now() - cfg.days * 86400_000).toISOString().slice(0, 10)
+        setSelectedStrategy(cfg.strategy_id)
+        setRegimeStates(cfg.regime_states)
+        setMaxPositions(String(cfg.max_positions))
+        setMaxExposure(String(cfg.max_exposure_pct))
+        setStart(from)
+        setPilotStep(`第 ${i} 轮 · 正在回测 ${cfg.strategy_id}…`)
+
+        const sinceId = currentBacktestId()
+        startBacktest({
+          strategy_id: cfg.strategy_id,
+          asset_type: assetType,
+          symbols: symbols ? symbols.split(',').map(v => v.trim()).filter(Boolean) : null,
+          start: from,
+          end: end || undefined,
+          matching, entry_fill: entryFill, exit_fill: exitFill,
+          commission_pct: Number(fees) / 10000,
+          stamp_tax_pct: Number(stampTax) / 1000,
+          slippage_bps: Number(slippage),
+          max_positions: cfg.max_positions,
+          max_exposure_pct: cfg.max_exposure_pct / 100,
+          initial_capital: Number(initialCapital),
+          position_sizing: positionSizing,
+          mode: simMode,
+          holding_days: Number(holdingDays) || 5,
+          minute_fill: highGranularity,
+          regime_filter: cfg.regime_states.length > 0 ? { states: cfg.regime_states } : null,
+        })
+        const task = await waitForBacktest(sinceId)
+        const stats = (task.result?.stats ?? {}) as Record<string, number | null>
+        const digest = {
+          总收益: stats.total_return ?? null, 年化: stats.annual_return ?? null,
+          夏普: stats.sharpe ?? null, 最大回撤: stats.max_drawdown ?? null,
+          胜率: stats.win_rate ?? null, 交易数: stats.n_trades ?? null,
+          平均持仓天数: stats.avg_duration ?? null,
+        }
+        const passed = (digest.交易数 ?? 0) >= 30 && (digest.最大回撤 ?? -1) >= -0.3
+          && (digest.总收益 ?? -1) > 0 && (digest.夏普 ?? 0) >= 0.5
+        history.push({ round: i, config: { ...cfg }, digest, passed, note: plan.note })
+        setPilotRounds([...history])
+        if (i === PILOT_MAX) {
+          setPilotConclusion('已用满 5 轮 —— 上面是每轮的结果，可以自己再调调看，或去「验证」tab 做稳健性检验')
+        }
+      }
+    } catch (e) {
+      toast(`代跑中断 · ${String((e as Error).message || e)}`, 'error')
+    } finally {
+      setPilotBusy(false); setPilotStep('')
+    }
+  }
+
   const handleRun = () => {
     if (!selectedStrategy || backtestDataUnavailable) return
     const requestOverrides = detail
@@ -1752,10 +1829,27 @@ export function StrategyBacktest() {
             <span className="text-sm font-semibold tracking-wide">运行回测</span>
           </button>
         )}
+
+        {/* [R34] 不会填表就点这个 —— AI 选策略、定风控参数、跑、看结果、不行再换 */}
+        <button
+          onClick={() => void runAutopilot()}
+          disabled={pilotBusy || isPending || backtestDataUnavailable}
+          title="AI 全程代劳: 选策略 → 定环境过滤/持仓上限/总仓位/区间 → 跑 → 看结果 → 不行就换一个再跑, 最多 5 轮"
+          className="mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-btn border border-accent/40
+            bg-accent/10 px-3 py-2 text-sm font-medium text-accent transition-colors hover:bg-accent/20
+            disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {pilotBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+          {pilotBusy ? 'AI 代跑中…' : '不会选? 让 AI 帮我跑'}
+        </button>
       </section>
 
       {/* 结果面板 */}
       <section className="min-w-0 space-y-3 bg-base/15 px-3 py-3 xl:overflow-y-auto">
+        {(pilotBusy || pilotRounds.length > 0 || pilotConclusion) && (
+          <PilotTrace busy={pilotBusy} step={pilotStep}
+            rounds={pilotRounds} conclusion={pilotConclusion} />
+        )}
         {/* 模式切换: 仓位模拟 / 全量模拟 */}
         <div className="flex items-center justify-between gap-2">
           <div className="inline-flex rounded-btn border border-border bg-surface/80 p-0.5 shadow-sm">
@@ -2715,6 +2809,65 @@ export function StrategyBacktest() {
       )}
 
       <TradeKlineModal trade={selectedTrade} onClose={() => setSelectedTrade(null)} />
+    </div>
+  )
+}
+
+
+/**
+ * [fork 增强] R34 代跑过程条 —— 让"AI 在替我操作"看得见。
+ *
+ * 每轮只报关键几项: 用了哪个策略、什么风控、跑出什么、达标没有。
+ * 结论必须带上"这是历史回测不代表未来 + 去验证 tab 做稳健性检验"的口径,
+ * 由后端提示词保证。
+ */
+function PilotTrace({ busy, step, rounds, conclusion }: {
+  busy: boolean
+  step: string
+  rounds: BacktestAiRound[]
+  conclusion: string | null
+}) {
+  const f = (v: number | null | undefined, digits = 2) =>
+    typeof v === 'number' && Number.isFinite(v) ? v.toFixed(digits) : '—'
+  const p = (v: number | null | undefined) =>
+    typeof v === 'number' && Number.isFinite(v) ? `${(v * 100).toFixed(1)}%` : '—'
+
+  return (
+    <div className="rounded-btn border border-accent/30 bg-accent/5 px-3 py-2.5">
+      <div className="flex items-center gap-2">
+        {busy
+          ? <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-accent" />
+          : <Sparkles className="h-3.5 w-3.5 shrink-0 text-accent" />}
+        <span className="text-xs font-medium text-foreground">AI 代跑</span>
+        <span className="min-w-0 flex-1 truncate text-[11px] text-secondary">
+          {busy ? step : `共 ${rounds.length} 轮`}
+        </span>
+      </div>
+
+      {rounds.length > 0 && (
+        <div className="mt-2 space-y-1">
+          {rounds.map(r => (
+            <div key={r.round} className="flex flex-wrap items-baseline gap-x-2 text-[10px]">
+              <span className="shrink-0 font-medium text-secondary">第 {r.round} 轮</span>
+              <span className="font-mono text-foreground">{String(r.config.strategy_id ?? '')}</span>
+              <span className="font-mono text-muted">
+                收益 {p(r.digest.总收益)} · 夏普 {f(r.digest.夏普)} ·
+                回撤 {p(r.digest.最大回撤)} · {r.digest.交易数 ?? '—'} 笔
+              </span>
+              <span className={r.passed ? 'text-success' : 'text-warning'}>
+                {r.passed ? '达标' : '未达标'}
+              </span>
+              {r.note && <span className="min-w-0 flex-1 truncate text-secondary">{r.note}</span>}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {conclusion && (
+        <p className="mt-2 border-t border-accent/20 pt-2 text-[11px] leading-relaxed text-secondary">
+          <span className="mr-1 text-accent">结论</span>{conclusion}
+        </p>
+      )}
     </div>
   )
 }
