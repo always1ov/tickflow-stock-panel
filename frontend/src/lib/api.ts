@@ -1242,6 +1242,23 @@ export interface FactorAiReading {
   error?: string
 }
 
+export interface FactorAiPlan {
+  satisfied: boolean
+  note: string
+  conclusion: string | null
+  next: { factor_names: string[]; rebalance: 'daily' | 'weekly' | 'monthly'; n_groups: number } | null
+  error?: string
+}
+/** 代跑的一轮记录: 配置 + 该轮短名单/漏斗 + AI 当时的判断 */
+export interface FactorAiRound {
+  round: number
+  config: Record<string, unknown>
+  shortlist: FactorShortlistRow[]
+  stats: Record<string, number>
+  note: string
+  satisfied: boolean
+}
+
 export interface FactorBatchResult {
   run_id: string
   config: Record<string, any>
@@ -2511,6 +2528,14 @@ export const api = {
     n_symbols?: number; n_dates?: number
   }) =>
     request<FactorAiReading>('/api/backtest/factor/ai-reading', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  // [fork 增强] R33 AI 代跑: 要下一轮该怎么配, 或"够了"+结论。跑仍走 factorBatch
+  factorAiPlan: (payload: {
+    rounds: FactorAiRound[]; max_rounds?: number; sample?: Record<string, unknown>
+  }) =>
+    request<FactorAiPlan>('/api/backtest/factor/ai-plan', {
       method: 'POST',
       body: JSON.stringify(payload),
     }),

@@ -5,7 +5,7 @@ import { DatePicker } from '@/components/DatePicker'
 import { EmptyState } from '@/components/EmptyState'
 import { toast } from '@/components/Toast'
 import { WatchlistGroupMenu } from '@/components/WatchlistAddMenu'
-import { api, type FactorAiReading, type FactorBatchItem, type FactorColumn } from '@/lib/api'
+import { api, type FactorAiReading, type FactorAiRound, type FactorBatchItem, type FactorColumn } from '@/lib/api'
 import { fmtPct, priceColorClass } from '@/lib/format'
 import { QK } from '@/lib/queryKeys'
 import { FactorBacktest } from './FactorBacktest'
@@ -72,15 +72,18 @@ function BatchDiscovery({ onInspect }: { onInspect: (factorName: string) => void
     return groups
   }, [columns.data])
 
+  // override 供 R33 代跑用: setState 是异步的, 代跑必须拿 AI 刚给的配置立刻跑,
+  // 不能等表单 state 生效。手动点「筛选」时不传, 行为与原来完全一致。
+  type BatchOverride = { factor_names: string[]; rebalance: 'daily' | 'weekly' | 'monthly'; n_groups: number }
   const run = useMutation({
-    mutationFn: () => api.factorBatch({
-      factor_names: selected,
+    mutationFn: (override?: BatchOverride) => api.factorBatch({
+      factor_names: override?.factor_names ?? selected,
       symbols: symbols ? symbols.split(',').map(value => value.trim()).filter(Boolean) : null,
       asset_type: assetType,
       start: start || null,
       end: end || null,
-      n_groups: nGroups,
-      rebalance,
+      n_groups: override?.n_groups ?? nGroups,
+      rebalance: override?.rebalance ?? rebalance,
       fees_pct: Number(fees) / 10000,
     }),
   })
@@ -95,6 +98,61 @@ function BatchDiscovery({ onInspect }: { onInspect: (factorName: string) => void
     },
     onError: error => toast(`保存失败 · ${String((error as Error).message || error)}`, 'error'),
   })
+
+  // [fork 增强] R33 AI 代跑 —— 用户不会填表, AI 来填、来跑、来判断。
+  // 每一轮都真的把配置灌进左侧表单再跑, 用户能亲眼看到它在操作, 不是黑箱。
+  const [rounds, setRounds] = useState<FactorAiRound[]>([])
+  const [pilotBusy, setPilotBusy] = useState(false)
+  const [pilotStep, setPilotStep] = useState('')
+  const [conclusion, setConclusion] = useState<string | null>(null)
+  const MAX_ROUNDS = 5
+
+  const runAutopilot = async () => {
+    if (pilotBusy) return
+    setPilotBusy(true)
+    setRounds([]); setConclusion(null); setReading(null)
+    const history: FactorAiRound[] = []
+    try {
+      for (let i = 1; i <= MAX_ROUNDS; i++) {
+        setPilotStep(`第 ${i} 轮 · AI 正在决定用哪些因子…`)
+        const plan = await api.factorAiPlan({ rounds: history, max_rounds: MAX_ROUNDS })
+        if (plan.error) { toast(plan.error, 'error'); break }
+        if (plan.satisfied) {
+          setConclusion(plan.conclusion || plan.note || '已完成')
+          break
+        }
+        if (!plan.next) { toast('AI 没给出下一轮配置, 可重试或换模型', 'error'); break }
+
+        // 真的填表: 勾选框/调仓/分组数都按 AI 给的改, 用户看得见
+        setSelected(plan.next.factor_names)
+        setRebalance(plan.next.rebalance)
+        setNGroups(plan.next.n_groups)
+        setPilotStep(`第 ${i} 轮 · 正在跑 ${plan.next.factor_names.length} 个因子…`)
+
+        // 走同一个 mutation —— 结果自动进原来那张结果表, 不另开一套展示
+        const res = await run.mutateAsync(plan.next)
+        if (res.error) { toast(res.error, 'error'); break }
+
+        setPilotStep(`第 ${i} 轮 · AI 正在看结果…`)
+        const digest = await api.factorAiReading({
+          results: res.results, config: res.config,
+          n_symbols: res.n_symbols, n_dates: res.n_dates,
+        })
+        const entry: FactorAiRound = {
+          round: i, config: { ...plan.next },
+          shortlist: digest.shortlist, stats: digest.stats,
+          note: plan.note, satisfied: false,
+        }
+        history.push(entry)
+        setRounds([...history])
+        if (i === MAX_ROUNDS) setConclusion('已用满 5 轮 —— 上面是最后一轮的结果, 可以自己再调调看')
+      }
+    } catch (e) {
+      toast(`代跑中断 · ${String((e as Error).message || e)}`, 'error')
+    } finally {
+      setPilotBusy(false); setPilotStep('')
+    }
+  }
 
   // [fork 增强] R32 AI 解读: 规则层先出短名单(零 AI 成本), AI 再做二次解读。
   // 结果原样回传给后端, 不必让服务端重算一遍。
@@ -293,19 +351,33 @@ function BatchDiscovery({ onInspect }: { onInspect: (factorName: string) => void
           </label>
         </div>
 
+        {/* [R33] 不会填表就点这个 —— AI 自己挑因子、自己定参数、自己跑, 跑不好自己换一批再跑 */}
         <button
           type="button"
-          onClick={() => run.mutate()}
-          disabled={run.isPending || selected.length === 0}
-          className="inline-flex w-full items-center justify-center gap-1.5 rounded-btn bg-accent px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50"
+          onClick={() => void runAutopilot()}
+          disabled={pilotBusy || run.isPending}
+          title="AI 全程代劳: 挑因子 → 填表 → 跑 → 看结果 → 不行就换一批再跑, 最多 5 轮"
+          className="inline-flex w-full items-center justify-center gap-1.5 rounded-btn bg-gradient-to-r from-accent to-accent/70 px-3 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {pilotBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+          {pilotBusy ? 'AI 代跑中…' : '不会选? 让 AI 帮我跑'}
+        </button>
+        <button
+          type="button"
+          onClick={() => run.mutate(undefined)}
+          disabled={run.isPending || pilotBusy || selected.length === 0}
+          className="inline-flex w-full items-center justify-center gap-1.5 rounded-btn border border-border bg-surface px-3 py-2 text-sm font-medium text-secondary transition-colors hover:border-accent/40 hover:text-accent disabled:cursor-not-allowed disabled:opacity-50"
         >
           <Play className="h-3.5 w-3.5" />
-          {run.isPending ? '筛选中…' : `筛选 ${selected.length} 个因子`}
+          {run.isPending ? '筛选中…' : `自己跑 · ${selected.length} 个因子`}
         </button>
       </section>
 
       <section className="min-w-0 bg-base/15 xl:overflow-y-auto">
-        {run.isPending && (
+        {(pilotBusy || rounds.length > 0 || conclusion) && (
+          <AutopilotTrace busy={pilotBusy} step={pilotStep} rounds={rounds} conclusion={conclusion} />
+        )}
+        {run.isPending && !pilotBusy && (
           <div className="m-3 flex items-center gap-3 rounded-btn border border-accent/30 bg-accent/5 px-3 py-2.5 text-xs text-secondary">
             <span className="h-4 w-4 animate-spin rounded-full border-2 border-accent/25 border-t-accent" />
             正在加载共享数据面板并评估 {selected.length} 个因子
@@ -537,6 +609,63 @@ function ReadingPanel({ reading, onUseFactors }: {
           </button>
         )}
       </div>
+    </div>
+  )
+}
+
+
+/**
+ * [fork 增强] R33 代跑过程条 —— 让"AI 在替我操作"看得见。
+ *
+ * 只呈现三件事: 现在在干嘛、每轮试了什么结果如何、最后的结论。
+ * 结论里必须带上"这是描述性统计不是验证过的策略"的口径, 由后端提示词保证。
+ */
+function AutopilotTrace({ busy, step, rounds, conclusion }: {
+  busy: boolean
+  step: string
+  rounds: FactorAiRound[]
+  conclusion: string | null
+}) {
+  return (
+    <div className="m-3 rounded-btn border border-accent/30 bg-accent/5 px-3 py-2.5">
+      <div className="flex items-center gap-2">
+        {busy
+          ? <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-accent" />
+          : <Sparkles className="h-3.5 w-3.5 shrink-0 text-accent" />}
+        <span className="text-xs font-medium text-foreground">AI 代跑</span>
+        <span className="min-w-0 flex-1 truncate text-[11px] text-secondary">
+          {busy ? step : `共 ${rounds.length} 轮`}
+        </span>
+      </div>
+
+      {rounds.length > 0 && (
+        <div className="mt-2 space-y-1">
+          {rounds.map(r => {
+            const top = r.shortlist[0]
+            return (
+              <div key={r.round} className="flex flex-wrap items-baseline gap-x-2 text-[10px]">
+                <span className="shrink-0 font-medium text-secondary">第 {r.round} 轮</span>
+                <span className="font-mono text-muted">
+                  {(r.config.factor_names as string[] | undefined)?.length ?? 0} 因子 ·
+                  {String(r.config.rebalance ?? '')} · {String(r.config.n_groups ?? '')} 组
+                </span>
+                <span className="text-muted">
+                  {top
+                    ? `最好的是 ${top.factor}(IC ${top.IC均值?.toFixed(3) ?? '—'})`
+                    : '没有因子有区分度'}
+                </span>
+                {r.note && <span className="min-w-0 flex-1 truncate text-secondary">{r.note}</span>}
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {conclusion && (
+        <p className="mt-2 border-t border-accent/20 pt-2 text-[11px] leading-relaxed text-secondary">
+          <span className="mr-1 text-accent">结论</span>{conclusion}
+        </p>
+      )}
     </div>
   )
 }

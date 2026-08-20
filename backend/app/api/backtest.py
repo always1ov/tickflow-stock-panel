@@ -266,6 +266,30 @@ async def factor_ai_reading(req: FactorAiReadingRequest):
     })
 
 
+class FactorAiPlanRequest(BaseModel):
+    """代跑计划请求。rounds 是此前每一轮的 {round, config, shortlist, stats, note, satisfied}。"""
+    rounds: list[dict] = Field(default_factory=list, max_length=10)
+    max_rounds: int = Field(5, ge=1, le=10)
+    sample: dict | None = None
+
+
+@router.post("/factor/ai-plan")
+async def factor_ai_plan(req: FactorAiPlanRequest):
+    """[R33] AI 代跑: 给出下一轮该怎么配, 或宣布够了并给结论。
+
+    实际跑批量筛选仍走 /factor/batch —— 前端把配置灌进表单再调用, 用户能亲眼
+    看到 AI 在操作而不是黑箱。未配 AI 返回 error 而非 500。
+    """
+    from app.backtest.factor import FACTOR_COLUMNS
+    from app.services import factor_ai
+
+    catalog = [{"id": str(f["id"]), "name": str(f.get("label") or f["id"]),
+                "group": str(f.get("group") or "")} for f in FACTOR_COLUMNS]
+    return await factor_ai.next_plan(
+        factor_catalog=catalog, rounds=req.rounds,
+        max_rounds=req.max_rounds, sample=req.sample)
+
+
 # ================================================================
 # 研究候选方案
 # ================================================================

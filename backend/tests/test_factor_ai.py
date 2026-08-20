@@ -145,3 +145,75 @@ def test_parse_reading_dedupes_picks():
 def test_parse_reading_raises_on_garbage():
     with pytest.raises(ValueError):
         fa.parse_reading("模型今天不想说话", VALID)
+
+
+# ================================================================
+# [R33] AI 代跑: 用户不会填表, AI 来填来跑来判断
+# ================================================================
+
+CATALOG = [{"id": f, "name": f} for f in
+           ["momentum_20d", "ma20_bias", "turnover_rate", "rsi_14", "atr_rel"]]
+CAT_IDS = {c["id"] for c in CATALOG}
+
+
+def test_plan_payload_carries_history_for_feedback():
+    """上一轮跑了什么、结果如何、AI 当时怎么说, 全带上 —— 这就是反馈闭环。"""
+    rounds = [{"round": 1, "config": {"rebalance": "weekly"},
+               "shortlist": [{"factor": "momentum_20d", "可用度": 80}],
+               "stats": {"总数": 61}, "note": "先广撒网"}]
+    p = fa.build_plan_payload(factor_catalog=CATALOG, rounds=rounds, max_rounds=5)
+    assert p["本轮是第几轮"] == 2
+    assert p["历史轮次"][0]["你当时的判断"] == "先广撒网"
+    assert p["历史轮次"][0]["跑出的因子表现(已按可用度排序)"][0]["factor"] == "momentum_20d"
+
+
+def test_parse_plan_clamps_and_drops_fabricated():
+    text = ('{"satisfied": false, "note": "先试量价", '
+            '"next": {"factor_names": ["turnover_rate", "编造的", "rsi_14"], '
+            '"rebalance": "乱填", "n_groups": 99}}')
+    plan = fa.parse_plan(text, CAT_IDS)
+    assert plan["next"]["factor_names"] == ["turnover_rate", "rsi_14"], "编造的丢掉"
+    assert plan["next"]["rebalance"] == "weekly", "非法调仓回落"
+    assert plan["next"]["n_groups"] == 10, "越界夹紧"
+
+
+def test_parse_plan_satisfied_carries_conclusion():
+    text = ('{"satisfied": true, "note": "够了", '
+            '"conclusion": "量价类有效, 建议拿去挖掘做组合", "next": null}')
+    plan = fa.parse_plan(text, CAT_IDS)
+    assert plan["satisfied"] is True
+    assert "挖掘" in plan["conclusion"]
+    assert plan["next"] is None
+
+
+def test_parse_plan_tolerates_think_block():
+    text = ('<think>先看看清单…</think>\n```json\n'
+            '{"satisfied": false, "note": "换一批", '
+            '"next": {"factor_names": ["ma20_bias"], "n_groups": 3}}\n```')
+    plan = fa.parse_plan(text, CAT_IDS)
+    assert plan["next"]["n_groups"] == 3 and plan["next"]["rebalance"] == "weekly"
+
+
+def test_parse_plan_drops_plan_when_all_factors_fabricated():
+    text = '{"satisfied": false, "note": "换", "next": {"factor_names": ["假的"]}}'
+    assert fa.parse_plan(text, CAT_IDS)["next"] is None
+
+
+def test_parse_plan_raises_on_garbage():
+    with pytest.raises(ValueError):
+        fa.parse_plan("模型今天不想说话", CAT_IDS)
+
+
+def test_round_digest_reuses_rule_layer():
+    """每轮摘要复用规则层短名单与漏斗, 不另起一套口径。"""
+    res = {"results": [item("mom", ic=0.05), item("bad", error="X"), item("flat", ic=0.0001)]}
+    d = fa.round_digest(res)
+    assert [r["factor"] for r in d["shortlist"]] == ["mom"]
+    assert d["stats"]["算失败"] == 1 and d["stats"]["总数"] == 3
+
+
+def test_plan_stop_reason():
+    assert fa.plan_stop_reason([], 5) is None
+    assert fa.plan_stop_reason([{"satisfied": False}], 5) is None
+    assert fa.plan_stop_reason([{"satisfied": True}], 5) == "satisfied"
+    assert fa.plan_stop_reason([{"satisfied": False}] * 5, 5) == "exhausted"

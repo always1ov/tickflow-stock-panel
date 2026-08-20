@@ -232,3 +232,147 @@ async def generate(result: dict) -> dict:
         logger.warning("factor ai reading failed: %s", e)
         return {**base, "error": f"AI 调用失败: {e}"}
     return {**base, "ai": ai}
+
+
+# ================================================================
+# [R33] AI 代跑 —— 用户不会填表, 那就让 AI 来填、来跑、来判断
+# ================================================================
+#
+# 与 R32「AI 解读」的区别: 解读是跑完之后帮你读; 代跑是**从头到尾替你操作** ——
+# 选因子、定参数、跑、看结果、不行就换一批再跑, 直到它认为可以。
+#
+# 这里只出"下一步该怎么配"和"够了没有", 实际跑批量筛选仍走原来的 /factor/batch,
+# 前端把每轮配置灌进表单再调用 —— 用户能亲眼看到它在操作, 而不是黑箱。
+#
+# 与挖掘 autopilot 的关键差别: 批量筛选是描述性统计(算 IC/IR), 不是带通过/否决
+# 门槛的策略验证, 也没有 786 根交易日的硬门槛, 几秒就能跑完。所以这里不需要锁
+# 终检窗口 —— 但也因此**它的结论只是"值得进一步研究", 不是"验证过的策略"**,
+# 提示词里要求 AI 如实这么说。
+
+MAX_PLAN_ROUNDS = 5
+_PLAN_REBALANCE = ("daily", "weekly", "monthly")
+
+_PLAN_SYSTEM = """你在替一个不懂量化的用户操作「因子批量筛选」。他不会填表, 你全权代劳。
+
+每一轮你要么给出下一轮怎么配, 要么宣布够了并给结论。
+
+可调的只有三样:
+- factor_names: 从给定清单里挑 8-16 个因子。**必须跨组挑**(动量/均线偏离/超买超卖/
+  趋势/波动率/量价/价格位置…), 同组挑 1-2 个就够 —— 同组高度相关, 堆一起是白费。
+- rebalance: daily / weekly / monthly。短周期因子(5日动量、量比)配 daily 或 weekly;
+  中长周期因子(60日动量、MA60乖离)配 monthly。
+- n_groups: 2-10, 常用 5。标的少时用小一点(3), 免得每组太少没有统计意义。
+
+判定够了的标准: 至少有 2 个因子的 |IC 均值| >= 0.02 且 IC 胜率偏离 50% 超过 5 个点。
+达到就收手, 不要为了更好看的数字反复刷 —— 试的次数越多, 挑出来的越可能是运气。
+
+纪律:
+- 只能用给定清单里的因子 id, 不得编造。
+- 批量筛选算的是 IC/IR 这类描述性统计, **不是经过验证的策略**。结论里必须说清
+  这只是"值得进一步研究的方向", 让用户拿去挖掘页做组合搜索和样本外验证。
+- 多空收益是理论价差, A 股不能真做空, 不得当成可执行收益来说。
+- 不要给个股、点位、仓位建议。
+
+只输出 JSON, 不要任何解释文字或代码块标记:
+{"satisfied": true|false,
+ "note": "一句话说这轮打算干什么 / 或这轮结果怎么样, 大白话给外行看",
+ "conclusion": "满意时: 三五句话说清哪几个因子有效、当前市场偏什么风格、下一步该干嘛; 不满意时填 null",
+ "next": {"factor_names": ["id1", ...], "rebalance": "daily|weekly|monthly", "n_groups": 5}}
+"""
+
+
+def build_plan_payload(*, factor_catalog: list[dict], rounds: list[dict],
+                       max_rounds: int, sample: dict | None = None) -> dict:
+    """送审 payload: 因子清单 + 历次配置与结果(这就是"拿上次结果反馈"的载体)。"""
+    history = []
+    for r in rounds or []:
+        history.append({
+            "第几轮": r.get("round"),
+            "用的配置": r.get("config"),
+            "跑出的因子表现(已按可用度排序)": r.get("shortlist"),
+            "规则层筛选情况": r.get("stats"),
+            "你当时的判断": r.get("note"),
+        })
+    return {
+        "样本": sample or {},
+        "本轮是第几轮": len(rounds or []) + 1,
+        "最多允许几轮": max_rounds,
+        "可用因子": factor_catalog,
+        "历史轮次": history,
+    }
+
+
+def parse_plan(text: str, valid_factors: set[str]) -> dict:
+    """解析代跑计划; 容错各厂商格式。编造因子丢弃, 参数越界夹紧。"""
+    from app.services.ai_json import extract_json_object
+
+    obj = extract_json_object((text or "").strip()) or {}
+    satisfied = bool(obj.get("satisfied"))
+    note = str(obj.get("note") or "").strip()[:300]
+    conclusion = obj.get("conclusion")
+    conclusion = str(conclusion).strip()[:800] if conclusion else None
+
+    nxt = obj.get("next")
+    plan = None
+    if isinstance(nxt, dict):
+        names = [str(n).strip() for n in (nxt.get("factor_names") or [])]
+        names = [n for n in dict.fromkeys(names) if n in valid_factors][:32]
+        if names:
+            reb = str(nxt.get("rebalance") or "").strip()
+            try:
+                groups = max(2, min(10, int(nxt.get("n_groups"))))
+            except (TypeError, ValueError):
+                groups = 5
+            plan = {
+                "factor_names": names,
+                "rebalance": reb if reb in _PLAN_REBALANCE else "weekly",
+                "n_groups": groups,
+            }
+
+    if not satisfied and plan is None and not note:
+        raise ValueError(f"AI 返回无法解析为代跑计划(原文开头: {(text or '')[:60]})")
+    return {"satisfied": satisfied, "note": note, "conclusion": conclusion, "next": plan}
+
+
+def round_digest(result: dict) -> dict:
+    """一轮批量筛选结果 → 喂回给 AI 的摘要(复用规则层短名单与漏斗)。"""
+    items = (result or {}).get("results") or []
+    picked = shortlist(items)
+    return {"shortlist": picked, "stats": dropped_summary(items, picked)}
+
+
+def plan_stop_reason(rounds: list[dict], max_rounds: int) -> str | None:
+    """该收手了吗。"""
+    if not rounds:
+        return None
+    if rounds[-1].get("satisfied"):
+        return "satisfied"
+    if len(rounds) >= max_rounds:
+        return "exhausted"
+    return None
+
+
+async def next_plan(*, factor_catalog: list[dict], rounds: list[dict],
+                    max_rounds: int = MAX_PLAN_ROUNDS,
+                    sample: dict | None = None) -> dict:
+    """要下一轮配置(或"够了")。未配 AI / 调用失败返回 {error}。"""
+    from app.services.ai_provider import ai_configured, generate_ai_text
+
+    if not ai_configured():
+        return {"error": "未配置 AI"}
+    valid = {str(f["id"]) for f in factor_catalog if f.get("id")}
+    payload = build_plan_payload(factor_catalog=factor_catalog, rounds=rounds,
+                                 max_rounds=max_rounds, sample=sample)
+    try:
+        text = await generate_ai_text(
+            [
+                {"role": "system", "content": _PLAN_SYSTEM},
+                {"role": "user", "content": json.dumps(payload, ensure_ascii=False, default=str)},
+            ],
+            temperature=0.3,
+            max_tokens=None,  # [上游标准] 分析类调用不限制输出
+        )
+        return parse_plan(text, valid)
+    except Exception as e:  # noqa: BLE001
+        logger.warning("factor autopilot plan failed: %s", e)
+        return {"error": f"AI 调用失败: {e}"}
