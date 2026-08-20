@@ -1218,6 +1218,30 @@ export interface FactorBatchItem {
   error: string | null
 }
 
+// ===== [fork 增强] R32 因子 AI 解读 =====
+export interface FactorShortlistRow {
+  factor: string
+  label: string
+  group: string
+  可用度: number
+  IC均值: number | null
+  IR: number | null
+  IC胜率: number | null
+}
+export interface FactorAiReading {
+  /** 规则层短名单(零 AI 成本, 未配 AI 时也有) */
+  shortlist: FactorShortlistRow[]
+  /** 漏斗统计: 61 个里为什么只剩这几个 */
+  stats: Record<string, number>
+  ai?: {
+    summary: string
+    picks: { factor: string; reason: string }[]
+    redundant: { keep: string; drop: string[]; reason: string }[]
+    next_step: string
+  }
+  error?: string
+}
+
 export interface FactorBatchResult {
   run_id: string
   config: Record<string, any>
@@ -2481,6 +2505,15 @@ export const api = {
       body: JSON.stringify(payload),
     }),
 
+  // [fork 增强] R32 批量筛选结果的 AI 解读(规则层短名单 + AI 二次解读)
+  factorAiReading: (payload: {
+    results: FactorBatchItem[]; config?: Record<string, unknown>
+    n_symbols?: number; n_dates?: number
+  }) =>
+    request<FactorAiReading>('/api/backtest/factor/ai-reading', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
   miningRuns: () =>
     request<{ items: MiningRun[] }>('/api/backtest/mining/runs'),
 

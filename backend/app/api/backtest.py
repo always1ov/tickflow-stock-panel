@@ -237,6 +237,35 @@ def factor_batch(req: FactorBatchRequest, request: Request):
     return asdict(result)
 
 
+# ── [fork 增强] R32 因子批量筛选的 AI 解读 ──
+#
+# 两层: 规则层先按 IC/IR/胜率算可用度并按因子组去重(零 AI 成本, 没配 AI 也有短名单),
+# AI 层只对短名单做解读。前端把跑完的批量结果原样回传, 不必在服务端重算一遍。
+
+class FactorAiReadingRequest(BaseModel):
+    """批量筛选的原始结果。字段与 /factor/batch 的返回一致, 多余键忽略。"""
+    results: list[dict] = Field(..., min_length=1, max_length=200)
+    config: dict | None = None
+    n_symbols: int | None = None
+    n_dates: int | None = None
+
+
+@router.post("/factor/ai-reading")
+async def factor_ai_reading(req: FactorAiReadingRequest):
+    """AI 解读批量筛选结果: 哪几个真能用 / 哪些同类冗余 / 当前市场偏什么风格。
+
+    未配 AI 或 AI 失败时仍返回规则层短名单 + 漏斗统计, 不给 500。
+    """
+    from app.services import factor_ai
+
+    return await factor_ai.generate({
+        "results": req.results,
+        "config": req.config or {},
+        "n_symbols": req.n_symbols,
+        "n_dates": req.n_dates,
+    })
+
+
 # ================================================================
 # 研究候选方案
 # ================================================================

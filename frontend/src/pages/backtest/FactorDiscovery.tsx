@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { BookmarkPlus, ChevronRight, Clock, Layers3, ListFilter, ListPlus, Play, Search } from 'lucide-react'
+import { BookmarkPlus, ChevronRight, Clock, Layers3, ListFilter, ListPlus, Loader2, Play, Search, Sparkles } from 'lucide-react'
 import { DatePicker } from '@/components/DatePicker'
 import { EmptyState } from '@/components/EmptyState'
 import { toast } from '@/components/Toast'
 import { WatchlistGroupMenu } from '@/components/WatchlistAddMenu'
-import { api, type FactorBatchItem, type FactorColumn } from '@/lib/api'
+import { api, type FactorAiReading, type FactorBatchItem, type FactorColumn } from '@/lib/api'
 import { fmtPct, priceColorClass } from '@/lib/format'
 import { QK } from '@/lib/queryKeys'
 import { FactorBacktest } from './FactorBacktest'
@@ -95,6 +95,28 @@ function BatchDiscovery({ onInspect }: { onInspect: (factorName: string) => void
     },
     onError: error => toast(`保存失败 · ${String((error as Error).message || error)}`, 'error'),
   })
+
+  // [fork 增强] R32 AI 解读: 规则层先出短名单(零 AI 成本), AI 再做二次解读。
+  // 结果原样回传给后端, 不必让服务端重算一遍。
+  const [reading, setReading] = useState<FactorAiReading | null>(null)
+  const aiRead = useMutation({
+    mutationFn: () => {
+      if (!run.data) throw new Error('先跑一次批量筛选')
+      return api.factorAiReading({
+        results: run.data.results,
+        config: run.data.config,
+        n_symbols: run.data.n_symbols,
+        n_dates: run.data.n_dates,
+      })
+    },
+    onSuccess: value => {
+      setReading(value)
+      if (value.error) toast(value.error, 'error')
+    },
+    onError: error => toast(`解读失败 · ${String((error as Error).message || error)}`, 'error'),
+  })
+  // 换一批结果就清掉旧解读 —— 免得读到的是上一次的结论
+  useEffect(() => { setReading(null) }, [run.data])
 
   const sortedResults = useMemo(() => {
     const values = [...(run.data?.results ?? [])]
@@ -312,7 +334,17 @@ function BatchDiscovery({ onInspect }: { onInspect: (factorName: string) => void
                   <span className="inline-flex items-center gap-1"><Clock className="h-3 w-3" />{run.data.elapsed_ms.toFixed(0)} ms</span>
                 </div>
               </div>
-              <label className="ml-auto flex items-center gap-2 text-[11px] text-muted">
+              <button
+                type="button"
+                onClick={() => aiRead.mutate()}
+                disabled={aiRead.isPending}
+                title="规则层先按 IC/IR/胜率筛出短名单并按因子组去重, AI 再解读哪几个真能用、哪些是同类冗余"
+                className="ml-auto inline-flex h-8 items-center gap-1.5 rounded-btn border border-accent/40 bg-accent/10 px-3 text-xs font-medium text-accent transition-colors hover:bg-accent/20 disabled:opacity-50"
+              >
+                {aiRead.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                AI 解读
+              </button>
+              <label className="flex items-center gap-2 text-[11px] text-muted">
                 排序
                 <select value={sortKey} onChange={event => setSortKey(event.target.value as SortKey)} className="h-8 rounded-input border border-border bg-surface px-2 text-xs text-secondary focus:border-accent focus:outline-none">
                   <option value="ic">|IC|</option>
@@ -321,6 +353,7 @@ function BatchDiscovery({ onInspect }: { onInspect: (factorName: string) => void
                 </select>
               </label>
             </div>
+            {reading && <ReadingPanel reading={reading} onUseFactors={setSelected} />}
             <div className="overflow-x-auto">
               <table className="w-full min-w-[820px] text-xs">
                 <thead className="sticky top-0 bg-elevated text-left text-[11px] text-secondary">
@@ -420,6 +453,89 @@ export function FactorDiscovery() {
           ? <BatchDiscovery onInspect={inspect} />
           : <FactorBacktest key={detailFactor} initialFactorName={detailFactor} />
         }
+      </div>
+    </div>
+  )
+}
+
+
+/**
+ * [fork 增强] R32 AI 解读面板。
+ *
+ * 呈现顺序按可信度从高到低: 规则层漏斗(确定的事) → AI 结论(判断) → 冗余提示。
+ * 「用这几个重跑」直接把 AI 选中的因子灌回左侧勾选框, 省得手动找。
+ */
+function ReadingPanel({ reading, onUseFactors }: {
+  reading: FactorAiReading
+  onUseFactors: (factors: string[]) => void
+}) {
+  const st = reading.stats ?? {}
+  const picks = reading.ai?.picks ?? []
+  return (
+    <div className="border-b border-border bg-elevated/30 px-4 py-3">
+      {/* 漏斗: 回答"61 个里为什么只剩这几个" */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-muted">
+        <span className="font-medium text-secondary">规则层筛选</span>
+        <span>{st['总数'] ?? 0} 个因子</span>
+        {!!st['算失败'] && <span className="text-danger">算失败 {st['算失败']}</span>}
+        <span>有区分度 {st['有区分度'] ?? 0}</span>
+        <span>同组去重剔除 {st['同组去重剔除'] ?? 0}</span>
+        <span className="text-accent">进短名单 {st['进短名单'] ?? 0}</span>
+      </div>
+
+      {reading.error && (
+        <p className="mt-2 text-[11px] text-warning">{reading.error}</p>
+      )}
+
+      {reading.ai?.summary && (
+        <p className="mt-2 text-[11px] leading-relaxed text-secondary">
+          <span className="mr-1 text-accent">AI</span>{reading.ai.summary}
+        </p>
+      )}
+
+      {picks.length > 0 && (
+        <div className="mt-2 space-y-1">
+          {picks.map(p => (
+            <div key={p.factor} className="flex flex-wrap items-baseline gap-x-2 text-[10px]">
+              <span className="font-mono font-medium text-foreground">{p.factor}</span>
+              <span className="text-secondary">{p.reason}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {(reading.ai?.redundant ?? []).length > 0 && (
+        <div className="mt-2 space-y-0.5">
+          {reading.ai!.redundant.map(r => (
+            <p key={r.keep} className="text-[10px] text-muted">
+              同类冗余：留 <span className="font-mono text-secondary">{r.keep}</span>
+              ，可丢 <span className="font-mono">{r.drop.join(', ')}</span>
+              {r.reason && <span className="ml-1">· {r.reason}</span>}
+            </p>
+          ))}
+        </div>
+      )}
+
+      {reading.ai?.next_step && (
+        <p className="mt-2 text-[10px] leading-4 text-accent/90">下一步：{reading.ai.next_step}</p>
+      )}
+
+      <div className="mt-2 flex flex-wrap gap-2">
+        {picks.length > 0 && (
+          <button type="button" onClick={() => onUseFactors(picks.map(p => p.factor))}
+            className="inline-flex h-7 items-center gap-1 rounded-btn border border-accent/40 bg-accent/10 px-2 text-[10px] font-medium text-accent hover:bg-accent/20">
+            <Sparkles className="h-3 w-3" />
+            只用 AI 选的这 {picks.length} 个重跑
+          </button>
+        )}
+        {reading.shortlist.length > 0 && (
+          <button type="button" onClick={() => onUseFactors(reading.shortlist.map(r => r.factor))}
+            className="inline-flex h-7 items-center gap-1 rounded-btn border border-border px-2 text-[10px] text-secondary hover:border-accent/40 hover:text-accent"
+            title="规则层短名单: 按可用度排序, 同组最多留 2 个">
+            <ListFilter className="h-3 w-3" />
+            用规则层短名单({reading.shortlist.length} 个)
+          </button>
+        )}
       </div>
     </div>
   )
