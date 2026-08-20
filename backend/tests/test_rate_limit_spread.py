@@ -7,7 +7,7 @@ import random
 
 import pytest
 
-from app.tickflow.rate_limits import shuffled_key_order, spread_delays
+from app.tickflow.rate_limits import select_keys, shuffled_key_order, spread_delays
 
 
 # ---------- 摊开 ----------
@@ -90,3 +90,48 @@ def test_key_order_edge_cases():
 def test_two_helpers_agree_on_length(n_keys, n_batches):
     assert len(spread_delays(n_batches, n_keys, 10)) == n_batches
     assert len(shuffled_key_order(n_keys, n_batches)) == n_batches
+
+
+# ---------- [R35] 每轮只启用一部分 key ----------
+
+def test_select_keys_picks_requested_count():
+    got = select_keys(14, 10, rng=random.Random(21))
+    assert len(got) == 10 and len(set(got)) == 10, "无放回抽样, 本轮内不重复用同一个 key"
+    assert all(0 <= i < 14 for i in got)
+
+
+def test_select_keys_varies_between_rounds():
+    a = select_keys(14, 10, rng=random.Random(31))
+    b = select_keys(14, 10, rng=random.Random(32))
+    assert a != b, "每轮都该重新抽, 否则那 4 个永远闲着"
+
+
+def test_select_keys_returns_all_when_disabled_or_oversized():
+    assert select_keys(14, 0, rng=random.Random(41)) == list(range(14)), "0 = 全部"
+    assert select_keys(14, None) == list(range(14))
+    assert select_keys(14, 99) == list(range(14)), "要的比有的多就是全部"
+    assert select_keys(14, -3) == list(range(14))
+
+
+def test_select_keys_edge_cases():
+    assert select_keys(0, 10) == []
+    assert select_keys(1, 10) == [0]
+    assert select_keys(5, "乱填") == list(range(5)), "非法值回落为全部"
+
+
+def test_subset_leaves_quota_headroom():
+    """本轮只用 10 个 key 时, 摊开的间隔按 10 算 —— 每个 key 的实际间隔更宽裕。"""
+    full = spread_delays(14, 14, 10, rng=random.Random(51))
+    subset = spread_delays(10, 10, 10, rng=random.Random(51))
+    base_full = (60 / 10) / 14
+    base_subset = (60 / 10) / 10
+    assert base_subset > base_full
+    assert min(subset[1:]) >= base_subset > max(full[1:]) * 0.9
+
+
+@pytest.mark.parametrize("per_round", [1, 5, 10, 14])
+def test_select_and_order_compose(per_round):
+    """抽子集后再排批次: 下标必须落在子集长度内, 否则会索引越界。"""
+    active = select_keys(14, per_round, rng=random.Random(61))
+    order = shuffled_key_order(len(active), 25, rng=random.Random(62))
+    assert all(0 <= i < len(active) for i in order)

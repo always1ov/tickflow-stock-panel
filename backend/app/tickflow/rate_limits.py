@@ -176,3 +176,27 @@ def shuffled_key_order(n_keys: int, n_batches: int, rng: Any = None) -> list[int
         r.shuffle(chunk)
         order.extend(chunk)
     return order[:n_batches]
+
+
+def select_keys(n_keys: int, per_round: int | None, rng: Any = None) -> list[int]:
+    """本轮用哪几个 key(下标)。per_round 为空/<=0/>=总数 时用全部。
+
+    为什么要留一部分不用:
+      - **额度留白**。摊开之后一轮正好铺满 60/rpm 的窗口, 余量几乎为零; 一旦某批
+        响应慢或触发重试, 同一个 key 的下一次调用就可能落进窗口内。少用几个 key
+        就相当于每轮留出空档, 谁都不贴着上限跑。
+      - **故障隔离**。某个 key 失效/被限流时, 它只影响自己被抽中的那些轮次,
+        而不是每一轮都拖一批标的下水。
+    抽样是无放回的, 所以本轮内不会有 key 被重复使用。
+    """
+    n_keys = max(0, int(n_keys))
+    if n_keys <= 0:
+        return []
+    try:
+        k = int(per_round)
+    except (TypeError, ValueError):
+        k = 0
+    if k <= 0 or k >= n_keys:
+        return list(range(n_keys))
+    r = rng or random.Random()
+    return sorted(r.sample(range(n_keys), k))

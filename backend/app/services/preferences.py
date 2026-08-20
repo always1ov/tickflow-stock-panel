@@ -122,6 +122,33 @@ def set_realtime_quote_interval(interval: float) -> float:
     return interval
 
 
+def get_realtime_keys_per_round() -> int:
+    """[R35] 每轮随机启用几个 key(0 = 全部)。
+
+    少用几个是为了给额度留白: 摊开后一轮正好铺满限速窗口, 余量几乎为零, 一旦某批
+    响应慢或重试, 同一 key 的下一次调用可能落进窗口内。留几个空档谁都不贴上限跑,
+    顺带让单个 key 失效时只影响它被抽中的那些轮次。
+    """
+    try:
+        return max(0, int(load().get("realtime_keys_per_round", 0)))
+    except (TypeError, ValueError):
+        return 0
+
+
+def set_realtime_keys_per_round(count: int) -> int:
+    current = load()
+    try:
+        value = max(0, min(64, int(count)))
+    except (TypeError, ValueError):
+        value = 0
+    current["realtime_keys_per_round"] = value
+    _path().write_text(
+        json.dumps(current, indent=2, ensure_ascii=False), encoding="utf-8",
+    )
+    _invalidate_cache()
+    return value
+
+
 def get_minute_sync_enabled() -> bool:
     return load().get("minute_sync_enabled", False)
 

@@ -1570,6 +1570,38 @@ class DepthPollingIntervalIn(BaseModel):
     interval: float
 
 
+class RealtimeKeysPerRoundIn(BaseModel):
+    """[R35] 每轮随机启用几个 key。0 = 全部。"""
+    count: int
+
+
+@router.get("/preferences/realtime-keys-per-round")
+def get_realtime_keys_per_round() -> dict:
+    """当前设置 + 已配置的 key 总数, 供界面显示"10 / 14"。"""
+    from app.secrets_store import get_tickflow_keys
+    from app.services import preferences
+
+    return {
+        "count": preferences.get_realtime_keys_per_round(),
+        "total_keys": len(get_tickflow_keys()),
+    }
+
+
+@router.put("/preferences/realtime-keys-per-round")
+def update_realtime_keys_per_round(req: RealtimeKeysPerRoundIn) -> dict:
+    """保存每轮随机启用的 key 数(0 = 全部)。
+
+    调小相当于每轮给额度留白: 摊开后一轮正好铺满限速窗口, 余量几乎为零, 某批
+    响应慢或重试时同一 key 的下次调用可能落进窗口内; 少用几个就谁都不贴上限跑。
+    代价是每轮容量变小(5 × 启用数), 全量刷完一遍的轮数相应变多。
+    """
+    from app.secrets_store import get_tickflow_keys
+    from app.services import preferences
+
+    count = preferences.set_realtime_keys_per_round(req.count)
+    return {"count": count, "total_keys": len(get_tickflow_keys())}
+
+
 @router.put("/preferences/depth-polling-interval")
 def update_depth_polling_interval(req: DepthPollingIntervalIn, request: Request) -> dict:
     """保存五档盘口盘中轮询间隔(秒)。需 Pro+。"""

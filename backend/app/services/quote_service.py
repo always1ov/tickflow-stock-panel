@@ -839,7 +839,8 @@ class QuoteService:
         from app.tickflow.capabilities import Cap
         from app.tickflow.policy import detect_capabilities
         from app.tickflow.rate_limits import (
-            chunked, resolve_limit, shuffled_key_order, sleep_between_batches, spread_delays,
+            chunked, resolve_limit, select_keys, shuffled_key_order, sleep_between_batches,
+            spread_delays,
         )
 
         symbols = preferences.get_realtime_watchlist_symbols()
@@ -868,7 +869,11 @@ class QuoteService:
         # 每轮拉 cap 只, 下一轮从上次结尾接着拉, ⌈总数/cap⌉ 轮内所有自选都刷新一遍。
         # 代价是每只的实时刷新周期变为 ⌈总数/cap⌉ × 轮询间隔(多 key、大自选时的取舍)。
         # 自选 ≤ cap 时窗口即全部, 退化为每轮全刷(与原行为一致)。
-        n_keys = len(pool)
+        # [R35] 每轮随机只启用一部分 key(偏好 realtime_keys_per_round, 0=全部) ——
+        # 给额度留白, 并让单个 key 失效时只影响它被抽中的轮次。
+        active_idx = select_keys(len(pool), preferences.get_realtime_keys_per_round())
+        active_pool = [pool[i] for i in active_idx] or pool
+        n_keys = len(active_pool)
         cap = lim.batch * n_keys
         total = len(symbols)
         if total > cap:
@@ -900,12 +905,13 @@ class QuoteService:
             if delays[i] > 0:
                 time.sleep(delays[i])
             key_idx = key_order[i]
-            client = pool[key_idx]
+            client = active_pool[key_idx]
             try:
                 resp.extend(client.quotes.get(symbols=batch) or [])
             except Exception as e:  # noqa: BLE001
-                logger.warning("自选实时批次 %d/%d 拉取失败(key #%d): %s",
-                               i + 1, len(batches), key_idx + 1, e)
+                logger.warning("自选实时批次 %d/%d 拉取失败(key #%d, 本轮启用 %d/%d): %s",
+                               i + 1, len(batches), active_idx[key_idx] + 1 if active_idx else key_idx + 1,
+                               n_keys, len(pool), e)
 
         if not resp:
             logger.warning("自选实时行情数据为空")
