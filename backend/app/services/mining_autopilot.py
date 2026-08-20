@@ -315,3 +315,111 @@ async def next_plan(*, factor_catalog: list[dict], windows: dict, iterations: li
     except Exception as e:  # noqa: BLE001
         logger.warning("mining autopilot plan failed: %s", e)
         return {"error": f"AI 调用失败: {e}"}
+
+
+# ---------- 编排: 一次 step 推进一格状态机 ----------
+#
+# 单一入口 step() 驱动整个闭环, 手动与自动共用:
+#   手动 = 你点一次「AI 再调一轮」调一次 step
+#   自动 = 前端定时轮询 step
+# 这样两种模式没有第二套逻辑, 也天然满足 docs/mining.md §任务与资源隔离
+# 「挖掘独占 2 个重任务槽位」—— 任一时刻最多一个 run 在跑, 严格串行。
+
+STEP_RUNNING = "running"        # 本轮 run 还在跑, 等着就行
+STEP_ITERATED = "iterated"      # 判完上一轮并开出了新一轮
+STEP_DONE = "done"              # 收工(满意 / 用尽轮数)
+STEP_ERROR = "error"
+
+
+def _iter_status(iteration: dict | None) -> str | None:
+    return (iteration or {}).get("status")
+
+
+async def step(*, session: dict, factor_catalog: list[dict],
+               run_status: str | None, run_result: dict | None,
+               start_run: Any, base_config: dict) -> dict:
+    """把会话推进一格。
+
+    参数里 run_status/run_result 是最后一轮 run 的当前状态与结果(由 API 层查好传入),
+    start_run 是"按这份配置起一个挖掘 run, 返回 run_id"的回调 —— 本函数不碰
+    HTTP、不碰 manager, 好单测。
+
+    返回 {action, session, message}。
+    """
+    from app.services import mining_autopilot_store as store
+
+    sid = session["session_id"]
+    iterations = session.get("iterations") or []
+    last = iterations[-1] if iterations else None
+
+    if session.get("status") not in ("open", None):
+        return {"action": STEP_DONE, "session": session, "message": "本会话已收工"}
+
+    # 上一轮还在跑 —— 什么都别做, 等它
+    if last is not None and _iter_status(last) in ("queued", "running", "cancelling"):
+        if run_status in ("queued", "running", "cancelling"):
+            return {"action": STEP_RUNNING, "session": session,
+                    "message": f"第 {last['iteration']} 轮挖掘进行中"}
+        # 跑完了 → 落状态, 继续往下判
+        last["status"] = run_status or "unknown"
+        session = store._replace(session)
+        iterations = session["iterations"]
+        last = iterations[-1]
+
+    # 上一轮跑完但还没让 AI 判过 → 判它
+    if last is not None and not last.get("ai"):
+        if _iter_status(last) not in ("succeeded", "succeeded_with_budget_exhausted"):
+            store.set_status(sid, "failed",
+                             winner=None, fail_reason=f"第 {last['iteration']} 轮 {last['status']}")
+            return {"action": STEP_ERROR, "session": store.get(sid) or session,
+                    "message": f"第 {last['iteration']} 轮挖掘 {last['status']}, 会话中止"}
+        last["candidates"] = summarize_candidates(run_result)
+        session = store._replace(session)
+
+        plan = await next_plan(
+            factor_catalog=factor_catalog,
+            windows={"search_start": session["search_start"], "search_end": session["search_end"]},
+            iterations=session["iterations"],
+            max_iterations=session["max_iterations"],
+            asset_type=session["asset_type"],
+        )
+        if plan.get("error"):
+            return {"action": STEP_ERROR, "session": session, "message": plan["error"]}
+        last["ai"] = plan
+        session = store._replace(session)
+
+    # 该收手了吗
+    reason = stop_reason(session["iterations"], session["max_iterations"])
+    if reason:
+        last = session["iterations"][-1]
+        winner = resolve_pick((last.get("ai") or {}).get("pick"), last.get("candidates") or [])
+        session = store.set_status(
+            sid, reason,
+            winner=(dict(winner, run_id=last.get("run_id")) if winner else None),
+            iteration_count=len(session["iterations"]),
+            confidence_note=confidence_note(len(session["iterations"])),
+        ) or session
+        msg = "AI 认为够好了" if reason == "satisfied" else f"已用满 {session['max_iterations']} 轮"
+        return {"action": STEP_DONE, "session": session,
+                "message": f"{msg} —— 赢家待人工确认发布, 发布后才跑终检"}
+
+    # 开新一轮: 第一轮用底稿配置, 之后用 AI 给的
+    if last is None:
+        plan_cfg = base_config
+    else:
+        plan_cfg = (last.get("ai") or {}).get("next")
+        if not plan_cfg:
+            return {"action": STEP_ERROR, "session": session,
+                    "message": "AI 没给出下一轮配置(可能因子全部编造被丢弃), 可重试或换模型"}
+    config = {**base_config, **plan_cfg,
+              "start": session["search_start"], "end": session["search_end"]}
+    try:
+        run_id = start_run(config)
+    except Exception as e:  # noqa: BLE001
+        return {"action": STEP_ERROR, "session": session, "message": f"挖掘启动失败: {e}"}
+    session = store.append_iteration(sid, {
+        "config": config, "run_id": run_id, "status": "running",
+        "candidates": [], "ai": None,
+    }) or session
+    return {"action": STEP_ITERATED, "session": session,
+            "message": f"第 {len(session['iterations'])} 轮已开跑"}

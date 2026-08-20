@@ -259,3 +259,133 @@ def test_unknown_session_is_none(store):
     assert store.get("nope") is None
     assert store.append_iteration("nope", {}) is None
     assert store.set_status("nope", "failed") is None
+
+
+# ---------- 编排状态机 ----------
+
+import asyncio
+
+
+CATALOG = [{"id": f} for f in sorted(FACTORS)]
+BASE = {"asset_type": "stock", "factor_names": ["momentum_20d"], "budget_profile": "balanced"}
+
+
+def _run_step(session, *, run_status=None, run_result=None, start_run=None, plan=None,
+              monkeypatch=None):
+    """跑一次 step; plan 给定时打桩掉 AI 调用。"""
+    async def fake_plan(**_kw):
+        return plan
+    if plan is not None:
+        monkeypatch.setattr(ap, "next_plan", fake_plan)
+    return asyncio.run(ap.step(
+        session=session, factor_catalog=CATALOG, run_status=run_status,
+        run_result=run_result, start_run=start_run or (lambda cfg: "run1"),
+        base_config=BASE,
+    ))
+
+
+def _open(store):
+    return store.create(
+        asset_type="stock",
+        windows=ap.split_windows(date(2021, 1, 1), date(2026, 8, 20)),
+        max_iterations=3, base_config=BASE)
+
+
+def test_step_first_call_starts_iteration_one(store, monkeypatch):
+    s = _open(store)
+    out = _run_step(s, start_run=lambda cfg: "runA")
+    assert out["action"] == ap.STEP_ITERATED
+    it = out["session"]["iterations"][0]
+    assert it["run_id"] == "runA" and it["iteration"] == 1
+    assert it["config"]["start"] == s["search_start"], "只能在搜索窗口跑"
+    assert it["config"]["end"] == s["search_end"], "绝不碰终检窗口"
+
+
+def test_step_waits_while_run_active(store, monkeypatch):
+    s = _open(store)
+    _run_step(s, start_run=lambda cfg: "runA")
+    s = store.get(s["session_id"])
+    calls = []
+    out = _run_step(s, run_status="running", start_run=lambda cfg: calls.append(cfg))
+    assert out["action"] == ap.STEP_RUNNING
+    assert calls == [], "上一轮没跑完不许再起一个 run(挖掘独占 2 个槽位)"
+
+
+def test_step_judges_then_starts_next_iteration(store, monkeypatch):
+    s = _open(store)
+    _run_step(s, start_run=lambda cfg: "runA")
+    s = store.get(s["session_id"])
+    plan = {"satisfied": False, "verdict": "Sharpe 不够", "pick": None,
+            "next": {"factor_names": ["ma20_bias", "turnover_rate"],
+                     "budget_profile": "strict", "max_combination_factors": 3,
+                     "beam_width": 16, "correlation_threshold": 0.7},
+            "reason": "换成量价组合"}
+    out = _run_step(s, run_status="succeeded", run_result=_result(),
+                    start_run=lambda cfg: "runB", plan=plan, monkeypatch=monkeypatch)
+    assert out["action"] == ap.STEP_ITERATED
+    iters = out["session"]["iterations"]
+    assert len(iters) == 2
+    assert iters[0]["ai"]["verdict"] == "Sharpe 不够"
+    assert iters[0]["candidates"][0]["样本外Sharpe"] == 0.31, "上一轮结果已存档, 供下次反馈"
+    assert iters[1]["config"]["factor_names"] == ["ma20_bias", "turnover_rate"]
+    assert iters[1]["config"]["budget_profile"] == "strict"
+
+
+def test_step_satisfied_closes_session_with_winner(store, monkeypatch):
+    s = _open(store)
+    _run_step(s, start_run=lambda cfg: "runA")
+    s = store.get(s["session_id"])
+    res = {"candidates": [dict(_result()["candidates"][0], signature="sigX",
+                               gate={"qualified": True, "reasons": []}, oos_sharpe=0.8)]}
+    plan = {"satisfied": True, "verdict": "稳稳达标", "pick": "sigX", "next": None, "reason": None}
+    out = _run_step(s, run_status="succeeded", run_result=res, plan=plan, monkeypatch=monkeypatch)
+    assert out["action"] == ap.STEP_DONE
+    sess = out["session"]
+    assert sess["status"] == "satisfied"
+    assert sess["winner"]["signature"] == "sigX" and sess["winner"]["run_id"] == "runA"
+    assert sess["confidence_note"]
+    assert "人工确认发布" in out["message"], "绝不自动发布(docs §自动运行)"
+
+
+def test_step_exhausted_after_max_iterations(store, monkeypatch):
+    s = _open(store)
+    plan = {"satisfied": False, "verdict": "还差点", "pick": None,
+            "next": {"factor_names": ["ma20_bias"]}, "reason": "再试"}
+    for i in range(3):
+        s = store.get(s["session_id"])
+        _run_step(s, run_status="succeeded" if i else None,
+                  run_result=_result() if i else None,
+                  start_run=lambda cfg: f"run{i}", plan=plan if i else None,
+                  monkeypatch=monkeypatch if i else None)
+    s = store.get(s["session_id"])
+    out = _run_step(s, run_status="succeeded", run_result=_result(),
+                    plan=plan, monkeypatch=monkeypatch)
+    assert out["action"] == ap.STEP_DONE
+    assert out["session"]["status"] == "exhausted"
+    assert "3 轮" in out["message"]
+
+
+def test_step_failed_run_aborts_session(store, monkeypatch):
+    s = _open(store)
+    _run_step(s, start_run=lambda cfg: "runA")
+    s = store.get(s["session_id"])
+    out = _run_step(s, run_status="failed")
+    assert out["action"] == ap.STEP_ERROR
+    assert out["session"]["status"] == "failed"
+
+
+def test_step_surfaces_ai_error_without_closing(store, monkeypatch):
+    s = _open(store)
+    _run_step(s, start_run=lambda cfg: "runA")
+    s = store.get(s["session_id"])
+    out = _run_step(s, run_status="succeeded", run_result=_result(),
+                    plan={"error": "未配置 AI"}, monkeypatch=monkeypatch)
+    assert out["action"] == ap.STEP_ERROR and "未配置 AI" in out["message"]
+    assert store.get(s["session_id"])["status"] == "open", "AI 挂了不该判会话死刑, 可重试"
+
+
+def test_step_is_noop_on_closed_session(store, monkeypatch):
+    s = _open(store)
+    store.set_status(s["session_id"], "satisfied")
+    out = _run_step(store.get(s["session_id"]), start_run=lambda cfg: pytest.fail("不该再跑"))
+    assert out["action"] == ap.STEP_DONE

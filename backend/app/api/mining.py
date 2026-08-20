@@ -29,6 +29,7 @@ from app.services.mining_jobs import (
     MiningRunStoreError,
     MiningRunValidationError,
 )
+from app.services import mining_autopilot, mining_autopilot_store
 from app.services.mining_preflight import (
     mining_availability,
     require_mining_availability,
@@ -734,3 +735,130 @@ def _mean(values: Sequence[Any] | Any) -> float | None:
 def _minimum(values: Sequence[Any] | Any) -> float | None:
     finite = [number for value in values if (number := _finite(value)) is not None]
     return min(finite) if finite else None
+
+
+# ── [fork 增强] R31 AI 自动挖掘: 拿上一轮结果反馈给 AI, 由它重配参数再跑一轮 ──
+#
+# 单一入口 /step 驱动整个闭环: 手动点一次调一次, 自动模式就是前端定时轮询它。
+# 严格串行 —— 任一时刻最多一个挖掘 run(docs/mining.md §任务与资源隔离)。
+# 绝不自动发布 —— 选出赢家即停, 等人工确认(§自动运行)。
+
+class AutopilotStartRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    asset_type: Literal["stock", "etf"] = "stock"
+    start: date
+    end: date
+    holdout_days: int = Field(mining_autopilot.DEFAULT_HOLDOUT_DAYS, ge=90, le=1095)
+    budget_profile: Literal["balanced", "strict"] = "balanced"
+    max_iterations: int = Field(
+        mining_autopilot.DEFAULT_MAX_ITERATIONS, ge=1, le=mining_autopilot.MAX_ITERATIONS_CAP)
+    factor_names: list[str] = Field(default_factory=list, max_length=48)
+    commission_pct: float = Field(0.0002, ge=0.0, le=0.05, allow_inf_nan=False)
+    stamp_tax_pct: float = Field(0.0005, ge=0.0, le=0.05, allow_inf_nan=False)
+    slippage_bps: float = Field(5.0, ge=0.0, le=1000.0, allow_inf_nan=False)
+
+    @field_validator("start", "end", mode="before")
+    @classmethod
+    def _iso(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            try:
+                return date.fromisoformat(value)
+            except ValueError as exc:
+                raise ValueError("dates must use ISO YYYY-MM-DD format") from exc
+        return value
+
+
+def _factor_catalog() -> list[dict[str, Any]]:
+    """喂给 AI 的因子清单(id + 中文名), 不带其他实现细节。"""
+    return [{"id": str(f["id"]), "name": str(f.get("label") or f["id"])} for f in FACTOR_COLUMNS]
+
+
+def _autopilot_session_or_404(session_id: str) -> dict[str, Any]:
+    session = mining_autopilot_store.get(session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="autopilot session not found")
+    return session
+
+
+@router.get("/autopilot/sessions")
+def autopilot_sessions() -> dict[str, Any]:
+    return {"items": mining_autopilot_store.list_sessions()}
+
+
+@router.get("/autopilot/sessions/{session_id}")
+def autopilot_session(session_id: str) -> dict[str, Any]:
+    return _autopilot_session_or_404(session_id)
+
+
+@router.post("/autopilot/sessions")
+def autopilot_start(payload: AutopilotStartRequest, request: Request) -> dict[str, Any]:
+    """开一个自动挖掘会话。窗口切分 + 真实交易日预检都在这里把关, 免得第一轮才失败。"""
+    try:
+        windows = mining_autopilot.split_windows(
+            payload.start, payload.end,
+            holdout_days=payload.holdout_days, budget_profile=payload.budget_profile)
+        # 粗筛过了还要按 enriched 真实交易日精确核验(docs §置信度: balanced/strict 需 3 个 outer 折)
+        require_mining_availability(
+            request.app.state.repo.store.data_dir,
+            asset_type=payload.asset_type,
+            budget_profile=payload.budget_profile,
+            start=windows["search_start"],
+            end=windows["search_end"],
+        )
+    except (ValueError, MiningRunValidationError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    factors = [f for f in payload.factor_names if f in _FACTOR_IDS]
+    base_config = {
+        "asset_type": payload.asset_type,
+        "budget_profile": payload.budget_profile,
+        # 首轮因子: 用户没指定就把全清单交给 AI 之后的轮次去挑, 首轮先用全量跑个底
+        "factor_names": factors or [str(f["id"]) for f in FACTOR_COLUMNS][:48],
+        "commission_pct": payload.commission_pct,
+        "stamp_tax_pct": payload.stamp_tax_pct,
+        "slippage_bps": payload.slippage_bps,
+        "correlation_threshold": 0.75,
+        "max_combination_factors": 4,
+        "beam_width": 12,
+    }
+    return mining_autopilot_store.create(
+        asset_type=payload.asset_type, windows=windows,
+        max_iterations=payload.max_iterations, base_config=base_config)
+
+
+@router.post("/autopilot/sessions/{session_id}/step")
+async def autopilot_step(session_id: str, request: Request) -> dict[str, Any]:
+    """推进一格: 等待中 / 判上一轮并开新一轮 / 收工。手动与自动共用这一个入口。"""
+    session = _autopilot_session_or_404(session_id)
+    manager = _manager(request)
+
+    run_status: str | None = None
+    run_result: dict[str, Any] | None = None
+    iterations = session.get("iterations") or []
+    if iterations and iterations[-1].get("run_id"):
+        run_id = str(iterations[-1]["run_id"])
+        manifest = manager.store.get(run_id)
+        if manifest:
+            run_status = str(manifest.get("status") or "")
+            if run_status in SUCCESS_RUN_STATUSES:
+                try:
+                    run_result = get_result(run_id, request)
+                except HTTPException:
+                    run_result = None
+
+    def start_run(config: dict[str, Any]) -> str:
+        worker_request = {k: v for k, v in config.items()}
+        worker_request["start"] = str(config["start"])
+        worker_request["end"] = str(config["end"])
+        fingerprint = build_data_fingerprint(
+            request.app.state.repo, request.app.state, worker_request)
+        # force=True: 同配置复用旧 run 会让循环原地打转 —— 每轮都要真跑
+        manifest = manager.start(worker_request, fingerprint, force=True, source="autopilot")
+        return str(manifest["run_id"])
+
+    out = await mining_autopilot.step(
+        session=session, factor_catalog=_factor_catalog(),
+        run_status=run_status, run_result=run_result,
+        start_run=start_run, base_config=session["base_config"])
+    return {"action": out["action"], "message": out["message"], "session": out["session"]}
