@@ -838,7 +838,9 @@ class QuoteService:
         from app.tickflow.client import get_realtime_client_pool
         from app.tickflow.capabilities import Cap
         from app.tickflow.policy import detect_capabilities
-        from app.tickflow.rate_limits import chunked, resolve_limit, sleep_between_batches
+        from app.tickflow.rate_limits import (
+            chunked, resolve_limit, shuffled_key_order, sleep_between_batches, spread_delays,
+        )
 
         symbols = preferences.get_realtime_watchlist_symbols()
         # 指数监控规则标的并入轮询 (与股票共享 batch 额度)
@@ -880,19 +882,30 @@ class QuoteService:
 
         # 免费多 key 池化: 把每组(≤5 只)轮流分给池中不同的 key,突破单免费 key 的
         # 5 只上限(总额度 5×key数)。单 key 时 pool 只有 1 个,退化为原逻辑。
+        #
+        # [R35] 不再让所有 key 背靠背打成一个突发, 而是把这一轮摊开在窗口内并加抖动:
+        #   - 刷新变成连续滚动, 不是"一跳一跳"整块更新
+        #   - 一次网络抖动只毁掉一批(5 只), 不再整轮一起失败
+        #   - key 与批次的映射每轮重洗, 免得某个 key 出问题时永远是同几只受害
+        # 抖动只会让间隔变大不会变小, 同一 key 的调用间隔仍 >= 60/rpm, 额度约束不变。
+        delays = spread_delays(len(batches), n_keys, lim.rpm)
+        key_order = shuffled_key_order(n_keys, len(batches))
         t0 = time.perf_counter()
         now_ts = time.perf_counter()
         resp = []
         for i, batch in enumerate(batches):
             # 按「每个 key 自己的第几次调用」限速(i // n_keys),而非全局批次序号 ——
-            # 不同 key 之间额度独立,可同轮并发,不该互相拖慢;只有同一 key 的连续调用才需间隔。
+            # 不同 key 之间额度独立,不该互相拖慢;只有同一 key 的连续调用才需间隔。
             sleep_between_batches(i // n_keys, lim.rpm)
-            client = pool[i % n_keys]
+            if delays[i] > 0:
+                time.sleep(delays[i])
+            key_idx = key_order[i]
+            client = pool[key_idx]
             try:
                 resp.extend(client.quotes.get(symbols=batch) or [])
             except Exception as e:  # noqa: BLE001
                 logger.warning("自选实时批次 %d/%d 拉取失败(key #%d): %s",
-                               i + 1, len(batches), i % n_keys + 1, e)
+                               i + 1, len(batches), key_idx + 1, e)
 
         if not resp:
             logger.warning("自选实时行情数据为空")

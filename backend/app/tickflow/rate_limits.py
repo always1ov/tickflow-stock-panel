@@ -5,10 +5,11 @@ TickFlow-backed services. It intentionally does not manage custom data sources.
 """
 from __future__ import annotations
 
+import random
 import threading
 import time
 from dataclasses import dataclass
-from typing import TypeVar
+from typing import Any, TypeVar
 
 from app.tickflow.capabilities import Cap, CapabilitySet
 
@@ -122,3 +123,56 @@ def sleep_between_batches(index: int, rpm: int | None, *, default_interval: floa
 def min_batch(preferred: int, limit: ResolvedLimit) -> int:
     """Clamp a user-preferred batch size by a resolved capability batch limit."""
     return min(preferred, limit.batch) if limit.batch else preferred
+
+
+# ── [fork 增强] R35 多 key 轮询的错峰与抖动 ──
+
+def spread_delays(
+    n_batches: int,
+    n_keys: int,
+    rpm: int | None,
+    *,
+    jitter: float = 0.35,
+    rng: Any = None,
+) -> list[float]:
+    """多 key 池化时, 每批调用前该等多久(秒)。
+
+    原来同一轮里 n_keys 批是背靠背打出去的(一个突发), 打完再干等一个窗口。
+    改成把这些调用摊开在窗口内, 并给每次间隔加随机抖动, 好处是:
+      - 刷新变成连续滚动, 而不是"一跳一跳"地整块更新
+      - 一次网络抖动只毁掉一批(5 只), 不再整轮 70 只一起失败
+      - 不与其他客户端形成同步节拍, 避免共振式的重试风暴
+
+    额度约束不变: 抖动系数恒为 [1, 1+jitter], 只会让间隔变大不会变小, 所以同一个
+    key 两次调用的实际间隔始终 >= 60/rpm。
+    """
+    if n_batches <= 0:
+        return []
+    n_keys = max(1, int(n_keys))
+    window = batch_interval(rpm, default=0.0)
+    if window <= 0:
+        return [0.0] * n_batches
+    base = window / n_keys
+    r = rng or random.Random()
+    # 第 0 批不等 —— 一轮总要有人先开口, 否则每轮白白多等一个间隔
+    return [0.0] + [round(base * (1.0 + r.random() * jitter), 4)
+                    for _ in range(n_batches - 1)]
+
+
+def shuffled_key_order(n_keys: int, n_batches: int, rng: Any = None) -> list[int]:
+    """每批用第几个 key。每轮重新洗牌, 而不是固定 i % n_keys。
+
+    固定映射会让同一组标的永远由同一个 key 拉取; 一旦某个 key 出问题(限流/失效),
+    受影响的永远是那几只。打散之后失败面在轮次之间随机分布, 更容易被察觉,
+    也不会让某几只长期拿不到数据。
+    """
+    n_keys = max(1, int(n_keys))
+    if n_batches <= 0:
+        return []
+    r = rng or random.Random()
+    order: list[int] = []
+    while len(order) < n_batches:
+        chunk = list(range(n_keys))
+        r.shuffle(chunk)
+        order.extend(chunk)
+    return order[:n_batches]
