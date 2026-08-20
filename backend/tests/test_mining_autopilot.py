@@ -11,15 +11,15 @@ FACTORS = {"momentum_20d", "ma20_bias", "turnover_rate", "volume_ratio", "amplit
 # ---------- 窗口切分: 终检段必须真的锁出来 ----------
 
 def test_split_windows_carves_holdout_off_the_tail():
-    w = ap.split_windows(date(2022, 1, 1), date(2026, 8, 20), holdout_days=365)
+    w = ap.split_windows(date(2021, 1, 1), date(2026, 8, 20), holdout_days=365)
     assert w["holdout_end"] == date(2026, 8, 20)
     assert w["holdout_start"] == date(2025, 8, 21)
     assert w["search_end"] == date(2025, 8, 20), "搜索窗口必须在终检段开始前一天截止"
-    assert w["search_start"] == date(2022, 1, 1)
+    assert w["search_start"] == date(2021, 1, 1)
 
 
 def test_split_windows_never_overlaps():
-    w = ap.split_windows(date(2020, 1, 1), date(2026, 8, 20))
+    w = ap.split_windows(date(2019, 1, 1), date(2026, 8, 20))
     assert w["search_end"] < w["holdout_start"], "两段不得有一天重叠 —— 重叠就等于泄题"
 
 
@@ -33,9 +33,41 @@ def test_split_windows_rejects_inverted_range():
         ap.split_windows(date(2026, 8, 20), date(2026, 1, 1))
 
 
-def test_split_windows_floors_holdout_at_90_days():
-    w = ap.split_windows(date(2020, 1, 1), date(2026, 8, 20), holdout_days=5)
-    assert (w["holdout_end"] - w["holdout_start"]).days + 1 == 90
+def test_split_windows_floors_holdout():
+    w = ap.split_windows(date(2018, 1, 1), date(2026, 8, 20), holdout_days=5)
+    assert (w["holdout_end"] - w["holdout_start"]).days + 1 == ap.MIN_HOLDOUT_DAYS
+
+
+# [docs/mining.md §自动运行] 自动挖掘只允许 balanced / strict
+def test_split_windows_rejects_exploratory_profile():
+    with pytest.raises(ValueError, match="档位"):
+        ap.split_windows(date(2018, 1, 1), date(2026, 8, 20), budget_profile="exploratory")
+
+
+def test_split_windows_search_floor_is_profile_aware():
+    """strict 需要的历史比 balanced 长得多, 同一区间可能 balanced 过、strict 不过。"""
+    start, end = date(2021, 1, 1), date(2026, 8, 20)
+    ap.split_windows(start, end, budget_profile="balanced")   # 不抛
+    with pytest.raises(ValueError, match="strict"):
+        ap.split_windows(start, end, budget_profile="strict")
+
+
+# ---------- 赢家解析: 必须走 signature ----------
+
+def test_resolve_pick_matches_signature_first():
+    cands = [{"signature": "abc123", "name": "组合A", "达标": True, "样本外Sharpe": 0.6},
+             {"signature": "def456", "name": "组合B", "达标": True, "样本外Sharpe": 1.9}]
+    assert ap.resolve_pick("abc123", cands)["name"] == "组合A", "按 signature 精确匹配"
+
+
+def test_resolve_pick_falls_back_to_name_then_rules():
+    cands = [{"signature": "abc123", "name": "组合A", "达标": False, "样本外Sharpe": 2.0},
+             {"signature": "def456", "name": "组合B", "达标": True, "样本外Sharpe": 0.6}]
+    assert ap.resolve_pick("组合A", cands)["signature"] == "abc123", "AI 回了 name 也认"
+    got = ap.resolve_pick("编造的signature", cands)
+    assert got["signature"] == "def456", "对不上就规则兜底(达标优先), 不凭字面值构造定义"
+    assert ap.resolve_pick(None, cands)["signature"] == "def456"
+    assert ap.resolve_pick("abc", []) is None
 
 
 # ---------- 结果摘要 ----------

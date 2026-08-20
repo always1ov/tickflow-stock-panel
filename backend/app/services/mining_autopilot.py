@@ -15,6 +15,18 @@
 循环结束后, 赢家在终检窗口上只跑一次 —— 那个数字才是可信的。
 同时记录迭代次数: 试的次数越多, 同样的 Sharpe 越该打折, 界面要如实显示。
 
+**与 docs/mining.md 的对齐点(不得违反)**
+- §自动运行「自动任务只生成 pending 结果, 永远不会自动发布策略」——
+  本循环同样绝不调 publish。选定赢家后停在那里, 等人工确认发布。
+- §功能边界「不生成任意公式, 不接受 AI 自由代码」——
+  AI 的输出只有"选哪些因子 id"和几个受控数值参数, 全部经白名单与夹紧。
+- §保存与发布「客户端只能提交 run ID 与 candidate signature」——
+  赢家一律按 signature 标识, 不靠 name(可能重名)。
+- §任务与资源隔离「挖掘独占 2 个重任务槽位」—— 迭代必须严格串行, 一次一个 run。
+- §自动运行「只允许 balanced 或 strict」—— 本循环沿用同一档位白名单。
+- 终检不是再跑一轮挖掘(那要再花 786/1164 个交易日), 而是人工发布后对该策略
+  在锁定期跑一次普通回测。
+
 纯函数在前(可单测), 编排在后。
 """
 from __future__ import annotations
@@ -26,14 +38,22 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-# 终检窗口长度(自然日)。365 天 ≈ 245 个交易日, 够探索档(219 根)跑一次终检。
+# 终检窗口长度(自然日)。终检是"发布后跑一次普通回测", 不是再跑一轮挖掘,
+# 所以不受 786/1164 根交易日的挖掘门槛约束; 一年足够给出可信的单次样本外结论。
 DEFAULT_HOLDOUT_DAYS = 365
-MIN_SEARCH_DAYS = 400          # 搜索窗口再短就没意义了, 直接拒绝开局
+MIN_HOLDOUT_DAYS = 180
+# 搜索窗口下限(自然日): balanced 需 786 个交易日 ≈ 1185 自然日, strict 需 1164 ≈ 1756。
+# 这里只做粗筛把明显不够的挡在门外; 精确判定必须走 mining_preflight 的
+# require_mining_availability(它按 enriched 真实交易日算), API 层负责调。
+MIN_SEARCH_DAYS = {"balanced": 1185, "strict": 1756}
 MAX_ITERATIONS_CAP = 20        # 硬上限: 不许无限刷样本外
 DEFAULT_MAX_ITERATIONS = 8
 _MAX_CANDIDATES_TO_AI = 6      # 每轮喂给 AI 的候选数, 太多会淹没重点
 
-_PROFILES = ("exploratory", "balanced", "strict")
+# [docs/mining.md §自动运行] 周度自动挖掘"只允许 balanced 或 strict"。自动循环沿用
+# 同一条规矩: exploratory 结果固定为低置信度、只能存 pending 且**不能发布**,
+# 让 AI 选它等于白烧一轮预算。
+PROFILES = ("balanced", "strict")
 
 _AI_SYSTEM = """你是量化因子研究员, 负责驱动一个自动挖掘循环。
 
@@ -46,6 +66,7 @@ _AI_SYSTEM = """你是量化因子研究员, 负责驱动一个自动挖掘循�
 - 样本外 Sharpe >= 0.5
 - 最大回撤不差于 -0.25
 - 成交笔数 >= 60
+- 档位只能是 balanced 或 strict(exploratory 结果不能发布, 选它等于白跑)
 
 重要纪律:
 1. 你看到的是**搜索窗口**的指标。系统另外锁了一段终检数据你永远看不到,
@@ -55,14 +76,16 @@ _AI_SYSTEM = """你是量化因子研究员, 负责驱动一个自动挖掘循�
    不要为了"再好一点"继续刷。
 3. 因子要挑不同类的(动量/均线乖离/成交量/波动/资金…)。同类堆一起是虚假多样性,
    系统的相关性过滤会把它们剔掉, 白费预算。
-4. 只能使用给定清单里的因子 id, 不得编造。
+4. 只能使用给定清单里的因子 id, 不得编造。系统不接受任何公式、权重、方向或代码 ——
+   你的输出只有"选哪些因子"和几个受控数值参数, 其余一律由系统按自己的口径计算。
+5. 你的判断不会自动发布任何策略。选定赢家后仍需人工确认发布, 这一步你无权代劳。
 
 只输出 JSON, 不要任何解释文字或代码块标记:
 {"satisfied": true|false,
  "verdict": "一两句话说清这轮结果怎么样, 大白话",
- "pick": "满意时填选中候选的 name, 不满意填 null",
+ "pick": "满意时填选中候选的 signature(原样照抄, 不要改写), 不满意填 null",
  "next": {"factor_names": ["id1","id2",...],
-          "budget_profile": "exploratory|balanced|strict",
+          "budget_profile": "balanced|strict",
           "max_combination_factors": 2-4,
           "beam_width": 4-32,
           "correlation_threshold": 0.5-0.95},
@@ -72,21 +95,26 @@ _AI_SYSTEM = """你是量化因子研究员, 负责驱动一个自动挖掘循�
 
 # ---------- 纯函数: 窗口切分 ----------
 
-def split_windows(start: date, end: date, *, holdout_days: int = DEFAULT_HOLDOUT_DAYS
-                  ) -> dict[str, date]:
+def split_windows(start: date, end: date, *, holdout_days: int = DEFAULT_HOLDOUT_DAYS,
+                  budget_profile: str = "balanced") -> dict[str, date]:
     """把区间切成 搜索窗口 + 终检窗口(锁定的尾段)。
 
-    终检窗口是循环全程看不到的那段; 搜索窗口太短直接抛错, 不给"凑合开局"的机会。
+    终检窗口是循环全程看不到的那段; 搜索窗口撑不起所选档位就直接抛错,
+    不给"凑合开局"的机会 —— 否则第一轮就会被 require_mining_availability 拒掉。
+    这里只按自然日粗筛, 精确判定由 API 层的 preflight 负责(它数真实交易日)。
     """
     if end <= start:
         raise ValueError("结束日期必须晚于开始日期")
-    holdout_days = max(90, int(holdout_days))
+    if budget_profile not in PROFILES:
+        raise ValueError(f"档位只能是 {' / '.join(PROFILES)}(探索档结果不能发布)")
+    holdout_days = max(MIN_HOLDOUT_DAYS, int(holdout_days))
     holdout_start = end - timedelta(days=holdout_days - 1)
     search_end = holdout_start - timedelta(days=1)
     search_days = (search_end - start).days + 1
-    if search_days < MIN_SEARCH_DAYS:
+    need = MIN_SEARCH_DAYS[budget_profile]
+    if search_days < need:
         raise ValueError(
-            f"搜索窗口只剩 {search_days} 天(需 >= {MIN_SEARCH_DAYS} 天) —— "
+            f"{budget_profile} 档的搜索窗口需 >= {need} 天, 现在只有 {search_days} 天 —— "
             f"把开始日期往前挪, 或调小终检窗口"
         )
     return {
@@ -109,6 +137,8 @@ def summarize_candidates(result: dict | None, *, limit: int = _MAX_CANDIDATES_TO
             continue
         gate = c.get("gate") or {}
         out.append({
+            # [docs/mining.md §保存与发布] 赢家一律按 signature 标识, name 只给人看
+            "signature": c.get("signature"),
             "name": c.get("name"),
             "定义": _definition_text(c.get("definition")),
             "达标": bool(gate.get("qualified")),
@@ -133,8 +163,25 @@ def _definition_text(definition: Any) -> str:
     return str(sid) if sid else "—"
 
 
+def resolve_pick(pick: str | None, candidates: list[dict]) -> dict | None:
+    """把 AI 的 pick 解析成候选。
+
+    [docs/mining.md §保存与发布] 客户端只能提交 run_id + candidate signature,
+    所以先按 signature 精确匹配; AI 若图省事回了 name 就退一步按 name 匹配;
+    都对不上(编造/改写)就交给规则兜底, 绝不凭 AI 的字面值去构造任何定义。
+    """
+    if pick:
+        for c in candidates:
+            if str(c.get("signature") or "") == pick:
+                return c
+        for c in candidates:
+            if str(c.get("name") or "") == pick:
+                return c
+    return pick_best(candidates)
+
+
 def pick_best(candidates: list[dict]) -> dict | None:
-    """规则兜底选优: 先看达标, 再看 Sharpe。AI 没给 pick 时用这个。"""
+    """规则兜底选优: 先看达标, 再看 Sharpe。AI 没给 pick 或给错时用这个。"""
     if not candidates:
         return None
     return max(
@@ -192,7 +239,7 @@ def parse_plan(text: str, valid_factors: set[str]) -> dict:
             profile = str(nxt.get("budget_profile") or "").strip()
             plan = {
                 "factor_names": names,
-                "budget_profile": profile if profile in _PROFILES else "balanced",
+                "budget_profile": profile if profile in PROFILES else "balanced",
                 "max_combination_factors": _clamp_int(nxt.get("max_combination_factors"), 2, 4, 4),
                 "beam_width": _clamp_int(nxt.get("beam_width"), 4, 32, 12),
                 "correlation_threshold": _clamp_float(
