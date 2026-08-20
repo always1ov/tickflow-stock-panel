@@ -2570,6 +2570,14 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
+  // [fork 增强] R35 每轮随机启用几个 key(0 = 全部)
+  realtimeKeysPerRound: () =>
+    request<{ count: number; total_keys: number }>(
+      '/api/settings/preferences/realtime-keys-per-round'),
+  setRealtimeKeysPerRound: (count: number) =>
+    request<{ count: number; total_keys: number }>(
+      '/api/settings/preferences/realtime-keys-per-round',
+      { method: 'PUT', body: JSON.stringify({ count }) }),
   miningRuns: () =>
     request<{ items: MiningRun[] }>('/api/backtest/mining/runs'),
 

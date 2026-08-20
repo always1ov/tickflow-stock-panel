@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Key,
@@ -15,8 +15,10 @@ import {
   Save,
   Check,
   HelpCircle,
+  Shuffle,
 } from 'lucide-react'
 import { api } from '@/lib/api'
+import { toast } from '@/components/Toast'
 import { useCapabilities, useSettings } from '@/lib/useSharedQueries'
 import { QK } from '@/lib/queryKeys'
 import { CAP_LABELS, tierTextStyle, tierStyle, tierBaseName, ALL_TIERS, TierTag } from '@/lib/capability-labels'
@@ -307,6 +309,9 @@ export function TickFlowKeyConfig() {
               </details>
             )}
           </Card>
+
+          {/* [R35] 多 key 时的每轮启用数 —— 只有配了 2 个以上才有意义 */}
+          <KeysPerRoundCard />
         </div>
       </div>
 
@@ -437,5 +442,77 @@ function Card({ icon: Icon, title, badge, right, children }: CardProps) {
       </div>
       {children}
     </section>
+  )
+}
+
+
+/**
+ * [fork 增强] R35 每轮随机启用几个 key。
+ *
+ * 只在配了多个 key 时显示 —— 单 key 没有可选的余地。
+ * 调小相当于每轮给额度留白: 摊开后一轮正好铺满限速窗口, 余量几乎为零,
+ * 某批响应慢或重试时同一 key 的下次调用可能落进窗口内; 少用几个就谁都不贴上限跑。
+ */
+function KeysPerRoundCard() {
+  const queryClient = useQueryClient()
+  const [draft, setDraft] = useState<string | null>(null)
+
+  const cfg = useQuery({
+    queryKey: ['realtime-keys-per-round'],
+    queryFn: () => api.realtimeKeysPerRound(),
+    staleTime: 60_000,
+  })
+  const save = useMutation({
+    mutationFn: (count: number) => api.setRealtimeKeysPerRound(count),
+    onSuccess: () => {
+      setDraft(null)
+      queryClient.invalidateQueries({ queryKey: ['realtime-keys-per-round'] })
+      toast('已保存', 'success')
+    },
+    onError: e => toast(String((e as Error).message || e), 'error'),
+  })
+
+  const total = cfg.data?.total_keys ?? 0
+  if (total < 2) return null   // 单 key 无从选起
+
+  const current = cfg.data?.count ?? 0
+  const value = draft ?? String(current)
+  const effective = Number(value) > 0 ? Math.min(Number(value), total) : total
+
+  return (
+    <Card icon={Shuffle} title="每轮启用的 Key 数">
+      <div className="px-5 pb-5 space-y-3">
+        <p className="text-[11px] leading-relaxed text-secondary">
+          自选实时每轮从 {total} 个 Key 里随机抽一部分用，其余这轮闲着、下轮重抽。
+          <span className="text-foreground">填 0 表示全部用上。</span>
+          调小相当于给额度留白——摊开后一轮正好铺满限速窗口，余量几乎为零，
+          某批响应慢或重试时同一个 Key 的下次调用可能挤进窗口内；少用几个就谁都不贴着上限跑，
+          单个 Key 失效时也只影响它被抽中的那些轮次。
+        </p>
+
+        <div className="flex items-center gap-2">
+          <input
+            type="number" min={0} max={total} value={value}
+            onChange={e => setDraft(e.target.value)}
+            className="h-9 w-24 rounded-input border border-border bg-base px-2 text-sm font-mono text-foreground focus:border-accent focus:outline-none"
+          />
+          <span className="text-xs text-muted">/ {total} 个</span>
+          <button
+            onClick={() => save.mutate(Number(value) || 0)}
+            disabled={save.isPending || draft === null}
+            className="ml-auto inline-flex h-9 items-center gap-1.5 rounded-btn bg-accent px-3 text-xs font-medium text-white disabled:opacity-40"
+          >
+            {save.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+            保存
+          </button>
+        </div>
+
+        <p className="text-[11px] text-muted">
+          当前生效：每轮 <span className="font-mono text-foreground">{effective}</span> 个 Key
+          · 一轮最多覆盖 <span className="font-mono text-foreground">{effective * 5}</span> 只自选
+          {current === 0 && <span className="ml-1 text-muted/70">(0 = 全部)</span>}
+        </p>
+      </div>
+    </Card>
   )
 }
