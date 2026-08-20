@@ -37,24 +37,39 @@ STATE_ACTION: dict[str, str] = {
 }
 
 
-def action_text(state: str | None, up_pivot: float | None, dn_pivot: float | None) -> str:
-    """操作建议代入具体关键点价位(语义沿用 STATE_ACTION 原版,拒绝"上一关键点"式模糊指代)。
+def action_text(state: str | None, up_pivot: float | None, dn_pivot: float | None,
+                flip_down: float | None = None, flip_up: float | None = None) -> str:
+    """操作建议代入具体价位。
 
-    关键点缺失时回退原版模板文案。
+    [R29] 上涨/下跌趋势里改用「翻转触发价」而不是关键点 —— 趋势途中 up_pivot 就是
+    本轮最高收盘价, 创新高当天等于当日收盘, 说"突破它加仓"等于没给价位。
+    真正前瞻的是"跌到多少就掉出上涨趋势"。四个中间态的关键点本就是触发价, 沿用。
+
+    价位缺失时回退原版模板文案。
     """
     up = f"{up_pivot:.2f}" if up_pivot is not None else None
     dn = f"{dn_pivot:.2f}" if dn_pivot is not None else None
+    fd = f"{flip_down:.2f}" if flip_down is not None else None
+    fu = f"{flip_up:.2f}" if flip_up is not None else None
     if state == "UT":
+        if fd:
+            return f"顺势持有多头 / 收盘跌破 {fd} 才转弱" + (f",跌破 {dn} 转空" if dn else "")
         return f"顺势持有多头 / 突破 {up} 可金字塔加仓" if up else STATE_ACTION["UT"]
     if state == "NR":
-        return f"观望,上破 {up} 确认转多" if up else STATE_ACTION["NR"]
+        base = f"观望,上破 {up} 确认转多" if up else STATE_ACTION["NR"]
+        return base + (f";跌破 {fd} 重回回撤" if fd else "")
     if state == "SR":
-        return f"不动作(上破 {up} 才确认转多)" if up else STATE_ACTION["SR"]
+        base = f"不动作(上破 {up} 才确认转多)" if up else STATE_ACTION["SR"]
+        return base + (f";跌破 {fd} 重回回撤" if fd else "")
     if state == "SREA":
-        return f"不动作(下破 {dn} 才确认转空)" if dn else STATE_ACTION["SREA"]
+        base = f"不动作(下破 {dn} 才确认转空)" if dn else STATE_ACTION["SREA"]
+        return base + (f";站上 {fu} 转回升" if fu else "")
     if state == "NREA":
-        return f"观望,下破 {dn} 确认转空" if dn else STATE_ACTION["NREA"]
+        base = f"观望,下破 {dn} 确认转空" if dn else STATE_ACTION["NREA"]
+        return base + (f";站上 {fu} 转回升" if fu else "")
     if state == "DT":
+        if fu:
+            return f"顺势持有空头 / 收盘站上 {fu} 才转强" + (f",站上 {up} 转多" if up else "")
         return f"顺势持有空头 / 跌破 {dn} 可加空" if dn else STATE_ACTION["DT"]
     return ""
 
@@ -65,6 +80,29 @@ DEFAULT_THRESHOLD = 0.06
 
 # 回测阈值网格:3% ~ 15%,步长 1%
 GRID_THRESHOLDS = [round(0.03 + 0.01 * i, 2) for i in range(13)]
+
+
+def _flip_prices(state: str | None, hi: float, lo: float,
+                 up_piv: float | None, dn_piv: float | None,
+                 threshold: float) -> tuple[float | None, float | None]:
+    """[R29] 当前状态下「跌破转弱 / 站上转强」的两条触发价。
+
+    直接对应状态机的判定式, 不是另算一套:
+      多头侧(UT/NR/SR): 收盘 ≤ 本轮最高 ×(1-阈值) → 掉进回撤态;
+                        NR/SR 另有 收盘 > 上关键点 → 确认上涨趋势。
+      空头侧(DT/NREA/SREA): 收盘 ≥ 本轮最低 ×(1+阈值) → 转进回升态;
+                        NREA/SREA 另有 收盘 < 下关键点 → 确认下跌趋势。
+    已是最强(UT)/最弱(DT)的那一侧没有更进一步的状态, 返回 None。
+    """
+    if state in ("UT", "NR", "SR"):
+        flip_dn = hi * (1 - threshold)
+        flip_up = up_piv if state in ("NR", "SR") else None
+        return flip_dn, flip_up
+    if state in ("DT", "NREA", "SREA"):
+        flip_up = lo * (1 + threshold)
+        flip_dn = dn_piv if state in ("NREA", "SREA") else None
+        return flip_dn, flip_up
+    return None, None
 
 
 def compute(closes: list[float], dates: list[str], threshold: float = DEFAULT_THRESHOLD) -> dict:
@@ -114,6 +152,7 @@ def compute(closes: list[float], dates: list[str], threshold: float = DEFAULT_TH
                     lo = p
                 elif st == "DT":
                     dn_piv = min(dn_piv if dn_piv is not None else p, p)
+        flip_dn, flip_up = _flip_prices(st, hi, lo, up_piv, dn_piv, threshold)
         steps.append({
             "i": i,
             "date": dates[i] if dates else str(i),
@@ -122,6 +161,13 @@ def compute(closes: list[float], dates: list[str], threshold: float = DEFAULT_TH
             "state": st,
             "up_pivot": round(up_piv, 4) if up_piv is not None else None,
             "dn_pivot": round(dn_piv, 4) if dn_piv is not None else None,
+            # [R29] 状态翻转触发价 —— 收盘跌破 flip_down 转弱 / 站上 flip_up 转强。
+            # 上涨趋势里 up_pivot 会退化成"本轮最高收盘"(创新高当天就等于当日收盘,
+            # 当触发价看等于没给价位), 真正前瞻的是这两条。
+            "flip_down": round(flip_dn, 4) if flip_dn is not None else None,
+            "flip_up": round(flip_up, 4) if flip_up is not None else None,
+            "leg_high": round(hi, 4),
+            "leg_low": round(lo, 4),
             "flipped": prev != st,
         })
 

@@ -249,6 +249,13 @@ export interface TrendInfo {
   entered_from_cn: string | null
   up_pivot: number | null
   dn_pivot: number | null
+  /** [R29] 收盘跌破即转弱的价位。趋势途中 up_pivot 退化成本轮最高收盘价, 这条才前瞻 */
+  flip_down?: number | null
+  /** [R29] 收盘站上即转强的价位 */
+  flip_up?: number | null
+  /** [R29] 本轮高/低水位收盘价(上关键点在趋势态下就等于 leg_high) */
+  leg_high?: number | null
+  leg_low?: number | null
   close: number
   as_of: string
   signal: '转多' | '转空' | '回升' | '回撤' | null

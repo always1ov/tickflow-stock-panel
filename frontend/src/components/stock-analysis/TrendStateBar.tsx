@@ -76,10 +76,25 @@ export function TrendStateBar({ symbol, trend }: { symbol: string; trend: TrendD
           {trend.signal}
         </span>
       )}
-      <span className="text-[11px] font-mono text-muted">
-        上关键点 <span className="text-bull/90">{trend.up_pivot?.toFixed(2) ?? '—'}</span>
-        <span className="mx-1.5 text-muted/40">|</span>
-        下关键点 <span className="text-bear/90">{trend.dn_pivot?.toFixed(2) ?? '—'}</span>
+      {/* [R29] 主打「跌破转弱 / 站上转强」两条翻转触发价 —— 趋势途中上关键点就是
+          本轮最高收盘价(创新高当天等于当日收盘), 当触发价看没有参考价值。
+          关键点降级为悬停可见的参考信息。 */}
+      <span
+        className="text-[11px] font-mono text-muted"
+        title={`本轮最高收盘 ${trend.leg_high?.toFixed(2) ?? '—'} · 本轮最低收盘 ${trend.leg_low?.toFixed(2) ?? '—'}\n上关键点 ${trend.up_pivot?.toFixed(2) ?? '—'} · 下关键点 ${trend.dn_pivot?.toFixed(2) ?? '—'}\n阈值 ${(trend.threshold * 100).toFixed(0)}%`}
+      >
+        {trend.flip_down != null && (
+          <>跌破 <span className="text-bear/90">{trend.flip_down.toFixed(2)}</span> 转弱</>
+        )}
+        {trend.flip_down != null && trend.flip_up != null && <span className="mx-1.5 text-muted/40">|</span>}
+        {trend.flip_up != null && (
+          <>站上 <span className="text-bull/90">{trend.flip_up.toFixed(2)}</span> 转强</>
+        )}
+        {trend.flip_down == null && trend.flip_up == null && (
+          <>上关键点 <span className="text-bull/90">{trend.up_pivot?.toFixed(2) ?? '—'}</span>
+            <span className="mx-1.5 text-muted/40">|</span>
+            下关键点 <span className="text-bear/90">{trend.dn_pivot?.toFixed(2) ?? '—'}</span></>
+        )}
       </span>
       <span className="text-[11px] text-amber-300/90">{trend.action}</span>
       <button

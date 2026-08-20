@@ -402,7 +402,12 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
                       {r.trend ? (
                         <span
                           className={`inline-flex whitespace-nowrap rounded border px-1.5 py-0.5 text-[10px] ${trendBadgeCls(r.trend.state)}`}
-                          title={`${r.trend.state_cn}(${r.trend.state_en})· 第 ${r.trend.duration} 天,自 ${r.trend.since}\n上关键点 ${r.trend.up_pivot?.toFixed(2) ?? '—'} / 下关键点 ${r.trend.dn_pivot?.toFixed(2) ?? '—'}\n${r.trend.action}${r.trend.signal ? `\n近期信号:${r.trend.signal} — ${r.trend.signal_desc}` : ''}${r.trend.intraday ? '\n⚠ 盘中临时口径:实时价参与判定,收盘确认为准' : ''}`}
+                          title={`${r.trend.state_cn}(${r.trend.state_en})· 第 ${r.trend.duration} 天,自 ${r.trend.since}\n${
+                            // [R29] 先给翻转触发价(真正要盯的位), 关键点/高低水位作参考
+                            [r.trend.flip_down != null ? `跌破 ${r.trend.flip_down.toFixed(2)} 转弱` : '',
+                             r.trend.flip_up != null ? `站上 ${r.trend.flip_up.toFixed(2)} 转强` : '']
+                              .filter(Boolean).join(' / ') || '暂无翻转触发价'
+                          }\n参考:本轮最高收盘 ${r.trend.leg_high?.toFixed(2) ?? '—'} · 上关键点 ${r.trend.up_pivot?.toFixed(2) ?? '—'} / 下关键点 ${r.trend.dn_pivot?.toFixed(2) ?? '—'}\n${r.trend.action}${r.trend.signal ? `\n近期信号:${r.trend.signal} — ${r.trend.signal_desc}` : ''}${r.trend.intraday ? '\n⚠ 盘中临时口径:实时价参与判定,收盘确认为准' : ''}`}
                         >
                           {r.trend.state_cn} {r.trend.duration}天{r.trend.intraday ? <span className="ml-0.5 opacity-70">*</span> : null}
                         </span>

@@ -137,10 +137,20 @@ def get_levels(
         from app.services.livermore_service import trend_for_symbol
         trend = trend_for_symbol(request.app.state.repo, symbol)
         lv_points = []
-        if trend.get("up_pivot"):
+        # [R29] 翻转触发价优先画 —— 趋势途中上关键点就是本轮最高收盘价, 贴着现价
+        # 画一条线没有参考价值; "跌到多少掉出上涨趋势"才是要盯的位置。
+        if trend.get("flip_down"):
+            lv_points.append({"value": float(trend["flip_down"]), "label": "六态跌破转弱",
+                              "type": "livermore", "side": "support", "strength": "strong"})
+        if trend.get("flip_up"):
+            lv_points.append({"value": float(trend["flip_up"]), "label": "六态站上转强",
+                              "type": "livermore", "side": "resistance", "strength": "strong"})
+        # 关键点仍画, 但趋势态里它与翻转价重合/贴现价时会被上面两条盖过, 不重复添加
+        seen = {round(p["value"], 4) for p in lv_points}
+        if trend.get("up_pivot") and round(float(trend["up_pivot"]), 4) not in seen:
             lv_points.append({"value": float(trend["up_pivot"]), "label": "六态上关键点",
                               "type": "livermore", "side": "resistance", "strength": "strong"})
-        if trend.get("dn_pivot"):
+        if trend.get("dn_pivot") and round(float(trend["dn_pivot"]), 4) not in seen:
             lv_points.append({"value": float(trend["dn_pivot"]), "label": "六态下关键点",
                               "type": "livermore", "side": "support", "strength": "strong"})
         levels["livermore"] = lv_points

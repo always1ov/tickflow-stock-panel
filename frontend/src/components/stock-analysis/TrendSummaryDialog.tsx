@@ -173,8 +173,9 @@ export function TrendSummaryDialog({ items, trends, onClose }: {
                     持续时间 {durDir === 'desc' ? <ArrowDown className="h-2.5 w-2.5" /> : <ArrowUp className="h-2.5 w-2.5" />}
                   </button>
                 </th>
-                <th className="px-2 py-1.5 font-normal text-right">上关键点</th>
-                <th className="px-2 py-1.5 font-normal text-right">下关键点</th>
+                {/* [R29] 换成翻转触发价: 趋势途中上关键点=本轮最高收盘, 贴着现价没参考价值 */}
+                <th className="px-2 py-1.5 font-normal text-right" title="收盘跌破即转弱(上涨/回升态: 本轮最高×(1-阈值); 回撤态: 下关键点)">跌破转弱</th>
+                <th className="px-2 py-1.5 font-normal text-right" title="收盘站上即转强(回撤/下跌态: 本轮最低×(1+阈值); 回升态: 上关键点)">站上转强</th>
                 <th className="px-4 py-1.5 font-normal text-center">近期信号</th>
               </tr>
             </thead>
@@ -194,8 +195,14 @@ export function TrendSummaryDialog({ items, trends, onClose }: {
                     </span>
                   </td>
                   <td className="px-2 py-1.5 text-right font-mono tabular-nums text-foreground">{r.trend.duration} 交易日</td>
-                  <td className="px-2 py-1.5 text-right font-mono tabular-nums text-red-400/80">{r.trend.up_pivot?.toFixed(2) ?? '—'}</td>
-                  <td className="px-2 py-1.5 text-right font-mono tabular-nums text-emerald-400/80">{r.trend.dn_pivot?.toFixed(2) ?? '—'}</td>
+                  <td className="px-2 py-1.5 text-right font-mono tabular-nums text-emerald-400/80"
+                    title={`本轮最高收盘 ${r.trend.leg_high?.toFixed(2) ?? '—'} · 上关键点 ${r.trend.up_pivot?.toFixed(2) ?? '—'}`}>
+                    {r.trend.flip_down?.toFixed(2) ?? '—'}
+                  </td>
+                  <td className="px-2 py-1.5 text-right font-mono tabular-nums text-red-400/80"
+                    title={`本轮最低收盘 ${r.trend.leg_low?.toFixed(2) ?? '—'} · 下关键点 ${r.trend.dn_pivot?.toFixed(2) ?? '—'}`}>
+                    {r.trend.flip_up?.toFixed(2) ?? '—'}
+                  </td>
                   <td className="px-4 py-1.5 text-center">
                     {r.trend.signal ? (
                       <span className="text-[10px] text-amber-300" title={r.trend.signal_desc ?? undefined}>{r.trend.signal}</span>
@@ -242,8 +249,8 @@ function buildExportHtml(
         <td><b style="color:${stateColor(r.trend.state)}">${esc(r.trend.state_cn)}</b></td>
         <td class="num">${r.trend.duration} 交易日</td>
         <td class="num">${esc(r.trend.since)}</td>
-        <td class="num" style="color:${bullColor}">${r.trend.up_pivot?.toFixed(2) ?? '—'}</td>
-        <td class="num" style="color:${bearColor}">${r.trend.dn_pivot?.toFixed(2) ?? '—'}</td>
+        <td class="num" style="color:${bearColor}">${r.trend.flip_down?.toFixed(2) ?? '—'}</td>
+        <td class="num" style="color:${bullColor}">${r.trend.flip_up?.toFixed(2) ?? '—'}</td>
         <td>${r.trend.signal ? `<b>${esc(r.trend.signal)}</b> <span class="dim">${esc(r.trend.signal_desc ?? '')}</span>` : '—'}</td>
       </tr>`).join('')
   const chips = STATES.map((s) =>
@@ -294,7 +301,7 @@ function buildExportHtml(
   <table>
     <thead><tr>
       <th>股票名称</th><th class="num">现价</th><th>所处状态</th><th class="num">持续时间</th>
-      <th class="num">状态起始</th><th class="num">上关键点</th><th class="num">下关键点</th><th>近期信号</th>
+      <th class="num">状态起始</th><th class="num">跌破转弱</th><th class="num">站上转强</th><th>近期信号</th>
     </tr></thead>
     <tbody>${trs}
     </tbody>
