@@ -96,17 +96,22 @@ export function MiningAutopilot() {
     onError: e => { setAuto(false); toast(String((e as Error).message || e), 'error') },
   })
 
-  // 自动模式 = 定时轮询同一个 step; 上一轮还在跑时后端返回 running, 不会重复起 run
+  // 自动模式 = 定时轮询同一个 step; 上一轮还在跑时后端返回 running, 不会重复起 run。
+  //
+  // 依赖只能取原始值(session_id / status), 不能直接依赖 active 对象 ——
+  // 每次查询刷新(轮询回来、窗口聚焦重取、staleTime 过期)都会产生新的对象引用,
+  // 依赖整个对象会让定时器被反复销毁重建、倒计时永远归零, 自动模式可能一直不触发。
   const stepRef = useRef(step)
   stepRef.current = step
+  const activeId = active?.session_id
+  const activeStatus = active?.status
   useEffect(() => {
-    if (!auto || !active || active.status !== 'open') return
-    const id = active.session_id
+    if (!auto || !activeId || activeStatus !== 'open') return
     const timer = setInterval(() => {
-      if (!stepRef.current.isPending) stepRef.current.mutate(id)
+      if (!stepRef.current.isPending) stepRef.current.mutate(activeId)
     }, POLL_MS)
     return () => clearInterval(timer)
-  }, [auto, active])
+  }, [auto, activeId, activeStatus])
 
   const busy = step.isPending || start.isPending
   const closed = !!active && active.status !== 'open'
