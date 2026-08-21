@@ -798,3 +798,138 @@ def test_the_look_prompt_explains_the_refresh_channel():
     """不写清楚的话模型不知道自己可以要新数据, 只会默默用旧信号。"""
     assert "refresh" in run.LOOK_PROMPT
     assert "已过期" in run.LOOK_PROMPT and str(run.MAX_REFRESH) in run.LOOK_PROMPT
+
+
+# ---------- [R68] 账本文件: 操作员不该凭空消失 ----------
+#
+# 这一组守的是一个真实发生过的事故: 建了三个操作员, 点了一下"改定时", 剩一个。
+# 链条是这样的 ——
+#   1. <input type="time"> 打一个时间会连发好几个 PUT;
+#   2. 服务端同步路由跑在线程池里, 几个请求同时 write_text 同一个文件 ——
+#      write_text 是先清空再写, 撞上就是一个半截的 JSON;
+#   3. 读的那一侧把 JSON 解析失败**当成空账本**, 于是下一次保存写回去的是一份
+#      "只剩当前这个人"的文件。前两步只是短暂的损坏, 第 3 步才是永久的删除。
+
+def test_a_broken_ledger_never_reads_as_empty():
+    """最要命的一条: 读不出来必须报错, 不能当成"一个操作员都没有"。
+
+    返回空的话, 紧接着的一次保存就把其他人连同他们几个月的账一起覆盖没了,
+    而且全程没有任何报错 —— 这正是操作员会凭空消失的那条路。
+    """
+    pt.create(name="a", profile_id="p")
+    pt._path().write_text("{ 半截的 json", encoding="utf-8")
+    pt._path().with_name(pt._path().name + ".bak").unlink(missing_ok=True)
+
+    with pytest.raises(pt.StoreError):
+        pt.list_traders()
+
+
+def test_a_broken_ledger_falls_back_to_the_backup():
+    """每次写之前都留一份上一次的完整内容, 坏了顶多丢最后一次改动。"""
+    a = pt.create(name="a", profile_id="p")
+    pt.create(name="b", profile_id="p")          # 这一次写入会把含 a 的那份备份下来
+    pt._path().write_text("{ 半截的 json", encoding="utf-8")
+
+    names = [t["name"] for t in pt.list_traders()]
+    assert names == ["a"], "主文件坏了要退到备份, 而不是当成空的"
+    assert a["id"] in [t["id"] for t in pt.list_traders()]
+
+
+def test_a_broken_ledger_does_not_get_overwritten():
+    """报错之后就该停在那儿 —— 不能顺手写一份新的把现场毁掉。"""
+    pt.create(name="a", profile_id="p")
+    pt.create(name="b", profile_id="p")
+    broken = "{ 半截的 json"
+    pt._path().write_text(broken, encoding="utf-8")
+    pt._path().with_name(pt._path().name + ".bak").unlink(missing_ok=True)
+
+    with pytest.raises(pt.StoreError):
+        pt.create(name="c", profile_id="p")
+    assert pt._path().read_text(encoding="utf-8") == broken
+
+
+def test_saving_never_drops_the_other_traders_under_concurrency():
+    """并发写不能把人写没。
+
+    锁 + 原子落盘之前, 这个测试会挂在"少了几个人"上; 挂不挂取决于线程怎么排,
+    所以这里跑得密一点。
+    """
+    import threading
+
+    ids = [pt.create(name=f"m{i}", profile_id="p")["id"] for i in range(6)]
+
+    def _hammer(tid: str) -> None:
+        # 刻意用 get→改→save 这条老路子: 定时跑和跑一次走的就是它
+        for i in range(12):
+            t = pt.get(tid)
+            assert t is not None
+            t["max_positions"] = (i % 20) + 1
+            pt.save(t)
+
+    threads = [threading.Thread(target=_hammer, args=(tid,)) for tid in ids]
+    for th in threads:
+        th.start()
+    for th in threads:
+        th.join()
+
+    got = {t["id"] for t in pt.list_traders()}
+    assert got == set(ids), f"并发写之后少了人: 少了 {set(ids) - got}"
+
+
+def test_creating_traders_concurrently_keeps_all_of_them():
+    """开人也是"读—改—写": 两个人同时开, 后写的会把前一个盖掉。"""
+    import threading
+
+    def _make(i: int) -> None:
+        pt.create(name=f"m{i}", profile_id="p")
+
+    threads = [threading.Thread(target=_make, args=(i,)) for i in range(pt.MAX_TRADERS)]
+    for th in threads:
+        th.start()
+    for th in threads:
+        th.join()
+
+    assert len(pt.list_traders()) == pt.MAX_TRADERS
+
+
+def test_the_trader_cap_holds_under_concurrency():
+    """名额检查和写入分开做的话, 同时来的两个会双双通过检查。"""
+    import threading
+
+    errors: list[Exception] = []
+
+    def _make(i: int) -> None:
+        try:
+            pt.create(name=f"m{i}", profile_id="p")
+        except ValueError as e:
+            errors.append(e)
+
+    threads = [threading.Thread(target=_make, args=(i,)) for i in range(pt.MAX_TRADERS + 6)]
+    for th in threads:
+        th.start()
+    for th in threads:
+        th.join()
+
+    assert len(pt.list_traders()) == pt.MAX_TRADERS
+    assert len(errors) == 6
+
+
+def test_saving_a_deleted_trader_does_not_bring_him_back():
+    """一次决策要跑好几分钟, 这中间我完全来得及把这个操作员删掉。
+
+    照写的话他会连同一整本账重新冒出来 —— 比"这次没保存"更难解释。
+    """
+    t = pt.create(name="a", profile_id="p")
+    held = pt.get(t["id"])                      # 手上捧着的那份副本
+    assert pt.delete(t["id"]) is True
+
+    pt.save(held)
+    assert pt.list_traders() == []
+
+
+def test_mutate_reports_a_missing_trader_instead_of_creating_one():
+    called: list[int] = []
+    got, _ = pt.mutate("没有这个人", lambda t: called.append(1))
+    assert got is None
+    assert called == []
+    assert pt.list_traders() == []

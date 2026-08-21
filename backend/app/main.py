@@ -512,6 +512,17 @@ async def capability_denied_handler(request: Request, exc: CapabilityDenied) -> 
         content={"detail": str(exc), "suggestion": exc.suggestion},
     )
 
+
+# [fork 增强] R68 操盘手账本读不出来 → 503, 而且**不写**。
+# 这个 handler 存在的意义不在于状态码好看, 而在于让那条路走到"报错"为止:
+# 读不出来时如果按空账本继续跑, 下一次保存就会把其他操作员一起覆盖掉。
+from app.services.paper_trader import StoreError as _PaperStoreError
+
+
+@app.exception_handler(_PaperStoreError)
+async def paper_store_error_handler(request: Request, exc: _PaperStoreError) -> JSONResponse:
+    return JSONResponse(status_code=503, content={"detail": str(exc)})
+
 # 生产期静态文件(前端 dist)
 _static = Path(settings.static_dir)
 if _static.exists():

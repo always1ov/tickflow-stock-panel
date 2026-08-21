@@ -24,8 +24,11 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
+import threading
 import uuid
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -74,6 +77,24 @@ def now_iso() -> str:
     return datetime.now(UTC).isoformat(timespec="seconds")
 
 
+class StoreError(RuntimeError):
+    """账本文件读不出来。
+
+    单独立一个异常, 是因为**这里绝不能"读不出来就当空的"**: 一次
+    ``_read() -> {"traders": []}`` 加上紧接着的一次 ``save()``, 写回去的就是一份
+    只剩当前这一个操作员的文件 —— 其他人连同他们跑了几个月的账一起没了, 而且
+    没有任何报错。宁可这一次请求失败, 也不能让它安静地覆盖掉。
+    """
+
+
+# [R68] 所有"读—改—写"都在这把锁里做。
+#
+# 同步路由跑在 FastAPI 的线程池里, 定时任务跑在调度器的线程里 —— 它们本来就
+# 会同时进来。而前端一个 <input type="time"> 打一次时间会连发好几个请求
+# (小时段、分钟段各算一次改动), 所以"同时两个写"不是极端情况, 是日常。
+_LOCK = threading.RLock()
+
+
 def _path() -> Path:
     from app.config import settings
     p = settings.data_dir / "user_data" / "paper_traders.json"
@@ -81,20 +102,81 @@ def _path() -> Path:
     return p
 
 
+def _parse(p: Path) -> dict:
+    data = json.loads(p.read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        raise ValueError("账本文件顶层不是对象")
+    return data
+
+
 def _read() -> dict:
     p = _path()
     if not p.exists():
         return {"traders": []}
     try:
-        data = json.loads(p.read_text(encoding="utf-8"))
-    except Exception as e:  # noqa: BLE001
-        logger.warning("paper_traders.json malformed: %s", e)
-        return {"traders": []}
-    return data if isinstance(data, dict) else {"traders": []}
+        return _parse(p)
+    except Exception as exc:  # noqa: BLE001
+        # 主文件坏了先找备份 —— 备份是上一次写入前的完整内容, 顶多丢最后一次改动
+        bak = p.with_name(p.name + ".bak")
+        if bak.exists():
+            try:
+                data = _parse(bak)
+                logger.warning("paper_traders.json 损坏(%s), 已回退到 .bak", exc)
+                return data
+            except Exception as bak_exc:  # noqa: BLE001
+                logger.warning("paper_traders.json.bak 也读不出来: %s", bak_exc)
+        raise StoreError(
+            f"操盘手账本文件读不出来({exc})。原文件保留在 {p}, "
+            f"备份在 {bak} —— 修好或删掉之前不会往里写东西, 免得把剩下的也覆盖没了。"
+        ) from exc
 
 
 def _write(data: dict) -> None:
-    _path().write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+    """原子落盘: 先写同目录的临时文件, fsync 之后再 os.replace 换过去。
+
+    原先直接 ``write_text`` 是**先清空再写**: 两个线程同时写、或者写到一半进程
+    被停掉, 留在盘上的就是一个半截的 JSON。而半截的 JSON 恰好会被读取那一侧
+    当成"空账本", 于是下一次保存就把人删干净了 —— 这正是操作员会凭空消失的
+    那条路。os.replace 在同一文件系统上是原子的: 要么还是旧的那份, 要么是完整
+    的新的那份, 不存在中间态。
+    """
+    p = _path()
+    payload = json.dumps(data, indent=2, ensure_ascii=False)
+    # 换之前留一份上一次的完整内容, 万一哪天还是坏了有得退
+    if p.exists():
+        try:
+            p.with_name(p.name + ".bak").write_text(p.read_text(encoding="utf-8"),
+                                                    encoding="utf-8")
+        except Exception as e:  # noqa: BLE001
+            logger.warning("备份 paper_traders.json 失败: %s", e)
+    tmp = p.with_name(f"{p.name}.{os.getpid()}.{threading.get_ident()}.tmp")
+    try:
+        with tmp.open("w", encoding="utf-8") as fh:
+            fh.write(payload)
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(tmp, p)
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
+def mutate(trader_id: str, fn: Callable[[dict], Any]) -> tuple[dict | None, Any]:
+    """在锁里"读—找到这个人—改—写", 返回 (改完的操作员, fn 的返回值)。
+
+    改操作员必须走这里, 不能"先 get 出来放着, 隔一会儿再 save": 中间隔的那段
+    时间里别人的改动会被 save 里那份旧副本盖掉(一次 AI 决策要跑好几分钟, 这
+    中间人完全来得及去改设置)。
+    """
+    with _LOCK:
+        data = _read()
+        rows = [t for t in data.get("traders") or [] if isinstance(t, dict)]
+        for t in rows:
+            if t.get("id") == trader_id:
+                out = fn(t)
+                _trim(t)
+                _write({**data, "traders": rows})
+                return t, out
+        return None, None
 
 
 # ================================================================
@@ -118,9 +200,6 @@ def create(*, name: str, profile_id: str, capital: float = DEFAULT_CAPITAL,
 
     ``capital`` 是**两本账各自**的初始资金(开的时候给同一个数, 之后可以分别改)。
     """
-    rows = list_traders()
-    if len(rows) >= MAX_TRADERS:
-        raise ValueError(f"最多 {MAX_TRADERS} 个操作员")
     cap = float(capital or DEFAULT_CAPITAL)
     if cap <= 0:
         raise ValueError("初始资金要大于 0")
@@ -137,8 +216,13 @@ def create(*, name: str, profile_id: str, capital: float = DEFAULT_CAPITAL,
         "enabled": True,
         "created_at": now_iso(),
     }
-    rows.append(trader)
-    _write({"traders": rows})
+    # 名额检查和写入必须在同一把锁里 —— 分开做的话两个人同时开会双双通过检查
+    with _LOCK:
+        rows = list_traders()
+        if len(rows) >= MAX_TRADERS:
+            raise ValueError(f"最多 {MAX_TRADERS} 个操作员")
+        rows.append(trader)
+        _write({"traders": rows})
     return trader
 
 
@@ -188,23 +272,39 @@ def book(trader: dict, scope: str) -> dict:
     return bk
 
 
-def save(trader: dict) -> dict:
-    rows = [t for t in list_traders() if t.get("id") != trader.get("id")]
+def _trim(trader: dict) -> None:
     for b in (trader.get("books") or {}).values():
         b["orders"] = (b.get("orders") or [])[-MAX_ORDERS:]
         b["nav_history"] = (b.get("nav_history") or [])[-MAX_NAV_POINTS:]
-    rows.append(trader)
-    rows.sort(key=lambda t: str(t.get("created_at") or ""))
-    _write({"traders": rows})
+
+
+def save(trader: dict) -> dict:
+    """把这一个操作员写回去, 其余人原样保留。
+
+    **人已经被删掉了就不写** —— 一次决策要跑好几分钟, 这中间我完全来得及把
+    这个操作员删掉; 照写的话他会连同一整本账重新冒出来, 比不保存更难解释。
+    """
+    tid = trader.get("id")
+    with _LOCK:
+        rows = list_traders()
+        if not any(t.get("id") == tid for t in rows):
+            logger.info("操作员 %s 已被删除, 跳过这次保存", tid)
+            return trader
+        _trim(trader)
+        rows = [t for t in rows if t.get("id") != tid]
+        rows.append(trader)
+        rows.sort(key=lambda t: str(t.get("created_at") or ""))
+        _write({"traders": rows})
     return trader
 
 
 def delete(trader_id: str) -> bool:
-    rows = list_traders()
-    keep = [t for t in rows if t.get("id") != trader_id]
-    if len(keep) == len(rows):
-        return False
-    _write({"traders": keep})
+    with _LOCK:
+        rows = list_traders()
+        keep = [t for t in rows if t.get("id") != trader_id]
+        if len(keep) == len(rows):
+            return False
+        _write({"traders": keep})
     return True
 
 
@@ -214,14 +314,14 @@ def reset(trader_id: str, scope: str | None = None) -> dict | None:
     单独给一个"重置"而不是让人删了重建: 删掉的话名字、模型、初始资金都要
     重填一遍, 而重新起跑正是这个功能的常规操作(改了系统就想再看一轮)。
     """
-    t = get(trader_id)
-    if t is None:
-        return None
-    # 重置只是回到起跑线, **不改本金** —— 我改过的设置不该被一次重置抹掉
-    for sc in (SCOPES if scope is None else (scope,)):
-        cap = float(book(t, sc)["initial_capital"])
-        t["books"][sc] = new_book(cap)
-    return save(t)
+    def _do(t: dict) -> None:
+        # 重置只是回到起跑线, **不改本金** —— 我改过的设置不该被一次重置抹掉
+        for sc in (SCOPES if scope is None else (scope,)):
+            cap = float(book(t, sc)["initial_capital"])
+            t["books"][sc] = new_book(cap)
+
+    t, _ = mutate(trader_id, _do)
+    return t
 
 
 # ================================================================

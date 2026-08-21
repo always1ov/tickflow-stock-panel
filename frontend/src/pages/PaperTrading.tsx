@@ -8,7 +8,7 @@
  * 界面上刻意不做「所有人持仓一览」: 那样我看完再去调提示词, 就把操作员之间的
  * 隔离破坏掉了。列表只给成绩, 明细要点进某一个人才看得到。
  */
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Bot, Clock, Eye, Loader2, Play, Plus, RotateCcw, ShieldAlert, Trash2, TrendingUp, X,
@@ -20,6 +20,31 @@ import { PageHeader } from '@/components/PageHeader'
 import { toast } from '@/components/Toast'
 
 const INPUT = 'h-8 w-full rounded-input border border-border bg-surface px-2 text-xs text-foreground outline-none transition-colors focus:border-accent'
+
+/**
+ * [R68] 输入框改动先在本地生效, 停手一会儿再发请求。
+ *
+ * 起因是个真的会丢数据的 bug: `<input type="time">` 打一个时间会分好几次
+ * onChange(时段一次、分段一次), 每次都发一个 PUT —— 服务端同时几个请求在写
+ * 同一个账本文件, 写坏了就有操作员凭空消失。服务端那边已经上锁 + 原子落盘,
+ * 这里再把"一次修改就发一个请求"收掉: 改成 14:30 本来就该是一次保存, 不是四次
+ * (中间那几次还会把定时短暂地设到 01:30 这种莫名其妙的时间上)。
+ */
+function useDebouncedField<T>(remote: T, commit: (v: T) => void, delay = 600) {
+  const [local, setLocal] = useState(remote)
+  const dirty = useRef(false)
+  // commit 每次渲染都是新函数, 放进依赖会让计时器一直被重置, 所以走 ref
+  const commitRef = useRef(commit)
+  commitRef.current = commit
+  // 服务端的值变了(别处改的 / 保存成功后回填)且本地没在编辑, 就跟过去
+  useEffect(() => { if (!dirty.current) setLocal(remote) }, [remote])
+  useEffect(() => {
+    if (!dirty.current) return
+    const id = setTimeout(() => { dirty.current = false; commitRef.current(local) }, delay)
+    return () => clearTimeout(id)
+  }, [local, delay])
+  return [local, (v: T) => { dirty.current = true; setLocal(v) }] as const
+}
 
 function pct(v: number | null | undefined, digits = 2): string {
   return v == null ? '—' : `${v > 0 ? '+' : ''}${(v * 100).toFixed(digits)}%`
@@ -177,6 +202,19 @@ function TraderCard({ t, runningScope, onRun, onLifeline, onOpen, onChanged }: {
     onError: e => toast(String((e as Error).message || e), 'error'),
   })
   const sched = t.schedule
+  // 停手 0.6 秒才发 —— 打一个时间会触发好几次 onChange, 一次改动只该保存一次
+  const [maxPos, setMaxPos] = useDebouncedField(t.max_positions, v => {
+    if (Number.isFinite(v) && v >= 1 && v !== t.max_positions) setSettings.mutate(v)
+  })
+  const [timeText, setTimeText] = useDebouncedField(
+    `${String(sched.hour).padStart(2, '0')}:${String(sched.minute).padStart(2, '0')}`,
+    v => {
+      const [h, m] = v.split(':').map(Number)
+      if (!Number.isFinite(h) || !Number.isFinite(m)) return
+      if (h === sched.hour && m === sched.minute) return
+      setSched.mutate({ ...sched, hour: h, minute: m })
+    },
+  )
 
   return (
     <section className="flex flex-col rounded-card border border-border bg-surface">
@@ -188,12 +226,9 @@ function TraderCard({ t, runningScope, onRun, onLifeline, onOpen, onChanged }: {
         <label className="flex shrink-0 items-center gap-1 text-[10px] text-muted"
           title="同时最多持有几只。只挡新开的仓, 已有持仓加仓不受限">
           最多持有
-          <input type="number" min={1} max={50} disabled={setSettings.isPending}
-            value={t.max_positions}
-            onChange={e => {
-              const v = Number(e.target.value)
-              if (Number.isFinite(v) && v >= 1) setSettings.mutate(v)
-            }}
+          <input type="number" min={1} max={50}
+            value={maxPos}
+            onChange={e => setMaxPos(Number(e.target.value))}
             className="h-6 w-12 rounded-input border border-border bg-surface px-1 text-center text-[10px] text-foreground outline-none focus:border-accent" />
           只
         </label>
@@ -215,12 +250,9 @@ function TraderCard({ t, runningScope, onRun, onLifeline, onOpen, onChanged }: {
             onChange={e => setSched.mutate({ ...sched, enabled: e.target.checked })} />
           每个交易日自动跑
         </label>
-        <input type="time" disabled={setSched.isPending}
-          value={`${String(sched.hour).padStart(2, '0')}:${String(sched.minute).padStart(2, '0')}`}
-          onChange={e => {
-            const [h, m] = e.target.value.split(':').map(Number)
-            if (Number.isFinite(h) && Number.isFinite(m)) setSched.mutate({ ...sched, hour: h, minute: m })
-          }}
+        <input type="time"
+          value={timeText}
+          onChange={e => setTimeText(e.target.value)}
           className="h-6 rounded-input border border-border bg-surface px-1.5 text-[10px] text-foreground outline-none focus:border-accent" />
         <span className="text-[10px] text-muted">
           建议收盘后 —— 收盘价出来了才有得算。到点会先查生命线, 再让两本账各决策一次。

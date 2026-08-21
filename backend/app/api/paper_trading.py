@@ -186,11 +186,14 @@ class TraderSettingsIn(BaseModel):
 
 @router.put("/traders/{trader_id}/settings")
 def set_trader_settings(trader_id: str, req: TraderSettingsIn) -> dict[str, Any]:
-    t = pt.get(trader_id)
+    # [R68] 走 mutate 而不是 get→改→save: 改设置的请求会成串地来(输入框每动
+    # 一下算一次), 各自捧着一份旧副本回写的话, 后写的那个会把前一个盖掉
+    def _do(t: dict) -> None:
+        t["max_positions"] = pt.clamp_max_positions(req.max_positions)
+
+    t, _ = pt.mutate(trader_id, _do)
     if t is None:
         raise HTTPException(status_code=404, detail="操作员不存在")
-    t["max_positions"] = pt.clamp_max_positions(req.max_positions)
-    pt.save(t)
     return {"ok": True, "max_positions": t["max_positions"]}
 
 
@@ -205,12 +208,14 @@ def set_book_capital(trader_id: str, scope: str, req: BookCapitalIn) -> dict[str
     收益率的分母变了但历史成交还在, 那条曲线就再也读不懂了。
     """
     _scope_or_400(scope)
-    t = pt.get(trader_id)
+
+    def _do(t: dict) -> None:
+        pt.book(t, scope)                   # 确保迁移过
+        t["books"][scope] = pt.new_book(float(req.initial_capital))
+
+    t, _ = pt.mutate(trader_id, _do)
     if t is None:
         raise HTTPException(status_code=404, detail="操作员不存在")
-    pt.book(t, scope)                       # 确保迁移过
-    t["books"][scope] = pt.new_book(float(req.initial_capital))
-    pt.save(t)
     return {"ok": True, "scope": scope, "initial_capital": float(req.initial_capital)}
 
 
@@ -223,11 +228,12 @@ class ScheduleIn(BaseModel):
 
 @router.put("/traders/{trader_id}/schedule")
 def set_schedule(trader_id: str, req: ScheduleIn, request: Request) -> dict[str, Any]:
-    t = pt.get(trader_id)
+    def _do(t: dict) -> None:
+        t["schedule"] = req.model_dump()
+
+    t, _ = pt.mutate(trader_id, _do)
     if t is None:
         raise HTTPException(status_code=404, detail="操作员不存在")
-    t["schedule"] = req.model_dump()
-    pt.save(t)
     _reinstall_schedules(request)
     return {"ok": True, "schedule": t["schedule"]}
 
