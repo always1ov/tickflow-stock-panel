@@ -14,7 +14,7 @@ import {
   SlidersHorizontal, Sparkles, Sunrise, Target,
 } from 'lucide-react'
 import {
-  api, TODAY_BOARDS, type SignalAiSchedule, type TodayAiSchedule, type TodayHeat,
+  api, TODAY_BOARDS, type KeltnerVerdict, type SignalAiSchedule, type TodayAiSchedule,
   type TodayOverview, type TodayPick, type TodayPrefs,
 } from '@/lib/api'
 import { toast } from '@/components/Toast'
@@ -32,16 +32,20 @@ function buildTodayHtml(d: TodayOverview, brief: string | null): string {
   const sym = (name: string, symbol: string) =>
     symbol && symbol !== name ? ` <span class="sym">${esc(symbol)}</span>` : ''
   // [R43] 通道位置标: 到上沿用暖色(偏贵), 到下沿用冷色(低吸位置)
-  const heatStyle = (h: TodayHeat) =>
-    h.side === 'high' ? 'background:#fdf0e3;color:#c78326' : 'background:#e6f4fb;color:#1c6ea4'
-  const heatLabel = (h: TodayHeat) =>
-    h.verdict?.title ?? (h.side === 'high' ? (h.level === 'strong' ? '到上沿' : '近上沿') : '到下沿')
+  // [R47] 导出件的通道结论标: 浅色排版单独一套配色
+  const vStyle = (v: KeltnerVerdict) => ({
+    sell: 'background:#fdecec;color:#c0392b',
+    buy: 'background:#e6f4fb;color:#1c6ea4',
+    hold: 'background:#fdf0e3;color:#c78326',
+    avoid: 'background:#f0f1f3;color:#8a919f',
+    watch: 'background:#f0f1f3;color:#5b6472',
+  }[v.tone])
   const actionRows = d.actions.map(a => `
       <li><i style="background:${a.severity === 'high' ? bull : '#c78326'}"></i>
         <b>${esc(a.name)}</b>${sym(a.name, a.symbol)} ${esc(a.text)}</li>`).join('')
   const oppRows = d.opportunities.map(o => `
       <li><b class="score">${o.score}</b>
-        <span><b>${esc(o.name)}</b>${sym(o.name, o.symbol)}${o.board ? ` <span class="adv" style="background:#eef1f5;color:#5b6472">${esc(o.board)}</span>` : ''}${o.mainline ? ` <span class="adv" style="background:#f4e6f7;color:#8b3fa0">主线${o.mainline.rank}·${esc(o.mainline.member)}</span>` : ''}${o.heat ? ` <span class="adv" style="${heatStyle(o.heat)}">${heatLabel(o.heat)}</span>` : ''}${o.advice ? ` <span class="adv">${esc(o.advice.text)}</span>` : ''} ${esc(o.text)}
+        <span><b>${esc(o.name)}</b>${sym(o.name, o.symbol)}${o.board ? ` <span class="adv" style="background:#eef1f5;color:#5b6472">${esc(o.board)}</span>` : ''}${o.mainline ? ` <span class="adv" style="background:#f4e6f7;color:#8b3fa0">主线${o.mainline.rank}·${esc(o.mainline.member)}</span>` : ''}${o.verdict ? ` <span class="adv" style="${vStyle(o.verdict)}">${esc(o.verdict.title)}</span>` : ''}${o.advice ? ` <span class="adv">${esc(o.advice.text)}</span>` : ''} ${esc(o.text)}
         <span class="why">${esc(o.why)}</span>${o.advice?.plan ? `<span class="why" style="color:#1c6ea4">建仓路径:${esc(o.advice.plan)}</span>` : ''}</span></li>`).join('')
   const holdRows = d.holdings.map(h => `
       <tr>
@@ -166,31 +170,34 @@ function sessionPhaseHint(live: boolean | undefined): { label: string; hint: str
 
 // [R40] 板块徽章。20cm 的两个板(创业/科创)与 30cm 的北交所用暖色标出来 ——
 // 同一个把握分, 20cm 的票波动天然更大, 仓位不该一样。
+// [R47] 机会区的通道结论标。与决策台「结论」列、导出件同一份数据 ——
+// tone 由后端给, 界面不自己判, 三处不会各说各的。
+const VERDICT_TAG_CLS: Record<KeltnerVerdict['tone'], string> = {
+  sell: 'bg-red-400/20 text-red-300',
+  buy: 'bg-sky-400/15 text-sky-300',
+  hold: 'bg-amber-400/20 text-amber-300',
+  avoid: 'bg-border/40 text-muted',
+  watch: 'bg-border/40 text-muted',
+}
+
 /**
- * [R43] 高抛/低吸标 —— 由 Keltner 三档通道位置合成, 与决策台三列、个股分析图表、
- * 回测策略同一组口径。原来这里用的是 RSI + MA20 乖离, 已整体撤掉:
- * 界面上看到的"贴上轨"和系统据以建议减仓的"贴上轨", 现在是同一件事。
+ * 三档通道结论标 —— 挂在机会区每条候选上。
  *
- * 标签必须写明哪几档共振 —— 只显示"高位"两个字等于要用户盲信一个他没法复核的判断。
+ * 这里的语气和持仓那侧相反: 同一个"到上沿", 持仓是止盈时机, 买入是追高。
+ * 所以徽标只放结论标题, 具体怎么解读由悬停里那句话说清。
  */
-function HeatTag({ heat }: { heat?: TodayHeat | null }) {
-  if (!heat) return null
-  const high = heat.side === 'high'
-  const strong = heat.level === 'strong'
+function VerdictTag({ v }: { v?: KeltnerVerdict | null }) {
+  if (!v) return null
   return (
     <span
       title={
-        heat.verdict
-          ? `${heat.verdict.action}\n\n${heat.verdict.detail}\n\n依据:${heat.verdict.bands_text}\n\n这是「位置」结论 —— 说的是贵不贵, 不是会不会继续涨。收盘口径`
-          : `${heat.text} —— ${high ? '在通道上沿' : '在通道下沿'}。收盘口径`
+        `${v.action}\n\n${v.detail}\n\n依据:${v.bands_text}\n\n` +
+        '注意:这是买入候选, 通道位置影响的是"这一笔值不值", 与持仓侧相反 —— ' +
+        '持仓到上沿是止盈时机, 买入到上沿是追高。收盘口径。'
       }
-      className={`ml-1.5 cursor-help rounded px-1 py-0.5 text-[9px] ${
-        high
-          ? (strong ? 'bg-amber-400/20 text-amber-300' : 'bg-border/40 text-muted')
-          : 'bg-sky-400/15 text-sky-300'
-      }`}
+      className={`ml-1.5 cursor-help rounded px-1 py-0.5 text-[9px] ${VERDICT_TAG_CLS[v.tone]}`}
     >
-      {heat.verdict?.title ?? (high ? (strong ? '到上沿' : '近上沿') : '到下沿')}
+      {v.title}
     </span>
   )
 }
@@ -894,7 +901,7 @@ export function Today() {
                               {o.board}
                             </span>
                           )}
-                          <HeatTag heat={o.heat} />
+                          <VerdictTag v={o.verdict} />
                           {picked && <span className="ml-1.5 text-[9px] text-amber-300">★ AI 优选</span>}
                           {o.intraday && (
                             <span
@@ -1036,7 +1043,7 @@ export function Today() {
                         <td className="px-4 py-1.5">
                           <span className="font-medium text-foreground">{h.name}</span>
                           {h.symbol !== h.name && <span className="ml-1.5 text-[9px] font-mono text-muted">{h.symbol}</span>}
-                          <HeatTag heat={h.heat} />
+                          <VerdictTag v={h.heat?.verdict} />
                         </td>
                         <td className="px-2 py-1.5 text-right font-mono">{h.close?.toFixed(2) ?? '—'}</td>
                         <td className="px-2 py-1.5 text-right font-mono text-muted" title="在决策台持有标记旁填「仓%」后显示">

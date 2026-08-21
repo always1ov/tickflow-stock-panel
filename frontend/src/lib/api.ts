@@ -161,8 +161,8 @@ export interface TodayOpportunity {
   mainline?: TodayMainlineTag | null
   /** [R40] 板块归属(沪主板/深主板/创业板/科创板/北交所) */
   board?: string
-  /** [R43] 高抛/低吸压力; 短期档在通道内时为 null */
-  heat?: TodayHeat | null
+  /** [R47] 三档通道结论; 三档都在中部时为 null。与决策台「结论」列同一份 */
+  verdict?: KeltnerVerdict | null
 }
 
 /**

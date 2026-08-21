@@ -8,8 +8,6 @@
 """
 from __future__ import annotations
 
-import pytest
-
 from app.api.today import holding_stance
 from app.indicators import keltner as k
 
@@ -151,38 +149,5 @@ def test_behaviour_is_unchanged_without_band_data():
     assert holding_stance(False, -0.2, "多头", "buy", "转多")[0] == "加仓"
 
 
-# ---------- 机会区打分 ----------
-
-def _rank(heat):
-    from app.api.today import rank_opportunities
-
-    trends = {"600000.SH": {"signal": "转多", "signal_desc": "刚转强", "duration": 1,
-                            "state": "UT", "close": 10.0}}
-    extras = {"600000.SH": {"heat": heat}} if heat else None
-    shown, _ = rank_opportunities(trends, {}, {"600000.SH": "测试"},
-                                  min_score=0, max_show=5, extras=extras)
-    return shown[0]
-
-
-def test_resonant_upper_band_candidate_is_penalised():
-    base = _rank(None)["score"]
-    hot = _rank(_high())
-    assert hot["score"] == base - 10
-    assert "最贵的地方买" in hot["why"]
-
-
-def test_short_band_alone_is_tagged_but_not_penalised():
-    """强势趋势本来就是沿着上轨走的, 一并扣分会把系统推成专挑弱势票。"""
-    assert _rank(_high(strong=False))["score"] == _rank(None)["score"]
-    assert "贴近通道上沿" in _rank(_high(strong=False))["why"]
-
-
-def test_lower_band_candidate_is_never_penalised():
-    """贴下轨正是低吸要的位置 —— 扣它的分等于跟这个策略对着干。"""
-    assert _rank(_low())["score"] == _rank(None)["score"]
-    assert "低吸位置" in _rank(_low())["why"]
-
-
-@pytest.mark.parametrize("heat", [None])
-def test_candidates_without_bands_carry_an_explicit_none(heat):
-    assert _rank(heat)["heat"] is None, "字段要在, 值为 None —— 前端不必判断键存不存在"
+# 机会区打分在 R47 改由三档「结论」驱动(不再是 pressure 的 side/level),
+# 那部分测试见 test_today_r47_verdict_score.py。

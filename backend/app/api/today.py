@@ -151,18 +151,6 @@ def rank_opportunities(
             elif vr < 0.8:
                 score -= 12
                 why.append(f"缩量(量比 {vr:.1f}),假突破风险")
-        heat = ext.get("heat")
-        if heat:
-            # [R43] 通道位置决定追不追。短中期共振在上沿才扣分, 只有短期贴上轨
-            # 仅标注 —— 强势趋势本来就是沿着上轨走的, 一并扣分会把系统推成
-            # 专挑弱势票的偏好。贴下轨反而是这个策略要的位置, 不扣分。
-            if heat["side"] == "high" and heat["level"] == "strong":
-                score -= 10
-                why.append(f"但已到通道上沿({heat['text']}), 这个位置追进去是在最贵的地方买")
-            elif heat["side"] == "high":
-                why.append(f"已贴近通道上沿({heat['text']})")
-            else:
-                why.append(f"在通道下沿({heat['text']}), 属于低吸位置")
         win = ext.get("win")
         if win:
             wr, wn = win["rate"], win["n"]
@@ -227,10 +215,20 @@ def rank_opportunities(
 
     from app.price_limits import board_of
 
+    # [R47] 通道结论进把握分。与主线加成同样放在两个来源合并之后 —— 趋势转强与
+    # 逼近突破都该按各自的通道位置加减, 只挂在趋势那一路的话, 一只在大顶区域的
+    # AI 候选照样满分排在前面, 而它的结论标就在旁边写着"不该开新仓"。
+    # 三档都在中部时没有结论, 不加不减: 与"不在主线内不扣分"同一条原则。
     for o in opp_by_sym.values():
-        o["score"] = max(0, min(100, o["score"]))
         o["board"] = board_of(o["symbol"])
-        o["heat"] = ((extras or {}).get(o["symbol"]) or {}).get("heat")
+        vd = ((extras or {}).get(o["symbol"]) or {}).get("verdict")
+        o["verdict"] = vd
+        if vd:
+            delta, reason = _VERDICT_SCORE.get(vd["code"], (0, ""))
+            o["score"] += delta
+            if reason:
+                o["why"].append(f"{'但' if delta < 0 else ''}{vd['title']}:{reason}")
+        o["score"] = max(0, min(100, o["score"]))   # 夹到 [0,100] 放在所有加减之后
     ranked = sorted(opp_by_sym.values(), key=lambda o: (-o["score"], o["symbol"]))
     if boards:
         keep = set(boards)
@@ -267,6 +265,31 @@ def build_pyramid_plan(fraction: float, pivot: float | None,
                 f"收盘跌回{px}下方,清掉试仓、计划作废")
     return (f"先试 {cheng(probe)} → 站稳{px}{days} 日加至 {cheng(confirm)}"
             f" → 回踩不破上满 {cheng(fraction)};收盘跌回{px}下方,清掉试仓、计划作废")
+
+
+# [R47] 通道结论 → 买入候选的把握分增减。
+#
+# 这里打分的对象是**买入候选**, 所以问的是"这个通道位置让这一笔更值还是更不值"。
+# 同一个结论对持仓和对买入的含义相反 —— 持仓到上沿是止盈时机, 买入到上沿是追高,
+# 所以不能复用 holding_stance 那套。
+#
+# 幅度对齐既有因子(量比 ±8/12、胜率 ±8/12、相对强度 +8/-15、主线 +5~12),
+# 不让通道位置一项压过量价本身。
+_VERDICT_SCORE = {
+    # 越便宜越该买
+    "dip_in_uptrend": (10, "强势票深调, 是这套里最好的低吸位置"),
+    "bottom_confirmed": (8, "短中期都到下沿, 低吸分量足"),
+    "low_short_only": (4, "短期回调到下沿"),
+    "watch_low": (2, "中期已到下沿, 短期还没给入场点"),
+    # 越贵越不该追
+    "watch_high": (-5, "中期在上沿、短期已回落, 追进去两头不靠"),
+    "high_short_only": (-6, "短期已冲到上沿, 这时候买是在最贵的地方"),
+    "top_confirmed": (-12, "短中期都到上沿, 这个位置追进去是在最贵的地方买"),
+    "top_all_bands": (-15, "三档都到上沿, 大顶区域不该开新仓"),
+    # 陷阱: 出了买信号, 但位置说这是反弹/下跌途中
+    "bounce_in_downtrend": (-15, "长期还在下沿, 这是跌深了反弹而非突破 —— 买信号在这里最不可信"),
+    "falling_all_bands": (-15, "三档都在下沿的下跌途中, 越抄越套"),
+}
 
 
 # [R43] 高抛要"已经涨上来了"才谈落袋 —— 浮亏还嫌它涨太急, 是纯粹的自相矛盾
@@ -424,6 +447,7 @@ def _build_overview(repo) -> dict:
     # 收盘口径: 通道要 ATR 与均线, 实时叠加层只有价格, 拿实时价比昨天的通道
     # 会得到半新半旧的判定(结论层本来就该走收盘)。
     heat_map: dict[str, dict] = {}
+    verdict_map: dict[str, dict] = {}
     bands_map: dict[str, dict] = {}
     try:
         from app.indicators import keltner
@@ -432,14 +456,18 @@ def _build_overview(repo) -> dict:
         if want:
             bands_map = keltner_service.channels_for_symbols(repo, want)
             for sym, bands in bands_map.items():
+                # 两者分开算, 不能让 verdict 挂在 pressure 下面:
+                # pressure 要求短期到轨(它驱动持仓的挡加仓/止盈减仓),
+                # verdict 还覆盖「候选池」那档(短期在中部、中期已到下沿) ——
+                # 那正是低吸候选该有的样子, 挂在 pressure 下面就永远到不了机会区。
                 pres = keltner.pressure(bands)
                 if pres:
-                    # [R44] 把三档组合的结论一并带上 —— 今日总览的标签、决策台的
-                    # 「结论」列、悬停提示必须是同一句话, 不能各说各的
-                    v = keltner.verdict(bands)
-                    heat_map[sym] = dict(pres, verdict=v) if v else pres
+                    heat_map[sym] = pres
+                v = keltner.verdict(bands)
+                if v:
+                    verdict_map[sym] = v
     except Exception as e:  # noqa: BLE001
-        logger.debug("today keltner pressure skipped: %s", e)
+        logger.debug("today keltner skipped: %s", e)
 
     # [R20] 量价与历史胜率因子: 只为带新信号的候选算(远小于自选总数, 上限 40 只保护)
     extras: dict[str, dict] = {}
@@ -467,8 +495,6 @@ def _build_overview(repo) -> dict:
             ent: dict = {}
             if s in vol_map:
                 ent["vol_ratio"] = vol_map[s]
-            if s in heat_map:
-                ent["heat"] = heat_map[s]      # Keltner 高抛/低吸压力
             try:
                 from app.services.livermore_service import bullish_win_rate_for_symbol
                 win = bullish_win_rate_for_symbol(repo, s)
@@ -478,6 +504,12 @@ def _build_overview(repo) -> dict:
                 logger.debug("today win rate skipped for %s: %s", s, e)
             if ent:
                 extras[s] = ent
+
+    # [R47] 通道结论: 给全部自选打标, 不只 cand_syms —— 逼近突破那一路的候选
+    # 来自 AI 信号, 不在 cand_syms 里, 同样该按它的通道位置加减分。
+    # (R37 的主线打标踩过同一个坑, 这里沿用同一个写法。)
+    for sym, v in verdict_map.items():
+        extras.setdefault(sym, {})["verdict"] = v
 
     # [R37] 中观层: 主线归属 + 中观快照。给全部自选打标(不止趋势候选) ——
     # 逼近突破那一路的候选来自 AI 信号, 不在 cand_syms 里, 也该享受同一份加成。
