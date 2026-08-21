@@ -35,6 +35,7 @@ from app.api import (
     strategy,
     today,  # [fork 增强] 今日总览
     watchlist,
+    workflows,  # [fork 增强] R39 研究工作流
 )
 from app.api import auth as auth_api
 from app.api import settings as settings_api
@@ -238,6 +239,19 @@ async def _application_lifespan(app: FastAPI):
         override_loader=lambda sid: strategy_config.load_override(store.data_dir, sid),
     )
     app.state.strategy_engine = strategy_engine
+
+    # [fork 增强] R39 研究工作流节拍器: 让挖掘/回测工作流不依赖页面开着。
+    # 必须在 mining_manager 与 strategy_engine 都就绪之后起 —— 两个 driver 都要用。
+    try:
+        from app.services.workflow_runner import recover_on_boot, workflow_runner
+        closed = recover_on_boot()
+        if closed:
+            logger.info("workflow: closed %d expired workflow(s) on boot", closed)
+        workflow_runner.start(app.state)
+        app.state.workflow_runner = workflow_runner
+    except Exception as e:  # noqa: BLE001
+        logger.warning("workflow runner not started: %s", e)
+        app.state.workflow_runner = None
     logger.info("strategy engine loaded: %d strategies", len(strategy_engine.list_strategies()))
 
     matrix_prewarm_owner = MatrixCachePrewarmOwner()
@@ -341,6 +355,9 @@ async def _application_lifespan(app: FastAPI):
         mmanager = getattr(app.state, "mining_manager", None)
         if mmanager:
             mmanager.shutdown()
+        wfr = getattr(app.state, "workflow_runner", None)
+        if wfr:
+            wfr.shutdown()
         if app.state.scheduler:
             app.state.scheduler.shutdown(wait=False)
         ps = getattr(app.state, "pull_scheduler", None)
@@ -444,6 +461,7 @@ app.include_router(watchlist.router)
 app.include_router(screener.router)
 app.include_router(backtest.router)
 app.include_router(mining.router)
+app.include_router(workflows.router)  # [fork 增强] R39 研究工作流
 app.include_router(intraday.router)
 app.include_router(indices.router)
 app.include_router(overview.router)

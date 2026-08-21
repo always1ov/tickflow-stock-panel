@@ -24,6 +24,7 @@ import { BUILTIN_COLUMNS } from '@/lib/watchlist-columns'
 import { cnSignal } from '@/lib/signals'
 import { SignalPicker } from '@/components/screener/SignalPicker'
 import { currentBacktestId, startBacktest, stopBacktest, tryReconnect, useBacktestTask, waitForBacktest } from '@/lib/backtestTask'
+import { WorkflowPanel } from '@/components/backtest/WorkflowPanel'
 import { useDataStatus, useCapabilities } from '@/lib/useSharedQueries'
 import { EmptyState } from '@/components/EmptyState'
 import { WarmupBadge } from '@/components/WarmupBadge'
@@ -1876,6 +1877,22 @@ export function StrategyBacktest() {
 
       {/* 结果面板 */}
       <section className="min-w-0 space-y-3 bg-base/15 px-3 py-3 xl:overflow-y-auto">
+        {/* [R39] 工作流: 开了就不用管, 服务端自己跑到达标为止。
+            账户事实(费率/印花税/滑点/初始资金/撮合口径)从这个页面原样透传下去 ——
+            工作流跑出来的结果必须和你手动跑的是同一套口径, AI 只动策略与风控那几个旋钮。 */}
+        <WorkflowPanel
+          kind="backtest"
+          extraConfig={{
+            asset_type: assetType,
+            symbols: symbols ? symbols.split(',').map(v => v.trim()).filter(Boolean) : null,
+            commission_pct: Number(fees) / 10000,
+            stamp_tax_pct: Number(stampTax) / 1000,
+            slippage_bps: Number(slippage),
+            initial_capital: Number(initialCapital),
+            matching,
+          }}
+          hint="开了就不用管 —— 服务端自己选策略、配风控、跑回测, 一次不达标就换一套重来"
+        />
         {(pilotBusy || pilotRounds.length > 0 || pilotConclusion) && (
           <PilotTrace busy={pilotBusy} step={pilotStep}
             rounds={pilotRounds} conclusion={pilotConclusion} />

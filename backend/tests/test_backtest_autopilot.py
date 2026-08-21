@@ -86,7 +86,23 @@ def test_parse_plan_defaults_when_numbers_missing():
     text = '{"satisfied": false, "note": "默认跑", "next": {"strategy_id": "ma_cross"}}'
     plan = bp.parse_plan(text, VALID)["next"]
     assert plan == {"strategy_id": "ma_cross", "regime_states": [],
-                    "max_positions": 10, "max_exposure_pct": 100, "days": 730}
+                    "max_positions": 10, "max_exposure_pct": 100, "days": 730,
+                    "holding_days": 5, "position_sizing": "equal"}
+
+
+def test_parse_plan_clamps_the_two_new_knobs():
+    """[R39] 持仓天数与分钱方式也交给 AI 了, 同样要夹紧 + 编造的回落。"""
+    text = ('{"satisfied": false, "note": "试试", "next": {"strategy_id": "ma_cross", '
+            '"holding_days": 9999, "position_sizing": "all_in_baby"}}')
+    plan = bp.parse_plan(text, VALID)["next"]
+    assert plan["holding_days"] == 60
+    assert plan["position_sizing"] == "equal", "编造的分钱方式回落等权, 不是照单全收"
+
+
+def test_parse_plan_keeps_a_valid_sizing():
+    text = ('{"satisfied": false, "note": "试试", "next": {"strategy_id": "ma_cross", '
+            '"position_sizing": "score_weight"}}')
+    assert bp.parse_plan(text, VALID)["next"]["position_sizing"] == "score_weight"
 
 
 def test_parse_plan_satisfied_carries_conclusion():

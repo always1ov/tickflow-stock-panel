@@ -27,12 +27,13 @@ logger = logging.getLogger(__name__)
 
 MAX_ROUNDS = 5
 REGIME_STATES = ("strong", "lean_strong", "range", "lean_weak", "weak")
+POSITION_SIZINGS = ("equal", "score_weight")
 
 _SYSTEM = """你在替一个不懂量化的用户操作「策略回测」。他不会填表, 你全权代劳。
 
 每一轮你要么给出下一轮怎么配, 要么宣布够了并给结论。
 
-你只能动这五样, 其余一律不许碰(费率、撮合口径、初始资金是用户的账户事实,
+你只能动这七样, 其余一律不许碰(费率、撮合口径、初始资金是用户的账户事实,
 策略自有参数是每个策略特有的语义, 盲调等于乱试):
 - strategy_id: 从给定策略清单里选一个。
 - regime_states: 市场环境过滤, 从 strong / lean_strong / range / lean_weak / weak
@@ -41,6 +42,10 @@ _SYSTEM = """你在替一个不懂量化的用户操作「策略回测」。他�
 - max_positions: 最大同时持仓数, 3-30。
 - max_exposure_pct: 最大总仓位百分比, 20-100。
 - days: 回测区间长度(自然日), 180-1460。数据不够时系统会自动截断。
+- holding_days: 兜底持仓天数, 2-60。策略自己有 max_hold_days 时以策略的为准,
+  这个只在策略没规定时起作用。
+- position_sizing: 每笔怎么分钱 —— equal(等权, 稳) 或 score_weight(按打分加权,
+  信号强的多买, 波动更大)。
 
 判定够了的标准(全部满足):
 - 交易数 >= 30 (太少没有统计意义)
@@ -61,7 +66,8 @@ _SYSTEM = """你在替一个不懂量化的用户操作「策略回测」。他�
  "note": "一句话说这轮打算干什么 / 或这轮结果怎么样, 大白话给外行看",
  "conclusion": "满意时: 三五句话说清这个策略表现如何、风险在哪、下一步该干嘛; 不满意时填 null",
  "next": {"strategy_id": "xxx", "regime_states": ["strong"],
-          "max_positions": 10, "max_exposure_pct": 100, "days": 730}}
+          "max_positions": 10, "max_exposure_pct": 100, "days": 730,
+          "holding_days": 5, "position_sizing": "equal"}}
 """
 
 
@@ -140,12 +146,16 @@ def parse_plan(text: str, valid_strategies: set[str]) -> dict:
         if sid in valid_strategies:
             states = [str(s).strip() for s in (nxt.get("regime_states") or [])]
             states = [s for s in dict.fromkeys(states) if s in REGIME_STATES]
+            sizing = str(nxt.get("position_sizing") or "").strip()
             plan = {
                 "strategy_id": sid,
                 "regime_states": states,
                 "max_positions": _clamp(nxt.get("max_positions"), 3, 30, 10),
                 "max_exposure_pct": _clamp(nxt.get("max_exposure_pct"), 20, 100, 100),
                 "days": _clamp(nxt.get("days"), 180, 1460, 730),
+                "holding_days": _clamp(nxt.get("holding_days"), 2, 60, 5),
+                # 编造的分钱方式一律回落等权 —— 等权是最不会出意外的那个
+                "position_sizing": sizing if sizing in POSITION_SIZINGS else "equal",
             }
 
     if not satisfied and plan is None and not note:

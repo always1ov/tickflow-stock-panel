@@ -231,6 +231,26 @@ def cancel_run(run_id: str, request: Request) -> dict[str, Any]:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
+def load_run_result(store: MiningRunStore, run_id: str) -> dict[str, Any] | None:
+    """[R39] 读一个已成功 run 的完整结果; 读不到返回 None。
+
+    与 ``get_result`` 同一套读法, 但不抛 HTTP 异常 —— 后台工作流不在请求上下文里,
+    拿 HTTPException 当控制流会把它自己也带崩。
+    """
+    manifest = store.get(run_id)
+    if manifest is None or str(manifest["status"]) not in SUCCESS_RUN_STATUSES:
+        return None
+    try:
+        summary = store.read_summary(run_id)
+        frames = {
+            name: _read_registered_artifact(store, manifest, name)
+            for name in ("factors", "correlation", "candidates", "folds")
+        }
+        return _project_result(manifest, summary, frames)
+    except (MiningRunStoreError, OSError, pl.exceptions.PolarsError, ValueError):
+        return None
+
+
 @router.get("/runs/{run_id}/result")
 def get_result(run_id: str, request: Request) -> dict[str, Any]:
     store = _manager(request).store
@@ -242,23 +262,13 @@ def get_result(run_id: str, request: Request) -> dict[str, Any]:
             status_code=status_code,
             detail=f"mining result is unavailable for status {status}",
         )
-    try:
-        summary = store.read_summary(run_id)
-        frames = {
-            name: _read_registered_artifact(store, manifest, name)
-            for name in ("factors", "correlation", "candidates", "folds")
-        }
-        return _project_result(manifest, summary, frames)
-    except (
-        MiningRunStoreError,
-        OSError,
-        pl.exceptions.PolarsError,
-        ValueError,
-    ) as exc:
+    result = load_run_result(store, run_id)
+    if result is None:
         raise HTTPException(
             status_code=500,
             detail="mining result artifacts are unavailable",
-        ) from exc
+        )
+    return result
 
 
 @router.get("/runs/{run_id}/events")
@@ -865,56 +875,61 @@ def autopilot_stop(session_id: str, request: Request) -> dict[str, Any]:
             "message": "已中止" + (", 正在跑的那一轮也停了" if cancelled_run else "")}
 
 
-@router.post("/autopilot/sessions")
-def autopilot_start(payload: AutopilotStartRequest, request: Request) -> dict[str, Any]:
-    """开一个自动挖掘会话。窗口切分 + 真实交易日预检都在这里把关, 免得第一轮才失败。"""
-    try:
-        windows = mining_autopilot.split_windows(
-            payload.start, payload.end,
-            holdout_days=payload.holdout_days, budget_profile=payload.budget_profile)
-    except (ValueError, MiningRunValidationError) as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+def build_autopilot_session(
+    *, repo, asset_type: str, start: date, end: date, holdout_days: int,
+    budget_profile: str, max_iterations: int, factor_names: Sequence[str] = (),
+    commission_pct: float = 0.0002, stamp_tax_pct: float = 0.0005,
+    slippage_bps: float = 5.0,
+) -> dict[str, Any]:
+    """[R39] 开一个自动挖掘会话(窗口切分 + 真实交易日预检)。
+
+    端点和后台工作流共用这一条路径 —— 预检口径必须一模一样, 否则手动开能过、
+    工作流开却在第一轮才炸。数据不够时抛 ValueError, 消息已是给用户看的中文。
+    """
+    windows = mining_autopilot.split_windows(
+        start, end, holdout_days=holdout_days, budget_profile=budget_profile)
 
     # 粗筛过了还要按 enriched 真实交易日精确核验(docs §置信度: balanced/strict 需 3 个 outer 折)。
     # 不够时不要直接把 preflight 原文抛给用户 —— 它只会说"有效区间 xx 到 yy 只有 3 根",
     # 而用户明明填了四年区间, 看不懂。换成带真实数字和出路的中文说明。
-    data_dir = request.app.state.repo.store.data_dir
+    data_dir = repo.store.data_dir
     avail_search = mining_availability(
-        data_dir, asset_type=payload.asset_type, budget_profile=payload.budget_profile,
+        data_dir, asset_type=asset_type, budget_profile=budget_profile,
         start=windows["search_start"], end=windows["search_end"]).to_dict()
     if not avail_search.get("eligible"):
         avail_all = mining_availability(
-            data_dir, asset_type=payload.asset_type,
-            budget_profile=payload.budget_profile).to_dict()
-        raise HTTPException(status_code=400, detail=mining_autopilot.explain_insufficient_data(
+            data_dir, asset_type=asset_type, budget_profile=budget_profile).to_dict()
+        raise ValueError(mining_autopilot.explain_insufficient_data(
             avail_search=avail_search, avail_all=avail_all,
             windows={k: str(v) for k, v in windows.items()},
-            budget_profile=payload.budget_profile, holdout_days=payload.holdout_days))
+            budget_profile=budget_profile, holdout_days=holdout_days))
 
-    factors = [f for f in payload.factor_names if f in _FACTOR_IDS]
+    factors = [f for f in factor_names if f in _FACTOR_IDS]
     base_config = {
-        "asset_type": payload.asset_type,
-        "budget_profile": payload.budget_profile,
+        "asset_type": asset_type,
+        "budget_profile": budget_profile,
         # 首轮因子: 用户没指定就把全清单交给 AI 之后的轮次去挑, 首轮先用全量跑个底
         "factor_names": factors or [str(f["id"]) for f in FACTOR_COLUMNS][:48],
-        "commission_pct": payload.commission_pct,
-        "stamp_tax_pct": payload.stamp_tax_pct,
-        "slippage_bps": payload.slippage_bps,
+        "commission_pct": commission_pct,
+        "stamp_tax_pct": stamp_tax_pct,
+        "slippage_bps": slippage_bps,
         "correlation_threshold": 0.75,
         "max_combination_factors": 4,
         "beam_width": 12,
     }
     return mining_autopilot_store.create(
-        asset_type=payload.asset_type, windows=windows,
-        max_iterations=payload.max_iterations, base_config=base_config)
+        asset_type=asset_type, windows=windows,
+        max_iterations=max_iterations, base_config=base_config)
 
 
-@router.post("/autopilot/sessions/{session_id}/step")
-async def autopilot_step(session_id: str, request: Request) -> dict[str, Any]:
-    """推进一格: 等待中 / 判上一轮并开新一轮 / 收工。手动与自动共用这一个入口。"""
-    session = _autopilot_session_or_404(session_id)
-    manager = _manager(request)
+async def advance_autopilot_session(
+    session: dict[str, Any], *, manager: Any, repo: Any, app_state: Any,
+) -> dict[str, Any]:
+    """[R39] 把一个自动挖掘会话推进一格。端点与后台工作流共用。
 
+    组装 step 需要的三样东西: 上一轮 run 的状态、它的结果、以及"按这份配置起
+    一个 run"的回调。step 本身不碰 HTTP 也不碰 manager, 所以这段装配必须在外面做。
+    """
     run_status: str | None = None
     run_result: dict[str, Any] | None = None
     iterations = session.get("iterations") or []
@@ -924,23 +939,43 @@ async def autopilot_step(session_id: str, request: Request) -> dict[str, Any]:
         if manifest:
             run_status = str(manifest.get("status") or "")
             if run_status in SUCCESS_RUN_STATUSES:
-                try:
-                    run_result = get_result(run_id, request)
-                except HTTPException:
-                    run_result = None
+                run_result = load_run_result(manager.store, run_id)
 
     def start_run(config: dict[str, Any]) -> str:
         worker_request = {k: v for k, v in config.items()}
         worker_request["start"] = str(config["start"])
         worker_request["end"] = str(config["end"])
-        fingerprint = build_data_fingerprint(
-            request.app.state.repo, request.app.state, worker_request)
+        fingerprint = build_data_fingerprint(repo, app_state, worker_request)
         # force=True: 同配置复用旧 run 会让循环原地打转 —— 每轮都要真跑
         manifest = manager.start(worker_request, fingerprint, force=True, source="autopilot")
         return str(manifest["run_id"])
 
-    out = await mining_autopilot.step(
+    return await mining_autopilot.step(
         session=session, factor_catalog=_factor_catalog(),
         run_status=run_status, run_result=run_result,
         start_run=start_run, base_config=session["base_config"])
+
+
+@router.post("/autopilot/sessions")
+def autopilot_start(payload: AutopilotStartRequest, request: Request) -> dict[str, Any]:
+    """开一个自动挖掘会话。窗口切分 + 真实交易日预检都在这里把关, 免得第一轮才失败。"""
+    try:
+        return build_autopilot_session(
+            repo=request.app.state.repo,
+            asset_type=payload.asset_type, start=payload.start, end=payload.end,
+            holdout_days=payload.holdout_days, budget_profile=payload.budget_profile,
+            max_iterations=payload.max_iterations, factor_names=payload.factor_names,
+            commission_pct=payload.commission_pct, stamp_tax_pct=payload.stamp_tax_pct,
+            slippage_bps=payload.slippage_bps)
+    except (ValueError, MiningRunValidationError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/autopilot/sessions/{session_id}/step")
+async def autopilot_step(session_id: str, request: Request) -> dict[str, Any]:
+    """推进一格: 等待中 / 判上一轮并开新一轮 / 收工。手动与自动共用这一个入口。"""
+    out = await advance_autopilot_session(
+        _autopilot_session_or_404(session_id),
+        manager=_manager(request), repo=request.app.state.repo,
+        app_state=request.app.state)
     return {"action": out["action"], "message": out["message"], "session": out["session"]}

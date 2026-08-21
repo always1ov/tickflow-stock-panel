@@ -886,6 +886,55 @@ export interface AutopilotSession {
   created_at: string
   updated_at: string
 }
+// ===== [fork 增强] R39 研究工作流 =====
+// 挖掘/回测自己一直跑, 跑到达标为止。一次"重开"= 一个完整会话(挖掘)或一串轮次(回测),
+// 用满轮数还没达标就换一批配置再开一次。
+export type WorkflowKind = 'mining' | 'backtest'
+export type WorkflowStatus = 'running' | 'satisfied' | 'exhausted' | 'stopped' | 'failed'
+
+export interface WorkflowBest {
+  passed: boolean
+  sharpe: number | null
+  label: string
+  kind: WorkflowKind
+  run_id?: string | null
+  signature?: string | null
+  session_id?: string | null
+  config?: Record<string, unknown>
+  detail?: Record<string, unknown>
+}
+
+export interface WorkflowAttempt {
+  attempt: number | null
+  outcome: string
+  started_at: string | null
+  ended_at: string
+  rounds?: number
+  session_id?: string
+  message?: string
+  conclusion?: string
+}
+
+export interface Workflow {
+  workflow_id: string
+  kind: WorkflowKind
+  config: Record<string, unknown>
+  budget: { max_attempts: number; rounds_per_attempt: number; max_hours: number; deadline_ts: number }
+  status: WorkflowStatus
+  stop_reason: string | null
+  stop_reason_cn: string | null
+  /** 抽卡账本: 一共试了多少轮, 这个结果该怎么看 */
+  overfit_note: string | null
+  best: WorkflowBest | null
+  attempts: WorkflowAttempt[]
+  ledger: { attempts: number; rounds: number; errors_in_a_row: number; last_error: string | null }
+  current: Record<string, unknown> | null
+  created_at: string
+  updated_at: string
+  finished_at: string | null
+  progress_text: string
+}
+
 export interface AutopilotStepResult {
   action: 'running' | 'iterated' | 'done' | 'error'
   message: string
@@ -2663,6 +2712,22 @@ export const api = {
       `/api/backtest/mining/autopilot/sessions/${encodeURIComponent(id)}/stop`,
       { method: 'POST' },
     ),
+  // [fork 增强] R39 研究工作流: 开了就不用管, 关页面照跑
+  workflowList: (kind?: WorkflowKind) =>
+    request<{ items: Workflow[] }>(`/api/workflows${kind ? `?kind=${kind}` : ''}`),
+  workflowCreate: (body: {
+    kind: WorkflowKind
+    config?: Record<string, unknown>
+    max_attempts?: number
+    rounds_per_attempt?: number
+    max_hours?: number
+  }) => request<Workflow>('/api/workflows', { method: 'POST', body: JSON.stringify(body) }),
+  workflowStop: (id: string) =>
+    request<Workflow>(`/api/workflows/${encodeURIComponent(id)}/stop`, { method: 'POST' }),
+  /** 手动催一格 —— 后台节拍器本来就会推, 这个是"我现在就想看它动一下" */
+  workflowTick: (id: string) =>
+    request<Workflow>(`/api/workflows/${encodeURIComponent(id)}/tick`, { method: 'POST' }),
+
   miningResult: (runId: string) =>
     request<MiningResult>(`/api/backtest/mining/runs/${encodeURIComponent(runId)}/result`),
 
