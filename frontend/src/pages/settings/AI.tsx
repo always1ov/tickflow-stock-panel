@@ -2,8 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Save, Loader2, Check, Wifi, WifiOff, Eye, EyeOff, Shield,
-  Shuffle, Plug, Zap, Settings2, ExternalLink, Trash2,
-  Terminal,
+  Shuffle, Plug, Settings2, Trash2,
 } from 'lucide-react'
 import { useSettings } from '@/lib/useSharedQueries'
 import { api, type SettingsState } from '@/lib/api'
@@ -19,7 +18,6 @@ const OPENAI_PROVIDER = 'openai'
 const OPENAI_COMPAT_PROVIDER = 'openai_compat'
 const CODEX_COMMAND = 'codex'
 const DEFAULT_CODEX_MODEL = 'gpt-5.6-sol'
-const DEFAULT_CODEX_REASONING_EFFORT = 'xhigh'
 const DEFAULT_OPENAI_MODEL = 'gpt-5.5'
 const DEFAULT_REASONING_EFFORT = 'high'
 const SAVED_CODEX_OPTION_VALUE = '__saved_codex_config__'
@@ -97,7 +95,9 @@ export function SettingsAIPanel() {
   const savedCodexProvider = s?.ai_provider === CODEX_PROVIDER
   const configured = s?.ai_configured ?? (savedCodexProvider ? !!(s?.ai_codex_command ?? CODEX_COMMAND) : s?.has_ai_key)
   const selectedPreset = PRESETS.find(p => p.label === selectedPresetLabel) ?? PRESETS[0]
-  const configTitle = isCodexProvider ? 'Codex CLI 配置' : isOpenAIProvider ? 'OpenAI 配置' : selectedPreset.custom ? '自定义配置' : `${selectedPreset.label} 配置`
+  // [R62] 标题不再随匹配到的预设变化 —— 预设已经不给选了, 还显示
+  // "DeepSeek 配置"会让人以为自己在某个选项里
+  const configTitle = isCodexProvider ? 'Codex CLI 配置' : 'AI 配置(OpenAI 兼容)'
   const savedCodexModel = s?.ai_codex_model ?? (savedCodexProvider ? (s?.ai_model ?? '') : '')
   const savedCodexEffort = s?.ai_codex_reasoning_effort ?? ''
   const savedCodexOptionKnown = CODEX_MODEL_OPTIONS.some(option =>
@@ -236,31 +236,6 @@ export function SettingsAIPanel() {
     setUserAgent(`Mozilla/5.0 (${pf}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${major}.0.0.0 Safari/537.36`)
   }
 
-  const handlePreset = (p: AiPreset) => {
-    setSelectedPresetLabel(p.label)
-    if (p.custom) {
-      setProvider(OPENAI_COMPAT_PROVIDER)
-      setBaseUrl(directDrafts.current.custom.baseUrl)
-      setModel(directDrafts.current.custom.model)
-      return
-    }
-    if (p.provider === CODEX_PROVIDER) {
-      setProvider(CODEX_PROVIDER)
-      setCodexModel(p.model)
-      setCodexReasoningEffort(DEFAULT_CODEX_REASONING_EFFORT)
-      setCodexCommand(CODEX_COMMAND)
-      return
-    }
-    const nextProvider = p.provider ?? OPENAI_COMPAT_PROVIDER
-    setProvider(nextProvider)
-    if (nextProvider === OPENAI_PROVIDER) {
-      setBaseUrl(directDrafts.current.openai.baseUrl)
-      setModel(directDrafts.current.openai.model)
-    } else {
-      setBaseUrl(p.url)
-      setModel(p.model)
-    }
-  }
 
   const handleBaseUrlChange = (value: string) => {
     setBaseUrl(value)
@@ -326,34 +301,11 @@ export function SettingsAIPanel() {
         )}
       </Card>
 
-      <Card icon={Zap} title="快速预设">
-        <div className="flex flex-wrap items-start gap-2">
-          {PRESETS.map(p => (
-            <button key={p.label} onClick={() => handlePreset(p)}
-              className={`rounded-lg border px-3 py-2 text-left transition-all ${selectedPreset?.label === p.label ? 'border-accent/40 bg-accent/10 text-accent' : 'border-border bg-base text-secondary hover:border-accent/30'}`}>
-              <div className="flex items-center gap-1.5 text-xs font-medium">
-                <span>{p.label}</span>
-                {p.provider === CODEX_PROVIDER && <Terminal className="h-3 w-3" />}
-              </div>
-            </button>
-          ))}
-        </div>
-        {selectedPreset && (
-          <div className="mt-3 rounded-btn border border-border/30 bg-base/30 px-3 py-2 text-[11px] leading-relaxed">
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-              <span className="text-secondary">{selectedPreset.description}</span>
-            </div>
-            {selectedPreset.website && (
-              <a href={selectedPreset.website} target="_blank" rel="noreferrer"
-                className="mt-1 inline-flex items-center gap-1 text-muted hover:text-accent transition-colors">
-                {selectedPreset.websiteLabel}
-                <ExternalLink className="h-3 w-3" />
-              </a>
-            )}
-          </div>
-        )}
-      </Card>
-
+      {/* [R62] 「快速预设」整块去掉 —— 用户明确不要这种挑选:
+          那种清单只在你正好用清单里那几家时省事, 否则先得挑一个再把三个字段
+          全改掉, 比直接填还多两步; 而且它会过期(模型名换代、中转站换域名),
+          过期的预设比没有预设更误事。一律按 OpenAI 兼容接口走, 地址/密钥/模型
+          三样自己填。 */}
       <Card
         icon={Settings2}
         title={configTitle}

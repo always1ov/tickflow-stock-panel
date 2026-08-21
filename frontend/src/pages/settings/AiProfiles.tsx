@@ -21,18 +21,16 @@ import { toast } from '@/components/Toast'
 const INPUT = 'h-8 w-full rounded-input border border-border bg-surface px-2 text-xs text-foreground outline-none transition-colors focus:border-accent'
 const LABEL = 'mb-1 block text-[10px] font-medium text-secondary'
 
-/** 常用的几家, 选了自动填地址与一个默认模型 —— 省得每次去翻文档 */
-const PRESETS: { label: string; base_url: string; model: string }[] = [
-  { label: 'DeepSeek', base_url: 'https://api.deepseek.com', model: 'deepseek-v4-pro' },
-  { label: 'Kimi', base_url: 'https://api.moonshot.cn/v1', model: 'kimi-k2.7-code' },
-  { label: 'OpenAI', base_url: 'https://api.openai.com/v1', model: 'gpt-5.5' },
-  { label: '炸鸡中转站', base_url: 'https://api.zhaji.dev/v1', model: 'gpt-5.5' },
-]
+// 一律按 OpenAI 兼容接口走 —— 地址、密钥、模型三样自己填就够了。
+// 不再列"常用配置"预设: 那种清单只在你正好用清单里那几家时省事, 否则先得
+// 从里面挑一个再把三个字段全改掉, 比直接填还多两步; 而且它会过期
+// (模型名换代、中转站换域名), 过期的预设比没有预设更误事。
+const OPENAI_COMPATIBLE = 'openai_compat'
 
 function blank(): AiProfile {
   return {
     id: `p${Date.now().toString(36)}`,
-    label: '', provider: 'openai_compat', base_url: '', api_key: '',
+    label: '', provider: OPENAI_COMPATIBLE, base_url: '', api_key: '',
     model: '', reasoning_effort: '', enabled: true,
   }
 }
@@ -74,7 +72,9 @@ export function AiProfiles() {
       <header className="flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-border px-3 py-2">
         <KeyRound className="h-3.5 w-3.5 shrink-0 text-accent" />
         <h2 className="shrink-0 text-xs font-semibold text-foreground">AI 档位 · 按优先级</h2>
-        <span className="text-[10px] text-muted">从上往下依次尝试 —— 上面那档用不了就自动换下一档</span>
+        <span className="text-[10px] text-muted">
+          OpenAI 兼容接口 · 从上往下依次尝试 —— 上面那档用不了就自动换下一档
+        </span>
         <div className="ml-auto flex items-center gap-1.5">
           <button type="button" onClick={() => setRows([...list, blank()])}
             className="inline-flex h-7 items-center gap-1 rounded-btn border border-border px-2 text-[11px] text-secondary transition-colors hover:border-accent/40 hover:text-accent">
@@ -119,16 +119,8 @@ export function AiProfiles() {
               title={i === 0 ? '优先用这一档' : `前 ${i} 档都用不了时才轮到它`}>
               {i + 1}
             </span>
-            <input className={`${INPUT} h-7 w-28`} placeholder="名字(自己看)"
+            <input className={`${INPUT} h-7 w-36`} placeholder="名字(自己看)"
               value={r.label} onChange={e => patch(i, { label: e.target.value })} />
-            <select className={`${INPUT} h-7 w-32`} value=""
-              onChange={e => {
-                const p = PRESETS.find(x => x.label === e.target.value)
-                if (p) patch(i, { base_url: p.base_url, model: p.model, label: r.label || p.label })
-              }}>
-              <option value="">套用常用配置…</option>
-              {PRESETS.map(p => <option key={p.label} value={p.label}>{p.label}</option>)}
-            </select>
             <label className="flex shrink-0 items-center gap-1 text-[10px] text-secondary">
               <input type="checkbox" className="h-3 w-3 accent-accent" checked={r.enabled}
                 onChange={e => patch(i, { enabled: e.target.checked })} />
@@ -151,10 +143,10 @@ export function AiProfiles() {
           </div>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
             <label><span className={LABEL}>接口地址</span>
-              <input className={INPUT} placeholder="https://api.example.com/v1"
+              <input className={INPUT} placeholder="https://api.xxx.com/v1"
                 value={r.base_url} onChange={e => patch(i, { base_url: e.target.value })} /></label>
             <label><span className={LABEL}>模型</span>
-              <input className={INPUT} placeholder="如 deepseek-v4-pro"
+              <input className={INPUT} placeholder="服务商给的模型名, 原样填"
                 value={r.model} onChange={e => patch(i, { model: e.target.value })} /></label>
             <label>
               <span className={LABEL}>
