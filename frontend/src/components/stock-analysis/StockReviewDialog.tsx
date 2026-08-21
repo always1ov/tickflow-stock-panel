@@ -5,13 +5,17 @@
  * 点进去只是在趋势表最右边多一个 4 字徽标, 等于把列里已经有的东西又抄了一遍。
  * 现在分成两个视图, 各答各的问题:
  *
- *   · 趋势视图(从「趋势」列点进来): 这个状态是怎么走到今天的。一张精简的
- *     逐日表 —— 日期/收盘/涨跌(带涨停标)/状态, 转折那天单独标出来。
- *     状态是这一列的全部内容, 表里就不该混进通道那套。
+ *   · 趋势视图(从「趋势」列点进来): 这个状态是怎么走到今天的。一张逐日表 ——
+ *     日期/收盘/涨跌(带涨停标)/状态/结论, 转折那天单独标出来。
  *   · 结论视图(从「结论」列点进来): 把每天的**悬停卡片**摊开。徽标背后那三段
  *     (怎么做/为什么/依据)才是这一列真正的内容, 复盘时要看的正是它们。
  *     连续同一档的天合并成一段 —— 「强势深调」连着 4 天时铺 4 张一模一样的
  *     卡片才是真的重复; 合成一段再标出天数, 反而看得出这一档持续了多久。
+ *
+ * [R52] 趋势表里保留「结论」徽标列, 与结论视图不冲突: 那边是摊开的卡片流
+ * (每一档说了什么、之后走成什么样), 这里只是让状态和当天的通道位置能横着
+ * 对上一眼 —— "这个板是在什么位置上出的"、"转折那天通道在哪"。当初判定它
+ * 重复, 是因为那时结论视图跟趋势表长得一模一样; 现在两边内容已经分开了。
  *
  * 两个视图共用同一份数据(一次请求), 顶部可以互相切换 —— 从哪一列进来只决定
  * 默认落在哪个视图, 不把人锁死。
@@ -22,6 +26,7 @@ import { CalendarRange, Loader2, X } from 'lucide-react'
 import { api, type KeltnerVerdict, type ReviewRow, type StockReview } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { trendBadgeCls } from '@/components/stock-analysis/TrendStateBar'
+import { VerdictHover } from '@/components/stock-analysis/VerdictHover'
 
 export type ReviewTab = 'trend' | 'verdict'
 
@@ -253,6 +258,7 @@ function TrendView({ d, rows, onlyMarked, onToggleMarked }: {
               <th className="whitespace-nowrap px-2 py-2 text-right font-normal">收盘</th>
               <th className="whitespace-nowrap px-2 py-2 text-right font-normal">涨跌</th>
               <th className="whitespace-nowrap px-3 py-2 text-left font-normal">六态状态</th>
+              <th className="whitespace-nowrap px-2 py-2 text-center font-normal" title="当天的三档通道结论 —— 与决策台「结论」列同一句话, 悬停看完整卡片">结论</th>
             </tr>
           </thead>
           <tbody>
@@ -284,10 +290,22 @@ function TrendView({ d, rows, onlyMarked, onToggleMarked }: {
                     </>
                   ) : <span className="text-[10px] text-muted/40">—</span>}
                 </td>
+                {/* [R52] 结论列在这张表里保留 —— 与「结论」视图不冲突: 那边是摊开的
+                    卡片流(每一档说了什么、之后走成什么样), 这里只是让状态和当天的
+                    通道位置能横着对上一眼("这个板是在什么位置上出的")。 */}
+                <td className="whitespace-nowrap px-2 py-1.5 text-center">
+                  {r.verdict ? (
+                    <VerdictHover v={r.verdict} note={`${r.date} 当天的读数。收盘口径。`}>
+                      <span className={`inline-flex cursor-help whitespace-nowrap rounded border px-1 py-0.5 text-[10px] ${VERDICT_CLS[r.verdict.tone]}`}>
+                        {r.verdict.title}
+                      </span>
+                    </VerdictHover>
+                  ) : <span className="text-[10px] text-muted/40">—</span>}
+                </td>
               </tr>
             ))}
             {rows.length === 0 && (
-              <tr><td colSpan={4} className="px-3 py-10 text-center text-[11px] text-muted">这段时间里没有涨跌停, 状态也没翻转过</td></tr>
+              <tr><td colSpan={5} className="px-3 py-10 text-center text-[11px] text-muted">这段时间里没有涨跌停, 状态也没翻转过</td></tr>
             )}
           </tbody>
         </table>
@@ -295,6 +313,7 @@ function TrendView({ d, rows, onlyMarked, onToggleMarked }: {
 
       <div className="border-t border-border/60 px-4 py-2 text-[10px] leading-relaxed text-muted">
         收盘口径, 与决策台「趋势」列同一个状态机、同一个阈值(含你自己调过的那个)。
+        「结论」列悬停看完整卡片, 要摊开每一档说了什么、之后走成什么样, 切到上方的「通道结论」。
       </div>
     </>
   )
