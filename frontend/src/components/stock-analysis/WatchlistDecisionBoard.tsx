@@ -11,7 +11,8 @@ import { TrendSummaryDialog } from '@/components/stock-analysis/TrendSummaryDial
 type Position = { held: boolean; cost: number | null; weight?: number | null; updated_at: string }
 type WatchPoint = { direction: 'up' | 'down'; price: number; label?: string; action?: string; reason?: string }
 type Signal = { signal: string; confidence: number; reason: string; close: number | null; created_at: string; watch_points?: WatchPoint[] }
-type SortKey = 'name' | 'close' | 'changePct' | 'held' | 'pnl' | 'confidence' | 'signal' | 'report' | 'trend'
+type SortKey = 'name' | 'close' | 'changePct' | 'held' | 'cost' | 'pnl' | 'exit'
+  | 'trend' | 'ks' | 'km' | 'kl' | 'confidence' | 'signal' | 'report'
 const SIGNAL_RANK: Record<string, number> = { buy: 0, sell: 1, hold: 2, watch: 3 }
 // [fork 增强] 六态排序权重:多头在前(上涨趋势 → 下跌趋势)
 const TREND_RANK: Record<string, number> = { UT: 0, NR: 1, SR: 2, SREA: 3, NREA: 4, DT: 5 }
@@ -256,8 +257,17 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
         case 'close': return r.close
         case 'changePct': return r.changePct
         case 'held': return r.held ? 1 : 0
+        case 'cost': return r.cost
         case 'pnl': return r.pnl
+        // 止盈线按"离触发还有多远"排, 不按线价 —— 线价本身没有可比性
+        // (不同票价格量级差几十倍), 距离才是要盯的那个数
+        case 'exit': return r.exit ? r.exit.distance_pct : null
         case 'trend': return r.trend ? -(TREND_RANK[r.trend.state] ?? 9) : null
+        // 三档通道按通道内位置排(0=贴下轨, 1=贴上轨, 轨外会越界)。
+        // 升序 = 最便宜的在前(低吸候选), 降序 = 最贵的在前(高抛候选)
+        case 'ks': return r.kc?.s?.pct ?? null
+        case 'km': return r.kc?.m?.pct ?? null
+        case 'kl': return r.kc?.l?.pct ?? null
         case 'confidence': return r.sig?.confidence ?? null
         case 'signal': return r.sig ? (SIGNAL_RANK[r.sig.signal] ?? 9) : null
         case 'report': {
@@ -358,14 +368,14 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
                 <th className="whitespace-nowrap px-2 py-2.5 font-normal text-right"><button onClick={() => toggleSort('close')} className={thBtn}>现价{caret('close')}</button></th>
                 <th className="whitespace-nowrap px-2 py-2.5 font-normal text-right"><button onClick={() => toggleSort('changePct')} className={thBtn}>涨跌{caret('changePct')}</button></th>
                 <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center"><button onClick={() => toggleSort('held')} className={thBtn}>仓位{caret('held')}</button></th>
-                <th className="whitespace-nowrap px-2 py-2.5 font-normal text-right">成本</th>
+                <th className="whitespace-nowrap px-2 py-2.5 font-normal text-right"><button onClick={() => toggleSort('cost')} className={thBtn} title="持仓成本价(仅持有且填了成本的票有)">成本{caret('cost')}</button></th>
                 <th className="whitespace-nowrap px-2 py-2.5 font-normal text-right"><button onClick={() => toggleSort('pnl')} className={thBtn}>浮盈{caret('pnl')}</button></th>
-                <th className="whitespace-nowrap px-2 py-2.5 font-normal text-right" title="ATR 三阶段出场线(止损/保本/移动止盈),仅持有+填成本的票有;跌破自动推送">止盈线</th>
+                <th className="whitespace-nowrap px-2 py-2.5 font-normal text-right"><button onClick={() => toggleSort('exit')} className={thBtn} title="ATR 三阶段出场线(止损/保本/移动止盈),仅持有+填成本的票有;跌破自动推送。按「离触发还有多远」排序 —— 线价本身不同票差几十倍没有可比性">止盈线{caret('exit')}</button></th>
                 <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center"><button onClick={() => toggleSort('trend')} className={thBtn} title="六态趋势(利弗莫尔,日线收盘价判定):多头在前">趋势{caret('trend')}</button></th>
                 {/* [R42] Keltner 三档: 一眼看出这只票贴着哪条轨。收盘口径, 与个股分析图表同一组公式 */}
-                <th className="whitespace-nowrap px-1.5 py-2.5 font-normal text-center" title="短期通道 = MA20 ± 2×ATR(约一个月的波动带)。收盘价在通道的哪一段">短通道</th>
-                <th className="whitespace-nowrap px-1.5 py-2.5 font-normal text-center" title="中期通道 = MA60 ± 2.5×ATR(一个季度)">中通道</th>
-                <th className="whitespace-nowrap px-1.5 py-2.5 font-normal text-center" title="长期通道 = MA120 ± 3×ATR(半年,牛熊边界)">长通道</th>
+                <th className="whitespace-nowrap px-1.5 py-2.5 font-normal text-center"><button onClick={() => toggleSort('ks')} className={thBtn} title="短期通道 = MA20 ± 2×ATR(约一个月)。按通道内位置排序:升序=最贴下轨的在前(低吸候选), 降序=最贴上轨的在前(高抛候选)">短通道{caret('ks')}</button></th>
+                <th className="whitespace-nowrap px-1.5 py-2.5 font-normal text-center"><button onClick={() => toggleSort('km')} className={thBtn} title="中期通道 = MA60 ± 2.5×ATR(一个季度)。按通道内位置排序">中通道{caret('km')}</button></th>
+                <th className="whitespace-nowrap px-1.5 py-2.5 font-normal text-center"><button onClick={() => toggleSort('kl')} className={thBtn} title="长期通道 = MA120 ± 3×ATR(半年,牛熊边界)。按通道内位置排序">长通道{caret('kl')}</button></th>
                 <th className="whitespace-nowrap px-2 py-2.5 font-normal text-right"><button onClick={() => toggleSort('confidence')} className={thBtn}>置信{caret('confidence')}</button></th>
                 <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center"><button onClick={() => toggleSort('report')} className={thBtn} title="最近一份 AI 分析报告(点击单元格直接打开)">报告{caret('report')}</button></th>
                 <th className="whitespace-nowrap px-4 py-2.5 font-normal text-left"><button onClick={() => toggleSort('signal')} className={thBtn}>AI 信号{caret('signal')}</button></th>
