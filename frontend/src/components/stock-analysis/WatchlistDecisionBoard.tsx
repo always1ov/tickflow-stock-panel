@@ -43,11 +43,11 @@ const KELTNER_CLS: Record<KeltnerBand['pos'], string> = {
  */
 function KeltnerCell({ band, close }: { band?: KeltnerBand; close: number | null }) {
   if (!band) {
-    return <td className="px-1 py-1.5 text-center"><span className="text-[10px] text-muted/40">—</span></td>
+    return <td className="px-1.5 py-2.5 text-center"><span className="text-[10px] text-muted/40">—</span></td>
   }
   const pct = Math.round(band.pct * 100)
   return (
-    <td className="px-1 py-1.5 text-center">
+    <td className="px-1.5 py-2.5 text-center">
       <span
         className={`inline-flex whitespace-nowrap rounded border px-1 py-0.5 text-[10px] ${KELTNER_CLS[band.pos]}`}
         title={
@@ -351,24 +351,24 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
 
       {/* [R28] 关键价位改弹窗后, 页面里已没有 K 线图要让位 —— 表格直接吃满剩余视口高度 */}
       <div className="overflow-auto border-t border-border/60 max-h-[calc(100vh-210px)]">
-          <table className="w-full min-w-[720px] text-xs">
+          <table className="w-full min-w-[1040px] text-xs">
             <thead className="sticky top-0 bg-surface/95 backdrop-blur text-[10px] text-muted">
               <tr className="text-left">
-                <th className="px-4 py-1.5 font-normal"><button onClick={() => toggleSort('name')} className={thBtn}>标的{caret('name')}</button></th>
-                <th className="px-2 py-1.5 font-normal text-right"><button onClick={() => toggleSort('close')} className={thBtn}>现价{caret('close')}</button></th>
-                <th className="px-2 py-1.5 font-normal text-right"><button onClick={() => toggleSort('changePct')} className={thBtn}>涨跌{caret('changePct')}</button></th>
-                <th className="px-2 py-1.5 font-normal text-center"><button onClick={() => toggleSort('held')} className={thBtn}>仓位{caret('held')}</button></th>
-                <th className="px-2 py-1.5 font-normal text-right">成本</th>
-                <th className="px-2 py-1.5 font-normal text-right"><button onClick={() => toggleSort('pnl')} className={thBtn}>浮盈{caret('pnl')}</button></th>
-                <th className="px-2 py-1.5 font-normal text-right" title="ATR 三阶段出场线(止损/保本/移动止盈),仅持有+填成本的票有;跌破自动推送">止盈线</th>
-                <th className="px-2 py-1.5 font-normal text-center"><button onClick={() => toggleSort('trend')} className={thBtn} title="六态趋势(利弗莫尔,日线收盘价判定):多头在前">趋势{caret('trend')}</button></th>
+                <th className="whitespace-nowrap px-4 py-2.5 font-normal"><button onClick={() => toggleSort('name')} className={thBtn}>标的{caret('name')}</button></th>
+                <th className="whitespace-nowrap px-2 py-2.5 font-normal text-right"><button onClick={() => toggleSort('close')} className={thBtn}>现价{caret('close')}</button></th>
+                <th className="whitespace-nowrap px-2 py-2.5 font-normal text-right"><button onClick={() => toggleSort('changePct')} className={thBtn}>涨跌{caret('changePct')}</button></th>
+                <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center"><button onClick={() => toggleSort('held')} className={thBtn}>仓位{caret('held')}</button></th>
+                <th className="whitespace-nowrap px-2 py-2.5 font-normal text-right">成本</th>
+                <th className="whitespace-nowrap px-2 py-2.5 font-normal text-right"><button onClick={() => toggleSort('pnl')} className={thBtn}>浮盈{caret('pnl')}</button></th>
+                <th className="whitespace-nowrap px-2 py-2.5 font-normal text-right" title="ATR 三阶段出场线(止损/保本/移动止盈),仅持有+填成本的票有;跌破自动推送">止盈线</th>
+                <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center"><button onClick={() => toggleSort('trend')} className={thBtn} title="六态趋势(利弗莫尔,日线收盘价判定):多头在前">趋势{caret('trend')}</button></th>
                 {/* [R42] Keltner 三档: 一眼看出这只票贴着哪条轨。收盘口径, 与个股分析图表同一组公式 */}
-                <th className="px-1 py-1.5 font-normal text-center" title="短期通道 = MA20 ± 2×ATR(约一个月的波动带)。收盘价在通道的哪一段">短通道</th>
-                <th className="px-1 py-1.5 font-normal text-center" title="中期通道 = MA60 ± 2.5×ATR(一个季度)">中通道</th>
-                <th className="px-1 py-1.5 font-normal text-center" title="长期通道 = MA120 ± 3×ATR(半年,牛熊边界)">长通道</th>
-                <th className="px-2 py-1.5 font-normal text-right"><button onClick={() => toggleSort('confidence')} className={thBtn}>置信{caret('confidence')}</button></th>
-                <th className="px-2 py-1.5 font-normal text-center"><button onClick={() => toggleSort('report')} className={thBtn} title="最近一份 AI 分析报告(点击单元格直接打开)">报告{caret('report')}</button></th>
-                <th className="px-4 py-1.5 font-normal text-left"><button onClick={() => toggleSort('signal')} className={thBtn}>AI 信号{caret('signal')}</button></th>
+                <th className="whitespace-nowrap px-1.5 py-2.5 font-normal text-center" title="短期通道 = MA20 ± 2×ATR(约一个月的波动带)。收盘价在通道的哪一段">短通道</th>
+                <th className="whitespace-nowrap px-1.5 py-2.5 font-normal text-center" title="中期通道 = MA60 ± 2.5×ATR(一个季度)">中通道</th>
+                <th className="whitespace-nowrap px-1.5 py-2.5 font-normal text-center" title="长期通道 = MA120 ± 3×ATR(半年,牛熊边界)">长通道</th>
+                <th className="whitespace-nowrap px-2 py-2.5 font-normal text-right"><button onClick={() => toggleSort('confidence')} className={thBtn}>置信{caret('confidence')}</button></th>
+                <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center"><button onClick={() => toggleSort('report')} className={thBtn} title="最近一份 AI 分析报告(点击单元格直接打开)">报告{caret('report')}</button></th>
+                <th className="whitespace-nowrap px-4 py-2.5 font-normal text-left"><button onClick={() => toggleSort('signal')} className={thBtn}>AI 信号{caret('signal')}</button></th>
               </tr>
             </thead>
             <tbody>
@@ -381,19 +381,21 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
                 return (
                   <tr key={r.symbol} className={`border-t border-border/30 hover:bg-elevated/40 ${active ? 'bg-accent/[0.06]' : ''}`}>
                     {/* 点标的即切换分析(免搜索) */}
-                    <td className="px-4 py-1.5">
-                      <button onClick={() => onSelect(r.symbol, r.name)} className="flex items-center gap-1.5 text-left cursor-pointer group">
+                    <td className="px-4 py-2.5">
+                      {/* min-h 给整行一个下限: AI 信号列 1 行和 3 行的行高原来差一倍,
+                          一屏扫下来参差得厉害。定住下限后只剩"多出来的那几行"的差异 */}
+                      <button onClick={() => onSelect(r.symbol, r.name)} className="flex min-h-[2.25rem] items-center gap-1.5 text-left cursor-pointer group">
                         {active && <Star className="h-2.5 w-2.5 text-accent shrink-0" />}
                         <span className="font-medium text-foreground group-hover:text-sky-300 transition-colors truncate max-w-[110px]">{r.name}</span>
                         <span className="text-[9px] font-mono text-muted">{r.symbol}</span>
                       </button>
                     </td>
-                    <td className="px-2 py-1.5 text-right font-mono tabular-nums text-foreground">{r.close != null ? r.close.toFixed(2) : '—'}</td>
-                    <td className={`px-2 py-1.5 text-right font-mono tabular-nums ${up ? 'text-red-400' : down ? 'text-emerald-400' : 'text-muted'}`}>
+                    <td className="px-2 py-2.5 text-right font-mono tabular-nums text-foreground">{r.close != null ? r.close.toFixed(2) : '—'}</td>
+                    <td className={`px-2 py-2.5 text-right font-mono tabular-nums ${up ? 'text-red-400' : down ? 'text-emerald-400' : 'text-muted'}`}>
                       {r.changePct != null ? `${(r.changePct * 100).toFixed(2)}%` : '—'}
                     </td>
                     {/* 仓位:持有/空仓 切换 */}
-                    <td className="px-2 py-1.5 text-center">
+                    <td className="px-2 py-2.5 text-center">
                       <button
                         onClick={() => setPos.mutate({ symbol: r.symbol, held: !r.held, cost: r.cost, weight: r.weight })}
                         className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors cursor-pointer ${
@@ -405,7 +407,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
                     </td>
                     {/* 成本+仓位%:仅持有时可填。生命线=20日线, 自动计算无需手填;
                         仓位% 供今日总览算组合总仓位/净值回撤, 不填不影响其他功能 */}
-                    <td className="px-2 py-1.5 text-right">
+                    <td className="px-2 py-2.5 text-right">
                       {r.held ? (
                         <span className="inline-flex items-center gap-1">
                           <input
@@ -434,11 +436,11 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
                       ) : <span className="text-muted">—</span>}
                     </td>
                     {/* 浮盈 */}
-                    <td className={`px-2 py-1.5 text-right font-mono tabular-nums ${r.pnl == null ? 'text-muted' : r.pnl > 0 ? 'text-red-400' : r.pnl < 0 ? 'text-emerald-400' : 'text-muted'}`}>
+                    <td className={`px-2 py-2.5 text-right font-mono tabular-nums ${r.pnl == null ? 'text-muted' : r.pnl > 0 ? 'text-red-400' : r.pnl < 0 ? 'text-emerald-400' : 'text-muted'}`}>
                       {r.pnl != null ? `${(r.pnl * 100).toFixed(1)}%` : '—'}
                     </td>
                     {/* [fork 增强] 持仓出场线:当前生效线位 + 距离; 逼近变琥珀, 跌破变红 */}
-                    <td className="px-2 py-1.5 text-right">
+                    <td className="px-2 py-2.5 text-right">
                       {r.exit ? (
                         <span
                           className={`inline-flex flex-col items-end text-[10px] font-mono leading-tight ${
@@ -456,7 +458,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
                       )}
                     </td>
                     {/* [fork 增强] 六态趋势(利弗莫尔):状态全名 + 持续天数, 悬停看关键点/操作建议 */}
-                    <td className="px-2 py-1.5 text-center">
+                    <td className="px-2 py-2.5 text-center">
                       {r.trend ? (
                         <span
                           className={`inline-flex whitespace-nowrap rounded border px-1.5 py-0.5 text-[10px] ${trendBadgeCls(r.trend.state)}`}
@@ -478,11 +480,11 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
                     <KeltnerCell band={r.kc?.m} close={r.close} />
                     <KeltnerCell band={r.kc?.l} close={r.close} />
                     {/* 置信度(独立列, 可排序) */}
-                    <td className="px-2 py-1.5 text-right font-mono tabular-nums text-muted">
+                    <td className="px-2 py-2.5 text-right font-mono tabular-nums text-muted">
                       {r.sig ? `${r.sig.confidence}%` : '—'}
                     </td>
                     {/* 历史报告: 最近一份的时间(+份数), 点击直接打开报告弹窗 */}
-                    <td className="px-2 py-1.5 text-center">
+                    <td className="px-2 py-2.5 text-center">
                       {(() => {
                         const rep = reportsBySymbol.get(r.symbol)
                         if (!rep) return <span className="text-[10px] text-muted/40">—</span>
@@ -500,7 +502,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
                       })()}
                     </td>
                     {/* AI 信号:徽标 + 时间 + 理由整段换行(不截断) */}
-                    <td className="px-4 py-1.5 min-w-[240px] align-top">
+                    <td className="px-4 py-2.5 min-w-[300px] align-middle">
                       {r.sig ? (
                         <div className="flex flex-col gap-0.5">
                           <div className="flex items-center gap-1.5">
