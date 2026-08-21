@@ -25,7 +25,7 @@ def _b(s, m=None, long=None):
 @pytest.mark.parametrize("bands,code,title", [
     # 偏贵一侧
     ((k.POS_ABOVE, k.POS_INSIDE, k.POS_INSIDE), "high_short_only", "短线冲高"),
-    ((k.POS_ABOVE, k.POS_NEAR_UPPER, k.POS_INSIDE), "top_confirmed", "到位了"),
+    ((k.POS_ABOVE, k.POS_NEAR_UPPER, k.POS_INSIDE), "top_confirmed", "该止盈了"),
     ((k.POS_ABOVE, k.POS_ABOVE, k.POS_ABOVE), "top_all_bands", "大顶区域"),
     ((k.POS_ABOVE, k.POS_INSIDE, k.POS_BELOW), "bounce_in_downtrend", "超跌反弹"),
     # 偏便宜一侧
@@ -92,7 +92,7 @@ def test_short_band_at_a_rail_always_wins_over_watch():
 # ---------- 判定顺序: 矛盾组合优先 ----------
 
 def test_bounce_wins_over_aligned_when_long_band_disagrees():
-    """短期+中期都到上沿, 但长期还在下沿 —— 这是跌深了反弹, 不是"到位了"。
+    """短期+中期都到上沿, 但长期还在下沿 —— 这是跌深了反弹, 不是"该止盈了"。
     顺序反了会说成止盈时机, 那是把反弹当成上涨。"""
     v = k.verdict(_b(k.POS_ABOVE, k.POS_ABOVE, k.POS_BELOW))
     assert v["code"] == "bounce_in_downtrend"

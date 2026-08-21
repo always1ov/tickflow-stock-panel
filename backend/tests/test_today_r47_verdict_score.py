@@ -110,7 +110,7 @@ def test_the_verdict_title_leads_the_reason():
 
 
 def test_penalties_read_as_a_caveat_not_an_endorsement():
-    """减分项前面带"但" —— 不然一句"到位了"跟在利好后面像是在夸它。"""
+    """减分项前面带"但" —— 不然一句"该止盈了"跟在利好后面像是在夸它。"""
     o = _rank(k.verdict(_bands(k.POS_ABOVE, k.POS_ABOVE, k.POS_ABOVE)))
     assert "但大顶区域:" in o["why"]
 

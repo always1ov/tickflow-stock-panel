@@ -326,6 +326,66 @@ export interface KeltnerVerdict {
   bands_aligned: number
 }
 
+/**
+ * [R48] 逐日复盘 —— 决策台「趋势」「结论」两列点进去看的那份数据。
+ *
+ * 三样东西按同一条时间轴对齐: 六态状态、三档通道结论、涨停。与那两列
+ * 同一个状态机、同一组公式、同一个阈值, 所以翻出来的历史能直接套回今天。
+ */
+export interface ReviewRow {
+  date: string
+  close: number
+  /** 小数, 如 0.05 = 5% */
+  change_pct: number | null
+  limit_up: boolean
+  limit_down: boolean
+  /** 炸板: 最高触及涨停但收盘没封住 */
+  broken_limit_up: boolean
+  /** 第几个板; 非涨停日为 0 */
+  limit_streak: number
+  trend?: {
+    state: LivermoreState; state_cn: string; state_en: string
+    side: '多头' | '空头'
+    /** 这个状态到当天已经走了第几天 */
+    day: number
+    /** 转折那天 —— 复盘最想找的就是这些 */
+    flipped: boolean
+  } | null
+  /** 当天三档位置; 算不出来的档缺席 */
+  bands: Partial<Record<'s' | 'm' | 'l', { pos: string; pos_cn: string }>>
+  verdict?: KeltnerVerdict | null
+}
+
+/** 每种结论在这只票上出现过几次、之后 forward_days 走成什么样 */
+export interface ReviewOutcome {
+  code: string; title: string; tone: KeltnerVerdict['tone']
+  n: number
+  /** 之后 N 日平均涨跌(小数) */
+  avg_fwd: number
+  /** 其中收涨的次数。样本小, 后端刻意不折算成百分比胜率 */
+  win: number
+}
+
+export interface StockReview {
+  symbol: string
+  error?: string
+  days: number
+  start: string | null
+  end: string | null
+  threshold: number
+  threshold_source: string
+  forward_days: number
+  stats: {
+    limit_ups: number; limit_downs: number; broken_limit_ups: number
+    max_streak: number
+    /** 涨停都出现在什么趋势状态下 */
+    limit_up_states: { state_cn: string; n: number }[]
+  }
+  outcomes: ReviewOutcome[]
+  /** 新 → 旧 */
+  rows: ReviewRow[]
+}
+
 /** 短期 MA20±2ATR / 中期 MA60±2.5ATR / 长期 MA120±3ATR */
 export interface KeltnerBands {
   s?: KeltnerBand
@@ -3235,6 +3295,11 @@ export const api = {
   stockKeltner: (symbols: string[]) =>
     request<{ keltner: Record<string, KeltnerBands> }>(
       `/api/stock-analysis/keltner?symbols=${encodeURIComponent(symbols.join(','))}`),
+
+  /** [R48] 单只逐日复盘(趋势 / 三档结论 / 涨停同一条时间轴)。收盘口径 */
+  stockReview: (symbol: string, days = 120) =>
+    request<StockReview>(
+      `/api/stock-analysis/review?symbol=${encodeURIComponent(symbol)}&days=${days}`),
 
   stockTrendBacktest: (symbol: string, useAi = true) =>
     request<TrendBacktestResult>('/api/stock-analysis/trend/backtest', {

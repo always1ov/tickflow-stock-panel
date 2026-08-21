@@ -338,6 +338,23 @@ def get_keltner(request: Request, symbols: str = Query(..., description="逗号�
     return {"keltner": keltner_service.channels_for_symbols(request.app.state.repo, syms)}
 
 
+@router.get("/review")
+def get_review(request: Request, symbol: str = Query(...),
+               days: int = Query(120, ge=10, le=250)):
+    """[R48] 单只逐日复盘: 六态趋势 / Keltner 三档结论 / 涨停, 同一条时间轴。
+
+    决策台的「趋势」「结论」两列点进来看的就是这个 —— 那两列只显示今天,
+    要判断它们靠不靠谱得能翻回去看历史。
+
+    收盘口径, 不叠加实时价: 复盘看的是已成立的事实, 掺进一个还会变的当日
+    临时价会让最后一行跟着盘中跳。
+    """
+    if not symbol.strip():
+        raise HTTPException(400, "symbol 不能为空")
+    from app.services import review_service
+    return review_service.review_for_symbol(request.app.state.repo, symbol, days)
+
+
 class TrendBacktestRequest(BaseModel):
     """六态阈值网格回测请求。"""
     symbol: str

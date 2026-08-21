@@ -7,6 +7,8 @@ import { toast } from '@/components/Toast'
 import { useHistoryReports, openHistoryReport, loadHistory } from '@/lib/stockAnalysisStore'
 import { trendBadgeCls } from '@/components/stock-analysis/TrendStateBar'
 import { TrendSummaryDialog } from '@/components/stock-analysis/TrendSummaryDialog'
+import { StockReviewDialog } from '@/components/stock-analysis/StockReviewDialog'
+import { VerdictHover } from '@/components/stock-analysis/VerdictHover'
 
 type Position = { held: boolean; cost: number | null; weight?: number | null; updated_at: string }
 type WatchPoint = { direction: 'up' | 'down'; price: number; label?: string; action?: string; reason?: string }
@@ -79,25 +81,34 @@ const VERDICT_CLS: Record<KeltnerVerdict['tone'], string> = {
 /**
  * 「通道结论」单元格 —— 三档组合翻成一句人话。
  *
- * 徽标只放 4-6 字的结论标题, 悬停给完整的一句话 + 为什么 + 哪几档共振。
- * 短期档在通道中部时显示 "—": 那时这一列确实没有信息, 硬凑一句反而误导。
+ * 徽标只放 4-6 字的结论标题, 悬停给分段排版的完整卡片(R49, 见 VerdictHover),
+ * 点击翻这只票的逐日复盘(R48) —— 这一列说的话在它身上过去好不好使, 只有
+ * 翻历史才知道。短期档在通道中部时显示 "—": 那时这一列确实没有信息。
  */
-function VerdictCell({ v }: { v?: KeltnerVerdict | null }) {
+function VerdictCell({ v, onOpen }: { v?: KeltnerVerdict | null; onOpen: () => void }) {
   if (!v) {
     return (
       <td className="whitespace-nowrap px-1.5 py-2.5 text-center">
-        <span className="text-[10px] text-muted/40" title="短期通道在中部 —— 位置上没有可说的, 听趋势和信号的">—</span>
+        <button
+          onClick={onOpen}
+          className="cursor-pointer text-[10px] text-muted/40 hover:text-sky-300"
+          title="短期通道在中部 —— 位置上没有可说的, 听趋势和信号的。点击看逐日复盘"
+        >
+          —
+        </button>
       </td>
     )
   }
   return (
     <td className="whitespace-nowrap px-1.5 py-2.5 text-center">
-      <span
-        className={`inline-flex whitespace-nowrap rounded border px-1 py-0.5 text-[10px] ${VERDICT_CLS[v.tone]}`}
-        title={`${v.action}\n\n${v.detail}\n\n依据:${v.bands_text}\n\n注意:这是「位置」结论, 说的是贵不贵, 不是会不会继续涨。清仓与否看止盈线/生命线, 优先级在通道之上。`}
-      >
-        {v.title}
-      </span>
+      <VerdictHover v={v} note="点击翻这只票的逐日复盘 —— 这一档结论过去出现在哪些天、之后走成什么样。">
+        <button
+          onClick={onOpen}
+          className={`inline-flex cursor-pointer whitespace-nowrap rounded border px-1 py-0.5 text-[10px] transition-colors hover:brightness-125 ${VERDICT_CLS[v.tone]}`}
+        >
+          {v.title}
+        </button>
+      </VerdictHover>
     </td>
   )
 }
@@ -223,6 +234,8 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
   const [heldOnly, setHeldOnly] = useState(false)
   // [fork 增强] 六态汇总弹窗
   const [showTrendSummary, setShowTrendSummary] = useState(false)
+  // [R48] 逐日复盘弹窗 —— 「趋势」「结论」两列点进来的就是它
+  const [review, setReview] = useState<{ symbol: string; name: string } | null>(null)
   // 排序:默认按置信度降序(信号最强的排前面;未分析的始终垫底)
   const [sort, setSort] = useState<{ key: SortKey; dir: 'asc' | 'desc' }>({ key: 'confidence', dir: 'desc' })
   const toggleSort = (key: SortKey) =>
@@ -534,6 +547,11 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
         />
       )}
 
+      {/* [R48] 逐日复盘: 趋势 / 三档结论 / 涨停按同一条时间轴排开 */}
+      {review && (
+        <StockReviewDialog symbol={review.symbol} name={review.name} onClose={() => setReview(null)} />
+      )}
+
       {/* [R28] 关键价位改弹窗后, 页面里已没有 K 线图要让位 —— 表格直接吃满剩余视口高度 */}
       <div className="overflow-auto border-t border-border/60 max-h-[calc(100vh-210px)]">
           <table className="w-full text-xs">
@@ -668,29 +686,36 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
                         <span className="text-[10px] text-muted/40">—</span>
                       )}
                     </td>
-                    {/* [fork 增强] 六态趋势(利弗莫尔):状态全名 + 持续天数, 悬停看关键点/操作建议 */}
+                    {/* [fork 增强] 六态趋势(利弗莫尔):状态全名 + 持续天数, 悬停看关键点/操作建议
+                        [R48] 点击翻逐日复盘 —— 这一列只显示今天, 要知道这个状态是
+                        怎么走到今天的、上次转折在哪天, 得能翻回去看 */}
                     <td className="whitespace-nowrap px-2 py-2.5 text-center">
                       {r.trend ? (
-                        <span
-                          className={`inline-flex whitespace-nowrap rounded border px-1.5 py-0.5 text-[10px] ${trendBadgeCls(r.trend.state)}`}
+                        <button
+                          onClick={() => setReview({ symbol: r.symbol, name: r.name })}
+                          className={`inline-flex cursor-pointer whitespace-nowrap rounded border px-1.5 py-0.5 text-[10px] transition-colors hover:brightness-125 ${trendBadgeCls(r.trend.state)}`}
                           title={`${r.trend.state_cn}(${r.trend.state_en})· 第 ${r.trend.duration} 天,自 ${r.trend.since}\n${
                             // [R29] 先给翻转触发价(真正要盯的位), 关键点/高低水位作参考
                             [r.trend.flip_down != null ? `跌破 ${r.trend.flip_down.toFixed(2)} 转弱` : '',
                              r.trend.flip_up != null ? `站上 ${r.trend.flip_up.toFixed(2)} 转强` : '']
                               .filter(Boolean).join(' / ') || '暂无翻转触发价'
-                          }\n参考:本轮最高收盘 ${r.trend.leg_high?.toFixed(2) ?? '—'} · 上关键点 ${r.trend.up_pivot?.toFixed(2) ?? '—'} / 下关键点 ${r.trend.dn_pivot?.toFixed(2) ?? '—'}\n${r.trend.action}${r.trend.signal ? `\n近期信号:${r.trend.signal} — ${r.trend.signal_desc}` : ''}\n出场优先级:组合回撤风控 > 生命线(20日线) > 止盈线(ATR) > 六态转弱${r.trend.intraday ? '\n⚠ 盘中临时口径:实时价只参与状态判定, 收盘确认为准;上面的价位一律按已收盘日线算' : ''}`}
+                          }\n参考:本轮最高收盘 ${r.trend.leg_high?.toFixed(2) ?? '—'} · 上关键点 ${r.trend.up_pivot?.toFixed(2) ?? '—'} / 下关键点 ${r.trend.dn_pivot?.toFixed(2) ?? '—'}\n${r.trend.action}${r.trend.signal ? `\n近期信号:${r.trend.signal} — ${r.trend.signal_desc}` : ''}\n\n点击翻这只票的逐日复盘\n出场优先级:组合回撤风控 > 生命线(20日线) > 止盈线(ATR) > 六态转弱${r.trend.intraday ? '\n⚠ 盘中临时口径:实时价只参与状态判定, 收盘确认为准;上面的价位一律按已收盘日线算' : ''}`}
                         >
                           {r.trend.state_cn} {r.trend.duration}天{r.trend.intraday ? <span className="ml-0.5 opacity-70">*</span> : null}
-                        </span>
+                        </button>
                       ) : (
-                        <span className="text-[10px] text-muted/40">—</span>
+                        <button
+                          onClick={() => setReview({ symbol: r.symbol, name: r.name })}
+                          className="cursor-pointer text-[10px] text-muted/40 hover:text-sky-300"
+                          title="点击看逐日复盘"
+                        >—</button>
                       )}
                     </td>
                     {/* [R42] Keltner 三档位置 */}
                     <KeltnerCell band={r.kc?.s} close={r.close} />
                     <KeltnerCell band={r.kc?.m} close={r.close} />
                     <KeltnerCell band={r.kc?.l} close={r.close} />
-                    <VerdictCell v={r.kc?.verdict} />
+                    <VerdictCell v={r.kc?.verdict} onOpen={() => setReview({ symbol: r.symbol, name: r.name })} />
                     {/* 置信度(独立列, 可排序) */}
                     <td className="whitespace-nowrap px-2 py-2.5 text-right font-mono tabular-nums text-muted">
                       {r.sig ? `${r.sig.confidence}%` : '—'}
