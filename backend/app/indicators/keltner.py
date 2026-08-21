@@ -215,56 +215,104 @@ TONE_SELL = "sell"     # 偏贵, 考虑减
 TONE_BUY = "buy"       # 偏便宜, 考虑吸
 TONE_HOLD = "hold"     # 别动, 尤其别加
 TONE_AVOID = "avoid"   # 别碰
+TONE_WATCH = "watch"   # [R45] 还不到动手的时候, 先盯着
 
 _VERDICTS = {
-    # code: (title, action, detail, side, tone)
+    # code: (title, action, detail, side, tone, rank)
+    # rank: 越大越偏卖 —— 界面排序直接用它, 免得两边各编一套顺序
     "bounce_in_downtrend": (
         "超跌反弹", "反弹卖点, 不是买点",
         "短期冲出上沿, 但长期还在下沿 —— 价格远低于半年均线, 这是跌深了反弹, "
         "看着像突破, 其实是反弹到阻力位。",
-        SIDE_HIGH, TONE_SELL),
+        SIDE_HIGH, TONE_SELL, 8),
     "top_all_bands": (
         "大顶区域", "动仓位基调, 不只减这一只",
         "三档同时到上沿 —— 大级别位置, 值得整体降仓而不只是处理单只票。",
-        SIDE_HIGH, TONE_SELL),
+        SIDE_HIGH, TONE_SELL, 9),
     "top_confirmed": (
         "到位了", "可落袋一部分",
         "短期和中期同时到上沿 —— 季度尺度上也涨到位了, 这是止盈的时机。"
         "趋势没坏的话, 剩下的继续按出场线拿。",
-        SIDE_HIGH, TONE_SELL),
+        SIDE_HIGH, TONE_SELL, 7),
     "high_short_only": (
         "短线冲高", "拿着, 别在这加仓",
         "只有短期到上沿, 大级别还早 —— 趋势票沿着上轨走是常态, 不必减; "
         "但这个位置加仓是在最贵的地方下最重的注。",
-        SIDE_HIGH, TONE_HOLD),
+        SIDE_HIGH, TONE_HOLD, 6),
     "dip_in_uptrend": (
         "强势深调", "最好的低吸位置",
         "短期跌破下沿, 但长期仍在上沿 —— 价格远高于半年均线, 这是涨多了回调, "
         "看着像破位, 其实是强势股洗盘。",
-        SIDE_LOW, TONE_BUY),
+        SIDE_LOW, TONE_BUY, 1),
     "falling_all_bands": (
         "下跌途中", "别抄, 下轨会一路下移",
         "三档同时到下沿 —— 大级别下跌, 每次都'触轨企稳'、每次都继续跌, "
         "越抄越套。等趋势企稳再说。",
-        SIDE_LOW, TONE_AVOID),
+        SIDE_LOW, TONE_AVOID, 0),
     "bottom_confirmed": (
         "调到位了", "低吸分量更足",
         "短期和中期同时到下沿 —— 季度尺度上也调到位了。趋势没坏的话, "
         "这是比只有短期触轨更值得下手的位置。",
-        SIDE_LOW, TONE_BUY),
+        SIDE_LOW, TONE_BUY, 2),
     "low_short_only": (
         "短线回调", "趋势没坏就是低吸候选",
         "只有短期到下沿 —— 常规回调。等收盘重新站回轨内再动手, "
         "别在破轨当天买, 那是接飞刀。",
-        SIDE_LOW, TONE_BUY),
+        SIDE_LOW, TONE_BUY, 3),
+    # [R45] 下面两条是"还没到动手的时候"。短期档在通道中部 = 没有操作级别的信号,
+    # 但中期已经到轨说明大级别位置到了 —— 这正是低吸候选池该有的样子:
+    # 大级别跌到位、就等短期给一个入场点。只报中期, 不报只有长期触轨的
+    # (半年通道太钝, 拿它定这周的事等于用尺子量头发)。
+    "watch_low": (
+        "候选池", "大级别到位, 等短期入场点",
+        "中期已到下沿, 但短期还在通道中部 —— 季度尺度上跌到位了, "
+        "短期这一档还没给出可以动手的位置。盯着, 等短期也到下沿或转强。",
+        SIDE_LOW, TONE_WATCH, 4),
+    "watch_high": (
+        "高位回落", "别追, 等回到下沿再看",
+        "中期已到上沿, 但短期已从上沿回落到通道中部 —— 高抛的窗口过去了, "
+        "这个位置追进去两头不靠。等回落到下沿再谈。",
+        SIDE_HIGH, TONE_WATCH, 5),
 }
 
 
+def _watch(bands: dict) -> dict | None:
+    """[R45] 短期档在中部、但中期已到轨 —— "还没到动手的时候"的观察档。
+
+    只看中期。长期单独触轨不报: 半年通道太钝, 一年也难得触几次, 报了也没法
+    据以行动, 只会把这一列填满噪音。
+    """
+    if (bands.get("s") or {}).get("pos") != POS_INSIDE:
+        return None
+    mid = (bands.get("m") or {}).get("pos")
+    if mid in _HIGH:
+        code, same = "watch_high", _HIGH
+    elif mid in _LOW:
+        code, same = "watch_low", _LOW
+    else:
+        return None
+    long = (bands.get("l") or {}).get("pos")
+    parts = [f"中期{POS_CN.get(mid, '')}"]
+    if long in same:
+        parts.append(f"长期同样{POS_CN.get(long, '')}")
+    parts.append("短期通道内")
+    return {"code": code, "text": "、".join(parts),
+            "aligned": 1 + (1 if long in same else 0)}
+
+
 def verdict(bands: dict | None) -> dict | None:
-    """三档通道组合 → 一句话结论。纯函数; 短期档在通道中部时返回 None。"""
+    """三档通道组合 → 一句话结论。纯函数; 三档都在通道中部时返回 None。"""
     p = pressure(bands)
     if not p:
-        return None
+        w = _watch(bands or {})
+        if not w:
+            return None
+        title, action, detail, side, tone, rank = _VERDICTS[w["code"]]
+        return {
+            "code": w["code"], "title": title, "action": action, "detail": detail,
+            "side": side, "tone": tone, "rank": rank,
+            "bands_text": w["text"], "bands_aligned": w["aligned"],
+        }
     mid = ((bands or {}).get("m") or {}).get("pos")
     long = ((bands or {}).get("l") or {}).get("pos")
     high = p["side"] == SIDE_HIGH
@@ -281,10 +329,10 @@ def verdict(bands: dict | None) -> dict | None:
     else:
         code = "high_short_only" if high else "low_short_only"
 
-    title, action, detail, side, tone = _VERDICTS[code]
+    title, action, detail, side, tone, rank = _VERDICTS[code]
     return {
         "code": code, "title": title, "action": action, "detail": detail,
-        "side": side, "tone": tone,
+        "side": side, "tone": tone, "rank": rank,
         "bands_text": p["text"],
         "bands_aligned": p["bands_aligned"],
     }

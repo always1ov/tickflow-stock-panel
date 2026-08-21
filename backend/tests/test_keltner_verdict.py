@@ -39,12 +39,54 @@ def test_every_combination_has_a_verdict(bands, code, title):
     assert v["code"] == code and v["title"] == title
     assert v["action"], "每一条都要给得出一句可执行的结论"
     assert v["detail"], "每一条都要说清为什么"
+    assert isinstance(v["rank"], int), "排序权重由后端给, 界面不自己编一套"
 
 
-def test_inside_the_short_channel_gives_no_verdict():
-    """短期在通道中部 = 这一列此刻没有信息, 不硬凑一句话。"""
+def test_all_three_inside_gives_no_verdict():
+    """三档都在中部 = 这一列此刻确实没有信息, 不硬凑一句话。"""
     assert k.verdict(_b(k.POS_INSIDE)) is None
-    assert k.verdict(_b(k.POS_INSIDE, k.POS_ABOVE, k.POS_ABOVE)) is None
+    assert k.verdict(_b(k.POS_INSIDE, k.POS_INSIDE, k.POS_INSIDE)) is None
+
+
+# ---------- 观察档: 短期还在中部, 但中期已到轨 ----------
+
+def test_mid_band_at_a_rail_gives_a_watch_verdict():
+    """[R45] 低吸候选池正是这个样子: 大级别跌到位了、短期还没给入场点。
+    只按"短期定方向"的话这批票全被滤掉, 恰好漏掉最该盯的那些。"""
+    v = k.verdict(_b(k.POS_INSIDE, k.POS_BELOW))
+    assert v["code"] == "watch_low" and v["title"] == "候选池"
+    assert v["tone"] == k.TONE_WATCH, "观察档要和四个动作档分开, 别看着像该动手了"
+
+
+def test_watch_high_when_price_fell_back_from_the_upper_rail():
+    v = k.verdict(_b(k.POS_INSIDE, k.POS_NEAR_UPPER))
+    assert v["code"] == "watch_high"
+    assert "别追" in v["action"]
+
+
+def test_long_band_alone_never_triggers_a_watch():
+    """半年通道太钝, 一年也难得触几次 —— 报了也没法据以行动, 只会填满噪音。"""
+    assert k.verdict(_b(k.POS_INSIDE, k.POS_INSIDE, k.POS_BELOW)) is None
+    assert k.verdict(_b(k.POS_INSIDE, k.POS_INSIDE, k.POS_ABOVE)) is None
+
+
+def test_watch_mentions_the_long_band_when_it_agrees():
+    v = k.verdict(_b(k.POS_INSIDE, k.POS_BELOW, k.POS_NEAR_LOWER))
+    assert "长期同样" in v["bands_text"] and v["bands_aligned"] == 2
+
+
+def test_watch_never_outranks_a_real_action():
+    """观察档排在动作档中间: 比"该吸的"靠后, 比"该减的"靠前。"""
+    watch_low = k.verdict(_b(k.POS_INSIDE, k.POS_BELOW))["rank"]
+    real_buy = k.verdict(_b(k.POS_BELOW))["rank"]
+    real_sell = k.verdict(_b(k.POS_ABOVE, k.POS_ABOVE))["rank"]
+    assert real_buy < watch_low < real_sell
+
+
+def test_short_band_at_a_rail_always_wins_over_watch():
+    """短期到轨时就是操作级别的信号, 不该被降级成"先盯着"。"""
+    v = k.verdict(_b(k.POS_BELOW, k.POS_BELOW))
+    assert v["tone"] != k.TONE_WATCH
 
 
 # ---------- 判定顺序: 矛盾组合优先 ----------
@@ -92,7 +134,7 @@ def test_falling_across_all_bands_says_stay_away_not_buy():
 def test_verdicts_never_issue_a_clear_out_instruction():
     """清不清仓是出场线/生命线的事, 优先级在通道之上。通道只谈加减, 不谈清仓。"""
     for code in ("high_short_only", "top_confirmed", "top_all_bands", "bounce_in_downtrend"):
-        title, action, detail, _side, _tone = k._VERDICTS[code]  # noqa: SLF001
+        title, action, detail, _side, _tone, _rank = k._VERDICTS[code]  # noqa: SLF001
         assert "清仓" not in action + detail
 
 

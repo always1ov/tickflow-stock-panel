@@ -14,8 +14,6 @@ type Signal = { signal: string; confidence: number; reason: string; close: numbe
 type SortKey = 'name' | 'close' | 'changePct' | 'held' | 'cost' | 'pnl' | 'exit'
   | 'trend' | 'ks' | 'km' | 'kl' | 'verdict' | 'confidence' | 'signal' | 'report'
 const SIGNAL_RANK: Record<string, number> = { buy: 0, sell: 1, hold: 2, watch: 3 }
-// [R44] 结论列排序权重: 数值越大越偏卖 —— 降序把"该减的"顶到最上面
-const VERDICT_RANK: Record<string, number> = { avoid: 0, buy: 1, hold: 2, sell: 3 }
 // [fork 增强] 六态排序权重:多头在前(上涨趋势 → 下跌趋势)
 const TREND_RANK: Record<string, number> = { UT: 0, NR: 1, SR: 2, SREA: 3, NREA: 4, DT: 5 }
 
@@ -74,6 +72,8 @@ const VERDICT_CLS: Record<KeltnerVerdict['tone'], string> = {
   buy: 'border-sky-400/40 bg-sky-400/10 text-sky-300',
   hold: 'border-amber-400/40 bg-amber-400/10 text-amber-400',
   avoid: 'border-border bg-base text-muted',
+  // [R45] 观察档: 还不到动手的时候, 用最淡的一档, 跟四个动作档区分开
+  watch: 'border-border bg-elevated/60 text-secondary',
 }
 
 /**
@@ -305,8 +305,9 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
         case 'ks': return r.kc?.s?.pct ?? null
         case 'km': return r.kc?.m?.pct ?? null
         case 'kl': return r.kc?.l?.pct ?? null
-        // 结论按"偏卖 → 偏买"排, 降序把该减的顶到最上面, 升序把该吸的顶上来
-        case 'verdict': return r.kc?.verdict ? VERDICT_RANK[r.kc.verdict.tone] : null
+        // 结论按后端给的 rank 排(越大越偏卖): 降序把该减的顶到最上面,
+        // 升序把该吸的顶上来。权重由后端定, 界面不自己编一套。
+        case 'verdict': return r.kc?.verdict?.rank ?? null
         case 'confidence': return r.sig?.confidence ?? null
         case 'signal': return r.sig ? (SIGNAL_RANK[r.sig.signal] ?? 9) : null
         case 'report': {

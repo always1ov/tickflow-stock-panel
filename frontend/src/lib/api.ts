@@ -317,8 +317,10 @@ export interface KeltnerVerdict {
   /** 为什么 */
   detail: string
   side: 'high' | 'low'
-  /** 界面配色: 偏卖/偏买/别动/别碰 */
-  tone: 'sell' | 'buy' | 'hold' | 'avoid'
+  /** 界面配色: 偏卖/偏买/别动/别碰/先盯着 */
+  tone: 'sell' | 'buy' | 'hold' | 'avoid' | 'watch'
+  /** 排序权重, 越大越偏卖。由后端给 —— 界面不自己编一套顺序 */
+  rank: number
   /** 哪几档共振, 如"短期破上轨、中期也贴上轨" */
   bands_text: string
   bands_aligned: number
