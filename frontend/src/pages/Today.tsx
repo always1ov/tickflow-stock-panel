@@ -31,16 +31,21 @@ function buildTodayHtml(d: TodayOverview, brief: string | null): string {
   const postureColor: Record<string, string> = { 进攻: bull, 谨慎: '#c78326', 防守: bear, 观察: '#8a919f' }
   const sym = (name: string, symbol: string) =>
     symbol && symbol !== name ? ` <span class="sym">${esc(symbol)}</span>` : ''
+  // [R43] 通道位置标: 到上沿用暖色(偏贵), 到下沿用冷色(低吸位置)
+  const heatStyle = (h: TodayHeat) =>
+    h.side === 'high' ? 'background:#fdf0e3;color:#c78326' : 'background:#e6f4fb;color:#1c6ea4'
+  const heatLabel = (h: TodayHeat) =>
+    h.side === 'high' ? (h.level === 'strong' ? '到上沿' : '近上沿') : '到下沿'
   const actionRows = d.actions.map(a => `
       <li><i style="background:${a.severity === 'high' ? bull : '#c78326'}"></i>
         <b>${esc(a.name)}</b>${sym(a.name, a.symbol)} ${esc(a.text)}</li>`).join('')
   const oppRows = d.opportunities.map(o => `
       <li><b class="score">${o.score}</b>
-        <span><b>${esc(o.name)}</b>${sym(o.name, o.symbol)}${o.board ? ` <span class="adv" style="background:#eef1f5;color:#5b6472">${esc(o.board)}</span>` : ''}${o.mainline ? ` <span class="adv" style="background:#f4e6f7;color:#8b3fa0">主线${o.mainline.rank}·${esc(o.mainline.member)}</span>` : ''}${o.advice ? ` <span class="adv">${esc(o.advice.text)}</span>` : ''} ${esc(o.text)}
+        <span><b>${esc(o.name)}</b>${sym(o.name, o.symbol)}${o.board ? ` <span class="adv" style="background:#eef1f5;color:#5b6472">${esc(o.board)}</span>` : ''}${o.mainline ? ` <span class="adv" style="background:#f4e6f7;color:#8b3fa0">主线${o.mainline.rank}·${esc(o.mainline.member)}</span>` : ''}${o.heat ? ` <span class="adv" style="${heatStyle(o.heat)}">${heatLabel(o.heat)}</span>` : ''}${o.advice ? ` <span class="adv">${esc(o.advice.text)}</span>` : ''} ${esc(o.text)}
         <span class="why">${esc(o.why)}</span>${o.advice?.plan ? `<span class="why" style="color:#1c6ea4">建仓路径:${esc(o.advice.plan)}</span>` : ''}</span></li>`).join('')
   const holdRows = d.holdings.map(h => `
       <tr>
-        <td>${esc(h.name)}${sym(h.name, h.symbol)}</td>
+        <td class="name">${esc(h.name)}${sym(h.name, h.symbol)}</td>
         <td class="num">${h.close?.toFixed(2) ?? '—'}</td>
         <td class="num">${h.weight != null ? h.weight + '%' : '—'}</td>
         <td class="num" style="color:${h.pnl_pct == null ? '#8a919f' : h.pnl_pct > 0 ? bull : bear}">${h.pnl_pct != null ? (h.pnl_pct * 100).toFixed(1) + '%' : '—'}</td>
@@ -58,7 +63,7 @@ function buildTodayHtml(d: TodayOverview, brief: string | null): string {
 <title>今日总览 · ${esc(d.as_of ?? '')}</title>
 <style>
   body{margin:0;padding:32px 24px;background:#f7f8fa;color:#1f2329;font:14px/1.6 -apple-system,'PingFang SC','Microsoft YaHei',sans-serif}
-  .wrap{max-width:860px;margin:0 auto}
+  .wrap{max-width:1000px;margin:0 auto}
   h1{font-size:20px;margin:0 0 4px}
   h2{font-size:14px;margin:22px 0 8px;display:flex;align-items:center;gap:6px}
   .meta{color:#8a919f;font-size:12px;margin-bottom:18px}
@@ -67,19 +72,22 @@ function buildTodayHtml(d: TodayOverview, brief: string | null): string {
   .brief{background:#f3efff;border:1px solid #ddd0fa;border-radius:8px;padding:12px 16px;font-size:13px;margin-top:14px}
   ul.items{list-style:none;margin:0;padding:0;background:#fff;border:1px solid #e5e6eb;border-radius:8px}
   ul.items li{padding:9px 14px;border-bottom:1px solid #f0f1f3;font-size:13px;display:flex;gap:8px;align-items:baseline}
+  ul.items li>span{min-width:0;flex:1}
   ul.items li:last-child{border-bottom:none}
   ul.items i{width:7px;height:7px;border-radius:50%;display:inline-block;flex:none;position:relative;top:-1px}
   .empty{background:#fff;border:1px solid #e5e6eb;border-radius:8px;padding:14px 16px;font-size:13px;color:#8a919f}
   table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #e5e6eb;border-radius:8px;overflow:hidden}
-  th{font-size:12px;font-weight:500;color:#8a919f;text-align:left;padding:8px 12px;border-bottom:1px solid #e5e6eb;background:#fafbfc}
-  td{padding:8px 12px;border-bottom:1px solid #f0f1f3;font-size:13px}
+  th{font-size:12px;font-weight:500;color:#8a919f;text-align:left;padding:8px 12px;border-bottom:1px solid #e5e6eb;background:#fafbfc;white-space:nowrap}
+  td{padding:8px 12px;border-bottom:1px solid #f0f1f3;font-size:13px;white-space:nowrap}
+  td.name{white-space:normal}
   tr:last-child td{border-bottom:none}
   .num{font-variant-numeric:tabular-nums;text-align:right}
   th.num,td.num{text-align:right}
   .sym{color:#a0a6b1;font-size:11px}
   .score{flex:none;background:#f0f1f3;color:#4e5666;border-radius:3px;padding:1px 5px;font-size:11px;font-variant-numeric:tabular-nums}
   .why{display:block;color:#8a919f;font-size:11px;margin-top:2px}
-  .adv{background:#e8f3fb;color:#1c6ea4;border-radius:3px;padding:1px 5px;font-size:11px}
+  .adv{background:#e8f3fb;color:#1c6ea4;border-radius:3px;padding:1px 5px;font-size:11px;white-space:nowrap;display:inline-block}
+  .sym,.score{white-space:nowrap}
   .foot{margin-top:18px;color:#a0a6b1;font-size:11px}
   @media print{body{background:#fff;padding:0}}
 </style>

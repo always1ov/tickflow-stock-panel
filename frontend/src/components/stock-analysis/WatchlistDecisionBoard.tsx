@@ -43,11 +43,11 @@ const KELTNER_CLS: Record<KeltnerBand['pos'], string> = {
  */
 function KeltnerCell({ band, close }: { band?: KeltnerBand; close: number | null }) {
   if (!band) {
-    return <td className="px-1.5 py-2.5 text-center"><span className="text-[10px] text-muted/40">—</span></td>
+    return <td className="whitespace-nowrap px-1.5 py-2.5 text-center"><span className="text-[10px] text-muted/40">—</span></td>
   }
   const pct = Math.round(band.pct * 100)
   return (
-    <td className="px-1.5 py-2.5 text-center">
+    <td className="whitespace-nowrap px-1.5 py-2.5 text-center">
       <span
         className={`inline-flex whitespace-nowrap rounded border px-1 py-0.5 text-[10px] ${KELTNER_CLS[band.pos]}`}
         title={
@@ -381,7 +381,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
                 return (
                   <tr key={r.symbol} className={`border-t border-border/30 hover:bg-elevated/40 ${active ? 'bg-accent/[0.06]' : ''}`}>
                     {/* 点标的即切换分析(免搜索) */}
-                    <td className="px-4 py-2.5">
+                    <td className="whitespace-nowrap px-4 py-2.5">
                       {/* min-h 给整行一个下限: AI 信号列 1 行和 3 行的行高原来差一倍,
                           一屏扫下来参差得厉害。定住下限后只剩"多出来的那几行"的差异 */}
                       <button onClick={() => onSelect(r.symbol, r.name)} className="flex min-h-[2.25rem] items-center gap-1.5 text-left cursor-pointer group">
@@ -390,15 +390,15 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
                         <span className="text-[9px] font-mono text-muted">{r.symbol}</span>
                       </button>
                     </td>
-                    <td className="px-2 py-2.5 text-right font-mono tabular-nums text-foreground">{r.close != null ? r.close.toFixed(2) : '—'}</td>
-                    <td className={`px-2 py-2.5 text-right font-mono tabular-nums ${up ? 'text-red-400' : down ? 'text-emerald-400' : 'text-muted'}`}>
+                    <td className="whitespace-nowrap px-2 py-2.5 text-right font-mono tabular-nums text-foreground">{r.close != null ? r.close.toFixed(2) : '—'}</td>
+                    <td className={`whitespace-nowrap px-2 py-2.5 text-right font-mono tabular-nums ${up ? 'text-red-400' : down ? 'text-emerald-400' : 'text-muted'}`}>
                       {r.changePct != null ? `${(r.changePct * 100).toFixed(2)}%` : '—'}
                     </td>
                     {/* 仓位:持有/空仓 切换 */}
-                    <td className="px-2 py-2.5 text-center">
+                    <td className="whitespace-nowrap px-2 py-2.5 text-center">
                       <button
                         onClick={() => setPos.mutate({ symbol: r.symbol, held: !r.held, cost: r.cost, weight: r.weight })}
-                        className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors cursor-pointer ${
+                        className={`whitespace-nowrap text-[10px] px-1.5 py-0.5 rounded border transition-colors cursor-pointer ${
                           r.held ? 'border-amber-400/40 bg-amber-400/10 text-amber-400' : 'border-border bg-base text-muted hover:border-amber-400/30'
                         }`}
                       >
@@ -407,7 +407,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
                     </td>
                     {/* 成本+仓位%:仅持有时可填。生命线=20日线, 自动计算无需手填;
                         仓位% 供今日总览算组合总仓位/净值回撤, 不填不影响其他功能 */}
-                    <td className="px-2 py-2.5 text-right">
+                    <td className="whitespace-nowrap px-2 py-2.5 text-right">
                       {r.held ? (
                         <span className="inline-flex items-center gap-1">
                           <input
@@ -436,11 +436,11 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
                       ) : <span className="text-muted">—</span>}
                     </td>
                     {/* 浮盈 */}
-                    <td className={`px-2 py-2.5 text-right font-mono tabular-nums ${r.pnl == null ? 'text-muted' : r.pnl > 0 ? 'text-red-400' : r.pnl < 0 ? 'text-emerald-400' : 'text-muted'}`}>
+                    <td className={`whitespace-nowrap px-2 py-2.5 text-right font-mono tabular-nums ${r.pnl == null ? 'text-muted' : r.pnl > 0 ? 'text-red-400' : r.pnl < 0 ? 'text-emerald-400' : 'text-muted'}`}>
                       {r.pnl != null ? `${(r.pnl * 100).toFixed(1)}%` : '—'}
                     </td>
                     {/* [fork 增强] 持仓出场线:当前生效线位 + 距离; 逼近变琥珀, 跌破变红 */}
-                    <td className="px-2 py-2.5 text-right">
+                    <td className="whitespace-nowrap px-2 py-2.5 text-right">
                       {r.exit ? (
                         <span
                           className={`inline-flex flex-col items-end text-[10px] font-mono leading-tight ${
@@ -449,7 +449,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
                           title={`${r.exit.stage_cn} · ${r.exit.line_cn}\n成本 ${r.exit.cost ?? '—'} · 浮盈 ${r.exit.profit_atr ?? '—'}×ATR · 持仓最高 ${r.exit.highest_close ?? '—'}\n跌破 ${r.exit.line.toFixed(2)} → ${r.exit.action}(k=${r.exit.k}, ATR14=${r.exit.atr})${r.exit.lifeline ? `\n生命线(20日线) ${r.exit.lifeline.toFixed(2)} — 收盘跌破无条件清仓` : ''}`}
                         >
                           <span>{r.exit.line.toFixed(2)}</span>
-                          <span className="text-[9px] opacity-80">
+                          <span className="whitespace-nowrap text-[9px] opacity-80">
                             {r.exit.stage === 'fatal' ? '生命线破位!' : r.exit.triggered ? '已触发' : `距 ${(r.exit.distance_pct * 100).toFixed(1)}%`}
                           </span>
                         </span>
@@ -458,7 +458,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
                       )}
                     </td>
                     {/* [fork 增强] 六态趋势(利弗莫尔):状态全名 + 持续天数, 悬停看关键点/操作建议 */}
-                    <td className="px-2 py-2.5 text-center">
+                    <td className="whitespace-nowrap px-2 py-2.5 text-center">
                       {r.trend ? (
                         <span
                           className={`inline-flex whitespace-nowrap rounded border px-1.5 py-0.5 text-[10px] ${trendBadgeCls(r.trend.state)}`}
@@ -480,11 +480,11 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
                     <KeltnerCell band={r.kc?.m} close={r.close} />
                     <KeltnerCell band={r.kc?.l} close={r.close} />
                     {/* 置信度(独立列, 可排序) */}
-                    <td className="px-2 py-2.5 text-right font-mono tabular-nums text-muted">
+                    <td className="whitespace-nowrap px-2 py-2.5 text-right font-mono tabular-nums text-muted">
                       {r.sig ? `${r.sig.confidence}%` : '—'}
                     </td>
                     {/* 历史报告: 最近一份的时间(+份数), 点击直接打开报告弹窗 */}
-                    <td className="px-2 py-2.5 text-center">
+                    <td className="whitespace-nowrap px-2 py-2.5 text-center">
                       {(() => {
                         const rep = reportsBySymbol.get(r.symbol)
                         if (!rep) return <span className="text-[10px] text-muted/40">—</span>
