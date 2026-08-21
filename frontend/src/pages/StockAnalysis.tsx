@@ -353,7 +353,7 @@ function StockAnalysisBoard({ symbol, height = 480, bare = false }: { symbol: st
         levels={levels}
         series={levelsQ.data?.series}
         seriesDates={levelsQ.data?.dates}
-        defaultLevelTypes={['sr', 'pivot', 'keltner_s']}
+        symbol={symbol}
         ranges={trendRanges}
         height={height}
       />

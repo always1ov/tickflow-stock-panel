@@ -80,71 +80,61 @@ const CURVE_DEFS: { alignedKey: string; group: LevelType; endLabel: string; colo
   { alignedKey: 'atr_tp',         group: 'atr_stop',  endLabel: 'ATR上轨', color: '#F87171', dashed: true },
 ]
 
-// ===== 智能选择:根据行情状态 + 档位与现价的距离,推荐该显示哪些价位组 =====
-// 纯规则、无 AI 成本、结果可复现。只是给一个合理起点,用户随时可手动增删。
-//   - 行情状态: 价/MA20/MA60 三者排列判定趋势 or 震荡
-//   - 趋势行情 → 跟随价格漂移的通道更有参考价值 (Keltner/ATR)
-//   - 震荡行情 → 静态区间位更有参考价值 (枢轴点/布林带/前高前低)
-//   - 缺口/整数关口/斐波那契: 只有档位离现价足够近才显示(远处的只是噪音)
-function computeSmartSelection(
+// ===== 默认显示:自动挑合适的 Keltner 档位 =====
+// 原来这里是「✨ 智能选择」按钮 —— 要点一下才生效, 且会一次勾上七八组价位,
+// 图上线多到看不清。改成打开就自动选好, 只留 Keltner 三档里"价格真正在打交道"的那些。
+//
+// 判定与决策台三列、后端 indicators/keltner.py 同一口径: 距轨 0.5 个 ATR 以内算"贴着"。
+// 这里拿不到 ATR, 但通道半宽本身就是 n×ATR, 所以 0.5 ATR 换算成通道宽度的比例是
+// 0.5 / (2n) —— 短期 n=2.0 → 12.5%, 中期 n=2.5 → 10%, 长期 n=3.0 → 8.3%。
+// 用比例而不是写死一个百分比, 三档才不会各判各的。
+const KELTNER_TIERS = [
+  { key: 'keltner_s' as LevelType, n: 2.0, cn: '短期' },
+  { key: 'keltner_m' as LevelType, n: 2.5, cn: '中期' },
+  { key: 'keltner_l' as LevelType, n: 3.0, cn: '长期' },
+]
+
+/** 从一组价位里取出上下轨(按标签认, 后端给的是「短期通道上轨/下轨」) */
+function bandOf(group: PriceLevel[] | undefined): { upper: number; lower: number } | null {
+  if (!group?.length) return null
+  const upper = group.find(p => p.label?.includes('上轨'))?.value
+  const lower = group.find(p => p.label?.includes('下轨'))?.value
+  if (upper == null || lower == null || !(upper > lower)) return null
+  return { upper, lower }
+}
+
+function pickKeltnerBands(
   rows: KlineRow[],
   levels: Record<LevelType, PriceLevel[]>,
 ): { picked: LevelType[]; reason: string } {
-  const fallback: LevelType[] = ['sr', 'pivot', 'keltner_s']
-  if (!rows.length) return { picked: fallback, reason: '' }
+  const fallback = { picked: ['keltner_s'] as LevelType[], reason: '' }
+  if (!rows.length) return fallback
   const close = rows[rows.length - 1].close
-  const closes = rows.map(r => r.close)
-  const ma = (n: number): number | null =>
-    closes.length >= n ? closes.slice(-n).reduce((a, b) => a + b, 0) / n : null
-  const ma20 = ma(20)
-  const ma60 = ma(60)
-
-  let regime: 'up' | 'down' | 'range' = 'range'
-  if (ma20 != null && ma60 != null) {
-    if (close > ma20 && ma20 > ma60) regime = 'up'
-    else if (close < ma20 && ma20 < ma60) regime = 'down'
-  }
-
-  const has = (k: LevelType) => (levels[k]?.length ?? 0) > 0
-  // 该组是否有档位落在现价 ±pct 范围内
-  const near = (k: LevelType, pct: number) =>
-    (levels[k] ?? []).some(p => close > 0 && Math.abs(p.value - close) / close <= pct)
 
   const picked: LevelType[] = []
   const notes: string[] = []
-
-  // 压力支撑(成交密集区)是价量核心,附近有档位就开
-  if (near('sr', 0.10)) picked.push('sr')
-
-  if (regime === 'range') {
-    if (has('pivot')) picked.push('pivot')
-    if (near('extreme', 0.10)) picked.push('extreme')
-    if (has('boll')) picked.push('boll')
-    notes.push('震荡行情 → 枢轴点/前高前低/布林带')
-  } else {
-    if (has('keltner_s')) picked.push('keltner_s')
-    if (has('keltner_m')) picked.push('keltner_m')
-    if (has('atr_stop')) picked.push('atr_stop')
-    if (near('extreme', 0.10)) picked.push('extreme')
-    notes.push(
-      regime === 'up'
-        ? '上升趋势(价>MA20>MA60)→ Keltner/ATR通道'
-        : '下降趋势(价<MA20<MA60)→ Keltner/ATR通道',
-    )
+  for (const t of KELTNER_TIERS) {
+    const b = bandOf(levels[t.key])
+    if (!b) continue
+    const pct = (close - b.lower) / (b.upper - b.lower)
+    const nearFrac = 0.5 / (2 * t.n)
+    if (pct >= 1 - nearFrac) {
+      picked.push(t.key)
+      notes.push(`${t.cn}${pct > 1 ? '破上轨' : '贴上轨'}`)
+    } else if (pct <= nearFrac) {
+      picked.push(t.key)
+      notes.push(`${t.cn}${pct < 0 ? '破下轨' : '贴下轨'}`)
+    }
   }
 
-  if (near('gap', 0.10)) { picked.push('gap'); notes.push('附近有未回补缺口') }
-  if (near('round', 0.03)) { picked.push('round'); notes.push('临近整数关口') }
-  if (near('fib', 0.06)) picked.push('fib')
-
-  // 说明被隐藏的常见组,避免用户以为数据丢了
-  const hidden: string[] = []
-  if (has('gap') && !picked.includes('gap')) hidden.push('缺口')
-  if (has('fib') && !picked.includes('fib')) hidden.push('斐波那契')
-  if (hidden.length) notes.push(`${hidden.join('/')}距现价远,已隐藏`)
-
-  if (!picked.length) return { picked: fallback.filter(has), reason: '' }
-  return { picked, reason: notes.join(';') }
+  // 三档都在通道中部时不是"没东西可看", 而是"没有一档正在起作用" ——
+  // 显示短期档(操作级别)当底, 并说明白, 免得用户以为图没画出来。
+  if (!picked.length) {
+    return bandOf(levels.keltner_s)
+      ? { picked: ['keltner_s'], reason: '三档通道价格都在中部, 默认显示短期档' }
+      : fallback
+  }
+  return { picked, reason: `${notes.join('、')} —— 已自动打开对应档位` }
 }
 
 // ===== 预留:标记 / 区间(后续新闻面、事件区间用) =====
@@ -172,6 +162,8 @@ interface Props {
   defaultLevelTypes?: LevelType[]
   /** 预留:新闻/暴雷/利好日期标记 */
   markers?: ChartMarker[]
+  /** 当前标的; 换股时据此重新自动选 Keltner 档位 */
+  symbol?: string
   /** 预留:事件区间高亮 */
   ranges?: ChartRange[]
   /** 预留:点击某根 K 线 */
@@ -187,7 +179,8 @@ export function AnalysisKChart({
   levels,
   series,
   seriesDates,
-  defaultLevelTypes = ['sr', 'pivot', 'keltner_s'],
+  defaultLevelTypes = ['keltner_s'],
+  symbol,
   markers,
   ranges,
   onDateClick,
@@ -205,8 +198,10 @@ export function AnalysisKChart({
   const [pivotRank, setPivotRank] = useState<1 | 2 | 3>(1)
   /** 双向联动高亮: hover 价位标签 ↔ hover 下方文字行。值为 levelKey, null=无高亮 */
   const [hoveredKey, setHoveredKey] = useState<string | null>(null)
-  /** 智能选择后的说明文案; 手动改开关即清除, 避免文案与实际勾选不符 */
+  /** 自动选档的说明文案; 手动改开关即清除, 避免文案与实际勾选不符 */
   const [smartHint, setSmartHint] = useState<string | null>(null)
+  /** 用户是否手动动过价位开关 —— 动过就不再自动覆盖他的选择 */
+  const touchedRef = useRef(false)
 
   // 数据预处理 + 带状曲线序列对齐(后端 series 的日期范围可能与 rows 不同,需映射)
   const { dates, candle, vols, dateIndex, zoomStart, alignedSeries } = useMemo(() => {
@@ -477,6 +472,8 @@ export function AnalysisKChart({
 
   const toggleType = (t: LevelType) => {
     setSmartHint(null)
+    touchedRef.current = true
+    setSmartHint(null)
     setActiveTypes(prev => {
       const next = new Set(prev)
       if (next.has(t)) next.delete(t)
@@ -485,12 +482,25 @@ export function AnalysisKChart({
     })
   }
 
-  const smartSelect = () => {
-    if (!levels) return
-    const { picked, reason } = computeSmartSelection(rows, levels)
+  // 打开即自动选好 Keltner 档位, 不再需要点「智能选择」。
+  //
+  // 只在"换了标的、且这只票的通道数据到齐"时选一次:
+  // 依赖里不放 rows —— 盘中每跳一次价都重算的话, 用户手动勾的组会被反复冲掉。
+  // rows 只用来取最新收盘价, 从 ref 里拿。
+  const rowsRef = useRef(rows)
+  rowsRef.current = rows
+  const autoPickedFor = useRef<string | null>(null)
+  useEffect(() => {
+    const key = symbol ?? ''
+    if (autoPickedFor.current !== key) {
+      autoPickedFor.current = key
+      touchedRef.current = false          // 换股了, 上一只票的手动选择不该带过来
+    }
+    if (!levels || !rowsRef.current.length || touchedRef.current) return
+    const { picked, reason } = pickKeltnerBands(rowsRef.current, levels)
     setActiveTypes(new Set(picked))
     setSmartHint(reason || null)
-  }
+  }, [levels, symbol])
 
   return (
     <div className={className}>
@@ -499,13 +509,6 @@ export function AnalysisKChart({
       {levels && (
         <div className="flex flex-wrap content-start items-center gap-1.5 mb-2">
           <span className="text-[10px] text-muted mr-1 shrink-0">关键价位</span>
-          <button
-            onClick={smartSelect}
-            title="按当前行情状态(趋势/震荡)和档位与现价的距离,自动勾选最值得看的价位组;之后仍可手动增删"
-            className="inline-flex shrink-0 whitespace-nowrap items-center gap-1 h-6 px-2 rounded-md text-[10px] font-medium border transition-all text-[#a5f3fc] bg-[#06B6D4]/10 border-[#06B6D4]/40 hover:bg-[#06B6D4]/20"
-          >
-            ✨ 智能选择
-          </button>
           {/* 全部价位组一次排开(不折叠)—— 开关本身就是一眼扫过去挑, 藏起来反而要多点一次 */}
           {LEVEL_GROUPS.map(g => {
             const active = activeTypes.has(g.key)
@@ -556,10 +559,10 @@ export function AnalysisKChart({
           )}
         </div>
       )}
-      {/* 智能选择的判定说明 —— 手动改开关即消失 */}
+      {/* 自动选档的判定说明 —— 手动改开关即消失 */}
       {smartHint && (
         <div className="mb-2 text-[10px] text-muted">
-          <span className="text-[#a5f3fc]">✨</span> {smartHint}
+          <span className="text-[#a5f3fc]">通道</span> {smartHint}
         </div>
       )}
       {/* 图表:右侧预留带(grid.right 预留)显示价位标签文字,不压蜡烛 */}
