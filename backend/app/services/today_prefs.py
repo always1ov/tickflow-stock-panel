@@ -10,6 +10,7 @@ import logging
 from pathlib import Path
 
 from app.config import settings
+from app.price_limits import BOARDS
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +23,8 @@ DEFAULTS = {
     # [R15] 金字塔建仓路径(利弗莫尔式, 由价格确认驱动):
     # 试仓占目标仓位 % → 站稳 N 日加至 % → 回踩不破上满
     "pyramid_probe": 35, "pyramid_confirm": 70, "pyramid_days": 2,
+    # [R40] 板块过滤: 空 = 全看。只影响买入机会区, 卖出/风险提醒永远不受影响。
+    "boards": [],
 }
 _MIN_SCORE_RANGE = (0, 100)
 _MAX_SHOW_RANGE = (1, 50)
@@ -31,6 +34,27 @@ _MAX_DRAWDOWN_RANGE = (3, 30)
 _PYRAMID_PROBE_RANGE = (10, 60)
 _PYRAMID_CONFIRM_RANGE = (40, 90)
 _PYRAMID_DAYS_RANGE = (1, 5)
+_VALID_BOARDS = frozenset(BOARDS)
+
+
+def _boards(value, fallback: list[str]) -> list[str]:
+    """板块清单归一: 丢掉不认识的名字, 去重且保持 BOARDS 的展示顺序。
+
+    全选等价于不过滤 —— 统一存成空列表, 免得以后 BOARDS 加了新板块时,
+    一个"当时全选"的旧配置反而变成了排除新板块。
+    """
+    if value is None:
+        return list(fallback)
+    if not isinstance(value, (list, tuple, set)):
+        return list(fallback)
+    raw = {str(v) for v in value}
+    picked = raw & _VALID_BOARDS
+    if not picked:
+        # 传了东西但一个都不认识 → 保持原样。静默变成"全看"会让人以为筛选生效了
+        return [] if not raw else list(fallback)
+    if picked == _VALID_BOARDS:
+        return []
+    return [b for b in BOARDS if b in picked]
 
 
 def _store_path() -> Path:
@@ -67,12 +91,13 @@ def load() -> dict:
         "pyramid_probe": _clamp(data.get("pyramid_probe"), *_PYRAMID_PROBE_RANGE, DEFAULTS["pyramid_probe"]),
         "pyramid_confirm": _clamp(data.get("pyramid_confirm"), *_PYRAMID_CONFIRM_RANGE, DEFAULTS["pyramid_confirm"]),
         "pyramid_days": _clamp(data.get("pyramid_days"), *_PYRAMID_DAYS_RANGE, DEFAULTS["pyramid_days"]),
+        "boards": _boards(data.get("boards"), DEFAULTS["boards"]),
     }
 
 
 def save(min_score=None, max_show=None, max_single=None, target_vol=None,
          max_drawdown=None, pyramid_probe=None, pyramid_confirm=None,
-         pyramid_days=None) -> dict:
+         pyramid_days=None, boards=None) -> dict:
     """更新偏好(只改传入的字段), 返回生效后的完整偏好。"""
     cur = load()
     if min_score is not None:
@@ -91,5 +116,7 @@ def save(min_score=None, max_show=None, max_single=None, target_vol=None,
         cur["pyramid_confirm"] = _clamp(pyramid_confirm, *_PYRAMID_CONFIRM_RANGE, cur["pyramid_confirm"])
     if pyramid_days is not None:
         cur["pyramid_days"] = _clamp(pyramid_days, *_PYRAMID_DAYS_RANGE, cur["pyramid_days"])
+    if boards is not None:
+        cur["boards"] = _boards(boards, cur["boards"])
     _store_path().write_text(json.dumps(cur, indent=2, ensure_ascii=False), encoding="utf-8")
     return cur

@@ -20,6 +20,40 @@ def is_risk_warning_name(name: str | None) -> bool:
     return "ST" in str(name or "").upper()
 
 
+# [fork 增强] 板块归属的权威实现。原来 market_overview_builder 里有一份私有副本,
+# 现在统一到这里 —— 板块决定涨跌停幅度, 两处各判一套迟早会对不上。
+BOARD_STAR = "科创板"
+BOARD_GROWTH = "创业板"
+BOARD_BEIJING = "北交所"
+BOARD_SH_MAIN = "沪主板"
+BOARD_SZ_MAIN = "深主板"
+BOARD_OTHER = "其他"
+
+#  展示顺序: 两个主板在前(体量最大), 20cm 的两个次之, 北交所最后
+BOARDS = (BOARD_SH_MAIN, BOARD_SZ_MAIN, BOARD_GROWTH, BOARD_STAR, BOARD_BEIJING, BOARD_OTHER)
+
+
+def board_of(symbol: str) -> str:
+    """代码 → 板块中文名。
+
+    判定顺序要紧: 先看后缀 .BJ, 再看数字前缀, 最后才回落到交易所主板 ——
+    300/301/688/689 同时也带 .SZ/.SH 后缀, 反过来判会把它们全算进主板。
+    002(原中小板)2021 年已并入深市主板, 这里不再单列。
+    """
+    s = str(symbol or "").upper()
+    if s.endswith(".BJ"):
+        return BOARD_BEIJING
+    if s.startswith(("300", "301")):
+        return BOARD_GROWTH
+    if s.startswith(("688", "689")):
+        return BOARD_STAR
+    if s.endswith(".SH"):
+        return BOARD_SH_MAIN
+    if s.endswith(".SZ"):
+        return BOARD_SZ_MAIN
+    return BOARD_OTHER
+
+
 def board_limit_pct(symbol: str) -> float:
     if symbol.endswith(".BJ"):
         return BEIJING_BOARD_LIMIT

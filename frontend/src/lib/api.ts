@@ -159,7 +159,12 @@ export interface TodayOpportunity {
   advice?: { fraction: number; text: string; why: string; plan?: string | null } | null
   intraday?: boolean
   mainline?: TodayMainlineTag | null
+  /** [R40] 板块归属(沪主板/深主板/创业板/科创板/北交所) */
+  board?: string
 }
+
+/** [R40] 板块过滤的可选项与展示顺序 —— 与后端 price_limits.BOARDS 一致 */
+export const TODAY_BOARDS = ['沪主板', '深主板', '创业板', '科创板', '北交所'] as const
 /** [fork 增强] R37 中观快照: 三层推导 大盘 → 主线 → 个股 里缺的那一层 */
 export interface TodayMeso {
   amount: {
@@ -195,6 +200,8 @@ export interface SignalAiSchedule {
 export interface TodayPrefs {
   min_score: number; max_show: number; max_single: number; target_vol: number; max_drawdown: number
   pyramid_probe: number; pyramid_confirm: number; pyramid_days: number
+  /** [R40] 只看这几个板; 空 = 全看 */
+  boards: string[]
 }
 export interface TodayHolding {
   symbol: string; name: string; close: number | null; cost: number | null; pnl_pct: number | null

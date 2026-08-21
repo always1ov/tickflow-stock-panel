@@ -61,17 +61,10 @@ def _json_safe(value: Any) -> Any:
 
 
 def _board(symbol: str) -> str:
-    if symbol.endswith(".BJ"):
-        return "北交所"
-    if symbol.startswith(("300", "301")):
-        return "创业板"
-    if symbol.startswith(("688", "689")):
-        return "科创板"
-    if symbol.endswith(".SH"):
-        return "沪主板"
-    if symbol.endswith(".SZ"):
-        return "深主板"
-    return "其他"
+    """板块归属统一走 price_limits.board_of —— 板块决定涨跌停幅度, 不能两处各判一套。"""
+    from app.price_limits import board_of
+
+    return board_of(symbol)
 
 
 def _score(value: float, low: float, high: float) -> int:

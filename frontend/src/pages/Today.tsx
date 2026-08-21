@@ -14,7 +14,7 @@ import {
   SlidersHorizontal, Sparkles, Sunrise, Target,
 } from 'lucide-react'
 import {
-  api, type SignalAiSchedule, type TodayAiSchedule, type TodayOverview,
+  api, TODAY_BOARDS, type SignalAiSchedule, type TodayAiSchedule, type TodayOverview,
   type TodayPick, type TodayPrefs,
 } from '@/lib/api'
 import { toast } from '@/components/Toast'
@@ -36,7 +36,7 @@ function buildTodayHtml(d: TodayOverview, brief: string | null): string {
         <b>${esc(a.name)}</b>${sym(a.name, a.symbol)} ${esc(a.text)}</li>`).join('')
   const oppRows = d.opportunities.map(o => `
       <li><b class="score">${o.score}</b>
-        <span><b>${esc(o.name)}</b>${sym(o.name, o.symbol)}${o.mainline ? ` <span class="adv" style="background:#f4e6f7;color:#8b3fa0">主线${o.mainline.rank}·${esc(o.mainline.member)}</span>` : ''}${o.advice ? ` <span class="adv">${esc(o.advice.text)}</span>` : ''} ${esc(o.text)}
+        <span><b>${esc(o.name)}</b>${sym(o.name, o.symbol)}${o.board ? ` <span class="adv" style="background:#eef1f5;color:#5b6472">${esc(o.board)}</span>` : ''}${o.mainline ? ` <span class="adv" style="background:#f4e6f7;color:#8b3fa0">主线${o.mainline.rank}·${esc(o.mainline.member)}</span>` : ''}${o.advice ? ` <span class="adv">${esc(o.advice.text)}</span>` : ''} ${esc(o.text)}
         <span class="why">${esc(o.why)}</span>${o.advice?.plan ? `<span class="why" style="color:#1c6ea4">建仓路径:${esc(o.advice.plan)}</span>` : ''}</span></li>`).join('')
   const holdRows = d.holdings.map(h => `
       <tr>
@@ -156,6 +156,19 @@ function sessionPhaseHint(live: boolean | undefined): { label: string; hint: str
   return { label: '盘后', hint: '当日数据应已定稿 —— 按定稿数据复盘,并做好明天的计划。' }
 }
 
+// [R40] 板块徽章。20cm 的两个板(创业/科创)与 30cm 的北交所用暖色标出来 ——
+// 同一个把握分, 20cm 的票波动天然更大, 仓位不该一样。
+const BOARD_CLS: Record<string, string> = {
+  沪主板: 'bg-border/40 text-muted',
+  深主板: 'bg-border/40 text-muted',
+  创业板: 'bg-orange-400/15 text-orange-300',
+  科创板: 'bg-orange-400/15 text-orange-300',
+  北交所: 'bg-rose-400/15 text-rose-300',
+}
+const BOARD_LIMIT_CN: Record<string, string> = {
+  沪主板: '10%', 深主板: '10%', 创业板: '20%', 科创板: '20%', 北交所: '30%',
+}
+
 const POSTURE_STYLE: Record<string, string> = {
   进攻: 'border-red-400/40 bg-red-400/10 text-red-400',
   谨慎: 'border-amber-400/40 bg-amber-400/10 text-amber-300',
@@ -232,8 +245,12 @@ export function Today() {
   const [minScore, setMinScore] = useState<number | null>(null)
   const prefsMut = useMutation({
     mutationFn: (body: Partial<TodayPrefs>) => api.todaySavePrefs(body),
-    onSuccess: (p) => {
-      toast(`门槛已保存:把握分 ≥ ${p.min_score},最多 ${p.max_show} 条`, 'success')
+    onSuccess: (p, vars) => {
+      toast(
+        'boards' in vars
+          ? (p.boards.length ? `只看:${p.boards.join('、')}` : '板块过滤已取消,全部板块都看')
+          : `门槛已保存:把握分 ≥ ${p.min_score},最多 ${p.max_show} 条`,
+        'success')
       setMinScore(null)
       setPicks(null)  // 候选集变了, 旧的 AI 优选结果不再对应
       q.refetch()
@@ -274,6 +291,8 @@ export function Today() {
   const aiCache = d?.ai ?? null
   const shownBrief = brief ?? aiCache?.brief ?? null
   const shownPicks = picks ?? aiCache?.picks ?? null
+  // [R40] 板块过滤当前值。空 = 全看; 由服务端偏好驱动, 刷新/换设备都保持
+  const boardFilter = d?.prefs?.boards ?? []
   const shownAnalyzed = picks ? analyzed : (aiCache?.analyzed ?? 0)
   const aiMeta = brief ? null : aiCache   // 缓存来源与时间(自己刚生成的不必标注)
   // [R37] 中观快照。提出来是为了在 JSX 的 map 回调里也保住类型收窄
@@ -519,12 +538,56 @@ export function Today() {
               <span className="text-[10px] text-muted">
                 {d.opportunities.length} 项 · 把握分 ≥ {d.prefs.min_score} 才显示
                 {d.opportunities_filtered > 0 && `(已滤掉 ${d.opportunities_filtered} 只)`}
+                {boardFilter.length > 0 && (
+                  <span
+                    className="text-sky-300"
+                    title="板块过滤在服务端于截断前生效 —— 显示的是该板块内把握分最高的前几只, 不是从已截断的列表里再挑"
+                  >
+                    {' '}· 只看 {boardFilter.join('、')}
+                  </span>
+                )}
                 {d.position_hint && (
                   <span title="由当前姿态决定的总仓位建议上限(进攻8成/谨慎5成/防守2成/观察3成)——所有持仓加起来别超过这个数">
                     {' '}· 总仓位基调 ≤{d.position_hint.posture_cap * 10}成
                   </span>
                 )}
               </span>
+              {/* [R40] 板块筛选。过滤在后端做 —— 前端筛的话会漏掉被 max_show 截掉的票,
+                  看到的"主板机会"是残缺的而你不会知道 */}
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => prefsMut.mutate({ boards: [] })}
+                  disabled={prefsMut.isPending}
+                  title="不过滤, 所有板块都看"
+                  className={`rounded-full border px-2 py-0.5 text-[10px] transition-colors cursor-pointer disabled:opacity-50 ${
+                    boardFilter.length === 0
+                      ? 'border-sky-400/40 bg-sky-400/15 text-sky-300'
+                      : 'border-border bg-base text-muted hover:text-foreground'
+                  }`}
+                >
+                  全部
+                </button>
+                {TODAY_BOARDS.map((b) => {
+                  const on = boardFilter.includes(b)
+                  return (
+                    <button
+                      key={b}
+                      onClick={() => prefsMut.mutate({
+                        boards: on ? boardFilter.filter((x) => x !== b) : [...boardFilter, b],
+                      })}
+                      disabled={prefsMut.isPending}
+                      title={`${on ? '取消' : '只看'}${b}(可多选)`}
+                      className={`rounded-full border px-2 py-0.5 text-[10px] transition-colors cursor-pointer disabled:opacity-50 ${
+                        on
+                          ? 'border-sky-400/40 bg-sky-400/15 text-sky-300'
+                          : 'border-border bg-base text-muted hover:text-foreground'
+                      }`}
+                    >
+                      {b}
+                    </button>
+                  )
+                })}
+              </div>
               <div className="ml-auto flex items-center gap-2">
                 <button
                   onClick={() => setPrefsOpen((v) => !v)}
@@ -786,6 +849,14 @@ export function Today() {
                         <span className="text-xs leading-relaxed">
                           <span className="font-medium text-foreground">{o.name}</span>
                           {o.symbol !== o.name && <span className="ml-1.5 text-[9px] font-mono text-muted">{o.symbol}</span>}
+                          {o.board && (
+                            <span
+                              title={`${o.board} —— 涨跌停幅度 ${BOARD_LIMIT_CN[o.board] ?? '10%'}`}
+                              className={`ml-1.5 rounded px-1 py-0.5 text-[9px] ${BOARD_CLS[o.board] ?? 'bg-border/40 text-muted'}`}
+                            >
+                              {o.board}
+                            </span>
+                          )}
                           {picked && <span className="ml-1.5 text-[9px] text-amber-300">★ AI 优选</span>}
                           {o.intraday && (
                             <span

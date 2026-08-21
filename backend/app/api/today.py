@@ -72,6 +72,7 @@ def rank_opportunities(
     min_score: int = _OPP_MIN_SCORE, max_show: int = _OPP_MAX_SHOW,
     bench_ret: float | None = None,
     extras: dict[str, dict] | None = None,
+    boards: list[str] | None = None,
 ) -> tuple[list[dict], int]:
     """给买入机会打"把握分"并筛选, 返回 (显示列表, 被滤掉条数)。
 
@@ -94,6 +95,10 @@ def rank_opportunities(
         扣"不在主线内"的分等于系统性偏向妖股;
       · 逼近买入触发价的按距离与置信度打分, 一到价就能行动的最优先。
     低于 min_score 或排在 max_show 之后的都不显示, 只报数量。
+
+    [R40] boards 非空时只保留这些板块的机会。**过滤必须发生在 max_show 截断之前** ——
+    先截 10 条再由前端挑出主板的话, 会漏掉那些被截掉的主板票, 看到的"主板机会"
+    是残缺的。被板块滤掉的不计入"已滤掉 N 只"(那个数字说的是没过门槛的)。
     """
     opp_by_sym: dict[str, dict] = {}
 
@@ -208,9 +213,15 @@ def rank_opportunities(
             + (f",同时还在{'、'.join(also)}" if also else "")
         )
 
+    from app.price_limits import board_of
+
     for o in opp_by_sym.values():
         o["score"] = max(0, min(100, o["score"]))
+        o["board"] = board_of(o["symbol"])
     ranked = sorted(opp_by_sym.values(), key=lambda o: (-o["score"], o["symbol"]))
+    if boards:
+        keep = set(boards)
+        ranked = [o for o in ranked if o["board"] in keep]
     shown = [dict(o, why=" · ".join(o["why"]))
              for o in ranked if o["score"] >= min_score][:max_show]
     return shown, len(ranked) - len(shown)
@@ -409,7 +420,8 @@ def _build_overview(repo) -> dict:
         logger.debug("today meso skipped: %s", e)
 
     opportunities, opp_filtered = rank_opportunities(
-        trends, signals, names, prefs["min_score"], prefs["max_show"], bench_ret, extras)
+        trends, signals, names, prefs["min_score"], prefs["max_show"], bench_ret, extras,
+        prefs.get("boards"))
     # [R18] 盘中口径标注: 实时价确实参与了判定的趋势类新信号是"临时信号",
     # 收盘价可能收回去 —— 标记出来, 前端提示"待收盘确认", 防止盘中追假信号
     for o in opportunities:
@@ -620,6 +632,8 @@ class PrefsModel(BaseModel):
     pyramid_probe: int | None = Field(default=None, ge=10, le=60)
     pyramid_confirm: int | None = Field(default=None, ge=40, le=90)
     pyramid_days: int | None = Field(default=None, ge=1, le=5)
+    # [R40] 板块过滤; 传 [] 或全选都等于不过滤
+    boards: list[str] | None = Field(default=None, max_length=12)
 
 
 @router.get("/prefs")
@@ -638,7 +652,8 @@ def put_prefs(body: PrefsModel):
                             max_drawdown=body.max_drawdown,
                             pyramid_probe=body.pyramid_probe,
                             pyramid_confirm=body.pyramid_confirm,
-                            pyramid_days=body.pyramid_days)
+                            pyramid_days=body.pyramid_days,
+                            boards=body.boards)
 
 
 _AI_SYSTEM = """你是用户的盘前参谋,有 15 年 A 股一线交易经验。输入分两部分:今日总览 JSON(市场天气/需要行动/持仓体检),和每只候选买入机会的真实日 K 数据。一次调用完成两件事:先做任务二(优选),再基于优选结果写任务一(导读),两者结论必须一致。
