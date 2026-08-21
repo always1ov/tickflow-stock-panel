@@ -716,7 +716,11 @@ async def strategy_stream(
                         elif error:
                             yield f"event: error\ndata: {json.dumps({'message': error}, ensure_ascii=False)}\n\n"
                         else:
-                            payload = r if isinstance(r, dict) else asdict(r)
+                            # [R54] 单次回测这一路原来漏了 _json_safe(优化器/WF 两路都有)。
+                            # 零波动的区间会算出 nan 的 sharpe/sortino, json.dumps 把它写成
+                            # 裸 NaN —— 那不是合法 JSON, 前端 JSON.parse 直接抛,
+                            # 界面上只剩一句"结果解析失败", 跑完的结果全丢。
+                            payload = _json_safe(r if isinstance(r, dict) else asdict(r))
                             yield f"event: done\ndata: {json.dumps(payload, ensure_ascii=False, default=str)}\n\n"
                     return
 

@@ -83,6 +83,12 @@ export const storage = {
   /** 连板梯队 封单显示模式: vol=按成交量(手), amount=按金额(元) */
   limitLadderSealMode:  kv<'vol' | 'amount'>('limit-ladder-seal-mode'),
 
+  /**
+   * [R54] 回测/挖掘页的手动配置栏是否展开。默认收起 —— 这两页的常规用法是
+   * 让 AI 拿内置的那套东西自己跑, 手动那一大列平时不需要占着主视野。
+   */
+  researchManualOpen:   kv<boolean>('research-manual-open'),
+
   /** 策略创建草稿（新建专用） */
   strategyDraft: kv<{ name: string; description: string; direction: string; style?: string; rules: string; code: string; step: number; strategyId: string; source?: 'ai' | 'custom' } | null>('strategy-draft'),
 

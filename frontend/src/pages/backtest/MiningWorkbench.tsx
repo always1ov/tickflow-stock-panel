@@ -15,9 +15,11 @@ import {
   Rocket,
   Save,
   Settings2,
+  SlidersHorizontal,
   Square,
 } from 'lucide-react'
 import { EmptyState } from '@/components/EmptyState'
+import { storage } from '@/lib/storage'
 import { toast } from '@/components/Toast'
 import {
   api,
@@ -270,6 +272,10 @@ export function MiningWorkbench() {
   const [searchParams, setSearchParams] = useSearchParams()
   const initializedFactors = useRef(false)
   const [draft, setDraft] = useState<MiningDraft>(loadDraft)
+  // [R54] 手动配置默认收起 —— 常规用法是让工作流拿内置因子自己跑。
+  // 收起只是不显示, draft 与下面所有状态照旧。
+  const [manualOpen, setManualOpen] = useState(() => storage.researchManualOpen.get(false))
+  useEffect(() => { storage.researchManualOpen.set(manualOpen) }, [manualOpen])
   const [scheduleDraft, setScheduleDraft] = useState<MiningScheduleConfig | null>(null)
   const [correlationScope, setCorrelationScope] = useState<'all' | 'selected'>('selected')
   const task = useMiningTask()
@@ -525,14 +531,39 @@ export function MiningWorkbench() {
   }
 
   return (
-    <div className="grid min-h-[calc(100vh-9rem)] grid-cols-1 overflow-hidden rounded-card border border-border bg-surface xl:grid-cols-[20rem_minmax(0,1fr)]">
-      <aside className="border-b border-border bg-base/25 xl:max-h-[calc(100vh-9rem)] xl:overflow-y-auto xl:border-b-0 xl:border-r">
+    <div className={`grid min-h-[calc(100vh-9rem)] grid-cols-1 overflow-hidden rounded-card border border-border bg-surface ${
+      manualOpen ? 'xl:grid-cols-[20rem_minmax(0,1fr)]' : ''}`}>
+      {/* [R54] 手动配置默认收起。这一页的常规用法是让上面的工作流拿内置因子
+          自己跑 —— 展开后一切照旧, 一个控件都没动。 */}
+      {!manualOpen && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-border bg-base/25 px-3 py-2">
+          <button type="button" onClick={() => setManualOpen(true)}
+            className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-btn border border-border px-2.5 text-[11px] text-secondary transition-colors hover:border-accent/40 hover:text-accent">
+            <SlidersHorizontal className="h-3.5 w-3.5" />
+            手动配置
+          </button>
+          <span className="text-[10px] leading-4 text-muted">
+            当前 {draft.assetType === 'etf' ? 'ETF' : '股票'} · {draft.factorNames.length}/48 个因子 ·
+            {' '}{draft.start} ~ {draft.end}
+            <span className="ml-1.5 text-muted/70">要自己选因子和档位跑一轮才需要展开</span>
+          </span>
+        </div>
+      )}
+      <aside className={`border-b border-border bg-base/25 xl:max-h-[calc(100vh-9rem)] xl:overflow-y-auto xl:border-b-0 xl:border-r ${
+        manualOpen ? '' : 'hidden'}`}>
         <div className="flex items-center justify-between border-b border-border px-3 py-2">
           <div>
             <div className="text-xs font-semibold text-foreground">挖掘配置</div>
             <div className="mt-0.5 text-[9px] text-muted">日频 · 嵌套样本外 · T-1 环境</div>
           </div>
-          <span className="font-mono text-[9px] text-muted">{draft.factorNames.length}/48</span>
+          <div className="flex items-center gap-1.5">
+            <span className="font-mono text-[9px] text-muted">{draft.factorNames.length}/48</span>
+            <button type="button" onClick={() => setManualOpen(false)}
+              title="收起 —— 让工作流拿内置因子自己跑时用不到这一列"
+              className="inline-flex h-6 items-center rounded-btn border border-border px-1.5 text-[10px] text-muted transition-colors hover:border-accent/40 hover:text-accent">
+              收起
+            </button>
+          </div>
         </div>
 
         <div className="space-y-4 p-3">

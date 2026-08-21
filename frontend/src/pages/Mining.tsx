@@ -37,7 +37,7 @@ export function Mining() {
         <WorkflowPanel
           kind="mining"
           extraConfig={{ asset_type: 'stock' }}
-          hint="开了就不用管 —— 服务端自己跑挖掘, 一次不达标就换一批因子配置重开, 直到达标或预算用尽"
+          hint="开了就不用管 —— AI 从内置因子里自己挑、自己配, 一次不达标就换一批重开, 直到达标或预算用尽"
         />
         <MiningAutopilot />
         <MiningWorkbench />

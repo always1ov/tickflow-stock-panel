@@ -904,6 +904,10 @@ export function StrategyBacktest() {
   const queryClient = useQueryClient()
   const signalNames = useSignalNames()
   const [saved] = useState(() => storage.strategyBacktestLast.get(null))
+  // [R54] 手动配置栏默认收起 —— 这一页的常规用法是让工作流拿内置策略自己跑。
+  // 收起只是不显示, 下面所有配置状态照旧存在, 也照旧透传给工作流。
+  const [manualOpen, setManualOpen] = useState(() => storage.researchManualOpen.get(false))
+  useEffect(() => { storage.researchManualOpen.set(manualOpen) }, [manualOpen])
   const [selectedStrategy, setSelectedStrategy] = useState<string | null>(saved?.selectedStrategy ?? null)
   const [strategyGroup, setStrategyGroup] = useState<StrategyGroup>('all')
   const [symbols, setSymbols] = useState(saved?.symbols ?? '')
@@ -1493,9 +1497,38 @@ export function StrategyBacktest() {
     .filter(item => item.value > 0)
 
   return (
-    <div className="h-full min-h-0 overflow-hidden rounded-card border border-border bg-surface/80 grid grid-cols-1 xl:grid-cols-[18rem_minmax(0,1fr)]">
+    <div className={`h-full min-h-0 overflow-hidden rounded-card border border-border bg-surface/80 grid grid-cols-1 ${
+      manualOpen ? 'xl:grid-cols-[18rem_minmax(0,1fr)]' : ''}`}>
+      {/* [R54] 手动配置栏默认收起。常规用法是让工作流拿内置的那套策略自己跑,
+          手动这一整列平时不该占着主视野 —— 展开后一切照旧, 一个控件都没动。 */}
+      {!manualOpen && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-border bg-base/25 px-3 py-2">
+          <button type="button" onClick={() => setManualOpen(true)}
+            className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-btn border border-border px-2.5 text-[11px] text-secondary transition-colors hover:border-accent/40 hover:text-accent">
+            <SlidersHorizontal className="h-3.5 w-3.5" />
+            手动配置
+          </button>
+          {/* 收起的时候这些口径照样生效, 而且会原样透传给工作流 —— 不写出来
+              就成了看不见的默认值, 那比多占一列更糟 */}
+          <span className="min-w-0 text-[10px] leading-4 text-muted">
+            当前口径 · 本金 {Number(initialCapital).toLocaleString()} · 最多 {maxPositions} 只 ·
+            总仓位 {maxExposure}% · 佣金 {fees}‰ / 印花税 {stampTax}‰ / 滑点 {slippage}‰ ·
+            建仓 {entryFill === 'open_t+1' ? '次日开盘' : '信号日收盘'}
+            <span className="ml-1.5 text-muted/70">这几项工作流原样照用, AI 只动策略与风控那几个旋钮</span>
+          </span>
+        </div>
+      )}
       {/* 配置面板 */}
-      <section className="space-y-3 border-b xl:border-b-0 xl:border-r border-border bg-base/25 px-3 py-3 xl:overflow-y-auto">
+      <section className={`space-y-3 border-b xl:border-b-0 xl:border-r border-border bg-base/25 px-3 py-3 xl:overflow-y-auto ${
+        manualOpen ? '' : 'hidden'}`}>
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-semibold text-foreground">手动配置</span>
+          <button type="button" onClick={() => setManualOpen(false)}
+            title="收起 —— 让工作流拿内置策略自己跑时用不到这一列"
+            className="inline-flex h-6 items-center gap-1 rounded-btn border border-border px-1.5 text-[10px] text-muted transition-colors hover:border-accent/40 hover:text-accent">
+            <X className="h-3 w-3" />收起
+          </button>
+        </div>
         <div>
           <div className="flex items-center justify-between mb-1.5">
             <label className="text-xs font-medium text-secondary">选择策略</label>
@@ -1891,7 +1924,7 @@ export function StrategyBacktest() {
             initial_capital: Number(initialCapital),
             matching,
           }}
-          hint="开了就不用管 —— 服务端自己选策略、配风控、跑回测, 一次不达标就换一套重来"
+          hint="开了就不用管 —— AI 从内置策略里自己挑、自己配风控、自己跑, 一次不达标就换一套重来。费率/本金/撮合口径用你在「手动配置」里设的那套, AI 碰不到"
         />
         {(pilotBusy || pilotRounds.length > 0 || pilotConclusion) && (
           <PilotTrace busy={pilotBusy} step={pilotStep}
