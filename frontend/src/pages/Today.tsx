@@ -159,28 +159,33 @@ function sessionPhaseHint(live: boolean | undefined): { label: string; hint: str
 // [R40] 板块徽章。20cm 的两个板(创业/科创)与 30cm 的北交所用暖色标出来 ——
 // 同一个把握分, 20cm 的票波动天然更大, 仓位不该一样。
 /**
- * [R41] 短期过热标。系统原来只说得出"该买了"和"该跑了", 说不出中间那句
- * "涨得太急了" —— 这个标就是那句话。
+ * [R43] 高抛/低吸标 —— 由 Keltner 三档通道位置合成, 与决策台三列、个股分析图表、
+ * 回测策略同一组口径。原来这里用的是 RSI + MA20 乖离, 已整体撤掉:
+ * 界面上看到的"贴上轨"和系统据以建议减仓的"贴上轨", 现在是同一件事。
  *
- * 标签必须带真实数字(RSI 多少、离 20 日线几个 ATR), 只显示"过热"两个字
- * 等于要用户盲信一个他没法复核的判断。
+ * 标签必须写明哪几档共振 —— 只显示"高位"两个字等于要用户盲信一个他没法复核的判断。
  */
 function HeatTag({ heat }: { heat?: TodayHeat | null }) {
   if (!heat) return null
-  const hot = heat.level === 'hot'
+  const high = heat.side === 'high'
+  const strong = heat.level === 'strong'
   return (
     <span
       title={
-        `${heat.text} —— ${hot
-          ? '短期冲过头了。趋势没坏, 但这个位置追进去是在最贵的地方买; 已有像样浮盈的可以落袋一部分'
-          : '节奏偏急, 只作提示, 不改变操作档位'}` +
-        '。判定要 RSI 超买「且」价格离 20 日线足够远, 两个条件同时满足才报 —— 强势趋势里 RSI 常年偏高, 只看 RSI 会误伤'
+        `${heat.text} —— ${high
+          ? (strong
+              ? '短中期都到了通道上沿。趋势没坏, 但这个位置追进去是在最贵的地方买; 已有像样浮盈的可以落袋一部分'
+              : '只有短期贴到上沿。强势趋势本来就沿着上轨走, 仅作提示, 不改变操作档位')
+          : '在通道下沿 —— 属于低吸位置, 不扣分'}` +
+        '。短期档定方向(它是操作级别), 中期档定强弱(只放大不改向), 长期档仅供参考。收盘口径'
       }
       className={`ml-1.5 cursor-help rounded px-1 py-0.5 text-[9px] ${
-        hot ? 'bg-amber-400/20 text-amber-300' : 'bg-border/40 text-muted'
+        high
+          ? (strong ? 'bg-amber-400/20 text-amber-300' : 'bg-border/40 text-muted')
+          : 'bg-sky-400/15 text-sky-300'
       }`}
     >
-      {heat.level_cn}
+      {high ? (strong ? '到上沿' : '近上沿') : '到下沿'}
     </span>
   )
 }

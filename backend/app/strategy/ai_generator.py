@@ -343,6 +343,12 @@ META = {{...}}，{entrypoint_requirement}。只输出完整 Python 代码。
         "polars",
         "numpy",
         "app.backtest.matrix",
+        # [R43] Keltner 三档参数的唯一出处。策略、决策台三列、个股分析图表、
+        # 今日总览四处共用它, 不放进白名单就只能在策略里再抄一份常量 ——
+        # 那正是"回测验证的不是你界面上看到的东西"的开端。
+        # 放行的前提是它必须保持纯净(纯常量 + 纯数学, 零 IO), 有测试守着;
+        # 能力远小于已在名单里的 app.backtest.matrix。
+        "app.indicators.keltner",
         "app.strategy.builtin.factor_rank_research",
         "datetime",
         "__future__",

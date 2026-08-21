@@ -125,3 +125,72 @@ def assess(*, close: Any, ma: Any, atr: Any, n: float) -> dict | None:
         "to_upper_atr": round((upper - c) / float(atr), 2) if c is not None else None,
         "to_lower_atr": round((c - lower) / float(atr), 2) if c is not None else None,
     }
+
+
+# ---------- 三档合成: 高抛 / 低吸压力 ----------
+
+# 高抛侧与低吸侧的位置集合。贴轨与破轨都算 —— 等真破了再动手往往已经过了那个价。
+_HIGH = (POS_ABOVE, POS_NEAR_UPPER)
+_LOW = (POS_BELOW, POS_NEAR_LOWER)
+
+SIDE_HIGH = "high"   # 该高抛
+SIDE_LOW = "low"     # 该低吸
+LEVEL_STRONG = "strong"
+LEVEL_MILD = "mild"
+
+
+def pressure(bands: dict | None) -> dict | None:
+    """三档通道读数 → 高抛/低吸压力。纯函数。
+
+    判定只看**短期档**定方向, 用**中期档**定强弱:
+
+    · 短期贴/破上轨 = 该高抛; 短期贴/破下轨 = 该低吸。短期是操作级别,
+      这是你真正要动手的那一档。
+    · 中期同向 = strong(两个级别共振), 否则 mild。中期只放大不改向 ——
+      让中期能否决短期的话, 一只中期在通道中部、短期已经破上轨的票会被判成
+      "没事", 而它明明已经短线过热了。
+    · 长期档只带在文本里供参考, 不参与判定。半年通道太钝, 拿它决定
+      这周该不该减仓等于用尺子量头发。
+
+    两侧同时成立是不可能的(短期只有一个位置), 所以不需要处理冲突。
+    """
+    if not bands:
+        return None
+    short = bands.get("s")
+    if not short:
+        return None
+    pos = short.get("pos")
+    if pos in _HIGH:
+        side = SIDE_HIGH
+    elif pos in _LOW:
+        side = SIDE_LOW
+    else:
+        return None
+
+    same = _HIGH if side == SIDE_HIGH else _LOW
+    mid = (bands.get("m") or {}).get("pos")
+    long = (bands.get("l") or {}).get("pos")
+    level = LEVEL_STRONG if mid in same else LEVEL_MILD
+
+    where = "上轨" if side == SIDE_HIGH else "下轨"
+    parts = [f"短期{short.get('pos_cn', '')}"]
+    if mid in same:
+        parts.append(f"中期也{POS_CN.get(mid, '')}")
+    if long in same:
+        parts.append(f"长期同样{POS_CN.get(long, '')}")
+    return {
+        "side": side,
+        "level": level,
+        "text": "、".join(parts),
+        "where": where,
+        # 共振了几档 —— 界面按这个决定标签轻重
+        "bands_aligned": sum(1 for x in (pos, mid, long) if x in same),
+    }
+
+
+def is_high(p: dict | None) -> bool:
+    return bool(p) and p.get("side") == SIDE_HIGH
+
+
+def is_strong(p: dict | None) -> bool:
+    return bool(p) and p.get("level") == LEVEL_STRONG

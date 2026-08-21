@@ -153,13 +153,16 @@ def rank_opportunities(
                 why.append(f"缩量(量比 {vr:.1f}),假突破风险")
         heat = ext.get("heat")
         if heat:
-            # 只有"过热"扣分, "偏热"仅标注不扣 —— 强势趋势里 RSI 偏高是常态,
-            # 一并扣分会把系统推成专挑弱势票的偏好
-            if heat["level"] == "hot":
+            # [R43] 通道位置决定追不追。短中期共振在上沿才扣分, 只有短期贴上轨
+            # 仅标注 —— 强势趋势本来就是沿着上轨走的, 一并扣分会把系统推成
+            # 专挑弱势票的偏好。贴下轨反而是这个策略要的位置, 不扣分。
+            if heat["side"] == "high" and heat["level"] == "strong":
                 score -= 10
-                why.append(f"但短期冲过头({heat['text']}), 这个位置追进去是在最贵的地方买")
+                why.append(f"但已到通道上沿({heat['text']}), 这个位置追进去是在最贵的地方买")
+            elif heat["side"] == "high":
+                why.append(f"已贴近通道上沿({heat['text']})")
             else:
-                why.append(f"节奏偏急({heat['text']})")
+                why.append(f"在通道下沿({heat['text']}), 属于低吸位置")
         win = ext.get("win")
         if win:
             wr, wn = win["rate"], win["n"]
@@ -266,9 +269,9 @@ def build_pyramid_plan(fraction: float, pivot: float | None,
             f" → 回踩不破上满 {cheng(fraction)};收盘跌回{px}下方,清掉试仓、计划作废")
 
 
-# [R41] 过热要"已经涨上来了"才谈落袋 —— 浮亏还嫌它涨太急, 是纯粹的自相矛盾
+# [R43] 高抛要"已经涨上来了"才谈落袋 —— 浮亏还嫌它涨太急, 是纯粹的自相矛盾
 _HEAT_TRIM_MIN_PNL = 0.10
-# 刚转强的头两天不因过热减仓: 主升浪起步 RSI 冲高是常态, 这时候减就是卖飞
+# 刚转强的头两天不因贴上轨减仓: 主升浪起步就是沿着上轨走的, 这时候减就是卖飞
 _HEAT_GRACE_DAYS = 2
 
 
@@ -282,17 +285,20 @@ def holding_stance(exit_triggered: bool, distance_pct: float | None,
     离场纪律由出场线/生命线兜底(最高优先); 减仓是"趋势或 AI 转坏但还没破线"
     的中间档; 加仓要求趋势多头 + AI 看多 + 离出场线还有安全距离, 三者缺一不可。
 
-    [R41] 过热(heat)接进来做两件事, 顺序都有讲究:
+    [R43] 高抛低吸由 **Keltner 通道位置**驱动(heat = ``keltner.pressure`` 的结果),
+    与决策台的三档列、个股分析图表同一组口径。接进来做两件事, 顺序都有讲究:
 
     · **挡加仓**(这条比减仓重要)。原来只要"趋势多头 + AI 看多 + 离线够远"就建议加,
-      不看价格已经冲到哪儿了 —— 那是在最贵的位置加最多的钱。过热时不加。
+      不看价格已经冲到通道哪个位置 —— 那是在最贵的位置加最多的钱。贴/破上轨时不加。
     · **补一档止盈减仓**, 但排在所有风险驱动的减仓**之后**: 破线/转空/AI 看空
-      都是"必须处理", 过热只是"可以落袋"。两者撞上时要说前者, 说后者会让人
+      都是"必须处理", 到上轨只是"可以落袋"。两者撞上时要说前者, 说后者会让人
       误以为只是获利了结。
-      并且加两道闸: 有像样浮盈才谈(``_HEAT_TRIM_MIN_PNL``), 刚转强的头两天不谈
+      并且要求短中期共振(``is_strong``)才减 —— 只有短期贴上轨的情况太常见,
+      每次都提示等于天天喊减仓。
+      另加两道闸: 有像样浮盈才谈(``_HEAT_TRIM_MIN_PNL``), 刚转强的头两天不谈
       (``_HEAT_GRACE_DAYS``) —— 这两条都是为了防"卖飞", 那是这个功能唯一的大风险。
     """
-    from app.services import overheat
+    from app.indicators import keltner
 
     if exit_triggered:
         return "离场", "已跌破出场线,按纪律执行,不猜反弹"
@@ -303,18 +309,18 @@ def holding_stance(exit_triggered: bool, distance_pct: float | None,
     if distance_pct is not None and distance_pct >= -0.015:
         return "减仓", "距出场线不足 1.5%,提前减一部分比破线再动手从容"
 
-    hot = overheat.is_hot(heat)
+    high = keltner.is_high(heat)
     fresh = trend_duration is not None and trend_duration <= _HEAT_GRACE_DAYS
-    if (hot and not fresh
+    if (high and keltner.is_strong(heat) and not fresh
             and pnl_pct is not None and pnl_pct >= _HEAT_TRIM_MIN_PNL):
-        return "减仓", (f"短期冲过头({heat['text']})、浮盈 {pnl_pct:.0%} ——"
+        return "减仓", (f"已到通道上沿({heat['text']})、浮盈 {pnl_pct:.0%} ——"
                         f"可落袋一部分。趋势没坏, 剩下的继续按出场线拿")
 
     if (trend_side == "多头" and ai_signal == "buy"
             and trend_signal in ("转多", "回升")
             and (distance_pct is None or distance_pct < -0.05)):
-        if hot:
-            return "持有", (f"本来够加仓条件, 但短期冲过头了({heat['text']})——"
+        if high:
+            return "持有", (f"本来够加仓条件, 但已经贴到通道上沿({heat['text']})——"
                             f"这个位置加仓是在最贵的地方下最重的注, 等回踩再说")
         return "加仓", "趋势刚走强 + AI 看多 + 离出场线还有安全距离"
     return "持有", "无触发条件,按既定计划持有"
@@ -413,25 +419,24 @@ def _build_overview(repo) -> dict:
     bench_ret = ((market or {}).get("metrics") or {}).get("ret_20d")
     prefs = today_prefs.load()
 
-    # [R41] 短期过热: 持仓与候选各取一次 rsi_14 / ma20 / atr_14。
-    # 一次批量读整张 enriched 快照, 不按标的逐个查 —— 持仓 + 候选加起来可能上百只。
-    # 盘中实时叠加层只有价格没有指标, 所以这里是收盘口径(结论层本来就该走收盘)。
+    # [R43] 高抛低吸由 Keltner 三档通道位置决定 —— 与决策台三列、个股分析图表
+    # 同一组口径。走批量服务, 持仓 + 候选加起来可能上百只, 逐只算会拖死总览。
+    # 收盘口径: 通道要 ATR 与均线, 实时叠加层只有价格, 拿实时价比昨天的通道
+    # 会得到半新半旧的判定(结论层本来就该走收盘)。
     heat_map: dict[str, dict] = {}
+    bands_map: dict[str, dict] = {}
     try:
-        import polars as pl
-        df_h, _hd = repo.get_enriched_latest()
-        need = {"symbol", "close", "ma20", "atr_14", "rsi_14"}
-        if df_h is not None and not df_h.is_empty() and need <= set(df_h.columns):
-            from app.services import overheat
-            want = sorted({*(s for s, p in pos_all.items() if p.get("held")), *trends})
-            if want:
-                sub = df_h.filter(pl.col("symbol").is_in(want)).select(sorted(need))
-                for r in sub.to_dicts():
-                    h = overheat.extract(r)
-                    if h:
-                        heat_map[str(r["symbol"]).upper()] = h
+        from app.indicators import keltner
+        from app.services import keltner_service
+        want = sorted({*(s for s, p in pos_all.items() if p.get("held")), *trends})
+        if want:
+            bands_map = keltner_service.channels_for_symbols(repo, want)
+            for sym, bands in bands_map.items():
+                pres = keltner.pressure(bands)
+                if pres:
+                    heat_map[sym] = pres
     except Exception as e:  # noqa: BLE001
-        logger.debug("today overheat skipped: %s", e)
+        logger.debug("today keltner pressure skipped: %s", e)
 
     # [R20] 量价与历史胜率因子: 只为带新信号的候选算(远小于自选总数, 上限 40 只保护)
     extras: dict[str, dict] = {}
@@ -460,7 +465,7 @@ def _build_overview(repo) -> dict:
             if s in vol_map:
                 ent["vol_ratio"] = vol_map[s]
             if s in heat_map:
-                ent["heat"] = heat_map[s]
+                ent["heat"] = heat_map[s]      # Keltner 高抛/低吸压力
             try:
                 from app.services.livermore_service import bullish_win_rate_for_symbol
                 win = bullish_win_rate_for_symbol(repo, s)
@@ -567,6 +572,7 @@ def _build_overview(repo) -> dict:
             "signal": (sig or {}).get("signal"),
             "stance": stance, "stance_why": stance_why,
             "heat": heat,
+            "bands": bands_map.get(sym),
             "weight": pos.get("weight"),
         })
     holdings.sort(key=lambda h: (not h["exit_triggered"], h["distance_pct"] if h["distance_pct"] is not None else -9))

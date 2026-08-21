@@ -161,18 +161,23 @@ export interface TodayOpportunity {
   mainline?: TodayMainlineTag | null
   /** [R40] 板块归属(沪主板/深主板/创业板/科创板/北交所) */
   board?: string
-  /** [R41] 短期过热读数; 够不着门槛为 null */
+  /** [R43] 高抛/低吸压力; 短期档在通道内时为 null */
   heat?: TodayHeat | null
 }
 
-/** [R41] 短期冲过头: RSI 超买 **且** 价格离 MA20 有 N 个 ATR, 两个条件同时满足才算 */
+/**
+ * [R43] 高抛/低吸压力 —— 由 Keltner 三档通道位置合成, 与决策台三列、
+ * 个股分析图表、回测策略同一组口径。
+ *
+ * 短期档定方向(它是操作级别), 中期档定强弱(只放大不改向), 长期档仅供参考。
+ */
 export interface TodayHeat {
-  level: 'hot' | 'warm'
-  level_cn: string
-  rsi: number
-  dev_atr: number
-  /** 带真实数字的一句话, 直接显示给用户复核 */
+  side: 'high' | 'low'
+  level: 'strong' | 'mild'
+  /** 哪几档共振, 如"短期破上轨、中期也贴上轨" */
   text: string
+  where: string
+  bands_aligned: number
 }
 
 /** [R40] 板块过滤的可选项与展示顺序 —— 与后端 price_limits.BOARDS 一致 */
@@ -222,8 +227,10 @@ export interface TodayHolding {
   trend_side: string | null; signal: string | null
   stance: string; stance_why: string
   weight?: number | null
-  /** [R41] 短期过热读数; 够不着门槛为 null */
+  /** [R43] 高抛/低吸压力; 短期档在通道内时为 null */
   heat?: TodayHeat | null
+  /** [R43] 三档通道原始读数, 供悬停显示具体轨价 */
+  bands?: KeltnerBands | null
 }
 export interface TodayPortfolio {
   count: number; avg_pnl: number | null; triggered: number; near_exit: number; bearish: number
