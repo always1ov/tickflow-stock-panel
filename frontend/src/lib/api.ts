@@ -354,6 +354,8 @@ export interface ReviewRow {
   /** 当天三档位置; 算不出来的档缺席 */
   bands: Partial<Record<'s' | 'm' | 'l', { pos: string; pos_cn: string }>>
   verdict?: KeltnerVerdict | null
+  /** [R51] 这天之后 forward_days 的涨跌(小数); 最近几天还不知道结果, 为 null */
+  fwd: number | null
 }
 
 /** 每种结论在这只票上出现过几次、之后 forward_days 走成什么样 */
@@ -2947,7 +2949,8 @@ export const api = {
       body: JSON.stringify({ rows, window_label: windowLabel, messages }),
     }),
 
-  // 连板梯队 AI 战法清单: 梯队快照 → 龙头/二进三/反包候选分组(带置信度);
+  // [R50] 「AI 打板复盘」(原「AI 战法」, 已从连板梯队页搬到复盘页):
+  // 梯队快照 → 龙头/二进三/反包候选分组(带置信度);
   // messages 传对话可追问; reportId 传历史报告 id 可对旧报告续问(复用其存档快照)
   ladderAiReview: (payload: { date: string; stats: Record<string, unknown>; tiers: unknown[] }, messages: { role: 'user' | 'assistant'; content: string }[] = [], reportId?: string) =>
     request<{ text: string; report_id: string | null }>('/api/screener/ladder-ai', {

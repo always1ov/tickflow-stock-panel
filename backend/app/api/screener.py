@@ -1007,7 +1007,7 @@ async def ladder_ai_review(req: LadderAiRequest, request: Request):
     from app.services.ai_provider import ai_configured, generate_ai_text
 
     if not ai_configured():
-        raise HTTPException(status_code=400, detail="未配置 AI, 无法生成战法清单")
+        raise HTTPException(status_code=400, detail="未配置 AI, 无法生成打板复盘")
 
     # 历史报告续问: 直接用存档上下文, 保证与当时的快照一致
     context: str | None = None

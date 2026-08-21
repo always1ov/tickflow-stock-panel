@@ -1,7 +1,7 @@
-import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react'
+import React, { useState, useCallback, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
-import { RefreshCw, ChevronDown, Flame, Settings2, X, Bell, BellOff, AlertCircle, Sparkles, Loader2, Send } from 'lucide-react'
+import { RefreshCw, ChevronDown, Flame, Settings2, X, Bell, BellOff, AlertCircle } from 'lucide-react'
 import { DatePicker } from '@/components/DatePicker'
 import { api, type LimitLadderTier, type LimitLadderStock, type MonitorRule } from '@/lib/api'
 import { StockPreviewDialog } from '@/components/StockPreviewDialog'
@@ -15,109 +15,14 @@ import { useTheme } from '@/lib/theme'
 import { useCapabilities, usePreferences } from '@/lib/useSharedQueries'
 import { SealedBadge } from '@/components/SealedBadge'
 import { useDialogBackdrop } from '@/lib/useDialogBackdrop'
+// [R50] ext 字段的读取与取值搬到了 lib —— 复盘页的「AI 打板复盘」要按同一份配置
+// 读题材/行业, 各写一份的话两处显示的题材迟早对不上
+import {
+  DEFAULT_BF, buildExtColumnsParam, getExtTags, loadExtFields, resolveExtFields,
+  type BrokenFailedConfig, type ExtFieldConfig, type ExtFieldItem,
+} from '@/lib/ladderExtFields'
 import type { ExtColumnDisplayConfig } from '@/lib/watchlist-columns'
 
-// ===== Ext 字段配置 =====
-
-/** 每个字段的完整配置：字段来源 + 渲染方式 */
-interface ExtFieldItem {
-  /** "config_id.field_name"，空=不显示 */
-  field?: string
-  /** 渲染配置（分隔符、显示模式、maxTags 等） */
-  display?: ExtColumnDisplayConfig
-}
-
-interface BrokenFailedConfig {
-  /** 炸板：计算N板以上（0=不限，即首板炸板也算） */
-  brokenMinBoards?: number
-  /** 断板：计算N板以上 */
-  failedMinBoards?: number
-  /** 是否计算炸板数 */
-  brokenCount?: boolean
-  /** 是否计算断板数 */
-  failedCount?: boolean
-  /** 是否显示炸板股票 */
-  brokenShow?: boolean
-  /** 是否显示断板股票 */
-  failedShow?: boolean
-}
-
-interface ExtFieldConfig {
-  concept?: ExtFieldItem
-  industry?: ExtFieldItem
-  /** 炸板/断板过滤配置 */
-  bf?: BrokenFailedConfig
-  /** 显示概念分布统计 */
-  showConceptStats?: boolean
-  /** 显示行业分布统计 */
-  showIndustryStats?: boolean
-  /** 显示分组概念分布统计 */
-  showConceptGroupStats?: boolean
-  /** 显示分组行业分布统计 */
-  showIndustryGroupStats?: boolean
-}
-
-const DEFAULT_BF: BrokenFailedConfig = {
-  brokenMinBoards: 0,
-  failedMinBoards: 0,
-  brokenCount: true,
-  failedCount: true,
-  brokenShow: true,
-  failedShow: true,
-}
-
-function loadExtFields(): ExtFieldConfig {
-  const raw = storage.limitLadderExtFields.get({}) as any
-  if (!raw) return {}
-  // 兼容旧格式 { concept: "id.field", conceptSep: "x" }
-  if (typeof raw.concept === 'string') {
-    return {
-      concept: raw.concept ? { field: raw.concept, display: { displayMode: 'tag', separator: raw.conceptSep } } : undefined,
-      industry: raw.industry ? { field: raw.industry, display: { displayMode: 'tag', separator: raw.industrySep } } : undefined,
-    }
-  }
-  return raw
-}
-
-/** 根据显示开关过滤 extFields */
-function resolveExtFields(fields: ExtFieldConfig, showConcept: boolean, showIndustry: boolean): ExtFieldConfig {
-  return {
-    concept: showConcept ? fields.concept : undefined,
-    industry: showIndustry ? fields.industry : undefined,
-    showConceptGroupStats: fields.showConceptGroupStats,
-    showIndustryGroupStats: fields.showIndustryGroupStats,
-  }
-}
-
-function buildExtColumnsParam(fields: ExtFieldConfig): string | undefined {
-  const parts = [fields.concept?.field, fields.industry?.field].filter(Boolean)
-  return parts.length > 0 ? parts.join(',') : undefined
-}
-
-/** 从 stock row 中取出 ext 字段值，按配置渲染 */
-function getExtTags(stock: LimitLadderStock, item?: ExtFieldItem): string[] {
-  if (!item?.field) return []
-  const key = item.field.replace('.', '__')
-  const v = (stock as unknown as Record<string, unknown>)[key]
-  if (v == null) return []
-  const str = String(v)
-  if (!str) return []
-
-  const cfg = item.display
-  if (cfg?.displayMode === 'text') return [str]
-
-  const sep = cfg?.separator?.trim() || null
-  const tags = sep
-    ? str.split(sep).map(s => s.trim()).filter(Boolean)
-    : str.split(/[、,，;；\-]/).map(s => s.trim()).filter(Boolean)
-
-  const maxTags = cfg?.maxTags ?? 0
-  const sliced = maxTags > 0 ? tags.slice(0, maxTags) : tags
-  const hiddenIndices = maxTags > 0 ? cfg?.hiddenIndices : undefined
-  return hiddenIndices?.length
-    ? sliced.filter((_, i) => !hiddenIndices.includes(i))
-    : sliced
-}
 
 // ===== 方向(涨停/跌停) =====
 
@@ -1534,33 +1439,6 @@ export function LimitUpLadder() {
   const tiers = filterTiers(rawTiers, filterKeys, extFields.bf)
   const displayDate = data?.as_of ?? asOf
 
-  // AI 战法清单: 把当前梯队快照(含情绪统计/封单/题材)交给 AI 按打板战法输出候选分组
-  const [showAiReview, setShowAiReview] = useState(false)
-  const aiPayload = useMemo(() => {
-    const allStocks = rawTiers.flatMap(t => t.stocks)
-    const stats = {
-      limit_up: data?.counts?.up ?? 0,
-      limit_down: data?.counts?.down ?? 0,
-      broken: allStocks.filter(st => st.status === 'broken').length,
-      failed: allStocks.filter(st => st.status === 'failed').length,
-      max_boards: rawTiers.reduce((m, t) => Math.max(m, t.boards), 0),
-    }
-    const tiersPayload = rawTiers.map(t => ({
-      boards: t.boards,
-      count: t.count,
-      stocks: t.stocks.slice(0, 25).map(st => ({
-        symbol: st.symbol,
-        name: st.name,
-        boards: t.boards,
-        status: st.status,
-        change_pct: st.change_pct,
-        sealed_status: st.sealed_status,
-        is_one_word: st.is_one_word,
-        concepts: getExtTags(st, extFields.concept).slice(0, 4).join('/') || undefined,
-      })),
-    }))
-    return { date: displayDate || '', stats, tiers: tiersPayload }
-  }, [rawTiers, data?.counts, displayDate, extFields.concept])
 
   // sealed 降级判定
   const sealedDegrade = useSealedDegrade(asOf, data?.as_of, data?.sealed_ready, data?.sealed_counts)
@@ -1642,16 +1520,6 @@ export function LimitUpLadder() {
         }
         right={
           <div className="flex items-center gap-1">
-            {direction === 'up' && (
-              <button
-                onClick={() => setShowAiReview(true)}
-                title="AI 按打板战法(情绪周期/龙头/二进三/反包)复盘当日梯队, 输出候选清单"
-                className="inline-flex items-center gap-1 h-7 px-2.5 rounded-full text-xs font-medium text-amber-400 border border-amber-400/25 bg-amber-400/5 hover:bg-amber-400/15 transition-colors cursor-pointer"
-              >
-                <Sparkles className="h-3.5 w-3.5" />
-                AI 战法
-              </button>
-            )}
             {/* 封单模式: 成交量/金额(仅 sealed 就绪时显示) — 胶囊式 */}
             {data?.sealed_ready && (
               <>
@@ -1824,10 +1692,6 @@ export function LimitUpLadder() {
         onClose={() => setPreviewSymbol(null)}
       />
 
-      {/* AI 战法清单弹窗 */}
-      {showAiReview && (
-        <LadderAiDialog payload={aiPayload} onClose={() => setShowAiReview(false)} />
-      )}
 
       {/* 字段配置弹窗 */}
       <AnimatePresence>
@@ -1843,165 +1707,3 @@ export function LimitUpLadder() {
   )
 }
 
-
-// ===== AI 战法清单弹窗 =====
-// 行为约定(用户明确要求): 打开 = 查看(默认展示最近一份存档, 没有就显示空态);
-// 生成 = 只在用户点「生成清单/重新生成」时才调 AI —— 打开/刷新绝不自动触发, 不重复计费。
-function LadderAiDialog({ payload, onClose }: {
-  payload: { date: string; stats: Record<string, unknown>; tiers: unknown[] }
-  onClose: () => void
-}) {
-  const [chat, setChat] = useState<{ role: 'user' | 'assistant'; content: string }[]>([])
-  const [question, setQuestion] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const [reportId, setReportId] = useState<string | null>(null)
-  const autoLoadedRef = useRef(false)
-
-  // 历史存档列表(后端 ladder_ai_reports.json, 保留 30 份)
-  const historyQ = useQuery({ queryKey: ['ladder-ai-reports'], queryFn: () => api.ladderAiReports() })
-  const reports = historyQ.data?.reports ?? []
-
-  // 打开时: 只"查看"—— 自动载入最近一份存档(优先今天的), 不触发生成
-  useEffect(() => {
-    if (autoLoadedRef.current || reports.length === 0 || chat.length > 0) return
-    autoLoadedRef.current = true
-    const todays = reports.find(r => r.date === payload.date)
-    const r = todays ?? reports[0]
-    setReportId(r.id)
-    setChat([{ role: 'assistant', content: r.text }])
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reports])
-
-  const generate = () => {
-    if (loading) return
-    setLoading(true)
-    setError('')
-    setChat([])
-    setReportId(null)
-    api.ladderAiReview(payload)
-      .then(res => {
-        setChat([{ role: 'assistant', content: res.text }])
-        setReportId(res.report_id)
-        historyQ.refetch()
-      })
-      .catch(e => setError(String((e as Error)?.message || 'AI 生成失败')))
-      .finally(() => setLoading(false))
-  }
-
-  const loadReport = (id: string) => {
-    const r = reports.find(x => x.id === id)
-    if (!r) return
-    setReportId(r.id)
-    setChat([{ role: 'assistant', content: r.text }])
-    setError('')
-  }
-
-  const ask = async () => {
-    const q = question.trim()
-    if (!q || loading || chat.length === 0) return
-    setQuestion('')
-    const next = [...chat, { role: 'user' as const, content: q }]
-    setChat(next)
-    setLoading(true)
-    try {
-      // 追问: 传 report_id, 后端复用该报告存档的快照, 保证问的是"那份清单当时的盘面"
-      const res = await api.ladderAiReview(payload, next, reportId ?? undefined)
-      setChat([...next, { role: 'assistant', content: res.text }])
-    } catch (e) {
-      setError(String((e as Error)?.message || 'AI 追问失败'))
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const removeReport = async (id: string) => {
-    try {
-      await api.ladderAiDeleteReport(id)
-      historyQ.refetch()
-      if (reportId === id) { setChat([]); setReportId(null) }
-    } catch { /* 静默 */ }
-  }
-
-  const viewingReport = reports.find(r => r.id === reportId)
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm" onClick={onClose}>
-      <div role="dialog" aria-modal="true" className="flex max-h-[84vh] w-full max-w-2xl flex-col overflow-hidden rounded-lg border border-border bg-surface shadow-2xl" onClick={e => e.stopPropagation()}>
-        <header className="flex items-center gap-2.5 border-b border-border/60 px-5 py-3.5">
-          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-md border border-amber-400/25 bg-amber-400/10 text-amber-400">
-            <Sparkles className="h-4 w-4" />
-          </span>
-          <div className="flex-1 min-w-0">
-            <h2 className="text-sm font-medium text-foreground">AI 战法清单 · {viewingReport ? `${viewingReport.date} 存档` : payload.date}</h2>
-            <p className="text-[11px] text-muted truncate">打开即查看存档 · 生成需手动点击 · 带置信度 —— 高风险, 仅为复盘参考</p>
-          </div>
-          {/* 历史存档: 选择回看, 可续问 */}
-          {reports.length > 0 && (
-            <select
-              value={reportId ?? ''}
-              onChange={e => e.target.value && loadReport(e.target.value)}
-              disabled={loading}
-              title="回看历史战法清单(选中后可继续追问当时的盘面)"
-              className="h-7 max-w-[150px] rounded border border-border bg-base px-1.5 text-[11px] text-foreground focus:outline-none focus:border-amber-400/50 disabled:opacity-50 cursor-pointer"
-            >
-              <option value="" disabled>历史 ({reports.length})</option>
-              {reports.map(r => (
-                <option key={r.id} value={r.id}>{r.date} · {new Date(r.created_at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}</option>
-              ))}
-            </select>
-          )}
-          {reportId && (
-            <button onClick={() => removeReport(reportId)} disabled={loading} title="删除当前查看的这份存档"
-              className="text-[11px] px-2 h-7 rounded border border-border bg-base text-muted hover:text-danger hover:border-danger/40 disabled:opacity-50 transition-colors cursor-pointer">
-              删除
-            </button>
-          )}
-          {/* 生成: 唯一会调 AI 的入口 */}
-          <button onClick={generate} disabled={loading}
-            title="对今日梯队生成新清单(调用 AI, 结果自动存档)"
-            className="inline-flex items-center gap-1 text-[11px] px-2.5 h-7 rounded border border-amber-400/30 bg-amber-400/10 text-amber-300 hover:bg-amber-400/20 disabled:opacity-50 transition-colors cursor-pointer">
-            {loading && chat.length === 0 ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
-            {chat.length > 0 || reports.some(r => r.date === payload.date) ? '重新生成' : '生成清单'}
-          </button>
-          <button onClick={onClose} className="text-muted hover:text-foreground transition-colors cursor-pointer"><X className="h-4 w-4" /></button>
-        </header>
-        <div className="flex-1 overflow-auto p-5 space-y-2">
-          {chat.length === 0 && !loading && (
-            <div className="py-10 text-center text-xs text-muted">
-              {reports.length === 0
-                ? <>还没有任何战法清单存档。<br /><span className="text-muted/60">点右上角「生成清单」对今日({payload.date})梯队生成第一份(会调用 AI)。</span></>
-                : <>选择上方「历史」回看存档, 或点「重新生成」出一份新的。</>}
-            </div>
-          )}
-          {chat.map((m, i) => (
-            <div key={i} className={m.role === 'assistant'
-              ? 'rounded-lg border border-border/60 bg-elevated/30 px-4 py-3 text-xs leading-relaxed text-secondary whitespace-pre-wrap'
-              : 'rounded-lg border border-amber-400/25 bg-amber-400/[0.06] px-4 py-2 text-xs text-amber-200 ml-10'}>
-              {m.content}
-            </div>
-          ))}
-          {loading && (
-            <div className="flex items-center gap-1.5 py-4 text-xs text-muted"><Loader2 className="h-3.5 w-3.5 animate-spin" />AI {chat.length === 0 ? '正在结合市场环境/主线排行按战法复盘…(生成中请勿关闭, 完成后自动存档)' : '思考中…'}</div>
-          )}
-          {error && <div className="text-xs text-danger">{error}</div>}
-        </div>
-        <div className="border-t border-border/60 p-3 flex items-center gap-2">
-          <input
-            value={question}
-            onChange={e => setQuestion(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') ask() }}
-            disabled={loading || chat.length === 0}
-            placeholder="继续追问, 如: 二进三里哪只封单最扎实? 明天集合竞价该盯什么?"
-            className="flex-1 h-8 rounded-lg border border-border bg-base px-3 text-xs text-foreground placeholder:text-muted/50 focus:outline-none focus:border-amber-400/50 disabled:opacity-50"
-          />
-          <button onClick={ask} disabled={loading || !question.trim() || chat.length === 0}
-            className="inline-flex items-center gap-1 h-8 px-3 rounded-lg border border-amber-400/30 bg-amber-400/10 text-amber-300 text-xs hover:bg-amber-400/20 disabled:opacity-40 transition-colors cursor-pointer">
-            <Send className="h-3 w-3" />
-            追问
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}

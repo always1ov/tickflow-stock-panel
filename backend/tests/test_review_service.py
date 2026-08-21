@@ -277,3 +277,36 @@ def test_blank_symbol_is_a_400_not_a_silent_empty_result():
     r = _client(_Repo(_frame(_series()))).get(
         "/api/stock-analysis/review", params={"symbol": "   "})
     assert r.status_code == 400
+
+
+# ---------- [R51] 每天的后验 ----------
+
+def test_each_row_carries_its_own_forward_return():
+    """结论视图按段展示时要说清这一段兑现没有 —— 只有一个全票平均数
+    看不出是哪一次。"""
+    out = _review(_frame(_series(wave=14.0)))
+    rows = out["rows"]
+    by_date = {r["date"]: r for r in rows}
+    older = [r for r in rows if r["fwd"] is not None]
+    assert older, "除了最近 5 天, 其余都该有结果"
+    r = older[0]
+    # rows 是新→旧, 所以"之后 5 天"在列表里是更靠前的位置
+    i = rows.index(r)
+    later = rows[i - rs.FORWARD_DAYS]
+    # close 是四舍五入到分的展示值, fwd 走的是原始收盘 —— 容差放到两个分位
+    assert r["fwd"] == pytest.approx(later["close"] / r["close"] - 1, abs=1e-3)
+    assert all(by_date[x["date"]]["fwd"] is None for x in rows[:rs.FORWARD_DAYS]), \
+        "最近 5 天还不知道结果, 不该编一个数出来"
+
+
+def test_row_forward_returns_agree_with_the_outcome_summary():
+    """两处算的是同一件事, 对不上就说明有一处走了另一套口径。"""
+    out = _review(_frame(_series(wave=14.0)))
+    want: dict[str, list[float]] = {}
+    for r in out["rows"]:
+        if r["verdict"] and r["fwd"] is not None:
+            want.setdefault(r["verdict"]["code"], []).append(r["fwd"])
+    for o in out["outcomes"]:
+        got = want[o["code"]]
+        assert o["n"] == len(got)
+        assert o["avg_fwd"] == pytest.approx(sum(got) / len(got), abs=1e-3)

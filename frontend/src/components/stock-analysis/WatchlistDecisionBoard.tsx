@@ -7,7 +7,7 @@ import { toast } from '@/components/Toast'
 import { useHistoryReports, openHistoryReport, loadHistory } from '@/lib/stockAnalysisStore'
 import { trendBadgeCls } from '@/components/stock-analysis/TrendStateBar'
 import { TrendSummaryDialog } from '@/components/stock-analysis/TrendSummaryDialog'
-import { StockReviewDialog } from '@/components/stock-analysis/StockReviewDialog'
+import { StockReviewDialog, type ReviewTab } from '@/components/stock-analysis/StockReviewDialog'
 import { VerdictHover } from '@/components/stock-analysis/VerdictHover'
 
 type Position = { held: boolean; cost: number | null; weight?: number | null; updated_at: string }
@@ -92,7 +92,7 @@ function VerdictCell({ v, onOpen }: { v?: KeltnerVerdict | null; onOpen: () => v
         <button
           onClick={onOpen}
           className="cursor-pointer text-[10px] text-muted/40 hover:text-sky-300"
-          title="短期通道在中部 —— 位置上没有可说的, 听趋势和信号的。点击看逐日复盘"
+          title="短期通道在中部 —— 位置上没有可说的, 听趋势和信号的。点击翻这只票过去出过哪些结论"
         >
           —
         </button>
@@ -101,7 +101,7 @@ function VerdictCell({ v, onOpen }: { v?: KeltnerVerdict | null; onOpen: () => v
   }
   return (
     <td className="whitespace-nowrap px-1.5 py-2.5 text-center">
-      <VerdictHover v={v} note="点击翻这只票的逐日复盘 —— 这一档结论过去出现在哪些天、之后走成什么样。">
+      <VerdictHover v={v} note="点击摊开这只票过去每一档结论 —— 出现在哪几天、当时说了什么、之后走成什么样。">
         <button
           onClick={onOpen}
           className={`inline-flex cursor-pointer whitespace-nowrap rounded border px-1 py-0.5 text-[10px] transition-colors hover:brightness-125 ${VERDICT_CLS[v.tone]}`}
@@ -234,8 +234,9 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
   const [heldOnly, setHeldOnly] = useState(false)
   // [fork 增强] 六态汇总弹窗
   const [showTrendSummary, setShowTrendSummary] = useState(false)
-  // [R48] 逐日复盘弹窗 —— 「趋势」「结论」两列点进来的就是它
-  const [review, setReview] = useState<{ symbol: string; name: string } | null>(null)
+  // [R48] 逐日复盘弹窗 —— 「趋势」「结论」两列点进来的就是它。
+  // [R51] tab 记住是从哪一列进来的: 两列点开看的不是同一张表(见 StockReviewDialog)
+  const [review, setReview] = useState<{ symbol: string; name: string; tab: ReviewTab } | null>(null)
   // 排序:默认按置信度降序(信号最强的排前面;未分析的始终垫底)
   const [sort, setSort] = useState<{ key: SortKey; dir: 'asc' | 'desc' }>({ key: 'confidence', dir: 'desc' })
   const toggleSort = (key: SortKey) =>
@@ -549,7 +550,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
 
       {/* [R48] 逐日复盘: 趋势 / 三档结论 / 涨停按同一条时间轴排开 */}
       {review && (
-        <StockReviewDialog symbol={review.symbol} name={review.name} onClose={() => setReview(null)} />
+        <StockReviewDialog symbol={review.symbol} name={review.name} tab={review.tab} onClose={() => setReview(null)} />
       )}
 
       {/* [R28] 关键价位改弹窗后, 页面里已没有 K 线图要让位 —— 表格直接吃满剩余视口高度 */}
@@ -692,22 +693,22 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
                     <td className="whitespace-nowrap px-2 py-2.5 text-center">
                       {r.trend ? (
                         <button
-                          onClick={() => setReview({ symbol: r.symbol, name: r.name })}
+                          onClick={() => setReview({ symbol: r.symbol, name: r.name, tab: 'trend' })}
                           className={`inline-flex cursor-pointer whitespace-nowrap rounded border px-1.5 py-0.5 text-[10px] transition-colors hover:brightness-125 ${trendBadgeCls(r.trend.state)}`}
                           title={`${r.trend.state_cn}(${r.trend.state_en})· 第 ${r.trend.duration} 天,自 ${r.trend.since}\n${
                             // [R29] 先给翻转触发价(真正要盯的位), 关键点/高低水位作参考
                             [r.trend.flip_down != null ? `跌破 ${r.trend.flip_down.toFixed(2)} 转弱` : '',
                              r.trend.flip_up != null ? `站上 ${r.trend.flip_up.toFixed(2)} 转强` : '']
                               .filter(Boolean).join(' / ') || '暂无翻转触发价'
-                          }\n参考:本轮最高收盘 ${r.trend.leg_high?.toFixed(2) ?? '—'} · 上关键点 ${r.trend.up_pivot?.toFixed(2) ?? '—'} / 下关键点 ${r.trend.dn_pivot?.toFixed(2) ?? '—'}\n${r.trend.action}${r.trend.signal ? `\n近期信号:${r.trend.signal} — ${r.trend.signal_desc}` : ''}\n\n点击翻这只票的逐日复盘\n出场优先级:组合回撤风控 > 生命线(20日线) > 止盈线(ATR) > 六态转弱${r.trend.intraday ? '\n⚠ 盘中临时口径:实时价只参与状态判定, 收盘确认为准;上面的价位一律按已收盘日线算' : ''}`}
+                          }\n参考:本轮最高收盘 ${r.trend.leg_high?.toFixed(2) ?? '—'} · 上关键点 ${r.trend.up_pivot?.toFixed(2) ?? '—'} / 下关键点 ${r.trend.dn_pivot?.toFixed(2) ?? '—'}\n${r.trend.action}${r.trend.signal ? `\n近期信号:${r.trend.signal} — ${r.trend.signal_desc}` : ''}\n\n点击翻这只票的逐日状态复盘\n出场优先级:组合回撤风控 > 生命线(20日线) > 止盈线(ATR) > 六态转弱${r.trend.intraday ? '\n⚠ 盘中临时口径:实时价只参与状态判定, 收盘确认为准;上面的价位一律按已收盘日线算' : ''}`}
                         >
                           {r.trend.state_cn} {r.trend.duration}天{r.trend.intraday ? <span className="ml-0.5 opacity-70">*</span> : null}
                         </button>
                       ) : (
                         <button
-                          onClick={() => setReview({ symbol: r.symbol, name: r.name })}
+                          onClick={() => setReview({ symbol: r.symbol, name: r.name, tab: 'trend' })}
                           className="cursor-pointer text-[10px] text-muted/40 hover:text-sky-300"
-                          title="点击看逐日复盘"
+                          title="点击看逐日状态复盘"
                         >—</button>
                       )}
                     </td>
@@ -715,7 +716,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
                     <KeltnerCell band={r.kc?.s} close={r.close} />
                     <KeltnerCell band={r.kc?.m} close={r.close} />
                     <KeltnerCell band={r.kc?.l} close={r.close} />
-                    <VerdictCell v={r.kc?.verdict} onOpen={() => setReview({ symbol: r.symbol, name: r.name })} />
+                    <VerdictCell v={r.kc?.verdict} onOpen={() => setReview({ symbol: r.symbol, name: r.name, tab: 'verdict' })} />
                     {/* 置信度(独立列, 可排序) */}
                     <td className="whitespace-nowrap px-2 py-2.5 text-right font-mono tabular-nums text-muted">
                       {r.sig ? `${r.sig.confidence}%` : '—'}

@@ -189,6 +189,9 @@ def review_for_symbol(repo, symbol: str, days: int = DEFAULT_DAYS) -> dict:
     for i in range(offset, n_total):
         bands = _bands_for_row(closes[i], ma20s[i], ma60s[i], ma120[i], atrs[i])
         v = k.verdict(bands) if bands else None
+        # [R51] 每天单独带上"之后 FORWARD_DAYS 走成什么样"。结论视图按段展示时要
+        # 说清这一段结论出现后到底兑现没有 —— 只有一个全票平均数看不出是哪一次。
+        fwd = _forward_returns(closes, i, FORWARD_DAYS)
         rows.append({
             "date": dates[i],
             "close": round(closes[i], 2),
@@ -202,6 +205,8 @@ def review_for_symbol(repo, symbol: str, days: int = DEFAULT_DAYS) -> dict:
             "bands": {key: {"pos": b["pos"], "pos_cn": b["pos_cn"]}
                       for key, b in bands.items()},
             "verdict": v,
+            # 末尾不足 FORWARD_DAYS 的那几天为 None —— 还不知道结果, 不拿半截数据凑
+            "fwd": None if fwd is None else round(fwd, 4),
         })
 
     limit_ups = sum(1 for r in rows if r["limit_up"])

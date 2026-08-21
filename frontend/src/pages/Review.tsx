@@ -20,6 +20,7 @@ import { QK } from '@/lib/queryKeys'
 import { cn } from '@/lib/cn'
 import { fmtBigNum } from '@/lib/format'
 import { PageHeader } from '@/components/PageHeader'
+import { LadderAiReview } from '@/components/LadderAiReview'
 import { MarkdownRenderer } from '@/components/financials/MarkdownRenderer'
 import { toast } from '@/components/Toast'
 import { usePreferences } from '@/lib/useSharedQueries'
@@ -263,6 +264,9 @@ export function Review() {
                 </button>
               ))}
             </div>
+            {/* [R50] 打板那条线。大盘复盘看指数与情绪, 这份看梯队与打板 ——
+                两份并排才是一次完整的盘后复盘。原在连板梯队页, 名为「AI 战法」 */}
+            <LadderAiReview date={data?.as_of ?? undefined} />
             <button
               onClick={generate}
               disabled={isGenerating}
