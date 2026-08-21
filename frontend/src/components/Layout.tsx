@@ -98,6 +98,23 @@ const nav = [
   { to: '/data',       label: '数据',   icon: Database },
 ] as const
 
+/**
+ * [R57] 「盘面参考」分组 —— 这几页是看的, 不是用来做决定的。
+ *
+ * 连板梯队 / 概念分析 / 行业分析都是展示型的: 打开看两眼有概念, 但不产出
+ * 任何可执行的东西(不给候选、不进把握分、不驱动仓位)。和今日总览/自选/回测
+ * 这些平铺在一起, 每次找常用的那几个都要从它们中间扫过去。
+ *
+ * 所以收进一个默认折叠的分组, 而不是删掉 —— 它们各自还有用处(比如「AI 打板
+ * 复盘」要读连板梯队的数据), 只是不该占主视野。想彻底不要, 设置→菜单里
+ * 本来就能隐藏。
+ */
+const BROWSE_GROUP = {
+  label: '盘面参考',
+  hint: '展示型: 看盘面用, 不产出候选也不影响仓位',
+  paths: new Set<string>(['/limit-ladder', '/concept-analysis', '/industry-analysis']),
+}
+
 /** 亮/暗主题切换 — 状态存 localStorage, 生效见 lib/theme.ts */
 function ThemeToggle() {
   const theme = useTheme()
@@ -315,6 +332,14 @@ export function Layout() {
     try { return localStorage.getItem('tf-nav-collapsed') === '1' } catch { return false }
   })
 
+  // [R57] 「盘面参考」分组默认折叠 —— 展示型的几页不该占主视野
+  const [browseOpen, setBrowseOpen] = useState(() => {
+    try { return localStorage.getItem('tf-nav-browse-open') === '1' } catch { return false }
+  })
+  useEffect(() => {
+    try { localStorage.setItem('tf-nav-browse-open', browseOpen ? '1' : '0') } catch { /* 忽略 */ }
+  }, [browseOpen])
+
   // 分组等权平均涨跌幅 — 复用 watchlist/enriched 查询缓存(与自选页同 key,
   // 盘中随 SSE 刷新)。可见性门控: 子菜单实际可见(侧栏展开 + 二级菜单展开)
   // 时才拉取, 收起状态下不为隐藏 UI 发请求。
@@ -513,6 +538,10 @@ export function Layout() {
 
   const hiddenIds = new Set(prefs?.nav_hidden ?? [])
   const visibleNavItems = navItems.filter(n => !hiddenIds.has(n.to) && !hiddenIds.has(n.to.replace(/^\/analysis\//, '')))
+  // [R57] 分组表头挂在这一组在当前菜单顺序里的**第一项**上 —— 顺序是用户可调的,
+  // 写死某一页当表头的话, 他一调顺序表头就跑到中间去了。全被隐藏时整组不出现。
+  const browsePaths = visibleNavItems.filter(n => BROWSE_GROUP.paths.has(n.to)).map(n => n.to)
+  const firstBrowsePath = browsePaths[0]
 
   const handleToggle = async (enabled: boolean) => {
     // 开启时重新校验档位
@@ -595,8 +624,40 @@ export function Layout() {
           {visibleNavItems.map(({ to, label, icon: Icon, badge }) => {
             // 「自选」项 — 开启分组侧栏且未整体收起时, 渲染为可展开父项 + 二级分组
             const isWatchlistExpandable = to === '/watchlist' && groupsInNav && !navCollapsed && watchlistGroups.length > 0
+            // [R57] 「盘面参考」分组: 表头挂在这一组的第一项上, 折叠时后面的都不渲染。
+            // 用 visibleNavItems 里第一个命中的作锚点 —— 菜单顺序是用户可以自己调的,
+            // 写死某一页当表头的话, 他一调顺序表头就跑到中间去了。
+            const inBrowse = BROWSE_GROUP.paths.has(to)
+            const isBrowseAnchor = inBrowse && to === firstBrowsePath
+            if (inBrowse && !browseOpen && !isBrowseAnchor) return null
             return (
               <div key={to}>
+                {isBrowseAnchor && (
+                  <button
+                    onClick={() => setBrowseOpen(v => !v)}
+                    title={navCollapsed ? BROWSE_GROUP.label : BROWSE_GROUP.hint}
+                    className={cn(
+                      'group relative flex w-full items-center rounded-btn text-sm transition-all duration-150 ease-smooth',
+                      navCollapsed ? 'justify-center px-0 py-2' : 'gap-3 px-3 py-2',
+                      browsePaths.includes(location.pathname)
+                        ? 'bg-elevated text-foreground font-medium'
+                        : 'text-foreground/55 hover:bg-elevated/70 hover:text-foreground',
+                    )}
+                  >
+                    <Layers3 className="h-4 w-4 shrink-0 text-foreground/50" />
+                    {!navCollapsed && (
+                      <>
+                        <span className="flex-1 text-left">{BROWSE_GROUP.label}</span>
+                        <span className="shrink-0 font-mono text-[10px] text-muted">{browsePaths.length}</span>
+                        {browseOpen
+                          ? <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted" />
+                          : <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted" />}
+                      </>
+                    )}
+                  </button>
+                )}
+                {inBrowse && !browseOpen ? null : (
+                <div className={inBrowse && !navCollapsed ? 'pl-3' : undefined}>
                 {isWatchlistExpandable ? (
                   /* 可展开的自选父项 — 点击切换展开, 不直接跳页 */
                   <button
@@ -664,6 +725,8 @@ export function Layout() {
                       </>
                     )}
                   </NavLink>
+                )}
+                </div>
                 )}
 
                 {/* 自选分组二级子菜单 — 展开时显示 */}
