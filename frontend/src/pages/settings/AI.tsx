@@ -8,6 +8,7 @@ import {
 import { useSettings } from '@/lib/useSharedQueries'
 import { api, type SettingsState } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
+import { AiProfiles } from '@/pages/settings/AiProfiles'
 
 // 统一的输入框样式(与项目其他设置页一致)
 const INPUT_CLS =
@@ -289,6 +290,10 @@ export function SettingsAIPanel() {
 
   return (
     <div className="space-y-5 max-w-2xl">
+      {/* [R56] 多档兜底放最上 —— 这是"AI 能不能一直用得上"的那一层。
+          下面那套单档配置保留原样(它就是兜底链里合成的第一档), 想只用一家的
+          照旧在下面配, 不必碰这个表。 */}
+      <AiProfiles />
       <Card icon={Plug} title="连接状态" right={
         configured && (
           <button onClick={handleTest} disabled={testing}

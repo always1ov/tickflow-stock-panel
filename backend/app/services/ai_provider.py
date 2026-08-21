@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 import re
 import shutil
@@ -12,12 +13,15 @@ import tempfile
 import time
 import tomllib
 from collections.abc import AsyncIterator, Callable, Sequence
+from contextvars import ContextVar
 from pathlib import Path
 from types import TracebackType
 from urllib.parse import urlsplit, urlunsplit
 
 from app import secrets_store
 from app.config import settings
+
+logger = logging.getLogger(__name__)
 
 OPENAI_COMPAT_PROVIDER = "openai_compat"
 OPENAI_PROVIDER = "openai"
@@ -102,15 +106,49 @@ def sanitize_focus(focus: str) -> str:
     return text
 
 
+# ===== [R56] 多档兜底 =====
+#
+# 一次调用会按优先级把配置好的档位逐个试过去。为了不去改 _run_openai_once /
+# _stream_openai / _openai_client 里那一堆读配置的地方, 这里用一个 ContextVar
+# 记住"当前正在试的是哪一档", 下面几个 current_* 读它优先。
+#
+# 用 ContextVar 而不是全局变量: 并发的两个请求可能各自在试不同的档, 用全局
+# 会互相串档 —— 那种 bug 只在有并发时才现, 排查起来最费劲。
+_ACTIVE_PROFILE: ContextVar[dict | None] = ContextVar("ai_active_profile", default=None)
+
+
+def _profile_value(field: str) -> str | None:
+    """当前档位的某个字段; 不在兜底链里(或该字段为空)时返回 None, 由调用方回落。"""
+    prof = _ACTIVE_PROFILE.get()
+    if not prof:
+        return None
+    val = prof.get(field)
+    return str(val) if val else None
+
+
+def active_profile() -> dict | None:
+    """当前正在试的档位。给日志与错误消息用。"""
+    return _ACTIVE_PROFILE.get()
+
+
+def _active_ai_key() -> str:
+    return _profile_value("api_key") or secrets_store.get_ai_key()
+
+
 def current_ai_provider() -> str:
-    return secrets_store.get_ai_config("ai_provider", settings.ai_provider) or OPENAI_COMPAT_PROVIDER
+    return (_profile_value("provider")
+            or secrets_store.get_ai_config("ai_provider", settings.ai_provider)
+            or OPENAI_COMPAT_PROVIDER)
 
 
 def current_openai_model() -> str:
-    return secrets_store.get_ai_config("ai_model", settings.ai_model)
+    return _profile_value("model") or secrets_store.get_ai_config("ai_model", settings.ai_model)
 
 
 def current_codex_model() -> str:
+    from_profile = _profile_value("model")
+    if from_profile:
+        return normalize_codex_model(from_profile)
     stored = secrets_store.load()
     model = stored.get("ai_codex_model")
     # 旧版本的两种 provider 共用 ai_model。仅在旧配置仍启用 Codex 时回退读取,
@@ -127,6 +165,10 @@ def current_ai_model() -> str:
 
 
 def current_openai_reasoning_effort() -> str:
+    prof = _ACTIVE_PROFILE.get()
+    if prof is not None:
+        # 档位里显式留空 = 这一档不传 reasoning_effort, 不该回落到全局默认
+        return str(prof.get("reasoning_effort") or "").strip()
     stored = secrets_store.load()
     if "ai_reasoning_effort" not in stored:
         return OPENAI_DEFAULT_REASONING_EFFORT
@@ -212,6 +254,56 @@ def ai_configured(provider: str | None = None) -> bool:
     return bool(secrets_store.get_ai_key())
 
 
+# 什么样的失败该顺位往下试。
+#
+# 分寸在这里: **只有"这一档现在服务不了"才换下一档**。请求本身有问题(比如
+# 消息构造错了)换谁都一样失败, 挨个试一遍等于把每个 key 都白烧一次往返,
+# 还会把真正的错误埋在一串"都失败了"里面。
+#
+#   401/403  key 无效或过期
+#   402      余额不足 —— 用户最常撞上的那个
+#   429      限流 / 额度用尽
+#   5xx      对面挂了
+#   连接类   连不上、超时
+#   模型不存在  这一档没有这个模型(换一档可能就有)
+_FAILOVER_STATUSES = frozenset({401, 402, 403, 429})
+_MODEL_MISSING_HINTS = ("model not found", "model_not_found", "does not exist",
+                        "unknown model", "无可用模型", "模型不存在")
+
+
+def _should_try_next(exc: Exception) -> bool:
+    status = getattr(exc, "status_code", None)
+    if isinstance(status, int):
+        if status in _FAILOVER_STATUSES or 500 <= status <= 599:
+            return True
+        if status == 404:
+            return True
+    if type(exc).__name__ in ("APIConnectionError", "APITimeoutError"):
+        return True
+    text = (_openai_error_detail(exc) or str(exc)).lower()
+    return any(h in text for h in _MODEL_MISSING_HINTS)
+
+
+def _profile_name(prof: dict) -> str:
+    label = str(prof.get("label") or "").strip()
+    model = str(prof.get("model") or "").strip()
+    if label and model:
+        return f"{label}({model})"
+    return label or model or str(prof.get("id") or "?")
+
+
+def _all_failed(errors: list[tuple[dict, Exception]]) -> RuntimeError:
+    """每一档各自为什么失败都要写出来 —— 一句"AI 调用失败"没法据以行动:
+    用户需要知道是该充值、该换 key, 还是对面在抽风。"""
+    lines = [f"· {_profile_name(p)}: {_format_openai_error(e) if _is_openai_transport_error(e) else e}"
+             for p, e in errors]
+    return RuntimeError("配置的 AI 档位全都没能用上:\n" + "\n".join(lines))
+
+
+def _profiles_for_call() -> list[dict]:
+    return secrets_store.list_ai_profiles(enabled_only=True)
+
+
 async def generate_ai_text(
     messages: Sequence[Message],
     *,
@@ -219,20 +311,41 @@ async def generate_ai_text(
     max_tokens: int | None = 3000,
     timeout: float = 180.0,
 ) -> str:
-    """Return a complete AI response from the currently configured provider.
+    """Return a complete AI response, trying each configured profile in priority order.
+
+    [R56] 按优先级逐档兜底: 排在前面的先用, 那一档因为额度/限流/鉴权/宕机
+    用不了就顺位往下。只在"这一档服务不了"时换档 —— 请求本身的错误不换,
+    见 _should_try_next。
 
     max_tokens=None 表示不传该参数(输出上限交给服务端默认) — 推理型模型
     (如 deepseek reasoner 系)的思考 token 计入 max_tokens 预算, 显式限制
     会挤占正文甚至全部吃光(正文 0 字 + finish=length), 长分析类调用应放开。
     """
-    if is_codex_cli_provider():
-        return await _run_codex_cli(messages, max_tokens=max_tokens, timeout=max(timeout, 600.0))
-    return await _run_openai_once(
-        messages,
-        temperature=temperature,
-        max_tokens=max_tokens,
-        timeout=timeout,
-    )
+    profiles = _profiles_for_call()
+    if not profiles:
+        raise RuntimeError("AI API Key 未配置, 请在设置页配置")
+
+    errors: list[tuple[dict, Exception]] = []
+    for i, prof in enumerate(profiles):
+        token = _ACTIVE_PROFILE.set(prof)
+        try:
+            if is_codex_cli_provider():
+                return await _run_codex_cli(
+                    messages, max_tokens=max_tokens, timeout=max(timeout, 600.0))
+            return await _run_openai_once(
+                messages, temperature=temperature, max_tokens=max_tokens, timeout=timeout)
+        except Exception as exc:
+            errors.append((prof, exc))
+            last = i == len(profiles) - 1
+            if last or not _should_try_next(exc):
+                # 只有一档时原样抛原错 —— 包一层只会让人看不到真正的报错
+                if len(errors) == 1:
+                    raise
+                raise _all_failed(errors) from exc
+            logger.warning("AI 档位 %s 用不了(%s), 顺位试下一档", _profile_name(prof), exc)
+        finally:
+            _ACTIVE_PROFILE.reset(token)
+    raise _all_failed(errors)
 
 
 async def stream_ai_text(
@@ -247,19 +360,45 @@ async def stream_ai_text(
     Codex CLI only exposes the final assistant message for this use case, so it
     yields one complete chunk after the command exits.
 
+    [R56] 同样按优先级逐档兜底, 但**只在还没吐出第一个字之前**能换档 ——
+    已经流给用户的内容收不回来, 中途换档会把两家的输出接在一起, 那比直接
+    报错更糟(用户看到的是一段读得通但其实是拼接的文字)。第一个字之后出错
+    就是错, 照实抛。
+
     max_tokens=None 表示不限制输出(同 generate_ai_text 的说明)。
     """
-    if is_codex_cli_provider():
-        yield await _run_codex_cli(messages, max_tokens=max_tokens, timeout=max(timeout, 600.0))
-        return
+    profiles = _profiles_for_call()
+    if not profiles:
+        raise RuntimeError("AI API Key 未配置, 请在设置页配置")
 
-    async for chunk in _stream_openai(
-        messages,
-        temperature=temperature,
-        max_tokens=max_tokens,
-        timeout=timeout,
-    ):
-        yield chunk
+    errors: list[tuple[dict, Exception]] = []
+    for i, prof in enumerate(profiles):
+        token = _ACTIVE_PROFILE.set(prof)
+        started = False
+        try:
+            if is_codex_cli_provider():
+                text = await _run_codex_cli(
+                    messages, max_tokens=max_tokens, timeout=max(timeout, 600.0))
+                started = True
+                yield text
+                return
+            async for chunk in _stream_openai(
+                messages, temperature=temperature, max_tokens=max_tokens, timeout=timeout,
+            ):
+                started = True
+                yield chunk
+            return
+        except Exception as exc:
+            errors.append((prof, exc))
+            last = i == len(profiles) - 1
+            if started or last or not _should_try_next(exc):
+                if len(errors) == 1:
+                    raise
+                raise _all_failed(errors) from exc
+            logger.warning("AI 档位 %s 用不了(%s), 顺位试下一档", _profile_name(prof), exc)
+        finally:
+            _ACTIVE_PROFILE.reset(token)
+    raise _all_failed(errors)
 
 
 async def _run_openai_once(
@@ -269,7 +408,7 @@ async def _run_openai_once(
     max_tokens: int | None,
     timeout: float,
 ) -> str:
-    ai_key = secrets_store.get_ai_key()
+    ai_key = _active_ai_key()
     if not ai_key:
         raise RuntimeError("AI API Key 未配置, 请在设置页配置")
 
@@ -317,7 +456,7 @@ async def _stream_openai(
     max_tokens: int | None,
     timeout: float,
 ) -> AsyncIterator[str]:
-    ai_key = secrets_store.get_ai_key()
+    ai_key = _active_ai_key()
     if not ai_key:
         raise RuntimeError("AI API Key 未配置, 请在设置页配置")
 
@@ -371,7 +510,8 @@ def _openai_client(api_key: str, timeout: float):
     user_agent = secrets_store.get_ai_config("ai_user_agent", "") or settings.ai_user_agent
     return AsyncOpenAI(
         api_key=api_key,
-        base_url=normalize_openai_base_url(secrets_store.get_ai_config("ai_base_url", settings.ai_base_url)),
+        base_url=normalize_openai_base_url(
+            _profile_value("base_url") or secrets_store.get_ai_config("ai_base_url", settings.ai_base_url)),
         timeout=timeout,
         max_retries=0,
         default_headers={"User-Agent": user_agent},

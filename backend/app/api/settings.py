@@ -324,6 +324,55 @@ def save_ai_settings(req: AiSettingsIn) -> dict:
     }
 
 
+# ===== [R56] 多 AI 档位 =====
+
+class AiProfileIn(BaseModel):
+    """一条 AI 档位。列表顺序即优先级 —— 不另设 priority 字段。"""
+    id: str = ""
+    label: str = ""
+    provider: str = "openai_compat"
+    base_url: str = ""
+    api_key: str = ""
+    model: str = ""
+    reasoning_effort: str = ""
+    enabled: bool = True
+
+
+class AiProfilesIn(BaseModel):
+    profiles: list[AiProfileIn] = Field(default_factory=list)
+
+
+def _mask_profiles(rows: list[dict]) -> list[dict]:
+    """key 一律脱敏后再出门 —— 设置页只需要看出"填过没、填的是哪一个"。"""
+    return [dict(p, api_key="", api_key_masked=secrets_store.mask(p.get("api_key") or ""))
+            for p in rows]
+
+
+@router.get("/ai/profiles")
+def list_ai_profiles() -> dict:
+    """按优先级列出 AI 档位。没配过多档时会合成一条来自旧配置的。"""
+    return {"profiles": _mask_profiles(secrets_store.list_ai_profiles())}
+
+
+@router.put("/ai/profiles")
+def save_ai_profiles(req: AiProfilesIn) -> dict:
+    """整表覆写(顺序即优先级)。
+
+    api_key 留空表示**沿用原来那条的 key** —— 列表是脱敏下发的, 前端手里
+    没有明文, 每次保存都要求重填等于逼人把所有 key 再贴一遍。按 id 对上号,
+    对不上(新增的一条)才当成真的空。
+    """
+    existing = {p["id"]: p.get("api_key", "") for p in secrets_store.list_ai_profiles()}
+    rows: list[dict] = []
+    for p in req.profiles:
+        raw = p.model_dump()
+        if not raw.get("api_key"):
+            raw["api_key"] = existing.get(raw.get("id") or "", "")
+        rows.append(raw)
+    saved = secrets_store.save_ai_profiles(rows)
+    return {"ok": True, "profiles": _mask_profiles(saved)}
+
+
 @router.delete("/ai")
 def clear_ai_settings() -> dict:
     """一键清空 AI 配置(provider / base_url / api_key / model)。

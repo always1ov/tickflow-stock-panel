@@ -7,6 +7,7 @@ UI 改 Key 时只动这个文件,不动 .env。
 """
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import os
@@ -100,6 +101,92 @@ def get_ai_key() -> str:
         return val
     from app.config import settings
     return settings.ai_api_key or ""
+
+
+# ===== [R56] 多 AI 档位(按优先级排序, 逐个兜底) =====
+#
+# 原来只有单个 provider / 单个 key / 单个模型 —— 一家用完额度就整个 AI 功能停摆,
+# 没有任何自动切换(用户以为有, 其实没有)。这里把它改成一个**有序列表**:
+# 排在前面的先用, 那一档因为额度/限流/鉴权/宕机用不了就顺位往下试。
+#
+# 列表顺序就是优先级 —— 不另存一个 priority 字段: 两处表达同一件事迟早会打架,
+# 而"拖一下换顺序"本来就是列表的语义。
+
+AI_PROFILE_FIELDS = ("id", "label", "provider", "base_url", "api_key",
+                     "model", "reasoning_effort", "enabled")
+
+
+def _clean_profile(raw: dict, index: int) -> dict | None:
+    if not isinstance(raw, dict):
+        return None
+    model = str(raw.get("model") or "").strip()
+    provider = str(raw.get("provider") or "openai_compat").strip() or "openai_compat"
+    api_key = str(raw.get("api_key") or "").strip()
+    # openai 兼容的那一路没 key 就是个摆设, 留着只会在兜底链上白占一次往返。
+    # Codex CLI 那一路不需要 key(走本地命令), 所以只对前者要求。
+    if provider != "codex_cli" and not api_key:
+        return None
+    return {
+        "id": str(raw.get("id") or "").strip() or f"ai{index}",
+        "label": str(raw.get("label") or "").strip(),
+        "provider": provider,
+        "base_url": str(raw.get("base_url") or "").strip(),
+        "api_key": api_key,
+        "model": model,
+        "reasoning_effort": str(raw.get("reasoning_effort") or "").strip(),
+        "enabled": bool(raw.get("enabled", True)),
+    }
+
+
+def list_ai_profiles(*, enabled_only: bool = False) -> list[dict]:
+    """按优先级返回 AI 档位。
+
+    没配过多档时**合成一条**来自旧字段(ai_provider/ai_api_key/ai_model/...)——
+    这样老配置一行不用改也照跑, 设置页也不会突然空一片。
+    """
+    rows = load().get("ai_profiles")
+    out: list[dict] = []
+    if isinstance(rows, list):
+        for i, raw in enumerate(rows):
+            got = _clean_profile(raw, i)
+            if got:
+                out.append(got)
+    if not out:
+        legacy = _legacy_profile()
+        if legacy:
+            out.append(legacy)
+    return [p for p in out if p["enabled"]] if enabled_only else out
+
+
+def _legacy_profile() -> dict | None:
+    """把旧的单档配置读成一条档位。没配过 AI 时返回 None。"""
+    from app.config import settings
+    provider = str(load().get("ai_provider") or settings.ai_provider or "openai_compat")
+    key = get_ai_key()
+    if provider != "codex_cli" and not key:
+        return None
+    return {
+        "id": "legacy",
+        "label": "",
+        "provider": provider,
+        "base_url": get_ai_config("ai_base_url", settings.ai_base_url),
+        "api_key": key,
+        "model": get_ai_config("ai_model", settings.ai_model),
+        "reasoning_effort": str(load().get("ai_reasoning_effort") or ""),
+        "enabled": True,
+    }
+
+
+def save_ai_profiles(rows: list[dict]) -> list[dict]:
+    """整表覆写(顺序即优先级)。返回清洗后的结果。"""
+    cleaned = [p for p in (_clean_profile(r, i) for i, r in enumerate(rows or [])) if p]
+    current = load()
+    current["ai_profiles"] = cleaned
+    path = _path()
+    path.write_text(json.dumps(current, indent=2, ensure_ascii=False), encoding="utf-8")
+    with contextlib.suppress(OSError):
+        os.chmod(path, 0o600)
+    return cleaned
 
 
 def get_ai_config(key: str, default: str = "") -> str:

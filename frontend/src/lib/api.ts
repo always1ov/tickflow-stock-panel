@@ -1839,6 +1839,26 @@ export interface EndpointManifest {
   source?: 'remote' | 'fallback'
 }
 
+/**
+ * [R56] 一条 AI 档位。**列表顺序就是优先级** —— 排在前面的先用, 那一档因为
+ * 额度/限流/鉴权/宕机用不了就顺位往下试。不另设 priority 字段: 两处表达
+ * 同一件事迟早会打架。
+ */
+export interface AiProfile {
+  id: string
+  /** 给自己看的名字, 如"主力"、"备用" */
+  label: string
+  provider: string
+  base_url: string
+  /** 只在提交时带明文; 留空 = 沿用原来那条的 key */
+  api_key?: string
+  /** 服务端下发的脱敏串, 只用来显示 */
+  api_key_masked?: string
+  model: string
+  reasoning_effort?: string
+  enabled: boolean
+}
+
 export interface SettingsState {
   mode: 'none' | 'free' | 'api_key'
   tickflow_api_key_masked: string
@@ -2081,6 +2101,15 @@ export const api = {
     ),
 
   /** 保存 AI 配置 */
+  /** [R56] 多 AI 档位: 列表顺序即优先级, 前面的先用, 用不了顺位往下 */
+  aiProfiles: () =>
+    request<{ profiles: AiProfile[] }>('/api/settings/ai/profiles'),
+
+  saveAiProfiles: (profiles: AiProfile[]) =>
+    request<{ ok: boolean; profiles: AiProfile[] }>('/api/settings/ai/profiles', {
+      method: 'PUT', body: JSON.stringify({ profiles }),
+    }),
+
   saveAiSettings: (ai: { provider?: string; base_url?: string; api_key?: string; model?: string; reasoning_effort?: string; codex_command?: string; codex_reasoning_effort?: string; user_agent?: string }) =>
     request<{ ok: boolean; ai_provider?: string; ai_model?: string; ai_openai_model?: string; ai_reasoning_effort?: string; ai_codex_model?: string; ai_codex_command?: string; ai_codex_reasoning_effort?: string; ai_configured?: boolean }>('/api/settings/ai', {
       method: 'POST',
