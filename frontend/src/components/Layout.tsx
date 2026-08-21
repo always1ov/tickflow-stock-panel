@@ -82,7 +82,6 @@ type CoreIndex = (typeof CORE_INDEXES)[number]
 const nav = [
   // [fork 增强] 今日总览: 决策汇聚层, 放首位
   { to: '/today',           label: '今日总览', icon: Sunrise },
-  { to: '/',                label: '看板',     icon: LayoutDashboard },
   { to: '/watchlist',  label: '自选',   icon: Star },
   { to: '/screener',   label: '策略',   icon: ScanSearch },
   { to: '/backtest',   label: '回测', icon: History },
@@ -90,6 +89,7 @@ const nav = [
   // [R59] AI 操盘手: 让模型用本系统的信息模拟交易, 长期观察这套信息够不够用
   { to: '/paper-trading', label: 'AI 操盘手', icon: Bot },
   { to: '/stock-analysis',    label: '个股分析', icon: TrendingUp },
+  { to: '/dashboard',       label: '看板',     icon: LayoutDashboard },
   { to: '/limit-ladder', label: '连板梯队', icon: Flame },
   { to: '/concept-analysis', label: '概念分析', icon: Layers3 },
   { to: '/industry-analysis', label: '行业分析', icon: Landmark },
@@ -104,9 +104,12 @@ const nav = [
 /**
  * [R57] 「盘面参考」分组 —— 这几页是看的, 不是用来做决定的。
  *
- * 连板梯队 / 概念分析 / 行业分析都是展示型的: 打开看两眼有概念, 但不产出
- * 任何可执行的东西(不给候选、不进把握分、不驱动仓位)。和今日总览/自选/回测
- * 这些平铺在一起, 每次找常用的那几个都要从它们中间扫过去。
+ * 看板 / 连板梯队 / 概念分析 / 行业分析都是展示型的: 打开看两眼有概念, 但不
+ * 产出任何可执行的东西(不给候选、不进把握分、不驱动仓位)。和今日总览/自选/
+ * 回测这些平铺在一起, 每次找常用的那几个都要从它们中间扫过去。
+ *
+ * [R64] 看板一并收进来, 同时把它从根路径挪到 /dashboard —— 一个展示型的页面
+ * 不该是每次打开应用第一眼看到的那一页。根路径现在去今日总览。
  *
  * 所以收进一个默认折叠的分组, 而不是删掉 —— 它们各自还有用处(比如「AI 打板
  * 复盘」要读连板梯队的数据), 只是不该占主视野。想彻底不要, 设置→菜单里
@@ -115,7 +118,7 @@ const nav = [
 const BROWSE_GROUP = {
   label: '盘面参考',
   hint: '展示型: 看盘面用, 不产出候选也不影响仓位',
-  paths: new Set<string>(['/limit-ladder', '/concept-analysis', '/industry-analysis']),
+  paths: new Set<string>(['/dashboard', '/limit-ladder', '/concept-analysis', '/industry-analysis']),
 }
 
 /** 亮/暗主题切换 — 状态存 localStorage, 生效见 lib/theme.ts */

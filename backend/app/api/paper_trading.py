@@ -20,10 +20,12 @@ router = APIRouter(prefix="/api/paper-trading", tags=["paper-trading"])
 
 def _book_summary(t: dict, scope: str, prices: dict[str, float]) -> dict:
     bk = pt.book(t, scope)
-    init = float(t.get("initial_capital") or 0) or 1.0
+    # 收益率各按各本账自己的本金算 —— 两本设成不同的数也照样可比
+    init = float(bk.get("initial_capital") or 0) or 1.0
     cur = pt.nav(bk, prices)
     return {
         "scope": scope, "scope_cn": pt.SCOPE_CN[scope],
+        "initial_capital": init,
         "cash": round(float(bk.get("cash") or 0), 2),
         "nav": round(cur, 2), "return_pct": round(cur / init - 1, 4),
         "positions_count": len(bk.get("positions") or {}),
@@ -43,8 +45,8 @@ def _summary(t: dict, prices: dict[str, float]) -> dict:
     """
     return {
         "id": t.get("id"), "name": t.get("name"), "profile_id": t.get("profile_id"),
-        "initial_capital": float(t.get("initial_capital") or 0),
         "created_at": t.get("created_at"),
+        "max_positions": pt.clamp_max_positions(t.get("max_positions")),
         "schedule": t.get("schedule") or {"enabled": False, "hour": 15, "minute": 30},
         "books": [_book_summary(t, sc, prices) for sc in pt.SCOPES],
     }
@@ -68,10 +70,14 @@ def list_traders(request: Request) -> dict[str, Any]:
 
 
 class TraderIn(BaseModel):
-    """name 应当就是模型名 —— 这张表要回答的是哪个模型做得更好。"""
+    """name 应当就是模型名 —— 这张表要回答的是哪个模型做得更好。
+
+    capital 是**两本账各自**的初始资金(开的时候给同一个数, 之后可以分别改)。
+    """
     name: str = ""
     profile_id: str
     capital: float = Field(pt.DEFAULT_CAPITAL, gt=0)
+    max_positions: int = Field(pt.DEFAULT_MAX_POSITIONS, ge=1, le=pt.MAX_POSITIONS_CAP)
 
 
 @router.post("/traders")
@@ -85,7 +91,8 @@ def create_trader(req: TraderIn) -> dict[str, Any]:
     # 名字缺省用模型名 —— 这张表比的就是模型
     name = req.name.strip() or prof.get("model") or prof.get("label") or req.profile_id
     try:
-        return pt.create(name=name, profile_id=req.profile_id, capital=req.capital)
+        return pt.create(name=name, profile_id=req.profile_id, capital=req.capital,
+                         max_positions=req.max_positions)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -122,7 +129,7 @@ def get_book(trader_id: str, scope: str, request: Request) -> dict[str, Any]:
     positions.sort(key=lambda p: -(p["market_value"] or 0))
     return {
         "id": t.get("id"), "name": t.get("name"),
-        "initial_capital": float(t.get("initial_capital") or 0),
+        "max_positions": pt.clamp_max_positions(t.get("max_positions")),
         **_book_summary(t, scope, prices),
         "positions": positions,
         # 新 → 旧: 打开先看到最近做了什么
@@ -169,6 +176,42 @@ def run_lifeline(trader_id: str, scope: str, request: Request) -> dict[str, Any]
     live = watchlist_live_map(request.app.state.repo)
     forced = paper_trader_run.check_lifelines(request.app.state.repo, t, scope, live=live)
     return {"forced": forced, "count": len(forced)}
+
+
+class TraderSettingsIn(BaseModel):
+    """[R63] 操作员级设置。持仓只数上限对两本账一视同仁 —— 两本要对照,
+    这个数就得对齐, 分开设会让"谁做得好"变成"谁被允许更分散"。"""
+    max_positions: int = Field(pt.DEFAULT_MAX_POSITIONS, ge=1, le=pt.MAX_POSITIONS_CAP)
+
+
+@router.put("/traders/{trader_id}/settings")
+def set_trader_settings(trader_id: str, req: TraderSettingsIn) -> dict[str, Any]:
+    t = pt.get(trader_id)
+    if t is None:
+        raise HTTPException(status_code=404, detail="操作员不存在")
+    t["max_positions"] = pt.clamp_max_positions(req.max_positions)
+    pt.save(t)
+    return {"ok": True, "max_positions": t["max_positions"]}
+
+
+class BookCapitalIn(BaseModel):
+    """[R63] 单本账的本金。两本各自可设 —— 比如全市场那本给多一点看分散效果。"""
+    initial_capital: float = Field(..., gt=0)
+
+
+@router.put("/traders/{trader_id}/books/{scope}/capital")
+def set_book_capital(trader_id: str, scope: str, req: BookCapitalIn) -> dict[str, Any]:
+    """改本金。**同时把这本账重置到起跑线** —— 中途换本金而不重来的话,
+    收益率的分母变了但历史成交还在, 那条曲线就再也读不懂了。
+    """
+    _scope_or_400(scope)
+    t = pt.get(trader_id)
+    if t is None:
+        raise HTTPException(status_code=404, detail="操作员不存在")
+    pt.book(t, scope)                       # 确保迁移过
+    t["books"][scope] = pt.new_book(float(req.initial_capital))
+    pt.save(t)
+    return {"ok": True, "scope": scope, "initial_capital": float(req.initial_capital)}
 
 
 class ScheduleIn(BaseModel):

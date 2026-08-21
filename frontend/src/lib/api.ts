@@ -1867,6 +1867,8 @@ export type PaperScope = 'market' | 'watchlist'
 export interface PaperBook {
   scope: PaperScope
   scope_cn: string
+  /** [R63] 每本账各自的本金 —— 收益率各按各的算, 设成不同的数也照样可比 */
+  initial_capital: number
   cash: number
   nav: number
   /** 相对初始资金的收益率(小数) */
@@ -1891,8 +1893,9 @@ export interface PaperTrader {
   id: string
   name: string
   profile_id: string
-  initial_capital: number
   created_at: string
+  /** [R63] 同时最多持有几只。两本账一视同仁 —— 要对照, 这个数就得对齐 */
+  max_positions: number
   schedule: PaperSchedule
   /** 两本账并排 —— 分开请求会让人下意识只看其中一边 */
   books: PaperBook[]
@@ -1924,7 +1927,7 @@ export interface PaperOrder {
 export interface PaperBookDetail extends PaperBook {
   id: string
   name: string
-  initial_capital: number
+  max_positions: number
   positions: PaperPosition[]
   /** 新 → 旧 */
   orders: PaperOrder[]
@@ -2196,7 +2199,9 @@ export const api = {
     request<PaperBookDetail>(
       `/api/paper-trading/traders/${encodeURIComponent(id)}/books/${scope}`),
 
-  paperTraderCreate: (body: { name: string; profile_id: string; capital: number }) =>
+  paperTraderCreate: (body: {
+    name: string; profile_id: string; capital: number; max_positions: number
+  }) =>
     request<PaperTrader>('/api/paper-trading/traders', {
       method: 'POST', body: JSON.stringify(body),
     }),
@@ -2211,6 +2216,18 @@ export const api = {
     request<{ forced: PaperOrder[]; count: number }>(
       `/api/paper-trading/traders/${encodeURIComponent(id)}/books/${scope}/lifeline`,
       { method: 'POST' }),
+
+  /** [R63] 操作员级设置(持仓只数上限对两本账一视同仁) */
+  paperTraderSettings: (id: string, maxPositions: number) =>
+    request<{ ok: boolean; max_positions: number }>(
+      `/api/paper-trading/traders/${encodeURIComponent(id)}/settings`,
+      { method: 'PUT', body: JSON.stringify({ max_positions: maxPositions }) }),
+
+  /** [R63] 改单本账的本金。会把这本账一并重置 —— 分母变了历史就读不懂了 */
+  paperBookCapital: (id: string, scope: PaperScope, capital: number) =>
+    request<{ ok: boolean; scope: PaperScope; initial_capital: number }>(
+      `/api/paper-trading/traders/${encodeURIComponent(id)}/books/${scope}/capital`,
+      { method: 'PUT', body: JSON.stringify({ initial_capital: capital }) }),
 
   paperTraderSchedule: (id: string, s: PaperSchedule) =>
     request<{ ok: boolean; schedule: PaperSchedule }>(

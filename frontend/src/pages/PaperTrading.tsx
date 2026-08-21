@@ -160,6 +160,11 @@ function TraderCard({ t, runningScope, onRun, onLifeline, onOpen, onChanged }: {
     },
     onError: e => toast(String((e as Error).message || e), 'error'),
   })
+  const setSettings = useMutation({
+    mutationFn: (n: number) => api.paperTraderSettings(t.id, n),
+    onSuccess: r => { onChanged(); toast(`同时最多持有 ${r.max_positions} 只`, 'success') },
+    onError: e => toast(String((e as Error).message || e), 'error'),
+  })
   const sched = t.schedule
 
   return (
@@ -167,7 +172,20 @@ function TraderCard({ t, runningScope, onRun, onLifeline, onOpen, onChanged }: {
       <header className="flex flex-wrap items-center gap-2 border-b border-border px-3 py-2">
         <Bot className="h-3.5 w-3.5 shrink-0 text-accent" />
         <span className="min-w-0 flex-1 truncate text-xs font-semibold text-foreground">{t.name}</span>
-        <span className="shrink-0 text-[10px] text-muted">本金 {money(t.initial_capital)}</span>
+        {/* [R63] 持仓只数上限对两本账一视同仁 —— 要对照, 这个数就得对齐,
+            分开设会让"谁做得好"变成"谁被允许更分散" */}
+        <label className="flex shrink-0 items-center gap-1 text-[10px] text-muted"
+          title="同时最多持有几只。只挡新开的仓, 已有持仓加仓不受限">
+          最多持有
+          <input type="number" min={1} max={50} disabled={setSettings.isPending}
+            value={t.max_positions}
+            onChange={e => {
+              const v = Number(e.target.value)
+              if (Number.isFinite(v) && v >= 1) setSettings.mutate(v)
+            }}
+            className="h-6 w-12 rounded-input border border-border bg-surface px-1 text-center text-[10px] text-foreground outline-none focus:border-accent" />
+          只
+        </label>
         <button type="button" disabled={remove.isPending}
           onClick={() => { if (window.confirm(`删掉操作员 ${t.name}？\n两本账的全部历史会一起删掉, 拿不回来。`)) remove.mutate() }}
           title="删掉这个操作员及其两本账的全部历史"
@@ -207,9 +225,18 @@ function TraderCard({ t, runningScope, onRun, onLifeline, onOpen, onChanged }: {
             onLifeline={() => onLifeline(b.scope)}
             onOpen={() => onOpen(b.scope)}
             onReset={() => {
-              if (window.confirm(`把「${b.scope_cn}」这本账重置到起跑线？\n只影响这一本, 另一本不动。`)) {
+              if (window.confirm(`把「${b.scope_cn}」这本账重置到起跑线？\n只影响这一本, 另一本不动。本金保持不变。`)) {
                 api.paperTraderReset(t.id, b.scope).then(() => { onChanged(); toast('已重置', 'success') })
                   .catch(e => toast(String((e as Error).message || e), 'error'))
+              }
+            }}
+            onCapital={v => {
+              if (window.confirm(`把「${b.scope_cn}」的本金改成 ${v.toLocaleString('zh-CN')}？\n这本账会一并重置到起跑线 —— 分母变了, 旧的收益率曲线就读不懂了。`)) {
+                api.paperBookCapital(t.id, b.scope, v)
+                  .then(() => { onChanged(); toast('本金已改, 这本账已重新起跑', 'success') })
+                  .catch(e => toast(String((e as Error).message || e), 'error'))
+              } else {
+                onChanged()   // 撤销输入框里的改动
               }
             }} />
         ))}
@@ -218,9 +245,10 @@ function TraderCard({ t, runningScope, onRun, onLifeline, onOpen, onChanged }: {
   )
 }
 
-function BookPane({ b, busy, onRun, onLifeline, onOpen, onReset }: {
+function BookPane({ b, busy, onRun, onLifeline, onOpen, onReset, onCapital }: {
   b: PaperBook; busy: boolean
   onRun: () => void; onLifeline: () => void; onOpen: () => void; onReset: () => void
+  onCapital: (v: number) => void
 }) {
   return (
     <div className="flex min-w-0 flex-col px-3 py-2.5">
@@ -228,6 +256,19 @@ function BookPane({ b, busy, onRun, onLifeline, onOpen, onReset }: {
         <button onClick={onOpen} className="shrink-0 text-[11px] font-medium text-foreground hover:text-accent">
           {b.scope_cn}
         </button>
+        {/* [R63] 两本账各自的本金。改本金会连带重置这本账 —— 中途换本金而不
+            重来的话, 收益率的分母变了但历史成交还在, 那条曲线就再也读不懂了。 */}
+        <label className="flex shrink-0 items-center gap-1 text-[10px] text-muted"
+          title="这本账的初始资金。改了会把这本账重置到起跑线 —— 分母变了, 旧曲线就读不懂了">
+          本金
+          <input type="number" min={10000} step={10000} defaultValue={b.initial_capital}
+            onBlur={e => {
+              const v = Number(e.target.value)
+              if (Number.isFinite(v) && v > 0 && v !== b.initial_capital) onCapital(v)
+              else e.target.value = String(b.initial_capital)
+            }}
+            className="h-6 w-24 rounded-input border border-border bg-surface px-1 text-right text-[10px] font-mono text-foreground outline-none focus:border-accent" />
+        </label>
         <span className={`ml-auto shrink-0 font-mono text-sm font-bold ${pnlCls(b.return_pct)}`}>
           {pct(b.return_pct)}
         </span>
@@ -290,9 +331,10 @@ function AddTrader({ onClose, onDone }: { onClose: () => void; onDone: () => voi
   const [profileId, setProfileId] = useState('')
   const [name, setName] = useState('')
   const [capital, setCapital] = useState(1_000_000)
+  const [maxPositions, setMaxPositions] = useState(10)
 
   const create = useMutation({
-    mutationFn: () => api.paperTraderCreate({ name, profile_id: profileId, capital }),
+    mutationFn: () => api.paperTraderCreate({ name, profile_id: profileId, capital, max_positions: maxPositions }),
     onSuccess: () => { onDone(); toast('操作员已就位, 点「跑一次」开始', 'success') },
     onError: e => toast(String((e as Error).message || e), 'error'),
   })
@@ -330,14 +372,22 @@ function AddTrader({ onClose, onDone }: { onClose: () => void; onDone: () => voi
             </span>
             <input className={INPUT} value={name} onChange={e => setName(e.target.value)} placeholder="如 deepseek-v4-pro" />
           </label>
-          <label className="block">
-            <span className="mb-1 block text-[10px] font-medium text-secondary">初始资金</span>
-            <input className={INPUT} type="number" min={10000} step={10000}
-              value={capital} onChange={e => setCapital(Number(e.target.value))} />
-            <span className="mt-1 block text-[10px] text-muted">
-              想互相比较的话, 几个操作员要用同一个数 —— 本金不同, 收益率也就不可比。
-            </span>
-          </label>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block">
+              <span className="mb-1 block text-[10px] font-medium text-secondary">初始资金</span>
+              <input className={INPUT} type="number" min={10000} step={10000}
+                value={capital} onChange={e => setCapital(Number(e.target.value))} />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-[10px] font-medium text-secondary">同时最多持有</span>
+              <input className={INPUT} type="number" min={1} max={50}
+                value={maxPositions} onChange={e => setMaxPositions(Number(e.target.value))} />
+            </label>
+          </div>
+          <span className="block text-[10px] leading-4 text-muted">
+            两本账各拿这么多本金起步(之后可以分别改)。想互相比较的话, 几个操作员要用同一个数 ——
+            本金和持仓上限不同, 收益率就不是一回事: 能同时拿 40 只的账户是在拿分散度换波动。
+          </span>
         </div>
         <div className="flex justify-end gap-2 border-t border-border px-4 py-3">
           <button onClick={onClose} className="h-8 rounded-btn border border-border px-3 text-xs text-secondary">取消</button>

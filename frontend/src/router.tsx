@@ -41,6 +41,7 @@ const Today = lazy(() => import('./pages/Today').then(m => ({ default: m.Today }
 
 const CORE_ROUTE_PATHS = new Set([
   '/',
+  '/dashboard',
   '/onboarding',
   '/login',
   '/overview',
@@ -116,8 +117,12 @@ export const router = createBrowserRouter([
       </OnboardingGuard>
     ),
     children: [
-      { index: true, element: <Dashboard /> },
-      { path: 'overview', element: <Navigate to="/" replace /> },
+      // [R64] 看板从根路径挪到 /dashboard, 根路径改去今日总览 ——
+      // 看板是展示型的(看一眼有概念, 但不产出可执行的东西), 不该是每次打开
+      // 应用第一眼看到的那一页。今日总览才是决策汇聚层。
+      { index: true, element: <Navigate to="/today" replace /> },
+      { path: 'dashboard', element: <Dashboard /> },
+      { path: 'overview', element: <Navigate to="/dashboard" replace /> },
       { path: 'today', element: <Today /> },
       { path: 'analysis', element: <Navigate to="/settings?tab=ext-pages" replace /> },
       { path: 'analysis/:menuId', element: <AnalysisDetail /> },

@@ -207,10 +207,14 @@ def build_context(repo, trader: dict, scope: str) -> str:
     prices = latest_prices(repo, list((bk.get("positions") or {}).keys()))
     lines.append(f"\n## 你的账户(只有你自己这本「{pt.SCOPE_CN[scope]}」账)")
     lines.append(f"- 现金: {float(bk.get('cash') or 0):,.0f}")
-    lines.append(f"- 初始资金: {float(trader.get('initial_capital') or 0):,.0f}")
+    lines.append(f"- 初始资金: {float(bk.get('initial_capital') or 0):,.0f}")
     lines.append(f"- 当前总资产: {pt.nav(bk, prices):,.0f}")
 
+    cap_n = pt.clamp_max_positions(trader.get("max_positions"))
     positions = bk.get("positions") or {}
+    # 上限写给模型看 —— 不写的话它会开一堆买单, 大半被拒, 那一天的决策就废了一半
+    lines.append(f"- 同时最多持有 {cap_n} 只(当前 {len(positions)} 只); "
+                 f"到上限后只能加仓已有的, 想买新的得先卖掉一只")
     if not positions:
         lines.append("- 当前空仓")
     else:
@@ -279,7 +283,8 @@ async def run_once(repo, trader: dict, scope: str) -> dict:
     for o in orders:
         entry = pt.apply_order(
             bk, action=o["action"], symbol=o["symbol"], shares=o["shares"],
-            price=prices.get(o["symbol"], 0.0), trade_date=trade_date, reason=o["reason"])
+            price=prices.get(o["symbol"], 0.0), trade_date=trade_date, reason=o["reason"],
+            max_positions=pt.clamp_max_positions(trader.get("max_positions")))
         filled.append(entry)
 
     # 净值在成交之后按最新价重记 —— 先记再成交的话当天那一笔看不进曲线

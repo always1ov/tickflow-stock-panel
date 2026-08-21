@@ -43,6 +43,12 @@ RECENT_ORDERS_IN_CONTEXT = 20
 DEFAULT_CAPITAL = 1_000_000.0
 LOT = 100                     # A 股一手
 
+# [R63] 同时最多持有几只。上限存在的理由不是"防止乱买", 而是让成绩可比:
+# 一个能同时拿 40 只的账户跑出来的曲线, 本质上是在拿分散度换波动, 和一个
+# 只拿 5 只的账户不是同一回事。两本账要对照, 这个数就得能对齐。
+DEFAULT_MAX_POSITIONS = 10
+MAX_POSITIONS_CAP = 50
+
 # 成本口径与回测页默认值对齐 —— 两处不一样的话, 操盘手的成绩没法和回测比
 DEFAULT_COMMISSION = 0.0002   # 双边
 DEFAULT_STAMP_TAX = 0.0005    # 卖出单边
@@ -106,8 +112,12 @@ def get(trader_id: str) -> dict | None:
     return None
 
 
-def create(*, name: str, profile_id: str, capital: float = DEFAULT_CAPITAL) -> dict:
-    """开一个操作员。name 应当就是模型名 —— 这张表要回答的是哪个模型做得更好。"""
+def create(*, name: str, profile_id: str, capital: float = DEFAULT_CAPITAL,
+           max_positions: int = DEFAULT_MAX_POSITIONS) -> dict:
+    """开一个操作员。name 应当就是模型名 —— 这张表要回答的是哪个模型做得更好。
+
+    ``capital`` 是**两本账各自**的初始资金(开的时候给同一个数, 之后可以分别改)。
+    """
     rows = list_traders()
     if len(rows) >= MAX_TRADERS:
         raise ValueError(f"最多 {MAX_TRADERS} 个操作员")
@@ -118,10 +128,10 @@ def create(*, name: str, profile_id: str, capital: float = DEFAULT_CAPITAL) -> d
         "id": uuid.uuid4().hex[:12],
         "name": str(name or "").strip() or profile_id,
         "profile_id": str(profile_id or ""),
-        "initial_capital": cap,
-        # 两本账各自一份初始资金 —— 要比的是同样的钱在两个选股范围里怎么走,
-        # 分一份钱给两边会让两条曲线互相牵制, 那就不是对照了
+        # [R63] 本金记在**每本账自己**身上 —— 两本可以设成不同的数(比如全市场
+        # 那本给多一点看分散效果)。收益率各按各的本金算, 所以设得不一样也照样可比。
         "books": {sc: new_book(cap) for sc in SCOPES},
+        "max_positions": clamp_max_positions(max_positions),
         # [R61] 定时: 每天几点自己跑一次。收盘后跑才有当天的收盘价可用。
         "schedule": {"enabled": False, "hour": 15, "minute": 30},
         "enabled": True,
@@ -132,9 +142,18 @@ def create(*, name: str, profile_id: str, capital: float = DEFAULT_CAPITAL) -> d
     return trader
 
 
+def clamp_max_positions(n: Any) -> int:
+    try:
+        v = int(n)
+    except (TypeError, ValueError):
+        return DEFAULT_MAX_POSITIONS
+    return max(1, min(v, MAX_POSITIONS_CAP))
+
+
 def new_book(capital: float) -> dict:
-    return {"cash": float(capital), "positions": {}, "orders": [], "nav_history": [],
-            "last_run_at": None, "last_error": "", "last_note": ""}
+    cap = float(capital)
+    return {"initial_capital": cap, "cash": cap, "positions": {}, "orders": [],
+            "nav_history": [], "last_run_at": None, "last_error": "", "last_note": ""}
 
 
 def book(trader: dict, scope: str) -> dict:
@@ -146,6 +165,7 @@ def book(trader: dict, scope: str) -> dict:
     if not isinstance(books, dict):
         cap = float(trader.get("initial_capital") or DEFAULT_CAPITAL)
         legacy = {
+            "initial_capital": cap,
             "cash": float(trader.get("cash", cap)),
             "positions": trader.get("positions") or {},
             "orders": trader.get("orders") or [],
@@ -161,7 +181,11 @@ def book(trader: dict, scope: str) -> dict:
             trader.pop(k, None)
     if scope not in books:
         books[scope] = new_book(float(trader.get("initial_capital") or DEFAULT_CAPITAL))
-    return books[scope]
+    bk = books[scope]
+    # [R63] 老账本没有自己的本金字段, 就地补上(取操作员那份, 行为不变)
+    if "initial_capital" not in bk:
+        bk["initial_capital"] = float(trader.get("initial_capital") or DEFAULT_CAPITAL)
+    return bk
 
 
 def save(trader: dict) -> dict:
@@ -193,12 +217,10 @@ def reset(trader_id: str, scope: str | None = None) -> dict | None:
     t = get(trader_id)
     if t is None:
         return None
-    cap = float(t["initial_capital"])
-    if scope is None:
-        t["books"] = {sc: new_book(cap) for sc in SCOPES}
-    else:
-        book(t, scope)          # 先确保迁移过
-        t["books"][scope] = new_book(cap)
+    # 重置只是回到起跑线, **不改本金** —— 我改过的设置不该被一次重置抹掉
+    for sc in (SCOPES if scope is None else (scope,)):
+        cap = float(book(t, sc)["initial_capital"])
+        t["books"][sc] = new_book(cap)
     return save(t)
 
 
@@ -235,7 +257,8 @@ def nav(bk: dict, prices: dict[str, float]) -> float:
 
 
 def apply_order(bk: dict, *, action: str, symbol: str, shares: int,
-                price: float, trade_date: str, reason: str = "") -> dict:
+                price: float, trade_date: str, reason: str = "",
+                max_positions: int | None = None) -> dict:
     """执行一笔并记账。返回这一笔的成交记录(被拒时带 rejected 原因)。
 
     拒单也要留痕 —— "AI 想买但钱不够"和"AI 没想买"是两件完全不同的事,
@@ -265,6 +288,11 @@ def apply_order(bk: dict, *, action: str, symbol: str, shares: int,
 
     positions = bk.setdefault("positions", {})
     if action == ACTION_BUY:
+        # [R63] 持仓只数上限: 只挡**新开**的仓, 已有持仓加仓不受限 ——
+        # 挡加仓等于逼它去开一只新的, 那正好和"控制分散度"反着来。
+        if (max_positions is not None and sym not in positions
+                and len(positions) >= max_positions):
+            return _reject(f"已持有 {len(positions)} 只, 到了上限 {max_positions}")
         px = _fill_price(price, ACTION_BUY)
         amount = px * lots
         need = amount + _cost_buy(amount)

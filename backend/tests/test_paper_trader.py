@@ -532,3 +532,112 @@ def test_the_scheduled_run_does_lifelines_before_asking_the_ai():
 
     src = inspect.getsource(ps.run_trader_once)
     assert src.index("check_lifelines") < src.index("run_once")
+
+
+# ---------- [R63] 持仓只数上限 ----------
+#
+# 上限存在的理由不是"防止乱买", 而是**让成绩可比**: 一个能同时拿 40 只的账户
+# 跑出来的曲线, 本质上是在拿分散度换波动, 和一个只拿 5 只的账户不是同一回事。
+
+def test_a_new_position_beyond_the_cap_is_rejected():
+    bk = _bk(cash=1_000_000.0)
+    for i in range(3):
+        pt.apply_order(bk, action="buy", symbol=f"60000{i}.SH", shares=100,
+                       price=10.0, trade_date="2026-08-20", max_positions=3)
+    e = pt.apply_order(bk, action="buy", symbol="600009.SH", shares=100,
+                       price=10.0, trade_date="2026-08-20", max_positions=3)
+    assert "上限 3" in (e.get("rejected") or "")
+    assert len(bk["positions"]) == 3
+
+
+def test_adding_to_an_existing_position_is_not_capped():
+    """挡加仓等于逼它去开一只新的 —— 那正好和"控制分散度"反着来。"""
+    bk = _bk(cash=1_000_000.0)
+    pt.apply_order(bk, action="buy", symbol="600000.SH", shares=100,
+                   price=10.0, trade_date="2026-08-20", max_positions=1)
+    e = pt.apply_order(bk, action="buy", symbol="600000.SH", shares=100,
+                       price=10.0, trade_date="2026-08-21", max_positions=1)
+    assert not e.get("rejected")
+    assert bk["positions"]["600000.SH"]["shares"] == 200
+
+
+def test_selling_frees_a_slot():
+    bk = _bk(cash=1_000_000.0)
+    pt.apply_order(bk, action="buy", symbol="600000.SH", shares=100,
+                   price=10.0, trade_date="2026-08-20", max_positions=1)
+    pt.apply_order(bk, action="sell", symbol="600000.SH", shares=100,
+                   price=10.0, trade_date="2026-08-21", max_positions=1)
+    e = pt.apply_order(bk, action="buy", symbol="600001.SH", shares=100,
+                       price=10.0, trade_date="2026-08-21", max_positions=1)
+    assert not e.get("rejected")
+
+
+def test_no_cap_given_means_no_limit():
+    """撮合本身不该自带一个隐形上限 —— 上限是操作员的设置, 由调用方传下来。"""
+    bk = _bk(cash=1_000_000.0)
+    for i in range(6):
+        pt.apply_order(bk, action="buy", symbol=f"60000{i}.SH", shares=100,
+                       price=10.0, trade_date="2026-08-20")
+    assert len(bk["positions"]) == 6
+
+
+@pytest.mark.parametrize("raw,want", [
+    (0, 1), (-5, 1),                       # 0 只等于这本账不能买任何东西
+    (999, pt.MAX_POSITIONS_CAP),
+    ("abc", pt.DEFAULT_MAX_POSITIONS), (None, pt.DEFAULT_MAX_POSITIONS),
+])
+def test_the_cap_is_clamped_to_something_sane(raw, want):
+    assert pt.clamp_max_positions(raw) == want
+
+
+def test_the_cap_is_written_into_the_context(quiet_overview):
+    """不写给模型看的话, 它会开一堆买单、大半被拒, 那一天的决策就废了一半。"""
+    t = _t()
+    t["max_positions"] = 4
+    ctx = run.build_context(_Repo(), t, pt.SCOPE_WATCHLIST)
+    assert "最多持有 4 只" in ctx
+
+
+# ---------- [R63] 两本账各自的本金 ----------
+
+def test_each_book_carries_its_own_capital():
+    t = pt.create(name="m", profile_id="p", capital=200_000.0)
+    for sc in pt.SCOPES:
+        assert pt.book(t, sc)["initial_capital"] == 200_000.0
+
+
+def test_changing_one_books_capital_leaves_the_other_alone():
+    t = pt.create(name="m", profile_id="p", capital=100_000.0)
+    t["books"][pt.SCOPE_MARKET] = pt.new_book(500_000.0)
+    pt.save(t)
+    back = pt.get(t["id"])
+    assert pt.book(back, pt.SCOPE_MARKET)["initial_capital"] == 500_000.0
+    assert pt.book(back, pt.SCOPE_WATCHLIST)["initial_capital"] == 100_000.0
+
+
+def test_resetting_keeps_the_capital_i_configured():
+    """重置只是回到起跑线 —— 我改过的本金不该被一次重置抹回默认值。"""
+    t = pt.create(name="m", profile_id="p", capital=100_000.0)
+    t["books"][pt.SCOPE_MARKET] = pt.new_book(500_000.0)
+    pt.apply_order(pt.book(t, pt.SCOPE_MARKET), action="buy", symbol="600000.SH",
+                   shares=100, price=10.0, trade_date="2026-08-20")
+    pt.save(t)
+    back = pt.reset(t["id"])
+    assert pt.book(back, pt.SCOPE_MARKET)["initial_capital"] == 500_000.0
+    assert pt.book(back, pt.SCOPE_MARKET)["cash"] == 500_000.0
+    assert pt.book(back, pt.SCOPE_MARKET)["orders"] == []
+
+
+def test_an_old_book_without_its_own_capital_inherits_the_traders():
+    """老账本没有这个字段, 补上之后行为要和以前一模一样。"""
+    legacy = {"id": "old", "name": "m", "profile_id": "p", "initial_capital": 80_000.0,
+              "books": {pt.SCOPE_WATCHLIST: {"cash": 80_000.0, "positions": {},
+                                             "orders": [], "nav_history": []}}}
+    assert pt.book(legacy, pt.SCOPE_WATCHLIST)["initial_capital"] == 80_000.0
+    assert pt.book(legacy, pt.SCOPE_MARKET)["initial_capital"] == 80_000.0
+
+
+def test_the_context_shows_this_books_own_capital(quiet_overview):
+    t = _t()
+    t["books"][pt.SCOPE_WATCHLIST]["initial_capital"] = 333_000.0
+    assert "333,000" in run.build_context(_Repo(), t, pt.SCOPE_WATCHLIST)

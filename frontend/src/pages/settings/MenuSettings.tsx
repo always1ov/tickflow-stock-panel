@@ -31,11 +31,15 @@ interface NavEntry {
 }
 
 const BUILTIN_PAGES: NavEntry[] = [
-  { id: '/', label: '看板', type: 'builtin', visible: true },
+  // [R64] 看板已从根路径挪到 /dashboard —— 这里跟着改, 否则隐藏/排序对它失效
+  // (那种失效不报错, 只表现为"我明明勾了不显示, 它还在")
+  { id: '/today', label: '今日总览', type: 'builtin', visible: true },
+  { id: '/dashboard', label: '看板', type: 'builtin', visible: true },
   { id: '/watchlist', label: '自选', type: 'builtin', visible: true },
   { id: '/screener', label: '策略', type: 'builtin', visible: true },
   { id: '/backtest', label: '回测', type: 'builtin', visible: true },
   { id: '/mining', label: '挖掘', type: 'builtin', visible: true },
+  { id: '/paper-trading', label: 'AI 操盘手', type: 'builtin', visible: true },
   { id: '/limit-ladder', label: '连板梯队', type: 'builtin', visible: true },
   { id: '/concept-analysis', label: '概念分析', type: 'builtin', visible: true },
   { id: '/industry-analysis', label: '行业分析', type: 'builtin', visible: true },
