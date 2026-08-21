@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Star, Wallet, Sparkles, Loader2, ArrowUp, ArrowDown, RefreshCw, FileText, TrendingUp } from 'lucide-react'
-import { api, type ExitLine, type TrendInfo } from '@/lib/api'
+import { api, type ExitLine, type KeltnerBand, type KeltnerBands, type TrendInfo } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { toast } from '@/components/Toast'
 import { useHistoryReports, openHistoryReport, loadHistory } from '@/lib/stockAnalysisStore'
@@ -22,6 +22,46 @@ const SIGNAL_META: Record<string, { label: string; cls: string }> = {
   sell: { label: '卖出', cls: 'border-emerald-400/40 bg-emerald-400/10 text-emerald-400' },
   hold: { label: '持有', cls: 'border-amber-400/40 bg-amber-400/10 text-amber-400' },
   watch: { label: '观望', cls: 'border-border bg-base text-muted' },
+}
+
+// [R42] Keltner 位置配色。破上轨/贴上轨用暖色(偏贵), 破下轨/贴下轨用冷色(偏便宜),
+// 通道内保持中性 —— 位置是事实, 不替用户下买卖判断。
+const KELTNER_CLS: Record<KeltnerBand['pos'], string> = {
+  above: 'border-red-400/40 bg-red-400/10 text-red-400',
+  near_upper: 'border-amber-400/40 bg-amber-400/10 text-amber-400',
+  inside: 'border-border bg-base text-muted',
+  near_lower: 'border-sky-400/40 bg-sky-400/10 text-sky-300',
+  below: 'border-emerald-400/40 bg-emerald-400/10 text-emerald-400',
+}
+
+/**
+ * 一档 Keltner 通道的单元格。
+ *
+ * 显示"贴上轨"这种五档文字, 悬停给出真实的上下轨价、通道内位置百分比,
+ * 以及"还差几个 ATR 到轨" —— 只给一个标签等于让用户盲信一个没法复核的判断。
+ * 该档算不出来(新股不够 120 根 / 均线列缺失)时显示 "—", 不编一个数出来。
+ */
+function KeltnerCell({ band, close }: { band?: KeltnerBand; close: number | null }) {
+  if (!band) {
+    return <td className="px-1 py-1.5 text-center"><span className="text-[10px] text-muted/40">—</span></td>
+  }
+  const pct = Math.round(band.pct * 100)
+  return (
+    <td className="px-1 py-1.5 text-center">
+      <span
+        className={`inline-flex whitespace-nowrap rounded border px-1 py-0.5 text-[10px] ${KELTNER_CLS[band.pos]}`}
+        title={
+          `${band.band_cn}通道 ${band.lower.toFixed(2)} ~ ${band.upper.toFixed(2)}` +
+          `${close != null ? `,收盘 ${close.toFixed(2)}` : ''}\n` +
+          `通道内位置 ${pct}%(0% 贴下轨 / 100% 贴上轨)\n` +
+          `距上轨 ${band.to_upper_atr ?? '—'} 个 ATR · 距下轨 ${band.to_lower_atr ?? '—'} 个 ATR\n` +
+          `${band.hint}\n收盘口径 —— 通道要用 ATR 与均线, 实时价比昨天的通道会半新半旧`
+        }
+      >
+        {band.pos_cn}
+      </span>
+    </td>
+  )
 }
 
 function fmtAgo(iso?: string): string {
@@ -86,6 +126,17 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
     staleTime: 5 * 60_000,
   })
   const trends: Record<string, TrendInfo> = useMemo(() => trendsQ.data?.trends ?? {}, [trendsQ.data])
+
+  // [R42] Keltner 三档位置 —— 与趋势列同一批标的, 收盘口径。
+  // 通道要 ATR 与均线, 实时叠加层只有价格 —— 拿实时价比昨天的通道会得到半新半旧的判定
+  const keltnerQ = useQuery({
+    queryKey: QK.stockKeltner(trendSyms),
+    queryFn: () => api.stockKeltner(trendSyms.split(',')),
+    enabled: trendSyms.length > 0,
+    staleTime: 5 * 60_000,
+  })
+  const keltner: Record<string, KeltnerBands> = useMemo(
+    () => keltnerQ.data?.keltner ?? {}, [keltnerQ.data])
 
   // [fork 增强] 持仓出场线(仅持有+填成本的票有;后端顺带把线同步为监控规则)
   const heldWithCost = Object.values(positions).some((p) => p.held && p.cost)
@@ -192,10 +243,11 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
         const pnl = pos?.held && cost && cost > 0 && close != null ? (close - cost) / cost : null
         const trend: TrendInfo | undefined = trends[symbol]
         const exit: ExitLine | undefined = exitLines[symbol]
-        return { symbol, name: r.name ?? symbol, close, changePct: r.change_pct ?? null, held: !!pos?.held, cost, weight: pos?.weight ?? null, pnl, sig, trend, exit }
+        const kc: KeltnerBands | undefined = keltner[symbol]
+        return { symbol, name: r.name ?? symbol, close, changePct: r.change_pct ?? null, held: !!pos?.held, cost, weight: pos?.weight ?? null, pnl, sig, trend, exit, kc }
       })
       .filter((r) => (heldOnly ? r.held : true))
-  }, [enriched.data, positions, signals, heldOnly, trends, exitLines])
+  }, [enriched.data, positions, signals, heldOnly, trends, exitLines, keltner])
 
   const sortedRows = useMemo(() => {
     const val = (r: (typeof rows)[number]): string | number | null => {
@@ -310,6 +362,10 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
                 <th className="px-2 py-1.5 font-normal text-right"><button onClick={() => toggleSort('pnl')} className={thBtn}>浮盈{caret('pnl')}</button></th>
                 <th className="px-2 py-1.5 font-normal text-right" title="ATR 三阶段出场线(止损/保本/移动止盈),仅持有+填成本的票有;跌破自动推送">止盈线</th>
                 <th className="px-2 py-1.5 font-normal text-center"><button onClick={() => toggleSort('trend')} className={thBtn} title="六态趋势(利弗莫尔,日线收盘价判定):多头在前">趋势{caret('trend')}</button></th>
+                {/* [R42] Keltner 三档: 一眼看出这只票贴着哪条轨。收盘口径, 与个股分析图表同一组公式 */}
+                <th className="px-1 py-1.5 font-normal text-center" title="短期通道 = MA20 ± 2×ATR(约一个月的波动带)。收盘价在通道的哪一段">短通道</th>
+                <th className="px-1 py-1.5 font-normal text-center" title="中期通道 = MA60 ± 2.5×ATR(一个季度)">中通道</th>
+                <th className="px-1 py-1.5 font-normal text-center" title="长期通道 = MA120 ± 3×ATR(半年,牛熊边界)">长通道</th>
                 <th className="px-2 py-1.5 font-normal text-right"><button onClick={() => toggleSort('confidence')} className={thBtn}>置信{caret('confidence')}</button></th>
                 <th className="px-2 py-1.5 font-normal text-center"><button onClick={() => toggleSort('report')} className={thBtn} title="最近一份 AI 分析报告(点击单元格直接打开)">报告{caret('report')}</button></th>
                 <th className="px-4 py-1.5 font-normal text-left"><button onClick={() => toggleSort('signal')} className={thBtn}>AI 信号{caret('signal')}</button></th>
@@ -317,7 +373,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
             </thead>
             <tbody>
               {rows.length === 0 ? (
-                <tr><td colSpan={11} className="px-4 py-6 text-center text-muted">自选为空 —— 去自选页添加标的</td></tr>
+                <tr><td colSpan={14} className="px-4 py-6 text-center text-muted">自选为空 —— 去自选页添加标的</td></tr>
               ) : sortedRows.map((r) => {
                 const active = r.symbol === currentSymbol
                 const up = (r.changePct ?? 0) > 0
@@ -417,6 +473,10 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
                         <span className="text-[10px] text-muted/40">—</span>
                       )}
                     </td>
+                    {/* [R42] Keltner 三档位置 */}
+                    <KeltnerCell band={r.kc?.s} close={r.close} />
+                    <KeltnerCell band={r.kc?.m} close={r.close} />
+                    <KeltnerCell band={r.kc?.l} close={r.close} />
                     {/* 置信度(独立列, 可排序) */}
                     <td className="px-2 py-1.5 text-right font-mono tabular-nums text-muted">
                       {r.sig ? `${r.sig.confidence}%` : '—'}

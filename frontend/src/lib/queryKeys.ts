@@ -78,6 +78,7 @@ export const QK = {
   // [fork 增强] 六态趋势
   stockTrend:           (symbol: string) => ['stock-trend', symbol] as const,
   stockTrends:          (symbols: string) => ['stock-trends', symbols] as const,
+  stockKeltner:         (symbols: string) => ['stock-keltner', symbols] as const,
   klineMinute:          (symbol: string, date: string) =>
                              ['kline-minute', symbol, date] as const,
   klineMinuteRange:     (symbol: string, days: number) =>

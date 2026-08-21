@@ -324,6 +324,20 @@ def get_trends(request: Request, symbols: str = Query(..., description="逗号�
         request.app.state.repo, syms, live=live)}
 
 
+@router.get("/keltner")
+def get_keltner(request: Request, symbols: str = Query(..., description="逗号分隔,最多 300 只")):
+    """[R42] 批量 Keltner 三档位置(决策台「短/中/长通道」三列)。
+
+    返回 {keltner: {SYMBOL: {s|m|l: {pos, pos_cn, upper, lower, pct, ...}}}}。
+    公式与个股分析图表共用 indicators.keltner, 收盘口径。
+    """
+    syms = [s for s in symbols.split(",") if s.strip()][:300]
+    if not syms:
+        raise HTTPException(400, "symbols 不能为空")
+    from app.services import keltner_service
+    return {"keltner": keltner_service.channels_for_symbols(request.app.state.repo, syms)}
+
+
 class TrendBacktestRequest(BaseModel):
     """六态阈值网格回测请求。"""
     symbol: str

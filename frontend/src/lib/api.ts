@@ -280,6 +280,28 @@ export interface ExitLine {
 // [fork 增强] 六态趋势(利弗莫尔 Market Key)
 export type LivermoreState = 'UT' | 'NR' | 'SR' | 'SREA' | 'NREA' | 'DT'
 
+/** [R42] 一档 Keltner 通道的读数。算不出来的档整个缺席, 不会给一个空壳。 */
+export interface KeltnerBand {
+  /** above=破上轨 near_upper=贴上轨 inside=通道内 near_lower=贴下轨 below=破下轨 */
+  pos: 'above' | 'near_upper' | 'inside' | 'near_lower' | 'below'
+  pos_cn: string
+  hint: string
+  upper: number
+  lower: number
+  /** 通道内相对位置: 0=贴下轨 1=贴上轨; 轨外会 <0 或 >1 */
+  pct: number
+  to_upper_atr: number | null
+  to_lower_atr: number | null
+  band_cn: string
+}
+
+/** 短期 MA20±2ATR / 中期 MA60±2.5ATR / 长期 MA120±3ATR */
+export interface KeltnerBands {
+  s?: KeltnerBand
+  m?: KeltnerBand
+  l?: KeltnerBand
+}
+
 export interface TrendInfo {
   state: LivermoreState
   state_cn: string
@@ -3176,6 +3198,11 @@ export const api = {
   stockTrends: (symbols: string[]) =>
     request<{ trends: Record<string, TrendInfo> }>(
       `/api/stock-analysis/trends?symbols=${encodeURIComponent(symbols.join(','))}`),
+
+  /** [R42] 批量 Keltner 三档位置(决策台短/中/长通道三列)。收盘口径, 与图表同一组公式 */
+  stockKeltner: (symbols: string[]) =>
+    request<{ keltner: Record<string, KeltnerBands> }>(
+      `/api/stock-analysis/keltner?symbols=${encodeURIComponent(symbols.join(','))}`),
 
   stockTrendBacktest: (symbol: string, useAi = true) =>
     request<TrendBacktestResult>('/api/stock-analysis/trend/backtest', {

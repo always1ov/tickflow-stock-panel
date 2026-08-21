@@ -17,6 +17,8 @@ from typing import Any
 
 import polars as pl
 
+from app.indicators.keltner import BANDS as KELTNER_BANDS
+
 logger = logging.getLogger(__name__)
 
 
@@ -316,8 +318,14 @@ def _keltner_band(
     ma_val = _ma_value(df, ma_col, window)
     if ma_val is None:
         return []
-    upper = ma_val + n * atr
-    lower = ma_val - n * atr
+    # [R42] 公式统一走 indicators.keltner —— 决策台的三列走批量路径算同一组数,
+    # 两边各写一份的话, 图表说"贴着上轨"、决策台说"通道内"的那天没法查
+    from app.indicators.keltner import band as _kband
+
+    pair = _kband(ma_val, atr, n)
+    if pair is None:
+        return []
+    upper, lower = pair
     return [
         {"value": round(upper, 2), "label": f"{label_short}通道上轨",
          "type": type_key, "side": _side(upper, close), "strength": "medium"},
@@ -359,19 +367,24 @@ def _boll_channel(df: pl.DataFrame) -> list[dict]:
     return out
 
 
+# [R42] 三档参数取自 indicators.keltner.BANDS —— 决策台三列与本图表同一组常量,
+# 改一处两边一起变, 不会出现图表按 2.0 倍、决策台按 2.5 倍的错位。
 def _keltner_short(df: pl.DataFrame) -> list[dict]:
     """Keltner 短期:MA20 ± 2×ATR(近期波动带,约一个月)。"""
-    return _keltner_band(df, "ma20", 20, 2.0, "短期", "keltner_s")
+    _, ma_col, window, n, cn = KELTNER_BANDS[0]
+    return _keltner_band(df, ma_col, window, n, cn, "keltner_s")
 
 
 def _keltner_mid(df: pl.DataFrame) -> list[dict]:
     """Keltner 中期:MA60 ± 2.5×ATR(季度波动带)。"""
-    return _keltner_band(df, "ma60", 60, 2.5, "中期", "keltner_m")
+    _, ma_col, window, n, cn = KELTNER_BANDS[1]
+    return _keltner_band(df, ma_col, window, n, cn, "keltner_m")
 
 
 def _keltner_long(df: pl.DataFrame) -> list[dict]:
     """Keltner 长期:MA120 ± 3×ATR(半年波动带,牛熊趋势边界)。"""
-    return _keltner_band(df, None, 120, 3.0, "长期", "keltner_l")
+    _, ma_col, window, n, cn = KELTNER_BANDS[2]
+    return _keltner_band(df, ma_col, window, n, cn, "keltner_l")
 
 
 # ================================================================
