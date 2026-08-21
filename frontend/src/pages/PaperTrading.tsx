@@ -50,9 +50,11 @@ export function PaperTrading() {
       const filled = res.orders.filter(o => !o.rejected).length
       const rejected = res.orders.length - filled
       const looked = res.focus?.length ? ` · 细看了 ${res.focus.length} 只` : ''
+      const redone = res.refreshed?.filter(r => r.ok).length
+      const fresh = redone ? ` · 重出了 ${redone} 个信号` : ''
       toast(res.orders.length === 0
-        ? `${res.date} 今天不动${looked} —— ${res.note || '没给理由'}`
-        : `${res.date} 成交 ${filled} 笔${rejected ? `, 被拒 ${rejected} 笔` : ''}${looked}`, 'success')
+        ? `${res.date} 今天不动${looked}${fresh} —— ${res.note || '没给理由'}`
+        : `${res.date} 成交 ${filled} 笔${rejected ? `, 被拒 ${rejected} 笔` : ''}${looked}${fresh}`, 'success')
     },
     onError: e => { refresh(); toast(String((e as Error).message || e), 'error') },
   })
@@ -98,6 +100,10 @@ export function PaperTrading() {
           但<span className="text-secondary">系统里的东西全都能用</span>: 先看一轮候选,
           自己挑最多 6 只细看, 服务端把那几只的六态趋势、通道三档与结论、十一类关键价位、
           近月日 K 走势(带涨停/炸板标注)、以及已有的 AI 个股分析一次给全。
+          <span className="text-secondary">信号旧了还能让它现场重出</span>——
+          AI 信号是缓存的, 会标出多久前生成、过期就提示它 refresh(每次最多 3 只)。
+          重出走的是系统默认那条 AI 链, 不是操作员自己的模型 —— 那份信号是系统产物,
+          用它自己的模型生成就变成了它的意见, 还会被别的操作员当系统数据读到。
           它们互相看不见对方的持仓和理由 —— 上下文是按人按账组装的, 不是靠提示词叮嘱。
           全程走<span className="text-secondary">收盘口径</span>;
           唯一的例外是<span className="text-secondary">跌破生命线</span>——

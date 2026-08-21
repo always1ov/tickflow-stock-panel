@@ -30,6 +30,14 @@ MAX_HOLDINGS_SHOWN = 30
 MAX_DEEP_DIVE = 6          # 一次最多细看几只 —— 再多上下文就被这一段吃光了
 KLINE_TAIL_DAYS = 20       # 走势摘要给多少天
 
+# [R66] AI 个股信号多久算旧。信号是缓存的, 别的东西(趋势/通道/价位)每次都现算,
+# 只有它会摆着一个过期的判断不动 —— 拿三周前的"买入"当今天的依据是最坏的情况:
+# 它读起来和今天刚出的一模一样。
+SIGNAL_STALE_DAYS = 3
+# 一次决策最多重出几个信号。每个都是一次真实的 AI 调用(要钱要时间), 而且
+# 无上限的话, 模型一句"全都刷一遍"就能把一次决策拖成几十次调用。
+MAX_REFRESH = 3
+
 # 界限说清楚: 禁的是**外部信息**, 不是"少给你看"。这套系统里的东西全都能用 ——
 # 趋势判定、通道结论、关键价位、日 K 走势、已有的 AI 个股分析, 想细看就开口要。
 _RULES = """铁律:
@@ -52,9 +60,15 @@ LOOK_PROMPT = f"""你是一名 A 股模拟盘操作员, 现在是**看盘**环�
 系统会把它们的趋势、通道、关键价位、近月走势、已有的 AI 分析一次给你。
 已持仓的票也可以挑(要判断是否该卖)。
 
+下面每只票的 AI 信号都标了出的时间, 过期的会写「已过期」。觉得哪只的信号旧到
+不能用了, 就把它列进 refresh —— 系统会**现场重新跑一次 AI 个股分析**再给你
+(最多 {MAX_REFRESH} 只, 每次都是真实开销, 别顺手全填)。
+
 只回一个 JSON:
-{{"focus": ["600000.SH", "000001.SZ"], "why": "一句话说明为什么挑这几只"}}
-一只都不想细看就给 "focus": []。"""
+{{"focus": ["600000.SH", "000001.SZ"],
+  "refresh": ["600000.SH"],
+  "why": "一句话说明为什么挑这几只"}}
+一只都不想细看就给 "focus": []; 不需要重出信号就给 "refresh": []。"""
 
 SYSTEM_PROMPT = f"""你是一名 A 股模拟盘操作员。
 
@@ -288,32 +302,42 @@ def _allowed_symbols(repo, trader: dict, scope: str) -> set[str]:
     return out
 
 
-def parse_focus(text: str, allowed: set[str]) -> list[str]:
-    """从看盘那一轮的回复里取出想细看的代码。
+def _pick(data: dict, keys: tuple[str, ...], allowed: set[str], cap: int) -> list[str]:
+    for k in keys:
+        raw = data.get(k)
+        if isinstance(raw, list):
+            out: list[str] = []
+            for x in raw:
+                sym = str(x or "").strip().upper()
+                if sym and sym in allowed and sym not in out:
+                    out.append(sym)
+            return out[:cap]
+    return []
+
+
+def parse_focus(text: str, allowed: set[str]) -> tuple[list[str], list[str]]:
+    """从看盘那一轮取出 (想细看的, 想重出信号的)。
 
     ``allowed`` 是这本账**允许碰**的范围(候选 + 自己的持仓)。范围外的一律丢掉 ——
     模型凭记忆报一只不在候选里的票, 给它明细就等于放它出了这本账的选股范围,
-    而那正是两本账对照的前提。
+    而那正是两本账对照的前提。refresh 同样受这个范围约束: 那一步会真的花钱
+    跑一次 AI, 更不该被一个范围外的代码触发。
     """
     import json as _json
     import re as _re
 
     m = _re.search(r"\{.*\}", (text or "").strip(), _re.S)
     if not m:
-        return []
+        return [], []
     try:
         data = _json.loads(m.group(0))
     except _json.JSONDecodeError:
-        return []
-    raw = data.get("focus") or data.get("symbols") or []
-    if not isinstance(raw, list):
-        return []
-    out: list[str] = []
-    for x in raw:
-        sym = str(x or "").strip().upper()
-        if sym and sym in allowed and sym not in out:
-            out.append(sym)
-    return out[:MAX_DEEP_DIVE]
+        return [], []
+    if not isinstance(data, dict):
+        return [], []
+    focus = _pick(data, ("focus", "symbols"), allowed, MAX_DEEP_DIVE)
+    refresh = _pick(data, ("refresh", "renew"), allowed, MAX_REFRESH)
+    return focus, refresh
 
 
 async def run_once(repo, trader: dict, scope: str) -> dict:
@@ -341,6 +365,8 @@ async def run_once(repo, trader: dict, scope: str) -> dict:
 
     token = _ACTIVE_PROFILE.set(profile)
     focus: list[str] = []
+    want_refresh: list[str] = []
+    refreshed: list[dict] = []
     try:
         # 第 1 轮: 看盘 —— 先挑想细看的几只
         allowed = _allowed_symbols(repo, trader, scope)
@@ -349,10 +375,19 @@ async def run_once(repo, trader: dict, scope: str) -> dict:
                 [{"role": "system", "content": LOOK_PROMPT},
                  {"role": "user", "content": context}],
                 temperature=0.2, max_tokens=None, timeout=180.0)
-            focus = parse_focus(look, allowed)
+            focus, want_refresh = parse_focus(look, allowed)
         except Exception as e:  # noqa: BLE001
             # 看盘轮失败不该让这一天整个报废 —— 退回只看摘要下单
             logger.warning("paper trader look round failed: %s", e)
+
+        # 触发新数据: 它认为哪只的 AI 信号旧到不能用了, 就现场重出一个。
+        # 必须在细看之前 —— 顺序反了的话, 它拿到的还是刚刚判定为过期的那一份。
+        if want_refresh:
+            refreshed = await refresh_signals(repo, want_refresh)
+            # 重出过的自动进细看名单: 它开口要新信号, 就是打算据此做判断
+            for r in refreshed:
+                if r["ok"] and r["symbol"] not in focus and len(focus) < MAX_DEEP_DIVE:
+                    focus.append(r["symbol"])
 
         # 第 2 轮: 带上细看的明细下单
         detail = ""
@@ -387,7 +422,8 @@ async def run_once(repo, trader: dict, scope: str) -> dict:
     bk["last_note"] = note
     pt.save(trader)
     return {"date": trade_date, "scope": scope, "orders": filled, "note": note,
-            "focus": focus, "raw": text[:4000], "nav": point}
+            "focus": focus, "refreshed": refreshed,
+            "raw": text[:4000], "nav": point}
 
 
 # ================================================================
@@ -567,6 +603,69 @@ def _recent_report(symbol: str) -> str:
     return f"[{r.get('created_at', '')[:10]}] {text[:1200]}"
 
 
+def _signal_line(symbol: str) -> tuple[str, bool]:
+    """这只票的 AI 信号 + 它有多旧。返回 (文本, 是否过期)。
+
+    **年龄一定要写出来**: 缓存的信号读起来和今天刚出的一模一样, 不标时间的话
+    模型没有任何办法知道自己在拿一个三周前的判断当今天的依据。
+    """
+    from datetime import datetime
+
+    try:
+        from app.services import stock_signal
+        sig = (stock_signal.load_all() or {}).get(symbol.upper())
+    except Exception as e:  # noqa: BLE001
+        logger.debug("signal lookup failed for %s: %s", symbol, e)
+        return "", False
+    if not sig:
+        return "- AI 信号: 还没跑过(可以列进 refresh 让系统现出一个)", True
+
+    created = str(sig.get("created_at") or "")
+    age_days = None
+    try:
+        dt = datetime.fromisoformat(created.replace("Z", "+00:00"))
+        age_days = (datetime.now(dt.tzinfo) - dt).days
+    except (TypeError, ValueError):
+        pass
+    stale = age_days is None or age_days >= SIGNAL_STALE_DAYS
+    age_txt = f"{age_days} 天前" if age_days is not None else "时间不详"
+    mark = " 【已过期, 建议 refresh】" if stale else ""
+    return (f"- AI 信号: {sig.get('signal')} 把握 {sig.get('confidence')}"
+            f" · 出于 {created[:16].replace('T', ' ')}({age_txt}){mark}\n"
+            f"  理由: {str(sig.get('reason') or '')[:400]}"), stale
+
+
+async def refresh_signals(repo, symbols: list[str]) -> list[dict]:
+    """现场重出 AI 个股信号 —— 这是操作员唯一能**触发新数据**的动作。
+
+    别的东西(趋势/通道/关键价位/走势)每次都是现算的, 本来就不会旧; 只有 AI
+    信号是缓存的, 所以只开这一个口子。串行跑: 并发调同一家模型只会互相限流,
+    而且这一步本来就在一次决策的关键路径上, 稳比快重要。
+
+    **重出时把当前档位放掉, 走系统默认的那条 AI 链**。这一点很要紧: AI 信号
+    是全局缓存的系统产物(个股分析页上人看到的就是它), 如果用操作员自己的模型
+    去生成, 这份"系统数据"就变成了那个模型自己的意见 —— 而且会被别的操作员
+    当成系统数据读到, 等于绕开隔离互相影响。用默认链生成, 它才还是"我的系统
+    怎么看这只票"。
+    """
+    from app.services import stock_signal
+    from app.services.ai_provider import _ACTIVE_PROFILE
+
+    out: list[dict] = []
+    for sym in symbols[:MAX_REFRESH]:
+        token = _ACTIVE_PROFILE.set(None)
+        try:
+            got = await stock_signal.generate_signal(repo, repo.store.data_dir, sym)
+            out.append({"symbol": sym, "ok": not got.get("error"),
+                        "error": str(got.get("error") or "")[:200]})
+        except Exception as e:  # noqa: BLE001
+            logger.warning("refresh signal failed for %s: %s", sym, e)
+            out.append({"symbol": sym, "ok": False, "error": str(e)[:200]})
+        finally:
+            _ACTIVE_PROFILE.reset(token)
+    return out
+
+
 def symbol_detail(repo, symbol: str) -> str:
     """系统里关于这一只的全部相关内容, 拼成一段。"""
     sym = str(symbol or "").strip().upper()
@@ -623,6 +722,10 @@ def symbol_detail(repo, symbol: str) -> str:
             out.append(f"- 关键价位: {summarize_levels(compute_levels(df), close)}")
     except Exception as e:  # noqa: BLE001
         logger.debug("levels detail failed for %s: %s", sym, e)
+
+    sig_txt, _stale = _signal_line(sym)
+    if sig_txt:
+        out.append(sig_txt)
 
     story = _kline_story(repo, sym)
     if story:

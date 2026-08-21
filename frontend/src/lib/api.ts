@@ -2212,6 +2212,8 @@ export const api = {
       date: string; scope: PaperScope; orders: PaperOrder[]; note: string
       /** [R65] 它这一轮要求细看的几只 */
       focus?: string[]
+      /** [R66] 它认为信号旧了、要求现场重出的几只 */
+      refreshed?: { symbol: string; ok: boolean; error: string }[]
       raw: string
     }>(
       `/api/paper-trading/traders/${encodeURIComponent(id)}/books/${scope}/run`, { method: 'POST' }),

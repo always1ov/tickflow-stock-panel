@@ -10,6 +10,8 @@
 """
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import polars as pl
 import pytest
 
@@ -663,22 +665,22 @@ def test_focus_picks_are_limited_to_what_this_book_may_touch():
     """模型凭记忆报一只不在候选里的票, 给它明细就等于放它出了这本账的选股
     范围, 而两本账能对照的前提就是各自只在自己那个池子里选。"""
     allowed = {"600000.SH", "000001.SZ"}
-    got = run.parse_focus(
+    focus, _ = run.parse_focus(
         '{"focus": ["600000.SH", "999999.SZ", "000001.sz"], "why": "看看"}', allowed)
-    assert got == ["600000.SH", "000001.SZ"], "范围外的要丢掉, 大小写要归一"
+    assert focus == ["600000.SH", "000001.SZ"], "范围外的要丢掉, 大小写要归一"
 
 
 def test_focus_is_capped():
     allowed = {f"60000{i}.SH" for i in range(9)}
     picks = ",".join(f'"60000{i}.SH"' for i in range(9))
     text = f'{{"focus": [{picks}]}}'
-    assert len(run.parse_focus(text, allowed)) == run.MAX_DEEP_DIVE
+    assert len(run.parse_focus(text, allowed)[0]) == run.MAX_DEEP_DIVE
 
 
 def test_an_unparseable_look_reply_just_means_no_deep_dive():
     """看盘轮没读懂不该让这一天报废 —— 退回只看摘要下单。"""
-    assert run.parse_focus("我先看看吧", {"600000.SH"}) == []
-    assert run.parse_focus("", {"600000.SH"}) == []
+    assert run.parse_focus("我先看看吧", {"600000.SH"}) == ([], [])
+    assert run.parse_focus("", {"600000.SH"}) == ([], [])
 
 
 def test_the_allowed_set_is_candidates_plus_own_holdings(quiet_overview):
@@ -708,3 +710,91 @@ def test_the_kline_story_marks_what_a_person_reads_off_a_chart(quiet_overview):
     src = inspect.getsource(run._kline_story)
     for marker in ("涨停", "跌停", "炸板", "20日线", "区间"):
         assert marker in src
+
+
+# ---------- [R66] 触发新数据 ----------
+#
+# 趋势/通道/关键价位/走势每次都是现算的, 本来就不会旧; 只有 AI 信号是缓存的,
+# 所以只在这一处开口子。要害是: 缓存的信号**读起来和今天刚出的一模一样**,
+# 不标年龄的话模型没有任何办法知道自己在拿三周前的判断当今天的依据。
+
+def test_refresh_requests_are_parsed_and_scoped():
+    """refresh 会真的花钱跑一次 AI —— 更不该被一个范围外的代码触发。"""
+    allowed = {"600000.SH"}
+    focus, refresh = run.parse_focus(
+        '{"focus": ["600000.SH"], "refresh": ["600000.SH", "999999.SZ"]}', allowed)
+    assert focus == ["600000.SH"]
+    assert refresh == ["600000.SH"], "范围外的 refresh 要丢掉"
+
+
+def test_refresh_is_capped():
+    """无上限的话, 模型一句"全都刷一遍"就能把一次决策拖成几十次 AI 调用。"""
+    allowed = {f"60000{i}.SH" for i in range(9)}
+    picks = ",".join(f'"60000{i}.SH"' for i in range(9))
+    _f, refresh = run.parse_focus(f'{{"refresh": [{picks}]}}', allowed)
+    assert len(refresh) == run.MAX_REFRESH
+
+
+def test_no_refresh_asked_means_none():
+    _f, refresh = run.parse_focus('{"focus": ["600000.SH"]}', {"600000.SH"})
+    assert refresh == []
+
+
+def test_a_missing_signal_reads_as_stale_and_says_how_to_get_one():
+    txt, stale = run._signal_line("600000.SH")
+    assert stale is True and "refresh" in txt
+
+
+def test_a_cached_signal_always_carries_its_age(monkeypatch):
+    """不标年龄是这条路上最危险的一处 —— 三周前的"买入"和今天刚出的"买入"
+    在文本上完全一样。"""
+    from datetime import UTC, datetime, timedelta
+    old = (datetime.now(UTC) - timedelta(days=30)).isoformat()
+    monkeypatch.setattr("app.services.stock_signal.load_all", lambda: {
+        "600000.SH": {"signal": "buy", "confidence": 80, "reason": "突破", "created_at": old}})
+    txt, stale = run._signal_line("600000.SH")
+    assert "30 天前" in txt and stale is True
+    assert "已过期" in txt
+
+
+def test_a_fresh_signal_is_not_marked_stale(monkeypatch):
+    from datetime import UTC, datetime
+    now = datetime.now(UTC).isoformat()
+    monkeypatch.setattr("app.services.stock_signal.load_all", lambda: {
+        "600000.SH": {"signal": "buy", "confidence": 80, "reason": "突破", "created_at": now}})
+    txt, stale = run._signal_line("600000.SH")
+    assert stale is False and "已过期" not in txt
+
+
+async def test_refreshing_uses_the_systems_own_ai_not_the_traders_model(monkeypatch):
+    """AI 信号是全局缓存的**系统产物**(个股分析页上人看到的就是它)。用操作员
+    自己的模型去生成, 这份"系统数据"就变成了那个模型的意见, 而且会被别的操作员
+    当成系统数据读到 —— 等于绕开隔离互相影响。
+    """
+    from app.services.ai_provider import _ACTIVE_PROFILE
+
+    seen: list[object] = []
+
+    async def _fake(repo, data_dir, symbol):
+        seen.append(_ACTIVE_PROFILE.get())
+        return {"symbol": symbol, "signal": "buy"}
+
+    monkeypatch.setattr("app.services.stock_signal.generate_signal", _fake)
+    mine = {"id": "trader-own-model", "model": "m"}
+    token = _ACTIVE_PROFILE.set(mine)
+    try:
+        out = await run.refresh_signals(SimpleNamespace(store=SimpleNamespace(data_dir=".")),
+                                        ["600000.SH"])
+        assert seen == [None], "重出信号时必须把操作员的档位放掉, 走系统默认那条链"
+        assert out[0]["ok"] is True
+        # 放掉之后要还回来 —— 不还的话紧接着的下单那一轮会用系统默认模型,
+        # 这一天的成绩就记到错误的模型名下了
+        assert _ACTIVE_PROFILE.get() is mine
+    finally:
+        _ACTIVE_PROFILE.reset(token)
+
+
+def test_the_look_prompt_explains_the_refresh_channel():
+    """不写清楚的话模型不知道自己可以要新数据, 只会默默用旧信号。"""
+    assert "refresh" in run.LOOK_PROMPT
+    assert "已过期" in run.LOOK_PROMPT and str(run.MAX_REFRESH) in run.LOOK_PROMPT
