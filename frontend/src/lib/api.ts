@@ -178,6 +178,8 @@ export interface TodayHeat {
   text: string
   where: string
   bands_aligned: number
+  /** [R44] 三档组合的结论; 与决策台「结论」列同一份 */
+  verdict?: KeltnerVerdict | null
 }
 
 /** [R40] 板块过滤的可选项与展示顺序 —— 与后端 price_limits.BOARDS 一致 */
@@ -302,11 +304,32 @@ export interface KeltnerBand {
   band_cn: string
 }
 
+/**
+ * [R44] 三档组合的结论。短期在通道中部时为 null —— 那时这一列没有信息,
+ * 不硬凑一句话。
+ */
+export interface KeltnerVerdict {
+  code: string
+  /** 4-6 字, 当徽标用 */
+  title: string
+  /** 一句话结论 */
+  action: string
+  /** 为什么 */
+  detail: string
+  side: 'high' | 'low'
+  /** 界面配色: 偏卖/偏买/别动/别碰 */
+  tone: 'sell' | 'buy' | 'hold' | 'avoid'
+  /** 哪几档共振, 如"短期破上轨、中期也贴上轨" */
+  bands_text: string
+  bands_aligned: number
+}
+
 /** 短期 MA20±2ATR / 中期 MA60±2.5ATR / 长期 MA120±3ATR */
 export interface KeltnerBands {
   s?: KeltnerBand
   m?: KeltnerBand
   l?: KeltnerBand
+  verdict?: KeltnerVerdict | null
 }
 
 export interface TrendInfo {

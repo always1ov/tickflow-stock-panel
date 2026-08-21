@@ -170,7 +170,7 @@ def test_batch_returns_all_three_bands():
     from app.services import keltner_service
 
     out = keltner_service.channels_for_symbols(_Repo(_rows()), ["600000.SH"])
-    assert set(out["600000.SH"]) == {"s", "m", "l"}
+    assert {k for k in out["600000.SH"] if k in ("s", "m", "l")} == {"s", "m", "l"}
     assert out["600000.SH"]["s"]["pos"] == k.POS_NEAR_UPPER
     assert out["600000.SH"]["s"]["band_cn"] == "短期"
 
@@ -189,7 +189,7 @@ def test_short_history_drops_only_the_long_band():
     from app.services import keltner_service
 
     out = keltner_service.channels_for_symbols(_Repo(_rows(), bars=60), ["600000.SH"])
-    assert set(out["600000.SH"]) == {"s", "m"}
+    assert {k for k in out["600000.SH"] if k in ("s", "m", "l")} == {"s", "m"}
 
 
 def test_missing_ma60_column_drops_only_the_mid_band():
@@ -197,7 +197,7 @@ def test_missing_ma60_column_drops_only_the_mid_band():
 
     rows = [{"symbol": "600000.SH", "close": 108.5, "atr_14": 5.0, "ma20": 100.0}]
     out = keltner_service.channels_for_symbols(_Repo(rows), ["600000.SH"])
-    assert set(out["600000.SH"]) == {"s", "l"}
+    assert {k for k in out["600000.SH"] if k in ("s", "m", "l")} == {"s", "l"}
 
 
 def test_batch_reads_daily_k_once_not_per_symbol():

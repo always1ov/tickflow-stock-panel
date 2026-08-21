@@ -434,7 +434,10 @@ def _build_overview(repo) -> dict:
             for sym, bands in bands_map.items():
                 pres = keltner.pressure(bands)
                 if pres:
-                    heat_map[sym] = pres
+                    # [R44] 把三档组合的结论一并带上 —— 今日总览的标签、决策台的
+                    # 「结论」列、悬停提示必须是同一句话, 不能各说各的
+                    v = keltner.verdict(bands)
+                    heat_map[sym] = dict(pres, verdict=v) if v else pres
     except Exception as e:  # noqa: BLE001
         logger.debug("today keltner pressure skipped: %s", e)
 

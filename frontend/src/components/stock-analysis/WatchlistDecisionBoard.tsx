@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Star, Wallet, Sparkles, Loader2, ArrowUp, ArrowDown, RefreshCw, FileText, TrendingUp } from 'lucide-react'
-import { api, type ExitLine, type KeltnerBand, type KeltnerBands, type TrendInfo } from '@/lib/api'
+import { api, type ExitLine, type KeltnerBand, type KeltnerBands, type KeltnerVerdict, type TrendInfo } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { toast } from '@/components/Toast'
 import { useHistoryReports, openHistoryReport, loadHistory } from '@/lib/stockAnalysisStore'
@@ -12,8 +12,10 @@ type Position = { held: boolean; cost: number | null; weight?: number | null; up
 type WatchPoint = { direction: 'up' | 'down'; price: number; label?: string; action?: string; reason?: string }
 type Signal = { signal: string; confidence: number; reason: string; close: number | null; created_at: string; watch_points?: WatchPoint[] }
 type SortKey = 'name' | 'close' | 'changePct' | 'held' | 'cost' | 'pnl' | 'exit'
-  | 'trend' | 'ks' | 'km' | 'kl' | 'confidence' | 'signal' | 'report'
+  | 'trend' | 'ks' | 'km' | 'kl' | 'verdict' | 'confidence' | 'signal' | 'report'
 const SIGNAL_RANK: Record<string, number> = { buy: 0, sell: 1, hold: 2, watch: 3 }
+// [R44] 结论列排序权重: 数值越大越偏卖 —— 降序把"该减的"顶到最上面
+const VERDICT_RANK: Record<string, number> = { avoid: 0, buy: 1, hold: 2, sell: 3 }
 // [fork 增强] 六态排序权重:多头在前(上涨趋势 → 下跌趋势)
 const TREND_RANK: Record<string, number> = { UT: 0, NR: 1, SR: 2, SREA: 3, NREA: 4, DT: 5 }
 
@@ -60,6 +62,41 @@ function KeltnerCell({ band, close }: { band?: KeltnerBand; close: number | null
         }
       >
         {band.pos_cn}
+      </span>
+    </td>
+  )
+}
+
+// [R44] 三档组合的结论配色。tone 由后端给, 界面不自己判 ——
+// 决策台、今日总览、悬停提示必须说同一句话。
+const VERDICT_CLS: Record<KeltnerVerdict['tone'], string> = {
+  sell: 'border-red-400/40 bg-red-400/10 text-red-400',
+  buy: 'border-sky-400/40 bg-sky-400/10 text-sky-300',
+  hold: 'border-amber-400/40 bg-amber-400/10 text-amber-400',
+  avoid: 'border-border bg-base text-muted',
+}
+
+/**
+ * 「通道结论」单元格 —— 三档组合翻成一句人话。
+ *
+ * 徽标只放 4-6 字的结论标题, 悬停给完整的一句话 + 为什么 + 哪几档共振。
+ * 短期档在通道中部时显示 "—": 那时这一列确实没有信息, 硬凑一句反而误导。
+ */
+function VerdictCell({ v }: { v?: KeltnerVerdict | null }) {
+  if (!v) {
+    return (
+      <td className="whitespace-nowrap px-1.5 py-2.5 text-center">
+        <span className="text-[10px] text-muted/40" title="短期通道在中部 —— 位置上没有可说的, 听趋势和信号的">—</span>
+      </td>
+    )
+  }
+  return (
+    <td className="whitespace-nowrap px-1.5 py-2.5 text-center">
+      <span
+        className={`inline-flex whitespace-nowrap rounded border px-1 py-0.5 text-[10px] ${VERDICT_CLS[v.tone]}`}
+        title={`${v.action}\n\n${v.detail}\n\n依据:${v.bands_text}\n\n注意:这是「位置」结论, 说的是贵不贵, 不是会不会继续涨。清仓与否看止盈线/生命线, 优先级在通道之上。`}
+      >
+        {v.title}
       </span>
     </td>
   )
@@ -268,6 +305,8 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
         case 'ks': return r.kc?.s?.pct ?? null
         case 'km': return r.kc?.m?.pct ?? null
         case 'kl': return r.kc?.l?.pct ?? null
+        // 结论按"偏卖 → 偏买"排, 降序把该减的顶到最上面, 升序把该吸的顶上来
+        case 'verdict': return r.kc?.verdict ? VERDICT_RANK[r.kc.verdict.tone] : null
         case 'confidence': return r.sig?.confidence ?? null
         case 'signal': return r.sig ? (SIGNAL_RANK[r.sig.signal] ?? 9) : null
         case 'report': {
@@ -376,6 +415,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
                 <th className="whitespace-nowrap px-1.5 py-2.5 font-normal text-center"><button onClick={() => toggleSort('ks')} className={thBtn} title="短期通道 = MA20 ± 2×ATR(约一个月)。按通道内位置排序:升序=最贴下轨的在前(低吸候选), 降序=最贴上轨的在前(高抛候选)">短通道{caret('ks')}</button></th>
                 <th className="whitespace-nowrap px-1.5 py-2.5 font-normal text-center"><button onClick={() => toggleSort('km')} className={thBtn} title="中期通道 = MA60 ± 2.5×ATR(一个季度)。按通道内位置排序">中通道{caret('km')}</button></th>
                 <th className="whitespace-nowrap px-1.5 py-2.5 font-normal text-center"><button onClick={() => toggleSort('kl')} className={thBtn} title="长期通道 = MA120 ± 3×ATR(半年,牛熊边界)。按通道内位置排序">长通道{caret('kl')}</button></th>
+                <th className="whitespace-nowrap px-1.5 py-2.5 font-normal text-center"><button onClick={() => toggleSort('verdict')} className={thBtn} title="三档组合的结论。排序把「该减的」和「该吸的」分到两头:降序=偏卖在前, 升序=偏买在前">结论{caret('verdict')}</button></th>
                 <th className="whitespace-nowrap px-2 py-2.5 font-normal text-right"><button onClick={() => toggleSort('confidence')} className={thBtn}>置信{caret('confidence')}</button></th>
                 <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center"><button onClick={() => toggleSort('report')} className={thBtn} title="最近一份 AI 分析报告(点击单元格直接打开)">报告{caret('report')}</button></th>
                 <th className="whitespace-nowrap px-4 py-2.5 font-normal text-left"><button onClick={() => toggleSort('signal')} className={thBtn}>AI 信号{caret('signal')}</button></th>
@@ -383,7 +423,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
             </thead>
             <tbody>
               {rows.length === 0 ? (
-                <tr><td colSpan={14} className="px-4 py-6 text-center text-muted">自选为空 —— 去自选页添加标的</td></tr>
+                <tr><td colSpan={15} className="px-4 py-6 text-center text-muted">自选为空 —— 去自选页添加标的</td></tr>
               ) : sortedRows.map((r) => {
                 const active = r.symbol === currentSymbol
                 const up = (r.changePct ?? 0) > 0
@@ -489,6 +529,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
                     <KeltnerCell band={r.kc?.s} close={r.close} />
                     <KeltnerCell band={r.kc?.m} close={r.close} />
                     <KeltnerCell band={r.kc?.l} close={r.close} />
+                    <VerdictCell v={r.kc?.verdict} />
                     {/* 置信度(独立列, 可排序) */}
                     <td className="whitespace-nowrap px-2 py-2.5 text-right font-mono tabular-nums text-muted">
                       {r.sig ? `${r.sig.confidence}%` : '—'}

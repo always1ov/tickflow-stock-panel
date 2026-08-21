@@ -35,7 +35,7 @@ function buildTodayHtml(d: TodayOverview, brief: string | null): string {
   const heatStyle = (h: TodayHeat) =>
     h.side === 'high' ? 'background:#fdf0e3;color:#c78326' : 'background:#e6f4fb;color:#1c6ea4'
   const heatLabel = (h: TodayHeat) =>
-    h.side === 'high' ? (h.level === 'strong' ? '到上沿' : '近上沿') : '到下沿'
+    h.verdict?.title ?? (h.side === 'high' ? (h.level === 'strong' ? '到上沿' : '近上沿') : '到下沿')
   const actionRows = d.actions.map(a => `
       <li><i style="background:${a.severity === 'high' ? bull : '#c78326'}"></i>
         <b>${esc(a.name)}</b>${sym(a.name, a.symbol)} ${esc(a.text)}</li>`).join('')
@@ -180,12 +180,9 @@ function HeatTag({ heat }: { heat?: TodayHeat | null }) {
   return (
     <span
       title={
-        `${heat.text} —— ${high
-          ? (strong
-              ? '短中期都到了通道上沿。趋势没坏, 但这个位置追进去是在最贵的地方买; 已有像样浮盈的可以落袋一部分'
-              : '只有短期贴到上沿。强势趋势本来就沿着上轨走, 仅作提示, 不改变操作档位')
-          : '在通道下沿 —— 属于低吸位置, 不扣分'}` +
-        '。短期档定方向(它是操作级别), 中期档定强弱(只放大不改向), 长期档仅供参考。收盘口径'
+        heat.verdict
+          ? `${heat.verdict.action}\n\n${heat.verdict.detail}\n\n依据:${heat.verdict.bands_text}\n\n这是「位置」结论 —— 说的是贵不贵, 不是会不会继续涨。收盘口径`
+          : `${heat.text} —— ${high ? '在通道上沿' : '在通道下沿'}。收盘口径`
       }
       className={`ml-1.5 cursor-help rounded px-1 py-0.5 text-[9px] ${
         high
@@ -193,7 +190,7 @@ function HeatTag({ heat }: { heat?: TodayHeat | null }) {
           : 'bg-sky-400/15 text-sky-300'
       }`}
     >
-      {high ? (strong ? '到上沿' : '近上沿') : '到下沿'}
+      {heat.verdict?.title ?? (high ? (strong ? '到上沿' : '近上沿') : '到下沿')}
     </span>
   )
 }

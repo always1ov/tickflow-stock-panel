@@ -194,3 +194,97 @@ def is_high(p: dict | None) -> bool:
 
 def is_strong(p: dict | None) -> bool:
     return bool(p) and p.get("level") == LEVEL_STRONG
+
+
+# ---------- 三档组合 → 结论 ----------
+#
+# pressure() 只回答"偏贵还是偏便宜、够不够分量"。这一层再往前一步, 把三档的
+# 具体组合翻成一句人话结论。
+#
+# 判定顺序要紧: **先看短期与长期是否反向**。这两种"矛盾"组合正是最容易读反的 ——
+#   · 短期到上轨 + 长期还在下沿 = 跌深了反弹, 看着像突破, 其实是反弹到阻力
+#   · 短期到下轨 + 长期仍在上沿 = 涨多了回调, 看着像破位, 其实是强势股洗盘
+# 同样一个"短期到轨", 长期档一翻, 结论完全相反。放在后面判就会被"三档同向"
+# 之类的粗规则先吃掉。
+#
+# 注意分工: 这里给的是**位置**结论, 不是买卖指令。价格贵不贵它说得准, 会不会
+# 继续涨它说不准 —— 所以偏卖的那几条都写成"别加仓/可落袋", 由用户结合六态
+# 趋势列自己定夺。清仓与否永远是出场线/生命线的事, 优先级在通道之上。
+
+TONE_SELL = "sell"     # 偏贵, 考虑减
+TONE_BUY = "buy"       # 偏便宜, 考虑吸
+TONE_HOLD = "hold"     # 别动, 尤其别加
+TONE_AVOID = "avoid"   # 别碰
+
+_VERDICTS = {
+    # code: (title, action, detail, side, tone)
+    "bounce_in_downtrend": (
+        "超跌反弹", "反弹卖点, 不是买点",
+        "短期冲出上沿, 但长期还在下沿 —— 价格远低于半年均线, 这是跌深了反弹, "
+        "看着像突破, 其实是反弹到阻力位。",
+        SIDE_HIGH, TONE_SELL),
+    "top_all_bands": (
+        "大顶区域", "动仓位基调, 不只减这一只",
+        "三档同时到上沿 —— 大级别位置, 值得整体降仓而不只是处理单只票。",
+        SIDE_HIGH, TONE_SELL),
+    "top_confirmed": (
+        "到位了", "可落袋一部分",
+        "短期和中期同时到上沿 —— 季度尺度上也涨到位了, 这是止盈的时机。"
+        "趋势没坏的话, 剩下的继续按出场线拿。",
+        SIDE_HIGH, TONE_SELL),
+    "high_short_only": (
+        "短线冲高", "拿着, 别在这加仓",
+        "只有短期到上沿, 大级别还早 —— 趋势票沿着上轨走是常态, 不必减; "
+        "但这个位置加仓是在最贵的地方下最重的注。",
+        SIDE_HIGH, TONE_HOLD),
+    "dip_in_uptrend": (
+        "强势深调", "最好的低吸位置",
+        "短期跌破下沿, 但长期仍在上沿 —— 价格远高于半年均线, 这是涨多了回调, "
+        "看着像破位, 其实是强势股洗盘。",
+        SIDE_LOW, TONE_BUY),
+    "falling_all_bands": (
+        "下跌途中", "别抄, 下轨会一路下移",
+        "三档同时到下沿 —— 大级别下跌, 每次都'触轨企稳'、每次都继续跌, "
+        "越抄越套。等趋势企稳再说。",
+        SIDE_LOW, TONE_AVOID),
+    "bottom_confirmed": (
+        "调到位了", "低吸分量更足",
+        "短期和中期同时到下沿 —— 季度尺度上也调到位了。趋势没坏的话, "
+        "这是比只有短期触轨更值得下手的位置。",
+        SIDE_LOW, TONE_BUY),
+    "low_short_only": (
+        "短线回调", "趋势没坏就是低吸候选",
+        "只有短期到下沿 —— 常规回调。等收盘重新站回轨内再动手, "
+        "别在破轨当天买, 那是接飞刀。",
+        SIDE_LOW, TONE_BUY),
+}
+
+
+def verdict(bands: dict | None) -> dict | None:
+    """三档通道组合 → 一句话结论。纯函数; 短期档在通道中部时返回 None。"""
+    p = pressure(bands)
+    if not p:
+        return None
+    mid = ((bands or {}).get("m") or {}).get("pos")
+    long = ((bands or {}).get("l") or {}).get("pos")
+    high = p["side"] == SIDE_HIGH
+    same = _HIGH if high else _LOW
+    opposite = _LOW if high else _HIGH
+
+    # 先判"短期与长期反向" —— 这两种最容易读反, 放后面会被粗规则先吃掉
+    if long in opposite:
+        code = "bounce_in_downtrend" if high else "dip_in_uptrend"
+    elif mid in same and long in same:
+        code = "top_all_bands" if high else "falling_all_bands"
+    elif mid in same:
+        code = "top_confirmed" if high else "bottom_confirmed"
+    else:
+        code = "high_short_only" if high else "low_short_only"
+
+    title, action, detail, side, tone = _VERDICTS[code]
+    return {
+        "code": code, "title": title, "action": action, "detail": detail,
+        "side": side, "tone": tone,
+        "bands_text": p["text"],
+        "bands_aligned": p["bands_aligned"],
+    }

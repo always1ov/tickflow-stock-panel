@@ -18,7 +18,7 @@ from datetime import date, timedelta
 
 import polars as pl
 
-from app.indicators.keltner import BANDS, assess
+from app.indicators.keltner import BANDS, assess, verdict
 
 logger = logging.getLogger(__name__)
 
@@ -91,5 +91,8 @@ def channels_for_symbols(repo, symbols: list[str]) -> dict[str, dict]:
             if got:
                 bands[key] = dict(got, band_cn=cn)
         if bands:
-            out[sym] = bands
+            # [R44] 三档组合的结论跟着一起返回 —— 界面不必自己再拼一遍规则,
+            # 也保证决策台、今日总览、悬停提示说的是同一句话
+            v = verdict(bands)
+            out[sym] = dict(bands, verdict=v) if v else bands
     return out
