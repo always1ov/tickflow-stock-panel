@@ -1844,6 +1844,17 @@ export interface EndpointManifest {
  * 额度/限流/鉴权/宕机用不了就顺位往下试。不另设 priority 字段: 两处表达
  * 同一件事迟早会打架。
  */
+/** [R58] 一个数据源 key 的死活。明文 —— 本地单机应用, 遮起来反而没法核对是哪个失效 */
+export interface TickflowKeyRow {
+  index: number
+  key: string
+  /** 第一个是主 key: 档位探测、付费端点、历史日 K 都走它 */
+  primary: boolean
+  /** 只有验活之后才有 */
+  alive?: boolean
+  error?: string
+}
+
 export interface AiProfile {
   id: string
   /** 给自己看的名字, 如"主力"、"备用" */
@@ -2108,6 +2119,20 @@ export const api = {
   saveAiProfiles: (profiles: AiProfile[]) =>
     request<{ ok: boolean; profiles: AiProfile[] }>('/api/settings/ai/profiles', {
       method: 'PUT', body: JSON.stringify({ profiles }),
+    }),
+
+  /** [R58] 逐个列出数据源 key(明文)。多 key 填在同一字段里, 只看脱敏串分不出哪个失效 */
+  tickflowKeys: () =>
+    request<{ keys: TickflowKeyRow[]; total: number }>('/api/settings/tickflow-keys'),
+
+  /** 逐个验活 —— 真打一次接口。串行跑, 并发会把活的 key 也打成限流 */
+  probeTickflowKeys: () =>
+    request<{ keys: TickflowKeyRow[]; total: number; alive: number }>(
+      '/api/settings/tickflow-keys/probe', { method: 'POST' }),
+
+  saveTickflowKeys: (keys: string[]) =>
+    request<{ ok: boolean; total: number; tier_label: string }>('/api/settings/tickflow-keys', {
+      method: 'PUT', body: JSON.stringify({ keys }),
     }),
 
   saveAiSettings: (ai: { provider?: string; base_url?: string; api_key?: string; model?: string; reasoning_effort?: string; codex_command?: string; codex_reasoning_effort?: string; user_agent?: string }) =>

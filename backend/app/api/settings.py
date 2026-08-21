@@ -207,6 +207,85 @@ def save_tickflow_key(req: TickflowKeyIn, request: Request) -> dict:
     }
 
 
+# ===== [R58] 数据源 key 逐个列出 + 逐个验活 =====
+#
+# 多 key 是填在同一个字段里的(逗号/换行分隔), 界面上只看得到一个脱敏串 ——
+# 池化跑着 14 个 key, 其中哪个过期了完全看不出来, 只表现为"有些股票总是刷不出来"。
+# 这里把它们拆开列出来, 并能逐个真打一次接口判定死活。
+#
+# 明文显示是用户明确要的: 这是本地单机应用, key 是他自己的, 遮起来反而让人没法
+# 核对是哪一个失效。要复制、要比对都得看得见全文。
+
+
+def _probe_one_tickflow_key(key: str) -> dict:
+    """拿这个 key 真打一次最便宜的接口(单只日 K, 免费档也有)。
+
+    只回答"这个 key 还能不能用", 不判档位 —— 档位是整体探测的事, 在这里
+    对 14 个 key 各跑一遍全套探测会慢到没法用。
+    """
+    from tickflow import TickFlow
+
+    from app.tickflow.client import PAID_ENDPOINT, _base_url
+
+    try:
+        tf = TickFlow(api_key=key, base_url=_base_url() or PAID_ENDPOINT)
+        tf.klines.get("000001.SZ", period="1d", count=1, as_dataframe=False)
+        return {"alive": True, "error": ""}
+    except Exception as exc:  # noqa: BLE001
+        return {"alive": False, "error": str(exc)[:200]}
+
+
+@router.get("/tickflow-keys")
+def list_tickflow_keys() -> dict:
+    """逐个列出已配置的 key(明文)。不验活 —— 验活要真打接口, 单独按钮触发。"""
+    keys = secrets_store.get_tickflow_keys()
+    return {"keys": [{"index": i, "key": k, "primary": i == 0} for i, k in enumerate(keys)],
+            "total": len(keys)}
+
+
+@router.post("/tickflow-keys/probe")
+def probe_tickflow_keys() -> dict:
+    """逐个验活。返回每个 key 的死活与失败原因。
+
+    串行跑: 并发打同一家的限速接口, 本来活着的 key 也可能被限流判成死的 ——
+    那比慢几秒糟得多。
+    """
+    out = []
+    for i, k in enumerate(secrets_store.get_tickflow_keys()):
+        got = _probe_one_tickflow_key(k)
+        out.append({"index": i, "key": k, "primary": i == 0, **got})
+    return {"keys": out, "total": len(out),
+            "alive": sum(1 for k in out if k["alive"])}
+
+
+class TickflowKeysIn(BaseModel):
+    """整表覆写已配置的 key(顺序即池化顺序, 第一个是主 key)。"""
+    keys: list[str] = Field(default_factory=list)
+
+
+@router.put("/tickflow-keys")
+def save_tickflow_keys(req: TickflowKeysIn, request: Request) -> dict:
+    """整表覆写。去重保序, 空串丢掉。
+
+    这里**不做验活**: 用户可能是先把新 key 贴进来、稍后再验; 存的时候拦下
+    等于逼他必须一次填对。验活是旁边那个按钮的事。
+    """
+    seen: list[str] = []
+    for raw in req.keys:
+        k = str(raw or "").strip()
+        if k and k not in seen:
+            seen.append(k)
+    if seen:
+        secrets_store.save({"tickflow_api_key": ",".join(seen)})
+    else:
+        secrets_store.clear("tickflow_api_key")
+    tf_client.reset_clients()
+    capset = detect_capabilities(force=True)
+    request.app.state.capabilities = capset
+    _sync_financial_scheduler_caps(request.app.state, capset)
+    return {"ok": True, "total": len(seen), "tier_label": tier_label()}
+
+
 @router.delete("/tickflow-key")
 def clear_tickflow_key(request: Request) -> dict:
     """清除 Key,退回无档(none)。

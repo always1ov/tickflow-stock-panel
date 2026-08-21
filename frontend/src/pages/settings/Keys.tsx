@@ -22,6 +22,7 @@ import { toast } from '@/components/Toast'
 import { useCapabilities, useSettings } from '@/lib/useSharedQueries'
 import { QK } from '@/lib/queryKeys'
 import { CAP_LABELS, tierTextStyle, tierStyle, tierBaseName, ALL_TIERS, TierTag } from '@/lib/capability-labels'
+import { TickflowKeys } from '@/pages/settings/TickflowKeys'
 
 // ===== TickFlow Key 配置主体 (可嵌入 DataSources 的 TickFlow 详情区) =====
 
@@ -72,6 +73,12 @@ export function TickFlowKeyConfig() {
 
   return (
     <>
+      {/* [R58] 多 key 逐个列出 + 逐个验活。下面那张卡是"贴一个 key 进来"的入口,
+          这张是"我现在有哪几个、哪个死了"的清单 —— 池化跑十几个 key 时, 只看
+          一个脱敏串根本看不出是哪一个过期了。 */}
+      <div className="mb-6 max-w-5xl">
+        <TickflowKeys />
+      </div>
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.3fr] gap-6 max-w-5xl">
         {/* ========== 左列: Key 配置 ========== */}
         <div className="space-y-6">
