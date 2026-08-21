@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Star, Wallet, Sparkles, Loader2, ArrowUp, ArrowDown, RefreshCw, FileText, TrendingUp } from 'lucide-react'
+import { Star, Wallet, Sparkles, Loader2, ArrowUp, ArrowDown, RefreshCw, FileText, TrendingUp, Download } from 'lucide-react'
 import { api, type ExitLine, type KeltnerBand, type KeltnerBands, type KeltnerVerdict, type TrendInfo } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { toast } from '@/components/Toast'
@@ -100,6 +100,108 @@ function VerdictCell({ v }: { v?: KeltnerVerdict | null }) {
       </span>
     </td>
   )
+}
+
+// ===== [R46] 自包含 HTML 导出 =====
+// 只导出「结论」列有内容的行 —— 三档都在通道中部的票没有位置信息,
+// 导出来只是占地方。导出件里第一行就写清导出了几只、总共几只, 免得
+// 看到 148 只自选导出 4 行时以为漏了。
+//
+// 与今日总览的导出同一套排版: 浅色、内联样式、无脚本无外链, 存档/打印/
+// 转发都不依赖这个应用。
+
+type ExportRow = {
+  symbol: string; name: string; close: number | null; changePct: number | null
+  held: boolean; pnl: number | null
+  trend?: TrendInfo; kc?: KeltnerBands
+}
+
+const esc = (v: unknown) =>
+  String(v ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string))
+
+// 导出件是浅色排版, 深色下的配色搬过去看不清 —— 这里单独给一套。
+const EXPORT_TONE: Record<KeltnerVerdict['tone'], string> = {
+  sell: 'background:#fdecec;color:#c0392b',
+  buy: 'background:#e6f4fb;color:#1c6ea4',
+  hold: 'background:#fdf0e3;color:#c78326',
+  avoid: 'background:#f0f1f3;color:#8a919f',
+  watch: 'background:#f0f1f3;color:#5b6472',
+}
+
+function buildBoardHtml(rows: ExportRow[], total: number): string {
+  const bull = '#d03050'
+  const bear = '#18a058'
+  const pos = (b?: KeltnerBand) => (b ? esc(b.pos_cn) : '—')
+  const body = rows.map(r => {
+    const v = r.kc?.verdict
+    return `
+      <tr>
+        <td class="name"><b>${esc(r.name)}</b> <span class="sym">${esc(r.symbol)}</span></td>
+        <td class="num">${r.close?.toFixed(2) ?? '—'}</td>
+        <td class="num" style="color:${(r.changePct ?? 0) > 0 ? bull : (r.changePct ?? 0) < 0 ? bear : '#8a919f'}">${
+          r.changePct != null ? (r.changePct * 100).toFixed(2) + '%' : '—'}</td>
+        <td>${r.held ? '持有' : '—'}</td>
+        <td class="num" style="color:${r.pnl == null ? '#8a919f' : r.pnl > 0 ? bull : bear}">${
+          r.pnl != null ? (r.pnl * 100).toFixed(1) + '%' : '—'}</td>
+        <td style="color:${r.trend?.side === '多头' ? bull : bear}">${
+          r.trend ? `${esc(r.trend.state_cn)} ${r.trend.duration}天` : '—'}</td>
+        <td>${pos(r.kc?.s)}</td><td>${pos(r.kc?.m)}</td><td>${pos(r.kc?.l)}</td>
+        <td>${v ? `<span class="tag" style="${EXPORT_TONE[v.tone]}">${esc(v.title)}</span>` : '—'}</td>
+        <td class="act">${v ? esc(v.action) : ''}<span class="why">${v ? esc(v.detail) : ''}</span></td>
+      </tr>`
+  }).join('')
+
+  return `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>自选决策台 · 通道结论</title>
+<style>
+  body{margin:0;padding:32px 24px;background:#f7f8fa;color:#1f2329;font:14px/1.6 -apple-system,'PingFang SC','Microsoft YaHei',sans-serif}
+  .wrap{max-width:1100px;margin:0 auto}
+  h1{font-size:20px;margin:0 0 4px}
+  .meta{color:#8a919f;font-size:12px;margin-bottom:16px}
+  .note{background:#fff;border:1px solid #e5e6eb;border-radius:8px;padding:10px 14px;font-size:12px;color:#4e5666;margin-bottom:16px;line-height:1.7}
+  table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #e5e6eb;border-radius:8px;overflow:hidden}
+  th{font-size:12px;font-weight:500;color:#8a919f;text-align:left;padding:8px 10px;border-bottom:1px solid #e5e6eb;background:#fafbfc;white-space:nowrap}
+  td{padding:8px 10px;border-bottom:1px solid #f0f1f3;font-size:13px;white-space:nowrap;vertical-align:top}
+  td.name{white-space:normal}
+  td.act{white-space:normal;min-width:16rem}
+  tr:last-child td{border-bottom:none}
+  .num{font-variant-numeric:tabular-nums;text-align:right}
+  th.num,td.num{text-align:right}
+  .sym{color:#a0a6b1;font-size:11px}
+  .tag{border-radius:3px;padding:1px 6px;font-size:11px;white-space:nowrap;display:inline-block}
+  .why{display:block;color:#8a919f;font-size:11px;margin-top:3px;line-height:1.6}
+  .foot{margin-top:16px;color:#a0a6b1;font-size:11px;line-height:1.8}
+  @media print{body{background:#fff;padding:0}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>自选决策台 · 通道结论</h1>
+  <div class="meta">导出 ${rows.length} 只(自选共 ${total} 只)· 生成于 ${esc(new Date().toLocaleString('zh-CN'))}</div>
+  <div class="note">
+    只列出「结论」列有内容的标的 —— 三档通道都在中部的票没有位置信息, 不占篇幅。<br>
+    通道口径:短期 MA20±2ATR / 中期 MA60±2.5ATR / 长期 MA120±3ATR,<b>收盘价</b>判定。<br>
+    结论说的是<b>位置</b>(贵不贵), 不是会不会继续涨。清仓与否看止盈线与生命线, 优先级在通道之上。
+  </div>
+  <table>
+    <thead><tr>
+      <th>标的</th><th class="num">现价</th><th class="num">涨跌</th><th>仓位</th>
+      <th class="num">浮盈</th><th>趋势</th>
+      <th>短通道</th><th>中通道</th><th>长通道</th><th>结论</th><th>怎么办</th>
+    </tr></thead>
+    <tbody>${body}</tbody>
+  </table>
+  <div class="foot">
+    本页为自包含 HTML(无脚本、无外链), 可直接存档、打印或转发。<br>
+    数据来自 TickFlow, 仅供研究参考, 不构成投资建议。
+  </div>
+</div>
+</body>
+</html>`
 }
 
 function fmtAgo(iso?: string): string {
@@ -330,6 +432,27 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
 
   const heldCount = Object.values(positions).filter((p) => p.held).length
 
+  // [R46] 导出用的行: 只留「结论」列有内容的。三档都在通道中部的票没有位置
+  // 信息, 导出来只是占地方。按当前排序导出 —— 你在界面上怎么排, 导出件就怎么排。
+  const exportRows = useMemo(
+    () => sortedRows.filter((r) => r.kc?.verdict),
+    [sortedRows],
+  )
+  const exportHtml = () => {
+    if (!exportRows.length) {
+      toast('当前没有「结论」列有内容的标的 —— 三档通道都在中部时不导出', 'error')
+      return
+    }
+    const blob = new Blob([buildBoardHtml(exportRows, rows.length)], { type: 'text/html;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `自选决策台_通道结论_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}.html`
+    a.click()
+    URL.revokeObjectURL(url)
+    toast(`已导出 ${exportRows.length} 只(自选共 ${rows.length} 只)`, 'success')
+  }
+
   return (
     <div className="rounded-xl border border-border/60 bg-surface/40 overflow-hidden">
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 px-4 py-2.5">
@@ -347,6 +470,18 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
         >
           <RefreshCw className={`h-3 w-3 ${refreshing ? 'animate-spin' : ''}`} />
           刷新
+        </button>
+        <button
+          onClick={exportHtml}
+          disabled={!exportRows.length}
+          title={exportRows.length
+            ? `导出为自包含 HTML(可存档/分享)。只导出「结论」列有内容的 ${exportRows.length} 只 —— 三档都在通道中部的票没有位置信息, 不占篇幅`
+            : '当前没有「结论」列有内容的标的'}
+          className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border border-sky-400/30 bg-sky-400/10 text-sky-300 hover:bg-sky-400/20 disabled:opacity-50 transition-colors cursor-pointer"
+        >
+          <Download className="h-3 w-3" />
+          导出 HTML
+          {exportRows.length > 0 && <span className="opacity-70">{exportRows.length}</span>}
         </button>
         <button
           onClick={() => setShowTrendSummary(true)}
