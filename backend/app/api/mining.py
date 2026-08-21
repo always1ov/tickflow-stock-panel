@@ -251,6 +251,28 @@ def load_run_result(store: MiningRunStore, run_id: str) -> dict[str, Any] | None
         return None
 
 
+@router.delete("/runs/{run_id}")
+def delete_run(run_id: str, request: Request) -> dict[str, Any]:
+    """[R55] 删掉一次挖掘运行(连同它的产物目录)。
+
+    跑着的不给删 —— worker 还在往那个目录里写, 删了下一次写入会把目录重建成
+    半个残骸, 之后列表里就是一条读不出来的记录。先取消再删。
+    """
+    manager = _manager(request)
+    manifest = manager.store.get(run_id)
+    if manifest is None:
+        raise HTTPException(status_code=404, detail="run 不存在")
+    if manifest.get("status") in ACTIVE_RUN_STATUSES:
+        raise HTTPException(status_code=409, detail="这次运行还没结束 —— 先取消再删")
+    try:
+        manager.store.delete(run_id)
+    except MiningRunValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except MiningRunStoreError as exc:
+        raise HTTPException(status_code=500, detail="删除失败") from exc
+    return {"deleted": run_id}
+
+
 @router.get("/runs/{run_id}/result")
 def get_result(run_id: str, request: Request) -> dict[str, Any]:
     store = _manager(request).store
@@ -981,6 +1003,24 @@ def _reject_if_workflow_owns_mining() -> None:
             detail=(f"挖掘工作流 {wf['workflow_id']} 正在跑, 它自己就在反复开自动挖掘会话。"
                     "同时再开一个不会更快 —— 挖掘一次只能跑一路, 第二个只会排队等着。"
                     "要手动一轮一轮调, 先把上面的工作流停掉。"))
+
+
+@router.delete("/autopilot/sessions/{session_id}")
+def autopilot_delete(session_id: str) -> dict[str, Any]:
+    """[R55] 删一个自动挖掘会话留档。
+
+    两种情况不给删: 还开着的(先中止, 否则正在跑的那一轮没人收尾), 以及
+    工作流开的(它还要靠这条记录接着往下推)。
+    """
+    session = _autopilot_session_or_404(session_id)
+    if session.get("owner_workflow_id"):
+        raise HTTPException(
+            status_code=409,
+            detail=f"这个会话属于工作流 {session['owner_workflow_id']} —— 要清掉请删那条工作流。")
+    if session.get("status") == "open":
+        raise HTTPException(status_code=409, detail="这个会话还开着 —— 先中止再删")
+    mining_autopilot_store.delete(session_id)
+    return {"deleted": session_id}
 
 
 @router.post("/autopilot/sessions")

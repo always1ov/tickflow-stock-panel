@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
-  AlertTriangle, ChevronDown, Info, LoaderCircle, Play, Rocket, Square, Workflow as WorkflowIcon,
+  AlertTriangle, ChevronDown, Info, LoaderCircle, Play, Rocket, Square, Trash2, Workflow as WorkflowIcon,
 } from 'lucide-react'
 import { toast } from '@/components/Toast'
 import { api, type Workflow, type WorkflowKind } from '@/lib/api'
@@ -114,6 +114,18 @@ export function WorkflowPanel({ kind, extraConfig, hint }: {
     onError: e => toast(String((e as Error).message || e), 'error'),
   })
 
+  // [R55] 删历史。跑着的后端会 409 —— 界面也不给按, 免得点了才知道不行
+  const remove = useMutation({
+    mutationFn: (id: string) => api.workflowDelete(id),
+    onSuccess: () => { refresh(); toast('已删除', 'success') },
+    onError: e => toast(String((e as Error).message || e), 'error'),
+  })
+  const onDelete = (wf: Workflow) => {
+    if (window.confirm(`删掉这条工作流记录？\n${wf.progress_text}\n跑出来的候选方案不受影响, 删的只是这条运行记录。`)) {
+      remove.mutate(wf.workflow_id)
+    }
+  }
+
   return (
     <section className="rounded-card border border-border bg-surface">
       <header className="flex flex-wrap items-center gap-x-2 gap-y-1.5 border-b border-border px-3 py-2">
@@ -203,7 +215,7 @@ export function WorkflowPanel({ kind, extraConfig, hint }: {
           还没开过工作流 —— 点上面「开一个工作流」，设好预算就不用再管了。
         </div>
       ) : (
-        <WorkflowCard wf={active} />
+        <WorkflowCard wf={active} onDelete={onDelete} deleting={remove.isPending} />
       )}
 
       {items.length > 1 && (
@@ -211,16 +223,23 @@ export function WorkflowPanel({ kind, extraConfig, hint }: {
           <summary className="cursor-pointer px-3 py-2 text-[10px] text-muted hover:text-secondary">
             以前的 {items.length - 1} 个工作流
           </summary>
-          {items.slice(1).map(w => <WorkflowCard key={w.workflow_id} wf={w} compact />)}
+          {items.slice(1).map(w => (
+            <WorkflowCard key={w.workflow_id} wf={w} compact onDelete={onDelete} deleting={remove.isPending} />
+          ))}
         </details>
       )}
     </section>
   )
 }
 
-function WorkflowCard({ wf, compact = false }: { wf: Workflow; compact?: boolean }) {
+function WorkflowCard({ wf, compact = false, onDelete, deleting }: {
+  wf: Workflow; compact?: boolean
+  onDelete?: (wf: Workflow) => void
+  deleting?: boolean
+}) {
   const [open, setOpen] = useState(false)
   const best = wf.best
+  const running = wf.status === 'running'
   return (
     <div className="border-t border-border/60 first:border-t-0">
       <div className="px-3 py-2.5">
@@ -231,6 +250,14 @@ function WorkflowCard({ wf, compact = false }: { wf: Workflow; compact?: boolean
           </span>
           <span className="font-mono text-[10px] text-muted">{wf.progress_text}</span>
           {compact && <span className="font-mono text-[9px] text-muted">{wf.created_at.slice(0, 16).replace('T', ' ')}</span>}
+          {onDelete && (
+            <button type="button" disabled={running || deleting}
+              onClick={() => onDelete(wf)}
+              title={running ? '还在跑 —— 先中止再删' : '删掉这条运行记录(候选方案不受影响)'}
+              className="ml-auto inline-flex h-6 shrink-0 items-center gap-1 rounded-btn border border-border px-1.5 text-[10px] text-muted transition-colors hover:border-danger/40 hover:text-danger disabled:cursor-not-allowed disabled:opacity-40">
+              <Trash2 className="h-3 w-3" />删除
+            </button>
+          )}
         </div>
 
         {/* 最好的一次成绩。达标与否用颜色分开 —— 这是唯一需要一眼看到的东西 */}

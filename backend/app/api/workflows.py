@@ -79,6 +79,22 @@ def stop_workflow(workflow_id: str) -> dict[str, Any]:
     return _project(wf)
 
 
+@router.delete("/{workflow_id}")
+def delete_workflow(workflow_id: str) -> dict[str, Any]:
+    """[R55] 删一条工作流记录。
+
+    跑着的不给删 —— 后台节拍还在推它, 记录删了下一拍又会把它写回来,
+    看上去就是"删不掉"。先停再删, 两步分开也更难误删正在出成绩的那条。
+    """
+    wf = workflow.get(workflow_id)
+    if wf is None:
+        raise HTTPException(status_code=404, detail="工作流不存在")
+    if wf.get("status") in workflow.OPEN_STATUSES:
+        raise HTTPException(status_code=409, detail="这条还在跑 —— 先中止再删")
+    workflow.delete(workflow_id)
+    return {"deleted": workflow_id}
+
+
 @router.post("/{workflow_id}/tick")
 async def tick_workflow(workflow_id: str, request: Request) -> dict[str, Any]:
     """手动催一格。后台节拍器本来就会推, 这个入口是给"我现在就想看它动一下"用的,

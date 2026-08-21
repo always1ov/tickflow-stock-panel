@@ -251,6 +251,20 @@ def running_workflows() -> list[dict]:
     return [w for w in _read_all() if w.get("status") in OPEN_STATUSES]
 
 
+def delete(workflow_id: str) -> bool:
+    """[R55] 删一条工作流记录。跑着的删不掉 —— 后台节拍还在推它, 记录删了
+    只会让下一拍写回一条借尸还魂的记录。要删先停。
+
+    返回 True 表示确实删掉了一条; 不存在返回 False(由上层决定是 404 还是幂等)。
+    """
+    rows = _read_all()
+    keep = [w for w in rows if w.get("workflow_id") != workflow_id]
+    if len(keep) == len(rows):
+        return False
+    _write_all(keep)
+    return True
+
+
 def create(*, kind: str, config: dict, budget: dict | None = None,
            now_ts: float | None = None) -> dict:
     if kind not in KINDS:

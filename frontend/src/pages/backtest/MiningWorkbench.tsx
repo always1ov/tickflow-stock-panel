@@ -16,6 +16,7 @@ import {
   Save,
   Settings2,
   SlidersHorizontal,
+  Trash2,
   Square,
 } from 'lucide-react'
 import { EmptyState } from '@/components/EmptyState'
@@ -292,6 +293,13 @@ export function MiningWorkbench() {
     queryFn: api.miningRuns,
     refetchInterval: task.isPending ? 5000 : false,
   })
+  // [R55] 删一次挖掘运行(连产物目录)。还没结束的后端会 409, 界面也不给按。
+  const removeRun = useMutation({
+    mutationFn: (runId: string) => api.miningRunDelete(runId),
+    onSuccess: () => { void runsQuery.refetch(); toast('已删除', 'success') },
+    onError: error => toast(String((error as Error).message || error), 'error'),
+  })
+
   const validDateRange = !draft.start || !draft.end || draft.start <= draft.end
   const availabilityQuery = useQuery({
     queryKey: QK.miningAvailability(
@@ -648,7 +656,27 @@ export function MiningWorkbench() {
           <section className="border-t border-border pt-3">
             <div className="mb-2 flex items-center justify-between"><span className="text-[10px] font-semibold text-secondary">最近运行</span><button type="button" title="刷新历史" onClick={() => void runsQuery.refetch()} className="text-muted hover:text-accent"><RefreshCw className={`h-3 w-3 ${runsQuery.isFetching ? 'animate-spin' : ''}`} /></button></div>
             <div className="max-h-40 space-y-1 overflow-y-auto">
-              {(runsQuery.data?.items ?? []).map(run => <button key={run.run_id} type="button" onClick={() => attachRun(run)} className={`flex w-full items-center gap-2 rounded-btn px-2 py-1.5 text-left hover:bg-elevated ${task.runId === run.run_id ? 'bg-accent/10' : ''}`}><span className={`h-1.5 w-1.5 shrink-0 rounded-full ${SUCCESS.has(run.status) ? 'bg-success' : ACTIVE.has(run.status) ? 'bg-accent' : 'bg-muted'}`} /><span className="min-w-0 flex-1 truncate font-mono text-[9px] text-secondary">{run.run_id}</span><span className="shrink-0 text-[9px] text-muted">{statusLabel(run.status)}</span></button>)}
+              {(runsQuery.data?.items ?? []).map(run => (
+                <div key={run.run_id} className={`flex w-full items-center gap-1 rounded-btn pr-1 hover:bg-elevated ${task.runId === run.run_id ? 'bg-accent/10' : ''}`}>
+                  <button type="button" onClick={() => attachRun(run)} className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-left">
+                    <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${SUCCESS.has(run.status) ? 'bg-success' : ACTIVE.has(run.status) ? 'bg-accent' : 'bg-muted'}`} />
+                    <span className="min-w-0 flex-1 truncate font-mono text-[9px] text-secondary">{run.run_id}</span>
+                    <span className="shrink-0 text-[9px] text-muted">{statusLabel(run.status)}</span>
+                  </button>
+                  {/* [R55] 删这次运行 —— 连产物目录一起删, 那才是真占盘的部分。
+                      还没结束的不给删: worker 还在往那个目录里写。 */}
+                  <button type="button" disabled={ACTIVE.has(run.status) || removeRun.isPending}
+                    onClick={() => {
+                      if (window.confirm(`删掉这次运行？\nrun ${run.run_id}\n它的产物文件会一并删除。已沉淀的候选方案不受影响。`)) {
+                        removeRun.mutate(run.run_id)
+                      }
+                    }}
+                    title={ACTIVE.has(run.status) ? '还没结束 —— 先取消再删' : '删掉这次运行及其产物'}
+                    className="shrink-0 text-muted transition-colors hover:text-danger disabled:cursor-not-allowed disabled:opacity-40">
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
               {runsQuery.isError && <div className="text-[9px] text-danger">运行历史加载失败</div>}
               {!runsQuery.isLoading && !runsQuery.isError && !(runsQuery.data?.items.length) && <div className="text-[9px] text-muted">暂无持久运行</div>}
             </div>

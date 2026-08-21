@@ -103,6 +103,17 @@ def create(*, asset_type: str, windows: dict, max_iterations: int,
     return session
 
 
+def delete(session_id: str) -> bool:
+    """[R55] 删一个会话留档。开着的删不掉(见 api 层的检查)——
+    这里只负责落盘, 允不允许删由调用方判断。"""
+    rows = _read_all()
+    keep = [s for s in rows if s.get("session_id") != session_id]
+    if len(keep) == len(rows):
+        return False
+    _write_all(keep)
+    return True
+
+
 def _replace(session: dict) -> dict:
     session["updated_at"] = _now()
     rows = [s for s in _read_all() if s.get("session_id") != session.get("session_id")]

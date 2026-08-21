@@ -6,6 +6,7 @@ import json
 import math
 import os
 import re
+import shutil
 import threading
 import uuid
 from collections.abc import Collection, Mapping
@@ -341,6 +342,24 @@ class MiningRunStore:
             manifests.append(manifest)
         manifests.sort(key=_manifest_sort_key, reverse=True)
         return manifests[:limit]
+
+    def delete(self, run_id: str) -> bool:
+        """[R55] 删掉一次 run 的整个目录(manifest / summary / 事件 / 产物)。
+
+        跑着的 run 不给删 —— worker 还在往这个目录里写, 删了它下一次写入会
+        把目录重建成半个残骸, 之后 list_runs 扫到的就是一条读不出来的记录。
+        要删先取消(见 api 层的 409)。
+
+        返回 True 表示确实删掉了; run 不存在返回 False。
+        """
+        run_dir = self._run_dir(run_id)
+        if not run_dir.exists():
+            return False
+        try:
+            shutil.rmtree(run_dir)
+        except OSError as exc:
+            raise MiningRunStoreError(f"failed to delete mining run {run_id}") from exc
+        return True
 
     def find_by_signature(
         self,

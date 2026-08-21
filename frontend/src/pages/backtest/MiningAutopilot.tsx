@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
 import {
-  Bot, ChevronDown, ExternalLink, Info, LoaderCircle, Lock, Play, Rocket, Square,
+  Bot, ChevronDown, ExternalLink, Info, LoaderCircle, Lock, Play, Rocket, Square, Trash2,
 } from 'lucide-react'
 import { toast } from '@/components/Toast'
 import { api, type AutopilotIteration, type AutopilotSession } from '@/lib/api'
@@ -149,6 +149,23 @@ export function MiningAutopilot() {
   // 依赖只能取原始值(session_id / status), 不能直接依赖 active 对象 ——
   // 每次查询刷新(轮询回来、窗口聚焦重取、staleTime 过期)都会产生新的对象引用,
   // 依赖整个对象会让定时器被反复销毁重建、倒计时永远归零, 自动模式可能一直不触发。
+  // [R55] 删会话留档。收工的才给删 —— 开着的后端会 409(正在跑的那一轮没人收尾),
+  // 工作流开的也不给删(它还要靠这条记录接着推)。
+  const remove = useMutation({
+    mutationFn: (id: string) => api.miningAutopilotDelete(id),
+    onSuccess: (_r, id) => {
+      if (sessionId === id) setSessionId(null)
+      refresh()
+      toast('已删除', 'success')
+    },
+    onError: e => toast(String((e as Error).message || e), 'error'),
+  })
+  const removeSession = (s: AutopilotSession) => {
+    if (window.confirm(`删掉这个会话记录？\n${s.search_start} ~ ${s.search_end} · 共 ${s.iterations.length} 轮\n跑出来的候选方案不受影响, 删的只是这条记录。`)) {
+      remove.mutate(s.session_id)
+    }
+  }
+
   const stepRef = useRef(step)
   stepRef.current = step
   const activeId = active?.session_id
@@ -261,7 +278,53 @@ export function MiningAutopilot() {
             {STATUS_LABEL[active.status]} · 第 {active.iterations.length}/{active.max_iterations} 轮
           </span>
         )}
+        {active && (
+          <button type="button" disabled={remove.isPending || active.status === 'open' || !!ownedBy}
+            onClick={() => removeSession(active)}
+            title={ownedBy ? '这个会话属于工作流 —— 要清掉请删那条工作流'
+              : active.status === 'open' ? '还开着 —— 先中止再删'
+              : '删掉这条会话记录(候选方案不受影响)'}
+            className="inline-flex h-6 shrink-0 items-center gap-1 rounded-btn border border-border px-1.5 text-[10px] text-muted transition-colors hover:border-danger/40 hover:text-danger disabled:cursor-not-allowed disabled:opacity-40">
+            <Trash2 className="h-3 w-3" />删除
+          </button>
+        )}
       </div>
+
+      {/* [R55] 以前的会话: 原来完全看不到(面板只跟随最新那个), 攒下来的旧记录
+          既翻不出来也删不掉。列出来, 点一下切过去看, 也能单条删掉。 */}
+      {(sessions.data?.items ?? []).length > 1 && (
+        <details className="border-b border-border">
+          <summary className="cursor-pointer px-3 py-2 text-[10px] text-muted hover:text-secondary">
+            以前的 {(sessions.data?.items ?? []).length - 1} 个会话
+          </summary>
+          <div className="max-h-48 overflow-y-auto">
+            {(sessions.data?.items ?? []).filter(s => s.session_id !== active?.session_id).map(s => (
+              <div key={s.session_id} className="flex items-center gap-2 border-t border-border/60 px-3 py-1.5">
+                <button type="button" onClick={() => setSessionId(s.session_id)}
+                  className="flex min-w-0 flex-1 items-center gap-2 text-left">
+                  <span className={`shrink-0 rounded-full px-1.5 py-px text-[9px] ${STATUS_CLS[s.status]}`}>
+                    {STATUS_LABEL[s.status]}
+                  </span>
+                  <span className="shrink-0 font-mono text-[9px] text-muted">
+                    {s.created_at.slice(0, 16).replace('T', ' ')}
+                  </span>
+                  <span className="min-w-0 truncate text-[9px] text-muted">
+                    {s.search_start} ~ {s.search_end} · {s.iterations.length} 轮
+                    {s.owner_workflow_id ? ' · 工作流开的' : ''}
+                  </span>
+                </button>
+                <button type="button" disabled={remove.isPending || s.status === 'open' || !!s.owner_workflow_id}
+                  onClick={() => removeSession(s)}
+                  title={s.owner_workflow_id ? '属于工作流 —— 要清掉请删那条工作流'
+                    : s.status === 'open' ? '还开着 —— 先中止再删' : '删掉这条会话记录'}
+                  className="shrink-0 text-muted transition-colors hover:text-danger disabled:cursor-not-allowed disabled:opacity-40">
+                  <Trash2 className="h-3 w-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
 
       {!active ? (
         <div className="px-3 py-8 text-center text-[11px] text-muted">

@@ -2804,6 +2804,11 @@ export const api = {
   miningRuns: () =>
     request<{ items: MiningRun[] }>('/api/backtest/mining/runs'),
 
+  /** [R55] 删一次挖掘运行(连同产物目录)。还没结束的删不掉(409) —— 先取消 */
+  miningRunDelete: (runId: string) =>
+    request<{ deleted: string }>(
+      `/api/backtest/mining/runs/${encodeURIComponent(runId)}`, { method: 'DELETE' }),
+
   miningAvailability: (params: {
     assetType: 'stock' | 'etf'
     budgetProfile: MiningBudgetProfile
@@ -2850,6 +2855,11 @@ export const api = {
       { method: 'POST' },
     ),
   /** [R38] 中止会话: 顺带取消正在跑的那一轮挖掘 */
+  /** [R55] 删一个自动挖掘会话留档。开着的、或工作流开的删不掉(409) */
+  miningAutopilotDelete: (id: string) =>
+    request<{ deleted: string }>(
+      `/api/backtest/mining/autopilot/sessions/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+
   miningAutopilotStop: (id: string) =>
     request<{ session: AutopilotSession; message: string }>(
       `/api/backtest/mining/autopilot/sessions/${encodeURIComponent(id)}/stop`,
@@ -2865,6 +2875,10 @@ export const api = {
     rounds_per_attempt?: number
     max_hours?: number
   }) => request<Workflow>('/api/workflows', { method: 'POST', body: JSON.stringify(body) }),
+  /** [R55] 删一条工作流记录。跑着的删不掉(409) —— 先中止 */
+  workflowDelete: (id: string) =>
+    request<{ deleted: string }>(`/api/workflows/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+
   workflowStop: (id: string) =>
     request<Workflow>(`/api/workflows/${encodeURIComponent(id)}/stop`, { method: 'POST' }),
   /** 手动催一格 —— 后台节拍器本来就会推, 这个是"我现在就想看它动一下" */
