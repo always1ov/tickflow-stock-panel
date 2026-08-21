@@ -52,6 +52,17 @@ ACTION_BUY = "buy"
 ACTION_SELL = "sell"
 ACTION_HOLD = "hold"
 
+# [R61] 每个操作员带两本账, 各自独立: 一本在全市场里挑, 一本只在自选里挑。
+#
+# 这不是"两个功能", 而是这套系统最想问的那个问题的对照组: **我这份自选到底
+# 有没有价值**。同一个模型、同一天、同一套信息口径, 一边只能从我圈的票里选,
+# 一边可以从全市场选 —— 长期跑下来两条净值曲线的差, 就是我选股这件事的价值。
+# 所以两本账必须严格分开: 共用现金或共用持仓, 这个对照就废了。
+SCOPE_MARKET = "market"
+SCOPE_WATCHLIST = "watchlist"
+SCOPES = (SCOPE_MARKET, SCOPE_WATCHLIST)
+SCOPE_CN = {SCOPE_MARKET: "全市场", SCOPE_WATCHLIST: "我的自选"}
+
 
 def now_iso() -> str:
     return datetime.now(UTC).isoformat(timespec="seconds")
@@ -108,24 +119,56 @@ def create(*, name: str, profile_id: str, capital: float = DEFAULT_CAPITAL) -> d
         "name": str(name or "").strip() or profile_id,
         "profile_id": str(profile_id or ""),
         "initial_capital": cap,
-        "cash": cap,
-        "positions": {},          # symbol -> {shares, cost, opened_on}
-        "orders": [],             # append-only
-        "nav_history": [],        # [{date, nav, cash, market_value}]
+        # 两本账各自一份初始资金 —— 要比的是同样的钱在两个选股范围里怎么走,
+        # 分一份钱给两边会让两条曲线互相牵制, 那就不是对照了
+        "books": {sc: new_book(cap) for sc in SCOPES},
+        # [R61] 定时: 每天几点自己跑一次。收盘后跑才有当天的收盘价可用。
+        "schedule": {"enabled": False, "hour": 15, "minute": 30},
         "enabled": True,
         "created_at": now_iso(),
-        "last_run_at": None,
-        "last_error": "",
     }
     rows.append(trader)
     _write({"traders": rows})
     return trader
 
 
+def new_book(capital: float) -> dict:
+    return {"cash": float(capital), "positions": {}, "orders": [], "nav_history": [],
+            "last_run_at": None, "last_error": "", "last_note": ""}
+
+
+def book(trader: dict, scope: str) -> dict:
+    """取某一本账。老数据(只有一本平铺的账)在这里就地迁移进 watchlist ——
+    之前那版的上下文本来就是自选口径, 记到全市场那本会把成绩安到错误的对照组上。"""
+    if scope not in SCOPES:
+        raise ValueError(f"未知分组 {scope}")
+    books = trader.get("books")
+    if not isinstance(books, dict):
+        cap = float(trader.get("initial_capital") or DEFAULT_CAPITAL)
+        legacy = {
+            "cash": float(trader.get("cash", cap)),
+            "positions": trader.get("positions") or {},
+            "orders": trader.get("orders") or [],
+            "nav_history": trader.get("nav_history") or [],
+            "last_run_at": trader.get("last_run_at"),
+            "last_error": trader.get("last_error") or "",
+            "last_note": trader.get("last_note") or "",
+        }
+        books = {SCOPE_WATCHLIST: legacy, SCOPE_MARKET: new_book(cap)}
+        trader["books"] = books
+        for k in ("cash", "positions", "orders", "nav_history",
+                  "last_run_at", "last_error", "last_note"):
+            trader.pop(k, None)
+    if scope not in books:
+        books[scope] = new_book(float(trader.get("initial_capital") or DEFAULT_CAPITAL))
+    return books[scope]
+
+
 def save(trader: dict) -> dict:
     rows = [t for t in list_traders() if t.get("id") != trader.get("id")]
-    trader["orders"] = (trader.get("orders") or [])[-MAX_ORDERS:]
-    trader["nav_history"] = (trader.get("nav_history") or [])[-MAX_NAV_POINTS:]
+    for b in (trader.get("books") or {}).values():
+        b["orders"] = (b.get("orders") or [])[-MAX_ORDERS:]
+        b["nav_history"] = (b.get("nav_history") or [])[-MAX_NAV_POINTS:]
     rows.append(trader)
     rows.sort(key=lambda t: str(t.get("created_at") or ""))
     _write({"traders": rows})
@@ -141,7 +184,7 @@ def delete(trader_id: str) -> bool:
     return True
 
 
-def reset(trader_id: str) -> dict | None:
+def reset(trader_id: str, scope: str | None = None) -> dict | None:
     """清空持仓与历史, 回到初始资金。
 
     单独给一个"重置"而不是让人删了重建: 删掉的话名字、模型、初始资金都要
@@ -150,8 +193,12 @@ def reset(trader_id: str) -> dict | None:
     t = get(trader_id)
     if t is None:
         return None
-    t.update({"cash": float(t["initial_capital"]), "positions": {},
-              "orders": [], "nav_history": [], "last_run_at": None, "last_error": ""})
+    cap = float(t["initial_capital"])
+    if scope is None:
+        t["books"] = {sc: new_book(cap) for sc in SCOPES}
+    else:
+        book(t, scope)          # 先确保迁移过
+        t["books"][scope] = new_book(cap)
     return save(t)
 
 
@@ -173,20 +220,21 @@ def _fill_price(price: float, side: str) -> float:
     return price * (1 + slip) if side == ACTION_BUY else price * (1 - slip)
 
 
-def market_value(trader: dict, prices: dict[str, float]) -> float:
+def market_value(bk: dict, prices: dict[str, float]) -> float:
+    """bk 是一本账(见 book())—— 撮合与净值全部按账本算, 两本互不相干。"""
     total = 0.0
-    for sym, pos in (trader.get("positions") or {}).items():
+    for sym, pos in (bk.get("positions") or {}).items():
         px = prices.get(sym)
         if px:
             total += float(px) * int(pos.get("shares") or 0)
     return total
 
 
-def nav(trader: dict, prices: dict[str, float]) -> float:
-    return float(trader.get("cash") or 0.0) + market_value(trader, prices)
+def nav(bk: dict, prices: dict[str, float]) -> float:
+    return float(bk.get("cash") or 0.0) + market_value(bk, prices)
 
 
-def apply_order(trader: dict, *, action: str, symbol: str, shares: int,
+def apply_order(bk: dict, *, action: str, symbol: str, shares: int,
                 price: float, trade_date: str, reason: str = "") -> dict:
     """执行一笔并记账。返回这一笔的成交记录(被拒时带 rejected 原因)。
 
@@ -203,7 +251,7 @@ def apply_order(trader: dict, *, action: str, symbol: str, shares: int,
     def _reject(why: str) -> dict:
         entry["rejected"] = why
         entry["shares"] = 0
-        (trader.setdefault("orders", [])).append(entry)
+        (bk.setdefault("orders", [])).append(entry)
         return entry
 
     if action not in (ACTION_BUY, ACTION_SELL):
@@ -215,14 +263,14 @@ def apply_order(trader: dict, *, action: str, symbol: str, shares: int,
     if lots <= 0:
         return _reject(f"不足一手({LOT} 股)")
 
-    positions = trader.setdefault("positions", {})
+    positions = bk.setdefault("positions", {})
     if action == ACTION_BUY:
         px = _fill_price(price, ACTION_BUY)
         amount = px * lots
         need = amount + _cost_buy(amount)
-        if need > float(trader.get("cash") or 0):
+        if need > float(bk.get("cash") or 0):
             return _reject("现金不够")
-        trader["cash"] = float(trader["cash"]) - need
+        bk["cash"] = float(bk["cash"]) - need
         pos = positions.setdefault(sym, {"shares": 0, "cost": 0.0, "opened_on": trade_date})
         total_cost = float(pos["cost"]) * int(pos["shares"]) + amount
         pos["shares"] = int(pos["shares"]) + lots
@@ -232,7 +280,7 @@ def apply_order(trader: dict, *, action: str, symbol: str, shares: int,
         entry["price"] = round(px, 3)
         entry["shares"] = lots
         entry["amount"] = round(amount, 2)
-        return _append(trader, entry)
+        return _append(bk, entry)
 
     pos = positions.get(sym)
     if not pos or int(pos.get("shares") or 0) <= 0:
@@ -244,27 +292,27 @@ def apply_order(trader: dict, *, action: str, symbol: str, shares: int,
     lots = min(lots, int(pos["shares"]))
     px = _fill_price(price, ACTION_SELL)
     amount = px * lots
-    trader["cash"] = float(trader.get("cash") or 0) + amount - _cost_sell(amount)
+    bk["cash"] = float(bk.get("cash") or 0) + amount - _cost_sell(amount)
     pos["shares"] = int(pos["shares"]) - lots
     if pos["shares"] <= 0:
         positions.pop(sym, None)
     entry["price"] = round(px, 3)
     entry["shares"] = lots
     entry["amount"] = round(amount, 2)
-    return _append(trader, entry)
+    return _append(bk, entry)
 
 
-def _append(trader: dict, entry: dict) -> dict:
-    (trader.setdefault("orders", [])).append(entry)
+def _append(bk: dict, entry: dict) -> dict:
+    (bk.setdefault("orders", [])).append(entry)
     return entry
 
 
-def mark_nav(trader: dict, prices: dict[str, float], trade_date: str) -> dict:
+def mark_nav(bk: dict, prices: dict[str, float], trade_date: str) -> dict:
     """记一个净值点。同一天重复记只更新, 不追加 —— 一天多条会把净值曲线画花。"""
-    mv = market_value(trader, prices)
-    point = {"date": trade_date, "nav": round(float(trader.get("cash") or 0) + mv, 2),
-             "cash": round(float(trader.get("cash") or 0), 2), "market_value": round(mv, 2)}
-    hist = trader.setdefault("nav_history", [])
+    mv = market_value(bk, prices)
+    point = {"date": trade_date, "nav": round(float(bk.get("cash") or 0) + mv, 2),
+             "cash": round(float(bk.get("cash") or 0), 2), "market_value": round(mv, 2)}
+    hist = bk.setdefault("nav_history", [])
     for i, p in enumerate(hist):
         if p.get("date") == trade_date:
             hist[i] = point

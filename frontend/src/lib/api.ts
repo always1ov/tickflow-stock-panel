@@ -1855,13 +1855,18 @@ export interface TickflowKeyRow {
   error?: string
 }
 
-/** [R59] AI 操作员一览用的成绩投影 */
-export interface PaperTrader {
-  id: string
-  /** 就是模型名 —— 这张表要回答的是哪个模型用同一份信息做得更好 */
-  name: string
-  profile_id: string
-  initial_capital: number
+/**
+ * [R61] 选股范围。每个操作员带**两本独立的账**:
+ *   market    只能从全市场候选里选
+ *   watchlist 只能从我圈的自选里选
+ * 这是这套系统最想问的那个问题的对照组 —— 我这份自选到底有没有价值。
+ */
+export type PaperScope = 'market' | 'watchlist'
+
+/** 一本账的成绩 */
+export interface PaperBook {
+  scope: PaperScope
+  scope_cn: string
   cash: number
   nav: number
   /** 相对初始资金的收益率(小数) */
@@ -1870,10 +1875,27 @@ export interface PaperTrader {
   orders_count: number
   /** 记过净值的天数 */
   days: number
-  created_at: string
   last_run_at: string | null
   last_error: string
   last_note: string
+}
+
+export interface PaperSchedule {
+  enabled: boolean
+  hour: number
+  minute: number
+}
+
+/** [R59] AI 操作员。名字就是模型名 —— 要比的是哪个模型用同一份信息做得更好 */
+export interface PaperTrader {
+  id: string
+  name: string
+  profile_id: string
+  initial_capital: number
+  created_at: string
+  schedule: PaperSchedule
+  /** 两本账并排 —— 分开请求会让人下意识只看其中一边 */
+  books: PaperBook[]
 }
 
 export interface PaperPosition {
@@ -1892,9 +1914,17 @@ export interface PaperOrder {
   reason: string
   /** 有值 = 这一笔被拒了。拒单也留痕: "想买但买不成"和"没想买"是两件事 */
   rejected?: string
+  /** [R61] 跌破生命线的纪律强平 —— 这一路不问 AI */
+  lifeline?: boolean
+  /** 那一笔用的是实时价(生命线是全流程唯一允许用实时的地方) */
+  intraday?: boolean
 }
 
-export interface PaperTraderDetail extends PaperTrader {
+/** 一本账的全部家当 */
+export interface PaperBookDetail extends PaperBook {
+  id: string
+  name: string
+  initial_capital: number
   positions: PaperPosition[]
   /** 新 → 旧 */
   orders: PaperOrder[]
@@ -2162,31 +2192,45 @@ export const api = {
   paperTraders: () =>
     request<{ traders: PaperTrader[] }>('/api/paper-trading/traders'),
 
-  paperTrader: (id: string) =>
-    request<PaperTraderDetail>(`/api/paper-trading/traders/${encodeURIComponent(id)}`),
+  paperBook: (id: string, scope: PaperScope) =>
+    request<PaperBookDetail>(
+      `/api/paper-trading/traders/${encodeURIComponent(id)}/books/${scope}`),
 
   paperTraderCreate: (body: { name: string; profile_id: string; capital: number }) =>
     request<PaperTrader>('/api/paper-trading/traders', {
       method: 'POST', body: JSON.stringify(body),
     }),
 
-  /** 让这个操作员按今天的信息做一次决策 */
-  paperTraderRun: (id: string) =>
-    request<{ date: string; orders: PaperOrder[]; note: string; raw: string }>(
-      `/api/paper-trading/traders/${encodeURIComponent(id)}/run`, { method: 'POST' }),
+  /** 让这一本账按今天的信息做一次决策 */
+  paperBookRun: (id: string, scope: PaperScope) =>
+    request<{ date: string; scope: PaperScope; orders: PaperOrder[]; note: string; raw: string }>(
+      `/api/paper-trading/traders/${encodeURIComponent(id)}/books/${scope}/run`, { method: 'POST' }),
 
-  paperTraderReset: (id: string) =>
-    request<{ ok: boolean }>(`/api/paper-trading/traders/${encodeURIComponent(id)}/reset`,
+  /** [R61] 生命线检查 —— 不问 AI, 也是全流程唯一用实时价的地方 */
+  paperBookLifeline: (id: string, scope: PaperScope) =>
+    request<{ forced: PaperOrder[]; count: number }>(
+      `/api/paper-trading/traders/${encodeURIComponent(id)}/books/${scope}/lifeline`,
+      { method: 'POST' }),
+
+  paperTraderSchedule: (id: string, s: PaperSchedule) =>
+    request<{ ok: boolean; schedule: PaperSchedule }>(
+      `/api/paper-trading/traders/${encodeURIComponent(id)}/schedule`,
+      { method: 'PUT', body: JSON.stringify(s) }),
+
+  /** 不给 scope 就是两本账一起重置 */
+  paperTraderReset: (id: string, scope?: PaperScope) =>
+    request<{ ok: boolean }>(
+      `/api/paper-trading/traders/${encodeURIComponent(id)}/reset${scope ? `?scope=${scope}` : ''}`,
       { method: 'POST' }),
 
   paperTraderDelete: (id: string) =>
     request<{ deleted: string }>(`/api/paper-trading/traders/${encodeURIComponent(id)}`,
       { method: 'DELETE' }),
 
-  /** 看一眼这次会喂给它什么 —— 判断"系统给的信息够不够"得先看清给了什么 */
-  paperTraderContext: (id: string) =>
+  /** 看一眼这本账这次会拿到什么 —— 判断"系统给的信息够不够"得先看清给了什么 */
+  paperBookContext: (id: string, scope: PaperScope) =>
     request<{ context: string; system_prompt: string }>(
-      `/api/paper-trading/traders/${encodeURIComponent(id)}/context`),
+      `/api/paper-trading/traders/${encodeURIComponent(id)}/books/${scope}/context`),
 
   /** [R56] 多 AI 档位: 列表顺序即优先级, 前面的先用, 用不了顺位往下 */
   aiProfiles: () =>

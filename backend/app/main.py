@@ -179,6 +179,14 @@ async def _application_lifespan(app: FastAPI):
         daily_pipeline.set_app_state(app.state)  # 供 depth_finalize job 访问 depth_service
         scheduler = daily_pipeline.start_scheduler(repo, capset)
         app.state.scheduler = scheduler
+        # [R61] 操盘手定时。默认全关 —— 一个会自动调用付费 API 的东西不该开箱就开着
+        try:
+            from app.services import paper_trader_schedule
+            n = paper_trader_schedule.install(scheduler, repo)
+            if n:
+                logger.info("装上 %d 个 AI 操盘手定时任务", n)
+        except Exception as e:  # noqa: BLE001
+            logger.warning("paper trader schedule not installed: %s", e)
     except Exception as e:  # noqa: BLE001
         logger.warning("scheduler not started: %s", e)
         app.state.scheduler = None
