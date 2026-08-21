@@ -14,8 +14,8 @@ import {
   SlidersHorizontal, Sparkles, Sunrise, Target,
 } from 'lucide-react'
 import {
-  api, TODAY_BOARDS, type SignalAiSchedule, type TodayAiSchedule, type TodayOverview,
-  type TodayPick, type TodayPrefs,
+  api, TODAY_BOARDS, type SignalAiSchedule, type TodayAiSchedule, type TodayHeat,
+  type TodayOverview, type TodayPick, type TodayPrefs,
 } from '@/lib/api'
 import { toast } from '@/components/Toast'
 
@@ -158,6 +158,33 @@ function sessionPhaseHint(live: boolean | undefined): { label: string; hint: str
 
 // [R40] 板块徽章。20cm 的两个板(创业/科创)与 30cm 的北交所用暖色标出来 ——
 // 同一个把握分, 20cm 的票波动天然更大, 仓位不该一样。
+/**
+ * [R41] 短期过热标。系统原来只说得出"该买了"和"该跑了", 说不出中间那句
+ * "涨得太急了" —— 这个标就是那句话。
+ *
+ * 标签必须带真实数字(RSI 多少、离 20 日线几个 ATR), 只显示"过热"两个字
+ * 等于要用户盲信一个他没法复核的判断。
+ */
+function HeatTag({ heat }: { heat?: TodayHeat | null }) {
+  if (!heat) return null
+  const hot = heat.level === 'hot'
+  return (
+    <span
+      title={
+        `${heat.text} —— ${hot
+          ? '短期冲过头了。趋势没坏, 但这个位置追进去是在最贵的地方买; 已有像样浮盈的可以落袋一部分'
+          : '节奏偏急, 只作提示, 不改变操作档位'}` +
+        '。判定要 RSI 超买「且」价格离 20 日线足够远, 两个条件同时满足才报 —— 强势趋势里 RSI 常年偏高, 只看 RSI 会误伤'
+      }
+      className={`ml-1.5 cursor-help rounded px-1 py-0.5 text-[9px] ${
+        hot ? 'bg-amber-400/20 text-amber-300' : 'bg-border/40 text-muted'
+      }`}
+    >
+      {heat.level_cn}
+    </span>
+  )
+}
+
 const BOARD_CLS: Record<string, string> = {
   沪主板: 'bg-border/40 text-muted',
   深主板: 'bg-border/40 text-muted',
@@ -857,6 +884,7 @@ export function Today() {
                               {o.board}
                             </span>
                           )}
+                          <HeatTag heat={o.heat} />
                           {picked && <span className="ml-1.5 text-[9px] text-amber-300">★ AI 优选</span>}
                           {o.intraday && (
                             <span
@@ -998,6 +1026,7 @@ export function Today() {
                         <td className="px-4 py-1.5">
                           <span className="font-medium text-foreground">{h.name}</span>
                           {h.symbol !== h.name && <span className="ml-1.5 text-[9px] font-mono text-muted">{h.symbol}</span>}
+                          <HeatTag heat={h.heat} />
                         </td>
                         <td className="px-2 py-1.5 text-right font-mono">{h.close?.toFixed(2) ?? '—'}</td>
                         <td className="px-2 py-1.5 text-right font-mono text-muted" title="在决策台持有标记旁填「仓%」后显示">

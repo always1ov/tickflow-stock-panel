@@ -151,6 +151,15 @@ def rank_opportunities(
             elif vr < 0.8:
                 score -= 12
                 why.append(f"缩量(量比 {vr:.1f}),假突破风险")
+        heat = ext.get("heat")
+        if heat:
+            # 只有"过热"扣分, "偏热"仅标注不扣 —— 强势趋势里 RSI 偏高是常态,
+            # 一并扣分会把系统推成专挑弱势票的偏好
+            if heat["level"] == "hot":
+                score -= 10
+                why.append(f"但短期冲过头({heat['text']}), 这个位置追进去是在最贵的地方买")
+            else:
+                why.append(f"节奏偏急({heat['text']})")
         win = ext.get("win")
         if win:
             wr, wn = win["rate"], win["n"]
@@ -218,6 +227,7 @@ def rank_opportunities(
     for o in opp_by_sym.values():
         o["score"] = max(0, min(100, o["score"]))
         o["board"] = board_of(o["symbol"])
+        o["heat"] = ((extras or {}).get(o["symbol"]) or {}).get("heat")
     ranked = sorted(opp_by_sym.values(), key=lambda o: (-o["score"], o["symbol"]))
     if boards:
         keep = set(boards)
@@ -256,14 +266,34 @@ def build_pyramid_plan(fraction: float, pivot: float | None,
             f" → 回踩不破上满 {cheng(fraction)};收盘跌回{px}下方,清掉试仓、计划作废")
 
 
+# [R41] 过热要"已经涨上来了"才谈落袋 —— 浮亏还嫌它涨太急, 是纯粹的自相矛盾
+_HEAT_TRIM_MIN_PNL = 0.10
+# 刚转强的头两天不因过热减仓: 主升浪起步 RSI 冲高是常态, 这时候减就是卖飞
+_HEAT_GRACE_DAYS = 2
+
+
 def holding_stance(exit_triggered: bool, distance_pct: float | None,
                    trend_side: str | None, ai_signal: str | None,
-                   trend_signal: str | None) -> tuple[str, str]:
+                   trend_signal: str | None,
+                   heat: dict | None = None, pnl_pct: float | None = None,
+                   trend_duration: int | None = None) -> tuple[str, str]:
     """[R13] 持仓操作档位: 离场/减仓/加仓/持有(规则版, 只用已有字段)。
 
     离场纪律由出场线/生命线兜底(最高优先); 减仓是"趋势或 AI 转坏但还没破线"
     的中间档; 加仓要求趋势多头 + AI 看多 + 离出场线还有安全距离, 三者缺一不可。
+
+    [R41] 过热(heat)接进来做两件事, 顺序都有讲究:
+
+    · **挡加仓**(这条比减仓重要)。原来只要"趋势多头 + AI 看多 + 离线够远"就建议加,
+      不看价格已经冲到哪儿了 —— 那是在最贵的位置加最多的钱。过热时不加。
+    · **补一档止盈减仓**, 但排在所有风险驱动的减仓**之后**: 破线/转空/AI 看空
+      都是"必须处理", 过热只是"可以落袋"。两者撞上时要说前者, 说后者会让人
+      误以为只是获利了结。
+      并且加两道闸: 有像样浮盈才谈(``_HEAT_TRIM_MIN_PNL``), 刚转强的头两天不谈
+      (``_HEAT_GRACE_DAYS``) —— 这两条都是为了防"卖飞", 那是这个功能唯一的大风险。
     """
+    from app.services import overheat
+
     if exit_triggered:
         return "离场", "已跌破出场线,按纪律执行,不猜反弹"
     if trend_side == "空头":
@@ -272,9 +302,20 @@ def holding_stance(exit_triggered: bool, distance_pct: float | None,
         return "减仓", "AI 转看空,与持仓方向矛盾"
     if distance_pct is not None and distance_pct >= -0.015:
         return "减仓", "距出场线不足 1.5%,提前减一部分比破线再动手从容"
+
+    hot = overheat.is_hot(heat)
+    fresh = trend_duration is not None and trend_duration <= _HEAT_GRACE_DAYS
+    if (hot and not fresh
+            and pnl_pct is not None and pnl_pct >= _HEAT_TRIM_MIN_PNL):
+        return "减仓", (f"短期冲过头({heat['text']})、浮盈 {pnl_pct:.0%} ——"
+                        f"可落袋一部分。趋势没坏, 剩下的继续按出场线拿")
+
     if (trend_side == "多头" and ai_signal == "buy"
             and trend_signal in ("转多", "回升")
             and (distance_pct is None or distance_pct < -0.05)):
+        if hot:
+            return "持有", (f"本来够加仓条件, 但短期冲过头了({heat['text']})——"
+                            f"这个位置加仓是在最贵的地方下最重的注, 等回踩再说")
         return "加仓", "趋势刚走强 + AI 看多 + 离出场线还有安全距离"
     return "持有", "无触发条件,按既定计划持有"
 
@@ -372,6 +413,26 @@ def _build_overview(repo) -> dict:
     bench_ret = ((market or {}).get("metrics") or {}).get("ret_20d")
     prefs = today_prefs.load()
 
+    # [R41] 短期过热: 持仓与候选各取一次 rsi_14 / ma20 / atr_14。
+    # 一次批量读整张 enriched 快照, 不按标的逐个查 —— 持仓 + 候选加起来可能上百只。
+    # 盘中实时叠加层只有价格没有指标, 所以这里是收盘口径(结论层本来就该走收盘)。
+    heat_map: dict[str, dict] = {}
+    try:
+        import polars as pl
+        df_h, _hd = repo.get_enriched_latest()
+        need = {"symbol", "close", "ma20", "atr_14", "rsi_14"}
+        if df_h is not None and not df_h.is_empty() and need <= set(df_h.columns):
+            from app.services import overheat
+            want = sorted({*(s for s, p in pos_all.items() if p.get("held")), *trends})
+            if want:
+                sub = df_h.filter(pl.col("symbol").is_in(want)).select(sorted(need))
+                for r in sub.to_dicts():
+                    h = overheat.extract(r)
+                    if h:
+                        heat_map[str(r["symbol"]).upper()] = h
+    except Exception as e:  # noqa: BLE001
+        logger.debug("today overheat skipped: %s", e)
+
     # [R20] 量价与历史胜率因子: 只为带新信号的候选算(远小于自选总数, 上限 40 只保护)
     extras: dict[str, dict] = {}
     cand_syms = [s for s, t in trends.items() if t.get("signal") in ("转多", "回升")][:40]
@@ -398,6 +459,8 @@ def _build_overview(repo) -> dict:
             ent: dict = {}
             if s in vol_map:
                 ent["vol_ratio"] = vol_map[s]
+            if s in heat_map:
+                ent["heat"] = heat_map[s]
             try:
                 from app.services.livermore_service import bullish_win_rate_for_symbol
                 win = bullish_win_rate_for_symbol(repo, s)
@@ -483,9 +546,12 @@ def _build_overview(repo) -> dict:
         sig = signals.get(sym)
         close = (ex or {}).get("close") or (t or {}).get("close")
         cost = pos.get("cost")
+        heat = heat_map.get(sym)
+        pnl_now = (close - cost) / cost if close and cost else None
         stance, stance_why = holding_stance(
             (ex or {}).get("triggered", False), (ex or {}).get("distance_pct"),
-            (t or {}).get("side"), (sig or {}).get("signal"), (t or {}).get("signal"))
+            (t or {}).get("side"), (sig or {}).get("signal"), (t or {}).get("signal"),
+            heat=heat, pnl_pct=pnl_now, trend_duration=(t or {}).get("duration"))
         holdings.append({
             "symbol": sym, "name": names.get(sym, sym),
             "close": close, "cost": cost,
@@ -500,6 +566,7 @@ def _build_overview(repo) -> dict:
             "trend_side": (t or {}).get("side"),
             "signal": (sig or {}).get("signal"),
             "stance": stance, "stance_why": stance_why,
+            "heat": heat,
             "weight": pos.get("weight"),
         })
     holdings.sort(key=lambda h: (not h["exit_triggered"], h["distance_pct"] if h["distance_pct"] is not None else -9))

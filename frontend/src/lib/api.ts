@@ -161,6 +161,18 @@ export interface TodayOpportunity {
   mainline?: TodayMainlineTag | null
   /** [R40] 板块归属(沪主板/深主板/创业板/科创板/北交所) */
   board?: string
+  /** [R41] 短期过热读数; 够不着门槛为 null */
+  heat?: TodayHeat | null
+}
+
+/** [R41] 短期冲过头: RSI 超买 **且** 价格离 MA20 有 N 个 ATR, 两个条件同时满足才算 */
+export interface TodayHeat {
+  level: 'hot' | 'warm'
+  level_cn: string
+  rsi: number
+  dev_atr: number
+  /** 带真实数字的一句话, 直接显示给用户复核 */
+  text: string
 }
 
 /** [R40] 板块过滤的可选项与展示顺序 —— 与后端 price_limits.BOARDS 一致 */
@@ -210,6 +222,8 @@ export interface TodayHolding {
   trend_side: string | null; signal: string | null
   stance: string; stance_why: string
   weight?: number | null
+  /** [R41] 短期过热读数; 够不着门槛为 null */
+  heat?: TodayHeat | null
 }
 export interface TodayPortfolio {
   count: number; avg_pnl: number | null; triggered: number; near_exit: number; bearish: number
