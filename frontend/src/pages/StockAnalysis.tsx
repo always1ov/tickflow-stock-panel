@@ -353,7 +353,6 @@ function StockAnalysisBoard({ symbol, height = 480, bare = false }: { symbol: st
         levels={levels}
         series={levelsQ.data?.series}
         seriesDates={levelsQ.data?.dates}
-        symbol={symbol}
         ranges={trendRanges}
         height={height}
       />
