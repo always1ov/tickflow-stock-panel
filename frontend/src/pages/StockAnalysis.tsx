@@ -106,7 +106,8 @@ export function StockAnalysis() {
         }
       />
 
-      <div className="w-full px-6 py-4 space-y-4">
+      {/* [R60] 统一页面留白 */}
+      <div className="w-full px-3 pb-4 pt-3 lg:px-4 space-y-3">
         {/* 搜索栏 —— 窄屏时按钮整块换行, 不把「点位提醒」挤出可视区 */}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           <div className="w-72 shrink-0">

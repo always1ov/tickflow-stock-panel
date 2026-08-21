@@ -714,7 +714,8 @@ export function Screener() {
         }
       />
 
-      <div className="px-8 py-4 space-y-3">
+      {/* [R60] 统一页面留白。宽度不限 —— 筛选器是宽表, 限宽只会逼出横向滚动条 */}
+      <div className="px-3 pb-4 pt-3 lg:px-4 space-y-3">
         {/* 策略卡片 */}
         {cardSize !== 'hidden' && (
         <section>

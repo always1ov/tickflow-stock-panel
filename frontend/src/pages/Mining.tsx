@@ -29,7 +29,7 @@ export function Mining() {
         )}
       />
 
-      <main className="min-h-0 flex-1 space-y-3 overflow-auto px-3 pb-3 pt-3 lg:px-4 lg:pb-4">
+      <main className="min-h-0 flex-1 space-y-3 overflow-auto px-3 pb-4 pt-3 lg:px-4">
         {/* [R53] 这三块是**包着的**, 不是三套并列的做法 —— 版面上并排放着最容易
             读成"选一个用", 于是有人一边开工作流一边手动开会话, 两路一起抢挖掘槽位,
             看着就像卡住了。这一行把关系先说清楚。 */}

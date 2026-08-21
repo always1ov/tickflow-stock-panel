@@ -658,7 +658,10 @@ export function Dashboard() {
   const quoteMode = data.quote_status?.mode as ('none' | 'watchlist' | 'full_market') | undefined
 
   return (
-    <div className="min-h-full bg-base p-1.5">
+    // [R60] 留白与宽度并入全站一档。这一页的渐变头部条**保留** —— 它带着日期
+    // 选择器、行情时延、实时/非实时状态, 是看板自己的仪表, 不是页标题;
+    // 硬塞进 PageHeader 会把这些挤成一行小字。它本来就在页内, 不影响页间对齐。
+    <div className="min-h-full bg-base px-3 pb-4 pt-3 lg:px-4">
       {/* 无本地数据常驻引导卡片 —— 一键触发盘后管道获取数据(无 Key 也可) */}
       {hasNoData && (
         <FetchDataCard

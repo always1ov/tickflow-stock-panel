@@ -68,7 +68,9 @@ export function Settings() {
         subtitle="管理账户、数据刷新策略和高级功能配置。"
       />
 
-      <div className="px-8 py-6">
+      {/* [R60] 统一版式: 设置以表单与说明文字为主, 取「读」档 */}
+      <div className="px-3 pb-4 pt-3 lg:px-4">
+        <div className="mx-auto w-full max-w-[1100px]">
         <div className="flex gap-6 items-stretch">
           {/* ===== 竖向 Tab 侧栏 ===== */}
           <nav className={cn('shrink-0 transition-all duration-200 ease-smooth', collapsed ? 'w-10' : 'w-36')}>
@@ -127,6 +129,7 @@ export function Settings() {
             ? <SettingsMonitoringPanel highlight={highlight} />
             : <activeTab.panel />}
           </motion.div>
+        </div>
         </div>
       </div>
     </>

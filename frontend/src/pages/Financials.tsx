@@ -188,7 +188,9 @@ export function Financials() {
         }
       />
 
-      <div className="px-3 sm:px-8 py-6 space-y-6 max-w-7xl">
+      {/* [R60] 统一版式 */}
+      <div className="px-3 pb-4 pt-3 lg:px-4">
+        <div className="mx-auto w-full max-w-[1440px] space-y-3">
         {syncing && (
           <div className="flex items-center gap-2 rounded-card border border-accent/30 bg-accent/[0.06] px-3 py-2 text-xs text-accent">
             <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" />
@@ -327,6 +329,7 @@ export function Financials() {
             {available && <ReportHistoryPanel />}
           </>
         )}
+        </div>
       </div>
     </>
   )

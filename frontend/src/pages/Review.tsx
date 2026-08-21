@@ -287,8 +287,10 @@ export function Review() {
         }
       />
 
-      <div className="min-h-full bg-[radial-gradient(circle_at_15%_-5%,rgba(59,130,246,0.10),transparent_30%),radial-gradient(circle_at_85%_5%,rgba(139,92,246,0.08),transparent_30%)] px-4 py-4 sm:px-6">
-        <div className="mx-auto max-w-[1280px] space-y-3">
+      {/* [R60] 统一版式: 留白与全站一致; 宽度取「读」档 —— 这页主体是一份
+          AI 报告, 一行横跨 1280px 眼睛回不到行首 */}
+      <div className="min-h-full bg-[radial-gradient(circle_at_15%_-5%,rgba(59,130,246,0.10),transparent_30%),radial-gradient(circle_at_85%_5%,rgba(139,92,246,0.08),transparent_30%)] px-3 pb-4 pt-3 lg:px-4">
+        <div className="mx-auto w-full max-w-[1100px] space-y-3">
 
           {marketQuery.isLoading && !data ? (
             <div className="flex h-40 items-center justify-center">

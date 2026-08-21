@@ -684,7 +684,10 @@ export function Data() {
         }
       />
 
-      <div className="px-8 py-6 space-y-6 max-w-6xl">
+      {/* [R60] 统一版式: 留白与全站一致, 宽度取「读」档 —— 这页以设置项和
+          说明文字为主, 一行太长眼睛回不到行首 */}
+      <div className="px-3 pb-4 pt-3 lg:px-4">
+        <div className="mx-auto w-full max-w-[1100px] space-y-3">
         {/* 数据持久化警告 —— 容器内数据目录未挂卷, 重建容器(拉新镜像)会丢全部数据 */}
         {s?.data_dir_persistent === false && (
           <div className="flex items-start gap-2 rounded-card border border-danger/40 bg-danger/10 px-3 py-2.5 text-xs">
@@ -985,6 +988,7 @@ export function Data() {
             启动失败:{String((startSync.error as any).message)}
           </div>
         )}
+        </div>
       </div>
 
       {/* 弹窗 */}

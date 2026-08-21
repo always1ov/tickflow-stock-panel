@@ -384,8 +384,9 @@ export function ConceptAnalysis() {
         }
       />
 
-      <div className="min-h-full bg-[radial-gradient(circle_at_12%_0%,rgba(59,130,246,0.12),transparent_28%),radial-gradient(circle_at_85%_8%,rgba(244,63,94,0.08),transparent_28%)] px-6 py-5">
-        <div className="mx-auto max-w-[1440px] space-y-5">
+      {/* [R60] 统一版式: 留白 px-3/lg:px-4、区块间距 12px, 与全站一致 */}
+      <div className="min-h-full bg-[radial-gradient(circle_at_12%_0%,rgba(59,130,246,0.12),transparent_28%),radial-gradient(circle_at_85%_8%,rgba(244,63,94,0.08),transparent_28%)] px-3 pb-4 pt-3 lg:px-4">
+        <div className="mx-auto w-full max-w-[1440px] space-y-3">
           <HeroPanel leading={leading[0]} falling={falling[0]} activeConcept={activeConcept} conceptBreadth={conceptBreadth} />
 
           <MarketPulse

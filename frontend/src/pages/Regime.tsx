@@ -25,6 +25,7 @@ import { toast } from '@/components/Toast'
 import { Modal } from '@/components/Modal'
 import { SeesawPanel } from '@/components/regime/SeesawPanel'
 import { cn } from '@/lib/cn'
+import { PageShell } from '@/components/PageShell'
 
 const STATE_ORDER: RegimeState[] = ['strong', 'lean_strong', 'range', 'lean_weak', 'weak']
 
@@ -683,17 +684,14 @@ export function Regime() {
     : '自定义'
 
   return (
-    <div className="mx-auto max-w-[1440px] px-4 py-5 space-y-4">
-      {/* ── 头部 (Dashboard 渐变条卡片) ── */}
-      <div className={cn(cardCls, 'relative overflow-hidden rounded-card bg-gradient-to-r from-surface/90 to-surface/70 px-4 py-3')}>
-        <div className="absolute left-0 top-0 h-full w-1 bg-gradient-to-b from-accent to-accent/20" />
-        <div className="flex items-center gap-3">
-          <Activity className="h-5 w-5 text-accent" />
-          <h1 className="text-base font-semibold text-foreground">市场环境</h1>
-          <span className="text-xs text-muted">
-            {view === 'phase' ? '涨停情绪 · 市场阶段 · 主线脉络' : '每日环境状态 · 赚钱效应 · 趋势分析'}
-          </span>
-          <div className="ml-auto flex items-center gap-2">
+    // [R60] 这一页原来手搓了一个渐变条头部 + 自己的 1440px 限宽, 和别的页
+    // 在标题字号、边界、留白上都对不上。头部交给 PageShell, 页内不再自成一套。
+    <PageShell
+      title="市场环境"
+      titleExtra={<Activity className="h-4 w-4 text-accent" />}
+      subtitle={view === 'phase' ? '涨停情绪 · 市场阶段 · 主线脉络' : '每日环境状态 · 赚钱效应 · 趋势分析'}
+      right={(
+          <div className="flex items-center gap-2">
             {/* 时间范围按钮组 */}
             <div className="flex items-center rounded-btn border border-border bg-base/60 p-0.5">
               {(['1y', '2y', 'all'] as const).map(k => (
@@ -730,9 +728,8 @@ export function Regime() {
               {recomputing ? '重算中…' : '重算'}
             </button>
           </div>
-        </div>
-      </div>
-
+      )}
+    >
       {/* ── 视图切换: 市场环境 / 情绪周期 (两组内容 tab 隔离, 减少单页高度) ── */}
       <div className="flex items-center gap-2">
         <div className="flex items-center rounded-btn border border-border bg-base/60 p-0.5">
@@ -1311,7 +1308,7 @@ export function Regime() {
           onApply={(d) => { setRange({ custom: d }); setCustomOpen(false) }}
         />
       )}
-    </div>
+    </PageShell>
   )
 }
 

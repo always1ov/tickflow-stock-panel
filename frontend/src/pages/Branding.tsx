@@ -88,7 +88,9 @@ export function Branding() {
         subtitle="名字保持 Tick Stock Panel,4 种赛博朋克 + 高级感的视觉处理 — 字重、字距、配色、图标各不同。挑你最喜欢的告诉我。"
       />
 
-      <div className="px-8 py-6">
+      {/* [R60] 统一版式 */}
+      <div className="px-3 pb-4 pt-3 lg:px-4">
+        <div className="mx-auto w-full max-w-[1100px]">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           {VARIANTS.map((v) => (
             <Sample key={v.id} v={v} />
@@ -100,6 +102,7 @@ export function Branding() {
           回复 <code className="font-mono text-accent">pulsar / vanta / helix / aurora</code> 任一,
           我把该风格的字体、配色、图标、发光效果应用到真实侧栏。
           也可以告诉我你想微调哪里(比如"用 VANTA 但换青色"),都行。
+        </div>
         </div>
       </div>
     </>

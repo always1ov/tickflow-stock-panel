@@ -428,7 +428,8 @@ function MonitorMenu({ stock, direction, sealMode, monitorRule, anchorRect, hasD
           <button onClick={onClose} className="text-muted hover:text-foreground shrink-0"><X className="h-3.5 w-3.5" /></button>
         </div>
 
-        <div className="px-3 py-2.5 space-y-2.5">
+        {/* [R60] 统一页面留白 */}
+        <div className="px-3 pb-4 pt-3 lg:px-4 space-y-3">
           {/* 预警类型徽章 */}
           <div className="flex items-center gap-2">
             <span className="text-[10px] text-muted shrink-0">类型</span>

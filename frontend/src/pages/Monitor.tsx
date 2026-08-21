@@ -172,8 +172,9 @@ export function Monitor() {
   return (
     <div className="flex flex-col h-full">
       <PageHeader title="监控中心" subtitle="实时信号与规则管理" />
-      <div className="flex-1 min-h-0 px-5 py-4">
-        <div className="mx-auto flex h-full max-w-7xl flex-col gap-4 lg:flex-row">
+      {/* [R60] 统一页面留白 */}
+      <div className="min-h-0 flex-1 px-3 pb-4 pt-3 lg:px-4">
+        <div className="mx-auto flex h-full w-full max-w-[1440px] flex-col gap-3 lg:flex-row">
           {/* 左栏: 触发记录 */}
           <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-surface/40 shadow-lg shadow-black/5">
             <div className="flex items-center gap-3 border-b border-border/60 bg-surface/60 px-4 py-2.5">

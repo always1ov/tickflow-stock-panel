@@ -97,7 +97,7 @@ export function Backtest() {
         )}
       />
 
-      <main className="min-h-0 flex-1 px-3 pb-3 pt-3 lg:px-4 lg:pb-4">
+      <main className="min-h-0 flex-1 px-3 pb-4 pt-3 lg:px-4">
         {activeTab === 'factor' && <FactorDiscovery />}
         {activeTab === 'strategy' && <StrategyBacktest />}
         {activeTab === 'robustness' && <RobustnessValidation />}

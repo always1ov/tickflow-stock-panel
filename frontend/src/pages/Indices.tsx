@@ -7,6 +7,7 @@ import { QK } from '@/lib/queryKeys'
 import { useCapabilities } from '@/lib/useSharedQueries'
 import { EChartsCandlestick, type OHLC } from '@/components/EChartsCandlestick'
 import { EChartsIntraday } from '@/components/EChartsIntraday'
+import { PageShell } from '@/components/PageShell'
 
 function defaultRange() {
   const now = new Date()
@@ -202,14 +203,12 @@ export function Indices() {
   }
 
   return (
-    <div className="h-full overflow-auto bg-base p-4">
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <div>
-          <h1 className="text-lg font-semibold text-foreground">指数</h1>
-          <p className="mt-1 text-xs text-muted">
-            指数使用独立 kline_index_* parquet，不进入股票选股和策略链路。
-          </p>
-        </div>
+    // [R60] 原来手搓了一个 h1 + p-4 的壳, 标题字号和留白都和别的页对不上
+    <PageShell
+      title="指数"
+      subtitle="独立 kline_index_* parquet，不进入股票选股和策略链路"
+      width="full"
+      right={(
         <div className="flex items-center gap-2">
           <button
             onClick={() => syncInstruments.mutate()}
@@ -228,8 +227,8 @@ export function Indices() {
             同步指数日K
           </button>
         </div>
-      </div>
-
+      )}
+    >
       <div className="grid grid-cols-[15rem_1fr] gap-4">
         <aside className="rounded-card border border-border bg-surface p-3">
           <div className="relative mb-3">
@@ -344,6 +343,6 @@ export function Indices() {
           )}
         </main>
       </div>
-    </div>
+    </PageShell>
   )
 }
