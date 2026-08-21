@@ -539,23 +539,27 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
           <table className="w-full text-xs">
             {/* 列宽按比例显式分配。不写的话浏览器会把富余空间全塞给 max-content 最大的
                 那一列(AI 信号), 别的列挤在一起; 写死 px 又不随视口走。
-                百分比 + table-layout:auto = 按比例分, 但内容撑不下时仍以内容为准
-                (所有单值格都是 nowrap, 所以内容宽度就是它的底线, 不会被压变形)。 */}
+
+                分配原则: 前半段(标的~止盈线)是查对用的, 给到"完整显示不换行"就够;
+                后半段(趋势/三档通道/结论/AI 信号)才是要盯的, 富余空间往那边给。
+
+                这些列全是 nowrap 且内容宽度固定(输入框、徽标、等宽数字), 所以百分比
+                调小**不会压字** —— 内容宽度是硬底线, 百分比只决定"能不能多吃富余空间"。 */}
             <colgroup>
-              <col style={{ width: '12%' }} />{/* 标的 */}
-              <col style={{ width: '5%' }} />{/* 现价 */}
-              <col style={{ width: '5%' }} />{/* 涨跌 */}
-              <col style={{ width: '4%' }} />{/* 仓位 */}
-              <col style={{ width: '8%' }} />{/* 成本(两个输入框) */}
-              <col style={{ width: '5%' }} />{/* 浮盈 */}
-              <col style={{ width: '7%' }} />{/* 止盈线(两行) */}
-              <col style={{ width: '7%' }} />{/* 趋势 */}
-              <col style={{ width: '4.5%' }} />{/* 短通道 */}
-              <col style={{ width: '4.5%' }} />{/* 中通道 */}
-              <col style={{ width: '4.5%' }} />{/* 长通道 */}
-              <col style={{ width: '5%' }} />{/* 结论 */}
-              <col style={{ width: '4%' }} />{/* 置信 */}
-              <col style={{ width: '5%' }} />{/* 报告 */}
+              <col style={{ width: '8%' }} />{/* 标的 */}
+              <col style={{ width: '3.5%' }} />{/* 现价 */}
+              <col style={{ width: '3.5%' }} />{/* 涨跌 */}
+              <col style={{ width: '3%' }} />{/* 仓位 */}
+              <col style={{ width: '6%' }} />{/* 成本(两个输入框) */}
+              <col style={{ width: '3.5%' }} />{/* 浮盈 */}
+              <col style={{ width: '5%' }} />{/* 止盈线(两行) */}
+              <col style={{ width: '6%' }} />{/* 趋势 */}
+              <col style={{ width: '4%' }} />{/* 短通道 */}
+              <col style={{ width: '4%' }} />{/* 中通道 */}
+              <col style={{ width: '4%' }} />{/* 长通道 */}
+              <col style={{ width: '6%' }} />{/* 结论 */}
+              <col style={{ width: '3%' }} />{/* 置信 */}
+              <col style={{ width: '4.5%' }} />{/* 报告 */}
               <col />{/* AI 信号: 不给宽度, 吃掉剩下的 —— 只有它是整段文字 */}
             </colgroup>
             <thead className="sticky top-0 bg-surface/95 backdrop-blur text-[10px] text-muted">
