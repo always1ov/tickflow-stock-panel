@@ -4,6 +4,10 @@
 
   · **只喂系统里的信息**。上下文全部由服务端从本地数据拼出来, 模型没有工具、
     没有联网出口, 想去查也没有手。每一块都注明来自哪个模块, 复盘时对得上。
+    [R65] 注意界限是"不许用**外部**信息", 不是"少给它看" —— 第一版把这两件
+    事混成了一件, 只给了一段候选摘要, 那考的就不是"这套系统够不够用"了。
+    现在走两轮: 先看盘挑出最多 MAX_DEEP_DIVE 只, 再把系统里关于那几只的
+    东西一次给全(趋势/通道/关键价位/近月走势/已有的 AI 个股分析)。
   · **操作员之间互相看不见**。``build_context`` 只按传进来的那一个 trader_id
     读持仓与历史, 别人的持仓/成交/理由一个字都不会进来 —— 有测试守着。
 
@@ -23,20 +27,43 @@ logger = logging.getLogger(__name__)
 # 而这套系统本来就已经替它排过序了 —— 让它自己在 150 只里翻是浪费。
 MAX_OPPORTUNITIES = 12
 MAX_HOLDINGS_SHOWN = 30
+MAX_DEEP_DIVE = 6          # 一次最多细看几只 —— 再多上下文就被这一段吃光了
+KLINE_TAIL_DAYS = 20       # 走势摘要给多少天
 
-SYSTEM_PROMPT = """你是一名 A 股模拟盘操作员。
-
-铁律:
-1. 只能依据下面这份「今日信息」做决定。你没有联网能力, 也不许凭记忆使用
-   任何外部消息(新闻、公告、传闻、行情网站)。信息里没有的, 就当不知道。
-2. 你只看得到自己的账户。不存在其他操作员, 也不要猜别人在做什么。
+# 界限说清楚: 禁的是**外部信息**, 不是"少给你看"。这套系统里的东西全都能用 ——
+# 趋势判定、通道结论、关键价位、日 K 走势、已有的 AI 个股分析, 想细看就开口要。
+_RULES = """铁律:
+1. **信息来源只能是这套系统**。你没有联网能力, 也不许凭记忆使用任何外部消息
+   (新闻、公告、传闻、研报、行情网站)。系统没给的事实, 就当不知道。
+   但系统里的东西你**都可以用**: 六态趋势、Keltner 三档与结论、十一类关键
+   价位、近月日 K 走势、以及这只票已有的 AI 个股分析 —— 想细看哪几只就说,
+   会给你。
+2. 你只看得到自己这本账。不存在其他操作员, 也不要猜别人在做什么。
 3. A 股规则: 买卖都以 100 股为单位; 当天买入的当天不能卖(T+1); 按收盘价成交。
-4. 现金不够就少买或不买。宁可不动, 不要为了交易而交易。
+4. 现金不够、或已到持仓只数上限就少买或不买。宁可不动, 不要为了交易而交易。"""
+
+# 第一轮: 先挑要细看的。刻意单独走一轮而不是一次给全 —— 全部候选的完整明细
+# 会长到把账户和规则都挤出上下文, 而且大部分是它根本不打算买的票。
+LOOK_PROMPT = f"""你是一名 A 股模拟盘操作员, 现在是**看盘**环节。
+
+{_RULES}
+
+先别下单。看完下面的信息, 挑出你想**细看**的股票(最多 {MAX_DEEP_DIVE} 只)——
+系统会把它们的趋势、通道、关键价位、近月走势、已有的 AI 分析一次给你。
+已持仓的票也可以挑(要判断是否该卖)。
+
+只回一个 JSON:
+{{"focus": ["600000.SH", "000001.SZ"], "why": "一句话说明为什么挑这几只"}}
+一只都不想细看就给 "focus": []。"""
+
+SYSTEM_PROMPT = f"""你是一名 A 股模拟盘操作员。
+
+{_RULES}
 
 输出**只回一个 JSON 对象**, 不要写别的:
-{"note": "一句话说明今天的整体想法",
- "orders": [{"action": "buy|sell", "symbol": "600000.SH", "shares": 100,
-             "reason": "为什么这一笔"}]}
+{{"note": "一句话说明今天的整体想法",
+ "orders": [{{"action": "buy|sell", "symbol": "600000.SH", "shares": 100,
+             "reason": "为什么这一笔"}}]}}
 今天什么都不做就给 "orders": []。每一笔都必须写 reason —— 这份记录是拿来
 复盘这套系统给的信息够不够用的, 没有理由的成交没有价值。"""
 
@@ -243,6 +270,52 @@ def build_context(repo, trader: dict, scope: str) -> str:
     return "\n".join(lines)
 
 
+def _allowed_symbols(repo, trader: dict, scope: str) -> set[str]:
+    """这本账**允许碰**的范围: 本轮候选 + 自己已有的持仓。
+
+    细看也要守这个范围 —— 放它细看一只不在候选里的票, 等于让它出了这本账的
+    选股范围, 而两本账能对照的前提就是各自只在自己那个池子里选。
+    """
+    bk = pt.book(trader, scope)
+    out = {str(s).upper() for s in (bk.get("positions") or {})}
+    if scope == pt.SCOPE_WATCHLIST:
+        for o in (_overview(repo).get("opportunities") or []):
+            if o.get("symbol"):
+                out.add(str(o["symbol"]).upper())
+    else:
+        for c in market_candidates(repo):
+            out.add(str(c["symbol"]).upper())
+    return out
+
+
+def parse_focus(text: str, allowed: set[str]) -> list[str]:
+    """从看盘那一轮的回复里取出想细看的代码。
+
+    ``allowed`` 是这本账**允许碰**的范围(候选 + 自己的持仓)。范围外的一律丢掉 ——
+    模型凭记忆报一只不在候选里的票, 给它明细就等于放它出了这本账的选股范围,
+    而那正是两本账对照的前提。
+    """
+    import json as _json
+    import re as _re
+
+    m = _re.search(r"\{.*\}", (text or "").strip(), _re.S)
+    if not m:
+        return []
+    try:
+        data = _json.loads(m.group(0))
+    except _json.JSONDecodeError:
+        return []
+    raw = data.get("focus") or data.get("symbols") or []
+    if not isinstance(raw, list):
+        return []
+    out: list[str] = []
+    for x in raw:
+        sym = str(x or "").strip().upper()
+        if sym and sym in allowed and sym not in out:
+            out.append(sym)
+    return out[:MAX_DEEP_DIVE]
+
+
 async def run_once(repo, trader: dict, scope: str) -> dict:
     """跑一次决策并入账(只动这一本账)。返回 {orders, note, raw, nav}。"""
     from app import secrets_store
@@ -267,10 +340,29 @@ async def run_once(repo, trader: dict, scope: str) -> dict:
         raise RuntimeError(f"操作员 {trader.get('name')} 绑定的 AI 档位不见了, 请在设置里重新指定")
 
     token = _ACTIVE_PROFILE.set(profile)
+    focus: list[str] = []
     try:
+        # 第 1 轮: 看盘 —— 先挑想细看的几只
+        allowed = _allowed_symbols(repo, trader, scope)
+        try:
+            look = await generate_ai_text(
+                [{"role": "system", "content": LOOK_PROMPT},
+                 {"role": "user", "content": context}],
+                temperature=0.2, max_tokens=None, timeout=180.0)
+            focus = parse_focus(look, allowed)
+        except Exception as e:  # noqa: BLE001
+            # 看盘轮失败不该让这一天整个报废 —— 退回只看摘要下单
+            logger.warning("paper trader look round failed: %s", e)
+
+        # 第 2 轮: 带上细看的明细下单
+        detail = ""
+        if focus:
+            blocks = [symbol_detail(repo, sym) for sym in focus]
+            detail = ("\n\n## 你要求细看的(全部来自本系统)\n"
+                      + "\n\n".join(b for b in blocks if b))
         text = await generate_ai_text(
             [{"role": "system", "content": SYSTEM_PROMPT},
-             {"role": "user", "content": context}],
+             {"role": "user", "content": context + detail}],
             temperature=0.3, max_tokens=None, timeout=300.0)
     finally:
         _ACTIVE_PROFILE.reset(token)
@@ -295,7 +387,7 @@ async def run_once(repo, trader: dict, scope: str) -> dict:
     bk["last_note"] = note
     pt.save(trader)
     return {"date": trade_date, "scope": scope, "orders": filled, "note": note,
-            "raw": text[:4000], "nav": point}
+            "focus": focus, "raw": text[:4000], "nav": point}
 
 
 # ================================================================
@@ -384,3 +476,160 @@ def check_lifelines(repo, trader: dict, scope: str, *, live: dict[str, dict] | N
         pt.mark_nav(bk, latest_prices(repo, list((bk.get("positions") or {}).keys())), day)
         pt.save(trader)
     return out
+
+
+# ================================================================
+# [R65] 个股细看 —— 系统里关于这一只的全部东西
+# ================================================================
+#
+# 第一版只给了一段候选清单摘要, 那是把"不能上网"错做成了"只能看一小段"。
+# 界限本来是: **不能去网上找信息, 但这套系统里的东西全都能用**。
+#
+# 所以补一条"细看"通道: 模型先从候选里挑几只想深看的, 服务端把系统里关于
+# 那几只的东西一次给全 —— 六态趋势与关键价位、Keltner 三档与结论、十一类
+# 价位点、出场线/生命线、近月的日 K 走势(带涨停/炸板/跳空标注)、以及这只票
+# 已有的 AI 分析报告。这就是人在个股分析页上"看图"能看到的那些, 只不过换成
+# 文字 —— 模型读不了图片, 但读得懂"哪根均线在哪、缺口在哪、离压力位还差多少"。
+#
+# 仍然一个字都不来自外部: 每一项都是本地算出来或本地存着的。
+
+
+
+def _kline_story(repo, symbol: str) -> str:
+    """近 20 个交易日的走势, 写成一段能读的话。
+
+    这是"看图"的文字版: 涨停/跌停/炸板/跳空/均线关系都标出来 —— 模型读不了
+    图片, 但这些正是人看图时真正在读的东西。
+    """
+    from datetime import date, timedelta
+
+    want = ["date", "close", "open", "high", "low", "change_pct", "ma20", "ma60",
+            "signal_limit_up", "signal_limit_down", "signal_broken_limit_up"]
+    try:
+        at = repo.resolve_asset_type(symbol)
+        df = repo.get_daily_asset(at, symbol, date.today() - timedelta(days=120),
+                                  date.today(), columns=want)
+    except Exception as e:  # noqa: BLE001
+        logger.debug("kline story failed for %s: %s", symbol, e)
+        return ""
+    if df is None or df.is_empty() or "close" not in df.columns:
+        return ""
+    rows = df.sort("date").tail(KLINE_TAIL_DAYS).to_dicts()
+    if not rows:
+        return ""
+
+    bits: list[str] = []
+    for r in rows:
+        tag = ""
+        if r.get("signal_limit_up"):
+            tag = "涨停"
+        elif r.get("signal_limit_down"):
+            tag = "跌停"
+        elif r.get("signal_broken_limit_up"):
+            tag = "炸板"
+        chg = r.get("change_pct")
+        bits.append(f"{str(r['date'])[5:]} {float(r['close']):.2f}"
+                    f"({_fmt_pct(chg)}){tag}")
+    last = rows[-1]
+    ma_note = []
+    for col, name in (("ma20", "20日线"), ("ma60", "60日线")):
+        v = last.get(col)
+        if v:
+            side = "上方" if float(last["close"]) >= float(v) else "下方"
+            ma_note.append(f"收盘在{name}({float(v):.2f}){side}")
+    highs = [float(r["high"]) for r in rows if r.get("high")]
+    lows = [float(r["low"]) for r in rows if r.get("low")]
+    span = ""
+    if highs and lows:
+        span = f"这 {len(rows)} 天区间 {min(lows):.2f} ~ {max(highs):.2f}"
+    return " · ".join(x for x in ["  ".join(bits), span, "、".join(ma_note)] if x)
+
+
+def _recent_report(symbol: str) -> str:
+    """这只票已有的 AI 分析报告(个股分析页生成的那些)。
+
+    有就带上一段 —— 那是这套系统对它下过的最完整的一次判断, 不给模型看
+    等于让它重新从零判断一遍, 而我要考的恰恰是"系统给的东西够不够用"。
+    """
+    try:
+        from app.services import ai_reports
+        rows = [r for r in ai_reports.list_reports()
+                if str(r.get("symbol") or "").upper() == symbol.upper()]
+    except Exception as e:  # noqa: BLE001
+        logger.debug("ai report lookup failed for %s: %s", symbol, e)
+        return ""
+    if not rows:
+        return ""
+    r = rows[0]
+    text = str(r.get("content") or r.get("text") or r.get("summary") or "").strip()
+    if not text:
+        return ""
+    return f"[{r.get('created_at', '')[:10]}] {text[:1200]}"
+
+
+def symbol_detail(repo, symbol: str) -> str:
+    """系统里关于这一只的全部相关内容, 拼成一段。"""
+    sym = str(symbol or "").strip().upper()
+    if not sym:
+        return ""
+    out: list[str] = [f"### {sym}"]
+
+    # 六态趋势 + 关键价位 + 操作建议
+    try:
+        from app.services import livermore_service
+        t = livermore_service.trend_for_symbol(repo, sym)
+        if t and not t.get("error"):
+            out.append(
+                f"- 六态趋势: {t.get('state_cn')}({t.get('side')}) 第 {t.get('duration')} 天, "
+                f"自 {t.get('since')}; 收盘 {t.get('close')}")
+            flips = [x for x in (
+                f"跌破 {t['flip_down']:.2f} 转弱" if t.get("flip_down") else "",
+                f"站上 {t['flip_up']:.2f} 转强" if t.get("flip_up") else "") if x]
+            if flips:
+                out.append(f"- 翻转触发价: {' / '.join(flips)}")
+            out.append(f"- 上关键点 {t.get('up_pivot')} / 下关键点 {t.get('dn_pivot')}"
+                       f"; 本轮最高收盘 {t.get('leg_high')}")
+            if t.get("action"):
+                out.append(f"- 系统建议: {t['action']}")
+            if t.get("signal"):
+                out.append(f"- 近期信号: {t['signal']} —— {t.get('signal_desc', '')}")
+    except Exception as e:  # noqa: BLE001
+        logger.debug("trend detail failed for %s: %s", sym, e)
+
+    # Keltner 三档 + 结论
+    try:
+        from app.services import keltner_service
+        kc = (keltner_service.channels_for_symbols(repo, [sym]) or {}).get(sym) or {}
+        band_bits = [f"{kc[k]['band_cn']}{kc[k]['pos_cn']}"
+                     f"({kc[k]['lower']}~{kc[k]['upper']})"
+                     for k in ("s", "m", "l") if k in kc]
+        if band_bits:
+            out.append(f"- 通道三档: {' · '.join(band_bits)}")
+        v = kc.get("verdict")
+        if v:
+            out.append(f"- 通道结论: 【{v['title']}】{v['action']} —— {v['detail']}")
+    except Exception as e:  # noqa: BLE001
+        logger.debug("keltner detail failed for %s: %s", sym, e)
+
+    # 十一类价位点(与个股分析图上画的是同一批)
+    try:
+        from datetime import date, timedelta
+
+        from app.indicators.levels import compute_levels, summarize_levels
+        at = repo.resolve_asset_type(sym)
+        df = repo.get_daily_asset(at, sym, date.today() - timedelta(days=400), date.today())
+        if df is not None and not df.is_empty() and "close" in df.columns:
+            close = float(df.sort("date").tail(1)["close"][0])
+            out.append(f"- 关键价位: {summarize_levels(compute_levels(df), close)}")
+    except Exception as e:  # noqa: BLE001
+        logger.debug("levels detail failed for %s: %s", sym, e)
+
+    story = _kline_story(repo, sym)
+    if story:
+        out.append(f"- 近 {KLINE_TAIL_DAYS} 日走势: {story}")
+
+    report = _recent_report(sym)
+    if report:
+        out.append(f"- 本系统已有的 AI 个股分析: {report}")
+
+    return "\n".join(out)

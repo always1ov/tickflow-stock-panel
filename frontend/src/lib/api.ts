@@ -2208,7 +2208,12 @@ export const api = {
 
   /** 让这一本账按今天的信息做一次决策 */
   paperBookRun: (id: string, scope: PaperScope) =>
-    request<{ date: string; scope: PaperScope; orders: PaperOrder[]; note: string; raw: string }>(
+    request<{
+      date: string; scope: PaperScope; orders: PaperOrder[]; note: string
+      /** [R65] 它这一轮要求细看的几只 */
+      focus?: string[]
+      raw: string
+    }>(
       `/api/paper-trading/traders/${encodeURIComponent(id)}/books/${scope}/run`, { method: 'POST' }),
 
   /** [R61] 生命线检查 —— 不问 AI, 也是全流程唯一用实时价的地方 */

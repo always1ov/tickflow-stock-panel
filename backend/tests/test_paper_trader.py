@@ -277,12 +277,23 @@ def test_the_context_only_contains_material_from_this_system(quiet_overview):
     assert "全部来自本系统" in ctx
 
 
-def test_the_prompt_forbids_going_outside_the_given_information():
-    """结构上模型也没有联网的手(它只拿到一段文本, 没有工具),
-    这条提示词是把同一件事说给它听, 两者一起才完整。"""
-    assert "没有联网能力" in run.SYSTEM_PROMPT
-    assert "只看得到自己的账户" in run.SYSTEM_PROMPT
+def test_the_boundary_is_about_outside_information_not_about_seeing_less():
+    """[R65] 界限是**外部信息**, 不是"少给它看"。
+
+    第一版把这两件事混成了一件, 结果模型只拿到一小段摘要 —— 那考的就不是
+    "这套系统的信息够不够用"了, 而是"一段摘要够不够用"。禁的是新闻/研报/
+    行情网站; 系统自己算出来的东西一样不该藏。
+    """
+    for p in (run.SYSTEM_PROMPT, run.LOOK_PROMPT):
+        assert "没有联网能力" in p
+        assert "只看得到自己这本账" in p
+        # 明确写出"系统里的东西都可以用" —— 只写禁令的话模型会保守到不敢用
+        assert "都可以用" in p
     assert "T+1" in run.SYSTEM_PROMPT
+
+
+def test_the_look_round_offers_the_deep_dive():
+    assert "细看" in run.LOOK_PROMPT and str(run.MAX_DEEP_DIVE) in run.LOOK_PROMPT
 
 
 def test_an_empty_watchlist_still_produces_a_usable_context(monkeypatch):
@@ -641,3 +652,59 @@ def test_the_context_shows_this_books_own_capital(quiet_overview):
     t = _t()
     t["books"][pt.SCOPE_WATCHLIST]["initial_capital"] = 333_000.0
     assert "333,000" in run.build_context(_Repo(), t, pt.SCOPE_WATCHLIST)
+
+
+# ---------- [R65] 细看: 系统里的东西全都能用 ----------
+#
+# 第一版把"不能上网"错做成了"只能看一小段摘要"。界限本来是: 禁的是**外部信息**,
+# 系统自己算出来的东西一样不该藏 —— 否则考的就不是"这套系统够不够用"了。
+
+def test_focus_picks_are_limited_to_what_this_book_may_touch():
+    """模型凭记忆报一只不在候选里的票, 给它明细就等于放它出了这本账的选股
+    范围, 而两本账能对照的前提就是各自只在自己那个池子里选。"""
+    allowed = {"600000.SH", "000001.SZ"}
+    got = run.parse_focus(
+        '{"focus": ["600000.SH", "999999.SZ", "000001.sz"], "why": "看看"}', allowed)
+    assert got == ["600000.SH", "000001.SZ"], "范围外的要丢掉, 大小写要归一"
+
+
+def test_focus_is_capped():
+    allowed = {f"60000{i}.SH" for i in range(9)}
+    picks = ",".join(f'"60000{i}.SH"' for i in range(9))
+    text = f'{{"focus": [{picks}]}}'
+    assert len(run.parse_focus(text, allowed)) == run.MAX_DEEP_DIVE
+
+
+def test_an_unparseable_look_reply_just_means_no_deep_dive():
+    """看盘轮没读懂不该让这一天报废 —— 退回只看摘要下单。"""
+    assert run.parse_focus("我先看看吧", {"600000.SH"}) == []
+    assert run.parse_focus("", {"600000.SH"}) == []
+
+
+def test_the_allowed_set_is_candidates_plus_own_holdings(quiet_overview):
+    """已持仓的也得能细看 —— 不然它没法判断该不该卖。"""
+    t = _t(positions={"000858.SZ": {"shares": 100, "cost": 9.0, "opened_on": "2026-08-19"}})
+    allowed = run._allowed_symbols(_Repo(), t, pt.SCOPE_WATCHLIST)
+    assert "600000.SH" in allowed, "今日总览里的候选"
+    assert "000858.SZ" in allowed, "自己的持仓"
+
+
+def test_the_deep_dive_is_assembled_from_local_modules_only():
+    """每一项都得是本地算出来或本地存着的 —— 这一段是"系统给的信息"的主体,
+    混进任何外部来源, 整个体检的结论就跟这套系统没关系了。"""
+    import inspect
+    src = inspect.getsource(run.symbol_detail)
+    for local in ("livermore_service", "keltner_service", "compute_levels",
+                  "_kline_story", "_recent_report"):
+        assert local in src
+    for outside in ("http", "requests", "urlopen", "fetch"):
+        assert outside not in src.lower()
+
+
+def test_the_kline_story_marks_what_a_person_reads_off_a_chart(quiet_overview):
+    """模型读不了图片, 但"哪天涨停、收在均线哪一侧、这段区间多宽"正是人看图
+    时真正在读的东西 —— 这就是"看图"的文字版。"""
+    import inspect
+    src = inspect.getsource(run._kline_story)
+    for marker in ("涨停", "跌停", "炸板", "20日线", "区间"):
+        assert marker in src

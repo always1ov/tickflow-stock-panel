@@ -49,9 +49,10 @@ export function PaperTrading() {
       qc.invalidateQueries({ queryKey: ['paper-book'] })
       const filled = res.orders.filter(o => !o.rejected).length
       const rejected = res.orders.length - filled
+      const looked = res.focus?.length ? ` · 细看了 ${res.focus.length} 只` : ''
       toast(res.orders.length === 0
-        ? `${res.date} 今天不动 —— ${res.note || '没给理由'}`
-        : `${res.date} 成交 ${filled} 笔${rejected ? `, 被拒 ${rejected} 笔` : ''}`, 'success')
+        ? `${res.date} 今天不动${looked} —— ${res.note || '没给理由'}`
+        : `${res.date} 成交 ${filled} 笔${rejected ? `, 被拒 ${rejected} 笔` : ''}${looked}`, 'success')
     },
     onError: e => { refresh(); toast(String((e as Error).message || e), 'error') },
   })
@@ -92,8 +93,12 @@ export function PaperTrading() {
           「全市场」只能从全市场候选里选, 「我的自选」只能从我圈的票里选。
           <span className="text-muted"> 这两条曲线的差, 就是我这份自选到底有没有价值。</span>
           <br />
-          <span className="text-muted">它们没有联网能力(只拿到一段服务端拼好的文本, 没有工具),
-          也互相看不见对方的持仓和理由 —— 上下文是按人按账组装的, 不是靠提示词叮嘱。
+          <span className="text-muted">禁的是<span className="text-secondary">外部信息</span>——
+          新闻、公告、研报、行情网站一律不许用, 它们也确实没有联网的手(只拿到服务端拼好的文本, 没有工具)。
+          但<span className="text-secondary">系统里的东西全都能用</span>: 先看一轮候选,
+          自己挑最多 6 只细看, 服务端把那几只的六态趋势、通道三档与结论、十一类关键价位、
+          近月日 K 走势(带涨停/炸板标注)、以及已有的 AI 个股分析一次给全。
+          它们互相看不见对方的持仓和理由 —— 上下文是按人按账组装的, 不是靠提示词叮嘱。
           全程走<span className="text-secondary">收盘口径</span>;
           唯一的例外是<span className="text-secondary">跌破生命线</span>——
           那是硬纪律, 不问 AI, 允许用实时价立刻清掉。
@@ -509,7 +514,8 @@ function BookDetail({ id, scope, onClose }: {
         {tab === 'context' && (
           <div className="min-h-0 flex-1 overflow-auto p-4">
             <p className="mb-2 text-[10px] leading-4 text-muted">
-              这就是这本账下一次会拿到的<span className="text-secondary">全部</span>信息 —— 没有别的输入, 也没有联网。
+              这是这本账下一次<span className="text-secondary">开局</span>会拿到的信息 —— 没有别的输入, 也没有联网。
+              它还可以从里面挑最多 6 只要求细看, 那时会再给它趋势/通道/关键价位/近月走势/已有的 AI 分析。
               要判断"系统给的信息够不够", 先看清楚给了什么。
               <span className="text-muted/70"> 这里也是核对隔离的地方: 别人的持仓和理由一个字都不该出现。</span>
             </p>
