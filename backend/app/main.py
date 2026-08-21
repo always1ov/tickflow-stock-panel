@@ -26,6 +26,7 @@ from app.api import (
     mining,
     monitor_rules,
     overview,
+    paper_trading,  # [fork 增强] R59 AI 操盘手
     pipeline,
     regime,
     rps,
@@ -462,6 +463,7 @@ app.include_router(screener.router)
 app.include_router(backtest.router)
 app.include_router(mining.router)
 app.include_router(workflows.router)  # [fork 增强] R39 研究工作流
+app.include_router(paper_trading.router)  # [fork 增强] R59 AI 操盘手
 app.include_router(intraday.router)
 app.include_router(indices.router)
 app.include_router(overview.router)

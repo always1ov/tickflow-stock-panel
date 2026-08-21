@@ -19,6 +19,8 @@ const Watchlist = lazy(() => import('./pages/Watchlist').then(m => ({ default: m
 const Screener = lazy(() => import('./pages/Screener').then(m => ({ default: m.Screener })))
 const Backtest = lazy(() => import('./pages/Backtest').then(m => ({ default: m.Backtest })))
 const Mining = lazy(() => import('./pages/Mining').then(m => ({ default: m.Mining })))
+// [R59] AI 操盘手: 让模型只用本系统的信息模拟交易, 长期看这套信息够不够用
+const PaperTrading = lazy(() => import('./pages/PaperTrading').then(m => ({ default: m.PaperTrading })))
 const Financials = lazy(() => import('./pages/Financials').then(m => ({ default: m.Financials })))
 const Data = lazy(() => import('./pages/Data').then(m => ({ default: m.Data })))
 const Monitor = lazy(() => import('./pages/Monitor').then(m => ({ default: m.Monitor })))
@@ -53,6 +55,7 @@ const CORE_ROUTE_PATHS = new Set([
   '/screener',
   '/backtest',
   '/mining',
+  '/paper-trading',
   '/financials',
   '/data',
   '/monitor',
@@ -126,6 +129,7 @@ export const router = createBrowserRouter([
       { path: 'screener', element: <Screener /> },
       { path: 'backtest', element: <Backtest /> },
       { path: 'mining', element: <Mining /> },
+      { path: 'paper-trading', element: <PaperTrading /> },
       { path: 'financials', element: <Financials /> },
       { path: 'data', element: <Data /> },
       { path: 'monitor', element: <Monitor /> },

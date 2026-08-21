@@ -1855,6 +1855,52 @@ export interface TickflowKeyRow {
   error?: string
 }
 
+/** [R59] AI 操作员一览用的成绩投影 */
+export interface PaperTrader {
+  id: string
+  /** 就是模型名 —— 这张表要回答的是哪个模型用同一份信息做得更好 */
+  name: string
+  profile_id: string
+  initial_capital: number
+  cash: number
+  nav: number
+  /** 相对初始资金的收益率(小数) */
+  return_pct: number
+  positions_count: number
+  orders_count: number
+  /** 记过净值的天数 */
+  days: number
+  created_at: string
+  last_run_at: string | null
+  last_error: string
+  last_note: string
+}
+
+export interface PaperPosition {
+  symbol: string; shares: number; cost: number
+  price: number | null
+  opened_on: string
+  pnl_pct: number | null
+  market_value: number
+}
+
+export interface PaperOrder {
+  ts: string; date: string
+  action: 'buy' | 'sell'
+  symbol: string; shares: number; price: number
+  amount?: number
+  reason: string
+  /** 有值 = 这一笔被拒了。拒单也留痕: "想买但买不成"和"没想买"是两件事 */
+  rejected?: string
+}
+
+export interface PaperTraderDetail extends PaperTrader {
+  positions: PaperPosition[]
+  /** 新 → 旧 */
+  orders: PaperOrder[]
+  nav_history: { date: string; nav: number; cash: number; market_value: number }[]
+}
+
 export interface AiProfile {
   id: string
   /** 给自己看的名字, 如"主力"、"备用" */
@@ -2112,6 +2158,36 @@ export const api = {
     ),
 
   /** 保存 AI 配置 */
+  // ===== [R59] AI 操盘手 =====
+  paperTraders: () =>
+    request<{ traders: PaperTrader[] }>('/api/paper-trading/traders'),
+
+  paperTrader: (id: string) =>
+    request<PaperTraderDetail>(`/api/paper-trading/traders/${encodeURIComponent(id)}`),
+
+  paperTraderCreate: (body: { name: string; profile_id: string; capital: number }) =>
+    request<PaperTrader>('/api/paper-trading/traders', {
+      method: 'POST', body: JSON.stringify(body),
+    }),
+
+  /** 让这个操作员按今天的信息做一次决策 */
+  paperTraderRun: (id: string) =>
+    request<{ date: string; orders: PaperOrder[]; note: string; raw: string }>(
+      `/api/paper-trading/traders/${encodeURIComponent(id)}/run`, { method: 'POST' }),
+
+  paperTraderReset: (id: string) =>
+    request<{ ok: boolean }>(`/api/paper-trading/traders/${encodeURIComponent(id)}/reset`,
+      { method: 'POST' }),
+
+  paperTraderDelete: (id: string) =>
+    request<{ deleted: string }>(`/api/paper-trading/traders/${encodeURIComponent(id)}`,
+      { method: 'DELETE' }),
+
+  /** 看一眼这次会喂给它什么 —— 判断"系统给的信息够不够"得先看清给了什么 */
+  paperTraderContext: (id: string) =>
+    request<{ context: string; system_prompt: string }>(
+      `/api/paper-trading/traders/${encodeURIComponent(id)}/context`),
+
   /** [R56] 多 AI 档位: 列表顺序即优先级, 前面的先用, 用不了顺位往下 */
   aiProfiles: () =>
     request<{ profiles: AiProfile[] }>('/api/settings/ai/profiles'),
