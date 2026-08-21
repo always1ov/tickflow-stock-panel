@@ -65,6 +65,7 @@ import { toggleTheme, useTheme } from '@/lib/theme'
 import { setCurrentTotal as setAlertTotal, useUnreadAlerts } from '@/lib/monitorBadge'
 import { ExtensionSlot } from '@/extensions/ExtensionSlot'
 import { getFrontendExtensionNavigation } from '@/extensions/registry'
+import { BROWSE_GROUP, BROWSE_GROUP_ID, splitBrowseGroup } from '@/lib/navGroups'
 
 // 品牌色 — 只用于 logo / brand 区域,不影响功能语义色
 const BRAND = '#8B5CF6'
@@ -89,6 +90,8 @@ const nav = [
   // [R59] AI 操盘手: 让模型用本系统的信息模拟交易, 长期观察这套信息够不够用
   { to: '/paper-trading', label: 'AI 操盘手', icon: Bot },
   { to: '/stock-analysis',    label: '个股分析', icon: TrendingUp },
+  // [R67] 分组本身也是菜单里的一行 —— 排序时它整块走, 后面四项是它的子项
+  { to: BROWSE_GROUP_ID,    label: BROWSE_GROUP.label, icon: Layers3 },
   { to: '/dashboard',       label: '看板',     icon: LayoutDashboard },
   { to: '/limit-ladder', label: '连板梯队', icon: Flame },
   { to: '/concept-analysis', label: '概念分析', icon: Layers3 },
@@ -114,12 +117,10 @@ const nav = [
  * 所以收进一个默认折叠的分组, 而不是删掉 —— 它们各自还有用处(比如「AI 打板
  * 复盘」要读连板梯队的数据), 只是不该占主视野。想彻底不要, 设置→菜单里
  * 本来就能隐藏。
+ *
+ * [R67] 分组的定义移到 lib/navGroups.ts —— 「设置 → 菜单」那一页要和这里用
+ * 同一份, 否则一边把它当一行、另一边当四行, 拖出来的顺序对不上。
  */
-const BROWSE_GROUP = {
-  label: '盘面参考',
-  hint: '展示型: 看盘面用, 不产出候选也不影响仓位',
-  paths: new Set<string>(['/dashboard', '/limit-ladder', '/concept-analysis', '/industry-analysis']),
-}
 
 /** 亮/暗主题切换 — 状态存 localStorage, 生效见 lib/theme.ts */
 function ThemeToggle() {
@@ -297,6 +298,64 @@ function AIConfigBadge({ configured, model }: { configured?: boolean; model?: st
       )}
       <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${configured ? 'bg-bear' : 'bg-warning'}`} />
     </NavLink>
+  )
+}
+
+type NavItem = { to: string; label: string; icon: typeof Gauge; badge?: string }
+
+/** 普通菜单项 —— 顶层和「盘面参考」组里用的是同一个, 免得两处样式各走各的。 */
+function PlainNavLink({ item, collapsed, indent, dataSyncing, dataSyncJustDone }: {
+  item: NavItem
+  collapsed: boolean
+  indent?: boolean
+  dataSyncing?: boolean
+  dataSyncJustDone?: boolean
+}) {
+  const { to, label, icon: Icon, badge } = item
+  return (
+    <div className={indent && !collapsed ? 'pl-3' : undefined}>
+      <NavLink
+        to={to}
+        title={collapsed ? label : undefined}
+        className={({ isActive }) =>
+          cn(
+            'group relative flex items-center rounded-btn text-sm transition-all duration-150 ease-smooth',
+            collapsed ? 'justify-center px-0 py-2' : 'gap-3 px-3 py-2',
+            isActive
+              ? 'bg-elevated text-foreground font-medium'
+              : 'text-foreground/75 hover:bg-elevated/70 hover:text-foreground',
+          )
+        }
+      >
+        {({ isActive }) => (
+          <>
+            {/* active 左侧 accent 竖条指示 */}
+            <span
+              className={cn(
+                'pointer-events-none absolute left-0 top-1/2 h-4 -translate-y-1/2 w-[2.5px] rounded-full bg-accent transition-opacity duration-150',
+                isActive ? 'opacity-100 shadow-[0_0_8px_rgba(59,130,246,0.6)]' : 'opacity-0',
+              )}
+            />
+            <Icon className={cn('h-4 w-4 shrink-0 transition-colors', isActive ? 'text-accent' : 'text-foreground/60 group-hover:text-foreground/85')} />
+            {!collapsed && <span className="flex-1">{label}</span>}
+            {!collapsed && badge && (
+              <span className="ml-auto inline-flex items-center rounded-full border border-amber-400/30 bg-amber-400/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-amber-400 shrink-0">
+                {badge}
+              </span>
+            )}
+            {/* 数据同步状态: 同步中转圈, 刚完成显示绿色对勾闪烁 3 秒 */}
+            {to === '/data' && dataSyncing && !collapsed && (
+              <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-accent" />
+            )}
+            {to === '/data' && !dataSyncing && dataSyncJustDone && !collapsed && (
+              <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-bull animate-pulse" />
+            )}
+            {/* 监控中心徽标: 仅非监控页且有未读时显示 */}
+            {to === '/monitor' && !collapsed && <MonitorBadge active={isActive} />}
+          </>
+        )}
+      </NavLink>
+    </div>
   )
 }
 
@@ -501,7 +560,6 @@ export function Layout() {
   }, [alertsTotal])
 
   // 合并内置页面 + 可见的扩展分析菜单
-  type NavItem = { to: string; label: string; icon: typeof Gauge; badge?: string }
   const analysisNav: NavItem[] = (analysisMenus?.items ?? [])
     .filter(m => m.visible)
     .map(m => ({ to: `/analysis/${m.id}`, label: m.label, icon: m.icon === 'tags' ? Tags : BarChart3 }))
@@ -543,11 +601,12 @@ export function Layout() {
     : allNav
 
   const hiddenIds = new Set(prefs?.nav_hidden ?? [])
-  const visibleNavItems = navItems.filter(n => !hiddenIds.has(n.to) && !hiddenIds.has(n.to.replace(/^\/analysis\//, '')))
-  // [R57] 分组表头挂在这一组在当前菜单顺序里的**第一项**上 —— 顺序是用户可调的,
-  // 写死某一页当表头的话, 他一调顺序表头就跑到中间去了。全被隐藏时整组不出现。
-  const browsePaths = visibleNavItems.filter(n => BROWSE_GROUP.paths.has(n.to)).map(n => n.to)
-  const firstBrowsePath = browsePaths[0]
+  const shownNavItems = navItems.filter(n => !hiddenIds.has(n.to) && !hiddenIds.has(n.to.replace(/^\/analysis\//, '')))
+  // [R67] 成员从顶层抽出来, 只在分组行下面出现 —— 分组行自己排在哪, 整块就在哪。
+  const { top: visibleNavItems, members: browseItems } = splitBrowseGroup(shownNavItems, n => n.to)
+  const browsePaths = browseItems.map(n => n.to)
+  // 四个成员全隐藏了就别留一个空表头
+  const showBrowseGroup = browsePaths.length > 0
 
   const handleToggle = async (enabled: boolean) => {
     // 开启时重新校验档位
@@ -627,18 +686,16 @@ export function Layout() {
         </div>
 
         <nav className="flex-1 min-h-0 overflow-y-auto px-2 py-3 space-y-0.5">
-          {visibleNavItems.map(({ to, label, icon: Icon, badge }) => {
+          {visibleNavItems.map((item) => {
+            const { to, label, icon: Icon } = item
             // 「自选」项 — 开启分组侧栏且未整体收起时, 渲染为可展开父项 + 二级分组
             const isWatchlistExpandable = to === '/watchlist' && groupsInNav && !navCollapsed && watchlistGroups.length > 0
-            // [R57] 「盘面参考」分组: 表头挂在这一组的第一项上, 折叠时后面的都不渲染。
-            // 用 visibleNavItems 里第一个命中的作锚点 —— 菜单顺序是用户可以自己调的,
-            // 写死某一页当表头的话, 他一调顺序表头就跑到中间去了。
-            const inBrowse = BROWSE_GROUP.paths.has(to)
-            const isBrowseAnchor = inBrowse && to === firstBrowsePath
-            if (inBrowse && !browseOpen && !isBrowseAnchor) return null
-            return (
-              <div key={to}>
-                {isBrowseAnchor && (
+            // [R67] 「盘面参考」是菜单里实实在在的一行, 它排在哪整块就在哪 ——
+            // 不再去猜"哪一页碰巧排最前"当表头, 成员也不会被中间的菜单切开。
+            if (to === BROWSE_GROUP_ID) {
+              if (!showBrowseGroup) return null
+              return (
+                <div key={to}>
                   <button
                     onClick={() => setBrowseOpen(v => !v)}
                     title={navCollapsed ? BROWSE_GROUP.label : BROWSE_GROUP.hint}
@@ -661,9 +718,18 @@ export function Layout() {
                       </>
                     )}
                   </button>
-                )}
-                {inBrowse && !browseOpen ? null : (
-                <div className={inBrowse && !navCollapsed ? 'pl-3' : undefined}>
+                  {browseOpen && (
+                    <div className="mt-0.5 space-y-0.5">
+                      {browseItems.map(m => (
+                        <PlainNavLink key={m.to} item={m} collapsed={navCollapsed} indent />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )
+            }
+            return (
+              <div key={to}>
                 {isWatchlistExpandable ? (
                   /* 可展开的自选父项 — 点击切换展开, 不直接跳页 */
                   <button
@@ -689,50 +755,12 @@ export function Layout() {
                     }
                   </button>
                 ) : (
-                  /* 普通菜单项 */
-                  <NavLink
-                    to={to}
-                    title={navCollapsed ? label : undefined}
-                    className={({ isActive }) =>
-                      cn(
-                        'group relative flex items-center rounded-btn text-sm transition-all duration-150 ease-smooth',
-                        navCollapsed ? 'justify-center px-0 py-2' : 'gap-3 px-3 py-2',
-                        isActive
-                          ? 'bg-elevated text-foreground font-medium'
-                          : 'text-foreground/75 hover:bg-elevated/70 hover:text-foreground',
-                      )
-                    }
-                  >
-                    {({ isActive }) => (
-                      <>
-                        {/* active 左侧 accent 竖条指示 */}
-                        <span
-                          className={cn(
-                            'pointer-events-none absolute left-0 top-1/2 h-4 -translate-y-1/2 w-[2.5px] rounded-full bg-accent transition-opacity duration-150',
-                            isActive ? 'opacity-100 shadow-[0_0_8px_rgba(59,130,246,0.6)]' : 'opacity-0',
-                          )}
-                        />
-                        <Icon className={cn('h-4 w-4 shrink-0 transition-colors', isActive ? 'text-accent' : 'text-foreground/60 group-hover:text-foreground/85')} />
-                        {!navCollapsed && <span className="flex-1">{label}</span>}
-                        {!navCollapsed && badge && (
-                          <span className="ml-auto inline-flex items-center rounded-full border border-amber-400/30 bg-amber-400/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-amber-400 shrink-0">
-                            {badge}
-                          </span>
-                        )}
-                        {/* 数据同步状态: 同步中转圈, 刚完成显示绿色对勾闪烁 3 秒 */}
-                        {to === '/data' && isDataSyncing && !navCollapsed && (
-                          <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-accent" />
-                        )}
-                        {to === '/data' && !isDataSyncing && dataSyncJustDone && !navCollapsed && (
-                          <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-bull animate-pulse" />
-                        )}
-                        {/* 监控中心徽标: 仅非监控页且有未读时显示 */}
-                        {to === '/monitor' && !navCollapsed && <MonitorBadge active={isActive} />}
-                      </>
-                    )}
-                  </NavLink>
-                )}
-                </div>
+                  <PlainNavLink
+                    item={item}
+                    collapsed={navCollapsed}
+                    dataSyncing={isDataSyncing}
+                    dataSyncJustDone={dataSyncJustDone}
+                  />
                 )}
 
                 {/* 自选分组二级子菜单 — 展开时显示 */}

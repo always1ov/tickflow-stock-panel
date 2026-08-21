@@ -17,16 +17,22 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Eye, EyeOff, ExternalLink, GripVertical, Settings, Bell } from 'lucide-react'
+import { Eye, EyeOff, ExternalLink, GripVertical, Settings, Bell, Layers3 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { api } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { usePreferences } from '@/lib/useSharedQueries'
+import {
+  BROWSE_GROUP,
+  BROWSE_GROUP_ID,
+  composeNavOrder,
+  splitBrowseGroup,
+} from '@/lib/navGroups'
 
 interface NavEntry {
   id: string
   label: string
-  type: 'builtin' | 'analysis'
+  type: 'builtin' | 'analysis' | 'group'
   visible: boolean
 }
 
@@ -44,6 +50,9 @@ const BUILTIN_PAGES: NavEntry[] = [
   { id: '/concept-analysis', label: '概念分析', type: 'builtin', visible: true },
   { id: '/industry-analysis', label: '行业分析', type: 'builtin', visible: true },
   { id: '/stock-analysis', label: '个股分析', type: 'builtin', visible: true },
+  // [R67] 分组自己占一行 —— 拖它就是整块挪。默认位置排在「个股分析」之后,
+  // 也就是老逻辑(表头挂在第一个成员上)算出来的那个位置, 升级上来位置不变。
+  { id: BROWSE_GROUP_ID, label: BROWSE_GROUP.label, type: 'group', visible: true },
   { id: '/regime', label: '市场环境', type: 'builtin', visible: true },
   { id: '/review', label: '复盘', type: 'builtin', visible: true },
   { id: '/financials', label: '财务分析', type: 'builtin', visible: true },
@@ -54,12 +63,16 @@ const BUILTIN_PAGES: NavEntry[] = [
 
 // ── Sortable row ──
 
-function SortableItem({ entry, hidden, onToggleHidden, badgeEnabled, onToggleBadge }: {
+function SortableItem({ entry, hidden, onToggleHidden, badgeEnabled, onToggleBadge, indent, note }: {
   entry: NavEntry
   hidden: boolean
   onToggleHidden: (id: string) => void
   badgeEnabled?: boolean
   onToggleBadge?: (id: string) => void
+  /** 组内成员 —— 缩进一格, 表示它跟着分组走 */
+  indent?: boolean
+  /** 代替路径显示的说明文字(分组行没有自己的页面, 显示 group:browse 没意义) */
+  note?: string
 }) {
   const {
     attributes,
@@ -81,9 +94,9 @@ function SortableItem({ entry, hidden, onToggleHidden, badgeEnabled, onToggleBad
     <div
       ref={setNodeRef}
       style={style}
-      className={`grid grid-cols-[2.5rem_1fr_4.5rem_3rem_3rem_3rem] items-center border-b border-border/70 px-4 py-3 last:border-b-0 ${
-        isDragging ? 'bg-elevated rounded-lg shadow-lg' : ''
-      } ${hidden ? 'opacity-50' : ''}`}
+      className={`grid grid-cols-[2.5rem_1fr_4.5rem_3rem_3rem_3rem] items-center border-b border-border/70 py-3 pr-4 last:border-b-0 ${
+        indent ? 'pl-10 bg-elevated/25' : 'pl-4'
+      } ${isDragging ? 'bg-elevated rounded-lg shadow-lg' : ''} ${hidden ? 'opacity-50' : ''}`}
     >
       <div
         {...attributes}
@@ -93,19 +106,20 @@ function SortableItem({ entry, hidden, onToggleHidden, badgeEnabled, onToggleBad
         <GripVertical className="h-4 w-4" />
       </div>
       <div className="min-w-0 flex items-center gap-2">
+        {entry.type === 'group' && <Layers3 className="h-3.5 w-3.5 shrink-0 text-muted" />}
         <span className={`truncate text-sm font-medium ${!hidden ? 'text-foreground' : 'text-muted line-through'}`}>
           {entry.label}
         </span>
         {hidden && (
           <span className="rounded bg-elevated px-1.5 py-0.5 text-[10px] text-muted shrink-0">已隐藏</span>
         )}
-        <span className="truncate text-[11px] text-muted font-mono">{entry.id}</span>
+        <span className={`truncate text-[11px] text-muted ${note ? '' : 'font-mono'}`}>{note ?? entry.id}</span>
       </div>
       <div>
         <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] ${
           entry.type === 'analysis' ? 'bg-accent/10 text-accent' : 'bg-elevated text-muted'
         }`}>
-          {entry.type === 'builtin' ? '内置' : '扩展'}
+          {entry.type === 'builtin' ? '内置' : entry.type === 'group' ? '分组' : '扩展'}
         </span>
       </div>
       <div className="flex justify-center">
@@ -122,7 +136,7 @@ function SortableItem({ entry, hidden, onToggleHidden, badgeEnabled, onToggleBad
         </button>
       </div>
       <div className="flex justify-center">
-        {entry.type === 'builtin' ? (
+        {entry.type === 'group' ? null : entry.type === 'builtin' ? (
           <Link
             to={entry.id}
             className="rounded p-1 text-muted hover:text-accent hover:bg-accent/10 transition-colors"
@@ -239,6 +253,12 @@ export function SettingsMenuSettingsPanel() {
     return result
   }, [localOrder, prefs?.nav_order, allEntries])
 
+  // [R67] 「盘面参考」的四个成员不在顶层排 —— 它们跟着分组行走, 组内单独排序。
+  const { top: topEntries, members: memberEntries } = useMemo(
+    () => splitBrowseGroup(orderedEntries, e => e.id),
+    [orderedEntries],
+  )
+
   const saveNavOrder = useMutation({
     mutationFn: (order: string[]) => api.saveNavOrder(order),
     onSuccess: () => {
@@ -257,16 +277,32 @@ export function SettingsMenuSettingsPanel() {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   )
 
+  /** 顶层排序: 分组行当一个整体挪, 成员始终跟在它后面重新落位。 */
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event
     if (!over || active.id === over.id) return
 
-    const ids = orderedEntries.map(e => e.id)
+    const ids = topEntries.map(e => e.id)
     const oldIdx = ids.indexOf(active.id as string)
     const newIdx = ids.indexOf(over.id as string)
-    const reordered = arrayMove(ids, oldIdx, newIdx)
-    setLocalOrder(reordered)
-    saveNavOrder.mutate(reordered)
+    if (oldIdx < 0 || newIdx < 0) return
+    const next = composeNavOrder(arrayMove(ids, oldIdx, newIdx), memberEntries.map(e => e.id))
+    setLocalOrder(next)
+    saveNavOrder.mutate(next)
+  }
+
+  /** 组内排序: 只动四个成员之间的先后, 分组行在顶层的位置不受影响。 */
+  const handleMemberDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+
+    const ids = memberEntries.map(e => e.id)
+    const oldIdx = ids.indexOf(active.id as string)
+    const newIdx = ids.indexOf(over.id as string)
+    if (oldIdx < 0 || newIdx < 0) return
+    const next = composeNavOrder(topEntries.map(e => e.id), arrayMove(ids, oldIdx, newIdx))
+    setLocalOrder(next)
+    saveNavOrder.mutate(next)
   }
 
   const toggleHidden = (id: string) => {
@@ -294,6 +330,8 @@ export function SettingsMenuSettingsPanel() {
         <h2 className="mt-2 text-2xl font-semibold tracking-tight text-foreground">调整左侧菜单顺序</h2>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-secondary">
           拖动左侧手柄调整菜单排列顺序，点击眼睛图标控制菜单在侧边栏中的显示或隐藏。
+          「{BROWSE_GROUP.label}」是一个分组，拖它整块一起挪；缩进的那几行是它的成员，
+          可以在组内单独排序、单独隐藏。
         </p>
       </section>
 
@@ -313,18 +351,43 @@ export function SettingsMenuSettingsPanel() {
           onDragEnd={handleDragEnd}
         >
           <SortableContext
-            items={orderedEntries.map(e => e.id)}
+            items={topEntries.map(e => e.id)}
             strategy={verticalListSortingStrategy}
           >
-            {orderedEntries.map((entry) => (
-              <SortableItem
-                key={entry.id}
-                entry={entry}
-                hidden={hiddenSet.has(entry.id)}
-                onToggleHidden={toggleHidden}
-                badgeEnabled={entry.id === '/monitor' ? badgeEnabled : undefined}
-                onToggleBadge={entry.id === '/monitor' ? toggleBadge : undefined}
-              />
+            {topEntries.map((entry) => (
+              <div key={entry.id}>
+                <SortableItem
+                  entry={entry}
+                  hidden={hiddenSet.has(entry.id)}
+                  onToggleHidden={toggleHidden}
+                  note={entry.id === BROWSE_GROUP_ID ? `${memberEntries.length} 项 · ${BROWSE_GROUP.hint}` : undefined}
+                  badgeEnabled={entry.id === '/monitor' ? badgeEnabled : undefined}
+                  onToggleBadge={entry.id === '/monitor' ? toggleBadge : undefined}
+                />
+                {/* 组内成员单开一个拖拽上下文 —— 组内排序不该把分组行本身卷进去 */}
+                {entry.id === BROWSE_GROUP_ID && (
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={handleMemberDragEnd}
+                  >
+                    <SortableContext
+                      items={memberEntries.map(e => e.id)}
+                      strategy={verticalListSortingStrategy}
+                    >
+                      {memberEntries.map(m => (
+                        <SortableItem
+                          key={m.id}
+                          entry={m}
+                          indent
+                          hidden={hiddenSet.has(m.id)}
+                          onToggleHidden={toggleHidden}
+                        />
+                      ))}
+                    </SortableContext>
+                  </DndContext>
+                )}
+              </div>
             ))}
           </SortableContext>
         </DndContext>
