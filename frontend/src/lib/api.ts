@@ -1005,6 +1005,12 @@ export interface AutopilotIteration {
 }
 export interface AutopilotSession {
   session_id: string
+  /**
+   * [R53] 这个会话是谁开的。工作流的一次「重开」就是开一个这样的会话, 之后由
+   * 后台节拍推进 —— 界面上如果还能对它按「AI 再调一轮」, 就是两个东西在推同一个
+   * 状态机, 轮次会错乱。非 null 时手动按钮一律禁用(后端也会 409)。
+   */
+  owner_workflow_id?: string | null
   asset_type: 'stock' | 'etf'
   /** 搜索窗口: AI 循环只在这里试 */
   search_start: string

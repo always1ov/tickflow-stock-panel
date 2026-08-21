@@ -95,6 +95,18 @@ export function MiningAutopilot() {
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['mining-autopilot-sessions'] })
 
+  // [R53] 工作流的一次「重开」就是开一个这样的会话 —— 两者是包含关系, 不是并列。
+  // 有挖掘工作流在跑时: 手动开新会话后端会 409(再开一路不会更快, 只会排队),
+  // 而它开的那个会话也不能手动推(界面和后台节拍同推一个状态机会把轮次弄乱)。
+  const runningWf = useQuery({
+    queryKey: ['workflows', 'mining'],
+    queryFn: () => api.workflowList('mining'),
+    refetchInterval: 15_000,
+  })
+  const wfRunning = (runningWf.data?.items ?? []).find(w => w.status === 'running')
+  const ownedBy = active?.owner_workflow_id ?? null
+
+
   // 最后一轮还在跑吗 —— 决定要不要开勤刷, 也决定「中止本轮」按不按得动
   const liveIter = useMemo(() => {
     const last = active?.iterations?.[active.iterations.length - 1]
@@ -141,13 +153,15 @@ export function MiningAutopilot() {
   stepRef.current = step
   const activeId = active?.session_id
   const activeStatus = active?.status
+  // 会话被工作流认领时必须把自动模式关掉, 否则那个定时器会一直去撞后端的 409
+  useEffect(() => { if (ownedBy) setAuto(false) }, [ownedBy])
   useEffect(() => {
-    if (!auto || !activeId || activeStatus !== 'open') return
+    if (!auto || !activeId || activeStatus !== 'open' || ownedBy) return
     const timer = setInterval(() => {
       if (!stepRef.current.isPending) stepRef.current.mutate(activeId)
     }, POLL_MS)
     return () => clearInterval(timer)
-  }, [auto, activeId, activeStatus])
+  }, [auto, activeId, activeStatus, ownedBy])
 
   const busy = step.isPending || start.isPending
   const closed = !!active && active.status !== 'open'
@@ -196,12 +210,20 @@ export function MiningAutopilot() {
             onChange={e => setForm({ ...form, maxIterations: Number(e.target.value) })} /></label>
       </div>
       <div className="flex flex-wrap items-center gap-2 border-b border-border px-3 py-2">
-        <button type="button" disabled={busy} onClick={() => start.mutate()}
+        <button type="button" disabled={busy || !!wfRunning} onClick={() => start.mutate()}
+          title={wfRunning
+            ? '上面的工作流正在跑, 它自己就在反复开这种会话 —— 同时再开一个不会更快, 只会排队。要手动调先把工作流停掉'
+            : undefined}
           className="inline-flex h-8 items-center gap-1.5 rounded-btn border border-border px-3 text-xs text-secondary transition-colors hover:border-accent/40 hover:text-accent disabled:opacity-50">
           {start.isPending ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
           开新会话
         </button>
-        {active && !closed && (
+        {active && !closed && ownedBy && (
+          <span className="text-[10px] text-warning">
+            这个会话由上面的工作流在跑, 它会自己往下推 —— 手动按钮已停用
+          </span>
+        )}
+        {active && !closed && !ownedBy && (
           <>
             <button type="button" disabled={busy}
               onClick={() => step.mutate(active.session_id)}

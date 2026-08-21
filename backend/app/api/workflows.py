@@ -96,6 +96,19 @@ def _preflight_mining(config: dict, request: Request) -> None:
     from app.api.mining import build_autopilot_session
     from app.services import mining_autopilot_store
 
+    # [R53] 另一半闸: 手动会话还开着时不给起工作流。挖掘一次只跑得动一路
+    # (heavy_job_limiter 容量 2, 一个挖掘 run 独占两格) —— 起了也是排队,
+    # 而且工作流会以为自己那一轮跑得特别慢。开会话那一侧的对称检查在
+    # api/mining.py 的 _reject_if_workflow_owns_mining。
+    open_manual = [s for s in mining_autopilot_store.list_sessions()
+                   if s.get("status") == "open" and not s.get("owner_workflow_id")]
+    if open_manual:
+        raise HTTPException(
+            status_code=409,
+            detail=(f"你还有一个手动的自动挖掘会话开着({open_manual[0]['session_id']})。"
+                    "挖掘一次只跑得动一路, 现在起工作流只会让两边互相排队。"
+                    "把那个会话中止(或等它收工)再开工作流。"))
+
     start, end = _dates(config)
     try:
         # 真开一个会话当预检 —— 开得出来就说明数据够。开出来的这个直接交给

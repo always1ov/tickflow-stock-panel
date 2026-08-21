@@ -56,7 +56,10 @@ class MiningDriver:
                 holdout_days=int(cfg.get("holdout_days") or 365),
                 budget_profile=str(cfg.get("budget_profile") or "balanced"),
                 max_iterations=int((wf.get("budget") or {}).get("rounds_per_attempt") or 6),
-                factor_names=cfg.get("factor_names") or [])
+                factor_names=cfg.get("factor_names") or [],
+                # [R53] 认领这个会话 —— 界面据此禁用手动推进, 后端也会挡掉,
+                # 免得界面和后台节拍同时 step 同一个状态机
+                owner_workflow_id=str(wf["workflow_id"]))
             workflow.note_attempt_start(wf, {"session_id": session["session_id"]})
             return {"action": "running"}
 

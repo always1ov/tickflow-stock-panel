@@ -72,10 +72,17 @@ def latest() -> dict | None:
 
 
 def create(*, asset_type: str, windows: dict, max_iterations: int,
-           base_config: dict) -> dict:
-    """开一个新会话。windows 的 date 统一转 ISO 字符串, 落盘即 JSON 安全。"""
+           base_config: dict, owner_workflow_id: str | None = None) -> dict:
+    """开一个新会话。windows 的 date 统一转 ISO 字符串, 落盘即 JSON 安全。
+
+    [R53] ``owner_workflow_id`` 记下这个会话是谁开的。工作流的一次"重开"就是
+    开一个这样的会话, 之后由后台节拍去 step 它 —— 界面上如果还能对同一个会话
+    按「AI 再调一轮」, 就是两个东西在推同一个状态机, 轮次会错乱。有主的会话
+    只能由它的主人推进(见 api/mining.py 的两处 409)。
+    """
     session = {
         "session_id": uuid.uuid4().hex[:12],
+        "owner_workflow_id": owner_workflow_id,
         "asset_type": asset_type,
         "search_start": str(windows["search_start"]),
         "search_end": str(windows["search_end"]),

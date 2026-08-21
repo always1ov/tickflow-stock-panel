@@ -847,6 +847,14 @@ def autopilot_stop(session_id: str, request: Request) -> dict[str, Any]:
     幂等: 已经收工的会话直接原样返回, 重复点不会把已完成的结果抹掉。
     """
     session = _autopilot_session_or_404(session_id)
+    # [R53] 有主的会话停了也白停 —— 工作流会认为这次"重开"结束了, 转头再开一个。
+    # 真想让它停下来, 要停的是工作流。
+    owner = session.get("owner_workflow_id")
+    if owner:
+        raise HTTPException(
+            status_code=409,
+            detail=(f"这个会话由工作流 {owner} 开的。单停会话没用 —— 工作流会当成"
+                    "这次重开结束了, 转头再开一个。要停就停那个工作流。"))
     if session.get("status") != "open":
         return {"session": session, "message": "本会话已经收工, 无需中止"}
 
@@ -879,7 +887,7 @@ def build_autopilot_session(
     *, repo, asset_type: str, start: date, end: date, holdout_days: int,
     budget_profile: str, max_iterations: int, factor_names: Sequence[str] = (),
     commission_pct: float = 0.0002, stamp_tax_pct: float = 0.0005,
-    slippage_bps: float = 5.0,
+    slippage_bps: float = 5.0, owner_workflow_id: str | None = None,
 ) -> dict[str, Any]:
     """[R39] 开一个自动挖掘会话(窗口切分 + 真实交易日预检)。
 
@@ -919,7 +927,8 @@ def build_autopilot_session(
     }
     return mining_autopilot_store.create(
         asset_type=asset_type, windows=windows,
-        max_iterations=max_iterations, base_config=base_config)
+        max_iterations=max_iterations, base_config=base_config,
+        owner_workflow_id=owner_workflow_id)
 
 
 async def advance_autopilot_session(
@@ -956,9 +965,28 @@ async def advance_autopilot_session(
         start_run=start_run, base_config=session["base_config"])
 
 
+# [R53] 挖掘是重活: heavy_job_limiter 容量 2, 一个挖掘 run 独占两格。所以同时
+# 只应该有一路在挖 —— 再开一路不会更快, 它只会静默排队, 界面上看着就是"卡住了"。
+#
+# 而工作流的一次"重开"本来就是开一个自动挖掘会话, 两者是包含关系不是并列关系:
+# 工作流跑着的时候手动再开一个, 等于让同一件事排两次队。这里直接挡掉并说清楚。
+def _reject_if_workflow_owns_mining() -> None:
+    from app.services import workflow
+
+    running = [w for w in workflow.running_workflows() if w.get("kind") == workflow.KIND_MINING]
+    if running:
+        wf = running[0]
+        raise HTTPException(
+            status_code=409,
+            detail=(f"挖掘工作流 {wf['workflow_id']} 正在跑, 它自己就在反复开自动挖掘会话。"
+                    "同时再开一个不会更快 —— 挖掘一次只能跑一路, 第二个只会排队等着。"
+                    "要手动一轮一轮调, 先把上面的工作流停掉。"))
+
+
 @router.post("/autopilot/sessions")
 def autopilot_start(payload: AutopilotStartRequest, request: Request) -> dict[str, Any]:
     """开一个自动挖掘会话。窗口切分 + 真实交易日预检都在这里把关, 免得第一轮才失败。"""
+    _reject_if_workflow_owns_mining()
     try:
         return build_autopilot_session(
             repo=request.app.state.repo,
@@ -974,8 +1002,16 @@ def autopilot_start(payload: AutopilotStartRequest, request: Request) -> dict[st
 @router.post("/autopilot/sessions/{session_id}/step")
 async def autopilot_step(session_id: str, request: Request) -> dict[str, Any]:
     """推进一格: 等待中 / 判上一轮并开新一轮 / 收工。手动与自动共用这一个入口。"""
+    session = _autopilot_session_or_404(session_id)
+    # [R53] 有主的会话只能由它的主人推 —— 界面和工作流后台同时 step 同一个
+    # 状态机, 轮次会错乱(两边都以为自己开的是第 N 轮)。
+    owner = session.get("owner_workflow_id")
+    if owner:
+        raise HTTPException(
+            status_code=409,
+            detail=f"这个会话由工作流 {owner} 在跑, 它会自己往下推。要手动接管请先停掉那个工作流。")
     out = await advance_autopilot_session(
-        _autopilot_session_or_404(session_id),
+        session,
         manager=_manager(request), repo=request.app.state.repo,
         app_state=request.app.state)
     return {"action": out["action"], "message": out["message"], "session": out["session"]}
