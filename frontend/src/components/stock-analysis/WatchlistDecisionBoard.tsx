@@ -400,7 +400,28 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
 
       {/* [R28] 关键价位改弹窗后, 页面里已没有 K 线图要让位 —— 表格直接吃满剩余视口高度 */}
       <div className="overflow-auto border-t border-border/60 max-h-[calc(100vh-210px)]">
-          <table className="w-full min-w-[1040px] text-xs">
+          <table className="w-full text-xs">
+            {/* 列宽按比例显式分配。不写的话浏览器会把富余空间全塞给 max-content 最大的
+                那一列(AI 信号), 别的列挤在一起; 写死 px 又不随视口走。
+                百分比 + table-layout:auto = 按比例分, 但内容撑不下时仍以内容为准
+                (所有单值格都是 nowrap, 所以内容宽度就是它的底线, 不会被压变形)。 */}
+            <colgroup>
+              <col style={{ width: '12%' }} />{/* 标的 */}
+              <col style={{ width: '5%' }} />{/* 现价 */}
+              <col style={{ width: '5%' }} />{/* 涨跌 */}
+              <col style={{ width: '4%' }} />{/* 仓位 */}
+              <col style={{ width: '8%' }} />{/* 成本(两个输入框) */}
+              <col style={{ width: '5%' }} />{/* 浮盈 */}
+              <col style={{ width: '7%' }} />{/* 止盈线(两行) */}
+              <col style={{ width: '7%' }} />{/* 趋势 */}
+              <col style={{ width: '4.5%' }} />{/* 短通道 */}
+              <col style={{ width: '4.5%' }} />{/* 中通道 */}
+              <col style={{ width: '4.5%' }} />{/* 长通道 */}
+              <col style={{ width: '5%' }} />{/* 结论 */}
+              <col style={{ width: '4%' }} />{/* 置信 */}
+              <col style={{ width: '5%' }} />{/* 报告 */}
+              <col />{/* AI 信号: 不给宽度, 吃掉剩下的 —— 只有它是整段文字 */}
+            </colgroup>
             <thead className="sticky top-0 bg-surface/95 backdrop-blur text-[10px] text-muted">
               <tr className="text-left">
                 <th className="whitespace-nowrap px-4 py-2.5 font-normal"><button onClick={() => toggleSort('name')} className={thBtn}>标的{caret('name')}</button></th>
@@ -553,7 +574,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
                       })()}
                     </td>
                     {/* AI 信号:徽标 + 时间 + 理由整段换行(不截断) */}
-                    <td className="px-4 py-2.5 min-w-[300px] align-middle">
+                    <td className="px-4 py-2.5 align-middle">
                       {r.sig ? (
                         <div className="flex flex-col gap-0.5">
                           <div className="flex items-center gap-1.5">
