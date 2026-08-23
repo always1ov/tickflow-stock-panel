@@ -165,7 +165,8 @@ def apply(proposal_groups: list[dict], *, replace_existing: bool = False) -> dic
     existing = {g["name"].casefold(): g for g in watchlist.list_groups()}
     if replace_existing:
         for entry in watchlist.list_symbols():
-            if entry.get("group_id"):
+            # [同步上游] 分组成员关系已改多值(group_ids); 老字段留着兼容读旧数据
+            if entry.get("group_ids") or entry.get("group_id"):
                 try:
                     watchlist.set_group(entry["symbol"], None)
                 except (KeyError, ValueError) as e:  # noqa: PERF203

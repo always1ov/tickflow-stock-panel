@@ -146,10 +146,37 @@ def run_now(
     latest_daily = repo.latest_daily_date()
     today = _date.today()
     today_exists = latest_daily and latest_daily >= today
+    new_daily_days = 0
 
-    # 历史稀疏检测: 全局 max(date) 会被部分写入(自选实时快照落的当日行 / 被中断的
-    # 首次拉取)拉高, 让下方"补缺口"分支误以为已是最新, 起点=今天 → 一年历史永远
-    # 不会回补(涨跌幅/指标全算不出)。近一年正常应有 ~240 个交易日分区, 远低于此
+    # 完整性自愈: 检测最近交易日的盘中快照/缺口 (盘中停机后次日开实时会留下
+    # 中午快照, 而下方"今天已有数据→只刷今天"分支会让它永久留存)。
+    # 命中 → 本次管道放弃实时覆写分支, 降级为从最早坏日起的范围拉取。
+    integrity_issues: list = []
+    stale_day: _date | None = None
+    etf_stale_day: _date | None = None
+    index_stale_day: _date | None = None
+    if override_start_date is None:
+        try:
+            from app.services import data_integrity
+            integrity_issues = data_integrity.scan_recent_integrity(
+                repo.store.data_dir, today=today,
+            )
+            if integrity_issues:
+                stale_day = data_integrity.earliest_issue_day(integrity_issues, ("kline_daily",))
+                etf_stale_day = data_integrity.earliest_issue_day(integrity_issues, ("kline_etf_daily",))
+                index_stale_day = data_integrity.earliest_issue_day(integrity_issues, ("kline_index_daily",))
+                logger.warning(
+                    "integrity: 检测到 %d 个不完整分区(%s), 本次管道改走范围拉取修复",
+                    len(integrity_issues), data_integrity.describe_issues(integrity_issues),
+                )
+        except Exception as e:  # noqa: BLE001
+            logger.warning("integrity scan failed (soft, 按无坏数据处理): %s", e)
+            integrity_issues = []
+    # [fork 保留] 历史稀疏检测 —— 和上面的完整性自检互补, 守的是另一类洞:
+    # 上面的 scan 只看最近 7 天(盘中停机快照); 这里看的是**年尺度**的大洞 ——
+    # 全局 max(date) 会被部分写入(自选实时快照落的当日行 / 被中断的首次拉取)
+    # 拉高, 让下方"补缺口"分支误以为已是最新, 起点=今天 → 一年历史永远不会
+    # 回补(涨跌幅/指标全算不出)。近一年正常应有 ~240 个交易日分区, 远低于此
     # (<120)即判定存在历史大洞 → 强制走首次拉取分支从一年前重拉(merge-upsert 幂等)。
     history_sparse = False
     if latest_daily and not override_start_date:
@@ -166,7 +193,6 @@ def run_now(
                     _n_dates)
         except Exception as e:  # noqa: BLE001
             logger.warning("history sparse detection failed: %s", e)
-    new_daily_days = 0
     # 日K范围拉取的起点(分支3补缺口/分支4首次/数据修正); 实时增量/跳过时为 None。
     # 供 Step 1.5 除权因子回溯范围对齐: 范围拉取→用日K范围, 非范围→最近N天兜底。
     daily_range_start: _date | None = None
@@ -197,8 +223,16 @@ def run_now(
         new_daily_days = gap_days
         emit("sync_daily", 45, f"日K 完成,覆盖 {gap_days} 天")
         logger.info("sync_daily: [%s ~ %s] done, %d days", start_date, today, gap_days)
-    elif today_exists and not history_sparse and capset.has(Cap.QUOTE_POOL) and _prefs.get_daily_data_provider() == "tickflow":
+    elif (
+        today_exists
+        and stale_day is None
+        and not history_sparse
+        and capset.has(Cap.QUOTE_POOL)
+        and _prefs.get_daily_data_provider() == "tickflow"
+    ):
         # 付费档:今天有数据(QuoteService 已落盘)→ 实时行情覆写,确保最新。
+        # stale_day 非空时禁用本分支: "只刷今天"会让停机日的盘中快照永久留存,
+        # 降级到下方 batch 路径从坏日起重拉。
         # free/none 档无 quote.pool 能力,即便今天已有数据(如从 expert 降级),
         # 也降级到下方 batch 路径刷新,避免调用无权限的实时行情接口。
         emit("sync_daily", 12, f"获取日K [{today} ~ {today}] 实时行情…")
@@ -206,11 +240,15 @@ def run_now(
         new_daily_days = 1
         emit("sync_daily", 45, f"日K 完成,{written_daily} 只标的")
         logger.info("sync_daily: [%s ~ %s] live quotes, %d symbols", today, today, written_daily)
-    elif latest_daily and not history_sparse:
+    elif (latest_daily or stale_day) and not history_sparse:
         # 有历史 → batch 补齐缺口。
         # 也覆盖"今天已有数据但无实时行情权限(free/none)"的降级场景:
         #   此时 start_date = latest_daily = today,batch 刷新当天日K。
-        start_date = latest_daily
+        # 完整性修复场景: start_date = min(本地最新日, 最早坏日) —
+        #   today_exists 时 latest_daily=今天, 不取 min 会漏掉坏日。
+        # history_sparse 时不走这里: 起点会被虚高的 max(date) 定在今天附近,
+        # 大洞永远补不上 —— 落到下面的首拉分支从一年前重拉。
+        start_date = min(d for d in (latest_daily, stale_day) if d is not None)
         daily_range_start = start_date
         emit("sync_daily", 12, f"获取日K [{start_date} ~ {today}]…")
         logger.info("sync_daily: [%s ~ %s] %s", start_date, today,
@@ -252,6 +290,22 @@ def run_now(
         logger.info("sync_daily: [%s ~ %s] done", start_date, today)
     _invalidate("daily")
 
+    # 完整性修复时删除股票 enriched 的坏分区: 增量重算只算 enriched 里不存在
+    # 的日期, 盘中快照日分区已存在(虽是错的), 不删永远不会被重算。删除后
+    # Step 2 把这些日期当"新日期"重算 (剩余分区最近 60 天做历史前缀, 窗口 ≤5 天回看充足)。
+    repair_start = override_start_date if override_start_date is not None else stale_day
+    if repair_start is not None:
+        try:
+            from app.services.data_integrity import prune_enriched_partitions
+            pruned = prune_enriched_partitions(
+                repo.store.data_dir, repair_start, "kline_daily_enriched",
+            )
+            if pruned:
+                logger.info("integrity: 已删除 %d 个待重算的 enriched 分区 (≥ %s)", pruned, repair_start)
+        except Exception as e:  # noqa: BLE001
+            logger.warning("enriched prune failed (soft): %s", e)
+
+
     # 单标的新鲜度: 全局 max(date) 会被任一有今日数据的标的"拉高", 掩盖停牌/复牌/
     # 一直拉失败而掉队的个股缺口(全局判据只刷"今天", 永不回补掉队标的的历史缺口)。
     # 这里检测并**可见化**(WARNING + 计入结果), 让掉队标的不再隐形。
@@ -267,18 +321,25 @@ def run_now(
             logger.warning("laggard detection failed: %s", e)
             stage_errors.append(f"laggard detection: {e}")
 
-    # Step 1.5: 同步除权因子 — 范围与日K拉取方式对齐(TickFlow 路径, 需 Starter+;
-    # 免费档无该能力时跳过, 复权指标按不复权价计算)
+    # Step 1.5: 同步除权因子 — 范围与日K拉取方式对齐
+    #   日K范围拉取(补缺口/首次) → 除权用日K范围 [daily_range_start, now]
+    #     首次会覆盖整个日K区间内的历史除权事件; 补缺口天然只增量(起点=latest_daily≈昨天)
+    #   日K实时增量/跳过(分支2/分支1) → 除权兜底拉最近 30 天, 补可能遗漏的新除权
+    #     (这两类分支不拉历史日K, 除权不能用日K范围, 只能兜底最近几日)
     written_adj = 0
     affected_symbols: list[str] = []
-    if capset.has(Cap.ADJ_FACTOR):
+    adj_provider = _prefs.get_adj_factor_provider()
+    if adj_provider == "same_as_daily":
+        adj_provider = _prefs.get_daily_data_provider()
+    can_sync_adj = capset.has(Cap.ADJ_FACTOR) or adj_provider != "tickflow"
+    if can_sync_adj:
         from datetime import datetime, timedelta
         adj_end = datetime.now()
         if daily_range_start is not None:
             adj_start = datetime.combine(daily_range_start, datetime.min.time())
         else:
-            # 兜底拉最近 15 天: 覆盖春节/国庆最长约10天长假 + 故障恢复缓冲;
-            # sync_adj_factor 内部 merge+unique 幂等, 多拉无副作用。
+            # 日K实时增量/跳过时, 除权兜底拉最近 N 天, 覆盖周末/长假/停机期间的新除权事件。
+            # 15 天: 覆盖春节/国庆最长约10天长假 + 故障恢复缓冲; sync_adj_factor 内部 merge+unique 幂等, 多拉无副作用。
             adj_start = adj_end - timedelta(days=15)
         adj_start_str = adj_start.strftime("%Y-%m-%d")
         adj_end_str = adj_end.strftime("%Y-%m-%d")
@@ -296,8 +357,10 @@ def run_now(
         if affected_symbols:
             _refresh_single_view(repo, "adj_factor")
             emit("sync_adj", 60, f"除权因子完成,新增 {len(affected_symbols)} 只个股")
+            logger.info("sync_adj: [%s ~ %s] done, %d symbols", adj_start_str, adj_end_str, len(affected_symbols))
         else:
             emit("sync_adj", 60, "除权因子完成,无新增")
+            logger.info("sync_adj: [%s ~ %s] no new factors", adj_start_str, adj_end_str)
         _invalidate("adj_factor")
     else:
         skipped.append("sync_adj")
@@ -404,11 +467,15 @@ def run_now(
                     d.name[5:] for d in index_dir.glob("date=*")
                     if d.is_dir() and d.name.startswith("date=")
                 ) if index_dir.exists() else []
-                # 数据修正模式下用传入起点; 否则用本地指数最新日期补到今天
+                # 数据修正模式下用传入起点; 否则用本地指数最新日期补到今天;
+                # 完整性修复时起点再提前到最早坏日 (实时写过今天的指数分区时,
+                # "最新日期=今天"会让停机日的快照/缺口永久留存)
                 if override_start_date:
                     index_start = override_start_date
                 else:
                     index_start = _date.fromisoformat(index_dates[-1]) if index_dates else today - _td(days=365)
+                if index_stale_day is not None and index_start > index_stale_day:
+                    index_start = index_stale_day
 
                 def _index_chunk(cur: int, tot: int) -> None:
                     emit("sync_index", 88, f"指数日K批次 {cur}/{tot}",
@@ -469,6 +536,9 @@ def run_now(
                     if d.is_dir() and d.name.startswith("date=")
                 ) if etf_dir.exists() else []
                 etf_start = _date.fromisoformat(etf_dates[-1]) if etf_dates else today - _td(days=365)
+                # 同指数: 完整性修复时把 ETF 起点提前到最早坏日
+                if etf_stale_day is not None and etf_start > etf_stale_day:
+                    etf_start = etf_stale_day
 
                 def _etf_chunk(cur: int, tot: int) -> None:
                     emit("sync_index", 88, f"ETF 日K批次 {cur}/{tot}",
@@ -588,47 +658,11 @@ def run_now(
     emit("refresh_views", 95, "刷新 DuckDB 视图…")
     _refresh_views(repo)
 
-    # 盘后完整性检测: 交易日收盘后同步, 但今日全市场日线未出齐(免费源如 BaoStock
-    # 一般 17:30~20:00 才发布当日数据) → 明示"稍后再手动同步", 不再静默显示"成功"
-    # 却让梯队/概念等停在昨天而用户不知原因。阈值 = max(100, 标的池一半), 只拦
-    # "基本没出数"(如仅自选实时那几只), 不误伤停牌等正常缺口。
-    today_daily_rows = 0
-    today_incomplete = False
-    try:
-        from datetime import time as _dtime
-        from app.market_time import cn_now, cn_today
-        _now = cn_now()
-        # 下限 15:00(A股收盘): 收盘后跑的管道都该检测。此前写 15:30 会让
-        # 15:10 调度的管道(15:2x 跑完)恰好躲过检测 —— 不提示也不触发当晚重试
-        if pull_a_share and _now.weekday() < 5 and _now.time() >= _dtime(15, 0):
-            row = repo.execute_one(
-                "SELECT count(*) FROM kline_daily WHERE date = CAST(? AS DATE)",
-                [str(cn_today())],
-            )
-            today_daily_rows = int(row[0]) if row and row[0] else 0
-            today_incomplete = today_daily_rows < max(100, len(universe) // 2)
-    except Exception as e:  # noqa: BLE001
-        logger.debug("今日日线完整性检测跳过: %s", e)
-
-    if today_incomplete:
-        emit("done", 100,
-             f"完成 · ⚠ 今日全市场日线尚未出齐(仅 {today_daily_rows}/{len(universe)} 只)。"
-             f"数据源一般 17:30~20:00 发布当日数据, 届时再点「立即同步」即可补到今天")
-    else:
-        emit("done", 100, "完成")
+    emit("done", 100, "完成")
     _invalidate(None)  # 兜底:全清
-
-    # [fork 增强] 用最新日线刷新持仓出场线并同步监控规则(线只会上移, 失败不影响管道)
-    try:
-        from app.services import position_exit
-        position_exit.sync_exit_rules(position_exit.exit_lines_for_positions(repo))
-    except Exception as e:  # noqa: BLE001
-        logger.debug("持仓出场线刷新跳过: %s", e)
 
     result = {
         "universe_size": len(universe),
-        "today_daily_rows": today_daily_rows,
-        "today_daily_incomplete": today_incomplete,
         "daily_days": new_daily_days,
         "adj_factor_symbols": len(affected_symbols),
         "enriched_days": written_enriched,
@@ -641,6 +675,8 @@ def run_now(
         "regime_days": regime_days,
         "mainline_rows": mainline_rows,
         "lagging_symbols": len(lagging_symbols),
+        "integrity_repair_from": repair_start.isoformat() if repair_start else None,
+        "integrity_issues": len(integrity_issues),
         "skipped_stages": skipped,
         "stage_errors": stage_errors,
     }
@@ -739,23 +775,19 @@ def _run_tracked(fn, job_label: str) -> bool:
     重任务执行槽: 再挡一层僵尸并发(reap 后线程仍活时不得并行写 parquet)。
     返回 True 仅表示任务已成功并且执行槽已释放。
     """
-    from app.services.pipeline_jobs import job_store, release_run_slot, try_acquire_run_slot
+    from app.services.pipeline_jobs import JobCancelledError, job_store, release_run_slot, try_acquire_run_slot
 
     job_id, is_new = job_store.create()
     if not is_new:
         logger.info("scheduled %s 跳过: 已有活跃任务在运行 (job_id=%s)", job_label, job_id)
         return False
-    if not try_acquire_run_slot():
+    if not try_acquire_run_slot(job_id):
         logger.warning("scheduled %s 跳过: 重任务执行槽被占用(疑似上次任务卡死)", job_label)
         job_store.fail(job_id, f"scheduled {job_label} skipped: 已有数据任务在运行")
         return False
 
     def progress(stage: str, pct: int, msg: str, stage_pct: int | None = None,
                  skip_log: bool = False) -> None:
-        # 协作式取消: 用户点了取消(或被判死)→ 在最近的批次边界立即退出
-        from app.services.pipeline_jobs import JobCancelled
-        if job_store.is_cancelled(job_id):
-            raise JobCancelled(job_id)
         job_store.progress(job_id, stage, pct, msg, stage_pct=stage_pct, skip_log=skip_log)
 
     succeeded = False
@@ -765,16 +797,14 @@ def _run_tracked(fn, job_label: str) -> bool:
         job_store.succeed(job_id, result)
         succeeded = True
         logger.info("scheduled %s completed: job_id=%s", job_label, job_id)
-    except Exception as e:
-        from app.services.pipeline_jobs import JobCancelled
-        if isinstance(e, JobCancelled):
-            # 已在 cancel 端点标记 failed; 已写入的增量保留, 下次调度自动续
-            logger.info("scheduled %s cancelled by user: job_id=%s", job_label, job_id)
-        else:
-            logger.exception("scheduled %s failed: job_id=%s", job_label, job_id)
-            job_store.fail(job_id, f"scheduled {job_label} failed")
+    except JobCancelledError:
+        # 已由 terminate() 标记失败(卡死/手动取消), 拉取线程在分块回调处自行退出
+        logger.warning("scheduled %s cancelled: job_id=%s", job_label, job_id)
+    except Exception:
+        logger.exception("scheduled %s failed: job_id=%s", job_label, job_id)
+        job_store.fail(job_id, f"scheduled {job_label} failed")
     finally:
-        release_run_slot()
+        release_run_slot(job_id)
     return succeeded
 
 
@@ -840,7 +870,6 @@ async def _run_scheduled_review(repo) -> None:
             "summary": meta.get("summary", ""),
             "emotion_score": meta.get("emotion_score"),
             "emotion_label": meta.get("emotion_label", ""),
-            "mode": "today",  # 定时复盘固定走当日模式
         })
         logger.info("scheduled review saved: as_of=%s", meta.get("as_of"))
 
@@ -967,17 +996,6 @@ def _maybe_push_review(content: str, meta: dict) -> None:
                     url, "每日复盘", full_body
                 )
                 logger.info("review push(wecom) %s", "sent" if ok else "failed")
-            elif ch == "dingtalk":
-                url = preferences.get_dingtalk_webhook_url()
-                if not url:
-                    logger.info("review push(dingtalk) skipped: webhook not configured")
-                    continue
-                keyword = preferences.get_dingtalk_keyword()
-                full_body = (f"**{subtitle}**\n\n{content}" if subtitle else content)
-                ok = webhook_adapter.send_dingtalk_markdown(
-                    url, "每日复盘", full_body, keyword
-                )
-                logger.info("review push(dingtalk) %s", "sent" if ok else "failed")
             # 未来更多渠道在此追加分支
     except Exception as e:  # noqa: BLE001
         logger.warning("review push error: %s", e)
@@ -1002,98 +1020,6 @@ def _register_review_job(scheduler, repo, hour: int, minute: int) -> None:
         id=REVIEW_JOB_ID,
         misfire_grace_time=7200,  # 复盘非关键, 允许 2 小时内补跑
         replace_existing=True,
-    )
-
-
-# ================================================================
-# [R27] 定时 AI: 今日总览导读·优选 / 个股信号批量
-# ================================================================
-
-TODAY_AI_JOB_ID = "scheduled_today_ai"
-SIGNAL_AI_JOB_ID = "scheduled_signal_ai"
-
-
-async def _run_scheduled_today_ai(repo) -> None:
-    """定时生成今日总览 AI 导读·优选并落盘。异常只记日志, 不影响调度器。"""
-    try:
-        from app import secrets_store as ss
-        if not ss.get_ai_key():
-            logger.info("scheduled today-ai skipped: AI key not configured")
-            return
-        from app.api.today import _build_overview, generate_today_ai
-        from app.services import today_ai_store
-
-        data = _build_overview(repo)
-        out = await generate_today_ai(repo, data)
-        if out.get("error"):
-            logger.warning("scheduled today-ai failed: %s", out["error"])
-            return
-        today_ai_store.save(out, as_of=data.get("as_of"), source="scheduled")
-        logger.info("scheduled today-ai done: %d picks", len(out.get("picks") or []))
-    except Exception:
-        logger.exception("scheduled today-ai crashed")
-
-
-async def _run_scheduled_signal_ai(repo) -> None:
-    """定时批量刷新个股 AI 信号。逐只串行 + 固定间隔, 避免打满 AI 接口。"""
-    import asyncio
-
-    try:
-        from app import secrets_store as ss
-        if not ss.get_ai_key():
-            logger.info("scheduled signal-ai skipped: AI key not configured")
-            return
-        from app.services import positions as positions_svc
-        from app.services import preferences as prefs
-        from app.services import stock_signal, watchlist
-
-        cfg = prefs.get_signal_ai_schedule()
-        syms = [str(e.get("symbol") or "").upper() for e in watchlist.list_symbols()]
-        syms = [s for s in syms if s]
-        if cfg["scope"] == "held":
-            held = {s for s, p in positions_svc.load_all().items() if p.get("held")}
-            syms = [s for s in syms if s in held]
-        if not syms:
-            logger.info("scheduled signal-ai: no symbols in scope=%s", cfg["scope"])
-            return
-        gap = cfg["gap_seconds"]
-        ok = failed = 0
-        for i, sym in enumerate(syms):
-            try:
-                res = await stock_signal.generate_signal(repo, repo.store.data_dir, sym)
-                if res.get("error"):
-                    failed += 1
-                    logger.debug("scheduled signal-ai %s: %s", sym, res["error"])
-                else:
-                    ok += 1
-            except Exception as e:  # noqa: BLE001
-                failed += 1
-                logger.debug("scheduled signal-ai %s crashed: %s", sym, e)
-            if i < len(syms) - 1:
-                await asyncio.sleep(gap)
-        logger.info("scheduled signal-ai done: %d ok, %d failed (scope=%s)",
-                    ok, failed, cfg["scope"])
-    except Exception:
-        logger.exception("scheduled signal-ai crashed")
-
-
-def _register_today_ai_job(scheduler, repo, hour: int, minute: int) -> None:
-    """注册/更新今日总览 AI 定时 job(协程函数直接传入, 不可用 lambda 包)。"""
-    scheduler.add_job(
-        _run_scheduled_today_ai, args=[repo],
-        trigger=CronTrigger(day_of_week="mon-fri", hour=hour, minute=minute,
-                            timezone="Asia/Shanghai"),
-        id=TODAY_AI_JOB_ID, misfire_grace_time=7200, replace_existing=True,
-    )
-
-
-def _register_signal_ai_job(scheduler, repo, hour: int, minute: int) -> None:
-    """注册/更新个股 AI 信号批量定时 job。"""
-    scheduler.add_job(
-        _run_scheduled_signal_ai, args=[repo],
-        trigger=CronTrigger(day_of_week="mon-fri", hour=hour, minute=minute,
-                            timezone="Asia/Shanghai"),
-        id=SIGNAL_AI_JOB_ID, misfire_grace_time=7200, replace_existing=True,
     )
 
 
@@ -1151,44 +1077,8 @@ def start_scheduler(repo: KlineRepository, capset: CapabilitySet) -> AsyncIOSche
             repo.refresh_cache()
         return result
 
-    # [R21] 当日数据未出齐 → 当晚自动重试: 数据源一般 17:30~20:00 才发布当日全量,
-    # 盘后管道跑得早(默认 15:30)时日K/enriched 抓不全, 此前只提示"稍后手动同步",
-    # 下一次自动跑要等次日 —— 现在检测到未出齐就每 90 分钟自动重跑(当晚最多 3 次),
-    # 补齐即停; 连板梯队/概念/行业等指标层消费方当晚自动追上, 无需人工守着点同步。
-    _RETRY_DELAY_MIN = 90
-    _RETRY_MAX = 3
-
-    def _pipeline_with_retry(on_progress=None, _attempt: int = 0):
-        result = _pipeline_then_refresh(on_progress=on_progress)
-        try:
-            if result and result.get("today_daily_incomplete"):
-                if _attempt < _RETRY_MAX:
-                    from datetime import timedelta
-
-                    from app.market_time import cn_now
-                    run_at = cn_now() + timedelta(minutes=_RETRY_DELAY_MIN)
-                    nxt = _attempt + 1
-                    scheduler.add_job(
-                        lambda: _run_tracked(
-                            lambda on_progress=None: _pipeline_with_retry(on_progress, nxt),
-                            "daily_pipeline"),
-                        trigger="date", run_date=run_at,
-                        id="daily_pipeline_incomplete_retry",
-                        misfire_grace_time=3600,
-                        replace_existing=True,
-                    )
-                    logger.info("今日日线未出齐, 已安排 %s 自动重试(第 %d/%d 次)",
-                                run_at.strftime("%H:%M"), nxt, _RETRY_MAX)
-                else:
-                    logger.warning("今日日线重试 %d 次仍未出齐, 交由次日调度补齐", _RETRY_MAX)
-        except Exception as e:  # noqa: BLE001
-            logger.warning("安排未出齐自动重试失败(不影响本次结果): %s", e)
-        return result
-
     scheduler.add_job(
-        # [合并] 上游的 _scheduled_pipeline_task(管道成功后跑每周因子挖掘)
-        # 包住我们的 _pipeline_with_retry(当日未出齐当晚自动重试)
-        lambda: _scheduled_pipeline_task(_pipeline_with_retry),
+        lambda: _scheduled_pipeline_task(_pipeline_then_refresh),
         trigger=CronTrigger(day_of_week="mon-fri",
                             hour=sched["hour"], minute=sched["minute"],
                             timezone="Asia/Shanghai"),
@@ -1254,20 +1144,6 @@ def start_scheduler(repo: KlineRepository, capset: CapabilitySet) -> AsyncIOSche
         _register_review_job(scheduler, repo, review_sched["hour"], review_sched["minute"])
         logger.info("scheduled_review enabled @%02d:%02d mon-fri",
                     review_sched["hour"], review_sched["minute"])
-
-    # [R27] 今日总览 AI 导读·优选 / 个股 AI 信号批量: 到点自动跑, 结果落盘常驻。
-    # 默认关闭, 用户在页面开启后才注册。
-    today_ai_sched = preferences.get_today_ai_schedule()
-    if today_ai_sched["enabled"]:
-        _register_today_ai_job(scheduler, repo, today_ai_sched["hour"], today_ai_sched["minute"])
-        logger.info("scheduled_today_ai enabled @%02d:%02d mon-fri",
-                    today_ai_sched["hour"], today_ai_sched["minute"])
-    signal_sched = preferences.get_signal_ai_schedule()
-    if signal_sched["enabled"]:
-        _register_signal_ai_job(scheduler, repo, signal_sched["hour"], signal_sched["minute"])
-        logger.info("scheduled_signal_ai enabled @%02d:%02d mon-fri (scope=%s gap=%ss)",
-                    signal_sched["hour"], signal_sched["minute"],
-                    signal_sched["scope"], signal_sched["gap_seconds"])
 
     scheduler.start()
     logger.info("scheduler started; instruments@%02d:%02d, pipeline@%02d:%02d, depth@%02d:%02d mon-fri",

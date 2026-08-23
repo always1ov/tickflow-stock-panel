@@ -756,10 +756,12 @@ function StockPoolPicker({ value, onChange, assetType = 'stock' }: { value: stri
   })
   const watchlistEntries = watchlist.data?.symbols ?? []
   const watchlistCounts = useMemo(() => {
+    // 多组并存: 一股计入每个所属分组
     const counts: Record<string, number> = { ungrouped: 0 }
     for (const entry of watchlistEntries) {
-      const groupId = entry.group_id ?? 'ungrouped'
-      counts[groupId] = (counts[groupId] ?? 0) + 1
+      const gids = entry.group_ids ?? []
+      if (gids.length === 0) counts.ungrouped += 1
+      else for (const gid of gids) counts[gid] = (counts[gid] ?? 0) + 1
     }
     return counts
   }, [watchlistEntries])
@@ -791,11 +793,13 @@ function StockPoolPicker({ value, onChange, assetType = 'stock' }: { value: stri
     setOpen(false)
   }
   const removeSymbol = (symbol: string) => setSymbols(symbols.filter(s => s !== symbol))
-  // 按分组导入自选: 合并去重, 顺带回填股票名
+  // 按分组导入自选: 合并去重, 顺带回填股票名 ('all'=全部, null=未分组)
   const importFromWatchlist = (groupId: string | null) => {
     const entries = groupId === 'all'
       ? watchlistEntries
-      : watchlistEntries.filter(entry => (entry.group_id ?? null) === groupId)
+      : groupId == null
+        ? watchlistEntries.filter(entry => !(entry.group_ids?.length))
+        : watchlistEntries.filter(entry => !!entry.group_ids?.includes(groupId))
     if (entries.length === 0) return
     setSymbolNames(prev => {
       const next = { ...prev }
@@ -934,7 +938,7 @@ export function StrategyBacktest() {
   const [regimeStates, setRegimeStates] = useState<string[]>(saved?.regimeStates ?? [])
   const [regimeMinScore, setRegimeMinScore] = useState<number | ''>(saved?.regimeMinScore ?? '')
   const [settingsOpen, setSettingsOpen] = useState(false)
-  // 分钟K成交价细化: 不改变信号日或成交日, 需 Pro+ 分钟K能力
+  // 分钟K成交价细化: 不改变信号日或成交日, 依赖分钟K批量数据
   const { data: caps } = useCapabilities()
   const hasMinuteBatch = !!caps?.capabilities?.['kline.minute.batch']
   const toggleMinuteFill = () => {
@@ -1539,7 +1543,7 @@ export function StrategyBacktest() {
                 onClick={toggleMinuteFill}
                 disabled={!hasMinuteBatch}
                 title={!hasMinuteBatch
-                  ? '分钟K成交价：需 Pro+ 权限 (分钟K批量)'
+                  ? '分钟K成交价：分钟K(批量)数据不可用'
                   : '分钟K成交：细化成交价，并为兼容的卖出信号提供下一分钟成交。'
                 }
                 className={`group relative inline-flex h-3.5 w-6 items-center rounded-full shrink-0 transition-colors duration-200 ${
@@ -1554,7 +1558,7 @@ export function StrategyBacktest() {
               </button>
               <span className={`text-[9px] font-medium ${highGranularity ? 'text-amber-400' : 'text-muted/50'}`}>分钟成交</span>
               {!hasMinuteBatch && (
-                <span className="text-[8px] text-accent/70 font-medium bg-accent/10 px-1 py-px rounded">Pro+</span>
+                <span className="text-[8px] text-accent/70 font-medium bg-accent/10 px-1 py-px rounded">分钟K</span>
               )}
             </div>
           </div>

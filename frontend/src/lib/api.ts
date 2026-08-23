@@ -557,7 +557,8 @@ export interface WatchlistEntry {
   added_at: string
   note?: string
   name?: string | null
-  group_id?: string | null
+  /** 所属分组 id 列表 (同一标的可属于多个分组; 空数组=未分组) */
+  group_ids?: string[]
 }
 
 export type WatchlistGroupColor =
@@ -1216,6 +1217,11 @@ export interface CustomSignalOptions {
   kinds: { key: string; label: string }[]
 }
 
+export interface CustomSignalAIGenerateResult {
+  name: string
+  conditions: CustomSignalCondition[]
+}
+
 // ===== Monitor (监控规则 + 触发记录) =====
 export interface MonitorCondition {
   field: string
@@ -1241,20 +1247,63 @@ export interface SectorMonitorTarget {
   member_count: number
 }
 
+export interface AbnormalWindowInfo {
+  /** 实时偏离值 (小数) */
+  value: number
+  /** 该窗口阈值 (小数) — 后端已按偏离方向取对应侧 (严重异动负向更严) */
+  threshold: number
+  /** 接近度 |value|/threshold */
+  closeness: number
+}
+
+export type AbnormalStatus = 'triggered' | 'edge' | 'watch'
+
+export interface AbnormalRow {
+  symbol: string
+  name: string | null
+  board: string
+  st: boolean
+  close: number | null
+  rt_pct: number | null
+  windows: Record<string, AbnormalWindowInfo>
+  max_closeness: number
+  status: AbnormalStatus
+}
+
+export interface AbnormalOverview {
+  asof: number
+  cache_date: string | null
+  bench_rt_pct: number
+  includes_today: boolean
+  rules: Array<{
+    board: string
+    st: boolean
+    /** 各窗口双侧阈值 {up: 正向, down: 负向} (小数) */
+    thresholds: Record<string, { up: number; down: number }>
+    note: string
+  }>
+  counts: { triggered: number; edge: number; watch: number }
+  rows: AbnormalRow[]
+}
+
 export interface MonitorRule {
   id: string
   name: string
   enabled: boolean
-  type: 'strategy' | 'signal' | 'price' | 'market' | 'ladder' | 'sector'
+  type: 'strategy' | 'signal' | 'price' | 'market' | 'ladder' | 'sector' | 'abnormal'
   asset_type?: 'stock' | 'etf' | 'index'
-  scope: 'symbols' | 'all' | 'sector'
+  scope: 'symbols' | 'all' | 'sector' | 'watchlist_group'
   symbols: string[]
+  /** scope=watchlist_group 时绑定的自选分组 id (成员动态解析, 增删自选自动生效) */
+  group_id?: string | null
   sector?: string | null
   sector_kind?: SectorKind | null
   sector_targets?: SectorMonitorTarget[]
   sector_trigger?: 'change_pct' | 'momentum'
   threshold_pct?: number
   window_minutes?: 1 | 3 | 5 | 10 | 15
+  /** abnormal 专属: 关注窗口 (any=全部) */
+  abnormal_window?: 'any' | '3d' | '10d' | '30d'
   strategy_id?: string | null
   direction: 'entry' | 'exit' | 'both' | 'up' | 'down'
   notify_events?: StrategyNotifyEvent[]
@@ -1323,6 +1372,11 @@ export interface AlertEvent {
   up_count?: number
   down_count?: number
   leader?: { symbol?: string; name?: string; change_pct?: number } | null
+  /** 异动边缘告警 (source=abnormal) 附加字段 */
+  abnormal_window?: string
+  abnormal_value?: number
+  abnormal_threshold?: number
+  abnormal_closeness?: number
   /** ext 富化字段 (行业/概念等), 键为 "{configId}__{fieldName}" */
   [key: string]: unknown
 }
@@ -1973,6 +2027,8 @@ export interface SettingsState {
   ai_codex_command?: string
   ai_codex_reasoning_effort?: string
   ai_user_agent: string
+  ai_max_output_tokens?: number
+  ai_context_window?: number
 }
 
 /** 保存 TickFlow Key 的响应(先探后存) */
@@ -2190,7 +2246,6 @@ export const api = {
       '/api/settings/onboarding/complete', { method: 'POST' },
     ),
 
-  /** 保存 AI 配置 */
   // ===== [R59] AI 操盘手 =====
   paperTraders: () =>
     request<{ traders: PaperTrader[] }>('/api/paper-trading/traders'),
@@ -2279,8 +2334,8 @@ export const api = {
       method: 'PUT', body: JSON.stringify({ keys }),
     }),
 
-  saveAiSettings: (ai: { provider?: string; base_url?: string; api_key?: string; model?: string; reasoning_effort?: string; codex_command?: string; codex_reasoning_effort?: string; user_agent?: string }) =>
-    request<{ ok: boolean; ai_provider?: string; ai_model?: string; ai_openai_model?: string; ai_reasoning_effort?: string; ai_codex_model?: string; ai_codex_command?: string; ai_codex_reasoning_effort?: string; ai_configured?: boolean }>('/api/settings/ai', {
+  saveAiSettings: (ai: { provider?: string; base_url?: string; api_key?: string; model?: string; reasoning_effort?: string; codex_command?: string; codex_reasoning_effort?: string; user_agent?: string; max_output_tokens?: number; context_window?: number }) =>
+    request<{ ok: boolean; ai_provider?: string; ai_model?: string; ai_openai_model?: string; ai_reasoning_effort?: string; ai_codex_model?: string; ai_codex_command?: string; ai_codex_reasoning_effort?: string; ai_configured?: boolean; ai_max_output_tokens?: number; ai_context_window?: number }>('/api/settings/ai', {
       method: 'POST',
       body: JSON.stringify(ai),
     }),
@@ -2765,6 +2820,16 @@ export const api = {
     request<{ symbols: WatchlistEntry[] }>(
       `/api/watchlist/${encodeURIComponent(symbol)}/group`,
       { method: 'PUT', body: JSON.stringify({ group_id: groupId }) },
+    ),
+  watchlistGroupAddMember: (groupId: string, symbol: string) =>
+    request<{ symbols: WatchlistEntry[] }>(
+      `/api/watchlist/groups/${encodeURIComponent(groupId)}/members/${encodeURIComponent(symbol)}`,
+      { method: 'POST' },
+    ),
+  watchlistGroupRemoveMember: (groupId: string, symbol: string) =>
+    request<{ symbols: WatchlistEntry[] }>(
+      `/api/watchlist/groups/${encodeURIComponent(groupId)}/members/${encodeURIComponent(symbol)}`,
+      { method: 'DELETE' },
     ),
   watchlistOcrStatus: () =>
     request<{ provider: string; available: boolean }>('/api/watchlist/ocr-status'),
@@ -3762,6 +3827,18 @@ export const api = {
 
   customSignalDelete: (id: string) =>
     request<{ ok: boolean }>(`/api/custom-signals/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+
+  customSignalsAiGenerate: (description: string) =>
+    request<CustomSignalAIGenerateResult>('/api/custom-signals/ai/generate', {
+      method: 'POST',
+      body: JSON.stringify({ description }),
+    }),
+
+  // ===== Abnormal Moves (异动边缘) =====
+  abnormalOverview: (minCloseness = 0.5, limit = 200) =>
+    request<AbnormalOverview>(
+      `/api/abnormal/overview?min_closeness=${minCloseness}&limit=${limit}`,
+    ),
 
   // ===== Monitor Rules (监控规则) =====
   monitorRulesList: () =>

@@ -110,9 +110,10 @@ def test_apply_creates_groups_and_assigns(wl):
     assert r["groups_created"] == 1
     assert r["symbols_assigned"] == 2
     gid = {g["name"]: g["id"] for g in wl.list_groups()}["光模块"]
-    by_sym = {e["symbol"]: e.get("group_id") for e in wl.list_symbols()}
-    assert by_sym["600487.SH"] == gid
-    assert by_sym["300502.SZ"] is None, "方案未覆盖的票保持原样"
+    # [同步上游] 成员关系已是多值 group_ids
+    by_sym = {e["symbol"]: list(e.get("group_ids") or []) for e in wl.list_symbols()}
+    assert by_sym["600487.SH"] == [gid]
+    assert by_sym["300502.SZ"] == [], "方案未覆盖的票保持原样"
 
 
 def test_apply_reuses_existing_group_name(wl):
@@ -129,5 +130,5 @@ def test_apply_replace_existing_clears_first(wl):
     wl.set_group("300502.SZ", old["id"])
     apply([{"name": "光模块", "symbols": ["600487.SH", "603083.SH"]}],
           replace_existing=True)
-    by_sym = {e["symbol"]: e.get("group_id") for e in wl.list_symbols()}
-    assert by_sym["300502.SZ"] is None, "彻底重分时旧归属应被清空"
+    by_sym = {e["symbol"]: list(e.get("group_ids") or []) for e in wl.list_symbols()}
+    assert by_sym["300502.SZ"] == [], "彻底重分时旧归属应被清空"

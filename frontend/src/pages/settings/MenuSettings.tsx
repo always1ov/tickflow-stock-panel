@@ -54,6 +54,7 @@ const BUILTIN_PAGES: NavEntry[] = [
   // 也就是老逻辑(表头挂在第一个成员上)算出来的那个位置, 升级上来位置不变。
   { id: BROWSE_GROUP_ID, label: BROWSE_GROUP.label, type: 'group', visible: true },
   { id: '/regime', label: '市场环境', type: 'builtin', visible: true },
+  { id: '/abnormal', label: '异动监控', type: 'builtin', visible: true },
   { id: '/review', label: '复盘', type: 'builtin', visible: true },
   { id: '/financials', label: '财务分析', type: 'builtin', visible: true },
   { id: '/indices', label: '指数', type: 'builtin', visible: true },

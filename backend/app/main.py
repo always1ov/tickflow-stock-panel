@@ -13,6 +13,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app import __version__
 from app.api import (
+    abnormal,
     alerts,
     analysis,
     backtest,
@@ -197,6 +198,19 @@ async def _application_lifespan(app: FastAPI):
         depth_service.start_polling()
     except Exception as e:  # noqa: BLE001
         logger.warning("depth_service init failed: %s", e)
+
+    # 停机缺口自检: 延迟后台扫描, 发现最近交易日的盘中快照/缺口时自动创建
+    # 修复任务 (盘中停机→次日开实时场景, 不修则坏数据被"只刷今天"分支永久留存)
+    try:
+        import threading
+
+        from app.services.data_integrity import boot_integrity_check
+
+        timer = threading.Timer(30.0, boot_integrity_check, args=(app.state,))
+        timer.daemon = True  # 不阻塞进程退出
+        timer.start()
+    except Exception as e:  # noqa: BLE001
+        logger.warning("integrity boot check scheduling failed: %s", e)
 
     # 企业微信智能机器人长连接(可选通道, 失败不阻断启动)
     try:
@@ -476,6 +490,7 @@ app.include_router(intraday.router)
 app.include_router(indices.router)
 app.include_router(overview.router)
 app.include_router(today.router)  # [fork 增强] 今日总览
+app.include_router(abnormal.router)
 app.include_router(regime.router)
 app.include_router(analysis.router)
 app.include_router(pipeline.router)

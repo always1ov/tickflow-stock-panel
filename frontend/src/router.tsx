@@ -35,6 +35,7 @@ const Branding = lazy(() => import('./pages/Branding').then(m => ({ default: m.B
 const Settings = lazy(() => import('./pages/Settings').then(m => ({ default: m.Settings })))
 const Indices = lazy(() => import('./pages/Indices').then(m => ({ default: m.Indices })))
 const Regime = lazy(() => import('./pages/Regime').then(m => ({ default: m.Regime })))
+const AbnormalMoves = lazy(() => import('./pages/AbnormalMoves').then(m => ({ default: m.AbnormalMoves })))
 const Dev = lazy(() => import('./pages/Dev').then(m => ({ default: m.Dev })))
 // [fork 增强] 今日总览(决策汇聚层)
 const Today = lazy(() => import('./pages/Today').then(m => ({ default: m.Today })))
@@ -63,6 +64,7 @@ const CORE_ROUTE_PATHS = new Set([
   '/limit-ladder',
   '/indices',
   '/regime',
+  '/abnormal',
   '/branding',
   '/settings',
   '/dev',
@@ -141,6 +143,7 @@ export const router = createBrowserRouter([
       { path: 'limit-ladder', element: <LimitUpLadder /> },
       { path: 'indices', element: <Indices /> },
     { path: 'regime', element: <Regime /> },
+      { path: 'abnormal', element: <AbnormalMoves /> },
       { path: 'branding', element: <Branding /> },
       { path: 'settings', element: <Settings /> },
       // 隐藏路由：开发者工具（不暴露在菜单，仅供调试）

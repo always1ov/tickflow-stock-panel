@@ -644,6 +644,10 @@ class KlineRepository:
                     df_full = compute_indicators(df_hist)
                     logger.info("enriched refresh step done: compute indicators rows=%d (%.2fs)", len(df_full), time.perf_counter() - step)
 
+                    # 异动偏离列 (deviate_Nd = 个股动量 - 基准指数动量), 运行时附着
+                    from app.indicators.pipeline import attach_deviation_columns
+                    df_full = attach_deviation_columns(df_full, self.store.data_dir)
+
                     step = time.perf_counter()
                     logger.info("enriched refresh step start: compute signals")
                     df_full = compute_signals(df_full)
@@ -967,6 +971,8 @@ class KlineRepository:
                 pl.col("high").tail(59).max().alias("_high_59d"),
                 pl.col("low").tail(59).min().alias("_low_59d"),
 
+                # 异动偏离 deviate_3d 用 (与 5d/10d/30d 同语义: 尾部第 N 个收盘)
+                pl.col("close").tail(3).first().alias("_close_3d_ago"),
                 pl.col("close").tail(5).first().alias("_close_5d_ago"),
                 pl.col("close").tail(10).first().alias("_close_10d_ago"),
                 pl.col("close").tail(20).first().alias("_close_20d_ago"),
@@ -2167,8 +2173,10 @@ class KlineRepository:
             "kline_daily_enriched": "stock",
             "kline_etf_enriched": "etf",
         }.get(table)
+        # recover=True: 外部进程残留的僵死 publishing 标记不应阻塞实时/管道
+        # enriched 落盘, 首次写入即接管自愈; 活进程的发布仍会抛错保护竞态。
         publication = (
-            EnrichedPublication(self.store.data_dir, generation_asset)
+            EnrichedPublication(self.store.data_dir, generation_asset, recover=True)
             if generation_asset is not None
             else None
         )
@@ -2310,7 +2318,7 @@ class KlineRepository:
         out = base / f"date={ds}" / "part.parquet"
         out.parent.mkdir(parents=True, exist_ok=True)
         publication = (
-            EnrichedPublication(self.store.data_dir, asset_type)
+            EnrichedPublication(self.store.data_dir, asset_type, recover=True)
             if asset_type in {"stock", "etf"}
             else None
         )
@@ -2440,7 +2448,7 @@ class KlineRepository:
         out = base / f"date={ds}" / "part.parquet"
         out.parent.mkdir(parents=True, exist_ok=True)
         publication = (
-            EnrichedPublication(self.store.data_dir, asset_type)
+            EnrichedPublication(self.store.data_dir, asset_type, recover=True)
             if asset_type in {"stock", "etf"}
             else None
         )
