@@ -140,7 +140,7 @@ function TrendBacktestDialog({ symbol, onClose }: { symbol: string; onClose: () 
       toast(`已应用阈值 ${(r.threshold * 100).toFixed(0)}%`, 'success')
       qc.invalidateQueries({ queryKey: QK.stockTrend(symbol) })
       qc.invalidateQueries({ queryKey: QK.stockLevels(symbol) })
-      qc.invalidateQueries({ queryKey: ['stock-trends'] })
+      qc.invalidateQueries({ queryKey: QK.stockTrendsAll })
     },
     onError: (e: Error) => toast(`应用失败: ${e.message}`, 'error'),
   })
@@ -151,7 +151,7 @@ function TrendBacktestDialog({ symbol, onClose }: { symbol: string; onClose: () 
       toast('已恢复默认阈值', 'success')
       qc.invalidateQueries({ queryKey: QK.stockTrend(symbol) })
       qc.invalidateQueries({ queryKey: QK.stockLevels(symbol) })
-      qc.invalidateQueries({ queryKey: ['stock-trends'] })
+      qc.invalidateQueries({ queryKey: QK.stockTrendsAll })
     },
   })
 

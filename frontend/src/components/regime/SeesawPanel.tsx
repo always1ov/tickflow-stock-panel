@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Repeat, Sparkles, Loader2, History, ChevronDown } from 'lucide-react'
 import { api, type SeesawPair, type SeesawEntry } from '@/lib/api'
+import { QK } from '@/lib/queryKeys'
 import { toast } from '@/components/Toast'
 import { cn } from '@/lib/cn'
 
@@ -78,7 +79,7 @@ export function SeesawPanel({ kind }: { kind: 'concept' | 'industry' }) {
   const [openDay, setOpenDay] = useState<string | null>(null)
 
   const q = useQuery({
-    queryKey: ['regime-seesaw', kind],
+    queryKey: QK.regimeSeesaw(kind),
     queryFn: () => api.regimeSeesaw(kind),
     staleTime: 5 * 60_000,
   })
@@ -88,7 +89,7 @@ export function SeesawPanel({ kind }: { kind: 'concept' | 'industry' }) {
     onSuccess: (res) => {
       if (res.error) toast(res.error, 'error')
       else toast(`已识别 ${res.ai?.picks?.length ?? 0} 对跷跷板, 已存入 30 天留档`, 'success')
-      qc.invalidateQueries({ queryKey: ['regime-seesaw', kind] })
+      qc.invalidateQueries({ queryKey: QK.regimeSeesaw(kind) })
     },
     onError: (e: any) => toast(e?.message ?? '识别失败', 'error'),
   })

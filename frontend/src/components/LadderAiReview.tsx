@@ -101,7 +101,7 @@ function LadderAiDialog({ payload, loadingLadder, onClose }: {
   const autoLoadedRef = useRef(false)
 
   // 历史存档列表(后端 ladder_ai_reports.json, 保留 30 份)
-  const historyQ = useQuery({ queryKey: ['ladder-ai-reports'], queryFn: () => api.ladderAiReports() })
+  const historyQ = useQuery({ queryKey: QK.ladderAiReports, queryFn: () => api.ladderAiReports() })
   const reports = historyQ.data?.reports ?? []
 
   // 打开时: 只"查看"—— 自动载入最近一份存档(优先今天的), 不触发生成

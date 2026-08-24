@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import { toast } from '@/components/Toast'
 import { api, type AutopilotIteration, type AutopilotSession } from '@/lib/api'
+import { QK } from '@/lib/queryKeys'
 
 /**
  * [fork 增强] R31 AI 自动挖掘 —— 拿上一轮结果反馈给 AI, 由它重配参数再跑一轮。
@@ -82,7 +83,7 @@ export function MiningAutopilot() {
   // [R38] 有 run 在跑时勤刷: 进度、阶段、已跑多久都在这个响应里, 刷得慢就看不出在动
   const [livePolling, setLivePolling] = useState(false)
   const sessions = useQuery({
-    queryKey: ['mining-autopilot-sessions'],
+    queryKey: QK.miningAutopilotSessions,
     queryFn: () => api.miningAutopilotSessions(),
     staleTime: livePolling ? 0 : 30_000,
     refetchInterval: livePolling ? LIVE_POLL_MS : false,
@@ -93,13 +94,13 @@ export function MiningAutopilot() {
     return sessionId ? items.find(s => s.session_id === sessionId) : items[0]
   }, [sessions.data, sessionId])
 
-  const refresh = () => queryClient.invalidateQueries({ queryKey: ['mining-autopilot-sessions'] })
+  const refresh = () => queryClient.invalidateQueries({ queryKey: QK.miningAutopilotSessions })
 
   // [R53] 工作流的一次「重开」就是开一个这样的会话 —— 两者是包含关系, 不是并列。
   // 有挖掘工作流在跑时: 手动开新会话后端会 409(再开一路不会更快, 只会排队),
   // 而它开的那个会话也不能手动推(界面和后台节拍同推一个状态机会把轮次弄乱)。
   const runningWf = useQuery({
-    queryKey: ['workflows', 'mining'],
+    queryKey: QK.workflows('mining'),
     queryFn: () => api.workflowList('mining'),
     refetchInterval: 15_000,
   })

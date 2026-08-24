@@ -469,7 +469,7 @@ function KeysPerRoundCard() {
   const [draft, setDraft] = useState<string | null>(null)
 
   const cfg = useQuery({
-    queryKey: ['realtime-keys-per-round'],
+    queryKey: QK.realtimeKeysPerRound,
     queryFn: () => api.realtimeKeysPerRound(),
     staleTime: 60_000,
   })
@@ -477,7 +477,7 @@ function KeysPerRoundCard() {
     mutationFn: (count: number) => api.setRealtimeKeysPerRound(count),
     onSuccess: () => {
       setDraft(null)
-      queryClient.invalidateQueries({ queryKey: ['realtime-keys-per-round'] })
+      queryClient.invalidateQueries({ queryKey: QK.realtimeKeysPerRound })
       toast('已保存', 'success')
     },
     onError: e => toast(String((e as Error).message || e), 'error'),

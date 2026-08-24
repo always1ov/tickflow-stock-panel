@@ -5,6 +5,7 @@ import {
 } from 'lucide-react'
 import { toast } from '@/components/Toast'
 import { api, type Workflow, type WorkflowKind } from '@/lib/api'
+import { QK } from '@/lib/queryKeys'
 
 /**
  * [fork 增强] R39 研究工作流面板 —— 挖掘与回测共用。
@@ -72,7 +73,7 @@ export function WorkflowPanel({ kind, extraConfig, hint }: {
   })
 
   const list = useQuery({
-    queryKey: ['workflows', kind],
+    queryKey: QK.workflows(kind),
     queryFn: () => api.workflowList(kind),
     refetchInterval: q => {
       const items = (q.state.data as { items: Workflow[] } | undefined)?.items ?? []
@@ -83,7 +84,7 @@ export function WorkflowPanel({ kind, extraConfig, hint }: {
   const active = items[0]
   const running = active?.status === 'running'
 
-  const refresh = () => queryClient.invalidateQueries({ queryKey: ['workflows', kind] })
+  const refresh = () => queryClient.invalidateQueries({ queryKey: QK.workflows(kind) })
 
   const create = useMutation({
     mutationFn: () => api.workflowCreate({

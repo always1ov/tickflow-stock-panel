@@ -205,7 +205,7 @@ export function Regime() {
 
   // [fork 增强] 盘中实时阶段(付费全市场档才 available; 免费档静默不可用)
   const phaseLive = useQuery({
-    queryKey: ['regime-phase-live'],
+    queryKey: QK.regimePhaseLive,
     queryFn: () => api.regimePhaseLive(),
     refetchInterval: 60_000,
     staleTime: 55_000,

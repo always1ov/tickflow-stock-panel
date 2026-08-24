@@ -265,7 +265,7 @@ function LevelsDialog({ symbol, name, onClose }: { symbol: string | null; name: 
 /** 顶栏右侧的行情摘要(交易日数 + 当前价)。查询键与看板一致, TanStack 直接命中缓存, 不产生额外请求。 */
 function LevelsPriceTag({ symbol }: { symbol: string }) {
   const kline = useQuery({
-    queryKey: ['kline', symbol, ''],
+    queryKey: QK.analysisKline(symbol),
     queryFn: () => api.klineDaily(symbol, 250),
     enabled: !!symbol,
     staleTime: 60_000,
@@ -295,7 +295,7 @@ function LevelsPriceTag({ symbol }: { symbol: string }) {
 // ===== 分析看板:日 K + 关键价位 =====
 function StockAnalysisBoard({ symbol, height = 480, bare = false }: { symbol: string; height?: number; bare?: boolean }) {
   const kline = useQuery({
-    queryKey: ['kline', symbol, ''],
+    queryKey: QK.analysisKline(symbol),
     queryFn: () => api.klineDaily(symbol, 250),
     enabled: !!symbol,
     staleTime: 60_000,

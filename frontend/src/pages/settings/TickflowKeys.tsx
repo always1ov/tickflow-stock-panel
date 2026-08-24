@@ -14,13 +14,14 @@ import {
   AlertCircle, CheckCircle2, Eye, EyeOff, Loader2, Plus, Save, Stethoscope, Trash2,
 } from 'lucide-react'
 import { api, type TickflowKeyRow } from '@/lib/api'
+import { QK } from '@/lib/queryKeys'
 import { toast } from '@/components/Toast'
 
 const INPUT = 'h-8 w-full rounded-input border border-border bg-surface px-2 font-mono text-xs text-foreground outline-none transition-colors focus:border-accent'
 
 export function TickflowKeys() {
   const qc = useQueryClient()
-  const q = useQuery({ queryKey: ['tickflow-keys'], queryFn: () => api.tickflowKeys() })
+  const q = useQuery({ queryKey: QK.tickflowKeys, queryFn: () => api.tickflowKeys() })
   const [rows, setRows] = useState<string[] | null>(null)
   const [health, setHealth] = useState<Record<number, TickflowKeyRow>>({})
   // 明文默认关着 —— 用户要的是"能看到", 不是"必须一直亮着给旁人看"
@@ -36,8 +37,8 @@ export function TickflowKeys() {
     mutationFn: (keys: string[]) => api.saveTickflowKeys(keys),
     onSuccess: res => {
       setHealth({})       // key 变了, 上一轮的死活结论作废
-      qc.invalidateQueries({ queryKey: ['tickflow-keys'] })
-      qc.invalidateQueries({ queryKey: ['settings'] })
+      qc.invalidateQueries({ queryKey: QK.tickflowKeys })
+      qc.invalidateQueries({ queryKey: QK.settings })
       toast(`已保存 ${res.total} 个 key · 档位 ${res.tier_label}`, 'success')
     },
     onError: e => toast(String((e as Error).message || e), 'error'),

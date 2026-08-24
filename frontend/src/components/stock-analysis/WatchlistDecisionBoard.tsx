@@ -251,7 +251,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
     staleTime: 30_000,
   })
   const positionsQ = useQuery({
-    queryKey: ['watchlist-positions'],
+    queryKey: QK.watchlistPositions,
     queryFn: () => api.watchlistPositions(),
     staleTime: 30_000,
   })
@@ -260,7 +260,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
   const positions = useMemo(() => positionsQ.data?.positions ?? {}, [positionsQ.data])
 
   const signalsQ = useQuery({
-    queryKey: ['stock-signals'],
+    queryKey: QK.stockSignals,
     queryFn: () => api.stockSignals(),
     staleTime: 30_000,
     // [R27] 每小时自动拉一次: 定时任务批量刷完信号后, 页面开着也能自动看到新结果
@@ -295,7 +295,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
   // [fork 增强] 持仓出场线(仅持有+填成本的票有;后端顺带把线同步为监控规则)
   const heldWithCost = Object.values(positions).some((p) => p.held && p.cost)
   const exitLinesQ = useQuery({
-    queryKey: ['watchlist-exit-lines'],
+    queryKey: QK.watchlistExitLines,
     queryFn: () => api.watchlistExitLines(),
     enabled: heldWithCost,
     staleTime: 5 * 60_000,
@@ -321,16 +321,16 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
   const refreshing = enriched.isFetching || positionsQ.isFetching || signalsQ.isFetching
   const refreshAll = () => {
     qc.invalidateQueries({ queryKey: QK.watchlistEnriched() })
-    qc.invalidateQueries({ queryKey: ['watchlist-positions'] })
-    qc.invalidateQueries({ queryKey: ['stock-signals'] })
+    qc.invalidateQueries({ queryKey: QK.watchlistPositions })
+    qc.invalidateQueries({ queryKey: QK.stockSignals })
   }
 
   const setPos = useMutation({
     mutationFn: ({ symbol, held, cost, weight }: { symbol: string; held: boolean; cost: number | null; weight?: number | null }) =>
       api.setWatchlistPosition(symbol, held, cost, weight),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['watchlist-positions'] })
-      qc.invalidateQueries({ queryKey: ['watchlist-exit-lines'] })
+      qc.invalidateQueries({ queryKey: QK.watchlistPositions })
+      qc.invalidateQueries({ queryKey: QK.watchlistExitLines })
     },
   })
 
@@ -367,12 +367,12 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
         }
         done++
         setProgress({ done, total: syms.length })
-        qc.invalidateQueries({ queryKey: ['stock-signals'] })
+        qc.invalidateQueries({ queryKey: QK.stockSignals })
       }
     }
     await Promise.all(Array.from({ length: Math.min(3, syms.length) }, () => worker()))
     setProgress(null)
-    qc.invalidateQueries({ queryKey: ['stock-signals'] })
+    qc.invalidateQueries({ queryKey: QK.stockSignals })
     if (failed) {
       toast(
         `AI 分析完成:成功 ${syms.length - failed} 只,失败 ${failed} 只${firstErr ? ` — ${firstErr}` : ''}`,

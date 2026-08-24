@@ -16,8 +16,26 @@
 
 > 回退方式:`docker compose` 镜像 tag 改为对应版本, 或从存档分支重建 `claude/upstream-clean`。
 
+## 上游基线与升级约定(按 docs/secondary-development.md §8)
+
+- **当前上游基线**: tag `v0.2.1` = commit `17ca245`(upstream/main), 于 R69(merge `5709f2c`)并入。
+  每次同步上游后更新这一行 —— 守则要求二开分支记录确切 Tag/commit, 不能只写"基于 v0.x"。
+- **升级预检**: 下次同步上游前先跑只读预演 `python3 scripts/upgrade_check.py <目标Tag>`,
+  它会列出双方都改过的文件和可预见的文本冲突; 预演不动工作区, 但只看已提交内容。
+- **高冲突热点复核清单**(守则 §5.2 点名的文件里, 本 fork 动过的 + 每次合并上游后必须复核的点):
+  - `backend/app/main.py` — fork 接线: 3 个路由(today/workflows/paper_trading)、操盘手定时安装、
+    工作流节拍器、数据持久化自检、操盘手账本 `StoreError`→503。复核: 路由都还挂着、scheduler 注入还在。
+  - `backend/app/strategy/engine.py` — `watchlist_only` 注入(context.watchlist_symbols, 未注入退化为全市场)。
+    对应守则里"按需扩展"的 `CandidateFilter` 接口 —— 出现第二个过滤类需求时应提取成正式接口。
+  - `frontend/src/router.tsx` — 根路径→/today、/dashboard、fork 页面路由。
+  - `frontend/src/components/Layout.tsx` — nav 数组的 fork 项、「盘面参考」分组(R57/R67)。
+  - `frontend/src/lib/api.ts` — fork 端点全部加在此(守则要求的单一客户端, 增长是预期内的)。
+  - `frontend/src/lib/queryKeys.ts` — fork 键集中在文件尾部 `[fork 增强]` 段(R70)。
+  - `backend/app/backtest/engine.py` — **未动**(0 diff), 保持为 0。
+
 | # | 改动 | 涉及文件 | 冲突风险 | 单独回退 |
 |---|------|---------|:---:|---------|
+| R70 | **按上游二开守则(docs/secondary-development.md)自查并整改**: 逐条对照后两类结果 —— **整改**: (1) fork 页面的 React Query 键此前散在 14 个文件里内联写(守则 §3.4 明令查询键集中于 `queryKeys.ts`), 其中 `'ai-profiles'`/`'workflows'` 各自重复出现在两个文件 —— 正是改一处漏一处、缓存悄悄失联的形状; 全部收进 QK 的 `[fork 增强]` 段(22 个键), 上游自己的内联键不动(改动最小原则)。(2) 台账补上守则 §8 要求的**上游基线锚点**(v0.2.1=17ca245)、**高冲突热点复核清单**(§5.2 的 7 个文件里我们动过哪些、每次合并后复核什么)和 `scripts/upgrade_check.py` 预检约定。**查过没问题的**: 无绕过 api.ts 的裸 fetch/URL 拼接; 无复制核心页面后长期分叉; 后端无继承大型编排服务(操盘手/工作流/今日总览全是独立模块+组合), AI 调用全走 `ai_provider` 单一链路; 工作流驱动复用挖掘/回测引擎公开入口而非平行实现; `strategy/engine.py` 的 watchlist_only 注入正对应守则"按需扩展"的 CandidateFilter —— 守则明说单用例不建接口, 按 L3 管理并已进复核清单; ruff 报的 RUF100 类噪音上游自身同样触发(main.py 29 条), 属 ruff 版本/配置基线, 不追 | `lib/queryKeys.ts` + 14 个 fork 页面/组件、`FORK_NOTES.md` | 低(键值字符串未变, 只是引用集中; 行为零变化) | 还原这批文件 |
 | R69 | **同步上游 v0.2.1→main(38 提交)**: 上游把 v0.2 正式并进 main 并追加一批。拿到的新东西: **异动监控全链路**(偏离值计算/独立监控页 `/abnormal`/系统告警接入 + ST 过滤, 页面已进侧栏与菜单设置)、**AI 生成自定义信号条件**(上游试验性合并的 PR #193 + 12 个测试修复)、**自选分组多组并存**(M:N, `group_ids`, 搜索下拉可把已加标的继续加进其他组)、**同步卡死判定改进度停滞 + 协作式取消 + 执行槽所有权**(慢带宽冷启动不再被误杀; 与我们 R55 撞车, 上游版本更完整 —— 基础设施整体取上游, `kline.py` 三处旧 `JobCancelled` 调用点对齐新 API)、**停机缺口检测与自动修复**(盘中停机次日开实时留下的中午快照不再被"只刷今天"分支永久留存)、僵死 enriched 发布标记修复、ETF/指数矩阵链路不再要求股本字段、监控中心新建标的展示重构、数据源插件化文案与引导页去品牌化。冲突 14 个文件, 原则**基础设施取上游、fork 功能保留**: `daily_pipeline` 取上游完整性自愈的同时**保留 fork 的历史稀疏检测**(上游只扫最近 7 天, 年尺度大洞仍要稀疏检测兜底, 两个互补); `ai_provider` 保留多档位兜底链、叠加上游的输出上限/输入预算检查(预算检查放在进档位循环**前** —— 预算超了换哪档都超, 不该触发兜底); `watchlist` 的缓存失效与上游 `_REVISION` 并存; `watchlist_ai_group`(R26) 适配 M:N。上游自身修了三处: 时区脆弱测试(`date.today()` vs `cn_today()`, UTC 16-24 点必挂)、integrity 测试铺足历史密度避免与稀疏检测打架、`WatchlistGroups` 新代码踩 fork 的 eslint 规则 | 全仓 347 文件(上游侧); 冲突解在 `pipeline_jobs`/`api/pipeline`/`daily_pipeline`/`ai_provider`/`watchlist`/`main`/`kline` + 前端 7 页 | —(这就是同步本身) | 回退整个 merge commit `5709f2c` |
 | R68 | **修操作员凭空消失(账本会被写坏, 写坏之后被当成空账本)**: 建了三个操作员, 点一下"改定时", 剩一个。链条有三环: (1) 前端 `<input type="time">` 打一个时间会**分几次** onChange(时段一次、分段一次), 每次发一个 PUT —— 顺带一提, 中间那几次还会把定时短暂地设到 `01:30` 这种莫名其妙的时间上; (2) 同步路由跑在 FastAPI 线程池里、定时任务跑在调度器线程里, 几个请求**同时** `Path.write_text` 同一个 JSON —— 而 `write_text` 是**先清空再写**, 撞上就留下一个半截的文件; (3) **最要命的一环**: `_read()` 把解析失败 `except` 掉、返回 `{"traders": []}` —— 于是紧接着的一次 `save()` 写回去的是一份"只剩当前这个人"的文件。前两环只是**短暂**的损坏, 第三环把它变成了**永久**的删除, 而且全程没有任何报错。三环各修各的: `_write` 改成**原子落盘**(同目录临时文件 → `flush`+`fsync` → `os.replace`, 换之前留一份 `.bak`), 所有"读—改—写"进同一把 `RLock`(名额检查和写入也必须在同一把锁里, 否则同时开的两个会双双通过 `MAX_TRADERS` 检查), `_read` 读不出来时**先退 `.bak`、再抛 `StoreError`**(→ 503)而**绝不返回空**; 另加 `mutate(id, fn)` 让改设置的路由在锁里就地改, 不再"先 get 出来捧着、隔一会儿再 save"(一次 AI 决策要跑好几分钟, 这中间人完全来得及去改设置, 旧副本一回写就把它盖掉了); `save()` 发现人已被删就**不写**(否则一次跑了几分钟的决策会把刚删掉的操作员连账一起复活)。前端把两个输入框改成停手 0.6 秒才发 —— 改成 14:30 本来就该是一次保存, 不是四次。测试 +8, 全部在旧代码上失败(其中并发那条复现出的正是 `pt.get()` 中途返回 `None`, 也就是"人不见了") | 改 `services/paper_trader.py`(`_read`/`_write`/`save`/`delete`/`create`/`reset` + `_LOCK`/`mutate`/`StoreError`)、`api/paper_trading.py`(设置/本金/定时三个路由走 `mutate`)、`main.py`(`StoreError` → 503)、`pages/PaperTrading.tsx`(`useDebouncedField`) | 低(只动这一个功能的存储层; 老账本文件格式没变, 直接能读) | 还原这四个文件; `.bak` 会留在 `user_data/` 里不影响老代码 |
 | R67 | **「盘面参考」变成菜单里真正的一行**: R57 建这个分组时, 表头是"挂"在**这一组第一个可见成员**上的 —— 分组本身在「设置 → 菜单」里没有对应的一行。于是三个毛病: (1) 想挪它没得挪, 列表里只有四个成员没有分组; (2) 去拖成员也不一定挪得动它 —— 表头挂在谁身上取决于谁碰巧排最前, 拖了个排在后面的等于白拖; (3) 成员一旦被拖散到顺序两端, 表头和成员会被中间的普通菜单**切开**, 看起来就是"分组卡在中间不动"。现在分组有自己的 id(`group:browse`), 和普通菜单项一样进 `nav_order` 参与排序: **拖它就是拖整块**, 四个成员从顶层抽出来只作它的子项(仍可各自单独隐藏, 组内也能单独排序); 分组行自己也能隐藏 —— 一下藏掉整块。存盘时成员紧跟在分组行后面写进同一条扁平 `nav_order`, 顺序本身就连成一块, 不可能再被切开。**升级不动位置**: 老数据里没有 `group:browse`, 走"新条目插回默认位置"那条路, 默认位置特意放在「个股分析」之后 —— 正是老逻辑算出来的那个位置, 所以已经存过顺序的人看到的位置和以前一样, 只是从此拖得动。顺带把侧栏那段重复的菜单项 JSX 抽成 `PlainNavLink`, 顶层和组内共用一份(原先组内那份是把整段抄了一遍, 加个徽标要改两处) | 新增 `lib/navGroups.ts`(分组定义 + `splitBrowseGroup`/`composeNavOrder`, 两边共用一份定义); 改 `components/Layout.tsx`(分组进 `nav` 数组, 成员从顶层抽出, +`PlainNavLink`)、`pages/settings/MenuSettings.tsx`(分组行 + 组内嵌套拖拽上下文) | 低(纯前端菜单渲染与排序; `nav_order`/`nav_hidden` 后端不校验 id, 无需改接口) | 还原这三个文件 |

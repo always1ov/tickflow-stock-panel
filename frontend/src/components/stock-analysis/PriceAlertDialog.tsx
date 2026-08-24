@@ -102,7 +102,7 @@ export function PriceAlertDialog({
   }, [currentPrice, levelsQuery.data?.levels])
 
   // 缓存的 AI 信号(含 watch_points 推荐点位)
-  const signalsQ = useQuery({ queryKey: ['stock-signals'], queryFn: () => api.stockSignals(), staleTime: 30_000 })
+  const signalsQ = useQuery({ queryKey: QK.stockSignals, queryFn: () => api.stockSignals(), staleTime: 30_000 })
 
   // 推荐点位:优先 AI signal 的 watch_points;无则规则兜底(上方最近压力涨至 + 下方最近支撑跌至)
   const recoPoints = useMemo(() => {

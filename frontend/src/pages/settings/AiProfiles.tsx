@@ -16,6 +16,7 @@ import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowDown, ArrowUp, KeyRound, Loader2, Plus, Save, Trash2 } from 'lucide-react'
 import { api, type AiProfile } from '@/lib/api'
+import { QK } from '@/lib/queryKeys'
 import { toast } from '@/components/Toast'
 
 const INPUT = 'h-8 w-full rounded-input border border-border bg-surface px-2 text-xs text-foreground outline-none transition-colors focus:border-accent'
@@ -37,7 +38,7 @@ function blank(): AiProfile {
 
 export function AiProfiles() {
   const qc = useQueryClient()
-  const q = useQuery({ queryKey: ['ai-profiles'], queryFn: () => api.aiProfiles() })
+  const q = useQuery({ queryKey: QK.aiProfiles, queryFn: () => api.aiProfiles() })
   const [rows, setRows] = useState<AiProfile[] | null>(null)
 
   // 服务端那份到了就填进草稿; 之后的编辑都在本地, 点保存才整表覆写
@@ -49,8 +50,8 @@ export function AiProfiles() {
     mutationFn: (list: AiProfile[]) => api.saveAiProfiles(list),
     onSuccess: res => {
       setRows(res.profiles)
-      qc.invalidateQueries({ queryKey: ['ai-profiles'] })
-      qc.invalidateQueries({ queryKey: ['settings'] })
+      qc.invalidateQueries({ queryKey: QK.aiProfiles })
+      qc.invalidateQueries({ queryKey: QK.settings })
       toast('已保存 —— 从上到下依次尝试', 'success')
     },
     onError: e => toast(String((e as Error).message || e), 'error'),

@@ -18,6 +18,7 @@ import {
 } from '@/lib/api'
 import { PageHeader } from '@/components/PageHeader'
 import { toast } from '@/components/Toast'
+import { QK } from '@/lib/queryKeys'
 
 const INPUT = 'h-8 w-full rounded-input border border-border bg-surface px-2 text-xs text-foreground outline-none transition-colors focus:border-accent'
 
@@ -63,15 +64,15 @@ export function PaperTrading() {
   const [openId, setOpenId] = useState<{ id: string; scope: PaperScope } | null>(null)
   const [adding, setAdding] = useState(false)
 
-  const q = useQuery({ queryKey: ['paper-traders'], queryFn: () => api.paperTraders(), refetchInterval: 30_000 })
+  const q = useQuery({ queryKey: QK.paperTraders, queryFn: () => api.paperTraders(), refetchInterval: 30_000 })
   const traders = q.data?.traders ?? []
-  const refresh = () => qc.invalidateQueries({ queryKey: ['paper-traders'] })
+  const refresh = () => qc.invalidateQueries({ queryKey: QK.paperTraders })
 
   const run = useMutation({
     mutationFn: (v: { id: string; scope: PaperScope }) => api.paperBookRun(v.id, v.scope),
     onSuccess: res => {
       refresh()
-      qc.invalidateQueries({ queryKey: ['paper-book'] })
+      qc.invalidateQueries({ queryKey: QK.paperBooksAll })
       const filled = res.orders.filter(o => !o.rejected).length
       const rejected = res.orders.length - filled
       const looked = res.focus?.length ? ` · 细看了 ${res.focus.length} 只` : ''
@@ -89,7 +90,7 @@ export function PaperTrading() {
     mutationFn: (v: { id: string; scope: PaperScope }) => api.paperBookLifeline(v.id, v.scope),
     onSuccess: res => {
       refresh()
-      qc.invalidateQueries({ queryKey: ['paper-book'] })
+      qc.invalidateQueries({ queryKey: QK.paperBooksAll })
       toast(res.count === 0 ? '没有持仓跌破生命线' : `按纪律清掉 ${res.count} 只`, 'success')
     },
     onError: e => toast(String((e as Error).message || e), 'error'),
@@ -369,7 +370,7 @@ function BookPane({ b, busy, onRun, onLifeline, onOpen, onReset, onCapital }: {
 }
 
 function AddTrader({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
-  const profiles = useQuery({ queryKey: ['ai-profiles'], queryFn: () => api.aiProfiles() })
+  const profiles = useQuery({ queryKey: QK.aiProfiles, queryFn: () => api.aiProfiles() })
   const rows = profiles.data?.profiles ?? []
   const [profileId, setProfileId] = useState('')
   const [name, setName] = useState('')
@@ -448,9 +449,9 @@ function BookDetail({ id, scope, onClose }: {
   id: string; scope: PaperScope; onClose: () => void
 }) {
   const [tab, setTab] = useState<'orders' | 'positions' | 'context'>('orders')
-  const q = useQuery({ queryKey: ['paper-book', id, scope], queryFn: () => api.paperBook(id, scope) })
+  const q = useQuery({ queryKey: QK.paperBook(id, scope), queryFn: () => api.paperBook(id, scope) })
   const ctx = useQuery({
-    queryKey: ['paper-book-context', id, scope],
+    queryKey: QK.paperBookContext(id, scope),
     queryFn: () => api.paperBookContext(id, scope),
     enabled: tab === 'context',
   })

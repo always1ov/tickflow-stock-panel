@@ -20,6 +20,7 @@ import {
 import { toast } from '@/components/Toast'
 import { PageShell } from '@/components/PageShell'
 import { VerdictHover } from '@/components/stock-analysis/VerdictHover'
+import { QK } from '@/lib/queryKeys'
 
 // ===== 自包含 HTML 导出(内联样式浅色排版, 无脚本无外链, 可存档/分享) =====
 
@@ -227,7 +228,7 @@ const POSTURE_STYLE: Record<string, string> = {
 export function Today() {
   const navigate = useNavigate()
   const q = useQuery({
-    queryKey: ['today-overview'],
+    queryKey: QK.todayOverview,
     queryFn: () => api.todayOverview(),
     staleTime: 60_000,
     // [R27] 每小时自动刷新一次: 盘后数据落盘/定时 AI 跑完后不必手点
@@ -258,12 +259,12 @@ export function Today() {
   })
   // [R27] AI 定时配置(门槛面板内)
   const todayAiSched = useQuery({
-    queryKey: ['today-ai-schedule'],
+    queryKey: QK.todayAiSchedule,
     queryFn: () => api.todayAiScheduleGet(),
     staleTime: 5 * 60_000,
   })
   const signalAiSched = useQuery({
-    queryKey: ['signal-ai-schedule'],
+    queryKey: QK.signalAiSchedule,
     queryFn: () => api.signalAiScheduleGet(),
     staleTime: 5 * 60_000,
   })

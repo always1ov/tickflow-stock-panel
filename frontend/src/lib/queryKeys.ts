@@ -117,6 +117,41 @@ export const QK = {
   regimeCoverage:       ['regime-coverage'] as const,
   regimePhases:         (start?: string, end?: string) => ['regime-phases', start ?? '', end ?? ''] as const,
   regimeMainline:       (kind: string, start?: string, end?: string) => ['regime-mainline', kind, start ?? '', end ?? ''] as const,
+
+  // ===== [fork 增强] 以下是 fork 页面的 key —— 之前散在各页面里内联写,
+  // R70 按上游二开守则(docs/secondary-development.md §3.4)收拢到这里。
+  // 'ai-profiles' 曾同时写在两个文件里、'workflows' 也是 —— 正是这种跨文件
+  // 重复字符串, 改一处漏一处时缓存就悄悄失联了。
+
+  // 今日总览
+  todayOverview:        ['today-overview'] as const,
+  todayAiSchedule:      ['today-ai-schedule'] as const,
+  signalAiSchedule:     ['signal-ai-schedule'] as const,
+  // AI 操盘手
+  paperTraders:         ['paper-traders'] as const,
+  paperBooksAll:        ['paper-book'] as const,          // 前缀失效: 所有账本明细
+  paperBook:            (id: string, scope: string) => ['paper-book', id, scope] as const,
+  paperBookContext:     (id: string, scope: string) => ['paper-book-context', id, scope] as const,
+  // 多 AI 档位 / 数据源 key
+  aiProfiles:           ['ai-profiles'] as const,
+  tickflowKeys:         ['tickflow-keys'] as const,
+  realtimeKeysPerRound: ['realtime-keys-per-round'] as const,
+  // 研究工作流 / AI 自动挖掘
+  workflows:            (kind: string) => ['workflows', kind] as const,
+  miningAutopilotSessions: ['mining-autopilot-sessions'] as const,
+  // 板块跷跷板 / 盘中阶段
+  regimeSeesaw:         (kind: string) => ['regime-seesaw', kind] as const,
+  regimePhaseLive:      ['regime-phase-live'] as const,
+  // 连板梯队 AI 打板复盘
+  ladderAiReports:      ['ladder-ai-reports'] as const,
+  // 自选决策台(持仓/出场线/AI 信号)
+  watchlistPositions:   ['watchlist-positions'] as const,
+  watchlistExitLines:   ['watchlist-exit-lines'] as const,
+  stockSignals:         ['stock-signals'] as const,
+  // 六态趋势前缀失效(带 symbols 参数的实例见 stockTrends)
+  stockTrendsAll:       ['stock-trends'] as const,
+  // 个股分析顶栏行情摘要 —— 键形刻意与页内看板一致, 共享缓存不发第二次请求
+  analysisKline:        (symbol: string) => ['kline', symbol, ''] as const,
 } as const
 
 // ===== SSE 应该 invalidate 的 key 前缀列表 =====
