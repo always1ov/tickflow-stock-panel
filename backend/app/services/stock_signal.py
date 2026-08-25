@@ -235,7 +235,13 @@ async def generate_signal(repo, data_dir: Path, symbol: str) -> dict:
                 "error": f"AI 返回无法解析为信号(已自动重试一次;原文开头: {snippet or '空'}…)——建议换非思考型模型"}
 
     entry = {**parsed, "close": close, "created_at": _now_iso()}
-    data = load_all()
-    data[sym] = entry
-    _store_path().write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+    # [R72] 这份文件是全系统并发最重的一个: 今日总览定时、个股分析页、多个
+    # 操盘手的 refresh 都会写它。读-改-写不上锁, 两个并发写会互丢一只的信号;
+    # 裸 write_text 撕裂后 load_all 回空, 下一次保存把**全部**信号清空 ——
+    # 和 R68 丢操作员是同一个形状(CONTRIBUTING §6.2)。
+    from app.services.json_store import atomic_write_json, lock_for
+    with lock_for(_store_path()):
+        data = load_all()
+        data[sym] = entry
+        atomic_write_json(_store_path(), data)
     return {"symbol": sym, **entry}

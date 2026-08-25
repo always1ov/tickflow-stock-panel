@@ -219,10 +219,9 @@ def _read_all() -> list[dict]:
 
 
 def _write_all(rows: list[dict]) -> None:
+    from app.services.json_store import atomic_write_json
     try:
-        _path().write_text(
-            json.dumps({"workflows": rows[-MAX_WORKFLOWS:]}, ensure_ascii=False, indent=2),
-            encoding="utf-8")
+        atomic_write_json(_path(), {"workflows": rows[-MAX_WORKFLOWS:]})
     except Exception as e:  # noqa: BLE001
         logger.warning("save workflows failed: %s", e)
 
@@ -240,10 +239,14 @@ def get(workflow_id: str) -> dict | None:
 
 
 def save(wf: dict) -> dict:
+    # [R72] 读-改-写整段上锁: 节拍器线程和 API 会同时改不同工作流, 各捧一份
+    # 旧全量回写的话, 后写的把前一个的改动整个盖掉(CONTRIBUTING §6.2)
+    from app.services.json_store import lock_for
     wf["updated_at"] = _now()
-    rows = [w for w in _read_all() if w.get("workflow_id") != wf.get("workflow_id")]
-    rows.append(wf)
-    _write_all(rows)
+    with lock_for(_path()):
+        rows = [w for w in _read_all() if w.get("workflow_id") != wf.get("workflow_id")]
+        rows.append(wf)
+        _write_all(rows)
     return wf
 
 

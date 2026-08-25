@@ -65,13 +65,15 @@ def save(result: dict, *, source: str = "manual") -> dict:
         "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "source": source,
     }
-    rows = [e for e in _read_all()
-            if not (e.get("as_of") == entry["as_of"] and e.get("kind") == entry["kind"])]
-    rows.append(entry)
-    rows = rows[-MAX_ENTRIES:]
-    try:
-        _path().write_text(
-            json.dumps({"entries": rows}, ensure_ascii=False, indent=2), encoding="utf-8")
-    except Exception as e:  # noqa: BLE001
-        logger.warning("save seesaw history failed: %s", e)
+    # [R72] 读-改-写上锁 + 原子落盘(CONTRIBUTING §6.2): 定时和手动可能同时保存
+    from app.services.json_store import atomic_write_json, lock_for
+    with lock_for(_path()):
+        rows = [e for e in _read_all()
+                if not (e.get("as_of") == entry["as_of"] and e.get("kind") == entry["kind"])]
+        rows.append(entry)
+        rows = rows[-MAX_ENTRIES:]
+        try:
+            atomic_write_json(_path(), {"entries": rows})
+        except Exception as e:  # noqa: BLE001
+            logger.warning("save seesaw history failed: %s", e)
     return entry

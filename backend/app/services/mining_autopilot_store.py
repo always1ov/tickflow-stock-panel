@@ -46,10 +46,9 @@ def _read_all() -> list[dict]:
 
 
 def _write_all(sessions: list[dict]) -> None:
+    from app.services.json_store import atomic_write_json
     try:
-        _path().write_text(
-            json.dumps({"sessions": sessions[-MAX_SESSIONS:]}, ensure_ascii=False, indent=2),
-            encoding="utf-8")
+        atomic_write_json(_path(), {"sessions": sessions[-MAX_SESSIONS:]})
     except Exception as e:  # noqa: BLE001
         logger.warning("save mining autopilot sessions failed: %s", e)
 
@@ -97,28 +96,36 @@ def create(*, asset_type: str, windows: dict, max_iterations: int,
         "created_at": _now(),
         "updated_at": _now(),
     }
-    rows = _read_all()
-    rows.append(session)
-    _write_all(rows)
+    from app.services.json_store import lock_for
+    with lock_for(_path()):
+        rows = _read_all()
+        rows.append(session)
+        _write_all(rows)
     return session
 
 
 def delete(session_id: str) -> bool:
     """[R55] 删一个会话留档。开着的删不掉(见 api 层的检查)——
     这里只负责落盘, 允不允许删由调用方判断。"""
-    rows = _read_all()
-    keep = [s for s in rows if s.get("session_id") != session_id]
-    if len(keep) == len(rows):
-        return False
-    _write_all(keep)
+    from app.services.json_store import lock_for
+    with lock_for(_path()):
+        rows = _read_all()
+        keep = [s for s in rows if s.get("session_id") != session_id]
+        if len(keep) == len(rows):
+            return False
+        _write_all(keep)
     return True
 
 
 def _replace(session: dict) -> dict:
+    # [R72] 读-改-写上锁(理由同 workflow.save): 节拍器 step 和 API 并发时
+    # 各捧旧全量回写会互相覆盖
+    from app.services.json_store import lock_for
     session["updated_at"] = _now()
-    rows = [s for s in _read_all() if s.get("session_id") != session.get("session_id")]
-    rows.append(session)
-    _write_all(rows)
+    with lock_for(_path()):
+        rows = [s for s in _read_all() if s.get("session_id") != session.get("session_id")]
+        rows.append(session)
+        _write_all(rows)
     return session
 
 

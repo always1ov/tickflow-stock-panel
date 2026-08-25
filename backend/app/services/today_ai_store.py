@@ -48,8 +48,10 @@ def save(result: dict, *, as_of: str | None, source: str = "manual") -> dict:
         "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "source": source,
     }
+    # [R72] 原子落盘: 定时和手动撞在一起时不留半截文件(整文件覆盖, 无读-改-写)
+    from app.services.json_store import atomic_write_json
     try:
-        _path().write_text(json.dumps(entry, ensure_ascii=False, indent=2), encoding="utf-8")
+        atomic_write_json(_path(), entry)
     except Exception as e:  # noqa: BLE001
         logger.warning("save today ai cache failed: %s", e)
     return entry

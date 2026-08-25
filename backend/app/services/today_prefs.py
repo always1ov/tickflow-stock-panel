@@ -99,6 +99,16 @@ def save(min_score=None, max_show=None, max_single=None, target_vol=None,
          max_drawdown=None, pyramid_probe=None, pyramid_confirm=None,
          pyramid_days=None, boards=None) -> dict:
     """更新偏好(只改传入的字段), 返回生效后的完整偏好。"""
+    # [R72] 读-改-写上锁 + 原子落盘(CONTRIBUTING §6.2)
+    from app.services.json_store import lock_for
+    with lock_for(_store_path()):
+        return _save_locked(min_score, max_show, max_single, target_vol,
+                            max_drawdown, pyramid_probe, pyramid_confirm,
+                            pyramid_days, boards)
+
+
+def _save_locked(min_score, max_show, max_single, target_vol, max_drawdown,
+                 pyramid_probe, pyramid_confirm, pyramid_days, boards) -> dict:
     cur = load()
     if min_score is not None:
         cur["min_score"] = _clamp(min_score, *_MIN_SCORE_RANGE, cur["min_score"])
@@ -118,5 +128,6 @@ def save(min_score=None, max_show=None, max_single=None, target_vol=None,
         cur["pyramid_days"] = _clamp(pyramid_days, *_PYRAMID_DAYS_RANGE, cur["pyramid_days"])
     if boards is not None:
         cur["boards"] = _boards(boards, cur["boards"])
-    _store_path().write_text(json.dumps(cur, indent=2, ensure_ascii=False), encoding="utf-8")
+    from app.services.json_store import atomic_write_json
+    atomic_write_json(_store_path(), cur)
     return cur
