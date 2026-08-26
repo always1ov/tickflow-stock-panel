@@ -184,6 +184,8 @@ class QuoteService:
         self._fetch_lock = threading.Lock()
         # [R74] 单票按需刷新的冷却表 {symbol: monotonic 时刻}
         self._single_refresh_at: dict[str, float] = {}
+        # [R76] 后台轮询本轮占用的 key 下标 —— 单票刷新避开它们挑空闲的
+        self._busy_key_idx: set[int] = set()
         self._running = False
         self._enabled = False      # 全局开关 (持久化到 preferences)
         # 暂停态: 盘后管道/数据修正运行期间临时暂停取数, 防止与管道写同一批 parquet 竞态。
@@ -248,6 +250,8 @@ class QuoteService:
             self._thread.join(timeout=10)
             self._thread = None
         self._save_enabled(False)
+        # [R76] 轮询停了, 所有 key 都算空闲 —— 单票刷新可以随便挑
+        self._busy_key_idx = set()
         logger.info("行情服务已停止")
 
     def enable(self) -> bool:
@@ -614,23 +618,66 @@ class QuoteService:
         sym = str(symbol or "").strip().upper()
         if not sym or self._repo is None:
             return False
+        if not self._claim_single_refresh(sym):
+            return True     # 冷却期内: 叠加层里就是刚拉过的, 视为已最新
+        return self._pull_single(sym)
+
+    def refresh_single_background(self, symbol: str) -> str:
+        """[R76] 弹窗用的非阻塞入口: 立刻返回, 拉取扔进后台线程。
+
+        R74 把拉取放在了日K响应路径上 —— 弹窗要白等一次网络才出图。改成:
+        响应马上回旧数据, 后台线程拉完写进叠加层, 前端过一两秒再取一次,
+        蜡烛自己冒出来。返回值给前端定节奏:
+          - "started": 刚认领, 后台在拉 —— 前端稍后应再取一次
+          - "fresh":   冷却期内, 叠加层就是新的 —— 不用再取
+          - "off":     没 key / 没 repo —— 没有实时这回事, 别再来问
+        """
+        sym = str(symbol or "").strip().upper()
+        if not sym or self._repo is None:
+            return "off"
+        from app.tickflow.client import get_realtime_client_pool
+        if not get_realtime_client_pool():
+            return "off"
+        if not self._claim_single_refresh(sym):
+            return "fresh"
+        t = threading.Thread(target=self._pull_single, args=(sym,),
+                             name=f"single-refresh-{sym}", daemon=True)
+        t.start()
+        return "started"
+
+    def _claim_single_refresh(self, sym: str) -> bool:
+        """认领一次单票刷新(15s 冷却)。True=拿到, False=冷却期内。
+
+        认领即占位 —— 之后失败也不退回, 免得坏 key 被连点打成请求风暴。"""
         now = time.monotonic()
         with self._fetch_lock:
-            last = self._single_refresh_at.get(sym, 0.0)
-            if now - last < 15.0:
-                return True     # 冷却期内: 叠加层里就是刚拉过的, 视为已最新
-            # 先记时间再拉 —— 失败也占住冷却位, 免得坏 key 被连点打成风暴
+            if now - self._single_refresh_at.get(sym, 0.0) < 15.0:
+                return False
             self._single_refresh_at[sym] = now
             if len(self._single_refresh_at) > 500:
                 self._single_refresh_at = dict(
                     sorted(self._single_refresh_at.items(), key=lambda kv: kv[1])[-200:])
+            return True
 
+    def _pick_single_client(self, pool: list):
+        """[R76] 挑一个**空闲**的 key 干这单活。
+
+        后台轮询每轮会占用池里的一部分 key(R35 错峰); 单票刷新再去挤同一个
+        key, 撞上的就是限流等待 —— 这正是"弹窗变慢"的另一半原因。优先挑
+        本轮没被轮询占用的 key; 全忙(或没开实时)时随机挑一个摊开负载。"""
+        import random
+        busy = getattr(self, "_busy_key_idx", None) or set()
+        idle = [c for i, c in enumerate(pool) if i not in busy]
+        return random.choice(idle or pool)
+
+    def _pull_single(self, sym: str) -> bool:
+        """真正的拉取 + 落盘(可能在后台线程里跑)。任何失败只 False 不抛。"""
         from app.tickflow.client import get_realtime_client_pool
         pool = get_realtime_client_pool()
         if not pool:
             return False
         try:
-            resp = pool[0].quotes.get(symbols=[sym]) or []
+            resp = self._pick_single_client(pool).quotes.get(symbols=[sym]) or []
         except Exception as e:
             logger.debug("单票实时拉取失败 %s: %s", sym, e)
             return False
@@ -947,6 +994,8 @@ class QuoteService:
         # 给额度留白, 并让单个 key 失效时只影响它被抽中的轮次。
         active_idx = select_keys(len(pool), preferences.get_realtime_keys_per_round())
         active_pool = [pool[i] for i in active_idx] or pool
+        # [R76] 记下本轮被轮询占用的 key, 单票按需刷新(弹窗)会避开它们挑空闲的
+        self._busy_key_idx = set(active_idx) if active_idx else set(range(len(pool)))
         n_keys = len(active_pool)
         cap = lim.batch * n_keys
         total = len(symbols)

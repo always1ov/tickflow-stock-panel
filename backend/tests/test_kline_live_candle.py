@@ -144,3 +144,46 @@ def test_refresh_single_failure_still_occupies_the_cooldown(monkeypatch):
     assert qs.refresh_single("600722.SH") is False
     assert qs.refresh_single("600722.SH") is True     # 冷却期内直接短路
     assert len(calls) == 1
+
+
+# ---------- [R76] 弹窗不再白等网络: 后台拉取 + 空闲 key ----------
+
+def test_background_refresh_returns_started_then_fresh(monkeypatch):
+    """第一次认领返回 started(后台在拉), 冷却期内再问返回 fresh —— 前端
+    靠这两个词定节奏: started 才补取, fresh 停手, 不会打转。"""
+    import threading as _threading
+
+    from app.services.quote_service import QuoteService
+    qs = QuoteService()
+    qs._repo = SimpleNamespace()
+    client = SimpleNamespace(quotes=SimpleNamespace(get=lambda symbols: []))
+    monkeypatch.setattr("app.tickflow.client.get_realtime_client_pool", lambda: [client])
+
+    pulled = _threading.Event()
+    monkeypatch.setattr(QuoteService, "_pull_single",
+                        lambda self, sym: pulled.set() or True)
+
+    assert qs.refresh_single_background("600722.SH") == "started"
+    assert pulled.wait(timeout=5), "后台线程要真的去拉"
+    assert qs.refresh_single_background("600722.SH") == "fresh"
+
+
+def test_background_refresh_without_key_says_off(monkeypatch):
+    from app.services.quote_service import QuoteService
+    qs = QuoteService()
+    qs._repo = SimpleNamespace()
+    monkeypatch.setattr("app.tickflow.client.get_realtime_client_pool", lambda: [])
+    assert qs.refresh_single_background("600722.SH") == "off"
+
+
+def test_single_pull_prefers_an_idle_key():
+    """后台轮询占着的 key 不去挤 —— 挤上的就是限流等待, 弹窗跟着慢。"""
+    from app.services.quote_service import QuoteService
+    qs = QuoteService()
+    a, b, c = object(), object(), object()
+    qs._busy_key_idx = {0, 2}
+    for _ in range(10):
+        assert qs._pick_single_client([a, b, c]) is b, "只有 1 号 key 空闲"
+    # 全忙时退化为随便挑一个, 不是拒绝服务
+    qs._busy_key_idx = {0, 1, 2}
+    assert qs._pick_single_client([a, b, c]) in (a, b, c)

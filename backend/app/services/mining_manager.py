@@ -112,8 +112,10 @@ class MiningJobManager:
 
             cancel_event = self._cancel_events.get(run_id)
             if cancel_event is None:
-                cancelled = self._store.transition_status(run_id, "cancelled")
+                # [fork R76] 事件先落、状态后翻(与三个 finisher 同序), 轮询方
+                # 看到终态时事件流必然完整
                 self._store.append_event(run_id, "cancelled", {"status": "cancelled"})
+                cancelled = self._store.transition_status(run_id, "cancelled")
                 return cancelled
 
             cancel_event.set()
@@ -234,9 +236,12 @@ class MiningJobManager:
             if cancel_event.is_set():
                 self._finish_cancelled_locked(run_id)
                 return
+            # [fork R76] 终态事件先落、状态后翻: 轮询方(前端/测试)看到终态状态时,
+            # 事件流里必须已经有那条终态事件 —— 反过来写就有一个"状态已终态、
+            # 事件还是 running"的竞态窗口(测试偶发挂的就是它)。
             self._store.write_summary(run_id, result)
-            self._store.transition_status(run_id, status)
             self._store.append_event(run_id, status, {"status": status})
+            self._store.transition_status(run_id, status)
 
     def _finish_cancelled(self, run_id: str) -> None:
         with self._lock:
@@ -246,8 +251,8 @@ class MiningJobManager:
         manifest = self._store.get(run_id)
         if manifest is None or manifest["status"] in TERMINAL_RUN_STATUSES:
             return
-        self._store.transition_status(run_id, "cancelled")
         self._store.append_event(run_id, "cancelled", {"status": "cancelled"})
+        self._store.transition_status(run_id, "cancelled")
 
     def _finish_failed(self, run_id: str, exc: Exception) -> None:
         message = str(exc)[:2000]
@@ -255,9 +260,11 @@ class MiningJobManager:
             manifest = self._store.get(run_id)
             if manifest is None or manifest["status"] in TERMINAL_RUN_STATUSES:
                 return
-            self._store.transition_status(run_id, "failed", error=message)
+            # [fork R76] 事件先落、状态后翻(理由见 _finish_success): 轮询方看到
+            # failed 时, 事件流里必须已有 error 事件
             self._store.append_event(
                 run_id,
                 "error",
                 {"status": "failed", "message": message},
             )
+            self._store.transition_status(run_id, "failed", error=message)

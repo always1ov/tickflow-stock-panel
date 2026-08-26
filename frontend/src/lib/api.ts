@@ -2668,6 +2668,8 @@ export const api = {
       stock_info?: { name?: string; total_shares?: number; float_shares?: number; ext?: Record<string, unknown> }
       rows: KlineRow[]
       source?: string
+      /** [R76] refreshLive 时返回: started=后台在拉(稍后再取一次) / fresh=已是新的 / off=没 key */
+      live_refresh?: 'started' | 'fresh' | 'off'
     }>(
       (dateRange
         ? `/api/kline/daily?symbol=${encodeURIComponent(symbol)}&start_date=${dateRange.start}&end_date=${dateRange.end}`

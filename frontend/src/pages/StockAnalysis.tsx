@@ -326,6 +326,17 @@ function StockAnalysisBoard({ symbol, height = 480, bare = false }: { symbol: st
     qc.invalidateQueries({ queryKey: QK.stockLevels(symbol) })
   }, [klineUpdatedAt, symbol, qc])
 
+  // [R76] 服务端把拉取扔了后台(响应立刻回, 弹窗不再白等网络) —— started 表示
+  // 后台在拉, 这里在 1.5s / 4s 各补取一次把新蜡烛接进来。第二次取时服务端在
+  // 冷却期内会回 fresh, 不再有下一轮 —— 不会打转。
+  const liveRefresh = kline.data?.live_refresh
+  useEffect(() => {
+    if (liveRefresh !== 'started' || !symbol) return
+    const timers = [1500, 4000].map(ms => setTimeout(
+      () => qc.invalidateQueries({ queryKey: QK.analysisKline(symbol) }), ms))
+    return () => timers.forEach(clearTimeout)
+  }, [liveRefresh, klineUpdatedAt, symbol, qc])
+
   if (kline.isLoading) {
     return <div className="flex items-center justify-center py-20"><Loader2 className="h-5 w-5 animate-spin text-muted" /></div>
   }

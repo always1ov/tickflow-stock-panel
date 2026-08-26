@@ -339,13 +339,16 @@ def get_daily(
 
     repo = request.app.state.repo
 
-    # [fork R74] 按需单票实时: 先喂叠加层, 下面的 _maybe_inject_live_candle 就能捡到。
-    # 失败/无 key 一律静默 —— 图表退回收盘口径本来就是这条链的默认行为。
+    # [fork R74/R76] 按需单票实时 —— **非阻塞**: 拉取扔后台线程, 本次响应立刻
+    # 回现有数据(R74 曾在响应路径上等网络, 弹窗因此变慢)。live_refresh 状态
+    # 告诉前端要不要稍后再取一次: started=后台在拉, fresh=叠加层已是新的,
+    # off=没 key。失败一律静默, 图表退回收盘口径。
+    live_refresh = ""
     if refresh_live:
         qs = getattr(request.app.state, "quote_service", None)
         if qs is not None:
             try:
-                qs.refresh_single(symbol)
+                live_refresh = qs.refresh_single_background(symbol)
             except Exception as e:
                 logger.debug("refresh_live 失败 %s: %s", symbol, e)
 
@@ -383,6 +386,8 @@ def get_daily(
         # 即使 live 模式也尝试追加实时蜡烛
         rows = _maybe_inject_live_candle(request, symbol, rows, asset_type)
         resp = {"symbol": symbol, "name": stock_name, "stock_info": stock_info, "rows": rows, "source": "live"}
+        if live_refresh:
+            resp["live_refresh"] = live_refresh
         return _attach_ext(resp, repo, symbol, ext_columns)
 
     rows = df.to_dicts()
@@ -391,6 +396,8 @@ def get_daily(
     rows = _maybe_inject_live_candle(request, symbol, rows, asset_type)
 
     resp = {"symbol": symbol, "name": stock_name, "stock_info": stock_info, "rows": rows, "source": "enriched"}
+    if live_refresh:
+        resp["live_refresh"] = live_refresh
     return _attach_ext(resp, repo, symbol, ext_columns)
 
 
