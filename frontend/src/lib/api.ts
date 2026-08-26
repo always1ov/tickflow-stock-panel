@@ -37,7 +37,11 @@ async function request<T>(path: string, init?: RequestOptions): Promise<T> {
     const msg = detail || `${res.status} ${res.statusText}`
     // 401 (未登录/会话过期) 不弹 toast — 由全局认证拦截器统一跳登录页, 避免刷屏
     if (res.status !== 401 && !quiet) toast(msg, 'error')
-    throw new Error(msg)
+    // [R80] 把 HTTP 状态码挂在错误对象上 —— detail 存在时 msg 里没有状态码
+    // (如 404 的 "job not found"), 调用方拿文本正则判状态永远判不中
+    const err = new Error(msg) as Error & { status?: number }
+    err.status = res.status
+    throw err
   }
   return res.json() as Promise<T>
 }

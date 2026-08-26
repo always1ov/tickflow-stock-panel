@@ -91,6 +91,9 @@ export function Data() {
     queryKey: QK.pipelineJob(activeJobId ?? ''),
     queryFn: () => api.pipelineJob(activeJobId!),
     enabled: !!activeJobId,
+    // [R80] 404(任务已不存在, 如后端重启把内存里的 running 任务清了)不重试 ——
+    // 让错误尽快落到下面的自愈 effect, 别拿着死 ID 反复撞
+    retry: (count, err: any) => err?.status !== 404 && count < 2,
     refetchInterval: (q: any) => {
       const j = q.state.data
       return j && (j.status === 'succeeded' || j.status === 'failed') ? false : 1_000
@@ -310,10 +313,16 @@ export function Data() {
   }, [job.data?.status])
 
   useEffect(() => {
-    if (job.isError && /404/.test(String((job.error as any)?.message ?? ''))) {
+    // [R80] 任务没了(典型: 后端重启, running 任务只存内存)→ 清掉死 ID 停止轮询,
+    // 历史列表随即恢复刷新并自动接上真实的活跃任务。原来用 /404/ 正则匹配错误
+    // **文本** —— 但 404 的文本是 "job not found", 里面没有"404", 永远匹配不上,
+    // 于是每秒撞一次死 ID、每秒弹一条错("一直404"的来源)。改判 err.status。
+    const status = (job.error as any)?.status
+    if (job.isError && (status === 404 || /404/.test(String((job.error as any)?.message ?? '')))) {
       setActiveJobId(null)
+      qc.invalidateQueries({ queryKey: QK.pipelineJobs })
     }
-  }, [job.isError, job.error])
+  }, [job.isError, job.error, qc])
 
   useEffect(() => {
     if (!activeJobId && history.data?.active_id) {
