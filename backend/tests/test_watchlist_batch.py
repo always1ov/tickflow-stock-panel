@@ -32,8 +32,9 @@ def _run_fetch(svc, tf, watchlist: list[str], capset: CapabilitySet):
             "app.services.preferences.get_realtime_watchlist_symbols",
             return_value=watchlist,
         ))
+        # [fork] 自选实时已改多 key 池化(get_realtime_client_pool), 单 key 即单元素池
         stack.enter_context(patch(
-            "app.tickflow.client.get_paid_realtime_client", return_value=tf,
+            "app.tickflow.client.get_realtime_client_pool", return_value=[tf],
         ))
         stack.enter_context(patch(
             "app.tickflow.policy.detect_capabilities", return_value=capset,
@@ -73,13 +74,22 @@ def test_watchlist_batch_respects_capability_limit():
                ["600000.SH", "600001.SH", "600002.SH", "600003.SH", "600004.SH"],
                capset)
 
-    # 5 股票 + 1 指数 = 6 symbols, batch 5 → 2 批
+    # [fork R30 轮转窗口] 6 symbols 超过单轮容量(batch 5 × 1 key) → 本轮只拉 5 只,
+    # 剩下的下一轮接着轮转 —— 不再是"一次全拉完分 2 批"
+    assert tf.quotes.get.call_count == 1
+    first_window = tf.quotes.get.call_args_list[0][1]["symbols"]
+    assert len(first_window) == 5
+
+    # 第二轮: 窗口从上次结尾接着转, 覆盖剩下的指数标的
+    _run_fetch(svc, tf,
+               ["600000.SH", "600001.SH", "600002.SH", "600003.SH", "600004.SH"],
+               capset)
     assert tf.quotes.get.call_count == 2
-    first_batch = tf.quotes.get.call_args_list[0][1]["symbols"]
-    second_batch = tf.quotes.get.call_args_list[1][1]["symbols"]
-    assert len(first_batch) == 5
-    assert len(second_batch) == 1
-    assert "000001.SH" in second_batch
+    second_window = tf.quotes.get.call_args_list[1][1]["symbols"]
+    assert "000001.SH" in second_window
+    # 两轮合起来 6 只全覆盖
+    assert set(first_window) | set(second_window) >= {
+        "600000.SH", "600001.SH", "600002.SH", "600003.SH", "600004.SH", "000001.SH"}
 
 
 def test_watchlist_batch_partial_failure_keeps_other_batches():
@@ -91,18 +101,22 @@ def test_watchlist_batch_partial_failure_keeps_other_batches():
     svc = _make_svc(engine_rules)
 
     tf = MagicMock()
-    # 第一批 (股票) 成功, 第二批 (指数) 失败
+    # [fork R30 轮转窗口] 第一轮(5 只)失败, 第二轮(轮转到剩余标的)成功 ——
+    # 一轮失败不该让轮转卡死, 下一轮照常接着转
     tf.quotes.get.side_effect = [
-        [{"symbol": "600000.SH", "last_price": 10.0, "prev_close": 9.9, "ext": {}}],
         ConnectionError("timeout"),
+        [{"symbol": "000001.SH", "last_price": 10.0, "prev_close": 9.9, "ext": {}}],
     ]
     capset = CapabilitySet({Cap.QUOTE_BY_SYMBOL: CapabilityLimits(batch=5, rpm=60)})
 
     _run_fetch(svc, tf,
                ["600000.SH", "600001.SH", "600002.SH", "600003.SH", "600004.SH"],
                capset)
+    _run_fetch(svc, tf,
+               ["600000.SH", "600001.SH", "600002.SH", "600003.SH", "600004.SH"],
+               capset)
 
-    # 两批都被尝试 (第二批失败不阻断)
+    # 两轮都被尝试 (第一轮失败不阻断第二轮)
     assert tf.quotes.get.call_count == 2
 
 

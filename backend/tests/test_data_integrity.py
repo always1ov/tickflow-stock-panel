@@ -437,9 +437,12 @@ def test_pipeline_self_heals_snapshot_day(tmp_path, monkeypatch):
     assert batch_calls and batch_calls[0]["start"] == yesterday
     assert result["integrity_repair_from"] == yesterday.isoformat()
     assert result["integrity_issues"] >= 1
-    # 坏 enriched 分区被删后当"新日期"重算写回 (无 prune 时 Step 2 走 skip 不写)
-    enriched_left = sorted(
+    # 坏 enriched 分区被删后当"新日期"重算写回 (无 prune 时 Step 2 走 skip 不写)。
+    # [fork] 断言从"恰好两个分区"放宽为"两个都在": 上面为绕开稀疏检测铺了
+    # 130 天历史, 重算会顺带写出这些日期的 enriched 分区, 数量不再是 2 ——
+    # 本测试守的是"坏分区被删后重算写回", 不是分区总数。
+    enriched_left = {
         p.name for p in (tmp_path / "kline_daily_enriched").glob("date=*")
-    )
-    assert enriched_left == [f"date={yesterday.isoformat()}", f"date={today.isoformat()}"]
+    }
+    assert {f"date={yesterday.isoformat()}", f"date={today.isoformat()}"} <= enriched_left
     assert result["enriched_days"] > 0

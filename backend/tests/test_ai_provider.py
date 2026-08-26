@@ -326,6 +326,9 @@ async def test_generate_ai_text_clamps_max_tokens_to_config_cap(monkeypatch):
     monkeypatch.setattr(ai_provider, "is_codex_cli_provider", lambda: False)
     monkeypatch.setattr(ai_provider, "current_ai_max_output_tokens", lambda: 3000)
     monkeypatch.setattr(ai_provider, "current_ai_context_window", lambda: 64000)
+    # [fork] 多档位兜底会在零档位时报"未配置"; 给一个空档位(回落全局配置)
+    # 让测试走到钳制逻辑 —— 本测试验证的就是钳制, 不是档位链
+    monkeypatch.setattr(ai_provider, "_profiles_for_call", lambda: [{}])
 
     async def fake_run(messages, *, temperature, max_tokens, timeout):
         captured["max_tokens"] = max_tokens
@@ -346,6 +349,9 @@ async def test_generate_ai_text_default_cap_and_none_passthrough(monkeypatch):
     monkeypatch.setattr(ai_provider, "is_codex_cli_provider", lambda: False)
     monkeypatch.setattr(ai_provider, "current_ai_max_output_tokens", lambda: 4000)
     monkeypatch.setattr(ai_provider, "current_ai_context_window", lambda: 64000)
+    # [fork] 多档位兜底会在零档位时报"未配置"; 给一个空档位(回落全局配置)
+    # 让测试走到钳制逻辑 —— 本测试验证的就是钳制, 不是档位链
+    monkeypatch.setattr(ai_provider, "_profiles_for_call", lambda: [{}])
 
     async def fake_run(messages, *, temperature, max_tokens, timeout):
         captured["max_tokens"] = max_tokens

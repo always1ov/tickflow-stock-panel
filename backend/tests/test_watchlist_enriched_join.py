@@ -36,6 +36,13 @@ class _FakeRepo:
     def get_enriched_latest(self):
         return self._enriched, self._enriched_date
 
+    def overlay_watchlist_live(self, df, asset_type="stock"):
+        # 与真 repo 语义一致: 叠加层为空时原样返回(测试里没有叠加层)
+        return df
+
+    def get_watchlist_live(self, asset_type="stock"):
+        return pl.DataFrame()
+
     def get_enriched_latest_asset(self, asset):
         if asset == "etf":
             etf = self._etf if self._etf is not None else pl.DataFrame()
