@@ -186,6 +186,9 @@ class QuoteService:
         self._single_refresh_at: dict[str, float] = {}
         # [R76] 后台轮询本轮占用的 key 下标 —— 单票刷新避开它们挑空闲的
         self._busy_key_idx: set[int] = set()
+        # [R77] 弹窗单票实时的独立缓存 {symbol: row} —— 刻意不进自选叠加层:
+        # 那层被监控/自选页/今日总览当"自选·当天·轮询喂"的快照消费
+        self._single_live: dict[str, dict] = {}
         self._running = False
         self._enabled = False      # 全局开关 (持久化到 preferences)
         # 暂停态: 盘后管道/数据修正运行期间临时暂停取数, 防止与管道写同一批 parquet 竞态。
@@ -605,15 +608,14 @@ class QuoteService:
     def refresh_single(self, symbol: str) -> bool:
         """[fork 增强] R74 单票按需实时: 现拉这一只的行情并写进自选实时叠加层。
 
-        个股分析弹窗要"点开就是最新"。后台实时开关关着时叠加层没人喂,
-        K 线只能停在最后一个同步日 —— 这里给一个按需的单票通道, 走与自选
-        实时**完全相同**的落盘链(建日K行 → 增量 enriched → 叠加层), 于是
-        日K注入 / 六态盘中口径 / 决策台读到的是同一份数据, 不另开口径。
+        个股分析弹窗要"点开就是最新"。结果进**独立的单票缓存**(R77),
+        只喂弹窗那一族消费者(日K注入 / 六态 live 映射) —— 不碰自选叠加层
+        和 kline_daily, 那些共享层有"只含自选、只含当天、只由轮询喂"的
+        契约, 混进弹窗随手点的票会把监控/策略的评估快照弄脏。
 
         - 只走 TickFlow(本 fork 铁律: 不引入第三方数据源); 无 key 静默返回 False,
           页面退回收盘口径, 不报错。
         - 每票 15s 冷却: 反复开关弹窗不烧配额(免费档 quotes.get 也计次)。
-        - 指数不走这条路(叠加层只收 stock/etf); 失败一律 False。
         """
         sym = str(symbol or "").strip().upper()
         if not sym or self._repo is None:
@@ -671,7 +673,20 @@ class QuoteService:
         return random.choice(idle or pool)
 
     def _pull_single(self, sym: str) -> bool:
-        """真正的拉取 + 落盘(可能在后台线程里跑)。任何失败只 False 不抛。"""
+        """真正的拉取(可能在后台线程里跑)。任何失败只 False 不抛。
+
+        [R77] 结果**只进独立的单票缓存**, 不再写任何共享层。R74/R76 曾把它
+        灌进自选实时叠加层 + merge 进 kline_daily —— 但那两层的隐含契约是
+        "只含自选、只含当天、只由轮询喂": 监控引擎在自选档直接拿叠加层当
+        股票评估快照(还把日期强制标成今天), 自选页/今日总览也读它 ——
+        随手点开过弹窗的票混着可能过期的价进去后, 异动监控和策略评估的
+        就是一份垃圾快照。磁盘那份更糟: _build_daily 把日期无条件标 cn_today,
+        非交易时段点弹窗会写出"幽灵交易日"分区。单票的日期从行情自带的
+        quote_ts 推真实交易日; 推不出宁可放弃, 不造日期。
+        """
+        from datetime import datetime as _dt
+
+        from app.market_time import CN_TZ
         from app.tickflow.client import get_realtime_client_pool
         pool = get_realtime_client_pool()
         if not pool:
@@ -682,37 +697,45 @@ class QuoteService:
             logger.debug("单票实时拉取失败 %s: %s", sym, e)
             return False
         records = self._quotes_to_records(resp)
-        if not records:
+        rec = next((r for r in records if str(r.get("symbol") or "").upper() == sym), None)
+        if rec is None and records:
+            rec = records[0]
+        if rec is None:
             return False
-
-        index_set = self._repo.get_index_symbol_set()
-        etf_set = self._repo.get_etf_symbol_set()
-        _index_records, etf_records, stock_records = self._split_records_by_asset(
-            records, index_set, etf_set)
-
-        # 与 _fetch_watchlist_quotes 同一套写法: stock 进叠加层, ETF merge 当天分区。
-        # 写盘段拿 _fetch_lock 与后台轮询串行(两边写同一批缓存); 网络请求在锁外。
-        wrote = False
+        close = rec.get("last_price")
+        ts = rec.get("timestamp")
+        if not close or close <= 0 or not ts:
+            return False
+        try:
+            trade_date = _dt.fromtimestamp(float(ts) / 1000.0, CN_TZ).date()
+        except (TypeError, ValueError, OSError):
+            return False
+        row = {
+            "symbol": sym,
+            "date": str(trade_date),
+            "open": rec.get("open") or close,
+            "high": rec.get("high") or close,
+            "low": rec.get("low") or close,
+            "close": close,
+            "volume": rec.get("volume"),
+            "amount": rec.get("amount"),
+            "prev_close": rec.get("prev_close"),
+            "change_pct": rec.get("change_pct"),   # 小数制, 与 enriched 口径一致
+            "quote_ts": ts,
+        }
         with self._fetch_lock:
-            daily_df = self._build_daily(stock_records)
-            if not daily_df.is_empty():
-                try:
-                    self._repo.merge_live_daily_asset("stock", daily_df)
-                except Exception as e:
-                    logger.warning("单票实时日K写盘失败 %s: %s", sym, e)
-                self._flush_live_enriched(daily_df, self._build_quote_extra(stock_records),
-                                          asset_type="stock", overlay=True)
-                wrote = True
-            etf_daily_df = self._build_daily(etf_records)
-            if not etf_daily_df.is_empty():
-                try:
-                    self._repo.merge_live_daily_asset("etf", etf_daily_df)
-                except Exception as e:
-                    logger.warning("单票实时 ETF 日K写盘失败 %s: %s", sym, e)
-                self._flush_live_enriched(etf_daily_df, self._build_quote_extra(etf_records),
-                                          asset_type="etf", merge=True)
-                wrote = True
-        return wrote
+            self._single_live[sym] = row
+            if len(self._single_live) > 200:
+                self._single_live.pop(next(iter(self._single_live)))
+        return True
+
+    def get_single_live(self, symbol: str) -> dict | None:
+        """[R77] 弹窗单票缓存里这只票的最新行(带真实 date)。没有返回 None。
+
+        只给弹窗那一族消费者用(日K注入 / 六态趋势的 live 映射) —— 监控、
+        自选页、今日总览等共享层消费者**不该**读这里。
+        """
+        return self._single_live.get(str(symbol or "").strip().upper())
 
     def _fetch_quotes(self, *, final: bool = False) -> bool:
         """按当前档位拉取行情。加锁串行化 (后台轮询 vs 手动 refresh)。返回本轮是否成功更新。"""

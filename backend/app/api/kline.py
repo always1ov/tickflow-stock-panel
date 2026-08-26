@@ -468,14 +468,15 @@ def _maybe_inject_live_candle(request: Request, symbol: str, rows: list[dict], a
             return None, None
         return row, d
 
-    # 取实时行: 叠加层优先(免费自选档); 没有再退回全市场实时缓存(付费档)
+    # 取实时行: 叠加层优先(免费自选档); 没有再退回全市场实时缓存(付费档);
+    # 最后兜底 [R77] 弹窗单票缓存(refresh_live 按需拉的, 只有 OHLCV 没有指标)
     q: dict | None = None
     enriched_date = None
     if asset_type in ("stock", "etf"):
         q, enriched_date = _overlay_row(asset_type)
     if q is None:
+        qs = getattr(request.app.state, "quote_service", None)
         if asset_type == "stock":
-            qs = getattr(request.app.state, "quote_service", None)
             if not qs:
                 return rows
             df_today, enriched_date = qs.get_enriched_today()
@@ -483,15 +484,22 @@ def _maybe_inject_live_candle(request: Request, symbol: str, rows: list[dict], a
             df_today, enriched_date = request.app.state.repo.get_enriched_latest_asset("etf")
         else:
             return rows
-        if df_today.is_empty():
-            return rows
-        try:
-            m = df_today.filter(pl.col("symbol") == symbol).to_dicts()
-            if not m:
+        if not df_today.is_empty():
+            try:
+                m = df_today.filter(pl.col("symbol") == symbol).to_dicts()
+                if m:
+                    q = m[0]
+            except Exception:  # noqa: BLE001
+                q = None
+        if q is None:
+            single = qs.get_single_live(symbol) if qs else None
+            if not single:
                 return rows
-            q = m[0]
-        except Exception:  # noqa: BLE001
-            return rows
+            try:
+                enriched_date = date.fromisoformat(str(single.get("date"))[:10])
+            except (TypeError, ValueError):
+                return rows
+            q = single
 
     # 非交易日（周末/假日）缓存的行情日期 != 今天，跳过注入避免产生重复蜡烛
     if not enriched_date or enriched_date != date.today():

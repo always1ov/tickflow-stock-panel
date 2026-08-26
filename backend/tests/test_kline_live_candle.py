@@ -76,42 +76,73 @@ def test_existing_today_row_is_overwritten_not_duplicated():
 # 冷却(不烧配额)、无 key 静默失败(退回收盘口径, 不报错)、走同一条落盘链。
 
 def _quote_service_for_single(monkeypatch, pool):
-    """只桩掉网络与落盘边界, 中间的记录处理走真代码。"""
+    """只桩掉网络边界; 共享层写入口全部装上警报器 —— 单票刷新碰到就算失败。"""
     from app.services.quote_service import QuoteService
     qs = QuoteService()
-    written: list[tuple[str, object]] = []
+    shared_writes: list[str] = []
     qs._repo = SimpleNamespace(
         get_index_symbol_set=lambda: set(),
         get_etf_symbol_set=lambda: set(),
-        merge_live_daily_asset=lambda asset, df: written.append(("daily", asset)),
+        merge_live_daily_asset=lambda asset, df: shared_writes.append(f"daily:{asset}"),
+        update_watchlist_live=lambda asset, df: shared_writes.append(f"overlay:{asset}"),
     )
     monkeypatch.setattr(
         "app.tickflow.client.get_realtime_client_pool", lambda: pool)
     monkeypatch.setattr(
         qs, "_flush_live_enriched",
         lambda df, extra=None, asset_type="stock", merge=False, overlay=False:
-            written.append(("enriched", asset_type, overlay, merge)))
-    return qs, written
+            shared_writes.append(f"enriched:{asset_type}"))
+    return qs, shared_writes
+
+
+def _quote(sym="600722.SH", ts=None):
+    import time as _time
+    return {"symbol": sym, "open": 11.3, "high": 12.0, "low": 11.2,
+            "last_price": 11.9, "volume": 990_000, "amount": 1.1e7,
+            "prev_close": 11.28,
+            "timestamp": ts if ts is not None else _time.time() * 1000}
 
 
 def test_refresh_single_without_key_returns_false(monkeypatch):
     """无 key 静默 False —— 图表退回收盘口径, 绝不报错打断弹窗。"""
-    qs, written = _quote_service_for_single(monkeypatch, pool=[])
+    qs, shared = _quote_service_for_single(monkeypatch, pool=[])
     assert qs.refresh_single("600722.SH") is False
-    assert written == []
+    assert shared == []
 
 
-def test_refresh_single_feeds_the_overlay_chain(monkeypatch):
-    """拉到行情 → 走与自选实时相同的链: 日K merge + enriched overlay=True。"""
-    quote = {"symbol": "600722.SH", "open": 11.3, "high": 12.0, "low": 11.2,
-             "close": 11.9, "volume": 990_000, "amount": 1.1e7,
-             "prev_close": 11.28}
-    client = SimpleNamespace(quotes=SimpleNamespace(get=lambda symbols: [quote]))
-    qs, written = _quote_service_for_single(monkeypatch, pool=[client])
-    assert qs.refresh_single("600722.sh") is True     # 顺带: 小写入参要被归一
-    assert ("daily", "stock") in written
-    assert ("enriched", "stock", True, False) in written, \
-        "必须 overlay=True 进自选叠加层, 不碰全市场盘后快照"
+def test_refresh_single_fills_the_isolated_cache_only(monkeypatch):
+    """[R77 回归] 单票刷新只进独立缓存, **绝不碰任何共享层**。
+
+    R74/R76 曾把它灌进自选叠加层 + merge 进 kline_daily —— 监控引擎在自选档
+    拿叠加层当股票评估快照(日期还强制标今天), 于是随手点开过弹窗的票混着
+    可能过期的价, 让异动监控和策略评估的是一份垃圾快照(用户实况)。
+    """
+    client = SimpleNamespace(quotes=SimpleNamespace(get=lambda symbols: [_quote()]))
+    qs, shared = _quote_service_for_single(monkeypatch, pool=[client])
+
+    assert qs.refresh_single("600722.sh") is True   # 顺带: 小写入参要被归一
+    assert shared == [], f"单票刷新写了共享层: {shared}"
+
+    row = qs.get_single_live("600722.SH")
+    assert row is not None and row["close"] == 11.9
+    # 日期来自行情自带的 quote_ts, 不是无条件的"今天"
+    assert row["date"]
+    # 口径: change_pct 小数制(与 enriched 一致)
+    assert abs(row["change_pct"] - (11.9 / 11.28 - 1)) < 1e-9
+
+
+def test_refresh_single_without_quote_ts_refuses_to_invent_a_date(monkeypatch):
+    """行情没带时间戳就放弃 —— 宁可不显示, 不造日期。
+
+    R74 的 _build_daily 会把日期无条件标 cn_today: 非交易时段点弹窗
+    等于造出一根"幽灵交易日"蜡烛。
+    """
+    q = _quote(); q["timestamp"] = None
+    client = SimpleNamespace(quotes=SimpleNamespace(get=lambda symbols: [q]))
+    qs, shared = _quote_service_for_single(monkeypatch, pool=[client])
+    assert qs._pull_single("600722.SH") is False
+    assert qs.get_single_live("600722.SH") is None
+    assert shared == []
 
 
 def test_refresh_single_cooldown_skips_the_network(monkeypatch):
@@ -120,9 +151,7 @@ def test_refresh_single_cooldown_skips_the_network(monkeypatch):
 
     def _get(symbols):
         calls.append(1)
-        return [{"symbol": symbols[0], "close": 11.9, "open": 11.3,
-                 "high": 12.0, "low": 11.2, "volume": 1, "amount": 1.0,
-                 "prev_close": 11.28}]
+        return [_quote(symbols[0])]
 
     client = SimpleNamespace(quotes=SimpleNamespace(get=_get))
     qs, _ = _quote_service_for_single(monkeypatch, pool=[client])

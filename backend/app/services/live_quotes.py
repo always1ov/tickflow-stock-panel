@@ -10,8 +10,13 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def watchlist_live_map(repo) -> dict[str, dict]:
-    """读自选实时叠加层(股票+ETF)→ {symbol: {date, close}}。任何失败返回空。"""
+def watchlist_live_map(repo, quote_service=None) -> dict[str, dict]:
+    """读自选实时叠加层(股票+ETF)→ {symbol: {date, close}}。任何失败返回空。
+
+    [R77] 传入 quote_service 时, 额外并入弹窗单票缓存里**叠加层没有**的票
+    (只补缺, 不覆盖 —— 轮询喂的叠加层永远更新鲜)。条目带真实行情日,
+    消费方(六态趋势)本来就按日期判断, 旧行情不会被当成今天。
+    """
     out: dict[str, dict] = {}
     for asset in ("stock", "etf"):
         try:
@@ -27,6 +32,15 @@ def watchlist_live_map(repo) -> dict[str, dict]:
             close = row.get("close")
             if sym and close:
                 out[sym] = {"date": str(row.get("date") or ""), "close": float(close)}
+    if quote_service is not None:
+        try:
+            singles = getattr(quote_service, "_single_live", {}) or {}
+            for sym, row in dict(singles).items():
+                close = row.get("close")
+                if sym not in out and close and row.get("date"):
+                    out[sym] = {"date": str(row["date"]), "close": float(close)}
+        except Exception as e:  # noqa: BLE001
+            logger.debug("single live merge skipped: %s", e)
     return out
 
 

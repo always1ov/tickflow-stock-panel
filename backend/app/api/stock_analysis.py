@@ -302,7 +302,10 @@ def get_trend(request: Request, symbol: str = Query(...)):
         raise HTTPException(400, "symbol 不能为空")
     from app.services import livermore_service
     from app.services.live_quotes import as_live_entries, watchlist_live_map
-    live = as_live_entries(watchlist_live_map(request.app.state.repo))
+    # [R77] 并入弹窗单票缓存(带真实行情日) —— 弹窗的六态才能拿到刚按需拉的价
+    live = as_live_entries(watchlist_live_map(
+        request.app.state.repo,
+        quote_service=getattr(request.app.state, 'quote_service', None)))
     return livermore_service.trend_for_symbol(
         request.app.state.repo, symbol, with_segments=True,
         live_entry=live.get(symbol.strip().upper()))
@@ -319,7 +322,10 @@ def get_trends(request: Request, symbols: str = Query(..., description="逗号�
         raise HTTPException(400, "symbols 不能为空")
     from app.services import livermore_service
     from app.services.live_quotes import as_live_entries, watchlist_live_map
-    live = as_live_entries(watchlist_live_map(request.app.state.repo))
+    # [R77] 并入弹窗单票缓存(带真实行情日) —— 弹窗的六态才能拿到刚按需拉的价
+    live = as_live_entries(watchlist_live_map(
+        request.app.state.repo,
+        quote_service=getattr(request.app.state, 'quote_service', None)))
     return {"trends": livermore_service.trends_for_symbols(
         request.app.state.repo, syms, live=live)}
 
