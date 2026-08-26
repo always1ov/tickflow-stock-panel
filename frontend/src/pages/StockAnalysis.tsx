@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Sparkles, LineChart, History as HistoryIcon, Loader2, ExternalLink, Bell, AlertTriangle, X, Maximize2, Minimize2 } from 'lucide-react'
 import { PageHeader } from '@/components/PageHeader'
@@ -266,9 +266,12 @@ function LevelsDialog({ symbol, name, onClose }: { symbol: string | null; name: 
 function LevelsPriceTag({ symbol }: { symbol: string }) {
   const kline = useQuery({
     queryKey: QK.analysisKline(symbol),
-    queryFn: () => api.klineDaily(symbol, 250),
+    // [R74] refreshLive: 服务端先现拉一次该票实时(15s 冷却) —— 点开就是最新,
+    // 不依赖侧栏那个后台实时开关
+    queryFn: () => api.klineDaily(symbol, 250, undefined, undefined, { refreshLive: true }),
     enabled: !!symbol,
-    staleTime: 60_000,
+    staleTime: 15_000,
+    refetchOnMount: 'always',
   })
   const levelsQ = useQuery({
     queryKey: QK.stockLevels(symbol),
@@ -296,9 +299,11 @@ function LevelsPriceTag({ symbol }: { symbol: string }) {
 function StockAnalysisBoard({ symbol, height = 480, bare = false }: { symbol: string; height?: number; bare?: boolean }) {
   const kline = useQuery({
     queryKey: QK.analysisKline(symbol),
-    queryFn: () => api.klineDaily(symbol, 250),
+    // [R74] 与 LevelsPriceTag 同 key 同参 —— 打开弹窗只发一次请求, 两处共享
+    queryFn: () => api.klineDaily(symbol, 250, undefined, undefined, { refreshLive: true }),
     enabled: !!symbol,
-    staleTime: 60_000,
+    staleTime: 15_000,
+    refetchOnMount: 'always',
   })
 
   const levelsQ = useQuery({
@@ -310,6 +315,16 @@ function StockAnalysisBoard({ symbol, height = 480, bare = false }: { symbol: st
 
   // [fork 增强] 六态趋势(利弗莫尔)—— 趋势条 + K 线多空分段着色
   const trendQ = useStockTrend(symbol)
+
+  // [R74] 日K带着 refresh_live 回来 = 服务端刚把这只票的实时喂进叠加层 ——
+  // 趋势/价位是并行发的, 可能赶在落地之前, 这里补一次失效让它们读到同一份
+  const qc = useQueryClient()
+  const klineUpdatedAt = kline.dataUpdatedAt
+  useEffect(() => {
+    if (!klineUpdatedAt || !symbol) return
+    qc.invalidateQueries({ queryKey: QK.stockTrend(symbol) })
+    qc.invalidateQueries({ queryKey: QK.stockLevels(symbol) })
+  }, [klineUpdatedAt, symbol, qc])
 
   if (kline.isLoading) {
     return <div className="flex items-center justify-center py-20"><Loader2 className="h-5 w-5 animate-spin text-muted" /></div>

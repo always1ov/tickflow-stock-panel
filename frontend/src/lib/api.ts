@@ -2661,7 +2661,7 @@ export const api = {
   redetectCapabilities: () =>
     request<CapabilitiesResponse>('/api/capabilities/redetect', { method: 'POST' }),
 
-  klineDaily: (symbol: string, days = 120, dateRange?: { start: string; end: string }, extColumns?: string) =>
+  klineDaily: (symbol: string, days = 120, dateRange?: { start: string; end: string }, extColumns?: string, opts?: { refreshLive?: boolean }) =>
     request<{
       symbol: string
       name?: string
@@ -2672,7 +2672,9 @@ export const api = {
       (dateRange
         ? `/api/kline/daily?symbol=${encodeURIComponent(symbol)}&start_date=${dateRange.start}&end_date=${dateRange.end}`
         : `/api/kline/daily?symbol=${encodeURIComponent(symbol)}&days=${days}`)
-      + (extColumns ? `&ext_columns=${encodeURIComponent(extColumns)}` : ''),
+      + (extColumns ? `&ext_columns=${encodeURIComponent(extColumns)}` : '')
+      // [R74] 服务端先现拉一次该票实时(15s 冷却)再返回 —— 弹窗"点开就是最新"
+      + (opts?.refreshLive ? '&refresh_live=1' : ''),
     ),
   klineDailyBatch: (symbols: string[], days = 12) =>
     request<{ data: Record<string, KlineRow[]> }>('/api/kline/daily-batch', {

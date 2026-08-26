@@ -182,6 +182,8 @@ class QuoteService:
         # 串行化行情拉取: 手动 POST /refresh 与后台轮询线程可能并发调用
         # _fetch_quotes, 两者同时写同一批 parquet/缓存会互相覆盖
         self._fetch_lock = threading.Lock()
+        # [R74] 单票按需刷新的冷却表 {symbol: monotonic 时刻}
+        self._single_refresh_at: dict[str, float] = {}
         self._running = False
         self._enabled = False      # 全局开关 (持久化到 preferences)
         # 暂停态: 盘后管道/数据修正运行期间临时暂停取数, 防止与管道写同一批 parquet 竞态。
@@ -595,6 +597,75 @@ class QuoteService:
             while self._running and self._enabled and waited < self._interval:
                 time.sleep(0.5)
                 waited += 0.5
+
+    def refresh_single(self, symbol: str) -> bool:
+        """[fork 增强] R74 单票按需实时: 现拉这一只的行情并写进自选实时叠加层。
+
+        个股分析弹窗要"点开就是最新"。后台实时开关关着时叠加层没人喂,
+        K 线只能停在最后一个同步日 —— 这里给一个按需的单票通道, 走与自选
+        实时**完全相同**的落盘链(建日K行 → 增量 enriched → 叠加层), 于是
+        日K注入 / 六态盘中口径 / 决策台读到的是同一份数据, 不另开口径。
+
+        - 只走 TickFlow(本 fork 铁律: 不引入第三方数据源); 无 key 静默返回 False,
+          页面退回收盘口径, 不报错。
+        - 每票 15s 冷却: 反复开关弹窗不烧配额(免费档 quotes.get 也计次)。
+        - 指数不走这条路(叠加层只收 stock/etf); 失败一律 False。
+        """
+        sym = str(symbol or "").strip().upper()
+        if not sym or self._repo is None:
+            return False
+        now = time.monotonic()
+        with self._fetch_lock:
+            last = self._single_refresh_at.get(sym, 0.0)
+            if now - last < 15.0:
+                return True     # 冷却期内: 叠加层里就是刚拉过的, 视为已最新
+            # 先记时间再拉 —— 失败也占住冷却位, 免得坏 key 被连点打成风暴
+            self._single_refresh_at[sym] = now
+            if len(self._single_refresh_at) > 500:
+                self._single_refresh_at = dict(
+                    sorted(self._single_refresh_at.items(), key=lambda kv: kv[1])[-200:])
+
+        from app.tickflow.client import get_realtime_client_pool
+        pool = get_realtime_client_pool()
+        if not pool:
+            return False
+        try:
+            resp = pool[0].quotes.get(symbols=[sym]) or []
+        except Exception as e:
+            logger.debug("单票实时拉取失败 %s: %s", sym, e)
+            return False
+        records = self._quotes_to_records(resp)
+        if not records:
+            return False
+
+        index_set = self._repo.get_index_symbol_set()
+        etf_set = self._repo.get_etf_symbol_set()
+        _index_records, etf_records, stock_records = self._split_records_by_asset(
+            records, index_set, etf_set)
+
+        # 与 _fetch_watchlist_quotes 同一套写法: stock 进叠加层, ETF merge 当天分区。
+        # 写盘段拿 _fetch_lock 与后台轮询串行(两边写同一批缓存); 网络请求在锁外。
+        wrote = False
+        with self._fetch_lock:
+            daily_df = self._build_daily(stock_records)
+            if not daily_df.is_empty():
+                try:
+                    self._repo.merge_live_daily_asset("stock", daily_df)
+                except Exception as e:
+                    logger.warning("单票实时日K写盘失败 %s: %s", sym, e)
+                self._flush_live_enriched(daily_df, self._build_quote_extra(stock_records),
+                                          asset_type="stock", overlay=True)
+                wrote = True
+            etf_daily_df = self._build_daily(etf_records)
+            if not etf_daily_df.is_empty():
+                try:
+                    self._repo.merge_live_daily_asset("etf", etf_daily_df)
+                except Exception as e:
+                    logger.warning("单票实时 ETF 日K写盘失败 %s: %s", sym, e)
+                self._flush_live_enriched(etf_daily_df, self._build_quote_extra(etf_records),
+                                          asset_type="etf", merge=True)
+                wrote = True
+        return wrote
 
     def _fetch_quotes(self, *, final: bool = False) -> bool:
         """按当前档位拉取行情。加锁串行化 (后台轮询 vs 手动 refresh)。返回本轮是否成功更新。"""

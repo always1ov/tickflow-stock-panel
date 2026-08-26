@@ -324,9 +324,12 @@ def get_daily(
     start_date: Optional[str] = Query(None, description="起始日期 YYYY-MM-DD, 优先于 days"),
     end_date: Optional[str] = Query(None, description="截止日期 YYYY-MM-DD, 默认今天"),
     ext_columns: Optional[str] = Query(None, description="逗号分隔的 ext 列: config_id.field_name"),
+    refresh_live: bool = Query(False, description="先现拉一次这只票的实时行情再返回(单票, 15s 冷却)"),
 ):
     """读取本地 enriched 表中某只股票的日 K。
 
+    - refresh_live=1: [fork R74] 先按需拉一次该票实时并写进自选叠加层 ——
+      个股分析弹窗用, "点开就是最新"不依赖后台实时开关; 无 key/失败静默退回收盘口径
     - 若 QuoteService 有实时行情, 追加/覆盖今日实时蜡烛
     - Free 用户: 若 enriched 表里没有该股票, 实时拉取 + 本地算 enriched 返回
     - ext_columns: 可选，动态 LEFT JOIN 扩展数据表，结果平铺到 stock_info.ext 下
@@ -335,6 +338,17 @@ def get_daily(
     import polars as pl
 
     repo = request.app.state.repo
+
+    # [fork R74] 按需单票实时: 先喂叠加层, 下面的 _maybe_inject_live_candle 就能捡到。
+    # 失败/无 key 一律静默 —— 图表退回收盘口径本来就是这条链的默认行为。
+    if refresh_live:
+        qs = getattr(request.app.state, "quote_service", None)
+        if qs is not None:
+            try:
+                qs.refresh_single(symbol)
+            except Exception as e:
+                logger.debug("refresh_live 失败 %s: %s", symbol, e)
+
     end = date.fromisoformat(end_date) if end_date else date.today()
     if start_date:
         start = date.fromisoformat(start_date)
