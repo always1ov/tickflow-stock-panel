@@ -182,6 +182,18 @@ class JobStore:
             else:
                 timeout_s = preferences.get_data_source_job_timeout_s()
 
+        # [fork R75] 单飞检查前先回收卡死任务 —— 自愈原来只挂在 /run 和
+        # /jobs/{id} 两个 HTTP 端点上("任意轮询都能自愈"), 但轮询只有浏览器
+        # 开着才发生。定时同步在没人看页面时到点触发, 一个卡死的 running
+        # 会让下面的单飞判定**天天**返回"已有活跃任务"、静默跳过, 数据从此
+        # 停更, 直到用户哪天手动点同步(那条路先 reap)才好 —— 而"没人看页面"
+        # 恰恰是定时任务存在的意义。放在 create() 里让每个入口(定时/开机
+        # 自检/分钟K按钮)统一拿到这层自愈, 不用逐个记得补。
+        try:
+            self.reap_stale()
+        except Exception:
+            logger.warning("create 前置 reap_stale 失败, 按现状单飞", exc_info=True)
+
         with self._lock:
             if self._active_id:
                 active = self._active_jobs.get(self._active_id)

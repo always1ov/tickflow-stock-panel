@@ -165,3 +165,42 @@ def test_run_slot_reap_release_prevents_zombie_release():
     pipeline_jobs.release_run_slot("jobB")
     assert pipeline_jobs.try_acquire_run_slot("jobC") is True
     pipeline_jobs.release_run_slot("jobC")
+
+
+# ── [fork R75] create() 前置自愈: 定时同步不再被僵尸天天挡掉 ─────────────
+
+def test_create_reaps_a_stalled_job_first(monkeypatch, tmp_path):
+    """卡死的 running 不该挡住新任务的单飞创建。
+
+    用户实况: 数据停在 24 号, 26 号才发现 —— 25 号 15:30 的定时同步被一个
+    卡死任务判成"已有活跃任务"静默跳过; 自愈(reap)原来只挂在 HTTP 轮询上,
+    没人开页面就没人自愈。create() 现在先 reap 再单飞。
+    """
+    monkeypatch.setattr(preferences, "load", lambda: {})
+    store = JobStore(store_dir=tmp_path / "jobs")
+    jid = _make_running_job(store, timeout_s=60)
+    stale = _iso(_now() - timedelta(minutes=30))
+    store._active_jobs[jid]["started_at"] = stale
+    store._active_jobs[jid]["last_progress_at"] = stale
+    assert pipeline_jobs.try_acquire_run_slot(jid) is True
+
+    new_id, is_new = store.create(timeout_s=60)
+
+    assert is_new, "卡死任务应先被回收, 而不是让定时同步天天静默跳过"
+    assert new_id != jid
+    assert store.get(jid)["status"] == "failed"
+    # 僵尸占的执行槽也被按所有权释放, 新任务能拿到
+    assert pipeline_jobs.try_acquire_run_slot(new_id) is True
+    pipeline_jobs.release_run_slot(new_id)
+
+
+def test_create_still_dedupes_a_healthy_running_job(monkeypatch, tmp_path):
+    """自愈只收卡死的 —— 正在正常推进的任务仍然单飞去重。"""
+    monkeypatch.setattr(preferences, "load", lambda: {})
+    store = JobStore(store_dir=tmp_path / "jobs")
+    jid = _make_running_job(store, timeout_s=600)
+    store.progress(jid, "sync_daily", 30, "推进中")     # 刚上报过心跳
+
+    same_id, is_new = store.create(timeout_s=600)
+
+    assert not is_new and same_id == jid

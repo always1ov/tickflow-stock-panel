@@ -777,6 +777,8 @@ def _run_tracked(fn, job_label: str) -> bool:
     """
     from app.services.pipeline_jobs import JobCancelledError, job_store, release_run_slot, try_acquire_run_slot
 
+    # [fork R75] 自愈已内建在 job_store.create() 里 —— 单飞检查前先回收卡死任务,
+    # 定时路径(没人开页面、没有轮询)也不会被僵尸挡到天天静默跳过。
     job_id, is_new = job_store.create()
     if not is_new:
         logger.info("scheduled %s 跳过: 已有活跃任务在运行 (job_id=%s)", job_label, job_id)
