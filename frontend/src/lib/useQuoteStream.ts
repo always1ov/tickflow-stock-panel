@@ -169,8 +169,14 @@ export function useQuoteStream(
       })
 
       es.addEventListener('strategy_results_updated', () => {
-        // 策略监控完成后只刷新策略结果缓存，不扩散到其他行情页面。
-        qc.invalidateQueries({ queryKey: ['screener-cached'] })
+        // 策略监控完成后按依赖顺序刷新：摘要决定当前策略明细查询是否 enabled，
+        // 必须先等摘要落地再刷新明细。原来同时 invalidate 会让两次独立请求跨过
+        // 一次实时快照切换，出现卡片数量、表格明细各拿一版甚至短暂空表。
+        void qc.refetchQueries({ queryKey: QK.screenerCachedSummary, type: 'active' })
+          .then(() => qc.invalidateQueries({
+            predicate: query => query.queryKey[0] === 'screener-cached'
+              && query.queryKey[1] !== 'summary',
+          }))
       })
 
       es.addEventListener('depth_updated', () => {

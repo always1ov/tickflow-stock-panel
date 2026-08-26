@@ -83,13 +83,19 @@ export function Screener() {
 
   // 结果列配置 — 默认内置列，异步合并后端/localStorage 偏好
   const [columns, setColumns] = useState<ColumnConfig[]>([...SCREENER_BUILTIN_COLUMNS])
+  const [columnsReady, setColumnsReady] = useState(false)
   const [customizerOpen, setCustomizerOpen] = useState(false)
-  const columnsLoaded = useRef(false)
 
   useEffect(() => {
-    if (columnsLoaded.current) return
-    columnsLoaded.current = true
-    loadScreenerColumnConfig().then(setColumns)
+    let active = true
+    loadScreenerColumnConfig()
+      .then(next => {
+        if (active) setColumns(next)
+      })
+      .finally(() => {
+        if (active) setColumnsReady(true)
+      })
+    return () => { active = false }
   }, [])
 
   const handleColumnsChange = useCallback((next: ColumnConfig[]) => {
@@ -152,16 +158,21 @@ export function Screener() {
   const fullCachedQuery = useQuery({
     queryKey: QK.screenerCached(asOf, extColumnsParam),
     queryFn: () => api.screenerCached(extColumnsParam || undefined),
-    enabled: assetType === 'stock' && showAll,
+    enabled: columnsReady && assetType === 'stock' && showAll,
+    placeholderData: previousData => previousData,
   })
 
   const singleCachedQuery = useQuery({
     queryKey: QK.screenerCachedResult(activeStrategy ?? '', asOf, extColumnsParam),
     queryFn: () => api.screenerCachedResult(activeStrategy!, extColumnsParam || undefined),
-    enabled: assetType === 'stock'
+    enabled: columnsReady
+      && assetType === 'stock'
       && !showAll
       && !!activeStrategy
       && summaryQuery.data?.results[activeStrategy]?.as_of === asOf,
+    // 列配置或实时快照变化时保留上一份完整明细，直到新请求整体返回。
+    // 避免表格先只画基础列、随后才补扩展列，造成“显示部分结果”的错觉。
+    placeholderData: previousData => previousData,
   })
 
   const dataStatus = useDataStatus({ staleTime: 0 })
@@ -225,6 +236,25 @@ export function Screener() {
     }
   }, [loadErrors])
 
+  // 批量/单策略计算完成后先发布摘要，再刷新明细查询。摘要是明细查询的
+  // enabled 门闩；反过来或同时失效会让明细短暂禁用、页面显示成空结果。
+  const publishSummary = useCallback((
+    nextAsOf: string | null,
+    nextResults: Record<string, { total: number; as_of: string }>,
+  ) => {
+    qc.setQueryData(QK.screenerCachedSummary, (previous: any) => ({
+      as_of: nextAsOf ?? previous?.as_of ?? null,
+      results: { ...(previous?.results ?? {}), ...nextResults },
+      today_ever_counts: previous?.today_ever_counts ?? {},
+      updated_at: Date.now(),
+    }))
+  }, [qc])
+
+  const invalidateScreenerDetails = useCallback(() => qc.invalidateQueries({
+    predicate: query => query.queryKey[0] === 'screener-cached'
+      && query.queryKey[1] !== 'summary',
+  }), [qc])
+
   // 进入页面自动跑策略池中的策略，获取命中数
   const runAll = useMutation({
     mutationFn: ({ date, strategyIds }: { date?: string; strategyIds?: string[] } = {}) =>
@@ -240,7 +270,8 @@ export function Screener() {
         counts[id] = item.total
       }
       setHitCounts(prev => ({ ...prev, ...counts }))
-      qc.invalidateQueries({ queryKey: ['screener-cached'] })
+      publishSummary(data.as_of, data.results)
+      void invalidateScreenerDetails()
     },
   })
 
@@ -477,10 +508,26 @@ export function Screener() {
       setResult(data)
       // 同步更新卡片上的命中数
       setHitCounts(prev => ({ ...prev, [vars.id]: data.total }))
-      // 单策略重跑后刷新摘要和当前按需明细，避免参数保存后回退到旧缓存。
-      qc.invalidateQueries({ queryKey: ['screener-cached'] })
+      // 先开放摘要门闩，再刷新明细。若同时广泛失效，当前明细会被摘要的
+      // 短暂旧值禁用，用户会看到结果消失后再出现。
+      publishSummary(data.as_of, {
+        [vars.id]: { total: data.total, as_of: data.as_of },
+      })
+      void invalidateScreenerDetails()
     },
   })
+
+  // 用户在批量补算期间点了一个尚无缓存的策略时先等待批量任务；若批量任务
+  // 失败，再降级为只计算当前策略，避免页面永久停在“点击策略查看”状态。
+  const fallbackRunKeyRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!runAll.isError || !activeStrategy || showAll || assetType !== 'stock' || !asOf) return
+    if (summaryQuery.data?.results[activeStrategy]?.as_of === asOf || run.isPending) return
+    const key = `${assetType}|${asOf}|${activeStrategy}`
+    if (fallbackRunKeyRef.current === key) return
+    fallbackRunKeyRef.current = key
+    run.mutate({ id: activeStrategy, date: asOf })
+  }, [runAll.isError, activeStrategy, showAll, assetType, asOf, summaryQuery.data, run.isPending])
 
   const handleRun = (s: ScreenerStrategy) => {
     handleStrategySwitch(s.id)
@@ -507,6 +554,20 @@ export function Screener() {
 
   const minDate = dataStatus.data?.enriched?.earliest_date ?? ''
   const maxDate = dataStatus.data?.enriched?.latest_date ?? ''
+
+  const hasResolvedView = showAll
+    ? fullCachedQuery.isSuccess && effectiveResults !== null
+    : !!result
+  const viewLoading = !columnsReady
+    || (showAll
+      ? fullCachedQuery.isPending || fullCachedQuery.isFetching
+      : !!activeStrategy && !result && (
+        run.isPending
+        || runAll.isPending
+        || singleCachedQuery.isPending
+        || singleCachedQuery.isFetching
+      ))
+    || (filter.watchlistOnly && watchlistQuery.isPending)
 
 
   // 单只股票加入/移出自选
@@ -751,13 +812,13 @@ export function Screener() {
 
         {/* 结果 */}
         <section>
-          {run.isError && (
+          {(run.isError || runAll.isError) && (
             <div className="text-sm text-danger bg-danger/10 border border-danger/30 rounded-btn px-3 py-2">
-              {String((run.error as any).message)}
+              {String(((run.error ?? runAll.error) as any)?.message ?? '策略计算失败')}
             </div>
           )}
 
-          {(showAll ? allRows.length > 0 : !!result) && (
+          {hasResolvedView && (
             <motion.div
               key={showAll ? `all-${asOf}` : `${result!.as_of}-${result!.strategy}`}
               initial={{ opacity: 0, y: 8 }}
@@ -781,8 +842,8 @@ export function Screener() {
                       <> · 共 {visiblePool.reduce((sum, id) => sum + (hitCounts[id] ?? 0), 0)} 只</>
                     )}
                   </span>
-                  {runAll.isPending && (
-                    <span className="text-[11px] text-muted animate-pulse">扫描中…</span>
+                  {(runAll.isPending || run.isPending || singleCachedQuery.isFetching || fullCachedQuery.isFetching) && (
+                    <span className="text-[11px] text-muted animate-pulse">更新中…</span>
                   )}
                 </h2>
                 <div className="flex items-center gap-3">
@@ -872,13 +933,21 @@ export function Screener() {
               )}
 
               {displayRows.length === 0 ? (
-                <EmptyState
-                  icon={ScanSearch}
-                  title={filterActive(filter) ? '筛选后无命中' : '今日无命中'}
-                  hint={filterActive(filter)
-                    ? '当前筛选条件过严, 试试放宽或重置筛选。'
-                    : '可能数据未跑盘后管道,或策略条件过于严苛。试试 POST /api/pipeline/run。'}
-                />
+                viewLoading ? (
+                  <EmptyState
+                    icon={ScanSearch}
+                    title="正在加载完整结果"
+                    hint="先完成策略明细，再加载自选筛选、日 K 和分时等辅助数据。"
+                  />
+                ) : (
+                  <EmptyState
+                    icon={ScanSearch}
+                    title={filterActive(filter) ? '筛选后无命中' : '今日无命中'}
+                    hint={filterActive(filter)
+                      ? '当前筛选条件过严, 试试放宽或重置筛选。'
+                      : '可能数据未跑盘后管道,或策略条件过于严苛。试试 POST /api/pipeline/run。'}
+                  />
+                )
               ) : (
                 <>
                   <ScreenerTable
@@ -909,7 +978,17 @@ export function Screener() {
             </motion.div>
           )}
 
-          {!showAll && !result && !run.isPending && (
+          {!hasResolvedView && viewLoading && (
+            <div className="flex flex-col items-center justify-center py-16 gap-4">
+              <RefreshCw className="h-7 w-7 text-accent/60 animate-spin" />
+              <div className="flex flex-col items-center gap-1.5">
+                <span className="text-sm text-secondary">正在准备完整策略结果</span>
+                <span className="text-[11px] text-muted">策略与日期 → 缓存摘要 → 当前明细 → 图表辅助数据</span>
+              </div>
+            </div>
+          )}
+
+          {!showAll && !result && !viewLoading && (
             <div className="flex flex-col items-center justify-center py-16 gap-4">
               <div className="w-16 h-16 rounded-2xl bg-accent/5 border border-border flex items-center justify-center">
                 <ScanSearch className="h-7 w-7 text-accent/40" />
