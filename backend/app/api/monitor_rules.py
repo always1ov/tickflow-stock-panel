@@ -8,7 +8,7 @@ from datetime import date
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.strategy import monitor_rules
 from app.strategy.intraday_signals import INTRADAY_SIGNAL_LABELS, uses_intraday_signals
@@ -107,6 +107,10 @@ class RuleModel(BaseModel):
     # ladder 专属 (连板梯队封单监控)
     metric: str = "sealed_vol"   # sealed_vol=封单量(手) | sealed_amount=封单额(元)
     threshold: float = 0         # 封单 <= 此值时报警 (原始单位: 量=手, 额=元)
+    # volume_delta 专属 (轮询放量监控): 相邻两次全市场快照的成交量增量
+    threshold_volume: float = 9000   # 单轮增量 >= 此值(手)时报警
+    threshold_amount: float = 1e6    # metric=amount 时: 单轮增量 >= 此值(元)时报警
+    basic_filter: dict = Field(default_factory=dict)
 
 
 # ── 字段选项 ─────────────────────────────────────────────
@@ -160,6 +164,7 @@ def get_options(request: Request):
             {"key": "strategy", "label": "策略监控"},
             {"key": "abnormal", "label": "异动监控"},
             {"key": "sector", "label": "板块监控"},
+            {"key": "volume_delta", "label": "轮询放量"},
         ],
         "scopes": [
             {"key": "symbols", "label": "指定标的"},

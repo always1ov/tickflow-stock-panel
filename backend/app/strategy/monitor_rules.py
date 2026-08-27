@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 # ── 常量 ────────────────────────────────────────────────
 ID_RE = re.compile(r"^[a-z0-9_]{1,40}$")
-RULE_TYPES = {"strategy", "signal", "price", "market", "ladder", "sector", "abnormal"}
+RULE_TYPES = {"strategy", "signal", "price", "market", "ladder", "sector", "abnormal", "volume_delta"}
 SCOPES = {"symbols", "all", "sector", "watchlist_group"}
 LOGICS = {"and", "or"}
 DIRECTIONS = {"entry", "exit", "both"}
@@ -45,6 +45,16 @@ SECTOR_WINDOWS = {1, 3, 5, 10, 15}
 # abnormal 规则 (异动边缘): 接近度方向 / 关注窗口
 ABNORMAL_DIRECTIONS = {"up", "down", "both"}
 ABNORMAL_WINDOWS = {"any", "3d", "10d", "30d"}
+VD_METRICS = {"volume", "amount"}
+VD_BASIC_FILTER_DEFAULTS: dict = {
+    "price_min": 3,
+    "price_max": 300,
+    "market_cap_min": 10e8,
+    "float_cap_min": None,
+    "float_cap_max": None,
+    "amount_min": 0.2e8,
+    "exclude_st": True,
+}
 
 # 布尔信号列前缀 (op=truth 时 field 取这些)
 _SIGNAL_PREFIXES = ("signal_", "csg_")
@@ -217,6 +227,45 @@ def validate(rule: dict) -> None:
         threshold_pct = rule.get("threshold_pct")
         if not isinstance(threshold_pct, (int, float)) or not 1 <= threshold_pct <= 150:
             raise ValueError("异动接近度阈值必须是 1 到 150 之间的百分比数字")
+    elif rule.get("type") == "volume_delta":
+        if rule.get("asset_type", "stock") != "stock":
+            raise ValueError("轮询放量监控仅支持个股 (依赖全市场股票快照)")
+        if rule.get("scope", "all") == "sector":
+            raise ValueError("轮询放量监控不支持板块作用域")
+        if rule.get("metric", "volume") not in VD_METRICS:
+            raise ValueError(f"metric 必须是 {VD_METRICS} 之一 (volume=手数, amount=金额)")
+        threshold_key = "threshold_amount" if rule.get("metric", "volume") == "amount" else "threshold_volume"
+        threshold = rule.get(threshold_key)
+        if (
+            isinstance(threshold, bool)
+            or not isinstance(threshold, (int, float))
+            or not math.isfinite(threshold)
+            or threshold < 1
+        ):
+            unit = "元" if threshold_key == "threshold_amount" else "手"
+            raise ValueError(f"{threshold_key} 必须是 >=1 的数字 (单轮增量, 单位{unit})")
+        basic_filter = rule.get("basic_filter")
+        if basic_filter is not None:
+            if not isinstance(basic_filter, dict):
+                raise ValueError("basic_filter 必须是对象")
+            numeric_keys = {
+                "price_min", "price_max", "market_cap_min",
+                "float_cap_min", "float_cap_max", "amount_min",
+            }
+            for key, value in basic_filter.items():
+                if key == "exclude_st":
+                    if not isinstance(value, bool):
+                        raise ValueError("basic_filter.exclude_st 必须是布尔值")
+                elif key in numeric_keys:
+                    if value is not None and (
+                        isinstance(value, bool)
+                        or not isinstance(value, (int, float))
+                        or not math.isfinite(value)
+                        or value <= 0
+                    ):
+                        raise ValueError(f"basic_filter.{key} 必须是正数字或 null")
+                else:
+                    raise ValueError(f"basic_filter 不支持字段: {key}")
     else:
         # 信号/价格/市场类型: 需要 conditions
         conds = rule.get("conditions")
@@ -280,8 +329,8 @@ def normalize(rule: dict) -> dict:
     r = dict(rule)
     r.setdefault("enabled", True)
     r.setdefault("asset_type", "stock")
-    # sector/abnormal 默认全市场 (sector 随后强制 all; abnormal 支持指定标的)
-    r.setdefault("scope", "all" if r.get("type") in {"sector", "abnormal"} else "symbols")
+    # sector/abnormal/volume_delta 默认全市场
+    r.setdefault("scope", "all" if r.get("type") in {"sector", "abnormal", "volume_delta"} else "symbols")
     r.setdefault("symbols", [])
     r.setdefault("group_id", None)
     # watchlist_group 作用域: 成员动态来自分组, symbols 不参与; 其他作用域清掉残留 group_id
@@ -317,6 +366,11 @@ def normalize(rule: dict) -> dict:
     # ladder 专属默认字段
     r.setdefault("metric", "sealed_vol")
     r.setdefault("threshold", 0)
+    if r.get("type") == "volume_delta":
+        r["metric"] = r["metric"] if r.get("metric") in VD_METRICS else "volume"
+        r.setdefault("threshold_volume", 9000)
+        r.setdefault("threshold_amount", 1e6)
+        r["basic_filter"] = {**VD_BASIC_FILTER_DEFAULTS, **(r.get("basic_filter") or {})}
     if r.get("type") == "sector":
         r["scope"] = "all"
         r["symbols"] = []
@@ -324,7 +378,7 @@ def normalize(rule: dict) -> dict:
     # abnormal 专属默认字段 (异动边缘监控)
     r.setdefault("abnormal_window", "any")
     r.setdefault("logic", "and")
-    r.setdefault("cooldown_seconds", 3600)
+    r.setdefault("cooldown_seconds", 300 if r.get("type") == "volume_delta" else 3600)
     r.setdefault("severity", "info")
     r.setdefault("message", "")
     r.setdefault("webhook_url", "")

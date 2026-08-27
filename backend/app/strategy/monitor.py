@@ -47,6 +47,7 @@ _SIGNAL_CN: dict[str, str] = {
     "close": "收盘价", "open": "开盘价", "high": "最高价", "low": "最低价",
     "change_pct": "涨跌幅", "change_amount": "涨跌额", "amplitude": "振幅",
     "turnover_rate": "换手率", "volume": "成交量", "amount": "成交额",
+    "_volume_delta": "轮询成交量差值(手)",
     # 均线
     "ma5": "MA5", "ma10": "MA10", "ma20": "MA20", "ma30": "MA30", "ma60": "MA60",
     "ema5": "EMA5", "ema10": "EMA10", "ema20": "EMA20",
@@ -427,6 +428,10 @@ class MonitorRuleEngine:
             rule.get("threshold_pct"),
             rule.get("window_minutes"),
             rule.get("abnormal_window"),
+            rule.get("metric"),
+            rule.get("threshold_volume"),
+            rule.get("threshold_amount"),
+            tuple(sorted((str(key), repr(value)) for key, value in (rule.get("basic_filter") or {}).items())),
         )
 
     def set_rules(self, rules: list[dict]) -> None:
@@ -983,6 +988,8 @@ class MonitorRuleEngine:
         elif rtype == "ladder":
             # 连板梯队封单监控: 独立处理 (需带预警封单值, 走专属 message)
             return self._evaluate_ladder(scoped, rule, now)
+        elif rtype == "volume_delta":
+            return self._evaluate_volume_delta(scoped, rule, now)
         else:
             # signal / price / market: 通用条件匹配
             for sym, name, price, pct, hit_sigs in self._match_conditions(scoped, rule):
@@ -1363,6 +1370,138 @@ class MonitorRuleEngine:
             ]
             results.append((sym, name, price, pct, hit_sigs))
         return results
+
+    @staticmethod
+    def _volume_delta_basic_mask(df: pl.DataFrame, basic_filter: dict, name_map: dict[str, str]) -> pl.Expr | None:
+        """构建轮询放量的价格、市值、成交额与 ST 基础过滤条件。"""
+        masks: list[pl.Expr] = []
+        if basic_filter.get("price_min") is not None:
+            masks.append(pl.col("close") >= float(basic_filter["price_min"]))
+        if basic_filter.get("price_max") is not None:
+            masks.append(pl.col("close") <= float(basic_filter["price_max"]))
+        if basic_filter.get("amount_min") is not None and "amount" in df.columns:
+            masks.append(pl.col("amount") >= float(basic_filter["amount_min"]))
+        elif basic_filter.get("amount_min") is not None:
+            masks.append(pl.lit(False))
+        if basic_filter.get("market_cap_min") is not None and "total_shares" in df.columns:
+            masks.append(
+                (pl.col("close") * pl.col("total_shares")) >= float(basic_filter["market_cap_min"])
+            )
+        elif basic_filter.get("market_cap_min") is not None:
+            masks.append(pl.lit(False))
+        if basic_filter.get("float_cap_min") is not None and "float_shares" in df.columns:
+            masks.append(
+                (pl.col("close") * pl.col("float_shares")) >= float(basic_filter["float_cap_min"])
+            )
+        elif basic_filter.get("float_cap_min") is not None:
+            masks.append(pl.lit(False))
+        if basic_filter.get("float_cap_max") is not None and "float_shares" in df.columns:
+            masks.append(
+                (pl.col("close") * pl.col("float_shares")) <= float(basic_filter["float_cap_max"])
+            )
+        elif basic_filter.get("float_cap_max") is not None:
+            masks.append(pl.lit(False))
+        if basic_filter.get("exclude_st") and name_map:
+            st_symbols = [
+                symbol for symbol, name in name_map.items()
+                if name and "ST" in str(name).upper()
+            ]
+            if st_symbols:
+                masks.append(~pl.col("symbol").is_in(st_symbols))
+        return pl.all_horizontal(masks) if masks else None
+
+    def _evaluate_volume_delta(self, scoped: pl.DataFrame, rule: dict, now: float) -> list[dict]:
+        """评估相邻两次全市场快照的成交量或成交额增量。"""
+        if "_volume_delta" not in scoped.columns:
+            return []
+
+        metric = rule.get("metric", "volume")
+        if metric == "amount":
+            if "_volume_delta_amount" not in scoped.columns:
+                return []
+            compare_column = "_volume_delta_amount"
+            threshold = rule.get("threshold_amount", 1e6)
+            threshold_text = f"{threshold / 1e4:,.0f} 万元"
+        else:
+            compare_column = "_volume_delta"
+            threshold = rule.get("threshold_volume", 9000)
+            threshold_text = f"{threshold:,.0f} 手"
+
+        candidate = scoped
+        basic_filter = rule.get("basic_filter") or {}
+        mask = self._volume_delta_basic_mask(candidate, basic_filter, self._name_map)
+        if mask is not None:
+            candidate = candidate.filter(mask)
+        hit = candidate.filter(
+            pl.col(compare_column).is_not_null() & (pl.col(compare_column) >= threshold)
+        ).sort(compare_column, descending=True)
+        if hit.is_empty():
+            return []
+
+        span_s = 0.0
+        if "_volume_delta_span" in hit.columns:
+            raw_span = hit["_volume_delta_span"][0]
+            span_s = float(raw_span) if raw_span is not None else 0.0
+        span_text = f" (间隔 {span_s:.0f}s)" if span_s > 0 else ""
+        cooldown = rule.get("cooldown_seconds", 300)
+        severity = rule.get("severity", "warn")
+        hit_rows = list(hit.iter_rows(named=True))
+
+        def name_of(row: dict) -> str:
+            symbol = str(row.get("symbol") or "")
+            return str(row.get("name") or self._name_map.get(symbol) or symbol)
+
+        def format_delta(value: float) -> str:
+            return f"{value / 1e4:,.0f} 万元" if metric == "amount" else f"{value:,.0f} 手"
+
+        def event_for(row: dict, message: str) -> dict:
+            symbol = str(row.get("symbol") or "")
+            return {
+                "ts": int(now * 1000),
+                "rule_id": rule["id"],
+                "rule_name": rule.get("name", ""),
+                "source": "volume_delta",
+                "type": "轮询放量",
+                "symbol": symbol,
+                "name": name_of(row) if symbol else "",
+                "message": message,
+                "price": row.get("close"),
+                "change_pct": row.get("change_pct"),
+                "signals": [],
+                "severity": severity,
+                "conditions": [],
+                "logic": "and",
+                "volume_delta": row.get("_volume_delta"),
+                "volume_delta_amount": row.get("_volume_delta_amount"),
+                "volume_delta_span": round(span_s, 1),
+            }
+
+        if len(hit_rows) > 5:
+            key = (rule["id"], "_volume_delta_batch", "volume_delta")
+            last = self._last_fire.get(key)
+            if last is not None and (now - last) < cooldown:
+                return []
+            self._last_fire[key] = now
+            names = "、".join(name_of(row) for row in hit_rows[:8])
+            suffix = "等" if len(hit_rows) > 8 else ""
+            message = (
+                f"放量 · 单轮增量 >= {threshold_text}{span_text} · "
+                f"共 {len(hit_rows)} 只: {names}{suffix}"
+            )
+            return [event_for({}, message)]
+
+        events: list[dict] = []
+        for row in hit_rows:
+            symbol = str(row.get("symbol") or "")
+            key = (rule["id"], symbol, "volume_delta")
+            last = self._last_fire.get(key)
+            if last is not None and (now - last) < cooldown:
+                continue
+            self._last_fire[key] = now
+            delta = float(row[compare_column])
+            message = f"放量 · 单轮增量 {format_delta(delta)} >= {threshold_text}{span_text}"
+            events.append(event_for(row, message))
+        return events
 
     def _evaluate_ladder(self, scoped: pl.DataFrame, rule: dict, now: float) -> list[dict]:
         """评估连板梯队封单监控规则。
