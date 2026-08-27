@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 36605)
-Total output lines: 4273
-
 // 后端 API 客户端 — 全项目统一入口
 //
 // Dev: Vite 按启动脚本解析出的 BACKEND_HOST/BACKEND_PORT 代理 /api
@@ -2112,7 +2109,628 @@ export interface PluginKeyResult {
   reason?: string
   error?: string
   api_key_masked?: string
-  plugin_available?…6605 tokens truncated…lineMinuteRange: (symbol: string, days = 10) =>
+  plugin_available?: boolean
+  plugin?: PluginDataSourceItem | null
+}
+
+export interface DatasetConfig {
+  url: string
+  method: string
+  batch?: number | null
+  rpm?: number | null
+  response_path: string
+  field_map: Record<string, string>
+  transforms?: Record<string, string>
+  symbols_param?: string
+  start_param?: string
+  end_param?: string
+  asset_type_param?: string | null
+  freq_param?: string | null
+  timeout?: number | null
+}
+
+export interface AuthConfig {
+  type: string
+  token_env?: string | null
+  header?: string
+  param?: string
+}
+
+export interface CustomSourceConfig {
+  name: string
+  display_name: string
+  auth: AuthConfig
+  datasets: Record<string, DatasetConfig>
+}
+
+export interface WecomBotStatus {
+  enabled: boolean
+  running: boolean
+  connected: boolean
+  bot_id_configured: boolean
+  secret_configured: boolean
+  last_error: string
+}
+
+export interface Preferences {
+  realtime_quotes_enabled: boolean
+  indices_nav_pinned: boolean
+  watchlist_groups_in_nav: boolean
+  minute_sync_enabled: boolean
+  minute_sync_days: number
+  minute_sync_segment_days: number
+  daily_data_provider?: string
+  adj_factor_provider?: string
+  minute_data_provider?: string
+  realtime_data_provider?: string
+  financial_data_provider?: string
+  data_source_job_timeout_s: number
+  data_source_long_job_timeout_s: number
+  realtime_watchlist_symbols?: string[]
+  realtime_pull_stock?: boolean
+  realtime_pull_etf?: boolean
+  realtime_pull_index?: boolean
+  realtime_index_mode?: 'core' | 'all'
+  realtime_index_symbols?: string[]
+  pipeline_pull_a_share: boolean
+  pipeline_pull_etf: boolean
+  pipeline_pull_index: boolean
+  pipeline_regime_enabled: boolean
+  regime_batch_days: number
+  regime_warmup_days: number
+  pipeline_index_symbols: string
+  pipeline_schedule: { hour: number; minute: number }
+  instruments_schedule: { hour: number; minute: number }
+  enriched_batch_size: number
+  index_daily_batch_size: number
+  limit_ladder_monitor_enabled: boolean
+  depth_polling_interval: number
+  depth_finalize_time: { hour: number; minute: number }
+  review_schedule: { enabled: boolean; hour: number; minute: number }
+  review_push_channels: string[]
+  sse_refresh_pages: Record<string, boolean>
+  strategy_monitor_enabled: boolean
+  strategy_monitor_ids: string[]
+  system_notify_enabled: boolean
+  feishu_webhook_url?: string
+  feishu_webhook_secret?: string
+  wecom_webhook_url?: string
+  dingtalk_webhook_url?: string
+  dingtalk_keyword?: string
+  wecom_bot_id?: string
+  wecom_bot_secret?: string
+  wecom_bot_enabled?: boolean
+  webhook_enabled_default?: boolean
+  webhook_default_channels?: string[]
+  sidebar_index_symbols: string[]
+  nav_order: string[]
+  nav_hidden: string[]
+  screener_auto_run: boolean
+  minute_intraday_refresh: boolean
+  minute_intraday_refresh_interval: number
+  monitor_ext_fields: { concept: MonitorExtFieldItem | null; industry: MonitorExtFieldItem | null }
+}
+
+/** 监控中心 ext 字段单项配置 (行业/概念标签的来源 + 显示裁剪) */
+export interface MonitorExtFieldItem {
+  /** "configId.fieldName" */
+  field: string
+  /** 显示前N个标签, 0=不限制 */
+  maxTags?: number
+  /** 隐藏的位置 (0-based), 如 [0] 表示隐藏第一个 */
+  hiddenIndices?: number[]
+}
+export interface StrategyAlertEvent {
+  source: 'strategy' | 'depth'
+  type: string
+  strategy_id?: string
+  symbol?: string
+  name?: string | null
+  message: string
+  price?: number | null
+  change_pct?: number | null
+  signals?: string[]
+  /** ext 富化字段 (行业/概念等), 键为 "{configId}__{fieldName}" */
+  [key: string]: unknown
+}
+
+// ===== API surface =====
+export const api = {
+  health: () => request<{ status: string; version: string; mode: string }>('/health'),
+
+  // ===== Auth (访问认证) =====
+  authStatus: () =>
+    request<{ configured: boolean; authenticated: boolean }>('/api/auth/status'),
+  authSetup: (password: string) =>
+    request<{ ok: boolean }>('/api/auth/setup', {
+      method: 'POST',
+      body: JSON.stringify({ password }),
+    }),
+  authLogin: (password: string) =>
+    request<{ ok: boolean }>('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ password }),
+    }),
+  authLogout: () =>
+    request<{ ok: boolean }>('/api/auth/logout', { method: 'POST' }),
+  authChangePassword: (oldPassword: string, newPassword: string) =>
+    request<{ ok: boolean }>('/api/auth/change-password', {
+      method: 'POST',
+      body: JSON.stringify({ old_password: oldPassword, new_password: newPassword }),
+    }),
+
+  settings: () => request<SettingsState>('/api/settings'),
+  saveTickflowKey: (api_key: string) =>
+    request<SaveTickflowKeyResult>('/api/settings/tickflow-key', {
+      method: 'POST',
+      body: JSON.stringify({ api_key }),
+    }),
+  clearTickflowKey: () =>
+    request<any>('/api/settings/tickflow-key', { method: 'DELETE' }),
+
+  /** 标记首次使用向导完成（持久化到后端 preferences） */
+  completeOnboarding: () =>
+    request<{ ok: boolean; onboarding_completed: boolean }>(
+      '/api/settings/onboarding/complete', { method: 'POST' },
+    ),
+
+  // ===== [R59] AI 操盘手 =====
+  paperTraders: () =>
+    request<{ traders: PaperTrader[] }>('/api/paper-trading/traders'),
+
+  paperBook: (id: string, scope: PaperScope) =>
+    request<PaperBookDetail>(
+      `/api/paper-trading/traders/${encodeURIComponent(id)}/books/${scope}`),
+
+  paperTraderCreate: (body: {
+    name: string; profile_id: string; capital: number; max_positions: number
+  }) =>
+    request<PaperTrader>('/api/paper-trading/traders', {
+      method: 'POST', body: JSON.stringify(body),
+    }),
+
+  /** 让这一本账按今天的信息做一次决策 */
+  paperBookRun: (id: string, scope: PaperScope) =>
+    request<{
+      date: string; scope: PaperScope; orders: PaperOrder[]; note: string
+      /** [R65] 它这一轮要求细看的几只 */
+      focus?: string[]
+      /** [R66] 它认为信号旧了、要求现场重出的几只 */
+      refreshed?: { symbol: string; ok: boolean; error: string }[]
+      raw: string
+    }>(
+      `/api/paper-trading/traders/${encodeURIComponent(id)}/books/${scope}/run`, { method: 'POST' }),
+
+  /** [R61] 生命线检查 —— 不问 AI, 也是全流程唯一用实时价的地方 */
+  paperBookLifeline: (id: string, scope: PaperScope) =>
+    request<{ forced: PaperOrder[]; count: number }>(
+      `/api/paper-trading/traders/${encodeURIComponent(id)}/books/${scope}/lifeline`,
+      { method: 'POST' }),
+
+  /** [R63] 操作员级设置(持仓只数上限对两本账一视同仁) */
+  paperTraderSettings: (id: string, maxPositions: number) =>
+    request<{ ok: boolean; max_positions: number }>(
+      `/api/paper-trading/traders/${encodeURIComponent(id)}/settings`,
+      { method: 'PUT', body: JSON.stringify({ max_positions: maxPositions }) }),
+
+  /** [R63] 改单本账的本金。会把这本账一并重置 —— 分母变了历史就读不懂了 */
+  paperBookCapital: (id: string, scope: PaperScope, capital: number) =>
+    request<{ ok: boolean; scope: PaperScope; initial_capital: number }>(
+      `/api/paper-trading/traders/${encodeURIComponent(id)}/books/${scope}/capital`,
+      { method: 'PUT', body: JSON.stringify({ initial_capital: capital }) }),
+
+  paperTraderSchedule: (id: string, s: PaperSchedule) =>
+    request<{ ok: boolean; schedule: PaperSchedule }>(
+      `/api/paper-trading/traders/${encodeURIComponent(id)}/schedule`,
+      { method: 'PUT', body: JSON.stringify(s) }),
+
+  /** 不给 scope 就是两本账一起重置 */
+  paperTraderReset: (id: string, scope?: PaperScope) =>
+    request<{ ok: boolean }>(
+      `/api/paper-trading/traders/${encodeURIComponent(id)}/reset${scope ? `?scope=${scope}` : ''}`,
+      { method: 'POST' }),
+
+  paperTraderDelete: (id: string) =>
+    request<{ deleted: string }>(`/api/paper-trading/traders/${encodeURIComponent(id)}`,
+      { method: 'DELETE' }),
+
+  /** 看一眼这本账这次会拿到什么 —— 判断"系统给的信息够不够"得先看清给了什么 */
+  paperBookContext: (id: string, scope: PaperScope) =>
+    request<{ context: string; system_prompt: string }>(
+      `/api/paper-trading/traders/${encodeURIComponent(id)}/books/${scope}/context`),
+
+  /** [R56] 多 AI 档位: 列表顺序即优先级, 前面的先用, 用不了顺位往下 */
+  aiProfiles: () =>
+    request<{ profiles: AiProfile[] }>('/api/settings/ai/profiles'),
+
+  saveAiProfiles: (profiles: AiProfile[]) =>
+    request<{ ok: boolean; profiles: AiProfile[] }>('/api/settings/ai/profiles', {
+      method: 'PUT', body: JSON.stringify({ profiles }),
+    }),
+
+  /** [R58] 逐个列出数据源 key(明文)。多 key 填在同一字段里, 只看脱敏串分不出哪个失效 */
+  tickflowKeys: () =>
+    request<{ keys: TickflowKeyRow[]; total: number }>('/api/settings/tickflow-keys'),
+
+  /** 逐个验活 —— 真打一次接口。串行跑, 并发会把活的 key 也打成限流 */
+  probeTickflowKeys: () =>
+    request<{ keys: TickflowKeyRow[]; total: number; alive: number }>(
+      '/api/settings/tickflow-keys/probe', { method: 'POST' }),
+
+  saveTickflowKeys: (keys: string[]) =>
+    request<{ ok: boolean; total: number; tier_label: string }>('/api/settings/tickflow-keys', {
+      method: 'PUT', body: JSON.stringify({ keys }),
+    }),
+
+  saveAiSettings: (ai: { provider?: string; base_url?: string; api_key?: string; model?: string; reasoning_effort?: string; codex_command?: string; codex_reasoning_effort?: string; user_agent?: string; max_output_tokens?: number; context_window?: number }) =>
+    request<{ ok: boolean; ai_provider?: string; ai_model?: string; ai_openai_model?: string; ai_reasoning_effort?: string; ai_codex_model?: string; ai_codex_command?: string; ai_codex_reasoning_effort?: string; ai_configured?: boolean; ai_max_output_tokens?: number; ai_context_window?: number }>('/api/settings/ai', {
+      method: 'POST',
+      body: JSON.stringify(ai),
+    }),
+
+  /** 一键清空 AI 配置(保留自定义 UA) */
+  clearAiSettings: () =>
+    request<{ ok: boolean }>('/api/settings/ai', { method: 'DELETE' }),
+
+  preferences: () => request<Preferences>('/api/settings/preferences'),
+  dataSources: () => request<DataSourcesResponse>('/api/settings/data-sources'),
+  dataSource: (name: string) => request<CustomSourceConfig>(`/api/settings/data-sources/${encodeURIComponent(name)}`),
+  saveDataSource: (config: CustomSourceConfig) =>
+    request<DataSourcesResponse>('/api/settings/data-sources', {
+      method: 'POST',
+      body: JSON.stringify(config),
+    }),
+  deleteDataSource: (name: string) =>
+    request<DataSourcesResponse>(`/api/settings/data-sources/${encodeURIComponent(name)}`, { method: 'DELETE' }),
+  reloadDataSources: () => request<DataSourcesResponse>('/api/settings/data-sources/reload', { method: 'POST' }),
+  installPlugin: (name: string) => {
+    // npm install 可能耗时较长, 用 6 分钟超时
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 360_000)
+    return request<DataSourcesResponse & { install_ok: boolean; install_message: string }>(
+      `/api/settings/plugins/${encodeURIComponent(name)}/install`,
+      { method: 'POST', signal: controller.signal },
+    ).finally(() => clearTimeout(timer))
+  },
+  uninstallPlugin: (name: string) =>
+    request<DataSourcesResponse & { uninstall_ok: boolean; uninstall_message: string }>(
+      `/api/settings/plugins/${encodeURIComponent(name)}/install`,
+      { method: 'DELETE' },
+    ),
+  savePluginKey: (plugin: string, apiKey: string) => {
+    // 先探后存: 后端会用候选 Key 实探一次, 探测超时 10s + 余量
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 30_000)
+    return request<PluginKeyResult>('/api/settings/plugin-key', {
+      method: 'POST',
+      body: JSON.stringify({ plugin, api_key: apiKey }),
+      signal: controller.signal,
+    }).finally(() => clearTimeout(timer))
+  },
+  clearPluginKey: (plugin: string) =>
+    request<PluginKeyResult>(`/api/settings/plugin-key/${encodeURIComponent(plugin)}`, { method: 'DELETE' }),
+  testDataSource: (
+    provider: string,
+    dataset: string,
+    symbols?: string[],
+    config?: CustomSourceConfig,
+  ) =>
+    request<DataSourceTestResult>('/api/settings/data-sources/test', {
+      method: 'POST',
+      body: JSON.stringify({ provider, dataset, symbols, config }),
+    }),
+  updateDataProviders: (cfg: Partial<Pick<Preferences, 'daily_data_provider' | 'adj_factor_provider' | 'minute_data_provider' | 'realtime_data_provider' | 'financial_data_provider'>>) =>
+    request<Pick<Preferences, 'daily_data_provider' | 'adj_factor_provider' | 'minute_data_provider' | 'realtime_data_provider'>>(
+      '/api/settings/preferences/data-providers',
+      { method: 'PUT', body: JSON.stringify(cfg) },
+    ),
+  updateDataSourceJobTimeouts: (dataSourceJobTimeoutS: number, dataSourceLongJobTimeoutS: number) =>
+    request<Pick<Preferences, 'data_source_job_timeout_s' | 'data_source_long_job_timeout_s'>>(
+      '/api/settings/preferences/data-source-job-timeouts',
+      {
+        method: 'PUT',
+        body: JSON.stringify({
+          data_source_job_timeout_s: dataSourceJobTimeoutS,
+          data_source_long_job_timeout_s: dataSourceLongJobTimeoutS,
+        }),
+      },
+    ),
+  updateMinuteSync: (enabled: boolean, days: number, segmentDays?: number) =>
+    request<Preferences>('/api/settings/preferences/minute-sync', {
+      method: 'PUT',
+      body: JSON.stringify({
+        minute_sync_enabled: enabled,
+        minute_sync_days: days,
+        ...(segmentDays != null ? { minute_sync_segment_days: segmentDays } : {}),
+      }),
+    }),
+  updatePipelinePullTypes: (cfg: Partial<Pick<Preferences, 'pipeline_pull_a_share' | 'pipeline_pull_etf' | 'pipeline_pull_index'>>) =>
+    request<{
+      pipeline_pull_a_share: boolean
+      pipeline_pull_etf: boolean
+      pipeline_pull_index: boolean
+    }>('/api/settings/preferences/pipeline-pull-types', {
+      method: 'PUT',
+      body: JSON.stringify(cfg),
+    }),
+  updatePipelineRegimeEnabled: (enabled: boolean) =>
+    request<{ pipeline_regime_enabled: boolean }>('/api/settings/preferences/pipeline-regime-enabled', {
+      method: 'PUT',
+      body: JSON.stringify({ pipeline_regime_enabled: enabled }),
+    }),
+  updateRegimeBatchParams: (params: { batch_days?: number; warmup_days?: number }) =>
+    request<{ regime_batch_days: number; regime_warmup_days: number }>('/api/settings/preferences/regime-batch-params', {
+      method: 'PUT',
+      body: JSON.stringify(params),
+    }),
+  updatePipelineIndexSymbols: (symbols: string) =>
+    request<{ pipeline_index_symbols: string }>('/api/settings/preferences/pipeline-index-symbols', {
+      method: 'PUT',
+      body: JSON.stringify({ symbols }),
+    }),
+  updateRealtimeQuotes: (enabled: boolean) =>
+    request<{ realtime_quotes_enabled: boolean; realtime_allowed?: boolean; mode?: string; error?: string }>('/api/settings/preferences/realtime-quotes', {
+      method: 'PUT',
+      body: JSON.stringify({ realtime_quotes_enabled: enabled }),
+    }),
+  updateRealtimeQuoteScope: (cfg: Partial<Pick<Preferences, 'realtime_pull_stock' | 'realtime_pull_etf' | 'realtime_pull_index' | 'realtime_index_mode' | 'realtime_index_symbols'>>) =>
+    request<Partial<Preferences>>('/api/settings/preferences/realtime-quote-scope', {
+      method: 'PUT',
+      body: JSON.stringify(cfg),
+    }),
+  updateIndicesNavPinned: (pinned: boolean) =>
+    request<{ indices_nav_pinned: boolean }>('/api/settings/preferences/indices-nav-pinned', {
+      method: 'PUT',
+      body: JSON.stringify({ indices_nav_pinned: pinned }),
+    }),
+  updateWatchlistGroupsInNav: (enabled: boolean) =>
+    request<{ watchlist_groups_in_nav: boolean }>('/api/settings/preferences/watchlist-groups-in-nav', {
+      method: 'PUT',
+      body: JSON.stringify({ watchlist_groups_in_nav: enabled }),
+    }),
+  quoteStatus: () =>
+    request<{
+      enabled: boolean
+      running: boolean
+      paused?: boolean
+      mode?: 'none' | 'watchlist' | 'full_market'
+      realtime_allowed?: boolean
+      interval_s: number
+      symbol_count: number
+      watchlist_symbol_count?: number
+      index_symbol_count?: number
+      etf_symbol_count?: number
+      quote_age_ms: number | null
+      is_trading_hours: boolean
+      is_polling_window?: boolean
+      market_phase?: string
+      final_sync_done?: boolean
+      final_sync_failed?: string | null
+      last_fetch_ms: number | null
+    }>('/api/intraday/status'),
+  quoteInterval: () =>
+    request<{ interval: number; min_interval: number; max_interval: number }>(
+      '/api/settings/preferences/quote-interval',
+    ),
+  updateQuoteInterval: (interval: number) =>
+    request<{ interval: number; min_interval: number; max_interval: number }>(
+      '/api/settings/preferences/quote-interval',
+      { method: 'PUT', body: JSON.stringify({ interval }) },
+    ),
+  intradayRefresh: () => request<{ status: string }>('/api/intraday/refresh', { method: 'POST' }),
+  indexQuotes: (symbols?: string[]) =>
+    request<{ rows: IndexQuote[]; count: number }>(
+      `/api/intraday/indices${symbols?.length ? `?symbols=${encodeURIComponent(symbols.join(','))}` : ''}`,
+    ),
+  updateRealtimeMonitorConfig: (cfg: {
+    sse_refresh_pages?: Record<string, boolean>
+    strategy_monitor_enabled?: boolean
+    strategy_monitor_ids?: string[]
+    sidebar_index_symbols?: string[]
+    screener_auto_run?: boolean
+    minute_intraday_refresh?: boolean
+    minute_intraday_refresh_interval?: number
+    monitor_ext_fields?: { concept: MonitorExtFieldItem | null; industry: MonitorExtFieldItem | null }
+  }) =>
+    request<{
+      sse_refresh_pages: Record<string, boolean>
+      strategy_monitor_enabled: boolean
+      strategy_monitor_ids: string[]
+      sidebar_index_symbols: string[]
+      screener_auto_run: boolean
+      minute_intraday_refresh: boolean
+      minute_intraday_refresh_interval: number
+      monitor_ext_fields: { concept: MonitorExtFieldItem | null; industry: MonitorExtFieldItem | null }
+    }>('/api/settings/preferences/realtime-monitor', {
+      method: 'PUT',
+      body: JSON.stringify(cfg),
+    }),
+  updateSystemNotify: (enabled: boolean) =>
+    request<{ system_notify_enabled: boolean }>('/api/settings/preferences/system-notify', {
+      method: 'PUT',
+      body: JSON.stringify({ enabled }),
+    }),
+  updateFeishuWebhook: (url: string, secret: string = '') =>
+    request<{ feishu_webhook_url: string; feishu_webhook_secret: string }>('/api/settings/preferences/feishu-webhook', {
+      method: 'PUT',
+      body: JSON.stringify({ url, secret }),
+    }),
+  updateWecomWebhook: (url: string) =>
+    request<{ wecom_webhook_url: string }>('/api/settings/preferences/wecom-webhook', {
+      method: 'PUT',
+      body: JSON.stringify({ url }),
+    }),
+  updateDingtalkWebhook: (url: string, keyword: string = '') =>
+    request<{ dingtalk_webhook_url: string; dingtalk_keyword: string }>('/api/settings/preferences/dingtalk-webhook', {
+      method: 'PUT',
+      body: JSON.stringify({ url, keyword }),
+    }),
+  testWebhook: (channel: 'feishu' | 'wecom' | 'dingtalk') =>
+    request<{ ok: boolean; channel: string }>('/api/settings/preferences/webhook-test', {
+      method: 'POST',
+      body: JSON.stringify({ channel }),
+    }),
+  updateWecomBot: (botId: string, secret: string, enabled: boolean = true) =>
+    request<{
+      wecom_bot_id: string
+      wecom_bot_secret: string
+      wecom_bot_enabled: boolean
+      wecom_bot_status: WecomBotStatus
+    }>('/api/settings/preferences/wecom-bot', {
+      method: 'PUT',
+      body: JSON.stringify({ bot_id: botId, secret, enabled }),
+    }),
+  toggleWecomBot: (enabled: boolean) =>
+    request<{ wecom_bot_enabled: boolean; wecom_bot_status: WecomBotStatus }>('/api/settings/preferences/wecom-bot-toggle', {
+      method: 'PUT',
+      body: JSON.stringify({ enabled }),
+    }),
+  updateWebhookDefault: (enabled: boolean) =>
+    request<{ webhook_enabled_default: boolean }>('/api/settings/preferences/webhook-enabled-default', {
+      method: 'PUT',
+      body: JSON.stringify({ enabled }),
+    }),
+  updateWebhookDefaultChannels: (channels: string[]) =>
+    request<{ webhook_default_channels: string[] }>('/api/settings/preferences/webhook-default-channels', {
+      method: 'PUT',
+      body: JSON.stringify({ channels }),
+    }),
+  updatePipelineSchedule: (hour: number, minute: number) =>
+    request<{ hour: number; minute: number }>('/api/settings/preferences/pipeline-schedule', {
+      method: 'PUT',
+      body: JSON.stringify({ hour, minute }),
+    }),
+  updateReviewSchedule: (enabled: boolean, hour: number, minute: number) =>
+    request<{ enabled: boolean; hour: number; minute: number }>('/api/settings/preferences/review-schedule', {
+      method: 'PUT',
+      body: JSON.stringify({ enabled, hour, minute }),
+    }),
+  updateReviewPush: (channels: string[]) =>
+    request<{ review_push_channels: string[] }>('/api/settings/preferences/review-push', {
+      method: 'PUT',
+      body: JSON.stringify({ channels }),
+    }),
+  updateDepthPollingInterval: (interval: number) =>
+    request<{ depth_polling_interval: number }>('/api/settings/preferences/depth-polling-interval', {
+      method: 'PUT',
+      body: JSON.stringify({ interval }),
+    }),
+  updateLimitLadderMonitor: (enabled: boolean) =>
+    request<{ limit_ladder_monitor_enabled: boolean }>('/api/settings/preferences/limit-ladder-monitor', {
+      method: 'PUT',
+      body: JSON.stringify({ enabled }),
+    }),
+  runLimitLadderFix: () =>
+    request<{ ok: boolean; count: number; msg: string }>('/api/settings/preferences/limit-ladder-monitor/run', {
+      method: 'POST',
+    }),
+  updateDepthFinalizeTime: (hour: number, minute: number) =>
+    request<{ hour: number; minute: number }>('/api/settings/preferences/depth-finalize-time', {
+      method: 'PUT',
+      body: JSON.stringify({ hour, minute }),
+    }),
+  saveNavOrder: (nav_order: string[]) =>
+    request<{ nav_order: string[] }>('/api/settings/preferences/nav-order', {
+      method: 'PUT',
+      body: JSON.stringify({ nav_order }),
+    }),
+  saveNavHidden: (nav_hidden: string[]) =>
+    request<{ nav_hidden: string[] }>('/api/settings/preferences/nav-hidden', {
+      method: 'PUT',
+      body: JSON.stringify({ nav_hidden }),
+    }),
+  updateInstrumentsSchedule: (hour: number, minute: number) =>
+    request<{ hour: number; minute: number }>('/api/settings/preferences/instruments-schedule', {
+      method: 'PUT',
+      body: JSON.stringify({ hour, minute }),
+    }),
+  updateEnrichedBatchSize: (size: number) =>
+    request<{ enriched_batch_size: number }>('/api/settings/preferences/enriched-batch-size', {
+      method: 'PUT',
+      body: JSON.stringify({ size }),
+    }),
+  updateIndexDailyBatchSize: (size: number) =>
+    request<{ index_daily_batch_size: number }>('/api/settings/preferences/index-daily-batch-size', {
+      method: 'PUT',
+      body: JSON.stringify({ size }),
+    }),
+
+  // 自选列表列配置
+  watchlistColumns: () =>
+    request<{ columns: any[] | null }>('/api/settings/preferences/watchlist-columns'),
+  updateWatchlistColumns: (columns: any[]) =>
+    request<{ columns: any[] }>('/api/settings/preferences/watchlist-columns', {
+      method: 'PUT',
+      body: JSON.stringify({ columns }),
+    }),
+
+  // 策略结果列表列配置
+  screenerResultColumns: () =>
+    request<{ columns: any[] | null }>('/api/settings/preferences/screener-result-columns'),
+  updateScreenerResultColumns: (columns: any[]) =>
+    request<{ columns: any[] }>('/api/settings/preferences/screener-result-columns', {
+      method: 'PUT',
+      body: JSON.stringify({ columns }),
+    }),
+
+  capabilities: () => request<CapabilitiesResponse>('/api/capabilities'),
+  version: () => request<{ version: string }>('/api/data/version'),
+  redetectCapabilities: () =>
+    request<CapabilitiesResponse>('/api/capabilities/redetect', { method: 'POST' }),
+
+  klineDaily: (symbol: string, days = 120, dateRange?: { start: string; end: string }, extColumns?: string, opts?: { refreshLive?: boolean }) =>
+    request<{
+      symbol: string
+      name?: string
+      stock_info?: { name?: string; total_shares?: number; float_shares?: number; ext?: Record<string, unknown> }
+      rows: KlineRow[]
+      source?: string
+      /** [R76] refreshLive 时返回: started=后台在拉(稍后再取一次) / fresh=已是新的 / off=没 key */
+      live_refresh?: 'started' | 'fresh' | 'off'
+    }>(
+      (dateRange
+        ? `/api/kline/daily?symbol=${encodeURIComponent(symbol)}&start_date=${dateRange.start}&end_date=${dateRange.end}`
+        : `/api/kline/daily?symbol=${encodeURIComponent(symbol)}&days=${days}`)
+      + (extColumns ? `&ext_columns=${encodeURIComponent(extColumns)}` : '')
+      // [R74] 服务端先现拉一次该票实时(15s 冷却)再返回 —— 弹窗"点开就是最新"
+      + (opts?.refreshLive ? '&refresh_live=1' : ''),
+    ),
+  klineDailyBatch: (symbols: string[], days = 12) =>
+    request<{ data: Record<string, KlineRow[]> }>('/api/kline/daily-batch', {
+      method: 'POST',
+      body: JSON.stringify({ symbols, days }),
+    }),
+  klineMinuteBatch: (symbols: string[], date?: string) =>
+    request<{ data: Record<string, MinuteKlineRow[]> }>('/api/kline/minute-batch', {
+      method: 'POST',
+      body: JSON.stringify({ symbols, date }),
+    }),
+  instrumentSearch: (q: string, limit = 20, assetTypes?: string) =>
+    request<{ results: { symbol: string; name: string; code: string; asset_type?: string }[] }>(
+      `/api/kline/instruments/search?q=${encodeURIComponent(q)}&limit=${limit}${assetTypes ? `&asset_types=${encodeURIComponent(assetTypes)}` : ''}`,
+    ),
+
+  /** 批量查股票名称 (传入 symbol 列表, 返回 {symbol: name}) */
+  instrumentNames: (symbols: string[]) =>
+    request<{ names: Record<string, string> }>('/api/kline/instruments/names', {
+      method: 'POST',
+      body: JSON.stringify(symbols),
+    }),
+  klineMinute: (symbol: string, date?: string) =>
+    request<{
+      symbol: string
+      name?: string
+      stock_info?: { name?: string; total_shares?: number; float_shares?: number }
+      date: string | null
+      rows: MinuteKlineRow[]
+      source?: 'local' | 'live' | 'none'
+      asset_type?: 'stock' | 'etf' | 'index'
+      price_limit?: PriceLimitInfo | null
+      prev_close?: number | null
+    }>(
+      `/api/kline/minute?symbol=${encodeURIComponent(symbol)}${date ? `&date=${date}` : ''}`,
+    ),
+  klineMinuteRange: (symbol: string, days = 10) =>
     request<{
       symbol: string
       name?: string
