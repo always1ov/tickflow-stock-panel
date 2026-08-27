@@ -18,7 +18,7 @@
 
 ## 上游基线与升级约定(按 docs/secondary-development.md §8)
 
-- **当前上游基线**: commit `e346e25`(upstream/main), 于 R78 并入; 此前 `196af2f`(R71)、tag `v0.2.1`=`17ca245`(R69)。
+- **当前上游基线**: commit `afbf432`(upstream/main), 于 R82 并入; 此前 `e346e25`(R78)、`196af2f`(R71)、tag `v0.2.1`=`17ca245`(R69)。
   每次同步上游后更新这一行 —— 守则要求二开分支记录确切 Tag/commit, 不能只写"基于 v0.x"。
 - **升级预检**: 下次同步上游前先跑只读预演 `python3 scripts/upgrade_check.py <目标Tag>`,
   它会列出双方都改过的文件和可预见的文本冲突; 预演不动工作区, 但只看已提交内容。
@@ -31,10 +31,12 @@
   - `frontend/src/components/Layout.tsx` — nav 数组的 fork 项、「盘面参考」分组(R57/R67)。
   - `frontend/src/lib/api.ts` — fork 端点全部加在此(守则要求的单一客户端, 增长是预期内的)。
   - `frontend/src/lib/queryKeys.ts` — fork 键集中在文件尾部 `[fork 增强]` 段(R70)。
-  - `backend/app/backtest/engine.py` — **未动**(0 diff), 保持为 0。
+  - `backend/app/backtest/engine.py` — R83 按作者分钟回测实现扩展了分钟数据入口；同步上游时复核分钟/日线回测路由与 fork 既有任务链均完整。
 
 | # | 改动 | 涉及文件 | 冲突风险 | 单独回退 |
 |---|------|---------|:---:|---------|
+| R83 | **整合作者分钟策略完整功能链，同时保留全部 fork 增强**: 同步 upstream/main `afbf432` 后，按作者 `feat-minute-strategy@8e84304` 的最终状态整合分钟策略执行上下文、日线/分钟统一策略池与周期路由、受 Expert 能力及开关门控的盘中分钟增量刷新、分钟回测/回放、分钟图表实时补取、卡片数据更新闪烁，以及作者后续的 worker 终态竞态、Fuyao/custom provider 百分比口径修正。冲突按“作者功能语义优先、fork 增强不丢”处理：策略页保留 R80 的摘要→明细顺序、旧完整结果占位和原子缓存失效，分钟结果不写入日线摘要/明细缓存；Review 保留钉钉配置识别，AI 设置保留多档位 Profiles；矩阵/ETF 测试保留 fork 额外策略计数。补三项并发/失败安全：分钟分区 read-merge-write 复用 repository 写锁，缺配置状态 fail-closed，worker 收到终态后不再多等一轮；固定两项随日期漂移的完整性测试时钟。TickFlow 单一数据源、多 Key、单票实时隔离、轮询放量监控、今日总览/操盘手/挖掘等 fork 功能均未删除。后端全量可执行范围 `1863 passed`，分钟/相关专项 `109 passed`，worker 终态竞态专项 `2 passed`；前端生产构建由推送后的 Docker workflow 验证 | 后端分钟策略/刷新/回测/worker/数据源适配，前端策略池/回测/图表/设置/监控，相关文档与测试（共约 60 文件） | 高（策略引擎、回测、Screener、分钟写盘均为核心链路，已逐处适配） | 回退本提交（会整体移除作者分钟功能链，R1~R82 保留） |
+| R82 | **同步作者回测 worker 收尾修复**: 整合 upstream/main `afbf432`。worker 发送终态消息后显式冲刷队列并立即退出，避免大数据量任务因解释器 teardown 超过 10 秒；父进程在终态消息已送达但子进程仍未退出时强制结束进程并保留真实结果/错误，同时记录 `worker_exit_forcibly` 指标。新增对应回归测试 | `backtest/worker.py`、`tests/backtest/test_worker_process.py` | 低(独立 worker 生命周期修复) | 回退本提交 |
 | R81 | **整合作者次要分支的“轮询放量监控”并补安全边界**: 仅移植 `feat-volume-delta-alert` 这一项，不合并整条旧分支。全市场实时行情每轮记录股票累计成交量/成交额，与上一轮完整快照求差；跨交易日、09:30/13:00 时段首轮、非连续竞价、累计量回退均不触发，缺成交额时金额口径 fail-closed，不用 0 伪造增量。监控规则新增手数/金额阈值、价格/市值/当日成交额/ST 基础过滤、5 分钟默认冷却与批量合并通知；仅全市场模式可运行，免费自选轮询不会进入差值状态，编辑器明确提示当前模式是否可用。规则阈值或过滤器修改会重置旧冷却态，避免新配置被旧状态压住。保持 TickFlow 单一数据源，不改策略加载/缓存/SSE 链路 | `api/monitor_rules.py`、`services/quote_service.py`、`strategy/{monitor,monitor_rules}.py`、前端规则编辑/监控展示/API 类型/梯队类型收窄、专项测试 | 中(接入实时行情→监控→告警链，但仅新增临时列与独立规则类型) | 删除 `volume_delta` 类型、快照状态/注入函数及前端表单，移除专项测试 |
 | R80 | **修同步时"一直 404 job not found / 502"刷屏**: 链条 —— 运行中的任务只存内存, 后端重启(R77 让用户重启过)后正在跑的任务 ID 消失; 数据页还捏着旧 ID 每秒轮询 `/jobs/{id}` → 每秒 404; 重启窗口内代理层 502。页面其实**有**自愈守卫, 但它用 `/404/` 正则匹配错误**文本** —— 而 `request()` 取后端 detail("job not found")当消息时把状态码丢了, 文本里没有"404", 守卫永远匹配不上; 更糟的是拿到 activeJobId 后历史列表停止刷新, 死循环没有任何出口。修三处: `request()` 把 HTTP 状态码挂上错误对象(err.status, 调用方从此不再靠正则猜文本); 自愈守卫改判 `err.status === 404`(保留文本回退), 清 ID 同时失效历史列表让它接回真实活跃任务; job 轮询对 404 不重试(别拿死 ID 反复撞) | `lib/api.ts`、`pages/Data.tsx` | 低(错误对象加字段, 现有 catch 不受影响) | 还原两文件 |
 | R79 | **测试全绿: "13 个缺 SDK 失败"逐个查清, 全部消灭(1785 passed / 0 failed)**: 装上 `tickflow` SDK(就在 PyPI 上)后真跑那批被挡住的测试, 发现"缺 SDK"这个标签下积压着四类完全不同的问题 —— (1) `test_ai_provider` 2 条: 上游测试桩掉底层、没配 key, 撞上 fork 多档位兜底的"未配置即报错"(生产行为正确); 测试补一个空档位(回落全局配置)走到钳制逻辑; (2) `test_watchlist_enriched_join` 8 条: `_FakeRepo` 假件缺 fork 后来加的 `overlay_watchlist_live`/`get_watchlist_live` —— **一直被误归类为缺 SDK, 其实早就该修**; (3) `test_watchlist_batch` 3 条: 测试还在打桩旧接口 `get_paid_realtime_client`(fork 已改多 key 池), 且断言"一次全拉完"的旧语义(R30 轮转窗口后 6 只超容量应分两轮) —— 按轮转语义重写; (4) `test_extensions` 1 条: 容器 fastapi 0.141(新版 include_router 懒包装 `_IncludedRouter`, 不再摊平进 app.routes)与项目锁定 0.136.1 不符, 装回锁定版即过 —— **用户机器上 uv --frozen 用锁定版, 从未受影响**; `test_data_integrity` 1 条: R69 铺的 130 天密度让 enriched 分区数变多, 断言按意图放宽(守"坏分区被删后重算写回", 不守总数)。产品代码零改动 —— 全是测试假件失修与环境错配 | 4 个测试文件 | 无(纯测试) | — |

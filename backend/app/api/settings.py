@@ -606,6 +606,8 @@ def get_preferences() -> dict:
         "minute_sync_enabled": preferences.get_minute_sync_enabled(),
         "minute_sync_days": preferences.get_minute_sync_days(),
         "minute_sync_segment_days": preferences.get_minute_sync_segment_days(),
+        "minute_refresh_enabled": preferences.get_minute_refresh_enabled(),
+        "minute_refresh_interval": preferences.get_minute_refresh_interval(),
         "daily_data_provider": preferences.get_daily_data_provider(),
         "adj_factor_provider": preferences.get_adj_factor_provider(),
         "minute_data_provider": preferences.get_minute_data_provider(),
@@ -971,6 +973,15 @@ def update_minute_sync(req: MinuteSyncPrefs) -> dict:
     }
 
 
+@router.get("/minute-refresh/status")
+def minute_refresh_status(request: Request) -> dict:
+    """盘中分钟增量刷新服务状态 (开关/能力门控/最近一轮/下一轮)。"""
+    svc = getattr(request.app.state, "minute_refresh", None)
+    if svc is None:
+        return {"available": False}
+    return {"available": True, **svc.status()}
+
+
 class RealtimeQuotesPrefs(BaseModel):
     realtime_quotes_enabled: bool
 
@@ -1111,6 +1122,9 @@ class RealtimeMonitorConfigIn(BaseModel):
     screener_auto_run: bool | None = None
     minute_intraday_refresh: bool | None = None
     minute_intraday_refresh_interval: int | None = None
+    # 盘中分钟增量落盘 (Expert 专有) — 交易时段常驻服务, 归实时监控配置
+    minute_refresh_enabled: bool | None = None
+    minute_refresh_interval: int | None = None
     monitor_ext_fields: dict | None = None
 
 

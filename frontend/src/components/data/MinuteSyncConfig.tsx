@@ -27,6 +27,9 @@ export function MinuteSyncConfig({ caps, onJobStart }: { caps: { label: string; 
   useEffect(() => { setLocalDays(days) }, [days])
   useEffect(() => { setLocalSegment(segmentDays) }, [segmentDays])
 
+  useEffect(() => { setLocalDays(days) }, [days])
+  useEffect(() => { setLocalSegment(segmentDays) }, [segmentDays])
+
   const handleToggle = () => {
     if (!hasMinuteCap) return
     update.mutate({ enabled: !enabled, days: localDays })

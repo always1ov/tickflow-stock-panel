@@ -270,6 +270,21 @@ def test_realtime_gate_blocks_on_snapshot_and_launches_repair(tmp_path, monkeypa
     from app.api import settings as settings_api
     from app.services import data_integrity
 
+    # 门禁默认读取真实当天；本用例使用固定的 2026-08-24 数据集，显式固定
+    # 扫描/修复窗口的 today，避免测试随运行日期推移失效。
+    real_scan = data_integrity.scan_recent_integrity
+    real_within_window = data_integrity.within_auto_repair_window
+    monkeypatch.setattr(
+        data_integrity,
+        "scan_recent_integrity",
+        lambda data_dir: real_scan(data_dir, today=TODAY),
+    )
+    monkeypatch.setattr(
+        data_integrity,
+        "within_auto_repair_window",
+        lambda day: real_within_window(day, today=TODAY),
+    )
+
     _write_daily_partition(tmp_path, "kline_daily", FRIDAY, _ts_ms(FRIDAY, time(11, 58)))
     _write_daily_partition(tmp_path, "kline_daily", TODAY, _ts_ms(TODAY, time(10, 0)))
 
@@ -390,7 +405,9 @@ def test_pipeline_self_heals_snapshot_day(tmp_path, monkeypatch):
     from app.services import instrument_sync, kline_sync
     from app.tickflow.repository import DataStore, KlineRepository
 
-    today = datetime.now(CN_TZ).date()
+    # daily_pipeline.run_now 当前以 date.today() 作为批次边界；测试与生产口径
+    # 保持一致，避免 UTC 主机跨北京时间午夜时出现 start > end。
+    today = date.today()
     yesterday = today - timedelta(days=1)
     while yesterday.weekday() >= 5:
         yesterday -= timedelta(days=1)

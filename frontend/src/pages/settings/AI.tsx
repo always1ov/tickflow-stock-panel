@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, createContext, useContext } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Save, Loader2, Check, Wifi, WifiOff, Eye, EyeOff, Shield,
@@ -8,6 +8,7 @@ import { useSettings } from '@/lib/useSharedQueries'
 import { api, type SettingsState } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { AiProfiles } from '@/pages/settings/AiProfiles'
+import { useCardFlash, cardFlashCls } from '@/lib/useCardFlash'
 
 // 统一的输入框样式(与项目其他设置页一致)
 const INPUT_CLS =
@@ -69,7 +70,7 @@ const findPreset = (provider: string, baseUrl: string, codexCommand: string) => 
   return provider === CODEX_PROVIDER ? p.codexCommand === codexCommand : p.url === baseUrl
 }) ?? PRESETS[0]
 
-export function SettingsAIPanel() {
+export function SettingsAIPanel({ highlight }: { highlight?: string } = {}) {
   const qc = useQueryClient()
   const settings = useSettings()
   const s = settings.data
@@ -282,12 +283,13 @@ export function SettingsAIPanel() {
   }
 
   return (
+    <HighlightContext.Provider value={highlight ?? ''}>
     <div className="space-y-5 max-w-2xl">
       {/* [R56] 多档兜底放最上 —— 这是"AI 能不能一直用得上"的那一层。
           下面那套单档配置保留原样(它就是兜底链里合成的第一档), 想只用一家的
           照旧在下面配, 不必碰这个表。 */}
       <AiProfiles />
-      <Card icon={Plug} title="连接状态" right={
+      <Card icon={Plug} title="连接状态" anchor="ai-connection" right={
         configured && (
           <button onClick={handleTest} disabled={testing}
             className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-btn bg-elevated hover:bg-elevated/80 text-xs text-secondary transition-colors duration-150 ease-smooth disabled:opacity-50">
@@ -476,20 +478,27 @@ export function SettingsAIPanel() {
         </div>
       )}
     </div>
+    </HighlightContext.Provider>
   )
 }
 
 // ===== 通用卡片(与 Keys 页风格统一) =====
+
+// 卡片定位锚点: highlight=<anchor> 时滚动到视口中央并闪烁 (见 useCardFlash)
+const HighlightContext = createContext('')
 
 interface CardProps {
   icon: React.ComponentType<{ className?: string }>
   title: string
   right?: React.ReactNode
   children: React.ReactNode
+  anchor?: string
 }
 
-function Card({ icon: Icon, title, right, children }: CardProps) {
-  return (
+function Card({ icon: Icon, title, right, children, anchor }: CardProps) {
+  const highlight = useContext(HighlightContext)
+  const { ref, flash } = useCardFlash(anchor ? highlight : undefined, anchor ?? '')
+  const inner = (
     <section className="rounded-card border border-border bg-surface p-5">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2.5">
@@ -500,6 +509,12 @@ function Card({ icon: Icon, title, right, children }: CardProps) {
       </div>
       {children}
     </section>
+  )
+  if (!anchor) return inner
+  return (
+    <div ref={ref} id={anchor} className={cardFlashCls(flash)}>
+      {inner}
+    </div>
   )
 }
 

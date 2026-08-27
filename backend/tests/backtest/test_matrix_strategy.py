@@ -320,6 +320,8 @@ def test_builtin_matrix_strategies_use_their_declared_formula_modules():
     )
 
     assert len(strategy_files) == 20
+    # 分钟形态策略 (minute_red_streak) 已迁至自定义策略目录；叉版额外保留
+    # factor_rank_research，因此内置策略总数比作者仓多 1，且仍全部走 matrix。
     for strategy_path in strategy_files:
         strategy = StrategyEngine._load_file(strategy_path)
         assert strategy.execution_backend == "matrix_native"
@@ -784,7 +786,10 @@ def test_registered_builtin_matrix_strategies_share_one_cache_profile():
         strategy_dirs=[REPO_ROOT / "backend" / "app" / "strategy" / "builtin"]
     )
     profile = build_matrix_cache_profile(engine, "stock")
-    strategies = engine.strategy_definitions()
+    strategies = tuple(
+        s for s in engine.strategy_definitions()
+        if s.execution_backend != "minute_filter"
+    )
 
     assert len(strategies) == 20
     assert all(strategy.execution_backend == "matrix_native" for strategy in strategies)
