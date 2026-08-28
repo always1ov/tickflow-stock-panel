@@ -241,17 +241,17 @@ def _gate_state(tmp_path, quote_service, repo):
 
 
 class _QuoteServiceStub:
-    def __init__(self, mode="market"):
+    def __init__(self, mode="market", *, paused=False):
         self._mode = mode
+        self._paused = paused
         self.enabled = False
 
     @staticmethod
     def is_realtime_allowed():
         return True
 
-    @staticmethod
-    def is_paused():
-        return False
+    def is_paused(self):
+        return self._paused
 
     @staticmethod
     def realtime_mode():
@@ -311,6 +311,43 @@ def test_realtime_gate_returns_repair_job_for_snapshot(tmp_path, monkeypatch):
     # 修复任务以最早坏日为起点, 且实时行情未被开启
     assert launched == [(FRIDAY, "realtime_gate")]
     assert saved == {}
+
+
+def test_realtime_gate_joins_repair_job_while_quotes_are_paused(tmp_path, monkeypatch):
+    """启动自检已在修复时，开关应接续任务，不能先被 paused 的 409 截断。"""
+    from app.api import settings as settings_api
+    from app.services import data_integrity
+
+    real_scan = data_integrity.scan_recent_integrity
+    real_within_window = data_integrity.within_auto_repair_window
+    monkeypatch.setattr(
+        data_integrity,
+        "scan_recent_integrity",
+        lambda data_dir: real_scan(data_dir, today=TODAY),
+    )
+    monkeypatch.setattr(
+        data_integrity,
+        "within_auto_repair_window",
+        lambda day: real_within_window(day, today=TODAY),
+    )
+    _write_daily_partition(tmp_path, "kline_daily", FRIDAY, _ts_ms(FRIDAY, time(11, 58)))
+    _write_daily_partition(tmp_path, "kline_daily", TODAY, _ts_ms(TODAY, time(10, 0)))
+    monkeypatch.setattr(
+        data_integrity,
+        "launch_integrity_repair",
+        lambda state, day, reason: ("job-running", False),
+    )
+
+    qs = _QuoteServiceStub(paused=True)
+    request = _gate_state(tmp_path, qs, repo=None)
+    req = settings_api.RealtimeQuotesPrefs(realtime_quotes_enabled=True)
+
+    result = settings_api.update_realtime_quotes(req, request)
+
+    assert result["repair_required"] is True
+    assert result["repair_job_id"] == "job-running"
+    assert result["repair_reused"] is True
+    assert qs.enabled is False
 
 
 def test_realtime_gate_allows_clean_data(tmp_path, monkeypatch):

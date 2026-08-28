@@ -1025,9 +1025,6 @@ def update_realtime_quotes(req: RealtimeQuotesPrefs, request: Request) -> dict:
             qs.disable()
         _sync_depth_polling(False)
         return {"realtime_quotes_enabled": False, "realtime_allowed": False}
-    if req.realtime_quotes_enabled and qs and qs.is_paused():
-        # 管道/数据修正运行期间禁止开启实时行情 — 防止写盘竞态
-        raise HTTPException(status_code=409, detail="数据同步运行中，实时行情已临时暂停，请稍后再开启")
     if req.realtime_quotes_enabled:
         # 历史完整性门禁: 检测到最近交易日的盘中快照/缺口时禁止开启 —
         # 实时 flush 写出"今天"分区后, 盘后管道的"只刷今天"分支会让停机日的
@@ -1063,6 +1060,11 @@ def update_realtime_quotes(req: RealtimeQuotesPrefs, request: Request) -> dict:
                         "repair_reused": not is_new,
                         "repair_detail": detail,
                     }
+    if req.realtime_quotes_enabled and qs and qs.is_paused():
+        # 完整性检查必须先于 paused 门禁：启动自检可能已经启动修复并暂停行情，
+        # 此时前端应接续该任务，而不是被普通同步的 409 提前截断。若没有可接续
+        # 的完整性任务，仍按原行为禁止与管道/数据修正并发开启。
+        raise HTTPException(status_code=409, detail="数据同步运行中，实时行情已临时暂停，请稍后再开启")
     if req.realtime_quotes_enabled and qs and qs.realtime_mode() == "watchlist" and not preferences.get_realtime_watchlist_symbols():
         preferences.save({"realtime_quotes_enabled": False})
         _sync_depth_polling(False)

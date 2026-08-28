@@ -31,8 +31,23 @@ async function updateRealtimeWithRepair(enabled: boolean) {
 
     toast(`${result.repair_detail ?? '检测到不完整行情数据'}，修复成功后将自动开启实时行情`, 'success')
     const jobId = result.repair_job_id
+    let jobMissing = false
     while (true) {
-      const job = await api.pipelineJob(jobId)
+      let job
+      try {
+        // 任务轮询自行处理 404，避免 request 层先弹一次“job not found”。
+        job = await api.pipelineJob(jobId, true)
+      } catch (error) {
+        const status = (error as Error & { status?: number }).status
+        if (status === 404) {
+          // 容器更新/后端重启会清空内存中的活跃任务。重新调用开启动作，
+          // 让新进程按当前磁盘状态创建或接续新的修复任务。
+          jobMissing = true
+          toast('后台服务已重启，正在重新接续数据修复', 'success')
+          break
+        }
+        throw error
+      }
       if (job.status === 'succeeded') break
       if (job.status === 'failed') {
         const message = `数据修复失败：${job.error || '请到数据页查看任务日志'}`
@@ -40,6 +55,11 @@ async function updateRealtimeWithRepair(enabled: boolean) {
         throw new Error(message)
       }
       await wait(REPAIR_POLL_MS)
+    }
+
+    if (jobMissing) {
+      result = await api.updateRealtimeQuotes(true)
+      continue
     }
 
     repaired = true

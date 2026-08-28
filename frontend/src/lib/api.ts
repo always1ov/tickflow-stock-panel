@@ -3344,7 +3344,8 @@ export const api = {
   pipelineRun: () => request<{ job_id: string; reused: boolean }>(
     '/api/pipeline/run', { method: 'POST' },
   ),
-  pipelineJob: (id: string) => request<PipelineJob>(`/api/pipeline/jobs/${id}`),
+  pipelineJob: (id: string, quiet = false) =>
+    request<PipelineJob>(`/api/pipeline/jobs/${id}`, { quiet }),
   pipelineJobCancel: (id: string) =>
     request<{ cancelled: string }>(`/api/pipeline/jobs/${id}/cancel`, { method: 'POST' }),
   pipelineJobs: (limit = 20) =>
