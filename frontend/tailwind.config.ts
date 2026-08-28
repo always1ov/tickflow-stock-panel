@@ -25,13 +25,55 @@ export default {
         danger:     'hsl(var(--danger) / <alpha-value>)',
       },
       fontFamily: {
-        sans: ['Inter', '"HarmonyOS Sans SC"', '"PingFang SC"', 'system-ui', 'sans-serif'],
-        mono: ['"JetBrains Mono"', '"IBM Plex Mono"', 'ui-monospace', 'monospace'],
+        // 参考 FluxDown 的中文优先字体栈。MiSans 不随仓库分发，设备未安装时
+        // 依次回退到各平台原生中文 UI 字体，避免远程字体阻塞首屏。
+        sans: [
+          'MiSans',
+          '"HarmonyOS Sans SC"',
+          '"PingFang SC"',
+          '"Microsoft YaHei UI"',
+          '"Segoe UI"',
+          'Roboto',
+          '"Noto Sans SC"',
+          'system-ui',
+          'sans-serif',
+        ],
+        mono: [
+          '"JetBrains Mono"',
+          '"Cascadia Code"',
+          '"SFMono-Regular"',
+          '"IBM Plex Mono"',
+          'Consolas',
+          'ui-monospace',
+          'monospace',
+        ],
+      },
+      // FluxDown 桌面端以 13px 为主字号、12px 为辅助字号。保留显式像素字号
+      // 给图表工具条使用，只统一语义字号，避免 K 线和表格几何发生漂移。
+      fontSize: {
+        xs: ['12px', { lineHeight: '18px' }],
+        sm: ['13px', { lineHeight: '20px' }],
+        base: ['14px', { lineHeight: '22px' }],
+        lg: ['16px', { lineHeight: '24px' }],
+        xl: ['18px', { lineHeight: '26px' }],
+        '2xl': ['22px', { lineHeight: '30px' }],
+      },
+      letterSpacing: {
+        tighter: '-0.015em',
+        tight: '-0.008em',
+        normal: '0.005em',
+        wide: '0.025em',
+        wider: '0.045em',
+        widest: '0.08em',
+      },
+      spacing: {
+        // 常用表单 h-9 从 36px 收到 FluxDown regular 控件的 32px。
+        9: '2rem',
       },
       borderRadius: {
         card: '8px',
         btn: '6px',
-        input: '4px',
+        input: '6px',
         dialog: '12px',
       },
       transitionTimingFunction: {

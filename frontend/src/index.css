@@ -71,9 +71,71 @@ html.dark {
 body {
   background: hsl(var(--base));
   color: hsl(var(--fg-primary));
+  font-family: theme('fontFamily.sans');
+  font-size: 13px;
+  line-height: 1.5;
+  letter-spacing: 0.005em;
   font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+  font-kerning: normal;
+  font-synthesis: none;
   /* 暗色模式不用 antialiased — 让字形保持饱满,不发虚 */
   -webkit-font-smoothing: subpixel-antialiased;
   -moz-osx-font-smoothing: auto;
+  -webkit-text-size-adjust: 100%;
   text-rendering: optimizeLegibility;
+}
+
+/* FluxDown 式桌面应用排版：默认规则放进 base 层，确保页面已有的 text-*、
+ * font-*、tracking-* utilities 仍可覆盖，不能让全局重构吃掉图表精确样式。 */
+@layer base {
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
+    letter-spacing: inherit;
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: hsl(var(--fg-muted));
+    letter-spacing: 0;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-weight: 600;
+    line-height: 1.25;
+    letter-spacing: -0.008em;
+  }
+
+  strong,
+  b {
+    font-weight: 600;
+  }
+
+  code,
+  pre,
+  kbd,
+  samp {
+    font-family: theme('fontFamily.mono');
+    font-variant-numeric: tabular-nums;
+  }
+
+  th {
+    font-weight: 600;
+    letter-spacing: 0.012em;
+  }
+
+  td,
+  th {
+    line-height: 1.45;
+  }
+}
+
+::selection {
+  background: hsl(var(--accent) / 0.28);
+  color: hsl(var(--fg-primary));
 }

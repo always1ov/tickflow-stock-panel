@@ -92,7 +92,7 @@ export function SettingsCustomSignalsPanel({ highlight }: { highlight?: string }
       <section className="rounded-2xl border border-border bg-surface p-6 bg-[radial-gradient(circle_at_top_right,rgba(234,179,8,0.12),transparent_38%)]">
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div>
-            <div className="text-[11px] uppercase tracking-[0.2em] text-amber-400/80">信号库</div>
+            <div className="text-[10.5px] font-semibold uppercase tracking-wider text-amber-400/80">信号库</div>
             <h2 className="mt-2 text-2xl font-semibold tracking-tight text-foreground">统一查看策略、回测与监控可用信号</h2>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-secondary">
               内置信号由系统预计算，作为只读信号库展示；自定义信号可用「字段 + 运算符 + 值」组合条件创建，保存后可在策略、回测与监控中选择使用。

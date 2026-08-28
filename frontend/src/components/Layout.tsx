@@ -320,7 +320,7 @@ function PlainNavLink({ item, collapsed, indent, dataSyncing, dataSyncJustDone }
         className={({ isActive }) =>
           cn(
             'group relative flex items-center rounded-btn text-sm transition-all duration-150 ease-smooth',
-            collapsed ? 'justify-center px-0 py-2' : 'gap-3 px-3 py-2',
+            collapsed ? 'justify-center px-0 py-2' : 'gap-2.5 px-3 py-1.5',
             isActive
               ? 'bg-elevated text-foreground font-medium'
               : 'text-foreground/75 hover:bg-elevated/70 hover:text-foreground',
@@ -651,7 +651,7 @@ export function Layout() {
             />
             {!navCollapsed && (
               <div
-                className="font-bold text-[11px] uppercase tracking-[0.14em] text-foreground whitespace-nowrap"
+                className="text-sm font-semibold tracking-[0.06em] text-foreground whitespace-nowrap"
                 style={{ textShadow: `0 0 10px ${BRAND}44` }}
               >
                 牛来
@@ -691,7 +691,7 @@ export function Layout() {
           )}
         </div>
 
-        <nav className="flex-1 min-h-0 overflow-y-auto px-2 py-3 space-y-0.5">
+        <nav className="flex-1 min-h-0 overflow-y-auto px-2 py-2.5 space-y-0.5">
           {visibleNavItems.map((item) => {
             const { to, label, icon: Icon } = item
             // 「自选」项 — 开启分组侧栏且未整体收起时, 渲染为可展开父项 + 二级分组
@@ -707,7 +707,7 @@ export function Layout() {
                     title={navCollapsed ? BROWSE_GROUP.label : BROWSE_GROUP.hint}
                     className={cn(
                       'group relative flex w-full items-center rounded-btn text-sm transition-all duration-150 ease-smooth',
-                      navCollapsed ? 'justify-center px-0 py-2' : 'gap-3 px-3 py-2',
+                      navCollapsed ? 'justify-center px-0 py-2' : 'gap-2.5 px-3 py-1.5',
                       browsePaths.includes(location.pathname)
                         ? 'bg-elevated text-foreground font-medium'
                         : 'text-foreground/55 hover:bg-elevated/70 hover:text-foreground',
@@ -741,7 +741,7 @@ export function Layout() {
                   <button
                     onClick={() => setWatchlistNavExpanded(v => !v)}
                     className={cn(
-                      'group relative flex w-full items-center gap-3 rounded-btn px-3 py-2 text-sm transition-all duration-150 ease-smooth',
+                      'group relative flex w-full items-center gap-2.5 rounded-btn px-3 py-1.5 text-sm transition-all duration-150 ease-smooth',
                       location.pathname === '/watchlist'
                         ? 'bg-elevated text-foreground font-medium'
                         : 'text-foreground/75 hover:bg-elevated/70 hover:text-foreground',
@@ -952,7 +952,7 @@ export function Layout() {
               className={({ isActive }) =>
                 cn(
                   'group relative flex items-center rounded-btn text-sm transition-all duration-150 ease-smooth',
-                  navCollapsed ? 'justify-center px-0 py-2' : 'flex-1 gap-3 px-3 py-2',
+                  navCollapsed ? 'justify-center px-0 py-2' : 'flex-1 gap-2.5 px-3 py-1.5',
                   isActive
                     ? 'bg-elevated text-foreground font-medium'
                     : 'text-foreground/75 hover:bg-elevated/70 hover:text-foreground',

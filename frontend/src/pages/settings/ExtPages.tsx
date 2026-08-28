@@ -70,7 +70,7 @@ function ExternalWebsiteSettings() {
     <section className="rounded-2xl border border-border bg-surface p-6 bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.12),transparent_38%)]">
       <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
         <div className="max-w-2xl">
-          <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.2em] text-cyan-400/80">
+          <div className="flex items-center gap-2 text-[10.5px] font-semibold uppercase tracking-wider text-cyan-400/80">
             <Globe2 className="h-3.5 w-3.5" />外部网页
           </div>
           <h2 className="mt-2 text-xl font-semibold tracking-tight text-foreground">嵌入第三方单页网站</h2>
@@ -220,7 +220,7 @@ export function SettingsExtPagesPanel() {
       <section className="rounded-2xl border border-border bg-surface p-6 bg-[radial-gradient(circle_at_top_right,rgba(139,92,246,0.14),transparent_38%)]">
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div>
-            <div className="text-[11px] uppercase tracking-[0.2em] text-accent/80">扩展页面</div>
+            <div className="text-[10.5px] font-semibold uppercase tracking-wider text-accent/80">扩展页面</div>
             <h2 className="mt-2 text-2xl font-semibold tracking-tight text-foreground">把扩展数据配置成左侧分析菜单</h2>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-secondary">
               选择扩展数据源、分析模板、分组字段和列表列后，系统会生成一个可访问的动态分析页面。

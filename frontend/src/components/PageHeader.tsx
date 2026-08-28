@@ -13,16 +13,16 @@ export function PageHeader({ title, subtitle, titleExtra, right, className }: Pr
   return (
     <header
       className={cn(
-        'px-5 pt-3 pb-2 border-b border-border flex items-center justify-between gap-4',
+        'min-h-[52px] px-4 py-2 border-b border-border flex items-center justify-between gap-4',
         className,
       )}
     >
-      <div className="flex items-center gap-2">
-        <h1 className="text-lg font-semibold tracking-tight">{title}</h1>
+      <div className="flex min-w-0 items-center gap-2.5">
+        <h1 className="shrink-0 text-lg font-semibold leading-tight tracking-tight">{title}</h1>
         {titleExtra}
-        {subtitle && <span className="text-xs text-muted">{subtitle}</span>}
+        {subtitle && <span className="min-w-0 truncate text-xs leading-[18px] text-muted">{subtitle}</span>}
       </div>
-      {right}
+      {right && <div className="shrink-0">{right}</div>}
     </header>
   )
 }
