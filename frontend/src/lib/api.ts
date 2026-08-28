@@ -2494,7 +2494,18 @@ export const api = {
       body: JSON.stringify({ symbols }),
     }),
   updateRealtimeQuotes: (enabled: boolean) =>
-    request<{ realtime_quotes_enabled: boolean; realtime_allowed?: boolean; mode?: string; error?: string }>('/api/settings/preferences/realtime-quotes', {
+    request<{
+      realtime_quotes_enabled: boolean
+      realtime_allowed?: boolean
+      mode?: string
+      error?: string
+      /** 历史快照需先修复：跟踪该任务，成功后重试一次开启动作。 */
+      repair_required?: boolean
+      repair_job_id?: string
+      repair_reused?: boolean
+      repair_detail?: string
+      repair_completed?: boolean
+    }>('/api/settings/preferences/realtime-quotes', {
       method: 'PUT',
       body: JSON.stringify({ realtime_quotes_enabled: enabled }),
     }),

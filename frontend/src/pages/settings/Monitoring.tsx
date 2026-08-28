@@ -357,7 +357,7 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
             }
             checked={realtimeEnabled}
             onChange={handleToggleQuote}
-            disabled={isPaused}
+            disabled={isPaused || toggleQuote.isPending}
           />
 
           <div className="mt-3 pt-3 border-t border-border">

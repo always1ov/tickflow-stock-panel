@@ -264,9 +264,7 @@ class _QuoteServiceStub:
         self.enabled = False
 
 
-def test_realtime_gate_blocks_on_snapshot_and_launches_repair(tmp_path, monkeypatch):
-    from fastapi import HTTPException
-
+def test_realtime_gate_returns_repair_job_for_snapshot(tmp_path, monkeypatch):
     from app.api import settings as settings_api
     from app.services import data_integrity
 
@@ -302,12 +300,14 @@ def test_realtime_gate_blocks_on_snapshot_and_launches_repair(tmp_path, monkeypa
     request = _gate_state(tmp_path, qs, repo=None)
     req = settings_api.RealtimeQuotesPrefs(realtime_quotes_enabled=True)
 
-    with pytest.raises(HTTPException) as exc_info:
-        settings_api.update_realtime_quotes(req, request)
+    result = settings_api.update_realtime_quotes(req, request)
 
-    assert exc_info.value.status_code == 409
-    assert "盘中快照" in exc_info.value.detail
-    assert "job-x" in exc_info.value.detail
+    assert result["realtime_quotes_enabled"] is False
+    assert result["repair_required"] is True
+    assert result["repair_job_id"] == "job-x"
+    assert result["repair_reused"] is False
+    assert "盘中快照" in result["repair_detail"]
+    assert "job-x" in result["repair_detail"]
     # 修复任务以最早坏日为起点, 且实时行情未被开启
     assert launched == [(FRIDAY, "realtime_gate")]
     assert saved == {}

@@ -1046,13 +1046,23 @@ def update_realtime_quotes(req: RealtimeQuotesPrefs, request: Request) -> dict:
                     request.app.state, earliest, "realtime_gate",
                 )
                 if job_id is not None:
+                    # 返回“已接受、等待修复”的结构化状态，而不是只抛 409。
+                    # 前端据此跟踪同一个任务，成功后自动重试本次开启动作；数据
+                    # 修好前仍不会调用 qs.enable()，完整性门禁没有被放宽。
                     detail = (
                         f"检测到{data_integrity.describe_issues(issues)}，"
-                        + ("已自动创建修复任务，完成后即可开启实时行情"
-                           if is_new else "修复任务正在进行中，请稍后再开启")
+                        + ("已自动创建修复任务"
+                           if is_new else "已接入正在运行的修复任务")
                         + f"（任务 {job_id}）"
                     )
-                    raise HTTPException(status_code=409, detail=detail)
+                    return {
+                        "realtime_quotes_enabled": False,
+                        "realtime_allowed": allowed,
+                        "repair_required": True,
+                        "repair_job_id": job_id,
+                        "repair_reused": not is_new,
+                        "repair_detail": detail,
+                    }
     if req.realtime_quotes_enabled and qs and qs.realtime_mode() == "watchlist" and not preferences.get_realtime_watchlist_symbols():
         preferences.save({"realtime_quotes_enabled": False})
         _sync_depth_polling(False)
