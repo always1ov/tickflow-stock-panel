@@ -307,7 +307,7 @@ function buildExportHtml(
     </tbody>
   </table>
   ${missNote}
-  <p class="foot">生成于 ${new Date().toLocaleString('zh-CN')} · TickFlow Stock Panel 六态趋势分析 · 仅个人参考,不构成投资建议</p>
+  <p class="foot">生成于 ${new Date().toLocaleString('zh-CN')} · 牛来六态趋势分析 · 仅个人参考,不构成投资建议</p>
 </div>
 </body>
 </html>

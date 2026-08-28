@@ -283,6 +283,10 @@ def save_rule(req: RuleModel, request: Request):
                     as_of=date.today(),
                 ),
             )
+            # 策略规则的身份由 strategy_id 决定，显示名统一跟随策略定义。
+            # 避免指定标的作用域或旧前端默认名把卡片/通知误显示成股票名。
+            strategy_name = str(strategy.meta.get("name") or rule.get("strategy_id"))
+            rule["name"] = f"策略监控 · {strategy_name}"
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e)) from e
     # 编辑现有规则时, 保留原 created_at (避免按时间排序时位置跳动)

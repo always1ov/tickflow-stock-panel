@@ -106,7 +106,7 @@ export function Onboarding() {
             className="shrink-0"
             style={{ color: BRAND, filter: `drop-shadow(0 0 8px ${BRAND}55)` }}
           />
-          <span className="text-sm font-semibold tracking-tight">Tick Stock Panel</span>
+          <span className="text-sm font-semibold tracking-tight">牛来</span>
         </div>
         {/* 步骤进度条 —— 胶囊式 */}
         <div className="flex items-center gap-1.5">

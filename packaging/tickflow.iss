@@ -1,5 +1,5 @@
 ; ===========================================================================
-; Tick Stock Panel — Inno Setup 安装包脚本
+; 牛来 — Inno Setup 安装包脚本
 ; ===========================================================================
 ; 用途: 把 PyInstaller 产出的 dist/TickFlowStockPanel/ 文件夹封装成
 ;       单个 Setup.exe 安装程序 (双击→安装向导→快捷方式→可卸载)。
@@ -18,8 +18,8 @@
 ;   - 卸载入口 (控制面板可见)
 ; ===========================================================================
 
-#define MyAppName          "TickFlow 股票面板"
-#define MyAppNameEN       "Tick Stock Panel"
+#define MyAppName          "牛来"
+#define MyAppNameEN       "牛来"
 #define MyAppExeName      "TickFlowStockPanel.exe"
 #define MyAppPublisher    "TickFlow"
 

@@ -694,6 +694,22 @@ function RulesList({ rulesQuery, onEdit }: {
   })
   const symbolNames = namesQuery.data?.names ?? {}
 
+  // 策略规则即使限定了个股作用域，标题也应显示策略名，而不是第一只股票。
+  // 复用策略页的完整策略池查询，兼容日线、分钟和自定义策略；旧规则名不规范时
+  // 也能用 strategy_id 找回当前真实名称。
+  const hasStrategyRules = rules.some(r => r.type === 'strategy' && !!r.strategy_id)
+  const strategiesQ = useQuery({
+    queryKey: QK.screenerStrategies('all', 'all'),
+    queryFn: () => api.screenerStrategies(undefined, 'all'),
+    enabled: hasStrategyRules,
+    staleTime: 60_000,
+  })
+  const strategyNames = useMemo(() => {
+    const names: Record<string, string> = {}
+    for (const strategy of strategiesQ.data?.presets ?? []) names[strategy.id] = strategy.name
+    return names
+  }, [strategiesQ.data])
+
   const del = useMutation({
     mutationFn: api.monitorRuleDelete,
     onSuccess: () => qc.invalidateQueries({ queryKey: QK.monitorRules }),
@@ -737,6 +753,9 @@ function RulesList({ rulesQuery, onEdit }: {
           // 名称截取: "策略监控 · MACD金叉" → "MACD金叉", "信号监控 · 300750.SZ" → "信号监控"
           const dotIdx = r.name.indexOf(' · ')
           const displayName = dotIdx >= 0 ? r.name.slice(dotIdx + 3) : r.name
+          const strategyDisplayName = r.type === 'strategy' && r.strategy_id
+            ? (strategyNames[r.strategy_id] ?? (dotIdx >= 0 ? displayName : r.strategy_id))
+            : displayName
           return (
             <motion.div
               key={r.id}
@@ -762,8 +781,15 @@ function RulesList({ rulesQuery, onEdit }: {
                   {r.asset_type === 'index' && (
                     <span className="shrink-0 rounded px-1.5 py-0.5 text-[9px] font-semibold bg-sky-500/10 text-sky-400">指数</span>
                   )}
-                  {/* 个股类型: 直接显示可点击的代码+名称; 分组类型: 分组chip跳自选页; 其他类型显示规则名 */}
-                  {r.scope === 'symbols' && r.symbols.length > 0 ? (
+                  {/* 策略类型始终显示策略名；其他个股类型才显示可点击的代码+名称。 */}
+                  {r.type === 'strategy' ? (
+                    <h3
+                      className={cn('truncate text-xs font-medium', r.enabled ? 'text-foreground' : 'text-muted')}
+                      title={strategyDisplayName}
+                    >
+                      {strategyDisplayName}
+                    </h3>
+                  ) : r.scope === 'symbols' && r.symbols.length > 0 ? (
                     <button
                       onClick={() => setPreviewSymbol(r.symbols[0])}
                       className="inline-flex items-center gap-1 min-w-0 hover:bg-elevated/50 rounded px-0.5 transition-colors cursor-pointer"

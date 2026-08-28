@@ -129,7 +129,7 @@ function buildTodayHtml(d: TodayOverview, brief: string | null): string {
     <thead><tr><th>标的</th><th class="num">现价</th><th class="num">仓位</th><th class="num">浮盈</th><th class="num">出场线</th><th>阶段</th><th>趋势</th><th>操作建议</th></tr></thead>
     <tbody>${holdRows}</tbody>
   </table>` : '<div class="empty">暂无持仓标记</div>'}
-  <p class="foot">TickFlow Stock Panel · 六态趋势 + ATR 出场线 + 生命线(20日线) · 仅个人参考,不构成投资建议</p>
+  <p class="foot">牛来 · 六态趋势 + ATR 出场线 + 生命线(20日线) · 仅个人参考,不构成投资建议</p>
 </div>
 </body>
 </html>
