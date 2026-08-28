@@ -1,21 +1,16 @@
 import { useState, useEffect } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Sparkles, LineChart, History as HistoryIcon, Loader2, ExternalLink, Bell, AlertTriangle, X, Maximize2, Minimize2 } from 'lucide-react'
+import { Sparkles, LineChart, History as HistoryIcon, Loader2, ExternalLink, Bell, X, Maximize2, Minimize2 } from 'lucide-react'
 import { PageHeader } from '@/components/PageHeader'
-import { EmptyState } from '@/components/EmptyState'
 import { StockFinancialSearch } from '@/components/financials/StockFinancialSearch'
 import { StockPreviewDialog } from '@/components/StockPreviewDialog'
 import { LastStockChip } from '@/components/LastStockChip'
-import { AnalysisKChart, type PriceLevel, type LevelType } from '@/components/stock-analysis/AnalysisKChart'
 import { PriceAlertDialog } from '@/components/stock-analysis/PriceAlertDialog'
+import { StockLevelsPanel, StockLevelsPriceTag } from '@/components/stock-analysis/StockLevelsPanel'
 import { WatchlistDecisionBoard } from '@/components/stock-analysis/WatchlistDecisionBoard'
-import { TrendStateBar, useStockTrend } from '@/components/stock-analysis/TrendStateBar'
-import { api } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import { useDialogBackdrop } from '@/lib/useDialogBackdrop'
 import { useLastStock } from '@/lib/useLastStock'
-import { QK } from '@/lib/queryKeys'
 import { toast } from '@/components/Toast'
 import {
   startAnalysis, findTodayReport, openHistoryReport, loadHistory,
@@ -234,7 +229,7 @@ function LevelsDialog({ symbol, name, onClose }: { symbol: string | null; name: 
                 {name && <span className="truncate text-xs text-muted">{name}</span>}
               </div>
               <div className="flex shrink-0 items-center gap-2">
-                <LevelsPriceTag symbol={symbol} />
+                <StockLevelsPriceTag symbol={symbol} />
                 <button
                   onClick={() => setMaximized(v => !v)}
                   title={maximized ? '缩小' : '放大'}
@@ -253,162 +248,12 @@ function LevelsDialog({ symbol, name, onClose }: { symbol: string | null; name: 
             </div>
             <div className="flex-1 overflow-auto px-4 pb-4 sm:px-5">
               {/* bare: 去掉内层卡片外框与标题条 —— 弹窗里再套一层框正是"辣眼睛"的来源 */}
-              <StockAnalysisBoard symbol={symbol} bare height={maximized ? 720 : 520} />
+              <StockLevelsPanel symbol={symbol} bare height={maximized ? 720 : 520} />
             </div>
           </motion.div>
         </div>
       )}
     </AnimatePresence>
-  )
-}
-
-/** 顶栏右侧的行情摘要(交易日数 + 当前价)。查询键与看板一致, TanStack 直接命中缓存, 不产生额外请求。 */
-function LevelsPriceTag({ symbol }: { symbol: string }) {
-  const kline = useQuery({
-    queryKey: QK.analysisKline(symbol),
-    // [R74] refreshLive: 服务端先现拉一次该票实时(15s 冷却) —— 点开就是最新,
-    // 不依赖侧栏那个后台实时开关
-    queryFn: () => api.klineDaily(symbol, 250, undefined, undefined, { refreshLive: true }),
-    enabled: !!symbol,
-    staleTime: 15_000,
-    refetchOnMount: 'always',
-  })
-  const levelsQ = useQuery({
-    queryKey: QK.stockLevels(symbol),
-    queryFn: () => api.stockAnalysisLevels(symbol, 250),
-    enabled: !!symbol,
-    staleTime: 60_000,
-  })
-  const rows = kline.data?.rows ?? []
-  if (rows.length === 0) return null
-  const last = rows[rows.length - 1]
-  const prev = rows[rows.length - 2]
-  const isUp = prev ? (last.close >= prev.close) : (last.close >= last.open)
-  return (
-    <span className="hidden items-baseline gap-2 sm:flex">
-      <span className="text-[10px] text-muted">{rows.length} 个交易日</span>
-      <span className="text-[10px] text-muted/60">·</span>
-      <span className={`font-mono text-base font-bold ${isUp ? 'text-bull' : 'text-bear'}`}>
-        {levelsQ.data?.close?.toFixed(2) ?? '—'}
-      </span>
-    </span>
-  )
-}
-
-// ===== 分析看板:日 K + 关键价位 =====
-function StockAnalysisBoard({ symbol, height = 480, bare = false }: { symbol: string; height?: number; bare?: boolean }) {
-  const kline = useQuery({
-    queryKey: QK.analysisKline(symbol),
-    // [R74] 与 LevelsPriceTag 同 key 同参 —— 打开弹窗只发一次请求, 两处共享
-    queryFn: () => api.klineDaily(symbol, 250, undefined, undefined, { refreshLive: true }),
-    enabled: !!symbol,
-    staleTime: 15_000,
-    refetchOnMount: 'always',
-  })
-
-  const levelsQ = useQuery({
-    queryKey: QK.stockLevels(symbol),
-    queryFn: () => api.stockAnalysisLevels(symbol, 250),
-    enabled: !!symbol,
-    staleTime: 60_000,
-  })
-
-  // [fork 增强] 六态趋势(利弗莫尔)—— 趋势条 + K 线多空分段着色
-  const trendQ = useStockTrend(symbol)
-
-  // [R74] 日K带着 refresh_live 回来 = 服务端刚把这只票的实时喂进叠加层 ——
-  // 趋势/价位是并行发的, 可能赶在落地之前, 这里补一次失效让它们读到同一份
-  const qc = useQueryClient()
-  const klineUpdatedAt = kline.dataUpdatedAt
-  useEffect(() => {
-    if (!klineUpdatedAt || !symbol) return
-    qc.invalidateQueries({ queryKey: QK.stockTrend(symbol) })
-    qc.invalidateQueries({ queryKey: QK.stockLevels(symbol) })
-  }, [klineUpdatedAt, symbol, qc])
-
-  // [R76] 服务端把拉取扔了后台(响应立刻回, 弹窗不再白等网络) —— started 表示
-  // 后台在拉, 这里在 1.5s / 4s 各补取一次把新蜡烛接进来。第二次取时服务端在
-  // 冷却期内会回 fresh, 不再有下一轮 —— 不会打转。
-  const liveRefresh = kline.data?.live_refresh
-  useEffect(() => {
-    if (liveRefresh !== 'started' || !symbol) return
-    const timers = [1500, 4000].map(ms => setTimeout(
-      () => qc.invalidateQueries({ queryKey: QK.analysisKline(symbol) }), ms))
-    return () => timers.forEach(clearTimeout)
-  }, [liveRefresh, klineUpdatedAt, symbol, qc])
-
-  if (kline.isLoading) {
-    return <div className="flex items-center justify-center py-20"><Loader2 className="h-5 w-5 animate-spin text-muted" /></div>
-  }
-
-  if (kline.isError) {
-    return (
-      <EmptyState
-        icon={AlertTriangle}
-        title="日 K 数据加载失败"
-        hint="请检查网络或数据源配置后重试。"
-      />
-    )
-  }
-
-  const rows = kline.data?.rows ?? []
-  if (rows.length === 0) {
-    return <EmptyState icon={LineChart} title="暂无日 K 数据" hint="该标的尚未同步日 K,请先在数据页或自选页同步。" />
-  }
-
-  const levels = (levelsQ.data?.levels ?? {}) as Record<LevelType, PriceLevel[]>
-
-  // [fork 增强] 六态多空分段 → K 线背景着色(多头段淡红、空头段淡绿,A 股惯例)
-  const trendRanges = (trendQ.data?.segments ?? []).map(s => ({
-    start: s.start_date,
-    end: s.end_date,
-    color: s.side === 'bull' ? 'rgba(239,68,68,0.05)' : 'rgba(34,197,94,0.05)',
-  }))
-
-  // 涨跌色:最后一根 K 线收 vs 前一根收(无前日则按开收判断)
-  const last = rows[rows.length - 1]
-  const prev = rows[rows.length - 2]
-  const curClose = levelsQ.data?.close
-  const isUp = prev ? (last.close >= prev.close) : (last.close >= last.open)
-
-  const body = (
-    <div className={bare ? 'space-y-2' : 'p-3 space-y-2'}>
-      {/* [fork 增强] 六态趋势条(利弗莫尔 Market Key) */}
-      <TrendStateBar symbol={symbol} trend={trendQ.data} />
-      <AnalysisKChart
-        rows={rows}
-        levels={levels}
-        series={levelsQ.data?.series}
-        seriesDates={levelsQ.data?.dates}
-        ranges={trendRanges}
-        height={height}
-      />
-    </div>
-  )
-
-  // bare: 弹窗里用 —— 卡片外框与标题条由弹窗自己提供, 再套一层就是双层边框
-  if (bare) return body
-
-  return (
-    <div className="rounded-card border border-border/60 bg-surface/40 overflow-hidden">
-      <div className="px-4 py-3 border-b border-border/40">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 min-w-0">
-            <LineChart className="h-4 w-4 text-sky-400 shrink-0" />
-            <span className="text-sm font-medium text-foreground">关键价位分析</span>
-          </div>
-          <div className="flex items-baseline gap-2 shrink-0">
-            <span className="text-[10px] text-muted">{rows.length} 个交易日</span>
-            <span className="text-[10px] text-muted/60">·</span>
-            <span className="text-[10px] text-muted">当前价</span>
-            <span className={`text-base font-mono font-bold ${isUp ? 'text-bull' : 'text-bear'}`}>
-              {curClose?.toFixed(2) ?? '—'}
-            </span>
-          </div>
-        </div>
-      </div>
-      {body}
-    </div>
   )
 }
 

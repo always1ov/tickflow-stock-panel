@@ -1073,6 +1073,7 @@ export function Screener() {
       <StockPreviewDialog
         symbol={previewSymbol}
         name={previewName}
+        enableLevelsView
         onClose={closePreview}
       />
 

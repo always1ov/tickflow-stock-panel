@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, RefreshCw, Clock, LineChart, Star, RadioTower, Maximize2, Minimize2, Activity } from 'lucide-react'
+import { X, RefreshCw, Clock, LineChart, Star, RadioTower, Maximize2, Minimize2, Activity, Crosshair } from 'lucide-react'
 import { api } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { cn } from '@/lib/cn'
@@ -13,6 +13,7 @@ import { StockMultiDayIntradayChart } from '@/components/StockMultiDayIntradayCh
 import { DatePicker } from '@/components/DatePicker'
 import { RuleEditor } from '@/components/monitor/RuleEditor'
 import { PriceAlertDialog } from '@/components/stock-analysis/PriceAlertDialog'
+import { StockLevelsPanel, StockLevelsPriceTag } from '@/components/stock-analysis/StockLevelsPanel'
 import { buildMonitorPriceLines } from '@/lib/price-alerts'
 import { usePreferences } from '@/lib/useSharedQueries'
 import { setFocusSymbol, clearFocusSymbol } from '@/lib/useQuoteStream'
@@ -24,6 +25,8 @@ interface Props {
   symbol: string | null
   name?: string
   onClose: () => void
+  /** 是否开放“关键价位”视图；默认关闭，避免改变其他页面的历史弹窗行为。 */
+  enableLevelsView?: boolean
   /** 触发信息 (来自监控触发记录, 有值时在顶栏下方显示) */
   triggerInfo?: {
     price?: number | null
@@ -42,7 +45,7 @@ const PRESETS: { label: string; months: number }[] = [
   { label: '1年', months: 12 },
 ]
 
-type PreviewView = 'daily' | 'intraday'
+type PreviewView = 'daily' | 'intraday' | 'levels'
 interface PriceAlertDraft {
   id: number
   targetPrice: number
@@ -79,7 +82,7 @@ function fmtAbnormalCalcTime(asofSec: number): string {
   return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
 }
 
-export function StockPreviewDialog({ symbol, name, onClose, triggerInfo }: Props) {
+export function StockPreviewDialog({ symbol, name, onClose, triggerInfo, enableLevelsView = false }: Props) {
   const [view, setView] = useState<PreviewView>('daily')
   const [intradayDays, setIntradayDays] = useState(loadIntradayDays)
   const [dateRange, setDateRange] = useState(getDefaultRange)
@@ -171,9 +174,13 @@ export function StockPreviewDialog({ symbol, name, onClose, triggerInfo }: Props
     if (!symbol) return
     if (view === 'daily') {
       qc.invalidateQueries({ queryKey: ['kline', symbol] })
-    } else {
+    } else if (view === 'intraday') {
       qc.invalidateQueries({ queryKey: ['kline-minute-range', symbol] })
       qc.invalidateQueries({ queryKey: ['kline-minute', symbol!] })
+    } else {
+      qc.invalidateQueries({ queryKey: QK.analysisKline(symbol) })
+      qc.invalidateQueries({ queryKey: QK.stockLevels(symbol) })
+      qc.invalidateQueries({ queryKey: QK.stockTrend(symbol) })
     }
   }
 
@@ -267,7 +274,7 @@ export function StockPreviewDialog({ symbol, name, onClose, triggerInfo }: Props
                       min={dateRange.start}
                     />
                   </div>
-                ) : (
+                ) : view === 'intraday' ? (
                   <div className="flex items-center gap-1">
                     <div className="inline-flex shrink-0 items-center rounded border border-border bg-elevated p-0.5" aria-label="分时周期">
                       {INTRADAY_DAY_OPTIONS.map(days => (
@@ -287,11 +294,11 @@ export function StockPreviewDialog({ symbol, name, onClose, triggerInfo }: Props
                       ))}
                     </div>
                   </div>
-                )}
+                ) : <StockLevelsPriceTag symbol={symbol} />}
 
                 <span className="mx-0.5 h-4 w-px shrink-0 bg-border" />
 
-                {/* 日K / 分时 切换 */}
+                {/* 日K / 分时 / 关键价位切换 */}
                 <div role="tablist" aria-label="图表视图" className="inline-flex shrink-0 items-center rounded border border-border bg-elevated p-0.5">
                   <button
                     type="button"
@@ -317,6 +324,20 @@ export function StockPreviewDialog({ symbol, name, onClose, triggerInfo }: Props
                     <Clock className="h-3 w-3" />
                     分时
                   </button>
+                  {enableLevelsView && (
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={view === 'levels'}
+                      onClick={() => setView('levels')}
+                      className={`inline-flex h-6 items-center gap-1 rounded px-2 text-[11px] transition-colors ${
+                        view === 'levels' ? 'bg-surface text-foreground shadow-sm' : 'text-muted hover:text-secondary'
+                      }`}
+                    >
+                      <Crosshair className="h-3 w-3" />
+                      关键价位
+                    </button>
+                  )}
                 </div>
 
                 <span className="mx-0.5 h-4 w-px shrink-0 bg-border" />
@@ -477,7 +498,7 @@ export function StockPreviewDialog({ symbol, name, onClose, triggerInfo }: Props
                   onPriceDoubleClick={openPriceAlert}
                   refetchIntervalMs={intradayRefetchMs}
                 />
-              ) : (
+              ) : view === 'intraday' ? (
                 <>
                 <StockPanel
                   symbol={symbol}
@@ -493,16 +514,20 @@ export function StockPreviewDialog({ symbol, name, onClose, triggerInfo }: Props
                   onPriceDoubleClick={openPriceAlert}
                 />
                 </>
+              ) : (
+                <StockLevelsPanel symbol={symbol} bare height={maximized ? 720 : 520} />
               )}
             </div>
 
             {/* 扩展插槽: 对话框底部二开区 (无注册时不渲染) */}
-            <div className="shrink-0">
-              <ExtensionSlot
-                name="stock-preview.footer"
-                context={{ symbol, name: name ?? null, view }}
-              />
-            </div>
+            {view !== 'levels' && (
+              <div className="shrink-0">
+                <ExtensionSlot
+                  name="stock-preview.footer"
+                  context={{ symbol, name: name ?? null, view }}
+                />
+              </div>
+            )}
 
             {/* 加监控编辑器弹层 */}
             <AnimatePresence>
