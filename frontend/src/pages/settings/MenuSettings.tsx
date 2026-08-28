@@ -182,6 +182,20 @@ export function SettingsMenuSettingsPanel() {
   const { data: prefs } = usePreferences()
   const menus = useQuery({ queryKey: QK.analysisMenus, queryFn: api.analysisMenus })
 
+  const builtinPages = useMemo(() => {
+    const pages = [...BUILTIN_PAGES]
+    if (prefs?.external_page_enabled && prefs.external_page_url) {
+      const anchor = pages.findIndex(page => page.id === '/industry-analysis')
+      pages.splice(anchor + 1, 0, {
+        id: '/external-page',
+        label: prefs.external_page_name || '利弗莫尔趋势',
+        type: 'builtin',
+        visible: true,
+      })
+    }
+    return pages
+  }, [prefs?.external_page_enabled, prefs?.external_page_name, prefs?.external_page_url])
+
   const analysisEntries: NavEntry[] = (menus.data?.items ?? []).map(m => ({
     id: m.id,
     label: m.label,
@@ -192,10 +206,10 @@ export function SettingsMenuSettingsPanel() {
   const allEntries = useMemo(() => {
     const saved = prefs?.nav_order ?? []
     const entryMap = new Map<string, NavEntry>()
-    for (const e of BUILTIN_PAGES) entryMap.set(e.id, e)
+    for (const e of builtinPages) entryMap.set(e.id, e)
     for (const e of analysisEntries) entryMap.set(e.id, e)
 
-    if (saved.length === 0) return [...BUILTIN_PAGES, ...analysisEntries]
+    if (saved.length === 0) return [...builtinPages, ...analysisEntries]
 
     const ordered: NavEntry[] = []
     const seen = new Set<string>()
@@ -206,14 +220,14 @@ export function SettingsMenuSettingsPanel() {
         seen.add(id)
       }
     }
-    for (const e of [...BUILTIN_PAGES, ...analysisEntries]) {
+    for (const e of [...builtinPages, ...analysisEntries]) {
       if (seen.has(e.id)) continue
       // 未保存过排序的新条目: 内置页插回默认位置, 分析菜单追加到末尾
-      const defaultIndex = BUILTIN_PAGES.findIndex(p => p.id === e.id)
+      const defaultIndex = builtinPages.findIndex(p => p.id === e.id)
       let anchor = -1
       if (defaultIndex > 0) {
         for (let i = defaultIndex - 1; i >= 0 && anchor < 0; i -= 1) {
-          anchor = ordered.findIndex(o => o.id === BUILTIN_PAGES[i].id)
+          anchor = ordered.findIndex(o => o.id === builtinPages[i].id)
         }
       }
       if (anchor >= 0) ordered.splice(anchor + 1, 0, e)
@@ -221,7 +235,7 @@ export function SettingsMenuSettingsPanel() {
       else ordered.push(e)
     }
     return ordered
-  }, [prefs?.nav_order, analysisEntries])
+  }, [prefs?.nav_order, analysisEntries, builtinPages])
 
   const hiddenSet = useMemo(() => new Set(prefs?.nav_hidden ?? []), [prefs?.nav_hidden])
 
@@ -240,11 +254,11 @@ export function SettingsMenuSettingsPanel() {
     for (const e of allEntries) {
       if (seen.has(e.id)) continue
       // 与 allEntries 同一语义: 未保存的新内置页插回默认位置而非追加到末尾
-      const defaultIndex = BUILTIN_PAGES.findIndex(p => p.id === e.id)
+      const defaultIndex = builtinPages.findIndex(p => p.id === e.id)
       let anchor = -1
       if (defaultIndex > 0) {
         for (let i = defaultIndex - 1; i >= 0 && anchor < 0; i -= 1) {
-          anchor = result.findIndex(o => o.id === BUILTIN_PAGES[i].id)
+          anchor = result.findIndex(o => o.id === builtinPages[i].id)
         }
       }
       if (anchor >= 0) result.splice(anchor + 1, 0, e)
@@ -252,9 +266,9 @@ export function SettingsMenuSettingsPanel() {
       else result.push(e)
     }
     return result
-  }, [localOrder, prefs?.nav_order, allEntries])
+  }, [localOrder, prefs?.nav_order, allEntries, builtinPages])
 
-  // [R67] 「盘面参考」的四个成员不在顶层排 —— 它们跟着分组行走, 组内单独排序。
+  // [R67] 「盘面参考」的成员不在顶层排 —— 它们跟着分组行走, 组内单独排序。
   const { top: topEntries, members: memberEntries } = useMemo(
     () => splitBrowseGroup(orderedEntries, e => e.id),
     [orderedEntries],
@@ -292,7 +306,7 @@ export function SettingsMenuSettingsPanel() {
     saveNavOrder.mutate(next)
   }
 
-  /** 组内排序: 只动四个成员之间的先后, 分组行在顶层的位置不受影响。 */
+  /** 组内排序: 只动成员之间的先后, 分组行在顶层的位置不受影响。 */
   const handleMemberDragEnd = (event: DragEndEvent) => {
     const { active, over } = event
     if (!over || active.id === over.id) return

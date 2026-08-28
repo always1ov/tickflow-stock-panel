@@ -53,6 +53,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Sunrise,
+  Globe2,
 } from 'lucide-react'
 import { Logo } from './Logo'
 import { api, type IndexQuote } from '@/lib/api'
@@ -88,7 +89,7 @@ const nav = [
   // [R59] AI 操盘手: 让模型用本系统的信息模拟交易, 长期观察这套信息够不够用
   { to: '/paper-trading', label: 'AI 操盘手', icon: Bot },
   { to: '/stock-analysis',    label: '个股分析', icon: TrendingUp },
-  // [R67] 分组本身也是菜单里的一行 —— 排序时它整块走, 后面四项是它的子项
+  // [R67] 分组本身也是菜单里的一行 —— 排序时它整块走, 后面的成员是它的子项
   { to: BROWSE_GROUP_ID,    label: BROWSE_GROUP.label, icon: Layers3 },
   { to: '/dashboard',       label: '看板',     icon: LayoutDashboard },
   { to: '/limit-ladder', label: '连板梯队', icon: Flame },
@@ -569,8 +570,11 @@ export function Layout() {
     icon: item.icon,
     badge: item.badge,
   }))
+  const externalPageNav: NavItem[] = prefs?.external_page_enabled && prefs.external_page_url
+    ? [{ to: '/external-page', label: prefs.external_page_name || '利弗莫尔趋势', icon: Globe2 }]
+    : []
 
-  const allNav: NavItem[] = [...nav, ...analysisNav, ...extensionNav]
+  const allNav: NavItem[] = [...nav, ...externalPageNav, ...analysisNav, ...extensionNav]
   const savedOrder = prefs?.nav_order ?? []
 
   const navItems = savedOrder.length > 0
@@ -605,7 +609,7 @@ export function Layout() {
   // [R67] 成员从顶层抽出来, 只在分组行下面出现 —— 分组行自己排在哪, 整块就在哪。
   const { top: visibleNavItems, members: browseItems } = splitBrowseGroup(shownNavItems, n => n.to)
   const browsePaths = browseItems.map(n => n.to)
-  // 四个成员全隐藏了就别留一个空表头
+  // 所有成员全隐藏了就别留一个空表头
   const showBrowseGroup = browsePaths.length > 0
 
   const handleToggle = async (enabled: boolean) => {

@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ExternalLink, Pencil, Plus, Save, Trash2, X } from 'lucide-react'
+import { ExternalLink, Globe2, Pencil, Plus, Save, ShieldCheck, Trash2, X } from 'lucide-react'
 import { api, type AnalysisColumn, type AnalysisMenu, type ExtDataConfig, type ExtDataField } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { Skeleton } from '@/components/data/Skeleton'
@@ -29,6 +29,92 @@ function firstMatchingField(config: ExtDataConfig | undefined, keywords: string[
     if (matched) return matched.name
   }
   return config.fields.find(f => !['symbol', 'code'].includes(f.name) && f.dtype === 'string')?.name ?? ''
+}
+
+function ExternalWebsiteSettings() {
+  const qc = useQueryClient()
+  const prefs = useQuery({ queryKey: QK.preferences, queryFn: api.preferences })
+  const [enabled, setEnabled] = useState(true)
+  const [name, setName] = useState('利弗莫尔趋势')
+  const [url, setUrl] = useState('https://livermore-trend-dashboard-tigergu.netlify.app/')
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    if (!prefs.data) return
+    setEnabled(prefs.data.external_page_enabled)
+    setName(prefs.data.external_page_name)
+    setUrl(prefs.data.external_page_url)
+  }, [prefs.data])
+
+  const save = useMutation({
+    mutationFn: () => {
+      const trimmedName = name.trim()
+      const trimmedUrl = url.trim()
+      if (!trimmedName) throw new Error('请输入页面名称')
+      try {
+        const parsed = new URL(trimmedUrl)
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') throw new Error()
+      } catch {
+        throw new Error('请输入完整的 HTTP 或 HTTPS 网站地址')
+      }
+      return api.updateExternalPage({ enabled, name: trimmedName, url: trimmedUrl })
+    },
+    onSuccess: () => {
+      setError('')
+      qc.invalidateQueries({ queryKey: QK.preferences })
+    },
+    onError: err => setError(String((err as Error)?.message ?? err)),
+  })
+
+  return (
+    <section className="rounded-2xl border border-border bg-surface p-6 bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.12),transparent_38%)]">
+      <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+        <div className="max-w-2xl">
+          <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.2em] text-cyan-400/80">
+            <Globe2 className="h-3.5 w-3.5" />外部网页
+          </div>
+          <h2 className="mt-2 text-xl font-semibold tracking-tight text-foreground">嵌入第三方单页网站</h2>
+          <p className="mt-2 text-sm leading-6 text-secondary">
+            启用后作为「盘面参考」的一个成员显示。网页在浏览器中直接加载，牛来不会向它转发 TickFlow 数据、API Key 或登录凭据。
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setEnabled(value => !value)}
+          className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs transition-colors ${enabled ? 'border-success/40 bg-success/10 text-success' : 'border-border bg-elevated text-muted'}`}
+        >
+          <span className={`h-2 w-2 rounded-full ${enabled ? 'bg-success' : 'bg-muted'}`} />
+          {enabled ? '已启用' : '已停用'}
+        </button>
+      </div>
+
+      <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-[minmax(12rem,0.7fr)_minmax(20rem,2fr)]">
+        <label className="space-y-1.5">
+          <span className="text-[11px] text-muted">页面名称</span>
+          <input value={name} maxLength={40} onChange={e => setName(e.target.value)} className="h-9 w-full rounded-btn border border-border bg-base px-3 text-xs text-foreground" />
+        </label>
+        <label className="space-y-1.5">
+          <span className="text-[11px] text-muted">网站地址</span>
+          <input value={url} onChange={e => setUrl(e.target.value)} placeholder="https://example.com/" className="h-9 w-full rounded-btn border border-border bg-base px-3 text-xs text-foreground" />
+        </label>
+      </div>
+
+      {error && <div className="mt-3 rounded-btn border border-danger/30 bg-danger/5 px-3 py-2 text-xs text-danger">{error}</div>}
+      <div className="mt-4 flex flex-col gap-3 text-[11px] text-muted sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-1.5"><ShieldCheck className="h-3.5 w-3.5" />目标网站若禁止 iframe，会显示空白，此时可使用页面内的“新窗口”按钮。</div>
+        <div className="flex items-center gap-2">
+          {prefs.data?.external_page_enabled && prefs.data.external_page_url && (
+            <Link to="/external-page" className="inline-flex items-center gap-1.5 rounded-btn border border-border bg-elevated px-3 py-1.5 text-xs text-secondary hover:text-foreground">
+              <ExternalLink className="h-3.5 w-3.5" />打开页面
+            </Link>
+          )}
+          <button onClick={() => save.mutate()} disabled={save.isPending || prefs.isLoading} className="inline-flex items-center gap-1.5 rounded-btn bg-accent px-3 py-1.5 text-xs font-medium text-base disabled:opacity-50">
+            <Save className="h-3.5 w-3.5" />{save.isPending ? '保存中…' : '保存设置'}
+          </button>
+        </div>
+      </div>
+    </section>
+  )
 }
 
 export function SettingsExtPagesPanel() {
@@ -130,6 +216,7 @@ export function SettingsExtPagesPanel() {
 
   return (
     <div className="max-w-6xl space-y-6">
+      <ExternalWebsiteSettings />
       <section className="rounded-2xl border border-border bg-surface p-6 bg-[radial-gradient(circle_at_top_right,rgba(139,92,246,0.14),transparent_38%)]">
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div>

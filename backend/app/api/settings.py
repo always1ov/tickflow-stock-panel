@@ -7,6 +7,7 @@ from __future__ import annotations
 import logging
 import time
 from typing import Literal
+from urllib.parse import urlsplit
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field
@@ -594,6 +595,12 @@ class MiningSchedulePrefs(BaseModel):
     mining_budget_profile: Literal["balanced", "strict"]
 
 
+class ExternalPagePrefsIn(BaseModel):
+    enabled: bool
+    name: str = Field(min_length=1, max_length=40)
+    url: str = Field(min_length=1, max_length=2048)
+
+
 @router.get("/preferences")
 def get_preferences() -> dict:
     """返回用户偏好设置。"""
@@ -651,6 +658,7 @@ def get_preferences() -> dict:
         "nav_order": preferences.get_nav_order(),
         "nav_hidden": preferences.get_nav_hidden(),
         "screener_auto_run": preferences.get_screener_auto_run(),
+        **preferences.get_external_page_config(),
         "limit_ladder_monitor_enabled": preferences.get_limit_ladder_monitor_enabled(),
         "depth_polling_interval": preferences.get_depth_polling_interval(),
         "depth_finalize_time": preferences.get_depth_finalize_time(),
@@ -906,6 +914,23 @@ class NavOrderIn(BaseModel):
 
 class NavHiddenIn(BaseModel):
     nav_hidden: list[str]
+
+
+@router.put("/preferences/external-page")
+def update_external_page(req: ExternalPagePrefsIn) -> dict:
+    """保存浏览器内嵌的外部网页, 仅允许不携带账号密码的 HTTP(S) 地址。"""
+    from app.services import preferences
+
+    name = req.name.strip()
+    url = req.url.strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="页面名称不能为空")
+    parsed = urlsplit(url)
+    if parsed.scheme.lower() not in {"http", "https"} or not parsed.netloc:
+        raise HTTPException(status_code=400, detail="仅支持完整的 HTTP 或 HTTPS 网站地址")
+    if parsed.username is not None or parsed.password is not None:
+        raise HTTPException(status_code=400, detail="网站地址中不能包含账号或密码")
+    return preferences.set_external_page_config(req.enabled, name, url)
 
 
 @router.put("/preferences/nav-order")

@@ -8,7 +8,7 @@
  *   2. 就算去拖成员, 挪的也不一定是它 —— 表头挂在谁身上取决于谁排最前;
  *   3. 成员一旦散落在顺序的两端, 表头和成员会被中间的普通菜单切开。
  *
- * 现在分组有自己的 id, 跟普通菜单项一样参与排序: 拖它就是拖整块。四个成员
+ * 现在分组有自己的 id, 跟普通菜单项一样参与排序: 拖它就是拖整块。组内成员
  * 不再出现在顶层, 只作为它的子项 —— 各自仍可单独隐藏, 组内也可单独排序。
  *
  * 分组行的默认位置放在「个股分析」之后 —— 也就是老逻辑下它实际待的地方,
@@ -22,7 +22,7 @@ export const BROWSE_GROUP = {
   label: '盘面参考',
   hint: '展示型: 看盘面用, 不产出候选也不影响仓位',
   /** 组内默认顺序 —— 用户在设置里可以自己调 */
-  paths: ['/dashboard', '/limit-ladder', '/concept-analysis', '/industry-analysis'],
+  paths: ['/dashboard', '/limit-ladder', '/concept-analysis', '/industry-analysis', '/external-page'],
 } as const
 
 const BROWSE_PATHS: ReadonlySet<string> = new Set<string>(BROWSE_GROUP.paths)

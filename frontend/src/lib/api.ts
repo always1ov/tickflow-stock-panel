@@ -2213,6 +2213,9 @@ export interface Preferences {
   minute_intraday_refresh: boolean
   minute_intraday_refresh_interval: number
   monitor_ext_fields: { concept: MonitorExtFieldItem | null; industry: MonitorExtFieldItem | null }
+  external_page_enabled: boolean
+  external_page_name: string
+  external_page_url: string
 }
 
 /** 监控中心 ext 字段单项配置 (行业/概念标签的来源 + 显示裁剪) */
@@ -2377,6 +2380,11 @@ export const api = {
     request<{ ok: boolean }>('/api/settings/ai', { method: 'DELETE' }),
 
   preferences: () => request<Preferences>('/api/settings/preferences'),
+  updateExternalPage: (config: { enabled: boolean; name: string; url: string }) =>
+    request<Pick<Preferences, 'external_page_enabled' | 'external_page_name' | 'external_page_url'>>(
+      '/api/settings/preferences/external-page',
+      { method: 'PUT', body: JSON.stringify(config) },
+    ),
   dataSources: () => request<DataSourcesResponse>('/api/settings/data-sources'),
   dataSource: (name: string) => request<CustomSourceConfig>(`/api/settings/data-sources/${encodeURIComponent(name)}`),
   saveDataSource: (config: CustomSourceConfig) =>
