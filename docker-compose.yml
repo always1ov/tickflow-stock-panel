@@ -50,6 +50,9 @@ services:
       - "com.centurylinklabs.watchtower.enable=false"
       # ===== Traefik(沿用旧栈: Cloudflare Tunnel + 内网 HTTPS) =====
       - "traefik.enable=true"
+      # Dokploy 会给容器附加自己的网络; 显式指定用 traefik-net 的 IP,
+      # 否则 Traefik 可能选到不可达网段(主栈 dokploy 服务同样这么防)
+      - "traefik.docker.network=traefik-net"
       - "traefik.http.services.tickflow.loadbalancer.server.port=3018"
       # Cloudflare Tunnel 路由(不配 tls)。
       # 注: 旧 compose 给这个 router 写了两次 middlewares(secure-headers 后又写
