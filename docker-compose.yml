@@ -63,8 +63,10 @@ services:
       - "traefik.http.routers.tickflow-cf.priority=100"
       - "traefik.http.routers.tickflow-cf.service=tickflow"
       - "traefik.http.routers.tickflow-cf.middlewares=web-default@docker"
-      # 内网 HTTPS(websecure, 与 web-cf 分开)
-      - 'traefik.http.routers.tickflow-main.rule=Host("${APP_DOMAIN}")'
+      # HTTPS(websecure): 内网直连 + [R-relay] 国内VPS frp 转发的 cn 域名共用这条 ——
+      # TLS 在这里终止, 证书由 cloudflare 解析器一次签两个名。
+      # APP_DOMAIN_CN 未设置时回落为 APP_DOMAIN(重复无害), 不会出现 Host("") 毁掉整条规则
+      - 'traefik.http.routers.tickflow-main.rule=Host("${APP_DOMAIN}") || Host("${APP_DOMAIN_CN:-${APP_DOMAIN}}")'
       - "traefik.http.routers.tickflow-main.entrypoints=websecure"
       - "traefik.http.routers.tickflow-main.tls=true"
       - "traefik.http.routers.tickflow-main.tls.certresolver=cloudflare"
