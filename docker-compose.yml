@@ -1,0 +1,73 @@
+# TickFlow Stock Panel (fork) — 单容器: FastAPI 既跑 API 又托管前端。
+# 镜像由 fork 仓库 CI 构建: push 到 claude/upstream-clean 即刷新 :latest,
+# 同时产出 :<提交sha> 便于回滚(FORK_NOTES.md 存档表里记着各版本提交号)。
+#
+# 入口(沿用旧栈架构):
+#   公网  https://${APP_DOMAIN}  → Cloudflare Tunnel → Traefik(web-cf) → :3018
+#   内网  http://${HOST_IP}:${HOST_PORT}
+services:
+  tickflow-panel:
+    image: ghcr.io/always1ov/tickflow-stock-panel:${IMAGE_TAG:-latest}
+    container_name: ${APP_NAME:-tickflow-panel}
+    restart: unless-stopped
+    # 点 Deploy 就真的重拉镜像 —— 不加这行, compose up 会一直用本地旧 latest
+    pull_policy: always
+    environment:
+      # 盘后管道 15:30 定时按上海时间跑, 时区错了同步就错了
+      - TZ=Asia/Shanghai
+      # 强制容器内绝对路径 —— 应用启动自检该目录是否挂载点, 不是则数据页亮红警告
+      - DATA_DIR=/app/data
+      # 仅首次启动(还没设过密码)时生效; 迁移了旧 data 的话密码沿用旧的, 此值被忽略
+      - AUTH_PASSWORD=${AUTH_PASSWORD}
+    volumes:
+      # 全部运行时数据: 行情 parquet、secrets.json(TickFlow key/AI key/密码)、
+      # 自选、策略、AI 操盘手账本、任务历史 —— 重新部署保留
+      - ../files/data:/app/data
+    ports:
+      - "${HOST_IP}:${HOST_PORT}:3018"
+    networks:
+      - traefik-net
+    healthcheck:
+      # 基础镜像 python:3.11-slim 没有 wget/curl, 用自带 urllib
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:3018/health', timeout=4)\" || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      # 启动要预热全市场 enriched 缓存, 数据多时较慢
+      start_period: 120s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          # 全市场 enriched 重算(百万行 Polars)是内存大头, 512M 必炸
+          cpus: "2.0"
+          memory: 4G
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false"
+      # ===== Traefik(沿用旧栈: Cloudflare Tunnel + 内网 HTTPS) =====
+      - "traefik.enable=true"
+      - "traefik.http.services.tickflow.loadbalancer.server.port=3018"
+      # Cloudflare Tunnel 路由(不配 tls)。
+      # 注: 旧 compose 给这个 router 写了两次 middlewares(secure-headers 后又写
+      # web-default), 同键标签后者覆盖前者, 实际生效的一直是 web-default —— 这里
+      # 保留实际生效的那个; 两个都要就改成逗号串 "web-default@docker,secure-headers@docker"
+      - 'traefik.http.routers.tickflow-cf.rule=Host("${APP_DOMAIN}")'
+      - "traefik.http.routers.tickflow-cf.entrypoints=web-cf"
+      - "traefik.http.routers.tickflow-cf.priority=100"
+      - "traefik.http.routers.tickflow-cf.service=tickflow"
+      - "traefik.http.routers.tickflow-cf.middlewares=web-default@docker"
+      # 内网 HTTPS(websecure, 与 web-cf 分开)
+      - 'traefik.http.routers.tickflow-main.rule=Host("${APP_DOMAIN}")'
+      - "traefik.http.routers.tickflow-main.entrypoints=websecure"
+      - "traefik.http.routers.tickflow-main.tls=true"
+      - "traefik.http.routers.tickflow-main.tls.certresolver=cloudflare"
+      - "traefik.http.routers.tickflow-main.service=tickflow"
+      - "traefik.http.routers.tickflow-main.middlewares=secure-headers@docker"
+
+networks:
+  traefik-net:
+    external: true
