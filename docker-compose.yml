@@ -19,6 +19,9 @@ services:
       - DATA_DIR=/app/data
       # 仅首次启动(还没设过密码)时生效; 迁移了旧 data 的话密码沿用旧的, 此值被忽略
       - AUTH_PASSWORD=${AUTH_PASSWORD}
+      # 免登录开关(见 env.example 警告)。Dokploy Environment 里的变量只做插值,
+      # 不写在这里容器根本收不到 —— 未设置时回落 0, 认证行为与从前一致
+      - AUTH_DISABLED=${AUTH_DISABLED:-0}
     volumes:
       # 全部运行时数据: 行情 parquet、secrets.json(TickFlow key/AI key/密码)、
       # 自选、策略、AI 操盘手账本、任务历史 —— 重新部署保留
