@@ -136,6 +136,10 @@ class ChangePasswordIn(BaseModel):
 @router.get("/status")
 def auth_status(request: Request) -> dict:
     """认证状态: 是否已设密码 + 当前请求是否已登录。"""
+    # [fork 增强] R82: 免登录模式下一律视为「已登录」— 手动打开 /login 也会直接弹回首页。
+    from app.config import settings as _settings
+    if _settings.auth_disabled:
+        return {"configured": True, "authenticated": True, "disabled": True}
     token = request.cookies.get(COOKIE_NAME)
     return {
         "configured": auth.is_configured(),

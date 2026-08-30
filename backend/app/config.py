@@ -116,6 +116,12 @@ class Settings(BaseSettings):
     # 公网服务器部署时免去 SSH 端口转发设密码的麻烦。写入 auth.json(哈希)后即不再读取。
     auth_password: str = ""
 
+    # [fork 增强] R82 免登录开关 — AUTH_DISABLED=1 时完全跳过访问认证。
+    # 适用场景: 面板前面另有一道门(如 Cloudflare Access / 内网穿透白名单), 不想要双重登录。
+    # 风险自负: 任何能连到端口的人都可读明文 API key、清库、改仓位; 启动日志会打大字警告。
+    # 回退: 删掉该环境变量并重启即恢复原认证行为(auth.json 里的密码不受影响)。
+    auth_disabled: bool = False
+
     # Data — frozen: exe 同级 data/ 子目录; 非 frozen: 项目根 data/
     # (均可被环境变量 DATA_DIR 覆盖, pydantic-settings 自动注入)
     data_dir: Path = _user_data_root()

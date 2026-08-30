@@ -93,6 +93,17 @@ async def _application_lifespan(app: FastAPI):
         __version__, tf_client.current_mode(),
     )
 
+    # [fork 增强] R82: 免登录模式的大字警告 — 让「谁都能进」这件事在日志里藏不住。
+    if settings.auth_disabled:
+        logger.warning(
+            "=" * 72 + "\n"
+            "!! AUTH_DISABLED=1 — 访问认证已完全关闭(免登录裸奔模式) !!\n"
+            "!! 任何能连到本服务端口的人都可以: 读取明文 API key、清空数据、 !!\n"
+            "!! 修改自选/策略/操盘手仓位。请确保前面另有访问控制(如 CF Access)。 !!\n"
+            "!! 恢复认证: 删除 AUTH_DISABLED 环境变量后重启。 !!\n"
+            + "=" * 72
+        )
+
     # 首次启动: 若配置了 AUTH_PASSWORD 环境变量且未设过密码, 用它初始化。
     # 公网部署免 SSH 端口转发; 已设过密码则不覆盖 (改密码走 UI)。
     try:
@@ -461,6 +472,9 @@ async def auth_middleware(request: Request, call_next):
     path = request.url.path
     # 仅 /api/ 走认证; 静态资源(前端页面/assets)放行, 由前端处理跳转
     if not path.startswith("/api/"):
+        return await call_next(request)
+    # [fork 增强] R82: AUTH_DISABLED=1 → 免登录全放行(公网也放)。风险自负, 启动日志有大字警告。
+    if settings.auth_disabled:
         return await call_next(request)
     # 白名单放行(设密码/登录/探活本身不拦)
     if path.startswith(_AUTH_WHITELIST_PREFIX) or path in _AUTH_WHITELIST_EXACT:
