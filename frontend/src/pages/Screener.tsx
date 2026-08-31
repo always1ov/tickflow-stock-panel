@@ -58,6 +58,8 @@ export function Screener() {
   const { pool, addToPool, removeFromPool, reorderPool, prune, restorePruned, dismissPruneBackup } = useStrategyPool()
   // [R95] prune 留底: 有备份就给一条可恢复的横幅
   const [pruneBackup, setPruneBackup] = useState(() => storage.strategyPoolPruneBackup.get(null))
+  // [R101] 池空时按盘后缓存找回的横幅(本次会话内可忽略)
+  const [recoverDismissed, setRecoverDismissed] = useState(false)
   const [cardSize, setCardSize] = useState<CardSize>(loadCardSize)
   // 日k蜡烛图显示开关（仅当 candle 列可见时才有意义；持久化）
   const [dailyKChartVisible, setDailyKChartVisible] = useState<boolean>(() => storage.screenerCandle.get(true))
@@ -837,6 +839,33 @@ export function Screener() {
         {cardSize !== 'hidden' && (
         <section>
           {strategies.isLoading && <div className="text-sm text-muted">加载中…</div>}
+          {/* [R101] 池空但盘后缓存里有跑批记录: 缓存的键=上次跑批时池里的策略
+              (含顺序), 正是被清空前的清单 —— 一键原样放回, 不用重新挑 */}
+          {pool.length === 0 && !recoverDismissed && Object.keys(summaryQuery.data?.results ?? {}).length > 0 && (
+            <div className="mb-3 flex flex-wrap items-center gap-2 rounded-btn border border-accent/30 bg-accent/[0.06] px-3 py-2 text-xs text-secondary">
+              <span>
+                策略池是空的, 但盘后跑批缓存里记着上次使用的 {Object.keys(summaryQuery.data?.results ?? {}).length} 个策略(含顺序) —— 可以原样找回
+              </span>
+              <div className="ml-auto flex items-center gap-1.5">
+                <button
+                  onClick={() => {
+                    const ids = Object.keys(summaryQuery.data?.results ?? {})
+                    reorderPool(ids)
+                    toast(`已按最近跑批记录恢复 ${ids.length} 个策略到池`, 'success')
+                  }}
+                  className="rounded-btn bg-accent/15 px-2 py-1 text-[11px] font-medium text-accent hover:bg-accent/25 transition-colors"
+                >
+                  一键找回
+                </button>
+                <button
+                  onClick={() => setRecoverDismissed(true)}
+                  className="rounded-btn px-2 py-1 text-[11px] text-muted hover:text-foreground transition-colors"
+                >
+                  忽略
+                </button>
+              </div>
+            </div>
+          )}
           {/* [R95] 自动清理留底横幅: 池里的策略被 prune 移除过, 给一键恢复的机会 */}
           {pruneBackup && pruneBackup.removed.length > 0 && (
             <div className="mb-3 flex flex-wrap items-center gap-2 rounded-btn border border-warning/30 bg-warning/[0.06] px-3 py-2 text-xs text-secondary">
