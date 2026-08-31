@@ -40,6 +40,9 @@ export function AiProfiles() {
   const qc = useQueryClient()
   const q = useQuery({ queryKey: QK.aiProfiles, queryFn: () => api.aiProfiles() })
   const [rows, setRows] = useState<AiProfile[] | null>(null)
+  // [R94] 未保存标记 —— 移动/编辑只是本地草稿, 忘了点保存的话调整的优先级不会生效;
+  // 这里给一个显眼的提醒, 免得"我明明把它挪到第一了怎么还在用旧首选"。
+  const [dirty, setDirty] = useState(false)
 
   // 服务端那份到了就填进草稿; 之后的编辑都在本地, 点保存才整表覆写
   useEffect(() => {
@@ -50,22 +53,26 @@ export function AiProfiles() {
     mutationFn: (list: AiProfile[]) => api.saveAiProfiles(list),
     onSuccess: res => {
       setRows(res.profiles)
+      setDirty(false)
       qc.invalidateQueries({ queryKey: QK.aiProfiles })
       qc.invalidateQueries({ queryKey: QK.settings })
-      toast('已保存 —— 从上到下依次尝试', 'success')
+      toast('已保存 —— 从上到下依次尝试, 全系统立即按新顺序生效', 'success')
     },
     onError: e => toast(String((e as Error).message || e), 'error'),
   })
 
   const list = rows ?? []
-  const patch = (i: number, p: Partial<AiProfile>) =>
+  const patch = (i: number, p: Partial<AiProfile>) => {
     setRows(list.map((r, k) => (k === i ? { ...r, ...p } : r)))
+    setDirty(true)
+  }
   const move = (i: number, dir: -1 | 1) => {
     const j = i + dir
     if (j < 0 || j >= list.length) return
     const next = [...list]
     ;[next[i], next[j]] = [next[j], next[i]]
     setRows(next)
+    setDirty(true)
   }
 
   return (
@@ -77,7 +84,13 @@ export function AiProfiles() {
           OpenAI 兼容接口 · 从上往下依次尝试 —— 上面那档用不了就自动换下一档
         </span>
         <div className="ml-auto flex items-center gap-1.5">
-          <button type="button" onClick={() => setRows([...list, blank()])}
+          {dirty && (
+            <span className="inline-flex items-center gap-1 rounded-full border border-warning/30 bg-warning/10 px-2 py-0.5 text-[10px] text-warning">
+              <span className="h-1.5 w-1.5 rounded-full bg-warning" />
+              有未保存改动 —— 保存后才生效
+            </span>
+          )}
+          <button type="button" onClick={() => { setRows([...list, blank()]); setDirty(true) }}
             className="inline-flex h-7 items-center gap-1 rounded-btn border border-border px-2 text-[11px] text-secondary transition-colors hover:border-accent/40 hover:text-accent">
             <Plus className="h-3.5 w-3.5" />加一档
           </button>
@@ -136,7 +149,7 @@ export function AiProfiles() {
                 title="往下 = 更靠后" className="p-1 text-muted transition-colors hover:text-accent disabled:opacity-30">
                 <ArrowDown className="h-3.5 w-3.5" />
               </button>
-              <button type="button" onClick={() => setRows(list.filter((_, k) => k !== i))}
+              <button type="button" onClick={() => { setRows(list.filter((_, k) => k !== i)); setDirty(true) }}
                 title="删掉这一档" className="p-1 text-muted transition-colors hover:text-danger">
                 <Trash2 className="h-3.5 w-3.5" />
               </button>
