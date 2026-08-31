@@ -28,7 +28,7 @@ export function StockAnalysis() {
   const [symbol, setSymbol] = useState<string>('')
   const [name, setName] = useState<string>('')
   const [checking, setChecking] = useState(false)
-  const [confirmReport, setConfirmReport] = useState<{ id: string; created_at: string; focus: string } | null>(null)
+  const [confirmReport, setConfirmReport] = useState<{ id: string; created_at: string; focus: string; symbol: string; name: string } | null>(null)
   const [previewSymbol, setPreviewSymbol] = useState<string | null>(null)
   const [showPriceAlerts, setShowPriceAlerts] = useState(false)
   // [R28] 关键价位分析弹窗:点决策台里的标的即弹出,关掉后列表原样还在
@@ -65,27 +65,43 @@ export function StockAnalysis() {
     setShowLevels(true)
   }
 
-  const handleAnalyze = async () => {
-    if (!symbol || checking) return
+  // [R106] 选中但不弹任何窗(行内 ✨/🔔 用: 只要上下文跟随, 不要弹窗打断)
+  const selectQuiet = (sym: string, nm: string) => {
+    setSymbol(sym)
+    setName(nm)
+    setShowLevels(false)
+    rememberStock(sym, nm)
+  }
+
+  const handleAnalyze = async (sym?: string, nm?: string) => {
+    const target = sym || symbol
+    const targetName = nm ?? (sym ? sym : name)
+    if (!target || checking) return
+    if (sym) selectQuiet(sym, targetName)
     setChecking(true)
     try {
       // 当日已分析过 → 二次确认(查看今日报告 / 重新分析)
-      const today = await findTodayReport(symbol)
+      const today = await findTodayReport(target)
       if (today) {
-        setConfirmReport({ id: today.id, created_at: today.created_at, focus: today.focus })
+        setConfirmReport({ id: today.id, created_at: today.created_at, focus: today.focus, symbol: target, name: targetName })
       } else {
-        await doAnalysis()
+        await doAnalysis(target, targetName)
       }
     } catch {
-      await doAnalysis()
+      await doAnalysis(target, targetName)
     } finally {
       setChecking(false)
     }
   }
 
-  const doAnalysis = async () => {
-    const r = await startAnalysis(symbol, name)
+  const doAnalysis = async (sym?: string, nm?: string) => {
+    const r = await startAnalysis(sym || symbol, nm ?? name)
     if (r.error) toast(r.error, 'error')
+  }
+
+  const openPriceAlert = (sym?: string, nm?: string) => {
+    if (sym) selectQuiet(sym, nm ?? sym)
+    setShowPriceAlerts(true)
   }
 
   return (
@@ -96,27 +112,6 @@ export function StockAnalysis() {
       <PageHeader
         title="个股分析"
         subtitle="日 K · 关键价位 · AI 四维分析(技术 / 基本面 / 财务 / 消息面)"
-        right={symbol ? (
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleAnalyze}
-              disabled={checking}
-              title={`对 ${name || symbol} 生成 AI 四维分析`}
-              className="inline-flex shrink-0 whitespace-nowrap items-center gap-1.5 px-3 py-1.5 rounded-btn bg-gradient-to-r from-sky-500/25 to-blue-500/15 border border-sky-400/30 text-sky-300 text-xs font-medium hover:from-sky-500/35 hover:to-blue-500/25 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              {checking ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-              AI 个股分析
-            </button>
-            <button
-              onClick={() => setShowPriceAlerts(true)}
-              className="inline-flex shrink-0 whitespace-nowrap items-center gap-1.5 px-3 py-1.5 rounded-btn border border-sky-400/25 bg-sky-400/[0.08] text-sky-300 text-xs font-medium hover:border-sky-400/40 hover:bg-sky-400/[0.12] transition-all"
-              title={`为 ${name || symbol} 设置价格点位提醒`}
-            >
-              <Bell className="h-3.5 w-3.5" />
-              点位提醒
-            </button>
-          </div>
-        ) : undefined}
       />
 
       {/* [R60] 统一页面留白 */}
@@ -131,6 +126,22 @@ export function StockAnalysis() {
               当前
               <span className="font-medium text-secondary">{name || symbol}</span>
               <span className="font-mono text-[10px]">{symbol}</span>
+              {/* [R106] 搜索出的股(可能不在自选列表)也能分析/设提醒 —— 与列表行内同一对动作 */}
+              <button
+                onClick={() => handleAnalyze()}
+                disabled={checking}
+                title={`对 ${name || symbol} 生成 AI 四维分析`}
+                className="rounded p-1 text-sky-300/70 hover:bg-sky-400/10 hover:text-sky-300 transition-colors disabled:opacity-40"
+              >
+                {checking ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+              </button>
+              <button
+                onClick={() => openPriceAlert()}
+                title={`为 ${name || symbol} 设置价格点位提醒`}
+                className="rounded p-1 text-sky-300/70 hover:bg-sky-400/10 hover:text-sky-300 transition-colors"
+              >
+                <Bell className="h-3.5 w-3.5" />
+              </button>
             </span>
           )}
         </div>
@@ -146,6 +157,8 @@ export function StockAnalysis() {
             setShowLevels(false)
             setPreviewSymbol(s)
           }}
+          onAnalyze={(s, n) => handleAnalyze(s, n)}
+          onPriceAlert={(s, n) => openPriceAlert(s, n)}
         />
       </div>
 
@@ -162,7 +175,7 @@ export function StockAnalysis() {
         <ConfirmModal
           report={confirmReport}
           onView={() => { openHistoryReport(confirmReport.id); setConfirmReport(null) }}
-          onRedo={async () => { setConfirmReport(null); await doAnalysis() }}
+          onRedo={async () => { const t = confirmReport; setConfirmReport(null); await doAnalysis(t.symbol, t.name) }}
           onClose={() => setConfirmReport(null)}
         />
       )}
