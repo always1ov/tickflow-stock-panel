@@ -1068,6 +1068,16 @@ export interface WorkflowAttempt {
   conclusion?: string
 }
 
+// [fork 增强] R99 全球指数实时
+export interface GlobalIndexQuote {
+  key: string
+  name: string
+  last: number
+  change?: number | null
+  change_pct?: number | null   // 小数制
+  updated_at?: number          // epoch 秒
+}
+
 // [fork 增强] R93 使用观察笔记
 export interface UsageNote {
   id: string
@@ -3359,6 +3369,13 @@ export const api = {
       `/api/backtest/mining/autopilot/sessions/${encodeURIComponent(id)}/stop`,
       { method: 'POST' },
     ),
+  // [fork 增强] R99 全球指数实时(独立模块, 新浪源)
+  globalIndices: () =>
+    request<{ items: GlobalIndexQuote[] }>('/api/global-indices'),
+  globalIndexOptions: () =>
+    request<{ presets: { key: string; name: string }[]; selected: string[] }>('/api/global-indices/options'),
+  saveGlobalIndexSelection: (keys: string[]) =>
+    request<{ selected: string[] }>('/api/global-indices/selection', { method: 'PUT', body: JSON.stringify({ keys }) }),
   // [fork 增强] R93 使用观察笔记: 纯文本, 增删改
   usageNotesList: () =>
     request<{ items: UsageNote[] }>('/api/usage-notes'),

@@ -265,6 +265,10 @@ def run_now(
         )
         gap_days = (today - start_date).days
         new_daily_days = gap_days
+        # [R98] 常态交易日(窗口=今天一天)做正式覆写确认; 多天补缺口窗口不判
+        # (行数没法归因到"今天", 由次日 integrity 兜底)
+        if start_date == today:
+            _note_today_official(written_daily, today)
         emit("sync_daily", 45, f"日K 完成,覆盖 {gap_days} 天")
         logger.info("sync_daily: [%s ~ %s] done, %d days", start_date, today, gap_days)
     else:
@@ -808,9 +812,78 @@ def _run_tracked(fn, job_label: str) -> bool:
     return succeeded
 
 
+# ================================================================
+# [fork R98] 收盘正式覆写确认 — "确保数据落盘完整"的最后一道闸
+# ================================================================
+# 常态交易日管道的日K窗口是 [今天~今天]: 若数据商(如 fuyao)当日正式数据
+# 在管道时刻尚未发布, 这一窗口会写 0 行 —— 当日行停留在收盘快照版, 且当天
+# 不会再有人回头。这里在调度路径上补一个确认循环: 窗口写入行数过低且当天
+# 是交易日 → 标记待确认, 1 小时后自动重跑管道, 最多 3 次; 全部落空也无害
+# (快照版数值≈正式版, 次日管道必然覆写), 但会把每一步写进日志。
+_OFFICIAL_MIN_ROWS = 500          # 全市场 ~5600 行; 低于此值视为"正式数据未就绪"
+_OFFICIAL_RETRY_MAX = 3
+_OFFICIAL_RETRY_DELAY_MIN = 60
+_today_official_pending: object = None   # date | None — 待确认的交易日
+_official_retry_count = 0
+_SCHEDULER: AsyncIOScheduler | None = None
+_PIPELINE_FN = None
+
+
+def _note_today_official(written_rows: int, today) -> None:
+    """常态窗口([今天~今天])同步后的落盘确认标记。"""
+    global _today_official_pending
+    if written_rows >= _OFFICIAL_MIN_ROWS:
+        _today_official_pending = None
+        return
+    try:
+        from app.services import trading_day
+        if trading_day.is_trading_day() is False:
+            _today_official_pending = None   # 休市日写 0 行是正常的
+            return
+    except Exception:  # noqa: BLE001
+        pass  # 探针失灵按交易日处理 —— 宁可多确认一轮
+    _today_official_pending = today
+    logger.warning(
+        "sync_daily: 今日窗口仅写入 %d 行(<%d), 数据商正式日K可能未就绪, 已标记待确认",
+        written_rows, _OFFICIAL_MIN_ROWS,
+    )
+
+
+def _maybe_schedule_official_retry() -> None:
+    """调度路径专用: 待确认标记还在 → 约 1 小时后重跑管道(有限次)。"""
+    global _official_retry_count
+    from datetime import date as _date, datetime as _dt, timedelta as _td
+    if _today_official_pending != _date.today():
+        _official_retry_count = 0
+        return
+    if _SCHEDULER is None or _PIPELINE_FN is None:
+        return
+    if _official_retry_count >= _OFFICIAL_RETRY_MAX:
+        logger.warning(
+            "sync_daily: 正式覆写确认重试 %d 次仍未就绪, 今日保持收盘快照版(数值≈正式), 次日管道覆写",
+            _OFFICIAL_RETRY_MAX,
+        )
+        return
+    _official_retry_count += 1
+    run_at = _dt.now() + _td(minutes=_OFFICIAL_RETRY_DELAY_MIN)
+    _SCHEDULER.add_job(
+        lambda: _scheduled_pipeline_task(_PIPELINE_FN),
+        trigger="date", run_date=run_at,
+        id="daily_pipeline_official_retry", replace_existing=True,
+        misfire_grace_time=1800,
+    )
+    logger.warning(
+        "sync_daily: 已安排正式覆写确认重试 #%d(%s)",
+        _official_retry_count, run_at.strftime("%H:%M"),
+    )
+
+
 def _scheduled_pipeline_task(pipeline_fn) -> None:
     """Run weekly mining only after the tracked daily pipeline has fully succeeded."""
-    if not _run_tracked(pipeline_fn, "daily_pipeline"):
+    ok = _run_tracked(pipeline_fn, "daily_pipeline")
+    # 管道成功与否都做确认检查: 失败轮同样该有下一次机会
+    _maybe_schedule_official_retry()
+    if not ok:
         return
     try:
         from app.services.mining_schedule import run_weekly_mining
@@ -1076,6 +1149,11 @@ def start_scheduler(repo: KlineRepository, capset: CapabilitySet) -> AsyncIOSche
             # 成功也生效; 随后异常继续上抛, 由 _run_tracked 标记任务 failed。
             repo.refresh_cache()
         return result
+
+    # [R98] 存下调度器与管道闭包, 供收盘正式覆写确认重试使用
+    global _SCHEDULER, _PIPELINE_FN
+    _SCHEDULER = scheduler
+    _PIPELINE_FN = _pipeline_then_refresh
 
     scheduler.add_job(
         lambda: _scheduled_pipeline_task(_pipeline_then_refresh),

@@ -202,6 +202,93 @@ function SidebarIndexQuotes({ rows, items }: { rows: IndexQuote[] | undefined; i
   )
 }
 
+// ===== [fork R99] 全球指数卡(独立模块: 新浪源, 与 A 股主链无关) =====
+// 有时差的市场休市时上游值静止, 卡片置灰角标不做时段门控; 数据超 10 分钟
+// 未更新时整体降透明度提示"这不是现在的价"。
+function GlobalIndexQuotes() {
+  const qc = useQueryClient()
+  const [showPicker, setShowPicker] = useState(false)
+  const quotes = useQuery({
+    queryKey: QK.globalIndices,
+    queryFn: api.globalIndices,
+    refetchInterval: 30000,
+    placeholderData: prev => prev,
+  })
+  const options = useQuery({
+    queryKey: QK.globalIndexOptions,
+    queryFn: api.globalIndexOptions,
+    enabled: showPicker,
+  })
+  const saveSel = async (keys: string[]) => {
+    await api.saveGlobalIndexSelection(keys)
+    qc.invalidateQueries({ queryKey: QK.globalIndices })
+    qc.invalidateQueries({ queryKey: QK.globalIndexOptions })
+  }
+  const items = quotes.data?.items ?? []
+  const selected = options.data?.selected ?? items.map(i => i.key)
+  if (items.length === 0 && !showPicker) {
+    // 没选任何指数或上游长期不可达: 只留一个入口, 不占空间
+    return (
+      <div className="mt-1.5 flex items-center justify-between border-t border-border/40 pt-1.5">
+        <span className="text-[9px] text-muted/50">全球指数</span>
+        <button onClick={() => setShowPicker(true)} className="rounded p-0.5 text-muted/50 hover:text-foreground transition-colors" title="选择全球指数">
+          <Settings className="h-3 w-3" />
+        </button>
+      </div>
+    )
+  }
+  return (
+    <div className="mt-1.5 border-t border-border/40 pt-1.5">
+      <div className="mb-1 flex items-center justify-between">
+        <span className="text-[9px] text-muted/50">全球指数 · 有时差</span>
+        <button onClick={() => setShowPicker(v => !v)} className="rounded p-0.5 text-muted/50 hover:text-foreground transition-colors" title="选择全球指数">
+          <Settings className="h-3 w-3" />
+        </button>
+      </div>
+      {showPicker && (
+        <div className="mb-1.5 flex flex-wrap gap-1">
+          {(options.data?.presets ?? []).map(p => {
+            const on = selected.includes(p.key)
+            return (
+              <button
+                key={p.key}
+                onClick={() => saveSel(on ? selected.filter(k => k !== p.key) : [...selected, p.key])}
+                className={cn(
+                  'rounded-full border px-1.5 py-0.5 text-[9px] transition-colors cursor-pointer',
+                  on ? 'border-accent/40 bg-accent/10 text-accent' : 'border-border text-muted hover:text-secondary',
+                )}
+              >
+                {p.name}
+              </button>
+            )
+          })}
+        </div>
+      )}
+      <div className="grid grid-cols-2 gap-1.5">
+        {items.map(q => {
+          const pct = q.change_pct != null ? q.change_pct * 100 : null
+          const staleMin = q.updated_at ? (Date.now() / 1000 - q.updated_at) / 60 : null
+          return (
+            <div
+              key={q.key}
+              className={cn('rounded bg-elevated/60 px-2 py-1.5', staleMin != null && staleMin > 10 && 'opacity-60')}
+              title={`${q.name}${staleMin != null ? ` · ${Math.round(staleMin)} 分钟前` : ''}`}
+            >
+              <div className="flex items-center justify-between gap-1">
+                <span className="text-[10px] text-secondary">{q.name}</span>
+                <span className={`text-[10px] font-mono ${indexPctClass(pct)}`}>{fmtIndexPct(pct)}</span>
+              </div>
+              <div className={`mt-0.5 truncate font-mono text-[10px] ${indexPctClass(pct)}`}>
+                {fmtIndexValue(q.last)}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 // ===== 数据源能力健康卡 =====
 // 能力路由架构下的侧栏状态: 不再展示「主数据源 + TickFlow 档位」(单源时代遗留 —
 // 五个能力各自路由, 拿日K的源代表全局是随意的), 改为回答「各能力当前是否都有源在供」。
@@ -740,6 +827,8 @@ export function Layout() {
           {!navCollapsed && showSidebarQuotes && !isWatchlistMode && (!realtimeUnavailable || !!realtimeProviderName) && (
             <SidebarIndexQuotes rows={sidebarIndexQuotes?.rows} items={sidebarIndexes} />
           )}
+          {/* [R99] 全球指数(韩综指等) — 独立模块, A 股实时开不开都能看 */}
+          {!navCollapsed && <GlobalIndexQuotes />}
         </div>
 
         <nav className="flex-1 min-h-0 overflow-y-auto px-2 py-2.5 space-y-0.5">
