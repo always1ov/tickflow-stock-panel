@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, createContext, useContext } from 'react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Save, Loader2, Check, Wifi, WifiOff, Eye, EyeOff, Shield,
   Shuffle, Plug, Settings2, Trash2,
@@ -99,6 +99,15 @@ export function SettingsAIPanel({ highlight }: { highlight?: string } = {}) {
   })
   const draftsInitialized = useRef(false)
 
+  // [fork R94] 全系统 AI 统一由「AI 档位」管理: 用户配过档位表(非合成的 legacy 单条)后,
+  // 调用链只走档位(第 1 档优先, 用不了自动顺位) —— 下面这张卡里的接口/模型/Key 不再
+  // 参与任何调用, 只剩全局参数(UA/输出上限/上下文窗口)仍然全局生效, 界面据此收起。
+  const profilesQuery = useQuery({ queryKey: QK.aiProfiles, queryFn: api.aiProfiles })
+  const profileRows = profilesQuery.data?.profiles ?? []
+  const profilesManaged = profileRows.some(p => p.id !== 'legacy')
+  const enabledProfiles = profileRows.filter(p => p.enabled && p.id !== 'legacy')
+  const primaryProfile = enabledProfiles[0]
+
   const isCodexProvider = provider === CODEX_PROVIDER
   const isOpenAIProvider = provider === OPENAI_PROVIDER
   const savedCodexProvider = s?.ai_provider === CODEX_PROVIDER
@@ -106,7 +115,9 @@ export function SettingsAIPanel({ highlight }: { highlight?: string } = {}) {
   const selectedPreset = PRESETS.find(p => p.label === selectedPresetLabel) ?? PRESETS[0]
   // [R62] 标题不再随匹配到的预设变化 —— 预设已经不给选了, 还显示
   // "DeepSeek 配置"会让人以为自己在某个选项里
-  const configTitle = isCodexProvider ? 'Codex CLI 配置' : 'AI 配置(OpenAI 兼容)'
+  const configTitle = profilesManaged
+    ? '全局参数(对所有档位生效)'
+    : isCodexProvider ? 'Codex CLI 配置' : 'AI 配置(OpenAI 兼容)'
   const savedCodexModel = s?.ai_codex_model ?? (savedCodexProvider ? (s?.ai_model ?? '') : '')
   const savedCodexEffort = s?.ai_codex_reasoning_effort ?? ''
   const savedCodexOptionKnown = CODEX_MODEL_OPTIONS.some(option =>
@@ -129,7 +140,8 @@ export function SettingsAIPanel({ highlight }: { highlight?: string } = {}) {
     option.model === codexModel && option.effort === codexReasoningEffort,
   ) ?? CODEX_MODEL_OPTIONS[0]
   const codexModelSelectValue = selectedCodexModelOption.value
-  const canSave = isCodexProvider ? true : !!baseUrl.trim() && !!model.trim()
+  // 档位接管时这张卡只存全局参数, 不再要求接口/模型必填
+  const canSave = profilesManaged ? true : isCodexProvider ? true : !!baseUrl.trim() && !!model.trim()
 
   useEffect(() => {
     if (!s) return
@@ -272,7 +284,8 @@ export function SettingsAIPanel({ highlight }: { highlight?: string } = {}) {
     setTesting(true)
     setTestResult(null)
     try {
-      if (canSave) await api.saveAiSettings(payload())
+      // 档位接管时测试的是档位链本身, 不该顺手把旧单档配置写回去
+      if (canSave && !profilesManaged) await api.saveAiSettings(payload())
       const r = await api.strategyAiTest()
       setTestResult({ ok: r.ok, msg: r.ok ? `连通成功 · ${r.model ?? provider}` : (r.error ?? '未知错误') })
     } catch (e: any) {
@@ -282,15 +295,35 @@ export function SettingsAIPanel({ highlight }: { highlight?: string } = {}) {
     }
   }
 
+  // 自定义 UA 块 —— 未接管时嵌在单档配置里, 档位接管后单独作为全局参数出现
+  const uaBlock = (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <Field label="自定义 User-Agent" inline>
+          <Toggle checked={customUa} onChange={() => setCustomUa(v => !v)} />
+        </Field>
+      </div>
+      {customUa && (
+        <div className="flex gap-2">
+          <input type="text" value={userAgent} onChange={e => setUserAgent(e.target.value)} placeholder="粘贴浏览器 User-Agent" className={`${INPUT_CLS} flex-1`} />
+          <button type="button" onClick={genRandomUa} title="随机生成浏览器 User-Agent" className="h-9 px-2.5 rounded-lg border border-border/50 text-xs text-secondary hover:text-accent hover:border-accent/30 transition-all flex items-center gap-1.5 shrink-0">
+            <Shuffle className="h-3 w-3" /> 随机
+          </button>
+        </div>
+      )}
+    </div>
+  )
+
   return (
     <HighlightContext.Provider value={highlight ?? ''}>
     <div className="space-y-5 max-w-2xl">
       {/* [R56] 多档兜底放最上 —— 这是"AI 能不能一直用得上"的那一层。
-          下面那套单档配置保留原样(它就是兜底链里合成的第一档), 想只用一家的
-          照旧在下面配, 不必碰这个表。 */}
+          [R94] 配过档位表后它就是全系统 AI 的唯一配置入口: 下面那张卡收起
+          接口/模型/Key, 只剩全局参数。没配过档位的老用户看到的仍是单档配置
+          (它会被合成为兜底链的唯一一档), 行为不变。 */}
       <AiProfiles />
       <Card icon={Plug} title="连接状态" anchor="ai-connection" right={
-        configured && (
+        (profilesManaged ? enabledProfiles.length > 0 : configured) && (
           <button onClick={handleTest} disabled={testing}
             className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-btn bg-elevated hover:bg-elevated/80 text-xs text-secondary transition-colors duration-150 ease-smooth disabled:opacity-50">
             {testing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Wifi className="h-3 w-3" />}
@@ -299,13 +332,21 @@ export function SettingsAIPanel({ highlight }: { highlight?: string } = {}) {
         )
       }>
         <div className="flex items-center gap-3">
-          <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${configured ? 'bg-emerald-400/10 text-emerald-400' : 'bg-amber-400/10 text-amber-400'}`}>
-            {configured ? <Wifi className="h-4.5 w-4.5" /> : <WifiOff className="h-4.5 w-4.5" />}
+          <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${(profilesManaged ? enabledProfiles.length > 0 : configured) ? 'bg-emerald-400/10 text-emerald-400' : 'bg-amber-400/10 text-amber-400'}`}>
+            {(profilesManaged ? enabledProfiles.length > 0 : configured) ? <Wifi className="h-4.5 w-4.5" /> : <WifiOff className="h-4.5 w-4.5" />}
           </div>
           <div className="min-w-0">
-            <div className="text-sm font-medium text-foreground">{configured ? 'AI 已连接' : 'AI 未配置'}</div>
+            <div className="text-sm font-medium text-foreground">
+              {profilesManaged
+                ? (enabledProfiles.length > 0 ? 'AI 已连接 · 档位统一管理' : 'AI 档位全部停用')
+                : configured ? 'AI 已连接' : 'AI 未配置'}
+            </div>
             <div className="text-xs text-muted mt-0.5 truncate">
-              {configured
+              {profilesManaged
+                ? (primaryProfile
+                  ? `首选 ${primaryProfile.label || primaryProfile.model}${enabledProfiles.length > 1 ? ` · 共 ${enabledProfiles.length} 档自动兜底` : ''}`
+                  : '在上方档位表里至少启用一档')
+                : configured
                 ? (savedCodexProvider
                   ? `${s?.ai_codex_command ?? CODEX_COMMAND} · ${codexModelLabel(s?.ai_model, s?.ai_codex_reasoning_effort)}`
                   : `${s?.ai_model} · ${s?.ai_api_key_masked}`)
@@ -329,15 +370,23 @@ export function SettingsAIPanel({ highlight }: { highlight?: string } = {}) {
       <Card
         icon={Settings2}
         title={configTitle}
-        right={
+        right={profilesManaged ? undefined : (
           <span className="inline-flex items-center gap-1.5 text-[10px] text-muted/60" title={isCodexProvider ? 'Use local Codex CLI via codex exec' : 'Use OpenAI-compatible Chat Completions API'}>
             <span className="rounded-full border border-border/40 bg-base/50 px-1.5 py-px font-mono">{isCodexProvider ? 'codex exec' : 'Chat Completions'}</span>
             {isCodexProvider ? 'CLI' : '接口'}
           </span>
-        }
+        )}
       >
         <div className="space-y-4">
-          {isCodexProvider ? (
+          {profilesManaged ? (
+            <>
+              <div className="rounded-lg border border-accent/15 bg-accent/[0.03] px-3 py-2.5 text-[11px] leading-relaxed text-secondary">
+                接口地址、模型与 API Key 已统一由上方「AI 档位」表管理: 全系统默认用第 1 档,
+                这一档服务不了时自动顺位切换。此处只保留对所有档位生效的全局参数。
+              </div>
+              {uaBlock}
+            </>
+          ) : isCodexProvider ? (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Field label="CLI 命令" hint="固定使用默认 codex 命令, 由后端自动解析本机 Codex Desktop/CLI, 不支持自定义可执行路径。">
                 <div className={`${INPUT_CLS} flex items-center text-muted/80 select-none`} aria-label="Codex CLI command">
@@ -405,21 +454,7 @@ export function SettingsAIPanel({ highlight }: { highlight?: string } = {}) {
 
               <div className="border-t border-border/20" />
 
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Field label="自定义 User-Agent" inline>
-                    <Toggle checked={customUa} onChange={() => setCustomUa(v => !v)} />
-                  </Field>
-                </div>
-                {customUa && (
-                  <div className="flex gap-2">
-                    <input type="text" value={userAgent} onChange={e => setUserAgent(e.target.value)} placeholder="粘贴浏览器 User-Agent" className={`${INPUT_CLS} flex-1`} />
-                    <button type="button" onClick={genRandomUa} title="随机生成浏览器 User-Agent" className="h-9 px-2.5 rounded-lg border border-border/50 text-xs text-secondary hover:text-accent hover:border-accent/30 transition-all flex items-center gap-1.5 shrink-0">
-                      <Shuffle className="h-3 w-3" /> 随机
-                    </button>
-                  </div>
-                )}
-              </div>
+              {uaBlock}
             </>
           )}
 
@@ -450,7 +485,7 @@ export function SettingsAIPanel({ highlight }: { highlight?: string } = {}) {
           {save.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : saved ? <Check className="h-4 w-4" /> : <Save className="h-4 w-4" />}
           {save.isPending ? '保存中...' : saved ? '已保存' : '保存配置'}
         </button>
-        {configured && (
+        {configured && !profilesManaged && (
           <button onClick={() => setConfirmClear(true)} disabled={clear.isPending} className="h-10 px-4 rounded-xl bg-elevated text-secondary hover:text-danger text-sm flex items-center justify-center gap-1.5 hover:bg-elevated/80 disabled:opacity-50 transition-all shrink-0" title="Clear AI provider configuration">
             <Trash2 className="h-4 w-4" />
             清空

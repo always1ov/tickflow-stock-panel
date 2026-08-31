@@ -801,7 +801,9 @@ def get_strategy_source(strategy_id: str, request: Request):
 @router.post("/ai/test")
 async def ai_test(request: Request):
     """Send a small prompt through the selected AI provider."""
-    from app.services.ai_provider import current_ai_model, current_ai_provider, generate_ai_text
+    from app.services.ai_provider import (
+        current_ai_model, current_ai_provider, generate_ai_text, last_served_profile_name,
+    )
 
     try:
         text = await generate_ai_text(
@@ -810,7 +812,9 @@ async def ai_test(request: Request):
             max_tokens=8,
             timeout=15,
         )
-        return {"ok": True, "model": current_ai_model() or current_ai_provider(), "response": text[:80]}
+        # [fork R94] 报真正服务成功的那一档 —— 兜底切过档时别把功劳记给第一档
+        served = last_served_profile_name()
+        return {"ok": True, "model": served or current_ai_model() or current_ai_provider(), "response": text[:80]}
     except Exception as e:
         return {
             "ok": False,

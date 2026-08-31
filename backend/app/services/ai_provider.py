@@ -369,6 +369,20 @@ def _profiles_for_call() -> list[dict]:
     return secrets_store.list_ai_profiles(enabled_only=True)
 
 
+# [fork R94] 最近一次真正服务成功的档位(诊断用: 测试按钮/日志据此报"是谁在答")。
+# 只是标签, 不参与任何路由决策; 简单全局够用 —— 并发下最多显示成"最近一个成功的"。
+_LAST_SERVED: dict | None = None
+
+
+def last_served_profile_name() -> str | None:
+    return _profile_name(_LAST_SERVED) if _LAST_SERVED else None
+
+
+def _mark_served(prof: dict) -> None:
+    global _LAST_SERVED
+    _LAST_SERVED = prof
+
+
 async def generate_ai_text(
     messages: Sequence[Message],
     *,
@@ -401,10 +415,13 @@ async def generate_ai_text(
         token = _ACTIVE_PROFILE.set(prof)
         try:
             if is_codex_cli_provider():
-                return await _run_codex_cli(
+                text = await _run_codex_cli(
                     messages, max_tokens=max_tokens, timeout=max(timeout, 600.0))
-            return await _run_openai_once(
-                messages, temperature=temperature, max_tokens=max_tokens, timeout=timeout)
+            else:
+                text = await _run_openai_once(
+                    messages, temperature=temperature, max_tokens=max_tokens, timeout=timeout)
+            _mark_served(prof)
+            return text
         except Exception as exc:
             errors.append((prof, exc))
             last = i == len(profiles) - 1
@@ -455,11 +472,14 @@ async def stream_ai_text(
                 text = await _run_codex_cli(
                     messages, max_tokens=max_tokens, timeout=max(timeout, 600.0))
                 started = True
+                _mark_served(prof)
                 yield text
                 return
             async for chunk in _stream_openai(
                 messages, temperature=temperature, max_tokens=max_tokens, timeout=timeout,
             ):
+                if not started:
+                    _mark_served(prof)
                 started = True
                 yield chunk
             return
