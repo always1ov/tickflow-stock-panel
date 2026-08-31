@@ -172,8 +172,14 @@ function MonitorBadge({ active }: { active: boolean }) {
   )
 }
 
-function SidebarIndexQuotes({ rows, items }: { rows: IndexQuote[] | undefined; items: CoreIndex[] }) {
-  if (items.length === 0) return null
+function SidebarIndexQuotes({ rows, items, globalRows }: {
+  rows: IndexQuote[] | undefined
+  items: CoreIndex[]
+  /** [R102] 全球指数(独立数据源) — 与 A 股指数同格显示, 数据链各自独立 */
+  globalRows?: { key: string; name: string; last: number; change_pct?: number | null; updated_at?: number }[]
+}) {
+  const globals = globalRows ?? []
+  if (items.length === 0 && globals.length === 0) return null
   const quoteBySymbol = new Map((rows ?? []).map(q => [q.symbol, q]))
   return (
     <div className="mt-2 grid grid-cols-2 gap-1.5 border-t border-border/60 pt-2">
@@ -198,93 +204,25 @@ function SidebarIndexQuotes({ rows, items }: { rows: IndexQuote[] | undefined; i
           </NavLink>
         )
       })}
-    </div>
-  )
-}
-
-// ===== [fork R99] 全球指数卡(独立模块: 新浪源, 与 A 股主链无关) =====
-// 有时差的市场休市时上游值静止, 卡片置灰角标不做时段门控; 数据超 10 分钟
-// 未更新时整体降透明度提示"这不是现在的价"。
-function GlobalIndexQuotes() {
-  const qc = useQueryClient()
-  const [showPicker, setShowPicker] = useState(false)
-  const quotes = useQuery({
-    queryKey: QK.globalIndices,
-    queryFn: api.globalIndices,
-    refetchInterval: 15000,
-    placeholderData: prev => prev,
-  })
-  const options = useQuery({
-    queryKey: QK.globalIndexOptions,
-    queryFn: api.globalIndexOptions,
-    enabled: showPicker,
-  })
-  const saveSel = async (keys: string[]) => {
-    await api.saveGlobalIndexSelection(keys)
-    qc.invalidateQueries({ queryKey: QK.globalIndices })
-    qc.invalidateQueries({ queryKey: QK.globalIndexOptions })
-  }
-  const items = quotes.data?.items ?? []
-  const selected = options.data?.selected ?? items.map(i => i.key)
-  if (items.length === 0 && !showPicker) {
-    // 没选任何指数或上游长期不可达: 只留一个入口, 不占空间
-    return (
-      <div className="mt-1.5 flex items-center justify-between border-t border-border/40 pt-1.5">
-        <span className="text-[9px] text-muted/50">全球指数</span>
-        <button onClick={() => setShowPicker(true)} className="rounded p-0.5 text-muted/50 hover:text-foreground transition-colors" title="选择全球指数">
-          <Settings className="h-3 w-3" />
-        </button>
-      </div>
-    )
-  }
-  return (
-    <div className="mt-1.5 border-t border-border/40 pt-1.5">
-      <div className="mb-1 flex items-center justify-between">
-        <span className="text-[9px] text-muted/50">全球指数 · 有时差</span>
-        <button onClick={() => setShowPicker(v => !v)} className="rounded p-0.5 text-muted/50 hover:text-foreground transition-colors" title="选择全球指数">
-          <Settings className="h-3 w-3" />
-        </button>
-      </div>
-      {showPicker && (
-        <div className="mb-1.5 flex flex-wrap gap-1">
-          {(options.data?.presets ?? []).map(p => {
-            const on = selected.includes(p.key)
-            return (
-              <button
-                key={p.key}
-                onClick={() => saveSel(on ? selected.filter(k => k !== p.key) : [...selected, p.key])}
-                className={cn(
-                  'rounded-full border px-1.5 py-0.5 text-[9px] transition-colors cursor-pointer',
-                  on ? 'border-accent/40 bg-accent/10 text-accent' : 'border-border text-muted hover:text-secondary',
-                )}
-              >
-                {p.name}
-              </button>
-            )
-          })}
-        </div>
-      )}
-      <div className="grid grid-cols-2 gap-1.5">
-        {items.map(q => {
-          const pct = q.change_pct != null ? q.change_pct * 100 : null
-          const staleMin = q.updated_at ? (Date.now() / 1000 - q.updated_at) / 60 : null
-          return (
-            <div
-              key={q.key}
-              className={cn('rounded bg-elevated/60 px-2 py-1.5', staleMin != null && staleMin > 10 && 'opacity-60')}
-              title={`${q.name}${staleMin != null ? ` · ${Math.round(staleMin)} 分钟前` : ''}`}
-            >
-              <div className="flex items-center justify-between gap-1">
-                <span className="text-[10px] text-secondary">{q.name}</span>
-                <span className={`text-[10px] font-mono ${indexPctClass(pct)}`}>{fmtIndexPct(pct)}</span>
-              </div>
-              <div className={`mt-0.5 truncate font-mono text-[10px] ${indexPctClass(pct)}`}>
-                {fmtIndexValue(q.last)}
-              </div>
+      {globals.map(q => {
+        const pct = q.change_pct != null ? q.change_pct * 100 : null
+        const staleMin = q.updated_at ? (Date.now() / 1000 - q.updated_at) / 60 : null
+        return (
+          <div
+            key={q.key}
+            className={cn('rounded bg-elevated/60 px-2 py-1.5', staleMin != null && staleMin > 10 && 'opacity-60')}
+            title={`${q.name}(全球·独立源)${staleMin != null && staleMin > 1 ? ` · ${Math.round(staleMin)} 分钟前` : ''}`}
+          >
+            <div className="flex items-center justify-between gap-1">
+              <span className="text-[10px] text-secondary">{q.name}</span>
+              <span className={`text-[10px] font-mono ${indexPctClass(pct)}`}>{fmtIndexPct(pct)}</span>
             </div>
-          )
-        })}
-      </div>
+            <div className={`mt-0.5 truncate font-mono text-[10px] ${indexPctClass(pct)}`}>
+              {fmtIndexValue(q.last)}
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -661,6 +599,15 @@ export function Layout() {
   const realtimeProviderName = realtimeProvider && realtimeProvider !== 'tickflow'
     ? (dataSources?.custom?.find(s => s.name === realtimeProvider)?.display_name || realtimeProvider)
     : null
+  // [R102] A 股卡自身的可用性条件(全球卡不受其影响)
+  const cnQuotesOk = !isWatchlistMode && (!realtimeUnavailable || !!realtimeProviderName)
+  const globalIdxQuery = useQuery({
+    queryKey: QK.globalIndices,
+    queryFn: api.globalIndices,
+    refetchInterval: 15000,
+    placeholderData: (prev: { items: import('@/lib/api').GlobalIndexQuote[] } | undefined) => prev,
+    enabled: showSidebarQuotes && !navCollapsed,
+  })
   const realtimeToggleDisabled = toggleQuote.isPending || isPaused
   const realtimeActive = realtimeEnabled && isRunning && isTrading
   const realtimeStatusLabel = toggleQuote.isPending
@@ -823,12 +770,15 @@ export function Layout() {
               />
             </div>
           )}
-          {/* 指数报价 — 按用户要求放左上角(品牌/状态卡之下), 不再挤在左下实时开关里 */}
-          {!navCollapsed && showSidebarQuotes && !isWatchlistMode && (!realtimeUnavailable || !!realtimeProviderName) && (
-            <SidebarIndexQuotes rows={sidebarIndexQuotes?.rows} items={sidebarIndexes} />
+          {/* [R102] 指数报价 — A 股与全球指数同格同开关(showSidebarQuotes), 数据链各自独立:
+              A 股来自行情主链, 全球来自独立新浪源; A 股实时不可用时全球卡照常显示 */}
+          {!navCollapsed && showSidebarQuotes && (
+            <SidebarIndexQuotes
+              rows={cnQuotesOk ? sidebarIndexQuotes?.rows : undefined}
+              items={cnQuotesOk ? sidebarIndexes : []}
+              globalRows={globalIdxQuery.data?.items}
+            />
           )}
-          {/* [R99] 全球指数(韩综指等) — 独立模块, A 股实时开不开都能看 */}
-          {!navCollapsed && <GlobalIndexQuotes />}
         </div>
 
         <nav className="flex-1 min-h-0 overflow-y-auto px-2 py-2.5 space-y-0.5">

@@ -156,6 +156,22 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
     save({ sidebar_index_symbols: next })
   }, [save, sidebarIndexSymbols])
 
+  // [R102] 全球指数选择 —— 与 A 股指数同卡配置, 背后独立接口/独立数据源
+  const globalIdxOptions = useQuery({
+    queryKey: QK.globalIndexOptions,
+    queryFn: api.globalIndexOptions,
+  })
+  const toggleGlobalIndex = useCallback((key: string, visible: boolean) => {
+    const selected = new Set(globalIdxOptions.data?.selected ?? [])
+    if (visible) selected.add(key)
+    else selected.delete(key)
+    const ordered = (globalIdxOptions.data?.presets ?? []).map(p => p.key).filter(k => selected.has(k))
+    api.saveGlobalIndexSelection(ordered).then(() => {
+      qc.invalidateQueries({ queryKey: QK.globalIndexOptions })
+      qc.invalidateQueries({ queryKey: QK.globalIndices })
+    })
+  }, [globalIdxOptions.data, qc])
+
   const toggleIndicesPin = useCallback((pinned: boolean) => {
     api.updateIndicesNavPinned(pinned).then(() => qc.invalidateQueries({ queryKey: QK.preferences }))
   }, [qc])
@@ -435,7 +451,7 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
 
         <Card icon={BarChart3} title="左侧菜单指数">
           <p className="text-xs text-secondary mb-4">
-            选择实时行情开启时，左侧菜单底部显示哪些指数点位和涨跌幅。
+            选择左侧菜单顶部指数卡显示哪些指数点位和涨跌幅。A 股与全球指数同格显示、同受下方"固定显示"控制，但数据来源各自独立。
           </p>
           <div className="space-y-2">
             {SIDEBAR_INDEX_OPTIONS.map(item => (
@@ -445,6 +461,19 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
                 desc={item.symbol}
                 checked={sidebarIndexSymbols.includes(item.symbol)}
                 onChange={(v) => toggleSidebarIndex(item.symbol, v)}
+              />
+            ))}
+          </div>
+          {/* [R99/R102] 全球指数 — 独立数据源(新浪), 开关与 A 股指数放同一张卡 */}
+          <div className="mt-3 pt-3 border-t border-border space-y-2">
+            <div className="text-[10px] text-muted">全球指数（独立数据源 · 有时差，休市时显示最后值）</div>
+            {(globalIdxOptions.data?.presets ?? []).map(p => (
+              <ToggleRow
+                key={p.key}
+                label={p.name}
+                desc={p.key}
+                checked={(globalIdxOptions.data?.selected ?? []).includes(p.key)}
+                onChange={(v) => toggleGlobalIndex(p.key, v)}
               />
             ))}
           </div>
