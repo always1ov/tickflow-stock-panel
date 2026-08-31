@@ -1072,6 +1072,9 @@ export interface WorkflowAttempt {
 export interface UsageNote {
   id: string
   content: string
+  /** ''=随手记 / pending=待验证 / verified=已验证 / rejected=不成立 */
+  status?: '' | 'pending' | 'verified' | 'rejected'
+  pinned?: boolean
   created_at: string
   updated_at: string
 }
@@ -3361,8 +3364,8 @@ export const api = {
     request<{ items: UsageNote[] }>('/api/usage-notes'),
   usageNoteCreate: (content: string) =>
     request<UsageNote>('/api/usage-notes', { method: 'POST', body: JSON.stringify({ content }) }),
-  usageNoteUpdate: (id: string, content: string) =>
-    request<UsageNote>(`/api/usage-notes/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify({ content }) }),
+  usageNoteUpdate: (id: string, patch: { content?: string; status?: string; pinned?: boolean }) =>
+    request<UsageNote>(`/api/usage-notes/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(patch) }),
   usageNoteDelete: (id: string) =>
     request<{ ok: boolean }>(`/api/usage-notes/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   // [fork 增强] R39 研究工作流: 开了就不用管, 关页面照跑

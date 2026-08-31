@@ -18,6 +18,15 @@ class NoteIn(BaseModel):
     content: str = Field(min_length=1, max_length=usage_notes.MAX_CONTENT_CHARS)
 
 
+class NotePatch(BaseModel):
+    """局部更新: 只带要改的字段。status 语义见 services/usage_notes。"""
+    model_config = ConfigDict(extra="forbid")
+
+    content: str | None = Field(default=None, min_length=1, max_length=usage_notes.MAX_CONTENT_CHARS)
+    status: str | None = None
+    pinned: bool | None = None
+
+
 @router.get("")
 def list_notes() -> dict:
     return {"items": usage_notes.list_notes()}
@@ -32,9 +41,14 @@ def create_note(payload: NoteIn) -> dict:
 
 
 @router.put("/{note_id}")
-def update_note(note_id: str, payload: NoteIn) -> dict:
+def update_note(note_id: str, payload: NotePatch) -> dict:
     try:
-        note = usage_notes.update_note(note_id, payload.content)
+        note = usage_notes.update_note(
+            note_id,
+            content=payload.content,
+            status=payload.status,
+            pinned=payload.pinned,
+        )
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
     if note is None:
