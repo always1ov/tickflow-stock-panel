@@ -19,56 +19,42 @@ const CARD = 'rounded-card border border-border bg-surface/80 shadow-[0_1px_2px_
 const COLOR_A = '#f59e0b'
 const COLOR_B = '#38bdf8'
 
-/** 双线迷你走势: 两条主线的日度强度叠在一起, 交替形态一眼可见(0 = 当天没上榜)。 */
-function DualSpark({ a, b }: { a: number[]; b: number[] }) {
-  const n = Math.max(a.length, b.length)
-  if (n < 2) return null
-  const pts = (xs: number[]) =>
-    xs.map((v, i) => `${(i / (n - 1)) * 100},${33 - Math.max(0, Math.min(100, v)) / 100 * 30}`).join(' ')
-  return (
-    <svg viewBox="0 0 100 34" preserveAspectRatio="none" className="h-9 w-full">
-      <polyline points={pts(a)} fill="none" stroke={COLOR_A} strokeWidth={1} vectorEffect="non-scaling-stroke" />
-      <polyline points={pts(b)} fill="none" stroke={COLOR_B} strokeWidth={1} vectorEffect="non-scaling-stroke" />
-    </svg>
-  )
-}
 
 function PairCard({ p, verdict, note }: { p: SeesawPair; verdict?: string; note?: string }) {
+  // [R107] 用户定案: 不看曲线图, 一行放全核心信息 —— 配对、分数、来回轮数、
+  // AI 判定、节奏提示(截断, 悬停看全文+AI备注)、当下谁占优。
   const leaderIsA = p.leader === p.a
+  const fullTip = note ? `${p.hint}\nAI: ${note}` : p.hint
   return (
-    <div className="rounded-lg border border-border/60 bg-base/40 p-2.5">
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-        <span className="inline-flex items-center gap-1 text-xs font-medium">
-          <span style={{ color: COLOR_A }}>{p.a}</span>
-          <Repeat className="h-3 w-3 text-muted" />
-          <span style={{ color: COLOR_B }}>{p.b}</span>
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-border/60 bg-base/40 px-2.5 py-1.5">
+      <span className="inline-flex shrink-0 items-center gap-1 text-xs font-medium">
+        <span style={{ color: COLOR_A }}>{p.a}</span>
+        <Repeat className="h-3 w-3 text-muted" />
+        <span style={{ color: COLOR_B }}>{p.b}</span>
+      </span>
+      <span className="shrink-0 rounded border border-border px-1.5 py-px font-mono text-[10px] text-secondary"
+        title="跷跷板分: 反向程度 + 来回轮数 + 双方活跃度">
+        {p.score} 分
+      </span>
+      <span className="shrink-0 rounded border border-border/60 px-1.5 py-px font-mono text-[10px] text-muted"
+        title="窗口内领先方换手次数 —— 来回才算跷跷板, 一次性此消彼长不算">
+        {p.flips} 轮
+      </span>
+      {verdict && (
+        <span className={cn('shrink-0 rounded px-1.5 py-px text-[10px]',
+          verdict === '成立'
+            ? 'border border-emerald-400/40 bg-emerald-400/10 text-emerald-400'
+            : 'border border-amber-400/40 bg-amber-400/10 text-amber-400')}>
+          AI {verdict}
         </span>
-        <span className="rounded border border-border px-1.5 py-px font-mono text-[10px] text-secondary"
-          title="跷跷板分: 反向程度 + 来回轮数 + 双方活跃度">
-          {p.score} 分
-        </span>
-        <span className="rounded border border-border/60 px-1.5 py-px font-mono text-[10px] text-muted"
-          title="窗口内领先方换手次数 —— 来回才算跷跷板, 一次性此消彼长不算">
-          来回 {p.flips} 轮
-        </span>
-        {verdict && (
-          <span className={cn('rounded px-1.5 py-px text-[10px]',
-            verdict === '成立'
-              ? 'border border-emerald-400/40 bg-emerald-400/10 text-emerald-400'
-              : 'border border-amber-400/40 bg-amber-400/10 text-amber-400')}>
-            AI {verdict}
-          </span>
-        )}
-        <span className="ml-auto rounded px-1.5 py-px text-[10px]"
-          style={{ color: leaderIsA ? COLOR_A : COLOR_B, backgroundColor: (leaderIsA ? COLOR_A : COLOR_B) + '18' }}>
-          当下{p.leader}占优 · 已 {p.lead_days} 天
-        </span>
-      </div>
-      {p.series_a && p.series_b && (
-        <div className="mt-1.5"><DualSpark a={p.series_a} b={p.series_b} /></div>
       )}
-      <p className="mt-1 text-[10px] leading-relaxed text-secondary">{p.hint}</p>
-      {note && <p className="mt-0.5 text-[10px] leading-relaxed text-accent/90">AI: {note}</p>}
+      <span className="min-w-0 flex-1 truncate text-[10px] text-secondary" title={fullTip}>
+        {p.hint}{note && <span className="text-accent/80"> · AI: {note}</span>}
+      </span>
+      <span className="ml-auto shrink-0 rounded px-1.5 py-px text-[10px]"
+        style={{ color: leaderIsA ? COLOR_A : COLOR_B, backgroundColor: (leaderIsA ? COLOR_A : COLOR_B) + '18' }}>
+        {p.leader}占优 · {p.lead_days} 天
+      </span>
     </div>
   )
 }
