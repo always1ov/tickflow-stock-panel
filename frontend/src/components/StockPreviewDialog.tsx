@@ -14,6 +14,7 @@ import { DatePicker } from '@/components/DatePicker'
 import { RuleEditor } from '@/components/monitor/RuleEditor'
 import { PriceAlertDialog } from '@/components/stock-analysis/PriceAlertDialog'
 import { StockLevelsPanel, StockLevelsPriceTag } from '@/components/stock-analysis/StockLevelsPanel'
+import { StockFinancialSearch } from '@/components/financials/StockFinancialSearch'
 import { buildMonitorPriceLines } from '@/lib/price-alerts'
 import { usePreferences } from '@/lib/useSharedQueries'
 import { setFocusSymbol, clearFocusSymbol } from '@/lib/useQuoteStream'
@@ -82,7 +83,33 @@ function fmtAbnormalCalcTime(asofSec: number): string {
   return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
 }
 
-export function StockPreviewDialog({ symbol, name, onClose, triggerInfo, enableLevelsView = false }: Props) {
+// [R100] 全局最近查看 —— 所有入口共用一份(弹窗内随意切换的数据源)
+const RECENT_MAX = 8
+
+function pushRecentStock(symbol: string, name?: string) {
+  const rows = storage.recentStocks.get([])
+  const known = rows.find(r => r.symbol === symbol)
+  const merged = [
+    { symbol, name: name || known?.name || symbol },
+    ...rows.filter(r => r.symbol !== symbol),
+  ].slice(0, RECENT_MAX)
+  storage.recentStocks.set(merged)
+  return merged
+}
+
+export function StockPreviewDialog({ symbol: symbolProp, name: nameProp, onClose, triggerInfo, enableLevelsView = false }: Props) {
+  // [R100] 弹窗内随意切换: 内部覆盖当前查看的股票; 外部换股/重开时回到外部指定。
+  // 好处是全站 11 个调用方零改动 —— 它们只负责"打开哪只", 切换是弹窗自己的事。
+  const [override, setOverride] = useState<{ symbol: string; name?: string } | null>(null)
+  useEffect(() => { setOverride(null) }, [symbolProp])
+  // 父级关闭(symbolProp=null)时 override 立即失效 —— 不能让内部切换把弹窗"扣住"
+  const symbol = symbolProp ? (override?.symbol ?? symbolProp) : null
+  const name = symbolProp && override ? override.name : nameProp
+  // 最近查看: 打开/切换都记一笔(带上已知名称)
+  const [recent, setRecent] = useState(() => storage.recentStocks.get([]))
+  useEffect(() => {
+    if (symbol) setRecent(pushRecentStock(symbol, name))
+  }, [symbol, name])
   const [view, setView] = useState<PreviewView>('daily')
   const [intradayDays, setIntradayDays] = useState<number | null>(loadIntradayDays)
   const [dateRange, setDateRange] = useState(getDefaultRange)
@@ -414,6 +441,31 @@ export function StockPreviewDialog({ symbol, name, onClose, triggerInfo, enableL
                 >
                   <X className="h-4 w-4" />
                 </button>
+              </div>
+            </div>
+
+            {/* [R100] 切换条: 最近查看 + 搜索 —— 不关弹窗随意换股 */}
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-border/60 bg-elevated/30 px-5 py-1.5 shrink-0">
+              <Clock className="h-3 w-3 shrink-0 text-muted/60" />
+              {recent.filter(r => r.symbol !== symbol).slice(0, 6).map(r => (
+                <button
+                  key={r.symbol}
+                  onClick={() => setOverride({ symbol: r.symbol, name: r.name })}
+                  title={`切换到 ${r.name} ${r.symbol}`}
+                  className="inline-flex items-center gap-1 rounded-full border border-border/50 bg-base/60 px-2 py-0.5 text-[10px] text-secondary hover:border-accent/40 hover:text-foreground transition-colors cursor-pointer"
+                >
+                  <span className="max-w-[6em] truncate">{r.name}</span>
+                  <span className="font-mono text-[9px] text-muted">{r.symbol}</span>
+                </button>
+              ))}
+              {recent.filter(r => r.symbol !== symbol).length === 0 && (
+                <span className="text-[10px] text-muted/50">最近查看的个股会出现在这里, 点击即切换</span>
+              )}
+              <div className="ml-auto w-52 shrink-0">
+                <StockFinancialSearch
+                  onSelect={(s, n) => setOverride({ symbol: s, name: n })}
+                  assetTypes="stock,index"
+                />
               </div>
             </div>
 

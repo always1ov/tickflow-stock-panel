@@ -96,7 +96,9 @@ export function StockAnalysis() {
         subtitle="日 K · 关键价位 · AI 四维分析(技术 / 基本面 / 财务 / 消息面)"
         right={
           <div className="flex items-center gap-2">
-            <LastStockChip stock={lastStock} onSelect={onSelect} />
+            {/* [R100] 与页内名称按钮合并为同一个弹窗: 点击恢复该股并直接弹详情,
+                弹窗内可通过最近查看/搜索随意切换 */}
+            <LastStockChip stock={lastStock} onSelect={(s, n) => { onSelect(s, n); setPreviewSymbol(s) }} />
           </div>
         }
       />
@@ -166,6 +168,7 @@ export function StockAnalysis() {
         symbol={previewSymbol}
         name={previewSymbol === symbol ? name : undefined}
         triggerInfo={null}
+        enableLevelsView
         onClose={() => setPreviewSymbol(null)}
       />
 
