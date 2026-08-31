@@ -226,9 +226,11 @@ function fmtAgo(iso?: string): string {
 
 /** 自选决策台 —— 个股分析页的整页主体: 一行一只自选, 点标的即弹出关键价位分析,
  *  并可标记仓位/成本、纵观对比浮盈。[R28] 起不再折叠(整页就它一个, 没有要让位的东西)。 */
-export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
+export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview }: {
   currentSymbol: string
   onSelect: (symbol: string, name: string) => void
+  /** [R103] 点标的名称时打开整合版个股弹窗(最近查看+随意切换); 未传时退回仅选中 */
+  onPreview?: (symbol: string, name: string) => void
 }) {
   const qc = useQueryClient()
   const [heldOnly, setHeldOnly] = useState(false)
@@ -614,7 +616,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect }: {
                     <td className="whitespace-nowrap px-4 py-2.5">
                       {/* min-h 给整行一个下限: AI 信号列 1 行和 3 行的行高原来差一倍,
                           一屏扫下来参差得厉害。定住下限后只剩"多出来的那几行"的差异 */}
-                      <button onClick={() => onSelect(r.symbol, r.name)} className="flex min-h-[2.25rem] items-center gap-1.5 text-left cursor-pointer group">
+                      <button onClick={() => (onPreview ?? onSelect)(r.symbol, r.name)} className="flex min-h-[2.25rem] items-center gap-1.5 text-left cursor-pointer group">
                         {active && <Star className="h-2.5 w-2.5 text-accent shrink-0" />}
                         <span className="font-medium text-foreground group-hover:text-sky-300 transition-colors truncate max-w-[110px]">{r.name}</span>
                         <span className="text-[9px] font-mono text-muted">{r.symbol}</span>

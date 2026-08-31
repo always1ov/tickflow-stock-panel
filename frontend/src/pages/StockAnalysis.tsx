@@ -142,7 +142,12 @@ export function StockAnalysis() {
         </div>
 
         {/* 主体:自选决策台铺满整页 —— 点标的弹出关键价位分析([R28]) */}
-        <WatchlistDecisionBoard currentSymbol={symbol} onSelect={onSelect} />
+        {/* [R103] 点标的名称 = 选中该股 + 弹整合版个股弹窗(与全站其他列表一致) */}
+        <WatchlistDecisionBoard
+          currentSymbol={symbol}
+          onSelect={onSelect}
+          onPreview={(s, n) => { onSelect(s, n); setPreviewSymbol(s) }}
+        />
       </div>
 
       {/* [R28] 关键价位分析弹窗:日 K + 压力支撑 + 六态趋势条。
