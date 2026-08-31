@@ -736,6 +736,10 @@ export function Layout() {
               />
             </div>
           )}
+          {/* 指数报价 — 按用户要求放左上角(品牌/状态卡之下), 不再挤在左下实时开关里 */}
+          {!navCollapsed && showSidebarQuotes && !isWatchlistMode && (!realtimeUnavailable || !!realtimeProviderName) && (
+            <SidebarIndexQuotes rows={sidebarIndexQuotes?.rows} items={sidebarIndexes} />
+          )}
         </div>
 
         <nav className="flex-1 min-h-0 overflow-y-auto px-2 py-2.5 space-y-0.5">
@@ -984,9 +988,6 @@ export function Layout() {
                 )}
               </div>
             )}
-          {showSidebarQuotes && !isWatchlistMode && (!realtimeUnavailable || !!realtimeProviderName) && (
-            <SidebarIndexQuotes rows={sidebarIndexQuotes?.rows} items={sidebarIndexes} />
-          )}
         </div>
         )}
 
