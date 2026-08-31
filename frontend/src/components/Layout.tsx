@@ -44,6 +44,7 @@ import {
   RadioTower,
   CheckCircle2,
   BookOpenCheck,
+  NotebookPen,
   ChevronRight,
   ChevronDown,
   Sun,
@@ -100,6 +101,8 @@ const nav = [
   { to: '/regime', label: '市场环境', icon: Gauge },
   { to: '/abnormal', label: '异动监控', icon: Siren },
   { to: '/review',      label: '复盘',   icon: BookOpenCheck },
+  // [fork 增强] R93 使用观察笔记
+  { to: '/usage-notes', label: '我的使用观察', icon: NotebookPen },
   { to: '/indices', label: '指数', icon: BarChart3 },
   { to: '/data',       label: '数据',   icon: Database },
 ] as const

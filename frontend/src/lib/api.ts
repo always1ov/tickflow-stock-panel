@@ -1068,6 +1068,14 @@ export interface WorkflowAttempt {
   conclusion?: string
 }
 
+// [fork 增强] R93 使用观察笔记
+export interface UsageNote {
+  id: string
+  content: string
+  created_at: string
+  updated_at: string
+}
+
 export interface Workflow {
   workflow_id: string
   kind: WorkflowKind
@@ -3348,6 +3356,15 @@ export const api = {
       `/api/backtest/mining/autopilot/sessions/${encodeURIComponent(id)}/stop`,
       { method: 'POST' },
     ),
+  // [fork 增强] R93 使用观察笔记: 纯文本, 增删改
+  usageNotesList: () =>
+    request<{ items: UsageNote[] }>('/api/usage-notes'),
+  usageNoteCreate: (content: string) =>
+    request<UsageNote>('/api/usage-notes', { method: 'POST', body: JSON.stringify({ content }) }),
+  usageNoteUpdate: (id: string, content: string) =>
+    request<UsageNote>(`/api/usage-notes/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify({ content }) }),
+  usageNoteDelete: (id: string) =>
+    request<{ ok: boolean }>(`/api/usage-notes/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   // [fork 增强] R39 研究工作流: 开了就不用管, 关页面照跑
   workflowList: (kind?: WorkflowKind) =>
     request<{ items: Workflow[] }>(`/api/workflows${kind ? `?kind=${kind}` : ''}`),

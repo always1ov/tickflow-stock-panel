@@ -40,6 +40,8 @@ const Dev = lazy(() => import('./pages/Dev').then(m => ({ default: m.Dev })))
 // [fork 增强] 今日总览(决策汇聚层)
 const Today = lazy(() => import('./pages/Today').then(m => ({ default: m.Today })))
 const ExternalPage = lazy(() => import('./pages/ExternalPage').then(m => ({ default: m.ExternalPage })))
+// [fork 增强] R93 使用观察笔记
+const UsageNotes = lazy(() => import('./pages/UsageNotes').then(m => ({ default: m.UsageNotes })))
 
 const CORE_ROUTE_PATHS = new Set([
   '/',
@@ -70,6 +72,7 @@ const CORE_ROUTE_PATHS = new Set([
   '/settings',
   '/dev',
   '/external-page',
+  '/usage-notes',
   '/settings/keys',
   '/settings/ai',
   '/settings/queries',
@@ -147,6 +150,7 @@ export const router = createBrowserRouter([
       { path: 'regime', element: <Regime /> },
       { path: 'abnormal', element: <AbnormalMoves /> },
       { path: 'external-page', element: <ExternalPage /> },
+      { path: 'usage-notes', element: <UsageNotes /> },
       { path: 'branding', element: <Branding /> },
       { path: 'settings', element: <Settings /> },
       // 隐藏路由：开发者工具（不暴露在菜单，仅供调试）

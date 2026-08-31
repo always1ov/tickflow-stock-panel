@@ -36,6 +36,7 @@ from app.api import (
     stock_analysis,
     strategy,
     today,  # [fork 增强] 今日总览
+    usage_notes,  # [fork 增强] R93 使用观察笔记
     watchlist,
     workflows,  # [fork 增强] R39 研究工作流
 )
@@ -517,6 +518,7 @@ app.include_router(intraday.router)
 app.include_router(indices.router)
 app.include_router(overview.router)
 app.include_router(today.router)  # [fork 增强] 今日总览
+app.include_router(usage_notes.router)  # [fork 增强] R93 使用观察笔记
 app.include_router(abnormal.router)
 app.include_router(regime.router)
 app.include_router(analysis.router)
