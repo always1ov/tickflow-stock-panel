@@ -106,7 +106,15 @@ def get_watchlist_groups_in_nav() -> bool:
 
 
 def get_realtime_quote_interval() -> float:
-    return load().get("realtime_quote_interval", 6.0)
+    stored = load().get("realtime_quote_interval")
+    if stored is not None:
+        return stored
+    # [fork R97] 未手动设置过时的默认: 自定义实时源(如 fuyao)全市场一轮只有
+    # 1 个请求, 下限 1s, 默认给 3s 让监控/放量反应更快; TickFlow 维持 6s
+    # (受档位限速保护, 上游默认)。用户在设置里拖过滑块则永远尊重存值。
+    if get_realtime_data_provider() != "tickflow":
+        return 3.0
+    return 6.0
 
 
 def get_realtime_watchlist_symbols() -> list[str]:

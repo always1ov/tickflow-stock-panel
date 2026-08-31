@@ -86,18 +86,27 @@ def availability() -> tuple[bool, str]:
 
 
 def probe_api_key(api_key: str) -> tuple[bool, str]:
-    """用候选 Key 实探一次快照接口(先探后存, 对齐 /tickflow-key 语义)。不落盘。"""
-    client = None
-    try:
-        client = fuyao_client.FuyaoClient(api_key=api_key, timeout=10.0)
-        client.snapshot_page(limit=1)
-        return True, "ok"
-    except FuyaoError as e:
-        return False, f"Key 无效或网络失败: {e}"
-    finally:
-        if client is not None:
-            with contextlib.suppress(Exception):
-                client.close()
+    """用候选 Key 实探快照接口(先探后存, 对齐 /tickflow-key 语义)。不落盘。
+
+    [R97] 支持逗号分隔的主备 key: 逐把单独实探(不走客户端的自动切换,
+    否则备 key 失效会被主 key 的成功盖住), 任何一把失效都拒绝保存并指明是哪把。
+    """
+    keys = [k.strip() for k in (api_key or "").split(",") if k.strip()]
+    if not keys:
+        return False, "Key 为空"
+    for i, key in enumerate(keys):
+        client = None
+        try:
+            client = fuyao_client.FuyaoClient(api_key=key, timeout=10.0)
+            client.snapshot_page(limit=1)
+        except FuyaoError as e:
+            which = f"第 {i + 1} 把 key" if len(keys) > 1 else "Key"
+            return False, f"{which} 无效或网络失败: {e}"
+        finally:
+            if client is not None:
+                with contextlib.suppress(Exception):
+                    client.close()
+    return True, "ok" if len(keys) == 1 else f"ok · {len(keys)} 把 key 全部有效(主备自动切换)"
 
 
 @dataclass

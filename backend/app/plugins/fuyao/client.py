@@ -27,19 +27,37 @@ _PAGE_INTERVAL_S = 0.15  # 页间隔, 降低触发限频 (code=4001) 的概率
 
 
 class FuyaoError(Exception):
-    """扶摇接口错误(配置缺失 / 网络失败 / 信封 code != 0)。"""
+    """扶摇接口错误(配置缺失 / 网络失败 / 信封 code != 0)。
+
+    switch_key: 换一把 key 有救的错误(限频 4001 / HTTP 401·403·429)。
+    网络失败或业务错误换 key 也一样, 不标。
+    """
+
+    def __init__(self, message: str, *, switch_key: bool = False) -> None:
+        super().__init__(message)
+        self.switch_key = switch_key
+
+
+# [fork R97] 换 key 有救的错误特征: 限频与鉴权/配额类
+_SWITCH_HTTP_STATUSES = {401, 403, 429}
+_SWITCH_ENVELOPE_CODES = {4001, "4001"}
 
 
 class FuyaoClient:
     """扶摇 REST 客户端 (线程安全: httpx.Client 可并发复用)。"""
 
     def __init__(self, api_key: str, base_url: str = BASE_URL, timeout: float = 20.0) -> None:
-        if not api_key:
+        # [fork R97] 主备 key: 与 TickFlow 同一约定 —— 多个 key 逗号分隔填在同一字段。
+        # 限频/鉴权类失败自动切下一把并粘住(后续请求继续用切到的那把), 其他错误不切。
+        keys = [k.strip() for k in (api_key or "").split(",") if k.strip()]
+        if not keys:
             raise FuyaoError("未配置 FUYAO_API_KEY")
+        self._keys = keys
+        self._key_idx = 0
         self.last_server_ts = 0  # 最近一页响应里的服务端时间戳(ms), 供行情归属
         self._http = httpx.Client(
             base_url=base_url,
-            headers={"X-api-key": api_key},
+            headers={"X-api-key": keys[0]},
             timeout=timeout,
         )
 
@@ -48,20 +66,49 @@ class FuyaoClient:
 
     # ---- 内部 ----
     def _get(self, path: str, params: dict) -> dict:
-        """GET + 信封解包。code != 0 时抛 FuyaoError(含 code 与 message)。"""
+        """GET + 信封解包 + 主备 key 兜底。
+
+        限频(4001)/鉴权(401·403·429)失败时逐把切换备用 key 重试一次,
+        切到能用的就粘住; 全部 key 都不行抛最后一个错误。
+        """
+        last: FuyaoError | None = None
+        for _ in range(len(self._keys)):
+            try:
+                return self._get_once(path, params)
+            except FuyaoError as e:
+                last = e
+                if len(self._keys) < 2 or not e.switch_key:
+                    raise
+                prev = self._key_idx
+                self._key_idx = (self._key_idx + 1) % len(self._keys)
+                self._http.headers["X-api-key"] = self._keys[self._key_idx]
+                logger.warning(
+                    "fuyao key #%d 受限/被拒(%s), 切换备用 key #%d 重试",
+                    prev + 1, e, self._key_idx + 1,
+                )
+        raise last if last is not None else FuyaoError(f"请求失败: {path}")
+
+    def _get_once(self, path: str, params: dict) -> dict:
+        """单次 GET + 信封解包。code != 0 时抛 FuyaoError(含 code 与 message)。"""
         try:
             resp = self._http.get(path, params=params)
         except httpx.HTTPError as e:
             raise FuyaoError(f"网络请求失败: {e}") from e
         if resp.status_code != 200:
-            raise FuyaoError(f"HTTP {resp.status_code}: {path}")
+            raise FuyaoError(
+                f"HTTP {resp.status_code}: {path}",
+                switch_key=resp.status_code in _SWITCH_HTTP_STATUSES,
+            )
         try:
             payload = resp.json()
         except ValueError as e:
             raise FuyaoError(f"响应不是 JSON: {path}") from e
         code = payload.get("code")
         if code not in (0, "0", None):
-            raise FuyaoError(f"扶摇接口错误 code={code}: {payload.get('message', '')} ({path})")
+            raise FuyaoError(
+                f"扶摇接口错误 code={code}: {payload.get('message', '')} ({path})",
+                switch_key=code in _SWITCH_ENVELOPE_CODES,
+            )
         return payload.get("data") or {}
 
     # ---- 快照 ----
