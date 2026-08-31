@@ -158,6 +158,8 @@ export const QK = {
   analysisKline:        (symbol: string) => ['kline', symbol, ''] as const,
   // R93 使用观察笔记
   usageNotes:           ['usage-notes'] as const,
+  // R110 竞价一进二扫描
+  auctionScan:          ['auction-scan'] as const,
   // R99 全球指数(独立模块)
   globalIndices:        ['global-indices'] as const,
   globalIndexOptions:   ['global-index-options'] as const,

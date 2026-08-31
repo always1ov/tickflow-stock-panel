@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useQuery, type UseQueryResult } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient, type UseQueryResult } from '@tanstack/react-query'
 import {
-  Activity, ChevronRight, Compass, FlaskConical, HelpCircle, History, Power,
+  Activity, ChevronDown, ChevronRight, Compass, FlaskConical, HelpCircle, History, Loader2, Power,
   Radar, RefreshCw, Ruler, Search, Settings2,
 } from 'lucide-react'
 import {
@@ -15,6 +15,7 @@ import { storage } from '@/lib/storage'
 import { fmtPrice, fmtPct, priceColorClass } from '@/lib/format'
 import { boardTag } from '@/components/stock-table/primitives'
 import { PageHeader } from '@/components/PageHeader'
+import { toast } from '@/components/Toast'
 import { StockPreviewDialog } from '@/components/StockPreviewDialog'
 
 /**
@@ -192,26 +193,8 @@ function AuctionView({ onOpenStock }: {
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 overflow-y-auto">
       <BenchmarkCard q={q} onOpenStock={onOpenStock} />
 
-      {/* 全市场竞价扫描: 采集任务启用后填充 (接口与批量能力已验证) */}
-      <div className="rounded-card border border-dashed border-border bg-surface/50 px-4 py-4">
-        <div className="flex items-start gap-3">
-          <span className="grid h-8 w-8 shrink-0 place-items-center rounded bg-elevated/60">
-            <Radar className="h-4 w-4 text-muted/50" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-medium text-foreground">全市场竞价扫描</span>
-              <span className="rounded-full border border-border bg-elevated px-2 py-px text-[9px] leading-tight text-muted">
-                待采集任务启用
-              </span>
-            </div>
-            <p className="mt-1.5 text-[11px] leading-relaxed text-muted">
-              9:25 竞价终态后扫描全市场 (实测 5547 只约 2 秒), 自动筛出高开 ≥5% 且竞价量比 ≥10
-              的标的并按日落盘积累历史。竞价明细无历史接口, 数据从采集启用之日起积累。
-            </p>
-          </div>
-        </div>
-      </div>
+      {/* [R110] 竞价一进二: 昨日首板 × 当下竞价快照评分 (替换原"待采集任务"占位卡) */}
+      <AuctionOneToTwoCard onOpenStock={onOpenStock} />
 
       <p className="px-1 text-[10px] leading-relaxed text-muted/70">
         风向标为同花顺盘前竞价筛选名单 (每日约 5~6 只)。60 日回测: 名单当日开盘买入均值 +0.54%
@@ -1069,3 +1052,133 @@ const FALLBACK_RULES: Array<{ board: string; st: boolean; thresholds: Record<str
   { board: '创业板/科创板', st: false, thresholds: { '3d': { up: 0.3, down: 0.3 }, '10d': { up: 1.0, down: 0.5 }, '30d': { up: 2.0, down: 0.7 } }, note: '' },
   { board: '北交所', st: false, thresholds: { '3d': { up: 0.4, down: 0.4 }, '10d': { up: 1.0, down: 0.5 }, '30d': { up: 2.0, down: 0.7 } }, note: '' },
 ]
+
+// ===== [fork 增强] R110 竞价一进二 =====
+// 昨日首板 × 当下竞价快照评分。竞价数据无历史接口, 必须在 9:15~9:25 竞价阶段
+// 点「扫描」才取得到; 扫过即按日落盘, 之后打开就是当天定格的结果。
+function AuctionOneToTwoCard({ onOpenStock }: {
+  onOpenStock: (symbol: string, name?: string | null) => void
+}) {
+  const qc = useQueryClient()
+  const [expanded, setExpanded] = useState<string | null>(null)
+  const q = useQuery({ queryKey: QK.auctionScan, queryFn: () => api.auctionScan(false) })
+  const scan = useMutation({
+    mutationFn: () => api.auctionScan(true),
+    onSuccess: (res) => {
+      qc.setQueryData(QK.auctionScan, res)
+      toast(res.candidates?.length
+        ? `扫描完成 — ${res.matched ?? res.candidates.length}/${res.total_first_boards ?? 0} 只昨日首板有竞价数据`
+        : (res.error || '没有候选'), res.candidates?.length ? 'success' : 'error')
+    },
+    onError: (e: any) => toast(e?.message ?? '扫描失败', 'error'),
+  })
+
+  const data = q.data
+  const list = data?.candidates ?? []
+  const medal = ['🥇', '🥈', '🥉']
+
+  return (
+    <div className="rounded-card border border-border bg-surface/60 px-4 py-3">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+        <span className="grid h-8 w-8 shrink-0 place-items-center rounded bg-amber-400/10">
+          <Radar className="h-4 w-4 text-amber-400" />
+        </span>
+        <div className="min-w-0">
+          <div className="text-xs font-medium text-foreground">
+            竞价一进二 · 昨日首板精选
+            {data?.as_of && <span className="ml-1.5 font-mono text-[10px] text-muted">{data.as_of} 首板</span>}
+          </div>
+          <div className="truncate text-[10px] text-muted">
+            评分 = 竞价涨幅 35 + 竞价量能 30 + 封板质量 20 + 市场情绪 15 · 仅主板, 剔除 ST/双创
+          </div>
+        </div>
+        <button
+          onClick={() => scan.mutate()}
+          disabled={scan.isPending}
+          title="现拉一次全市场竞价快照重算(竞价阶段 9:15~9:25 点才有当天数据)"
+          className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-btn border border-amber-400/40 bg-amber-400/10 px-2.5 py-1 text-[11px] font-medium text-amber-400 transition-colors hover:bg-amber-400/20 disabled:opacity-60"
+        >
+          {scan.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Radar className="h-3 w-3" />}
+          {list.length ? '重新扫描' : '扫描'}
+        </button>
+      </div>
+
+      {/* 空态: 说清为什么空 + 该什么时候点 */}
+      {list.length === 0 ? (
+        <p className="mt-3 rounded border border-dashed border-border/70 px-3 py-4 text-center text-[11px] leading-relaxed text-muted">
+          {q.isLoading ? '加载中…' : (data?.error || data?.hint
+            || '今天还没扫描 —— 竞价数据没有历史接口, 需在 9:15~9:25 竞价阶段点「扫描」')}
+        </p>
+      ) : (
+        <>
+          <div className="mt-3 space-y-1.5">
+            {list.map((c, i) => {
+              const open = expanded === c.symbol
+              const up = c.auction_pct >= 0
+              return (
+                <div key={c.symbol} className="rounded-lg border border-border/60 bg-base/40">
+                  <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 px-2.5 py-2">
+                    <span className="w-6 shrink-0 text-center text-xs">{medal[i] ?? <span className="font-mono text-[10px] text-muted">{i + 1}</span>}</span>
+                    <button
+                      onClick={() => onOpenStock(c.symbol, c.name)}
+                      className="shrink-0 text-left transition-colors hover:text-sky-300"
+                    >
+                      <span className="text-xs font-medium text-foreground">{c.name}</span>
+                      <span className="ml-1.5 font-mono text-[10px] text-muted">{c.symbol}</span>
+                    </button>
+                    <span className={`shrink-0 font-mono text-xs font-semibold ${up ? 'text-red-400' : 'text-emerald-400'}`}>
+                      竞价 {up ? '+' : ''}{c.auction_pct.toFixed(2)}%
+                    </span>
+                    {/* 四维得分条 —— 一眼看出分从哪来 */}
+                    <div className="hidden min-w-0 flex-1 items-center gap-1 sm:flex">
+                      {c.breakdown.map(b => (
+                        <span
+                          key={b.dim}
+                          title={`${b.dim} ${b.score}/${b.max}${b.proxy ? ' (替代口径)' : ''} — ${b.note}`}
+                          className="h-1.5 flex-1 overflow-hidden rounded-full bg-elevated"
+                        >
+                          <span
+                            className="block h-full rounded-full bg-amber-400/70"
+                            style={{ width: `${Math.max(4, (b.score / b.max) * 100)}%` }}
+                          />
+                        </span>
+                      ))}
+                    </div>
+                    <span className="ml-auto shrink-0 font-mono text-sm font-bold text-amber-400">{c.score}</span>
+                    <button
+                      onClick={() => setExpanded(open ? null : c.symbol)}
+                      className="shrink-0 rounded p-0.5 text-muted transition-colors hover:text-foreground"
+                      title={open ? '收起评分明细' : '展开评分明细'}
+                    >
+                      <ChevronDown className={`h-3.5 w-3.5 transition-transform ${open ? '' : '-rotate-90'}`} />
+                    </button>
+                  </div>
+                  {open && (
+                    <div className="space-y-1 border-t border-border/50 px-2.5 py-2">
+                      {c.breakdown.map(b => (
+                        <div key={b.dim} className="flex items-baseline gap-2 text-[10px]">
+                          <span className="w-14 shrink-0 text-secondary">{b.dim}</span>
+                          <span className="w-10 shrink-0 font-mono text-amber-400">{b.score}/{b.max}</span>
+                          <span className="min-w-0 flex-1 leading-relaxed text-muted">
+                            {b.note}
+                            {b.proxy && <span className="ml-1 text-amber-400/70">(替代口径: 无五档盘口, 用昨日量价近似)</span>}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+          <p className="mt-2 px-1 text-[10px] leading-relaxed text-muted/70">
+            口径: 昨日首板取 enriched 的涨停+连板数=1(与连板梯队同源); 竞价涨幅按温和高开给高分
+            —— 本面板 60 日回测显示"高开≥5%当日均值 -1.97%", 追高是陷阱。
+            {data?.quality_proxy && ' 封板质量为替代口径(五档盘口需 TickFlow Expert, 当前档位没有)。'}
+            {data?.cached && ' · 本次为当日已存扫描结果'}
+          </p>
+        </>
+      )}
+    </div>
+  )
+}

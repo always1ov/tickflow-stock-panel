@@ -1068,6 +1068,29 @@ export interface WorkflowAttempt {
   conclusion?: string
 }
 
+// [fork 增强] R110 竞价一进二
+export interface AuctionScanItem {
+  symbol: string
+  name: string
+  score: number
+  auction_pct: number
+  auction_price?: number | null
+  auction_volume?: number | null
+  prev_volume?: number | null
+  breakdown: { dim: string; score: number; max: number; note: string; proxy?: boolean }[]
+}
+export interface AuctionScanPayload {
+  as_of: string | null
+  candidates: AuctionScanItem[]
+  total_first_boards?: number
+  matched?: number
+  quality_proxy?: boolean
+  cached?: boolean
+  dates?: string[]
+  hint?: string
+  error?: string
+}
+
 // [fork 增强] R99 全球指数实时
 export interface GlobalIndexQuote {
   key: string
@@ -3369,6 +3392,9 @@ export const api = {
       `/api/backtest/mining/autopilot/sessions/${encodeURIComponent(id)}/stop`,
       { method: 'POST' },
     ),
+  // [fork 增强] R110 竞价一进二扫描(昨日首板 × 当下竞价)
+  auctionScan: (refresh = false) =>
+    request<AuctionScanPayload>(`/api/abnormal/auction-scan${refresh ? '?refresh=true' : ''}`),
   // [fork 增强] R99 全球指数实时(独立模块, 新浪源)
   globalIndices: () =>
     request<{ items: GlobalIndexQuote[] }>('/api/global-indices'),
