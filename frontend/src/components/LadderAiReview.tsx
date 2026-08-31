@@ -19,6 +19,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Loader2, Send, Sparkles, X } from 'lucide-react'
 import { api } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
+import { SeesawPanel } from '@/components/regime/SeesawPanel'
 import { buildExtColumnsParam, getExtTags, loadExtFields } from '@/lib/ladderExtFields'
 
 type AiPayload = { date: string; stats: Record<string, unknown>; tiers: unknown[] }
@@ -72,7 +73,7 @@ export function LadderAiReview({ date }: { date?: string }) {
     <>
       <button
         onClick={() => setOpen(true)}
-        title="AI 按打板战法(情绪周期/龙头/二进三/反包)复盘当日连板梯队, 输出候选清单"
+        title="AI 按打板战法(情绪周期/龙头/二进三/反包)复盘当日连板梯队, 输出候选清单; 弹窗内含「板块跷跷板」标签页"
         className="inline-flex items-center gap-1 h-7 px-2.5 rounded-full text-xs font-medium text-amber-400 border border-amber-400/25 bg-amber-400/5 hover:bg-amber-400/15 transition-colors cursor-pointer"
       >
         <Sparkles className="h-3.5 w-3.5" />
@@ -165,6 +166,10 @@ function LadderAiDialog({ payload, loadingLadder, onClose }: {
     } catch { /* 静默 */ }
   }
 
+  // [R108b] 弹窗内标签: 打板复盘 / 板块跷跷板 —— 用户定案两件事共用这一个弹窗
+  const [tab, setTab] = useState<'ladder' | 'seesaw'>('ladder')
+  const [seesawKind, setSeesawKind] = useState<'concept' | 'industry'>('concept')
+
   const viewingReport = reports.find(r => r.id === reportId)
   // 梯队还没到就不能生成 —— 拿一份空快照去调 AI 会得到一份煞有介事的空报告
   const ladderReady = payload.tiers.length > 0
@@ -177,11 +182,41 @@ function LadderAiDialog({ payload, loadingLadder, onClose }: {
             <Sparkles className="h-4 w-4" />
           </span>
           <div className="flex-1 min-w-0">
-            <h2 className="text-sm font-medium text-foreground">AI 打板复盘 · {viewingReport ? `${viewingReport.date} 存档` : (payload.date || '—')}</h2>
-            <p className="text-[11px] text-muted truncate">打开即查看存档 · 生成需手动点击 · 带置信度 —— 高风险, 仅为复盘参考</p>
+            <h2 className="text-sm font-medium text-foreground">
+              {tab === 'ladder'
+                ? <>AI 打板复盘 · {viewingReport ? `${viewingReport.date} 存档` : (payload.date || '—')}</>
+                : '板块跷跷板'}
+            </h2>
+            <p className="text-[11px] text-muted truncate">
+              {tab === 'ladder'
+                ? '打开即查看存档 · 生成需手动点击 · 带置信度 —— 高风险, 仅为复盘参考'
+                : '来自「市场环境」页主线强度数据 · 识别资金在两个板块间来回切换 —— 一边熄火往往是另一边点火'}
+            </p>
           </div>
+          <div className="flex items-center rounded-btn border border-border bg-base/60 p-0.5">
+            {([['ladder', '打板复盘'], ['seesaw', '跷跷板']] as const).map(([k, label]) => (
+              <button key={k} onClick={() => setTab(k)}
+                className={k === tab
+                  ? 'h-6 rounded-[5px] bg-amber-400/15 px-2.5 text-[11px] font-medium text-amber-300'
+                  : 'h-6 rounded-[5px] px-2.5 text-[11px] font-medium text-muted hover:text-secondary transition-colors'}>
+                {label}
+              </button>
+            ))}
+          </div>
+          {tab === 'seesaw' && (
+            <div className="flex items-center rounded-btn border border-border bg-base/60 p-0.5">
+              {([['concept', '概念'], ['industry', '行业']] as const).map(([k, label]) => (
+                <button key={k} onClick={() => setSeesawKind(k)}
+                  className={k === seesawKind
+                    ? 'h-6 rounded-[5px] bg-accent/15 px-2.5 text-[11px] font-medium text-accent'
+                    : 'h-6 rounded-[5px] px-2.5 text-[11px] font-medium text-muted hover:text-secondary transition-colors'}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
           {/* 历史存档: 选择回看, 可续问 */}
-          {reports.length > 0 && (
+          {tab === 'ladder' && reports.length > 0 && (
             <select
               value={reportId ?? ''}
               onChange={e => e.target.value && loadReport(e.target.value)}
@@ -195,21 +230,29 @@ function LadderAiDialog({ payload, loadingLadder, onClose }: {
               ))}
             </select>
           )}
-          {reportId && (
+          {tab === 'ladder' && reportId && (
             <button onClick={() => removeReport(reportId)} disabled={loading} title="删除当前查看的这份存档"
               className="text-[11px] px-2 h-7 rounded border border-border bg-base text-muted hover:text-danger hover:border-danger/40 disabled:opacity-50 transition-colors cursor-pointer">
               删除
             </button>
           )}
           {/* 生成: 唯一会调 AI 的入口 */}
+          {tab === 'ladder' && (
           <button onClick={generate} disabled={loading || loadingLadder || !ladderReady}
             title={ladderReady ? '对当日梯队生成新清单(调用 AI, 结果自动存档)' : '当日梯队数据还没就绪 —— 拿空快照生成只会得到一份空报告'}
             className="inline-flex items-center gap-1 text-[11px] px-2.5 h-7 rounded border border-amber-400/30 bg-amber-400/10 text-amber-300 hover:bg-amber-400/20 disabled:opacity-50 transition-colors cursor-pointer">
             {(loading && chat.length === 0) || loadingLadder ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
             {chat.length > 0 || reports.some(r => r.date === payload.date) ? '重新生成' : '生成清单'}
           </button>
+          )}
           <button onClick={onClose} className="text-muted hover:text-foreground transition-colors cursor-pointer"><X className="h-4 w-4" /></button>
         </header>
+        {tab === 'seesaw' ? (
+          <div className="flex-1 overflow-auto px-5 py-3">
+            <SeesawPanel kind={seesawKind} embedded />
+          </div>
+        ) : (
+        <>
         <div className="flex-1 overflow-auto p-5 space-y-2">
           {chat.length === 0 && !loading && (
             <div className="py-10 text-center text-xs text-muted">
@@ -245,6 +288,8 @@ function LadderAiDialog({ payload, loadingLadder, onClose }: {
             追问
           </button>
         </div>
+        </>
+        )}
       </div>
     </div>
   )

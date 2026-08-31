@@ -12,7 +12,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   BookOpenCheck, RefreshCw, Sparkles, Trash2, History, ChevronRight, AlertTriangle,
-  Database, Wand2, Copy, Download, Clock, X, Check, Trophy, ChevronDown, ChevronUp, Repeat, ArrowLeftRight,
+  Database, Wand2, Copy, Download, Clock, X, Check, Trophy, ChevronDown, ChevronUp, Repeat,
 } from 'lucide-react'
 
 import { api, type OverviewMarket, type AiReviewReport, type DragonTigerStockItem } from '@/lib/api'
@@ -24,7 +24,6 @@ import { boardTag } from '@/components/stock-table/primitives'
 import { fmtBigNum } from '@/lib/format'
 import { PageHeader } from '@/components/PageHeader'
 import { RpsRotationDialog } from '@/components/RpsRotationDialog'
-import { SeesawDialog } from '@/components/regime/SeesawPanel'
 import { LadderAiReview } from '@/components/LadderAiReview'
 import { MarkdownRenderer } from '@/components/financials/MarkdownRenderer'
 import { toast } from '@/components/Toast'
@@ -111,8 +110,6 @@ export function Review() {
   const [showSchedule, setShowSchedule] = useState(false)
   // [R105] 板块 RPS 轮动弹窗(统一入口)
   const [showRps, setShowRps] = useState(false)
-  // [R108] 板块跷跷板弹窗(统一入口, 原市场环境页内联区块)
-  const [showSeesaw, setShowSeesaw] = useState(false)
   const prefs = usePreferences()
   const reviewSched = prefs.data?.review_schedule ?? { enabled: false, hour: 15, minute: 10 }
   const feishuConfigured = !!(prefs.data?.feishu_webhook_url)
@@ -256,13 +253,6 @@ export function Review() {
               <Repeat className="h-3 w-3" />板块RPS轮动
             </button>
             <button
-              onClick={() => setShowSeesaw(true)}
-              className="inline-flex items-center gap-1 rounded-btn border border-amber-400/40 bg-amber-400/15 px-2.5 py-1 text-[11px] text-amber-400 font-medium transition-colors hover:bg-amber-400/25 hover:border-amber-400/60"
-              title="板块跷跷板(数据来自市场环境页) —— 识别资金在两个板块间来回切换, 复盘时判断谁接力"
-            >
-              <ArrowLeftRight className="h-3 w-3" />板块跷跷板
-            </button>
-            <button
               onClick={() => { marketQuery.refetch() }}
               disabled={marketQuery.isFetching}
               className="inline-flex items-center gap-1 rounded-btn border border-border bg-elevated px-2 py-1 text-[11px] text-secondary transition-colors hover:text-foreground disabled:opacity-50"
@@ -400,8 +390,6 @@ export function Review() {
       {/* [R105] 板块 RPS 轮动弹窗 —— 全站唯一入口, 弹窗内可切行业/概念 */}
       {showRps && <RpsRotationDialog onClose={() => setShowRps(false)} kind="industry" allowKindSwitch />}
 
-      {/* [R108] 板块跷跷板弹窗 —— 全站唯一入口 */}
-      {showSeesaw && <SeesawDialog onClose={() => setShowSeesaw(false)} />}
 
       {/* ===== 定时复盘设置弹窗 ===== */}
       <AnimatePresence>

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Repeat, Sparkles, Loader2, History, ChevronDown, X } from 'lucide-react'
+import { Repeat, Sparkles, Loader2, History, ChevronDown } from 'lucide-react'
 import { api, type SeesawPair, type SeesawEntry } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { toast } from '@/components/Toast'
@@ -199,59 +199,3 @@ export function SeesawPanel({ kind, embedded = false }: { kind: 'concept' | 'ind
   )
 }
 
-// ===== [R108] 板块跷跷板弹窗 —— 复盘页统一入口 =====
-// 版式对齐「AI 打板复盘」弹窗: 左上图标+标题+出处副标题, 右上维度切换与关闭;
-// 正文即 SeesawPanel(embedded), 内容按【AI 定性】/【配对明细】分节, 一屏抓重点。
-export function SeesawDialog({ onClose }: { onClose: () => void }) {
-  const [kind, setKind] = useState<'concept' | 'industry'>('concept')
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div
-        role="dialog"
-        aria-label="板块跷跷板"
-        className="relative flex max-h-[88vh] w-[92vw] max-w-[900px] flex-col overflow-hidden rounded-card border border-border bg-surface shadow-xl"
-      >
-        {/* 标题栏: 图标 + 名称 + 出处/用法说明 */}
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-border px-4 py-3 shrink-0">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-accent/30 bg-accent/10">
-            <Repeat className="h-4 w-4 text-accent" />
-          </span>
-          <div className="min-w-0">
-            <div className="text-sm font-semibold text-foreground">板块跷跷板</div>
-            <div className="truncate text-[10px] text-muted">
-              来自「市场环境」页主线强度数据 · 识别资金在两个板块间来回切换 —— 一边熄火往往是另一边点火
-            </div>
-          </div>
-          <div className="ml-auto flex items-center gap-2">
-            <div className="flex items-center rounded-btn border border-border bg-base/60 p-0.5">
-              {([['concept', '概念'], ['industry', '行业']] as const).map(([k, label]) => (
-                <button
-                  key={k}
-                  onClick={() => setKind(k)}
-                  className={cn(
-                    'h-6 rounded-[5px] px-2.5 text-[11px] font-medium transition-colors',
-                    kind === k ? 'bg-accent/15 text-accent' : 'text-muted hover:text-secondary',
-                  )}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-            <button
-              onClick={onClose}
-              className="rounded-btn p-1.5 text-secondary transition-colors hover:bg-elevated hover:text-foreground"
-              title="关闭"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
-        {/* 正文: 面板内嵌(AI 定性 / 配对明细 / 30 天留档 / 一键识别 全在) */}
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
-          <SeesawPanel kind={kind} embedded />
-        </div>
-      </div>
-    </div>
-  )
-}
