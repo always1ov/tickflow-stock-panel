@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Repeat, Sparkles, Loader2, History, ChevronDown } from 'lucide-react'
+import { Repeat, Sparkles, Loader2, History, ChevronDown, X } from 'lucide-react'
 import { api, type SeesawPair, type SeesawEntry } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { toast } from '@/components/Toast'
@@ -59,7 +59,7 @@ function PairCard({ p, verdict, note }: { p: SeesawPair; verdict?: string; note?
   )
 }
 
-export function SeesawPanel({ kind }: { kind: 'concept' | 'industry' }) {
+export function SeesawPanel({ kind, embedded = false }: { kind: 'concept' | 'industry'; embedded?: boolean }) {
   const qc = useQueryClient()
   const [showHistory, setShowHistory] = useState(false)
   const [openDay, setOpenDay] = useState<string | null>(null)
@@ -89,14 +89,18 @@ export function SeesawPanel({ kind }: { kind: 'concept' | 'industry' }) {
   )
 
   return (
-    <div className={cn(CARD, 'p-3')}>
+    <div className={embedded ? '' : cn(CARD, 'p-3')}>
       {/* 窄屏时按钮整块换行, 不挤成一条横向滚动 */}
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
-        <span className="h-3 w-0.5 shrink-0 rounded-full bg-gradient-to-b from-accent to-accent/30" />
-        <Repeat className="h-3.5 w-3.5 shrink-0 text-accent" />
-        <h2 className="shrink-0 text-xs font-semibold text-foreground">板块跷跷板</h2>
-        <span className="hidden text-[9px] text-muted sm:inline">
-          一边熄火往往就是另一边点火 · 近 {q.data?.window ?? 0} 个交易日
+        {!embedded && (
+          <>
+            <span className="h-3 w-0.5 shrink-0 rounded-full bg-gradient-to-b from-accent to-accent/30" />
+            <Repeat className="h-3.5 w-3.5 shrink-0 text-accent" />
+            <h2 className="shrink-0 text-xs font-semibold text-foreground">板块跷跷板</h2>
+          </>
+        )}
+        <span className={cn('text-[9px] text-muted', embedded ? '' : 'hidden sm:inline')}>
+          {embedded ? `近 ${q.data?.window ?? 0} 个交易日 · 每天收盘后识别一次即可` : `一边熄火往往就是另一边点火 · 近 ${q.data?.window ?? 0} 个交易日`}
         </span>
         <button
           onClick={() => setShowHistory(v => !v)}
@@ -120,7 +124,7 @@ export function SeesawPanel({ kind }: { kind: 'concept' | 'industry' }) {
       {/* AI 结论(最近一次) */}
       {latest?.ai?.summary && (
         <p className="mt-2 rounded-lg border border-accent/25 bg-accent/[0.06] px-2.5 py-2 text-[11px] leading-relaxed text-secondary">
-          <span className="mr-1 text-accent">AI</span>{latest.ai.summary}
+          <span className="mr-1 font-semibold text-accent">【AI 定性】</span>{latest.ai.summary}
           <span className="ml-1.5 font-mono text-[9px] text-muted">
             {latest.as_of ?? ''}{latest.as_of !== q.data?.as_of ? ' · 非最新交易日, 建议重新识别' : ''}
           </span>
@@ -129,6 +133,11 @@ export function SeesawPanel({ kind }: { kind: 'concept' | 'industry' }) {
 
       {/* 规则候选 */}
       <div className="mt-2 space-y-1.5">
+        {pairs.length > 0 && (
+          <p className="text-[10px] font-semibold text-foreground/80">
+            【配对明细】<span className="font-normal text-muted">按跷跷板分排序 · 悬停行内提示看节奏全文</span>
+          </p>
+        )}
         {pairs.length === 0 ? (
           <p className="py-4 text-center text-[10px] text-muted">
             {q.isLoading ? '加载中…' : (q.data?.error ?? '近期没有明显的跷跷板 —— 板块各走各的, 或主线数据不足')}
@@ -186,6 +195,63 @@ export function SeesawPanel({ kind }: { kind: 'concept' | 'industry' }) {
           )}
         </div>
       )}
+    </div>
+  )
+}
+
+// ===== [R108] 板块跷跷板弹窗 —— 复盘页统一入口 =====
+// 版式对齐「AI 打板复盘」弹窗: 左上图标+标题+出处副标题, 右上维度切换与关闭;
+// 正文即 SeesawPanel(embedded), 内容按【AI 定性】/【配对明细】分节, 一屏抓重点。
+export function SeesawDialog({ onClose }: { onClose: () => void }) {
+  const [kind, setKind] = useState<'concept' | 'industry'>('concept')
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div
+        role="dialog"
+        aria-label="板块跷跷板"
+        className="relative flex max-h-[88vh] w-[92vw] max-w-[900px] flex-col overflow-hidden rounded-card border border-border bg-surface shadow-xl"
+      >
+        {/* 标题栏: 图标 + 名称 + 出处/用法说明 */}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-border px-4 py-3 shrink-0">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-accent/30 bg-accent/10">
+            <Repeat className="h-4 w-4 text-accent" />
+          </span>
+          <div className="min-w-0">
+            <div className="text-sm font-semibold text-foreground">板块跷跷板</div>
+            <div className="truncate text-[10px] text-muted">
+              来自「市场环境」页主线强度数据 · 识别资金在两个板块间来回切换 —— 一边熄火往往是另一边点火
+            </div>
+          </div>
+          <div className="ml-auto flex items-center gap-2">
+            <div className="flex items-center rounded-btn border border-border bg-base/60 p-0.5">
+              {([['concept', '概念'], ['industry', '行业']] as const).map(([k, label]) => (
+                <button
+                  key={k}
+                  onClick={() => setKind(k)}
+                  className={cn(
+                    'h-6 rounded-[5px] px-2.5 text-[11px] font-medium transition-colors',
+                    kind === k ? 'bg-accent/15 text-accent' : 'text-muted hover:text-secondary',
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={onClose}
+              className="rounded-btn p-1.5 text-secondary transition-colors hover:bg-elevated hover:text-foreground"
+              title="关闭"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+        {/* 正文: 面板内嵌(AI 定性 / 配对明细 / 30 天留档 / 一键识别 全在) */}
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+          <SeesawPanel kind={kind} embedded />
+        </div>
+      </div>
     </div>
   )
 }
