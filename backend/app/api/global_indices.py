@@ -29,6 +29,12 @@ def options() -> dict:
     return {"presets": global_indices.list_presets(), "selected": _selected_keys()}
 
 
+@router.get("/debug")
+def debug() -> dict:
+    """诊断: 直连上游一次, 回原始行与解析结果。卡片不显示时打开这个看哪一步断了。"""
+    return global_indices.debug_fetch(_selected_keys())
+
+
 class SelectionIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

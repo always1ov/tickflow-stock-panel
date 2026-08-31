@@ -29,8 +29,10 @@ logger = logging.getLogger(__name__)
 _URL = "https://hq.sinajs.cn/list={codes}"
 _HEADERS = {"Referer": "https://finance.sina.com.cn"}  # 新浪要求, 否则 403
 _TIMEOUT_S = 6.0
-_TTL_S = 20.0          # 服务端缓存: 多前端/多标签页轮询合并成同一次上游请求
+_TTL_S = 10.0          # 服务端缓存: 多前端/多标签页轮询合并成同一次上游请求
 _STALE_KEEP_S = 600.0  # 上游失败时旧值最多再顶 10 分钟, 之后按缺失处理
+_FAIL_LOG_INTERVAL_S = 300.0  # 失败日志节流: 5 分钟一条 warning, 不刷屏
+_last_fail_log = 0.0
 
 
 @dataclass(frozen=True)
@@ -51,7 +53,7 @@ PRESETS: tuple[_Preset, ...] = (
     _Preset("sp500",    "int_sp500",    "标普500",  "int"),
 )
 _BY_KEY = {p.key: p for p in PRESETS}
-DEFAULT_KEYS = ["kospi"]
+DEFAULT_KEYS = ["kospi", "nikkei", "nasdaq"]  # 用户定案: 日、韩、纳斯达克
 
 _lock = threading.Lock()
 _cache: dict[str, dict] = {}     # key → {..row..}
@@ -65,23 +67,35 @@ def list_presets() -> list[dict]:
 
 def _to_float(raw: str) -> float | None:
     try:
-        v = float(raw.replace(",", "").strip())
+        v = float(raw.replace(",", "").replace("%", "").strip())
     except (ValueError, AttributeError):
         return None
     return v
 
 
 def _parse_line(preset: _Preset, payload: str) -> dict | None:
-    """一行行情 → 卡片行。任何字段缺失/畸形返回 None(缺失处理, 不抛)。"""
+    """一行行情 → 卡片行。任何字段缺失/畸形返回 None(缺失处理, 不抛)。
+
+    int_ 格式自适应: 标准是"名称,最新,涨跌额,涨跌幅", 但个别代码会多一列
+    (如前置英文代码) —— 从头找到第一个能解析成数的字段当最新价, 紧随其后
+    两个字段当涨跌额/涨跌幅, 两种排布都吃得下。
+    """
     fields = payload.split(",")
-    try:
-        if preset.kind == "int":
-            last, change, pct = _to_float(fields[1]), _to_float(fields[2]), _to_float(fields[3])
-        elif preset.kind == "hk":
+    last = change = pct = None
+    if preset.kind == "int":
+        for i in range(min(len(fields), 6)):
+            v = _to_float(fields[i])
+            if v is not None:
+                last = v
+                change = _to_float(fields[i + 1]) if i + 1 < len(fields) else None
+                pct = _to_float(fields[i + 2]) if i + 2 < len(fields) else None
+                break
+    elif preset.kind == "hk":
+        try:
             last, change, pct = _to_float(fields[6]), _to_float(fields[7]), _to_float(fields[8])
-        else:
+        except IndexError:
             return None
-    except IndexError:
+    else:
         return None
     if last is None:
         return None
@@ -98,7 +112,7 @@ def _parse_line(preset: _Preset, payload: str) -> dict | None:
 def _fetch(codes: list[str]) -> dict[str, str]:
     """拉一批代码 → {code: 原始 payload}。网络/编码问题抛给调用方统一处理。"""
     url = _URL.format(codes=",".join(codes))
-    resp = httpx.get(url, headers=_HEADERS, timeout=_TIMEOUT_S)
+    resp = httpx.get(url, headers=_HEADERS, timeout=_TIMEOUT_S, follow_redirects=True)
     resp.raise_for_status()
     text = resp.content.decode("gbk", errors="replace")
     out: dict[str, str] = {}
@@ -140,10 +154,29 @@ def get_quotes(keys: list[str]) -> list[dict]:
                 elif (now - _cache_at) > _STALE_KEEP_S:
                     _set_cache({}, now, codes)
             except Exception as e:  # noqa: BLE001
-                logger.debug("global indices fetch failed (soft): %s", e)
+                global _last_fail_log
+                if now - _last_fail_log > _FAIL_LOG_INTERVAL_S:
+                    _last_fail_log = now
+                    logger.warning("全球指数上游拉取失败(软, 卡片显示旧值/空): %s", e)
                 if (now - _cache_at) > _STALE_KEEP_S:
                     _set_cache({}, now, codes)
         return [dict(_cache[k]) for k in (p.key for p in presets) if k in _cache]
+
+
+def debug_fetch(keys: list[str]) -> dict:
+    """诊断用: 直连上游一次, 返回原始 payload 与逐行解析结果(不进缓存)。"""
+    presets = [_BY_KEY[k] for k in keys if k in _BY_KEY] or list(PRESETS)
+    codes = [p.code for p in presets]
+    try:
+        raw = _fetch(codes)
+    except Exception as e:  # noqa: BLE001
+        return {"ok": False, "error": f"{type(e).__name__}: {e}", "codes": codes}
+    return {
+        "ok": True,
+        "codes": codes,
+        "raw": raw,
+        "parsed": {p.key: _parse_line(p, raw.get(p.code, "")) for p in presets},
+    }
 
 
 def _set_cache(rows: dict[str, dict], at: float, codes: tuple[str, ...]) -> None:

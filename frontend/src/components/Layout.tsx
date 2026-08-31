@@ -211,7 +211,7 @@ function GlobalIndexQuotes() {
   const quotes = useQuery({
     queryKey: QK.globalIndices,
     queryFn: api.globalIndices,
-    refetchInterval: 30000,
+    refetchInterval: 15000,
     placeholderData: prev => prev,
   })
   const options = useQuery({
