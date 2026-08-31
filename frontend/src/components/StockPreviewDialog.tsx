@@ -26,7 +26,8 @@ interface Props {
   symbol: string | null
   name?: string
   onClose: () => void
-  /** 是否开放“关键价位”视图；默认关闭，避免改变其他页面的历史弹窗行为。 */
+  /** 是否开放“关键价位”视图。[R103] 全站统一弹窗后默认开启 —— 自选/监控/异动
+      等所有入口与策略页、个股分析页看到同一套三视图(日K/分时/关键价位)。 */
   enableLevelsView?: boolean
   /** 触发信息 (来自监控触发记录, 有值时在顶栏下方显示) */
   triggerInfo?: {
@@ -97,7 +98,7 @@ function pushRecentStock(symbol: string, name?: string) {
   return merged
 }
 
-export function StockPreviewDialog({ symbol: symbolProp, name: nameProp, onClose, triggerInfo, enableLevelsView = false }: Props) {
+export function StockPreviewDialog({ symbol: symbolProp, name: nameProp, onClose, triggerInfo, enableLevelsView = true }: Props) {
   // [R100] 弹窗内随意切换: 内部覆盖当前查看的股票; 外部换股/重开时回到外部指定。
   // 好处是全站 11 个调用方零改动 —— 它们只负责"打开哪只", 切换是弹窗自己的事。
   const [override, setOverride] = useState<{ symbol: string; name?: string } | null>(null)
