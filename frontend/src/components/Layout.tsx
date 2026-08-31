@@ -365,26 +365,56 @@ function DataSourceHealthBadge({ matrix }: { matrix: CapabilityMatrix | undefine
 }
 
 function AIConfigBadge({ configured, model }: { configured?: boolean; model?: string }) {
-  const descText = configured ? (model || '已接入模型') : '接入策略生成模型'
+  // [R109] 显示"当前实际在用的那一档" —— 全系统 AI 走档位表(第 1 档优先, 用不了
+  // 自动顺位), 侧栏原来读的是旧单档配置字段 ai_model, 用户在档位表里把别的档
+  // 拖到第一后这里纹丝不动。改为优先读档位表首个启用档; 没配过档位表(只有
+  // legacy 合成档)时回落到原字段, 老用户显示不变。
+  const profilesQ = useQuery({
+    queryKey: QK.aiProfiles,
+    queryFn: api.aiProfiles,
+    staleTime: 60_000,
+  })
+  const rows = profilesQ.data?.profiles ?? []
+  const managed = rows.filter(p => p.id !== 'legacy')
+  const enabled = managed.filter(p => p.enabled)
+  const primary = enabled[0]
+
+  const shownModel = primary ? (primary.label?.trim() || primary.model) : model
+  const isConfigured = managed.length > 0 ? enabled.length > 0 : configured
+  const fallbackCount = enabled.length > 1 ? enabled.length - 1 : 0
+  const descText = isConfigured ? (shownModel || '已接入模型') : '接入策略生成模型'
+  const tip = primary
+    ? `AI 档位 — 当前首选 ${primary.label?.trim() || primary.model}${
+        fallbackCount ? `, 用不了时自动顺位试另 ${fallbackCount} 档` : ''}${
+        enabled.length ? `\n链路: ${enabled.map(p => p.label?.trim() || p.model).join(' → ')}` : ''}`
+    : `AI 配置 — ${descText}`
+
   return (
     <NavLink
       to="/settings?tab=ai"
       className="group relative flex items-center gap-2 overflow-hidden rounded-md py-1.5 pl-2.5 pr-2 transition-colors duration-150 hover:bg-elevated/70"
-      title={`AI 配置 — ${descText}`}
+      title={tip}
     >
       <span className="pointer-events-none absolute inset-y-1.5 left-0 w-[2px] rounded-full bg-purple-400/50 transition-colors group-hover:bg-purple-400" />
       <Sparkles className="h-3.5 w-3.5 shrink-0 text-muted group-hover:text-purple-400 transition-colors" />
-      {configured ? (
-        <span className="truncate text-[11px] font-medium text-secondary group-hover:text-foreground transition-colors">
-          {model || '已接入模型'}
-        </span>
+      {isConfigured ? (
+        <>
+          <span className="truncate text-[11px] font-medium text-secondary group-hover:text-foreground transition-colors">
+            {shownModel || '已接入模型'}
+          </span>
+          {fallbackCount > 0 && (
+            <span className="shrink-0 font-mono text-[9px] leading-none text-muted/70" title="备用档位数(前一档用不了时自动顺位)">
+              +{fallbackCount}
+            </span>
+          )}
+        </>
       ) : (
         <>
           <span className="text-[11px] text-secondary group-hover:text-foreground transition-colors">AI 配置</span>
           <span className="ml-auto text-[11px] font-mono leading-none text-muted">未配置</span>
         </>
       )}
-      <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${configured ? 'bg-bear' : 'bg-warning'}`} />
+      <span className={`ml-auto h-1.5 w-1.5 rounded-full shrink-0 ${isConfigured ? 'bg-bear' : 'bg-warning'}`} />
     </NavLink>
   )
 }
