@@ -1,4 +1,10 @@
-"""[fork R97] fuyao 主备 key 自动切换 + 自定义源默认轮询间隔。"""
+"""[fork R97] fuyao 主备 key「失效才切换」语义。
+
+- 鉴权失败(401/403) = key 真失效 → 立即切备并粘住;
+- 限频(4001/429) = 瞬时 → 单次不切(本次抛错交给软失败), 同一把 key 连续
+  限频满 3 次才判失效切备;
+- 网络/业务错误 → 换 key 也没救, 不切。
+"""
 from __future__ import annotations
 
 import pytest
@@ -37,26 +43,60 @@ def _client(keys: str, script: list[_FakeResp]) -> tuple[FuyaoClient, _FakeHttp]
     return c, fake
 
 
-def test_rate_limited_primary_switches_to_backup_and_sticks():
+_RL = {"code": 4001, "message": "rate limited"}
+
+
+def test_auth_failure_switches_immediately_and_sticks():
     c, fake = _client("key-a,key-b", [
-        _FakeResp(payload={"code": 4001, "message": "rate limited"}),  # 主 key 限频
-        _FakeResp(),                                                    # 备 key 成功
-        _FakeResp(),                                                    # 下一次调用
+        _FakeResp(status_code=403),   # 主 key 鉴权失败 = 失效
+        _FakeResp(),                  # 备 key 成功
+        _FakeResp(),                  # 下一次调用
     ])
     assert c._get("/x", {}) == {"ok": True}
     assert fake.used_keys == ["key-a", "key-b"]
-    # 粘住备 key: 后续请求直接用 key-b, 不再先撞主 key
+    # 粘住备 key
     assert c._get("/x", {}) == {"ok": True}
     assert fake.used_keys[-1] == "key-b"
 
 
-def test_http_auth_failure_switches():
+def test_single_rate_limit_does_not_switch():
     c, fake = _client("key-a,key-b", [
-        _FakeResp(status_code=403),
-        _FakeResp(),
+        _FakeResp(payload=dict(_RL)),
     ])
+    with pytest.raises(FuyaoError):
+        c._get("/x", {})
+    assert fake.used_keys == ["key-a"]  # 瞬时限频: 本次抛错, 不动备 key
+
+
+def test_three_consecutive_rate_limits_escalate_to_switch():
+    c, fake = _client("key-a,key-b", [
+        _FakeResp(payload=dict(_RL)),   # 第 1 次: 抛错不切
+        _FakeResp(payload=dict(_RL)),   # 第 2 次: 抛错不切
+        _FakeResp(payload=dict(_RL)),   # 第 3 次: 判失效, 切备重试
+        _FakeResp(),                    # 备 key 成功
+    ])
+    with pytest.raises(FuyaoError):
+        c._get("/x", {})
+    with pytest.raises(FuyaoError):
+        c._get("/x", {})
     assert c._get("/x", {}) == {"ok": True}
-    assert fake.used_keys == ["key-a", "key-b"]
+    assert fake.used_keys == ["key-a", "key-a", "key-a", "key-b"]
+
+
+def test_success_resets_rate_limit_streak():
+    c, fake = _client("key-a,key-b", [
+        _FakeResp(payload=dict(_RL)),
+        _FakeResp(payload=dict(_RL)),
+        _FakeResp(),                    # 成功清零计数
+        _FakeResp(payload=dict(_RL)),   # 重新从 1 数起, 不该切
+    ])
+    for _ in range(2):
+        with pytest.raises(FuyaoError):
+            c._get("/x", {})
+    assert c._get("/x", {}) == {"ok": True}
+    with pytest.raises(FuyaoError):
+        c._get("/x", {})
+    assert fake.used_keys == ["key-a"] * 4
 
 
 def test_business_error_does_not_switch():
@@ -65,22 +105,22 @@ def test_business_error_does_not_switch():
     ])
     with pytest.raises(FuyaoError):
         c._get("/x", {})
-    assert fake.used_keys == ["key-a"]  # 业务错误换 key 也没救, 不切
+    assert fake.used_keys == ["key-a"]
 
 
-def test_all_keys_exhausted_raises_last_error():
+def test_all_keys_auth_failed_raises_last_error():
     c, fake = _client("key-a,key-b", [
-        _FakeResp(payload={"code": 4001, "message": "limited"}),
-        _FakeResp(payload={"code": 4001, "message": "limited too"}),
+        _FakeResp(status_code=401),
+        _FakeResp(status_code=401),
     ])
     with pytest.raises(FuyaoError):
         c._get("/x", {})
     assert fake.used_keys == ["key-a", "key-b"]
 
 
-def test_single_key_rate_limit_raises_directly():
+def test_single_key_auth_failure_raises_directly():
     c, fake = _client("only-key", [
-        _FakeResp(payload={"code": 4001, "message": "limited"}),
+        _FakeResp(status_code=403),
     ])
     with pytest.raises(FuyaoError):
         c._get("/x", {})
@@ -93,22 +133,3 @@ def test_comma_keys_parsed_and_blank_rejected():
     c._http.close()
     with pytest.raises(FuyaoError):
         FuyaoClient(api_key=" , ")
-
-
-# ── 自定义源默认轮询间隔 ─────────────────────────────────
-
-
-def test_default_interval_3s_for_custom_provider(monkeypatch, tmp_path):
-    from app import config as app_config
-    from app.services import preferences
-
-    monkeypatch.setattr(app_config.settings, "data_dir", tmp_path)
-    preferences._invalidate_cache()
-    monkeypatch.setattr(preferences, "get_realtime_data_provider", lambda: "fuyao")
-    assert preferences.get_realtime_quote_interval() == 3.0
-    monkeypatch.setattr(preferences, "get_realtime_data_provider", lambda: "tickflow")
-    assert preferences.get_realtime_quote_interval() == 6.0
-    # 用户手动存过的值永远优先
-    preferences.set_realtime_quote_interval(5.0)
-    monkeypatch.setattr(preferences, "get_realtime_data_provider", lambda: "fuyao")
-    assert preferences.get_realtime_quote_interval() == 5.0

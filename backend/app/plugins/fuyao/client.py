@@ -29,18 +29,25 @@ _PAGE_INTERVAL_S = 0.15  # 页间隔, 降低触发限频 (code=4001) 的概率
 class FuyaoError(Exception):
     """扶摇接口错误(配置缺失 / 网络失败 / 信封 code != 0)。
 
-    switch_key: 换一把 key 有救的错误(限频 4001 / HTTP 401·403·429)。
-    网络失败或业务错误换 key 也一样, 不标。
+    auth_failed: 鉴权类失败(401/403) —— key 真失效, 立即切备。
+    rate_limited: 限频(4001/429) —— 瞬时不切, 连续多次才判失效。
+    网络失败或业务错误换 key 也一样, 两个都不标。
     """
 
-    def __init__(self, message: str, *, switch_key: bool = False) -> None:
+    def __init__(self, message: str, *, auth_failed: bool = False, rate_limited: bool = False) -> None:
         super().__init__(message)
-        self.switch_key = switch_key
+        self.auth_failed = auth_failed
+        self.rate_limited = rate_limited
 
 
-# [fork R97] 换 key 有救的错误特征: 限频与鉴权/配额类
-_SWITCH_HTTP_STATUSES = {401, 403, 429}
-_SWITCH_ENVELOPE_CODES = {4001, "4001"}
+# [fork R97 定案] 主备语义 = "失效才切换":
+# - 鉴权失败(401/403) = key 真失效, 立即切换;
+# - 限频(4001/429) = 多半是瞬时的, 单次不切(切了反而把备 key 也烧进同一阵风);
+#   只有**连续多次**限频才视为"这把 key 额度耗尽", 升级为失效切换。
+_AUTH_HTTP_STATUSES = {401, 403}
+_RATELIMIT_HTTP_STATUSES = {429}
+_RATELIMIT_ENVELOPE_CODES = {4001, "4001"}
+_RATELIMIT_STREAK_TO_SWITCH = 3  # 连续限频达到该次数 → 判失效切备
 
 
 class FuyaoClient:
@@ -54,6 +61,7 @@ class FuyaoClient:
             raise FuyaoError("未配置 FUYAO_API_KEY")
         self._keys = keys
         self._key_idx = 0
+        self._rl_streak = 0  # 当前 key 的连续限频计数(成功清零)
         self.last_server_ts = 0  # 最近一页响应里的服务端时间戳(ms), 供行情归属
         self._http = httpx.Client(
             base_url=base_url,
@@ -65,27 +73,41 @@ class FuyaoClient:
         self._http.close()
 
     # ---- 内部 ----
-    def _get(self, path: str, params: dict) -> dict:
-        """GET + 信封解包 + 主备 key 兜底。
+    def _switch_key(self, reason: str) -> None:
+        prev = self._key_idx
+        self._key_idx = (self._key_idx + 1) % len(self._keys)
+        self._rl_streak = 0
+        self._http.headers["X-api-key"] = self._keys[self._key_idx]
+        logger.warning("fuyao key #%d %s, 切换备用 key #%d", prev + 1, reason, self._key_idx + 1)
 
-        限频(4001)/鉴权(401·403·429)失败时逐把切换备用 key 重试一次,
-        切到能用的就粘住; 全部 key 都不行抛最后一个错误。
+    def _get(self, path: str, params: dict) -> dict:
+        """GET + 信封解包 + 主备 key「失效才切换」。
+
+        - 鉴权失败(401/403): key 真失效, 立即逐把切备重试;
+        - 限频(4001/429): 瞬时不切(本次抛错, 由调用方软失败/下一轮自愈);
+          同一把 key **连续**限频满 _RATELIMIT_STREAK_TO_SWITCH 次判失效, 切备重试;
+        - 其他错误(网络/业务): 换 key 也没救, 原样抛。
+        切到能用的 key 就粘住; 全部 key 都失效抛最后一个错误。
         """
         last: FuyaoError | None = None
         for _ in range(len(self._keys)):
             try:
-                return self._get_once(path, params)
+                result = self._get_once(path, params)
+                self._rl_streak = 0
+                return result
             except FuyaoError as e:
                 last = e
-                if len(self._keys) < 2 or not e.switch_key:
+                if len(self._keys) < 2:
                     raise
-                prev = self._key_idx
-                self._key_idx = (self._key_idx + 1) % len(self._keys)
-                self._http.headers["X-api-key"] = self._keys[self._key_idx]
-                logger.warning(
-                    "fuyao key #%d 受限/被拒(%s), 切换备用 key #%d 重试",
-                    prev + 1, e, self._key_idx + 1,
-                )
+                if e.auth_failed:
+                    self._switch_key("鉴权失败(key 失效)")
+                    continue
+                if e.rate_limited:
+                    self._rl_streak += 1
+                    if self._rl_streak >= _RATELIMIT_STREAK_TO_SWITCH:
+                        self._switch_key(f"连续限频 {self._rl_streak} 次(视为额度耗尽)")
+                        continue
+                raise
         raise last if last is not None else FuyaoError(f"请求失败: {path}")
 
     def _get_once(self, path: str, params: dict) -> dict:
@@ -97,7 +119,8 @@ class FuyaoClient:
         if resp.status_code != 200:
             raise FuyaoError(
                 f"HTTP {resp.status_code}: {path}",
-                switch_key=resp.status_code in _SWITCH_HTTP_STATUSES,
+                auth_failed=resp.status_code in _AUTH_HTTP_STATUSES,
+                rate_limited=resp.status_code in _RATELIMIT_HTTP_STATUSES,
             )
         try:
             payload = resp.json()
@@ -107,7 +130,7 @@ class FuyaoClient:
         if code not in (0, "0", None):
             raise FuyaoError(
                 f"扶摇接口错误 code={code}: {payload.get('message', '')} ({path})",
-                switch_key=code in _SWITCH_ENVELOPE_CODES,
+                rate_limited=code in _RATELIMIT_ENVELOPE_CODES,
             )
         return payload.get("data") or {}
 
