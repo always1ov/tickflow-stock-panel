@@ -1,10 +1,9 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Sparkles, LineChart, History as HistoryIcon, Loader2, ExternalLink, Bell, X, Maximize2, Minimize2 } from 'lucide-react'
+import { Sparkles, LineChart, History as HistoryIcon, Loader2, Bell, X, Maximize2, Minimize2 } from 'lucide-react'
 import { PageHeader } from '@/components/PageHeader'
 import { StockFinancialSearch } from '@/components/financials/StockFinancialSearch'
 import { StockPreviewDialog } from '@/components/StockPreviewDialog'
-import { LastStockChip } from '@/components/LastStockChip'
 import { PriceAlertDialog } from '@/components/stock-analysis/PriceAlertDialog'
 import { StockLevelsPanel, StockLevelsPriceTag } from '@/components/stock-analysis/StockLevelsPanel'
 import { WatchlistDecisionBoard } from '@/components/stock-analysis/WatchlistDecisionBoard'
@@ -91,53 +90,48 @@ export function StockAnalysis() {
 
   return (
     <>
+      {/* [R104] 页头重排: 名称按钮与"上次查看"胶囊已被整合弹窗取代(列表点标的即弹),
+          撤销这两个入口; AI 个股分析/点位提醒 上移到页头右侧, 搜索行只留搜索框
+          和一个非交互的"当前个股"小标签(标明 AI 分析/点位提醒作用在谁身上)。 */}
       <PageHeader
         title="个股分析"
         subtitle="日 K · 关键价位 · AI 四维分析(技术 / 基本面 / 财务 / 消息面)"
-        right={
+        right={symbol ? (
           <div className="flex items-center gap-2">
-            {/* [R100] 与页内名称按钮合并为同一个弹窗: 点击恢复该股并直接弹详情,
-                弹窗内可通过最近查看/搜索随意切换 */}
-            <LastStockChip stock={lastStock} onSelect={(s, n) => { onSelect(s, n); setPreviewSymbol(s) }} />
+            <button
+              onClick={handleAnalyze}
+              disabled={checking}
+              title={`对 ${name || symbol} 生成 AI 四维分析`}
+              className="inline-flex shrink-0 whitespace-nowrap items-center gap-1.5 px-3 py-1.5 rounded-btn bg-gradient-to-r from-sky-500/25 to-blue-500/15 border border-sky-400/30 text-sky-300 text-xs font-medium hover:from-sky-500/35 hover:to-blue-500/25 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {checking ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+              AI 个股分析
+            </button>
+            <button
+              onClick={() => setShowPriceAlerts(true)}
+              className="inline-flex shrink-0 whitespace-nowrap items-center gap-1.5 px-3 py-1.5 rounded-btn border border-sky-400/25 bg-sky-400/[0.08] text-sky-300 text-xs font-medium hover:border-sky-400/40 hover:bg-sky-400/[0.12] transition-all"
+              title={`为 ${name || symbol} 设置价格点位提醒`}
+            >
+              <Bell className="h-3.5 w-3.5" />
+              点位提醒
+            </button>
           </div>
-        }
+        ) : undefined}
       />
 
       {/* [R60] 统一页面留白 */}
       <div className="w-full px-3 pb-4 pt-3 lg:px-4 space-y-3">
-        {/* 搜索栏 —— 窄屏时按钮整块换行, 不把「点位提醒」挤出可视区 */}
+        {/* 搜索 + 当前个股标签(纯展示, 点开弹窗走下方列表的标的名称) */}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           <div className="w-72 shrink-0">
             <StockFinancialSearch onSelect={onSelect} assetTypes="stock,index" />
           </div>
           {symbol && (
-            <>
-              <button
-                onClick={() => setPreviewSymbol(symbol)}
-                title="查看个股日 K 详情"
-                className="group flex shrink-0 items-center gap-2 text-sm rounded-md px-1.5 py-0.5 -mx-1.5 hover:bg-elevated transition-colors"
-              >
-                <span className="text-foreground font-medium group-hover:text-sky-300 transition-colors">{name || symbol}</span>
-                <span className="text-[10px] font-mono text-muted">{symbol}</span>
-                <ExternalLink className="h-3 w-3 text-muted opacity-0 group-hover:opacity-100 transition-opacity" />
-              </button>
-              <button
-                onClick={handleAnalyze}
-                disabled={checking}
-                className="inline-flex shrink-0 whitespace-nowrap items-center gap-1.5 px-3 py-1.5 rounded-btn bg-gradient-to-r from-sky-500/25 to-blue-500/15 border border-sky-400/30 text-sky-300 text-xs font-medium hover:from-sky-500/35 hover:to-blue-500/25 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                {checking ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-                AI 个股分析
-              </button>
-              <button
-                onClick={() => setShowPriceAlerts(true)}
-                className="inline-flex shrink-0 whitespace-nowrap items-center gap-1.5 px-3 py-1.5 rounded-btn border border-sky-400/25 bg-sky-400/[0.08] text-sky-300 text-xs font-medium hover:border-sky-400/40 hover:bg-sky-400/[0.12] transition-all"
-                title="设置价格点位提醒"
-              >
-                <Bell className="h-3.5 w-3.5" />
-                点位提醒
-              </button>
-            </>
+            <span className="inline-flex shrink-0 items-center gap-1.5 text-xs text-muted">
+              当前
+              <span className="font-medium text-secondary">{name || symbol}</span>
+              <span className="font-mono text-[10px]">{symbol}</span>
+            </span>
           )}
         </div>
 
@@ -146,7 +140,12 @@ export function StockAnalysis() {
         <WatchlistDecisionBoard
           currentSymbol={symbol}
           onSelect={onSelect}
-          onPreview={(s, n) => { onSelect(s, n); setPreviewSymbol(s) }}
+          onPreview={(s, n) => {
+            onSelect(s, n)
+            // 整合弹窗自带关键价位视图, 不再叠一层 R28 的关键价位弹窗
+            setShowLevels(false)
+            setPreviewSymbol(s)
+          }}
         />
       </div>
 
