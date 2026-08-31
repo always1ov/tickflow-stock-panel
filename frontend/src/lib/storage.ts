@@ -31,6 +31,8 @@ export const storage = {
   strategyPool:         kv<string[]>('strategy-pool'),
   /** 旧分钟隔离池 — 仅作一次性迁移读取源, 迁移完成后移除该 key */
   strategyPoolMinute:   kv<string[]>('strategy-pool-1m'),
+  /** [R95] prune 自动清理的备份 — 被移除的 ID 留底, 页面提供一键恢复 */
+  strategyPoolPruneBackup: kv<{ at: string; removed: string[] } | null>('strategy-pool-prune-backup'),
 
   /** 自选列表列配置 */
   watchlistColumns:     kv<unknown[]>('watchlist_columns'),

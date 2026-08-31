@@ -55,7 +55,9 @@ export function Screener() {
   const [builderMode, setBuilderMode] = useState<'create' | 'modify'>('create')
   const [showStore, setShowStore] = useState(false)
   const [showComposite, setShowComposite] = useState(false)
-  const { pool, addToPool, removeFromPool, reorderPool, prune } = useStrategyPool()
+  const { pool, addToPool, removeFromPool, reorderPool, prune, restorePruned, dismissPruneBackup } = useStrategyPool()
+  // [R95] prune 留底: 有备份就给一条可恢复的横幅
+  const [pruneBackup, setPruneBackup] = useState(() => storage.strategyPoolPruneBackup.get(null))
   const [cardSize, setCardSize] = useState<CardSize>(loadCardSize)
   // 日k蜡烛图显示开关（仅当 candle 列可见时才有意义；持久化）
   const [dailyKChartVisible, setDailyKChartVisible] = useState<boolean>(() => storage.screenerCandle.get(true))
@@ -253,8 +255,11 @@ export function Screener() {
     if (strategies.isError) return        // 拉取失败: 不 prune
     if (!strategies.isSuccess) return     // 加载中: 不 prune
     if (allStrategyIds.size === 0) return  // 空列表: 不 prune
+    // [R95] 有策略加载失败时不 prune: 列表非空但缺一截, 缺的很可能正是
+    // 加载失败的那批 —— 这时清池等于把暂时打不开的策略永久删掉
+    if ((strategies.data?.load_errors ?? []).length > 0) return
     prune(allStrategyIds)
-  }, [allStrategyIds, prune, strategies.isError, strategies.isSuccess])
+  }, [allStrategyIds, prune, strategies.isError, strategies.isSuccess, strategies.data])
 
   // 策略文件加载失败时提示用户(避免"策略静默消失"被误判为正常)
   const loadErrors = strategies.data?.load_errors ?? []
@@ -832,6 +837,29 @@ export function Screener() {
         {cardSize !== 'hidden' && (
         <section>
           {strategies.isLoading && <div className="text-sm text-muted">加载中…</div>}
+          {/* [R95] 自动清理留底横幅: 池里的策略被 prune 移除过, 给一键恢复的机会 */}
+          {pruneBackup && pruneBackup.removed.length > 0 && (
+            <div className="mb-3 flex flex-wrap items-center gap-2 rounded-btn border border-warning/30 bg-warning/[0.06] px-3 py-2 text-xs text-secondary">
+              <span>
+                {pruneBackup.at.slice(0, 16).replace('T', ' ')} 自动清理移除过 {pruneBackup.removed.length} 个策略
+                (当时后端列表里没有它们 —— 若是数据未迁移/加载失败导致的误清, 可恢复)
+              </span>
+              <div className="ml-auto flex items-center gap-1.5">
+                <button
+                  onClick={() => { const n = restorePruned(); setPruneBackup(null); toast(`已恢复 ${n} 个策略到池(仍不存在的暂不显示, 待其恢复后自动出现)`, 'success') }}
+                  className="rounded-btn bg-warning/15 px-2 py-1 text-[11px] font-medium text-warning hover:bg-warning/25 transition-colors"
+                >
+                  恢复到策略池
+                </button>
+                <button
+                  onClick={() => { dismissPruneBackup(); setPruneBackup(null) }}
+                  className="rounded-btn px-2 py-1 text-[11px] text-muted hover:text-foreground transition-colors"
+                >
+                  不再提示
+                </button>
+              </div>
+            </div>
+          )}
           {!strategies.isLoading && displayPool.length === 0 && (
             <div className="text-sm text-muted py-4 text-center border border-dashed border-border rounded-btn">
               {pool.length === 0

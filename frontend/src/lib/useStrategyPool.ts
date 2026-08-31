@@ -48,16 +48,46 @@ export function useStrategyPool() {
   // 清除池中不存在于 validIds 的失效策略(如本地开发残留的自定义策略)。
   // 调用方传入"全周期合并的策略列表" ID, 池内日线/分钟策略一并校验。
   // 仅当确实有失效项时才更新,避免无谓重渲染。
+  //
+  // [R95] 被移除的 ID 先留底到 strategyPoolPruneBackup: prune 的判据是
+  // "后端当前列表里没有", 但"没有"未必是永久的 —— 数据目录还没迁移、策略文件
+  // 暂时加载失败, 都会让好好的策略从列表上暂时消失。没有留底的话, 一次误清
+  // 就是永久丢失(localStorage 写掉了, 用户只看见"策略全没了")。
   const prune = useCallback((validIds: Iterable<string>) => {
     const validSet = validIds instanceof Set ? validIds : new Set(validIds)
     setPool(prev => {
       if (prev.length === 0) return prev
       const next = prev.filter(id => validSet.has(id))
-      return next.length === prev.length ? prev : next
+      if (next.length === prev.length) return prev
+      const removed = prev.filter(id => !validSet.has(id))
+      const old = storage.strategyPoolPruneBackup.get(null)
+      const merged = [...new Set([...(old?.removed ?? []), ...removed])]
+      storage.strategyPoolPruneBackup.set({ at: new Date().toISOString(), removed: merged })
+      return next
     })
+  }, [])
+
+  // [R95] 一键恢复上次自动清理移除的 ID(去重并回池尾)。策略仍不存在时卡片
+  // 不会显示(visiblePool 过滤), 但 ID 保住了 —— 等数据迁回来它们自动重新出现。
+  const restorePruned = useCallback(() => {
+    const backup = storage.strategyPoolPruneBackup.get(null)
+    if (!backup || backup.removed.length === 0) return 0
+    setPool(prev => {
+      const next = [...prev]
+      for (const id of backup.removed) {
+        if (!next.includes(id)) next.push(id)
+      }
+      return next
+    })
+    storage.strategyPoolPruneBackup.remove()
+    return backup.removed.length
+  }, [])
+
+  const dismissPruneBackup = useCallback(() => {
+    storage.strategyPoolPruneBackup.remove()
   }, [])
 
   const isInPool = useCallback((id: string) => pool.includes(id), [pool])
 
-  return { pool, addToPool, removeFromPool, reorderPool, prune, isInPool }
+  return { pool, addToPool, removeFromPool, reorderPool, prune, isInPool, restorePruned, dismissPruneBackup }
 }
