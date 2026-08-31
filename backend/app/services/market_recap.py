@@ -179,8 +179,9 @@ def _build_emotion_block(overview: dict) -> str:
     return "\n".join(lines)
 
 
-def _build_user_prompt(overview: dict, news: list[dict], focus: str) -> str:
-    """构建用户消息:复盘日期 + 市场数据精简切片 + 新闻 + 关注点。"""
+def _build_user_prompt(overview: dict, news: list[dict], focus: str, lhb_context: str = "",
+                       bench_context: str = "") -> str:
+    """构建用户消息:复盘日期 + 市场数据精简切片 + 龙虎榜(可选) + 盘前风向标(可选) + 新闻 + 关注点。"""
     as_of = overview.get("as_of") or "今日"
 
     parts: list[str] = [
@@ -201,6 +202,22 @@ def _build_user_prompt(overview: dict, news: list[dict], focus: str) -> str:
         "## 行业板块排名",
         _build_sector_block(overview.get("industry_rank"), "行业"),
     ]
+
+    # 龙虎榜资金动向 (fuyao 数据源, 摘要自带数据日期; 无数据源/失败时为空不占段)
+    if lhb_context:
+        parts.extend([
+            "",
+            "## 龙虎榜资金动向",
+            lhb_context,
+        ])
+
+    # 盘前风向标 (fuyao 竞价筛选名单 + 当日实际表现对照; 失败为空不占段)
+    if bench_context:
+        parts.extend([
+            "",
+            "## 盘前风向标(竞价)",
+            bench_context,
+        ])
 
     if news:
         news_lines = []
@@ -393,14 +410,23 @@ async def recap_market_stream(
     try:
         from app.services.ai_provider import stream_ai_text
 
-        user_prompt = _build_user_prompt(overview, news or [], focus)
-        # 复盘模式: today=当日直接复盘(原行为) / continuity=连读上一份复盘对照今日 /
-        # week=近7交易日纵览。附加段拼在 prompt 末尾, 指令就近生效。
+        # 龙虎榜摘要 (fuyao 专有): 拉取失败/未配置 → 空串, 复盘主流程不受影响
+        from app.services import dragon_tiger as dragon_tiger_svc
+
+        lhb_ctx = dragon_tiger_svc.build_recap_context(repo.store.data_dir)
+
+        # 盘前风向标摘要 (fuyao 专有): 失败/未配置 → 空串
+        from app.services import auction_benchmark as auction_benchmark_svc
+
+        bench_ctx = auction_benchmark_svc.build_recap_context(repo.store.data_dir)
+        user_prompt = _build_user_prompt(overview, news or [], focus, lhb_ctx, bench_ctx)
+        # [fork 增强] 复盘模式: today=当日直接复盘(原行为) / continuity=连读上一份
+        # 复盘对照今日 / week=近7交易日纵览。附加段拼在 prompt 末尾, 指令就近生效。
         if mode == "continuity":
             user_prompt += _prev_recap_section(as_of_str)
         elif mode == "week":
             user_prompt += _week_digest_section(repo, as_of_str)
-        got_content = False  # [上游] 空正文守卫: 流结束 0 delta → 明确报错
+        got_content = False  # 空正文守卫: 流结束 0 delta → 明确报错
         async for delta in stream_ai_text(
             [
                 {"role": "system", "content": _SYSTEM_PROMPT},

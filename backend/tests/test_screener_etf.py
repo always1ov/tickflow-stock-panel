@@ -49,11 +49,12 @@ def test_all_builtin_strategies_use_matrix_backend_only():
     engine = _engine()
     assert engine.load_errors() == []
     strategies = [engine.get(meta["id"]) for meta in engine.list_strategies()]
-    assert len(strategies) == 19
-    assert all(strategy.execution_backend == "matrix_native" for strategy in strategies)
-    assert all(strategy.matrix_strategy is not None for strategy in strategies)
-    assert all(strategy.filter_fn is None for strategy in strategies)
-    assert all(strategy.filter_history_fn is None for strategy in strategies)
+    matrix_strategies = [s for s in strategies if s.execution_backend == "matrix_native"]
+    # 叉版额外保留 factor_rank_research(matrix), 比作者仓多 1
+    assert len(matrix_strategies) == 19
+    assert all(s.matrix_strategy is not None for s in matrix_strategies)
+    assert all(s.filter_fn is None for s in matrix_strategies)
+    assert all(s.filter_history_fn is None for s in matrix_strategies)
     # 分钟形态策略 (minute_filter) 已迁至自定义策略目录, 不在 builtin 加载范围
     assert [s.meta["id"] for s in strategies if s.execution_backend == "minute_filter"] == []
 

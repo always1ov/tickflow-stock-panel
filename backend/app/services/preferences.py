@@ -270,11 +270,13 @@ def get_minute_sync_segment_days() -> int:
     """
     return max(5, min(30, load().get("minute_sync_segment_days", 20)))
 
-# ===== 盘中分钟增量刷新 (Expert 专有, intraday.batch 独立限流池) =====
+# ===== 盘中分钟增量刷新 (Expert 专有) =====
 
-# 下限 60s: 保证任何 60s 滑动窗口至多一个全市场脉冲 (28 并发 < 48 安全 rpm)。
-_MINUTE_REFRESH_INTERVAL_MIN = 60
-_MINUTE_REFRESH_INTERVAL_MAX = 300
+# 稳态轮为 intraday.universe 单请求增量, 无脉冲并发, 间隔可低至 3s;
+# 全天修复轮 (intraday.batch 28 块爆发) 的 rpm 安全与间隔无关, 由轮次
+# 调度 max(间隔, 单轮完成) 天然防重叠。
+_MINUTE_REFRESH_INTERVAL_MIN = 3
+_MINUTE_REFRESH_INTERVAL_MAX = 120
 
 
 def get_minute_refresh_enabled() -> bool:
@@ -283,10 +285,10 @@ def get_minute_refresh_enabled() -> bool:
 
 
 def get_minute_refresh_interval() -> int:
-    """盘中分钟增量刷新间隔(秒)。默认 60,范围 [60, 300]。"""
+    """盘中分钟增量刷新间隔(秒)。默认 6,范围 [3, 120]。"""
     return max(
         _MINUTE_REFRESH_INTERVAL_MIN,
-        min(_MINUTE_REFRESH_INTERVAL_MAX, int(load().get("minute_refresh_interval", 60))),
+        min(_MINUTE_REFRESH_INTERVAL_MAX, int(load().get("minute_refresh_interval", 6))),
     )
 
 
@@ -335,14 +337,18 @@ def get_daily_data_provider() -> str:
 
 
 def get_adj_factor_provider() -> str:
-    provider = str(load().get("adj_factor_provider", "same_as_daily") or "same_as_daily").lower()
-    if provider == "same_as_daily":
-        return provider
-    return provider if provider in _allowed_data_providers() else "same_as_daily"
+    # 「跟随日K」(same_as_daily) 特殊值已下线: 存量配置里的旧值按非法值回退 tickflow
+    provider = str(load().get("adj_factor_provider", "tickflow") or "tickflow").lower()
+    return provider if provider in _allowed_data_providers() else "tickflow"
 
 
 def get_minute_data_provider() -> str:
     provider = str(load().get("minute_data_provider", "tickflow") or "tickflow").lower()
+    return provider if provider in _allowed_data_providers() else "tickflow"
+
+
+def get_depth5_data_provider() -> str:
+    provider = str(load().get("depth5_data_provider", "tickflow") or "tickflow").lower()
     return provider if provider in _allowed_data_providers() else "tickflow"
 
 
@@ -1084,7 +1090,7 @@ def set_realtime_monitor_config(cfg: dict) -> dict:
     if "minute_refresh_enabled" in cfg:
         updates["minute_refresh_enabled"] = bool(cfg["minute_refresh_enabled"])
     if "minute_refresh_interval" in cfg:
-        # clamp 到 [60, 300] (下限保证 60s 窗口至多一个全市场脉冲), 与 getter 一致
+        # clamp 到 [3, 120], 与 getter 一致, 防前端传越界值
         updates["minute_refresh_interval"] = max(
             _MINUTE_REFRESH_INTERVAL_MIN,
             min(_MINUTE_REFRESH_INTERVAL_MAX, int(cfg["minute_refresh_interval"])))

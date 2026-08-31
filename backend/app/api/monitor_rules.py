@@ -110,7 +110,8 @@ class RuleModel(BaseModel):
     # volume_delta 专属 (轮询放量监控): 相邻两次全市场快照的成交量增量
     threshold_volume: float = 9000   # 单轮增量 >= 此值(手)时报警
     threshold_amount: float = 1e6    # metric=amount 时: 单轮增量 >= 此值(元)时报警
-    basic_filter: dict = Field(default_factory=dict)
+    # 基础过滤 (与策略 basic_filter 语义对齐): 值为 null 表示不过滤
+    basic_filter: dict = {}
 
 
 # ── 字段选项 ─────────────────────────────────────────────

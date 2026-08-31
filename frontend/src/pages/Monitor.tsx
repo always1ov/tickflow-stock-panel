@@ -20,7 +20,7 @@ import { RuleEditor } from '@/components/monitor/RuleEditor'
 import { toast } from '@/components/Toast'
 import { StockPreviewDialog } from '@/components/StockPreviewDialog'
 import { DimensionMembersDialog, type DimensionKind, type DimensionMembersTarget } from '@/components/DimensionMembersDialog'
-import { usePreferences } from '@/lib/useSharedQueries'
+import { usePreferences, useQuoteStatus } from '@/lib/useSharedQueries'
 
 const TYPE_LABEL: Record<string, string> = {
   signal: '信号', price: '价格/涨跌', market: '市场异动', strategy: '策略监控', sector: '板块监控',
@@ -142,6 +142,10 @@ export function Monitor() {
 
   // 全局 ext 字段配置 (监控中心个股通知带行业/概念标签)
   const { data: prefs } = usePreferences()
+  // 实时行情可用性: mode=none 表示当前生效数据源完全无法提供实时行情
+  // (TickFlow 无有效 Key, 或路由源未就绪) — 监控/预警收不到最新价, 顶部提示去数据源配置。
+  const { data: quoteStatus } = useQuoteStatus()
+  const realtimeUnavailable = quoteStatus?.mode === 'none'
   const monitorExtFields = prefs?.monitor_ext_fields ?? {
     concept: { field: 'ext_gn_ths.所属概念' },
     industry: { field: 'ext_hy_ths.所属同花顺行业' },
@@ -189,6 +193,22 @@ export function Monitor() {
   return (
     <div className="flex flex-col h-full">
       <PageHeader title="监控中心" subtitle="实时信号与规则管理" />
+      {realtimeUnavailable && (
+        <div className="px-3 pb-1 lg:px-4">
+          <div className="mx-auto flex max-w-[1440px] items-center gap-2.5 rounded-xl border border-warning/30 bg-warning/[0.06] px-4 py-2.5">
+            <AlertTriangle className="h-4 w-4 shrink-0 text-warning" />
+            <span className="text-xs leading-relaxed text-secondary">
+              实时行情当前不可用 — 监控与预警收不到最新价。可接入提供实时行情的数据源。
+            </span>
+            <Link
+              to="/settings?tab=data-sources"
+              className="ml-auto shrink-0 rounded-btn bg-warning/15 px-2.5 py-1 text-[11px] font-medium text-warning hover:bg-warning/25 transition-colors"
+            >
+              前往数据源配置
+            </Link>
+          </div>
+        </div>
+      )}
       {/* [R60] 统一页面留白 */}
       <div className="min-h-0 flex-1 px-3 pb-4 pt-3 lg:px-4">
         <div className="mx-auto flex h-full w-full max-w-[1440px] flex-col gap-3 lg:flex-row">
@@ -907,7 +927,7 @@ function RulesList({ rulesQuery, onEdit }: {
                   <span className="rounded bg-elevated px-1.5 py-0.5 text-[9px] text-secondary">
                     冷却 {Math.round((r.cooldown_seconds ?? 300) / 60)} 分钟
                   </span>
-                  {r.basic_filter && Object.values(r.basic_filter).some(value => value !== null && value !== false) && (
+                  {r.basic_filter && Object.values(r.basic_filter).some(v => v !== null && v !== false) && (
                     <span className="rounded bg-elevated px-1.5 py-0.5 text-[9px] text-secondary">
                       基础过滤{r.basic_filter.exclude_st ? ' · 剔除ST' : ''}
                     </span>

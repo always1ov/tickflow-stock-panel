@@ -167,13 +167,15 @@ class QuoteService:
 
     CORE_INDEX_SYMBOLS = ("000001.SH", "399001.SZ", "399006.SZ", "000680.SH")
 
-    # 档位 → 最小轮询间隔 (秒)
+    # 档位 → 最小轮询间隔 (秒) — TickFlow 档位限速保护, 仅实时源为 tickflow 时适用
     TIER_MIN_INTERVAL = {
         "expert": 1.0,
         "pro": 3.0,
         "starter": 6.0,
         "free": 6.0,
     }
+    # 插件/自定义源: 不受 TickFlow 档位保护约束, 通用下限 1s (默认间隔仍为 DEFAULT_INTERVAL)
+    CUSTOM_PROVIDER_MIN_INTERVAL = 1.0
     DEFAULT_INTERVAL = 6.0
     MAX_INTERVAL = 60.0
 
@@ -225,12 +227,15 @@ class QuoteService:
         # 午休/收盘最终同步状态: 到边界后必须成功拉取一版行情, 再进入休盘态。
         self._final_sync_done: set[tuple[date, str]] = set()
         self._final_sync_failed: dict[tuple[date, str], str] = {}
-        # 轮询放量: 仅保存全市场股票快照; 免费/自选轮询不会写入这里。
+        self._holiday_active = False  # 交易日探针当前是否判休市 (日志去重)
+        # 轮询放量 (volume_delta 规则): 上一轮全市场股票快照的 (累计成交量[手], 累计成交额[元]|None)。
+        # 每轮全量快照后更新; 跨交易日清空; 免费/自选轮询不会写入这里。
+        # [fork R81] 成交额缺失记 None (金额口径 fail-closed, 不用 0 伪造增量)。
         self._prev_stock_volume: dict[str, tuple[float, float | None]] | None = None
-        self._prev_volume_fetched_at: float | None = None
+        self._prev_volume_fetched_at: float | None = None   # epoch 毫秒
         self._prev_volume_date: date | None = None
         self._volume_delta: dict[str, tuple[float, float | None]] = {}
-        self._volume_delta_span_s = 0.0
+        self._volume_delta_span_s: float = 0.0
 
     # ================================================================
     # 生命周期
@@ -448,7 +453,12 @@ class QuoteService:
 
     @classmethod
     def realtime_mode(cls) -> str:
-        """当前实时行情模式: none / watchlist / full_market。"""
+        """当前实时行情模式: none / watchlist / full_market。
+
+        [fork] 上游 v0.2.2 起免费档=无实时(理由是 fuyao 免费全市场已覆盖);
+        本 fork 保留免费档自选实时(watchlist) —— 多 key 轮换池(R30/R35)喂
+        自选叠加层与监控引擎, 是本 fork 的主干功能, 不随上游下线。
+        """
         from app.services import preferences
         if preferences.get_realtime_data_provider() != "tickflow":
             return "full_market"
@@ -466,6 +476,11 @@ class QuoteService:
 
     @classmethod
     def _tier_min_interval(cls) -> float:
+        # 实时源路由到插件/自定义源时, TickFlow 档位限速不适用 (中立能力原则):
+        # 下限放宽到通用 1s, 默认/已保存间隔不变
+        from app.services import preferences
+        if preferences.get_realtime_data_provider() != "tickflow":
+            return cls.CUSTOM_PROVIDER_MIN_INTERVAL
         tier = cls._current_tier()
         return cls.TIER_MIN_INTERVAL.get(tier, cls.DEFAULT_INTERVAL)
 
@@ -519,7 +534,6 @@ class QuoteService:
 
     def status(self) -> dict:
         """返回行情服务状态。"""
-        from app.services import preferences
         age = (time.perf_counter() - self._fetch_time) * 1000 if self._fetch_time else -1
         mode = self.realtime_mode()
         phase = self._market_phase()
@@ -532,7 +546,6 @@ class QuoteService:
             "paused": self._paused,
             "mode": mode,
             "realtime_allowed": mode != "none",
-            "watchlist_symbol_count": len(preferences.get_realtime_watchlist_symbols()),
             "interval_s": self._interval,
             "symbol_count": self._symbol_count,
             "index_symbol_count": self._index_symbol_count,
@@ -902,6 +915,7 @@ class QuoteService:
         _persist_last_fetch(fetched_at)
         logger.info("行情刷新: %d 只股票, %d 只ETF, %d 只指数, 耗时 %.0fms", len(stock_records), len(etf_records), len(index_records), fetch_ms)
 
+        # 轮询放量状态更新 (volume_delta 规则的差值来源)
         self._update_volume_delta(stock_records, fetched_at)
 
         # ---- 写 kline_daily (不复权原始价格, 只有 OHLCV) ----
@@ -1278,8 +1292,29 @@ class QuoteService:
             return (cn_today(), "close")
         return None
 
+    def _holiday_gate(self) -> bool:
+        """交易日探针门控: 确定休市 → False (停止轮询, 含 final 定版)。
+
+        探针未知 (None, 未配置 fuyao 且 tickflow 不可用/开盘缓冲窗内) → True,
+        维持周几近似现状行为。探针是纯读, 不落盘; 休市结论带 TTL 定期复探,
+        误判自愈。首次判定变化打一条日志, 避免每拍刷屏。
+        """
+        from app.services import trading_day
+
+        holiday = trading_day.is_trading_day() is False
+        if holiday != self._holiday_active:
+            self._holiday_active = holiday
+            if holiday:
+                logger.info("交易日探针判定休市, 行情轮询暂停 (30 分钟复探)")
+        return not holiday
+
     def _should_poll_for_phase(self, phase: str) -> bool:
-        """是否处于会主动拉行情的阶段。final 阶段成功后即停止。"""
+        """是否处于会主动拉行情的阶段。final 阶段成功后即停止。
+
+        节假日 (工作日但休市) 由交易日探针剔除 — 周几门控覆盖不到的部分。
+        """
+        if not self._holiday_gate():
+            return False
         if phase in {"preopen", "morning", "pre_afternoon", "afternoon"}:
             return True
         key = self._final_sync_key(phase)
@@ -1601,13 +1636,21 @@ class QuoteService:
 
     @staticmethod
     def _continuous_session_start_ms() -> float:
-        """返回当前连续竞价时段起点（北京时间 09:30 或 13:00）。"""
+        """当前连续竞价时段的起点 (北京时间 9:30 或 13:00) 的 epoch 毫秒。"""
         now = cn_now()
         start_time = dt_time(13, 0) if now.time() >= dt_time(13, 0) else dt_time(9, 30)
         return datetime.combine(now.date(), start_time, tzinfo=now.tzinfo).timestamp() * 1000.0
 
     def _update_volume_delta(self, stock_records: list[dict], fetched_at_ms: float) -> None:
-        """计算全市场相邻快照差值；跨日、开盘首轮和非连续竞价时段不产出。"""
+        """全市场相邻两次快照的股票累计成交量差值 (手), 供 volume_delta 规则。
+
+        - prev 每轮都更新 (含非连续竞价时段); 差值只在连续竞价时段内计算
+        - 开盘保护: prev 早于本时段起点 (9:30/13:00) 时本轮差值无效 -- 避免
+          9:25 集合竞价撮合量 / 午休缺口被当成"突然放量"
+        - cur < prev (数据源重置/口径跳变) 的个股丢弃差值; 跨交易日清空
+        - [fork R81] 额外: 跨轮距超 3×interval 时整轮作废 (暂停恢复不产伪差值);
+          成交额缺失记 None 而非 0 (金额口径 fail-closed)
+        """
         today = cn_today()
         if self._prev_volume_date != today:
             self._prev_stock_volume = None

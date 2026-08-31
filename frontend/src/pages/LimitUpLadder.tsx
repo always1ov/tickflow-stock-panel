@@ -327,9 +327,7 @@ function MonitorMenu({ stock, direction, sealMode, monitorRule, anchorRect, hasD
   ]
 
   const [metric, setMetric] = useState<'sealed_vol' | 'sealed_amount'>(
-    existing?.metric === 'sealed_amount' || (!existing && sealMode === 'amount')
-      ? 'sealed_amount'
-      : 'sealed_vol',
+    existing?.metric === 'sealed_amount' || (!existing && sealMode === 'amount') ? 'sealed_amount' : 'sealed_vol'
   )
   const units = metric === 'sealed_amount' ? AMT_UNITS : VOL_UNITS
   // 已有规则: 反算到最大便捷单位 (选能整除的最大倍率); 新建: 额默认亿元, 量默认万手

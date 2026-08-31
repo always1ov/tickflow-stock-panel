@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Key,
@@ -8,29 +8,58 @@ import {
   Trash2,
   CheckCircle2,
   AlertCircle,
-  RefreshCw,
-  Activity,
   ExternalLink,
   Loader2,
   Save,
   Check,
   HelpCircle,
-  Shuffle,
 } from 'lucide-react'
 import { api } from '@/lib/api'
-import { toast } from '@/components/Toast'
-import { useCapabilities, useSettings } from '@/lib/useSharedQueries'
+import { useSettings } from '@/lib/useSharedQueries'
 import { QK } from '@/lib/queryKeys'
-import { CAP_LABELS, tierTextStyle, tierStyle, tierBaseName, ALL_TIERS, TierTag } from '@/lib/capability-labels'
+import { tierStyle, tierBaseName, ALL_TIERS, TierTag } from '@/lib/capability-labels'
 import { TickflowKeys } from '@/pages/settings/TickflowKeys'
 
-// ===== TickFlow Key 配置主体 (可嵌入 DataSources 的 TickFlow 详情区) =====
+// ===== TickFlow 详情内嵌区块 (组合进数据源页的单一详情卡, 不再各自成卡) =====
+// 档位变化会重塑能力矩阵候选 (按档位过滤) → Key/档位相关写操作统一连带失效。
 
-export function TickFlowKeyConfig() {
+/** 区块小标题 (详情卡内部的分节, 区别于页面级 section) */
+function SectionHeading({ icon: Icon, title, badge, right }: {
+  icon: React.ComponentType<{ className?: string }>
+  title: string
+  badge?: string
+  right?: React.ReactNode
+}) {
+  return (
+    <div className="flex items-center justify-between gap-2 mb-3">
+      <div className="flex items-center gap-2 min-w-0">
+        <Icon className="h-3.5 w-3.5 text-secondary shrink-0" />
+        <h3 className="text-xs font-medium text-foreground">{title}</h3>
+        {badge && (
+          <span className="px-1.5 py-0.5 text-[10px] font-mono rounded bg-elevated text-muted shrink-0">{badge}</span>
+        )}
+      </div>
+      {right}
+    </div>
+  )
+}
+
+/** Key/档位/能力矩阵/侧栏状态的统一连带失效 (档位变化重塑矩阵候选) */
+export function useInvalidateTierRelated() {
   const qc = useQueryClient()
+  return () => {
+    qc.invalidateQueries({ queryKey: QK.settings })
+    qc.invalidateQueries({ queryKey: QK.capabilities })
+    qc.invalidateQueries({ queryKey: QK.capabilityMatrix })
+    // 档位变化会改变实时行情模式(none/watchlist/full_market), 立即刷新侧边栏状态
+    qc.invalidateQueries({ queryKey: QK.quoteStatus })
+  }
+}
 
+/** API Key 配置区块: 状态 + 输入 + 保存并检测 (先探后存) */
+export function TickFlowKeySection({ right }: { right?: React.ReactNode }) {
   const settings = useSettings()
-  const caps = useCapabilities()
+  const invalidate = useInvalidateTierRelated()
 
   const [keyInput, setKeyInput] = useState('')
   const [revealing, setRevealing] = useState(false)
@@ -41,10 +70,7 @@ export function TickFlowKeyConfig() {
     mutationFn: () => api.saveTickflowKey(keyInput.trim()),
     onSuccess: (data) => {
       setKeyInput('')
-      qc.invalidateQueries({ queryKey: QK.settings })
-      qc.invalidateQueries({ queryKey: QK.capabilities })
-      // 档位变化会改变实时行情模式(none/watchlist/full_market), 立即刷新侧边栏状态
-      qc.invalidateQueries({ queryKey: QK.quoteStatus })
+      invalidate()
       if (data.ok) {
         setSaved(true)
         setTimeout(() => setSaved(false), 2000)
@@ -55,276 +81,152 @@ export function TickFlowKeyConfig() {
 
   const clear = useMutation({
     mutationFn: () => api.clearTickflowKey(),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: QK.settings })
-      qc.invalidateQueries({ queryKey: QK.capabilities })
-      qc.invalidateQueries({ queryKey: QK.quoteStatus })
-    },
+    onSuccess: () => invalidate(),
   })
 
   const redetect = useMutation({
-    mutationFn: api.redetectCapabilities,
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: QK.settings })
-      qc.invalidateQueries({ queryKey: QK.capabilities })
-      qc.invalidateQueries({ queryKey: QK.quoteStatus })
-    },
+    mutationFn: () => api.redetectCapabilities(),
+    onSuccess: () => invalidate(),
   })
 
   const mode = settings.data?.mode
   const masked = settings.data?.tickflow_api_key_masked
-  const capCount = caps.data ? Object.keys(caps.data.capabilities).length : 0
 
   return (
-    <>
-      {/* [R58] 多 key 逐个列出 + 逐个验活。下面那张卡是"贴一个 key 进来"的入口,
-          这张是"我现在有哪几个、哪个死了"的清单 —— 池化跑十几个 key 时, 只看
-          一个脱敏串根本看不出是哪一个过期了。 */}
-      <div className="mb-6 max-w-5xl">
+    <div>
+      {/* [fork R58] 多 key 逐个列出 + 逐个验活: 池化跑十几个 key 时, 只看一个
+          脱敏串看不出哪一个过期了。放在单 key 配置入口上方。 */}
+      <div className="mb-6">
         <TickflowKeys />
       </div>
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.3fr] gap-6 max-w-5xl">
-        {/* ========== 左列: Key 配置 ========== */}
-        <div className="space-y-6">
-          <Card icon={Key} title="TickFlow API Key">
-            <p className="text-sm text-secondary leading-relaxed mb-4">
-              在{' '}
-              <a
-                href="https://tickflow.org/auth/register?ref=V3KDKGXPEA"
-                target="_blank"
-                rel="noreferrer"
-                className="text-accent hover:underline inline-flex items-baseline gap-0.5"
-              >
-                tickflow.org
-                <ExternalLink className="h-3 w-3 self-center" />
-              </a>{' '}
-              注册获取。API Key 存放为本地文件,不会上传任何第三方,请妥善保管。
-              <br />
-              <span className="text-[10px] text-muted">多个免费 Key 用英文逗号分隔(如 <code>tk_aaa,tk_bbb</code>):每个免费 Key 各加 5 只自选实时额度,凑成 5×N 只。填单个付费 Key 则直接走付费额度。</span>
-            </p>
+      <SectionHeading icon={Key} title="TickFlow API Key" right={right} />
 
-            {/* 当前状态 */}
-            <div className="flex items-center justify-between mb-4">
-              <div className="min-w-0">
-                <div className="text-[10px] uppercase tracking-widest text-muted">状态</div>
-                <div className="mt-1 flex items-center gap-2 min-w-0">
-                  {mode === 'api_key' ? (
-                    <>
-                      <CheckCircle2 className="h-4 w-4 text-bear shrink-0" />
-                      <span className="text-sm font-medium shrink-0">已配置</span>
-                      <span className="font-mono text-xs text-secondary truncate">{masked}</span>
-                    </>
-                  ) : mode === 'free' ? (
-                    <>
-                      <CheckCircle2 className="h-4 w-4 text-bear shrink-0" />
-                      <span className="text-sm font-medium shrink-0">免费 Key</span>
-                      <span className="font-mono text-xs text-secondary truncate">{masked}</span>
-                    </>
-                  ) : (
-                    <>
-                      <AlertCircle className="h-4 w-4 text-muted shrink-0" />
-                      <span className="text-sm font-medium text-muted">未配置</span>
-                    </>
-                  )}
-                </div>
-              </div>
-              {(mode === 'api_key' || mode === 'free') && (
-                <button
-                  onClick={() => setConfirmClear(true)}
-                  disabled={clear.isPending}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-btn bg-elevated text-secondary hover:text-danger text-xs transition-colors duration-150 ease-smooth disabled:opacity-50 shrink-0"
-                >
-                  <Trash2 className="h-3 w-3" />
-                  清除
-                </button>
-              )}
-            </div>
+      <p className="text-xs text-secondary leading-relaxed mb-4">
+        在{' '}
+        <a
+          href="https://tickflow.org/auth/register?ref=V3KDKGXPEA"
+          target="_blank"
+          rel="noreferrer"
+          className="text-accent hover:underline inline-flex items-baseline gap-0.5"
+        >
+          tickflow.org
+          <ExternalLink className="h-3 w-3 self-center" />
+        </a>{' '}
+        注册获取。API Key 存放为本地文件,不会上传任何第三方,请妥善保管。
+      </p>
 
-            {/* 输入 */}
-            <form
-              onSubmit={(e) => {
-                e.preventDefault()
-                if (keyInput.trim()) save.mutate()
-              }}
-              className="space-y-2"
-            >
-              <div className="relative">
-                <input
-                  type={revealing ? 'text' : 'password'}
-                  placeholder={mode === 'none' ? '粘贴 TickFlow API Key(多个免费 Key 用逗号分隔)' : '粘贴新 Key 替换当前(多个用逗号分隔)'}
-                  value={keyInput}
-                  onChange={(e) => { setKeyInput(e.target.value); if (saved) setSaved(false) }}
-                  className="w-full px-3 py-2 pr-9 rounded-input bg-base border border-border text-sm font-mono focus:outline-none focus:border-accent transition-colors duration-150 ease-smooth"
-                />
-                <button
-                  type="button"
-                  onClick={() => setRevealing((v) => !v)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted hover:text-foreground transition-colors duration-150 ease-smooth"
-                  tabIndex={-1}
-                  aria-label={revealing ? '隐藏' : '显示'}
-                >
-                  {revealing ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
-              <button
-                type="submit"
-                disabled={save.isPending || (!keyInput.trim() && !saved)}
-                className="w-full h-10 rounded-xl bg-accent text-white text-sm font-semibold flex items-center justify-center gap-2 hover:bg-accent/90 disabled:opacity-40 transition-all"
-              >
-                {save.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : saved ? <Check className="h-4 w-4" /> : <Save className="h-4 w-4" />}
-                {save.isPending ? '保存中...' : saved ? '已保存' : '保存并检测'}
-              </button>
-
-              {/* 检测中提示 —— 成功/失败后自动消失 */}
-              {save.isPending && (
-                <div className="flex items-start gap-1.5 rounded-btn border border-warning/30 bg-warning/10 px-3 py-2 text-[11px] leading-snug text-warning">
-                  <AlertCircle className="h-3.5 w-3.5 mt-px shrink-0" />
-                  <span>
-                    验证通过前请不要离开当前页面 · 如遇网络问题请点击
-                    <button
-                      type="button"
-                      onClick={() => { save.reset(); redetect.mutate() }}
-                      disabled={redetect.isPending}
-                      className="font-semibold underline underline-offset-2 hover:text-warning/80 disabled:opacity-50"
-                    >
-                      {redetect.isPending ? '重新检测中…' : '重新检测'}
-                    </button>
-                  </span>
-                </div>
-              )}
-            </form>
-
-            {save.isError && (
-              <div className="mt-3 text-xs text-danger">
-                保存失败:{String((save.error as any).message)}
-              </div>
-            )}
-            {/* 无效 key —— 先探后存:探测失败(key 无效/乱填)时不存储,提示用户 */}
-            {save.data && !save.data.ok && (
-              <div className="mt-3 text-xs text-danger flex items-center gap-1.5">
-                <AlertCircle className="h-3 w-3 shrink-0" />
-                {save.data.reason === 'invalid'
-                  ? 'Key 无效或已过期,请检查后重试(未保存该 Key)'
-                  : save.data.error ?? '保存失败'}
-              </div>
-            )}
-            {save.data?.ok && (
-              <div className="mt-3 text-xs text-bear flex items-center gap-1.5">
-                <CheckCircle2 className="h-3 w-3" />
-                保存成功 — 档位 {save.data.tier_label}
-                {save.data.mode === 'free' && '(免费档 · 历史日K + 自选实时监控)'}
-              </div>
-            )}
-          </Card>
-        </div>
-
-        {/* ========== 右列: 档位 + 能力 ========== */}
-        <div className="space-y-6">
-          <Card
-            icon={Activity}
-            title="订阅档位"
-            right={
-              <button
-                onClick={() => redetect.mutate()}
-                disabled={redetect.isPending}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-btn bg-elevated hover:bg-elevated/80 text-xs text-secondary transition-colors duration-150 ease-smooth disabled:opacity-50"
-              >
-                <RefreshCw className={`h-3 w-3 ${redetect.isPending ? 'animate-spin' : ''}`} />
-                重新检测
-              </button>
-            }
-          >
-            {caps.data ? (
+      {/* 当前状态 */}
+      <div className="flex items-center justify-between mb-4">
+        <div className="min-w-0">
+          <div className="text-[10px] uppercase tracking-widest text-muted">状态</div>
+          <div className="mt-1 flex items-center gap-2 min-w-0">
+            {mode === 'api_key' ? (
               <>
-                <div className="flex items-center gap-1.5">
-                  <div className="font-mono text-3xl font-bold tracking-tight" style={tierTextStyle(caps.data.label)}>
-                    {caps.data.label}
-                  </div>
-                  <TierHelpPopover currentLabel={caps.data.label} />
-                </div>
-                <div className="mt-1 text-xs text-muted">
-                  根据 API Key 自动检测 · 拥有"代表性 capability"任一即认为该档
-                </div>
-
-                {settings.data?.missing_caps && settings.data.missing_caps.length > 0 && (
-                  <div className="mt-3 rounded-btn border border-warning/40 bg-warning/5 px-3 py-2 text-xs">
-                    <div className="font-medium text-warning mb-1">
-                      本档应有但未探测到({settings.data.missing_caps.length} 项)
-                    </div>
-                    <div className="text-secondary space-y-0.5">
-                      {settings.data.missing_caps.map((c) => (
-                        <div key={c} className="font-mono">
-                          {CAP_LABELS[c]?.name ?? c}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                <CheckCircle2 className="h-4 w-4 text-bear shrink-0" />
+                <span className="text-sm font-medium shrink-0">已配置</span>
+                <span className="font-mono text-xs text-secondary truncate">{masked}</span>
+              </>
+            ) : mode === 'free' ? (
+              <>
+                <CheckCircle2 className="h-4 w-4 text-bear shrink-0" />
+                <span className="text-sm font-medium shrink-0">免费 Key</span>
+                <span className="font-mono text-xs text-secondary truncate">{masked}</span>
               </>
             ) : (
-              <div className="text-sm text-muted">加载中…</div>
+              <>
+                <AlertCircle className="h-4 w-4 text-muted shrink-0" />
+                <span className="text-sm font-medium text-muted">未配置</span>
+              </>
             )}
-          </Card>
-
-          <Card icon={CheckCircle2} title="可用功能" badge={`${capCount} 项`}>
-            {caps.data && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-                className="-mx-5 -mb-5"
-              >
-                <div className="border-t border-border">
-                  {Object.entries(caps.data.capabilities).map(([cap, lim]) => {
-                    const meta = CAP_LABELS[cap]
-                    return (
-                      <div
-                        key={cap}
-                        className="px-5 py-3 border-b border-border last:border-b-0 flex items-baseline justify-between gap-4"
-                      >
-                        <div className="min-w-0">
-                          <div className="text-sm text-foreground truncate">
-                            {meta?.name ?? cap}
-                          </div>
-                          {meta?.hint && (
-                            <div className="mt-0.5 text-[11px] text-muted truncate">
-                              {meta.hint}
-                            </div>
-                          )}
-                        </div>
-                        <div className="text-right shrink-0 text-xs">
-                          <div className="font-mono text-foreground">
-                            {lim.rpm ? `${lim.rpm}/min` : lim.subscribe ? `${lim.subscribe} 订阅` : '—'}
-                          </div>
-                          {lim.batch && (
-                            <div className="font-mono text-muted">{lim.batch} 只/次</div>
-                          )}
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </motion.div>
-            )}
-
-            {settings.data?.probe_log && settings.data.probe_log.length > 0 && (
-              <details className="mt-4 -mx-5 -mb-5 border-t border-border">
-                <summary className="cursor-pointer px-5 py-3 text-xs text-muted hover:text-secondary transition-colors duration-150 ease-smooth select-none">
-                  查看检测日志
-                </summary>
-                <div className="px-5 pb-4 font-mono text-[11px] space-y-0.5 text-secondary">
-                  {settings.data.probe_log.map((line, i) => (
-                    <div key={i}>{line}</div>
-                  ))}
-                </div>
-              </details>
-            )}
-          </Card>
-
-          {/* [R35] 多 key 时的每轮启用数 —— 只有配了 2 个以上才有意义 */}
-          <KeysPerRoundCard />
+          </div>
         </div>
+        {(mode === 'api_key' || mode === 'free') && (
+          <button
+            onClick={() => setConfirmClear(true)}
+            disabled={clear.isPending}
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-btn bg-elevated text-secondary hover:text-danger text-xs transition-colors duration-150 ease-smooth disabled:opacity-50 shrink-0"
+          >
+            <Trash2 className="h-3 w-3" />
+            清除
+          </button>
+        )}
       </div>
+
+      {/* 输入 + 保存: 左右一行 */}
+      <form
+        onSubmit={(e) => {
+          e.preventDefault()
+          if (keyInput.trim()) save.mutate()
+        }}
+        className="flex items-center gap-2"
+      >
+        <div className="relative flex-1 min-w-0">
+          <input
+            type={revealing ? 'text' : 'password'}
+            placeholder={mode === 'none' ? '粘贴 TickFlow API Key' : '粘贴新 Key 替换当前'}
+            value={keyInput}
+            onChange={(e) => { setKeyInput(e.target.value); if (saved) setSaved(false) }}
+            className="w-full px-3 py-2 pr-9 rounded-input bg-base border border-border text-sm font-mono focus:outline-none focus:border-accent transition-colors duration-150 ease-smooth"
+          />
+          <button
+            type="button"
+            onClick={() => setRevealing((v) => !v)}
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted hover:text-foreground transition-colors duration-150 ease-smooth"
+            tabIndex={-1}
+            aria-label={revealing ? '隐藏' : '显示'}
+          >
+            {revealing ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </button>
+        </div>
+        <button
+          type="submit"
+          disabled={save.isPending || (!keyInput.trim() && !saved)}
+          className="h-9 shrink-0 px-4 rounded-xl bg-accent text-white text-sm font-semibold flex items-center justify-center gap-2 hover:bg-accent/90 disabled:opacity-40 transition-all"
+        >
+          {save.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : saved ? <Check className="h-4 w-4" /> : <Save className="h-4 w-4" />}
+          {save.isPending ? '保存中...' : saved ? '已保存' : '保存并检测'}
+        </button>
+      </form>
+
+      {/* 检测中提示 —— 成功/失败后自动消失 */}
+      {save.isPending && (
+        <div className="mt-2 flex items-start gap-1.5 rounded-btn border border-warning/30 bg-warning/10 px-3 py-2 text-[11px] leading-snug text-warning">
+          <AlertCircle className="h-3.5 w-3.5 mt-px shrink-0" />
+            <span>
+              验证通过前请不要离开当前页面 · 如遇网络问题请点击
+              <button
+                type="button"
+                onClick={() => { save.reset(); redetect.mutate() }}
+                disabled={redetect.isPending}
+                className="font-semibold underline underline-offset-2 hover:text-warning/80 disabled:opacity-50"
+              >
+                {redetect.isPending ? '重新检测中…' : '重新检测'}
+              </button>
+            </span>
+          </div>
+        )}
+
+      {save.isError && (
+        <div className="mt-3 text-xs text-danger">
+          保存失败:{String((save.error as any).message)}
+        </div>
+      )}
+      {/* 无效 key —— 先探后存:探测失败(key 无效/乱填)时不存储,提示用户 */}
+      {save.data && !save.data.ok && (
+        <div className="mt-3 text-xs text-danger flex items-center gap-1.5">
+          <AlertCircle className="h-3 w-3 shrink-0" />
+          {save.data.reason === 'invalid'
+            ? 'Key 无效或已过期,请检查后重试(未保存该 Key)'
+            : save.data.error ?? '保存失败'}
+        </div>
+      )}
+      {save.data?.ok && (
+        <div className="mt-3 text-xs text-bear flex items-center gap-1.5">
+          <CheckCircle2 className="h-3 w-3" />
+          保存成功 — 档位 {save.data.tier_label}
+          {save.data.mode === 'free' && '(免费档 · 历史日K + 自选实时监控)'}
+        </div>
+      )}
 
       {/* 确认清除 Key 弹窗 */}
       {confirmClear && (
@@ -356,15 +258,13 @@ export function TickFlowKeyConfig() {
           </div>
         </div>
       )}
-    </>
+    </div>
   )
 }
 
-// ===== 通用卡片 =====
-
 // ===== 档位说明弹窗 =====
 
-function TierHelpPopover({ currentLabel }: { currentLabel: string }) {
+export function TierHelpPopover({ currentLabel }: { currentLabel: string }) {
   const [open, setOpen] = useState(false)
   const currentBase = tierBaseName(currentLabel)
 
@@ -424,106 +324,5 @@ function TierHelpPopover({ currentLabel }: { currentLabel: string }) {
         )}
       </AnimatePresence>
     </div>
-  )
-}
-
-
-interface CardProps {
-  icon: React.ComponentType<{ className?: string }>
-  title: string
-  badge?: string
-  right?: React.ReactNode
-  children: React.ReactNode
-}
-
-function Card({ icon: Icon, title, badge, right, children }: CardProps) {
-  return (
-    <section className="rounded-card border border-border bg-surface p-5">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2.5">
-          <Icon className="h-4 w-4 text-secondary" />
-          <h2 className="text-sm font-medium text-foreground">{title}</h2>
-          {badge && (
-            <span className="px-1.5 py-0.5 text-[10px] font-mono rounded bg-elevated text-muted">
-              {badge}
-            </span>
-          )}
-        </div>
-        {right}
-      </div>
-      {children}
-    </section>
-  )
-}
-
-
-/**
- * [fork 增强] R35 每轮随机启用几个 key。
- *
- * 只在配了多个 key 时显示 —— 单 key 没有可选的余地。
- * 调小相当于每轮给额度留白: 摊开后一轮正好铺满限速窗口, 余量几乎为零,
- * 某批响应慢或重试时同一 key 的下次调用可能落进窗口内; 少用几个就谁都不贴上限跑。
- */
-function KeysPerRoundCard() {
-  const queryClient = useQueryClient()
-  const [draft, setDraft] = useState<string | null>(null)
-
-  const cfg = useQuery({
-    queryKey: QK.realtimeKeysPerRound,
-    queryFn: () => api.realtimeKeysPerRound(),
-    staleTime: 60_000,
-  })
-  const save = useMutation({
-    mutationFn: (count: number) => api.setRealtimeKeysPerRound(count),
-    onSuccess: () => {
-      setDraft(null)
-      queryClient.invalidateQueries({ queryKey: QK.realtimeKeysPerRound })
-      toast('已保存', 'success')
-    },
-    onError: e => toast(String((e as Error).message || e), 'error'),
-  })
-
-  const total = cfg.data?.total_keys ?? 0
-  if (total < 2) return null   // 单 key 无从选起
-
-  const current = cfg.data?.count ?? 0
-  const value = draft ?? String(current)
-  const effective = Number(value) > 0 ? Math.min(Number(value), total) : total
-
-  return (
-    <Card icon={Shuffle} title="每轮启用的 Key 数">
-      <div className="px-5 pb-5 space-y-3">
-        <p className="text-[11px] leading-relaxed text-secondary">
-          自选实时每轮从 {total} 个 Key 里随机抽一部分用，其余这轮闲着、下轮重抽。
-          <span className="text-foreground">填 0 表示全部用上。</span>
-          调小相当于给额度留白——摊开后一轮正好铺满限速窗口，余量几乎为零，
-          某批响应慢或重试时同一个 Key 的下次调用可能挤进窗口内；少用几个就谁都不贴着上限跑，
-          单个 Key 失效时也只影响它被抽中的那些轮次。
-        </p>
-
-        <div className="flex items-center gap-2">
-          <input
-            type="number" min={0} max={total} value={value}
-            onChange={e => setDraft(e.target.value)}
-            className="h-9 w-24 rounded-input border border-border bg-base px-2 text-sm font-mono text-foreground focus:border-accent focus:outline-none"
-          />
-          <span className="text-xs text-muted">/ {total} 个</span>
-          <button
-            onClick={() => save.mutate(Number(value) || 0)}
-            disabled={save.isPending || draft === null}
-            className="ml-auto inline-flex h-9 items-center gap-1.5 rounded-btn bg-accent px-3 text-xs font-medium text-white disabled:opacity-40"
-          >
-            {save.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
-            保存
-          </button>
-        </div>
-
-        <p className="text-[11px] text-muted">
-          当前生效：每轮 <span className="font-mono text-foreground">{effective}</span> 个 Key
-          · 一轮最多覆盖 <span className="font-mono text-foreground">{effective * 5}</span> 只自选
-          {current === 0 && <span className="ml-1 text-muted/70">(0 = 全部)</span>}
-        </p>
-      </div>
-    </Card>
   )
 }

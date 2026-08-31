@@ -515,6 +515,21 @@ def _realtime_allowed() -> bool:
     return QuoteService.is_realtime_allowed()
 
 
+def _minute_history_days() -> int | None:
+    """当前分钟源的 1 分钟历史深度(交易日); None = 深历史(tickflow 基准)。
+
+    provider 可选类属性 minute_history_days 声明 (如 stock-sdk = 5,
+    免费分时接口只保留最近 5 个交易日); 未声明或走 tickflow 时视为深历史。
+    前端分时档位/默认值据此收窄。
+    """
+    from app.services import kline_sync, preferences
+    provider_name = preferences.get_minute_data_provider()
+    provider, fallback, _err = kline_sync._resolve_minute_provider(provider_name)
+    if fallback or provider is None:
+        return None
+    return getattr(provider, "minute_history_days", None)
+
+
 class MinuteSyncPrefs(BaseModel):
     minute_sync_enabled: bool
     minute_sync_days: int = 5
@@ -526,6 +541,7 @@ class DataProvidersIn(BaseModel):
     daily_data_provider: str | None = None
     adj_factor_provider: str | None = None
     minute_data_provider: str | None = None
+    depth5_data_provider: str | None = None
     realtime_data_provider: str | None = None
     financial_data_provider: str | None = None
 
@@ -618,11 +634,12 @@ def get_preferences() -> dict:
         "daily_data_provider": preferences.get_daily_data_provider(),
         "adj_factor_provider": preferences.get_adj_factor_provider(),
         "minute_data_provider": preferences.get_minute_data_provider(),
+        "minute_history_days": _minute_history_days(),
+        "depth5_data_provider": preferences.get_depth5_data_provider(),
         "realtime_data_provider": preferences.get_realtime_data_provider(),
         "financial_data_provider": preferences.get_financial_provider(),
         "data_source_job_timeout_s": preferences.get_data_source_job_timeout_s(),
         "data_source_long_job_timeout_s": preferences.get_data_source_long_job_timeout_s(),
-        "realtime_watchlist_symbols": preferences.get_realtime_watchlist_symbols(),
         **preferences.get_realtime_quote_scope(),
         "pipeline_pull_a_share": preferences.get_pipeline_pull_a_share(),
         "pipeline_pull_etf": preferences.get_pipeline_pull_etf(),
@@ -679,6 +696,31 @@ def list_data_sources() -> dict:
         "errors": custom_sources.errors(),
         "config_dir": str(custom_sources.data_sources_dir()),
     }
+
+
+@router.get("/capability-matrix")
+def get_capability_matrix() -> dict:
+    """能力 x 源路由矩阵: 能力注册表 + 各源能力声明 + 当前路由偏好, 设置页一次拉全。
+
+    偏好值经 preferences getters 注入 (自带合法源校验, 非法值回退默认),
+    TickFlow 当前档位由 tickflow policy 注入 (候选按档位过滤),
+    组装逻辑在 data_providers.capabilities, 本层保持薄。
+    """
+    from app.data_providers.capabilities import build_capability_matrix
+    from app.services import preferences
+    from app.tickflow import policy
+
+    return build_capability_matrix(
+        {
+            "realtime_data_provider": preferences.get_realtime_data_provider(),
+            "daily_data_provider": preferences.get_daily_data_provider(),
+            "minute_data_provider": preferences.get_minute_data_provider(),
+            "depth5_data_provider": preferences.get_depth5_data_provider(),
+            "adj_factor_provider": preferences.get_adj_factor_provider(),
+            "financial_data_provider": preferences.get_financial_provider(),
+        },
+        tickflow_tier=policy.base_tier_name(),
+    )
 
 
 @router.post("/plugin-key")
@@ -827,9 +869,8 @@ def delete_data_source(name: str, request: Request) -> dict:
         updates["realtime_data_provider"] = "tickflow"
     if preferences.get_financial_provider() == name:
         updates["financial_data_provider"] = "tickflow"
-    adj = preferences.get_adj_factor_provider()
-    if adj == name:
-        updates["adj_factor_provider"] = "same_as_daily"
+    if preferences.get_adj_factor_provider() == name:
+        updates["adj_factor_provider"] = "tickflow"
     if updates:
         preferences.save(updates)
     # 删除源可能触发偏好回退 tickflow, 同步刷新能力快照
@@ -875,6 +916,7 @@ def update_data_providers(req: DataProvidersIn, request: Request) -> dict:
         "daily_data_provider": preferences.get_daily_data_provider(),
         "adj_factor_provider": preferences.get_adj_factor_provider(),
         "minute_data_provider": preferences.get_minute_data_provider(),
+        "depth5_data_provider": preferences.get_depth5_data_provider(),
         "realtime_data_provider": preferences.get_realtime_data_provider(),
         "financial_data_provider": preferences.get_financial_provider(),
     }
@@ -1023,8 +1065,8 @@ class RealtimeQuoteScopePrefs(BaseModel):
 def update_realtime_quotes(req: RealtimeQuotesPrefs, request: Request) -> dict:
     """保存全局实时行情开关。
 
-    none 档无实时行情权限；free 档开启自选股实时；starter+ 开启全市场实时。
-    前端据此把开关置灰 / 回弹。
+    无实时能力的档位(TickFlow none/free)开关回弹强制关闭;
+    starter+ 或自定义实时源(如 fuyao)为全市场实时。前端据此把开关置灰 / 回弹。
     """
     from app.services import preferences
     qs = getattr(request.app.state, "quote_service", None)
@@ -1112,18 +1154,6 @@ def update_realtime_quote_scope(req: RealtimeQuoteScopePrefs) -> dict:
     from app.services import preferences
     cfg = req.model_dump(exclude_none=True)
     return preferences.set_realtime_quote_scope(cfg)
-
-
-class RealtimeWatchlistPrefs(BaseModel):
-    symbols: list[str] = []
-
-
-@router.put("/preferences/realtime-watchlist")
-def update_realtime_watchlist(req: RealtimeWatchlistPrefs) -> dict:
-    """兼容旧入口；Free 实时标的由自选页前 5 个决定。"""
-    from app.services import preferences
-    symbols = preferences.set_realtime_watchlist_symbols(req.symbols)
-    return {"realtime_watchlist_symbols": symbols}
 
 
 class IndicesNavPinnedPrefs(BaseModel):

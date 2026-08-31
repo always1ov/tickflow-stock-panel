@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -23,6 +23,7 @@ import { api, type ExtDataConfig } from '@/lib/api'
 import { toast } from '@/components/Toast'
 import {
   useCapabilities,
+  useCapabilityMatrix,
   useSettings,
   usePreferences,
   useQuoteStatus,
@@ -30,13 +31,13 @@ import {
   useDataStatus,
 } from '@/lib/useSharedQueries'
 import { useToggleRealtimeQuotes, useUpdateQuoteInterval } from '@/lib/useSharedMutations'
-import { MissingCapChip } from '@/lib/capability-labels'
+import { MissingCapChip, routeCapUsable, routeProviderDisplay, type RouteCapId } from '@/lib/capability-labels'
 import { QK } from '@/lib/queryKeys'
 import { PageHeader } from '@/components/PageHeader'
 import { formatScheduleDatePart, formatScheduleTimePart, isToday } from '@/lib/format'
 
 // 拆分出的子组件
-import { StatCard, type FieldTab } from '@/components/data/StatCard'
+import { StatCard, type FieldTab, type CapLimitValue } from '@/components/data/StatCard'
 import { ActiveJobCard } from '@/components/data/ActiveJobCard'
 import { SectionTitle, HistoryRow } from '@/components/data/SectionTitle'
 import { SettingsModal } from '@/components/data/SettingsModal'
@@ -184,42 +185,23 @@ export function Data() {
     ? 'TickFlow'
     : (dataSources.data?.custom?.find(s => s.name === activeProvider)?.display_name || activeProvider)
 
-  // tierKey → 自定义数据集名映射 (用于数据画像 CapBadge 显示数据源名而非 TickFlow 档位)
-  const TIERKEY_TO_DATASET: Record<string, string> = {
-    daily: 'daily',
-    adj_factor: 'adj_factor',
-    etf: 'daily',        // ETF 复用日K能力
-    minute: 'minute',
-    financials: 'financial',
-  }
-  // 数据源按数据集独立路由 (日线/分钟/实时/财务各有偏好, 除权跟随日线),
-  // 每张卡片按自己数据集的路由取显示名, 而非统一按日线源。
-  const allSourceItems = [
-    ...(dataSources.data?.custom ?? []),
-    ...(dataSources.data?.plugins ?? []),
-  ]
-  const getDatasetProvider = (ds: string): string => {
-    const p = prefs.data as Record<string, unknown> | undefined
-    let name = 'tickflow'
-    if (ds === 'daily') name = (p?.daily_data_provider as string) || 'tickflow'
-    else if (ds === 'minute') name = (p?.minute_data_provider as string) || 'tickflow'
-    else if (ds === 'financial') name = (p?.financial_data_provider as string) || 'tickflow'
-    else if (ds === 'adj_factor') {
-      name = (p?.adj_factor_provider as string) || 'same_as_daily'
-      if (name === 'same_as_daily') name = (p?.daily_data_provider as string) || 'tickflow'
-    }
-    return name.toLowerCase()
-  }
-  // 给定 tierKey, 返回该数据集实际路由到的自定义源显示名, 走 TickFlow 时返回 null
-  const getCustomProviderName = (tierKey: string): string | null => {
-    const ds = TIERKEY_TO_DATASET[tierKey]
-    if (!ds) return null
-    const provider = getDatasetProvider(ds)
-    if (provider === 'tickflow') return null
-    const item = allSourceItems.find(s => s.name === provider)
-    if (!item || !item.datasets.includes(ds)) return null
-    return item.display_name || provider
-  }
+  // —— 能力路由门控 (全项目统一判定) ——
+  // usable = 生效源当前能否提供该能力 (含插件/自定义源; TickFlow 档位不足则不可用),
+  // 区别于 useCapabilities 的 TickFlow 套餐视角。矩阵未加载时回退套餐视角, 避免首屏闪烁。
+  const matrix = useCapabilityMatrix()
+  const tfCaps = caps.data?.capabilities
+  const usableOr = (id: RouteCapId, tfHas: boolean) => routeCapUsable(matrix.data, id) ?? tfHas
+  // 合并视角 caps: 套餐限额键位 + 路由可用性覆盖, 卡片徽章/显隐/设置弹窗共用
+  const mergedCaps = useMemo(() => {
+    const m: Record<string, CapLimitValue> = { ...(tfCaps ?? {}) }
+    const merge = (tfKey: string, usable: boolean) => { m[tfKey] = usable ? (m[tfKey] ?? true) : false }
+    merge('adj_factor', usableOr('adj_factor', !!tfCaps?.['adj_factor']))
+    merge('kline.daily.batch', usableOr('daily', !!tfCaps?.['kline.daily.batch']))
+    merge('kline.minute.batch', usableOr('minute', !!tfCaps?.['kline.minute.batch']))
+    merge('financial', usableOr('financial', !!tfCaps?.['financial']))
+    return m
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tfCaps, matrix.data])
 
   const minuteAuto = prefs.data?.minute_sync_enabled ?? false
   const pipelineSched = prefs.data?.pipeline_schedule ?? { hour: 15, minute: 30 }
@@ -262,9 +244,10 @@ export function Data() {
   const quoteStatus = useQuoteStatus()
   const toggleQuote = useToggleRealtimeQuotes()
 
-  const hasAdjCap = !!caps.data?.capabilities?.['adj_factor']
-  const hasDailyBatchCap = !!caps.data?.capabilities?.['kline.daily.batch']
-  const hasMinuteCap = !!caps.data?.capabilities?.['kline.minute.batch']
+  // 路由感知能力门控: 矩阵判定生效源可用性, 未加载回退套餐视角
+  const hasAdjCap = usableOr('adj_factor', !!tfCaps?.['adj_factor'])
+  const hasDailyBatchCap = usableOr('daily', !!tfCaps?.['kline.daily.batch'])
+  const hasMinuteCap = usableOr('minute', !!tfCaps?.['kline.minute.batch'])
   const indexAuto = prefs.data?.pipeline_pull_index ?? true
   const etfAuto = prefs.data?.pipeline_pull_etf ?? false
   const pipelineSteps = [
@@ -283,7 +266,7 @@ export function Data() {
     window.addEventListener('data-card-visible-change', handler)
     return () => window.removeEventListener('data-card-visible-change', handler)
   }, [])
-  const cardVisible = getCardVisibility(caps.data?.capabilities)
+  const cardVisible = getCardVisibility(mergedCaps)
   // 引用 cardVisibleTick 触发重渲染(避免 lint 警告)
   void cardVisibleTick
 
@@ -432,7 +415,7 @@ export function Data() {
             skipped={skippedCards.has('instruments')}
             stagePct={activeCard === 'instruments' ? (job.data?.stage_pct ?? 0) : 0}
             tierKey="instruments"
-            capLimits={caps.data?.capabilities}
+            capLimits={mergedCaps}
             auto
             onShowFields={() => setSchemaTable('instruments')}
           />
@@ -449,8 +432,8 @@ export function Data() {
             skipped={skippedCards.has('daily')}
             stagePct={activeCard === 'daily' ? (job.data?.stage_pct ?? 0) : 0}
             tierKey="daily"
-            capLimits={caps.data?.capabilities}
-            customProvider={getCustomProviderName('daily')}
+            capLimits={mergedCaps}
+            customProvider={routeProviderDisplay(matrix.data, 'daily')}
             auto
             onShowFields={() => setSchemaTable('daily')}
             onSettings={hasData ? () => setOpenSettings(v => v === 'daily' ? null : 'daily') : undefined}
@@ -469,8 +452,8 @@ export function Data() {
             skipped={skippedCards.has('adj_factor')}
             stagePct={activeCard === 'adj_factor' ? (job.data?.stage_pct ?? 0) : 0}
             tierKey="adj_factor"
-            capLimits={caps.data?.capabilities}
-            customProvider={getCustomProviderName('adj_factor')}
+            capLimits={mergedCaps}
+            customProvider={routeProviderDisplay(matrix.data, 'adj_factor')}
             auto
             onShowFields={() => setSchemaTable('adj_factor')}
           />
@@ -487,7 +470,7 @@ export function Data() {
             skipped={skippedCards.has('enriched')}
             stagePct={activeCard === 'enriched' ? (job.data?.stage_pct ?? 0) : 0}
             tierKey="enriched"
-            capLimits={caps.data?.capabilities}
+            capLimits={mergedCaps}
             auto
             subLabel={status.data?.indicators_ready === false ? '字段 · 指标计算中…' : '字段 · 指标 · 信号'}
             localBadgeSuffix={`${prefs.data?.enriched_batch_size ?? 1000}只/批`}
@@ -508,7 +491,7 @@ export function Data() {
             skipped={skippedCards.has('index_daily')}
             stagePct={activeCard === 'index_daily' ? (job.data?.stage_pct ?? 0) : 0}
             tierKey="daily"
-            capLimits={caps.data?.capabilities}
+            capLimits={mergedCaps}
             auto={indexAuto}
             subLabel={indexOverviewLabel}
             fieldTabs={[
@@ -529,8 +512,8 @@ export function Data() {
             stats={etfOverviewStats}
             loading={isLoading}
             tierKey="etf"
-            capLimits={caps.data?.capabilities}
-            customProvider={getCustomProviderName('etf')}
+            capLimits={mergedCaps}
+            customProvider={routeProviderDisplay(matrix.data, 'daily')}
             auto={etfAuto}
             subLabel="维表 · 日K · 指标"
             fieldTabs={[
@@ -553,8 +536,8 @@ export function Data() {
             skipped={skippedCards.has('minute')}
             stagePct={activeCard === 'minute' ? (job.data?.stage_pct ?? 0) : 0}
             tierKey="minute"
-            capLimits={caps.data?.capabilities}
-            customProvider={getCustomProviderName('minute')}
+            capLimits={mergedCaps}
+            customProvider={routeProviderDisplay(matrix.data, 'minute')}
             auto={minuteAuto}
             onShowFields={() => setSchemaTable('minute')}
             onSettings={hasData ? () => setOpenSettings(v => v === 'minute' ? null : 'minute') : undefined}
@@ -570,8 +553,8 @@ export function Data() {
             stats={s?.financials ? { rows: s.financials.rows } : null}
             loading={isLoading}
             tierKey="financials"
-            capLimits={caps.data?.capabilities}
-            customProvider={getCustomProviderName('financials')}
+            capLimits={mergedCaps}
+            customProvider={routeProviderDisplay(matrix.data, 'financial')}
             subLabel={`历史股本 · ${historicalShareRows.toLocaleString()} 条`}
             onSettings={hasData ? () => setOpenSettings(v => v === 'financials' ? null : 'financials') : undefined}
             settingsOpen={openSettings === 'financials'}
@@ -590,7 +573,7 @@ export function Data() {
             skipped={skippedCards.has('regime')}
             stagePct={activeCard === 'regime' ? (job.data?.stage_pct ?? 0) : 0}
             tierKey="regime"
-            capLimits={caps.data?.capabilities}
+            capLimits={mergedCaps}
             auto={prefs.data?.pipeline_regime_enabled === true}
             subLabel="状态 · 综合分 · 指标"
             onSettings={hasData ? () => setOpenSettings(v => v === 'regime' ? null : 'regime') : undefined}
@@ -1020,7 +1003,7 @@ export function Data() {
         {openSettings === 'daily' && (
           <SettingsModal title="日 K · 向前扩展历史" onClose={() => setOpenSettings(null)}>
             <ExtendHistoryPanel
-              caps={caps.data}
+              hasCap={hasDailyBatchCap}
               isRunning={!!activeJobId}
               earliestDate={s?.daily?.earliest_date ?? null}
               onStart={() => setOpenSettings(null)}
@@ -1033,7 +1016,7 @@ export function Data() {
         {showRepair && (
           <SettingsModal title="日 K · 修正 / 补数据" onClose={() => setShowRepair(false)}>
             <RepairDailyPanel
-              caps={caps.data}
+              hasCap={hasDailyBatchCap}
               isRunning={!!activeJobId}
               latestDate={s?.daily?.latest_date ?? null}
               onStart={() => setShowRepair(false)}
@@ -1085,7 +1068,7 @@ export function Data() {
       <AnimatePresence>
         {openSettings === 'page-settings' && (
           <SettingsModal title="页面设置 · 数据画像卡片" onClose={() => setOpenSettings(null)}>
-            <PageSettingsModal caps={caps.data?.capabilities} />
+            <PageSettingsModal caps={mergedCaps} />
           </SettingsModal>
         )}
       </AnimatePresence>
@@ -1194,7 +1177,7 @@ export function Data() {
       <AnimatePresence>
         {openSettings === 'minute' && (
           <SettingsModal title="分钟 K · 同步设置" onClose={() => setOpenSettings(null)}>
-            <MinuteSyncConfig caps={caps.data} onJobStart={(jobId) => { setActiveJobId(jobId); setOpenSettings(null) }} />
+            <MinuteSyncConfig hasCap={hasMinuteCap} onJobStart={(jobId) => { setActiveJobId(jobId); setOpenSettings(null) }} />
           </SettingsModal>
         )}
       </AnimatePresence>

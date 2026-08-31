@@ -611,13 +611,24 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
                   return {
                     ...d,
                     type,
+                    // 轮询放量依赖全市场股票快照, 仅支持个股
+                    asset_type: type === 'volume_delta' ? 'stock' : d.asset_type,
                     notify_events: type === 'strategy'
                       ? [...(d.notify_events ?? DEFAULT_STRATEGY_NOTIFY_EVENTS)]
                       : undefined,
-                    asset_type: type === 'volume_delta' ? 'stock' : d.asset_type,
                     scope: type === 'sector' || type === 'abnormal' || type === 'volume_delta'
                       ? 'all'
                       : type === 'strategy' && d.scope === 'symbols' && d.symbols.length === 0 ? 'all' : d.scope,
+                    // 轮询放量: 冷却期默认 300s (持续放量会连续多轮达标); 切走时还原 3600
+                    cooldown_seconds: type === 'volume_delta' && d.type !== 'volume_delta' ? 300
+                      : type !== 'volume_delta' && d.type === 'volume_delta' ? 3600
+                      : d.cooldown_seconds,
+                    // 轮询放量: metric / 金额阈值 / 基础过滤默认 (与策略 basic_filter 对齐)
+                    metric: type === 'volume_delta' && d.type !== 'volume_delta' ? 'volume' : d.metric,
+                    threshold_amount: type === 'volume_delta' && d.type !== 'volume_delta' ? 1e6 : d.threshold_amount,
+                    basic_filter: type === 'volume_delta' && d.type !== 'volume_delta'
+                      ? { price_min: 3, price_max: 300, market_cap_min: 10e8, float_cap_min: null, float_cap_max: null, amount_min: 0.2e8, exclude_st: true }
+                      : d.basic_filter,
                     direction: type === 'sector' ? 'up'
                       : type === 'abnormal' ? 'both'
                       : d.type === 'sector' || d.type === 'abnormal' ? 'entry' : d.direction,
@@ -625,14 +636,6 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
                     threshold_pct: type === 'abnormal' && d.type !== 'abnormal' ? 70
                       : type !== 'abnormal' && d.type === 'abnormal' ? 1
                       : d.threshold_pct,
-                    cooldown_seconds: type === 'volume_delta' && d.type !== 'volume_delta' ? 300
-                      : type !== 'volume_delta' && d.type === 'volume_delta' ? 3600
-                      : d.cooldown_seconds,
-                    metric: type === 'volume_delta' && d.type !== 'volume_delta' ? 'volume' : d.metric,
-                    threshold_amount: type === 'volume_delta' && d.type !== 'volume_delta' ? 1e6 : d.threshold_amount,
-                    basic_filter: type === 'volume_delta' && d.type !== 'volume_delta'
-                      ? { price_min: 3, price_max: 300, market_cap_min: 10e8, float_cap_min: null, float_cap_max: null, amount_min: 0.2e8, exclude_st: true }
-                      : d.basic_filter,
                   }
                 })}
                 className={`inline-flex h-9 items-center justify-center gap-1.5 rounded-btn border px-2 text-xs font-medium transition-colors cursor-pointer ${

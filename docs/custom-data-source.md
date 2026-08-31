@@ -226,7 +226,7 @@ cp docs/examples/custom-data-source/mock_source.yaml data/data_sources/mock_sour
 5. 保存数据源选择:
 
 - 日K: `mock_source`
-- 除权因子: `same_as_daily` 或 `mock_source`
+- 除权因子: `mock_source` (或保持默认 `tickflow`)
 - 实时行情: `mock_source`
 
 6. 触发同步或开启实时行情。
@@ -296,7 +296,9 @@ cp docs/examples/custom-data-source/mock_source.yaml data/data_sources/mock_sour
 
 分钟K (minute):
   symbol = 股票代码
-  datetime = 时间戳 (YYYY-MM-DD HH:MM:SS)
+  # datetime 必须是北京时间墙钟 (如 2026-08-28 09:35:00), 不要返回 UTC;
+  # 入口守卫会自动纠偏 UTC 特征帧, 但契约仍要求源头写对
+  datetime = 北京时间墙钟 (YYYY-MM-DD HH:MM:SS)
   open / high / low / close = OHLC
   volume = 成交量
   amount = 成交额

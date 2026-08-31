@@ -19,7 +19,7 @@
 
 ## 上游基线与升级约定(按 docs/secondary-development.md §8)
 
-- **当前上游基线**: commit `afbf432`(upstream/main), 于 R82 并入; 此前 `e346e25`(R78)、`196af2f`(R71)、tag `v0.2.1`=`17ca245`(R69)。
+- **当前上游基线**: commit `4d27f31`(upstream/main, tag `v0.2.2`), 于 R92 并入; 此前 `afbf432`(R82)、`e346e25`(R78)、`196af2f`(R71)、tag `v0.2.1`=`17ca245`(R69)。
   每次同步上游后更新这一行 —— 守则要求二开分支记录确切 Tag/commit, 不能只写"基于 v0.x"。
 - **升级预检**: 下次同步上游前先跑只读预演 `python3 scripts/upgrade_check.py <目标Tag>`,
   它会列出双方都改过的文件和可预见的文本冲突; 预演不动工作区, 但只看已提交内容。
@@ -36,6 +36,7 @@
 
 | # | 改动 | 涉及文件 | 冲突风险 | 单独回退 |
 |---|------|---------|:---:|---------|
+| R92 | **同步上游 v0.2.2(afbf432→4d27f31, 56 提交), 一处明确背离作者**: 大头是 feat/capability-routing 分支入正史(R81/R83 已按分支状态先行整合, 本次接上历史), 真正的新内容照单全收 —— TickFlow 取数列式直转提速(as_dataframe=False)+除权因子 UTC 偏移修复、分钟增量两段式重构(intraday.universe 单请求稳态 + batch 全天修复, 间隔 [3,120] 默认 6s, 上游整文件接管)、单块失败重试的全市场脉冲、能力路由矩阵 UI(数据源页上游正式功能, fork 旧 CapBadge 路由显示让位——R70 先例)、复盘接入 fuyao 龙虎榜/盘前风向标上下文、弹窗分时档位按分钟源深度收窄、监控中心"实时不可用"横幅(适配 fork 版式)、首用引导改版、图表角标关闭。**背离**: 上游 v0.2.2 砍掉免费档自选实时("free=无实时, 用 fuyao 补"), 本 fork 明确保留 —— watchlist 档、多 key 轮转拉取链(_fetch_watchlist_quotes/_quotes_to_records/get_realtime_watchlist_symbols)、监控自选档、放量编辑器"非全市场模式不触发"提示全数保住, realtime_mode 注明背离原因(fork 主干功能, 用户即此形态运行)。放量差值保 fork 实现(金额缺失 fail-closed + 跨轮距守卫, 为上游超集), 状态声明并入上游 _holiday_active 探针; 规则指纹保 fork"改配置重置冷却"。Keys 页被上游收编进数据源页, fork 多 key 清单(R58 TickflowKeys)嵌入新 TickFlowKeySection 顶部。AI 设置保多档位 Profiles、Review 保钉钉、Screener 保摘要→明细顺序与 columnsReady 门闩、监控卡片保 R60/R89 版式。测试: 矩阵/ETF 计数保 fork(+factor_rank_research), ETF 采上游新形状; 放量测试 fork 超集; watchlist_batch 测试保留(上游随功能删除); 上游新测试 test_realtime_mode 按 fork 语义改写并注明背离。后端全量 2051 passed / 0 failed; 前端 tsc/vite build 过、ESLint 0 error(顺手修 Review 页 _DtStockTable 下划线命名触发的 rules-of-hooks) | 29 个冲突文件(quote_service/preferences/monitor*/minute_refresh/kline_sync/market_recap/settings/worker + 前端 13 文件) + 大量自动合并 | 高(实时链/分钟链/监控链全动过, 已逐处核对 fork 增强完整) | 回退 merge commit(会同时退掉 v0.2.2 全部新功能) |
 | R91 | **外部网页(利弗莫尔趋势)移出「盘面参考」分组**: R88 把它归进了分组, 用户要求回到一级菜单且可拖动。分组成员资格集中于 `BROWSE_GROUP.paths`(R67 设计), 从数组移除 `/external-page` 即完成 —— Layout 与菜单设置共用同一 `isBrowsePath` 判定, 该项自动回到顶层并参与 `nav_order` 排序。已存过顺序的用户: 它出现在原分组块之后的位置(存档顺序里它就在那), 可在设置里拖到任意位置 | `frontend/src/lib/navGroups.ts` | 无(单数组一行) | 把路径加回 `paths` |
 | R90 | **AUTH_DISABLED 免登录开关(用户明确选择, 风险已告知)**: 部署在 Cloudflare Access 等外层门后面时, 面板自己的登录页成了第二道多余的门。新增环境变量 `AUTH_DISABLED=1`: 认证中间件对 `/api/` 完全放行(公网也放), `/api/auth/status` 一律报告已登录(手动打开 `/login` 会被前端弹回首页——前端零改动, 复用其"已登录即跳转"逻辑)。安全边界: 默认(未设置)时行为与从前逐字节一致, 有专项测试钉死(未设密码公网 403 / 已设密码无会话 401 / status 字段原样); 开启时启动日志打大字裸奔警告(明文 key/清库/仓位对全网开放)。回退路径: 删掉环境变量重启即恢复, auth.json 里的密码原样保留 | `config.py`、`main.py`(中间件+启动警告)、`api/auth.py`(status)、`tests/test_auth_disabled.py` | 无(默认关闭, 不碰上游认证逻辑本体) | 删开关三处 + 测试文件 |
 | R81 | **同步上游 1 提交(回测子进程收尾修复)**: 上游 afbf432 与本 fork 另一会话的 937411b 是**同一个 bug 的两份修法**(终态结果已送达但子进程退出收尾超 10s 时, 不再把成功结果当失败丢弃): 子进程侧 close+join_thread 冲刷两边一致; 父进程侧 fork 版是超集(多一层 join 后兜底排空, 盖住"先看到 Empty 再发现进程已死"的另一个竞态, 带回归测试)。冲突解法: 注释措辞取上游对齐(减少未来 diff), 功能与测试保留 fork 版 | `backtest/worker.py`、`tests/backtest/test_worker_process.py` | — | 回退 merge commit |
