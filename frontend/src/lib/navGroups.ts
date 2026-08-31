@@ -21,8 +21,11 @@ export const BROWSE_GROUP = {
   id: BROWSE_GROUP_ID,
   label: '盘面参考',
   hint: '展示型: 看盘面用, 不产出候选也不影响仓位',
-  /** 组内默认顺序 —— 用户在设置里可以自己调 */
-  paths: ['/dashboard', '/limit-ladder', '/concept-analysis', '/industry-analysis', '/external-page'],
+  /**
+   * 组内默认顺序 —— 用户在设置里可以自己调。
+   * 注: 外部网页(/external-page)按用户要求不入组 —— 保持一级菜单, 可单独拖动。
+   */
+  paths: ['/dashboard', '/limit-ladder', '/concept-analysis', '/industry-analysis'],
 } as const
 
 const BROWSE_PATHS: ReadonlySet<string> = new Set<string>(BROWSE_GROUP.paths)
