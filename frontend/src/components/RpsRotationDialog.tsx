@@ -13,6 +13,8 @@ interface Props {
   onClose: () => void
   /** 维度: concept 概念(默认) / industry 行业 */
   kind?: 'concept' | 'industry'
+  /** [R105] 弹窗内显示 行业/概念 维度切换(复盘统一入口用) */
+  allowKindSwitch?: boolean
 }
 
 const DEFAULT_DAYS = 12
@@ -47,7 +49,9 @@ function rankColorClass(rank: number, total: number): string {
   return 'text-accent'
 }
 
-export function RpsRotationDialog({ onClose, kind = 'concept' }: Props) {
+export function RpsRotationDialog({ onClose, kind: initialKind = 'concept', allowKindSwitch = false }: Props) {
+  // [R105] 从复盘入口打开时可在弹窗内切换行业/概念维度(原两个页面各开各的, 现统一入口)
+  const [kind, setKind] = useState<'concept' | 'industry'>(initialKind)
   // 维度文案: concept→概念, industry→行业
   const dimLabel = kind === 'industry' ? '行业' : '概念'
   const [days, setDays] = useState(DEFAULT_DAYS)
@@ -218,9 +222,34 @@ export function RpsRotationDialog({ onClose, kind = 'concept' }: Props) {
             <div className="flex items-center gap-2">
               <Repeat className="h-4 w-4 text-accent" />
               <span id="rps-rotation-title" className="text-sm font-medium text-foreground">{dimLabel}涨幅轮动</span>
+              {allowKindSwitch && (
+                <div className="flex items-center rounded-btn border border-border bg-base/60 p-0.5">
+                  {([['industry', '行业'], ['concept', '概念']] as const).map(([k, label]) => (
+                    <button
+                      key={k}
+                      onClick={() => {
+                        setKind(k)
+                        setLevel(k === 'industry' ? 2 : 0)
+                        setSelected(null)
+                      }}
+                      className={cn(
+                        'h-5 rounded-[5px] px-2 text-[10px] font-medium transition-colors',
+                        kind === k ? 'bg-accent/15 text-accent' : 'text-muted hover:text-secondary',
+                      )}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              )}
               <span className="text-[11px] text-muted">
                 {conceptCount > 0 ? `${dates.length} 天 · ${conceptCount} 个${dimLabel}` : '暂无数据'}
               </span>
+              {allowKindSwitch && (
+                <span className="hidden lg:inline text-[10px] text-muted/60">
+                  数据来自「{dimLabel === '行业' ? '行业分析' : '概念分析'}」页的板块行情 · 按每日涨幅算 RPS 排名, 观察板块强弱轮动
+                </span>
+              )}
               {/* 行业层级选择器: 1/2/3 级, 默认 2 级。仅 kind=industry 显示 */}
               {kind === 'industry' && (
                 <div className="ml-1 flex items-center rounded-btn border border-border bg-base/60 p-0.5">

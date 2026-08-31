@@ -6,7 +6,6 @@ import {
   Crown,
   Layers3,
   RefreshCw,
-  Repeat,
   Search,
   Settings2,
   TrendingDown,
@@ -16,7 +15,6 @@ import { PageHeader } from '@/components/PageHeader'
 import { EmptyState } from '@/components/EmptyState'
 import { AnalysisConfigDialog, PresetFetchState, type AnalysisFieldConfig } from '@/components/analysis-shared'
 import { StockPreviewDialog } from '@/components/StockPreviewDialog'
-import { RpsRotationDialog } from '@/components/RpsRotationDialog'
 import { api, type MarketSnapshotRow } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { storage } from '@/lib/storage'
@@ -241,7 +239,6 @@ export function ConceptAnalysis() {
   const [sortMode, setSortMode] = useState<SortMode>('heat')
   const [previewSymbol, setPreviewSymbol] = useState<string | null>(null)
   const [previewName, setPreviewName] = useState<string>('')
-  const [showRps, setShowRps] = useState(false)
 
   const configsQuery = useQuery({ queryKey: QK.extData, queryFn: api.extDataList })
   const availableConfigs = configsQuery.data?.items ?? []
@@ -361,14 +358,7 @@ export function ConceptAnalysis() {
         subtitle={`${marketQuery.data?.as_of ?? rowsQuery.data?.date ?? '最新'} · ${stats.length} 个概念 · ${totalSymbols} 只标的`}
         right={
           <div className="flex items-center gap-1">
-            {/* RPS 轮动: 打开涨幅轮动矩阵对话框 */}
-            <button
-              onClick={() => setShowRps(true)}
-              className="inline-flex items-center gap-1 rounded-btn border border-amber-400/40 bg-amber-400/15 px-2.5 py-1.5 text-[11px] text-amber-400 font-medium transition-colors hover:bg-amber-400/25 hover:border-amber-400/60"
-              title="概念涨幅轮动矩阵"
-            >
-              <Repeat className="h-3.5 w-3.5" />涨幅RPS轮动分析
-            </button>
+            {/* [R105] RPS 轮动入口移到「复盘」页(全站唯一入口, 弹窗内可切行业/概念) */}
             <button
               onClick={() => { rowsQuery.refetch(); marketQuery.refetch() }}
               disabled={rowsQuery.isFetching || marketQuery.isFetching}
@@ -439,7 +429,6 @@ export function ConceptAnalysis() {
       )}
 
       <AnimatePresence>
-        {showRps && <RpsRotationDialog onClose={() => setShowRps(false)} />}
       </AnimatePresence>
     </>
   )

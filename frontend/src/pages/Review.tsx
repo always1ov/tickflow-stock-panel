@@ -12,7 +12,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   BookOpenCheck, RefreshCw, Sparkles, Trash2, History, ChevronRight, AlertTriangle,
-  Database, Wand2, Copy, Download, Clock, X, Check, Trophy, ChevronDown, ChevronUp,
+  Database, Wand2, Copy, Download, Clock, X, Check, Trophy, ChevronDown, ChevronUp, Repeat,
 } from 'lucide-react'
 
 import { api, type OverviewMarket, type AiReviewReport, type DragonTigerStockItem } from '@/lib/api'
@@ -23,6 +23,7 @@ import { StockPreviewDialog } from '@/components/StockPreviewDialog'
 import { boardTag } from '@/components/stock-table/primitives'
 import { fmtBigNum } from '@/lib/format'
 import { PageHeader } from '@/components/PageHeader'
+import { RpsRotationDialog } from '@/components/RpsRotationDialog'
 import { LadderAiReview } from '@/components/LadderAiReview'
 import { MarkdownRenderer } from '@/components/financials/MarkdownRenderer'
 import { toast } from '@/components/Toast'
@@ -107,6 +108,8 @@ export function Review() {
 
   // ===== 定时复盘 =====
   const [showSchedule, setShowSchedule] = useState(false)
+  // [R105] 板块 RPS 轮动弹窗(统一入口)
+  const [showRps, setShowRps] = useState(false)
   const prefs = usePreferences()
   const reviewSched = prefs.data?.review_schedule ?? { enabled: false, hour: 15, minute: 10 }
   const feishuConfigured = !!(prefs.data?.feishu_webhook_url)
@@ -240,6 +243,15 @@ export function Review() {
         subtitle={`${displayDate}${data?.emotion ? ` · 情绪 ${data.emotion.label}` : ''}`}
         right={
           <div className="flex items-center gap-1">
+            {/* [R105] 板块 RPS 轮动 —— 从行业/概念分析页收编到复盘的统一入口,
+                弹窗内可切行业/概念维度并标明数据出处 */}
+            <button
+              onClick={() => setShowRps(true)}
+              className="inline-flex items-center gap-1 rounded-btn border border-amber-400/40 bg-amber-400/15 px-2.5 py-1 text-[11px] text-amber-400 font-medium transition-colors hover:bg-amber-400/25 hover:border-amber-400/60"
+              title="板块涨幅 RPS 轮动矩阵(数据来自行业/概念分析页) —— 复盘时观察板块强弱轮动"
+            >
+              <Repeat className="h-3 w-3" />板块RPS轮动
+            </button>
             <button
               onClick={() => { marketQuery.refetch() }}
               disabled={marketQuery.isFetching}
@@ -374,6 +386,9 @@ export function Review() {
           )}
         </div>
       </div>
+
+      {/* [R105] 板块 RPS 轮动弹窗 —— 全站唯一入口, 弹窗内可切行业/概念 */}
+      {showRps && <RpsRotationDialog onClose={() => setShowRps(false)} kind="industry" allowKindSwitch />}
 
       {/* ===== 定时复盘设置弹窗 ===== */}
       <AnimatePresence>
