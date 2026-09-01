@@ -1303,7 +1303,12 @@ function DragonTigerCard({ date, onOpenStock }: {
             )}
           </span>
           <span className="mt-0.5 block text-[10px] text-muted">
-            {d.trade_date} · {d.all?.stock_count ?? allItems.length} 只上榜 · 点击{expanded ? '收起' : '查看三榜明细'}
+            {/* [R132] 交易日的龙虎榜不可能是 0 只 —— 真出现 0 就是没发布/没拿到,
+                不能拿「0 只上榜」糊过去(那和"今天确实没人上榜"分不出来)。
+                后端现在会把空榜按未发布处理并回退上一期, 这里是最后一道兜底文案。 */}
+            {d.trade_date} · {allItems.length > 0
+              ? `${d.all?.stock_count ?? allItems.length} 只上榜`
+              : '榜单尚未发布(通常收盘后才出)'} · 点击{expanded ? '收起' : '查看三榜明细'}
           </span>
         </span>
         <span className="ml-auto flex items-center gap-1.5">

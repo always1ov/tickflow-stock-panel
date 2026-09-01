@@ -32,15 +32,21 @@ def data_dir(tmp_path: Path) -> Path:
 class _FakeProvider:
     """按 (board, date) 记录调用; fail_dates 中的日期抛 FuyaoError。"""
 
-    def __init__(self, fail_dates: set[str] | None = None):
+    def __init__(self, fail_dates: set[str] | None = None,
+                 empty_dates: set[str] | None = None):
         self.calls: list[tuple] = []
         self.fail_dates = fail_dates or set()
+        # [R132] 接口 200 但三榜全空 —— 榜单未发布时的真实表现, 不抛错
+        self.empty_dates = empty_dates or set()
 
     def dragon_tiger(self, board_type: str, date: str | None) -> dict:
         self.calls.append((board_type, date))
         if date in self.fail_dates:
             raise FuyaoError(f"code=3002: {date} 未就绪")
         iso = date or "2026-08-28"
+        if date in self.empty_dates:
+            return {"trade_date": iso, "count": 0, "stock_count": 0,
+                    "stock_items": [], "hot_money_items": []}
         return {
             "trade_date": iso,
             "count": 2,
@@ -155,3 +161,53 @@ def test_build_recap_context_contains_summary(data_dir, monkeypatch):
 def test_build_recap_context_empty_without_source(data_dir, monkeypatch):
     monkeypatch.setattr(dt, "_provider", lambda: None)
     assert dt.build_recap_context(data_dir) == ""
+
+
+# ---- [R132] 空榜单 = 未发布, 不是"0 只上榜" ----
+
+def test_empty_boards_are_not_reported_as_ok(data_dir, monkeypatch):
+    """交易日的龙虎榜不可能是 0 只 —— 三榜全空只能是还没发布。
+
+    改之前: 接口 200 + 空列表 → state=ok, 界面显示「0 只上榜」+ 空表,
+    与"数据没到"完全分不出来。现在按未发布处理, 回退上一期。
+    """
+    _use_provider(monkeypatch, _FakeProvider(empty_dates={"2026-08-28"}))
+    out = dt.get_dragon_tiger(data_dir, date(2026, 8, 28))
+    assert out["state"] == "fallback_prev"
+    assert out["trade_date"] == "2026-08-27"
+    assert out["all"]["stock_items"]        # 拿到的是上一期真数据
+
+
+def test_empty_result_is_never_cached(data_dir, monkeypatch):
+    """空结果落了盘会把这一天永久钉死在 0 只 —— 绝不缓存。"""
+    _use_provider(monkeypatch, _FakeProvider(empty_dates={"2026-08-28"}))
+    dt.get_dragon_tiger(data_dir, date(2026, 8, 28))
+    assert not (data_dir / "dragon_tiger" / "date=2026-08-28.json").exists()
+
+
+def test_poisoned_empty_cache_self_heals(data_dir, monkeypatch):
+    """早期版本可能已经把空结果写进缓存 —— 视同未命中, 重拉一次自愈。"""
+    path = data_dir / "dragon_tiger" / "date=2026-08-27.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({
+        "state": "ok", "trade_date": "2026-08-27",
+        "all": {"stock_items": []}, "org": {"stock_items": []},
+        "hot_money": {"hot_money_items": []},
+    }), encoding="utf-8")
+    _use_provider(monkeypatch, _FakeProvider())
+    out = dt.get_dragon_tiger(data_dir, date(2026, 8, 27))
+    assert out["state"] == "ok" and out["all"]["stock_items"]
+
+
+def test_both_days_empty_reports_no_data(data_dir, monkeypatch):
+    """今天和上一期都空 → 如实报不可用, 不拿空当结果糊弄。"""
+    _use_provider(monkeypatch, _FakeProvider(empty_dates={"2026-08-28", "2026-08-27"}))
+    out = dt.get_dragon_tiger(data_dir, date(2026, 8, 28))
+    assert out["state"] == "no_data"
+
+
+def test_is_empty_helper():
+    assert dt._is_empty({"all": {"stock_items": []}, "org": {}, "hot_money": {}})
+    assert not dt._is_empty({"all": {"stock_items": [{"x": 1}]}, "org": {}, "hot_money": {}})
+    # 只有席位榜有数据也算有
+    assert not dt._is_empty({"all": {}, "org": {}, "hot_money": {"hot_money_items": [{"x": 1}]}})

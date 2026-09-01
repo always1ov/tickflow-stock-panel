@@ -93,6 +93,21 @@ def _boards_of(provider, board_type: str, iso: str | None) -> dict:
     }
 
 
+def _is_empty(payload: dict) -> bool:
+    """三榜一条不剩 = 这一天的榜单还没出来。
+
+    [R132] 关键判断: 交易日的龙虎榜**永远不可能是 0 只**(每天都有几十只上榜)。
+    所以"接口 200 但三榜全空"不是"今天没人上榜", 而是**还没发布** —— 龙虎榜
+    通常收盘后才出。之前这种情况被当成 state=ok 原样展示, 用户看到的就是
+    「0 只上榜」+ 一张空表, 与"数据没到"完全分不出来。
+    """
+    return not any(
+        (payload.get(bt) or {}).get("stock_items")
+        or (payload.get(bt) or {}).get("hot_money_items")
+        for bt in _BOARDS
+    )
+
+
 def _cache_path(data_dir: Path, d: date_cls) -> Path:
     return data_dir / "dragon_tiger" / f"date={d.isoformat()}.json"
 
@@ -127,7 +142,9 @@ def get_dragon_tiger(data_dir: Path, target: date_cls | None = None) -> dict:
     # 历史日缓存优先 (纯本地, 不触发插件注册表加载)
     if trade_date is not None and trade_date < today:
         cached = _load_cache(_cache_path(data_dir, trade_date))
-        if cached is not None:
+        # [R132] 空缓存视同未命中: 早期版本会把"还没发布"的空结果落盘,
+        # 那份文件会把这一天永久钉死在 0 只。重新拉一次即可自愈。
+        if cached is not None and not _is_empty(cached):
             return cached
 
     provider = _provider()
@@ -150,7 +167,12 @@ def get_dragon_tiger(data_dir: Path, target: date_cls | None = None) -> dict:
             "trade_date": raw["all"].get("trade_date"),
             **raw,
         }
+        # [R132] 拉到空 = 还没发布, 走与"拉取失败"同一条回退路径(不是 ok)。
+        # 抛出去让下面 except 统一处理, 免得回退逻辑写两遍。
+        if _is_empty(payload):
+            raise FuyaoError(f"{explicit or '最近交易日'} 榜单尚未发布(三榜均为空)")
         # 历史日不可变 → 落缓存; 当日不缓存 (盘中 fallback / 盘后补充都以现拉为准)
+        # 空结果永不落缓存 —— 上面已经挡掉了
         if actual is not None and actual < today:
             with contextlib.suppress(OSError):
                 _store_cache(_cache_path(data_dir, actual), payload)
@@ -162,7 +184,7 @@ def get_dragon_tiger(data_dir: Path, target: date_cls | None = None) -> dict:
             if prev is not None:
                 try:
                     cached_prev = _load_cache(_cache_path(data_dir, prev))
-                    if cached_prev is not None:
+                    if cached_prev is not None and not _is_empty(cached_prev):
                         base = dict(cached_prev)
                         base.pop("state", None)
                         return {**base, "state": "fallback_prev",
@@ -173,6 +195,8 @@ def get_dragon_tiger(data_dir: Path, target: date_cls | None = None) -> dict:
                         "trade_date": prev.isoformat(),
                         **raw_prev,
                     }
+                    if _is_empty(base):     # [R132] 上一期也空 → 别拿空当结果
+                        raise FuyaoError(f"{prev.isoformat()} 榜单也是空的")
                     with contextlib.suppress(OSError):
                         _store_cache(_cache_path(data_dir, prev), {**base, "state": "ok"})
                     return {**base, "state": "fallback_prev",
