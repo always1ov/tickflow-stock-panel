@@ -89,6 +89,10 @@ class _Preset:
     # 界面据此显示"交易中/休市", 不让用户把静止当成故障。
     open_h: float = 0.0
     close_h: float = 24.0
+    # [R150] 该市场的行情时刻**可能**用哪些时区发布, 写成"要补几小时才是北京时间"。
+    # 0 永远在列(就是北京时间)。见 `_shift_quote_at` —— 只有当某个补正能把
+    # 时刻拉回"确实新鲜"时才采纳, 所以多列一个候选不会凭空制造新鲜感。
+    tz_shifts_h: tuple[float, ...] = (0.0,)
 
 
 # 指数表 —— 想加新的在这里加一行即可(独立维护的意义所在)。
@@ -99,12 +103,16 @@ PRESETS: tuple[_Preset, ...] = (
     # [R148] 候选顺序不再决定用谁(盘中改由行情自带时刻决定, 见 pick_candidate),
     # 这里的顺序只在**休市**时当排名用。排序依据是"能不能自证新鲜":
     # tickflow(毫秒时间戳) > sina/腾讯完整版(秒级时刻) > 腾讯精简版(不给时刻)。
+    # [R150] 美股这一行的时刻**可能是美东当地时间** —— 用户实测卡片恒定显示
+    # "延迟720分"(=12 小时整), 而北京与美东夏令时正好差 12 小时。真卡住不长
+    # 这样(那个数会随时间连续变大), 恒定整数小时是时区口径不同的签名。
+    # 12=夏令时(EDT, UTC-4), 13=冬令时(EST, UTC-5)。
     _Preset("nasdaq", (
         _Src("tickflow", "IXIC"),
         _Src("sina", "int_nasdaq"),
         _Src("tencent", "usIXIC"),
         _Src("tencent", "s_usIXIC"),
-    ), "纳斯达克", 21.5, 5.0),
+    ), "纳斯达克", 21.5, 5.0, (0.0, 12.0, 13.0)),
 )
 _BY_KEY = {p.key: p for p in PRESETS}
 DEFAULT_KEYS = [p.key for p in PRESETS]  # [R149] 表里只剩纳指, 默认全看
@@ -188,6 +196,42 @@ def _quote_ts(fields: list[str], now: float) -> float | None:
         return _epoch(datetime(int(y), int(mo), int(d), int(hh), int(mm), int(ss or 0)), now)
     except ValueError:
         return None
+
+
+def _shift_quote_at(quote_at: float | None, now: float,
+                    shifts: tuple[float, ...]) -> tuple[float | None, float]:
+    """[R150] 行情时刻的**时区口径**补正 → (补正后的时刻, 用了几小时)。
+
+    起因: 纳指卡片恒定显示"延迟720分"。720 分 = 12 小时整, 而北京与美东夏令时
+    正好差 12 小时 —— 这是"那家发的是当地时间, 而我按北京时间解析了"的签名,
+    不是真的延迟。真卡住的数**不长这样**: 它的年龄会随时间连续变大, 不会钉在
+    一个整数小时上。
+
+    关键是**不能顺手把真故障也抹掉**。所以只有当某个补正能把时刻拉回
+    "确实新鲜"(年龄 < `STALE_IN_SESSION_S`)时才采纳; 补完还差几小时的,
+    说明这个补正什么也没解释, 一律按原样报。
+
+    这条守卫让"真的冻住 12 小时"这种极端巧合也只能骗过很短一瞬: 时间一走,
+    原始年龄就超过 12 小时, 补正之后不再落在新鲜区间, 卡片马上又变回延迟。
+    """
+    if quote_at is None:
+        return None, 0.0
+    best = (quote_at, 0.0)
+    best_age = now - quote_at
+    for h in shifts:
+        if not h:
+            continue
+        cand = quote_at + h * 3600.0
+        age = now - cand
+        # 未来太多说明补过头了(比如冬夏令时挑错), 不要
+        if age < -_TS_FUTURE_TOL_S:
+            continue
+        # 补完仍然不新鲜 = 这个补正没解释任何事, 不采纳
+        if age >= STALE_IN_SESSION_S:
+            continue
+        if abs(age) < abs(best_age):
+            best, best_age = (cand, h), age
+    return best
 
 
 def _to_float(raw: str) -> float | None:
@@ -494,12 +538,19 @@ def pick_candidate(p: _Preset, raw: dict, now: float, *, in_session: bool) -> di
 
     时区/口径猜错的情况已经在 ``_epoch`` 兜住了(超出 ±范围一律当读不出),
     所以最坏情况是退化成原来的排名规则, 不会挑出一个更差的。
+
+    [R150] 比新鲜度**之前**先做一次时区口径补正(``_shift_quote_at``) —— 否则
+    一家发当地时间的源会被恒定误判成"落后 12 小时", 在这里永远排最后。
     """
     parsed: list[tuple[int, dict, _Src]] = []
     for rank, src in enumerate(p.sources):
         got = _parse(src, raw.get((src.vendor, src.code), ""), now)
-        if got is not None:
-            parsed.append((rank, got, src))
+        if got is None:
+            continue
+        shifted, shift_h = _shift_quote_at(got.get("quote_at"), now, p.tz_shifts_h)
+        got["quote_at"] = shifted
+        got["tz_shift_h"] = shift_h
+        parsed.append((rank, got, src))
     if not parsed:
         return None
     if in_session:
@@ -592,13 +643,22 @@ def debug_fetch(keys: list[str]) -> dict:
     raw = _fetch_all(sources)
     now = time.time()
 
-    def _one(s: _Src) -> dict | None:
+    def _one(p: _Preset, s: _Src) -> dict | None:
         got = _parse(s, raw.get((s.vendor, s.code), ""), now)
         if got is None:
             return None
-        qa = got.get("quote_at")
+        raw_qa = got.get("quote_at")
+        qa, shift_h = _shift_quote_at(raw_qa, now, p.tz_shifts_h)
         return {
             **got,
+            "quote_at": qa,
+            # [R150] 补正前后都给, 免得"卡片说不延迟了"变成一句无法复核的话
+            "quote_at_raw_text": (
+                datetime.fromtimestamp(raw_qa, _QUOTE_TZ).strftime("%Y-%m-%d %H:%M:%S")
+                if raw_qa else None
+            ),
+            "raw_age_s": round(now - raw_qa) if raw_qa else None,
+            "tz_shift_h": shift_h,
             "quote_at_text": (
                 datetime.fromtimestamp(qa, _QUOTE_TZ).strftime("%Y-%m-%d %H:%M:%S")
                 if qa else None
@@ -612,9 +672,10 @@ def debug_fetch(keys: list[str]) -> dict:
         "candidates": [f"{s.vendor}:{s.code}" for s in sources],
         "raw": {f"{v}:{c}": payload for (v, c), payload in raw.items()},
         "parsed": {
-            p.key: {f"{s.vendor}:{s.code}": _one(s) for s in p.sources}
+            p.key: {f"{s.vendor}:{s.code}": _one(p, s) for s in p.sources}
             for p in presets
         },
+        "tz_shifts_h": {p.key: list(p.tz_shifts_h) for p in presets},
         "picked": {
             p.key: pick_candidate(p, raw, now, in_session=_in_session(p))
             for p in presets

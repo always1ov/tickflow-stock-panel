@@ -185,31 +185,55 @@ function SidebarIndexQuotes({ rows, items, globalRows, cnLive }: {
   const globals = globalRows ?? []
   if (items.length === 0 && globals.length === 0) return null
   const quoteBySymbol = new Map((rows ?? []).map(q => [q.symbol, q]))
+  // [R150] A 股卡的"延迟"门槛比境外紧得多: 境外指数本就是延迟行情, 8 秒轮询只是
+  // 习惯, 10 分钟才算卡住; A 股这条链是 6 秒一轮的实时链, 拿 10 分钟当门槛等于
+  // 白加 —— 超过 3 分钟不动就该说话。
+  const CN_STALE_S = 180
   return (
     <div className="mt-2 grid grid-cols-2 gap-1.5 border-t border-border/60 pt-2">
       {items.map(item => {
         const q = quoteBySymbol.get(item.symbol)
         const value = q?.last_price ?? q?.close
         const pct = q?.change_pct
+        // [R150] 原来 A 股卡只有 cnLive 一个信号, 而它答的是「**我们**有没有在
+        // 干活」(交易时段 + 轮询在跑 + 数据来自实时缓存) —— 不是「这个数新不新」。
+        // 上游卡住/限流/失败而缓存里还留着旧值时, 绿点照样脉冲、数照样不动,
+        // 正是境外指数那次栽的同一个跟头。这里补上行情自己的时刻。
+        // timestamp 是毫秒 epoch; 日线回退那条路没有它, 但那时 cnLive 本就是 false。
+        const ageS = cnLive && q?.timestamp ? Date.now() / 1000 - Number(q.timestamp) / 1000 : null
+        const stale = ageS != null && ageS > CN_STALE_S
+        const live = cnLive && !stale
+        const ageMin = ageS != null ? ageS / 60 : null
         return (
           <NavLink
             key={item.symbol}
             to={`/indices?symbol=${encodeURIComponent(item.symbol)}`}
             className={cn('block rounded bg-elevated/60 px-2 py-1.5 transition-colors hover:bg-elevated',
-              !cnLive && 'opacity-70')}
-            title={`${item.name} ${item.symbol} — ${cnLive ? '交易中, 实时刷新' : '非实时(休市或实时行情未开), 显示最后收盘/缓存值'}`}
+              !live && 'opacity-70')}
+            title={`${item.name} ${item.symbol} — ${
+              !cnLive ? '非实时(休市或实时行情未开), 显示最后收盘/缓存值'
+                : stale ? '交易时段内, 但这个数已经很久没变了 —— 上游可能卡住了'
+                  : '交易中, 实时刷新'
+            }${ageMin != null
+              ? ` · 行情时刻: ${ageMin < 1 ? '1 分钟内' : `${Math.round(ageMin)} 分钟前`}`
+              : ''}`}
           >
             <div className="flex items-center justify-between gap-1">
               <span className="flex min-w-0 items-center gap-1 text-[10px] text-secondary">
-                {/* [R119] 与全球卡同一套语义: 绿点脉冲=在跳, 灰点=静止 */}
+                {/* [R119/R150] 与全球卡同一套语义: 绿点脉冲=在跳, 黄点=盘中卡住, 灰点=静止 */}
                 <span className={cn('h-1 w-1 shrink-0 rounded-full',
-                  cnLive ? 'bg-bull animate-pulse' : 'bg-muted/40')} />
+                  live ? 'bg-bull animate-pulse' : stale ? 'bg-warning' : 'bg-muted/40')} />
                 <span className="truncate">{item.name}</span>
               </span>
               <span className={`text-[10px] font-mono ${indexPctClass(pct)}`}>{fmtIndexPct(pct)}</span>
             </div>
-            <div className={`mt-0.5 truncate font-mono text-[10px] ${indexPctClass(pct)}`}>
-              {fmtIndexValue(value)}
+            <div className="mt-0.5 flex items-baseline justify-between gap-1">
+              <span className={`truncate font-mono text-[10px] ${indexPctClass(pct)}`}>
+                {fmtIndexValue(value)}
+              </span>
+              {stale && ageMin != null && (
+                <span className="shrink-0 text-[9px] text-warning">延迟{Math.round(ageMin)}分</span>
+              )}
             </div>
           </NavLink>
         )
