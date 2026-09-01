@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 _URL = "https://hq.sinajs.cn/list={codes}"
 _HEADERS = {"Referer": "https://finance.sina.com.cn"}  # 新浪要求, 否则 403
 _TIMEOUT_S = 6.0
-_TTL_S = 10.0          # 服务端缓存: 多前端/多标签页轮询合并成同一次上游请求
+_TTL_S = 5.0           # 服务端缓存: 多前端/多标签页轮询合并成同一次上游请求
 _STALE_KEEP_S = 600.0  # 上游失败时旧值最多再顶 10 分钟, 之后按缺失处理
 _FAIL_LOG_INTERVAL_S = 300.0  # 失败日志节流: 5 分钟一条 warning, 不刷屏
 _last_fail_log = 0.0
@@ -41,16 +41,26 @@ class _Preset:
     code: str         # 新浪行情代码
     name: str         # 显示名
     kind: str         # 行格式: "int" / "hk"
+    # [R112] 各市场交易时段(北京时间, 24h 制小数, 如 14.5=14:30)。跨零点的
+    # 美股写成 start>end, 判定时按"跨日"处理。休市时上游值静止是正常的 ——
+    # 界面据此显示"交易中/休市", 不让用户把静止当成故障。
+    open_h: float = 0.0
+    close_h: float = 24.0
 
 
 # 可选指数表 —— 想加新的在这里加一行即可(独立维护的意义所在)
 PRESETS: tuple[_Preset, ...] = (
-    _Preset("kospi",    "int_kospi",    "韩国综合", "int"),
-    _Preset("nikkei",   "int_nikkei",   "日经225",  "int"),
-    _Preset("hsi",      "rt_hkHSI",     "恒生指数", "hk"),
-    _Preset("dji",      "int_dji",      "道琼斯",   "int"),
-    _Preset("nasdaq",   "int_nasdaq",   "纳斯达克", "int"),
-    _Preset("sp500",    "int_sp500",    "标普500",  "int"),
+    # 韩国 09:00-15:30 KST = 08:00-14:30 北京
+    _Preset("kospi",    "int_kospi",    "韩国综合", "int", 8.0, 14.5),
+    # 日本 09:00-15:00 JST = 08:00-14:00 北京(午休不细分, 只判大时段)
+    _Preset("nikkei",   "int_nikkei",   "日经225",  "int", 8.0, 14.0),
+    # 港股 09:30-16:00 = 北京同时区
+    _Preset("hsi",      "rt_hkHSI",     "恒生指数", "hk", 9.5, 16.0),
+    # 美股 21:30-04:00 北京(夏令时; 冬令时晚 1 小时, 这里取并集 21.5~05.0
+    # 宁可多标一小时"交易中", 也不要在真开盘时标成休市)
+    _Preset("dji",      "int_dji",      "道琼斯",   "int", 21.5, 5.0),
+    _Preset("nasdaq",   "int_nasdaq",   "纳斯达克", "int", 21.5, 5.0),
+    _Preset("sp500",    "int_sp500",    "标普500",  "int", 21.5, 5.0),
 )
 _BY_KEY = {p.key: p for p in PRESETS}
 DEFAULT_KEYS = ["kospi", "nikkei", "nasdaq"]  # 用户定案: 日、韩、纳斯达克
@@ -63,6 +73,18 @@ _cache_codes: tuple[str, ...] = ()
 
 def list_presets() -> list[dict]:
     return [{"key": p.key, "name": p.name} for p in PRESETS]
+
+
+def _in_session(p: _Preset, now: "datetime | None" = None) -> bool:
+    """该市场此刻是否在交易时段(北京时间; 周末一律休市)。"""
+    from datetime import datetime as _dt
+    n = now or _dt.now()
+    if n.weekday() >= 5:      # 周六日 —— 美股跨零点的周一凌晨落在周一, 不误伤
+        return False
+    h = n.hour + n.minute / 60
+    if p.open_h <= p.close_h:
+        return p.open_h <= h <= p.close_h
+    return h >= p.open_h or h <= p.close_h   # 跨零点(美股)
 
 
 def _to_float(raw: str) -> float | None:
@@ -148,6 +170,7 @@ def get_quotes(keys: list[str]) -> list[dict]:
                     parsed = _parse_line(p, raw.get(p.code, ""))
                     if parsed is not None:
                         parsed["updated_at"] = now
+                        parsed["trading"] = _in_session(p)
                         rows[p.key] = parsed
                 if rows:
                     _set_cache(rows, now, codes)

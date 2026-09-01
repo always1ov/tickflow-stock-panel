@@ -1099,6 +1099,8 @@ export interface GlobalIndexQuote {
   change?: number | null
   change_pct?: number | null   // 小数制
   updated_at?: number          // epoch 秒
+  /** [R112] 该市场此刻是否在交易时段(北京时间) —— 休市时值静止是正常的 */
+  trading?: boolean
 }
 
 // [fork 增强] R93 使用观察笔记

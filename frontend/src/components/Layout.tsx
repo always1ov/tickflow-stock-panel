@@ -176,7 +176,7 @@ function SidebarIndexQuotes({ rows, items, globalRows }: {
   rows: IndexQuote[] | undefined
   items: CoreIndex[]
   /** [R102] 全球指数(独立数据源) — 与 A 股指数同格显示, 数据链各自独立 */
-  globalRows?: { key: string; name: string; last: number; change_pct?: number | null; updated_at?: number }[]
+  globalRows?: { key: string; name: string; last: number; change_pct?: number | null; updated_at?: number; trading?: boolean }[]
 }) {
   const globals = globalRows ?? []
   if (items.length === 0 && globals.length === 0) return null
@@ -207,14 +207,21 @@ function SidebarIndexQuotes({ rows, items, globalRows }: {
       {globals.map(q => {
         const pct = q.change_pct != null ? q.change_pct * 100 : null
         const staleMin = q.updated_at ? (Date.now() / 1000 - q.updated_at) / 60 : null
+        const trading = q.trading !== false
         return (
           <div
             key={q.key}
-            className={cn('rounded bg-elevated/60 px-2 py-1.5', staleMin != null && staleMin > 10 && 'opacity-60')}
-            title={`${q.name}(全球·独立源)${staleMin != null && staleMin > 1 ? ` · ${Math.round(staleMin)} 分钟前` : ''}`}
+            className={cn('rounded bg-elevated/60 px-2 py-1.5', !trading && 'opacity-70')}
+            title={`${q.name}(全球·独立源) — ${trading ? '交易中, 实时刷新' : '当前休市, 显示最后成交值'}${
+              staleMin != null && staleMin > 1 ? ` · ${Math.round(staleMin)} 分钟前` : ''}`}
           >
             <div className="flex items-center justify-between gap-1">
-              <span className="text-[10px] text-secondary">{q.name}</span>
+              <span className="flex min-w-0 items-center gap-1 text-[10px] text-secondary">
+                {/* 交易中: 绿点脉冲(在实时跳); 休市: 灰点 */}
+                <span className={cn('h-1 w-1 shrink-0 rounded-full',
+                  trading ? 'bg-bull animate-pulse' : 'bg-muted/40')} />
+                <span className="truncate">{q.name}</span>
+              </span>
               <span className={`text-[10px] font-mono ${indexPctClass(pct)}`}>{fmtIndexPct(pct)}</span>
             </div>
             <div className={`mt-0.5 truncate font-mono text-[10px] ${indexPctClass(pct)}`}>
@@ -644,7 +651,9 @@ export function Layout() {
   const globalIdxQuery = useQuery({
     queryKey: QK.globalIndices,
     queryFn: api.globalIndices,
-    refetchInterval: 15000,
+    // [R112] 有市场在交易时就跟 A 股同频刷(8s), 全部休市时退到 60s ——
+    // 休市值静止, 高频拉只是白打上游
+    refetchInterval: (q: any) => (q?.state?.data?.items ?? []).some((i: any) => i.trading) ? 8000 : 60000,
     placeholderData: (prev: { items: import('@/lib/api').GlobalIndexQuote[] } | undefined) => prev,
     enabled: showSidebarQuotes && !navCollapsed,
   })
