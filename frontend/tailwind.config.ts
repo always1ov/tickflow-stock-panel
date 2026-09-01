@@ -77,10 +77,13 @@ export default {
         9: '2rem',
       },
       borderRadius: {
-        card: '8px',
-        btn: '6px',
-        input: '6px',
-        dialog: '12px',
+        // [R126] skill Quick Reference 建议 0.5~1rem; Modern Dark Mode 那段给的是
+        // --radius: 0.625rem(10px)。卡片按它走, 按钮/输入框按比例小一档 ——
+        // 密集交易界面里控件多且小, 圆角跟卡片一样大会显得肉。
+        card: '10px',
+        btn: '7px',
+        input: '7px',
+        dialog: '14px',
       },
       transitionTimingFunction: {
         // §6.0.4 Linear/Vercel 同款缓动
