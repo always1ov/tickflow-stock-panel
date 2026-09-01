@@ -898,9 +898,16 @@ export function Today() {
   const [ledgerOpen, setLedgerOpen] = useState(false)   // [R133] 把握分体检弹窗
   // 滑块拖动中的即时值(null = 用服务端返回的偏好); 松手才落库
   const [minScore, setMinScore] = useState<number | null>(null)
+  // [R140] 板块过滤的**乐观值**。null = 用服务端偏好。
+  //
+  // 原来按钮亮不亮完全取决于 `d.prefs.boards`, 而那要等一次 PUT + 一次 GET
+  // 回来才更新 —— 中间那段时间按钮纹丝不动, 看起来就是"点了没反应", 于是
+  // 用户会再点一次(第二次读到的还是旧的 boardFilter, 于是又发了一遍同样的
+  // 请求, 屏幕上叠出两个一样的 toast)。先本地亮起来, 服务端回来再对齐。
+  const [boardDraft, setBoardDraft] = useState<string[] | null>(null)
   const prefsMut = useMutation({
     mutationFn: (body: Partial<TodayPrefs>) => api.todaySavePrefs(body),
-    onSuccess: (p, vars) => {
+    onSuccess: async (p, vars) => {
       toast(
         'boards' in vars
           ? (p.boards.length ? `只看:${p.boards.join('、')}` : '板块过滤已取消,全部板块都看')
@@ -908,11 +915,14 @@ export function Today() {
         'success')
       setMinScore(null)
       setPicks(null)  // 候选集变了, 旧的 AI 优选结果不再对应
-      q.refetch()
+      // 等这次重取真的落地再撤掉乐观值 —— 提前撤会让按钮闪回旧状态
+      await q.refetch()
+      setBoardDraft(null)
     },
     onError: (e: Error) => {
       toast(`保存失败: ${e.message}`, 'error')
       setMinScore(null)
+      setBoardDraft(null)   // 存失败就退回服务端的真实值, 不留一个假的高亮
     },
   })
 
@@ -946,8 +956,16 @@ export function Today() {
   const aiCache = d?.ai ?? null
   const shownBrief = brief ?? aiCache?.brief ?? null
   const shownPicks = picks ?? aiCache?.picks ?? null
-  // [R40] 板块过滤当前值。空 = 全看; 由服务端偏好驱动, 刷新/换设备都保持
-  const boardFilter = d?.prefs?.boards ?? []
+  // [R40] 板块过滤当前值。空 = 全看; 由服务端偏好驱动, 刷新/换设备都保持。
+  // [R140] 落库期间用乐观值, 否则按钮要等一次往返才亮 —— 看起来像点了没反应。
+  const boardFilter = boardDraft ?? d?.prefs?.boards ?? []
+  /** 切换某个板块(传 null = 全部)。本地先切, 再落库。 */
+  const toggleBoard = (b: string | null) => {
+    const next = b === null ? []
+      : boardFilter.includes(b) ? boardFilter.filter(x => x !== b) : [...boardFilter, b]
+    setBoardDraft(next)
+    prefsMut.mutate({ boards: next })
+  }
   const shownAnalyzed = picks ? analyzed : (aiCache?.analyzed ?? 0)
   const aiMeta = brief ? null : aiCache   // 缓存来源与时间(自己刚生成的不必标注)
   // [R37] 中观快照。提出来是为了在 JSX 的 map 回调里也保住类型收窄
@@ -1231,7 +1249,7 @@ export function Today() {
                   看到的"主板机会"是残缺的而你不会知道 */}
               <div className="flex items-center gap-1">
                 <button
-                  onClick={() => prefsMut.mutate({ boards: [] })}
+                  onClick={() => toggleBoard(null)}
                   disabled={prefsMut.isPending}
                   title="不过滤, 所有板块都看"
                   className={`rounded-btn border px-2 py-0.5 text-[10px] transition-colors cursor-pointer disabled:opacity-50 ${
@@ -1242,14 +1260,15 @@ export function Today() {
                 >
                   全部
                 </button>
+                {/* [R140] 正在落库/重取时给个明确的进行态。/api/today 要跑
+                    Keltner 批量、MA120 批量、几十只的历史胜率, 一次好几秒 ——
+                    没有这个提示, 那几秒就是"点了没反应", 用户会重复点。 */}
                 {TODAY_BOARDS.map((b) => {
                   const on = boardFilter.includes(b)
                   return (
                     <button
                       key={b}
-                      onClick={() => prefsMut.mutate({
-                        boards: on ? boardFilter.filter((x) => x !== b) : [...boardFilter, b],
-                      })}
+                      onClick={() => toggleBoard(b)}
                       disabled={prefsMut.isPending}
                       title={`${on ? '取消' : '只看'}${b}(可多选)`}
                       className={`rounded-btn border px-2 py-0.5 text-[10px] transition-colors cursor-pointer disabled:opacity-50 ${
@@ -1262,6 +1281,12 @@ export function Today() {
                     </button>
                   )
                 })}
+                {(prefsMut.isPending || (boardDraft !== null && q.isFetching)) && (
+                  <span className="inline-flex items-center gap-1 pl-1 text-[10px] text-muted">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    筛选中
+                  </span>
+                )}
               </div>
               <div className="ml-auto flex items-center gap-2">
                 {/* [R133] 门槛旁边就是体检 —— 调门槛前先看"这个门槛值不值",
