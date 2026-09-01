@@ -55,6 +55,7 @@ import {
   PanelLeftOpen,
   Sunrise,
   Globe2,
+  CalendarClock,   // [R127] 实时行情自动开关
 } from 'lucide-react'
 import { Logo } from './Logo'
 import { api, type CapabilityMatrix, type IndexQuote } from '@/lib/api'
@@ -1116,7 +1117,9 @@ export function Layout() {
                 <span className={`inline-block h-2 w-2 shrink-0 rounded-full ${realtimeIndicatorClass}`} />
                 <div className="min-w-0">
                   <div className="text-xs font-medium leading-none text-foreground">实时行情</div>
-                  <div className="mt-1 flex min-w-0 items-center gap-1 text-[10px] leading-none">
+                  {/* [R127] 允许换行: 侧栏只有 230px, 「fuyao · 等待交易时段 · 自动」
+                      挤一行时数据源名会被截成空白。宁可占两行, 也别把信息挤没。 */}
+                  <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-1 gap-y-0.5 text-[10px] leading-tight">
                     <span className="truncate text-muted">{realtimeProviderName || realtimeModeLabel}</span>
                     <span className="shrink-0 text-border" aria-hidden="true">·</span>
                     <span className={`shrink-0 ${realtimeStatusClass}`}>{realtimeStatusLabel}</span>
@@ -1142,14 +1145,19 @@ export function Layout() {
                     ? '自动开关已开启：交易日 09:15 自动开、15:05 自动关。中途手动改动在当天有效，次日恢复自动'
                     : '开启后按交易日自动开关行情，不用每天手动点'}
                   className={cn(
-                    'flex h-7 items-center rounded-btn px-1.5 text-[10px] font-medium transition-colors',
+                    // [R127] 原来是「自动」两个字的文字按钮 —— 侧栏只有 230px 宽,
+                    // 文字按钮 + 齿轮 + 开关三件挤在一行, 把左侧数据源名整个挤没了
+                    // 还换行, 于是屏幕上出现两个「自动」(按钮一个、状态行一个)。
+                    // 改成与齿轮同尺寸的图标按钮: 控件归控件(图标+title), 状态归
+                    // 状态(状态行那个「自动」), 一屏只出现一次, 也不再挤。
+                    'flex h-7 w-7 items-center justify-center rounded-btn transition-colors duration-hover',
                     realtimeAuto
                       ? 'bg-accent/15 text-accent hover:bg-accent/25'
                       : 'text-muted hover:bg-elevated hover:text-foreground',
                     (toggleRealtimeAuto.isPending || realtimeUnavailable) && 'cursor-not-allowed opacity-50',
                   )}
                 >
-                  自动
+                  <CalendarClock className="h-3.5 w-3.5" />
                 </button>
                 <button
                   onClick={() => navigate('/settings?tab=monitoring&highlight=quotes')}
