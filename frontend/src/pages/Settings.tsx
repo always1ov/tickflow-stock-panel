@@ -77,13 +77,13 @@ export function Settings() {
         <div className="w-full">
         <div className="flex gap-5 items-start">
           {/* ===== 竖向 Tab 侧栏 ===== */}
-          <nav className={cn('shrink-0 transition-all duration-200 ease-smooth', collapsed ? 'w-10' : 'w-36')}>
+          <nav className={cn('shrink-0 transition-all duration-expand ease-smooth', collapsed ? 'w-10' : 'w-36')}>
             <div className="flex flex-col gap-0.5 sticky top-3">
               {/* 收起/展开 按钮 */}
               <button
                 onClick={toggleCollapsed}
                 className={cn(
-                  'flex items-center gap-2 rounded-btn text-muted hover:text-foreground hover:bg-elevated/60 transition-colors duration-150 ease-smooth mb-1',
+                  'flex items-center gap-2 rounded-btn text-muted hover:text-foreground hover:bg-elevated/60 transition-colors duration-hover ease-smooth mb-1',
                   collapsed ? 'justify-center px-0 py-2' : 'px-3 py-2 text-xs',
                 )}
                 title={collapsed ? '展开菜单' : '收起菜单'}
@@ -102,7 +102,7 @@ export function Settings() {
                   onClick={() => setSearchParams({ tab: key }, { replace: true })}
                   title={collapsed ? label : undefined}
                   className={cn(
-                    'relative flex items-center rounded-btn text-sm transition-colors duration-150 ease-smooth',
+                    'relative flex items-center rounded-btn text-sm transition-colors duration-hover ease-smooth',
                     collapsed ? 'justify-center px-0 py-2' : 'items-center gap-2 px-3 py-2 text-left',
                     activeTab.key === key
                       ? 'bg-accent/10 text-accent font-medium'

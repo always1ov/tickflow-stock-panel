@@ -113,7 +113,7 @@ export function StockFinancialSearch({ onSelect, assetTypes }: Props) {
                   key={r.symbol}
                   type="button"
                   onClick={() => handleSelect(r)}
-                  className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors duration-100 ${
+                  className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors duration-press ${
                     i === activeIdx ? 'bg-accent/10 text-accent' : 'hover:bg-elevated text-foreground'
                   }`}
                 >

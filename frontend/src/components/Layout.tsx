@@ -132,7 +132,7 @@ function ThemeToggle() {
   return (
     <button
       onClick={() => toggleTheme()}
-      className="flex items-center justify-center rounded-btn p-2 text-foreground/80 transition-colors duration-150 ease-smooth hover:bg-elevated hover:text-foreground cursor-pointer"
+      className="flex items-center justify-center rounded-btn p-2 text-foreground/80 transition-colors duration-hover ease-smooth hover:bg-elevated hover:text-foreground cursor-pointer"
       title={dark ? '切换到亮色模式' : '切换到暗色模式'}
     >
       {dark ? <Sun className="h-4 w-4 shrink-0" /> : <Moon className="h-4 w-4 shrink-0" />}
@@ -302,7 +302,7 @@ function DataSourceHealthBadge({ matrix }: { matrix: CapabilityMatrix | undefine
         onFocus={openPop}
         onBlur={closePop}
         onKeyDown={e => { if (e.key === 'Escape') setPopPos(null) }}
-        className="group relative flex items-center gap-2 overflow-hidden rounded-md py-1.5 pl-2.5 pr-2 transition-colors duration-150 hover:bg-elevated/70"
+        className="group relative flex items-center gap-2 overflow-hidden rounded-md py-1.5 pl-2.5 pr-2 transition-colors duration-hover hover:bg-elevated/70"
       >
         <span className="pointer-events-none absolute inset-y-1.5 left-0 w-[2px] rounded-full bg-accent/50 transition-colors group-hover:bg-accent" />
         <DatabaseZap className="h-3.5 w-3.5 shrink-0 text-muted group-hover:text-accent transition-colors" />
@@ -444,7 +444,7 @@ function AIConfigBadge({ configured, model }: { configured?: boolean; model?: st
         ref={btnRef}
         onClick={e => { e.stopPropagation(); toggleMenu() }}
         title={managed.length > 0 ? '点击快速切换首选 AI 档位' : `AI 配置 — ${descText}`}
-        className="group relative flex w-full items-center gap-2 overflow-hidden rounded-md py-1.5 pl-2.5 pr-2 text-left transition-colors duration-150 hover:bg-elevated/70"
+        className="group relative flex w-full items-center gap-2 overflow-hidden rounded-md py-1.5 pl-2.5 pr-2 text-left transition-colors duration-hover hover:bg-elevated/70"
       >
         <span className="pointer-events-none absolute inset-y-1.5 left-0 w-[2px] rounded-full bg-purple-400/50 transition-colors group-hover:bg-purple-400" />
         <Sparkles className="h-3.5 w-3.5 shrink-0 text-muted group-hover:text-purple-400 transition-colors" />
@@ -541,7 +541,7 @@ function PlainNavLink({ item, collapsed, indent, dataSyncing, dataSyncJustDone }
         title={collapsed ? label : undefined}
         className={({ isActive }) =>
           cn(
-            'group relative flex items-center rounded-btn text-sm transition-all duration-150 ease-smooth',
+            'group relative flex items-center rounded-btn text-sm transition-all duration-hover ease-smooth',
             collapsed ? 'justify-center px-0 py-2' : 'gap-2.5 px-3 py-1.5',
             isActive
               ? 'bg-elevated text-foreground font-medium'
@@ -554,7 +554,7 @@ function PlainNavLink({ item, collapsed, indent, dataSyncing, dataSyncJustDone }
             {/* active 左侧 accent 竖条指示 */}
             <span
               className={cn(
-                'pointer-events-none absolute left-0 top-1/2 h-4 -translate-y-1/2 w-[2.5px] rounded-full bg-accent transition-opacity duration-150',
+                'pointer-events-none absolute left-0 top-1/2 h-4 -translate-y-1/2 w-[2.5px] rounded-full bg-accent transition-opacity duration-hover',
                 isActive ? 'opacity-100 shadow-[0_0_8px_rgba(59,130,246,0.6)]' : 'opacity-0',
               )}
             />
@@ -875,7 +875,7 @@ export function Layout() {
 
   return (
     <div
-      className="h-screen grid bg-base text-foreground overflow-hidden transition-[grid-template-columns] duration-200 ease-smooth"
+      className="h-screen grid bg-base text-foreground overflow-hidden transition-[grid-template-columns] duration-expand ease-smooth"
       style={{ gridTemplateColumns: navCollapsed ? '3.5rem 1fr' : '14rem 1fr' }}
     >
       <aside className="border-r border-border bg-surface flex flex-col h-full min-h-0 overflow-hidden">
@@ -899,7 +899,7 @@ export function Layout() {
             <button
               onClick={toggleNavCollapsed}
               className={cn(
-                'flex items-center rounded-btn text-muted hover:text-foreground hover:bg-elevated/60 transition-colors duration-150 ease-smooth',
+                'flex items-center rounded-btn text-muted hover:text-foreground hover:bg-elevated/60 transition-colors duration-hover ease-smooth',
                 navCollapsed ? 'justify-center p-1.5' : 'ml-auto p-1.5',
               )}
               title={navCollapsed ? '展开菜单' : '收起菜单'}
@@ -950,7 +950,7 @@ export function Layout() {
                     onClick={() => setBrowseOpen(v => !v)}
                     title={navCollapsed ? BROWSE_GROUP.label : BROWSE_GROUP.hint}
                     className={cn(
-                      'group relative flex w-full items-center rounded-btn text-sm transition-all duration-150 ease-smooth',
+                      'group relative flex w-full items-center rounded-btn text-sm transition-all duration-hover ease-smooth',
                       navCollapsed ? 'justify-center px-0 py-2' : 'gap-2.5 px-3 py-1.5',
                       browsePaths.includes(location.pathname)
                         ? 'bg-elevated text-foreground font-medium'
@@ -985,7 +985,7 @@ export function Layout() {
                   <button
                     onClick={() => setWatchlistNavExpanded(v => !v)}
                     className={cn(
-                      'group relative flex w-full items-center gap-2.5 rounded-btn px-3 py-1.5 text-sm transition-all duration-150 ease-smooth',
+                      'group relative flex w-full items-center gap-2.5 rounded-btn px-3 py-1.5 text-sm transition-all duration-hover ease-smooth',
                       location.pathname === '/watchlist'
                         ? 'bg-elevated text-foreground font-medium'
                         : 'text-foreground/75 hover:bg-elevated/70 hover:text-foreground',
@@ -993,7 +993,7 @@ export function Layout() {
                   >
                     <span
                       className={cn(
-                        'pointer-events-none absolute left-0 top-1/2 h-4 -translate-y-1/2 w-[2.5px] rounded-full bg-accent transition-opacity duration-150',
+                        'pointer-events-none absolute left-0 top-1/2 h-4 -translate-y-1/2 w-[2.5px] rounded-full bg-accent transition-opacity duration-hover',
                         location.pathname === '/watchlist' ? 'opacity-100 shadow-[0_0_8px_rgba(59,130,246,0.6)]' : 'opacity-0',
                       )}
                     />
@@ -1019,7 +1019,7 @@ export function Layout() {
                     <NavLink
                       to="/watchlist"
                       className={({ isActive }) => cn(
-                        'flex items-center gap-2 rounded-btn py-1.5 pl-9 pr-3 text-[12px] transition-colors duration-150 ease-smooth',
+                        'flex items-center gap-2 rounded-btn py-1.5 pl-9 pr-3 text-[12px] transition-colors duration-hover ease-smooth',
                         isActive && !location.search
                           ? 'text-accent font-medium'
                           : 'text-foreground/60 hover:text-foreground hover:bg-elevated/50',
@@ -1046,7 +1046,7 @@ export function Layout() {
                           key={group.id}
                           to={groupPath}
                           className={cn(
-                            'flex items-center gap-2 rounded-btn py-1.5 pl-9 pr-3 text-[12px] transition-colors duration-150 ease-smooth',
+                            'flex items-center gap-2 rounded-btn py-1.5 pl-9 pr-3 text-[12px] transition-colors duration-hover ease-smooth',
                             isGroupActive
                               ? 'text-accent font-medium'
                               : 'text-foreground/60 hover:text-foreground hover:bg-elevated/50',
@@ -1169,7 +1169,7 @@ export function Layout() {
                   disabled={realtimeToggleDisabled}
                   title={realtimeToggleTitle}
                   className={cn(
-                    'relative inline-flex h-5 w-9 items-center rounded-full border transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-1 focus-visible:ring-offset-surface',
+                    'relative inline-flex h-5 w-9 items-center rounded-full border transition-all duration-expand focus-visible:outline-none focus-ring-custom focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-1 focus-visible:ring-offset-surface',
                     realtimeEnabled
                       ? 'border-accent/50 bg-accent shadow-[0_0_6px_rgba(59,130,246,0.25)]'
                       : 'border-border bg-elevated hover:border-muted',
@@ -1177,7 +1177,7 @@ export function Layout() {
                   )}
                 >
                   <span className={cn(
-                    'inline-block h-3.5 w-3.5 rounded-full border border-black/5 bg-white shadow-sm transition-transform duration-200',
+                    'inline-block h-3.5 w-3.5 rounded-full border border-black/5 bg-white shadow-sm transition-transform duration-expand',
                     realtimeEnabled ? 'translate-x-[18px]' : 'translate-x-0.5',
                   )} />
                 </button>
@@ -1221,7 +1221,7 @@ export function Layout() {
               title={navCollapsed ? '设置' : undefined}
               className={({ isActive }) =>
                 cn(
-                  'group relative flex items-center rounded-btn text-sm transition-all duration-150 ease-smooth',
+                  'group relative flex items-center rounded-btn text-sm transition-all duration-hover ease-smooth',
                   navCollapsed ? 'justify-center px-0 py-2' : 'flex-1 gap-2.5 px-3 py-1.5',
                   isActive
                     ? 'bg-elevated text-foreground font-medium'
@@ -1233,7 +1233,7 @@ export function Layout() {
                 <>
                   <span
                     className={cn(
-                      'pointer-events-none absolute left-0 top-1/2 h-4 -translate-y-1/2 w-[2.5px] rounded-full bg-accent transition-opacity duration-150',
+                      'pointer-events-none absolute left-0 top-1/2 h-4 -translate-y-1/2 w-[2.5px] rounded-full bg-accent transition-opacity duration-hover',
                       isActive ? 'opacity-100 shadow-[0_0_8px_rgba(59,130,246,0.6)]' : 'opacity-0',
                     )}
                   />

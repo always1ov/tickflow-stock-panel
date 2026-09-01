@@ -164,7 +164,7 @@ export function DatePicker({
         onClick={handleOpen}
         className={`inline-flex items-center gap-1.5 h-7 px-2.5 rounded-input border border-border
           bg-elevated hover:border-accent/50 text-xs text-foreground num
-          focus:outline-none focus:border-accent/60 transition-colors duration-150 cursor-pointer ${buttonClassName}`}
+          focus:outline-none focus:border-accent/60 transition-colors duration-hover cursor-pointer ${buttonClassName}`}
       >
         <Calendar className="h-3.5 w-3.5 text-accent" />
         <span className={value ? undefined : 'text-muted'}>{displayLabel}</span>
@@ -226,7 +226,7 @@ export function DatePicker({
                         setViewYear(y)
                         setShowYearPicker(false)
                       }}
-                      className={`h-8 text-xs rounded-btn transition-colors duration-100
+                      className={`h-8 text-xs rounded-btn transition-colors duration-press
                         ${isSelected ? 'bg-accent text-white font-bold' : ''}
                         ${isThisYear && !isSelected ? 'border border-accent/40' : ''}
                         ${!isSelected ? 'hover:bg-elevated cursor-pointer text-foreground' : ''}
@@ -263,7 +263,7 @@ export function DatePicker({
                       }
                     }}
                     className={`
-                      h-7 w-full text-xs rounded-btn transition-colors duration-100
+                      h-7 w-full text-xs rounded-btn transition-colors duration-press
                       ${c.cur ? 'text-foreground' : 'text-muted/40'}
                       ${isSelected ? 'bg-accent text-white font-bold' : ''}
                       ${isToday && !isSelected ? 'border border-accent/40' : ''}

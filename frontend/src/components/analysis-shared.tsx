@@ -258,7 +258,7 @@ export function DimensionHeatmap({
         </button>
       </div>
       <div
-        className="flex flex-wrap gap-1.5 overflow-hidden transition-[max-height] duration-200"
+        className="flex flex-wrap gap-1.5 overflow-hidden transition-[max-height] duration-expand"
         style={{ maxHeight: showAll ? 'none' : collapsedMaxH }}
       >
         {enriched.map(g => {

@@ -1406,12 +1406,12 @@ function MainlineFilterPanel({ filter, onDone }: {
           aria-label="统计剔除 ST 股"
           onClick={() => setExcludeSt(v => !v)}
           className={cn(
-            'relative inline-flex h-4.5 w-8 items-center rounded-full border transition-all duration-200',
+            'relative inline-flex h-4.5 w-8 items-center rounded-full border transition-all duration-expand',
             excludeSt ? 'border-accent/50 bg-accent' : 'border-border bg-elevated hover:border-muted',
           )}
         >
           <span className={cn(
-            'inline-block h-3 w-3 rounded-full border border-black/5 bg-white shadow-sm transition-transform duration-200',
+            'inline-block h-3 w-3 rounded-full border border-black/5 bg-white shadow-sm transition-transform duration-expand',
             excludeSt ? 'translate-x-[17px]' : 'translate-x-0.5',
           )} />
         </button>

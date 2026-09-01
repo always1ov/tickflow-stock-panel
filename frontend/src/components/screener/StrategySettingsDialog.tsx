@@ -50,7 +50,7 @@ function Section({ icon: Icon, title, accent, defaultOpen = true, children, extr
           onClick={() => setOpen(v => !v)}
           className="flex min-w-0 flex-1 items-center gap-2 text-left cursor-pointer"
         >
-          <ChevronDown className={`h-3 w-3 text-muted/40 transition-transform duration-200 ${open ? '' : '-rotate-90'}`} />
+          <ChevronDown className={`h-3 w-3 text-muted/40 transition-transform duration-expand ${open ? '' : '-rotate-90'}`} />
           {Icon && <Icon className={`h-3.5 w-3.5 ${accent ?? 'text-muted'}`} />}
           <span className="text-[11px] font-medium text-foreground/70">{title}</span>
         </button>
@@ -128,12 +128,12 @@ function ParamField({ def, value, onChange }: {
         <button
           type="button"
           onClick={() => onChange(!checked)}
-          className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors duration-200 cursor-pointer ${
+          className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors duration-expand cursor-pointer ${
             checked ? 'bg-accent' : 'bg-elevated'
           }`}
           aria-pressed={checked}
         >
-          <span className={`inline-block h-3 w-3 rounded-full bg-white shadow-sm transition-transform duration-200 ${
+          <span className={`inline-block h-3 w-3 rounded-full bg-white shadow-sm transition-transform duration-expand ${
             checked ? 'translate-x-[14px]' : 'translate-x-0.5'
           }`} />
         </button>
@@ -501,7 +501,7 @@ export function StrategySettingsDialog({ strategyId, onClose, onSaved, onAiModif
                           <span className={`absolute top-0.5 w-3.5 h-3.5 rounded-full bg-white transition-transform ${basicFilterEnabled ? 'left-[16px]' : 'left-0.5'}`} />
                         </button>
                       </div>
-                      <div className={`space-y-2 transition-opacity duration-200 ${basicFilterEnabled ? '' : 'opacity-25 pointer-events-none'}`}>
+                      <div className={`space-y-2 transition-opacity duration-expand ${basicFilterEnabled ? '' : 'opacity-25 pointer-events-none'}`}>
                       <RangeField label="价格" minVal={basicFilter.price_min} maxVal={basicFilter.price_max} onMinChange={v => setBF('price_min', v)} onMaxChange={v => setBF('price_max', v)} unit="元" step="1" />
                       <RangeField label="流通市值" minVal={basicFilter.float_cap_min != null ? basicFilter.float_cap_min / 1e8 : null} maxVal={basicFilter.float_cap_max != null ? basicFilter.float_cap_max / 1e8 : null} onMinChange={v => setBF('float_cap_min', v != null ? v * 1e8 : null)} onMaxChange={v => setBF('float_cap_max', v != null ? v * 1e8 : null)} unit="亿" step="5" />
                       <RangeField label="成交额" minVal={basicFilter.amount_min != null ? basicFilter.amount_min / 1e8 : null} maxVal={basicFilter.amount_max != null ? basicFilter.amount_max / 1e8 : null} onMinChange={v => setBF('amount_min', v != null ? v * 1e8 : null)} onMaxChange={v => setBF('amount_max', v != null ? v * 1e8 : null)} unit="亿" step="0.5" />

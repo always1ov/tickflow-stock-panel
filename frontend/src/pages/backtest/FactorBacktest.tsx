@@ -22,7 +22,7 @@ const TODAY = formatDate(new Date())
 const THREE_MONTHS_AGO = monthsAgo(3)
 
 const INPUT_CLS = `w-full px-2.5 py-1.5 rounded-input bg-surface border border-border text-xs
-  focus:outline-none focus:border-accent transition-colors duration-150 ease-smooth`
+  focus:outline-none focus:border-accent transition-colors duration-hover ease-smooth`
 
 function StatCard({ label, value, highlight }: {
   label: string
@@ -240,7 +240,7 @@ export function FactorBacktest({ initialFactorName = 'momentum_20d' }: { initial
             onChange={e => setSymbols(e.target.value)}
             placeholder="留空则使用全市场，建议最近3个月"
             className={`w-full px-2.5 py-1.5 rounded-input bg-surface border border-border text-xs font-mono
-              focus:outline-none focus:border-accent transition-colors duration-150 ease-smooth`}
+              focus:outline-none focus:border-accent transition-colors duration-hover ease-smooth`}
           />
         </div>
 
@@ -313,7 +313,7 @@ export function FactorBacktest({ initialFactorName = 'momentum_20d' }: { initial
           disabled={run.isPending}
           className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-btn
             bg-accent text-sm font-medium text-white hover:bg-accent/90
-            transition-colors duration-150 ease-smooth disabled:opacity-50"
+            transition-colors duration-hover ease-smooth disabled:opacity-50"
         >
           <Play className="h-3.5 w-3.5" />
           {run.isPending ? '分析中…' : '开始因子分析'}

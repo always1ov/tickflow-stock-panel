@@ -430,12 +430,12 @@ export function ListColumnCustomizer({
               <button
                 type="button"
                 onClick={() => updateExtDisplay(col.id, { thousandSeparator: !col.extDisplay?.thousandSeparator })}
-                className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors duration-200 cursor-pointer ${
+                className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors duration-expand cursor-pointer ${
                   col.extDisplay?.thousandSeparator ? 'bg-accent' : 'bg-elevated'
                 }`}
                 aria-pressed={!!col.extDisplay?.thousandSeparator}
               >
-                <span className={`inline-block h-3 w-3 rounded-full bg-white shadow-sm transition-transform duration-200 ${
+                <span className={`inline-block h-3 w-3 rounded-full bg-white shadow-sm transition-transform duration-expand ${
                   col.extDisplay?.thousandSeparator ? 'translate-x-[14px]' : 'translate-x-0.5'
                 }`} />
               </button>

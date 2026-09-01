@@ -228,12 +228,12 @@ export function ExtDataPullPanel({ config, onSaved }: {
             aria-checked={enabled}
             disabled={toggling}
             onClick={() => handleToggle(!enabled)}
-            className={`relative inline-flex h-4 w-7 shrink-0 items-center rounded-full transition-colors duration-200 disabled:opacity-50 ${
+            className={`relative inline-flex h-4 w-7 shrink-0 items-center rounded-full transition-colors duration-expand disabled:opacity-50 ${
               enabled ? 'bg-accent' : 'bg-border'
             }`}
           >
             <span
-              className={`inline-block h-3 w-3 transform rounded-full bg-white shadow transition-transform duration-200 ${
+              className={`inline-block h-3 w-3 transform rounded-full bg-white shadow transition-transform duration-expand ${
                 enabled ? 'translate-x-3.5' : 'translate-x-0.5'
               }`}
             />

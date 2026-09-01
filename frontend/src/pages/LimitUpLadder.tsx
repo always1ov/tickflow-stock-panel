@@ -203,7 +203,7 @@ const StockCard = React.memo(function StockCard({ stock, extFields, direction, s
         event.preventDefault()
         onClick(stock.symbol, stock.name ?? undefined)
       }}
-      className={`w-full flex flex-col items-start gap-1 px-2.5 py-2 rounded-md transition-all duration-200 cursor-pointer hover:opacity-100 ${style.bg} ${style.bar} ${monitored ? 'ring-1 ring-amber-400/50 ring-inset' : ''}`}
+      className={`w-full flex flex-col items-start gap-1 px-2.5 py-2 rounded-md transition-all duration-expand cursor-pointer hover:opacity-100 ${style.bg} ${style.bar} ${monitored ? 'ring-1 ring-amber-400/50 ring-inset' : ''}`}
       style={style.cardStyle ? { ...style.cardStyle } : undefined}
       onMouseEnter={e => {
         if (!style.cardStyle || !style.hoverShadow) return
@@ -786,7 +786,7 @@ function TagStats({ title, tiers, extFields, fieldKey, color, selectedTag, onSel
       </button>
       <div className="relative">
         <div
-          className={`flex flex-wrap gap-1.5 pt-0.5 pl-1 transition-all duration-300 ${
+          className={`flex flex-wrap gap-1.5 pt-0.5 pl-1 transition-all duration-enter ${
             expanded ? 'pb-2.5' : 'pb-0.5 max-h-[3.5rem] overflow-hidden'
           }`}
         >

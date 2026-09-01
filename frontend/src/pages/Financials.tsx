@@ -186,7 +186,7 @@ export function Financials() {
               </span>
             )}
             <button
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-btn bg-gradient-to-r from-accent/25 to-accent/10 border border-accent/30 text-accent text-xs font-medium hover:from-accent/35 hover:to-accent/20 transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-btn bg-gradient-to-r from-accent/25 to-accent/10 border border-accent/30 text-accent text-xs font-medium hover:from-accent/35 hover:to-accent/20 transition-all duration-hover disabled:opacity-40 disabled:cursor-not-allowed"
               onClick={() => handleSync('all')}
               disabled={syncing}
               title={syncing ? '正在同步，请稍候…' : '同步全部财务表'}

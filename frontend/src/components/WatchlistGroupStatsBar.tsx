@@ -127,13 +127,13 @@ export function WatchlistGroupStatsBar({
                 <span className="absolute inset-y-0 left-1/2 w-px bg-border" />
                 {isUp && (
                   <span
-                    className="absolute inset-y-[3px] left-1/2 rounded-r bg-bull/75 transition-[width] duration-300"
+                    className="absolute inset-y-[3px] left-1/2 rounded-r bg-bull/75 transition-[width] duration-enter"
                     style={{ width: `${half}%` }}
                   />
                 )}
                 {isDown && (
                   <span
-                    className="absolute inset-y-[3px] right-1/2 rounded-l bg-bear/75 transition-[width] duration-300"
+                    className="absolute inset-y-[3px] right-1/2 rounded-l bg-bear/75 transition-[width] duration-enter"
                     style={{ width: `${half}%` }}
                   />
                 )}

@@ -229,6 +229,25 @@ def rank_opportunities(
             if reason:
                 o["why"].append(f"{'但' if delta < 0 else ''}{vd['title']}:{reason}")
         o["score"] = max(0, min(100, o["score"]))   # 夹到 [0,100] 放在所有加减之后
+
+    # [R123] 把两个**直接决定今天动不动手**的数字从 why 散文里拎成结构化字段:
+    #   gap_pct  现价距触发价还差几个点(负数=已越过) —— 回答"今天能不能动手"
+    #   vol_ratio 量比 —— 回答"这个突破是不是真的"(也是 AI 优选的核心判据,
+    #             摆成列用户才能自己核 AI 那句"量比 1.25"是不是真的, 与 R121 同源)
+    # 统一在两个来源合并之后算一次: 两路都存了 pivot, 逻辑不必在分支里各写一遍。
+    for sym, o in opp_by_sym.items():
+        ext = (extras or {}).get(sym) or {}
+        vr = ext.get("vol_ratio")
+        o["vol_ratio"] = round(float(vr), 2) if isinstance(vr, (int, float)) and vr else None
+        close = ((trends.get(sym) or {}).get("close")
+                 or ((signals.get(sym) or {}).get("close")))
+        pivot = o.get("pivot")
+        try:
+            o["gap_pct"] = (round((float(pivot) - float(close)) / float(close) * 100, 2)
+                            if pivot and close else None)
+        except (TypeError, ValueError, ZeroDivisionError):
+            o["gap_pct"] = None
+
     ranked = sorted(opp_by_sym.values(), key=lambda o: (-o["score"], o["symbol"]))
     if boards:
         keep = set(boards)

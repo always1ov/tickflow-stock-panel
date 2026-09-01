@@ -1300,7 +1300,7 @@ function DragonTigerCard({ date, onOpenStock }: {
           </span>
         </span>
         <span className="ml-auto flex items-center gap-1.5">
-          <ChevronDown className={cn('h-4 w-4 text-muted transition-transform duration-200 group-hover:text-secondary', expanded && 'rotate-180')} />
+          <ChevronDown className={cn('h-4 w-4 text-muted transition-transform duration-expand group-hover:text-secondary', expanded && 'rotate-180')} />
         </span>
       </button>
 

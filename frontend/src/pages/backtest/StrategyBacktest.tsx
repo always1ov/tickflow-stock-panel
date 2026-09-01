@@ -100,7 +100,7 @@ const quickRangeTitle = (range: QuickRangeConfig) => range.unit === 'all'
     : `近 ${range.value} 个月`
 
 const INPUT_CLS = `w-full px-2.5 py-1.5 rounded-input bg-surface border border-border text-xs
-  focus:outline-none focus:border-accent transition-colors duration-150 ease-smooth`
+  focus:outline-none focus:border-accent transition-colors duration-hover ease-smooth`
 
 /** 成交时序说明 — 黄色问号图标, 点击弹出气泡。
  * 用 fixed 定位脱离父容器 overflow 裁剪(左侧表单是 overflow-y-auto, absolute 气泡会被裁)。 */
@@ -709,12 +709,12 @@ function StrategyParamInput({ param, value, onChange }: {
         <button
           type="button"
           onClick={() => onChange(!checked)}
-          className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 cursor-pointer ${
+          className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-expand cursor-pointer ${
             checked ? 'bg-accent shadow-[0_0_6px_rgba(59,130,246,0.3)]' : 'bg-elevated'
           }`}
           aria-pressed={checked}
         >
-          <span className={`inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${
+          <span className={`inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-expand ${
             checked ? 'translate-x-[18px]' : 'translate-x-0.5'
           }`} />
         </button>
@@ -1680,13 +1680,13 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
                   ? '分钟K成交价：分钟K(批量)数据不可用'
                   : '分钟K成交：细化成交价，并为兼容的卖出信号提供下一分钟成交。'
                 }
-                className={`group relative inline-flex h-3.5 w-6 items-center rounded-full shrink-0 transition-colors duration-200 ${
+                className={`group relative inline-flex h-3.5 w-6 items-center rounded-full shrink-0 transition-colors duration-expand ${
                   !hasMinuteBatch ? 'bg-elevated opacity-50 cursor-not-allowed'
                   : highGranularity ? 'bg-amber-500 cursor-pointer'
                   : 'bg-elevated cursor-pointer'
                 }`}
               >
-                <span className={`inline-block h-2.5 w-2.5 rounded-full bg-white shadow-sm transition-transform duration-200 ${
+                <span className={`inline-block h-2.5 w-2.5 rounded-full bg-white shadow-sm transition-transform duration-expand ${
                   highGranularity ? 'translate-x-[13px]' : 'translate-x-0.5'
                 }`} />
               </button>
@@ -1752,7 +1752,7 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
               <button
                 key={st.id}
                 onClick={() => setSelectedStrategy(st.id)}
-                className={`px-2 py-1 rounded-btn text-[11px] border transition-all duration-150 ease-smooth cursor-pointer
+                className={`px-2 py-1 rounded-btn text-[11px] border transition-all duration-hover ease-smooth cursor-pointer
                   ${selectedStrategy === st.id
                     ? 'border-accent/50 bg-accent/10 text-accent shadow-[0_0_10px_rgba(59,130,246,0.1)]'
                     : 'border-border bg-base text-secondary hover:border-accent/40'
@@ -2027,7 +2027,7 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
             onClick={stopBacktest}
             className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-btn
               bg-danger/15 border border-danger/40 text-sm font-medium text-danger hover:bg-danger/25
-              transition-colors duration-150 ease-smooth"
+              transition-colors duration-hover ease-smooth"
           >
             <Square className="h-3.5 w-3.5 fill-current" />
             停止回测
@@ -2038,7 +2038,7 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
             disabled={!selectedStrategy || strategyDetail.isLoading || backtestDataUnavailable}
             className="group w-full inline-flex items-center justify-center gap-2.5 rounded-btn border border-accent/40
               bg-gradient-to-r from-accent to-blue-500 px-3 py-2.5 text-white shadow-[0_10px_24px_rgba(59,130,246,0.22)]
-              transition-all duration-150 ease-smooth hover:-translate-y-0.5 hover:shadow-[0_14px_28px_rgba(59,130,246,0.28)]
+              transition-all duration-hover ease-smooth hover:-translate-y-0.5 hover:shadow-[0_14px_28px_rgba(59,130,246,0.28)]
               disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
           >
             <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/18 ring-1 ring-white/25 transition-transform group-hover:scale-105">
@@ -2257,7 +2257,7 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
             {backtestTask?.progress && (
               <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-base/60">
                 <div
-                  className="h-full rounded-full bg-accent transition-all duration-300 ease-out"
+                  className="h-full rounded-full bg-accent transition-all duration-enter ease-out"
                   style={{ width: `${(backtestTask.progress.day / backtestTask.progress.total) * 100}%` }}
                 />
               </div>

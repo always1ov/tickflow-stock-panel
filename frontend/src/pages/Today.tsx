@@ -275,6 +275,10 @@ function OpportunityTable({ rows, pickedSymbols, onOpen }: {
             <th className="w-12 px-3 py-1.5 text-center font-normal">把握</th>
             <th className="px-2 py-1.5 text-left font-normal">名称</th>
             <th className="px-2 py-1.5 text-left font-normal">信号</th>
+            <th className="hidden px-2 py-1.5 text-right font-normal md:table-cell"
+                title="现价距触发价还差几个点。负数=已越过触发价">距触发</th>
+            <th className="hidden px-2 py-1.5 text-right font-normal md:table-cell"
+                title="量比 ——放量突破才是真金,缩量突破多半是假的">量比</th>
             <th className="hidden px-2 py-1.5 text-left font-normal lg:table-cell">主线</th>
             <th className="hidden px-2 py-1.5 text-right font-normal sm:table-cell">建议仓位</th>
             <th className="w-7 px-1 py-1.5" aria-label="展开" />
@@ -323,6 +327,26 @@ function OpportunityTable({ rows, pickedSymbols, onOpen }: {
                       )}
                     </div>
                   </td>
+                  {/* [R123] 这两列是今天唯二决定"动不动手"的数字: 距触发回答
+                      "能不能动", 量比回答"这个突破是不是真的" */}
+                  <td className="hidden whitespace-nowrap px-2 py-2 text-right align-top font-mono md:table-cell">
+                    {o.gap_pct == null ? <span className="text-[10px] text-muted/50">—</span> : (
+                      <span className={o.gap_pct <= 0 ? 'text-danger'
+                        : o.gap_pct <= 1.5 ? 'text-warning' : 'text-secondary'}
+                        title={o.gap_pct <= 0 ? '已越过触发价' : `还差 ${o.gap_pct}% 到触发价`}>
+                        {o.gap_pct > 0 ? '+' : ''}{o.gap_pct}%
+                      </span>
+                    )}
+                  </td>
+                  <td className="hidden whitespace-nowrap px-2 py-2 text-right align-top font-mono md:table-cell">
+                    {o.vol_ratio == null ? <span className="text-[10px] text-muted/50">—</span> : (
+                      <span className={o.vol_ratio >= 1.5 ? 'text-danger'
+                        : o.vol_ratio < 0.8 ? 'text-success' : 'text-secondary'}
+                        title={o.vol_ratio >= 1.5 ? '放量' : o.vol_ratio < 0.8 ? '缩量,假突破风险' : ''}>
+                        {o.vol_ratio.toFixed(2)}
+                      </span>
+                    )}
+                  </td>
                   <td className="hidden px-2 py-2 align-top lg:table-cell">
                     {o.mainline ? (
                       <span
@@ -359,7 +383,7 @@ function OpportunityTable({ rows, pickedSymbols, onOpen }: {
                 </tr>
                 {expanded && (
                   <tr className="border-b border-border/25 bg-base/40">
-                    <td colSpan={6} className="px-4 py-2.5">
+                    <td colSpan={8} className="px-4 py-2.5">
                       <div className="animate-rise-in space-y-1 text-[11px] leading-5">
                         <div className="text-muted">{o.why}</div>
                         {o.advice?.plan && (

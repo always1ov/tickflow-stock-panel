@@ -46,13 +46,13 @@ export function QuoteConfigCard({ enabled, running, isTrading, lastFetchMs, inte
         <button
           onClick={() => onToggle(!enabled)}
           disabled={toggling}
-          className={`relative inline-flex h-4 w-7 items-center rounded-full shrink-0 transition-colors duration-200 ${
+          className={`relative inline-flex h-4 w-7 items-center rounded-full shrink-0 transition-colors duration-expand ${
             enabled
               ? 'bg-accent shadow-[0_0_6px_rgba(59,130,246,0.3)]'
               : 'bg-elevated'
           } ${toggling ? 'opacity-50' : 'cursor-pointer'}`}
         >
-          <span className={`inline-block h-3 w-3 rounded-full bg-white shadow-sm transition-transform duration-200 ${
+          <span className={`inline-block h-3 w-3 rounded-full bg-white shadow-sm transition-transform duration-expand ${
             enabled ? 'translate-x-[14px]' : 'translate-x-0.5'
           }`} />
         </button>

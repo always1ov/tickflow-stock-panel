@@ -380,12 +380,12 @@ function ToggleRow({
       <button
         onClick={() => onChange(!checked)}
         disabled={disabled}
-        className={`relative inline-flex h-5 w-9 items-center rounded-full shrink-0 transition-colors duration-200 disabled:opacity-50 ${
+        className={`relative inline-flex h-5 w-9 items-center rounded-full shrink-0 transition-colors duration-expand disabled:opacity-50 ${
           checked ? 'bg-accent' : 'bg-elevated'
         }`}
       >
         <span
-          className={`inline-block h-3.5 w-3.5 rounded-full bg-white shadow-sm transition-transform duration-200 ${
+          className={`inline-block h-3.5 w-3.5 rounded-full bg-white shadow-sm transition-transform duration-expand ${
             checked ? 'translate-x-[18px]' : 'translate-x-[3px]'
           }`}
         />

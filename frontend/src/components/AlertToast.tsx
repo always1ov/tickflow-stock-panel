@@ -157,7 +157,7 @@ export function AlertToastContainer() {
                   handleClick(item.id)
                 }
               }}
-              className="pointer-events-auto relative overflow-hidden rounded-xl border border-border/60 bg-surface/95 backdrop-blur-md shadow-2xl pl-3 pr-2 py-2.5 cursor-pointer hover:border-accent/40 hover:shadow-accent/10 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+              className="pointer-events-auto relative overflow-hidden rounded-xl border border-border/60 bg-surface/95 backdrop-blur-md shadow-2xl pl-3 pr-2 py-2.5 cursor-pointer hover:border-accent/40 hover:shadow-accent/10 transition-all focus:outline-none focus-ring-custom focus-visible:ring-2 focus-visible:ring-accent/60"
             >
               {/* 左侧色条 */}
               <div className={cn('absolute left-0 top-0 h-full w-0.5', sev)} />

@@ -102,7 +102,7 @@ export function StockDataTable({
       key={rowKey(r)}
       ref={virtualRow ? rowVirtualizer.measureElement : undefined}
       data-index={virtualRow?.index}
-      className={`transition-colors duration-150 ease-smooth group ${rowClassName(r)}`}
+      className={`transition-colors duration-hover ease-smooth group ${rowClassName(r)}`}
     >
       {visibleColumns.map(col => {
         // renderCell 返回的 <td> 无 key, 这里补上避免 React key 警告

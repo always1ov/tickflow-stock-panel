@@ -68,7 +68,7 @@ export function ExtDataStatCard({ config, onDelete, deleting, onEdit }: {
   }
 
   return (
-    <div className={`rounded-card border flex flex-col transition-all duration-300 ${
+    <div className={`rounded-card border flex flex-col transition-all duration-enter ${
       config.mode === 'snapshot'
         ? 'border-blue-500/30 bg-blue-500/[0.03]'
         : 'border-amber-500/30 bg-amber-500/[0.03]'
@@ -97,7 +97,7 @@ export function ExtDataStatCard({ config, onDelete, deleting, onEdit }: {
       </div>
 
       <div className="flex-1 min-h-[81px] px-4 pb-2">
-        <div className={`relative overflow-hidden transition-all duration-300 ${fieldsExpanded ? '' : 'h-[75px]'}`}>
+        <div className={`relative overflow-hidden transition-all duration-enter ${fieldsExpanded ? '' : 'h-[75px]'}`}>
           <div
             ref={fieldsRef}
             className="flex flex-wrap gap-1"

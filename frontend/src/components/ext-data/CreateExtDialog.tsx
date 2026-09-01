@@ -367,7 +367,7 @@ export function CreateExtDialog({ onClose }: { onClose: () => void }) {
                   <button
                     key={m}
                     onClick={() => setMode(m)}
-                    className={`relative flex items-start gap-3 px-4 py-3 rounded-xl border transition-all duration-200 text-left ${
+                    className={`relative flex items-start gap-3 px-4 py-3 rounded-xl border transition-all duration-expand text-left ${
                       active
                         ? 'border-amber-500/40 bg-amber-500/[0.08] shadow-sm shadow-amber-500/10'
                         : 'border-border bg-elevated/30 hover:bg-elevated/60'

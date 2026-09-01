@@ -254,11 +254,11 @@ export function ScreenerTable({
                 ) : (
                   <span className="shrink-0 w-[18px]" />
                 )}
-                <span className="font-mono text-secondary group-hover:text-accent transition-colors duration-150 leading-snug">
+                <span className="font-mono text-secondary group-hover:text-accent transition-colors duration-hover leading-snug">
                   {r.symbol}
                 </span>
                 {r.name && (
-                  <span className="text-[11px] text-muted truncate group-hover:text-secondary transition-colors duration-150 leading-snug">
+                  <span className="text-[11px] text-muted truncate group-hover:text-secondary transition-colors duration-hover leading-snug">
                     {r.name}
                   </span>
                 )}

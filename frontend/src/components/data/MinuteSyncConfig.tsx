@@ -83,12 +83,12 @@ export function MinuteSyncConfig({ hasCap, onJobStart }: { hasCap: boolean; onJo
           <button
             onClick={handleToggle}
             disabled={!hasMinuteCap}
-            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 shrink-0 ${
+            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-expand shrink-0 ${
               enabled ? 'bg-accent shadow-[0_0_6px_rgba(61,214,140,0.3)]' : 'bg-elevated'
             } ${!hasMinuteCap ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
           >
             <span
-              className={`inline-block h-3.5 w-3.5 rounded-full bg-white shadow-sm transition-transform duration-200 ${
+              className={`inline-block h-3.5 w-3.5 rounded-full bg-white shadow-sm transition-transform duration-expand ${
                 enabled ? 'translate-x-[18px]' : 'translate-x-0.5'
               }`}
             />
@@ -162,7 +162,7 @@ export function MinuteSyncConfig({ hasCap, onJobStart }: { hasCap: boolean; onJo
         <button
           onClick={() => handleFetch('40d')}
           disabled={!hasMinuteCap || fetchingMode !== ''}
-          className="inline-flex flex-col items-center justify-center gap-0.5 px-2 py-2 rounded-btn bg-accent/90 text-foreground text-xs font-medium hover:bg-accent disabled:opacity-40 transition-colors duration-150"
+          className="inline-flex flex-col items-center justify-center gap-0.5 px-2 py-2 rounded-btn bg-accent/90 text-foreground text-xs font-medium hover:bg-accent disabled:opacity-40 transition-colors duration-hover"
         >
           {fetchingMode === '40d' ? (
             <><Loader2 className="h-3.5 w-3.5 animate-spin" /><span>获取中…</span></>
@@ -173,7 +173,7 @@ export function MinuteSyncConfig({ hasCap, onJobStart }: { hasCap: boolean; onJo
         <button
           onClick={() => handleFetch('1y')}
           disabled={!hasMinuteCap || fetchingMode !== ''}
-          className="inline-flex flex-col items-center justify-center gap-0.5 px-2 py-2 rounded-btn border border-amber-400/40 bg-amber-400/10 text-amber-400 text-xs font-medium hover:bg-amber-400/20 disabled:opacity-40 transition-colors duration-150"
+          className="inline-flex flex-col items-center justify-center gap-0.5 px-2 py-2 rounded-btn border border-amber-400/40 bg-amber-400/10 text-amber-400 text-xs font-medium hover:bg-amber-400/20 disabled:opacity-40 transition-colors duration-hover"
         >
           {fetchingMode === '1y' ? (
             <><Loader2 className="h-3.5 w-3.5 animate-spin" /><span>分段获取中…</span></>
@@ -193,7 +193,7 @@ export function MinuteSyncConfig({ hasCap, onJobStart }: { hasCap: boolean; onJo
         onClick={() => setConfirmClear(true)}
         disabled={clearMutation.isPending}
         title="清空分钟K数据"
-        className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-btn border border-danger/30 text-danger/80 text-xs font-medium hover:bg-danger/10 disabled:opacity-40 transition-colors duration-150"
+        className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-btn border border-danger/30 text-danger/80 text-xs font-medium hover:bg-danger/10 disabled:opacity-40 transition-colors duration-hover"
       >
         <Trash2 className="h-3 w-3" />
         清空分钟K数据
@@ -210,9 +210,9 @@ export function MinuteSyncConfig({ hasCap, onJobStart }: { hasCap: boolean; onJo
             </div>
             <div className="flex items-center justify-center gap-3">
               <button onClick={() => setConfirmClear(false)} disabled={clearMutation.isPending}
-                className="px-4 py-1.5 rounded-btn bg-elevated text-secondary text-xs hover:bg-elevated/80 transition-colors duration-150">取消</button>
+                className="px-4 py-1.5 rounded-btn bg-elevated text-secondary text-xs hover:bg-elevated/80 transition-colors duration-hover">取消</button>
               <button onClick={() => clearMutation.mutate()} disabled={clearMutation.isPending}
-                className="px-4 py-1.5 rounded-btn bg-danger/90 text-foreground text-xs font-medium hover:bg-danger disabled:opacity-40 transition-colors duration-150">
+                className="px-4 py-1.5 rounded-btn bg-danger/90 text-foreground text-xs font-medium hover:bg-danger disabled:opacity-40 transition-colors duration-hover">
                 {clearMutation.isPending ? <span className="inline-flex items-center gap-1.5"><Loader2 className="h-3 w-3 animate-spin" />清空中…</span> : '确认清空'}
               </button>
             </div>

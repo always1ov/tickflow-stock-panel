@@ -602,7 +602,7 @@ export function Data() {
             <button
               onClick={() => adjGate.guard(() => startSync.mutate())}
               disabled={isStarting}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-btn bg-gradient-to-r from-accent/25 to-accent/10 border border-accent/30 text-accent text-xs font-medium hover:from-accent/35 hover:to-accent/20 disabled:opacity-40 transition-all duration-150"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-btn bg-gradient-to-r from-accent/25 to-accent/10 border border-accent/30 text-accent text-xs font-medium hover:from-accent/35 hover:to-accent/20 disabled:opacity-40 transition-all duration-hover"
             >
               {(isRunning || isStarting) ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -613,7 +613,7 @@ export function Data() {
             </button>
             <button
               onClick={() => setOpenSettings('pipeline-scope')}
-              className="inline-flex items-center gap-1 px-2 py-1 rounded-btn text-secondary hover:text-accent hover:bg-accent/8 text-xs transition-colors duration-150"
+              className="inline-flex items-center gap-1 px-2 py-1 rounded-btn text-secondary hover:text-accent hover:bg-accent/8 text-xs transition-colors duration-hover"
             >
               <CheckSquare className="h-3.5 w-3.5" />
               数据范围
@@ -621,7 +621,7 @@ export function Data() {
             <button
               onClick={() => setShowRepair(true)}
               disabled={!hasData || isRunning}
-              className="inline-flex items-center gap-1 px-2 py-1 rounded-btn text-secondary hover:text-accent hover:bg-accent/8 text-xs transition-colors duration-150 disabled:opacity-40 disabled:pointer-events-none"
+              className="inline-flex items-center gap-1 px-2 py-1 rounded-btn text-secondary hover:text-accent hover:bg-accent/8 text-xs transition-colors duration-hover disabled:opacity-40 disabled:pointer-events-none"
             >
               <WandSparkles className="h-3.5 w-3.5" />
               修正数据
@@ -630,21 +630,21 @@ export function Data() {
             <div className="flex items-center gap-1.5">
               <button
                 onClick={() => setShowCreateExt(true)}
-                className="inline-flex items-center gap-1 px-2 py-1 rounded-btn text-secondary hover:text-accent hover:bg-accent/8 text-xs transition-colors duration-150"
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-btn text-secondary hover:text-accent hover:bg-accent/8 text-xs transition-colors duration-hover"
               >
                 <Plus className="h-3.5 w-3.5" />
                 扩展数据
               </button>
               <button
                 onClick={() => setShowEndpointTest(true)}
-                className="inline-flex items-center gap-1 px-2 py-1 rounded-btn text-secondary hover:text-accent hover:bg-accent/8 text-xs transition-colors duration-150"
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-btn text-secondary hover:text-accent hover:bg-accent/8 text-xs transition-colors duration-hover"
               >
                 <Wifi className="h-3.5 w-3.5" />
                 测试端点
               </button>
               <button
                 onClick={() => setOpenSettings('page-settings')}
-                className="inline-flex items-center gap-1 px-2 py-1 rounded-btn text-secondary hover:text-accent hover:bg-accent/8 text-xs transition-colors duration-150"
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-btn text-secondary hover:text-accent hover:bg-accent/8 text-xs transition-colors duration-hover"
               >
                 <SlidersHorizontal className="h-3.5 w-3.5" />
                 页面设置
@@ -652,7 +652,7 @@ export function Data() {
               <div className="w-px h-4 bg-border" />
               <Link
                 to="/settings?tab=data-sources&highlight=data-sources"
-                className="inline-flex items-center gap-1 px-2 py-1 rounded-btn text-secondary hover:text-accent hover:bg-accent/8 text-xs transition-colors duration-150"
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-btn text-secondary hover:text-accent hover:bg-accent/8 text-xs transition-colors duration-hover"
                 title="切换数据源"
               >
                 <Database className="h-3.5 w-3.5" />
@@ -661,7 +661,7 @@ export function Data() {
               <button
                 onClick={() => setShowClearConfirm(true)}
                 disabled={isRunning}
-                className="inline-flex items-center gap-1 px-2 py-1 rounded-btn text-muted hover:text-danger hover:bg-danger/8 text-xs transition-colors duration-150 disabled:opacity-40 disabled:pointer-events-none"
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-btn text-muted hover:text-danger hover:bg-danger/8 text-xs transition-colors duration-hover disabled:opacity-40 disabled:pointer-events-none"
               >
                 <Trash2 className="h-3.5 w-3.5" />
                 清除数据
@@ -1157,7 +1157,7 @@ export function Data() {
                 <button
                   onClick={() => syncIndexDaily.mutate()}
                   disabled={!hasDailyBatchCap || !!activeJobId || syncIndexDaily.isPending}
-                  className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-btn bg-accent/90 text-base text-xs font-medium hover:bg-accent disabled:opacity-40 disabled:pointer-events-none transition-colors duration-150"
+                  className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-btn bg-accent/90 text-base text-xs font-medium hover:bg-accent disabled:opacity-40 disabled:pointer-events-none transition-colors duration-hover"
                 >
                   {syncIndexDaily.isPending ? (
                     <>

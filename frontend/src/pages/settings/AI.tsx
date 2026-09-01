@@ -325,7 +325,7 @@ export function SettingsAIPanel({ highlight }: { highlight?: string } = {}) {
       <Card icon={Plug} title="连接状态" anchor="ai-connection" right={
         (profilesManaged ? enabledProfiles.length > 0 : configured) && (
           <button onClick={handleTest} disabled={testing}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-btn bg-elevated hover:bg-elevated/80 text-xs text-secondary transition-colors duration-150 ease-smooth disabled:opacity-50">
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-btn bg-elevated hover:bg-elevated/80 text-xs text-secondary transition-colors duration-hover ease-smooth disabled:opacity-50">
             {testing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Wifi className="h-3 w-3" />}
             {testing ? '测试中' : '测试'}
           </button>
@@ -588,10 +588,10 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: () => void 
     <button
       type="button"
       onClick={onChange}
-      className={`relative inline-flex h-5 w-9 items-center rounded-full shrink-0 transition-colors duration-200 ${checked ? 'bg-accent' : 'bg-elevated'}`}
+      className={`relative inline-flex h-5 w-9 items-center rounded-full shrink-0 transition-colors duration-expand ${checked ? 'bg-accent' : 'bg-elevated'}`}
       aria-pressed={checked}
     >
-      <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white shadow-sm transition-transform duration-200 ${checked ? 'translate-x-[18px]' : 'translate-x-[3px]'}`} />
+      <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white shadow-sm transition-transform duration-expand ${checked ? 'translate-x-[18px]' : 'translate-x-[3px]'}`} />
     </button>
   )
 }

@@ -85,7 +85,7 @@ export function StockIntradayChart({
               <div className="text-xs text-muted">该日暂无分钟数据（数据源未提供）</div>
               <button
                 onClick={() => fetchMinute.mutate()}
-                className="px-4 py-1.5 rounded-btn bg-elevated text-secondary text-xs font-medium hover:bg-elevated/80 transition-colors duration-150"
+                className="px-4 py-1.5 rounded-btn bg-elevated text-secondary text-xs font-medium hover:bg-elevated/80 transition-colors duration-hover"
               >
                 重新获取
               </button>
@@ -95,7 +95,7 @@ export function StockIntradayChart({
               <div className="text-xs text-muted">暂无分钟数据</div>
               <button
                 onClick={() => setMinuteDismissed(false)}
-                className="px-4 py-1.5 rounded-btn bg-accent/90 text-base text-xs font-medium hover:bg-accent transition-colors duration-150"
+                className="px-4 py-1.5 rounded-btn bg-accent/90 text-base text-xs font-medium hover:bg-accent transition-colors duration-hover"
               >
                 获取分钟K
               </button>
@@ -106,13 +106,13 @@ export function StockIntradayChart({
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => fetchMinute.mutate()}
-                  className="px-4 py-1.5 rounded-btn bg-accent/90 text-base text-xs font-medium hover:bg-accent transition-colors duration-150"
+                  className="px-4 py-1.5 rounded-btn bg-accent/90 text-base text-xs font-medium hover:bg-accent transition-colors duration-hover"
                 >
                   确定
                 </button>
                 <button
                   onClick={() => setMinuteDismissed(true)}
-                  className="px-4 py-1.5 rounded-btn bg-elevated text-secondary text-xs hover:bg-elevated/80 transition-colors duration-150"
+                  className="px-4 py-1.5 rounded-btn bg-elevated text-secondary text-xs hover:bg-elevated/80 transition-colors duration-hover"
                 >
                   取消
                 </button>

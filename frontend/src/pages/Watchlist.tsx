@@ -305,7 +305,7 @@ function StockSearchBox({
           onChange={(e) => { setQuery(e.target.value); setOpen(true); setActiveIdx(-1) }}
           onFocus={() => { if (query.trim()) setOpen(true) }}
           onKeyDown={handleKeyDown}
-          className="w-44 h-8 pl-8 pr-2.5 rounded-btn bg-elevated border border-border text-xs text-foreground placeholder:text-muted focus:outline-none focus:border-accent/50 focus:w-56 transition-all duration-200"
+          className="w-44 h-8 pl-8 pr-2.5 rounded-btn bg-elevated border border-border text-xs text-foreground placeholder:text-muted focus:outline-none focus:border-accent/50 focus:w-56 transition-all duration-expand"
         />
       </div>
 
@@ -324,7 +324,7 @@ function StockSearchBox({
               return (
                 <div
                   key={r.symbol}
-                  className={`flex items-center gap-2.5 px-3 py-2 text-xs transition-colors duration-100 ${
+                  className={`flex items-center gap-2.5 px-3 py-2 text-xs transition-colors duration-press ${
                     i === activeIdx ? 'bg-accent/10 text-accent' : 'hover:bg-elevated text-foreground'
                   }`}
                 >
@@ -511,7 +511,7 @@ const StockCard = React.memo(function StockCard({
 
   return (
     <div
-      className={`relative rounded-lg border border-border bg-surface hover:border-border/80 transition-all duration-200 group cursor-pointer overflow-hidden ${bgGlow}`}
+      className={`relative rounded-lg border border-border bg-surface hover:border-border/80 transition-all duration-expand group cursor-pointer overflow-hidden ${bgGlow}`}
       onClick={() => onPreview(r.symbol, name ?? '')}
     >
       {/* 左侧彩色指示条 */}
@@ -542,7 +542,7 @@ const StockCard = React.memo(function StockCard({
             />
             <button
               onClick={() => onRequestRemove(r.symbol)}
-              className="opacity-0 group-hover:opacity-100 text-muted hover:text-danger transition-all duration-150 p-0.5 rounded hover:bg-elevated"
+              className="opacity-0 group-hover:opacity-100 text-muted hover:text-danger transition-all duration-hover p-0.5 rounded hover:bg-elevated"
               aria-label="移除"
             >
               <Trash2 className="h-3.5 w-3.5" />
@@ -1421,7 +1421,7 @@ export function Watchlist() {
             {/* 筛选 / 重置 / 搜索 */}
             <button
               onClick={() => setFilterOpen(v => !v)}
-              className={`inline-flex items-center justify-center h-8 w-8 rounded-btn transition-colors duration-150 ease-smooth ${
+              className={`inline-flex items-center justify-center h-8 w-8 rounded-btn transition-colors duration-hover ease-smooth ${
                 filterOpen || hasActiveFilters
                   ? 'bg-accent/15 text-accent hover:bg-accent/25'
                   : 'bg-elevated text-secondary hover:bg-elevated/80'
@@ -1433,7 +1433,7 @@ export function Watchlist() {
             {hasActiveFilters && (
               <button
                 onClick={resetAllFilters}
-                className="inline-flex items-center justify-center h-8 w-8 rounded-btn bg-elevated text-secondary hover:bg-danger/10 hover:text-danger transition-colors duration-150 ease-smooth"
+                className="inline-flex items-center justify-center h-8 w-8 rounded-btn bg-elevated text-secondary hover:bg-danger/10 hover:text-danger transition-colors duration-hover ease-smooth"
                 title="重置全部筛选"
                 aria-label="重置全部筛选"
               >
@@ -1456,7 +1456,7 @@ export function Watchlist() {
                 setImportOpen(true)
               }}
               disabled={ocrAvailable === false}
-              className="inline-flex items-center justify-center h-8 w-8 rounded-btn bg-elevated hover:bg-elevated/80 text-secondary hover:text-foreground transition-colors duration-150 ease-smooth disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-elevated disabled:hover:text-secondary"
+              className="inline-flex items-center justify-center h-8 w-8 rounded-btn bg-elevated hover:bg-elevated/80 text-secondary hover:text-foreground transition-colors duration-hover ease-smooth disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-elevated disabled:hover:text-secondary"
               title={
                 ocrAvailable === false
                   ? ocrInstallHint || 'OCR 不可用，请先安装 Tesseract'
@@ -1469,7 +1469,7 @@ export function Watchlist() {
             <button
               onClick={() => aiGroupMut.mutate()}
               disabled={aiGroupMut.isPending || rows.length < 4}
-              className="inline-flex items-center justify-center h-8 w-8 rounded-btn bg-elevated hover:bg-elevated/80 text-secondary hover:text-violet-300 transition-colors duration-150 ease-smooth disabled:opacity-40 disabled:cursor-not-allowed"
+              className="inline-flex items-center justify-center h-8 w-8 rounded-btn bg-elevated hover:bg-elevated/80 text-secondary hover:text-violet-300 transition-colors duration-hover ease-smooth disabled:opacity-40 disabled:cursor-not-allowed"
               title="AI 一键分组:按题材把自选归拢成几组(先出方案,确认后才应用)"
             >
               {aiGroupMut.isPending
@@ -1480,7 +1480,7 @@ export function Watchlist() {
             {/* 视图 */}
             <button
               onClick={toggleView}
-              className="inline-flex items-center justify-center h-8 w-8 rounded-btn bg-elevated hover:bg-elevated/80 text-secondary hover:text-foreground transition-colors duration-150 ease-smooth"
+              className="inline-flex items-center justify-center h-8 w-8 rounded-btn bg-elevated hover:bg-elevated/80 text-secondary hover:text-foreground transition-colors duration-hover ease-smooth"
               title={viewMode === 'table' ? '卡片视图' : '列表视图'}
             >
               {viewMode === 'table' ? <LayoutGrid className="h-4 w-4" /> : <List className="h-4 w-4" />}
@@ -1489,7 +1489,7 @@ export function Watchlist() {
             <button
               onClick={toggleGroupView}
               aria-pressed={groupCardsOpen}
-              className={`inline-flex items-center justify-center h-8 w-8 rounded-btn transition-colors duration-150 ease-smooth ${
+              className={`inline-flex items-center justify-center h-8 w-8 rounded-btn transition-colors duration-hover ease-smooth ${
                 groupCardsOpen
                   ? 'bg-accent/15 text-accent hover:bg-accent/25'
                   : 'bg-elevated text-secondary hover:bg-elevated/80 hover:text-foreground'
@@ -1503,7 +1503,7 @@ export function Watchlist() {
             <button
               onClick={toggleGroupStats}
               aria-pressed={groupStatsOpen}
-              className={`inline-flex items-center justify-center h-8 w-8 rounded-btn transition-colors duration-150 ease-smooth ${
+              className={`inline-flex items-center justify-center h-8 w-8 rounded-btn transition-colors duration-hover ease-smooth ${
                 groupStatsOpen
                   ? 'bg-accent/15 text-accent hover:bg-accent/25'
                   : 'bg-elevated text-secondary hover:bg-elevated/80 hover:text-foreground'
@@ -1517,7 +1517,7 @@ export function Watchlist() {
             {/* 自定义列 / 刷新 */}
             <button
               onClick={() => setCustomizerOpen(true)}
-              className="inline-flex items-center justify-center h-8 w-8 rounded-btn bg-elevated hover:bg-elevated/80 text-secondary hover:text-foreground transition-colors duration-150 ease-smooth"
+              className="inline-flex items-center justify-center h-8 w-8 rounded-btn bg-elevated hover:bg-elevated/80 text-secondary hover:text-foreground transition-colors duration-hover ease-smooth"
               title="自定义列"
             >
               <Settings2 className="h-4 w-4" />
@@ -1525,7 +1525,7 @@ export function Watchlist() {
             <button
               onClick={() => enriched.refetch()}
               disabled={enriched.isFetching}
-              className="inline-flex items-center justify-center h-8 w-8 rounded-btn bg-elevated hover:bg-elevated/80 text-secondary hover:text-foreground transition-colors duration-150 ease-smooth disabled:opacity-50"
+              className="inline-flex items-center justify-center h-8 w-8 rounded-btn bg-elevated hover:bg-elevated/80 text-secondary hover:text-foreground transition-colors duration-hover ease-smooth disabled:opacity-50"
               title="刷新"
             >
               <RefreshCw className={`h-4 w-4 ${enriched.isFetching ? 'animate-spin' : ''}`} />
@@ -1535,7 +1535,7 @@ export function Watchlist() {
                 <div className="w-px h-5 bg-border" />
                 <button
                   onClick={() => setConfirmClear(true)}
-                  className="inline-flex items-center justify-center h-8 w-8 rounded-btn bg-danger/10 text-danger hover:bg-danger/20 transition-colors duration-150 ease-smooth"
+                  className="inline-flex items-center justify-center h-8 w-8 rounded-btn bg-danger/10 text-danger hover:bg-danger/20 transition-colors duration-hover ease-smooth"
                   title="清空自选"
                 >
                   <Trash2 className="h-4 w-4" />
@@ -1713,7 +1713,7 @@ export function Watchlist() {
               onSortToggle={handleSortToggle}
               extraSortableKeys={INTRADAY_SORTABLE_KEYS}
               rowKey={(r: any) => r.symbol}
-              rowClassName={() => 'border-t border-border hover:bg-elevated/50 transition-colors duration-150 ease-smooth'}
+              rowClassName={() => 'border-t border-border hover:bg-elevated/50 transition-colors duration-hover ease-smooth'}
               // 日k列表头：标签 + 显示/隐藏眼睛按钮
               renderHeaderContent={(col) => {
                 if (col.source.type === 'builtin' && col.source.key === 'candle') {
@@ -1796,11 +1796,11 @@ export function Watchlist() {
                           onClick={() => { setPreviewSymbol(r.symbol); setPreviewName(name ?? '') }}
                           className="flex items-center gap-1 text-left min-w-0"
                         >
-                          <span className="font-mono text-foreground text-xs group-hover:text-accent transition-colors duration-150">
+                          <span className="font-mono text-foreground text-xs group-hover:text-accent transition-colors duration-hover">
                             {r.symbol}
                           </span>
                           {name && (
-                            <span className="text-xs text-secondary truncate group-hover:text-foreground transition-colors duration-150">
+                            <span className="text-xs text-secondary truncate group-hover:text-foreground transition-colors duration-hover">
                               {name}
                             </span>
                           )}
@@ -1841,7 +1841,7 @@ export function Watchlist() {
                                 <button
                                   onClick={() => handleToggleMember(r.symbol, selectedGroup, false)}
                                   disabled={addGroupMember.isPending || removeGroupMember.isPending}
-                                  className="p-0.5 text-muted hover:text-warning transition-colors duration-150 ease-smooth disabled:opacity-50"
+                                  className="p-0.5 text-muted hover:text-warning transition-colors duration-hover ease-smooth disabled:opacity-50"
                                   aria-label="移出当前分组"
                                   title="移出当前分组（仍保留在自选中）"
                                 >
@@ -1850,7 +1850,7 @@ export function Watchlist() {
                               )}
                               <button
                                 onClick={() => setConfirmRemove(r.symbol)}
-                                className="p-0.5 text-muted hover:text-danger transition-colors duration-150 ease-smooth"
+                                className="p-0.5 text-muted hover:text-danger transition-colors duration-hover ease-smooth"
                                 aria-label="移除"
                                 title="从自选移除"
                               >
@@ -1859,7 +1859,7 @@ export function Watchlist() {
                               <button
                                 onClick={() => moveToTop.mutate(r.symbol)}
                                 disabled={moveToTop.isPending || allSymbols[0] === r.symbol}
-                                className="p-0.5 text-muted hover:text-accent transition-colors duration-150 ease-smooth disabled:opacity-30 disabled:hover:text-muted"
+                                className="p-0.5 text-muted hover:text-accent transition-colors duration-hover ease-smooth disabled:opacity-30 disabled:hover:text-muted"
                                 aria-label="移到顶部"
                                 title="移到顶部"
                               >

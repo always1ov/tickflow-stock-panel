@@ -976,7 +976,7 @@ export function Screener() {
                     <div className="inline-flex items-stretch h-7 rounded-btn border border-border bg-surface overflow-hidden">
                       <button
                         onClick={() => setShowFilter(v => !v)}
-                        className={`inline-flex items-center gap-1.5 px-2.5 text-xs font-medium transition-colors duration-150 cursor-pointer
+                        className={`inline-flex items-center gap-1.5 px-2.5 text-xs font-medium transition-colors duration-hover cursor-pointer
                           ${filterActive(filter)
                             ? 'bg-accent/15 text-accent'
                             : showFilter
@@ -1002,7 +1002,7 @@ export function Screener() {
                             }}
                             title="清空筛选条件"
                             className="inline-flex items-center gap-1 px-2 text-muted
-                              hover:bg-danger/10 hover:text-danger transition-colors duration-150 cursor-pointer"
+                              hover:bg-danger/10 hover:text-danger transition-colors duration-hover cursor-pointer"
                           >
                             <RotateCcw className="h-3 w-3" />
                           </button>

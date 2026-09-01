@@ -481,7 +481,7 @@ function PluginKeyConfig({ plugin }: { plugin: PluginDataSourceItem }) {
           <button
             onClick={() => clear.mutate()}
             disabled={clear.isPending}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-btn bg-elevated text-secondary hover:text-danger text-xs transition-colors duration-150 ease-smooth disabled:opacity-50 shrink-0"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-btn bg-elevated text-secondary hover:text-danger text-xs transition-colors duration-hover ease-smooth disabled:opacity-50 shrink-0"
           >
             <Trash2 className="h-3 w-3" />
             清除
@@ -501,12 +501,12 @@ function PluginKeyConfig({ plugin }: { plugin: PluginDataSourceItem }) {
             value={keyInput}
             onChange={(e) => { setKeyInput(e.target.value); if (saved) setSaved(false) }}
             autoComplete="off"
-            className="w-full px-3 py-2 pr-9 rounded-input bg-base border border-border text-sm font-mono focus:outline-none focus:border-accent transition-colors duration-150 ease-smooth"
+            className="w-full px-3 py-2 pr-9 rounded-input bg-base border border-border text-sm font-mono focus:outline-none focus:border-accent transition-colors duration-hover ease-smooth"
           />
           <button
             type="button"
             onClick={() => setRevealing((v) => !v)}
-            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted hover:text-foreground transition-colors duration-150 ease-smooth"
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted hover:text-foreground transition-colors duration-hover ease-smooth"
             tabIndex={-1}
             aria-label={revealing ? '隐藏' : '显示'}
           >
@@ -1116,7 +1116,7 @@ function TickFlowDetail({ active, matrix }: { active: boolean; matrix?: Capabili
         onClick={() => redetect.mutate()}
         disabled={redetect.isPending}
         title="根据 API Key 重新检测订阅档位"
-        className="inline-flex h-5 w-5 items-center justify-center rounded text-muted/60 hover:text-foreground hover:bg-elevated/70 transition-colors duration-150"
+        className="inline-flex h-5 w-5 items-center justify-center rounded text-muted/60 hover:text-foreground hover:bg-elevated/70 transition-colors duration-hover"
       >
         <RefreshCw className={`h-3 w-3 ${redetect.isPending ? 'animate-spin' : ''}`} />
       </button>
@@ -1127,7 +1127,7 @@ function TickFlowDetail({ active, matrix }: { active: boolean; matrix?: Capabili
         <span className="flex h-5 w-5 items-center justify-center rounded text-muted/60 transition-colors group-hover/caps:text-foreground">
           <ListChecks className="h-3 w-3" />
         </span>
-        <div className="invisible absolute right-0 top-full z-20 pt-1.5 opacity-0 transition-all duration-150 group-hover/caps:visible group-hover/caps:opacity-100">
+        <div className="invisible absolute right-0 top-full z-20 pt-1.5 opacity-0 transition-all duration-hover group-hover/caps:visible group-hover/caps:opacity-100">
           <div className="w-64 rounded-md border border-border bg-surface py-2 pl-3 pr-3.5 shadow-2xl shadow-black/40">
             <div className="mb-1.5 flex items-center justify-between">
               <span className="text-xs font-medium text-foreground">可用功能</span>

@@ -504,8 +504,8 @@ function IntradayRowView({ row, rank, onPreview }: {
           title="查看个股详情"
           className="flex min-w-0 items-center gap-1.5 text-left"
         >
-          <span className="shrink-0 font-mono text-xs text-foreground transition-colors duration-150 group-hover:text-accent">{row.symbol}</span>
-          <span className="min-w-0 max-w-40 truncate text-xs text-secondary transition-colors duration-150 group-hover:text-foreground">{row.name ?? '—'}</span>
+          <span className="shrink-0 font-mono text-xs text-foreground transition-colors duration-hover group-hover:text-accent">{row.symbol}</span>
+          <span className="min-w-0 max-w-40 truncate text-xs text-secondary transition-colors duration-hover group-hover:text-foreground">{row.name ?? '—'}</span>
           {board && (
             <span className={`shrink-0 rounded border px-1 text-[9px] font-bold leading-tight ${board.color}`}>
               {board.label}
@@ -942,8 +942,8 @@ function AbnormalRowView({ row, rank, onPreview }: {
           title="查看个股详情"
           className="flex min-w-0 items-center gap-1.5 text-left"
         >
-          <span className="shrink-0 font-mono text-xs text-foreground group-hover:text-accent transition-colors duration-150">{row.symbol}</span>
-          <span className="min-w-0 max-w-40 truncate text-xs text-secondary group-hover:text-foreground transition-colors duration-150">{row.name ?? '—'}</span>
+          <span className="shrink-0 font-mono text-xs text-foreground group-hover:text-accent transition-colors duration-hover">{row.symbol}</span>
+          <span className="min-w-0 max-w-40 truncate text-xs text-secondary group-hover:text-foreground transition-colors duration-hover">{row.name ?? '—'}</span>
           {board && (
             <span className={`shrink-0 rounded px-1 text-[9px] font-bold leading-tight border ${board.color}`}>
               {board.label}

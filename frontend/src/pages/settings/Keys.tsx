@@ -144,7 +144,7 @@ export function TickFlowKeySection({ right }: { right?: React.ReactNode }) {
           <button
             onClick={() => setConfirmClear(true)}
             disabled={clear.isPending}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-btn bg-elevated text-secondary hover:text-danger text-xs transition-colors duration-150 ease-smooth disabled:opacity-50 shrink-0"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-btn bg-elevated text-secondary hover:text-danger text-xs transition-colors duration-hover ease-smooth disabled:opacity-50 shrink-0"
           >
             <Trash2 className="h-3 w-3" />
             清除
@@ -166,12 +166,12 @@ export function TickFlowKeySection({ right }: { right?: React.ReactNode }) {
             placeholder={mode === 'none' ? '粘贴 TickFlow API Key' : '粘贴新 Key 替换当前'}
             value={keyInput}
             onChange={(e) => { setKeyInput(e.target.value); if (saved) setSaved(false) }}
-            className="w-full px-3 py-2 pr-9 rounded-input bg-base border border-border text-sm font-mono focus:outline-none focus:border-accent transition-colors duration-150 ease-smooth"
+            className="w-full px-3 py-2 pr-9 rounded-input bg-base border border-border text-sm font-mono focus:outline-none focus:border-accent transition-colors duration-hover ease-smooth"
           />
           <button
             type="button"
             onClick={() => setRevealing((v) => !v)}
-            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted hover:text-foreground transition-colors duration-150 ease-smooth"
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted hover:text-foreground transition-colors duration-hover ease-smooth"
             tabIndex={-1}
             aria-label={revealing ? '隐藏' : '显示'}
           >

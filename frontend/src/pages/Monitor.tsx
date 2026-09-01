@@ -417,7 +417,7 @@ function AlertsList({ alertsQuery, confirmClear, setConfirmClear, total, enterTs
                 } : { opacity: 1, y: 0 }}
                 transition={isNew ? { duration: 1.2, times: [0, 0.2, 0.5, 0.75, 1] } : { duration: 0.2, delay: Math.min(i * 0.02, 0.2) }}
                 className={cn(
-                  'group relative flex items-start gap-3 overflow-hidden rounded-lg border bg-surface pl-3.5 pr-3 py-2.5 shadow-sm transition-all duration-200 hover:border-border hover:shadow-md hover:shadow-black/10 hover:-translate-y-px',
+                  'group relative flex items-start gap-3 overflow-hidden rounded-lg border bg-surface pl-3.5 pr-3 py-2.5 shadow-sm transition-all duration-expand hover:border-border hover:shadow-md hover:shadow-black/10 hover:-translate-y-px',
                   isNew ? 'border-accent/60 ring-1 ring-accent/30' : 'border-border/50',
                 )}
               >
@@ -783,7 +783,7 @@ function RulesList({ rulesQuery, onEdit }: {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.2 }}
               className={cn(
-                'group relative overflow-hidden rounded-lg border pl-3.5 pr-2.5 py-2 shadow-sm transition-all duration-200 hover:shadow-md hover:shadow-black/10',
+                'group relative overflow-hidden rounded-lg border pl-3.5 pr-2.5 py-2 shadow-sm transition-all duration-expand hover:shadow-md hover:shadow-black/10',
                 r.enabled
                   ? 'border-border/50 bg-surface hover:border-accent/30'
                   : 'border-border/30 bg-surface/40 opacity-70 hover:opacity-100',

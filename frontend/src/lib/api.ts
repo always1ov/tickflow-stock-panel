@@ -168,6 +168,10 @@ export interface TodayOpportunity {
   board?: string
   /** [R47] 三档通道结论; 三档都在中部时为 null。与决策台「结论」列同一份 */
   verdict?: KeltnerVerdict | null
+  /** [R123] 量比 —— 突破是不是真的(也是 AI 优选的核心判据, 摆成列好让用户自己核) */
+  vol_ratio?: number | null
+  /** [R123] 现价距触发价还差几个点; 负数 = 已越过。回答"今天能不能动手" */
+  gap_pct?: number | null
 }
 
 /**

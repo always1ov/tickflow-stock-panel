@@ -22,7 +22,7 @@ export function HistoryRow({ job, onClick }: { job: any; onClick: () => void }) 
   return (
     <button
       onClick={onClick}
-      className="w-full px-5 py-3 hover:bg-elevated/50 transition-colors duration-150 ease-smooth text-left flex items-center justify-between gap-4"
+      className="w-full px-5 py-3 hover:bg-elevated/50 transition-colors duration-hover ease-smooth text-left flex items-center justify-between gap-4"
     >
       <div className="flex items-center gap-3 min-w-0">
         <Icon className={`h-4 w-4 shrink-0 ${statusIcon.color} ${(statusIcon as any).spinning ? 'animate-spin' : ''}`} />

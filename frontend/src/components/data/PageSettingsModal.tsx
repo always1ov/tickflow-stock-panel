@@ -242,6 +242,7 @@ function SortableCardRow({
         }`}
         role="checkbox"
         aria-checked={on}
+        aria-label={`${on ? '隐藏' : '显示'}「${label}」列`}
       >
         {on && <Check className="h-3 w-3 text-white" strokeWidth={3} />}
       </button>

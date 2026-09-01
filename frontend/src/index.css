@@ -139,3 +139,38 @@ body {
   background: hsl(var(--accent) / 0.28);
   color: hsl(var(--fg-primary));
 }
+
+/* ===== [R124] 全项目无障碍与动效基线 =====
+ * 按用户提供的 frontend-design skill §7(可访问性)/§4(动效)统一补齐。
+ * 放在全局层是有意的: 161 个 tsx 里此前只有 2 个文件写过 focus-visible,
+ * 逐个组件补既漏又不一致 —— 一条全局规则覆盖所有交互元素, 新页面天然继承。
+ */
+
+/* 键盘焦点环 —— 只在键盘导航时出现(:focus-visible), 鼠标点击不显示,
+ * 所以不会打扰鼠标用户, 但 Tab 走查时每一步都看得见自己在哪。
+ *
+ * 为什么用 !important(全项目仅此一处): 代码里有 130 处 `focus:outline-none`
+ * (40 个文件), 而其中只有 2 处补了自己的 focus-visible 环。Tailwind 那个工具类
+ * 的选择器权重(0,2,0)高于这里的 :where(0,1,0), 不加 !important 的话这条规则会被
+ * 静默盖掉 —— 焦点指示器是 WCAG 2.4.7 的硬要求, 恰恰不该允许被随手覆盖。
+ * 组件想用自己的环, 加 .focus-ring-custom 显式退出。 */
+:where(a, button, [role='button'], [role='switch'], [role='tab'],
+       input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid hsl(var(--accent) / 0.75) !important;
+  outline-offset: 2px;
+}
+/* 自带 ring 的组件(Toast/开关)显式退出, 避免环与轮廓叠两层 */
+.focus-ring-custom:focus-visible { outline: none !important; }
+
+/* 尊重系统「减少动态效果」设置 —— 前庭功能敏感的用户会打开它。
+ * 不是关掉动画了事: 保留极短时长, 状态切换仍可感知, 只是不再有位移与缩放。 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

@@ -40,7 +40,7 @@ export function ToastContainer() {
       {items.map(t => (
         <div
           key={t.id}
-          className={`pointer-events-auto px-4 py-2.5 rounded-lg shadow-lg text-sm font-medium animate-in slide-in-from-bottom-2 fade-in duration-200 ${
+          className={`pointer-events-auto px-4 py-2.5 rounded-lg shadow-lg text-sm font-medium animate-in slide-in-from-bottom-2 fade-in duration-expand ${
             t.kind === 'error'
               ? 'bg-red-500/90 text-white'
               : 'bg-emerald-500/90 text-white'

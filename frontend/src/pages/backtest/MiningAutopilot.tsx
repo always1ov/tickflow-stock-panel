@@ -445,7 +445,7 @@ function IterationRow({ it, open, onToggle }: {
       {/* 进度条: 后端给了百分比才画; 给不出就只有上面那行文字, 不画一根假的匀速条 */}
       {running && typeof pct0 === 'number' && (
         <div className="mx-3 mb-2 h-1 overflow-hidden rounded-full bg-border">
-          <div className="h-full rounded-full bg-accent transition-[width] duration-500"
+          <div className="h-full rounded-full bg-accent transition-[width] duration-enter"
             style={{ width: `${Math.min(100, Math.max(0, pct0))}%` }} />
         </div>
       )}
