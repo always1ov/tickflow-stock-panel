@@ -1,5 +1,9 @@
 @import '@fontsource/jetbrains-mono/latin-400.css';
 @import '@fontsource/jetbrains-mono/latin-500.css';
+/* [R153] 600/700 补齐: 原来这两档靠 index.html 里的 Google Fonts 链接供给,
+ * 那条链接去掉后(渲染阻塞 + 国内不通), 等宽字体的 semibold/bold 改由本地出。 */
+@import '@fontsource/jetbrains-mono/latin-600.css';
+@import '@fontsource/jetbrains-mono/latin-700.css';
 /* 只声明 latin 一片: index.css 会带上西里尔/希腊/越南语等 5 个分片(176KB),
  * 一个 A 股面板永远用不到。浏览器靠 unicode-range 本来就不会去下载它们,
  * 但没必要让它们进产物。 */

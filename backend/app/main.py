@@ -9,7 +9,6 @@ from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
-from fastapi.staticfiles import StaticFiles
 
 from app import __version__
 from app.api import (
@@ -575,7 +574,10 @@ async def paper_store_error_handler(request: Request, exc: _PaperStoreError) -> 
 _static = Path(settings.static_dir)
 if _static.exists():
     if (_static / "assets").exists():
-        app.mount("/assets", StaticFiles(directory=_static / "assets"), name="assets")
+        # [fork R153] 带 hash 的产物: 一年 immutable 缓存 + 构建期预压缩直出。
+        # 见 app/static_assets.py。API 路径不受影响。
+        from app.static_assets import HashedAssets
+        app.mount("/assets", HashedAssets(directory=_static / "assets"), name="assets")
 
     @app.get("/{full_path:path}", include_in_schema=False)
     def spa_fallback(full_path: str):  # noqa: ARG001

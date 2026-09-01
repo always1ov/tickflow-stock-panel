@@ -78,12 +78,7 @@ const CORE_ROUTE_PATHS = new Set([
   '/settings/queries',
 ])
 
-finalizeFrontendExtensions(CORE_ROUTE_PATHS)
-const frontendExtensionRoutes = getFrontendExtensionRoutes()
-const frontendExtensionErrors = getFrontendExtensionLoadErrors()
-if (frontendExtensionErrors.length > 0) {
-  console.error('部分前端扩展加载失败', frontendExtensionErrors)
-}
+// [R153] 扩展注册表的 finalize / 取路由挪进了 createAppRouter() —— 见文件尾。
 
 // 首次使用守卫 —— 未完成向导则重定向到 /onboarding
 // 只挂在根路由上;/onboarding 本身不被守卫,避免循环重定向。
@@ -113,7 +108,19 @@ function OnboardingGuard({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
-export const router = createBrowserRouter([
+// [R153] 从「模块顶层立即建路由」改成「调用时建」。
+// 目的是让 main.tsx 可以**静态** import 本模块 —— Vite 因此把它并进入口 chunk,
+// 浏览器少一次"先下入口、执行到 import() 才知道还要下路由"的串行往返。
+// 顺序约束没变: 扩展注册表必须先 load 完再 finalize —— 原来靠"动态 import 排在
+// await 之后"保证, 现在靠"main.tsx 在 await 之后才调用本函数"保证, 更直白。
+export function createAppRouter() {
+  finalizeFrontendExtensions(CORE_ROUTE_PATHS)
+  const frontendExtensionRoutes = getFrontendExtensionRoutes()
+  const frontendExtensionErrors = getFrontendExtensionLoadErrors()
+  if (frontendExtensionErrors.length > 0) {
+    console.error('部分前端扩展加载失败', frontendExtensionErrors)
+  }
+  return createBrowserRouter([
   { path: '/onboarding', element: <Onboarding /> },
   { path: '/login', element: <Auth /> },
   {
@@ -172,4 +179,5 @@ export const router = createBrowserRouter([
       }),
     ],
   },
-])
+  ])
+}

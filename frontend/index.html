@@ -19,11 +19,10 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="theme-color" content="#8B5CF6" />
     <title>牛来 · Quant Terminal</title>
-    <link rel="preconnect" href="https://rsms.me/" />
-    <link rel="stylesheet" href="https://rsms.me/inter/inter.css" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <!-- [fork R153] 字体不再从 rsms.me / fonts.googleapis.com 拉取。
+         两套字体(Inter Variable / JetBrains Mono)本来就已经通过 @fontsource 打进
+         index.css 本地供给了, 这两个 <link rel="stylesheet"> 是纯冗余 —— 而且它们
+         是**渲染阻塞**的: 国内访问这两个域名慢或不通时, 首屏要干等到超时才画。 -->
   </head>
   <body class="bg-base text-foreground">
     <div id="root"></div>
