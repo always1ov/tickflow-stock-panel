@@ -744,7 +744,7 @@ export function Dashboard() {
           <Gauge className="h-4 w-4 text-accent" />
           <h1 className="text-base font-semibold text-foreground">市场看板</h1>
           <span
-            className="rounded-full border px-2 py-0.5 text-[10px] font-medium"
+            className="rounded-btn border px-2 py-0.5 text-[10px] font-medium"
             style={{
               color: scoreColor(score),
               borderColor: `${scoreColor(score)}40`,

@@ -287,7 +287,7 @@ export function ExtDimensionAnalysis({
       <div className="px-8 py-6 space-y-6 max-w-7xl">
         <section className={`relative overflow-hidden rounded-2xl border border-border bg-surface p-6 ${accentClass}`}>
           <div className="relative z-10 max-w-3xl">
-            <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[11px] text-secondary">
+            <div className="inline-flex items-center gap-2 rounded-btn border border-white/10 bg-white/[0.04] px-3 py-1 text-[11px] text-secondary">
               <Layers3 className="h-3.5 w-3.5" />
               扩展数据驱动 · 菜单可配置 · 列动态渲染
             </div>
@@ -386,7 +386,7 @@ export function ExtDimensionAnalysis({
                   <div>
                     <div className="flex items-center gap-2">
                       <h3 className="text-base font-semibold text-foreground">{menu?.template === 'table' || menu?.template === 'ranking' ? '明细列表' : currentGroup?.key ?? `选择${activeKindLabel}`}</h3>
-                      <span className="rounded-full bg-accent/10 px-2 py-0.5 text-[10px] text-accent">{tableRows.length} 条</span>
+                      <span className="rounded-btn bg-accent/10 px-2 py-0.5 text-[10px] text-accent">{tableRows.length} 条</span>
                     </div>
                     <p className="mt-1 text-xs text-muted">列来自菜单 detail_columns：{displayColumns.map(f => f.label || f.field).join(' / ') || '暂无字段'}</p>
                   </div>

@@ -50,7 +50,7 @@ export function TrendStateBar({ symbol, trend }: { symbol: string; trend: TrendD
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg border border-border/50 bg-elevated/20 px-3 py-2">
       <span
-        className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs ${trendBadgeCls(trend.state)}`}
+        className={`inline-flex items-center gap-1 rounded-btn border px-2.5 py-0.5 text-xs ${trendBadgeCls(trend.state)}`}
         title={`${trend.state_en} · 窗口 ${trend.window_days} 个交易日${trend.intraday ? '\n⚠ 盘中临时口径:实时价参与状态判定,收盘确认为准\n(价位仍按已收盘日线算, 盘中冲高不会抬高转弱线)' : ''}`}
       >
         {trend.state_cn}
@@ -70,7 +70,7 @@ export function TrendStateBar({ symbol, trend }: { symbol: string; trend: TrendD
       </span>
       {trend.signal && (
         <span
-          className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] ${SIGNAL_BADGE[trend.signal] ?? ''}`}
+          className={`inline-flex rounded-btn border px-2 py-0.5 text-[10px] ${SIGNAL_BADGE[trend.signal] ?? ''}`}
           title={trend.signal_desc ?? undefined}
         >
           {trend.signal}
@@ -99,7 +99,7 @@ export function TrendStateBar({ symbol, trend }: { symbol: string; trend: TrendD
       <span className="text-[11px] text-amber-300/90">{trend.action}</span>
       <button
         onClick={() => setShowBacktest(true)}
-        className="ml-auto inline-flex items-center gap-1 rounded-full border border-violet-400/30 bg-violet-400/10 px-2 py-0.5 text-[10px] text-violet-300 hover:bg-violet-400/20 transition-colors cursor-pointer"
+        className="ml-auto inline-flex items-center gap-1 rounded-btn border border-violet-400/30 bg-violet-400/10 px-2 py-0.5 text-[10px] text-violet-300 hover:bg-violet-400/20 transition-colors cursor-pointer"
         title="按阈值网格回测近 180 个交易日,选择该票的合适回撤/回升阈值"
       >
         <FlaskConical className="h-3 w-3" />

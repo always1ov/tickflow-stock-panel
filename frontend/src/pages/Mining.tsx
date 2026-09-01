@@ -75,7 +75,7 @@ function LevelGuide() {
             style={{ paddingLeft: `${i * 14}px` }}>
             <span className="shrink-0 text-muted/50">{i === 0 ? '' : '└'}</span>
             <span className="shrink-0 font-medium text-foreground">{l.name}</span>
-            <span className="shrink-0 rounded-full bg-elevated px-1.5 text-[9px] text-secondary">{l.role}</span>
+            <span className="shrink-0 rounded-btn bg-elevated px-1.5 text-[9px] text-secondary">{l.role}</span>
             <span className="min-w-0 text-muted">{l.desc}</span>
           </li>
         ))}

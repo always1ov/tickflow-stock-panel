@@ -1806,7 +1806,7 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
               <div className="text-xs font-medium text-foreground">回测区间</div>
               <WarmupBadge />
             </div>
-            <span className="shrink-0 rounded-full border border-accent/25 bg-accent/10 px-2 py-0.5 text-[10px] font-medium text-accent">
+            <span className="shrink-0 rounded-btn border border-accent/25 bg-accent/10 px-2 py-0.5 text-[10px] font-medium text-accent">
               {rangeTitle}
             </span>
           </div>

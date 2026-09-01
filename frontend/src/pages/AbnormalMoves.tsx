@@ -98,7 +98,7 @@ export function AbnormalMoves() {
 
       {/* tab 条: 交易时间线 竞价(盘前) → 盘中 → 偏移(多日) */}
       <div className="flex shrink-0 flex-wrap items-center gap-3 px-5 pt-3">
-        <div className="inline-flex items-center gap-0.5 rounded-full border border-border/50 bg-base/70 p-0.5">
+        <div className="inline-flex items-center gap-0.5 rounded-btn border border-border/50 bg-base/70 p-0.5">
           {TAB_META.map(t => {
             const Icon = t.icon
             const active = tab === t.key
@@ -108,7 +108,7 @@ export function AbnormalMoves() {
                 type="button"
                 aria-pressed={active}
                 onClick={() => setTab(t.key)}
-                className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs transition-all ${
+                className={`inline-flex items-center gap-1.5 rounded-btn px-3.5 py-1.5 text-xs transition-all ${
                   active
                     ? 'bg-accent/15 font-medium text-accent shadow-sm'
                     : 'text-secondary hover:text-foreground'
@@ -317,7 +317,7 @@ function BenchmarkCard({ q, onOpenStock }: {
                     </span>
                   )}
                   {(i.tags ?? []).slice(0, 2).map(t => (
-                    <span key={t} className="max-w-24 truncate rounded-full bg-base/70 px-1.5 py-px text-[9px] text-muted" title={t}>
+                    <span key={t} className="max-w-24 truncate rounded-btn bg-base/70 px-1.5 py-px text-[9px] text-muted" title={t}>
                       {t}
                     </span>
                   ))}
@@ -475,7 +475,7 @@ function SigChip({ active, onClick, label, count, cls }: {
       type="button"
       aria-pressed={active}
       onClick={onClick}
-      className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] transition-colors ${
+      className={`inline-flex items-center gap-1 rounded-btn border px-2.5 py-1 text-[11px] transition-colors ${
         active
           ? (cls ?? 'border-accent/40 bg-accent/12 text-accent')
           : 'border-border bg-elevated text-secondary hover:text-foreground'
@@ -1013,7 +1013,7 @@ function StatusChip({ label, count, tone }: { label: string; count?: number; ton
         ? 'border-warning/30 bg-warning/8 text-warning'
         : 'border-border bg-elevated text-secondary'
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] ${toneCls}`}>
+    <span className={`inline-flex items-center gap-1.5 rounded-btn border px-2.5 py-1 text-[11px] ${toneCls}`}>
       <span className="font-mono text-sm font-semibold tabular-nums">{count ?? '—'}</span>
       {label}
     </span>

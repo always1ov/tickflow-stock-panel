@@ -136,7 +136,7 @@ export function WorkflowPanel({ kind, extraConfig, hint }: {
           {hint ?? '开了就不用管 —— 服务端自己跑, 关页面照跑, 一次不成换配置再来一次'}
         </span>
         {active && (
-          <span className={`ml-auto shrink-0 rounded-full px-2 py-px text-[10px] font-medium ${STATUS_CLS[active.status]}`}>
+          <span className={`ml-auto shrink-0 rounded-btn px-2 py-px text-[10px] font-medium ${STATUS_CLS[active.status]}`}>
             {STATUS_LABEL[active.status]} · {active.progress_text}
           </span>
         )}
@@ -246,7 +246,7 @@ function WorkflowCard({ wf, compact = false, onDelete, deleting }: {
       <div className="px-3 py-2.5">
         <div className="flex flex-wrap items-center gap-2">
           {wf.status === 'running' && <LoaderCircle className="h-3 w-3 shrink-0 animate-spin text-accent" />}
-          <span className={`shrink-0 rounded-full px-2 py-px text-[10px] font-medium ${STATUS_CLS[wf.status]}`}>
+          <span className={`shrink-0 rounded-btn px-2 py-px text-[10px] font-medium ${STATUS_CLS[wf.status]}`}>
             {STATUS_LABEL[wf.status]}
           </span>
           <span className="font-mono text-[10px] text-muted">{wf.progress_text}</span>
@@ -266,7 +266,7 @@ function WorkflowCard({ wf, compact = false, onDelete, deleting }: {
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <Rocket className={`h-3.5 w-3.5 shrink-0 ${best.passed ? 'text-success' : 'text-muted'}`} />
             <span className="text-xs font-semibold text-foreground">{best.label}</span>
-            <span className={`rounded-full px-1.5 py-px text-[9px] font-medium ${
+            <span className={`rounded-btn px-1.5 py-px text-[9px] font-medium ${
               best.passed ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'}`}>
               {best.passed ? '达标' : '未达标'}
             </span>

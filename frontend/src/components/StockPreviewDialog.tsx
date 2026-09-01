@@ -453,7 +453,7 @@ export function StockPreviewDialog({ symbol: symbolProp, name: nameProp, onClose
                   key={r.symbol}
                   onClick={() => setOverride({ symbol: r.symbol, name: r.name })}
                   title={`切换到 ${r.name} ${r.symbol}`}
-                  className="inline-flex items-center gap-1 rounded-full border border-border/50 bg-base/60 px-2 py-0.5 text-[10px] text-secondary hover:border-accent/40 hover:text-foreground transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-1 rounded-btn border border-border/50 bg-base/60 px-2 py-0.5 text-[10px] text-secondary hover:border-accent/40 hover:text-foreground transition-colors cursor-pointer"
                 >
                   <span className="max-w-[6em] truncate">{r.name}</span>
                   <span className="font-mono text-[9px] text-muted">{r.symbol}</span>

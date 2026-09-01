@@ -562,7 +562,7 @@ function PlainNavLink({ item, collapsed, indent, dataSyncing, dataSyncJustDone }
             <Icon className={cn('h-4 w-4 shrink-0 transition-colors', isActive ? 'text-accent' : 'text-foreground/60 group-hover:text-foreground/85')} />
             {!collapsed && <span className="flex-1">{label}</span>}
             {!collapsed && badge && (
-              <span className="ml-auto inline-flex items-center rounded-full border border-amber-400/30 bg-amber-400/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-amber-400 shrink-0">
+              <span className="ml-auto inline-flex items-center rounded-btn border border-amber-400/30 bg-amber-400/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-amber-400 shrink-0">
                 {badge}
               </span>
             )}

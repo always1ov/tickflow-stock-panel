@@ -96,7 +96,7 @@ export function SealedBadge({ degraded, hasDepth, isHistorical, sealedReady, sea
             }
             setShowHint(v => !v)
           }}
-          className="group inline-flex items-center gap-1 h-5 px-2 rounded-full bg-yellow-500/10 border border-yellow-500/30 cursor-help transition-all hover:bg-yellow-500/20 hover:border-yellow-500/50"
+          className="group inline-flex items-center gap-1 h-5 px-2 rounded-btn bg-yellow-500/10 border border-yellow-500/30 cursor-help transition-all hover:bg-yellow-500/20 hover:border-yellow-500/50"
         >
           <span className="h-1.5 w-1.5 rounded-full bg-yellow-500" />
           <span className="text-[10px] font-medium text-yellow-600 dark:text-yellow-500 leading-none">{label}</span>

@@ -85,7 +85,7 @@ export function AiProfiles() {
         </span>
         <div className="ml-auto flex items-center gap-1.5">
           {dirty && (
-            <span className="inline-flex items-center gap-1 rounded-full border border-warning/30 bg-warning/10 px-2 py-0.5 text-[10px] text-warning">
+            <span className="inline-flex items-center gap-1 rounded-btn border border-warning/30 bg-warning/10 px-2 py-0.5 text-[10px] text-warning">
               <span className="h-1.5 w-1.5 rounded-full bg-warning" />
               有未保存改动 —— 保存后才生效
             </span>

@@ -117,7 +117,7 @@ function ExternalWebsiteSettings() {
         <button
           type="button"
           onClick={() => setEnabled(value => !value)}
-          className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs transition-colors ${enabled ? 'border-success/40 bg-success/10 text-success' : 'border-border bg-elevated text-muted'}`}
+          className={`inline-flex items-center gap-2 rounded-btn border px-3 py-1.5 text-xs transition-colors ${enabled ? 'border-success/40 bg-success/10 text-success' : 'border-border bg-elevated text-muted'}`}
         >
           <span className={`h-2 w-2 rounded-full ${enabled ? 'bg-success' : 'bg-muted'}`} />
           {enabled ? '已启用' : '已停用'}
@@ -428,7 +428,7 @@ export function SettingsExtPagesPanel() {
                   <button
                     key={f.name}
                     onClick={() => setSelectedColumns(cols => active ? cols.filter(c => c !== f.name) : [...cols, f.name])}
-                    className={`rounded-full border px-3 py-1 text-[11px] transition-colors ${active ? 'border-accent/40 bg-accent/10 text-accent' : 'border-border bg-elevated/40 text-secondary hover:bg-elevated'}`}
+                    className={`rounded-btn border px-3 py-1 text-[11px] transition-colors ${active ? 'border-accent/40 bg-accent/10 text-accent' : 'border-border bg-elevated/40 text-secondary hover:bg-elevated'}`}
                   >
                     {f.label || f.name}
                   </button>

@@ -131,7 +131,7 @@ export function TrendSummaryDialog({ items, trends, onClose }: {
         <div className="flex flex-wrap items-center gap-1.5 px-4 pt-3">
           <button
             onClick={() => setTab('all')}
-            className={`rounded-full border px-2.5 py-0.5 text-[11px] transition-colors cursor-pointer ${
+            className={`rounded-btn border px-2.5 py-0.5 text-[11px] transition-colors cursor-pointer ${
               tab === 'all' ? 'border-accent/50 bg-accent/10 text-accent' : 'border-border text-muted hover:text-foreground'
             }`}
           >
@@ -141,7 +141,7 @@ export function TrendSummaryDialog({ items, trends, onClose }: {
             <button
               key={s.key}
               onClick={() => setTab(s.key)}
-              className={`rounded-full border px-2.5 py-0.5 text-[11px] transition-colors cursor-pointer ${
+              className={`rounded-btn border px-2.5 py-0.5 text-[11px] transition-colors cursor-pointer ${
                 tab === s.key
                   ? trendBadgeCls(s.key)
                   : 'border-border text-muted hover:text-foreground'

@@ -150,7 +150,7 @@ export function StrategyOptimizer() {
                 </div>
                 <div className="flex flex-wrap gap-1.5">
                   {Object.entries(result.best_params).map(([k, v]) => (
-                    <span key={k} className="rounded-full border border-border bg-surface px-2 py-0.5 text-[11px]">{k}: {String(v)}</span>
+                    <span key={k} className="rounded-btn border border-border bg-surface px-2 py-0.5 text-[11px]">{k}: {String(v)}</span>
                   ))}
                 </div>
               </div>

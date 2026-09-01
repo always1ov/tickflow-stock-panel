@@ -152,7 +152,7 @@ export function FilterPanel({ value, onChange, onClose, onReset }: {
           <Filter className="h-3.5 w-3.5 text-accent" />
           <span className="text-xs font-medium text-accent">筛选条件</span>
           {filterActive(value) && (
-            <span className="bg-accent/15 text-accent rounded-full px-1.5 h-4 inline-flex items-center text-[10px] font-bold leading-none">
+            <span className="bg-accent/15 text-accent rounded-btn px-1.5 h-4 inline-flex items-center text-[10px] font-bold leading-none">
               {countActiveFilters(value)}
             </span>
           )}

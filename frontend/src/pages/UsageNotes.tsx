@@ -58,7 +58,7 @@ function StatusChip({ status, onCycle, busy }: { status: NoteStatus; onCycle: ()
       disabled={busy}
       title="点击切换: 随手记 → 待验证 → 已验证 → 不成立"
       className={cn(
-        'inline-flex h-6 items-center gap-1.5 rounded-full border px-2 text-[10px] font-medium transition-colors cursor-pointer disabled:opacity-60',
+        'inline-flex h-6 items-center gap-1.5 rounded-btn border px-2 text-[10px] font-medium transition-colors cursor-pointer disabled:opacity-60',
         meta.cls,
       )}
     >
@@ -208,7 +208,10 @@ export function UsageNotes() {
     <div className="flex h-full flex-col">
       <PageHeader title="我的使用观察" subtitle="观察 → 待验证 → 已验证 / 不成立" />
       <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4 pt-3 lg:px-4">
-        <div className="mx-auto w-full max-w-5xl space-y-3">
+        {/* [R129] 原来 mx-auto max-w-5xl(1024px) 居中: 这是一面卡片墙, 宽屏下
+            两侧空一大片而卡片仍挤成两列。改为贴左 + 放宽到 1600px, 配合下方
+            网格在宽屏加到三列 —— 观察条目多的时候一屏能多看一行。 */}
+        <div className="w-full max-w-[1600px] space-y-3">
           {/* 新增区: 单行起步, 聚焦时长高 */}
           <div className="rounded-card border border-border bg-surface p-3">
             <div className="flex items-start gap-2">
@@ -273,7 +276,7 @@ export function UsageNotes() {
               没有匹配的笔记 —— 换个过滤条件或清空搜索
             </div>
           ) : (
-            <div className="grid grid-cols-1 items-start gap-3 lg:grid-cols-2">
+            <div className="grid grid-cols-1 items-start gap-3 lg:grid-cols-2 2xl:grid-cols-3">
               {shown.map(note => <NoteCard key={note.id} note={note} />)}
             </div>
           )}

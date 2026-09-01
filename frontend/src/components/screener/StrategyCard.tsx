@@ -22,7 +22,7 @@ const CARD_STYLES: Record<CardSize, {
 }> = {
   mini: {
     wrap: 'gap-1',
-    card: 'inline-flex items-center gap-1 px-2 py-0.5 rounded-full',
+    card: 'inline-flex items-center gap-1 px-2 py-0.5 rounded-btn',
     name: 'text-[10px]',
     count: 'text-[11px]',
     desc: '',

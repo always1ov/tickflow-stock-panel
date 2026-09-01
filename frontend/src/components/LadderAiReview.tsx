@@ -74,7 +74,7 @@ export function LadderAiReview({ date }: { date?: string }) {
       <button
         onClick={() => setOpen(true)}
         title="AI 按打板战法(情绪周期/龙头/二进三/反包)复盘当日连板梯队, 输出候选清单; 弹窗内含「板块跷跷板」标签页"
-        className="inline-flex items-center gap-1 h-7 px-2.5 rounded-full text-xs font-medium text-amber-400 border border-amber-400/25 bg-amber-400/5 hover:bg-amber-400/15 transition-colors cursor-pointer"
+        className="inline-flex items-center gap-1 h-7 px-2.5 rounded-btn text-xs font-medium text-amber-400 border border-amber-400/25 bg-amber-400/5 hover:bg-amber-400/15 transition-colors cursor-pointer"
       >
         <Sparkles className="h-3.5 w-3.5" />
         AI 打板复盘

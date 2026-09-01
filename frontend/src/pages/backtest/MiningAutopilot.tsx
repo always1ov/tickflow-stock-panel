@@ -275,7 +275,7 @@ export function MiningAutopilot() {
           </>
         )}
         {active && (
-          <span className={`ml-auto shrink-0 rounded-full px-2 py-px text-[10px] font-medium ${STATUS_CLS[active.status]}`}>
+          <span className={`ml-auto shrink-0 rounded-btn px-2 py-px text-[10px] font-medium ${STATUS_CLS[active.status]}`}>
             {STATUS_LABEL[active.status]} · 第 {active.iterations.length}/{active.max_iterations} 轮
           </span>
         )}
@@ -303,7 +303,7 @@ export function MiningAutopilot() {
               <div key={s.session_id} className="flex items-center gap-2 border-t border-border/60 px-3 py-1.5">
                 <button type="button" onClick={() => setSessionId(s.session_id)}
                   className="flex min-w-0 flex-1 items-center gap-2 text-left">
-                  <span className={`shrink-0 rounded-full px-1.5 py-px text-[9px] ${STATUS_CLS[s.status]}`}>
+                  <span className={`shrink-0 rounded-btn px-1.5 py-px text-[9px] ${STATUS_CLS[s.status]}`}>
                     {STATUS_LABEL[s.status]}
                   </span>
                   <span className="shrink-0 font-mono text-[9px] text-muted">

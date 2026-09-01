@@ -273,11 +273,11 @@ export function Review() {
               <Clock className="h-3 w-3" />定时
             </button>
             {/* 复盘模式: 当日 / 连读昨日(对照上一份) / 近7交易日纵览 */}
-            <div className="flex items-center rounded-full bg-elevated/60 p-0.5">
+            <div className="flex items-center rounded-btn bg-elevated/60 p-0.5">
               {([['today', '当日'], ['continuity', '连读昨日'], ['week', '近7日']] as const).map(([k, label]) => (
                 <button key={k} onClick={() => setRecapMode(k)}
                   title={k === 'continuity' ? '先回顾上一份复盘的观察要点是否兑现, 再结合今日复盘' : k === 'week' ? '以近7个交易日为主时间轴: 情绪演变/主线切换/量能趋势' : '按当日盘面直接复盘(原模式)'}
-                  className={`px-2.5 h-7 rounded-full text-xs transition-all cursor-pointer ${recapMode === k ? 'bg-accent/15 text-accent font-medium' : 'text-muted hover:text-foreground'}`}>
+                  className={`px-2.5 h-7 rounded-btn text-xs transition-all cursor-pointer ${recapMode === k ? 'bg-accent/15 text-accent font-medium' : 'text-muted hover:text-foreground'}`}>
                   {label}
                 </button>
               ))}
@@ -305,10 +305,14 @@ export function Review() {
         }
       />
 
-      {/* [R60] 统一版式: 留白与全站一致; 宽度取「读」档 —— 这页主体是一份
-          AI 报告, 一行横跨 1280px 眼睛回不到行首 */}
+      {/* [R60] 宽度取「读」档 —— 这页主体是一份 AI 报告, 一行横跨 1280px 眼睛
+          回不到行首。
+          [R129] 但**整页居中是过头了**: 1100px 的块 mx-auto 摆在超宽屏正中,
+          左右各空一大片, 右边的「历史复盘」栏也跟着被推到屏幕中间。改为贴左,
+          上限放到 1600px —— 行长由正文自己的 max-w 控(见下方 prose), 不该让
+          整页陪着一起窄。 */}
       <div className="min-h-full bg-[radial-gradient(circle_at_15%_-5%,rgba(59,130,246,0.10),transparent_30%),radial-gradient(circle_at_85%_5%,rgba(139,92,246,0.08),transparent_30%)] px-3 pb-4 pt-3 lg:px-4">
-        <div className="mx-auto w-full max-w-[1100px] space-y-3">
+        <div className="w-full max-w-[1600px] space-y-3">
 
           {marketQuery.isLoading && !data ? (
             <div className="flex h-40 items-center justify-center">
@@ -794,7 +798,10 @@ function ReportPanel({
             <div className="text-xs text-secondary">分析指数结构 · 连板梯队 · 板块轮动 · 资金情绪</div>
           </div>
         ) : (
-          <div className="prose prose-invert max-w-none">
+          // [R129] 行长控在**正文自己身上**, 不再靠把整页压窄来实现:
+          // 页面放宽到 1600px 后, 若正文仍是 max-w-none, 一行会横跨一米多宽,
+          // 眼睛回不到行首。75ch ≈ 中英文混排的舒适行长上限。
+          <div className="prose prose-invert max-w-[75ch]">
             <MarkdownRenderer content={content} />
             {showCursor && (
               <span className="ml-0.5 inline-block h-4 w-1.5 animate-pulse rounded-sm bg-accent align-middle" />
@@ -963,7 +970,7 @@ function _DtPill({ item, idx, value, onOpenStock }: {
     <button
       type="button"
       onClick={() => onOpenStock(item.thscode)}
-      className="group inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-elevated/40 py-0.5 pl-0.5 pr-2.5 transition-all hover:border-accent/40 hover:bg-elevated/70"
+      className="group inline-flex items-center gap-1.5 rounded-btn border border-border/60 bg-elevated/40 py-0.5 pl-0.5 pr-2.5 transition-all hover:border-accent/40 hover:bg-elevated/70"
       title={`查看 ${item.name ?? item.thscode} · 净买 ${fmtVolume(value ?? null)}`}
     >
       <span className={cn('grid h-[18px] w-[18px] min-w-[18px] place-items-center rounded-full font-mono text-[9px] font-bold leading-none', _rankCls(idx))}>
@@ -996,7 +1003,7 @@ function _DtSummaryRow({ label, items, pick, onOpenStock }: {
       {/* 固定宽度标签槽: 无标签行(净卖)也占位, 保证四行药丸左缘对齐 */}
       <span className="flex w-16 shrink-0">
         {label && (
-          <span className="rounded-full bg-base/70 px-2 py-0.5 text-[9px] font-medium tracking-wide text-muted">
+          <span className="rounded-btn bg-base/70 px-2 py-0.5 text-[9px] font-medium tracking-wide text-muted">
             {label}
           </span>
         )}
@@ -1182,7 +1189,7 @@ function _DtSeatList({ seats, onOpenStock }: {
                   key={`${s.name}-${r.thscode}`}
                   type="button"
                   onClick={() => onOpenStock(r.thscode)}
-                  className="inline-flex items-baseline gap-1.5 rounded-full border border-border/60 bg-surface/60 px-2 py-0.5 text-[10px] transition-all hover:border-accent/40 hover:text-accent"
+                  className="inline-flex items-baseline gap-1.5 rounded-btn border border-border/60 bg-surface/60 px-2 py-0.5 text-[10px] transition-all hover:border-accent/40 hover:text-accent"
                   title={`查看 ${r.name ?? r.thscode} 详情`}
                 >
                   <span>{r.name ?? r.thscode}</span>
@@ -1326,14 +1333,14 @@ function DragonTigerCard({ date, onOpenStock }: {
           >
             <div className="border-t border-border/60 px-4 py-3">
               {/* 分段式 tab */}
-              <div className="mb-2.5 inline-flex items-center gap-0.5 rounded-full border border-border/50 bg-base/70 p-0.5">
+              <div className="mb-2.5 inline-flex items-center gap-0.5 rounded-btn border border-border/50 bg-base/70 p-0.5">
                 {_DT_TABS.map(t => (
                   <button
                     key={t.key}
                     type="button"
                     onClick={() => setTab(t.key)}
                     className={cn(
-                      'rounded-full px-3 py-1 text-[11px] transition-all',
+                      'rounded-btn px-3 py-1 text-[11px] transition-all',
                       tab === t.key
                         ? 'bg-accent/15 font-medium text-accent shadow-sm'
                         : 'text-secondary hover:text-foreground',

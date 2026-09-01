@@ -147,7 +147,7 @@ export function Analysis() {
       <div className="px-3 pb-4 pt-3 lg:px-4">
         <div className="mx-auto w-full max-w-[1100px] space-y-3">
         <section className="rounded-2xl border border-border bg-surface p-6 bg-[radial-gradient(circle_at_top_right,rgba(139,92,246,0.14),transparent_38%)]">
-          <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[11px] text-secondary">
+          <div className="inline-flex items-center gap-2 rounded-btn border border-white/10 bg-white/[0.04] px-3 py-1 text-[11px] text-secondary">
             <BarChart3 className="h-3.5 w-3.5" />
             扩展数据 → 分析菜单 → 动态页面
           </div>
@@ -219,7 +219,7 @@ export function Analysis() {
                     <button
                       key={f.name}
                       onClick={() => setSelectedColumns(cols => active ? cols.filter(c => c !== f.name) : [...cols, f.name])}
-                      className={`rounded-full border px-3 py-1 text-[11px] transition-colors ${active ? 'border-accent/40 bg-accent/10 text-accent' : 'border-border bg-elevated/40 text-secondary hover:bg-elevated'}`}
+                      className={`rounded-btn border px-3 py-1 text-[11px] transition-colors ${active ? 'border-accent/40 bg-accent/10 text-accent' : 'border-border bg-elevated/40 text-secondary hover:bg-elevated'}`}
                     >
                       {f.label || f.name}
                     </button>

@@ -739,7 +739,7 @@ export function Today() {
             }}
             disabled={!d}
             title="导出为自包含 HTML 页面(可存档/分享;已生成 AI 导读会一并带上)"
-            className="inline-flex items-center gap-1 rounded-full border border-sky-400/30 bg-sky-400/10 px-2.5 py-1 text-[10px] text-sky-300 hover:bg-sky-400/20 disabled:opacity-50 transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1 rounded-btn border border-sky-400/30 bg-sky-400/10 px-2.5 py-1 text-[10px] text-sky-300 hover:bg-sky-400/20 disabled:opacity-50 transition-colors cursor-pointer"
           >
             <Download className="h-3 w-3" />
             导出 HTML
@@ -748,7 +748,7 @@ export function Today() {
             onClick={() => aiMut.mutate()}
             disabled={aiMut.isPending || !d}
             title="一次生成盘前导读, 并调取候选的日 K 与量能做横向对比选出 1-3 只(耗时约十几秒)"
-            className="inline-flex items-center gap-1 rounded-full border border-violet-400/30 bg-violet-400/10 px-2.5 py-1 text-[10px] text-violet-300 hover:bg-violet-400/20 disabled:opacity-50 transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1 rounded-btn border border-violet-400/30 bg-violet-400/10 px-2.5 py-1 text-[10px] text-violet-300 hover:bg-violet-400/20 disabled:opacity-50 transition-colors cursor-pointer"
           >
             {aiMut.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
             AI 导读·优选
@@ -757,7 +757,7 @@ export function Today() {
             onClick={() => refreshMut.mutate()}
             disabled={refreshMut.isPending || q.isFetching}
             title="先把全部自选的实时行情立即拉一遍(轮转全覆盖),再刷新本页 —— 实时行情未开启时仅刷新收盘数据"
-            className="inline-flex items-center gap-1 rounded-full border border-border bg-base px-2.5 py-1 text-[10px] text-muted hover:text-foreground disabled:opacity-50 transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1 rounded-btn border border-border bg-base px-2.5 py-1 text-[10px] text-muted hover:text-foreground disabled:opacity-50 transition-colors cursor-pointer"
           >
             <RefreshCw className={`h-3 w-3 ${(refreshMut.isPending || q.isFetching) ? 'animate-spin' : ''}`} />
             {refreshMut.isPending ? '同步中…' : '刷新'}
@@ -814,7 +814,7 @@ export function Today() {
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
                 <Compass className="h-4 w-4 shrink-0 text-sky-400" />
-                <span className={`inline-flex rounded-full border px-3 py-0.5 text-sm font-medium ${POSTURE_STYLE[d.weather.posture] ?? POSTURE_STYLE['观察']}`}>
+                <span className={`inline-flex rounded-btn border px-3 py-0.5 text-sm font-medium ${POSTURE_STYLE[d.weather.posture] ?? POSTURE_STYLE['观察']}`}>
                   {d.weather.posture}
                 </span>
                 {/* [R122] 时段徽章(原独立横幅): 标签常显, 用法说明收进 title */}
@@ -836,7 +836,7 @@ export function Today() {
                         : '') +
                       ` —— 最终姿态取大盘与自选中更保守的一方`
                     }
-                    className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] ${POSTURE_STYLE[d.weather.market.mode] ?? POSTURE_STYLE['观察']}`}
+                    className={`inline-flex items-center gap-1 rounded-btn border px-2 py-0.5 text-[10px] ${POSTURE_STYLE[d.weather.market.mode] ?? POSTURE_STYLE['观察']}`}
                   >
                     {d.weather.market.benchmark_name ?? '大盘'}·{d.weather.market.mode}
                     {d.weather.market.pending && <span className="opacity-70">(将转{d.weather.market.pending.mode} {d.weather.market.pending.streak}/{d.weather.market.pending.need})</span>}
@@ -962,7 +962,7 @@ export function Today() {
                   onClick={() => prefsMut.mutate({ boards: [] })}
                   disabled={prefsMut.isPending}
                   title="不过滤, 所有板块都看"
-                  className={`rounded-full border px-2 py-0.5 text-[10px] transition-colors cursor-pointer disabled:opacity-50 ${
+                  className={`rounded-btn border px-2 py-0.5 text-[10px] transition-colors cursor-pointer disabled:opacity-50 ${
                     boardFilter.length === 0
                       ? 'border-sky-400/40 bg-sky-400/15 text-sky-300'
                       : 'border-border bg-base text-muted hover:text-foreground'
@@ -980,7 +980,7 @@ export function Today() {
                       })}
                       disabled={prefsMut.isPending}
                       title={`${on ? '取消' : '只看'}${b}(可多选)`}
-                      className={`rounded-full border px-2 py-0.5 text-[10px] transition-colors cursor-pointer disabled:opacity-50 ${
+                      className={`rounded-btn border px-2 py-0.5 text-[10px] transition-colors cursor-pointer disabled:opacity-50 ${
                         on
                           ? 'border-sky-400/40 bg-sky-400/15 text-sky-300'
                           : 'border-border bg-base text-muted hover:text-foreground'
@@ -995,7 +995,7 @@ export function Today() {
                 <button
                   onClick={() => setPrefsOpen((v) => !v)}
                   title="调整显示门槛(把握分下限与最多显示条数)"
-                  className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] transition-colors cursor-pointer ${
+                  className={`inline-flex items-center gap-1 rounded-btn border px-2.5 py-1 text-[10px] transition-colors cursor-pointer ${
                     prefsOpen ? 'border-sky-400/40 bg-sky-400/15 text-sky-300'
                       : 'border-border bg-base text-muted hover:text-foreground'
                   }`}

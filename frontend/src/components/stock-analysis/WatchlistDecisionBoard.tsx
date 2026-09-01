@@ -486,7 +486,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
           onClick={refreshAll}
           disabled={refreshing}
           title="刷新行情/仓位/信号快照(不调用 AI、不计费)"
-          className="ml-auto inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border border-border bg-base text-muted hover:text-foreground disabled:opacity-60 transition-colors cursor-pointer"
+          className="ml-auto inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-btn border border-border bg-base text-muted hover:text-foreground disabled:opacity-60 transition-colors cursor-pointer"
         >
           <RefreshCw className={`h-3 w-3 ${refreshing ? 'animate-spin' : ''}`} />
           刷新
@@ -497,7 +497,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
           title={exportRows.length
             ? `导出为自包含 HTML(可存档/分享)。只导出「结论」列有内容的 ${exportRows.length} 只 —— 三档都在通道中部的票没有位置信息, 不占篇幅`
             : '当前没有「结论」列有内容的标的'}
-          className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border border-sky-400/30 bg-sky-400/10 text-sky-300 hover:bg-sky-400/20 disabled:opacity-50 transition-colors cursor-pointer"
+          className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-btn border border-sky-400/30 bg-sky-400/10 text-sky-300 hover:bg-sky-400/20 disabled:opacity-50 transition-colors cursor-pointer"
         >
           <Download className="h-3 w-3" />
           导出 HTML
@@ -506,14 +506,14 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
         <button
           onClick={() => setShowTrendSummary(true)}
           title="全部自选的六态趋势纵览(零 AI 成本),可导出 HTML"
-          className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border border-sky-400/30 bg-sky-400/10 text-sky-300 hover:bg-sky-400/20 transition-colors cursor-pointer"
+          className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-btn border border-sky-400/30 bg-sky-400/10 text-sky-300 hover:bg-sky-400/20 transition-colors cursor-pointer"
         >
           <TrendingUp className="h-3 w-3" />
           六态汇总
         </button>
         <button
           onClick={() => setHeldOnly((v) => !v)}
-          className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors cursor-pointer ${
+          className={`text-[10px] px-2 py-0.5 rounded-btn border transition-colors cursor-pointer ${
             heldOnly ? 'border-accent/40 bg-accent/10 text-accent' : 'border-border bg-base text-muted hover:text-foreground'
           }`}
         >
@@ -524,7 +524,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
             onClick={runHeld}
             disabled={!!progress}
             title="只对标记为「持有」的自选生成 AI 买卖信号(省调用, 持仓优先)"
-            className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border border-amber-400/30 bg-amber-400/10 text-amber-300 hover:bg-amber-400/20 disabled:opacity-60 transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-btn border border-amber-400/30 bg-amber-400/10 text-amber-300 hover:bg-amber-400/20 disabled:opacity-60 transition-colors cursor-pointer"
           >
             {progress ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
             AI 分析持有
@@ -534,7 +534,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
           onClick={runAll}
           disabled={!!progress}
           title="对全部自选逐只生成 AI 买卖信号(会调用 AI,按只计费)"
-          className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border border-sky-400/30 bg-sky-400/10 text-sky-300 hover:bg-sky-400/20 disabled:opacity-60 transition-colors cursor-pointer"
+          className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-btn border border-sky-400/30 bg-sky-400/10 text-sky-300 hover:bg-sky-400/20 disabled:opacity-60 transition-colors cursor-pointer"
         >
           {progress ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
           {progress ? `分析中 ${progress.done}/${progress.total}` : 'AI 分析全部'}

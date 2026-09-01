@@ -247,7 +247,7 @@ export function FactorBacktest({ initialFactorName = 'momentum_20d' }: { initial
         <div className="rounded-btn border border-border bg-surface p-2.5">
           <div className="flex items-center justify-between gap-2">
             <div className="text-xs font-medium text-foreground">回测区间</div>
-            <span className="shrink-0 rounded-full border border-accent/25 bg-accent/10 px-2 py-0.5 text-[10px] font-medium text-accent">
+            <span className="shrink-0 rounded-btn border border-accent/25 bg-accent/10 px-2 py-0.5 text-[10px] font-medium text-accent">
               {rangeTitle}
             </span>
           </div>

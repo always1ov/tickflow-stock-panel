@@ -541,7 +541,7 @@ function PulseList({
           {mode === 'up' ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
           {title}
         </div>
-        <span className="rounded-full bg-elevated/60 px-2 py-0.5 text-[10px] text-muted">Top 10</span>
+        <span className="rounded-btn bg-elevated/60 px-2 py-0.5 text-[10px] text-muted">Top 10</span>
       </div>
       <div className="space-y-1">
         {items.map((item, idx) => {
@@ -675,7 +675,7 @@ function ConceptFocus({ stat, onStockClick }: { stat: ConceptStat | null; onStoc
           <div className="min-w-0">
             <div className="flex items-center gap-3">
               <h3 className="truncate text-xl font-semibold text-foreground">{stat.key}</h3>
-              <span className="rounded-full bg-blue-400/10 px-2 py-0.5 text-[10px] text-blue-300">强度 {stat.heatScore.toFixed(0)}</span>
+              <span className="rounded-btn bg-blue-400/10 px-2 py-0.5 text-[10px] text-blue-300">强度 {stat.heatScore.toFixed(0)}</span>
             </div>
             <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
               <span>{stat.count} 只成分</span>

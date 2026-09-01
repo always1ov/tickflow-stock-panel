@@ -372,7 +372,7 @@ export function SettingsAIPanel({ highlight }: { highlight?: string } = {}) {
         title={configTitle}
         right={profilesManaged ? undefined : (
           <span className="inline-flex items-center gap-1.5 text-[10px] text-muted/60" title={isCodexProvider ? 'Use local Codex CLI via codex exec' : 'Use OpenAI-compatible Chat Completions API'}>
-            <span className="rounded-full border border-border/40 bg-base/50 px-1.5 py-px font-mono">{isCodexProvider ? 'codex exec' : 'Chat Completions'}</span>
+            <span className="rounded-btn border border-border/40 bg-base/50 px-1.5 py-px font-mono">{isCodexProvider ? 'codex exec' : 'Chat Completions'}</span>
             {isCodexProvider ? 'CLI' : '接口'}
           </span>
         )}
@@ -427,7 +427,7 @@ export function SettingsAIPanel({ highlight }: { highlight?: string } = {}) {
               {isOpenAIProvider && (
                 <div className="rounded-lg border border-accent/15 bg-accent/[0.03] p-3">
                   <div className="mb-2.5">
-                    <span className="rounded-full bg-accent/10 px-2 py-0.5 text-[10px] font-medium text-accent">OpenAI 专属</span>
+                    <span className="rounded-btn bg-accent/10 px-2 py-0.5 text-[10px] font-medium text-accent">OpenAI 专属</span>
                   </div>
                   <div className="max-w-xs">
                     <Field label="推理强度">

@@ -52,7 +52,7 @@ export function WarmupBadge() {
         ref={anchorRef}
         type="button"
         onClick={() => setOpen(o => !o)}
-        className="inline-flex items-center gap-0.5 rounded-full px-1.5 text-[10px] text-amber-500/70 transition-colors hover:bg-amber-400/10 hover:text-amber-500"
+        className="inline-flex items-center gap-0.5 rounded-btn px-1.5 text-[10px] text-amber-500/70 transition-colors hover:bg-amber-400/10 hover:text-amber-500"
         title="为什么开头可能没交易?"
       >
         <Info className="h-3 w-3" strokeWidth={1.5} />

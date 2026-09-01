@@ -118,7 +118,7 @@ function SortableItem({ entry, hidden, onToggleHidden, badgeEnabled, onToggleBad
         <span className={`truncate text-[11px] text-muted ${note ? '' : 'font-mono'}`}>{note ?? entry.id}</span>
       </div>
       <div>
-        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] ${
+        <span className={`inline-flex items-center rounded-btn px-2 py-0.5 text-[11px] ${
           entry.type === 'analysis' ? 'bg-accent/10 text-accent' : 'bg-elevated text-muted'
         }`}>
           {entry.type === 'builtin' ? '内置' : entry.type === 'group' ? '分组' : '扩展'}

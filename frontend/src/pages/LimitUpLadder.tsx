@@ -225,7 +225,7 @@ const StockCard = React.memo(function StockCard({ stock, extFields, direction, s
           }`}>一字</span>
         )}
         {tag && (
-          <span className={`shrink-0 text-[9px] px-1 py-px rounded-full border leading-none ${tag.cls}`}>{tag.label}</span>
+          <span className={`shrink-0 text-[9px] px-1 py-px rounded-btn border leading-none ${tag.cls}`}>{tag.label}</span>
         )}
       </div>
       {/* 代码 + 数字行 */}
@@ -490,7 +490,7 @@ function MonitorMenu({ stock, direction, sealMode, monitorRule, anchorRect, hasD
                   key={ch.key}
                   type="button"
                   onClick={() => togglePushChannel(ch.key)}
-                  className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-medium transition-colors border cursor-pointer ${
+                  className={`inline-flex items-center gap-1 px-2 py-1 rounded-btn text-[10px] font-medium transition-colors border cursor-pointer ${
                     on
                       ? 'bg-accent/15 text-accent border-accent/40'
                       : 'bg-elevated/40 text-muted border-border hover:text-secondary'
@@ -1484,7 +1484,7 @@ export function LimitUpLadder() {
             {/* 部分数据日提示: 当日全市场数据未出齐(免费源盘后延迟发布) */}
             {data?.partial_from && (
               <span
-                className="inline-flex items-center gap-1 rounded-full border border-warning/40 bg-warning/10 px-2 h-6 text-[10px] text-warning"
+                className="inline-flex items-center gap-1 rounded-btn border border-warning/40 bg-warning/10 px-2 h-6 text-[10px] text-warning"
                 title={data.partial_count != null
                   ? `该日全市场数据未出齐(仅 ${data.partial_count} 只, 多为自选实时写入), 结果不具代表性。数据源一般 17:30~20:00 发布当日数据, 届时在数据页点立即同步`
                   : `${data.partial_from} 全市场数据未出齐, 已自动显示上一完整交易日。数据源一般 17:30~20:00 发布当日数据, 届时在数据页点立即同步`}
@@ -1495,10 +1495,10 @@ export function LimitUpLadder() {
               </span>
             )}
             {/* 涨跌停切换(胶囊式): 点击切换方向, 当前方向有背景 */}
-            <div className="flex items-center rounded-full bg-elevated/60 p-0.5">
+            <div className="flex items-center rounded-btn bg-elevated/60 p-0.5">
               <button
                 onClick={() => direction !== 'up' && toggleDirection('up')}
-                className={`flex items-center gap-1 px-2.5 h-7 rounded-full text-xs tabular-nums transition-all ${
+                className={`flex items-center gap-1 px-2.5 h-7 rounded-btn text-xs tabular-nums transition-all ${
                   direction === 'up'
                     ? 'bg-bull/15 text-bull font-semibold'
                     : 'text-muted hover:text-bull/70'
@@ -1509,7 +1509,7 @@ export function LimitUpLadder() {
               </button>
               <button
                 onClick={() => direction !== 'down' && toggleDirection('down')}
-                className={`flex items-center gap-1 px-2.5 h-7 rounded-full text-xs tabular-nums transition-all ${
+                className={`flex items-center gap-1 px-2.5 h-7 rounded-btn text-xs tabular-nums transition-all ${
                   direction === 'down'
                     ? 'bg-bear/15 text-bear font-semibold'
                     : 'text-muted hover:text-bear/70'
@@ -1526,7 +1526,7 @@ export function LimitUpLadder() {
             {/* 封单模式: 成交量/金额(仅 sealed 就绪时显示) — 胶囊式 */}
             {data?.sealed_ready && (
               <>
-                <div className="flex items-center rounded-full bg-elevated/60 p-0.5">
+                <div className="flex items-center rounded-btn bg-elevated/60 p-0.5">
                   {(['vol', 'amount'] as const).map(m => (
                     <button
                       key={m}
@@ -1534,7 +1534,7 @@ export function LimitUpLadder() {
                         setSealMode(m)
                         storage.limitLadderSealMode.set(m)
                       }}
-                      className={`flex items-center px-2 py-1 rounded-full text-xs transition-all ${
+                      className={`flex items-center px-2 py-1 rounded-btn text-xs transition-all ${
                         sealMode === m
                           ? 'bg-accent/15 text-accent font-medium'
                           : 'text-muted hover:text-secondary'
