@@ -15,8 +15,8 @@ import {
 } from 'lucide-react'
 import {
   api, TODAY_BOARDS, type KeltnerVerdict, type SignalAiSchedule, type TodayAiSchedule,
-  type TodayGates, type TodayNote, type TodayOpportunity, type TodayOverview,
-  type TodayPick, type TodayPrefs,
+  type TodayGates, type TodayLive, type TodayNote, type TodayOpportunity,
+  type TodayOverview, type TodayPick, type TodayPrefs,
 } from '@/lib/api'
 import { toast } from '@/components/Toast'
 import { PageShell } from '@/components/PageShell'
@@ -315,6 +315,55 @@ function PositionCell({ pct }: { pct?: number | null }) {
   )
 }
 
+/**
+ * [R137] 盘中列 —— 只在开着实时行情时出现。
+ *
+ * 这一列和把握分是**两回事**, 版面上也刻意分开: 把握分冻在收盘口径(盘中一动
+ * 不动, 你的决策基准), 这一列是"现在正在发生什么"。用户的用法就是这样 ——
+ * 决策看收盘, 盘中一直盯着。
+ *
+ * 最要紧的是「破生命线」那个红标: v2 的生命线是硬门槛, 一只昨天入选的票今天
+ * 盘中跌回 MA20 之下, 收盘定稿后就会被挡掉。盯盘的人得当场知道, 而不是等到
+ * 收盘发现它凭空消失了。
+ */
+function LiveCell({ live, closePct }: { live?: TodayLive | null; closePct?: number | null }) {
+  if (!live) return <span className="text-[10px] text-muted/50">—</span>
+  const chg = live.change_pct
+  // 通道位置今天往上走还是往下走 —— 与收盘位置的差
+  const drift = live.channel_pct != null && closePct != null
+    ? live.channel_pct - closePct : null
+  return (
+    <span className="flex flex-col items-end gap-0.5 whitespace-nowrap">
+      <span className="font-mono">
+        <span className="text-foreground">{live.price.toFixed(2)}</span>
+        {chg != null && (
+          <span className={cn('ml-1', chg > 0 ? 'text-bull' : chg < 0 ? 'text-bear' : 'text-muted')}>
+            {chg > 0 ? '+' : ''}{chg}%
+          </span>
+        )}
+      </span>
+      <span className="flex items-center gap-1 text-[9px]">
+        {live.below_lifeline && (
+          <span title={`现价已跌回昨日生命线 MA20 ${live.ma20?.toFixed(2) ?? ''} 之下 —— 若收盘仍在下方, 定稿后会被生命线门槛挡掉。这是盘中预警, 不是结论`}
+                className="rounded bg-danger/20 px-1 py-0.5 font-medium text-danger">
+            破生命线
+          </span>
+        )}
+        {live.vol_ratio != null && (
+          <span title="盘中量比(不参与把握分 —— 评分用的是昨收那份)"
+                className="font-mono text-muted">量{live.vol_ratio.toFixed(2)}</span>
+        )}
+        {drift != null && Math.abs(drift) >= 0.03 && (
+          <span title={`现价在昨日通道里的位置 ${(live.channel_pct! * 100).toFixed(0)}%,较昨收${drift > 0 ? '上移' : '下移'} ${Math.abs(drift * 100).toFixed(0)} 个点`}
+                className={cn('font-mono', drift > 0 ? 'text-bull' : 'text-bear')}>
+            {drift > 0 ? '↑' : '↓'}{Math.abs(drift * 100).toFixed(0)}
+          </span>
+        )}
+      </span>
+    </span>
+  )
+}
+
 function NoteChips({ notes }: { notes?: TodayNote[] }) {
   if (!notes?.length) return <span className="text-[10px] text-muted/50">—</span>
   return (
@@ -358,10 +407,12 @@ function GateFunnel({ gates }: { gates?: TodayGates | null }) {
   )
 }
 
-function OpportunityTable({ rows, pickedSymbols, onOpen }: {
+function OpportunityTable({ rows, pickedSymbols, onOpen, live }: {
   rows: TodayOverview['opportunities']
   pickedSymbols: Set<string>
   onOpen: (symbol: string, name: string) => void
+  /** 实时行情开着 —— 多一列「盘中」。关着时整列不占版面 */
+  live?: boolean
 }) {
   const [open, setOpen] = useState<string | null>(null)
   return (
@@ -375,8 +426,14 @@ function OpportunityTable({ rows, pickedSymbols, onOpen }: {
             </th>
             <th className="px-2 py-1.5 text-left font-normal">名称</th>
             <th className="px-2 py-1.5 text-left font-normal">信号</th>
+            {live && (
+              <th className="px-2 py-1.5 text-right font-normal"
+                  title="盘中现价与变化。**不参与把握分** —— 把握分冻在收盘口径, 盘中一动不动">
+                盘中
+              </th>
+            )}
             <th className="hidden px-2 py-1.5 text-right font-normal md:table-cell"
-                title="Keltner 短期通道位置。50% = 恰好站在生命线 MA20 上;甜区 50%~65%">位置</th>
+                title="Keltner 短期通道位置(收盘口径)。50% = 恰好站在生命线 MA20 上;甜区 50%~65%">位置</th>
             <th className="hidden px-2 py-1.5 text-right font-normal md:table-cell"
                 title="量比。区间最优:峰在 1.3~2.5,超过 4 说明这波已经走完了">量比</th>
             <th className="hidden px-2 py-1.5 text-right font-normal xl:table-cell"
@@ -443,6 +500,11 @@ function OpportunityTable({ rows, pickedSymbols, onOpen }: {
                       )}
                     </div>
                   </td>
+                  {live && (
+                    <td className="whitespace-nowrap px-2 py-2 text-right align-top">
+                      <LiveCell live={o.live} closePct={o.channel_pct} />
+                    </td>
+                  )}
                   <td className="hidden whitespace-nowrap px-2 py-2 text-right align-top md:table-cell">
                     <PositionCell pct={o.channel_pct} />
                   </td>
@@ -489,7 +551,7 @@ function OpportunityTable({ rows, pickedSymbols, onOpen }: {
                     </button>
                   </td>
                 </tr>
-                {expanded && <OpportunityDetail o={o} />}
+                {expanded && <OpportunityDetail o={o} live={live} />}
               </Fragment>
             )
           })}
@@ -500,7 +562,7 @@ function OpportunityTable({ rows, pickedSymbols, onOpen }: {
 }
 
 /** 展开行: 把三维度拆到因子这一层, 外加注记全文与建仓路径。 */
-function OpportunityDetail({ o }: { o: TodayOpportunity }) {
+function OpportunityDetail({ o, live }: { o: TodayOpportunity; live?: boolean }) {
   const F_CN: Record<string, string> = {
     fresh: '新鲜度', state: '六态状态', rs: '相对强度',
     vol_ratio: '量比', turnover: '换手率', pos: '通道位置',
@@ -510,7 +572,7 @@ function OpportunityDetail({ o }: { o: TodayOpportunity }) {
   }
   return (
     <tr className="border-b border-border/25 bg-base/40">
-      <td colSpan={9} className="px-4 py-3">
+      <td colSpan={live ? 10 : 9} className="px-4 py-3">
         <div className="animate-rise-in space-y-2.5 text-[11px] leading-5">
           <div className="grid gap-2.5 sm:grid-cols-3">
             {DIM_META.map(d => {
@@ -546,6 +608,14 @@ function OpportunityDetail({ o }: { o: TodayOpportunity }) {
               )
             })}
           </div>
+
+          {live && (
+            <div className="rounded border border-sky-400/30 bg-sky-400/10 px-2.5 py-1.5 text-sky-300">
+              把握分与三个维度都是 <span className="font-medium">{'{'}收盘口径{'}'}</span>,盘中一动不动 ——
+              它是你的决策基准。上面「盘中」那一列才是现在正在发生的事,一分不进评分。
+              带「盘中·待收盘确认」标的候选例外:那是盘中才冒出来的信号,收盘可能收回去。
+            </div>
+          )}
 
           {o.partial && (
             <div className="rounded border border-warning/30 bg-warning/10 px-2.5 py-1.5 text-warning">
@@ -1125,11 +1195,11 @@ export function Today() {
               <span className="text-sm font-medium text-foreground">值得关注</span>
               <span
                 title={d.live
-                  ? '现价与距触发价按盘中最新价计算;带「盘中·待收盘确认」标的信号等收盘定稿'
-                  : `所有现价/距离为 ${d.as_of ?? '上一交易日'} 收盘快照 —— 打开左下角「实时行情」后自动实时`}
+                  ? '把握分与三维度是收盘口径,盘中不变(决策基准);「盘中」列是实时价与变化,不进评分。带「盘中·待收盘确认」标的候选是盘中新冒出来的信号,收盘可能收回去'
+                  : `所有价格与位置为 ${d.as_of ?? '上一交易日'} 收盘快照 —— 打开左下角「实时行情」后多出一列「盘中」`}
                 className={`rounded border px-1.5 py-0.5 text-[9px] ${d.live ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-400' : 'border-amber-400/30 bg-amber-400/10 text-amber-300'}`}
               >
-                {d.live ? '实时口径' : `昨收快照 ${d.as_of ?? ''}`}
+                {d.live ? '分数收盘口径 · 盘中列实时' : `昨收快照 ${d.as_of ?? ''}`}
               </span>
               <span className="text-[10px] text-muted">
                 {d.opportunities.length} 项 ·{' '}
@@ -1412,6 +1482,7 @@ export function Today() {
               </div>
             ) : (
               <OpportunityTable
+                live={d.live}
                 rows={d.opportunities}
                 pickedSymbols={new Set((shownPicks ?? []).filter(p => p.verdict !== '驳回').map(p => p.symbol))}
                 onOpen={goStock}
@@ -1431,7 +1502,7 @@ export function Today() {
                   : `所有距离/价格为 ${d.as_of ?? '上一交易日'} 收盘快照 —— 盘中已变化的不会反映,打开左下角「实时行情」后自动实时`}
                 className={`rounded border px-1.5 py-0.5 text-[9px] ${d.live ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-400' : 'border-amber-400/30 bg-amber-400/10 text-amber-300'}`}
               >
-                {d.live ? '实时口径' : `昨收快照 ${d.as_of ?? ''}`}
+                {d.live ? '分数收盘口径 · 盘中列实时' : `昨收快照 ${d.as_of ?? ''}`}
               </span>
             </div>
             {d.actions.length === 0 ? (

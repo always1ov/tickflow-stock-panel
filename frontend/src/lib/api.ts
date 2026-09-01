@@ -198,8 +198,25 @@ export interface TodayOpportunity {
   /** 近 20 日相对大盘(百分点) */
   rs_pct?: number | null
   close?: number | null
-  /** 不参与打分的佐证: 主线/AI/历史胜率/通道结论/龙虎榜 */
+  /** 不参与打分的佐证: 主线/AI/历史胜率/通道结论/策略命中/龙虎榜 */
   notes?: TodayNote[]
+  /** [R137] 盘中视图 —— 与 score/dims **完全并列, 一分不进评分**。
+   *  把握分冻在收盘口径(盘中一动不动, 是稳定的决策基准), 盘中的变化摆这里。
+   *  只在开着实时行情、且该标的拿到了实时行时才有。 */
+  live?: TodayLive | null
+}
+
+/** [R137] 盘中盯盘数据。拿现价去比**昨天那条**通道与生命线 —— MA20 与通道边界
+ *  都是慢变量, 这个近似给的是方向性预警, 不是结论(结论等收盘)。 */
+export interface TodayLive {
+  price: number
+  change_pct?: number
+  vol_ratio?: number
+  /** 现价落在昨天那条短期通道里的位置; 与收盘的 channel_pct 并排看就知道今天往哪走 */
+  channel_pct?: number
+  /** 现价已跌回昨日 MA20 之下 —— 收盘定稿后会被生命线门槛挡掉 */
+  below_lifeline?: boolean
+  ma20?: number
 }
 
 /** [R134] 注记 —— 展示用的佐证, **一分不加一分不减**。tone 决定界面配色。 */

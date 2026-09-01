@@ -209,3 +209,57 @@ def test_annotations_reach_the_candidate_and_never_move_the_score():
     assert {"strategy", "dragon"} <= keys
     joined = "".join(noted[0]["why"])
     assert "策略" not in joined and "龙虎" not in joined, "注记不许混进评分理由"
+
+
+# ------------------------------------------------------- [R137] 盘中视图与评分分离
+
+
+def test_live_view_reads_price_against_yesterdays_levels():
+    """拿今天的价比昨天的位置。近似成立是因为 MA20 与通道边界都是慢变量。"""
+    lv = ta.live_view(10.5, change_pct=2.5, vol_ratio=1.8,
+                      bands={"s": {"upper": 12.0, "lower": 8.0}}, ma20=10.0)
+    assert lv["price"] == 10.5 and lv["change_pct"] == 2.5 and lv["vol_ratio"] == 1.8
+    assert lv["channel_pct"] == 0.625          # (10.5-8)/(12-8)
+    assert lv["below_lifeline"] is False
+
+
+def test_live_view_flags_intraday_lifeline_break():
+    """v2 的生命线是硬门槛 —— 盘中跌回 MA20 之下, 收盘定稿就会被挡掉。
+    盯盘的人要**当场**知道, 而不是等收盘看它凭空消失。"""
+    lv = ta.live_view(9.6, bands=None, ma20=10.0)
+    assert lv["below_lifeline"] is True and lv["ma20"] == 10.0
+
+
+def test_live_view_derives_change_from_prev_close_when_absent():
+    assert ta.live_view(11.0, prev_close=10.0)["change_pct"] == 10.0
+
+
+def test_live_view_survives_missing_pieces():
+    assert ta.live_view(10.0) == {"price": 10.0}
+    assert ta.live_view(None) is None
+    assert ta.live_view(0) is None
+    assert ta.live_view("不是数") is None
+    assert "channel_pct" not in ta.live_view(10.0, bands={"s": {"upper": 5, "lower": 5}})
+
+
+def test_live_block_never_touches_the_score():
+    """决策看收盘 —— 盘中数据一分不进评分, 同一只票盘中分数必须一动不动。"""
+    from app.api.today import score_opportunities
+    trends = {"600000.SH": {"state": "UT", "state_cn": "上涨趋势", "side": "多头",
+                            "duration": 1, "close": 10.0, "as_of": "2026-08-31",
+                            "signal": "转多", "signal_desc": "突破", "ret_20d": 0.08}}
+    names = {"600000.SH": "测试"}
+    base_extra = {"gate": {"above_ma20": True, "above_ma20_prev": True, "close": 10.0,
+                           "ma120": 8.0, "ma120_rising": True},
+                  "channel_pct": 0.6, "vol_ratio": 1.6, "turnover": 4.0}
+    quiet, _ = score_opportunities(trends, {}, names, bench_ret=0.02,
+                                   extras={"600000.SH": dict(base_extra)})
+    # 盘中: 量比翻到 6、价格跌破生命线 —— 分数一分不许变
+    loud, _ = score_opportunities(trends, {}, names, bench_ret=0.02, extras={"600000.SH": {
+        **base_extra,
+        "live": {"price": 9.4, "change_pct": -6.0, "vol_ratio": 6.0,
+                 "channel_pct": 0.12, "below_lifeline": True, "ma20": 10.0},
+    }})
+    assert loud[0]["score"] == quiet[0]["score"]
+    assert loud[0]["live"]["below_lifeline"] is True
+    assert quiet[0]["live"] is None

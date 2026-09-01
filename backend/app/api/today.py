@@ -222,6 +222,9 @@ def score_opportunities(
             "why": osc.explain(res, duration=c["duration"], vol_ratio=vr,
                                channel_pct=cpct, rs_pct=rs_pct),
             "notes": _annotations(sym, e, signals.get(sym) or {}),
+            # [R137] 盘中视图。**和 score/dims 完全并列, 一分不进评分** ——
+            # 决策基准冻在收盘口径(盘中一动不动), 盘中的变化单独摆一份给人盯。
+            "live": e.get("live"),
             "mainline": e.get("mainline"),
             "verdict": e.get("verdict"),
             # 台账口径: 因子拆解现在就是三个维度分, 不再是一串加减项
@@ -614,30 +617,37 @@ def _build_overview(repo, engine=None) -> dict:
         *ai_buy_syms,
     })[:80]
     if cand_syms:
+        # [R137] **盘后与盘中分成两份, 不再互相覆盖。**
+        #
+        # 原来这里把实时叠加层叠在盘后快照之上, 于是盘中量比一变, 把握分就跟着
+        # 变 —— 而位置和门槛还是昨收, 得到的分数既不是收盘口径也不是实时口径。
+        # 用户的用法是"决策看收盘、盘中一直盯着", 那就该是:
+        #   · vol_map / turn_map  只取**盘后快照** → 喂给评分, 盘中一动不动
+        #   · live_rows           只取**实时叠加层** → 单独一份盘中视图, 不进评分
         vol_map: dict[str, float] = {}
         turn_map: dict[str, float] = {}
+        live_rows: dict[str, dict] = {}
         try:
             import polars as pl
-            frames = []
+            _LIVE_COLS = ("symbol", "close", "change_pct", "vol_ratio_5d", "turnover_rate")
             df_e, _ed = repo.get_enriched_latest()
-            if df_e is not None:
-                frames.append(df_e)
-            for asset in ("stock", "etf"):  # 实时叠加层的量比后写入 → 盘中覆盖盘后快照
-                frames.append(repo.get_watchlist_live(asset))
-            for df in frames:
-                if df is None or df.is_empty() or "symbol" not in df.columns:
-                    continue
+            if df_e is not None and not df_e.is_empty() and "symbol" in df_e.columns:
                 cols = [c for c in ("symbol", "vol_ratio_5d", "turnover_rate")
-                        if c in df.columns]
-                if len(cols) < 2:
+                        if c in df_e.columns]
+                if len(cols) >= 2:
+                    for r in df_e.filter(pl.col("symbol").is_in(cand_syms)).select(cols).to_dicts():
+                        sym_u = str(r["symbol"]).upper()
+                        if r.get("vol_ratio_5d"):
+                            vol_map[sym_u] = float(r["vol_ratio_5d"])
+                        if r.get("turnover_rate"):
+                            turn_map[sym_u] = float(r["turnover_rate"])
+            for asset in ("stock", "etf"):
+                dfl = repo.get_watchlist_live(asset)
+                if dfl is None or dfl.is_empty() or "symbol" not in dfl.columns:
                     continue
-                sub = df.filter(pl.col("symbol").is_in(cand_syms)).select(cols)
-                for r in sub.to_dicts():
-                    sym_u = str(r["symbol"]).upper()
-                    if r.get("vol_ratio_5d"):
-                        vol_map[sym_u] = float(r["vol_ratio_5d"])
-                    if r.get("turnover_rate"):
-                        turn_map[sym_u] = float(r["turnover_rate"])
+                cols = [c for c in _LIVE_COLS if c in dfl.columns]
+                for r in dfl.filter(pl.col("symbol").is_in(cand_syms)).select(cols).to_dicts():
+                    live_rows[str(r["symbol"]).upper()] = r
         except Exception as e:  # noqa: BLE001
             logger.debug("today vol factor skipped: %s", e)
         # [R134] 门槛原料: 生命线(MA20 含前一日)与长期趋势(MA120 及斜率)。
@@ -658,6 +668,18 @@ def _build_overview(repo, engine=None) -> dict:
             spct = ((bands_map.get(s) or {}).get("s") or {}).get("pct")
             if isinstance(spct, (int, float)):
                 ent["channel_pct"] = float(spct)
+            # [R137] 盘中视图: 拿现价去比**昨天那条**通道与生命线。给的是方向性
+            # 预警不是结论 —— 结论等收盘(PRD §7.5)。一分不进评分。
+            lr = live_rows.get(s)
+            if lr:
+                from app.services.today_annotations import live_view
+                lv = live_view(lr.get("close"),
+                               change_pct=lr.get("change_pct"),
+                               vol_ratio=lr.get("vol_ratio_5d"),
+                               bands=bands_map.get(s),
+                               ma20=(gate_map.get(s) or {}).get("ma20"))
+                if lv:
+                    ent["live"] = lv
             extras[s] = ent
         for s in cand_syms:
             ent = extras.setdefault(s, {})

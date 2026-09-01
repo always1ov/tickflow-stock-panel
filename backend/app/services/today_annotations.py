@@ -140,6 +140,68 @@ def dragon_note(info: dict) -> dict:
     return {"key": "dragon", "tone": tone, "label": label, "text": ";".join(parts)}
 
 
+def live_view(price, *, prev_close=None, change_pct=None, vol_ratio=None,
+              bands: dict | None = None, ma20=None) -> dict | None:
+    """[R137] 盘中盯盘视图 —— **与把握分完全分开的一份数据**。
+
+    用户的用法是"决策看收盘、盘中一直盯着"。这两件事以前混在一个数字里:
+    量比走实时叠加层, 于是同一只票盘中分数会自己动, 而位置和门槛还是昨收 ——
+    既不是收盘口径也不是实时口径, 盯着它反而会被带偏。
+
+    现在分开: **把握分冻在收盘口径**(盘中一动不动, 是稳定的决策基准),
+    盘中的变化单独摆一份, 一分不进评分。
+
+    这里算的三样都是"拿今天的价去比昨天的位置", 这个近似成立的原因是
+    MA20 与通道边界都是慢变量(一天挪不了多少); 它给的是**方向性预警**,
+    不是结论 —— 结论要等收盘, 这是 PRD §7.5 的分工, 不改。
+
+    below_lifeline 是这里最有价值的一项: v2 的生命线是硬门槛, 一只昨天入选的票
+    今天盘中跌回 MA20 之下, 收盘定稿后就会被门槛挡掉。盯盘的人需要**当场**知道,
+    而不是等收盘看它凭空消失。
+    """
+    try:
+        p = float(price)
+    except (TypeError, ValueError):
+        return None
+    if p <= 0:
+        return None
+    out: dict = {"price": round(p, 3)}
+
+    if change_pct is not None:
+        try:
+            out["change_pct"] = round(float(change_pct), 2)
+        except (TypeError, ValueError):
+            pass
+    elif prev_close:
+        try:
+            out["change_pct"] = round((p / float(prev_close) - 1) * 100, 2)
+        except (TypeError, ValueError, ZeroDivisionError):
+            pass
+
+    if vol_ratio:
+        try:
+            out["vol_ratio"] = round(float(vol_ratio), 2)
+        except (TypeError, ValueError):
+            pass
+
+    # 现价落在**昨天那条**短期通道里的位置; 与收盘位置并排看就知道今天在往哪走
+    short = (bands or {}).get("s") or {}
+    try:
+        up, low = float(short["upper"]), float(short["lower"])
+        if up > low:
+            out["channel_pct"] = round((p - low) / (up - low), 3)
+    except (KeyError, TypeError, ValueError):
+        pass
+
+    if ma20:
+        try:
+            out["below_lifeline"] = p < float(ma20)
+            out["ma20"] = round(float(ma20), 3)
+        except (TypeError, ValueError):
+            pass
+    return out
+
+
 def strategy_note(hits: list[str]) -> dict:
     """策略命中 → 注记。**不按命中数量给倾向**。
 
