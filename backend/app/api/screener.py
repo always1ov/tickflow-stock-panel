@@ -504,6 +504,7 @@ def market_snapshot(request: Request):
         for k, v in list(r.items()):
             if isinstance(v, float) and not math.isfinite(v):
                 r[k] = None
+    rows = _rows_with_ext(rows, ext_value_maps)
 
     return {"as_of": str(as_of), "rows": rows}
 
@@ -814,43 +815,22 @@ def limit_ladder(
     df = df.with_columns(_one_word_limit_expr(status_main, df.columns).alias("is_one_word"))
 
     # 动态 JOIN 扩展数据
-    ext_specs = _parse_ext_columns(ext_columns) if ext_columns else []
-    ext_col_names: list[str] = []
-    if ext_specs:
-        db = repo.store.db
-        data_dir = repo.store.data_dir
-        from app.services.ext_data import ExtConfigStore
-
-        ext_store = ExtConfigStore(data_dir)
-        configs = {c.id: c for c in ext_store.load_all()}
-
-        for config_id, field_name in ext_specs:
-            view_name = f"ext_{config_id}"
-            ext_col_name = f"{config_id}__{field_name}"
-            try:
-                ext_df = pl.from_arrow(db.query(
-                    f"SELECT symbol, {quote_ident(field_name)} FROM {view_name}"
-                ).arrow())
-                if not ext_df.is_empty() and "symbol" in ext_df.columns:
-                    ext_df = ext_df.rename({field_name: ext_col_name})
-                    df = df.join(ext_df.select(["symbol", ext_col_name]), on="symbol", how="left")
-                    ext_col_names.append(ext_col_name)
-            except Exception:
-                cfg = configs.get(config_id)
-                if cfg:
-                    try:
-                        from app.api.ext_data import _parquet_glob
-                        glob = _parquet_glob(cfg, data_dir)
-                        ext_df = pl.read_parquet(glob)
-                        if not ext_df.is_empty() and "symbol" in ext_df.columns and field_name in ext_df.columns:
-                            ext_df = ext_df.select(["symbol", field_name]).rename({field_name: ext_col_name})
-                            df = df.join(ext_df, on="symbol", how="left")
-                            ext_col_names.append(ext_col_name)
-                    except Exception:
-                        pass
+    # [R145] 扩展列改走全站通用的 `_load_ext_value_maps`。
+    #
+    # 这里原来自己写了一份 JOIN, 漏掉了通用路径里**至关重要的两步**:
+    #   1. 时序扩展表只取**最新分区**(`_read_ext_dataframe` 做的事);
+    #   2. JOIN 前 `unique(subset=["symbol"])` 去重。
+    # 「所属同花顺行业」正是一张按日分区的时序表 —— 直接查 `ext_*` 视图会拿到
+    # 一只票 × N 个历史分区那么多行, 左连接之后梯队的行数被**成倍放大**,
+    # 内存与耗时一起爆, 用户点一下配置整个页面就 500。
+    #
+    # 通用路径本来就已经处理好了分区、去重、按 parquet mtime 做的缓存, 以及
+    # 逐列的异常隔离。与其在这里维护第二份实现, 不如直接用它 —— 少一份实现,
+    # 就少一处会漏掉去重的地方。值在 rows 生成后逐行贴上, 不再动 DataFrame。
+    ext_value_maps = _load_ext_value_maps(repo, ext_columns)
 
     # 选择输出列
-    cols = ["symbol", "name", "close", "change_pct", "boards", "status", consec_col, "sealed_status", "sealed_vol", "is_one_word"] + ext_col_names
+    cols = ["symbol", "name", "close", "change_pct", "boards", "status", consec_col, "sealed_status", "sealed_vol", "is_one_word"]
     df = df.select([c for c in cols if c in df.columns])
     # 排序: boards 降序, status 按主状态→炸/翘→断/止
     status_order = pl.when(pl.col("status") == status_main).then(0)
