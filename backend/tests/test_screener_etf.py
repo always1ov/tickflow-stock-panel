@@ -51,7 +51,7 @@ def test_all_builtin_strategies_use_matrix_backend_only():
     strategies = [engine.get(meta["id"]) for meta in engine.list_strategies()]
     matrix_strategies = [s for s in strategies if s.execution_backend == "matrix_native"]
     # 叉版额外保留 factor_rank_research(matrix), 比作者仓多 1
-    assert len(matrix_strategies) == 19
+    assert len(matrix_strategies) == 26
     assert all(s.matrix_strategy is not None for s in matrix_strategies)
     assert all(s.filter_fn is None for s in matrix_strategies)
     assert all(s.filter_history_fn is None for s in matrix_strategies)

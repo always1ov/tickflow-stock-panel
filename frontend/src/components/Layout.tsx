@@ -174,7 +174,8 @@ function MonitorBadge({ active }: { active: boolean }) {
 
 function SidebarIndexQuotes({ rows, items, globalRows, cnLive }: {
   rows: IndexQuote[] | undefined
-  items: CoreIndex[]
+  // [同步上游 3c6ed99] 作者把展示层指数收敛为固定核心四只(readonly 常量)
+  items: readonly CoreIndex[]
   /** [R102] 全球指数(独立数据源) — 与 A 股指数同格显示, 数据链各自独立 */
   globalRows?: { key: string; name: string; last: number; change_pct?: number | null; updated_at?: number; trading?: boolean }[]
   /** [R119] A 股这几张卡此刻是不是真在跳(交易时段 + 数据来自实时缓存) */
@@ -703,18 +704,16 @@ export function Layout() {
       return next
     })
   }
-  const indicesPinned = prefs?.indices_nav_pinned ?? true
-  const sidebarIndexSymbols = prefs?.sidebar_index_symbols ?? CORE_INDEXES.map(p => p.symbol)
-  const sidebarIndexes = CORE_INDEXES.filter(item => sidebarIndexSymbols.includes(item.symbol))
-  // 卡片数据：固定显示时也拉取（即使实时行情关闭）
-  const showSidebarQuotes = indicesPinned || realtimeEnabled
+  // [同步上游 3c6ed99] 指数条固定核心四只(产品契约, 不再可配置), 常驻显示 ——
+  // indices_nav_pinned / sidebar_index_symbols 两个偏好随作者一并下线。
+  const sidebarIndexes = CORE_INDEXES
   // [R119] A 股指数卡也走自主轮询, 不再只靠 SSE 推 —— SSE 断线或实时开关关着时
   // 卡片就彻底静止了, 用户看不出是"没变"还是"没在更新"。端点只读行情缓存/日线
   // 回退, **不触发 TickFlow 请求**, 所以这里多问几次不烧配额。
   const { data: sidebarIndexQuotes } = useQuery({
-    queryKey: [...QK.indexQuotes, 'sidebar', sidebarIndexSymbols.join(',')] as const,
+    queryKey: [...QK.indexQuotes, 'sidebar', 'core'] as const,
     queryFn: () => api.indexQuotes(sidebarIndexes.map(p => p.symbol)),
-    enabled: showSidebarQuotes && sidebarIndexes.length > 0,
+    enabled: sidebarIndexes.length > 0,
     placeholderData: (prev) => prev,
     // 交易时段 + 轮询在跑 → 6s(与行情轮询同频); 交易时段但没开实时 → 30s
     // (读到的是日线回退, 不会变, 只为开关一打开就跟上); 休市 → 60s
@@ -752,7 +751,7 @@ export function Layout() {
     // 休市值静止, 高频拉只是白打上游
     refetchInterval: (q: any) => (q?.state?.data?.items ?? []).some((i: any) => i.trading) ? 8000 : 60000,
     placeholderData: (prev: { items: import('@/lib/api').GlobalIndexQuote[] } | undefined) => prev,
-    enabled: showSidebarQuotes && !navCollapsed,
+    enabled: !navCollapsed,
   })
   const realtimeToggleDisabled = toggleQuote.isPending || isPaused
   const realtimeActive = realtimeEnabled && isRunning && isTrading
@@ -923,9 +922,9 @@ export function Layout() {
               />
             </div>
           )}
-          {/* [R102] 指数报价 — A 股与全球指数同格同开关(showSidebarQuotes), 数据链各自独立:
-              A 股来自行情主链, 全球来自独立新浪源; A 股实时不可用时全球卡照常显示 */}
-          {!navCollapsed && showSidebarQuotes && (
+          {/* [R102] 指数报价 — A 股与全球指数同格, 数据链各自独立: A 股来自行情主链,
+              全球来自独立公开源; A 股实时不可用时全球卡照常显示。常驻显示(上游口径) */}
+          {!navCollapsed && (
             <SidebarIndexQuotes
               rows={cnQuotesOk ? sidebarIndexQuotes?.rows : undefined}
               items={cnQuotesOk ? sidebarIndexes : []}
@@ -1209,6 +1208,8 @@ export function Layout() {
                 )}
               </div>
             )}
+          {/* [R102] 指数卡的渲染点在上面(与全球指数同格) —— 作者这里新增的裸调用
+              会重复渲染一遍, 故不采纳; A 股可用性判据 cnQuotesOk 与作者同口径。 */}
         </div>
         )}
 

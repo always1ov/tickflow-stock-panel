@@ -47,6 +47,7 @@ const BUILTIN_PAGES: NavEntry[] = [
   { id: '/mining', label: '挖掘', type: 'builtin', visible: true },
   { id: '/paper-trading', label: 'AI 操盘手', type: 'builtin', visible: true },
   { id: '/limit-ladder', label: '连板梯队', type: 'builtin', visible: true },
+  { id: '/indices', label: '指数', type: 'builtin', visible: true },
   { id: '/concept-analysis', label: '概念分析', type: 'builtin', visible: true },
   { id: '/industry-analysis', label: '行业分析', type: 'builtin', visible: true },
   { id: '/stock-analysis', label: '个股分析', type: 'builtin', visible: true },
@@ -58,7 +59,6 @@ const BUILTIN_PAGES: NavEntry[] = [
   { id: '/review', label: '复盘', type: 'builtin', visible: true },
   { id: '/usage-notes', label: '我的使用观察', type: 'builtin', visible: true },
   { id: '/financials', label: '财务分析', type: 'builtin', visible: true },
-  { id: '/indices', label: '指数', type: 'builtin', visible: true },
   { id: '/monitor', label: '监控中心', type: 'builtin', visible: true },
   { id: '/data', label: '数据', type: 'builtin', visible: true },
 ]

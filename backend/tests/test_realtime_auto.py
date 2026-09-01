@@ -50,13 +50,27 @@ def test_grace_window():
 # ------------------------------------------------------------ 边沿触发
 
 
+class _FakeRepo:
+    """[同步上游 ed2f81c] 首用门禁判据: 日K/enriched 最近日期。"""
+
+    def __init__(self, empty=False):
+        self._empty = empty
+
+    def latest_daily_date(self):
+        return None if self._empty else "2026-09-01"
+
+    def latest_enriched_date(self):
+        return None
+
+
 class _FakeService:
     """只保留自动开关需要的那几个成员, 不碰真正的轮询线程。"""
 
     _AUTO_TICK_S = 30.0
     _final_sync_key = staticmethod(lambda phase: ("2026-09-02", "close") if phase == "close_final" else None)
 
-    def __init__(self):
+    def __init__(self, *, has_data=True):
+        self._repo = _FakeRepo() if has_data else _FakeRepo(empty=True)
         self._enabled = False
         self._auto_last_desired = None
         self._auto_pref_last = None
@@ -82,6 +96,7 @@ class _FakeService:
     from app.services.quote_service import QuoteService as _QS
     _auto_tick = _QS._auto_tick
     _final_sync_pending = _QS._final_sync_pending
+    _has_local_data = _QS._has_local_data
     notify_auto_pref_changed = _QS.notify_auto_pref_changed
 
 
@@ -194,3 +209,15 @@ def test_preference_round_trip(svc):
     assert preferences.get_realtime_auto() is False
     preferences.set_realtime_auto(True)
     assert preferences.get_realtime_auto() is True
+
+
+def test_auto_is_blocked_when_local_store_is_empty(svc, monkeypatch):
+    """[同步上游 ed2f81c] 空库下自动开关不该硬开 —— 与作者的首用门禁同口径。
+
+    那道门禁在 API 层, 自动开关走服务层 enable() 绕得过去, 所以服务层自己再判一次。
+    """
+    from app.services import preferences
+    preferences.set_realtime_auto(True)
+    svc._repo = _FakeRepo(empty=True)
+    _at(svc, monkeypatch, datetime(2026, 9, 2, 10, 0))
+    assert svc.calls == [] and svc._enabled is False
