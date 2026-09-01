@@ -228,7 +228,7 @@ function SortableCardRow({
         type="button"
         {...attributes}
         {...listeners}
-        className="cursor-grab active:cursor-grabbing text-muted hover:text-foreground transition-colors shrink-0"
+        className="no-press cursor-grab active:cursor-grabbing text-muted hover:text-foreground transition-colors shrink-0"
         title="拖动排序"
       >
         <GripVertical className="h-4 w-4" />
@@ -237,7 +237,7 @@ function SortableCardRow({
       <button
         type="button"
         onClick={onToggle}
-        className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors ${
+        className={`tap-target flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors ${
           on ? 'bg-accent border-accent' : 'bg-base border-border'
         }`}
         role="checkbox"

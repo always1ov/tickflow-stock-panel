@@ -201,6 +201,35 @@ body {
 /* 自带 ring 的组件(Toast/开关)显式退出, 避免环与轮廓叠两层 */
 .focus-ring-custom:focus-visible { outline: none !important; }
 
+/* ===== [R128] 按钮按下反馈 —— skill §4 的 `button: [S1→0.95→1] press` =====
+ * 全项目 917 个按钮里, 改之前**只有 4 处**写了 active:scale ——
+ * 点下去没有任何反馈, 在网络慢的时候尤其难受: 用户不知道到底点上没有。
+ * 与焦点环同一个思路: 与其在 917 处各写一遍, 不如一条全局规则兜住。
+ *
+ * 幅度取 0.97 而不是 skill 举例的 0.95: 这个界面的按钮普遍小(28~32px 高),
+ * 0.95 在小尺寸上会有明显的"塌陷感", 0.97 刚好能感觉到又不晃眼。
+ * 禁用态不给反馈 —— 按不动的东西不该假装被按下。
+ * 拖拽手柄(.no-press)排除: 它按下后要跟手移动, 缩放会让指针错位。 */
+:where(button, [role='button'], [role='switch'], [role='tab']):not(:disabled):not([aria-disabled='true']):not(.no-press):active {
+  transform: scale(0.97);
+  transition-duration: theme('transitionDuration.press');
+}
+
+/* 极小控件的透明扩展点击区 —— 密集表格里那几个 16~20px 的勾选/切换,
+ * 视觉尺寸不动(放大会毁掉版式), 但用伪元素把可点区域撑到 28px。
+ * skill §8 写的 44×44 是**移动端**指南; 这是桌面密集交易界面, 一屏几百个
+ * 数字, 44px 的控件根本排不下 —— 取 28px 这个桌面工具的常见底线, 并明说
+ * 这是有意偏离而不是漏做。 */
+.tap-target { position: relative; }
+.tap-target::before {
+  content: '';
+  position: absolute;
+  inset: 50% auto auto 50%;
+  width: max(100%, 28px);
+  height: max(100%, 28px);
+  transform: translate(-50%, -50%);
+}
+
 /* 尊重系统「减少动态效果」设置 —— 前庭功能敏感的用户会打开它。
  * 不是关掉动画了事: 保留极短时长, 状态切换仍可感知, 只是不再有位移与缩放。 */
 @media (prefers-reduced-motion: reduce) {
@@ -211,5 +240,9 @@ body {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+  /* 按下缩放属于"位移类"动效, 这里直接取消而不是加速 */
+  :where(button, [role='button'], [role='switch'], [role='tab']):active {
+    transform: none !important;
   }
 }

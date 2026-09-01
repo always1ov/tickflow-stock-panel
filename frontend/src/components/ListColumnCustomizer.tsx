@@ -93,7 +93,7 @@ function SortableActiveCol({ col, onRemove, onConfig, configOpen, extTableLabel,
         <span
           {...attributes}
           {...listeners}
-          className="cursor-grab active:cursor-grabbing text-muted hover:text-foreground transition-colors shrink-0"
+          className="no-press cursor-grab active:cursor-grabbing text-muted hover:text-foreground transition-colors shrink-0"
         >
           <GripVertical className="h-3.5 w-3.5" />
         </span>

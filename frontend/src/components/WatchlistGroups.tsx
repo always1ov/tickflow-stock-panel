@@ -131,7 +131,7 @@ export function WatchlistGroupBar({
                 onClick={() => onSelect(tab.id)}
                 title={draggable ? `${tab.name} — 可拖拽调整分组顺序` : undefined}
                 className={`relative my-1.5 inline-flex shrink-0 items-center gap-1.5 rounded-btn border px-3 text-xs transition-colors ${
-                  draggable ? 'cursor-grab active:cursor-grabbing' : ''
+                  draggable ? 'no-press cursor-grab active:cursor-grabbing' : ''
                 } ${
                   dragging ? 'opacity-40' : ''
                 } ${

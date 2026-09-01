@@ -103,7 +103,7 @@ function SortableItem({ entry, hidden, onToggleHidden, badgeEnabled, onToggleBad
       <div
         {...attributes}
         {...listeners}
-        className="cursor-grab active:cursor-grabbing text-muted hover:text-foreground transition-colors"
+        className="no-press cursor-grab active:cursor-grabbing text-muted hover:text-foreground transition-colors"
       >
         <GripVertical className="h-4 w-4" />
       </div>

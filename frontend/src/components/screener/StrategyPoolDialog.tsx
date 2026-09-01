@@ -309,7 +309,7 @@ export function StrategyPoolDialog({ pool, onConfirm, onClose }: Props) {
                             value={id}
                             className="flex items-center gap-2 px-2.5 py-1.5 rounded-btn
                               bg-accent/8 border border-accent/20
-                              cursor-grab active:cursor-grabbing
+                              no-press cursor-grab active:cursor-grabbing
                               hover:bg-accent/15 transition-colors group"
                             whileDrag={{ scale: 1.02, zIndex: 50, boxShadow: '0 4px 12px rgba(0,0,0,0.2)' }}
                           >

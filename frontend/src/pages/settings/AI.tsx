@@ -588,7 +588,7 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: () => void 
     <button
       type="button"
       onClick={onChange}
-      className={`relative inline-flex h-5 w-9 items-center rounded-full shrink-0 transition-colors duration-expand ${checked ? 'bg-accent' : 'bg-elevated'}`}
+      className={`tap-target relative inline-flex h-5 w-9 items-center rounded-full shrink-0 transition-colors duration-expand ${checked ? 'bg-accent' : 'bg-elevated'}`}
       aria-pressed={checked}
     >
       <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white shadow-sm transition-transform duration-expand ${checked ? 'translate-x-[18px]' : 'translate-x-[3px]'}`} />

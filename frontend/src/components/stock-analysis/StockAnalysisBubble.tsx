@@ -99,7 +99,7 @@ export function StockAnalysisBubble() {
   return (
     <div
       ref={containerRef}
-      className="sa-bubble-root fixed z-[60] select-none cursor-grab active:cursor-grabbing"
+      className="sa-bubble-root fixed z-[60] select-none no-press cursor-grab active:cursor-grabbing"
       style={{
         width: `${BUBBLE_W}px`,
         transform: `translate3d(${pos.x}px, ${pos.y}px, 0)`,

@@ -719,7 +719,7 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (e?: React.
     <button
       type="button"
       onClick={onChange}
-      className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors ${checked ? 'bg-accent' : 'bg-elevated'}`}
+      className={`tap-target relative inline-flex h-4 w-7 items-center rounded-full transition-colors ${checked ? 'bg-accent' : 'bg-elevated'}`}
       aria-pressed={checked}
     >
       <span className={`inline-block h-3 w-3 rounded-full bg-white shadow-sm transition-transform ${checked ? 'translate-x-[14px]' : 'translate-x-[2px]'}`} />
