@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import time
 from datetime import date, timedelta
 
 from fastapi import APIRouter, Request
@@ -490,6 +491,30 @@ def holding_stance(exit_triggered: bool, distance_pct: float | None,
     return "持有", "无触发条件,按既定计划持有"
 
 
+class _Stages:
+    """[R156] 总览各阶段计时。结果随响应带出(``perf`` 字段)并在超过阈值时记日志 ——
+    「今日总览慢」这种反馈, 没有分段数字就只能猜。"""
+
+    SLOW_MS = 1500
+
+    def __init__(self) -> None:
+        self.t0 = self.t = time.perf_counter()
+        self.rows: dict[str, int] = {}
+
+    def mark(self, name: str) -> None:
+        now = time.perf_counter()
+        self.rows[name] = round((now - self.t) * 1000)
+        self.t = now
+
+    def done(self) -> dict:
+        total = round((time.perf_counter() - self.t0) * 1000)
+        if total >= self.SLOW_MS:
+            slowest = sorted(self.rows.items(), key=lambda kv: -kv[1])[:4]
+            logger.info("today overview %d ms; 最慢: %s", total,
+                        ", ".join(f"{k} {v}ms" for k, v in slowest))
+        return {"total_ms": total, "stages_ms": self.rows}
+
+
 def _build_overview(repo, engine=None) -> dict:
     """[R135] engine 为 StrategyEngine, 只用来把「策略命中」这个**注记**读出来
     (读策略页已写好的缓存, 不跑策略)。不传就没有那个标, 其余一切不变。"""
@@ -498,6 +523,7 @@ def _build_overview(repo, engine=None) -> dict:
     from app.services.livermore_service import trends_for_symbols
     from app.services.position_exit import exit_lines_for_positions
 
+    _st = _Stages()
     entries = watchlist.list_symbols()
     syms_raw = [str(e.get("symbol", "")).upper() for e in entries if e.get("symbol")]
     # 自选表只存代码; 中文名走 instruments 统一名称入口(股票+ETF+指数), 查不到再退回代码
@@ -513,6 +539,7 @@ def _build_overview(repo, engine=None) -> dict:
     signals = stock_signal.load_all()
     pos_all = positions_svc.load_all()
     exit_lines = exit_lines_for_positions(repo)
+    _st.mark("trends+exit_lines")
     # 出场线的现价/距离改用实时价(纪律判定 triggered/fatal 仍是收盘口径, 不动)
     for sym, ex in exit_lines.items():
         lv = live.get(sym)
@@ -574,6 +601,8 @@ def _build_overview(repo, engine=None) -> dict:
     sev_rank = {"high": 0, "mid": 1}
     actions.sort(key=lambda a: sev_rank.get(a["severity"], 9))
 
+    _st.mark("actions")
+
     # ---- ② 机会区(门槛可由用户调; 卖出提醒都在行动区, 永不过滤) ----
     # [R11/R13] 大盘模式提前取: 姿态合成与相对强度都要用; 失败只降级不拦路
     market = None
@@ -584,6 +613,7 @@ def _build_overview(repo, engine=None) -> dict:
         logger.warning("today market mode skipped: %s", e)
     bench_ret = ((market or {}).get("metrics") or {}).get("ret_20d")
     prefs = today_prefs.load()
+    _st.mark("market_mode")
 
     # [R43] 高抛低吸由 Keltner 三档通道位置决定 —— 与决策台三列、个股分析图表
     # 同一组口径。走批量服务, 持仓 + 候选加起来可能上百只, 逐只算会拖死总览。
@@ -611,6 +641,8 @@ def _build_overview(repo, engine=None) -> dict:
                     verdict_map[sym] = v
     except Exception as e:  # noqa: BLE001
         logger.debug("today keltner skipped: %s", e)
+
+    _st.mark("keltner")
 
     # [R134] 候选集要**同时覆盖两路**: 六态转强的, 和 AI 看多(逼近突破)的。
     # v1 只给前者算量能, 于是后者的量能维度整个缺席, 而缺维度会在维度间重归一化
@@ -656,6 +688,7 @@ def _build_overview(repo, engine=None) -> dict:
                     live_rows[str(r["symbol"]).upper()] = r
         except Exception as e:  # noqa: BLE001
             logger.debug("today vol factor skipped: %s", e)
+        _st.mark("snapshot+live")
         # [R134] 门槛原料: 生命线(MA20 含前一日)与长期趋势(MA120 及斜率)。
         # 与 Keltner 长期档共用同一次批量读, 不新增 IO。
         gate_map: dict[str, dict] = {}
@@ -664,6 +697,7 @@ def _build_overview(repo, engine=None) -> dict:
             gate_map = _ks.long_trend_map(repo, cand_syms)
         except Exception as e:  # noqa: BLE001
             logger.warning("today gate data skipped: %s", e)
+        _st.mark("gates")
         for s in cand_syms:
             ent = {}
             if s in turn_map:
@@ -687,17 +721,22 @@ def _build_overview(repo, engine=None) -> dict:
                 if lv:
                     ent["live"] = lv
             extras[s] = ent
+        # [R156] 历史胜率改走批量: 原来逐只调 bullish_win_rate_for_symbol, 每只一趟
+        # 320 日历日 parquet 扫描, 候选上限 80 只 = 80 趟扫盘 —— 这是总览接口
+        # 最大的一块耗时。现在一次批量读 + 按(票, 末日, 阈值)记忆, 结果一字不差。
+        wins: dict[str, dict] = {}
+        try:
+            from app.services.livermore_service import bullish_win_rates_for_symbols
+            wins = bullish_win_rates_for_symbols(repo, cand_syms)
+        except Exception as e:  # noqa: BLE001
+            logger.debug("today win rate skipped: %s", e)
         for s in cand_syms:
             ent = extras.setdefault(s, {})
             if s in vol_map:
                 ent["vol_ratio"] = vol_map[s]
-            try:
-                from app.services.livermore_service import bullish_win_rate_for_symbol
-                win = bullish_win_rate_for_symbol(repo, s)
-                if win:
-                    ent["win"] = win
-            except Exception as e:  # noqa: BLE001
-                logger.debug("today win rate skipped for %s: %s", s, e)
+            if s in wins:
+                ent["win"] = wins[s]
+        _st.mark("win_rate")
 
     # [R47] 通道结论: 给全部自选打标, 不只 cand_syms。[R134] 它现在是**注记**,
     # 不再进把握分 —— 位置那一维改用 Keltner 短期通道位置这个连续量,
@@ -721,6 +760,8 @@ def _build_overview(repo, engine=None) -> dict:
     except Exception as e:  # noqa: BLE001 —— 注记取不到只是少个标, 不该拖垮总览
         logger.debug("today annotations skipped: %s", e)
 
+    _st.mark("annotations")
+
     # [R37] 中观层: 主线归属 + 中观快照。给全部自选打标(不止趋势候选) ——
     # 逼近突破那一路的候选来自 AI 信号, 不在 cand_syms 里, 也该享受同一份加成。
     meso = None
@@ -732,6 +773,8 @@ def _build_overview(repo, engine=None) -> dict:
     except Exception as e:  # noqa: BLE001
         logger.debug("today meso skipped: %s", e)
 
+    _st.mark("meso")
+
     # [R133] 先拿到**完整**排序列表, 再按门槛截断。台账记完整的那份 ——
     # 只记显示出来的 10 条, 等于只用样本里最好的一段去证明样本好。
     ranked_all, gate_info = score_opportunities(trends, signals, names, bench_ret, extras)
@@ -742,6 +785,8 @@ def _build_overview(repo, engine=None) -> dict:
     for o in opportunities:
         if o["kind"] == "trend_signal" and (trends.get(o["symbol"]) or {}).get("intraday"):
             o["intraday"] = True
+
+    _st.mark("score")
 
     # ---- ③ 市场天气(自选口径)----
     bull = sum(1 for t in trends.values() if t["side"] == "多头")
@@ -826,6 +871,8 @@ def _build_overview(repo, engine=None) -> dict:
 
     as_of = max((t["as_of"] for t in trends.values()), default=None)
 
+    _st.mark("weather+holdings")
+
     # [R133] 落一份当日候选池快照 —— 这套把握分有没有区分度, 只能靠事后记录回答。
     # 判"定稿"看数据不看时钟: 只要没有任何一只用了实时价参与判定, 这份快照的
     # close 就是 as_of 那天的真收盘, 可以当收益起点; 盘中(实时行情开着)则不记,
@@ -837,6 +884,8 @@ def _build_overview(repo, engine=None) -> dict:
                                     {o["symbol"] for o in opportunities}, True)
     except Exception as e:  # noqa: BLE001 —— 记账失败绝不能影响总览
         logger.debug("score ledger record skipped: %s", e)
+
+    _st.mark("ledger")
 
     # [R13] 组合汇总: 逐票之上的整体视角
     portfolio = None
@@ -885,20 +934,43 @@ def _build_overview(repo, engine=None) -> dict:
             sev_rank = {"high": 0, "mid": 1}
             actions.sort(key=lambda a: sev_rank.get(a["severity"], 9))
 
+    _st.mark("portfolio")
+
+    # [R156] ATR 先从 enriched 最新快照取 —— 它与 Keltner 用的是同一份、已在内存,
+    # 且本来就带 atr_14/close。原来每只机会都单独 get_daily_asset 扫一趟 30 天盘,
+    # 十来只就是十来趟。快照里没有的(ETF/指数)才回退到逐只读, 结果口径不变。
+    atr_map: dict[str, float] = {}
+    try:
+        import polars as pl
+        df_snap, _ = repo.get_enriched_latest()
+        if (df_snap is not None and not df_snap.is_empty()
+                and {"symbol", "close", "atr_14"} <= set(df_snap.columns)):
+            want_syms = [o["symbol"] for o in opportunities]
+            rows_snap = (df_snap
+                         .filter(pl.col("symbol").str.to_uppercase().is_in(want_syms))
+                         .select(["symbol", "close", "atr_14"]).to_dicts())
+            for r in rows_snap:
+                c, a = r.get("close"), r.get("atr_14")
+                if c and a:
+                    atr_map[str(r["symbol"]).upper()] = float(a) / float(c)
+    except Exception as e:  # noqa: BLE001
+        logger.debug("today atr snapshot skipped: %s", e)
+
     # [R12] 仓位建议: 姿态定总仓位基调, 把握分×波动率定单票建议(仅展示, 不是指令)
     for o in opportunities:
-        atr_pct = None
+        atr_pct = atr_map.get(o["symbol"])
         try:
-            df = repo.get_daily_asset(
-                repo.resolve_asset_type(o["symbol"]), o["symbol"],
-                date.today() - timedelta(days=30), date.today(),
-                columns=["date", "close", "atr_14"],
-            )
-            if not df.is_empty() and "atr_14" in df.columns and "close" in df.columns:
-                last = df.sort("date").tail(1)
-                c, a = last["close"][0], last["atr_14"][0]
-                if c and a:
-                    atr_pct = float(a) / float(c)
+            if atr_pct is None:
+                df = repo.get_daily_asset(
+                    repo.resolve_asset_type(o["symbol"]), o["symbol"],
+                    date.today() - timedelta(days=30), date.today(),
+                    columns=["date", "close", "atr_14"],
+                )
+                if not df.is_empty() and "atr_14" in df.columns and "close" in df.columns:
+                    last = df.sort("date").tail(1)
+                    c, a = last["close"][0], last["atr_14"][0]
+                    if c and a:
+                        atr_pct = float(a) / float(c)
         except Exception as e:  # noqa: BLE001
             logger.debug("today atr load skipped for %s: %s", o["symbol"], e)
         o["advice"] = suggest_position(
@@ -909,8 +981,13 @@ def _build_overview(repo, engine=None) -> dict:
                 o["advice"]["fraction"], o.get("pivot"),
                 prefs["pyramid_probe"], prefs["pyramid_confirm"], prefs["pyramid_days"])
 
+    _st.mark("advice")
+    perf = _st.done()
+
     return {
         "as_of": as_of,
+        # [R156] 各阶段耗时(ms)。用户说"慢"时打开 /api/today 看这一栏, 不用猜
+        "perf": perf,
         "watchlist_total": len(syms),
         "trend_total": len(trends),
         "live": bool(live),

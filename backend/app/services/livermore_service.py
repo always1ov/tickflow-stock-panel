@@ -268,6 +268,69 @@ def bullish_win_rate_for_symbol(repo, symbol: str, horizon: int = 5) -> dict | N
     return _bullish_event_win_rate(states, closes, horizon=horizon)
 
 
+# [R156] 历史胜率的批量版 + 按(票, 末日, 阈值)记忆。
+#
+# 起因: 今日总览对每只候选逐只调 bullish_win_rate_for_symbol, 每次都是一趟
+# 320 日历日的 parquet 扫描 —— 候选上限 80 只就是 80 趟扫盘, 这是总览接口
+# 最大的一块耗时。而 trends_for_symbols 早就示范了正确做法: 同一窗口、同一列,
+# 一次 get_daily_batch 读完再按 symbol 分组。
+#
+# 记忆: 一只票的历史胜率只在新日线落地或阈值改动时才会变, 所以键取
+# (symbol, 窗口末日, 阈值, horizon) —— 同一天再打开总览, 连 compute 都省了。
+_WIN_CACHE: dict[tuple[str, str, float, int], dict | None] = {}
+_WIN_CACHE_MAX = 4000
+
+
+def bullish_win_rates_for_symbols(repo, symbols: list[str], horizon: int = 5) -> dict[str, dict]:
+    """{SYMBOL: {"rate", "n"}}, 样本不足的票不出现。股票一次批量读; ETF/指数逐只回退。
+
+    结果与逐只调 bullish_win_rate_for_symbol 完全一致(同窗口、同阈值、同纯函数),
+    只是 IO 从 N 趟变成 1 趟。
+    """
+    out: dict[str, dict] = {}
+    syms = sorted({str(s).strip().upper() for s in symbols if s and str(s).strip()})
+    if not syms:
+        return out
+    series: dict[str, tuple[list[float], list[str]]] = {}
+    stock_syms = [s for s in syms if repo.resolve_asset_type(s) == "stock"]
+    if stock_syms:
+        end = date.today()
+        start = end - timedelta(days=_CALENDAR_SPAN_DAYS)
+        try:
+            df = repo.get_daily_batch(stock_syms, start, end, ["symbol", "date", "close"])
+        except Exception as e:  # noqa: BLE001
+            logger.warning("livermore win-rate batch daily failed: %s", e)
+            df = pl.DataFrame()
+        if df is not None and not df.is_empty() and "symbol" in df.columns:
+            for sym, part in df.group_by("symbol"):
+                key = str(sym[0] if isinstance(sym, tuple) else sym).upper()
+                series[key] = _closes_window(part)
+    for s in syms:
+        if s in series:
+            continue
+        try:  # ETF / 指数, 或批量里没读到的
+            series[s] = _load_symbol_window(repo, s)
+        except Exception as e:  # noqa: BLE001
+            logger.debug("livermore win-rate window for %s failed: %s", s, e)
+    for s, (closes, dates) in series.items():
+        if len(closes) < _MIN_DAYS:
+            continue
+        thr, _src = get_effective_threshold(s)
+        key = (s, dates[-1], float(thr), int(horizon))
+        if key in _WIN_CACHE:
+            win = _WIN_CACHE[key]
+        else:
+            res = compute(closes, dates, thr)
+            states = [st["state"] for st in res["steps"]]
+            win = _bullish_event_win_rate(states, closes, horizon=horizon)
+            if len(_WIN_CACHE) >= _WIN_CACHE_MAX:
+                _WIN_CACHE.clear()
+            _WIN_CACHE[key] = win
+        if win:
+            out[s] = win
+    return out
+
+
 def append_live_bar(closes: list[float], dates: list[str],
                     live_entry: tuple[str, float] | None) -> tuple[list[float], list[str]]:
     """[R16] 盘中实时: 把当天实时价作为"临时收盘"追加到窗口末尾。
