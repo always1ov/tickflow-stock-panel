@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Star, Wallet, Sparkles, Loader2, ArrowUp, ArrowDown, RefreshCw, FileText, TrendingUp, Download, Bell } from 'lucide-react'
 import { api, type ExitLine, type KeltnerBand, type KeltnerBands, type KeltnerVerdict, type TrendInfo } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
+import { pickStale, SIGNAL_TTL_HOURS } from '@/lib/signalFreshness'   // [R131] 增量分析判据
 import { toast } from '@/components/Toast'
 import { useHistoryReports, openHistoryReport, loadHistory } from '@/lib/stockAnalysisStore'
 import { trendBadgeCls } from '@/components/stock-analysis/TrendStateBar'
@@ -387,9 +388,38 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
     }
   }
   const allSyms = () => (enriched.data?.rows ?? []).map((r: any) => String(r.symbol))
-  const runAll = () => runBatch(allSyms())
-  // 只分析标记为「持有」的自选 —— 省 AI 调用, 持仓优先
-  const runHeld = () => runBatch(allSyms().filter((sym: string) => positions[sym]?.held))
+  const heldSyms = () => allSyms().filter((sym: string) => positions[sym]?.held)
+
+  // [R131] 批量分析改**增量**: 只跑"需要重算"的。判据见 lib/signalFreshness ——
+  // 主要看信号有没有见过最新那根 K 线, 数据没更新就没必要再花一次调用。
+  // 单只想强制重跑, 点行内那个 ✨(它不走这套过滤)。
+  const staleAll = useMemo(
+    () => pickStale(allSyms(), signals, enriched.data?.as_of),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [enriched.data, signals],
+  )
+  const staleHeld = useMemo(
+    () => pickStale(heldSyms(), signals, enriched.data?.as_of),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [enriched.data, signals, positions],
+  )
+
+  /** 跑增量批量, 并在结果里如实说明跳过了多少 */
+  const runIncremental = (stale: string[], total: number, what: string) => {
+    if (!total) {
+      toast(`没有可分析的标的:行情数据未就绪或自选为空${what === '持有' ? '(只看持有时需先标记持有)' : ''}`, 'error')
+      return
+    }
+    if (!stale.length) {
+      toast(`${what}的 ${total} 只都已是最新分析(基于当前数据基准日), 无需重算`, 'success')
+      return
+    }
+    const skipped = total - stale.length
+    if (skipped > 0) toast(`跳过 ${skipped} 只已是最新的, 开始分析 ${stale.length} 只`, 'success')
+    runBatch(stale)
+  }
+  const runAll = () => runIncremental(staleAll, allSyms().length, '全部')
+  const runHeld = () => runIncremental(staleHeld, heldSyms().length, '持有')
 
   const rows = useMemo(() => {
     const src = enriched.data?.rows ?? []
@@ -523,21 +553,29 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
           <button
             onClick={runHeld}
             disabled={!!progress}
-            title="只对标记为「持有」的自选生成 AI 买卖信号(省调用, 持仓优先)"
+            title={`只对标记为「持有」的自选生成 AI 买卖信号(省调用, 持仓优先)。`
+              + `\n[R131] 只跑需要重算的 ${staleHeld.length} 只 —— 信号已看过最新一根 K 线的会跳过`
+              + `\n(数据没更新时重跑, 喂给 AI 的还是同一份输入; 超过 ${SIGNAL_TTL_HOURS} 小时仍会重算)`
+              + `\n想强制重跑某一只, 点它那行的 ✨`}
             className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-btn border border-amber-400/30 bg-amber-400/10 text-amber-300 hover:bg-amber-400/20 disabled:opacity-60 transition-colors cursor-pointer"
           >
             {progress ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
-            AI 分析持有
+            AI 分析持有{staleHeld.length > 0 && <span className="text-amber-300/70">·{staleHeld.length}</span>}
           </button>
         )}
         <button
           onClick={runAll}
           disabled={!!progress}
-          title="对全部自选逐只生成 AI 买卖信号(会调用 AI,按只计费)"
+          title={`对自选逐只生成 AI 买卖信号(会调用 AI, 按只计费)。`
+            + `\n[R131] 只跑需要重算的 ${staleAll.length} 只 —— 信号已看过最新一根 K 线的会跳过`
+            + `\n(数据没更新时重跑, 喂给 AI 的还是同一份输入, 花钱买不到新信息; 超过 ${SIGNAL_TTL_HOURS} 小时仍会重算)`
+            + `\n想强制重跑某一只, 点它那行的 ✨`}
           className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-btn border border-sky-400/30 bg-sky-400/10 text-sky-300 hover:bg-sky-400/20 disabled:opacity-60 transition-colors cursor-pointer"
         >
           {progress ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
-          {progress ? `分析中 ${progress.done}/${progress.total}` : 'AI 分析全部'}
+          {progress
+            ? `分析中 ${progress.done}/${progress.total}`
+            : <>AI 分析全部{staleAll.length > 0 && <span className="text-sky-300/70">·{staleAll.length}</span>}</>}
         </button>
       </div>
 

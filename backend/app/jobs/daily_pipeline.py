@@ -1096,6 +1096,164 @@ def _register_review_job(scheduler, repo, hour: int, minute: int) -> None:
     )
 
 
+# ================================================================
+# [R27 恢复 / R131] 今日总览 AI 定时 + 个股 AI 信号批量定时
+#
+# **这两个 job 曾经在一次上游合并中整段丢失**: `api/settings.py` 一直从本模块
+# import `TODAY_AI_JOB_ID/_register_today_ai_job/SIGNAL_AI_JOB_ID/
+# _register_signal_ai_job`, 但定义没了 —— 用户在设置页一开定时就 ImportError
+# 500, 两个功能等于哑火。这次连同 R131 的增量判据一起补回来。
+# ================================================================
+
+TODAY_AI_JOB_ID = "scheduled_today_ai"
+SIGNAL_AI_JOB_ID = "scheduled_signal_ai"
+
+# [R131] 信号年龄超过这个小时数就允许重算(与前端 lib/signalFreshness 同口径)
+SIGNAL_TTL_HOURS = 24
+
+
+def signal_needs_refresh(created_at: str | None, as_of, now=None,
+                         ttl_hours: int = SIGNAL_TTL_HOURS) -> bool:
+    """这只标的的 AI 信号要不要重算(纯函数)。
+
+    [R131] 主判据是**数据**不是时间: 信号是拿日 K 算的, 只要没有新 K 线落盘,
+    重跑一遍喂给 AI 的还是同一份输入, 花的钱买不到新信息。所以问的是
+    「这份信号见没见过最新那根 K 线」—— 用 as_of 当天 15:00(收盘) 作分界,
+    早于它的信号必定没见过。这个近似是保守的(收盘到实际落盘之间生成的会被
+    多算一次), 方向刻意如此: 宁可多花一次调用, 也不能把没看过新数据的旧信号
+    当成最新的用。时间阈值只是安全阀 —— 长假数据不更新时不至于永远不重算。
+    """
+    from datetime import datetime, time as dt_time
+
+    from app.market_time import CN_TZ, cn_now
+
+    if not created_at:
+        return True
+    try:
+        created = datetime.fromisoformat(str(created_at).replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return True                      # 时间戳坏了, 按没分析过处理
+    if created.tzinfo is not None:
+        created = created.astimezone(CN_TZ).replace(tzinfo=None)
+
+    ref = now or cn_now().replace(tzinfo=None)
+    if (ref - created).total_seconds() / 3600 > ttl_hours:
+        return True
+    if as_of:
+        try:
+            day = as_of if hasattr(as_of, "year") else datetime.fromisoformat(str(as_of)).date()
+            if created < datetime.combine(day, dt_time(15, 0)):
+                return True
+        except (TypeError, ValueError):
+            pass                          # as_of 解析不了就只靠 TTL
+    return False
+
+
+async def _run_scheduled_today_ai(repo) -> None:
+    """定时生成今日总览 AI 导读·优选并落盘。异常只记日志, 不影响调度器。"""
+    try:
+        from app import secrets_store as ss
+        if not ss.get_ai_key():
+            logger.info("scheduled today-ai skipped: AI key not configured")
+            return
+        from app.api.today import _build_overview, generate_today_ai
+        from app.services import today_ai_store
+
+        data = _build_overview(repo)
+        out = await generate_today_ai(repo, data)
+        if out.get("error"):
+            logger.warning("scheduled today-ai failed: %s", out["error"])
+            return
+        today_ai_store.save(out, as_of=data.get("as_of"), source="scheduled")
+        logger.info("scheduled today-ai done: %d picks", len(out.get("picks") or []))
+    except Exception:
+        logger.exception("scheduled today-ai crashed")
+
+
+async def _run_scheduled_signal_ai(repo) -> None:
+    """定时批量刷新个股 AI 信号。逐只串行 + 固定间隔, 避免打满 AI 接口。
+
+    [R131] 只跑**需要重算**的: 定时任务无人盯着, 每天把全部自选重跑一遍最费钱,
+    而其中绝大多数输入数据根本没变。
+    """
+    import asyncio
+
+    try:
+        from app import secrets_store as ss
+        if not ss.get_ai_key():
+            logger.info("scheduled signal-ai skipped: AI key not configured")
+            return
+        from app.services import positions as positions_svc
+        from app.services import preferences as prefs
+        from app.services import stock_signal, watchlist
+
+        cfg = prefs.get_signal_ai_schedule()
+        syms = [str(e.get("symbol") or "").upper() for e in watchlist.list_symbols()]
+        syms = [s for s in syms if s]
+        if cfg["scope"] == "held":
+            held = {s for s, p in positions_svc.load_all().items() if p.get("held")}
+            syms = [s for s in syms if s in held]
+        if not syms:
+            logger.info("scheduled signal-ai: no symbols in scope=%s", cfg["scope"])
+            return
+
+        # [R131] 增量过滤 —— 已看过最新一根 K 线的跳过
+        try:
+            as_of = repo.latest_enriched_date() or repo.latest_daily_date()
+        except Exception:  # noqa: BLE001 —— 取不到基准日就退化成全跑(保守)
+            as_of = None
+        cached = stock_signal.load_all()
+        total = len(syms)
+        syms = [s for s in syms
+                if signal_needs_refresh((cached.get(s) or {}).get("created_at"), as_of)]
+        if not syms:
+            logger.info("scheduled signal-ai: 全部 %d 只都已是最新分析, 跳过", total)
+            return
+        if total != len(syms):
+            logger.info("scheduled signal-ai: 跳过 %d 只已最新, 待分析 %d 只",
+                        total - len(syms), len(syms))
+
+        gap = cfg["gap_seconds"]
+        ok = failed = 0
+        for i, sym in enumerate(syms):
+            try:
+                res = await stock_signal.generate_signal(repo, repo.store.data_dir, sym)
+                if res.get("error"):
+                    failed += 1
+                    logger.debug("scheduled signal-ai %s: %s", sym, res["error"])
+                else:
+                    ok += 1
+            except Exception as e:  # noqa: BLE001
+                failed += 1
+                logger.debug("scheduled signal-ai %s crashed: %s", sym, e)
+            if i < len(syms) - 1:
+                await asyncio.sleep(gap)
+        logger.info("scheduled signal-ai done: %d ok, %d failed (scope=%s)",
+                    ok, failed, cfg["scope"])
+    except Exception:
+        logger.exception("scheduled signal-ai crashed")
+
+
+def _register_today_ai_job(scheduler, repo, hour: int, minute: int) -> None:
+    """注册/更新今日总览 AI 定时 job(协程函数直接传入, 不可用 lambda 包)。"""
+    scheduler.add_job(
+        _run_scheduled_today_ai, args=[repo],
+        trigger=CronTrigger(day_of_week="mon-fri", hour=hour, minute=minute,
+                            timezone="Asia/Shanghai"),
+        id=TODAY_AI_JOB_ID, misfire_grace_time=7200, replace_existing=True,
+    )
+
+
+def _register_signal_ai_job(scheduler, repo, hour: int, minute: int) -> None:
+    """注册/更新个股 AI 信号批量定时 job。"""
+    scheduler.add_job(
+        _run_scheduled_signal_ai, args=[repo],
+        trigger=CronTrigger(day_of_week="mon-fri", hour=hour, minute=minute,
+                            timezone="Asia/Shanghai"),
+        id=SIGNAL_AI_JOB_ID, misfire_grace_time=7200, replace_existing=True,
+    )
+
+
 def start_scheduler(repo: KlineRepository, capset: CapabilitySet) -> AsyncIOScheduler:
     """启动调度器。
 
@@ -1222,6 +1380,19 @@ def start_scheduler(repo: KlineRepository, capset: CapabilitySet) -> AsyncIOSche
         _register_review_job(scheduler, repo, review_sched["hour"], review_sched["minute"])
         logger.info("scheduled_review enabled @%02d:%02d mon-fri",
                     review_sched["hour"], review_sched["minute"])
+
+    # [R27 恢复] 今日总览 AI / 个股 AI 信号批量: 默认关, 用户在页面开启后才注册
+    today_ai_sched = preferences.get_today_ai_schedule()
+    if today_ai_sched["enabled"]:
+        _register_today_ai_job(scheduler, repo, today_ai_sched["hour"], today_ai_sched["minute"])
+        logger.info("scheduled_today_ai enabled @%02d:%02d mon-fri",
+                    today_ai_sched["hour"], today_ai_sched["minute"])
+    signal_sched = preferences.get_signal_ai_schedule()
+    if signal_sched["enabled"]:
+        _register_signal_ai_job(scheduler, repo, signal_sched["hour"], signal_sched["minute"])
+        logger.info("scheduled_signal_ai enabled @%02d:%02d mon-fri (scope=%s gap=%ss)",
+                    signal_sched["hour"], signal_sched["minute"],
+                    signal_sched["scope"], signal_sched["gap_seconds"])
 
     scheduler.start()
     logger.info("scheduler started; instruments@%02d:%02d, pipeline@%02d:%02d, depth@%02d:%02d mon-fri",
