@@ -23,6 +23,33 @@ export default {
         bear:       'oklch(var(--bear) / <alpha-value>)',
         warning:    'oklch(var(--warning) / <alpha-value>)',
         danger:     'oklch(var(--danger) / <alpha-value>)',
+
+        // [R138] Tailwind 强调色改走 CSS 变量, 好让**亮色模式单独压暗**。
+        //
+        // 起因: 全站一千多处用的是 text-amber-300 / text-sky-300 / text-emerald-400
+        // 这类**为深色背景挑的浅色**, 放到白底上普遍只有 2~3:1, 用户的原话是
+        // "太白了好多东西都看不见"。逐个文件改不现实(涉及一百多个组件), 但把
+        // 色值收进变量之后, 组件一个字都不用动 —— 换主题自动切。
+        //
+        // 只覆盖 300~600 这四档: 50/100/200 本来就是该淡的浅底(亮色模式里用作
+        // 背景), 700+ 已经足够暗, 动它们只会把亮色模式弄糟。
+        // 暗色一侧的值 = Tailwind 原值, 视觉零变化。
+        amber: { 300: 'oklch(var(--t-amber-300) / <alpha-value>)', 400: 'oklch(var(--t-amber-400) / <alpha-value>)', 500: 'oklch(var(--t-amber-500) / <alpha-value>)', 600: 'oklch(var(--t-amber-600) / <alpha-value>)' },
+        blue: { 300: 'oklch(var(--t-blue-300) / <alpha-value>)', 400: 'oklch(var(--t-blue-400) / <alpha-value>)', 500: 'oklch(var(--t-blue-500) / <alpha-value>)' },
+        cyan: { 300: 'oklch(var(--t-cyan-300) / <alpha-value>)', 400: 'oklch(var(--t-cyan-400) / <alpha-value>)', 500: 'oklch(var(--t-cyan-500) / <alpha-value>)', 600: 'oklch(var(--t-cyan-600) / <alpha-value>)' },
+        emerald: { 300: 'oklch(var(--t-emerald-300) / <alpha-value>)', 400: 'oklch(var(--t-emerald-400) / <alpha-value>)', 500: 'oklch(var(--t-emerald-500) / <alpha-value>)' },
+        fuchsia: { 300: 'oklch(var(--t-fuchsia-300) / <alpha-value>)', 400: 'oklch(var(--t-fuchsia-400) / <alpha-value>)', 500: 'oklch(var(--t-fuchsia-500) / <alpha-value>)' },
+        green: { 400: 'oklch(var(--t-green-400) / <alpha-value>)', 500: 'oklch(var(--t-green-500) / <alpha-value>)' },
+        indigo: { 400: 'oklch(var(--t-indigo-400) / <alpha-value>)' },
+        lime: { 400: 'oklch(var(--t-lime-400) / <alpha-value>)' },
+        orange: { 300: 'oklch(var(--t-orange-300) / <alpha-value>)', 400: 'oklch(var(--t-orange-400) / <alpha-value>)', 500: 'oklch(var(--t-orange-500) / <alpha-value>)' },
+        purple: { 300: 'oklch(var(--t-purple-300) / <alpha-value>)', 400: 'oklch(var(--t-purple-400) / <alpha-value>)', 500: 'oklch(var(--t-purple-500) / <alpha-value>)' },
+        red: { 300: 'oklch(var(--t-red-300) / <alpha-value>)', 400: 'oklch(var(--t-red-400) / <alpha-value>)', 500: 'oklch(var(--t-red-500) / <alpha-value>)' },
+        rose: { 300: 'oklch(var(--t-rose-300) / <alpha-value>)', 400: 'oklch(var(--t-rose-400) / <alpha-value>)', 500: 'oklch(var(--t-rose-500) / <alpha-value>)' },
+        sky: { 300: 'oklch(var(--t-sky-300) / <alpha-value>)', 400: 'oklch(var(--t-sky-400) / <alpha-value>)', 500: 'oklch(var(--t-sky-500) / <alpha-value>)' },
+        teal: { 300: 'oklch(var(--t-teal-300) / <alpha-value>)', 400: 'oklch(var(--t-teal-400) / <alpha-value>)', 500: 'oklch(var(--t-teal-500) / <alpha-value>)' },
+        violet: { 300: 'oklch(var(--t-violet-300) / <alpha-value>)', 400: 'oklch(var(--t-violet-400) / <alpha-value>)', 500: 'oklch(var(--t-violet-500) / <alpha-value>)' },
+        yellow: { 400: 'oklch(var(--t-yellow-400) / <alpha-value>)', 500: 'oklch(var(--t-yellow-500) / <alpha-value>)', 600: 'oklch(var(--t-yellow-600) / <alpha-value>)' },
       },
       fontFamily: {
         // 中文优先字体栈。MiSans 不随仓库分发，设备未安装时依次回退到各平台
