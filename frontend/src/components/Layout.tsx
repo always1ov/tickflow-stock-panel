@@ -234,7 +234,7 @@ function SidebarIndexQuotes({ rows, items, globalRows, cnLive }: {
               !trading ? '当前休市, 显示最后成交值'
                 : stale ? '交易时段内, 但上游这个数已经很久没变了 —— 当延迟数据看'
                   : '交易中, 实时刷新'
-            } · ${ageText}${q.source ? ` · 源: ${q.source}` : ''}`}
+            } · ${ageText}${q.source ? ` · 源: ${q.source}${q.source_code ? `(${q.source_code})` : ''}` : ''}`}
           >
             <div className="flex items-center justify-between gap-1">
               <span className="flex min-w-0 items-center gap-1 text-[10px] text-secondary">

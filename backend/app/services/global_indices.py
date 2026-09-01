@@ -1,21 +1,38 @@
 """[fork 增强] R99 全球指数实时 — 自成一体的独立模块。
 
-用途: 侧栏挂境外指数看实时(R116 起只留韩国综合与纳斯达克)。
+用途: 侧栏挂境外指数看实时(R149 起只剩纳斯达克一只)。
 为什么独立: 境外市场有时差, 各自的交易时段/更新节奏与 A 股主链完全无关 ——
 所以这里**不进**能力路由矩阵、不碰 QuoteService、不落盘, 就是一个带 TTL
 缓存的只读小服务, 挂了也只影响这一块卡片(前端拿到空列表不渲染)。
 
-[R119] 数据源改成**多家轮试**: 每个指数配一串候选 `(厂商, 代码)`, 按顺序取
-第一个能出价的。这样"新浪这个代码没数"不再需要改代码结构, 换一家或换个写法
-就是加一行。当前支持两家公开行情接口(都免 key):
-  - sina    hq.sinajs.cn   需 Referer, GBK, 逗号分隔
-  - tencent qt.gtimg.cn    GBK, `~` 分隔; `s_` 前缀是精简版
+[R119] 数据源**多家轮试**: 每个指数配一串候选 `(厂商, 代码)`。
+[R148] 挑谁不再看候选表排名, 而是看**行情自带的时刻** —— 一家把上次收盘价
+挂着不动也算"能出数", 按排名挑就永远轮不到真在跳的那家(用户报的"纳指不动"
+就是这么来的)。详见 `pick_candidate`。
 
-**TickFlow 为什么不在候选里**: 官方 SDK 的 `Region` 枚举写死
-`Literal["CN", "US", "HK"]`(见 tickflow/generated_model.py) —— 压根没有韩国,
-所以韩国综合走 TickFlow 无解, 这是数据源本身的边界不是配置问题。美股倒是
-region=US + type=index 有定义, 能不能用取决于账号档位, `/tickflow-probe`
-端点就是用来当场问清楚这件事的。
+当前支持三家:
+  - tickflow 官方 SDK 直连(见下), 结构化返回, 自带毫秒级时间戳
+  - sina     hq.sinajs.cn   需 Referer, GBK, 逗号分隔
+  - tencent  qt.gtimg.cn    GBK, `~` 分隔; `s_` 前缀是精简版(不给时刻)
+
+**[R149] TickFlow 现在是纳指的首选候选**。之前不放它是因为要兼顾韩国综合 ——
+SDK 的 `Region` 枚举写死 `Literal["CN", "US", "HK"]`(见 generated_model.py),
+压根没有韩国, 那是数据源本身的边界不是配置问题。R149 按用户要求删掉韩国之后,
+这块只剩美股, 而美股 `region=US + type=index` 是有定义的, 于是回到项目本来的
+"只用 TickFlow"原则, 把它排在最前面试。
+
+关于 TickFlow 这条支路的三条自我约束:
+  1. **不许让现状变差** —— 档位不给美股指数时 `_fetch_tickflow` 返回空,
+     直接回落到 sina/tencent, 与 R148 之前的行为完全一致。
+  2. **不烧配额** —— 只在美股交易时段调用(休市时那个数是静止的, 花配额去拿
+     没有意义), 且自带 20 秒最小间隔(侧栏看境外指数不需要秒级)。
+  3. **不进能力路由** —— 直接用 SDK 只读一次, 不落盘、不走 QuoteService,
+     保持本模块"挂了也只坏这一张卡"的性质。
+
+代码到底解析成 TickFlow 的哪个 symbol 不靠猜: `_tickflow_resolve` 去
+`exchanges.get_instruments("US", type="index")` 里按代码根/名称找, 找到什么用
+什么, 找不到就是找不到(负结果也缓存, 不反复问)。`/api/global-indices/debug`
+与 `/tickflow-probe` 会把这一步的结果原样吐出来。
 """
 from __future__ import annotations
 
@@ -57,8 +74,8 @@ _TENCENT_URL = "https://qt.gtimg.cn/q={codes}"
 class _Src:
     """一个候选行情来源。"""
 
-    vendor: str       # "sina" / "tencent"
-    code: str         # 该厂商的行情代码
+    vendor: str       # "tickflow" / "sina" / "tencent"
+    code: str         # 该厂商的行情代码(tickflow 填代码根, 真实 symbol 去清单里解析)
     fmt: str = "int"  # sina: "int"(全球指数) / "hk"(港股行); tencent 忽略此字段
 
 
@@ -75,34 +92,22 @@ class _Preset:
 
 
 # 指数表 —— 想加新的在这里加一行即可(独立维护的意义所在)。
-# [R116] 用户定案: 只看韩国综合与纳斯达克, 其余整行删除。
+# [R149] 用户定案: 韩国综合整行删除, 只留纳斯达克。
 PRESETS: tuple[_Preset, ...] = (
-    # 韩国 09:00-15:30 KST = 08:00-14:30 北京。
-    # [R113/R119] 实测新浪 int_kospi 取不到数(其余 int_* 都正常) —— 各家对韩国
-    # 综合的代码写法不一, 这里把已知的几种都列成候选逐个试。**没有一个是确认
-    # 过的**, 哪个能出数要用 /api/global-indices/debug 看 raw 才知道;
-    # 确认之后把能用的挪到第一位、其余删掉即可。
-    _Preset("kospi", (
-        _Src("sina", "int_kospi"),
-        _Src("sina", "znb_KS11"),
-        _Src("sina", "gb_ks11"),
-        _Src("sina", "hf_KS11"),
-        _Src("tencent", "int_ks11"),
-        _Src("tencent", "s_int_ks11"),
-    ), "韩国综合", 8.0, 14.5),
     # 美股 21:30-04:00 北京(夏令时; 冬令时晚 1 小时, 这里取并集 21.5~05.0
     # 宁可多标一小时"交易中", 也不要在真开盘时标成休市)
     # [R148] 候选顺序不再决定用谁(盘中改由行情自带时刻决定, 见 pick_candidate),
-    # 这里的顺序只在**休市**时当排名用。把腾讯完整版 usIXIC 提到精简版 s_usIXIC
-    # 之前: 完整版带行情时刻, 精简版不带 —— 能自证的排前面。
+    # 这里的顺序只在**休市**时当排名用。排序依据是"能不能自证新鲜":
+    # tickflow(毫秒时间戳) > sina/腾讯完整版(秒级时刻) > 腾讯精简版(不给时刻)。
     _Preset("nasdaq", (
+        _Src("tickflow", "IXIC"),
         _Src("sina", "int_nasdaq"),
         _Src("tencent", "usIXIC"),
         _Src("tencent", "s_usIXIC"),
     ), "纳斯达克", 21.5, 5.0),
 )
 _BY_KEY = {p.key: p for p in PRESETS}
-DEFAULT_KEYS = [p.key for p in PRESETS]  # 表里就这两个, 默认全看
+DEFAULT_KEYS = [p.key for p in PRESETS]  # [R149] 表里只剩纳指, 默认全看
 
 _lock = threading.Lock()
 _cache: dict[str, dict] = {}     # key → {..row..}
@@ -193,6 +198,153 @@ def _to_float(raw: str) -> float | None:
     return v
 
 
+# ---------------------------------------------------------------- TickFlow 支路
+# [R149] 独立于 A 股主链的一次只读 SDK 调用。三条自我约束见模块头。
+_TICKFLOW_REGION = "US"
+_TICKFLOW_MIN_INTERVAL_S = 20.0   # 侧栏看境外指数不需要秒级, 别拿配额换刷新率
+_TF_SYMBOL_TTL_S = 6 * 3600.0     # 合约清单是静态元数据, 半天问一次绰绰有余
+# 代码根 → 名称里出现任一即认(小写比对)。symbol 匹配优先, 名称是兜底。
+_TF_NAME_HINTS: dict[str, tuple[str, ...]] = {
+    "IXIC": ("nasdaq composite", "nasdaq comp", "纳斯达克综合", "纳斯达克"),
+}
+_tf_lock = threading.Lock()
+_tf_at = 0.0
+_tf_payloads: dict[str, dict] = {}          # 代码根 → 上次拿到的 quote
+_tf_symbol: dict[str, str | None] = {}      # 代码根 → 解析出的真实 symbol(None=查过没有)
+_tf_symbol_at = 0.0
+_tf_last_error: str | None = None
+
+
+def _tf_root(symbol: str) -> str:
+    """`.IXIC.US` / `IXIC.US` / `IXIC` → `IXIC`。各家对指数加不加前导点不统一。"""
+    return symbol.strip().lstrip(".").split(".", 1)[0].upper()
+
+
+def _tickflow_resolve(client, roots: list[str], now: float) -> dict[str, str | None]:
+    """代码根 → TickFlow 真实 symbol。**不猜代码**, 去合约清单里找。
+
+    猜 `IXIC.US` / `.IXIC.US` / `NDX.US` 哪个对, 猜错了只会得到一个静默的空值;
+    去 `get_instruments("US", type="index")` 里按代码根和名称找, 找到什么用什么,
+    对方改了写法也自动跟上。负结果同样缓存 —— "这个档位没有美股指数"是个稳定
+    事实, 不该每 20 秒再问一遍。
+    """
+    global _tf_symbol, _tf_symbol_at, _tf_last_error
+    fresh = (now - _tf_symbol_at) < _TF_SYMBOL_TTL_S
+    if fresh and all(r in _tf_symbol for r in roots):
+        return {r: _tf_symbol[r] for r in roots}
+    try:
+        instruments = client.exchanges.get_instruments(
+            _TICKFLOW_REGION, instrument_type="index") or []
+    except Exception as e:  # noqa: BLE001 —— 档位不给/网络不通都算"这家没有"
+        _tf_last_error = f"列合约失败: {type(e).__name__}: {e}"
+        logger.debug("TickFlow 美股指数清单不可用: %s", e)
+        return dict.fromkeys(roots)
+    found: dict[str, str | None] = {}
+    for root in roots:
+        hit = None
+        for inst in instruments:
+            if not isinstance(inst, dict):
+                continue
+            sym = str(inst.get("symbol") or "")
+            if not sym:
+                continue
+            if _tf_root(sym) == root:
+                hit = sym
+                break
+        if hit is None:                      # symbol 对不上再退到名称匹配
+            hints = _TF_NAME_HINTS.get(root, ())
+            for inst in instruments:
+                if not isinstance(inst, dict):
+                    continue
+                name = str(inst.get("name") or "").lower()
+                if name and any(h in name for h in hints):
+                    hit = str(inst.get("symbol") or "") or None
+                    break
+        found[root] = hit
+    _tf_symbol = {**_tf_symbol, **found}
+    _tf_symbol_at = now
+    _tf_last_error = None if any(found.values()) else "清单里没有匹配的美股指数"
+    return found
+
+
+def _fetch_tickflow(codes: list[str]) -> dict[str, dict]:
+    """代码根 → TickFlow quote 原样。任何一步不通都返回空 = "这家没数"。
+
+    返回空的代价只是回落到 sina/腾讯 —— 与 R149 之前的行为完全一致, 所以
+    这条支路**不可能让现状变差**, 这是敢把它排第一位的前提。
+    """
+    global _tf_at, _tf_payloads, _tf_last_error
+    now = time.time()
+    with _tf_lock:
+        if (now - _tf_at) < _TICKFLOW_MIN_INTERVAL_S:
+            return dict(_tf_payloads)   # 最小间隔内复用上次的, 不再打一次
+        _tf_at = now
+    roots = [_tf_root(c) for c in codes]
+    try:
+        from app.tickflow.client import get_client
+        client = get_client()
+    except Exception as e:  # noqa: BLE001
+        _tf_last_error = f"客户端不可用: {type(e).__name__}: {e}"
+        return {}
+    if client is None:
+        _tf_last_error = "没有配置 TickFlow key"
+        return {}
+    mapping = _tickflow_resolve(client, roots, now)
+    symbols = [s for s in mapping.values() if s]
+    if not symbols:
+        return {}
+    try:
+        quotes = client.quotes.get(symbols=symbols) or []
+    except Exception as e:  # noqa: BLE001
+        _tf_last_error = f"取报价失败: {type(e).__name__}: {e}"
+        logger.debug("TickFlow 美股指数报价失败: %s", e)
+        return {}
+    by_root: dict[str, dict] = {}
+    for q in quotes:
+        if not isinstance(q, dict):
+            continue
+        sym = str(q.get("symbol") or "")
+        if sym:
+            by_root[_tf_root(sym)] = q
+    out = {root: by_root[root] for root in roots if root in by_root}
+    with _tf_lock:
+        _tf_payloads = dict(out)
+    _tf_last_error = None if out else "报价里没有请求的指数"
+    return out
+
+
+def _parse_tickflow(src: _Src, payload) -> tuple[float, float | None, float | None] | None:
+    """TickFlow quote → (最新, 涨跌额, 涨跌幅%)。
+
+    SDK 不直接给涨跌, 给的是 `last_price` 与 `prev_close` —— 自己减。
+    `prev_close` 缺或为 0 时只报最新价, 涨跌留空(宁可空着, 不编一个 0%)。
+    """
+    if not isinstance(payload, dict):
+        return None
+    last = _to_float(str(payload.get("last_price")))
+    if last is None:
+        return None
+    prev = _to_float(str(payload.get("prev_close")))
+    if prev is None or prev == 0:
+        return last, None, None
+    change = last - prev
+    return last, change, change / prev * 100.0
+
+
+def _tickflow_quote_ts(payload, now: float) -> float | None:
+    """TickFlow 的 `timestamp` 是**毫秒** epoch。范围守卫与文本源一视同仁。"""
+    if not isinstance(payload, dict):
+        return None
+    raw = payload.get("timestamp")
+    try:
+        ts = float(raw) / 1000.0
+    except (TypeError, ValueError):
+        return None
+    if ts - now > _TS_FUTURE_TOL_S or now - ts > _TS_PAST_TOL_S:
+        return None
+    return ts
+
+
 def _parse_sina(src: _Src, payload: str) -> tuple[float, float | None, float | None] | None:
     """新浪一行 → (最新, 涨跌额, 涨跌幅%)。
 
@@ -232,26 +384,37 @@ def _parse_tencent(src: _Src, payload: str) -> tuple[float, float | None, float 
     return last, _to_float(f[4]), _to_float(f[5])
 
 
-_PARSERS = {"sina": _parse_sina, "tencent": _parse_tencent}
+_PARSERS = {"sina": _parse_sina, "tencent": _parse_tencent, "tickflow": _parse_tickflow}
+# [R149] 结构化厂商: payload 是 dict 而不是一行文本, 时刻另有出处
+_STRUCTURED = frozenset({"tickflow"})
 
 
-def _parse(src: _Src, payload: str, now: float | None = None) -> dict | None:
+def _parse(src: _Src, payload, now: float | None = None) -> dict | None:
     """一行行情 → 价格三元组字典。任何字段缺失/畸形返回 None(缺失处理, 不抛)。"""
     parser = _PARSERS.get(src.vendor)
-    if parser is None or not payload.strip():
+    if parser is None:
         return None
+    now = now if now is not None else time.time()
+    if src.vendor in _STRUCTURED:
+        if not isinstance(payload, dict) or not payload:
+            return None
+        quote_at = _tickflow_quote_ts(payload, now)
+    else:
+        if not isinstance(payload, str) or not payload.strip():
+            return None
+        sep = "~" if src.vendor == "tencent" else ","
+        quote_at = _quote_ts(payload.split(sep), now)
     got = parser(src, payload)
     if got is None or got[0] is None:
         return None
     last, change, pct = got
-    sep = "~" if src.vendor == "tencent" else ","
     return {
         "last": last,
         "change": change,
         # 各家口径都是百分数(如 -0.38 表示 -0.38%), 转小数制与项目 change_pct 一致
         "change_pct": pct / 100.0 if pct is not None else None,
         # [R148] 行情自己的时刻(epoch 秒); 这家不给或读不出就是 None
-        "quote_at": _quote_ts(payload.split(sep), now if now is not None else time.time()),
+        "quote_at": quote_at,
     }
 
 
@@ -289,15 +452,16 @@ def _fetch_tencent(codes: list[str]) -> dict[str, str]:
     return out
 
 
-_FETCHERS = {"sina": _fetch_sina, "tencent": _fetch_tencent}
+_FETCHERS = {"sina": _fetch_sina, "tencent": _fetch_tencent, "tickflow": _fetch_tickflow}
 
 
-def _fetch_all(sources: list[_Src]) -> dict[tuple[str, str], str]:
+def _fetch_all(sources: list[_Src]) -> dict[tuple[str, str], object]:
     """按厂商分组各拉一次 → {(vendor, code): 原始 payload}。
 
     某一家挂了不影响另一家(分别 try) —— 多源的意义就在这。
+    payload 对文本源是一行字符串, 对结构化源(tickflow)是一个 dict。
     """
-    out: dict[tuple[str, str], str] = {}
+    out: dict[tuple[str, str], object] = {}
     by_vendor: dict[str, list[str]] = {}
     for s in sources:
         by_vendor.setdefault(s.vendor, []).append(s.code)
@@ -376,7 +540,15 @@ def get_quotes(keys: list[str]) -> list[dict]:
     presets = [_BY_KEY[k] for k in keys if k in _BY_KEY]
     if not presets:
         return []
-    sources = [s for p in presets for s in p.sources]
+    # [R149] 休市时不去打 TickFlow —— 那个数是静止的, 花配额拿它没有意义。
+    # 免费源照拉(不要钱, 且休市值也要显示), 这条只针对付费支路。
+    sessions = {p.key: _in_session(p) for p in presets}
+    sources = [
+        s for p in presets for s in p.sources
+        if not (s.vendor == "tickflow" and not sessions[p.key])
+    ]
+    if not sources:
+        return []
     sig = tuple(f"{s.vendor}:{s.code}" for s in sources)
     now = time.time()
     with _lock:
@@ -387,7 +559,7 @@ def get_quotes(keys: list[str]) -> list[dict]:
                 rows: dict[str, dict] = {}
                 for p in presets:
                     # [R148] 挑候选的规则见 pick_candidate —— 盘中按行情时刻挑最新的
-                    picked = pick_candidate(p, raw, now, in_session=_in_session(p))
+                    picked = pick_candidate(p, raw, now, in_session=sessions[p.key])
                     if picked is not None:
                         rows[p.key] = picked
                 if rows:
@@ -452,13 +624,18 @@ def debug_fetch(keys: list[str]) -> dict:
 
 
 def tickflow_probe() -> dict:
-    """[R119] 用用户自己的 TickFlow key 问清楚"境外指数到底能不能走 TickFlow"。
+    """[R119/R149] 用用户自己的 key 当场问清楚"纳指到底能不能走 TickFlow"。
 
-    SDK 的 Region 枚举只有 CN/US/HK —— 韩国不用问了, 没有。这里问的是美股:
-    账号档位能不能列出 region=US 的指数、拿不拿得到它的实时报价。
-    纯读探针: 只列 instruments + 拉一次 quote, 不落盘、不进任何缓存链路。
+    R149 把 TickFlow 排成纳指的首选候选之后, 这个探针要回答的就是一句话:
+    **这个档位给不给美股指数报价**。给 → 侧栏那个数从此由 TickFlow 供;
+    不给 → 自动回落 sina/腾讯, 与之前一模一样(所以放它在第一位是安全的)。
+
+    输出里最该看的是 `nasdaq_resolved`(代码根 IXIC 在合约清单里对上了哪个
+    symbol, null = 这个档位的清单里根本没有)与 `nasdaq_quote`(那个 symbol
+    真的拿到报价没有)。纯读探针: 只列 instruments + 拉一次 quote,
+    不落盘、不进任何缓存链路。
     """
-    out: dict = {"regions_supported": ["CN", "US", "HK"], "korea": False}
+    out: dict = {"regions_supported": ["CN", "US", "HK"]}
     try:
         from app.tickflow.client import get_client
         client = get_client()
@@ -481,6 +658,27 @@ def tickflow_probe() -> dict:
             out["quote_probe"] = client.quotes.get(symbols=symbols)
     except Exception as e:  # noqa: BLE001
         out["us_index_error"] = f"{type(e).__name__}: {e}"
+
+    # [R149] 直奔正题: 纳指这一路到底通不通
+    now = time.time()
+    roots = [_tf_root(s.code) for p in PRESETS for s in p.sources if s.vendor == "tickflow"]
+    if roots:
+        resolved = _tickflow_resolve(client, roots, now)
+        out["nasdaq_resolved"] = resolved
+        picked = [s for s in resolved.values() if s]
+        if picked:
+            try:
+                quotes = client.quotes.get(symbols=picked) or []
+                out["nasdaq_quote"] = quotes
+                # 报价自带的时刻离现在多久 —— 这才是"能不能解决不动的问题"的答案
+                out["nasdaq_quote_age_s"] = [
+                    (round(now - ts) if (ts := _tickflow_quote_ts(q, now)) else None)
+                    for q in quotes if isinstance(q, dict)
+                ]
+            except Exception as e:  # noqa: BLE001
+                out["nasdaq_quote_error"] = f"{type(e).__name__}: {e}"
+        else:
+            out["nasdaq_quote_error"] = _tf_last_error or "合约清单里没找到纳指"
     out["ok"] = True
     return out
 

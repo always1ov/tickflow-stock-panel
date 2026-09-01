@@ -16,7 +16,7 @@ def _selected_keys() -> list[str]:
         return list(global_indices.DEFAULT_KEYS)
     valid = {p["key"] for p in global_indices.list_presets()}
     keys = [k for k in raw if k in valid]
-    # [R116] 老选择里可能只剩已删除的指数(日经/恒生/道指/标普) —— 全被过滤掉
+    # [R116/R149] 老选择里可能只剩已删除的指数(日经/恒生/道指/标普/韩国综合) —— 全被过滤掉
     # 就回落默认, 免得用户卡在"一张卡片都没有"。主动清空(存了空列表)时 raw
     # 本身为空, 不触发回落, 关得掉。
     if raw and not keys:
@@ -43,7 +43,11 @@ def debug() -> dict:
 
 @router.get("/tickflow-probe")
 def tickflow_probe() -> dict:
-    """[R119] 问 TickFlow: 境外指数你给不给。韩国不用问(SDK 只有 CN/US/HK)。"""
+    """[R119/R149] 问 TickFlow: 纳指报价你给不给 —— 给了它就是侧栏那个数的源。
+
+    看 `nasdaq_resolved`(代码根在合约清单里对上了哪个 symbol)与 `nasdaq_quote`
+    (那个 symbol 真拿到报价没有)。不给也无妨, 自动回落 sina/腾讯。
+    """
     return global_indices.tickflow_probe()
 
 
