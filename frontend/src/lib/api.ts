@@ -205,7 +205,37 @@ export interface TodayMeso {
   } | null
   membership_note: string
 }
-export interface TodayPick { symbol: string; reason: string }
+/** [R121] 一条数字对账结果: AI 说的 vs 日K 里真实的 */
+export interface TodayPickCheck {
+  kind: '涨幅' | '量比' | '价位' | string
+  said: number
+  actual: number | number[] | null
+  /** true=对得上 / false=对不上 / null=没数据可对 */
+  ok: boolean | null
+  fatal?: boolean
+  note: string
+}
+export interface TodayPick {
+  symbol: string
+  reason: string
+  name?: string
+  /** [R121] 事实校验结论: 已核对 / 待查 / 存疑 / 驳回 */
+  verdict?: '已核对' | '待查' | '存疑' | '驳回'
+  verdict_note?: string
+  checks?: TodayPickCheck[]
+}
+/** [R121] AI 优选的事实校验汇总 */
+export interface TodayPickVerify {
+  total: number; rejected: number; doubtful: number; clean: number; text: string
+}
+/** [R121] AI 优选历史命中率(纯事后统计, 不参与选股) */
+export interface AiTrackRecord {
+  detail: { symbol: string; name?: string; as_of: string; reason?: string
+            t1: number | null; t3: number | null; t5: number | null }[]
+  stats: Record<'t1' | 't3' | 't5', { n: number; win_rate: number | null; avg: number | null }>
+  recorded_days: number
+  caveat: string
+}
 /** [fork 增强] 缓存的 AI 导读·优选(刷新页面仍在) */
 export interface TodayAiCache {
   as_of: string | null
@@ -3892,8 +3922,11 @@ export const api = {
     request<SignalAiSchedule>('/api/settings/preferences/signal-ai-schedule',
       { method: 'PUT', body: JSON.stringify(body) }),
   todayAi: () =>
-    request<{ brief?: string; picks?: TodayPick[]; analyzed?: number; error?: string }>(
+    request<{ brief?: string; picks?: TodayPick[]; analyzed?: number
+              verify?: TodayPickVerify; error?: string }>(
       '/api/today/ai', { method: 'POST' }),
+  /** [R121] AI 优选历史命中率 —— 「靠不靠谱」的硬证据, 纯事后统计 */
+  todayAiTrackRecord: () => request<AiTrackRecord>('/api/today/ai/track-record'),
   todaySavePrefs: (body: Partial<TodayPrefs>) =>
     request<TodayPrefs>('/api/today/prefs', { method: 'PUT', body: JSON.stringify(body) }),
 

@@ -129,6 +129,8 @@ export const QK = {
   // 今日总览
   todayOverview:        ['today-overview'] as const,
   todayAiSchedule:      ['today-ai-schedule'] as const,
+  // R121 AI 优选历史命中率(纯事后统计)
+  todayAiTrackRecord:   ['today-ai-track-record'] as const,
   signalAiSchedule:     ['signal-ai-schedule'] as const,
   // AI 操盘手
   paperTraders:         ['paper-traders'] as const,

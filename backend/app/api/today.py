@@ -784,6 +784,16 @@ _AI_SYSTEM = """你是用户的盘前参谋,有 15 年 A 股一线交易经验�
 - 几只都不理想就少选甚至不选(picks 给空数组)。**宁缺毋滥,空仓等待也是决策**
 - 每只理由 ≤35 字,大白话,让不懂术语的人看懂
 
+### [R121] 你写的每个数字都会被自动核对
+
+理由里出现的涨幅、量比、价位,系统会拿**上面这份日 K 原始数据**逐条对账:
+- 涨幅、量比对不上最近几根 K 的真实值 → 这条优选被标「存疑」展示给用户
+- 价位落在该股近期价格区间之外 → 这条优选被**直接驳回**,不会作为推荐显示
+
+所以: **只写你能在数据里指出来的数字**。记不准的宁可不写具体数值,写"放量"
+"回踩不破"这类定性描述也好过写一个错的数 —— 编造的数字一定会被抓出来,
+而且用户会照着你写的价位挂单。
+
 ## 任务一: 导读(brief)
 
 用 3-4 句大白话写一段盘前导读:先说仓位姿态与原因;再点名最需要处理的 1-2 件事(带具体价位;行动区为空就明说今天无需操作);最后落到你在任务二选出的头号机会,说清为什么是它、等什么触发条件(picks 为空就如实说今天没有值得出手的)。每句话都落到具体标的或数字,不写空话;不用"胶着""博弈""多空拉锯"这类行话;正文不要标题、列表或格式标记。
@@ -884,9 +894,12 @@ async def generate_today_ai(repo, data: dict) -> dict:
          "建仓路径": (c.get("advice") or {}).get("plan"),
          # [R18] 盘中临时信号如实告知 AI, 优选时应降级处理而非当定稿推荐
          "盘中待收盘确认": bool(c.get("intraday"))} for c in cands]
+    # [R121] 送审的这份候选数据同时是**校验的账本** —— 校验只拿它对账,
+    # 不另外去读一次行情: 要检验的正是"AI 有没有忠实使用我们喂给它的数据"。
+    payload_cands = _candidate_market_data(repo, cands) if cands else []
     payload = {
         "今日总览": overview,
-        "候选买入机会(含真实日K)": _candidate_market_data(repo, cands) if cands else [],
+        "候选买入机会(含真实日K)": payload_cands,
     }
     try:
         text = await generate_ai_text(
@@ -899,6 +912,16 @@ async def generate_today_ai(repo, data: dict) -> dict:
         )
         out = parse_ai_brief_response(text, {c["symbol"] for c in cands})
         out["analyzed"] = len(cands)
+        # [R121] 事实校验: 拿刚才喂给它的那份日K, 逐条对账理由里的数字。
+        # 驳回的 pick 仍然回给前端(要让用户看见"它编了什么"), 但会被标成驳回,
+        # 界面不当推荐展示, 也不进命中率台账。
+        from app.services import today_ai_verify
+        out["picks"] = today_ai_verify.verify_picks(out.get("picks") or [], payload_cands)
+        out["verify"] = today_ai_verify.summarize(out["picks"])
+        # 名字补上 —— 台账与界面都要显示中文名, 别让用户对着代码猜
+        name_by_symbol = {c["symbol"]: c["name"] for c in cands}
+        for p in out["picks"]:
+            p.setdefault("name", name_by_symbol.get(p.get("symbol"), ""))
         return out
     except Exception as e:  # noqa: BLE001
         logger.warning("today ai failed: %s", e)
@@ -915,8 +938,41 @@ async def today_ai(request: Request):
     data = _build_overview(repo)
     out = await generate_today_ai(repo, data)
     if not out.get("error"):
-        from app.services import today_ai_store
+        from app.services import ai_pick_ledger, today_ai_store
         saved = today_ai_store.save(out, as_of=data.get("as_of"), source="manual")
         out["created_at"] = saved["created_at"]
         out["source"] = saved["source"]
+        # [R121] 落一条命中率台账 —— 只记未被驳回的, 起点用当日收盘价
+        try:
+            closes = _pick_entry_closes(repo, out.get("picks") or [])
+            ai_pick_ledger.record(data.get("as_of"), out.get("picks") or [], closes)
+        except Exception as e:  # noqa: BLE001 —— 台账失败不该影响优选本身
+            logger.warning("record ai pick ledger failed: %s", e)
     return out
+
+
+def _pick_entry_closes(repo, picks: list[dict]) -> dict[str, float]:
+    """优选标的的当日收盘价 —— 台账收益的起点。取不到就不记那一只。"""
+    from app.services.stock_analyzer import _load_kline
+    out: dict[str, float] = {}
+    for p in picks:
+        sym = str(p.get("symbol") or "").upper()
+        if not sym or sym in out:
+            continue
+        try:
+            df = _load_kline(repo, sym)
+            if not df.is_empty() and "close" in df.columns:
+                out[sym] = float(df.tail(1)["close"][0])
+        except Exception as e:  # noqa: BLE001
+            logger.debug("entry close unavailable for %s: %s", sym, e)
+    return out
+
+
+@router.get("/ai/track-record")
+def ai_track_record(request: Request):
+    """[R121] AI 优选的历史命中率 —— 「靠不靠谱」唯一的硬证据。
+
+    纯事后统计: 不参与选股, 也不回喂给提示词(否则这个数就不干净了)。
+    """
+    from app.services import ai_pick_ledger
+    return ai_pick_ledger.evaluate(request.app.state.repo)

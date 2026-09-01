@@ -7,7 +7,7 @@
  * 数据全部来自既有模块,零新计算;AI 导读可选(手动点击,一次调用)。
  */
 import { useState } from 'react'
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import {
   AlertTriangle, CheckCircle2, Compass, Download, Layers, Loader2, RefreshCw,
@@ -225,7 +225,168 @@ const POSTURE_STYLE: Record<string, string> = {
   观察: 'border-border bg-base text-muted',
 }
 
+// ===== [R121] AI 优选面板 —— 把「凭什么信它」摆到台面上 =====
+//
+// 旧版这里只有一行字: 名字 + 理由。理由里那些数字(涨 7.2%、量比 1.25、守住
+// 2372)看着很具体, 但**没有任何东西检查它们是不是真的** —— 模型把量比 0.87
+// 写成 1.25、把关键位编到一个该股从没到过的价位, 界面照样原样展示, 而用户会
+// 照着这个数去挂单。新版补上两样东西, 都直接摆在优选旁边:
+//   1. **逐条数字对账**: 后端拿送审时喂给 AI 的那份日K 核对理由里的每个数字,
+//      对不上标存疑、价位离谱直接驳回(驳回的不当推荐展示, 折到最下面)
+//   2. **历史命中率**: 过往优选 T+1/T+3/T+5 的胜率与平均收益 —— 靠不靠谱,
+//      最后只能用记录说话。带口径说明, 不说清口径的胜率就是误导。
+const VERDICT_STYLE: Record<string, { cls: string; label: string }> = {
+  已核对: { cls: 'bg-emerald-400/15 text-emerald-300 border-emerald-400/30', label: '✓ 数字已核对' },
+  待查:   { cls: 'bg-border/40 text-muted border-border', label: '理由无数字可核' },
+  存疑:   { cls: 'bg-amber-400/15 text-amber-300 border-amber-400/30', label: '⚠ 存疑' },
+  驳回:   { cls: 'bg-danger/15 text-danger border-danger/30', label: '✕ 已驳回' },
+}
+
+function CheckRow({ c }: { c: NonNullable<TodayPick['checks']>[number] }) {
+  const actual = Array.isArray(c.actual) ? `${c.actual[0]}~${c.actual[1]}` : c.actual
+  return (
+    <li className="flex items-baseline gap-1.5 font-mono text-[10px]">
+      <span className={c.ok === true ? 'text-emerald-400' : c.ok === false ? 'text-danger' : 'text-muted'}>
+        {c.ok === true ? '✓' : c.ok === false ? '✕' : '?'}
+      </span>
+      <span className="text-muted">{c.kind}</span>
+      <span className="text-foreground/80">AI 说 {c.said}</span>
+      {actual !== null && actual !== undefined && (
+        <span className={c.ok === false ? 'text-danger' : 'text-muted'}>· 实际 {actual}</span>
+      )}
+    </li>
+  )
+}
+
+function TrackRecordBar() {
+  const q = useQuery({
+    queryKey: QK.todayAiTrackRecord,
+    queryFn: api.todayAiTrackRecord,
+    staleTime: 10 * 60 * 1000,
+  })
+  const s = q.data?.stats
+  if (!s || (s.t1.n === 0 && s.t3.n === 0 && s.t5.n === 0)) {
+    return (
+      <span className="text-[10px] text-muted">
+        历史命中率:样本还不够(已记录 {q.data?.recorded_days ?? 0} 天,每天优选后自动累计)
+      </span>
+    )
+  }
+  const cell = (k: 't1' | 't3' | 't5', label: string) => {
+    const v = s[k]
+    if (!v.n) return null
+    const good = (v.win_rate ?? 0) >= 50
+    return (
+      <span key={k} className="whitespace-nowrap">
+        <span className="text-muted">{label} </span>
+        <span className={good ? 'text-danger' : 'text-success'}>
+          {v.win_rate}% 胜 / 均 {(v.avg ?? 0) > 0 ? '+' : ''}{v.avg}%
+        </span>
+        <span className="text-muted/70"> ({v.n})</span>
+      </span>
+    )
+  }
+  return (
+    <span className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-[10px]"
+          title={q.data?.caveat}>
+      <span className="text-muted">历史命中率</span>
+      {(['t1', 't3', 't5'] as const).map((k, i) => cell(k, ['T+1', 'T+3', 'T+5'][i]))}
+      <span className="text-muted/60">· 收盘价口径,未计滑点</span>
+    </span>
+  )
+}
+
+function AiPickPanel({ picks, analyzed, opportunities, onOpen }: {
+  picks: TodayPick[]
+  analyzed: number
+  opportunities: TodayOverview['opportunities']
+  onOpen: (symbol: string, name: string) => void
+}) {
+  const [openChecks, setOpenChecks] = useState<string | null>(null)
+  // 驳回的不当推荐展示 —— 一条编造价位的建议, 比没有建议更糟
+  const shown = picks.filter(p => p.verdict !== '驳回')
+  const rejected = picks.filter(p => p.verdict === '驳回')
+
+  return (
+    <div className="border-b border-amber-400/20 bg-amber-400/[0.06] px-4 py-2.5 text-xs">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <span className="text-[10px] font-medium text-amber-300">
+          AI 优选 {shown.length} 只
+          <span className="ml-1.5 font-normal text-muted">· 已对比 {analyzed} 只的日 K 与量能后选出</span>
+        </span>
+        <TrackRecordBar />
+      </div>
+
+      {shown.length === 0 && rejected.length === 0 ? (
+        <div className="mt-1.5 text-muted">
+          AI 逐一看过这 {analyzed} 只的量价后,认为都不够理想 —— 空仓等待也是决策
+        </div>
+      ) : (
+        <ul className="mt-1.5 space-y-1.5">
+          {shown.map((p) => {
+            const o = opportunities.find((x) => x.symbol === p.symbol)
+            const style = VERDICT_STYLE[p.verdict ?? '待查'] ?? VERDICT_STYLE.待查
+            const open = openChecks === p.symbol
+            return (
+              <li key={p.symbol} className="rounded border border-border/40 bg-base/40 px-2.5 py-1.5">
+                <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                  <button
+                    onClick={() => onOpen(p.symbol, o?.name ?? p.name ?? p.symbol)}
+                    className="font-medium text-foreground hover:underline cursor-pointer"
+                  >
+                    {o?.name ?? p.name ?? p.symbol}
+                  </button>
+                  <span className={`rounded border px-1.5 py-0.5 text-[9px] ${style.cls}`}
+                        title={p.verdict_note || undefined}>
+                    {style.label}
+                  </span>
+                  {!!p.checks?.length && (
+                    <button
+                      onClick={() => setOpenChecks(open ? null : p.symbol)}
+                      className="text-[9px] text-muted hover:text-foreground"
+                    >
+                      {open ? '收起对账' : `对账 ${p.checks.length} 项`}
+                    </button>
+                  )}
+                </div>
+                <div className="mt-0.5 text-foreground/80">{p.reason}</div>
+                {p.verdict === '存疑' && p.verdict_note && (
+                  <div className="mt-1 text-[10px] text-amber-300/90">{p.verdict_note}</div>
+                )}
+                {open && p.checks && (
+                  <ul className="mt-1.5 space-y-0.5 border-t border-border/40 pt-1.5">
+                    {p.checks.map((c, i) => <CheckRow key={i} c={c} />)}
+                  </ul>
+                )}
+              </li>
+            )
+          })}
+        </ul>
+      )}
+
+      {rejected.length > 0 && (
+        <div className="mt-2 rounded border border-danger/25 bg-danger/[0.05] px-2.5 py-1.5">
+          <div className="text-[10px] font-medium text-danger">
+            {rejected.length} 条被驳回,没有当作推荐
+          </div>
+          <ul className="mt-1 space-y-0.5">
+            {rejected.map((p) => (
+              <li key={p.symbol} className="text-[10px] leading-5 text-muted">
+                <span className="text-foreground/70">{p.name || p.symbol}</span>
+                <span className="mx-1">·</span>
+                <span className="line-through">{p.reason}</span>
+                <div className="text-danger/80">{p.verdict_note}</div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function Today() {
+  const qc = useQueryClient()
   const navigate = useNavigate()
   const q = useQuery({
     queryKey: QK.todayOverview,
@@ -251,6 +412,11 @@ export function Today() {
       setBrief(r.brief || null)
       setPicks(r.picks ?? [])
       setAnalyzed(r.analyzed ?? 0)
+      // [R121] 刚落了一条台账 → 命中率重取(样本数会变)
+      qc.invalidateQueries({ queryKey: QK.todayAiTrackRecord })
+      const v = r.verify
+      if (v?.rejected) toast(`AI 优选有 ${v.rejected} 条数字对不上日K, 已驳回`, 'error')
+      else if (v?.doubtful) toast(`AI 优选有 ${v.doubtful} 条存疑, 已标出`, 'error')
     },
     onError: (e: Error) => {
       setAiError(`AI 分析失败: ${e.message}`)
@@ -840,38 +1006,12 @@ export function Today() {
               </div>
             )}
             {shownPicks && (
-              <div className="border-b border-amber-400/20 bg-amber-400/[0.06] px-4 py-2.5 text-xs">
-                {shownPicks.length === 0 ? (
-                  <span className="text-muted">
-                    AI 逐一看过这 {shownAnalyzed} 只的量价后,认为都不够理想 —— 空仓等待也是决策
-                  </span>
-                ) : (
-                  <>
-                    <span className="text-[10px] font-medium text-amber-300">
-                      AI 优选 {shownPicks.length} 只
-                      <span className="ml-1.5 font-normal text-muted">
-                        · 已对比 {shownAnalyzed} 只的日 K 与量能后选出
-                      </span>
-                    </span>
-                    <ul className="mt-1 space-y-1">
-                      {shownPicks.map((p) => {
-                        const o = d.opportunities.find((x) => x.symbol === p.symbol)
-                        return (
-                          <li key={p.symbol}>
-                            <button
-                              onClick={() => goStock(p.symbol, o?.name ?? p.symbol)}
-                              className="text-left hover:underline cursor-pointer"
-                            >
-                              <span className="font-medium text-foreground">{o?.name ?? p.symbol}</span>
-                              <span className="ml-2 text-foreground/80">{p.reason}</span>
-                            </button>
-                          </li>
-                        )
-                      })}
-                    </ul>
-                  </>
-                )}
-              </div>
+              <AiPickPanel
+                picks={shownPicks}
+                analyzed={shownAnalyzed}
+                opportunities={d.opportunities}
+                onOpen={goStock}
+              />
             )}
             {d.opportunities.length === 0 ? (
               <div className="px-4 py-5 text-xs text-muted">
