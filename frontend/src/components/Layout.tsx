@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, Suspense } from 'react'
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import { useQuoteStream, useQuoteStreamStatus } from '@/lib/useQuoteStream'
 import { ToastContainer, toast } from '@/components/Toast'
@@ -373,9 +373,11 @@ function DataSourceHealthBadge({ matrix }: { matrix: CapabilityMatrix | undefine
 
 function AIConfigBadge({ configured, model }: { configured?: boolean; model?: string }) {
   // [R109] 显示"当前实际在用的那一档" —— 全系统 AI 走档位表(第 1 档优先, 用不了
-  // 自动顺位), 侧栏原来读的是旧单档配置字段 ai_model, 用户在档位表里把别的档
-  // 拖到第一后这里纹丝不动。改为优先读档位表首个启用档; 没配过档位表(只有
-  // legacy 合成档)时回落到原字段, 老用户显示不变。
+  // 自动顺位)。[R114] 点开是下拉快切: 选谁就把谁提到第 1 位并保存, 与「设置 →
+  // AI 设置」共用同一 queryKey, 两边永远同一份顺序。
+  const qc = useQueryClient()
+  const btnRef = useRef<HTMLButtonElement>(null)
+  const [menuPos, setMenuPos] = useState<{ left: number; top: number } | null>(null)
   const profilesQ = useQuery({
     queryKey: QK.aiProfiles,
     queryFn: api.aiProfiles,
@@ -394,45 +396,121 @@ function AIConfigBadge({ configured, model }: { configured?: boolean; model?: st
   const isConfigured = managed.length > 0 ? enabled.length > 0 : configured
   const fallbackCount = enabled.length > 1 ? enabled.length - 1 : 0
   const descText = isConfigured ? (shownModel || '已接入模型') : '接入策略生成模型'
-  const tip = primary
-    ? `AI 档位 — 当前首选 ${primary.label?.trim() || primary.model}${
-        fallbackCount ? `, 用不了时自动顺位试另 ${fallbackCount} 档` : ''}${
-        enabled.length ? `\n链路: ${enabled.map(p => p.label?.trim() || p.model).join(' → ')}` : ''}${
-        topDisabled ? `\n⚠ 表里第 1 档「${topDisabled}」未勾选启用, 已跳过 —— 想用它请在 AI 设置里勾上「启用」并保存` : ''}`
-    : `AI 配置 — ${descText}`
+
+  // 切档: 把选中项提到第 1 位(其余保持原相对顺序)后整表保存。
+  // api_key 回传空串即可 —— 后端按 id 对号沿用原 key(见 save_ai_profiles)。
+  const switchTo = useMutation({
+    mutationFn: async (id: string) => {
+      const picked = managed.find(p => p.id === id)
+      if (!picked) return
+      const next = [picked, ...managed.filter(p => p.id !== id)]
+      await api.saveAiProfiles(next.map(p => ({ ...p, enabled: p.id === id ? true : p.enabled })))
+    },
+    onSuccess: () => {
+      setMenuPos(null)
+      qc.invalidateQueries({ queryKey: QK.aiProfiles })
+      qc.invalidateQueries({ queryKey: QK.settings })
+      toast('已切换首选 AI 档位', 'success')
+    },
+    onError: (e: any) => toast(String(e?.message ?? '切换失败'), 'error'),
+  })
+
+  const toggleMenu = () => {
+    if (menuPos) { setMenuPos(null); return }
+    const rect = btnRef.current?.getBoundingClientRect()
+    if (rect) setMenuPos({ left: rect.left, top: rect.bottom + 4 })
+  }
+  useEffect(() => {
+    if (!menuPos) return
+    const onDoc = () => setMenuPos(null)
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setMenuPos(null) }
+    window.addEventListener('click', onDoc)
+    window.addEventListener('keydown', onKey)
+    return () => { window.removeEventListener('click', onDoc); window.removeEventListener('keydown', onKey) }
+  }, [menuPos])
 
   return (
-    <NavLink
-      to="/settings?tab=ai"
-      className="group relative flex items-center gap-2 overflow-hidden rounded-md py-1.5 pl-2.5 pr-2 transition-colors duration-150 hover:bg-elevated/70"
-      title={tip}
-    >
-      <span className="pointer-events-none absolute inset-y-1.5 left-0 w-[2px] rounded-full bg-purple-400/50 transition-colors group-hover:bg-purple-400" />
-      <Sparkles className="h-3.5 w-3.5 shrink-0 text-muted group-hover:text-purple-400 transition-colors" />
-      {isConfigured ? (
-        <>
-          <span className="truncate text-[11px] font-medium text-secondary group-hover:text-foreground transition-colors">
-            {shownModel || '已接入模型'}
-          </span>
-          {fallbackCount > 0 && (
-            <span className="shrink-0 font-mono text-[9px] leading-none text-muted/70" title="备用档位数(前一档用不了时自动顺位)">
-              +{fallbackCount}
+    <>
+      <button
+        ref={btnRef}
+        onClick={e => { e.stopPropagation(); toggleMenu() }}
+        title={managed.length > 0 ? '点击快速切换首选 AI 档位' : `AI 配置 — ${descText}`}
+        className="group relative flex w-full items-center gap-2 overflow-hidden rounded-md py-1.5 pl-2.5 pr-2 text-left transition-colors duration-150 hover:bg-elevated/70"
+      >
+        <span className="pointer-events-none absolute inset-y-1.5 left-0 w-[2px] rounded-full bg-purple-400/50 transition-colors group-hover:bg-purple-400" />
+        <Sparkles className="h-3.5 w-3.5 shrink-0 text-muted group-hover:text-purple-400 transition-colors" />
+        {isConfigured ? (
+          <>
+            <span className="truncate text-[11px] font-medium text-secondary group-hover:text-foreground transition-colors">
+              {shownModel || '已接入模型'}
             </span>
-          )}
-          {topDisabled && (
-            <span className="shrink-0 text-[9px] leading-none text-warning" title={`表里第 1 档「${topDisabled}」未启用, 已跳过`}>
-              ⚠
-            </span>
-          )}
-        </>
-      ) : (
-        <>
-          <span className="text-[11px] text-secondary group-hover:text-foreground transition-colors">AI 配置</span>
-          <span className="ml-auto text-[11px] font-mono leading-none text-muted">未配置</span>
-        </>
+            {fallbackCount > 0 && (
+              <span className="shrink-0 font-mono text-[9px] leading-none text-muted/70" title="备用档位数(前一档用不了时自动顺位)">
+                +{fallbackCount}
+              </span>
+            )}
+            {topDisabled && (
+              <span className="shrink-0 text-[9px] leading-none text-warning" title={`表里第 1 档「${topDisabled}」未启用, 已跳过`}>
+                ⚠
+              </span>
+            )}
+            {managed.length > 1 && (
+              <ChevronDown className="h-3 w-3 shrink-0 text-muted/50 transition-colors group-hover:text-muted" />
+            )}
+          </>
+        ) : (
+          <>
+            <span className="text-[11px] text-secondary group-hover:text-foreground transition-colors">AI 配置</span>
+            <span className="ml-auto text-[11px] font-mono leading-none text-muted">未配置</span>
+          </>
+        )}
+        <span className={`ml-auto h-1.5 w-1.5 rounded-full shrink-0 ${isConfigured ? 'bg-bear' : 'bg-warning'}`} />
+      </button>
+
+      {/* 下拉: 侧栏 overflow-hidden, 用 fixed 逃逸裁剪 */}
+      {menuPos && (
+        <div
+          onClick={e => e.stopPropagation()}
+          style={{ left: menuPos.left, top: menuPos.top }}
+          className="fixed z-[60] w-60 rounded-card border border-border bg-surface p-1 shadow-xl"
+        >
+          <div className="px-2 py-1 text-[9px] text-muted">
+            首选档位 · 用不了时自动顺位试下一档
+          </div>
+          {managed.length === 0 ? (
+            <div className="px-2 py-2 text-[10px] text-muted">还没有档位 —— 去 AI 设置里添加</div>
+          ) : managed.map((p, i) => {
+            const label = p.label?.trim() || p.model
+            const isPrimary = primary?.id === p.id
+            return (
+              <button
+                key={p.id}
+                onClick={() => !isPrimary && switchTo.mutate(p.id)}
+                disabled={switchTo.isPending}
+                className={cn(
+                  'flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-[11px] transition-colors disabled:opacity-60',
+                  isPrimary ? 'bg-accent/10 text-accent' : 'text-secondary hover:bg-elevated hover:text-foreground',
+                )}
+              >
+                <span className="w-3 shrink-0 text-center font-mono text-[9px] text-muted">{i + 1}</span>
+                <span className="min-w-0 flex-1 truncate">{label}</span>
+                {!p.enabled && <span className="shrink-0 text-[9px] text-warning">未启用</span>}
+                {isPrimary && <CheckCircle2 className="h-3 w-3 shrink-0" />}
+              </button>
+            )
+          })}
+          <div className="mt-1 border-t border-border/60 pt-1">
+            <NavLink
+              to="/settings?tab=ai"
+              onClick={() => setMenuPos(null)}
+              className="block rounded px-2 py-1.5 text-[10px] text-muted transition-colors hover:bg-elevated hover:text-foreground"
+            >
+              管理档位(增删 / 改 Key / 排序) →
+            </NavLink>
+          </div>
+        </div>
       )}
-      <span className={`ml-auto h-1.5 w-1.5 rounded-full shrink-0 ${isConfigured ? 'bg-bear' : 'bg-warning'}`} />
-    </NavLink>
+    </>
   )
 }
 
