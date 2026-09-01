@@ -26,33 +26,62 @@ import { QK } from '@/lib/queryKeys'
 import { cn } from '@/lib/cn'
 
 // ===== 自包含 HTML 导出(内联样式浅色排版, 无脚本无外链, 可存档/分享) =====
+//
+// [R143] 与界面同步。这份导出件从 R47 之后就没跟上过 —— 界面已经换了整套评分
+// (R134 的三门槛 + 三维度)、加了门槛漏斗、把主线/AI/胜率/通道结论收编成"注记",
+// 导出件却还在按 v1 的样子打印一个光秃秃的把握分。**存档件与屏幕说的不是同一件
+// 事, 比没有存档更糟**: 事后复盘时你会拿它当"当时看到的东西", 而它不是。
+//
+// 同步的三块:
+//   1. 市场状态 —— 与屏幕一样的五个统计格(总仓位基调/出手结构/自选强弱/
+//      全市场/成交额) + 主线 + 姿态理由
+//   2. AI 导读与优选 —— 优选带上 R121 的核对结论(已核对/存疑/待查), 驳回的
+//      单独列出。**存档件尤其不能只印结论不印核对状态**
+//   3. 值得关注 —— 三维度分解、位置、量比、距触发、注记, 与屏幕列一一对应
 
 function esc(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
-function buildTodayHtml(d: TodayOverview, brief: string | null): string {
+function buildTodayHtml(d: TodayOverview, brief: string | null,
+                        picks: TodayPick[] | null): string {
   const bull = '#d03050'
   const bear = '#18a058'
   const postureColor: Record<string, string> = { 进攻: bull, 谨慎: '#c78326', 防守: bear, 观察: '#8a919f' }
   const sym = (name: string, symbol: string) =>
     symbol && symbol !== name ? ` <span class="sym">${esc(symbol)}</span>` : ''
-  // [R43] 通道位置标: 到上沿用暖色(偏贵), 到下沿用冷色(低吸位置)
-  // [R47] 导出件的通道结论标: 浅色排版单独一套配色
-  const vStyle = (v: KeltnerVerdict) => ({
-    sell: 'background:#fdecec;color:#c0392b',
-    buy: 'background:#e6f4fb;color:#1c6ea4',
-    hold: 'background:#fdf0e3;color:#c78326',
-    avoid: 'background:#f0f1f3;color:#8a919f',
-    watch: 'background:#f0f1f3;color:#5b6472',
-  }[v.tone])
+  const noteStyle: Record<string, string> = {
+    good: 'background:#e8f7ee;color:#18794e',
+    bad: 'background:#fdecec;color:#c0392b',
+    info: 'background:#f0f1f3;color:#5b6472',
+  }
+  // 三维度分解条: 打印出来也要能一眼看出这分是谁给的
+  const dimBar = (o: TodayOverview['opportunities'][number]) => {
+    const rows: [string, number | null | undefined, string][] = [
+      ['趋势', o.dims?.trend, bull], ['量能', o.dims?.volume, '#c78326'],
+      ['位置', o.dims?.position, '#1c6ea4'],
+    ]
+    return `<span class="dims">${rows.map(([, v, c]) =>
+      `<i style="background:${c};height:${v == null ? 0 : Math.max(8, Math.min(100, v))}%"></i>`).join('')}</span>`
+  }
+
   const actionRows = d.actions.map(a => `
       <li><i style="background:${a.severity === 'high' ? bull : '#c78326'}"></i>
         <b>${esc(a.name)}</b>${sym(a.name, a.symbol)} ${esc(a.text)}</li>`).join('')
+
   const oppRows = d.opportunities.map(o => `
-      <li><b class="score">${o.score}</b>
-        <span><b>${esc(o.name)}</b>${sym(o.name, o.symbol)}${o.board ? ` <span class="adv" style="background:#eef1f5;color:#5b6472">${esc(o.board)}</span>` : ''}${o.mainline ? ` <span class="adv" style="background:#f4e6f7;color:#8b3fa0">主线${o.mainline.rank}·${esc(o.mainline.member)}</span>` : ''}${o.verdict ? ` <span class="adv" style="${vStyle(o.verdict)}">${esc(o.verdict.title)}</span>` : ''}${o.advice ? ` <span class="adv">${esc(o.advice.text)}</span>` : ''} ${esc(o.text)}
-        <span class="why">${esc(o.why)}</span>${o.advice?.plan ? `<span class="why" style="color:#1c6ea4">建仓路径:${esc(o.advice.plan)}</span>` : ''}</span></li>`).join('')
+      <tr>
+        <td class="num"><b class="score">${o.score}${o.partial ? '<sup>*</sup>' : ''}</b>${dimBar(o)}</td>
+        <td class="name"><b>${esc(o.name)}</b>${sym(o.name, o.symbol)}${o.board ? ` <span class="adv" style="background:#eef1f5;color:#5b6472">${esc(o.board)}</span>` : ''}</td>
+        <td class="sig">${esc(o.text)}${o.trend_state_cn ? ` <span class="adv" style="background:#f0f1f3;color:#5b6472">${esc(o.trend_state_cn)}</span>` : ''}${o.intraday ? ' <span class="adv" style="background:#fdf0e3;color:#c78326">盘中·待收盘确认</span>' : ''}</td>
+        <td class="num">${o.channel_pct == null ? '—' : `${Math.round(o.channel_pct * 100)}%`}</td>
+        <td class="num">${o.vol_ratio == null ? '—' : o.vol_ratio.toFixed(2)}</td>
+        <td class="num">${o.gap_pct == null ? '—' : `${o.gap_pct > 0 ? '+' : ''}${o.gap_pct}%`}</td>
+        <td>${(o.notes ?? []).map(n => `<span class="adv" style="${noteStyle[n.tone] ?? noteStyle.info}">${esc(n.label)}</span>`).join(' ') || '—'}</td>
+        <td>${o.advice ? `<span class="adv">${esc(o.advice.text)}</span>` : '—'}</td>
+      </tr>
+      <tr class="sub"><td></td><td colspan="7">${esc(o.why || '')}${o.advice?.plan ? ` · <span style="color:#1c6ea4">建仓路径:${esc(o.advice.plan)}</span>` : ''}</td></tr>`).join('')
+
   const holdRows = d.holdings.map(h => `
       <tr>
         <td class="name">${esc(h.name)}${sym(h.name, h.symbol)}</td>
@@ -64,6 +93,28 @@ function buildTodayHtml(d: TodayOverview, brief: string | null): string {
         <td style="color:${h.trend_side === '多头' ? bull : bear}">${h.trend_cn ? `${esc(h.trend_cn)} ${h.trend_duration}天` : '—'}</td>
         <td style="color:${h.stance === '离场' ? bull : h.stance === '减仓' ? '#c78326' : '#4e5666'};font-weight:${h.stance === '离场' ? 700 : 400}">${esc(h.stance)}</td>
       </tr>`).join('')
+
+  // 与屏幕同款的五个统计格
+  const cap = d.position_hint?.posture_cap
+  const m = d.meso
+  const stat = (label: string, value: string, sub = '') =>
+    `<div class="cell"><div class="k">${label}</div><div class="v">${value}</div>${sub ? `<div class="s">${sub}</div>` : ''}</div>`
+  const stats = [
+    stat('总仓位基调', cap != null ? `≤${(cap * 10).toFixed(0)}成` : '—', `${esc(d.weather.posture)}档`),
+    stat('出手结构', d.gates?.candidates ? `${d.gates.passed}/${d.gates.candidates}` : '—', '只候选过门槛'),
+    stat('自选强弱', `<b style="color:${bull}">${d.weather.bull}</b> / <b style="color:${bear}">${d.weather.bear}</b>`,
+      `刚转强 ${d.weather.new_bull} · 刚转弱 ${d.weather.new_bear}`),
+    stat('全市场', m?.breadth ? `<b style="color:${bull}">${m.breadth.up}</b> / <b style="color:${bear}">${m.breadth.down}</b>` : '—', '涨 / 跌'),
+    stat('两市成交额', m?.amount ? esc(m.amount.text) : '—',
+      m?.amount?.pct_rank != null ? `${(m.amount.pct_rank * 100).toFixed(0)}% 分位 · ${esc(m.amount.label ?? '')}` : ''),
+  ].join('')
+
+  const shown = (picks ?? []).filter(p => p.verdict !== '驳回')
+  const rejected = (picks ?? []).filter(p => p.verdict === '驳回')
+  const pickStyle: Record<string, string> = {
+    已核对: 'background:#e8f7ee;color:#18794e', 存疑: 'background:#fdf0e3;color:#c78326',
+    待查: 'background:#f0f1f3;color:#5b6472', 驳回: 'background:#fdecec;color:#c0392b',
+  }
   const genAt = new Date().toLocaleString('zh-CN')
   return `<!DOCTYPE html>
 <html lang="zh-CN">
@@ -73,31 +124,42 @@ function buildTodayHtml(d: TodayOverview, brief: string | null): string {
 <title>今日总览 · ${esc(d.as_of ?? '')}</title>
 <style>
   body{margin:0;padding:32px 24px;background:#f7f8fa;color:#1f2329;font:14px/1.6 -apple-system,'PingFang SC','Microsoft YaHei',sans-serif}
-  .wrap{max-width:1000px;margin:0 auto}
+  .wrap{max-width:1100px;margin:0 auto}
   h1{font-size:20px;margin:0 0 4px}
   h2{font-size:14px;margin:22px 0 8px;display:flex;align-items:center;gap:6px}
   .meta{color:#8a919f;font-size:12px;margin-bottom:18px}
   .posture{display:inline-block;border-radius:999px;padding:2px 14px;font-weight:600;color:#fff}
-  .weather{background:#fff;border:1px solid #e5e6eb;border-radius:8px;padding:12px 16px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
-  .brief{background:#f3efff;border:1px solid #ddd0fa;border-radius:8px;padding:12px 16px;font-size:13px;margin-top:14px}
+  .card{background:#fff;border:1px solid #e5e6eb;border-radius:8px;overflow:hidden}
+  .hd{padding:10px 16px;border-bottom:1px solid #f0f1f3;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .grid{display:grid;grid-template-columns:repeat(5,1fr)}
+  .cell{padding:9px 14px;border-right:1px solid #f0f1f3}
+  .cell:last-child{border-right:none}
+  .cell .k{font-size:11px;color:#8a919f}
+  .cell .v{font-size:15px;font-weight:600;font-variant-numeric:tabular-nums;margin-top:2px}
+  .cell .s{font-size:11px;color:#a0a6b1;margin-top:2px}
+  .row{padding:8px 16px;border-top:1px solid #f0f1f3;font-size:12px;color:#5b6472}
+  .brief{background:#f3efff;border:1px solid #ddd0fa;border-radius:8px;padding:12px 16px;margin-top:14px}
+  .brief p{margin:6px 0 0;font-size:13px;line-height:1.8;max-width:80ch}
+  .picks{margin:8px 0 0;padding:0;list-style:none}
+  .picks li{font-size:12px;padding:3px 0;border-top:1px solid #e7defa}
   ul.items{list-style:none;margin:0;padding:0;background:#fff;border:1px solid #e5e6eb;border-radius:8px}
   ul.items li{padding:9px 14px;border-bottom:1px solid #f0f1f3;font-size:13px;display:flex;gap:8px;align-items:baseline}
-  ul.items li>span{min-width:0;flex:1}
   ul.items li:last-child{border-bottom:none}
   ul.items i{width:7px;height:7px;border-radius:50%;display:inline-block;flex:none;position:relative;top:-1px}
   .empty{background:#fff;border:1px solid #e5e6eb;border-radius:8px;padding:14px 16px;font-size:13px;color:#8a919f}
   table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #e5e6eb;border-radius:8px;overflow:hidden}
   th{font-size:12px;font-weight:500;color:#8a919f;text-align:left;padding:8px 12px;border-bottom:1px solid #e5e6eb;background:#fafbfc;white-space:nowrap}
-  td{padding:8px 12px;border-bottom:1px solid #f0f1f3;font-size:13px;white-space:nowrap}
-  td.name{white-space:normal}
+  td{padding:7px 12px;border-bottom:1px solid #f0f1f3;font-size:13px;white-space:nowrap;vertical-align:middle}
+  td.name,td.sig{white-space:normal}
+  tr.sub td{border-bottom:1px solid #f0f1f3;padding:0 12px 7px;font-size:11px;color:#8a919f;white-space:normal}
   tr:last-child td{border-bottom:none}
   .num{font-variant-numeric:tabular-nums;text-align:right}
   th.num,td.num{text-align:right}
   .sym{color:#a0a6b1;font-size:11px}
-  .score{flex:none;background:#f0f1f3;color:#4e5666;border-radius:3px;padding:1px 5px;font-size:11px;font-variant-numeric:tabular-nums}
-  .why{display:block;color:#8a919f;font-size:11px;margin-top:2px}
+  .score{background:#f0f1f3;color:#4e5666;border-radius:3px;padding:1px 5px;font-size:11px;font-variant-numeric:tabular-nums}
+  .dims{display:inline-flex;align-items:flex-end;gap:2px;height:14px;margin-left:5px;vertical-align:middle}
+  .dims i{width:3px;background:#dfe2e7;border-radius:2px;display:block}
   .adv{background:#e8f3fb;color:#1c6ea4;border-radius:3px;padding:1px 5px;font-size:11px;white-space:nowrap;display:inline-block}
-  .sym,.score{white-space:nowrap}
   .foot{margin-top:18px;color:#a0a6b1;font-size:11px}
   @media print{body{background:#fff;padding:0}}
 </style>
@@ -106,25 +168,33 @@ function buildTodayHtml(d: TodayOverview, brief: string | null): string {
 <div class="wrap">
   <h1>今日总览</h1>
   <div class="meta">数据截至 ${esc(d.as_of ?? '—')} · 自选 ${d.watchlist_total} 只(其中 ${d.trend_total} 只有趋势判定)· 生成于 ${genAt}</div>
-  <div class="weather">
-    <span class="posture" style="background:${postureColor[d.weather.posture] ?? '#8a919f'}">${esc(d.weather.posture)}</span>
-    ${d.weather.market ? `<span class="posture" style="background:${postureColor[d.weather.market.mode] ?? '#8a919f'};font-size:11px;padding:1px 10px">大盘${esc(d.weather.market.mode)}</span>` : ''}
-    <span style="font-size:13px;color:#4e5666">${esc(d.weather.posture_reason)}</span>
-    <span style="margin-left:auto;font-size:12px;color:#8a919f">涨势 <b style="color:${bull}">${d.weather.bull}</b> / 跌势 <b style="color:${bear}">${d.weather.bear}</b> · 刚转强 ${d.weather.new_bull} · 刚转弱 ${d.weather.new_bear}</span>
+
+  <div class="card">
+    <div class="hd">
+      <span class="posture" style="background:${postureColor[d.weather.posture] ?? '#8a919f'}">${esc(d.weather.posture)}</span>
+      ${d.weather.market ? `<span class="posture" style="background:${postureColor[d.weather.market.mode] ?? '#8a919f'};font-size:11px;padding:1px 10px">${esc(d.weather.market.benchmark_name ?? '大盘')}·${esc(d.weather.market.mode)}</span>` : ''}
+      <span style="font-size:12px;color:#8a919f">${esc(d.weather.posture_reason)}</span>
+    </div>
+    <div class="grid">${stats}</div>
+    ${m?.mainline ? `<div class="row">${m.mainline.stale ? '主线(已停更)' : '今日主线'} · ${m.mainline.rows.slice(0, 3).map(x => `<b>${esc(x.member)}</b> ${x.limit_up_count} 家涨停`).join(' · ')}</div>` : ''}
+    ${d.gates?.text ? `<div class="row">三道硬门槛 · ${esc(d.gates.text)}</div>` : ''}
   </div>
-  ${(() => {
-    // [R37] 中观一行: 钱在往哪儿聚 —— 导出件里同样保留, 否则打印出来只剩大盘与个股两层
-    const m = d.meso
-    if (!m || !(m.amount || m.breadth || m.mainline)) return ''
-    const parts: string[] = []
-    if (m.amount) parts.push(`成交额 <b>${esc(m.amount.text)}</b>${m.amount.pct_rank != null ? ` (${(m.amount.pct_rank * 100).toFixed(0)}% 分位·${esc(m.amount.label ?? '')})` : ''}`)
-    if (m.breadth) parts.push(`<b style="color:${bull}">${m.breadth.up}</b> 涨 / <b style="color:${bear}">${m.breadth.down}</b> 跌`)
-    if (m.mainline) parts.push(`${m.mainline.stale ? '主线(已停更)' : '今日主线'} ${m.mainline.rows.slice(0, 3).map(x => `${esc(x.member)}(${x.limit_up_count})`).join('、')}`)
-    return `<div class="meta" style="margin-top:-6px">中观 · ${parts.join(' · ')}</div>`
-  })()}
-  ${brief ? `<div class="brief">✦ ${esc(brief)}</div>` : ''}
-  <h2>🎯 值得关注(${d.opportunities.length}·已按把握分筛选${d.opportunities_filtered > 0 ? `,滤掉 ${d.opportunities_filtered} 只` : ''})</h2>
-  ${d.opportunities.length ? `<ul class="items">${oppRows}</ul>` : '<div class="empty">今日没有把握足够的买入机会 —— 等待比出手更常见</div>'}
+
+  ${brief || shown.length || rejected.length ? `<div class="brief">
+    <b style="font-size:11px;color:#7a4fd0">✦ AI 导读·优选</b>
+    ${brief ? `<p>${esc(brief)}</p>` : ''}
+    ${shown.length ? `<ul class="picks">${shown.map(p => `<li><b>${esc(p.name || p.symbol)}</b> <span class="adv" style="${pickStyle[p.verdict ?? '待查'] ?? pickStyle.待查}">${esc(p.verdict ?? '待查')}</span> ${esc(p.reason)}${p.verdict_note ? ` <span style="color:#c78326">(${esc(p.verdict_note)})</span>` : ''}</li>`).join('')}</ul>` : ''}
+    ${rejected.length ? `<ul class="picks">${rejected.map(p => `<li style="color:#8a919f"><b>${esc(p.name || p.symbol)}</b> <span class="adv" style="${pickStyle.驳回}">已驳回</span> <s>${esc(p.reason)}</s> ${esc(p.verdict_note ?? '')}</li>`).join('')}</ul>` : ''}
+  </div>` : ''}
+
+  <h2>🎯 值得关注(${d.opportunities.length}·把握分 ≥ ${d.prefs.min_score}${d.opportunities_filtered > 0 ? `,滤掉 ${d.opportunities_filtered} 只` : ''})</h2>
+  ${d.opportunities.length ? `<table>
+    <thead><tr><th class="num">把握</th><th>名称</th><th>信号</th><th class="num">位置</th><th class="num">量比</th><th class="num">距触发</th><th>注记·不计分</th><th>建议仓位</th></tr></thead>
+    <tbody>${oppRows}</tbody>
+  </table>
+  <div class="meta" style="margin:6px 0 0">把握分 = 趋势强度 45% + 量能确认 30% + 位置成本 25%,先过三道硬门槛才打分;三条竖线依次是这三个维度的得分。分数带 * 表示有维度缺数据,总分偏乐观。位置 = Keltner 短期通道位置(50% 恰好站在生命线 MA20 上,甜区 50%~65%)。注记一律不参与打分。</div>`
+    : '<div class="empty">今日没有把握足够的买入机会 —— 等待比出手更常见</div>'}
+
   <h2>⚠️ 需要行动(${d.actions.length})</h2>
   ${d.actions.length ? `<ul class="items">${actionRows}</ul>` : '<div class="empty">今日无需操作 —— 管住手</div>'}
   <h2>💼 持仓体检(${d.holdings.length})${d.portfolio ? `<span style="font-weight:400;font-size:12px;color:#8a919f;margin-left:8px">组合:平均浮盈 ${d.portfolio.avg_pnl != null ? (d.portfolio.avg_pnl * 100).toFixed(1) + '%' : '—'} · 已触发 ${d.portfolio.triggered} · 逼近出场线 ${d.portfolio.near_exit} · 空头趋势 ${d.portfolio.bearish}${d.portfolio.total_weight != null ? ` · 总仓位 ${(d.portfolio.total_weight / 10).toFixed(1)}成${d.portfolio.drawdown != null ? ` · 距净值高点 -${(d.portfolio.drawdown * 100).toFixed(1)}%` : ''}` : ''}</span>` : ''}</h2>
@@ -132,14 +202,13 @@ function buildTodayHtml(d: TodayOverview, brief: string | null): string {
     <thead><tr><th>标的</th><th class="num">现价</th><th class="num">仓位</th><th class="num">浮盈</th><th class="num">出场线</th><th>阶段</th><th>趋势</th><th>操作建议</th></tr></thead>
     <tbody>${holdRows}</tbody>
   </table>` : '<div class="empty">暂无持仓标记</div>'}
-  <p class="foot">牛来 · 六态趋势 + ATR 出场线 + 生命线(20日线) · 仅个人参考,不构成投资建议</p>
+  <p class="foot">牛来 · 六态趋势 + ATR 出场线 + 生命线(20日线) + 把握分 v2(三门槛 + 三维度) · 仅个人参考,不构成投资建议</p>
 </div>
 </body>
 </html>
 `
 }
 
-/** [R18] 时段感知: 盘前/盘中/盘后各自该怎么用这页(北京时间) */
 function sessionPhaseHint(live: boolean | undefined): { label: string; hint: string } {
   const now = new Date()
   const bj = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Shanghai' }))
@@ -1173,7 +1242,7 @@ export function Today() {
           <button
             onClick={() => {
               if (!d) return
-              const html = buildTodayHtml(d, shownBrief)
+              const html = buildTodayHtml(d, shownBrief, shownPicks)
               const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
               const url = URL.createObjectURL(blob)
               const a = document.createElement('a')
