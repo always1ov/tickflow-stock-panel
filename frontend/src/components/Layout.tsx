@@ -407,7 +407,27 @@ function DataSourceHealthBadge({ matrix }: { matrix: CapabilityMatrix | undefine
   )
 }
 
+// [R154] 启动分档 —— 只决定"什么时候开始要", 不改任何请求的内容/key/时效。
+// 0 = 挂载即刻(首屏必需: settings / 偏好 / 能力矩阵 / 行情状态 / 四指数)
+// 1 = 首帧画完之后(侧栏角落的徽标与小字: 数据源健康、AI 档位、纳指、分析菜单)
+// 2 = 再过 1.5s(纯后台或本就不可见的: 管道轮询、告警计数、自选增强)
+// 目的是让 /api/today 那条几秒钟的主内容请求不用和十来个侧栏请求抢服务端 CPU
+// 与连接; 晚到的数据照常渲染, 界面上只是角落晚 1~2 秒亮起来。
+function useBootTier(): 0 | 1 | 2 {
+  const [tier, setTier] = useState<0 | 1 | 2>(0)
+  useEffect(() => {
+    let t2: number | undefined
+    const raf = requestAnimationFrame(() => {
+      setTier(1)
+      t2 = window.setTimeout(() => setTier(2), 1500)
+    })
+    return () => { cancelAnimationFrame(raf); if (t2 !== undefined) window.clearTimeout(t2) }
+  }, [])
+  return tier
+}
+
 function AIConfigBadge({ configured, model }: { configured?: boolean; model?: string }) {
+  const bootTier = useBootTier()
   // [R109] 显示"当前实际在用的那一档" —— 全系统 AI 走档位表(第 1 档优先, 用不了
   // 自动顺位)。[R114] 点开是下拉快切: 选谁就把谁提到第 1 位并保存, 与「设置 →
   // AI 设置」共用同一 queryKey, 两边永远同一份顺序。
@@ -418,6 +438,7 @@ function AIConfigBadge({ configured, model }: { configured?: boolean; model?: st
     queryKey: QK.aiProfiles,
     queryFn: api.aiProfiles,
     staleTime: 60_000,
+    enabled: bootTier >= 1,   // [R154] 首帧之后
   })
   const rows = profilesQ.data?.profiles ?? []
   const managed = rows.filter(p => !p.synthesized)
@@ -609,6 +630,7 @@ function PlainNavLink({ item, collapsed, indent, dataSyncing, dataSyncJustDone }
 }
 
 export function Layout() {
+  const bootTier = useBootTier()   // [R154] 见 useBootTier 注释
   // ===== 共享 hooks (替代内联 useQuery) =====
   const { data: settingsState } = useSettings()
   const { data: matrix } = useCapabilityMatrix()
@@ -619,12 +641,14 @@ export function Layout() {
     queryKey: QK.dataSources,
     queryFn: api.dataSources,
     staleTime: 60_000,
+    enabled: bootTier >= 1,   // [R154]
   })
   // poll=true: 全局唯一开启条件轮询 (非交易时段 60s 兜底, 交易时段靠 SSE)
   const { data: quoteStatus } = useQuoteStatus({ poll: true })
   const { data: analysisMenus } = useQuery({
     queryKey: QK.analysisMenus,
     queryFn: api.analysisMenus,
+    enabled: bootTier >= 1,   // [R154] 下一帧就发, 只是别挤在首帧那一撮里
   })
 
   // 自选分组 — 仅当用户开启「显示在侧边栏」时拉取
@@ -633,7 +657,7 @@ export function Layout() {
   const { data: watchlistGroupsData } = useQuery({
     queryKey: QK.watchlistGroups,
     queryFn: api.watchlistGroups,
-    enabled: groupsInNav,
+    enabled: groupsInNav && bootTier >= 1,   // [R154]
     staleTime: 60_000,
   })
   const watchlistGroups = watchlistGroupsData?.groups ?? []
@@ -661,13 +685,15 @@ export function Layout() {
   const { data: navWatchlist } = useQuery({
     queryKey: QK.watchlist,
     queryFn: api.watchlistList,
-    enabled: navGroupPctVisible,
+    enabled: navGroupPctVisible && bootTier >= 2,   // [R154]
     staleTime: 60_000,
   })
   const { data: navEnriched } = useQuery({
     queryKey: QK.watchlistEnriched(undefined),
     queryFn: () => api.watchlistEnriched(),
-    enabled: navGroupPctVisible,
+    // [R154] 这条在服务端是全自选的指标批量, 与 /api/today 抢的是同一批 CPU ——
+    // 侧栏分组涨跌幅晚 1.5s 出来, 换主内容早到
+    enabled: navGroupPctVisible && bootTier >= 2,
     staleTime: 60_000,
   })
   const navGroupPcts = useMemo(
@@ -684,6 +710,7 @@ export function Layout() {
     queryFn: () => api.pipelineJobs(1),
     refetchInterval: (query) => (query.state.data?.active_id ? 2000 : 15000),
     refetchIntervalInBackground: true,
+    enabled: bootTier >= 2,   // [R154] 纯后台轮询, 首屏用不着
   })
   const isDataSyncing = !!pipelineJobs?.active_id
 
@@ -778,7 +805,7 @@ export function Layout() {
     // 休市值静止, 高频拉只是白打上游
     refetchInterval: (q: any) => (q?.state?.data?.items ?? []).some((i: any) => i.trading) ? 8000 : 60000,
     placeholderData: (prev: { items: import('@/lib/api').GlobalIndexQuote[] } | undefined) => prev,
-    enabled: !navCollapsed,
+    enabled: !navCollapsed && bootTier >= 1,   // [R154] 四指数先到, 纳指下一帧
   })
   const realtimeToggleDisabled = toggleQuote.isPending || isPaused
   const realtimeActive = realtimeEnabled && isRunning && isTrading
@@ -822,6 +849,7 @@ export function Layout() {
     queryFn: () => api.alertsList({ days: 7, limit: 1 }),
     refetchInterval: 15000,
     select: (data) => data.total,
+    enabled: bootTier >= 2,   // [R154] 徽标计数, 晚 1.5s 无感
   })
   // 只在拿到真实总数时同步徽标 (避免 data=undefined 时传 0 重置 lastSeen)
   const alertsTotal = alertsTotalQuery.data
