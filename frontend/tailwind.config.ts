@@ -1,13 +1,19 @@
 import type { Config } from 'tailwindcss'
 import animate from 'tailwindcss-animate'
 
-// 设计语言 §6.0:暗色为主 + 电光蓝强调 + 等宽数字
+// 设计语言 §6.0:暗色为主 + 低饱和靛蓝强调([R155] Radix Slate 骨架 / Indigo 强调) + 等宽数字
 export default {
   darkMode: ['class'],
   content: ['./index.html', './src/**/*.{ts,tsx}'],
   theme: {
     container: { center: true, padding: '1rem' },
     extend: {
+      // [R155] text-accent 单独走 --accent-text: 暗色里"深底上的靛蓝文字"要亮、
+      // "靛蓝实底上的白字"要暗, 一个 token 兼顾不了(Radix 也是 9 档实底 / 11 档文字)。
+      // 只覆盖文字; bg-/border-/ring-accent 仍走下面 colors.accent。
+      textColor: {
+        accent: 'oklch(var(--accent-text) / <alpha-value>)',
+      },
       colors: {
         // §6.0.1 色板 — CSS variables 见 src/index.css
         base:      'oklch(var(--base) / <alpha-value>)',

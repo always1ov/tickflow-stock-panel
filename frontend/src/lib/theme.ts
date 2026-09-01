@@ -81,32 +81,33 @@ export interface ChartTheme {
   fillSubtle: string
 }
 
+// [R155] 灰阶跟 index.css 一起换成 Radix Slate(原来是 Tailwind Zinc), 画布与 DOM 才是同一套灰。
 const DARK: ChartTheme = {
-  text: '#A1A1AA',
-  textStrong: '#E4E4E7',
+  text: '#b0b4ba',        // slateDark11
+  textStrong: '#edeef0',  // slateDark12
   grid: 'rgba(255,255,255,0.06)',
-  border: '#27272A',
+  border: '#363a3f',      // slateDark6
   crosshair: 'rgba(255,255,255,0.25)',
-  crosshairLabelBg: '#333',
-  tooltipBg: 'rgba(24,24,27,0.95)',
+  crosshairLabelBg: '#43484e', // slateDark7
+  tooltipBg: 'rgba(24,25,27,0.95)',  // slateDark2
   tooltipBorder: 'rgba(255,255,255,0.1)',
-  tooltipText: '#E4E4E7',
-  infoBarBg: 'rgba(39,39,42,0.6)',
+  tooltipText: '#edeef0',
+  infoBarBg: 'rgba(46,49,53,0.6)',   // slateDark5 = surface
   zoomFill: 'rgba(255,255,255,0.06)',
   fillSubtle: 'rgba(255,255,255,0.04)',
 }
 
 const LIGHT: ChartTheme = {
-  text: '#71717A',
-  textStrong: '#27272A',
+  text: '#60646c',        // slate11
+  textStrong: '#1c2024',  // slate12
   grid: 'rgba(0,0,0,0.06)',
-  border: '#E4E4E7',
+  border: '#cdced6',      // slate7
   crosshair: 'rgba(0,0,0,0.3)',
-  crosshairLabelBg: '#52525B',
+  crosshairLabelBg: '#8b8d98', // slate9
   tooltipBg: 'rgba(255,255,255,0.97)',
   tooltipBorder: 'rgba(0,0,0,0.1)',
-  tooltipText: '#27272A',
-  infoBarBg: 'rgba(244,244,245,0.85)',
+  tooltipText: '#1c2024',
+  infoBarBg: 'rgba(240,240,243,0.85)',  // slate3 = base
   zoomFill: 'rgba(0,0,0,0.06)',
   fillSubtle: 'rgba(0,0,0,0.04)',
 }
