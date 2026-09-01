@@ -80,6 +80,25 @@ export default {
         // §6.0.4 Linear/Vercel 同款缓动
         smooth: 'cubic-bezier(0.16, 1, 0.3, 1)',
       },
+      // [R122] 动效时长档位 —— 此前各处 150/200/300 全靠手写, 同一类交互在不同
+      // 页面快慢不一。按"交互越轻越快"分四档, 新代码一律引用这里:
+      //   press 按下 / hover 悬停与着色 / enter 元素入场 / expand 展开收起
+      transitionDuration: {
+        press: '120ms',
+        hover: '180ms',
+        enter: '320ms',
+        expand: '220ms',
+      },
+      keyframes: {
+        // 列表项入场: 轻微上移 + 淡入(配 stagger 用)
+        'rise-in': {
+          from: { opacity: '0', transform: 'translateY(6px)' },
+          to: { opacity: '1', transform: 'translateY(0)' },
+        },
+      },
+      animation: {
+        'rise-in': 'rise-in 320ms cubic-bezier(0.16, 1, 0.3, 1) both',
+      },
     },
   },
   plugins: [animate],

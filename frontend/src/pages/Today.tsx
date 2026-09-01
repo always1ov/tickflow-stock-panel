@@ -6,12 +6,12 @@
  * 行动区与持仓体检相邻 —— 两者都是持仓管理, 连着看不用来回滚。
  * 数据全部来自既有模块,零新计算;AI 导读可选(手动点击,一次调用)。
  */
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import {
-  AlertTriangle, CheckCircle2, Compass, Download, Layers, Loader2, RefreshCw,
-  SlidersHorizontal, Sparkles, Sunrise, Target,
+  AlertTriangle, CheckCircle2, ChevronDown, Compass, Download, Layers, Loader2,
+  RefreshCw, SlidersHorizontal, Sparkles, Sunrise, Target,
 } from 'lucide-react'
 import {
   api, TODAY_BOARDS, type KeltnerVerdict, type SignalAiSchedule, type TodayAiSchedule,
@@ -21,6 +21,7 @@ import { toast } from '@/components/Toast'
 import { PageShell } from '@/components/PageShell'
 import { VerdictHover } from '@/components/stock-analysis/VerdictHover'
 import { QK } from '@/lib/queryKeys'
+import { cn } from '@/lib/cn'
 
 // ===== 自包含 HTML 导出(内联样式浅色排版, 无脚本无外链, 可存档/分享) =====
 
@@ -225,6 +226,161 @@ const POSTURE_STYLE: Record<string, string> = {
   观察: 'border-border bg-base text-muted',
 }
 
+// ===== [R122] 机会区表格 —— 15 张同质卡片 → 一行一只 =====
+//
+// 版式设计(先画后写, 见 FORK_NOTES R122):
+//   ┌──┬──────────┬────────────────┬──────┬──────┬────────┬─┐
+//   │分│ 名称/代码 │ 信号            │ 主线 │建议仓│ 结论标 │▸│
+//   ├──┴──────────┴────────────────┴──────┴──────┴────────┴─┤
+//   │  ▸ 展开: 规则依据 · 建仓路径(金字塔三步)                │
+//   └────────────────────────────────────────────────────────┘
+//
+// 为什么从卡片改表格: 旧版每只票 4~5 行, 其中"建仓路径:先试 0.5 成 → 站稳 X
+// 3 日加至 1 成 → …"这句每张卡一模一样, 15 只就是 15 遍模板文字, 眼睛扫不动,
+// 真正有区分度的信息(把握分、量比、距关键点)反而埋在长句里。表格把可比字段
+// 对齐成列, 模板文字收进展开行 —— 要看细节点开就是, 不看不占地方。
+//
+// 把握分保留数字, 但补一条**分布条**: 顶上一串 100/100/97/95 光看数字没有区
+// 分度, 条形按今日候选里的相对位置画, 一眼看出"这只在今天算高还是算低"。
+function ScoreCell({ score, rank, total }: { score: number; rank: number; total: number }) {
+  const tone = score >= 80 ? 'bg-danger' : score >= 70 ? 'bg-warning' : 'bg-muted'
+  return (
+    <span
+      className="inline-flex w-9 shrink-0 flex-col items-center gap-0.5"
+      title={`把握分 ${score}(综合信号新鲜度与 AI 置信度) —— 今日候选里排第 ${rank}/${total}`}
+    >
+      <span className={`font-mono text-[10px] font-semibold ${
+        score >= 80 ? 'text-danger' : score >= 70 ? 'text-warning' : 'text-muted'}`}>
+        {score}
+      </span>
+      <span className="h-0.5 w-full overflow-hidden rounded-full bg-border/60">
+        <span className={`block h-full rounded-full transition-all duration-enter ease-smooth ${tone}`}
+              style={{ width: `${Math.max(6, Math.min(100, score))}%` }} />
+      </span>
+    </span>
+  )
+}
+
+function OpportunityTable({ rows, pickedSymbols, onOpen }: {
+  rows: TodayOverview['opportunities']
+  pickedSymbols: Set<string>
+  onOpen: (symbol: string, name: string) => void
+}) {
+  const [open, setOpen] = useState<string | null>(null)
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-xs">
+        <thead>
+          <tr className="border-b border-border/40 text-[10px] text-muted">
+            <th className="w-12 px-3 py-1.5 text-center font-normal">把握</th>
+            <th className="px-2 py-1.5 text-left font-normal">名称</th>
+            <th className="px-2 py-1.5 text-left font-normal">信号</th>
+            <th className="hidden px-2 py-1.5 text-left font-normal lg:table-cell">主线</th>
+            <th className="hidden px-2 py-1.5 text-right font-normal sm:table-cell">建议仓位</th>
+            <th className="w-7 px-1 py-1.5" aria-label="展开" />
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((o, i) => {
+            const picked = pickedSymbols.has(o.symbol)
+            const expanded = open === o.symbol
+            return (
+              <Fragment key={o.symbol}>
+                <tr
+                  className={cn('group border-b border-border/25 transition-colors duration-hover',
+                    picked ? 'bg-amber-400/[0.07]' : 'hover:bg-elevated/40')}
+                >
+                  <td className="px-3 py-2 text-center align-top">
+                    <ScoreCell score={o.score} rank={i + 1} total={rows.length} />
+                  </td>
+                  <td className="px-2 py-2 align-top">
+                    <button
+                      onClick={() => onOpen(o.symbol, o.name)}
+                      className="text-left font-medium text-foreground hover:text-accent hover:underline transition-colors duration-hover cursor-pointer"
+                    >
+                      {o.name}
+                    </button>
+                    <div className="mt-0.5 flex flex-wrap items-center gap-1">
+                      <span className="font-mono text-[9px] text-muted">{o.symbol}</span>
+                      {o.board && (
+                        <span title={`${o.board} —— 涨跌停幅度 ${BOARD_LIMIT_CN[o.board] ?? '10%'}`}
+                              className={`rounded px-1 py-0.5 text-[9px] ${BOARD_CLS[o.board] ?? 'bg-border/40 text-muted'}`}>
+                          {o.board}
+                        </span>
+                      )}
+                      {picked && <span className="text-[9px] text-amber-300">★ AI 优选</span>}
+                    </div>
+                  </td>
+                  <td className="px-2 py-2 align-top text-foreground/85">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span>{o.text}</span>
+                      <VerdictTag v={o.verdict} />
+                      {o.intraday && (
+                        <span title="这个信号由盘中实时价触发,收盘可能收回去 —— 只记录观察,收盘确认后再动手"
+                              className="rounded bg-amber-400/15 px-1 py-0.5 text-[9px] text-amber-300">
+                          盘中·待收盘确认
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="hidden px-2 py-2 align-top lg:table-cell">
+                    {o.mainline ? (
+                      <span
+                        title={
+                          `今日第 ${o.mainline.rank} 主线「${o.mainline.member}」,该概念今日 ${o.mainline.limit_up_count} 家涨停` +
+                          (o.mainline.also.length ? `;同时还属于 ${o.mainline.also.join('、')}` : '') +
+                          ' —— 板块效应是佐证不是理由:量价不扎实的票在第一主线里也不该买。没有这个标只说明它单打独斗,不扣分'
+                        }
+                        className="whitespace-nowrap rounded bg-fuchsia-400/15 px-1.5 py-0.5 text-[9px] text-fuchsia-300"
+                      >
+                        主线{o.mainline.rank}·{o.mainline.member}
+                      </span>
+                    ) : <span className="text-[10px] text-muted/50">—</span>}
+                  </td>
+                  <td className="hidden whitespace-nowrap px-2 py-2 text-right align-top sm:table-cell">
+                    {o.advice ? (
+                      <span title={`${o.advice.why} —— 仅供参考的上限建议, 不是操作指令`}
+                            className="rounded bg-sky-400/15 px-1.5 py-0.5 text-[9px] text-sky-300">
+                        {o.advice.text}
+                      </span>
+                    ) : <span className="text-[10px] text-muted/50">—</span>}
+                  </td>
+                  <td className="px-1 py-2 align-top">
+                    <button
+                      onClick={() => setOpen(expanded ? null : o.symbol)}
+                      aria-expanded={expanded}
+                      aria-label={expanded ? '收起细节' : '展开细节'}
+                      className="rounded p-1 text-muted transition-colors duration-hover hover:bg-elevated hover:text-foreground"
+                    >
+                      <ChevronDown className={cn('h-3.5 w-3.5 transition-transform duration-expand ease-smooth',
+                        expanded && 'rotate-180')} />
+                    </button>
+                  </td>
+                </tr>
+                {expanded && (
+                  <tr className="border-b border-border/25 bg-base/40">
+                    <td colSpan={6} className="px-4 py-2.5">
+                      <div className="animate-rise-in space-y-1 text-[11px] leading-5">
+                        <div className="text-muted">{o.why}</div>
+                        {o.advice?.plan && (
+                          <div className="text-sky-300/90"
+                               title="金字塔建仓:每一步由价格确认驱动;假突破最多损失一个试仓(比例可在「门槛」面板调)">
+                            建仓路径:{o.advice.plan}
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
+            )
+          })}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
 // ===== [R121] AI 优选面板 —— 把「凭什么信它」摆到台面上 =====
 //
 // 旧版这里只有一行字: 名字 + 理由。理由里那些数字(涨 7.2%、量比 1.25、守住
@@ -323,12 +479,16 @@ function AiPickPanel({ picks, analyzed, opportunities, onOpen }: {
         </div>
       ) : (
         <ul className="mt-1.5 space-y-1.5">
-          {shown.map((p) => {
+          {shown.map((p, i) => {
             const o = opportunities.find((x) => x.symbol === p.symbol)
             const style = VERDICT_STYLE[p.verdict ?? '待查'] ?? VERDICT_STYLE.待查
             const open = openChecks === p.symbol
             return (
-              <li key={p.symbol} className="rounded border border-border/40 bg-base/40 px-2.5 py-1.5">
+              // [R122] 入场: 320ms 上移淡入, 逐条错开 60ms —— AI 跑完后结果是
+              // "长出来"的, 不是突然闪现; 只给优选卡, 表格行不做(每次刷新都动会闹)
+              <li key={p.symbol}
+                  style={{ animationDelay: `${i * 60}ms` }}
+                  className="animate-rise-in rounded border border-border/40 bg-base/40 px-2.5 py-1.5">
                 <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
                   <button
                     onClick={() => onOpen(p.symbol, o?.name ?? p.name ?? p.symbol)}
@@ -581,18 +741,9 @@ export function Today() {
         </div>
       )}
     >
-      {/* [R18] 时段提示条: 现在处于哪个时段、这页该怎么用 */}
-      {d && (() => {
-        const phase = sessionPhaseHint(d.live)
-        return (
-          <div className="flex items-start gap-2 rounded-lg border border-border/40 bg-base/40 px-3 py-2 text-[11px] text-muted">
-            <span className="mt-[1px] shrink-0 rounded border border-border/60 bg-elevated/50 px-1.5 py-0.5 text-[10px] font-medium text-foreground">
-              {phase.label}
-            </span>
-            <span className="leading-relaxed">{phase.hint}</span>
-          </div>
-        )
-      })()}
+      {/* [R122] 时段提示条并入下方「市场天气」横幅 —— 三条通栏横幅(时段/天气/中观)
+          在首屏堆掉近三分之一高度, 而时段只是一句"现在该怎么用这页"的说明,
+          不值得独占一条。现在它是天气条右上角的一个徽章, 悬停看全文。 */}
 
       {aiError && (
         <div className="flex items-start justify-between gap-3 rounded-lg border border-red-400/30 bg-red-400/[0.07] px-4 py-3 text-xs text-red-300">
@@ -642,6 +793,16 @@ export function Today() {
                 <span className={`inline-flex rounded-full border px-3 py-0.5 text-sm font-medium ${POSTURE_STYLE[d.weather.posture] ?? POSTURE_STYLE['观察']}`}>
                   {d.weather.posture}
                 </span>
+                {/* [R122] 时段徽章(原独立横幅): 标签常显, 用法说明收进 title */}
+                {(() => {
+                  const phase = sessionPhaseHint(d.live)
+                  return (
+                    <span title={phase.hint}
+                          className="rounded border border-border/60 bg-elevated/50 px-1.5 py-0.5 text-[10px] font-medium text-secondary">
+                      {phase.label}
+                    </span>
+                  )
+                })()}
                 {d.weather.market && (
                   <span
                     title={
@@ -1019,82 +1180,11 @@ export function Today() {
                 {d.opportunities_filtered > 0 && `(有 ${d.opportunities_filtered} 只信号把握不足,已替你滤掉)`}
               </div>
             ) : (
-              <ul className="grid lg:grid-cols-2 -mb-px">
-                {d.opportunities.map((o, i) => {
-                  const picked = shownPicks?.some((p) => p.symbol === o.symbol)
-                  return (
-                    <li key={i} className={`border-b border-border/30 lg:odd:border-r ${picked ? 'bg-amber-400/[0.07]' : ''}`}>
-                      <button
-                        onClick={() => goStock(o.symbol, o.name)}
-                        className="flex w-full items-start gap-2.5 px-4 py-2.5 text-left hover:bg-elevated/40 transition-colors cursor-pointer"
-                      >
-                        <span
-                          title={`把握分 ${o.score}(综合信号新鲜度与 AI 置信度)`}
-                          className={`mt-0.5 shrink-0 rounded px-1.5 py-0.5 text-[9px] font-mono font-semibold ${
-                            o.score >= 80 ? 'bg-red-400/20 text-red-300'
-                              : o.score >= 70 ? 'bg-amber-400/20 text-amber-300'
-                                : 'bg-border/40 text-muted'
-                          }`}
-                        >
-                          {o.score}
-                        </span>
-                        <span className="text-xs leading-relaxed">
-                          <span className="font-medium text-foreground">{o.name}</span>
-                          {o.symbol !== o.name && <span className="ml-1.5 text-[9px] font-mono text-muted">{o.symbol}</span>}
-                          {o.board && (
-                            <span
-                              title={`${o.board} —— 涨跌停幅度 ${BOARD_LIMIT_CN[o.board] ?? '10%'}`}
-                              className={`ml-1.5 rounded px-1 py-0.5 text-[9px] ${BOARD_CLS[o.board] ?? 'bg-border/40 text-muted'}`}
-                            >
-                              {o.board}
-                            </span>
-                          )}
-                          <VerdictTag v={o.verdict} />
-                          {picked && <span className="ml-1.5 text-[9px] text-amber-300">★ AI 优选</span>}
-                          {o.intraday && (
-                            <span
-                              title="这个信号由盘中实时价触发,收盘可能收回去 —— 只记录观察,收盘确认后再动手"
-                              className="ml-1.5 rounded bg-amber-400/15 px-1 py-0.5 text-[9px] text-amber-300"
-                            >
-                              盘中·待收盘确认
-                            </span>
-                          )}
-                          {o.mainline && (
-                            <span
-                              title={
-                                `今日第 ${o.mainline.rank} 主线「${o.mainline.member}」,该概念今日 ${o.mainline.limit_up_count} 家涨停` +
-                                (o.mainline.also.length ? `;同时还属于 ${o.mainline.also.join('、')}` : '') +
-                                ' —— 板块效应是佐证不是理由:量价不扎实的票在第一主线里也不该买。没有这个标只说明它单打独斗,不扣分'
-                              }
-                              className="ml-1.5 rounded bg-fuchsia-400/15 px-1.5 py-0.5 text-[9px] text-fuchsia-300"
-                            >
-                              主线{o.mainline.rank}·{o.mainline.member}
-                            </span>
-                          )}
-                          {o.advice && (
-                            <span
-                              title={`${o.advice.why} —— 仅供参考的上限建议, 不是操作指令`}
-                              className="ml-1.5 rounded bg-sky-400/15 px-1.5 py-0.5 text-[9px] text-sky-300"
-                            >
-                              {o.advice.text}
-                            </span>
-                          )}
-                          <span className="ml-2 text-foreground/80">{o.text}</span>
-                          <span className="mt-0.5 block text-[10px] text-muted">{o.why}</span>
-                          {o.advice?.plan && (
-                            <span
-                              title="金字塔建仓:每一步由价格确认驱动;假突破最多损失一个试仓(比例可在「门槛」面板调)"
-                              className="mt-0.5 block text-[10px] text-sky-300/90"
-                            >
-                              建仓路径:{o.advice.plan}
-                            </span>
-                          )}
-                        </span>
-                      </button>
-                    </li>
-                  )
-                })}
-              </ul>
+              <OpportunityTable
+                rows={d.opportunities}
+                pickedSymbols={new Set((shownPicks ?? []).filter(p => p.verdict !== '驳回').map(p => p.symbol))}
+                onOpen={goStock}
+              />
             )}
           </section>
 
