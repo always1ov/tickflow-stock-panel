@@ -292,10 +292,17 @@ def _annotations(sym: str, e: dict, sig: dict) -> list[dict]:
                     "label": vd.get("title") or "通道结论",
                     "text": vd.get("detail") or vd.get("hint") or ""})
 
+    # [R135] 这两项 R134 时只写了展示分支没接数据源, 界面上永远不出现。
+    # 数据都来自既有产出(策略页的 run_all 缓存 / 龙虎榜按日缓存), 不新增计算。
+    hits = e.get("strategy_hits")
+    if hits:
+        from app.services.today_annotations import strategy_note
+        out.append(strategy_note(list(hits)))
+
     dragon = e.get("dragon")
-    if dragon:
-        out.append({"key": "dragon", "tone": "info", "label": "龙虎榜在列",
-                    "text": str(dragon)[:60]})
+    if isinstance(dragon, dict):
+        from app.services.today_annotations import dragon_note
+        out.append(dragon_note(dragon))
     return out
 
 
@@ -474,7 +481,9 @@ def holding_stance(exit_triggered: bool, distance_pct: float | None,
     return "持有", "无触发条件,按既定计划持有"
 
 
-def _build_overview(repo) -> dict:
+def _build_overview(repo, engine=None) -> dict:
+    """[R135] engine 为 StrategyEngine, 只用来把「策略命中」这个**注记**读出来
+    (读策略页已写好的缓存, 不跑策略)。不传就没有那个标, 其余一切不变。"""
     from app.services import positions as positions_svc
     from app.services import stock_signal, today_prefs, watchlist
     from app.services.livermore_service import trends_for_symbols
@@ -667,6 +676,22 @@ def _build_overview(repo) -> dict:
     # 比十档文字结论细得多, 也不必再担心"结论表和分数各说各话"。
     for sym, v in verdict_map.items():
         extras.setdefault(sym, {})["verdict"] = v
+
+    # [R135] 另外两个注记数据源。与主线同层: 都是"给全部自选打标, 不参与打分"。
+    # 两者都只读既有产出 —— 策略命中读策略页 run_all 写的缓存, 龙虎榜读按日缓存;
+    # 在总览接口里现算 27 个内置策略是几秒级开销, 为一个不计分的展示标不值得。
+    try:
+        from app.services import today_annotations
+        data_as_of = max((t.get("as_of") for t in trends.values() if t.get("as_of")),
+                         default=None)
+        for s_, hits in today_annotations.strategy_hits(repo, engine, data_as_of).items():
+            if s_ in names:
+                extras.setdefault(s_, {})["strategy_hits"] = hits
+        for s_, info in today_annotations.dragon_tiger_map(repo).items():
+            if s_ in names:
+                extras.setdefault(s_, {})["dragon"] = info
+    except Exception as e:  # noqa: BLE001 —— 注记取不到只是少个标, 不该拖垮总览
+        logger.debug("today annotations skipped: %s", e)
 
     # [R37] 中观层: 主线归属 + 中观快照。给全部自选打标(不止趋势候选) ——
     # 逼近突破那一路的候选来自 AI 信号, 不在 cand_syms 里, 也该享受同一份加成。
@@ -895,7 +920,8 @@ def get_today(request: Request):
     [R27] 顺带带出已缓存的 AI 导读·优选(ai 字段), 前端进页面即常驻显示,
     不必每次手点; 缓存过期(数据日已推进)时前端据 as_of 提示。
     """
-    data = _build_overview(request.app.state.repo)
+    data = _build_overview(request.app.state.repo,
+                           getattr(request.app.state, 'strategy_engine', None))
     try:
         from app.services import today_ai_store
         data["ai"] = today_ai_store.load()
@@ -1151,7 +1177,7 @@ async def today_ai(request: Request):
     未配 AI 返回 error 而非 500。生成成功即落盘缓存(刷新页面仍在, 见 today_ai_store)。
     """
     repo = request.app.state.repo
-    data = _build_overview(repo)
+    data = _build_overview(repo, getattr(request.app.state, "strategy_engine", None))
     out = await generate_today_ai(repo, data)
     if not out.get("error"):
         from app.services import ai_pick_ledger, today_ai_store
