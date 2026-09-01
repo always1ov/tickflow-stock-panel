@@ -172,11 +172,13 @@ function MonitorBadge({ active }: { active: boolean }) {
   )
 }
 
-function SidebarIndexQuotes({ rows, items, globalRows }: {
+function SidebarIndexQuotes({ rows, items, globalRows, cnLive }: {
   rows: IndexQuote[] | undefined
   items: CoreIndex[]
   /** [R102] 全球指数(独立数据源) — 与 A 股指数同格显示, 数据链各自独立 */
   globalRows?: { key: string; name: string; last: number; change_pct?: number | null; updated_at?: number; trading?: boolean }[]
+  /** [R119] A 股这几张卡此刻是不是真在跳(交易时段 + 数据来自实时缓存) */
+  cnLive?: boolean
 }) {
   const globals = globalRows ?? []
   if (items.length === 0 && globals.length === 0) return null
@@ -191,11 +193,17 @@ function SidebarIndexQuotes({ rows, items, globalRows }: {
           <NavLink
             key={item.symbol}
             to={`/indices?symbol=${encodeURIComponent(item.symbol)}`}
-            className="block rounded bg-elevated/60 px-2 py-1.5 transition-colors hover:bg-elevated"
-            title={`${item.name} ${item.symbol}`}
+            className={cn('block rounded bg-elevated/60 px-2 py-1.5 transition-colors hover:bg-elevated',
+              !cnLive && 'opacity-70')}
+            title={`${item.name} ${item.symbol} — ${cnLive ? '交易中, 实时刷新' : '非实时(休市或实时行情未开), 显示最后收盘/缓存值'}`}
           >
             <div className="flex items-center justify-between gap-1">
-              <span className="text-[10px] text-secondary">{item.name}</span>
+              <span className="flex min-w-0 items-center gap-1 text-[10px] text-secondary">
+                {/* [R119] 与全球卡同一套语义: 绿点脉冲=在跳, 灰点=静止 */}
+                <span className={cn('h-1 w-1 shrink-0 rounded-full',
+                  cnLive ? 'bg-bull animate-pulse' : 'bg-muted/40')} />
+                <span className="truncate">{item.name}</span>
+              </span>
               <span className={`text-[10px] font-mono ${indexPctClass(pct)}`}>{fmtIndexPct(pct)}</span>
             </div>
             <div className={`mt-0.5 truncate font-mono text-[10px] ${indexPctClass(pct)}`}>
@@ -700,11 +708,19 @@ export function Layout() {
   const sidebarIndexes = CORE_INDEXES.filter(item => sidebarIndexSymbols.includes(item.symbol))
   // 卡片数据：固定显示时也拉取（即使实时行情关闭）
   const showSidebarQuotes = indicesPinned || realtimeEnabled
+  // [R119] A 股指数卡也走自主轮询, 不再只靠 SSE 推 —— SSE 断线或实时开关关着时
+  // 卡片就彻底静止了, 用户看不出是"没变"还是"没在更新"。端点只读行情缓存/日线
+  // 回退, **不触发 TickFlow 请求**, 所以这里多问几次不烧配额。
   const { data: sidebarIndexQuotes } = useQuery({
     queryKey: [...QK.indexQuotes, 'sidebar', sidebarIndexSymbols.join(',')] as const,
     queryFn: () => api.indexQuotes(sidebarIndexes.map(p => p.symbol)),
     enabled: showSidebarQuotes && sidebarIndexes.length > 0,
     placeholderData: (prev) => prev,
+    // 交易时段 + 轮询在跑 → 6s(与行情轮询同频); 交易时段但没开实时 → 30s
+    // (读到的是日线回退, 不会变, 只为开关一打开就跟上); 休市 → 60s
+    refetchInterval: !(quoteStatus?.is_trading_hours ?? false)
+      ? 60000
+      : (quoteStatus?.running ?? false) ? 6000 : 30000,
   })
 
   // SSE: 行情更新时自动刷新相关 queries + 告警通知
@@ -914,6 +930,8 @@ export function Layout() {
               rows={cnQuotesOk ? sidebarIndexQuotes?.rows : undefined}
               items={cnQuotesOk ? sidebarIndexes : []}
               globalRows={globalIdxQuery.data?.items}
+              // [R119] 真在跳 = A 股交易时段 + 轮询在跑 + 数据确实来自实时缓存
+              cnLive={isTrading && isRunning && sidebarIndexQuotes?.source === 'realtime'}
             />
           )}
         </div>

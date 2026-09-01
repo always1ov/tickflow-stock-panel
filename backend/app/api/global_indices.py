@@ -41,6 +41,12 @@ def debug() -> dict:
     return global_indices.debug_fetch(_selected_keys())
 
 
+@router.get("/tickflow-probe")
+def tickflow_probe() -> dict:
+    """[R119] 问 TickFlow: 境外指数你给不给。韩国不用问(SDK 只有 CN/US/HK)。"""
+    return global_indices.tickflow_probe()
+
+
 class SelectionIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
