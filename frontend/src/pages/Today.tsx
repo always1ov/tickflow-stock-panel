@@ -824,6 +824,177 @@ function AiPickPanel({ picks, analyzed, opportunities, onOpen }: {
   )
 }
 
+// ===== [R142] 市场状态卡 —— 原来的「市场天气」+「中观」两条横幅合并重做 =====
+//
+// 旧版的毛病不是配色, 是**版式**: 两条横幅各自是一行跑马灯式的长句, 关键数字
+// 全埋在散文里 ——「沪深300 收盘 4611 已跌破年线(200日均线)4699,大环境转坏;
+// 自选:在涨势中的自选只剩 40%,今天转弱的(38 只)明显多于转强的(54 只)…」。
+// 要从这样一句话里读出"今天能不能出手", 得逐字扫一遍; 而这五个数
+// (仓位基调 / 出手结构 / 自选强弱 / 全市场 / 成交额)才是真正要看的东西。
+//
+// 重做的三件事:
+//   1. **数字从散文里拎出来做成统计格** —— 标签在上、数值加大加粗在中、口径在下。
+//      一眼扫过去就是五个数, 不用读句子。
+//   2. **长句降级成可展开的「为什么」** —— 它是解释不是结论, 不该默认占两行。
+//   3. **两条横幅合并** —— 大盘姿态与中观资金说的是同一件事的两个层面,
+//      拆成两个卡片反而要在两处找同一个判断。
+function StatCell({ label, value, sub, tone, title }: {
+  label: string
+  value: React.ReactNode
+  sub?: React.ReactNode
+  tone?: 'bull' | 'bear' | 'neutral'
+  title?: string
+}) {
+  return (
+    <div className="min-w-0 px-3 py-2" title={title}>
+      <div className="truncate text-[10px] text-muted">{label}</div>
+      <div className={cn('mt-0.5 truncate font-mono text-sm font-semibold',
+        tone === 'bull' ? 'text-bull' : tone === 'bear' ? 'text-bear' : 'text-foreground')}>
+        {value}
+      </div>
+      {sub && <div className="mt-0.5 truncate text-[10px] text-muted/80">{sub}</div>}
+    </div>
+  )
+}
+
+function MarketStatusCard({ d, meso, mainline }: {
+  d: TodayOverview
+  meso: TodayOverview['meso']
+  mainline: NonNullable<TodayOverview['meso']>['mainline'] | null
+}) {
+  const [whyOpen, setWhyOpen] = useState(false)
+  const w = d.weather
+  const cap = d.position_hint?.posture_cap
+  const phase = sessionPhaseHint(d.live)
+  return (
+    <div className="overflow-hidden rounded-lg border border-border/60 bg-surface/40">
+      {/* 第一行: 结论徽章 —— 姿态是这张卡的标题, 给它最大的字重 */}
+      <div className="flex flex-wrap items-center gap-2 border-b border-border/40 px-4 py-2.5">
+        <Compass className="h-4 w-4 shrink-0 text-sky-400" />
+        <span className={`inline-flex rounded-btn border px-3 py-0.5 text-sm font-medium ${POSTURE_STYLE[w.posture] ?? POSTURE_STYLE['观察']}`}>
+          {w.posture}
+        </span>
+        <span title={phase.hint}
+              className="rounded border border-border/60 bg-elevated/50 px-1.5 py-0.5 text-[10px] font-medium text-secondary">
+          {phase.label}
+        </span>
+        {w.market && (
+          <span
+            title={
+              `基准 ${w.market.benchmark_name ?? '—'}(${w.market.as_of ?? '—'})` +
+              (w.market.metrics.close != null
+                ? ` · 收盘 ${w.market.metrics.close} / 50日线 ${w.market.metrics.ma50} / 年线 ${w.market.metrics.ma200} / 年动量 ${((w.market.metrics.momentum_12m ?? 0) * 100).toFixed(1)}%`
+                : '') +
+              ` —— 最终姿态取大盘与自选中更保守的一方`
+            }
+            className={`inline-flex items-center gap-1 rounded-btn border px-2 py-0.5 text-[10px] ${POSTURE_STYLE[w.market.mode] ?? POSTURE_STYLE['观察']}`}
+          >
+            {w.market.benchmark_name ?? '大盘'}·{w.market.mode}
+            {w.market.pending && <span className="opacity-70">(将转{w.market.pending.mode} {w.market.pending.streak}/{w.market.pending.need})</span>}
+          </span>
+        )}
+        <button
+          onClick={() => setWhyOpen(v => !v)}
+          aria-expanded={whyOpen}
+          className="ml-auto inline-flex items-center gap-1 rounded-btn border border-border bg-base px-2 py-0.5 text-[10px] text-muted transition-colors cursor-pointer hover:text-foreground"
+        >
+          为什么
+          <ChevronDown className={cn('h-3 w-3 transition-transform duration-expand ease-smooth',
+            whyOpen && 'rotate-180')} />
+        </button>
+      </div>
+
+      {/* 第二行: 五个统计格。竖分隔线让它们读起来是一排并列的数, 不是一句话 */}
+      <div className="grid grid-cols-2 divide-x divide-y divide-border/30 sm:grid-cols-3 lg:grid-cols-5 lg:divide-y-0">
+        <StatCell
+          label="总仓位基调"
+          value={cap != null ? `≤${(cap * 10).toFixed(0)}成` : '—'}
+          sub={`${w.posture}档`}
+          title="由当前姿态决定的总仓位建议上限 —— 所有持仓加起来别超过这个数。展示用基调, 不是强制" />
+        <StatCell
+          label="出手结构"
+          value={d.gates?.candidates ? `${d.gates.passed}/${d.gates.candidates}` : '—'}
+          sub="只候选过门槛"
+          tone={d.gates && d.gates.candidates
+            ? (d.gates.passed / d.gates.candidates >= 0.4 ? 'bull' : 'bear') : undefined}
+          title={d.gates?.text
+            ? `${d.gates.text}\n\n候选一堆但过门槛的没几只, 说明信号在遍地开花而趋势结构没跟上 —— 那种日子最容易追在半山腰。`
+            : '三道硬门槛: 六态多头侧 / 站上生命线 MA20 / 非长期下跌'} />
+        <StatCell
+          label="自选强弱"
+          value={<><span className="text-bull">{w.bull}</span>
+            <span className="mx-1 text-muted/40">/</span>
+            <span className="text-bear">{w.bear}</span></>}
+          sub={`刚转强 ${w.new_bull} · 刚转弱 ${w.new_bear}`}
+          title="自选中处于涨势/跌势的只数; 下面是今天新转强/新转弱的只数" />
+        {meso?.breadth ? (
+          <StatCell
+            label="全市场"
+            value={<><span className="text-bull">{meso.breadth.up}</span>
+              <span className="mx-1 text-muted/40">/</span>
+              <span className="text-bear">{meso.breadth.down}</span></>}
+            sub="涨 / 跌"
+            title={`全市场涨跌家数(${meso.breadth.date})`} />
+        ) : <StatCell label="全市场" value="—" />}
+        {meso?.amount ? (
+          <StatCell
+            label="两市成交额"
+            value={meso.amount.text}
+            sub={meso.amount.pct_rank != null
+              ? `${(meso.amount.pct_rank * 100).toFixed(0)}% 分位 · ${meso.amount.label}`
+              : `样本仅 ${meso.amount.sample} 天`}
+            title={
+              `两市成交额 ${meso.amount.text}${meso.amount.date ? `(${meso.amount.date})` : ''}` +
+              (meso.amount.pct_rank != null
+                ? ` —— 在最近 ${meso.amount.sample} 个交易日里排在 ${(meso.amount.pct_rank * 100).toFixed(0)}% 分位`
+                : ` —— 历史样本只有 ${meso.amount.sample} 天, 不足以给出分位`)
+            } />
+        ) : <StatCell label="两市成交额" value="—" />}
+      </div>
+
+      {/* 第三行: 主线 —— 它是"钱往哪儿聚", 与上面那排数不同层, 单独一行 */}
+      {mainline && meso && (
+        <div className="flex flex-wrap items-center gap-1.5 border-t border-border/40 px-4 py-2 text-[11px]">
+          <span className="flex shrink-0 items-center gap-1.5 text-muted">
+            <Layers className="h-3.5 w-3.5 text-fuchsia-400" />
+            {mainline.stale ? '主线(数据已停更)' : '今日主线'}
+          </span>
+          {mainline.rows.slice(0, 3).map((m) => (
+            <span
+              key={m.member}
+              title={`第 ${m.rank} 名 · ${m.limit_up_count} 家涨停 · 最高 ${m.max_boards} 连板${m.leader_symbol ? ` · 龙头 ${m.leader_symbol}` : ''}`}
+              className={`shrink-0 rounded px-1.5 py-0.5 ${
+                mainline.stale ? 'bg-border/40 text-muted' : 'bg-fuchsia-400/15 text-fuchsia-300'
+              }`}
+            >
+              {m.member}
+              <span className="ml-1 font-mono opacity-70">{m.limit_up_count} 家涨停</span>
+            </span>
+          ))}
+          <span
+            title={
+              (mainline.stale
+                ? `主线数据停在 ${mainline.date},已经 ${mainline.age_days} 天没更新 —— 只作展示, 不参与机会区打分。到「数据」页重跑一次涨停梯队相关批次即可恢复。`
+                : `按 ${mainline.date} 的涨停梯队聚合:同一概念内涨停家数多、最高连板高、梯队不断层的排在前面。`) +
+              ` ${meso.membership_note}`
+            }
+            className="shrink-0 cursor-help text-muted/60"
+          >
+            ⓘ
+          </span>
+        </div>
+      )}
+
+      {/* 展开: 原来那两句长散文。它是解释不是结论, 默认收起 */}
+      {whyOpen && (
+        <div className="animate-rise-in border-t border-border/40 bg-base/40 px-4 py-2.5 text-[11px] leading-relaxed text-muted">
+          {w.posture_reason}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function Today() {
   const qc = useQueryClient()
   const navigate = useNavigate()
@@ -1055,19 +1226,30 @@ export function Today() {
           </button>
         </div>
       )}
+      {/* [R142] 导读是**正文**, 按正文排版, 不按标签排版:
+          · 行宽卡到 80ch —— 整屏宽(1600px+)的一行中文最难读, 眼睛回行会跑错行;
+          · 字号 12→13px、行高 1.8 —— 这是唯一需要逐字读完的一段;
+          · 正文用满对比度(原来 foreground/90 是把主角调暗), 生成来源退到标题行。*/}
       {shownBrief && (
-        <div className="rounded-lg border border-violet-400/20 bg-violet-400/[0.06] px-4 py-3 text-xs leading-relaxed text-foreground/90">
-          <Sparkles className="mr-1.5 inline h-3.5 w-3.5 text-violet-300" />
-          {shownBrief}
-          {aiMeta && (
-            <span
-              className="ml-2 whitespace-nowrap text-[10px] text-muted"
-              title={`生成于 ${new Date(aiMeta.created_at).toLocaleString('zh-CN')}${aiMeta.as_of ? ` · 基于 ${aiMeta.as_of} 数据` : ''}`}
-            >
-              ({aiMeta.source === 'scheduled' ? '定时生成' : '上次生成'}
-              {aiMeta.as_of && aiMeta.as_of !== d?.as_of ? ' · 数据已更新,建议重新生成' : ''})
+        <div className="rounded-lg border border-violet-400/20 bg-violet-400/[0.06] px-4 py-3">
+          <div className="mb-1 flex flex-wrap items-baseline gap-x-2">
+            <span className="inline-flex items-center gap-1.5 text-[10px] font-medium text-violet-300">
+              <Sparkles className="h-3.5 w-3.5" />
+              AI 导读
             </span>
-          )}
+            {aiMeta && (
+              <span
+                className="whitespace-nowrap text-[10px] text-muted"
+                title={`生成于 ${new Date(aiMeta.created_at).toLocaleString('zh-CN')}${aiMeta.as_of ? ` · 基于 ${aiMeta.as_of} 数据` : ''}`}
+              >
+                {aiMeta.source === 'scheduled' ? '定时生成' : '上次生成'}
+                {aiMeta.as_of && aiMeta.as_of !== d?.as_of && (
+                  <span className="text-amber-300"> · 数据已更新,建议重新生成</span>
+                )}
+              </span>
+            )}
+          </div>
+          <p className="max-w-[80ch] text-[13px] leading-[1.8] text-foreground">{shownBrief}</p>
         </div>
       )}
 
@@ -1082,135 +1264,8 @@ export function Today() {
 
       {d && (
         <>
-          {/* ③ 市场天气(最上面一条横幅, 定基调) —— 左侧徽章+理由, 右侧统计定宽对齐,
-              避免理由长短不一时统计块被挤得忽上忽下 */}
-          <div className="flex items-start gap-4 rounded-lg border border-border/60 bg-surface/40 px-4 py-3">
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <Compass className="h-4 w-4 shrink-0 text-sky-400" />
-                <span className={`inline-flex rounded-btn border px-3 py-0.5 text-sm font-medium ${POSTURE_STYLE[d.weather.posture] ?? POSTURE_STYLE['观察']}`}>
-                  {d.weather.posture}
-                </span>
-                {/* [R122] 时段徽章(原独立横幅): 标签常显, 用法说明收进 title */}
-                {(() => {
-                  const phase = sessionPhaseHint(d.live)
-                  return (
-                    <span title={phase.hint}
-                          className="rounded border border-border/60 bg-elevated/50 px-1.5 py-0.5 text-[10px] font-medium text-secondary">
-                      {phase.label}
-                    </span>
-                  )
-                })()}
-                {d.weather.market && (
-                  <span
-                    title={
-                      `基准 ${d.weather.market.benchmark_name ?? '—'}(${d.weather.market.as_of ?? '—'})` +
-                      (d.weather.market.metrics.close != null
-                        ? ` · 收盘 ${d.weather.market.metrics.close} / 50日线 ${d.weather.market.metrics.ma50} / 年线 ${d.weather.market.metrics.ma200} / 年动量 ${((d.weather.market.metrics.momentum_12m ?? 0) * 100).toFixed(1)}%`
-                        : '') +
-                      ` —— 最终姿态取大盘与自选中更保守的一方`
-                    }
-                    className={`inline-flex items-center gap-1 rounded-btn border px-2 py-0.5 text-[10px] ${POSTURE_STYLE[d.weather.market.mode] ?? POSTURE_STYLE['观察']}`}
-                  >
-                    {d.weather.market.benchmark_name ?? '大盘'}·{d.weather.market.mode}
-                    {d.weather.market.pending && <span className="opacity-70">(将转{d.weather.market.pending.mode} {d.weather.market.pending.streak}/{d.weather.market.pending.need})</span>}
-                  </span>
-                )}
-              </div>
-              <p className="mt-1.5 text-xs leading-relaxed text-muted">{d.weather.posture_reason}</p>
-            </div>
-            <div className="shrink-0 space-y-0.5 text-right font-mono text-[11px] text-muted">
-              <div title="自选中处于涨势/跌势的只数">
-                涨势 <span className="font-semibold text-red-400">{d.weather.bull}</span>
-                <span className="mx-1 text-muted/40">/</span>
-                跌势 <span className="font-semibold text-emerald-400">{d.weather.bear}</span>
-              </div>
-              <div title="今天新转强/新转弱的只数">
-                刚转强 {d.weather.new_bull} · 刚转弱 {d.weather.new_bear}
-              </div>
-            </div>
-          </div>
-
-          {/* [R37] 中观快照 —— 三层推导 大盘 → 主线 → 个股 里缺的那一层。
-              上面那条横幅是"大盘"层, 下面机会区是"个股"层, 这一条回答
-              "今天的钱在往哪儿聚" */}
-          {meso && (meso.amount || meso.breadth || mainline) && (
-            <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 rounded-lg border border-border/60 bg-surface/40 px-4 py-2 text-[11px]">
-              <span className="flex shrink-0 items-center gap-1.5 text-muted">
-                <Layers className="h-3.5 w-3.5 text-fuchsia-400" />
-                中观
-              </span>
-              {meso.amount && (
-                <span
-                  title={
-                    `两市成交额 ${meso.amount.text}${meso.amount.date ? `(${meso.amount.date})` : ''}` +
-                    (meso.amount.pct_rank != null
-                      ? ` —— 在最近 ${meso.amount.sample} 个交易日里排在 ${(meso.amount.pct_rank * 100).toFixed(0)}% 分位`
-                      : ` —— 历史样本只有 ${meso.amount.sample} 天, 不足以给出分位`)
-                  }
-                  className="font-mono text-muted"
-                >
-                  成交额 <span className="font-semibold text-foreground">{meso.amount.text}</span>
-                  {meso.amount.pct_rank != null && (
-                    <span className="ml-1 text-muted/80">
-                      {(meso.amount.pct_rank * 100).toFixed(0)}% 分位 · {meso.amount.label}
-                    </span>
-                  )}
-                </span>
-              )}
-              {meso.breadth && (
-                <span title={`全市场涨跌家数(${meso.breadth.date})`} className="font-mono text-muted">
-                  <span className="font-semibold text-red-400">{meso.breadth.up}</span> 涨
-                  <span className="mx-1 text-muted/40">/</span>
-                  <span className="font-semibold text-emerald-400">{meso.breadth.down}</span> 跌
-                </span>
-              )}
-              {mainline && (
-                <span className="flex min-w-0 flex-wrap items-center gap-1.5">
-                  <span className="shrink-0 text-muted">
-                    {mainline.stale ? '主线(数据已停更)' : '今日主线'}
-                  </span>
-                  {mainline.rows.slice(0, 3).map((m) => (
-                    <span
-                      key={m.member}
-                      title={`第 ${m.rank} 名 · ${m.limit_up_count} 家涨停 · 最高 ${m.max_boards} 连板${m.leader_symbol ? ` · 龙头 ${m.leader_symbol}` : ''}`}
-                      className={`shrink-0 rounded px-1.5 py-0.5 ${
-                        mainline.stale ? 'bg-border/40 text-muted' : 'bg-fuchsia-400/15 text-fuchsia-300'
-                      }`}
-                    >
-                      {m.member}
-                      <span className="ml-1 font-mono opacity-70">{m.limit_up_count} 家涨停</span>
-                    </span>
-                  ))}
-                  <span
-                    title={
-                      (mainline.stale
-                        ? `主线数据停在 ${mainline.date},已经 ${mainline.age_days} 天没更新 —— 只作展示, 不参与机会区打分。到「数据」页重跑一次涨停梯队相关批次即可恢复。`
-                        : `按 ${mainline.date} 的涨停梯队聚合:同一概念内涨停家数多、最高连板高、梯队不断层的排在前面。`) +
-                      ` ${meso.membership_note}`
-                    }
-                    className="shrink-0 cursor-help text-muted/50"
-                  >
-                    ⓘ
-                  </span>
-                </span>
-              )}
-              {/* [R134] 中观再补一层: 用**新评分口径**读出来的市场结构。
-                  成交额/涨跌家数说的是"钱在往哪儿聚", 这一句说的是"这个市场里
-                  有多少票真的具备出手的结构" —— 候选一堆但过门槛的没几只,
-                  说明信号在遍地开花而趋势结构没跟上, 那种日子最容易追在半山腰。*/}
-              {d.gates && d.gates.candidates > 0 && (
-                <span title={`三道硬门槛: ${Object.values(d.gates.labels ?? {}).map(l => l.cn).join(' / ')}`}
-                      className="font-mono text-muted">
-                  出手结构{' '}
-                  <span className="font-semibold text-emerald-400">{d.gates.passed}</span>
-                  <span className="text-muted/60">/{d.gates.candidates}</span>
-                  <span className="ml-1 font-sans text-muted/70">只候选过门槛</span>
-                </span>
-              )}
-            </div>
-          )}
-
+          {/* [R142] 市场状态 —— 原「市场天气」+「中观」合并。见组件上方注释 */}
+          <MarketStatusCard d={d} meso={meso} mainline={mainline} />
 
           {/* ② 机会区(已按把握分筛选排序; AI 优选可再精选) */}
           <section className="rounded-lg border border-border/60 bg-surface/40 overflow-hidden">
