@@ -68,13 +68,17 @@ export function Settings() {
         subtitle="管理账户、数据刷新策略和高级功能配置。"
       />
 
-      {/* [R60] 统一版式: 设置以表单与说明文字为主, 取「读」档 */}
+      {/* [R60] 统一版式: 设置以表单与说明文字为主, 取「读」档
+          [R115] 重排: 原来整块 mx-auto max-w-[1100px] 居中 + tab 列表垂直居中
+          (justify-center min-h-[60vh]), 宽屏下导航浮在屏幕正中、两侧各留一大片
+          空白, 内容区反被挤窄。改为**贴左贴顶**: 导航紧跟应用侧栏、从顶部开始,
+          内容区吃掉剩余宽度(上限 1500px 防超宽屏行长失控, 左对齐不居中)。 */}
       <div className="px-3 pb-4 pt-3 lg:px-4">
-        <div className="mx-auto w-full max-w-[1100px]">
-        <div className="flex gap-6 items-stretch">
+        <div className="w-full">
+        <div className="flex gap-5 items-start">
           {/* ===== 竖向 Tab 侧栏 ===== */}
           <nav className={cn('shrink-0 transition-all duration-200 ease-smooth', collapsed ? 'w-10' : 'w-36')}>
-            <div className="flex flex-col gap-0.5 justify-center min-h-[60vh] sticky top-6">
+            <div className="flex flex-col gap-0.5 sticky top-3">
               {/* 收起/展开 按钮 */}
               <button
                 onClick={toggleCollapsed}
@@ -123,7 +127,7 @@ export function Settings() {
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.15 }}
-            className="min-w-0 flex-1"
+            className="min-w-0 flex-1 max-w-[1500px]"
           >
             {activeTab.key === 'monitoring'
             ? <SettingsMonitoringPanel highlight={highlight} />
