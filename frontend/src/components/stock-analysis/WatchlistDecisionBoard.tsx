@@ -584,7 +584,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
               <col style={{ width: '4%' }} />{/* 长通道 */}
               <col style={{ width: '6%' }} />{/* 结论 */}
               <col style={{ width: '3%' }} />{/* 置信 */}
-              <col style={{ width: '7%' }} />{/* AI 分析: 报告胶囊 + ✨分析 + 🔔提醒 */}
+              <col style={{ width: '7%' }} />{/* AI 分析: [R130] 上下两行 —— 报告胶囊 / ✨分析 + 🔔提醒 */}
               <col />{/* AI 信号: 不给宽度, 吃掉剩下的 —— 只有它是整段文字 */}
             </colgroup>
             <thead className="sticky top-0 bg-surface/95 backdrop-blur text-[10px] text-muted">
@@ -730,40 +730,48 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
                     {/* [R106] AI 分析列: 报告胶囊(点开最近报告) + ✨生成/更新分析 + 🔔点位提醒
                         —— 原页头两个按钮整合到这里, 每个标的都有自己的一对动作 */}
                     <td className="whitespace-nowrap px-2 py-2.5 text-center">
-                      <div className="inline-flex items-center gap-0.5">
+                      {/* [R130] 上下结构: 报告胶囊一行、两个动作一行。
+                          原来三件横排挤在 7% 宽的列里, 胶囊里的「17天前」被压得
+                          几乎贴着图标。竖过来之后胶囊能吃满列宽, 图标也不再被挤,
+                          顺带把两个图标按钮的点击区从 p-1 放大到 6×6。 */}
+                      <div className="inline-flex flex-col items-center gap-1">
                         {(() => {
                           const rep = reportsBySymbol.get(r.symbol)
-                          if (!rep) return <span className="text-[10px] text-muted/40 px-1">—</span>
+                          if (!rep) return null
                           return (
                             <button
                               onClick={() => openHistoryReport(rep.latest.id)}
                               title={`打开最近报告(${new Date(rep.latest.created_at).toLocaleString()})${rep.count > 1 ? ` · 共 ${rep.count} 份` : ''}`}
-                              className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border border-violet-400/30 bg-violet-400/10 text-violet-300 hover:bg-violet-400/20 transition-colors cursor-pointer"
+                              className="inline-flex w-full items-center justify-center gap-1 rounded-btn border border-violet-400/30 bg-violet-400/10 px-1.5 py-0.5 text-[10px] text-violet-300 transition-colors duration-hover hover:bg-violet-400/20 cursor-pointer"
                             >
-                              <FileText className="h-2.5 w-2.5" />
+                              <FileText className="h-2.5 w-2.5 shrink-0" />
                               {fmtAgo(rep.latest.created_at)}
                               {rep.count > 1 && <span className="text-violet-300/60">·{rep.count}</span>}
                             </button>
                           )
                         })()}
-                        {onAnalyze && (
-                          <button
-                            onClick={() => onAnalyze(r.symbol, r.name)}
-                            title={`对 ${r.name} 生成/更新 AI 四维分析`}
-                            className="rounded p-1 text-sky-300/60 hover:bg-sky-400/10 hover:text-sky-300 transition-colors"
-                          >
-                            <Sparkles className="h-3 w-3" />
-                          </button>
-                        )}
-                        {onPriceAlert && (
-                          <button
-                            onClick={() => onPriceAlert(r.symbol, r.name)}
-                            title={`为 ${r.name} 设置价格点位提醒`}
-                            className="rounded p-1 text-sky-300/60 hover:bg-sky-400/10 hover:text-sky-300 transition-colors"
-                          >
-                            <Bell className="h-3 w-3" />
-                          </button>
-                        )}
+                        <div className="flex items-center gap-1.5">
+                          {onAnalyze && (
+                            <button
+                              onClick={() => onAnalyze(r.symbol, r.name)}
+                              title={`对 ${r.name} 生成/更新 AI 四维分析`}
+                              aria-label={`对 ${r.name} 生成 AI 分析`}
+                              className="grid h-6 w-6 place-items-center rounded-btn text-sky-300/60 transition-colors duration-hover hover:bg-sky-400/10 hover:text-sky-300"
+                            >
+                              <Sparkles className="h-3 w-3" />
+                            </button>
+                          )}
+                          {onPriceAlert && (
+                            <button
+                              onClick={() => onPriceAlert(r.symbol, r.name)}
+                              title={`为 ${r.name} 设置价格点位提醒`}
+                              aria-label={`为 ${r.name} 设置点位提醒`}
+                              className="grid h-6 w-6 place-items-center rounded-btn text-sky-300/60 transition-colors duration-hover hover:bg-sky-400/10 hover:text-sky-300"
+                            >
+                              <Bell className="h-3 w-3" />
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </td>
                     {/* AI 信号:徽标 + 时间 + 理由整段换行(不截断) */}
