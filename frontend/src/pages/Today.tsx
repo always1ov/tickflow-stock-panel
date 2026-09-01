@@ -6,7 +6,7 @@
  * 行动区与持仓体检相邻 —— 两者都是持仓管理, 连着看不用来回滚。
  * 数据全部来自既有模块,零新计算;AI 导读可选(手动点击,一次调用)。
  */
-import { Fragment, useState } from 'react'
+import { Fragment, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -20,6 +20,7 @@ import {
 } from '@/lib/api'
 import { toast } from '@/components/Toast'
 import { PageShell } from '@/components/PageShell'
+import { Modal } from '@/components/Modal'
 import { VerdictHover } from '@/components/stock-analysis/VerdictHover'
 import { ScoreLedgerDialog } from '@/components/ScoreLedgerDialog'
 import { QK } from '@/lib/queryKeys'
@@ -1064,6 +1065,91 @@ function MarketStatusCard({ d, meso, mainline }: {
   )
 }
 
+/**
+ * [R147] AI 导读·优选的「问一句」弹窗。
+ *
+ * 用户: 「点击后弹窗我能填点东西带着一起提问, 或者不填也能点击按钮分析」。
+ * 所以这里的默认路径必须是**零输入**: 弹窗一开焦点就在「开始分析」上,
+ * 回车即走 —— 想说话的人多打一句, 不想说话的人一下都不多点。
+ *
+ * 补充说明能改什么、不能改什么, 边界写在后端提示词里(见 _AI_SYSTEM 的 R147 段):
+ * 它能改关注点与措辞, 改不了输出格式、事实校验与"宁缺毋滥"。这几条必须由
+ * 系统契约守住 —— 一句随口的「多选几只」不该能绕过 R121 那套约束。
+ */
+function AiAskDialog({ initial, pending, onClose, onStart }: {
+  initial: string
+  pending: boolean
+  onClose: () => void
+  onStart: (note: string) => void
+}) {
+  const [note, setNote] = useState(initial)
+  const startRef = useRef<HTMLButtonElement>(null)
+  const EXAMPLES = ['今天只想看半导体', '重点看量能和回踩', '解释详细一点', '偏保守一些']
+  return (
+    <Modal
+      onClose={onClose}
+      labelledBy="ai-ask-title"
+      initialFocusRef={startRef}
+      panelClassName="w-[92vw] max-w-lg rounded-card border border-border bg-surface shadow-xl"
+    >
+      <div className="flex items-center gap-2 border-b border-border/60 px-4 py-3">
+        <Sparkles className="h-4 w-4 text-violet-300" />
+        <h2 id="ai-ask-title" className="text-sm font-medium text-foreground">AI 导读·优选</h2>
+        <span className="text-[10px] text-muted">可以先说一句这次想让它重点看什么</span>
+      </div>
+      <div className="space-y-2.5 px-4 py-3">
+        <textarea
+          value={note}
+          onChange={(e) => setNote(e.target.value.slice(0, 500))}
+          onKeyDown={(e) => {
+            // Ctrl/⌘+Enter 直接开始 —— 手还在输入框上时不必去够按钮
+            if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); onStart(note.trim()) }
+          }}
+          rows={3}
+          placeholder="不填也可以,直接点「开始分析」就是原来的行为"
+          className="w-full resize-none rounded border border-border bg-base px-2.5 py-2 text-xs leading-relaxed text-foreground outline-none placeholder:text-muted/60 focus:border-accent/50"
+        />
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-[10px] text-muted">试试:</span>
+          {EXAMPLES.map(x => (
+            <button
+              key={x}
+              onClick={() => setNote(x)}
+              className="rounded-btn border border-border bg-base px-2 py-0.5 text-[10px] text-muted transition-colors cursor-pointer hover:text-foreground"
+            >
+              {x}
+            </button>
+          ))}
+          <span className="ml-auto font-mono text-[10px] text-muted/60">{note.length}/500</span>
+        </div>
+        <p className="text-[10px] leading-relaxed text-muted/80">
+          这句话只影响它<span className="text-foreground/80">关注哪几只、理由怎么写</span>;
+          输出格式、逐条数字核对、宁缺毋滥这几条由系统守着,不会因为你怎么说而变。
+          候选池也仍然由规则层给定 —— 点名了没进候选的票,它会在导读里说明为什么没进。
+        </p>
+      </div>
+      <div className="flex items-center gap-2 border-t border-border/60 px-4 py-2.5">
+        <button
+          onClick={onClose}
+          className="rounded-btn border border-border bg-base px-3 py-1 text-[11px] text-muted transition-colors cursor-pointer hover:text-foreground"
+        >
+          取消
+        </button>
+        <span className="text-[10px] text-muted/60">⌘/Ctrl + Enter 也可开始</span>
+        <button
+          ref={startRef}
+          onClick={() => onStart(note.trim())}
+          disabled={pending}
+          className="ml-auto inline-flex items-center gap-1.5 rounded-btn border border-violet-400/30 bg-violet-400/15 px-3 py-1 text-[11px] text-violet-300 transition-colors cursor-pointer hover:bg-violet-400/25 disabled:opacity-50"
+        >
+          {pending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+          {note.trim() ? '带着这句话分析' : '开始分析'}
+        </button>
+      </div>
+    </Modal>
+  )
+}
+
 export function Today() {
   const qc = useQueryClient()
   const navigate = useNavigate()
@@ -1084,7 +1170,7 @@ export function Today() {
   // 失败必须在页面上留痕(toast 一闪即逝, 用户会以为"点了没反应")
   const [aiError, setAiError] = useState<string | null>(null)
   const aiMut = useMutation({
-    mutationFn: () => api.todayAi(),
+    mutationFn: (note?: string) => api.todayAi(note),
     onMutate: () => setAiError(null),
     onSuccess: (r) => {
       if (r.error) { setAiError(r.error); toast(r.error, 'error'); return }
@@ -1136,6 +1222,9 @@ export function Today() {
 
   const [prefsOpen, setPrefsOpen] = useState(false)
   const [ledgerOpen, setLedgerOpen] = useState(false)   // [R133] 把握分体检弹窗
+  // [R147] AI 分析前的补充说明弹窗。lastNote 只为"重试"沿用上一次问的话
+  const [askOpen, setAskOpen] = useState(false)
+  const [lastNote, setLastNote] = useState('')
   // 滑块拖动中的即时值(null = 用服务端返回的偏好); 松手才落库
   const [minScore, setMinScore] = useState<number | null>(null)
   // [R140] 板块过滤的**乐观值**。null = 用服务端偏好。
@@ -1207,6 +1296,8 @@ export function Today() {
     prefsMut.mutate({ boards: next })
   }
   const shownAnalyzed = picks ? analyzed : (aiCache?.analyzed ?? 0)
+  // 本次会话问过就用本次的, 否则用缓存里存的那句
+  const shownNote = (picks ? lastNote : (aiCache?.note ?? '')) || ''
   const aiMeta = brief ? null : aiCache   // 缓存来源与时间(自己刚生成的不必标注)
   // [R37] 中观快照。提出来是为了在 JSX 的 map 回调里也保住类型收窄
   const meso = d?.meso ?? null
@@ -1259,9 +1350,9 @@ export function Today() {
             导出 HTML
           </button>
           <button
-            onClick={() => aiMut.mutate()}
+            onClick={() => setAskOpen(true)}
             disabled={aiMut.isPending || !d}
-            title="一次生成盘前导读, 并调取候选的日 K 与量能做横向对比选出 1-3 只(耗时约十几秒)"
+            title="一次生成盘前导读, 并调取候选的日 K 与量能做横向对比选出 1-3 只(耗时约十几秒)。点开可以先写一句这次想让它重点看什么,不写直接开始也行"
             className="inline-flex items-center gap-1 rounded-btn border border-violet-400/30 bg-violet-400/10 px-2.5 py-1 text-[10px] text-violet-300 hover:bg-violet-400/20 disabled:opacity-50 transition-colors cursor-pointer"
           >
             {aiMut.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
@@ -1287,8 +1378,9 @@ export function Today() {
         <div className="flex items-start justify-between gap-3 rounded-lg border border-red-400/30 bg-red-400/[0.07] px-4 py-3 text-xs text-red-300">
           <span>AI 导读·优选没有成功:{aiError}</span>
           <button
-            onClick={() => aiMut.mutate()}
+            onClick={() => aiMut.mutate(lastNote || undefined)}
             disabled={aiMut.isPending}
+            title={lastNote ? `沿用上次的补充说明:${lastNote}` : undefined}
             className="shrink-0 rounded border border-red-400/40 px-2 py-0.5 text-[10px] hover:bg-red-400/10 disabled:opacity-50 cursor-pointer"
           >
             重试
@@ -1306,6 +1398,16 @@ export function Today() {
               <Sparkles className="h-3.5 w-3.5" />
               AI 导读
             </span>
+            {/* [R147] 当时问了什么必须跟着结论一起显示 —— 一句「今天只看半导体」
+                产出的窄结论, 隔天不标出来就会被读成"今天全市场就这几只" */}
+            {shownNote && (
+              <span
+                title="这次分析带了这句补充说明 —— 结论的范围与措辞受它影响"
+                className="max-w-[40ch] truncate rounded bg-violet-400/15 px-1.5 py-0.5 text-[10px] text-violet-300"
+              >
+                问了:{shownNote}
+              </span>
+            )}
             {aiMeta && (
               <span
                 className="whitespace-nowrap text-[10px] text-muted"
@@ -1779,6 +1881,14 @@ export function Today() {
         </>
       )}
       {ledgerOpen && <ScoreLedgerDialog onClose={() => setLedgerOpen(false)} />}
+      {askOpen && (
+        <AiAskDialog
+          initial={lastNote}
+          pending={aiMut.isPending}
+          onClose={() => setAskOpen(false)}
+          onStart={(note) => { setLastNote(note); setAskOpen(false); aiMut.mutate(note || undefined) }}
+        />
+      )}
     </PageShell>
   )
 }

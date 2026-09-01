@@ -341,6 +341,8 @@ export interface ScoreLedger {
 export interface TodayAiCache {
   as_of: string | null
   brief: string
+  /** [R147] 生成这份结论时用户写的补充说明; 空 = 没写 */
+  note?: string
   picks: TodayPick[]
   analyzed: number
   created_at: string
@@ -2542,6 +2544,13 @@ export interface ExternalPageView {
   fetched_at: number
   source_chars: number
   from_cache: boolean
+  /** [R146] 这份结果是哪来的:
+   *  latest = 最近一次结果(30 分钟内, **连页面都没抓**)
+   *  source = 抓了但原文一个字没变, 省掉了 AI
+   *  fresh  = 这次真抓真整理 */
+  cache_kind?: 'latest' | 'source' | 'fresh'
+  /** 距这份整理生成过了多少秒 */
+  age_seconds?: number
 }
 
 /** [R117] 只抓原文不调 AI —— 设置页确认地址通不通用 */
@@ -4024,10 +4033,11 @@ export const api = {
   signalAiScheduleSet: (body: SignalAiSchedule) =>
     request<SignalAiSchedule>('/api/settings/preferences/signal-ai-schedule',
       { method: 'PUT', body: JSON.stringify(body) }),
-  todayAi: () =>
+  /** [R147] note 可省 —— 不填就是原来的行为, 填了一起送进这次分析 */
+  todayAi: (note?: string) =>
     request<{ brief?: string; picks?: TodayPick[]; analyzed?: number
-              verify?: TodayPickVerify; error?: string }>(
-      '/api/today/ai', { method: 'POST' }),
+              verify?: TodayPickVerify; note?: string; error?: string }>(
+      '/api/today/ai', { method: 'POST', body: JSON.stringify({ note: note || null }) }),
   /** [R121] AI 优选历史命中率 —— 「靠不靠谱」的硬证据, 纯事后统计 */
   todayAiTrackRecord: () => request<AiTrackRecord>('/api/today/ai/track-record'),
   /** [R133] 规则层把握分体检: 分层胜率/排名段/因子归因/同期基准 */

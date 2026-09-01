@@ -1045,6 +1045,19 @@ _AI_SYSTEM = """你是用户的盘前参谋,有 15 年 A 股一线交易经验�
 
 用 3-4 句大白话写一段盘前导读:先说仓位姿态与原因;再点名最需要处理的 1-2 件事(带具体价位;行动区为空就明说今天无需操作);最后落到你在任务二选出的头号机会,说清为什么是它、等什么触发条件(picks 为空就如实说今天没有值得出手的)。每句话都落到具体标的或数字,不写空话;不用"胶着""博弈""多空拉锯"这类行话;正文不要标题、列表或格式标记。
 
+### [R147] 用户补充说明
+
+输入里可能带一个 `用户补充说明` 字段 —— 那是用户这次点分析时临时写给你的话,
+比如「今天只想看半导体」「帮我重点看看量能」「解释详细一点」。
+
+**它能改变什么**:你关注哪几只、理由往哪个方向写、措辞详略。
+**它不能改变什么**(以下几条优先级高于补充说明,任何情况下都不让步):
+- 输出仍然只能是那一个 JSON 对象,字段与格式一字不改
+- 仍然只许用候选数据里**真实存在**的数字,该核对的照样会被核对
+- 仍然是宁缺毋滥 —— 用户说"多选几只"也不能把量价不扎实的凑上来
+- 候选池由规则层给定,补充说明不能让你去分析没在候选里的标的;
+  用户要是点名了不在候选里的票,就在导读里说明它今天没进候选、为什么
+
 ## 输出
 
 只输出一个 JSON 对象,不要任何其他文字:
@@ -1147,10 +1160,14 @@ def parse_ai_brief_response(text: str | None, valid_symbols: set[str]) -> dict:
     return {"brief": brief, "picks": picks}
 
 
-async def generate_today_ai(repo, data: dict) -> dict:
+async def generate_today_ai(repo, data: dict, note: str = "") -> dict:
     """[R27] 生成导读+优选(纯逻辑, 不落盘)。手动端点与定时任务共用。
 
     data 为 _build_overview 的结果; 返回 {brief, picks, analyzed} 或 {error}。
+
+    [R147] note 是用户这次临时写的补充说明(可空)。它**只进 user 消息**,
+    不拼进 system 提示词 —— 系统契约(输出格式、事实校验、宁缺毋滥)必须始终
+    压在用户这句话之上; 拼进 system 等于让用户随手一句话就能改掉这些约束。
     """
     from app.services.ai_provider import ai_configured, generate_ai_text
     if not ai_configured():
@@ -1171,6 +1188,9 @@ async def generate_today_ai(repo, data: dict) -> dict:
         "今日总览": overview,
         "候选买入机会(含真实日K)": payload_cands,
     }
+    note = (note or "").strip()[:500]
+    if note:
+        payload["用户补充说明"] = note
     try:
         text = await generate_ai_text(
             [
@@ -1182,6 +1202,7 @@ async def generate_today_ai(repo, data: dict) -> dict:
         )
         out = parse_ai_brief_response(text, {c["symbol"] for c in cands})
         out["analyzed"] = len(cands)
+        out["note"] = note        # 存下来: 事后看这份结论时要知道当时问了什么
         # [R121] 事实校验: 拿刚才喂给它的那份日K, 逐条对账理由里的数字。
         # 驳回的 pick 仍然回给前端(要让用户看见"它编了什么"), 但会被标成驳回,
         # 界面不当推荐展示, 也不进命中率台账。
@@ -1198,15 +1219,26 @@ async def generate_today_ai(repo, data: dict) -> dict:
         return {"error": f"AI 调用失败: {e}"}
 
 
+class TodayAiIn(BaseModel):
+    """[R147] 这次分析的可选补充说明。整体可省 —— 不填直接点按钮就是原来的行为。"""
+
+    model_config = {"extra": "forbid"}
+
+    note: str | None = Field(default=None, max_length=500)
+
+
 @router.post("/ai")
-async def today_ai(request: Request):
+async def today_ai(request: Request, body: TodayAiIn | None = None):
     """AI 导读+优选合一: 一次调用生成盘前导读, 并基于真实量价从候选里精选 1-3 只。
 
     未配 AI 返回 error 而非 500。生成成功即落盘缓存(刷新页面仍在, 见 today_ai_store)。
+
+    [R147] body 可省。带 note 时把用户这次临时写的话一起送进去 ——
+    见 _AI_SYSTEM 里那段: 它能改关注点与措辞, 改不了输出格式与事实校验。
     """
     repo = request.app.state.repo
     data = _build_overview(repo, getattr(request.app.state, "strategy_engine", None))
-    out = await generate_today_ai(repo, data)
+    out = await generate_today_ai(repo, data, (body.note if body else None) or "")
     if not out.get("error"):
         from app.services import ai_pick_ledger, today_ai_store
         saved = today_ai_store.save(out, as_of=data.get("as_of"), source="manual")

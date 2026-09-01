@@ -147,3 +147,36 @@ def test_prompt_merges_brief_and_picks_consistently():
     assert "两者结论必须一致" in sys_prompt, "导读末尾的机会必须来自优选结果"
     # 导读侧的通俗化要求不能在合并时丢掉
     assert "胶着" in sys_prompt and "大白话" in sys_prompt
+
+
+# ------------------------------------------------------- [R147] 用户补充说明
+
+
+def test_prompt_bounds_what_a_user_note_may_change():
+    """补充说明能改关注点与措辞, 改不了输出格式与事实校验。
+
+    这条边界必须写死在提示词里 —— 否则用户随口一句「多选几只」「不用核对」
+    就能把 R121 建起来的那套约束绕过去。
+    """
+    sys_prompt = today_api._AI_SYSTEM
+    assert "用户补充说明" in sys_prompt
+    assert "它不能改变什么" in sys_prompt
+    for must in ("字段与格式一字不改", "宁缺毋滥", "候选池由规则层给定"):
+        assert must in sys_prompt, f"提示词缺少边界: {must}"
+
+
+def test_note_goes_into_the_user_payload_not_the_system_prompt():
+    """系统契约必须始终压在用户那句话之上 —— 拼进 system 等于让它可被改写。"""
+    import inspect
+    src = inspect.getsource(today_api.generate_today_ai)
+    assert 'payload["用户补充说明"] = note' in src
+    assert "note" not in today_api._AI_SYSTEM.split("### [R147]")[0], \
+        "system 提示词的前半段不该出现 note 拼接"
+
+
+def test_note_is_length_capped_and_optional():
+    import inspect
+    src = inspect.getsource(today_api.generate_today_ai)
+    assert '[:500]' in src, "补充说明要限长, 免得把候选数据挤出上下文"
+    sig = inspect.signature(today_api.generate_today_ai)
+    assert sig.parameters["note"].default == "", "不填也要能直接分析"

@@ -283,6 +283,67 @@ def _source_hash(url: str, source: str, hint: str) -> str:
     return h.hexdigest()
 
 
+# [R146] 「最近一次结果」缓存的有效期。命中期内**连页面都不抓**。
+#
+# 起因(用户): 「这部分不应该每次点开都需要抓取分析一次」。原来的缓存键是
+# `sha256(url + hint + 原文)` —— 要算这个键就**必须先把页面抓回来**, 而这类
+# 行情看板的 HTML 里带时间戳/随机 id, 原文哈希几乎从不命中, 于是每次点开都是
+# 一次抓取 + 一次 AI 调用。既慢又花钱, 而页面内容其实半小时都不会变多少。
+#
+# 所以补一层**只按「地址 + 提示词」索引**的最近结果: 命中且没过期 → 直接回,
+# 零网络零 AI。过期了才走原来那条(抓取 → 原文哈希 → 必要时 AI)。
+# 想立刻重来点「重新解析」(force), 那条路不受这层影响。
+LATEST_TTL_S = 30 * 60
+
+
+def _latest_path():
+    from app.config import settings
+    p = settings.data_dir / "user_data" / "external_view_latest.json"
+    p.parent.mkdir(parents=True, exist_ok=True)
+    return p
+
+
+def _latest_key(url: str, hint: str) -> str:
+    h = hashlib.sha256()
+    h.update((url or "").encode("utf-8"))
+    h.update(b"\x00")
+    h.update((hint or "").strip().encode("utf-8"))
+    return h.hexdigest()
+
+
+def load_latest(url: str, hint: str) -> dict | None:
+    """按地址+提示词取最近一次成功的整理结果; 没有/坏了返回 None。"""
+    from app.services.json_store import lock_for
+    path = _latest_path()
+    with lock_for(path):
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return None
+    if not isinstance(data, dict):
+        return None
+    got = data.get(_latest_key(url, hint))
+    return got if isinstance(got, dict) else None
+
+
+def save_latest(url: str, hint: str, payload: dict) -> None:
+    """存最近一次结果。按 key 覆盖, 只保留最近若干个地址免得无限长。"""
+    from app.services.json_store import atomic_write_json, lock_for
+    path = _latest_path()
+    with lock_for(path):
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            if not isinstance(data, dict):
+                data = {}
+        except (OSError, ValueError):
+            data = {}
+        data[_latest_key(url, hint)] = payload
+        if len(data) > 20:   # 配过的外部页不会有那么多, 超了按生成时间裁
+            data = dict(sorted(data.items(),
+                               key=lambda kv: kv[1].get("generated_at") or 0)[-20:])
+        atomic_write_json(path, data)
+
+
 def load_cached(key: str) -> dict | None:
     """取缓存(键不匹配返回 None)。缓存文件坏了按没有处理。"""
     from app.services.json_store import lock_for
@@ -308,16 +369,31 @@ async def build_view(url: str, hint: str = "", *, force: bool = False) -> dict:
     from app.services.ai_json import extract_json_object
     from app.services.ai_provider import ai_configured, generate_ai_text, last_served_profile_name
 
+    # [R146] 第一层: 最近一次结果还新鲜就**直接回, 连页面都不抓**。
+    # 这一层是为了"点开就有", 不是为了省那一次 HTTP —— 省掉的主要是后面那次
+    # AI 调用, 以及抓取本身最长 12 秒的等待。
+    if not force:
+        latest = load_latest(url, (hint or "").strip())
+        if latest:
+            age = time.time() - float(latest.get("generated_at") or 0)
+            if 0 <= age < LATEST_TTL_S:
+                return {**latest, "from_cache": True, "cache_kind": "latest",
+                        "age_seconds": int(age)}
+
     fetched = external_fetch.fetch(url, force=force)
     source = clean_source(fetched["text"], fetched.get("content_type", ""))
     if not source:
         raise ValueError("抓回来是空页面, 没有内容可以整理")
 
+    # 第二层: 原文一个字没变就不必再调 AI(过期后重抓, 但页面没更新的常见情形)
     key = _source_hash(fetched["url"], source, (hint or "").strip())
     if not force:
         cached = load_cached(key)
         if cached:
-            return {**cached, "from_cache": True, "fetched_at": fetched["fetched_at"]}
+            payload = {**cached, "fetched_at": fetched["fetched_at"]}
+            save_latest(url, hint or "", payload)
+            return {**payload, "from_cache": True, "cache_kind": "source",
+                    "age_seconds": 0}
 
     if not ai_configured():
         raise ValueError("还没有配置 AI —— 抓取模式要靠面板里的 AI 把页面整理成表格")
@@ -346,6 +422,11 @@ async def build_view(url: str, hint: str = "", *, force: bool = False) -> dict:
         "model": last_served_profile_name() or "",
         "generated_at": time.time(),
         "source_chars": len(source),
+        # 抓取时刻存进 payload —— 走"最近一次结果"那条路时不会再抓一次,
+        # 界面上那行"抓取于 …"必须是当时那次的时间, 不能是现在
+        "fetched_at": fetched["fetched_at"],
     }
     save_cached(key, payload)
-    return {**payload, "key": key, "from_cache": False, "fetched_at": fetched["fetched_at"]}
+    save_latest(url, hint or "", payload)
+    return {**payload, "key": key, "from_cache": False, "cache_kind": "fresh",
+            "age_seconds": 0}

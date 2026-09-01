@@ -23,6 +23,16 @@ function fmtTime(epoch?: number): string {
   return new Date(epoch * 1000).toLocaleTimeString('zh-CN', { hour12: false })
 }
 
+/** [R146] 「多久以前」比一个时刻更有用 —— 你要判断的是这份整理还新不新鲜 */
+function fmtAge(epoch?: number): string {
+  if (!epoch) return ''
+  const mins = Math.floor((Date.now() / 1000 - epoch) / 60)
+  if (mins < 1) return '刚刚'
+  if (mins < 60) return `${mins} 分钟前`
+  const hrs = Math.floor(mins / 60)
+  return hrs < 24 ? `${hrs} 小时前` : `${Math.floor(hrs / 24)} 天前`
+}
+
 /**
  * [R117] 抓取模式: 后端抓原文 → 面板自己的 AI 按固定提示词整理 → 固定版式。
  * 不再用 iframe 内嵌整站, 所以对方禁不禁 iframe、是不是 SPA 都无所谓。
@@ -33,7 +43,10 @@ function FetchModeBody({ hint }: { hint: string }) {
   const q = useQuery({
     queryKey: QK.externalPageView(hint),
     queryFn: () => api.externalPageView({ hint }),
-    staleTime: 5 * 60 * 1000,
+    // [R146] 与后端「最近一次结果」的有效期对齐(30 分钟)。后端在这个窗口内
+    // 连页面都不抓, 前端也就没必要反复发这个请求。
+    staleTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
     retry: false,
   })
   const [refreshing, setRefreshing] = useState(false)
@@ -92,8 +105,18 @@ function FetchModeBody({ hint }: { hint: string }) {
     <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
       <ExternalViewRender view={data.spec} />
       <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border pt-3 text-[11px] text-muted">
+        {/* [R146] 把"多久以前"放在最前面。这一页现在**默认给的是缓存**,
+            所以第一眼要能判断这份整理还新不新鲜 —— 时刻不如时长直观。 */}
+        <span className="text-secondary">
+          AI 整理于 {fmtTime(data.generated_at)}
+          <span className="ml-1 text-muted">({fmtAge(data.generated_at)})</span>
+        </span>
         <span>抓取 {fmtTime(data.fetched_at)}</span>
-        <span>AI 整理 {fmtTime(data.generated_at)}{data.from_cache ? '(缓存)' : ''}</span>
+        {data.from_cache && (
+          <span title="30 分钟内再打开这一页直接给这份结果 —— 不再抓取, 也不再调 AI。想立刻重来点右边的「重新解析」">
+            缓存复用{data.cache_kind === 'source' ? '(原文未变)' : ''}
+          </span>
+        )}
         {data.model && <span>档位 {data.model}</span>}
         <span>原文 {data.source_chars} 字</span>
         <button
