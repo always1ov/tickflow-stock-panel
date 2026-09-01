@@ -38,7 +38,7 @@ _last_fail_log = 0.0
 @dataclass(frozen=True)
 class _Preset:
     key: str          # 稳定 id(前端选择用)
-    code: str         # 新浪行情代码
+    codes: tuple[str, ...]   # [R113] 新浪行情代码**候选**: 逐个试, 用第一个有数据的
     name: str         # 显示名
     kind: str         # 行格式: "int" / "hk"
     # [R112] 各市场交易时段(北京时间, 24h 制小数, 如 14.5=14:30)。跨零点的
@@ -50,20 +50,22 @@ class _Preset:
 
 # 可选指数表 —— 想加新的在这里加一行即可(独立维护的意义所在)
 PRESETS: tuple[_Preset, ...] = (
-    # 韩国 09:00-15:30 KST = 08:00-14:30 北京
-    _Preset("kospi",    "int_kospi",    "韩国综合", "int", 8.0, 14.5),
+    # 韩国 09:00-15:30 KST = 08:00-14:30 北京。
+    # [R113] int_kospi 实测取不到数(其余 int_* 都正常) —— 新浪对韩国综合的
+    # 代码不止一种写法, 这里列出已知几种候选逐个试, 免得靠猜来回改。
+    _Preset("kospi",  ("int_kospi", "gb_ks11", "znb_KS11", "hf_KS11"), "韩国综合", "int", 8.0, 14.5),
     # 日本 09:00-15:00 JST = 08:00-14:00 北京(午休不细分, 只判大时段)
-    _Preset("nikkei",   "int_nikkei",   "日经225",  "int", 8.0, 14.0),
+    _Preset("nikkei", ("int_nikkei",), "日经225",  "int", 8.0, 14.0),
     # 港股 09:30-16:00 = 北京同时区
-    _Preset("hsi",      "rt_hkHSI",     "恒生指数", "hk", 9.5, 16.0),
+    _Preset("hsi",    ("rt_hkHSI", "int_hangseng"), "恒生指数", "hk", 9.5, 16.0),
     # 美股 21:30-04:00 北京(夏令时; 冬令时晚 1 小时, 这里取并集 21.5~05.0
     # 宁可多标一小时"交易中", 也不要在真开盘时标成休市)
-    _Preset("dji",      "int_dji",      "道琼斯",   "int", 21.5, 5.0),
-    _Preset("nasdaq",   "int_nasdaq",   "纳斯达克", "int", 21.5, 5.0),
-    _Preset("sp500",    "int_sp500",    "标普500",  "int", 21.5, 5.0),
+    _Preset("dji",    ("int_dji",),    "道琼斯",   "int", 21.5, 5.0),
+    _Preset("nasdaq", ("int_nasdaq",), "纳斯达克", "int", 21.5, 5.0),
+    _Preset("sp500",  ("int_sp500",),  "标普500",  "int", 21.5, 5.0),
 )
 _BY_KEY = {p.key: p for p in PRESETS}
-DEFAULT_KEYS = ["kospi", "nikkei", "nasdaq"]  # 用户定案: 日、韩、纳斯达克
+DEFAULT_KEYS = ["kospi", "nasdaq"]  # 用户定案: 只留韩国综合与纳斯达克
 
 _lock = threading.Lock()
 _cache: dict[str, dict] = {}     # key → {..row..}
@@ -104,6 +106,9 @@ def _parse_line(preset: _Preset, payload: str) -> dict | None:
     """
     fields = payload.split(",")
     last = change = pct = None
+    if preset.kind == "hk" and len(fields) < 9:
+        # 该候选返回的不是港股行格式(如回落到 int_hangseng), 按 int 解析
+        preset = _Preset(preset.key, preset.codes, preset.name, "int", preset.open_h, preset.close_h)
     if preset.kind == "int":
         for i in range(min(len(fields), 6)):
             v = _to_float(fields[i])
@@ -158,7 +163,7 @@ def get_quotes(keys: list[str]) -> list[dict]:
     presets = [_BY_KEY[k] for k in keys if k in _BY_KEY]
     if not presets:
         return []
-    codes = tuple(p.code for p in presets)
+    codes = tuple(c for p in presets for c in p.codes)
     now = time.time()
     with _lock:
         fresh = _cache_codes == codes and (now - _cache_at) < _TTL_S
@@ -167,7 +172,13 @@ def get_quotes(keys: list[str]) -> list[dict]:
                 raw = _fetch(list(codes))
                 rows: dict[str, dict] = {}
                 for p in presets:
-                    parsed = _parse_line(p, raw.get(p.code, ""))
+                    # 逐个候选代码试, 用第一个能解析出价格的
+                    parsed = None
+                    for c in p.codes:
+                        parsed = _parse_line(p, raw.get(c, ""))
+                        if parsed is not None:
+                            parsed["source_code"] = c
+                            break
                     if parsed is not None:
                         parsed["updated_at"] = now
                         parsed["trading"] = _in_session(p)
@@ -189,7 +200,7 @@ def get_quotes(keys: list[str]) -> list[dict]:
 def debug_fetch(keys: list[str]) -> dict:
     """诊断用: 直连上游一次, 返回原始 payload 与逐行解析结果(不进缓存)。"""
     presets = [_BY_KEY[k] for k in keys if k in _BY_KEY] or list(PRESETS)
-    codes = [p.code for p in presets]
+    codes = [c for p in presets for c in p.codes]
     try:
         raw = _fetch(codes)
     except Exception as e:  # noqa: BLE001
@@ -198,7 +209,10 @@ def debug_fetch(keys: list[str]) -> dict:
         "ok": True,
         "codes": codes,
         "raw": raw,
-        "parsed": {p.key: _parse_line(p, raw.get(p.code, "")) for p in presets},
+        "parsed": {
+            p.key: {c: _parse_line(p, raw.get(c, "")) for c in p.codes}
+            for p in presets
+        },
     }
 
 

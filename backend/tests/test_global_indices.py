@@ -69,3 +69,30 @@ def test_upstream_failure_keeps_stale_value(monkeypatch):
 
 def test_unknown_keys_ignored():
     assert gi.get_quotes(["nope"]) == []
+
+
+def test_multi_candidate_codes_fall_through(monkeypatch):
+    """[R113] 首选代码没数据时自动试下一个候选(韩国综合的实际情况)。"""
+    kospi = gi._BY_KEY["kospi"]
+    assert len(kospi.codes) > 1, "韩国综合应配多个候选代码"
+
+    # 只有第二个候选有数据 → 仍应解析成功, 并记录实际生效的代码
+    def fake_fetch(codes):
+        assert kospi.codes[0] in codes and kospi.codes[1] in codes
+        return {kospi.codes[1]: "KOSPI,3200.12,-12.34,-0.38"}
+
+    monkeypatch.setattr(gi, "_fetch", fake_fetch)
+    rows = gi.get_quotes(["kospi"])
+    assert len(rows) == 1
+    assert rows[0]["last"] == 3200.12
+    assert rows[0]["source_code"] == kospi.codes[1]
+
+
+def test_trading_flag_present():
+    """卡片要能区分'交易中'与'休市'(休市值静止不是故障)。"""
+    from datetime import datetime
+    kospi = gi._BY_KEY["kospi"]
+    assert gi._in_session(kospi, datetime(2026, 9, 2, 10, 0)) is True    # 周三上午
+    assert gi._in_session(kospi, datetime(2026, 9, 2, 20, 0)) is False   # 韩股已收
+    nasdaq = gi._BY_KEY["nasdaq"]
+    assert gi._in_session(nasdaq, datetime(2026, 9, 2, 23, 0)) is True   # 美股夜盘
