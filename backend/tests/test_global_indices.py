@@ -14,7 +14,9 @@ def _reset_cache():
 
 
 _KOSPI = gi._BY_KEY["kospi"]
-_HSI = gi._BY_KEY["hsi"]
+# [R116] 恒生已从 PRESETS 删除(用户只看韩国+纳指), 但港股行格式解析分支保留
+# 备用 —— 这里现造一条 hk 档位守住它, 将来加回 rt_hk* 指数时不用重写解析。
+_HSI = gi._Preset("hsi", ("rt_hkHSI",), "恒生指数", "hk", 9.5, 16.0)
 
 
 def test_parse_int_format():
@@ -96,3 +98,9 @@ def test_trading_flag_present():
     assert gi._in_session(kospi, datetime(2026, 9, 2, 20, 0)) is False   # 韩股已收
     nasdaq = gi._BY_KEY["nasdaq"]
     assert gi._in_session(nasdaq, datetime(2026, 9, 2, 23, 0)) is True   # 美股夜盘
+
+
+def test_preset_table_is_the_two_the_user_wants():
+    """[R116] 只留韩国综合 + 纳斯达克, 且默认全选(表里没别的可选)。"""
+    assert [p.key for p in gi.PRESETS] == ["kospi", "nasdaq"]
+    assert gi.DEFAULT_KEYS == ["kospi", "nasdaq"]

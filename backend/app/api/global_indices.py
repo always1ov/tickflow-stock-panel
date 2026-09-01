@@ -15,7 +15,13 @@ def _selected_keys() -> list[str]:
     if not isinstance(raw, list):
         return list(global_indices.DEFAULT_KEYS)
     valid = {p["key"] for p in global_indices.list_presets()}
-    return [k for k in raw if k in valid]
+    keys = [k for k in raw if k in valid]
+    # [R116] 老选择里可能只剩已删除的指数(日经/恒生/道指/标普) —— 全被过滤掉
+    # 就回落默认, 免得用户卡在"一张卡片都没有"。主动清空(存了空列表)时 raw
+    # 本身为空, 不触发回落, 关得掉。
+    if raw and not keys:
+        return list(global_indices.DEFAULT_KEYS)
+    return keys
 
 
 @router.get("")
