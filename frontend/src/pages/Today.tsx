@@ -10,8 +10,8 @@ import { Fragment, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import {
-  AlertTriangle, CheckCircle2, ChevronDown, Compass, Download, Layers, Loader2,
-  RefreshCw, SlidersHorizontal, Sparkles, Sunrise, Target,
+  AlertTriangle, BarChart3, CheckCircle2, ChevronDown, Compass, Download, Layers,
+  Loader2, RefreshCw, SlidersHorizontal, Sparkles, Sunrise, Target,
 } from 'lucide-react'
 import {
   api, TODAY_BOARDS, type KeltnerVerdict, type SignalAiSchedule, type TodayAiSchedule,
@@ -20,6 +20,7 @@ import {
 import { toast } from '@/components/Toast'
 import { PageShell } from '@/components/PageShell'
 import { VerdictHover } from '@/components/stock-analysis/VerdictHover'
+import { ScoreLedgerDialog } from '@/components/ScoreLedgerDialog'
 import { QK } from '@/lib/queryKeys'
 import { cn } from '@/lib/cn'
 
@@ -640,6 +641,7 @@ export function Today() {
   })
 
   const [prefsOpen, setPrefsOpen] = useState(false)
+  const [ledgerOpen, setLedgerOpen] = useState(false)   // [R133] 把握分体检弹窗
   // 滑块拖动中的即时值(null = 用服务端返回的偏好); 松手才落库
   const [minScore, setMinScore] = useState<number | null>(null)
   const prefsMut = useMutation({
@@ -992,6 +994,16 @@ export function Today() {
                 })}
               </div>
               <div className="ml-auto flex items-center gap-2">
+                {/* [R133] 门槛旁边就是体检 —— 调门槛前先看"这个门槛值不值",
+                    两个按钮挨着放, 才不会出现凭感觉拧滑块的情况 */}
+                <button
+                  onClick={() => setLedgerOpen(true)}
+                  title="把握分体检: 完整候选池的分层胜率/名次段/因子归因, 并可一键导出给外部做调参"
+                  className="inline-flex items-center gap-1 rounded-btn border border-border bg-base px-2.5 py-1 text-[10px] text-muted transition-colors cursor-pointer hover:text-foreground"
+                >
+                  <BarChart3 className="h-3 w-3" />
+                  体检
+                </button>
                 <button
                   onClick={() => setPrefsOpen((v) => !v)}
                   title="调整显示门槛(把握分下限与最多显示条数)"
@@ -1345,6 +1357,7 @@ export function Today() {
           </section>
         </>
       )}
+      {ledgerOpen && <ScoreLedgerDialog onClose={() => setLedgerOpen(false)} />}
     </PageShell>
   )
 }

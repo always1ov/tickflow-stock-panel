@@ -67,16 +67,21 @@ def suggest_position(score: int, atr_pct: float | None,
     return {"fraction": round(frac, 2), "text": text, "why": why}
 
 
-def rank_opportunities(
+def score_opportunities(
     trends: dict[str, dict], signals: dict[str, dict], names: dict[str, str],
-    min_score: int = _OPP_MIN_SCORE, max_show: int = _OPP_MAX_SHOW,
     bench_ret: float | None = None,
     extras: dict[str, dict] | None = None,
-    boards: list[str] | None = None,
-) -> tuple[list[dict], int]:
-    """给买入机会打"把握分"并筛选, 返回 (显示列表, 被滤掉条数)。
+) -> list[dict]:
+    """给买入机会打"把握分", 返回**完整**排序列表(不做门槛/条数/板块过滤)。
 
-    门槛 min_score / max_show 由用户偏好传入(见 services.today_prefs), 默认值即常量。
+    [R133] 从 rank_opportunities 里拆出来的一半。拆的理由是台账:
+    要判断这套评分有没有区分度, 必须看到被门槛滤掉的那些票后来涨没涨 ——
+    只记显示出来的那 10 条, 等于只用样本里最好的一段去证明样本好。
+
+    每条候选除了 score 还带两样给台账用的东西(前端不用, 也不影响任何既有逻辑):
+      · ``factors``  这一分一分是谁给的(新鲜度 +15 / 通道 -12 …), 用于因子归因
+      · ``ctx``      打分时的原始输入(第几天/量比/相对强度/胜率/主线名次…),
+                     导出后可以离线重算任意权重组合, 不必改代码再等三个月
 
     纯函数, 无 IO —— 打分口径:
       · 趋势刚转强底分最高, 按信号出现第几天加减(第 1-2 天最佳, 第 4 天起判定
@@ -94,71 +99,90 @@ def rank_opportunities(
         **只加分不减分**: 主线由涨停梯队推出, 只覆盖市场最躁动的一小撮,
         扣"不在主线内"的分等于系统性偏向妖股;
       · 逼近买入触发价的按距离与置信度打分, 一到价就能行动的最优先。
-    低于 min_score 或排在 max_show 之后的都不显示, 只报数量。
-
-    [R40] boards 非空时只保留这些板块的机会。**过滤必须发生在 max_show 截断之前** ——
-    先截 10 条再由前端挑出主板的话, 会漏掉那些被截掉的主板票, 看到的"主板机会"
-    是残缺的。被板块滤掉的不计入"已滤掉 N 只"(那个数字说的是没过门槛的)。
     """
     opp_by_sym: dict[str, dict] = {}
 
     def add(sym: str, kind: str, score: int, text: str, why: list[str],
-            pivot: float | None = None) -> None:
+            pivot: float | None = None,
+            factors: dict | None = None, ctx: dict | None = None) -> None:
         cur = opp_by_sym.get(sym)
         if cur is None:
             opp_by_sym[sym] = {
                 "kind": kind, "symbol": sym, "name": names.get(sym, sym),
                 "score": score, "why": why, "text": text, "pivot": pivot,
+                "factors": dict(factors or {}), "ctx": dict(ctx or {}),
             }
             return
         if score > cur["score"]:  # 同票命中多个来源: 取更高分的表述, 理由合并
             cur["score"], cur["kind"], cur["text"], cur["pivot"] = score, kind, text, pivot
+            # 因子拆解跟着"赢的那一路"走 —— 两路的加减项不是同一套, 混起来对不上总分
+            cur["factors"] = dict(factors or {})
+        cur["ctx"].update({k: v for k, v in (ctx or {}).items() if v is not None})
         cur["why"] += [w for w in why if w not in cur["why"]]
 
     for sym, t in trends.items():
         if t.get("signal") not in ("转多", "回升"):
             continue
         dur = int(t.get("duration") or 1)
-        score = (70 if t["signal"] == "转多" else 55) + _FRESH_BONUS.get(dur, -30)
+        base = 70 if t["signal"] == "转多" else 55
+        fresh = _FRESH_BONUS.get(dur, -30)
+        fac: dict[str, int] = {"base": base, "fresh": fresh}
+        cx: dict = {"dur": dur, "signal": t["signal"], "intraday": bool(t.get("intraday"))}
+        score = base + fresh
         note = "(刚出现,入场窗口最佳)" if dur <= 2 else "(已过最佳入场时机)" if dur >= 4 else ""
         why = [f"{t['signal']}第 {dur} 天{note}"]
         sig = signals.get(sym) or {}
         conf = sig.get("confidence")
         if sig.get("signal") == "buy":
-            score += round(int(conf or 50) * 0.2)
+            d = round(int(conf or 50) * 0.2)
+            score += d
+            fac["ai"] = d
+            cx["ai_conf"] = conf
             why.append(f"AI 也看多(把握 {conf})" if conf is not None else "AI 也看多")
         elif sig.get("signal") == "sell":
             score -= 40
+            fac["ai"] = -40
+            cx["ai_conf"] = conf
             why.append("但 AI 看空,信号互相矛盾")
         r20 = t.get("ret_20d")
         if bench_ret is not None and r20 is not None:
             rs = r20 - bench_ret
+            cx["rs"] = round(rs * 100, 2)
             if rs >= 0.05:
                 score += 8
+                fac["rs"] = 8
                 why.append(f"近20日跑赢大盘 {rs * 100:.0f} 个点")
             elif rs < -0.05:
                 score -= 15
+                fac["rs"] = -15
                 why.append(f"近20日跑输大盘 {abs(rs) * 100:.0f} 个点,比市场还弱")
             elif rs < 0:
                 score -= 8
+                fac["rs"] = -8
                 why.append("近20日略跑输大盘")
         ext = (extras or {}).get(sym) or {}
         vr = ext.get("vol_ratio")
         if vr:
+            cx["vol_ratio"] = round(float(vr), 2)
             if vr >= 1.5:
                 score += 8
+                fac["vol"] = 8
                 why.append(f"放量突破(量比 {vr:.1f})")
             elif vr < 0.8:
                 score -= 12
+                fac["vol"] = -12
                 why.append(f"缩量(量比 {vr:.1f}),假突破风险")
         win = ext.get("win")
         if win:
             wr, wn = win["rate"], win["n"]
+            cx["win_rate"], cx["win_n"] = round(float(wr), 3), wn
             if wr >= 0.6:
                 score += 8
+                fac["win"] = 8
                 why.append(f"这票历史转强信号胜率 {wr:.0%}({wn} 次)")
             elif wr <= 0.4:
                 score -= 12
+                fac["win"] = -12
                 why.append(f"这票历史转强信号胜率仅 {wr:.0%}({wn} 次),信号在它身上不好使")
             else:
                 why.append(f"历史转强信号胜率 {wr:.0%}({wn} 次)")
@@ -171,7 +195,7 @@ def rank_opportunities(
         except (TypeError, ValueError):
             t_pivot = None
         add(sym, "trend_signal", score,
-            f"{t['signal']}:{t['signal_desc']}(第 {dur} 天)", why, t_pivot)
+            f"{t['signal']}:{t['signal_desc']}(第 {dur} 天)", why, t_pivot, fac, cx)
 
     for sym, sig in signals.items():
         if sym not in names or sig.get("signal") != "buy":
@@ -188,13 +212,17 @@ def rank_opportunities(
             gap = (price - close) / close
             if 0 <= gap <= _NEAR_BREAKOUT_PCT:
                 conf = sig.get("confidence")
-                score = 62 + round(int(conf or 50) * 0.25) + (8 if gap <= 0.005 else 0)
+                ai_d = round(int(conf or 50) * 0.25)
+                near_d = 8 if gap <= 0.005 else 0
+                score = 62 + ai_d + near_d
                 why = [f"现价距买入触发价仅 {gap * 100:.1f}%,一到价就能按预案行动"]
                 if conf is not None:
                     why.append(f"AI 看多(把握 {conf})")
                 add(sym, "near_breakout", score,
                     f"AI 看多,现价 {close:.2f} 距触发价 {price:.2f} 仅 {gap * 100:.1f}%"
-                    f" — 到价{p.get('action') or '关注'}", why, price)
+                    f" — 到价{p.get('action') or '关注'}", why, price,
+                    {"base": 62, "ai": ai_d, "near": near_d},
+                    {"ai_conf": conf, "gap_pct": round(gap * 100, 2)})
                 break
 
     # [R37] 主线加成放在两个来源合并之后统一加: 趋势转强与逼近突破都该享受同一份
@@ -204,7 +232,10 @@ def rank_opportunities(
         ml = ((extras or {}).get(sym) or {}).get("mainline")
         if not ml:
             continue
-        o["score"] += mainline_bonus(ml.get("rank"))
+        bonus = mainline_bonus(ml.get("rank"))
+        o["score"] += bonus
+        o["factors"]["mainline"] = bonus
+        o["ctx"]["mainline_rank"] = ml.get("rank")
         o["mainline"] = ml
         also = ml.get("also") or []
         o["why"].append(
@@ -226,9 +257,17 @@ def rank_opportunities(
         if vd:
             delta, reason = _VERDICT_SCORE.get(vd["code"], (0, ""))
             o["score"] += delta
+            o["factors"]["verdict"] = delta
+            o["ctx"]["verdict"] = vd.get("code")
             if reason:
                 o["why"].append(f"{'但' if delta < 0 else ''}{vd['title']}:{reason}")
-        o["score"] = max(0, min(100, o["score"]))   # 夹到 [0,100] 放在所有加减之后
+        raw = o["score"]
+        o["score"] = max(0, min(100, raw))          # 夹到 [0,100] 放在所有加减之后
+        # [R133] 夹掉了多少也记下来 —— 理论上限 151 分, 顶格的那些票在榜上其实
+        # 没有区分度, 而这件事只有把 clamp 记下来才看得见
+        if raw != o["score"]:
+            o["factors"]["clamp"] = o["score"] - raw
+            o["ctx"]["raw_score"] = raw
 
     # [R123] 把两个**直接决定今天动不动手**的数字从 why 散文里拎成结构化字段:
     #   gap_pct  现价距触发价还差几个点(负数=已越过) —— 回答"今天能不能动手"
@@ -241,20 +280,60 @@ def rank_opportunities(
         o["vol_ratio"] = round(float(vr), 2) if isinstance(vr, (int, float)) and vr else None
         close = ((trends.get(sym) or {}).get("close")
                  or ((signals.get(sym) or {}).get("close")))
+        # [R133] 台账的收益起点。存在候选上而不是回头再读一次行情 ——
+        # 记的必须是"当时那个价", 事后重读会因复权口径变动而对不上。
+        try:
+            o["close"] = float(close) if close else None
+        except (TypeError, ValueError):
+            o["close"] = None
         pivot = o.get("pivot")
         try:
             o["gap_pct"] = (round((float(pivot) - float(close)) / float(close) * 100, 2)
                             if pivot and close else None)
         except (TypeError, ValueError, ZeroDivisionError):
             o["gap_pct"] = None
+        o["ctx"]["gap_pct"] = o["gap_pct"]
 
-    ranked = sorted(opp_by_sym.values(), key=lambda o: (-o["score"], o["symbol"]))
+    return sorted(opp_by_sym.values(), key=lambda o: (-o["score"], o["symbol"]))
+
+
+def filter_opportunities(
+    ranked: list[dict],
+    min_score: int = _OPP_MIN_SCORE, max_show: int = _OPP_MAX_SHOW,
+    boards: list[str] | None = None,
+) -> tuple[list[dict], int]:
+    """完整排序列表 → (显示列表, 被门槛滤掉条数)。
+
+    门槛 min_score / max_show 由用户偏好传入(见 services.today_prefs), 默认值即常量。
+    低于 min_score 或排在 max_show 之后的都不显示, 只报数量。
+
+    [R40] boards 非空时只保留这些板块的机会。**过滤必须发生在 max_show 截断之前** ——
+    先截 10 条再由前端挑出主板的话, 会漏掉那些被截掉的主板票, 看到的"主板机会"
+    是残缺的。被板块滤掉的不计入"已滤掉 N 只"(那个数字说的是没过门槛的)。
+    """
     if boards:
         keep = set(boards)
-        ranked = [o for o in ranked if o["board"] in keep]
+        ranked = [o for o in ranked if o.get("board") in keep]
     shown = [dict(o, why=" · ".join(o["why"]))
              for o in ranked if o["score"] >= min_score][:max_show]
     return shown, len(ranked) - len(shown)
+
+
+def rank_opportunities(
+    trends: dict[str, dict], signals: dict[str, dict], names: dict[str, str],
+    min_score: int = _OPP_MIN_SCORE, max_show: int = _OPP_MAX_SHOW,
+    bench_ret: float | None = None,
+    extras: dict[str, dict] | None = None,
+    boards: list[str] | None = None,
+) -> tuple[list[dict], int]:
+    """打分 + 筛选一步到位, 返回 (显示列表, 被滤掉条数)。
+
+    [R133] 拆分后的薄封装。签名与行为与拆分前完全一致 —— 既有调用方与六组
+    测试都按这个形状写的, 拆分是为了让台账拿到完整列表, 不是为了改接口。
+    """
+    return filter_opportunities(
+        score_opportunities(trends, signals, names, bench_ret, extras),
+        min_score, max_show, boards)
 
 
 def build_pyramid_plan(fraction: float, pivot: float | None,
@@ -541,9 +620,11 @@ def _build_overview(repo) -> dict:
     except Exception as e:  # noqa: BLE001
         logger.debug("today meso skipped: %s", e)
 
-    opportunities, opp_filtered = rank_opportunities(
-        trends, signals, names, prefs["min_score"], prefs["max_show"], bench_ret, extras,
-        prefs.get("boards"))
+    # [R133] 先拿到**完整**排序列表, 再按门槛截断。台账记完整的那份 ——
+    # 只记显示出来的 10 条, 等于只用样本里最好的一段去证明样本好。
+    ranked_all = score_opportunities(trends, signals, names, bench_ret, extras)
+    opportunities, opp_filtered = filter_opportunities(
+        ranked_all, prefs["min_score"], prefs["max_show"], prefs.get("boards"))
     # [R18] 盘中口径标注: 实时价确实参与了判定的趋势类新信号是"临时信号",
     # 收盘价可能收回去 —— 标记出来, 前端提示"待收盘确认", 防止盘中追假信号
     for o in opportunities:
@@ -632,6 +713,18 @@ def _build_overview(repo) -> dict:
     holdings.sort(key=lambda h: (not h["exit_triggered"], h["distance_pct"] if h["distance_pct"] is not None else -9))
 
     as_of = max((t["as_of"] for t in trends.values()), default=None)
+
+    # [R133] 落一份当日候选池快照 —— 这套把握分有没有区分度, 只能靠事后记录回答。
+    # 判"定稿"看数据不看时钟: 只要没有任何一只用了实时价参与判定, 这份快照的
+    # close 就是 as_of 那天的真收盘, 可以当收益起点; 盘中(实时行情开着)则不记,
+    # 免得把实时价当成收盘价算出一份假收益。
+    try:
+        from app.services import score_ledger
+        if as_of and not any(t.get("intraday") for t in trends.values()):
+            score_ledger.record_day(as_of, ranked_all,
+                                    {o["symbol"] for o in opportunities}, True)
+    except Exception as e:  # noqa: BLE001 —— 记账失败绝不能影响总览
+        logger.debug("score ledger record skipped: %s", e)
 
     # [R13] 组合汇总: 逐票之上的整体视角
     portfolio = None
@@ -995,3 +1088,40 @@ def ai_track_record(request: Request):
     """
     from app.services import ai_pick_ledger
     return ai_pick_ledger.evaluate(request.app.state.repo)
+
+
+@router.get("/score-ledger")
+def score_ledger_stats(request: Request):
+    """[R133] 规则层把握分体检: 分层胜率 / 排名段 / 因子归因 / 同期基准。
+
+    与 AI 命中率台账互补 —— 那个只看 AI 挑的 1-3 只(有选择偏差),
+    这个看**完整候选池**, 才能回答"把握分本身有没有区分度"。
+    """
+    from app.services import ai_pick_ledger, score_ledger
+    repo = request.app.state.repo
+    out = score_ledger.evaluate(repo)
+    try:
+        ai_stats = ai_pick_ledger.evaluate(repo).get("stats")
+    except Exception as e:  # noqa: BLE001
+        logger.debug("score ledger ai stats skipped: %s", e)
+        ai_stats = None
+    # 服务端就把可粘贴的摘要拼好: 用户点一下复制就能整段交给外部做调参,
+    # 不必自己从几张表里抄数字(抄错了结论就跟着错)
+    out["summary_md"] = score_ledger.build_summary_md(out, ai_stats)
+    return out
+
+
+@router.get("/score-ledger/export")
+def score_ledger_export(request: Request):
+    """[R133] 整本台账导出成一行一候选的扁平 CSV —— 调参用的原料。"""
+    from fastapi.responses import Response
+    from app.services import score_ledger
+    csv_text = score_ledger.export_csv(request.app.state.repo)
+    stamp = date.today().isoformat()
+    return Response(
+        # BOM: Excel 认它才不会把中文名列显示成乱码
+        content="﻿" + csv_text,
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition":
+                 f'attachment; filename="score_ledger_{stamp}.csv"'},
+    )

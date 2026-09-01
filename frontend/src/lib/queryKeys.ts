@@ -131,6 +131,8 @@ export const QK = {
   todayAiSchedule:      ['today-ai-schedule'] as const,
   // R121 AI 优选历史命中率(纯事后统计)
   todayAiTrackRecord:   ['today-ai-track-record'] as const,
+  // R133 规则层把握分体检(完整候选池的分层胜率/因子归因)
+  todayScoreLedger:     ['today-score-ledger'] as const,
   signalAiSchedule:     ['signal-ai-schedule'] as const,
   // AI 操盘手
   paperTraders:         ['paper-traders'] as const,

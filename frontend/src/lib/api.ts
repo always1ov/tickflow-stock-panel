@@ -240,6 +240,34 @@ export interface AiTrackRecord {
   recorded_days: number
   caveat: string
 }
+/** [R133] 一段区间的表现: 胜率 / 平均收益 / 样本数 */
+export interface LedgerStat { n: number; win_rate: number | null; avg: number | null }
+export type LedgerStats = Record<'t1' | 't3' | 't5', LedgerStat>
+/** [R133] 规则层把握分体检 —— 与 AI 命中率互补: 那个只看 AI 挑的几只(有选择
+ *  偏差), 这个看完整候选池, 才回答得了"把握分本身有没有区分度" */
+export interface ScoreLedger {
+  recorded_days: number
+  total_rows: number
+  evaluated_rows: number
+  pending_symbols: number
+  first_day: string | null
+  last_day: string | null
+  all: LedgerStats
+  shown: LedgerStats
+  buckets: { label: string; lo: number; hi: number; count: number; stats: LedgerStats }[]
+  ranks: { label: string; cut: number; count: number; stats: LedgerStats }[]
+  factors: {
+    key: string; label: string
+    plus: { count: number; stats: LedgerStats }
+    minus: { count: number; stats: LedgerStats }
+    none: { count: number; stats: LedgerStats }
+  }[]
+  baseline: { symbol?: string; name?: string; stats?: LedgerStats }
+  monotonic: { ok: boolean | null; text: string }
+  caveat: string
+  /** 服务端拼好的可粘贴摘要(Markdown) —— 一键复制就能整段交出去做调参 */
+  summary_md: string
+}
 /** [fork 增强] 缓存的 AI 导读·优选(刷新页面仍在) */
 export interface TodayAiCache {
   as_of: string | null
@@ -3931,6 +3959,10 @@ export const api = {
       '/api/today/ai', { method: 'POST' }),
   /** [R121] AI 优选历史命中率 —— 「靠不靠谱」的硬证据, 纯事后统计 */
   todayAiTrackRecord: () => request<AiTrackRecord>('/api/today/ai/track-record'),
+  /** [R133] 规则层把握分体检: 分层胜率/排名段/因子归因/同期基准 */
+  todayScoreLedger: () => request<ScoreLedger>('/api/today/score-ledger'),
+  /** [R133] 明细 CSV 的地址 —— 交给 <a download>, 不走 fetch(浏览器直接落文件) */
+  todayScoreLedgerExportUrl: () => `${BASE}/api/today/score-ledger/export`,
   todaySavePrefs: (body: Partial<TodayPrefs>) =>
     request<TodayPrefs>('/api/today/prefs', { method: 'PUT', body: JSON.stringify(body) }),
 
