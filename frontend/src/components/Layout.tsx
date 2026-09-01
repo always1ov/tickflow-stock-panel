@@ -378,6 +378,10 @@ function AIConfigBadge({ configured, model }: { configured?: boolean; model?: st
   const managed = rows.filter(p => p.id !== 'legacy')
   const enabled = managed.filter(p => p.enabled)
   const primary = enabled[0]
+  // 表里排第一但没勾「启用」的档位: 调用链会跳过它, 徽标也不能显示它 ——
+  // 但用户多半以为"拖上去就是首选", 这里必须点破, 否则看起来就是"没跟着切换"
+  const topRow = managed[0]
+  const topDisabled = topRow && !topRow.enabled ? (topRow.label?.trim() || topRow.model) : null
 
   const shownModel = primary ? (primary.label?.trim() || primary.model) : model
   const isConfigured = managed.length > 0 ? enabled.length > 0 : configured
@@ -386,7 +390,8 @@ function AIConfigBadge({ configured, model }: { configured?: boolean; model?: st
   const tip = primary
     ? `AI 档位 — 当前首选 ${primary.label?.trim() || primary.model}${
         fallbackCount ? `, 用不了时自动顺位试另 ${fallbackCount} 档` : ''}${
-        enabled.length ? `\n链路: ${enabled.map(p => p.label?.trim() || p.model).join(' → ')}` : ''}`
+        enabled.length ? `\n链路: ${enabled.map(p => p.label?.trim() || p.model).join(' → ')}` : ''}${
+        topDisabled ? `\n⚠ 表里第 1 档「${topDisabled}」未勾选启用, 已跳过 —— 想用它请在 AI 设置里勾上「启用」并保存` : ''}`
     : `AI 配置 — ${descText}`
 
   return (
@@ -405,6 +410,11 @@ function AIConfigBadge({ configured, model }: { configured?: boolean; model?: st
           {fallbackCount > 0 && (
             <span className="shrink-0 font-mono text-[9px] leading-none text-muted/70" title="备用档位数(前一档用不了时自动顺位)">
               +{fallbackCount}
+            </span>
+          )}
+          {topDisabled && (
+            <span className="shrink-0 text-[9px] leading-none text-warning" title={`表里第 1 档「${topDisabled}」未启用, 已跳过`}>
+              ⚠
             </span>
           )}
         </>
