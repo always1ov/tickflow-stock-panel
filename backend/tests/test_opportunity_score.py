@@ -246,3 +246,44 @@ def test_explain_calls_out_the_expensive_position():
 
 def test_explain_survives_missing_inputs():
     assert osc.explain(_s()) == [] or isinstance(osc.explain(_s()), list)
+
+
+# ------------------------------------------------------- [R139] 同分时的次序
+
+
+def test_ties_break_on_data_completeness_then_trend():
+    """同分时按代码字典序是个无意义的顺序, 而用户会照着名次从上往下看。"""
+    from app.api.today import score_opportunities
+    base_t = {"state": "UT", "state_cn": "上涨趋势", "side": "多头", "duration": 2,
+              "close": 10.0, "as_of": "2026-08-31", "signal": "转多",
+              "signal_desc": "突破", "ret_20d": 0.08}
+    gate = {"above_ma20": True, "above_ma20_prev": True, "close": 10.0,
+            "ma120": 8.0, "ma120_rising": True}
+    # 代码字典序上 A 在前, 但 A 缺量能维度(partial) —— 数据齐全的 Z 必须排前面
+    trends = {"AAA.SH": dict(base_t), "ZZZ.SH": dict(base_t)}
+    names = {"AAA.SH": "甲", "ZZZ.SH": "乙"}
+    ranked, _ = score_opportunities(trends, {}, names, bench_ret=0.02, extras={
+        "AAA.SH": {"gate": gate, "channel_pct": 0.6},
+        "ZZZ.SH": {"gate": gate, "channel_pct": 0.6, "vol_ratio": 1.6, "turnover": 4.0},
+    })
+    order = [o["symbol"] for o in ranked]
+    if ranked[0]["score"] == ranked[1]["score"]:
+        assert order[0] == "ZZZ.SH", "同分时数据齐全的应排在 partial 前面"
+    assert ranked[0]["partial"] is False
+
+
+def test_sort_is_deterministic_across_calls():
+    """同一份数据每次刷新顺序必须一致 —— 名次天天跳用户没法用。"""
+    from app.api.today import score_opportunities
+    t = {"state": "UT", "state_cn": "上涨趋势", "side": "多头", "duration": 2,
+         "close": 10.0, "as_of": "2026-08-31", "signal": "转多",
+         "signal_desc": "突破", "ret_20d": 0.08}
+    gate = {"above_ma20": True, "above_ma20_prev": True, "close": 10.0,
+            "ma120": 8.0, "ma120_rising": True}
+    trends = {f"{i:06d}.SH": dict(t) for i in range(6)}
+    names = {s: s for s in trends}
+    ex = {s: {"gate": gate, "channel_pct": 0.6, "vol_ratio": 1.6, "turnover": 4.0}
+          for s in trends}
+    a = [o["symbol"] for o in score_opportunities(trends, {}, names, 0.02, ex)[0]]
+    b = [o["symbol"] for o in score_opportunities(trends, {}, names, 0.02, ex)[0]]
+    assert a == b

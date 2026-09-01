@@ -239,7 +239,13 @@ def score_opportunities(
         }
         out.append(o)
 
-    out.sort(key=lambda o: (-o["score"], o["symbol"]))
+    # [R139] 排序 = 把握分降序。同分时的次序以前是按代码字典序 —— 那是个
+    # **无意义**的顺序, 而用户会照着名次从上往下看。改成两级有含义的兜底:
+    #   ① 数据齐全的排在 partial 前面(同样 78 分, 三维都算出来的那只更可信);
+    #   ② 再比趋势强度 —— 三个维度里它权重最大, 也最接近"这波起来了没有"。
+    # 最后才用代码保证确定性(同一份数据每次刷新顺序不变)。
+    out.sort(key=lambda o: (-o["score"], bool(o["partial"]),
+                            -(o["dims"].get("trend") or 0), o["symbol"]))
     return out, {"candidates": len(cands), "passed": len(out),
                  "blocked_total": blocked_total, "blocked": blocked}
 

@@ -751,7 +751,13 @@ function AiPickPanel({ picks, analyzed, opportunities, onOpen }: {
           AI 逐一看过这 {analyzed} 只的量价后,认为都不够理想 —— 空仓等待也是决策
         </div>
       ) : (
-        <ul className="mt-1.5 space-y-1.5">
+        // [R139] 一只一行, 不再是一只一个三行的方框。
+        //
+        // 原来每只优选要占三行(名字+徽标 / 理由 / 存疑说明)外加一圈边框与内边距,
+        // 两只就吃掉 ~180px, 把下面真正要看的候选表挤下屏。这里全部收进一行:
+        // 名字、核对徽标、理由、存疑提示、对账入口横着排, 窄屏才回落成换行。
+        // 信息一项没少 —— 少的是包装。
+        <ul className="mt-1 divide-y divide-border/30">
           {shown.map((p, i) => {
             const o = opportunities.find((x) => x.symbol === p.symbol)
             const style = VERDICT_STYLE[p.verdict ?? '待查'] ?? VERDICT_STYLE.待查
@@ -761,33 +767,34 @@ function AiPickPanel({ picks, analyzed, opportunities, onOpen }: {
               // "长出来"的, 不是突然闪现; 只给优选卡, 表格行不做(每次刷新都动会闹)
               <li key={p.symbol}
                   style={{ animationDelay: `${i * 60}ms` }}
-                  className="animate-rise-in rounded border border-border/40 bg-base/40 px-2.5 py-1.5">
-                <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                  className="animate-rise-in py-1">
+                <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
                   <button
                     onClick={() => onOpen(p.symbol, o?.name ?? p.name ?? p.symbol)}
-                    className="font-medium text-foreground hover:underline cursor-pointer"
+                    className="shrink-0 font-medium text-foreground hover:underline cursor-pointer"
                   >
                     {o?.name ?? p.name ?? p.symbol}
                   </button>
-                  <span className={`rounded border px-1.5 py-0.5 text-[9px] ${style.cls}`}
+                  <span className={`shrink-0 rounded border px-1.5 py-0.5 text-[9px] ${style.cls}`}
                         title={p.verdict_note || undefined}>
                     {style.label}
                   </span>
+                  <span className="text-foreground/80">{p.reason}</span>
+                  {/* 存疑说明原来单独占一行; 它只是补充, 跟在理由后面就够 */}
+                  {p.verdict === '存疑' && p.verdict_note && (
+                    <span className="text-[10px] text-amber-300/90">({p.verdict_note})</span>
+                  )}
                   {!!p.checks?.length && (
                     <button
                       onClick={() => setOpenChecks(open ? null : p.symbol)}
-                      className="text-[9px] text-muted hover:text-foreground"
+                      className="ml-auto shrink-0 text-[9px] text-muted hover:text-foreground"
                     >
                       {open ? '收起对账' : `对账 ${p.checks.length} 项`}
                     </button>
                   )}
                 </div>
-                <div className="mt-0.5 text-foreground/80">{p.reason}</div>
-                {p.verdict === '存疑' && p.verdict_note && (
-                  <div className="mt-1 text-[10px] text-amber-300/90">{p.verdict_note}</div>
-                )}
                 {open && p.checks && (
-                  <ul className="mt-1.5 space-y-0.5 border-t border-border/40 pt-1.5">
+                  <ul className="mt-1 space-y-0.5 border-l-2 border-border/40 pl-2">
                     {p.checks.map((c, i) => <CheckRow key={i} c={c} />)}
                   </ul>
                 )}
@@ -802,13 +809,12 @@ function AiPickPanel({ picks, analyzed, opportunities, onOpen }: {
           <div className="text-[10px] font-medium text-danger">
             {rejected.length} 条被驳回,没有当作推荐
           </div>
-          <ul className="mt-1 space-y-0.5">
+          <ul className="mt-0.5">
             {rejected.map((p) => (
-              <li key={p.symbol} className="text-[10px] leading-5 text-muted">
+              <li key={p.symbol} className="flex flex-wrap items-baseline gap-x-1.5 text-[10px] leading-5 text-muted">
                 <span className="text-foreground/70">{p.name || p.symbol}</span>
-                <span className="mx-1">·</span>
                 <span className="line-through">{p.reason}</span>
-                <div className="text-danger/80">{p.verdict_note}</div>
+                <span className="text-danger/80">{p.verdict_note}</span>
               </li>
             ))}
           </ul>
