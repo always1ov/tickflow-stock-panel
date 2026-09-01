@@ -46,9 +46,16 @@ def _kline(n=40, base=10.0):
 def cands():
     return [
         {"symbol": "000001.SZ", "name": "平安银行", "score": 100,
-         "why": "转多第 1 天(刚出现,入场窗口最佳)", "text": "转多:突破上关键点 12.0"},
+         "why": "转多第 1 天(刚出现,入场窗口最佳)", "text": "转多:突破上关键点 12.0",
+         "dims": {"trend": 98.0, "volume": 92, "position": 96},
+         "partial": False, "duration": 1, "trend_state_cn": "上涨趋势",
+         "vol_ratio": 1.7, "turnover": 2.0, "channel_pct": 0.58,
+         "rs_pct": 6.0, "gap_pct": 1.2,
+         "notes": [{"key": "mainline", "tone": "info", "label": "主线1·机器人",
+                    "text": "今日第 1 主线"}]},
         {"symbol": "000002.SZ", "name": "万科A", "score": 88,
-         "why": "转多第 2 天", "text": "转多:突破上关键点 20.0"},
+         "why": "转多第 2 天", "text": "转多:突破上关键点 20.0",
+         "dims": {"trend": 90, "volume": 80, "position": 85}, "partial": False},
     ]
 
 
@@ -67,14 +74,31 @@ def test_payload_carries_real_kline_and_levels(cands):
         assert item["关键价位"], "关键价位摘要不能为空"
 
 
-def test_payload_keeps_symbol_and_rule_context(cands):
-    """规则分仍然带上(作为背景), 但只是候选的一部分, 不是唯一内容。"""
+def test_payload_carries_the_score_breakdown_not_a_black_box(cands):
+    """[R134] 送的不再是一个黑箱"规则分", 而是三维度分解 + 原始输入。
+
+    黑箱分只能被复述("它规则分高"), 分解才能被核对("它说量能 92, K 线上量比
+    确实 1.7") —— 而核对正是我们要 AI 做的那件事。
+    """
     repo = _FakeRepo({"000001.SZ": _kline(), "000002.SZ": _kline(base=20.0)})
     payload = today_api._candidate_market_data(repo, cands)
     assert payload[0]["symbol"] == "000001.SZ"
-    assert payload[0]["规则分"] == 100
-    # 关键: 送审内容远不止规则分
-    assert set(payload[0]) > {"symbol", "name", "规则分", "规则依据", "信号摘要"}
+    br = payload[0]["把握分分解"]
+    assert br["总分"] == 100
+    assert set(br) >= {"总分", "门槛", "趋势强度", "量能确认", "位置成本",
+                       "partial", "原始输入"}
+    assert br["量能确认"] == 92 and br["原始输入"]["量比"] == 1.7
+    # 关键: 送审内容远不止分数
+    assert set(payload[0]) > {"symbol", "name", "把握分分解", "规则依据", "信号摘要"}
+
+
+def test_annotations_are_labelled_as_not_scoring(cands):
+    """注记必须自带"不参与把握分"的标签, 否则 AI 会拿主线/胜率当理由。"""
+    repo = _FakeRepo({"000001.SZ": _kline(), "000002.SZ": _kline(base=20.0)})
+    payload = today_api._candidate_market_data(repo, cands)
+    key = next(k for k in payload[0] if k.startswith("注记"))
+    assert "不参与把握分" in key
+    assert payload[0][key][0]["项"] == "主线1·机器人"
 
 
 def test_missing_kline_is_flagged_not_silently_dropped(cands):
@@ -101,10 +125,19 @@ def test_kline_load_failure_is_contained(cands):
 def test_prompt_forbids_restating_the_rule_score():
     """提示词必须明确禁止用'规则分高/AI 看多'当理由, 否则 AI 会复述分数。"""
     sys_prompt = today_api._AI_SYSTEM
-    assert "不许拿" in sys_prompt and "规则分高" in sys_prompt
-    assert "粗筛门票" in sys_prompt, "必须说明规则分不是排序依据"
+    assert "不许拿" in sys_prompt and "把握分高" in sys_prompt
+    assert "粗筛门票" in sys_prompt, "必须说明把握分不是排序依据"
     for kw in ("量比", "回踩", "阻力"):
         assert kw in sys_prompt, f"提示词应引导看量价维度: {kw}"
+
+
+def test_prompt_explains_the_v2_breakdown_and_that_notes_do_not_score():
+    """[R134] AI 拿到的是三维度分解, 提示词必须教它怎么用, 并划清注记的边界。"""
+    sys_prompt = today_api._AI_SYSTEM
+    for kw in ("三维度分解", "趋势强度", "量能确认", "位置成本", "门槛", "partial"):
+        assert kw in sys_prompt, f"提示词缺少 {kw}"
+    assert "区间最优" in sys_prompt, "必须说明曲线不是越大越好"
+    assert "都不参与把握分" in sys_prompt, "注记的边界必须写死在提示词里"
 
 
 def test_prompt_merges_brief_and_picks_consistently():

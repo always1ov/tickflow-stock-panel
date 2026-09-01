@@ -37,41 +37,70 @@ def test_win_rate_needs_min_sample():
     assert _bullish_event_win_rate(states, closes, horizon=5, min_events=3) is None
 
 
-# ---------- 量价与胜率进把握分 ----------
+# ---------- 量价与胜率在 v2 里的位置 ----------
+#
+# [R134] 这一段整体重写。R20 时量比与历史胜率都是加减分(±8/±12);
+# v2 把它们分开了:
+#   · 量比 → 留在评分里, 但改成**区间型曲线**(峰在 1.3~2.5)。
+#     量比 5 不再比 2 高 —— 那种量往往出现在一波的末端而不是起点。
+#   · 历史胜率 → 退出评分, 只作注记。单票历史转强常不足 10 次, n 这么小的
+#     胜率噪声远大于信号, 拿它去动名次是在把噪声写进排序。
 
-def _rank(extras):
+
+def _rank(extras, **kw):
     names = {"a": "甲", "b": "乙"}
     trends = {"a": _trend(), "b": _trend()}
+    base = {"gate": {"above_ma20": True, "above_ma20_prev": True,
+                     "close": 10.0, "ma120": 8.0, "ma120_rising": True},
+            "channel_pct": 0.6}
+    merged = {k: {**base, **v} for k, v in extras.items()}
+    for s in ("a", "b"):
+        merged.setdefault(s, dict(base))
     shown, _ = rank_opportunities(trends, {}, names, min_score=0, max_show=10,
-                                  extras=extras)
+                                  extras=merged, **kw)
     return {o["symbol"]: o for o in shown}
 
 
 def test_volume_surge_beats_shrink():
-    """同样的信号: 放量的分数必须高于缩量的, 且理由写明量比。"""
+    """同样的信号: 有增量的分数必须高于缩量的, 且理由写明量比。"""
     out = _rank({"a": {"vol_ratio": 2.1}, "b": {"vol_ratio": 0.5}})
     assert out["a"]["score"] > out["b"]["score"]
-    assert "放量突破" in out["a"]["why"]
-    assert "假突破风险" in out["b"]["why"]
+    assert "量比 2.10" in out["a"]["why"]
+    assert "没量" in out["b"]["why"]
 
 
-def test_historical_win_rate_adjusts_score():
-    """历史胜率 70% 加分, 35% 压分 —— 信号在谁身上好使, 分数说话。"""
-    out = _rank({"a": {"win": {"rate": 0.7, "n": 6}}, "b": {"win": {"rate": 0.35, "n": 6}}})
+def test_volume_ratio_is_range_optimal():
+    """v1 是"越大越加"; v2 里量比 5.0 必须低于 2.0 —— 那不是苗头, 是已经发生了。"""
+    out = _rank({"a": {"vol_ratio": 2.0}, "b": {"vol_ratio": 5.0}})
     assert out["a"]["score"] > out["b"]["score"]
-    assert "胜率 70%" in out["a"]["why"]
-    assert "不好使" in out["b"]["why"]
+    assert "已经走了一段" in out["b"]["why"]
 
 
-def test_mid_win_rate_shown_but_neutral():
-    """胜率 50% 不加不扣, 但要展示给用户参考。"""
-    base = _rank({})["a"]["score"]
-    out = _rank({"a": {"win": {"rate": 0.5, "n": 5}}})
-    assert out["a"]["score"] == base
-    assert "胜率 50%" in out["a"]["why"]
+def test_historical_win_rate_no_longer_moves_the_score():
+    """n 常不足 10 次, 这种胜率噪声远大于信号 —— 不该动名次。"""
+    out = _rank({"a": {"win": {"rate": 0.7, "n": 6}}, "b": {"win": {"rate": 0.35, "n": 6}}})
+    assert out["a"]["score"] == out["b"]["score"]
 
 
-def test_no_extras_keeps_old_behavior():
+def test_historical_win_rate_is_still_shown_as_an_annotation():
+    """不计分不等于不展示 —— 用户要的是"看到它时知道些什么"。"""
+    out = _rank({"a": {"win": {"rate": 0.7, "n": 6}}})
+    note = {n["key"]: n for n in out["a"]["notes"]}["win"]
+    assert "70%" in note["label"] and note["tone"] == "good"
+    assert "10 次" in note["text"], "样本量小的告诫必须跟着一起显示"
+
+
+def test_low_win_rate_annotation_is_toned_bad():
+    out = _rank({"a": {"win": {"rate": 0.3, "n": 8}}})
+    assert {n["key"]: n["tone"] for n in out["a"]["notes"]}["win"] == "bad"
+
+
+def test_annotations_stay_out_of_the_scoring_reasons():
+    out = _rank({"a": {"win": {"rate": 0.7, "n": 6}}})
+    assert "胜率" not in out["a"]["why"]
+
+
+def test_no_extras_still_scores_both_the_same():
     out = _rank({})
     assert out["a"]["score"] == out["b"]["score"]
-    assert "量比" not in out["a"]["why"] and "胜率" not in out["a"]["why"]
+    assert "量比" not in out["a"]["why"]

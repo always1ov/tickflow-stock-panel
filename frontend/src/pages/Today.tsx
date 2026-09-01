@@ -15,7 +15,8 @@ import {
 } from 'lucide-react'
 import {
   api, TODAY_BOARDS, type KeltnerVerdict, type SignalAiSchedule, type TodayAiSchedule,
-  type TodayOverview, type TodayPick, type TodayPrefs,
+  type TodayGates, type TodayNote, type TodayOpportunity, type TodayOverview,
+  type TodayPick, type TodayPrefs,
 } from '@/lib/api'
 import { toast } from '@/components/Toast'
 import { PageShell } from '@/components/PageShell'
@@ -227,38 +228,133 @@ const POSTURE_STYLE: Record<string, string> = {
   观察: 'border-border bg-base text-muted',
 }
 
-// ===== [R122] 机会区表格 —— 15 张同质卡片 → 一行一只 =====
+// ===== [R122 → R134] 机会区表格 =====
 //
-// 版式设计(先画后写, 见 FORK_NOTES R122):
-//   ┌──┬──────────┬────────────────┬──────┬──────┬────────┬─┐
-//   │分│ 名称/代码 │ 信号            │ 主线 │建议仓│ 结论标 │▸│
-//   ├──┴──────────┴────────────────┴──────┴──────┴────────┴─┤
-//   │  ▸ 展开: 规则依据 · 建仓路径(金字塔三步)                │
-//   └────────────────────────────────────────────────────────┘
+// R122 把 15 张同质卡片压成一行一只。R134 换了评分口径(三道硬门槛 + 三维度加权),
+// 这张表也跟着重做 —— 因为**旧版最要命的问题是把握分看不出所以然**: 用户截图里
+// 顶上并排两个 100, 光看数字不知道一只强在量能、另一只强在位置, 更不知道是不是
+// 因为缺数据被顶上去的。
 //
-// 为什么从卡片改表格: 旧版每只票 4~5 行, 其中"建仓路径:先试 0.5 成 → 站稳 X
-// 3 日加至 1 成 → …"这句每张卡一模一样, 15 只就是 15 遍模板文字, 眼睛扫不动,
-// 真正有区分度的信息(把握分、量比、距关键点)反而埋在长句里。表格把可比字段
-// 对齐成列, 模板文字收进展开行 —— 要看细节点开就是, 不看不占地方。
+// 现在每一行都能自己解释自己:
+//   ┌────┬──────────┬──────────────┬────┬────┬────┬──────────┬────┬─┐
+//   │分+ │ 名称/代码 │ 信号          │位置│量比│距触│ 注记      │仓位│▸│
+//   │三条│           │               │    │    │发  │(不计分)   │    │ │
+//   └────┴──────────┴──────────────┴────┴────┴────┴──────────┴────┴─┘
 //
-// 把握分保留数字, 但补一条**分布条**: 顶上一串 100/100/97/95 光看数字没有区
-// 分度, 条形按今日候选里的相对位置画, 一眼看出"这只在今天算高还是算低"。
-function ScoreCell({ score, rank, total }: { score: number; rank: number; total: number }) {
-  const tone = score >= 80 ? 'bg-danger' : score >= 70 ? 'bg-warning' : 'bg-muted'
+// 「分」下面的三条细条 = 趋势强度 / 量能确认 / 位置成本, 长度就是各自的维度分。
+// 同样是 87 分, 三条的形状完全不同 —— 一眼看出这分是谁给的。
+//
+// 「注记」列摆的是**不参与打分**的佐证(主线/AI/历史胜率/通道结论)。单独成列
+// 而不是混进信号里, 是为了让"哪些东西影响了排名"这件事在版面上就一目了然。
+const DIM_META = [
+  { key: 'trend', cn: '趋势强度', weight: '45%', cls: 'bg-red-400',
+    hint: '新鲜度(主导) / 六态状态 / 相对强度' },
+  { key: 'volume', cn: '量能确认', weight: '30%', cls: 'bg-amber-400',
+    hint: '量比(区间最优,峰在 1.3~2.5) / 换手率' },
+  { key: 'position', cn: '位置成本', weight: '25%', cls: 'bg-sky-400',
+    hint: 'Keltner 短期通道位置,甜区 50%~65%(刚站上生命线)' },
+] as const
+
+const NOTE_TONE: Record<string, string> = {
+  good: 'bg-emerald-400/15 text-emerald-300',
+  bad: 'bg-danger/15 text-danger',
+  info: 'bg-border/50 text-muted',
+}
+
+/** 把握分 + 三维度分解条。分数本身不再是黑箱 —— 条的形状就是理由。 */
+function ScoreCell({ o, rank, total }: { o: TodayOpportunity; rank: number; total: number }) {
+  const dims = o.dims
+  const detail = DIM_META
+    .map(d => `${d.cn}(${d.weight}) ${dims?.[d.key] ?? '无数据'}`)
+    .join('\n')
   return (
     <span
-      className="inline-flex w-9 shrink-0 flex-col items-center gap-0.5"
-      title={`把握分 ${score}(综合信号新鲜度与 AI 置信度) —— 今日候选里排第 ${rank}/${total}`}
+      className="inline-flex w-11 shrink-0 flex-col items-center gap-1"
+      title={`把握分 ${o.score} —— 今日候选里排第 ${rank}/${total}\n\n${detail}\n\n`
+        + (o.partial
+          ? '⚠ 有维度缺数据,总分是在剩下的维度上算的,偏乐观'
+          : '三个维度数据齐全')}
     >
-      <span className={`font-mono text-[10px] font-semibold ${
-        score >= 80 ? 'text-danger' : score >= 70 ? 'text-warning' : 'text-muted'}`}>
-        {score}
+      <span className="font-mono text-[11px] font-semibold leading-none">
+        <span className={o.score >= 80 ? 'text-danger' : o.score >= 60 ? 'text-warning' : 'text-muted'}>
+          {o.score}
+        </span>
+        {o.partial && <span className="text-[9px] text-warning">*</span>}
       </span>
-      <span className="h-0.5 w-full overflow-hidden rounded-full bg-border/60">
-        <span className={`block h-full rounded-full transition-all duration-enter ease-smooth ${tone}`}
-              style={{ width: `${Math.max(6, Math.min(100, score))}%` }} />
+      <span className="w-full space-y-[2px]">
+        {DIM_META.map(d => {
+          const v = dims?.[d.key]
+          return (
+            <span key={d.key} className="block h-[3px] overflow-hidden rounded-full bg-border/50">
+              {v != null && (
+                <span className={cn('block h-full rounded-full transition-all duration-enter ease-smooth', d.cls)}
+                      style={{ width: `${Math.max(3, Math.min(100, v))}%` }} />
+              )}
+            </span>
+          )
+        })}
       </span>
     </span>
+  )
+}
+
+/** 通道位置: 0.5 = 恰好站在生命线上, 1.0 = 贴上轨。甜区在刚站上那一段。 */
+function PositionCell({ pct }: { pct?: number | null }) {
+  if (pct == null) return <span className="text-[10px] text-muted/50">—</span>
+  const p = Math.round(pct * 100)
+  const tone = pct >= 0.5 && pct <= 0.66 ? 'text-danger'
+    : pct >= 0.85 ? 'text-success' : 'text-secondary'
+  const hint = pct >= 0.5 && pct <= 0.66 ? '刚站上生命线,位置便宜'
+    : pct >= 0.95 ? '已到通道上沿,这个位置买是在最贵的地方'
+    : pct >= 0.78 ? '空间已经走掉一半' : '通道中段'
+  return (
+    <span className={cn('font-mono', tone)}
+          title={`Keltner 短期通道位置 ${p}%(0=下轨 / 50=生命线 MA20 / 100=上轨)—— ${hint}`}>
+      {p}%
+    </span>
+  )
+}
+
+function NoteChips({ notes }: { notes?: TodayNote[] }) {
+  if (!notes?.length) return <span className="text-[10px] text-muted/50">—</span>
+  return (
+    <span className="flex flex-wrap gap-1">
+      {notes.map(n => (
+        <span key={n.key}
+              title={`${n.text}\n\n（注记只作佐证,不参与把握分)`}
+              className={cn('whitespace-nowrap rounded px-1.5 py-0.5 text-[9px]',
+                NOTE_TONE[n.tone] ?? NOTE_TONE.info)}>
+          {n.label}
+        </span>
+      ))}
+    </span>
+  )
+}
+
+/** [R134] 门槛漏斗 —— 熊市里机会区空空如也时, 这一行说明系统在干活 */
+function GateFunnel({ gates }: { gates?: TodayGates | null }) {
+  if (!gates || !gates.candidates) return null
+  const blocked = Object.entries(gates.blocked || {}).sort((a, b) => b[1] - a[1])
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-border/40 bg-base/30 px-4 py-2 text-[10px]">
+      <span className="text-muted">
+        三道硬门槛:
+        <span className="ml-1 font-mono text-foreground">{gates.candidates}</span> 只候选 →
+        <span className="ml-1 font-mono text-emerald-400">{gates.passed}</span> 只过关
+      </span>
+      {blocked.map(([code, n]) => (
+        <span key={code}
+              title={gates.labels?.[code]?.why ?? ''}
+              className="whitespace-nowrap rounded bg-border/40 px-1.5 py-0.5 text-muted">
+          {gates.labels?.[code]?.cn ?? code} <span className="font-mono">{n}</span>
+        </span>
+      ))}
+      {blocked.length === 0 && <span className="text-muted/70">今天没有候选被门槛挡下</span>}
+      <span className="text-muted/60"
+            title="门槛只挡明确不该看的,不挡我们没读到的 —— 数据缺失一律放行">
+        · 门槛全部是纯价格判据,可回测
+      </span>
+    </div>
   )
 }
 
@@ -273,14 +369,22 @@ function OpportunityTable({ rows, pickedSymbols, onOpen }: {
       <table className="w-full text-xs">
         <thead>
           <tr className="border-b border-border/40 text-[10px] text-muted">
-            <th className="w-12 px-3 py-1.5 text-center font-normal">把握</th>
+            <th className="w-14 px-3 py-1.5 text-center font-normal"
+                title="把握分 = 趋势强度 45% + 量能确认 30% + 位置成本 25%;下面三条细条是各维度得分">
+              把握
+            </th>
             <th className="px-2 py-1.5 text-left font-normal">名称</th>
             <th className="px-2 py-1.5 text-left font-normal">信号</th>
             <th className="hidden px-2 py-1.5 text-right font-normal md:table-cell"
-                title="现价距触发价还差几个点。负数=已越过触发价">距触发</th>
+                title="Keltner 短期通道位置。50% = 恰好站在生命线 MA20 上;甜区 50%~65%">位置</th>
             <th className="hidden px-2 py-1.5 text-right font-normal md:table-cell"
-                title="量比 ——放量突破才是真金,缩量突破多半是假的">量比</th>
-            <th className="hidden px-2 py-1.5 text-left font-normal lg:table-cell">主线</th>
+                title="量比。区间最优:峰在 1.3~2.5,超过 4 说明这波已经走完了">量比</th>
+            <th className="hidden px-2 py-1.5 text-right font-normal xl:table-cell"
+                title="现价距触发价还差几个点。负数=已越过。不参与打分,只回答「今天能不能动手」">距触发</th>
+            <th className="hidden px-2 py-1.5 text-left font-normal lg:table-cell"
+                title="主线 / AI 信号 / 历史胜率 / 通道结论 —— 全部只作佐证,一分不加一分不减">
+              注记·不计分
+            </th>
             <th className="hidden px-2 py-1.5 text-right font-normal sm:table-cell">建议仓位</th>
             <th className="w-7 px-1 py-1.5" aria-label="展开" />
           </tr>
@@ -296,7 +400,7 @@ function OpportunityTable({ rows, pickedSymbols, onOpen }: {
                     picked ? 'bg-amber-400/[0.07]' : 'hover:bg-elevated/40')}
                 >
                   <td className="px-3 py-2 text-center align-top">
-                    <ScoreCell score={o.score} rank={i + 1} total={rows.length} />
+                    <ScoreCell o={o} rank={i + 1} total={rows.length} />
                   </td>
                   <td className="px-2 py-2 align-top">
                     <button
@@ -319,7 +423,18 @@ function OpportunityTable({ rows, pickedSymbols, onOpen }: {
                   <td className="px-2 py-2 align-top text-foreground/85">
                     <div className="flex flex-wrap items-center gap-1.5">
                       <span>{o.text}</span>
-                      <VerdictTag v={o.verdict} />
+                      {o.trend_state_cn && (
+                        <span title="六态趋势状态 —— 门槛要求必须在多头侧(上涨趋势/自然回升/次级回升)"
+                              className="whitespace-nowrap rounded bg-border/40 px-1 py-0.5 text-[9px] text-muted">
+                          {o.trend_state_cn}
+                        </span>
+                      )}
+                      {o.fresh_from === 'near_breakout' && (
+                        <span title="这只是靠「逼近触发价」进来的:突破还没发生,跑道最长但也最未经确认"
+                              className="whitespace-nowrap rounded bg-sky-400/15 px-1 py-0.5 text-[9px] text-sky-300">
+                          尚未突破
+                        </span>
+                      )}
                       {o.intraday && (
                         <span title="这个信号由盘中实时价触发,收盘可能收回去 —— 只记录观察,收盘确认后再动手"
                               className="rounded bg-amber-400/15 px-1 py-0.5 text-[9px] text-amber-300">
@@ -328,9 +443,21 @@ function OpportunityTable({ rows, pickedSymbols, onOpen }: {
                       )}
                     </div>
                   </td>
-                  {/* [R123] 这两列是今天唯二决定"动不动手"的数字: 距触发回答
-                      "能不能动", 量比回答"这个突破是不是真的" */}
+                  <td className="hidden whitespace-nowrap px-2 py-2 text-right align-top md:table-cell">
+                    <PositionCell pct={o.channel_pct} />
+                  </td>
                   <td className="hidden whitespace-nowrap px-2 py-2 text-right align-top font-mono md:table-cell">
+                    {o.vol_ratio == null ? <span className="text-[10px] text-muted/50">—</span> : (
+                      <span className={o.vol_ratio >= 1.3 && o.vol_ratio <= 2.5 ? 'text-danger'
+                        : o.vol_ratio < 0.8 || o.vol_ratio > 4 ? 'text-success' : 'text-secondary'}
+                        title={o.vol_ratio >= 1.3 && o.vol_ratio <= 2.5 ? '有增量,还没到人尽皆知'
+                          : o.vol_ratio > 4 ? '量太大,这波多半已经走了一段'
+                          : o.vol_ratio < 0.8 ? '没量,突破成色存疑' : ''}>
+                        {o.vol_ratio.toFixed(2)}
+                      </span>
+                    )}
+                  </td>
+                  <td className="hidden whitespace-nowrap px-2 py-2 text-right align-top font-mono xl:table-cell">
                     {o.gap_pct == null ? <span className="text-[10px] text-muted/50">—</span> : (
                       <span className={o.gap_pct <= 0 ? 'text-danger'
                         : o.gap_pct <= 1.5 ? 'text-warning' : 'text-secondary'}
@@ -339,28 +466,8 @@ function OpportunityTable({ rows, pickedSymbols, onOpen }: {
                       </span>
                     )}
                   </td>
-                  <td className="hidden whitespace-nowrap px-2 py-2 text-right align-top font-mono md:table-cell">
-                    {o.vol_ratio == null ? <span className="text-[10px] text-muted/50">—</span> : (
-                      <span className={o.vol_ratio >= 1.5 ? 'text-danger'
-                        : o.vol_ratio < 0.8 ? 'text-success' : 'text-secondary'}
-                        title={o.vol_ratio >= 1.5 ? '放量' : o.vol_ratio < 0.8 ? '缩量,假突破风险' : ''}>
-                        {o.vol_ratio.toFixed(2)}
-                      </span>
-                    )}
-                  </td>
                   <td className="hidden px-2 py-2 align-top lg:table-cell">
-                    {o.mainline ? (
-                      <span
-                        title={
-                          `今日第 ${o.mainline.rank} 主线「${o.mainline.member}」,该概念今日 ${o.mainline.limit_up_count} 家涨停` +
-                          (o.mainline.also.length ? `;同时还属于 ${o.mainline.also.join('、')}` : '') +
-                          ' —— 板块效应是佐证不是理由:量价不扎实的票在第一主线里也不该买。没有这个标只说明它单打独斗,不扣分'
-                        }
-                        className="whitespace-nowrap rounded bg-fuchsia-400/15 px-1.5 py-0.5 text-[9px] text-fuchsia-300"
-                      >
-                        主线{o.mainline.rank}·{o.mainline.member}
-                      </span>
-                    ) : <span className="text-[10px] text-muted/50">—</span>}
+                    <NoteChips notes={o.notes} />
                   </td>
                   <td className="hidden whitespace-nowrap px-2 py-2 text-right align-top sm:table-cell">
                     {o.advice ? (
@@ -382,27 +489,98 @@ function OpportunityTable({ rows, pickedSymbols, onOpen }: {
                     </button>
                   </td>
                 </tr>
-                {expanded && (
-                  <tr className="border-b border-border/25 bg-base/40">
-                    <td colSpan={8} className="px-4 py-2.5">
-                      <div className="animate-rise-in space-y-1 text-[11px] leading-5">
-                        <div className="text-muted">{o.why}</div>
-                        {o.advice?.plan && (
-                          <div className="text-sky-300/90"
-                               title="金字塔建仓:每一步由价格确认驱动;假突破最多损失一个试仓(比例可在「门槛」面板调)">
-                            建仓路径:{o.advice.plan}
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                )}
+                {expanded && <OpportunityDetail o={o} />}
               </Fragment>
             )
           })}
         </tbody>
       </table>
     </div>
+  )
+}
+
+/** 展开行: 把三维度拆到因子这一层, 外加注记全文与建仓路径。 */
+function OpportunityDetail({ o }: { o: TodayOpportunity }) {
+  const F_CN: Record<string, string> = {
+    fresh: '新鲜度', state: '六态状态', rs: '相对强度',
+    vol_ratio: '量比', turnover: '换手率', pos: '通道位置',
+  }
+  const DIM_FACTORS: Record<string, string[]> = {
+    trend: ['fresh', 'state', 'rs'], volume: ['vol_ratio', 'turnover'], position: ['pos'],
+  }
+  return (
+    <tr className="border-b border-border/25 bg-base/40">
+      <td colSpan={9} className="px-4 py-3">
+        <div className="animate-rise-in space-y-2.5 text-[11px] leading-5">
+          <div className="grid gap-2.5 sm:grid-cols-3">
+            {DIM_META.map(d => {
+              const v = o.dims?.[d.key]
+              return (
+                <div key={d.key} className="rounded border border-border/40 bg-surface/40 px-2.5 py-2">
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-foreground/90">{d.cn}</span>
+                    <span className="font-mono text-[10px] text-muted">权重 {d.weight}</span>
+                  </div>
+                  <div className="mt-1 flex items-center gap-2">
+                    <span className="h-1 flex-1 overflow-hidden rounded-full bg-border/50">
+                      {v != null && <span className={cn('block h-full rounded-full', d.cls)}
+                                          style={{ width: `${Math.max(3, Math.min(100, v))}%` }} />}
+                    </span>
+                    <span className="w-8 text-right font-mono text-foreground">
+                      {v == null ? '无数据' : Math.round(v)}
+                    </span>
+                  </div>
+                  <div className="mt-1.5 space-y-0.5 text-[10px] text-muted">
+                    {DIM_FACTORS[d.key].map(fk => (
+                      <div key={fk} className="flex justify-between">
+                        <span>{F_CN[fk]}</span>
+                        <span className="font-mono">
+                          {o.factors?.[fk as keyof NonNullable<typeof o.factors>] == null
+                            ? '—' : Math.round(o.factors[fk as keyof NonNullable<typeof o.factors>]!)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-1 text-[9px] text-muted/70">{d.hint}</div>
+                </div>
+              )
+            })}
+          </div>
+
+          {o.partial && (
+            <div className="rounded border border-warning/30 bg-warning/10 px-2.5 py-1.5 text-warning">
+              有维度整档缺数据,总分是在剩下的维度上算的 —— 这种候选的分**偏乐观**,
+              与同分候选比较时优先选数据齐全的那只。
+            </div>
+          )}
+
+          {!!o.why && <div className="text-muted">{o.why}</div>}
+
+          {!!o.notes?.length && (
+            <div className="space-y-1">
+              <div className="text-[10px] text-muted/70">
+                以下都是**佐证**,一分不加一分不减 —— 它们要么不可回测(主线口径随情绪周期漂移)、
+                要么样本太小(单票历史突破常不足 10 次)、要么是模型对自己输出的自评(AI 置信度)。
+              </div>
+              {o.notes.map(n => (
+                <div key={n.key} className="flex gap-2">
+                  <span className={cn('shrink-0 rounded px-1.5 py-0.5 text-[9px]',
+                    NOTE_TONE[n.tone] ?? NOTE_TONE.info)}>{n.label}</span>
+                  <span className="text-muted">{n.text}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {o.advice?.plan && (
+            <div className="text-sky-300/90"
+                 title="金字塔建仓:每一步由价格确认驱动;假突破最多损失一个试仓(比例可在「门槛」面板调)">
+              建仓路径:{o.advice.plan}
+            </div>
+          )}
+        </div>
+      </td>
+    </tr>
   )
 }
 
@@ -923,6 +1101,19 @@ export function Today() {
                   </span>
                 </span>
               )}
+              {/* [R134] 中观再补一层: 用**新评分口径**读出来的市场结构。
+                  成交额/涨跌家数说的是"钱在往哪儿聚", 这一句说的是"这个市场里
+                  有多少票真的具备出手的结构" —— 候选一堆但过门槛的没几只,
+                  说明信号在遍地开花而趋势结构没跟上, 那种日子最容易追在半山腰。*/}
+              {d.gates && d.gates.candidates > 0 && (
+                <span title={`三道硬门槛: ${Object.values(d.gates.labels ?? {}).map(l => l.cn).join(' / ')}`}
+                      className="font-mono text-muted">
+                  出手结构{' '}
+                  <span className="font-semibold text-emerald-400">{d.gates.passed}</span>
+                  <span className="text-muted/60">/{d.gates.candidates}</span>
+                  <span className="ml-1 font-sans text-muted/70">只候选过门槛</span>
+                </span>
+              )}
             </div>
           )}
 
@@ -941,7 +1132,10 @@ export function Today() {
                 {d.live ? '实时口径' : `昨收快照 ${d.as_of ?? ''}`}
               </span>
               <span className="text-[10px] text-muted">
-                {d.opportunities.length} 项 · 把握分 ≥ {d.prefs.min_score} 才显示
+                {d.opportunities.length} 项 ·{' '}
+                <span title="把握分 v2 = 趋势强度 45% + 量能确认 30% + 位置成本 25%,先过三道硬门槛才打分。三条曲线都是区间最优(量比峰在 1.3~2.5、通道位置甜区 50%~65%),不是越大越好 —— 要的是有苗头,不是已经涨完的">
+                  把握分 ≥ {d.prefs.min_score} 才显示
+                </span>
                 {d.opportunities_filtered > 0 && `(已滤掉 ${d.opportunities_filtered} 只)`}
                 {boardFilter.length > 0 && (
                   <span
@@ -1210,6 +1404,7 @@ export function Today() {
                 onOpen={goStock}
               />
             )}
+            <GateFunnel gates={d.gates} />
             {d.opportunities.length === 0 ? (
               <div className="px-4 py-5 text-xs text-muted">
                 今日没有把握足够的买入机会 —— 等待比出手更常见

@@ -27,29 +27,70 @@ _LOOKBACK_DAYS = 260
 _MAX_SYMBOLS = 300
 
 
-def _ma120_map(repo, symbols: list[str]) -> dict[str, float]:
-    """批量算 MA120。长期档是唯一没有预计算列的一档, 只能自己滚。
+# [R134] MA120 斜率的回看跨度(交易日)。20 日 ≈ 一个月 —— 比它短会被单周波动
+# 带得忽上忽下, 比它长则高位刚拐头的票要好几周才认出来。
+_SLOPE_LOOKBACK = 20
 
-    不足 120 根的标的直接不给值 —— 拿 60 根算出来的"120 日均线"是个假数,
-    宁可这一档留空。
+
+def long_trend_map(repo, symbols: list[str]) -> dict[str, dict]:
+    """[R134] 一次批量日 K 同时算出**生命线**与**长期趋势**, 供买入门槛使用。
+
+    这两件事原本要各读一次盘: 生命线要 MA20 与前一日收盘, 长期趋势要 MA120
+    及其斜率。但它们的原料是同一串收盘价 —— MA20 = 最近 20 根的均值,
+    MA120 = 最近 120 根的均值, 斜率 = 与 20 根之前那个 MA120 比。所以合并到
+    本来就存在的这一次 260 日批量读里, **不新增任何 IO**。
+
+    返回 {SYMBOL: {close, close_prev, ma20, ma20_prev, above_ma20, above_ma20_prev,
+                   ma120, ma120_prev, ma120_rising}}。
+    算不出来的项缺席而不是给 0 —— 门槛那侧对"缺数据"的处理是放行, 给个假的 0
+    会让它变成误杀。
     """
     end = date.today()
     try:
         df = repo.get_daily_batch(symbols, end - timedelta(days=_LOOKBACK_DAYS), end,
                                   ["symbol", "date", "close"])
     except Exception as e:  # noqa: BLE001
-        logger.debug("keltner ma120 batch failed: %s", e)
+        logger.debug("keltner long trend batch failed: %s", e)
         return {}
     if df is None or df.is_empty() or not {"symbol", "date", "close"} <= set(df.columns):
         return {}
-    out: dict[str, float] = {}
+    out: dict[str, dict] = {}
     for sym, sub in df.drop_nulls("close").sort("date").group_by("symbol"):
         name = str(sym[0] if isinstance(sym, tuple) else sym).upper()
-        closes = sub["close"].tail(120)
-        if len(closes) < 120:
-            continue
-        out[name] = float(closes.mean())
+        closes = sub["close"].to_list()
+        ent: dict = {}
+        if closes:
+            ent["close"] = float(closes[-1])
+        if len(closes) >= 2:
+            ent["close_prev"] = float(closes[-2])
+        if len(closes) >= 20:
+            ent["ma20"] = float(sum(closes[-20:]) / 20)
+            ent["above_ma20"] = ent["close"] >= ent["ma20"]
+        # 前一日的生命线要用**前一日的** MA20, 不是今天的 —— 拿今天的均线去比
+        # 昨天的收盘, 得到的是个半新半旧的判定
+        if len(closes) >= 21:
+            ent["ma20_prev"] = float(sum(closes[-21:-1]) / 20)
+            ent["above_ma20_prev"] = ent["close_prev"] >= ent["ma20_prev"]
+        # 不足 120 根的直接不给值 —— 拿 60 根算出来的"120 日均线"是个假数
+        if len(closes) >= 120:
+            ent["ma120"] = float(sum(closes[-120:]) / 120)
+        if len(closes) >= 120 + _SLOPE_LOOKBACK:
+            prev = float(sum(closes[-120 - _SLOPE_LOOKBACK:-_SLOPE_LOOKBACK]) / 120)
+            ent["ma120_prev"] = prev
+            ent["ma120_rising"] = ent["ma120"] >= prev
+        if ent:
+            out[name] = ent
     return out
+
+
+def _ma120_map(repo, symbols: list[str]) -> dict[str, float]:
+    """批量算 MA120。长期档是唯一没有预计算列的一档, 只能自己滚。
+
+    [R134] 现在是 long_trend_map 的一个投影 —— 同一串收盘价既要算通道的
+    长期档, 又要算买入门槛的长期趋势, 读两次盘没道理。
+    """
+    return {k: v["ma120"] for k, v in long_trend_map(repo, symbols).items()
+            if v.get("ma120") is not None}
 
 
 def channels_for_symbols(repo, symbols: list[str]) -> dict[str, dict]:

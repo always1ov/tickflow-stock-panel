@@ -11,11 +11,17 @@
  *   2. 分层单调性 —— 最关键的一张。高分档不比低分档好, 这套分数就没有信息量,
  *      再漂亮的头部胜率也可能只是运气。
  *   3. 按名次 —— 直接回答"最多显示几条"该设成几。
- *   4. 因子归因 —— 加分组不明显强于扣分组的因子, 就是在白占权重。
+ *   4. 维度归因 —— [R134] 高分组不明显强于低分组的维度, 就是在白占权重。
+ *      (v1 时这里分的是"吃到加分/吃到扣分"; v2 的维度分是 0~100 的连续量,
+ *       没有正负, 所以改成按分数高低切。要回答的问题没变。)
  *
  * 两个导出口都指向同一件事: 把原料交出去做调参。
  *   · 「复制体检摘要」 服务端拼好的 Markdown, 粘到对话里就能直接分析(小)
- *   · 「导出明细 CSV」 一行一候选, 因子增量各占一列, 可离线重算任意权重组合(大)
+ *   · 「导出明细 CSV」 一行一候选, 三维度分与各因子子分各占一列(大)
+ *
+ * [R134] 换打分口径之后, 老口径的记录**不进任何一张表** —— 两套分数刻度不同,
+ * 混在一起算胜率没有意义。它们仍在 CSV 里(scoring_version 列区分), 面板上
+ * 单独报一行数量, 免得用户以为"攒了一个月怎么样本还这么少"。
  */
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
@@ -187,9 +193,9 @@ export function ScoreLedgerDialog({ onClose }: { onClose: () => void }) {
             {/* ④ 因子归因 */}
             <section>
               <h3 className="mb-1 text-[11px] font-medium text-foreground">
-                因子归因
+                维度归因
                 <span className="ml-1.5 font-normal text-muted">
-                  T+5;加分组不明显强于扣分组 = 这个因子在白占权重
+                  T+5;高分组不明显强于低分组 = 这一维在白占权重
                 </span>
               </h3>
               <div className="overflow-x-auto">
@@ -197,9 +203,11 @@ export function ScoreLedgerDialog({ onClose }: { onClose: () => void }) {
                   <thead>
                     <tr className="border-b border-border/60 text-[10px] text-muted">
                       <th className="px-2 py-1 text-left font-normal">因子</th>
-                      <th className="px-2 py-1 text-center font-normal">加分组</th>
-                      <th className="px-2 py-1 text-center font-normal">扣分组</th>
-                      <th className="px-2 py-1 text-center font-normal">未触发</th>
+                      <th className="px-2 py-1 text-center font-normal" title="这一维 ≥70 分">高分组</th>
+                      <th className="px-2 py-1 text-center font-normal" title="40~70 分">中间</th>
+                      <th className="px-2 py-1 text-center font-normal" title="<40 分">低分组</th>
+                      <th className="px-2 py-1 text-center font-normal"
+                          title="这一维整档没数据。缺席比例高说明它的权重其实被重归一化悄悄分给别人了">缺席</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -207,13 +215,14 @@ export function ScoreLedgerDialog({ onClose }: { onClose: () => void }) {
                       <tr key={f.key} className="border-b border-border/25">
                         <td className="whitespace-nowrap px-2 py-1">{f.label}</td>
                         <Cell s={f.plus.stats?.t5} />
+                        <Cell s={f.mid?.stats?.t5} />
                         <Cell s={f.minus.stats?.t5} />
                         <Cell s={f.none.stats?.t5} />
                       </tr>
                     ))}
                     {d.factors.length === 0 && (
-                      <tr><td colSpan={4} className="px-2 py-3 text-center text-muted">
-                        还没有任何因子被触发过
+                      <tr><td colSpan={5} className="px-2 py-3 text-center text-muted">
+                        还没有任何维度有样本
                       </td></tr>
                     )}
                   </tbody>
@@ -221,8 +230,16 @@ export function ScoreLedgerDialog({ onClose }: { onClose: () => void }) {
               </div>
             </section>
 
+            {!!d.legacy_days && (
+              <p className="rounded border border-warning/30 bg-warning/10 px-2.5 py-1.5 text-[10px] text-warning">
+                另有 {d.legacy_days} 天是**换打分口径之前**记的,未计入上面任何一张表 ——
+                两套分数刻度不同,混在一起算胜率没有意义。它们仍在导出的 CSV 里
+                (scoring_version 列区分)。
+              </p>
+            )}
             <p className="text-[10px] text-muted/80">
               口径: {d.caveat}
+              {d.scoring_version ? ` · 打分口径 v${d.scoring_version}` : ''}
               {d.pending_symbols > 0 && ` · 还有 ${d.pending_symbols} 只标的的收益没补完, 下次打开继续补`}
             </p>
           </>

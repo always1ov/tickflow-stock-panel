@@ -172,6 +172,53 @@ export interface TodayOpportunity {
   vol_ratio?: number | null
   /** [R123] 现价距触发价还差几个点; 负数 = 已越过。回答"今天能不能动手" */
   gap_pct?: number | null
+
+  // ===== [R134] 评分 v2: 三道硬门槛 + 三维度加权 =====
+  /** 三个维度分(0~100); 数据整档缺失时为 null */
+  dims?: { trend: number | null; volume: number | null; position: number | null }
+  /** 每个因子的子分(0~100) —— 维度分说明"量能不行", 子分说明是量比还是换手 */
+  factors?: Record<'fresh' | 'state' | 'rs' | 'vol_ratio' | 'turnover' | 'pos', number | null>
+  /** 各维度实际覆盖到的因子权重占比 */
+  coverage?: { trend: number; volume: number; position: number }
+  /** 有维度整档缺席 → 总分是在剩下的维度上算的, 偏乐观, 界面必须说清楚 */
+  partial?: boolean
+  /** 新鲜度来自哪一路: 六态信号 / 逼近触发价 / 都没有 */
+  fresh_from?: 'signal' | 'near_breakout' | 'none'
+  /** 命中的候选来源(可同时命中两路) */
+  kinds?: string[]
+  /** 信号第几天 */
+  duration?: number | null
+  /** 六态状态与中文名 */
+  trend_state?: string | null
+  trend_state_cn?: string | null
+  /** Keltner 短期通道位置 0~1(0.5 = 恰好站在生命线 MA20 上) */
+  channel_pct?: number | null
+  /** 换手率 % */
+  turnover?: number | null
+  /** 近 20 日相对大盘(百分点) */
+  rs_pct?: number | null
+  close?: number | null
+  /** 不参与打分的佐证: 主线/AI/历史胜率/通道结论/龙虎榜 */
+  notes?: TodayNote[]
+}
+
+/** [R134] 注记 —— 展示用的佐证, **一分不加一分不减**。tone 决定界面配色。 */
+export interface TodayNote {
+  key: 'ai' | 'mainline' | 'win' | 'verdict' | 'dragon' | string
+  tone: 'good' | 'bad' | 'info'
+  label: string
+  text: string
+}
+
+/** [R134] 门槛漏斗 —— "今天 N 只候选被挡掉 M 只"本身就是市场状态的读数 */
+export interface TodayGates {
+  candidates: number
+  passed: number
+  blocked_total: number
+  /** {门槛代码: 被这条挡了几只}; 各项之和会大于 blocked_total(一只可踩多条) */
+  blocked: Record<string, number>
+  labels: Record<string, { cn: string; why: string }>
+  text: string
 }
 
 /**
@@ -250,15 +297,20 @@ export interface ScoreLedger {
   total_rows: number
   evaluated_rows: number
   pending_symbols: number
+  /** [R134] 当前打分口径版本; 换口径前的记录不进统计 */
+  scoring_version?: number
+  legacy_days?: number
   first_day: string | null
   last_day: string | null
   all: LedgerStats
   shown: LedgerStats
   buckets: { label: string; lo: number; hi: number; count: number; stats: LedgerStats }[]
   ranks: { label: string; cut: number; count: number; stats: LedgerStats }[]
+  /** [R134] 维度归因: 高分组 / 中间 / 低分组 / 缺席 */
   factors: {
     key: string; label: string
     plus: { count: number; stats: LedgerStats }
+    mid?: { count: number; stats: LedgerStats }
     minus: { count: number; stats: LedgerStats }
     none: { count: number; stats: LedgerStats }
   }[]
@@ -314,6 +366,8 @@ export interface TodayOverview {
   actions: TodayActionItem[]
   opportunities: TodayOpportunity[]
   opportunities_filtered: number
+  /** [R134] 三道硬门槛的漏斗统计 */
+  gates?: TodayGates | null
   prefs: TodayPrefs
   position_hint?: { posture_cap: number; max_single: number; target_vol: number }
   ai?: TodayAiCache | null

@@ -50,8 +50,18 @@ MAX_FILL_SYMBOLS = 300
 SCORE_BINS = ((0, 60), (60, 70), (70, 80), (80, 90), (90, 101))
 # 排名段: 回答"只看前几名合适"
 RANK_CUTS = (1, 3, 5, 10, 15, 20)
-# 因子中文名 —— 归因表直接用, 别让用户对着 key 猜
+# [R134] 打分口径版本。v1 = 底分+八项加减(夹到 100), v2 = 三门槛+三维度加权。
+# **不同版本的记录绝不能混进同一个胜率里** —— 那是拿两套不同的分数当同一把尺子,
+# 算出来的分层单调性没有任何意义。统计默认只取当前版本, 老记录留着但单独归档。
+SCORING_VERSION = 2
+# 归因维度中文名(v2)。v1 的那八项加减保留在下面, 老记录还要按它解读。
 FACTOR_LABELS = {
+    "trend": "趋势强度(新鲜度/六态/相对强度)",
+    "volume": "量能确认(量比/换手)",
+    "position": "位置成本(通道位置)",
+}
+# v1 的加减项 —— 只用于解读 SCORING_VERSION < 2 的历史记录与导出列
+LEGACY_FACTOR_LABELS = {
     "fresh": "信号新鲜度",
     "ai": "AI 信号同向/反向",
     "rs": "相对强度(对大盘)",
@@ -60,8 +70,6 @@ FACTOR_LABELS = {
     "mainline": "主线归属",
     "verdict": "Keltner 通道结论",
     "near": "紧贴触发价",
-    # 不是"因子", 是把握分被夹到 100 削掉的那部分。单列出来是因为它本身就是个
-    # 结论: 顶格的那批票在榜上彼此没有区分度, 它们的表现值不值这个第一名要看数据
     "clamp": "顶格削减(理论分 >100)",
 }
 CAVEAT = ("收盘价对收盘价, 未计滑点与开盘价差, 数字天然偏乐观; "
@@ -102,9 +110,20 @@ def _write(days: list[dict]) -> None:
 
 
 def _row(o: dict, rank: int, shown: bool) -> dict:
-    """一条候选 → 台账行。只留调参用得上的字段, 别把整份总览抄进来。"""
-    f = {k: v for k, v in (o.get("factors") or {}).items() if v}
-    ctx = o.get("ctx") or {}
+    """一条候选 → 台账行。只留调参用得上的字段, 别把整份总览抄进来。
+
+    [R134] ``f`` 存的是**三个维度分**(v2)而不是一串加减项(v1)。归因表因此从
+    "加分组 vs 扣分组"变成"这一维高分组 vs 低分组" —— 维度分是 0~100 的连续量,
+    没有正负之分, 硬套 v1 的三分法会把整批记录都归进"加分组", 归因表就废了。
+    """
+    f = {k: v for k, v in (o.get("dims") or o.get("factors") or {}).items()
+         if v is not None}
+    ctx = dict(o.get("ctx") or {})
+    # 每个因子的子分也留下 —— 维度分能说明"量能这一档不行", 子分才能说明
+    # "是量比不行还是换手不行"
+    for k, v in (o.get("factors") or {}).items():
+        if v is not None and k not in f:
+            ctx.setdefault(f"sub_{k}", v)
     close = o.get("close")
     return {
         "symbol": o.get("symbol"),
@@ -153,6 +172,8 @@ def record_day(as_of: str | None, ranked: list[dict], shown_symbols: set[str],
             days.append({
                 "as_of": day,
                 "finalized": bool(finalized),
+                # 打分口径版本 —— 换了口径的记录不能和老记录混进同一个胜率里
+                "scoring_version": SCORING_VERSION,
                 "rows": rows,
                 "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             })
@@ -286,14 +307,30 @@ def _agg_rows(rows: list[dict]) -> dict:
             for h in HORIZONS}
 
 
-def _flat(days: list[dict]) -> list[dict]:
-    """定稿日的所有行摊平, 带上 as_of。"""
+def _version_of(day: dict) -> int:
+    """老记录没有这个字段, 它们都是 v1。"""
+    try:
+        return int(day.get("scoring_version") or 1)
+    except (TypeError, ValueError):
+        return 1
+
+
+def _flat(days: list[dict], version: int | None = SCORING_VERSION) -> list[dict]:
+    """定稿日的所有行摊平, 带上 as_of。
+
+    [R134] 默认**只取当前打分口径**的记录。把 v1 和 v2 的分数混进同一个胜率里,
+    等于拿两把不同刻度的尺子量同一段路 —— 算出来的分层单调性没有任何意义。
+    version=None 时不过滤(导出用: 老记录也要能拿出去看)。
+    """
     out = []
     for d in days:
         if not d.get("finalized"):
             continue
+        if version is not None and _version_of(d) != version:
+            continue
         for row in d.get("rows") or []:
-            out.append({**row, "as_of": str(d.get("as_of"))})
+            out.append({**row, "as_of": str(d.get("as_of")),
+                        "scoring_version": _version_of(d)})
     return out
 
 
@@ -315,22 +352,36 @@ def _by_rank(rows: list[dict]) -> list[dict]:
     return out
 
 
-def _by_factor(rows: list[dict]) -> list[dict]:
-    """每个因子: 吃到加分的 / 吃到扣分的 / 没触发的, 三组分别的表现。
+# 维度分的高/低分界。取 70/40 是因为曲线峰值区都在 90 以上、谷底在 20 以下,
+# 70 以上基本等于"这一维在甜区", 40 以下等于"这一维明确不合格"。
+DIM_HIGH, DIM_LOW = 70.0, 40.0
 
-    加分组不明显强于扣分组 —— 那个因子就是在白占权重。这是调参最直接的入口。
+
+def _by_factor(rows: list[dict]) -> list[dict]:
+    """每个维度: 高分组 / 低分组 / 缺席, 三组分别的表现。
+
+    [R134] v1 时这里分的是"吃到加分 / 吃到扣分"; v2 的维度分是 0~100 的连续量,
+    没有正负, 所以改成按分数高低切。要回答的问题没变: **高分组不明显强于低分组,
+    这一维就是在白占权重**。这是调参最直接的入口 —— 比如量能维度两组胜率一样,
+    就该把 30% 的权重挪给趋势或位置。
+
+    "缺席"那一列同样要看: 它是数据覆盖率的体检 —— 缺席比例高的维度,
+    它的权重其实有一大半在被重归一化悄悄分给别人。
     """
     out = []
     for key, label in FACTOR_LABELS.items():
-        plus = [r for r in rows if (r.get("f") or {}).get(key, 0) > 0]
-        minus = [r for r in rows if (r.get("f") or {}).get(key, 0) < 0]
-        none = [r for r in rows if not (r.get("f") or {}).get(key)]
-        if not plus and not minus:
+        vals = [(r, (r.get("f") or {}).get(key)) for r in rows]
+        high = [r for r, v in vals if v is not None and v >= DIM_HIGH]
+        low = [r for r, v in vals if v is not None and v < DIM_LOW]
+        mid = [r for r, v in vals if v is not None and DIM_LOW <= v < DIM_HIGH]
+        none = [r for r, v in vals if v is None]
+        if not high and not low and not mid:
             continue
         out.append({
             "key": key, "label": label,
-            "plus": {"count": len(plus), "stats": _agg_rows(plus)},
-            "minus": {"count": len(minus), "stats": _agg_rows(minus)},
+            "plus": {"count": len(high), "stats": _agg_rows(high)},
+            "mid": {"count": len(mid), "stats": _agg_rows(mid)},
+            "minus": {"count": len(low), "stats": _agg_rows(low)},
             "none": {"count": len(none), "stats": _agg_rows(none)},
         })
     return out
@@ -371,11 +422,14 @@ def evaluate(repo, days_limit: int = MAX_DAYS) -> dict:
         logger.warning("score ledger evaluate/fill failed: %s", e)
     days = all_days[-days_limit:]
 
-    rows = _flat(days)
+    rows = _flat(days)                          # 只含当前打分口径
     scored = [r for r in rows if r.get("r")]
     shown = [r for r in rows if r.get("shown")]
     buckets = _by_bucket(rows)
-    day_dates = sorted({str(d.get("as_of")) for d in days if d.get("finalized")})
+    day_dates = sorted({str(d.get("as_of")) for d in days
+                        if d.get("finalized") and _version_of(d) == SCORING_VERSION})
+    legacy_days = sorted({str(d.get("as_of")) for d in days
+                          if d.get("finalized") and _version_of(d) != SCORING_VERSION})
     try:
         baseline = _bench_baseline(repo, day_dates)
     except Exception as e:  # noqa: BLE001
@@ -387,6 +441,10 @@ def evaluate(repo, days_limit: int = MAX_DAYS) -> dict:
         "total_rows": len(rows),
         "evaluated_rows": len(scored),
         "pending_symbols": pending,
+        "scoring_version": SCORING_VERSION,
+        # 换口径之前的记录: 不进统计(两把尺子不能混), 但要如实报出来,
+        # 否则用户会以为"攒了一个月怎么样本还是这么少"
+        "legacy_days": len(legacy_days),
         "first_day": day_dates[0] if day_dates else None,
         "last_day": day_dates[-1] if day_dates else None,
         "all": _agg_rows(rows),
@@ -470,32 +528,48 @@ def build_summary_md(res: dict, ai_stats: dict | None = None) -> str:
                  f"| {_cell(st.get('t3'))} | {_cell(st.get('t5'))} |")
     L.append("")
 
-    L.append("## 因子归因(T+5;加分组不明显强于扣分组 = 这个因子在白占权重)")
+    L.append(f"## 维度归因(T+5;高分组 ≥{DIM_HIGH:.0f} 分,低分组 <{DIM_LOW:.0f} 分)")
     L.append("")
-    L.append("| 因子 | 加分组 | 扣分组 | 未触发 |")
-    L.append("|---|---|---|---|")
+    L.append("> 高分组不明显强于低分组 = 这一维在白占权重,该把它的权重挪给别的维度。"
+             "「缺席」比例高说明数据覆盖不足,那部分权重其实被重归一化悄悄分掉了。")
+    L.append("")
+    L.append("| 维度 | 高分组 | 中间 | 低分组 | 缺席 |")
+    L.append("|---|---|---|---|---|")
     for f in res.get("factors") or []:
         def c(side: str) -> str:
             g = f.get(side) or {}
             return f"{_cell((g.get('stats') or {}).get('t5'))}"
-        L.append(f"| {f['label']} | {c('plus')} | {c('minus')} | {c('none')} |")
+        L.append(f"| {f['label']} | {c('plus')} | {c('mid')} | {c('minus')} | {c('none')} |")
+    L.append("")
+    L.append(f"当前打分口径 v{res.get('scoring_version')}(三道硬门槛 + 三维度加权)。")
+    if res.get("legacy_days"):
+        L.append(f"另有 {res['legacy_days']} 天是换口径之前记的,**未计入上面任何一张表** ——"
+                 "两套分数刻度不同,混在一起算胜率没有意义。")
     L.append("")
     L.append("需要更细的可以要明细 CSV(同一面板里「导出明细 CSV」按钮),"
-             "一行一候选, 因子增量各占一列, 可离线重算任意权重组合。")
+             "一行一候选,三个维度分与每个因子的子分各占一列,可离线重算任意权重组合。")
     return "\n".join(L)
 
 
 # --------------------------------------------------------------- 导出
 
 
+# 每个因子的子分(0~100), 与 opportunity_score.FACTOR_CN 的键一一对应。
+# 维度分说明"量能这一档不行", 子分才说明"是量比不行还是换手不行"。
+SUB_FACTOR_KEYS = ("fresh", "state", "rs", "vol_ratio", "turnover", "pos")
+
 CSV_HEADER = [
-    "as_of", "symbol", "name", "score", "rank", "shown", "kind", "board", "close",
-    # f_base 单列: 底分(转多70/回升55/逼近62)不是"因子"(不进归因表), 但离线重算
-    # 权重时它是起点, 少了这一列就复原不出总分
-    "f_base",
-    *[f"f_{k}" for k in FACTOR_LABELS],
-    "ctx_dur", "ctx_signal", "ctx_vol_ratio", "ctx_rs", "ctx_win_rate", "ctx_win_n",
-    "ctx_mainline_rank", "ctx_verdict", "ctx_gap_pct", "ctx_intraday",
+    "as_of", "scoring_version", "symbol", "name", "score", "rank", "shown",
+    "kind", "board", "close",
+    # 三个维度分 —— 离线重算权重的起点
+    *[f"dim_{k}" for k in FACTOR_LABELS],
+    *[f"sub_{k}" for k in SUB_FACTOR_KEYS],
+    "ctx_dur", "ctx_state", "ctx_vol_ratio", "ctx_turnover", "ctx_channel_pct",
+    "ctx_rs", "ctx_gap_pct", "ctx_partial", "ctx_fresh_from", "ctx_kinds",
+    "ctx_intraday",
+    # v1 老记录才有的加减项, 一并带出去(v2 的行全是空) —— 换口径不该让历史消失
+    *[f"legacy_{k}" for k in LEGACY_FACTOR_LABELS],
+    "legacy_win_rate", "legacy_win_n", "legacy_mainline_rank", "legacy_verdict",
     *[f"ret_t{h}" for h in HORIZONS],
 ]
 
@@ -523,18 +597,23 @@ def export_csv(repo) -> str:
     w = csv.writer(buf)
     w.writerow(CSV_HEADER)
     for d in days:
-        day, fin = str(d.get("as_of")), d.get("finalized")
+        day, fin, ver = str(d.get("as_of")), d.get("finalized"), _version_of(d)
         for row in d.get("rows") or []:
             f, ctx, r = row.get("f") or {}, row.get("ctx") or {}, row.get("r") or {}
             w.writerow([
-                day, row.get("symbol"), row.get("name"), row.get("score"),
+                day, ver, row.get("symbol"), row.get("name"), row.get("score"),
                 row.get("rank"), int(bool(row.get("shown"))), row.get("kind"),
                 row.get("board"), row.get("close"),
-                f.get("base", 0), *[f.get(k, 0) for k in FACTOR_LABELS],
-                ctx.get("dur"), ctx.get("signal"), ctx.get("vol_ratio"), ctx.get("rs"),
-                ctx.get("win_rate"), ctx.get("win_n"), ctx.get("mainline_rank"),
-                ctx.get("verdict"), ctx.get("gap_pct"),
+                *[f.get(k) for k in FACTOR_LABELS],
+                *[ctx.get(f"sub_{k}") for k in SUB_FACTOR_KEYS],
+                ctx.get("dur"), ctx.get("state"), ctx.get("vol_ratio"),
+                ctx.get("turnover"), ctx.get("channel_pct"), ctx.get("rs"),
+                ctx.get("gap_pct"), int(bool(ctx.get("partial"))),
+                ctx.get("fresh_from"), ctx.get("kinds"),
                 int(bool(ctx.get("intraday"))) if not fin else 0,
+                *[f.get(k) for k in LEGACY_FACTOR_LABELS],
+                ctx.get("win_rate"), ctx.get("win_n"), ctx.get("mainline_rank"),
+                ctx.get("verdict"),
                 *[r.get(f"t{h}") for h in HORIZONS],
             ])
     return buf.getvalue()

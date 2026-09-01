@@ -28,10 +28,10 @@ _NEAR_EXIT_PCT = -0.03
 # 机会区: 现价距上方突破预案价 2% 以内
 _NEAR_BREAKOUT_PCT = 0.02
 # 机会区筛选: 把握分低于此值不显示; 最多显示条数
+# [R134] 上限 10 → 15: v2 的分数不再饱和(v1 榜首一片并列 100), 名次真的分得开了,
+# 多看 5 条才有意义; 用户也明确要"只显示前 15 个"。
 _OPP_MIN_SCORE = 60
-_OPP_MAX_SHOW = 10
-# 信号新鲜度加减分: 刚出现窗口最佳, 拖到第 4-5 天已错过入场时机
-_FRESH_BONUS = {1: 15, 2: 10, 3: 0, 4: -12, 5: -22}
+_OPP_MAX_SHOW = 15
 # [R12] 姿态 → 总仓位基调(占总资金比例上限, 展示用基调而非强制)
 POSTURE_CAPS = {"进攻": 0.8, "谨慎": 0.5, "防守": 0.2, "观察": 0.3}
 # 把握分 → 单票仓位系数(相对单票上限; 取自 AI-TIS PRD 6.4 的映射思路)
@@ -71,137 +71,69 @@ def score_opportunities(
     trends: dict[str, dict], signals: dict[str, dict], names: dict[str, str],
     bench_ret: float | None = None,
     extras: dict[str, dict] | None = None,
-) -> list[dict]:
-    """给买入机会打"把握分", 返回**完整**排序列表(不做门槛/条数/板块过滤)。
+) -> tuple[list[dict], dict]:
+    """[R134] 买入机会评分 v2。返回 (完整排序列表, 门槛体检)。
 
-    [R133] 从 rank_opportunities 里拆出来的一半。拆的理由是台账:
-    要判断这套评分有没有区分度, 必须看到被门槛滤掉的那些票后来涨没涨 ——
-    只记显示出来的那 10 条, 等于只用样本里最好的一段去证明样本好。
+    门槛体检 = {"candidates": 进门槛前有几只, "passed": 过了几只,
+                "blocked_total": 被挡几只, "blocked": {门槛代码: 被这条挡了几只}}。
+    ``blocked`` 各项之和会大于 ``blocked_total`` —— 一只票可以同时踩中好几条。
 
-    每条候选除了 score 还带两样给台账用的东西(前端不用, 也不影响任何既有逻辑):
-      · ``factors``  这一分一分是谁给的(新鲜度 +15 / 通道 -12 …), 用于因子归因
-      · ``ctx``      打分时的原始输入(第几天/量比/相对强度/胜率/主线名次…),
-                     导出后可以离线重算任意权重组合, 不必改代码再等三个月
+    打分口径整体搬到 ``services.opportunity_score``(三道硬门槛 + 三维度加权),
+    这里只负责三件事: **收候选、喂数据、挂注记**。这样做的理由是打分必须能
+    脱离 HTTP 层单测与回测 —— v1 的加减分散在这个函数里, 想验证一条曲线就得
+    先造一整份总览。
 
-    纯函数, 无 IO —— 打分口径:
-      · 趋势刚转强底分最高, 按信号出现第几天加减(第 1-2 天最佳, 第 4 天起判定
-        为已过入场窗口而扣分), 这样"陈年老信号"不会因置信度高就一直占着榜首;
-      · AI 信号同向加分、反向重扣(自相矛盾的机会宁可不看);
-      · [R13] 相对强度: 传入大盘 20 日收益(bench_ret)时, 跑赢大盘加分、
-        跑输扣分 —— 跑输大盘的"突破"多半是补涨陷阱;
-      · [R20] 量能质量(extras[sym]["vol_ratio"]): 放量突破加分,
-        缩量突破重扣 —— 没有量的突破多半是假突破;
-      · [R20] 该票自身历史胜率(extras[sym]["win"] = {rate, n}): 同一套
-        六态在这只票上历史转强后 5 日为正的比例 —— 胜率高的票信号更可信,
-        胜率差的票即使这次形态漂亮也要压分;
-      · [R37] 主线归属(extras[sym]["mainline"]): 三层推导里缺的中间层 ——
-        同样是转强, 站在今天最强那条主线上的和单打独斗的不是一回事。
-        **只加分不减分**: 主线由涨停梯队推出, 只覆盖市场最躁动的一小撮,
-        扣"不在主线内"的分等于系统性偏向妖股;
-      · 逼近买入触发价的按距离与置信度打分, 一到价就能行动的最优先。
+    候选两路(与 v1 相同, 换的是打分不是选材):
+      · 六态发出 转多/回升 信号
+      · AI 看多且现价距上方触发价 2% 以内(逼近突破)
+
+    **注记不参与打分**(extras 里的 win/mainline/verdict 与 AI 信号):
+    它们照常挂在候选上给界面显示, 但一分不加一分不减。这是与 v1 最大的分野 ——
+    用户要的是"评分系统专职做好自己的工作", 而这几项要么不可回测(主线口径随
+    情绪周期漂移)、要么样本太小(单票历史突破常不足 10 次)、要么是模型对自己
+    输出的自评(AI 置信度), 拿它们去动名次等于把噪声写进排序。
+
+    extras[sym] 认得的键:
+      vol_ratio / turnover  量能维度的两个因子
+      channel_pct           Keltner 短期通道位置(位置维度)
+      gate                  keltner_service.long_trend_map 的一行(生命线 + 长期趋势)
+      win / mainline / verdict / dragon  纯注记
     """
-    opp_by_sym: dict[str, dict] = {}
+    from app.services import opportunity_score as osc
 
-    def add(sym: str, kind: str, score: int, text: str, why: list[str],
-            pivot: float | None = None,
-            factors: dict | None = None, ctx: dict | None = None) -> None:
-        cur = opp_by_sym.get(sym)
-        if cur is None:
-            opp_by_sym[sym] = {
-                "kind": kind, "symbol": sym, "name": names.get(sym, sym),
-                "score": score, "why": why, "text": text, "pivot": pivot,
-                "factors": dict(factors or {}), "ctx": dict(ctx or {}),
-            }
-            return
-        if score > cur["score"]:  # 同票命中多个来源: 取更高分的表述, 理由合并
-            cur["score"], cur["kind"], cur["text"], cur["pivot"] = score, kind, text, pivot
-            # 因子拆解跟着"赢的那一路"走 —— 两路的加减项不是同一套, 混起来对不上总分
-            cur["factors"] = dict(factors or {})
-        cur["ctx"].update({k: v for k, v in (ctx or {}).items() if v is not None})
-        cur["why"] += [w for w in why if w not in cur["why"]]
+    ex = extras or {}
+    cands: dict[str, dict] = {}
 
+    def _cand(sym: str) -> dict:
+        c = cands.get(sym)
+        if c is None:
+            c = cands[sym] = {"symbol": sym, "name": names.get(sym, sym),
+                              "kinds": [], "near_breakout": False,
+                              "duration": None, "pivot": None, "text": ""}
+        return c
+
+    # ---- 候选路 A: 六态转强 ----
     for sym, t in trends.items():
         if t.get("signal") not in ("转多", "回升"):
             continue
         dur = int(t.get("duration") or 1)
-        base = 70 if t["signal"] == "转多" else 55
-        fresh = _FRESH_BONUS.get(dur, -30)
-        fac: dict[str, int] = {"base": base, "fresh": fresh}
-        cx: dict = {"dur": dur, "signal": t["signal"], "intraday": bool(t.get("intraday"))}
-        score = base + fresh
-        note = "(刚出现,入场窗口最佳)" if dur <= 2 else "(已过最佳入场时机)" if dur >= 4 else ""
-        why = [f"{t['signal']}第 {dur} 天{note}"]
-        sig = signals.get(sym) or {}
-        conf = sig.get("confidence")
-        if sig.get("signal") == "buy":
-            d = round(int(conf or 50) * 0.2)
-            score += d
-            fac["ai"] = d
-            cx["ai_conf"] = conf
-            why.append(f"AI 也看多(把握 {conf})" if conf is not None else "AI 也看多")
-        elif sig.get("signal") == "sell":
-            score -= 40
-            fac["ai"] = -40
-            cx["ai_conf"] = conf
-            why.append("但 AI 看空,信号互相矛盾")
-        r20 = t.get("ret_20d")
-        if bench_ret is not None and r20 is not None:
-            rs = r20 - bench_ret
-            cx["rs"] = round(rs * 100, 2)
-            if rs >= 0.05:
-                score += 8
-                fac["rs"] = 8
-                why.append(f"近20日跑赢大盘 {rs * 100:.0f} 个点")
-            elif rs < -0.05:
-                score -= 15
-                fac["rs"] = -15
-                why.append(f"近20日跑输大盘 {abs(rs) * 100:.0f} 个点,比市场还弱")
-            elif rs < 0:
-                score -= 8
-                fac["rs"] = -8
-                why.append("近20日略跑输大盘")
-        ext = (extras or {}).get(sym) or {}
-        vr = ext.get("vol_ratio")
-        if vr:
-            cx["vol_ratio"] = round(float(vr), 2)
-            if vr >= 1.5:
-                score += 8
-                fac["vol"] = 8
-                why.append(f"放量突破(量比 {vr:.1f})")
-            elif vr < 0.8:
-                score -= 12
-                fac["vol"] = -12
-                why.append(f"缩量(量比 {vr:.1f}),假突破风险")
-        win = ext.get("win")
-        if win:
-            wr, wn = win["rate"], win["n"]
-            cx["win_rate"], cx["win_n"] = round(float(wr), 3), wn
-            if wr >= 0.6:
-                score += 8
-                fac["win"] = 8
-                why.append(f"这票历史转强信号胜率 {wr:.0%}({wn} 次)")
-            elif wr <= 0.4:
-                score -= 12
-                fac["win"] = -12
-                why.append(f"这票历史转强信号胜率仅 {wr:.0%}({wn} 次),信号在它身上不好使")
-            else:
-                why.append(f"历史转强信号胜率 {wr:.0%}({wn} 次)")
+        c = _cand(sym)
+        c["kinds"].append("trend_signal")
+        c["duration"] = dur
+        c["text"] = f"{t['signal']}:{t.get('signal_desc', '')}(第 {dur} 天)"
         # [R30] 建仓计划的锚用「进入当前状态那天的关键点」, 不用会随新高上移的
         # up_pivot —— 否则"站稳 X 上满 / 跌回 X 作废"里的 X 天天变, 事后无从复盘
-        # (PRD §10.1 决策日志)。取不到时回退 up_pivot, 不制造空洞。
         try:
-            raw_pivot = t.get("entry_pivot") or t.get("up_pivot")
-            t_pivot = float(raw_pivot) if raw_pivot else None
+            raw = t.get("entry_pivot") or t.get("up_pivot")
+            c["pivot"] = float(raw) if raw else None
         except (TypeError, ValueError):
-            t_pivot = None
-        add(sym, "trend_signal", score,
-            f"{t['signal']}:{t['signal_desc']}(第 {dur} 天)", why, t_pivot, fac, cx)
+            c["pivot"] = None
 
+    # ---- 候选路 B: 逼近买入触发价 ----
     for sym, sig in signals.items():
         if sym not in names or sig.get("signal") != "buy":
             continue
-        t = trends.get(sym)
-        close = (t or {}).get("close") or sig.get("close")
+        close = (trends.get(sym) or {}).get("close") or sig.get("close")
         for p in sig.get("watch_points") or []:
             if p.get("direction") != "up" or not close:
                 continue
@@ -211,90 +143,186 @@ def score_opportunities(
                 continue
             gap = (price - close) / close
             if 0 <= gap <= _NEAR_BREAKOUT_PCT:
-                conf = sig.get("confidence")
-                ai_d = round(int(conf or 50) * 0.25)
-                near_d = 8 if gap <= 0.005 else 0
-                score = 62 + ai_d + near_d
-                why = [f"现价距买入触发价仅 {gap * 100:.1f}%,一到价就能按预案行动"]
-                if conf is not None:
-                    why.append(f"AI 看多(把握 {conf})")
-                add(sym, "near_breakout", score,
-                    f"AI 看多,现价 {close:.2f} 距触发价 {price:.2f} 仅 {gap * 100:.1f}%"
-                    f" — 到价{p.get('action') or '关注'}", why, price,
-                    {"base": 62, "ai": ai_d, "near": near_d},
-                    {"ai_conf": conf, "gap_pct": round(gap * 100, 2)})
+                c = _cand(sym)
+                c["kinds"].append("near_breakout")
+                c["near_breakout"] = True
+                if c["pivot"] is None:
+                    c["pivot"] = price
+                if not c["text"]:
+                    c["text"] = (f"现价 {close:.2f} 距触发价 {price:.2f} 仅 "
+                                 f"{gap * 100:.1f}% — 到价{p.get('action') or '关注'}")
                 break
 
-    # [R37] 主线加成放在两个来源合并之后统一加: 趋势转强与逼近突破都该享受同一份
-    # 加成, 且同一只票命中两个来源时只能加一次
-    from app.services.today_mainline import mainline_bonus
-    for sym, o in opp_by_sym.items():
-        ml = ((extras or {}).get(sym) or {}).get("mainline")
-        if not ml:
-            continue
-        bonus = mainline_bonus(ml.get("rank"))
-        o["score"] += bonus
-        o["factors"]["mainline"] = bonus
-        o["ctx"]["mainline_rank"] = ml.get("rank")
-        o["mainline"] = ml
-        also = ml.get("also") or []
-        o["why"].append(
-            f"属于今日第 {ml['rank']} 主线「{ml['member']}」"
-            f"(该概念今日 {ml['limit_up_count']} 家涨停)"
-            + (f",同时还在{'、'.join(also)}" if also else "")
-        )
-
+    # ---- 门槛 → 打分 → 注记 ----
     from app.price_limits import board_of
 
-    # [R47] 通道结论进把握分。与主线加成同样放在两个来源合并之后 —— 趋势转强与
-    # 逼近突破都该按各自的通道位置加减, 只挂在趋势那一路的话, 一只在大顶区域的
-    # AI 候选照样满分排在前面, 而它的结论标就在旁边写着"不该开新仓"。
-    # 三档都在中部时没有结论, 不加不减: 与"不在主线内不扣分"同一条原则。
-    for o in opp_by_sym.values():
-        o["board"] = board_of(o["symbol"])
-        vd = ((extras or {}).get(o["symbol"]) or {}).get("verdict")
-        o["verdict"] = vd
-        if vd:
-            delta, reason = _VERDICT_SCORE.get(vd["code"], (0, ""))
-            o["score"] += delta
-            o["factors"]["verdict"] = delta
-            o["ctx"]["verdict"] = vd.get("code")
-            if reason:
-                o["why"].append(f"{'但' if delta < 0 else ''}{vd['title']}:{reason}")
-        raw = o["score"]
-        o["score"] = max(0, min(100, raw))          # 夹到 [0,100] 放在所有加减之后
-        # [R133] 夹掉了多少也记下来 —— 理论上限 151 分, 顶格的那些票在榜上其实
-        # 没有区分度, 而这件事只有把 clamp 记下来才看得见
-        if raw != o["score"]:
-            o["factors"]["clamp"] = o["score"] - raw
-            o["ctx"]["raw_score"] = raw
+    out: list[dict] = []
+    blocked: dict[str, int] = {}
+    blocked_total = 0
+    for sym, c in cands.items():
+        t = trends.get(sym) or {}
+        e = ex.get(sym) or {}
+        g = e.get("gate") or {}
+        gates = osc.check_gates(
+            state=t.get("state"),
+            above_ma20=g.get("above_ma20"), above_ma20_prev=g.get("above_ma20_prev"),
+            close=g.get("close") if g.get("close") is not None else t.get("close"),
+            ma120=g.get("ma120"), ma120_rising=g.get("ma120_rising"))
+        if not gates["ok"]:
+            # 被挡下的只计数不进列表。计数要报给界面 —— "今天 40 只候选被门槛
+            # 挡掉 28 只"本身就是市场状态, 藏起来用户会以为系统没干活
+            blocked_total += 1
+            for code in gates["failed"]:
+                blocked[code] = blocked.get(code, 0) + 1
+            continue
 
-    # [R123] 把两个**直接决定今天动不动手**的数字从 why 散文里拎成结构化字段:
-    #   gap_pct  现价距触发价还差几个点(负数=已越过) —— 回答"今天能不能动手"
-    #   vol_ratio 量比 —— 回答"这个突破是不是真的"(也是 AI 优选的核心判据,
-    #             摆成列用户才能自己核 AI 那句"量比 1.25"是不是真的, 与 R121 同源)
-    # 统一在两个来源合并之后算一次: 两路都存了 pivot, 逻辑不必在分支里各写一遍。
-    for sym, o in opp_by_sym.items():
-        ext = (extras or {}).get(sym) or {}
-        vr = ext.get("vol_ratio")
-        o["vol_ratio"] = round(float(vr), 2) if isinstance(vr, (int, float)) and vr else None
-        close = ((trends.get(sym) or {}).get("close")
-                 or ((signals.get(sym) or {}).get("close")))
-        # [R133] 台账的收益起点。存在候选上而不是回头再读一次行情 ——
-        # 记的必须是"当时那个价", 事后重读会因复权口径变动而对不上。
+        r20 = t.get("ret_20d")
+        rs_pct = ((r20 - bench_ret) * 100
+                  if bench_ret is not None and r20 is not None else None)
+        vr = e.get("vol_ratio")
+        vr = float(vr) if isinstance(vr, (int, float)) and vr else None
+        turn = e.get("turnover")
+        turn = float(turn) if isinstance(turn, (int, float)) and turn else None
+        cpct = e.get("channel_pct")
+        cpct = float(cpct) if isinstance(cpct, (int, float)) else None
+
+        res = osc.score_candidate(
+            duration=c["duration"], state=t.get("state"), rs_pct=rs_pct,
+            vol_ratio=vr, turnover_rate=turn, channel_pct=cpct,
+            near_breakout=c["near_breakout"])
+
+        close = t.get("close") or (signals.get(sym) or {}).get("close")
         try:
-            o["close"] = float(close) if close else None
+            close = float(close) if close else None
         except (TypeError, ValueError):
-            o["close"] = None
-        pivot = o.get("pivot")
-        try:
-            o["gap_pct"] = (round((float(pivot) - float(close)) / float(close) * 100, 2)
-                            if pivot and close else None)
-        except (TypeError, ValueError, ZeroDivisionError):
-            o["gap_pct"] = None
-        o["ctx"]["gap_pct"] = o["gap_pct"]
+            close = None
+        gap_pct = None
+        if c["pivot"] and close:
+            try:
+                gap_pct = round((float(c["pivot"]) - close) / close * 100, 2)
+            except (TypeError, ValueError, ZeroDivisionError):
+                gap_pct = None
 
-    return sorted(opp_by_sym.values(), key=lambda o: (-o["score"], o["symbol"]))
+        o = {
+            "symbol": sym, "name": c["name"],
+            # 主 kind 取先命中的那一路, 供界面沿用既有图标; kinds 保留全部
+            "kind": c["kinds"][0] if c["kinds"] else "trend_signal",
+            "kinds": c["kinds"],
+            "score": res["score"],
+            "dims": res["dims"], "factors": res["factors"],
+            "coverage": res["coverage"], "partial": res["partial"],
+            "fresh_from": res["fresh_from"],
+            "text": c["text"], "pivot": c["pivot"], "close": close,
+            "gap_pct": gap_pct, "vol_ratio": vr, "turnover": turn,
+            "channel_pct": round(cpct, 3) if cpct is not None else None,
+            "duration": c["duration"],
+            "trend_state": t.get("state"), "trend_state_cn": t.get("state_cn"),
+            "rs_pct": round(rs_pct, 1) if rs_pct is not None else None,
+            "board": board_of(sym),
+            "why": osc.explain(res, duration=c["duration"], vol_ratio=vr,
+                               channel_pct=cpct, rs_pct=rs_pct),
+            "notes": _annotations(sym, e, signals.get(sym) or {}),
+            "mainline": e.get("mainline"),
+            "verdict": e.get("verdict"),
+            # 台账口径: 因子拆解现在就是三个维度分, 不再是一串加减项
+            "ctx": {
+                "dur": c["duration"], "state": t.get("state"),
+                "vol_ratio": vr, "turnover": turn, "channel_pct": cpct,
+                "rs": round(rs_pct, 2) if rs_pct is not None else None,
+                "gap_pct": gap_pct, "partial": res["partial"],
+                "fresh_from": res["fresh_from"], "kinds": ",".join(c["kinds"]),
+                "intraday": bool(t.get("intraday")),
+            },
+        }
+        out.append(o)
+
+    out.sort(key=lambda o: (-o["score"], o["symbol"]))
+    return out, {"candidates": len(cands), "passed": len(out),
+                 "blocked_total": blocked_total, "blocked": blocked}
+
+
+# [R134] 注记 —— 挂在候选上给人看, **一分不加一分不减**。
+#
+# 每条都带 tone: good/bad/info, 界面据此上色。刻意不给"权重"这类字段: 一旦有了
+# 权重, 下一步就会有人把它加回分数里, 那就又变回 v1 那个八项加减的黑箱了。
+_NOTE_VERDICT_TONE = {
+    "dip_in_uptrend": "good", "bottom_confirmed": "good", "low_short_only": "good",
+    "watch_low": "info", "watch_high": "bad", "high_short_only": "bad",
+    "top_confirmed": "bad", "top_all_bands": "bad",
+    "bounce_in_downtrend": "bad", "falling_all_bands": "bad",
+}
+
+
+def _annotations(sym: str, e: dict, sig: dict) -> list[dict]:
+    """把不参与打分的佐证整理成一串标签。纯函数。"""
+    out: list[dict] = []
+
+    # AI 信号: 只做佐证, 但**方向相反时要显眼**。v1 把它算成 -40 分等于把票
+    # 藏起来; 藏起来用户就不知道有过这个冲突, 更谈不上自己判断。
+    if sig.get("signal") == "sell":
+        out.append({"key": "ai", "tone": "bad", "label": "AI 看空",
+                    "text": "规则看多但 AI 看空 —— 结论互相矛盾, 自己定夺"})
+    elif sig.get("signal") == "buy":
+        conf = sig.get("confidence")
+        out.append({"key": "ai", "tone": "info",
+                    "label": f"AI 看多 {conf}" if conf is not None else "AI 看多",
+                    "text": "仅作佐证, 不参与把握分"})
+
+    ml = e.get("mainline")
+    if ml:
+        also = ml.get("also") or []
+        out.append({"key": "mainline", "tone": "info",
+                    "label": f"主线{ml.get('rank')}·{ml.get('member')}",
+                    "text": f"今日第 {ml.get('rank')} 主线「{ml.get('member')}」"
+                            f"({ml.get('limit_up_count')} 家涨停)"
+                            + (f",同时还在{'、'.join(also)}" if also else "")})
+
+    win = e.get("win")
+    if win:
+        wr, wn = win.get("rate"), win.get("n")
+        tone = "good" if (wr or 0) >= 0.6 else "bad" if (wr or 1) <= 0.4 else "info"
+        out.append({"key": "win", "tone": tone,
+                    "label": f"历史胜率 {wr:.0%}({wn})",
+                    "text": "同一套六态在这只票上历史转强后 5 日为正的比例; "
+                            f"{wn} 次样本, 少于 10 次参考价值有限"})
+
+    vd = e.get("verdict")
+    if vd:
+        out.append({"key": "verdict", "tone": _NOTE_VERDICT_TONE.get(vd.get("code"), "info"),
+                    "label": vd.get("title") or "通道结论",
+                    "text": vd.get("detail") or vd.get("hint") or ""})
+
+    dragon = e.get("dragon")
+    if dragon:
+        out.append({"key": "dragon", "tone": "info", "label": "龙虎榜在列",
+                    "text": str(dragon)[:60]})
+    return out
+
+
+def _gate_labels() -> dict[str, dict]:
+    """门槛的中文名与理由 —— 界面直接用, 不在前端再抄一份。"""
+    from app.services import opportunity_score as osc
+    return {code: {"cn": osc.GATE_CN[code], "why": osc.GATE_WHY[code]}
+            for code in (osc.GATE_TREND, osc.GATE_LIFELINE, osc.GATE_LONG_DOWN)}
+
+
+def _gate_text(info: dict) -> str:
+    """[R134] 门槛漏斗的一句话版本, 中观层直接显示。
+
+    这句话回答的是"今天这个市场值不值得出手" —— 候选很多但过门槛的很少,
+    说明信号在遍地开花而趋势结构没跟上, 那种日子最容易追在半山腰。
+    """
+    from app.services import opportunity_score as osc
+    total = int(info.get("candidates") or 0)
+    passed = int(info.get("passed") or 0)
+    if not total:
+        return "今天没有新信号候选"
+    blocked = info.get("blocked") or {}
+    if not blocked:
+        return f"{total} 只候选全部通过三道门槛"
+    top = sorted(blocked.items(), key=lambda kv: -kv[1])
+    parts = "、".join(f"{osc.GATE_CN.get(k, k)} {v} 只" for k, v in top)
+    return f"{total} 只候选过门槛 {passed} 只;挡下的原因:{parts}"
 
 
 def filter_opportunities(
@@ -328,12 +356,11 @@ def rank_opportunities(
 ) -> tuple[list[dict], int]:
     """打分 + 筛选一步到位, 返回 (显示列表, 被滤掉条数)。
 
-    [R133] 拆分后的薄封装。签名与行为与拆分前完全一致 —— 既有调用方与六组
-    测试都按这个形状写的, 拆分是为了让台账拿到完整列表, 不是为了改接口。
+    [R133] 拆分后的薄封装。[R134] 打分换成 v2 后签名保持不变 —— 门槛淘汰计数
+    在这里被丢掉, 需要它的调用方直接用 score_opportunities。
     """
-    return filter_opportunities(
-        score_opportunities(trends, signals, names, bench_ret, extras),
-        min_score, max_show, boards)
+    ranked, _gates = score_opportunities(trends, signals, names, bench_ret, extras)
+    return filter_opportunities(ranked, min_score, max_show, boards)
 
 
 def build_pyramid_plan(fraction: float, pivot: float | None,
@@ -567,11 +594,19 @@ def _build_overview(repo) -> dict:
     except Exception as e:  # noqa: BLE001
         logger.debug("today keltner skipped: %s", e)
 
-    # [R20] 量价与历史胜率因子: 只为带新信号的候选算(远小于自选总数, 上限 40 只保护)
+    # [R134] 候选集要**同时覆盖两路**: 六态转强的, 和 AI 看多(逼近突破)的。
+    # v1 只给前者算量能, 于是后者的量能维度整个缺席, 而缺维度会在维度间重归一化
+    # —— 结果是"数据越少分越高"。这是个必须堵死的口子, 不是可选优化。
     extras: dict[str, dict] = {}
-    cand_syms = [s for s, t in trends.items() if t.get("signal") in ("转多", "回升")][:40]
+    ai_buy_syms = [s for s, sig in signals.items()
+                   if s in names and sig.get("signal") == "buy"]
+    cand_syms = sorted({
+        *(s for s, t in trends.items() if t.get("signal") in ("转多", "回升")),
+        *ai_buy_syms,
+    })[:80]
     if cand_syms:
         vol_map: dict[str, float] = {}
+        turn_map: dict[str, float] = {}
         try:
             import polars as pl
             frames = []
@@ -581,16 +616,42 @@ def _build_overview(repo) -> dict:
             for asset in ("stock", "etf"):  # 实时叠加层的量比后写入 → 盘中覆盖盘后快照
                 frames.append(repo.get_watchlist_live(asset))
             for df in frames:
-                if df is None or df.is_empty() or not {"symbol", "vol_ratio_5d"} <= set(df.columns):
+                if df is None or df.is_empty() or "symbol" not in df.columns:
                     continue
-                sub = df.filter(pl.col("symbol").is_in(cand_syms))
-                for r in sub.select(["symbol", "vol_ratio_5d"]).to_dicts():
+                cols = [c for c in ("symbol", "vol_ratio_5d", "turnover_rate")
+                        if c in df.columns]
+                if len(cols) < 2:
+                    continue
+                sub = df.filter(pl.col("symbol").is_in(cand_syms)).select(cols)
+                for r in sub.to_dicts():
+                    sym_u = str(r["symbol"]).upper()
                     if r.get("vol_ratio_5d"):
-                        vol_map[str(r["symbol"]).upper()] = float(r["vol_ratio_5d"])
+                        vol_map[sym_u] = float(r["vol_ratio_5d"])
+                    if r.get("turnover_rate"):
+                        turn_map[sym_u] = float(r["turnover_rate"])
         except Exception as e:  # noqa: BLE001
             logger.debug("today vol factor skipped: %s", e)
+        # [R134] 门槛原料: 生命线(MA20 含前一日)与长期趋势(MA120 及斜率)。
+        # 与 Keltner 长期档共用同一次批量读, 不新增 IO。
+        gate_map: dict[str, dict] = {}
+        try:
+            from app.services import keltner_service as _ks
+            gate_map = _ks.long_trend_map(repo, cand_syms)
+        except Exception as e:  # noqa: BLE001
+            logger.warning("today gate data skipped: %s", e)
         for s in cand_syms:
-            ent: dict = {}
+            ent = {}
+            if s in turn_map:
+                ent["turnover"] = turn_map[s]
+            if s in gate_map:
+                ent["gate"] = gate_map[s]
+            # 位置维度直接用 Keltner 短期档的通道位置(与决策台、图表同一口径)
+            spct = ((bands_map.get(s) or {}).get("s") or {}).get("pct")
+            if isinstance(spct, (int, float)):
+                ent["channel_pct"] = float(spct)
+            extras[s] = ent
+        for s in cand_syms:
+            ent = extras.setdefault(s, {})
             if s in vol_map:
                 ent["vol_ratio"] = vol_map[s]
             try:
@@ -600,12 +661,10 @@ def _build_overview(repo) -> dict:
                     ent["win"] = win
             except Exception as e:  # noqa: BLE001
                 logger.debug("today win rate skipped for %s: %s", s, e)
-            if ent:
-                extras[s] = ent
 
-    # [R47] 通道结论: 给全部自选打标, 不只 cand_syms —— 逼近突破那一路的候选
-    # 来自 AI 信号, 不在 cand_syms 里, 同样该按它的通道位置加减分。
-    # (R37 的主线打标踩过同一个坑, 这里沿用同一个写法。)
+    # [R47] 通道结论: 给全部自选打标, 不只 cand_syms。[R134] 它现在是**注记**,
+    # 不再进把握分 —— 位置那一维改用 Keltner 短期通道位置这个连续量,
+    # 比十档文字结论细得多, 也不必再担心"结论表和分数各说各话"。
     for sym, v in verdict_map.items():
         extras.setdefault(sym, {})["verdict"] = v
 
@@ -622,7 +681,7 @@ def _build_overview(repo) -> dict:
 
     # [R133] 先拿到**完整**排序列表, 再按门槛截断。台账记完整的那份 ——
     # 只记显示出来的 10 条, 等于只用样本里最好的一段去证明样本好。
-    ranked_all = score_opportunities(trends, signals, names, bench_ret, extras)
+    ranked_all, gate_info = score_opportunities(trends, signals, names, bench_ret, extras)
     opportunities, opp_filtered = filter_opportunities(
         ranked_all, prefs["min_score"], prefs["max_show"], prefs.get("boards"))
     # [R18] 盘中口径标注: 实时价确实参与了判定的趋势类新信号是"临时信号",
@@ -806,6 +865,11 @@ def _build_overview(repo) -> dict:
         "actions": actions,
         "opportunities": opportunities,
         "opportunities_filtered": opp_filtered,
+        # [R134] 门槛体检: 今天有多少候选被哪条硬门槛挡下。
+        # 这不是调试信息 —— "40 只候选被挡掉 28 只"本身就是市场状态的读数,
+        # 藏起来的话, 熊市里机会区空空如也会被读成"系统没干活"。
+        "gates": {**gate_info, "labels": _gate_labels(),
+                  "text": _gate_text(gate_info)},
         "prefs": prefs,
         "position_hint": {
             "posture_cap": POSTURE_CAPS.get(posture, 0.3),
@@ -888,11 +952,28 @@ _AI_SYSTEM = """你是用户的盘前参谋,有 15 年 A 股一线交易经验�
 4. **上方阻力空间**:离上方压力位还有多少空间?空间太小的机会不值得占用仓位
 5. **K 线形态质量**:是干净利落的放量长阳,还是上影线很长、量价背离、连续跳空的透支形态
 
+### 你会看到的「三维度分解」怎么用
+
+每只候选带一份 `把握分分解`,那是规则层的自评,结构固定:
+
+- **门槛**:这只票已经通过三道硬门槛(六态在多头侧 / 收盘站上生命线 MA20 且连续两日 / 不在长期下跌趋势里)。**没过门槛的票压根不会送到你面前**,所以不必再核这三件事。
+- **趋势强度 / 量能确认 / 位置成本**:各 0~100。三条曲线都是**区间最优**不是越大越好 —— 量比峰值在 1.3~2.5(超过 4 说明这波已经走完了),通道位置甜区在 0.50~0.65(刚站上生命线,越接近 1.0 越是追高)。
+- `partial: true` 表示某个维度**没有数据**,那一档的分是靠剩下的维度顶上来的 —— 这种候选的总分偏乐观,同分时优先选 partial 为 false 的。
+
+用法是: **把分解当"规则层看到了什么"的摘要,然后自己去日 K 里验证它对不对**。分解和 K 线打架时以 K 线为准,并在理由里点出来。
+
+### 佐证字段(`注记`)一律不能单独当理由
+
+`注记` 里的主线归属、AI 信号、历史胜率、通道结论,**都不参与把握分**,它们只是背景。硬性规定:
+
+- 量价不扎实的票,在第一主线里也不选;
+- `AI 看空` 的注记意味着另一套模型与规则层结论相反 —— 这时你要**特别仔细地**看 K 线,若仍选中,理由里必须写明你在数据里看到了什么才敢反驳它;
+- 历史胜率的样本量常常只有几次,不能当依据。
+
 硬性要求:
-- **不许拿"规则分高""AI 看多""信号共振"当理由** —— 这些是筛选前就知道的,把它们复述一遍等于没分析。理由必须来自你在 K 线数据里**实际看到的东西**,带上具体数字(量比、涨幅、距离、价位)
-- **主线归属是佐证,不是理由**。候选带"主线归属"字段时,它只说明这只票背后有板块效应,不能单独拿来当选中的理由;量价不扎实的票在第一主线里也不选。只有当两只候选量价质量相当时,才优先选站在主线里的那只,并在理由里连同量价一起说
+- **不许拿"把握分高""AI 看多""信号共振"当理由** —— 这些是筛选前就知道的,把它们复述一遍等于没分析。理由必须来自你在 K 线数据里**实际看到的东西**,带上具体数字(量比、涨幅、距离、价位)
 - 标注"盘中待收盘确认"的候选是盘中临时信号(收盘可能收回去): 优选时降级处理, 若仍选中, 理由里必须注明"等收盘确认"
-- **规则分只是粗筛门票,不是排序依据**。分低但量价扎实的可以选,分高但量能虚、位置差的要果断放弃
+- **把握分只是粗筛门票,不是排序依据**。分低但量价扎实的可以选,分高但量能虚、位置差的要果断放弃
 - 几只都不理想就少选甚至不选(picks 给空数组)。**宁缺毋滥,空仓等待也是决策**
 - 每只理由 ≤35 字,大白话,让不懂术语的人看懂
 
@@ -938,14 +1019,37 @@ def _candidate_market_data(repo, cands: list[dict]) -> list[dict]:
 
     out: list[dict] = []
     for c in cands:
+        # [R134] 送给 AI 的不再是一个黑箱"规则分", 而是**三维度分解 + 注记**。
+        # 黑箱分只能被复述("它规则分高"), 分解才能被核对("它说量能 92, K 线上
+        # 量比确实 1.7") —— 而核对正是我们要 AI 做的事。
+        dims = c.get("dims") or {}
         item = {
-            "symbol": c["symbol"], "name": c["name"],
-            "规则分": c["score"], "规则依据": c["why"], "信号摘要": c["text"],
+            "symbol": c["symbol"], "name": c["name"], "信号摘要": c["text"],
+            "把握分分解": {
+                "总分": c["score"],
+                "门槛": "已通过(六态多头侧 / 站上生命线 MA20 连续两日 / 非长期下跌)",
+                "趋势强度": dims.get("trend"),
+                "量能确认": dims.get("volume"),
+                "位置成本": dims.get("position"),
+                "partial": bool(c.get("partial")),
+                "原始输入": {
+                    "信号第几天": c.get("duration"),
+                    "六态": c.get("trend_state_cn") or c.get("trend_state"),
+                    "量比": c.get("vol_ratio"),
+                    "换手率%": c.get("turnover"),
+                    "通道位置": c.get("channel_pct"),
+                    "相对大盘20日": c.get("rs_pct"),
+                    "距触发价%": c.get("gap_pct"),
+                },
+            },
+            "规则依据": c["why"],
         }
-        if c.get("mainline"):
-            ml = c["mainline"]
-            item["主线归属"] = (f"今日第 {ml['rank']} 主线「{ml['member']}」"
-                                f"({ml['limit_up_count']} 家涨停)")
+        notes = c.get("notes") or []
+        if notes:
+            item["注记(不参与把握分, 只作背景)"] = [
+                {"项": n.get("label"), "倾向": n.get("tone"), "说明": n.get("text")}
+                for n in notes
+            ]
         try:
             df = _load_kline(repo, c["symbol"])
             if df.is_empty():

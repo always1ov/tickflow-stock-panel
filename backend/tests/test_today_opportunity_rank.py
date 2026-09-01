@@ -27,6 +27,8 @@ def test_fresh_signal_outranks_stale_one():
     assert scores["000001.SZ"] > scores["000002.SZ"]
     assert shown[0]["symbol"] == "000001.SZ"
     assert "入场窗口最佳" in shown[0]["why"]
+    # [R134] 新鲜度是趋势维度里权重最大的一项, 它必须能自己拉开差距
+    assert shown[0]["factors"]["fresh"] > shown[1]["factors"]["fresh"]
     # 第 5 天已过入场窗口, 分数低于第 3 天(可能已被滤掉)
     assert scores.get("000003.SZ", 0) < scores["000002.SZ"]
 
@@ -39,18 +41,26 @@ def test_stale_weak_signal_is_filtered_out():
     assert filtered == 1
 
 
-def test_ai_agreement_boosts_and_conflict_drops():
-    """AI 同向看多加分; AI 看空则大幅扣分, 自相矛盾的机会不显示。"""
+def test_ai_signal_no_longer_moves_the_score():
+    """[R134] AI 置信度退出评分, 只作注记。
+
+    它是模型对自己输出的自评, 不可回测, 而且会过时(用户明确提过"别搞过时信息")。
+    v1 里 AI 看空扣 40 分, 效果等于把票藏起来 —— 藏起来用户就不知道有过这个冲突,
+    更谈不上自己定夺。现在改成: 分数不动, 但矛盾要**显眼地**摆出来。
+    """
     names = {"000001.SZ": "平安银行", "000002.SZ": "万科A"}
     trends = {"000001.SZ": _trend("转多", 2), "000002.SZ": _trend("转多", 2)}
     signals = {
         "000001.SZ": {"signal": "buy", "confidence": 90},
         "000002.SZ": {"signal": "sell", "confidence": 80},
     }
-    shown, filtered = rank_opportunities(trends, signals, names)
-    assert [o["symbol"] for o in shown] == ["000001.SZ"], "AI 看空的票不该出现在买入机会里"
-    assert "AI 也看多" in shown[0]["why"]
-    assert filtered == 1
+    shown, _ = rank_opportunities(trends, signals, names)
+    by = {o["symbol"]: o for o in shown}
+    assert set(by) == {"000001.SZ", "000002.SZ"}, "看空的票不再被悄悄藏起来"
+    assert by["000001.SZ"]["score"] == by["000002.SZ"]["score"]
+    bear_note = {n["key"]: n for n in by["000002.SZ"]["notes"]}["ai"]
+    assert bear_note["tone"] == "bad" and "矛盾" in bear_note["text"]
+    assert "AI" not in "".join(by["000001.SZ"]["why"]), "注记不许混进评分理由"
 
 
 def test_high_confidence_cannot_rescue_stale_signal():
@@ -62,8 +72,10 @@ def test_high_confidence_cannot_rescue_stale_signal():
     assert shown[0]["symbol"] == "fresh"
 
 
-def test_near_breakout_scored_by_distance():
-    """已经贴着买入触发价的, 比还差 2% 的分数高。"""
+def test_near_breakout_distance_no_longer_scores_but_is_still_exposed():
+    """[R134] 距触发价退出评分 —— 它与通道位置指向同一件事(离上方阻力多远),
+    两个一起放是把同一份信息计价两次。改成结构化字段摆在列上给人看。
+    """
     names = {"near": "贴价", "far": "还差些"}
     signals = {
         "near": {"signal": "buy", "confidence": 70, "close": 100.0,
@@ -71,10 +83,11 @@ def test_near_breakout_scored_by_distance():
         "far": {"signal": "buy", "confidence": 70, "close": 100.0,
                 "watch_points": [{"direction": "up", "price": 101.9, "action": "突破关注买入"}]},
     }
-    shown, _ = rank_opportunities({}, signals, names)
-    scores = {o["symbol"]: o["score"] for o in shown}
-    assert scores["near"] > scores["far"]
-    assert "一到价就能按预案行动" in shown[0]["why"]
+    shown, _ = rank_opportunities({}, signals, names, min_score=0)
+    by = {o["symbol"]: o for o in shown}
+    assert by["near"]["score"] == by["far"]["score"]
+    assert by["near"]["gap_pct"] == 0.3 and by["far"]["gap_pct"] == 1.9
+    assert by["near"]["fresh_from"] == "near_breakout"
 
 
 def test_show_cap_and_filtered_count():

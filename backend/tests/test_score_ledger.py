@@ -14,6 +14,7 @@ import polars as pl
 import pytest
 
 from app.api.today import filter_opportunities, rank_opportunities, score_opportunities
+from app.services import opportunity_score as osc
 from app.config import settings
 from app.services import score_ledger as sl
 
@@ -54,10 +55,12 @@ def repo():
     })
 
 
-def _cand(sym, score, *, rank_hint=0, factors=None, close=10.0, shown=True):  # noqa: ARG001
+def _cand(sym, score, *, dims=None, close=10.0, factors=None):
     return {"symbol": sym, "name": sym, "score": score, "kind": "trend_signal",
             "board": "主板", "close": close, "why": ["x"],
-            "factors": factors or {"base": 70, "fresh": 15}, "ctx": {"dur": 1}}
+            "dims": dims or {"trend": 90, "volume": 85, "position": 80},
+            "factors": factors or {"fresh": 100, "vol_ratio": 92},
+            "ctx": {"dur": 1}}
 
 
 # ------------------------------------------------------- 打分拆分后行为不变
@@ -68,47 +71,79 @@ def _trend(signal="转多", dur=1, **kw):
             "state": "UT", "side": "多头", "as_of": "2026-08-17", "close": 10.0, **kw}
 
 
+_GATE_OK = {"above_ma20": True, "above_ma20_prev": True,
+            "close": 10.0, "ma120": 8.0, "ma120_rising": True}
+
+
+def _ex(syms, **extra):
+    return {s: {"gate": dict(_GATE_OK), "channel_pct": 0.6, **extra} for s in syms}
+
+
 def test_split_keeps_rank_opportunities_identical():
     """拆成 score+filter 之后, 老接口必须逐字段等于原来的结果。"""
     trends = {f"60000{i}.SH": _trend(dur=i) for i in range(1, 6)}
     names = {s: s for s in trends}
-    shown, filtered = rank_opportunities(trends, {}, names)
-    again, f2 = filter_opportunities(score_opportunities(trends, {}, names), 60, 10)
+    ex = _ex(names)
+    shown, filtered = rank_opportunities(trends, {}, names, extras=ex)
+    ranked, _gates = score_opportunities(trends, {}, names, extras=ex)
+    again, f2 = filter_opportunities(ranked, 60, 15)
     assert [o["symbol"] for o in shown] == [o["symbol"] for o in again]
     assert filtered == f2
 
 
 def test_score_opportunities_keeps_sub_threshold_candidates():
     """完整列表必须含被门槛滤掉的票 —— 台账要的正是它们。"""
-    trends = {"600001.SH": _trend(dur=1), "600002.SH": _trend("回升", dur=5)}
+    trends = {"600001.SH": _trend(dur=1), "600002.SH": _trend("回升", dur=12)}
     names = {s: s for s in trends}
-    full = score_opportunities(trends, {}, names)
-    shown, _ = rank_opportunities(trends, {}, names)
+    ex = {"600001.SH": {"gate": dict(_GATE_OK), "channel_pct": 0.58,
+                        "vol_ratio": 1.8, "turnover": 5.0},
+          # 弱候选: 陈年信号 + 缩量 + 已贴上轨, 三维全差
+          "600002.SH": {"gate": dict(_GATE_OK), "channel_pct": 0.98,
+                        "vol_ratio": 0.5, "turnover": 0.3}}
+    full, _ = score_opportunities(trends, {}, names, extras=ex)
+    shown, _ = rank_opportunities(trends, {}, names, extras=ex)
     assert len(full) == 2 and len(shown) == 1
     assert min(o["score"] for o in full) < 60
 
 
-def test_factors_sum_back_to_score():
-    """因子拆解必须能加回总分, 否则归因表说的不是这套分数。"""
-    trends = {"600001.SH": _trend(dur=1, ret_20d=0.20)}
-    full = score_opportunities(trends, {}, {"600001.SH": "测试"}, bench_ret=0.02,
-                               extras={"600001.SH": {"vol_ratio": 2.0}})
+def test_dimensions_blend_back_to_the_score():
+    """[R134] 维度分必须能按声明权重加回总分, 否则归因表说的不是这套分数。"""
+    names = {"600001.SH": "测试"}
+    full, _ = score_opportunities({"600001.SH": _trend(dur=1, ret_20d=0.20)}, {}, names,
+                                  bench_ret=0.02,
+                                  extras=_ex(names, vol_ratio=1.8, turnover=5.0))
     o = full[0]
-    assert sum(o["factors"].values()) == o["score"]
-    assert o["factors"]["fresh"] == 15 and o["factors"]["vol"] == 8 and o["factors"]["rs"] == 8
+    expect = sum(o["dims"][k] * w for k, w in osc.WEIGHTS.items())
+    assert o["score"] == round(expect)
+    assert o["partial"] is False
 
 
-def test_clamp_is_recorded_when_score_saturates():
-    """理论分 >100 被夹平这件事本身就是结论, 必须留痕。"""
-    trends = {"600001.SH": _trend(dur=1, ret_20d=0.20)}
-    full = score_opportunities(
-        trends, {"600001.SH": {"signal": "buy", "confidence": 90}}, {"600001.SH": "测试"},
-        bench_ret=0.02,
-        extras={"600001.SH": {"vol_ratio": 2.0, "win": {"rate": 0.8, "n": 10},
-                              "mainline": {"rank": 1, "member": "AI", "limit_up_count": 5}}})
+def test_no_clamp_is_needed_in_v2():
+    """v1 的理论上限 151 被夹到 100, 榜首一片并列; v2 满分只能靠三维都到峰值。"""
+    names = {"600001.SH": "测试"}
+    full, _ = score_opportunities(
+        {"600001.SH": _trend(dur=1, ret_20d=0.16)},
+        {"600001.SH": {"signal": "buy", "confidence": 90}}, names, bench_ret=0.02,
+        extras={"600001.SH": {"gate": dict(_GATE_OK), "channel_pct": 0.58,
+                              "vol_ratio": 1.8, "turnover": 5.0,
+                              "win": {"rate": 0.8, "n": 10},
+                              "mainline": {"rank": 1, "member": "AI",
+                                           "limit_up_count": 5, "also": []}}})
     o = full[0]
     assert o["score"] == 100
-    assert o["factors"]["clamp"] < 0 and o["ctx"]["raw_score"] > 100
+    assert "clamp" not in (o.get("factors") or {})
+    # 注记堆满也不会把分数推过 100 —— 它们压根不参与
+    assert len(o["notes"]) >= 3
+
+
+def test_partial_coverage_is_recorded_for_the_ledger():
+    """整个维度缺席时台账要留痕, 否则事后分不清"分低"和"没数据"。"""
+    names = {"600001.SH": "测试"}
+    full, _ = score_opportunities({"600001.SH": _trend(dur=1)}, {}, names,
+                                  extras={"600001.SH": {"gate": dict(_GATE_OK)}})
+    o = full[0]
+    assert o["partial"] is True
+    assert o["ctx"]["partial"] is True
 
 
 # ------------------------------------------------------- 记录
@@ -219,16 +254,22 @@ def test_monotonic_note_flags_inversion(repo):
     assert note["ok"] is False and "不单调" in note["text"]
 
 
-def test_factor_attribution_splits_three_ways(repo):
+def test_dimension_attribution_splits_high_mid_low_and_missing(repo):
+    """[R134] 归因从"加分组/扣分组"改成"高分组/低分组" —— 维度分是 0~100 的
+    连续量, 没有正负, 硬套 v1 的三分法会把整批记录都归进"加分组"。"""
     sl.record_day("2026-08-17", [
-        _cand("600110.SH", 90, close=10.0, factors={"base": 70, "vol": 8}),
-        _cand("002222.SZ", 70, close=20.0, factors={"base": 70, "vol": -12}),
+        _cand("600110.SH", 90, close=10.0, dims={"trend": 95, "volume": 92, "position": 88}),
+        _cand("002222.SZ", 70, close=20.0, dims={"trend": 60, "volume": 20, "position": None}),
     ], set(), True)
     out = sl.evaluate(repo)
-    vol = next(f for f in out["factors"] if f["key"] == "vol")
+    vol = next(f for f in out["factors"] if f["key"] == "volume")
     assert vol["plus"]["count"] == 1 and vol["minus"]["count"] == 1
     assert vol["plus"]["stats"]["t1"]["win_rate"] == 100.0
     assert vol["minus"]["stats"]["t1"]["win_rate"] == 0.0
+    pos = next(f for f in out["factors"] if f["key"] == "position")
+    assert pos["none"]["count"] == 1, "缺席那一列是数据覆盖率的体检, 不能丢"
+    trend = next(f for f in out["factors"] if f["key"] == "trend")
+    assert trend["mid"]["count"] == 1
 
 
 def test_baseline_uses_same_dates_and_horizons(repo):
@@ -248,16 +289,17 @@ def test_caveat_is_always_present(repo):
 
 def test_export_csv_is_flat_and_complete(repo):
     sl.record_day("2026-08-17", [
-        _cand("600110.SH", 90, close=10.0, factors={"base": 70, "fresh": 15, "vol": 8}),
+        _cand("600110.SH", 90, close=10.0),
         _cand("002222.SZ", 55, close=20.0),
     ], {"600110.SH"}, True)
     text = sl.export_csv(repo)
     lines = [ln for ln in text.splitlines() if ln.strip()]
     assert lines[0].split(",") == sl.CSV_HEADER
     assert len(lines) == 3                       # 表头 + 2 行
-    assert "f_vol" in lines[0] and "ret_t5" in lines[0]
+    assert "dim_volume" in lines[0] and "sub_vol_ratio" in lines[0]
+    assert "scoring_version" in lines[0] and "ret_t5" in lines[0]
     body = lines[1]
-    assert body.startswith("2026-08-17,600110.SH")
+    assert body.startswith("2026-08-17,2,600110.SH")   # 口径版本紧跟日期
     assert body.endswith("10.0,20.0,30.0")       # 导出时顺手补上的收益
 
 
@@ -269,6 +311,7 @@ def test_summary_md_carries_everything_needed_to_tune(repo):
     """一键复制的那段必须自带口径/样本量/基准 —— 缺一样, 外部就会读出错误结论。"""
     _seed_two_buckets(repo)
     md = sl.build_summary_md(sl.evaluate(repo), {"t5": {"n": 3, "win_rate": 66.7, "avg": 2.0}})
-    for must in ("分层单调性", "因子归因", "按名次", "同期基准", "滑点", "n="):
+    for must in ("分层单调性", "维度归因", "按名次", "同期基准", "滑点", "n=",
+                 "打分口径 v"):
         assert must in md, f"摘要缺少 {must}"
     assert "AI 优选(R121 台账)" in md

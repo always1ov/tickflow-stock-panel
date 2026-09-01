@@ -233,11 +233,19 @@ def _rank(extras, signals=None, duration=1):
     return {o["symbol"]: o for o in shown}
 
 
-def test_mainline_membership_lifts_the_score():
+def test_mainline_is_an_annotation_not_a_bonus():
+    """[R134] 主线退出评分, 只作注记。
+
+    理由不是"主线没用", 是**不可回测**: 主线由涨停梯队推出, 口径随情绪周期
+    漂移, 没有稳定的历史定义 —— 拿它去动名次, 名次就带上了一个说不清的东西。
+    展示照旧: 用户要的是"看到它时知道些什么"。
+    """
     got = _rank({"A": {"mainline": {"member": "机器人", "rank": 1,
                                     "limit_up_count": 9, "also": []}}})
-    assert got["A"]["score"] > got["B"]["score"]
-    assert "机器人" in got["A"]["why"]
+    assert got["A"]["score"] == got["B"]["score"], "主线不该动分数"
+    assert "机器人" not in got["A"]["why"], "注记不许混进评分理由"
+    note = {n["key"]: n for n in got["A"]["notes"]}["mainline"]
+    assert "机器人" in note["label"] and "9 家涨停" in note["text"]
     assert got["A"]["mainline"]["rank"] == 1
 
 
@@ -249,16 +257,13 @@ def test_absence_does_not_lower_the_score():
     assert with_data["B"]["score"] == without["B"]["score"]
 
 
-def test_bonus_applies_once_when_a_symbol_hits_both_sources():
-    """同一只票既是趋势转强又逼近 AI 触发价时, 主线加成只能算一次。"""
-    # 置信度与信号天数都压低, 免得分数顶到 100 的上限把加成吃掉
+def test_mainline_note_appears_once_when_a_symbol_hits_both_sources():
+    """同一只票既是趋势转强又逼近 AI 触发价时, 主线注记只能出现一条。"""
     signals = {"A": {"signal": "buy", "confidence": 30, "close": 10.0,
                      "watch_points": [{"direction": "up", "price": 10.1,
                                        "action": "买入"}]}}
     ml = {"A": {"mainline": {"member": "机器人", "rank": 1,
                              "limit_up_count": 9, "also": []}}}
     both = _rank(ml, signals, duration=3)["A"]
-    plain = _rank({}, signals, duration=3)["A"]
-    assert plain["score"] < 100, "基准已顶到上限, 这个用例测不出加成"
-    assert both["score"] - plain["score"] == mainline_bonus(1)
-    assert sum(1 for w in both["why"].split(" · ") if "主线" in w) == 1
+    assert sum(1 for n in both["notes"] if n["key"] == "mainline") == 1
+    assert set(both["kinds"]) == {"trend_signal", "near_breakout"}
