@@ -15,6 +15,9 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_EXTERNAL_PAGE_NAME = "利弗莫尔趋势"
 DEFAULT_EXTERNAL_PAGE_URL = "https://livermore-trend-dashboard-tigergu.netlify.app/"
+# [R117] 外部网页两种形态: iframe 内嵌整站(上游原行为) / fetch 抓原文自己排版
+EXTERNAL_PAGE_MODES = ("iframe", "fetch")
+DEFAULT_EXTERNAL_PAGE_MODE = "iframe"
 
 # 进程内缓存: 行情轮询线程一轮会调用 8~12 次 getter, 每次读盘+parse 是纯重复;
 # 文件仅在用户改设置时变化, 以 (mtime_ns, size) 签名判断是否重读。
@@ -69,24 +72,45 @@ def save(updates: dict) -> dict:
 
 
 def get_external_page_config() -> dict:
-    """返回嵌入式外部网页配置, 旧 preferences 文件缺少字段时自动使用默认值。"""
+    """返回外部网页配置, 旧 preferences 文件缺少字段时自动使用默认值。"""
     data = load()
     name = str(data.get("external_page_name", DEFAULT_EXTERNAL_PAGE_NAME)).strip()
     url = str(data.get("external_page_url", DEFAULT_EXTERNAL_PAGE_URL)).strip()
+    mode = str(data.get("external_page_mode", DEFAULT_EXTERNAL_PAGE_MODE)).strip()
     return {
         "external_page_enabled": bool(data.get("external_page_enabled", True)),
         "external_page_name": name or DEFAULT_EXTERNAL_PAGE_NAME,
         "external_page_url": url,
+        # [R117] iframe=内嵌整站(上游原行为, 默认值不变); fetch=后端抓原文 +
+        # 面板自己的 AI 整理成固定结构 + 固定版式渲染
+        "external_page_mode": mode if mode in EXTERNAL_PAGE_MODES else DEFAULT_EXTERNAL_PAGE_MODE,
+        # [R117] 用户用大白话说明"想从这页看到什么", 会拼进 AI 提示词
+        "external_page_ai_hint": str(data.get("external_page_ai_hint", "") or ""),
     }
 
 
-def set_external_page_config(enabled: bool, name: str, url: str) -> dict:
-    """保存嵌入式外部网页配置。URL 安全校验由 API 层统一完成。"""
-    save({
+def set_external_page_config(
+    enabled: bool,
+    name: str,
+    url: str,
+    mode: str | None = None,
+    ai_hint: str | None = None,
+) -> dict:
+    """保存外部网页配置。URL 安全校验由 API 层统一完成。
+
+    [R117] mode / ai_hint 传 None = 保持原值 —— 老调用方(只传三个参数)
+    行为与从前完全一致。
+    """
+    updates = {
         "external_page_enabled": bool(enabled),
         "external_page_name": name.strip() or DEFAULT_EXTERNAL_PAGE_NAME,
         "external_page_url": url.strip(),
-    })
+    }
+    if mode is not None:
+        updates["external_page_mode"] = mode if mode in EXTERNAL_PAGE_MODES else DEFAULT_EXTERNAL_PAGE_MODE
+    if ai_hint is not None:
+        updates["external_page_ai_hint"] = ai_hint.strip()
+    save(updates)
     return get_external_page_config()
 
 

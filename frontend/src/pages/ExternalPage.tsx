@@ -1,7 +1,11 @@
 import { useMemo, useState } from 'react'
-import { ExternalLink, Globe2, RefreshCw, Settings } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
+import { AlertTriangle, ExternalLink, Globe2, RefreshCw, Settings, Sparkles } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { PageHeader } from '@/components/PageHeader'
+import { ExternalViewRender } from '@/components/ExternalViewRender'
+import { api } from '@/lib/api'
+import { QK } from '@/lib/queryKeys'
 import { usePreferences } from '@/lib/useSharedQueries'
 
 function validExternalUrl(raw: string | undefined): string | undefined {
@@ -14,6 +18,99 @@ function validExternalUrl(raw: string | undefined): string | undefined {
   }
 }
 
+function fmtTime(epoch?: number): string {
+  if (!epoch) return ''
+  return new Date(epoch * 1000).toLocaleTimeString('zh-CN', { hour12: false })
+}
+
+/**
+ * [R117] 抓取模式: 后端抓原文 → 面板自己的 AI 按固定提示词整理 → 固定版式。
+ * 不再用 iframe 内嵌整站, 所以对方禁不禁 iframe、是不是 SPA 都无所谓。
+ * AI 结果按「地址 + 原文哈希 + 提示词」缓存在后端, 页面来回切不会重复花钱;
+ * 想重新解析点「重新解析」(force)。
+ */
+function FetchModeBody({ hint }: { hint: string }) {
+  const q = useQuery({
+    queryKey: QK.externalPageView(hint),
+    queryFn: () => api.externalPageView({ hint }),
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+  })
+  const [refreshing, setRefreshing] = useState(false)
+
+  const reparse = async () => {
+    setRefreshing(true)
+    try {
+      await api.externalPageView({ hint, force: true })
+      await q.refetch()
+    } finally {
+      setRefreshing(false)
+    }
+  }
+
+  if (q.isLoading) {
+    return (
+      <div className="grid h-full place-items-center text-sm text-muted">
+        <div className="flex items-center gap-2">
+          <Sparkles className="h-4 w-4 animate-pulse" />正在抓取并让 AI 整理这个页面…
+        </div>
+      </div>
+    )
+  }
+
+  if (q.isError) {
+    return (
+      <div className="mx-auto max-w-2xl px-4 py-10">
+        <div className="rounded-card border border-danger/30 bg-danger/5 p-5">
+          <div className="flex items-center gap-2 text-sm font-medium text-danger">
+            <AlertTriangle className="h-4 w-4" />这个页面没能整理出来
+          </div>
+          <p className="mt-2 whitespace-pre-wrap break-words text-xs leading-6 text-secondary">
+            {String((q.error as Error)?.message ?? q.error)}
+          </p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              onClick={() => q.refetch()}
+              className="inline-flex items-center gap-1.5 rounded-btn border border-border bg-surface px-3 py-1.5 text-xs text-secondary hover:text-foreground"
+            >
+              <RefreshCw className="h-3.5 w-3.5" />重试
+            </button>
+            <Link
+              to="/settings?tab=ext-pages"
+              className="inline-flex items-center gap-1.5 rounded-btn bg-accent px-3 py-1.5 text-xs font-medium text-base"
+            >
+              <Settings className="h-3.5 w-3.5" />去设置里改地址或提示
+            </Link>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const data = q.data!
+  return (
+    <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+      <ExternalViewRender view={data.spec} />
+      <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border pt-3 text-[11px] text-muted">
+        <span>抓取 {fmtTime(data.fetched_at)}</span>
+        <span>AI 整理 {fmtTime(data.generated_at)}{data.from_cache ? '(缓存)' : ''}</span>
+        {data.model && <span>档位 {data.model}</span>}
+        <span>原文 {data.source_chars} 字</span>
+        <button
+          onClick={reparse}
+          disabled={refreshing}
+          className="inline-flex items-center gap-1 text-accent hover:underline disabled:opacity-50"
+        >
+          <Sparkles className="h-3 w-3" />{refreshing ? '重新解析中…' : '重新解析(会再调一次 AI)'}
+        </button>
+        <span className="text-muted/70">
+          外部数据仅供参考 —— 由 AI 从第三方页面整理而来, 与 A 股主链的行情/落盘完全无关
+        </span>
+      </div>
+    </div>
+  )
+}
+
 export function ExternalPage() {
   const { data: prefs, isLoading } = usePreferences()
   const [frameVersion, setFrameVersion] = useState(0)
@@ -22,6 +119,7 @@ export function ExternalPage() {
   const name = prefs?.external_page_name || '外部网页'
   const enabled = Boolean(prefs?.external_page_enabled && url)
   const host = url ? new URL(url).host : ''
+  const isFetchMode = prefs?.external_page_mode === 'fetch'
 
   if (isLoading) {
     return <div className="grid h-full place-items-center text-sm text-muted">正在加载外部网页配置…</div>
@@ -49,14 +147,18 @@ export function ExternalPage() {
         subtitle={host}
         right={(
           <div className="flex items-center gap-2">
-            <span className="hidden text-[11px] text-muted lg:inline">若页面空白，请用新窗口打开</span>
-            <button
-              type="button"
-              onClick={() => { setFrameLoading(true); setFrameVersion(v => v + 1) }}
-              className="inline-flex items-center gap-1.5 rounded-btn border border-border bg-surface px-2.5 py-1.5 text-xs text-secondary hover:text-foreground"
-            >
-              <RefreshCw className="h-3.5 w-3.5" />刷新
-            </button>
+            {isFetchMode
+              ? <span className="hidden items-center gap-1 text-[11px] text-muted lg:inline-flex"><Sparkles className="h-3 w-3" />抓取 + AI 整理</span>
+              : <span className="hidden text-[11px] text-muted lg:inline">若页面空白，请用新窗口打开</span>}
+            {!isFetchMode && (
+              <button
+                type="button"
+                onClick={() => { setFrameLoading(true); setFrameVersion(v => v + 1) }}
+                className="inline-flex items-center gap-1.5 rounded-btn border border-border bg-surface px-2.5 py-1.5 text-xs text-secondary hover:text-foreground"
+              >
+                <RefreshCw className="h-3.5 w-3.5" />刷新
+              </button>
+            )}
             <a
               href={url}
               target="_blank"
@@ -75,22 +177,26 @@ export function ExternalPage() {
           </div>
         )}
       />
-      <div className="relative min-h-0 flex-1 bg-surface">
-        {frameLoading && (
-          <div className="absolute inset-0 z-10 grid place-items-center bg-base text-sm text-muted">正在载入 {name}…</div>
-        )}
-        <iframe
-          key={frameVersion}
-          src={url}
-          title={name}
-          className="h-full w-full border-0 bg-white"
-          loading="eager"
-          referrerPolicy="strict-origin-when-cross-origin"
-          sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-downloads"
-          allow="fullscreen; clipboard-read; clipboard-write"
-          onLoad={() => setFrameLoading(false)}
-        />
-      </div>
+      {isFetchMode ? (
+        <FetchModeBody hint={prefs?.external_page_ai_hint ?? ''} />
+      ) : (
+        <div className="relative min-h-0 flex-1 bg-surface">
+          {frameLoading && (
+            <div className="absolute inset-0 z-10 grid place-items-center bg-base text-sm text-muted">正在载入 {name}…</div>
+          )}
+          <iframe
+            key={frameVersion}
+            src={url}
+            title={name}
+            className="h-full w-full border-0 bg-white"
+            loading="eager"
+            referrerPolicy="strict-origin-when-cross-origin"
+            sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-downloads"
+            allow="fullscreen; clipboard-read; clipboard-write"
+            onLoad={() => setFrameLoading(false)}
+          />
+        </div>
+      )}
     </div>
   )
 }

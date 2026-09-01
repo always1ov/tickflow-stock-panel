@@ -4,6 +4,7 @@
 // Prod:同源(FastAPI 托管前端 dist)
 
 import { toast } from '@/components/Toast'
+import type { ExtSpec } from '@/lib/externalView'   // [R117] 外部网页固定契约
 
 const BASE = ''
 
@@ -2395,6 +2396,34 @@ export interface Preferences {
   external_page_enabled: boolean
   external_page_name: string
   external_page_url: string
+  /** [R117] iframe=内嵌整站; fetch=抓原文 + 面板 AI 整理 + 固定版式 */
+  external_page_mode: 'iframe' | 'fetch'
+  /** [R117] 用大白话说明想从这页看到什么, 会拼进 AI 提示词 */
+  external_page_ai_hint: string
+}
+
+/** [R117] 抓取模式的成品: AI 整理后、后端已归一化的固定结构 */
+export interface ExternalPageView {
+  spec: ExtSpec
+  url: string
+  hint: string
+  model: string
+  generated_at: number
+  fetched_at: number
+  source_chars: number
+  from_cache: boolean
+}
+
+/** [R117] 只抓原文不调 AI —— 设置页确认地址通不通用 */
+export interface ExternalPageRaw {
+  ok: boolean
+  url: string
+  status: number
+  content_type: string
+  bytes: number
+  fetched_at: number
+  preview: string
+  source_chars: number
 }
 
 /** 监控中心 ext 字段单项配置 (行业/概念标签的来源 + 显示裁剪) */
@@ -2559,11 +2588,28 @@ export const api = {
     request<{ ok: boolean }>('/api/settings/ai', { method: 'DELETE' }),
 
   preferences: () => request<Preferences>('/api/settings/preferences'),
-  updateExternalPage: (config: { enabled: boolean; name: string; url: string }) =>
-    request<Pick<Preferences, 'external_page_enabled' | 'external_page_name' | 'external_page_url'>>(
+  updateExternalPage: (config: {
+    enabled: boolean; name: string; url: string
+    mode?: 'iframe' | 'fetch'; ai_hint?: string   // [R117] 省略 = 保持原值
+  }) =>
+    request<Pick<Preferences,
+      'external_page_enabled' | 'external_page_name' | 'external_page_url'
+      | 'external_page_mode' | 'external_page_ai_hint'>>(
       '/api/settings/preferences/external-page',
       { method: 'PUT', body: JSON.stringify(config) },
     ),
+  /** [R117] 抓页面 + AI 整理成固定结构(原文没变时后端直接回缓存, 不重复花钱) */
+  externalPageView: (opts?: { url?: string; hint?: string; force?: boolean }) =>
+    request<ExternalPageView>('/api/external-page/view', {
+      method: 'POST',
+      body: JSON.stringify({ url: opts?.url ?? null, hint: opts?.hint ?? null, force: opts?.force ?? false }),
+    }),
+  /** [R117] 只抓原文不调 AI */
+  externalPageRaw: (opts?: { url?: string; force?: boolean }) =>
+    request<ExternalPageRaw>('/api/external-page/raw', {
+      method: 'POST',
+      body: JSON.stringify({ url: opts?.url ?? null, hint: null, force: opts?.force ?? true }),
+    }),
   dataSources: () => request<DataSourcesResponse>('/api/settings/data-sources'),
   capabilityMatrix: () => request<CapabilityMatrix>('/api/settings/capability-matrix'),
   dataSource: (name: string) => request<CustomSourceConfig>(`/api/settings/data-sources/${encodeURIComponent(name)}`),

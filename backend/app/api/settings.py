@@ -615,6 +615,9 @@ class ExternalPagePrefsIn(BaseModel):
     enabled: bool
     name: str = Field(min_length=1, max_length=40)
     url: str = Field(min_length=1, max_length=2048)
+    # [R117] 抓取模式相关; 都是可选 —— 不传 = 保持原值, 老客户端不受影响
+    mode: Literal["iframe", "fetch"] | None = None
+    ai_hint: str | None = Field(default=None, max_length=2000)
 
 
 @router.get("/preferences")
@@ -972,7 +975,7 @@ def update_external_page(req: ExternalPagePrefsIn) -> dict:
         raise HTTPException(status_code=400, detail="仅支持完整的 HTTP 或 HTTPS 网站地址")
     if parsed.username is not None or parsed.password is not None:
         raise HTTPException(status_code=400, detail="网站地址中不能包含账号或密码")
-    return preferences.set_external_page_config(req.enabled, name, url)
+    return preferences.set_external_page_config(req.enabled, name, url, req.mode, req.ai_hint)
 
 
 @router.put("/preferences/nav-order")
