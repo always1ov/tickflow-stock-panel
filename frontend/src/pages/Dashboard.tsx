@@ -227,7 +227,7 @@ function KpiCell({ label, value, sub, tone = 'neutral' }: { label: ReactNode; va
   const isPlain = typeof value === 'string' || typeof value === 'number'
   const color = tone === 'bull' ? 'text-bull' : tone === 'bear' ? 'text-bear' : tone === 'accent' ? 'text-accent' : 'text-foreground'
   return (
-    <div className="min-w-0 overflow-hidden rounded-lg border border-border bg-surface/80 px-2 py-1 shadow-[0_1px_2px_hsl(var(--border)/0.4)] backdrop-blur-sm transition-all hover:border-accent/30 hover:shadow-[0_2px_8px_hsl(var(--accent)/0.15)]">
+    <div className="min-w-0 overflow-hidden rounded-lg border border-border bg-surface/80 px-2 py-1 shadow-[0_1px_2px_oklch(var(--border)/0.4)] backdrop-blur-sm transition-all hover:border-accent/30 hover:shadow-[0_2px_8px_oklch(var(--accent)/0.15)]">
       <div className="flex items-center gap-1 text-[11px] text-muted">{label}</div>
       <div className={`mt-1 truncate font-mono text-lg font-semibold leading-none tabular-nums ${isPlain ? color : 'text-foreground'}`}>{value}</div>
       {sub && <div className="mt-1 truncate text-[10px] text-muted">{sub}</div>}
@@ -241,7 +241,7 @@ function IndexTicker({ item }: { item: OverviewMarket['indices'][number] }) {
   return (
     <Link
       to={`/indices?symbol=${encodeURIComponent(item.symbol)}`}
-      className="grid min-w-0 grid-cols-[1fr_auto] items-center gap-x-2 gap-y-0.5 rounded-lg border border-border bg-elevated/45 px-1.5 py-1 shadow-[0_1px_1px_hsl(var(--border)/0.3)] backdrop-blur-sm transition-all hover:border-accent/40 hover:bg-elevated hover:shadow-[0_2px_6px_hsl(var(--accent)/0.15)]"
+      className="grid min-w-0 grid-cols-[1fr_auto] items-center gap-x-2 gap-y-0.5 rounded-lg border border-border bg-elevated/45 px-1.5 py-1 shadow-[0_1px_1px_oklch(var(--border)/0.3)] backdrop-blur-sm transition-all hover:border-accent/40 hover:bg-elevated hover:shadow-[0_2px_6px_oklch(var(--accent)/0.15)]"
     >
       <div className="truncate text-xs font-medium text-foreground">{item.name || item.symbol}</div>
       <div className={`font-mono text-xs font-semibold ${pctClass(pct)}`}>{fmtIndexPct(pct)}</div>
@@ -334,25 +334,25 @@ function EmotionRadar({ radar, score }: { radar: OverviewMarket['radar']; score:
             <stop offset="0%" stopColor={`${color}57`} />
             <stop offset="100%" stopColor={`${color}1f`} />
           </radialGradient>
-          {/* 中心/网格用 CSS 变量取色, 亮暗主题自动切换 (SVG 属性支持 hsl(var(--x))) */}
+          {/* 中心/网格用 CSS 变量取色, 亮暗主题自动切换 (SVG 属性支持 oklch(var(--x))) */}
           <radialGradient id="emotionRadarCenter" cx="50%" cy="50%" r="55%">
-            <stop offset="0%" stopColor="hsl(var(--surface) / 0.92)" />
-            <stop offset="68%" stopColor="hsl(var(--surface) / 0.70)" />
-            <stop offset="100%" stopColor="hsl(var(--surface) / 0)" />
+            <stop offset="0%" stopColor="oklch(var(--surface) / 0.92)" />
+            <stop offset="68%" stopColor="oklch(var(--surface) / 0.70)" />
+            <stop offset="100%" stopColor="oklch(var(--surface) / 0)" />
           </radialGradient>
         </defs>
         {gridPolygons.map(g => (
           <polygon
             key={g.level}
             points={g.points}
-            fill={g.idx % 2 === 0 ? 'hsl(var(--elevated) / 0.55)' : 'hsl(var(--elevated) / 0.3)'}
-            stroke={g.level === 1 ? 'hsl(var(--border) / 0.9)' : 'hsl(var(--border) / 0.5)'}
+            fill={g.idx % 2 === 0 ? 'oklch(var(--elevated) / 0.55)' : 'oklch(var(--elevated) / 0.3)'}
+            stroke={g.level === 1 ? 'oklch(var(--border) / 0.9)' : 'oklch(var(--border) / 0.5)'}
             strokeWidth={g.level === 1 ? 1.2 : 0.8}
           />
         ))}
-        {points.map(p => <line key={p.key} x1={cx} y1={cy} x2={p.gx} y2={p.gy} stroke="hsl(var(--border) / 0.4)" />)}
+        {points.map(p => <line key={p.key} x1={cx} y1={cy} x2={p.gx} y2={p.gy} stroke="oklch(var(--border) / 0.4)" />)}
         <polygon points={polygon} fill="url(#emotionRadarFill)" stroke={color} strokeWidth="2" />
-        {points.map(p => <circle key={p.key} cx={p.x} cy={p.y} r="2.8" fill={color} stroke="hsl(var(--surface) / 0.9)" strokeWidth="1" />)}
+        {points.map(p => <circle key={p.key} cx={p.x} cy={p.y} r="2.8" fill={color} stroke="oklch(var(--surface) / 0.9)" strokeWidth="1" />)}
         <circle cx={cx} cy={cy} r="29" fill="url(#emotionRadarCenter)" />
         <text x={cx} y={cy + 7} textAnchor="middle" className="fill-foreground font-mono text-[24px] font-bold">{score}</text>
         {points.map(p => (
@@ -414,7 +414,7 @@ function StockList({ title, rows, mode, onStockClick }: {
   onStockClick?: (symbol: string, name?: string) => void;
 }) {
   return (
-    <div className="rounded-card border border-border bg-surface/80 p-1.5 shadow-[0_1px_2px_hsl(var(--border)/0.4)] backdrop-blur-sm transition-shadow hover:shadow-[0_2px_8px_hsl(var(--border)/0.5)]">
+    <div className="rounded-card border border-border bg-surface/80 p-1.5 shadow-[0_1px_2px_oklch(var(--border)/0.4)] backdrop-blur-sm transition-shadow hover:shadow-[0_2px_8px_oklch(var(--border)/0.5)]">
       <div className="mb-1 flex items-center justify-between">
         <h3 className="text-xs font-semibold text-foreground">{title}</h3>
         <span className="text-[9px] text-muted">TOP {Math.min(rows.length, 8)}</span>
@@ -540,7 +540,7 @@ function HotRankCard({ title, rank, configUrl, onStockClick, onDimensionClick }:
 }) {
   const hasData = (rank?.leading?.length ?? 0) > 0 || (rank?.lagging?.length ?? 0) > 0
   return (
-    <section className="rounded-card border border-border bg-surface/80 p-1.5 shadow-[0_1px_2px_hsl(var(--border)/0.4)] backdrop-blur-sm transition-shadow hover:shadow-[0_2px_8px_hsl(var(--border)/0.5)]">
+    <section className="rounded-card border border-border bg-surface/80 p-1.5 shadow-[0_1px_2px_oklch(var(--border)/0.4)] backdrop-blur-sm transition-shadow hover:shadow-[0_2px_8px_oklch(var(--border)/0.5)]">
       <SectionTitle icon={Flame} title={title} hint="领涨/领跌 · 点击板块看成分股" />
       {hasData ? (
         <div className="grid grid-cols-2 gap-2">
@@ -738,7 +738,7 @@ export function Dashboard() {
       </AnimatePresence>
       {/* 无除权因子能力时的同步前置确认 */}
       {adjGate.dialog}
-      <div className="relative mb-1.5 flex flex-wrap items-center justify-between gap-2 overflow-hidden rounded-card border border-border bg-gradient-to-r from-surface/90 to-surface/70 px-3 py-1.5 shadow-[0_1px_3px_hsl(var(--border)/0.4)] backdrop-blur-sm">
+      <div className="relative mb-1.5 flex flex-wrap items-center justify-between gap-2 overflow-hidden rounded-card border border-border bg-gradient-to-r from-surface/90 to-surface/70 px-3 py-1.5 shadow-[0_1px_3px_oklch(var(--border)/0.4)] backdrop-blur-sm">
         <div className="pointer-events-none absolute left-0 top-0 h-full w-1 bg-gradient-to-b from-accent to-accent/20" aria-hidden />
         <div className="flex items-center gap-2">
           <Gauge className="h-4 w-4 text-accent" />
@@ -811,7 +811,7 @@ export function Dashboard() {
       <div className="grid grid-cols-1 gap-1.5 xl:grid-cols-[minmax(0,1fr)_20rem]">
         <main className="min-w-0 space-y-1.5">
           <div className="grid grid-cols-1 gap-1.5 lg:grid-cols-3">
-            <section className="rounded-card border border-border bg-surface/80 p-1.5 shadow-[0_1px_2px_hsl(var(--border)/0.4)] backdrop-blur-sm transition-shadow hover:shadow-[0_2px_8px_hsl(var(--border)/0.5)]">
+            <section className="rounded-card border border-border bg-surface/80 p-1.5 shadow-[0_1px_2px_oklch(var(--border)/0.4)] backdrop-blur-sm transition-shadow hover:shadow-[0_2px_8px_oklch(var(--border)/0.5)]">
               <SectionTitle icon={BarChart3} title="涨跌分布 / 广度" hint={`${data.breadth.total}只`} />
               <DistributionBars rows={data.distribution} />
               <div className="mt-2">
@@ -824,14 +824,14 @@ export function Dashboard() {
             </section>
 
             <section
-              className="rounded-card border bg-surface/80 p-1.5 shadow-[0_1px_2px_hsl(var(--border)/0.4)] backdrop-blur-sm transition-shadow hover:shadow-[0_2px_8px_hsl(var(--border)/0.5)]"
+              className="rounded-card border bg-surface/80 p-1.5 shadow-[0_1px_2px_oklch(var(--border)/0.4)] backdrop-blur-sm transition-shadow hover:shadow-[0_2px_8px_oklch(var(--border)/0.5)]"
               style={{ borderColor: `${scoreColor(score)}40` }}
             >
               <SectionTitle icon={Sparkles} title="情绪雷达" hint={`情绪评分 ${score}`} />
               <EmotionRadar radar={data.radar} score={score} />
             </section>
 
-            <section className="flex flex-col rounded-card border border-border bg-surface/80 p-1.5 shadow-[0_1px_2px_hsl(var(--border)/0.4)] backdrop-blur-sm transition-shadow hover:shadow-[0_2px_8px_hsl(var(--border)/0.5)]">
+            <section className="flex flex-col rounded-card border border-border bg-surface/80 p-1.5 shadow-[0_1px_2px_oklch(var(--border)/0.4)] backdrop-blur-sm transition-shadow hover:shadow-[0_2px_8px_oklch(var(--border)/0.5)]">
               <div>
                 <SectionTitle icon={LineChart} title="趋势强度" hint="均线/新高低" />
                 <div className="grid grid-cols-3 gap-1.5">
@@ -875,11 +875,11 @@ export function Dashboard() {
         </main>
 
         <aside className="min-w-0 space-y-1.5">
-          <section className="rounded-card border border-border bg-surface/80 p-1.5 shadow-[0_1px_2px_hsl(var(--border)/0.4)] backdrop-blur-sm transition-shadow hover:shadow-[0_2px_8px_hsl(var(--border)/0.5)]">
+          <section className="rounded-card border border-border bg-surface/80 p-1.5 shadow-[0_1px_2px_oklch(var(--border)/0.4)] backdrop-blur-sm transition-shadow hover:shadow-[0_2px_8px_oklch(var(--border)/0.5)]">
             <SectionTitle icon={Flame} title="涨停梯队" hint={<span className="inline-flex items-center gap-1">{`涨停 ${data.limit.limit_up}`}{isSealedDegrade && <span className="text-[9px] px-1 rounded bg-yellow-500/10 text-yellow-600 dark:text-yellow-500">{hasDepth ? '未修正' : '降级'}</span>}</span>} />
             <LadderMini limit={data.limit} />
           </section>
-          <section className="rounded-card border border-border bg-surface/80 p-1.5 shadow-[0_1px_2px_hsl(var(--border)/0.4)] backdrop-blur-sm transition-shadow hover:shadow-[0_2px_8px_hsl(var(--border)/0.5)]">
+          <section className="rounded-card border border-border bg-surface/80 p-1.5 shadow-[0_1px_2px_oklch(var(--border)/0.4)] backdrop-blur-sm transition-shadow hover:shadow-[0_2px_8px_oklch(var(--border)/0.5)]">
             <div className="mb-2 flex items-center justify-between gap-2">
               <div className="flex items-center gap-1.5">
                 <BellRing className="h-3.5 w-3.5 text-accent" />

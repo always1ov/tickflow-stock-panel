@@ -1024,7 +1024,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
               <label className="flex items-center gap-2 pt-4">
                 <input type="checkbox" checked={draft.basic_filter?.exclude_st ?? true}
                   onChange={event => setDraft(d => ({ ...d, basic_filter: { ...d.basic_filter, exclude_st: event.target.checked } }))}
-                  className="h-3.5 w-3.5 accent-[hsl(var(--accent))]" />
+                  className="h-3.5 w-3.5 accent-[oklch(var(--accent))]" />
                 <span className="text-[11px] text-secondary">剔除 ST / 风险警示</span>
               </label>
             </div>

@@ -10,24 +10,28 @@ export default {
     extend: {
       colors: {
         // §6.0.1 色板 — CSS variables 见 src/index.css
-        base:      'hsl(var(--base) / <alpha-value>)',
-        surface:   'hsl(var(--surface) / <alpha-value>)',
-        elevated:  'hsl(var(--elevated) / <alpha-value>)',
-        border:    'hsl(var(--border) / <alpha-value>)',
-        foreground: 'hsl(var(--fg-primary) / <alpha-value>)',
-        secondary:  'hsl(var(--fg-secondary) / <alpha-value>)',
-        muted:      'hsl(var(--fg-muted) / <alpha-value>)',
-        accent:     'hsl(var(--accent) / <alpha-value>)',
+        base:      'oklch(var(--base) / <alpha-value>)',
+        surface:   'oklch(var(--surface) / <alpha-value>)',
+        elevated:  'oklch(var(--elevated) / <alpha-value>)',
+        border:    'oklch(var(--border) / <alpha-value>)',
+        foreground: 'oklch(var(--fg-primary) / <alpha-value>)',
+        secondary:  'oklch(var(--fg-secondary) / <alpha-value>)',
+        muted:      'oklch(var(--fg-muted) / <alpha-value>)',
+        accent:     'oklch(var(--accent) / <alpha-value>)',
         // A 股语义色:仅用于价格 / K 线,不用于 UI 状态
-        bull:       'hsl(var(--bull) / <alpha-value>)',
-        bear:       'hsl(var(--bear) / <alpha-value>)',
-        warning:    'hsl(var(--warning) / <alpha-value>)',
-        danger:     'hsl(var(--danger) / <alpha-value>)',
+        bull:       'oklch(var(--bull) / <alpha-value>)',
+        bear:       'oklch(var(--bear) / <alpha-value>)',
+        warning:    'oklch(var(--warning) / <alpha-value>)',
+        danger:     'oklch(var(--danger) / <alpha-value>)',
       },
       fontFamily: {
-        // 参考 FluxDown 的中文优先字体栈。MiSans 不随仓库分发，设备未安装时
-        // 依次回退到各平台原生中文 UI 字体，避免远程字体阻塞首屏。
+        // 中文优先字体栈。MiSans 不随仓库分发，设备未安装时依次回退到各平台
+        // 原生中文 UI 字体。
+        // [R125] 拉丁字形交给打包进产物的 Inter(skill §2 首选之一): 它没有 CJK
+        // 字形, 浏览器遇到中文会自然落到后面的中文字体 —— 这正是混排字体栈的
+        // 工作方式, 一个声明同时管好中英文。字体文件自托管, 不请求 Google。
         sans: [
+          'Inter Variable',
           'MiSans',
           '"HarmonyOS Sans SC"',
           '"PingFang SC"',
@@ -39,6 +43,8 @@ export default {
           'sans-serif',
         ],
         mono: [
+          // [R125] 之前这里写着 JetBrains Mono 但没人提供它 —— 只有本机装过的
+          // 人看得到, 其余人静默回落 Consolas。现在打包进产物, 所有人一致。
           '"JetBrains Mono"',
           '"Cascadia Code"',
           '"SFMono-Regular"',

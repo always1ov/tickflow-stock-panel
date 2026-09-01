@@ -1,40 +1,70 @@
+@import '@fontsource/jetbrains-mono/latin-400.css';
+@import '@fontsource/jetbrains-mono/latin-500.css';
+/* 只声明 latin 一片: index.css 会带上西里尔/希腊/越南语等 5 个分片(176KB),
+ * 一个 A 股面板永远用不到。浏览器靠 unicode-range 本来就不会去下载它们,
+ * 但没必要让它们进产物。 */
+@font-face {
+  font-family: 'Inter Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url('@fontsource-variable/inter/files/inter-latin-wght-normal.woff2') format('woff2-variations');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* [R125] 自托管字体 —— 打包进产物, 不走 Google Fonts CDN。
+ * 两个理由: ①国内访问 Google Fonts 慢且经常直接不通, 走 CDN 等于把首屏交给
+ * 一个可能超时的第三方; ②此前 tailwind 里写着 JetBrains Mono, 但没有任何地方
+ * 提供这个字体 —— **只有本机装过的人才看得到**, 其余人静默回落到 Consolas。
+ * 现在它是产物的一部分, 所有人看到的等宽数字终于一致。只引 latin 子集:
+ * 中文由系统字体栈接管(MiSans/苹方/微软雅黑), 不为 CJK 拉几 MB 字体。 */
+
 /* === §6.0 设计语言 CSS variables ===
  * 暗色为默认(html.dark) / 亮色用 :root 反转
- * HSL 形式以兼容 Tailwind alpha-value 语法
+ *
+ * [R125] 色值从 HSL 换成 **oklch**(按 frontend-design skill §2)。数值由原 HSL
+ * 精确换算而来(sRGB → 线性 → OKLab → OKLCH), **当前视觉与改版前一致**, 不是
+ * 换了套颜色。换的是坐标系, 好处有三:
+ *   1. L 是感知亮度, 不是 HSL 那个骗人的 lightness —— 同 L 的蓝和黄看起来
+ *      真的一样亮, 以后调层级不用靠肉眼试;
+ *   2. 半透明叠加(本项目大量用 /10 /15 /20)在感知均匀的空间里更可预期;
+ *   3. 广色域屏(P3)上不再被 sRGB 夹住。
+ * 浏览器要求: Chrome 111+ / Safari 15.4+ / Firefox 113+(2023 年起的版本都行)。
+ * 回退方案见 FORK_NOTES R125 —— 换回 HSL 只需还原本文件与 tailwind.config 两处。
  */
 :root {
   /* 亮色(可切换) */
-  --base: 0 0% 98%;          /* #FAFAFA */
-  --surface: 0 0% 100%;      /* #FFFFFF */
-  --elevated: 240 5% 96%;    /* #F4F4F5 */
-  --border: 240 6% 90%;      /* #E4E4E7 */
-  --fg-primary: 240 6% 10%;  /* #18181B */
-  --fg-secondary: 240 4% 35%;/* #52525B */
-  --fg-muted: 240 5% 65%;    /* #A1A1AA */
-  --accent: 217 91% 60%;     /* #3B82F6 电光蓝 */
-  --bull: 4 87% 60%;         /* #F04438 红涨 */
-  --bear: 152 67% 45%;       /* #12B76A 绿跌 */
-  --warning: 32 95% 50%;     /* #F79009 */
-  --danger: 4 87% 60%;       /* #F04438 */
+  --base: 0.9848 0.0000 89.88;        /* was #FAFAFA */
+  --surface: 1.0000 0.0000 89.88;     /* was #FFFFFF */
+  --elevated: 0.9683 0.0014 286.37;   /* was #F4F4F5 */
+  --border: 0.9197 0.0041 286.32;     /* was #E4E4E7 */
+  --fg-primary: 0.2102 0.0060 285.87; /* was #18181B */
+  --fg-secondary: 0.4545 0.0115 285.93;
+  --fg-muted: 0.7127 0.0128 286.07;
+  --accent: 0.6261 0.1859 259.60;     /* 电光蓝 —— skill 明令避开的 bootstrap 蓝不是这个 */
+  --bull: 0.6488 0.2040 28.22;        /* 红涨 */
+  --bear: 0.7137 0.1614 156.67;       /* 绿跌 */
+  --warning: 0.7351 0.1754 57.62;
+  --danger: 0.6488 0.2040 28.22;
 }
 
 html.dark {
-  --base: 240 5% 5%;         /* #0A0A0B */
-  --surface: 240 7% 10%;     /* #18181B 略亮一点,与 base 对比清晰 */
-  --elevated: 240 9% 14%;    /* #212126 */
-  --border: 240 5% 22%;      /* #353539 边框加亮,易识别 */
-  --fg-primary: 0 0% 98%;    /* #FAFAFA */
-  --fg-secondary: 240 5% 78%;/* #C4C4CB 大幅提亮 — 子标题/导航非激活态 */
-  --fg-muted: 240 5% 58%;    /* #8E8E96 muted 提亮 — 辅助提示 */
-  --accent: 217 91% 60%;
-  --bull: 4 87% 60%;
-  --bear: 152 67% 45%;
-  --warning: 32 95% 50%;
-  --danger: 4 87% 60%;
+  --base: 0.1555 0.0027 286.08;
+  --surface: 0.2093 0.0070 285.78;    /* 比 base 亮一档, 层级看得出来 */
+  --elevated: 0.2484 0.0121 285.49;
+  --border: 0.3323 0.0098 285.86;
+  --fg-primary: 0.9848 0.0000 89.88;
+  --fg-secondary: 0.8223 0.0078 286.23;
+  --fg-muted: 0.6520 0.0158 285.95;
+  --accent: 0.6261 0.1859 259.60;
+  --bull: 0.6488 0.2040 28.22;
+  --bear: 0.7137 0.1614 156.67;
+  --warning: 0.7351 0.1754 57.62;
+  --danger: 0.6488 0.2040 28.22;
 }
 
 /* 价格 / 数字一律等宽 */
@@ -43,7 +73,7 @@ html.dark {
 /* 全局滚动条 */
 * {
   scrollbar-width: thin;
-  scrollbar-color: hsl(var(--border)) transparent;
+  scrollbar-color: oklch(var(--border)) transparent;
 }
 *::-webkit-scrollbar {
   width: 8px;
@@ -53,24 +83,24 @@ html.dark {
   background: transparent;
 }
 *::-webkit-scrollbar-thumb {
-  background: hsl(var(--border) / 0.72);
+  background: oklch(var(--border) / 0.72);
   border: 2px solid transparent;
   border-radius: 999px;
   background-clip: content-box;
 }
 *::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--accent) / 0.75);
+  background: oklch(var(--accent) / 0.75);
   background-clip: content-box;
 }
 .tabular { font-variant-numeric: tabular-nums; }
 .num { font-family: theme('fontFamily.mono'); font-variant-numeric: tabular-nums; }
 
 /* 默认 1px 细分隔线(暗色用边框区分层次,不用 shadow) */
-* { border-color: hsl(var(--border)); }
+* { border-color: oklch(var(--border)); }
 
 body {
-  background: hsl(var(--base));
-  color: hsl(var(--fg-primary));
+  background: oklch(var(--base));
+  color: oklch(var(--fg-primary));
   font-family: theme('fontFamily.sans');
   font-size: 13px;
   line-height: 1.5;
@@ -98,7 +128,7 @@ body {
 
   input::placeholder,
   textarea::placeholder {
-    color: hsl(var(--fg-muted));
+    color: oklch(var(--fg-muted));
     letter-spacing: 0;
   }
 
@@ -136,8 +166,8 @@ body {
 }
 
 ::selection {
-  background: hsl(var(--accent) / 0.28);
-  color: hsl(var(--fg-primary));
+  background: oklch(var(--accent) / 0.28);
+  color: oklch(var(--fg-primary));
 }
 
 /* ===== [R124] 全项目无障碍与动效基线 =====
@@ -156,7 +186,7 @@ body {
  * 组件想用自己的环, 加 .focus-ring-custom 显式退出。 */
 :where(a, button, [role='button'], [role='switch'], [role='tab'],
        input, select, textarea, summary, [tabindex]):focus-visible {
-  outline: 2px solid hsl(var(--accent) / 0.75) !important;
+  outline: 2px solid oklch(var(--accent) / 0.75) !important;
   outline-offset: 2px;
 }
 /* 自带 ring 的组件(Toast/开关)显式退出, 避免环与轮廓叠两层 */

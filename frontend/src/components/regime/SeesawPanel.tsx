@@ -15,7 +15,7 @@ import { cn } from '@/lib/cn'
  *    结果滚动留档 30 天 —— 单看今天没意义, 要知道最近来回切了几轮。
  */
 
-const CARD = 'rounded-card border border-border bg-surface/80 shadow-[0_1px_2px_hsl(var(--border)/0.4)] backdrop-blur-sm'
+const CARD = 'rounded-card border border-border bg-surface/80 shadow-[0_1px_2px_oklch(var(--border)/0.4)] backdrop-blur-sm'
 const COLOR_A = '#f59e0b'
 const COLOR_B = '#38bdf8'
 

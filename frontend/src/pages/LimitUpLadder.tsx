@@ -823,7 +823,7 @@ function TagStats({ title, tiers, extFields, fieldKey, color, selectedTag, onSel
         {needsExpand && !expanded && (
           <div
             className="absolute bottom-0 left-0 right-0 h-4 pointer-events-none"
-            style={{ background: 'linear-gradient(to bottom, transparent 0%, hsl(var(--surface)) 100%)' }}
+            style={{ background: 'linear-gradient(to bottom, transparent 0%, oklch(var(--surface)) 100%)' }}
           />
         )}
       </div>

@@ -83,14 +83,14 @@ export function Onboarding() {
         />
         <div
           className="absolute -bottom-40 -right-32 h-[26rem] w-[26rem] rounded-full blur-[120px] opacity-15"
-          style={{ background: 'radial-gradient(circle, hsl(var(--accent)), transparent 70%)' }}
+          style={{ background: 'radial-gradient(circle, oklch(var(--accent)), transparent 70%)' }}
         />
         {/* 极淡网格底纹 */}
         <div
           className="absolute inset-0 opacity-[0.025]"
           style={{
             backgroundImage:
-              'linear-gradient(hsl(var(--fg-primary)) 1px, transparent 1px), linear-gradient(90deg, hsl(var(--fg-primary)) 1px, transparent 1px)',
+              'linear-gradient(oklch(var(--fg-primary)) 1px, transparent 1px), linear-gradient(90deg, oklch(var(--fg-primary)) 1px, transparent 1px)',
             backgroundSize: '40px 40px',
           }}
         />
@@ -115,10 +115,10 @@ export function Onboarding() {
                 animate={{
                   width: i === step ? 64 : 24,
                   backgroundColor: i === step
-                    ? 'hsl(var(--accent))'
+                    ? 'oklch(var(--accent))'
                     : i < step
-                      ? 'hsl(var(--accent) / 0.6)'
-                      : 'hsl(var(--border))',
+                      ? 'oklch(var(--accent) / 0.6)'
+                      : 'oklch(var(--border))',
                 }}
                 transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
                 className="h-1.5 rounded-full"
@@ -169,7 +169,7 @@ function DisclaimerStep({ onNext }: { onNext: () => void }) {
         animate={{ scale: 1, opacity: 1 }}
         transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
         className="mx-auto w-fit rounded-2xl p-4 border border-warning/40"
-        style={{ background: 'linear-gradient(135deg, hsl(var(--warning) / 0.15), transparent)' }}
+        style={{ background: 'linear-gradient(135deg, oklch(var(--warning) / 0.15), transparent)' }}
       >
         <AlertCircle className="h-8 w-8 text-warning" />
       </motion.div>

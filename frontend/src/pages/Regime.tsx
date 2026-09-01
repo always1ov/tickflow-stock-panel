@@ -135,7 +135,7 @@ function SectionTitle({ icon: Icon, title, hint }: { icon: typeof Activity; titl
 }
 
 // ── 卡片容器样式 (Dashboard 同款) ─────────────────────────
-const cardCls = 'rounded-card border border-border bg-surface/80 shadow-[0_1px_2px_hsl(var(--border)/0.4)] backdrop-blur-sm transition-shadow hover:shadow-[0_2px_8px_hsl(var(--border)/0.5)]'
+const cardCls = 'rounded-card border border-border bg-surface/80 shadow-[0_1px_2px_oklch(var(--border)/0.4)] backdrop-blur-sm transition-shadow hover:shadow-[0_2px_8px_oklch(var(--border)/0.5)]'
 
 // ── 主组件 ────────────────────────────────────────────────
 export function Regime() {
