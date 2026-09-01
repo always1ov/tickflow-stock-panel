@@ -375,7 +375,7 @@ function AIConfigBadge({ configured, model }: { configured?: boolean; model?: st
     staleTime: 60_000,
   })
   const rows = profilesQ.data?.profiles ?? []
-  const managed = rows.filter(p => p.id !== 'legacy')
+  const managed = rows.filter(p => !p.synthesized)
   const enabled = managed.filter(p => p.enabled)
   const primary = enabled[0]
   // 表里排第一但没勾「启用」的档位: 调用链会跳过它, 徽标也不能显示它 ——

@@ -2148,6 +2148,9 @@ export interface AiProfile {
   model: string
   reasoning_effort?: string
   enabled: boolean
+  /** [R111] true=后端现合成的兼容档(存储里还没有档位表); 存储里的真实档位为 false。
+      不能靠 id==='legacy' 判断 —— 早期合成的那条被保存后 id 会原样留在表里。 */
+  synthesized?: boolean
 }
 
 export interface SettingsState {

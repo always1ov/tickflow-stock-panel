@@ -104,8 +104,8 @@ export function SettingsAIPanel({ highlight }: { highlight?: string } = {}) {
   // 参与任何调用, 只剩全局参数(UA/输出上限/上下文窗口)仍然全局生效, 界面据此收起。
   const profilesQuery = useQuery({ queryKey: QK.aiProfiles, queryFn: api.aiProfiles })
   const profileRows = profilesQuery.data?.profiles ?? []
-  const profilesManaged = profileRows.some(p => p.id !== 'legacy')
-  const enabledProfiles = profileRows.filter(p => p.enabled && p.id !== 'legacy')
+  const profilesManaged = profileRows.some(p => !p.synthesized)
+  const enabledProfiles = profileRows.filter(p => p.enabled && !p.synthesized)
   const primaryProfile = enabledProfiles[0]
 
   const isCodexProvider = provider === CODEX_PROVIDER

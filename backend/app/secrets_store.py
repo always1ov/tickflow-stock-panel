@@ -135,6 +135,10 @@ def _clean_profile(raw: dict, index: int) -> dict | None:
         "model": model,
         "reasoning_effort": str(raw.get("reasoning_effort") or "").strip(),
         "enabled": bool(raw.get("enabled", True)),
+        # [R111] 来自存储 = 用户真实档位。**不能靠 id=="legacy" 判断是不是合成档**:
+        # 早期合成的那条一旦被用户保存进表, id 就原样留在存储里, 它已是真实档位
+        # (调用链也确实在用它)。靠 id 猜会把用户排第一的档位误当兼容占位过滤掉。
+        "synthesized": False,
     }
 
 
@@ -167,6 +171,7 @@ def _legacy_profile() -> dict | None:
         return None
     return {
         "id": "legacy",
+        "synthesized": True,   # [R111] 后端现合成的兼容档(存储里没有档位表时才出现)
         "label": "",
         "provider": provider,
         "base_url": get_ai_config("ai_base_url", settings.ai_base_url),
