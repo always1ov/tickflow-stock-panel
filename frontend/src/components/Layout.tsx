@@ -178,7 +178,7 @@ function SidebarIndexQuotes({ rows, items, globalRows, cnLive }: {
   // [同步上游 3c6ed99] 作者把展示层指数收敛为固定核心四只(readonly 常量)
   items: readonly CoreIndex[]
   /** [R102] 全球指数(独立数据源) — 与 A 股指数同格显示, 数据链各自独立 */
-  globalRows?: { key: string; name: string; last: number; change_pct?: number | null; updated_at?: number; trading?: boolean }[]
+  globalRows?: import('@/lib/api').GlobalIndexQuote[]
   /** [R119] A 股这几张卡此刻是不是真在跳(交易时段 + 数据来自实时缓存) */
   cnLive?: boolean
 }) {
@@ -216,26 +216,42 @@ function SidebarIndexQuotes({ rows, items, globalRows, cnLive }: {
       })}
       {globals.map(q => {
         const pct = q.change_pct != null ? q.change_pct * 100 : null
-        const staleMin = q.updated_at ? (Date.now() / 1000 - q.updated_at) / 60 : null
         const trading = q.trading !== false
+        // [R148] 只认**行情自己**的时刻。原来这里用 updated_at 算"多久前",
+        // 而那是我们抓取的时刻 —— 于是一个盘中冻住的数永远显示"刚刚更新",
+        // 故障在界面上完全隐身(纳指不动就是这么被藏起来的)。
+        const ageMin = q.quote_age_s != null ? q.quote_age_s / 60 : null
+        const stale = q.stale === true
+        const live = trading && !stale
+        const ageText = ageMin == null
+          ? '该源不提供行情时刻, 无法判断新旧'
+          : ageMin < 1 ? '行情时刻: 1 分钟内' : `行情时刻: ${Math.round(ageMin)} 分钟前`
         return (
           <div
             key={q.key}
-            className={cn('rounded bg-elevated/60 px-2 py-1.5', !trading && 'opacity-70')}
-            title={`${q.name}(全球·独立源) — ${trading ? '交易中, 实时刷新' : '当前休市, 显示最后成交值'}${
-              staleMin != null && staleMin > 1 ? ` · ${Math.round(staleMin)} 分钟前` : ''}`}
+            className={cn('rounded bg-elevated/60 px-2 py-1.5', !live && 'opacity-70')}
+            title={`${q.name}(全球·独立源) — ${
+              !trading ? '当前休市, 显示最后成交值'
+                : stale ? '交易时段内, 但上游这个数已经很久没变了 —— 当延迟数据看'
+                  : '交易中, 实时刷新'
+            } · ${ageText}${q.source ? ` · 源: ${q.source}` : ''}`}
           >
             <div className="flex items-center justify-between gap-1">
               <span className="flex min-w-0 items-center gap-1 text-[10px] text-secondary">
-                {/* 交易中: 绿点脉冲(在实时跳); 休市: 灰点 */}
+                {/* 在跳=绿点脉冲; 休市=灰点; 盘中卡住=黄点常亮(不脉冲, 它没在跳) */}
                 <span className={cn('h-1 w-1 shrink-0 rounded-full',
-                  trading ? 'bg-bull animate-pulse' : 'bg-muted/40')} />
+                  live ? 'bg-bull animate-pulse' : stale ? 'bg-warning' : 'bg-muted/40')} />
                 <span className="truncate">{q.name}</span>
               </span>
               <span className={`text-[10px] font-mono ${indexPctClass(pct)}`}>{fmtIndexPct(pct)}</span>
             </div>
-            <div className={`mt-0.5 truncate font-mono text-[10px] ${indexPctClass(pct)}`}>
-              {fmtIndexValue(q.last)}
+            <div className={`mt-0.5 flex items-baseline justify-between gap-1`}>
+              <span className={`truncate font-mono text-[10px] ${indexPctClass(pct)}`}>
+                {fmtIndexValue(q.last)}
+              </span>
+              {stale && ageMin != null && (
+                <span className="shrink-0 text-[9px] text-warning">延迟{Math.round(ageMin)}分</span>
+              )}
             </div>
           </div>
         )
