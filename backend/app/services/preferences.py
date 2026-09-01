@@ -118,6 +118,16 @@ def get_realtime_quotes_enabled() -> bool:
     return load().get("realtime_quotes_enabled", False)
 
 
+def get_realtime_auto() -> bool:
+    """[R118] 实时行情是否按交易日/交易时段自动开关。默认关(保持手动)。"""
+    return bool(load().get("realtime_auto", False))
+
+
+def set_realtime_auto(enabled: bool) -> bool:
+    save({"realtime_auto": bool(enabled)})
+    return bool(enabled)
+
+
 def get_indices_nav_pinned() -> bool:
     """侧栏指数报价卡片是否固定显示。默认 True（常驻）。
     关闭后，卡片跟随实时行情开关（仅实时开时显示）。"""

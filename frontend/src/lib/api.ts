@@ -2334,6 +2334,8 @@ export interface WecomBotStatus {
 
 export interface Preferences {
   realtime_quotes_enabled: boolean
+  /** [R118] 按交易日/交易时段自动开关实时行情 */
+  realtime_auto: boolean
   indices_nav_pinned: boolean
   watchlist_groups_in_nav: boolean
   minute_sync_enabled: boolean
@@ -2747,6 +2749,12 @@ export const api = {
     request<Partial<Preferences>>('/api/settings/preferences/realtime-quote-scope', {
       method: 'PUT',
       body: JSON.stringify(cfg),
+    }),
+  /** [R118] 开/关「按交易日自动开关行情」(实际开关由后端守护线程在≤30s 内落地) */
+  updateRealtimeAuto: (enabled: boolean) =>
+    request<{ realtime_auto: boolean; window: string }>('/api/settings/preferences/realtime-auto', {
+      method: 'PUT',
+      body: JSON.stringify({ realtime_auto: enabled }),
     }),
   updateIndicesNavPinned: (pinned: boolean) =>
     request<{ indices_nav_pinned: boolean }>('/api/settings/preferences/indices-nav-pinned', {

@@ -199,6 +199,13 @@ class QuoteService:
         self._paused = False
         self._interval = self.DEFAULT_INTERVAL
         self._thread: threading.Thread | None = None
+        # [R118] 自动开关: 独立守护线程, 与轮询线程无关(开关关着时轮询线程压根
+        # 不存在, 所以不能把这段逻辑塞进 _poll_loop)。**边沿触发** ——
+        # 只在"应开/应关"翻转的那一刻动手, 中间用户手动改了就一直听用户的,
+        # 到下一个边界(次日开盘/当日收盘)才回到自动节奏。
+        self._auto_thread: threading.Thread | None = None
+        self._auto_last_desired: bool | None = None
+        self._auto_pref_last: bool | None = None
         self._repo = None          # 延迟注入, 避免循环导入
         # SSE 订阅者集合: 每个 /stream 连接一个 QuoteSubscriber, 事件广播到所有订阅者
         self._subscribers: set[QuoteSubscriber] = set()
@@ -355,6 +362,76 @@ class QuoteService:
             return
         if preferences.get_realtime_quotes_enabled():
             self.start()
+        self.start_auto_supervisor()   # [R118] 无论开关当前是开是关都要跑
+
+    # ================================================================
+    # [R118] 自动开关(对齐交易日/交易时段)
+    # ================================================================
+
+    _AUTO_TICK_S = 30.0
+
+    def start_auto_supervisor(self) -> None:
+        """启动自动开关守护线程(幂等)。自动没打开时它每拍就是空转。"""
+        if self._auto_thread and self._auto_thread.is_alive():
+            return
+        self._auto_thread = threading.Thread(
+            target=self._auto_loop, name="realtime-auto", daemon=True)
+        self._auto_thread.start()
+
+    def notify_auto_pref_changed(self) -> None:
+        """自动开关刚被用户改动 —— 清掉边沿记忆, 让下一拍立刻按当前时段生效。"""
+        self._auto_last_desired = None
+        self._auto_pref_last = None
+
+    def _auto_loop(self) -> None:
+        while True:
+            try:
+                self._auto_tick()
+            except Exception as e:  # noqa: BLE001 —— 自动开关出错不该拖垮进程
+                logger.warning("实时行情自动开关异常: %s", e)
+            time.sleep(self._AUTO_TICK_S)
+
+    def _final_sync_pending(self) -> bool:
+        """今天的收盘定版还没成功(有就别急着关, 那一版快照是当日数据的收尾)。"""
+        key = self._final_sync_key("close_final")
+        return bool(key and key not in self._final_sync_done)
+
+    def _auto_tick(self) -> None:
+        from app.market_time import cn_now
+        from app.services import preferences, realtime_schedule, trading_day
+
+        auto_on = preferences.get_realtime_auto()
+        if auto_on != self._auto_pref_last:
+            # 刚被打开/关闭 → 重新认边沿, 打开的那一刻就按当前时段生效
+            self._auto_pref_last = auto_on
+            self._auto_last_desired = None
+        if not auto_on:
+            return
+        if not self.is_realtime_allowed():
+            return      # none 档没有实时权限, 自动开也开不出来, 静默空转
+
+        now = cn_now()
+        desired = realtime_schedule.desired_state(now, trading_day.is_trading_day(now))
+        # 该关了但收盘定版还没成功 → 宽限到 15:40, 让它把最后一版拉完
+        if not desired and self._auto_last_desired is True \
+                and realtime_schedule.in_grace_window(now) and self._final_sync_pending():
+            logger.debug("收盘定版未完成, 自动关闭延后")
+            return
+        if desired == self._auto_last_desired:
+            return      # 边沿没变: 中间用户手动怎么改都不覆盖
+
+        self._auto_last_desired = desired
+        if desired:
+            if not self._enabled:
+                self.enable()
+                logger.info("实时行情自动开启(%s)", realtime_schedule.window_label())
+        elif self._enabled:
+            # 用 stop() 而不是 disable(): disable 会连自选实时叠加层一起清空
+            # ([R16] 那是"用户要回到收盘口径"的语义)。自动关只是"这一天的行情
+            # 时段结束了", 当天已拉到的实时价要留着给今日总览/决策台用,
+            # 等盘后管道把官方收盘价落盘后自然被覆盖。
+            self.stop()
+            logger.info("实时行情自动关闭(收盘)")
 
     def set_repo(self, repo) -> None:
         """注入 KlineRepository, 用于实时落盘。"""

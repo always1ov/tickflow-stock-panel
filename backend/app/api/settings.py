@@ -626,6 +626,7 @@ def get_preferences() -> dict:
     from app.services import preferences
     return {
         "realtime_quotes_enabled": preferences.get_realtime_quotes_enabled(),
+        "realtime_auto": preferences.get_realtime_auto(),   # [R118] 按交易日自动开关
         "realtime_allowed": _realtime_allowed(),
         "indices_nav_pinned": preferences.get_indices_nav_pinned(),
         "watchlist_groups_in_nav": preferences.get_watchlist_groups_in_nav(),
@@ -1149,6 +1150,28 @@ def update_realtime_quotes(req: RealtimeQuotesPrefs, request: Request) -> dict:
     _sync_depth_polling(req.realtime_quotes_enabled)
 
     return {"realtime_quotes_enabled": req.realtime_quotes_enabled, "realtime_allowed": allowed}
+
+
+class RealtimeAutoPrefs(BaseModel):
+    """[R118] 实时行情自动开关(按交易日/交易时段)。"""
+
+    realtime_auto: bool
+
+
+@router.put("/preferences/realtime-auto")
+def update_realtime_auto(req: RealtimeAutoPrefs, request: Request) -> dict:
+    """开/关「按交易日自动开关行情」。
+
+    打开时不立刻改行情开关本身 —— 交给后台守护线程在下一拍(≤30s)按当前时段
+    判定; 这样"现在是不是该开"只有一处逻辑([R118] realtime_schedule)。
+    """
+    from app.services import preferences, realtime_schedule
+    saved = preferences.set_realtime_auto(req.realtime_auto)
+    qs = getattr(request.app.state, "quote_service", None)
+    if qs is not None:
+        qs.notify_auto_pref_changed()
+        qs.start_auto_supervisor()   # 老进程没起过守护线程时兜底
+    return {"realtime_auto": saved, "window": realtime_schedule.window_label()}
 
 
 @router.put("/preferences/realtime-quote-scope")

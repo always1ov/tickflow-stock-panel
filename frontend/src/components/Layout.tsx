@@ -670,6 +670,9 @@ export function Layout() {
   const navigate = useNavigate()
   const version = versionData?.version
   const realtimeEnabled = prefs?.realtime_quotes_enabled ?? false
+  // [R118] 自动开关: 开着的话后端守护线程按「交易日 + 09:15~15:05」自己开关行情。
+  // 边沿触发 —— 中途手动改了就听手动的, 到下一个边界再回到自动节奏。
+  const realtimeAuto = prefs?.realtime_auto ?? false
   // 自选实时模式限制提示: 可手动关闭, 不持久化 (刷新后恢复显示)
   const [dismissFreeHint, setDismissFreeHint] = useState(false)
   useEffect(() => {
@@ -756,6 +759,13 @@ export function Layout() {
     : realtimeEnabled || isPaused
       ? 'bg-warning/70'
       : 'bg-muted'
+  const toggleRealtimeAuto = useMutation({
+    mutationFn: (next: boolean) => api.updateRealtimeAuto(next),
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: QK.preferences })
+      toast(res.realtime_auto ? `已开启自动行情(${res.window})` : '已关闭自动行情', 'success')
+    },
+  })
   const realtimeToggleTitle = isPaused
     ? '数据同步运行中，实时行情已临时暂停'
     : toggleQuote.isPending
@@ -1093,10 +1103,37 @@ export function Layout() {
                     <span className="truncate text-muted">{realtimeProviderName || realtimeModeLabel}</span>
                     <span className="shrink-0 text-border" aria-hidden="true">·</span>
                     <span className={`shrink-0 ${realtimeStatusClass}`}>{realtimeStatusLabel}</span>
+                    {realtimeAuto && (
+                      <>
+                        <span className="shrink-0 text-border" aria-hidden="true">·</span>
+                        <span className="shrink-0 text-accent/80">自动</span>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
               <div className="flex shrink-0 items-center gap-1">
+                {/* [R118] 自动开关: 交易日 09:15 自动开、15:05 自动关(收盘定版没完成会延后到 15:40) */}
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={realtimeAuto}
+                  aria-label="按交易日自动开关行情"
+                  onClick={() => toggleRealtimeAuto.mutate(!realtimeAuto)}
+                  disabled={toggleRealtimeAuto.isPending || realtimeUnavailable}
+                  title={realtimeAuto
+                    ? '自动开关已开启：交易日 09:15 自动开、15:05 自动关。中途手动改动在当天有效，次日恢复自动'
+                    : '开启后按交易日自动开关行情，不用每天手动点'}
+                  className={cn(
+                    'flex h-7 items-center rounded-btn px-1.5 text-[10px] font-medium transition-colors',
+                    realtimeAuto
+                      ? 'bg-accent/15 text-accent hover:bg-accent/25'
+                      : 'text-muted hover:bg-elevated hover:text-foreground',
+                    (toggleRealtimeAuto.isPending || realtimeUnavailable) && 'cursor-not-allowed opacity-50',
+                  )}
+                >
+                  自动
+                </button>
                 <button
                   onClick={() => navigate('/settings?tab=monitoring&highlight=quotes')}
                   aria-label="打开实时监控设置"

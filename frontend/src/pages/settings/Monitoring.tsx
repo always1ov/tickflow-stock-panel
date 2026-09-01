@@ -52,6 +52,15 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
   const toggleQuote = useToggleRealtimeQuotes()
   // 实时模式以 quote_status 为准 (数据源无关): full_market=全市场 / none=不可用
   const realtimeEnabled = prefs?.realtime_quotes_enabled ?? false
+  // [R118] 按交易日自动开关(后端守护线程边沿触发, 前端只负责这个偏好项)
+  const realtimeAuto = prefs?.realtime_auto ?? false
+  const toggleRealtimeAuto = useMutation({
+    mutationFn: (next: boolean) => api.updateRealtimeAuto(next),
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: QK.preferences })
+      toast(res.realtime_auto ? `已开启自动行情(${res.window})` : '已关闭自动行情', 'success')
+    },
+  })
   // 分时图实时刷新间隔 (秒), 与后端 [3,60] clamp 对齐; 默认 6
   const intradayInterval = prefs?.minute_intraday_refresh_interval ?? 6
   // 滑块本地草稿: 拖动时即时反馈, 停顿 2s 后落库 (与行情轮询滑块一致)
@@ -363,6 +372,15 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
             checked={realtimeEnabled}
             onChange={handleToggleQuote}
             disabled={isPaused || toggleQuote.isPending}
+          />
+
+          {/* [R118] 自动开关 —— 省得每天早上手动开、收盘手动关 */}
+          <ToggleRow
+            label="按交易日自动开关"
+            desc="交易日 09:15 自动开、15:05 自动关（收盘定版没拉完会延后，最晚 15:40）。周末与节假日不开。中途手动改动当天有效，次日回到自动节奏。"
+            checked={realtimeAuto}
+            onChange={(next) => toggleRealtimeAuto.mutate(next)}
+            disabled={toggleRealtimeAuto.isPending}
           />
 
           <div className="mt-3 pt-3 border-t border-border">
