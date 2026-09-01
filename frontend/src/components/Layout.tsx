@@ -185,55 +185,51 @@ function SidebarIndexQuotes({ rows, items, globalRows, cnLive }: {
   const globals = globalRows ?? []
   if (items.length === 0 && globals.length === 0) return null
   const quoteBySymbol = new Map((rows ?? []).map(q => [q.symbol, q]))
-  // [R150] A 股卡的"延迟"门槛比境外紧得多: 境外指数本就是延迟行情, 8 秒轮询只是
-  // 习惯, 10 分钟才算卡住; A 股这条链是 6 秒一轮的实时链, 拿 10 分钟当门槛等于
-  // 白加 —— 超过 3 分钟不动就该说话。
-  const CN_STALE_S = 180
+  // [R151] 用户定案:「都不显示延时, 能实时就行了」。卡面回到两态(在跳 / 静止),
+  // 「延迟N分」徽标与黄点一并去掉 —— 那个标签本来是 R148 为了让"冻住的数看起来
+  // 像刚更新的"这件事现形而加的, 而 R148~R150 已经从**选源**上解决了它: 现在
+  // 盘中按行情自带时刻挑最新的源, 卡面不动的概率本来就低了。
+  //
+  // **后端一行没动**: quote_at / stale / 时区补正全部保留 —— 它们不是为了显示,
+  // 是选源的依据, 拆了就等于把"能实时"一起拆了。行情时刻退到 title 里(悬停可见,
+  // 零视觉重量), 真要重新亮出来只是把徽标那几行加回来。
+  //
+  // 代价说清楚: 万一某天源真的又冻住, 卡面看起来会一切正常 —— 那时用悬停的
+  // 行情时刻, 或 /api/global-indices/debug 的 age_s 来判断。
   return (
     <div className="mt-2 grid grid-cols-2 gap-1.5 border-t border-border/60 pt-2">
       {items.map(item => {
         const q = quoteBySymbol.get(item.symbol)
         const value = q?.last_price ?? q?.close
         const pct = q?.change_pct
-        // [R150] 原来 A 股卡只有 cnLive 一个信号, 而它答的是「**我们**有没有在
-        // 干活」(交易时段 + 轮询在跑 + 数据来自实时缓存) —— 不是「这个数新不新」。
-        // 上游卡住/限流/失败而缓存里还留着旧值时, 绿点照样脉冲、数照样不动,
-        // 正是境外指数那次栽的同一个跟头。这里补上行情自己的时刻。
-        // timestamp 是毫秒 epoch; 日线回退那条路没有它, 但那时 cnLive 本就是 false。
-        const ageS = cnLive && q?.timestamp ? Date.now() / 1000 - Number(q.timestamp) / 1000 : null
-        const stale = ageS != null && ageS > CN_STALE_S
-        const live = cnLive && !stale
-        const ageMin = ageS != null ? ageS / 60 : null
+        // [R151] 行情自己的时刻只进 title, 不占卡面。timestamp 是毫秒 epoch;
+        // 日线回退那条路没有它, 那时 cnLive 本就是 false。
+        const ageMin = cnLive && q?.timestamp
+          ? (Date.now() - Number(q.timestamp)) / 60000
+          : null
         return (
           <NavLink
             key={item.symbol}
             to={`/indices?symbol=${encodeURIComponent(item.symbol)}`}
             className={cn('block rounded bg-elevated/60 px-2 py-1.5 transition-colors hover:bg-elevated',
-              !live && 'opacity-70')}
+              !cnLive && 'opacity-70')}
             title={`${item.name} ${item.symbol} — ${
-              !cnLive ? '非实时(休市或实时行情未开), 显示最后收盘/缓存值'
-                : stale ? '交易时段内, 但这个数已经很久没变了 —— 上游可能卡住了'
-                  : '交易中, 实时刷新'
+              cnLive ? '交易中, 实时刷新' : '非实时(休市或实时行情未开), 显示最后收盘/缓存值'
             }${ageMin != null
               ? ` · 行情时刻: ${ageMin < 1 ? '1 分钟内' : `${Math.round(ageMin)} 分钟前`}`
               : ''}`}
           >
             <div className="flex items-center justify-between gap-1">
               <span className="flex min-w-0 items-center gap-1 text-[10px] text-secondary">
-                {/* [R119/R150] 与全球卡同一套语义: 绿点脉冲=在跳, 黄点=盘中卡住, 灰点=静止 */}
+                {/* [R119] 与全球卡同一套语义: 绿点脉冲=在跳, 灰点=静止 */}
                 <span className={cn('h-1 w-1 shrink-0 rounded-full',
-                  live ? 'bg-bull animate-pulse' : stale ? 'bg-warning' : 'bg-muted/40')} />
+                  cnLive ? 'bg-bull animate-pulse' : 'bg-muted/40')} />
                 <span className="truncate">{item.name}</span>
               </span>
               <span className={`text-[10px] font-mono ${indexPctClass(pct)}`}>{fmtIndexPct(pct)}</span>
             </div>
-            <div className="mt-0.5 flex items-baseline justify-between gap-1">
-              <span className={`truncate font-mono text-[10px] ${indexPctClass(pct)}`}>
-                {fmtIndexValue(value)}
-              </span>
-              {stale && ageMin != null && (
-                <span className="shrink-0 text-[9px] text-warning">延迟{Math.round(ageMin)}分</span>
-              )}
+            <div className={`mt-0.5 truncate font-mono text-[10px] ${indexPctClass(pct)}`}>
+              {fmtIndexValue(value)}
             </div>
           </NavLink>
         )
@@ -241,41 +237,31 @@ function SidebarIndexQuotes({ rows, items, globalRows, cnLive }: {
       {globals.map(q => {
         const pct = q.change_pct != null ? q.change_pct * 100 : null
         const trading = q.trading !== false
-        // [R148] 只认**行情自己**的时刻。原来这里用 updated_at 算"多久前",
-        // 而那是我们抓取的时刻 —— 于是一个盘中冻住的数永远显示"刚刚更新",
-        // 故障在界面上完全隐身(纳指不动就是这么被藏起来的)。
+        // [R148/R151] 只认**行情自己**的时刻(`quote_age_s`), 不是我们抓取的时刻 ——
+        // 但按用户定案只进 title, 不占卡面。
         const ageMin = q.quote_age_s != null ? q.quote_age_s / 60 : null
-        const stale = q.stale === true
-        const live = trading && !stale
         const ageText = ageMin == null
           ? '该源不提供行情时刻, 无法判断新旧'
           : ageMin < 1 ? '行情时刻: 1 分钟内' : `行情时刻: ${Math.round(ageMin)} 分钟前`
         return (
           <div
             key={q.key}
-            className={cn('rounded bg-elevated/60 px-2 py-1.5', !live && 'opacity-70')}
+            className={cn('rounded bg-elevated/60 px-2 py-1.5', !trading && 'opacity-70')}
             title={`${q.name}(全球·独立源) — ${
-              !trading ? '当前休市, 显示最后成交值'
-                : stale ? '交易时段内, 但上游这个数已经很久没变了 —— 当延迟数据看'
-                  : '交易中, 实时刷新'
+              trading ? '交易中, 实时刷新' : '当前休市, 显示最后成交值'
             } · ${ageText}${q.source ? ` · 源: ${q.source}${q.source_code ? `(${q.source_code})` : ''}` : ''}`}
           >
             <div className="flex items-center justify-between gap-1">
               <span className="flex min-w-0 items-center gap-1 text-[10px] text-secondary">
-                {/* 在跳=绿点脉冲; 休市=灰点; 盘中卡住=黄点常亮(不脉冲, 它没在跳) */}
+                {/* 交易中: 绿点脉冲(在实时跳); 休市: 灰点 */}
                 <span className={cn('h-1 w-1 shrink-0 rounded-full',
-                  live ? 'bg-bull animate-pulse' : stale ? 'bg-warning' : 'bg-muted/40')} />
+                  trading ? 'bg-bull animate-pulse' : 'bg-muted/40')} />
                 <span className="truncate">{q.name}</span>
               </span>
               <span className={`text-[10px] font-mono ${indexPctClass(pct)}`}>{fmtIndexPct(pct)}</span>
             </div>
-            <div className={`mt-0.5 flex items-baseline justify-between gap-1`}>
-              <span className={`truncate font-mono text-[10px] ${indexPctClass(pct)}`}>
-                {fmtIndexValue(q.last)}
-              </span>
-              {stale && ageMin != null && (
-                <span className="shrink-0 text-[9px] text-warning">延迟{Math.round(ageMin)}分</span>
-              )}
+            <div className={`mt-0.5 truncate font-mono text-[10px] ${indexPctClass(pct)}`}>
+              {fmtIndexValue(q.last)}
             </div>
           </div>
         )
