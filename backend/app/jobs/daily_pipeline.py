@@ -663,6 +663,21 @@ def run_now(
     emit("done", 100, "完成")
     _invalidate(None)  # 兜底:全清
 
+    # [R136] 数据落盘后顺手记一份把握分台账快照。
+    #
+    # 原来只有两条记账路径: 用户在收盘口径下打开今日总览, 或定时导读跑起来。
+    # 两条都靠不住 —— 没开页面、没配 AI 的那天就**永久少一天样本**, 而台账是
+    # 事后统计, 漏掉的补不回来。这里是唯一保证每个数据日都被走到的地方: 数据
+    # 刚落盘, as_of 必新, 且必然是收盘定稿口径。
+    #
+    # record_day 自己按 as_of 去重, 所以与另外两条路径重复触发是安全的。
+    # 整段失败只记日志: 记账绝不能让一次成功的数据管道被判失败。
+    try:
+        from app.api.today import _build_overview
+        _build_overview(repo)
+    except Exception:
+        logger.exception("pipeline score-ledger snapshot failed (not fatal)")
+
     result = {
         "universe_size": len(universe),
         "daily_days": new_daily_days,

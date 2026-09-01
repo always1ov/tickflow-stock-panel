@@ -315,3 +315,25 @@ def test_summary_md_carries_everything_needed_to_tune(repo):
                  "打分口径 v"):
         assert must in md, f"摘要缺少 {must}"
     assert "AI 优选(R121 台账)" in md
+
+
+# ------------------------------------------------------- [R136] 记账路径必须齐全
+
+
+def test_pipeline_takes_a_ledger_snapshot_after_data_lands():
+    """台账原来只有两条记账路径: 用户打开页面, 或定时导读跑起来。
+
+    两条都靠不住 —— 没开页面、没配 AI 的那天就永久少一天样本, 而事后统计漏掉的
+    补不回来。数据管道是唯一保证每个数据日都被走到的地方, 必须在那里也记一次。
+    """
+    import inspect
+    from app.jobs import daily_pipeline as dp
+    src = inspect.getsource(dp.run_now)
+    assert "_build_overview" in src, "数据管道结尾必须走一次总览以落台账快照"
+    assert "not fatal" in src or "logger.exception" in src, "记账失败不能判管道失败"
+
+
+def test_scheduled_today_ai_also_builds_the_overview():
+    import inspect
+    from app.jobs import daily_pipeline as dp
+    assert "_build_overview" in inspect.getsource(dp._run_scheduled_today_ai)
