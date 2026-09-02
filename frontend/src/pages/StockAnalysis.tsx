@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Sparkles, LineChart, History as HistoryIcon, Loader2, Bell, X, Maximize2, Minimize2 } from 'lucide-react'
+import { Sparkles, LineChart, History as HistoryIcon, Loader2, Bell, X, Maximize2, Minimize2, LocateFixed } from 'lucide-react'
 import { PageHeader } from '@/components/PageHeader'
 import { StockFinancialSearch } from '@/components/financials/StockFinancialSearch'
 import { StockPreviewDialog } from '@/components/StockPreviewDialog'
@@ -33,6 +33,8 @@ export function StockAnalysis() {
   const [showPriceAlerts, setShowPriceAlerts] = useState(false)
   // [R28] 关键价位分析弹窗:点决策台里的标的即弹出,关掉后列表原样还在
   const [showLevels, setShowLevels] = useState(false)
+  // [R157] 「定位」按钮计数: 每按一次 +1, 决策台据此把当前个股那一行滚到正中
+  const [locateNonce, setLocateNonce] = useState(0)
   const { last: lastStock, remember: rememberStock } = useLastStock('stock-analysis')
 
   // 进入页面立即加载历史报告(供决策台「报告」列)。store 内部有 historyLoaded 去重, 重复调用安全。
@@ -126,6 +128,15 @@ export function StockAnalysis() {
               当前
               <span className="font-medium text-secondary">{name || symbol}</span>
               <span className="font-mono text-[10px]">{symbol}</span>
+              {/* [R157] 定位: 把这只票在决策台里的那一行滚到正中并闪一下。
+                  不在自选 / 被「只看持有」挡住时会提示, 不会静默没反应 */}
+              <button
+                onClick={() => setLocateNonce((n) => n + 1)}
+                title={`在决策台里定位 ${name || symbol} 那一行`}
+                className="rounded p-1 text-accent/80 hover:bg-accent/10 hover:text-accent transition-colors"
+              >
+                <LocateFixed className="h-3.5 w-3.5" />
+              </button>
               {/* [R106] 搜索出的股(可能不在自选列表)也能分析/设提醒 —— 与列表行内同一对动作 */}
               <button
                 onClick={() => handleAnalyze()}
@@ -150,6 +161,7 @@ export function StockAnalysis() {
         {/* [R103] 点标的名称 = 选中该股 + 弹整合版个股弹窗(与全站其他列表一致) */}
         <WatchlistDecisionBoard
           currentSymbol={symbol}
+          locateNonce={locateNonce}
           onSelect={onSelect}
           onPreview={(s, n) => {
             onSelect(s, n)

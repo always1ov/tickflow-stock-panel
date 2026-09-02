@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Star, Wallet, Sparkles, Loader2, ArrowUp, ArrowDown, RefreshCw, FileText, TrendingUp, Download, Bell } from 'lucide-react'
 import { api, type ExitLine, type KeltnerBand, type KeltnerBands, type KeltnerVerdict, type TrendInfo } from '@/lib/api'
@@ -227,8 +227,10 @@ function fmtAgo(iso?: string): string {
 
 /** 自选决策台 —— 个股分析页的整页主体: 一行一只自选, 点标的即弹出关键价位分析,
  *  并可标记仓位/成本、纵观对比浮盈。[R28] 起不再折叠(整页就它一个, 没有要让位的东西)。 */
-export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onAnalyze, onPriceAlert }: {
+export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onAnalyze, onPriceAlert, locateNonce }: {
   currentSymbol: string
+  /** [R157] 页头「定位」按钮每按一次 +1: 把当前个股那一行滚到视野正中并闪一下 */
+  locateNonce?: number
   onSelect: (symbol: string, name: string) => void
   /** [R103] 点标的名称时打开整合版个股弹窗(最近查看+随意切换); 未传时退回仅选中 */
   onPreview?: (symbol: string, name: string) => void
@@ -239,6 +241,11 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
 }) {
   const qc = useQueryClient()
   const [heldOnly, setHeldOnly] = useState(false)
+  // [R157] 定位当前个股: 行引用 + 闪烁高亮 + "行还没渲染出来"时的待定位
+  const rowRefs = useRef<Record<string, HTMLTableRowElement | null>>({})
+  const pendingLocate = useRef<{ symbol: string; explicit: boolean } | null>(null)
+  const [flash, setFlash] = useState<string | null>(null)
+  const flashTimer = useRef<number | undefined>(undefined)
   // [fork 增强] 六态汇总弹窗
   const [showTrendSummary, setShowTrendSummary] = useState(false)
   // [R48] 逐日复盘弹窗 —— 「趋势」「结论」两列点进来的就是它。
@@ -482,6 +489,65 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
 
   const heldCount = Object.values(positions).filter((p) => p.held).length
 
+  // ===== [R157] 定位当前个股 =====
+  // 用户: 「加个定位当前个股的功能, 任何适合被选中的都要能当前页面显示, 我不想每次
+  // 都找半天」。150 行的表, 搜索框选中一只票之后它在哪一行只能靠肉眼扫。
+  //
+  // 两条路径, 一个函数:
+  //   · 自动 —— currentSymbol 一变(搜索/URL ?symbol=/上次记忆/行内点击)就把那一行
+  //     滚进视野。用 `nearest`: 已经看得见的不动(行内点击时不该把表格跳一下)。
+  //   · 手动 —— 页头「定位」按钮: 滚到正中 + 闪一下, 让眼睛一下落到它身上。
+  // 行还没渲染出来(数据没到 / 刚切换筛选)时记成待定位, rows 一出来就补做。
+  const scrollToRow = (sym: string, explicit: boolean) => {
+    const el = rowRefs.current[sym]
+    if (!el) return false
+    el.scrollIntoView({ block: explicit ? 'center' : 'nearest', behavior: 'smooth' })
+    setFlash(sym)
+    if (flashTimer.current) window.clearTimeout(flashTimer.current)
+    flashTimer.current = window.setTimeout(() => setFlash(null), explicit ? 1800 : 1000)
+    return true
+  }
+  const locate = (sym: string, explicit: boolean) => {
+    if (!sym) return
+    if (scrollToRow(sym, explicit)) return
+    // 行不在当前可见列表里 —— 分清是哪种"不在", 别静默
+    const loaded = !!enriched.data
+    const inWatchlist = (enriched.data?.rows ?? []).some((r: any) => String(r.symbol) === sym)
+    if (!loaded) {                       // 数据还没到: 等 rows 出来再滚
+      pendingLocate.current = { symbol: sym, explicit }
+      return
+    }
+    if (!inWatchlist) {
+      if (explicit) toast(`${sym} 不在自选里, 决策台没有它这一行`, 'error')
+      return
+    }
+    if (heldOnly) {                      // 被「只看持有」挡住了: 切回全部再定位
+      pendingLocate.current = { symbol: sym, explicit: true }
+      setHeldOnly(false)
+      toast('这只票不是持有 —— 已切回「全部」并定位', 'success')
+    }
+  }
+  // 行渲染出来之后补做待定位(数据首次到达 / 切换筛选 / 排序变化)
+  useEffect(() => {
+    const p = pendingLocate.current
+    if (p && rowRefs.current[p.symbol]) {
+      pendingLocate.current = null
+      scrollToRow(p.symbol, p.explicit)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sortedRows])
+  // 自动: 选中谁就让谁在视野里
+  useEffect(() => {
+    if (currentSymbol) locate(currentSymbol, false)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentSymbol])
+  // 手动: 页头「定位」
+  useEffect(() => {
+    if (locateNonce && currentSymbol) locate(currentSymbol, true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [locateNonce])
+  useEffect(() => () => { if (flashTimer.current) window.clearTimeout(flashTimer.current) }, [])
+
   // [R46] 导出用的行: 只留「结论」列有内容的。三档都在通道中部的票没有位置
   // 信息, 导出来只是占地方。按当前排序导出 —— 你在界面上怎么排, 导出件就怎么排。
   const exportRows = useMemo(
@@ -652,8 +718,15 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
                 const active = r.symbol === currentSymbol
                 const up = (r.changePct ?? 0) > 0
                 const down = (r.changePct ?? 0) < 0
+                const flashing = r.symbol === flash
                 return (
-                  <tr key={r.symbol} className={`border-t border-border/30 hover:bg-elevated/40 ${active ? 'bg-accent/[0.06]' : ''}`}>
+                  // [R157] ref 供定位滚动; scroll-mt 避开 sticky 表头; 定位到时整行闪一下
+                  <tr
+                    key={r.symbol}
+                    ref={(el) => { rowRefs.current[r.symbol] = el }}
+                    className={`scroll-mt-10 border-t border-border/30 transition-colors duration-500 hover:bg-elevated/40 ${
+                      flashing ? 'bg-accent/25' : active ? 'bg-accent/[0.06]' : ''}`}
+                  >
                     {/* 点标的即切换分析(免搜索) */}
                     <td className="whitespace-nowrap px-4 py-2.5">
                       {/* min-h 给整行一个下限: AI 信号列 1 行和 3 行的行高原来差一倍,
