@@ -19,6 +19,7 @@ import { toast } from '@/components/Toast'
 const TIER_STYLE: Record<FocusTier, string> = {
   held: 'border-bull/40 bg-bull/10 text-bull',
   plan: 'border-accent/40 bg-accent/10 text-accent',
+  band: 'border-warning/40 bg-warning/10 text-warning',   // [R161] 贴轨: 高抛低吸候选
   watch: 'border-border bg-elevated/60 text-muted',
 }
 
@@ -43,6 +44,7 @@ export function FocusBar() {
   const labels = v.labels
   const held = v.items.filter(i => i.effective === 'held')
   const plan = v.items.filter(i => i.effective === 'plan')
+  const band = v.items.filter(i => i.effective === 'band')
   const watch = v.items.filter(i => i.effective === 'watch')
 
   const Row = ({ it }: { it: FocusItem }) => {
@@ -77,7 +79,7 @@ export function FocusBar() {
             推送焦点
             <ChevronDown className={cn('h-3 w-3 text-muted transition-transform', open && 'rotate-180')} />
           </button>
-          {(['held', 'plan', 'watch'] as FocusTier[]).map(t => (
+          {(['held', 'plan', 'band', 'watch'] as FocusTier[]).map(t => (
             <span key={t} className={cn('rounded border px-1.5 py-px text-[10px]', TIER_STYLE[t])}>
               {labels[t]} {v.counts[t]}
             </span>
@@ -106,12 +108,14 @@ export function FocusBar() {
               名单来自今日总览(持有 + 值得关注), 每次构建自动刷新
               {v.as_of ? ` · 数据日 ${v.as_of}` : ''}。钉住/静音是你的例外, 长期有效。
             </div>
-            {held.length + plan.length === 0 && (
-              <div className="px-2 py-2 text-[11px] text-muted">还没有持有或计划中的票 —— 打开一次今日总览, 名单就会生成。</div>
+            {held.length + plan.length + band.length === 0 && (
+              <div className="px-2 py-2 text-[11px] text-muted">还没有持有 / 计划中 / 贴轨的票 —— 打开一次今日总览, 名单就会生成。</div>
             )}
-            <div className="grid gap-x-4 md:grid-cols-2">
+            <div className="grid gap-x-4 md:grid-cols-2 xl:grid-cols-3">
               <div>{held.map(it => <Row key={it.symbol} it={it} />)}</div>
               <div>{plan.map(it => <Row key={it.symbol} it={it} />)}</div>
+              {/* [R161] 短期贴/破上下轨: 高抛低吸候选, 用户常盯的那一档 */}
+              <div>{band.map(it => <Row key={it.symbol} it={it} />)}</div>
             </div>
             <button onClick={() => setShowWatch(s => !s)} className="mt-1 px-2 text-[10px] text-muted hover:text-foreground">
               {showWatch ? '收起' : '展开'} {labels.watch} {watch.length} 只(不推外部渠道, 想推就钉住它)

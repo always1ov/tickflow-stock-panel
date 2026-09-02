@@ -121,7 +121,7 @@ def test_build_view_groups_and_counts():
     fl.save_snapshot(TODAY, HOLD, OPPS)
     fl.set_override("000001.SZ", "pin")
     v = fl.build_view(["000001.SZ", "000002.SZ", "600000.SH", "300750.SZ"], {"000002.SZ": "万科A"})
-    assert v["counts"] == {fl.TIER_HELD: 2, fl.TIER_PLAN: 1, fl.TIER_WATCH: 1}
+    assert v["counts"] == {fl.TIER_HELD: 2, fl.TIER_PLAN: 1, fl.TIER_BAND: 0, fl.TIER_WATCH: 1}
     # 排序: 持有档在前(钉住的算持有档待遇), 观察档垫底
     assert {x["symbol"] for x in v["items"][:2]} == {"600000.SH", "000001.SZ"}
     assert v["items"][-1]["symbol"] == "000002.SZ"
@@ -129,6 +129,49 @@ def test_build_view_groups_and_counts():
     assert by["000001.SZ"]["override"] == "pin" and by["000001.SZ"]["effective"] == fl.TIER_HELD
     assert by["000002.SZ"]["name"] == "万科A" and by["000002.SZ"]["effective"] == fl.TIER_WATCH
     assert v["fresh"] is True and v["focus_only"] is True   # [R160] 默认开
+
+
+# ---------------------------------------------------------------- [R161] 短期贴/破上下轨进焦点
+
+
+def _bands(pos: str, pct: float) -> dict:
+    return {"s": {"pos": pos, "pos_cn": {"above": "破上轨", "near_upper": "贴上轨", "inside": "通道内",
+                                          "near_lower": "贴下轨", "below": "破下轨"}[pos], "pct": pct}}
+
+
+def test_band_tier_from_keltner_short_position():
+    """用户: 「我经常关注 Keltner 短期处于上轨和下轨状态的票」—— 贴/破上下轨进焦点, 通道内不进。"""
+    snap = fl.save_snapshot(TODAY, HOLD, OPPS, {
+        "000001.SZ": _bands("near_upper", 0.92),
+        "000002.SZ": _bands("below", -0.05),
+        "000003.SZ": _bands("inside", 0.55),
+    })
+    assert snap["items"]["000001.SZ"]["tier"] == fl.TIER_BAND
+    assert "贴上轨" in snap["items"]["000001.SZ"]["reason"] and "92%" in snap["items"]["000001.SZ"]["reason"]
+    assert snap["items"]["000002.SZ"]["tier"] == fl.TIER_BAND
+    assert "000003.SZ" not in snap["items"]
+
+
+def test_band_does_not_override_held_or_plan():
+    snap = fl.save_snapshot(TODAY, HOLD, OPPS, {
+        "600000.SH": _bands("above", 1.1),     # 持有
+        "300750.SZ": _bands("near_lower", 0.1),  # 计划中
+    })
+    assert snap["items"]["600000.SH"]["tier"] == fl.TIER_HELD
+    assert snap["items"]["300750.SZ"]["tier"] == fl.TIER_PLAN
+
+
+def test_band_tier_passes_the_gate():
+    fl.save_snapshot(TODAY, HOLD, OPPS, {"000001.SZ": _bands("near_lower", 0.08)})
+    preferences.set_push_focus_only(True)
+    assert fl.should_push("000001.SZ", {"scope": "all"}) is True
+    assert fl.should_push("000009.SZ", {"scope": "all"}) is False
+
+
+def test_band_uses_keltner_vocabulary_not_its_own_threshold():
+    """到轨判定只认 keltner.classify 的五档, 本模块不另立百分比阈值。"""
+    from app.indicators import keltner
+    assert fl._BAND_POS == {keltner.POS_ABOVE, keltner.POS_NEAR_UPPER, keltner.POS_NEAR_LOWER, keltner.POS_BELOW}
 
 
 # ---------------------------------------------------------------- [R160] 所有打扰通道认同一个章
@@ -185,7 +228,7 @@ def test_r160_alerts_api_focus_filter(tmp_path, monkeypatch):
 def test_today_overview_saves_snapshot_and_webhook_gate_wired():
     from app.api import today
     from app.services import quote_service
-    assert "focus_list.save_snapshot(as_of, holdings, opportunities)" in inspect.getsource(today._build_overview)
+    assert "focus_list.save_snapshot(as_of, holdings, opportunities, bands_map)" in inspect.getsource(today._build_overview)
     src = inspect.getsource(quote_service.QuoteService._maybe_send_webhook)
     assert "focus_list.should_push(" in src
     # 门必须在"规则没勾渠道就跳过"之后、真正投递之前

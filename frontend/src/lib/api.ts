@@ -219,7 +219,8 @@ export interface TodayAction {
 }
 
 /** [R159] 推送焦点名单: 持有 / 计划中 / 观察 三档, 用户可钉住或静音 */
-export type FocusTier = 'held' | 'plan' | 'watch'
+/** held 持有 / plan 计划中 / band [R161] 短期贴·破上下轨 / watch 观察 */
+export type FocusTier = 'held' | 'plan' | 'band' | 'watch'
 export interface FocusItem {
   symbol: string; name: string
   tier: FocusTier

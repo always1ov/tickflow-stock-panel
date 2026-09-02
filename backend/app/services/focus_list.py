@@ -35,9 +35,14 @@ logger = logging.getLogger(__name__)
 
 TIER_HELD = "held"
 TIER_PLAN = "plan"
+TIER_BAND = "band"     # [R161] 短期 Keltner 贴/破上下轨 —— 用户常盯的高抛低吸候选
 TIER_WATCH = "watch"
-TIER_LABELS = {TIER_HELD: "持有", TIER_PLAN: "计划中", TIER_WATCH: "观察"}
-PUSH_TIERS = frozenset({TIER_HELD, TIER_PLAN})
+TIER_LABELS = {TIER_HELD: "持有", TIER_PLAN: "计划中", TIER_BAND: "贴轨", TIER_WATCH: "观察"}
+TIER_ORDER = {TIER_HELD: 0, TIER_PLAN: 1, TIER_BAND: 2, TIER_WATCH: 3}
+PUSH_TIERS = frozenset({TIER_HELD, TIER_PLAN, TIER_BAND})
+# 到轨判定复用 indicators/keltner 的口径(classify 的五档), 不另立阈值 ——
+# 决策台「短通道」列写"贴上轨"的那天, 这里也必须是贴轨
+_BAND_POS = frozenset({"above", "near_upper", "near_lower", "below"})
 
 MODE_PIN = "pin"
 MODE_MUTE = "mute"
@@ -99,9 +104,12 @@ def _write_json(path: Path, payload: dict) -> None:
 # ---------------------------------------------------------------- 快照
 
 
-def save_snapshot(as_of: str | None, holdings: list[dict], opportunities: list[dict]) -> dict:
-    """今日总览构建完时落一份分档快照。只记「持有」与「计划中」, 其余自选即观察。
+def save_snapshot(as_of: str | None, holdings: list[dict], opportunities: list[dict],
+                  bands_map: dict[str, dict] | None = None) -> dict:
+    """今日总览构建完时落一份分档快照。记「持有」「计划中」「贴轨」, 其余自选即观察。
 
+    bands_map: keltner_service.channels_for_symbols 的结果 {SYMBOL: {"s": {...}, ...}};
+    短期档 pos 在贴/破上下轨的进「贴轨」档(收盘口径, 与决策台同一口径)。
     内容没变就不写盘 —— /api/today 每次打开都会走到这里。
     """
     items: dict[str, dict] = {}
@@ -126,6 +134,22 @@ def save_snapshot(as_of: str | None, holdings: list[dict], opportunities: list[d
             "reason": " · ".join(bits),
             "score": o.get("score"),
             "action": act.get("code"),
+        }
+    # [R161] 短期贴/破上下轨: 高抛低吸候选。持有 / 计划中优先级更高, 已在的不覆盖
+    for sym, bands in (bands_map or {}).items():
+        s = str(sym or "").upper()
+        if not s or s in items:
+            continue
+        short = (bands or {}).get("s") or {}
+        pos = short.get("pos")
+        if pos not in _BAND_POS:
+            continue
+        pct = short.get("pct")
+        pct_txt = f" {float(pct) * 100:.0f}%" if isinstance(pct, (int, float)) else ""
+        items[s] = {
+            "tier": TIER_BAND, "name": s,
+            "reason": f"短期{short.get('pos_cn') or pos}{pct_txt}",
+            "pos": pos,
         }
     payload = {"as_of": as_of, "items": items}
     prev = _read_json(_snapshot_path())
@@ -238,7 +262,7 @@ def build_view(watch_symbols: list[str], names: dict[str, str]) -> dict:
             "tier": r["tier"], "effective": r["effective"], "override": r.get("override"),
             "reason": r["reason"], "score": snap_item.get("score"), "action": snap_item.get("action"),
         })
-    order = {TIER_HELD: 0, TIER_PLAN: 1, TIER_WATCH: 2}
+    order = TIER_ORDER
     items.sort(key=lambda x: (order.get(x["effective"], 9), -(x.get("score") or 0), x["symbol"]))
     counts = {t: sum(1 for x in items if x["effective"] == t) for t in order}
     return {

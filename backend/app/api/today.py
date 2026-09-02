@@ -997,7 +997,8 @@ def _build_overview(repo, engine=None) -> dict:
     # 内容不变不写盘; 失败只记 debug —— 名单是辅助, 不能拖垮总览。
     try:
         from app.services import focus_list
-        focus_list.save_snapshot(as_of, holdings, opportunities)
+        # [R161] bands_map: 短期贴/破上下轨的也进焦点(用户常盯的高抛低吸候选)
+        focus_list.save_snapshot(as_of, holdings, opportunities, bands_map)
     except Exception as e:  # noqa: BLE001
         logger.debug("focus snapshot skipped: %s", e)
     perf = _st.done()
