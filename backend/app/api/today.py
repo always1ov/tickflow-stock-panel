@@ -833,6 +833,16 @@ def _build_overview(repo, engine=None) -> dict:
     if market_breadth and not market_breadth["capped"]:
         posture_reason += f";全市场 {market_breadth['up']}涨/{market_breadth['down']}跌"
 
+    # [R158] 出手时机: 每只机会一句结论 —— 今天动手 / 收盘再动 / 不动手。
+    # 纯注记, 与 R134 的分工一致: 一分不进评分, 不改名次。姿态要等上面合成完才能用,
+    # 所以放在这里而不是打分处。规则见 services/action_timing.py。
+    try:
+        from app.services import action_timing
+        for o in opportunities:
+            o["action"] = action_timing.decide(o, posture)
+    except Exception as e:  # noqa: BLE001 —— 结论取不到只是少一列, 不拖垮总览
+        logger.debug("today action timing skipped: %s", e)
+
     # ---- ④ 持仓体检 ----
     holdings: list[dict] = []
     for sym, pos in pos_all.items():

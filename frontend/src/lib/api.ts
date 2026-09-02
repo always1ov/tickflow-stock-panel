@@ -204,6 +204,16 @@ export interface TodayOpportunity {
    *  把握分冻在收盘口径(盘中一动不动, 是稳定的决策基准), 盘中的变化摆这里。
    *  只在开着实时行情、且该标的拿到了实时行时才有。 */
   live?: TodayLive | null
+  /** [R158] 出手时机: 今天动手 / 收盘再动 / 不动手 —— 一句结论, 不进评分不改名次 */
+  action?: TodayAction | null
+}
+
+/** [R158] 出手时机结论。trigger = 结论围绕的那个关键点/触发价(有则给) */
+export interface TodayAction {
+  code: 'today' | 'after_close' | 'hold_off'
+  label: string
+  reason: string
+  trigger?: number | null
 }
 
 /** [R137] 盘中盯盘数据。拿现价去比**昨天那条**通道与生命线 —— MA20 与通道边界

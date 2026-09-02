@@ -16,7 +16,7 @@ import {
 import {
   api, TODAY_BOARDS, type KeltnerVerdict, type SignalAiSchedule, type TodayAiSchedule,
   type TodayGates, type TodayLive, type TodayNote, type TodayOpportunity,
-  type TodayOverview, type TodayPick, type TodayPrefs,
+  type TodayOverview, type TodayPick, type TodayPrefs, type TodayAction,
 } from '@/lib/api'
 import { toast } from '@/components/Toast'
 import { PageShell } from '@/components/PageShell'
@@ -77,11 +77,12 @@ function buildTodayHtml(d: TodayOverview, brief: string | null,
         <td class="sig">${esc(o.text)}${o.trend_state_cn ? ` <span class="adv" style="background:#f0f1f3;color:#5b6472">${esc(o.trend_state_cn)}</span>` : ''}${o.intraday ? ' <span class="adv" style="background:#fdf0e3;color:#c78326">盘中·待收盘确认</span>' : ''}</td>
         <td class="num">${o.channel_pct == null ? '—' : `${Math.round(o.channel_pct * 100)}%`}</td>
         <td class="num">${o.vol_ratio == null ? '—' : o.vol_ratio.toFixed(2)}</td>
-        <td class="num">${o.gap_pct == null ? '—' : `${o.gap_pct > 0 ? '+' : ''}${o.gap_pct}%`}</td>
+        <td class="num">${o.gap_pct == null ? '—' : `${o.gap_pct <= 0 ? '已过' : '还差'} ${Math.abs(o.gap_pct).toFixed(1)}%`}</td>
+        <td>${o.action ? `<span class="adv" style="${o.action.code === 'today' ? 'background:#e6ecfb;color:#3451a8;font-weight:600' : o.action.code === 'after_close' ? 'background:#fdf0e3;color:#c78326' : noteStyle.info}">${esc(o.action.label)}</span><br><span style="font-size:10px;color:#5b6472">${esc(o.action.reason)}</span>` : '—'}</td>
         <td>${(o.notes ?? []).map(n => `<span class="adv" style="${noteStyle[n.tone] ?? noteStyle.info}">${esc(n.label)}</span>`).join(' ') || '—'}</td>
         <td>${o.advice ? `<span class="adv">${esc(o.advice.text)}</span>` : '—'}</td>
       </tr>
-      <tr class="sub"><td></td><td colspan="7">${esc(o.why || '')}${o.advice?.plan ? ` · <span style="color:#1c6ea4">建仓路径:${esc(o.advice.plan)}</span>` : ''}</td></tr>`).join('')
+      <tr class="sub"><td></td><td colspan="8">${esc(o.why || '')}${o.advice?.plan ? ` · <span style="color:#1c6ea4">建仓路径:${esc(o.advice.plan)}</span>` : ''}</td></tr>`).join('')
 
   const holdRows = d.holdings.map(h => `
       <tr>
@@ -190,7 +191,7 @@ function buildTodayHtml(d: TodayOverview, brief: string | null,
 
   <h2>🎯 值得关注(${d.opportunities.length}·把握分 ≥ ${d.prefs.min_score}${d.opportunities_filtered > 0 ? `,滤掉 ${d.opportunities_filtered} 只` : ''})</h2>
   ${d.opportunities.length ? `<table>
-    <thead><tr><th class="num">把握</th><th>名称</th><th>信号</th><th class="num">位置</th><th class="num">量比</th><th class="num">距触发</th><th>注记·不计分</th><th>建议仓位</th></tr></thead>
+    <thead><tr><th class="num">把握</th><th>名称</th><th>信号</th><th class="num">位置</th><th class="num">量比</th><th class="num">距关键点</th><th>出手</th><th>注记·不计分</th><th>建议仓位</th></tr></thead>
     <tbody>${oppRows}</tbody>
   </table>
   <div class="meta" style="margin:6px 0 0">把握分 = 趋势强度 45% + 量能确认 30% + 位置成本 25%,先过三道硬门槛才打分;三条竖线依次是这三个维度的得分。分数带 * 表示有维度缺数据,总分偏乐观。位置 = Keltner 短期通道位置(50% 恰好站在生命线 MA20 上,甜区 50%~65%)。注记一律不参与打分。</div>`
@@ -507,7 +508,11 @@ function OpportunityTable({ rows, pickedSymbols, onOpen, live }: {
             <th className="hidden px-2 py-1.5 text-right font-normal md:table-cell"
                 title="量比。区间最优:峰在 1.3~2.5,超过 4 说明这波已经走完了">量比</th>
             <th className="hidden px-2 py-1.5 text-right font-normal xl:table-cell"
-                title="现价距触发价还差几个点。负数=已越过。不参与打分,只回答「今天能不能动手」">距触发</th>
+                title="收盘价相对关键点(转多的关键点 / 回升待突破的关键点 / AI 触发价)。「已过」= 已在关键点上方, 「还差」= 还在下方。不参与打分">距关键点</th>
+            <th className="px-2 py-1.5 text-left font-normal"
+                title={'今天这一天能不能下手, 一句结论。不进评分不改名次。\n今天动手: 已确认上涨趋势、信号 ≤3 天、贴着关键点(高出不到 5%)、没贴上轨、盘中没跌回关键点下方、大盘不在防守档\n收盘再动: 方向对但还差一个确认 —— 盘中临时信号 / 回升途中盘中刚过关键点 / 距触发价 2% 以内 / 转多第 4~5 天 / 盘中回落。收盘站稳(守住)关键点再动\n不动手: 大盘防守 / 盘中跌破生命线 / 当日涨幅到板幅 70% / 已高出关键点 5%+ / 贴上轨 / 转多第 6 天起 / 回升还没突破'}>
+              出手
+            </th>
             <th className="hidden px-2 py-1.5 text-left font-normal lg:table-cell"
                 title="主线 / AI 信号 / 历史胜率 / 通道结论 —— 全部只作佐证,一分不加一分不减">
               注记·不计分
@@ -590,13 +595,18 @@ function OpportunityTable({ rows, pickedSymbols, onOpen, live }: {
                     )}
                   </td>
                   <td className="hidden whitespace-nowrap px-2 py-2 text-right align-top font-mono xl:table-cell">
+                    {/* [R158] 「-2.55%」要人翻译一次; 直接说「已过 2.6%」「还差 7.0%」 */}
                     {o.gap_pct == null ? <span className="text-[10px] text-muted/50">—</span> : (
                       <span className={o.gap_pct <= 0 ? 'text-danger'
                         : o.gap_pct <= 1.5 ? 'text-warning' : 'text-secondary'}
-                        title={o.gap_pct <= 0 ? '已越过触发价' : `还差 ${o.gap_pct}% 到触发价`}>
-                        {o.gap_pct > 0 ? '+' : ''}{o.gap_pct}%
+                        title={o.pivot != null ? `关键点 ${o.pivot}` : undefined}>
+                        <span className="mr-0.5 font-sans text-[9px] opacity-70">{o.gap_pct <= 0 ? '已过' : '还差'}</span>
+                        {Math.abs(o.gap_pct).toFixed(1)}%
                       </span>
                     )}
+                  </td>
+                  <td className="px-2 py-2 align-top">
+                    <ActionCell action={o.action} />
                   </td>
                   <td className="hidden px-2 py-2 align-top lg:table-cell">
                     <NoteChips notes={o.notes} />
@@ -627,6 +637,24 @@ function OpportunityTable({ rows, pickedSymbols, onOpen, live }: {
           })}
         </tbody>
       </table>
+    </div>
+  )
+}
+
+/** [R158] 出手时机: 一个结论胶囊 + 一行理由。三态三色: 今天动手=强调色, 收盘再动=警示色, 不动手=灰。 */
+function ActionCell({ action }: { action?: TodayAction | null }) {
+  if (!action) return <span className="text-[10px] text-muted/50">—</span>
+  const cls = action.code === 'today'
+    ? 'border-accent/40 bg-accent/15 text-accent'
+    : action.code === 'after_close'
+      ? 'border-warning/40 bg-warning/15 text-warning'
+      : 'border-border bg-elevated/60 text-muted'
+  return (
+    <div className="flex min-w-[9rem] flex-col gap-0.5" title={action.reason}>
+      <span className={cn('inline-flex w-fit items-center rounded border px-1.5 py-0.5 text-[10px] font-medium', cls)}>
+        {action.label}
+      </span>
+      <span className="max-w-[14rem] truncate text-[9px] leading-tight text-muted">{action.reason}</span>
     </div>
   )
 }
