@@ -725,10 +725,12 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
                     key={r.symbol}
                     ref={(el) => { rowRefs.current[r.symbol] = el }}
                     className={`scroll-mt-10 border-t border-border/30 transition-colors duration-500 hover:bg-elevated/40 ${
-                      flashing ? 'bg-accent/25' : active ? 'bg-accent/[0.06]' : ''}`}
+                      flashing ? 'bg-accent/25' : active ? 'bg-accent/[0.10]' : ''}`}
                   >
                     {/* 点标的即切换分析(免搜索) */}
-                    <td className="whitespace-nowrap px-4 py-2.5">
+                    {/* [R157b] 当前个股整行常驻高亮 + 左侧一道靛蓝边: 搜索后先弹出关键价位
+                        弹窗, 闪烁那 1.8 秒多半被弹窗盖住, 关掉弹窗还得一眼认得出它在哪 */}
+                    <td className={`whitespace-nowrap px-4 py-2.5 border-l-2 ${active ? 'border-l-accent' : 'border-l-transparent'}`}>
                       {/* min-h 给整行一个下限: AI 信号列 1 行和 3 行的行高原来差一倍,
                           一屏扫下来参差得厉害。定住下限后只剩"多出来的那几行"的差异 */}
                       <button onClick={() => (onPreview ?? onSelect)(r.symbol, r.name)} className="flex min-h-[2.25rem] items-center gap-1.5 text-left cursor-pointer group">

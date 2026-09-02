@@ -48,11 +48,13 @@ export function StockAnalysis() {
     if (urlSym) {
       setSymbol(urlSym)
       setName(params.get('name') || urlSym)
+      setLocateNonce((k) => k + 1)   // [R157b] 从别的页跳过来: 到了就定位到它那一行
       return
     }
     if (!symbol && lastStock) {
       setSymbol(lastStock.symbol)
       setName(lastStock.name)
+      setLocateNonce((k) => k + 1)   // [R157b] 恢复上次那只: 同样定位到正中
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -121,7 +123,11 @@ export function StockAnalysis() {
         {/* 搜索 + 当前个股标签(纯展示, 点开弹窗走下方列表的标的名称) */}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           <div className="w-72 shrink-0">
-            <StockFinancialSearch onSelect={onSelect} assetTypes="stock,index" />
+            {/* [R157b] 搜索选中 = 明确的"带我去它那一行": 滚到正中并高亮, 不只是"进视野" */}
+            <StockFinancialSearch
+              onSelect={(s, n) => { onSelect(s, n); setLocateNonce((k) => k + 1) }}
+              assetTypes="stock,index"
+            />
           </div>
           {symbol && (
             <span className="inline-flex shrink-0 items-center gap-1.5 text-xs text-muted">
