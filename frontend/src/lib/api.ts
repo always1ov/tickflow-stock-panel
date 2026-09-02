@@ -170,8 +170,10 @@ export interface TodayOpportunity {
   verdict?: KeltnerVerdict | null
   /** [R123] 量比 —— 突破是不是真的(也是 AI 优选的核心判据, 摆成列好让用户自己核) */
   vol_ratio?: number | null
-  /** [R123] 现价距触发价还差几个点; 负数 = 已越过。回答"今天能不能动手" */
+  /** [R123] 收盘价距关键点/触发价还差几个点; 负数 = 已越过 */
   gap_pct?: number | null
+  /** [R158] 关键点/触发价本身(gap_pct 就是相对它算的); 界面上悬停显示 */
+  pivot?: number | null
 
   // ===== [R134] 评分 v2: 三道硬门槛 + 三维度加权 =====
   /** 三个维度分(0~100); 数据整档缺失时为 null */
