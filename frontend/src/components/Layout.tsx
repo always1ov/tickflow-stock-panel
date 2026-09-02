@@ -846,7 +846,7 @@ export function Layout() {
   // 轮询触发记录总数 → 更新监控中心徽标 (每 15 秒; 后台标签页由 SSE 事件驱动, 不轮询)
   const alertsTotalQuery = useQuery({
     queryKey: ['alerts-total'],
-    queryFn: () => api.alertsList({ days: 7, limit: 1 }),
+    queryFn: () => api.alertsList({ days: 7, limit: 1, focus: true }),   // [R160] 徽标只数焦点内的
     refetchInterval: 15000,
     select: (data) => data.total,
     enabled: bootTier >= 2,   // [R154] 徽标计数, 晚 1.5s 无感

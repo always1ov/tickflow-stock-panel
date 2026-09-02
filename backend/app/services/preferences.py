@@ -930,8 +930,10 @@ def set_system_notify_enabled(enabled: bool) -> bool:
 
 
 def get_push_focus_only() -> bool:
-    """[fork R159] 外部推送只发焦点名单(持有 / 计划中 / 钉住)。默认关 —— 推送行为不能悄悄变。"""
-    return bool(load().get("push_focus_only", False))
+    """[fork R159/R160] 打扰人的通道(外部推送 / 系统通知 / 弹窗 / 徽标)只认焦点名单
+    (持有 / 计划中 / 钉住)。R160 起默认开 —— 用户明确要"真的聚焦"; 名单失效或
+    任何异常时门自动放行, 关掉开关即回到全推。"""
+    return bool(load().get("push_focus_only", True))
 
 
 def set_push_focus_only(enabled: bool) -> bool:

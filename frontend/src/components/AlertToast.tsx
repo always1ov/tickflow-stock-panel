@@ -57,6 +57,8 @@ export function pushAlertToast(alert: AlertEvent) {
  * - 整批只播放一声通知音, 避免短时连续响多声刷屏
  */
 export function pushAlertToasts(alerts: AlertEvent[]) {
+  // [R160] 焦点外的告警不弹、不响 —— 它们仍在触发记录里(切「全部」可见)
+  alerts = alerts.filter(a => !a.focus_muted)
   if (alerts.length === 0) return
   if (!getEnabled()) return                  // 开关关闭: 不弹
   const maxVisible = getMaxVisible()

@@ -24,15 +24,23 @@ def list_alerts(
     source: str | None = None,
     type: str | None = None,
     ext_columns: str | None = None,
+    focus: bool = False,
 ):
     """查询触发记录 (时间倒序)。
 
     ext_columns: 逗号分隔的 "configId.fieldName", 传入后按 symbol 富化行业/概念等 ext 字段,
     每条记录附带 {configId}__{fieldName} 键 (与 watchlist/screener 一致)。
+    focus: [fork R160] 只要焦点内的(去掉评估时盖了 focus_muted 章的), total 也按过滤后算 ——
+    侧栏徽标就是靠这个只数值得看的那几条。
     """
-    events = alert_store.list_recent(
-        _data_dir(request), days=days, limit=limit, source=source, type=type,
-    )
+    if focus:
+        pool = alert_store.list_recent(_data_dir(request), days=days, source=source, type=type)
+        pool = [e for e in pool if not e.get("focus_muted")]
+        events = pool[:limit]
+    else:
+        events = alert_store.list_recent(
+            _data_dir(request), days=days, limit=limit, source=source, type=type,
+        )
     if ext_columns and events:
         try:
             from app.api.screener import _load_ext_value_maps, _rows_with_ext
@@ -42,7 +50,7 @@ def list_alerts(
                 events = _rows_with_ext(events, value_maps)
         except Exception:  # noqa: BLE001
             pass
-    total = alert_store.count(_data_dir(request))
+    total = len(pool) if focus else alert_store.count(_data_dir(request))
     return {"alerts": events, "total": total}
 
 

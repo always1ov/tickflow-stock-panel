@@ -1673,6 +1673,8 @@ export interface MonitorRuleOptions {
 
 export interface AlertEvent {
   ts: number
+  /** [R160] 评估时盖的章: 这只票不在推送焦点名单里 —— 不弹窗、不响、不推外部、不计徽标; 触发记录仍保留 */
+  focus_muted?: boolean
   rule_id?: string
   rule_name?: string
   source: string
@@ -4466,8 +4468,9 @@ export const api = {
     request<{ ok: boolean; generated: number }>('/api/monitor-rules/seed', { method: 'POST' }),
 
   // ===== Alerts (触发记录) =====
-  alertsList: (params?: { days?: number; limit?: number; source?: string; type?: string; extColumns?: string }) => {
+  alertsList: (params?: { days?: number; limit?: number; source?: string; type?: string; extColumns?: string; focus?: boolean }) => {
     const qs = new URLSearchParams()
+    if (params?.focus) qs.set('focus', '1')   // [R160] 只要焦点内的, total 也按过滤后算
     if (params?.days) qs.set('days', String(params.days))
     if (params?.limit) qs.set('limit', String(params.limit))
     if (params?.source) qs.set('source', params.source)

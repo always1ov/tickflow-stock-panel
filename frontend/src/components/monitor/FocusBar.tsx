@@ -30,7 +30,7 @@ export function FocusBar() {
   const apply = (v: FocusView) => qc.setQueryData(QK.focus, v)
   const prefsMut = useMutation({
     mutationFn: (on: boolean) => api.focusPrefs(on),
-    onSuccess: (v) => { apply(v); toast(v.focus_only ? '已开启: 广域规则只推焦点名单' : '已关闭: 所有规则照常推送', 'success') },
+    onSuccess: (v) => { apply(v); toast(v.focus_only ? '已开启: 弹窗/推送/徽标只认焦点名单' : '已关闭: 所有告警照常打扰', 'success') },
     onError: (e: Error) => toast(e.message, 'error'),
   })
   const overrideMut = useMutation({
@@ -88,8 +88,8 @@ export function FocusBar() {
             </span>
           )}
           <label className="ml-auto inline-flex cursor-pointer items-center gap-2 text-[11px] text-secondary"
-                 title="开: 全市场/自选分组/板块这类广域规则, 只对「持有 + 计划中 + 钉住」推送外部渠道; 单独给某只票设的规则不受影响。关: 所有规则照常推送。应用内触发记录两种情况都照常保留。">
-            <span>只推送焦点名单</span>
+                 title={'开(默认): 全市场/自选分组/板块这类广域规则, 只对「持有 + 计划中 + 钉住」弹窗、响铃、推外部渠道、计徽标; 焦点外的只写进触发记录(灰显)。\n单独给某只票设的规则(点位提醒等)不受影响, 永远推。\n关: 所有告警照常打扰。'}>
+            <span>只认焦点名单</span>
             <button
               role="switch" aria-checked={v.focus_only}
               disabled={prefsMut.isPending}

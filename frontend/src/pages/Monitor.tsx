@@ -136,6 +136,8 @@ export function Monitor() {
 
   // 触发记录: 过滤 + 统计 (提升到主组件, 供 header 行使用)
   const [filter, setFilter] = useState<'all' | 'strategy' | 'signal' | 'price' | 'market' | 'sector' | 'abnormal' | 'volume_delta'>('all')
+  // [R160] 触发记录默认只看焦点内的; 切「含焦点外」能看到被静音的那些(灰显)
+  const [focusOnly, setFocusOnly] = useState(true)
   const [confirmClear, setConfirmClear] = useState(false)
   const [confirmClearRules, setConfirmClearRules] = useState(false)
   // [fork 增强] 批量设置推送渠道
@@ -158,8 +160,8 @@ export function Monitor() {
   }, [monitorExtFields])
 
   const alertsQuery = useQuery({
-    queryKey: [...QK.alerts(filter === 'all' ? undefined : filter), extColumnsParam ?? ''],
-    queryFn: () => api.alertsList({ days: 7, limit: 500, source: filter === 'all' ? undefined : filter, extColumns: extColumnsParam }),
+    queryKey: [...QK.alerts(filter === 'all' ? undefined : filter), extColumnsParam ?? '', focusOnly ? 'focus' : 'all'],
+    queryFn: () => api.alertsList({ days: 7, limit: 500, source: filter === 'all' ? undefined : filter, extColumns: extColumnsParam, focus: focusOnly }),
     // 10s 轮询仅作 SSE strategy_alert 事件的兜底; 后台标签页不再拉 500 条全量
     refetchInterval: 10000,
   })
@@ -233,6 +235,17 @@ export function Monitor() {
                     {f === 'all' ? '全部' : TYPE_LABEL[f]}
                   </button>
                 ))}
+                {/* [R160] 焦点开关: 默认只看焦点内; 焦点外的仍记录, 切过去灰显 */}
+                <button
+                  onClick={() => setFocusOnly(v => !v)}
+                  title={focusOnly ? '当前只看焦点内(持有 / 计划中 / 钉住)。点击含焦点外的' : '当前含焦点外的(灰显)。点击只看焦点内'}
+                  className={cn(
+                    'ml-1 rounded-md border px-1.5 py-0.5 text-[10px] font-medium transition-all cursor-pointer',
+                    focusOnly ? 'border-accent/40 bg-accent/10 text-accent' : 'border-border/60 text-muted hover:text-secondary',
+                  )}
+                >
+                  {focusOnly ? '只看焦点' : '含焦点外'}
+                </button>
               </div>
               {/* 数量 + 清空 + 字段配置 */}
               <div className="ml-auto flex items-center gap-2 shrink-0">
@@ -422,7 +435,9 @@ function AlertsList({ alertsQuery, confirmClear, setConfirmClear, total, enterTs
                 className={cn(
                   'group relative flex items-start gap-3 overflow-hidden rounded-lg border bg-surface pl-3.5 pr-3 py-2.5 shadow-sm transition-all duration-expand hover:border-border hover:shadow-md hover:shadow-black/10 hover:-translate-y-px',
                   isNew ? 'border-accent/60 ring-1 ring-accent/30' : 'border-border/50',
+                  ev.focus_muted && 'opacity-55 saturate-50',   // [R160] 焦点外: 只记录, 灰显
                 )}
+                title={ev.focus_muted ? '焦点外: 只记录, 没弹窗/没推送/不计徽标。想推就在「推送焦点」里钉住它' : undefined}
               >
                 <div className={cn('absolute left-0 top-0 h-full w-0.5', sev.bar)} />
                 <div className={cn('mt-px shrink-0', sev.iconCls)}>

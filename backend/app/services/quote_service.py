@@ -1565,6 +1565,18 @@ class QuoteService:
                             logger.warning("指数监控评估失败 (不影响股票/ETF 告警): %s", e)
                     if rule_events:
                         rule_events = self._format_extension_notifications(rule_events)
+                        # [fork R160] 焦点标记: 每条告警算一次"这只票在不在焦点名单",
+                        # 结果盖章在事件上(focus_muted), 落盘 / SSE / 系统通知 / Webhook
+                        # 四条出口读同一个章 —— 用户说"开了跌破生命线就一堆推送", 光拦
+                        # 外部渠道不够, 所有会打断人的通道都得认这个章。任何异常 = 不静音。
+                        try:
+                            from app.services import focus_list
+                            _rules = engine.rules if engine is not None else {}
+                            for ev in rule_events:
+                                _rule = _rules.get(ev.get("rule_id"))
+                                ev["focus_muted"] = not focus_list.should_push(ev.get("symbol") or "", _rule)
+                        except Exception as e:  # noqa: BLE001
+                            logger.debug("focus stamp skipped: %s", e)
                         # 落盘到 alerts.jsonl
                         try:
                             from app.services import alert_store
@@ -1589,6 +1601,7 @@ class QuoteService:
                                 "severity": ev.get("severity", "info"),
                                 "conditions": ev.get("conditions") or [],
                                 "logic": ev.get("logic") or "and",
+                                "focus_muted": bool(ev.get("focus_muted")),   # [R160]
                             }
                             for key in (
                                 "sector_kind", "sector_key", "sector_name",
@@ -1926,13 +1939,17 @@ class QuoteService:
                     continue
                 # [fork R159] 推送门: 总开关开着时, 广域规则只推焦点名单(持有/计划中/钉住);
                 # 用户单独给这只票设的规则(scope=symbols)永远放行。任何不确定都放行。
-                try:
-                    from app.services import focus_list
-                    if not focus_list.should_push(ev.get("symbol") or "", rule):
-                        muted += 1
-                        continue
-                except Exception:  # noqa: BLE001
-                    pass
+                if ev.get("focus_muted"):        # [R160] 章已在评估处盖好, 这里只认章
+                    muted += 1
+                    continue
+                if "focus_muted" not in ev:      # 没盖到章(异常路径)才现算一次
+                    try:
+                        from app.services import focus_list
+                        if not focus_list.should_push(ev.get("symbol") or "", rule):
+                            muted += 1
+                            continue
+                    except Exception:  # noqa: BLE001
+                        pass
                 source = ev.get("source", "")
                 source_label = source_labels.get(source, source or "通知")
                 symbol = ev.get("symbol") or ""
@@ -1975,6 +1992,8 @@ class QuoteService:
                 return
 
             for ev in all_alerts:
+                if ev.get("focus_muted"):   # [R160] 焦点外的不打系统通知
+                    continue
                 # 通知标题: 用 source 分类 (策略/信号/价格/异动)
                 source = ev.get("source", "")
                 source_label = {

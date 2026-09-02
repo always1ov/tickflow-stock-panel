@@ -61,10 +61,12 @@ def test_override_pin_and_mute():
 # ---------------------------------------------------------------- 推送门
 
 
-def test_gate_is_open_by_default():
-    """总开关默认关: 推送行为不能悄悄变。"""
+def test_gate_is_on_by_default_since_r160():
+    """[R160] 用户明确要"真的聚焦" → 默认开。关掉即回到全推。"""
     fl.save_snapshot(TODAY, HOLD, OPPS)
-    assert preferences.get_push_focus_only() is False
+    assert preferences.get_push_focus_only() is True
+    assert fl.should_push("000001.SZ", {"scope": "all"}) is False
+    preferences.set_push_focus_only(False)
     assert fl.should_push("000001.SZ", {"scope": "all"}) is True
 
 
@@ -120,11 +122,64 @@ def test_build_view_groups_and_counts():
     fl.set_override("000001.SZ", "pin")
     v = fl.build_view(["000001.SZ", "000002.SZ", "600000.SH", "300750.SZ"], {"000002.SZ": "万科A"})
     assert v["counts"] == {fl.TIER_HELD: 2, fl.TIER_PLAN: 1, fl.TIER_WATCH: 1}
-    assert [x["symbol"] for x in v["items"]][:2] == sorted(["600000.SH", "000001.SZ"])[::1] or True
+    # 排序: 持有档在前(钉住的算持有档待遇), 观察档垫底
+    assert {x["symbol"] for x in v["items"][:2]} == {"600000.SH", "000001.SZ"}
+    assert v["items"][-1]["symbol"] == "000002.SZ"
     by = {x["symbol"]: x for x in v["items"]}
     assert by["000001.SZ"]["override"] == "pin" and by["000001.SZ"]["effective"] == fl.TIER_HELD
     assert by["000002.SZ"]["name"] == "万科A" and by["000002.SZ"]["effective"] == fl.TIER_WATCH
-    assert v["fresh"] is True and v["focus_only"] is False
+    assert v["fresh"] is True and v["focus_only"] is True   # [R160] 默认开
+
+
+# ---------------------------------------------------------------- [R160] 所有打扰通道认同一个章
+
+
+def test_r160_stamp_is_set_before_persist_and_read_by_every_outlet():
+    """焦点章在评估处盖一次, 落盘 / SSE / 系统通知 / Webhook 都只认章。"""
+    from app.services import quote_service
+    src = inspect.getsource(quote_service.QuoteService)
+    stamp = src.index('ev["focus_muted"] = not focus_list.should_push(')
+    persist = src.index("alert_store.append_many(")
+    assert stamp < persist, "章必须在落盘之前盖, 触发记录才带得上它"
+    assert '"focus_muted": bool(ev.get("focus_muted"))' in src, "SSE 告警要带章"
+    sysn = inspect.getsource(quote_service.QuoteService._maybe_send_system_notifications)
+    assert 'if ev.get("focus_muted")' in sysn, "系统通知要认章"
+    hook = inspect.getsource(quote_service.QuoteService._maybe_send_webhook)
+    assert 'if ev.get("focus_muted")' in hook, "Webhook 要认章"
+
+
+def test_r160_alerts_api_focus_filter(tmp_path, monkeypatch):
+    """/api/alerts?focus=1: 去掉盖了章的, total 也按过滤后算 —— 侧栏徽标靠这个。"""
+    import time as _t
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from app.api import alerts as alerts_api
+    from app.services import alert_store
+
+    class _Store:
+        data_dir = tmp_path
+
+    class _Repo:
+        store = _Store()
+
+    now_ms = int(_t.time() * 1000)
+    alert_store.append_many(tmp_path, [
+        {"ts": now_ms - 3, "source": "signal", "type": "x", "symbol": "000001.SZ", "message": "焦点外", "focus_muted": True},
+        {"ts": now_ms - 2, "source": "signal", "type": "x", "symbol": "600000.SH", "message": "焦点内", "focus_muted": False},
+        {"ts": now_ms - 1, "source": "signal", "type": "x", "symbol": "300750.SZ", "message": "老记录没章"},
+    ])
+    app = FastAPI()
+    app.state.repo = _Repo()
+    app.include_router(alerts_api.router)
+    c = TestClient(app)
+
+    everything = c.get("/api/alerts").json()
+    assert everything["total"] == 3 and len(everything["alerts"]) == 3
+
+    focus = c.get("/api/alerts", params={"focus": 1, "limit": 1}).json()
+    assert focus["total"] == 2, "没章的老记录算焦点内(不能因为旧数据没章就藏起来)"
+    assert len(focus["alerts"]) == 1
+    assert all(not a.get("focus_muted") for a in focus["alerts"])
 
 
 def test_today_overview_saves_snapshot_and_webhook_gate_wired():
