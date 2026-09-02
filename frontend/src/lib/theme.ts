@@ -92,7 +92,7 @@ const DARK: ChartTheme = {
   tooltipBg: 'rgba(24,25,27,0.95)',  // slateDark2
   tooltipBorder: 'rgba(255,255,255,0.1)',
   tooltipText: '#edeef0',
-  infoBarBg: 'rgba(46,49,53,0.6)',   // slateDark5 = surface
+  infoBarBg: 'rgba(39,42,45,0.6)',   // slateDark4 = surface ([R162] 卡片档位下调后跟着走)
   zoomFill: 'rgba(255,255,255,0.06)',
   fillSubtle: 'rgba(255,255,255,0.04)',
 }

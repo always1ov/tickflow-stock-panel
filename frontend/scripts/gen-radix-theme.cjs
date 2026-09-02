@@ -103,7 +103,9 @@ const line = (name, lch, note) => out.push(`  --${name}: ${L3(lch)};${note ? ` /
 // ---------------- 暗色 ----------------
 {
   const D = c.slateDark
-  const base = of(D.slate1), surface = of(D.slate5), elevated = of(D.slate7), border = of(D.slate8)
+  // [R162] 底不用 slateDark1(#111113, 本身偏灰): 压到 L 0.135 的近黑并带一点靛蓝冷调 ——
+  // 有力感来自深与对比, 不是彩度。卡片/悬浮/边框仍是 Radix 4/6/7 档。
+  const base = [0.135, 0.012, 265], surface = of(D.slate4), elevated = of(D.slate6), border = of(D.slate7)
   const fgP = of(D.slate12), fgS = of(D.slate11)
   const fgM = solve(5.2, fgS[1], fgS[2], surface, 0.55, +1)
   const accentText = solve(4.7, INDIGO_C, INDIGO_H, surface, 0.55, +1)
@@ -111,10 +113,10 @@ const line = (name, lch, note) => out.push(`  --${name}: ${L3(lch)};${note ? ` /
   const bull = ensure(4.7, of(c.redDark.red10), surface, +1)
   const bear = ensure(4.7, of(c.greenDark.green10), surface, +1)
   const warning = ensure(4.7, of(c.amberDark.amber11), surface, +1)
-  out.push('\n/* ===== 暗色(html.dark) —— Radix Slate Dark 1/5/7/8/11/12 ===== */')
-  line('base', base, 'slateDark1 页面底'); line('surface', surface, `slateDark5 ΔL ${(surface[0] - base[0]).toFixed(3)} over base`)
-  line('elevated', elevated, `slateDark7 ΔL ${(elevated[0] - surface[0]).toFixed(3)} over surface`)
-  line('border', border, `slateDark8 ΔL ${(border[0] - base[0]).toFixed(3)} over base`)
+  out.push('\n/* ===== 暗色(html.dark) —— 近黑底 + Radix Slate Dark 4/6/7/11/12 ===== */')
+  line('base', base, '近黑底(靛蓝冷调), 比 slateDark1 更深'); line('surface', surface, `slateDark4 ΔL ${(surface[0] - base[0]).toFixed(3)} over base`)
+  line('elevated', elevated, `slateDark6 ΔL ${(elevated[0] - surface[0]).toFixed(3)} over surface`)
+  line('border', border, `slateDark7 ΔL ${(border[0] - base[0]).toFixed(3)} over base`)
   line('fg-primary', fgP, `slateDark12 ${contrast(fgP, surface).toFixed(1)}:1`)
   line('fg-secondary', fgS, `slateDark11 ${contrast(fgS, surface).toFixed(1)}:1`)
   line('fg-muted', fgM, `slateDark11 色相, ${contrast(fgM, surface).toFixed(2)}:1`)
