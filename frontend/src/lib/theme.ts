@@ -81,18 +81,19 @@ export interface ChartTheme {
   fillSubtle: string
 }
 
-// [R155] 灰阶跟 index.css 一起换成 Radix Slate(原来是 Tailwind Zinc), 画布与 DOM 才是同一套灰。
+// [R163] 暗色回到作者原版(Tailwind Zinc 灰阶) —— 与 index.css 的 html.dark 块一起还原。
+// 亮色仍是 R155 的 Radix Slate。
 const DARK: ChartTheme = {
-  text: '#b0b4ba',        // slateDark11
-  textStrong: '#edeef0',  // slateDark12
+  text: '#A1A1AA',
+  textStrong: '#E4E4E7',
   grid: 'rgba(255,255,255,0.06)',
-  border: '#363a3f',      // slateDark6
+  border: '#27272A',
   crosshair: 'rgba(255,255,255,0.25)',
-  crosshairLabelBg: '#43484e', // slateDark7
-  tooltipBg: 'rgba(24,25,27,0.95)',  // slateDark2
+  crosshairLabelBg: '#333',
+  tooltipBg: 'rgba(24,24,27,0.95)',
   tooltipBorder: 'rgba(255,255,255,0.1)',
-  tooltipText: '#edeef0',
-  infoBarBg: 'rgba(39,42,45,0.6)',   // slateDark4 = surface ([R162] 卡片档位下调后跟着走)
+  tooltipText: '#E4E4E7',
+  infoBarBg: 'rgba(39,39,42,0.6)',
   zoomFill: 'rgba(255,255,255,0.06)',
   fillSubtle: 'rgba(255,255,255,0.04)',
 }
