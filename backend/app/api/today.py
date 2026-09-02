@@ -992,6 +992,14 @@ def _build_overview(repo, engine=None) -> dict:
                 prefs["pyramid_probe"], prefs["pyramid_confirm"], prefs["pyramid_days"])
 
     _st.mark("advice")
+
+    # [R159] 落一份推送焦点快照: 持有 + 今天显示出来的机会 = 值得推送的那几只。
+    # 内容不变不写盘; 失败只记 debug —— 名单是辅助, 不能拖垮总览。
+    try:
+        from app.services import focus_list
+        focus_list.save_snapshot(as_of, holdings, opportunities)
+    except Exception as e:  # noqa: BLE001
+        logger.debug("focus snapshot skipped: %s", e)
     perf = _st.done()
 
     return {

@@ -17,6 +17,7 @@ import { boardTag } from '@/components/stock-table/primitives'
 import { resolveWatchlistGroupColor } from '@/lib/watchlist-group-colors'
 import { markSeen, resetBadge, leaveMonitorPage } from '@/lib/monitorBadge'
 import { RuleEditor } from '@/components/monitor/RuleEditor'
+import { FocusBar } from '@/components/monitor/FocusBar'
 import { toast } from '@/components/Toast'
 import { StockPreviewDialog } from '@/components/StockPreviewDialog'
 import { DimensionMembersDialog, type DimensionKind, type DimensionMembersTarget } from '@/components/DimensionMembersDialog'
@@ -209,6 +210,8 @@ export function Monitor() {
           </div>
         </div>
       )}
+      {/* [R159] 推送焦点名单: 自选太多时, 谁值得推送 */}
+      <FocusBar />
       {/* [R60] 统一页面留白 */}
       <div className="min-h-0 flex-1 px-3 pb-4 pt-3 lg:px-4">
         <div className="mx-auto flex h-full w-full max-w-[1440px] flex-col gap-3 lg:flex-row">

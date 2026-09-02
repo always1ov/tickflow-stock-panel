@@ -218,6 +218,29 @@ export interface TodayAction {
   trigger?: number | null
 }
 
+/** [R159] 推送焦点名单: 持有 / 计划中 / 观察 三档, 用户可钉住或静音 */
+export type FocusTier = 'held' | 'plan' | 'watch'
+export interface FocusItem {
+  symbol: string; name: string
+  tier: FocusTier
+  /** 覆盖(钉住/静音)之后的有效档 —— 推送门看的是这个 */
+  effective: FocusTier
+  override?: 'pin' | 'mute' | null
+  reason: string
+  score?: number | null
+  action?: string | null
+}
+export interface FocusView {
+  focus_only: boolean
+  as_of?: string | null
+  generated_at?: string | null
+  /** 快照是否在有效期内; 过期时推送门放行 */
+  fresh: boolean
+  counts: Record<FocusTier, number>
+  labels: Record<string, string>
+  items: FocusItem[]
+}
+
 /** [R137] 盘中盯盘数据。拿现价去比**昨天那条**通道与生命线 —— MA20 与通道边界
  *  都是慢变量, 这个近似给的是方向性预警, 不是结论(结论等收盘)。 */
 export interface TodayLive {
@@ -4385,6 +4408,12 @@ export const api = {
     request<AbnormalIntradayPayload>(`/api/abnormal/intraday?limit=${limit}`),
 
   // ===== Monitor Rules (监控规则) =====
+  // [R159] 推送焦点名单
+  focusList: () => request<FocusView>('/api/focus'),
+  focusOverride: (symbol: string, mode: 'pin' | 'mute' | null) =>
+    request<FocusView>('/api/focus/override', { method: 'PUT', body: JSON.stringify({ symbol, mode }) }),
+  focusPrefs: (focus_only: boolean) =>
+    request<FocusView>('/api/focus/prefs', { method: 'PUT', body: JSON.stringify({ focus_only }) }),
   monitorRulesList: () =>
     request<{ rules: MonitorRule[] }>('/api/monitor-rules'),
 

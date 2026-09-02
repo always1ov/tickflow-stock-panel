@@ -104,6 +104,7 @@ export const QK = {
 
   // Monitor (监控规则 + 触发记录)
   monitorRules:         ['monitor-rules'] as const,
+  focus:                ['focus'] as const,   // [R159] 推送焦点名单
   monitorRuleOptions:   ['monitor-rule-options'] as const,
   alerts:               (source?: string) => ['alerts', source ?? ''] as const,
 

@@ -1,0 +1,129 @@
+import { useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Crosshair, Pin, BellOff, ChevronDown, AlertTriangle } from 'lucide-react'
+import { api, type FocusItem, type FocusTier, type FocusView } from '@/lib/api'
+import { QK } from '@/lib/queryKeys'
+import { cn } from '@/lib/cn'
+import { toast } from '@/components/Toast'
+
+/** [R159] 推送焦点名单 —— 自选太多时, 谁值得推送。
+ *
+ * 用户: 「我自选个股太多了, 不知道哪些才是我真的要推送通知的」。
+ * 不让用户逐只勾(150 只没人勾得动), 而是按已有决策产出**自动分档**:
+ *   持有   positions 标了持有 —— 任何时候都要推
+ *   计划中 今日总览「值得关注」显示出来的 —— 今天/收盘打算动手的那几只
+ *   观察   其余 —— 只记应用内, 不打外部渠道
+ * 用户只在例外处动手: 钉住(永远推) / 静音(永远不推)。
+ * 总开关默认关 —— 推送行为不能悄悄变, 看过名单觉得对了再打开。
+ * 单独给某只票设的规则(点位提醒等)不受此门影响, 永远推。 */
+const TIER_STYLE: Record<FocusTier, string> = {
+  held: 'border-bull/40 bg-bull/10 text-bull',
+  plan: 'border-accent/40 bg-accent/10 text-accent',
+  watch: 'border-border bg-elevated/60 text-muted',
+}
+
+export function FocusBar() {
+  const qc = useQueryClient()
+  const [open, setOpen] = useState(false)
+  const [showWatch, setShowWatch] = useState(false)
+  const q = useQuery({ queryKey: QK.focus, queryFn: api.focusList, staleTime: 30_000 })
+  const apply = (v: FocusView) => qc.setQueryData(QK.focus, v)
+  const prefsMut = useMutation({
+    mutationFn: (on: boolean) => api.focusPrefs(on),
+    onSuccess: (v) => { apply(v); toast(v.focus_only ? '已开启: 广域规则只推焦点名单' : '已关闭: 所有规则照常推送', 'success') },
+    onError: (e: Error) => toast(e.message, 'error'),
+  })
+  const overrideMut = useMutation({
+    mutationFn: ({ symbol, mode }: { symbol: string; mode: 'pin' | 'mute' | null }) => api.focusOverride(symbol, mode),
+    onSuccess: apply,
+    onError: (e: Error) => toast(e.message, 'error'),
+  })
+  const v = q.data
+  if (!v) return null
+  const labels = v.labels
+  const held = v.items.filter(i => i.effective === 'held')
+  const plan = v.items.filter(i => i.effective === 'plan')
+  const watch = v.items.filter(i => i.effective === 'watch')
+
+  const Row = ({ it }: { it: FocusItem }) => {
+    const pinned = it.override === 'pin'
+    const muted = it.override === 'mute'
+    return (
+      <div className="flex items-center gap-2 rounded-md px-2 py-1 text-[11px] hover:bg-elevated/40">
+        <span className={cn('shrink-0 rounded border px-1 py-px text-[9px]', TIER_STYLE[it.effective])}>{labels[it.effective]}</span>
+        <span className="font-medium text-foreground">{it.name}</span>
+        <span className="font-mono text-[9px] text-muted">{it.symbol}</span>
+        <span className="min-w-0 flex-1 truncate text-muted" title={it.reason}>{it.reason}</span>
+        <button
+          onClick={() => overrideMut.mutate({ symbol: it.symbol, mode: pinned ? null : 'pin' })}
+          title={pinned ? '取消钉住' : '钉住: 无论分档, 永远推送'}
+          className={cn('rounded p-0.5 transition-colors', pinned ? 'text-accent' : 'text-muted/50 hover:text-accent')}
+        ><Pin className="h-3 w-3" /></button>
+        <button
+          onClick={() => overrideMut.mutate({ symbol: it.symbol, mode: muted ? null : 'mute' })}
+          title={muted ? '取消静音' : '静音: 无论分档, 广域规则不推(单独设的点位提醒仍推)'}
+          className={cn('rounded p-0.5 transition-colors', muted ? 'text-warning' : 'text-muted/50 hover:text-warning')}
+        ><BellOff className="h-3 w-3" /></button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="px-3 pb-2 lg:px-4">
+      <div className="mx-auto max-w-[1440px] rounded-xl border border-border/60 bg-surface/40">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-2">
+          <button onClick={() => setOpen(o => !o)} className="flex items-center gap-2 text-xs font-medium text-foreground">
+            <Crosshair className="h-3.5 w-3.5 text-accent" />
+            推送焦点
+            <ChevronDown className={cn('h-3 w-3 text-muted transition-transform', open && 'rotate-180')} />
+          </button>
+          {(['held', 'plan', 'watch'] as FocusTier[]).map(t => (
+            <span key={t} className={cn('rounded border px-1.5 py-px text-[10px]', TIER_STYLE[t])}>
+              {labels[t]} {v.counts[t]}
+            </span>
+          ))}
+          {!v.fresh && (
+            <span className="inline-flex items-center gap-1 text-[10px] text-warning" title="今日总览超过 7 天没构建, 名单失效期间推送门放行">
+              <AlertTriangle className="h-3 w-3" />名单已过期, 放行中
+            </span>
+          )}
+          <label className="ml-auto inline-flex cursor-pointer items-center gap-2 text-[11px] text-secondary"
+                 title="开: 全市场/自选分组/板块这类广域规则, 只对「持有 + 计划中 + 钉住」推送外部渠道; 单独给某只票设的规则不受影响。关: 所有规则照常推送。应用内触发记录两种情况都照常保留。">
+            <span>只推送焦点名单</span>
+            <button
+              role="switch" aria-checked={v.focus_only}
+              disabled={prefsMut.isPending}
+              onClick={() => prefsMut.mutate(!v.focus_only)}
+              className={cn('relative h-4 w-7 rounded-full transition-colors', v.focus_only ? 'bg-accent' : 'bg-border')}
+            >
+              <span className={cn('absolute top-0.5 h-3 w-3 rounded-full bg-white transition-all', v.focus_only ? 'left-3.5' : 'left-0.5')} />
+            </button>
+          </label>
+        </div>
+        {open && (
+          <div className="border-t border-border/40 px-2 py-2">
+            <div className="px-2 pb-1 text-[10px] text-muted">
+              名单来自今日总览(持有 + 值得关注), 每次构建自动刷新
+              {v.as_of ? ` · 数据日 ${v.as_of}` : ''}。钉住/静音是你的例外, 长期有效。
+            </div>
+            {held.length + plan.length === 0 && (
+              <div className="px-2 py-2 text-[11px] text-muted">还没有持有或计划中的票 —— 打开一次今日总览, 名单就会生成。</div>
+            )}
+            <div className="grid gap-x-4 md:grid-cols-2">
+              <div>{held.map(it => <Row key={it.symbol} it={it} />)}</div>
+              <div>{plan.map(it => <Row key={it.symbol} it={it} />)}</div>
+            </div>
+            <button onClick={() => setShowWatch(s => !s)} className="mt-1 px-2 text-[10px] text-muted hover:text-foreground">
+              {showWatch ? '收起' : '展开'} {labels.watch} {watch.length} 只(不推外部渠道, 想推就钉住它)
+            </button>
+            {showWatch && (
+              <div className="grid gap-x-4 md:grid-cols-2 xl:grid-cols-3">
+                {watch.map(it => <Row key={it.symbol} it={it} />)}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}

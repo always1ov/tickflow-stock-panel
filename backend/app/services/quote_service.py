@@ -1916,6 +1916,7 @@ class QuoteService:
             }
             rules = engine.rules if engine is not None else {}
             enqueued = 0
+            muted = 0
             for ev in rule_events:
                 rule = rules.get(ev.get("rule_id"))
                 # webhook_channels 指定命中的渠道 (['feishu'] / ['wecom'] / ['feishu','wecom'] / []).
@@ -1923,6 +1924,15 @@ class QuoteService:
                 channels = rule.get("webhook_channels") if rule else None
                 if not channels:
                     continue
+                # [fork R159] 推送门: 总开关开着时, 广域规则只推焦点名单(持有/计划中/钉住);
+                # 用户单独给这只票设的规则(scope=symbols)永远放行。任何不确定都放行。
+                try:
+                    from app.services import focus_list
+                    if not focus_list.should_push(ev.get("symbol") or "", rule):
+                        muted += 1
+                        continue
+                except Exception:  # noqa: BLE001
+                    pass
                 source = ev.get("source", "")
                 source_label = source_labels.get(source, source or "通知")
                 symbol = ev.get("symbol") or ""
@@ -1943,8 +1953,9 @@ class QuoteService:
                 if dingtalk_url and "dingtalk" in channels:
                     _WEBHOOK_EXECUTOR.submit(webhook_adapter.send_dingtalk, dingtalk_url, title, body, dingtalk_keyword)
                     enqueued += 1
-            if enqueued:
-                logger.info("Webhook 已提交 %d 条 (异步投递, 按渠道独立投递, 失败记 WARNING)", enqueued)
+            if enqueued or muted:
+                logger.info("Webhook 已提交 %d 条, 焦点名单静音 %d 条 (异步投递, 按渠道独立投递, 失败记 WARNING)",
+                            enqueued, muted)
         except Exception as e:  # noqa: BLE001
             logger.warning("Webhook 提交异常 (不影响告警主流程): %s", e)
 

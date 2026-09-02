@@ -929,6 +929,16 @@ def set_system_notify_enabled(enabled: bool) -> bool:
     return bool(enabled)
 
 
+def get_push_focus_only() -> bool:
+    """[fork R159] 外部推送只发焦点名单(持有 / 计划中 / 钉住)。默认关 —— 推送行为不能悄悄变。"""
+    return bool(load().get("push_focus_only", False))
+
+
+def set_push_focus_only(enabled: bool) -> bool:
+    save({"push_focus_only": bool(enabled)})
+    return bool(enabled)
+
+
 def get_feishu_webhook_url() -> str:
     """飞书自定义机器人 Webhook 地址 — 全局共用一处, 所有启用推送的规则都推到这一个群。"""
     return load().get("feishu_webhook_url", "")
