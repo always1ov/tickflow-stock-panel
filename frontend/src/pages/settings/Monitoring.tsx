@@ -243,12 +243,15 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
 
   // 发送测试消息 (用已保存的配置验证 Webhook 是否通)
   const testDingtalk = useMutation({
-    mutationFn: () => api.testWebhook('dingtalk'),
-    onSuccess: (d) => toast(
-      d.ok ? '测试消息已发送, 请到钉钉群查看' : '发送失败, 请检查地址与关键词是否正确',
-      d.ok ? 'success' : 'error',
-    ),
+    mutationFn: () => api.sendTestWebhook('dingtalk'),
+    onSuccess: (d) => toast(d.detail, d.ok ? 'success' : 'error'),
     onError: (err: any) => toast(String(err?.message ?? '测试失败'), 'error'),
+  })
+  const testFeishu = useMutation({
+    mutationFn: () => api.sendTestWebhook('feishu'),
+  })
+  const testWecom = useMutation({
+    mutationFn: () => api.sendTestWebhook('wecom'),
   })
 
   // 智能机器人 (BotID + Secret) 保存 → 后端立即重建连接
@@ -605,7 +608,7 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
                     <span className="text-[11px] text-muted">Webhook 地址</span>
                     <input
                       value={feishuDraft}
-                      onChange={e => setFeishuDraft(e.target.value)}
+                      onChange={e => { setFeishuDraft(e.target.value); if (!testFeishu.isPending) testFeishu.reset() }}
                       placeholder={FEISHU_PREFIX + 'xxxxxxxx'}
                       className="h-9 w-full rounded-btn border border-border bg-base px-3 text-xs font-mono text-foreground focus:outline-none focus:border-accent/50"
                     />
@@ -616,7 +619,7 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
                     <input
                       type="password"
                       value={feishuSecretDraft}
-                      onChange={e => setFeishuSecretDraft(e.target.value)}
+                      onChange={e => { setFeishuSecretDraft(e.target.value); if (!testFeishu.isPending) testFeishu.reset() }}
                       placeholder="机器人未启用签名校验则留空"
                       className="h-9 w-full rounded-btn border border-border bg-base px-3 text-xs font-mono text-foreground focus:outline-none focus:border-accent/50"
                     />
@@ -634,9 +637,11 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
                     >
                       {saveFeishuWebhook.isPending ? '保存中…' : '保存'}
                     </button>
+                    <TestSendButton test={testFeishu} configured={!!feishuWebhookUrl} />
                     {feishuWebhookUrl && (
                       <span className="text-[10px] text-emerald-500">● 已配置</span>
                     )}
+                    <TestResult test={testFeishu} />
                   </div>
 
                   <details className="mt-3 text-[10px] text-muted">
@@ -690,7 +695,7 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
                     <span className="text-[11px] text-muted">Webhook 地址 或 Key</span>
                     <input
                       value={wecomDraft}
-                      onChange={e => setWecomDraft(e.target.value)}
+                      onChange={e => { setWecomDraft(e.target.value); if (!testWecom.isPending) testWecom.reset() }}
                       placeholder={WECOM_PREFIX + '?key=xxxxxxxx' + ' 或直接填 key'}
                       className="h-9 w-full rounded-btn border border-border bg-base px-3 text-xs font-mono text-foreground focus:outline-none focus:border-accent/50"
                     />
@@ -708,9 +713,11 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
                     >
                       {saveWecomWebhook.isPending ? '保存中…' : '保存'}
                     </button>
+                    <TestSendButton test={testWecom} configured={!!wecomWebhookUrl} />
                     {wecomWebhookUrl && (
                       <span className="text-[10px] text-emerald-500">● 已配置</span>
                     )}
+                    <TestResult test={testWecom} />
                   </div>
 
                   <details className="mt-3 text-[10px] text-muted">
@@ -927,6 +934,48 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
   )
 }
 
+
+// ===== 推送测试按钮 + 内联结果 =====
+
+function TestSendButton({ test, configured }: {
+  test: { isPending: boolean; mutate: () => void }
+  configured: boolean
+}) {
+  return (
+    <button
+      onClick={() => test.mutate()}
+      disabled={test.isPending || !configured}
+      title={!configured ? '请先保存 Webhook 地址' : '向已保存的地址发送测试消息'}
+      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-btn bg-elevated text-secondary hover:text-foreground text-xs disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+    >
+      {test.isPending ? '测试中…' : '测试'}
+    </button>
+  )
+}
+
+function TestResult({ test }: {
+  test: { data?: { ok: boolean; detail: string } | null; isError: boolean; error?: Error | null; reset: () => void }
+}) {
+  // 成功结果 2 秒后自动消失; 失败保留, 便于阅读
+  useEffect(() => {
+    if (test.data?.ok) {
+      const t = window.setTimeout(test.reset, 2000)
+      return () => window.clearTimeout(t)
+    }
+  }, [test.data, test.reset])
+
+  let text: string | null = null
+  let tone = ''
+  if (test.isError) {
+    text = String(test.error?.message ?? '发送失败')
+    tone = 'text-danger'
+  } else if (test.data) {
+    text = (test.data.ok ? '✓ ' : '✗ ') + test.data.detail
+    tone = test.data.ok ? 'text-emerald-500' : 'text-danger'
+  }
+  if (!text) return null
+  return <span className={`min-w-0 text-[11px] leading-snug ${tone}`}>{text}</span>
+}
 
 // ===== ToggleRow =====
 

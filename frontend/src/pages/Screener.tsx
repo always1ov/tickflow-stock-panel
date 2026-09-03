@@ -1,18 +1,20 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
-import { ScanSearch, Clock, TrendingUp, Filter, Layers, Network, Sparkles, RefreshCw, Settings2, Store, RotateCcw, X, Activity } from 'lucide-react'
+import { ScanSearch, Clock, TrendingUp, Filter, Layers, Network, Sparkles, RefreshCw, Settings2, Store, RotateCcw, X, Activity, Star } from 'lucide-react'
 import { api, genRuleId, type ScreenerStrategy, type ScreenerResult } from '@/lib/api'
 import { fetchMinuteBatchIncremental } from '@/lib/minuteBatchIncremental'
 import { DEFAULT_STRATEGY_NOTIFY_EVENTS } from '@/lib/strategyMonitorEvents'
 import { toast } from '@/components/Toast'
+import { useWatchlistBatchAdd } from '@/lib/useSharedMutations'   // [R164] 作者的批量加自选
 import { useDataStatus, usePreferences, useCapabilities, useQuoteStatus } from '@/lib/useSharedQueries'
 import { QK } from '@/lib/queryKeys'
 import { storage } from '@/lib/storage'
 import { PageHeader } from '@/components/PageHeader'
 import { EmptyState } from '@/components/EmptyState'
 import { DatePicker } from '@/components/DatePicker'
-import { StockPreviewDialog } from '@/components/StockPreviewDialog'
+import { StockPreviewDialog, type NavItem } from '@/components/StockPreviewDialog'
+import { WatchlistAddMenu } from '@/components/WatchlistAddMenu'
 import { useStrategyPool } from '@/lib/useStrategyPool'
 import { StrategyCard, CardSize, loadCardSize, cardWrapCls } from '@/components/screener/StrategyCard'
 import { ScreenerTable } from '@/components/screener/ScreenerTable'
@@ -48,7 +50,12 @@ export function Screener() {
   const [asOf, setAsOf] = useState<string>('')
   const [previewSymbol, setPreviewSymbol] = useState<string | null>(null)
   const [previewName, setPreviewName] = useState<string>('')
-  const closePreview = useCallback(() => { setPreviewSymbol(null); setPreviewName('') }, [])
+  const [previewNavList, setPreviewNavList] = useState<NavItem[]>([])
+  const closePreview = useCallback(() => {
+    setPreviewSymbol(null)
+    setPreviewName('')
+    setPreviewNavList([])
+  }, [])
   const [settingsStrategyId, setSettingsStrategyId] = useState<string | null>(null)
   const [showPoolDialog, setShowPoolDialog] = useState(false)
   const [showHealth, setShowHealth] = useState(false)
@@ -431,6 +438,17 @@ export function Screener() {
   const { sort, toggle, sortRows } = useTableSort()
 
   // 当前显示的行数据 (全部模式 或 单策略模式) + 失效行
+  // [R164] 作者 e9f5c60/#228 的「批量加自选」: 当前筛选结果一键加入自选(可选分组)。
+  // 作者原版用 batchMsg 内联提示, fork 全站用 toast, 这里跟 fork 的口径。
+  const batchAdd = useWatchlistBatchAdd()
+  const handleBatchAdd = (groupId: string | null) => {
+    if (!displayRows.length) return
+    const symbols = displayRows.map((r: any) => r.symbol as string)
+    batchAdd.mutate({ symbols, groupId }, {
+      onSuccess: (data: any) => toast(`已添加 ${data?.added ?? symbols.length} 只到自选`, 'success'),
+      onError: (e: Error) => toast(`添加失败: ${e.message}`, 'error'),
+    })
+  }
   const displayRows = useMemo(() => {
     let rows = showAll
       ? applyFilter(allRows, filter, watchlistSet)
@@ -1018,6 +1036,21 @@ export function Screener() {
                       )}
                     </div>
                   )}
+                  {displayRows.length > 0 && (
+                    <WatchlistAddMenu
+                      onSelect={handleBatchAdd}
+                      disabled={batchAdd.isPending}
+                      align="right"
+                      title="批量加自选"
+                      ariaLabel="批量加入自选"
+                      triggerClassName="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-btn
+                        border border-accent/40 bg-accent/10 text-accent text-xs font-medium
+                        hover:bg-accent/20 disabled:opacity-50 transition-colors duration-hover cursor-pointer"
+                    >
+                      <Star className="h-3 w-3" />
+                      {batchAdd.isPending ? '添加中…' : '批量加自选'}
+                    </WatchlistAddMenu>
+                  )}
                   <button
                     onClick={() => setCustomizerOpen(true)}
                     title="列表配置"
@@ -1089,8 +1122,9 @@ export function Screener() {
                     strategyIdToName={strategyIdToName}
                     symbolStrategyMap={symbolStrategyMap}
                     activeStrategy={activeStrategy}
+                    activeSymbol={previewSymbol}
                     watchlistSet={watchlistSet}
-                    onPreview={(symbol, name) => { setPreviewSymbol(symbol); setPreviewName(name) }}
+                    onPreview={(symbol, name, navList) => { setPreviewSymbol(symbol); setPreviewName(name ?? ''); setPreviewNavList(navList ?? []) }}
                     onAddToWatchlist={(symbol, groupId) => toggleWatchlist.mutate({ symbol, action: 'add', groupId })}
                     onRemoveFromWatchlist={symbol => toggleWatchlist.mutate({ symbol, action: 'remove' })}
                     watchlistPending={toggleWatchlist.isPending}
@@ -1153,6 +1187,8 @@ export function Screener() {
         name={previewName}
         enableLevelsView
         onClose={closePreview}
+        navList={previewNavList}
+        onNavigate={(sym, n) => { setPreviewSymbol(sym); setPreviewName(n ?? '') }}
       />
 
       <StrategySettingsDialog

@@ -1461,41 +1461,50 @@ def update_dingtalk_webhook(req: DingtalkWebhookPrefsIn) -> dict:
 
 
 class WebhookTestIn(BaseModel):
-    channel: str  # feishu | wecom | dingtalk
+    channel: Literal["feishu", "wecom", "dingtalk"]   # [fork] dingtalk 是 fork 渠道
 
 
 @router.post("/preferences/webhook-test")
 def test_webhook(req: WebhookTestIn) -> dict:
-    """向指定渠道发送一条测试消息, 用已保存的配置。返回 {ok} 供前端提示成败。
+    """向已保存的 Webhook 地址发送一条测试消息，验证配置是否正确。
 
-    同步发送 (走 webhook_adapter 的重试/静默逻辑); 未配置该渠道时返回 400。
+    只测试已保存的配置（与生产推送同源），不测试未保存草稿。
+    未配置 / 地址非法 / 发送失败均返回 HTTP 200 + {ok: False}，
+    前端统一读 detail 渲染绿/红，不抛 400。
     """
     from app.services import preferences
     from app.services import webhook_adapter
 
-    ch = (req.channel or "").strip()
-    title = "TickFlow 测试推送"
-    body = "这是一条测试消息，收到即表示 Webhook 配置成功。"
+    title = "TickFlow Stock Panel 推送测试"
+    body = "如果你看到这条消息，说明推送配置正确 🎉"
 
-    if ch == "feishu":
+    if req.channel == "feishu":
         url = preferences.get_feishu_webhook_url()
         if not url:
-            raise HTTPException(status_code=400, detail="飞书 Webhook 未配置")
-        ok = webhook_adapter.send_feishu(url, title, body, preferences.get_feishu_webhook_secret())
-    elif ch == "wecom":
+            return {"ok": False, "detail": "尚未配置飞书 Webhook，请先保存"}
+        if not webhook_adapter.is_valid_feishu_url(url):
+            return {"ok": False, "detail": "已保存的飞书 Webhook 地址非法，请重新保存"}
+        secret = preferences.get_feishu_webhook_secret()
+        # 诊断用途单次尝试: 失败即返回, 不等生产退避重试 (~17s)
+        ok = webhook_adapter.send_feishu(url, title, body, secret, max_attempts=1)
+    elif req.channel == "wecom":
         url = preferences.get_wecom_webhook_url()
         if not url:
-            raise HTTPException(status_code=400, detail="企业微信 Webhook 未配置")
+            return {"ok": False, "detail": "尚未配置企业微信 Webhook，请先保存"}
+        if not webhook_adapter.is_valid_wecom_url(url):
+            return {"ok": False, "detail": "已保存的企业微信 Webhook 地址非法，请重新保存"}
         ok = webhook_adapter.send_wecom(url, title, body)
-    elif ch == "dingtalk":
+    else:  # dingtalk —— [fork] 钉钉渠道
         url = preferences.get_dingtalk_webhook_url()
         if not url:
-            raise HTTPException(status_code=400, detail="钉钉 Webhook 未配置")
+            return {"ok": False, "detail": "尚未配置钉钉 Webhook，请先保存"}
+        if not webhook_adapter.is_valid_dingtalk_url(url):
+            return {"ok": False, "detail": "已保存的钉钉 Webhook 地址非法，请重新保存"}
         ok = webhook_adapter.send_dingtalk(url, title, body, preferences.get_dingtalk_keyword())
-    else:
-        raise HTTPException(status_code=400, detail=f"未知渠道: {ch}")
 
-    return {"ok": bool(ok), "channel": ch}
+    if ok:
+        return {"ok": True, "detail": "测试消息已发送，请到群内查收"}
+    return {"ok": False, "detail": "推送失败：网络不可达或地址/密钥不正确，详情见后端日志"}
 
 
 class WecomBotPrefsIn(BaseModel):
