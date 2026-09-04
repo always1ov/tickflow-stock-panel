@@ -25,7 +25,6 @@ import {
   Star,
   ScanSearch,
   History,
-  Bot,
   Pickaxe,
   FileText,
   Settings,
@@ -93,9 +92,9 @@ const nav = [
   { to: '/screener',   label: '策略',   icon: ScanSearch },
   { to: '/backtest',   label: '回测', icon: History },
   { to: '/mining',     label: '挖掘', icon: Pickaxe },
-  { to: '/lots',       label: '持仓提醒', icon: Layers2 },
-  // [R59] AI 操盘手: 让模型用本系统的信息模拟交易, 长期观察这套信息够不够用
-  { to: '/paper-trading', label: 'AI 操盘手', icon: Bot },
+  // [R170] 「持仓提醒」(真钱批次) 与 [R59]「AI 操盘手」(模拟盘) 并入仓位中心的两个 tab。
+  // 旧路径 /paper-trading 仍可用(router 里重定向), 书签和菜单设置不会断。
+  { to: '/lots',       label: '仓位中心', icon: Layers2 },
   { to: '/stock-analysis',    label: '个股分析', icon: TrendingUp },
   // [R67] 分组本身也是菜单里的一行 —— 排序时它整块走, 后面的成员是它的子项
   { to: BROWSE_GROUP_ID,    label: BROWSE_GROUP.label, icon: Layers3 },

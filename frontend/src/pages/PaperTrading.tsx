@@ -59,7 +59,8 @@ function pnlCls(v: number | null | undefined): string {
   return v > 0 ? 'text-red-400' : 'text-emerald-400'
 }
 
-export function PaperTrading() {
+// [R170] embedded: 被「仓位中心」当 tab 挂载时为 true, 不画自己的页头。
+export function PaperTrading({ embedded = false }: { embedded?: boolean } = {}) {
   const qc = useQueryClient()
   const [openId, setOpenId] = useState<{ id: string; scope: PaperScope } | null>(null)
   const [adding, setAdding] = useState(false)
@@ -98,6 +99,20 @@ export function PaperTrading() {
 
   return (
     <div className="flex min-h-full flex-col bg-base">
+      {embedded ? (
+        // [R170] 嵌进「仓位中心」时页头归外壳画, 这里只保留「加操作员」按钮,
+        // 外加一条常驻横幅 —— 隔壁 tab 是真钱, 这一侧必须一眼看出是模拟盘。
+        <div className="flex shrink-0 items-center justify-between gap-3 px-3 pt-2 lg:px-5">
+          <span className="inline-flex items-center gap-1.5 rounded border border-amber-400/40 bg-amber-400/10 px-2 py-1 text-[11px] text-amber-400">
+            <ShieldAlert className="h-3.5 w-3.5" />
+            模拟盘 · 非真实资金, 与「我的批次」互不相干
+          </span>
+          <button type="button" onClick={() => setAdding(true)}
+            className="inline-flex h-8 items-center gap-1.5 rounded-btn border border-border bg-surface px-2.5 text-xs text-secondary transition-colors hover:border-accent/40 hover:text-accent">
+            <Plus className="h-3.5 w-3.5" />加操作员
+          </button>
+        </div>
+      ) : (
       <PageHeader
         title="AI 操盘手"
         subtitle={<span className="hidden md:inline">让模型只用本系统的信息模拟交易 · 长期看这套信息够不够用</span>}
@@ -109,6 +124,7 @@ export function PaperTrading() {
           </button>
         )}
       />
+      )}
 
       <main className="min-h-0 flex-1 space-y-3 overflow-auto px-3 pb-4 pt-3 lg:px-4">
         <section className="rounded-card border border-border bg-surface px-3 py-2.5 text-[11px] leading-5 text-secondary">

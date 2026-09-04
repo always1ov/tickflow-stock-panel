@@ -45,7 +45,10 @@ const BUILTIN_PAGES: NavEntry[] = [
   { id: '/screener', label: '策略', type: 'builtin', visible: true },
   { id: '/backtest', label: '回测', type: 'builtin', visible: true },
   { id: '/mining', label: '挖掘', type: 'builtin', visible: true },
-  { id: '/paper-trading', label: 'AI 操盘手', type: 'builtin', visible: true },
+  // [R170] 并入仓位中心。**id 保持 /paper-trading 不变** —— 用户已保存的菜单
+  // 排序/显隐是以 id 为键的, 换 id 会让那份配置对不上。点进去 router 会重定向到
+  // /lots?tab=paper, 行为不变。
+  { id: '/paper-trading', label: 'AI 操盘手 (仓位中心)', type: 'builtin', visible: true },
   { id: '/limit-ladder', label: '连板梯队', type: 'builtin', visible: true },
   { id: '/indices', label: '指数', type: 'builtin', visible: true },
   { id: '/concept-analysis', label: '概念分析', type: 'builtin', visible: true },

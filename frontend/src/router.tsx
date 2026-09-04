@@ -20,11 +20,11 @@ const Screener = lazy(() => import('./pages/Screener').then(m => ({ default: m.S
 const Backtest = lazy(() => import('./pages/Backtest').then(m => ({ default: m.Backtest })))
 const Mining = lazy(() => import('./pages/Mining').then(m => ({ default: m.Mining })))
 // [R59] AI 操盘手: 让模型只用本系统的信息模拟交易, 长期看这套信息够不够用
-const PaperTrading = lazy(() => import('./pages/PaperTrading').then(m => ({ default: m.PaperTrading })))
 const Financials = lazy(() => import('./pages/Financials').then(m => ({ default: m.Financials })))
 const Data = lazy(() => import('./pages/Data').then(m => ({ default: m.Data })))
 const Monitor = lazy(() => import('./pages/Monitor').then(m => ({ default: m.Monitor })))
-const Lots = lazy(() => import('./pages/Lots').then(m => ({ default: m.Lots })))
+// [R170] 仓位中心: 「我的批次」(真钱) 与「AI 操盘手」(模拟盘) 的双 tab 外壳
+const PositionsHub = lazy(() => import('./pages/PositionsHub').then(m => ({ default: m.PositionsHub })))
 const Dashboard = lazy(() => import('./pages/Dashboard').then(m => ({ default: m.Dashboard })))
 const AnalysisDetail = lazy(() => import('./pages/AnalysisDetail').then(m => ({ default: m.AnalysisDetail })))
 const ConceptAnalysis = lazy(() => import('./pages/ConceptAnalysis').then(m => ({ default: m.ConceptAnalysis })))
@@ -62,6 +62,7 @@ const CORE_ROUTE_PATHS = new Set([
   '/backtest',
   '/mining',
   '/paper-trading',
+  '/lots',            // [R170] 上游加 /lots 路由时漏了这一条; 它现在托管仓位中心
   '/financials',
   '/data',
   '/monitor',
@@ -149,11 +150,12 @@ export function createAppRouter() {
       { path: 'screener', element: <Screener /> },
       { path: 'backtest', element: <Backtest /> },
       { path: 'mining', element: <Mining /> },
-      { path: 'paper-trading', element: <PaperTrading /> },
+      // [R170] 并入仓位中心。路由保留并重定向: 书签、菜单设置里存的旧路径不能断。
+      { path: 'paper-trading', element: <Navigate to="/lots?tab=paper" replace /> },
       { path: 'financials', element: <Financials /> },
       { path: 'data', element: <Data /> },
       { path: 'monitor', element: <Monitor /> },
-      { path: 'lots', element: <Lots /> },
+      { path: 'lots', element: <PositionsHub /> },
       { path: 'limit-ladder', element: <LimitUpLadder /> },
       { path: 'indices', element: <Indices /> },
       { path: 'regime', element: <Regime /> },

@@ -272,6 +272,37 @@ def book(trader: dict, scope: str) -> dict:
     return bk
 
 
+def holdings_overlap() -> tuple[dict[str, int], int]:
+    """[fork 增强 R170] ({SYMBOL: 有几个操作员持有它}, 操作员总数)。
+
+    **只报数量, 不报是谁、成本多少、什么理由** —— 这是刻意的。本模块开头那条
+    设计约束(界面不做"所有人持仓一览")的理由是: 看完所有操作员的持仓再去调提示词,
+    操作员之间的隔离就没了, 而隔离正是这个实验的价值所在。一个聚合计数能回答
+    "AI 那边也看上这只了吗", 又不泄露任何一本账的内容, 是这条线上能给的最大信息量。
+
+    同一个操作员的两本账都持有只算一次 —— 问的是"几个人", 不是"几本账"。
+    """
+    counts: dict[str, int] = {}
+    traders = list_traders()
+    for t in traders:
+        syms: set[str] = set()
+        books = t.get("books")
+        if not isinstance(books, dict):
+            continue          # 老格式/坏数据: 这只是个对照小标, 不该因此报错
+        for bk in books.values():
+            if not isinstance(bk, dict):
+                continue
+            positions = bk.get("positions")
+            if not isinstance(positions, dict):
+                continue
+            for sym, pos in positions.items():
+                if isinstance(pos, dict) and float(pos.get("shares") or 0) > 0:
+                    syms.add(str(sym).strip().upper())
+        for sym in syms:
+            counts[sym] = counts.get(sym, 0) + 1
+    return counts, len(traders)
+
+
 def _trim(trader: dict) -> None:
     for b in (trader.get("books") or {}).values():
         b["orders"] = (b.get("orders") or [])[-MAX_ORDERS:]

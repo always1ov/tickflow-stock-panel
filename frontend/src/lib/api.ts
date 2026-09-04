@@ -2731,6 +2731,17 @@ export const api = {
   paperTraders: () =>
     request<{ traders: PaperTrader[] }>('/api/paper-trading/traders'),
 
+  /**
+   * [R170] 各标的被**几个**操作员持有 —— 供「我的批次」表做对照标记。
+   *
+   * 刻意只有计数: 不带操作员身份、成本、理由。作者在 paper_trader 里写明界面不做
+   * "所有人持仓一览"(看完再去调提示词会破坏操作员隔离, 而隔离正是这个实验的价值)。
+   * 一个聚合数能回答"AI 那边也看上这只了吗", 又不泄露任何一本账。
+   */
+  paperHoldingsOverlap: () =>
+    request<{ overlap: Record<string, number>; trader_count: number }>(
+      '/api/paper-trading/holdings-overlap'),
+
   paperBook: (id: string, scope: PaperScope) =>
     request<PaperBookDetail>(
       `/api/paper-trading/traders/${encodeURIComponent(id)}/books/${scope}`),

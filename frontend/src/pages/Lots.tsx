@@ -12,6 +12,8 @@ import { DatePicker } from '@/components/DatePicker'
 import { DateShortcuts } from '@/components/DateShortcuts'
 import { StockPreviewDialog, toNavItems } from '@/components/StockPreviewDialog'
 import { boardTag } from '@/components/stock-table/primitives'
+// [R170] AI 操盘手对照标记 —— 只显示有几个操作员也拿着, 不泄露是谁/成本/理由
+import { AiHoldMark } from '@/components/lots/AiHoldMark'
 
 const emptyDraft = (): Lot => ({
   id: '',
@@ -43,7 +45,10 @@ function CostPnL({ close, cost }: { close?: number; cost: number }) {
   return <span className={cn('font-mono', priceColorClass(pnl))}>{fmtPct(pnl)}</span>
 }
 
-export function Lots() {
+// [R170] embedded: 被「仓位中心」当 tab 挂载时为 true —— 只是不画自己的页头,
+// 其余一字不动。tab 逻辑刻意留在 fork 独有的 PositionsHub.tsx 里, 免得每次同步上游
+// 都在这个文件起冲突。
+export function Lots({ embedded = false }: { embedded?: boolean } = {}) {
   const qc = useQueryClient()
   const navigate = useNavigate()
   const [editing, setEditing] = useState<Lot | null>(null) // null=关闭
@@ -100,6 +105,17 @@ export function Lots() {
     return m
   }, [dailyQuery.data])
 
+  // [R170] AI 操盘手模拟盘的持仓对照。只拿聚合计数; 拿不到也只是少个小标,
+  // 所以给长 staleTime 且失败不重试 —— 不值得为一个装饰性标记反复打接口。
+  const overlapQuery = useQuery({
+    queryKey: QK.paperOverlap,
+    queryFn: () => api.paperHoldingsOverlap(),
+    staleTime: 5 * 60_000,
+    retry: false,
+  })
+  const overlap = overlapQuery.data?.overlap ?? {}
+  const traderTotal = overlapQuery.data?.trader_count ?? 0
+
   const del = useMutation({
     mutationFn: api.lotDelete,
     onSuccess: () => {
@@ -124,7 +140,7 @@ export function Lots() {
 
   return (
     <div className="flex flex-col h-full">
-      <PageHeader title="持仓提醒" subtitle="记录个股 / ETF 买入批次, 自动生成止盈止损 / 到期监控规则" />
+      {!embedded && <PageHeader title="持仓提醒" subtitle="记录个股 / ETF 买入批次, 自动生成止盈止损 / 到期监控规则" />}
       <div className="flex-1 min-h-0 px-5 py-4">
         <div className="mx-auto max-w-5xl space-y-4">
           <div className="flex items-center justify-between">
@@ -196,6 +212,7 @@ export function Lots() {
                             <span className="font-mono font-medium text-foreground">{lot.symbol}</span>
                             {(() => { const b = boardTag(lot.symbol); return b && <span className={`inline-flex items-center justify-center rounded px-1 text-[9px] font-bold leading-tight border ${b.color}`}>{b.label}</span> })()}
                             {symbolNames[lot.symbol] && <span className="text-secondary truncate max-w-28">{symbolNames[lot.symbol]}</span>}
+                            <AiHoldMark count={overlap[lot.symbol.toUpperCase()] ?? 0} traderTotal={traderTotal} />
                           </button>
                         </td>
                         <td className="px-2 py-2.5 text-right font-mono text-secondary">{lot.qty}</td>

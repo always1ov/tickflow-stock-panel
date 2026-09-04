@@ -69,6 +69,16 @@ def list_traders(request: Request) -> dict[str, Any]:
     return {"traders": [_summary(t, prices) for t in rows]}
 
 
+@router.get("/holdings-overlap")
+def holdings_overlap() -> dict[str, Any]:
+    """[fork 增强 R170] 各标的被几个操作员持有 —— 供「我的批次」表做对照标记。
+
+    只回计数, 不回操作员身份/成本/理由, 理由见 paper_trader.holdings_overlap 的说明。
+    """
+    counts, total = pt.holdings_overlap()
+    return {"overlap": counts, "trader_count": total}
+
+
 class TraderIn(BaseModel):
     """name 应当就是模型名 —— 这张表要回答的是哪个模型做得更好。
 

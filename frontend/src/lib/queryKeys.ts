@@ -139,6 +139,7 @@ export const QK = {
   signalAiSchedule:     ['signal-ai-schedule'] as const,
   // AI 操盘手
   paperTraders:         ['paper-traders'] as const,
+  paperOverlap:         ['paper-holdings-overlap'] as const,   // [R170] 对照标记
   paperBooksAll:        ['paper-book'] as const,          // 前缀失效: 所有账本明细
   paperBook:            (id: string, scope: string) => ['paper-book', id, scope] as const,
   paperBookContext:     (id: string, scope: string) => ['paper-book-context', id, scope] as const,
