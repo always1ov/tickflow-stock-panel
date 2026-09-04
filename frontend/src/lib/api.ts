@@ -2313,6 +2313,10 @@ export interface PaperBook {
   last_run_at: string | null
   last_error: string
   last_note: string
+  /** [R171] 出场原因分布 —— 立计划之后真正的产出 */
+  exit_stats?: PaperExitStats
+  /** [R171] 已到止盈线但系统没替它卖的, 会写进下一轮它的上下文 */
+  plan_reminders?: { symbol: string; kind: string; reason: string }[]
 }
 
 export interface PaperSchedule {
@@ -2334,12 +2338,44 @@ export interface PaperTrader {
   books: PaperBook[]
 }
 
+/**
+ * [R171] 买入时立的交易计划 —— 借鉴「持仓提醒」的批次: 按成本价 ± 止盈/止损%
+ * 推出监控线, 按最长持有天数推出到期日。
+ *
+ * 纪律分两档: **止损线与到期日到了系统直接卖, 不问 AI**(和跌破生命线同一条道理);
+ * **止盈线到了只提醒**, 由模型自己决定落袋还是让利润奔跑 —— 那是策略不是纪律。
+ */
+export interface PaperPlan {
+  target_pct: number | null
+  stop_pct: number | null
+  hold_days: number | null
+  target_price: number | null
+  stop_price: number | null
+  due_date: string | null
+  /** 三条线是按哪个成本算出来的(加仓后会按新的加权成本重算) */
+  based_on_cost: number
+}
+
+/** [R171] 出场归因: 每笔卖出归到其中一类 */
+export type PaperExitReason = 'stop' | 'due' | 'target' | 'lifeline' | 'ai'
+
+export interface PaperExitStats {
+  counts: Record<PaperExitReason, number>
+  closed: number
+  wins: number
+  win_rate: number | null
+  positions_with_plan: number
+  positions_total: number
+}
+
 export interface PaperPosition {
   symbol: string; shares: number; cost: number
   price: number | null
   opened_on: string
   pnl_pct: number | null
   market_value: number
+  /** [R171] 买入时立的三条线; 升级前建的仓没有 */
+  plan?: PaperPlan | null
 }
 
 export interface PaperOrder {
@@ -2354,6 +2390,15 @@ export interface PaperOrder {
   lifeline?: boolean
   /** 那一笔用的是实时价(生命线是全流程唯一允许用实时的地方) */
   intraday?: boolean
+  /** [R171] 卖出归因。买入没有这个字段 */
+  exit_reason?: PaperExitReason
+  /** [R171] 卖出时的成本与已实现盈亏 */
+  cost?: number | null
+  pnl_pct?: number | null
+  /** [R171] 买入时立的计划(存一份在成交上, 便于复盘当时怎么想的) */
+  plan?: PaperPlan | null
+  /** [R171] 这笔强平是被计划的哪条线带走的 */
+  plan_hit?: 'stop' | 'due'
 }
 
 /** 一本账的全部家当 */
@@ -2738,6 +2783,15 @@ export const api = {
    * "所有人持仓一览"(看完再去调提示词会破坏操作员隔离, 而隔离正是这个实验的价值)。
    * 一个聚合数能回答"AI 那边也看上这只了吗", 又不泄露任何一本账。
    */
+  /**
+   * [R171] 过一遍模型买入时立的交易计划。与生命线那个端点成对, 同样**不问 AI**:
+   * 止损线与到期日直接卖, 止盈线只记提醒(下一轮写进它的上下文)。
+   */
+  paperPlanCheck: (id: string, scope: PaperScope) =>
+    request<{ forced: PaperOrder[]; reminders: { symbol: string; kind: string; reason: string }[]; count: number }>(
+      `/api/paper-trading/traders/${encodeURIComponent(id)}/books/${scope}/plan-check`,
+      { method: 'POST' }),
+
   paperHoldingsOverlap: () =>
     request<{ overlap: Record<string, number>; trader_count: number }>(
       '/api/paper-trading/holdings-overlap'),

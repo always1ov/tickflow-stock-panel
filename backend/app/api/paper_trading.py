@@ -34,6 +34,10 @@ def _book_summary(t: dict, scope: str, prices: dict[str, float]) -> dict:
         "last_run_at": bk.get("last_run_at"),
         "last_error": bk.get("last_error") or "",
         "last_note": bk.get("last_note") or "",
+        # [R171] 出场归因分布 + 还有几只挂着计划。这一栏才是"立计划"的产出:
+        # 止盈占比高 = 目标定得够得着; 止损/生命线占比高 = 买入那一刻常判断错。
+        "exit_stats": pt.exit_stats(bk),
+        "plan_reminders": bk.get("plan_reminders") or [],
     }
 
 
@@ -186,6 +190,27 @@ def run_lifeline(trader_id: str, scope: str, request: Request) -> dict[str, Any]
     live = watchlist_live_map(request.app.state.repo)
     forced = paper_trader_run.check_lifelines(request.app.state.repo, t, scope, live=live)
     return {"forced": forced, "count": len(forced)}
+
+
+@router.post("/traders/{trader_id}/books/{scope}/plan-check")
+def run_plan_check(trader_id: str, scope: str, request: Request) -> dict[str, Any]:
+    """[R171] 过一遍模型买入时立的交易计划 —— 这一路同样**不问 AI**。
+
+    止损线与到期日到了直接卖(和生命线一个道理: 保命的事不该给模型"再看看"的
+    机会); 到止盈线的只记提醒, 下一轮决策时写进它的上下文, 由它自己决定落袋
+    还是继续拿 —— 那是策略不是纪律。
+
+    与生命线端点分开而不是合并: 两者的归因要分得清, 复盘时得知道这笔是被系统的
+    纪律带走的, 还是它自己的计划兑现了。
+    """
+    from app.services import paper_trader_run
+
+    _scope_or_400(scope)
+    t = pt.get(trader_id)
+    if t is None:
+        raise HTTPException(status_code=404, detail="操作员不存在")
+    res = paper_trader_run.check_plans(request.app.state.repo, t, scope)
+    return {**res, "count": len(res["forced"])}
 
 
 class TraderSettingsIn(BaseModel):

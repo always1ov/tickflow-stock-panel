@@ -11,7 +11,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
-  Bot, Clock, Eye, Loader2, Play, Plus, RotateCcw, ShieldAlert, Trash2, TrendingUp, X,
+  Bot, Clock, Eye, Loader2, Play, Plus, RotateCcw, ShieldAlert, Target, Trash2, TrendingUp, X,
 } from 'lucide-react'
 import {
   api, type PaperBook, type PaperOrder, type PaperScope, type PaperTrader,
@@ -19,6 +19,8 @@ import {
 import { PageHeader } from '@/components/PageHeader'
 import { toast } from '@/components/Toast'
 import { QK } from '@/lib/queryKeys'
+// [R171] 交易计划: 三条线 / 出场归因标 / 出场分布
+import { ExitStatsBar, ExitTag, PlanCell } from '@/components/paper/PlanCells'
 
 const INPUT = 'h-8 w-full rounded-input border border-border bg-surface px-2 text-xs text-foreground outline-none transition-colors focus:border-accent'
 
@@ -93,6 +95,22 @@ export function PaperTrading({ embedded = false }: { embedded?: boolean } = {}) 
       refresh()
       qc.invalidateQueries({ queryKey: QK.paperBooksAll })
       toast(res.count === 0 ? '没有持仓跌破生命线' : `按纪律清掉 ${res.count} 只`, 'success')
+    },
+    onError: e => toast(String((e as Error).message || e), 'error'),
+  })
+
+  // [R171] 交易计划检查: 与生命线成对, 同样不问 AI。
+  // 那条是系统定的纪律(跌破 20 日线), 这条是模型买入那一刻自己立的 ——
+  // 止损/到期硬执行, 止盈只记提醒。
+  const planCheck = useMutation({
+    mutationFn: (v: { id: string; scope: PaperScope }) => api.paperPlanCheck(v.id, v.scope),
+    onSuccess: res => {
+      refresh()
+      qc.invalidateQueries({ queryKey: QK.paperBooksAll })
+      const bits: string[] = []
+      if (res.count) bits.push(`按计划卖出 ${res.count} 只`)
+      if (res.reminders.length) bits.push(`${res.reminders.length} 只到止盈线(系统不代劳)`)
+      toast(bits.length ? bits.join(' · ') : '没有持仓触到计划的线', 'success')
     },
     onError: e => toast(String((e as Error).message || e), 'error'),
   })
@@ -176,6 +194,7 @@ export function PaperTrading({ embedded = false }: { embedded?: boolean } = {}) 
                 runningScope={run.isPending && run.variables?.id === t.id ? run.variables.scope : null}
                 onRun={sc => run.mutate({ id: t.id, scope: sc })}
                 onLifeline={sc => lifeline.mutate({ id: t.id, scope: sc })}
+                onPlanCheck={sc => planCheck.mutate({ id: t.id, scope: sc })}
                 onOpen={sc => setOpenId({ id: t.id, scope: sc })}
                 onChanged={refresh} />
             ))}
@@ -189,11 +208,12 @@ export function PaperTrading({ embedded = false }: { embedded?: boolean } = {}) 
   )
 }
 
-function TraderCard({ t, runningScope, onRun, onLifeline, onOpen, onChanged }: {
+function TraderCard({ t, runningScope, onRun, onLifeline, onPlanCheck, onOpen, onChanged }: {
   t: PaperTrader
   runningScope: PaperScope | null
   onRun: (scope: PaperScope) => void
   onLifeline: (scope: PaperScope) => void
+  onPlanCheck: (scope: PaperScope) => void
   onOpen: (scope: PaperScope) => void
   onChanged: () => void
 }) {
@@ -283,6 +303,7 @@ function TraderCard({ t, runningScope, onRun, onLifeline, onOpen, onChanged }: {
             busy={runningScope === b.scope}
             onRun={() => onRun(b.scope)}
             onLifeline={() => onLifeline(b.scope)}
+            onPlanCheck={() => onPlanCheck(b.scope)}
             onOpen={() => onOpen(b.scope)}
             onReset={() => {
               if (window.confirm(`把「${b.scope_cn}」这本账重置到起跑线？\n只影响这一本, 另一本不动。本金保持不变。`)) {
@@ -305,9 +326,10 @@ function TraderCard({ t, runningScope, onRun, onLifeline, onOpen, onChanged }: {
   )
 }
 
-function BookPane({ b, busy, onRun, onLifeline, onOpen, onReset, onCapital }: {
+function BookPane({ b, busy, onRun, onLifeline, onPlanCheck, onOpen, onReset, onCapital }: {
   b: PaperBook; busy: boolean
-  onRun: () => void; onLifeline: () => void; onOpen: () => void; onReset: () => void
+  onRun: () => void; onLifeline: () => void; onPlanCheck: () => void
+  onOpen: () => void; onReset: () => void
   onCapital: (v: number) => void
 }) {
   return (
@@ -349,6 +371,21 @@ function BookPane({ b, busy, onRun, onLifeline, onOpen, onReset, onCapital }: {
         </div>
       </div>
 
+      {/* [R171] 出场归因分布 —— 逼模型先立计划真正的产出。摆在「上次想法」上面
+          是有意的: 先看它做成了什么, 再看它当时怎么说的。 */}
+      <div className="mt-2">
+        <ExitStatsBar stats={b.exit_stats} />
+      </div>
+
+      {/* 已到止盈线但系统没替它卖的。止盈只提醒 —— 这里显示出来, 下一轮也会写进
+          它的上下文, 由它自己决定落袋还是继续拿。 */}
+      {(b.plan_reminders?.length ?? 0) > 0 && (
+        <div className="mt-1.5 rounded border border-red-400/35 bg-red-400/[0.06] px-2 py-1 text-[10px] leading-4 text-red-400/90">
+          已到止盈线({b.plan_reminders!.length} 只): {b.plan_reminders!.map(r => r.symbol).join('、')}
+          <span className="ml-1 text-muted">—— 系统不代劳, 等它自己决定</span>
+        </div>
+      )}
+
       {b.last_note && (
         <div className="mt-2 rounded border border-border/60 bg-elevated/30 px-2 py-1 text-[10px] leading-4 text-secondary">
           上次想法: {b.last_note}
@@ -371,6 +408,13 @@ function BookPane({ b, busy, onRun, onLifeline, onOpen, onReset, onCapital }: {
           title="查一遍持仓有没有跌破生命线(20日线)。这一路不问 AI —— 硬纪律, 也是全流程唯一用实时价的地方"
           className="inline-flex h-7 items-center gap-1 rounded-btn border border-amber-400/40 px-2 text-[10px] text-amber-400 transition-colors hover:bg-amber-400/10">
           <ShieldAlert className="h-3 w-3" />查生命线
+        </button>
+        {/* [R171] 与「查生命线」成对: 那条是系统定的纪律, 这条是模型买入时
+            自己立的计划。都不问 AI, 但归因分开记。 */}
+        <button type="button" onClick={onPlanCheck}
+          title="过一遍模型买入时立的计划。止损线与到期日到了直接卖(不问 AI); 到止盈线的只记提醒, 下一轮写进它的上下文"
+          className="inline-flex h-7 items-center gap-1 rounded-btn border border-sky-400/40 px-2 text-[10px] text-sky-400 transition-colors hover:bg-sky-400/10">
+          <Target className="h-3 w-3" />过计划
         </button>
         <button type="button" onClick={onOpen}
           className="inline-flex h-7 items-center gap-1 rounded-btn border border-border px-2 text-[10px] text-secondary transition-colors hover:border-accent/40 hover:text-accent">
@@ -542,6 +586,12 @@ function BookDetail({ id, scope, onClose }: {
                   <th className="whitespace-nowrap px-2 py-2 text-right font-normal">成本 / 现价</th>
                   <th className="whitespace-nowrap px-2 py-2 text-right font-normal">市值</th>
                   <th className="whitespace-nowrap px-2 py-2 text-right font-normal">浮盈</th>
+                  {/* [R171] 买入时立的三条线。摆在浮盈旁边是有意的: 看到浮盈的
+                      下一个问题必然是"那当初打算怎么办" */}
+                  <th className="whitespace-nowrap px-2 py-2 text-left font-normal"
+                      title="买入时模型自己立的计划。止损线与到期日到了系统直接卖(不问 AI); 止盈线到了只提醒。">
+                    计划(损/盈/期)
+                  </th>
                   <th className="whitespace-nowrap px-3 py-2 text-left font-normal">建仓日</th>
                 </tr>
               </thead>
@@ -555,11 +605,12 @@ function BookDetail({ id, scope, onClose }: {
                     </td>
                     <td className="whitespace-nowrap px-2 py-1.5 text-right font-mono tabular-nums text-secondary">{money(p.market_value)}</td>
                     <td className={`whitespace-nowrap px-2 py-1.5 text-right font-mono tabular-nums ${pnlCls(p.pnl_pct)}`}>{pct(p.pnl_pct, 1)}</td>
+                    <td className="whitespace-nowrap px-2 py-1.5"><PlanCell plan={p.plan} price={p.price} /></td>
                     <td className="whitespace-nowrap px-3 py-1.5 font-mono text-[10px] text-muted">{p.opened_on}</td>
                   </tr>
                 ))}
                 {d.positions.length === 0 && (
-                  <tr><td colSpan={6} className="px-3 py-12 text-center text-[11px] text-muted">当前空仓</td></tr>
+                  <tr><td colSpan={7} className="px-3 py-12 text-center text-[11px] text-muted">当前空仓</td></tr>
                 )}
               </tbody>
             </table>
@@ -619,6 +670,9 @@ function OrderRow({ o }: { o: PaperOrder }) {
             纪律强平{o.intraday ? ' · 实时' : ''}
           </span>
         )}
+        {/* [R171] 卖出归因: 止损/到期是系统按它自己的计划执行的, 止盈/主动卖是它
+            自己的决定, 生命线是系统的纪律 —— 混成一类就看不出这个模型的章法 */}
+        <ExitTag o={o} />
         {o.rejected
           ? <span className="text-amber-400">被拒: {o.rejected}{o.reason ? ` · 原意图: ${o.reason}` : ''}</span>
           : (o.reason || <span className="text-muted/50">(没给理由)</span>)}

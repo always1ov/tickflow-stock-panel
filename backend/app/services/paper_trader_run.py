@@ -19,6 +19,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from app.services import paper_plan as pp   # [R171] 买入即立止盈/止损/到期
 from app.services import paper_trader as pt
 
 logger = logging.getLogger(__name__)
@@ -70,14 +71,38 @@ LOOK_PROMPT = f"""你是一名 A 股模拟盘操作员, 现在是**看盘**环�
   "why": "一句话说明为什么挑这几只"}}
 一只都不想细看就给 "focus": []; 不需要重出信号就给 "refresh": []。"""
 
+# [R171] 买入必须带交易计划。借鉴「持仓提醒」的批次: 记一笔买入就按成本价
+# ± 止盈/止损% 立好监控线, 填了持有期限就有到期日。
+#
+# 为什么要逼模型先说清楚: 升级前它每天重新自由决定买卖, 复盘时**没法回答
+# "它的计划靠不靠谱"** —— 赚了说是眼光, 亏了说是运气。先立计划再执行, 每笔
+# 出场就能归到止盈/止损/到期/生命线/主动卖里的一类, 一段时间下来这个模型是
+# 真有章法还是只会画大饼, 表上自己会说话。
+_PLAN_RULE = f"""买入的纪律(这是硬的):
+- 每一笔买入**必须**同时给出 target_pct(止盈%)、stop_pct(止损%)、
+  hold_days(最长持有几天)。系统会按你的成交成本立好三条线。
+- **止损线和到期日到了, 系统直接卖, 不会再问你** —— 和跌破生命线一样是纪律。
+  所以别写"止损 1%"这种一个跳就打掉的数, 也别写"持有 1 天"。
+- **止盈线到了系统只提醒你, 不替你卖** —— 落袋还是让利润奔跑由你自己判断,
+  那是策略不是纪律。
+- 合理区间: 止盈 {pp.MIN_TARGET_PCT:g}~{pp.MAX_TARGET_PCT:g}%,
+  止损 {pp.MIN_STOP_PCT:g}~{pp.MAX_STOP_PCT:g}%,
+  持有 {pp.MIN_HOLD_DAYS}~{pp.MAX_HOLD_DAYS} 天(自然日)。超出会被夹到边界。
+- 加仓时成本会变, 系统按新成本重算三条线; 不重新给参数就沿用原来的百分比。"""
+
 SYSTEM_PROMPT = f"""你是一名 A 股模拟盘操作员。
 
 {_RULES}
 
+{_PLAN_RULE}
+
 输出**只回一个 JSON 对象**, 不要写别的:
 {{"note": "一句话说明今天的整体想法",
- "orders": [{{"action": "buy|sell", "symbol": "600000.SH", "shares": 100,
-             "reason": "为什么这一笔"}}]}}
+ "orders": [{{"action": "buy", "symbol": "600000.SH", "shares": 100,
+             "target_pct": 15, "stop_pct": 8, "hold_days": 30,
+             "reason": "为什么这一笔, 以及为什么是这三个数"}},
+            {{"action": "sell", "symbol": "000001.SZ", "shares": 100,
+             "reason": "为什么现在走"}}]}}
 今天什么都不做就给 "orders": []。每一笔都必须写 reason —— 这份记录是拿来
 复盘这套系统给的信息够不够用的, 没有理由的成交没有价值。"""
 
@@ -266,6 +291,19 @@ def build_context(repo, trader: dict, scope: str) -> str:
             lines.append(
                 f"  · {sym} {pos.get('shares')} 股 · 成本 {pos.get('cost')} · "
                 f"现价 {px if px else '—'} · 浮盈 {_fmt_pct(pnl)} · 建仓日 {pos.get('opened_on', '—')}")
+            # [R171] 把这一笔买入时自己立的三条线摆出来。不摆的话模型看不见自己的
+            # 承诺, 于是下一天又凭当天的感觉重新决定 —— 那就回到升级前了。
+            plan_txt = pp.plan_line(sym, pos, px)
+            if plan_txt:
+                lines.append(f"    ({plan_txt.split(': ', 1)[-1]})")
+
+    # [R171] 上一轮纪律检查记下的止盈提醒。止盈不硬执行, 所以必须让它看见 ——
+    # 否则"只提醒"就等于没提醒。
+    rem = bk.get("plan_reminders") or []
+    if rem:
+        lines.append("\n## 已到止盈线(系统不替你卖, 走不走你自己定)")
+        for r in rem:
+            lines.append(f"- {r.get('symbol')}: {r.get('reason')}")
 
     orders = (bk.get("orders") or [])[-pt.RECENT_ORDERS_IN_CONTEXT:]
     lines.append("\n## 你最近的操作(只有你自己的)")
@@ -408,10 +446,19 @@ async def run_once(repo, trader: dict, scope: str) -> dict:
 
     filled: list[dict] = []
     for o in orders:
+        # [R171] 买入带上交易计划 —— derive_plan 按**成交成本**立线, 所以要等
+        # apply_order 算完加权成本再重算一次(那一步在 apply_order 里做)。
+        # 这里只把模型给的百分比透传过去。
+        plan_in = None
+        if o["action"] == pt.ACTION_BUY and any(
+                k in o for k in ("target_pct", "stop_pct", "hold_days")):
+            plan_in = {"target_pct": o.get("target_pct"), "stop_pct": o.get("stop_pct"),
+                       "hold_days": o.get("hold_days")}
         entry = pt.apply_order(
             bk, action=o["action"], symbol=o["symbol"], shares=o["shares"],
             price=prices.get(o["symbol"], 0.0), trade_date=trade_date, reason=o["reason"],
-            max_positions=pt.clamp_max_positions(trader.get("max_positions")))
+            max_positions=pt.clamp_max_positions(trader.get("max_positions")),
+            plan=plan_in)
         filled.append(entry)
 
     # 净值在成交之后按最新价重记 —— 先记再成交的话当天那一笔看不进曲线
@@ -503,7 +550,8 @@ def check_lifelines(repo, trader: dict, scope: str, *, live: dict[str, dict] | N
             bk, action=pt.ACTION_SELL, symbol=sym,
             shares=int((bk["positions"][sym]).get("shares") or 0),
             price=px, trade_date=day,
-            reason=f"{LIFELINE_REASON} —— 现价 {px:.2f} < 生命线 {line:.2f}")
+            reason=f"{LIFELINE_REASON} —— 现价 {px:.2f} < 生命线 {line:.2f}",
+            exit_reason=pt.EXIT_LIFELINE)      # [R171] 与"模型自己的计划"分开归因
         entry["lifeline"] = True
         entry["intraday"] = sym in live
         out.append(entry)
@@ -512,6 +560,73 @@ def check_lifelines(repo, trader: dict, scope: str, *, live: dict[str, dict] | N
         pt.mark_nav(bk, latest_prices(repo, list((bk.get("positions") or {}).keys())), day)
         pt.save(trader)
     return out
+
+
+# ================================================================
+# [R171] 交易计划纪律 —— 买入时立的止损/到期硬执行, 止盈只提醒
+# ================================================================
+#
+# 借鉴「持仓提醒」的批次: 记一笔买入 → 按成本价 ± 止盈/止损% 生成价格监控,
+# 填了持有期限就生成到期提醒。那边是真钱、由人拍板, 所以只提醒; 这边没有人,
+# 所以要先说清「提醒发给谁」。答案分两档(理由见 paper_plan 模块开头):
+#
+#   止损 / 到期 → 硬执行, 不问 AI(和生命线同一条道理: 保命的事不给"再看看"的机会)
+#   止盈       → 只提醒, 写进下一轮上下文, 由模型自己决定落袋还是继续拿
+#
+# 与生命线的关系: 生命线是**系统**定的纪律(跌破 20 日线无条件走), 计划是
+# **模型自己**买入那一刻立的。两条都硬执行, 但归因分开记 —— 复盘时要能分清
+# 这笔是被系统的纪律带走的, 还是它自己的计划兑现了。
+
+
+def check_plans(repo, trader: dict, scope: str, *,
+                trade_date: str | None = None) -> dict:
+    """扫一遍这本账的持仓, 触了止损/到期的按纪律卖掉, 到止盈线的只记提醒。
+
+    返回 {"forced": [成交记录...], "reminders": [{symbol, kind, reason}...]}。
+
+    全程**收盘口径** —— 与生命线那一路不同, 这里不接实时价: 计划的三条线是模型
+    按收盘成本立的, 拿盘中价去比会在同一天里反复触发又反复回来。
+    """
+    bk = pt.book(trader, scope)
+    positions = bk.get("positions") or {}
+    if not positions:
+        return {"forced": [], "reminders": []}
+
+    syms = list(positions.keys())
+    closes = latest_prices(repo, syms)
+    day = trade_date or _overview(repo).get("as_of") or ""
+
+    forced: list[dict] = []
+    reminders: list[dict] = []
+    for sym in syms:
+        pos = positions.get(sym)
+        if not isinstance(pos, dict):
+            continue
+        px = closes.get(sym)
+        if not px:
+            continue                      # 没价不判, 更不能凭空成交
+        hit = pp.check_plan(pos, px, day)
+        if not hit:
+            continue
+        if not hit["enforce"]:
+            reminders.append({"symbol": sym, "kind": hit["kind"], "reason": hit["reason"]})
+            continue
+        # T+1 挡住当天买当天卖: 计划再硬也不能违反交易规则, apply_order 会拒,
+        # 拒单同样留痕, 明天再触发一次就是了
+        entry = pt.apply_order(
+            bk, action=pt.ACTION_SELL, symbol=sym,
+            shares=int(pos.get("shares") or 0), price=px, trade_date=day,
+            reason=hit["reason"],
+            exit_reason=pt.EXIT_STOP if hit["kind"] == pp.KIND_STOP else pt.EXIT_DUE)
+        entry["plan_hit"] = hit["kind"]
+        forced.append(entry)
+
+    if forced:
+        pt.mark_nav(bk, latest_prices(repo, list((bk.get("positions") or {}).keys())), day)
+    # 提醒也要落在账上 —— 下一轮 build_context 从这里读, 不然模型看不见
+    bk["plan_reminders"] = reminders
+    pt.save(trader)
+    return {"forced": forced, "reminders": reminders}
 
 
 # ================================================================

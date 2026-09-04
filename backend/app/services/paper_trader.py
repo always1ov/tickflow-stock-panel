@@ -33,6 +33,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from app.services import paper_plan   # [R171] 买入即立止盈/止损/到期三条线
+
 logger = logging.getLogger(__name__)
 
 MAX_TRADERS = 8
@@ -71,6 +73,16 @@ SCOPE_MARKET = "market"
 SCOPE_WATCHLIST = "watchlist"
 SCOPES = (SCOPE_MARKET, SCOPE_WATCHLIST)
 SCOPE_CN = {SCOPE_MARKET: "全市场", SCOPE_WATCHLIST: "我的自选"}
+
+# [R171] 出场归因 —— 每一笔卖出都要能归到其中一类, 这样一段时间下来才能看出
+# 这个模型是"计划立得准"还是"只会画大饼"。
+EXIT_STOP = "stop"          # 触买入时立的止损线(硬执行)
+EXIT_DUE = "due"            # 到买入时定的最长持有期(硬执行)
+EXIT_TARGET = "target"      # 到止盈线后模型自己决定走(止盈只提醒, 不硬执行)
+EXIT_LIFELINE = "lifeline"  # [R61] 跌破生命线的纪律强平
+EXIT_AI = "ai"              # 模型自己判断该走了
+EXIT_CN = {EXIT_STOP: "止损", EXIT_DUE: "到期", EXIT_TARGET: "止盈",
+           EXIT_LIFELINE: "生命线", EXIT_AI: "主动卖"}
 
 
 def now_iso() -> str:
@@ -389,11 +401,17 @@ def nav(bk: dict, prices: dict[str, float]) -> float:
 
 def apply_order(bk: dict, *, action: str, symbol: str, shares: int,
                 price: float, trade_date: str, reason: str = "",
-                max_positions: int | None = None) -> dict:
+                max_positions: int | None = None,
+                plan: dict | None = None, exit_reason: str | None = None) -> dict:
     """执行一笔并记账。返回这一笔的成交记录(被拒时带 rejected 原因)。
 
     拒单也要留痕 —— "AI 想买但钱不够"和"AI 没想买"是两件完全不同的事,
     只记成交的话复盘时看到的是一个安静的空窗期。
+
+    [R171] ``plan``: 买入时立的交易计划(止盈线/止损线/到期日, 见 paper_plan)。
+    加仓会按新的加权成本**重算**三条线 —— 成本变了还挂着旧线, 那条线就不再是
+    "成本 ± x%"了。``exit_reason``: 卖出归因(stop/due/target/lifeline/ai),
+    用来统计这个模型的计划靠不靠谱。
     """
     sym = str(symbol or "").strip().upper()
     entry: dict[str, Any] = {
@@ -436,6 +454,20 @@ def apply_order(bk: dict, *, action: str, symbol: str, shares: int,
         pos["cost"] = round(total_cost / pos["shares"], 4)
         # 当天买入 → T+1 的锚。加仓也要刷新: 新加的那部分当天同样不能卖
         pos["opened_on"] = trade_date
+        # [R171] 立(或按新成本重立)交易计划。加仓后成本变了, 三条线必须跟着动;
+        # 这一笔没给计划就沿用原来的百分比, 只是换个成本重算 —— 加仓不该悄悄
+        # 把已有的纪律抹掉。
+        _src = plan if plan else pos.get("plan")
+        if isinstance(_src, dict):
+            _re = paper_plan.derive_plan(
+                pos["cost"], target_pct=_src.get("target_pct"),
+                stop_pct=_src.get("stop_pct"), hold_days=_src.get("hold_days"),
+                buy_date=str(pos.get("first_bought_on") or trade_date))
+            if _re:
+                pos["plan"] = _re
+        pos.setdefault("first_bought_on", trade_date)
+        if pos.get("plan"):
+            entry["plan"] = pos["plan"]
         entry["price"] = round(px, 3)
         entry["shares"] = lots
         entry["amount"] = round(amount, 2)
@@ -451,10 +483,17 @@ def apply_order(bk: dict, *, action: str, symbol: str, shares: int,
     lots = min(lots, int(pos["shares"]))
     px = _fill_price(price, ACTION_SELL)
     amount = px * lots
+    # [R171] 把这一笔的成本与已实现盈亏记在成交上。不记的话出场归因只能数条数,
+    # 回答不了"止损那几笔平均亏多少""止盈那几笔真赚到了没"。
+    _cost = float(pos.get("cost") or 0)
+    entry["cost"] = round(_cost, 4) if _cost > 0 else None
+    entry["pnl_pct"] = round(px / _cost - 1, 4) if _cost > 0 else None
     bk["cash"] = float(bk.get("cash") or 0) + amount - _cost_sell(amount)
     pos["shares"] = int(pos["shares"]) - lots
     if pos["shares"] <= 0:
         positions.pop(sym, None)
+    # [R171] 出场归因。没给就是模型自己决定卖的 —— 那也是一类, 不该留空
+    entry["exit_reason"] = str(exit_reason or EXIT_AI)
     entry["price"] = round(px, 3)
     entry["shares"] = lots
     entry["amount"] = round(amount, 2)
@@ -464,6 +503,41 @@ def apply_order(bk: dict, *, action: str, symbol: str, shares: int,
 def _append(bk: dict, entry: dict) -> dict:
     (bk.setdefault("orders", [])).append(entry)
     return entry
+
+
+def exit_stats(bk: dict) -> dict:
+    """[R171] 这本账的出场原因分布 + 计划达成率。
+
+    这才是立计划之后真正的产出: 一个模型是"计划立得准"还是"只会画大饼",
+    看的就是这张表 —— 止盈占比高说明它的目标定得够得着, 止损/生命线占比高说明
+    它买入那一刻的判断经常错, 到期占比高说明它老是拿着不动等时间到。
+    """
+    counts = dict.fromkeys(EXIT_CN, 0)
+    wins = 0
+    closed = 0
+    for o in bk.get("orders") or []:
+        if o.get("action") != ACTION_SELL or o.get("rejected"):
+            continue
+        kind = str(o.get("exit_reason") or EXIT_AI)
+        if kind not in counts:
+            kind = EXIT_AI
+        counts[kind] += 1
+        closed += 1
+        # 止盈与主动卖里赚钱的算"计划兑现"; 止损/生命线/到期按定义不算
+        if kind in (EXIT_TARGET, EXIT_AI) and float(o.get("pnl_pct") or 0) > 0:
+            wins += 1
+    planned = sum(1 for p in (bk.get("positions") or {}).values()
+                  if isinstance(p, dict) and isinstance(p.get("plan"), dict))
+    return {
+        "counts": counts,
+        "closed": closed,
+        # 赚钱出场的占比。止损/生命线/到期按定义不算"计划兑现" —— 它们是
+        # 计划没走通才触发的; 只有止盈与主动卖里赚到钱的那些才算。
+        "wins": wins,
+        "win_rate": round(wins / closed, 4) if closed else None,
+        "positions_with_plan": planned,
+        "positions_total": len(bk.get("positions") or {}),
+    }
 
 
 def mark_nav(bk: dict, prices: dict[str, float], trade_date: str) -> dict:
@@ -543,6 +617,19 @@ def parse_orders(text: str) -> tuple[list[dict], str]:
             shares = int(float(r.get("shares") or r.get("qty") or 0))
         except (TypeError, ValueError):
             continue
-        out.append({"action": action, "symbol": sym, "shares": shares,
-                    "reason": str(r.get("reason") or r.get("why") or "")[:300]})
+        row = {"action": action, "symbol": sym, "shares": shares,
+               "reason": str(r.get("reason") or r.get("why") or "")[:300]}
+        # [R171] 买入时的交易计划。**只对买入有意义** —— 卖出带着这几个字段
+        # 是模型抄格式抄顺手了, 收下来只会在账上留一份用不到的噪音。
+        # 三项都可缺: 缺了就是这一笔没立计划(退回升级前的行为), 而不是整笔作废。
+        if action == ACTION_BUY:
+            for k_out, k_in in (("target_pct", ("target_pct", "take_profit_pct", "止盈")),
+                                ("stop_pct", ("stop_pct", "stop_loss_pct", "止损")),
+                                ("hold_days", ("hold_days", "max_hold_days", "持有天数"))):
+                for k in k_in:
+                    v = r.get(k)
+                    if isinstance(v, (int, float)) and not isinstance(v, bool):
+                        row[k_out] = float(v)
+                        break
+        out.append(row)
     return out, note

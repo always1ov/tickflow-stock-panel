@@ -47,6 +47,17 @@ async def run_trader_once(repo, trader_id: str) -> dict:
         except Exception as e:  # noqa: BLE001
             logger.warning("paper trader %s lifeline check failed: %s", trader_id, e)
 
+        # [R171] 再过一遍模型自己立的计划: 止损/到期硬执行, 止盈只记提醒。
+        # 排在生命线之后 —— 生命线是系统的硬纪律, 优先级最高(与出场线体系一致);
+        # 已经被生命线带走的仓, 这一步自然就扫不到了。
+        t = pt.get(trader_id) or t
+        try:
+            res = paper_trader_run.check_plans(repo, t, scope)
+            out["forced"].extend(res["forced"])
+            out.setdefault("reminders", []).extend(res["reminders"])
+        except Exception as e:  # noqa: BLE001
+            logger.warning("paper trader %s plan check failed: %s", trader_id, e)
+
         # 2) AI 决策。一本账失败不该拖累另一本 —— 它们本来就是互相独立的对照组
         t = pt.get(trader_id) or t
         try:
