@@ -517,7 +517,7 @@ function PluginKeyConfig({ plugin }: { plugin: PluginDataSourceItem }) {
         <button
           type="submit"
           disabled={save.isPending || (!keyInput.trim() && !saved)}
-          className="w-full h-9 rounded-xl bg-accent text-white text-sm font-semibold flex items-center justify-center gap-2 hover:bg-accent/90 disabled:opacity-40 transition-all"
+          className="w-full h-9 rounded-xl bg-accent text-white text-sm font-semibold flex items-center justify-center gap-2 hover:bg-accent/90 disabled:opacity-40 transition-ui"
         >
           {save.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : saved ? <Check className="h-4 w-4" /> : <Save className="h-4 w-4" />}
           {save.isPending ? '验证中...' : saved ? '已保存' : '保存并检测'}
@@ -788,7 +788,7 @@ export function SettingsDataSourcesPanel({ highlight }: { highlight?: string } =
                     editExisting.mutate(item.name)
                   }
                 }}
-                className={`relative text-left rounded-lg border px-3.5 py-3 transition-all ${
+                className={`relative text-left rounded-lg border px-3.5 py-3 transition-ui ${
                   pluginUnavailable && !plugin?.api_key_env
                     ? 'border-border/40 bg-elevated/10 opacity-70'
                     : isSelected
@@ -879,7 +879,7 @@ export function SettingsDataSourcesPanel({ highlight }: { highlight?: string } =
           {/* 新增数据源卡片 */}
           <button
             onClick={() => setSelected('__new__')}
-            className={`rounded-lg border border-dashed px-3.5 py-3 transition-all flex items-center justify-center gap-1.5 text-sm ${
+            className={`rounded-lg border border-dashed px-3.5 py-3 transition-ui flex items-center justify-center gap-1.5 text-sm ${
               selected === '__new__'
                 ? 'border-accent/50 bg-accent/5 text-accent'
                 : 'border-border/50 text-muted hover:text-foreground hover:border-border hover:bg-elevated/30'
@@ -1122,7 +1122,7 @@ function TickFlowDetail({ active, matrix }: { active: boolean; matrix?: Capabili
         <span className="flex h-5 w-5 items-center justify-center rounded text-muted/60 transition-colors group-hover/caps:text-foreground">
           <ListChecks className="h-3 w-3" />
         </span>
-        <div className="invisible absolute right-0 top-full z-20 pt-1.5 opacity-0 transition-all duration-hover group-hover/caps:visible group-hover/caps:opacity-100">
+        <div className="invisible absolute right-0 top-full z-20 pt-1.5 opacity-0 transition-ui duration-hover group-hover/caps:visible group-hover/caps:opacity-100">
           <div className="w-64 rounded-md border border-border bg-surface py-2 pl-3 pr-3.5 shadow-2xl shadow-black/40">
             <div className="mb-1.5 flex items-center justify-between">
               <span className="text-xs font-medium text-foreground">可用功能</span>

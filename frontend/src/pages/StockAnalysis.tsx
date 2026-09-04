@@ -255,7 +255,7 @@ function LevelsDialog({ symbol, name, onClose }: { symbol: string | null; name: 
             exit={{ opacity: 0, scale: 0.97, y: 8 }}
             transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
             className={cn(
-              'relative rounded-card border border-border bg-base shadow-2xl overflow-hidden flex flex-col transition-all duration-expand ease-smooth',
+              'relative rounded-card border border-border bg-base shadow-2xl overflow-hidden flex flex-col transition-ui duration-expand ease-smooth',
               maximized ? 'w-screen h-screen max-w-none max-h-none' : 'w-[92vw] max-w-[1100px] max-h-[95vh]',
             )}
           >
@@ -323,7 +323,7 @@ function ConfirmModal({ report, onView, onRedo, onClose }: {
             查看历史
           </button>
           <button onClick={onRedo}
-            className="flex-1 h-8 rounded-lg bg-gradient-to-r from-sky-500/20 to-blue-500/15 border border-sky-400/30 text-xs text-sky-300 hover:from-sky-500/30 transition-all">
+            className="flex-1 h-8 rounded-lg bg-gradient-to-r from-sky-500/20 to-blue-500/15 border border-sky-400/30 text-xs text-sky-300 hover:from-sky-500/30 transition-ui">
             重新分析
           </button>
         </div>

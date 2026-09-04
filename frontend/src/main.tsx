@@ -2,6 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { RouterProvider } from 'react-router-dom'
 import { QueryClient, QueryClientProvider, QueryCache } from '@tanstack/react-query'
+import { MotionConfig } from 'framer-motion'
 import { initializeFrontendExtensions } from './extensions/bootstrap'
 import { createAppRouter } from './router'
 import { api } from './lib/api'
@@ -74,9 +75,19 @@ async function bootstrap() {
   const router = createAppRouter()
   ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>
-      <QueryClientProvider client={queryClient}>
-        <RouterProvider router={router} />
-      </QueryClientProvider>
+      {/* [R168] 让 115 处 framer-motion 动效也听系统的「减少动态效果」。
+          index.css 里那条 prefers-reduced-motion 全局兜底**管不到这些** ——
+          它只压 CSS transition/animation, 而 framer-motion 是用 JS 逐帧改行内
+          style, 媒体查询碰不到。reducedMotion="user" 打开后, framer-motion 会
+          自动把位移与缩放去掉、只留透明度过渡, 正好是无障碍指南要的"更少更轻,
+          而不是全关"。
+          放在 main.tsx 不额外增加首屏体积: framer-motion 本来就在入口 chunk 里
+          (router.tsx 同步 import 了 Layout, Layout 里有 motion), 见 R153。 */}
+      <MotionConfig reducedMotion="user">
+        <QueryClientProvider client={queryClient}>
+          <RouterProvider router={router} />
+        </QueryClientProvider>
+      </MotionConfig>
     </React.StrictMode>,
   )
 }

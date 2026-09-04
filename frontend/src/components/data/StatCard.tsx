@@ -208,7 +208,7 @@ export function StatCard({
   }
 
   return (
-    <div className={`rounded-card border ${borderCls} ${bgCls} flex flex-col transition-all duration-enter ${active ? 'shadow-[0_0_16px_rgba(61,214,140,0.08)]' : ''}`}>
+    <div className={`rounded-card border ${borderCls} ${bgCls} flex flex-col transition-ui duration-enter ${active ? 'shadow-[0_0_16px_rgba(61,214,140,0.08)]' : ''}`}>
       <div className="flex items-center justify-between px-4 pt-4 pb-2">
         <h3 className="text-sm font-medium text-foreground">{title}</h3>
         <div className="flex items-center gap-1.5">

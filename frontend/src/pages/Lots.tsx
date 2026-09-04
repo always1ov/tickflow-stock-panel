@@ -196,7 +196,7 @@ export function Lots() {
                             <button
                               onClick={() => setEditing(lot)}
                               title="编辑"
-                              className="p-1.5 rounded-md text-secondary transition-all hover:bg-accent/10 hover:text-accent cursor-pointer"
+                              className="p-1.5 rounded-md text-secondary transition-ui hover:bg-accent/10 hover:text-accent cursor-pointer"
                             >
                               <Pencil className="h-3.5 w-3.5" />
                             </button>
@@ -212,7 +212,7 @@ export function Lots() {
                               <button
                                 onClick={() => handleClickDelete(lot.id)}
                                 title="删除 (同步删除生成的监控规则)"
-                                className="p-1.5 rounded-md text-secondary transition-all hover:bg-danger/10 hover:text-danger cursor-pointer"
+                                className="p-1.5 rounded-md text-secondary transition-ui hover:bg-danger/10 hover:text-danger cursor-pointer"
                               >
                                 <Trash2 className="h-3.5 w-3.5" />
                               </button>

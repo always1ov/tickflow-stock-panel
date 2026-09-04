@@ -277,7 +277,7 @@ export function Review() {
               {([['today', '当日'], ['continuity', '连读昨日'], ['week', '近7日']] as const).map(([k, label]) => (
                 <button key={k} onClick={() => setRecapMode(k)}
                   title={k === 'continuity' ? '先回顾上一份复盘的观察要点是否兑现, 再结合今日复盘' : k === 'week' ? '以近7个交易日为主时间轴: 情绪演变/主线切换/量能趋势' : '按当日盘面直接复盘(原模式)'}
-                  className={`px-2.5 h-7 rounded-btn text-xs transition-all cursor-pointer ${recapMode === k ? 'bg-accent/15 text-accent font-medium' : 'text-muted hover:text-foreground'}`}>
+                  className={`px-2.5 h-7 rounded-btn text-xs transition-ui cursor-pointer ${recapMode === k ? 'bg-accent/15 text-accent font-medium' : 'text-muted hover:text-foreground'}`}>
                   {label}
                 </button>
               ))}
@@ -289,7 +289,7 @@ export function Review() {
               onClick={generate}
               disabled={isGenerating}
               className={cn(
-                'inline-flex items-center gap-1.5 rounded-btn px-3.5 py-1.5 text-xs font-medium transition-all',
+                'inline-flex items-center gap-1.5 rounded-btn px-3.5 py-1.5 text-xs font-medium transition-ui',
                 isGenerating
                   ? 'border border-accent/40 bg-accent/10 text-accent cursor-not-allowed'
                   : 'bg-accent text-white shadow-sm shadow-accent/25 hover:bg-accent/90 hover:shadow hover:shadow-accent/30',
@@ -333,7 +333,7 @@ export function Review() {
               </div>
               <Link
                 to="/data"
-                className="inline-flex items-center gap-1.5 rounded-btn bg-accent px-4 py-2 text-xs font-medium text-white shadow-sm transition-all hover:bg-accent/90 hover:shadow"
+                className="inline-flex items-center gap-1.5 rounded-btn bg-accent px-4 py-2 text-xs font-medium text-white shadow-sm transition-ui hover:bg-accent/90 hover:shadow"
               >
                 <Database className="h-3.5 w-3.5" />前往数据页同步
                 <ChevronRight className="h-3.5 w-3.5" />
@@ -918,7 +918,7 @@ function HistoryPanel({
                   </div>
                   <button
                     onClick={(e) => { e.stopPropagation(); onDelete(r.id) }}
-                    className="shrink-0 p-1 text-muted opacity-0 transition-all hover:text-bear group-hover:opacity-100"
+                    className="shrink-0 p-1 text-muted opacity-0 transition-ui hover:text-bear group-hover:opacity-100"
                     title="删除"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
@@ -970,7 +970,7 @@ function _DtPill({ item, idx, value, onOpenStock }: {
     <button
       type="button"
       onClick={() => onOpenStock(item.thscode)}
-      className="group inline-flex items-center gap-1.5 rounded-btn border border-border/60 bg-elevated/40 py-0.5 pl-0.5 pr-2.5 transition-all hover:border-accent/40 hover:bg-elevated/70"
+      className="group inline-flex items-center gap-1.5 rounded-btn border border-border/60 bg-elevated/40 py-0.5 pl-0.5 pr-2.5 transition-ui hover:border-accent/40 hover:bg-elevated/70"
       title={`查看 ${item.name ?? item.thscode} · 净买 ${fmtVolume(value ?? null)}`}
     >
       <span className={cn('grid h-[18px] w-[18px] min-w-[18px] place-items-center rounded-full font-mono text-[9px] font-bold leading-none', _rankCls(idx))}>
@@ -1189,7 +1189,7 @@ function _DtSeatList({ seats, onOpenStock }: {
                   key={`${s.name}-${r.thscode}`}
                   type="button"
                   onClick={() => onOpenStock(r.thscode)}
-                  className="inline-flex items-baseline gap-1.5 rounded-btn border border-border/60 bg-surface/60 px-2 py-0.5 text-[10px] transition-all hover:border-accent/40 hover:text-accent"
+                  className="inline-flex items-baseline gap-1.5 rounded-btn border border-border/60 bg-surface/60 px-2 py-0.5 text-[10px] transition-ui hover:border-accent/40 hover:text-accent"
                   title={`查看 ${r.name ?? r.thscode} 详情`}
                 >
                   <span>{r.name ?? r.thscode}</span>
@@ -1345,7 +1345,7 @@ function DragonTigerCard({ date, onOpenStock }: {
                     type="button"
                     onClick={() => setTab(t.key)}
                     className={cn(
-                      'rounded-btn px-3 py-1 text-[11px] transition-all',
+                      'rounded-btn px-3 py-1 text-[11px] transition-ui',
                       tab === t.key
                         ? 'bg-accent/15 font-medium text-accent shadow-sm'
                         : 'text-secondary hover:text-foreground',

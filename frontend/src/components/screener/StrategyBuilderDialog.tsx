@@ -404,10 +404,10 @@ export function StrategyBuilderDialog({ open, onClose, onSavedId, mode = 'create
           <div className="grid grid-cols-[1fr_auto_1fr] items-center px-5 py-2.5 border-b border-border/50">
             {/* 左侧：Tab 切换 */}
             <div className="flex rounded-lg bg-elevated p-0.5 w-fit">
-              <button onClick={() => { setTab('ai'); if (mode === 'create') setSource('ai') }} className={cn('px-3 py-1 rounded-md text-xs font-medium transition-all cursor-pointer', tab === 'ai' ? 'bg-amber-400/15 text-amber-400' : 'text-muted hover:text-foreground')}>
+              <button onClick={() => { setTab('ai'); if (mode === 'create') setSource('ai') }} className={cn('px-3 py-1 rounded-md text-xs font-medium transition-ui cursor-pointer', tab === 'ai' ? 'bg-amber-400/15 text-amber-400' : 'text-muted hover:text-foreground')}>
                 <Sparkles className="h-3 w-3 inline mr-1" />AI 生成
               </button>
-              <button onClick={() => { setTab('custom'); if (mode === 'create') { setSource('custom'); if (!code) setCode(executionBackend === 'matrix_native' ? MATRIX_TEMPLATE : CUSTOM_TEMPLATE) } }} className={cn('px-3 py-1 rounded-md text-xs font-medium transition-all cursor-pointer', tab === 'custom' ? 'bg-accent/15 text-accent' : 'text-muted hover:text-foreground')}>
+              <button onClick={() => { setTab('custom'); if (mode === 'create') { setSource('custom'); if (!code) setCode(executionBackend === 'matrix_native' ? MATRIX_TEMPLATE : CUSTOM_TEMPLATE) } }} className={cn('px-3 py-1 rounded-md text-xs font-medium transition-ui cursor-pointer', tab === 'custom' ? 'bg-accent/15 text-accent' : 'text-muted hover:text-foreground')}>
                 <FileText className="h-3 w-3 inline mr-1" />自定义编写
               </button>
             </div>
@@ -498,7 +498,7 @@ export function StrategyBuilderDialog({ open, onClose, onSavedId, mode = 'create
                 </div>
                 {error && <div className="text-[11px] text-danger bg-danger/10 border border-danger/20 rounded-lg px-3 py-2">{error}</div>}
                 <button onClick={handleGenerate} disabled={loading || !name.trim() || !rules.trim()}
-                  className="w-full h-10 rounded-xl bg-gradient-to-r from-amber-500/20 to-amber-500/10 border border-amber-400/30 text-amber-400 text-sm font-medium flex items-center justify-center gap-2 hover:from-amber-500/30 hover:to-amber-500/20 disabled:opacity-40 transition-all">
+                  className="w-full h-10 rounded-xl bg-gradient-to-r from-amber-500/20 to-amber-500/10 border border-amber-400/30 text-amber-400 text-sm font-medium flex items-center justify-center gap-2 hover:from-amber-500/30 hover:to-amber-500/20 disabled:opacity-40 transition-ui">
                   {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
                   {loading ? 'AI 生成中...' : code ? '重新生成' : 'AI 生成策略'}
                 </button>
@@ -591,7 +591,7 @@ export function StrategyBuilderDialog({ open, onClose, onSavedId, mode = 'create
                     placeholder="调整策略逻辑，如：增加RSI超卖条件、要求今日放量、修改均线为30日..."
                     className="flex-1 h-9 px-3 rounded-lg bg-base border-0 ring-1 ring-border/30 text-sm text-foreground placeholder:text-muted/30 focus:outline-none focus:ring-2 focus:ring-accent/30" />
                   <button onClick={handleModify} disabled={loading || !instruction.trim()}
-                    className="h-9 px-4 rounded-lg bg-amber-400/15 border border-amber-400/30 text-amber-400 text-xs font-medium flex items-center gap-1.5 hover:bg-amber-400/20 disabled:opacity-40 transition-all">
+                    className="h-9 px-4 rounded-lg bg-amber-400/15 border border-amber-400/30 text-amber-400 text-xs font-medium flex items-center gap-1.5 hover:bg-amber-400/20 disabled:opacity-40 transition-ui">
                     {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
                     AI 修改
                   </button>
@@ -622,7 +622,7 @@ export function StrategyBuilderDialog({ open, onClose, onSavedId, mode = 'create
                       {validated && <span className="text-[10px] text-emerald-400">已校验</span>}
                     </div>
                     <button onClick={() => { navigator.clipboard.writeText(code || (executionBackend === 'matrix_native' ? MATRIX_TEMPLATE : CUSTOM_TEMPLATE)); setCustomCopied(true); setTimeout(() => setCustomCopied(false), 2000) }}
-                      className={cn('inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium transition-all cursor-pointer', customCopied ? 'bg-emerald-400/10 text-emerald-400' : 'bg-elevated text-muted hover:text-foreground hover:bg-accent/10')}>
+                      className={cn('inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium transition-ui cursor-pointer', customCopied ? 'bg-emerald-400/10 text-emerald-400' : 'bg-elevated text-muted hover:text-foreground hover:bg-accent/10')}>
                       {customCopied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
                       {customCopied ? '已复制' : '复制代码'}
                     </button>
@@ -674,7 +674,7 @@ export function StrategyBuilderDialog({ open, onClose, onSavedId, mode = 'create
                     <ChevronLeft className="h-3 w-3" />上一步
                   </button>
                   <button onClick={handleSave} disabled={saving || loading}
-                    className="inline-flex items-center gap-1.5 h-7 px-3 rounded-lg bg-accent text-white text-xs font-medium hover:bg-accent/90 disabled:opacity-50 transition-all">
+                    className="inline-flex items-center gap-1.5 h-7 px-3 rounded-lg bg-accent text-white text-xs font-medium hover:bg-accent/90 disabled:opacity-50 transition-ui">
                     <Save className="h-3 w-3" />
                     {saving ? '保存中...' : '保存策略'}
                   </button>

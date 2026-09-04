@@ -197,7 +197,7 @@ function DisclaimerStep({ onNext }: { onNext: () => void }) {
       <div className="mt-6 flex items-center justify-center">
         <button
           onClick={onNext}
-          className="inline-flex items-center gap-2 px-6 h-11 rounded-xl bg-accent text-white text-sm font-semibold shadow-lg shadow-accent/20 hover:bg-accent/90 hover:shadow-accent/30 transition-all"
+          className="inline-flex items-center gap-2 px-6 h-11 rounded-xl bg-accent text-white text-sm font-semibold shadow-lg shadow-accent/20 hover:bg-accent/90 hover:shadow-accent/30 transition-ui"
         >
           我已了解,继续
           <ArrowRight className="h-4 w-4" />
@@ -256,7 +256,7 @@ function WelcomeStep({ onNext, onSkip }: { onNext: () => void; onSkip: () => voi
       <div className="mt-8 flex items-center justify-center gap-3">
         <button
           onClick={onNext}
-          className="inline-flex items-center gap-2 px-6 h-11 rounded-xl bg-accent text-white text-sm font-semibold shadow-lg shadow-accent/20 hover:bg-accent/90 hover:shadow-accent/30 transition-all"
+          className="inline-flex items-center gap-2 px-6 h-11 rounded-xl bg-accent text-white text-sm font-semibold shadow-lg shadow-accent/20 hover:bg-accent/90 hover:shadow-accent/30 transition-ui"
         >
           开始配置
           <ArrowRight className="h-4 w-4" />
@@ -821,7 +821,7 @@ function FinishStep({ onNext, onBack, pending }: { onNext: () => void; onBack: (
         <button
           onClick={onNext}
           disabled={pending}
-          className="inline-flex items-center gap-2 px-6 h-10 rounded-xl bg-accent text-white text-sm font-semibold shadow-lg shadow-accent/20 hover:bg-accent/90 hover:shadow-accent/30 disabled:opacity-60 transition-all"
+          className="inline-flex items-center gap-2 px-6 h-10 rounded-xl bg-accent text-white text-sm font-semibold shadow-lg shadow-accent/20 hover:bg-accent/90 hover:shadow-accent/30 disabled:opacity-60 transition-ui"
         >
           {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
           {pending ? '正在进入…' : '进入面板'}

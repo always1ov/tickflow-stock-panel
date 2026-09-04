@@ -613,7 +613,7 @@ export function Data() {
             <button
               onClick={() => adjGate.guard(() => startSync.mutate())}
               disabled={isStarting}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-btn bg-gradient-to-r from-accent/25 to-accent/10 border border-accent/30 text-accent text-xs font-medium hover:from-accent/35 hover:to-accent/20 disabled:opacity-40 transition-all duration-hover"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-btn bg-gradient-to-r from-accent/25 to-accent/10 border border-accent/30 text-accent text-xs font-medium hover:from-accent/35 hover:to-accent/20 disabled:opacity-40 transition-ui duration-hover"
             >
               {(isStarting || isRunning) ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -626,7 +626,7 @@ export function Data() {
               <button
                 onClick={() => setShowStopConfirm(true)}
                 title="停止当前同步任务"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-btn bg-danger/12 border border-danger/30 text-danger text-xs font-medium hover:bg-danger/20 transition-all duration-150"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-btn bg-danger/12 border border-danger/30 text-danger text-xs font-medium hover:bg-danger/20 transition-ui duration-150"
               >
                 <Square className="h-3 w-3 fill-current" />
                 停止

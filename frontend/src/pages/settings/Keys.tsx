@@ -181,7 +181,7 @@ export function TickFlowKeySection({ right }: { right?: React.ReactNode }) {
         <button
           type="submit"
           disabled={save.isPending || (!keyInput.trim() && !saved)}
-          className="h-9 shrink-0 px-4 rounded-xl bg-accent text-white text-sm font-semibold flex items-center justify-center gap-2 hover:bg-accent/90 disabled:opacity-40 transition-all"
+          className="h-9 shrink-0 px-4 rounded-xl bg-accent text-white text-sm font-semibold flex items-center justify-center gap-2 hover:bg-accent/90 disabled:opacity-40 transition-ui"
         >
           {save.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : saved ? <Check className="h-4 w-4" /> : <Save className="h-4 w-4" />}
           {save.isPending ? '保存中...' : saved ? '已保存' : '保存并检测'}

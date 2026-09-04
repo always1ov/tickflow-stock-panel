@@ -229,7 +229,7 @@ export function Monitor() {
                     key={f}
                     onClick={() => setFilter(f)}
                     className={cn(
-                      'rounded-md px-1.5 py-0.5 text-[10px] font-medium transition-all cursor-pointer',
+                      'rounded-md px-1.5 py-0.5 text-[10px] font-medium transition-ui cursor-pointer',
                       filter === f ? 'bg-accent/15 text-accent' : 'text-muted hover:bg-elevated/60 hover:text-secondary',
                     )}
                   >
@@ -241,7 +241,7 @@ export function Monitor() {
                   onClick={() => setFocusOnly(v => !v)}
                   title={focusOnly ? '当前只看焦点内(持有 / 计划中 / 钉住)。点击含焦点外的' : '当前含焦点外的(灰显)。点击只看焦点内'}
                   className={cn(
-                    'ml-1 rounded-md border px-1.5 py-0.5 text-[10px] font-medium transition-all cursor-pointer',
+                    'ml-1 rounded-md border px-1.5 py-0.5 text-[10px] font-medium transition-ui cursor-pointer',
                     focusOnly ? 'border-accent/40 bg-accent/10 text-accent' : 'border-border/60 text-muted hover:text-secondary',
                   )}
                 >
@@ -254,7 +254,7 @@ export function Monitor() {
                   onClick={() => setExtConfigOpen(true)}
                   title="配置行业/概念标签"
                   className={cn(
-                    'inline-flex h-6 w-6 items-center justify-center rounded-lg border transition-all cursor-pointer',
+                    'inline-flex h-6 w-6 items-center justify-center rounded-lg border transition-ui cursor-pointer',
                     extConfigOpen ? 'border-accent/40 text-accent' : 'border-border/60 bg-surface text-muted hover:border-accent/40 hover:text-accent',
                   )}
                 >
@@ -286,14 +286,14 @@ export function Monitor() {
                   onClick={() => setBatchChannelsOpen(true)}
                   disabled={rulesCount === 0}
                   title="批量设置推送渠道(飞书/企微/钉钉)—— 一次改所有规则, 不用逐条打开"
-                  className="inline-flex h-6 w-6 items-center justify-center rounded-lg border border-border/60 bg-surface text-muted transition-all hover:border-sky-400/40 hover:text-sky-300 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                  className="inline-flex h-6 w-6 items-center justify-center rounded-lg border border-border/60 bg-surface text-muted transition-ui hover:border-sky-400/40 hover:text-sky-300 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
                 >
                   <BellRing className="h-3.5 w-3.5" />
                 </button>
                 <button
                   onClick={() => { setEditingRule(null); setEditorPreset(null); setEditorOpen(true) }}
                   title="新建规则"
-                  className="inline-flex h-6 w-6 items-center justify-center rounded-lg border border-border/60 bg-surface text-muted transition-all hover:border-accent/40 hover:text-accent hover:shadow-sm cursor-pointer"
+                  className="inline-flex h-6 w-6 items-center justify-center rounded-lg border border-border/60 bg-surface text-muted transition-ui hover:border-accent/40 hover:text-accent hover:shadow-sm cursor-pointer"
                 >
                   <Plus className="h-3.5 w-3.5" />
                 </button>
@@ -301,7 +301,7 @@ export function Monitor() {
                   onClick={() => setConfirmClearRules(true)}
                   disabled={rulesCount === 0}
                   title="清除全部规则"
-                  className="inline-flex h-6 w-6 items-center justify-center rounded-lg border border-border/60 bg-surface text-muted transition-all hover:border-danger/40 hover:text-danger disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                  className="inline-flex h-6 w-6 items-center justify-center rounded-lg border border-border/60 bg-surface text-muted transition-ui hover:border-danger/40 hover:text-danger disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
@@ -451,7 +451,7 @@ function AlertsList({ alertsQuery, confirmClear, setConfirmClear, total, enterTs
                 } : { opacity: 1, y: 0 }}
                 transition={isNew ? { duration: 1.2, times: [0, 0.2, 0.5, 0.75, 1] } : { duration: 0.2, delay: Math.min(i * 0.02, 0.2) }}
                 className={cn(
-                  'group relative flex items-start gap-3 overflow-hidden rounded-lg border bg-surface pl-3.5 pr-3 py-2.5 shadow-sm transition-all duration-expand hover:border-border hover:shadow-md hover:shadow-black/10 hover:-translate-y-px',
+                  'group relative flex items-start gap-3 overflow-hidden rounded-lg border bg-surface pl-3.5 pr-3 py-2.5 shadow-sm transition-ui duration-expand hover:border-border hover:shadow-md hover:shadow-black/10 hover:-translate-y-px',
                   isNew ? 'border-accent/60 ring-1 ring-accent/30' : 'border-border/50',
                   ev.focus_muted && 'opacity-55 saturate-50',   // [R160] 焦点外: 只记录, 灰显
                 )}
@@ -829,7 +829,7 @@ function RulesList({ rulesQuery, onEdit }: {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.2 }}
               className={cn(
-                'group relative overflow-hidden rounded-lg border pl-3.5 pr-2.5 py-2 shadow-sm transition-all duration-expand hover:shadow-md hover:shadow-black/10',
+                'group relative overflow-hidden rounded-lg border pl-3.5 pr-2.5 py-2 shadow-sm transition-ui duration-expand hover:shadow-md hover:shadow-black/10',
                 r.enabled
                   ? 'border-border/50 bg-surface hover:border-accent/30'
                   : 'border-border/30 bg-surface/40 opacity-70 hover:opacity-100',
@@ -905,7 +905,7 @@ function RulesList({ rulesQuery, onEdit }: {
                         onClick={() => toggleEnabled(r)}
                         title={r.enabled ? '停用' : '启用'}
                         className={cn(
-                          'p-1 rounded-md transition-all cursor-pointer',
+                          'p-1 rounded-md transition-ui cursor-pointer',
                           r.enabled ? 'text-accent hover:bg-accent/10' : 'text-muted hover:bg-elevated hover:text-accent',
                         )}
                       >
@@ -913,7 +913,7 @@ function RulesList({ rulesQuery, onEdit }: {
                       </button>
                       <button
                         onClick={() => onEdit(r)}
-                        className="p-1 rounded-md text-secondary transition-all hover:bg-accent/10 hover:text-accent cursor-pointer"
+                        className="p-1 rounded-md text-secondary transition-ui hover:bg-accent/10 hover:text-accent cursor-pointer"
                         title="编辑"
                       >
                         <Settings2 className="h-3.5 w-3.5" />
@@ -930,7 +930,7 @@ function RulesList({ rulesQuery, onEdit }: {
                         <button
                           onClick={() => handleClickDelete(r.id)}
                           disabled={del.isPending}
-                          className="p-1 rounded-md text-secondary transition-all hover:bg-danger/10 hover:text-danger cursor-pointer"
+                          className="p-1 rounded-md text-secondary transition-ui hover:bg-danger/10 hover:text-danger cursor-pointer"
                           title="删除"
                         >
                           <Trash2 className="h-3.5 w-3.5" />

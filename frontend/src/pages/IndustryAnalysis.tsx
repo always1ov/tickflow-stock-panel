@@ -841,7 +841,7 @@ function LeaderStage({ stocks, onStockClick, activeSymbol }: { stocks: EnrichedS
       </div>
       <div className="grid gap-2 md:grid-cols-3">
         {stocks.map((stock, idx) => (
-          <div key={stock.symbol} onClick={() => onStockClick(stock.symbol, stock.name || undefined)} className={cn('rounded-lg border p-3 cursor-pointer hover:brightness-110 transition-all', idx === 0 ? 'border-amber-400/25 bg-amber-400/[0.06]' : 'border-border/60 bg-base/35', stock.symbol === activeSymbol && 'ring-1 ring-accent/60')}>
+          <div key={stock.symbol} onClick={() => onStockClick(stock.symbol, stock.name || undefined)} className={cn('rounded-lg border p-3 cursor-pointer hover:brightness-110 transition-ui', idx === 0 ? 'border-amber-400/25 bg-amber-400/[0.06]' : 'border-border/60 bg-base/35', stock.symbol === activeSymbol && 'ring-1 ring-accent/60')}>
             <div className="flex items-center justify-between gap-2">
               <span className={cn('text-[10px] font-medium', idx === 0 ? 'text-amber-300' : 'text-muted')}>{idx === 0 ? '主龙头' : `辅龙 ${idx}`}</span>
               <span className="font-mono text-[11px] text-amber-300">{stock.leaderScore.toFixed(0)}</span>

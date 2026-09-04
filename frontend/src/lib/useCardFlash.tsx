@@ -30,7 +30,7 @@ export function useCardFlash(highlight: string | undefined, key: string) {
 
 /** 闪烁态样式: 与连板梯队修正卡片 (depth-fix) 原实现保持一致 */
 export function cardFlashCls(flash: boolean): string {
-  return `rounded-card transition-all duration-enter ${
+  return `rounded-card transition-ui duration-enter ${
     flash ? 'ring-2 ring-accent/60 ring-offset-2 ring-offset-base scale-[1.01]' : 'ring-0 ring-transparent'
   }`
 }

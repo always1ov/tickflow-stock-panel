@@ -98,7 +98,7 @@ export function FocusBar() {
               onClick={() => prefsMut.mutate(!v.focus_only)}
               className={cn('relative h-4 w-7 rounded-full transition-colors', v.focus_only ? 'bg-accent' : 'bg-border')}
             >
-              <span className={cn('absolute top-0.5 h-3 w-3 rounded-full bg-white transition-all', v.focus_only ? 'left-3.5' : 'left-0.5')} />
+              <span className={cn('absolute top-0.5 h-3 w-3 rounded-full bg-white transition-ui', v.focus_only ? 'left-3.5' : 'left-0.5')} />
             </button>
           </label>
         </div>

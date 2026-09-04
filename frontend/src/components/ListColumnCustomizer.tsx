@@ -128,7 +128,7 @@ function SortableActiveCol({ col, onRemove, onConfig, configOpen, extTableLabel,
         {hasConfig && (
           <button
             onClick={() => onConfig(configOpen ? null : col.id)}
-            className={`transition-all ${configOpen ? 'text-accent' : 'opacity-0 group-hover:opacity-100 text-muted hover:text-accent'}`}
+            className={`transition-ui ${configOpen ? 'text-accent' : 'opacity-0 group-hover:opacity-100 text-muted hover:text-accent'}`}
             title="配置"
           >
             <Settings2 className="h-3 w-3" />
@@ -136,7 +136,7 @@ function SortableActiveCol({ col, onRemove, onConfig, configOpen, extTableLabel,
         )}
         <button
           onClick={() => onRemove(col.id)}
-          className="opacity-0 group-hover:opacity-100 text-muted hover:text-danger transition-all shrink-0"
+          className="opacity-0 group-hover:opacity-100 text-muted hover:text-danger transition-ui shrink-0"
           title="隐藏"
         >
           <EyeOff className="h-3 w-3" />

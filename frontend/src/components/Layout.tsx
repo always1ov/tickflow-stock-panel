@@ -595,7 +595,7 @@ function PlainNavLink({ item, collapsed, indent, dataSyncing, dataSyncJustDone }
         title={collapsed ? label : undefined}
         className={({ isActive }) =>
           cn(
-            'group relative flex items-center rounded-btn text-sm transition-all duration-hover ease-smooth',
+            'group relative flex items-center rounded-btn text-sm transition-ui duration-hover ease-smooth',
             collapsed ? 'justify-center px-0 py-2' : 'gap-2.5 px-3 py-1.5',
             isActive
               ? 'bg-elevated text-foreground font-medium'
@@ -1109,7 +1109,7 @@ export function Layout() {
                     onClick={() => setBrowseOpen(v => !v)}
                     title={railMode ? BROWSE_GROUP.label : BROWSE_GROUP.hint}
                     className={cn(
-                      'group relative flex w-full items-center rounded-btn text-sm transition-all duration-hover ease-smooth',
+                      'group relative flex w-full items-center rounded-btn text-sm transition-ui duration-hover ease-smooth',
                       railMode ? 'justify-center px-0 py-2' : 'gap-2.5 px-3 py-1.5',
                       browsePaths.includes(location.pathname)
                         ? 'bg-elevated text-foreground font-medium'
@@ -1144,7 +1144,7 @@ export function Layout() {
                   <button
                     onClick={() => setWatchlistNavExpanded(v => !v)}
                     className={cn(
-                      'group relative flex w-full items-center gap-2.5 rounded-btn px-3 py-1.5 text-sm transition-all duration-hover ease-smooth',
+                      'group relative flex w-full items-center gap-2.5 rounded-btn px-3 py-1.5 text-sm transition-ui duration-hover ease-smooth',
                       location.pathname === '/watchlist'
                         ? 'bg-elevated text-foreground font-medium'
                         : 'text-foreground/75 hover:bg-elevated/70 hover:text-foreground',
@@ -1335,7 +1335,7 @@ export function Layout() {
                   disabled={realtimeToggleDisabled}
                   title={realtimeToggleTitle}
                   className={cn(
-                    'relative inline-flex h-5 w-9 items-center rounded-full border transition-all duration-expand focus-visible:outline-none focus-ring-custom focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-1 focus-visible:ring-offset-surface',
+                    'relative inline-flex h-5 w-9 items-center rounded-full border transition-ui duration-expand focus-visible:outline-none focus-ring-custom focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-1 focus-visible:ring-offset-surface',
                     realtimeEnabled
                       ? 'border-accent/50 bg-accent shadow-[0_0_6px_rgba(59,130,246,0.25)]'
                       : 'border-border bg-elevated hover:border-muted',
@@ -1387,7 +1387,7 @@ export function Layout() {
               title={railMode ? '设置' : undefined}
               className={({ isActive }) =>
                 cn(
-                  'group relative flex items-center rounded-btn text-sm transition-all duration-hover ease-smooth',
+                  'group relative flex items-center rounded-btn text-sm transition-ui duration-hover ease-smooth',
                   railMode ? 'justify-center px-0 py-2' : 'flex-1 gap-2.5 px-3 py-1.5',
                   isActive
                     ? 'bg-elevated text-foreground font-medium'

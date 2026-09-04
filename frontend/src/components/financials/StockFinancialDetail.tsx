@@ -187,7 +187,7 @@ export function StockFinancialDetail({ symbol, name }: Props) {
           <button
             onClick={handleAiClick}
             disabled={checking}
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-btn text-[11px] font-medium border border-purple-400/30 bg-purple-400/10 text-purple-300 hover:bg-purple-400/20 hover:border-purple-400/40 transition-all shrink-0 disabled:opacity-50"
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-btn text-[11px] font-medium border border-purple-400/30 bg-purple-400/10 text-purple-300 hover:bg-purple-400/20 hover:border-purple-400/40 transition-ui shrink-0 disabled:opacity-50"
             title="AI 财务分析"
           >
             {checking ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
@@ -324,7 +324,7 @@ export function StockFinancialDetail({ symbol, name }: Props) {
                 </button>
                 <button
                   onClick={() => { doAnalysis(); setConfirmReport(null) }}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-btn bg-gradient-to-r from-purple-500/80 to-fuchsia-500/80 text-white text-xs font-medium hover:from-purple-500 hover:to-fuchsia-500 transition-all"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-btn bg-gradient-to-r from-purple-500/80 to-fuchsia-500/80 text-white text-xs font-medium hover:from-purple-500 hover:to-fuchsia-500 transition-ui"
                 >
                   <Sparkles className="h-3.5 w-3.5" />
                   重新分析

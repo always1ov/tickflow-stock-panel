@@ -273,7 +273,7 @@ export function DimensionHeatmap({
             <button
               key={g.key}
               onClick={() => onSelect(active ? null : g.key)}
-              className="px-2.5 py-1.5 rounded-sm text-[11px] whitespace-nowrap cursor-pointer hover:brightness-125 transition-all"
+              className="px-2.5 py-1.5 rounded-sm text-[11px] whitespace-nowrap cursor-pointer hover:brightness-125 transition-ui"
               style={{
                 fontSize: `${10 + size * 2}px`,
                 color: active ? '#fff' : `rgba(${r},${gr},${b},${0.6 + upRatio * 0.4})`,
@@ -371,7 +371,7 @@ export function DimensionGroupSidebar({
               {/* 覆盖量进度条 */}
               <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-elevated">
                 <div
-                  className="h-full rounded-full transition-all"
+                  className="h-full rounded-full transition-ui"
                   style={{
                     width: `${Math.max(6, (group.count / (filtered[0]?.count || 1)) * 100)}%`,
                     backgroundColor: accentColor,

@@ -309,7 +309,7 @@ function StockSearchBox({
           onChange={(e) => { setQuery(e.target.value); setOpen(true); setActiveIdx(-1) }}
           onFocus={() => { if (query.trim()) setOpen(true) }}
           onKeyDown={handleKeyDown}
-          className="w-44 h-8 pl-8 pr-2.5 rounded-btn bg-elevated border border-border text-xs text-foreground placeholder:text-muted focus:outline-none focus:border-accent/50 focus:w-56 transition-all duration-expand"
+          className="w-44 h-8 pl-8 pr-2.5 rounded-btn bg-elevated border border-border text-xs text-foreground placeholder:text-muted focus:outline-none focus:border-accent/50 focus:w-56 transition-ui duration-expand"
         />
       </div>
 
@@ -518,7 +518,7 @@ const StockCard = React.memo(function StockCard({
 
   return (
     <div
-      className={`relative rounded-lg border border-border bg-surface hover:border-border/80 transition-all duration-expand group cursor-pointer overflow-hidden ${bgGlow} ${active ? 'ring-2 ring-accent/60' : ''}`}
+      className={`relative rounded-lg border border-border bg-surface hover:border-border/80 transition-ui duration-expand group cursor-pointer overflow-hidden ${bgGlow} ${active ? 'ring-2 ring-accent/60' : ''}`}
       onClick={() => onPreview(r.symbol, name ?? '')}
     >
       {/* 左侧彩色指示条 */}
@@ -549,7 +549,7 @@ const StockCard = React.memo(function StockCard({
             />
             <button
               onClick={() => onRequestRemove(r.symbol)}
-              className="opacity-0 group-hover:opacity-100 text-muted hover:text-danger transition-all duration-hover p-0.5 rounded hover:bg-elevated"
+              className="opacity-0 group-hover:opacity-100 text-muted hover:text-danger transition-ui duration-hover p-0.5 rounded hover:bg-elevated"
               aria-label="移除"
             >
               <Trash2 className="h-3.5 w-3.5" />

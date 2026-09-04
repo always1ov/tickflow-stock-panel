@@ -205,7 +205,7 @@ const StockCard = React.memo(function StockCard({ stock, extFields, direction, s
         event.preventDefault()
         onClick(stock.symbol, stock.name ?? undefined)
       }}
-      className={`w-full flex flex-col items-start gap-1 px-2.5 py-2 rounded-md transition-all duration-expand cursor-pointer hover:opacity-100 ${style.bg} ${style.bar} ${monitored ? 'ring-1 ring-amber-400/50 ring-inset' : ''} ${active ? 'ring-1 ring-accent/60 ring-inset' : ''}`}
+      className={`w-full flex flex-col items-start gap-1 px-2.5 py-2 rounded-md transition-ui duration-expand cursor-pointer hover:opacity-100 ${style.bg} ${style.bar} ${monitored ? 'ring-1 ring-amber-400/50 ring-inset' : ''} ${active ? 'ring-1 ring-accent/60 ring-inset' : ''}`}
       style={style.cardStyle ? { ...style.cardStyle } : undefined}
       onMouseEnter={e => {
         if (!style.cardStyle || !style.hoverShadow) return
@@ -527,7 +527,7 @@ function MonitorMenu({ stock, direction, sealMode, monitorRule, anchorRect, hasD
             onClick={handleSave}
             disabled={saving || !threshold || !hasDepth}
             title={!hasDepth ? '五档盘口(批量)数据不可用' : ''}
-            className="flex-1 h-7 rounded text-[11px] font-medium transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed bg-accent text-white hover:bg-accent/90 active:scale-[0.98] disabled:active:scale-100"
+            className="flex-1 h-7 rounded text-[11px] font-medium transition-ui cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed bg-accent text-white hover:bg-accent/90 active:scale-[0.98] disabled:active:scale-100"
           >
             {saving ? '保存中…' : !hasDepth ? '五档盘口不可用' : existing ? '更新监控' : '开启监控'}
           </button>
@@ -788,7 +788,7 @@ function TagStats({ title, tiers, extFields, fieldKey, color, selectedTag, onSel
       </button>
       <div className="relative">
         <div
-          className={`flex flex-wrap gap-1.5 pt-0.5 pl-1 transition-all duration-enter ${
+          className={`flex flex-wrap gap-1.5 pt-0.5 pl-1 transition-ui duration-enter ${
             expanded ? 'pb-2.5' : 'pb-0.5 max-h-[3.5rem] overflow-hidden'
           }`}
         >
@@ -802,7 +802,7 @@ function TagStats({ title, tiers, extFields, fieldKey, color, selectedTag, onSel
                   onSelect(isSelected ? null : { fieldKey, tag: name })
                   onDimensionClick(fieldKey, name, extFields[fieldKey]?.field)
                 }}
-                className="text-[11px] px-2 py-1 rounded-sm whitespace-nowrap cursor-pointer hover:brightness-110 transition-all"
+                className="text-[11px] px-2 py-1 rounded-sm whitespace-nowrap cursor-pointer hover:brightness-110 transition-ui"
                 style={{
                   // 亮色: 深色阶文字 + 更淡的底; 选中态不用白字 (黄底白字在亮色下不可读)
                   color: isSelected
@@ -991,7 +991,7 @@ function TierGroup({ tier, defaultOpen, extFields, filterKeys, bf, onStockClick,
                             onSelectTag(isSelected ? null : { fieldKey: 'concept', tag: name })
                             onDimensionClick('concept', name, extFields.concept?.field)
                           }}
-                          className="text-[10px] px-1.5 py-0.5 rounded-sm whitespace-nowrap cursor-pointer hover:brightness-110 transition-all"
+                          className="text-[10px] px-1.5 py-0.5 rounded-sm whitespace-nowrap cursor-pointer hover:brightness-110 transition-ui"
                           style={{
                             color: isSelected
                               ? (isDarkTheme ? '#fff' : 'rgb(161,98,7)')
@@ -1021,7 +1021,7 @@ function TierGroup({ tier, defaultOpen, extFields, filterKeys, bf, onStockClick,
                             onSelectTag(isSelected ? null : { fieldKey: 'industry', tag: name })
                             onDimensionClick('industry', name, extFields.industry?.field)
                           }}
-                          className="text-[10px] px-1.5 py-0.5 rounded-sm whitespace-nowrap cursor-pointer hover:brightness-110 transition-all"
+                          className="text-[10px] px-1.5 py-0.5 rounded-sm whitespace-nowrap cursor-pointer hover:brightness-110 transition-ui"
                           style={{
                             color: isSelected
                               ? (isDarkTheme ? '#fff' : 'rgb(29,78,216)')
@@ -1535,7 +1535,7 @@ export function LimitUpLadder() {
             <div className="flex items-center rounded-btn bg-elevated/60 p-0.5">
               <button
                 onClick={() => direction !== 'up' && toggleDirection('up')}
-                className={`flex items-center gap-1 px-2.5 h-7 rounded-btn text-xs tabular-nums transition-all ${
+                className={`flex items-center gap-1 px-2.5 h-7 rounded-btn text-xs tabular-nums transition-ui ${
                   direction === 'up'
                     ? 'bg-bull/15 text-bull font-semibold'
                     : 'text-muted hover:text-bull/70'
@@ -1546,7 +1546,7 @@ export function LimitUpLadder() {
               </button>
               <button
                 onClick={() => direction !== 'down' && toggleDirection('down')}
-                className={`flex items-center gap-1 px-2.5 h-7 rounded-btn text-xs tabular-nums transition-all ${
+                className={`flex items-center gap-1 px-2.5 h-7 rounded-btn text-xs tabular-nums transition-ui ${
                   direction === 'down'
                     ? 'bg-bear/15 text-bear font-semibold'
                     : 'text-muted hover:text-bear/70'
@@ -1571,7 +1571,7 @@ export function LimitUpLadder() {
                         setSealMode(m)
                         storage.limitLadderSealMode.set(m)
                       }}
-                      className={`flex items-center px-2 py-1 rounded-btn text-xs transition-all ${
+                      className={`flex items-center px-2 py-1 rounded-btn text-xs transition-ui ${
                         sealMode === m
                           ? 'bg-accent/15 text-accent font-medium'
                           : 'text-muted hover:text-secondary'

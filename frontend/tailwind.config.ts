@@ -4,6 +4,12 @@ import animate from 'tailwindcss-animate'
 // 设计语言 §6.0:暗色为主 + 低饱和靛蓝强调([R155] Radix Slate 骨架 / Indigo 强调) + 等宽数字
 export default {
   darkMode: ['class'],
+  // [R168] 把所有 hover: / group-hover: / peer-hover: 变体包进
+  // `@media (hover: hover)`(emil-design-eng「Touch device hover states」)。
+  // 触屏上点一下会触发 hover 并**粘住**, 于是本仓库那些 hover 高亮行、
+  // hover 才显形的操作按钮, 在平板上点完一行会一直亮着, 看盘时非常干扰。
+  // Tailwind 官方开关, 不用逐处加媒体查询; 桌面端零变化。
+  future: { hoverOnlyWhenSupported: true },
   content: ['./index.html', './src/**/*.{ts,tsx}'],
   theme: {
     container: { center: true, padding: '1rem' },
@@ -121,6 +127,23 @@ export default {
       transitionTimingFunction: {
         // §6.0.4 Linear/Vercel 同款缓动
         smooth: 'cubic-bezier(0.16, 1, 0.3, 1)',
+      },
+      // [R168] `transition-ui` —— 用来替掉全项目 105 处 `transition-all`。
+      //
+      // 问题出在 `all` 上: 它把 height / width / padding / margin / top / left
+      // 这些**布局属性**也一起过渡了。布局属性每一帧都要重新排版 + 重绘 + 合成,
+      // 而 transform / opacity 只走合成(GPU)。密集表格一屏几百个单元格, 只要有
+      // 一处 hover 顺手改了内边距, 整屏就得重排 —— 这是 emil-design-eng
+      // 「Only animate transform and opacity」那条规则的实际代价。
+      //
+      // 但直接换成 `transition-colors` 会**改掉现有观感**(阴影、透明度、位移就不动了)。
+      // 所以这里列出「现状实际用到的全部非布局属性」: 视觉上是 no-op,
+      // 唯一的差别就是布局属性不再参与过渡 —— 而那正是要修的 bug。
+      //
+      // 真心想动布局的两处已单独写明属性(见 ExtDataStatCard 的 transition-[height]
+      // 与 AbnormalMoves 进度条的 transition-[width]), 没有被这次替换波及。
+      transitionProperty: {
+        ui: 'color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter',
       },
       // [R122/R124] 动效时长档位 —— 此前全项目 136 处手写 duration-150/200/300,
       // 同一类交互在不同页面快慢不一, 也无从统一调。按"交互越轻越快"分四档。

@@ -232,7 +232,7 @@ function KpiCell({ label, value, sub, tone = 'neutral' }: { label: ReactNode; va
   const isPlain = typeof value === 'string' || typeof value === 'number'
   const color = tone === 'bull' ? 'text-bull' : tone === 'bear' ? 'text-bear' : tone === 'accent' ? 'text-accent' : 'text-foreground'
   return (
-    <div className="min-w-0 overflow-hidden rounded-lg border border-border bg-surface/80 px-2 py-1 shadow-[0_1px_2px_oklch(var(--border)/0.4)] backdrop-blur-sm transition-all hover:border-accent/30 hover:shadow-[0_2px_8px_oklch(var(--accent)/0.15)]">
+    <div className="min-w-0 overflow-hidden rounded-lg border border-border bg-surface/80 px-2 py-1 shadow-[0_1px_2px_oklch(var(--border)/0.4)] backdrop-blur-sm transition-ui hover:border-accent/30 hover:shadow-[0_2px_8px_oklch(var(--accent)/0.15)]">
       <div className="flex items-center gap-1 text-[11px] text-muted">{label}</div>
       <div className={`mt-1 truncate font-mono text-lg font-semibold leading-none tabular-nums ${isPlain ? color : 'text-foreground'}`}>{value}</div>
       {sub && <div className="mt-1 truncate text-[10px] text-muted">{sub}</div>}
@@ -246,7 +246,7 @@ function IndexTicker({ item }: { item: OverviewMarket['indices'][number] }) {
   return (
     <Link
       to={`/indices?symbol=${encodeURIComponent(item.symbol)}`}
-      className="grid min-w-0 grid-cols-[1fr_auto] items-center gap-x-2 gap-y-0.5 rounded-lg border border-border bg-elevated/45 px-1.5 py-1 shadow-[0_1px_1px_oklch(var(--border)/0.3)] backdrop-blur-sm transition-all hover:border-accent/40 hover:bg-elevated hover:shadow-[0_2px_6px_oklch(var(--accent)/0.15)]"
+      className="grid min-w-0 grid-cols-[1fr_auto] items-center gap-x-2 gap-y-0.5 rounded-lg border border-border bg-elevated/45 px-1.5 py-1 shadow-[0_1px_1px_oklch(var(--border)/0.3)] backdrop-blur-sm transition-ui hover:border-accent/40 hover:bg-elevated hover:shadow-[0_2px_6px_oklch(var(--accent)/0.15)]"
     >
       <div className="truncate text-xs font-medium text-foreground">{item.name || item.symbol}</div>
       <div className={`font-mono text-xs font-semibold ${pctClass(pct)}`}>{fmtIndexPct(pct)}</div>
@@ -1002,11 +1002,17 @@ function FetchDataCard({
                 </span>
               </div>
               <div className="h-1.5 rounded-full bg-elevated overflow-hidden">
+                {/* [R168] 原来动的是 width —— 布局属性, 每帧重排, 而进度条恰恰是在
+                    "主线程最忙"的时候(拉数据)一直在跑。改成 scaleX 走 GPU 合成。
+                    视觉零差别: 内层是个直角矩形, 圆角由外层 rounded-full +
+                    overflow-hidden 裁出来, 所以横向缩放不会把圆头拉扁。
+                    写完整 transform 字符串而不是 framer-motion 的 scaleX 简写:
+                    简写走 requestAnimationFrame 在主线程上跑, 掉帧的正是这种时候。 */}
                 <motion.div
-                  className="h-full bg-accent"
-                  initial={{ width: 0 }}
-                  animate={{ width: `${Math.max(2, Math.min(100, fetchPct ?? 0))}%` }}
-                  transition={{ duration: 0.4, ease: 'easeOut' }}
+                  className="h-full w-full origin-left bg-accent"
+                  initial={{ transform: 'scaleX(0)' }}
+                  animate={{ transform: `scaleX(${Math.max(2, Math.min(100, fetchPct ?? 0)) / 100})` }}
+                  transition={{ duration: 0.25, ease: 'easeOut' }}
                 />
               </div>
             </div>
@@ -1095,7 +1101,7 @@ function WelcomeFetchModal({
           </button>
           <button
             onClick={onStart}
-            className="inline-flex items-center gap-2 px-5 h-9 rounded-xl bg-accent text-white text-sm font-semibold shadow-lg shadow-accent/20 hover:bg-accent/90 transition-all"
+            className="inline-flex items-center gap-2 px-5 h-9 rounded-xl bg-accent text-white text-sm font-semibold shadow-lg shadow-accent/20 hover:bg-accent/90 transition-ui"
           >
             <Play className="h-4 w-4" />开始获取
           </button>

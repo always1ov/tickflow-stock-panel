@@ -367,7 +367,7 @@ export function CreateExtDialog({ onClose }: { onClose: () => void }) {
                   <button
                     key={m}
                     onClick={() => setMode(m)}
-                    className={`relative flex items-start gap-3 px-4 py-3 rounded-xl border transition-all duration-expand text-left ${
+                    className={`relative flex items-start gap-3 px-4 py-3 rounded-xl border transition-ui duration-expand text-left ${
                       active
                         ? 'border-amber-500/40 bg-amber-500/[0.08] shadow-sm shadow-amber-500/10'
                         : 'border-border bg-elevated/30 hover:bg-elevated/60'
@@ -699,7 +699,7 @@ export function CreateExtDialog({ onClose }: { onClose: () => void }) {
                       </select>
                       <button
                         onClick={() => removeField(idx)}
-                        className="p-1 rounded text-muted/40 hover:text-danger hover:bg-danger/10 opacity-0 group-hover:opacity-100 transition-all"
+                        className="p-1 rounded text-muted/40 hover:text-danger hover:bg-danger/10 opacity-0 group-hover:opacity-100 transition-ui"
                       >
                         <X className="h-3 w-3" />
                       </button>

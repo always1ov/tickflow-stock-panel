@@ -119,7 +119,7 @@ export function StrategyCard({
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.12, ease: [0.16, 1, 0.3, 1] }}
-      className={`${cs.card} border transition-all duration-hover text-left group ${activeCls}`}
+      className={`${cs.card} border transition-ui duration-hover text-left group ${activeCls}`}
     >
       {cardSize === 'large' ? (
         <>

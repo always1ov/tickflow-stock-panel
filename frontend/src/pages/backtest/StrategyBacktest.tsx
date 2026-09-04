@@ -1752,7 +1752,7 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
               <button
                 key={st.id}
                 onClick={() => setSelectedStrategy(st.id)}
-                className={`px-2 py-1 rounded-btn text-[11px] border transition-all duration-hover ease-smooth cursor-pointer
+                className={`px-2 py-1 rounded-btn text-[11px] border transition-ui duration-hover ease-smooth cursor-pointer
                   ${selectedStrategy === st.id
                     ? 'border-accent/50 bg-accent/10 text-accent shadow-[0_0_10px_rgba(59,130,246,0.1)]'
                     : 'border-border bg-base text-secondary hover:border-accent/40'
@@ -2038,7 +2038,7 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
             disabled={!selectedStrategy || strategyDetail.isLoading || backtestDataUnavailable}
             className="group w-full inline-flex items-center justify-center gap-2.5 rounded-btn border border-accent/40
               bg-gradient-to-r from-accent to-blue-500 px-3 py-2.5 text-white shadow-[0_10px_24px_rgba(59,130,246,0.22)]
-              transition-all duration-hover ease-smooth hover:-translate-y-0.5 hover:shadow-[0_14px_28px_rgba(59,130,246,0.28)]
+              transition-ui duration-hover ease-smooth hover:-translate-y-0.5 hover:shadow-[0_14px_28px_rgba(59,130,246,0.28)]
               disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
           >
             <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/18 ring-1 ring-white/25 transition-transform group-hover:scale-105">
@@ -2257,7 +2257,7 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
             {backtestTask?.progress && (
               <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-base/60">
                 <div
-                  className="h-full rounded-full bg-accent transition-all duration-enter ease-out"
+                  className="h-full rounded-full bg-accent transition-ui duration-enter ease-out"
                   style={{ width: `${(backtestTask.progress.day / backtestTask.progress.total) * 100}%` }}
                 />
               </div>

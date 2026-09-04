@@ -132,7 +132,7 @@ export function StrategyOptimizer() {
               <span>当前最优: {progress.best_score != null ? progress.best_score.toFixed(3) : '—'}</span>
             </div>
             <div className="h-1.5 overflow-hidden rounded-full bg-elevated">
-              <div className="h-full bg-accent transition-all" style={{ width: `${progress.total ? (progress.done / progress.total) * 100 : 0}%` }} />
+              <div className="h-full bg-accent transition-ui" style={{ width: `${progress.total ? (progress.done / progress.total) * 100 : 0}%` }} />
             </div>
           </div>
         )}

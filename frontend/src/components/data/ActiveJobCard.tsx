@@ -121,10 +121,12 @@ export function ActiveJobCard({ job }: { job: PipelineJob }) {
       {!isDone && (
         <div className="mb-2">
           <div className="h-1.5 rounded-full bg-elevated overflow-hidden">
+            {/* [R168] 同 Dashboard 的进度条: width → scaleX, 写完整 transform 字符串
+                走 GPU。任务卡在跑批时每秒都在更新, 是最需要省主线程的地方。 */}
             <motion.div
-              className="h-full bg-accent"
-              animate={{ width: `${job.progress}%` }}
-              transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+              className="h-full w-full origin-left bg-accent"
+              animate={{ transform: `scaleX(${Math.max(0, Math.min(100, job.progress)) / 100})` }}
+              transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
             />
           </div>
           {job.stage_pct > 0 && (

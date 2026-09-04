@@ -203,7 +203,7 @@ export function StrategyWalkForward() {
               <span>第 {progress.done}/{progress.total} 折</span>
             </div>
             <div className="h-1.5 overflow-hidden rounded-full bg-elevated">
-              <div className="h-full bg-accent transition-all" style={{ width: `${progress.total ? (progress.done / progress.total) * 100 : 0}%` }} />
+              <div className="h-full bg-accent transition-ui" style={{ width: `${progress.total ? (progress.done / progress.total) * 100 : 0}%` }} />
             </div>
           </div>
         )}

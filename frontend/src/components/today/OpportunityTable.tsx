@@ -63,7 +63,7 @@ function ScoreCell({ o, rank, total }: { o: TodayOpportunity; rank: number; tota
           return (
             <span key={d.key} className="block h-[3px] overflow-hidden rounded-full bg-border/50">
               {v != null && (
-                <span className={cn('block h-full rounded-full transition-all duration-enter ease-smooth', d.cls)}
+                <span className={cn('block h-full rounded-full transition-ui duration-enter ease-smooth', d.cls)}
                       style={{ width: `${Math.max(3, Math.min(100, v))}%` }} />
               )}
             </span>

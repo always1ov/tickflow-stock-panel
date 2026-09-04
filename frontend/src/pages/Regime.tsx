@@ -1091,7 +1091,7 @@ export function Regime() {
               <span className="text-sm text-muted">{latest.score} 分</span>
             </div>
             <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-base">
-              <div className="h-full rounded-full transition-all"
+              <div className="h-full rounded-full transition-ui"
                 style={{ width: `${Math.max(2, Math.min(100, latest.score))}%`, backgroundColor: REGIME_STATE_COLORS[latest.state] }} />
             </div>
           </div>
@@ -1132,7 +1132,7 @@ export function Regime() {
                 <div key={d.label} className="flex items-center gap-1.5">
                   <span className="w-6 shrink-0 text-[9px] text-muted">{d.label}</span>
                   <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-base">
-                    <div className="h-full rounded-full transition-all"
+                    <div className="h-full rounded-full transition-ui"
                       style={{ width: `${d.val ?? 0}%`, backgroundColor: d.color }} />
                   </div>
                   <span className="w-5 shrink-0 text-right text-[9px] font-mono text-muted">{d.val ?? '—'}</span>
@@ -1406,7 +1406,7 @@ function MainlineFilterPanel({ filter, onDone }: {
           aria-label="统计剔除 ST 股"
           onClick={() => setExcludeSt(v => !v)}
           className={cn(
-            'relative inline-flex h-4.5 w-8 items-center rounded-full border transition-all duration-expand',
+            'relative inline-flex h-4.5 w-8 items-center rounded-full border transition-ui duration-expand',
             excludeSt ? 'border-accent/50 bg-accent' : 'border-border bg-elevated hover:border-muted',
           )}
         >

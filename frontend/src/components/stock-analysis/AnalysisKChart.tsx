@@ -440,7 +440,7 @@ export function AnalysisKChart({
                 onClick={() => toggleType(g.key)}
                 disabled={raw.length === 0}
                 title={`${g.label} (${count} 个)`}
-                className={`inline-flex shrink-0 whitespace-nowrap items-center gap-1 h-6 px-2 rounded-md text-[10px] font-medium border transition-all disabled:opacity-30 disabled:cursor-not-allowed ${
+                className={`inline-flex shrink-0 whitespace-nowrap items-center gap-1 h-6 px-2 rounded-md text-[10px] font-medium border transition-ui disabled:opacity-30 disabled:cursor-not-allowed ${
                   active
                     ? 'text-foreground'
                     : 'text-muted bg-base/40 border-border/30 hover:border-border/60'
@@ -463,7 +463,7 @@ export function AnalysisKChart({
                   key={r}
                   onClick={() => setPivotRank(r)}
                   title={r === 1 ? 'P + R1/S1(3 个)' : r === 2 ? '到 R2/S2(5 个)' : '全档 R3/S3(7 个)'}
-                  className={`h-6 px-2 rounded-md text-[10px] font-mono border transition-all ${
+                  className={`h-6 px-2 rounded-md text-[10px] font-mono border transition-ui ${
                     pivotRank === r
                       ? 'bg-[#8B5CF6]/15 border-[#8B5CF6]/40 text-[#c4b5fd]'
                       : 'text-muted bg-base/40 border-border/30 hover:border-border/60'

@@ -107,7 +107,7 @@ export function AbnormalMoves() {
                 type="button"
                 aria-pressed={active}
                 onClick={() => setTab(t.key)}
-                className={`inline-flex items-center gap-1.5 rounded-btn px-3.5 py-1.5 text-xs transition-all ${
+                className={`inline-flex items-center gap-1.5 rounded-btn px-3.5 py-1.5 text-xs transition-ui ${
                   active
                     ? 'bg-accent/15 font-medium text-accent shadow-sm'
                     : 'text-secondary hover:text-foreground'
@@ -985,7 +985,10 @@ function AbnormalRowView({ row, rank, onPreview }: {
         >
           <div className="h-1.5 w-20 overflow-hidden rounded-full bg-elevated">
             <div
-              className={`h-full rounded-full transition-all ${meta.bar}`}
+              /* [R168] 进度条本来就是靠 width 动的(下面 style 里), 故写明 transition-[width]。
+                 没改成 scaleX: 这条只有 80px 宽、一屏几条, 重排代价可忽略, 而 scaleX
+                 会把 rounded-full 的圆头拉扁。 */
+              className={`h-full rounded-full transition-[width] ${meta.bar}`}
               style={{ width: `${Math.min(100, (dominant?.closeness ?? 0) * 100)}%` }}
             />
           </div>

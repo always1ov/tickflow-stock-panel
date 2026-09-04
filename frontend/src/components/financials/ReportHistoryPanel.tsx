@@ -98,7 +98,7 @@ export function ReportHistoryPanel() {
               {/* 删除按钮 */}
               <button
                 onClick={e => { e.stopPropagation(); deleteReport(r.id) }}
-                className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-danger/10 text-muted hover:text-danger transition-all shrink-0"
+                className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-danger/10 text-muted hover:text-danger transition-ui shrink-0"
                 title="删除"
               >
                 <Trash2 className="h-3.5 w-3.5" />

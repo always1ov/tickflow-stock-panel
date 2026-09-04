@@ -211,7 +211,7 @@ export function JobTimeoutCard() {
             }`}
             title={compressAnyOn ? '全部关闭' : '全部开启'}
           >
-            <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all ${
+            <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-ui ${
               compressAnyOn ? 'left-[1.125rem]' : 'left-0.5'
             }`} />
           </button>
@@ -258,7 +258,7 @@ function CompressToggleRow({ label, desc, enabled, pending, onToggle }: {
         }`}
         title={enabled ? '点击关闭' : '点击开启'}
       >
-        <span className={`absolute top-0.5 h-3 w-3 rounded-full bg-white shadow transition-all ${
+        <span className={`absolute top-0.5 h-3 w-3 rounded-full bg-white shadow transition-ui ${
           enabled ? 'left-[0.875rem]' : 'left-0.5'
         }`} />
       </button>

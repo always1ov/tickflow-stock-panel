@@ -132,7 +132,7 @@ export function GroupStatsSettings({
                     }`}
                   >
                     <span
-                      className={`absolute top-0.5 h-3 w-3 rounded-full transition-all ${
+                      className={`absolute top-0.5 h-3 w-3 rounded-full transition-ui ${
                         config.cardColorBar ? 'left-[14px] bg-white' : 'left-0.5 bg-muted'
                       }`}
                     />
@@ -151,7 +151,7 @@ export function GroupStatsSettings({
                     }`}
                   >
                     <span
-                      className={`absolute top-0.5 h-3 w-3 rounded-full transition-all ${
+                      className={`absolute top-0.5 h-3 w-3 rounded-full transition-ui ${
                         config.cardRank ? 'left-[14px] bg-white' : 'left-0.5 bg-muted'
                       }`}
                     />

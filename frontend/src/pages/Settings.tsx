@@ -77,7 +77,7 @@ export function Settings() {
         <div className="w-full">
         <div className="flex gap-5 items-start">
           {/* ===== 竖向 Tab 侧栏 ===== */}
-          <nav className={cn('shrink-0 transition-all duration-expand ease-smooth', collapsed ? 'w-10' : 'w-36')}>
+          <nav className={cn('shrink-0 transition-ui duration-expand ease-smooth', collapsed ? 'w-10' : 'w-36')}>
             <div className="flex flex-col gap-0.5 sticky top-3">
               {/* 收起/展开 按钮 */}
               <button
