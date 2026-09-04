@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Star, Wallet, Sparkles, Loader2, ArrowUp, ArrowDown, RefreshCw, FileText, TrendingUp, Download, Bell } from 'lucide-react'
-import { api, type ExitLine, type KeltnerBand, type KeltnerBands, type KeltnerVerdict, type TrendInfo } from '@/lib/api'
+import { api, type ExitLine, type KeltnerBands, type TrendInfo } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { pickStale, SIGNAL_TTL_HOURS } from '@/lib/signalFreshness'   // [R131] 增量分析判据
 import { toast } from '@/components/Toast'
@@ -9,8 +9,10 @@ import { useHistoryReports, openHistoryReport, loadHistory } from '@/lib/stockAn
 import { trendBadgeCls } from '@/components/stock-analysis/TrendStateBar'
 import { TrendSummaryDialog } from '@/components/stock-analysis/TrendSummaryDialog'
 import { StockReviewDialog, type ReviewTab } from '@/components/stock-analysis/StockReviewDialog'
-import { VerdictHover } from '@/components/stock-analysis/VerdictHover'
-
+// [R167] 导出与两个单元格从本文件拆出 —— 拆前 933 行, 顶部堆着两张配色表和一整份
+// HTML 导出模板, 主组件被压在后面。
+import { buildBoardHtml } from '@/lib/decisionBoardHtmlExport'
+import { KeltnerCell, VerdictCell } from '@/components/stock-analysis/decision-board/cells'
 type Position = { held: boolean; cost: number | null; weight?: number | null; updated_at: string }
 type WatchPoint = { direction: 'up' | 'down'; price: number; label?: string; action?: string; reason?: string }
 type Signal = { signal: string; confidence: number; reason: string; close: number | null; created_at: string; watch_points?: WatchPoint[] }
@@ -26,194 +28,6 @@ const SIGNAL_META: Record<string, { label: string; cls: string }> = {
   sell: { label: '卖出', cls: 'border-emerald-400/40 bg-emerald-400/10 text-emerald-400' },
   hold: { label: '持有', cls: 'border-amber-400/40 bg-amber-400/10 text-amber-400' },
   watch: { label: '观望', cls: 'border-border bg-base text-muted' },
-}
-
-// [R42] Keltner 位置配色。破上轨/贴上轨用暖色(偏贵), 破下轨/贴下轨用冷色(偏便宜),
-// 通道内保持中性 —— 位置是事实, 不替用户下买卖判断。
-const KELTNER_CLS: Record<KeltnerBand['pos'], string> = {
-  above: 'border-red-400/40 bg-red-400/10 text-red-400',
-  near_upper: 'border-amber-400/40 bg-amber-400/10 text-amber-400',
-  inside: 'border-border bg-base text-muted',
-  near_lower: 'border-sky-400/40 bg-sky-400/10 text-sky-300',
-  below: 'border-emerald-400/40 bg-emerald-400/10 text-emerald-400',
-}
-
-/**
- * 一档 Keltner 通道的单元格。
- *
- * 显示"贴上轨"这种五档文字, 悬停给出真实的上下轨价、通道内位置百分比,
- * 以及"还差几个 ATR 到轨" —— 只给一个标签等于让用户盲信一个没法复核的判断。
- * 该档算不出来(新股不够 120 根 / 均线列缺失)时显示 "—", 不编一个数出来。
- */
-function KeltnerCell({ band, close }: { band?: KeltnerBand; close: number | null }) {
-  if (!band) {
-    return <td className="whitespace-nowrap px-1.5 py-2.5 text-center"><span className="text-[10px] text-muted/40">—</span></td>
-  }
-  const pct = Math.round(band.pct * 100)
-  return (
-    <td className="whitespace-nowrap px-1.5 py-2.5 text-center">
-      <span
-        className={`inline-flex whitespace-nowrap rounded border px-1 py-0.5 text-[10px] ${KELTNER_CLS[band.pos]}`}
-        title={
-          `${band.band_cn}通道 ${band.lower.toFixed(2)} ~ ${band.upper.toFixed(2)}` +
-          `${close != null ? `,收盘 ${close.toFixed(2)}` : ''}\n` +
-          `通道内位置 ${pct}%(0% 贴下轨 / 100% 贴上轨)\n` +
-          `距上轨 ${band.to_upper_atr ?? '—'} 个 ATR · 距下轨 ${band.to_lower_atr ?? '—'} 个 ATR\n` +
-          `${band.hint}\n收盘口径 —— 通道要用 ATR 与均线, 实时价比昨天的通道会半新半旧`
-        }
-      >
-        {band.pos_cn}
-      </span>
-    </td>
-  )
-}
-
-// [R44] 三档组合的结论配色。tone 由后端给, 界面不自己判 ——
-// 决策台、今日总览、悬停提示必须说同一句话。
-const VERDICT_CLS: Record<KeltnerVerdict['tone'], string> = {
-  sell: 'border-red-400/40 bg-red-400/10 text-red-400',
-  buy: 'border-sky-400/40 bg-sky-400/10 text-sky-300',
-  hold: 'border-amber-400/40 bg-amber-400/10 text-amber-400',
-  avoid: 'border-border bg-base text-muted',
-  // [R45] 观察档: 还不到动手的时候, 用最淡的一档, 跟四个动作档区分开
-  watch: 'border-border bg-elevated/60 text-secondary',
-}
-
-/**
- * 「通道结论」单元格 —— 三档组合翻成一句人话。
- *
- * 徽标只放 4-6 字的结论标题, 悬停给分段排版的完整卡片(R49, 见 VerdictHover),
- * 点击翻这只票的逐日复盘(R48) —— 这一列说的话在它身上过去好不好使, 只有
- * 翻历史才知道。短期档在通道中部时显示 "—": 那时这一列确实没有信息。
- */
-function VerdictCell({ v, onOpen }: { v?: KeltnerVerdict | null; onOpen: () => void }) {
-  if (!v) {
-    return (
-      <td className="whitespace-nowrap px-1.5 py-2.5 text-center">
-        <button
-          onClick={onOpen}
-          className="cursor-pointer text-[10px] text-muted/40 hover:text-sky-300"
-          title="短期通道在中部 —— 位置上没有可说的, 听趋势和信号的。点击翻这只票过去出过哪些结论"
-        >
-          —
-        </button>
-      </td>
-    )
-  }
-  return (
-    <td className="whitespace-nowrap px-1.5 py-2.5 text-center">
-      <VerdictHover v={v} note="点击摊开这只票过去每一档结论 —— 出现在哪几天、当时说了什么、之后走成什么样。">
-        <button
-          onClick={onOpen}
-          className={`inline-flex cursor-pointer whitespace-nowrap rounded border px-1 py-0.5 text-[10px] transition-colors hover:brightness-125 ${VERDICT_CLS[v.tone]}`}
-        >
-          {v.title}
-        </button>
-      </VerdictHover>
-    </td>
-  )
-}
-
-// ===== [R46] 自包含 HTML 导出 =====
-// 只导出「结论」列有内容的行 —— 三档都在通道中部的票没有位置信息,
-// 导出来只是占地方。导出件里第一行就写清导出了几只、总共几只, 免得
-// 看到 148 只自选导出 4 行时以为漏了。
-//
-// 与今日总览的导出同一套排版: 浅色、内联样式、无脚本无外链, 存档/打印/
-// 转发都不依赖这个应用。
-
-type ExportRow = {
-  symbol: string; name: string; close: number | null; changePct: number | null
-  held: boolean; pnl: number | null
-  trend?: TrendInfo; kc?: KeltnerBands
-}
-
-const esc = (v: unknown) =>
-  String(v ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string))
-
-// 导出件是浅色排版, 深色下的配色搬过去看不清 —— 这里单独给一套。
-const EXPORT_TONE: Record<KeltnerVerdict['tone'], string> = {
-  sell: 'background:#fdecec;color:#c0392b',
-  buy: 'background:#e6f4fb;color:#1c6ea4',
-  hold: 'background:#fdf0e3;color:#c78326',
-  avoid: 'background:#f0f1f3;color:#8a919f',
-  watch: 'background:#f0f1f3;color:#5b6472',
-}
-
-function buildBoardHtml(rows: ExportRow[], total: number): string {
-  const bull = '#d03050'
-  const bear = '#18a058'
-  const pos = (b?: KeltnerBand) => (b ? esc(b.pos_cn) : '—')
-  const body = rows.map(r => {
-    const v = r.kc?.verdict
-    return `
-      <tr>
-        <td class="name"><b>${esc(r.name)}</b> <span class="sym">${esc(r.symbol)}</span></td>
-        <td class="num">${r.close?.toFixed(2) ?? '—'}</td>
-        <td class="num" style="color:${(r.changePct ?? 0) > 0 ? bull : (r.changePct ?? 0) < 0 ? bear : '#8a919f'}">${
-          r.changePct != null ? (r.changePct * 100).toFixed(2) + '%' : '—'}</td>
-        <td>${r.held ? '持有' : '—'}</td>
-        <td class="num" style="color:${r.pnl == null ? '#8a919f' : r.pnl > 0 ? bull : bear}">${
-          r.pnl != null ? (r.pnl * 100).toFixed(1) + '%' : '—'}</td>
-        <td style="color:${r.trend?.side === '多头' ? bull : bear}">${
-          r.trend ? `${esc(r.trend.state_cn)} ${r.trend.duration}天` : '—'}</td>
-        <td>${pos(r.kc?.s)}</td><td>${pos(r.kc?.m)}</td><td>${pos(r.kc?.l)}</td>
-        <td>${v ? `<span class="tag" style="${EXPORT_TONE[v.tone]}">${esc(v.title)}</span>` : '—'}</td>
-        <td class="act">${v ? esc(v.action) : ''}<span class="why">${v ? esc(v.detail) : ''}</span></td>
-      </tr>`
-  }).join('')
-
-  return `<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>自选决策台 · 通道结论</title>
-<style>
-  body{margin:0;padding:32px 24px;background:#f7f8fa;color:#1f2329;font:14px/1.6 -apple-system,'PingFang SC','Microsoft YaHei',sans-serif}
-  .wrap{max-width:1100px;margin:0 auto}
-  h1{font-size:20px;margin:0 0 4px}
-  .meta{color:#8a919f;font-size:12px;margin-bottom:16px}
-  .note{background:#fff;border:1px solid #e5e6eb;border-radius:8px;padding:10px 14px;font-size:12px;color:#4e5666;margin-bottom:16px;line-height:1.7}
-  table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #e5e6eb;border-radius:8px;overflow:hidden}
-  th{font-size:12px;font-weight:500;color:#8a919f;text-align:left;padding:8px 10px;border-bottom:1px solid #e5e6eb;background:#fafbfc;white-space:nowrap}
-  td{padding:8px 10px;border-bottom:1px solid #f0f1f3;font-size:13px;white-space:nowrap;vertical-align:top}
-  td.name{white-space:normal}
-  td.act{white-space:normal;min-width:16rem}
-  tr:last-child td{border-bottom:none}
-  .num{font-variant-numeric:tabular-nums;text-align:right}
-  th.num,td.num{text-align:right}
-  .sym{color:#a0a6b1;font-size:11px}
-  .tag{border-radius:3px;padding:1px 6px;font-size:11px;white-space:nowrap;display:inline-block}
-  .why{display:block;color:#8a919f;font-size:11px;margin-top:3px;line-height:1.6}
-  .foot{margin-top:16px;color:#a0a6b1;font-size:11px;line-height:1.8}
-  @media print{body{background:#fff;padding:0}}
-</style>
-</head>
-<body>
-<div class="wrap">
-  <h1>自选决策台 · 通道结论</h1>
-  <div class="meta">导出 ${rows.length} 只(自选共 ${total} 只)· 生成于 ${esc(new Date().toLocaleString('zh-CN'))}</div>
-  <div class="note">
-    只列出「结论」列有内容的标的 —— 三档通道都在中部的票没有位置信息, 不占篇幅。<br>
-    通道口径:短期 MA20±2ATR / 中期 MA60±2.5ATR / 长期 MA120±3ATR,<b>收盘价</b>判定。<br>
-    结论说的是<b>位置</b>(贵不贵), 不是会不会继续涨。清仓与否看止盈线与生命线, 优先级在通道之上。
-  </div>
-  <table>
-    <thead><tr>
-      <th>标的</th><th class="num">现价</th><th class="num">涨跌</th><th>仓位</th>
-      <th class="num">浮盈</th><th>趋势</th>
-      <th>短通道</th><th>中通道</th><th>长通道</th><th>结论</th><th>怎么办</th>
-    </tr></thead>
-    <tbody>${body}</tbody>
-  </table>
-  <div class="foot">
-    本页为自包含 HTML(无脚本、无外链), 可直接存档、打印或转发。<br>
-    数据来自 TickFlow, 仅供研究参考, 不构成投资建议。
-  </div>
-</div>
-</body>
-</html>`
 }
 
 function fmtAgo(iso?: string): string {
