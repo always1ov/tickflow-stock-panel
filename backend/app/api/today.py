@@ -518,7 +518,9 @@ class _Stages:
 def _build_overview(repo, engine=None) -> dict:
     """[R135] engine 为 StrategyEngine, 只用来把「策略命中」这个**注记**读出来
     (读策略页已写好的缓存, 不跑策略)。不传就没有那个标, 其余一切不变。"""
-    from app.services import positions as positions_svc
+    # [R169] 持仓改读合并视图(手填 ⊕ 批次): 字段与语义一字不变, 只是没手填成本时
+    # 会用批次的加权平均补上。评分/门槛/注记全部原样, 本行之外没有任何改动。
+    from app.services import effective_positions as positions_svc
     from app.services import stock_signal, today_prefs, watchlist
     from app.services.livermore_service import trends_for_symbols
     from app.services.position_exit import exit_lines_for_positions
@@ -876,6 +878,11 @@ def _build_overview(repo, engine=None) -> dict:
             "heat": heat,
             "bands": bands_map.get(sym),
             "weight": pos.get("weight"),
+            # [R169] 批次登记的附加信息(纯展示字段, 不参与任何评分/门槛/姿态判定):
+            # 成本是手填还是批次派生、有几笔批次、最近一个未过期的到期日。
+            "cost_source": pos.get("cost_source"),
+            "lot_count": pos.get("lot_count", 0),
+            "lot_remind_date": pos.get("next_remind_date"),
         })
     holdings.sort(key=lambda h: (not h["exit_triggered"], h["distance_pct"] if h["distance_pct"] is not None else -9))
 

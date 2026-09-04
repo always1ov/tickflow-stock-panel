@@ -25,6 +25,7 @@ import { QK } from '@/lib/queryKeys'
 // 弹窗和页面本体。缝按"对外暴露什么"划: 每个模块只导出 1~2 个组件, 其余是内部实现。
 import { buildTodayHtml } from '@/lib/todayHtmlExport'
 import { VerdictTag } from '@/components/today/VerdictTag'
+import { LotBadge } from '@/components/today/LotBadge'   // [R169] 批次派生成本 / 到期提醒小标
 import { OpportunityTable, GateFunnel } from '@/components/today/OpportunityTable'
 import { AiPickPanel } from '@/components/today/AiPickPanel'
 import { MarketStatusCard } from '@/components/today/MarketStatusCard'
@@ -721,6 +722,7 @@ export function Today() {
                           <span className="font-medium text-foreground">{h.name}</span>
                           {h.symbol !== h.name && <span className="ml-1.5 text-[9px] font-mono text-muted">{h.symbol}</span>}
                           <VerdictTag v={h.heat?.verdict} holding />
+                          <LotBadge h={h} />
                         </td>
                         <td className="px-2 py-1.5 text-right font-mono">{h.close?.toFixed(2) ?? '—'}</td>
                         <td className="px-2 py-1.5 text-right font-mono text-muted" title="在决策台持有标记旁填「仓%」后显示">

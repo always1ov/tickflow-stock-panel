@@ -215,7 +215,8 @@ def _dn_pivots(repo, sym_closes: dict[str, tuple[list[str], list[float]]]) -> di
 
 def exit_lines_for_positions(repo) -> dict[str, dict]:
     """全部「持有+已填成本」自选的出场线 {SYMBOL: {...}}。"""
-    from app.services import positions
+    # [R169] 走合并视图: 只在批次页登记过的票也能自动盯上生命线, 无需再去决策台标一次
+    from app.services import effective_positions as positions
     # 标了「持有」就纳入: 没填成本也自动盯生命线(20日线)
     pos_all = {s: p for s, p in positions.load_all().items() if p.get("held")}
     if not pos_all:
@@ -356,7 +357,7 @@ def sync_exit_rules(lines: dict[str, dict], engine=None) -> None:
 
 def exit_for_symbol(repo, symbol: str) -> dict | None:
     """单只出场线(喂 AI 信号 / 关键价位注入用)。未持有或没填成本返回 None。"""
-    from app.services import positions
+    from app.services import effective_positions as positions   # [R169] 同上, 含批次派生成本
     sym = (symbol or "").strip().upper()
     pos = positions.load_all().get(sym)
     if not pos or not pos.get("held"):

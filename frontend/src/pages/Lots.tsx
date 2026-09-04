@@ -1,6 +1,6 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowUpRight, CalendarClock, Pencil, Plus, Search, Trash2 } from 'lucide-react'
 import { api, type Lot } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
@@ -71,6 +71,19 @@ export function Lots() {
     () => toNavItems(sortedLots.map(l => ({ symbol: l.symbol, name: symbolNames[l.symbol] }))),
     [sortedLots, symbolNames],
   )
+
+  // [R169] 从决策台仓位列点「批次」进来时带着 ?symbol=, 落地后定位到该票的批次并高亮。
+  // 与 R157 决策台「定位当前个股」同一套做法: 滚到视野正中 + 短暂描边, 不做位移动画。
+  // 用 matchMedia 而不是只靠 index.css 那条 prefers-reduced-motion —— 那条压的是 CSS
+  // scroll-behavior, 压不住这里 JS 传的 behavior: 'smooth'。
+  const [searchParams] = useSearchParams()
+  const focusSymbol = (searchParams.get('symbol') || '').trim().toUpperCase()
+  const focusRowRef = useRef<HTMLTableRowElement | null>(null)
+  useEffect(() => {
+    if (!focusSymbol || !focusRowRef.current) return
+    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    focusRowRef.current.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'center' })
+  }, [focusSymbol, sortedLots.length])
 
   const dailyQuery = useQuery({
     queryKey: QK.lotsKline(allSymbols.join(',')),
@@ -161,8 +174,19 @@ export function Lots() {
                     </tr>
                   </thead>
                   <tbody>
-                    {sortedLots.map(lot => (
-                      <tr key={lot.id} className="border-b border-border/40 last:border-0 hover:bg-elevated/40">
+                    {sortedLots.map((lot, i) => {
+                      const focused = !!focusSymbol && lot.symbol.toUpperCase() === focusSymbol
+                      // 同一只票可能有多笔批次, 只把第一笔挂 ref 作为滚动锚点
+                      const isFirstFocused = focused && sortedLots.findIndex(l => l.symbol.toUpperCase() === focusSymbol) === i
+                      return (
+                      <tr
+                        key={lot.id}
+                        ref={isFirstFocused ? focusRowRef : undefined}
+                        className={cn(
+                          'border-b border-border/40 last:border-0 hover:bg-elevated/40',
+                          focused && 'bg-accent/[0.07] ring-1 ring-inset ring-accent/35',
+                        )}
+                      >
                         <td className="px-4 py-2.5">
                           <button
                             onClick={() => setPreviewSymbol(lot.symbol)}
@@ -220,7 +244,8 @@ export function Lots() {
                           </div>
                         </td>
                       </tr>
-                    ))}
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>

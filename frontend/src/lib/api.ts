@@ -407,6 +407,12 @@ export interface TodayHolding {
   heat?: TodayHeat | null
   /** [R43] 三档通道原始读数, 供悬停显示具体轨价 */
   bands?: KeltnerBands | null
+  /** [R169] 成本是手填还是从「持仓提醒」页的批次派生 */
+  cost_source?: 'manual' | 'lots' | null
+  /** [R169] 该票在批次页登记了几笔 */
+  lot_count?: number
+  /** [R169] 最近一个未过期的批次到期日 (YYYY-MM-DD) */
+  lot_remind_date?: string | null
 }
 export interface TodayPortfolio {
   count: number; avg_pnl: number | null; triggered: number; near_exit: number; bearish: number
@@ -772,6 +778,30 @@ export interface WatchlistImportResult {
   candidates: WatchlistImportCandidate[]
   matched_count: number
   unmatched_count: number
+}
+
+/**
+ * [fork 增强 R169] 标的级持仓视图 —— 决策台手填的仓位标记 ⊕ 上游「持仓提醒」页的批次登记。
+ *
+ * 两者是同一件事的两个口径: 批次是**每笔买入**(成本/数量/到期提醒), 这里是**每只票**
+ * (持有与否/成本/占总资金 %)。唯一重合的字段是成本价, 所以后端在读侧合并:
+ * 手填永远优先, 没手填时用批次的数量加权平均补上。写仍只落 positions.json。
+ */
+export interface EffectivePosition {
+  held: boolean
+  /** 生效成本: 手填优先, 没填则取批次加权平均 */
+  cost: number | null
+  /** 仓位比例(占总资金 %) —— 只能手填, 批次不知道总资金 */
+  weight?: number | null
+  updated_at?: string
+  /** 'manual' 手填 | 'lots' 批次派生 | null 没有成本 */
+  cost_source?: 'manual' | 'lots' | null
+  /** 批次加权平均成本(手填优先时也带出来, 供并排显示) */
+  lot_cost?: number | null
+  /** 手填相对批次均价的偏离 %, 两者都有时才给 */
+  cost_drift_pct?: number | null
+  lot_count?: number
+  lot_qty?: number
 }
 
 export interface Quote {
@@ -3418,8 +3448,10 @@ export const api = {
         ? `/api/watchlist/enriched?ext_columns=${encodeURIComponent(extColumns)}`
         : '/api/watchlist/enriched',
     ),
+  // [R169] 返回的是「手填 ⊕ 批次登记」的合并视图: held/cost/weight 语义不变,
+  // 另附成本来源与批次信息, 供决策台标注来源、提示手填值与批次均价不一致。
   watchlistPositions: () =>
-    request<{ positions: Record<string, { held: boolean; cost: number | null; weight?: number | null; updated_at: string }> }>('/api/watchlist/positions'),
+    request<{ positions: Record<string, EffectivePosition> }>('/api/watchlist/positions'),
   setWatchlistPosition: (symbol: string, held: boolean, cost: number | null, weight?: number | null) =>
     request<{ symbol: string; position: { held: boolean; cost: number | null; weight?: number | null; updated_at: string } }>(
       `/api/watchlist/positions/${encodeURIComponent(symbol)}`,

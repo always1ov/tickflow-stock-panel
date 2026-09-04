@@ -1245,7 +1245,7 @@ async def _run_scheduled_signal_ai(repo) -> None:
         if not ss.get_ai_key():
             logger.info("scheduled signal-ai skipped: AI key not configured")
             return
-        from app.services import positions as positions_svc
+        from app.services import effective_positions as positions_svc   # [R169] 含批次登记的票
         from app.services import preferences as prefs
         from app.services import stock_signal, watchlist
 

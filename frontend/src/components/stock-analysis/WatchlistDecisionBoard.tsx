@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Star, Wallet, Sparkles, Loader2, ArrowUp, ArrowDown, RefreshCw, FileText, TrendingUp, Download, Bell } from 'lucide-react'
-import { api, type ExitLine, type KeltnerBands, type TrendInfo } from '@/lib/api'
+import { api, type EffectivePosition, type ExitLine, type KeltnerBands, type TrendInfo } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { pickStale, SIGNAL_TTL_HOURS } from '@/lib/signalFreshness'   // [R131] 增量分析判据
 import { toast } from '@/components/Toast'
@@ -13,7 +13,9 @@ import { StockReviewDialog, type ReviewTab } from '@/components/stock-analysis/S
 // HTML 导出模板, 主组件被压在后面。
 import { buildBoardHtml } from '@/lib/decisionBoardHtmlExport'
 import { KeltnerCell, VerdictCell } from '@/components/stock-analysis/decision-board/cells'
-type Position = { held: boolean; cost: number | null; weight?: number | null; updated_at: string }
+import { LotsLink } from '@/components/stock-analysis/decision-board/LotsLink'
+// [R169] 合并视图(手填 ⊕ 上游批次登记), 字段说明见 api.ts 的 EffectivePosition
+type Position = EffectivePosition
 type WatchPoint = { direction: 'up' | 'down'; price: number; label?: string; action?: string; reason?: string }
 type Signal = { signal: string; confidence: number; reason: string; close: number | null; created_at: string; watch_points?: WatchPoint[] }
 type SortKey = 'name' | 'close' | 'changePct' | 'held' | 'cost' | 'pnl' | 'exit'
@@ -255,7 +257,15 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
         const trend: TrendInfo | undefined = trends[symbol]
         const exit: ExitLine | undefined = exitLines[symbol]
         const kc: KeltnerBands | undefined = keltner[symbol]
-        return { symbol, name: r.name ?? symbol, close, changePct: r.change_pct ?? null, held: !!pos?.held, cost, weight: pos?.weight ?? null, pnl, sig, trend, exit, kc }
+        return {
+          symbol, name: r.name ?? symbol, close, changePct: r.change_pct ?? null,
+          held: !!pos?.held, cost, weight: pos?.weight ?? null, pnl, sig, trend, exit, kc,
+          // [R169] 成本来源与批次信息 —— 让"这个成本是我填的还是批次算的"一眼可辨
+          costSource: pos?.cost_source ?? null,
+          lotCost: pos?.lot_cost ?? null,
+          costDriftPct: pos?.cost_drift_pct ?? null,
+          lotCount: pos?.lot_count ?? 0,
+        }
       })
       .filter((r) => (heldOnly ? r.held : true))
   }, [enriched.data, positions, signals, heldOnly, trends, exitLines, keltner])
@@ -532,6 +542,9 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
                 const active = r.symbol === currentSymbol
                 const up = (r.changePct ?? 0) > 0
                 const down = (r.changePct ?? 0) < 0
+                // [R169] 只有手填的成本才回写。r.cost 可能是批次派生值, 回写它等于
+                // 把派生固化成手填, 之后改批次就不跟着动了。
+                const manualCost = r.costSource === 'manual' ? r.cost : null
                 const flashing = r.symbol === flash
                 return (
                   // [R157] ref 供定位滚动; scroll-mt 避开 sticky 表头; 定位到时整行闪一下
@@ -557,10 +570,13 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
                     <td className={`whitespace-nowrap px-2 py-2.5 text-right font-mono tabular-nums ${up ? 'text-red-400' : down ? 'text-emerald-400' : 'text-muted'}`}>
                       {r.changePct != null ? `${(r.changePct * 100).toFixed(2)}%` : '—'}
                     </td>
-                    {/* 仓位:持有/空仓 切换 */}
+                    {/* 仓位:持有/空仓 切换。
+                        [R169] 写回时一律用 manualCost 而不是 r.cost —— r.cost 可能是批次
+                        派生出来的, 直接回写会把"批次算的"固化成"我填的", 之后改批次就不
+                        跟着动了。派生值必须保持派生。 */}
                     <td className="whitespace-nowrap px-2 py-2.5 text-center">
                       <button
-                        onClick={() => setPos.mutate({ symbol: r.symbol, held: !r.held, cost: r.cost, weight: r.weight })}
+                        onClick={() => setPos.mutate({ symbol: r.symbol, held: !r.held, cost: manualCost, weight: r.weight })}
                         className={`whitespace-nowrap text-[10px] px-1.5 py-0.5 rounded border transition-colors cursor-pointer ${
                           r.held ? 'border-amber-400/40 bg-amber-400/10 text-amber-400' : 'border-border bg-base text-muted hover:border-amber-400/30'
                         }`}
@@ -569,34 +585,49 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
                       </button>
                     </td>
                     {/* 成本+仓位%:仅持有时可填。生命线=20日线, 自动计算无需手填;
-                        仓位% 供今日总览算组合总仓位/净值回撤, 不填不影响其他功能 */}
+                        仓位% 供今日总览算组合总仓位/净值回撤, 不填不影响其他功能。
+
+                        [R169] 成本框只装**手填值**: 批次页登记过而这里没填的, 走
+                        placeholder 显示批次加权均价(带「批」字), 一眼能分清"我填的"
+                        和"批次算的"。想改成自己的口径就直接往里敲, 敲了即变手填。 */}
                     <td className="whitespace-nowrap px-2 py-2.5 text-right">
                       {r.held ? (
                         <span className="inline-flex items-center gap-1">
                           <input
                             type="number"
-                            defaultValue={r.cost ?? ''}
-                            placeholder="成本"
+                            defaultValue={manualCost ?? ''}
+                            placeholder={r.costSource === 'lots' && r.lotCost != null ? `批 ${r.lotCost.toFixed(2)}` : '成本'}
+                            title={r.costSource === 'lots' && r.lotCost != null
+                              ? `成本来自「持仓提醒」页的 ${r.lotCount} 笔批次(数量加权均价 ${r.lotCost.toFixed(2)})。这里留空即跟随批次; 填了数字则以填的为准。`
+                              : '买入成本(手填)'}
                             onBlur={(e) => {
                               const v = e.target.value === '' ? null : Number(e.target.value)
-                              if (v !== r.cost) setPos.mutate({ symbol: r.symbol, held: true, cost: v, weight: r.weight })
+                              if (v !== manualCost) setPos.mutate({ symbol: r.symbol, held: true, cost: v, weight: r.weight })
                             }}
-                            className="w-16 h-6 px-1 rounded bg-base border border-border text-[11px] font-mono text-right text-foreground focus:outline-none focus:border-accent/50"
+                            className={`w-16 h-6 px-1 rounded bg-base border text-[11px] font-mono text-right text-foreground focus:outline-none focus:border-accent/50 ${
+                              r.costSource === 'lots' ? 'border-accent/35 placeholder:text-accent/70' : 'border-border'
+                            }`}
                           />
                           <input
                             type="number"
                             min={0} max={100}
                             defaultValue={r.weight ?? ''}
                             placeholder="仓%"
-                            title="仓位比例(占总资金 %),可选 —— 填了之后今日总览能算组合总仓位、净值回撤纪律与超配提醒"
+                            title="仓位比例(占总资金 %),可选 —— 填了之后今日总览能算组合总仓位、净值回撤纪律与超配提醒。批次页给不出这个数(它不知道总资金),只能在这里填。"
                             onBlur={(e) => {
                               const v = e.target.value === '' ? null : Number(e.target.value)
-                              if (v !== r.weight) setPos.mutate({ symbol: r.symbol, held: true, cost: r.cost, weight: v })
+                              if (v !== r.weight) setPos.mutate({ symbol: r.symbol, held: true, cost: manualCost, weight: v })
                             }}
                             className="w-12 h-6 px-1 rounded bg-base border border-border text-[11px] font-mono text-right text-foreground focus:outline-none focus:border-accent/50"
                           />
+                          <LotsLink symbol={r.symbol} lotCount={r.lotCount} driftPct={r.costDriftPct} lotCost={r.lotCost} />
                         </span>
-                      ) : <span className="text-muted">—</span>}
+                      ) : (
+                        // 空仓但批次还挂着 —— 多半是卖出后忘了删批次, 那两条监控规则还在跑
+                        r.lotCount > 0
+                          ? <LotsLink symbol={r.symbol} lotCount={r.lotCount} driftPct={null} lotCost={null} stale />
+                          : <span className="text-muted">—</span>
+                      )}
                     </td>
                     {/* 浮盈 */}
                     <td className={`whitespace-nowrap px-2 py-2.5 text-right font-mono tabular-nums ${r.pnl == null ? 'text-muted' : r.pnl > 0 ? 'text-red-400' : r.pnl < 0 ? 'text-emerald-400' : 'text-muted'}`}>

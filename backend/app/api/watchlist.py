@@ -203,9 +203,14 @@ class PositionIn(BaseModel):
 
 @router.get("/positions")
 def list_positions():
-    """全部自选的持仓标记 {SYMBOL: {held, cost, updated_at}} —— 供决策台浮盈/纵观对比。"""
-    from app.services import positions
-    return {"positions": positions.load_all()}
+    """全部自选的持仓视图 —— 供决策台浮盈/纵观对比。
+
+    [R169] 读的是合并视图(手填 ⊕ 上游批次登记): 老字段 held/cost/weight/updated_at
+    语义不变, 另附 cost_source / lot_cost / cost_drift_pct / lot_count / lot_qty,
+    让决策台能标出成本来源、并提示手填值与批次均价不一致。写仍只落 positions.json。
+    """
+    from app.services import effective_positions
+    return {"positions": effective_positions.load_all()}
 
 
 @router.put("/positions/{symbol}")
