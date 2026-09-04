@@ -106,6 +106,8 @@ export const QK = {
   monitorRules:         ['monitor-rules'] as const,
   focus:                ['focus'] as const,   // [R159] 推送焦点名单
   monitorRuleOptions:   ['monitor-rule-options'] as const,
+  lots:                 ['lots'] as const,
+  lotsKline:            (symbols: string) => ['lots-kline', symbols] as const,
   alerts:               (source?: string) => ['alerts', source ?? ''] as const,
 
   // AI 大盘复盘

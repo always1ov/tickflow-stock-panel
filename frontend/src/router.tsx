@@ -24,6 +24,7 @@ const PaperTrading = lazy(() => import('./pages/PaperTrading').then(m => ({ defa
 const Financials = lazy(() => import('./pages/Financials').then(m => ({ default: m.Financials })))
 const Data = lazy(() => import('./pages/Data').then(m => ({ default: m.Data })))
 const Monitor = lazy(() => import('./pages/Monitor').then(m => ({ default: m.Monitor })))
+const Lots = lazy(() => import('./pages/Lots').then(m => ({ default: m.Lots })))
 const Dashboard = lazy(() => import('./pages/Dashboard').then(m => ({ default: m.Dashboard })))
 const AnalysisDetail = lazy(() => import('./pages/AnalysisDetail').then(m => ({ default: m.AnalysisDetail })))
 const ConceptAnalysis = lazy(() => import('./pages/ConceptAnalysis').then(m => ({ default: m.ConceptAnalysis })))
@@ -152,6 +153,7 @@ export function createAppRouter() {
       { path: 'financials', element: <Financials /> },
       { path: 'data', element: <Data /> },
       { path: 'monitor', element: <Monitor /> },
+      { path: 'lots', element: <Lots /> },
       { path: 'limit-ladder', element: <LimitUpLadder /> },
       { path: 'indices', element: <Indices /> },
       { path: 'regime', element: <Regime /> },

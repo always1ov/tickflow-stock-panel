@@ -22,6 +22,7 @@ from app.api import (
     indices,
     intraday,
     kline,
+    lots,
     market_recap,
     mining,
     monitor_rules,
@@ -537,6 +538,7 @@ app.include_router(settings_api.router)
 app.include_router(strategy.router)
 app.include_router(signals.router)
 app.include_router(monitor_rules.router)
+app.include_router(lots.router)
 app.include_router(alerts.router)
 app.include_router(rps.router)
 

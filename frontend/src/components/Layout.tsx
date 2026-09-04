@@ -39,6 +39,7 @@ import {
   BarChart3,
   Gauge,
   Sparkles,
+  Layers2,
   Layers3,
   Landmark,
   RadioTower,
@@ -92,6 +93,7 @@ const nav = [
   { to: '/screener',   label: '策略',   icon: ScanSearch },
   { to: '/backtest',   label: '回测', icon: History },
   { to: '/mining',     label: '挖掘', icon: Pickaxe },
+  { to: '/lots',       label: '持仓提醒', icon: Layers2 },
   // [R59] AI 操盘手: 让模型用本系统的信息模拟交易, 长期观察这套信息够不够用
   { to: '/paper-trading', label: 'AI 操盘手', icon: Bot },
   { to: '/stock-analysis',    label: '个股分析', icon: TrendingUp },
