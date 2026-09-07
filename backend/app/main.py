@@ -160,6 +160,15 @@ async def _application_lifespan(app: FastAPI):
     except Exception as e:  # noqa: BLE001
         logger.warning("custom data sources init failed: %s", e)
 
+    # [R173] 把把握分的维度注册进作者的因子平台, 好让它能走 IC/IR 检验。
+    # 失败只记 WARNING —— 因子库少几条是小事, 把启动搞挂是大事。
+    try:
+        from app.services.fork_score_factors import register_all as _reg_fork_factors
+        _n = len(_reg_fork_factors())
+        logger.info("fork 把握分因子已注册 %d 条", _n)
+    except Exception as e:  # noqa: BLE001
+        logger.warning("fork 把握分因子注册跳过: %s", e)
+
     # [fork 增强] 数据持久化自检: 容器内 data_dir 不是挂载点 → 数据写在容器层,
     # 重建容器(拉新镜像)会丢全部数据。数据页据此显示红色警告横幅。
     # 仅容器环境判定(/.dockerenv); bind mount 与 named volume 都是挂载点。

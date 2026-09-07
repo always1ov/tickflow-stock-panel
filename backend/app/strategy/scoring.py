@@ -101,6 +101,11 @@ def scoring_value_expr(columns: Collection[str], name: str) -> pl.Expr | None:
     available = set(columns)
     if name in available:
         return pl.col(name)
+    # [R173] fork 把握分维度因子(fk_ 前缀)的转接点。表达式全在 fork 模块里 ——
+    # 这里只留一行, 让同步上游时这个文件的冲突面尽可能小。
+    if name.startswith("fk_"):
+        from app.services.fork_score_factors import scoring_expr as _fork_expr
+        return _fork_expr(available, name)
     # composite 在 VIRTUAL 字典门控之前分派 (依赖经注册表递归展开) —— P3
     spec = _registry_get_factor(name)
     if spec is not None and spec.kind == "composite":
