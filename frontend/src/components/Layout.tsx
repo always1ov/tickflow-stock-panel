@@ -25,7 +25,7 @@ import {
   Star,
   ScanSearch,
   History,
-  Pickaxe,
+  Sigma,
   FileText,
   Settings,
   DatabaseZap,
@@ -40,6 +40,7 @@ import {
   Sparkles,
   Layers2,
   Layers3,
+  Zap,
   Landmark,
   RadioTower,
   CheckCircle2,
@@ -90,11 +91,8 @@ const nav = [
   { to: '/today',           label: '今日总览', icon: Sunrise },
   { to: '/watchlist',  label: '自选',   icon: Star },
   { to: '/screener',   label: '策略',   icon: ScanSearch },
+  { to: '/factors',    label: '因子', icon: Sigma },
   { to: '/backtest',   label: '回测', icon: History },
-  { to: '/mining',     label: '挖掘', icon: Pickaxe },
-  // [R170] 「持仓提醒」(真钱批次) 与 [R59]「AI 操盘手」(模拟盘) 并入仓位中心的两个 tab。
-  // 旧路径 /paper-trading 仍可用(router 里重定向), 书签和菜单设置不会断。
-  { to: '/lots',       label: '仓位中心', icon: Layers2 },
   { to: '/stock-analysis',    label: '个股分析', icon: TrendingUp },
   // [R67] 分组本身也是菜单里的一行 —— 排序时它整块走, 后面的成员是它的子项
   { to: BROWSE_GROUP_ID,    label: BROWSE_GROUP.label, icon: Layers3 },
@@ -106,6 +104,10 @@ const nav = [
   { to: '/monitor', label: '监控中心', icon: RadioTower },
   { to: '/regime', label: '市场环境', icon: Gauge },
   { to: '/abnormal', label: '异动监控', icon: Siren },
+  // [R170] 上游这里叫「持仓提醒」; 在 fork 这边它是双 tab 外壳(我的批次 + AI 操盘手),
+  // 所以叫「仓位中心」。旧路径 /paper-trading 仍可用(router 里重定向)。
+  { to: '/lots',       label: '仓位中心', icon: Layers2 },
+  { to: '/signals',    label: '信号库',   icon: Zap },
   { to: '/review',      label: '复盘',   icon: BookOpenCheck },
   // [fork 增强] R93 使用观察笔记
   { to: '/usage-notes', label: '我的使用观察', icon: NotebookPen },

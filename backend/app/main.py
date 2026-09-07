@@ -18,6 +18,7 @@ from app.api import (
     backtest,
     data,
     ext_data,
+    factors,
     financials,
     indices,
     intraday,
@@ -121,6 +122,15 @@ async def _application_lifespan(app: FastAPI):
     repo = KlineRepository(store)
     app.state.datastore = store
     app.state.repo = repo
+    # 自定义/复合因子载入注册表 (P3); 单个失败只跳过该因子 (fail-隔离)
+    from app.factors.store import load_into_registry
+
+    try:
+        loaded_factors = load_into_registry(store.data_dir)
+        if loaded_factors:
+            logger.info("custom factors loaded: %s", len(loaded_factors))
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("custom factors load failed: %s", exc)
     from app.services.mining_manager import MiningJobManager
 
     mining_manager = MiningJobManager(store.data_dir)
@@ -141,11 +151,6 @@ async def _application_lifespan(app: FastAPI):
     # Polars 缓存预热 — enriched 的重计算 (107万行 compute_indicators) 推后台,
     # instruments/index/ETF 仍同步 (毫秒级)。应用立即 ready, 指标算完后自动替换。
     repo.refresh_cache(background=True)
-
-    # 能力探测
-    capset = detect_capabilities()
-    app.state.capabilities = capset
-    logger.info("ready; %d capabilities active", len(capset.all()))
 
     # 自定义数据源配置(可选): 失败只记录错误, 不影响 TickFlow 基准路径。
     try:
@@ -169,6 +174,10 @@ async def _application_lifespan(app: FastAPI):
                     "请在 compose 的 volumes 挂载该路径", settings.data_dir)
     except Exception as e:  # noqa: BLE001
         logger.debug("data dir persistence check skipped: %s", e)
+    # 自定义源必须先注册,能力探测才能补充其数据集能力。
+    capset = detect_capabilities()
+    app.state.capabilities = capset
+    logger.info("ready; %d capabilities active", len(capset.all()))
 
     # 全局行情服务
     qs = QuoteService()
@@ -514,6 +523,7 @@ app.include_router(kline.router)
 app.include_router(watchlist.router)
 app.include_router(screener.router)
 app.include_router(backtest.router)
+app.include_router(factors.router)
 app.include_router(mining.router)
 app.include_router(workflows.router)  # [fork 增强] R39 研究工作流
 app.include_router(paper_trading.router)  # [fork 增强] R59 AI 操盘手

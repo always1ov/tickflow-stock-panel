@@ -36,6 +36,7 @@ interface NavEntry {
   visible: boolean
 }
 
+// 与 Layout 侧边栏默认顺序保持一致 (nav_order 未保存时的默认展示顺序)
 const BUILTIN_PAGES: NavEntry[] = [
   // [R64] 看板已从根路径挪到 /dashboard —— 这里跟着改, 否则隐藏/排序对它失效
   // (那种失效不报错, 只表现为"我明明勾了不显示, 它还在")
@@ -43,26 +44,28 @@ const BUILTIN_PAGES: NavEntry[] = [
   { id: '/dashboard', label: '看板', type: 'builtin', visible: true },
   { id: '/watchlist', label: '自选', type: 'builtin', visible: true },
   { id: '/screener', label: '策略', type: 'builtin', visible: true },
+  { id: '/factors', label: '因子', type: 'builtin', visible: true },
   { id: '/backtest', label: '回测', type: 'builtin', visible: true },
-  { id: '/mining', label: '挖掘', type: 'builtin', visible: true },
   // [R170] 并入仓位中心。**id 保持 /paper-trading 不变** —— 用户已保存的菜单
   // 排序/显隐是以 id 为键的, 换 id 会让那份配置对不上。点进去 router 会重定向到
   // /lots?tab=paper, 行为不变。
   { id: '/paper-trading', label: 'AI 操盘手 (仓位中心)', type: 'builtin', visible: true },
   { id: '/limit-ladder', label: '连板梯队', type: 'builtin', visible: true },
-  { id: '/indices', label: '指数', type: 'builtin', visible: true },
   { id: '/concept-analysis', label: '概念分析', type: 'builtin', visible: true },
   { id: '/industry-analysis', label: '行业分析', type: 'builtin', visible: true },
   { id: '/stock-analysis', label: '个股分析', type: 'builtin', visible: true },
   // [R67] 分组自己占一行 —— 拖它就是整块挪。默认位置排在「个股分析」之后,
   // 也就是老逻辑(表头挂在第一个成员上)算出来的那个位置, 升级上来位置不变。
   { id: BROWSE_GROUP_ID, label: BROWSE_GROUP.label, type: 'group', visible: true },
-  { id: '/regime', label: '市场环境', type: 'builtin', visible: true },
-  { id: '/abnormal', label: '异动监控', type: 'builtin', visible: true },
-  { id: '/review', label: '复盘', type: 'builtin', visible: true },
   { id: '/usage-notes', label: '我的使用观察', type: 'builtin', visible: true },
   { id: '/financials', label: '财务分析', type: 'builtin', visible: true },
   { id: '/monitor', label: '监控中心', type: 'builtin', visible: true },
+  { id: '/regime', label: '市场环境', type: 'builtin', visible: true },
+  { id: '/abnormal', label: '异动监控', type: 'builtin', visible: true },
+  { id: '/lots', label: '仓位中心', type: 'builtin', visible: true },   // [R170] 双 tab 外壳
+  { id: '/signals', label: '信号库', type: 'builtin', visible: true },
+  { id: '/review', label: '复盘', type: 'builtin', visible: true },
+  { id: '/indices', label: '指数', type: 'builtin', visible: true },
   { id: '/data', label: '数据', type: 'builtin', visible: true },
 ]
 

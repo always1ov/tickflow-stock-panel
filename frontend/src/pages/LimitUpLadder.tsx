@@ -23,7 +23,6 @@ import {
 } from '@/lib/ladderExtFields'
 import type { ExtColumnDisplayConfig } from '@/lib/watchlist-columns'
 
-
 // ===== 方向(涨停/跌停) =====
 
 type Direction = 'up' | 'down'
@@ -406,7 +405,7 @@ function MonitorMenu({ stock, direction, sealMode, monitorRule, anchorRect, hasD
 
   // 基于齿轮按钮位置算菜单坐标 (fixed 定位, 脱离父级 overflow-hidden 裁剪)
   const MENU_W = 240  // w-60 = 15rem = 240px
-  const MENU_H = 340  // 预估高度 (含标题栏 + 4 行设置 + 权限提示 + 按钮区)
+  const MENU_H = 370  // 预估高度 (推送渠道可换行)
   const anchorRight = anchorRect.right
   const anchorBottom = anchorRect.bottom
   // 水平: 默认右对齐齿轮; 超出右边则左移
@@ -478,31 +477,36 @@ function MonitorMenu({ stock, direction, sealMode, monitorRule, anchorRect, hasD
             </select>
           </div>
 
-          {/* 推送渠道: 胶囊标签 (飞书 / 企业微信 各自独立勾选), 选中带强调色 */}
-          <div className="flex items-center gap-2">
+          {/* 推送渠道: 多选胶囊标签 */}
+          <div className="flex items-start gap-2">
             <span className="text-[10px] text-muted shrink-0 w-8">推送</span>
-            {([
-              { key: 'feishu', label: '飞书' },
-              { key: 'wecom', label: '企业微信' },
-              { key: 'dingtalk', label: '钉钉' },
-            ] as const).map(ch => {
-              const on = pushChannels.includes(ch.key)
-              return (
-                <button
-                  key={ch.key}
-                  type="button"
-                  onClick={() => togglePushChannel(ch.key)}
-                  className={`inline-flex items-center gap-1 px-2 py-1 rounded-btn text-[10px] font-medium transition-colors border cursor-pointer ${
-                    on
-                      ? 'bg-accent/15 text-accent border-accent/40'
-                      : 'bg-elevated/40 text-muted border-border hover:text-secondary'
-                  }`}
-                >
-                  <span className={`w-1.5 h-1.5 rounded-full ${on ? 'bg-accent' : 'bg-muted/50'}`} />
-                  {ch.label}
-                </button>
-              )
-            })}
+            <div className="flex flex-wrap gap-1">
+              {/* [fork+上游] 五条渠道: 钉钉是 fork 加的, 第三方/邮件是上游 v0.2.3 加的 */}
+              {([
+                { key: 'feishu', label: '飞书' },
+                { key: 'wecom', label: '企微' },
+                { key: 'dingtalk', label: '钉钉' },
+                { key: 'custom', label: '第三方' },
+                { key: 'email', label: '邮件' },
+              ] as const).map(ch => {
+                const on = pushChannels.includes(ch.key)
+                return (
+                  <button
+                    key={ch.key}
+                    type="button"
+                    onClick={() => togglePushChannel(ch.key)}
+                    className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-medium transition-colors border cursor-pointer ${
+                      on
+                        ? 'bg-accent/15 text-accent border-accent/40'
+                        : 'bg-elevated/40 text-muted border-border hover:text-secondary'
+                    }`}
+                  >
+                    <span className={`w-1.5 h-1.5 rounded-full ${on ? 'bg-accent' : 'bg-muted/50'}`} />
+                    {ch.label}
+                  </button>
+                )
+              })}
+            </div>
           </div>
 
           {/* 权限提示 (免费用户) */}

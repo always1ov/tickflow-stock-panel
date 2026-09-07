@@ -13,6 +13,16 @@ type RequestOptions = RequestInit & {
   quiet?: boolean
 }
 
+export class ApiError extends Error {
+  readonly status: number
+
+  constructor(message: string, status: number) {
+    super(message)
+    this.name = 'ApiError'
+    this.status = status
+  }
+}
+
 async function request<T>(path: string, init?: RequestOptions): Promise<T> {
   const { quiet, ...fetchInit } = init ?? {}
   const isFormData = fetchInit.body instanceof FormData
@@ -38,11 +48,7 @@ async function request<T>(path: string, init?: RequestOptions): Promise<T> {
     const msg = detail || `${res.status} ${res.statusText}`
     // 401 (未登录/会话过期) 不弹 toast — 由全局认证拦截器统一跳登录页, 避免刷屏
     if (res.status !== 401 && !quiet) toast(msg, 'error')
-    // [R80] 把 HTTP 状态码挂在错误对象上 —— detail 存在时 msg 里没有状态码
-    // (如 404 的 "job not found"), 调用方拿文本正则判状态永远判不中
-    const err = new Error(msg) as Error & { status?: number }
-    err.status = res.status
-    throw err
+    throw new ApiError(msg, res.status)
   }
   return res.json() as Promise<T>
 }
@@ -698,7 +704,7 @@ export interface MinuteKlineRow {
   low: number
   close: number
   volume: number
-  amount: number
+  amount: number | null
 }
 
 export interface MinuteKlineSession {
@@ -732,6 +738,20 @@ export interface KlineRow {
   rsi_14?: number | null
   vol_ratio_5d?: number | null
   [key: string]: any
+}
+
+export interface KlineDailyResponse {
+  symbol: string
+  name?: string
+  stock_info?: { name?: string; total_shares?: number; float_shares?: number; ext?: Record<string, unknown> }
+  rows: KlineRow[]
+  source?: string
+}
+
+export interface KlineDailyLatestResponse {
+  symbol: string
+  row: KlineRow | null
+  source: 'live' | 'none'
 }
 
 // ===== Watchlist =====
@@ -1460,6 +1480,7 @@ export interface StrategyDetail {
   description: string
   tags: string[]
   source: 'builtin' | 'custom' | 'ai' | 'composite'
+  research_only?: boolean
   execution_backend: 'polars_expr' | 'matrix_native' | 'python_history_legacy' | 'composite' | 'minute_filter'
   asset_types: string[]
   timeframes: string[]
@@ -1507,6 +1528,7 @@ export interface StrategyCodeSaveResult {
   source: 'ai' | 'custom' | 'composite'
   path: string
   meta: Record<string, any>
+  research_only?: boolean
 }
 
 // ===== Custom Signals (自定义信号) =====
@@ -1537,6 +1559,9 @@ export interface CustomSignalOptions {
   groups?: CustomSignalFieldGroup[]
   maxDays?: number
   operators: string[]
+  /** string 扩展字段 (概念/行业归属): 这些字段用 stringOperators + 字符串右值 */
+  stringFields?: string[]
+  stringOperators?: string[]
   kinds: { key: string; label: string }[]
 }
 
@@ -1661,7 +1686,7 @@ export interface MonitorRule {
   message: string
   webhook_url?: string
   webhook_enabled?: boolean  // 兼容老规则, 已由 webhook_channels 取代
-  webhook_channels?: string[]  // 命中时推送的外部渠道 (合法值 'feishu' | 'wecom' | 'dingtalk')
+  webhook_channels?: string[]  // 合法值: feishu | wecom | dingtalk[fork] | custom | email
   created_at?: string
   runtime_warning?: string
   // ladder 专属: 封单监控; volume_delta 复用 metric 表示阈值口径 (volume=手数, amount=金额)
@@ -1831,6 +1856,56 @@ export interface FactorColumn {
   desc: string
 }
 
+// ===== Factor Library (注册表, P1) =====
+export type FactorKind = 'base' | 'virtual' | 'composite' | 'custom'
+export type FactorStability = 'stable' | 'experimental' | 'deprecated'
+
+export interface FactorLibraryItem {
+  id: string
+  label: string
+  group: string
+  kind: FactorKind
+  version: number
+  formula: string
+  direction: 'high' | 'low' | 'none'
+  unit: string
+  warmup_bars: number
+  pit: boolean
+  asset_types: string[]
+  stability: FactorStability
+  scale_free: boolean
+  dependencies: string[]
+}
+
+export interface FactorDslError {
+  code: string
+  message: string
+  position: { offset: number; line: number }
+  detail?: Record<string, unknown>
+}
+
+export interface FactorValidateResponse {
+  ok: boolean
+  errors: FactorDslError[]
+  dependencies: string[]
+  referenced_factors: string[]
+  warmup_bars: number
+  cross_sectional: boolean
+}
+
+export interface FactorTrialResponse {
+  ok: boolean
+  n_dates: number
+  null_ratio: number | null
+  ic_mean: number | null
+  ic_std: number | null
+  ir: number | null
+  ic_win_rate: number | null
+  t_newey_west?: number | null
+  ic_series: { date: string; ic: number; n_symbols: number }[]
+  message?: string
+}
+
 export interface GroupStat {
   group: number
   label: string
@@ -1872,6 +1947,12 @@ export interface FactorBatchItem {
   n_dates: number
   elapsed_ms: number
   error: string | null
+  // metrics_v2 (P3): NW HAC t 值与 BH-FDR q 值; 样本不足为 null (前端降级经验规则)
+  t_naive?: number | null
+  t_newey_west?: number | null
+  nw_lag?: number | null
+  p_value?: number | null
+  q_value?: number | null
 }
 
 // ===== [fork 增强] R32 因子 AI 解读 =====
@@ -2008,8 +2089,8 @@ export interface MiningRun {
   run_id: string
   signature: string
   status: MiningRunStatus
-  request: MiningRequestV1
-  source?: 'manual' | 'scheduled'
+  request: MiningRequestV1 & { auto?: boolean; auto_screening?: AutoScreening }
+  source?: 'manual' | 'scheduled' | 'auto'
   created_at: string
   updated_at: string
   started_at?: string | null
@@ -2019,6 +2100,37 @@ export interface MiningRun {
   error?: string | null
   reused?: boolean
   summary?: MiningResultSummary | null
+}
+
+// 自动挖掘 L1 筛选摘要 (后端 app/services/auto_mining.py 产出结构)
+export interface AutoScreening {
+  profile: MiningBudgetProfile
+  gate: { min_abs_ic: number; min_abs_ir: number; min_abs_t: number; max_q: number }
+  screen_window: { start: string; end: string }
+  n_total: number
+  n_qualified: number
+  pool: string[]
+  pool_truncated: boolean
+  qualified: Array<{ factor_name: string; label: string; group: string; ic: number | null; ir: number | null; t: number | null; q: number | null; direction: 1 | -1 }>
+  failed: Array<{ factor_name: string; label: string; group: string; ic: number | null; ir: number | null; t: number | null; q: number | null; reason: string }>
+  reason_counts: Record<string, number>
+  elapsed_ms: number
+}
+
+export interface MiningAutoStartPayload {
+  asset_type?: 'stock' | 'etf'
+  start?: string | null
+  end?: string | null
+  budget_profile?: MiningBudgetProfile
+  correlation_threshold?: number
+  force?: boolean
+}
+
+export interface MiningAutoStartResponse {
+  started: boolean
+  reason?: string
+  run?: MiningRun
+  screening?: AutoScreening
 }
 
 export interface MiningResultSummary {
@@ -2218,6 +2330,12 @@ export interface StrategyBacktestResult {
   drawdown_curve: { date: string; value: number }[]
   benchmark_curve?: { date: string; value: number; close?: number; name?: string; symbol?: string }[]
   trades: StrategyBacktestTrade[]
+  /** v1 因子归因: 入场信号日因子值快照 × 成交盈亏 (胜/败单均值对比); 无评分因子或分钟路径时为 null */
+  factor_attribution?: {
+    factors: { factor: string; win_mean: number | null; lose_mean: number | null; win_n: number; lose_n: number }[]
+    n_win: number
+    n_lose: number
+  } | null
   per_symbol_stats: {
     symbol: string
     n_trades: number
@@ -2649,6 +2767,7 @@ export interface Preferences {
   depth_finalize_time: { hour: number; minute: number }
   review_schedule: { enabled: boolean; hour: number; minute: number }
   review_push_channels: string[]
+  review_push_mode?: 'auto' | 'manual'
   sse_refresh_pages: Record<string, boolean>
   strategy_monitor_enabled: boolean
   strategy_monitor_ids: string[]
@@ -2658,6 +2777,10 @@ export interface Preferences {
   wecom_webhook_url?: string
   dingtalk_webhook_url?: string
   dingtalk_keyword?: string
+  custom_webhook_url?: string
+  custom_webhook_secret_set?: boolean
+  email_smtp_config?: EmailSmtpConfig
+  email_smtp_password_set?: boolean
   wecom_bot_id?: string
   wecom_bot_secret?: string
   wecom_bot_enabled?: boolean
@@ -2707,6 +2830,15 @@ export interface ExternalPageRaw {
   fetched_at: number
   preview: string
   source_chars: number
+}
+
+export interface EmailSmtpConfig {
+  host: string
+  port: number
+  security: 'ssl' | 'starttls' | 'none'
+  username: string
+  from_address: string
+  to_addresses: string[]
 }
 
 /** 监控中心 ext 字段单项配置 (行业/概念标签的来源 + 显示裁剪) */
@@ -3157,7 +3289,17 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify({ url, keyword }),
     }),
-  sendTestWebhook: (channel: 'feishu' | 'wecom' | 'dingtalk') =>
+  updateCustomWebhook: (url: string, secret?: string) =>
+    request<{ custom_webhook_url: string; custom_webhook_secret_set: boolean }>('/api/settings/preferences/custom-webhook', {
+      method: 'PUT',
+      body: JSON.stringify({ url, ...(secret !== undefined ? { secret } : {}) }),
+    }),
+  updateEmailSmtp: (config: EmailSmtpConfig, password?: string) =>
+    request<{ email_smtp_config: EmailSmtpConfig; email_smtp_password_set: boolean }>('/api/settings/preferences/email-smtp', {
+      method: 'PUT',
+      body: JSON.stringify({ ...config, ...(password !== undefined ? { password } : {}) }),
+    }),
+  sendTestWebhook: (channel: 'feishu' | 'wecom' | 'dingtalk' | 'custom' | 'email') =>
     request<{ ok: boolean; detail: string }>('/api/settings/preferences/webhook-test', {
       method: 'POST',
       body: JSON.stringify({ channel }),
@@ -3197,10 +3339,10 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify({ enabled, hour, minute }),
     }),
-  updateReviewPush: (channels: string[]) =>
-    request<{ review_push_channels: string[] }>('/api/settings/preferences/review-push', {
+  updateReviewPush: (channels: string[], mode?: 'auto' | 'manual') =>
+    request<{ review_push_channels: string[]; review_push_mode: 'auto' | 'manual' }>('/api/settings/preferences/review-push', {
       method: 'PUT',
-      body: JSON.stringify({ channels }),
+      body: JSON.stringify({ channels, mode: mode ?? null }),
     }),
   updateDepthPollingInterval: (interval: number) =>
     request<{ depth_polling_interval: number }>('/api/settings/preferences/depth-polling-interval', {
@@ -3270,13 +3412,10 @@ export const api = {
   redetectCapabilities: () =>
     request<CapabilitiesResponse>('/api/capabilities/redetect', { method: 'POST' }),
 
+  // [R76] opts.refreshLive 与返回的 live_refresh 是 fork 加的: 弹窗点开先回旧数据,
+  // 后台线程拉完再取一次。上游把响应体收成了 KlineDailyResponse, 这里在它之上扩展。
   klineDaily: (symbol: string, days = 120, dateRange?: { start: string; end: string }, extColumns?: string, opts?: { refreshLive?: boolean }) =>
-    request<{
-      symbol: string
-      name?: string
-      stock_info?: { name?: string; total_shares?: number; float_shares?: number; ext?: Record<string, unknown> }
-      rows: KlineRow[]
-      source?: string
+    request<KlineDailyResponse & {
       /** [R76] refreshLive 时返回: started=后台在拉(稍后再取一次) / fresh=已是新的 / off=没 key */
       live_refresh?: 'started' | 'fresh' | 'off'
     }>(
@@ -3286,6 +3425,10 @@ export const api = {
       + (extColumns ? `&ext_columns=${encodeURIComponent(extColumns)}` : '')
       // [R74] 服务端先现拉一次该票实时(15s 冷却)再返回 —— 弹窗"点开就是最新"
       + (opts?.refreshLive ? '&refresh_live=1' : ''),
+    ),
+  klineDailyLatest: (symbol: string) =>
+    request<KlineDailyLatestResponse>(
+      `/api/kline/daily/latest?symbol=${encodeURIComponent(symbol)}`,
     ),
   klineDailyBatch: (symbols: string[], days = 12) =>
     request<{ data: Record<string, KlineRow[]> }>('/api/kline/daily-batch', {
@@ -3651,6 +3794,79 @@ export const api = {
   factorColumns: () =>
     request<{ columns: FactorColumn[] }>('/api/backtest/factor/columns'),
 
+  factorLibrary: (assetType?: 'stock' | 'etf') =>
+    request<{ factors: FactorLibraryItem[] }>(
+      `/api/factors${assetType ? `?asset_type=${assetType}` : ''}`,
+    ),
+
+  factorValidate: (formula: string) =>
+    request<FactorValidateResponse>('/api/factors/validate', {
+      method: 'POST',
+      body: JSON.stringify({ formula }),
+    }),
+
+  factorTrial: (payload: { formula: string; asset_type?: 'stock' | 'etf'; days?: number }) =>
+    request<FactorTrialResponse>('/api/factors/trial', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  factorCustomCreate: (payload: {
+    id?: string
+    label: string
+    group?: string
+    formula: string
+    description?: string
+    direction?: 'high' | 'low' | 'none'
+  }) =>
+    request<{ ok: boolean; id: string; version: number }>('/api/factors/custom', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  factorCustomUpdate: (factorId: string, payload: {
+    label: string
+    group?: string
+    formula: string
+    description?: string
+    direction?: 'high' | 'low' | 'none'
+  }) =>
+    request<{ ok: boolean; id: string; version: number; status: string }>(
+      `/api/factors/custom/${encodeURIComponent(factorId)}/update`,
+      { method: 'POST', body: JSON.stringify(payload) },
+    ),
+
+  factorCompositeCreate: (payload: {
+    id?: string
+    label: string
+    group?: string
+    members: Record<string, number>
+    description?: string
+    direction?: 'high' | 'low' | 'none'
+  }) =>
+    request<{ ok: boolean; id: string; version: number }>('/api/factors/composite', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  factorDelete: (factorId: string, force = false) =>
+    request<{ ok: boolean; id: string; removed_references?: string[] }>(
+      `/api/factors/custom/${encodeURIComponent(factorId)}${force ? '?force=true' : ''}`,
+      { method: 'DELETE', quiet: true },
+    ),
+
+  factorSetStatus: (factorId: string, status: 'draft' | 'active' | 'watch' | 'retired') =>
+    request<{ ok: boolean; id: string; status: string }>(
+      `/api/factors/custom/${encodeURIComponent(factorId)}/status`,
+      { method: 'POST', body: JSON.stringify({ status }) },
+    ),
+
+  factorSetGroup: (factorId: string, group: string) =>
+    request<{ ok: boolean; id: string; group: string }>(
+      `/api/factors/custom/${encodeURIComponent(factorId)}/group`,
+      { method: 'POST', body: JSON.stringify({ group }) },
+    ),
+
   factorRun: (payload: {
     factor_name: string
     symbols?: string[] | null
@@ -3745,6 +3961,12 @@ export const api = {
 
   miningRun: (runId: string) =>
     request<MiningRun>(`/api/backtest/mining/runs/${encodeURIComponent(runId)}`),
+
+  miningAutoStart: (payload: MiningAutoStartPayload) =>
+    request<MiningAutoStartResponse>('/api/backtest/mining/auto', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
 
   miningStart: (payload: MiningRequestV1) =>
     request<MiningRun>('/api/backtest/mining/runs', {
@@ -4068,6 +4290,7 @@ export const api = {
     response_path?: string; field_map?: Record<string, string>;
     schedule_minutes?: number; enabled?: boolean;
     time_window_start?: string | null; time_window_end?: string | null;
+    date_param?: string | null;
   }) =>
     request<{ status: string; pull: PullConfig }>(
       `/api/ext-data/${id}/pull`,
@@ -4083,6 +4306,13 @@ export const api = {
   extDataPullRun: (id: string) =>
     request<{ status: string; rows: number; date: string }>(
       `/api/ext-data/${id}/pull/run`,
+      { method: 'POST' },
+    ),
+
+  /** 历史回补: 按本地交易日逐日拉取写入 timeseries 分区 (需 pull.date_param) */
+  extDataBackfill: (id: string, start: string, end: string) =>
+    request<ExtDataBackfillResult>(
+      `/api/ext-data/${encodeURIComponent(id)}/backfill?start=${start}&end=${end}`,
       { method: 'POST' },
     ),
 
@@ -4369,6 +4599,7 @@ export const api = {
     as_of: string; focus?: string; content: string
     summary?: string; emotion_score?: number | null; emotion_label?: string
     mode?: 'today' | 'continuity' | 'week'
+    push?: boolean
   }) =>
     request<{ ok: boolean; report: AiReviewReport }>('/api/market-recap/reports', {
       method: 'POST', body: JSON.stringify(r),
@@ -4467,10 +4698,11 @@ export const api = {
   },
 
   // ===== Strategy Engine =====
-  strategyList: (assetType?: 'stock' | 'etf', timeframe: '1d' | '1m' | 'all' = '1d') => {
+  strategyList: (assetType?: 'stock' | 'etf', timeframe: '1d' | '1m' | 'all' = '1d', includeResearch = false) => {
     const params = new URLSearchParams()
     if (assetType) params.set('asset_type', assetType)
     if (timeframe && timeframe !== 'all') params.set('timeframe', timeframe)
+    if (includeResearch) params.set('include_research', 'true')
     const qs = params.toString()
     return request<{ strategies: StrategyDetail[]; load_errors?: StrategyLoadError[] }>(
       `/api/strategies${qs ? `?${qs}` : ''}`,
@@ -4479,6 +4711,10 @@ export const api = {
 
   strategyGet: (id: string) =>
     request<StrategyDetail>(`/api/strategies/${id}`),
+
+  /** 发布 research_only 的 AI 草稿策略(翻转为公开) */
+  strategyPublish: (strategyId: string) =>
+    request<{ ok: boolean; strategy_id: string }>(`/api/strategies/${encodeURIComponent(strategyId)}/publish`, { method: 'POST' }),
 
   strategyRun: (strategyId: string, params?: Record<string, any>, asOf?: string, pool?: string[]) =>
     request<ScreenerResult>('/api/strategies/run', {
@@ -4865,6 +5101,18 @@ export interface PullConfig {
   next_run?: string | null
   time_window_start?: string | null
   time_window_end?: string | null
+  /** 接口按日查询的参数名 (如 "date"): 配置后支持历史回补 */
+  date_param?: string | null
+}
+
+export interface ExtDataBackfillResult {
+  status: string
+  total_days: number
+  fetched: number
+  skipped_existing: number
+  empty: number
+  failed: { date: string; reason: string }[]
+  rows_written: number
 }
 
 export interface ExtDataDetectUrlRequest {

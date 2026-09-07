@@ -1,5 +1,5 @@
 import { lazy } from 'react'
-import { createBrowserRouter, Navigate } from 'react-router-dom'
+import { createBrowserRouter, Navigate, useSearchParams } from 'react-router-dom'
 import { Layout } from './components/Layout'
 import { Onboarding } from './pages/Onboarding'
 import { Auth } from './pages/Auth'
@@ -18,8 +18,7 @@ import {
 const Watchlist = lazy(() => import('./pages/Watchlist').then(m => ({ default: m.Watchlist })))
 const Screener = lazy(() => import('./pages/Screener').then(m => ({ default: m.Screener })))
 const Backtest = lazy(() => import('./pages/Backtest').then(m => ({ default: m.Backtest })))
-const Mining = lazy(() => import('./pages/Mining').then(m => ({ default: m.Mining })))
-// [R59] AI 操盘手: 让模型只用本系统的信息模拟交易, 长期看这套信息够不够用
+const Factors = lazy(() => import('./pages/Factors').then(m => ({ default: m.Factors })))
 const Financials = lazy(() => import('./pages/Financials').then(m => ({ default: m.Financials })))
 const Data = lazy(() => import('./pages/Data').then(m => ({ default: m.Data })))
 const Monitor = lazy(() => import('./pages/Monitor').then(m => ({ default: m.Monitor })))
@@ -30,6 +29,7 @@ const AnalysisDetail = lazy(() => import('./pages/AnalysisDetail').then(m => ({ 
 const ConceptAnalysis = lazy(() => import('./pages/ConceptAnalysis').then(m => ({ default: m.ConceptAnalysis })))
 const IndustryAnalysis = lazy(() => import('./pages/IndustryAnalysis').then(m => ({ default: m.IndustryAnalysis })))
 const StockAnalysis = lazy(() => import('./pages/StockAnalysis').then(m => ({ default: m.StockAnalysis })))
+const Signals = lazy(() => import('./pages/Signals').then(m => ({ default: m.Signals })))
 const Review = lazy(() => import('./pages/Review').then(m => ({ default: m.Review })))
 const LimitUpLadder = lazy(() => import('./pages/LimitUpLadder').then(m => ({ default: m.LimitUpLadder })))
 const Indices = lazy(() => import('./pages/Indices').then(m => ({ default: m.Indices })))
@@ -60,6 +60,7 @@ const CORE_ROUTE_PATHS = new Set([
   '/watchlist',
   '/screener',
   '/backtest',
+  '/factors',
   '/mining',
   '/paper-trading',
   '/lots',            // [R170] 上游加 /lots 路由时漏了这一条; 它现在托管仓位中心
@@ -81,6 +82,13 @@ const CORE_ROUTE_PATHS = new Set([
 ])
 
 // [R153] 扩展注册表的 finalize / 取路由挪进了 createAppRouter() —— 见文件尾。
+
+// 旧链接兼容: 挖掘已并入因子页 (/factors?tab=mining), 保留 run/candidate 等参数重定向
+function MiningRedirect() {
+  const [searchParams] = useSearchParams()
+  const search = searchParams.toString()
+  return <Navigate to={`/factors?tab=mining${search ? `&${search}` : ''}`} replace />
+}
 
 // 首次使用守卫 —— 未完成向导则重定向到 /onboarding
 // 只挂在根路由上;/onboarding 本身不被守卫,避免循环重定向。
@@ -149,13 +157,17 @@ export function createAppRouter() {
       { path: 'watchlist', element: <Watchlist /> },
       { path: 'screener', element: <Screener /> },
       { path: 'backtest', element: <Backtest /> },
-      { path: 'mining', element: <Mining /> },
-      // [R170] 并入仓位中心。路由保留并重定向: 书签、菜单设置里存的旧路径不能断。
+      { path: 'factors', element: <Factors /> },
+      // 上游把挖掘并进了因子页; 这条重定向让老书签(带 run/candidate 参数)仍然可用
+      { path: 'mining', element: <MiningRedirect /> },
+      // [R170] AI 操盘手并入仓位中心。路由保留并重定向: 书签、菜单设置里存的旧路径不能断。
       { path: 'paper-trading', element: <Navigate to="/lots?tab=paper" replace /> },
       { path: 'financials', element: <Financials /> },
       { path: 'data', element: <Data /> },
       { path: 'monitor', element: <Monitor /> },
+      // [R170] 这里挂的是 fork 的双 tab 外壳, 不是上游的 Lots —— 上游那个是其中一个 tab
       { path: 'lots', element: <PositionsHub /> },
+      { path: 'signals', element: <Signals /> },
       { path: 'limit-ladder', element: <LimitUpLadder /> },
       { path: 'indices', element: <Indices /> },
       { path: 'regime', element: <Regime /> },

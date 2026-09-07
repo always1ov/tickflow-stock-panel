@@ -480,11 +480,23 @@ def _attach_ext(resp: dict, repo, symbol: str, ext_columns: Optional[str]) -> di
     return resp
 
 
-def _maybe_inject_live_candle(request: Request, symbol: str, rows: list[dict], asset_type: str = "stock") -> list[dict]:
-    """如果有当日实时 enriched 数据, 用实时数据生成今日蜡烛并追加/覆盖。
+def _latest_live_candle(
+    request: Request,
+    symbol: str,
+    asset_type: str = "stock",
+    *,
+    refresh_asset: bool = True,
+) -> dict | None:
+    """从内存缓存读取单只标的的当日实时 enriched 行。
 
-    stock 走 QuoteService 的股票实时缓存; etf 走 ETF enriched 缓存 (开启实时 ETF
-    拉取时为盘中数据, 否则为磁盘最新日, 由下方"非今日不注入"守卫自然跳过)。
+    [R16 + R77] 取值优先级(fork 增强, 上游那版只有第 2 级):
+      1. 自选实时叠加层 —— 免费自选档实时数据的**唯一**去处
+      2. 全市场实时缓存(付费档): stock 走 QuoteService, etf 走 ETF enriched 缓存
+         (开启实时 ETF 拉取时为盘中数据, 否则为磁盘最新日, 由下方"非今日不注入"
+         守卫自然跳过)
+      3. 弹窗单票缓存(refresh_live 按需拉的, 只有 OHLCV 没有指标)
+
+    契约随上游 v0.2.3: 返回 dict | None, 并支持 refresh_asset。
     """
     import polars as pl
 
@@ -507,8 +519,6 @@ def _maybe_inject_live_candle(request: Request, symbol: str, rows: list[dict], a
             return None, None
         return row, d
 
-    # 取实时行: 叠加层优先(免费自选档); 没有再退回全市场实时缓存(付费档);
-    # 最后兜底 [R77] 弹窗单票缓存(refresh_live 按需拉的, 只有 OHLCV 没有指标)
     q: dict | None = None
     enriched_date = None
     if asset_type in ("stock", "etf"):
@@ -517,12 +527,15 @@ def _maybe_inject_live_candle(request: Request, symbol: str, rows: list[dict], a
         qs = getattr(request.app.state, "quote_service", None)
         if asset_type == "stock":
             if not qs:
-                return rows
+                return None
             df_today, enriched_date = qs.get_enriched_today()
         elif asset_type == "etf":
-            df_today, enriched_date = request.app.state.repo.get_enriched_latest_asset("etf")
+            # refresh_asset 是上游新加的开关, 跟着传下去
+            df_today, enriched_date = request.app.state.repo.get_enriched_latest_asset(
+                "etf", refresh=refresh_asset,
+            )
         else:
-            return rows
+            return None
         if not df_today.is_empty():
             try:
                 m = df_today.filter(pl.col("symbol") == symbol).to_dicts()
@@ -531,32 +544,34 @@ def _maybe_inject_live_candle(request: Request, symbol: str, rows: list[dict], a
             except Exception:  # noqa: BLE001
                 q = None
         if q is None:
-            single = qs.get_single_live(symbol) if qs else None
+            # [R77] 弹窗单票缓存兜底。用 getattr 而不是直接点属性: 上游 v0.2.3 新增的
+            # test_kline_daily_latest 用的替身没有这个方法, 真跑起来也可能遇到
+            # 老版本/替身形状的 quote_service —— 兜底本身不该成为新的崩溃点。
+            getter = getattr(qs, "get_single_live", None) if qs else None
+            single = getter(symbol) if callable(getter) else None
             if not single:
-                return rows
+                return None
             try:
                 enriched_date = date.fromisoformat(str(single.get("date"))[:10])
             except (TypeError, ValueError):
-                return rows
+                return None
             q = single
 
-    # 非交易日（周末/假日）缓存的行情日期 != 今天，跳过注入避免产生重复蜡烛
+    # 非交易日(周末/假日)缓存日期 != 今天, 跳过注入避免产生重复蜡烛
     if not enriched_date or enriched_date != date.today():
-        return rows
+        return None
 
     close_price = q.get("close")
     if not close_price or close_price <= 0:
-        return rows
+        return None
 
-    today_str = str(enriched_date)
-
-    # enriched 行已包含 OHLCV + 全套指标, 直接用它
-    # 修复: API 在非交易时段可能返回 open/high/low=0, 用 close 填充避免异常蜡烛
+    # 沿用完整日K接口原有的实时行投影, 避免增量接口形成第二套字段契约。
+    # API 在非交易时段可能返回 open/high/low=0, 用 close 填充避免异常蜡烛。
     raw_open = q.get("open")
     raw_high = q.get("high")
     raw_low = q.get("low")
-    live_row: dict = {
-        "date": today_str,
+    live_row = {
+        "date": str(enriched_date),
         "symbol": symbol,
         "open": raw_open if raw_open and raw_open > 0 else close_price,
         "high": raw_high if raw_high and raw_high > 0 else close_price,
@@ -567,7 +582,6 @@ def _maybe_inject_live_candle(request: Request, symbol: str, rows: list[dict], a
         "change_pct": q.get("change_pct"),
         "is_live": True,
     }
-    # 补上 enriched 的技术指标字段
     for key in ("ma5", "ma10", "ma20", "ma30", "ma60",
                 "macd_dif", "macd_dea", "macd_hist",
                 "kdj_k", "kdj_d", "kdj_j",
@@ -576,11 +590,19 @@ def _maybe_inject_live_candle(request: Request, symbol: str, rows: list[dict], a
                 "atr_14", "vol_ratio_5d"):
         if key in q and q[key] is not None:
             live_row[key] = q[key]
+    return live_row
+
+
+def _maybe_inject_live_candle(request: Request, symbol: str, rows: list[dict], asset_type: str = "stock") -> list[dict]:
+    """如果有当日实时 enriched 数据, 用实时数据生成今日蜡烛并追加/覆盖。"""
+    live_row = _latest_live_candle(request, symbol, asset_type)
+    if live_row is None:
+        return rows
 
     # 如果已有今天的 enriched 行, 覆盖; 否则追加
     found = False
-    for i, r in enumerate(rows):
-        if str(r.get("date")) == today_str:
+    for r in rows:
+        if str(r.get("date")) == live_row["date"]:
             r.update(live_row)
             found = True
             break
@@ -589,6 +611,22 @@ def _maybe_inject_live_candle(request: Request, symbol: str, rows: list[dict], a
         rows.append(live_row)
 
     return rows
+
+
+@router.get("/daily/latest")
+def get_daily_latest(
+    request: Request,
+    symbol: str = Query(..., description="标的代码,如 000001.SZ"),
+):
+    """返回内存中的当日单行 K 线, 供详情页实时增量更新。"""
+    repo = request.app.state.repo
+    asset_type = repo.resolve_asset_type(symbol)
+    row = _latest_live_candle(request, symbol, asset_type, refresh_asset=False)
+    return {
+        "symbol": symbol,
+        "row": row,
+        "source": "live" if row is not None else "none",
+    }
 
 
 class DailyBatchRequest:
