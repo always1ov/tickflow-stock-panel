@@ -4,7 +4,7 @@
  * [R167] 从 WatchlistDecisionBoard.tsx 拆出。各自带着自己的配色表 —— 配色表是
  * 实现细节, 不该摆在 933 行主文件的顶部让人以为是全局约定。
  */
-import type { KeltnerBand, KeltnerVerdict } from '@/lib/api'
+import type { KeltnerBand, KeltnerVerdict, Urgency } from '@/lib/api'
 import { VerdictHover } from '@/components/stock-analysis/VerdictHover'
 
 // [R42] Keltner 位置配色。破上轨/贴上轨用暖色(偏贵), 破下轨/贴下轨用冷色(偏便宜),
@@ -101,3 +101,42 @@ export function VerdictCell({ v, onOpen }: { v?: KeltnerVerdict | null; onOpen: 
 // 与今日总览的导出同一套排版: 浅色、内联样式、无脚本无外链, 存档/打印/
 // 转发都不依赖这个应用。
 
+
+
+// [R178] 「该动了」配色。急的用暖色、无事的彻底压暗 —— 这一列的作用是让眼睛
+// 在 80 行里一秒找到该看的那几行, 所以对比要拉开, 不能像别的列那样克制。
+const URGENCY_CLS: Record<Urgency['level'], string> = {
+  triggered: 'border-red-400/50 bg-red-400/15 text-red-400 font-medium',
+  near: 'border-amber-400/40 bg-amber-400/10 text-amber-400',
+  flip: 'border-violet-400/40 bg-violet-400/10 text-violet-300',
+  band: 'border-sky-400/30 bg-sky-400/5 text-sky-300/90',
+  idle: 'border-transparent text-muted/30',
+}
+
+/**
+ * 「该动了」单元格。
+ *
+ * 显示档位 + 离触发多远, 悬停给判定理由 —— 只给一个"逼近"的标签而不说凭什么,
+ * 用户没法复核, 那就跟 AI 随口说一句没有区别。这里每一档背后都是一条写死的
+ * 规则(见 backend/app/services/watchlist_urgency.py), 理由是后端给的原话。
+ *
+ * 判定还没回来时显示 "—" 而不是"无事" —— 那是两件事, 混在一起会让人以为
+ * 今天真没事。
+ */
+export function UrgencyCell({ u }: { u?: Urgency }) {
+  if (!u) return <td className="px-2 py-1.5 text-center text-muted/30">—</td>
+  const showDist = u.level !== 'idle' && u.distance != null
+  return (
+    <td className="whitespace-nowrap px-2 py-1.5 text-center">
+      <span
+        title={u.reason}
+        className={`inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] ${URGENCY_CLS[u.level]}`}
+      >
+        {u.label}
+        {showDist && (
+          <span className="font-mono opacity-70">{(u.distance! * 100).toFixed(1)}%</span>
+        )}
+      </span>
+    </td>
+  )
+}

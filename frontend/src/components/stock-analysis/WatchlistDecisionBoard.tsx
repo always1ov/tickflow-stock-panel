@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Star, Wallet, Sparkles, Loader2, ArrowUp, ArrowDown, RefreshCw, FileText, TrendingUp, Download, Bell } from 'lucide-react'
-import { api, type EffectivePosition, type ExitLine, type KeltnerBands, type TrendInfo } from '@/lib/api'
+import { api, type EffectivePosition, type ExitLine, type KeltnerBands, type TrendInfo, type Urgency } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { pickStale, SIGNAL_TTL_HOURS } from '@/lib/signalFreshness'   // [R131] 增量分析判据
 import { toast } from '@/components/Toast'
@@ -12,13 +12,13 @@ import { StockReviewDialog, type ReviewTab } from '@/components/stock-analysis/S
 // [R167] 导出与两个单元格从本文件拆出 —— 拆前 933 行, 顶部堆着两张配色表和一整份
 // HTML 导出模板, 主组件被压在后面。
 import { buildBoardHtml } from '@/lib/decisionBoardHtmlExport'
-import { KeltnerCell, VerdictCell } from '@/components/stock-analysis/decision-board/cells'
+import { KeltnerCell, UrgencyCell, VerdictCell } from '@/components/stock-analysis/decision-board/cells'
 import { LotsLink } from '@/components/stock-analysis/decision-board/LotsLink'
 // [R169] 合并视图(手填 ⊕ 上游批次登记), 字段说明见 api.ts 的 EffectivePosition
 type Position = EffectivePosition
 type WatchPoint = { direction: 'up' | 'down'; price: number; label?: string; action?: string; reason?: string }
 type Signal = { signal: string; confidence: number; reason: string; close: number | null; created_at: string; watch_points?: WatchPoint[] }
-type SortKey = 'name' | 'close' | 'changePct' | 'held' | 'cost' | 'pnl' | 'exit'
+type SortKey = 'urgency' | 'name' | 'close' | 'changePct' | 'held' | 'cost' | 'pnl' | 'exit'
   | 'trend' | 'ks' | 'km' | 'kl' | 'verdict' | 'confidence' | 'signal' | 'report'
 const SIGNAL_RANK: Record<string, number> = { buy: 0, sell: 1, hold: 2, watch: 3 }
 // [fork 增强] 六态排序权重:多头在前(上涨趋势 → 下跌趋势)
@@ -68,7 +68,15 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
   // [R51] tab 记住是从哪一列进来的: 两列点开看的不是同一张表(见 StockReviewDialog)
   const [review, setReview] = useState<{ symbol: string; name: string; tab: ReviewTab } | null>(null)
   // 排序:默认按置信度降序(信号最强的排前面;未分析的始终垫底)
-  const [sort, setSort] = useState<{ key: SortKey; dir: 'asc' | 'desc' }>({ key: 'confidence', dir: 'desc' })
+  // [R178] 默认按「该动了」排, 不再按 AI 置信度。
+  //
+  // 置信度是"AI 有多确定", 不是"这只有多急" —— 一只 AI 95% 确信「观望」的票
+  // 会压在一只刚跌破止损线的票上面。而且拿 AI 决定用户先看谁, 跟本项目别处
+  // 立的规矩是矛盾的(台账「只记不反馈」、R175「AI 只念表」)。
+  // 升序 = 最急的在最上面(order 越小越急)。
+  const [sort, setSort] = useState<{ key: SortKey; dir: 'asc' | 'desc' }>({ key: 'urgency', dir: 'asc' })
+  // 「只看要动的」—— 自选一多, 默认列 80 行本身就是噪音
+  const [actionableOnly, setActionableOnly] = useState(false)
   const toggleSort = (key: SortKey) =>
     setSort((s) => (s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: key === 'name' ? 'asc' : 'desc' }))
   const caret = (key: SortKey) =>
@@ -121,6 +129,17 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
   })
   const keltner: Record<string, KeltnerBands> = useMemo(
     () => keltnerQ.data?.keltner ?? {}, [keltnerQ.data])
+
+  // [R178] 「该动了」判定 —— 决策台的默认顺序由它定, 不再由 AI 置信度定。
+  // 判定全在后端(纯规则、有测试), 这边只负责按 order/distance 排。
+  const urgencyQ = useQuery({
+    queryKey: QK.stockUrgency(trendSyms),
+    queryFn: () => api.stockUrgency(trendSyms.split(',')),
+    enabled: trendSyms.length > 0,
+    staleTime: 60_000,     // 比通道短: 距离随实时价动, 陈旧的紧迫度会误导
+  })
+  const urgency: Record<string, Urgency> = useMemo(
+    () => urgencyQ.data?.urgency ?? {}, [urgencyQ.data])
 
   // [fork 增强] 持仓出场线(仅持有+填成本的票有;后端顺带把线同步为监控规则)
   const heldWithCost = Object.values(positions).some((p) => p.held && p.cost)
@@ -260,6 +279,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
         return {
           symbol, name: r.name ?? symbol, close, changePct: r.change_pct ?? null,
           held: !!pos?.held, cost, weight: pos?.weight ?? null, pnl, sig, trend, exit, kc,
+          urg: urgency[symbol],
           // [R169] 成本来源与批次信息 —— 让"这个成本是我填的还是批次算的"一眼可辨
           costSource: pos?.cost_source ?? null,
           lotCost: pos?.lot_cost ?? null,
@@ -268,11 +288,22 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
         }
       })
       .filter((r) => (heldOnly ? r.held : true))
-  }, [enriched.data, positions, signals, heldOnly, trends, exitLines, keltner])
+      // [R178] 「要动的」= 前四档(已触发/逼近/刚变盘/到轨), 无事档不算。
+      // 判定还没回来时不过滤 —— 宁可多显示, 不能让表在加载中看起来是空的。
+      .filter((r) => (actionableOnly ? (r.urg ? r.urg.level !== 'idle' : true) : true))
+  }, [enriched.data, positions, signals, heldOnly, actionableOnly, trends, exitLines, keltner, urgency])
 
   const sortedRows = useMemo(() => {
     const val = (r: (typeof rows)[number]): string | number | null => {
       switch (sort.key) {
+        // [R178] 档位为主、同档内离触发多近为辅。合成一个可比的数:
+        // order*1000 + 距离(百分点), 距离缺失的排在同档最后。
+        // 这样同为「逼近」时, 离线 0.3% 的会排在 1.4% 前面。
+        case 'urgency': {
+          if (!r.urg) return null
+          const d = r.urg.distance == null ? 999 : Math.min(r.urg.distance * 100, 998)
+          return r.urg.order * 1000 + d
+        }
         case 'name': return r.name
         case 'close': return r.close
         case 'changePct': return r.changePct
@@ -312,6 +343,9 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
   }, [rows, sort, reportsBySymbol])
 
   const heldCount = Object.values(positions).filter((p) => p.held).length
+  // 「要动的」有几只 —— 显示在开关上, 用户不点也能一眼知道今天有没有事
+  const actionCount = useMemo(
+    () => Object.values(urgency).filter((u) => u.level !== 'idle').length, [urgency])
 
   // ===== [R157] 定位当前个股 =====
   // 用户: 「加个定位当前个股的功能, 任何适合被选中的都要能当前页面显示, 我不想每次
@@ -374,13 +408,16 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
 
   // [R46] 导出用的行: 只留「结论」列有内容的。三档都在通道中部的票没有位置
   // 信息, 导出来只是占地方。按当前排序导出 —— 你在界面上怎么排, 导出件就怎么排。
+  // [R178] 原来只导「有结论」的票。加了「该动」列之后这个条件就漏了 ——
+  // 一只已跌破出场线、但三档通道都在中部的票没有结论, 却正是最该出现在
+  // 导出件里的那只。改成两者取并集。
   const exportRows = useMemo(
-    () => sortedRows.filter((r) => r.kc?.verdict),
+    () => sortedRows.filter((r) => r.kc?.verdict || (r.urg && r.urg.level !== 'idle')),
     [sortedRows],
   )
   const exportHtml = () => {
     if (!exportRows.length) {
-      toast('当前没有「结论」列有内容的标的 —— 三档通道都在中部时不导出', 'error')
+      toast('当前没有要动的、也没有「结论」列有内容的标的 —— 无可导出', 'error')
       return
     }
     const blob = new Blob([buildBoardHtml(exportRows, rows.length)], { type: 'text/html;charset=utf-8' })
@@ -430,6 +467,17 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
         >
           <TrendingUp className="h-3 w-3" />
           六态汇总
+        </button>
+        <button
+          onClick={() => setActionableOnly((v) => !v)}
+          title={'只留下有触发的那几只: 出场线已破/逼近、离趋势翻转价 2% 以内、今日刚翻转、'
+            + '短通道到轨。判定是纯规则的(与推送焦点名单同一套到轨口径), AI 不参与。\n'
+            + '自选一多, 默认列出全部本身就是噪音 —— 绝大多数票今天确实不需要你看。'}
+          className={`text-[10px] px-2 py-0.5 rounded-btn border transition-colors cursor-pointer ${
+            actionableOnly ? 'border-amber-400/40 bg-amber-400/10 text-amber-400' : 'border-border bg-base text-muted hover:text-foreground'
+          }`}
+        >
+          只看要动的{actionCount > 0 && <span className="opacity-70">·{actionCount}</span>}
         </button>
         <button
           onClick={() => setHeldOnly((v) => !v)}
@@ -517,6 +565,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
             </colgroup>
             <thead className="sticky top-0 bg-surface/95 backdrop-blur text-[10px] text-muted">
               <tr className="text-left">
+                <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center"><button onClick={() => toggleSort('urgency')} className={thBtn} title="该动了: 已触发 > 逼近 > 刚变盘 > 到轨 > 无事。同档内按离触发多近排。纯规则判定, AI 不参与 —— 它只解释, 不决定你先看谁">该动{caret('urgency')}</button></th>
                 <th className="whitespace-nowrap px-4 py-2.5 font-normal"><button onClick={() => toggleSort('name')} className={thBtn}>标的{caret('name')}</button></th>
                 <th className="whitespace-nowrap px-2 py-2.5 font-normal text-right"><button onClick={() => toggleSort('close')} className={thBtn}>现价{caret('close')}</button></th>
                 <th className="whitespace-nowrap px-2 py-2.5 font-normal text-right"><button onClick={() => toggleSort('changePct')} className={thBtn}>涨跌{caret('changePct')}</button></th>
@@ -537,7 +586,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
             </thead>
             <tbody>
               {rows.length === 0 ? (
-                <tr><td colSpan={15} className="px-4 py-6 text-center text-muted">自选为空 —— 去自选页添加标的</td></tr>
+                <tr><td colSpan={16}   /* [R178] 加了「该动」列 */ className="px-4 py-6 text-center text-muted">自选为空 —— 去自选页添加标的</td></tr>
               ) : sortedRows.map((r) => {
                 const active = r.symbol === currentSymbol
                 const up = (r.changePct ?? 0) > 0
@@ -557,6 +606,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
                     {/* 点标的即切换分析(免搜索) */}
                     {/* [R157b] 当前个股整行常驻高亮 + 左侧一道靛蓝边: 搜索后先弹出关键价位
                         弹窗, 闪烁那 1.8 秒多半被弹窗盖住, 关掉弹窗还得一眼认得出它在哪 */}
+                    <UrgencyCell u={r.urg} />
                     <td className={`whitespace-nowrap px-4 py-2.5 border-l-2 ${active ? 'border-l-accent' : 'border-l-transparent'}`}>
                       {/* min-h 给整行一个下限: AI 信号列 1 行和 3 行的行高原来差一倍,
                           一屏扫下来参差得厉害。定住下限后只剩"多出来的那几行"的差异 */}

@@ -655,6 +655,19 @@ export interface StockReview {
 }
 
 /** 短期 MA20±2ATR / 中期 MA60±2.5ATR / 长期 MA120±3ATR */
+/** [R178] 决策台「该动了」判定。纯规则层产出, AI 不参与 —— 它只决定顺序, 不做判断。 */
+export interface Urgency {
+  /** triggered 已触发 > near 逼近 > flip 刚变盘 > band 到轨 > idle 无事 */
+  level: 'triggered' | 'near' | 'flip' | 'band' | 'idle'
+  label: string
+  /** 越小越急; 直接拿来排序, 前端不另编一套顺序 */
+  order: number
+  /** 促成这个档位的那个距离(绝对值, 小数); 同档内按它升序。无事档为 null */
+  distance: number | null
+  /** 为什么是这个档 —— 悬停显示, 用户得能追问"凭什么" */
+  reason: string
+}
+
 export interface KeltnerBands {
   s?: KeltnerBand
   m?: KeltnerBand
@@ -678,6 +691,10 @@ export interface TrendInfo {
   flip_down?: number | null
   /** [R29] 收盘站上即转强的价位 */
   flip_up?: number | null
+  /** [R178] 离翻转还有多远。口径与出场线 distance_pct 一致: (线−现价)/现价。
+   *  价位回答"到哪儿", 距离才回答"还有多急" —— 买点侧原来缺的就是这个数。 */
+  flip_down_distance_pct?: number | null
+  flip_up_distance_pct?: number | null
   /** [R29] 本轮高/低水位收盘价(上关键点在趋势态下就等于 leg_high) */
   leg_high?: number | null
   leg_low?: number | null
@@ -4435,6 +4452,11 @@ export const api = {
       `/api/stock-analysis/trends?symbols=${encodeURIComponent(symbols.join(','))}`),
 
   /** [R42] 批量 Keltner 三档位置(决策台短/中/长通道三列)。收盘口径, 与图表同一组公式 */
+  // [R178] 批量「该动了」判定 —— 决策台默认按它排序
+  stockUrgency: (symbols: string[]) =>
+    request<{ urgency: Record<string, Urgency> }>(
+      `/api/stock-analysis/urgency?symbols=${encodeURIComponent(symbols.join(','))}`),
+
   stockKeltner: (symbols: string[]) =>
     request<{ keltner: Record<string, KeltnerBands> }>(
       `/api/stock-analysis/keltner?symbols=${encodeURIComponent(symbols.join(','))}`),

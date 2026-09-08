@@ -134,6 +134,17 @@ def _load_symbol_window(repo, symbol: str) -> tuple[list[float], list[str]]:
 # 趋势查询
 # ================================================================
 
+def _distance_pct(line: float | None, close: float | None) -> float | None:
+    """(线 − 现价) / 现价。与 position_exit 同一口径, 两处必须一致 ——
+    决策台把出场线距离和翻转价距离摆在一起比, 口径不同就没法比。"""
+    try:
+        if line is None or not close:
+            return None
+        return round((float(line) - float(close)) / float(close), 4)
+    except (TypeError, ValueError, ZeroDivisionError):
+        return None
+
+
 def _trend_payload(closes: list[float], dates: list[str], threshold: float, source: str) -> dict:
     res = compute(closes, dates, threshold)
     last = res["last"]
@@ -157,6 +168,14 @@ def _trend_payload(closes: list[float], dates: list[str], threshold: float, sour
         # [R29] 翻转触发价 + 本轮高低水位: 趋势途中真正前瞻的价位(见 _flip_prices)
         "flip_down": last.get("flip_down"),
         "flip_up": last.get("flip_up"),
+        # [R178] 离翻转还有多远。**口径与 position_exit 的 distance_pct 完全一致**:
+        # (线 − 现价) / 现价, 所以 flip_down 通常为负(线在下方)、flip_up 为正。
+        #
+        # 补这两个数是因为一个不对称: 出场线一直有 distance_pct, 于是"该不该卖"
+        # 能按紧迫度排序、能盘中推送; 而翻转价只有价位没有距离, "该不该买"就只
+        # 剩一个静态数字, 自选一多就淹掉了。价位回答"到哪儿", 距离才回答"还有多急"。
+        "flip_down_distance_pct": _distance_pct(last.get("flip_down"), last["close"]),
+        "flip_up_distance_pct": _distance_pct(last.get("flip_up"), last["close"]),
         "leg_high": last.get("leg_high"),
         "leg_low": last.get("leg_low"),
         # [R30] 建仓/作废计划的锚: 进入当前状态那天的关键点, 不随新高漂移

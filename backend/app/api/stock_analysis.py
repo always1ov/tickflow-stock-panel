@@ -344,6 +344,50 @@ def get_keltner(request: Request, symbols: str = Query(..., description="逗号�
     return {"keltner": keltner_service.channels_for_symbols(request.app.state.repo, syms)}
 
 
+@router.get("/urgency")
+def get_urgency(request: Request, symbols: str = Query(..., description="逗号分隔,最多 300 只")):
+    """[R178] 批量「该动了」判定(决策台默认排序)。
+
+    返回 {urgency: {SYMBOL: {level, label, order, distance, reason}}}。
+
+    单独一个端点而不是塞进 /trends 或 /keltner: 判定要同时看仓位、趋势、出场线、
+    通道四样, 塞进任何一个都会让那个端点承担它不该有的依赖。这里用的全是既有的
+    批量函数, 数据都走各自的缓存。
+    """
+    syms = [s.strip() for s in symbols.split(",") if s.strip()][:300]
+    if not syms:
+        raise HTTPException(400, "symbols 不能为空")
+
+    from app.services import (
+        effective_positions, keltner_service, livermore_service,
+        position_exit, watchlist_urgency,
+    )
+    from app.services.live_quotes import as_live_entries, watchlist_live_map
+
+    repo = request.app.state.repo
+    # 任何一路取不到都不该让整张表失去排序 —— 缺的那一路当空处理, 判定会
+    # 自动降级到还能判的那些档
+    def _safe(fn, what: str, default):
+        try:
+            return fn()
+        except Exception as e:  # noqa: BLE001
+            logger.warning("urgency: %s unavailable (%s)", what, e)
+            return default
+
+    live = _safe(lambda: as_live_entries(watchlist_live_map(
+        repo, quote_service=getattr(request.app.state, "quote_service", None))),
+        "live quotes", {})
+    trends = _safe(lambda: livermore_service.trends_for_symbols(repo, syms, live=live),
+                   "trends", {})
+    keltner = _safe(lambda: keltner_service.channels_for_symbols(repo, syms),
+                    "keltner", {})
+    exits = _safe(lambda: position_exit.exit_lines_for_positions(repo), "exit lines", {})
+    positions = _safe(effective_positions.load_all, "positions", {})
+
+    return {"urgency": watchlist_urgency.assess_many(
+        syms, positions=positions, trends=trends, exit_lines=exits, keltner=keltner)}
+
+
 @router.get("/review")
 def get_review(request: Request, symbol: str = Query(...),
                days: int = Query(120, ge=10, le=250)):

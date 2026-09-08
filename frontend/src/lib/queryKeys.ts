@@ -86,6 +86,7 @@ export const QK = {
   stockTrend:           (symbol: string) => ['stock-trend', symbol] as const,
   stockTrends:          (symbols: string) => ['stock-trends', symbols] as const,
   stockKeltner:         (symbols: string) => ['stock-keltner', symbols] as const,
+  stockUrgency:         (symbols: string) => ['stock-urgency', symbols] as const,
   stockReview:          (symbol: string, days: number) => ['stock-review', symbol, days] as const,
   klineMinute:          (symbol: string, date: string) =>
                              ['kline-minute', symbol, date] as const,

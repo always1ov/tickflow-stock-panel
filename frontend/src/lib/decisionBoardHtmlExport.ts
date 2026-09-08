@@ -4,12 +4,23 @@
  * [R167] 从 WatchlistDecisionBoard.tsx 拆出。纯函数不碰 React, 与今日总览的
  * lib/todayHtmlExport.ts 同一模式: (行, 总数) → 一份可存档的 HTML 字符串。
  */
-import type { KeltnerBand, KeltnerBands, KeltnerVerdict, TrendInfo } from '@/lib/api'
+import type { KeltnerBand, KeltnerBands, KeltnerVerdict, TrendInfo, Urgency } from '@/lib/api'
 
 export type ExportRow = {
   symbol: string; name: string; close: number | null; changePct: number | null
   held: boolean; pnl: number | null
   trend?: TrendInfo; kc?: KeltnerBands
+  /** [R178] 该动了 —— 导出件里最该先看的一列, 排在最前面 */
+  urg?: Urgency
+}
+
+// [R178] 「该动了」的浅色配色。与 EXPORT_TONE 同一个理由: 导出件是浅色排版。
+const EXPORT_URGENCY: Record<Urgency['level'], string> = {
+  triggered: 'background:#fdecec;color:#c0392b;font-weight:600',
+  near: 'background:#fdf0e3;color:#c78326',
+  flip: 'background:#f3ecfd;color:#7b4fc0',
+  band: 'background:#e6f4fb;color:#1c6ea4',
+  idle: 'color:#b6bcc7',
 }
 
 const esc = (v: unknown) =>
@@ -32,6 +43,10 @@ export function buildBoardHtml(rows: ExportRow[], total: number): string {
     const v = r.kc?.verdict
     return `
       <tr>
+        <td>${r.urg && r.urg.level !== 'idle'
+          ? `<span class="tag" style="${EXPORT_URGENCY[r.urg.level]}" title="${esc(r.urg.reason)}">${esc(r.urg.label)}${
+              r.urg.distance != null ? ' ' + (r.urg.distance * 100).toFixed(1) + '%' : ''}</span>`
+          : '—'}</td>
         <td class="name"><b>${esc(r.name)}</b> <span class="sym">${esc(r.symbol)}</span></td>
         <td class="num">${r.close?.toFixed(2) ?? '—'}</td>
         <td class="num" style="color:${(r.changePct ?? 0) > 0 ? bull : (r.changePct ?? 0) < 0 ? bear : '#8a919f'}">${
@@ -79,13 +94,14 @@ export function buildBoardHtml(rows: ExportRow[], total: number): string {
   <h1>自选决策台 · 通道结论</h1>
   <div class="meta">导出 ${rows.length} 只(自选共 ${total} 只)· 生成于 ${esc(new Date().toLocaleString('zh-CN'))}</div>
   <div class="note">
-    只列出「结论」列有内容的标的 —— 三档通道都在中部的票没有位置信息, 不占篇幅。<br>
+    只列出<b>要动的</b>或「结论」列有内容的标的 —— 既没触发、三档通道又都在中部的票没有信息量, 不占篇幅。<br>
     通道口径:短期 MA20±2ATR / 中期 MA60±2.5ATR / 长期 MA120±3ATR,<b>收盘价</b>判定。<br>
-    结论说的是<b>位置</b>(贵不贵), 不是会不会继续涨。清仓与否看止盈线与生命线, 优先级在通道之上。
+    结论说的是<b>位置</b>(贵不贵), 不是会不会继续涨。清仓与否看止盈线与生命线, 优先级在通道之上。<br>
+    「该动」是纯规则判定(已触发 &gt; 逼近 &gt; 刚变盘 &gt; 到轨), <b>AI 不参与</b> —— 它只解释, 不决定先看谁。
   </div>
   <table>
     <thead><tr>
-      <th>标的</th><th class="num">现价</th><th class="num">涨跌</th><th>仓位</th>
+      <th>该动</th><th>标的</th><th class="num">现价</th><th class="num">涨跌</th><th>仓位</th>
       <th class="num">浮盈</th><th>趋势</th>
       <th>短通道</th><th>中通道</th><th>长通道</th><th>结论</th><th>怎么办</th>
     </tr></thead>
