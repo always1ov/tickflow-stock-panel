@@ -488,10 +488,16 @@ export function Today() {
               </span>
               <span className="text-[10px] text-muted">
                 {d.opportunities.length} 项 ·{' '}
-                <span title="把握分 v2 = 趋势强度 45% + 量能确认 30% + 位置成本 25%,先过三道硬门槛才打分。三条曲线都是区间最优(量比峰在 1.3~2.5、通道位置甜区 50%~65%),不是越大越好 —— 要的是有苗头,不是已经涨完的">
-                  把握分 ≥ {d.prefs.min_score} 才显示
+                <span title={'把握分 = √(质地 × 时机) × 置信,先过四道硬门槛才打分。\n'
+                  + '质地(月计变化): 趋势模板 / 磨底节拍 / 相对强度 / 六态状态 / 三线间距\n'
+                  + '时机(逐日变化): 新鲜度 / 通道位置 / 量比 / 换手率 / 快慢变化\n'
+                  + '曲线全是区间最优(量比峰在 1.3~2.5、通道位置甜区 50%~65%),不是越大越好 —— 要的是有苗头,不是已经涨完的。\n\n'
+                  + '注意: 分数的实际取值挤在 65~82 这一段(十个因子平均出来的必然结果),'
+                  + '所以这个门槛拖到 85 会一只都不剩 —— 真正该看的是名次那一列。'
+                  + '够格的不足 3 只时会保底摆出几只并标明「没到门槛」,页面不会空。'}>
+                  把握分 ≥ {d.prefs.min_score} 才算够格
                 </span>
-                {d.opportunities_filtered > 0 && `(已滤掉 ${d.opportunities_filtered} 只)`}
+                {d.opportunities_filtered > 0 && `(${d.opportunities_filtered} 只没够上)`}
                 {boardFilter.length > 0 && (
                   <span
                     className="text-sky-300"
@@ -768,9 +774,15 @@ export function Today() {
             )}
             <GateFunnel gates={d.gates} />
             {d.opportunities.length === 0 ? (
-              <div className="px-4 py-5 text-xs text-muted">
-                今日没有把握足够的买入机会 —— 等待比出手更常见
-                {d.opportunities_filtered > 0 && `(有 ${d.opportunities_filtered} 只信号把握不足,已替你滤掉)`}
+              /* [R201] 走到这里只剩一种情形: **候选池本身是空的** ——
+                 一只票都没进来, 保底也没得保。门槛再松也变不出候选,
+                 所以这句话要说的是"今天没有可看的", 不是"我替你滤掉了"。 */
+              <div className="px-4 py-5 text-xs leading-relaxed text-muted">
+                今天没有一只票走到可以看的位置 —— 等待比出手更常见。
+                <span className="ml-1 text-muted/70">
+                  (候选要么是六态当天转多/回升,要么已经贴到买点,要么通道正憋着劲;
+                  三条路今天一条都没人走到)
+                </span>
               </div>
             ) : (
               <OpportunityTable

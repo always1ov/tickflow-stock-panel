@@ -48,27 +48,44 @@ const NOTE_TONE: Record<string, string> = {
   info: 'bg-border/50 text-muted',
 }
 
-/** 把握分 + 两轴分解条。分数本身不再是黑箱 —— 条的形状就是理由。 */
+/**
+ * [R201] 「今天该看哪几只」这一格 —— **名次在前, 分数退到副位**。
+ *
+ * 为什么改: 把握分是五个因子加权平均再取几何平均, 而"平均"这件事本身就把
+ * 取值挤向中间 —— 实测 p10~p90 只有 17 分(65~82)。于是 68 分这个数字对用户
+ * **没有可读的含义**: 它既不是"及格", 也说不清是今天的第几档。名次和分位
+ * 没有这个毛病, 它们天然是相对的, 一眼就知道该不该往下看。
+ *
+ * 分数仍然显示(台账要它做跨日比较, 用户也需要能核对), 只是不再当主角。
+ */
 function ScoreCell({ o, rank, total }: { o: TodayOpportunity; rank: number; total: number }) {
   const axes = o.axes
   const detail = AXIS_META
     .map(d => `${d.cn} ${axes?.[d.key] ?? '无数据'} — ${d.what}`)
     .join('\n')
   const verdict = axisVerdict(axes?.quality, axes?.timing)
+  const pct = o.pct_rank != null ? Math.round((1 - o.pct_rank) * 100) : null
   return (
     <span
-      className="inline-flex w-11 shrink-0 flex-col items-center gap-1"
-      title={`把握分 ${o.score} = √(质地 × 时机) —— 今日候选里排第 ${rank}/${total}\n\n${detail}\n\n`
+      className="inline-flex w-14 shrink-0 flex-col items-center gap-1"
+      title={`今日候选里排第 ${rank}/${total}`
+        + (pct != null ? `(前 ${Math.max(1, pct)}%)` : '')
+        + `\n把握分 ${o.score} = √(质地 × 时机) × 置信\n\n${detail}\n\n`
         + (verdict ? `${verdict}\n\n` : '')
-        + (o.partial
-          ? '⚠ 有因子缺数据,总分是在剩下的因子上算的,偏乐观'
+        + (o.confidence != null && o.confidence < 0.999
+          ? `⚠ 只读到了 ${(o.confidence * 100).toFixed(0)}% 的因子,分数已按这个比例打折 —— `
+            + '缺数据不判你坏, 但也不让你因此占便宜'
           : '两根轴的因子都齐全')}
     >
-      <span className="font-mono text-[11px] font-semibold leading-none">
-        <span className={o.score >= 80 ? 'text-danger' : o.score >= 60 ? 'text-warning' : 'text-muted'}>
-          {o.score}
-        </span>
-        {o.partial && <span className="text-[9px] text-warning">*</span>}
+      <span className="font-mono text-[12px] font-semibold leading-none text-foreground">
+        {rank}
+        <span className="text-[9px] font-normal text-muted">/{total}</span>
+      </span>
+      <span className="font-mono text-[9px] leading-none text-muted">
+        {o.score}
+        {o.confidence != null && o.confidence < 0.999 && (
+          <span className="text-warning" title="有因子没读到, 分数已打折">*</span>
+        )}
       </span>
       <span className="w-full space-y-[2px]">
         {AXIS_META.map(d => {
@@ -210,8 +227,12 @@ export function OpportunityTable({ rows, pickedSymbols, onOpen, live }: {
         <thead>
           <tr className="border-b border-border/40 text-[10px] text-muted">
             <th className="w-14 px-3 py-1.5 text-center font-normal"
-                title="把握分 = √(质地 × 时机)。质地=长周期结构(趋势模板/磨底节拍/相对强度/六态),以月计变化;时机=今天是不是那一天(新鲜度/通道位置/量比/换手),逐日变化。一边好一边差不会被平均成中等 —— 下面两条细条就是这两根轴的得分。">
-              把握
+                title={'上面那个是今天的名次, 下面那个小字才是把握分。\n\n'
+                  + '把握分 = √(质地 × 时机) × 置信。质地=长周期结构(趋势模板/磨底节拍/相对强度/六态/三线间距), 以月计变化;'
+                  + '时机=今天是不是那一天(新鲜度/通道位置/量比/换手/快慢变化), 逐日变化。一边好一边差不会被平均成中等 —— 两条细条就是这两根轴。\n\n'
+                  + '为什么名次在前: 把握分是十个因子平均出来的, 实际取值挤在 65~82 这一段, '
+                  + '「68 分」本身读不出好坏; 名次和分位是相对的, 一眼就知道该不该往下看。'}>
+              名次
             </th>
             <th className="px-2 py-1.5 text-left font-normal">名称</th>
             <th className="px-2 py-1.5 text-left font-normal">信号</th>
@@ -243,10 +264,24 @@ export function OpportunityTable({ rows, pickedSymbols, onOpen, live }: {
           {rows.map((o, i) => {
             const picked = pickedSymbols.has(o.symbol)
             const expanded = open === o.symbol
+            // [R201] 保底行的分界线 —— 从这一行起都是"没到你门槛的"。
+            // 摆一条明确的界, 而不是让它们混在够格的里面: 页面永远不空是
+            // 一回事, 让人误以为它们够格是另一回事。
+            const firstBelow = o.below_bar && !rows[i - 1]?.below_bar
             return (
               <Fragment key={o.symbol}>
+                {firstBelow && (
+                  <tr>
+                    <td colSpan={live ? 11 : 10}
+                        className="border-y border-dashed border-warning/30 bg-warning/[0.05] px-3 py-1.5 text-[10px] leading-relaxed text-warning/90">
+                      以下没到你的把握分门槛,是矮子里拔高个 —— 摆出来是为了让你知道
+                      今天最好的也就这样,不是推荐。真要动手,先想清楚为什么今天非做不可。
+                    </td>
+                  </tr>
+                )}
                 <tr
                   className={cn('group border-b border-border/25 transition-colors duration-hover',
+                    o.below_bar && 'opacity-70',
                     picked ? 'bg-amber-400/[0.07]' : 'hover:bg-elevated/40')}
                 >
                   <td className="px-3 py-2 text-center align-top">
@@ -589,7 +624,7 @@ function OpportunityDetail({ o, live }: { o: TodayOpportunity; live?: boolean })
                 </div>
               )}
               <div className="mt-1 text-[9px] text-muted/70">
-                眼下价格离各自中线:短 {o.geo.d.s.toFixed(1)} / 中 {o.geo.d.m.toFixed(1)} / 长 {o.geo.d.l.toFixed(1)} 倍日常波动
+                眼下价格离各自中线:短期 {o.geo.d.s.toFixed(1)} / 中期 {o.geo.d.m.toFixed(1)} / 长期 {o.geo.d.l.toFixed(1)} 倍日常波动
                 (正的偏贵、负的偏便宜)。三档用的是同一把尺子, 所以可以直接相减。
               </div>
             </div>

@@ -45,6 +45,15 @@ _NEAR_BREAKOUT_PCT = 0.02
 # 多看 5 条才有意义; 用户也明确要"只显示前 15 个"。
 _OPP_MIN_SCORE = 60
 _OPP_MAX_SHOW = 15
+# [R201] 候选路 C 认的两个阶段: 憋着劲(挤在一起) / 刚分开。
+# 不收 advancing —— 那已经在走了, 属于"错过了", 不是"有苗头"。
+_COILING_PHASES = ("coiling", "launching")
+_BULLISH = ("UT", "NR", "SR")
+
+# [R201] 保底条数 —— 够格的不足这个数时, 从排序里补齐并标 below_bar。
+# 取 3 而不是 1: 一只票没有比较对象, 看不出它是「今天最好的」还是
+# 「今天只剩它」; 也不取 5, 熊市里凑五只等于在鼓励硬做。
+FLOOR_ROWS = 3
 # [R12] 姿态 → 总仓位基调(占总资金比例上限, 展示用基调而非强制)
 POSTURE_CAPS = {"进攻": 0.8, "谨慎": 0.5, "防守": 0.2, "观察": 0.3}
 # 把握分 → 单票仓位系数(相对单票上限; 取自 AI-TIS PRD 6.4 的映射思路)
@@ -173,6 +182,37 @@ def score_opportunities(
                                  f"{gap * 100:.1f}% — 到价{p.get('action') or '关注'}")
                 break
 
+    # ---- 候选路 C: 通道憋着劲 / 刚走出来 ----
+    #
+    # [R201] 前两条路都要求**今天有事发生** —— 路 A 要六态当天转多或回升,
+    # 路 B 要现价已经贴到买点 2% 以内。熊市里这两件事可以连着好几天一件都没有,
+    # 于是候选池整个是空的, 页面自然也是空的。**那不是门槛太严, 是压根没人进来** ——
+    # 这是"今日总览没有任何个股"最常见的一种成因, 靠调门槛永远修不好。
+    #
+    # 这条路问的是另一个问题: 「谁正在酝酿」。三条线挤在一起(憋着劲)或者刚刚
+    # 走出来(刚分开), 而六态还在多头侧 —— 这正是用户一直要的"有苗头"那一批,
+    # 它**不依赖当天发不发信号**, 所以熊市里也不会整批消失。
+    #
+    # 原料是 keltner 那趟批量已经算好挂在 bands 上的 geo/runs, **零新增取数**。
+    for sym, e in ex.items():
+        if sym in cands or sym not in names:
+            continue
+        t = trends.get(sym) or {}
+        if t.get("state") not in _BULLISH:
+            continue
+        kc = e.get("bands") or {}
+        if not kc.get("geo"):
+            continue
+        try:
+            ph = _kg.phase(kc.get("geo"), kc.get("runs"))
+        except Exception:  # noqa: BLE001
+            continue
+        if not ph or ph["code"] not in _COILING_PHASES:
+            continue
+        c = _cand(sym)
+        c["kinds"].append("coiling")
+        c["text"] = f"{ph['cn']}:{ph['why']}"
+
     # ---- 门槛 → 打分 → 注记 ----
     from app.price_limits import board_of
 
@@ -243,7 +283,7 @@ def score_opportunities(
         res = osc.score_candidate(
             duration=c["duration"], state=t.get("state"), rs_pct=rs_pct,
             vol_ratio=vr, turnover_rate=turn, channel_pct=cpct,
-            near_breakout=c["near_breakout"],
+            near_breakout=c["near_breakout"], coiling="coiling" in c["kinds"],
             template=tpl, rhythm=t.get("rhythm"), geo=geo, runs=kc.get("runs"))
 
         close = t.get("close") or (signals.get(sym) or {}).get("close")
@@ -266,6 +306,9 @@ def score_opportunities(
             "score": res["score"],
             "axes": res["axes"], "factors": res["factors"],
             "coverage": res["coverage"], "partial": res["partial"],
+            # [R201] 置信系数 —— 排序里"这只票我们到底读到了多少"那一层。
+            # 摆在明面上而不是藏进 ctx: 它**真的乘进了分数**, 用户有权看见。
+            "confidence": res["confidence"],
             "fresh_from": res["fresh_from"],
             "text": c["text"], "pivot": c["pivot"], "close": close,
             "gap_pct": gap_pct, "vol_ratio": vr, "turnover": turn,
@@ -345,6 +388,21 @@ def score_opportunities(
     # 最后才用代码保证确定性(同一份数据每次刷新顺序不变)。
     out.sort(key=lambda o: (-o["score"], bool(o["partial"]),
                             -(o["axes"].get("quality") or 0), o["symbol"]))
+    # [R201] 名次与分位。**把握分的绝对值不该当筛选旋钮用** —— 它是五个因子的
+    # 加权平均再取几何平均, 而"平均"这件事本身就把取值挤到中间一段: 实测
+    # p10~p90 只有 17 分(65~82), 连纯随机满量程因子合成出来也只有 24 分。
+    # 所以 60 分这个门槛实际只挡掉 1.6% 的候选, 用户以为在调筛选强度, 其实
+    # 那个旋钮几乎没作用。
+    #
+    # 名次和分位没有这个毛病 —— 它们天然是**相对**的: 熊市里前 20% 仍然有票,
+    # 牛市里前 20% 自动收紧。绝对分保留(台账要它做跨日比较), 但界面上的
+    # "今天该看哪几只"改由分位回答。
+    n = len(out)
+    for i, o in enumerate(out):
+        o["rank"] = i + 1
+        o["rank_total"] = n
+        # 分位: 1.0 = 今天最好的那只, 0.0 = 最后一名。单只候选时给 1.0。
+        o["pct_rank"] = round(1.0 - (i / (n - 1)), 3) if n > 1 else 1.0
     return out, {"candidates": len(cands), "passed": len(out),
                  "blocked_total": blocked_total, "blocked": blocked}
 
@@ -457,9 +515,24 @@ def filter_opportunities(
     if boards:
         keep = set(boards)
         ranked = [o for o in ranked if o.get("board") in keep]
-    shown = [dict(o, why=" · ".join(o["why"]))
-             for o in ranked if o["score"] >= min_score][:max_show]
-    return shown, len(ranked) - len(shown)
+    passed = [o for o in ranked if o["score"] >= min_score]
+    # [R201] **保底条数** —— 用户: 「筛选标准不能过严导致今日总览页面无任何个股
+    # 显示」。这一条不能靠"把门槛调低"来满足: 门槛调低了牛市又会糊一屏, 而且
+    # 任何一个**绝对**阈值在牛熊两头都不可能同时合适。
+    #
+    # 所以门槛的语义保持不变(它仍然表示"够格"), 另外加一条保底: 够格的不足
+    # FLOOR_ROWS 条时, 从排序里补齐, 补进来的每条打上 `below_bar` ——
+    # 界面据此说明白"这几只没到你的门槛, 是矮子里拔高个"。
+    #
+    # 这样页面永远不空, 而"今天没有够格的票"这个**事实本身**也没有被掩盖 ——
+    # 那正是熊市里最该让人看见的一句话。
+    shown_src = passed if len(passed) >= FLOOR_ROWS else ranked[:max(FLOOR_ROWS, len(passed))]
+    bar = {id(o) for o in passed}
+    shown = [dict(o, why=" · ".join(o["why"]), below_bar=id(o) not in bar)
+             for o in shown_src][:max_show]
+    # 「已滤掉 N 只」始终是**没过把握分门槛**的条数, 与保底补进来几条无关 ——
+    # 保底是展示策略, 门槛是判定, 两件事不能混进同一个数字里。
+    return shown, len(ranked) - len(passed)
 
 
 def rank_opportunities(

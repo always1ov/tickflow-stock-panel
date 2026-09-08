@@ -76,7 +76,9 @@ def test_threshold_actually_changes_what_is_shown():
     strict, strict_filtered = rank_opportunities(trends, {}, names, min_score=80, max_show=50)
     assert len(strict) < len(loose)
     assert strict_filtered > loose_filtered
-    assert all(o["score"] >= 80 for o in strict)
+    # [R201] 保底行(below_bar)是刻意补进来的"矮子里拔高个", 不受门槛约束 ——
+    # 要检验的是**够格的那些**确实都在门槛之上。
+    assert all(o["score"] >= 80 for o in strict if not o["below_bar"])
 
 
 def test_max_show_caps_list():
@@ -84,4 +86,7 @@ def test_max_show_caps_list():
     trends = {s: _trend(1) for s in names}
     shown, filtered = rank_opportunities(trends, {}, names, min_score=0, max_show=3)
     assert len(shown) == 3
-    assert filtered == 5
+    # [R201] `filtered` 现在只数**没过把握分门槛**的 —— 与它在界面上的说法
+    # (「有 N 只信号把握不足, 已替你滤掉」)对上了。被 max_show 截掉的不是
+    # "把握不足", 两件事混进同一个数字, 用户读到的就是个错的理由。
+    assert filtered == 0

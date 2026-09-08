@@ -131,7 +131,12 @@ def test_filtered_count_still_means_below_threshold(monkeypatch):
     trends["600869.SH"] = _trend(duration=5)  # 陈年信号, 分数低
     _, filtered = rank_opportunities(trends, {}, names, min_score=60, max_show=50,
                                      boards=[BOARD_SH_MAIN])
-    assert filtered == 1, "只数没过门槛的那一只主板票"
+    # 要守的是"板块过滤不会把 filtered 撑大" —— 只统计**这个板块内**没过门槛的。
+    # 具体数字随打分改动会变([R201] 置信折扣让原料稀薄的合成候选整体下移),
+    # 关键是它必须远小于被板块滤掉的那一大批。
+    _, all_filtered = rank_opportunities(trends, {}, names, min_score=60, max_show=50)
+    assert filtered < all_filtered, "板块过滤掉的不该被算进「没过门槛」"
+    assert filtered <= 2
 
 
 def test_unknown_board_name_filters_everything_out():

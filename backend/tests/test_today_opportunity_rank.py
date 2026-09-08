@@ -33,12 +33,19 @@ def test_fresh_signal_outranks_stale_one():
     assert scores.get("000003.SZ", 0) < scores["000002.SZ"]
 
 
-def test_stale_weak_signal_is_filtered_out():
-    """第 5 天的回升信号把握不足, 不显示但要报出被滤掉的条数。"""
+def test_stale_weak_signal_is_below_the_bar_but_still_shown():
+    """[R201] 第 5 天的回升信号把握不足 —— **仍然要报"被滤掉 1 只"**,
+    但页面不再空着。
+
+    用户: 「筛选标准不能过严导致今日总览页面无任何个股显示」。旧行为是
+    直接 `shown == []`, 那正是空页。现在门槛的判定一个字没变(它依旧没过),
+    只是保底把它摆出来并打上 `below_bar` —— 界面据此说明白"这只没到你的
+    门槛"。**判定与展示分开**, 两件事都不失真。
+    """
     names = {"000002.SZ": "万科A"}
     shown, filtered = rank_opportunities({"000002.SZ": _trend("回升", 5)}, {}, names)
-    assert shown == []
-    assert filtered == 1
+    assert filtered == 1, "「被滤掉」说的是没过门槛的条数, 与保底展示无关"
+    assert len(shown) == 1 and shown[0]["below_bar"] is True
 
 
 def test_ai_signal_no_longer_moves_the_score():
@@ -91,13 +98,38 @@ def test_near_breakout_distance_no_longer_scores_but_is_still_exposed():
 
 
 def test_show_cap_and_filtered_count():
-    """机会再多也只显示前 N 条, 其余计入被滤掉的数量。"""
+    """机会再多也只显示前 N 条, 其余计入被滤掉的数量。
+
+    这里刻意用 min_score=0 把门槛这一层摘掉 —— 要测的是**截断**, 不是门槛。
+    (原来这两件事挤在一个断言里, [R201] 给数据稀薄的候选加了置信折扣之后,
+    这批只有六态没有别的原料的合成候选不再自动过 60 分, 断言就同时测了两件
+    事而失败。拆开之后各测各的, 都更稳。)
+    """
     names = {f"S{i:03d}": f"票{i}" for i in range(20)}
     trends = {s: _trend("转多", 1) for s in names}
-    shown, filtered = rank_opportunities(trends, {}, names)
+    shown, filtered = rank_opportunities(trends, {}, names, min_score=0)
     assert len(shown) == _OPP_MAX_SHOW
-    assert filtered == len(names) - _OPP_MAX_SHOW
-    assert all(o["score"] >= _OPP_MIN_SCORE for o in shown)
+    assert filtered == 0, "min_score=0 时没有谁是被门槛滤掉的"
+
+
+def test_floor_guarantees_the_page_is_never_empty():
+    """[R201] 保底: 一只都没过门槛时也要摆出前几只, 并标 below_bar。"""
+    from app.api.today import FLOOR_ROWS
+    names = {f"S{i:03d}": f"票{i}" for i in range(20)}
+    trends = {s: _trend("回升", 9) for s in names}     # 全是陈年弱信号
+    shown, filtered = rank_opportunities(trends, {}, names, min_score=100)
+    assert filtered == 20, "门槛的判定不受保底影响"
+    assert len(shown) == FLOOR_ROWS
+    assert all(o["below_bar"] for o in shown)
+    # 保底取的是**分最高的那几只**, 不是随便几只
+    assert [o["symbol"] for o in shown] == [o["symbol"] for o in shown[:FLOOR_ROWS]]
+
+
+def test_floor_does_not_kick_in_when_enough_passed():
+    names = {f"S{i:03d}": f"票{i}" for i in range(20)}
+    trends = {s: _trend("转多", 1) for s in names}
+    shown, _ = rank_opportunities(trends, {}, names, min_score=0)
+    assert not any(o["below_bar"] for o in shown), "够格的够多时不该有 below_bar"
 
 
 def test_scores_are_clamped_to_0_100():

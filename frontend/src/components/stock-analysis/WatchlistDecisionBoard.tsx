@@ -601,11 +601,11 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
                     onClick={() => toggleSort(sort.key === 'ks' ? 'km' : sort.key === 'km' ? 'kl' : 'ks')}
                     className={thBtn}
                     title={'量化波动通道 —— 同一个指标在短/中/长三个尺度上的读数, 竖排三行。\n'
-                      + '点这里在 短 → 中 → 长 之间轮换排序目标, 再点同一个翻方向。'}
+                      + '点这里在 短期 → 中期 → 长期 之间轮换排序目标, 再点同一个翻方向。'}
                   >
                     量化通道
                     {(['ks', 'km', 'kl'] as const).includes(sort.key as 'ks')
-                      && <span className="ml-1 text-accent">{{ ks: '短', km: '中', kl: '长' }[sort.key as 'ks' | 'km' | 'kl']}{caret(sort.key)}</span>}
+                      && <span className="ml-1 text-accent">{{ ks: '短期', km: '中期', kl: '长期' }[sort.key as 'ks' | 'km' | 'kl']}{caret(sort.key)}</span>}
                   </button>
                 </th>
                 <th className="whitespace-nowrap px-1.5 py-2.5 font-normal text-center"><button onClick={() => toggleSort('verdict')} className={thBtn} title="三档组合的结论。排序把「该减的」和「该吸的」分到两头:降序=偏卖在前, 升序=偏买在前">结论{caret('verdict')}</button></th>

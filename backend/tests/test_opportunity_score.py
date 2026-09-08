@@ -221,7 +221,11 @@ def test_whole_axis_missing_falls_back_to_the_other_one():
                             turnover_rate=5.0, channel_pct=0.56, geo=None)
     assert r["axes"]["quality"] is None
     assert r["partial"] is True          # 界面必须说清楚这一档没算进去
-    assert r["score"] == round(r["axes"]["timing"])
+    # [R201] 分数仍由活着的那根轴给出, 只是按覆盖率打了个折(见 confidence())。
+    # 关键是它**没有变成 0** —— 那才叫"缺数据的票凭空消失"。
+    assert r["score"] > 0
+    assert r["score"] == round(r["axes"]["timing"] * r["confidence"])
+    assert 0.8 < r["confidence"] < 1.0, "整根轴缺席只该温和打折, 不该腰斩"
 
 
 def test_full_coverage_is_not_partial():
@@ -399,7 +403,7 @@ def test_ties_break_on_quality_not_on_alphabet():
     # 两只时机完全一样, 只有磨底长短不同 —— 分数四舍五入后打平, 质地不同。
     # 代码字典序上 A 在前, 但 Z 磨得更久(质地更高), 必须排在 A 前面。
     trends = {
-        "AAA.SH": dict(base_t, rhythm={"level": "building", "basing": {"days": 60}}),
+        "AAA.SH": dict(base_t, rhythm={"level": "building", "basing": {"days": 72}}),
         "ZZZ.SH": dict(base_t, rhythm={"level": "building", "basing": {"days": 90}}),
     }
     ranked, _ = score_opportunities(
@@ -455,3 +459,112 @@ def test_sort_is_deterministic_across_calls():
     a = [o["symbol"] for o in score_opportunities(trends, {}, names, 0.02, ex)[0]]
     b = [o["symbol"] for o in score_opportunities(trends, {}, names, 0.02, ex)[0]]
     assert a == b
+
+
+# ================================================================
+# [R201] 置信系数 —— 「缺数据不该反而排在前面」
+#
+# 这一组守的是一个**实测出来的**缺陷, 不是假想: v2 里同样条件下, 只有
+# state+fresh 两个因子的票拿 100 分排第 1, 而十个因子全齐的同类票只有 82。
+# `partial` 那个标记只在同分时参与排序, 挡不住这件事。
+
+
+def _sparse():
+    """只有六态和新鲜度 —— 别的一概读不到。"""
+    return osc.score_candidate(duration=1, state="UT", rs_pct=None, vol_ratio=None,
+                               turnover_rate=None, channel_pct=None,
+                               template=None, rhythm=None, geo=None, runs=None)
+
+
+def test_数据稀薄的票不再排在因子齐全的同类票前面():
+    sparse = _sparse()
+    full = osc.score_candidate(duration=1, state="UT", rs_pct=4.0, vol_ratio=1.5,
+                               turnover_rate=3.0, channel_pct=0.60,
+                               template={"passed": 6, "known": 8, "total": 8},
+                               rhythm={"level": "none", "basing": {"days": 10}},
+                               geo={"spread": 1.5, "accel": {"a1": 0.05}},
+                               runs={"compress_days": 8})
+    # 稀薄那只两根轴都是满分(因为只剩两个满分因子), 齐全那只反而不是
+    assert sparse["axes"]["quality"] == 100.0 and sparse["axes"]["timing"] == 100.0
+    assert full["axes"]["quality"] < 100.0
+    # 可它就是不该排在前面 —— v2 里 100 vs 82, 现在必须反过来
+    assert sparse["score"] < full["score"], (
+        f"稀薄 {sparse['score']} 仍然压过齐全 {full['score']}")
+
+
+def test_两轴齐全时置信系数恰好是一不引入任何偏移():
+    r = _s()
+    assert r["coverage"] == {"quality": 1.0, "timing": 1.0}
+    assert r["confidence"] == 1.0
+    assert r["score"] == round((r["axes"]["quality"] * r["axes"]["timing"]) ** 0.5)
+
+
+def test_缺一个因子只是温和打折不是惩罚():
+    """「不因为我们没读到就惩罚这只票」那条纪律必须还在 —— 缺一个因子
+    掉的分要小到无感, 只有缺掉大半时才该显著掉队。"""
+    one_missing = osc.confidence(1.0, 1 - osc.TIMING_WEIGHTS["turnover"])
+    assert one_missing > 0.97, f"缺一个因子就扣 {(1-one_missing)*100:.0f}% —— 太狠"
+    almost_nothing = osc.confidence(0.1275, 0.2635)
+    assert almost_nothing < 0.5, "只剩两个因子还几乎不打折, 那就没修到"
+
+
+def test_置信系数单调不减且封顶在一():
+    prev = -1.0
+    for c in (0.05, 0.2, 0.4, 0.6, 0.8, 0.95, 1.0):
+        got = osc.confidence(c, c)
+        assert got >= prev, "覆盖率更高反而置信更低, 方向反了"
+        assert 0.0 <= got <= 1.0
+        prev = got
+    assert osc.confidence(1.0, 1.0) == 1.0
+    assert osc.confidence(0.0, 0.0) == 0.0
+
+
+def test_整根轴缺席时只按活着的那根算():
+    """否则"质地整根读不到"的票会被乘成 0 分凭空消失 —— 那是另一个方向的错。"""
+    only_timing = osc.confidence(0.0, 1.0)
+    assert only_timing == 1.0, "活着那根是满的, 就不该因为另一根缺席而打折"
+
+
+def test_满分仍然拿得到():
+    """置信系数不能把天花板压下来 —— 因子都到峰值且都读到了就是 100。"""
+    best = osc.score_candidate(duration=1, state="UT", rs_pct=14.0, vol_ratio=1.8,
+                               turnover_rate=5.0, channel_pct=0.58,
+                               template=_TPL_FULL, rhythm=_RHY_FULL,
+                               geo={"spread": 2.5, "accel": {"a1": 0.12}})
+    assert best["confidence"] == 1.0 and best["score"] == 100
+
+
+# ---------------------------------------------- [R201] 候选路 C 的新鲜度
+
+
+def test_憋着劲那一路拿到的是中性新鲜度而不是高分():
+    """路 C 比"逼近触发价"更早一步: 那边价格已经贴到买点了, 这边连方向都
+    还没出来。所以它只该拿中性那一档, 不能靠"我最早"排到前面去。"""
+    r = osc.score_candidate(duration=None, state="UT", rs_pct=6.0, vol_ratio=1.6,
+                            turnover_rate=5.0, channel_pct=0.56, coiling=True)
+    assert r["factors"]["fresh"] == osc.FRESH_COILING
+    assert r["fresh_from"] == "coiling"
+    assert osc.FRESH_COILING < osc.FRESH_NEAR_BREAKOUT < 100
+
+
+def test_有信号时信号的新鲜度优先于憋着劲():
+    """两条路都成立时该按信号算 —— 信号是更确定的那个。"""
+    r = osc.score_candidate(duration=1, state="UT", rs_pct=6.0, vol_ratio=1.6,
+                            turnover_rate=5.0, channel_pct=0.56, coiling=True)
+    assert r["fresh_from"] == "signal" and r["factors"]["fresh"] == 100
+
+
+# ---------------------------------------------- [R201] 中性锚点
+
+
+def test_所有无信息的取值都锚在中性五十():
+    """v2 里"没读到/没发生"的默认值散在 55~60, 于是每只票的底子都被垫高了
+    一截, 合成分整体上移、区分度更窄。统一锚到 50: 无信息就是无信息。"""
+    assert osc._piecewise(0.0, osc.RS_CURVE) == 50            # 与大盘同步
+    assert osc._piecewise(0.0, osc.ACCEL_CURVE) == 50         # 速度没变
+    assert osc._piecewise(0.5, osc.SPREAD_CURVE) == 50        # 方向还没出来
+    assert osc.RHYTHM_SCORE["none"] == 50                     # 没有循环
+    assert osc.BASING_DAYS_NEUTRAL == 50
+    assert osc._piecewise(0.0, osc.BASING_DAYS_CURVE) == 50
+    # 震荡是**负面信息**, 必须低于"无信息"; 蓄势必须高于
+    assert osc.RHYTHM_SCORE["choppy"] < 50 < osc.RHYTHM_SCORE["building"]

@@ -242,6 +242,15 @@ export interface TodayOpportunity {
   channel_event?: ChannelEvent | null
   /** [R200] 现在处在哪一段 + 该盯什么 */
   channel_phase?: ChannelPhase | null
+  /** [R201] 今日名次(1 = 最好)与候选总数 —— 界面主显它们, 不再主显裸分 */
+  rank?: number
+  rank_total?: number
+  /** [R201] 分位: 1.0 = 今天最好的那只, 0.0 = 最后一名 */
+  pct_rank?: number
+  /** [R201] 置信系数 0~1 —— 因子读到了几成, 已经乘进 score 里 */
+  confidence?: number
+  /** [R201] 保底行: 没过把握分门槛, 是为了让页面不空才摆出来的 */
+  below_bar?: boolean
   /** [R195/R197] 压缩持续天数、平均压缩度、在轨外连续天数 */
   runs?: ChannelRuns | null
   /** [R197] 频段能量分布 */

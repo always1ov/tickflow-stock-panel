@@ -123,7 +123,11 @@ def test_score_opportunities_keeps_sub_threshold_candidates():
                         "vol_ratio": 0.5, "turnover": 0.3}}
     full, _ = score_opportunities(trends, {}, names, extras=ex)
     shown, _ = rank_opportunities(trends, {}, names, extras=ex)
-    assert len(full) == 2 and len(shown) == 1
+    assert len(full) == 2
+    # [R201] 保底会把没过门槛的那只也摆出来, 但**打上 below_bar** ——
+    # 台账要的"完整列表"与界面要的"哪几只够格"仍然分得干干净净。
+    assert len(shown) == 2
+    assert [o["below_bar"] for o in shown] == [False, True]
     assert min(o["score"] for o in full) < 60
 
 
@@ -144,15 +148,33 @@ def test_no_clamp_is_needed_in_v2():
     """v1 的理论上限 151 被夹到 100, 榜首一片并列; v2 满分只能靠三维都到峰值。"""
     names = {"600001.SH": "测试"}
     full, _ = score_opportunities(
-        {"600001.SH": _trend(dur=1, ret_20d=0.16)},
+        # [R201] 满分要求两根轴的因子都读到 —— 红绿节拍也得喂上, 否则质地
+        # 覆盖率不满, 置信系数会把满分削掉一角(那正是本版要的行为)。
+        {"600001.SH": dict(_trend(dur=1, ret_20d=0.16),
+                           rhythm={"level": "building", "basing": {"days": 120}})},
         {"600001.SH": {"signal": "buy", "confidence": 90}}, names, bench_ret=0.02,
         extras={"600001.SH": {"gate": dict(_GATE_OK), "channel_pct": 0.58,
                               "vol_ratio": 1.8, "turnover": 5.0,
+                              # [R201] 满分现在还要求"因子都读到了"(置信系数),
+                              # 缺通道几何就不是满分 —— 那正是这一版要修的
+                              # 「缺数据反而排在前面」。
+                              "bands": {"geo": {"spread": 2.5,
+                                                "accel": {"a1": 0.12}},
+                                        "runs": {"compress_days": 120}},
                               "win": {"rate": 0.8, "n": 10},
                               "mainline": {"rank": 1, "member": "AI",
                                            "limit_up_count": 5, "also": []}}})
     o = full[0]
-    assert o["score"] == 100
+    # 两根轴都到了峰值 —— v1 那种"加到 151 再夹回 100"的事不存在了
+    assert o["axes"]["quality"] == 100.0 and o["axes"]["timing"] == 100.0
+    # [R201] 但这份夹具的 closes 判不出完整八条模板, 质地覆盖率不满, 于是
+    # 置信系数把满分削掉一角 —— **这正是本版要的行为**: 读不全就不给满分,
+    # 否则"读不到"会变成优势(实测过: 只有两个因子的票拿 100 排第一)。
+    from app.services import opportunity_score as _osc
+    cov = o["coverage"]
+    assert cov["quality"] < 1.0 and cov["timing"] == 1.0
+    assert o["score"] == round(100 * _osc.confidence(cov["quality"], cov["timing"]))
+    assert o["score"] < 100
     assert "clamp" not in (o.get("factors") or {})
     # 注记堆满也不会把分数推过 100 —— 它们压根不参与
     assert len(o["notes"]) >= 3

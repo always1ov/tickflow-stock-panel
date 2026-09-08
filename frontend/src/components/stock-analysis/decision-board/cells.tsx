@@ -67,14 +67,14 @@ export function ChannelStackCell({ kc, close }: {
   close?: number | null
 }) {
   const rows: [string, KeltnerBand | undefined][] = [
-    ['短', kc?.s], ['中', kc?.m], ['长', kc?.l],
+    ['短期', kc?.s], ['中期', kc?.m], ['长期', kc?.l],
   ]
   return (
     <td className={`${TD_BASE} whitespace-nowrap px-1.5`}>
       <div className="inline-flex flex-col items-center gap-0.5">
         {rows.map(([tag, band]) => (
           <span key={tag} className="flex items-center gap-1">
-            <span className="w-3 text-[9px] text-muted/60">{tag}</span>
+            <span className="w-6 text-right text-[9px] text-muted/60">{tag}</span>
             {band
               ? (
                 <span
@@ -143,7 +143,7 @@ function geoLines(geo?: ChannelGeometry | null, ev?: ChannelEvent | null,
   if (geo.torn) L.push(`短线和长线离得太远(差 ${Math.abs(geo.spread).toFixed(1)} 倍日常波动),已经没有共同认可的合理价`)
   else if (geo.nested) L.push(`三条线几乎挤在一块(只差 ${Math.abs(geo.spread).toFixed(1)} 倍日常波动)`)
   else if (geo.compress != null) L.push(`三条线还有 ${(geo.compress * 100).toFixed(0)}% 重合,首尾相差 ${geo.spread.toFixed(1)} 倍日常波动`)
-  L.push(`眼下价格离各自中线:短 ${geo.d.s.toFixed(1)} / 中 ${geo.d.m.toFixed(1)} / 长 ${geo.d.l.toFixed(1)} 倍日常波动(正的偏贵、负的偏便宜)`)
+  L.push(`眼下价格离各自中线:短期 ${geo.d.s.toFixed(1)} / 中期 ${geo.d.m.toFixed(1)} / 长期 ${geo.d.l.toFixed(1)} 倍日常波动(正的偏贵、负的偏便宜)`)
   if (runs?.compress_days) L.push(`已经这样挤了 ${runs.compress_days} 天`)
   if (runs?.compress_avg != null) L.push(`整个季度平均重合 ${(runs.compress_avg * 100).toFixed(0)}%`)
   if (energy) {

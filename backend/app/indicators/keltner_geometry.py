@@ -291,7 +291,7 @@ def explain(g: dict | None) -> list[str]:
 
     d = g.get("d") or {}
     if all(k_ in d for k_ in ("s", "m", "l")):
-        out.append(f"眼下价格离各自中线: 短 {d['s']:+.1f} / 中 {d['m']:+.1f} / 长 {d['l']:+.1f}"
+        out.append(f"眼下价格离各自中线: 短期 {d['s']:+.1f} / 中期 {d['m']:+.1f} / 长期 {d['l']:+.1f}"
                    " 倍日常波动(正的偏贵、负的偏便宜, 越大越极端)")
     return out
 
