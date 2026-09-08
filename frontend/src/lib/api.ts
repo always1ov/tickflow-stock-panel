@@ -608,10 +608,27 @@ export interface ReviewRow {
 /** 每种结论在这只票上出现过几次、之后 forward_days 走成什么样 */
 export interface ReviewOutcome {
   code: string; title: string; tone: KeltnerVerdict['tone']
+  /** [R177] 出现过几**段**(不是几天) —— 一段持续 8 天的状态算 1 次,
+   *  按天算的话那 8 天的前瞻窗口互相重叠, n 会被撑大 */
   n: number
-  /** 之后 N 日平均涨跌(小数) */
-  avg_fwd: number
-  /** 其中收涨的次数。样本小, 后端刻意不折算成百分比胜率 */
+  /** 平均每段持续几天 */
+  avg_days: number
+  /** n 段里有几段已经够 N 日、知道结果了 */
+  scored: number
+  /** 之后 N 日平均涨跌(小数); 一段都没兑现时为 null */
+  avg_fwd: number | null
+  /** 其中收涨的段数。样本小, 后端刻意不折算成百分比胜率 */
+  win: number
+}
+
+/** [R177] 六态各状态在这只票上的同类统计。与 ReviewOutcome 同形状, 少了通道那几个字段。 */
+export interface ReviewTrendOutcome {
+  key: string
+  label: string
+  n: number
+  avg_days: number
+  scored: number
+  avg_fwd: number | null
   win: number
 }
 
@@ -631,6 +648,8 @@ export interface StockReview {
     limit_up_states: { state_cn: string; n: number }[]
   }
   outcomes: ReviewOutcome[]
+  /** [R177] 「趋势状态」那一栏的同类统计: 每种六态之后普遍怎么走 */
+  trend_outcomes: ReviewTrendOutcome[]
   /** 新 → 旧 */
   rows: ReviewRow[]
 }

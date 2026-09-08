@@ -119,32 +119,113 @@ def _forward_returns(closes: list[float], i: int, horizon: int) -> float | None:
     return closes[j] / closes[i] - 1
 
 
+# ==================== [R177] 按「段」而不是按「天」聚合 ====================
+#
+# 这只票在某个状态下之后普遍怎么走 —— 要回答这个, 单位必须是**段**, 不是天。
+#
+# 原因是前瞻收益会重叠。一段持续 8 天的「上涨趋势」, 按天算就是 8 个样本, 可
+# 这 8 天各自的"之后 5 日"互相共享 4 天, 根本不独立。把它们平均起来, n 看着
+# 有 8, 实际信息量只有 1 段多一点 —— 这会让一个很薄的结论显得挺扎实, 恰恰是
+# 这套复盘最该避免的事。
+#
+# 所以: **一段 = 一次**, 收益从段的第一天起算。代价是样本数变得更小更难看,
+# 但那个更小的数字才是真的。
+
+def _episodes(rows: list[dict], key_of, closes: list[float],
+              offset: int, horizon: int) -> list[dict]:
+    """把连续同值的行压成段。返回 [{key, start, days, fwd}]。
+
+    key_of(row) 返回 None 的行不进段, 并且**打断**当前段 —— 中间隔了一段没有
+    读数的日子, 前后不该算同一次。
+    """
+    out: list[dict] = []
+    cur_key, cur_start, cur_days = None, 0, 0
+
+    def _flush():
+        if cur_key is None:
+            return
+        out.append({"key": cur_key, "start": rows[cur_start]["date"],
+                    "days": cur_days,
+                    "fwd": _forward_returns(closes, offset + cur_start, horizon)})
+
+    for i, r in enumerate(rows):
+        key = key_of(r)
+        if key == cur_key and key is not None:
+            cur_days += 1
+            continue
+        _flush()
+        cur_key, cur_start, cur_days = key, i, 1
+    _flush()
+    return out
+
+
+def _agg_episodes(eps: list[dict], label_of) -> list[dict]:
+    """段 → 每个取值的次数 / 平均持续 / 之后 horizon 日表现。
+
+    末尾不足 horizon 的段不计收益(还不知道结果), 但**仍计次数** —— 那一段
+    确实发生过, 只是结果还没出来; 把它从次数里也抹掉会让"这只票出现过几次"
+    这个最基本的问题都答错。
+    """
+    agg: dict = {}
+    for e in eps:
+        a = agg.setdefault(e["key"], {"key": e["key"], "n": 0, "days": 0,
+                                      "scored": 0, "sum": 0.0, "win": 0})
+        a["n"] += 1
+        a["days"] += e["days"]
+        if e["fwd"] is not None:
+            a["scored"] += 1
+            a["sum"] += e["fwd"]
+            a["win"] += 1 if e["fwd"] > 0 else 0
+    out = []
+    for a in agg.values():
+        out.append({
+            "key": a["key"],
+            "label": label_of(a["key"]),
+            "n": a["n"],                                    # 出现过几段
+            "avg_days": round(a["days"] / a["n"], 1),       # 平均持续几天
+            "scored": a["scored"],                          # 其中几段已知结果
+            "avg_fwd": round(a["sum"] / a["scored"], 4) if a["scored"] else None,
+            "win": a["win"],
+        })
+    out.sort(key=lambda x: -x["n"])
+    return out
+
+
+def _trend_outcomes(rows: list[dict], closes: list[float], offset: int) -> list[dict]:
+    """[R177] 六态各状态在这只票上出现过几段、之后怎么走。
+
+    「趋势状态」这一列原来只统计了"涨停出现在什么状态下"; 那回答的是另一个
+    问题。这里补上真正该问的: **每种状态之后普遍怎么走。**
+    """
+    eps = _episodes(rows, lambda r: (r.get("trend") or {}).get("state"),
+                    closes, offset, FORWARD_DAYS)
+    return _agg_episodes(eps, lambda k: STATE_LABELS.get(k, (k, ""))[0])
+
+
 def _outcomes(rows: list[dict], closes: list[float], offset: int) -> list[dict]:
-    """每种结论在这只票上出现过几次、之后 FORWARD_DAYS 走成什么样。
+    """每种结论在这只票上出现过几**段**、之后 FORWARD_DAYS 走成什么样。
 
     这是复盘真正想问的那个问题 —— 「结论」列说的话, 在**这只票**身上过去
     好不好使。样本小得很(半年内同一档往往只有个位数), 所以只报次数和均值,
     不折算成胜率百分比去装得像统计结论。
+
+    [R177] 从按天改成**按段**。原来一段持续 5 天的"强势深调"会被算成 5 个
+    样本, 而这 5 天的前瞻窗口互相重叠 4 天 —— n 被撑大了, 一个很薄的结论
+    看着挺扎实。改完之后数字更小, 但那个更小的数字才是真的。
     """
-    agg: dict[str, dict] = {}
-    for n, r in enumerate(rows):
+    title_tone: dict[str, tuple[str, str]] = {}
+    for r in rows:
         v = r.get("verdict")
-        if not v:
-            continue
-        fwd = _forward_returns(closes, offset + n, FORWARD_DAYS)
-        if fwd is None:
-            continue    # 末尾不足 FORWARD_DAYS 的不计, 不拿半截数据凑样本
-        a = agg.setdefault(v["code"], {"code": v["code"], "title": v["title"],
-                                       "tone": v["tone"], "n": 0, "sum": 0.0, "win": 0})
-        a["n"] += 1
-        a["sum"] += fwd
-        a["win"] += 1 if fwd > 0 else 0
-    out = []
-    for a in agg.values():
-        out.append({"code": a["code"], "title": a["title"], "tone": a["tone"],
-                    "n": a["n"], "avg_fwd": round(a["sum"] / a["n"], 4),
-                    "win": a["win"]})
-    out.sort(key=lambda x: -x["n"])
+        if v:
+            title_tone.setdefault(v["code"], (v["title"], v["tone"]))
+
+    eps = _episodes(rows, lambda r: (r.get("verdict") or {}).get("code"),
+                    closes, offset, FORWARD_DAYS)
+    out = _agg_episodes(eps, lambda k: title_tone.get(k, (k, ""))[0])
+    for o in out:
+        o["code"] = o["key"]
+        o["title"] = o["label"]
+        o["tone"] = title_tone.get(o["key"], ("", "info"))[1]
     return out
 
 
@@ -229,6 +310,9 @@ def review_for_symbol(repo, symbol: str, days: int = DEFAULT_DAYS) -> dict:
             "limit_up_states": _limit_up_states(rows),
         },
         "outcomes": _outcomes(rows, closes, offset),
+        # [R177] 「趋势状态」那一栏的同类统计 —— 原来那栏只有"涨停出在什么状态下",
+        # 回答的是另一个问题; 这条补上"每种状态之后普遍怎么走"
+        "trend_outcomes": _trend_outcomes(rows, closes, offset),
         "rows": out_rows,
     }
 

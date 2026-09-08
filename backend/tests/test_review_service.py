@@ -189,15 +189,20 @@ def test_days_is_clamped_to_a_sane_range(asked, expect):
 # ---------- 后验统计 ----------
 
 def test_outcomes_skip_days_without_a_full_forward_window():
-    """末尾不足 5 天的那几行没法知道后来走成什么样 —— 拿半截数据凑样本
-    会让最近的结论看起来总是"刚好没涨"。"""
+    """末尾不足 5 天的段没法知道后来走成什么样 —— 拿半截数据凑样本会让最近的
+    结论看起来总是"刚好没涨"。
+
+    [R177] 改成按段之后这里分成了两个数: 段仍然**计次数**(它确实发生过),
+    只是不计收益。把它从次数里也抹掉会答错"这只票出现过几次"。
+    """
     out = _review(_frame(_series(wave=14.0)))
-    total = sum(o["n"] for o in out["outcomes"])
-    with_verdict = sum(1 for r in out["rows"] if r["verdict"])
-    tail = out["rows"][:rs.FORWARD_DAYS]      # 新→旧, 前 5 行就是最近 5 天
-    dropped = sum(1 for r in tail if r["verdict"])
-    assert dropped > 0, "构造的数据要让末尾几天确实有结论, 否则这个测试没验到东西"
-    assert total == with_verdict - dropped
+    for o in out["outcomes"]:
+        assert o["scored"] <= o["n"], "已知结果的段不可能多于总段数"
+        if o["scored"] == 0:
+            assert o["avg_fwd"] is None, "一段都没兑现就不能给均值"
+    # 刻意不要求"必须存在没兑现的段" —— 按段之后这种情况反而少见, 而这正是
+    # 改动带来的好处: 只有**最后一段的起点**落在末尾 5 天内才会丢, 按天时是
+    # 末尾 5 天全丢。机制本身由 test_review_episodes.py 单独验。
 
 
 def test_outcomes_report_raw_counts_not_a_dressed_up_win_rate():
@@ -205,9 +210,12 @@ def test_outcomes_report_raw_counts_not_a_dressed_up_win_rate():
     百分比胜率会让人当成统计结论用。"""
     out = _review(_frame(_series(wave=14.0)))
     for o in out["outcomes"]:
-        assert set(o) == {"code", "title", "tone", "n", "avg_fwd", "win"}
-        assert o["n"] >= 1 and 0 <= o["win"] <= o["n"]
-        assert isinstance(o["avg_fwd"], float)
+        assert set(o) == {"key", "label", "code", "title", "tone",
+                          "n", "avg_days", "scored", "avg_fwd", "win"}
+        assert o["n"] >= 1 and 0 <= o["win"] <= o["scored"]
+        assert o["avg_fwd"] is None or isinstance(o["avg_fwd"], float)
+        # 就是没有胜率字段 —— 个位数样本折算成百分比会被当统计结论用
+        assert "win_rate" not in o
 
 
 def test_outcomes_are_ordered_by_sample_size():
@@ -300,13 +308,25 @@ def test_each_row_carries_its_own_forward_return():
 
 
 def test_row_forward_returns_agree_with_the_outcome_summary():
-    """两处算的是同一件事, 对不上就说明有一处走了另一套口径。"""
+    """两处算的是同一件事, 对不上就说明有一处走了另一套口径。
+
+    [R177] 按段之后, 摘要只该用**每段第一天**的 fwd —— 段内其余那些天的
+    前瞻窗口和它重叠, 算进去就等于把同一次数了好几遍。
+    """
     out = _review(_frame(_series(wave=14.0)))
+    old_to_new = list(reversed(out["rows"]))      # rows 是新→旧, 这里要按时间正序
+
     want: dict[str, list[float]] = {}
-    for r in out["rows"]:
-        if r["verdict"] and r["fwd"] is not None:
-            want.setdefault(r["verdict"]["code"], []).append(r["fwd"])
+    prev = None
+    for r in old_to_new:
+        code = (r.get("verdict") or {}).get("code")
+        if code is not None and code != prev and r["fwd"] is not None:
+            want.setdefault(code, []).append(r["fwd"])   # 只取段起点
+        prev = code
+
     for o in out["outcomes"]:
+        if o["scored"] == 0:
+            continue
         got = want[o["code"]]
-        assert o["n"] == len(got)
+        assert o["scored"] == len(got), f"{o['code']}: 段起点数对不上"
         assert o["avg_fwd"] == pytest.approx(sum(got) / len(got), abs=1e-3)

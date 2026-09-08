@@ -200,6 +200,57 @@ export function StockReviewDialog({ symbol, name, tab: initialTab, onClose }: {
 
 // ===== 趋势视图: 这个状态是怎么走到今天的 =====
 
+/**
+ * [R177] 「回头看」小结: 每种状态/结论出现过几**段**、之后 N 日普遍怎么走。
+ *
+ * 单位是段不是天 —— 一段持续 8 天的上涨趋势算 1 次。按天算的话, 那 8 天各自
+ * 的"之后 5 日"互相共享 4 天, n 会被撑大, 一个很薄的结论看着挺扎实。
+ *
+ * 样本本来就小(半年内同一档常是个位数), 所以: 只报次数和均值, 不折算成百分比
+ * 胜率; 还没兑现的段照样计次数(它确实发生过), 但不进均值。
+ */
+function OutcomeChips({ items, forwardDays, hint }: {
+  items: { key?: string; code?: string; label?: string; title?: string
+           n: number; avg_days: number; scored: number
+           avg_fwd: number | null; win: number
+           tone?: KeltnerVerdict['tone'] }[]
+  forwardDays: number
+  hint: string
+}) {
+  if (items.length === 0) return null
+  return (
+    <div className="px-4 pt-4">
+      <div className="mb-1.5 text-[10px] text-muted">{hint}</div>
+      <div className="flex flex-wrap gap-1.5">
+        {items.map((o) => {
+          const id = o.key ?? o.code ?? ''
+          const name = o.label ?? o.title ?? id
+          const cls = o.tone ? VERDICT_CLS[o.tone] : 'border-border/60 bg-elevated/30 text-secondary'
+          return (
+            <span
+              key={id}
+              className={`inline-flex items-center gap-1.5 rounded border px-1.5 py-0.5 text-[10px] ${cls}`}
+              title={
+                `「${name}」在这只票上出现过 ${o.n} 段, 平均持续 ${o.avg_days} 天。`
+                + (o.scored
+                  ? `其中 ${o.scored} 段已够 ${forwardDays} 个交易日: 之后平均 ${pct(o.avg_fwd)}, ${o.win} 段收涨。`
+                  : `还没有哪一段够 ${forwardDays} 个交易日, 结果未知。`)
+                + ' 单位是段不是天 —— 段内每天的前瞻窗口互相重叠, 按天算会把同一次数很多遍。'
+              }
+            >
+              {name}
+              <span className="opacity-70">{o.n} 次</span>
+              {o.scored > 0
+                ? <span className={`font-mono ${chgCls(o.avg_fwd)}`}>{pct(o.avg_fwd)}</span>
+                : <span className="font-mono opacity-50">待定</span>}
+            </span>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 function TrendView({ d, rows, onlyMarked, onToggleMarked }: {
   d: StockReview
   rows: ReviewRow[]
@@ -238,6 +289,13 @@ function TrendView({ d, rows, onlyMarked, onToggleMarked }: {
           ))}
         </div>
       )}
+
+      {/* [R177] 每种状态之后普遍怎么走 —— 上面「涨停出现在」回答的是另一个问题 */}
+      <OutcomeChips
+        items={d.trend_outcomes ?? []}
+        forwardDays={d.forward_days}
+        hint={`各状态出现后 ${d.forward_days} 日表现(按段计, 一段=一次;样本小, 只作参考, 不是胜率统计)`}
+      />
 
       <div className="flex items-center justify-end px-4 pt-3">
         <button
@@ -325,26 +383,11 @@ function VerdictView({ d, segments }: { d: StockReview; segments: Segment[] }) {
   return (
     <>
       {/* 各档结论在这只票上过去好不好使 */}
-      {d.outcomes.length > 0 && (
-        <div className="px-4 pt-4">
-          <div className="mb-1.5 text-[10px] text-muted">
-            各档结论出现后 {d.forward_days} 日表现(样本小, 只作参考, 不是胜率统计)
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            {d.outcomes.map((o) => (
-              <span
-                key={o.code}
-                className={`inline-flex items-center gap-1.5 rounded border px-1.5 py-0.5 text-[10px] ${VERDICT_CLS[o.tone]}`}
-                title={`「${o.title}」在这只票上出现 ${o.n} 天, 之后 ${d.forward_days} 个交易日平均 ${pct(o.avg_fwd)}, 其中 ${o.win} 天收涨`}
-              >
-                {o.title}
-                <span className="opacity-70">{o.n}天</span>
-                <span className={`font-mono ${chgCls(o.avg_fwd)}`}>{pct(o.avg_fwd)}</span>
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
+      <OutcomeChips
+        items={d.outcomes}
+        forwardDays={d.forward_days}
+        hint={`各档结论出现后 ${d.forward_days} 日表现(按段计, 一段=一次;样本小, 只作参考, 不是胜率统计)`}
+      />
 
       <div className="mt-3 flex-1 overflow-auto border-t border-border/60 p-4">
         {segments.length === 0 && (
