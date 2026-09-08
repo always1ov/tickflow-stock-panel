@@ -14,7 +14,7 @@ import { storage } from '@/lib/storage'
 import { buildBoardHtml } from '@/lib/decisionBoardHtmlExport'
 import { DEFAULT_EXPORT_KEYS } from '@/lib/decisionBoardExportColumns'
 import { ExportColumnsDialog } from '@/components/stock-analysis/decision-board/ExportColumnsDialog'
-import { ChannelStackCell, NUM, TD_BASE, UrgencyLine, VerdictCell } from '@/components/stock-analysis/decision-board/cells'
+import { ChannelStackCell, ChannelStateCell, NUM, TD_BASE, UrgencyLine, VerdictCell } from '@/components/stock-analysis/decision-board/cells'
 import { LotsLink } from '@/components/stock-analysis/decision-board/LotsLink'
 import { GlossaryButton } from '@/components/stock-analysis/decision-board/GlossaryDialog'
 // [R169] 合并视图(手填 ⊕ 上游批次登记), 字段说明见 api.ts 的 EffectivePosition
@@ -22,7 +22,7 @@ type Position = EffectivePosition
 type WatchPoint = { direction: 'up' | 'down'; price: number; label?: string; action?: string; reason?: string }
 type Signal = { signal: string; confidence: number; reason: string; close: number | null; created_at: string; watch_points?: WatchPoint[] }
 type SortKey = 'urgency' | 'name' | 'close' | 'changePct' | 'held' | 'cost' | 'pnl' | 'exit'
-  | 'trend' | 'ks' | 'km' | 'kl' | 'verdict' | 'confidence' | 'signal' | 'report'
+  | 'trend' | 'ks' | 'km' | 'kl' | 'spread' | 'verdict' | 'confidence' | 'signal' | 'report'
 const SIGNAL_RANK: Record<string, number> = { buy: 0, sell: 1, hold: 2, watch: 3 }
 /**
  * [R194] 决策台的列宽表 —— colgroup 与空表提示的 colSpan 同源。
@@ -51,6 +51,9 @@ const BOARD_COLS = [
   // [R198] 短/中/长三档合成一列, 换行竖排。它们本来就是同一个指标的三次采样
   // (共用同一个 ATR 分母), 拆成三列是把一件事摊成三份看。
   { label: '量化通道', w: '7%' },
+  // [R201] 延伸指标里唯一值得占一列的那一组: 阶段 + 三线间距 + 快慢 + 挤了几天。
+  // 为什么只有这几个进来、别的为什么留在悬停里, 见 cells.tsx 的 ChannelStateCell。
+  { label: '通道态势', w: '6.5%' },
   { label: '结论', w: '6%' },
   { label: '置信', w: '3%' },
   { label: 'AI 分析', w: '7%' },     // R130 上下两行: 报告胶囊 / ✨分析 + 🔔提醒
@@ -373,6 +376,9 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
         case 'kl': return r.kc?.l?.pct ?? null
         // 结论按后端给的 rank 排(越大越偏卖): 降序把该减的顶到最上面,
         // 升序把该吸的顶上来。权重由后端定, 界面不自己编一套。
+        // [R201] 三线间距。升序 = 刚从挤在一起走出来的排前面(找起点),
+        // 降序 = 走得最远的排前面(找该收的)。带符号, 空头排列自然沉底。
+        case 'spread': return r.kc?.geo?.spread ?? null
         case 'verdict': return r.kc?.verdict?.rank ?? null
         case 'confidence': return r.sig?.confidence ?? null
         case 'signal': return r.sig ? (SIGNAL_RANK[r.sig.signal] ?? 9) : null
@@ -608,6 +614,14 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
                       && <span className="ml-1 text-accent">{{ ks: '短期', km: '中期', kl: '长期' }[sort.key as 'ks' | 'km' | 'kl']}{caret(sort.key)}</span>}
                   </button>
                 </th>
+                <th className="whitespace-nowrap px-1.5 py-2.5 font-normal text-center">
+                  <button onClick={() => toggleSort('spread')} className={thBtn}
+                          title={'现在处在哪一段 + 三条线离多远 + 还有没有劲。\n\n'
+                            + '按三线间距排序: 升序 = 刚从挤在一起走出来的在前(找起点), '
+                            + '降序 = 走得最远的在前(找该收的)。'}>
+                    通道态势{caret('spread')}
+                  </button>
+                </th>
                 <th className="whitespace-nowrap px-1.5 py-2.5 font-normal text-center"><button onClick={() => toggleSort('verdict')} className={thBtn} title="三档组合的结论。排序把「该减的」和「该吸的」分到两头:降序=偏卖在前, 升序=偏买在前">结论{caret('verdict')}</button></th>
                 <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center"><button onClick={() => toggleSort('confidence')} className={thBtn}>置信{caret('confidence')}</button></th>
                 <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center"><button onClick={() => toggleSort('report')} className={thBtn} title="最近一份 AI 分析报告(点击胶囊打开) · ✨生成/更新分析 · 🔔点位提醒">AI 分析{caret('report')}</button></th>
@@ -771,6 +785,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
                     </td>
                     {/* [R42] Keltner 三档位置 */}
                     <ChannelStackCell kc={r.kc} close={r.close} />
+                    <ChannelStateCell geo={r.kc?.geo} runs={r.kc?.runs} ph={r.ph} />
                     <VerdictCell v={r.kc?.verdict} ev={r.ev} geo={r.kc?.geo} runs={r.kc?.runs} energy={r.kc?.energy} ph={r.ph}
                                  onOpen={() => setReview({ symbol: r.symbol, name: r.name, tab: 'verdict' })} />
                     {/* 置信度(独立列, 可排序) */}

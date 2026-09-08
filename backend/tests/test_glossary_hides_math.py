@@ -87,6 +87,11 @@ SURFACES = {
     _FRONT / "StockReviewDialog.tsx": "function ChannelPanel",
     _SRC / "components" / "today" / "OpportunityTable.tsx":
         '<span className="text-foreground/90">量化波动通道</span>',
+    # [R201] **导出的 HTML 是所有面里最该守的一个** —— 屏幕上的东西只有本人看得到,
+    # 导出的文件是拿去发给别人的。而它恰恰是 R200 那一轮漏掉的: 页头说明里
+    # 白纸黑字写着「短期 MA20±2ATR / 中期 MA60±2.5ATR / 长期 MA120±3ATR」。
+    # 这条规则的教训就是"扫描面要跟着**能外传的东西**走, 不是跟着屏幕走"。
+    _SRC / "lib" / "decisionBoardHtmlExport.ts": "export function buildBoardHtml",
 }
 
 # 显示区里也躲不开的技术词(它们是数据本身或纯样式), 逐条豁免而不是整类放行。

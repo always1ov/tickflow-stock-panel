@@ -82,7 +82,7 @@ export function buildBoardHtml(
   <div class="meta">导出 ${rows.length} 只(自选共 ${total} 只)· ${cols.length} 列 · 生成于 ${esc(new Date().toLocaleString('zh-CN'))}</div>
   <div class="note">
     「该动」是<b>纯规则</b>判定(已触发 &gt; 逼近 &gt; 刚变盘 &gt; 到轨), <b>AI 不参与</b> —— 它只解释, 不决定先看谁。<br>
-    通道口径:短期 MA20±2ATR / 中期 MA60±2.5ATR / 长期 MA120±3ATR,<b>收盘价</b>判定;
+    量化波动通道一律按<b>收盘价</b>判定, 分短期 / 中期 / 长期三档;
     结论说的是<b>位置</b>(贵不贵), 不是会不会继续涨。<br>
     清仓与否看止盈线与生命线, 优先级在通道之上。
   </div>

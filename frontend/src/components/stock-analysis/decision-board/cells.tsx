@@ -299,3 +299,85 @@ export function UrgencyLine({ u }: { u?: Urgency }) {
     </div>
   )
 }
+
+// [R201] 阶段配色 —— 与复盘弹窗那张 PHASE_CLS 同一套语义, 只是这里要更淡:
+// 决策台一屏 80 行, 整列都是实色会盖过「该动了」那一列的红。
+const PHASE_TEXT: Record<string, string> = {
+  coiling: 'text-secondary',
+  launching: 'text-red-300',
+  advancing: 'text-red-400',
+  stalling: 'text-amber-300',
+  overextended: 'text-amber-400',
+  declining: 'text-emerald-400',
+  unclear: 'text-muted',
+}
+
+/**
+ * [R201] 「通道态势」列 —— 延伸指标里**唯一值得占一列**的那一组。
+ *
+ * ## 为什么是这三个, 不是全部
+ *
+ * 几何层一共算出十来个量。逐个问"它能不能改变我今天的动作":
+ *
+ *   · **阶段**      能。它是唯一直接回答「现在该盯什么」的; 而且它是
+ *                   压缩/间距/快慢三个量合起来的判定, 一个词顶三个数。
+ *   · **三线间距**  能。一个带符号的数同时给方向(正=朝上)与成熟度
+ *                   (接近 0 没出方向 / 适中趋势立住 / 太大追不动了),
+ *                   而且**可排序** —— 想找"刚立住的"就升序扫这一列。
+ *   · **快慢变化**  能。它与间距正交: 间距说走了多远, 快慢说还有没有劲。
+ *                   同样是间距 2.5, 提速和变慢是两个完全不同的处境。
+ *   · **挤了几天**  能, 但只在"憋着劲"那一档才有意义 —— 所以只在有值时显示,
+ *                   不占固定行高。
+ *
+ * 明确**不进列**的那几个, 以及理由:
+ *
+ *   · 还重合多少(压缩指数) —— 与间距单调对应(|间距| 越大重合越少), 摆两个
+ *     等于同一件事投两次票, 占地方还让人以为是两条独立证据。
+ *   · 波动主要来自(频段能量) —— 它回答的是"这波是谁在推", 属于**研究**而不是
+ *     **今天的动作**; 留在悬停与复盘里。
+ *   · 离各自中线多远 —— 与旁边「量化通道」那一列讲的是同一件事(位置), 重复。
+ *   · 三档位置码(如「上中下」) —— 已经由「结论」列翻成人话了, 码本身是给
+ *     台账分组用的, 不是给人扫的。
+ *
+ * R193 的教训在这里同样成立: **一列 80 行是用来扫的, 扫的时候没人会悬停。**
+ * 所以这一列摆的是能被"扫"出来的东西(一个词 + 一个带符号的数), 细节留悬停。
+ */
+export function ChannelStateCell({ geo, runs, ph }: {
+  geo?: ChannelGeometry | null
+  runs?: ChannelRuns | null
+  ph?: ChannelPhase | null
+}) {
+  if (!geo) {
+    return <td className={`${TD_BASE} px-1.5`}><span className="text-[10px] text-muted/30">—</span></td>
+  }
+  const a = geo.accel
+  const fast = a?.level === 'accel' ? '提速' : a?.level === 'decel' ? '变慢' : '匀速'
+  const fastCls = a?.level === 'accel' ? 'text-red-400/80'
+    : a?.level === 'decel' ? 'text-emerald-400/80' : 'text-muted'
+  return (
+    <td className={`${TD_BASE} whitespace-nowrap px-1.5`}>
+      <div className="inline-flex flex-col items-center gap-0.5 leading-tight">
+        {!!ph && (
+          <span className={`text-[10px] ${PHASE_TEXT[ph.code] ?? 'text-muted'}`}
+                title={`${ph.why}\n该盯什么:${ph.watch}`}>
+            {ph.cn}
+          </span>
+        )}
+        <span className="text-[9px] text-muted"
+              title="短线和长线离多远,带方向。接近零=方向还没出来;适中=趋势立住了;太大=已经走了很长一段">
+          间距 <b className="font-mono tabular-nums text-foreground/85">{geo.spread.toFixed(1)}</b>
+          <span className={`ml-1 ${fastCls}`}
+                title="最近这一段比之前那一段走得快了还是慢了 —— 与间距正交:间距说走了多远,这个说还有没有劲">
+            {fast}
+          </span>
+        </span>
+        {!!runs?.compress_days && (
+          <span className="text-[9px] text-muted/70"
+                title="到今天为止连着多少天三种看法都一致 —— 这只票横了多久">
+            挤 {runs.compress_days} 天
+          </span>
+        )}
+      </div>
+    </td>
+  )
+}

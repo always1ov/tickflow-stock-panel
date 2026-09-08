@@ -16,7 +16,7 @@
  * 导出件是**浅色**排版(要能打印), 深色主题那套配色搬过去看不清, 所以颜色在
  * 这里单独定义, 不复用界面的 class。
  */
-import type { ExitLine, KeltnerBand, KeltnerBands, TrendInfo, Urgency } from '@/lib/api'
+import type { ExitLine, KeltnerBand, KeltnerBands, TrendInfo, Urgency, ChannelPhase } from '@/lib/api'
 
 /** 导出用的一行 —— 与决策台 sortedRows 的形状一致(结构化取用, 不强耦合) */
 export type ExportRow = {
@@ -33,6 +33,8 @@ export type ExportRow = {
   kc?: KeltnerBands
   urg?: Urgency
   sig?: { signal: string; confidence: number; reason: string } | null
+  /** [R201] 现在处在哪一段 —— 决策台「通道态势」那一列的第一行 */
+  ph?: ChannelPhase | null
 }
 
 /** 单元格: 文本 + 可选的行内样式(浅色排版用) + 对齐 */
@@ -152,6 +154,23 @@ export const EXPORT_COLUMNS: ExportColumn[] = [
   { key: 'ks', label: '短通道', group: '通道', align: 'center', on: true, cell: (r) => band(r.kc?.s) },
   { key: 'km', label: '中通道', group: '通道', align: 'center', on: true, cell: (r) => band(r.kc?.m) },
   { key: 'kl', label: '长通道', group: '通道', align: 'center', on: true, cell: (r) => band(r.kc?.l) },
+  // [R201] 通道态势 —— 与屏幕上那一列同源: 阶段 + 三线间距 + 快慢 + 挤了几天。
+  // 默认**不勾选**: 导出是拿去发给别人的, 默认给最少的必要信息;
+  // 要带上它是一次有意识的选择, 不是顺手带出去。
+  {
+    key: 'chanState', label: '通道态势', group: '通道', align: 'center', on: false,
+    cell: (r) => {
+      const g = r.kc?.geo
+      if (!g) return { text: '—' }
+      const fast = g.accel?.level === 'accel' ? '提速'
+        : g.accel?.level === 'decel' ? '变慢' : '匀速'
+      const days = r.kc?.runs?.compress_days
+      return {
+        text: [r.ph?.cn, `间距 ${g.spread.toFixed(1)}`, fast,
+               days ? `挤 ${days} 天` : null].filter(Boolean).join(' · '),
+      }
+    },
+  },
   {
     key: 'verdict', label: '结论', group: '通道', on: true,
     cell: (r) => (r.kc?.verdict
