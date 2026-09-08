@@ -379,6 +379,29 @@ export interface LedgerStat { n: number; win_rate: number | null; avg: number | 
 export type LedgerStats = Record<'t1' | 't3' | 't5', LedgerStat>
 /** [R133] 规则层把握分体检 —— 与 AI 命中率互补: 那个只看 AI 挑的几只(有选择
  *  偏差), 这个看完整候选池, 才回答得了"把握分本身有没有区分度" */
+/** [R175] 一个标签维度(通道结论/六态趋势/主线归属/龙虎榜)下的各档表现。 */
+export interface LedgerLabelDim {
+  key: string
+  label: string
+  items: {
+    value: string
+    count: number
+    recent_count: number
+    stats: LedgerStats
+    recent_stats: LedgerStats
+    /** 全期与最近的背离; 两边样本都够才有值 —— 这是整栏唯一有信息量的数 */
+    shift: { dir: 'up' | 'down' | 'flat'; delta: number; text: string } | null
+  }[]
+}
+
+/** [R175] AI 把上面那张表念成的人话。连同当时那张表一起存, 好回看它准不准。 */
+export interface PatternDigest {
+  as_of: string
+  text: string
+  table?: unknown
+  created_at?: string
+}
+
 export interface ScoreLedger {
   recorded_days: number
   total_rows: number
@@ -403,6 +426,14 @@ export interface ScoreLedger {
   }[]
   baseline: { symbol?: string; name?: string; stats?: LedgerStats }
   monotonic: { ok: boolean | null; text: string }
+  /** [R175] 回头看: 不参与打分的那批标签, 全期 vs 最近 */
+  labels?: LedgerLabelDim[]
+  /** 「最近」那一列覆盖多少个记录日 */
+  recent_days?: number
+  /** 一档至少要多少样本才给读数 */
+  min_label_n?: number
+  /** 已存档的 AI 提炼(可能是前一天的); 生成走单独的端点 */
+  digest?: PatternDigest | null
   caveat: string
   /** 服务端拼好的可粘贴摘要(Markdown) —— 一键复制就能整段交出去做调参 */
   summary_md: string
@@ -4380,6 +4411,15 @@ export const api = {
   todayAiTrackRecord: () => request<AiTrackRecord>('/api/today/ai/track-record'),
   /** [R133] 规则层把握分体检: 分层胜率/排名段/因子归因/同期基准 */
   todayScoreLedger: () => request<ScoreLedger>('/api/today/score-ledger'),
+
+  // [R175] 显式生成 AI 提炼。今天已经跑过的话服务端直接回存档 —— 打开弹窗
+  // 不会自动调它, 免得点一次烧一次。
+  todayScoreLedgerDigest: () =>
+    request<PatternDigest>('/api/today/score-ledger/digest', { method: 'POST' }),
+
+  todayScoreLedgerDigestHistory: (limit = 30) =>
+    request<{ entries: PatternDigest[] }>(
+      `/api/today/score-ledger/digest/history?limit=${limit}`),
   /** [R133] 明细 CSV 的地址 —— 交给 <a download>, 不走 fetch(浏览器直接落文件) */
   todayScoreLedgerExportUrl: () => `${BASE}/api/today/score-ledger/export`,
   todaySavePrefs: (body: Partial<TodayPrefs>) =>

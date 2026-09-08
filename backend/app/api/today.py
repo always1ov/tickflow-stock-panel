@@ -17,7 +17,7 @@ import re
 import time
 from datetime import date, timedelta
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
@@ -236,6 +236,19 @@ def score_opportunities(
                 "gap_pct": gap_pct, "partial": res["partial"],
                 "fresh_from": res["fresh_from"], "kinds": ",".join(c["kinds"]),
                 "intraday": bool(t.get("intraday")),
+                # [R175] 注记标签也落台账。这几样是"在界面上说了句话、但一分不
+                # 参与打分"的东西 —— 恰恰因为不参与打分, 它们从来没被验证过。
+                # 只存能分组的那个键(code/名次), 不存整个对象: 台账是要按天攒
+                # 几个月的, 每行多塞一个 dict 到后面就是几 MB 的差别。
+                #
+                # 时效提醒: 这些字段**补不了历史**。今天不记, 三个月后想回头看
+                # "通道结论说强势深调之后普遍怎么走", 就还是没有数据可看。
+                "verdict": (e.get("verdict") or {}).get("code"),
+                "mainline_rank": (e.get("mainline") or {}).get("rank"),
+                "win_rate": (e.get("win") or {}).get("rate"),
+                # 没上榜的存 None 让 ctx 的过滤把它丢掉 —— 绝大多数行都没上榜,
+                # 存一堆 false 只是白占盘; 分组时"缺这个键"就是没上榜。
+                "dragon": True if e.get("dragon") else None,
             },
         }
         out.append(o)
@@ -1401,7 +1414,38 @@ def score_ledger_stats(request: Request):
     # 服务端就把可粘贴的摘要拼好: 用户点一下复制就能整段交给外部做调参,
     # 不必自己从几张表里抄数字(抄错了结论就跟着错)
     out["summary_md"] = score_ledger.build_summary_md(out, ai_stats)
+    # [R175] 已经存下来的那条提炼(可能是昨天的)。**这里只读不生成** ——
+    # 生成走下面那个显式端点, 免得打开一次弹窗就烧一次 AI。
+    try:
+        from app.services import pattern_digest
+        out["digest"] = pattern_digest.latest()
+    except Exception as e:  # noqa: BLE001
+        logger.debug("pattern digest read skipped: %s", e)
+        out["digest"] = None
     return out
+
+
+@router.post("/score-ledger/digest")
+async def score_ledger_digest(request: Request):
+    """[R175] 让 AI 把「回头看」那张表念成人话。
+
+    今天已经跑过就直接返回存档 —— 同一批数据问两次 AI 会给两套说法,
+    而"今天和昨天说的不一样"会被读成行情变了, 其实只是采样噪声。
+    """
+    from app.services import pattern_digest, score_ledger
+    out = score_ledger.evaluate(request.app.state.repo)
+    entry = await pattern_digest.refresh_if_stale(out)
+    if entry is None:
+        raise HTTPException(status_code=400,
+                            detail="提炼失败: 未配置 AI, 或台账还没有可统计的标签数据")
+    return entry
+
+
+@router.get("/score-ledger/digest/history")
+def score_ledger_digest_history(limit: int = 30):
+    """[R175] 回看 AI 过去都说过什么 —— 它准不准, 也只能用记录回答。"""
+    from app.services import pattern_digest
+    return {"entries": pattern_digest.history(limit)}
 
 
 @router.get("/score-ledger/export")

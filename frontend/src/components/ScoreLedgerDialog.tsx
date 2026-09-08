@@ -6,7 +6,7 @@
  *     它有选择偏差 —— 60 分和 90 分的票从没被同台比过, 所以它证明不了评分本身。
  *   · 本面板     = **完整候选池**(含被门槛滤掉的那些)按把握分分层之后的表现。
  *
- * 四张表按"看的顺序"排, 不按数据结构排:
+ * 五张表按"看的顺序"排, 不按数据结构排:
  *   1. 总体 + 同期基准 —— 先看有没有超额。没有基准的胜率会骗人。
  *   2. 分层单调性 —— 最关键的一张。高分档不比低分档好, 这套分数就没有信息量,
  *      再漂亮的头部胜率也可能只是运气。
@@ -14,6 +14,13 @@
  *   4. 维度归因 —— [R134] 高分组不明显强于低分组的维度, 就是在白占权重。
  *      (v1 时这里分的是"吃到加分/吃到扣分"; v2 的维度分是 0~100 的连续量,
  *       没有正负, 所以改成按分数高低切。要回答的问题没变。)
+ *   5. [R175] 回头看 —— 前四张都在验**把握分**; 这一张验的是那批
+ *      **不参与打分的标签**(通道结论/六态趋势/主线/龙虎榜)。它们在界面上
+ *      天天下结论, 恰恰因为不进分数, 从来没被验证过。
+ *      读法也和前四张不同: 前面看绝对水平, 这里看**全期与最近的背离** ——
+ *      长期能赚的那档最近开始亏, 才是这一栏想告诉你的事。
+ *      末尾挂一段 AI 提炼, 它**只念这张表**: 分组与胜率全由后端算完,
+ *      AI 只负责讲成人话, 说错了也不影响任何一个数字。
  *
  * 两个导出口都指向同一件事: 把原料交出去做调参。
  *   · 「复制体检摘要」 服务端拼好的 Markdown, 粘到对话里就能直接分析(小)
@@ -25,8 +32,15 @@
  */
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { BarChart3, Check, ClipboardCopy, Download, Loader2, X } from 'lucide-react'
-import { api, type LedgerStat, type LedgerStats, type ScoreLedger } from '@/lib/api'
+import { BarChart3, Check, ClipboardCopy, Download, Loader2, Sparkles, X } from 'lucide-react'
+import {
+  api,
+  type LedgerLabelDim,
+  type LedgerStat,
+  type LedgerStats,
+  type PatternDigest,
+  type ScoreLedger,
+} from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { Modal } from '@/components/Modal'
 import { copyText } from '@/lib/clipboard'
@@ -81,6 +95,65 @@ function StatTable({ head, rows }: {
   )
 }
 
+/**
+ * [R175] 回头看: 一个标签维度的各档, 全期与最近**并排**。
+ *
+ * 这一栏跟上面四张表的读法不同 —— 上面看的是绝对水平(这档胜率高不高),
+ * 这里看的是**变化**(这档最近还灵不灵)。所以视觉重心放在最右边那列背离上,
+ * 两个数字本身反而是配角。
+ */
+function LabelDimTable({ dim, minN }: { dim: LedgerLabelDim; minN: number }) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-[30rem] border-collapse text-[11px]">
+        <thead>
+          <tr className="border-b border-border/60 text-[10px] text-muted">
+            <th className="px-2 py-1 text-left font-normal">{dim.label}</th>
+            <th className="px-2 py-1 text-right font-normal">条数</th>
+            <th className="px-2 py-1 text-center font-normal" title="全部记录日, T+5">全期</th>
+            <th className="px-2 py-1 text-center font-normal" title="最近那段, T+5">最近</th>
+            <th className="px-2 py-1 text-left font-normal"
+                title="两边样本都够才给结论 —— 这一列才是这张表存在的理由">变化</th>
+          </tr>
+        </thead>
+        <tbody>
+          {dim.items.map(it => {
+            // 样本不够的档整行压暗: 让它可见(用户要知道这档还没攒够),
+            // 但读起来明显不如够样本的那几行有分量
+            const thin = (it.stats?.t5?.n ?? 0) < minN
+            return (
+              <tr key={it.value}
+                  className={cn('border-b border-border/25', thin && 'text-muted/60')}>
+                <td className="whitespace-nowrap px-2 py-1">{it.value}</td>
+                <td className="px-2 py-1 text-right font-mono text-muted">{it.count}</td>
+                <Cell s={it.stats?.t5} />
+                <Cell s={it.recent_stats?.t5} />
+                <td className="px-2 py-1">
+                  {it.shift ? (
+                    <span className={cn(
+                      'whitespace-nowrap',
+                      it.shift.dir === 'down' && 'text-bear',
+                      it.shift.dir === 'up' && 'text-bull',
+                      it.shift.dir === 'flat' && 'text-muted/70',
+                    )}>
+                      {it.shift.dir === 'down' ? '↓ ' : it.shift.dir === 'up' ? '↑ ' : ''}
+                      {it.shift.delta > 0 ? '+' : ''}{it.shift.delta}pt
+                    </span>
+                  ) : (
+                    <span className="text-muted/40" title={`两边各需 ${minN} 个样本才给结论`}>
+                      样本不足
+                    </span>
+                  )}
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
 export function ScoreLedgerDialog({ onClose }: { onClose: () => void }) {
   const [copied, setCopied] = useState(false)
   const q = useQuery({
@@ -89,6 +162,24 @@ export function ScoreLedgerDialog({ onClose }: { onClose: () => void }) {
     staleTime: 10 * 60 * 1000,
   })
   const d: ScoreLedger | undefined = q.data
+
+  // [R175] 提炼**只在点按钮时**跑。打开弹窗显示的是服务端存档(可能是昨天的) ——
+  // 同一批数据反复问 AI 会给两套说法, 而"今天和昨天说的不一样"会被读成行情
+  // 变了, 其实只是采样噪声。
+  const [digesting, setDigesting] = useState(false)
+  const [fresh, setFresh] = useState<PatternDigest | null>(null)
+  const digest = fresh ?? d?.digest ?? null
+
+  const onDigest = async () => {
+    setDigesting(true)
+    try {
+      setFresh(await api.todayScoreLedgerDigest())
+    } catch (e) {
+      toast(e instanceof Error ? e.message : '提炼失败', 'error')
+    } finally {
+      setDigesting(false)
+    }
+  }
 
   const onCopy = async () => {
     if (!d?.summary_md) return
@@ -230,9 +321,66 @@ export function ScoreLedgerDialog({ onClose }: { onClose: () => void }) {
               </div>
             </section>
 
+            {/* ⑤ [R175] 回头看 —— 不参与打分的那批标签, 到底灵不灵 */}
+            {!!d.labels?.length && (
+              <section className="rounded border border-border/60 bg-base/40 p-2.5">
+                <h3 className="mb-1 text-[11px] font-medium text-foreground">
+                  回头看 · 这些结论最近还灵吗
+                  <span className="ml-1.5 font-normal text-muted">
+                    T+5;这批标签<b className="font-medium text-foreground/90">一分不参与打分</b>,也正因如此从没被验证过
+                  </span>
+                </h3>
+                <p className="mb-2 text-[10px] text-muted/80">
+                  「全期」是长期成色,「最近」是近 {d.recent_days ?? 20} 个记录日 ——
+                  真正要看的是<b className="font-medium text-foreground/90">两者背离</b>:长期能赚的那档最近开始亏,才是这张表想告诉你的事。
+                  单看全期看不出来,一年的均值会把最近一个月的转向稀释掉。
+                </p>
+                <div className="space-y-3">
+                  {d.labels.map(dim => (
+                    <LabelDimTable key={dim.key} dim={dim} minN={d.min_label_n ?? 15} />
+                  ))}
+                </div>
+
+                {/* AI 提炼 —— 只念上面那张表 */}
+                <div className="mt-3 border-t border-border/40 pt-2">
+                  <div className="mb-1 flex flex-wrap items-center gap-2">
+                    <span className="text-[11px] font-medium text-foreground">AI 提炼</span>
+                    <button
+                      onClick={onDigest}
+                      disabled={digesting}
+                      title="把上面那几张表交给 AI 念成人话。它只能引用表里的数字,样本不足的档不许下结论;今天已经跑过就直接返回存档"
+                      className="inline-flex items-center gap-1 rounded-btn border border-violet-400/40 bg-violet-400/15 px-2 py-0.5 text-[10px] text-violet-300 transition-colors cursor-pointer hover:bg-violet-400/25 disabled:opacity-40"
+                    >
+                      {digesting
+                        ? <Loader2 className="h-3 w-3 animate-spin" />
+                        : <Sparkles className="h-3 w-3" />}
+                      {digest ? '重新提炼' : '让 AI 试着说两句'}
+                    </button>
+                    {digest?.as_of && (
+                      <span className="text-[10px] text-muted/70">{digest.as_of} 的提炼</span>
+                    )}
+                  </div>
+                  {digest?.text ? (
+                    <p className="whitespace-pre-wrap rounded border border-violet-400/20 bg-violet-400/5 px-2.5 py-2 text-[11px] leading-relaxed text-foreground/90">
+                      {digest.text}
+                    </p>
+                  ) : (
+                    <p className="text-[10px] text-muted/70">
+                      还没跑过。AI 只负责把上面的数字讲成人话 ——
+                      分组和胜率都是代码算的,它说错了也不影响那些数。
+                    </p>
+                  )}
+                  <p className="mt-1 text-[10px] text-muted/60">
+                    提炼结果<b className="font-medium text-foreground/80">不参与打分、不进任何提示词</b>,并且连同当时那张表一起存档 ——
+                    三个月后能回头看它当时说得准不准。
+                  </p>
+                </div>
+              </section>
+            )}
+
             {!!d.legacy_days && (
               <p className="rounded border border-warning/30 bg-warning/10 px-2.5 py-1.5 text-[10px] text-warning">
-                另有 {d.legacy_days} 天是**换打分口径之前**记的,未计入上面任何一张表 ——
+                另有 {d.legacy_days} 天是<b className="font-medium">换打分口径之前</b>记的,未计入上面任何一张表 ——
                 两套分数刻度不同,混在一起算胜率没有意义。它们仍在导出的 CSV 里
                 (scoring_version 列区分)。
               </p>

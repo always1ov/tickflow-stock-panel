@@ -407,6 +407,117 @@ def _monotonic_note(buckets: list[dict], horizon: str = "t5") -> dict:
     return {"ok": False, "text": f"{horizon.upper()} 分层不单调, {len(breaks)} 处回落: {'; '.join(breaks)} —— 把握分没有把好票排到前面"}
 
 
+# ======================= [R175] 回头看: 按标签分组 =======================
+#
+# 台账原来只按**把握分**切(90 分档 vs 70 分档谁的胜率高)。可界面上还有一批
+# "说了句话但一分不参与打分"的标签 —— 通道结论、六态趋势、主线名次、龙虎榜。
+# 恰恰因为它们不参与打分, 从来没人验证过它们说得对不对。
+#
+# 这里把它们换个轴切一遍。做法就是最朴素的 group-by, 没有模型也没有 AI ——
+# 标签本身已经是离散的, 分组算前瞻收益就是全部答案。
+#
+# 关键是**两列并排**: 全期 vs 最近 N 日。
+#   · 全期  = 这个标签长期什么成色
+#   · 最近  = 它现在什么成色
+# 用户问的"这个东西正在遵循什么规律", 落到实处就是这两列的**背离**:
+# 长期能赚的那档最近开始亏, 才是真正要看见的信号。单看全期看不出来 ——
+# 一年的均值会把最近一个月的转向稀释掉。
+
+# 最近多少个**记录日**算"最近"。20 个交易日 ≈ 一个月, 短到能反映当前风格,
+# 又不至于每档只剩两三个样本。
+RECENT_DAYS = 20
+# 一档至少要有多少样本才给读数。低于它照样列出来(要让用户看见"这档还没攒够"),
+# 但不给胜率 —— 5 个样本的 60% 和 500 个样本的 60% 不是一回事。
+MIN_LABEL_N = 15
+
+
+def _verdict_titles() -> dict[str, str]:
+    from app.indicators.keltner import _VERDICTS
+    return {code: v[0] for code, v in _VERDICTS.items()}
+
+
+def _state_titles() -> dict[str, str]:
+    from app.indicators.livermore import STATE_LABELS
+    return {code: cn for code, (cn, _en) in STATE_LABELS.items()}
+
+
+def _mainline_label(v) -> str:
+    try:
+        r = int(v)
+    except (TypeError, ValueError):
+        return "非主线"
+    return f"主线第 {r} 位" if r <= 3 else "主线 4 位以后"
+
+
+# 标签维度注册表。**加一个新标签就是加一行** —— 以后再往界面上添什么"结论",
+# 只要它落进了 ctx, 在这里登记一行就能回答"我历史上好不好使"。
+#   key    : ctx 里的字段名
+#   label  : 界面上这一维叫什么
+#   fmt    : 取值 → 人能读的名字
+LABEL_DIMS: list[dict] = [
+    {"key": "verdict", "label": "通道结论",
+     "fmt": lambda v: _verdict_titles().get(str(v), str(v))},
+    {"key": "state", "label": "六态趋势",
+     "fmt": lambda v: _state_titles().get(str(v), str(v))},
+    {"key": "mainline_rank", "label": "主线归属", "fmt": _mainline_label},
+    {"key": "dragon", "label": "龙虎榜", "fmt": lambda v: "上榜" if v else "未上榜"},
+]
+
+
+def _by_label(rows: list[dict], recent_dates: set[str]) -> list[dict]:
+    """每个标签维度 → 各取值的全期与最近表现。
+
+    没有这个标签的行归进 "—"(未标注)那一档, 不丢掉 —— 丢掉的话每档的占比
+    会失真, 用户会以为"通道结论天天都有", 其实多数日子它是 None。
+    """
+    out = []
+    for dim in LABEL_DIMS:
+        key, fmt = dim["key"], dim["fmt"]
+        groups: dict[str, list[dict]] = {}
+        for r in rows:
+            v = (r.get("ctx") or {}).get(key)
+            groups.setdefault("—" if v is None else fmt(v), []).append(r)
+        items = []
+        for name, sub in groups.items():
+            recent = [r for r in sub if str(r.get("as_of")) in recent_dates]
+            items.append({
+                "value": name,
+                "count": len(sub),
+                "recent_count": len(recent),
+                "stats": _agg_rows(sub),
+                "recent_stats": _agg_rows(recent),
+                "shift": _shift_note(_agg_rows(sub), _agg_rows(recent)),
+            })
+        # 样本多的排前面 —— 用户先看见的应该是站得住的那几档
+        items.sort(key=lambda x: -x["count"])
+        out.append({"key": key, "label": dim["label"], "items": items})
+    return out
+
+
+def _shift_note(all_st: dict, recent_st: dict, horizon: str = "t5") -> dict | None:
+    """全期与最近的背离。**这是整个"回头看"里唯一有信息量的那个数。**
+
+    两边样本都够才给结论。差值用胜率(不是均值) —— 均值容易被一两只翻倍股
+    带偏, 而这里问的是"还灵不灵", 胜率更贴题。
+    """
+    a, b = all_st.get(horizon) or {}, recent_st.get(horizon) or {}
+    if (a.get("n") or 0) < MIN_LABEL_N or (b.get("n") or 0) < MIN_LABEL_N:
+        return None
+    aw, bw = a.get("win_rate"), b.get("win_rate")
+    if aw is None or bw is None:
+        return None
+    d = round(bw - aw, 1)
+    # 10 个百分点以内当噪声。样本这个量级下, 更小的差值说不出什么。
+    if abs(d) < 10:
+        return {"dir": "flat", "delta": d,
+                "text": f"最近与全期基本一致({aw}% → {bw}%)"}
+    if d < 0:
+        return {"dir": "down", "delta": d,
+                "text": f"最近明显转差: 全期 {aw}% → 最近 {bw}%({d} 个百分点)"}
+    return {"dir": "up", "delta": d,
+            "text": f"最近明显转好: 全期 {aw}% → 最近 {bw}%(+{d} 个百分点)"}
+
+
 def evaluate(repo, days_limit: int = MAX_DAYS) -> dict:
     """补齐收益并给出全套统计。补出来的收益会落盘, 下次不必重算。"""
     from app.services.json_store import lock_for
@@ -452,6 +563,10 @@ def evaluate(repo, days_limit: int = MAX_DAYS) -> dict:
         "buckets": buckets,
         "ranks": _by_rank(rows),
         "factors": _by_factor(rows),
+        # [R175] 回头看: 把不参与打分的那批标签也拉出来验一验
+        "labels": _by_label(rows, set(day_dates[-RECENT_DAYS:])),
+        "recent_days": min(RECENT_DAYS, len(day_dates)),
+        "min_label_n": MIN_LABEL_N,
         "baseline": baseline,
         "monotonic": _monotonic_note(buckets),
         "caveat": CAVEAT,
