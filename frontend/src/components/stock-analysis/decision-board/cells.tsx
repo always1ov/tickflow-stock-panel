@@ -7,6 +7,28 @@
 import type { KeltnerBand, KeltnerVerdict, Urgency } from '@/lib/api'
 import { VerdictHover } from '@/components/stock-analysis/VerdictHover'
 
+/**
+ * [R194] 决策台单元格的统一基线。**整张表只有这一处定义垂直对齐与行内边距。**
+ *
+ * 上一版参差的原因就是没有这一处: 行内 td 写 `py-2.5` 走默认居中、Keltner 与
+ * 结论写 `px-1.5 py-2.5`、R193 的「该动」写 `py-1.5 align-top` —— 三套各写各的。
+ * 平时看不出来, 一旦某行的「该动」是三行、「AI 信号」是三行, 单行的那几列
+ * (现价/涨跌/浮盈/置信)就飘到了行的**垂直中间**, 而多行的那几列贴着顶,
+ * 一屏扫下来没有任何一条共同的基线。
+ *
+ * 选 `align-top` 而不是 `align-middle`: 这张表有三列天然多行(该动 / AI 分析 /
+ * AI 信号), 居中会让"这一行从哪儿开始读"每行都不一样。顶对齐之后,
+ * **每一行的所有列都从同一条线起笔** —— 这才是"每一列每一行都整齐对齐"。
+ */
+export const TD_BASE = 'align-top py-2'
+
+/**
+ * 数字列的统一写法。`tabular-nums` 是**列对齐的关键**: 没有它, 比例字形下
+ * `1` 比 `8` 窄, 386.50 与 1088.00 的小数点在列里就对不齐, 一列数字看着像
+ * 波浪线。只给 `font-mono` 不够 —— 有些等宽字体的数字仍走比例宽度。
+ */
+export const NUM = 'font-mono tabular-nums'
+
 // [R42] Keltner 位置配色。破上轨/贴上轨用暖色(偏贵), 破下轨/贴下轨用冷色(偏便宜),
 // 通道内保持中性 —— 位置是事实, 不替用户下买卖判断。
 const KELTNER_CLS: Record<KeltnerBand['pos'], string> = {
@@ -26,11 +48,11 @@ const KELTNER_CLS: Record<KeltnerBand['pos'], string> = {
  */
 export function KeltnerCell({ band, close }: { band?: KeltnerBand; close: number | null }) {
   if (!band) {
-    return <td className="whitespace-nowrap px-1.5 py-2.5 text-center"><span className="text-[10px] text-muted/40">—</span></td>
+    return <td className={`${TD_BASE} whitespace-nowrap px-1.5 text-center`}><span className="text-[10px] text-muted/40">—</span></td>
   }
   const pct = Math.round(band.pct * 100)
   return (
-    <td className="whitespace-nowrap px-1.5 py-2.5 text-center">
+    <td className={`${TD_BASE} whitespace-nowrap px-1.5 text-center`}>
       <span
         className={`inline-flex whitespace-nowrap rounded border px-1 py-0.5 text-[10px] ${KELTNER_CLS[band.pos]}`}
         title={
@@ -68,7 +90,7 @@ const VERDICT_CLS: Record<KeltnerVerdict['tone'], string> = {
 export function VerdictCell({ v, onOpen }: { v?: KeltnerVerdict | null; onOpen: () => void }) {
   if (!v) {
     return (
-      <td className="whitespace-nowrap px-1.5 py-2.5 text-center">
+      <td className={`${TD_BASE} whitespace-nowrap px-1.5 text-center`}>
         <button
           onClick={onOpen}
           className="cursor-pointer text-[10px] text-muted/40 hover:text-sky-300"
@@ -80,7 +102,7 @@ export function VerdictCell({ v, onOpen }: { v?: KeltnerVerdict | null; onOpen: 
     )
   }
   return (
-    <td className="whitespace-nowrap px-1.5 py-2.5 text-center">
+    <td className={`${TD_BASE} whitespace-nowrap px-1.5 text-center`}>
       <VerdictHover v={v} note="点击摊开这只票过去每一档结论 —— 出现在哪几天、当时说了什么、之后走成什么样。">
         <button
           onClick={onOpen}
@@ -141,10 +163,10 @@ const SIDE_CLS: Record<string, string> = {
  * 这里显示的是后端给的原话, 前端不自己编。
  */
 export function UrgencyCell({ u }: { u?: Urgency }) {
-  if (!u) return <td className="px-2 py-1.5 text-center text-muted/30">—</td>
+  if (!u) return <td className={`${TD_BASE} px-2 text-muted/30`}>—</td>
   if (u.level === 'idle') {
     return (
-      <td className="px-2 py-1.5 text-center align-top">
+      <td className={`${TD_BASE} px-2`}>
         <span className="text-[10px] text-muted/30" title={u.reason}>无事</span>
       </td>
     )
@@ -152,13 +174,13 @@ export function UrgencyCell({ u }: { u?: Urgency }) {
   const showDist = u.distance != null
   const side = u.side ?? 'info'
   return (
-    <td className="px-2 py-1.5 align-top" title={u.reason}>
+    <td className={`${TD_BASE} px-2`} title={u.reason}>
       <div className="flex flex-col items-start gap-0.5">
         <div className="flex items-center gap-1">
           <span className={`inline-flex items-center gap-1 whitespace-nowrap rounded border px-1.5 py-0.5 text-[10px] ${URGENCY_CLS[u.level]}`}>
             {u.label}
             {showDist && (
-              <span className="font-mono opacity-70">{(u.distance! * 100).toFixed(1)}%</span>
+              <span className={`${NUM} opacity-70`}>{(u.distance! * 100).toFixed(1)}%</span>
             )}
           </span>
           {/* 方向单独一块。**这一格是整列的重点** —— 没有它, 「逼近」两个字
