@@ -15,6 +15,7 @@ import { buildBoardHtml } from '@/lib/decisionBoardHtmlExport'
 import { DEFAULT_EXPORT_KEYS } from '@/lib/decisionBoardExportColumns'
 import { ExportColumnsDialog } from '@/components/stock-analysis/decision-board/ExportColumnsDialog'
 import { ChannelStackCell, ChannelStateCell, NUM, TD_BASE, UrgencyLine, VerdictCell } from '@/components/stock-analysis/decision-board/cells'
+import { ComboTableDialog } from '@/components/stock-analysis/decision-board/ComboTableDialog'
 import { LotsLink } from '@/components/stock-analysis/decision-board/LotsLink'
 import { GlossaryButton } from '@/components/stock-analysis/decision-board/GlossaryDialog'
 // [R169] 合并视图(手填 ⊕ 上游批次登记), 字段说明见 api.ts 的 EffectivePosition
@@ -120,6 +121,8 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
   // 立的规矩是矛盾的(台账「只记不反馈」、R175「AI 只念表」)。
   // 升序 = 最急的在最上面(order 越小越急)。
   const [sort, setSort] = useState<{ key: SortKey; dir: 'asc' | 'desc' }>({ key: 'urgency', dir: 'asc' })
+  // [R203] 27 种组合速查 —— 存整行, 因为弹窗要拿这只票的 geo/runs 做读数带与高亮
+  const [combo, setCombo] = useState<{ name: string; geo?: KeltnerBands['geo']; runs?: KeltnerBands['runs'] } | null>(null)
   // 「只看要动的」—— 自选一多, 默认列 80 行本身就是噪音
   const [actionableOnly, setActionableOnly] = useState(false)
   const toggleSort = (key: SortKey) =>
@@ -573,6 +576,10 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
       </div>
 
       {/* [R48] 逐日复盘: 趋势 / 三档结论 / 涨停按同一条时间轴排开 */}
+      {combo && (
+        <ComboTableDialog name={combo.name} geo={combo.geo} runs={combo.runs}
+                          onClose={() => setCombo(null)} />
+      )}
       {review && (
         <StockReviewDialog symbol={review.symbol} name={review.name} tab={review.tab} onClose={() => setReview(null)} />
       )}
@@ -785,7 +792,8 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
                     </td>
                     {/* [R42] Keltner 三档位置 */}
                     <ChannelStackCell kc={r.kc} close={r.close} />
-                    <ChannelStateCell geo={r.kc?.geo} runs={r.kc?.runs} ph={r.ph} />
+                    <ChannelStateCell geo={r.kc?.geo} runs={r.kc?.runs} ph={r.ph}
+                                      onOpenCombo={() => setCombo({ name: r.name, geo: r.kc?.geo, runs: r.kc?.runs })} />
                     <VerdictCell v={r.kc?.verdict} ev={r.ev} geo={r.kc?.geo} runs={r.kc?.runs} energy={r.kc?.energy} ph={r.ph}
                                  onOpen={() => setReview({ symbol: r.symbol, name: r.name, tab: 'verdict' })} />
                     {/* 置信度(独立列, 可排序) */}

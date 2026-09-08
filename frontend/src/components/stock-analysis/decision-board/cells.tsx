@@ -190,15 +190,28 @@ export function VerdictCell({ v, ev, geo, runs, energy, ph, onOpen }: {
     </span>
   ) : null
   if (!v) {
+    // [R203] 底层在三格上返回「无结论」, 其中**两格是有信息的**:
+    // 「中中上」= 长期到了上沿而中短期都休整完了, 「中中下」= 长期到了下沿
+    // 而中短期已经企稳。它们正是「大级别位置到了、等一个入场点」的另一半。
+    //
+    // 底层是禁止改的, 所以这里不去改判定 —— 改的是**显示**: 补充层已经给这
+    // 两格写了注记, 那就把注记的标题当徽标摆出来, 而不是一个 "—"。
+    // 只有「中中中」是真的零信息(价格在三条通道都认可的区间里), 它照旧显示 "—"。
+    const note = ev?.combo_note
     return (
       <td className={`${TD_BASE} whitespace-nowrap px-1.5`}>
         <button
           onClick={onOpen}
-          className="cursor-pointer text-[10px] text-muted/40 hover:text-sky-300"
-          title={"短期通道在中部 —— 位置上没有可说的, 听趋势和信号的。点击翻这只票过去出过哪些结论"
+          className={note
+            ? 'inline-flex cursor-pointer whitespace-nowrap rounded border border-border bg-elevated/60 px-1 py-0.5 text-[10px] text-secondary transition-colors hover:brightness-125'
+            : 'cursor-pointer text-[10px] text-muted/40 hover:text-sky-300'}
+          title={(note
+            ? `${note.title}:${note.detail}\n\n底层判定在这一格是空的 —— 这句话来自补充层。`
+            : '三档都在通道中部 —— 位置上真的没有可说的, 听趋势和信号的')
+            + '。点击翻这只票过去出过哪些结论'
             + geoLines(geo, ev, runs, energy, ph)}
         >
-          —
+          {note ? note.title : '—'}
         </button>
         {evLine}
       </td>
@@ -342,10 +355,12 @@ const PHASE_TEXT: Record<string, string> = {
  * R193 的教训在这里同样成立: **一列 80 行是用来扫的, 扫的时候没人会悬停。**
  * 所以这一列摆的是能被"扫"出来的东西(一个词 + 一个带符号的数), 细节留悬停。
  */
-export function ChannelStateCell({ geo, runs, ph }: {
+export function ChannelStateCell({ geo, runs, ph, onOpenCombo }: {
   geo?: ChannelGeometry | null
   runs?: ChannelRuns | null
   ph?: ChannelPhase | null
+  /** [R203] 点开 27 种组合速查(带这只票的读数与高亮) */
+  onOpenCombo?: () => void
 }) {
   if (!geo) {
     return <td className={`${TD_BASE} px-1.5`}><span className="text-[10px] text-muted/30">—</span></td>
@@ -356,7 +371,9 @@ export function ChannelStateCell({ geo, runs, ph }: {
     : a?.level === 'decel' ? 'text-emerald-400/80' : 'text-muted'
   return (
     <td className={`${TD_BASE} whitespace-nowrap px-1.5`}>
-      <div className="inline-flex flex-col items-center gap-0.5 leading-tight">
+      <button type="button" onClick={onOpenCombo}
+              className="inline-flex cursor-pointer flex-col items-center gap-0.5 leading-tight transition-colors duration-hover hover:brightness-125"
+              title="点开三档组合速查 —— 27 种组合系统各怎么说, 并高亮这只票现在在哪一格">
         {!!ph && (
           <span className={`text-[10px] ${PHASE_TEXT[ph.code] ?? 'text-muted'}`}
                 title={`${ph.why}\n该盯什么:${ph.watch}`}>
@@ -377,7 +394,7 @@ export function ChannelStateCell({ geo, runs, ph }: {
             挤 {runs.compress_days} 天
           </span>
         )}
-      </div>
+      </button>
     </td>
   )
 }

@@ -387,3 +387,76 @@ def test_阶段的两个刻度与打分曲线的甜区对齐():
 def test_阶段空输入不崩():
     assert g.phase(None) is None
     assert g.phase({"accel": {}}) is None
+
+
+# ================================================================
+# [R203] 匀速基准 —— 加速度的比值形式
+#
+# 这一层的推导 R195 就写在模块头里了, 但一直没算出来。补上它的理由不是
+# "多一个数", 是**这句话用户能自己核对**:
+#
+#     「短期偏离 1.2, 按匀速中期该到 3.7, 实际只有 2.1 —— 跟不上」
+#
+# 而 a1 = −0.08 不能。两者是同一件事的两种写法, 各有各的用处:
+# 打分走差值(比值在 d短 跨零时会翻转解释), 界面走比值。
+
+
+def test_匀速时比值精确等于一():
+    """这是**精确**成立的, 不是近似 —— 匀速下 d_n ∝ (n−1)/2。"""
+    b = g.baseline({"s": 1.0, "m": g.STEADY_RATIO_MID, "l": g.STEADY_RATIO_LONG})
+    assert b["ratio"] == 1.0
+    assert b["level"] == "onpace"
+
+
+def test_加速时中期跟不上短期的甩开():
+    b = g.baseline({"s": 2.0, "m": 3.5, "l": 5.0})
+    assert b["level"] == "lead" and b["ratio"] < 1
+    assert "比之前快" in b["why"]
+
+
+def test_减速时中期比该有的位置还远():
+    b = g.baseline({"s": 0.5, "m": 3.0, "l": 7.0})
+    assert b["level"] == "lag" and b["ratio"] > 1
+    assert "收劲" in b["why"]
+
+
+def test_短期偏离太小时不给结论而不是给个假数():
+    """分母趋近 0 时任何比值都没有意义。给个"看着像真的"的数比不给更坏。"""
+    assert g.baseline({"s": 0.1, "m": 0.3, "l": 0.6}) is None
+    assert g.baseline({"s": 0.0, "m": 0.0, "l": 0.0}) is None
+    assert g.baseline(None) is None
+    assert g.baseline({"s": 1.0}) is None
+
+
+def test_比值形式与差值形式方向一致():
+    """两种写法是同一件事 —— 结论打架就说明有一边写错了。
+
+    只在**短期偏离够大**(比值有意义)且**判定不在容差带里**时比较:
+    两者的门槛本来就不同(一个是 ±15% 的比值容差, 一个是 0.05 ATR/天),
+    边界附近各自落在不同档是正常的, 不是矛盾。
+    """
+    import itertools
+    checked = 0
+    for ds, dm in itertools.product((0.5, 1.0, 2.0, 3.0), (0.5, 2.0, 4.0, 8.0, 12.0)):
+        d = {"s": ds, "m": dm, "l": dm * 2}
+        b = g.baseline(d)
+        if not b or b["level"] == "onpace":
+            continue
+        # 差值形式: v1 = d_s / SPAN1, v2 = (d_s − d_m) / SPAN2 …
+        # 这里直接用 geometry 那套的定义重算一遍
+        v1 = ds / g.SPAN1
+        v2 = (ds - dm) / g.SPAN2 * -1      # d_m − d_s = (MA_s − MA_m)/ATR
+        a1 = v1 - v2
+        if abs(a1) <= g.ACCEL_FLAT:
+            continue
+        checked += 1
+        assert (b["level"] == "lead") == (a1 > 0), (
+            f"d={d} 比值说 {b['level']}, 差值说 a1={a1:.3f} —— 两种写法打架")
+    assert checked >= 5, "样本太少, 这条测不到什么"
+
+
+def test_基准挂在几何量的返回值里():
+    """算了不给出去等于没算 —— R200 那次 explain() 就是这么躺了五轮。"""
+    bands = _bands(104.0, 102.0, 100.0, 96.0, atr=2.0)
+    got = g.geometry(bands, close=104.0)
+    assert got is not None and "baseline" in got

@@ -497,6 +497,16 @@ export interface TodayPrefs {
   pyramid_probe: number; pyramid_confirm: number; pyramid_days: number
   /** [R40] 只看这几个板; 空 = 全看 */
   boards: string[]
+  /** [R204] 参与打分的因子键; 空 = 全开(与 boards 同一个约定) */
+  factors?: string[]
+  /** [R204] 因子目录 —— 只在 GET /prefs 与总览里给, 保存时不用回传。
+   *  从后端权重表推出来的, 前端不写死一份免得漂。 */
+  factor_catalog?: {
+    key: string; cn: string
+    axis: 'quality' | 'timing'; axis_cn: string
+    /** 轴内权重 */
+    weight: number
+  }[]
 }
 export interface TodayHolding {
   symbol: string; name: string; close: number | null; cost: number | null; pnl_pct: number | null
@@ -786,6 +796,20 @@ export interface ChannelGeometry {
     level: 'accel' | 'steady' | 'decel' | null
     level_cn: string
   }
+  /**
+   * [R203] 匀速基准对照 —— 加速度的**比值形式**。
+   * 匀速时 d短 : d中 : d长 = 1 : 3.105 : 6.263 是精确成立的, 偏离这条线就是
+   * 加速/减速。比 a1 好讲: 「短期 1.2 时中期该到 3.7, 实际 2.1」可以自己核对。
+   * 短期偏离太小时分母趋近 0, 返回 null(不给假数)。
+   */
+  baseline: {
+    expect_m: number; expect_l: number
+    actual_m: number; actual_l: number
+    ratio: number
+    level: 'lead' | 'onpace' | 'lag'
+    level_cn: string
+    why: string
+  } | null
   /** 压缩指数 = 三带交集 / 短带宽度 ∈ [0,1]。1 = 均线粘合, 0 = 已脱开 */
   compress: number | null
   compress_level: 'tight' | 'mid' | 'loose' | null
@@ -829,6 +853,16 @@ export interface ChannelEvent {
   confirmed: boolean
   /** 这一格组合底层结论说得不准时的补充(27 种里有 11 种) */
   combo_note?: { combo: string; title: string; detail: string }
+}
+
+/** [R203] 27 种组合速查表的一行。整份由后端从底层判定生成, 前端不写死。 */
+export interface ComboTableRow {
+  combo: string
+  shape: string
+  read: string
+  verdict: { title: string; code: string; tone: KeltnerVerdict['tone']
+             action: string; detail: string } | null
+  note: { title: string; detail: string } | null
 }
 
 export interface KeltnerBands {
@@ -4762,6 +4796,10 @@ export const api = {
     request<{ urgency: Record<string, Urgency>; event?: Record<string, ChannelEvent>
               phase?: Record<string, ChannelPhase> }>(
       `/api/stock-analysis/urgency?symbols=${encodeURIComponent(symbols.join(','))}`),
+
+  /** [R203] 27 种组合速查表。无参数、结果恒定 —— 前端按天缓存即可 */
+  comboTable: () =>
+    request<{ rows: ComboTableRow[] }>('/api/stock-analysis/combo-table'),
 
   stockKeltner: (symbols: string[]) =>
     request<{ keltner: Record<string, KeltnerBands> }>(

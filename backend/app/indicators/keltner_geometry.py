@@ -196,6 +196,60 @@ def combo_code(bands: dict | None) -> str | None:
     return "".join(out)
 
 
+# [R203] 匀速基准 —— 这一层推导早就写在模块头里, 却从来没算出来过。
+#
+# 匀速上涨时 d_n ∝ (n−1)/2, 于是有一条**精确**的参照线:
+#
+#     d短 : d中 : d长  =  9.5 : 29.5 : 59.5  =  1 : 3.105 : 6.263
+#
+# 偏离这条线的部分就是加速度的**比值形式**。它与打分用的差值形式
+# (a1 = v1 − v2) 是同一件事的两种写法, 但比值这一版**在界面上好讲得多**:
+#
+#     「短期偏离 1.2 倍日常波动, 按匀速中期该到 3.7, 实际只有 2.1
+#       —— 中期跟不上, 这波在减速」
+#
+# 这句话是可以自己核对的, 而 a1 = −0.08 不是。所以打分照旧走差值(比值在
+# d短 跨零时会翻转解释), 界面这一层走比值。
+#
+# 用 d 而不是 pct: 两者只差一个线性映射, 但 d 三档同尺, 比值才有意义。
+_BASE_TOL = 0.15          # 实际 / 应该 落在 ±15% 内算"跟得上"
+_BASE_MIN_D = 0.30        # |d短| 小于这个数时比值会炸, 不给结论
+
+
+def baseline(d: dict[str, float] | None) -> dict | None:
+    """匀速基准对照。返回 None 表示"这只票现在问不出这个问题"。
+
+    短期偏离太小时(价格就贴在短期中线上)比值的分母趋近 0, 任何比值都没有
+    意义 —— 那时不给结论, 而不是给一个看着像真的假数。
+    """
+    if not d or any(k_ not in d for k_ in ("s", "m", "l")):
+        return None
+    ds = float(d["s"])
+    if abs(ds) < _BASE_MIN_D:
+        return None
+    exp_m, exp_l = ds * STEADY_RATIO_MID, ds * STEADY_RATIO_LONG
+    act_m, act_l = float(d["m"]), float(d["l"])
+    # 比值按**符号方向**读: 上涨途中 ds > 0, 实际小于应该 = 中期跟不上 = 减速。
+    # ds < 0(下跌途中)时方向整个翻过来, 所以统一除以 exp 再看大小。
+    ratio = act_m / exp_m if exp_m else None
+    if ratio is None:
+        return None
+    if ratio > 1 + _BASE_TOL:
+        level, cn = "lag", "跟不上"
+        why = "中期比匀速该有的位置还远 —— 这一段是慢慢走上来的, 近期反而在收劲"
+    elif ratio < 1 - _BASE_TOL:
+        level, cn = "lead", "冲在前面"
+        why = "短期已经甩开中期该有的位置 —— 最近这一段明显比之前快"
+    else:
+        level, cn = "onpace", "跟得上"
+        why = "短、中期的位置正好落在匀速那条线上 —— 速度没变"
+    return {
+        "expect_m": round(exp_m, 2), "expect_l": round(exp_l, 2),
+        "actual_m": round(act_m, 2), "actual_l": round(act_l, 2),
+        "ratio": round(ratio, 2), "level": level, "level_cn": cn, "why": why,
+    }
+
+
 def geometry(bands: dict | None, close) -> dict | None:
     """三档读数 → 全部几何量。纯函数, 零新增取数。
 
@@ -244,6 +298,8 @@ def geometry(bands: dict | None, close) -> dict | None:
                            "tight" if o >= COMPRESS_TIGHT else
                            "loose" if o <= COMPRESS_LOOSE else "mid"),
         # --- 排列与分离 ---
+        # [R203] 匀速基准对照 —— 加速度的比值形式, 界面上好讲、可自己核对
+        "baseline": baseline(d),
         "spread": round(spread, 3),
         "torn": abs(spread) >= TORN_ATR,
         "nested": abs(spread) <= NESTED_ATR,
@@ -830,3 +886,106 @@ def phase(geo: dict | None, runs: dict | None = None) -> dict | None:
     return mk(PH_ADVANCING,
               f"三条线稳稳地往上散开(间距 {sp:.1f})" + ("而且还在提速" if up else ", 速度平稳"),
               "这一段是行情的主体。真正要盯的是什么时候开始走慢 —— 那才是转折的先兆")
+
+
+# ================================================================
+# [R203] 27 种组合速查表 —— 「系统结论」与「几何含义」并排
+#
+# 用户: 「我要看到系统结论和几何含义、偏离基准加速度等等」。
+#
+# ## 为什么是**生成**的, 不是誊抄的
+#
+# 结论那一列直接调作者的 `keltner.verdict()` 拿, 传进去的是只带 `pos` 的
+# 最小 bands。这样做的意义不只是省事:
+#
+#   · 誊抄一份 27 行的对照表, 底层哪天改了措辞, 这张表就开始说假话, 而且
+#     **没有任何东西会报错** —— 那种漂移是最难发现的一类。
+#   · 生成的表天然与底层同步。底层一个字没动(它是禁止动的), 这里只是读它。
+#
+# 「几何含义」那一列同样是**推出来的**: 由三档各自在上沿/中部/下沿这件事
+# 直接构造, 不是每格手写一句。手写 27 句的问题和誊抄一样 —— 迟早对不上。
+# 只有那 11 格底层说得不够贴切的, 才另外挂 COMBO_NOTES 的补充(见上)。
+#
+# ## 用词
+#
+# 守 R200 那两条: 不用行话(高频/中频/低频、O、粘合), 不点破均线周期与倍数。
+# 用户给的那张草表里写着「O=0」「MA120 ≫ C」「全频段过热」—— 那三样都不能
+# 进界面: 前两个是公式, 第三个是行话。
+
+_POS_CN = {"上": "上沿", "中": "中部", "下": "下沿"}
+_SCALE_CN = ("短期", "中期", "长期")
+
+
+def _combo_shape(code: str) -> str:
+    """三档位置 → 一句「谁在哪」。纯描述, 不下判断。"""
+    return "、".join(f"{s}在{_POS_CN[c]}" for s, c in zip(_SCALE_CN, code))
+
+
+def _combo_read(code: str) -> str:
+    """三档位置 → 一句「这意味着什么」。
+
+    只有六种形态需要分别说, 其余按"谁和谁一致"归并 —— 归并是有依据的:
+    三档共用同一把尺子, 所以真正的信息只在**它们一致不一致**上。
+    """
+    s, m, l = code
+    if s == m == l == "上":
+        return "三种看法同时说贵 —— 上面已经没有回旋余地, 这个位置买是在最贵的地方"
+    if s == m == l == "下":
+        return "三种看法同时说便宜 —— 可能是到底了, 也可能是还在跌, 光看位置分不出来"
+    if s == m == l == "中":
+        return "价格落在三条通道都认可的区间里 —— 这一格是真的没有信息, 该听趋势和信号的"
+    if s == "上" and l == "下":
+        return "短期最贵而长期最便宜 —— 是深跌之后的反弹, 不是趋势转好, 最容易被读成突破"
+    if s == "下" and l == "上":
+        return "短期最便宜而长期最贵 —— 上升途中的深蹲, 和真跌破长得像但大周期还站着"
+    if s == "上" and m == "中" and l == "中":
+        return "只有短期冲高, 中长期都没动 —— 多半是一次性冲击, 不是状态变了"
+    if s == "下" and m == "中" and l == "中":
+        return "只有短期回落, 中长期都没动 —— 常规回调, 大周期还没受影响"
+    if s == "中" and m == "中":
+        # l 必然不是「中」(三个都中已经在上面返回了)
+        return (f"短期和中期都已经回到中部, 只有长期还在{_POS_CN[l]} —— "
+                + ("大周期位置不低, 但一个月和一个季度都休整完了"
+                   if l == "上" else "大周期跌了不少, 而中短期已经企稳"))
+    if s == "上":
+        return "短期已经到上沿, 中长期还没同时确认 —— 冲高成不成还要看后面跟不跟"
+    if s == "下":
+        return "短期已经到下沿, 中长期还没同时确认 —— 调到不到位还要看后面跟不跟"
+    if m == l:
+        return f"短期已经回到中部, 而中长期都在{_POS_CN[m]} —— 大周期的位置还在, 短期先休整完了"
+    return "三档互相打架, 各说各的 —— 这种格子先别急着定性, 等它们对齐"
+
+
+def combo_table() -> list[dict]:
+    """27 种组合的完整速查表。纯函数, 无输入无取数, 结果可缓存。
+
+    每行:
+        combo        三字码, 如「上中下」
+        shape        谁在哪(短期在上沿、中期在中部……)
+        read         这意味着什么
+        verdict      作者那一层的结论 {title, code, tone, action, detail} 或 None
+        note         这一格底层说得不够贴切时的补充 {title, detail} 或 None
+    """
+    from app.indicators.keltner import POS_ABOVE, POS_BELOW, POS_INSIDE, verdict
+
+    pos_map = {"上": POS_ABOVE, "中": POS_INSIDE, "下": POS_BELOW}
+    out: list[dict] = []
+    for s in "上中下":
+        for m in "上中下":
+            for l_ in "上中下":
+                code = s + m + l_
+                bands = {k_: {"pos": pos_map[c]}
+                         for k_, c in zip(("s", "m", "l"), code)}
+                v = verdict(bands)
+                got = COMBO_NOTES.get(code)
+                out.append({
+                    "combo": code,
+                    "shape": _combo_shape(code),
+                    "read": _combo_read(code),
+                    "verdict": (None if not v else
+                                {"title": v["title"], "code": v["code"],
+                                 "tone": v["tone"], "action": v["action"],
+                                 "detail": v["detail"]}),
+                    "note": (None if not got else {"title": got[0], "detail": got[1]}),
+                })
+    return out

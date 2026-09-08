@@ -86,6 +86,8 @@ export const QK = {
   stockTrend:           (symbol: string) => ['stock-trend', symbol] as const,
   stockTrends:          (symbols: string) => ['stock-trends', symbols] as const,
   stockKeltner:         (symbols: string) => ['stock-keltner', symbols] as const,
+  // [R203] 27 种组合速查表 —— 恒定内容, 不带参数
+  comboTable:           ['combo-table'] as const,
   stockUrgency:         (symbols: string) => ['stock-urgency', symbols] as const,
   stockReview:          (symbol: string, days: number) => ['stock-review', symbol, days] as const,
   klineMinute:          (symbol: string, date: string) =>

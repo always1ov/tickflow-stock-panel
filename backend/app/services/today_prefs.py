@@ -11,6 +11,7 @@ from pathlib import Path
 
 from app.config import settings
 from app.price_limits import BOARDS
+from app.services.opportunity_score import QUALITY_WEIGHTS, TIMING_WEIGHTS
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +26,11 @@ DEFAULTS = {
     "pyramid_probe": 35, "pyramid_confirm": 70, "pyramid_days": 2,
     # [R40] 板块过滤: 空 = 全看。只影响买入机会区, 卖出/风险提醒永远不受影响。
     "boards": [],
+    # [R204] 参与打分的因子。**空 = 全开**(与 boards 同一个约定: 全选等价于
+    # 不过滤, 统一存成空, 免得以后加了新因子时"当时全选"的旧配置反而把新因子
+    # 排除在外)。用户可以关掉几个来把把握分的区分度拉开 —— 十个因子平均出来
+    # 的分天生挤在中间一段, 少平均几个带宽就回来了。
+    "factors": [],
 }
 _MIN_SCORE_RANGE = (0, 100)
 _MAX_SHOW_RANGE = (1, 50)
@@ -35,6 +41,8 @@ _PYRAMID_PROBE_RANGE = (10, 60)
 _PYRAMID_CONFIRM_RANGE = (40, 90)
 _PYRAMID_DAYS_RANGE = (1, 5)
 _VALID_BOARDS = frozenset(BOARDS)
+# [R204] 合法因子键**从权重表推**, 不另抄一份 —— 抄一份就会漂。
+_VALID_FACTORS = frozenset(QUALITY_WEIGHTS) | frozenset(TIMING_WEIGHTS)
 
 
 def _boards(value, fallback: list[str]) -> list[str]:
@@ -55,6 +63,25 @@ def _boards(value, fallback: list[str]) -> list[str]:
     if picked == _VALID_BOARDS:
         return []
     return [b for b in BOARDS if b in picked]
+
+
+def _factors(value, fallback: list[str]) -> list[str]:
+    """因子清单归一。与 _boards 同一套规矩: 全选 = 空 = 不过滤。
+
+    多守一条: **两根轴各自至少要留一个**。把整根轴关空会让那根轴变成 None,
+    合成分退化成只看另一根 —— 那不是"自定义因子", 是把两轴结构关掉了,
+    而用户按的只是几个勾。真按空了就整表原样返回(等于没关)。
+    """
+    if value is None or not isinstance(value, (list, tuple, set)):
+        return list(fallback)
+    picked = {str(v) for v in value} & _VALID_FACTORS
+    if not picked or picked == _VALID_FACTORS:
+        return []
+    if not (picked & set(QUALITY_WEIGHTS)) or not (picked & set(TIMING_WEIGHTS)):
+        return list(fallback)
+    # 按权重表的顺序存, 让文件与界面的顺序一致
+    order = list(QUALITY_WEIGHTS) + list(TIMING_WEIGHTS)
+    return [k for k in order if k in picked]
 
 
 def _store_path() -> Path:
@@ -92,23 +119,25 @@ def load() -> dict:
         "pyramid_confirm": _clamp(data.get("pyramid_confirm"), *_PYRAMID_CONFIRM_RANGE, DEFAULTS["pyramid_confirm"]),
         "pyramid_days": _clamp(data.get("pyramid_days"), *_PYRAMID_DAYS_RANGE, DEFAULTS["pyramid_days"]),
         "boards": _boards(data.get("boards"), DEFAULTS["boards"]),
+        "factors": _factors(data.get("factors"), DEFAULTS["factors"]),
     }
 
 
 def save(min_score=None, max_show=None, max_single=None, target_vol=None,
          max_drawdown=None, pyramid_probe=None, pyramid_confirm=None,
-         pyramid_days=None, boards=None) -> dict:
+         pyramid_days=None, boards=None, factors=None) -> dict:
     """更新偏好(只改传入的字段), 返回生效后的完整偏好。"""
     # [R72] 读-改-写上锁 + 原子落盘(CONTRIBUTING §6.2)
     from app.services.json_store import lock_for
     with lock_for(_store_path()):
         return _save_locked(min_score, max_show, max_single, target_vol,
                             max_drawdown, pyramid_probe, pyramid_confirm,
-                            pyramid_days, boards)
+                            pyramid_days, boards, factors)
 
 
 def _save_locked(min_score, max_show, max_single, target_vol, max_drawdown,
-                 pyramid_probe, pyramid_confirm, pyramid_days, boards) -> dict:
+                 pyramid_probe, pyramid_confirm, pyramid_days, boards,
+                 factors=None) -> dict:
     cur = load()
     if min_score is not None:
         cur["min_score"] = _clamp(min_score, *_MIN_SCORE_RANGE, cur["min_score"])
@@ -128,6 +157,8 @@ def _save_locked(min_score, max_show, max_single, target_vol, max_drawdown,
         cur["pyramid_days"] = _clamp(pyramid_days, *_PYRAMID_DAYS_RANGE, cur["pyramid_days"])
     if boards is not None:
         cur["boards"] = _boards(boards, cur["boards"])
+    if factors is not None:
+        cur["factors"] = _factors(factors, cur["factors"])
     from app.services.json_store import atomic_write_json
     atomic_write_json(_store_path(), cur)
     return cur

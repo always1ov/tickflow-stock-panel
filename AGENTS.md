@@ -110,4 +110,8 @@ Keltner 三档、注记·不计分、焦点名单、收盘口径 vs 盘中口径
 9. **改代码必须用 `.claude/skills/` 里那三套技能**（见上面 `## Agent skills`）。
    用户原话「以后任何 ai 改代码都要用这三套技能」。动前端就得走 `emil-design-eng`；
    动到动效，改完必须过 `review-animations`。
+10. **镜像构建按 [`docs/docker-build-convention.md`](docs/docker-build-convention.md) 来。**
+    用户原话「以后这个项目构建都要按照这个要求」。目标是**体积更小、构建更快、
+    缓存更稳**；任何动到 `Dockerfile` / `.dockerignore` / `.github/workflows/docker.yml`
+    的改动，都要先读那份约定再动手，并在改完后逐条对照自查。
 

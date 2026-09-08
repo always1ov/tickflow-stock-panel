@@ -420,6 +420,22 @@ def get_urgency(request: Request, symbols: str = Query(..., description="逗号�
         "event": events, "phase": phases}
 
 
+@router.get("/combo-table")
+def get_combo_table() -> dict:
+    """[R203] 27 种组合速查表 —— 「系统结论」与「几何含义」并排。
+
+    用户: 「我要看到系统结论和几何含义、偏离基准加速度等等」。
+
+    **无参数、无取数、结果恒定** —— 它只是把作者那一层的 10 条结论按三档位置
+    展开成 27 格, 再并上补充层的解读。所以整份可以让浏览器长期缓存。
+
+    为什么做成端点而不是前端写死一份: 誊抄的表会漂 —— 底层哪天改了措辞,
+    前端那份就开始说假话, 而且没有任何东西会报错。生成的表跟着底层走。
+    """
+    from app.indicators import keltner_geometry as kg
+    return {"rows": kg.combo_table()}
+
+
 @router.get("/review")
 def get_review(request: Request, symbol: str = Query(...),
                days: int = Query(120, ge=10, le=250)):

@@ -29,6 +29,7 @@ import {
   api, TODAY_BOARDS, type SignalAiSchedule, type TodayAiSchedule,
   type TodayPick, type TodayPrefs,
 } from '@/lib/api'
+import { cn } from '@/lib/cn'
 import { toast } from '@/components/Toast'
 import { PageShell } from '@/components/PageShell'
 import { ScoreLedgerDialog } from '@/components/ScoreLedgerDialog'
@@ -52,6 +53,96 @@ const ACTION_DOT: Record<string, string> = {
   mid: 'bg-amber-300',
   low: 'bg-muted/50',
 }
+
+
+/**
+ * [R204] 因子开关 —— 用户自己想到的那个解法。
+ *
+ * 用户: 「为了解决"因子越多挤得越狠", 因子我可以在今日总览页面自定义选择哪些开启」。
+ *
+ * 这确实是对的解法。把握分的取值挤在中间一段是**「平均」的固有性质**, 不是
+ * 曲线没调好 —— 拿满量程的随机因子跑同一套合成, p10~p90 也只有 24 分。
+ * 少平均几个, 带宽自然就回来了。
+ *
+ * 两条必须守住的:
+ *   ① **关掉 ≠ 没读到。** 关掉的因子压根不进覆盖率分母, 所以不会被置信系数
+ *      罚一次(见 opportunity_score.enabled_weights)。不然每关一个就掉几分,
+ *      这个开关等于告诉人"你最好别动"。
+ *   ② **两根轴各自至少留一个。** 把整根轴关空会让合成分退化成只看另一根 ——
+ *      那不是自定义因子, 是把两轴结构关掉了, 而用户按的只是几个勾。
+ *      后端会拒绝这种保存(按"没改"处理), 这里也把最后一个勾禁掉, 免得
+ *      用户点了没反应还不知道为什么。
+ */
+function FactorPicker({ prefs, onSave }: {
+  prefs: TodayPrefs
+  onSave: (factors: string[]) => void
+}) {
+  const catalog = prefs.factor_catalog ?? []
+  if (!catalog.length) return null
+  const all = catalog.map(c => c.key)
+  // 空 = 全开(与板块过滤同一个约定)
+  const on = new Set(prefs.factors?.length ? prefs.factors : all)
+  const axes = ['quality', 'timing'] as const
+  const lastOfAxis = (axis: string) =>
+    catalog.filter(c => c.axis === axis && on.has(c.key)).length <= 1
+  const toggle = (key: string, axis: string) => {
+    const next = new Set(on)
+    if (next.has(key)) {
+      if (lastOfAxis(axis)) return          // 见 ② —— 这根轴不能清空
+      next.delete(key)
+    } else next.add(key)
+    onSave(next.size === all.length ? [] : all.filter(k => next.has(k)))
+  }
+  return (
+    <div className="flex w-full flex-col gap-1.5">
+      <div className="flex items-baseline gap-2 text-[11px] text-muted">
+        <span className="whitespace-nowrap">参与打分的因子</span>
+        <span className="text-[10px] text-muted/70">
+          关掉几个能把分数拉开 —— 十个因子平均出来的分天生挤在中间一段。
+          关掉的不算「缺数据」,不扣置信分。
+        </span>
+        {on.size < all.length && (
+          <button type="button" onClick={() => onSave([])}
+                  className="ml-auto text-[10px] text-accent hover:underline">
+            全开
+          </button>
+        )}
+      </div>
+      {axes.map(axis => {
+        const items = catalog.filter(c => c.axis === axis)
+        if (!items.length) return null
+        return (
+          <div key={axis} className="flex flex-wrap items-center gap-1.5">
+            <span className="w-8 shrink-0 text-[10px] text-muted/70">{items[0].axis_cn}</span>
+            {items.map(c => {
+              const active = on.has(c.key)
+              const locked = active && lastOfAxis(axis)
+              return (
+                <button
+                  key={c.key} type="button"
+                  onClick={() => toggle(c.key, axis)}
+                  disabled={locked}
+                  title={locked
+                    ? '这根轴至少要留一个因子 —— 全关掉的话这根轴就没有分数了'
+                    : `轴内权重 ${(c.weight * 100).toFixed(0)}%${active ? '(点击关掉)' : '(点击开启)'}`}
+                  className={cn(
+                    'rounded-btn border px-1.5 py-0.5 text-[10px] transition-colors duration-hover',
+                    locked && 'cursor-not-allowed opacity-60',
+                    active
+                      ? 'border-accent/40 bg-accent/10 text-foreground'
+                      : 'border-border/60 text-muted hover:text-foreground')}
+                >
+                  {c.cn}
+                </button>
+              )
+            })}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 
 export function Today() {
   const qc = useQueryClient()
@@ -581,6 +672,7 @@ export function Today() {
             </div>
             {prefsOpen && (
               <div className="flex flex-wrap items-center gap-x-5 gap-y-3 border-b border-border/40 bg-base/40 px-4 py-3">
+                <FactorPicker prefs={d.prefs} onSave={(factors) => prefsMut.mutate({ factors })} />
                 <label className="flex items-center gap-2 text-[11px] text-muted">
                   <span className="whitespace-nowrap">最低把握分</span>
                   <input
