@@ -143,7 +143,10 @@ export function StockPreviewDialog({ symbol: symbolProp, name: nameProp, onClose
   useEffect(() => {
     if (symbol) setRecent(pushRecentStock(symbol, name))
   }, [symbol, name])
-  const [view, setView] = useState<PreviewView>('daily')
+  // [R185] 默认落在「关键价位」而不是日K —— 这个弹窗是拿来做决策的, 图表模块
+  // 自己的注释也写着「本图表面向分析决策, 核心是关键价位」。点进来先看到的
+  // 该是压力/支撑/枢轴那几条线, 而不是一根还要自己看的 K 线。
+  const [view, setView] = useState<PreviewView>('levels')
   const [intradayDays, setIntradayDays] = useState<number | null>(loadIntradayDays)
   const [dateRange, setDateRange] = useState(getDefaultRange)
   const [showMonitorEditor, setShowMonitorEditor] = useState(false)
@@ -271,11 +274,13 @@ export function StockPreviewDialog({ symbol: symbolProp, name: nameProp, onClose
     return () => document.removeEventListener('keydown', handler)
   }, [symbol, go, showMonitorEditor, priceAlertDraft])
 
-  // 弹窗内切股时保留当前视图 (分时 tab 下切股不应跳回日K);
-  // 仅当弹窗首次打开 (symbol 从 null 变非空) 时重置为日K。
+  // 弹窗内切股时保留当前视图 (分时 tab 下切股不应跳回去);
+  // 仅当弹窗首次打开 (symbol 从 null 变非空) 时重置。
+  // [R185] 重置目标跟着默认值一起从 daily 改成 levels —— 只改上面那个
+  // useState 初值是不够的: 弹窗关掉再打开会走这一条, 又会跳回日K。
   const prevSymbolRef = useRef<string | null>(null)
   useEffect(() => {
-    if (prevSymbolRef.current == null && symbol != null) setView('daily')
+    if (prevSymbolRef.current == null && symbol != null) setView('levels')
     prevSymbolRef.current = symbol
     setPriceAlertDraft(null)
   }, [symbol])
