@@ -11,11 +11,12 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
-  Bot, Clock, Eye, Loader2, Play, Plus, RotateCcw, ShieldAlert, Target, Trash2, TrendingUp, X,
+  Bot, Clock, Eye, Loader2, Play, Plus, RotateCcw, ShieldAlert, Target, Trash2, X,
 } from 'lucide-react'
 import {
   api, type PaperBook, type PaperOrder, type PaperScope, type PaperTrader,
 } from '@/lib/api'
+import { storage } from '@/lib/storage'
 import { PageHeader } from '@/components/PageHeader'
 import { PaperEquityChart } from '@/components/paper/PaperEquityChart'
 import { toast } from '@/components/Toast'
@@ -102,9 +103,15 @@ export function PaperTrading({ embedded = false }: { embedded?: boolean } = {}) 
   const qc = useQueryClient()
   const [openId, setOpenId] = useState<{ id: string; scope: PaperScope } | null>(null)
   const [adding, setAdding] = useState(false)
+  // [R192] 一页只显示一个操作员, 下拉切换。刷新后回到原处 —— 每天要看的多半是
+  // 同一个, 每次都得重选一遍是纯摩擦。
+  const [pickedId, setPickedId] = useState<string | null>(() => storage.paperTrader.get(null))
 
   const q = useQuery({ queryKey: QK.paperTraders, queryFn: () => api.paperTraders(), refetchInterval: 30_000 })
   const traders = q.data?.traders ?? []
+  // 存的那个可能已经被删了 —— 找不到就退回第一个, 不留白屏
+  const current = traders.find(t => t.id === pickedId) ?? traders[0] ?? null
+  useEffect(() => { if (current) storage.paperTrader.set(current.id) }, [current])
   const refresh = () => qc.invalidateQueries({ queryKey: QK.paperTraders })
 
   const run = useMutation({
@@ -197,21 +204,39 @@ export function PaperTrading({ embedded = false }: { embedded?: boolean } = {}) 
           </div>
         )}
 
-        {/* [R190] 一行一个操作员。参考项目的 `.mp-paper` 是**单栏面板**, 指标条
-            与净值图都吃满整宽; 原来 xl 两栏会把它们各压到半屏, 九个指标格挤在
-            半宽里就又变回一段话了。 */}
-        {traders.length > 0 && (
-          <div className="grid grid-cols-1 gap-4">
-            {traders.map(t => (
-              <TraderCard key={t.id} t={t}
-                runningScope={run.isPending && run.variables?.id === t.id ? run.variables.scope : null}
-                onRun={sc => run.mutate({ id: t.id, scope: sc })}
-                onLifeline={sc => lifeline.mutate({ id: t.id, scope: sc })}
-                onPlanCheck={sc => planCheck.mutate({ id: t.id, scope: sc })}
-                onOpen={sc => setOpenId({ id: t.id, scope: sc })}
-                onChanged={refresh} />
-            ))}
+        {/* [R192] 操作员切换条。原来是把所有操作员的卡片一路铺下去 —— 配三个
+            模型就是三份净值图 + 六本账, 一屏放不下, 而任一时刻真正在看的只有
+            一个。下拉里带上每本账的收益率, 所以「切之前先看一眼谁领先」这件事
+            不需要靠铺开来完成。 */}
+        {traders.length > 0 && current && (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[10px] text-muted">操作员</span>
+            <select
+              value={current.id}
+              onChange={e => setPickedId(e.target.value)}
+              className="h-8 max-w-full rounded-input border border-border bg-surface px-2 text-xs text-foreground outline-none focus:border-accent"
+            >
+              {traders.map(t => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                  {t.books.length
+                    ? ` — ${t.books.map(b => `${b.scope_cn} ${pct(b.return_pct)}`).join(' / ')}`
+                    : ''}
+                </option>
+              ))}
+            </select>
+            <span className="text-[10px] text-muted/70">共 {traders.length} 个</span>
           </div>
+        )}
+
+        {current && (
+          <TraderCard key={current.id} t={current}
+            runningScope={run.isPending && run.variables?.id === current.id ? run.variables.scope : null}
+            onRun={sc => run.mutate({ id: current.id, scope: sc })}
+            onLifeline={sc => lifeline.mutate({ id: current.id, scope: sc })}
+            onPlanCheck={sc => planCheck.mutate({ id: current.id, scope: sc })}
+            onOpen={sc => setOpenId({ id: current.id, scope: sc })}
+            onChanged={refresh} />
         )}
       </main>
 
@@ -325,7 +350,7 @@ function TraderCard({ t, runningScope, onRun, onLifeline, onPlanCheck, onOpen, o
           画在一起), 而指标条要的是整行宽度。 */}
       <div className="divide-y divide-border/60">
         {t.books.map(b => (
-          <BookPane key={b.scope} b={b}
+          <BookPane key={b.scope} b={b} traderId={t.id}
             busy={runningScope === b.scope}
             onRun={() => onRun(b.scope)}
             onLifeline={() => onLifeline(b.scope)}
@@ -352,12 +377,22 @@ function TraderCard({ t, runningScope, onRun, onLifeline, onPlanCheck, onOpen, o
   )
 }
 
-function BookPane({ b, busy, onRun, onLifeline, onPlanCheck, onOpen, onReset, onCapital }: {
-  b: PaperBook; busy: boolean
+function BookPane({ b, traderId, busy, onRun, onLifeline, onPlanCheck, onOpen, onReset, onCapital }: {
+  b: PaperBook; traderId: string; busy: boolean
   onRun: () => void; onLifeline: () => void; onPlanCheck: () => void
   onOpen: () => void; onReset: () => void
   onCapital: (v: number) => void
 }) {
+  // [R192] 持仓明细与操作记录直接摊在页面上, 不再只藏在「明细」弹窗里。
+  // 一页只显示一个操作员之后有的是地方, 而这两张表恰恰是每天要看的东西 ——
+  // 「它今天买了什么、为什么」原来要点两下才看得到。
+  const detail = useQuery({
+    queryKey: QK.paperBook(traderId, b.scope),
+    queryFn: () => api.paperBook(traderId, b.scope),
+    refetchInterval: 60_000,
+  })
+  const positions = detail.data?.positions ?? []
+  const orders = detail.data?.orders ?? []
   return (
     <div className="flex min-w-0 flex-col gap-3 px-4 py-3.5">
       {/* [R190] 账名一行 + 动作按钮靠右 —— 对应参考项目的 `.mp-paper__head`
@@ -401,9 +436,12 @@ function BookPane({ b, busy, onRun, onLifeline, onPlanCheck, onOpen, onReset, on
             className="inline-flex h-7 items-center gap-1 rounded-btn border border-sky-400/40 px-2 text-[10px] text-sky-400 transition-colors hover:bg-sky-400/10">
             <Target className="h-3 w-3" />过计划
           </button>
+          {/* [R192] 原来这里是「明细」—— 持仓与操作记录现在直接在下面摊开了,
+              弹窗只剩「它看到了什么」那一份上下文(一大段 prompt, 不适合摊开)。 */}
           <button type="button" onClick={onOpen}
+            title="看这本账下一次开局会拿到的全部信息 —— 判断「系统给的够不够」就得先看清给了什么"
             className="inline-flex h-7 items-center gap-1 rounded-btn border border-border px-2 text-[10px] text-secondary transition-colors hover:border-accent/40 hover:text-accent">
-            <TrendingUp className="h-3 w-3" />明细
+            <Eye className="h-3 w-3" />它看到了什么
           </button>
           <button type="button" onClick={onReset} title="把这一本账重置到起跑线(另一本不动)"
             className="p-1 text-muted transition-colors hover:text-amber-400">
@@ -457,48 +495,123 @@ function BookPane({ b, busy, onRun, onLifeline, onPlanCheck, onOpen, onReset, on
         </div>
       )}
 
-      {/* [R183] 持仓的批次视图 —— 「我的批次」并进模拟盘之后, 持仓按批次的样子摊开。
-          这是**派生**的, 没有写进真的 lots.json(那会派生真实监控规则, 并污染决策台
-          管真钱的那几列)。
-          [R190] 收进 `<details>`, 对应参考项目底部那个「成交记录 N 笔」折叠块 ——
-          它把明细放在最后且默认收起, 首屏留给指标与曲线。 */}
-      {!!b.lots?.length && (
-        <details className="rounded border border-border/50">
-          <summary className="cursor-pointer list-none px-2 py-1.5 text-[10px] text-secondary marker:content-none hover:text-foreground">
-            持仓批次 {b.lots.length} 笔
-          </summary>
-          <table className="w-full table-fixed border-collapse text-[10px]">
-            <thead>
-              <tr className="border-y border-border/50 text-[9px] text-muted">
-                <th className="w-[34%] px-1.5 py-1 text-left font-normal">批次</th>
-                <th className="px-1.5 py-1 text-right font-normal">成本</th>
-                <th className="px-1.5 py-1 text-right font-normal">数量</th>
-                <th className="px-1.5 py-1 text-right font-normal">现价</th>
-                <th className="px-1.5 py-1 text-right font-normal">盈亏</th>
-              </tr>
-            </thead>
-            <tbody>
-              {b.lots.map(l => (
-                <tr key={l.id} className="border-b border-border/25 last:border-0">
-                  <td className="whitespace-nowrap px-1.5 py-1 font-mono text-foreground/90"
-                      title={l.buy_date ? `建仓 ${l.buy_date}` : undefined}>
-                    {l.symbol}
-                  </td>
-                  <td className="px-1.5 py-1 text-right font-mono text-muted">{l.cost_price.toFixed(2)}</td>
-                  <td className="px-1.5 py-1 text-right font-mono text-muted">{l.qty}</td>
-                  <td className="px-1.5 py-1 text-right font-mono text-foreground/80">
-                    {l.price != null ? l.price.toFixed(2) : '—'}
-                  </td>
-                  <td className={`px-1.5 py-1 text-right font-mono ${
-                    l.pnl_pct == null ? 'text-muted' : l.pnl_pct > 0 ? 'text-bull' : 'text-bear'}`}>
-                    {l.pnl_pct != null ? `${(l.pnl_pct * 100).toFixed(1)}%` : '—'}
-                  </td>
+      {/* [R192] 持仓明细 —— **展开, 不折叠**。用户: 「每个操盘手在模拟盘这页
+          显示完整所有东西」。R190 把它收进 details 是照参考项目那个单标的面板,
+          但这一页每天要回答的就是「它现在拿着什么、当初打算怎么办」, 那不该
+          点一下才看得见。
+          用的是账本的 positions 而不是 R183 那份批次派生视图 —— 它是超集:
+          多了市值、建仓日, 以及买入时立的三条线。 */}
+      <div className="rounded border border-border/50">
+        <div className="flex items-baseline gap-2 border-b border-border/50 px-2 py-1.5">
+          <span className="text-[10px] font-medium text-secondary">持仓</span>
+          <span className="font-mono text-[10px] text-muted">{b.positions_count} 只</span>
+          {detail.isLoading && <Loader2 className="h-3 w-3 animate-spin text-muted" />}
+        </div>
+        {positions.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-[10px]">
+              <thead>
+                <tr className="border-b border-border/40 text-[9px] text-muted">
+                  <th className="px-1.5 py-1 text-left font-normal">标的</th>
+                  <th className="px-1.5 py-1 text-right font-normal">股数</th>
+                  <th className="px-1.5 py-1 text-right font-normal">成本 / 现价</th>
+                  <th className="px-1.5 py-1 text-right font-normal">市值</th>
+                  <th className="px-1.5 py-1 text-right font-normal">浮盈</th>
+                  <th className="px-1.5 py-1 text-left font-normal"
+                      title="买入时模型自己立的计划。止损线与到期日到了系统直接卖(不问 AI); 止盈线到了只提醒。">
+                    计划(损/盈/期)
+                  </th>
+                  <th className="px-1.5 py-1 text-left font-normal">建仓日</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </details>
-      )}
+              </thead>
+              <tbody>
+                {positions.map(p => (
+                  <tr key={p.symbol} className="border-b border-border/25 last:border-0">
+                    <td className="whitespace-nowrap px-1.5 py-1 font-mono text-foreground/90">{p.symbol}</td>
+                    <td className="whitespace-nowrap px-1.5 py-1 text-right font-mono tabular-nums text-muted">{p.shares}</td>
+                    <td className="whitespace-nowrap px-1.5 py-1 text-right font-mono tabular-nums text-muted">
+                      {p.cost.toFixed(2)} / {p.price?.toFixed(2) ?? '—'}
+                    </td>
+                    <td className="whitespace-nowrap px-1.5 py-1 text-right font-mono tabular-nums text-muted">{money(p.market_value)}</td>
+                    <td className={`whitespace-nowrap px-1.5 py-1 text-right font-mono tabular-nums ${pnlCls(p.pnl_pct)}`}>
+                      {pct(p.pnl_pct, 1)}
+                    </td>
+                    <td className="whitespace-nowrap px-1.5 py-1"><PlanCell plan={p.plan} price={p.price} /></td>
+                    <td className="whitespace-nowrap px-1.5 py-1 font-mono text-[9px] text-muted/80">{p.opened_on}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="px-2 py-3 text-center text-[10px] text-muted">
+            {detail.isLoading ? '读取中…' : '当前空仓'}
+          </div>
+        )}
+
+        {/* [R183] 用户当时的原话是「把操盘手的持仓写进批次表」。同一只票分几次
+            买进时, 上面那张按标的合并的表看不出是几笔、分别什么成本 —— 只有
+            真的拆开过才画这一段, 否则就是把同样的行再列一遍。 */}
+        {!!b.lots?.length && b.lots.length > positions.length && (
+          <details className="border-t border-border/40">
+            <summary className="cursor-pointer list-none px-2 py-1 text-[9px] text-muted marker:content-none hover:text-foreground">
+              按批次拆开({b.lots.length} 笔)
+            </summary>
+            <table className="w-full border-collapse text-[10px]">
+              <tbody>
+                {b.lots.map(l => (
+                  <tr key={l.id} className="border-t border-border/25">
+                    <td className="whitespace-nowrap px-1.5 py-1 font-mono text-foreground/80">{l.symbol}</td>
+                    <td className="px-1.5 py-1 text-right font-mono text-muted">{l.cost_price.toFixed(2)}</td>
+                    <td className="px-1.5 py-1 text-right font-mono text-muted">{l.qty}</td>
+                    <td className="px-1.5 py-1 text-right font-mono text-foreground/70">
+                      {l.price != null ? l.price.toFixed(2) : '—'}
+                    </td>
+                    <td className={`px-1.5 py-1 text-right font-mono ${
+                      l.pnl_pct == null ? 'text-muted' : l.pnl_pct > 0 ? 'text-bull' : 'text-bear'}`}>
+                      {l.pnl_pct != null ? `${(l.pnl_pct * 100).toFixed(1)}%` : '—'}
+                    </td>
+                    <td className="whitespace-nowrap px-1.5 py-1 font-mono text-[9px] text-muted/70">{l.buy_date ?? ''}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </details>
+        )}
+      </div>
+
+      {/* [R192] 操作记录也摊开。**每一笔的理由才是这个功能真正的产出** ——
+          模块头从 R59 就写着这句话, 可它一直藏在弹窗里点两下才看得到。
+          全部记录都在, 超过一屏就在框里滚, 不做分页也不截断: 被拒的单子、
+          纪律强平那几笔恰恰是最该翻的。 */}
+      <div className="rounded border border-border/50">
+        <div className="flex items-baseline gap-2 border-b border-border/50 px-2 py-1.5">
+          <span className="text-[10px] font-medium text-secondary">操作记录</span>
+          <span className="font-mono text-[10px] text-muted">{b.orders_count} 笔</span>
+          {detail.isLoading && <Loader2 className="h-3 w-3 animate-spin text-muted" />}
+        </div>
+        {orders.length > 0 ? (
+          <div className="max-h-72 overflow-auto">
+            <table className="w-full text-[10px]">
+              <thead className="sticky top-0 z-10 bg-surface">
+                <tr className="border-b border-border/40 text-[9px] text-muted">
+                  <th className="whitespace-nowrap px-1.5 py-1 text-left font-normal">日期</th>
+                  <th className="whitespace-nowrap px-1.5 py-1 text-left font-normal">操作</th>
+                  <th className="whitespace-nowrap px-1.5 py-1 text-right font-normal">股数 @ 价</th>
+                  <th className="px-1.5 py-1 text-left font-normal">为什么</th>
+                </tr>
+              </thead>
+              <tbody>
+                {orders.map((o, i) => <OrderRow key={`${o.ts}-${i}`} o={o} dense />)}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="px-2 py-3 text-center text-[10px] text-muted">
+            {detail.isLoading ? '读取中…' : '还没有操作过 —— 点上面的「跑一次」'}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
@@ -582,7 +695,9 @@ function AddTrader({ onClose, onDone }: { onClose: () => void; onDone: () => voi
 function BookDetail({ id, scope, onClose }: {
   id: string; scope: PaperScope; onClose: () => void
 }) {
-  const [tab, setTab] = useState<'orders' | 'positions' | 'context'>('orders')
+  // [R192] 默认落在「它看到了什么」—— 持仓与操作记录现在都摊在页面上了,
+  // 打开弹窗只剩这一个理由。另外两个 tab 留着当放大镜(表格更宽、能滚全屏)。
+  const [tab, setTab] = useState<'orders' | 'positions' | 'context'>('context')
   const q = useQuery({ queryKey: QK.paperBook(id, scope), queryFn: () => api.paperBook(id, scope) })
   const ctx = useQuery({
     queryKey: QK.paperBookContext(id, scope),
@@ -718,12 +833,15 @@ function BookDetail({ id, scope, onClose }: {
   )
 }
 
-function OrderRow({ o }: { o: PaperOrder }) {
+function OrderRow({ o, dense = false }: { o: PaperOrder; dense?: boolean }) {
   const buy = o.action === 'buy'
+  // [R192] dense = 页面内嵌那张表(横向空间比弹窗窄), 只收窄内边距, 内容一样多
+  const px = dense ? 'px-1.5 py-1' : 'px-3 py-1.5'
+  const px2 = dense ? 'px-1.5 py-1' : 'px-2 py-1.5'
   return (
-    <tr className={`border-b border-border/30 ${o.rejected ? 'opacity-60' : ''}`}>
-      <td className="whitespace-nowrap px-3 py-1.5 font-mono text-[10px] text-muted">{o.date}</td>
-      <td className="whitespace-nowrap px-2 py-1.5">
+    <tr className={`border-b border-border/25 ${o.rejected ? 'opacity-60' : ''}`}>
+      <td className={`whitespace-nowrap ${px} font-mono text-[10px] text-muted`}>{o.date}</td>
+      <td className={`whitespace-nowrap ${px2}`}>
         <span className={`inline-flex whitespace-nowrap rounded border px-1 py-0.5 text-[10px] ${
           o.rejected ? 'border-border bg-base text-muted'
             : buy ? 'border-red-400/40 bg-red-400/10 text-red-400'
@@ -732,10 +850,10 @@ function OrderRow({ o }: { o: PaperOrder }) {
         </span>
         <span className="ml-1.5 font-mono text-[10px] text-secondary">{o.symbol}</span>
       </td>
-      <td className="whitespace-nowrap px-2 py-1.5 text-right font-mono tabular-nums text-secondary">
+      <td className={`whitespace-nowrap ${px2} text-right font-mono tabular-nums text-secondary`}>
         {o.rejected ? '—' : `${o.shares} @ ${o.price}`}
       </td>
-      <td className="px-3 py-1.5 text-[10px] leading-4 text-muted">
+      <td className={`${px} text-[10px] leading-4 text-muted`}>
         {/* 被拒的也留着 —— "想买但买不成"和"没想买"是两件事 */}
         {/* [R61] 纪律强平单独标出来: 这一笔不是模型的决定, 混在一起会把
             "它自己止损了"和"系统按纪律替它砍了"记成同一回事 */}

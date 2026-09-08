@@ -33,6 +33,9 @@ export const storage = {
   strategyPoolMinute:   kv<string[]>('strategy-pool-1m'),
   /** [R95] prune 自动清理的备份 — 被移除的 ID 留底, 页面提供一键恢复 */
   strategyPoolPruneBackup: kv<{ at: string; removed: string[] } | null>('strategy-pool-prune-backup'),
+  /** [R192] 模拟盘当前看的是哪个操作员 —— 一页只显示一个, 刷新后该回到原处 */
+  paperTrader:          kv<string | null>('paper-trader'),
+
   /** [R100] 个股弹窗最近查看(全局, 弹窗内随意切换用) */
   recentStocks:         kv<{ symbol: string; name: string }[]>('recent-stocks'),
 
