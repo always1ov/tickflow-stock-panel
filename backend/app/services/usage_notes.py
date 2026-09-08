@@ -33,7 +33,7 @@ from __future__ import annotations
 
 import json
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from app.config import settings
@@ -45,6 +45,9 @@ STATUSES = ("", "pending", "verified", "rejected")
 # [R180] 一条消息的形态。file 只收**可读文本**(csv/txt/md 之类) —— 二进制收了
 # 也读不出内容, 只会变成一个打不开的附件。
 KINDS = ("text", "image", "file")
+# [R181] 时效档 —— 与 status(成立了吗)正交的第二个轴: 这条多久有效。
+# 语义与分档理由见 services/news_desk.py 顶部。
+HORIZONS = ("news", "thesis", "rule")
 MAX_DIGEST_CHARS = 2000
 
 
@@ -76,7 +79,10 @@ def _with_defaults(note: dict) -> dict:
     kind=text、没有附件、还没凝练过的消息, 不需要迁移脚本。
     """
     return {"status": "", "pinned": False, "kind": "text",
-            "attachment": None, "digest": "", "digest_at": None, **note}
+            "attachment": None, "digest": "", "digest_at": None,
+            # [R181] 时效档与埋伏的兑现检查点。老数据没有 → 当"时效"处理,
+            # 它们本来也确实是随手记的当下观察。
+            "horizon": "news", "due_at": None, **note}
 
 
 def list_notes() -> list[dict]:
@@ -131,6 +137,7 @@ def update_note(
     content: str | None = None,
     status: str | None = None,
     pinned: bool | None = None,
+    horizon: str | None = None,
 ) -> dict | None:
     """就地改字段(None = 不改)。返回更新后的笔记; 不存在返回 None。
 
@@ -156,12 +163,26 @@ def update_note(
                     note["status"] = status
                 if pinned is not None:
                     note["pinned"] = bool(pinned)
+                if horizon is not None:
+                    # [R181] AI 判错了要能改。改成埋伏时补一个默认检查点,
+                    # 改成别的就把检查点清掉 —— 只有埋伏才有"什么时候回来看"。
+                    if horizon not in HORIZONS:
+                        raise ValueError(f"horizon 必须是 {HORIZONS} 之一")
+                    note["horizon"] = horizon
+                    if horizon == "thesis":
+                        note.setdefault("due_at", None)
+                        if not note.get("due_at"):
+                            note["due_at"] = (datetime.now()
+                                              + timedelta(days=90)).isoformat(timespec="seconds")
+                    else:
+                        note["due_at"] = None
                 atomic_write_json(_path(), notes)
                 return _with_defaults(dict(note))
     return None
 
 
-def set_digest(note_id: str, digest: str, *, raw_text: str | None = None) -> dict | None:
+def set_digest(note_id: str, digest: str, *, raw_text: str | None = None,
+               horizon: str | None = None, due_days: int | None = None) -> dict | None:
     """[R180] 写入 AI 凝练结果, 并**丢掉原始文件**。
 
     用户定的口径: **只保存凝练, 不保存图片; 文字允许保存原文。** 所以:
@@ -189,6 +210,13 @@ def set_digest(note_id: str, digest: str, *, raw_text: str | None = None) -> dic
                 continue
             note["digest"] = digest
             note["digest_at"] = _now()
+            # [R181] 时效档由凝练时的 AI 分类给出; 用户之后可以手动改
+            if horizon:
+                note["horizon"] = horizon
+                note["due_at"] = (
+                    (datetime.now() + timedelta(days=int(due_days))).isoformat(timespec="seconds")
+                    if horizon == "thesis" and due_days else None
+                )
             if raw_text:
                 # 文本文件的内容并进正文 —— 用户要"文字保存原文"。接在已有备注
                 # 后面而不是覆盖: 那句备注("这是某某的调研纪要")往往比正文还重要。

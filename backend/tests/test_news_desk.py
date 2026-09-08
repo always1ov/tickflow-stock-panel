@@ -16,8 +16,11 @@ from app.services import news_desk as nd
 
 
 def _note(**kw):
+    """默认给**当天**时间 —— 这些用例测的是 payload 的内容与形状, 不是过期规则。
+    写死日期的话, 跑测试的那天一变就会漂到 STALE_DAYS 边界上, 变成随机失败。"""
     base = {"id": "n1", "content": "原文", "digest": "要点", "status": "",
-            "pinned": False, "updated_at": "2026-09-01T10:00:00"}
+            "pinned": False, "horizon": "news",
+            "updated_at": datetime.now().isoformat(timespec="seconds")}
     return {**base, **kw}
 
 
@@ -57,9 +60,10 @@ def test_关掉开关就完全不注入(monkeypatch, tmp_path):
 
 
 def test_过期的消息面不注入(monkeypatch, tmp_path):
-    """与其拿上个月的消息面影响今天的判断, 不如没有。"""
+    """[R181] 淘汰的是"总结太久没重新综合", 不再是 R180 那个 7 天一刀切 ——
+    那个把埋伏和规律一起判了死刑。逐条的时效由 build_payload 管。"""
     monkeypatch.setattr(nd, "_path", lambda: tmp_path / "s.json")
-    old = (datetime.now() - timedelta(days=nd.STALE_DAYS + 1)).isoformat(timespec="seconds")
+    old = (datetime.now() - timedelta(days=nd.SUMMARY_STALE_DAYS + 1)).isoformat(timespec="seconds")
     nd._write({"text": "过期内容", "as_of": old, "item_count": 3})
     assert nd.context_for_ai() == ""
 
@@ -99,30 +103,30 @@ def test_附件路径不进综合():
 def test_不成立的条目照样进综合并带着状态():
     """标了"不成立"的必须让 AI 看见 —— 留着一条已经错了的判断比没有更糟。"""
     pl = nd.build_payload([_note(status="rejected")])
-    assert pl[0]["状态"] == "不成立"
+    assert pl["时效"][0]["状态"] == "不成立"
 
 
 def test_没有digest时退回用正文():
     pl = nd.build_payload([_note(digest="", content="只有原文")])
-    assert pl[0]["要点"] == "只有原文"
+    assert pl["时效"][0]["要点"] == "只有原文"
 
 
 def test_空条目不占位置():
     pl = nd.build_payload([_note(digest="", content=""), _note(id="n2")])
-    assert len(pl) == 1
+    assert nd.payload_count(pl) == 1
 
 
 def test_置顶的优先进综合():
     notes = [_note(id=f"n{i}") for i in range(nd.MAX_ITEMS_FOR_SUMMARY + 5)]
     notes[-1] = _note(id="pinned", pinned=True, digest="置顶要点")
     pl = nd.build_payload(notes)
-    assert len(pl) == nd.MAX_ITEMS_FOR_SUMMARY
-    assert pl[0]["要点"] == "置顶要点", "置顶的不该被数量上限挤掉"
+    assert nd.payload_count(pl) == nd.MAX_ITEMS_FOR_SUMMARY
+    assert pl["时效"][0]["要点"] == "置顶要点", "置顶的不该被数量上限挤掉"
 
 
 def test_综合有条数上限():
     notes = [_note(id=f"n{i}") for i in range(500)]
-    assert len(nd.build_payload(notes)) == nd.MAX_ITEMS_FOR_SUMMARY
+    assert nd.payload_count(nd.build_payload(notes)) == nd.MAX_ITEMS_FOR_SUMMARY
 
 
 def test_没有可综合内容时明确报错(monkeypatch):
@@ -218,3 +222,119 @@ def test_没有原文时正文不变(tmp_path, monkeypatch):
     note = un.create_note("纯文字消息")
     got = un.set_digest(note["id"], "要点")
     assert got["content"] == "纯文字消息"
+
+
+# ---------- [R181] 时效: 时效 / 埋伏 / 规律 ----------
+
+def _n(**kw):
+    from datetime import datetime, timedelta
+    base = {"id": "x", "digest": "要点", "status": "", "pinned": False,
+            "updated_at": (datetime.now() - timedelta(days=60)).isoformat(timespec="seconds")}
+    return {**base, **kw}
+
+
+def test_六十天前的时效消息被淘汰():
+    """R180 的 7 天一刀切只对这一类是对的。"""
+    assert nd.build_payload([_n(horizon="news")]) == {}
+
+
+def test_六十天前的埋伏仍然保留():
+    """业绩埋伏正是三个月后你快忘了的时候最需要它 —— 不能按天数淘汰。"""
+    got = nd.build_payload([_n(horizon="thesis")])
+    assert "埋伏" in got
+
+
+def test_规律永不过期():
+    from datetime import datetime, timedelta
+    ancient = (datetime.now() - timedelta(days=999)).isoformat(timespec="seconds")
+    got = nd.build_payload([_n(horizon="rule", updated_at=ancient)])
+    assert "规律" in got, "「贴下轨胜率高」这种经验不该因为记得久就失效"
+
+
+def test_置顶的时效消息也留着():
+    """用户手动钉住是最强的"我还要它"的信号, 压过时效。"""
+    assert "时效" in nd.build_payload([_n(horizon="news", pinned=True)])
+
+
+def test_老数据当时效处理():
+    """R180 之前的记录没有 horizon 字段 —— 它们本来也确实是当下的随手观察。"""
+    from datetime import datetime
+    fresh = datetime.now().isoformat(timespec="seconds")
+    got = nd.build_payload([_n(updated_at=fresh)])   # 无 horizon 字段
+    assert "时效" in got
+
+
+def test_埋伏带上该核对的时间():
+    got = nd.build_payload([_n(horizon="thesis", due_at="2026-12-01T00:00:00")])
+    assert got["埋伏"][0]["该核对的时间"] == "2026-12-01"
+
+
+def test_注入文本把三类的用法分开说():
+    """三类混着用是这次改动要防的核心问题。"""
+    import tempfile
+    import pathlib
+    with tempfile.TemporaryDirectory() as d:
+        orig = nd._path
+        nd._path = lambda: pathlib.Path(d) / "s.json"
+        try:
+            nd._write({"text": "正文", "as_of": nd._now(), "item_count": 3})
+            got = nd.context_for_ai()
+        finally:
+            nd._path = orig
+    assert "不能当作今天的买入理由" in got, "埋伏不该被当成今天的买点"
+    assert "埋伏不是死扛的借口" in got, "但也不能变成死扛的理由 —— 出场线仍然优先"
+    assert "【规律】" in got
+
+
+# ---------- 到期提醒 ----------
+
+def test_到期未结论的埋伏会被提醒():
+    """记了之后忘了, 才是埋伏最容易失败的方式。"""
+    from datetime import datetime, timedelta
+    past = (datetime.now() - timedelta(days=1)).isoformat(timespec="seconds")
+    got = nd.due_theses([_n(horizon="thesis", due_at=past, status="pending")])
+    assert len(got) == 1
+
+
+def test_已给结论的埋伏不再提醒():
+    from datetime import datetime, timedelta
+    past = (datetime.now() - timedelta(days=1)).isoformat(timespec="seconds")
+    for st in ("verified", "rejected"):
+        assert nd.due_theses([_n(horizon="thesis", due_at=past, status=st)]) == []
+
+
+def test_没到期的埋伏不提醒():
+    from datetime import datetime, timedelta
+    future = (datetime.now() + timedelta(days=30)).isoformat(timespec="seconds")
+    assert nd.due_theses([_n(horizon="thesis", due_at=future)]) == []
+
+
+def test_只有埋伏才有到期提醒():
+    from datetime import datetime, timedelta
+    past = (datetime.now() - timedelta(days=1)).isoformat(timespec="seconds")
+    assert nd.due_theses([_n(horizon="rule", due_at=past)]) == []
+    assert nd.due_theses([_n(horizon="news", due_at=past)]) == []
+
+
+# ---------- 分类降级 ----------
+
+def test_分类解析失败时保住要点():
+    """分类是锦上添花, 要点才是用户要的 —— 不能为一个分类把整条判死。"""
+    got = nd._parse_digest("模型没按格式输出, 直接给了一段话")
+    assert got["digest"] == "模型没按格式输出, 直接给了一段话"
+    assert got["horizon"] == nd.HORIZON_NEWS
+
+
+def test_埋伏没给天数时补默认():
+    got = nd._parse_digest('{"digest":"业绩", "horizon":"thesis", "due_days":null}')
+    assert got["due_days"] == nd.THESIS_DEFAULT_DUE_DAYS
+
+
+def test_非埋伏不给检查点():
+    got = nd._parse_digest('{"digest":"规律", "horizon":"rule", "due_days":90}')
+    assert got["due_days"] is None, "只有埋伏才有「什么时候回来看」"
+
+
+def test_未知类型退回时效():
+    got = nd._parse_digest('{"digest":"x", "horizon":"胡说八道"}')
+    assert got["horizon"] == nd.HORIZON_NEWS

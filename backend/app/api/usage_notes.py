@@ -45,6 +45,7 @@ class NotePatch(BaseModel):
     content: str | None = Field(default=None, min_length=1, max_length=usage_notes.MAX_CONTENT_CHARS)
     status: str | None = None
     pinned: bool | None = None
+    horizon: str | None = None
 
 
 @router.get("")
@@ -68,6 +69,7 @@ def update_note(note_id: str, payload: NotePatch) -> dict:
             content=payload.content,
             status=payload.status,
             pinned=payload.pinned,
+            horizon=payload.horizon,
         )
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
@@ -153,10 +155,18 @@ async def digest_note(note_id: str, request: Request) -> dict:
     att = note.get("attachment") or {}
     if (note.get("kind") == "file") and att.get("path"):
         raw = news_desk.read_attachment_text(settings.data_dir / att["path"])
-    updated = usage_notes.set_digest(note_id, text, raw_text=raw)
+    updated = usage_notes.set_digest(
+        note_id, text["digest"], raw_text=raw,
+        horizon=text["horizon"], due_days=text["due_days"])
     if not updated:
         raise HTTPException(404, "笔记不存在")
     return updated
+
+
+@router.get("/due")
+def list_due() -> dict:
+    """[R181] 到了兑现检查点、还没给结论的埋伏 —— 界面上要顶到最前面提醒。"""
+    return {"items": news_desk.due_theses(usage_notes.list_notes())}
 
 
 @router.get("/summary")

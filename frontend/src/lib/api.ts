@@ -1440,6 +1440,13 @@ export interface UsageNote {
   /** AI 对这一条的凝练; 空 = 还没凝练过 */
   digest?: string
   digest_at?: string | null
+  /** [R181] 时效档 —— 与 status(成立了吗)正交的第二个轴: 这条多久有效。
+   *  news 时效(几天内有效, 影响今天买不买) /
+   *  thesis 埋伏(业绩等逻辑, 影响持有耐心, 到 due_at 回来核对) /
+   *  rule 规律(方法论, 不过期) */
+  horizon?: 'news' | 'thesis' | 'rule'
+  /** 埋伏的兑现检查点; 只有 thesis 有 */
+  due_at?: string | null
   created_at: string
   updated_at: string
 }
@@ -4015,7 +4022,7 @@ export const api = {
     request<{ items: UsageNote[] }>('/api/usage-notes'),
   usageNoteCreate: (content: string) =>
     request<UsageNote>('/api/usage-notes', { method: 'POST', body: JSON.stringify({ content }) }),
-  usageNoteUpdate: (id: string, patch: { content?: string; status?: string; pinned?: boolean }) =>
+  usageNoteUpdate: (id: string, patch: { content?: string; status?: string; pinned?: boolean; horizon?: string }) =>
     request<UsageNote>(`/api/usage-notes/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(patch) }),
   // [R180] 让 AI 凝练这一条(图片走多模态)
   usageNoteDigest: (id: string) =>
@@ -4030,6 +4037,10 @@ export const api = {
       `/api/usage-notes/upload?content=${encodeURIComponent(content)}`,
       { method: 'POST', body: fd })
   },
+
+  // [R181] 到了兑现检查点、还没给结论的埋伏 —— 埋伏最容易失败的方式是记了之后忘了
+  usageNotesDue: () =>
+    request<{ items: UsageNote[] }>('/api/usage-notes/due'),
 
   usageNotesSummaryGet: () =>
     request<{ summary: NewsDeskSummary | null }>('/api/usage-notes/summary'),

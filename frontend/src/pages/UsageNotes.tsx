@@ -57,6 +57,31 @@ const STATUS_META: Record<NoteStatus, { label: string; cls: string; dot: string 
   rejected:   { label: '不成立', cls: 'border-danger/30 bg-danger/10 text-danger',         dot: 'bg-danger' },
 }
 
+/** [R181] 时效档: 与 status(成立了吗)正交的第二个轴 —— 这条多久有效。
+ *
+ * 三类在决策里的用法完全不同, 所以配色也拉开:
+ *   时效  几天内有效, 影响今天买不买 —— 中性
+ *   埋伏  还没兑现的逻辑, 影响持有耐心 —— 暖色(要一直看得见)
+ *   规律  方法论, 不过期 —— 冷色(不针对某只票)
+ */
+type Horizon = 'news' | 'thesis' | 'rule'
+const HORIZON_CYCLE: Horizon[] = ['news', 'thesis', 'rule']
+const HORIZON_META: Record<Horizon, { label: string; cls: string; hint: string }> = {
+  news: {
+    label: '时效', cls: 'border-border text-muted',
+    hint: '时效 —— 政策/突发/公告。几天内影响判断, 过后就不再进决策。点击切换',
+  },
+  thesis: {
+    label: '埋伏', cls: 'border-amber-400/40 bg-amber-400/10 text-amber-400',
+    hint: '埋伏 —— 业绩/基本面逻辑, 不会立刻兑现。不按天数淘汰, 一直留在总览里影响'
+      + '「要不要有耐心继续持有」; 到兑现检查点会提醒你回来给结论。点击切换',
+  },
+  rule: {
+    label: '规律', cls: 'border-sky-400/40 bg-sky-400/10 text-sky-300',
+    hint: '规律 —— 关于市场本身的经验(某形态胜率高之类)。不针对某只票, 永不过期。点击切换',
+  },
+}
+
 const FILTERS: { key: 'all' | NoteStatus; label: string }[] = [
   { key: 'all', label: '全部' },
   { key: 'pending', label: '待验证' },
@@ -99,10 +124,14 @@ function NoteCard({ note, onDigest, digesting }: {
   const [draft, setDraft] = useState(note.content)
   const [showRaw, setShowRaw] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
-  const invalidate = () => qc.invalidateQueries({ queryKey: QK.usageNotes })
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: QK.usageNotes })
+    // 标了结论之后到期提醒要跟着消失, 否则那条横幅会一直挂着
+    qc.invalidateQueries({ queryKey: ['usage-notes-due'] })
+  }
 
   const update = useMutation({
-    mutationFn: (patch: { content?: string; status?: string; pinned?: boolean }) =>
+    mutationFn: (patch: { content?: string; status?: string; pinned?: boolean; horizon?: Horizon }) =>
       api.usageNoteUpdate(note.id, patch),
     onSuccess: () => { setEditing(false); invalidate() },
   })
@@ -199,6 +228,34 @@ function NoteCard({ note, onDigest, digesting }: {
           )}
           <div className="mt-2.5 flex items-center gap-2 border-t border-border/50 pt-2">
             <StatusChip status={status} onCycle={cycleStatus} busy={update.isPending} />
+            {/* [R181] 时效档。点击循环 时效→埋伏→规律 —— AI 判错了要能一键改, 
+                而不是去某个下拉里找。 */}
+            <button
+              onClick={() => {
+                const cur = (note.horizon ?? 'news') as Horizon
+                const next = HORIZON_CYCLE[(HORIZON_CYCLE.indexOf(cur) + 1) % HORIZON_CYCLE.length]
+                update.mutate({ horizon: next })
+              }}
+              disabled={update.isPending}
+              title={HORIZON_META[(note.horizon ?? 'news') as Horizon].hint}
+              className={cn(
+                'rounded border px-1.5 py-0.5 text-[10px] transition-colors cursor-pointer',
+                HORIZON_META[(note.horizon ?? 'news') as Horizon].cls,
+              )}
+            >
+              {HORIZON_META[(note.horizon ?? 'news') as Horizon].label}
+            </button>
+            {note.horizon === 'thesis' && note.due_at && (
+              <span
+                className={cn('text-[10px] tabular-nums',
+                  new Date(note.due_at) <= new Date() ? 'text-warning' : 'text-muted/60')}
+                title={new Date(note.due_at) <= new Date()
+                  ? '到兑现检查点了 —— 回来把它标成「已验证」还是「不成立」'
+                  : '到这天回来核对它兑现了没有'}
+              >
+                {new Date(note.due_at) <= new Date() ? '⏰ 该核对' : `核对 ${fmtTime(note.due_at).slice(0, 5)}`}
+              </span>
+            )}
             <span className="text-[10px] tabular-nums text-muted/60" title={`创建 ${note.created_at.replace('T', ' ')}`}>
               {note.updated_at !== note.created_at ? `改 ${fmtTime(note.updated_at)}` : fmtTime(note.created_at)}
             </span>
@@ -294,6 +351,16 @@ export function UsageNotes() {
     onError: (e) => toast(e instanceof Error ? e.message : '凝练失败', 'error'),
   })
 
+  // [R181] 到了兑现检查点、还没给结论的埋伏。
+  // **埋伏最容易失败的方式不是记错, 是记了之后忘了** —— 三个月后财报出来, 人早忘了
+  // 当初为什么买。所以到期要主动顶到页面最前, 不能等用户自己翻。
+  const dueQ = useQuery({
+    queryKey: ['usage-notes-due'],
+    queryFn: api.usageNotesDue,
+    staleTime: 5 * 60_000,
+  })
+  const due = dueQ.data?.items ?? []
+
   // 一大段总的 —— 只在点按钮时重新综合, 打开页面读已存的
   const summaryQ = useQuery({
     queryKey: ['usage-notes-summary'],
@@ -340,6 +407,27 @@ export function UsageNotes() {
             两侧空一大片而卡片仍挤成两列。改为贴左 + 放宽到 1600px, 配合下方
             网格在宽屏加到三列 —— 观察条目多的时候一屏能多看一行。 */}
         <div className="w-full max-w-[1600px] space-y-3">
+          {/* [R181] 到期埋伏提醒 —— 排在总览之前, 因为它是这一页唯一需要你"现在动手"的东西 */}
+          {due.length > 0 && (
+            <div className="rounded-card border border-warning/30 bg-warning/[0.07] px-3 py-2">
+              <div className="mb-1 text-[11px] font-medium text-warning">
+                ⏰ {due.length} 条埋伏到兑现检查点了 —— 回来给个结论
+              </div>
+              <ul className="space-y-0.5">
+                {due.map(n => (
+                  <li key={n.id} className="text-[11px] leading-relaxed text-foreground/85">
+                    · {(n.digest || n.content).slice(0, 60)}
+                    {(n.digest || n.content).length > 60 && '…'}
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-1 text-[10px] text-muted/70">
+                在下面找到它, 把状态点成「已验证」或「不成立」——
+                不给结论的话它会一直留在总览里影响之后的判断。
+              </p>
+            </div>
+          )}
+
           {/* [R180] 一大段总的 —— 这一页最重要的产物: 之后每次 AI 决策都会带上它。
               所以放最上面, 并且把"多旧、基于几条"直接写在标题行上: 一段过期的
               消息面总结比没有更危险, 用户得一眼看见它的时效。 */}
