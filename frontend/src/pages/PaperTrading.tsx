@@ -8,10 +8,10 @@
  * 界面上刻意不做「所有人持仓一览」: 那样我看完再去调提示词, 就把操作员之间的
  * 隔离破坏掉了。列表只给成绩, 明细要点进某一个人才看得到。
  */
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
-  Bot, ChevronDown, Clock, Eye, Loader2, Play, Plus, RotateCcw, ShieldAlert, Target, Trash2, TrendingUp, X,
+  Bot, Clock, Eye, Loader2, Play, Plus, RotateCcw, ShieldAlert, Target, Trash2, TrendingUp, X,
 } from 'lucide-react'
 import {
   api, type PaperBook, type PaperOrder, type PaperScope, type PaperTrader,
@@ -63,18 +63,38 @@ function pnlCls(v: number | null | undefined): string {
 }
 
 // [R170] embedded: 被「仓位中心」当 tab 挂载时为 true, 不画自己的页头。
-/** [R186] 一个指标格。照 MarketPulse 的 `mp-paper__metric`: 小标签 + 加粗的值,
- *  横向平铺。tone 为正显示红(A 股涨红)、为负显示绿、null 走中性色。 */
+
+/**
+ * [R190] 指标条 —— 严格照 MarketPulse 的 `.mp-paper__metrics`。
+ *
+ * 它的做法是: 外层 `gap: 1px` + 线色背景, 内层每格自己的底色 —— 那 1px 缝隙
+ * 就是分隔线, 不用画 border。每格 `flex: 1 1 110px` 平分整行, **标签在上、
+ * 值在下**。
+ *
+ * R186 我做成了「标签 值」并排、一行 wrap 下来的样子, 那是**行内文本**不是
+ * 仪表盘: 九个数挤成一段话, 扫一眼说不出哪个是哪个。瓦片条一格一个数,
+ * 宽度自己平分, 才是参考项目那个版式。
+ */
+function MetricStrip({ children }: { children: ReactNode }) {
+  return (
+    <div className="flex flex-wrap gap-px overflow-hidden rounded-card bg-border/70">
+      {children}
+    </div>
+  )
+}
+
+/** 一格。tone 为正显示红(A 股涨红)、为负显示绿、null 走中性色。 */
 function Metric({ label, value, title, tone }: {
   label: string; value: string; title?: string; tone?: number | null
 }) {
   const cls = tone == null || tone === 0 ? 'text-foreground'
     : tone > 0 ? 'text-red-400' : 'text-emerald-400'
   return (
-    <span className="inline-flex items-baseline gap-1" title={title}>
-      <span className="text-muted">{label}</span>
-      <b className={`font-mono font-medium ${cls}`}>{value}</b>
-    </span>
+    <div className="flex min-w-0 flex-1 basis-[110px] flex-col gap-[3px] bg-elevated/40 px-3.5 py-2.5"
+         title={title}>
+      <span className="truncate text-[10px] tracking-wide text-muted">{label}</span>
+      <b className={`truncate font-mono text-[15px] font-medium tabular-nums ${cls}`}>{value}</b>
+    </div>
   )
 }
 
@@ -160,41 +180,10 @@ export function PaperTrading({ embedded = false }: { embedded?: boolean } = {}) 
       )}
 
       <main className="min-h-0 flex-1 space-y-3 overflow-auto px-3 pb-4 pt-3 lg:px-4">
-        {/* [R186] 改成默认折叠。这段说明是**读一次就够**的东西(这一页是干嘛的、
-            禁什么、撮合按什么规矩), 可它有二十来行, 天天占掉首屏一半 —— 而真正
-            每天要看的净值曲线和账本卡片被挤到下面去了。想再读一遍点开就行。 */}
-        <details className="group rounded-card border border-border bg-surface px-3 py-2 text-[11px] leading-5 text-secondary">
-          <summary className="flex cursor-pointer list-none items-center gap-1.5 text-xs font-semibold text-foreground marker:content-none">
-            <Bot className="h-3.5 w-3.5 text-accent" />
-            这个页面是拿来体检的, 不是拿来赚钱的
-            <ChevronDown className="ml-auto h-3.5 w-3.5 text-muted transition-transform group-open:rotate-180" />
-          </summary>
-          <div className="mt-2">
-          每个操作员就是一个模型, 每天拿<span className="text-foreground">同一份</span>本系统的信息独立做决定。
-          每人带<span className="text-foreground">两本独立的账</span>——
-          「全市场」只能从全市场候选里选, 「我的自选」只能从我圈的票里选。
-          <span className="text-muted"> 这两条曲线的差, 就是我这份自选到底有没有价值。</span>
-          <br />
-          <span className="text-muted">禁的是<span className="text-secondary">外部信息</span>——
-          新闻、公告、研报、行情网站一律不许用, 它们也确实没有联网的手(只拿到服务端拼好的文本, 没有工具)。
-          但<span className="text-secondary">系统里的东西全都能用</span>: 先看一轮候选,
-          自己挑最多 6 只细看, 服务端把那几只的六态趋势、通道三档与结论、十一类关键价位、
-          近月日 K 走势(带涨停/炸板标注)、以及已有的 AI 个股分析一次给全。
-          <span className="text-secondary">信号旧了还能让它现场重出</span>——
-          AI 信号是缓存的, 会标出多久前生成、过期就提示它 refresh(每次最多 3 只)。
-          重出走的是系统默认那条 AI 链, 不是操作员自己的模型 —— 那份信号是系统产物,
-          用它自己的模型生成就变成了它的意见, 还会被别的操作员当系统数据读到。
-          它们互相看不见对方的持仓和理由 —— 上下文是按人按账组装的, 不是靠提示词叮嘱。
-          全程走<span className="text-secondary">收盘口径</span>;
-          唯一的例外是<span className="text-secondary">跌破生命线</span>——
-          那是硬纪律, 不问 AI, 允许用实时价立刻清掉。
-          撮合按 A 股规矩: 100 股一手、T+1 当天买的不能卖、算佣金印花税滑点。</span>
-          <br />
-          <span className="text-muted">跑一段时间后, 谁做得好不重要 —— 重要的是看它们
-          <span className="text-secondary">因为缺什么信息而做错</span>, 那就是系统下一步该补的。</span>
-          </div>
-        </details>
-
+        {/* [R190] 这里原来有一段二十来行的折叠说明(这一页是干嘛的、禁什么、
+            撮合按什么规矩)。用户: 「顶头那两个说明, 太多废话了」—— 说得对,
+            那是读一次就够的东西, 却天天占着首屏, 而每天真要看的净值曲线和
+            指标被挤到下面。规则本身没变, 只是不再摆在脸上。 */}
         {q.isLoading && (
           <div className="flex items-center justify-center gap-2 py-16 text-xs text-muted">
             <Loader2 className="h-4 w-4 animate-spin" />加载中…
@@ -208,8 +197,11 @@ export function PaperTrading({ embedded = false }: { embedded?: boolean } = {}) 
           </div>
         )}
 
+        {/* [R190] 一行一个操作员。参考项目的 `.mp-paper` 是**单栏面板**, 指标条
+            与净值图都吃满整宽; 原来 xl 两栏会把它们各压到半屏, 九个指标格挤在
+            半宽里就又变回一段话了。 */}
         {traders.length > 0 && (
-          <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4">
             {traders.map(t => (
               <TraderCard key={t.id} t={t}
                 runningScope={run.isPending && run.variables?.id === t.id ? run.variables.scope : null}
@@ -276,9 +268,13 @@ function TraderCard({ t, runningScope, onRun, onLifeline, onPlanCheck, onOpen, o
 
   return (
     <section className="flex flex-col rounded-card border border-border bg-surface">
-      <header className="flex flex-wrap items-center gap-2 border-b border-border px-3 py-2">
-        <Bot className="h-3.5 w-3.5 shrink-0 text-accent" />
-        <span className="min-w-0 flex-1 truncate text-xs font-semibold text-foreground">{t.name}</span>
+      {/* [R190] 名字 / 持仓上限 / 定时 合成一行 —— 对应参考项目的
+          `.mp-paper__head`(一行: 标题在左, 动作在右)。原来这是**两行**, 第二行
+          还挂着一句「建议收盘后 —— 收盘价出来了才有得算…」的长解释, 那句话
+          读一次就够, 挪进 title 悬停。 */}
+      <header className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border px-4 py-2.5">
+        <Bot className="h-4 w-4 shrink-0 text-accent" />
+        <span className="min-w-0 flex-1 truncate text-sm font-semibold text-foreground">{t.name}</span>
         {/* [R63] 持仓只数上限对两本账一视同仁 —— 要对照, 这个数就得对齐,
             分开设会让"谁做得好"变成"谁被允许更分散" */}
         <label className="flex shrink-0 items-center gap-1 text-[10px] text-muted"
@@ -290,6 +286,21 @@ function TraderCard({ t, runningScope, onRun, onLifeline, onPlanCheck, onOpen, o
             className="h-6 w-12 rounded-input border border-border bg-surface px-1 text-center text-[10px] text-foreground outline-none focus:border-accent" />
           只
         </label>
+        {/* [R61] 定时: 收盘后自己跑。长期观察靠人记得点按钮是不成立的 ——
+            漏几天就是净值曲线上几个说不清的缺口。 */}
+        <label className="flex shrink-0 items-center gap-1 text-[10px] text-secondary"
+          title="到点先查生命线, 再让两本账各决策一次。建议设在收盘后 —— 收盘价出来了才有得算">
+          <Clock className="h-3 w-3 text-muted" />
+          <input type="checkbox" className="h-3 w-3 accent-accent" checked={sched.enabled}
+            disabled={setSched.isPending}
+            onChange={e => setSched.mutate({ ...sched, enabled: e.target.checked })} />
+          自动跑
+        </label>
+        <input type="time"
+          value={timeText}
+          onChange={e => setTimeText(e.target.value)}
+          title="每个交易日几点自动跑"
+          className="h-6 shrink-0 rounded-input border border-border bg-surface px-1.5 text-[10px] text-foreground outline-none focus:border-accent" />
         <button type="button" disabled={remove.isPending}
           onClick={() => { if (window.confirm(`删掉操作员 ${t.name}？\n两本账的全部历史会一起删掉, 拿不回来。`)) remove.mutate() }}
           title="删掉这个操作员及其两本账的全部历史"
@@ -298,36 +309,21 @@ function TraderCard({ t, runningScope, onRun, onLifeline, onPlanCheck, onOpen, o
         </button>
       </header>
 
-      {/* [R61] 定时: 收盘后自己跑。长期观察靠人记得点按钮是不成立的 ——
-          漏几天就是净值曲线上几个说不清的缺口。 */}
-      <div className="flex flex-wrap items-center gap-2 border-b border-border/60 bg-elevated/20 px-3 py-1.5">
-        <Clock className="h-3 w-3 shrink-0 text-muted" />
-        <label className="flex shrink-0 items-center gap-1 text-[10px] text-secondary">
-          <input type="checkbox" className="h-3 w-3 accent-accent" checked={sched.enabled}
-            disabled={setSched.isPending}
-            onChange={e => setSched.mutate({ ...sched, enabled: e.target.checked })} />
-          每个交易日自动跑
-        </label>
-        <input type="time"
-          value={timeText}
-          onChange={e => setTimeText(e.target.value)}
-          className="h-6 rounded-input border border-border bg-surface px-1.5 text-[10px] text-foreground outline-none focus:border-accent" />
-        <span className="text-[10px] text-muted">
-          建议收盘后 —— 收盘价出来了才有得算。到点会先查生命线, 再让两本账各决策一次。
-        </span>
-      </div>
-
       {/* [R186] 净值曲线 —— 这一页最该有的那样东西。
           注释里一直写着"这两条曲线的差就是我这份自选有没有价值", 可**曲线从来
           没画出来过**: nav_history 从 R59 起就在存, 界面上却只有一个总资产数字。
           那个数只说明现在几块钱; 一路冲到 +30% 又跌回来, 和一路平着走, 在总资产
           上看不出任何区别。两本账画在同一张图里, 差值一眼可见。 */}
-      <div className="border-t border-border/60 px-3 pb-1 pt-2">
-        <PaperEquityChart books={t.books} height={168} />
+      {/* [R190] 高度由 168 提到 260 —— 参考项目的 `.mp-equity` 就是固定 260px。
+          净值曲线是这一页的主角, 168px 里两条线挤在一起, 看不出谁在什么时候
+          领先, 而"两条曲线的差"正是这一页要回答的问题。 */}
+      <div className="border-t border-border/60 px-4 pb-2 pt-3">
+        <PaperEquityChart books={t.books} height={260} />
       </div>
 
-      {/* 两本账并排 */}
-      <div className="grid grid-cols-1 divide-y divide-border/60 sm:grid-cols-2 sm:divide-x sm:divide-y-0">
+      {/* [R190] 两本账**纵向排开**, 不再左右各半。对比靠上面那张图(两条线本来就
+          画在一起), 而指标条要的是整行宽度。 */}
+      <div className="divide-y divide-border/60">
         {t.books.map(b => (
           <BookPane key={b.scope} b={b}
             busy={runningScope === b.scope}
@@ -363,9 +359,13 @@ function BookPane({ b, busy, onRun, onLifeline, onPlanCheck, onOpen, onReset, on
   onCapital: (v: number) => void
 }) {
   return (
-    <div className="flex min-w-0 flex-col px-3 py-2.5">
-      <div className="mb-2 flex items-center gap-2">
-        <button onClick={onOpen} className="shrink-0 text-[11px] font-medium text-foreground hover:text-accent">
+    <div className="flex min-w-0 flex-col gap-3 px-4 py-3.5">
+      {/* [R190] 账名一行 + 动作按钮靠右 —— 对应参考项目的 `.mp-paper__head`
+          (标题 + 一行小字说明, 右侧一个按钮)。按钮原来沉在整段的最底下,
+          两本账纵向排开之后那个位置离标题隔着一屏, 找不着。 */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <button onClick={onOpen}
+                className="shrink-0 text-xs font-semibold text-foreground hover:text-accent">
           {b.scope_cn}
         </button>
         {/* [R63] 两本账各自的本金。改本金会连带重置这本账 —— 中途换本金而不
@@ -381,48 +381,95 @@ function BookPane({ b, busy, onRun, onLifeline, onPlanCheck, onOpen, onReset, on
             }}
             className="h-6 w-24 rounded-input border border-border bg-surface px-1 text-right text-[10px] font-mono text-foreground outline-none focus:border-accent" />
         </label>
-        <span className={`ml-auto shrink-0 font-mono text-sm font-bold ${pnlCls(b.return_pct)}`}>
-          {pct(b.return_pct)}
-        </span>
+
+        <div className="ml-auto flex shrink-0 items-center gap-1">
+          <button type="button" disabled={busy} onClick={onRun}
+            title="按今天的信息做一次决策(调用这个操作员绑定的模型)"
+            className="inline-flex h-7 items-center gap-1 rounded-btn bg-accent px-2 text-[10px] font-medium text-white transition-opacity disabled:opacity-50">
+            {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Play className="h-3 w-3" />}
+            跑一次
+          </button>
+          <button type="button" onClick={onLifeline}
+            title="查一遍持仓有没有跌破生命线(20日线)。这一路不问 AI —— 硬纪律, 也是全流程唯一用实时价的地方"
+            className="inline-flex h-7 items-center gap-1 rounded-btn border border-amber-400/40 px-2 text-[10px] text-amber-400 transition-colors hover:bg-amber-400/10">
+            <ShieldAlert className="h-3 w-3" />查生命线
+          </button>
+          {/* [R171] 与「查生命线」成对: 那条是系统定的纪律, 这条是模型买入时
+              自己立的计划。都不问 AI, 但归因分开记。 */}
+          <button type="button" onClick={onPlanCheck}
+            title="过一遍模型买入时立的计划。止损线与到期日到了直接卖(不问 AI); 到止盈线的只记提醒, 下一轮写进它的上下文"
+            className="inline-flex h-7 items-center gap-1 rounded-btn border border-sky-400/40 px-2 text-[10px] text-sky-400 transition-colors hover:bg-sky-400/10">
+            <Target className="h-3 w-3" />过计划
+          </button>
+          <button type="button" onClick={onOpen}
+            className="inline-flex h-7 items-center gap-1 rounded-btn border border-border px-2 text-[10px] text-secondary transition-colors hover:border-accent/40 hover:text-accent">
+            <TrendingUp className="h-3 w-3" />明细
+          </button>
+          <button type="button" onClick={onReset} title="把这一本账重置到起跑线(另一本不动)"
+            className="p-1 text-muted transition-colors hover:text-amber-400">
+            <RotateCcw className="h-3.5 w-3.5" />
+          </button>
+        </div>
       </div>
 
-      {/* 总资产单独一行放大 —— 它是这本账的"现在几块钱", 其余细项在下面那排 */}
-      <div className="font-mono text-[15px] text-foreground">{money(b.nav)}</div>
-
-      {/* [R183] 绩效 —— 参考 MarketPulse 的 Metrics 补的。
-          原来只有总资产和交易天数: **没有回撤就不知道过程多难受**, 一条从 +30%
-          回撤到 0 的曲线和一条稳稳 +5% 的曲线, 只看总资产是看不出区别的。
+      {/* [R190] 指标条 —— 参考项目 `MetricRow` 的九项密排, 一格一个数吃满整行。
+          原来「总资产」单独放大一行、其余挤成一段行内文本, 那是两套排版混在
+          一起; 现在总资产就是九格里的一格, 与收益、回撤同一个视觉重量。
           算不出的显示 —— 而不是 0, 0 会被读成"从没回撤过"。 */}
-      {/* [R186] 指标改成 MarketPulse 那种**一排密排** —— 它的 MetricRow 是九项
-          平铺、标签小值大, 一眼扫完。原来做成三格居中的网格, 三个数占一整行,
-          既看不出多少又浪费高度。这里按本系统能算出的排开, 算不出的显示 —— 。 */}
-      {b.metrics && (
-        <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-[10px]">
-          <Metric label="收益" title="相对本金" tone={b.return_pct}
-                  value={`${b.return_pct > 0 ? '+' : ''}${(b.return_pct * 100).toFixed(2)}%`} />
-          <Metric label="最大回撤" title="从净值最高点起最深的一次回撤。样本不足显示 — 而不是 0(0 会被读成从没回撤过)"
-                  tone={b.metrics.max_drawdown ? -1 : null}
-                  value={b.metrics.max_drawdown != null ? `-${(b.metrics.max_drawdown * 100).toFixed(1)}%` : '—'} />
-          <Metric label="夏普" title="按日夏普年化。少于 20 个净值点不给 —— 那个数是噪声"
-                  value={b.metrics.sharpe != null ? b.metrics.sharpe.toFixed(2) : '—'} />
-          <Metric label="下场率" title="有持仓的交易日占比 —— 空仓躺着不动跑平也不叫本事"
-                  value={b.metrics.exposure != null ? `${(b.metrics.exposure * 100).toFixed(0)}%` : '—'} />
-          <Metric label="交易/天数" value={`${b.orders_count} / ${b.days}`} />
-          <Metric label="持仓/现金" value={`${b.positions_count} / ${money(b.cash)}`} />
+      <MetricStrip>
+        <Metric label="收益" title="相对本金" tone={b.return_pct}
+                value={`${b.return_pct > 0 ? '+' : ''}${(b.return_pct * 100).toFixed(2)}%`} />
+        <Metric label="总资产" title="现金 + 持仓市值" value={money(b.nav)} />
+        <Metric label="最大回撤" title="从净值最高点起最深的一次回撤。样本不足显示 — 而不是 0(0 会被读成从没回撤过)"
+                tone={b.metrics?.max_drawdown ? -1 : null}
+                value={b.metrics?.max_drawdown != null ? `-${(b.metrics.max_drawdown * 100).toFixed(1)}%` : '—'} />
+        <Metric label="夏普" title="按日夏普年化。少于 20 个净值点不给 —— 那个数是噪声"
+                value={b.metrics?.sharpe != null ? b.metrics.sharpe.toFixed(2) : '—'} />
+        <Metric label="下场率" title="有持仓的交易日占比 —— 空仓躺着不动跑平也不叫本事"
+                value={b.metrics?.exposure != null ? `${(b.metrics.exposure * 100).toFixed(0)}%` : '—'} />
+        <Metric label="交易" value={`${b.orders_count} 笔`} />
+        <Metric label="天数" value={`${b.days} 天`} />
+        <Metric label="持仓" value={`${b.positions_count} 只`} />
+        <Metric label="现金" value={money(b.cash)} />
+      </MetricStrip>
+
+      {/* [R171] 出场归因分布 —— 逼模型先立计划真正的产出。摆在「上次想法」上面
+          是有意的: 先看它做成了什么, 再看它当时怎么说的。 */}
+      <ExitStatsBar stats={b.exit_stats} />
+
+      {/* 已到止盈线但系统没替它卖的。止盈只提醒 —— 这里显示出来, 下一轮也会写进
+          它的上下文, 由它自己决定落袋还是继续拿。 */}
+      {(b.plan_reminders?.length ?? 0) > 0 && (
+        <div className="rounded border border-red-400/35 bg-red-400/[0.06] px-2 py-1 text-[10px] leading-4 text-red-400/90">
+          已到止盈线({b.plan_reminders!.length} 只): {b.plan_reminders!.map(r => r.symbol).join('、')}
+          <span className="ml-1 text-muted">—— 系统不代劳, 等它自己决定</span>
+        </div>
+      )}
+
+      {b.last_note && (
+        <div className="rounded border border-border/60 bg-elevated/30 px-2 py-1 text-[10px] leading-4 text-secondary">
+          上次想法: {b.last_note}
+        </div>
+      )}
+      {b.last_error && (
+        <div className="rounded border border-danger/40 bg-danger/[0.06] px-2 py-1 text-[10px] leading-4 text-danger">
+          上次没跑成: {b.last_error}
         </div>
       )}
 
       {/* [R183] 持仓的批次视图 —— 「我的批次」并进模拟盘之后, 持仓按批次的样子摊开。
           这是**派生**的, 没有写进真的 lots.json(那会派生真实监控规则, 并污染决策台
-          管真钱的那几列)。 */}
+          管真钱的那几列)。
+          [R190] 收进 `<details>`, 对应参考项目底部那个「成交记录 N 笔」折叠块 ——
+          它把明细放在最后且默认收起, 首屏留给指标与曲线。 */}
       {!!b.lots?.length && (
-        // [R186] 原来 min-w-[22rem] + overflow-x-auto —— 两本账并排时每边只有半屏,
-        // 于是这张表永远在横向滚动条里, 四列挤成一团。列本来就窄(代码/成本/数量/
-        // 现价/盈亏), 去掉最小宽度让它自适应, 一眼能看全才有意义。
-        <div className="mt-2 rounded border border-border/50">
+        <details className="rounded border border-border/50">
+          <summary className="cursor-pointer list-none px-2 py-1.5 text-[10px] text-secondary marker:content-none hover:text-foreground">
+            持仓批次 {b.lots.length} 笔
+          </summary>
           <table className="w-full table-fixed border-collapse text-[10px]">
             <thead>
-              <tr className="border-b border-border/50 text-[9px] text-muted">
+              <tr className="border-y border-border/50 text-[9px] text-muted">
                 <th className="w-[34%] px-1.5 py-1 text-left font-normal">批次</th>
                 <th className="px-1.5 py-1 text-right font-normal">成本</th>
                 <th className="px-1.5 py-1 text-right font-normal">数量</th>
@@ -450,63 +497,8 @@ function BookPane({ b, busy, onRun, onLifeline, onPlanCheck, onOpen, onReset, on
               ))}
             </tbody>
           </table>
-        </div>
+        </details>
       )}
-
-      {/* [R171] 出场归因分布 —— 逼模型先立计划真正的产出。摆在「上次想法」上面
-          是有意的: 先看它做成了什么, 再看它当时怎么说的。 */}
-      <div className="mt-2">
-        <ExitStatsBar stats={b.exit_stats} />
-      </div>
-
-      {/* 已到止盈线但系统没替它卖的。止盈只提醒 —— 这里显示出来, 下一轮也会写进
-          它的上下文, 由它自己决定落袋还是继续拿。 */}
-      {(b.plan_reminders?.length ?? 0) > 0 && (
-        <div className="mt-1.5 rounded border border-red-400/35 bg-red-400/[0.06] px-2 py-1 text-[10px] leading-4 text-red-400/90">
-          已到止盈线({b.plan_reminders!.length} 只): {b.plan_reminders!.map(r => r.symbol).join('、')}
-          <span className="ml-1 text-muted">—— 系统不代劳, 等它自己决定</span>
-        </div>
-      )}
-
-      {b.last_note && (
-        <div className="mt-2 rounded border border-border/60 bg-elevated/30 px-2 py-1 text-[10px] leading-4 text-secondary">
-          上次想法: {b.last_note}
-        </div>
-      )}
-      {b.last_error && (
-        <div className="mt-2 rounded border border-danger/40 bg-danger/[0.06] px-2 py-1 text-[10px] leading-4 text-danger">
-          上次没跑成: {b.last_error}
-        </div>
-      )}
-
-      <div className="mt-auto flex items-center gap-1 pt-2">
-        <button type="button" disabled={busy} onClick={onRun}
-          title="按今天的信息做一次决策(调用这个操作员绑定的模型)"
-          className="inline-flex h-7 items-center gap-1 rounded-btn bg-accent px-2 text-[10px] font-medium text-white transition-opacity disabled:opacity-50">
-          {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Play className="h-3 w-3" />}
-          跑一次
-        </button>
-        <button type="button" onClick={onLifeline}
-          title="查一遍持仓有没有跌破生命线(20日线)。这一路不问 AI —— 硬纪律, 也是全流程唯一用实时价的地方"
-          className="inline-flex h-7 items-center gap-1 rounded-btn border border-amber-400/40 px-2 text-[10px] text-amber-400 transition-colors hover:bg-amber-400/10">
-          <ShieldAlert className="h-3 w-3" />查生命线
-        </button>
-        {/* [R171] 与「查生命线」成对: 那条是系统定的纪律, 这条是模型买入时
-            自己立的计划。都不问 AI, 但归因分开记。 */}
-        <button type="button" onClick={onPlanCheck}
-          title="过一遍模型买入时立的计划。止损线与到期日到了直接卖(不问 AI); 到止盈线的只记提醒, 下一轮写进它的上下文"
-          className="inline-flex h-7 items-center gap-1 rounded-btn border border-sky-400/40 px-2 text-[10px] text-sky-400 transition-colors hover:bg-sky-400/10">
-          <Target className="h-3 w-3" />过计划
-        </button>
-        <button type="button" onClick={onOpen}
-          className="inline-flex h-7 items-center gap-1 rounded-btn border border-border px-2 text-[10px] text-secondary transition-colors hover:border-accent/40 hover:text-accent">
-          <TrendingUp className="h-3 w-3" />明细
-        </button>
-        <button type="button" onClick={onReset} title="把这一本账重置到起跑线(另一本不动)"
-          className="ml-auto p-1 text-muted transition-colors hover:text-amber-400">
-          <RotateCcw className="h-3.5 w-3.5" />
-        </button>
-      </div>
     </div>
   )
 }

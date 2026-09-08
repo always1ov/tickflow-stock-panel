@@ -24,7 +24,6 @@
  * 监控规则(你会收到模拟持仓的止损推送), 以及经 `effective_positions` 流进决策台
  * 的成本/浮盈与今日总览的持仓体检 —— 那几列管的是真钱。
  */
-import { AlertTriangle } from 'lucide-react'
 import { PageHeader } from '@/components/PageHeader'
 import { PaperTrading } from '@/pages/PaperTrading'
 
@@ -33,20 +32,13 @@ export function PositionsHub() {
     <div className="flex h-full flex-col">
       <PageHeader
         title="模拟盘"
-        subtitle="全权交给 AI 打理 · 体检这套系统给的信息够不够模型做决定"
+        subtitle="非真实资金 · 全权交给 AI 打理 · 与真实持仓完全分开"
       />
+      {/* [R190] 原来这里还有一条「模拟盘 · 非真实资金」的黄色横幅, 加上
+          PaperTrading 顶上那段二十来行的折叠说明, 一共两段 —— 用户: 「顶头
+          那两个说明, 太多废话了」。页头副标题已经写着"全权交给 AI 打理",
+          非真实资金这件事读一次就够, 不该天天占着首屏。 */}
       <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="px-3 pt-3 lg:px-4">
-          <div className="flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/[0.07] px-3 py-2 text-[11px] leading-relaxed text-warning">
-            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-            <span>
-              <b>模拟盘 · 非真实资金。</b>
-              这里的持仓、成本、盈亏全部是 AI 自己跑出来的,
-              与你的真实持仓<b>完全分开</b> ——
-              真实成本走决策台手填那条路, 不受这一页影响, 这一页也不会给你推送。
-            </span>
-          </div>
-        </div>
         <PaperTrading embedded />
       </div>
     </div>
