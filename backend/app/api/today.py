@@ -26,6 +26,18 @@ router = APIRouter(prefix="/api/today", tags=["today"])
 
 # 出场线"逼近"阈值(距离 3% 以内进入行动区)
 _NEAR_EXIT_PCT = -0.03
+
+# [R179] 行动区四档。原来只有 high/mid 两档, 于是「跌破生命线·无条件清仓」和
+# 「持有票转入下跌趋势」并列 —— 前者是**无条件**的, 后者要看情况, 不是一个量级;
+# 谁排在上面全靠 dict 迭代顺序, 等于没定。
+#
+#   fatal 无条件清仓(跌破生命线) —— 这一档只放"不用想, 照做"的
+#   high  该处理了(跌破止损线 / 转下跌趋势 / 组合回撤过纪律线)
+#   mid   要盯着(逼近出场线 / 超配)
+#   low   **已经发生过的事**(监控触发记录), 不是此刻的状态, 永远排最后
+SEVERITY_RANK = {"fatal": 0, "high": 1, "mid": 2, "low": 3}
+# 监控触发最多列几条 —— 它是历史记录, 不该把此刻要处理的挤下去
+_MAX_ALERT_ACTIONS = 3
 # 机会区: 现价距上方突破预案价 2% 以内
 _NEAR_BREAKOUT_PCT = 0.02
 # 机会区筛选: 把握分低于此值不显示; 最多显示条数
@@ -569,7 +581,7 @@ def _build_overview(repo, engine=None) -> dict:
         if ex["stage"] == "fatal":
             life_cn = "生命线(20日线)" if ex.get("lifeline_src") == "ma20" else "生命线"
             actions.append({
-                "kind": "lifeline_broken", "severity": "high", "symbol": sym, "name": nm,
+                "kind": "lifeline_broken", "severity": "fatal", "symbol": sym, "name": nm,
                 "text": f"已跌破{life_cn} {ex['line']:.2f}!按纪律无条件清仓离场 —— 这票不看了",
             })
         elif ex["triggered"]:
@@ -602,18 +614,30 @@ def _build_overview(repo, engine=None) -> dict:
     try:
         from app.services import alert_store
         events = alert_store.list_recent(repo.store.data_dir, days=1, limit=50)
-        for ev in events[:10]:
+        # [R179] 监控触发降为 low 档并限 3 条。
+        #
+        # 这些是**近 24h 已经发生过的事**, 而行动区其余各项说的是**此刻的状态**。
+        # 两者混在一列里, 原来最多灌 10 条 —— 设了几个点位提醒的用户, 行动区就被
+        # 历史记录占满, 真正要处理的那条反而被挤下去。降档 + 限流 + 溢出如实报数,
+        # 完整列表在告警页, 这里只留个提示。
+        shown = [ev for ev in events
+                 if str(ev.get("message") or ev.get("name") or "").strip()]
+        for ev in shown[:_MAX_ALERT_ACTIONS]:
             sym = str(ev.get("symbol", "")).upper()
             msg = str(ev.get("message") or ev.get("name") or "").strip()
-            if msg:
-                actions.append({
-                    "kind": "alert", "severity": "mid", "symbol": sym,
-                    "name": names.get(sym, sym or "—"),
-                    "text": f"监控触发:{msg}",
-                })
+            actions.append({
+                "kind": "alert", "severity": "low", "symbol": sym,
+                "name": names.get(sym, sym or "—"),
+                "text": f"监控触发:{msg}",
+            })
+        if len(shown) > _MAX_ALERT_ACTIONS:
+            actions.append({
+                "kind": "alert_more", "severity": "low", "symbol": "", "name": "监控",
+                "text": f"近 24 小时还有 {len(shown) - _MAX_ALERT_ACTIONS} 条触发未列出 —— 去告警页看完整记录",
+            })
     except Exception as e:  # noqa: BLE001
         logger.debug("today alerts skipped: %s", e)
-    sev_rank = {"high": 0, "mid": 1}
+    sev_rank = SEVERITY_RANK
     actions.sort(key=lambda a: sev_rank.get(a["severity"], 9))
 
     _st.mark("actions")
@@ -961,7 +985,7 @@ def _build_overview(repo, engine=None) -> dict:
                     "text": f"当前总仓位 {total_weight / 10:.1f}成,超过{posture}姿态的基调上限 {cap * 10:.0f}成"
                             f" —— 建议把差额 {(total_weight / 100 - cap) * 10:.1f}成 减下来",
                 })
-            sev_rank = {"high": 0, "mid": 1}
+            sev_rank = SEVERITY_RANK
             actions.sort(key=lambda a: sev_rank.get(a["severity"], 9))
 
     _st.mark("portfolio")

@@ -14,6 +14,8 @@ import type { TodayOverview, TodayPick } from '@/lib/api'
 // 事, 比没有存档更糟**: 事后复盘时你会拿它当"当时看到的东西", 而它不是。
 //
 // 同步的三块:
+//   [R179] 顺序与屏幕一致: 市场状态 → 需要行动 → 持仓体检 → 值得关注。
+//   风险排在机会前面 —— 导出件常被打印出来照着做, 顺序错了后果和屏幕上一样。
 //   1. 市场状态 —— 与屏幕一样的五个统计格(总仓位基调/出手结构/自选强弱/
 //      全市场/成交额) + 主线 + 姿态理由
 //   2. AI 导读与优选 —— 优选带上 R121 的核对结论(已核对/存疑/待查), 驳回的
@@ -169,6 +171,13 @@ export function buildTodayHtml(d: TodayOverview, brief: string | null,
     ${rejected.length ? `<ul class="picks">${rejected.map(p => `<li style="color:#8a919f"><b>${esc(p.name || p.symbol)}</b> <span class="adv" style="${pickStyle.驳回}">已驳回</span> <s>${esc(p.reason)}</s> ${esc(p.verdict_note ?? '')}</li>`).join('')}</ul>` : ''}
   </div>` : ''}
 
+  <h2>⚠️ 需要行动(${d.actions.length})</h2>
+  ${d.actions.length ? `<ul class="items">${actionRows}</ul>` : '<div class="empty">今日无需操作 —— 管住手</div>'}
+  <h2>💼 持仓体检(${d.holdings.length})${d.portfolio ? `<span style="font-weight:400;font-size:12px;color:#8a919f;margin-left:8px">组合:平均浮盈 ${d.portfolio.avg_pnl != null ? (d.portfolio.avg_pnl * 100).toFixed(1) + '%' : '—'} · 已触发 ${d.portfolio.triggered} · 逼近出场线 ${d.portfolio.near_exit} · 空头趋势 ${d.portfolio.bearish}${d.portfolio.total_weight != null ? ` · 总仓位 ${(d.portfolio.total_weight / 10).toFixed(1)}成${d.portfolio.drawdown != null ? ` · 距净值高点 -${(d.portfolio.drawdown * 100).toFixed(1)}%` : ''}` : ''}</span>` : ''}</h2>
+  ${d.holdings.length ? `<table>
+    <thead><tr><th>标的</th><th class="num">现价</th><th class="num">仓位</th><th class="num">浮盈</th><th class="num">出场线</th><th>阶段</th><th>趋势</th><th>操作建议</th></tr></thead>
+    <tbody>${holdRows}</tbody>
+  </table>` : '<div class="empty">暂无持仓标记</div>'}
   <h2>🎯 值得关注(${d.opportunities.length}·把握分 ≥ ${d.prefs.min_score}${d.opportunities_filtered > 0 ? `,滤掉 ${d.opportunities_filtered} 只` : ''})</h2>
   ${d.opportunities.length ? `<table>
     <thead><tr><th class="num">把握</th><th>名称</th><th>信号</th><th class="num">位置</th><th class="num">量比</th><th class="num">距关键点</th><th>出手</th><th>注记·不计分</th><th>建议仓位</th></tr></thead>
@@ -177,13 +186,6 @@ export function buildTodayHtml(d: TodayOverview, brief: string | null,
   <div class="meta" style="margin:6px 0 0">把握分 = 趋势强度 45% + 量能确认 30% + 位置成本 25%,先过三道硬门槛才打分;三条竖线依次是这三个维度的得分。分数带 * 表示有维度缺数据,总分偏乐观。位置 = Keltner 短期通道位置(50% 恰好站在生命线 MA20 上,甜区 50%~65%)。注记一律不参与打分。</div>`
     : '<div class="empty">今日没有把握足够的买入机会 —— 等待比出手更常见</div>'}
 
-  <h2>⚠️ 需要行动(${d.actions.length})</h2>
-  ${d.actions.length ? `<ul class="items">${actionRows}</ul>` : '<div class="empty">今日无需操作 —— 管住手</div>'}
-  <h2>💼 持仓体检(${d.holdings.length})${d.portfolio ? `<span style="font-weight:400;font-size:12px;color:#8a919f;margin-left:8px">组合:平均浮盈 ${d.portfolio.avg_pnl != null ? (d.portfolio.avg_pnl * 100).toFixed(1) + '%' : '—'} · 已触发 ${d.portfolio.triggered} · 逼近出场线 ${d.portfolio.near_exit} · 空头趋势 ${d.portfolio.bearish}${d.portfolio.total_weight != null ? ` · 总仓位 ${(d.portfolio.total_weight / 10).toFixed(1)}成${d.portfolio.drawdown != null ? ` · 距净值高点 -${(d.portfolio.drawdown * 100).toFixed(1)}%` : ''}` : ''}</span>` : ''}</h2>
-  ${d.holdings.length ? `<table>
-    <thead><tr><th>标的</th><th class="num">现价</th><th class="num">仓位</th><th class="num">浮盈</th><th class="num">出场线</th><th>阶段</th><th>趋势</th><th>操作建议</th></tr></thead>
-    <tbody>${holdRows}</tbody>
-  </table>` : '<div class="empty">暂无持仓标记</div>'}
   <p class="foot">牛来 · 六态趋势 + ATR 出场线 + 生命线(20日线) + 把握分 v2(三门槛 + 三维度) · 仅个人参考,不构成投资建议</p>
 </div>
 </body>

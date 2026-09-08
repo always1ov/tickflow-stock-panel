@@ -188,7 +188,14 @@ export interface AiFinancialReport {
 export type LevelType = 'sr' | 'pivot' | 'extreme' | 'boll' | 'keltner_s' | 'keltner_m' | 'keltner_l' | 'atr_stop' | 'gap' | 'fib' | 'round' | 'livermore' | 'exit'
 
 // [fork 增强] 今日总览(决策汇聚层)
-export interface TodayActionItem { kind: string; severity: 'high' | 'mid'; symbol: string; name: string; text: string }
+/** [R179] 四档: fatal 无条件清仓 > high 该处理了 > mid 要盯着 > low 已发生过的事(监控触发) */
+export interface TodayActionItem {
+  kind: string
+  severity: 'fatal' | 'high' | 'mid' | 'low'
+  symbol: string
+  name: string
+  text: string
+}
 /** [fork 增强] R37 主线归属(候选票所属的今日主线, 不在主线内则字段缺席) */
 export interface TodayMainlineTag {
   member: string; rank: number; limit_up_count: number; also: string[]
