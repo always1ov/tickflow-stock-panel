@@ -1,17 +1,19 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Star, Wallet, Sparkles, Loader2, ArrowUp, ArrowDown, RefreshCw, FileText, TrendingUp, Download, Bell } from 'lucide-react'
+import { Star, Wallet, Sparkles, Loader2, ArrowUp, ArrowDown, RefreshCw, FileText, Download, Bell } from 'lucide-react'
 import { api, type EffectivePosition, type ExitLine, type KeltnerBands, type TrendInfo, type Urgency } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { pickStale, SIGNAL_TTL_HOURS } from '@/lib/signalFreshness'   // [R131] 增量分析判据
 import { toast } from '@/components/Toast'
 import { useHistoryReports, openHistoryReport, loadHistory } from '@/lib/stockAnalysisStore'
 import { trendBadgeCls } from '@/components/stock-analysis/TrendStateBar'
-import { TrendSummaryDialog } from '@/components/stock-analysis/TrendSummaryDialog'
 import { StockReviewDialog, type ReviewTab } from '@/components/stock-analysis/StockReviewDialog'
 // [R167] 导出与两个单元格从本文件拆出 —— 拆前 933 行, 顶部堆着两张配色表和一整份
 // HTML 导出模板, 主组件被压在后面。
+import { storage } from '@/lib/storage'
 import { buildBoardHtml } from '@/lib/decisionBoardHtmlExport'
+import { DEFAULT_EXPORT_KEYS } from '@/lib/decisionBoardExportColumns'
+import { ExportColumnsDialog } from '@/components/stock-analysis/decision-board/ExportColumnsDialog'
 import { KeltnerCell, UrgencyCell, VerdictCell } from '@/components/stock-analysis/decision-board/cells'
 import { LotsLink } from '@/components/stock-analysis/decision-board/LotsLink'
 // [R169] 合并视图(手填 ⊕ 上游批次登记), 字段说明见 api.ts 的 EffectivePosition
@@ -62,8 +64,14 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
   const pendingLocate = useRef<{ symbol: string; explicit: boolean } | null>(null)
   const [flash, setFlash] = useState<string | null>(null)
   const flashTimer = useRef<number | undefined>(undefined)
-  // [fork 增强] 六态汇总弹窗
-  const [showTrendSummary, setShowTrendSummary] = useState(false)
+  // [R182] 导出选列。六态汇总弹窗已并进导出 —— 勾上趋势那几列就是它。
+  const [exportOpen, setExportOpen] = useState(false)
+  const [exportCols, setExportCols] = useState<string[]>(
+    () => storage.boardExportCols.get(DEFAULT_EXPORT_KEYS) ?? DEFAULT_EXPORT_KEYS)
+  const setCols = (keys: string[]) => {
+    setExportCols(keys)
+    storage.boardExportCols.set(keys)
+  }
   // [R48] 逐日复盘弹窗 —— 「趋势」「结论」两列点进来的就是它。
   // [R51] tab 记住是从哪一列进来的: 两列点开看的不是同一张表(见 StockReviewDialog)
   const [review, setReview] = useState<{ symbol: string; name: string; tab: ReviewTab } | null>(null)
@@ -408,19 +416,18 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
 
   // [R46] 导出用的行: 只留「结论」列有内容的。三档都在通道中部的票没有位置
   // 信息, 导出来只是占地方。按当前排序导出 —— 你在界面上怎么排, 导出件就怎么排。
-  // [R178] 原来只导「有结论」的票。加了「该动」列之后这个条件就漏了 ——
-  // 一只已跌破出场线、但三档通道都在中部的票没有结论, 却正是最该出现在
-  // 导出件里的那只。改成两者取并集。
-  const exportRows = useMemo(
-    () => sortedRows.filter((r) => r.kc?.verdict || (r.urg && r.urg.level !== 'idle')),
-    [sortedRows],
-  )
+  // [R182] 导出**当前列表所见**, 不再另加筛选条件。
+  //
+  // 以前写死"只导有结论的", R178 又补了"或要动的" —— 那是因为列写死在模板里,
+  // 只能靠行筛选控制篇幅。现在列可选了, 导多少由「只看要动的」「只看持有」这两个
+  // 已有的开关决定就够了: **屏幕上看到什么就导出什么**, 不再有第三套隐藏规则。
+  const exportRows = sortedRows
   const exportHtml = () => {
     if (!exportRows.length) {
       toast('当前没有要动的、也没有「结论」列有内容的标的 —— 无可导出', 'error')
       return
     }
-    const blob = new Blob([buildBoardHtml(exportRows, rows.length)], { type: 'text/html;charset=utf-8' })
+    const blob = new Blob([buildBoardHtml(exportRows, rows.length, exportCols)], { type: 'text/html;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
@@ -440,35 +447,6 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
           <span className="text-[10px] text-muted">{rows.length} 只 · 持有 {heldCount}</span>
         </span>
         <button
-          onClick={refreshAll}
-          disabled={refreshing}
-          title="刷新行情/仓位/信号快照(不调用 AI、不计费)"
-          className="ml-auto inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-btn border border-border bg-base text-muted hover:text-foreground disabled:opacity-60 transition-colors cursor-pointer"
-        >
-          <RefreshCw className={`h-3 w-3 ${refreshing ? 'animate-spin' : ''}`} />
-          刷新
-        </button>
-        <button
-          onClick={exportHtml}
-          disabled={!exportRows.length}
-          title={exportRows.length
-            ? `导出为自包含 HTML(可存档/分享)。只导出「结论」列有内容的 ${exportRows.length} 只 —— 三档都在通道中部的票没有位置信息, 不占篇幅`
-            : '当前没有「结论」列有内容的标的'}
-          className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-btn border border-sky-400/30 bg-sky-400/10 text-sky-300 hover:bg-sky-400/20 disabled:opacity-50 transition-colors cursor-pointer"
-        >
-          <Download className="h-3 w-3" />
-          导出 HTML
-          {exportRows.length > 0 && <span className="opacity-70">{exportRows.length}</span>}
-        </button>
-        <button
-          onClick={() => setShowTrendSummary(true)}
-          title="全部自选的六态趋势纵览(零 AI 成本),可导出 HTML"
-          className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-btn border border-sky-400/30 bg-sky-400/10 text-sky-300 hover:bg-sky-400/20 transition-colors cursor-pointer"
-        >
-          <TrendingUp className="h-3 w-3" />
-          六态汇总
-        </button>
-        <button
           onClick={() => setActionableOnly((v) => !v)}
           title={'只留下有触发的那几只: 出场线已破/逼近、离趋势翻转价 2% 以内、今日刚翻转、'
             + '短通道到轨。判定是纯规则的(与推送焦点名单同一套到轨口径), AI 不参与。\n'
@@ -487,6 +465,31 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
         >
           只看持有
         </button>
+        <span className="mx-0.5 h-3 w-px shrink-0 bg-border/60" aria-hidden />
+        <button
+          onClick={refreshAll}
+          disabled={refreshing}
+          title="刷新行情/仓位/信号快照(不调用 AI、不计费)"
+          className="ml-auto inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-btn border border-border bg-base text-muted hover:text-foreground disabled:opacity-60 transition-colors cursor-pointer"
+        >
+          <RefreshCw className={`h-3 w-3 ${refreshing ? 'animate-spin' : ''}`} />
+          刷新
+        </button>
+        <button
+          onClick={() => setExportOpen(true)}
+          disabled={!exportRows.length}
+          title={exportRows.length
+            ? `导出当前列表所见的 ${exportRows.length} 只为自包含 HTML(可存档/打印/转发)。\n`
+              + `点开可以选导哪些列 —— 原「六态汇总」就是其中一个预设。\n`
+              + `导出的读法与屏幕一致(通道列写「贴上轨」而不是 0.87)。`
+            : '当前列表是空的'}
+          className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-btn border border-sky-400/30 bg-sky-400/10 text-sky-300 hover:bg-sky-400/20 disabled:opacity-50 transition-colors cursor-pointer"
+        >
+          <Download className="h-3 w-3" />
+          导出
+          {exportRows.length > 0 && <span className="opacity-70">{exportRows.length}·{exportCols.length}列</span>}
+        </button>
+        <span className="mx-0.5 h-3 w-px shrink-0 bg-border/60" aria-hidden />
         {heldCount > 0 && (
           <button
             onClick={runHeld}
@@ -516,19 +519,6 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
             : <>AI 分析全部{staleAll.length > 0 && <span className="text-sky-300/70">·{staleAll.length}</span>}</>}
         </button>
       </div>
-
-      {/* [fork 增强] 六态汇总弹窗:全部自选(不受"只看持有"过滤)+ 批量趋势 */}
-      {showTrendSummary && (
-        <TrendSummaryDialog
-          items={((enriched.data?.rows ?? []) as any[]).map((r: any) => ({
-            symbol: String(r.symbol),
-            name: String(r.name ?? r.symbol),
-            close: typeof r.close === 'number' ? r.close : null,
-          }))}
-          trends={trends}
-          onClose={() => setShowTrendSummary(false)}
-        />
-      )}
 
       {/* [R48] 逐日复盘: 趋势 / 三档结论 / 涨停按同一条时间轴排开 */}
       {review && (
@@ -823,6 +813,16 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
             </tbody>
           </table>
       </div>
+
+      {exportOpen && (
+        <ExportColumnsDialog
+          keys={exportCols}
+          onChange={setCols}
+          rowCount={exportRows.length}
+          onClose={() => setExportOpen(false)}
+          onExport={() => { exportHtml(); setExportOpen(false) }}
+        />
+      )}
     </div>
   )
 }

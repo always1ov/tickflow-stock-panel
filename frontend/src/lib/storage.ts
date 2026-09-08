@@ -66,6 +66,8 @@ export const storage = {
   watchlistIntraday:    kv<boolean>('watchlist_showIntraday'),
 
   /** 策略结果列表日K蜡烛图显示状态 */
+  // [R182] 决策台导出选中的列 —— 选完下次打开还是这套
+  boardExportCols:      kv<string[]>('board_exportCols'),
   screenerCandle:       kv<boolean>('screener_showCandle'),
 
   /** 策略结果列表分时图显示状态 */
