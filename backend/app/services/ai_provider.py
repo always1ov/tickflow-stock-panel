@@ -13,6 +13,7 @@ import tempfile
 import time
 import tomllib
 from collections.abc import AsyncIterator, Callable, Sequence
+from typing import Any
 from contextvars import ContextVar
 from pathlib import Path
 from types import TracebackType
@@ -70,7 +71,10 @@ _CODEX_ENV_ALLOWLIST = (
     "NODE_EXTRA_CA_CERTS",
 )
 
-Message = dict[str, str]
+# [R180] content 放宽成 str | list —— 多模态(图文混排)时 OpenAI 兼容协议要求
+# content 是一个 part 数组: [{"type":"text",...}, {"type":"image_url",...}]。
+# 既有调用方全部传字符串, 不受影响。
+Message = dict[str, Any]
 
 _ANSI_RE = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]")
 
@@ -214,13 +218,43 @@ def _resolve_max_tokens(max_tokens: int | None) -> int | None:
     return max(1, min(int(max_tokens), cap))
 
 
+# 一张图按多少 token 估。各家实测在几百到一两千之间(与分辨率有关), 取 1500
+# 是**故意偏高**的: 这个估算只用来挡"明显超窗", 宁可早一点拒绝, 也不要让一张
+# 大图把请求撑到上游 400。
+_IMAGE_TOKEN_ESTIMATE = 1500
+
+
+def _content_text(content: Any) -> tuple[str, int]:
+    """(可计字数的文本, 图片张数)。
+
+    [R180] 多模态的 content 是 part 数组, 里面 image_url 往往是一个几十万字符的
+    base64 data URI。直接 str() 会把它当文本算 —— 一张图就能顶出十几万"token",
+    上下文保护会立刻拒掉一个其实完全正常的请求。所以这里只取文本 part。
+    """
+    if isinstance(content, str):
+        return content, 0
+    if not isinstance(content, list):
+        return str(content or ""), 0
+    texts, images = [], 0
+    for part in content:
+        if not isinstance(part, dict):
+            texts.append(str(part))
+            continue
+        if part.get("type") == "text":
+            texts.append(str(part.get("text") or ""))
+        elif part.get("type") == "image_url":
+            images += 1
+    return "".join(texts), images
+
+
 def _estimate_input_tokens(messages: Sequence[Message]) -> int:
     """粗略估算输入 token 数: 中文按 1 字 1 token, 其余按 4 字符 1 token。"""
     total = 0
     for m in messages:
-        text = str(m.get("content") or "")
+        text, images = _content_text(m.get("content"))
         cjk = sum(1 for ch in text if "一" <= ch <= "鿿")
         total += cjk + (len(text) - cjk) // 4 + 1
+        total += images * _IMAGE_TOKEN_ESTIMATE
     return max(1, total)
 
 

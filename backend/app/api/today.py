@@ -1331,10 +1331,19 @@ async def generate_today_ai(repo, data: dict, note: str = "") -> dict:
     note = (note or "").strip()[:500]
     if note:
         payload["用户补充说明"] = note
+    # [R180] 带上消息面总览。取不到/过期/关掉都返回空串, 那就跟改造前一样。
+    # 放在 system 而不是 payload 里: 它是**背景**不是数据, 混进那份 JSON 会被
+    # 当成和 K 线同级的事实, 而它未经核实。
+    try:
+        from app.services import news_desk
+        _news = news_desk.context_for_ai()
+    except Exception as e:  # noqa: BLE001
+        logger.debug("today ai: news desk skipped: %s", e)
+        _news = ""
     try:
         text = await generate_ai_text(
             [
-                {"role": "system", "content": _AI_SYSTEM},
+                {"role": "system", "content": _AI_SYSTEM + ("\n\n" + _news if _news else "")},
                 {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
             ],
             temperature=0.2,

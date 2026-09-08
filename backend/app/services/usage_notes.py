@@ -1,4 +1,16 @@
-"""[fork 增强] R93 使用观察笔记 — 纯文本笔记的增删改查。
+"""[fork 增强] R93 使用观察笔记 → [R180] **消息面**。
+
+用途从"归纳这个系统怎么用"扩成**消息面台账**: 政策、公告、研报截图、行业新闻、
+自己的观察, 一条条记进来, 每条由 AI 凝练成一段要点, 再由 AI 把全部条目综合成
+**一大段总的**, 供后续决策参考。
+
+[R180] 三件事是新的, 其余一条没动(旧数据、状态链、并发写法全部照旧):
+  · kind        text / image / file —— 一条可以挂一个附件
+  · digest      AI 对这一条的凝练; 图片走多模态, 文本直接凝练
+  · 一大段总的  不在本模块, 见 news_desk —— 它综合的是各条的 digest
+
+**旧数据一条不动**: 老笔记没有 kind/digest 字段, 读时补默认(kind=text,
+digest 为空), 照样能编辑、标状态、参与综合。
 
 用途: 用户归纳"这个系统怎么用、哪些功能有用"的个人笔记本。
 存储: data/user_data/usage_notes.json (数组, 按 updated_at 降序返回)。
@@ -30,6 +42,10 @@ from app.services.json_store import atomic_write_json, lock_for
 MAX_NOTES = 500          # 防失控: 纯文本笔记 500 条足够, 超出拒绝新增
 MAX_CONTENT_CHARS = 20000
 STATUSES = ("", "pending", "verified", "rejected")
+# [R180] 一条消息的形态。file 只收**可读文本**(csv/txt/md 之类) —— 二进制收了
+# 也读不出内容, 只会变成一个打不开的附件。
+KINDS = ("text", "image", "file")
+MAX_DIGEST_CHARS = 2000
 
 
 def _path() -> Path:
@@ -54,8 +70,13 @@ def _read_unlocked() -> list[dict]:
 
 
 def _with_defaults(note: dict) -> dict:
-    """老数据补默认字段(不回写盘, 读时视图)。"""
-    return {"status": "", "pinned": False, **note}
+    """老数据补默认字段(不回写盘, 读时视图)。
+
+    [R180] 新增 kind/attachment/digest 也走这里 —— 老笔记读出来就是一条
+    kind=text、没有附件、还没凝练过的消息, 不需要迁移脚本。
+    """
+    return {"status": "", "pinned": False, "kind": "text",
+            "attachment": None, "digest": "", "digest_at": None, **note}
 
 
 def list_notes() -> list[dict]:
@@ -67,10 +88,18 @@ def list_notes() -> list[dict]:
     return sorted(by_time, key=lambda n: 0 if n.get("pinned") else 1)
 
 
-def create_note(content: str) -> dict:
+def create_note(content: str, *, kind: str = "text",
+                attachment: dict | None = None) -> dict:
+    """[R180] kind/attachment 可选 —— 不传就和改造前完全一样。
+
+    带附件时正文可以为空(一张图本身就是内容), 但两者不能都空:
+    一条既没正文也没附件的记录, 之后谁也说不清它是什么。
+    """
     content = (content or "").strip()
-    if not content:
-        raise ValueError("笔记内容不能为空")
+    if kind not in KINDS:
+        raise ValueError(f"kind 必须是 {KINDS} 之一")
+    if not content and not attachment:
+        raise ValueError("正文和附件不能都为空")
     if len(content) > MAX_CONTENT_CHARS:
         raise ValueError(f"单条笔记最长 {MAX_CONTENT_CHARS} 字")
     with lock_for(_path()):
@@ -81,6 +110,11 @@ def create_note(content: str) -> dict:
         note = {
             "id": f"note_{uuid.uuid4().hex[:12]}",
             "content": content,
+            "kind": kind,
+            "attachment": attachment,
+            # 凝练在落盘之后单独触发 —— 上传要立刻有反馈, 不能卡在一次 AI 调用上
+            "digest": "",
+            "digest_at": None,
             "status": "",
             "pinned": False,
             "created_at": now,
@@ -127,11 +161,75 @@ def update_note(
     return None
 
 
+def set_digest(note_id: str, digest: str, *, raw_text: str | None = None) -> dict | None:
+    """[R180] 写入 AI 凝练结果, 并**丢掉原始文件**。
+
+    用户定的口径: **只保存凝练, 不保存图片; 文字允许保存原文。** 所以:
+      · 图片  —— 凝练成功后把文件删掉, 只留要点(和文件名, 好知道这条是从哪来的)
+      · 文本  —— 文件内容并进正文(那就是"原文"), 文件同样删掉
+
+    这样盘上不会长期堆附件, 消息面攒几年也只是一堆文字。
+
+    **删除只在这里发生, 也就是只在凝练成功之后。** 凝练失败时文件原样留着,
+    用户可以重试 —— 一张图删了就再也凝练不了了, 不能在还没拿到要点时就删。
+
+    代价说明白: 图片删掉之后**没法重新凝练**。AI 读错了、或者以后换了更好的
+    模型想重跑, 源都没了。这是用户明确要的取舍。
+
+    **不动 updated_at** —— 凝练是系统行为不是用户编辑, 把一条旧消息顶到
+    "最近编辑"的最前面会打乱用户自己的整理顺序(与 update_note 里标状态/
+    置顶不刷新时间是同一个道理)。
+    """
+    digest = (digest or "").strip()[:MAX_DIGEST_CHARS]
+    stale_file: str | None = None
+    with lock_for(_path()):
+        notes = _read_unlocked()
+        for note in notes:
+            if note.get("id") != note_id:
+                continue
+            note["digest"] = digest
+            note["digest_at"] = _now()
+            if raw_text:
+                # 文本文件的内容并进正文 —— 用户要"文字保存原文"。接在已有备注
+                # 后面而不是覆盖: 那句备注("这是某某的调研纪要")往往比正文还重要。
+                existing = (note.get("content") or "").strip()
+                merged = f"{existing}\n\n{raw_text}".strip() if existing else raw_text
+                note["content"] = merged[:MAX_CONTENT_CHARS]
+            att = note.get("attachment") or {}
+            if att.get("path"):
+                stale_file = att["path"]
+                # 只留文件名与大小, 路径去掉 —— 记录里不该再指向一个已经不在的文件
+                note["attachment"] = {k: v for k, v in att.items() if k != "path"}
+            atomic_write_json(_path(), notes)
+            result = _with_defaults(dict(note))
+            break
+        else:
+            return None
+
+    if stale_file:
+        try:
+            (settings.data_dir / stale_file).unlink(missing_ok=True)
+        except Exception as e:  # noqa: BLE001
+            import logging
+            logging.getLogger(__name__).warning("attachment unlink failed: %s", e)
+    return result
+
+
 def delete_note(note_id: str) -> bool:
     with lock_for(_path()):
         notes = _read_unlocked()
+        target = next((n for n in notes if n.get("id") == note_id), None)
         remaining = [n for n in notes if n.get("id") != note_id]
         if len(remaining) == len(notes):
             return False
         atomic_write_json(_path(), remaining)
+    # [R180] 附件跟着记录一起删 —— 不然盘上会攒一堆没人引用的图。
+    # 删文件失败只记日志: 记录已经删掉了, 不该因为一个孤儿文件把接口报成失败。
+    att = (target or {}).get("attachment") or {}
+    if att.get("path"):
+        try:
+            (settings.data_dir / att["path"]).unlink(missing_ok=True)
+        except Exception as e:  # noqa: BLE001
+            import logging
+            logging.getLogger(__name__).warning("attachment unlink failed: %s", e)
     return True

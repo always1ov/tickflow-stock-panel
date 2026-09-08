@@ -111,7 +111,7 @@ const nav = [
   { to: '/signals',    label: '信号库',   icon: Zap },
   { to: '/review',      label: '复盘',   icon: BookOpenCheck },
   // [fork 增强] R93 使用观察笔记
-  { to: '/usage-notes', label: '我的使用观察', icon: NotebookPen },
+  { to: '/usage-notes', label: '消息面', icon: NotebookPen },   // [R180] 原「我的使用观察」
   { to: '/indices', label: '指数', icon: BarChart3 },
   { to: '/data',       label: '数据',   icon: Database },
 ] as const

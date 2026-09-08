@@ -405,12 +405,21 @@ async def run_once(repo, trader: dict, scope: str) -> dict:
     focus: list[str] = []
     want_refresh: list[str] = []
     refreshed: list[dict] = []
+    # [R180] 消息面总览 —— 这是真下单的路径, 所以同样带上背景;
+    # 但它只进 system 作参考, 价格与规则仍以 context 里的为准(见 news_desk 模块头)。
+    try:
+        from app.services import news_desk
+        _news = news_desk.context_for_ai()
+    except Exception as e:  # noqa: BLE001
+        logger.debug("paper trader: news desk skipped: %s", e)
+        _news = ""
+    _sfx = ("\n\n" + _news) if _news else ""
     try:
         # 第 1 轮: 看盘 —— 先挑想细看的几只
         allowed = _allowed_symbols(repo, trader, scope)
         try:
             look = await generate_ai_text(
-                [{"role": "system", "content": LOOK_PROMPT},
+                [{"role": "system", "content": LOOK_PROMPT + _sfx},
                  {"role": "user", "content": context}],
                 temperature=0.2, max_tokens=None, timeout=180.0)
             focus, want_refresh = parse_focus(look, allowed)
@@ -434,7 +443,7 @@ async def run_once(repo, trader: dict, scope: str) -> dict:
             detail = ("\n\n## 你要求细看的(全部来自本系统)\n"
                       + "\n\n".join(b for b in blocks if b))
         text = await generate_ai_text(
-            [{"role": "system", "content": SYSTEM_PROMPT},
+            [{"role": "system", "content": SYSTEM_PROMPT + _sfx},
              {"role": "user", "content": context + detail}],
             temperature=0.3, max_tokens=None, timeout=300.0)
     finally:

@@ -197,8 +197,15 @@ async def generate_signal(repo, data_dir: Path, symbol: str) -> dict:
         f"关键价位概览: {summarize_levels(levels, close)}\n"
         f"最近 {_SIGNAL_WINDOW} 日 K(JSON,含指标):\n{json.dumps(kline_tail, ensure_ascii=False)}"
     )
+    # [R180] 同今日总览: 消息面总览进 system 作背景, 不混进价格数据里
+    try:
+        from app.services import news_desk
+        _news = news_desk.context_for_ai()
+    except Exception as e:  # noqa: BLE001
+        logger.debug("stock signal: news desk skipped: %s", e)
+        _news = ""
     msgs = [
-        {"role": "system", "content": _SYSTEM_PROMPT},
+        {"role": "system", "content": _SYSTEM_PROMPT + ("\n\n" + _news if _news else "")},
         {"role": "user", "content": user_prompt},
     ]
     try:

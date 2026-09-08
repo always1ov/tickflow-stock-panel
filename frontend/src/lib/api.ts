@@ -1432,8 +1432,24 @@ export interface UsageNote {
   /** ''=随手记 / pending=待验证 / verified=已验证 / rejected=不成立 */
   status?: '' | 'pending' | 'verified' | 'rejected'
   pinned?: boolean
+  /** [R180] 消息形态; 老数据没有这个字段, 后端读时补 text */
+  kind?: 'text' | 'image' | 'file'
+  /** [R180] 凝练成功后 path 会被去掉、原件删除 —— 只保存凝练不保存图片。
+   *  留 name/size 是为了知道这条要点是从哪个文件来的。 */
+  attachment?: { path?: string; name: string; size: number } | null
+  /** AI 对这一条的凝练; 空 = 还没凝练过 */
+  digest?: string
+  digest_at?: string | null
   created_at: string
   updated_at: string
+}
+
+/** [R180] 一大段总的 —— 综合全部条目, 之后每次 AI 决策都会带上它 */
+export interface NewsDeskSummary {
+  text: string
+  as_of: string
+  item_count: number
+  item_ids?: string[]
 }
 
 
@@ -4001,6 +4017,26 @@ export const api = {
     request<UsageNote>('/api/usage-notes', { method: 'POST', body: JSON.stringify({ content }) }),
   usageNoteUpdate: (id: string, patch: { content?: string; status?: string; pinned?: boolean }) =>
     request<UsageNote>(`/api/usage-notes/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(patch) }),
+  // [R180] 让 AI 凝练这一条(图片走多模态)
+  usageNoteDigest: (id: string) =>
+    request<UsageNote>(`/api/usage-notes/${encodeURIComponent(id)}/digest`, { method: 'POST' }),
+
+  // [R180] 传图片/文本文件, 建一条带附件的记录。落盘即返回, 凝练是单独一步 ——
+  // 上传要立刻有反馈, 不能卡在一次几十秒的 AI 调用上。
+  usageNoteUpload: (file: File, content = '') => {
+    const fd = new FormData()
+    fd.append('file', file)
+    return request<UsageNote>(
+      `/api/usage-notes/upload?content=${encodeURIComponent(content)}`,
+      { method: 'POST', body: fd })
+  },
+
+  usageNotesSummaryGet: () =>
+    request<{ summary: NewsDeskSummary | null }>('/api/usage-notes/summary'),
+
+  usageNotesSummaryBuild: () =>
+    request<{ summary: NewsDeskSummary }>('/api/usage-notes/summary', { method: 'POST' }),
+
   usageNoteDelete: (id: string) =>
     request<{ ok: boolean }>(`/api/usage-notes/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   miningResult: (runId: string) =>

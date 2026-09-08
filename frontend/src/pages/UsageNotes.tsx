@@ -11,13 +11,32 @@
  *   - 标状态/置顶不刷新"编辑时间", 整理动作不打乱时间线。
  *
  * 仍然刻意没有: 分类、标签、富文本 —— 记下来就走。
+ *
+ * [R180] 改造成**消息面**。用户: 「当作是个消息面, 我上传的数据或者图片都会调度
+ * AI 凝练后保存, 然后还要凝练一大段总的, 以后每次做出决策性的结论都得参考一次
+ * 这一大段总的」。三件事是新的:
+ *   · 可以传图/传文本文件(也支持直接 Ctrl+V 粘贴截图) —— 研报、公告截图最常见;
+ *   · 每条可让 AI 凝练成一段要点;
+ *   · **只保存凝练, 不保存图片; 文字保留原文**(用户定的口径) —— 图片凝练成功后
+ *     原件即删, 只留要点与文件名; 文本文件的内容并进正文。盘上不长期堆附件。
+ *     代价说明白: 图删了就没法重新凝练, AI 读错了也回不去。
+ *   · 顶部一段**总的** —— 综合全部条目, 并且**之后每次 AI 决策都会带上它**
+ *     (今日导读·优选 / 个股信号 / 模拟交易)。
+ *
+ * 状态链一个字没改 —— 消息面同样需要"这条后来成立没有"。而且标了「不成立」的
+ * 会被明确喂给综合, 让它写清楚哪条已经被证伪: 留着一条已经错了的判断比没有更糟。
+ *
+ * **注入只到 AI 层。** 把握分/出场线/六态/通道位置这些规则层的东西一个字都不吃
+ * 这段总结 —— 它们必须保持可复现。这条边界在后端有测试钉着。
  */
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   NotebookPen, Plus, Pencil, Trash2, Loader2, X, Check, Search, Pin, PinOff,
+  Sparkles, ImageIcon, Paperclip, ChevronDown, RefreshCw,
 } from 'lucide-react'
-import { api, type UsageNote } from '@/lib/api'
+import { api, type NewsDeskSummary, type UsageNote } from '@/lib/api'
+import { toast } from '@/components/Toast'
 import { QK } from '@/lib/queryKeys'
 import { PageHeader } from '@/components/PageHeader'
 import { EmptyState } from '@/components/EmptyState'
@@ -68,10 +87,17 @@ function StatusChip({ status, onCycle, busy }: { status: NoteStatus; onCycle: ()
   )
 }
 
-function NoteCard({ note }: { note: UsageNote }) {
+function NoteCard({ note, onDigest, digesting }: {
+  note: UsageNote
+  /** [R180] 凝练由页面统一持有 —— 卡片自己发起的话, 每张卡都要挂一份
+   *  mutation, 而"哪一张正在凝练"的状态又得靠 id 比对, 不如提上去。 */
+  onDigest: (id: string) => void
+  digesting: boolean
+}) {
   const qc = useQueryClient()
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(note.content)
+  const [showRaw, setShowRaw] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const invalidate = () => qc.invalidateQueries({ queryKey: QK.usageNotes })
 
@@ -127,13 +153,66 @@ function NoteCard({ note }: { note: UsageNote }) {
         </div>
       ) : (
         <>
-          <p className="flex-1 whitespace-pre-wrap text-[13px] leading-relaxed text-foreground">{note.content}</p>
+          {/* [R180] 有凝练时以**要点**为主体, 原文收进可展开的一行。
+              凝练是多一层不是替换 —— 原文永远还在, 因为 AI 会漏、会读错,
+              而这条记录之后要进综合、进决策, 得能翻回去核对。 */}
+          {note.digest ? (
+            <div className="flex-1">
+              <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-foreground">{note.digest}</p>
+              {(note.content || note.attachment) && (
+                <button
+                  onClick={() => setShowRaw(v => !v)}
+                  className="mt-1.5 inline-flex items-center gap-1 text-[10px] text-muted/70 transition-colors hover:text-foreground cursor-pointer"
+                >
+                  <ChevronDown className={cn('h-3 w-3 transition-transform', showRaw && 'rotate-180')} />
+                  {showRaw ? '收起原文' : '原文'}
+                  {note.attachment && (
+                    <span className="opacity-70" title={note.attachment.path
+                      ? '原件还在(这条还没凝练成功)'
+                      : '来自这个文件; 图片原件在凝练后已删除, 只保留要点'}>
+                      · 来自 {note.attachment.name}
+                    </span>
+                  )}
+                </button>
+              )}
+              {showRaw && (
+                <p className="mt-1 whitespace-pre-wrap rounded border border-border/40 bg-base/50 px-2 py-1.5 text-[11px] leading-relaxed text-muted">
+                  {note.content || <span className="italic opacity-70">(只有附件, 没有正文)</span>}
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="flex-1">
+              <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-foreground">
+                {note.content || <span className="italic text-muted">(只有附件)</span>}
+              </p>
+              {note.attachment && (
+                <span
+                  className="mt-1 inline-flex items-center gap-1 text-[10px] text-warning/80"
+                  title="还没凝练成功 —— 原件暂时留着, 点 ✨ 重试。凝练成功后图片会被删掉, 只留要点。"
+                >
+                  {note.kind === 'image' ? <ImageIcon className="h-3 w-3" /> : <Paperclip className="h-3 w-3" />}
+                  {note.attachment.name} · 待凝练
+                </span>
+              )}
+            </div>
+          )}
           <div className="mt-2.5 flex items-center gap-2 border-t border-border/50 pt-2">
             <StatusChip status={status} onCycle={cycleStatus} busy={update.isPending} />
             <span className="text-[10px] tabular-nums text-muted/60" title={`创建 ${note.created_at.replace('T', ' ')}`}>
               {note.updated_at !== note.created_at ? `改 ${fmtTime(note.updated_at)}` : fmtTime(note.created_at)}
             </span>
             <div className="ml-auto flex items-center gap-0.5">
+              <button
+                onClick={() => onDigest(note.id)}
+                disabled={digesting}
+                title={note.digest
+                  ? '重新凝练(改过正文之后可以重来)'
+                  : '让 AI 把这条凝练成要点。图片会直接读图。'}
+                className="rounded p-1 text-muted/60 transition-colors hover:bg-elevated hover:text-violet-300 disabled:opacity-40"
+              >
+                {digesting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+              </button>
               <button
                 onClick={() => update.mutate({ pinned: !note.pinned })}
                 disabled={update.isPending}
@@ -189,6 +268,54 @@ export function UsageNotes() {
     },
   })
 
+  // [R180] 上传: 落盘即返回, 然后**自动**触发一次凝练。
+  // 两步分开是后端的设计(上传要立刻有反馈), 但对用户来说传完就该看到要点,
+  // 所以这里替他把第二步也点了; 凝练失败只提示, 记录已经存下了不会丢。
+  const upload = useMutation({
+    mutationFn: async (file: File) => {
+      const note = await api.usageNoteUpload(file, draft)
+      try {
+        return await api.usageNoteDigest(note.id)
+      } catch (e) {
+        toast(e instanceof Error ? e.message : '已保存, 但凝练失败', 'error')
+        return note
+      }
+    },
+    onSuccess: () => {
+      setDraft('')
+      qc.invalidateQueries({ queryKey: QK.usageNotes })
+    },
+    onError: (e) => toast(e instanceof Error ? e.message : '上传失败', 'error'),
+  })
+
+  const digest = useMutation({
+    mutationFn: (id: string) => api.usageNoteDigest(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: QK.usageNotes }),
+    onError: (e) => toast(e instanceof Error ? e.message : '凝练失败', 'error'),
+  })
+
+  // 一大段总的 —— 只在点按钮时重新综合, 打开页面读已存的
+  const summaryQ = useQuery({
+    queryKey: ['usage-notes-summary'],
+    queryFn: api.usageNotesSummaryGet,
+    staleTime: 5 * 60_000,
+  })
+  const summary: NewsDeskSummary | null = summaryQ.data?.summary ?? null
+  // 过期多少天 —— 一段过期的消息面总结比没有更危险, 标题行要直说
+  const staleDays = useMemo(() => {
+    if (!summary?.as_of) return null
+    const d = (Date.now() - new Date(summary.as_of).getTime()) / 86400_000
+    return d > 0 ? Math.floor(d) : 0
+  }, [summary])
+  const rebuild = useMutation({
+    mutationFn: api.usageNotesSummaryBuild,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['usage-notes-summary'] })
+      toast('已重新综合 —— 之后的 AI 决策会带上这一段', 'success')
+    },
+    onError: (e) => toast(e instanceof Error ? e.message : '综合失败', 'error'),
+  })
+
   const notes = useMemo(() => notesQuery.data?.items ?? [], [notesQuery.data])
   const counts = useMemo(() => {
     const c: Record<string, number> = { all: notes.length }
@@ -200,18 +327,64 @@ export function UsageNotes() {
     const kw = search.trim().toLowerCase()
     return notes.filter(n =>
       (filter === 'all' || (n.status ?? '') === filter)
-      && (!kw || n.content.toLowerCase().includes(kw)),
+      && (!kw || n.content.toLowerCase().includes(kw)
+        || (n.digest ?? '').toLowerCase().includes(kw)),
     )
   }, [notes, filter, search])
 
   return (
     <div className="flex h-full flex-col">
-      <PageHeader title="我的使用观察" subtitle="观察 → 待验证 → 已验证 / 不成立" />
+      <PageHeader title="消息面" subtitle="记录 → AI 凝练 → 综合成一段总的 → 每次 AI 决策都带上它" />
       <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4 pt-3 lg:px-4">
         {/* [R129] 原来 mx-auto max-w-5xl(1024px) 居中: 这是一面卡片墙, 宽屏下
             两侧空一大片而卡片仍挤成两列。改为贴左 + 放宽到 1600px, 配合下方
             网格在宽屏加到三列 —— 观察条目多的时候一屏能多看一行。 */}
         <div className="w-full max-w-[1600px] space-y-3">
+          {/* [R180] 一大段总的 —— 这一页最重要的产物: 之后每次 AI 决策都会带上它。
+              所以放最上面, 并且把"多旧、基于几条"直接写在标题行上: 一段过期的
+              消息面总结比没有更危险, 用户得一眼看见它的时效。 */}
+          <section className="rounded-card border border-violet-400/25 bg-violet-400/[0.05] p-3">
+            <div className="mb-1.5 flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-violet-300">
+                <Sparkles className="h-3.5 w-3.5" />
+                消息面总览
+              </span>
+              {summary && (
+                <span className="text-[10px] text-muted">
+                  综合自 {summary.item_count} 条 · {fmtTime(summary.as_of)}
+                  {staleDays != null && staleDays > 7 && (
+                    <span className="ml-1.5 text-warning">已过期 {staleDays} 天,不再参与决策</span>
+                  )}
+                </span>
+              )}
+              <button
+                onClick={() => rebuild.mutate()}
+                disabled={rebuild.isPending || notes.length === 0}
+                title={'把下面全部条目重新综合成一段。\n'
+                  + '这一段会被带进: 今日 AI 导读·优选 / AI 个股信号 / 模拟交易。\n'
+                  + '不会进把握分、出场线、六态、通道位置 —— 那些是纯规则的, 必须保持可复现。'}
+                className="ml-auto inline-flex items-center gap-1 rounded-btn border border-violet-400/40 bg-violet-400/15 px-2 py-0.5 text-[10px] text-violet-300 transition-colors cursor-pointer hover:bg-violet-400/25 disabled:opacity-40"
+              >
+                {rebuild.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+                {summary ? '重新综合' : '生成总览'}
+              </button>
+            </div>
+            {summary?.text ? (
+              <p className="whitespace-pre-wrap text-[12px] leading-relaxed text-foreground/90">
+                {summary.text}
+              </p>
+            ) : (
+              <p className="text-[11px] text-muted">
+                还没有总览。下面记几条之后点「生成总览」——
+                之后每次 AI 做决策(今日导读·优选 / 个股信号 / 模拟交易)都会先看这一段。
+              </p>
+            )}
+            <p className="mt-1.5 text-[10px] text-muted/60">
+              总览只作背景参考,<b className="font-medium">不会覆盖价格与规则层的事实</b>
+              (趋势状态、出场线、通道位置、把握分)。两者冲突时以价格与规则为准。
+            </p>
+          </section>
+
           {/* 新增区: 单行起步, 聚焦时长高 */}
           <div className="rounded-card border border-border bg-surface p-3">
             <div className="flex items-start gap-2">
@@ -223,7 +396,33 @@ export function UsageNotes() {
                 onKeyDown={e => {
                   if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && draft.trim()) create.mutate()
                 }}
+                onPaste={e => {
+                  // 截图直接粘 —— 研报/公告截图是这一页最常见的输入, 让它少一步
+                  const img = Array.from(e.clipboardData.files).find(f => f.type.startsWith('image/'))
+                  if (img) { e.preventDefault(); upload.mutate(img) }
+                }}
               />
+              {/* [R180] 传图/传文件。上面那个 textarea 里的文字会作为这条的备注一起带上 ——
+                  「这张图是什么」经常比图本身更重要。 */}
+              <label
+                title={'传图片(png/jpg/webp…)或文本文件(txt/md/csv/json)。也可以直接在左边输入框里 Ctrl+V 粘贴截图。\n'
+                  + '传完自动让 AI 凝练一次。\n'
+                  + '注意: 图片凝练成功后原件会被删除, 只保留要点(文字会保留原文)。'}
+                className="inline-flex h-[38px] shrink-0 cursor-pointer items-center gap-1 rounded-btn border border-border bg-base px-2.5 text-xs text-muted transition-colors hover:text-foreground"
+              >
+                {upload.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Paperclip className="h-3.5 w-3.5" />}
+                传图/文件
+                <input
+                  type="file"
+                  className="hidden"
+                  accept=".png,.jpg,.jpeg,.webp,.gif,.bmp,.txt,.md,.csv,.tsv,.json,.log"
+                  onChange={e => {
+                    const f = e.target.files?.[0]
+                    if (f) upload.mutate(f)
+                    e.target.value = ''      // 同一个文件连传两次也要能触发
+                  }}
+                />
+              </label>
               <button
                 onClick={() => create.mutate()}
                 disabled={create.isPending || !draft.trim()}
@@ -277,7 +476,14 @@ export function UsageNotes() {
             </div>
           ) : (
             <div className="grid grid-cols-1 items-start gap-3 lg:grid-cols-2 2xl:grid-cols-3">
-              {shown.map(note => <NoteCard key={note.id} note={note} />)}
+              {shown.map(note => (
+                <NoteCard
+                  key={note.id}
+                  note={note}
+                  onDigest={(id) => digest.mutate(id)}
+                  digesting={digest.isPending && digest.variables === note.id}
+                />
+              ))}
             </div>
           )}
         </div>
