@@ -460,3 +460,76 @@ def test_基准挂在几何量的返回值里():
     bands = _bands(104.0, 102.0, 100.0, 96.0, atr=2.0)
     got = g.geometry(bands, close=104.0)
     assert got is not None and "baseline" in got
+
+
+# ================================================================
+# [R207] 「一路往下走」「间距 -1.7 匀速」这类残句
+#
+# 用户: 「这类描述改成更明确的意思, 这样太含糊不清了」。两个毛病:
+#   ·「间距 -1.7」没说是**谁和谁**之间, 没有单位, 负号要人自己想是什么意思;
+#   ·「匀速」单独摆着不知道在讲什么 —— 匀速地涨? 匀速地跌?
+#
+# 顺带翻出一个**真错误**: 「走得过头了」由 |间距| ≥ 5 触发, 所以一只**深跌**
+# 的票也会落到这一档, 却配着「追进去的性价比很低」这种只对涨过头成立的话。
+
+
+def _torn(sp):
+    return {"spread": sp, "accel": {"a1": 0.0}, "compress": 0.0,
+            "torn": True, "nested": False}
+
+
+def test_走过头要分涨过头和跌过头():
+    """同一个 |间距| ≥ 5, 涨上去和跌下来该说的话完全相反。"""
+    up = g.phase(_torn(6.2))
+    down = g.phase(_torn(-6.2))
+    assert up["code"] == down["code"] == g.PH_OVEREXTENDED, "还是同一档, 只是说法不同"
+    assert up["cn"] == "涨过头" and down["cn"] == "跌过头"
+
+
+def test_跌过头不能配追高的话():
+    """这是这次翻出来的真错误 —— 对一只已经崩下去的票说「追进去性价比很低」
+    是答非所问, 它根本不存在「追」这个动作。"""
+    down = g.phase(_torn(-6.2))
+    assert "追" not in down["watch"], "跌过头那一档还在说追高的事"
+    assert "抄" in down["watch"], "跌过头该说的是「别急着抄」"
+    up = g.phase(_torn(6.2))
+    assert "追" in up["watch"], "涨过头那一档反倒不提追了"
+
+
+@pytest.mark.parametrize("sp,accel,o,torn,nested", [
+    (6.2, 0.0, 0.0, True, False),
+    (-6.2, 0.0, 0.0, True, False),
+    (-1.7, 0.0, 0.2, False, False),
+    (2.2, 0.15, 0.1, False, False),
+    (0.3, 0.0, 0.95, False, True),
+    (0.7, 0.15, 0.5, False, False),
+    (3.6, -0.2, 0.0, False, False),
+])
+def test_阶段文案里不许出现残句(sp, accel, o, torn, nested):
+    """每一句都得说清**谁比谁高(低)多少**, 而不是甩一个「间距 X」出来。"""
+    p = g.phase({"spread": sp, "accel": {"a1": accel}, "compress": o,
+                 "torn": torn, "nested": nested}, {"compress_days": 12})
+    body = p["why"] + p["watch"]
+    assert "间距" not in body, f"还有裸的「间距」: {p['why']}"
+    # 只要提到了具体数字, 就必须带单位
+    if any(ch.isdigit() for ch in p["why"]):
+        assert "倍日常波动" in p["why"] or "天" in p["why"], f"数字没有单位: {p['why']}"
+
+
+def test_阶段名都在四个字以内且不含方向歧义():
+    """决策台那一列很窄, 而且名字要能一眼读出方向。"""
+    for code, cn in g.PHASE_CN.items():
+        assert len(cn) <= 4, f"{code} 的名字「{cn}」太长, 列里放不下"
+    assert set(g.PHASE_OVEREXTENDED_CN) == {"up", "down"}
+    assert g.PHASE_OVEREXTENDED_CN["up"] != g.PHASE_OVEREXTENDED_CN["down"]
+
+
+def test_文案里没有漏掉的f前缀():
+    """R207 拼字符串时把 `f` 拼进了正文, 界面上就会显示成「—— f短、中、长」。
+    这类手误不会报错, 只能扫。"""
+    import re
+    for sp, o, nested in ((0.3, 0.95, True), (2.2, 0.1, False), (-1.7, 0.2, False)):
+        p = g.phase({"spread": sp, "accel": {"a1": 0.0}, "compress": o,
+                     "torn": False, "nested": nested}, {"compress_days": 12})
+        for text in (p["why"], p["watch"]):
+            assert not re.search(r"[—,、。\s]f[一-鿿]", text), f"混进了 f 前缀: {text}"

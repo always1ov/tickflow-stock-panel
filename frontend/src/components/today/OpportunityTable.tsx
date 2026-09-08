@@ -552,13 +552,15 @@ function OpportunityDetail({ o, live }: { o: TodayOpportunity; live?: boolean })
                 {!!o.geo.accel?.level_cn && (
                   <span className="font-mono text-[10px] text-muted"
                         title="最近这十天比之前那一段多走(少走)了多少。零表示速度没变。不是越大越好 —— 冲得太猛常出现在一波的末尾">
-                    {o.geo.accel.level_cn} {o.geo.accel.gain_atr >= 0 ? '+' : ''}
-                    {o.geo.accel.gain_atr.toFixed(1)} 倍日常波动/10日
+                    最近十天比前一段{o.geo.accel.gain_atr >= 0 ? '多' : '少'}走了{' '}
+                    {Math.abs(o.geo.accel.gain_atr).toFixed(1)} 倍日常波动
                   </span>
                 )}
                 <span className="font-mono text-[10px] text-muted"
                       title="短线和长线离多远,带方向。接近零 = 挤在一起、方向还没出来;适中 = 趋势立住了;太大 = 已经走了很长一段,再追不划算">
-                  三线间距 {o.geo.spread.toFixed(1)} 倍日常波动
+                  {o.geo.spread >= 0
+                    ? `短线高出长线 ${o.geo.spread.toFixed(1)} 倍日常波动`
+                    : `短线低于长线 ${Math.abs(o.geo.spread).toFixed(1)} 倍日常波动`}
                 </span>
                 {o.geo.compress != null && (
                   <span className="font-mono text-[10px] text-muted"

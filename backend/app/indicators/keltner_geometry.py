@@ -820,12 +820,23 @@ PH_OVEREXTENDED = "overextended"  # 极端拉伸
 PH_DECLINING = "declining"      # 下行途中
 PH_UNCLEAR = "unclear"          # 说不清
 
+# [R207] 阶段名。用户: 「一路往下走、间距 -1.7 匀速 这类描述太含糊」。
+#
+# 原来那批名字(「一路往上走」「走得过头了」)是大白话没错, 但**没说清是什么在走、
+# 往哪走**。在一张几十行的表里, 「一路往下走」既可能被读成"这只票在跌", 也可能
+# 被读成"某个指标在降"。改成带方向的短判断: 上升中 / 下跌中 / 涨过头 / 跌过头。
+#
+# **「走得过头了」还藏着一个真错误**: 它由 |间距| ≥ 5 触发, 所以一只**深跌**
+# 的票也会落到这一档, 却配着「追进去的性价比很低」这种只对涨过头成立的话。
+# 现在按 spread 的符号分成两档, 文案各说各的。
 PHASE_CN = {
-    PH_COILING: "挤在一起等方向", PH_LAUNCHING: "刚开始分开",
-    PH_ADVANCING: "一路往上走", PH_STALLING: "后劲不足",
-    PH_OVEREXTENDED: "走得过头了", PH_DECLINING: "一路往下走",
-    PH_UNCLEAR: "看不出来",
+    PH_COILING: "横着憋", PH_LAUNCHING: "刚启动",
+    PH_ADVANCING: "上升中", PH_STALLING: "涨势转弱",
+    PH_OVEREXTENDED: "走过头", PH_DECLINING: "下跌中",
+    PH_UNCLEAR: "看不出",
 }
+# 走过头的两个方向 —— 同一个 code, 两套说法
+PHASE_OVEREXTENDED_CN = {"up": "涨过头", "down": "跌过头"}
 
 # 分离度的两个刻度: 越过 LAUNCH 算真的脱开了, 越过 MATURE 算走了一大段。
 # 与 opportunity_score 的 SPREAD_CURVE 甜区(1.5~3)对齐, 不另立一套。
@@ -850,41 +861,55 @@ def phase(geo: dict | None, runs: dict | None = None) -> dict | None:
     up = a1 is not None and a1 > ACCEL_FLAT
     down = a1 is not None and a1 < -ACCEL_FLAT
 
-    def mk(code, why, watch):
-        return {"code": code, "cn": PHASE_CN[code], "why": why, "watch": watch}
+    def mk(code, why, watch, cn=None):
+        return {"code": code, "cn": cn or PHASE_CN[code], "why": why, "watch": watch}
 
     if geo.get("torn"):
+        # [R207] 分方向。同一个 |间距| ≥ 5, 涨上去和跌下来该说的话完全相反 ——
+        # 原来两种情况共用「追进去的性价比很低」, 对一只已经崩下去的票是错的。
+        if sp > 0:
+            return mk(PH_OVEREXTENDED,
+                      f"短线已经高出长线 {sp:.1f} 倍日常波动 —— 涨得太远, "
+                      f"短线看和长线看已经没有一个共同认可的合理价",
+                      "这个位置再争论「贵不贵」没有意义 —— 按短线看是贵, 按长线看还没到。"
+                      "先想清楚你做的是哪一段; 现在追进去性价比很低",
+                      cn=PHASE_OVEREXTENDED_CN["up"])
         return mk(PH_OVEREXTENDED,
-                  f"三条线已经离得太远(间距 {abs(sp):.1f}) —— 短期看和长期看已经没有一个"
-                  f"共同认可的合理价了, 这一段走了很长",
-                  "这个位置再争论「贵不贵」没有意义 —— 按短期看是贵, 按长期看还没到。"
-                  "先想清楚你做的是哪一段, 追进去的性价比已经很低")
+                  f"短线已经低于长线 {abs(sp):.1f} 倍日常波动 —— 跌得太深, "
+                  f"短线看和长线看已经没有一个共同认可的合理价",
+                  "别急着抄 —— 跌到这个程度往往还要磨一段。等三条线重新靠拢、"
+                  "或者短线先站回长线上方, 再谈买点",
+                  cn=PHASE_OVEREXTENDED_CN["down"])
     if sp <= -SPREAD_LAUNCH:
         return mk(PH_DECLINING,
-                  f"三条线向下散开(间距 {sp:.1f}), 方向朝下",
+                  f"短线低于长线 {abs(sp):.1f} 倍日常波动, 三条线朝下散开 —— 方向朝下",
                   "别用「跌到下边那条线就该反弹」去抄底 —— 往下走的时候, 那条线也在跟着往下挪")
     if geo.get("nested") or (o is not None and o >= COMPRESS_TIGHT):
         extra = f", 已经这样 {cd} 天" if cd else ""
         return mk(PH_COILING,
-                  f"三条线挤在一起{extra} —— 短、中、长三种看法几乎一致, 方向还没出来",
+                  f"短线和长线只差 {abs(sp):.1f} 倍日常波动, 挤在一起{extra} —— "
+                  f"短、中、长三种看法几乎认同一个价, 方向还没出来",
                   "盯着它往哪边先走出去。这种挤在一起的状态通常不会持续太久, "
                   "但在走出去之前猜方向没有胜算")
     if sp < SPREAD_LAUNCH:
         return mk(PH_LAUNCHING if up else PH_UNCLEAR,
-                  f"刚从挤在一起的状态里走出来(间距 {sp:.1f})"
-                  + ("而且越走越快" if up else ", 但速度没跟上"),
+                  f"刚从挤在一起的状态里走出来, 短线{'高出' if sp >= 0 else '低于'}长线 "
+                  f"{abs(sp):.1f} 倍日常波动"
+                  + (", 而且越走越快" if up else ", 但速度没跟上"),
                   "刚分开的这一段最关键 —— 接着能不能继续走开, 决定了这次是真启动还是又缩回去"
                   if up else "分是分开了, 可是没有力气跟上, 这种最容易缩回去")
     if sp >= SPREAD_MATURE and down:
         return mk(PH_STALLING,
-                  f"三条线已经离得挺远(间距 {sp:.1f}), 而最近走得比之前慢了 —— 劲在往回收",
+                  f"短线已经高出长线 {sp:.1f} 倍日常波动, 而最近走得比之前慢了 —— 劲在往回收",
                   "趋势本身还没坏, 但推力在减弱。该开始想「什么情况下我就走」, 而不是再加")
     if down:
         return mk(PH_STALLING,
-                  f"间距 {sp:.1f}, 最近走得比之前慢了",
+                  f"短线{'高出' if sp >= 0 else '低于'}长线 {abs(sp):.1f} 倍日常波动, "
+                  f"最近走得比之前慢了",
                   "力气在往回收, 这个时候别加仓")
     return mk(PH_ADVANCING,
-              f"三条线稳稳地往上散开(间距 {sp:.1f})" + ("而且还在提速" if up else ", 速度平稳"),
+              f"短线高出长线 {sp:.1f} 倍日常波动, 三条线稳稳朝上散开"
+              + (", 而且还在提速" if up else ", 速度平稳"),
               "这一段是行情的主体。真正要盯的是什么时候开始走慢 —— 那才是转折的先兆")
 
 

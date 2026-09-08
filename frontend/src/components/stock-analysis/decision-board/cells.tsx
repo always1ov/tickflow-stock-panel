@@ -142,9 +142,14 @@ function geoLines(geo?: ChannelGeometry | null, ev?: ChannelEvent | null,
   }
   if (geo.torn) L.push(`短线和长线离得太远(差 ${Math.abs(geo.spread).toFixed(1)} 倍日常波动),已经没有共同认可的合理价`)
   else if (geo.nested) L.push(`三条线几乎挤在一块(只差 ${Math.abs(geo.spread).toFixed(1)} 倍日常波动)`)
-  else if (geo.compress != null) L.push(`三条线还有 ${(geo.compress * 100).toFixed(0)}% 重合,首尾相差 ${geo.spread.toFixed(1)} 倍日常波动`)
+  else if (geo.compress != null) {
+    L.push(`三条线还有 ${(geo.compress * 100).toFixed(0)}% 重合,`
+      + (geo.spread >= 0
+        ? `短线高出长线 ${geo.spread.toFixed(1)} 倍日常波动`
+        : `短线低于长线 ${Math.abs(geo.spread).toFixed(1)} 倍日常波动`))
+  }
   L.push(`眼下价格离各自中线:短期 ${geo.d.s.toFixed(1)} / 中期 ${geo.d.m.toFixed(1)} / 长期 ${geo.d.l.toFixed(1)} 倍日常波动(正的偏贵、负的偏便宜)`)
-  if (runs?.compress_days) L.push(`已经这样挤了 ${runs.compress_days} 天`)
+  if (runs?.compress_days) L.push(`三条线已经这样挤在一起 ${runs.compress_days} 天`)
   if (runs?.compress_avg != null) L.push(`整个季度平均重合 ${(runs.compress_avg * 100).toFixed(0)}%`)
   if (energy) {
     const sh = energy.share
@@ -365,10 +370,18 @@ export function ChannelStateCell({ geo, runs, ph, onOpenCombo }: {
   if (!geo) {
     return <td className={`${TD_BASE} px-1.5`}><span className="text-[10px] text-muted/30">—</span></td>
   }
+  // [R207] 用户: 「间距 -1.7 匀速 这类描述太含糊」。**说得对, 那是两个残句拼的**:
+  //   ·「间距」没说是谁和谁之间;「-1.7」没有单位; 负号要人自己想是什么意思。
+  //   ·「匀速」单独摆着不知道在讲什么 —— 匀速地涨? 匀速地跌?
+  // 现在每一行都是一句完整的话: 谁比谁高(低)多少、比之前快了还是慢了。
   const a = geo.accel
-  const fast = a?.level === 'accel' ? '提速' : a?.level === 'decel' ? '变慢' : '匀速'
+  const fast = a?.level === 'accel' ? '比之前快'
+    : a?.level === 'decel' ? '比之前慢' : '速度没变'
   const fastCls = a?.level === 'accel' ? 'text-red-400/80'
     : a?.level === 'decel' ? 'text-emerald-400/80' : 'text-muted'
+  const gap = geo.spread >= 0
+    ? `短线高 ${geo.spread.toFixed(1)} 倍波动`
+    : `短线低 ${Math.abs(geo.spread).toFixed(1)} 倍波动`
   return (
     <td className={`${TD_BASE} whitespace-nowrap px-1.5`}>
       <button type="button" onClick={onOpenCombo}
@@ -381,17 +394,18 @@ export function ChannelStateCell({ geo, runs, ph, onOpenCombo }: {
           </span>
         )}
         <span className="text-[9px] text-muted"
-              title="短线和长线离多远,带方向。接近零=方向还没出来;适中=趋势立住了;太大=已经走了很长一段">
-          间距 <b className="font-mono tabular-nums text-foreground/85">{geo.spread.toFixed(1)}</b>
-          <span className={`ml-1 ${fastCls}`}
-                title="最近这一段比之前那一段走得快了还是慢了 —— 与间距正交:间距说走了多远,这个说还有没有劲">
-            {fast}
-          </span>
+              title={'短线比长线高(低)多少 —— 单位是「倍日常波动」, 1 倍就是这只票平常一天大致会走的幅度。\n\n'
+                + '接近 0 = 方向还没出来;适中 = 趋势立住了;差得太多 = 已经走了很长一段。'}>
+          {gap}
+        </span>
+        <span className={`text-[9px] ${fastCls}`}
+              title="最近这十天比之前那一段走得快了还是慢了 —— 和上面那行正交:上面说走了多远, 这行说还有没有劲">
+          {fast}
         </span>
         {!!runs?.compress_days && (
           <span className="text-[9px] text-muted/70"
-                title="到今天为止连着多少天三种看法都一致 —— 这只票横了多久">
-            挤 {runs.compress_days} 天
+                title="到今天为止连着多少天三种看法都认同一个价 —— 也就是这只票横了多久">
+            横了 {runs.compress_days} 天
           </span>
         )}
       </button>

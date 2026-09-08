@@ -300,11 +300,11 @@ def _side_edge(outcomes: list[dict]) -> dict:
 
     返回 {level, label, text, bull, bear, spread}。level 取值:
 
-      both     买卖都能用 —— 转多之后真涨, 转空之后真跌
-      defense  只能用来卖 —— 转空确实跌, 但转多不涨
-      offense  只能用来买 —— 转多确实涨, 但转空也没怎么跌
-      flat     看不出差别 —— 在这只票上六态说明不了什么
-      inverted 反过来了 —— 多头侧之后反而更差
+      both     买卖都能用   —— 转多之后真涨, 转空之后真跌
+      defense  只能用来卖   —— 转空确实跌, 但转多不涨
+      offense  只能用来买   —— 转多确实涨, 但转空也没怎么跌
+      flat     看不出差别   —— 在这只票上六态说明不了什么
+      inverted 方向反过来了 —— 多头侧之后反而更差
       thin     样本不够, 不下结论
 
     **defense / offense 是这一层最值钱的两个结论**: 它们说的是"这只票的六态
@@ -313,7 +313,12 @@ def _side_edge(outcomes: list[dict]) -> dict:
 
     [R206] 档位名一律改成大白话。「只有进攻灵」「两头都灵」「反着的」这类
     说法要读的人先在心里翻译一道 —— 「进攻」是买还是加仓?「灵」是准还是有用?
-    换成「只能用来买」「买卖都能用」「反过来了」, 一眼就知道能拿它干什么。
+    换成「只能用来买」「买卖都能用」, 一眼就知道能拿它干什么。
+
+    [R207] **价位那一层(`_verdict_edge`)用同一套六个标签**, 不再是
+    「只能用来找便宜 / 只能用来躲贵」。两层问的本来就是同一个问题 ——
+    「这套判定我能拿来买, 还是拿来卖, 还是两头都行」—— 两套说法只会
+    让人以为它们是两种不同的东西。区别留给下面那句正文去说。
     """
     bear_states = {s for s in STATE_LABELS if s not in BULLISH}
     bull = _side_stats(outcomes, set(BULLISH))
@@ -334,7 +339,7 @@ def _side_edge(outcomes: list[dict]) -> dict:
             f"空头侧 {bear['episodes']} 段平均 {r:+.1%})")
 
     if b < r:
-        out.update(level="inverted", label="反过来了",
+        out.update(level="inverted", label="方向反过来了",
                    text="多头侧之后反而比空头侧更差 —— 样本这么小时多半是巧合, "
                         "但至少说明六态在这只票上没有正向信息, 别拿它做主要依据。" + tail)
     elif up_ok and down_ok:
@@ -453,15 +458,15 @@ def _verdict_edge(outcomes: list[dict]) -> dict:
         out.update(level="both", label="买卖都能用",
                    text="说便宜的之后真涨、说贵的之后真跌 —— 这只票的位置结论可以照着做。" + tail)
     elif b >= SIDE_EDGE:
-        out.update(level="offense", label="只能用来找便宜",
-                   text="说便宜的之后确实涨, 但说贵的之后也没怎么跌 —— 拿它找低吸位, "
-                        "别拿它当减仓理由。" + tail)
+        out.update(level="offense", label="只能用来买",
+                   text="说便宜的之后确实涨, 但说贵的之后也没怎么跌 —— 拿它找买点, "
+                        "别拿它当卖出理由。" + tail)
     elif r <= -SIDE_EDGE:
-        out.update(level="defense", label="只能用来躲贵",
-                   text="说贵的之后确实跌, 但说便宜的之后并不涨 —— 拿它规避高位, "
-                        "低吸另找依据。" + tail)
+        out.update(level="defense", label="只能用来卖",
+                   text="说贵的之后确实跌, 但说便宜的之后并不涨 —— 拿它躲开高位、找卖点, "
+                        "买点另找依据。" + tail)
     elif b < r:
-        out.update(level="inverted", label="反过来了",
+        out.update(level="inverted", label="方向反过来了",
                    text="说便宜的那几档之后反而比说贵的更差 —— 样本这么小时多半是巧合, "
                         "但至少说明位置结论在这只票上没有正向信息。" + tail)
     else:

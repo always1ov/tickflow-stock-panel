@@ -49,13 +49,15 @@ function LiveStrip({ geo, runs }: { geo: ChannelGeometry; runs?: ChannelRuns | n
           '眼下价格离短期那条中线多远,单位是倍日常波动。正的偏贵、负的偏便宜')}
         {cell('离中期中线', geo.d.m.toFixed(1), '同上,按中期那条中线算')}
         {cell('离长期中线', geo.d.l.toFixed(1), '同上,按长期那条中线算')}
-        {cell('三线间距', geo.spread.toFixed(1),
-          '短线和长线离多远,带方向。接近零=方向还没出来;适中=趋势立住了;太大=已经走了很长一段')}
-        {cell('快慢变化', `${a.gain_atr >= 0 ? '+' : ''}${a.gain_atr.toFixed(1)}`,
-          '最近这十天比之前那一段多走(少走)了多少倍日常波动。零表示速度没变',
+        {cell(geo.spread >= 0 ? '短线高出长线' : '短线低于长线',
+          `${Math.abs(geo.spread).toFixed(1)} 倍波动`,
+          '短线比长线高(低)多少,单位是「倍日常波动」。接近零 = 方向还没出来;适中 = 趋势立住了;差得太多 = 已经走了很长一段')}
+        {cell(a.gain_atr >= 0 ? '这十天多走了' : '这十天少走了',
+          `${Math.abs(a.gain_atr).toFixed(1)} 倍波动`,
+          '最近这十天比之前那一段多走(少走)了多少。零表示速度没变;不是越大越好, 冲得太猛常出现在一波的末尾',
           a.level === 'accel' ? 'text-red-400' : a.level === 'decel' ? 'text-emerald-400' : undefined)}
-        {!!runs?.compress_days && cell('已经挤了', `${runs.compress_days} 天`,
-          '到今天为止连着多少天三种看法都一致 —— 这只票横了多久')}
+        {!!runs?.compress_days && cell('横了', `${runs.compress_days} 天`,
+          '到今天为止连着多少天三种看法都认同一个价 —— 也就是这只票横了多久')}
       </div>
       {/* [R203] 匀速基准对照 —— 这句话是可以自己核对的, 而「加速度 −0.08」不是。 */}
       {b ? (
