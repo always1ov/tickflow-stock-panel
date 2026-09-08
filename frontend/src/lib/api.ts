@@ -657,6 +657,8 @@ export interface StockReview {
   outcomes: ReviewOutcome[]
   /** [R177] 「趋势状态」那一栏的同类统计: 每种六态之后普遍怎么走 */
   trend_outcomes: ReviewTrendOutcome[]
+  /** [R188] 红绿节拍与磨底时长 —— 「这只票磨底磨了多久」 */
+  rhythm?: TrendRhythm | null
   /** 新 → 旧 */
   rows: ReviewRow[]
 }
@@ -682,6 +684,30 @@ export interface KeltnerBands {
   verdict?: KeltnerVerdict | null
 }
 
+/** [R188] 红绿节拍 —— 反复进多头又跌出, 是蓄势还是反复失败。
+ *
+ *  **档位不是分数**: 这东西还没被台账验证过, 给分数就会有人想加进把握分。
+ *  低点不抬高是否决项 —— 「同一位置撞五次没过去」次数最多, 却最该躲开。 */
+export interface TrendRhythm {
+  level: 'building' | 'choppy' | 'failing' | 'none'
+  label: string
+  cycles: number
+  low_rising: boolean | null
+  high_rising: boolean | null
+  red_share_rising: boolean | null
+  dip_shallower: boolean | null
+  reason: string
+  /** 磨底磨了多久 + 箱体上下沿(那就是突破价与破位价) */
+  basing: {
+    days: number
+    high: number | null
+    low: number | null
+    range_pct: number | null
+    since: string | null
+    is_basing: boolean
+  }
+}
+
 export interface TrendInfo {
   state: LivermoreState
   state_cn: string
@@ -702,6 +728,9 @@ export interface TrendInfo {
    *  价位回答"到哪儿", 距离才回答"还有多急" —— 买点侧原来缺的就是这个数。 */
   flip_down_distance_pct?: number | null
   flip_up_distance_pct?: number | null
+  /** [R188] 红绿节拍与磨底时长。零成本算出来的 —— 六态 compute 已经跑完,
+   *  steps 就在手上, 原来用完即弃。 */
+  rhythm?: TrendRhythm | null
   /** [R29] 本轮高/低水位收盘价(上关键点在趋势态下就等于 leg_high) */
   leg_high?: number | null
   leg_low?: number | null

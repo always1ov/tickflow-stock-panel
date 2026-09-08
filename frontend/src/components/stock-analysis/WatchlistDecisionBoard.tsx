@@ -671,7 +671,16 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
                             [r.trend.flip_down != null ? `跌破 ${r.trend.flip_down.toFixed(2)} 转弱` : '',
                              r.trend.flip_up != null ? `站上 ${r.trend.flip_up.toFixed(2)} 转强` : '']
                               .filter(Boolean).join(' / ') || '暂无翻转触发价'
-                          }\n参考:本轮最高收盘 ${r.trend.leg_high?.toFixed(2) ?? '—'} · 上关键点 ${r.trend.up_pivot?.toFixed(2) ?? '—'} / 下关键点 ${r.trend.dn_pivot?.toFixed(2) ?? '—'}\n${r.trend.action}${r.trend.signal ? `\n近期信号:${r.trend.signal} — ${r.trend.signal_desc}` : ''}\n\n点击翻这只票的逐日状态复盘\n出场优先级:组合回撤风控 > 生命线(20日线) > 止盈线(ATR) > 六态转弱${r.trend.intraday ? '\n⚠ 盘中临时口径:实时价只参与状态判定, 收盘确认为准;上面的价位一律按已收盘日线算' : ''}`}
+                          }\n参考:本轮最高收盘 ${r.trend.leg_high?.toFixed(2) ?? '—'} · 上关键点 ${r.trend.up_pivot?.toFixed(2) ?? '—'} / 下关键点 ${r.trend.dn_pivot?.toFixed(2) ?? '—'}\n${r.trend.action}${r.trend.signal ? `\n近期信号:${r.trend.signal} — ${r.trend.signal_desc}` : ''}${r.trend.rhythm && r.trend.rhythm.basing.days > 0
+                            // [R188] 磨底磨了多久 + 磨得好不好。**不新增列** ——
+                            // R184 刚把六列合成一列, 不该马上又加回去; 这两个数
+                            // 是「看一眼」性质的, 挂在趋势列的悬停里正好。
+                            ? `\n\n磨底 ${r.trend.rhythm.basing.days} 天`
+                              + (r.trend.rhythm.basing.low != null
+                                ? ` · 箱体 ${r.trend.rhythm.basing.low.toFixed(2)}~${r.trend.rhythm.basing.high?.toFixed(2)}` : '')
+                              + (r.trend.rhythm.cycles > 0
+                                ? `\n${r.trend.rhythm.label}:${r.trend.rhythm.reason}` : '')
+                            : ''}\n\n点击翻这只票的逐日状态复盘\n出场优先级:组合回撤风控 > 生命线(20日线) > 止盈线(ATR) > 六态转弱${r.trend.intraday ? '\n⚠ 盘中临时口径:实时价只参与状态判定, 收盘确认为准;上面的价位一律按已收盘日线算' : ''}`}
                         >
                           {r.trend.state_cn} {r.trend.duration}天{r.trend.intraday ? <span className="ml-0.5 opacity-70">*</span> : null}
                         </button>

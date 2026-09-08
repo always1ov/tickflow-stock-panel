@@ -261,6 +261,11 @@ def score_opportunities(
                 # 没上榜的存 None 让 ctx 的过滤把它丢掉 —— 绝大多数行都没上榜,
                 # 存一堆 false 只是白占盘; 分组时"缺这个键"就是没上榜。
                 "dragon": True if e.get("dragon") else None,
+                # [R188] 红绿节拍与磨底时长。**只存能分组的那两个键**, 不存整个
+                # rhythm 对象 —— 台账要按天攒几个月, 每行多塞一个 dict 到后面
+                # 就是几 MB。天数不落, 因为它每天都在变、不适合做分组维度。
+                "rhythm": (t.get("rhythm") or {}).get("level"),
+                "basing_days": ((t.get("rhythm") or {}).get("basing") or {}).get("days"),
             },
         }
         out.append(o)

@@ -190,7 +190,21 @@ def _trend_payload(closes: list[float], dates: list[str], threshold: float, sour
         "window_days": len(closes),
         # [R13] 近 20 交易日收益, 供今日总览算相对强度(个股 vs 大盘); 窗口不足给 None
         "ret_20d": (closes[-1] / closes[-21] - 1) if len(closes) >= 21 and closes[-21] else None,
+        # [R188] 红绿节拍与磨底时长。**接在这里是零成本的** —— compute 已经跑完,
+        # steps 就在手上, 原来用完即弃; 节拍判定只是对它做一次 O(n) 遍历。
+        # 另起一条取数路的话, 决策台每只票就要多扫一遍盘。
+        "rhythm": _rhythm(res),
     }
+
+
+def _rhythm(res: dict) -> dict | None:
+    """[R188] 红绿节拍 —— 失败只降级为 None, 不能让一个注记把趋势整条链拖垮。"""
+    try:
+        from app.services.trend_rhythm import assess
+        return assess(res.get("steps"))
+    except Exception as e:  # noqa: BLE001
+        logger.debug("trend rhythm skipped: %s", e)
+        return None
 
 
 _CLOSING_PRICE_KEYS = ("flip_down", "flip_up", "leg_high", "leg_low",

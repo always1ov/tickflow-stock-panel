@@ -441,6 +441,25 @@ def _state_titles() -> dict[str, str]:
     return {code: cn for code, (cn, _en) in STATE_LABELS.items()}
 
 
+def _rhythm_cn(v: str) -> str:
+    from app.services.trend_rhythm import LEVEL_CN
+    return LEVEL_CN.get(v, v)
+
+
+def _basing_bucket(v) -> str:
+    try:
+        d = int(v)
+    except (TypeError, ValueError):
+        return "—"
+    if d < 20:
+        return "没在磨(<20天)"
+    if d < 60:
+        return "磨 20-60 天"
+    if d < 120:
+        return "磨 60-120 天"
+    return "磨 120 天以上"
+
+
 def _mainline_label(v) -> str:
     try:
         r = int(v)
@@ -461,7 +480,15 @@ LABEL_DIMS: list[dict] = [
      "fmt": lambda v: _state_titles().get(str(v), str(v))},
     {"key": "mainline_rank", "label": "主线归属", "fmt": _mainline_label},
     {"key": "dragon", "label": "龙虎榜", "fmt": lambda v: "上榜" if v else "未上榜"},
+    # [R188] 红绿节拍。这一条正是加注册表的意义 —— R175 说「以后往界面加什么
+    # 结论, 落进 ctx 再登记一行就能回答"我历史上好不好使"」, 这是第一次兑现。
+    {"key": "rhythm", "label": "红绿节拍",
+     "fmt": lambda v: _rhythm_cn(str(v))},
+    # 磨底时长分档。天数本身是连续量, 直接当分组维度会碎成几百档 ——
+    # 分成四段才看得出"磨得久的是不是真的更好"。
+    {"key": "basing_days", "label": "磨底时长", "fmt": _basing_bucket},
 ]
+
 
 
 def _by_label(rows: list[dict], recent_dates: set[str]) -> list[dict]:

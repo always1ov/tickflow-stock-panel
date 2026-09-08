@@ -25,6 +25,7 @@ import { useQuery } from '@tanstack/react-query'
 import { CalendarRange, Loader2, X } from 'lucide-react'
 import { api, type KeltnerVerdict, type ReviewRow, type StockReview } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
+import { cn } from '@/lib/cn'
 import { trendBadgeCls } from '@/components/stock-analysis/TrendStateBar'
 import { VerdictHover } from '@/components/stock-analysis/VerdictHover'
 
@@ -287,6 +288,49 @@ function TrendView({ d, rows, onlyMarked, onToggleMarked }: {
               {s.state_cn} {s.n} 次
             </span>
           ))}
+        </div>
+      )}
+
+      {/* [R188] 磨底磨了多久 + 磨得好不好。用户原话:「其实我是想知道一个票磨底
+          磨了多久」—— 这里正是看这只票历史的地方, 所以放在最上面。
+          两个数必须一起给: 「磨了 87 天」不说好坏, 「蓄势」不说久暂。 */}
+      {d.rhythm && (d.rhythm.basing.days > 0 || d.rhythm.cycles > 0) && (
+        <div className="mx-4 mt-3 rounded border border-border/60 bg-elevated/25 px-3 py-2">
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-[11px]">
+            <span className="text-muted">磨底</span>
+            <b className="font-mono text-[13px] text-foreground">
+              {d.rhythm.basing.days} 天
+              {!d.rhythm.basing.is_basing && (
+                <span className="ml-1 text-[10px] font-normal text-muted/70">(还不算磨底)</span>
+              )}
+            </b>
+            {d.rhythm.basing.low != null && d.rhythm.basing.high != null && (
+              <span className="font-mono text-muted"
+                    title="箱体上下沿 —— 上沿就是突破价, 下沿就是破位价">
+                箱体 {d.rhythm.basing.low.toFixed(2)} ~ {d.rhythm.basing.high.toFixed(2)}
+                {d.rhythm.basing.range_pct != null
+                  && ` (${(d.rhythm.basing.range_pct * 100).toFixed(0)}%)`}
+              </span>
+            )}
+            <span className={cn(
+              'rounded border px-1.5 py-0.5 text-[10px]',
+              d.rhythm.level === 'building' ? 'border-red-400/40 bg-red-400/10 text-red-400'
+                : d.rhythm.level === 'failing' ? 'border-emerald-400/40 bg-emerald-400/10 text-emerald-400'
+                : 'border-border text-muted',
+            )}>
+              {d.rhythm.label}
+            </span>
+            {d.rhythm.cycles > 0 && (
+              <span className="text-muted/70">{d.rhythm.cycles} 轮红绿</span>
+            )}
+          </div>
+          <p className="mt-1 text-[10px] leading-relaxed text-muted">
+            {d.rhythm.reason}
+            <span className="ml-1 opacity-70">
+              —— 判定看的是<b className="font-medium">几何形状不是次数</b>: 低点不抬高的「反复」是下台阶, 不是夯实。
+              这一条<b className="font-medium">不参与把握分</b>, 还在等台账验证。
+            </span>
+          </p>
         </div>
       )}
 
