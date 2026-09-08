@@ -11,12 +11,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
-  Bot, Clock, Eye, Loader2, Play, Plus, RotateCcw, ShieldAlert, Target, Trash2, TrendingUp, X,
+  Bot, ChevronDown, Clock, Eye, Loader2, Play, Plus, RotateCcw, ShieldAlert, Target, Trash2, TrendingUp, X,
 } from 'lucide-react'
 import {
   api, type PaperBook, type PaperOrder, type PaperScope, type PaperTrader,
 } from '@/lib/api'
 import { PageHeader } from '@/components/PageHeader'
+import { PaperEquityChart } from '@/components/paper/PaperEquityChart'
 import { toast } from '@/components/Toast'
 import { QK } from '@/lib/queryKeys'
 // [R171] 交易计划: 三条线 / 出场归因标 / 出场分布
@@ -62,6 +63,21 @@ function pnlCls(v: number | null | undefined): string {
 }
 
 // [R170] embedded: 被「仓位中心」当 tab 挂载时为 true, 不画自己的页头。
+/** [R186] 一个指标格。照 MarketPulse 的 `mp-paper__metric`: 小标签 + 加粗的值,
+ *  横向平铺。tone 为正显示红(A 股涨红)、为负显示绿、null 走中性色。 */
+function Metric({ label, value, title, tone }: {
+  label: string; value: string; title?: string; tone?: number | null
+}) {
+  const cls = tone == null || tone === 0 ? 'text-foreground'
+    : tone > 0 ? 'text-red-400' : 'text-emerald-400'
+  return (
+    <span className="inline-flex items-baseline gap-1" title={title}>
+      <span className="text-muted">{label}</span>
+      <b className={`font-mono font-medium ${cls}`}>{value}</b>
+    </span>
+  )
+}
+
 export function PaperTrading({ embedded = false }: { embedded?: boolean } = {}) {
   const qc = useQueryClient()
   const [openId, setOpenId] = useState<{ id: string; scope: PaperScope } | null>(null)
@@ -120,11 +136,10 @@ export function PaperTrading({ embedded = false }: { embedded?: boolean } = {}) 
       {embedded ? (
         // [R170] 嵌进「仓位中心」时页头归外壳画, 这里只保留「加操作员」按钮,
         // 外加一条常驻横幅 —— 隔壁 tab 是真钱, 这一侧必须一眼看出是模拟盘。
-        <div className="flex shrink-0 items-center justify-between gap-3 px-3 pt-2 lg:px-5">
-          <span className="inline-flex items-center gap-1.5 rounded border border-amber-400/40 bg-amber-400/10 px-2 py-1 text-[11px] text-amber-400">
-            <ShieldAlert className="h-3.5 w-3.5" />
-            模拟盘 · 非真实资金, 与「我的批次」互不相干
-          </span>
+        // [R186] 这里原来还有一条「模拟盘·非真实资金, 与我的批次互不相干」的横幅。
+        // R183 之后外壳(PositionsHub)已经画了一条更准确的, 两条并排是重复;
+        // 而且这条的文案也过期了 —— 批次早就不是并列的 tab 了。
+        <div className="flex shrink-0 items-center justify-end gap-3 px-3 pt-2 lg:px-5">
           <button type="button" onClick={() => setAdding(true)}
             className="inline-flex h-8 items-center gap-1.5 rounded-btn border border-border bg-surface px-2.5 text-xs text-secondary transition-colors hover:border-accent/40 hover:text-accent">
             <Plus className="h-3.5 w-3.5" />加操作员
@@ -145,11 +160,16 @@ export function PaperTrading({ embedded = false }: { embedded?: boolean } = {}) 
       )}
 
       <main className="min-h-0 flex-1 space-y-3 overflow-auto px-3 pb-4 pt-3 lg:px-4">
-        <section className="rounded-card border border-border bg-surface px-3 py-2.5 text-[11px] leading-5 text-secondary">
-          <div className="mb-1 flex items-center gap-1.5">
+        {/* [R186] 改成默认折叠。这段说明是**读一次就够**的东西(这一页是干嘛的、
+            禁什么、撮合按什么规矩), 可它有二十来行, 天天占掉首屏一半 —— 而真正
+            每天要看的净值曲线和账本卡片被挤到下面去了。想再读一遍点开就行。 */}
+        <details className="group rounded-card border border-border bg-surface px-3 py-2 text-[11px] leading-5 text-secondary">
+          <summary className="flex cursor-pointer list-none items-center gap-1.5 text-xs font-semibold text-foreground marker:content-none">
             <Bot className="h-3.5 w-3.5 text-accent" />
-            <span className="text-xs font-semibold text-foreground">这个页面是拿来体检的, 不是拿来赚钱的</span>
-          </div>
+            这个页面是拿来体检的, 不是拿来赚钱的
+            <ChevronDown className="ml-auto h-3.5 w-3.5 text-muted transition-transform group-open:rotate-180" />
+          </summary>
+          <div className="mt-2">
           每个操作员就是一个模型, 每天拿<span className="text-foreground">同一份</span>本系统的信息独立做决定。
           每人带<span className="text-foreground">两本独立的账</span>——
           「全市场」只能从全市场候选里选, 「我的自选」只能从我圈的票里选。
@@ -172,7 +192,8 @@ export function PaperTrading({ embedded = false }: { embedded?: boolean } = {}) 
           <br />
           <span className="text-muted">跑一段时间后, 谁做得好不重要 —— 重要的是看它们
           <span className="text-secondary">因为缺什么信息而做错</span>, 那就是系统下一步该补的。</span>
-        </section>
+          </div>
+        </details>
 
         {q.isLoading && (
           <div className="flex items-center justify-center gap-2 py-16 text-xs text-muted">
@@ -296,7 +317,16 @@ function TraderCard({ t, runningScope, onRun, onLifeline, onPlanCheck, onOpen, o
         </span>
       </div>
 
-      {/* 两本账并排 —— 这两条曲线的差就是"我这份自选有没有价值" */}
+      {/* [R186] 净值曲线 —— 这一页最该有的那样东西。
+          注释里一直写着"这两条曲线的差就是我这份自选有没有价值", 可**曲线从来
+          没画出来过**: nav_history 从 R59 起就在存, 界面上却只有一个总资产数字。
+          那个数只说明现在几块钱; 一路冲到 +30% 又跌回来, 和一路平着走, 在总资产
+          上看不出任何区别。两本账画在同一张图里, 差值一眼可见。 */}
+      <div className="border-t border-border/60 px-3 pb-1 pt-2">
+        <PaperEquityChart books={t.books} height={168} />
+      </div>
+
+      {/* 两本账并排 */}
       <div className="grid grid-cols-1 divide-y divide-border/60 sm:grid-cols-2 sm:divide-x sm:divide-y-0">
         {t.books.map(b => (
           <BookPane key={b.scope} b={b}
@@ -356,45 +386,29 @@ function BookPane({ b, busy, onRun, onLifeline, onPlanCheck, onOpen, onReset, on
         </span>
       </div>
 
-      <div className="grid grid-cols-3 gap-1.5 text-center">
-        <div>
-          <div className="text-[9px] text-muted">总资产</div>
-          <div className="mt-0.5 font-mono text-[11px] text-foreground">{money(b.nav)}</div>
-        </div>
-        <div>
-          <div className="text-[9px] text-muted">持仓/现金</div>
-          <div className="mt-0.5 font-mono text-[11px] text-foreground">{b.positions_count} / {money(b.cash)}</div>
-        </div>
-        <div>
-          <div className="text-[9px] text-muted">交易/天数</div>
-          <div className="mt-0.5 font-mono text-[11px] text-foreground">{b.orders_count} / {b.days}</div>
-        </div>
-      </div>
+      {/* 总资产单独一行放大 —— 它是这本账的"现在几块钱", 其余细项在下面那排 */}
+      <div className="font-mono text-[15px] text-foreground">{money(b.nav)}</div>
 
       {/* [R183] 绩效 —— 参考 MarketPulse 的 Metrics 补的。
           原来只有总资产和交易天数: **没有回撤就不知道过程多难受**, 一条从 +30%
           回撤到 0 的曲线和一条稳稳 +5% 的曲线, 只看总资产是看不出区别的。
           算不出的显示 —— 而不是 0, 0 会被读成"从没回撤过"。 */}
+      {/* [R186] 指标改成 MarketPulse 那种**一排密排** —— 它的 MetricRow 是九项
+          平铺、标签小值大, 一眼扫完。原来做成三格居中的网格, 三个数占一整行,
+          既看不出多少又浪费高度。这里按本系统能算出的排开, 算不出的显示 —— 。 */}
       {b.metrics && (
-        <div className="mt-1.5 grid grid-cols-3 gap-1.5 text-center">
-          <div title="从净值最高点起最深的一次回撤。样本不足时显示 — 而不是 0">
-            <div className="text-[9px] text-muted">最大回撤</div>
-            <div className="mt-0.5 font-mono text-[11px] text-bear">
-              {b.metrics.max_drawdown != null ? `-${(b.metrics.max_drawdown * 100).toFixed(1)}%` : '—'}
-            </div>
-          </div>
-          <div title="有持仓的交易日占比 —— 空仓躺着不动跑平也不叫本事">
-            <div className="text-[9px] text-muted">下场率</div>
-            <div className="mt-0.5 font-mono text-[11px] text-foreground">
-              {b.metrics.exposure != null ? `${(b.metrics.exposure * 100).toFixed(0)}%` : '—'}
-            </div>
-          </div>
-          <div title="按日夏普, 年化。少于 20 个净值点不给 —— 那个数是噪声">
-            <div className="text-[9px] text-muted">夏普</div>
-            <div className="mt-0.5 font-mono text-[11px] text-foreground">
-              {b.metrics.sharpe != null ? b.metrics.sharpe.toFixed(2) : '—'}
-            </div>
-          </div>
+        <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-[10px]">
+          <Metric label="收益" title="相对本金" tone={b.return_pct}
+                  value={`${b.return_pct > 0 ? '+' : ''}${(b.return_pct * 100).toFixed(2)}%`} />
+          <Metric label="最大回撤" title="从净值最高点起最深的一次回撤。样本不足显示 — 而不是 0(0 会被读成从没回撤过)"
+                  tone={b.metrics.max_drawdown ? -1 : null}
+                  value={b.metrics.max_drawdown != null ? `-${(b.metrics.max_drawdown * 100).toFixed(1)}%` : '—'} />
+          <Metric label="夏普" title="按日夏普年化。少于 20 个净值点不给 —— 那个数是噪声"
+                  value={b.metrics.sharpe != null ? b.metrics.sharpe.toFixed(2) : '—'} />
+          <Metric label="下场率" title="有持仓的交易日占比 —— 空仓躺着不动跑平也不叫本事"
+                  value={b.metrics.exposure != null ? `${(b.metrics.exposure * 100).toFixed(0)}%` : '—'} />
+          <Metric label="交易/天数" value={`${b.orders_count} / ${b.days}`} />
+          <Metric label="持仓/现金" value={`${b.positions_count} / ${money(b.cash)}`} />
         </div>
       )}
 
@@ -402,11 +416,14 @@ function BookPane({ b, busy, onRun, onLifeline, onPlanCheck, onOpen, onReset, on
           这是**派生**的, 没有写进真的 lots.json(那会派生真实监控规则, 并污染决策台
           管真钱的那几列)。 */}
       {!!b.lots?.length && (
-        <div className="mt-2 overflow-x-auto rounded border border-border/50">
-          <table className="w-full min-w-[22rem] border-collapse text-[10px]">
+        // [R186] 原来 min-w-[22rem] + overflow-x-auto —— 两本账并排时每边只有半屏,
+        // 于是这张表永远在横向滚动条里, 四列挤成一团。列本来就窄(代码/成本/数量/
+        // 现价/盈亏), 去掉最小宽度让它自适应, 一眼能看全才有意义。
+        <div className="mt-2 rounded border border-border/50">
+          <table className="w-full table-fixed border-collapse text-[10px]">
             <thead>
               <tr className="border-b border-border/50 text-[9px] text-muted">
-                <th className="px-1.5 py-1 text-left font-normal">批次</th>
+                <th className="w-[34%] px-1.5 py-1 text-left font-normal">批次</th>
                 <th className="px-1.5 py-1 text-right font-normal">成本</th>
                 <th className="px-1.5 py-1 text-right font-normal">数量</th>
                 <th className="px-1.5 py-1 text-right font-normal">现价</th>

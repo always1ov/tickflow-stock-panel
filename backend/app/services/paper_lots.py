@@ -149,5 +149,23 @@ def metrics_for_book(bk: dict, *, benchmark: list[dict] | None = None) -> dict:
     return out
 
 
+# 净值曲线最多给前端多少个点。原始 nav_history 上限 1000, 每点四个字段;
+# 画一条 200px 高的小曲线用不了那么多, 而列表接口是**多个操作员 × 两本账**
+# 一起返回的, 不收着点会把响应撑到几百 KB —— 那正是 _summary 当初刻意不带
+# nav_history 全量的原因。
+MAX_CURVE_POINTS = 260
+
+
+def nav_curve(bk: dict) -> list[dict]:
+    """净值曲线。只出 date/nav 两个字段, 并且只取最近 MAX_CURVE_POINTS 个点。
+
+    **不做等距抽稀** —— 抽稀会把最大回撤的那个谷底抹掉, 而那正是这条曲线
+    最该让人看见的地方。宁可只画最近一段, 也不要画一条被削平的全程。
+    """
+    hist = [p for p in (bk.get("nav_history") or []) if p.get("nav")]
+    return [{"date": str(p.get("date") or ""), "nav": round(float(p["nav"]), 2)}
+            for p in hist[-MAX_CURVE_POINTS:]]
+
+
 def _now() -> str:
     return datetime.now().isoformat(timespec="seconds")

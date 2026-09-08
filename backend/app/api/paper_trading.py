@@ -46,6 +46,10 @@ def _book_summary(t: dict, scope: str, prices: dict[str, float]) -> dict:
         # [R183] 绩效 —— 参考 MarketPulse 的 Metrics 补上回撤/夏普/曝光度。
         # 原来只有总资产和交易天数: 没有回撤就不知道过程多难受。算不出的给 null。
         "metrics": paper_lots.metrics_for_book(bk),
+        # [R186] 净值曲线 —— nav_history 一直在存, 但从来没画出来过。
+        # 一个模拟盘没有净值曲线, 等于最该看的那样东西不在: 总资产只告诉你
+        # 现在几块钱, 曲线才告诉你这一路是怎么走过来的。
+        "nav_curve": paper_lots.nav_curve(bk),
     }
 
 

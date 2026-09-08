@@ -2521,6 +2521,10 @@ export interface PaperBook {
   lots?: PaperLot[]
   /** [R183] 绩效。参考 MarketPulse 的 Metrics 补的; 算不出的是 null, 不用 0 顶替 */
   metrics?: PaperMetrics
+  /** [R186] 净值曲线(只 date/nav 两个字段, 最近 260 点)。
+   *  nav_history 一直在存却从没画过 —— 总资产只说明现在几块钱, 曲线才说明
+   *  这一路是怎么走过来的。 */
+  nav_curve?: { date: string; nav: number }[]
   /** [R171] 已到止盈线但系统没替它卖的, 会写进下一轮它的上下文 */
   plan_reminders?: { symbol: string; kind: string; reason: string }[]
 }
