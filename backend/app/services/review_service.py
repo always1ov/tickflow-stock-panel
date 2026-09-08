@@ -97,6 +97,10 @@ def _trend_by_date(df: pl.DataFrame, threshold: float) -> dict[str, dict]:
             "day": run,
             # 转折那天单独标出来 —— 复盘时最想找的就是这些天
             "flipped": bool(st.get("flipped")),
+            # [R191] 翻转触发价。逐日行里用不着, 但**最后一行**要 —— 「现在」
+            # 那一条得说清"再走到哪个价就换状态", 不然复盘完还是不知道盯什么。
+            "flip_down": st.get("flip_down"),
+            "flip_up": st.get("flip_up"),
         }
     return out
 
@@ -251,6 +255,164 @@ def _outcomes(rows: list[dict], closes: list[float], offset: int) -> list[dict]:
     return out
 
 
+# ================================================================
+# [R191] 判定层 —— 把测量变成结论
+#
+# 这一栏原来五块内容全是**测量**: 涨停几次、磨底几天、各状态之后平均涨跌多少。
+# 一个都没有回答用户打开复盘时真正带着的那个问题 ——
+#
+#     「这套六态在**这只票**上到底灵不灵? 我该怎么用它?」
+#
+# 四个状态各自的 5 日均值摆在那里, 要自己在脑子里两两相减才读得出结论, 而
+# 那个结论恰恰是可以算出来的。所以补两样:
+#
+#   · side_edge  多头侧 vs 空头侧的分离度 → 「这只票上六态哪一半有用」
+#   · now        当前这一段与它自己的历史对照 → 「现在在什么位置, 盯哪个价」
+#
+# **判定只用已经算好的段统计**(_trend_outcomes 的 n/scored/avg_fwd/win),
+# 不新增任何一次取数。
+
+# 一侧至少要有这么多**已兑现的段**才下结论。3 段仍然很少, 但 1~2 段是纯噪声,
+# 拿它说"这只票上六态很灵"是在骗自己。
+MIN_SIDE_EPISODES = 3
+# 一侧算不算"有方向": FORWARD_DAYS(5 个交易日)内平均走出这么多才算。
+# 3% 是个刻意保守的数 —— A 股 5 日振幅本来就大, 门槛太低会把噪声读成信号。
+SIDE_EDGE = 0.03
+
+
+def _side_stats(outcomes: list[dict], states: set[str]) -> dict:
+    """按**已兑现段数**加权合出一侧的平均表现。
+
+    加权而不是简单平均: 「上涨趋势 4 段 +7.9%」与「自然回升 7 段 -4.5%」直接
+    取平均会让只出现过 4 次的那一档和出现过 7 次的那一档一样重。
+    """
+    n = sum(o["scored"] for o in outcomes if o["key"] in states)
+    if not n:
+        return {"episodes": 0, "avg_fwd": None, "win": 0}
+    total = sum((o["avg_fwd"] or 0.0) * o["scored"]
+                for o in outcomes if o["key"] in states and o["avg_fwd"] is not None)
+    win = sum(o["win"] for o in outcomes if o["key"] in states)
+    return {"episodes": n, "avg_fwd": round(total / n, 4), "win": win}
+
+
+def _side_edge(outcomes: list[dict]) -> dict:
+    """多头侧 vs 空头侧: 这只票上六态哪一半有用。
+
+    返回 {level, label, text, bull, bear, spread}。level 取值:
+
+      both     两头都灵 —— 转多之后真涨, 转空之后真跌
+      defense  只有避险这一半灵 —— 转空确实跌, 但转多不涨
+      offense  只有进攻这一半灵 —— 转多确实涨, 但转空也没怎么跌
+      flat     分不开 —— 在这只票上六态说明不了什么
+      inverted 反着的 —— 多头侧之后反而更差
+      thin     样本不够, 不下结论
+
+    **defense / offense 是这一层最值钱的两个结论**: 它们说的是"这只票的六态
+    只有一半能用", 而这件事在四个并排的均值里是看不出来的 —— 得把同侧的段
+    合起来才显形。
+    """
+    bear_states = {s for s in STATE_LABELS if s not in BULLISH}
+    bull = _side_stats(outcomes, set(BULLISH))
+    bear = _side_stats(outcomes, bear_states)
+    out = {"bull": bull, "bear": bear, "spread": None,
+           "level": "thin", "label": "样本不够", "text": ""}
+
+    if bull["episodes"] < MIN_SIDE_EPISODES or bear["episodes"] < MIN_SIDE_EPISODES:
+        out["text"] = (f"多头侧 {bull['episodes']} 段、空头侧 {bear['episodes']} 段, "
+                       f"任一侧不足 {MIN_SIDE_EPISODES} 段就不下结论 —— "
+                       f"把窗口拉长到 250 日再看。")
+        return out
+
+    b, r = bull["avg_fwd"] or 0.0, bear["avg_fwd"] or 0.0
+    out["spread"] = round(b - r, 4)
+    up_ok, down_ok = b >= SIDE_EDGE, r <= -SIDE_EDGE
+    tail = (f"(多头侧 {bull['episodes']} 段平均 {b:+.1%}, "
+            f"空头侧 {bear['episodes']} 段平均 {r:+.1%})")
+
+    if b < r:
+        out.update(level="inverted", label="反着的",
+                   text="多头侧之后反而比空头侧更差 —— 样本这么小时多半是巧合, "
+                        "但至少说明六态在这只票上没有正向信息, 别拿它做主要依据。" + tail)
+    elif up_ok and down_ok:
+        out.update(level="both", label="两头都灵",
+                   text="转多之后真涨、转空之后真跌 —— 这只票可以照六态找买点, "
+                        "也可以照它离场。" + tail)
+    elif down_ok:
+        out.update(level="defense", label="只有避险灵",
+                   text="转空之后确实跌, 但转多之后并不涨 —— 在这只票上, "
+                        "六态是「离场信号」, 不是买入依据; 买点另找。" + tail)
+    elif up_ok:
+        out.update(level="offense", label="只有进攻灵",
+                   text="转多之后确实涨, 但转空之后也没怎么跌 —— 在这只票上, "
+                        "六态是「买点线索」, 离场靠出场线与生命线, 别等它转空。" + tail)
+    else:
+        out.update(level="flat", label="分不开",
+                   text="多头侧与空头侧之后的走势差不多 —— 在这只票上六态说明不了"
+                        "什么, 排名和买卖点都别主要靠它。" + tail)
+    return out
+
+
+def _now(rows: list[dict], outcomes: list[dict]) -> dict | None:
+    """当前这一段, 与它自己的历史对照。
+
+    复盘打开时最想知道的其实是「我现在在哪」, 而这件事原来要自己去表格里
+    从上往下数 —— 表格第一行是今天, 但"这个状态平均能持续多久、以前出现过
+    几次、之后普遍怎么走"分散在下面另外两块里, 得来回对。这里合成一条。
+    """
+    if not rows:
+        return None
+    last = rows[-1]
+    t = last.get("trend") or {}
+    state = t.get("state")
+    if not state:
+        return None
+    hist = next((o for o in outcomes if o["key"] == state), None)
+    day = int(t.get("day") or 1)
+    avg_days = hist["avg_days"] if hist else None
+    # 走到平均时长的哪儿了。avg_days 是"这只票上这个状态平均持续几天",
+    # 不是预测 —— 用它只为回答"我在这一段的前段还是后段"。
+    phase = None
+    if avg_days:
+        phase = "前段" if day < avg_days * 0.6 else "后段" if day > avg_days * 1.2 else "中段"
+    return {
+        "date": last["date"],
+        "state": state,
+        "state_cn": t.get("state_cn"),
+        "side": t.get("side"),
+        "day": day,
+        "avg_days": avg_days,
+        "phase": phase,
+        "n": hist["n"] if hist else 0,
+        "scored": hist["scored"] if hist else 0,
+        "avg_fwd": hist["avg_fwd"] if hist else None,
+        "win": hist["win"] if hist else 0,
+        # 再走到哪个价就换状态 —— 复盘完总得知道盯什么
+        "flip_down": t.get("flip_down"),
+        "flip_up": t.get("flip_up"),
+        "close": last["close"],
+    }
+
+
+def _seal(limit_ups: int, broken: int) -> dict | None:
+    """封板率 —— 把「涨停 6 / 炸板 5」两个计数变成一句性格判断。
+
+    冲了 11 次板只封住 6 次, 说明这只票**封不住板**: 盘中冲板时追进去有近一半
+    概率当天就收在板下。这件事在两个并排的计数里得自己去除, 而它恰恰是这四张
+    卡片里唯一能直接改变操作的信息。
+    """
+    attempts = limit_ups + broken
+    if attempts < 3:      # 冲板次数太少, 这个比率没有意义
+        return None
+    rate = limit_ups / attempts
+    if rate >= 0.75:
+        text = f"冲板 {attempts} 次封住 {limit_ups} 次 —— 板封得住, 冲板时的追入相对可靠"
+    elif rate >= 0.5:
+        text = f"冲板 {attempts} 次封住 {limit_ups} 次 —— 一半上下, 盘中冲板不能当成已经涨停"
+    else:
+        text = f"冲板 {attempts} 次只封住 {limit_ups} 次 —— 封不住板, 盘中冲板追进去多半收在板下"
+    return {"attempts": attempts, "sealed": limit_ups, "rate": round(rate, 3), "text": text}
+
+
 def _b(v) -> bool:
     return bool(v) if v is not None else False
 
@@ -313,6 +475,8 @@ def review_for_symbol(repo, symbol: str, days: int = DEFAULT_DAYS) -> dict:
         })
 
     limit_ups = sum(1 for r in rows if r["limit_up"])
+    broken = sum(1 for r in rows if r["broken_limit_up"])
+    trend_outcomes = _trend_outcomes(rows, closes, offset)
     out_rows = list(reversed(rows))
     return {
         "symbol": sym,
@@ -325,7 +489,10 @@ def review_for_symbol(repo, symbol: str, days: int = DEFAULT_DAYS) -> dict:
         "stats": {
             "limit_ups": limit_ups,
             "limit_downs": sum(1 for r in rows if r["limit_down"]),
-            "broken_limit_ups": sum(1 for r in rows if r["broken_limit_up"]),
+            "broken_limit_ups": broken,
+            # [R191] 封板率 —— 「涨停 6 / 炸板 5」两个并排的计数要自己去除才读得出
+            # "这票封不住板", 而那是这四张卡片里唯一能直接改变操作的信息
+            "seal": _seal(limit_ups, broken),
             "max_streak": max((r["limit_streak"] for r in rows), default=0),
             # 涨停都出现在什么趋势状态下 —— 复盘时最直接的一条: 这只票的涨停
             # 是趋势里出的, 还是下跌途中的反抽
@@ -334,7 +501,12 @@ def review_for_symbol(repo, symbol: str, days: int = DEFAULT_DAYS) -> dict:
         "outcomes": _outcomes(rows, closes, offset),
         # [R177] 「趋势状态」那一栏的同类统计 —— 原来那栏只有"涨停出在什么状态下",
         # 回答的是另一个问题; 这条补上"每种状态之后普遍怎么走"
-        "trend_outcomes": _trend_outcomes(rows, closes, offset),
+        "trend_outcomes": trend_outcomes,
+        # [R191] 判定层。上面那些全是测量, 这两条才回答用户带着的问题:
+        # 「六态在这只票上灵不灵」与「我现在在哪、盯什么价」。
+        # 两条都只用已经算好的段统计, 不新增取数。
+        "side_edge": _side_edge(trend_outcomes),
+        "now": _now(rows, trend_outcomes),
         # [R188] 磨底磨了多久 + 磨得好不好。用户: 「其实我是想知道一个票磨底
         # 磨了多久」—— 复盘弹窗正是看这只票历史的地方, 这个数该在这儿。
         "rhythm": _rhythm(df, thr),

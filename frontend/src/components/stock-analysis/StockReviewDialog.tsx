@@ -242,12 +242,139 @@ function OutcomeChips({ items, forwardDays, hint }: {
               {name}
               <span className="opacity-70">{o.n} 次</span>
               {o.scored > 0
-                ? <span className={`font-mono ${chgCls(o.avg_fwd)}`}>{pct(o.avg_fwd)}</span>
+                ? (
+                  <>
+                    <span className={`font-mono ${chgCls(o.avg_fwd)}`}>{pct(o.avg_fwd)}</span>
+                    {/* [R191] 一致性摆到脸上, 不再只藏在悬停里。
+                        「+7.9%」可能是一次 +40% 拉起来的, 也可能是四次都涨了两个点
+                        —— 这两种情况该做的事完全不同, 而只给均值看不出是哪一种。 */}
+                    <span className="font-mono opacity-55"
+                          title={`${o.scored} 段已兑现, 其中 ${o.win} 段收涨 —— 均值容易被一两次极端行情带偏, 这个比才说明稳不稳`}>
+                      {o.win}/{o.scored}
+                    </span>
+                  </>
+                )
                 : <span className="font-mono opacity-50">待定</span>}
             </span>
           )
         })}
       </div>
+    </div>
+  )
+}
+
+/**
+ * [R191] 判定条 —— 这一栏唯一的**结论**。
+ *
+ * 其余四块(涨停计数、磨底、各状态 5 日均值、逐日表)全是测量: 摆的是数字, 得
+ * 自己在脑子里换算才读得出该怎么办。而用户打开复盘带着的问题只有一个 ——
+ * 「这套六态在**这只票**上灵不灵, 我该怎么用它」。
+ *
+ * 最关键的是它能认出**只有一半灵**的情况: 空头侧真跌、多头侧不涨, 意味着
+ * 这只票的六态是离场信号而不是买入依据。这件事在四个并排的均值里看不出来,
+ * 必须把同侧的段合起来才显形 —— 所以它得由系统算, 不能指望人去减。
+ */
+const EDGE_CLS: Record<string, string> = {
+  both: 'border-red-400/40 bg-red-400/[0.07] text-red-300',
+  offense: 'border-red-400/30 bg-red-400/[0.05] text-red-300/90',
+  defense: 'border-amber-400/40 bg-amber-400/[0.07] text-amber-300',
+  flat: 'border-border/60 bg-elevated/30 text-muted',
+  inverted: 'border-emerald-400/40 bg-emerald-400/[0.07] text-emerald-300',
+  thin: 'border-border/60 bg-elevated/20 text-muted',
+}
+
+function SideEdgeCard({ edge, forwardDays }: {
+  edge: NonNullable<StockReview['side_edge']>
+  forwardDays: number
+}) {
+  const sides: [string, { episodes: number; avg_fwd: number | null; win: number }][] = [
+    ['多头侧 UT/NR/SR', edge.bull], ['空头侧 DT/NREA/SREA', edge.bear],
+  ]
+  return (
+    <div className={cn('mx-4 mt-4 rounded-lg border px-3 py-2.5', EDGE_CLS[edge.level] ?? EDGE_CLS.flat)}>
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <span className="text-[10px] text-muted">六态在这只票上</span>
+        <b className="text-[13px] font-semibold">{edge.label}</b>
+        {edge.spread != null && (
+          <span className="font-mono text-[10px] opacity-80"
+                title={`多头侧平均 − 空头侧平均。差得越开, 六态在这只票上越有信息量`}>
+            分离度 {(edge.spread * 100).toFixed(1)} 个点
+          </span>
+        )}
+        {edge.level !== 'thin' && (
+          <span className="ml-auto flex flex-wrap gap-x-3 text-[10px]">
+            {sides.map(([name, v]) => (
+              <span key={name} title={`${v.episodes} 段已够 ${forwardDays} 个交易日, 其中 ${v.win} 段收涨`}>
+                <span className="text-muted">{name}</span>
+                <b className={cn('ml-1 font-mono', chgCls(v.avg_fwd))}>{pct(v.avg_fwd)}</b>
+                <span className="ml-1 opacity-60">{v.win}/{v.episodes}</span>
+              </span>
+            ))}
+          </span>
+        )}
+      </div>
+      <p className="mt-1 text-[10px] leading-relaxed opacity-90">{edge.text}</p>
+    </div>
+  )
+}
+
+/**
+ * [R191] 「现在」条 —— 当前这一段与它自己的历史对上。
+ *
+ * 这些数原来全在页面上, 只是**散在三个地方**: 今天什么状态在表格第一行,
+ * 这个状态平均持续多久在小结的悬停里, 翻转价压根没有。要回答「我现在在哪」
+ * 得来回对三次。合成一句之后, 打开复盘第一眼就是答案。
+ */
+function NowCard({ now, forwardDays }: {
+  now: NonNullable<StockReview['now']>
+  forwardDays: number
+}) {
+  const bull = now.side === '多头'
+  const gap = (line: number | null) =>
+    line == null || !now.close ? null : (line - now.close) / now.close
+  const dn = gap(now.flip_down)
+  const up = gap(now.flip_up)
+  return (
+    <div className="mx-4 mt-3 rounded-lg border border-sky-400/30 bg-sky-400/[0.06] px-3 py-2.5">
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-[11px]">
+        <span className="text-[10px] text-muted">现在</span>
+        <b className={cn('text-[13px] font-semibold', bull ? 'text-red-400' : 'text-emerald-400')}>
+          {now.state_cn} 第 {now.day} 天
+        </b>
+        {now.avg_days != null && (
+          <span className="text-muted"
+                title="这只票上这个状态历史平均持续几天。不是预测 —— 只为回答「我在这一段的前段还是后段」">
+            历史平均 {now.avg_days} 天{now.phase ? ` · 你在${now.phase}` : ''}
+          </span>
+        )}
+        {/* 翻转价: 复盘完总得知道盯什么。距离按现价算, 与决策台同一口径 */}
+        <span className="ml-auto flex flex-wrap gap-x-3 font-mono text-[10px]">
+          {now.flip_down != null && (
+            <span className="text-emerald-400/90" title="收盘跌破这个价转弱">
+              跌破 {now.flip_down.toFixed(2)}
+              {dn != null && <span className="ml-1 opacity-70">{(dn * 100).toFixed(1)}%</span>}
+            </span>
+          )}
+          {now.flip_up != null && (
+            <span className="text-red-400/90" title="收盘站上这个价转强">
+              站上 {now.flip_up.toFixed(2)}
+              {up != null && <span className="ml-1 opacity-70">+{(up * 100).toFixed(1)}%</span>}
+            </span>
+          )}
+        </span>
+      </div>
+      <p className="mt-1 text-[10px] leading-relaxed text-muted">
+        {now.scored > 0 ? (
+          <>
+            这只票历史上进入「{now.state_cn}」{now.n} 次,
+            其中 {now.scored} 次已够 {forwardDays} 个交易日:
+            之后平均 <b className={cn('font-mono', chgCls(now.avg_fwd))}>{pct(now.avg_fwd)}</b>,
+            {now.scored} 次里 {now.win} 次收涨。
+          </>
+        ) : (
+          <>这只票历史上进入「{now.state_cn}」{now.n} 次,还没有哪一次够 {forwardDays} 个交易日,结果未知。</>
+        )}
+      </p>
     </div>
   )
 }
@@ -260,40 +387,14 @@ function TrendView({ d, rows, onlyMarked, onToggleMarked }: {
 }) {
   return (
     <>
-      <div className="grid grid-cols-4 gap-3 px-4 pt-4">
-        <div className="rounded-lg border border-red-400/20 bg-red-400/[0.05] px-4 py-3">
-          <div className="text-[10px] text-muted">涨停</div>
-          <div className="mt-1 font-mono text-2xl font-bold text-red-400">{d.stats.limit_ups}</div>
-        </div>
-        <div className="rounded-lg border border-border/60 bg-elevated/20 px-4 py-3">
-          <div className="text-[10px] text-muted">最高连板</div>
-          <div className="mt-1 font-mono text-2xl font-bold text-foreground">{d.stats.max_streak}</div>
-        </div>
-        <div className="rounded-lg border border-border/60 bg-elevated/20 px-4 py-3">
-          <div className="text-[10px] text-muted" title="盘中最高触及涨停但收盘没封住">炸板</div>
-          <div className="mt-1 font-mono text-2xl font-bold text-amber-400">{d.stats.broken_limit_ups}</div>
-        </div>
-        <div className="rounded-lg border border-emerald-400/20 bg-emerald-400/[0.05] px-4 py-3">
-          <div className="text-[10px] text-muted">跌停</div>
-          <div className="mt-1 font-mono text-2xl font-bold text-emerald-400">{d.stats.limit_downs}</div>
-        </div>
-      </div>
-
-      {/* 涨停出在什么状态下 —— 趋势里出的板和下跌途中的反抽完全是两回事 */}
-      {d.stats.limit_up_states.length > 0 && (
-        <div className="flex flex-wrap items-center gap-1.5 px-4 pt-3 text-[10px] text-muted">
-          <span>涨停出现在:</span>
-          {d.stats.limit_up_states.map((s) => (
-            <span key={s.state_cn} className="rounded border border-border/60 bg-elevated/30 px-1.5 py-0.5 text-secondary">
-              {s.state_cn} {s.n} 次
-            </span>
-          ))}
-        </div>
-      )}
+      {/* [R191] 结论在最上面, 测量在下面。
+          原来顺序反过来: 打开先看见四个计数和一堆均值, 得自己换算才知道该怎么办。
+          用户: 「不喜欢单纯的展示」—— 展示不是没用, 但它该在结论后面当依据。 */}
+      {d.now && <NowCard now={d.now} forwardDays={d.forward_days} />}
+      {d.side_edge && <SideEdgeCard edge={d.side_edge} forwardDays={d.forward_days} />}
 
       {/* [R188] 磨底磨了多久 + 磨得好不好。用户原话:「其实我是想知道一个票磨底
-          磨了多久」—— 这里正是看这只票历史的地方, 所以放在最上面。
-          两个数必须一起给: 「磨了 87 天」不说好坏, 「蓄势」不说久暂。 */}
+          磨了多久」。两个数必须一起给: 「磨了 87 天」不说好坏, 「蓄势」不说久暂。 */}
       {d.rhythm && (d.rhythm.basing.days > 0 || d.rhythm.cycles > 0) && (
         <div className="mx-4 mt-3 rounded border border-border/60 bg-elevated/25 px-3 py-2">
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-[11px]">
@@ -326,19 +427,73 @@ function TrendView({ d, rows, onlyMarked, onToggleMarked }: {
           </div>
           <p className="mt-1 text-[10px] leading-relaxed text-muted">
             {d.rhythm.reason}
+            {/* [R191] 这句原来写着「不参与把握分, 还在等台账验证」—— R189 之后
+                不成立了: 反复失败已经是硬门槛 G4(直接否决), 蓄势进了质地轴。
+                过期的口径说明比没有说明更坏, 它会让人按错的规则读这个标。 */}
             <span className="ml-1 opacity-70">
               —— 判定看的是<b className="font-medium">几何形状不是次数</b>: 低点不抬高的「反复」是下台阶, 不是夯实。
-              这一条<b className="font-medium">不参与把握分</b>, 还在等台账验证。
+              {d.rhythm.level === 'failing'
+                ? '「反复失败」是买入门槛之一 —— 这只票现在会被机会评分直接挡掉。'
+                : d.rhythm.level === 'building'
+                  ? '「蓄势」计入把握分的质地轴。'
+                  : ''}
             </span>
           </p>
         </div>
       )}
 
-      {/* [R177] 每种状态之后普遍怎么走 —— 上面「涨停出现在」回答的是另一个问题 */}
+      {/* ---- 以下是依据(测量), 摆在结论后面 ---- */}
+
+      <div className="grid grid-cols-4 gap-3 px-4 pt-4">
+        <div className="rounded-lg border border-red-400/20 bg-red-400/[0.05] px-4 py-3">
+          <div className="text-[10px] text-muted">涨停</div>
+          <div className="mt-1 font-mono text-2xl font-bold text-red-400">{d.stats.limit_ups}</div>
+        </div>
+        <div className="rounded-lg border border-border/60 bg-elevated/20 px-4 py-3">
+          <div className="text-[10px] text-muted">最高连板</div>
+          <div className="mt-1 font-mono text-2xl font-bold text-foreground">{d.stats.max_streak}</div>
+        </div>
+        <div className="rounded-lg border border-border/60 bg-elevated/20 px-4 py-3">
+          <div className="text-[10px] text-muted" title="盘中最高触及涨停但收盘没封住">炸板</div>
+          <div className="mt-1 font-mono text-2xl font-bold text-amber-400">{d.stats.broken_limit_ups}</div>
+        </div>
+        <div className="rounded-lg border border-emerald-400/20 bg-emerald-400/[0.05] px-4 py-3">
+          <div className="text-[10px] text-muted">跌停</div>
+          <div className="mt-1 font-mono text-2xl font-bold text-emerald-400">{d.stats.limit_downs}</div>
+        </div>
+      </div>
+
+      {/* [R191] 封板率。「涨停 6 / 炸板 5」两个并排的计数要自己去除才读得出
+          「这票封不住板」, 而那是这四张卡片里唯一能直接改变操作的信息。 */}
+      {d.stats.seal && (
+        <div className="px-4 pt-2 text-[10px] leading-relaxed text-muted">
+          <span className={cn('font-mono',
+            d.stats.seal.rate >= 0.75 ? 'text-red-400'
+              : d.stats.seal.rate < 0.5 ? 'text-amber-400' : 'text-secondary')}>
+            封板率 {(d.stats.seal.rate * 100).toFixed(0)}%
+          </span>
+          <span className="ml-2">{d.stats.seal.text}</span>
+        </div>
+      )}
+
+      {/* 涨停出在什么状态下 —— 趋势里出的板和下跌途中的反抽完全是两回事 */}
+      {d.stats.limit_up_states.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5 px-4 pt-2 text-[10px] text-muted">
+          <span>涨停出现在:</span>
+          {d.stats.limit_up_states.map((s) => (
+            <span key={s.state_cn} className="rounded border border-border/60 bg-elevated/30 px-1.5 py-0.5 text-secondary">
+              {s.state_cn} {s.n} 次
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* [R177] 每种状态之后普遍怎么走 —— 上面「涨停出现在」回答的是另一个问题。
+          [R191] 降到判定条下面: 它现在是 side_edge 那个结论的**分档依据**。 */}
       <OutcomeChips
         items={d.trend_outcomes ?? []}
         forwardDays={d.forward_days}
-        hint={`各状态出现后 ${d.forward_days} 日表现(按段计, 一段=一次;样本小, 只作参考, 不是胜率统计)`}
+        hint={`分档依据 —— 各状态出现后 ${d.forward_days} 日表现(按段计, 一段=一次;样本小, 括号里是「几段收涨/几段已兑现」)`}
       />
 
       <div className="flex items-center justify-end px-4 pt-3">

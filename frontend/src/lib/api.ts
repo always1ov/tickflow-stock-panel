@@ -663,10 +663,34 @@ export interface StockReview {
     max_streak: number
     /** 涨停都出现在什么趋势状态下 */
     limit_up_states: { state_cn: string; n: number }[]
+    /** [R191] 封板率 —— 冲了几次板、封住几次, 外加一句性格判断。
+     *  冲板次数少于 3 次时为 null(那个比率没有意义)。 */
+    seal?: { attempts: number; sealed: number; rate: number; text: string } | null
   }
   outcomes: ReviewOutcome[]
   /** [R177] 「趋势状态」那一栏的同类统计: 每种六态之后普遍怎么走 */
   trend_outcomes: ReviewTrendOutcome[]
+  /** [R191] 多头侧 vs 空头侧的分离度 —— 「六态在这只票上哪一半有用」。
+   *  这是整栏唯一的**结论**, 其余都是测量。 */
+  side_edge?: {
+    level: 'both' | 'defense' | 'offense' | 'flat' | 'inverted' | 'thin'
+    label: string
+    text: string
+    spread: number | null
+    bull: { episodes: number; avg_fwd: number | null; win: number }
+    bear: { episodes: number; avg_fwd: number | null; win: number }
+  } | null
+  /** [R191] 当前这一段与它自己的历史对照 —— 「我现在在哪、盯哪个价」 */
+  now?: {
+    date: string; state: string; state_cn: string | null; side: string | null
+    day: number
+    /** 这只票上这个状态平均持续几天(不是预测, 只为回答"在这一段的前段还是后段") */
+    avg_days: number | null
+    phase: '前段' | '中段' | '后段' | null
+    n: number; scored: number; avg_fwd: number | null; win: number
+    flip_down: number | null; flip_up: number | null
+    close: number
+  } | null
   /** [R188] 红绿节拍与磨底时长 —— 「这只票磨底磨了多久」 */
   rhythm?: TrendRhythm | null
   /** 新 → 旧 */
