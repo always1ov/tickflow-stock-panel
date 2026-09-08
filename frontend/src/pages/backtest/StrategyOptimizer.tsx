@@ -132,7 +132,7 @@ export function StrategyOptimizer() {
               <span>当前最优: {progress.best_score != null ? progress.best_score.toFixed(3) : '—'}</span>
             </div>
             <div className="h-1.5 overflow-hidden rounded-full bg-elevated">
-              <div className="h-full bg-accent transition-ui" style={{ width: `${progress.total ? (progress.done / progress.total) * 100 : 0}%` }} />
+              <div className="h-full bg-accent transition-all" style={{ width: `${progress.total ? (progress.done / progress.total) * 100 : 0}%` }} />
             </div>
           </div>
         )}
@@ -150,7 +150,7 @@ export function StrategyOptimizer() {
                 </div>
                 <div className="flex flex-wrap gap-1.5">
                   {Object.entries(result.best_params).map(([k, v]) => (
-                    <span key={k} className="rounded-btn border border-border bg-surface px-2 py-0.5 text-[11px]">{k}: {String(v)}</span>
+                    <span key={k} className="rounded-full border border-border bg-surface px-2 py-0.5 text-[11px]">{k}: {String(v)}</span>
                   ))}
                 </div>
               </div>

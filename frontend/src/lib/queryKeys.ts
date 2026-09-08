@@ -150,8 +150,6 @@ export const QK = {
   tickflowKeys:         ['tickflow-keys'] as const,
   realtimeKeysPerRound: ['realtime-keys-per-round'] as const,
   // 研究工作流 / AI 自动挖掘
-  workflows:            (kind: string) => ['workflows', kind] as const,
-  miningAutopilotSessions: ['mining-autopilot-sessions'] as const,
   // 板块跷跷板 / 盘中阶段
   regimeSeesaw:         (kind: string) => ['regime-seesaw', kind] as const,
   regimePhaseLive:      ['regime-phase-live'] as const,

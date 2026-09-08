@@ -15,13 +15,10 @@ import {
   Rocket,
   Save,
   Settings2,
-  SlidersHorizontal,
   Sparkles,
-  Trash2,
   Square,
 } from 'lucide-react'
 import { EmptyState } from '@/components/EmptyState'
-import { storage } from '@/lib/storage'
 import { toast } from '@/components/Toast'
 import {
   api,
@@ -334,10 +331,6 @@ export function MiningWorkbench() {
   const [searchParams, setSearchParams] = useSearchParams()
   const initializedFactors = useRef(false)
   const [draft, setDraft] = useState<MiningDraft>(loadDraft)
-  // [R54] 手动配置默认收起 —— 常规用法是让工作流拿内置因子自己跑。
-  // 收起只是不显示, draft 与下面所有状态照旧。
-  const [manualOpen, setManualOpen] = useState(() => storage.researchManualOpen.get(false))
-  useEffect(() => { storage.researchManualOpen.set(manualOpen) }, [manualOpen])
   const [scheduleDraft, setScheduleDraft] = useState<MiningScheduleConfig | null>(null)
   const [correlationScope, setCorrelationScope] = useState<'all' | 'selected'>('selected')
   const task = useMiningTask()
@@ -369,13 +362,6 @@ export function MiningWorkbench() {
     queryFn: api.miningRuns,
     refetchInterval: task.isPending ? 5000 : false,
   })
-  // [R55] 删一次挖掘运行(连产物目录)。还没结束的后端会 409, 界面也不给按。
-  const removeRun = useMutation({
-    mutationFn: (runId: string) => api.miningRunDelete(runId),
-    onSuccess: () => { void runsQuery.refetch(); toast('已删除', 'success') },
-    onError: error => toast(String((error as Error).message || error), 'error'),
-  })
-
   const validDateRange = !draft.start || !draft.end || draft.start <= draft.end
   const availabilityQuery = useQuery({
     queryKey: QK.miningAvailability(
@@ -628,39 +614,14 @@ export function MiningWorkbench() {
   }
 
   return (
-    <div className={`grid min-h-[calc(100vh-9rem)] grid-cols-1 overflow-hidden rounded-card border border-border bg-surface ${
-      manualOpen ? 'xl:grid-cols-[20rem_minmax(0,1fr)]' : ''}`}>
-      {/* [R54] 手动配置默认收起。这一页的常规用法是让上面的工作流拿内置因子
-          自己跑 —— 展开后一切照旧, 一个控件都没动。 */}
-      {!manualOpen && (
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-border bg-base/25 px-3 py-2">
-          <button type="button" onClick={() => setManualOpen(true)}
-            className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-btn border border-border px-2.5 text-[11px] text-secondary transition-colors hover:border-accent/40 hover:text-accent">
-            <SlidersHorizontal className="h-3.5 w-3.5" />
-            手动配置
-          </button>
-          <span className="text-[10px] leading-4 text-muted">
-            当前 {draft.assetType === 'etf' ? 'ETF' : '股票'} · {draft.factorNames.length}/48 个因子 ·
-            {' '}{draft.start} ~ {draft.end}
-            <span className="ml-1.5 text-muted/70">要自己选因子和档位跑一轮才需要展开</span>
-          </span>
-        </div>
-      )}
-      <aside className={`border-b border-border bg-base/25 xl:max-h-[calc(100vh-9rem)] xl:overflow-y-auto xl:border-b-0 xl:border-r ${
-        manualOpen ? '' : 'hidden'}`}>
+    <div className="grid min-h-[calc(100vh-9rem)] grid-cols-1 overflow-hidden rounded-card border border-border bg-surface xl:grid-cols-[20rem_minmax(0,1fr)]">
+      <aside className="border-b border-border bg-base/25 xl:max-h-[calc(100vh-9rem)] xl:overflow-y-auto xl:border-b-0 xl:border-r">
         <div className="flex items-center justify-between border-b border-border px-3 py-2">
           <div>
             <div className="text-xs font-semibold text-foreground">挖掘配置</div>
             <div className="mt-0.5 text-[9px] text-muted">日频 · 嵌套样本外 · T-1 环境</div>
           </div>
-          <div className="flex items-center gap-1.5">
-            <span className="font-mono text-[9px] text-muted">{draft.factorNames.length}/48</span>
-            <button type="button" onClick={() => setManualOpen(false)}
-              title="收起 —— 让工作流拿内置因子自己跑时用不到这一列"
-              className="inline-flex h-6 items-center rounded-btn border border-border px-1.5 text-[10px] text-muted transition-colors hover:border-accent/40 hover:text-accent">
-              收起
-            </button>
-          </div>
+          <span className="font-mono text-[9px] text-muted">{draft.factorNames.length}/48</span>
         </div>
 
         <div className="space-y-4 p-3">
@@ -751,27 +712,7 @@ export function MiningWorkbench() {
           <section className="border-t border-border pt-3">
             <div className="mb-2 flex items-center justify-between"><span className="text-[10px] font-semibold text-secondary">最近运行</span><button type="button" title="刷新历史" onClick={() => void runsQuery.refetch()} className="text-muted hover:text-accent"><RefreshCw className={`h-3 w-3 ${runsQuery.isFetching ? 'animate-spin' : ''}`} /></button></div>
             <div className="max-h-40 space-y-1 overflow-y-auto">
-              {(runsQuery.data?.items ?? []).map(run => (
-                <div key={run.run_id} className={`flex w-full items-center gap-1 rounded-btn pr-1 hover:bg-elevated ${task.runId === run.run_id ? 'bg-accent/10' : ''}`}>
-                  <button type="button" onClick={() => attachRun(run)} className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-left">
-                    <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${SUCCESS.has(run.status) ? 'bg-success' : ACTIVE.has(run.status) ? 'bg-accent' : 'bg-muted'}`} />
-                    <span className="min-w-0 flex-1 truncate font-mono text-[9px] text-secondary">{run.run_id}</span>
-                    <span className="shrink-0 text-[9px] text-muted">{statusLabel(run.status)}</span>
-                  </button>
-                  {/* [R55] 删这次运行 —— 连产物目录一起删, 那才是真占盘的部分。
-                      还没结束的不给删: worker 还在往那个目录里写。 */}
-                  <button type="button" disabled={ACTIVE.has(run.status) || removeRun.isPending}
-                    onClick={() => {
-                      if (window.confirm(`删掉这次运行？\nrun ${run.run_id}\n它的产物文件会一并删除。已沉淀的候选方案不受影响。`)) {
-                        removeRun.mutate(run.run_id)
-                      }
-                    }}
-                    title={ACTIVE.has(run.status) ? '还没结束 —— 先取消再删' : '删掉这次运行及其产物'}
-                    className="shrink-0 text-muted transition-colors hover:text-danger disabled:cursor-not-allowed disabled:opacity-40">
-                    <Trash2 className="h-3 w-3" />
-                  </button>
-                </div>
-              ))}
+              {(runsQuery.data?.items ?? []).map(run => <button key={run.run_id} type="button" onClick={() => attachRun(run)} className={`flex w-full items-center gap-2 rounded-btn px-2 py-1.5 text-left hover:bg-elevated ${task.runId === run.run_id ? 'bg-accent/10' : ''}`}><span className={`h-1.5 w-1.5 shrink-0 rounded-full ${SUCCESS.has(run.status) ? 'bg-success' : ACTIVE.has(run.status) ? 'bg-accent' : 'bg-muted'}`} />{run.request?.auto && <span className="shrink-0 rounded-btn bg-accent/10 px-1 text-[8px] font-medium text-accent" title="自动挖掘（因子池由统计筛选生成）">自动</span>}<span className="min-w-0 flex-1 truncate font-mono text-[9px] text-secondary">{run.run_id}</span><span className="shrink-0 text-[9px] text-muted">{statusLabel(run.status)}</span></button>)}
               {runsQuery.isError && <div className="text-[9px] text-danger">运行历史加载失败</div>}
               {!runsQuery.isLoading && !runsQuery.isError && !(runsQuery.data?.items.length) && <div className="text-[9px] text-muted">暂无持久运行</div>}
             </div>

@@ -42,7 +42,6 @@ from app.api import (
     global_indices,  # [fork 增强] R99 全球指数实时(独立模块)
     usage_notes,  # [fork 增强] R93 使用观察笔记
     watchlist,
-    workflows,  # [fork 增强] R39 研究工作流
 )
 from app.api import auth as auth_api
 from app.api import settings as settings_api
@@ -159,15 +158,6 @@ async def _application_lifespan(app: FastAPI):
         logger.info("custom data sources loaded: %d", len(custom_sources.list_sources()))
     except Exception as e:  # noqa: BLE001
         logger.warning("custom data sources init failed: %s", e)
-
-    # [R173] 把把握分的维度注册进作者的因子平台, 好让它能走 IC/IR 检验。
-    # 失败只记 WARNING —— 因子库少几条是小事, 把启动搞挂是大事。
-    try:
-        from app.services.fork_score_factors import register_all as _reg_fork_factors
-        _n = len(_reg_fork_factors())
-        logger.info("fork 把握分因子已注册 %d 条", _n)
-    except Exception as e:  # noqa: BLE001
-        logger.warning("fork 把握分因子注册跳过: %s", e)
 
     # [fork 增强] 数据持久化自检: 容器内 data_dir 不是挂载点 → 数据写在容器层,
     # 重建容器(拉新镜像)会丢全部数据。数据页据此显示红色警告横幅。
@@ -306,18 +296,6 @@ async def _application_lifespan(app: FastAPI):
     )
     app.state.strategy_engine = strategy_engine
 
-    # [fork 增强] R39 研究工作流节拍器: 让挖掘/回测工作流不依赖页面开着。
-    # 必须在 mining_manager 与 strategy_engine 都就绪之后起 —— 两个 driver 都要用。
-    try:
-        from app.services.workflow_runner import recover_on_boot, workflow_runner
-        closed = recover_on_boot()
-        if closed:
-            logger.info("workflow: closed %d expired workflow(s) on boot", closed)
-        workflow_runner.start(app.state)
-        app.state.workflow_runner = workflow_runner
-    except Exception as e:  # noqa: BLE001
-        logger.warning("workflow runner not started: %s", e)
-        app.state.workflow_runner = None
     logger.info("strategy engine loaded: %d strategies", len(strategy_engine.list_strategies()))
 
     matrix_prewarm_owner = MatrixCachePrewarmOwner()
@@ -421,9 +399,6 @@ async def _application_lifespan(app: FastAPI):
         mmanager = getattr(app.state, "mining_manager", None)
         if mmanager:
             mmanager.shutdown()
-        wfr = getattr(app.state, "workflow_runner", None)
-        if wfr:
-            wfr.shutdown()
         if app.state.scheduler:
             app.state.scheduler.shutdown(wait=False)
         ps = getattr(app.state, "pull_scheduler", None)
@@ -534,7 +509,6 @@ app.include_router(screener.router)
 app.include_router(backtest.router)
 app.include_router(factors.router)
 app.include_router(mining.router)
-app.include_router(workflows.router)  # [fork 增强] R39 研究工作流
 app.include_router(paper_trading.router)  # [fork 增强] R59 AI 操盘手
 app.include_router(intraday.router)
 app.include_router(indices.router)

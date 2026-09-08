@@ -7,10 +7,6 @@ import { FactorComposite } from './factors/FactorComposite'
 import { FactorEditor } from './factors/FactorEditor'
 import { FactorLibrary } from './factors/FactorLibrary'
 import { MiningWorkbench } from './backtest/MiningWorkbench'
-// [R53 → R172] 挖掘页被上游并进本页的 mining tab, fork 的这三层随之搬过来
-import { WorkflowPanel } from '@/components/backtest/WorkflowPanel'
-import { MiningAutopilot } from './backtest/MiningAutopilot'
-import { LevelGuide } from '@/components/backtest/LevelGuide'
 import { ResearchCandidatesDialog } from './backtest/ResearchCandidatesDialog'
 
 type Tab = 'inspect' | 'library' | 'editor' | 'composite' | 'mining'
@@ -94,19 +90,7 @@ export function Factors() {
         {activeTab === 'editor' && <FactorEditor key={searchParams.get('edit') ?? ''} editId={searchParams.get('edit') ?? ''} />}
         {activeTab === 'composite' && <FactorComposite />}
         {activeTab === 'mining' && (
-          <div className="h-full min-h-0 space-y-3 xl:overflow-y-auto">
-            {/* [R53] 这三块是**包着的**, 不是三套并列的做法 —— 版面上并排放着最容易
-                读成"选一个用", 于是有人一边开工作流一边手动开会话, 两路一起抢挖掘
-                槽位, 看着就像卡住了。这一行把关系先说清楚。
-                [R172] 上游把「挖掘」整页并进了因子页的这个 tab, 于是这三层跟着搬过来 ——
-                只搬不改, 顺序与原挖掘页一致。 */}
-            <LevelGuide />
-            <WorkflowPanel
-              kind="mining"
-              extraConfig={{ asset_type: 'stock' }}
-              hint="开了就不用管 —— AI 从内置因子里自己挑、自己配, 一次不达标就换一批重开, 直到达标或预算用尽"
-            />
-            <MiningAutopilot />
+          <div className="h-full min-h-0 xl:overflow-y-auto">
             <MiningWorkbench />
           </div>
         )}

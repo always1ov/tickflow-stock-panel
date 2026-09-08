@@ -1,13 +1,11 @@
 import { useState, useMemo, useEffect, useRef, type ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Play, FlaskConical, Clock, Loader2, Square, Search, Plus, X, SlidersHorizontal, BarChart3, Gauge, Zap, ListPlus, HelpCircle, ChevronRight, AlertTriangle, Layers, BookmarkPlus, Sparkles, Download } from 'lucide-react'
+import { Play, FlaskConical, Clock, Loader2, Square, Search, Plus, X, SlidersHorizontal, BarChart3, Gauge, Zap, ListPlus, HelpCircle, ChevronRight, AlertTriangle, Layers, BookmarkPlus, Download } from 'lucide-react'
 import {
+  paramOptionValue, paramOptionLabel,
   api,
-  paramOptionValue,
-  paramOptionLabel,
   type StrategyBacktestResult,
-  type BacktestAiRound,
   type ResearchCandidate,
   type StrategyBacktestTrade,
   type StrategyDetail,
@@ -24,8 +22,7 @@ import { boardTag as boardBadge } from '@/components/stock-table/primitives'
 import { BUILTIN_COLUMNS } from '@/lib/watchlist-columns'
 import { cnSignal } from '@/lib/signals'
 import { SignalPicker } from '@/components/screener/SignalPicker'
-import { currentBacktestId, startBacktest, stopBacktest, tryReconnect, useBacktestTask, waitForBacktest } from '@/lib/backtestTask'
-import { WorkflowPanel } from '@/components/backtest/WorkflowPanel'
+import { startBacktest, stopBacktest, tryReconnect, useBacktestTask } from '@/lib/backtestTask'
 import { useDataStatus, useCapabilities } from '@/lib/useSharedQueries'
 import { EmptyState } from '@/components/EmptyState'
 import { WarmupBadge } from '@/components/WarmupBadge'
@@ -101,7 +98,7 @@ const quickRangeTitle = (range: QuickRangeConfig) => range.unit === 'all'
     : `近 ${range.value} 个月`
 
 const INPUT_CLS = `w-full px-2.5 py-1.5 rounded-input bg-surface border border-border text-xs
-  focus:outline-none focus:border-accent transition-colors duration-hover ease-smooth`
+  focus:outline-none focus:border-accent transition-colors duration-150 ease-smooth`
 
 /** 成交时序说明 — 黄色问号图标, 点击弹出气泡。
  * 用 fixed 定位脱离父容器 overflow 裁剪(左侧表单是 overflow-y-auto, absolute 气泡会被裁)。 */
@@ -708,12 +705,12 @@ function StrategyParamInput({ param, value, onChange }: {
         <button
           type="button"
           onClick={() => onChange(!checked)}
-          className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-expand cursor-pointer ${
+          className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 cursor-pointer ${
             checked ? 'bg-accent shadow-[0_0_6px_rgba(59,130,246,0.3)]' : 'bg-elevated'
           }`}
           aria-pressed={checked}
         >
-          <span className={`inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-expand ${
+          <span className={`inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${
             checked ? 'translate-x-[18px]' : 'translate-x-0.5'
           }`} />
         </button>
@@ -725,9 +722,15 @@ function StrategyParamInput({ param, value, onChange }: {
       <label className="block">
         <span className="mb-1 block text-[11px] text-secondary">{param.label}</span>
         <select value={value ?? param.default} onChange={e => onChange(e.target.value)} className={INPUT_CLS}>
+          {/* [R174] 这两页已整体还原成作者那份, 只有这一行没能原样保留 ——
+              而且它不是 fork 功能, 是被数据形状逼出来的: 你的内置策略
+              (strategy/builtin/keltner_reversion.py 等)给的 options 是
+              {value,label} 对象而不是字符串, 按作者原样直接渲染会出
+              [object Object]。那个文件是只读红线, 所以这里用 api.ts 的
+              两个取值助手兜一下。 */}
           {(param.options ?? []).map(opt => {
-            const val = paramOptionValue(opt)
-            return <option key={String(val)} value={val}>{paramOptionLabel(opt)}</option>
+            const v = paramOptionValue(opt)
+            return <option key={String(v)} value={v}>{paramOptionLabel(opt)}</option>
           })}
         </select>
       </label>
@@ -926,10 +929,6 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
   const queryClient = useQueryClient()
   const signalNames = useSignalNames()
   const [saved] = useState(() => storage.strategyBacktestLast.get(null))
-  // [R54] 手动配置栏默认收起 —— 这一页的常规用法是让工作流拿内置策略自己跑。
-  // 收起只是不显示, 下面所有配置状态照旧存在, 也照旧透传给工作流。
-  const [manualOpen, setManualOpen] = useState(() => storage.researchManualOpen.get(false))
-  useEffect(() => { storage.researchManualOpen.set(manualOpen) }, [manualOpen])
   const [selectedStrategy, setSelectedStrategy] = useState<string | null>(saved?.selectedStrategy ?? null)
   const [strategyGroup, setStrategyGroup] = useState<StrategyGroup>('all')
   const [symbols, setSymbols] = useState(saved?.symbols ?? '')
@@ -1048,33 +1047,24 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
   const filteredStrategyList = useMemo(() => (
     strategyGroup === 'all' ? strategyList : strategyList.filter(st => st.source === strategyGroup)
   ), [strategyGroup, strategyList])
-  // 校验 localStorage 里保存的上次选中策略是否仍存在(删掉的 AI 策略、本地开发
-  // 残留的自定义策略拉新代码后都会失效)。连带清除其专属的 params/overrides/result
-  // (这些是该策略的运行配置/产物, 策略失效后留着会造成"孤儿"状态:界面显示旧回测
-  // 结果却无对应策略)。
-  // 用 isSuccess 而不是 !isLoading: 列表请求失败时 strategyList 也是空的, 那时清空
-  // 会把一个有效选择误删; 只有确实拿到了列表、里面没有它, 才判定失效。
-  const strategyExists = useMemo(
-    () => !!selectedStrategy && strategyList.some(st => st.id === selectedStrategy),
-    [strategyList, selectedStrategy],
-  )
+  // 校验 localStorage 里保存的上次选中策略是否仍存在(本地开发残留的自定义策略
+  // 拉新代码后会失效,导致 strategyGet 一直 404/加载中)。列表就绪后若失效,
+  // 连带清除其专属的 params/overrides/result(这些是该策略的运行配置/产物,
+  // 策略失效后留着会造成"孤儿"状态:界面显示旧回测结果却无对应策略)。
   useEffect(() => {
-    if (!strategies.isSuccess) return
-    if (selectedStrategy && !strategyExists) {
+    if (strategies.isLoading || strategyList.length === 0) return
+    if (selectedStrategy && !strategyList.some(st => st.id === selectedStrategy)) {
       setSelectedStrategy(null)
       setStrategyParams({})
       setOverrides({})
       setResult(null)
     }
-  }, [strategies.isSuccess, strategyExists, selectedStrategy])
+  }, [strategies.isLoading, strategyList, selectedStrategy])
 
-  // 必须等列表确认这个 id 还在, 才去拉详情。此前只看 !!selectedStrategy, 详情请求
-  // 与列表请求同时发出 —— 失效 id 的 404 先到, 全局错误 toast 已经弹出
-  // ("unknown strategy: xxx"), 上面的清理才姗姗来迟, 用户一进页面就吃一个红条。
   const strategyDetail = useQuery({
     queryKey: QK.strategyDetail(selectedStrategy ?? ''),
     queryFn: () => api.strategyGet(selectedStrategy!),
-    enabled: strategyExists,
+    enabled: !!selectedStrategy,
   })
 
   const backtestTask = useBacktestTask()
@@ -1188,98 +1178,6 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
       })
     }
   }, [backtestTask])
-
-  // [fork 增强] R34 AI 代跑 —— 用户不会填表, AI 来选策略、定风控参数、跑、判断。
-  // 每轮都真的把配置灌进左侧表单再跑, 用户看得见它在操作; 严格串行, 一次一个回测。
-  const [pilotRounds, setPilotRounds] = useState<BacktestAiRound[]>([])
-  const [pilotBusy, setPilotBusy] = useState(false)
-  const [pilotStep, setPilotStep] = useState('')
-  const [pilotConclusion, setPilotConclusion] = useState<string | null>(null)
-  const PILOT_MAX = 5
-  // [R38] 中止: 循环跑在前端, 用 ref 不用 state —— 闭包里读 state 拿到的是
-  // 点开跑那一刻的旧值, 永远读不到"后来点了停"
-  const pilotAbortRef = useRef(false)
-
-  /** 停代跑: 先掐掉正在跑的那个回测(后端 cancel_event), 再让循环在下一个检查点退出 */
-  const stopAutopilot = () => {
-    pilotAbortRef.current = true
-    void stopBacktest()
-    setPilotStep('正在停…')
-  }
-
-  const runAutopilot = async () => {
-    if (pilotBusy || isPending) return
-    pilotAbortRef.current = false
-    setPilotBusy(true)
-    setPilotRounds([]); setPilotConclusion(null)
-    const history: BacktestAiRound[] = []
-    try {
-      for (let i = 1; i <= PILOT_MAX; i++) {
-        if (pilotAbortRef.current) break
-        setPilotStep(`第 ${i} 轮 · AI 正在选策略、定参数…`)
-        const plan = await api.strategyAiPlan({
-          rounds: history, max_rounds: PILOT_MAX, asset_type: assetType,
-        })
-        if (pilotAbortRef.current) break
-        if (plan.error) { toast(plan.error, 'error'); break }
-        if (plan.satisfied) { setPilotConclusion(plan.conclusion || plan.note || '已完成'); break }
-        if (!plan.next) { toast('AI 没给出下一轮配置, 可重试或换模型', 'error'); break }
-
-        // 真的填表: 策略、环境过滤、持仓上限、总仓位、区间当场变, 用户看得见
-        const cfg = plan.next
-        const from = new Date(Date.now() - cfg.days * 86400_000).toISOString().slice(0, 10)
-        setSelectedStrategy(cfg.strategy_id)
-        setRegimeStates(cfg.regime_states)
-        setMaxPositions(String(cfg.max_positions))
-        setMaxExposure(String(cfg.max_exposure_pct))
-        setStart(from)
-        setPilotStep(`第 ${i} 轮 · 正在回测 ${cfg.strategy_id}…`)
-
-        const sinceId = currentBacktestId()
-        startBacktest({
-          strategy_id: cfg.strategy_id,
-          asset_type: assetType,
-          symbols: symbols ? symbols.split(',').map(v => v.trim()).filter(Boolean) : null,
-          start: from,
-          end: end || undefined,
-          matching, entry_fill: entryFill, exit_fill: exitFill,
-          commission_pct: Number(fees) / 10000,
-          stamp_tax_pct: Number(stampTax) / 1000,
-          slippage_bps: Number(slippage),
-          max_positions: cfg.max_positions,
-          max_exposure_pct: cfg.max_exposure_pct / 100,
-          initial_capital: Number(initialCapital),
-          position_sizing: positionSizing,
-          mode: simMode,
-          holding_days: Number(holdingDays) || 5,
-          minute_fill: highGranularity,
-          regime_filter: cfg.regime_states.length > 0 ? { states: cfg.regime_states } : null,
-        })
-        const task = await waitForBacktest(sinceId)
-        const stats = (task.result?.stats ?? {}) as Record<string, number | null>
-        const digest = {
-          总收益: stats.total_return ?? null, 年化: stats.annual_return ?? null,
-          夏普: stats.sharpe ?? null, 最大回撤: stats.max_drawdown ?? null,
-          胜率: stats.win_rate ?? null, 交易数: stats.n_trades ?? null,
-          平均持仓天数: stats.avg_duration ?? null,
-        }
-        const passed = (digest.交易数 ?? 0) >= 30 && (digest.最大回撤 ?? -1) >= -0.3
-          && (digest.总收益 ?? -1) > 0 && (digest.夏普 ?? 0) >= 0.5
-        history.push({ round: i, config: { ...cfg }, digest, passed, note: plan.note })
-        setPilotRounds([...history])
-        if (i === PILOT_MAX) {
-          setPilotConclusion('已用满 5 轮 —— 上面是每轮的结果，可以自己再调调看，或去「验证」tab 做稳健性检验')
-        }
-      }
-      if (pilotAbortRef.current) setPilotConclusion(`已中止 —— 跑完了 ${history.length} 轮，上面是已有的结果`)
-    } catch (e) {
-      // 中止时 waitForBacktest 会以"已取消"reject —— 那是预期内的, 不该报成错误
-      if (pilotAbortRef.current) setPilotConclusion(`已中止 —— 跑完了 ${history.length} 轮，上面是已有的结果`)
-      else toast(`代跑中断 · ${String((e as Error).message || e)}`, 'error')
-    } finally {
-      setPilotBusy(false); setPilotStep('')
-    }
-  }
 
   const handleRun = () => {
     if (!selectedStrategy || backtestDataUnavailable) return
@@ -1649,38 +1547,9 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
     .filter(item => item.value > 0)
 
   return (
-    <div className={`h-full min-h-0 overflow-hidden rounded-card border border-border bg-surface/80 grid grid-cols-1 ${
-      manualOpen ? 'xl:grid-cols-[18rem_minmax(0,1fr)]' : ''}`}>
-      {/* [R54] 手动配置栏默认收起。常规用法是让工作流拿内置的那套策略自己跑,
-          手动这一整列平时不该占着主视野 —— 展开后一切照旧, 一个控件都没动。 */}
-      {!manualOpen && (
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-border bg-base/25 px-3 py-2">
-          <button type="button" onClick={() => setManualOpen(true)}
-            className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-btn border border-border px-2.5 text-[11px] text-secondary transition-colors hover:border-accent/40 hover:text-accent">
-            <SlidersHorizontal className="h-3.5 w-3.5" />
-            手动配置
-          </button>
-          {/* 收起的时候这些口径照样生效, 而且会原样透传给工作流 —— 不写出来
-              就成了看不见的默认值, 那比多占一列更糟 */}
-          <span className="min-w-0 text-[10px] leading-4 text-muted">
-            当前口径 · 本金 {Number(initialCapital).toLocaleString()} · 最多 {maxPositions} 只 ·
-            总仓位 {maxExposure}% · 佣金 {fees}‰ / 印花税 {stampTax}‰ / 滑点 {slippage}‰ ·
-            建仓 {entryFill === 'open_t+1' ? '次日开盘' : '信号日收盘'}
-            <span className="ml-1.5 text-muted/70">这几项工作流原样照用, AI 只动策略与风控那几个旋钮</span>
-          </span>
-        </div>
-      )}
+    <div className="h-full min-h-0 overflow-hidden rounded-card border border-border bg-surface/80 grid grid-cols-1 xl:grid-cols-[18rem_minmax(0,1fr)]">
       {/* 配置面板 */}
-      <section className={`space-y-3 border-b xl:border-b-0 xl:border-r border-border bg-base/25 px-3 py-3 xl:overflow-y-auto ${
-        manualOpen ? '' : 'hidden'}`}>
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-semibold text-foreground">手动配置</span>
-          <button type="button" onClick={() => setManualOpen(false)}
-            title="收起 —— 让工作流拿内置策略自己跑时用不到这一列"
-            className="inline-flex h-6 items-center gap-1 rounded-btn border border-border px-1.5 text-[10px] text-muted transition-colors hover:border-accent/40 hover:text-accent">
-            <X className="h-3 w-3" />收起
-          </button>
-        </div>
+      <section className="space-y-3 border-b xl:border-b-0 xl:border-r border-border bg-base/25 px-3 py-3 xl:overflow-y-auto">
         <div>
           <div className="flex items-center justify-between mb-1.5">
             <label className="text-xs font-medium text-secondary">选择策略</label>
@@ -1695,13 +1564,13 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
                   ? '分钟K成交价：分钟K(批量)数据不可用'
                   : '分钟K成交：细化成交价，并为兼容的卖出信号提供下一分钟成交。'
                 }
-                className={`group relative inline-flex h-3.5 w-6 items-center rounded-full shrink-0 transition-colors duration-expand ${
+                className={`group relative inline-flex h-3.5 w-6 items-center rounded-full shrink-0 transition-colors duration-200 ${
                   !hasMinuteBatch ? 'bg-elevated opacity-50 cursor-not-allowed'
                   : highGranularity ? 'bg-amber-500 cursor-pointer'
                   : 'bg-elevated cursor-pointer'
                 }`}
               >
-                <span className={`inline-block h-2.5 w-2.5 rounded-full bg-white shadow-sm transition-transform duration-expand ${
+                <span className={`inline-block h-2.5 w-2.5 rounded-full bg-white shadow-sm transition-transform duration-200 ${
                   highGranularity ? 'translate-x-[13px]' : 'translate-x-0.5'
                 }`} />
               </button>
@@ -1767,7 +1636,7 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
               <button
                 key={st.id}
                 onClick={() => setSelectedStrategy(st.id)}
-                className={`px-2 py-1 rounded-btn text-[11px] border transition-ui duration-hover ease-smooth cursor-pointer
+                className={`px-2 py-1 rounded-btn text-[11px] border transition-all duration-150 ease-smooth cursor-pointer
                   ${selectedStrategy === st.id
                     ? 'border-accent/50 bg-accent/10 text-accent shadow-[0_0_10px_rgba(59,130,246,0.1)]'
                     : 'border-border bg-base text-secondary hover:border-accent/40'
@@ -1821,7 +1690,7 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
               <div className="text-xs font-medium text-foreground">回测区间</div>
               <WarmupBadge />
             </div>
-            <span className="shrink-0 rounded-btn border border-accent/25 bg-accent/10 px-2 py-0.5 text-[10px] font-medium text-accent">
+            <span className="shrink-0 rounded-full border border-accent/25 bg-accent/10 px-2 py-0.5 text-[10px] font-medium text-accent">
               {rangeTitle}
             </span>
           </div>
@@ -2042,7 +1911,7 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
             onClick={stopBacktest}
             className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-btn
               bg-danger/15 border border-danger/40 text-sm font-medium text-danger hover:bg-danger/25
-              transition-colors duration-hover ease-smooth"
+              transition-colors duration-150 ease-smooth"
           >
             <Square className="h-3.5 w-3.5 fill-current" />
             停止回测
@@ -2053,7 +1922,7 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
             disabled={!selectedStrategy || strategyDetail.isLoading || backtestDataUnavailable}
             className="group w-full inline-flex items-center justify-center gap-2.5 rounded-btn border border-accent/40
               bg-gradient-to-r from-accent to-blue-500 px-3 py-2.5 text-white shadow-[0_10px_24px_rgba(59,130,246,0.22)]
-              transition-ui duration-hover ease-smooth hover:-translate-y-0.5 hover:shadow-[0_14px_28px_rgba(59,130,246,0.28)]
+              transition-all duration-150 ease-smooth hover:-translate-y-0.5 hover:shadow-[0_14px_28px_rgba(59,130,246,0.28)]
               disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
           >
             <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/18 ring-1 ring-white/25 transition-transform group-hover:scale-105">
@@ -2062,57 +1931,10 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
             <span className="text-sm font-semibold tracking-wide">运行回测</span>
           </button>
         )}
-
-        {/* [R34] 不会填表就点这个 —— AI 选策略、定风控参数、跑、看结果、不行再换 */}
-        {pilotBusy ? (
-          /* [R38] 中止代跑: 回测本身能真取消(后端 cancel_event), 所以这里是即刻停,
-             不是"跑完这轮再停" */
-          <button
-            onClick={stopAutopilot}
-            title="立刻停掉正在跑的这轮回测, 并结束代跑循环"
-            className="mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-btn border border-danger/40
-              px-3 py-2 text-sm font-medium text-danger transition-colors hover:bg-danger/10"
-          >
-            <Square className="h-3.5 w-3.5 fill-current" />
-            中止代跑
-          </button>
-        ) : (
-          <button
-            onClick={() => void runAutopilot()}
-            disabled={isPending || backtestDataUnavailable}
-            title="AI 全程代劳: 选策略 → 定环境过滤/持仓上限/总仓位/区间 → 跑 → 看结果 → 不行就换一个再跑, 最多 5 轮"
-            className="mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-btn border border-accent/40
-              bg-accent/10 px-3 py-2 text-sm font-medium text-accent transition-colors hover:bg-accent/20
-              disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <Sparkles className="h-3.5 w-3.5" />
-            不会选? 让 AI 帮我跑
-          </button>
-        )}
       </section>
 
       {/* 结果面板 */}
       <section className="min-w-0 space-y-3 bg-base/15 px-3 py-3 xl:overflow-y-auto">
-        {/* [R39] 工作流: 开了就不用管, 服务端自己跑到达标为止。
-            账户事实(费率/印花税/滑点/初始资金/撮合口径)从这个页面原样透传下去 ——
-            工作流跑出来的结果必须和你手动跑的是同一套口径, AI 只动策略与风控那几个旋钮。 */}
-        <WorkflowPanel
-          kind="backtest"
-          extraConfig={{
-            asset_type: assetType,
-            symbols: symbols ? symbols.split(',').map(v => v.trim()).filter(Boolean) : null,
-            commission_pct: Number(fees) / 10000,
-            stamp_tax_pct: Number(stampTax) / 1000,
-            slippage_bps: Number(slippage),
-            initial_capital: Number(initialCapital),
-            matching,
-          }}
-          hint="开了就不用管 —— AI 从内置策略里自己挑、自己配风控、自己跑, 一次不达标就换一套重来。费率/本金/撮合口径用你在「手动配置」里设的那套, AI 碰不到"
-        />
-        {(pilotBusy || pilotRounds.length > 0 || pilotConclusion) && (
-          <PilotTrace busy={pilotBusy} step={pilotStep}
-            rounds={pilotRounds} conclusion={pilotConclusion} />
-        )}
         {/* 模式切换: 仓位模拟 / 全量模拟 */}
         <div className="flex items-center justify-between gap-2">
           <div className="inline-flex rounded-btn border border-border bg-surface/80 p-0.5 shadow-sm">
@@ -2272,7 +2094,7 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
             {backtestTask?.progress && (
               <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-base/60">
                 <div
-                  className="h-full rounded-full bg-accent transition-ui duration-enter ease-out"
+                  className="h-full rounded-full bg-accent transition-all duration-300 ease-out"
                   style={{ width: `${(backtestTask.progress.day / backtestTask.progress.total) * 100}%` }}
                 />
               </div>
@@ -3204,65 +3026,6 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
         periodEnd={resultEndDate}
         onClose={() => setChartOverlay(null)}
       />
-    </div>
-  )
-}
-
-
-/**
- * [fork 增强] R34 代跑过程条 —— 让"AI 在替我操作"看得见。
- *
- * 每轮只报关键几项: 用了哪个策略、什么风控、跑出什么、达标没有。
- * 结论必须带上"这是历史回测不代表未来 + 去验证 tab 做稳健性检验"的口径,
- * 由后端提示词保证。
- */
-function PilotTrace({ busy, step, rounds, conclusion }: {
-  busy: boolean
-  step: string
-  rounds: BacktestAiRound[]
-  conclusion: string | null
-}) {
-  const f = (v: number | null | undefined, digits = 2) =>
-    typeof v === 'number' && Number.isFinite(v) ? v.toFixed(digits) : '—'
-  const p = (v: number | null | undefined) =>
-    typeof v === 'number' && Number.isFinite(v) ? `${(v * 100).toFixed(1)}%` : '—'
-
-  return (
-    <div className="rounded-btn border border-accent/30 bg-accent/5 px-3 py-2.5">
-      <div className="flex items-center gap-2">
-        {busy
-          ? <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-accent" />
-          : <Sparkles className="h-3.5 w-3.5 shrink-0 text-accent" />}
-        <span className="text-xs font-medium text-foreground">AI 代跑</span>
-        <span className="min-w-0 flex-1 truncate text-[11px] text-secondary">
-          {busy ? step : `共 ${rounds.length} 轮`}
-        </span>
-      </div>
-
-      {rounds.length > 0 && (
-        <div className="mt-2 space-y-1">
-          {rounds.map(r => (
-            <div key={r.round} className="flex flex-wrap items-baseline gap-x-2 text-[10px]">
-              <span className="shrink-0 font-medium text-secondary">第 {r.round} 轮</span>
-              <span className="font-mono text-foreground">{String(r.config.strategy_id ?? '')}</span>
-              <span className="font-mono text-muted">
-                收益 {p(r.digest.总收益)} · 夏普 {f(r.digest.夏普)} ·
-                回撤 {p(r.digest.最大回撤)} · {r.digest.交易数 ?? '—'} 笔
-              </span>
-              <span className={r.passed ? 'text-success' : 'text-warning'}>
-                {r.passed ? '达标' : '未达标'}
-              </span>
-              {r.note && <span className="min-w-0 flex-1 truncate text-secondary">{r.note}</span>}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {conclusion && (
-        <p className="mt-2 border-t border-accent/20 pt-2 text-[11px] leading-relaxed text-secondary">
-          <span className="mr-1 text-accent">结论</span>{conclusion}
-        </p>
-      )}
     </div>
   )
 }

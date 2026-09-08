@@ -1235,32 +1235,6 @@ export interface AutopilotIteration {
     error: string | null
   } | null
 }
-export interface AutopilotSession {
-  session_id: string
-  /**
-   * [R53] 这个会话是谁开的。工作流的一次「重开」就是开一个这样的会话, 之后由
-   * 后台节拍推进 —— 界面上如果还能对它按「AI 再调一轮」, 就是两个东西在推同一个
-   * 状态机, 轮次会错乱。非 null 时手动按钮一律禁用(后端也会 409)。
-   */
-  owner_workflow_id?: string | null
-  asset_type: 'stock' | 'etf'
-  /** 搜索窗口: AI 循环只在这里试 */
-  search_start: string
-  search_end: string
-  /** 终检窗口: 循环全程看不到, 发布后才在这上面跑一次 */
-  holdout_start: string
-  holdout_end: string
-  max_iterations: number
-  base_config: Record<string, unknown>
-  iterations: AutopilotIteration[]
-  status: 'open' | 'satisfied' | 'exhausted' | 'failed' | 'stopped'
-  winner: (Record<string, unknown> & { signature?: string; name?: string; run_id?: string }) | null
-  final_check: Record<string, unknown> | null
-  confidence_note?: string
-  fail_reason?: string
-  created_at: string
-  updated_at: string
-}
 // ===== [fork 增强] R39 研究工作流 =====
 // 挖掘/回测自己一直跑, 跑到达标为止。一次"重开"= 一个完整会话(挖掘)或一串轮次(回测),
 // 用满轮数还没达标就换一批配置再开一次。
@@ -1344,31 +1318,7 @@ export interface UsageNote {
   updated_at: string
 }
 
-export interface Workflow {
-  workflow_id: string
-  kind: WorkflowKind
-  config: Record<string, unknown>
-  budget: { max_attempts: number; rounds_per_attempt: number; max_hours: number; deadline_ts: number }
-  status: WorkflowStatus
-  stop_reason: string | null
-  stop_reason_cn: string | null
-  /** 抽卡账本: 一共试了多少轮, 这个结果该怎么看 */
-  overfit_note: string | null
-  best: WorkflowBest | null
-  attempts: WorkflowAttempt[]
-  ledger: { attempts: number; rounds: number; errors_in_a_row: number; last_error: string | null }
-  current: Record<string, unknown> | null
-  created_at: string
-  updated_at: string
-  finished_at: string | null
-  progress_text: string
-}
 
-export interface AutopilotStepResult {
-  action: 'running' | 'iterated' | 'done' | 'error'
-  message: string
-  session: AutopilotSession
-}
 // ===== 大盘复盘 =====
 export interface AiReviewReport {
   id: string
@@ -1965,27 +1915,7 @@ export interface FactorShortlistRow {
   IR: number | null
   IC胜率: number | null
 }
-export interface FactorAiReading {
-  /** 规则层短名单(零 AI 成本, 未配 AI 时也有) */
-  shortlist: FactorShortlistRow[]
-  /** 漏斗统计: 61 个里为什么只剩这几个 */
-  stats: Record<string, number>
-  ai?: {
-    summary: string
-    picks: { factor: string; reason: string }[]
-    redundant: { keep: string; drop: string[]; reason: string }[]
-    next_step: string
-  }
-  error?: string
-}
 
-export interface FactorAiPlan {
-  satisfied: boolean
-  note: string
-  conclusion: string | null
-  next: { factor_names: string[]; rebalance: 'daily' | 'weekly' | 'monthly'; n_groups: number } | null
-  error?: string
-}
 /** 代跑的一轮记录: 配置 + 该轮短名单/漏斗 + AI 当时的判断 */
 export interface FactorAiRound {
   round: number
@@ -1996,20 +1926,6 @@ export interface FactorAiRound {
   satisfied: boolean
 }
 
-// ===== [fork 增强] R34 策略回测 AI 代跑 =====
-export interface BacktestAiPlan {
-  satisfied: boolean
-  note: string
-  conclusion: string | null
-  next: {
-    strategy_id: string
-    regime_states: string[]
-    max_positions: number
-    max_exposure_pct: number
-    days: number
-  } | null
-  error?: string
-}
 /** 代跑的一轮: 配置 + 关键指标 + 是否达标 + AI 当时的判断 */
 export interface BacktestAiRound {
   round: number
@@ -3901,31 +3817,6 @@ export const api = {
       body: JSON.stringify(payload),
     }),
 
-  // [fork 增强] R32 批量筛选结果的 AI 解读(规则层短名单 + AI 二次解读)
-  factorAiReading: (payload: {
-    results: FactorBatchItem[]; config?: Record<string, unknown>
-    n_symbols?: number; n_dates?: number
-  }) =>
-    request<FactorAiReading>('/api/backtest/factor/ai-reading', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    }),
-  // [fork 增强] R33 AI 代跑: 要下一轮该怎么配, 或"够了"+结论。跑仍走 factorBatch
-  factorAiPlan: (payload: {
-    rounds: FactorAiRound[]; max_rounds?: number; sample?: Record<string, unknown>
-  }) =>
-    request<FactorAiPlan>('/api/backtest/factor/ai-plan', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    }),
-  // [fork 增强] R34 AI 代跑策略回测: 要下一轮配置或"够了"+结论; 回测本身仍走原入口
-  strategyAiPlan: (payload: {
-    rounds: BacktestAiRound[]; max_rounds?: number; asset_type?: 'stock' | 'etf'
-  }) =>
-    request<BacktestAiPlan>('/api/backtest/strategy/ai-plan', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    }),
   // [fork 增强] R35 每轮随机启用几个 key(0 = 全部)
   realtimeKeysPerRound: () =>
     request<{ count: number; total_keys: number }>(
@@ -3938,10 +3829,6 @@ export const api = {
     request<{ items: MiningRun[] }>('/api/backtest/mining/runs'),
 
   /** [R55] 删一次挖掘运行(连同产物目录)。还没结束的删不掉(409) —— 先取消 */
-  miningRunDelete: (runId: string) =>
-    request<{ deleted: string }>(
-      `/api/backtest/mining/runs/${encodeURIComponent(runId)}`, { method: 'DELETE' }),
-
   miningAvailability: (params: {
     assetType: 'stock' | 'etf'
     budgetProfile: MiningBudgetProfile
@@ -3974,36 +3861,6 @@ export const api = {
       body: JSON.stringify(payload),
     }),
 
-  // [fork 增强] R31 AI 自动挖掘: step 是唯一入口 —— 手动点一次调一次, 自动就是轮询它
-  miningAutopilotSessions: () =>
-    request<{ items: AutopilotSession[] }>('/api/backtest/mining/autopilot/sessions'),
-  miningAutopilotSession: (id: string) =>
-    request<AutopilotSession>(`/api/backtest/mining/autopilot/sessions/${encodeURIComponent(id)}`),
-  miningAutopilotStart: (payload: {
-    asset_type?: 'stock' | 'etf'; start: string; end: string
-    holdout_days?: number; budget_profile?: 'balanced' | 'strict'
-    max_iterations?: number; factor_names?: string[]
-  }) =>
-    request<AutopilotSession>('/api/backtest/mining/autopilot/sessions', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    }),
-  miningAutopilotStep: (id: string) =>
-    request<AutopilotStepResult>(
-      `/api/backtest/mining/autopilot/sessions/${encodeURIComponent(id)}/step`,
-      { method: 'POST' },
-    ),
-  /** [R38] 中止会话: 顺带取消正在跑的那一轮挖掘 */
-  /** [R55] 删一个自动挖掘会话留档。开着的、或工作流开的删不掉(409) */
-  miningAutopilotDelete: (id: string) =>
-    request<{ deleted: string }>(
-      `/api/backtest/mining/autopilot/sessions/${encodeURIComponent(id)}`, { method: 'DELETE' }),
-
-  miningAutopilotStop: (id: string) =>
-    request<{ session: AutopilotSession; message: string }>(
-      `/api/backtest/mining/autopilot/sessions/${encodeURIComponent(id)}/stop`,
-      { method: 'POST' },
-    ),
   // [fork 增强] R110 竞价一进二扫描(昨日首板 × 当下竞价)
   auctionScan: (refresh = false) =>
     request<AuctionScanPayload>(`/api/abnormal/auction-scan${refresh ? '?refresh=true' : ''}`),
@@ -4023,26 +3880,6 @@ export const api = {
     request<UsageNote>(`/api/usage-notes/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(patch) }),
   usageNoteDelete: (id: string) =>
     request<{ ok: boolean }>(`/api/usage-notes/${encodeURIComponent(id)}`, { method: 'DELETE' }),
-  // [fork 增强] R39 研究工作流: 开了就不用管, 关页面照跑
-  workflowList: (kind?: WorkflowKind) =>
-    request<{ items: Workflow[] }>(`/api/workflows${kind ? `?kind=${kind}` : ''}`),
-  workflowCreate: (body: {
-    kind: WorkflowKind
-    config?: Record<string, unknown>
-    max_attempts?: number
-    rounds_per_attempt?: number
-    max_hours?: number
-  }) => request<Workflow>('/api/workflows', { method: 'POST', body: JSON.stringify(body) }),
-  /** [R55] 删一条工作流记录。跑着的删不掉(409) —— 先中止 */
-  workflowDelete: (id: string) =>
-    request<{ deleted: string }>(`/api/workflows/${encodeURIComponent(id)}`, { method: 'DELETE' }),
-
-  workflowStop: (id: string) =>
-    request<Workflow>(`/api/workflows/${encodeURIComponent(id)}/stop`, { method: 'POST' }),
-  /** 手动催一格 —— 后台节拍器本来就会推, 这个是"我现在就想看它动一下" */
-  workflowTick: (id: string) =>
-    request<Workflow>(`/api/workflows/${encodeURIComponent(id)}/tick`, { method: 'POST' }),
-
   miningResult: (runId: string) =>
     request<MiningResult>(`/api/backtest/mining/runs/${encodeURIComponent(runId)}/result`),
 

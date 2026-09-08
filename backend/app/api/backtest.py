@@ -249,81 +249,16 @@ class FactorAiReadingRequest(BaseModel):
     config: dict | None = None
     n_symbols: int | None = None
     n_dates: int | None = None
-
-
-@router.post("/factor/ai-reading")
-async def factor_ai_reading(req: FactorAiReadingRequest):
-    """AI 解读批量筛选结果: 哪几个真能用 / 哪些同类冗余 / 当前市场偏什么风格。
-
-    未配 AI 或 AI 失败时仍返回规则层短名单 + 漏斗统计, 不给 500。
-    """
-    from app.services import factor_ai
-
-    return await factor_ai.generate({
-        "results": req.results,
-        "config": req.config or {},
-        "n_symbols": req.n_symbols,
-        "n_dates": req.n_dates,
-    })
-
-
 class FactorAiPlanRequest(BaseModel):
     """代跑计划请求。rounds 是此前每一轮的 {round, config, shortlist, stats, note, satisfied}。"""
     rounds: list[dict] = Field(default_factory=list, max_length=10)
     max_rounds: int = Field(5, ge=1, le=10)
     sample: dict | None = None
-
-
-@router.post("/factor/ai-plan")
-async def factor_ai_plan(req: FactorAiPlanRequest):
-    """[R33] AI 代跑: 给出下一轮该怎么配, 或宣布够了并给结论。
-
-    实际跑批量筛选仍走 /factor/batch —— 前端把配置灌进表单再调用, 用户能亲眼
-    看到 AI 在操作而不是黑箱。未配 AI 返回 error 而非 500。
-    """
-    from app.backtest.factor import FACTOR_COLUMNS
-    from app.services import factor_ai
-
-    catalog = [{"id": str(f["id"]), "name": str(f.get("label") or f["id"]),
-                "group": str(f.get("group") or "")} for f in FACTOR_COLUMNS]
-    return await factor_ai.next_plan(
-        factor_catalog=catalog, rounds=req.rounds,
-        max_rounds=req.max_rounds, sample=req.sample)
-
-
 class BacktestAiPlanRequest(BaseModel):
     """[R34] 策略回测代跑计划请求。rounds 是此前每轮 {round, config, digest, passed, note}。"""
     rounds: list[dict] = Field(default_factory=list, max_length=10)
     max_rounds: int = Field(5, ge=1, le=10)
     asset_type: Literal["stock", "etf"] = "stock"
-
-
-@router.post("/strategy/ai-plan")
-async def strategy_ai_plan(req: BacktestAiPlanRequest, request: Request):
-    """[R34] AI 代跑策略回测: 给出下一轮该选哪个策略、怎么配, 或宣布够了并给结论。
-
-    只暴露给 AI 五个旋钮(策略/环境过滤/最大持仓/最大总仓位/区间天数) —— 费率、
-    撮合口径、初始资金是用户的账户事实, 策略自有参数是各策略特有语义, 都不给 AI 动。
-    实际回测仍走原来的回测入口, 前端把配置灌进表单再跑。未配 AI 返回 error 而非 500。
-    """
-    from app.services import backtest_autopilot
-
-    engine = getattr(request.app.state, "strategy_engine", None)
-    if engine is None:
-        raise HTTPException(status_code=503, detail="策略引擎未初始化")
-    strategies = [
-        {"id": str(m["id"]), "name": str(m.get("name") or m["id"]),
-         "desc": str(m.get("description") or "")[:120]}
-        for m in engine.list_strategies()
-        if not m.get("research_only")
-        and req.asset_type in (m.get("asset_types") or ["stock"])
-    ]
-    if not strategies:
-        return {"error": "没有可用策略"}
-    return await backtest_autopilot.next_plan(
-        strategies=strategies, rounds=req.rounds, max_rounds=req.max_rounds)
-
-
 # ================================================================
 # 研究候选方案
 # ================================================================

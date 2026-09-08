@@ -23,7 +23,6 @@ from app.enriched_generation import EnrichedGenerationUnavailableError
 from app.factors.registry import factor_columns_view
 from app.services import preferences
 from app.services.mining_jobs import (
-    ACTIVE_RUN_STATUSES,
     RUN_STATUSES,
     SUCCESS_RUN_STATUSES,
     TERMINAL_RUN_STATUSES,
@@ -31,7 +30,6 @@ from app.services.mining_jobs import (
     MiningRunStoreError,
     MiningRunValidationError,
 )
-from app.services import mining_autopilot, mining_autopilot_store
 from app.services.mining_preflight import (
     enriched_partition_dates,
     mining_availability,
@@ -274,46 +272,6 @@ def cancel_run(run_id: str, request: Request) -> dict[str, Any]:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-def load_run_result(store: MiningRunStore, run_id: str) -> dict[str, Any] | None:
-    """[R39] 读一个已成功 run 的完整结果; 读不到返回 None。
-
-    与 ``get_result`` 同一套读法, 但不抛 HTTP 异常 —— 后台工作流不在请求上下文里,
-    拿 HTTPException 当控制流会把它自己也带崩。
-    """
-    manifest = store.get(run_id)
-    if manifest is None or str(manifest["status"]) not in SUCCESS_RUN_STATUSES:
-        return None
-    try:
-        summary = store.read_summary(run_id)
-        frames = {
-            name: _read_registered_artifact(store, manifest, name)
-            for name in ("factors", "correlation", "candidates", "folds")
-        }
-        return _project_result(manifest, summary, frames)
-    except (MiningRunStoreError, OSError, pl.exceptions.PolarsError, ValueError):
-        return None
-
-
-@router.delete("/runs/{run_id}")
-def delete_run(run_id: str, request: Request) -> dict[str, Any]:
-    """[R55] 删掉一次挖掘运行(连同它的产物目录)。
-
-    跑着的不给删 —— worker 还在往那个目录里写, 删了下一次写入会把目录重建成
-    半个残骸, 之后列表里就是一条读不出来的记录。先取消再删。
-    """
-    manager = _manager(request)
-    manifest = manager.store.get(run_id)
-    if manifest is None:
-        raise HTTPException(status_code=404, detail="run 不存在")
-    if manifest.get("status") in ACTIVE_RUN_STATUSES:
-        raise HTTPException(status_code=409, detail="这次运行还没结束 —— 先取消再删")
-    try:
-        manager.store.delete(run_id)
-    except MiningRunValidationError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except MiningRunStoreError as exc:
-        raise HTTPException(status_code=500, detail="删除失败") from exc
-    return {"deleted": run_id}
 @router.post("/auto")
 def start_auto_run(payload: MiningAutoStartRequest, request: Request) -> dict[str, Any]:
     """自动挖掘: L1 统计筛选全量因子 → 达标池 → 复用挖掘任务管理启动嵌套样本外验证。
@@ -412,13 +370,23 @@ def get_result(run_id: str, request: Request) -> dict[str, Any]:
             status_code=status_code,
             detail=f"mining result is unavailable for status {status}",
         )
-    result = load_run_result(store, run_id)
-    if result is None:
+    try:
+        summary = store.read_summary(run_id)
+        frames = {
+            name: _read_registered_artifact(store, manifest, name)
+            for name in ("factors", "correlation", "candidates", "folds")
+        }
+        return _project_result(manifest, summary, frames)
+    except (
+        MiningRunStoreError,
+        OSError,
+        pl.exceptions.PolarsError,
+        ValueError,
+    ) as exc:
         raise HTTPException(
             status_code=500,
             detail="mining result artifacts are unavailable",
-        )
-    return result
+        ) from exc
 
 
 @router.get("/runs/{run_id}/events")
@@ -896,290 +864,3 @@ def _mean(values: Sequence[Any] | Any) -> float | None:
 def _minimum(values: Sequence[Any] | Any) -> float | None:
     finite = [number for value in values if (number := _finite(value)) is not None]
     return min(finite) if finite else None
-
-
-# ── [fork 增强] R31 AI 自动挖掘: 拿上一轮结果反馈给 AI, 由它重配参数再跑一轮 ──
-#
-# 单一入口 /step 驱动整个闭环: 手动点一次调一次, 自动模式就是前端定时轮询它。
-# 严格串行 —— 任一时刻最多一个挖掘 run(docs/mining.md §任务与资源隔离)。
-# 绝不自动发布 —— 选出赢家即停, 等人工确认(§自动运行)。
-
-class AutopilotStartRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid", strict=True)
-
-    asset_type: Literal["stock", "etf"] = "stock"
-    start: date
-    end: date
-    holdout_days: int = Field(mining_autopilot.DEFAULT_HOLDOUT_DAYS, ge=90, le=1095)
-    budget_profile: Literal["balanced", "strict"] = "balanced"
-    max_iterations: int = Field(
-        mining_autopilot.DEFAULT_MAX_ITERATIONS, ge=1, le=mining_autopilot.MAX_ITERATIONS_CAP)
-    factor_names: list[str] = Field(default_factory=list, max_length=48)
-    commission_pct: float = Field(0.0002, ge=0.0, le=0.05, allow_inf_nan=False)
-    stamp_tax_pct: float = Field(0.0005, ge=0.0, le=0.05, allow_inf_nan=False)
-    slippage_bps: float = Field(5.0, ge=0.0, le=1000.0, allow_inf_nan=False)
-
-    @field_validator("start", "end", mode="before")
-    @classmethod
-    def _iso(cls, value: Any) -> Any:
-        if isinstance(value, str):
-            try:
-                return date.fromisoformat(value)
-            except ValueError as exc:
-                raise ValueError("dates must use ISO YYYY-MM-DD format") from exc
-        return value
-
-
-def _factor_catalog() -> list[dict[str, Any]]:
-    """喂给 AI 的因子清单(id + 中文名), 不带其他实现细节。"""
-    return [{"id": str(f["id"]), "name": str(f.get("label") or f["id"])} for f in FACTOR_COLUMNS]
-
-
-def _autopilot_session_or_404(session_id: str) -> dict[str, Any]:
-    session = mining_autopilot_store.get(session_id)
-    if session is None:
-        raise HTTPException(status_code=404, detail="autopilot session not found")
-    return session
-
-
-def _attach_live_run(manager: Any, session: dict[str, Any]) -> dict[str, Any]:
-    """[R38] 给还在跑的那一轮补上 run 的实时进度。
-
-    会话档案只记 queued/running 这种粗状态, 界面上就只能转个圈 —— 用户没法区分
-    "排队等槽位"、"正在算第 3 折"和"真卡死了"。这里把 run manifest 里已有的
-    progress/started_at 挂到最后一轮上, 让界面能显示阶段、百分比和已跑多久。
-    只读, 取不到就不挂(绝不因为进度读失败而让整个会话接口挂掉)。
-    """
-    iterations = session.get("iterations") or []
-    if session.get("status") != "open" or not iterations:
-        return session
-    last = iterations[-1]
-    run_id = last.get("run_id")
-    if not run_id or last.get("status") not in ACTIVE_RUN_STATUSES:
-        return session
-    try:
-        manifest = manager.store.get(str(run_id))
-        if not manifest:
-            return session
-        summary = manager.store.read_summary(str(run_id))
-        progress = summary.get("progress")
-        last["live"] = {
-            "status": manifest.get("status"),
-            "progress": progress if isinstance(progress, Mapping) else None,
-            "queued_at": manifest.get("created_at"),
-            "started_at": manifest.get("started_at"),
-            "updated_at": manifest.get("updated_at"),
-            "error": manifest.get("error"),
-        }
-    except Exception:  # noqa: BLE001
-        return session
-    return session
-
-
-@router.get("/autopilot/sessions")
-def autopilot_sessions(request: Request) -> dict[str, Any]:
-    manager = _manager(request)
-    return {"items": [_attach_live_run(manager, s)
-                      for s in mining_autopilot_store.list_sessions()]}
-
-
-@router.get("/autopilot/sessions/{session_id}")
-def autopilot_session(session_id: str, request: Request) -> dict[str, Any]:
-    return _attach_live_run(_manager(request), _autopilot_session_or_404(session_id))
-
-
-@router.post("/autopilot/sessions/{session_id}/stop")
-def autopilot_stop(session_id: str, request: Request) -> dict[str, Any]:
-    """[R38] 中止会话: 先取消正在跑的那一轮, 再把会话收成 stopped。
-
-    收成独立的 stopped 而不是 failed —— "我按了停"和"它自己崩了"在复盘时是两件事,
-    混成一个状态以后看历史会以为这轮挖掘出过问题。
-    幂等: 已经收工的会话直接原样返回, 重复点不会把已完成的结果抹掉。
-    """
-    session = _autopilot_session_or_404(session_id)
-    # [R53] 有主的会话停了也白停 —— 工作流会认为这次"重开"结束了, 转头再开一个。
-    # 真想让它停下来, 要停的是工作流。
-    owner = session.get("owner_workflow_id")
-    if owner:
-        raise HTTPException(
-            status_code=409,
-            detail=(f"这个会话由工作流 {owner} 开的。单停会话没用 —— 工作流会当成"
-                    "这次重开结束了, 转头再开一个。要停就停那个工作流。"))
-    if session.get("status") != "open":
-        return {"session": session, "message": "本会话已经收工, 无需中止"}
-
-    manager = _manager(request)
-    cancelled_run: str | None = None
-    iterations = session.get("iterations") or []
-    if iterations and iterations[-1].get("run_id"):
-        last = iterations[-1]
-        run_id = str(last["run_id"])
-        manifest = manager.store.get(run_id)
-        if manifest and manifest.get("status") in ACTIVE_RUN_STATUSES:
-            try:
-                manager.cancel(run_id)
-                cancelled_run = run_id
-            except (MiningRunStoreError, KeyError, ValueError) as exc:
-                raise HTTPException(status_code=409, detail=str(exc)) from exc
-        # 会话档案里的这一轮同步落成 cancelled, 否则下次 step 还会以为它在跑
-        last["status"] = "cancelled"
-        mining_autopilot_store._replace(session)
-
-    updated = mining_autopilot_store.set_status(
-        session_id, "stopped",
-        fail_reason="你中止了这个会话" + (f"(第 {len(iterations)} 轮挖掘已取消)" if cancelled_run else ""),
-    ) or session
-    return {"session": _attach_live_run(manager, updated),
-            "message": "已中止" + (", 正在跑的那一轮也停了" if cancelled_run else "")}
-
-
-def build_autopilot_session(
-    *, repo, asset_type: str, start: date, end: date, holdout_days: int,
-    budget_profile: str, max_iterations: int, factor_names: Sequence[str] = (),
-    commission_pct: float = 0.0002, stamp_tax_pct: float = 0.0005,
-    slippage_bps: float = 5.0, owner_workflow_id: str | None = None,
-) -> dict[str, Any]:
-    """[R39] 开一个自动挖掘会话(窗口切分 + 真实交易日预检)。
-
-    端点和后台工作流共用这一条路径 —— 预检口径必须一模一样, 否则手动开能过、
-    工作流开却在第一轮才炸。数据不够时抛 ValueError, 消息已是给用户看的中文。
-    """
-    windows = mining_autopilot.split_windows(
-        start, end, holdout_days=holdout_days, budget_profile=budget_profile)
-
-    # 粗筛过了还要按 enriched 真实交易日精确核验(docs §置信度: balanced/strict 需 3 个 outer 折)。
-    # 不够时不要直接把 preflight 原文抛给用户 —— 它只会说"有效区间 xx 到 yy 只有 3 根",
-    # 而用户明明填了四年区间, 看不懂。换成带真实数字和出路的中文说明。
-    data_dir = repo.store.data_dir
-    avail_search = mining_availability(
-        data_dir, asset_type=asset_type, budget_profile=budget_profile,
-        start=windows["search_start"], end=windows["search_end"]).to_dict()
-    if not avail_search.get("eligible"):
-        avail_all = mining_availability(
-            data_dir, asset_type=asset_type, budget_profile=budget_profile).to_dict()
-        raise ValueError(mining_autopilot.explain_insufficient_data(
-            avail_search=avail_search, avail_all=avail_all,
-            windows={k: str(v) for k, v in windows.items()},
-            budget_profile=budget_profile, holdout_days=holdout_days))
-
-    factors = [f for f in factor_names if f in _FACTOR_IDS]
-    base_config = {
-        "asset_type": asset_type,
-        "budget_profile": budget_profile,
-        # 首轮因子: 用户没指定就把全清单交给 AI 之后的轮次去挑, 首轮先用全量跑个底
-        "factor_names": factors or [str(f["id"]) for f in FACTOR_COLUMNS][:48],
-        "commission_pct": commission_pct,
-        "stamp_tax_pct": stamp_tax_pct,
-        "slippage_bps": slippage_bps,
-        "correlation_threshold": 0.75,
-        "max_combination_factors": 4,
-        "beam_width": 12,
-    }
-    return mining_autopilot_store.create(
-        asset_type=asset_type, windows=windows,
-        max_iterations=max_iterations, base_config=base_config,
-        owner_workflow_id=owner_workflow_id)
-
-
-async def advance_autopilot_session(
-    session: dict[str, Any], *, manager: Any, repo: Any, app_state: Any,
-) -> dict[str, Any]:
-    """[R39] 把一个自动挖掘会话推进一格。端点与后台工作流共用。
-
-    组装 step 需要的三样东西: 上一轮 run 的状态、它的结果、以及"按这份配置起
-    一个 run"的回调。step 本身不碰 HTTP 也不碰 manager, 所以这段装配必须在外面做。
-    """
-    run_status: str | None = None
-    run_result: dict[str, Any] | None = None
-    iterations = session.get("iterations") or []
-    if iterations and iterations[-1].get("run_id"):
-        run_id = str(iterations[-1]["run_id"])
-        manifest = manager.store.get(run_id)
-        if manifest:
-            run_status = str(manifest.get("status") or "")
-            if run_status in SUCCESS_RUN_STATUSES:
-                run_result = load_run_result(manager.store, run_id)
-
-    def start_run(config: dict[str, Any]) -> str:
-        worker_request = {k: v for k, v in config.items()}
-        worker_request["start"] = str(config["start"])
-        worker_request["end"] = str(config["end"])
-        fingerprint = build_data_fingerprint(repo, app_state, worker_request)
-        # force=True: 同配置复用旧 run 会让循环原地打转 —— 每轮都要真跑
-        manifest = manager.start(worker_request, fingerprint, force=True, source="autopilot")
-        return str(manifest["run_id"])
-
-    return await mining_autopilot.step(
-        session=session, factor_catalog=_factor_catalog(),
-        run_status=run_status, run_result=run_result,
-        start_run=start_run, base_config=session["base_config"])
-
-
-# [R53] 挖掘是重活: heavy_job_limiter 容量 2, 一个挖掘 run 独占两格。所以同时
-# 只应该有一路在挖 —— 再开一路不会更快, 它只会静默排队, 界面上看着就是"卡住了"。
-#
-# 而工作流的一次"重开"本来就是开一个自动挖掘会话, 两者是包含关系不是并列关系:
-# 工作流跑着的时候手动再开一个, 等于让同一件事排两次队。这里直接挡掉并说清楚。
-def _reject_if_workflow_owns_mining() -> None:
-    from app.services import workflow
-
-    running = [w for w in workflow.running_workflows() if w.get("kind") == workflow.KIND_MINING]
-    if running:
-        wf = running[0]
-        raise HTTPException(
-            status_code=409,
-            detail=(f"挖掘工作流 {wf['workflow_id']} 正在跑, 它自己就在反复开自动挖掘会话。"
-                    "同时再开一个不会更快 —— 挖掘一次只能跑一路, 第二个只会排队等着。"
-                    "要手动一轮一轮调, 先把上面的工作流停掉。"))
-
-
-@router.delete("/autopilot/sessions/{session_id}")
-def autopilot_delete(session_id: str) -> dict[str, Any]:
-    """[R55] 删一个自动挖掘会话留档。
-
-    两种情况不给删: 还开着的(先中止, 否则正在跑的那一轮没人收尾), 以及
-    工作流开的(它还要靠这条记录接着往下推)。
-    """
-    session = _autopilot_session_or_404(session_id)
-    if session.get("owner_workflow_id"):
-        raise HTTPException(
-            status_code=409,
-            detail=f"这个会话属于工作流 {session['owner_workflow_id']} —— 要清掉请删那条工作流。")
-    if session.get("status") == "open":
-        raise HTTPException(status_code=409, detail="这个会话还开着 —— 先中止再删")
-    mining_autopilot_store.delete(session_id)
-    return {"deleted": session_id}
-
-
-@router.post("/autopilot/sessions")
-def autopilot_start(payload: AutopilotStartRequest, request: Request) -> dict[str, Any]:
-    """开一个自动挖掘会话。窗口切分 + 真实交易日预检都在这里把关, 免得第一轮才失败。"""
-    _reject_if_workflow_owns_mining()
-    try:
-        return build_autopilot_session(
-            repo=request.app.state.repo,
-            asset_type=payload.asset_type, start=payload.start, end=payload.end,
-            holdout_days=payload.holdout_days, budget_profile=payload.budget_profile,
-            max_iterations=payload.max_iterations, factor_names=payload.factor_names,
-            commission_pct=payload.commission_pct, stamp_tax_pct=payload.stamp_tax_pct,
-            slippage_bps=payload.slippage_bps)
-    except (ValueError, MiningRunValidationError) as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-
-@router.post("/autopilot/sessions/{session_id}/step")
-async def autopilot_step(session_id: str, request: Request) -> dict[str, Any]:
-    """推进一格: 等待中 / 判上一轮并开新一轮 / 收工。手动与自动共用这一个入口。"""
-    session = _autopilot_session_or_404(session_id)
-    # [R53] 有主的会话只能由它的主人推 —— 界面和工作流后台同时 step 同一个
-    # 状态机, 轮次会错乱(两边都以为自己开的是第 N 轮)。
-    owner = session.get("owner_workflow_id")
-    if owner:
-        raise HTTPException(
-            status_code=409,
-            detail=f"这个会话由工作流 {owner} 在跑, 它会自己往下推。要手动接管请先停掉那个工作流。")
-    out = await advance_autopilot_session(
-        session,
-        manager=_manager(request), repo=request.app.state.repo,
-        app_state=request.app.state)
-    return {"action": out["action"], "message": out["message"], "session": out["session"]}
