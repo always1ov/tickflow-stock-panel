@@ -855,6 +855,23 @@ export interface ChannelEvent {
   combo_note?: { combo: string; title: string; detail: string }
 }
 
+/**
+ * [R205] 「怎么办」—— 五套判定的收敛层。
+ * level: exit 纪律已破 / act 今天就得动 / conflict 判定打架 / watch 盯着 /
+ *        shape 形态提示 / idle 没事。order 越小越该先看。
+ */
+export interface Playbook {
+  level: 'exit' | 'act' | 'conflict' | 'watch' | 'shape' | 'idle'
+  label: string
+  order: number
+  tone: 'danger' | 'warn' | 'info' | 'muted'
+  headline: string
+  why: string
+  price: number | null
+  /** 互相矛盾的判定对。**任何档位都会带**, 不只是 conflict 档 */
+  conflicts: string[]
+}
+
 /** [R203] 27 种组合速查表的一行。整份由后端从底层判定生成, 前端不写死。 */
 export interface ComboTableRow {
   combo: string
@@ -4794,7 +4811,8 @@ export const api = {
   // [R178] 批量「该动了」判定 —— 决策台默认按它排序
   stockUrgency: (symbols: string[]) =>
     request<{ urgency: Record<string, Urgency>; event?: Record<string, ChannelEvent>
-              phase?: Record<string, ChannelPhase> }>(
+              phase?: Record<string, ChannelPhase>
+              playbook?: Record<string, Playbook> }>(
       `/api/stock-analysis/urgency?symbols=${encodeURIComponent(symbols.join(','))}`),
 
   /** [R203] 27 种组合速查表。无参数、结果恒定 —— 前端按天缓存即可 */

@@ -475,7 +475,7 @@ def _annotations(sym: str, e: dict, sig: dict) -> list[dict]:
     vd = e.get("verdict")
     if vd:
         out.append({"key": "verdict", "tone": _NOTE_VERDICT_TONE.get(vd.get("code"), "info"),
-                    "label": vd.get("title") or "通道结论",
+                    "label": vd.get("title") or "价位贵贱",
                     "text": vd.get("detail") or vd.get("hint") or ""})
 
     # [R135] 这两项 R134 时只写了展示分支没接数据源, 界面上永远不出现。

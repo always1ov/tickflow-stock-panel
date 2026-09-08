@@ -4,7 +4,7 @@
  * [R167] 从 WatchlistDecisionBoard.tsx 拆出。各自带着自己的配色表 —— 配色表是
  * 实现细节, 不该摆在 933 行主文件的顶部让人以为是全局约定。
  */
-import type { BandEnergy, ChannelEvent, ChannelGeometry, ChannelPhase, ChannelRuns, KeltnerBand, KeltnerVerdict, Urgency } from '@/lib/api'
+import type { BandEnergy, ChannelEvent, ChannelGeometry, ChannelPhase, ChannelRuns, KeltnerBand, KeltnerVerdict, Playbook, Urgency } from '@/lib/api'
 import { VerdictHover } from '@/components/stock-analysis/VerdictHover'
 
 /**
@@ -395,6 +395,55 @@ export function ChannelStateCell({ geo, runs, ph, onOpenCombo }: {
           </span>
         )}
       </button>
+    </td>
+  )
+}
+
+// [R205] 「怎么办」配色。**只有两档是红的** —— 纪律已破和今天已触发。
+// 分歧档刻意用琥珀而不是红: 它说的是"别动", 不是"快动", 用红会被读反。
+const PLAY_CLS: Record<string, string> = {
+  danger: 'border-red-400/45 bg-red-400/10 text-red-400',
+  warn: 'border-amber-400/40 bg-amber-400/10 text-amber-300',
+  info: 'border-sky-400/30 bg-sky-400/[0.07] text-sky-300',
+  muted: 'border-border/50 text-muted/50',
+}
+
+/**
+ * [R205] 「怎么办」列 —— **整张表唯一的收敛层**, 所以放在最左边。
+ *
+ * 决策台上有五套彼此平行的判定(该动了 / 六态 / 通道结论 / 通道阶段 / AI 信号),
+ * 每一套单独看都对, 摆在一起就是让用户每天在脑子里做一次五路合成。这一列
+ * 替他做完那次合成: 一句话说该怎么办, 一行小字说凭什么。
+ *
+ * **最值钱的是「先别动」那一档。** 系统原来从不说这五套什么时候互相矛盾 ——
+ * 而那恰恰是最该停手的时刻, 却是最容易被忽略的时刻(界面把它们并排摆着,
+ * 谁都不提一句)。分歧档刻意排在「逼近」之前: 「还差 1.2% 到买点」这种话
+ * 会诱人下手, 判定打架时不该让它出现在标题上。
+ *
+ * 这一列**不产生任何新判定** —— 每句话都能追到某一层的原话。
+ */
+export function PlaybookCell({ p }: { p?: Playbook | null }) {
+  if (!p) {
+    return <td className={`${TD_BASE} px-2`}><span className="text-[10px] text-muted/30">—</span></td>
+  }
+  const more = p.conflicts.length && p.level !== 'conflict'
+  return (
+    <td className={`${TD_BASE} px-2`}>
+      <div className="inline-flex max-w-[13rem] flex-col items-center gap-0.5 leading-tight">
+        <span className={`inline-flex whitespace-nowrap rounded border px-1.5 py-0.5 text-[10px] ${PLAY_CLS[p.tone] ?? PLAY_CLS.muted}`}
+              title={p.why}>
+          {p.headline}
+          {p.price != null && <span className="ml-1 font-mono tabular-nums opacity-80">{p.price.toFixed(2)}</span>}
+        </span>
+        <span className="line-clamp-2 text-[9px] text-muted" title={p.why}>{p.why}</span>
+        {/* 不在分歧档时, 分歧仍然作为一行小字带出来 —— 它任何时候都值得知道 */}
+        {!!more && (
+          <span className="text-[9px] text-amber-300/80"
+                title={p.conflicts.join('\n')}>
+            另有 {p.conflicts.length} 处判定不一致
+          </span>
+        )}
+      </div>
     </td>
   )
 }

@@ -77,7 +77,7 @@ LEGACY_FACTOR_LABELS = {
     "vol": "量比",
     "win": "该票历史胜率",
     "mainline": "主线归属",
-    "verdict": "量化波动通道结论",
+    "verdict": "价位贵贱(量化波动通道)",
     "near": "紧贴触发价",
     "clamp": "顶格削减(理论分 >100)",
 }
@@ -512,7 +512,7 @@ def _tpl_bucket(v) -> str:
 
 
 LABEL_DIMS: list[dict] = [
-    {"key": "verdict", "label": "通道结论",
+    {"key": "verdict", "label": "价位贵贱",
      "fmt": lambda v: _verdict_titles().get(str(v), str(v))},
     {"key": "state", "label": "六态趋势",
      "fmt": lambda v: _state_titles().get(str(v), str(v))},

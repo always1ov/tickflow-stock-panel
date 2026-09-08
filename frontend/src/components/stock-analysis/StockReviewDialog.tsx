@@ -155,7 +155,7 @@ export function StockReviewDialog({ symbol, name, tab: initialTab, onClose }: {
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <div className="flex overflow-hidden rounded-btn border border-border/60">
-              {([['trend', '趋势状态'], ['verdict', '通道结论']] as const).map(([k, label]) => (
+              {([['trend', '趋势状态'], ['verdict', '这个价贵不贵']] as const).map(([k, label]) => (
                 <button
                   key={k}
                   onClick={() => setTab(k)}
@@ -515,7 +515,7 @@ function TrendView({ d, rows, onlyMarked, onToggleMarked }: {
               <th className="whitespace-nowrap px-2 py-2 text-right font-normal">收盘</th>
               <th className="whitespace-nowrap px-2 py-2 text-right font-normal">涨跌</th>
               <th className="whitespace-nowrap px-3 py-2 text-left font-normal">六态状态</th>
-              <th className="whitespace-nowrap px-2 py-2 text-center font-normal" title="当天的三档通道结论 —— 与决策台「结论」列同一句话, 悬停看完整卡片">结论</th>
+              <th className="whitespace-nowrap px-2 py-2 text-center font-normal" title="当天这个价位算贵还是算便宜 —— 与决策台「贵不贵」列同一句话, 悬停看完整卡片">贵不贵</th>
             </tr>
           </thead>
           <tbody>
@@ -570,7 +570,7 @@ function TrendView({ d, rows, onlyMarked, onToggleMarked }: {
 
       <div className="border-t border-border/60 px-4 py-2 text-[10px] leading-relaxed text-muted">
         收盘口径, 与决策台「趋势」列同一个状态机、同一个阈值(含你自己调过的那个)。
-        「结论」列悬停看完整卡片, 要摊开每一档说了什么、之后走成什么样, 切到上方的「通道结论」。
+        「贵不贵」列悬停看完整卡片, 要摊开每一档说了什么、之后走成什么样, 切到上方的「这个价贵不贵」。
       </div>
     </>
   )

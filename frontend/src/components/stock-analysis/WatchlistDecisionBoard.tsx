@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Star, Wallet, Sparkles, Loader2, ArrowUp, ArrowDown, RefreshCw, FileText, Download, Bell } from 'lucide-react'
-import { api, type ChannelEvent, type ChannelPhase, type EffectivePosition, type ExitLine, type KeltnerBands, type TrendInfo, type Urgency } from '@/lib/api'
+import { api, type ChannelEvent, type ChannelPhase, type EffectivePosition, type Playbook, type ExitLine, type KeltnerBands, type TrendInfo, type Urgency } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { pickStale, SIGNAL_TTL_HOURS } from '@/lib/signalFreshness'   // [R131] 增量分析判据
 import { toast } from '@/components/Toast'
@@ -14,7 +14,7 @@ import { storage } from '@/lib/storage'
 import { buildBoardHtml } from '@/lib/decisionBoardHtmlExport'
 import { DEFAULT_EXPORT_KEYS } from '@/lib/decisionBoardExportColumns'
 import { ExportColumnsDialog } from '@/components/stock-analysis/decision-board/ExportColumnsDialog'
-import { ChannelStackCell, ChannelStateCell, NUM, TD_BASE, UrgencyLine, VerdictCell } from '@/components/stock-analysis/decision-board/cells'
+import { ChannelStackCell, ChannelStateCell, NUM, PlaybookCell, TD_BASE, UrgencyLine, VerdictCell } from '@/components/stock-analysis/decision-board/cells'
 import { ComboTableDialog } from '@/components/stock-analysis/decision-board/ComboTableDialog'
 import { LotsLink } from '@/components/stock-analysis/decision-board/LotsLink'
 import { GlossaryButton } from '@/components/stock-analysis/decision-board/GlossaryDialog'
@@ -22,7 +22,7 @@ import { GlossaryButton } from '@/components/stock-analysis/decision-board/Gloss
 type Position = EffectivePosition
 type WatchPoint = { direction: 'up' | 'down'; price: number; label?: string; action?: string; reason?: string }
 type Signal = { signal: string; confidence: number; reason: string; close: number | null; created_at: string; watch_points?: WatchPoint[] }
-type SortKey = 'urgency' | 'name' | 'close' | 'changePct' | 'held' | 'cost' | 'pnl' | 'exit'
+type SortKey = 'play' | 'urgency' | 'name' | 'close' | 'changePct' | 'held' | 'cost' | 'pnl' | 'exit'
   | 'trend' | 'ks' | 'km' | 'kl' | 'spread' | 'verdict' | 'confidence' | 'signal' | 'report'
 const SIGNAL_RANK: Record<string, number> = { buy: 0, sell: 1, hold: 2, watch: 3 }
 /**
@@ -39,6 +39,10 @@ const SIGNAL_RANK: Record<string, number> = { buy: 0, sell: 1, hold: 2, watch: 3
  * **顺序必须与 thead 里的 <th> 一一对应。**
  */
 const BOARD_COLS = [
+  // [R205] **整张表唯一的收敛层, 所以在最左边。** 决策台有五套彼此平行的判定
+  // (该动了/六态/通道结论/通道阶段/AI 信号), 这一列替人做完那次五路合成,
+  // 并且**指出它们什么时候打架** —— 那是最该停手、却最容易被忽略的时刻。
+  { label: '怎么办', w: '13%' },
   // [R198] 「该动」不再单独占一列 —— 它挪进了标的格的第二行。判定本身没变,
   // 只是从"另一列"变成"这只票名字底下的一句话", 扫表时不用左右对眼。
   { label: '标的', w: '11%' },       // 名字 + 该动两行
@@ -55,8 +59,7 @@ const BOARD_COLS = [
   // [R201] 延伸指标里唯一值得占一列的那一组: 阶段 + 三线间距 + 快慢 + 挤了几天。
   // 为什么只有这几个进来、别的为什么留在悬停里, 见 cells.tsx 的 ChannelStateCell。
   { label: '通道态势', w: '6.5%' },
-  { label: '结论', w: '6%' },
-  { label: '置信', w: '3%' },
+  { label: '贵不贵', w: '6%' },
   { label: 'AI 分析', w: '7%' },     // R130 上下两行: 报告胶囊 / ✨分析 + 🔔提醒
   { label: 'AI 信号', w: '' },       // 不给宽度, 吃掉剩下的 —— 只有它是整段文字
 ] as const
@@ -196,6 +199,9 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
   // 该盯什么" —— 后者才是能照着做的那句, 之前只有复盘弹窗看得到。
   const phases: Record<string, ChannelPhase> = useMemo(
     () => urgencyQ.data?.phase ?? {}, [urgencyQ.data])
+  // [R205] 「怎么办」与「该动了」同一趟返回 —— 它就是在那份判定之上再合成一层
+  const plays: Record<string, Playbook> = useMemo(
+    () => urgencyQ.data?.playbook ?? {}, [urgencyQ.data])
 
   // [fork 增强] 持仓出场线(仅持有+填成本的票有;后端顺带把线同步为监控规则)
   const heldWithCost = Object.values(positions).some((p) => p.held && p.cost)
@@ -338,6 +344,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
           urg: urgency[symbol],
           ev: events[symbol],
           ph: phases[symbol],
+          play: plays[symbol],
           // [R169] 成本来源与批次信息 —— 让"这个成本是我填的还是批次算的"一眼可辨
           costSource: pos?.cost_source ?? null,
           lotCost: pos?.lot_cost ?? null,
@@ -362,6 +369,8 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
           const d = r.urg.distance == null ? 999 : Math.min(r.urg.distance * 100, 998)
           return r.urg.order * 1000 + d
         }
+        // [R205] 「怎么办」按急迫程度排 —— order 越小越该先看
+        case 'play': return r.play ? r.play.order : 9
         case 'name': return r.name
         case 'close': return r.close
         case 'changePct': return r.changePct
@@ -484,7 +493,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `自选决策台_通道结论_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}.html`
+    a.download = `自选决策台_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}.html`
     a.click()
     URL.revokeObjectURL(url)
     toast(`已导出 ${exportRows.length} 只(自选共 ${rows.length} 只)`, 'success')
@@ -598,6 +607,14 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
             </colgroup>
             <thead className="sticky top-0 bg-surface/95 backdrop-blur text-[10px] text-muted">
               <tr className="text-left">
+                <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center">
+                  <button onClick={() => toggleSort('play')} className={thBtn}
+                          title={'把「该动了 / 六态趋势 / 通道结论 / 通道阶段 / AI 信号」这五套判定合成一句话。\n\n'
+                            + '排序按急迫程度: 纪律已破 > 今天就得动 > 判定打架 > 盯着 > 留意 > 没事。\n\n'
+                            + '「先别动」那一档最值得看 —— 五套判定互相矛盾时系统原来从不提一句, 而那恰恰是最该停手的时刻。'}>
+                    怎么办{caret('play')}
+                  </button>
+                </th>
                 <th className="whitespace-nowrap px-3 py-2.5 font-normal text-center"><button onClick={() => toggleSort('name')} className={thBtn} title="标的名称;第二行是「该动了」判定 —— 已触发 > 逼近 > 刚变盘 > 到轨 > 无事,纯规则,AI 不参与">标的{caret('name')}</button></th>
                 <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center"><button onClick={() => toggleSort('close')} className={thBtn}>现价{caret('close')}</button></th>
                 <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center"><button onClick={() => toggleSort('changePct')} className={thBtn}>涨跌{caret('changePct')}</button></th>
@@ -629,8 +646,9 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
                     通道态势{caret('spread')}
                   </button>
                 </th>
-                <th className="whitespace-nowrap px-1.5 py-2.5 font-normal text-center"><button onClick={() => toggleSort('verdict')} className={thBtn} title="三档组合的结论。排序把「该减的」和「该吸的」分到两头:降序=偏卖在前, 升序=偏买在前">结论{caret('verdict')}</button></th>
-                <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center"><button onClick={() => toggleSort('confidence')} className={thBtn}>置信{caret('confidence')}</button></th>
+                <th className="whitespace-nowrap px-1.5 py-2.5 font-normal text-center"><button onClick={() => toggleSort('verdict')} className={thBtn} title={'这个价位现在算贵还是算便宜 —— 三档位置合起来读出的一句话。\n\n'
+                    + '它说的是**位置**, 不是方向: 同一个「短线冲高」, 在上涨趋势里是常态, 在下跌趋势里是撞到阻力。\n\n'
+                    + '排序把该减的和该吸的分到两头: 降序 = 偏贵的在前, 升序 = 偏便宜的在前。'}>贵不贵{caret('verdict')}</button></th>
                 <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center"><button onClick={() => toggleSort('report')} className={thBtn} title="最近一份 AI 分析报告(点击胶囊打开) · ✨生成/更新分析 · 🔔点位提醒">AI 分析{caret('report')}</button></th>
                 <th className="whitespace-nowrap px-4 py-2.5 font-normal text-center"><button onClick={() => toggleSort('signal')} className={thBtn}>AI 信号{caret('signal')}</button></th>
               </tr>
@@ -654,6 +672,8 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
                     className={`scroll-mt-10 border-t border-border/30 transition-colors duration-500 hover:bg-elevated/40 ${
                       flashing ? 'bg-accent/25' : active ? 'bg-accent/[0.10]' : ''}`}
                   >
+                    {/* [R205] 收敛层 —— 整张表唯一一列"该怎么办", 所以在最左边 */}
+                    <PlaybookCell p={r.play} />
                     {/* 点标的即切换分析(免搜索) */}
                     {/* [R157b] 当前个股整行常驻高亮 + 左侧一道靛蓝边: 搜索后先弹出关键价位
                         弹窗, 闪烁那 1.8 秒多半被弹窗盖住, 关掉弹窗还得一眼认得出它在哪 */}
@@ -796,10 +816,6 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
                                       onOpenCombo={() => setCombo({ name: r.name, geo: r.kc?.geo, runs: r.kc?.runs })} />
                     <VerdictCell v={r.kc?.verdict} ev={r.ev} geo={r.kc?.geo} runs={r.kc?.runs} energy={r.kc?.energy} ph={r.ph}
                                  onOpen={() => setReview({ symbol: r.symbol, name: r.name, tab: 'verdict' })} />
-                    {/* 置信度(独立列, 可排序) */}
-                    <td className={`${TD_BASE} ${NUM} whitespace-nowrap px-2 text-muted`}>
-                      {r.sig ? `${r.sig.confidence}%` : '—'}
-                    </td>
                     {/* [R106] AI 分析列: 报告胶囊(点开最近报告) + ✨生成/更新分析 + 🔔点位提醒
                         —— 原页头两个按钮整合到这里, 每个标的都有自己的一对动作 */}
                     <td className={`${TD_BASE} whitespace-nowrap px-2 text-center`}>

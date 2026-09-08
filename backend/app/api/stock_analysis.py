@@ -415,9 +415,22 @@ def get_urgency(request: Request, symbols: str = Query(..., description="逗号�
                 phases[sym] = ph
         except Exception as e:  # noqa: BLE001
             logger.debug("channel event skipped for %s: %s", sym, e)
-    return {"urgency": watchlist_urgency.assess_many(
-        syms, positions=positions, trends=trends, exit_lines=exits, keltner=keltner),
-        "event": events, "phase": phases}
+    urgency = watchlist_urgency.assess_many(
+        syms, positions=positions, trends=trends, exit_lines=exits, keltner=keltner)
+    # [R205] 「怎么办」收敛层 —— 五套判定合成一句话, 并指出它们什么时候打架。
+    # 原料全是上面已经算好的, **零新增取数**; AI 信号从本地缓存读, 不调模型。
+    from app.services import stock_playbook
+    try:
+        from app.services import stock_signal
+        all_sigs = stock_signal.load_all()
+        sigs = {s_: (all_sigs.get(s_) or {}) for s_ in syms}
+    except Exception as e:  # noqa: BLE001
+        logger.debug("playbook: 读 AI 信号失败, 按没有信号处理: %s", e)
+        sigs = {}
+    play = stock_playbook.playbook_many(
+        syms, positions=positions, trends=trends, exit_lines=exits,
+        urgency=urgency, keltner=keltner, phases=phases, events=events, signals=sigs)
+    return {"urgency": urgency, "event": events, "phase": phases, "playbook": play}
 
 
 @router.get("/combo-table")

@@ -300,16 +300,20 @@ def _side_edge(outcomes: list[dict]) -> dict:
 
     返回 {level, label, text, bull, bear, spread}。level 取值:
 
-      both     两头都灵 —— 转多之后真涨, 转空之后真跌
-      defense  只有避险这一半灵 —— 转空确实跌, 但转多不涨
-      offense  只有进攻这一半灵 —— 转多确实涨, 但转空也没怎么跌
-      flat     分不开 —— 在这只票上六态说明不了什么
-      inverted 反着的 —— 多头侧之后反而更差
+      both     买卖都能用 —— 转多之后真涨, 转空之后真跌
+      defense  只能用来卖 —— 转空确实跌, 但转多不涨
+      offense  只能用来买 —— 转多确实涨, 但转空也没怎么跌
+      flat     看不出差别 —— 在这只票上六态说明不了什么
+      inverted 反过来了 —— 多头侧之后反而更差
       thin     样本不够, 不下结论
 
     **defense / offense 是这一层最值钱的两个结论**: 它们说的是"这只票的六态
     只有一半能用", 而这件事在四个并排的均值里是看不出来的 —— 得把同侧的段
     合起来才显形。
+
+    [R206] 档位名一律改成大白话。「只有进攻灵」「两头都灵」「反着的」这类
+    说法要读的人先在心里翻译一道 —— 「进攻」是买还是加仓?「灵」是准还是有用?
+    换成「只能用来买」「买卖都能用」「反过来了」, 一眼就知道能拿它干什么。
     """
     bear_states = {s for s in STATE_LABELS if s not in BULLISH}
     bull = _side_stats(outcomes, set(BULLISH))
@@ -330,23 +334,23 @@ def _side_edge(outcomes: list[dict]) -> dict:
             f"空头侧 {bear['episodes']} 段平均 {r:+.1%})")
 
     if b < r:
-        out.update(level="inverted", label="反着的",
+        out.update(level="inverted", label="反过来了",
                    text="多头侧之后反而比空头侧更差 —— 样本这么小时多半是巧合, "
                         "但至少说明六态在这只票上没有正向信息, 别拿它做主要依据。" + tail)
     elif up_ok and down_ok:
-        out.update(level="both", label="两头都灵",
+        out.update(level="both", label="买卖都能用",
                    text="转多之后真涨、转空之后真跌 —— 这只票可以照六态找买点, "
                         "也可以照它离场。" + tail)
     elif down_ok:
-        out.update(level="defense", label="只有避险灵",
+        out.update(level="defense", label="只能用来卖",
                    text="转空之后确实跌, 但转多之后并不涨 —— 在这只票上, "
                         "六态是「离场信号」, 不是买入依据; 买点另找。" + tail)
     elif up_ok:
-        out.update(level="offense", label="只有进攻灵",
+        out.update(level="offense", label="只能用来买",
                    text="转多之后确实涨, 但转空之后也没怎么跌 —— 在这只票上, "
                         "六态是「买点线索」, 离场靠出场线与生命线, 别等它转空。" + tail)
     else:
-        out.update(level="flat", label="分不开",
+        out.update(level="flat", label="看不出差别",
                    text="多头侧与空头侧之后的走势差不多 —— 在这只票上六态说明不了"
                         "什么, 排名和买卖点都别主要靠它。" + tail)
     return out
@@ -439,30 +443,30 @@ def _verdict_edge(outcomes: list[dict]) -> dict:
     out = {"buy": buy, "sell": sell, "spread": None,
            "level": "thin", "label": "样本不够", "text": ""}
     if buy["episodes"] < MIN_SIDE_EPISODES or sell["episodes"] < MIN_SIDE_EPISODES:
-        out["text"] = (f"偏买档 {buy['episodes']} 段、偏卖档 {sell['episodes']} 段, "
+        out["text"] = (f"说便宜的 {buy['episodes']} 段、说贵的 {sell['episodes']} 段, "
                        f"任一侧不足 {MIN_SIDE_EPISODES} 段就不下结论 —— 把窗口拉长再看。")
         return out
     b, r = buy["avg_fwd"] or 0.0, sell["avg_fwd"] or 0.0
     out["spread"] = round(b - r, 4)
-    tail = f"(偏买档 {buy['episodes']} 段平均 {b:+.1%}, 偏卖档 {sell['episodes']} 段平均 {r:+.1%})"
+    tail = f"(说便宜的 {buy['episodes']} 段平均 {b:+.1%}, 说贵的 {sell['episodes']} 段平均 {r:+.1%})"
     if b >= SIDE_EDGE and r <= -SIDE_EDGE:
-        out.update(level="both", label="两头都灵",
+        out.update(level="both", label="买卖都能用",
                    text="说便宜的之后真涨、说贵的之后真跌 —— 这只票的位置结论可以照着做。" + tail)
     elif b >= SIDE_EDGE:
-        out.update(level="offense", label="只有低吸灵",
+        out.update(level="offense", label="只能用来找便宜",
                    text="说便宜的之后确实涨, 但说贵的之后也没怎么跌 —— 拿它找低吸位, "
                         "别拿它当减仓理由。" + tail)
     elif r <= -SIDE_EDGE:
-        out.update(level="defense", label="只有高抛灵",
+        out.update(level="defense", label="只能用来躲贵",
                    text="说贵的之后确实跌, 但说便宜的之后并不涨 —— 拿它规避高位, "
                         "低吸另找依据。" + tail)
     elif b < r:
-        out.update(level="inverted", label="反着的",
-                   text="偏买档之后反而比偏卖档更差 —— 样本这么小时多半是巧合, "
+        out.update(level="inverted", label="反过来了",
+                   text="说便宜的那几档之后反而比说贵的更差 —— 样本这么小时多半是巧合, "
                         "但至少说明位置结论在这只票上没有正向信息。" + tail)
     else:
-        out.update(level="flat", label="分不开",
-                   text="偏买档与偏卖档之后走势差不多 —— 在这只票上, 位置结论说明不了什么。" + tail)
+        out.update(level="flat", label="看不出差别",
+                   text="说便宜的和说贵的之后走势差不多 —— 在这只票上, 这个价位判断说明不了什么。" + tail)
     return out
 
 
