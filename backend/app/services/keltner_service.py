@@ -18,6 +18,7 @@ from datetime import date, timedelta
 
 import polars as pl
 
+from app.indicators import keltner_geometry as kg
 from app.indicators.keltner import BANDS, assess, verdict
 
 logger = logging.getLogger(__name__)
@@ -35,6 +36,9 @@ _SLOPE_LOOKBACK = 20
 # 高低点(250 个交易日), 取最长的 250 根再留出停牌与节假日的富余 —— 420 个
 # 自然日约 285 个交易日。只有 with_closes=True 时才用这个跨度。
 _LOOKBACK_DAYS_LONG = 420
+
+# 算历史序列至少要够长期档滚一遍
+WINDOW_LONG = 120
 
 
 def long_trend_map(repo, symbols: list[str], *, with_closes: bool = False) -> dict[str, dict]:
@@ -58,13 +62,17 @@ def long_trend_map(repo, symbols: list[str], *, with_closes: bool = False) -> di
     end = date.today()
     span = _LOOKBACK_DAYS_LONG if with_closes else _LOOKBACK_DAYS
     try:
+        # [R195] 多要一列 atr_14 —— 压缩指数与"在轨外连续几天"要按 ATR 归一化算
+        # 历史序列。**这一次批量读本来就在发生**(长期档的 MA120 没有预计算列,
+        # 全自选每天都要走这里滚一遍), 多带一列几乎不花钱; 另起一条取数路才贵。
         df = repo.get_daily_batch(symbols, end - timedelta(days=span), end,
-                                  ["symbol", "date", "close"])
+                                  ["symbol", "date", "close", "atr_14"])
     except Exception as e:  # noqa: BLE001
         logger.debug("keltner long trend batch failed: %s", e)
         return {}
     if df is None or df.is_empty() or not {"symbol", "date", "close"} <= set(df.columns):
         return {}
+    has_atr = "atr_14" in df.columns
     out: dict[str, dict] = {}
     for sym, sub in df.drop_nulls("close").sort("date").group_by("symbol"):
         name = str(sym[0] if isinstance(sym, tuple) else sym).upper()
@@ -89,6 +97,17 @@ def long_trend_map(repo, symbols: list[str], *, with_closes: bool = False) -> di
             prev = float(sum(closes[-120 - _SLOPE_LOOKBACK:-_SLOPE_LOOKBACK]) / 120)
             ent["ma120_prev"] = prev
             ent["ma120_rising"] = ent["ma120"] >= prev
+        # [R195] 通道几何的历史序列 → 压缩持续天数(新的"磨底磨了多久")与
+        # 在轨外连续天数(区分"突破"与"站稳")。O(n) 前缀和, 不新增取数。
+        # 取不到 atr_14 就整块缺席 —— 半截数据推不出压缩指数。
+        if has_atr and len(closes) >= WINDOW_LONG:
+            try:
+                rows = kg.series([float(c) for c in closes],
+                                 [None if a is None else float(a) for a in sub["atr_14"].to_list()])
+                if rows:
+                    ent["runs"] = kg.runs(rows)
+            except Exception as e:  # noqa: BLE001
+                logger.debug("channel runs skipped for %s: %s", name, e)
         if with_closes:
             # 趋势模板要自己按 50/150/200 滚均线、按 250 根取 52 周高低,
             # 所以给序列而不是给几个算好的数 —— 口径归 trend_template 一处管。
@@ -138,7 +157,10 @@ def channels_for_symbols(repo, symbols: list[str]) -> dict[str, dict]:
         return {}
 
     need_long = any(b[1] is None for b in BANDS)
-    ma120 = _ma120_map(repo, [str(r["symbol"]).upper() for r in rows]) if need_long else {}
+    # [R195] 直接用整份 long_trend_map 而不是它的 ma120 投影 —— 同一次批量读里
+    # 已经把通道几何的历史序列(runs)算好了, 丢掉再算一遍没道理。
+    long_map = long_trend_map(repo, [str(r["symbol"]).upper() for r in rows]) if need_long else {}
+    ma120 = {k_: v["ma120"] for k_, v in long_map.items() if v.get("ma120") is not None}
 
     out: dict[str, dict] = {}
     for r in rows:
@@ -154,5 +176,14 @@ def channels_for_symbols(repo, symbols: list[str]) -> dict[str, dict]:
             # [R44] 三档组合的结论跟着一起返回 —— 界面不必自己再拼一遍规则,
             # 也保证决策台、今日总览、悬停提示说的是同一句话
             v = verdict(bands)
-            out[sym] = dict(bands, verdict=v) if v else bands
+            row = dict(bands, verdict=v) if v else dict(bands)
+            # [R195] 几何量(速度/加速度/压缩/排列)。**零新增取数** —— 全部从
+            # 已经算好的三档上下轨反推(轨 = MA ± k·ATR 是恒等式)。
+            geo = kg.geometry(bands, close)
+            if geo:
+                row["geo"] = geo
+            runs = (long_map.get(sym) or {}).get("runs")
+            if runs:
+                row["runs"] = runs
+            out[sym] = row
     return out

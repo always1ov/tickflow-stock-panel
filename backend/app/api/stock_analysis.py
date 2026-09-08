@@ -384,8 +384,34 @@ def get_urgency(request: Request, symbols: str = Query(..., description="逗号�
     exits = _safe(lambda: position_exit.exit_lines_for_positions(repo), "exit lines", {})
     positions = _safe(effective_positions.load_all, "positions", {})
 
+    # [R195] 通道事件在这里合成 —— **这个端点已经同时拿着六态与三档通道了**,
+    # 零额外取数。放这儿而不是 /keltner, 是因为事件必须三样齐全才判得出:
+    #
+    #     位置(通道三档) × 方向(六态) × 确认(在轨外连续几天)
+    #
+    # 缺任何一个都答不了「破上轨算站稳了, 还是算突破, 还是主升浪」——
+    # 这三个问题问的是三个不同的维度, 而通道只回答其中一个。
+    #
+    # **底层的三档判定一个字没动**, 这里只是读它。
+    from app.indicators import keltner_geometry as kg
+    events: dict[str, dict] = {}
+    for sym in syms:
+        kc = keltner.get(sym) or {}
+        if not kc.get("geo"):
+            continue
+        t = trends.get(sym) or {}
+        try:
+            ev = kg.event(state=t.get("state"), duration=t.get("duration"),
+                          geo=kc.get("geo"), run=kc.get("runs"))
+            note = kg.combo_note(kc)
+            if note:
+                ev = dict(ev, combo_note=note)
+            events[sym] = ev
+        except Exception as e:  # noqa: BLE001
+            logger.debug("channel event skipped for %s: %s", sym, e)
     return {"urgency": watchlist_urgency.assess_many(
-        syms, positions=positions, trends=trends, exit_lines=exits, keltner=keltner)}
+        syms, positions=positions, trends=trends, exit_lines=exits, keltner=keltner),
+        "event": events}
 
 
 @router.get("/review")
