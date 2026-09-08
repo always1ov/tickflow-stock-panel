@@ -14,8 +14,9 @@ import { storage } from '@/lib/storage'
 import { buildBoardHtml } from '@/lib/decisionBoardHtmlExport'
 import { DEFAULT_EXPORT_KEYS } from '@/lib/decisionBoardExportColumns'
 import { ExportColumnsDialog } from '@/components/stock-analysis/decision-board/ExportColumnsDialog'
-import { KeltnerCell, NUM, TD_BASE, UrgencyCell, VerdictCell } from '@/components/stock-analysis/decision-board/cells'
+import { ChannelStackCell, NUM, TD_BASE, UrgencyLine, VerdictCell } from '@/components/stock-analysis/decision-board/cells'
 import { LotsLink } from '@/components/stock-analysis/decision-board/LotsLink'
+import { GlossaryButton } from '@/components/stock-analysis/decision-board/GlossaryDialog'
 // [R169] 合并视图(手填 ⊕ 上游批次登记), 字段说明见 api.ts 的 EffectivePosition
 type Position = EffectivePosition
 type WatchPoint = { direction: 'up' | 'down'; price: number; label?: string; action?: string; reason?: string }
@@ -37,8 +38,9 @@ const SIGNAL_RANK: Record<string, number> = { buy: 0, sell: 1, hold: 2, watch: 3
  * **顺序必须与 thead 里的 <th> 一一对应。**
  */
 const BOARD_COLS = [
-  { label: '该动', w: '7%' },        // R193 起放两行说明
-  { label: '标的', w: '8%' },
+  // [R198] 「该动」不再单独占一列 —— 它挪进了标的格的第二行。判定本身没变,
+  // 只是从"另一列"变成"这只票名字底下的一句话", 扫表时不用左右对眼。
+  { label: '标的', w: '11%' },       // 名字 + 该动两行
   { label: '现价', w: '3.5%' },
   { label: '涨跌', w: '3.5%' },
   { label: '仓位', w: '3%' },
@@ -46,9 +48,9 @@ const BOARD_COLS = [
   { label: '浮盈', w: '3.5%' },
   { label: '止盈线', w: '5%' },      // 两行
   { label: '趋势', w: '6%' },
-  { label: '短通道', w: '4%' },
-  { label: '中通道', w: '4%' },
-  { label: '长通道', w: '4%' },
+  // [R198] 短/中/长三档合成一列, 换行竖排。它们本来就是同一个指标的三次采样
+  // (共用同一个 ATR 分母), 拆成三列是把一件事摊成三份看。
+  { label: '量化通道', w: '7%' },
   { label: '结论', w: '6%' },
   { label: '置信', w: '3%' },
   { label: 'AI 分析', w: '7%' },     // R130 上下两行: 报告胶囊 / ✨分析 + 🔔提醒
@@ -482,6 +484,8 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
           <Wallet className="h-3.5 w-3.5 text-sky-400" />
           <span className="text-xs font-medium text-foreground">自选决策台</span>
           <span className="text-[10px] text-muted">{rows.length} 只 · 持有 {heldCount}</span>
+          {/* [R198] 角上的感叹号 —— 点开只讲这些词怎么读, 不讲怎么算出来的 */}
+          <GlossaryButton />
         </span>
         <button
           onClick={() => setActionableOnly((v) => !v)}
@@ -576,23 +580,33 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
             </colgroup>
             <thead className="sticky top-0 bg-surface/95 backdrop-blur text-[10px] text-muted">
               <tr className="text-left">
-                <th className="whitespace-nowrap px-2 py-2.5 font-normal text-left"><button onClick={() => toggleSort('urgency')} className={thBtn} title="该动了: 已触发 > 逼近 > 刚变盘 > 到轨 > 无事。同档内按离触发多近排。纯规则判定, AI 不参与 —— 它只解释, 不决定你先看谁">该动{caret('urgency')}</button></th>
-                <th className="whitespace-nowrap px-4 py-2.5 font-normal"><button onClick={() => toggleSort('name')} className={thBtn}>标的{caret('name')}</button></th>
-                <th className="whitespace-nowrap px-2 py-2.5 font-normal text-right"><button onClick={() => toggleSort('close')} className={thBtn}>现价{caret('close')}</button></th>
-                <th className="whitespace-nowrap px-2 py-2.5 font-normal text-right"><button onClick={() => toggleSort('changePct')} className={thBtn}>涨跌{caret('changePct')}</button></th>
+                <th className="whitespace-nowrap px-3 py-2.5 font-normal text-center"><button onClick={() => toggleSort('name')} className={thBtn} title="标的名称;第二行是「该动了」判定 —— 已触发 > 逼近 > 刚变盘 > 到轨 > 无事,纯规则,AI 不参与">标的{caret('name')}</button></th>
+                <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center"><button onClick={() => toggleSort('close')} className={thBtn}>现价{caret('close')}</button></th>
+                <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center"><button onClick={() => toggleSort('changePct')} className={thBtn}>涨跌{caret('changePct')}</button></th>
                 <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center"><button onClick={() => toggleSort('held')} className={thBtn}>仓位{caret('held')}</button></th>
-                <th className="whitespace-nowrap px-2 py-2.5 font-normal text-right"><button onClick={() => toggleSort('cost')} className={thBtn} title="持仓成本价(仅持有且填了成本的票有)">成本{caret('cost')}</button></th>
-                <th className="whitespace-nowrap px-2 py-2.5 font-normal text-right"><button onClick={() => toggleSort('pnl')} className={thBtn}>浮盈{caret('pnl')}</button></th>
-                <th className="whitespace-nowrap px-2 py-2.5 font-normal text-right"><button onClick={() => toggleSort('exit')} className={thBtn} title="ATR 三阶段出场线(止损/保本/移动止盈),仅持有+填成本的票有;跌破自动推送。按「离触发还有多远」排序 —— 线价本身不同票差几十倍没有可比性">止盈线{caret('exit')}</button></th>
+                <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center"><button onClick={() => toggleSort('cost')} className={thBtn} title="持仓成本价(仅持有且填了成本的票有)">成本{caret('cost')}</button></th>
+                <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center"><button onClick={() => toggleSort('pnl')} className={thBtn}>浮盈{caret('pnl')}</button></th>
+                <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center"><button onClick={() => toggleSort('exit')} className={thBtn} title="ATR 三阶段出场线(止损/保本/移动止盈),仅持有+填成本的票有;跌破自动推送。按「离触发还有多远」排序 —— 线价本身不同票差几十倍没有可比性">止盈线{caret('exit')}</button></th>
                 <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center"><button onClick={() => toggleSort('trend')} className={thBtn} title="六态趋势(利弗莫尔,日线收盘价判定):多头在前">趋势{caret('trend')}</button></th>
                 {/* [R42] Keltner 三档: 一眼看出这只票贴着哪条轨。收盘口径, 与个股分析图表同一组公式 */}
-                <th className="whitespace-nowrap px-1.5 py-2.5 font-normal text-center"><button onClick={() => toggleSort('ks')} className={thBtn} title="短期通道 = MA20 ± 2×ATR(约一个月)。按通道内位置排序:升序=最贴下轨的在前(低吸候选), 降序=最贴上轨的在前(高抛候选)">短通道{caret('ks')}</button></th>
-                <th className="whitespace-nowrap px-1.5 py-2.5 font-normal text-center"><button onClick={() => toggleSort('km')} className={thBtn} title="中期通道 = MA60 ± 2.5×ATR(一个季度)。按通道内位置排序">中通道{caret('km')}</button></th>
-                <th className="whitespace-nowrap px-1.5 py-2.5 font-normal text-center"><button onClick={() => toggleSort('kl')} className={thBtn} title="长期通道 = MA120 ± 3×ATR(半年,牛熊边界)。按通道内位置排序">长通道{caret('kl')}</button></th>
+                {/* [R198] 三档合一。排序键仍是三个 —— 点表头在 短→中→长 之间轮换,
+                    再点同一个翻方向。合并的是显示不是能力。 */}
+                <th className="whitespace-nowrap px-1.5 py-2.5 font-normal text-center">
+                  <button
+                    onClick={() => toggleSort(sort.key === 'ks' ? 'km' : sort.key === 'km' ? 'kl' : 'ks')}
+                    className={thBtn}
+                    title={'量化波动通道 —— 同一个指标在短/中/长三个尺度上的读数, 竖排三行。\n'
+                      + '点这里在 短 → 中 → 长 之间轮换排序目标, 再点同一个翻方向。'}
+                  >
+                    量化通道
+                    {(['ks', 'km', 'kl'] as const).includes(sort.key as 'ks')
+                      && <span className="ml-1 text-accent">{{ ks: '短', km: '中', kl: '长' }[sort.key as 'ks' | 'km' | 'kl']}{caret(sort.key)}</span>}
+                  </button>
+                </th>
                 <th className="whitespace-nowrap px-1.5 py-2.5 font-normal text-center"><button onClick={() => toggleSort('verdict')} className={thBtn} title="三档组合的结论。排序把「该减的」和「该吸的」分到两头:降序=偏卖在前, 升序=偏买在前">结论{caret('verdict')}</button></th>
-                <th className="whitespace-nowrap px-2 py-2.5 font-normal text-right"><button onClick={() => toggleSort('confidence')} className={thBtn}>置信{caret('confidence')}</button></th>
+                <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center"><button onClick={() => toggleSort('confidence')} className={thBtn}>置信{caret('confidence')}</button></th>
                 <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center"><button onClick={() => toggleSort('report')} className={thBtn} title="最近一份 AI 分析报告(点击胶囊打开) · ✨生成/更新分析 · 🔔点位提醒">AI 分析{caret('report')}</button></th>
-                <th className="whitespace-nowrap px-4 py-2.5 font-normal text-left"><button onClick={() => toggleSort('signal')} className={thBtn}>AI 信号{caret('signal')}</button></th>
+                <th className="whitespace-nowrap px-4 py-2.5 font-normal text-center"><button onClick={() => toggleSort('signal')} className={thBtn}>AI 信号{caret('signal')}</button></th>
               </tr>
             </thead>
             <tbody>
@@ -617,21 +631,22 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
                     {/* 点标的即切换分析(免搜索) */}
                     {/* [R157b] 当前个股整行常驻高亮 + 左侧一道靛蓝边: 搜索后先弹出关键价位
                         弹窗, 闪烁那 1.8 秒多半被弹窗盖住, 关掉弹窗还得一眼认得出它在哪 */}
-                    <UrgencyCell u={r.urg} />
-                    <td className={`${TD_BASE} whitespace-nowrap px-4 border-l-2 ${active ? 'border-l-accent' : 'border-l-transparent'}`}>
-                      {/* min-h 给整行一个下限: AI 信号列 1 行和 3 行的行高原来差一倍,
-                          一屏扫下来参差得厉害。定住下限后只剩"多出来的那几行"的差异。
-                          [R194] items-center → items-start: 整表改顶对齐之后, 这里再
-                          居中的话, 标的名会在 2.25rem 的框里往下沉半行, 与同一行
-                          其余列的第一行文字错开 —— 那正是最刺眼的一种不齐。 */}
-                      <button onClick={() => (onPreview ?? onSelect)(r.symbol, r.name)} className="flex min-h-[2.25rem] items-start gap-1.5 text-left cursor-pointer group">
-                        {active && <Star className="h-2.5 w-2.5 text-accent shrink-0" />}
-                        <span className="font-medium text-foreground group-hover:text-sky-300 transition-colors truncate max-w-[110px]">{r.name}</span>
-                        <span className="text-[9px] font-mono text-muted">{r.symbol}</span>
+                    {/* [R198] 「该动了」从独立一列挪进标的格的第二行。判定一个字
+                        没改, 只是从"另一列"变成"这只票名字底下的一句话" ——
+                        自选一多, 左右对眼比上下读一行累得多。 */}
+                    <td className={`${TD_BASE} px-3 text-center border-l-2 ${active ? 'border-l-accent' : 'border-l-transparent'}`}>
+                      <button onClick={() => (onPreview ?? onSelect)(r.symbol, r.name)}
+                              className="mx-auto flex min-h-[2.25rem] flex-col items-center justify-center gap-0.5 text-center cursor-pointer group">
+                        <span className="flex items-center gap-1.5">
+                          {active && <Star className="h-2.5 w-2.5 shrink-0 text-accent" />}
+                          <span className="max-w-[110px] truncate font-medium text-foreground transition-colors group-hover:text-sky-300">{r.name}</span>
+                          <span className={`${NUM} text-[9px] text-muted`}>{r.symbol}</span>
+                        </span>
                       </button>
+                      <UrgencyLine u={r.urg} />
                     </td>
-                    <td className={`${TD_BASE} ${NUM} whitespace-nowrap px-2 text-right text-foreground`}>{r.close != null ? r.close.toFixed(2) : '—'}</td>
-                    <td className={`${TD_BASE} ${NUM} whitespace-nowrap px-2 text-right ${up ? 'text-red-400' : down ? 'text-emerald-400' : 'text-muted'}`}>
+                    <td className={`${TD_BASE} ${NUM} whitespace-nowrap px-2 text-foreground`}>{r.close != null ? r.close.toFixed(2) : '—'}</td>
+                    <td className={`${TD_BASE} ${NUM} whitespace-nowrap px-2 ${up ? 'text-red-400' : down ? 'text-emerald-400' : 'text-muted'}`}>
                       {r.changePct != null ? `${(r.changePct * 100).toFixed(2)}%` : '—'}
                     </td>
                     {/* 仓位:持有/空仓 切换。
@@ -654,7 +669,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
                         [R169] 成本框只装**手填值**: 批次页登记过而这里没填的, 走
                         placeholder 显示批次加权均价(带「批」字), 一眼能分清"我填的"
                         和"批次算的"。想改成自己的口径就直接往里敲, 敲了即变手填。 */}
-                    <td className={`${TD_BASE} whitespace-nowrap px-2 text-right`}>
+                    <td className={`${TD_BASE} whitespace-nowrap px-2`}>
                       {r.held ? (
                         <span className="inline-flex items-center gap-1">
                           <input
@@ -694,11 +709,11 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
                       )}
                     </td>
                     {/* 浮盈 */}
-                    <td className={`${TD_BASE} ${NUM} whitespace-nowrap px-2 text-right ${r.pnl == null ? 'text-muted' : r.pnl > 0 ? 'text-red-400' : r.pnl < 0 ? 'text-emerald-400' : 'text-muted'}`}>
+                    <td className={`${TD_BASE} ${NUM} whitespace-nowrap px-2 ${r.pnl == null ? 'text-muted' : r.pnl > 0 ? 'text-red-400' : r.pnl < 0 ? 'text-emerald-400' : 'text-muted'}`}>
                       {r.pnl != null ? `${(r.pnl * 100).toFixed(1)}%` : '—'}
                     </td>
                     {/* [fork 增强] 持仓出场线:当前生效线位 + 距离; 逼近变琥珀, 跌破变红 */}
-                    <td className={`${TD_BASE} whitespace-nowrap px-2 text-right`}>
+                    <td className={`${TD_BASE} whitespace-nowrap px-2`}>
                       {r.exit ? (
                         <span
                           className={`inline-flex flex-col items-end text-[10px] ${NUM} leading-tight ${
@@ -750,13 +765,11 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
                       )}
                     </td>
                     {/* [R42] Keltner 三档位置 */}
-                    <KeltnerCell band={r.kc?.s} close={r.close} />
-                    <KeltnerCell band={r.kc?.m} close={r.close} />
-                    <KeltnerCell band={r.kc?.l} close={r.close} />
+                    <ChannelStackCell kc={r.kc} close={r.close} />
                     <VerdictCell v={r.kc?.verdict} ev={r.ev} geo={r.kc?.geo} runs={r.kc?.runs} energy={r.kc?.energy}
                                  onOpen={() => setReview({ symbol: r.symbol, name: r.name, tab: 'verdict' })} />
                     {/* 置信度(独立列, 可排序) */}
-                    <td className={`${TD_BASE} ${NUM} whitespace-nowrap px-2 text-right text-muted`}>
+                    <td className={`${TD_BASE} ${NUM} whitespace-nowrap px-2 text-muted`}>
                       {r.sig ? `${r.sig.confidence}%` : '—'}
                     </td>
                     {/* [R106] AI 分析列: 报告胶囊(点开最近报告) + ✨生成/更新分析 + 🔔点位提醒

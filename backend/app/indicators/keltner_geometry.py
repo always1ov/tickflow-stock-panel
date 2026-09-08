@@ -727,3 +727,91 @@ def band_energy(closes: list[float] | None, atrs: list[float] | None,
         "dominant_cn": {"s": "高频(消息驱动)", "m": "中频(行情主体)",
                         "l": "低频(老趋势)"}[dom],
     }
+
+
+# ================================================================
+# [R199] 阶段判定 —— 把几何量变成"现在处在哪一段"
+#
+# 用户: 「通道结论这部分也思考一下, 如何排版和内容的显示才能更有价值,
+#        而不是展示单纯的数据, 对我有指导性意义」。
+#
+# 压缩度、分离度、加速度**单看每一个都答不了"我该怎么办"**: 压缩 0.9 是好是坏?
+# 分离度 2.4 呢? 要三个一起读才有意义 —— 而"一起读"这件事恰恰是可以算的。
+#
+# 一条趋势的生命周期在这三个量上有固定的次序:
+#
+#     粘合(压缩高) → 脱开(压缩掉) → 分离扩大 → 分离到头 → 再粘合
+#     加速度:  ≈0        转正         正         转负
+#
+# 所以三个量的**组合**就是阶段坐标。这一层只回答"在哪一段", 不回答"买不买" ——
+# 后者要配上六态方向与把握分, 那是别人的活。
+
+PH_COILING = "coiling"          # 蓄势待变
+PH_LAUNCHING = "launching"      # 启动初期
+PH_ADVANCING = "advancing"      # 趋势推进
+PH_STALLING = "stalling"        # 末段钝化
+PH_OVEREXTENDED = "overextended"  # 极端拉伸
+PH_DECLINING = "declining"      # 下行途中
+PH_UNCLEAR = "unclear"          # 说不清
+
+PHASE_CN = {
+    PH_COILING: "蓄势待变", PH_LAUNCHING: "启动初期", PH_ADVANCING: "趋势推进",
+    PH_STALLING: "末段钝化", PH_OVEREXTENDED: "极端拉伸",
+    PH_DECLINING: "下行途中", PH_UNCLEAR: "说不清",
+}
+
+# 分离度的两个刻度: 越过 LAUNCH 算真的脱开了, 越过 MATURE 算走了一大段。
+# 与 opportunity_score 的 SPREAD_CURVE 甜区(1.5~3)对齐, 不另立一套。
+SPREAD_LAUNCH = 1.0
+SPREAD_MATURE = 3.0
+
+
+def phase(geo: dict | None, runs: dict | None = None) -> dict | None:
+    """三个几何量 → 阶段 + 一句该注意什么。纯函数。
+
+    返回 {code, cn, why, watch}。`watch` 是"这一段该盯什么", 不是买卖指令 ——
+    同一个阶段对持仓和对空仓要做的事不同, 那要配上仓位才说得了。
+    """
+    if not geo:
+        return None
+    sp = geo.get("spread")
+    a1 = (geo.get("accel") or {}).get("a1")
+    o = geo.get("compress")
+    cd = (runs or {}).get("compress_days") or 0
+    if sp is None:
+        return None
+    up = a1 is not None and a1 > ACCEL_FLAT
+    down = a1 is not None and a1 < -ACCEL_FLAT
+
+    def mk(code, why, watch):
+        return {"code": code, "cn": PHASE_CN[code], "why": why, "watch": watch}
+
+    if geo.get("torn"):
+        return mk(PH_OVEREXTENDED,
+                  f"三个尺度已经拉开到没有共同价格区间(相隔 {abs(sp):.1f}) —— 这一段走得极长",
+                  "这个位置争论贵不贵没有意义, 先说清楚你按哪个尺度做; 追高的性价比很低")
+    if sp <= -SPREAD_LAUNCH:
+        return mk(PH_DECLINING,
+                  f"三个尺度往下拉开(分离度 {sp:.1f}), 方向朝下",
+                  "别用「触到下沿就企稳」抄底 —— 下沿会跟着一路下移")
+    if geo.get("nested") or (o is not None and o >= COMPRESS_TIGHT):
+        extra = f", 已经这样 {cd} 天" if cd else ""
+        return mk(PH_COILING,
+                  f"三个尺度对合理价几乎没有分歧{extra} —— 方向还没出来",
+                  "盯着往哪边先脱开; 这种状态通常不会持续太久, 但猜方向没有胜算")
+    if sp < SPREAD_LAUNCH:
+        return mk(PH_LAUNCHING if up else PH_UNCLEAR,
+                  f"刚从粘合里脱开(分离度 {sp:.1f})" + ("且在加速" if up else ", 但还没有加速"),
+                  "这是分离刚开始的那一段, 走得成不成要看接下来能不能持续拉开"
+                  if up else "脱开了但没有动能跟上, 容易缩回去")
+    if sp >= SPREAD_MATURE and down:
+        return mk(PH_STALLING,
+                  f"已经拉开 {sp:.1f} 而最近在减速 —— 推动力在退",
+                  "趋势还没坏, 但该开始想退出计划而不是加仓")
+    if down:
+        return mk(PH_STALLING,
+                  f"分离度 {sp:.1f}, 最近在减速",
+                  "动能在退, 别在这时候加仓")
+    return mk(PH_ADVANCING,
+              f"三个尺度稳定往上拉开(分离度 {sp:.1f})" + ("且仍在加速" if up else ", 速度平稳"),
+              "这一段是趋势的主体; 真正要盯的是加速度什么时候转负")

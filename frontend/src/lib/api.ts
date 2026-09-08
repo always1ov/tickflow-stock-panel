@@ -702,6 +702,27 @@ export interface StockReview {
   } | null
   /** [R188] 红绿节拍与磨底时长 —— 「这只票磨底磨了多久」 */
   rhythm?: TrendRhythm | null
+  /** [R198] 量化波动通道的几何层 —— 复盘是唯一有地方把它摊开的位置 */
+  channel?: {
+    geo: ChannelGeometry
+    runs: ChannelRuns
+    energy: BandEnergy | null
+    event: ChannelEvent
+    /** [R199] 阶段判定 —— 三个几何量单看都答不了「我该怎么办」, 合起来才回答
+     *  「现在处在哪一段」。watch 是这一段该盯什么, 不是买卖指令。 */
+    phase: { code: string; cn: string; why: string; watch: string } | null
+    explain: string[]
+  } | null
+  /** [R199] 偏买档 vs 偏卖档的分离度 —— 「位置结论在这只票上灵不灵」。
+   *  与趋势那栏的 side_edge 完全平行。 */
+  verdict_edge?: {
+    level: 'both' | 'offense' | 'defense' | 'flat' | 'inverted' | 'thin'
+    label: string
+    text: string
+    spread: number | null
+    buy: { episodes: number; avg_fwd: number | null; win: number }
+    sell: { episodes: number; avg_fwd: number | null; win: number }
+  } | null
   /** 新 → 旧 */
   rows: ReviewRow[]
 }

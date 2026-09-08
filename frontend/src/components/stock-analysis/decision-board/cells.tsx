@@ -16,11 +16,18 @@ import { VerdictHover } from '@/components/stock-analysis/VerdictHover'
  * (现价/涨跌/浮盈/置信)就飘到了行的**垂直中间**, 而多行的那几列贴着顶,
  * 一屏扫下来没有任何一条共同的基线。
  *
- * 选 `align-top` 而不是 `align-middle`: 这张表有三列天然多行(该动 / AI 分析 /
- * AI 信号), 居中会让"这一行从哪儿开始读"每行都不一样。顶对齐之后,
- * **每一行的所有列都从同一条线起笔** —— 这才是"每一列每一行都整齐对齐"。
+ * [R198] 由 `align-top` 改成 `align-middle text-center` —— 用户: 「内容都要
+ * 居中对齐每一行每一列」。
+ *
+ * R194 当时选顶对齐, 是因为那时只有三列天然多行、行高差得远, 居中会让
+ * "这一行从哪儿开始读"每行都不一样。R198 把「该动」并进标的、三档并成一列
+ * 之后, **多行的格子反而每行都有且行数接近**, 居中于是成了更稳的选择:
+ * 每一格都落在自己那一行的正中。
+ *
+ * 水平方向一并统一成居中并写进这个常量, 于是表头与单元格天然对齐 ——
+ * R194 那种"逐列核对表头与单元格是否同向"的活儿从此不存在。
  */
-export const TD_BASE = 'align-top py-2'
+export const TD_BASE = 'align-middle py-2 text-center'
 
 /**
  * 数字列的统一写法。`tabular-nums` 是**列对齐的关键**: 没有它, 比例字形下
@@ -46,25 +53,47 @@ const KELTNER_CLS: Record<KeltnerBand['pos'], string> = {
  * 以及"还差几个 ATR 到轨" —— 只给一个标签等于让用户盲信一个没法复核的判断。
  * 该档算不出来(新股不够 120 根 / 均线列缺失)时显示 "—", 不编一个数出来。
  */
-export function KeltnerCell({ band, close }: { band?: KeltnerBand; close: number | null }) {
-  if (!band) {
-    return <td className={`${TD_BASE} whitespace-nowrap px-1.5 text-center`}><span className="text-[10px] text-muted/40">—</span></td>
-  }
-  const pct = Math.round(band.pct * 100)
+/**
+ * [R198] 三档竖排成一格。短/中/长本来就是**同一个指标在三个尺度上的读数**
+ * (共用同一个 ATR 分母), 拆成三列是把一件事摊成三份看; 合成一格之后每行三条,
+ * 上下一对比就知道三个尺度是不是同向 —— 那正是这套指标最该被读出来的东西。
+ *
+ * 原来的 `KeltnerCell`(单档一列)随之删掉, 没有留下没人调的死代码。
+ * 悬停照旧给真实的上下轨价、通道内位置、还差几个 ATR 到轨 —— 只给一个标签
+ * 等于让用户盲信一个没法复核的判断。该档算不出来时显示 "—", 不编一个数出来。
+ */
+export function ChannelStackCell({ kc, close }: {
+  kc?: { s?: KeltnerBand; m?: KeltnerBand; l?: KeltnerBand } | null
+  close?: number | null
+}) {
+  const rows: [string, KeltnerBand | undefined][] = [
+    ['短', kc?.s], ['中', kc?.m], ['长', kc?.l],
+  ]
   return (
-    <td className={`${TD_BASE} whitespace-nowrap px-1.5 text-center`}>
-      <span
-        className={`inline-flex whitespace-nowrap rounded border px-1 py-0.5 text-[10px] ${KELTNER_CLS[band.pos]}`}
-        title={
-          `${band.band_cn}通道 ${band.lower.toFixed(2)} ~ ${band.upper.toFixed(2)}` +
-          `${close != null ? `,收盘 ${close.toFixed(2)}` : ''}\n` +
-          `通道内位置 ${pct}%(0% 贴下轨 / 100% 贴上轨)\n` +
-          `距上轨 ${band.to_upper_atr ?? '—'} 个 ATR · 距下轨 ${band.to_lower_atr ?? '—'} 个 ATR\n` +
-          `${band.hint}\n收盘口径 —— 通道要用 ATR 与均线, 实时价比昨天的通道会半新半旧`
-        }
-      >
-        {band.pos_cn}
-      </span>
+    <td className={`${TD_BASE} whitespace-nowrap px-1.5`}>
+      <div className="inline-flex flex-col items-center gap-0.5">
+        {rows.map(([tag, band]) => (
+          <span key={tag} className="flex items-center gap-1">
+            <span className="w-3 text-[9px] text-muted/60">{tag}</span>
+            {band
+              ? (
+                <span
+                  className={`inline-flex whitespace-nowrap rounded border px-1 py-0.5 text-[10px] ${KELTNER_CLS[band.pos]}`}
+                  title={
+                    `${band.band_cn}通道 ${band.lower.toFixed(2)} ~ ${band.upper.toFixed(2)}`
+                    + `${close != null ? `,收盘 ${close.toFixed(2)}` : ''}\n`
+                    + `通道内位置 ${Math.round(band.pct * 100)}%(0% 贴下轨 / 100% 贴上轨)\n`
+                    + `距上轨 ${band.to_upper_atr ?? '—'} 个 ATR · 距下轨 ${band.to_lower_atr ?? '—'} 个 ATR\n`
+                    + `${band.hint}\n收盘口径 —— 通道要用 ATR 与均线, 实时价比昨天的通道会半新半旧`
+                  }
+                >
+                  {band.pos_cn}
+                </span>
+              )
+              : <span className="text-[10px] text-muted/30">—</span>}
+          </span>
+        ))}
+      </div>
     </td>
   )
 }
@@ -155,7 +184,7 @@ export function VerdictCell({ v, ev, geo, runs, energy, onOpen }: {
   ) : null
   if (!v) {
     return (
-      <td className={`${TD_BASE} whitespace-nowrap px-1.5 text-center`}>
+      <td className={`${TD_BASE} whitespace-nowrap px-1.5`}>
         <button
           onClick={onOpen}
           className="cursor-pointer text-[10px] text-muted/40 hover:text-sky-300"
@@ -169,7 +198,7 @@ export function VerdictCell({ v, ev, geo, runs, energy, onOpen }: {
     )
   }
   return (
-    <td className={`${TD_BASE} whitespace-nowrap px-1.5 text-center`}>
+    <td className={`${TD_BASE} whitespace-nowrap px-1.5`}>
       <VerdictHover v={v} note={"点击摊开这只票过去每一档结论 —— 出现在哪几天、当时说了什么、之后走成什么样。"
         + geoLines(geo, ev, runs, energy)}>
         <button
@@ -231,44 +260,35 @@ const SIDE_CLS: Record<string, string> = {
  * 今天真没事。每一档背后都是一条写死的规则(见 services/watchlist_urgency.py),
  * 这里显示的是后端给的原话, 前端不自己编。
  */
-export function UrgencyCell({ u }: { u?: Urgency }) {
-  if (!u) return <td className={`${TD_BASE} px-2 text-muted/30`}>—</td>
-  if (u.level === 'idle') {
-    return (
-      <td className={`${TD_BASE} px-2`}>
-        <span className="text-[10px] text-muted/30" title={u.reason}>无事</span>
-      </td>
-    )
-  }
-  const showDist = u.distance != null
+/**
+ * [R198] 「该动了」由**独立一列**改成挂在标的名字下面的一行。
+ *
+ * 判定一个字没改(见 services/watchlist_urgency.py), 换的只是位置: 自选一多,
+ * 左右对眼比上下读一行累得多 —— 「这只票该动」和「这只票叫什么」本来就该
+ * 挨在一起。R193 那条纪律照旧: **方向要直接写出来**, 不能只给一个档位 ——
+ * 同样是「逼近」, 可能是"再跌一点破止损"也可能是"再涨一点转强", 两个相反的
+ * 动作不标方向就长得一模一样。
+ */
+export function UrgencyLine({ u }: { u?: Urgency }) {
+  if (!u || u.level === 'idle') return null
   const side = u.side ?? 'info'
   return (
-    <td className={`${TD_BASE} px-2`} title={u.reason}>
-      <div className="flex flex-col items-start gap-0.5">
-        <div className="flex items-center gap-1">
-          <span className={`inline-flex items-center gap-1 whitespace-nowrap rounded border px-1.5 py-0.5 text-[10px] ${URGENCY_CLS[u.level]}`}>
-            {u.label}
-            {showDist && (
-              <span className={`${NUM} opacity-70`}>{(u.distance! * 100).toFixed(1)}%</span>
-            )}
-          </span>
-          {/* 方向单独一块。**这一格是整列的重点** —— 没有它, 「逼近」两个字
-              在该卖的票和该买的票上完全一样 */}
-          {u.side_cn && (
-            <span className={`inline-flex shrink-0 rounded border px-1 py-0.5 text-[10px] font-medium ${SIDE_CLS[side]}`}>
-              {u.side_cn}
-            </span>
+    <div className="mt-0.5 flex flex-col items-center gap-0.5" title={u.reason}>
+      <span className="flex items-center gap-1">
+        <span className={`inline-flex items-center gap-1 whitespace-nowrap rounded border px-1.5 py-0.5 text-[10px] ${URGENCY_CLS[u.level]}`}>
+          {u.label}
+          {u.distance != null && (
+            <span className={`${NUM} opacity-70`}>{(u.distance * 100).toFixed(1)}%</span>
           )}
-        </div>
-        {/* 哪条线、什么价、差多远 —— 带价位才能直接照着挂单 */}
-        {u.what && (
-          <span className="text-[9px] leading-tight text-secondary/90">{u.what}</span>
+        </span>
+        {!!u.side_cn && (
+          <span className={`inline-flex shrink-0 rounded border px-1 py-0.5 text-[10px] font-medium ${SIDE_CLS[side]}`}>
+            {u.side_cn}
+          </span>
         )}
-        {/* 该干什么。刻意与上一行分开: 「差多远」是事实, 「该干嘛」是建议 */}
-        {u.action && (
-          <span className="text-[9px] leading-tight text-muted/80">{u.action}</span>
-        )}
-      </div>
-    </td>
+      </span>
+      {!!u.what && <span className="text-[9px] leading-tight text-secondary/90">{u.what}</span>}
+      {!!u.action && <span className="text-[9px] leading-tight text-muted/80">{u.action}</span>}
+    </div>
   )
 }

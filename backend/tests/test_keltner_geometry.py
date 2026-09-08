@@ -30,15 +30,24 @@ def _bands(close: float, ma_s: float, ma_m: float, ma_l: float, atr: float) -> d
 # ---------- ① 边界: 不许改动底层 ----------
 
 def test_只读底层不改动它():
-    """补充层不许写回三档读数, 也不许自己定义一套通道参数。"""
+    """补充层不许自己定义一套通道参数, 必须从 keltner.BANDS 取。
+
+    [R199] 原来这里还用字符串扫 `= 2.0 / 2.5 / 3.0`。那是个**太粗的代理**:
+    它撞上了阶段层的 `SPREAD_MATURE = 3.0`(那是"分离度超过 3 个 ATR 算走了
+    一大段"的门槛, 与通道倍数毫无关系)。换成精确断言 —— 直接比对常量本身,
+    并要求两个派生量真的由 K 推出来而不是写死。
+    """
     import inspect
-    src = inspect.getsource(g)
-    # 参数一律从 keltner.BANDS 取, 不复制常量
-    assert "from app.indicators.keltner import" in src
-    for magic in ("2.0", "2.5", "3.0"):
-        assert f"= {magic}" not in src, f"不该自己写死 {magic}, 应从 BANDS 取"
+    assert "from app.indicators.keltner import" in inspect.getsource(g)
+    # 倍数与窗口逐项等于底层的定义
     assert g.K == {key: n for key, _ma, _w, n, _cn in k.BANDS}
     assert g.WINDOW == {key: w for key, _ma, w, _n, _cn in k.BANDS}
+    # 两个临界必须是从 K 推出来的, 不是另写的数
+    assert g.TORN_ATR == g.K["s"] + g.K["l"]
+    assert g.NESTED_ATR == g.K["l"] - g.K["s"]
+    # 滞后天数必须与窗口一致((n−1)/2)
+    for key, w in g.WINDOW.items():
+        assert g.LAG[key] == (w - 1) / 2, key
 
 
 def test_几何层不产出买卖指令():
@@ -324,3 +333,57 @@ def test_频段能量样本不够就不给():
 
 def test_基线常量就是三段的天数跨度():
     assert g.ENERGY_REF == (g.SPAN1, g.SPAN2, g.SPAN3) == (9.5, 20.0, 30.0)
+
+
+# ---------- ⑨ [R199] 阶段判定 ----------
+
+def _geo(spread, a1, o=0.3, torn=False, nested=False):
+    return {"spread": spread, "accel": {"a1": a1}, "compress": o,
+            "torn": torn, "nested": nested}
+
+
+def test_阶段是三个量一起读出来的():
+    """**这是阶段层存在的理由**: 压缩 0.9 是好是坏? 分离度 2.4 呢? 单看每一个
+    都答不了「我该怎么办」, 三个一起才落到某一段上。"""
+    assert g.phase(_geo(0.3, 0.0, o=0.95, nested=True))["code"] == g.PH_COILING
+    assert g.phase(_geo(0.7, 0.12, o=0.6))["code"] == g.PH_LAUNCHING
+    assert g.phase(_geo(2.2, 0.08))["code"] == g.PH_ADVANCING
+    assert g.phase(_geo(3.6, -0.15))["code"] == g.PH_STALLING
+    assert g.phase(_geo(6.2, 0.1, torn=True))["code"] == g.PH_OVEREXTENDED
+    assert g.phase(_geo(-2.4, -0.1))["code"] == g.PH_DECLINING
+
+
+def test_同一个分离度加速度不同就是不同的阶段():
+    """分离度一样、加速度反号 —— 推进 vs 钝化。只看分离度会把它们混为一谈。"""
+    assert g.phase(_geo(3.5, 0.10))["code"] == g.PH_ADVANCING
+    assert g.phase(_geo(3.5, -0.10))["code"] == g.PH_STALLING
+
+
+def test_脱开了但没有动能不叫启动():
+    """刚脱开却没加速, 很容易缩回去 —— 不该给它「启动初期」这个乐观的名字。"""
+    assert g.phase(_geo(0.7, 0.0, o=0.6))["code"] == g.PH_UNCLEAR
+
+
+def test_每个阶段都说清了该盯什么():
+    for geo in (_geo(0.3, 0.0, o=0.95, nested=True), _geo(0.7, 0.12), _geo(2.2, 0.08),
+                _geo(3.6, -0.15), _geo(6.2, 0.1, torn=True), _geo(-2.4, -0.1)):
+        p = g.phase(geo)
+        assert p["why"] and p["watch"], p
+
+
+def test_阶段层不下买卖指令():
+    """与 explain 同一条纪律 —— 同一个阶段对持仓和对空仓要做的事不同。"""
+    import inspect
+    src = inspect.getsource(g.phase)
+    for bad in ("该买", "该卖", "买入", "卖出", "清仓"):
+        assert bad not in src, f"phase 不该说 {bad}"
+
+
+def test_阶段的两个刻度与打分曲线的甜区对齐():
+    """不另立一套数 —— SPREAD_CURVE 的甜区就是 1.5~3。"""
+    assert g.SPREAD_LAUNCH == 1.0 and g.SPREAD_MATURE == 3.0
+
+
+def test_阶段空输入不崩():
+    assert g.phase(None) is None
+    assert g.phase({"accel": {}}) is None

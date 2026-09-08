@@ -413,6 +413,101 @@ def _seal(limit_ups: int, broken: int) -> dict | None:
     return {"attempts": attempts, "sealed": limit_ups, "rate": round(rate, 3), "text": text}
 
 
+def _verdict_edge(outcomes: list[dict]) -> dict:
+    """[R199] 通道结论在这只票上灵不灵 —— 与 R191 给六态做的那层完全平行。
+
+    「各档结论出现后 5 日表现」原来是十来个并排的均值, 要自己在脑子里把偏买的
+    几档和偏卖的几档分别合起来再相减, 才读得出"这套结论在这只票上有没有信息"。
+    那个减法可以算, 所以就该算。
+
+    偏买侧 = tone 为 buy 的那几档; 偏卖侧 = tone 为 sell 的。**watch/hold/avoid
+    不进任何一侧** —— 它们本来就是"还不到动手"或"别碰", 不构成方向主张,
+    塞进去会把两侧都稀释掉。
+    """
+    from app.indicators.keltner import TONE_BUY, TONE_SELL
+
+    def side(tone: str) -> dict:
+        picked = [o for o in outcomes if o.get("tone") == tone and o.get("scored")]
+        n = sum(o["scored"] for o in picked)
+        if not n:
+            return {"episodes": 0, "avg_fwd": None, "win": 0}
+        tot = sum((o["avg_fwd"] or 0.0) * o["scored"] for o in picked)
+        return {"episodes": n, "avg_fwd": round(tot / n, 4),
+                "win": sum(o["win"] for o in picked)}
+
+    buy, sell = side(TONE_BUY), side(TONE_SELL)
+    out = {"buy": buy, "sell": sell, "spread": None,
+           "level": "thin", "label": "样本不够", "text": ""}
+    if buy["episodes"] < MIN_SIDE_EPISODES or sell["episodes"] < MIN_SIDE_EPISODES:
+        out["text"] = (f"偏买档 {buy['episodes']} 段、偏卖档 {sell['episodes']} 段, "
+                       f"任一侧不足 {MIN_SIDE_EPISODES} 段就不下结论 —— 把窗口拉长再看。")
+        return out
+    b, r = buy["avg_fwd"] or 0.0, sell["avg_fwd"] or 0.0
+    out["spread"] = round(b - r, 4)
+    tail = f"(偏买档 {buy['episodes']} 段平均 {b:+.1%}, 偏卖档 {sell['episodes']} 段平均 {r:+.1%})"
+    if b >= SIDE_EDGE and r <= -SIDE_EDGE:
+        out.update(level="both", label="两头都灵",
+                   text="说便宜的之后真涨、说贵的之后真跌 —— 这只票的位置结论可以照着做。" + tail)
+    elif b >= SIDE_EDGE:
+        out.update(level="offense", label="只有低吸灵",
+                   text="说便宜的之后确实涨, 但说贵的之后也没怎么跌 —— 拿它找低吸位, "
+                        "别拿它当减仓理由。" + tail)
+    elif r <= -SIDE_EDGE:
+        out.update(level="defense", label="只有高抛灵",
+                   text="说贵的之后确实跌, 但说便宜的之后并不涨 —— 拿它规避高位, "
+                        "低吸另找依据。" + tail)
+    elif b < r:
+        out.update(level="inverted", label="反着的",
+                   text="偏买档之后反而比偏卖档更差 —— 样本这么小时多半是巧合, "
+                        "但至少说明位置结论在这只票上没有正向信息。" + tail)
+    else:
+        out.update(level="flat", label="分不开",
+                   text="偏买档与偏卖档之后走势差不多 —— 在这只票上, 位置结论说明不了什么。" + tail)
+    return out
+
+
+def _channel(df: pl.DataFrame, rows: list[dict]) -> dict | None:
+    """[R198] 量化波动通道的几何 + 历史序列 + 事件。失败降级为 None。
+
+    复盘弹窗的「通道结论」栏原来只有逐段卡片, 而几何层(加速度/压缩/频段)在
+    决策台上只挤得下一格悬停。这里是唯一有地方把它们摊开的位置。
+    """
+    try:
+        from app.indicators import keltner_geometry as kg
+        if "atr_14" not in df.columns or df.is_empty() or not rows:
+            return None
+        closes = [float(c) for c in df["close"]]
+        atrs = [None if a is None else float(a) for a in df["atr_14"]]
+        series = kg.series(closes, atrs)
+        if not series:
+            return None
+        runs = kg.runs(series)
+        runs["compress_avg"] = kg.compress_avg(series)
+        last = rows[-1]
+        # 末日的三档读数走与逐日行同一条路(_bands_for_row), 保证与卡片一致
+        i = len(closes) - 1
+        ma120 = _ma120(df)
+        cols = set(df.columns)
+        def col(name):
+            return list(df[name]) if name in cols else [None] * len(closes)
+        bands = _bands_for_row(closes[i], col("ma20")[i], col("ma60")[i], ma120[i], atrs[i])
+        geo = kg.geometry(bands, closes[i]) if bands else None
+        if not geo:
+            return None
+        t = (last.get("trend") or {})
+        ev = kg.event(state=t.get("state"), duration=t.get("day"), geo=geo, run=runs)
+        note = kg.combo_note(bands)
+        return {"geo": geo, "runs": runs, "energy": kg.band_energy(closes, atrs),
+                "event": dict(ev, combo_note=note) if note else ev,
+                # [R199] 阶段判定 —— 三个几何量单看都答不了"我该怎么办",
+                # 合起来才回答"现在处在哪一段"
+                "phase": kg.phase(geo, runs),
+                "explain": kg.explain(geo)}
+    except Exception as e:  # noqa: BLE001
+        logger.debug("review channel geometry skipped: %s", e)
+        return None
+
+
 def _b(v) -> bool:
     return bool(v) if v is not None else False
 
@@ -498,7 +593,10 @@ def review_for_symbol(repo, symbol: str, days: int = DEFAULT_DAYS) -> dict:
             # 是趋势里出的, 还是下跌途中的反抽
             "limit_up_states": _limit_up_states(rows),
         },
-        "outcomes": _outcomes(rows, closes, offset),
+        "outcomes": (_oc := _outcomes(rows, closes, offset)),
+        # [R199] 与 R191 给六态做的那层平行: 偏买档 vs 偏卖档的分离度 ——
+        # 「这套位置结论在这只票上灵不灵」
+        "verdict_edge": _verdict_edge(_oc),
         # [R177] 「趋势状态」那一栏的同类统计 —— 原来那栏只有"涨停出在什么状态下",
         # 回答的是另一个问题; 这条补上"每种状态之后普遍怎么走"
         "trend_outcomes": trend_outcomes,
@@ -510,6 +608,9 @@ def review_for_symbol(repo, symbol: str, days: int = DEFAULT_DAYS) -> dict:
         # [R188] 磨底磨了多久 + 磨得好不好。用户: 「其实我是想知道一个票磨底
         # 磨了多久」—— 复盘弹窗正是看这只票历史的地方, 这个数该在这儿。
         "rhythm": _rhythm(df, thr),
+        # [R198] 量化波动通道的几何层。复盘是"看清楚"的地方 —— 决策台只给一格,
+        # 这里要把速度/加速度/压缩/频段摊开。原料就是同一份 df, 不新增取数。
+        "channel": _channel(df, rows),
         "rows": out_rows,
     }
 

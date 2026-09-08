@@ -578,14 +578,144 @@ function TrendView({ d, rows, onlyMarked, onToggleMarked }: {
 
 // ===== 结论视图: 把每天的悬停卡片摊开 =====
 
+/**
+ * [R199] 「通道结论」栏的判定层 —— 结论在前, 数据降为依据。
+ *
+ * 用户: 「如何排版和内容的显示才能更有价值, 而不是展示单纯的数据,
+ *        对我有指导性意义」。
+ *
+ * R198 我在这里摆了八个指标格 —— 那正是 R191 之前「趋势状态」栏犯过的错:
+ * **全是测量, 没有一条是结论**。压缩 0.9 是好是坏? 分离度 2.4 呢? 单看每一个
+ * 都答不了"我该怎么办"。
+ *
+ * 所以这一版分三层, 从上到下依次是:
+ *   ① 现在处在哪一段(阶段判定) + 这一段该盯什么   ← 唯一的行动指引
+ *   ② 位置结论在这只票上灵不灵(偏买档 vs 偏卖档)  ← 要不要信它
+ *   ③ 那八个数                                    ← 前两条的依据
+ */
+const PHASE_CLS: Record<string, string> = {
+  coiling: 'border-border/60 bg-elevated/40 text-secondary',
+  launching: 'border-red-400/40 bg-red-400/[0.07] text-red-300',
+  advancing: 'border-red-400/50 bg-red-400/10 text-red-300',
+  stalling: 'border-amber-400/40 bg-amber-400/[0.07] text-amber-300',
+  overextended: 'border-amber-400/50 bg-amber-400/10 text-amber-300',
+  declining: 'border-emerald-400/40 bg-emerald-400/[0.07] text-emerald-300',
+  unclear: 'border-border/60 bg-elevated/30 text-muted',
+}
+
+function PhaseCard({ ch }: { ch: NonNullable<StockReview['channel']> }) {
+  const ph = ch.phase
+  if (!ph) return null
+  return (
+    <div className={cn('mx-4 mt-4 rounded-lg border px-3 py-2.5', PHASE_CLS[ph.code] ?? PHASE_CLS.unclear)}>
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <span className="text-[10px] text-muted">现在处在</span>
+        <b className="text-[13px] font-semibold">{ph.cn}</b>
+        {ch.event.code !== 'none' && (
+          <span className="text-[10px] opacity-90">
+            {ch.event.cn}{ch.event.confirmed ? '' : '(未确认)'}
+          </span>
+        )}
+      </div>
+      <p className="mt-1 text-[10px] leading-relaxed opacity-90">{ph.why}</p>
+      <p className="mt-1 text-[10px] leading-relaxed">
+        <span className="text-muted">该盯什么:</span> {ph.watch}
+      </p>
+    </div>
+  )
+}
+
+const EDGE_CLS2: Record<string, string> = {
+  both: 'border-red-400/40 bg-red-400/[0.07] text-red-300',
+  offense: 'border-red-400/30 bg-red-400/[0.05] text-red-300/90',
+  defense: 'border-amber-400/40 bg-amber-400/[0.07] text-amber-300',
+  flat: 'border-border/60 bg-elevated/30 text-muted',
+  inverted: 'border-emerald-400/40 bg-emerald-400/[0.07] text-emerald-300',
+  thin: 'border-border/60 bg-elevated/20 text-muted',
+}
+
+function VerdictEdgeCard({ e, forwardDays }: {
+  e: NonNullable<StockReview['verdict_edge']>; forwardDays: number
+}) {
+  return (
+    <div className={cn('mx-4 mt-3 rounded-lg border px-3 py-2.5', EDGE_CLS2[e.level] ?? EDGE_CLS2.flat)}>
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <span className="text-[10px] text-muted">位置结论在这只票上</span>
+        <b className="text-[13px] font-semibold">{e.label}</b>
+        {e.spread != null && (
+          <span className="font-mono text-[10px] opacity-80" title="偏买档平均 − 偏卖档平均。差得越开, 位置结论越有信息量">
+            分离度 {(e.spread * 100).toFixed(1)} 个点
+          </span>
+        )}
+        {e.level !== 'thin' && (
+          <span className="ml-auto flex flex-wrap gap-x-3 text-[10px]">
+            {([['偏买档', e.buy], ['偏卖档', e.sell]] as const).map(([n, v]) => (
+              <span key={n} title={`${v.episodes} 段已够 ${forwardDays} 个交易日, 其中 ${v.win} 段收涨`}>
+                <span className="text-muted">{n}</span>
+                <b className={cn('ml-1 font-mono', chgCls(v.avg_fwd))}>{pct(v.avg_fwd)}</b>
+                <span className="ml-1 opacity-60">{v.win}/{v.episodes}</span>
+              </span>
+            ))}
+          </span>
+        )}
+      </div>
+      <p className="mt-1 text-[10px] leading-relaxed opacity-90">{e.text}</p>
+    </div>
+  )
+}
+
+/** ③ 依据 —— 八个数。摆在两条结论后面, 是给人核对用的, 不是主角。 */
+function ChannelPanel({ ch }: { ch: NonNullable<StockReview['channel']> }) {
+  const { geo, runs, energy, event } = ch
+  const cell = (label: string, value: string, title?: string, tone?: string) => (
+    <div key={label} className="min-w-0 flex-1 basis-[104px] bg-elevated/40 px-3 py-2 text-center" title={title}>
+      <div className="truncate text-[10px] text-muted">{label}</div>
+      <b className={cn('block truncate font-mono text-[13px] font-medium', tone ?? 'text-foreground')}>{value}</b>
+    </div>
+  )
+  return (
+    <div className="mx-4 mt-3 space-y-2">
+      <div className="text-[10px] text-muted">依据(上面两条结论就是从这些数读出来的)</div>
+      <div className="flex flex-wrap gap-px overflow-hidden rounded-card bg-border/70">
+        {cell('加速度', `${geo.accel.gain_atr >= 0 ? '+' : ''}${geo.accel.gain_atr.toFixed(1)}`,
+          '最近这一段比之前那一段快了还是慢了。为零表示速度没变;不是越大越好, 过度加速常出现在一波的末端',
+          geo.accel.level === 'accel' ? 'text-red-400'
+            : geo.accel.level === 'decel' ? 'text-emerald-400' : 'text-foreground')}
+        {cell('状态', geo.accel.level_cn || '—')}
+        {cell('分离度', geo.spread.toFixed(1),
+          '三个尺度之间拉开了多远, 带方向。接近零是挤在一起(方向未定), 适度拉开是趋势立住了, 拉得过开是已经走了很长一段')}
+        {cell('三尺度重叠', geo.compress != null ? `${(geo.compress * 100).toFixed(0)}%` : '—',
+          '三个尺度对「合理价」的看法有多一致。高 = 几乎没有分歧')}
+        {cell('已粘合', `${runs.compress_days} 天`,
+          '连续多少天三个尺度看法一致 —— 这只票「磨了多久」')}
+        {cell('季度平均', runs.compress_avg != null ? `${(runs.compress_avg * 100).toFixed(0)}%` : '—',
+          '这个季度平均有多一致。与「已粘合」一起看: 连续天数为零但平均很高 = 刚刚启动')}
+        {cell('主导频段', energy ? energy.dominant_cn.replace(/\(.*/, '') : '—',
+          energy ? `高频 ${(energy.share.s * 100).toFixed(0)}% / 中频 ${(energy.share.m * 100).toFixed(0)}% / 低频 ${(energy.share.l * 100).toFixed(0)}%` : undefined)}
+        {cell('组合', geo.combo ?? '—', '短/中/长三档位置')}
+      </div>
+      {!!event.combo_note && (
+        <p className="rounded border border-amber-400/30 bg-amber-400/[0.06] px-2.5 py-1.5 text-[10px] leading-relaxed text-amber-300/90">
+          组合「{event.combo_note.combo}」· {event.combo_note.title}:{event.combo_note.detail}
+        </p>
+      )}
+    </div>
+  )
+}
+
 function VerdictView({ d, segments }: { d: StockReview; segments: Segment[] }) {
   return (
     <>
+      {/* [R199] 三层, 从上到下: 现在在哪一段 → 这套结论灵不灵 → 依据 */}
+      {!!d.channel && <PhaseCard ch={d.channel} />}
+      {!!d.verdict_edge && <VerdictEdgeCard e={d.verdict_edge} forwardDays={d.forward_days} />}
+      {!!d.channel && <ChannelPanel ch={d.channel} />}
+
       {/* 各档结论在这只票上过去好不好使 */}
       <OutcomeChips
         items={d.outcomes}
         forwardDays={d.forward_days}
-        hint={`各档结论出现后 ${d.forward_days} 日表现(按段计, 一段=一次;样本小, 只作参考, 不是胜率统计)`}
+        hint={`分档依据 —— 各档结论出现后 ${d.forward_days} 日表现(按段计, 一段=一次;括号里是「几段收涨/几段已兑现」)`}
       />
 
       <div className="mt-3 flex-1 overflow-auto border-t border-border/60 p-4">
