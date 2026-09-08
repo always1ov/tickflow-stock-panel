@@ -12,6 +12,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
+from app.services import paper_lots
 from app.services import paper_trader as pt
 
 logger = logging.getLogger(__name__)
@@ -38,6 +39,13 @@ def _book_summary(t: dict, scope: str, prices: dict[str, float]) -> dict:
         # 止盈占比高 = 目标定得够得着; 止损/生命线占比高 = 买入那一刻常判断错。
         "exit_stats": pt.exit_stats(bk),
         "plan_reminders": bk.get("plan_reminders") or [],
+        # [R183] 批次视图 —— 「我的批次」并进模拟盘之后, 持仓要按批次的样子给出来。
+        # 是**派生**的: 唯一真相仍在账本里, 不写进作者的 lots.json(那会派生真实
+        # 监控规则, 并经 effective_positions 污染决策台管真钱的那几列)。
+        "lots": paper_lots.lots_for_book(t.get("id") or "", scope, bk, prices),
+        # [R183] 绩效 —— 参考 MarketPulse 的 Metrics 补上回撤/夏普/曝光度。
+        # 原来只有总资产和交易天数: 没有回撤就不知道过程多难受。算不出的给 null。
+        "metrics": paper_lots.metrics_for_book(bk),
     }
 
 

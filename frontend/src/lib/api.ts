@@ -2472,6 +2472,31 @@ export interface TickflowKeyRow {
 export type PaperScope = 'market' | 'watchlist'
 
 /** 一本账的成绩 */
+/** [R183] 模拟盘持仓的批次视图。字段名与作者的批次一致, 界面可照批次表渲染。 */
+export interface PaperLot {
+  id: string
+  symbol: string
+  cost_price: number
+  qty: number
+  buy_date: string | null
+  price: number | null
+  market_value: number | null
+  pnl_pct: number | null
+  trader_id: string
+  scope: string
+}
+
+/** [R183] 绩效指标。**null = 算不出来**(样本不足/没有基准), 不是 0。 */
+export interface PaperMetrics {
+  days: number
+  total_return: number | null
+  max_drawdown: number | null
+  sharpe: number | null
+  exposure: number | null
+  benchmark_return: number | null
+  excess_return: number | null
+}
+
 export interface PaperBook {
   scope: PaperScope
   scope_cn: string
@@ -2490,6 +2515,12 @@ export interface PaperBook {
   last_note: string
   /** [R171] 出场原因分布 —— 立计划之后真正的产出 */
   exit_stats?: PaperExitStats
+  /** [R183] 持仓的**批次视图** —— 「我的批次」并进模拟盘后按批次的样子给出来。
+   *  是派生的: 唯一真相在账本里, 不写进作者的 lots.json(那会派生真实监控规则,
+   *  并经 effective_positions 污染决策台管真钱的那几列)。 */
+  lots?: PaperLot[]
+  /** [R183] 绩效。参考 MarketPulse 的 Metrics 补的; 算不出的是 null, 不用 0 顶替 */
+  metrics?: PaperMetrics
   /** [R171] 已到止盈线但系统没替它卖的, 会写进下一轮它的上下文 */
   plan_reminders?: { symbol: string; kind: string; reason: string }[]
 }

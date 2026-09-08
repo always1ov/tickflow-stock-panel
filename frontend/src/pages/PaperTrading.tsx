@@ -371,6 +371,71 @@ function BookPane({ b, busy, onRun, onLifeline, onPlanCheck, onOpen, onReset, on
         </div>
       </div>
 
+      {/* [R183] 绩效 —— 参考 MarketPulse 的 Metrics 补的。
+          原来只有总资产和交易天数: **没有回撤就不知道过程多难受**, 一条从 +30%
+          回撤到 0 的曲线和一条稳稳 +5% 的曲线, 只看总资产是看不出区别的。
+          算不出的显示 —— 而不是 0, 0 会被读成"从没回撤过"。 */}
+      {b.metrics && (
+        <div className="mt-1.5 grid grid-cols-3 gap-1.5 text-center">
+          <div title="从净值最高点起最深的一次回撤。样本不足时显示 — 而不是 0">
+            <div className="text-[9px] text-muted">最大回撤</div>
+            <div className="mt-0.5 font-mono text-[11px] text-bear">
+              {b.metrics.max_drawdown != null ? `-${(b.metrics.max_drawdown * 100).toFixed(1)}%` : '—'}
+            </div>
+          </div>
+          <div title="有持仓的交易日占比 —— 空仓躺着不动跑平也不叫本事">
+            <div className="text-[9px] text-muted">下场率</div>
+            <div className="mt-0.5 font-mono text-[11px] text-foreground">
+              {b.metrics.exposure != null ? `${(b.metrics.exposure * 100).toFixed(0)}%` : '—'}
+            </div>
+          </div>
+          <div title="按日夏普, 年化。少于 20 个净值点不给 —— 那个数是噪声">
+            <div className="text-[9px] text-muted">夏普</div>
+            <div className="mt-0.5 font-mono text-[11px] text-foreground">
+              {b.metrics.sharpe != null ? b.metrics.sharpe.toFixed(2) : '—'}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* [R183] 持仓的批次视图 —— 「我的批次」并进模拟盘之后, 持仓按批次的样子摊开。
+          这是**派生**的, 没有写进真的 lots.json(那会派生真实监控规则, 并污染决策台
+          管真钱的那几列)。 */}
+      {!!b.lots?.length && (
+        <div className="mt-2 overflow-x-auto rounded border border-border/50">
+          <table className="w-full min-w-[22rem] border-collapse text-[10px]">
+            <thead>
+              <tr className="border-b border-border/50 text-[9px] text-muted">
+                <th className="px-1.5 py-1 text-left font-normal">批次</th>
+                <th className="px-1.5 py-1 text-right font-normal">成本</th>
+                <th className="px-1.5 py-1 text-right font-normal">数量</th>
+                <th className="px-1.5 py-1 text-right font-normal">现价</th>
+                <th className="px-1.5 py-1 text-right font-normal">盈亏</th>
+              </tr>
+            </thead>
+            <tbody>
+              {b.lots.map(l => (
+                <tr key={l.id} className="border-b border-border/25 last:border-0">
+                  <td className="whitespace-nowrap px-1.5 py-1 font-mono text-foreground/90"
+                      title={l.buy_date ? `建仓 ${l.buy_date}` : undefined}>
+                    {l.symbol}
+                  </td>
+                  <td className="px-1.5 py-1 text-right font-mono text-muted">{l.cost_price.toFixed(2)}</td>
+                  <td className="px-1.5 py-1 text-right font-mono text-muted">{l.qty}</td>
+                  <td className="px-1.5 py-1 text-right font-mono text-foreground/80">
+                    {l.price != null ? l.price.toFixed(2) : '—'}
+                  </td>
+                  <td className={`px-1.5 py-1 text-right font-mono ${
+                    l.pnl_pct == null ? 'text-muted' : l.pnl_pct > 0 ? 'text-bull' : 'text-bear'}`}>
+                    {l.pnl_pct != null ? `${(l.pnl_pct * 100).toFixed(1)}%` : '—'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
       {/* [R171] 出场归因分布 —— 逼模型先立计划真正的产出。摆在「上次想法」上面
           是有意的: 先看它做成了什么, 再看它当时怎么说的。 */}
       <div className="mt-2">
