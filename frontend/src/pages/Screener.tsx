@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
-import { ScanSearch, Clock, TrendingUp, Filter, Layers, Network, Sparkles, RefreshCw, Settings2, Store, RotateCcw, X, Activity, Star } from 'lucide-react'
+import { ScanSearch, Clock, TrendingUp, Filter, Layers, Network, Sparkles, RefreshCw, Settings2, Store, RotateCcw, X, Star } from 'lucide-react'
 import { api, genRuleId, type ScreenerStrategy, type ScreenerResult } from '@/lib/api'
 import { fetchMinuteBatchIncremental } from '@/lib/minuteBatchIncremental'
 import { DEFAULT_STRATEGY_NOTIFY_EVENTS } from '@/lib/strategyMonitorEvents'
@@ -20,7 +20,6 @@ import { StrategyCard, CardSize, loadCardSize, cardWrapCls } from '@/components/
 import { ScreenerTable } from '@/components/screener/ScreenerTable'
 import { ScreenerFilter as ScreenerFilterType, defaultFilter, filterActive, countActiveFilters, applyFilter, FilterPanel } from '@/components/screener/ScreenerFilter'
 import { StrategySettingsDialog } from '@/components/screener/StrategySettingsDialog'
-import { StrategyHealthDialog } from '@/components/screener/StrategyHealthDialog'
 import { StrategyPoolDialog } from '@/components/screener/StrategyPoolDialog'
 import { StrategyBuilderDialog } from '@/components/screener/StrategyBuilderDialog'
 import { StrategyStoreDialog } from '@/components/screener/StrategyStoreDialog'
@@ -58,7 +57,6 @@ export function Screener() {
   }, [])
   const [settingsStrategyId, setSettingsStrategyId] = useState<string | null>(null)
   const [showPoolDialog, setShowPoolDialog] = useState(false)
-  const [showHealth, setShowHealth] = useState(false)
   const [showBuilder, setShowBuilder] = useState(false)
   const [builderMode, setBuilderMode] = useState<'create' | 'modify'>('create')
   const [showStore, setShowStore] = useState(false)
@@ -848,17 +846,6 @@ export function Screener() {
                 </button>
               ))}
             </div>
-            {/* 策略体检: 零配置批量回测, 出胜率对比表 */}
-            <button
-              onClick={() => setShowHealth(true)}
-              title="策略池零配置批量回测: 胜率/盈亏比/回撤对比 + AI 解读"
-              className="inline-flex items-center gap-1.5 h-7 px-3 rounded-btn
-                text-xs font-medium text-emerald-400 border border-emerald-400/20 bg-emerald-400/5
-                hover:bg-emerald-400/15 transition-colors cursor-pointer"
-            >
-              <Activity className="h-3.5 w-3.5" />
-              策略体检
-            </button>
             {/* 策略池按钮 */}
             <button
               onClick={() => setShowPoolDialog(true)}
@@ -1269,13 +1256,6 @@ export function Screener() {
             qc.invalidateQueries({ queryKey: ['screener-strategies'] })
           }
         }}
-      />
-
-      <StrategyHealthDialog
-        open={showHealth}
-        onClose={() => setShowHealth(false)}
-        strategyIds={visiblePool}
-        nameOf={(id) => strategyIdToName[id] ?? id}
       />
 
       {showPoolDialog && (

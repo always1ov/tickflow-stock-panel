@@ -4037,13 +4037,6 @@ export const api = {
       body: JSON.stringify(payload),
     }),
 
-  // 策略体检: 把胜率对比表交给 AI 解读(留谁/调谁/怎么调); messages 传既有对话可继续追问
-  backtestHealthInterpret: (rows: Record<string, unknown>[], windowLabel: string, messages: { role: 'user' | 'assistant'; content: string }[] = []) =>
-    request<{ text: string }>('/api/backtest/strategy/health-interpret', {
-      method: 'POST',
-      body: JSON.stringify({ rows, window_label: windowLabel, messages }),
-    }),
-
   // [R50] 「AI 打板复盘」(原「AI 战法」, 已从连板梯队页搬到复盘页):
   // 梯队快照 → 龙头/二进三/反包候选分组(带置信度);
   // messages 传对话可追问; reportId 传历史报告 id 可对旧报告续问(复用其存档快照)
@@ -4056,21 +4049,6 @@ export const api = {
     request<{ reports: { id: string; date: string; created_at: string; text: string }[] }>('/api/screener/ladder-ai/reports'),
   ladderAiDeleteReport: (id: string) =>
     request<{ ok: boolean }>(`/api/screener/ladder-ai/reports/${id}`, { method: 'DELETE' }),
-
-  // 策略诊断: 配置+回测证据(出场原因分布/基准) → AI 归析死因与具体改法
-  backtestDiagnose: (payload: {
-    name: string
-    window_label: string
-    scope_label: string
-    config: Record<string, unknown>
-    stats: Record<string, unknown>
-    exit_reasons: { reason: string; count: number; avg_pnl: number }[]
-    benchmark_return: number | null
-  }) =>
-    request<{ text: string }>('/api/backtest/strategy/diagnose', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    }),
 
   pipelineRun: () => request<{ job_id: string; reused: boolean }>(
     '/api/pipeline/run', { method: 'POST' },
