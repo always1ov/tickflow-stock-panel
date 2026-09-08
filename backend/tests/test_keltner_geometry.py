@@ -260,3 +260,67 @@ def test_底层没有结论的两种组合这里补上了():
     for combo in ("中中上", "中中下"):
         assert combo in g.COMBO_NOTES
         assert g.COMBO_NOTES[combo][1], combo
+
+
+# ---------- ⑧ [R197] O 的时间积分 与 频段能量 ----------
+
+def test_平均压缩度与连续压缩天数量的不是同一件事():
+    """一只票可以「昨天刚脱开」(compress_days=0)而「整个季度几乎都粘着」
+    (compress_avg 很高) —— 那是刚刚启动。两个数分开看才知道是哪一种。"""
+    # 拉开要够大才算数: O ≥ 0.8 等价于 |spread| ≤ 1.8 个 ATR, 三天小涨根本
+    # 拉不开(spread 才 1.25) —— 这个前提本身就是压缩指数的定义在起作用。
+    closes = [100.0] * 200 + [100.0 + 8 * i for i in range(1, 11)]
+    rows = g.series(closes, [1.0] * len(closes))
+    r = g.runs(rows)
+    avg = g.compress_avg(rows)
+    assert r["compress_days"] == 0, f"最后十天已经拉开, 实际连续 {r['compress_days']} 天"
+    assert avg is not None and avg > 0.7, f"但这个季度大部分时间是粘的, 实际 {avg}"
+
+
+def test_平均压缩度是窗口内的均值():
+    closes = [100.0] * 300
+    rows = g.series(closes, [1.0] * 300)
+    assert g.compress_avg(rows) == pytest.approx(1.0)
+    assert g.compress_avg([]) is None
+
+
+def test_频段能量必须扣掉趋势基线():
+    """**这是整个指标成立的前提。** 匀速趋势下三个带通的幅度天然正比于各自
+    覆盖的天数(9.5 : 20 : 30), 不扣基线的话它会永远说"低频占优" ——
+    那是均线的定义, 不是这只票的特征。扣掉之后纯趋势恰好三份各 1/3。"""
+    trend = [100.0 + 0.5 * t for t in range(200)]
+    e = g.band_energy(trend, [1.5] * 200)
+    for k_ in ("s", "m", "l"):
+        assert e["share"][k_] == pytest.approx(1 / 3, abs=0.02), e["share"]
+
+
+def test_高频噪声让短频占优():
+    import random
+    random.seed(3)
+    noisy = [100.0 + 0.5 * t + random.gauss(0, 4) for t in range(200)]
+    e = g.band_energy(noisy, [1.5] * 200)
+    assert e["dominant"] == "s"
+    assert e["share"]["s"] > 1 / 3
+
+
+def test_趋势走平之后能量落到低频():
+    """老趋势还在均线里, 但近期没有新动能 —— 低频占优 = 动能在衰减。"""
+    flat = [100.0 + 0.5 * t for t in range(140)] + [170.0] * 60
+    e = g.band_energy(flat, [1.5] * 200)
+    assert e["dominant"] == "l"
+    assert e["share"]["l"] > 0.4
+
+
+def test_频段占比恒和为一():
+    trend = [100.0 + 0.3 * t for t in range(200)]
+    e = g.band_energy(trend, [1.5] * 200)
+    assert sum(e["share"].values()) == pytest.approx(1.0, abs=1e-3)
+
+
+def test_频段能量样本不够就不给():
+    assert g.band_energy([100.0] * 50, [1.0] * 50) is None
+    assert g.band_energy(None, None) is None
+
+
+def test_基线常量就是三段的天数跨度():
+    assert g.ENERGY_REF == (g.SPAN1, g.SPAN2, g.SPAN3) == (9.5, 20.0, 30.0)

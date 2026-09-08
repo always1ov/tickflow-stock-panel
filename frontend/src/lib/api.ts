@@ -240,6 +240,10 @@ export interface TodayOpportunity {
   geo?: ChannelGeometry | null
   /** [R195] 位置 × 六态 × 在轨外天数 → 事件 */
   channel_event?: ChannelEvent | null
+  /** [R195/R197] 压缩持续天数、平均压缩度、在轨外连续天数 */
+  runs?: ChannelRuns | null
+  /** [R197] 频段能量分布 */
+  energy?: BandEnergy | null
   /** 新鲜度来自哪一路: 六态信号 / 逼近触发价 / 都没有 */
   fresh_from?: 'signal' | 'near_breakout' | 'none'
   /** 命中的候选来源(可同时命中两路) */
@@ -788,14 +792,36 @@ export interface KeltnerBands {
   /** [R195] 几何补充层 —— 速度/加速度/压缩/排列。底层三档未动, 这是从它反推的 */
   geo?: ChannelGeometry | null
   /** [R195] 历史序列导出量: 压缩持续天数(新的「磨底磨了多久」)与在轨外连续天数 */
-  runs?: {
-    compress_days: number
-    above_run: number
-    below_run: number
-    box_high: number | null
-    box_low: number | null
-    box_range_atr: number | null
-  } | null
+  runs?: ChannelRuns | null
+  /** [R197] 频段能量分布 —— 这只票的波动主要来自哪个周期 */
+  energy?: BandEnergy | null
+}
+
+export interface ChannelRuns {
+  /** 连续多少天三带交集 ≥ 80% —— **这是新的「磨底磨了多久」**, 按 ATR 归一化,
+   *  取代原来「最高/最低收盘 ≤ 1.35」那个绝对幅度判据 */
+  compress_days: number
+  /** [R197] O 的时间积分 ÷ 窗口 = 这个季度的平均压缩度。与 compress_days 不同:
+   *  中间脱开一天会把 compress_days 清零, 却只把均值拉低一点 */
+  compress_avg?: number | null
+  /** 连续多少天收盘在短期上轨之上。1 天 = 突破, ≥2 天 = 站稳 */
+  above_run: number
+  below_run: number
+  box_high: number | null
+  box_low: number | null
+  box_range_atr: number | null
+}
+
+/**
+ * [R197] 频段能量分布。三档通道本质上是一组带通滤波器, 这里量的是各频段的
+ * 能量占比 —— **已扣掉匀速趋势基线**(不扣的话会恒定说"低频占优", 那是均线的
+ * 定义不是这只票的特征), 所以纯趋势下三份恰好各 1/3, 偏离 1/3 才是信息。
+ */
+export interface BandEnergy {
+  share: { s: number; m: number; l: number }
+  rms: { s: number; m: number; l: number }
+  dominant: 's' | 'm' | 'l'
+  dominant_cn: string
 }
 
 /** [R188] 红绿节拍 —— 反复进多头又跌出, 是蓄势还是反复失败。

@@ -102,10 +102,21 @@ def long_trend_map(repo, symbols: list[str], *, with_closes: bool = False) -> di
         # 取不到 atr_14 就整块缺席 —— 半截数据推不出压缩指数。
         if has_atr and len(closes) >= WINDOW_LONG:
             try:
-                rows = kg.series([float(c) for c in closes],
-                                 [None if a is None else float(a) for a in sub["atr_14"].to_list()])
+                atrs = [None if a is None else float(a) for a in sub["atr_14"].to_list()]
+                cl = [float(c) for c in closes]
+                rows = kg.series(cl, atrs)
                 if rows:
-                    ent["runs"] = kg.runs(rows)
+                    r = kg.runs(rows)
+                    # [R197] O 的时间积分(平均压缩度)。与 compress_days 量的不是
+                    # 同一件事: 前者会被中间一天的脱开清零, 后者只是被拉低一点。
+                    # 一只 compress_days=0 而 compress_avg=0.9 的票是"刚刚启动"。
+                    r["compress_avg"] = kg.compress_avg(rows)
+                    ent["runs"] = r
+                    # [R197] 频段能量分布 —— 这只票的波动主要来自哪个周期。
+                    # 同一份序列, 不额外取数。
+                    e = kg.band_energy(cl, atrs)
+                    if e:
+                        ent["energy"] = e
             except Exception as e:  # noqa: BLE001
                 logger.debug("channel runs skipped for %s: %s", name, e)
         if with_closes:
@@ -182,8 +193,10 @@ def channels_for_symbols(repo, symbols: list[str]) -> dict[str, dict]:
             geo = kg.geometry(bands, close)
             if geo:
                 row["geo"] = geo
-            runs = (long_map.get(sym) or {}).get("runs")
-            if runs:
-                row["runs"] = runs
+            lm = long_map.get(sym) or {}
+            if lm.get("runs"):
+                row["runs"] = lm["runs"]
+            if lm.get("energy"):
+                row["energy"] = lm["energy"]
             out[sym] = row
     return out

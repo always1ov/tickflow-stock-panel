@@ -627,3 +627,103 @@ def combo_note(bands: dict | None) -> dict | None:
     if not got:
         return None
     return {"combo": code, "title": got[0], "detail": got[1]}
+
+
+# ================================================================
+# [R197] O 的时间积分 与 频段能量分布
+#
+# 这两样是把前面两条"只写在文档里"的推导真正算出来。
+
+# 平均压缩度的回看窗口。取 60 —— 与中期档同一个尺度, 问的是"一个季度里
+# 三个尺度平均有多一致"。
+COMPRESS_WINDOW = 60
+
+
+def compress_avg(rows: list[dict], window: int = COMPRESS_WINDOW) -> float | None:
+    """**O 的时间积分**(除以窗口长度) = 这段时间的平均压缩度。
+
+    与 `runs().compress_days` 量的不是同一件事, 两个都要:
+
+        compress_days  今天往回**连续**粘合了几天 —— 会被中间一天的脱开清零
+        compress_avg   这一段里**平均**有多粘 —— 中间脱开几天只是把均值拉低一点
+
+    一只票可以 compress_days=0(昨天刚脱开)而 compress_avg=0.9(整个季度几乎都
+    粘着), 那是"刚刚启动"; 也可以 compress_days=15 而 compress_avg=0.3, 那是
+    "反复脱开又粘回来"。两个数分开看才知道是哪一种。
+
+    单时点上三条带是**区间**, 交集是长度; 一段时间上它们扫出的是带状区域,
+    交集的**面积 ÷ 窗口长度**就是这个均值 —— 用户问的"重叠面积"落到实处就是它。
+    """
+    vals = [r["o"] for r in (rows or [])[-window:] if r and r.get("o") is not None]
+    if not vals:
+        return None
+    return sum(vals) / len(vals)
+
+
+# 频段能量的回看窗口。要够长才能让 RMS 稳定, 又不能长到跨越两个 regime。
+ENERGY_WINDOW = 60
+
+# 纯趋势下三个带通的**期望幅度之比** = 各自覆盖的天数 (9.5 : 20 : 30)。
+# 这是基线, 不是结论 —— 见 band_energy 的 docstring。
+ENERGY_REF = (SPAN1, SPAN2, SPAN3)
+
+
+def band_energy(closes: list[float] | None, atrs: list[float] | None,
+                window: int = ENERGY_WINDOW) -> dict | None:
+    """**频段能量分布** —— 这只票现在的波动主要来自哪个周期。
+
+    三档通道本质上是一组带通滤波器(均线是线性相位 FIR, 相邻两档之差就是带通):
+
+        C − MA20     周期 < 20 天    高频(消息、跳空、日内情绪)
+        MA20 − MA60  周期 20~60 天   中频(一波行情的主体)
+        MA60 − MA120 周期 60~120 天  低频(趋势/阶段)
+
+    **必须扣掉趋势基线, 否则这个指标恒定说"低频占优"。** 匀速趋势下三者的
+    幅度天然正比于各自覆盖的天数(9.5 : 20 : 30), 直接算占比会永远得到
+    0.16 : 0.34 : 0.50 —— 那是均线的定义, 不是这只票的特征。所以先各自除以
+    ENERGY_REF 再归一化: **纯趋势下三份恰好都是 1/3**, 偏离 1/3 的部分才是信息。
+
+      短频 > 1/3   噪声/冲击成分超出趋势能解释的范围 —— 这一波是消息驱动
+      中频 > 1/3   一个月到一个季度这一段的动能最足 —— 典型的主升段
+      低频 > 1/3   近期反而平静, 能量都在老趋势里 —— 动能在衰减
+
+    返回 {share: {s,m,l}, dominant, dominant_cn, rms: {...}}。
+    """
+    cs = [_f(c) for c in (closes or [])]
+    as_ = [_f(a) for a in (atrs or [])]
+    n = len(cs)
+    if n < WINDOW["l"] + 5 or len(as_) != n or any(c is None for c in cs):
+        return None
+    vals: list[float] = [c for c in cs]  # type: ignore[misc]
+    ma = {k_: _rolling_mean(vals, WINDOW[k_]) for k_ in ("s", "m", "l")}
+
+    acc = {"s": [], "m": [], "l": []}
+    for i in range(max(0, n - window), n):
+        a = as_[i]
+        m_s, m_m, m_l = ma["s"][i], ma["m"][i], ma["l"][i]
+        if a is None or a <= 0 or None in (m_s, m_m, m_l):
+            continue
+        acc["s"].append(abs(vals[i] - m_s) / a)     # 高通
+        acc["m"].append(abs(m_s - m_m) / a)         # 带通 20~60
+        acc["l"].append(abs(m_m - m_l) / a)         # 带通 60~120
+    if len(acc["s"]) < 10:
+        return None
+
+    def rms(xs: list[float]) -> float:
+        return (sum(x * x for x in xs) / len(xs)) ** 0.5
+
+    raw = {k_: rms(v) for k_, v in acc.items()}
+    # 扣掉趋势基线 —— 这一步是整个指标成立的前提
+    norm = {k_: raw[k_] / ref for k_, ref in zip(("s", "m", "l"), ENERGY_REF)}
+    tot = sum(norm.values())
+    if tot <= 0:
+        return None
+    share = {k_: v / tot for k_, v in norm.items()}
+    dom = max(share, key=lambda k_: share[k_])
+    return {
+        "share": {k_: round(v, 3) for k_, v in share.items()},
+        "rms": {k_: round(v, 3) for k_, v in raw.items()},
+        "dominant": dom,
+        "dominant_cn": {"s": "高频(消息驱动)", "m": "中频(行情主体)",
+                        "l": "低频(老趋势)"}[dom],
+    }

@@ -546,6 +546,34 @@ function OpportunityDetail({ o, live }: { o: TodayOpportunity; live?: boolean })
                   {o.channel_event.combo_note.detail}
                 </div>
               )}
+              {/* [R197] 压缩的两个数必须一起给 —— 它们量的不是同一件事:
+                  连续天数会被中间一天的脱开清零, 平均值只是被拉低一点。
+                  compress_days=0 而平均 90% = 刚刚启动; 反过来 = 反复脱开又粘回。 */}
+              {(!!o.runs?.compress_days || o.runs?.compress_avg != null) && (
+                <div className="mt-1 flex flex-wrap gap-x-3 text-[10px] text-muted">
+                  {!!o.runs?.compress_days && (
+                    <span title="连续多少天三条带的交集 ≥ 80%。这是按 ATR 归一化的「磨底磨了多久」——取代了原来「最高/最低收盘 ≤ 1.35」那个绝对幅度判据">
+                      已粘合 <b className="font-mono text-foreground/90">{o.runs.compress_days}</b> 天
+                    </span>
+                  )}
+                  {o.runs?.compress_avg != null && (
+                    <span title="重叠面积 ÷ 窗口长度 = 这个季度的平均压缩度。与「连续天数」不同: 中间脱开一天会把连续天数清零, 却只把均值拉低一点">
+                      季度平均压缩 <b className="font-mono text-foreground/90">{(o.runs.compress_avg * 100).toFixed(0)}%</b>
+                    </span>
+                  )}
+                </div>
+              )}
+              {/* [R197] 频段能量 —— 三档通道本质上是一组带通滤波器 */}
+              {!!o.energy && (
+                <div className="mt-1 text-[10px] text-muted">
+                  波动主导 <b className="text-foreground/90">{o.energy.dominant_cn}</b>
+                  <span className="ml-2 font-mono text-[9px]"
+                        title="已扣掉匀速趋势基线: 匀速上涨时三个带通的幅度天然正比于各自覆盖的天数(9.5:20:30), 不扣的话会恒定说「低频占优」——那是均线的定义不是这只票的特征。扣掉之后纯趋势恰好三档各 33%, 偏离 33% 的部分才是信息。">
+                    高频 {(o.energy.share.s * 100).toFixed(0)}% / 中频 {(o.energy.share.m * 100).toFixed(0)}% / 低频 {(o.energy.share.l * 100).toFixed(0)}%
+                    <span className="ml-1 opacity-60">(纯趋势各 33%)</span>
+                  </span>
+                </div>
+              )}
               <div className="mt-1 text-[9px] text-muted/70">
                 偏离度 短 {o.geo.d.s.toFixed(1)} / 中 {o.geo.d.m.toFixed(1)} / 长 {o.geo.d.l.toFixed(1)} 个 ATR
                 (破轨门槛依次 2 / 2.5 / 3)。三档共用同一个 ATR 分母, 所以可以直接相减。

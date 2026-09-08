@@ -347,8 +347,19 @@ BASE_LEVEL_W = 0.6
 TEMPLATE_MIN_KNOWN = 8
 
 
-def base_score(rhythm: dict | None) -> float | None:
-    """磨底与节拍 → 0~100。rhythm 是 trend_rhythm.assess 的返回值。"""
+def base_score(rhythm: dict | None, compress_days: int | None = None) -> float | None:
+    """磨底与节拍 → 0~100。rhythm 是 trend_rhythm.assess 的返回值。
+
+    [R197] **时长这一半的判据换成压缩持续天数。** 原来用 trend_rhythm.basing
+    的"最高收盘/最低收盘 ≤ 1.35"——那是**绝对幅度**, 对一只 ATR 3% 的票和一只
+    ATR 1% 的票意义完全不同: 同样 35% 的箱体, 前者只是正常波动, 后者是死死
+    摁住。压缩持续天数用的是"三条带的交集 ≥ 80% 连续几天", 全程按 ATR 归一化,
+    这一点是对的。
+
+    **只换判据, 不换问题** —— 回答的仍然是用户那句「我想知道一个票磨底磨了
+    多久」。档位那一半照旧走红绿节拍(它量的是"磨得好不好", 与"多久"正交)。
+    压缩天数取不到时回落到原来的 basing.days, 不因为换判据就丢结果。
+    """
     if not rhythm:
         return None
     lvl = RHYTHM_SCORE.get(str(rhythm.get("level") or "none"))
@@ -357,6 +368,9 @@ def base_score(rhythm: dict | None) -> float | None:
         return None
     if lvl is None:
         lvl = RHYTHM_SCORE["none"]
+    # [R197] 优先用 ATR 归一化的压缩天数, 取不到才回落到绝对箱体那个口径
+    if compress_days is not None:
+        days = compress_days
     if days is None:
         return lvl
     # **时长只在蓄势时才算数。** 这一条是整个因子的关键:
@@ -399,7 +413,8 @@ def score_candidate(*, duration: int | None, state: str | None,
                     near_breakout: bool = False,
                     template: dict | None = None,
                     rhythm: dict | None = None,
-                    geo: dict | None = None) -> dict:
+                    geo: dict | None = None,
+                    runs: dict | None = None) -> dict:
     """质地 × 时机 两轴打分。返回 {score, axes, factors, coverage, partial}。纯函数。
 
     rs_pct: 个股 20 日收益 − 大盘 20 日收益, 单位**百分点**(如 +6.0 表示跑赢 6 个点)。
@@ -410,6 +425,8 @@ def score_candidate(*, duration: int | None, state: str | None,
     rhythm:   trend_rhythm.assess 的返回值(可缺)。
     geo:      [R195] keltner_geometry.geometry 的返回值(可缺) —— 量化波动通道的
               几何层, 供 spread(进质地)与 accel(进时机)两个因子。
+    runs:     [R197] keltner_geometry.runs 的返回值(可缺) —— 其中的
+              compress_days 用来替换磨底那一半的判据(见 base_score)。
     """
     fresh: float | None
     fresh_from: str
@@ -428,7 +445,7 @@ def score_candidate(*, duration: int | None, state: str | None,
     factors: dict[str, float | None] = {
         # --- 质地(慢变) ---
         "template": template_score(template),
-        "base": base_score(rhythm),
+        "base": base_score(rhythm, (runs or {}).get("compress_days")),
         "rs": _piecewise(float(rs_pct), RS_CURVE) if rs_pct is not None else None,
         "state": STATE_SCORE.get(state or "") if state else None,
         "spread": spread_score(geo),

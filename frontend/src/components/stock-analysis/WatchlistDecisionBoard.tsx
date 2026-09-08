@@ -753,7 +753,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
                     <KeltnerCell band={r.kc?.s} close={r.close} />
                     <KeltnerCell band={r.kc?.m} close={r.close} />
                     <KeltnerCell band={r.kc?.l} close={r.close} />
-                    <VerdictCell v={r.kc?.verdict} ev={r.ev} geo={r.kc?.geo} runs={r.kc?.runs}
+                    <VerdictCell v={r.kc?.verdict} ev={r.ev} geo={r.kc?.geo} runs={r.kc?.runs} energy={r.kc?.energy}
                                  onOpen={() => setReview({ symbol: r.symbol, name: r.name, tab: 'verdict' })} />
                     {/* 置信度(独立列, 可排序) */}
                     <td className={`${TD_BASE} ${NUM} whitespace-nowrap px-2 text-right text-muted`}>

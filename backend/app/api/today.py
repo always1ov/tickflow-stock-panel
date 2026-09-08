@@ -240,7 +240,7 @@ def score_opportunities(
             duration=c["duration"], state=t.get("state"), rs_pct=rs_pct,
             vol_ratio=vr, turnover_rate=turn, channel_pct=cpct,
             near_breakout=c["near_breakout"],
-            template=tpl, rhythm=t.get("rhythm"), geo=geo)
+            template=tpl, rhythm=t.get("rhythm"), geo=geo, runs=kc.get("runs"))
 
         close = t.get("close") or (signals.get(sym) or {}).get("close")
         try:
@@ -282,6 +282,8 @@ def score_opportunities(
             # accel→时机), 所以和 template 一样摆在 notes 之外 —— notes 那一栏
             # 的规矩是"一分不加一分不减", 混进去会让边界读不清。
             "geo": geo,
+            "runs": kc.get("runs"),
+            "energy": kc.get("energy"),
             "channel_event": chan_event,
             "notes": _annotations(sym, e, signals.get(sym) or {}),
             # [R137] 盘中视图。**和 score/dims 完全并列, 一分不进评分** ——
@@ -324,6 +326,8 @@ def score_opportunities(
                 "chan_event": (chan_event or {}).get("code"),
                 "accel": ((geo or {}).get("accel") or {}).get("level"),
                 "combo": (geo or {}).get("combo"),
+                # [R197] 频段能量的主导档 —— 「这波是消息驱动还是趋势驱动」
+                "energy": (kc.get("energy") or {}).get("dominant"),
             },
         }
         out.append(o)
@@ -1347,6 +1351,9 @@ def _candidate_market_data(repo, cands: list[dict]) -> list[dict]:
                     "三尺度重叠": (c.get("geo") or {}).get("compress"),
                     "通道组合": (c.get("geo") or {}).get("combo"),
                     "通道事件": (c.get("channel_event") or {}).get("cn"),
+                    "压缩持续天数": (c.get("runs") or {}).get("compress_days"),
+                    "季度平均压缩度": (c.get("runs") or {}).get("compress_avg"),
+                    "波动主导频段": (c.get("energy") or {}).get("dominant_cn"),
                 },
             },
             "规则依据": c["why"],
