@@ -53,6 +53,31 @@ LABELS = {
 # rank 同一个做法)。
 ORDER = {TRIGGERED: 0, NEAR: 1, FLIP: 2, BAND: 3, IDLE: 4}
 
+# ---------------------------------------------------------------- 方向
+#
+# [R193] 用户: 「这一列要把话说清楚, 太简洁了, 这也不行, 会误人子弟」。**说得对,
+# 而且这是这一列唯一一处真会害人的地方**:
+#
+#     「逼近 0.0%」可以是"再跌一点就破止损, 准备卖", 也可以是"再涨一点就转强,
+#      是个买点线索" —— **两个相反的动作, 长得一模一样**(同一个词、同一个琥珀色)。
+#     「已触发 0.0%」更糟: 触发了什么? 0.0% 还是个假数(触发档的 distance 被写死
+#      成 0.0), 显示出来像"离触发还有 0%", 其实是"已经破了"。
+#
+# 光靠悬停不算说清楚 —— 一列 80 行是用来**扫**的, 扫的时候没人会悬停。所以档位
+# 之外必须再出两样, 而且要出在单元格里:
+#
+#   side   这一条是**卖方向**还是**买方向** —— 最要命的那一项
+#   what   到底是哪条线、什么价、差多远
+#   action 该干什么
+#
+# 档位(急不急)和方向(买还是卖)是两个正交的维度, 原来只显示了前者。
+
+SIDE_SELL = "sell"     # 卖出/减仓方向 —— 纪律或形态转弱
+SIDE_BUY = "buy"       # 买入方向 —— 机会线索, 不是纪律
+SIDE_INFO = "info"     # 只是提醒, 不指向任何一边
+
+SIDE_CN = {SIDE_SELL: "卖", SIDE_BUY: "买", SIDE_INFO: ""}
+
 # 「要动的」= 前四档。idle 不算 —— 决策台的「只看要动的」开关就按这个筛。
 ACTIONABLE = frozenset({TRIGGERED, NEAR, FLIP, BAND})
 
@@ -86,55 +111,94 @@ def assess(*, position: dict | None, trend: dict | None,
     reason:   一句话说明为什么是这个档 —— 界面上悬停显示, 用户得能追问"凭什么"。
     """
     held = bool((position or {}).get("held"))
+    ex = exit_line or {}
+    stage = ex.get("stage_cn") or "出场线"
+    line = _num(ex.get("line"))
+    line_txt = f"{stage} {line:.2f}" if line is not None else stage
+    do = ex.get("action") or "按纪律处理"
 
     # ① 已触发 —— 纪律层面已经该动手
-    if exit_line and exit_line.get("triggered"):
-        return _mk(TRIGGERED, 0.0,
-                   f"{exit_line.get('stage_cn') or '出场线'}已跌破"
-                   f"({exit_line.get('action') or '按纪律处理'})")
+    if ex.get("triggered"):
+        # [R193] 距离用**真的破了多少**, 不再写死 0.0。原来那个 0.0 显示成
+        # 「已触发 0.0%」, 读起来像"离触发还有 0%"(还没破), 意思正好反了。
+        depth = _abs_or_none(ex.get("distance_pct")) or 0.0
+        return _mk(TRIGGERED, depth, kind="exit_broken", side=SIDE_SELL,
+                   what=f"{line_txt} 已跌破" + (f" {depth * 100:.1f}%" if depth else ""),
+                   action=do)
 
     # ② 逼近: 出场线优先于翻转价 —— 前者是纪律, 后者是形态
-    ex_d = _abs_or_none((exit_line or {}).get("distance_pct"))
+    ex_d = _abs_or_none(ex.get("distance_pct"))
     if ex_d is not None and ex_d <= EXIT_NEAR_PCT:
-        return _mk(NEAR, ex_d,
-                   f"离{exit_line.get('stage_cn') or '出场线'}仅 {ex_d * 100:.1f}%")
+        return _mk(NEAR, ex_d, kind="exit_near", side=SIDE_SELL,
+                   what=f"离{line_txt} 还有 {ex_d * 100:.1f}%",
+                   action=f"跌破就{do}")
 
-    flip_d, flip_txt = _nearest_flip(trend, held)
+    flip_d, flip_info = _nearest_flip(trend, held)
     if flip_d is not None and flip_d <= FLIP_NEAR_PCT:
-        return _mk(NEAR, flip_d, flip_txt)
+        return _mk(NEAR, flip_d, **flip_info)
 
     # ③ 今天刚翻转 —— duration==1 就是"昨天还不是这个状态"
     if (trend or {}).get("duration") == 1:
         frm = (trend or {}).get("entered_from_cn")
         cur = (trend or {}).get("state_cn") or "新状态"
-        return _mk(FLIP, flip_d,
-                   f"今日刚转入{cur}" + (f"(自{frm})" if frm else ""))
+        bull = (trend or {}).get("side") == "多头"
+        return _mk(FLIP, flip_d, kind="flipped",
+                   side=SIDE_BUY if bull else SIDE_SELL,
+                   what=f"今日刚转入{cur}" + (f"(自{frm})" if frm else ""),
+                   action=("转多第一天 —— 买点窗口从今天起算, 但要量能配合"
+                           if bull else "转空第一天 —— 持有的该考虑减了"))
 
     # ④ 到轨 —— 短期通道贴/破上下轨
-    pos = ((bands or {}).get("s") or {}).get("pos")
+    s_band = (bands or {}).get("s") or {}
+    pos = s_band.get("pos")
     if pos in _band_positions():
-        pos_cn = ((bands or {}).get("s") or {}).get("pos_cn") or "到轨"
-        return _mk(BAND, flip_d, f"短期通道{pos_cn}")
+        pos_cn = s_band.get("pos_cn") or "到轨"
+        up = pos in ("above", "near_upper")
+        return _mk(BAND, flip_d, kind="band_up" if up else "band_down",
+                   side=SIDE_SELL if up else SIDE_BUY,
+                   what=f"短期通道{pos_cn}",
+                   action=("到上沿, 这个位置买是在最贵的地方; 持有的可考虑高抛"
+                           if up else "到下沿, 相对便宜; 但要先确认趋势还在"))
 
-    return _mk(IDLE, None, "无触发")
+    return _mk(IDLE, None, kind="none", side=SIDE_INFO,
+               what="没有触到任何线", action="")
 
 
-def _nearest_flip(trend: dict | None, held: bool) -> tuple[float | None, str]:
+def _nearest_flip(trend: dict | None, held: bool) -> tuple[float | None, dict]:
     """离翻转还有多远。持有的看转弱(要卖), 没持有的看转强(要买)。
 
     两边都有值时取更近的那个 —— 一只票同时逼近上下两个翻转价的情况很少,
     真出现了也是"离哪个近就先盯哪个"。
+
+    [R193] 返回的不再是一句话, 而是**一整份说明**(kind/side/what/action) ——
+    转弱和转强是相反的两件事, 只给一句「离转弱价仅 0.5%」而不标方向, 扫表时
+    和「离转强价仅 0.5%」长得一模一样。
     """
     t = trend or {}
-    cands: list[tuple[float, str]] = []
+    cands: list[tuple[float, dict]] = []
     dn = _abs_or_none(t.get("flip_down_distance_pct"))
     up = _abs_or_none(t.get("flip_up_distance_pct"))
+    dn_px, up_px = _num(t.get("flip_down")), _num(t.get("flip_up"))
     if dn is not None:
-        cands.append((dn, f"离转弱价仅 {dn * 100:.1f}%"))
+        cands.append((dn, {
+            "kind": "flip_down_near",
+            # 空仓的票转弱与你无关(你本来就没拿), 所以只对持有的算卖方向
+            "side": SIDE_SELL if held else SIDE_INFO,
+            "what": (f"离转弱价 {dn_px:.2f} 还有 {dn * 100:.1f}%" if dn_px is not None
+                     else f"离转弱价还有 {dn * 100:.1f}%"),
+            "action": ("跌破就转空 —— 持有的先想好减多少"
+                       if held else "跌破就转空 —— 空仓的别在这时候接"),
+        }))
     if up is not None:
-        cands.append((up, f"离转强价仅 {up * 100:.1f}%"))
+        cands.append((up, {
+            "kind": "flip_up_near",
+            "side": SIDE_BUY,
+            "what": (f"离转强价 {up_px:.2f} 还有 {up * 100:.1f}%" if up_px is not None
+                     else f"离转强价还有 {up * 100:.1f}%"),
+            "action": "站上才算转强 —— 别提前抢, 收盘确认再动",
+        }))
     if not cands:
-        return None, ""
+        return None, {}
     # 持有的票优先看转弱(卖点), 空仓的优先看转强(买点); 但只在两边都存在时才偏袒
     if len(cands) == 2:
         pick = cands[0] if held else cands[1]
@@ -144,10 +208,25 @@ def _nearest_flip(trend: dict | None, held: bool) -> tuple[float | None, str]:
     return cands[0]
 
 
-def _mk(level: str, distance: float | None, reason: str) -> dict:
+def _num(v) -> float | None:
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return None
+
+
+def _mk(level: str, distance: float | None, *, kind: str, side: str,
+        what: str, action: str) -> dict:
+    """一档判定。
+
+    `reason` 是把 what + action 拼起来的整句, 留给悬停与导出; 界面上**这两半
+    要分开显示** —— 「哪条线差多远」和「该干什么」是两行不同的信息。
+    """
+    reason = what + (f" —— {action}" if action else "")
     return {"level": level, "label": LABELS[level], "order": ORDER[level],
             "distance": None if distance is None else round(distance, 4),
-            "reason": reason}
+            "kind": kind, "side": side, "side_cn": SIDE_CN[side],
+            "what": what, "action": action, "reason": reason}
 
 
 def assess_many(symbols: list[str], *, positions: dict, trends: dict,
@@ -160,5 +239,6 @@ def assess_many(symbols: list[str], *, positions: dict, trends: dict,
                               exit_line=exit_lines.get(sym), bands=keltner.get(sym))
         except Exception as e:  # noqa: BLE001
             logger.warning("urgency assess failed for %s: %s", sym, e)
-            out[sym] = _mk(IDLE, None, "判定失败")
+            out[sym] = _mk(IDLE, None, kind="none", side=SIDE_INFO,
+                           what="判定失败", action="")
     return out

@@ -91,10 +91,17 @@ export type ExportColumn = {
 export const EXPORT_COLUMNS: ExportColumn[] = [
   {
     key: 'urgency', label: '该动', group: '决策', align: 'center', on: true,
+    // [R193] 导出里也得把话说清楚, 而且**这里比屏幕上更要紧**: 导出的 HTML
+    // 是拿去存档/打印/转发的, 一个纸面上的「逼近 0.5%」连悬停都没有 ——
+    // 看的人无从知道那是该买还是该卖。所以带上方向与那条线。
     cell: (r) => (r.urg && r.urg.level !== 'idle'
       ? {
-          text: r.urg.label + (r.urg.distance != null
-            ? ` ${(r.urg.distance * 100).toFixed(1)}%` : ''),
+          text: [
+            r.urg.label + (r.urg.distance != null
+              ? ` ${(r.urg.distance * 100).toFixed(1)}%` : ''),
+            r.urg.side_cn ? `[${r.urg.side_cn}]` : '',
+            r.urg.what ?? '',
+          ].filter(Boolean).join(' '),
           style: URGENCY_STYLE[r.urg.level],
         }
       : { text: '—' }),

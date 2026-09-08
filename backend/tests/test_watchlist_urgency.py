@@ -157,3 +157,125 @@ def test_批量覆盖所有传入的票():
     got = u.assess_many(["A", "B", "C"], positions={}, trends={},
                         exit_lines={}, keltner={})
     assert set(got) == {"A", "B", "C"}, "缺数据的票也要有档位, 不能从表里消失"
+
+
+# ==================== [R193] 把话说清楚 ====================
+#
+# 用户: 「这一列要把话说清楚, 太简洁了, 这也不行, 会误人子弟」。
+#
+# 这一组守的是**这一列唯一一处真会害人的地方**: 同一个「逼近」既可能是
+# "再跌一点就破止损, 准备卖", 也可能是"再涨一点就转强, 是个买点线索" ——
+# 两个相反的动作, 原来长得一模一样。
+
+
+def _u(**kw):
+    base = dict(position=None, trend=None, exit_line=None, bands=None)
+    base.update(kw)
+    return u.assess(**base)
+
+
+_HELD = {"held": True}
+_FLAT = {"held": False}
+
+
+def test_逼近止损和逼近转强必须分得出方向():
+    """整组测试的理由。两条都是 near 档、距离也差不多, 但一个该卖一个该买。"""
+    sell = _u(position=_HELD,
+              exit_line={"triggered": False, "stage_cn": "止损线", "line": 386.5,
+                         "action": "清仓", "distance_pct": -0.005})
+    buy = _u(position=_FLAT,
+             trend={"flip_up": 412.3, "flip_up_distance_pct": 0.005, "duration": 6})
+    assert sell["level"] == buy["level"] == u.NEAR, "两条同档 —— 光看档位分不出来"
+    assert sell["side"] == u.SIDE_SELL and buy["side"] == u.SIDE_BUY
+    assert sell["side_cn"] != buy["side_cn"]
+
+
+def test_已触发不再报一个假的零距离():
+    """原来触发档的 distance 写死成 0.0, 显示出来是「已触发 0.0%」——
+    读起来像"离触发还有 0%"(还没破), 意思正好反了。"""
+    got = _u(position=_HELD,
+             exit_line={"triggered": True, "stage_cn": "止损线", "line": 386.5,
+                        "action": "清仓", "distance_pct": 0.012})
+    assert got["distance"] == 0.012
+    assert "已跌破" in got["what"]
+
+
+def test_每一档都说清哪条线以及该干什么():
+    cases = [
+        _u(position=_HELD, exit_line={"triggered": True, "stage_cn": "止损线",
+                                      "line": 386.5, "action": "清仓", "distance_pct": 0.01}),
+        _u(position=_HELD, exit_line={"triggered": False, "stage_cn": "移动止盈线",
+                                      "line": 402.0, "action": "减半仓", "distance_pct": -0.008}),
+        _u(position=_FLAT, trend={"flip_up": 412.3, "flip_up_distance_pct": 0.005, "duration": 6}),
+        _u(position=_HELD, trend={"flip_down": 370.0, "flip_down_distance_pct": -0.004, "duration": 9}),
+        _u(trend={"duration": 1, "state_cn": "上涨趋势", "side": "多头"}),
+        _u(bands={"s": {"pos": "near_upper", "pos_cn": "贴上轨"}}, trend={"duration": 5}),
+    ]
+    for got in cases:
+        assert got["what"], got
+        assert got["action"], f"{got['level']} 没说该干什么: {got}"
+        assert got["side"] in (u.SIDE_SELL, u.SIDE_BUY), got
+        assert got["kind"] != "none"
+
+
+def test_具体价位要出现在话里():
+    """「离转强价还有 0.5%」不如「离转强价 412.30 还有 0.5%」—— 后者能直接挂单。"""
+    got = _u(position=_FLAT, trend={"flip_up": 412.3, "flip_up_distance_pct": 0.005, "duration": 6})
+    assert "412.30" in got["what"]
+    got = _u(position=_HELD, exit_line={"triggered": False, "stage_cn": "止损线",
+                                        "line": 386.5, "action": "清仓", "distance_pct": -0.01})
+    assert "386.50" in got["what"]
+
+
+def test_没有价位时也不崩只是少说一句():
+    got = _u(position=_FLAT, trend={"flip_up_distance_pct": 0.005, "duration": 6})
+    assert got["level"] == u.NEAR and "转强价" in got["what"]
+
+
+def test_上轨和下轨是相反的方向():
+    up = _u(bands={"s": {"pos": "near_upper", "pos_cn": "贴上轨"}}, trend={"duration": 5})
+    down = _u(bands={"s": {"pos": "near_lower", "pos_cn": "贴下轨"}}, trend={"duration": 5})
+    assert up["side"] == u.SIDE_SELL and down["side"] == u.SIDE_BUY
+
+
+def test_转多第一天是买方向转空第一天是卖方向():
+    bull = _u(trend={"duration": 1, "state_cn": "上涨趋势", "side": "多头"})
+    bear = _u(trend={"duration": 1, "state_cn": "下跌趋势", "side": "空头"})
+    assert bull["side"] == u.SIDE_BUY and bear["side"] == u.SIDE_SELL
+
+
+def test_空仓票逼近转弱不算卖方向():
+    """本来就没拿, 它转弱与你无关 —— 标成"该卖"是无中生有。"""
+    got = _u(position=_FLAT, trend={"flip_down": 370.0, "flip_down_distance_pct": -0.004,
+                                    "duration": 9})
+    assert got["side"] == u.SIDE_INFO
+    assert "空仓" in got["action"]
+
+
+def test_无事那一档不指向任何一边():
+    got = _u(trend={"duration": 5}, bands={"s": {"pos": "inside"}})
+    assert got["level"] == u.IDLE
+    assert got["side"] == u.SIDE_INFO and got["side_cn"] == ""
+    assert got["action"] == "", "无事就是无事, 不该编一个动作出来"
+
+
+def test_reason_仍然是完整一句供悬停与导出():
+    got = _u(position=_HELD, exit_line={"triggered": False, "stage_cn": "止损线",
+                                        "line": 386.5, "action": "清仓", "distance_pct": -0.01})
+    assert got["what"] in got["reason"] and got["action"] in got["reason"]
+
+
+def test_判定失败也带齐字段():
+    """降级路径少给一个键, 前端就会在渲染时炸掉整张表。"""
+    got = u.assess_many(["X"], positions={"X": object()}, trends={}, exit_lines={}, keltner={})["X"]
+    for key in ("level", "label", "order", "distance", "kind", "side", "side_cn", "what", "action", "reason"):
+        assert key in got, key
+
+
+def test_文案里不许有markdown粗体():
+    """后端文案在前端按纯文本渲染, `**` 会原样显示成星号。"""
+    for got in (_u(position=_HELD, exit_line={"triggered": True, "stage_cn": "止损线",
+                                              "line": 1.0, "action": "清仓", "distance_pct": 0.01}),
+                _u(position=_FLAT, trend={"flip_up": 1.0, "flip_up_distance_pct": 0.005, "duration": 6}),
+                _u(bands={"s": {"pos": "above", "pos_cn": "破上轨"}}, trend={"duration": 5})):
+        assert "**" not in got["reason"], got

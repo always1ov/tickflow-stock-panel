@@ -113,30 +113,71 @@ const URGENCY_CLS: Record<Urgency['level'], string> = {
   idle: 'border-transparent text-muted/30',
 }
 
+// [R193] 方向标。**档位管急不急, 方向管买还是卖 —— 两个正交的维度**,
+// 原来只显示了前者。同样一个琥珀色的「逼近」, 可能是"再跌一点就破止损"
+// 也可能是"再涨一点就转强", 不标方向的话扫表时长得一模一样。
+const SIDE_CLS: Record<string, string> = {
+  sell: 'border-rose-400/50 bg-rose-400/15 text-rose-300',
+  buy: 'border-sky-400/50 bg-sky-400/15 text-sky-300',
+  info: 'border-border/50 text-muted/70',
+}
+
 /**
  * 「该动了」单元格。
  *
- * 显示档位 + 离触发多远, 悬停给判定理由 —— 只给一个"逼近"的标签而不说凭什么,
- * 用户没法复核, 那就跟 AI 随口说一句没有区别。这里每一档背后都是一条写死的
- * 规则(见 backend/app/services/watchlist_urgency.py), 理由是后端给的原话。
+ * [R193] 用户: 「这一列要把话说清楚, 太简洁了, 这也不行, 会误人子弟」。
+ *
+ * 原来只画一个「逼近 0.5%」的胶囊, 其余全在悬停的 title 里。**一列 80 行是
+ * 用来扫的, 扫的时候没人会悬停** —— 所以那句解释等于不存在, 而缺了它,
+ * 「该卖」和「该买」在这一列里完全同形。这是这一列唯一一处真会害人的地方。
+ *
+ * 现在单元格自己说三件事:
+ *   ① 档位 + 距离   —— 有多急(已触发那一档给的是"已经破了多少", 不再是假的 0.0%)
+ *   ② 方向          —— 买还是卖, 单独一个色块, 不靠语义色去暗示
+ *   ③ 哪条线 / 该干嘛 —— 带上具体价位, 能直接照着挂单
  *
  * 判定还没回来时显示 "—" 而不是"无事" —— 那是两件事, 混在一起会让人以为
- * 今天真没事。
+ * 今天真没事。每一档背后都是一条写死的规则(见 services/watchlist_urgency.py),
+ * 这里显示的是后端给的原话, 前端不自己编。
  */
 export function UrgencyCell({ u }: { u?: Urgency }) {
   if (!u) return <td className="px-2 py-1.5 text-center text-muted/30">—</td>
-  const showDist = u.level !== 'idle' && u.distance != null
+  if (u.level === 'idle') {
+    return (
+      <td className="px-2 py-1.5 text-center align-top">
+        <span className="text-[10px] text-muted/30" title={u.reason}>无事</span>
+      </td>
+    )
+  }
+  const showDist = u.distance != null
+  const side = u.side ?? 'info'
   return (
-    <td className="whitespace-nowrap px-2 py-1.5 text-center">
-      <span
-        title={u.reason}
-        className={`inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] ${URGENCY_CLS[u.level]}`}
-      >
-        {u.label}
-        {showDist && (
-          <span className="font-mono opacity-70">{(u.distance! * 100).toFixed(1)}%</span>
+    <td className="px-2 py-1.5 align-top" title={u.reason}>
+      <div className="flex flex-col items-start gap-0.5">
+        <div className="flex items-center gap-1">
+          <span className={`inline-flex items-center gap-1 whitespace-nowrap rounded border px-1.5 py-0.5 text-[10px] ${URGENCY_CLS[u.level]}`}>
+            {u.label}
+            {showDist && (
+              <span className="font-mono opacity-70">{(u.distance! * 100).toFixed(1)}%</span>
+            )}
+          </span>
+          {/* 方向单独一块。**这一格是整列的重点** —— 没有它, 「逼近」两个字
+              在该卖的票和该买的票上完全一样 */}
+          {u.side_cn && (
+            <span className={`inline-flex shrink-0 rounded border px-1 py-0.5 text-[10px] font-medium ${SIDE_CLS[side]}`}>
+              {u.side_cn}
+            </span>
+          )}
+        </div>
+        {/* 哪条线、什么价、差多远 —— 带价位才能直接照着挂单 */}
+        {u.what && (
+          <span className="text-[9px] leading-tight text-secondary/90">{u.what}</span>
         )}
-      </span>
+        {/* 该干什么。刻意与上一行分开: 「差多远」是事实, 「该干嘛」是建议 */}
+        {u.action && (
+          <span className="text-[9px] leading-tight text-muted/80">{u.action}</span>
+        )}
+      </div>
     </td>
   )
 }

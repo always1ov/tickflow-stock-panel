@@ -705,10 +705,24 @@ export interface Urgency {
   label: string
   /** 越小越急; 直接拿来排序, 前端不另编一套顺序 */
   order: number
-  /** 促成这个档位的那个距离(绝对值, 小数); 同档内按它升序。无事档为 null */
+  /** 促成这个档位的那个距离(绝对值, 小数); 同档内按它升序。无事档为 null。
+   *  [R193] 已触发档给的是**已经破了多少**, 不再是写死的 0 */
   distance: number | null
-  /** 为什么是这个档 —— 悬停显示, 用户得能追问"凭什么" */
+  /** 为什么是这个档 —— 悬停显示, 用户得能追问"凭什么"。= what + action */
   reason: string
+  /** [R193] 哪条线促成的: exit_broken / exit_near / flip_down_near /
+   *  flip_up_near / flipped / band_up / band_down / none */
+  kind?: string
+  /** [R193] **这一列最要命的那一项**: 这一条是卖方向还是买方向。
+   *  同样是「逼近」, 可能是"再跌一点就破止损"也可能是"再涨一点就转强" ——
+   *  两个相反的动作, 不标方向就长得一模一样。 */
+  side?: 'sell' | 'buy' | 'info'
+  /** 「卖」/「买」/空 */
+  side_cn?: string
+  /** 哪条线、什么价、差多远 —— 一句能直接照着挂单的话 */
+  what?: string
+  /** 该干什么 */
+  action?: string
 }
 
 export interface KeltnerBands {
