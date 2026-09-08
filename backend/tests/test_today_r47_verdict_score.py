@@ -3,7 +3,7 @@
 **R134 起这条关系变了, 这个文件因此整体重写。**
 
 R47 时通道的十档文字结论直接加减把握分(+10 ~ -15)。v2 把它换掉了, 换成
-**通道位置这个连续量**(``pct_in_channel``, 0=贴下轨 1=贴上轨)直接当"位置成本"
+**通道位置这个连续量**(``pct_in_channel``, 0=贴下轨 1=贴上轨)直接进"时机"轴
 那一维。理由:
 
   · 十档文字是把连续量先切成几档再打分, 中间白丢了分辨率 —— 0.52 和 0.74
@@ -55,9 +55,9 @@ def _one(extras, trends=None):
 
 @pytest.mark.parametrize("pct,tag", [(0.55, "刚站上生命线"), (0.75, "走掉一半"),
                                      (1.05, "破上轨")])
-def test_channel_position_drives_the_position_dimension(pct, tag):
+def test_channel_position_drives_the_timing_axis(pct, tag):
     o, _ = _one({"600000.SH": {"gate": _gate_ok(), "channel_pct": pct}})
-    assert o["dims"]["position"] is not None, tag
+    assert o["axes"]["timing"] is not None, tag
     assert o["channel_pct"] == pytest.approx(pct)
 
 

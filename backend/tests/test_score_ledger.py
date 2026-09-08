@@ -55,10 +55,10 @@ def repo():
     })
 
 
-def _cand(sym, score, *, dims=None, close=10.0, factors=None):
+def _cand(sym, score, *, axes=None, close=10.0, factors=None):
     return {"symbol": sym, "name": sym, "score": score, "kind": "trend_signal",
             "board": "主板", "close": close, "why": ["x"],
-            "dims": dims or {"trend": 90, "volume": 85, "position": 80},
+            "axes": axes or {"quality": 90, "timing": 85},
             "factors": factors or {"fresh": 100, "vol_ratio": 92},
             "ctx": {"dur": 1}}
 
@@ -66,13 +66,22 @@ def _cand(sym, score, *, dims=None, close=10.0, factors=None):
 # ------------------------------------------------------- 打分拆分后行为不变
 
 
+# [R189] 质地轴的两个新因子。不喂的话每只候选都是 partial, 下面几条"全覆盖"
+# 的断言就永远测不到 —— 所以默认喂满, 要测缺数据的用例自己去掉。
+_RHYTHM_OK = {"level": "building", "basing": {"days": 90}}
+# 一段真的上升序列, 长到八条模板都判得出来(要 250 根算 52 周 + 222 根算年线斜率)
+_CLOSES_OK = [10.0 * (1.004 ** i) for i in range(290)]
+
+
 def _trend(signal="转多", dur=1, **kw):
     return {"signal": signal, "duration": dur, "signal_desc": "描述",
-            "state": "UT", "side": "多头", "as_of": "2026-08-17", "close": 10.0, **kw}
+            "state": "UT", "side": "多头", "as_of": "2026-08-17", "close": 10.0,
+            "rhythm": dict(_RHYTHM_OK), **kw}
 
 
 _GATE_OK = {"above_ma20": True, "above_ma20_prev": True,
-            "close": 10.0, "ma120": 8.0, "ma120_rising": True}
+            "close": 10.0, "ma120": 8.0, "ma120_rising": True,
+            "closes": _CLOSES_OK, "ret_120d": 0.30}
 
 
 def _ex(syms, **extra):
@@ -106,14 +115,15 @@ def test_score_opportunities_keeps_sub_threshold_candidates():
     assert min(o["score"] for o in full) < 60
 
 
-def test_dimensions_blend_back_to_the_score():
-    """[R134] 维度分必须能按声明权重加回总分, 否则归因表说的不是这套分数。"""
+def test_axes_blend_back_to_the_score():
+    """[R189] 两根轴必须能按几何平均合回总分, 否则归因表说的不是这套分数。"""
     names = {"600001.SH": "测试"}
     full, _ = score_opportunities({"600001.SH": _trend(dur=1, ret_20d=0.20)}, {}, names,
                                   bench_ret=0.02,
-                                  extras=_ex(names, vol_ratio=1.8, turnover=5.0))
+                                  extras=_ex(names, vol_ratio=1.8, turnover=5.0),
+                                  bench_ret_120d=0.05)
     o = full[0]
-    expect = sum(o["dims"][k] * w for k, w in osc.WEIGHTS.items())
+    expect = (o["axes"]["quality"] * o["axes"]["timing"]) ** 0.5
     assert o["score"] == round(expect)
     assert o["partial"] is False
 
@@ -254,22 +264,25 @@ def test_monotonic_note_flags_inversion(repo):
     assert note["ok"] is False and "不单调" in note["text"]
 
 
-def test_dimension_attribution_splits_high_mid_low_and_missing(repo):
-    """[R134] 归因从"加分组/扣分组"改成"高分组/低分组" —— 维度分是 0~100 的
-    连续量, 没有正负, 硬套 v1 的三分法会把整批记录都归进"加分组"。"""
+def test_axis_attribution_splits_high_mid_low_and_missing(repo):
+    """[R134] 归因从"加分组/扣分组"改成"高分组/低分组" —— 轴分是 0~100 的
+    连续量, 没有正负, 硬套 v1 的三分法会把整批记录都归进"加分组"。
+    [R189] 两根轴走的是同一套归因代码, 换的只是记哪几个键。"""
     sl.record_day("2026-08-17", [
-        _cand("600110.SH", 90, close=10.0, dims={"trend": 95, "volume": 92, "position": 88}),
-        _cand("002222.SZ", 70, close=20.0, dims={"trend": 60, "volume": 20, "position": None}),
+        # 涨的那只: 两轴都高
+        _cand("600110.SH", 90, close=10.0, axes={"quality": 95, "timing": 92}),
+        # 跌的那只: 时机低、质地中等、**时机缺席**分不到高低组
+        _cand("002222.SZ", 70, close=20.0, axes={"quality": 60, "timing": 20}),
+        _cand("000001.SZ", 65, close=20.0, axes={"quality": 60, "timing": None}),
     ], set(), True)
     out = sl.evaluate(repo)
-    vol = next(f for f in out["factors"] if f["key"] == "volume")
-    assert vol["plus"]["count"] == 1 and vol["minus"]["count"] == 1
-    assert vol["plus"]["stats"]["t1"]["win_rate"] == 100.0
-    assert vol["minus"]["stats"]["t1"]["win_rate"] == 0.0
-    pos = next(f for f in out["factors"] if f["key"] == "position")
-    assert pos["none"]["count"] == 1, "缺席那一列是数据覆盖率的体检, 不能丢"
-    trend = next(f for f in out["factors"] if f["key"] == "trend")
-    assert trend["mid"]["count"] == 1
+    timing = next(f for f in out["factors"] if f["key"] == "timing")
+    assert timing["plus"]["count"] == 1 and timing["minus"]["count"] == 1
+    assert timing["plus"]["stats"]["t1"]["win_rate"] == 100.0
+    assert timing["minus"]["stats"]["t1"]["win_rate"] == 0.0
+    assert timing["none"]["count"] == 1, "缺席那一列是数据覆盖率的体检, 不能丢"
+    quality = next(f for f in out["factors"] if f["key"] == "quality")
+    assert quality["mid"]["count"] == 2
 
 
 def test_baseline_uses_same_dates_and_horizons(repo):
@@ -296,10 +309,10 @@ def test_export_csv_is_flat_and_complete(repo):
     lines = [ln for ln in text.splitlines() if ln.strip()]
     assert lines[0].split(",") == sl.CSV_HEADER
     assert len(lines) == 3                       # 表头 + 2 行
-    assert "dim_volume" in lines[0] and "sub_vol_ratio" in lines[0]
+    assert "dim_timing" in lines[0] and "sub_vol_ratio" in lines[0]
     assert "scoring_version" in lines[0] and "ret_t5" in lines[0]
     body = lines[1]
-    assert body.startswith("2026-08-17,2,600110.SH")   # 口径版本紧跟日期
+    assert body.startswith(f"2026-08-17,{sl.SCORING_VERSION},600110.SH")  # 口径版本紧跟日期
     assert body.endswith("10.0,20.0,30.0")       # 导出时顺手补上的收益
 
 

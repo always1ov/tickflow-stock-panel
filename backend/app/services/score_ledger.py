@@ -50,12 +50,21 @@ MAX_FILL_SYMBOLS = 300
 SCORE_BINS = ((0, 60), (60, 70), (70, 80), (80, 90), (90, 101))
 # 排名段: 回答"只看前几名合适"
 RANK_CUTS = (1, 3, 5, 10, 15, 20)
-# [R134] 打分口径版本。v1 = 底分+八项加减(夹到 100), v2 = 三门槛+三维度加权。
+# [R134] 打分口径版本。v1 = 底分+八项加减(夹到 100), v2 = 三门槛+三维度加权,
+# v3 [R189] = 四门槛 + 质地×时机两轴(几何平均)。
 # **不同版本的记录绝不能混进同一个胜率里** —— 那是拿两套不同的分数当同一把尺子,
 # 算出来的分层单调性没有任何意义。统计默认只取当前版本, 老记录留着但单独归档。
-SCORING_VERSION = 2
-# 归因维度中文名(v2)。v1 的那八项加减保留在下面, 老记录还要按它解读。
+#
+# 升到 v3 意味着 v2 攒下的样本从统计里退场, 用户明确接受了这件事:
+# 「不管是前面的红绿节拍还是现在的六态升级, 只要能有提升我不在乎台账重新开始验证」。
+SCORING_VERSION = 3
+# 归因轴中文名(v3)。v2 的三维度与 v1 的八项加减保留在下面, 老记录还要按它解读。
 FACTOR_LABELS = {
+    "quality": "质地(趋势模板/磨底节拍/相对强度/六态)",
+    "timing": "时机(新鲜度/通道位置/量比/换手)",
+}
+# v2 的三维度 —— 只用于解读 SCORING_VERSION == 2 的历史记录
+V2_FACTOR_LABELS = {
     "trend": "趋势强度(新鲜度/六态/相对强度)",
     "volume": "量能确认(量比/换手)",
     "position": "位置成本(通道位置)",
@@ -112,15 +121,18 @@ def _write(days: list[dict]) -> None:
 def _row(o: dict, rank: int, shown: bool) -> dict:
     """一条候选 → 台账行。只留调参用得上的字段, 别把整份总览抄进来。
 
-    [R134] ``f`` 存的是**三个维度分**(v2)而不是一串加减项(v1)。归因表因此从
+    [R134] ``f`` 存的是**维度分**而不是一串加减项(v1)。归因表因此从
     "加分组 vs 扣分组"变成"这一维高分组 vs 低分组" —— 维度分是 0~100 的连续量,
     没有正负之分, 硬套 v1 的三分法会把整批记录都归进"加分组", 归因表就废了。
+
+    [R189] v3 起是**两根轴**(质地/时机)。轴分与维度分同为 0~100, 归因表的
+    算法一个字不用改 —— 换的是记哪几个键。
     """
-    f = {k: v for k, v in (o.get("dims") or o.get("factors") or {}).items()
+    f = {k: v for k, v in (o.get("axes") or o.get("dims") or o.get("factors") or {}).items()
          if v is not None}
     ctx = dict(o.get("ctx") or {})
-    # 每个因子的子分也留下 —— 维度分能说明"量能这一档不行", 子分才能说明
-    # "是量比不行还是换手不行"
+    # 每个因子的子分也留下 —— 轴分能说明"时机这一档不行", 子分才能说明
+    # "是量比不行还是位置不行"
     for k, v in (o.get("factors") or {}).items():
         if v is not None and k not in f:
             ctx.setdefault(f"sub_{k}", v)
@@ -473,6 +485,22 @@ def _mainline_label(v) -> str:
 #   key    : ctx 里的字段名
 #   label  : 界面上这一维叫什么
 #   fmt    : 取值 → 人能读的名字
+def _tpl_bucket(v) -> str:
+    """趋势模板通过条数 → 分档。八条里过几条是 0~8 的整数, 但 0~4 那几档
+    样本会很少(过不了 5 条的票多半也过不了 G1/G3 门槛), 合成一档。"""
+    try:
+        n = int(v)
+    except (TypeError, ValueError):
+        return "—"
+    if n >= 8:
+        return "模板 8/8 全过"
+    if n == 7:
+        return "模板 7/8"
+    if n == 6:
+        return "模板 6/8"
+    return "模板 ≤5/8"
+
+
 LABEL_DIMS: list[dict] = [
     {"key": "verdict", "label": "通道结论",
      "fmt": lambda v: _verdict_titles().get(str(v), str(v))},
@@ -487,6 +515,10 @@ LABEL_DIMS: list[dict] = [
     # 磨底时长分档。天数本身是连续量, 直接当分组维度会碎成几百档 ——
     # 分成四段才看得出"磨得久的是不是真的更好"。
     {"key": "basing_days", "label": "磨底时长", "fmt": _basing_bucket},
+    # [R189] 趋势模板通过条数。这一维是本次改动最该被验证的那个 ——
+    # 「8 条全过的票是不是真的更好」直接决定 TEMPLATE_CURVE 那条上凸曲线
+    # 该不该继续凸下去。
+    {"key": "tpl_passed", "label": "趋势模板", "fmt": _tpl_bucket},
 ]
 
 

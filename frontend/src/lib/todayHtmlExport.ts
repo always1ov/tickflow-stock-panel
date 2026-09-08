@@ -9,7 +9,7 @@ import type { TodayOverview, TodayPick } from '@/lib/api'
 // ===== 自包含 HTML 导出(内联样式浅色排版, 无脚本无外链, 可存档/分享) =====
 //
 // [R143] 与界面同步。这份导出件从 R47 之后就没跟上过 —— 界面已经换了整套评分
-// (R134 的三门槛 + 三维度)、加了门槛漏斗、把主线/AI/胜率/通道结论收编成"注记",
+// (R134 的硬门槛 + R189 的质地×时机两轴)、加了门槛漏斗、把主线/AI/胜率/通道结论收编成"注记",
 // 导出件却还在按 v1 的样子打印一个光秃秃的把握分。**存档件与屏幕说的不是同一件
 // 事, 比没有存档更糟**: 事后复盘时你会拿它当"当时看到的东西", 而它不是。
 //
@@ -20,7 +20,7 @@ import type { TodayOverview, TodayPick } from '@/lib/api'
 //      全市场/成交额) + 主线 + 姿态理由
 //   2. AI 导读与优选 —— 优选带上 R121 的核对结论(已核对/存疑/待查), 驳回的
 //      单独列出。**存档件尤其不能只印结论不印核对状态**
-//   3. 值得关注 —— 三维度分解、位置、量比、距触发、注记, 与屏幕列一一对应
+//   3. 值得关注 —— 两轴分解、位置、量比、距触发、注记, 与屏幕列一一对应
 
 function esc(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -38,11 +38,10 @@ export function buildTodayHtml(d: TodayOverview, brief: string | null,
     bad: 'background:#fdecec;color:#c0392b',
     info: 'background:#f0f1f3;color:#5b6472',
   }
-  // 三维度分解条: 打印出来也要能一眼看出这分是谁给的
+  // [R189] 两轴分解条: 打印出来也要能一眼看出这分是谁给的
   const dimBar = (o: TodayOverview['opportunities'][number]) => {
     const rows: [string, number | null | undefined, string][] = [
-      ['趋势', o.dims?.trend, bull], ['量能', o.dims?.volume, '#c78326'],
-      ['位置', o.dims?.position, '#1c6ea4'],
+      ['质地', o.axes?.quality, bull], ['时机', o.axes?.timing, '#1c6ea4'],
     ]
     return `<span class="dims">${rows.map(([, v, c]) =>
       `<i style="background:${c};height:${v == null ? 0 : Math.max(8, Math.min(100, v))}%"></i>`).join('')}</span>`
@@ -183,10 +182,10 @@ export function buildTodayHtml(d: TodayOverview, brief: string | null,
     <thead><tr><th class="num">把握</th><th>名称</th><th>信号</th><th class="num">位置</th><th class="num">量比</th><th class="num">距关键点</th><th>出手</th><th>注记·不计分</th><th>建议仓位</th></tr></thead>
     <tbody>${oppRows}</tbody>
   </table>
-  <div class="meta" style="margin:6px 0 0">把握分 = 趋势强度 45% + 量能确认 30% + 位置成本 25%,先过三道硬门槛才打分;三条竖线依次是这三个维度的得分。分数带 * 表示有维度缺数据,总分偏乐观。位置 = Keltner 短期通道位置(50% 恰好站在生命线 MA20 上,甜区 50%~65%)。注记一律不参与打分。</div>`
+  <div class="meta" style="margin:6px 0 0">把握分 = √(质地 × 时机),先过四道硬门槛才打分;两条竖线依次是质地与时机的得分。质地 = 趋势模板八条 / 磨底节拍 / 相对强度 / 六态(以月计变化);时机 = 新鲜度 / 通道位置 / 量比 / 换手(逐日变化)。用几何平均是为了不让一边补另一边 —— 质地 95 时机 15 不该和两边都 55 打平。分数带 * 表示有因子缺数据,总分偏乐观。位置 = Keltner 短期通道位置(50% 恰好站在生命线 MA20 上,甜区 50%~65%)。注记一律不参与打分。</div>`
     : '<div class="empty">今日没有把握足够的买入机会 —— 等待比出手更常见</div>'}
 
-  <p class="foot">牛来 · 六态趋势 + ATR 出场线 + 生命线(20日线) + 把握分 v2(三门槛 + 三维度) · 仅个人参考,不构成投资建议</p>
+  <p class="foot">牛来 · 六态趋势 + ATR 出场线 + 生命线(20日线) + 把握分 v3(四门槛 + 质地×时机) · 仅个人参考,不构成投资建议</p>
 </div>
 </body>
 </html>

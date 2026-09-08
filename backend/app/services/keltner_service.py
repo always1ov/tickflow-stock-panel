@@ -31,8 +31,13 @@ _MAX_SYMBOLS = 300
 # 带得忽上忽下, 比它长则高位刚拐头的票要好几周才认出来。
 _SLOPE_LOOKBACK = 20
 
+# [R189] 趋势模板那条路的窗口。要算 MA200 的一个月斜率(222 个交易日)与 52 周
+# 高低点(250 个交易日), 取最长的 250 根再留出停牌与节假日的富余 —— 420 个
+# 自然日约 285 个交易日。只有 with_closes=True 时才用这个跨度。
+_LOOKBACK_DAYS_LONG = 420
 
-def long_trend_map(repo, symbols: list[str]) -> dict[str, dict]:
+
+def long_trend_map(repo, symbols: list[str], *, with_closes: bool = False) -> dict[str, dict]:
     """[R134] 一次批量日 K 同时算出**生命线**与**长期趋势**, 供买入门槛使用。
 
     这两件事原本要各读一次盘: 生命线要 MA20 与前一日收盘, 长期趋势要 MA120
@@ -44,10 +49,16 @@ def long_trend_map(repo, symbols: list[str]) -> dict[str, dict]:
                    ma120, ma120_prev, ma120_rising}}。
     算不出来的项缺席而不是给 0 —— 门槛那侧对"缺数据"的处理是放行, 给个假的 0
     会让它变成误杀。
+
+    [R189] `with_closes=True` 时**把窗口拉长到 _LOOKBACK_DAYS_LONG 并在每行附上
+    收盘价序列**, 供趋势模板算 MA150/MA200 与 52 周高低点。默认关着:
+    这个函数还被 Keltner 长期档(全自选逐日调用)复用, 那条路只要 MA120,
+    多读半年的行、多背一份序列都是白花的。
     """
     end = date.today()
+    span = _LOOKBACK_DAYS_LONG if with_closes else _LOOKBACK_DAYS
     try:
-        df = repo.get_daily_batch(symbols, end - timedelta(days=_LOOKBACK_DAYS), end,
+        df = repo.get_daily_batch(symbols, end - timedelta(days=span), end,
                                   ["symbol", "date", "close"])
     except Exception as e:  # noqa: BLE001
         logger.debug("keltner long trend batch failed: %s", e)
@@ -78,6 +89,14 @@ def long_trend_map(repo, symbols: list[str]) -> dict[str, dict]:
             prev = float(sum(closes[-120 - _SLOPE_LOOKBACK:-_SLOPE_LOOKBACK]) / 120)
             ent["ma120_prev"] = prev
             ent["ma120_rising"] = ent["ma120"] >= prev
+        if with_closes:
+            # 趋势模板要自己按 50/150/200 滚均线、按 250 根取 52 周高低,
+            # 所以给序列而不是给几个算好的数 —— 口径归 trend_template 一处管。
+            ent["closes"] = [float(c) for c in closes]
+            # 近 6 个月超额收益的个股一侧(基准一侧在 market_mode)。
+            # 120 个交易日 ≈ 半年, 与 market_mode 的 ret_120d 同一口径。
+            if len(closes) >= 121 and closes[-121]:
+                ent["ret_120d"] = float(closes[-1]) / float(closes[-121]) - 1
         if ent:
             out[name] = ent
     return out

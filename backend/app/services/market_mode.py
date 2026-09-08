@@ -87,6 +87,11 @@ def raw_mode(closes: list[float], bench_name: str = "大盘") -> dict:
         "ma200_rising": ma200_rising,
         # [R13] 近 20 交易日收益, 供个股相对强度对比
         "ret_20d": round(close / closes[-21] - 1, 4) if closes[-21] else None,
+        # [R189] 近 120 交易日(约半年)收益 —— 趋势模板第 8 条要的基准一侧。
+        # 那一条原版是全市场 RS 分位, 本系统还没有全市场排名, 用"半年超额
+        # 收益是否为正"近似; 个股一侧在 keltner_service.long_trend_map。
+        "ret_120d": (round(close / closes[-121] - 1, 4)
+                     if n >= 121 and closes[-121] else None),
     }
     out = decide_mode(close, ma50, ma200, momentum, ma200_rising, bench_name)
     out["metrics"] = metrics

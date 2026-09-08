@@ -1,4 +1,4 @@
-"""[fork 增强] R134 买入机会评分 v2 —— 三道硬门槛 + 三维度加权。
+"""[fork 增强] 买入机会评分 —— 硬门槛 + 质地 × 时机 两轴(R134 起, R189 重构)。
 
 ## 为什么重写
 
@@ -16,7 +16,7 @@ v1(R12 起累积到 R47)是"底分 + 八项加减"。它有三个结构性毛病
 ## v2 的结构
 
     第 0 层 门槛(硬否决, 不打分)   → 有没有资格被看
-    第 1 层 三维度加权(0~100)      → 排第几
+    第 1 层 质地 × 时机(各 0~100)  → 排第几, 几何平均
     第 2 层 注记(展示, 不参与打分) → 看到它时该知道些什么
 
 **门槛**(全部纯价格, 无前视, 可回测):
@@ -29,18 +29,35 @@ v1(R12 起累积到 R47)是"底分 + 八项加减"。它有三个结构性毛病
     位置 + 斜率两个条件同时成立才算长期下跌, 与 market_mode 判指数同源。
     只用位置的话, 一只刚从底部拉起、还没回到 MA120 上方的强势股会被误杀;
     只用斜率的话, 高位刚拐头的票会被漏掉。
+  · G4 [R189] 红绿节拍不是"反复失败" —— 至少两轮进多头又跌出、且每轮低点
+    更低。这是唯一一种"次数越多越该躲"的形态, 靠打分压不住它(次数正是它
+    最多), 只能否决。**没有对应的"必须蓄势"门槛**: 蓄势是加分项, 一路上涨
+    从没磨过底的票压根没有循环, 不该被挡在外面。
 
-三道门槛叠加等价于一句话: **只做上升趋势中继的早期, 不做底部反转。**
+四道门槛叠加等价于一句话: **只做上升趋势中继的早期, 不做底部反转。**
 这是用户"跌破生命线的不看、长期是下跌趋势的也不看"的必然推论, 是一个
 真实且持续存在的机会成本(底部反转第一波必然错过), 不是可以调参消除的。
 
-**三维度**(权重见 WEIGHTS; 起始值是先验, 等 R133 台账攒够样本后按分层单调性调):
+## R189: 三维度 → 质地 × 时机 两根轴
 
-  | 维度     | 权重 | 因子                                   |
-  |----------|------|----------------------------------------|
-  | 趋势强度 | 45%  | 新鲜度(主导) / 六态状态 / 相对强度     |
-  | 量能确认 | 30%  | 量比(主导) / 换手率                     |
-  | 位置成本 | 25%  | Keltner 短期通道位置                    |
+原来的 trend / volume / position 三个维度是**按数据来源分的**, 于是把两类
+性质完全不同的信息混进了同一个数: 慢变的"这只票好不好"和快变的"今天是不是
+那一天"。结果就是「结构极好但信号第 8 天」与「结构一般但今天刚放量」拿到
+同一个分 —— 而这两种情况该做的事完全不同。
+
+改成按**变化速度**分的两根轴, 并用几何平均合成(详见「两根轴」那一节):
+
+  | 轴   | 因子                                        |
+  |------|---------------------------------------------|
+  | 质地 | 趋势模板 / 磨底节拍 / 相对强度 / 六态状态   |
+  | 时机 | 新鲜度 / 通道位置 / 量比 / 换手率           |
+
+    把握分 = √(质地 × 时机)
+
+几何平均不引入任何新权重, 而且它的含义正是用户那句原话「高概率的有苗头的
+东西」: 高概率是质地, 有苗头是时机, 缺一个就不成立, 也不许互相补贴。
+
+时机轴内部的比例是从 v2 旧权重推出来的(排序行为不变); 质地轴是新的。
 
 **三条曲线全是区间最优(倒 U), 不是单调递增** —— 这是"高概率有苗头"这句话
 唯一自洽的数学形式:
@@ -52,9 +69,9 @@ v1(R12 起累积到 R47)是"底分 + 八项加减"。它有三个结构性毛病
 
 Keltner 短期带以 MA20 为中轴, 所以 **收盘 ≥ MA20 ⟺ pct_in_channel ≥ 0.5**
 (恒等, 不是近似)。因此过了 G2 之后, 位置因子的实际取值域只有 [0.5, 1.0+],
-有效分辨率是名义的一半 —— 位置维度 25% 的**名义权重**买到的**实际区分度**
-低于 25%。这不是 bug(门槛是刻意设的), 但意味着 WEIGHTS 里的数字是"声明权重"
-而非"有效权重", 最终要靠台账的分层单调性来定, 不能靠拍脑袋。
+有效分辨率是名义的一半 —— 位置因子在时机轴里 32% 的**名义权重**买到的
+**实际区分度**低于 32%。这不是 bug(门槛是刻意设的), 但意味着权重表里的
+数字是"声明权重"而非"有效权重", 最终要靠台账的分层单调性来定, 不能拍脑袋。
 
 ## 缺数据怎么办
 
@@ -71,23 +88,27 @@ from app.indicators.livermore import BULLISH   # 多头三态 UT/NR/SR, 只引�
 GATE_TREND = "trend_side"        # 六态必须在多头侧
 GATE_LIFELINE = "lifeline"       # 收盘必须站上生命线(MA20), 连续两日
 GATE_LONG_DOWN = "long_down"     # 不能处在长期下跌趋势里
+GATE_RHYTHM = "rhythm_failing"   # [R189] 不能是"同一个位置反复撞不过去"
 
 GATE_CN = {
     GATE_TREND: "逆势(六态在空头侧)",
     GATE_LIFELINE: "跌破生命线(MA20)",
     GATE_LONG_DOWN: "长期下跌趋势",
+    GATE_RHYTHM: "反复失败(低点一路下移)",
 }
 GATE_WHY = {
     GATE_TREND: "六态在空头侧 —— 逆势的「突破」多半是反弹",
     GATE_LIFELINE: "收盘在 MA20 之下 —— 生命线都没站上, 谈不上趋势中继",
     GATE_LONG_DOWN: "收盘在 MA120 之下且 MA120 向下 —— 长期方向还没转",
+    GATE_RHYTHM: "反复进多头又跌出, 而每次的低点更低 —— 撞第五次和撞第一次不一样",
 }
 
 
 def check_gates(*, state: str | None, above_ma20: bool | None,
                 above_ma20_prev: bool | None, close: float | None,
-                ma120: float | None, ma120_rising: bool | None) -> dict:
-    """三道硬门槛。返回 {"ok": bool, "failed": [code...]}。纯函数。
+                ma120: float | None, ma120_rising: bool | None,
+                rhythm_level: str | None = None) -> dict:
+    """四道硬门槛。返回 {"ok": bool, "failed": [code...]}。纯函数。
 
     **数据缺失一律放行**, 不当作不通过 —— 门槛的职责是"挡掉明确不该看的",
     不是"挡掉我们没读到的"。新股不足 120 根算不出 MA120, 不该因此被判长期下跌。
@@ -103,6 +124,14 @@ def check_gates(*, state: str | None, above_ma20: bool | None,
     if (close is not None and ma120 is not None
             and ma120_rising is False and close < ma120):
         failed.append(GATE_LONG_DOWN)
+    # [R189] 红绿节拍判为"反复失败" —— 定义是**至少两轮循环且低点不抬高**
+    # (见 trend_rhythm)。这是门槛而不是扣分, 因为它和另外三道是同一类判断:
+    # "明确不该看"。次数多寡在这里帮不上忙 —— 撞同一个位置撞五次, 次数正是
+    # 最多的那个, 只数次数会把它排到最前面。
+    # 门槛之外**不设"蓄势"门槛**: 蓄势是加分项不是准入条件, 一只一路上涨
+    # 从没磨过底的强势股压根没有循环, 不该因此被挡在外面。
+    if rhythm_level == "failing":
+        failed.append(GATE_RHYTHM)
     return {"ok": not failed, "failed": failed}
 
 
@@ -165,34 +194,144 @@ POS_CURVE: Curve = ((0.40, 40), (0.50, 90), (0.58, 100), (0.66, 94), (0.75, 72),
                     (0.85, 50), (1.00, 26), (1.25, 10))
 
 
-# --------------------------------------------------------------- 维度与权重
+# --------------------------------------------------------------- 两根轴
+#
+# [R189] 由「三维度加权」改成「质地 × 时机」两根轴。
+#
+# 原来 trend / volume / position 三个维度混着两类完全不同的信息:
+#
+#   · 慢变的 —— 这只票的结构好不好(六态状态、相对强度)。以月计变化。
+#   · 快变的 —— 今天是不是那一天(新鲜度、量比、换手、通道位置)。逐日变化。
+#
+# 混成一个数之后, 「结构极好但信号已经第 8 天」和「结构一般但今天刚放量突破」
+# 会拿到同一个分, 而这是两件必须分开处理的事: 前者该等回踩, 后者该看紧一点。
+# 用户要的是"抓住重点和买卖点机会" —— 重点是质地, 买卖点是时机, 一个数说不了。
+#
+# ## 合成为什么用几何平均, 不用加权平均
+#
+#     把握分 = √(质地 × 时机)
+#
+# 加权平均要再编一个权重(质地占几成), 而且它允许一边补另一边:
+# 质地 95 / 时机 15 会和 质地 55 / 时机 55 打平 —— 前者是"好票但今天不是买点",
+# 后者是"平庸的票在平庸的时点", 把它们排成一样是错的。
+#
+# 几何平均**一个新参数都不引入**, 而且它的含义正好是用户那句原话:
+# 「高概率的有苗头的东西」—— 高概率是质地, 有苗头是时机, 缺一个就不成立。
+# 任一边趋近 0, 合成分也趋近 0, 没有互相补贴的余地。
+#
+# ## 轴内权重哪来的
+#
+# 时机那四个因子的相对比例是从 R134 旧权重**推出来的**, 不是重编的:
+# 旧的有效权重 fresh .2475 / vol_ratio .21 / turnover .09 / pos .25, 在这四个
+# 之间归一化就是下面的数。也就是说时机轴保持了原系统的排序行为。
+# 质地轴则是新的(见 QUALITY_WEIGHTS 上面的说明)。
 
-DIM_TREND = "trend"
-DIM_VOLUME = "volume"
-DIM_POSITION = "position"
+AXIS_QUALITY = "quality"   # 质地: 这只票的结构 —— 以月计变化
+AXIS_TIMING = "timing"     # 时机: 今天是不是那一天 —— 逐日变化
 
-DIM_CN = {DIM_TREND: "趋势强度", DIM_VOLUME: "量能确认", DIM_POSITION: "位置成本"}
+AXIS_CN = {AXIS_QUALITY: "质地", AXIS_TIMING: "时机"}
+AXIS_WHAT = {
+    AXIS_QUALITY: "这只票的长周期结构好不好(趋势模板 / 磨底节拍 / 相对强度 / 六态)",
+    AXIS_TIMING: "今天是不是那一天(信号新鲜度 / 量比 / 通道位置 / 换手)",
+}
 
-# 维度权重。**声明权重 ≠ 有效权重** —— 三个维度之间有残余相关(见模块头),
-# 真实区分度要等 R133 台账的分层单调性回来才定得下来。
-WEIGHTS = {DIM_TREND: 0.45, DIM_VOLUME: 0.30, DIM_POSITION: 0.25}
+# 质地轴的权重。**这是本次唯一新编的一组数**, 理由逐条写在这:
+#
+#   template .40  八条模板是四个因子里唯一被公开检验过的一组标准, 而且它是
+#                 8 条的合成, 分辨率天然最高(0~8 档), 该给最大的一份。
+#   base     .25  用户明确要的那件事(「磨了多久」+「红绿节拍」)。给 .25 而不是
+#                 更多的理由: 它管的是**模板还没通过之前**那一段, 一旦结构确认
+#                 了, 底是怎么磨出来的就成了历史; 而"反复失败"那一侧已经由
+#                 门槛 G4 单独否决掉, 不需要再靠权重去压。
+#   rs       .20  唯一一个"相对市场"的量, 与另外三个都不相关 —— 不相关的因子
+#                 便宜, 权重该保住。
+#   state    .15  六态是本 fork 的招牌, 但它和模板的均线排列讲的是同一件事的
+#                 两种说法, 重叠最多; 而且 G1 门槛已经用它筛过一道了。同一个
+#                 事实投两次票, 第二次该轻。
+#
+# 这四个数和 R134 的 WEIGHTS 一样是**先验**, 等台账攒够样本按分层单调性调。
+# 「蓄势该加多少分」的答案就落在 base 这 .25 里: 蓄势与震荡在 base 上差 45 分
+# (见 RHYTHM_SCORE), 折进质地是 11 分, 再经几何平均落到把握分上约 5~6 分 ——
+# 够让同档次的票分出先后, 不够让它一个人把一只结构不行的票抬进前排。
+QUALITY_WEIGHTS = {"template": 0.40, "base": 0.25, "rs": 0.20, "state": 0.15}
 
-# 维度内部的因子权重
-TREND_WEIGHTS = {"fresh": 0.55, "state": 0.25, "rs": 0.20}
-VOLUME_WEIGHTS = {"vol_ratio": 0.70, "turnover": 0.30}
-POSITION_WEIGHTS = {"pos": 1.0}
+# 时机轴的权重 —— 由 R134 旧有效权重归一化得到, 见上面「轴内权重哪来的」
+TIMING_WEIGHTS = {"fresh": 0.31, "pos": 0.32, "vol_ratio": 0.26, "turnover": 0.11}
+
+AXIS_FACTORS = {AXIS_QUALITY: QUALITY_WEIGHTS, AXIS_TIMING: TIMING_WEIGHTS}
 
 FACTOR_CN = {
-    "fresh": "新鲜度", "state": "六态状态", "rs": "相对强度",
-    "vol_ratio": "量比", "turnover": "换手率", "pos": "通道位置",
+    "template": "趋势模板", "base": "磨底节拍", "rs": "相对强度", "state": "六态状态",
+    "fresh": "新鲜度", "vol_ratio": "量比", "turnover": "换手率", "pos": "通道位置",
 }
+
+# 趋势模板通过条数 → 0~100。**上凸**: 8/8 与 7/8 的差距要比 4/8 与 3/8 的大 ——
+# 模板的意义在"全部满足", 差一条就还不是那个形态, 差四条只是差得更多而已。
+TEMPLATE_CURVE: Curve = ((0, 0), (2, 10), (4, 30), (5, 45), (6, 62), (7, 82), (8, 100))
+
+# 红绿节拍档位 → 0~100。
+#   蓄势 100 / 震荡 55 —— 差 45 分, 这就是「蓄势加多少分」的原始刻度。
+#   没循环 60: **中性偏上, 不是低分**。一路上涨从没跌出过多头的强势股恰恰是
+#     cycles=0, 给它低分等于惩罚"没磨过底", 方向反了。
+#   反复失败 0: 正常到不了这里(G4 已经否决), 留着是为了万一门槛没喂到值。
+RHYTHM_SCORE = {"building": 100.0, "choppy": 55.0, "none": 60.0, "failing": 0.0}
+
+# 磨底天数 → 0~100。同样**从中性 60 起步**, 只上不下 —— 天数少不是缺点,
+# 只是"这只票不是靠磨底磨出来的"。磨过一年以上开始回落: 那不再是蓄势,
+# 是这只票没人要。
+BASING_DAYS_CURVE: Curve = ((0, 60), (20, 62), (45, 78), (90, 100), (200, 100),
+                            (320, 80), (500, 62))
+
+# 天数中性值 —— 用在"时长这一半不该说话"的时候, 见 base_score。
+BASING_DAYS_NEUTRAL = 60.0
+
+# base 因子内部: 档位六成、天数四成。「磨得好不好」是有区分度的信息,
+# 「磨了多久」没有质量做前提时只是时间 —— 用户要看的天数在界面上单独显示
+# (R188), 不必在分数里也让它当家。
+BASE_LEVEL_W = 0.6
+
+# 趋势模板要**八条全都判得出来**才计入, 否则这个因子缺席(权重让给另外三个)。
+# 不做"按 known 缩放": 一只上市半年的次新股 3 条全过缩放成 8 条满分, 那是
+# 凭空造出来的质地。次新股本来就不该由这套模板来评价。
+TEMPLATE_MIN_KNOWN = 8
+
+
+def base_score(rhythm: dict | None) -> float | None:
+    """磨底与节拍 → 0~100。rhythm 是 trend_rhythm.assess 的返回值。"""
+    if not rhythm:
+        return None
+    lvl = RHYTHM_SCORE.get(str(rhythm.get("level") or "none"))
+    days = ((rhythm.get("basing") or {}).get("days"))
+    if lvl is None and days is None:
+        return None
+    if lvl is None:
+        lvl = RHYTHM_SCORE["none"]
+    if days is None:
+        return lvl
+    # **时长只在蓄势时才算数。** 这一条是整个因子的关键:
+    # 低点一路抬高、红段越来越长, 那么磨得越久力量攒得越足 —— 天数是好事;
+    # 但同一个位置来回震荡, 磨三个月并不比磨三周更接近突破, 只是更久而已。
+    # 不加这个条件的话, 一只震荡了 90 天的票会排在一只一路上涨从没磨过底的
+    # 强势股前面 —— 而后者恰恰是这套系统最该抓的那种。
+    if str(rhythm.get("level")) == "building":
+        days_part = _piecewise(float(days), BASING_DAYS_CURVE)
+    else:
+        days_part = BASING_DAYS_NEUTRAL
+    return BASE_LEVEL_W * lvl + (1 - BASE_LEVEL_W) * days_part
+
+
+def template_score(tpl: dict | None) -> float | None:
+    """趋势模板 → 0~100。八条判不全就返回 None(因子缺席), 见 TEMPLATE_MIN_KNOWN。"""
+    if not tpl or (tpl.get("known") or 0) < TEMPLATE_MIN_KNOWN:
+        return None
+    return _piecewise(float(tpl.get("passed") or 0), TEMPLATE_CURVE)
 
 
 def _blend(parts: dict[str, float | None], weights: dict[str, float]) -> tuple[float | None, float]:
     """按权重合成, 缺失的因子把权重让给还在的那些。
 
     返回 (分数, 实际覆盖到的权重占比)。全缺时返回 (None, 0.0) ——
-    调用方据此决定这个维度算不算数, 而不是拿一个假的 0 分往下传。
+    调用方据此决定这根轴算不算数, 而不是拿一个假的 0 分往下传。
     """
     got = {k: v for k, v in parts.items() if v is not None and k in weights}
     if not got:
@@ -206,13 +345,17 @@ def _blend(parts: dict[str, float | None], weights: dict[str, float]) -> tuple[f
 def score_candidate(*, duration: int | None, state: str | None,
                     rs_pct: float | None, vol_ratio: float | None,
                     turnover_rate: float | None, channel_pct: float | None,
-                    near_breakout: bool = False) -> dict:
-    """三维度打分。返回 {score, dims, factors, coverage, partial}。纯函数。
+                    near_breakout: bool = False,
+                    template: dict | None = None,
+                    rhythm: dict | None = None) -> dict:
+    """质地 × 时机 两轴打分。返回 {score, axes, factors, coverage, partial}。纯函数。
 
-    rs_pct: 个股 20 日收益 - 大盘 20 日收益, 单位**百分点**(如 +6.0 表示跑赢 6 个点)。
+    rs_pct: 个股 20 日收益 − 大盘 20 日收益, 单位**百分点**(如 +6.0 表示跑赢 6 个点)。
     turnover_rate: 换手率, 单位 **%**。
     channel_pct: Keltner 短期通道位置 0~1(轨外会 <0 或 >1)。
     near_breakout: 这只是"逼近触发价"那一路进来的 —— 没有六态信号新鲜度可用。
+    template: trend_template.assess 的返回值(可缺)。
+    rhythm:   trend_rhythm.assess 的返回值(可缺)。
     """
     fresh: float | None
     fresh_from: str
@@ -229,30 +372,37 @@ def score_candidate(*, duration: int | None, state: str | None,
         fresh, fresh_from = None, "none"
 
     factors: dict[str, float | None] = {
-        "fresh": fresh,
-        "state": STATE_SCORE.get(state or "") if state else None,
+        # --- 质地(慢变) ---
+        "template": template_score(template),
+        "base": base_score(rhythm),
         "rs": _piecewise(float(rs_pct), RS_CURVE) if rs_pct is not None else None,
+        "state": STATE_SCORE.get(state or "") if state else None,
+        # --- 时机(快变) ---
+        "fresh": fresh,
         "vol_ratio": _piecewise(float(vol_ratio), VOL_RATIO_CURVE) if vol_ratio else None,
         "turnover": (_piecewise(float(turnover_rate), TURNOVER_CURVE)
                      if turnover_rate else None),
         "pos": _piecewise(float(channel_pct), POS_CURVE) if channel_pct is not None else None,
     }
 
-    trend, cov_t = _blend(factors, TREND_WEIGHTS)
-    volume, cov_v = _blend(factors, VOLUME_WEIGHTS)
-    position, cov_p = _blend(factors, POSITION_WEIGHTS)
-    dims: dict[str, float | None] = {
-        DIM_TREND: trend, DIM_VOLUME: volume, DIM_POSITION: position}
-    coverage = {DIM_TREND: cov_t, DIM_VOLUME: cov_v, DIM_POSITION: cov_p}
+    quality, cov_q = _blend(factors, QUALITY_WEIGHTS)
+    timing, cov_t = _blend(factors, TIMING_WEIGHTS)
+    axes: dict[str, float | None] = {AXIS_QUALITY: quality, AXIS_TIMING: timing}
 
-    total, dim_cov = _blend(dims, WEIGHTS)     # 整个维度缺席时在维度之间再归一化
+    # 几何平均。一根轴整根缺席时退回另一根 —— 不能把"没读到质地"当成"质地 0",
+    # 那会让缺数据的票直接从榜上消失, 与门槛层「缺数据放行」是同一条纪律。
+    if quality is not None and timing is not None:
+        total: float | None = (max(quality, 0.0) * max(timing, 0.0)) ** 0.5
+    else:
+        total = quality if quality is not None else timing
+
     return {
         "score": int(round(total)) if total is not None else 0,
-        "dims": {k: (round(v, 1) if v is not None else None) for k, v in dims.items()},
+        "axes": {k: (round(v, 1) if v is not None else None) for k, v in axes.items()},
         "factors": {k: (round(v, 1) if v is not None else None) for k, v in factors.items()},
-        "coverage": {k: round(v, 2) for k, v in coverage.items()},
-        # 有维度缺席 → 分数是在剩下的维度上算的, 界面必须说清楚, 不能装作满的
-        "partial": dim_cov < 0.999,
+        "coverage": {AXIS_QUALITY: round(cov_q, 2), AXIS_TIMING: round(cov_t, 2)},
+        # 有因子缺席 → 分数是在剩下的因子上算的, 界面必须说清楚, 不能装作满的
+        "partial": cov_q < 0.999 or cov_t < 0.999,
         "fresh_from": fresh_from,
     }
 
@@ -264,7 +414,7 @@ def explain(res: dict, *, duration: int | None = None, vol_ratio: float | None =
             channel_pct: float | None = None, rs_pct: float | None = None) -> list[str]:
     """把打分结果翻成几句可以直接摆在卡片上的话。
 
-    刻意只讲**这套分数自己**的事(三维度各强在哪弱在哪), 不掺主线/AI/胜率 ——
+    刻意只讲**这套分数自己**的事(两根轴各强在哪弱在哪), 不掺主线/AI/胜率 ——
     那些是注记, 归注记那一栏说。混在一起用户就分不清哪句话影响了排名。
     """
     out: list[str] = []

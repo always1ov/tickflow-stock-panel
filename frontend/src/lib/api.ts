@@ -216,15 +216,25 @@ export interface TodayOpportunity {
   /** [R158] 关键点/触发价本身(gap_pct 就是相对它算的); 界面上悬停显示 */
   pivot?: number | null
 
-  // ===== [R134] 评分 v2: 三道硬门槛 + 三维度加权 =====
-  /** 三个维度分(0~100); 数据整档缺失时为 null */
-  dims?: { trend: number | null; volume: number | null; position: number | null }
-  /** 每个因子的子分(0~100) —— 维度分说明"量能不行", 子分说明是量比还是换手 */
-  factors?: Record<'fresh' | 'state' | 'rs' | 'vol_ratio' | 'turnover' | 'pos', number | null>
-  /** 各维度实际覆盖到的因子权重占比 */
-  coverage?: { trend: number; volume: number; position: number }
-  /** 有维度整档缺席 → 总分是在剩下的维度上算的, 偏乐观, 界面必须说清楚 */
+  // ===== [R134/R189] 评分: 四道硬门槛 + 质地 × 时机两轴 =====
+  /** 两根轴(0~100)。**总分 = √(质地 × 时机)** —— 一边好一边差不许平均成中等。
+   *  质地以月计变化(结构), 时机逐日变化(买点); 整根轴的因子全缺时为 null。 */
+  axes?: { quality: number | null; timing: number | null }
+  /** 每个因子的子分(0~100) —— 轴分说明"时机不行", 子分说明是量比还是位置 */
+  factors?: Record<
+    'template' | 'base' | 'rs' | 'state' | 'fresh' | 'pos' | 'vol_ratio' | 'turnover',
+    number | null>
+  /** 各轴实际覆盖到的因子权重占比 */
+  coverage?: { quality: number; timing: number }
+  /** 有因子缺席 → 总分是在剩下的因子上算的, 偏乐观, 界面必须说清楚 */
   partial?: boolean
+  /** [R189] 趋势模板(Minervini 八条)的原始事实 —— 分数是结论, 这是依据 */
+  template?: {
+    passed: number; known: number; total: number; text: string
+    criteria: { code: string; label: string; pass: boolean | null; detail: string }[]
+  } | null
+  /** [R189] 红绿节拍与磨底时长(trend_rhythm 的返回值) */
+  rhythm?: TrendRhythm | null
   /** 新鲜度来自哪一路: 六态信号 / 逼近触发价 / 都没有 */
   fresh_from?: 'signal' | 'near_breakout' | 'none'
   /** 命中的候选来源(可同时命中两路) */
@@ -243,7 +253,7 @@ export interface TodayOpportunity {
   close?: number | null
   /** 不参与打分的佐证: 主线/AI/历史胜率/通道结论/策略命中/龙虎榜 */
   notes?: TodayNote[]
-  /** [R137] 盘中视图 —— 与 score/dims **完全并列, 一分不进评分**。
+  /** [R137] 盘中视图 —— 与 score/axes **完全并列, 一分不进评分**。
    *  把握分冻在收盘口径(盘中一动不动, 是稳定的决策基准), 盘中的变化摆这里。
    *  只在开着实时行情、且该标的拿到了实时行时才有。 */
   live?: TodayLive | null

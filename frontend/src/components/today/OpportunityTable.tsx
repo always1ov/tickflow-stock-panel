@@ -22,14 +22,25 @@ const BOARD_LIMIT_CN: Record<string, string> = {
   沪主板: '10%', 深主板: '10%', 创业板: '20%', 科创板: '20%', 北交所: '30%',
 }
 
-const DIM_META = [
-  { key: 'trend', cn: '趋势强度', weight: '45%', cls: 'bg-red-400',
-    hint: '新鲜度(主导) / 六态状态 / 相对强度' },
-  { key: 'volume', cn: '量能确认', weight: '30%', cls: 'bg-amber-400',
-    hint: '量比(区间最优,峰在 1.3~2.5) / 换手率' },
-  { key: 'position', cn: '位置成本', weight: '25%', cls: 'bg-sky-400',
-    hint: 'Keltner 短期通道位置,甜区 50%~65%(刚站上生命线)' },
+// [R189] 三维度 → 两根轴。分法从"按数据来源"改成"按变化速度":
+// 质地以月计变化, 时机逐日变化。总分 = √(质地 × 时机) —— 两边都得像样。
+const AXIS_META = [
+  { key: 'quality', cn: '质地', cls: 'bg-red-400',
+    what: '这只票的长周期结构 —— 以月计变化',
+    hint: '趋势模板(八条) / 磨底节拍 / 相对强度 / 六态状态' },
+  { key: 'timing', cn: '时机', cls: 'bg-sky-400',
+    what: '今天是不是那一天 —— 逐日变化',
+    hint: '新鲜度 / 通道位置 / 量比(区间最优,峰在 1.3~2.5) / 换手率' },
 ] as const
+
+/** 两轴一高一低时该说的那句话 —— 这正是合成分说不出来的东西。 */
+function axisVerdict(q?: number | null, t?: number | null): string | null {
+  if (q == null || t == null) return null
+  if (q >= 70 && t < 50) return '好票,但今天不是买点 —— 等回踩或等放量,别追'
+  if (q < 50 && t >= 70) return '今天是有动静,但这票本身结构不行 —— 不值得占仓位'
+  if (q >= 70 && t >= 70) return '质地与时机都在位 —— 高概率的有苗头的东西'
+  return null
+}
 
 const NOTE_TONE: Record<string, string> = {
   good: 'bg-emerald-400/15 text-emerald-300',
@@ -37,19 +48,21 @@ const NOTE_TONE: Record<string, string> = {
   info: 'bg-border/50 text-muted',
 }
 
-/** 把握分 + 三维度分解条。分数本身不再是黑箱 —— 条的形状就是理由。 */
+/** 把握分 + 两轴分解条。分数本身不再是黑箱 —— 条的形状就是理由。 */
 function ScoreCell({ o, rank, total }: { o: TodayOpportunity; rank: number; total: number }) {
-  const dims = o.dims
-  const detail = DIM_META
-    .map(d => `${d.cn}(${d.weight}) ${dims?.[d.key] ?? '无数据'}`)
+  const axes = o.axes
+  const detail = AXIS_META
+    .map(d => `${d.cn} ${axes?.[d.key] ?? '无数据'} — ${d.what}`)
     .join('\n')
+  const verdict = axisVerdict(axes?.quality, axes?.timing)
   return (
     <span
       className="inline-flex w-11 shrink-0 flex-col items-center gap-1"
-      title={`把握分 ${o.score} —— 今日候选里排第 ${rank}/${total}\n\n${detail}\n\n`
+      title={`把握分 ${o.score} = √(质地 × 时机) —— 今日候选里排第 ${rank}/${total}\n\n${detail}\n\n`
+        + (verdict ? `${verdict}\n\n` : '')
         + (o.partial
-          ? '⚠ 有维度缺数据,总分是在剩下的维度上算的,偏乐观'
-          : '三个维度数据齐全')}
+          ? '⚠ 有因子缺数据,总分是在剩下的因子上算的,偏乐观'
+          : '两根轴的因子都齐全')}
     >
       <span className="font-mono text-[11px] font-semibold leading-none">
         <span className={o.score >= 80 ? 'text-danger' : o.score >= 60 ? 'text-warning' : 'text-muted'}>
@@ -58,8 +71,8 @@ function ScoreCell({ o, rank, total }: { o: TodayOpportunity; rank: number; tota
         {o.partial && <span className="text-[9px] text-warning">*</span>}
       </span>
       <span className="w-full space-y-[2px]">
-        {DIM_META.map(d => {
-          const v = dims?.[d.key]
+        {AXIS_META.map(d => {
+          const v = axes?.[d.key]
           return (
             <span key={d.key} className="block h-[3px] overflow-hidden rounded-full bg-border/50">
               {v != null && (
@@ -197,7 +210,7 @@ export function OpportunityTable({ rows, pickedSymbols, onOpen, live }: {
         <thead>
           <tr className="border-b border-border/40 text-[10px] text-muted">
             <th className="w-14 px-3 py-1.5 text-center font-normal"
-                title="把握分 = 趋势强度 45% + 量能确认 30% + 位置成本 25%;下面三条细条是各维度得分">
+                title="把握分 = √(质地 × 时机)。质地=长周期结构(趋势模板/磨底节拍/相对强度/六态),以月计变化;时机=今天是不是那一天(新鲜度/通道位置/量比/换手),逐日变化。一边好一边差不会被平均成中等 —— 下面两条细条就是这两根轴的得分。">
               把握
             </th>
             <th className="px-2 py-1.5 text-left font-normal">名称</th>
@@ -364,27 +377,36 @@ function ActionCell({ action }: { action?: TodayAction | null }) {
   )
 }
 
-/** 展开行: 把三维度拆到因子这一层, 外加注记全文与建仓路径。 */
+/** 展开行: 把两根轴拆到因子这一层, 外加注记全文与建仓路径。 */
 function OpportunityDetail({ o, live }: { o: TodayOpportunity; live?: boolean }) {
   const F_CN: Record<string, string> = {
-    fresh: '新鲜度', state: '六态状态', rs: '相对强度',
-    vol_ratio: '量比', turnover: '换手率', pos: '通道位置',
+    template: '趋势模板', base: '磨底节拍', rs: '相对强度', state: '六态状态',
+    fresh: '新鲜度', pos: '通道位置', vol_ratio: '量比', turnover: '换手率',
   }
-  const DIM_FACTORS: Record<string, string[]> = {
-    trend: ['fresh', 'state', 'rs'], volume: ['vol_ratio', 'turnover'], position: ['pos'],
+  const AXIS_FACTORS: Record<string, string[]> = {
+    quality: ['template', 'base', 'rs', 'state'],
+    timing: ['fresh', 'pos', 'vol_ratio', 'turnover'],
   }
+  const verdict = axisVerdict(o.axes?.quality, o.axes?.timing)
   return (
     <tr className="border-b border-border/25 bg-base/40">
       <td colSpan={live ? 10 : 9} className="px-4 py-3">
         <div className="animate-rise-in space-y-2.5 text-[11px] leading-5">
-          <div className="grid gap-2.5 sm:grid-cols-3">
-            {DIM_META.map(d => {
-              const v = o.dims?.[d.key]
+          {/* [R189] 两轴的结论先说 —— 「质地 92 / 时机 41」的意思是"好票但今天
+              不是买点", 而合成后的 61 分说不出这句话。那正是拆成两轴的理由。 */}
+          {verdict && (
+            <div className="rounded border border-accent/30 bg-accent/10 px-2.5 py-1.5 text-foreground/90">
+              {verdict}
+            </div>
+          )}
+          <div className="grid gap-2.5 sm:grid-cols-2">
+            {AXIS_META.map(d => {
+              const v = o.axes?.[d.key]
               return (
                 <div key={d.key} className="rounded border border-border/40 bg-surface/40 px-2.5 py-2">
                   <div className="flex items-baseline justify-between">
                     <span className="text-foreground/90">{d.cn}</span>
-                    <span className="font-mono text-[10px] text-muted">权重 {d.weight}</span>
+                    <span className="text-[10px] text-muted">{d.what}</span>
                   </div>
                   <div className="mt-1 flex items-center gap-2">
                     <span className="h-1 flex-1 overflow-hidden rounded-full bg-border/50">
@@ -396,7 +418,7 @@ function OpportunityDetail({ o, live }: { o: TodayOpportunity; live?: boolean })
                     </span>
                   </div>
                   <div className="mt-1.5 space-y-0.5 text-[10px] text-muted">
-                    {DIM_FACTORS[d.key].map(fk => (
+                    {AXIS_FACTORS[d.key].map(fk => (
                       <div key={fk} className="flex justify-between">
                         <span>{F_CN[fk]}</span>
                         <span className="font-mono">
@@ -414,7 +436,7 @@ function OpportunityDetail({ o, live }: { o: TodayOpportunity; live?: boolean })
 
           {live && (
             <div className="rounded border border-sky-400/30 bg-sky-400/10 px-2.5 py-1.5 text-sky-300">
-              把握分与三个维度都是 <span className="font-medium">{'{'}收盘口径{'}'}</span>,盘中一动不动 ——
+              把握分与两根轴都是 <span className="font-medium">{'{'}收盘口径{'}'}</span>,盘中一动不动 ——
               它是你的决策基准。上面「盘中」那一列才是现在正在发生的事,一分不进评分。
               带「盘中·待收盘确认」标的候选例外:那是盘中才冒出来的信号,收盘可能收回去。
             </div>
@@ -422,8 +444,56 @@ function OpportunityDetail({ o, live }: { o: TodayOpportunity; live?: boolean })
 
           {o.partial && (
             <div className="rounded border border-warning/30 bg-warning/10 px-2.5 py-1.5 text-warning">
-              有维度整档缺数据,总分是在剩下的维度上算的 —— 这种候选的分**偏乐观**,
+              有因子缺数据,总分是在剩下的因子上算的 —— 这种候选的分<b>偏乐观</b>,
               与同分候选比较时优先选数据齐全的那只。
+            </div>
+          )}
+
+          {/* [R189] 趋势模板八条的原文。**分数是结论, 这里是依据** —— 「质地 88」
+              没法核对, 「MA200 上行至少一个月:较 22 日前 +3.1%」可以。 */}
+          {!!o.template && (
+            <div className="rounded border border-border/40 bg-surface/40 px-2.5 py-2">
+              <div className="mb-1 flex items-baseline justify-between">
+                <span className="text-foreground/90">趋势模板</span>
+                <span className="font-mono text-[10px] text-muted">
+                  {o.template.passed}/{o.template.total} 条
+                  {o.template.known < o.template.total
+                    && ` · ${o.template.total - o.template.known} 条历史不足`}
+                </span>
+              </div>
+              <div className="grid gap-x-4 gap-y-0.5 text-[10px] sm:grid-cols-2">
+                {o.template.criteria.map(c => (
+                  <div key={c.code} className="flex items-baseline gap-1.5" title={c.detail}>
+                    <span className={c.pass === true ? 'text-emerald-400'
+                      : c.pass === false ? 'text-danger' : 'text-muted/50'}>
+                      {c.pass === true ? '✓' : c.pass === false ? '✗' : '—'}
+                    </span>
+                    <span className={c.pass === null ? 'text-muted/50' : 'text-muted'}>{c.label}</span>
+                    <span className="ml-auto truncate font-mono text-[9px] text-muted/60">{c.detail}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-1 text-[9px] text-muted/70">
+                八条全部满足才是确认的上升阶段;判不出来的记「—」,不当作没通过。
+              </div>
+            </div>
+          )}
+
+          {/* [R188/R189] 磨了多久 + 磨得好不好。两个数凑一起才完整 ——
+              「磨了 87 天」不说好坏, 「蓄势」不说久暂。 */}
+          {!!o.rhythm && (o.rhythm.basing.days > 0 || o.rhythm.cycles > 0) && (
+            <div className="text-muted">
+              <span className="text-foreground/90">磨底节拍</span>
+              {o.rhythm.basing.days > 0 && (
+                <span className="ml-2 font-mono text-[10px]">
+                  磨底 {o.rhythm.basing.days} 天
+                  {o.rhythm.basing.low != null && o.rhythm.basing.high != null
+                    && ` · 箱体 ${o.rhythm.basing.low.toFixed(2)}~${o.rhythm.basing.high.toFixed(2)}`}
+                </span>
+              )}
+              {o.rhythm.cycles > 0 && (
+                <span className="ml-2">{o.rhythm.label}:{o.rhythm.reason}</span>
+              )}
             </div>
           )}
 
@@ -432,7 +502,7 @@ function OpportunityDetail({ o, live }: { o: TodayOpportunity; live?: boolean })
           {!!o.notes?.length && (
             <div className="space-y-1">
               <div className="text-[10px] text-muted/70">
-                以下都是**佐证**,一分不加一分不减 —— 它们要么不可回测(主线口径随情绪周期漂移)、
+                以下都是<b>佐证</b>,一分不加一分不减 —— 它们要么不可回测(主线口径随情绪周期漂移)、
                 要么样本太小(单票历史突破常不足 10 次)、要么是模型对自己输出的自评(AI 置信度)。
               </div>
               {o.notes.map(n => (

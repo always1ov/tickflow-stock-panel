@@ -84,6 +84,7 @@ def score_opportunities(
     trends: dict[str, dict], signals: dict[str, dict], names: dict[str, str],
     bench_ret: float | None = None,
     extras: dict[str, dict] | None = None,
+    bench_ret_120d: float | None = None,
 ) -> tuple[list[dict], dict]:
     """[R134] 买入机会评分 v2。返回 (完整排序列表, 门槛体检)。
 
@@ -91,7 +92,7 @@ def score_opportunities(
                 "blocked_total": 被挡几只, "blocked": {门槛代码: 被这条挡了几只}}。
     ``blocked`` 各项之和会大于 ``blocked_total`` —— 一只票可以同时踩中好几条。
 
-    打分口径整体搬到 ``services.opportunity_score``(三道硬门槛 + 三维度加权),
+    打分口径整体搬到 ``services.opportunity_score``(硬门槛 + 质地 × 时机两轴),
     这里只负责三件事: **收候选、喂数据、挂注记**。这样做的理由是打分必须能
     脱离 HTTP 层单测与回测 —— v1 的加减分散在这个函数里, 想验证一条曲线就得
     先造一整份总览。
@@ -109,10 +110,13 @@ def score_opportunities(
     extras[sym] 认得的键:
       vol_ratio / turnover  量能维度的两个因子
       channel_pct           Keltner 短期通道位置(位置维度)
-      gate                  keltner_service.long_trend_map 的一行(生命线 + 长期趋势)
+      gate                  keltner_service.long_trend_map 的一行(生命线 + 长期趋势;
+                            [R189] with_closes=True 时还带 closes 与 ret_120d,
+                            趋势模板要拿它算 MA150/MA200 与 52 周高低点)
       win / mainline / verdict / dragon  纯注记
     """
     from app.services import opportunity_score as osc
+    from app.services import trend_template as _tt
 
     ex = extras or {}
     cands: dict[str, dict] = {}
@@ -180,7 +184,9 @@ def score_opportunities(
             state=t.get("state"),
             above_ma20=g.get("above_ma20"), above_ma20_prev=g.get("above_ma20_prev"),
             close=g.get("close") if g.get("close") is not None else t.get("close"),
-            ma120=g.get("ma120"), ma120_rising=g.get("ma120_rising"))
+            ma120=g.get("ma120"), ma120_rising=g.get("ma120_rising"),
+            # [R189] G4 红绿节拍。R188 起 _trend_payload 就带着它了, 白捡
+            rhythm_level=(t.get("rhythm") or {}).get("level"))
         if not gates["ok"]:
             # 被挡下的只计数不进列表。计数要报给界面 —— "今天 40 只候选被门槛
             # 挡掉 28 只"本身就是市场状态, 藏起来用户会以为系统没干活
@@ -199,10 +205,24 @@ def score_opportunities(
         cpct = e.get("channel_pct")
         cpct = float(cpct) if isinstance(cpct, (int, float)) else None
 
+        # [R189] 趋势模板。原料全在 gate 那一行里(与生命线/长期趋势同一次批量
+        # 读), 唯一要现算的是第 8 条的半年超额收益。
+        tpl = None
+        closes_long = g.get("closes")
+        if closes_long:
+            r120 = g.get("ret_120d")
+            rs6 = (r120 - bench_ret_120d
+                   if r120 is not None and bench_ret_120d is not None else None)
+            try:
+                tpl = _tt.assess(closes_long, rs6)
+            except Exception as e:  # noqa: BLE001
+                logger.debug("trend template skipped for %s: %s", sym, e)
+
         res = osc.score_candidate(
             duration=c["duration"], state=t.get("state"), rs_pct=rs_pct,
             vol_ratio=vr, turnover_rate=turn, channel_pct=cpct,
-            near_breakout=c["near_breakout"])
+            near_breakout=c["near_breakout"],
+            template=tpl, rhythm=t.get("rhythm"))
 
         close = t.get("close") or (signals.get(sym) or {}).get("close")
         try:
@@ -222,7 +242,7 @@ def score_opportunities(
             "kind": c["kinds"][0] if c["kinds"] else "trend_signal",
             "kinds": c["kinds"],
             "score": res["score"],
-            "dims": res["dims"], "factors": res["factors"],
+            "axes": res["axes"], "factors": res["factors"],
             "coverage": res["coverage"], "partial": res["partial"],
             "fresh_from": res["fresh_from"],
             "text": c["text"], "pivot": c["pivot"], "close": close,
@@ -234,6 +254,12 @@ def score_opportunities(
             "board": board_of(sym),
             "why": osc.explain(res, duration=c["duration"], vol_ratio=vr,
                                channel_pct=cpct, rs_pct=rs_pct),
+            # [R189] 质地那两个新因子的原始事实 —— 分数是结论, 这里给依据。
+            # 与 notes 一样只是展示, 但它们**确实进了分**, 所以摆在 notes 之外。
+            "template": ({"passed": tpl["passed"], "known": tpl["known"],
+                          "total": tpl["total"], "text": _tt.summary(tpl),
+                          "criteria": tpl["criteria"]} if tpl else None),
+            "rhythm": t.get("rhythm"),
             "notes": _annotations(sym, e, signals.get(sym) or {}),
             # [R137] 盘中视图。**和 score/dims 完全并列, 一分不进评分** ——
             # 决策基准冻在收盘口径(盘中一动不动), 盘中的变化单独摆一份给人盯。
@@ -266,17 +292,21 @@ def score_opportunities(
                 # 就是几 MB。天数不落, 因为它每天都在变、不适合做分组维度。
                 "rhythm": (t.get("rhythm") or {}).get("level"),
                 "basing_days": ((t.get("rhythm") or {}).get("basing") or {}).get("days"),
+                # [R189] 趋势模板过了几条。只在八条全判得出时落 —— 判不全的
+                # 那个 passed 和判得全的不是同一把尺子, 混在一档里统计会骗人。
+                "tpl_passed": (tpl["passed"] if tpl and tpl.get("complete") else None),
             },
         }
         out.append(o)
 
     # [R139] 排序 = 把握分降序。同分时的次序以前是按代码字典序 —— 那是个
     # **无意义**的顺序, 而用户会照着名次从上往下看。改成两级有含义的兜底:
-    #   ① 数据齐全的排在 partial 前面(同样 78 分, 三维都算出来的那只更可信);
-    #   ② 再比趋势强度 —— 三个维度里它权重最大, 也最接近"这波起来了没有"。
+    #   ① 数据齐全的排在 partial 前面(同样 78 分, 因子都算出来的那只更可信);
+    #   ② [R189] 再比**质地** —— 同分意味着质地×时机的乘积相同, 而在乘积相同
+    #      时该先看质地好的那只: 时机会重来, 质地不会。
     # 最后才用代码保证确定性(同一份数据每次刷新顺序不变)。
     out.sort(key=lambda o: (-o["score"], bool(o["partial"]),
-                            -(o["dims"].get("trend") or 0), o["symbol"]))
+                            -(o["axes"].get("quality") or 0), o["symbol"]))
     return out, {"candidates": len(cands), "passed": len(out),
                  "blocked_total": blocked_total, "blocked": blocked}
 
@@ -656,6 +686,8 @@ def _build_overview(repo, engine=None) -> dict:
     except Exception as e:  # noqa: BLE001
         logger.warning("today market mode skipped: %s", e)
     bench_ret = ((market or {}).get("metrics") or {}).get("ret_20d")
+    # [R189] 趋势模板第 8 条要的基准一侧(半年超额收益)
+    bench_ret_120d = ((market or {}).get("metrics") or {}).get("ret_120d")
     prefs = today_prefs.load()
     _st.mark("market_mode")
 
@@ -738,7 +770,9 @@ def _build_overview(repo, engine=None) -> dict:
         gate_map: dict[str, dict] = {}
         try:
             from app.services import keltner_service as _ks
-            gate_map = _ks.long_trend_map(repo, cand_syms)
+            # [R189] with_closes: 窗口拉长到 420 天并带回收盘序列, 趋势模板要
+            # MA150/MA200 与 52 周高低点。只有候选这一小撮走这条路。
+            gate_map = _ks.long_trend_map(repo, cand_syms, with_closes=True)
         except Exception as e:  # noqa: BLE001
             logger.warning("today gate data skipped: %s", e)
         _st.mark("gates")
@@ -821,7 +855,8 @@ def _build_overview(repo, engine=None) -> dict:
 
     # [R133] 先拿到**完整**排序列表, 再按门槛截断。台账记完整的那份 ——
     # 只记显示出来的 10 条, 等于只用样本里最好的一段去证明样本好。
-    ranked_all, gate_info = score_opportunities(trends, signals, names, bench_ret, extras)
+    ranked_all, gate_info = score_opportunities(trends, signals, names, bench_ret, extras,
+                                               bench_ret_120d=bench_ret_120d)
     opportunities, opp_filtered = filter_opportunities(
         ranked_all, prefs["min_score"], prefs["max_show"], prefs.get("boards"))
     # [R18] 盘中口径标注: 实时价确实参与了判定的趋势类新信号是"临时信号",
@@ -1151,13 +1186,18 @@ _AI_SYSTEM = """你是用户的盘前参谋,有 15 年 A 股一线交易经验�
 4. **上方阻力空间**:离上方压力位还有多少空间?空间太小的机会不值得占用仓位
 5. **K 线形态质量**:是干净利落的放量长阳,还是上影线很长、量价背离、连续跳空的透支形态
 
-### 你会看到的「三维度分解」怎么用
+### 你会看到的「质地 × 时机 两轴分解」怎么用
 
 每只候选带一份 `把握分分解`,那是规则层的自评,结构固定:
 
-- **门槛**:这只票已经通过三道硬门槛(六态在多头侧 / 收盘站上生命线 MA20 且连续两日 / 不在长期下跌趋势里)。**没过门槛的票压根不会送到你面前**,所以不必再核这三件事。
-- **趋势强度 / 量能确认 / 位置成本**:各 0~100。三条曲线都是**区间最优**不是越大越好 —— 量比峰值在 1.3~2.5(超过 4 说明这波已经走完了),通道位置甜区在 0.50~0.65(刚站上生命线,越接近 1.0 越是追高)。
-- `partial: true` 表示某个维度**没有数据**,那一档的分是靠剩下的维度顶上来的 —— 这种候选的总分偏乐观,同分时优先选 partial 为 false 的。
+- **门槛**:这只票已经通过四道硬门槛(六态在多头侧 / 收盘站上生命线 MA20 且连续两日 / 不在长期下跌趋势里 / 红绿节拍不是「反复失败」)。**没过门槛的票压根不会送到你面前**,所以不必再核这四件事。
+- **质地**(0~100):这只票的长周期结构 —— 趋势模板八条过了几条、磨底磨了多久磨得好不好、相对大盘强弱、六态状态。**它以月计变化**,今天和上周基本是同一个数。
+- **时机**(0~100):今天是不是那一天 —— 信号第几天、量比、通道位置、换手率。**它逐日变化**。这几条曲线都是**区间最优**不是越大越好 —— 量比峰值在 1.3~2.5(超过 4 说明这波已经走完了),通道位置甜区在 0.50~0.65(刚站上生命线,越接近 1.0 越是追高)。
+- **总分 = √(质地 × 时机)**。所以两根轴要**分开读**,这正是分解存在的理由:
+  - 质地高、时机低 → 「好票,但今天不是买点」。该说的是等什么(回踩到哪、放量到什么程度),不是现在追。
+  - 质地低、时机高 → 「今天是有动静,但这票本身结构不行」。该说的是为什么不值得占仓位。
+  - 两个都高才是「高概率的有苗头的东西」。
+- `partial: true` 表示某个因子**没有数据**,那一份权重是靠剩下的因子顶上来的 —— 这种候选的总分偏乐观,同分时优先选 partial 为 false 的。
 
 用法是: **把分解当"规则层看到了什么"的摘要,然后自己去日 K 里验证它对不对**。分解和 K 线打架时以 K 线为准,并在理由里点出来。
 
@@ -1231,18 +1271,22 @@ def _candidate_market_data(repo, cands: list[dict]) -> list[dict]:
 
     out: list[dict] = []
     for c in cands:
-        # [R134] 送给 AI 的不再是一个黑箱"规则分", 而是**三维度分解 + 注记**。
+        # [R134] 送给 AI 的不再是一个黑箱"规则分", 而是**分解 + 注记**。
         # 黑箱分只能被复述("它规则分高"), 分解才能被核对("它说量能 92, K 线上
         # 量比确实 1.7") —— 而核对正是我们要 AI 做的事。
-        dims = c.get("dims") or {}
+        # [R189] 分解改成两轴。**这一步对 AI 尤其重要**: 「质地 92 / 时机 41」
+        # 直接告诉它该说"好票但今天不是买点", 而合成后的 61 分说不出这句话。
+        axes = c.get("axes") or {}
+        rhy = c.get("rhythm") or {}
         item = {
             "symbol": c["symbol"], "name": c["name"], "信号摘要": c["text"],
             "把握分分解": {
                 "总分": c["score"],
-                "门槛": "已通过(六态多头侧 / 站上生命线 MA20 连续两日 / 非长期下跌)",
-                "趋势强度": dims.get("trend"),
-                "量能确认": dims.get("volume"),
-                "位置成本": dims.get("position"),
+                "算法": "把握分 = √(质地 × 时机) —— 两边都得像样, 不许互相补贴",
+                "门槛": ("已通过(六态多头侧 / 站上生命线 MA20 连续两日 / "
+                         "非长期下跌 / 红绿节拍不是反复失败)"),
+                "质地": axes.get("quality"),
+                "时机": axes.get("timing"),
                 "partial": bool(c.get("partial")),
                 "原始输入": {
                     "信号第几天": c.get("duration"),
@@ -1252,6 +1296,9 @@ def _candidate_market_data(repo, cands: list[dict]) -> list[dict]:
                     "通道位置": c.get("channel_pct"),
                     "相对大盘20日": c.get("rs_pct"),
                     "距触发价%": c.get("gap_pct"),
+                    "趋势模板": (c.get("template") or {}).get("text"),
+                    "磨底天数": (rhy.get("basing") or {}).get("days"),
+                    "节拍": rhy.get("label"),
                 },
             },
             "规则依据": c["why"],
