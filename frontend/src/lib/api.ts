@@ -240,6 +240,8 @@ export interface TodayOpportunity {
   geo?: ChannelGeometry | null
   /** [R195] 位置 × 六态 × 在轨外天数 → 事件 */
   channel_event?: ChannelEvent | null
+  /** [R200] 现在处在哪一段 + 该盯什么 */
+  channel_phase?: ChannelPhase | null
   /** [R195/R197] 压缩持续天数、平均压缩度、在轨外连续天数 */
   runs?: ChannelRuns | null
   /** [R197] 频段能量分布 */
@@ -710,7 +712,7 @@ export interface StockReview {
     event: ChannelEvent
     /** [R199] 阶段判定 —— 三个几何量单看都答不了「我该怎么办」, 合起来才回答
      *  「现在处在哪一段」。watch 是这一段该盯什么, 不是买卖指令。 */
-    phase: { code: string; cn: string; why: string; watch: string } | null
+    phase: ChannelPhase | null
     explain: string[]
   } | null
   /** [R199] 偏买档 vs 偏卖档的分离度 —— 「位置结论在这只票上灵不灵」。
@@ -795,6 +797,21 @@ export interface ChannelGeometry {
  * 「穿过上轨算站稳还是突破还是主升浪」这个问题混着三个独立维度: 通道只回答
  * 位置, 六态回答方向, **在轨外连续几天**才回答确认。少一个都答不了。
  */
+/**
+ * [R200] 阶段 —— 「现在处在哪一段, 该盯什么」。
+ *
+ * 与 ChannelEvent 分工: 事件说的是**今天发生了什么**(冲出上沿了没、站稳没),
+ * 阶段说的是**整体走到哪一段了**。用户要的指导性意义在 watch 这一行, 所以
+ * 三个界面(决策台悬停 / 今日总览 / 复盘弹窗)都该给, 不能只有复盘有。
+ */
+export interface ChannelPhase {
+  code: string
+  cn: string
+  why: string
+  /** 这一段该盯什么。**不是买卖指令** —— 那是把握分与六态的事 */
+  watch: string
+}
+
 export interface ChannelEvent {
   code: string
   cn: string
@@ -4733,7 +4750,8 @@ export const api = {
   /** [R42] 批量 Keltner 三档位置(决策台短/中/长通道三列)。收盘口径, 与图表同一组公式 */
   // [R178] 批量「该动了」判定 —— 决策台默认按它排序
   stockUrgency: (symbols: string[]) =>
-    request<{ urgency: Record<string, Urgency>; event?: Record<string, ChannelEvent> }>(
+    request<{ urgency: Record<string, Urgency>; event?: Record<string, ChannelEvent>
+              phase?: Record<string, ChannelPhase> }>(
       `/api/stock-analysis/urgency?symbols=${encodeURIComponent(symbols.join(','))}`),
 
   stockKeltner: (symbols: string[]) =>

@@ -253,8 +253,17 @@ def geometry(bands: dict | None, close) -> dict | None:
 
 
 def explain(g: dict | None) -> list[str]:
-    """把几何量翻成几句能直接摆在界面上的话。**只描述, 不下买卖判断** ——
-    同一个"加速"在趋势初期是启动、在末端是赶顶, 那是趋势状态与把握分的事。
+    """把几何量翻成几句能直接摆在界面上的**大白话**。**只描述, 不下买卖判断** ——
+    同一个"走得越来越快"在趋势初期是启动、在末端是赶顶, 那是趋势状态与把握分的事。
+
+    ## 用词的两条规矩(R200)
+
+    1. **不用行话。** 用户原话「别用拉开脱开这种词, 不够通俗易懂」。所以这里
+       没有"粘合/脱开/撕裂/分离度/偏离度"—— 一律换成"挤在一起/走开/离得太远/
+       间距/离中线多远"。
+    2. **不说出指标本名与参数。** 与把 Keltner 改名成「量化波动通道」同一个目的。
+       所以单位不写"个 ATR"而写"倍日常波动"(读法一样, 但没有点名), 也不出现
+       均线周期与倍数。
     """
     if not g:
         return []
@@ -262,28 +271,28 @@ def explain(g: dict | None) -> list[str]:
     ac = g.get("accel") or {}
     lvl, gain = ac.get("level"), ac.get("gain_atr")
     if lvl == ACCEL_UP:
-        out.append(f"加速中 —— 近 10 天比之前那一段多走了 {gain:.1f} 个 ATR")
+        out.append(f"最近走得比前一段快 —— 这十天多走了 {gain:.1f} 倍日常波动的距离")
     elif lvl == ACCEL_DOWN:
-        out.append(f"在减速 —— 近 10 天比之前那一段少走了 {abs(gain):.1f} 个 ATR")
+        out.append(f"最近走得比前一段慢 —— 这十天少走了 {abs(gain):.1f} 倍日常波动的距离")
     else:
-        out.append("匀速 —— 近 10 天与之前那一段的速度基本一致")
+        out.append("速度没变 —— 这十天和之前那一段走得一样快")
 
     sp, o = g.get("spread"), g.get("compress")
     if g.get("torn"):
-        out.append(f"尺度撕裂: 短带与长带相隔 {abs(sp):.1f} 个 ATR, 已完全没有共同价格区间"
-                   " —— 任何价格在一个尺度上超买时, 在另一个尺度上都是超卖")
+        out.append(f"短线和长线离得太远(差 {abs(sp):.1f} 倍日常波动), 已经没有一个"
+                   "共同认可的合理价 —— 同一个价钱, 按短线看是贵到极点, 按长线看还没到位")
     elif g.get("nested"):
-        out.append(f"均线粘合: 短带完全包在长带里(相隔仅 {abs(sp):.1f} 个 ATR)"
-                   " —— 三个尺度对合理价没有分歧, 这是磨底/盘整的形态")
+        out.append(f"三条线几乎挤在一块(只差 {abs(sp):.1f} 倍日常波动)"
+                   " —— 短、中、长三种看法认的是同一个价, 这是横盘磨底的样子")
     elif o is not None:
-        out.append(f"三尺度重叠 {o:.0%}"
-                   + (f", 均线{'多头' if sp > 0 else '空头'}排列相隔 {abs(sp):.1f} 个 ATR"
-                      if g.get("stack") in (STACK_BULL, STACK_BEAR) else ", 均线正在交叉"))
+        out.append(f"三条线还有 {o:.0%} 是重合的"
+                   + (f", 排列{'朝上' if sp > 0 else '朝下'}, 首尾差 {abs(sp):.1f} 倍日常波动"
+                      if g.get("stack") in (STACK_BULL, STACK_BEAR) else ", 三条线正在互相穿过"))
 
     d = g.get("d") or {}
     if all(k_ in d for k_ in ("s", "m", "l")):
-        out.append(f"偏离度 短 {d['s']:+.1f} / 中 {d['m']:+.1f} / 长 {d['l']:+.1f} 个 ATR"
-                   f"(破轨门槛依次是 {K['s']:.0f} / {K['m']:.1f} / {K['l']:.0f})")
+        out.append(f"眼下价格离各自中线: 短 {d['s']:+.1f} / 中 {d['m']:+.1f} / 长 {d['l']:+.1f}"
+                   " 倍日常波动(正的偏贵、负的偏便宜, 越大越极端)")
     return out
 
 
@@ -450,16 +459,16 @@ EV_NONE = "none"                      # 没有可命名的事件
 EVENT_CN = {
     EV_BREAKOUT_TRY: "突破尝试",
     EV_BREAKOUT_HOLD: "突破站稳",
-    EV_TREND_ACCEL: "趋势内加速",
+    EV_TREND_ACCEL: "趋势中提速",
     EV_MAIN_ADVANCE: "主升浪特征",
-    EV_EXHAUSTING: "末端钝化",
+    EV_EXHAUSTING: "涨势没劲",
     EV_BOUNCE_CAP: "反弹遇阻",
     EV_PULLBACK_END: "回撤结束",
     EV_BREAKDOWN_TRY: "破位第一天",
     EV_BREAKDOWN_HOLD: "破位站稳",
-    EV_SHAKEOUT: "强势洗盘",
-    EV_COILING: "压缩待变",
-    EV_NONE: "无事件",
+    EV_SHAKEOUT: "强势甩人",
+    EV_COILING: "憋着劲",
+    EV_NONE: "没什么事",
 }
 
 # 主升浪的五个条件 —— 写成常量是为了能被测试逐条钉住, 也为了以后调的时候
@@ -497,11 +506,11 @@ def event(*, state: str | None, duration: int | None, geo: dict | None,
     def mk(code, why, confirmed):
         return {"code": code, "cn": EVENT_CN[code], "why": why, "confirmed": confirmed}
 
-    # ---- 在短期上轨之外 ----
+    # ---- 在短期上沿之外 ----
     if up >= 1:
         if not bull:
             return mk(EV_BOUNCE_CAP,
-                      f"六态在空头侧({state}), 破上轨只是反弹撞到阻力 —— 不是突破",
+                      f"趋势本身是往下的({state}), 这次冲到上沿只是反弹撞到头 —— 不是突破",
                       False)
         if state == "UT":
             m = MAIN_ADVANCE
@@ -510,43 +519,44 @@ def event(*, state: str | None, duration: int | None, geo: dict | None,
                     and up >= m["min_above_run"]
                     and (a1 is not None and a1 >= m["min_a1"])):
                 return mk(EV_MAIN_ADVANCE,
-                          f"上涨趋势 + 均线多头排列 + 短长已分离 {g.get('spread'):.1f} 个 ATR"
-                          f" + 连续 {up} 天守在上轨之上 + 未减速 —— 五条全中",
+                          f"正在上涨 + 三条线朝上排好 + 首尾已经差了 {g.get('spread'):.1f} 倍日常波动"
+                          f" + 连着 {up} 天站在上沿之外 + 没有变慢 —— 五个条件全中",
                           True)
             if up >= EXHAUST_RUN and a1 is not None and a1 < -ACCEL_FLAT:
                 return mk(EV_EXHAUSTING,
-                          f"已连续 {up} 天在上轨外, 但近 10 天在减速 —— 涨势在钝化",
+                          f"已经连着 {up} 天在上沿之外, 可是最近走得比前一段慢了 —— 涨势在没劲",
                           True)
             return mk(EV_TREND_ACCEL,
-                      f"趋势已确认(UT), 破上轨是趋势内加速 —— 沿上轨走是常态, 不必因此减",
+                      "上涨趋势已经确认, 冲出上沿是趋势里的正常提速 —— 沿着上沿走是常态, "
+                      "不必因为「到高位了」就减",
                       up >= CONFIRM_DAYS)
-        # NR/SR: 回升途中冲出上轨 —— 这才是真正意义上的"突破"
+        # NR/SR: 回升途中冲出上沿 —— 这才是真正意义上的"突破"
         if up >= CONFIRM_DAYS:
             return mk(EV_BREAKOUT_HOLD,
-                      f"回升({state})途中冲出上轨并连续守住 {up} 天 —— 突破站稳",
+                      f"回升途中冲出上沿, 而且连着守住了 {up} 天 —— 站稳了",
                       True)
         return mk(EV_BREAKOUT_TRY,
-                  f"回升({state})途中第 1 天冲出上轨 —— 突破尝试, 收盘守不住就是假突破",
+                  "回升途中第一天冲出上沿 —— 只是刚冲出去, 收盘守不住就是假的",
                   False)
 
-    # ---- 在短期下轨之外 ----
+    # ---- 在短期下沿之外 ----
     if dn >= 1:
         if bull:
             return mk(EV_SHAKEOUT,
-                      f"六态仍在多头侧({state}), 跌破下轨更像强势洗盘 —— 看长期档还在不在上沿",
+                      f"趋势还是往上的({state}), 跌破下沿更像是甩人下车 —— 关键看长期那条还在不在上边",
                       dn >= CONFIRM_DAYS)
         if dn >= CONFIRM_DAYS:
-            return mk(EV_BREAKDOWN_HOLD, f"空头侧连续 {dn} 天在下轨之下 —— 破位站稳", True)
-        return mk(EV_BREAKDOWN_TRY, "空头侧第 1 天跌破下轨 —— 还没确认", False)
+            return mk(EV_BREAKDOWN_HOLD, f"往下的趋势里连着 {dn} 天掉在下沿之外 —— 是真跌破了", True)
+        return mk(EV_BREAKDOWN_TRY, "第一天掉到下沿之外 —— 还不算数, 明天才知道", False)
 
-    # ---- 没到轨: 回撤刚结束 / 压缩待变 ----
+    # ---- 没到沿: 回撤刚结束 / 挤在一起 ----
     if state in ("NREA", "SREA") and duration == 1:
-        return mk(EV_PULLBACK_END, "今日刚从回撤转出 —— 回到强势侧的第一天", False)
+        return mk(EV_PULLBACK_END, "今天刚从回撤里转出来 —— 回到强势那一边的第一天", False)
     if cd >= CONFIRM_DAYS and (g.get("compress") or 0) >= COMPRESS_TIGHT:
         return mk(EV_COILING,
-                  f"均线粘合已 {cd} 天(三尺度对合理价没有分歧) —— 压缩待变, 方向未定",
+                  f"三条线挤在一起已经 {cd} 天(短、中、长认的是同一个价) —— 憋着劲, 方向还没出来",
                   False)
-    return mk(EV_NONE, "既没到轨, 也不在粘合状态", False)
+    return mk(EV_NONE, "既没碰到上下沿, 三条线也没挤在一起", False)
 
 
 # ================================================================
@@ -581,17 +591,17 @@ COMBO_NOTES: dict[str, tuple[str, str]] = {
               "结论说的是「只有短期到上沿, 大级别还早」, 但这一格的长期档就在上沿 ——"
               " 半年尺度本来就在高位, 这一冲是趋势中继的再加速。"),
     "上下中": ("中期还在下沿",
-              "结论说的是「大级别还早」, 但这一格的中期档在下沿 —— 20 日线刚拉起来"
-              "而 60 日线远在价格之上, 这更像下跌途中的反抽而不是趋势票沿上轨走。"),
+              "结论说的是「大级别还早」, 但这一格的中期档在下沿 —— 短线刚拉起来而"
+              "中线还远远压在价格上方, 这更像下跌途中的反抽, 不是趋势票沿着上沿走。"),
     "上下上": ("中期在下沿、长期在上沿",
-              "三档互相矛盾的一格(60 日线最高)。结论按「只有短期到上沿」处理, "
-              "但这一格既不是常态的趋势中继, 也不是干净的反抽。"),
+              "三档互相打架的一格(中线的位置最高)。结论按「只有短期到上沿」处理, "
+              "但这一格既不是常见的趋势中继, 也不是干净的反抽。"),
     "中上下": ("长期还在下沿",
               "结论说的是「高位回落」, 但这一格的长期档在下沿 —— 它根本不在高位, "
               "是深跌之后的反弹走到季度阻力就停住了。"),
     "中下上": ("长期仍在上沿",
-              "同为「候选池」, 但这一格的长期档还在上沿 —— 价格仍远高于半年均线而"
-              "季度这一档已经调到位, 比普通候选池更值得盯。"),
+              "同为「候选池」, 但这一格的长期档还在上沿 —— 长线看价格还高高在上, 中线"
+              "这一档却已经调到位了, 比普通候选池更值得盯。"),
     "下上中": ("中期还在上沿",
               "结论说的是「常规回调」, 但这一格的中期档在上沿 —— 从季度高位一口气"
               "蹲到短期下轨, 一点也不常规。是洗盘还是变盘, 这一天分不出来。"),
@@ -755,9 +765,10 @@ PH_DECLINING = "declining"      # 下行途中
 PH_UNCLEAR = "unclear"          # 说不清
 
 PHASE_CN = {
-    PH_COILING: "蓄势待变", PH_LAUNCHING: "启动初期", PH_ADVANCING: "趋势推进",
-    PH_STALLING: "末段钝化", PH_OVEREXTENDED: "极端拉伸",
-    PH_DECLINING: "下行途中", PH_UNCLEAR: "说不清",
+    PH_COILING: "挤在一起等方向", PH_LAUNCHING: "刚开始分开",
+    PH_ADVANCING: "一路往上走", PH_STALLING: "后劲不足",
+    PH_OVEREXTENDED: "走得过头了", PH_DECLINING: "一路往下走",
+    PH_UNCLEAR: "看不出来",
 }
 
 # 分离度的两个刻度: 越过 LAUNCH 算真的脱开了, 越过 MATURE 算走了一大段。
@@ -788,30 +799,34 @@ def phase(geo: dict | None, runs: dict | None = None) -> dict | None:
 
     if geo.get("torn"):
         return mk(PH_OVEREXTENDED,
-                  f"三个尺度已经拉开到没有共同价格区间(相隔 {abs(sp):.1f}) —— 这一段走得极长",
-                  "这个位置争论贵不贵没有意义, 先说清楚你按哪个尺度做; 追高的性价比很低")
+                  f"三条线已经离得太远(间距 {abs(sp):.1f}) —— 短期看和长期看已经没有一个"
+                  f"共同认可的合理价了, 这一段走了很长",
+                  "这个位置再争论「贵不贵」没有意义 —— 按短期看是贵, 按长期看还没到。"
+                  "先想清楚你做的是哪一段, 追进去的性价比已经很低")
     if sp <= -SPREAD_LAUNCH:
         return mk(PH_DECLINING,
-                  f"三个尺度往下拉开(分离度 {sp:.1f}), 方向朝下",
-                  "别用「触到下沿就企稳」抄底 —— 下沿会跟着一路下移")
+                  f"三条线向下散开(间距 {sp:.1f}), 方向朝下",
+                  "别用「跌到下边那条线就该反弹」去抄底 —— 往下走的时候, 那条线也在跟着往下挪")
     if geo.get("nested") or (o is not None and o >= COMPRESS_TIGHT):
         extra = f", 已经这样 {cd} 天" if cd else ""
         return mk(PH_COILING,
-                  f"三个尺度对合理价几乎没有分歧{extra} —— 方向还没出来",
-                  "盯着往哪边先脱开; 这种状态通常不会持续太久, 但猜方向没有胜算")
+                  f"三条线挤在一起{extra} —— 短、中、长三种看法几乎一致, 方向还没出来",
+                  "盯着它往哪边先走出去。这种挤在一起的状态通常不会持续太久, "
+                  "但在走出去之前猜方向没有胜算")
     if sp < SPREAD_LAUNCH:
         return mk(PH_LAUNCHING if up else PH_UNCLEAR,
-                  f"刚从粘合里脱开(分离度 {sp:.1f})" + ("且在加速" if up else ", 但还没有加速"),
-                  "这是分离刚开始的那一段, 走得成不成要看接下来能不能持续拉开"
-                  if up else "脱开了但没有动能跟上, 容易缩回去")
+                  f"刚从挤在一起的状态里走出来(间距 {sp:.1f})"
+                  + ("而且越走越快" if up else ", 但速度没跟上"),
+                  "刚分开的这一段最关键 —— 接着能不能继续走开, 决定了这次是真启动还是又缩回去"
+                  if up else "分是分开了, 可是没有力气跟上, 这种最容易缩回去")
     if sp >= SPREAD_MATURE and down:
         return mk(PH_STALLING,
-                  f"已经拉开 {sp:.1f} 而最近在减速 —— 推动力在退",
-                  "趋势还没坏, 但该开始想退出计划而不是加仓")
+                  f"三条线已经离得挺远(间距 {sp:.1f}), 而最近走得比之前慢了 —— 劲在往回收",
+                  "趋势本身还没坏, 但推力在减弱。该开始想「什么情况下我就走」, 而不是再加")
     if down:
         return mk(PH_STALLING,
-                  f"分离度 {sp:.1f}, 最近在减速",
-                  "动能在退, 别在这时候加仓")
+                  f"间距 {sp:.1f}, 最近走得比之前慢了",
+                  "力气在往回收, 这个时候别加仓")
     return mk(PH_ADVANCING,
-              f"三个尺度稳定往上拉开(分离度 {sp:.1f})" + ("且仍在加速" if up else ", 速度平稳"),
-              "这一段是趋势的主体; 真正要盯的是加速度什么时候转负")
+              f"三条线稳稳地往上散开(间距 {sp:.1f})" + ("而且还在提速" if up else ", 速度平稳"),
+              "这一段是行情的主体。真正要盯的是什么时候开始走慢 —— 那才是转折的先兆")

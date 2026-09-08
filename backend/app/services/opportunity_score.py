@@ -278,7 +278,7 @@ AXIS_FACTORS = {AXIS_QUALITY: QUALITY_WEIGHTS, AXIS_TIMING: TIMING_WEIGHTS}
 
 FACTOR_CN = {
     "template": "趋势模板", "base": "磨底节拍", "rs": "相对强度", "state": "六态状态",
-    "spread": "通道分离度",
+    "spread": "三线间距",
     "fresh": "新鲜度", "vol_ratio": "量比", "turnover": "换手率", "pos": "通道位置",
     "accel": "加速度",
 }

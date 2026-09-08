@@ -395,6 +395,7 @@ def get_urgency(request: Request, symbols: str = Query(..., description="逗号�
     # **底层的三档判定一个字没动**, 这里只是读它。
     from app.indicators import keltner_geometry as kg
     events: dict[str, dict] = {}
+    phases: dict[str, dict] = {}
     for sym in syms:
         kc = keltner.get(sym) or {}
         if not kc.get("geo"):
@@ -407,11 +408,16 @@ def get_urgency(request: Request, symbols: str = Query(..., description="逗号�
             if note:
                 ev = dict(ev, combo_note=note)
             events[sym] = ev
+            # [R200] 阶段。事件回答"今天发生了什么", 阶段回答"整体走到哪一段、
+            # 该盯什么" —— 决策台悬停要的是后者。纯函数, 不新增取数。
+            ph = kg.phase(kc.get("geo"), kc.get("runs"))
+            if ph:
+                phases[sym] = ph
         except Exception as e:  # noqa: BLE001
             logger.debug("channel event skipped for %s: %s", sym, e)
     return {"urgency": watchlist_urgency.assess_many(
         syms, positions=positions, trends=trends, exit_lines=exits, keltner=keltner),
-        "event": events}
+        "event": events, "phase": phases}
 
 
 @router.get("/review")

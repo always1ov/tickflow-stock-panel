@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Star, Wallet, Sparkles, Loader2, ArrowUp, ArrowDown, RefreshCw, FileText, Download, Bell } from 'lucide-react'
-import { api, type ChannelEvent, type EffectivePosition, type ExitLine, type KeltnerBands, type TrendInfo, type Urgency } from '@/lib/api'
+import { api, type ChannelEvent, type ChannelPhase, type EffectivePosition, type ExitLine, type KeltnerBands, type TrendInfo, type Urgency } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { pickStale, SIGNAL_TTL_HOURS } from '@/lib/signalFreshness'   // [R131] 增量分析判据
 import { toast } from '@/components/Toast'
@@ -186,6 +186,10 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
   // 事件必须三样齐全(位置 × 方向 × 确认)才判得出, 所以合在那儿算
   const events: Record<string, ChannelEvent> = useMemo(
     () => urgencyQ.data?.event ?? {}, [urgencyQ.data])
+  // [R200] 阶段判定同一趟返回。事件是"今天发生了什么", 阶段是"整体走到哪一段、
+  // 该盯什么" —— 后者才是能照着做的那句, 之前只有复盘弹窗看得到。
+  const phases: Record<string, ChannelPhase> = useMemo(
+    () => urgencyQ.data?.phase ?? {}, [urgencyQ.data])
 
   // [fork 增强] 持仓出场线(仅持有+填成本的票有;后端顺带把线同步为监控规则)
   const heldWithCost = Object.values(positions).some((p) => p.held && p.cost)
@@ -327,6 +331,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
           held: !!pos?.held, cost, weight: pos?.weight ?? null, pnl, sig, trend, exit, kc,
           urg: urgency[symbol],
           ev: events[symbol],
+          ph: phases[symbol],
           // [R169] 成本来源与批次信息 —— 让"这个成本是我填的还是批次算的"一眼可辨
           costSource: pos?.cost_source ?? null,
           lotCost: pos?.lot_cost ?? null,
@@ -766,7 +771,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
                     </td>
                     {/* [R42] Keltner 三档位置 */}
                     <ChannelStackCell kc={r.kc} close={r.close} />
-                    <VerdictCell v={r.kc?.verdict} ev={r.ev} geo={r.kc?.geo} runs={r.kc?.runs} energy={r.kc?.energy}
+                    <VerdictCell v={r.kc?.verdict} ev={r.ev} geo={r.kc?.geo} runs={r.kc?.runs} energy={r.kc?.energy} ph={r.ph}
                                  onOpen={() => setReview({ symbol: r.symbol, name: r.name, tab: 'verdict' })} />
                     {/* 置信度(独立列, 可排序) */}
                     <td className={`${TD_BASE} ${NUM} whitespace-nowrap px-2 text-muted`}>

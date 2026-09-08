@@ -297,8 +297,8 @@ function SideEdgeCard({ edge, forwardDays }: {
         <b className="text-[13px] font-semibold">{edge.label}</b>
         {edge.spread != null && (
           <span className="font-mono text-[10px] opacity-80"
-                title={`多头侧平均 − 空头侧平均。差得越开, 六态在这只票上越有信息量`}>
-            分离度 {(edge.spread * 100).toFixed(1)} 个点
+                title={`多头侧平均 − 空头侧平均。两边差得越多, 说明六态在这只票上越有用`}>
+            两边差 {(edge.spread * 100).toFixed(1)} 个点
           </span>
         )}
         {edge.level !== 'thin' && (
@@ -643,8 +643,8 @@ function VerdictEdgeCard({ e, forwardDays }: {
         <span className="text-[10px] text-muted">位置结论在这只票上</span>
         <b className="text-[13px] font-semibold">{e.label}</b>
         {e.spread != null && (
-          <span className="font-mono text-[10px] opacity-80" title="偏买档平均 − 偏卖档平均。差得越开, 位置结论越有信息量">
-            分离度 {(e.spread * 100).toFixed(1)} 个点
+          <span className="font-mono text-[10px] opacity-80" title="偏买档平均 − 偏卖档平均。两边差得越多, 说明这套位置结论越有用">
+            两边差 {(e.spread * 100).toFixed(1)} 个点
           </span>
         )}
         {e.level !== 'thin' && (
@@ -664,9 +664,19 @@ function VerdictEdgeCard({ e, forwardDays }: {
   )
 }
 
-/** ③ 依据 —— 八个数。摆在两条结论后面, 是给人核对用的, 不是主角。 */
+/**
+ * ③ 依据 —— 先用**大白话**说一遍, 再摆那几个数。
+ *
+ * [R200] 用户: 「这些大白话的描述很适合放到系统里面展示」。后端 `explain()`
+ * 早就把几何量翻成了几句人话, 但一直只在接口里躺着没人显示 —— 这一版把它摆
+ * 到数字前面。顺序是有意的: **先读一遍句子就够了**, 下面那排数字是留给要核
+ * 对的时候看的。
+ *
+ * 用词同样守 R200 那两条: 不用「拉开/脱开/粘合/撕裂/分离度/频段」这类行话,
+ * 也不点破指标本名与参数(单位写「倍日常波动」而不是「个 ATR」)。
+ */
 function ChannelPanel({ ch }: { ch: NonNullable<StockReview['channel']> }) {
-  const { geo, runs, energy, event } = ch
+  const { geo, runs, energy, event, explain } = ch
   const cell = (label: string, value: string, title?: string, tone?: string) => (
     <div key={label} className="min-w-0 flex-1 basis-[104px] bg-elevated/40 px-3 py-2 text-center" title={title}>
       <div className="truncate text-[10px] text-muted">{label}</div>
@@ -675,24 +685,33 @@ function ChannelPanel({ ch }: { ch: NonNullable<StockReview['channel']> }) {
   )
   return (
     <div className="mx-4 mt-3 space-y-2">
-      <div className="text-[10px] text-muted">依据(上面两条结论就是从这些数读出来的)</div>
+      <div className="text-[10px] text-muted">依据(上面两条结论就是从这些话和数读出来的)</div>
+      {!!explain?.length && (
+        <ul className="space-y-1 rounded-card border border-border/50 bg-elevated/25 px-3 py-2">
+          {explain.map(t => (
+            <li key={t} className="flex gap-1.5 text-[11px] leading-relaxed text-secondary">
+              <span className="select-none text-muted">·</span><span>{t}</span>
+            </li>
+          ))}
+        </ul>
+      )}
       <div className="flex flex-wrap gap-px overflow-hidden rounded-card bg-border/70">
-        {cell('加速度', `${geo.accel.gain_atr >= 0 ? '+' : ''}${geo.accel.gain_atr.toFixed(1)}`,
-          '最近这一段比之前那一段快了还是慢了。为零表示速度没变;不是越大越好, 过度加速常出现在一波的末端',
+        {cell('快慢变化', `${geo.accel.gain_atr >= 0 ? '+' : ''}${geo.accel.gain_atr.toFixed(1)}`,
+          '最近这一段比之前那一段走得快了还是慢了(单位:倍日常波动)。零表示速度没变。不是越大越好 —— 冲得太猛常出现在一波的末尾',
           geo.accel.level === 'accel' ? 'text-red-400'
             : geo.accel.level === 'decel' ? 'text-emerald-400' : 'text-foreground')}
-        {cell('状态', geo.accel.level_cn || '—')}
-        {cell('分离度', geo.spread.toFixed(1),
-          '三个尺度之间拉开了多远, 带方向。接近零是挤在一起(方向未定), 适度拉开是趋势立住了, 拉得过开是已经走了很长一段')}
-        {cell('三尺度重叠', geo.compress != null ? `${(geo.compress * 100).toFixed(0)}%` : '—',
-          '三个尺度对「合理价」的看法有多一致。高 = 几乎没有分歧')}
-        {cell('已粘合', `${runs.compress_days} 天`,
-          '连续多少天三个尺度看法一致 —— 这只票「磨了多久」')}
-        {cell('季度平均', runs.compress_avg != null ? `${(runs.compress_avg * 100).toFixed(0)}%` : '—',
-          '这个季度平均有多一致。与「已粘合」一起看: 连续天数为零但平均很高 = 刚刚启动')}
-        {cell('主导频段', energy ? energy.dominant_cn.replace(/\(.*/, '') : '—',
-          energy ? `高频 ${(energy.share.s * 100).toFixed(0)}% / 中频 ${(energy.share.m * 100).toFixed(0)}% / 低频 ${(energy.share.l * 100).toFixed(0)}%` : undefined)}
-        {cell('组合', geo.combo ?? '—', '短/中/长三档位置')}
+        {cell('快慢', geo.accel.level_cn || '—', '比前一段是快了、慢了, 还是没变')}
+        {cell('三线间距', geo.spread.toFixed(1),
+          '短线和长线离多远, 带方向。接近零 = 挤在一起, 方向还没出来;适中 = 趋势立住了;太大 = 已经走了很长一段, 再追不划算')}
+        {cell('还重合多少', geo.compress != null ? `${(geo.compress * 100).toFixed(0)}%` : '—',
+          '短、中、长三种看法认的价还有多少是重合的。越高说明三种看法越一致')}
+        {cell('挤了几天', `${runs.compress_days} 天`,
+          '到今天为止连着多少天三种看法都一致 —— 也就是这只票「横了多久」')}
+        {cell('这季平均', runs.compress_avg != null ? `${(runs.compress_avg * 100).toFixed(0)}%` : '—',
+          '整个季度平均有多一致。跟「挤了几天」一起看:连着的天数是零、平均却很高 = 刚刚才走出来')}
+        {cell('波动来自', energy ? energy.dominant_cn.replace(/\(.*/, '') : '—',
+          energy ? `几天的短波动 ${(energy.share.s * 100).toFixed(0)}% / 一波行情的主体 ${(energy.share.m * 100).toFixed(0)}% / 长期老趋势 ${(energy.share.l * 100).toFixed(0)}%` : undefined)}
+        {cell('三档位置', geo.combo ?? '—', '短、中、长各自在自己通道里的高低')}
       </div>
       {!!event.combo_note && (
         <p className="rounded border border-amber-400/30 bg-amber-400/[0.06] px-2.5 py-1.5 text-[10px] leading-relaxed text-amber-300/90">
@@ -730,9 +749,9 @@ function VerdictView({ d, segments }: { d: StockReview; segments: Segment[] }) {
       </div>
 
       <div className="border-t border-border/60 px-4 py-2 text-[10px] leading-relaxed text-muted">
-        每一段就是决策台「结论」列当时悬停会看到的那张卡片。收盘口径, 同一组通道公式。
-        均线与 ATR 按<b className="text-secondary">当前</b>复权因子回算 —— 之后除权的话,
-        同一天今天算出的通道会和当时屏幕上略有出入, 复盘看的是形态与节奏。
+        每一段就是决策台「结论」列当时悬停会看到的那张卡片。一律按收盘算, 用的是同一套通道。
+        历史是按<b className="text-secondary">当前</b>复权价重新算的 —— 期间除过权的话,
+        同一天今天算出来的通道会和当时屏幕上略有出入, 复盘看的是形态与节奏。
       </div>
     </>
   )

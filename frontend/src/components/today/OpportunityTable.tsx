@@ -27,7 +27,7 @@ const BOARD_LIMIT_CN: Record<string, string> = {
 const AXIS_META = [
   { key: 'quality', cn: '质地', cls: 'bg-red-400',
     what: '这只票的长周期结构 —— 以月计变化',
-    hint: '趋势模板(八条) / 磨底节拍 / 相对强度 / 六态状态 / 通道分离度' },
+    hint: '趋势模板(八条) / 磨底节拍 / 相对强度 / 六态状态 / 三线间距' },
   { key: 'timing', cn: '时机', cls: 'bg-sky-400',
     what: '今天是不是那一天 —— 逐日变化',
     hint: '新鲜度 / 通道位置 / 量比(区间最优,峰在 1.3~2.5) / 换手率 / 加速度' },
@@ -381,9 +381,9 @@ function ActionCell({ action }: { action?: TodayAction | null }) {
 function OpportunityDetail({ o, live }: { o: TodayOpportunity; live?: boolean }) {
   const F_CN: Record<string, string> = {
     template: '趋势模板', base: '磨底节拍', rs: '相对强度', state: '六态状态',
-    spread: '通道分离度',
+    spread: '三线间距',
     fresh: '新鲜度', pos: '通道位置', vol_ratio: '量比', turnover: '换手率',
-    accel: '加速度',
+    accel: '快慢变化',
   }
   const AXIS_FACTORS: Record<string, string[]> = {
     quality: ['template', 'base', 'rs', 'state', 'spread'],
@@ -515,28 +515,42 @@ function OpportunityDetail({ o, live }: { o: TodayOpportunity; live?: boolean })
                   </span>
                 )}
                 {!!o.geo.accel?.level_cn && (
-                  <span className="font-mono text-[10px] text-muted">
+                  <span className="font-mono text-[10px] text-muted"
+                        title="最近这十天比之前那一段多走(少走)了多少。零表示速度没变。不是越大越好 —— 冲得太猛常出现在一波的末尾">
                     {o.geo.accel.level_cn} {o.geo.accel.gain_atr >= 0 ? '+' : ''}
-                    {o.geo.accel.gain_atr.toFixed(1)} ATR/10日
+                    {o.geo.accel.gain_atr.toFixed(1)} 倍日常波动/10日
                   </span>
                 )}
                 <span className="font-mono text-[10px] text-muted"
-                      title="短期均线与长期均线相隔多少个 ATR。≈0 粘合, 1.5~3 趋势确立, >5 尺度撕裂">
-                  分离度 {o.geo.spread.toFixed(1)} ATR
+                      title="短线和长线离多远,带方向。接近零 = 挤在一起、方向还没出来;适中 = 趋势立住了;太大 = 已经走了很长一段,再追不划算">
+                  三线间距 {o.geo.spread.toFixed(1)} 倍日常波动
                 </span>
                 {o.geo.compress != null && (
                   <span className="font-mono text-[10px] text-muted"
-                        title="三条带的交集 / 短带宽度。1 = 均线粘合(三个尺度对合理价没有分歧), 0 = 已脱开">
-                    重叠 {(o.geo.compress * 100).toFixed(0)}%
+                        title="短、中、长三种看法认的价还有多少是重合的。100% = 三种看法认的是同一个价;0% = 已经完全分开">
+                    还重合 {(o.geo.compress * 100).toFixed(0)}%
                   </span>
                 )}
                 {!!o.geo.combo && (
                   <span className="font-mono text-[10px] text-muted/70"
-                        title="短/中/长三档位置压成的三字码 —— 27 种组合表的行号">
-                    组合 {o.geo.combo}
+                        title="短、中、长各自在自己通道里是高、是中、还是低">
+                    三档位置 {o.geo.combo}
                   </span>
                 )}
               </div>
+              {/* [R200] 阶段先于数据。上面一排是测量, 这一块是「现在处在哪一段、
+                  该盯什么」—— 用户要的指导性意义在这两行, 不在那排数字里。 */}
+              {!!o.channel_phase && (
+                <div className="mb-1 rounded border border-border/50 bg-elevated/30 px-2 py-1.5">
+                  <div className="text-[10px] leading-relaxed text-secondary">
+                    <b className="text-foreground/90">{o.channel_phase.cn}</b>
+                    <span className="ml-2">{o.channel_phase.why}</span>
+                  </div>
+                  <div className="mt-0.5 text-[10px] leading-relaxed text-muted">
+                    该盯什么:{o.channel_phase.watch}
+                  </div>
+                </div>
+              )}
               {!!o.channel_event?.why && (
                 <div className="text-[10px] leading-relaxed text-muted">{o.channel_event.why}</div>
               )}
@@ -552,13 +566,13 @@ function OpportunityDetail({ o, live }: { o: TodayOpportunity; live?: boolean })
               {(!!o.runs?.compress_days || o.runs?.compress_avg != null) && (
                 <div className="mt-1 flex flex-wrap gap-x-3 text-[10px] text-muted">
                   {!!o.runs?.compress_days && (
-                    <span title="连续多少天三条带的交集 ≥ 80%。这是按 ATR 归一化的「磨底磨了多久」——取代了原来「最高/最低收盘 ≤ 1.35」那个绝对幅度判据">
-                      已粘合 <b className="font-mono text-foreground/90">{o.runs.compress_days}</b> 天
+                    <span title="到今天为止连着多少天三种看法都一致 —— 也就是这只票「横了多久」。按波动幅度算,所以大盘股和小盘股之间也能比">
+                      已经挤了 <b className="font-mono text-foreground/90">{o.runs.compress_days}</b> 天
                     </span>
                   )}
                   {o.runs?.compress_avg != null && (
-                    <span title="重叠面积 ÷ 窗口长度 = 这个季度的平均压缩度。与「连续天数」不同: 中间脱开一天会把连续天数清零, 却只把均值拉低一点">
-                      季度平均压缩 <b className="font-mono text-foreground/90">{(o.runs.compress_avg * 100).toFixed(0)}%</b>
+                    <span title="整个季度平均有多一致。跟「已经挤了几天」一起看:中间散开一天,连着的天数就归零了,这个百分比却只低一点 —— 连着是零而平均很高 = 刚刚才走出来">
+                      这季平均重合 <b className="font-mono text-foreground/90">{(o.runs.compress_avg * 100).toFixed(0)}%</b>
                     </span>
                   )}
                 </div>
@@ -566,17 +580,17 @@ function OpportunityDetail({ o, live }: { o: TodayOpportunity; live?: boolean })
               {/* [R197] 频段能量 —— 三档通道本质上是一组带通滤波器 */}
               {!!o.energy && (
                 <div className="mt-1 text-[10px] text-muted">
-                  波动主导 <b className="text-foreground/90">{o.energy.dominant_cn}</b>
+                  波动主要来自 <b className="text-foreground/90">{o.energy.dominant_cn}</b>
                   <span className="ml-2 font-mono text-[9px]"
-                        title="已扣掉匀速趋势基线: 匀速上涨时三个带通的幅度天然正比于各自覆盖的天数(9.5:20:30), 不扣的话会恒定说「低频占优」——那是均线的定义不是这只票的特征。扣掉之后纯趋势恰好三档各 33%, 偏离 33% 的部分才是信息。">
-                    高频 {(o.energy.share.s * 100).toFixed(0)}% / 中频 {(o.energy.share.m * 100).toFixed(0)}% / 低频 {(o.energy.share.l * 100).toFixed(0)}%
-                    <span className="ml-1 opacity-60">(纯趋势各 33%)</span>
+                        title="已经扣掉了「就是一路匀速走」那部分 —— 不扣的话每只票都会显示成长期占优, 那是算法本身的样子, 不是这只票的特征。扣完之后纯匀速恰好三份各 33%, 偏离 33% 的那部分才是这只票自己的信息。">
+                    几天的短波动 {(o.energy.share.s * 100).toFixed(0)}% / 一波行情的主体 {(o.energy.share.m * 100).toFixed(0)}% / 长期老趋势 {(o.energy.share.l * 100).toFixed(0)}%
+                    <span className="ml-1 opacity-60">(匀速走时各 33%)</span>
                   </span>
                 </div>
               )}
               <div className="mt-1 text-[9px] text-muted/70">
-                偏离度 短 {o.geo.d.s.toFixed(1)} / 中 {o.geo.d.m.toFixed(1)} / 长 {o.geo.d.l.toFixed(1)} 个 ATR
-                (破轨门槛依次 2 / 2.5 / 3)。三档共用同一个 ATR 分母, 所以可以直接相减。
+                眼下价格离各自中线:短 {o.geo.d.s.toFixed(1)} / 中 {o.geo.d.m.toFixed(1)} / 长 {o.geo.d.l.toFixed(1)} 倍日常波动
+                (正的偏贵、负的偏便宜)。三档用的是同一把尺子, 所以可以直接相减。
               </div>
             </div>
           )}

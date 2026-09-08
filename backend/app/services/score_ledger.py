@@ -533,15 +533,15 @@ LABEL_DIMS: list[dict] = [
     # 「主升浪特征之后是不是真的更好」直接决定 MAIN_ADVANCE 那五条阈值该不该
     # 继续这么定; 而那五条目前全是先验, 一条都没有台账支持。
     {"key": "chan_event", "label": "通道事件", "fmt": _event_cn},
-    {"key": "accel", "label": "加速度", "fmt": _accel_cn},
+    {"key": "accel", "label": "快慢变化", "fmt": _accel_cn},
     # 三档位置的三字码(如「上中下」)。27 种组合直接当分组维度会碎得没法看,
     # 但它是**唯一**能回答"哪几种组合真的好使"的东西, 所以原样落。
-    {"key": "combo", "label": "通道组合", "fmt": lambda v: f"组合 {v}"},
+    {"key": "combo", "label": "三档位置", "fmt": lambda v: f"组合 {v}"},
     # [R197] 波动的主导频段 —— 「这波是消息驱动(高频)、行情主体(中频)
     # 还是老趋势的余温(低频)」。已扣掉匀速趋势基线, 纯趋势下三档各 1/3。
-    {"key": "energy", "label": "主导频段",
-     "fmt": lambda v: {"s": "高频·消息驱动", "m": "中频·行情主体",
-                       "l": "低频·老趋势"}.get(str(v), str(v))},
+    {"key": "energy", "label": "波动来自",
+     "fmt": lambda v: {"s": "几天的短波动", "m": "一波行情的主体",
+                       "l": "长期老趋势"}.get(str(v), str(v))},
 ]
 
 

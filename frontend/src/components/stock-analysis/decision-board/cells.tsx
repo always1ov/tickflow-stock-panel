@@ -4,7 +4,7 @@
  * [R167] 从 WatchlistDecisionBoard.tsx 拆出。各自带着自己的配色表 —— 配色表是
  * 实现细节, 不该摆在 933 行主文件的顶部让人以为是全局约定。
  */
-import type { BandEnergy, ChannelEvent, ChannelGeometry, ChannelRuns, KeltnerBand, KeltnerVerdict, Urgency } from '@/lib/api'
+import type { BandEnergy, ChannelEvent, ChannelGeometry, ChannelPhase, ChannelRuns, KeltnerBand, KeltnerVerdict, Urgency } from '@/lib/api'
 import { VerdictHover } from '@/components/stock-analysis/VerdictHover'
 
 /**
@@ -82,9 +82,9 @@ export function ChannelStackCell({ kc, close }: {
                   title={
                     `${band.band_cn}通道 ${band.lower.toFixed(2)} ~ ${band.upper.toFixed(2)}`
                     + `${close != null ? `,收盘 ${close.toFixed(2)}` : ''}\n`
-                    + `通道内位置 ${Math.round(band.pct * 100)}%(0% 贴下轨 / 100% 贴上轨)\n`
-                    + `距上轨 ${band.to_upper_atr ?? '—'} 个 ATR · 距下轨 ${band.to_lower_atr ?? '—'} 个 ATR\n`
-                    + `${band.hint}\n收盘口径 —— 通道要用 ATR 与均线, 实时价比昨天的通道会半新半旧`
+                    + `在这条通道里的位置 ${Math.round(band.pct * 100)}%(0% 贴下沿 / 100% 贴上沿)\n`
+                    + `离上沿还有 ${band.to_upper_atr ?? '—'} 倍日常波动 · 离下沿还有 ${band.to_lower_atr ?? '—'} 倍日常波动\n`
+                    + `${band.hint}\n一律按收盘算 —— 盘中拿实时价去比昨天的通道, 会半新半旧`
                   }
                 >
                   {band.pos_cn}
@@ -128,26 +128,32 @@ const EVENT_CLS: Record<string, string> = {
 
 /** 几何量摊成悬停里的几行 —— 速度/加速度/压缩/排列, 外加 27 组合的补充注记。 */
 function geoLines(geo?: ChannelGeometry | null, ev?: ChannelEvent | null,
-                  runs?: ChannelRuns | null, energy?: BandEnergy | null): string {
+                  runs?: ChannelRuns | null, energy?: BandEnergy | null,
+                  ph?: ChannelPhase | null): string {
   if (!geo) return ''
-  const L: string[] = ['', '—— 量化波动通道 · 几何 ——']
+  const L: string[] = []
+  // [R200] 阶段摆在最前面。悬停这一片本来全是测量 —— 先给一句"现在处在哪一段、
+  // 该盯什么", 后面那些数才有落点。这句话之前只有复盘弹窗里有。
+  if (ph) L.push('', `【${ph.cn}】${ph.why}`, `该盯什么:${ph.watch}`)
+  L.push('', '—— 量化波动通道 ——')
   const a = geo.accel
   if (a?.level_cn) {
-    L.push(`${a.level_cn}:近 10 天比之前那一段${a.gain_atr >= 0 ? '多' : '少'}走 ${Math.abs(a.gain_atr).toFixed(1)} 个 ATR`)
+    L.push(`最近这十天比前一段${a.gain_atr >= 0 ? '多' : '少'}走了 ${Math.abs(a.gain_atr).toFixed(1)} 倍日常波动(${a.level_cn})`)
   }
-  if (geo.torn) L.push(`尺度撕裂:短带与长带相隔 ${Math.abs(geo.spread).toFixed(1)} 个 ATR,已无共同价格区间`)
-  else if (geo.nested) L.push(`均线粘合:短带完全包在长带里(相隔 ${Math.abs(geo.spread).toFixed(1)} 个 ATR)`)
-  else if (geo.compress != null) L.push(`三尺度重叠 ${(geo.compress * 100).toFixed(0)}%,间距 ${geo.spread.toFixed(1)} 个 ATR`)
-  L.push(`偏离度 短 ${geo.d.s.toFixed(1)} / 中 ${geo.d.m.toFixed(1)} / 长 ${geo.d.l.toFixed(1)} 个 ATR(破轨门槛 2 / 2.5 / 3)`)
-  if (runs?.compress_days) L.push(`已粘合 ${runs.compress_days} 天(按 ATR 算的磨底时长)`)
-  if (runs?.compress_avg != null) L.push(`季度平均压缩度 ${(runs.compress_avg * 100).toFixed(0)}%(重叠面积 ÷ 窗口)`)
+  if (geo.torn) L.push(`短线和长线离得太远(差 ${Math.abs(geo.spread).toFixed(1)} 倍日常波动),已经没有共同认可的合理价`)
+  else if (geo.nested) L.push(`三条线几乎挤在一块(只差 ${Math.abs(geo.spread).toFixed(1)} 倍日常波动)`)
+  else if (geo.compress != null) L.push(`三条线还有 ${(geo.compress * 100).toFixed(0)}% 重合,首尾相差 ${geo.spread.toFixed(1)} 倍日常波动`)
+  L.push(`眼下价格离各自中线:短 ${geo.d.s.toFixed(1)} / 中 ${geo.d.m.toFixed(1)} / 长 ${geo.d.l.toFixed(1)} 倍日常波动(正的偏贵、负的偏便宜)`)
+  if (runs?.compress_days) L.push(`已经这样挤了 ${runs.compress_days} 天`)
+  if (runs?.compress_avg != null) L.push(`整个季度平均重合 ${(runs.compress_avg * 100).toFixed(0)}%`)
   if (energy) {
     const sh = energy.share
-    L.push(`波动主导:${energy.dominant_cn} —— 高频 ${(sh.s * 100).toFixed(0)}% / 中频 ${(sh.m * 100).toFixed(0)}% / 低频 ${(sh.l * 100).toFixed(0)}%`)
-    L.push('(已扣掉匀速趋势基线,纯趋势时三档各 33%,偏离才是信息)')
+    L.push(`波动主要来自:${energy.dominant_cn}`)
+    L.push(`几天的短波动 ${(sh.s * 100).toFixed(0)}% / 一波行情的主体 ${(sh.m * 100).toFixed(0)}% / 长期老趋势 ${(sh.l * 100).toFixed(0)}%`)
+    L.push('(三份各 33% 是「就是一路匀速走」的样子,偏离 33% 的那部分才是信息)')
   }
-  if (runs?.above_run) L.push(`连续 ${runs.above_run} 天在短期上轨之上`)
-  if (runs?.below_run) L.push(`连续 ${runs.below_run} 天在短期下轨之下`)
+  if (runs?.above_run) L.push(`连着 ${runs.above_run} 天站在短线上沿之外`)
+  if (runs?.below_run) L.push(`连着 ${runs.below_run} 天掉在短线下沿之外`)
   if (ev?.why) L.push('', `事件:${ev.cn} —— ${ev.why}`)
   if (ev?.combo_note) {
     L.push('', `组合「${ev.combo_note.combo}」补充 · ${ev.combo_note.title}`, ev.combo_note.detail)
@@ -168,12 +174,13 @@ function geoLines(geo?: ChannelGeometry | null, ev?: ChannelEvent | null,
  * 是用来扫的, 扫的时候没人会悬停。未确认的事件用虚一档的颜色, 因为
  * 「突破尝试」与「突破站稳」差的就是那两天。
  */
-export function VerdictCell({ v, ev, geo, runs, energy, onOpen }: {
+export function VerdictCell({ v, ev, geo, runs, energy, ph, onOpen }: {
   v?: KeltnerVerdict | null
   ev?: ChannelEvent | null
   geo?: ChannelGeometry | null
   runs?: ChannelRuns | null
   energy?: BandEnergy | null
+  ph?: ChannelPhase | null
   onOpen: () => void
 }) {
   const evLine = ev && ev.code !== 'none' ? (
@@ -189,7 +196,7 @@ export function VerdictCell({ v, ev, geo, runs, energy, onOpen }: {
           onClick={onOpen}
           className="cursor-pointer text-[10px] text-muted/40 hover:text-sky-300"
           title={"短期通道在中部 —— 位置上没有可说的, 听趋势和信号的。点击翻这只票过去出过哪些结论"
-            + geoLines(geo, ev, runs, energy)}
+            + geoLines(geo, ev, runs, energy, ph)}
         >
           —
         </button>
@@ -200,7 +207,7 @@ export function VerdictCell({ v, ev, geo, runs, energy, onOpen }: {
   return (
     <td className={`${TD_BASE} whitespace-nowrap px-1.5`}>
       <VerdictHover v={v} note={"点击摊开这只票过去每一档结论 —— 出现在哪几天、当时说了什么、之后走成什么样。"
-        + geoLines(geo, ev, runs, energy)}>
+        + geoLines(geo, ev, runs, energy, ph)}>
         <button
           onClick={onOpen}
           className={`inline-flex cursor-pointer whitespace-nowrap rounded border px-1 py-0.5 text-[10px] transition-colors hover:brightness-125 ${VERDICT_CLS[v.tone]}`}
