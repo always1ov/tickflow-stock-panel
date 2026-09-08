@@ -253,17 +253,68 @@ AXIS_WHAT = {
 # 「蓄势该加多少分」的答案就落在 base 这 .25 里: 蓄势与震荡在 base 上差 45 分
 # (见 RHYTHM_SCORE), 折进质地是 11 分, 再经几何平均落到把握分上约 5~6 分 ——
 # 够让同档次的票分出先后, 不够让它一个人把一只结构不行的票抬进前排。
-QUALITY_WEIGHTS = {"template": 0.40, "base": 0.25, "rs": 0.20, "state": 0.15}
+# [R195] 加入量化波动通道几何层的 spread。**原有四项按原比例缩到 0.85**,
+# 新因子占 0.15 —— 这样保住 R189 那个性质: 老因子之间的**相对**比例仍然是从
+# R134 推出来的, 不是重编的(0.40:0.25:0.20:0.15 = 0.34:0.21:0.17:0.13)。
+#
+#   spread .15  短长均线间距(ATR 归一化, **带符号**)。为什么用它而不用压缩指数:
+#               压缩指数没有方向 —— 下跌趋势的重叠度与上涨趋势一样是 0。
+#               spread 一个数同时表达方向与分离度。它与 base(磨底节拍)有部分
+#               重叠(粘合 ⟺ 磨底), 所以压到 .15; 但 base 说不了「已分离 2~3 个
+#               ATR 的趋势确立态」, 那一段是 spread 独有的。
+# 用精确的 0.85 倍而不是两位小数圆整值 —— 圆整会让「相对比例不变」这句话
+# 变成近似(0.11×0.85=0.0935, 写成 0.10 就把换手率抬高了 7%)。
+QUALITY_WEIGHTS = {"template": 0.34, "base": 0.2125, "rs": 0.17, "state": 0.1275,
+                   "spread": 0.15}
 
-# 时机轴的权重 —— 由 R134 旧有效权重归一化得到, 见上面「轴内权重哪来的」
-TIMING_WEIGHTS = {"fresh": 0.31, "pos": 0.32, "vol_ratio": 0.26, "turnover": 0.11}
+# 时机轴的权重 —— 由 R134 旧有效权重归一化得到, 见上面「轴内权重哪来的」。
+# [R195] 同样按原比例缩到 0.85, 让出 0.15 给加速度:
+#   accel .15   二阶导。与 pos 正交 —— 位置说"贵不贵", 加速度说"这波还在不在
+#               加速"。0.31:0.32:0.26:0.11 → 0.26:0.27:0.22:0.10, 相对关系不变。
+TIMING_WEIGHTS = {"fresh": 0.2635, "pos": 0.272, "vol_ratio": 0.221,
+                  "turnover": 0.0935, "accel": 0.15}
 
 AXIS_FACTORS = {AXIS_QUALITY: QUALITY_WEIGHTS, AXIS_TIMING: TIMING_WEIGHTS}
 
 FACTOR_CN = {
     "template": "趋势模板", "base": "磨底节拍", "rs": "相对强度", "state": "六态状态",
+    "spread": "通道分离度",
     "fresh": "新鲜度", "vol_ratio": "量比", "turnover": "换手率", "pos": "通道位置",
+    "accel": "加速度",
 }
+
+# [R195] 短长均线间距(ATR) → 0~100。**倒 U, 且零点不在中间**:
+#   < 0    空头排列且已分开 —— 最差
+#   ≈ 0    均线粘合, 方向未定 —— 中性偏下
+#   1.5~3  趋势已确立但还没走过头 —— 甜区
+#   > 5    尺度撕裂(短带与长带没有共同价格区间) —— 走太远, 回落
+# 门槛 G1/G2/G3 已经保证了多头侧, 这条曲线是在"已过门槛"的前提下读的。
+SPREAD_CURVE: Curve = ((-4.0, 5), (-2.0, 15), (-0.5, 40), (0.5, 55), (1.5, 82),
+                       (2.5, 100), (4.0, 85), (5.0, 60), (7.0, 30), (10.0, 12))
+
+# [R195] 加速度 a1(ATR/天) → 0~100。同样倒 U 而不是单调:
+#   强减速 → 涨势钝化, 最差
+#   匀速   → 中性
+#   适度加速 → 甜区(这波刚起来)
+#   过度加速 → 拉升末端的赶顶, 回落(与量比曲线同一个道理)
+# 峰值 0.12 约在合成样本的 75 分位 —— "比大多数时候快, 但没到极端"。
+ACCEL_CURVE: Curve = ((-0.30, 8), (-0.15, 25), (-0.05, 45), (0.0, 58), (0.06, 82),
+                      (0.12, 100), (0.20, 88), (0.30, 60), (0.45, 30), (0.70, 12))
+
+
+def spread_score(geo: dict | None) -> float | None:
+    """短长均线间距 → 0~100。geo 是 keltner_geometry.geometry 的返回值。"""
+    if not geo or geo.get("spread") is None:
+        return None
+    return _piecewise(float(geo["spread"]), SPREAD_CURVE)
+
+
+def accel_score(geo: dict | None) -> float | None:
+    """加速度 → 0~100。"""
+    a1 = ((geo or {}).get("accel") or {}).get("a1")
+    if a1 is None:
+        return None
+    return _piecewise(float(a1), ACCEL_CURVE)
 
 # 趋势模板通过条数 → 0~100。**上凸**: 8/8 与 7/8 的差距要比 4/8 与 3/8 的大 ——
 # 模板的意义在"全部满足", 差一条就还不是那个形态, 差四条只是差得更多而已。
@@ -347,7 +398,8 @@ def score_candidate(*, duration: int | None, state: str | None,
                     turnover_rate: float | None, channel_pct: float | None,
                     near_breakout: bool = False,
                     template: dict | None = None,
-                    rhythm: dict | None = None) -> dict:
+                    rhythm: dict | None = None,
+                    geo: dict | None = None) -> dict:
     """质地 × 时机 两轴打分。返回 {score, axes, factors, coverage, partial}。纯函数。
 
     rs_pct: 个股 20 日收益 − 大盘 20 日收益, 单位**百分点**(如 +6.0 表示跑赢 6 个点)。
@@ -356,6 +408,8 @@ def score_candidate(*, duration: int | None, state: str | None,
     near_breakout: 这只是"逼近触发价"那一路进来的 —— 没有六态信号新鲜度可用。
     template: trend_template.assess 的返回值(可缺)。
     rhythm:   trend_rhythm.assess 的返回值(可缺)。
+    geo:      [R195] keltner_geometry.geometry 的返回值(可缺) —— 量化波动通道的
+              几何层, 供 spread(进质地)与 accel(进时机)两个因子。
     """
     fresh: float | None
     fresh_from: str
@@ -377,12 +431,14 @@ def score_candidate(*, duration: int | None, state: str | None,
         "base": base_score(rhythm),
         "rs": _piecewise(float(rs_pct), RS_CURVE) if rs_pct is not None else None,
         "state": STATE_SCORE.get(state or "") if state else None,
+        "spread": spread_score(geo),
         # --- 时机(快变) ---
         "fresh": fresh,
         "vol_ratio": _piecewise(float(vol_ratio), VOL_RATIO_CURVE) if vol_ratio else None,
         "turnover": (_piecewise(float(turnover_rate), TURNOVER_CURVE)
                      if turnover_rate else None),
         "pos": _piecewise(float(channel_pct), POS_CURVE) if channel_pct is not None else None,
+        "accel": accel_score(geo),
     }
 
     quality, cov_q = _blend(factors, QUALITY_WEIGHTS)

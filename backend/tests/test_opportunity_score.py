@@ -13,15 +13,32 @@ import pytest
 from app.services import opportunity_score as osc
 
 
-# 八条全过 + 蓄势磨了三个月 —— 质地轴四个因子都喂满, 这样 _s() 才是"全覆盖"
+# 八条全过 + 蓄势磨了三个月 + 通道几何 —— 两轴的因子都喂满, _s() 才算"全覆盖"
 _TPL_FULL = {"passed": 8, "known": 8, "total": 8}
 _RHY_FULL = {"level": "building", "basing": {"days": 90}}
+# [R195] 趋势已确立(短长分离 2.4 个 ATR)且适度加速 —— 两个新因子都在甜区
+_GEO_FULL = {"spread": 2.4, "accel": {"a1": 0.10}}
+
+
+def _bands_with_geo() -> dict:
+    """走 score_opportunities 那条路时, extras["bands"] 里要有 geo。
+    造真的上下轨让 keltner_geometry 自己反推, 不手拼 geo —— 手拼的话测的是
+    假输入, 反推那条恒等式就没被覆盖到。"""
+    from app.indicators import keltner as _k
+    from app.indicators import keltner_geometry as _kg
+    close, atr = 10.0, 0.5
+    ma = {"s": 9.8, "m": 9.4, "l": 8.6}      # 多头排列, 短长相隔 2.4 个 ATR
+    b = {key: _k.assess(close=close, ma=ma[key], atr=atr, n=_kg.K[key])
+         for key in ("s", "m", "l")}
+    geo = _kg.geometry(b, close)
+    assert geo, "造的上下轨推不出几何, 测试前提就错了"
+    return dict(b, geo=geo)
 
 
 def _s(**kw):
     base = dict(duration=1, state="UT", rs_pct=6.0, vol_ratio=1.6,
                 turnover_rate=5.0, channel_pct=0.56,
-                template=_TPL_FULL, rhythm=_RHY_FULL)
+                template=_TPL_FULL, rhythm=_RHY_FULL, geo=_GEO_FULL)
     base.update(kw)
     return osc.score_candidate(**base)
 
@@ -155,7 +172,11 @@ def test_stronger_six_state_scores_higher():
 def test_already_run_candidate_is_clearly_worse_than_fresh_one():
     """v1 里这两只都会顶到 100 分并列; v2 必须拉开明显差距。"""
     fresh = _s(duration=1, vol_ratio=1.6, channel_pct=0.55, rs_pct=6.0)["score"]
-    ran = _s(duration=1, vol_ratio=5.0, channel_pct=1.05, rs_pct=45.0)["score"]
+    # [R195] 已经走完的那只同时是在减速的 —— 量比 5.0、贴上轨、跑赢 45 个点的票
+    # 十有八九处在拉升末端。原来两只共用同一份几何, 新因子对二者一样, 白白
+    # 稀释了差距; 让它带上自己的加速度才是这个例子该有的样子。
+    ran = _s(duration=1, vol_ratio=5.0, channel_pct=1.05, rs_pct=45.0,
+             geo={"spread": 5.5, "accel": {"a1": -0.22}})["score"]
     # [R189] 门限由 30 降到 25: 两只票的**质地一样**(同一份模板与节拍), 差别
     # 全在时机轴上, 而几何平均对单轴摆幅的响应是开方的 —— 这是它换来"不许
     # 互相补贴"的代价, 不是区分度丢了。25 分仍然是隔着好几个名次的距离。
@@ -174,7 +195,8 @@ def test_no_clamp_is_needed():
     """满分只能靠两根轴的每个因子都到峰值拿到, 不是靠加项堆出来后被夹平。"""
     best = osc.score_candidate(duration=1, state="UT", rs_pct=14.0, vol_ratio=1.8,
                                turnover_rate=5.0, channel_pct=0.58,
-                               template=_TPL_FULL, rhythm=_RHY_FULL)
+                               template=_TPL_FULL, rhythm=_RHY_FULL,
+                               geo={"spread": 2.5, "accel": {"a1": 0.12}})
     assert best["score"] == 100
     assert all(v is not None and v >= 99 for v in best["axes"].values())
 
@@ -188,7 +210,7 @@ def test_missing_factor_renormalizes_inside_the_axis():
     without = _s(turnover_rate=None)
     # 别的时机因子都在峰值, 所以去掉换手率后时机轴该仍然很高, 而不是掉一截
     assert without["axes"]["timing"] > 90
-    assert without["coverage"]["timing"] == pytest.approx(1 - osc.TIMING_WEIGHTS["turnover"])
+    assert without["coverage"]["timing"] == round(1 - osc.TIMING_WEIGHTS["turnover"], 2)
     assert with_turn["coverage"]["timing"] == 1.0
 
 
@@ -196,7 +218,7 @@ def test_whole_axis_missing_falls_back_to_the_other_one():
     """整根轴取不到时退回另一根 —— 不能把"没读到质地"当成"质地 0",
     那会让缺数据的票直接从榜上消失。"""
     r = osc.score_candidate(duration=1, state=None, rs_pct=None, vol_ratio=1.6,
-                            turnover_rate=5.0, channel_pct=0.56)
+                            turnover_rate=5.0, channel_pct=0.56, geo=None)
     assert r["axes"]["quality"] is None
     assert r["partial"] is True          # 界面必须说清楚这一档没算进去
     assert r["score"] == round(r["axes"]["timing"])
@@ -274,7 +296,8 @@ def test_geometric_mean_refuses_to_average_a_lopsided_pair():
     """好票+坏时点 不该和 平庸票+平庸时点 打平 —— 那正是三维度加权的毛病。"""
     lopsided = osc.score_candidate(
         duration=12, state="UT", rs_pct=14.0, vol_ratio=4.5, turnover_rate=22.0,
-        channel_pct=1.15, template=_TPL_FULL, rhythm=_RHY_FULL)
+        channel_pct=1.15, template=_TPL_FULL, rhythm=_RHY_FULL,
+        geo={"spread": 2.4, "accel": {"a1": -0.18}})
     q, t = lopsided["axes"]["quality"], lopsided["axes"]["timing"]
     assert q > 90 and t < 40, f"造的例子不对: 质地 {q} 时机 {t}"
     # 算术平均会给 (95+35)/2 ≈ 65; 几何平均给 √(95×35) ≈ 58 —— 必须更低
@@ -285,7 +308,8 @@ def test_one_axis_near_zero_kills_the_score():
     """任一边趋近 0, 合成分也趋近 0 —— 不许互相补贴。"""
     r = osc.score_candidate(duration=20, state="UT", rs_pct=14.0, vol_ratio=0.1,
                             turnover_rate=0.1, channel_pct=1.8,
-                            template=_TPL_FULL, rhythm=_RHY_FULL)
+                            template=_TPL_FULL, rhythm=_RHY_FULL,
+                            geo={"spread": 2.4, "accel": {"a1": -0.28}})
     assert r["axes"]["quality"] > 90
     assert r["score"] < 40, f"时机烂到底了还有 {r['score']} 分"
 
@@ -397,12 +421,15 @@ def test_incomplete_candidates_are_flagged_and_lose_ties():
     closes = [10.0 * (1.004 ** i) for i in range(290)]
     gate = {"above_ma20": True, "above_ma20_prev": True, "close": 10.0,
             "ma120": 8.0, "ma120_rising": True, "closes": closes, "ret_120d": 0.30}
+    # [R195] 通道读数(含几何层)也要喂, 否则两只都会因为缺 spread/accel 而 partial
+    bands = _bands_with_geo()
     ranked, _ = score_opportunities(
         trends := {"AAA.SH": dict(base_t), "ZZZ.SH": dict(base_t)}, {},
         {"AAA.SH": "甲", "ZZZ.SH": "乙"}, bench_ret=0.02, extras={
             # A 缺量能那两个因子; Z 全齐
-            "AAA.SH": {"gate": gate, "channel_pct": 0.6},
-            "ZZZ.SH": {"gate": gate, "channel_pct": 0.6, "vol_ratio": 1.6, "turnover": 4.0},
+            "AAA.SH": {"gate": gate, "channel_pct": 0.6, "bands": bands},
+            "ZZZ.SH": {"gate": gate, "channel_pct": 0.6, "vol_ratio": 1.6,
+                       "turnover": 4.0, "bands": bands},
         }, bench_ret_120d=0.05)
     assert trends  # 只是让 walrus 的意图明显: 两只用的是同一份趋势
     m = {o["symbol"]: o for o in ranked}

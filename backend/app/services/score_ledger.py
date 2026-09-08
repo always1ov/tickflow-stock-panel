@@ -77,7 +77,7 @@ LEGACY_FACTOR_LABELS = {
     "vol": "量比",
     "win": "该票历史胜率",
     "mainline": "主线归属",
-    "verdict": "Keltner 通道结论",
+    "verdict": "量化波动通道结论",
     "near": "紧贴触发价",
     "clamp": "顶格削减(理论分 >100)",
 }
@@ -485,6 +485,16 @@ def _mainline_label(v) -> str:
 #   key    : ctx 里的字段名
 #   label  : 界面上这一维叫什么
 #   fmt    : 取值 → 人能读的名字
+def _accel_cn(v) -> str:
+    from app.indicators.keltner_geometry import ACCEL_CN
+    return ACCEL_CN.get(str(v), str(v))
+
+
+def _event_cn(v) -> str:
+    from app.indicators.keltner_geometry import EVENT_CN
+    return EVENT_CN.get(str(v), str(v))
+
+
 def _tpl_bucket(v) -> str:
     """趋势模板通过条数 → 分档。八条里过几条是 0~8 的整数, 但 0~4 那几档
     样本会很少(过不了 5 条的票多半也过不了 G1/G3 门槛), 合成一档。"""
@@ -519,6 +529,14 @@ LABEL_DIMS: list[dict] = [
     # 「8 条全过的票是不是真的更好」直接决定 TEMPLATE_CURVE 那条上凸曲线
     # 该不该继续凸下去。
     {"key": "tpl_passed", "label": "趋势模板", "fmt": _tpl_bucket},
+    # [R195] 量化波动通道的三个新维度。**事件那一条是本次最该被验证的** ——
+    # 「主升浪特征之后是不是真的更好」直接决定 MAIN_ADVANCE 那五条阈值该不该
+    # 继续这么定; 而那五条目前全是先验, 一条都没有台账支持。
+    {"key": "chan_event", "label": "通道事件", "fmt": _event_cn},
+    {"key": "accel", "label": "加速度", "fmt": _accel_cn},
+    # 三档位置的三字码(如「上中下」)。27 种组合直接当分组维度会碎得没法看,
+    # 但它是**唯一**能回答"哪几种组合真的好使"的东西, 所以原样落。
+    {"key": "combo", "label": "通道组合", "fmt": lambda v: f"组合 {v}"},
 ]
 
 

@@ -84,8 +84,20 @@ _GATE_OK = {"above_ma20": True, "above_ma20_prev": True,
             "closes": _CLOSES_OK, "ret_120d": 0.30}
 
 
+def _bands_ok() -> dict:
+    """[R195] 三档读数 + 几何层。造真的上下轨让几何自己反推, 不手拼。"""
+    from app.indicators import keltner as _k
+    from app.indicators import keltner_geometry as _kg
+    close, atr = 10.0, 0.5
+    ma = {"s": 9.8, "m": 9.4, "l": 8.6}
+    b = {key: _k.assess(close=close, ma=ma[key], atr=atr, n=_kg.K[key])
+         for key in ("s", "m", "l")}
+    return dict(b, geo=_kg.geometry(b, close))
+
+
 def _ex(syms, **extra):
-    return {s: {"gate": dict(_GATE_OK), "channel_pct": 0.6, **extra} for s in syms}
+    return {s: {"gate": dict(_GATE_OK), "channel_pct": 0.6,
+                "bands": _bands_ok(), **extra} for s in syms}
 
 
 def test_split_keeps_rank_opportunities_identical():

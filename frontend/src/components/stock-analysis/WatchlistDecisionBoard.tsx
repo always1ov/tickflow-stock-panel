@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Star, Wallet, Sparkles, Loader2, ArrowUp, ArrowDown, RefreshCw, FileText, Download, Bell } from 'lucide-react'
-import { api, type EffectivePosition, type ExitLine, type KeltnerBands, type TrendInfo, type Urgency } from '@/lib/api'
+import { api, type ChannelEvent, type EffectivePosition, type ExitLine, type KeltnerBands, type TrendInfo, type Urgency } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { pickStale, SIGNAL_TTL_HOURS } from '@/lib/signalFreshness'   // [R131] 增量分析判据
 import { toast } from '@/components/Toast'
@@ -180,6 +180,10 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
   })
   const urgency: Record<string, Urgency> = useMemo(
     () => urgencyQ.data?.urgency ?? {}, [urgencyQ.data])
+  // [R195] 通道事件与「该动了」同一个端点返回 —— 那里已经同时拿着六态与三档,
+  // 事件必须三样齐全(位置 × 方向 × 确认)才判得出, 所以合在那儿算
+  const events: Record<string, ChannelEvent> = useMemo(
+    () => urgencyQ.data?.event ?? {}, [urgencyQ.data])
 
   // [fork 增强] 持仓出场线(仅持有+填成本的票有;后端顺带把线同步为监控规则)
   const heldWithCost = Object.values(positions).some((p) => p.held && p.cost)
@@ -320,6 +324,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
           symbol, name: r.name ?? symbol, close, changePct: r.change_pct ?? null,
           held: !!pos?.held, cost, weight: pos?.weight ?? null, pnl, sig, trend, exit, kc,
           urg: urgency[symbol],
+          ev: events[symbol],
           // [R169] 成本来源与批次信息 —— 让"这个成本是我填的还是批次算的"一眼可辨
           costSource: pos?.cost_source ?? null,
           lotCost: pos?.lot_cost ?? null,
@@ -331,7 +336,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
       // [R178] 「要动的」= 前四档(已触发/逼近/刚变盘/到轨), 无事档不算。
       // 判定还没回来时不过滤 —— 宁可多显示, 不能让表在加载中看起来是空的。
       .filter((r) => (actionableOnly ? (r.urg ? r.urg.level !== 'idle' : true) : true))
-  }, [enriched.data, positions, signals, heldOnly, actionableOnly, trends, exitLines, keltner, urgency])
+  }, [enriched.data, positions, signals, heldOnly, actionableOnly, trends, exitLines, keltner, urgency, events])
 
   const sortedRows = useMemo(() => {
     const val = (r: (typeof rows)[number]): string | number | null => {
@@ -748,7 +753,8 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
                     <KeltnerCell band={r.kc?.s} close={r.close} />
                     <KeltnerCell band={r.kc?.m} close={r.close} />
                     <KeltnerCell band={r.kc?.l} close={r.close} />
-                    <VerdictCell v={r.kc?.verdict} onOpen={() => setReview({ symbol: r.symbol, name: r.name, tab: 'verdict' })} />
+                    <VerdictCell v={r.kc?.verdict} ev={r.ev} geo={r.kc?.geo} runs={r.kc?.runs}
+                                 onOpen={() => setReview({ symbol: r.symbol, name: r.name, tab: 'verdict' })} />
                     {/* 置信度(独立列, 可排序) */}
                     <td className={`${TD_BASE} ${NUM} whitespace-nowrap px-2 text-right text-muted`}>
                       {r.sig ? `${r.sig.confidence}%` : '—'}

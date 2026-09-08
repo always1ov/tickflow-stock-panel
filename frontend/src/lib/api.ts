@@ -222,7 +222,8 @@ export interface TodayOpportunity {
   axes?: { quality: number | null; timing: number | null }
   /** 每个因子的子分(0~100) —— 轴分说明"时机不行", 子分说明是量比还是位置 */
   factors?: Record<
-    'template' | 'base' | 'rs' | 'state' | 'fresh' | 'pos' | 'vol_ratio' | 'turnover',
+    'template' | 'base' | 'rs' | 'state' | 'spread'
+    | 'fresh' | 'pos' | 'vol_ratio' | 'turnover' | 'accel',
     number | null>
   /** 各轴实际覆盖到的因子权重占比 */
   coverage?: { quality: number; timing: number }
@@ -235,6 +236,10 @@ export interface TodayOpportunity {
   } | null
   /** [R189] 红绿节拍与磨底时长(trend_rhythm 的返回值) */
   rhythm?: TrendRhythm | null
+  /** [R195] 量化波动通道的几何层 —— 分离度进质地轴、加速度进时机轴 */
+  geo?: ChannelGeometry | null
+  /** [R195] 位置 × 六态 × 在轨外天数 → 事件 */
+  channel_event?: ChannelEvent | null
   /** 新鲜度来自哪一路: 六态信号 / 逼近触发价 / 都没有 */
   fresh_from?: 'signal' | 'near_breakout' | 'none'
   /** 命中的候选来源(可同时命中两路) */
@@ -725,11 +730,72 @@ export interface Urgency {
   action?: string
 }
 
+/**
+ * [R195] 量化波动通道的**几何补充层**。底层三档读数一个字没改, 这些是从
+ * 已算好的上下轨反推出来的导出量(轨 = MA ± k×ATR 是恒等式)。
+ */
+export interface ChannelGeometry {
+  atr: number
+  /** 三条均线 */
+  ma: { s: number; m: number; l: number }
+  /** 价格偏离各档均线多少个 ATR。破轨门槛依次是 2 / 2.5 / 3 */
+  d: { s: number; m: number; l: number }
+  /** 三段平均速度(ATR/天): 近 10 天 / 10~30 天前 / 30~60 天前 */
+  v: { v1: number; v2: number; v3: number }
+  /** 二阶: 加速度。匀速时 a1 = 0 是恒等而非近似 */
+  accel: {
+    a1: number; a2: number
+    /** 近 10 天因为加速多走(少走)了几个 ATR —— 比 ATR/天 好读 */
+    gain_atr: number
+    level: 'accel' | 'steady' | 'decel' | null
+    level_cn: string
+  }
+  /** 压缩指数 = 三带交集 / 短带宽度 ∈ [0,1]。1 = 均线粘合, 0 = 已脱开 */
+  compress: number | null
+  compress_level: 'tight' | 'mid' | 'loose' | null
+  /** 带符号的短长均线间距(ATR)。**打分用它不用压缩指数** —— 后者没有方向 */
+  spread: number
+  /** |spread| ≥ 5 ATR: 短带与长带没有任何共同价格区间 */
+  torn: boolean
+  /** |spread| ≤ 1 ATR: 短带完全包在长带里 */
+  nested: boolean
+  stack: 'bull' | 'bear' | 'mixed' | null
+  /** 三档位置压成三字码, 如「上中下」—— 27 种组合表的行号 */
+  combo: string | null
+}
+
+/**
+ * [R195] 位置 × 方向 × 时间 → 一个明确的事件。
+ *
+ * 「穿过上轨算站稳还是突破还是主升浪」这个问题混着三个独立维度: 通道只回答
+ * 位置, 六态回答方向, **在轨外连续几天**才回答确认。少一个都答不了。
+ */
+export interface ChannelEvent {
+  code: string
+  cn: string
+  why: string
+  /** false = 还没站稳。突破与站稳是两件事, 混在一起就是在鼓励追高 */
+  confirmed: boolean
+  /** 这一格组合底层结论说得不准时的补充(27 种里有 11 种) */
+  combo_note?: { combo: string; title: string; detail: string }
+}
+
 export interface KeltnerBands {
   s?: KeltnerBand
   m?: KeltnerBand
   l?: KeltnerBand
   verdict?: KeltnerVerdict | null
+  /** [R195] 几何补充层 —— 速度/加速度/压缩/排列。底层三档未动, 这是从它反推的 */
+  geo?: ChannelGeometry | null
+  /** [R195] 历史序列导出量: 压缩持续天数(新的「磨底磨了多久」)与在轨外连续天数 */
+  runs?: {
+    compress_days: number
+    above_run: number
+    below_run: number
+    box_high: number | null
+    box_low: number | null
+    box_range_atr: number | null
+  } | null
 }
 
 /** [R188] 红绿节拍 —— 反复进多头又跌出, 是蓄势还是反复失败。
@@ -4620,7 +4686,7 @@ export const api = {
   /** [R42] 批量 Keltner 三档位置(决策台短/中/长通道三列)。收盘口径, 与图表同一组公式 */
   // [R178] 批量「该动了」判定 —— 决策台默认按它排序
   stockUrgency: (symbols: string[]) =>
-    request<{ urgency: Record<string, Urgency> }>(
+    request<{ urgency: Record<string, Urgency>; event?: Record<string, ChannelEvent> }>(
       `/api/stock-analysis/urgency?symbols=${encodeURIComponent(symbols.join(','))}`),
 
   stockKeltner: (symbols: string[]) =>

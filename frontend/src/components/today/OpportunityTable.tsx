@@ -27,10 +27,10 @@ const BOARD_LIMIT_CN: Record<string, string> = {
 const AXIS_META = [
   { key: 'quality', cn: '质地', cls: 'bg-red-400',
     what: '这只票的长周期结构 —— 以月计变化',
-    hint: '趋势模板(八条) / 磨底节拍 / 相对强度 / 六态状态' },
+    hint: '趋势模板(八条) / 磨底节拍 / 相对强度 / 六态状态 / 通道分离度' },
   { key: 'timing', cn: '时机', cls: 'bg-sky-400',
     what: '今天是不是那一天 —— 逐日变化',
-    hint: '新鲜度 / 通道位置 / 量比(区间最优,峰在 1.3~2.5) / 换手率' },
+    hint: '新鲜度 / 通道位置 / 量比(区间最优,峰在 1.3~2.5) / 换手率 / 加速度' },
 ] as const
 
 /** 两轴一高一低时该说的那句话 —— 这正是合成分说不出来的东西。 */
@@ -98,7 +98,7 @@ function PositionCell({ pct }: { pct?: number | null }) {
     : pct >= 0.78 ? '空间已经走掉一半' : '通道中段'
   return (
     <span className={cn('font-mono', tone)}
-          title={`Keltner 短期通道位置 ${p}%(0=下轨 / 50=生命线 MA20 / 100=上轨)—— ${hint}`}>
+          title={`量化波动通道·短期 位置 ${p}%(0=下轨 / 50=生命线 MA20 / 100=上轨)—— ${hint}`}>
       {p}%
     </span>
   )
@@ -222,7 +222,7 @@ export function OpportunityTable({ rows, pickedSymbols, onOpen, live }: {
               </th>
             )}
             <th className="hidden px-2 py-1.5 text-right font-normal md:table-cell"
-                title="Keltner 短期通道位置(收盘口径)。50% = 恰好站在生命线 MA20 上;甜区 50%~65%">位置</th>
+                title="量化波动通道·短期 的位置(收盘口径)。50% = 恰好站在生命线 MA20 上;甜区 50%~65%">位置</th>
             <th className="hidden px-2 py-1.5 text-right font-normal md:table-cell"
                 title="量比。区间最优:峰在 1.3~2.5,超过 4 说明这波已经走完了">量比</th>
             <th className="hidden px-2 py-1.5 text-right font-normal xl:table-cell"
@@ -381,11 +381,13 @@ function ActionCell({ action }: { action?: TodayAction | null }) {
 function OpportunityDetail({ o, live }: { o: TodayOpportunity; live?: boolean }) {
   const F_CN: Record<string, string> = {
     template: '趋势模板', base: '磨底节拍', rs: '相对强度', state: '六态状态',
+    spread: '通道分离度',
     fresh: '新鲜度', pos: '通道位置', vol_ratio: '量比', turnover: '换手率',
+    accel: '加速度',
   }
   const AXIS_FACTORS: Record<string, string[]> = {
-    quality: ['template', 'base', 'rs', 'state'],
-    timing: ['fresh', 'pos', 'vol_ratio', 'turnover'],
+    quality: ['template', 'base', 'rs', 'state', 'spread'],
+    timing: ['fresh', 'pos', 'vol_ratio', 'turnover', 'accel'],
   }
   const verdict = axisVerdict(o.axes?.quality, o.axes?.timing)
   return (
@@ -494,6 +496,60 @@ function OpportunityDetail({ o, live }: { o: TodayOpportunity; live?: boolean })
               {o.rhythm.cycles > 0 && (
                 <span className="ml-2">{o.rhythm.label}:{o.rhythm.reason}</span>
               )}
+            </div>
+          )}
+
+          {/* [R195] 量化波动通道的几何与事件。**几何进了分**(分离度→质地、
+              加速度→时机), 所以摆在依据区而不是注记区 —— 注记那一栏的规矩是
+              「一分不加一分不减」, 混进去边界就读不清了。 */}
+          {!!o.geo && (
+            <div className="rounded border border-border/40 bg-surface/40 px-2.5 py-2">
+              <div className="mb-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <span className="text-foreground/90">量化波动通道</span>
+                {!!o.channel_event && o.channel_event.code !== 'none' && (
+                  <span className={cn('rounded border px-1.5 py-0.5 text-[10px]',
+                    o.channel_event.confirmed
+                      ? 'border-accent/40 bg-accent/10 text-foreground'
+                      : 'border-amber-400/40 bg-amber-400/10 text-amber-300')}>
+                    {o.channel_event.cn}{o.channel_event.confirmed ? '' : '(未确认)'}
+                  </span>
+                )}
+                {!!o.geo.accel?.level_cn && (
+                  <span className="font-mono text-[10px] text-muted">
+                    {o.geo.accel.level_cn} {o.geo.accel.gain_atr >= 0 ? '+' : ''}
+                    {o.geo.accel.gain_atr.toFixed(1)} ATR/10日
+                  </span>
+                )}
+                <span className="font-mono text-[10px] text-muted"
+                      title="短期均线与长期均线相隔多少个 ATR。≈0 粘合, 1.5~3 趋势确立, >5 尺度撕裂">
+                  分离度 {o.geo.spread.toFixed(1)} ATR
+                </span>
+                {o.geo.compress != null && (
+                  <span className="font-mono text-[10px] text-muted"
+                        title="三条带的交集 / 短带宽度。1 = 均线粘合(三个尺度对合理价没有分歧), 0 = 已脱开">
+                    重叠 {(o.geo.compress * 100).toFixed(0)}%
+                  </span>
+                )}
+                {!!o.geo.combo && (
+                  <span className="font-mono text-[10px] text-muted/70"
+                        title="短/中/长三档位置压成的三字码 —— 27 种组合表的行号">
+                    组合 {o.geo.combo}
+                  </span>
+                )}
+              </div>
+              {!!o.channel_event?.why && (
+                <div className="text-[10px] leading-relaxed text-muted">{o.channel_event.why}</div>
+              )}
+              {!!o.channel_event?.combo_note && (
+                <div className="mt-1 text-[10px] leading-relaxed text-amber-300/80">
+                  组合「{o.channel_event.combo_note.combo}」· {o.channel_event.combo_note.title}:
+                  {o.channel_event.combo_note.detail}
+                </div>
+              )}
+              <div className="mt-1 text-[9px] text-muted/70">
+                偏离度 短 {o.geo.d.s.toFixed(1)} / 中 {o.geo.d.m.toFixed(1)} / 长 {o.geo.d.l.toFixed(1)} 个 ATR
+                (破轨门槛依次 2 / 2.5 / 3)。三档共用同一个 ATR 分母, 所以可以直接相减。
+              </div>
             </div>
           )}
 

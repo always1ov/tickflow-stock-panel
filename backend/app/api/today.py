@@ -110,11 +110,14 @@ def score_opportunities(
     extras[sym] 认得的键:
       vol_ratio / turnover  量能维度的两个因子
       channel_pct           Keltner 短期通道位置(位置维度)
+      bands                 [R195] channels_for_symbols 的一行(三档读数 + geo 几何层
+                            + runs 历史序列)。几何层进把握分, 事件靠它与六态合成。
       gate                  keltner_service.long_trend_map 的一行(生命线 + 长期趋势;
                             [R189] with_closes=True 时还带 closes 与 ret_120d,
                             趋势模板要拿它算 MA150/MA200 与 52 周高低点)
       win / mainline / verdict / dragon  纯注记
     """
+    from app.indicators import keltner_geometry as _kg
     from app.services import opportunity_score as osc
     from app.services import trend_template as _tt
 
@@ -218,11 +221,26 @@ def score_opportunities(
             except Exception as e:  # noqa: BLE001
                 logger.debug("trend template skipped for %s: %s", sym, e)
 
+        # [R195] 量化波动通道的几何层。channels_for_symbols 已经把它算好挂在
+        # bands 上了(零新增取数), 这里只是取出来喂进打分与事件判定。
+        kc = e.get("bands") or {}
+        geo = kc.get("geo")
+        chan_event = None
+        if geo:
+            try:
+                chan_event = _kg.event(state=t.get("state"), duration=t.get("duration"),
+                                       geo=geo, run=kc.get("runs"))
+                note = _kg.combo_note(kc)
+                if note:
+                    chan_event = dict(chan_event, combo_note=note)
+            except Exception as e:  # noqa: BLE001
+                logger.debug("channel event skipped for %s: %s", sym, e)
+
         res = osc.score_candidate(
             duration=c["duration"], state=t.get("state"), rs_pct=rs_pct,
             vol_ratio=vr, turnover_rate=turn, channel_pct=cpct,
             near_breakout=c["near_breakout"],
-            template=tpl, rhythm=t.get("rhythm"))
+            template=tpl, rhythm=t.get("rhythm"), geo=geo)
 
         close = t.get("close") or (signals.get(sym) or {}).get("close")
         try:
@@ -260,6 +278,11 @@ def score_opportunities(
                           "total": tpl["total"], "text": _tt.summary(tpl),
                           "criteria": tpl["criteria"]} if tpl else None),
             "rhythm": t.get("rhythm"),
+            # [R195] 量化波动通道的几何与事件。**几何进了分**(spread→质地,
+            # accel→时机), 所以和 template 一样摆在 notes 之外 —— notes 那一栏
+            # 的规矩是"一分不加一分不减", 混进去会让边界读不清。
+            "geo": geo,
+            "channel_event": chan_event,
             "notes": _annotations(sym, e, signals.get(sym) or {}),
             # [R137] 盘中视图。**和 score/dims 完全并列, 一分不进评分** ——
             # 决策基准冻在收盘口径(盘中一动不动), 盘中的变化单独摆一份给人盯。
@@ -295,6 +318,12 @@ def score_opportunities(
                 # [R189] 趋势模板过了几条。只在八条全判得出时落 —— 判不全的
                 # 那个 passed 和判得全的不是同一把尺子, 混在一档里统计会骗人。
                 "tpl_passed": (tpl["passed"] if tpl and tpl.get("complete") else None),
+                # [R195] 通道几何三个分组维度。加速度档位与事件是这次最该被验证的
+                # 两个 —— 「主升浪特征之后是不是真的更好」直接决定 MAIN_ADVANCE
+                # 那五条阈值该不该继续这么定。
+                "chan_event": (chan_event or {}).get("code"),
+                "accel": ((geo or {}).get("accel") or {}).get("level"),
+                "combo": (geo or {}).get("combo"),
             },
         }
         out.append(o)
@@ -786,6 +815,11 @@ def _build_overview(repo, engine=None) -> dict:
             spct = ((bands_map.get(s) or {}).get("s") or {}).get("pct")
             if isinstance(spct, (int, float)):
                 ent["channel_pct"] = float(spct)
+            # [R195] 整份通道读数(内含 geo 几何层与 runs 历史序列)。打分要 geo,
+            # 事件判定要 geo + runs —— 都是 channels_for_symbols 已经算好的,
+            # 这里只是把它带过去, 不重算。
+            if s in bands_map:
+                ent["bands"] = bands_map[s]
             # [R137] 盘中视图: 拿现价去比**昨天那条**通道与生命线。给的是方向性
             # 预警不是结论 —— 结论等收盘(PRD §7.5)。一分不进评分。
             lr = live_rows.get(s)
@@ -1191,13 +1225,20 @@ _AI_SYSTEM = """你是用户的盘前参谋,有 15 年 A 股一线交易经验�
 每只候选带一份 `把握分分解`,那是规则层的自评,结构固定:
 
 - **门槛**:这只票已经通过四道硬门槛(六态在多头侧 / 收盘站上生命线 MA20 且连续两日 / 不在长期下跌趋势里 / 红绿节拍不是「反复失败」)。**没过门槛的票压根不会送到你面前**,所以不必再核这四件事。
-- **质地**(0~100):这只票的长周期结构 —— 趋势模板八条过了几条、磨底磨了多久磨得好不好、相对大盘强弱、六态状态。**它以月计变化**,今天和上周基本是同一个数。
-- **时机**(0~100):今天是不是那一天 —— 信号第几天、量比、通道位置、换手率。**它逐日变化**。这几条曲线都是**区间最优**不是越大越好 —— 量比峰值在 1.3~2.5(超过 4 说明这波已经走完了),通道位置甜区在 0.50~0.65(刚站上生命线,越接近 1.0 越是追高)。
+- **质地**(0~100):这只票的长周期结构 —— 趋势模板八条过了几条、磨底磨了多久磨得好不好、相对大盘强弱、六态状态、**量化波动通道的分离度**。**它以月计变化**,今天和上周基本是同一个数。
+- **时机**(0~100):今天是不是那一天 —— 信号第几天、量比、通道位置、换手率、**加速度**。**它逐日变化**。这几条曲线都是**区间最优**不是越大越好 —— 量比峰值在 1.3~2.5(超过 4 说明这波已经走完了),通道位置甜区在 0.50~0.65(刚站上生命线,越接近 1.0 越是追高)。
 - **总分 = √(质地 × 时机)**。所以两根轴要**分开读**,这正是分解存在的理由:
   - 质地高、时机低 → 「好票,但今天不是买点」。该说的是等什么(回踩到哪、放量到什么程度),不是现在追。
   - 质地低、时机高 → 「今天是有动静,但这票本身结构不行」。该说的是为什么不值得占仓位。
   - 两个都高才是「高概率的有苗头的东西」。
 - `partial: true` 表示某个因子**没有数据**,那一份权重是靠剩下的因子顶上来的 —— 这种候选的总分偏乐观,同分时优先选 partial 为 false 的。
+
+### 「量化波动通道」那几个数怎么读
+
+- **加速度**:三条均线是价格在滞后 0/9.5/29.5/59.5 天处的四次采样,相邻两档之差就是那一段的平均速度,速度之差就是加速度。**匀速时它精确为 0**。「加速」= 近 10 天比之前那一段走得更快。但它和量比一样是**区间最优**:过度加速是拉升末端的赶顶,不是好事。
+- **分离度**(单位 ATR):短期均线与长期均线相隔多少个 ATR,带符号。≈0 是均线粘合(方向未定),1.5~3 是趋势已确立的甜区,>5 是「尺度撕裂」——短期与长期通道已经没有任何共同价格区间,走过头了。
+- **三尺度重叠**:0~1,1 = 完全粘合。它**没有方向**(下跌趋势的重叠度和上涨一样低),所以只用来读形态,打分走带符号的分离度。
+- **通道事件**:位置 × 六态方向 × 在轨外连续天数。**「突破尝试」与「突破站稳」差的只是那两天** —— 前者可能是假突破,别当成同一回事。「主升浪特征」要五条同时成立才给。
 
 用法是: **把分解当"规则层看到了什么"的摘要,然后自己去日 K 里验证它对不对**。分解和 K 线打架时以 K 线为准,并在理由里点出来。
 
@@ -1299,6 +1340,13 @@ def _candidate_market_data(repo, cands: list[dict]) -> list[dict]:
                     "趋势模板": (c.get("template") or {}).get("text"),
                     "磨底天数": (rhy.get("basing") or {}).get("days"),
                     "节拍": rhy.get("label"),
+                    # [R195] 量化波动通道的几何与事件。**几何进了分**(分离度→质地,
+                    # 加速度→时机), 所以摆在"原始输入"里让 AI 能核对。
+                    "通道加速度": ((c.get("geo") or {}).get("accel") or {}).get("level_cn"),
+                    "通道分离度ATR": (c.get("geo") or {}).get("spread"),
+                    "三尺度重叠": (c.get("geo") or {}).get("compress"),
+                    "通道组合": (c.get("geo") or {}).get("combo"),
+                    "通道事件": (c.get("channel_event") or {}).get("cn"),
                 },
             },
             "规则依据": c["why"],
