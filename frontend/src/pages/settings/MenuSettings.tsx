@@ -62,7 +62,7 @@ const BUILTIN_PAGES: NavEntry[] = [
   { id: '/monitor', label: '监控中心', type: 'builtin', visible: true },
   { id: '/regime', label: '市场环境', type: 'builtin', visible: true },
   { id: '/abnormal', label: '异动监控', type: 'builtin', visible: true },
-  { id: '/lots', label: '模拟盘', type: 'builtin', visible: true },   // [R170] 双 tab 外壳
+  { id: '/lots', label: '模拟盘', type: 'builtin', visible: true },   // [R183] 整页 AI 模拟盘
   { id: '/signals', label: '信号库', type: 'builtin', visible: true },
   { id: '/review', label: '复盘', type: 'builtin', visible: true },
   { id: '/indices', label: '指数', type: 'builtin', visible: true },

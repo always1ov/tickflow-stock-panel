@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Star, Wallet, Sparkles, Loader2, ArrowUp, ArrowDown, RefreshCw, FileText, Download, Bell } from 'lucide-react'
+import { Star, Wallet, Sparkles, Loader2, ArrowUp, ArrowDown, RefreshCw, FileText, Download, Bell, ChevronDown } from 'lucide-react'
 import { api, type EffectivePosition, type ExitLine, type KeltnerBands, type TrendInfo, type Urgency } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { pickStale, SIGNAL_TTL_HOURS } from '@/lib/signalFreshness'   // [R131] 增量分析判据
@@ -14,7 +14,7 @@ import { storage } from '@/lib/storage'
 import { buildBoardHtml } from '@/lib/decisionBoardHtmlExport'
 import { DEFAULT_EXPORT_KEYS } from '@/lib/decisionBoardExportColumns'
 import { ExportColumnsDialog } from '@/components/stock-analysis/decision-board/ExportColumnsDialog'
-import { KeltnerCell, UrgencyCell, VerdictCell } from '@/components/stock-analysis/decision-board/cells'
+import { KeltnerCell, PriceHoldingCell, UrgencyCell, VerdictCell } from '@/components/stock-analysis/decision-board/cells'
 import { LotsLink } from '@/components/stock-analysis/decision-board/LotsLink'
 // [R169] 合并视图(手填 ⊕ 上游批次登记), 字段说明见 api.ts 的 EffectivePosition
 type Position = EffectivePosition
@@ -23,6 +23,15 @@ type Signal = { signal: string; confidence: number; reason: string; close: numbe
 type SortKey = 'urgency' | 'name' | 'close' | 'changePct' | 'held' | 'cost' | 'pnl' | 'exit'
   | 'trend' | 'ks' | 'km' | 'kl' | 'verdict' | 'confidence' | 'signal' | 'report'
 const SIGNAL_RANK: Record<string, number> = { buy: 0, sell: 1, hold: 2, watch: 3 }
+// [R184] 合并列里可选的排序目标 —— 六列合一之后, 排序键一个都不能少
+const MERGED_SORTS = [
+  { key: 'close' as const, label: '现价' },
+  { key: 'changePct' as const, label: '涨跌' },
+  { key: 'held' as const, label: '仓位' },
+  { key: 'cost' as const, label: '成本' },
+  { key: 'pnl' as const, label: '浮盈' },
+  { key: 'exit' as const, label: '止盈线' },
+]
 // [fork 增强] 六态排序权重:多头在前(上涨趋势 → 下跌趋势)
 const TREND_RANK: Record<string, number> = { UT: 0, NR: 1, SR: 2, SREA: 3, NREA: 4, DT: 5 }
 
@@ -85,6 +94,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
   const [sort, setSort] = useState<{ key: SortKey; dir: 'asc' | 'desc' }>({ key: 'urgency', dir: 'asc' })
   // 「只看要动的」—— 自选一多, 默认列 80 行本身就是噪音
   const [actionableOnly, setActionableOnly] = useState(false)
+  const [sortMenu, setSortMenu] = useState(false)   // [R184] 合并列的排序选择菜单
   const toggleSort = (key: SortKey) =>
     setSort((s) => (s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: key === 'name' ? 'asc' : 'desc' }))
   const caret = (key: SortKey) =>
@@ -538,12 +548,10 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
                 调小**不会压字** —— 内容宽度是硬底线, 百分比只决定"能不能多吃富余空间"。 */}
             <colgroup>
               <col style={{ width: '8%' }} />{/* 标的 */}
-              <col style={{ width: '3.5%' }} />{/* 现价 */}
-              <col style={{ width: '3.5%' }} />{/* 涨跌 */}
-              <col style={{ width: '3%' }} />{/* 仓位 */}
-              <col style={{ width: '6%' }} />{/* 成本(两个输入框) */}
-              <col style={{ width: '3.5%' }} />{/* 浮盈 */}
-              <col style={{ width: '5%' }} />{/* 止盈线(两行) */}
+              {/* [R184] 六列合一: 现价/涨跌/仓位/成本/浮盈/止盈线。原来合计 24.5%,
+                  这里给 20% —— 少的那部分是"空仓行不画第二行"省下来的, 让给
+                  趋势/通道/结论那几列(它们才是每行都有内容的)。 */}
+              <col style={{ width: '20%' }} />{/* 行情 · 持仓 */}
               <col style={{ width: '6%' }} />{/* 趋势 */}
               <col style={{ width: '4%' }} />{/* 短通道 */}
               <col style={{ width: '4%' }} />{/* 中通道 */}
@@ -557,12 +565,44 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
               <tr className="text-left">
                 <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center"><button onClick={() => toggleSort('urgency')} className={thBtn} title="该动了: 已触发 > 逼近 > 刚变盘 > 到轨 > 无事。同档内按离触发多近排。纯规则判定, AI 不参与 —— 它只解释, 不决定你先看谁">该动{caret('urgency')}</button></th>
                 <th className="whitespace-nowrap px-4 py-2.5 font-normal"><button onClick={() => toggleSort('name')} className={thBtn}>标的{caret('name')}</button></th>
-                <th className="whitespace-nowrap px-2 py-2.5 font-normal text-right"><button onClick={() => toggleSort('close')} className={thBtn}>现价{caret('close')}</button></th>
-                <th className="whitespace-nowrap px-2 py-2.5 font-normal text-right"><button onClick={() => toggleSort('changePct')} className={thBtn}>涨跌{caret('changePct')}</button></th>
-                <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center"><button onClick={() => toggleSort('held')} className={thBtn}>仓位{caret('held')}</button></th>
-                <th className="whitespace-nowrap px-2 py-2.5 font-normal text-right"><button onClick={() => toggleSort('cost')} className={thBtn} title="持仓成本价(仅持有且填了成本的票有)">成本{caret('cost')}</button></th>
-                <th className="whitespace-nowrap px-2 py-2.5 font-normal text-right"><button onClick={() => toggleSort('pnl')} className={thBtn}>浮盈{caret('pnl')}</button></th>
-                <th className="whitespace-nowrap px-2 py-2.5 font-normal text-right"><button onClick={() => toggleSort('exit')} className={thBtn} title="ATR 三阶段出场线(止损/保本/移动止盈),仅持有+填成本的票有;跌破自动推送。按「离触发还有多远」排序 —— 线价本身不同票差几十倍没有可比性">止盈线{caret('exit')}</button></th>
+                <th className="whitespace-nowrap px-2 py-2.5 font-normal">
+                  {/* [R184] 六列合一。**排序键一个没丢** —— 点表头选按哪个排,
+                      再点同一个翻方向, 与别的列行为一致。 */}
+                  <div className="relative inline-block">
+                    <button
+                      onClick={() => setSortMenu(v => !v)}
+                      title={'现价 / 涨跌 / 仓位 / 成本 / 浮盈 / 止盈线 合并成了一列。\n'
+                        + '后四项只有「持有」的票才有值, 空仓票原来是四列空白 —— 合并后空仓行只画一行。\n'
+                        + '点这里选按哪个排序。'}
+                      className={thBtn}
+                    >
+                      行情 · 持仓
+                      {MERGED_SORTS.some(k => k.key === sort.key) && (
+                        <span className="ml-1 text-accent">
+                          {MERGED_SORTS.find(k => k.key === sort.key)!.label}{caret(sort.key)}
+                        </span>
+                      )}
+                      <ChevronDown className="ml-0.5 inline h-2.5 w-2.5" />
+                    </button>
+                    {sortMenu && (
+                      <div
+                        onMouseLeave={() => setSortMenu(false)}
+                        className="absolute left-0 top-full z-20 mt-1 w-20 rounded-btn border border-border bg-surface py-0.5 shadow-xl"
+                      >
+                        {MERGED_SORTS.map(k => (
+                          <button
+                            key={k.key}
+                            onClick={() => { toggleSort(k.key); setSortMenu(false) }}
+                            className={`block w-full cursor-pointer px-2 py-1 text-left text-[10px] transition-colors hover:bg-elevated ${
+                              sort.key === k.key ? 'text-accent' : 'text-muted'}`}
+                          >
+                            {k.label}{sort.key === k.key ? caret(k.key) : ''}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </th>
                 <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center"><button onClick={() => toggleSort('trend')} className={thBtn} title="六态趋势(利弗莫尔,日线收盘价判定):多头在前">趋势{caret('trend')}</button></th>
                 {/* [R42] Keltner 三档: 一眼看出这只票贴着哪条轨。收盘口径, 与个股分析图表同一组公式 */}
                 <th className="whitespace-nowrap px-1.5 py-2.5 font-normal text-center"><button onClick={() => toggleSort('ks')} className={thBtn} title="短期通道 = MA20 ± 2×ATR(约一个月)。按通道内位置排序:升序=最贴下轨的在前(低吸候选), 降序=最贴上轨的在前(高抛候选)">短通道{caret('ks')}</button></th>
@@ -576,11 +616,9 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
             </thead>
             <tbody>
               {rows.length === 0 ? (
-                <tr><td colSpan={16}   /* [R178] 加了「该动」列 */ className="px-4 py-6 text-center text-muted">自选为空 —— 去自选页添加标的</td></tr>
+                <tr><td colSpan={11}   /* [R184] 六列合一后共 11 列 */ className="px-4 py-6 text-center text-muted">自选为空 —— 去自选页添加标的</td></tr>
               ) : sortedRows.map((r) => {
                 const active = r.symbol === currentSymbol
-                const up = (r.changePct ?? 0) > 0
-                const down = (r.changePct ?? 0) < 0
                 // [R169] 只有手填的成本才回写。r.cost 可能是批次派生值, 回写它等于
                 // 把派生固化成手填, 之后改批次就不跟着动了。
                 const manualCost = r.costSource === 'manual' ? r.cost : null
@@ -606,91 +644,20 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
                         <span className="text-[9px] font-mono text-muted">{r.symbol}</span>
                       </button>
                     </td>
-                    <td className="whitespace-nowrap px-2 py-2.5 text-right font-mono tabular-nums text-foreground">{r.close != null ? r.close.toFixed(2) : '—'}</td>
-                    <td className={`whitespace-nowrap px-2 py-2.5 text-right font-mono tabular-nums ${up ? 'text-red-400' : down ? 'text-emerald-400' : 'text-muted'}`}>
-                      {r.changePct != null ? `${(r.changePct * 100).toFixed(2)}%` : '—'}
-                    </td>
-                    {/* 仓位:持有/空仓 切换。
-                        [R169] 写回时一律用 manualCost 而不是 r.cost —— r.cost 可能是批次
-                        派生出来的, 直接回写会把"批次算的"固化成"我填的", 之后改批次就不
-                        跟着动了。派生值必须保持派生。 */}
-                    <td className="whitespace-nowrap px-2 py-2.5 text-center">
-                      <button
-                        onClick={() => setPos.mutate({ symbol: r.symbol, held: !r.held, cost: manualCost, weight: r.weight })}
-                        className={`whitespace-nowrap text-[10px] px-1.5 py-0.5 rounded border transition-colors cursor-pointer ${
-                          r.held ? 'border-amber-400/40 bg-amber-400/10 text-amber-400' : 'border-border bg-base text-muted hover:border-amber-400/30'
-                        }`}
-                      >
-                        {r.held ? '持有' : '空仓'}
-                      </button>
-                    </td>
-                    {/* 成本+仓位%:仅持有时可填。生命线=20日线, 自动计算无需手填;
-                        仓位% 供今日总览算组合总仓位/净值回撤, 不填不影响其他功能。
-
-                        [R169] 成本框只装**手填值**: 批次页登记过而这里没填的, 走
-                        placeholder 显示批次加权均价(带「批」字), 一眼能分清"我填的"
-                        和"批次算的"。想改成自己的口径就直接往里敲, 敲了即变手填。 */}
-                    <td className="whitespace-nowrap px-2 py-2.5 text-right">
-                      {r.held ? (
-                        <span className="inline-flex items-center gap-1">
-                          <input
-                            type="number"
-                            defaultValue={manualCost ?? ''}
-                            placeholder={r.costSource === 'lots' && r.lotCost != null ? `批 ${r.lotCost.toFixed(2)}` : '成本'}
-                            title={r.costSource === 'lots' && r.lotCost != null
-                              ? `成本来自「持仓提醒」页的 ${r.lotCount} 笔批次(数量加权均价 ${r.lotCost.toFixed(2)})。这里留空即跟随批次; 填了数字则以填的为准。`
-                              : '买入成本(手填)'}
-                            onBlur={(e) => {
-                              const v = e.target.value === '' ? null : Number(e.target.value)
-                              if (v !== manualCost) setPos.mutate({ symbol: r.symbol, held: true, cost: v, weight: r.weight })
-                            }}
-                            className={`w-16 h-6 px-1 rounded bg-base border text-[11px] font-mono text-right text-foreground focus:outline-none focus:border-accent/50 ${
-                              r.costSource === 'lots' ? 'border-accent/35 placeholder:text-accent/70' : 'border-border'
-                            }`}
-                          />
-                          <input
-                            type="number"
-                            min={0} max={100}
-                            defaultValue={r.weight ?? ''}
-                            placeholder="仓%"
-                            title="仓位比例(占总资金 %),可选 —— 填了之后今日总览能算组合总仓位、净值回撤纪律与超配提醒。批次页给不出这个数(它不知道总资金),只能在这里填。"
-                            onBlur={(e) => {
-                              const v = e.target.value === '' ? null : Number(e.target.value)
-                              if (v !== r.weight) setPos.mutate({ symbol: r.symbol, held: true, cost: manualCost, weight: v })
-                            }}
-                            className="w-12 h-6 px-1 rounded bg-base border border-border text-[11px] font-mono text-right text-foreground focus:outline-none focus:border-accent/50"
-                          />
-                          <LotsLink symbol={r.symbol} lotCount={r.lotCount} driftPct={r.costDriftPct} lotCost={r.lotCost} />
-                        </span>
-                      ) : (
-                        // 空仓但批次还挂着 —— 多半是卖出后忘了删批次, 那两条监控规则还在跑
-                        r.lotCount > 0
-                          ? <LotsLink symbol={r.symbol} lotCount={r.lotCount} driftPct={null} lotCost={null} stale />
-                          : <span className="text-muted">—</span>
+                    <PriceHoldingCell
+                      r={r}
+                      manualCost={manualCost}
+                      onSave={(patch) => setPos.mutate({ symbol: r.symbol, ...patch })}
+                      lotsLink={({ stale }) => (
+                        <LotsLink
+                          symbol={r.symbol}
+                          lotCount={r.lotCount}
+                          driftPct={stale ? null : r.costDriftPct}
+                          lotCost={stale ? null : r.lotCost}
+                          stale={stale}
+                        />
                       )}
-                    </td>
-                    {/* 浮盈 */}
-                    <td className={`whitespace-nowrap px-2 py-2.5 text-right font-mono tabular-nums ${r.pnl == null ? 'text-muted' : r.pnl > 0 ? 'text-red-400' : r.pnl < 0 ? 'text-emerald-400' : 'text-muted'}`}>
-                      {r.pnl != null ? `${(r.pnl * 100).toFixed(1)}%` : '—'}
-                    </td>
-                    {/* [fork 增强] 持仓出场线:当前生效线位 + 距离; 逼近变琥珀, 跌破变红 */}
-                    <td className="whitespace-nowrap px-2 py-2.5 text-right">
-                      {r.exit ? (
-                        <span
-                          className={`inline-flex flex-col items-end text-[10px] font-mono leading-tight ${
-                            r.exit.triggered ? 'text-red-400' : r.exit.distance_pct > -0.03 ? 'text-amber-300' : 'text-muted'
-                          }`}
-                          title={`${r.exit.stage_cn} · ${r.exit.line_cn}\n成本 ${r.exit.cost ?? '—'} · 浮盈 ${r.exit.profit_atr ?? '—'}×ATR · 持仓最高 ${r.exit.highest_close ?? '—'}\n跌破 ${r.exit.line.toFixed(2)} → ${r.exit.action}(k=${r.exit.k}, ATR14=${r.exit.atr})${r.exit.lifeline ? `\n生命线(20日线) ${r.exit.lifeline.toFixed(2)} — 收盘跌破无条件清仓` : ''}`}
-                        >
-                          <span>{r.exit.line.toFixed(2)}</span>
-                          <span className="whitespace-nowrap text-[9px] opacity-80">
-                            {r.exit.stage === 'fatal' ? '生命线破位!' : r.exit.triggered ? '已触发' : `距 ${(r.exit.distance_pct * 100).toFixed(1)}%`}
-                          </span>
-                        </span>
-                      ) : (
-                        <span className="text-[10px] text-muted/40">—</span>
-                      )}
-                    </td>
+                    />
                     {/* [fork 增强] 六态趋势(利弗莫尔):状态全名 + 持续天数, 悬停看关键点/操作建议
                         [R48] 点击翻逐日复盘 —— 这一列只显示今天, 要知道这个状态是
                         怎么走到今天的、上次转折在哪天, 得能翻回去看 */}

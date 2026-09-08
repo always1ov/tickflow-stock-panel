@@ -41,7 +41,9 @@ export function LotsLink({ symbol, lotCount, driftPct, lotCost, stale = false }:
 
   return (
     <Link
-      to={`/lots?symbol=${encodeURIComponent(symbol)}`}
+      // [R184] R183 把 /lots 改成模拟盘之后, 批次页搬到了 /lots-registry ——
+      // 这里没跟着改, 点进去会落到模拟盘上看不到批次。属于 R183 引入的回归。
+      to={`/lots-registry?symbol=${encodeURIComponent(symbol)}`}
       title={title}
       aria-label={title}
       className={`tap-target inline-flex h-6 shrink-0 items-center gap-0.5 rounded border bg-base px-1 text-[10px] font-mono transition-colors ${tone}`}
