@@ -124,6 +124,7 @@ def test_天数挂在结论对象上而不是另起一个平级字段():
         "没核对码一致 —— 历史窗口与当日快照万一算出不同的结论码, "
         "会把别人的天数安在这一档上"
     )
+    assert "days_exact" in src, "没标出天数是数出来的还是只能确认到今天"
 
 
 def test_候选池这一档同样有天数():
@@ -177,7 +178,7 @@ def test_两条路对不上时今天仍然算一天而不是整个不给():
 
     from app.services import keltner_service
     src = inspect.getsource(keltner_service.channels_for_symbols)
-    assert 'days=int(vr["days"]) if same else 1' in src, (
+    assert 'days=int(vr["days"]) if exact else 1' in src, (
         '两条路对不上时又变回「整个不给」了 —— 那会让天数从徽标上静默消失'
     )
     # 反向: 不该再出现"对不上就跳过"的写法
@@ -234,3 +235,53 @@ def test_端到端_天数真的出现在接口返回的_verdict_里():
         f"拿到的是 {sorted(v)}"
     )
     assert v["days"] > 1, f"这只票连着挂了很多天「{v['title']}」, 却只报了 {v['days']} 天"
+
+
+def test_R236_只要有结论天数就一定在():
+    """用户连着三次报「外面还是没显示」。
+
+    根子上的问题是: 「功能没部署」和「这只票算不出来」在界面上**长得一模
+    一样** —— 都是徽标后面什么都没有。而这两种要做的事完全不同。
+
+    所以现在只要有结论, `days` 就一定在: 今天这一档是确定的(徽标上印的
+    就是它), 至少 1 天。算不出历史时用 `days_exact=False` 标开, 界面画淡
+    并说明"只能确认到今天" —— **不假装自己知道, 但也不消失。**
+    """
+    import datetime as dt
+
+    import polars as pl
+
+    from app.services import keltner_service as ks
+
+    closes = [10.0] * 200 + [10.0 - 0.025 * i for i in range(1, 101)]
+    dates = [dt.date(2025, 1, 1) + dt.timedelta(days=i) for i in range(len(closes))]
+    last = len(closes) - 1
+
+    def _ma(w: int) -> float:
+        return sum(closes[last + 1 - w:last + 1]) / w
+
+    class _Repo:
+        def __init__(self, bars: int) -> None:
+            self.bars = bars
+
+        def get_enriched_latest(self):
+            return pl.DataFrame({
+                "symbol": ["X"], "close": [closes[-1]], "atr_14": [_ATR],
+                "ma20": [_ma(20)], "ma60": [_ma(60)],
+            }), "d"
+
+        def get_daily_batch(self, *a, **k):
+            n = self.bars
+            return pl.DataFrame({
+                "symbol": ["X"] * n, "date": dates[-n:],
+                "close": closes[-n:], "atr_14": [_ATR] * n,
+            })
+
+    # 历史够长 → 数得出来
+    v = (ks.channels_for_symbols(_Repo(len(closes)), ["X"]).get("X") or {})["verdict"]
+    assert v["days"] > 1 and v["days_exact"] is True
+
+    # 暖机不足 120 根 → 仍然给天数, 但标明不精确
+    v = (ks.channels_for_symbols(_Repo(60), ["X"]).get("X") or {})["verdict"]
+    assert v["days"] == 1, "算不出历史时该退化成「至少 1 天」而不是消失"
+    assert v["days_exact"] is False, "不精确却没标出来 —— 那是在假装自己知道"

@@ -198,7 +198,16 @@ function VerdictInner({ v, ev, geo, runs, energy, ph, onOpen }: {
           {/* [R233] 用户: 「『候选、调到位了』也是要显示这个状态持续多少天了」。
               六态徽标一直带着天数, 而它旁边的结论只有 4 个字 —— 于是「调到位了」
               看不出是今天刚到位, 还是已经这样磨了三周。这两种要做的事完全不同。 */}
-          {v.days != null && <span className="ml-0.5 opacity-70">{v.days}天</span>}
+          {/* [R236] 不精确时画淡并在悬停里说明 —— 「至少 1 天」和「数出来就是
+              第 1 天」不是一回事, 不能长得一样。 */}
+          {v.days != null && (
+            <span className={v.days_exact === false ? 'ml-0.5 opacity-40' : 'ml-0.5 opacity-70'}
+                  title={v.days_exact === false
+                    ? '这只票的历史不够长,只能确认到今天 —— 实际可能已经连着很多天'
+                    : undefined}>
+              {v.days}天{v.days_exact === false ? '?' : ''}
+            </span>
+          )}
         </button>
       </VerdictHover>
   )

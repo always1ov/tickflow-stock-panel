@@ -117,8 +117,12 @@ export function VerdictHover({ v, note, children }: {
                       会把这一档持续了多久说多。 */}
                   {v.days != null && (
                     <span className="ml-1 text-[10px] font-normal text-muted"
-                          title="这一档结论已经连着挂了几天(含今天)。中间断一天就重新起算">
-                      连着第 {v.days} 天
+                          title={v.days_exact === false
+                            ? '这只票的历史不够长,只能确认到今天 —— 实际可能已经连着很多天'
+                            : '这一档结论已经连着挂了几天(含今天)。中间断一天就重新起算'}>
+                      {v.days_exact === false
+                        ? '只能确认到今天'
+                        : `连着第 ${v.days} 天`}
                     </span>
                   )}
                 </span>

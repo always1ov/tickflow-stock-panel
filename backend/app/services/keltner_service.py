@@ -210,10 +210,17 @@ def channels_for_symbols(repo, symbols: list[str]) -> dict[str, dict]:
                 # 现在对不上时**今天仍然算数**: 徽标上印的就是 v["code"], 说它
                 # 「连着第 1 天」是真话(按历史那条路的读法, 昨天不是这一档)。
                 # 一个偏保守的数字远好过一个消失的字段。
+                # [R236] **只要有结论, days 一定在。** 原来还留着两个"算不出来
+                # 就不给"的分支(历史暖机不足 120 根、日线批量缺 atr_14), 那让
+                # 「功能没部署」和「这只票算不出来」在界面上长得一模一样 ——
+                # 用户连着报了三次"外面还是没显示", 而两种成因要做的事完全不同。
+                #
+                # 今天这一档是**确定**的(徽标上印的就是它), 所以天数至少是 1。
+                # 但"至少 1 天"与"数出来就是 1 天"不是一回事, 用 days_exact
+                # 标开: 界面把不精确的那种画淡并在悬停里说明, 不假装自己知道。
                 vr = (long_map.get(sym) or {}).get("verdict_run")
-                if vr:
-                    same = vr.get("code") == v.get("code")
-                    v = dict(v, days=int(vr["days"]) if same else 1)
+                exact = bool(vr) and vr.get("code") == v.get("code")
+                v = dict(v, days=int(vr["days"]) if exact else 1, days_exact=exact)
             row = dict(bands, verdict=v) if v else dict(bands)
             # [R195] 几何量(速度/加速度/压缩/排列)。**零新增取数** —— 全部从
             # 已经算好的三档上下轨反推(轨 = MA ± k·ATR 是恒等式)。

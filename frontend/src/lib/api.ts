@@ -649,6 +649,10 @@ export interface KeltnerVerdict {
    *  只有决策台/今日总览那份"今天的读数"带它 —— 复盘的逐日行是**当天**的
    *  结论, 天数由段卡片自己算, 这里为 undefined。 */
   days?: number
+  /** [R236] 上面那个 days 是**数出来的**还是**只能确认到今天**。
+   *  false 表示历史读数不可用(暖机不足 120 根 / 缺 ATR / 两条路对不上),
+   *  那时 days 恒为 1, 含义是"至少 1 天"而不是"就是第 1 天"。 */
+  days_exact?: boolean
 }
 
 /**
