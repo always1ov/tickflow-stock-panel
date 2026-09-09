@@ -51,13 +51,6 @@ KIND_TARGET = "target"
 #: 硬执行的两类。止盈不在其中 —— 见模块开头那张表。
 ENFORCED = frozenset({KIND_STOP, KIND_DUE})
 
-KIND_CN = {
-    KIND_STOP: "止损",
-    KIND_DUE: "到期",
-    KIND_TARGET: "止盈",
-}
-
-
 def _clamp(v, lo: float, hi: float) -> float | None:
     """夹到区间; 不是数或 <=0 视为「没填」返回 None。"""
     if isinstance(v, bool) or not isinstance(v, (int, float)):

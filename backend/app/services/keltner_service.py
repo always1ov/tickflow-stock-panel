@@ -146,16 +146,6 @@ def long_trend_map(repo, symbols: list[str], *, with_closes: bool = False) -> di
     return out
 
 
-def _ma120_map(repo, symbols: list[str]) -> dict[str, float]:
-    """批量算 MA120。长期档是唯一没有预计算列的一档, 只能自己滚。
-
-    [R134] 现在是 long_trend_map 的一个投影 —— 同一串收盘价既要算通道的
-    长期档, 又要算买入门槛的长期趋势, 读两次盘没道理。
-    """
-    return {k: v["ma120"] for k, v in long_trend_map(repo, symbols).items()
-            if v.get("ma120") is not None}
-
-
 def _state_run(key: str | None, lm: dict, as_of: str | None) -> dict | None:
     """[R246] `key` 这一档从今天往回连着几天。
 

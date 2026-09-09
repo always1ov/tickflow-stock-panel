@@ -80,11 +80,6 @@ FACTOR_LABELS = {
     "volume": "量能确认(量比/换手)",
     "position": "位置成本(通道位置)",
 }
-# v3/v4 的两轴 —— 只用于解读 SCORING_VERSION in (3, 4) 的历史记录
-V34_FACTOR_LABELS = {
-    "quality": "质地(趋势模板/相对强度/六态)",
-    "timing": "时机(新鲜度/通道位置/量比/换手)",
-}
 # v1 的加减项 —— 只用于解读 SCORING_VERSION < 2 的历史记录与导出列
 LEGACY_FACTOR_LABELS = {
     "fresh": "信号新鲜度",
