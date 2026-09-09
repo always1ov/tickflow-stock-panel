@@ -922,13 +922,18 @@ export interface ChannelRuns {
 /**
  * [R197] 频段能量分布。三档通道本质上是一组带通滤波器, 这里量的是各频段的
  * 能量占比 —— **已扣掉匀速趋势基线**(不扣的话会恒定说"低频占优", 那是均线的
- * 定义不是这只票的特征), 所以纯趋势下三份恰好各 1/3, 偏离 1/3 才是信息。
+ * 定义不是这只票的特征)。[R217] 基准是**零漂移随机游走**而不是匀速直线 ——
+ * 零假设是「这只票什么也没发生」, 无趋势时三份各 1/3, 偏离 1/3 才是信息。
  */
 export interface BandEnergy {
   share: { s: number; m: number; l: number }
   rms: { s: number; m: number; l: number }
   dominant: 's' | 'm' | 'l'
   dominant_cn: string
+  /** [R217] 最高那一段有多突出。**不是开关** —— dominant 永远有值,
+   *  这个字段只说该给它多少信任。flat = 三段差不多。 */
+  lead?: 'clear' | 'slight' | 'flat'
+  lead_cn?: string
 }
 
 /** [R188] 红绿节拍 —— 反复进多头又跌出, 是蓄势还是反复失败。

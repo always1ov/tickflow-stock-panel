@@ -293,23 +293,73 @@ def test_平均压缩度是窗口内的均值():
     assert g.compress_avg([]) is None
 
 
-def test_频段能量必须扣掉趋势基线():
-    """**这是整个指标成立的前提。** 匀速趋势下三个带通的幅度天然正比于各自
-    覆盖的天数(9.5 : 20 : 30), 不扣基线的话它会永远说"低频占优" ——
-    那是均线的定义, 不是这只票的特征。扣掉之后纯趋势恰好三份各 1/3。"""
-    trend = [100.0 + 0.5 * t for t in range(200)]
-    e = g.band_energy(trend, [1.5] * 200)
-    for k_ in ("s", "m", "l"):
-        assert e["share"][k_] == pytest.approx(1 / 3, abs=0.02), e["share"]
-
-
-def test_高频噪声让短频占优():
+def _driftless_walk(seed: int, n: int = 400, sigma: float = 0.02) -> list[float]:
     import random
-    random.seed(3)
-    noisy = [100.0 + 0.5 * t + random.gauss(0, 4) for t in range(200)]
-    e = g.band_energy(noisy, [1.5] * 200)
-    assert e["dominant"] == "s"
-    assert e["share"]["s"] > 1 / 3
+    rnd = random.Random(seed)
+    p, out = 100.0, []
+    for _ in range(n):
+        p *= (1 + rnd.gauss(0, sigma))
+        out.append(p)
+    return out
+
+
+def test_频段能量的基线是随机游走不是匀速直线():
+    """[R217] **换基线是这一版最实质的改动, 这条测试是它的验收标准。**
+
+    老基线拿「匀速直线」当分母(9.5 : 20 : 30)。可真实价格离匀速直线远得很,
+    它更接近随机游走 —— 拿匀速当分母, 中长频天然被高估, 短频占比被推高:
+    实测 300 条**纯随机游走**(既没消息也没趋势), 66% 被判成「短波动主导」。
+    那不是这些票的特征, 是分母选错了。
+
+    新基线问的是有意义的那个问题:「和纯噪声比, 哪一段更突出」。所以校准
+    标准也跟着变 —— **零漂移随机游走上三份各 1/3**, 而不是匀速直线上各 1/3。
+
+    单条路径是噪声的(一条随机游走可以偏出很多), 所以这里对**分布**取中位数,
+    与定标那次的做法一致。
+    """
+    import statistics as st
+
+    acc = {"s": [], "m": [], "l": []}
+    for seed in range(60):
+        closes = _driftless_walk(seed)
+        atrs = [max(1e-6, st.pstdev(closes[max(0, i - 13):i + 1]) if i else 1e-6) * 1.2
+                for i in range(len(closes))]
+        e = g.band_energy(closes, atrs)
+        if e:
+            for k_ in acc:
+                acc[k_].append(e["share"][k_])
+    assert len(acc["s"]) >= 50
+    for k_ in ("s", "m", "l"):
+        assert st.median(acc[k_]) == pytest.approx(1 / 3, abs=0.05), \
+            {k2: round(st.median(v), 3) for k2, v in acc.items()}
+
+
+def test_基线只留作对照的那一组仍然是天数跨度():
+    """老基线没删, 降级成 `ENERGY_REF_STEADY` 留作对照 —— 它本身没算错,
+    只是回答的问题(和匀速直线比)不是我们要问的那个。"""
+    assert g.ENERGY_REF_STEADY == (g.SPAN1, g.SPAN2, g.SPAN3) == (9.5, 20.0, 30.0)
+    assert g.ENERGY_REF != g.ENERGY_REF_STEADY
+    # 短段归一到 9.5, 另外两段比匀速基线小得多 —— 随机游走里中长频本来就弱
+    assert g.ENERGY_REF[0] == g.SPAN1
+    assert g.ENERGY_REF[1] < g.SPAN2 and g.ENERGY_REF[2] < g.SPAN3
+
+
+def test_噪声越大短段占比越高():
+    """[R217] 原来这条钉的是「带噪声的趋势 → 短频占优」。**在新基线下那是错的
+    期望** —— 那条序列本身就有一条实打实的趋势, 低频占优才对。
+
+    真正该守的不变量是**单调性**: 同一条趋势上噪声加大, 短段占比必须上升。
+    这一条不依赖基线怎么定, 换哪套分母都成立。
+    """
+    import random
+
+    def share_s(noise: float) -> float:
+        rnd = random.Random(3)
+        closes = [100.0 + 0.5 * t + rnd.gauss(0, noise) for t in range(200)]
+        return g.band_energy(closes, [1.5] * 200)["share"]["s"]
+
+    quiet, loud = share_s(1.0), share_s(8.0)
+    assert loud > quiet, (quiet, loud)
 
 
 def test_趋势走平之后能量落到低频():
@@ -321,18 +371,16 @@ def test_趋势走平之后能量落到低频():
 
 
 def test_频段占比恒和为一():
+    """三份 share 各自 round 到 3 位, 所以和最多差 1.5e-3 —— 容差必须容得下
+    这个舍入, 否则它会在某些输入上偶发地红(改基线那次就撞上了)。"""
     trend = [100.0 + 0.3 * t for t in range(200)]
     e = g.band_energy(trend, [1.5] * 200)
-    assert sum(e["share"].values()) == pytest.approx(1.0, abs=1e-3)
+    assert sum(e["share"].values()) == pytest.approx(1.0, abs=2e-3)
 
 
 def test_频段能量样本不够就不给():
     assert g.band_energy([100.0] * 50, [1.0] * 50) is None
     assert g.band_energy(None, None) is None
-
-
-def test_基线常量就是三段的天数跨度():
-    assert g.ENERGY_REF == (g.SPAN1, g.SPAN2, g.SPAN3) == (9.5, 20.0, 30.0)
 
 
 # ---------- ⑨ [R199] 阶段判定 ----------

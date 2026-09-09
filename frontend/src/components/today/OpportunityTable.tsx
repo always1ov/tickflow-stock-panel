@@ -653,6 +653,7 @@ function OpportunityDetail({ o, live }: { o: TodayOpportunity; live?: boolean })
               {!!o.energy && (
                 <div className="mt-1 text-[10px] text-muted">
                   波动主要来自 <b className="text-foreground/90">{o.energy.dominant_cn}</b>
+                  {!!o.energy.lead_cn && <span className="ml-1 text-muted/70">({o.energy.lead_cn})</span>}
                   <span className="ml-2 font-mono text-[9px]"
                         title="已经扣掉了「就是一路匀速走」那部分 —— 不扣的话每只票都会显示成长期占优, 那是算法本身的样子, 不是这只票的特征。扣完之后纯匀速恰好三份各 33%, 偏离 33% 的那部分才是这只票自己的信息。">
                     几天的短波动 {(o.energy.share.s * 100).toFixed(0)}% / 一波行情的主体 {(o.energy.share.m * 100).toFixed(0)}% / 长期老趋势 {(o.energy.share.l * 100).toFixed(0)}%

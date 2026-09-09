@@ -101,7 +101,8 @@ function geoLines(geo?: ChannelGeometry | null, ev?: ChannelEvent | null,
   if (runs?.compress_avg != null) L.push(`整个季度平均重合 ${(runs.compress_avg * 100).toFixed(0)}%`)
   if (energy) {
     const sh = energy.share
-    L.push(`波动主要来自:${energy.dominant_cn}`)
+    L.push(`波动主要来自:${energy.dominant_cn}`
+      + (energy.lead_cn ? `(${energy.lead_cn})` : ''))
     L.push(`几天的短波动 ${(sh.s * 100).toFixed(0)}% / 一波行情的主体 ${(sh.m * 100).toFixed(0)}% / 长期老趋势 ${(sh.l * 100).toFixed(0)}%`)
     L.push('(三份各 33% 是「就是一路匀速走」的样子,偏离 33% 的那部分才是信息)')
   }
@@ -136,12 +137,11 @@ function VerdictInner({ v, ev, geo, runs, energy, ph, onOpen }: {
   ph?: ChannelPhase | null
   onOpen: () => void
 }) {
-  const evLine = ev && ev.code !== 'none' ? (
-    <span className={`block truncate text-[9px] leading-tight ${EVENT_CLS[ev.code] ?? 'text-muted'}`}
-          title={`${ev.cn} —— ${ev.why}`}>
-      {ev.cn}{ev.confirmed ? '' : '?'}
-    </span>
-  ) : null
+  // [R217] 事件那一行**不在这里出了**。用户: 「每一列的内容应该就是一部分,
+  // 而不是内容上面一部分下面一部分」—— 原来这一列会摞到五层(结论徽标 / 事件行 /
+  // 怎么办徽标 / 两行折行的理由 / 另有 N 处), 每行高度还不一样, 于是上一行的
+  // 尾巴挂到下一行的表头底下, 行与行糊成一片。
+  // 现在整列固定两行, 事件并进第二行那句话里, 见 ConclusionCell。
   if (!v) {
     // [R203] 底层在三格上返回「无结论」, 其中**两格是有信息的**:
     // 「中中上」= 长期到了上沿而中短期都休整完了, 「中中下」= 长期到了下沿
@@ -152,7 +152,6 @@ function VerdictInner({ v, ev, geo, runs, energy, ph, onOpen }: {
     // 只有「中中中」是真的零信息(价格在三条通道都认可的区间里), 它照旧显示 "—"。
     const note = ev?.combo_note
     return (
-      <>
         <button
           onClick={onOpen}
           className={note
@@ -166,12 +165,9 @@ function VerdictInner({ v, ev, geo, runs, energy, ph, onOpen }: {
         >
           {note ? note.title : '—'}
         </button>
-        {evLine}
-      </>
     )
   }
   return (
-      <>
       <VerdictHover v={v} note={"点击摊开这只票过去每一档结论 —— 出现在哪几天、当时说了什么、之后走成什么样。"
         + geoLines(geo, ev, runs, energy, ph)}>
         <button
@@ -181,8 +177,6 @@ function VerdictInner({ v, ev, geo, runs, energy, ph, onOpen }: {
           {v.title}
         </button>
       </VerdictHover>
-      {evLine}
-    </>
   )
 }
 
@@ -282,27 +276,33 @@ export function ChannelStateCell({ trend, geo, runs, ph, kc, close, trendCls,
     close != null ? `收盘 ${close.toFixed(2)}` : '',
     '', '点这两行看 27 种组合系统各怎么说'].filter(Boolean).join('\n')
   return (
+    // [R217] 与「结论」列同一个形状: **固定两行**, 高度对齐, 行与行不再糊在一起。
+    //   行 1: 六态徽标 + 阶段·成熟度(原来阶段自己占一行)
+    //   行 2: 快慢一行
+    // 用户: 「每一列的内容应该就是一部分, 而不是内容上面一部分下面一部分」。
     <td className={`${TD_BASE} whitespace-nowrap px-1.5`}>
-      <div className="inline-flex flex-col items-center gap-0.5 leading-tight">
-        {trend ? (
-          <button onClick={onOpenReview}
-                  className={`inline-flex cursor-pointer whitespace-nowrap rounded border px-1.5 py-0.5 text-[10px] transition-colors hover:brightness-125 ${trendCls ?? ''}`}
-                  title={`${trend.state_cn} · 第 ${trend.duration} 天`
-                    + (trend.since ? `,自 ${trend.since}` : '')
-                    + (trend.action ? `\n${trend.action}` : '')
-                    + '\n\n点开翻这只票的逐日状态复盘'}>
-            {trend.state_cn} {trend.duration}天{trend.intraday ? <span className="ml-0.5 opacity-70">*</span> : null}
-          </button>
-        ) : <span className="text-[10px] text-muted/30">—</span>}
-        {!!ph && (
-          <button type="button" onClick={onOpenCombo} title={tip}
-                  className="inline-flex cursor-pointer flex-col items-center gap-0.5 leading-tight transition-colors duration-hover hover:brightness-125">
-            <span className={`text-[10px] ${PHASE_TEXT[ph.code] ?? 'text-muted'}`}>
+      <div className="mx-auto flex flex-col items-center gap-0.5 leading-tight">
+        <span className="flex flex-wrap items-center justify-center gap-1">
+          {trend ? (
+            <button onClick={onOpenReview}
+                    className={`inline-flex cursor-pointer whitespace-nowrap rounded border px-1.5 py-0.5 text-[10px] transition-colors hover:brightness-125 ${trendCls ?? ''}`}
+                    title={`${trend.state_cn} · 第 ${trend.duration} 天`
+                      + (trend.since ? `,自 ${trend.since}` : '')
+                      + (trend.action ? `\n${trend.action}` : '')
+                      + '\n\n点开翻这只票的逐日状态复盘'}>
+              {trend.state_cn} {trend.duration}天{trend.intraday ? <span className="ml-0.5 opacity-70">*</span> : null}
+            </button>
+          ) : <span className="text-[10px] text-muted/30">—</span>}
+          {!!ph && (
+            <button type="button" onClick={onOpenCombo} title={tip}
+                    className={`cursor-pointer whitespace-nowrap text-[10px] transition-colors duration-hover hover:brightness-125 ${PHASE_TEXT[ph.code] ?? 'text-muted'}`}>
               {ph.cn} · {ph.maturity_cn}
-            </span>
-            <span className="text-[9px] text-muted">{ph.pace_cn}</span>
-          </button>
-        )}
+            </button>
+          )}
+        </span>
+        <span className="text-[9px] text-muted">
+          {ph ? ph.pace_cn : <span className="text-transparent select-none">·</span>}
+        </span>
       </div>
     </td>
   )
@@ -333,23 +333,12 @@ const PLAY_CLS: Record<string, string> = {
  */
 function PlaybookInner({ p }: { p?: Playbook | null }) {
   if (!p) return <span className="text-[10px] text-muted/30">—</span>
-  const more = p.conflicts.length && p.level !== 'conflict'
   return (
-      <div className="inline-flex max-w-[13rem] flex-col items-center gap-0.5 leading-tight">
-        <span className={`inline-flex whitespace-nowrap rounded border px-1.5 py-0.5 text-[10px] ${PLAY_CLS[p.tone] ?? PLAY_CLS.muted}`}
-              title={p.why}>
-          {p.headline}
-          {p.price != null && <span className="ml-1 font-mono tabular-nums opacity-80">{p.price.toFixed(2)}</span>}
-        </span>
-        <span className="line-clamp-2 text-[9px] text-muted" title={p.why}>{p.why}</span>
-        {/* 不在分歧档时, 分歧仍然作为一行小字带出来 —— 它任何时候都值得知道 */}
-        {!!more && (
-          <span className="text-[9px] text-amber-300/80"
-                title={p.conflicts.join('\n')}>
-            另有 {p.conflicts.length} 处判定不一致
-          </span>
-        )}
-      </div>
+      <span className={`inline-flex whitespace-nowrap rounded border px-1.5 py-0.5 text-[10px] ${PLAY_CLS[p.tone] ?? PLAY_CLS.muted}`}
+            title={p.why}>
+        {p.headline}
+        {p.price != null && <span className="ml-1 font-mono tabular-nums opacity-80">{p.price.toFixed(2)}</span>}
+      </span>
   )
 }
 
@@ -374,11 +363,34 @@ export function ConclusionCell({ v, ev, geo, runs, energy, ph, p, onOpen }: {
   p?: Playbook | null
   onOpen: () => void
 }) {
+  // [R217] **整列固定两行**, 见下面的说明。
+  //   行 1: 贵不贵 · 怎么办 两个徽标横排
+  //   行 2: 一行说明(截断), 事件与"另有 N 处分歧"都并进这一行
+  const evOn = ev && ev.code !== 'none'
+  const more = p && p.conflicts.length && p.level !== 'conflict'
+  const line2 = [
+    evOn ? `${ev!.cn}${ev!.confirmed ? '' : '?'}` : '',
+    p?.why || '',
+    more ? `(另有 ${p!.conflicts.length} 处判定不一致)` : '',
+  ].filter(Boolean).join(' · ')
+  const tip = [
+    evOn ? `${ev!.cn}${ev!.confirmed ? '' : '(未确认)'} —— ${ev!.why}` : '',
+    p?.why || '',
+    more ? '另有判定不一致:\n' + p!.conflicts.join('\n') : '',
+  ].filter(Boolean).join('\n\n')
   return (
     <td className={`${TD_BASE} px-2`}>
-      <div className="flex flex-col items-center gap-1">
-        <VerdictInner v={v} ev={ev} geo={geo} runs={runs} energy={energy} ph={ph} onOpen={onOpen} />
-        <PlaybookInner p={p} />
+      <div className="mx-auto flex max-w-[15rem] flex-col items-center gap-0.5 leading-tight">
+        <span className="flex flex-wrap items-center justify-center gap-1">
+          <VerdictInner v={v} ev={ev} geo={geo} runs={runs} energy={energy} ph={ph} onOpen={onOpen} />
+          <PlaybookInner p={p} />
+        </span>
+        {line2 ? (
+          <span className={`w-full truncate text-[9px] ${evOn ? EVENT_CLS[ev!.code] ?? 'text-muted' : 'text-muted'}`}
+                title={tip}>
+            {line2}
+          </span>
+        ) : <span className="text-[9px] text-transparent select-none">·</span>}
       </div>
     </td>
   )

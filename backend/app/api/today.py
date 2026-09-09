@@ -113,28 +113,38 @@ def coiling_candidates(trends: dict[str, dict], bands_map: dict[str, dict],
     路 C 的票**连方向都还没出来**, 比"今天刚转多"和"已经贴到买点"都弱一档。
     所以它只填 A/B 用剩的额度, 不跟它们抢。
     """
-    from app.indicators import keltner_geometry as kg
     from app.indicators.livermore import BULLISH
 
     if limit <= 0:
         return []
     skip = exclude or set()
-    out: list[str] = []
-    for sym, bands in bands_map.items():
-        if sym in skip or not bands:
-            continue
-        if (trends.get(sym) or {}).get("state") not in BULLISH:
-            continue
-        geo = bands.get("geo")
-        if not geo:
-            continue
-        try:
-            ph = kg.phase(geo, bands.get("runs"))
-        except Exception:  # noqa: BLE001
-            continue
-        if ph and ph["code"] in _COILING_PHASES:
-            out.append(sym)
+    out = [sym for sym, bands in bands_map.items()
+           if sym not in skip
+           and (trends.get(sym) or {}).get("state") in BULLISH
+           and coiling_phase(bands) is not None]
     return sorted(out)[:limit]
+
+
+def coiling_phase(bands_row: dict | None) -> dict | None:
+    """[R217] 「这一格算不算酝酿中」—— **判据只在这里定义一次**。
+
+    这条规则原来写在两个地方: `coiling_candidates()` 选票时判一次,
+    `score_opportunities()` 里建候选时**再判一次同样的条件**。两处当时是一致的,
+    但那正是 R201 那个 bug 的土壤 —— 路 C 头一回就是因为"选票"和"建候选"
+    各写各的、而其中一处永远走不到, 整条路成了死代码(R210 才发现)。
+
+    所以收成一个函数: 两处都调它, 想改判据只有一个地方能改。
+    """
+    from app.indicators import keltner_geometry as kg
+
+    geo = (bands_row or {}).get("geo")
+    if not geo:
+        return None
+    try:
+        ph = kg.phase(geo, (bands_row or {}).get("runs"))
+    except Exception:  # noqa: BLE001
+        return None
+    return ph if ph and ph["code"] in _COILING_PHASES else None
 
 
 def factor_catalog() -> list[dict]:
@@ -260,20 +270,17 @@ def score_opportunities(
     # 它**不依赖当天发不发信号**, 所以熊市里也不会整批消失。
     #
     # 原料是 keltner 那趟批量已经算好挂在 bands 上的 geo/runs, **零新增取数**。
+    #
+    # [R217] 判据不在这里写第二遍 —— 走 `coiling_phase()`, 与
+    # `coiling_candidates()` 选票时用的是同一个函数。两处各写一份是 R201 那个
+    # 死代码的成因, 不再重演。
     for sym, e in ex.items():
         if sym in cands or sym not in names:
             continue
-        t = trends.get(sym) or {}
-        if t.get("state") not in _BULLISH:
+        if (trends.get(sym) or {}).get("state") not in _BULLISH:
             continue
-        kc = e.get("bands") or {}
-        if not kc.get("geo"):
-            continue
-        try:
-            ph = _kg.phase(kc.get("geo"), kc.get("runs"))
-        except Exception:  # noqa: BLE001
-            continue
-        if not ph or ph["code"] not in _COILING_PHASES:
+        ph = coiling_phase(e.get("bands"))
+        if not ph:
             continue
         c = _cand(sym)
         c["kinds"].append("coiling")
@@ -689,21 +696,17 @@ def build_pyramid_plan(fraction: float, pivot: float | None,
 #
 # 幅度对齐既有因子(量比 ±8/12、胜率 ±8/12、相对强度 +8/-15、主线 +5~12),
 # 不让通道位置一项压过量价本身。
-_VERDICT_SCORE = {
-    # 越便宜越该买
-    "dip_in_uptrend": (10, "强势票深调, 是这套里最好的低吸位置"),
-    "bottom_confirmed": (8, "短中期都到下沿, 低吸分量足"),
-    "low_short_only": (4, "短期回调到下沿"),
-    "watch_low": (2, "中期已到下沿, 短期还没给入场点"),
-    # 越贵越不该追
-    "watch_high": (-5, "中期在上沿、短期已回落, 追进去两头不靠"),
-    "high_short_only": (-6, "短期已冲到上沿, 这时候买是在最贵的地方"),
-    "top_confirmed": (-12, "短中期都到上沿, 这个位置追进去是在最贵的地方买"),
-    "top_all_bands": (-15, "三档都到上沿, 大顶区域不该开新仓"),
-    # 陷阱: 出了买信号, 但位置说这是反弹/下跌途中
-    "bounce_in_downtrend": (-15, "长期还在下沿, 这是跌深了反弹而非突破 —— 买信号在这里最不可信"),
-    "falling_all_bands": (-15, "三档都在下沿的下跌途中, 越抄越套"),
-}
+# [R217] 这里原来有一张 `_VERDICT_SCORE` 表 —— 10 条通道结论配 +10 ~ −15 的
+# 分值, **全项目零引用**。它是 v1 的遗留: 那时候通道结论真的加减分, R134 改成
+# 「注记一分不加一分不减」之后表就没人用了, 却留在文件里。
+#
+# 危害不是占地方, 是**读代码的人会以为通道结论在参与打分**。这一轮已经在
+# `_conflicts` 规则②、`PH_LAUNCHING`、`lib/button.ts` 上各栽过一次 ——
+# 「没人用的代码看起来像在用」是这个仓库反复出现的同一类问题。删掉。
+#
+# 通道结论现在的去处: `_annotations()` 里的 `verdict` 注记(纯展示)、
+# 决策台「结论」列的上半行、以及 `stock_playbook._conflicts` 规则②(判打架,
+# 读的是 `tone` 不是分值)。
 
 
 # [R43] 高抛要"已经涨上来了"才谈落袋 —— 浮亏还嫌它涨太急, 是纯粹的自相矛盾
