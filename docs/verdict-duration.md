@@ -23,7 +23,7 @@
 | `watch_high` | 高位回落 | watch |
 | `watch_low` | **候选池** | watch |
 | `low_short_only` | 短线回调 | buy |
-| `bottom_confirmed` | 调到位了 | buy |
+| `bottom_confirmed` | 调整到位 | buy |
 | `dip_in_uptrend` | 强势深调 | buy |
 | `falling_all_bands` | 下跌途中 | avoid |
 
@@ -149,7 +149,7 @@
 当时在界面上有六种说法:
 
     上涨趋势 3天          决策台六态徽标
-    调到位了 已12天        决策台结论徽标
+    调整到位 已12天        决策台结论徽标
     上涨趋势 第 11 天      复盘「现在」条与逐日表
     3天                   复盘段卡片
     已连着 12 个交易日      悬停卡片

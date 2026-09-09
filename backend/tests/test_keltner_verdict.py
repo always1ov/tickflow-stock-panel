@@ -30,7 +30,7 @@ def _b(s, m=None, long=None):
     ((k.POS_ABOVE, k.POS_INSIDE, k.POS_BELOW), "bounce_in_downtrend", "超跌反弹"),
     # 偏便宜一侧
     ((k.POS_NEAR_LOWER, k.POS_INSIDE, k.POS_INSIDE), "low_short_only", "短线回调"),
-    ((k.POS_BELOW, k.POS_BELOW, k.POS_INSIDE), "bottom_confirmed", "调到位了"),
+    ((k.POS_BELOW, k.POS_BELOW, k.POS_INSIDE), "bottom_confirmed", "调整到位"),
     ((k.POS_BELOW, k.POS_BELOW, k.POS_BELOW), "falling_all_bands", "下跌途中"),
     ((k.POS_BELOW, k.POS_INSIDE, k.POS_ABOVE), "dip_in_uptrend", "强势深调"),
 ])
