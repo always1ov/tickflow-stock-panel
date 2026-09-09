@@ -79,26 +79,26 @@ def _universe():
 
 def test_no_filter_returns_every_board():
     trends, names = _universe()
-    shown, _ = rank_opportunities(trends, {}, names, min_score=0, max_show=50)
+    shown, _ = rank_opportunities(trends, {}, names, min_hist_pct=0, max_show=50)
     assert {o["board"] for o in shown} == {BOARD_GROWTH, BOARD_STAR, BOARD_SH_MAIN, BOARD_SZ_MAIN}
 
 
 def test_every_opportunity_carries_its_board():
     trends, names = _universe()
-    shown, _ = rank_opportunities(trends, {}, names, min_score=0, max_show=50)
+    shown, _ = rank_opportunities(trends, {}, names, min_hist_pct=0, max_show=50)
     assert all(o["board"] for o in shown), "界面要按板块标色, 每条都得带"
 
 
 def test_filter_keeps_only_the_asked_boards():
     trends, names = _universe()
-    shown, _ = rank_opportunities(trends, {}, names, min_score=0, max_show=50,
+    shown, _ = rank_opportunities(trends, {}, names, min_hist_pct=0, max_show=50,
                                   boards=[BOARD_SH_MAIN])
     assert {o["symbol"] for o in shown} == {"600722.SH", "600869.SH"}
 
 
 def test_filter_accepts_several_boards():
     trends, names = _universe()
-    shown, _ = rank_opportunities(trends, {}, names, min_score=0, max_show=50,
+    shown, _ = rank_opportunities(trends, {}, names, min_hist_pct=0, max_show=50,
                                   boards=[BOARD_SH_MAIN, BOARD_SZ_MAIN])
     assert {o["board"] for o in shown} == {BOARD_SH_MAIN, BOARD_SZ_MAIN}
     assert len(shown) == 3
@@ -108,10 +108,10 @@ def test_filter_runs_before_the_max_show_cut(monkeypatch):
     """核心不变量。max_show=2 时, 主板过滤必须先把非主板剔掉, 再取前 2 条 ——
     否则前 2 条全是创业板/科创板, 主板机会一条都看不到。"""
     trends, names = _universe()
-    unfiltered, _ = rank_opportunities(trends, {}, names, min_score=0, max_show=2)
+    unfiltered, _ = rank_opportunities(trends, {}, names, min_hist_pct=0, max_show=2)
     assert not any(o["board"] == BOARD_SH_MAIN for o in unfiltered), "前提: 前两条不是主板"
 
-    shown, _ = rank_opportunities(trends, {}, names, min_score=0, max_show=2,
+    shown, _ = rank_opportunities(trends, {}, names, min_hist_pct=0, max_show=2,
                                   boards=[BOARD_SH_MAIN])
     assert len(shown) == 2
     assert all(o["board"] == BOARD_SH_MAIN for o in shown)
@@ -119,30 +119,36 @@ def test_filter_runs_before_the_max_show_cut(monkeypatch):
 
 def test_empty_board_list_means_no_filter():
     trends, names = _universe()
-    a, _ = rank_opportunities(trends, {}, names, min_score=0, max_show=50, boards=[])
-    b, _ = rank_opportunities(trends, {}, names, min_score=0, max_show=50, boards=None)
+    a, _ = rank_opportunities(trends, {}, names, min_hist_pct=0, max_show=50, boards=[])
+    b, _ = rank_opportunities(trends, {}, names, min_hist_pct=0, max_show=50, boards=None)
     assert len(a) == len(b) == 6
 
 
 def test_filtered_count_still_means_below_threshold(monkeypatch):
-    """"已滤掉 N 只"说的是没过把握分门槛的, 不该把板块滤掉的也算进去 ——
-    不然用户切到主板会看到一个莫名其妙变大的数字。"""
-    trends, names = _universe()
-    trends["600869.SH"] = _trend(duration=5)  # 陈年信号, 分数低
-    _, filtered = rank_opportunities(trends, {}, names, min_score=60, max_show=50,
-                                     boards=[BOARD_SH_MAIN])
-    # 要守的是"板块过滤不会把 filtered 撑大" —— 只统计**这个板块内**没过门槛的。
-    # 具体数字随打分改动会变([R201] 置信折扣让原料稀薄的合成候选整体下移),
-    # 关键是它必须远小于被板块滤掉的那一大批。
-    _, all_filtered = rank_opportunities(trends, {}, names, min_score=60, max_show=50)
+    """「已滤掉 N 只」说的是没过门槛的, 不该把板块滤掉的也算进去 ——
+    不然用户切到主板会看到一个莫名其妙变大的数字。
+    [R220] 门槛按历史分位判(分位来自台账, 测试环境里是空的), 所以这条改走
+    `filter_opportunities` 直接喂分位 —— 要守的性质没变。
+    """
+    from app.api.today import filter_opportunities
+    rows = ([{"symbol": f"60000{i}.SH", "name": f"沪{i}", "score": 80 - i,
+              "why": [], "partial": False, "board": BOARD_SH_MAIN,
+              "hist_pct": 90.0 if i == 0 else 10.0} for i in range(3)]
+            + [{"symbol": f"00000{i}.SZ", "name": f"深{i}", "score": 70 - i,
+                "why": [], "partial": False, "board": "深主板",
+                "hist_pct": 10.0} for i in range(5)])
+    _, filtered = filter_opportunities(rows, min_hist_pct=50, max_show=50,
+                                       boards=[BOARD_SH_MAIN])
+    _, all_filtered = filter_opportunities(rows, min_hist_pct=50, max_show=50)
+    # 只统计**这个板块内**没过门槛的 —— 被板块滤掉的那 5 只不该算进来
+    assert filtered == 2 and all_filtered == 7
     assert filtered < all_filtered, "板块过滤掉的不该被算进「没过门槛」"
-    assert filtered <= 2
 
 
 def test_unknown_board_name_filters_everything_out():
     """乱传板块名不该静默变成"不过滤" —— 那会让人以为筛选生效了。"""
     trends, names = _universe()
-    shown, _ = rank_opportunities(trends, {}, names, min_score=0, max_show=50,
+    shown, _ = rank_opportunities(trends, {}, names, min_hist_pct=0, max_show=50,
                                   boards=["纳斯达克"])
     assert shown == []
 
@@ -182,4 +188,4 @@ def test_only_junk_falls_back_instead_of_hiding_everything(prefs):
 
 def test_none_leaves_it_alone(prefs):
     prefs.save(boards=[BOARD_GROWTH])
-    assert prefs.save(min_score=70)["boards"] == [BOARD_GROWTH]
+    assert prefs.save(min_hist_pct=70)["boards"] == [BOARD_GROWTH]

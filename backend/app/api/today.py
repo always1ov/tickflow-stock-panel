@@ -43,7 +43,10 @@ _NEAR_BREAKOUT_PCT = 0.02
 # 机会区筛选: 把握分低于此值不显示; 最多显示条数
 # [R134] 上限 10 → 15: v2 的分数不再饱和(v1 榜首一片并列 100), 名次真的分得开了,
 # 多看 5 条才有意义; 用户也明确要"只显示前 15 个"。
-_OPP_MIN_SCORE = 60
+# [R220] 入选门槛的单位是**历史分位**(0~90), 不再是绝对把握分。
+# 0 = 不过滤。默认 0: 台账攒够之前它本来就不起作用, 默认开着会让人以为
+# 页面少票是筛选造成的。见 filter_opportunities 与 score_ledger.score_distribution。
+_OPP_MIN_HIST_PCT = 0
 _OPP_MAX_SHOW = 15
 # [R201] 候选路 C 认的两个阶段: 憋着劲(挤在一起) / 刚分开。
 # 不收 advancing —— 那已经在走了, 属于"错过了", 不是"有苗头"。
@@ -455,10 +458,21 @@ def score_opportunities(
     # 名次和分位没有这个毛病 —— 它们天然是**相对**的: 熊市里前 20% 仍然有票,
     # 牛市里前 20% 自动收紧。绝对分保留(台账要它做跨日比较), 但界面上的
     # "今天该看哪几只"改由分位回答。
+    # [R220] 历史分位 —— 入选门槛按它判, 界面也显示它。台账没攒够时全是 None,
+    # 门槛随之失效(见 filter_opportunities)。读台账失败一律降级成"没有分位",
+    # 绝不让记账层的问题影响到总览本身。
+    try:
+        from app.services import score_ledger as _sl
+        _dist = _sl.score_distribution()
+    except Exception as e:  # noqa: BLE001
+        logger.debug("score distribution unavailable: %s", e)
+        _dist = None
     n = len(out)
     for i, o in enumerate(out):
         o["rank"] = i + 1
         o["rank_total"] = n
+        o["hist_pct"] = (_sl.percentile_of(o["score"], _dist)
+                         if _dist else None)
         # 分位: 1.0 = 今天最好的那只, 0.0 = 最后一名。单只候选时给 1.0。
         o["pct_rank"] = round(1.0 - (i / (n - 1)), 3) if n > 1 else 1.0
     return out, {"candidates": len(cands), "passed": len(out),
@@ -558,13 +572,26 @@ def _gate_text(info: dict) -> str:
 
 def filter_opportunities(
     ranked: list[dict],
-    min_score: int = _OPP_MIN_SCORE, max_show: int = _OPP_MAX_SHOW,
+    min_hist_pct: int = _OPP_MIN_HIST_PCT, max_show: int = _OPP_MAX_SHOW,
     boards: list[str] | None = None,
 ) -> tuple[list[dict], int]:
     """完整排序列表 → (显示列表, 被门槛滤掉条数)。
 
-    门槛 min_score / max_show 由用户偏好传入(见 services.today_prefs), 默认值即常量。
-    低于 min_score 或排在 max_show 之后的都不显示, 只报数量。
+    [R220] 门槛的单位从**绝对把握分**换成了**历史分位**。
+
+    原来是 `score >= min_score`(默认 60)。那个旋钮几乎没有作用 —— 把握分是
+    十个因子加权平均再取几何平均, "平均"这件事本身就把取值挤向中间: 实测
+    同一天横截面 p10~p90 只有 26 分, 于是 60 分只挡掉约 1.6% 的候选。
+    用户以为在调筛选强度, 其实拖到哪儿都差不多。
+
+    换成历史分位之后, 旋钮每一格都有抓手(分位天然均匀), 而且**跨日可比** ——
+    「今天最好的一只也只排到历史第 20 百分位」这句话才说得出来。
+    换成"今天前 N%"是不行的: 那只是 `max_show` 的重复, 而且它永远有票,
+    「今天没有够格的」这个信号就没了。见 `score_ledger.score_distribution`。
+
+    **台账样本不够时门槛整个失效**(每行的 `hist_pct` 都是 None), 而不是
+    静默按 0 处理 —— 界面必须说清楚"这个门槛现在不起作用, 因为台账还没攒够"。
+    静默失效正是这一轮反复栽跟头的那类问题。
 
     [R40] boards 非空时只保留这些板块的机会。**过滤必须发生在 max_show 截断之前** ——
     先截 10 条再由前端挑出主板的话, 会漏掉那些被截掉的主板票, 看到的"主板机会"
@@ -573,7 +600,10 @@ def filter_opportunities(
     if boards:
         keep = set(boards)
         ranked = [o for o in ranked if o.get("board") in keep]
-    passed = [o for o in ranked if o["score"] >= min_score]
+    # hist_pct 为 None = 台账没攒够, 这一档谁也不挡(门槛失效, 界面会说明)
+    passed = [o for o in ranked
+              if min_hist_pct <= 0 or o.get("hist_pct") is None
+              or o["hist_pct"] >= min_hist_pct]
     # [R201] **保底条数** —— 用户: 「筛选标准不能过严导致今日总览页面无任何个股
     # 显示」。这一条不能靠"把门槛调低"来满足: 门槛调低了牛市又会糊一屏, 而且
     # 任何一个**绝对**阈值在牛熊两头都不可能同时合适。
@@ -588,7 +618,7 @@ def filter_opportunities(
     bar = {id(o) for o in passed}
     shown = [dict(o, why=" · ".join(o["why"]), below_bar=id(o) not in bar)
              for o in shown_src][:max_show]
-    # 「已滤掉 N 只」始终是**没过把握分门槛**的条数, 与保底补进来几条无关 ——
+    # 「已滤掉 N 只」始终是**没过门槛**的条数, 与保底补进来几条无关 ——
     # 保底是展示策略, 门槛是判定, 两件事不能混进同一个数字里。
     return shown, len(ranked) - len(passed)
 
@@ -628,7 +658,7 @@ def empty_reason(ranked: list[dict], shown: list[dict], gates: dict,
 
 def rank_opportunities(
     trends: dict[str, dict], signals: dict[str, dict], names: dict[str, str],
-    min_score: int = _OPP_MIN_SCORE, max_show: int = _OPP_MAX_SHOW,
+    min_hist_pct: int = _OPP_MIN_HIST_PCT, max_show: int = _OPP_MAX_SHOW,
     bench_ret: float | None = None,
     extras: dict[str, dict] | None = None,
     boards: list[str] | None = None,
@@ -639,7 +669,7 @@ def rank_opportunities(
     在这里被丢掉, 需要它的调用方直接用 score_opportunities。
     """
     ranked, _gates = score_opportunities(trends, signals, names, bench_ret, extras)
-    return filter_opportunities(ranked, min_score, max_show, boards)
+    return filter_opportunities(ranked, min_hist_pct, max_show, boards)
 
 
 def build_pyramid_plan(fraction: float, pivot: float | None,
@@ -1067,7 +1097,7 @@ def _build_overview(repo, engine=None) -> dict:
     ranked_all, gate_info = score_opportunities(trends, signals, names, bench_ret, extras,
                                                bench_ret_120d=bench_ret_120d)
     opportunities, opp_filtered = filter_opportunities(
-        ranked_all, prefs["min_score"], prefs["max_show"], prefs.get("boards"))
+        ranked_all, prefs["min_hist_pct"], prefs["max_show"], prefs.get("boards"))
     # [R210] 空了就得说清是空在哪一步 —— 候选池空 / 门槛全挡 / 你自己的板块过滤,
     # 对用户是完全不同的三件事, 最后那种一键就能撤。
     opp_empty_why = empty_reason(ranked_all, opportunities, gate_info, prefs.get("boards"))
@@ -1310,6 +1340,10 @@ def _build_overview(repo, engine=None) -> dict:
         "actions": actions,
         "opportunities": opportunities,
         "opportunities_filtered": opp_filtered,
+        # [R220] 入选门槛按历史分位判, 而分位要台账攒够样本才算得出来。
+        # **这个标志必须送到界面上** —— 门槛失效时得说清楚是为什么, 不能让
+        # 用户拖着一个没反应的旋钮猜。静默失效是这一轮反复栽的那类跟头。
+        "hist_pct_ready": any(o.get("hist_pct") is not None for o in ranked_all),
         "opportunities_empty_why": opp_empty_why,
         # [R134] 门槛体检: 今天有多少候选被哪条硬门槛挡下。
         # 这不是调试信息 —— "40 只候选被挡掉 28 只"本身就是市场状态的读数,
@@ -1357,7 +1391,9 @@ def get_today(request: Request):
 class PrefsModel(BaseModel):
     """机会区筛选门槛(两项都可选, 只改传入的)。"""
 
-    min_score: int | None = Field(default=None, ge=0, le=100)
+    # [R220] 入选门槛 = 历史分位(0 = 不过滤)。上限 90 —— 再往上就只剩个位数
+    # 的票, 那已经是 max_show 的活了。
+    min_hist_pct: int | None = Field(default=None, ge=0, le=90)
     max_show: int | None = Field(default=None, ge=1, le=50)
     max_single: int | None = Field(default=None, ge=5, le=100)
     target_vol: int | None = Field(default=None, ge=1, le=10)
@@ -1383,7 +1419,7 @@ def get_prefs():
 def put_prefs(body: PrefsModel):
     """修改筛选门槛, 立即对下次总览生效。"""
     from app.services import today_prefs
-    return today_prefs.save(min_score=body.min_score, max_show=body.max_show,
+    return today_prefs.save(min_hist_pct=body.min_hist_pct, max_show=body.max_show,
                             max_single=body.max_single, target_vol=body.target_vol,
                             max_drawdown=body.max_drawdown,
                             pyramid_probe=body.pyramid_probe,

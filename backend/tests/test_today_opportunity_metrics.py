@@ -15,7 +15,7 @@ _NAMES = {"600110.SH": "诺德股份"}
 
 
 def _one(**kw):
-    shown, _ = rank_opportunities(names=_NAMES, min_score=0, max_show=10, **kw)
+    shown, _ = rank_opportunities(names=_NAMES, min_hist_pct=0, max_show=10, **kw)
     return shown[0]
 
 
@@ -47,7 +47,7 @@ def test_vol_ratio_zero_is_treated_as_missing():
 def test_near_breakout_source_also_gets_metrics():
     """逼近突破那一路(signals)也要有这两个字段, 不能只有趋势那一路有。"""
     shown, _ = rank_opportunities(
-        names=_NAMES, trends={}, min_score=0, max_show=10,
+        names=_NAMES, trends={}, min_hist_pct=0, max_show=10,
         extras={"600110.SH": {"vol_ratio": 2.1}},
         signals={"600110.SH": {
             "signal": "buy", "confidence": 70, "close": 10.0,

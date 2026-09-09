@@ -203,7 +203,7 @@ export function buildTodayHtml(d: TodayOverview, brief: string | null,
     <thead><tr><th>标的</th><th class="num">现价</th><th class="num">仓位</th><th class="num">浮盈</th><th class="num">出场线</th><th>阶段</th><th>趋势</th><th>操作建议</th></tr></thead>
     <tbody>${holdRows}</tbody>
   </table>` : '<div class="empty">暂无持仓标记</div>'}
-  <h2>🎯 值得关注(${d.opportunities.length}·把握分 ≥ ${d.prefs.min_score}${d.opportunities_filtered > 0 ? `,滤掉 ${d.opportunities_filtered} 只` : ''})</h2>
+  <h2>🎯 值得关注(${d.opportunities.length}·${d.prefs.min_hist_pct > 0 ? `只看历史前 ${100 - d.prefs.min_hist_pct}%` : '未设门槛'}${d.opportunities_filtered > 0 ? `,滤掉 ${d.opportunities_filtered} 只` : ''})</h2>
   ${d.opportunities.length ? `<table>
     <thead><tr><th class="num">把握</th><th>名称</th><th>结论</th><th>走势</th><th>建议仓位</th></tr></thead>
     <tbody>${oppRows}</tbody>

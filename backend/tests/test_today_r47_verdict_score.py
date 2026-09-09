@@ -170,7 +170,7 @@ def test_ai_breakout_candidates_go_through_the_same_gates():
 def test_rank_opportunities_still_returns_the_old_two_tuple():
     """对外签名不变 —— 换的是打分, 不是接口。"""
     shown, filtered = rank_opportunities(
-        {"600000.SH": _trend()}, {}, NAMES, min_score=0, max_show=10,
+        {"600000.SH": _trend()}, {}, NAMES, min_hist_pct=0, max_show=10,
         bench_ret=0.02, extras={"600000.SH": {"gate": _gate_ok(), "channel_pct": 0.6}})
     assert len(shown) == 1 and filtered == 0
     assert isinstance(shown[0]["why"], str)      # 显示列表里 why 已拼成一句

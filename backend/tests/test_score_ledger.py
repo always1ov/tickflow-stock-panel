@@ -127,8 +127,14 @@ def test_score_opportunities_keeps_sub_threshold_candidates():
     # [R201] 保底会把没过门槛的那只也摆出来, 但**打上 below_bar** ——
     # 台账要的"完整列表"与界面要的"哪几只够格"仍然分得干干净净。
     assert len(shown) == 2
-    assert [o["below_bar"] for o in shown] == [False, True]
     assert min(o["score"] for o in full) < 60
+    # [R220] 门槛按历史分位判, 而分位来自台账 —— 这里台账是空的, 所以门槛
+    # 整个失效、谁也不标 below_bar。要验 below_bar 的语义, 得自己喂分位:
+    from app.api.today import filter_opportunities
+    rows = [dict(o, hist_pct=80.0 if i == 0 else 10.0) for i, o in enumerate(full)]
+    shown2, filtered2 = filter_opportunities(rows, min_hist_pct=50, max_show=50)
+    assert [o["below_bar"] for o in shown2] == [False, True]
+    assert filtered2 == 1
 
 
 def test_axes_blend_back_to_the_score():

@@ -3,7 +3,7 @@
 核心约定: 买入机会先打分再显示, 信号越"陈旧"(错过入场窗口)分数越低;
 卖出/风险提醒走行动区, 不经过这里的筛选。
 """
-from app.api.today import _OPP_MAX_SHOW, _OPP_MIN_SCORE, rank_opportunities
+from app.api.today import _OPP_MAX_SHOW, _OPP_MIN_HIST_PCT, rank_opportunities
 
 
 def _trend(signal, duration, close=10.0):
@@ -41,9 +41,15 @@ def test_stale_weak_signal_is_below_the_bar_but_still_shown():
     直接 `shown == []`, 那正是空页。现在门槛的判定一个字没变(它依旧没过),
     只是保底把它摆出来并打上 `below_bar` —— 界面据此说明白"这只没到你的
     门槛"。**判定与展示分开**, 两件事都不失真。
+
+    [R220] 门槛的单位换成历史分位之后, 这条测试改走 `filter_opportunities`:
+    分位来自台账, 而测试环境的台账是空的, 走 `rank_opportunities` 造不出
+    非 None 的分位(那时门槛按设计整个失效, 见下面那条测试)。
     """
-    names = {"000002.SZ": "万科A"}
-    shown, filtered = rank_opportunities({"000002.SZ": _trend("回升", 5)}, {}, names)
+    from app.api.today import filter_opportunities
+    rows = [{"symbol": "000002.SZ", "name": "万科A", "score": 55, "why": [],
+             "partial": False, "board": "深主板", "hist_pct": 12.0}]
+    shown, filtered = filter_opportunities(rows, min_hist_pct=50, max_show=50)
     assert filtered == 1, "「被滤掉」说的是没过门槛的条数, 与保底展示无关"
     assert len(shown) == 1 and shown[0]["below_bar"] is True
 
@@ -90,7 +96,7 @@ def test_near_breakout_distance_no_longer_scores_but_is_still_exposed():
         "far": {"signal": "buy", "confidence": 70, "close": 100.0,
                 "watch_points": [{"direction": "up", "price": 101.9, "action": "突破关注买入"}]},
     }
-    shown, _ = rank_opportunities({}, signals, names, min_score=0)
+    shown, _ = rank_opportunities({}, signals, names, min_hist_pct=0)
     by = {o["symbol"]: o for o in shown}
     assert by["near"]["score"] == by["far"]["score"]
     assert by["near"]["gap_pct"] == 0.3 and by["far"]["gap_pct"] == 1.9
@@ -100,35 +106,67 @@ def test_near_breakout_distance_no_longer_scores_but_is_still_exposed():
 def test_show_cap_and_filtered_count():
     """机会再多也只显示前 N 条, 其余计入被滤掉的数量。
 
-    这里刻意用 min_score=0 把门槛这一层摘掉 —— 要测的是**截断**, 不是门槛。
+    这里刻意用 min_hist_pct=0 把门槛这一层摘掉 —— 要测的是**截断**, 不是门槛。
     (原来这两件事挤在一个断言里, [R201] 给数据稀薄的候选加了置信折扣之后,
     这批只有六态没有别的原料的合成候选不再自动过 60 分, 断言就同时测了两件
     事而失败。拆开之后各测各的, 都更稳。)
     """
     names = {f"S{i:03d}": f"票{i}" for i in range(20)}
     trends = {s: _trend("转多", 1) for s in names}
-    shown, filtered = rank_opportunities(trends, {}, names, min_score=0)
+    shown, filtered = rank_opportunities(trends, {}, names, min_hist_pct=0)
     assert len(shown) == _OPP_MAX_SHOW
-    assert filtered == 0, "min_score=0 时没有谁是被门槛滤掉的"
+    assert filtered == 0, "min_hist_pct=0 时没有谁是被门槛滤掉的"
+
+
+def _ranked(n=20, hist_pct=10.0):
+    """[R220] 直接造排序后的行 —— 门槛现在按 `hist_pct` 判, 而那个值来自台账,
+    测试环境里台账是空的, 走 rank_opportunities 造不出非 None 的分位。"""
+    return [{"symbol": f"S{i:03d}", "name": f"票{i}", "score": 90 - i,
+             "why": [], "partial": False, "board": "沪主板",
+             "hist_pct": hist_pct} for i in range(n)]
 
 
 def test_floor_guarantees_the_page_is_never_empty():
     """[R201] 保底: 一只都没过门槛时也要摆出前几只, 并标 below_bar。"""
-    from app.api.today import FLOOR_ROWS
-    names = {f"S{i:03d}": f"票{i}" for i in range(20)}
-    trends = {s: _trend("回升", 9) for s in names}     # 全是陈年弱信号
-    shown, filtered = rank_opportunities(trends, {}, names, min_score=100)
+    from app.api.today import FLOOR_ROWS, filter_opportunities
+    shown, filtered = filter_opportunities(_ranked(20, hist_pct=10.0),
+                                           min_hist_pct=90, max_show=50)
     assert filtered == 20, "门槛的判定不受保底影响"
     assert len(shown) == FLOOR_ROWS
     assert all(o["below_bar"] for o in shown)
     # 保底取的是**分最高的那几只**, 不是随便几只
-    assert [o["symbol"] for o in shown] == [o["symbol"] for o in shown[:FLOOR_ROWS]]
+    assert [o["symbol"] for o in shown] == ["S000", "S001", "S002"]
+
+
+def test_台账没攒够时门槛整个失效而不是静默挡光():
+    """[R220] **这一条是这个旋钮的安全绳。**
+
+    分位来自台账。台账还没攒够(`score_distribution` 返回 None)时每行的
+    `hist_pct` 都是 None —— 那时候门槛必须**谁也不挡**, 而不是把 None 当 0
+    然后把整页挡光。静默失效正是这一轮反复栽跟头的那类问题, 界面另有一句话
+    说明"这个门槛现在不起作用"。
+    """
+    from app.api.today import filter_opportunities
+    rows = [{**r, "hist_pct": None} for r in _ranked(8)]
+    shown, filtered = filter_opportunities(rows, min_hist_pct=90, max_show=50)
+    assert filtered == 0, "没有分位可用时不该有人被判成「没过门槛」"
+    assert len(shown) == 8
+    assert not any(o["below_bar"] for o in shown)
+
+
+def test_分位门槛每一格都真的在挡人():
+    """换掉绝对分就是为了这个 —— 拖到 30 就该挡掉分位低于 30 的那些。"""
+    from app.api.today import filter_opportunities
+    rows = [{**r, "hist_pct": float(i * 10)} for i, r in enumerate(_ranked(10))]
+    for bar, want_pass in ((0, 10), (30, 7), (60, 4), (90, 1)):
+        shown, filtered = filter_opportunities(rows, min_hist_pct=bar, max_show=50)
+        assert filtered == 10 - want_pass, (bar, filtered)
 
 
 def test_floor_does_not_kick_in_when_enough_passed():
     names = {f"S{i:03d}": f"票{i}" for i in range(20)}
     trends = {s: _trend("转多", 1) for s in names}
-    shown, _ = rank_opportunities(trends, {}, names, min_score=0)
+    shown, _ = rank_opportunities(trends, {}, names, min_hist_pct=0)
     assert not any(o["below_bar"] for o in shown), "够格的够多时不该有 below_bar"
 
 
@@ -225,7 +263,7 @@ def test_全是安静自选时页面不该是空的():
     extras = {s: {"gate": {"above_ma20": True, "above_ma20_prev": True,
                            "close": 10.0, "ma120": 8.0, "ma120_rising": True},
                   "channel_pct": 0.55, "bands": bands[s]} for s in picked}
-    shown, _ = rank_opportunities(trends, {}, names, extras=extras, min_score=60)
+    shown, _ = rank_opportunities(trends, {}, names, extras=extras, min_hist_pct=0)
     assert shown, "路 C 选出来了, 但一条都没显示 —— 保底也没兜住"
     assert all(o["fresh_from"] == "coiling" for o in shown), \
         "这批该走路 C 的新鲜度(中性档), 而不是别的来源"

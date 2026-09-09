@@ -247,6 +247,9 @@ export interface TodayOpportunity {
   rank_total?: number
   /** [R201] 分位: 1.0 = 今天最好的那只, 0.0 = 最后一名 */
   pct_rank?: number
+  /** [R220] 这个分数在台账历史分布里的百分位。入选门槛按它判;
+   *  台账没攒够时为 null, 那时门槛整个失效。 */
+  hist_pct?: number | null
   /** [R201] 置信系数 0~1 —— 因子读到了几成, 已经乘进 score 里 */
   confidence?: number
   /** [R201] 保底行: 没过把握分门槛, 是为了让页面不空才摆出来的 */
@@ -493,7 +496,7 @@ export interface SignalAiSchedule {
 }
 
 export interface TodayPrefs {
-  min_score: number; max_show: number; max_single: number; target_vol: number; max_drawdown: number
+  min_hist_pct: number; max_show: number; max_single: number; target_vol: number; max_drawdown: number
   pyramid_probe: number; pyramid_confirm: number; pyramid_days: number
   /** [R40] 只看这几个板; 空 = 全看 */
   boards: string[]
@@ -532,6 +535,9 @@ export interface TodayOverview {
   actions: TodayActionItem[]
   opportunities: TodayOpportunity[]
   opportunities_filtered: number
+  /** [R220] 台账攒够样本了吗 —— 入选门槛按历史分位判, 没攒够时它整个失效。
+   *  界面必须据此说明白, 而不是让人拖一个没反应的旋钮。 */
+  hist_pct_ready?: boolean
   /** [R210] 机会区为空时的原因(候选池空 / 门槛全挡 / 板块过滤滤没了)。非空时为 null */
   opportunities_empty_why?: string | null
   /** [R134] 三道硬门槛的漏斗统计 */

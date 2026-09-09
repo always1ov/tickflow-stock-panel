@@ -15,7 +15,7 @@ from app.price_limits import BOARDS
 logger = logging.getLogger(__name__)
 
 DEFAULTS = {
-    "min_score": 60, "max_show": 10,
+    "min_hist_pct": 0, "max_show": 10,
     # [R12] 仓位建议: 单票仓位上限(%)与目标日波动率(%); ATR 波幅超过目标时按比例压缩
     "max_single": 20, "target_vol": 3,
     # [缺口④] 组合回撤纪律线(%): 组合净值从高点回撤超过此值 → 行动区置顶降仓提醒
@@ -30,7 +30,9 @@ DEFAULTS = {
     # 排除在外)。用户可以关掉几个来把把握分的区分度拉开 —— 十个因子平均出来
     # 的分天生挤在中间一段, 少平均几个带宽就回来了。
 }
-_MIN_SCORE_RANGE = (0, 100)
+# [R220] 入选门槛的单位是历史分位, 不是绝对把握分。上限 90 而不是 100 ——
+# 100% 等于一只都不留, 那不是筛选是清屏。
+_MIN_HIST_PCT_RANGE = (0, 90)
 _MAX_SHOW_RANGE = (1, 50)
 _MAX_SINGLE_RANGE = (5, 100)
 _TARGET_VOL_RANGE = (1, 10)
@@ -90,7 +92,8 @@ def load() -> dict:
         logger.warning("load today prefs failed: %s", e)
         return dict(DEFAULTS)
     return {
-        "min_score": _clamp(data.get("min_score"), *_MIN_SCORE_RANGE, DEFAULTS["min_score"]),
+        "min_hist_pct": _clamp(data.get("min_hist_pct"), *_MIN_HIST_PCT_RANGE,
+                               DEFAULTS["min_hist_pct"]),
         "max_show": _clamp(data.get("max_show"), *_MAX_SHOW_RANGE, DEFAULTS["max_show"]),
         "max_single": _clamp(data.get("max_single"), *_MAX_SINGLE_RANGE, DEFAULTS["max_single"]),
         "target_vol": _clamp(data.get("target_vol"), *_TARGET_VOL_RANGE, DEFAULTS["target_vol"]),
@@ -102,23 +105,23 @@ def load() -> dict:
     }
 
 
-def save(min_score=None, max_show=None, max_single=None, target_vol=None,
+def save(min_hist_pct=None, max_show=None, max_single=None, target_vol=None,
          max_drawdown=None, pyramid_probe=None, pyramid_confirm=None,
          pyramid_days=None, boards=None) -> dict:
     """更新偏好(只改传入的字段), 返回生效后的完整偏好。"""
     # [R72] 读-改-写上锁 + 原子落盘(CONTRIBUTING §6.2)
     from app.services.json_store import lock_for
     with lock_for(_store_path()):
-        return _save_locked(min_score, max_show, max_single, target_vol,
+        return _save_locked(min_hist_pct, max_show, max_single, target_vol,
                             max_drawdown, pyramid_probe, pyramid_confirm,
                             pyramid_days, boards)
 
 
-def _save_locked(min_score, max_show, max_single, target_vol, max_drawdown,
+def _save_locked(min_hist_pct, max_show, max_single, target_vol, max_drawdown,
                  pyramid_probe, pyramid_confirm, pyramid_days, boards) -> dict:
     cur = load()
-    if min_score is not None:
-        cur["min_score"] = _clamp(min_score, *_MIN_SCORE_RANGE, cur["min_score"])
+    if min_hist_pct is not None:
+        cur["min_hist_pct"] = _clamp(min_hist_pct, *_MIN_HIST_PCT_RANGE, cur["min_hist_pct"])
     if max_show is not None:
         cur["max_show"] = _clamp(max_show, *_MAX_SHOW_RANGE, cur["max_show"])
     if max_single is not None:

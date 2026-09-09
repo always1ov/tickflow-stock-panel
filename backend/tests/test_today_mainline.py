@@ -229,7 +229,7 @@ def _rank(extras, signals=None, duration=1):
     from app.api.today import rank_opportunities
     trends = {"A": _trend(duration=duration), "B": _trend(duration=duration)}
     shown, _ = rank_opportunities(trends, signals or {}, {"A": "甲", "B": "乙"},
-                                  min_score=0, max_show=10, extras=extras)
+                                  min_hist_pct=0, max_show=10, extras=extras)
     return {o["symbol"]: o for o in shown}
 
 

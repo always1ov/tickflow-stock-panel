@@ -33,6 +33,7 @@ import { toast } from '@/components/Toast'
 import { PageShell } from '@/components/PageShell'
 import { ScoreLedgerDialog } from '@/components/ScoreLedgerDialog'
 import { QK } from '@/lib/queryKeys'
+import { cn } from '@/lib/cn'
 // [R167] 以下五块从本文件拆出 —— 拆前 1922 行, 一个文件装下了导出、表格、面板、
 // 弹窗和页面本体。缝按"对外暴露什么"划: 每个模块只导出 1~2 个组件, 其余是内部实现。
 import { buildTodayHtml } from '@/lib/todayHtmlExport'
@@ -146,7 +147,7 @@ export function Today() {
   const [askOpen, setAskOpen] = useState(false)
   const [lastNote, setLastNote] = useState('')
   // 滑块拖动中的即时值(null = 用服务端返回的偏好); 松手才落库
-  const [minScore, setMinScore] = useState<number | null>(null)
+  const [minPct, setMinPct] = useState<number | null>(null)
   // [R140] 板块过滤的**乐观值**。null = 用服务端偏好。
   //
   // 原来按钮亮不亮完全取决于 `d.prefs.boards`, 而那要等一次 PUT + 一次 GET
@@ -160,9 +161,9 @@ export function Today() {
       toast(
         'boards' in vars
           ? (p.boards.length ? `只看:${p.boards.join('、')}` : '板块过滤已取消,全部板块都看')
-          : `门槛已保存:把握分 ≥ ${p.min_score},最多 ${p.max_show} 条`,
+          : `门槛已保存:只看历史前 ${100 - p.min_hist_pct}%,最多 ${p.max_show} 条`,
         'success')
-      setMinScore(null)
+      setMinPct(null)
       setPicks(null)  // 候选集变了, 旧的 AI 优选结果不再对应
       // 等这次重取真的落地再撤掉乐观值 —— 提前撤会让按钮闪回旧状态
       await q.refetch()
@@ -170,7 +171,7 @@ export function Today() {
     },
     onError: (e: Error) => {
       toast(`保存失败: ${e.message}`, 'error')
-      setMinScore(null)
+      setMinPct(null)
       setBoardDraft(null)   // 存失败就退回服务端的真实值, 不留一个假的高亮
     },
   })
@@ -512,10 +513,15 @@ export function Today() {
                   + '质地(月计变化): 趋势模板 / 磨底节拍 / 相对强度 / 六态状态 / 三线间距\n'
                   + '时机(逐日变化): 新鲜度 / 通道位置 / 量比 / 换手率 / 快慢变化\n'
                   + '曲线全是区间最优(量比峰在 1.3~2.5、通道位置甜区 50%~65%),不是越大越好 —— 要的是有苗头,不是已经涨完的。\n\n'
-                  + '注意: 分数的实际取值挤在 65~82 这一段(十个因子平均出来的必然结果),'
-                  + '所以这个门槛拖到 85 会一只都不剩 —— 真正该看的是名次那一列。'
+                  + '[R220] 门槛的单位是**历史分位**,不是绝对分。绝对分挤在中间一段'
+                  + '(十个因子平均出来的必然结果),拖到哪儿都差不多;分位天然均匀,每一格都有抓手,'
+                  + '而且跨日可比 —— 熊市里「今天最好的也只排到历史第 20 百分位」这句话才说得出来。\n'
                   + '够格的不足 3 只时会保底摆出几只并标明「没到门槛」,页面不会空。'}>
-                  把握分 ≥ {d.prefs.min_score} 才算够格
+                  {!d.hist_pct_ready
+                    ? '门槛待命中(台账还没攒够)'
+                    : d.prefs.min_hist_pct > 0
+                      ? `只看历史前 ${100 - d.prefs.min_hist_pct}% 的`
+                      : '未设门槛'}
                 </span>
                 {d.opportunities_filtered > 0 && `(${d.opportunities_filtered} 只没够上)`}
                 {boardFilter.length > 0 && (
@@ -601,18 +607,34 @@ export function Today() {
             </div>
             {prefsOpen && (
               <div className="flex flex-wrap items-center gap-x-5 gap-y-3 border-b border-border/40 bg-base/40 px-4 py-3">
-                <label className="flex items-center gap-2 text-[11px] text-muted">
-                  <span className="whitespace-nowrap">最低把握分</span>
+                {/* [R220] 门槛的单位从绝对把握分换成了历史分位。
+                    绝对分那个旋钮几乎没有作用(实测 60 分只挡掉约 1.6% 的候选),
+                    因为分数被"平均"挤在中间一段;分位天然均匀,拖到哪儿都真的在挡人。
+                    台账没攒够时**禁用并说明**,而不是让人拖一个没反应的旋钮。 */}
+                <label className={cn('flex items-center gap-2 text-[11px] text-muted',
+                                     !d.hist_pct_ready && 'opacity-60')}>
+                  <span className="whitespace-nowrap">入选门槛</span>
                   <input
-                    type="range" min={0} max={100} step={5}
-                    value={minScore ?? d.prefs.min_score}
-                    onChange={(e) => setMinScore(Number(e.target.value))}
+                    type="range" min={0} max={90} step={5}
+                    disabled={!d.hist_pct_ready}
+                    value={minPct ?? d.prefs.min_hist_pct}
+                    onChange={(e) => setMinPct(Number(e.target.value))}
                     onPointerUp={() => {
-                      if (minScore != null && minScore !== d.prefs.min_score) prefsMut.mutate({ min_score: minScore })
+                      if (minPct != null && minPct !== d.prefs.min_hist_pct) prefsMut.mutate({ min_hist_pct: minPct })
                     }}
-                    className="w-36 accent-sky-400 cursor-pointer"
+                    className="w-36 accent-sky-400 cursor-pointer disabled:cursor-not-allowed"
                   />
-                  <span className="w-6 font-mono text-foreground">{minScore ?? d.prefs.min_score}</span>
+                  <span className="w-24 whitespace-nowrap font-mono text-foreground">
+                    {(minPct ?? d.prefs.min_hist_pct) > 0
+                      ? `历史前 ${100 - (minPct ?? d.prefs.min_hist_pct)}%`
+                      : '不过滤'}
+                  </span>
+                  {!d.hist_pct_ready && (
+                    <span className="text-[10px] text-amber-300/80"
+                          title="分位要跟历史比才算得出来。台账攒够约一个月的记录(400 条)之后这个门槛自动开始起作用 —— 在那之前它谁也不挡, 而不是偷偷把页面挡空。">
+                      台账还没攒够,暂不起作用
+                    </span>
+                  )}
                 </label>
                 <label className="flex items-center gap-2 text-[11px] text-muted">
                   <span className="whitespace-nowrap">最多显示</span>

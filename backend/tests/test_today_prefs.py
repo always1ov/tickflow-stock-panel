@@ -19,31 +19,31 @@ def test_defaults_when_unset(prefs):
 
 
 def test_save_and_reload_roundtrip(prefs):
-    saved = prefs.save(min_score=75, max_show=5, max_single=30, target_vol=4, max_drawdown=8)
-    expect = {"min_score": 75, "max_show": 5, "max_single": 30,
+    saved = prefs.save(min_hist_pct=75, max_show=5, max_single=30, target_vol=4, max_drawdown=8)
+    expect = {"min_hist_pct": 75, "max_show": 5, "max_single": 30,
               "target_vol": 4, "max_drawdown": 8}
     assert expect.items() <= saved.items()  # 子集断言: 未传字段保持默认即可
     assert prefs.load() == saved
 
 
 def test_partial_update_keeps_other_field(prefs):
-    prefs.save(min_score=75, max_show=5, max_single=30)
-    after = prefs.save(min_score=40)
-    assert after["min_score"] == 40
+    prefs.save(min_hist_pct=75, max_show=5, max_single=30)
+    after = prefs.save(min_hist_pct=40)
+    assert after["min_hist_pct"] == 40
     assert after["max_show"] == 5
     assert after["max_single"] == 30
 
 
 def test_values_are_clamped_to_valid_range(prefs):
-    up = prefs.save(min_score=999, max_show=999, max_single=999, target_vol=999,
+    up = prefs.save(min_hist_pct=999, max_show=999, max_single=999, target_vol=999,
                     max_drawdown=999, pyramid_probe=999, pyramid_confirm=999,
                     pyramid_days=999)
-    assert {"min_score": 100, "max_show": 50, "max_single": 100, "target_vol": 10,
+    assert {"min_hist_pct": 90, "max_show": 50, "max_single": 100, "target_vol": 10,
             "max_drawdown": 30, "pyramid_probe": 60, "pyramid_confirm": 90,
             "pyramid_days": 5}.items() <= up.items()
-    dn = prefs.save(min_score=-50, max_show=0, max_single=1, target_vol=0,
+    dn = prefs.save(min_hist_pct=-50, max_show=0, max_single=1, target_vol=0,
                     max_drawdown=1, pyramid_probe=1, pyramid_confirm=1, pyramid_days=0)
-    assert {"min_score": 0, "max_show": 1, "max_single": 5, "target_vol": 1,
+    assert {"min_hist_pct": 0, "max_show": 1, "max_single": 5, "target_vol": 1,
             "max_drawdown": 3, "pyramid_probe": 10, "pyramid_confirm": 40,
             "pyramid_days": 1}.items() <= dn.items()
 
@@ -56,9 +56,9 @@ def test_corrupt_file_falls_back_to_defaults(prefs):
 
 def test_garbage_values_fall_back_per_field(prefs):
     prefs._store_path().write_text(
-        json.dumps({"min_score": "高一点", "max_show": 7}), encoding="utf-8")
+        json.dumps({"min_hist_pct": "高一点", "max_show": 7}), encoding="utf-8")
     loaded = prefs.load()
-    assert loaded["min_score"] == prefs.DEFAULTS["min_score"]
+    assert loaded["min_hist_pct"] == prefs.DEFAULTS["min_hist_pct"]
     assert loaded["max_show"] == 7
     assert loaded["max_single"] == prefs.DEFAULTS["max_single"]
 
@@ -69,22 +69,27 @@ def _trend(duration):
 
 
 def test_threshold_actually_changes_what_is_shown():
-    """同一批候选, 门槛调高后显示变少 —— 门槛是真的生效的。"""
-    names = {f"S{i}": f"票{i}" for i in range(6)}
-    trends = {s: _trend(1 + i) for i, s in enumerate(names)}
-    loose, loose_filtered = rank_opportunities(trends, {}, names, min_score=0, max_show=50)
-    strict, strict_filtered = rank_opportunities(trends, {}, names, min_score=80, max_show=50)
+    """同一批候选, 门槛调高后显示变少 —— 门槛是真的生效的。
+    [R220] 改走 `filter_opportunities` —— 门槛按历史分位判, 而分位来自台账,
+    测试环境里台账是空的。
+    """
+    from app.api.today import filter_opportunities
+    rows = [{"symbol": f"S{i}", "name": f"票{i}", "score": 90 - i * 5, "why": [],
+             "partial": False, "board": "沪主板", "hist_pct": float(i * 15)}
+            for i in range(6)]
+    loose, loose_filtered = filter_opportunities(rows, min_hist_pct=0, max_show=50)
+    strict, strict_filtered = filter_opportunities(rows, min_hist_pct=50, max_show=50)
     assert len(strict) < len(loose)
     assert strict_filtered > loose_filtered
     # [R201] 保底行(below_bar)是刻意补进来的"矮子里拔高个", 不受门槛约束 ——
     # 要检验的是**够格的那些**确实都在门槛之上。
-    assert all(o["score"] >= 80 for o in strict if not o["below_bar"])
+    assert all(o["hist_pct"] >= 50 for o in strict if not o["below_bar"])
 
 
 def test_max_show_caps_list():
     names = {f"S{i}": f"票{i}" for i in range(8)}
     trends = {s: _trend(1) for s in names}
-    shown, filtered = rank_opportunities(trends, {}, names, min_score=0, max_show=3)
+    shown, filtered = rank_opportunities(trends, {}, names, min_hist_pct=0, max_show=3)
     assert len(shown) == 3
     # [R201] `filtered` 现在只数**没过把握分门槛**的 —— 与它在界面上的说法
     # (「有 N 只信号把握不足, 已替你滤掉」)对上了。被 max_show 截掉的不是

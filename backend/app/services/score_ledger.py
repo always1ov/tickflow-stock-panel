@@ -814,3 +814,53 @@ def export_csv(repo) -> str:
                 *[r.get(f"t{h}") for h in HORIZONS],
             ])
     return buf.getvalue()
+
+
+# --------------------------------------------------------------- 历史分位
+
+# 算历史分位至少要多少条样本。少于这个数时**不给分位**, 让门槛整个失效并
+# 明说原因 —— 样本太少的分位是假精度: 30 条记录算出来的"前 20%"就是 6 条,
+# 换一天可能完全不同。
+#
+# 400 条 ≈ 每天 20 只候选 × 20 个交易日, 是"一个月"的量级。
+MIN_PCT_SAMPLES = 400
+
+
+def score_distribution(days_limit: int = MAX_DAYS) -> list[int] | None:
+    """[R220] 当前打分口径下的**历史把握分**, 升序。样本不够返回 None。
+
+    ## 这个函数是来救「最低把握分」那个旋钮的
+
+    绝对分不适合当筛选旋钮, 这是**数学性质不是 bug**: 把握分是十个因子加权
+    平均再取几何平均, 而"平均"这件事本身就把取值挤向中间 —— 实测同一天的
+    横截面 p10~p90 只有 26 分, 两根轴分别也只有 34 / 39 分。于是
+    `min_score = 60` 实际只挡掉约 1.6% 的候选: 用户以为在调筛选强度,
+    那个旋钮几乎没有作用。
+
+    换成**历史分位**同时解决两件事:
+
+      · **旋钮每一格都有抓手** —— 分位天然是均匀分布的, 拖到 30% 就真的
+        挡掉七成。绝对分做不到这一点, 因为分数本身挤在中间。
+      · **「今天没有够格的票」这个信号回来了** —— 分位是跨日可比的。
+        熊市里今天最好的一只可能只排到历史第 20 百分位, 那句话就该说出来;
+        而换成"今天前 20%"这种当日相对量的话, 它永远有票, 那个信号就没了
+        (而且那样也只是 `max_show` 的重复)。
+
+    只取 `SCORING_VERSION` 相同的定稿日 —— 混版本等于拿两把尺子量同一段路。
+    """
+    rows = _flat(_read()[-days_limit:])
+    scores = sorted(int(r["score"]) for r in rows
+                    if isinstance(r.get("score"), (int, float)))
+    return scores if len(scores) >= MIN_PCT_SAMPLES else None
+
+
+def percentile_of(score: float | None, dist: list[int] | None) -> float | None:
+    """一个分数在历史分布里的百分位(0~100)。dist 为空或分数缺失时返回 None。
+
+    用 `bisect_left` 而不是 `bisect_right`: 同分时取**保守**的那一端 ——
+    分数并列时不该因为并列而被抬到更高的分位。
+    """
+    if score is None or not dist:
+        return None
+    import bisect
+    return round(bisect.bisect_left(dist, score) / len(dist) * 100, 1)

@@ -56,7 +56,7 @@ def _rank(extras, **kw):
     merged = {k: {**base, **v} for k, v in extras.items()}
     for s in ("a", "b"):
         merged.setdefault(s, dict(base))
-    shown, _ = rank_opportunities(trends, {}, names, min_score=0, max_show=10,
+    shown, _ = rank_opportunities(trends, {}, names, min_hist_pct=0, max_show=10,
                                   extras=merged, **kw)
     return {o["symbol"]: o for o in shown}
 
