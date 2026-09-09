@@ -3,6 +3,10 @@
 # 可选:stock-sdk 插件默认不打包(它抓取第三方财经网站接口,存在版权与反爬风险)。
 #       如确需启用,传入 --build-arg INCLUDE_STOCKSDK=1 显式开启,使用风险自负。
 #       (fork 2026-08 决定: 系统只用 TickFlow, 不打包任何第三方数据源插件。)
+#
+# 构建约定见 docs/docker-build-convention.md —— 改本文件前先读那份。
+# 基础镜像一律 pin 到具体 minor(floating tag 上游一动整层缓存就失效),
+# 版本号以实际能 pull 到的为准。
 ARG USE_CN_MIRROR=1
 ARG INCLUDE_STOCKSDK=0
 ARG NPM_REGISTRY=https://registry.npmmirror.com
@@ -11,21 +15,33 @@ ARG PYPI_INDEX=https://pypi.tuna.tsinghua.edu.cn/simple
 ARG PYPI_FALLBACK=https://mirrors.aliyun.com/pypi/simple
 ARG BACKEND_EXTRAS=
 ARG CODEX_CLI_VERSION=0.144.3
+# pnpm 版本与 frontend/package.json 的 packageManager 字段保持一致,
+# 锁死才不会出现「本地 9.10 构建过、镜像里 9.x 新版重解析 lock」的漂移。
+ARG PNPM_VERSION=9.10.0
+# numba/llvmlite 约 150MB, 只有回测 Matrix 引擎用得到, 且 app/backtest/matrix.py
+# 对缺失有纯 Python 降级(njit no-op + prange=range), 功能不变只是回测变慢。
+# 默认裁掉;需要 numba 加速时传 --build-arg STRIP_NUMBA=0。
+ARG STRIP_NUMBA=1
 
 # === Stage 1: 前端构建 ===
-FROM node:20-alpine AS frontend-builder
+FROM node:20.20.2-alpine AS frontend-builder
 ARG USE_CN_MIRROR=1
 ARG NPM_REGISTRY=https://registry.npmmirror.com
+ARG PNPM_VERSION
 WORKDIR /build
 # 关键:corepack 不读 npm 的 registry 配置,且跨 RUN 不保留环境变量,
 # 因此国内网络下最稳的做法是直接用 npm 安装 pnpm(npm 会读取 .npmrc 镜像源),
 # 彻底绕开 corepack 再次联网下载 pnpm 的问题。
+# --no-audit --no-fund: 安装 pnpm 这一步不需要审计报告和捐赠提示,少两次网络往返。
 RUN if [ "$USE_CN_MIRROR" = "1" ]; then npm config set registry "$NPM_REGISTRY"; fi && \
-    npm install -g pnpm@9
+    npm install -g --no-audit --no-fund "pnpm@${PNPM_VERSION}"
 # 让 pnpm 走镜像源安装依赖
 RUN if [ "$USE_CN_MIRROR" = "1" ]; then pnpm config set registry "$NPM_REGISTRY"; fi
 COPY frontend/package.json frontend/pnpm-lock.yaml* ./
-RUN pnpm install --frozen-lockfile || pnpm install
+# 严格 frozen:去掉原来的 `|| pnpm install` 容错。容错会掩盖 lockfile 漂移,
+# 还会退化成一次完整的慢速重解析 —— 宁可在这里红着失败,也不要静默构建出
+# 与本地不一致的前端。
+RUN pnpm install --frozen-lockfile
 COPY frontend/ ./
 RUN pnpm build
 
@@ -34,29 +50,30 @@ RUN pnpm build
 #    未经对方授权,可能违反其服务条款并涉及交易所行情版权。默认不打包(INCLUDE_STOCKSDK=0)。
 #    如确需启用,构建时传 --build-arg INCLUDE_STOCKSDK=1,即视为使用者知悉并自行承担合规责任。
 # INCLUDE_STOCKSDK=0 时,本 stage 仅产出空 node_modules 目录,保证后续 COPY 不报错。
-FROM node:20-bookworm-slim AS stocksdk-builder
+FROM node:20.20.2-bookworm-slim AS stocksdk-builder
 ARG USE_CN_MIRROR=1
 ARG NPM_REGISTRY=https://registry.npmmirror.com
 ARG INCLUDE_STOCKSDK=0
 WORKDIR /build
 RUN if [ "$USE_CN_MIRROR" = "1" ]; then npm config set registry "$NPM_REGISTRY"; fi
 COPY backend/app/plugins/stocksdk/package.json backend/app/plugins/stocksdk/package-lock.json ./
-# INCLUDE_STOCKSDK=1 时安装依赖;=0 时仅建空目录,使最终镜像不含 stock-sdk 依赖
+# INCLUDE_STOCKSDK=1 时按 lock 严格安装(去掉 `|| npm install` 容错,理由同前端);
+# =0 时仅建空目录,使最终镜像不含 stock-sdk 依赖。
 RUN if [ "$INCLUDE_STOCKSDK" = "1" ]; then \
-      (npm ci || npm install); \
+      npm ci --no-audit --no-fund; \
     else \
       mkdir -p /build/node_modules; \
     fi
 
 # === Stage 1c: Codex CLI ===
 # 固定版本保证镜像可复现；只复制安装产物到运行镜像，不保留 npm。
-FROM node:20-bookworm-slim AS codex-builder
+FROM node:20.20.2-bookworm-slim AS codex-builder
 ARG USE_CN_MIRROR=1
 ARG NPM_REGISTRY=https://registry.npmmirror.com
 # 版本由顶层 ARG CODEX_CLI_VERSION 提供, 这里仅声明以继承, 不再重复默认值。
 ARG CODEX_CLI_VERSION
 RUN if [ "$USE_CN_MIRROR" = "1" ]; then npm config set registry "$NPM_REGISTRY"; fi \
-    && npm install --global --prefix /opt/codex "@openai/codex@${CODEX_CLI_VERSION}" \
+    && npm install --global --no-audit --no-fund --prefix /opt/codex "@openai/codex@${CODEX_CLI_VERSION}" \
     && CODEX_NATIVE="$(find /opt/codex -type f -path '*/vendor/*/bin/codex' -print -quit)" \
     && test -n "$CODEX_NATIVE" \
     && cp "$CODEX_NATIVE" /opt/codex-native \
@@ -64,12 +81,13 @@ RUN if [ "$USE_CN_MIRROR" = "1" ]; then npm config set registry "$NPM_REGISTRY";
     && /opt/codex-native --version
 
 # === Stage 2: Python 运行时 ===
-FROM python:3.11-slim AS runtime
+FROM python:3.11.16-slim AS runtime
 ARG USE_CN_MIRROR=1
 ARG PYPI_INDEX=https://pypi.tuna.tsinghua.edu.cn/simple
 ARG PYPI_FALLBACK=https://mirrors.aliyun.com/pypi/simple
 ARG BACKEND_EXTRAS=
 ARG INCLUDE_STOCKSDK=0
+ARG STRIP_NUMBA=1
 WORKDIR /app
 
 # Node.js 运行时: 仅在启用 stock-sdk 插件时安装(供 node bridge.mjs 使用)。
@@ -109,6 +127,10 @@ COPY README.md ./README.md
 COPY backend/pyproject.toml backend/uv.lock* ./
 # uv 原生支持同时挂多个 index(主源 + 备用源),会自动在两源中查找,
 # 比逐个重试更稳健 —— 任一源缺包时另一源补位。
+# 严格 frozen:去掉 `|| uv sync "$@"` 容错。lock 漂移必须显式报错,
+# 不能靠一次静默重解析糊过去(那既慢又会装出与 uv.lock 不同的版本)。
+# STRIP_NUMBA 的卸载必须与 uv sync 同层:Docker 分层是叠加的,
+# 换到下一个 RUN 再删,那 150MB 仍然留在上一层里,镜像一点没小。
 RUN if [ "$USE_CN_MIRROR" = "1" ]; then \
       export UV_DEFAULT_INDEX="$PYPI_INDEX" UV_EXTRA_INDEX_URL="$PYPI_FALLBACK"; \
     fi; \
@@ -116,7 +138,10 @@ RUN if [ "$USE_CN_MIRROR" = "1" ]; then \
     for extra in $BACKEND_EXTRAS; do \
       set -- "$@" --extra "$extra"; \
     done; \
-    uv sync --frozen "$@" || uv sync "$@"
+    uv sync --frozen "$@" \
+    && if [ "$STRIP_NUMBA" = "1" ]; then \
+         uv pip uninstall numba llvmlite || true; \
+       fi
 
 # Backend code
 # 注意:Docker 里 WORKDIR=/app, 而 config.py 的 _PROJECT_ROOT 是按开发布局
@@ -142,9 +167,9 @@ COPY --from=codex-builder /opt/codex-native /usr/local/bin/codex
 RUN codex --version
 
 ENV PYTHONPATH=/app
-# 运行时 uv 镜像源持久化: CMD 用 `uv run` 启动, 锁与 pyproject 不一致等场景下
-# uv 会在容器内重新解析/安装 —— 无源配置时默认 pypi.org, 国内网络会卡死启动
-# (实测阿里云 ECS)。与构建期 RUN 内的 export 同源, 这里让它跨层存活。
+# 运行时 uv 镜像源持久化: 锁与 pyproject 不一致等场景下 uv 会在容器内重新
+# 解析/安装 —— 无源配置时默认 pypi.org, 国内网络会卡死启动(实测阿里云 ECS)。
+# 与构建期 RUN 内的 export 同源, 这里让它跨层存活。
 ARG PYPI_INDEX=https://pypi.tuna.tsinghua.edu.cn/simple
 ARG PYPI_FALLBACK=https://mirrors.aliyun.com/pypi/simple
 ENV UV_DEFAULT_INDEX=${PYPI_INDEX} \
@@ -152,5 +177,16 @@ ENV UV_DEFAULT_INDEX=${PYPI_INDEX} \
 # 兜底时区: 交易时段判断已在代码里显式用北京时间 (app/market_time.py),
 # 此处让日志时间戳等其余 naive 时间也对齐北京时间。
 ENV TZ=Asia/Shanghai
+
+# 探活: 后端 /health 在鉴权白名单里(main.py 的 _AUTH_WHITELIST_EXACT), 免认证。
+# 用 venv 自带的 python + urllib, 不额外装 curl/wget。
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+  CMD ["/app/.venv/bin/python", "-c", \
+       "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:3018/health', timeout=4).status==200 else 1)"]
+
 EXPOSE 3018
-CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "3018"]
+# --no-sync 是 STRIP_NUMBA 的必要配套: `uv run` 默认会先把环境同步回 uv.lock,
+# 那会在容器启动时把刚裁掉的 numba/llvmlite 又装回来 —— 既白裁了 150MB,
+# 又会在离线/国内网络下卡死启动。加上它之后启动直接用构建好的 .venv,
+# 跑的仍然是同一个 uvicorn、同一个 app,运行行为不变。
+CMD ["uv", "run", "--no-sync", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "3018"]
