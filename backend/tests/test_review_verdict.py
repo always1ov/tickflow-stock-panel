@@ -177,3 +177,33 @@ def test_文案里不许有markdown粗体():
     texts.append(rv._side_edge([])["text"])
     for t in texts:
         assert "**" not in t, t
+
+
+# ---------- [R208] inverted 那一档的措辞 ----------
+
+def test_说买的反而更差这一档不许把话说成跌():
+    """判据是「多头侧均值 < 空头侧均值」—— **+1% 对 +3% 同样命中**。
+    写成"反而跌"就是在没跌的时候说它跌了。
+
+    这一档本来就常常是小样本下的巧合(正文里明说了), 措辞再说过头,
+    用户真反着做就是被这个标签坑的。
+    """
+    got = rv._side_edge(_both_sides(0.01, 0.03))   # 两边都涨, 只是多头侧涨得少
+    assert got["level"] == "inverted"
+    assert got["label"] == "说买的反而更差"
+    assert "跌" not in got["label"], "标签把话说过头了"
+    assert "多半是巧合" in got["text"], "小样本的告诫不能丢"
+
+
+def test_两层用的是同一个标签():
+    """六态层与价位层问的是同一个问题, 标签不该有两套说法。"""
+    a = rv._side_edge(_both_sides(-0.08, 0.05))["label"]
+    from app.indicators.keltner import TONE_BUY, TONE_SELL
+    # 价位层是按 tone 分侧的(不是按 key) —— 说便宜的那几档反而更差
+    b = rv._verdict_edge([
+        {"key": "low_short_only", "tone": TONE_BUY, "n": 6, "scored": 6,
+         "avg_fwd": -0.08, "win": 1, "avg_days": 5.0, "label": "低吸候选"},
+        {"key": "high_short_only", "tone": TONE_SELL, "n": 6, "scored": 6,
+         "avg_fwd": 0.05, "win": 4, "avg_days": 5.0, "label": "短线冲高"},
+    ])["label"]
+    assert a == b == "说买的反而更差"

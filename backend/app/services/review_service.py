@@ -304,7 +304,7 @@ def _side_edge(outcomes: list[dict]) -> dict:
       defense  只能用来卖   —— 转空确实跌, 但转多不涨
       offense  只能用来买   —— 转多确实涨, 但转空也没怎么跌
       flat     看不出差别   —— 在这只票上六态说明不了什么
-      inverted 方向反过来了 —— 多头侧之后反而更差
+      inverted 说买的反而更差 —— 多头侧之后反而不如空头侧
       thin     样本不够, 不下结论
 
     **defense / offense 是这一层最值钱的两个结论**: 它们说的是"这只票的六态
@@ -319,6 +319,15 @@ def _side_edge(outcomes: list[dict]) -> dict:
     「只能用来找便宜 / 只能用来躲贵」。两层问的本来就是同一个问题 ——
     「这套判定我能拿来买, 还是拿来卖, 还是两头都行」—— 两套说法只会
     让人以为它们是两种不同的东西。区别留给下面那句正文去说。
+
+    [R208] inverted 那一档由「方向反过来了」改成「**说买的反而更差**」。
+    「方向反过来了」说的是抽象的方向, 读的人还得自己想「什么的方向、
+    反过来之后我该干嘛」; 换成直接陈述发生了什么, 一句话读完就明白。
+
+    **措辞刻意用「更差」不用「反而跌」**: 这一档的判据是
+    `多头侧均值 < 空头侧均值`, 而 +1% 对 +3% 同样命中 —— 写成"跌"就是
+    在没跌的时候说它跌了。这一档本来就常常是小样本下的巧合(正文里明说了),
+    再把话说过头, 用户真反着做就是被这个标签坑的。
     """
     bear_states = {s for s in STATE_LABELS if s not in BULLISH}
     bull = _side_stats(outcomes, set(BULLISH))
@@ -339,7 +348,7 @@ def _side_edge(outcomes: list[dict]) -> dict:
             f"空头侧 {bear['episodes']} 段平均 {r:+.1%})")
 
     if b < r:
-        out.update(level="inverted", label="方向反过来了",
+        out.update(level="inverted", label="说买的反而更差",
                    text="多头侧之后反而比空头侧更差 —— 样本这么小时多半是巧合, "
                         "但至少说明六态在这只票上没有正向信息, 别拿它做主要依据。" + tail)
     elif up_ok and down_ok:
@@ -466,7 +475,7 @@ def _verdict_edge(outcomes: list[dict]) -> dict:
                    text="说贵的之后确实跌, 但说便宜的之后并不涨 —— 拿它躲开高位、找卖点, "
                         "买点另找依据。" + tail)
     elif b < r:
-        out.update(level="inverted", label="方向反过来了",
+        out.update(level="inverted", label="说买的反而更差",
                    text="说便宜的那几档之后反而比说贵的更差 —— 样本这么小时多半是巧合, "
                         "但至少说明位置结论在这只票上没有正向信息。" + tail)
     else:

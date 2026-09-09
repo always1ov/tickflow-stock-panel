@@ -49,9 +49,9 @@ export const LEVEL_GROUPS: { key: LevelType; label: string; color: string }[] = 
   { key: 'pivot',    label: '枢轴点',    color: '#8B5CF6' },   // 紫
   { key: 'extreme',  label: '前高前低',  color: '#EAB308' },   // 黄
   { key: 'boll',     label: '布林带',    color: '#F97316' },   // 橙(MA20±2σ 曲线)
-  { key: 'keltner_s',label: '量化通道短',  color: '#06B6D4' },   // 青(MA20±2ATR 曲线)
-  { key: 'keltner_m',label: '量化通道中',  color: '#22D3EE' },   // 浅青(MA60±2.5ATR 曲线)
-  { key: 'keltner_l',label: '量化通道长',  color: '#67E8F9' },   // 更浅青(MA120±3ATR 曲线)
+  { key: 'keltner_s',label: '量化通道短期',  color: '#06B6D4' },   // 青(MA20±2ATR 曲线)
+  { key: 'keltner_m',label: '量化通道中期',  color: '#22D3EE' },   // 浅青(MA60±2.5ATR 曲线)
+  { key: 'keltner_l',label: '量化通道长期',  color: '#67E8F9' },   // 更浅青(MA120±3ATR 曲线)
   { key: 'atr_stop', label: 'ATR波动通道',  color: '#EF4444' },   // 红(警示)
   { key: 'gap',      label: '缺口位',    color: '#EC4899' },   // 粉
   { key: 'fib',      label: '斐波那契',  color: '#F59E0B' },   // 金
@@ -70,12 +70,12 @@ const CURVE_DEFS: { alignedKey: string; group: LevelType; endLabel: string; colo
   { alignedKey: 'boll_upper',     group: 'boll',      endLabel: '布林上轨', color: '#F97316', dashed: true },
   { alignedKey: 'boll_lower',     group: 'boll',      endLabel: '布林下轨', color: '#F97316', dashed: true },
   { alignedKey: 'boll_mid',       group: 'boll',      endLabel: '布林中轨', color: '#FB923C', dashed: false },
-  { alignedKey: 'keltner_s_upper',group: 'keltner_s', endLabel: '量通道短上', color: '#06B6D4', dashed: true },
-  { alignedKey: 'keltner_s_lower',group: 'keltner_s', endLabel: '量通道短下', color: '#06B6D4', dashed: true },
-  { alignedKey: 'keltner_m_upper',group: 'keltner_m', endLabel: '量通道中上', color: '#22D3EE', dashed: true },
-  { alignedKey: 'keltner_m_lower',group: 'keltner_m', endLabel: '量通道中下', color: '#22D3EE', dashed: true },
-  { alignedKey: 'keltner_l_upper',group: 'keltner_l', endLabel: '量通道长上', color: '#67E8F9', dashed: true },
-  { alignedKey: 'keltner_l_lower',group: 'keltner_l', endLabel: '量通道长下', color: '#67E8F9', dashed: true },
+  { alignedKey: 'keltner_s_upper',group: 'keltner_s', endLabel: '短期上沿', color: '#06B6D4', dashed: true },
+  { alignedKey: 'keltner_s_lower',group: 'keltner_s', endLabel: '短期下沿', color: '#06B6D4', dashed: true },
+  { alignedKey: 'keltner_m_upper',group: 'keltner_m', endLabel: '中期上沿', color: '#22D3EE', dashed: true },
+  { alignedKey: 'keltner_m_lower',group: 'keltner_m', endLabel: '中期下沿', color: '#22D3EE', dashed: true },
+  { alignedKey: 'keltner_l_upper',group: 'keltner_l', endLabel: '长期上沿', color: '#67E8F9', dashed: true },
+  { alignedKey: 'keltner_l_lower',group: 'keltner_l', endLabel: '长期下沿', color: '#67E8F9', dashed: true },
   { alignedKey: 'atr_stop',       group: 'atr_stop',  endLabel: 'ATR下轨', color: '#EF4444', dashed: true },
   { alignedKey: 'atr_tp',         group: 'atr_stop',  endLabel: 'ATR上轨', color: '#F87171', dashed: true },
 ]
@@ -123,7 +123,13 @@ export function AnalysisKChart({
   levels,
   series,
   seriesDates,
-  defaultLevelTypes = [],
+  // [R208] 默认勾上**量化通道短期**。用户: 「关键价位的指标默认选量化通道短期」。
+  //
+  // 原来默认是空的 —— 图上一条线都没有, 每次打开都要自己点一次。而这十几个
+  // 价位组里, 短期通道是唯一**每天都在动、且决策台整张表都在用**的那一个
+  // (「贵不贵」「该动了」「通道态势」三列的位置判定都以它为准), 所以它是
+  // 最该默认在场的。别的组按需再点。
+  defaultLevelTypes = ['keltner_s'],
   markers,
   ranges,
   onDateClick,

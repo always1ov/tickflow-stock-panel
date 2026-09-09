@@ -151,9 +151,9 @@ export const EXPORT_COLUMNS: ExportColumn[] = [
         }
       : { text: '—' }),
   },
-  { key: 'ks', label: '短通道', group: '通道', align: 'center', on: true, cell: (r) => band(r.kc?.s) },
-  { key: 'km', label: '中通道', group: '通道', align: 'center', on: true, cell: (r) => band(r.kc?.m) },
-  { key: 'kl', label: '长通道', group: '通道', align: 'center', on: true, cell: (r) => band(r.kc?.l) },
+  { key: 'ks', label: '短期通道', group: '通道', align: 'center', on: true, cell: (r) => band(r.kc?.s) },
+  { key: 'km', label: '中期通道', group: '通道', align: 'center', on: true, cell: (r) => band(r.kc?.m) },
+  { key: 'kl', label: '长期通道', group: '通道', align: 'center', on: true, cell: (r) => band(r.kc?.l) },
   // [R201] 通道态势 —— 与屏幕上那一列同源: 阶段 + 三线间距 + 快慢 + 挤了几天。
   // 默认**不勾选**: 导出是拿去发给别人的, 默认给最少的必要信息;
   // 要带上它是一次有意识的选择, 不是顺手带出去。

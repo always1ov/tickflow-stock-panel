@@ -513,7 +513,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
         <button
           onClick={() => setActionableOnly((v) => !v)}
           title={'只留下有触发的那几只: 出场线已破/逼近、离趋势翻转价 2% 以内、今日刚翻转、'
-            + '短通道到轨。判定是纯规则的(与推送焦点名单同一套到轨口径), AI 不参与。\n'
+            + '短期通道到轨。判定是纯规则的(与推送焦点名单同一套到轨口径), AI 不参与。\n'
             + '自选一多, 默认列出全部本身就是噪音 —— 绝大多数票今天确实不需要你看。'}
           className={`text-[10px] px-2 py-0.5 rounded-btn border transition-colors cursor-pointer ${
             actionableOnly ? 'border-amber-400/40 bg-amber-400/10 text-amber-400' : 'border-border bg-base text-muted hover:text-foreground'
