@@ -884,3 +884,95 @@ def test_均线是简单均线而不是指数均线():
     path = [100.0 + v * t for t in range(200)]
     b = _bands(path[-1], _ma_of(path, 20), _ma_of(path, 60), _ma_of(path, 120), atr)
     assert g.geometry(b, path[-1])["accel"]["a1"] == pytest.approx(0.0, abs=2e-3)
+
+
+# ================================================================
+# [R222] 逐行核对 27 条结论 —— 用户: 「组合表的结论都正确的吗」
+#
+# R221 验的是**原则**(站上上轨=延续 / 长周期为准 / SMA 是前提)和**频率**,
+# 没有逐行核对结论本身。这一节把那件事补上, 而且做成机器可查的两条性质,
+# 不是一次性人工过一遍 —— 底层哪天改了措辞, 这里要能红。
+#
+# 两类漏洞, 判据不同:
+#   甲 正文把这一格的事实**说反了**(如「大级别还早」而长期档就在上沿)
+#   乙 正文每句都对, 但**漏掉了长期档**, 于是两格拿到逐字相同的话
+#      (中下中 与 中下下 —— 前者长期在中部, 后者长期也在下沿)
+#
+# 底层禁止改, 所以两类都由补充层注记兜。这两条测试守的是"必须有人兜"。
+
+
+def _combo_rows():
+    return {r["combo"]: r for r in g.combo_table()}
+
+
+# 底层正文里可以被组合直接证伪的断言
+_FALSIFIABLE = (
+    ("只有短期到上沿", lambda s, m, l: not (m == "上" or l == "上")),
+    ("大级别还早", lambda s, m, l: l != "上"),
+    ("只有短期到下沿", lambda s, m, l: not (m == "下" or l == "下")),
+    ("长期还在下沿", lambda s, m, l: l == "下"),
+    ("长期仍在上沿", lambda s, m, l: l == "上"),
+    ("三档同时到上沿", lambda s, m, l: s == m == l == "上"),
+    ("三档同时到下沿", lambda s, m, l: s == m == l == "下"),
+    ("短期和中期同时到上沿", lambda s, m, l: s == "上" and m == "上"),
+    ("短期和中期同时到下沿", lambda s, m, l: s == "下" and m == "下"),
+    ("短期还在通道中部", lambda s, m, l: s == "中"),
+)
+
+
+def test_正文说错了事实的那几格必须有注记兜着():
+    """甲类。底层是禁止改的, 所以"说错"只能靠旁边加注纠正 —— 但**必须真的有**。"""
+    naked = []
+    for code, r in _combo_rows().items():
+        v = r["verdict"]
+        if not v:
+            continue
+        s, m, l = code
+        wrong = [p for p, ok in _FALSIFIABLE if p in v["detail"] and not ok(s, m, l)]
+        if wrong and not r["note"]:
+            naked.append((code, v["title"], wrong))
+    assert not naked, f"这些格子的正文与事实对不上, 却没有补充注记: {naked}"
+
+
+def test_长期档在轨上时正文或注记必须提到它():
+    """乙类。**这一条是这次逐行核对新加的。**
+
+    「中下中」与「中下下」在底层拿到逐字相同的正文, 而那段话只讲短期与中期。
+    差别恰恰在长期: 前者长期在通道中部, 后者长期也在下沿 —— 一个是"大级别
+    跌到位、等入场点", 另一个半年尺度本身还在低位。而「中下下」是第四常见的
+    格子(约 12%), 不是边角情形。
+
+    所以立一条: **长期档只要在轨上, 这一行就必须有人提到它** —— 底层正文提了
+    也行, 补充注记提了也行, 但不能两边都不提。
+    """
+    silent = []
+    for code, r in _combo_rows().items():
+        v = r["verdict"]
+        if not v or code[2] == "中":
+            continue
+        # 注记的标题在弹窗里也是显示的(`▸ 标题:正文`), 所以标题里提到了也算
+        note_txt = (r["note"]["title"] + r["note"]["detail"]) if r["note"] else ""
+        said = "长期" in v["detail"] or "长期" in note_txt
+        if not said:
+            silent.append((code, v["title"], r["rarity"]))
+    assert not silent, f"长期档在轨上却没人提它的格子: {silent}"
+
+
+def test_注记与干净两份名单恰好把27格分完():
+    """没有注记必须是**明确的结论**(底层说准了), 不是"忘了写"。"""
+    allc = {a + b + c for a in "上中下" for b in "上中下" for c in "上中下"}
+    assert set(g.COMBO_NOTES) | g.COMBO_CLEAN == allc
+    assert not (set(g.COMBO_NOTES) & g.COMBO_CLEAN), "一格不能既有注记又算干净"
+
+
+def test_注记只补话不改底层结论():
+    """整个补充层的边界: 加注可以, 改判定不行(用户: 「这是根本, 不能够改动的」)。"""
+    rows = _combo_rows()
+    for code in ("上上上", "中下下", "中上上", "上中上"):
+        r = rows[code]
+        assert r["note"], code
+        assert r["verdict"], f"{code} 的底层结论必须照旧摆着, 不是被注记替换"
+    # 底层判定必须是**现调**出来的, 不是表里誊抄的一份
+    from app.indicators.keltner import POS_ABOVE, verdict
+    live = verdict({k_: {"pos": POS_ABOVE} for k_ in ("s", "m", "l")})
+    assert rows["上上上"]["verdict"]["title"] == live["title"]
