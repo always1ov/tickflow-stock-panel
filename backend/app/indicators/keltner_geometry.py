@@ -666,6 +666,26 @@ def verdict_codes(closes: list[float] | None, atrs: list[float] | None,
     return out
 
 
+def judgeable_span(codes: list[str | None] | None) -> int:
+    """[R244] 从最近一天往回, 连着**判得出结论**的有几天(遇到第一个 None 就停)。
+
+    这是"我们最多能数到多少"的上限, 与 `len(codes)` **不是一回事** ——
+    序列里最老的那些天算不出结论(长期档要 120 根暖机, 缺 ATR 的天也算不出),
+    它们照样占着位置。
+
+    `len(codes)` 当上限用是我埋的那个 bug: 判据写成 `hist >= len(codes)`,
+    而 hist 数到暖机边界就停了, 永远够不着 `len(codes)` —— 于是**一个被窗口
+    截断的天数, 从来不会被标成下界**, 看着像个准数。用户: 「候选池显示的
+    天数不正确」。
+    """
+    n = 0
+    for c in (codes or []):
+        if c is None:
+            break
+        n += 1
+    return n
+
+
 def count_trailing(codes: list[str | None] | None, code: str | None) -> int:
     """从头(=最近一天)数, 连着等于 `code` 的有几个。**中断即停。**
 

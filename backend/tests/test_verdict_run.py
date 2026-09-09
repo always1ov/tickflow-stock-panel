@@ -487,7 +487,12 @@ def test_批量里真的把两列均线要出来了():
     from app.services import keltner_service
     src = inspect.getsource(keltner_service.long_trend_map)
     assert '"ma20", "ma60"' in src, "日线批量没要预计算均线列"
-    assert "ma20=sub[" in src, "要来了却没传给 verdict_run"
+    # [R244] 原来盯的是 `ma20=sub[` —— 那把变量名也钉死了, 而 R244 把逐日结论
+    # 那一路换成了加长的 `full`。盯的该是**这两列传进去了**, 不是它叫什么。
+    call = src[src.index("kg.verdict_codes("):]
+    assert "ma20=" in call[:400] and "ma60=" in call[:400], (
+        "要来了却没传给 verdict_codes —— 那它就又在自己滚均线了"
+    )
 
 
 def test_R239_两条路对不上今天时也数得出天数():
@@ -737,4 +742,169 @@ def test_R242_没有结论那一格的徽标也写_已N天():
                     if not ln.lstrip().startswith(("//", "*", "/*")))
     assert "已{run.days}天{run.capped" in src, (
         "没结论那一格的徽标没有按统一说法写「已N天」"
+    )
+
+
+# ===== [R244] 「候选池显示的天数不正确」 =====
+#
+# 两个 bug 叠在一起, 一个让数字变小, 另一个让变小之后还看不出来:
+#
+#   ① 窗口太短。`verdict_codes` 里长期档要**自己滚 MA120**(日线表只预计算到
+#      ma60, `pipeline.py` 是作者的不能加), 序列最老的 119 天必然是 None。
+#      260 个自然日 ≈ 178 根 K, 扣掉暖机**只剩 59 天判得出结论** ——
+#      `VERDICT_TAIL = 250` 那个上限从来就没够着过。
+#   ② 上限判据写错。`hist >= len(codes)` 里的 `len(codes)` 把 None 那些天也
+#      算在内, 所以**永远不成立** —— 被截断的天数从不标下界, 看着像准数。
+
+
+def test_R244_judgeable_span_数的是判得出结论的天数():
+    assert kg.judgeable_span(["a", "a", "b", None, "b"]) == 3, "遇到 None 该停"
+    assert kg.judgeable_span(["a", "a", "a"]) == 3, "没有 None 时就是全长"
+    assert kg.judgeable_span([None, "a"]) == 0, "今天就判不出, 一天都数不了"
+    assert kg.judgeable_span([]) == 0
+    assert kg.judgeable_span(None) == 0
+
+
+def test_R244_被暖机截断的天数必须标成下界():
+    """**这条就是那个 bug。** 序列尾巴上全是 None(暖机不足), 连续段一直数到
+    那个边界为止 —— 那时报出来的天数是**下界**, 不是准数。
+
+    老判据 `hist >= len(codes)`: hist=3, len=6 → 不标。用户看到的是个假的准数。
+    """
+    codes = ["watch_low"] * 3 + [None] * 3
+    hist = kg.count_trailing(codes, "watch_low")
+    assert hist == 3
+    assert hist < len(codes), "夹具没造出「被截断」的情形, 这条测不到"
+    assert hist >= kg.judgeable_span(codes), (
+        "数到了判得出结论的尽头, 却没被认成下界 —— 徽标上就会少一个 `+`"
+    )
+
+
+def test_R244_没被截断时不许乱标下界():
+    """反面。段是自己结束的(前面那天是别的档), 那就是个准数, 不该带 `+`。"""
+    codes = ["watch_low"] * 3 + ["falling_all_bands"] * 5 + [None] * 3
+    hist = kg.count_trailing(codes, "watch_low")
+    assert hist == 3
+    assert hist < kg.judgeable_span(codes), "自己结束的段被当成了下界"
+
+
+def test_R244_上限判据不许再写成_len_codes():
+    """`len(codes)` 把算不出结论的那些天也算在内, 于是判据永远不成立。"""
+    import inspect
+
+    from app.services import keltner_service
+    src = inspect.getsource(keltner_service.channels_for_symbols)
+    assert "hist >= len(codes)" not in src, (
+        "那个永远不成立的上限判据回来了 —— 截断的天数又会被当成准数印出去"
+    )
+    assert "judgeable_span" in src, "没有按「判得出结论的天数」定上限"
+
+
+def _fake_repo(closes, atrs=None, *, symbol="X"):
+    """按线上那条链造一只票: enriched 快照 + 日线批量(带 ma20/ma60 预计算列)。"""
+    import datetime as dt
+
+    import polars as pl
+
+    n = len(closes)
+    atrs = atrs or [_ATR] * n
+    end = dt.date.today()
+    dates, d = [], end
+    while len(dates) < n:
+        if d.weekday() < 5:
+            dates.append(d)
+        d -= dt.timedelta(days=1)
+    dates = dates[::-1]
+
+    def ma(w, i):
+        return None if i + 1 < w else sum(closes[i + 1 - w:i + 1]) / w
+
+    class _Repo:
+        def get_enriched_latest(self):
+            return pl.DataFrame({
+                "symbol": [symbol], "close": [closes[-1]], "atr_14": [atrs[-1]],
+                "ma20": [ma(20, n - 1)], "ma60": [ma(60, n - 1)],
+            }), str(end)
+
+        def get_daily_batch(self, symbols, start, end_, cols):
+            keep = [i for i, dd in enumerate(dates) if start <= dd <= end_]
+            return pl.DataFrame({
+                "symbol": [symbol] * len(keep), "date": [dates[i] for i in keep],
+                "close": [closes[i] for i in keep], "atr_14": [atrs[i] for i in keep],
+                "ma20": [ma(20, i) for i in keep], "ma60": [ma(60, i) for i in keep],
+            })
+
+    return _Repo()
+
+
+def test_R244_端到端_长期挂着的候选池数得出远超暖机上限的天数():
+    """用户: 「候选池显示的天数不正确」。
+
+    造一只**一路缓跌、长期挂在候选池**的票。修好之前徽标封顶只能印「已59天」
+    (260 天窗口 178 根 K 减去 120 根暖机), 而且不带 `+`。
+    """
+    from app.services import keltner_service as ks
+
+    closes = [round(10.0 - 0.02 * i, 4) for i in range(380)]
+    v = (ks.channels_for_symbols(_fake_repo(closes), ["X"]).get("X") or {}).get("verdict")
+    assert v and v["code"] == "watch_low", f"夹具造出来的是 {v and v.get('code')}"
+    # 老窗口判得出结论的只有 ~59 天, 所以这个数字本身就是"修好了"的证据
+    assert v["days"] > 100, (
+        f"只数出 {v['days']} 天 —— 又被暖机边界截断了(老窗口的上限是 59 天左右)"
+    )
+    assert v.get("capped") is True, "整段比能看到的还长, 却没标成下界"
+
+
+def test_R244_加长窗口不许改动别的指标的读数():
+    """**加长窗口是为了把天数数够, 不是顺手改别的。**
+
+    压缩指数/在轨外天数/频段能量的读数**会**被窗口长度改变(实测
+    `compress_days` 能从 59 跳到 250)。所以多取的那一段只喂给逐日结论,
+    其余每一处仍旧按原来的窗口切。这条把它钉死。
+    """
+    from app.services import keltner_service as ks
+    from tests.fixtures import market_archetypes as fx
+
+    watch = ("close", "close_prev", "ma20", "ma20_prev", "above_ma20",
+             "above_ma20_prev", "ma120", "ma120_prev", "ma120_rising",
+             "runs", "energy")
+
+    def once(name, widen):
+        cl = list(fx.closes(name))
+        if len(cl) < 420:
+            cl = [cl[0]] * (420 - len(cl)) + cl
+        keep = ks._LOOKBACK_DAYS_VERDICT
+        ks._LOOKBACK_DAYS_VERDICT = keep if widen else ks._LOOKBACK_DAYS
+        try:
+            return ks.long_trend_map(_fake_repo(cl, fx.atrs(cl)), ["X"]).get("X", {})
+        finally:
+            ks._LOOKBACK_DAYS_VERDICT = keep
+
+    checked = 0
+    for name in fx.SCENARIOS:
+        narrow, wide = once(name, False), once(name, True)
+        for k in watch:
+            checked += 1
+            assert narrow.get(k) == wide.get(k), (
+                f"{name} · {k} 被加长的窗口改变了 —— 那是搭车改动, 不是这次要修的\n"
+                f"  窄窗 {narrow.get(k)}\n  宽窗 {wide.get(k)}"
+            )
+        # 正面: 逐日结论那一路确实变长了
+        assert (kg.judgeable_span(wide.get("verdict_codes") or [])
+                >= kg.judgeable_span(narrow.get("verdict_codes") or [])), \
+            f"{name}: 窗口加长了, 判得出结论的天数反而没变多"
+    assert checked >= 100, f"只核了 {checked} 组, 覆盖不够"
+
+
+def test_R244_窗口够长期档暖机之后还能数满_VERDICT_TAIL():
+    """`VERDICT_TAIL = 250` 是承诺的上限, 窗口必须真的支撑得起它 ——
+    否则那个常数就是句空话(这正是用户撞上的)。"""
+    from app.services import keltner_service as ks
+
+    bars = ks._LOOKBACK_DAYS_VERDICT * 5 // 7      # 自然日 → 交易日, 扣掉周末
+    usable = bars - kg.WINDOW["l"] + 1
+    assert usable >= kg.VERDICT_TAIL, (
+        f"窗口 {ks._LOOKBACK_DAYS_VERDICT} 个自然日 ≈ {bars} 根 K, 扣掉 "
+        f"{kg.WINDOW['l']} 根暖机只剩 {usable} 天 —— 够不着 VERDICT_TAIL="
+        f"{kg.VERDICT_TAIL}, 那个上限还是句空话"
     )
