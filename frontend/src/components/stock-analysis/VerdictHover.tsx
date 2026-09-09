@@ -110,7 +110,18 @@ export function VerdictHover({ v, note, children }: {
             <div className={`w-1 shrink-0 ${TONE_BAR[v.tone]}`} />
             <div className="min-w-0 flex-1 px-3 py-2.5">
               <div className="flex items-baseline justify-between gap-2">
-                <span className={`text-xs font-medium ${TONE_ACCENT[v.tone]}`}>{v.title}</span>
+                <span className={`text-xs font-medium ${TONE_ACCENT[v.tone]}`}>
+                  {v.title}
+                  {/* [R233] 连着第几天。**中间断一天就重新起算** ——
+                      出现 3 天、隔一天、再 2 天是两次独立的出现, 说成 5 天
+                      会把这一档持续了多久说多。 */}
+                  {v.days != null && (
+                    <span className="ml-1 text-[10px] font-normal text-muted"
+                          title="这一档结论已经连着挂了几天(含今天)。中间断一天就重新起算">
+                      连着第 {v.days} 天
+                    </span>
+                  )}
+                </span>
                 <span className="shrink-0 text-[9px] text-muted">{TONE_CN[v.tone]}</span>
               </div>
 

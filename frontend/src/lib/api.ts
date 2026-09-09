@@ -645,6 +645,10 @@ export interface KeltnerVerdict {
   /** 哪几档共振, 如"短期破上轨、中期也贴上轨" */
   bands_text: string
   bands_aligned: number
+  /** [R233] 这一档结论已经连着挂了几天(含今天)。中间断一天就重新起算。
+   *  只有决策台/今日总览那份"今天的读数"带它 —— 复盘的逐日行是**当天**的
+   *  结论, 天数由段卡片自己算, 这里为 undefined。 */
+  days?: number
 }
 
 /**

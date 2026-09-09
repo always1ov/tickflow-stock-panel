@@ -117,6 +117,12 @@ def long_trend_map(repo, symbols: list[str], *, with_closes: bool = False) -> di
                     e = kg.band_energy(cl, atrs)
                     if e:
                         ent["energy"] = e
+                    # [R233] 当前通道结论已经连着挂了几天。用户: 「『候选、
+                    # 调到位了』也是要显示这个状态持续多少天了」。同一份
+                    # closes/atrs, 不新增取数; 判定仍走作者的 verdict()。
+                    vr = kg.verdict_run(cl, atrs)
+                    if vr:
+                        ent["verdict_run"] = vr
             except Exception as e:  # noqa: BLE001
                 logger.debug("channel runs skipped for %s: %s", name, e)
         if with_closes:
@@ -187,6 +193,13 @@ def channels_for_symbols(repo, symbols: list[str]) -> dict[str, dict]:
             # [R44] 三档组合的结论跟着一起返回 —— 界面不必自己再拼一遍规则,
             # 也保证决策台、今日总览、悬停提示说的是同一句话
             v = verdict(bands)
+            if v:
+                # [R233] 结论徽标要能说"这一档已经连着几天了" —— 天数与结论是
+                # 同一件事的两半, 挂在 verdict 里而不是另起一个平级字段,
+                # 免得界面各处取一个忘一个。
+                vr = (long_map.get(sym) or {}).get("verdict_run")
+                if vr and vr.get("code") == v.get("code"):
+                    v = dict(v, days=int(vr["days"]))
             row = dict(bands, verdict=v) if v else dict(bands)
             # [R195] 几何量(速度/加速度/压缩/排列)。**零新增取数** —— 全部从
             # 已经算好的三档上下轨反推(轨 = MA ± k·ATR 是恒等式)。

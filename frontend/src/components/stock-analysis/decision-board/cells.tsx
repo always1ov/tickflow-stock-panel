@@ -195,6 +195,10 @@ function VerdictInner({ v, ev, geo, runs, energy, ph, onOpen }: {
           className={`inline-flex cursor-pointer whitespace-nowrap rounded border px-1 py-0.5 text-[10px] transition-colors hover:brightness-125 ${VERDICT_CLS[v.tone]}`}
         >
           {v.title}
+          {/* [R233] 用户: 「『候选、调到位了』也是要显示这个状态持续多少天了」。
+              六态徽标一直带着天数, 而它旁边的结论只有 4 个字 —— 于是「调到位了」
+              看不出是今天刚到位, 还是已经这样磨了三周。这两种要做的事完全不同。 */}
+          {v.days != null && <span className="ml-0.5 opacity-70">{v.days}天</span>}
         </button>
       </VerdictHover>
   )

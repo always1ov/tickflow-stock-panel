@@ -570,6 +570,66 @@ def _tail_run(rows: list[dict], ok) -> int:
     return run
 
 
+def verdict_run(closes: list[float] | None, atrs: list[float] | None) -> dict | None:
+    """[R233] 当前这条**通道结论**已经连着挂了几天。返回 {code, days} 或 None。
+
+    用户: 「『候选、调到位了』也是要显示这个状态持续多少天了」。
+
+    六态徽标一直带着「上涨趋势 15 天」, 而它旁边的通道结论只有一个 4 字标签 ——
+    于是「调到位了」看不出是**今天刚到位**还是**已经这样磨了三周**。这两件事
+    要做的动作完全不同: 第一天是"刚出现的机会", 第 20 天更像"它就是不涨"。
+
+    ## 口径
+
+    逐日重建三档 → 走作者的 `verdict()` → 从今天往回数**同一个 code** 连续几天。
+    中间断一天就停(与 `_tail_run` 同一条纪律): 「调到位了」出现 3 天、隔一天、
+    再出现 2 天, 那是两次独立的出现, 说成 5 天会把这一档持续了多久说多。
+
+    **判定一个字没自己写** —— 三条均线在这里滚(长期档本来就没有预计算列),
+    但 `assess` / `verdict` 全是作者那两个函数。这一层只负责数天数。
+
+    原料就是 `series()` 用的那一串收盘价与 ATR, **不新增任何取数**。
+    往回最多数 `MAX_LOOKBACK` 天。
+    """
+    from app.indicators.keltner import assess, verdict as _verdict
+
+    cs = [_f(c) for c in (closes or [])]
+    as_ = [_f(a) for a in (atrs or [])]
+    n = len(cs)
+    if n == 0 or len(as_) != n or any(c is None for c in cs):
+        return None
+    vals: list[float] = [c for c in cs]  # type: ignore[misc]
+    ma = {k_: _rolling_mean(vals, WINDOW[k_]) for k_ in ("s", "m", "l")}
+
+    def _code_at(i: int) -> str | None:
+        a = as_[i]
+        if a is None or a <= 0:
+            return None
+        bands: dict[str, dict] = {}
+        for k_ in ("s", "m", "l"):
+            m = ma[k_][i]
+            if m is None:
+                return None
+            got = assess(close=vals[i], ma=m, atr=a, n=K[k_])
+            if not got:
+                return None
+            bands[k_] = got
+        v = _verdict(bands)
+        return str(v["code"]) if v else None
+
+    today = _code_at(n - 1)
+    if today is None:
+        # 三档都在通道中部(底层返回 None), 或者当天算不出来。
+        # 这时候"持续几天"没有可说的 —— 不给 0, 给 None, 让界面照旧什么都不显示。
+        return None
+    days = 1
+    for i in range(n - 2, max(-1, n - 1 - MAX_LOOKBACK), -1):
+        if _code_at(i) != today:
+            break
+        days += 1
+    return {"code": today, "days": days}
+
+
 def runs(rows: list[dict]) -> dict:
     """从今天往回数的三种连续天数 + 压缩期的箱体。
 
