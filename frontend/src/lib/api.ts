@@ -216,17 +216,16 @@ export interface TodayOpportunity {
   /** [R158] 关键点/触发价本身(gap_pct 就是相对它算的); 界面上悬停显示 */
   pivot?: number | null
 
-  // ===== [R134/R189] 评分: 四道硬门槛 + 质地 × 时机两轴 =====
-  /** 两根轴(0~100)。**总分 = √(质地 × 时机)** —— 一边好一边差不许平均成中等。
-   *  质地以月计变化(结构), 时机逐日变化(买点); 整根轴的因子全缺时为 null。 */
-  axes?: { quality: number | null; timing: number | null }
-  /** 每个因子的子分(0~100) —— 轴分说明"时机不行", 子分说明是量比还是位置 */
+  // ===== [R134] 评分: 三道硬门槛 + 三维度加权(R230 回退到这一版) =====
+  /** 三个维度(0~100)。**总分 = 趋势×45% + 量能×30% + 位置×25%**;
+   *  整个维度的因子全缺时为 null。 */
+  dims?: { trend: number | null; volume: number | null; position: number | null }
+  /** 每个因子的子分(0~100) —— 维度分说明"量能不行", 子分说明是量比还是换手 */
   factors?: Record<
-    'template' | 'base' | 'rs' | 'state' | 'spread'
-    | 'fresh' | 'pos' | 'vol_ratio' | 'turnover' | 'accel',
+    'fresh' | 'state' | 'rs' | 'vol_ratio' | 'turnover' | 'pos',
     number | null>
-  /** 各轴实际覆盖到的因子权重占比 */
-  coverage?: { quality: number; timing: number }
+  /** 各维度实际覆盖到的因子权重占比 */
+  coverage?: { trend: number; volume: number; position: number }
   /** 有因子缺席 → 总分是在剩下的因子上算的, 偏乐观, 界面必须说清楚 */
   partial?: boolean
   /** [R189] 趋势模板(Minervini 八条)的原始事实 —— 分数是结论, 这是依据 */
@@ -249,8 +248,8 @@ export interface TodayOpportunity {
   /** [R220] 这个分数在台账历史分布里的百分位。入选门槛按它判;
    *  台账没攒够时为 null, 那时门槛整个失效。 */
   hist_pct?: number | null
-  /** [R201] 置信系数 0~1 —— 因子读到了几成, 已经乘进 score 里 */
-  confidence?: number
+  // [R201 加, R230 删] `confidence`(置信系数)随两轴一起退场 ——
+  // R134 的分数里没有这一层, 缺因子只由 `partial` 如实标出来。
   /** [R201] 保底行: 没过把握分门槛, 是为了让页面不空才摆出来的 */
   below_bar?: boolean
   /** [R195/R197] 压缩持续天数、平均压缩度、在轨外连续天数 */

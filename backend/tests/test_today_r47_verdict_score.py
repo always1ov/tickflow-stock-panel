@@ -55,9 +55,10 @@ def _one(extras, trends=None):
 
 @pytest.mark.parametrize("pct,tag", [(0.55, "刚站上生命线"), (0.75, "走掉一半"),
                                      (1.05, "破上轨")])
-def test_channel_position_drives_the_timing_axis(pct, tag):
+def test_channel_position_drives_the_position_dim(pct, tag):
     o, _ = _one({"600000.SH": {"gate": _gate_ok(), "channel_pct": pct}})
-    assert o["axes"]["timing"] is not None, tag
+    # [R230] 两轴退回三维度: 通道位置现在独占「位置成本」这一档
+    assert o["dims"]["position"] is not None, tag
     assert o["channel_pct"] == pytest.approx(pct)
 
 

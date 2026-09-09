@@ -55,10 +55,10 @@ def repo():
     })
 
 
-def _cand(sym, score, *, axes=None, close=10.0, factors=None):
+def _cand(sym, score, *, dims=None, close=10.0, factors=None):
     return {"symbol": sym, "name": sym, "score": score, "kind": "trend_signal",
             "board": "主板", "close": close, "why": ["x"],
-            "axes": axes or {"quality": 90, "timing": 85},
+            "dims": dims or {"trend": 90, "volume": 85, "position": 80},
             "factors": factors or {"fresh": 100, "vol_ratio": 92},
             "ctx": {"dur": 1}}
 
@@ -137,50 +137,44 @@ def test_score_opportunities_keeps_sub_threshold_candidates():
     assert filtered2 == 1
 
 
-def test_axes_blend_back_to_the_score():
-    """[R189] 两根轴必须能按几何平均合回总分, 否则归因表说的不是这套分数。"""
+def test_dims_blend_back_to_the_score():
+    """[R189 加, R230 回退] 三个维度必须能按权重合回总分, 否则归因表说的不是
+    这套分数。R189~R228 期间这里验的是两轴的几何平均; 评分退回 R134 之后
+    验的是三维度加权 —— **要验的性质没变: 归因表和分数必须是同一套算法。**"""
     names = {"600001.SH": "测试"}
     full, _ = score_opportunities({"600001.SH": _trend(dur=1, ret_20d=0.20)}, {}, names,
                                   bench_ret=0.02,
                                   extras=_ex(names, vol_ratio=1.8, turnover=5.0),
                                   bench_ret_120d=0.05)
     o = full[0]
-    expect = (o["axes"]["quality"] * o["axes"]["timing"]) ** 0.5
+    from app.services import opportunity_score as _osc
+    d, w = o["dims"], _osc.WEIGHTS
+    expect = sum(d[k] * w[k] for k in w) / sum(w.values())
     assert o["score"] == round(expect)
     assert o["partial"] is False
 
 
 def test_no_clamp_is_needed_in_v2():
-    """v1 的理论上限 151 被夹到 100, 榜首一片并列; v2 满分只能靠三维都到峰值。"""
+    """v1 的理论上限 151 被夹到 100, 榜首一片并列; v2 满分只能靠三维都到峰值。
+
+    [R230] 评分退回 R134 之后, 满分的条件也回到那一版: **三个维度的因子各自
+    到峰值就够了**。R201 那层置信系数(读不全就不给满分)随两轴一起退场, 所以
+    这里不再喂红绿节拍与通道几何 —— 它们本来就不进分了。
+    """
     names = {"600001.SH": "测试"}
     full, _ = score_opportunities(
-        # [R201] 满分要求两根轴的因子都读到 —— 红绿节拍也得喂上, 否则质地
-        # 覆盖率不满, 置信系数会把满分削掉一角(那正是本版要的行为)。
-        {"600001.SH": dict(_trend(dur=1, ret_20d=0.16),
-                           rhythm={"level": "building", "basing": {"days": 120}})},
+        {"600001.SH": _trend(dur=1, ret_20d=0.16)},
         {"600001.SH": {"signal": "buy", "confidence": 90}}, names, bench_ret=0.02,
         extras={"600001.SH": {"gate": dict(_GATE_OK), "channel_pct": 0.58,
                               "vol_ratio": 1.8, "turnover": 5.0,
-                              # [R201] 满分现在还要求"因子都读到了"(置信系数),
-                              # 缺通道几何就不是满分 —— 那正是这一版要修的
-                              # 「缺数据反而排在前面」。
-                              "bands": {"geo": {"spread": 2.5,
-                                                "accel": {"a1": 0.12}},
-                                        "runs": {"compress_days": 120}},
                               "win": {"rate": 0.8, "n": 10},
                               "mainline": {"rank": 1, "member": "AI",
                                            "limit_up_count": 5, "also": []}}})
     o = full[0]
-    # 两根轴都到了峰值 —— v1 那种"加到 151 再夹回 100"的事不存在了
-    assert o["axes"]["quality"] == 100.0 and o["axes"]["timing"] == 100.0
-    # [R201] 但这份夹具的 closes 判不出完整八条模板, 质地覆盖率不满, 于是
-    # 置信系数把满分削掉一角 —— **这正是本版要的行为**: 读不全就不给满分,
-    # 否则"读不到"会变成优势(实测过: 只有两个因子的票拿 100 排第一)。
-    from app.services import opportunity_score as _osc
-    cov = o["coverage"]
-    assert cov["quality"] < 1.0 and cov["timing"] == 1.0
-    assert o["score"] == round(100 * _osc.confidence(cov["quality"], cov["timing"]))
-    assert o["score"] < 100
+    # 三个维度都到了峰值 —— v1 那种"加到 151 再夹回 100"的事不存在了
+    assert o["dims"] == {"trend": 100.0, "volume": 100.0, "position": 100.0}
+    assert o["score"] == 100
+    assert o["partial"] is False
     assert "clamp" not in (o.get("factors") or {})
     # 注记堆满也不会把分数推过 100 —— 它们压根不参与
     assert len(o["notes"]) >= 3
@@ -310,18 +304,18 @@ def test_axis_attribution_splits_high_mid_low_and_missing(repo):
     [R189] 两根轴走的是同一套归因代码, 换的只是记哪几个键。"""
     sl.record_day("2026-08-17", [
         # 涨的那只: 两轴都高
-        _cand("600110.SH", 90, close=10.0, axes={"quality": 95, "timing": 92}),
+        _cand("600110.SH", 90, close=10.0, dims={"trend": 95, "volume": 92, "position": 88}),
         # 跌的那只: 时机低、质地中等、**时机缺席**分不到高低组
-        _cand("002222.SZ", 70, close=20.0, axes={"quality": 60, "timing": 20}),
-        _cand("000001.SZ", 65, close=20.0, axes={"quality": 60, "timing": None}),
+        _cand("002222.SZ", 70, close=20.0, dims={"trend": 60, "volume": 20, "position": 55}),
+        _cand("000001.SZ", 65, close=20.0, dims={"trend": 60, "volume": None, "position": 55}),
     ], set(), True)
     out = sl.evaluate(repo)
-    timing = next(f for f in out["factors"] if f["key"] == "timing")
+    timing = next(f for f in out["factors"] if f["key"] == "volume")
     assert timing["plus"]["count"] == 1 and timing["minus"]["count"] == 1
     assert timing["plus"]["stats"]["t1"]["win_rate"] == 100.0
     assert timing["minus"]["stats"]["t1"]["win_rate"] == 0.0
     assert timing["none"]["count"] == 1, "缺席那一列是数据覆盖率的体检, 不能丢"
-    quality = next(f for f in out["factors"] if f["key"] == "quality")
+    quality = next(f for f in out["factors"] if f["key"] == "trend")
     assert quality["mid"]["count"] == 2
 
 
@@ -349,7 +343,7 @@ def test_export_csv_is_flat_and_complete(repo):
     lines = [ln for ln in text.splitlines() if ln.strip()]
     assert lines[0].split(",") == sl.CSV_HEADER
     assert len(lines) == 3                       # 表头 + 2 行
-    assert "dim_timing" in lines[0] and "sub_vol_ratio" in lines[0]
+    assert "dim_volume" in lines[0] and "sub_vol_ratio" in lines[0]
     assert "scoring_version" in lines[0] and "ret_t5" in lines[0]
     body = lines[1]
     assert body.startswith(f"2026-08-17,{sl.SCORING_VERSION},600110.SH")  # 口径版本紧跟日期

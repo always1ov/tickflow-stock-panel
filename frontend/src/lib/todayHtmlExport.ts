@@ -42,10 +42,11 @@ export function buildTodayHtml(d: TodayOverview, brief: string | null,
     bad: 'background:#fdecec;color:#c0392b',
     info: 'background:#f0f1f3;color:#5b6472',
   }
-  // [R189] 两轴分解条: 打印出来也要能一眼看出这分是谁给的
+  // 三维度分解条: 打印出来也要能一眼看出这分是谁给的
   const dimBar = (o: TodayOverview['opportunities'][number]) => {
     const rows: [string, number | null | undefined, string][] = [
-      ['质地', o.axes?.quality, bull], ['时机', o.axes?.timing, '#1c6ea4'],
+      ['趋势强度', o.dims?.trend, bull], ['量能确认', o.dims?.volume, '#1c6ea4'],
+      ['位置成本', o.dims?.position, '#c78326'],
     ]
     return `<span class="dims">${rows.map(([, v, c]) =>
       `<i style="background:${c};height:${v == null ? 0 : Math.max(8, Math.min(100, v))}%"></i>`).join('')}</span>`

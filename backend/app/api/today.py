@@ -48,29 +48,11 @@ _NEAR_BREAKOUT_PCT = 0.02
 # 页面少票是筛选造成的。见 filter_opportunities 与 score_ledger.score_distribution。
 _OPP_MIN_HIST_PCT = 0
 _OPP_MAX_SHOW = 15
-# [R201] 候选路 C 认的两个阶段: 憋着劲(挤在一起) / 刚分开。
-# 不收 advancing —— 那已经在走了, 属于"错过了", 不是"有苗头"。
-# [R226] **`unclear` 是 R215 漏掉的第三种, 补回来。**
-#
-# 用户: 「值得关注还是很少结果, 到底和以前哪里不一样了」。查出来是我 R215
-# 那次改动: 那之前「挤在一起」是整整一档, 全部算 coiling、全部能进路 C;
-# R215 把它按重合度与快慢拆成 横盘中 / 刚启动 / **看不出** 三种, 而
-# `_COILING_PHASES` 只收了前两种 —— 第三种就此被挡在候选之外。
-#
-# 系统性网格(spread × 重合度 × 快慢, 3087 格)量下来:
-#
-#     R215 之前 能进路 C: 2940 格
-#     R215 之后 能进路 C: 1660 格     ← **取材面缩小 44%**
-#
-# 而且我在 R215 的台账里把方向写反了 —— 写的是「路 C 的出票量因此会上升」
-# (因为 launching 变得可达)。**错了**: launching 本来就在同一个分支里、
-# 本来就算 coiling, 让它可达一格没多; 真正发生的是 unclear 被切出去丢掉了。
-#
-# 为什么 `unclear` 该在里面: 它是「三条线还挤着, 重合度已经松开, 但没在加速」,
-# 原话「分是分开了, 可是没有力气跟上」。**这正是酝酿**, 甚至比「刚启动」更早
-# 一步。路 C 的定义就是「谁正在酝酿」(R201), 它不该被挡在外面 —— 而且路 C
-# 的新鲜度是中性的 55 分, 进来也不会被抬分, 只是进池子。
-_COILING_PHASES = ("coiling", "launching", "unclear")
+# [R201 加, R230 删] 候选路 C(通道憋着劲 / 刚走出来)整条撤掉了, 连同
+# `_COILING_PHASES` / `coiling_candidates()` / `coiling_phase()`。
+# 用户: 「完整回退到上一个版本的评分系统」—— 路 C 是 R201 跟着量化通道延申
+# 一起加的, 判据就是 `keltner_geometry.phase()`, 属于要撤的那一批。
+# 候选现在只剩 R134 就有的两路: A 六态转强 / B 逼近买点。
 _BULLISH = ("UT", "NR", "SR")
 
 # [R201] 保底条数 —— 够格的不足这个数时, 从排序里补齐并标 below_bar。
@@ -112,62 +94,6 @@ def suggest_position(score: int, atr_pct: float | None,
     return {"fraction": round(frac, 2), "text": text, "why": why}
 
 
-def coiling_candidates(trends: dict[str, dict], bands_map: dict[str, dict],
-                       *, exclude: set[str] | None = None,
-                       limit: int = 80) -> list[str]:
-    """[R210] 候选路 C 的选票 —— 通道憋着劲 / 刚走出来, 且六态还在多头侧。
-
-    ## 这个函数是来补一个真 bug 的
-
-    R201 加路 C 时把判定写在了 `score_opportunities` 里, 遍历的是 `extras`。
-    可 `extras` **只给 `cand_syms` 备料**, 而 `cand_syms` 恰恰就是路 A/B 已经
-    选出来的那批 —— 于是路 C 的第一行 `if sym in cands: continue` 把每一个都
-    跳过了。**它一次都没跑过。**
-
-    后果正是用户看到的那个: 熊市里路 A(当天转多/回升)和路 B(贴到买点 2% 内)
-    可以连着几天一只都没有, 候选池整个是空的 —— 而保底(FLOOR_ROWS)是从候选池
-    里取的, 池子空了它也保不出东西来。
-
-    修法是把选票提到 `cand_syms` 之前: `bands_map` 早就覆盖了**全部自选**
-    (它是按 持仓 ∪ 自选 算的), 所以这里能用, 不新增任何取数。
-
-    ## 为什么排在 A/B 之后
-
-    路 C 的票**连方向都还没出来**, 比"今天刚转多"和"已经贴到买点"都弱一档。
-    所以它只填 A/B 用剩的额度, 不跟它们抢。
-    """
-    from app.indicators.livermore import BULLISH
-
-    if limit <= 0:
-        return []
-    skip = exclude or set()
-    out = [sym for sym, bands in bands_map.items()
-           if sym not in skip
-           and (trends.get(sym) or {}).get("state") in BULLISH
-           and coiling_phase(bands) is not None]
-    return sorted(out)[:limit]
-
-
-def coiling_phase(bands_row: dict | None) -> dict | None:
-    """[R217] 「这一格算不算酝酿中」—— **判据只在这里定义一次**。
-
-    这条规则原来写在两个地方: `coiling_candidates()` 选票时判一次,
-    `score_opportunities()` 里建候选时**再判一次同样的条件**。两处当时是一致的,
-    但那正是 R201 那个 bug 的土壤 —— 路 C 头一回就是因为"选票"和"建候选"
-    各写各的、而其中一处永远走不到, 整条路成了死代码(R210 才发现)。
-
-    所以收成一个函数: 两处都调它, 想改判据只有一个地方能改。
-    """
-    from app.indicators import keltner_geometry as kg
-
-    geo = (bands_row or {}).get("geo")
-    if not geo:
-        return None
-    try:
-        ph = kg.phase(geo, (bands_row or {}).get("runs"))
-    except Exception:  # noqa: BLE001
-        return None
-    return ph if ph and ph["code"] in _COILING_PHASES else None
 
 
 # [R218] `factor_catalog()` 随因子勾选面板一起删掉, 见 pages/Today.tsx 的说明。
@@ -185,7 +111,7 @@ def score_opportunities(
                 "blocked_total": 被挡几只, "blocked": {门槛代码: 被这条挡了几只}}。
     ``blocked`` 各项之和会大于 ``blocked_total`` —— 一只票可以同时踩中好几条。
 
-    打分口径整体搬到 ``services.opportunity_score``(硬门槛 + 质地 × 时机两轴),
+    打分口径整体搬到 ``services.opportunity_score``(硬门槛 + 三维度加权),
     这里只负责三件事: **收候选、喂数据、挂注记**。这样做的理由是打分必须能
     脱离 HTTP 层单测与回测 —— v1 的加减分散在这个函数里, 想验证一条曲线就得
     先造一整份总览。
@@ -272,27 +198,8 @@ def score_opportunities(
     # 路 B 要现价已经贴到买点 2% 以内。熊市里这两件事可以连着好几天一件都没有,
     # 于是候选池整个是空的, 页面自然也是空的。**那不是门槛太严, 是压根没人进来** ——
     # 这是"今日总览没有任何个股"最常见的一种成因, 靠调门槛永远修不好。
-    #
-    # 这条路问的是另一个问题: 「谁正在酝酿」。三条线挤在一起(憋着劲)或者刚刚
-    # 走出来(刚分开), 而六态还在多头侧 —— 这正是用户一直要的"有苗头"那一批,
-    # 它**不依赖当天发不发信号**, 所以熊市里也不会整批消失。
-    #
-    # 原料是 keltner 那趟批量已经算好挂在 bands 上的 geo/runs, **零新增取数**。
-    #
-    # [R217] 判据不在这里写第二遍 —— 走 `coiling_phase()`, 与
-    # `coiling_candidates()` 选票时用的是同一个函数。两处各写一份是 R201 那个
-    # 死代码的成因, 不再重演。
-    for sym, e in ex.items():
-        if sym in cands or sym not in names:
-            continue
-        if (trends.get(sym) or {}).get("state") not in _BULLISH:
-            continue
-        ph = coiling_phase(e.get("bands"))
-        if not ph:
-            continue
-        c = _cand(sym)
-        c["kinds"].append("coiling")
-        c["text"] = f"{ph['cn']}:{ph['why']}"
+    # [R201 加, R230 删] 当时补的路 C(通道憋着劲/刚走出来)已随评分系统一起
+    # 回退掉了 —— 判据是通道延申的 `phase()`。空池子的兜底现在只剩保底条数。
 
     # ---- 门槛 → 打分 → 注记 ----
     from app.price_limits import board_of
@@ -359,11 +266,12 @@ def score_opportunities(
             except Exception as e:  # noqa: BLE001
                 logger.debug("channel event skipped for %s: %s", sym, e)
 
+        # [R230] 回到 R134 的三维度打分。签名只剩这七个参数 —— 趋势模板、
+        # 红绿节拍、通道几何、路 C 的中性新鲜度全部不在里面了。
         res = osc.score_candidate(
             duration=c["duration"], state=t.get("state"), rs_pct=rs_pct,
             vol_ratio=vr, turnover_rate=turn, channel_pct=cpct,
-            near_breakout=c["near_breakout"], coiling="coiling" in c["kinds"],
-            template=tpl)
+            near_breakout=c["near_breakout"])
 
         close = t.get("close") or (signals.get(sym) or {}).get("close")
         try:
@@ -383,11 +291,10 @@ def score_opportunities(
             "kind": c["kinds"][0] if c["kinds"] else "trend_signal",
             "kinds": c["kinds"],
             "score": res["score"],
-            "axes": res["axes"], "factors": res["factors"],
+            # [R230] `axes`(两轴)换回 `dims`(三维度); `confidence` 随 R201
+            # 的置信系数一起去掉 —— R134 的分数里没有这一层。
+            "dims": res["dims"], "factors": res["factors"],
             "coverage": res["coverage"], "partial": res["partial"],
-            # [R201] 置信系数 —— 排序里"这只票我们到底读到了多少"那一层。
-            # 摆在明面上而不是藏进 ctx: 它**真的乘进了分数**, 用户有权看见。
-            "confidence": res["confidence"],
             "fresh_from": res["fresh_from"],
             "text": c["text"], "pivot": c["pivot"], "close": close,
             "gap_pct": gap_pct, "vol_ratio": vr, "turnover": turn,
@@ -464,11 +371,12 @@ def score_opportunities(
     # [R139] 排序 = 把握分降序。同分时的次序以前是按代码字典序 —— 那是个
     # **无意义**的顺序, 而用户会照着名次从上往下看。改成两级有含义的兜底:
     #   ① 数据齐全的排在 partial 前面(同样 78 分, 因子都算出来的那只更可信);
-    #   ② [R189] 再比**质地** —— 同分意味着质地×时机的乘积相同, 而在乘积相同
-    #      时该先看质地好的那只: 时机会重来, 质地不会。
+    #   ② [R189 加, R230 换] 再比**趋势强度**维度 —— R189 时这里比的是"质地",
+    #      两轴换回三维度之后, 对应的那一档是 trend(新鲜度/六态/相对强度),
+    #      它同样是"这只票本身怎么样"的那一半, 兜底的用意没变。
     # 最后才用代码保证确定性(同一份数据每次刷新顺序不变)。
     out.sort(key=lambda o: (-o["score"], bool(o["partial"]),
-                            -(o["axes"].get("quality") or 0), o["symbol"]))
+                            -(o["dims"].get("trend") or 0), o["symbol"]))
     # [R201] 名次与分位。**把握分的绝对值不该当筛选旋钮用** —— 它是五个因子的
     # 加权平均再取几何平均, 而"平均"这件事本身就把取值挤到中间一段: 实测
     # p10~p90 只有 17 分(65~82), 连纯随机满量程因子合成出来也只有 24 分。
@@ -978,12 +886,7 @@ def _build_overview(repo, engine=None) -> dict:
         *(s for s, t in trends.items() if t.get("signal") in ("转多", "回升")),
         *ai_buy_syms,
     })[:80]
-    # [R210] 路 C 填 A/B 用剩的额度。**必须在这里加而不是在 score_opportunities
-    # 里加** —— extras(门槛原料/通道/量能)只给 cand_syms 备, 不进这个名单的票
-    # 后面根本拿不到原料, 路 C 就永远是死代码(R201 犯的正是这个错)。
-    if len(cand_syms) < 80:
-        cand_syms = sorted({*cand_syms, *coiling_candidates(
-            trends, bands_map, exclude=set(cand_syms), limit=80 - len(cand_syms))})
+    # [R210 加, R230 删] 路 C 填余额那一步随路 C 一起撤掉。
     if cand_syms:
         # [R137] **盘后与盘中分成两份, 不再互相覆盖。**
         #
@@ -1460,17 +1363,18 @@ _AI_SYSTEM = """你是用户的盘前参谋,有 15 年 A 股一线交易经验�
 4. **上方阻力空间**:离上方压力位还有多少空间?空间太小的机会不值得占用仓位
 5. **K 线形态质量**:是干净利落的放量长阳,还是上影线很长、量价背离、连续跳空的透支形态
 
-### 你会看到的「质地 × 时机 两轴分解」怎么用
+### 你会看到的「三维度分解」怎么用
 
 每只候选带一份 `把握分分解`,那是规则层的自评,结构固定:
 
 - **门槛**:这只票已经通过三道硬门槛(六态在多头侧 / 收盘站上生命线 MA20 且连续两日 / 不在长期下跌趋势里)。**没过门槛的票压根不会送到你面前**,所以不必再核这三件事。
-- **质地**(0~100):这只票的长周期结构 —— 趋势模板八条过了几条、相对大盘强弱、六态状态。**它以月计变化**,今天和上周基本是同一个数。
-- **时机**(0~100):今天是不是那一天 —— 信号第几天、量比、通道位置、换手率。**它逐日变化**。这几条曲线都是**区间最优**不是越大越好 —— 量比峰值在 1.3~2.5(超过 4 说明这波已经走完了),通道位置甜区在 0.50~0.65(刚站上生命线,越接近 1.0 越是追高)。
-- **总分 = √(质地 × 时机)**。所以两根轴要**分开读**,这正是分解存在的理由:
-  - 质地高、时机低 → 「好票,但今天不是买点」。该说的是等什么(回踩到哪、放量到什么程度),不是现在追。
-  - 质地低、时机高 → 「今天是有动静,但这票本身结构不行」。该说的是为什么不值得占仓位。
-  - 两个都高才是「高概率的有苗头的东西」。
+- **趋势强度**(权重 45%):信号第几天(主导)/ 六态状态 / 相对大盘强弱。
+- **量能确认**(权重 30%):量比(主导)/ 换手率。
+- **位置成本**(权重 25%):通道位置。
+- 三条曲线都是**区间最优**不是越大越好 —— 量比峰值在 1.3~2.5(超过 4 说明这波已经走完了),通道位置甜区在 0.50~0.65(刚站上生命线,越接近 1.0 越是追高),相对强度太靠前往往意味着已经涨了一大段。
+- **总分 = 三个维度加权平均**。三档要**分开读**,这正是分解存在的理由:
+  - 趋势强而量能弱 → 「形态到了但没人跟」。该说的是等放量,不是现在追。
+  - 量能强而位置差 → 「今天是有动静,但这个价已经不便宜」。该说的是为什么不值得占仓位。
 - `partial: true` 表示某个因子**没有数据**,那一份权重是靠剩下的因子顶上来的 —— 这种候选的总分偏乐观,同分时优先选 partial 为 false 的。
 
 ### 「量化波动通道」那几个数怎么读(**它们不进把握分**)
@@ -1559,18 +1463,20 @@ def _candidate_market_data(repo, cands: list[dict]) -> list[dict]:
         # [R134] 送给 AI 的不再是一个黑箱"规则分", 而是**分解 + 注记**。
         # 黑箱分只能被复述("它规则分高"), 分解才能被核对("它说量能 92, K 线上
         # 量比确实 1.7") —— 而核对正是我们要 AI 做的事。
-        # [R189] 分解改成两轴。**这一步对 AI 尤其重要**: 「质地 92 / 时机 41」
-        # 直接告诉它该说"好票但今天不是买点", 而合成后的 61 分说不出这句话。
-        axes = c.get("axes") or {}
+        # [R189 加, R230 回退] 分解一度改成两轴(质地 × 时机)。评分系统整体退回
+        # R134 之后, 这里也回到三维度 —— 分解要**照着分数真实的算法**报, 不然
+        # AI 会去核对一个不存在的东西。
+        dims = c.get("dims") or {}
         item = {
             "symbol": c["symbol"], "name": c["name"], "信号摘要": c["text"],
             "把握分分解": {
                 "总分": c["score"],
-                "算法": "把握分 = √(质地 × 时机) —— 两边都得像样, 不许互相补贴",
+                "算法": "把握分 = 趋势强度×45% + 量能确认×30% + 位置成本×25%",
                 "门槛": ("已通过(六态多头侧 / 站上生命线 MA20 连续两日 / "
                          "非长期下跌)"),
-                "质地": axes.get("quality"),
-                "时机": axes.get("timing"),
+                "趋势强度": dims.get("trend"),
+                "量能确认": dims.get("volume"),
+                "位置成本": dims.get("position"),
                 "partial": bool(c.get("partial")),
                 "原始输入": {
                     "信号第几天": c.get("duration"),
@@ -1580,21 +1486,24 @@ def _candidate_market_data(repo, cands: list[dict]) -> list[dict]:
                     "通道位置": c.get("channel_pct"),
                     "相对大盘20日": c.get("rs_pct"),
                     "距触发价%": c.get("gap_pct"),
-                    "趋势模板": (c.get("template") or {}).get("text"),
                 },
             },
             "规则依据": c["why"],
         }
-        # [R229] 量化波动通道的那一组读数**从「原始输入」搬到注记里**。
+        # [R229/R230] 通道读数与**趋势模板**都从「原始输入」搬到注记里。
         #
-        # R195~R197 期间它确实进过分(分离度→质地, 加速度→时机), 摆在"原始输入"
-        # 底下是对的。现在它已从打分里整个剥离, 再留在那儿就是**在骗 AI**:
-        # 「把握分分解 → 原始输入」这个位置本身就在说"这些数算出了上面那个分",
-        # 而它们一个也没有。搬到「注记」栏, 与 AI 信号/主线/胜率同一个身份。
+        # 「把握分分解 → 原始输入」这个位置本身就在说"这些数算出了上面那个分"。
+        # 通道几何 R195~R197 期间确实进过分, 趋势模板 R189~R228 期间也确实进过
+        # 质地轴 —— 但评分退回 R134 之后两者都不进分了, 留在那儿就是在骗 AI。
+        # 搬到「注记」栏, 与 AI 信号/主线/胜率同一个身份: 一分不加一分不减。
         notes = [
             {"项": n.get("label"), "倾向": n.get("tone"), "说明": n.get("text")}
             for n in (c.get("notes") or [])
         ]
+        tpl_text = (c.get("template") or {}).get("text")
+        if tpl_text:
+            notes.append({"项": "趋势模板(Minervini 八条)", "倾向": "neutral",
+                          "说明": tpl_text})
         chan = {
             "三档位置": (c.get("geo") or {}).get("combo"),
             "现在处在": (c.get("channel_phase") or {}).get("cn"),

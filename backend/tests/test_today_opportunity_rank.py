@@ -180,94 +180,16 @@ def test_scores_are_clamped_to_0_100():
 
 
 # ================================================================
-# [R210] 候选路 C 必须真的产出候选
+# [R210 加, R230 删] 候选路 C 的那一组测试(选票 / 只认多头 / 不跟 AB 抢额度 /
+# 缺读数不崩 / 全是安静自选也不空页)在这里删掉了。
 #
-# R201 加路 C 时判定写在 `score_opportunities` 里、遍历 `extras`, 而 extras
-# **只给 cand_syms 备料** —— cand_syms 恰恰就是路 A/B 选出来的那批, 于是
-# 路 C 的 `if sym in cands: continue` 把每一个都跳过了。**它一次都没跑过。**
+# 路 C 是 R201 跟着量化通道延申一起加的, 判据就是 `keltner_geometry.phase()`,
+# 随评分系统回退到 R134 一起撤掉了。功能没了, 断言也一起走 —— 按 R198 的规矩,
+# 留着测一个不存在的能力就是下一个「看起来像在用」的死代码。
 #
-# 当时也"有测试": `test_憋着劲那一路拿到的是中性新鲜度` 测的是
-# `score_candidate(coiling=True)` 这个**纯函数**, 它当然是绿的 —— 但没有
-# 任何一条测试问过"路 C 到底选不选得出票来"。这一组补的就是那个缺口。
-
-
-def _coiling_bands(spread=0.3, compress_days=40):
-    """造一份「三条线挤在一起」的通道读数(路 C 认的形态)。"""
-    return {
-        "s": {"pos": "inside", "pct": 0.55},
-        "geo": {"spread": spread, "accel": {"a1": 0.0}, "compress": 0.95,
-                "torn": False, "nested": True,
-                "d": {"s": 0.1, "m": 0.1, "l": 0.1}},
-        "runs": {"compress_days": compress_days},
-    }
-
-
-def _quiet_trend(state="UT"):
-    """今天什么信号都没有的多头票 —— 路 A 和路 B 都选不到它。"""
-    return {"state": state, "state_cn": "上涨趋势", "side": "多头",
-            "duration": 30, "close": 10.0, "as_of": "2026-09-09",
-            "signal": None, "signal_desc": ""}
-
-
-def test_路C能从全是安静的自选里选出候选():
-    """**这条是核心**: 一只信号都没有、也没贴买点的自选, 只要通道在憋着劲
-    就该进候选池 —— 否则熊市里池子是空的, 保底也保不出东西。"""
-    from app.api.today import coiling_candidates
-    trends = {f"S{i:03d}": _quiet_trend() for i in range(5)}
-    bands = {s: _coiling_bands() for s in trends}
-    got = coiling_candidates(trends, bands)
-    assert len(got) == 5, f"路 C 一只都没选出来: {got}"
-
-
-def test_路C只认多头侧():
-    from app.api.today import coiling_candidates
-    trends = {"A": _quiet_trend("UT"), "B": _quiet_trend("DT")}
-    trends["B"]["side"] = "空头"
-    bands = {"A": _coiling_bands(), "B": _coiling_bands()}
-    assert coiling_candidates(trends, bands) == ["A"]
-
-
-def test_路C不认已经在走的票():
-    """advancing/declining 是「已经在走」, 不是「有苗头」—— 那属于错过了。"""
-    from app.api.today import coiling_candidates
-    trends = {"A": _quiet_trend()}
-    running = _coiling_bands(spread=2.5)
-    running["geo"].update(compress=0.05, nested=False, accel={"a1": 0.15})
-    assert coiling_candidates(trends, {"A": running}) == []
-
-
-def test_路C不跟AB抢额度():
-    from app.api.today import coiling_candidates
-    trends = {f"S{i}": _quiet_trend() for i in range(4)}
-    bands = {s: _coiling_bands() for s in trends}
-    got = coiling_candidates(trends, bands, exclude={"S0", "S1"}, limit=1)
-    assert len(got) == 1 and got[0] not in ("S0", "S1")
-
-
-def test_路C缺通道读数时安静跳过而不是崩():
-    from app.api.today import coiling_candidates
-    trends = {"A": _quiet_trend(), "B": _quiet_trend(), "C": _quiet_trend()}
-    bands = {"A": {}, "B": {"geo": None}, "C": _coiling_bands()}
-    assert coiling_candidates(trends, bands) == ["C"]
-
-
-def test_全是安静自选时页面不该是空的():
-    """把整条链走一遍 —— 这是用户报的那个现象: 「一个票都不显示出来了」。"""
-    from app.api.today import coiling_candidates, rank_opportunities
-    names = {f"S{i:03d}": f"票{i}" for i in range(6)}
-    trends = {s: _quiet_trend() for s in names}
-    bands = {s: _coiling_bands() for s in names}
-    picked = coiling_candidates(trends, bands)
-    assert picked, "路 C 没选出票, 后面都不用测了"
-    # 模拟 overview: 只给路 C 选中的票备料
-    extras = {s: {"gate": {"above_ma20": True, "above_ma20_prev": True,
-                           "close": 10.0, "ma120": 8.0, "ma120_rising": True},
-                  "channel_pct": 0.55, "bands": bands[s]} for s in picked}
-    shown, _ = rank_opportunities(trends, {}, names, extras=extras, min_hist_pct=0)
-    assert shown, "路 C 选出来了, 但一条都没显示 —— 保底也没兜住"
-    assert all(o["fresh_from"] == "coiling" for o in shown), \
-        "这批该走路 C 的新鲜度(中性档), 而不是别的来源"
-
+# **那次修的 bug 本身没有作废**: R201 的路 C 一次都没跑过, 因为选票和建候选
+# 各写各的、而其中一处永远走不到。那条教训搬进了 docs/scoring-and-rules.md,
+# 下次再加候选路时要先问「它到底选不选得出票来」。
 
 # ---------------------------------------------- [R210] 空页要说清空在哪一步
 
@@ -299,51 +221,22 @@ def test_有候选过了门槛却空了要明说是bug():
     assert "bug" in why
 
 
-# ================================================================
-# [R226] 候选路 C 的取材面 —— 用户: 「值得关注还是很少结果, 到底和以前哪里不一样了」
+# [R226 加, R230 删] 「挤在一起那一档的三种全都要能进路 C」那条网格测试删掉了
+# —— 路 C 已随评分系统回退到 R134 一起撤掉, 没有 `_COILING_PHASES` 可核对了。
 #
-# 查出来是 R215 那次改动: 那之前「挤在一起」是整整一档, 全部算 coiling、
-# 全部能进路 C; R215 按重合度与快慢把它拆成 横盘中 / 刚启动 / 看不出 三种,
-# 而 `_COILING_PHASES` 只收了前两种 —— 第三种就此被挡在候选之外, 取材面
-# 一次缩掉 44%(系统性网格 3087 格: 2940 → 1660)。
+# 那次量出来的结论仍然记在 docs/rule-layers.md: R215 把「挤在一起」拆成
+# 横盘中 / 刚启动 / 看不出 三档时漏掉了第三档, 取材面一次缩掉 44%
+# (系统性网格 3087 格: 2940 → 1660)。教训是「拆档位时要回头看谁在按档位取材」,
+# 与路 C 存不存在无关, 所以留在文档里。
 #
-# **而且我在 R215 的台账里把方向写反了**, 写的是「路 C 的出票量因此会上升」。
-# 错在: launching 本来就在同一个分支里、本来就算 coiling, 让它可达一格没多;
-# 真正发生的是 unclear 被切出去丢了。
-#
-# 这一节守的是"路 C 的取材面不许再被悄悄改小"。
-
-
-def test_挤在一起那一档的三种全都要能进路C():
-    """`phase()` 在 nested 分支里能返回的每一种, 都必须在 `_COILING_PHASES` 里。
-
-    **这条是按"分支能产出什么"写的, 不是按当前的三个名字写死的** —— 以后
-    那个分支再细分出第四种, 这条会红, 而不是又悄悄丢一批候选。
-    """
-    import itertools
-    from app.api.today import _COILING_PHASES
-    from app.indicators import keltner_geometry as kg
-
-    produced = set()
-    for sp, o, a1 in itertools.product(
-            [round(x * 0.1, 2) for x in range(-9, 11)],      # nested 区(不含 -1.0 边界)
-            [round(x * 0.05, 2) for x in range(0, 21)],
-            [-0.30, -0.15, -0.06, 0.0, 0.06, 0.15, 0.30]):
-        geo = {"spread": sp, "accel": {"a1": a1}, "compress": o,
-               "torn": False, "nested": abs(sp) <= kg.NESTED_ATR}
-        if not geo["nested"] and o < kg.COMPRESS_TIGHT:
-            continue          # 不在「挤在一起」那一档里
-        produced.add(kg.phase(geo)["code"])
-    missing = produced - set(_COILING_PHASES)
-    assert not missing, (
-        f"「挤在一起」这一档会产出 {sorted(produced)}, 而 _COILING_PHASES 只收了 "
-        f"{sorted(_COILING_PHASES)} —— 漏掉的 {sorted(missing)} 会被挡在候选路 C 之外, "
-        f"值得关注就会莫名其妙变少(R215 正是这么丢了 44% 取材面)")
-
+# 下面这条留着: 它测的是 `keltner_geometry.phase()` 本身 —— 那一层没有被删,
+# 只是从"进分/取材"降成了界面上的注记。
 
 def test_看不出这一档确实是酝酿而不是别的():
-    """把「为什么它该进路 C」钉住: 三条线还挤着、重合已松开、但没在加速 ——
-    这是**比刚启动更早一步**的酝酿, 不是"没结论"。"""
+    """[R230] 原话是「把为什么它该进路 C 钉住」。路 C 没了, 但这一档的**含义**
+    没变, 而且它现在照样显示在决策台「走势」列里: 三条线还挤着、重合已松开、
+    但没在加速 —— 这是比「刚启动」更早一步的酝酿, 不是"没结论"。
+    读的人会照着它做判断, 所以这条继续守着。"""
     from app.indicators import keltner_geometry as kg
     geo = {"spread": 0.7, "accel": {"a1": 0.0}, "compress": 0.6,
            "torn": False, "nested": True}

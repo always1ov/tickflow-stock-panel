@@ -47,7 +47,7 @@ def cands():
     return [
         {"symbol": "000001.SZ", "name": "平安银行", "score": 100,
          "why": "转多第 1 天(刚出现,入场窗口最佳)", "text": "转多:突破上关键点 12.0",
-         "axes": {"quality": 98.0, "timing": 92},
+         "dims": {"trend": 98.0, "volume": 92, "position": 85},
          "partial": False, "duration": 1, "trend_state_cn": "上涨趋势",
          "vol_ratio": 1.7, "turnover": 2.0, "channel_pct": 0.58,
          "rs_pct": 6.0, "gap_pct": 1.2,
@@ -55,7 +55,7 @@ def cands():
                     "text": "今日第 1 主线"}]},
         {"symbol": "000002.SZ", "name": "万科A", "score": 88,
          "why": "转多第 2 天", "text": "转多:突破上关键点 20.0",
-         "axes": {"quality": 90, "timing": 80}, "partial": False},
+         "dims": {"trend": 90, "volume": 80, "position": 75}, "partial": False},
     ]
 
 
@@ -75,22 +75,22 @@ def test_payload_carries_real_kline_and_levels(cands):
 
 
 def test_payload_carries_the_score_breakdown_not_a_black_box(cands):
-    """[R134/R189] 送的不再是一个黑箱"规则分", 而是两轴分解 + 原始输入。
+    """[R134] 送的不再是一个黑箱"规则分", 而是维度分解 + 原始输入。
 
-    黑箱分只能被复述("它规则分高"), 分解才能被核对("它说时机 92, K 线上量比
+    黑箱分只能被复述("它规则分高"), 分解才能被核对("它说量能 92, K 线上量比
     确实 1.7") —— 而核对正是我们要 AI 做的那件事。
 
-    [R189] 两轴对 AI 尤其重要: 「质地 92 / 时机 41」直接告诉它该说"好票但今天
-    不是买点", 而合成后的 61 分说不出这句话。
+    [R230] 分解回到三维度。**这一条真正守的性质是「分解必须照着分数真实的算法
+    报」** —— 报一套 AI 核对不到的东西, 比不报更坏。
     """
     repo = _FakeRepo({"000001.SZ": _kline(), "000002.SZ": _kline(base=20.0)})
     payload = today_api._candidate_market_data(repo, cands)
     assert payload[0]["symbol"] == "000001.SZ"
     br = payload[0]["把握分分解"]
     assert br["总分"] == 100
-    assert set(br) >= {"总分", "门槛", "质地", "时机", "算法",
-                       "partial", "原始输入"}
-    assert br["质地"] == 98.0 and br["时机"] == 92
+    assert set(br) >= {"总分", "门槛", "趋势强度", "量能确认", "位置成本",
+                       "算法", "partial", "原始输入"}
+    assert br["趋势强度"] == 98.0 and br["量能确认"] == 92 and br["位置成本"] == 85
     assert br["原始输入"]["量比"] == 1.7
     # 关键: 送审内容远不止分数
     assert set(payload[0]) > {"symbol", "name", "把握分分解", "规则依据", "信号摘要"}
@@ -136,11 +136,11 @@ def test_prompt_forbids_restating_the_rule_score():
 
 
 def test_prompt_explains_the_v2_breakdown_and_that_notes_do_not_score():
-    """[R134/R189] AI 拿到的是两轴分解, 提示词必须教它怎么用, 并划清注记的边界。"""
+    """[R134/R230] AI 拿到的是三维度分解, 提示词必须教它怎么用, 并划清注记的边界。"""
     sys_prompt = today_api._AI_SYSTEM
-    for kw in ("质地", "时机", "门槛", "partial",
-               # [R189] 两轴分开读才有意义 —— 提示词必须点破"好票但今天不是买点"
-               "好票,但今天不是买点"):
+    for kw in ("趋势强度", "量能确认", "位置成本", "门槛", "partial",
+               # 分档分开读才有意义 —— 提示词必须点破"形态到了但没人跟"
+               "形态到了但没人跟"):
         assert kw in sys_prompt, f"提示词缺少 {kw}"
     assert "区间最优" in sys_prompt, "必须说明曲线不是越大越好"
     assert "都不参与把握分" in sys_prompt, "注记的边界必须写死在提示词里"
