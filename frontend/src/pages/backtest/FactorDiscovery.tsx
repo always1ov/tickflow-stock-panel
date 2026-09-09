@@ -526,7 +526,7 @@ function BatchDiscovery({ onInspect, focusFactor }: { onInspect: (factorName: st
             </div>
             <div className="overflow-x-auto">
               <table className="w-full min-w-[820px] text-xs">
-                <thead className="sticky top-0 bg-elevated text-left text-[11px] text-secondary">
+                <thead className="sticky top-0 z-20 bg-elevated text-left text-[11px] text-secondary">
                   <tr>
                     <th className="w-12 px-3 py-2.5 text-center font-medium" title="按当前排序键排序的名次，默认按 |IC|。">排名</th>
                     <th className="px-3 py-2.5 font-medium">因子</th>

@@ -665,7 +665,13 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
                 <col key={c.label} style={c.w ? { width: c.w } : undefined} />
               ))}
             </colgroup>
-            <thead className="sticky top-0 bg-surface/95 backdrop-blur text-[10px] text-muted">
+            {/* [R252] **`z-20` 与不透明背景**。用户: 「怎么背后的东西也显示出来了, 层级
+                是不是不对」—— 是的。
+                原来只有 `sticky top-0`, **没有 z-index**: 行里那个 `opacity-70` 的
+                天数徽标(opacity < 1 会自己造一个层叠上下文)于是画到了表头上面,
+                滚动时表头被行内容穿透。背景也从 95% 半透明改成实心 —— 表头底下本来
+                就是要划走的行, 让它透出来没有任何好处。 */}
+            <thead className="sticky top-0 z-20 bg-surface text-[10px] text-muted">
               <tr className="text-left">
                 <th className="whitespace-nowrap px-3 py-2.5 font-normal text-center"><button onClick={() => toggleSort('name')} className={thBtn} title="标的名称;第二行是「该动了」判定 —— 已触发 > 逼近 > 刚变盘 > 到轨 > 无事,纯规则,AI 不参与">标的{caret('name')}</button></th>
                 <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center">

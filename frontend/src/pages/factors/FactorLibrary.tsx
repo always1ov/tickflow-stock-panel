@@ -84,7 +84,7 @@ export function FactorLibrary({ onInspect, onEdit }: { onInspect: (factorId: str
         )}
         {!lib.isLoading && filtered.length > 0 && (
           <table className="w-full min-w-[760px] text-xs">
-            <thead className="sticky top-0 bg-elevated text-left text-[11px] text-secondary">
+            <thead className="sticky top-0 z-20 bg-elevated text-left text-[11px] text-secondary">
               <tr>
                 <th className="px-3 py-2.5 font-medium">因子</th>
                 <th className="px-3 py-2.5 font-medium">分组</th>

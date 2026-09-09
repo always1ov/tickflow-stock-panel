@@ -240,3 +240,48 @@ def test_R251_表头说的和实际做的一致():
     assert "play: 'asc'" in block[:block.index("}")], (
         "表头说「按纪律走排最前」, 而首次点击是降序 —— 说明与行为相反"
     )
+
+
+def test_R252_粘性表头必须有_z_index():
+    """用户: 「怎么背后的东西也显示出来了, 层级是不是不对」。
+
+    `position: sticky` 不带 z-index 时, 行里任何**自己造层叠上下文**的东西
+    (`opacity < 1`、`transform`、`filter`…)都会画到表头上面 —— 决策台那个
+    `opacity-70` 的天数徽标正是这样穿透过去的。
+
+    这条盯**全仓所有粘性表头**, 不只决策台 —— 同一个毛病当时有三处。
+    """
+    import pathlib
+
+    root = _BOARD.parents[2]            # frontend/src
+    if not root.exists():
+        pytest.skip("拿不到前端源码(只跑后端时正常)")
+    bad = []
+    for f in root.rglob("*.tsx"):
+        in_block = False
+        for i, ln in enumerate(f.read_text(encoding="utf-8").splitlines(), 1):
+            # 注释里复述这个 bug 是允许的 —— 不去注释的话守卫会被自己的说明文字
+            # 骗到(第一版就栽了一次)
+            t = ln.strip()
+            if in_block:
+                in_block = "*/" not in t
+                continue
+            if t.startswith(("//", "*")):
+                continue
+            if t.startswith(("/*", "{/*")):
+                in_block = not any(x in t for x in ("*/", "*/}"))
+                continue
+            if "sticky top-0" in ln and not re.search(r"\bz-(\[|\d)", ln):
+                bad.append(f"{f.relative_to(root)}:{i}")
+    assert not bad, (
+        "这些粘性表头没有 z-index, 行内容会穿透上来:\n  " + "\n  ".join(bad)
+    )
+
+
+def test_R252_决策台表头背景是实心的():
+    """半透明表头底下是**正在划走的行** —— 让它透出来没有任何好处, 只会把
+    表头读成花的。"""
+    src = _src()
+    head = src[src.index("<thead"):src.index(">", src.index("<thead")) + 1]
+    assert "bg-surface/" not in head, f"表头背景又半透明了: {head}"
+    assert "bg-surface" in head, "表头没有背景色 —— 行会直接透上来"
