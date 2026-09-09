@@ -656,7 +656,7 @@ export interface KeltnerVerdict {
   /** [R237] 进入这一档的那个**交易日**(YYYY-MM-DD)。天数每天变, 它不变 ——
    *  可以拿它回 K 线上核对那天到底发生了什么。`days_exact` 为 false 时没有。 */
   since?: string
-  /** [R237] 这一段比回看上限还长, `days` 是**下界**而不是准确值。 */
+  /** [R237] 这一段比能取回的历史还长, `days` 是**下界**而不是准确值。 */
   capped?: boolean
 }
 
@@ -937,6 +937,9 @@ export interface ComboTableRow {
   note: { title: string; detail: string } | null
 }
 
+/** [R242] 没有通道结论时, 那一格徽标(组合注记标题)的状态时长 */
+export interface StateRun { days: number; since?: string; capped?: boolean }
+
 export interface KeltnerBands {
   s?: KeltnerBand
   m?: KeltnerBand
@@ -948,6 +951,11 @@ export interface KeltnerBands {
   runs?: ChannelRuns | null
   /** [R197] 频段能量分布 —— 这只票的波动主要来自哪个周期 */
   energy?: BandEnergy | null
+  /**
+   * [R242] 当前状态连着多少天。有结论时与 `verdict.days` 同值; 没结论时数的是
+   * 三档组合本身 —— 结论列每一个徽标都该带「已N天」, 这才叫统一表达。
+   */
+  state_run?: StateRun | null
 }
 
 export interface ChannelRuns {

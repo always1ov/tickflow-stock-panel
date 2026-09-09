@@ -107,7 +107,7 @@ function geoLines(geo?: ChannelGeometry | null, ev?: ChannelEvent | null,
   if (geo.compress != null || runs?.compress_days || runs?.compress_avg != null) {
     L.push('[重合] ' + [
       geo.compress != null ? `三条线还有 ${(geo.compress * 100).toFixed(0)}% 重合` : '',
-      runs?.compress_days ? `已经这样 ${runs.compress_days} 天` : '',
+      runs?.compress_days ? `已${runs.compress_days}天` : '',
       runs?.compress_avg != null ? `整个季度平均 ${(runs.compress_avg * 100).toFixed(0)}%` : '',
     ].filter(Boolean).join(' · '))
   }
@@ -125,8 +125,8 @@ function geoLines(geo?: ChannelGeometry | null, ev?: ChannelEvent | null,
   }
   if (runs?.above_run || runs?.below_run) {
     L.push('[在轨外] ' + (runs.above_run
-      ? `连着 ${runs.above_run} 天站在短线上沿之外`
-      : `连着 ${runs.below_run} 天掉在短线下沿之外`))
+      ? `已${runs.above_run}天站在短线上沿之外`
+      : `已${runs.below_run}天掉在短线下沿之外`))
   }
   if (ev?.why) L.push('', `【事件】${ev.cn} —— ${ev.why}`)
   if (ev?.combo_note) {
@@ -148,8 +148,10 @@ function geoLines(geo?: ChannelGeometry | null, ev?: ChannelEvent | null,
  * 是用来扫的, 扫的时候没人会悬停。未确认的事件用虚一档的颜色, 因为
  * 「突破尝试」与「突破站稳」差的就是那两天。
  */
-function VerdictInner({ v, ev, geo, runs, energy, ph, onOpen }: {
+function VerdictInner({ v, ev, geo, runs, energy, ph, stateRun, onOpen }: {
   v?: KeltnerVerdict | null
+  /** [R242] 没有结论时那一格的状态时长 —— 与 v.days 同一套口径 */
+  stateRun?: { days: number; since?: string; capped?: boolean } | null
   ev?: ChannelEvent | null
   geo?: ChannelGeometry | null
   runs?: ChannelRuns | null
@@ -171,6 +173,10 @@ function VerdictInner({ v, ev, geo, runs, energy, ph, onOpen }: {
     // 两格写了注记, 那就把注记的标题当徽标摆出来, 而不是一个 "—"。
     // 只有「中中中」是真的零信息(价格在三条通道都认可的区间里), 它照旧显示 "—"。
     const note = ev?.combo_note
+    // [R242] **没有结论的那一格也要有天数。** 用户: 「别搞什么下跌半年,
+    // 下跌多少天就表示多少天」—— 这一格印的是组合注记标题(「半年低位」),
+    // 一个模糊的时间词却偏偏没有天数。结论列每个徽标都带「已N天」才叫统一。
+    const run = stateRun
     return (
         <button
           onClick={onOpen}
@@ -184,6 +190,12 @@ function VerdictInner({ v, ev, geo, runs, energy, ph, onOpen }: {
             + geoLines(geo, ev, runs, energy, ph)}
         >
           {note ? note.title : '—'}
+          {run?.days != null && (
+            <span className="ml-0.5 opacity-70"
+                  title={run.since ? `自 ${run.since} 起,已${run.days}天` : undefined}>
+              已{run.days}天{run.capped ? '+' : ''}
+            </span>
+          )}
         </button>
     )
   }
@@ -216,7 +228,7 @@ function VerdictInner({ v, ev, geo, runs, energy, ph, onOpen }: {
           {v.days != null && (
             <span className="ml-0.5 opacity-70"
                   title={v.since
-                    ? `自 ${v.since} 起,已连着 ${v.days} 个交易日`
+                    ? `自 ${v.since} 起,已${v.days}天`
                     : '今天刚变成这一档'}>
               已{v.days}天{v.capped ? '+' : ''}
             </span>
@@ -321,7 +333,7 @@ export function ChannelStateCell({ trend, geo, runs, ph, kc, close, trendCls,
   // 原来是两半各一份: 鼠标从徽标挪到阶段, 提示整个换掉一份, 而这一格
   // 讲的本来就是同一只票的方向。末尾那句从「点这两行…」改成整格的去处。
   const tip = [
-    trend ? `【六态】${trend.state_cn} · 第 ${trend.duration} 天`
+    trend ? `【六态】${trend.state_cn} · 已${trend.duration}天`
       + (trend.since ? `,自 ${trend.since}` : '') : '',
     trend?.action ?? '',
     ...(ph ? ['', `【通道】${ph.cn} —— ${ph.why}`, `该盯什么:${ph.watch}`] : []),
@@ -329,7 +341,7 @@ export function ChannelStateCell({ trend, geo, runs, ph, kc, close, trendCls,
     ph?.align ? `【${ph.align.cn}】${ph.align.why}` : (ph ? `快慢:${ph.pace_cn}` : ''),
     '', gap,
     at.length ? '现在到边的:' + at.map(([t, b]) => `${t}${b!.pos_cn}`).join('、') : '三档都在通道中部',
-    runs?.compress_days ? `三条线已经这样挤在一起 ${runs.compress_days} 天` : '',
+    runs?.compress_days ? `三条线已${runs.compress_days}天挤在一起` : '',
     '',
     ...([['短期', kc?.s], ['中期', kc?.m], ['长期', kc?.l]] as const)
       .filter(([, b]) => b)
@@ -352,7 +364,7 @@ export function ChannelStateCell({ trend, geo, runs, ph, kc, close, trendCls,
         <span className="flex flex-wrap items-center justify-center gap-1">
           {trend ? (
             <span className={`inline-flex whitespace-nowrap rounded border px-1.5 py-0.5 text-[10px] ${trendCls ?? ''}`}>
-              {trend.state_cn} {trend.duration}天{trend.intraday ? <span className="ml-0.5 opacity-70">*</span> : null}
+              {trend.state_cn} 已{trend.duration}天{trend.intraday ? <span className="ml-0.5 opacity-70">*</span> : null}
             </span>
           ) : <span className="text-[10px] text-muted/30">—</span>}
           {!!ph && (
@@ -426,8 +438,10 @@ function PlaybookInner({ p }: { p?: Playbook | null }) {
  * 顺序是有讲究的: 上面「贵不贵」是**位置**(这个价现在算贵还是便宜),
  * 下面「怎么办」是**动作**(所以今天该干嘛) —— 从事实到结论, 自上而下读。
  */
-export function ConclusionCell({ v, ev, geo, runs, energy, ph, p, onOpen }: {
+export function ConclusionCell({ v, ev, geo, runs, energy, ph, p, stateRun, onOpen }: {
   v?: KeltnerVerdict | null
+  /** [R242] 无结论那一格的状态时长 */
+  stateRun?: { days: number; since?: string; capped?: boolean } | null
   ev?: ChannelEvent | null
   geo?: ChannelGeometry | null
   runs?: ChannelRuns | null
@@ -455,7 +469,8 @@ export function ConclusionCell({ v, ev, geo, runs, energy, ph, p, onOpen }: {
     <td className={`${TD_BASE} px-2`}>
       <div className="mx-auto flex max-w-[15rem] flex-col items-center gap-0.5 leading-tight">
         <span className="flex flex-wrap items-center justify-center gap-1">
-          <VerdictInner v={v} ev={ev} geo={geo} runs={runs} energy={energy} ph={ph} onOpen={onOpen} />
+          <VerdictInner v={v} ev={ev} geo={geo} runs={runs} energy={energy} ph={ph}
+                        stateRun={stateRun} onOpen={onOpen} />
           <PlaybookInner p={p} />
         </span>
         {line2 ? (

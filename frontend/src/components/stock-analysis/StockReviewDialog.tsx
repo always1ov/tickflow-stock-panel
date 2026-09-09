@@ -376,7 +376,7 @@ function NowCard({ now, forwardDays }: {
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-[11px]">
         <span className="text-[10px] text-muted">现在</span>
         <b className={cn('text-[13px] font-semibold', bull ? 'text-red-400' : 'text-emerald-400')}>
-          {now.state_cn} 第 {now.day} 天
+          {now.state_cn} 已{now.day}天
         </b>
         {now.avg_days != null && (
           <span className="text-muted"
@@ -529,7 +529,7 @@ function TrendView({ d, rows, onlyMarked, onToggleMarked }: {
                         className={`inline-flex whitespace-nowrap rounded border px-1.5 py-0.5 text-[10px] ${trendBadgeCls(r.trend.state)}`}
                         title={`${r.trend.state_cn}(${r.trend.state_en})`}
                       >
-                        {r.trend.state_cn} 第 {r.trend.day} 天
+                        {r.trend.state_cn} 已{r.trend.day}天
                       </span>
                       {r.trend.flipped && (
                         <span className="ml-1.5 text-[9px] text-amber-400" title="这天六态状态发生了翻转">
@@ -768,7 +768,9 @@ function SegmentCard({ seg, forwardDays }: { seg: Segment; forwardDays: number }
           <span className="shrink-0 font-mono text-[10px] text-secondary">
             {rows.length > 1 ? `${oldest.date} ~ ${newest.date}` : newest.date}
           </span>
-          <span className="shrink-0 text-[10px] text-muted">{rows.length} 天</span>
+          {/* [R241] 历史段用「持续N天」, 与进行中的「已N天」分开 ——
+              这一段可能早就结束了, 说「已」会读成"到今天还在"。 */}
+          <span className="shrink-0 text-[10px] text-muted">持续{rows.length}天</span>
           <span className={`shrink-0 font-mono text-[10px] ${chgCls(span)}`} title="这一段期间的累计涨跌">
             期间 {pct(span)}
           </span>

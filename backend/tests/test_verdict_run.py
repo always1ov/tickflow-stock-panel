@@ -27,11 +27,16 @@ def _vr(closes, atrs=None, dates=None, ma20=None, ma60=None, limit=None):
 
     这个适配器保留原来那个返回形状, 好让下面那些**行为断言**一字不改地继续
     守着 —— 它们守的是口径(中断即重算、含今天、起始日、上限), 与拆不拆无关。
+
+    [R242] 序列里现在**不只有结论码**, 没结论的那些天带的是组合键
+    (`combo:…`)。这个适配器守的是**结论**那条路, 与线上一致: 服务层只在
+    `verdict` 非空时才去数 `v["days"]`。所以组合键在这里等同于"没有结论"。
+    组合键那条路由 `test_没有结论的那一格…` 那几条单独守。
     """
     n = len(closes)
     kw = {} if limit is None else {"limit": limit}
     codes = kg.verdict_codes(closes, atrs or [_ATR] * n, ma20=ma20, ma60=ma60, **kw)
-    if not codes or not codes[0]:
+    if not codes or not codes[0] or str(codes[0]).startswith("combo:"):
         return None
     today = codes[0]
     days = kg.count_trailing(codes, today)
@@ -542,3 +547,194 @@ def test_R239_两条路对不上今天时也数得出天数():
         )
         assert v["days"] > 1, f"{tag}: 天数是 {v['days']}"
         assert v.get("since"), f"{tag}: 没给起始日"
+
+
+def test_R241_时长说法全界面统一():
+    """用户: 「必须要统一表达, 不能又两种多种表述」。
+
+    这条是我的问题 —— 同一件事当时有六种说法(`3天` / `已12天` /
+    `第 11 天` / `已连着 N 个交易日` / `已经这样 N 天` / `连着 N 天`)。
+    同一行里六态写「3天」、结论写「已12天」, 读的人得先判断这两个数是不是
+    一回事。
+
+    从此只有两个词, 各有一个意思且从不用于同一件事:
+
+        已N天     到今天**还在**这个状态
+        持续N天   历史上**那一段**总共多久(已结束)
+
+    这条守着"不许再长出第三种"。
+    """
+    import pathlib
+    import re
+
+    root = pathlib.Path(__file__).resolve().parents[2] / "frontend" / "src" / "components"
+    if not root.exists():
+        import pytest as _pytest
+        _pytest.skip("拿不到前端源码(只跑后端时正常)")
+
+    banned = {
+        "第 {": "「第 N 天」—— 换成「已N天」",
+        "已连着 ": "「已连着 N 个交易日」—— 换成「已N天」",
+        "已经这样 ": "「已经这样 N 天」—— 换成「已N天」",
+    }
+    files = [
+        "stock-analysis/decision-board/cells.tsx",
+        "stock-analysis/VerdictHover.tsx",
+        "stock-analysis/StockReviewDialog.tsx",
+        "today/VerdictTag.tsx",
+    ]
+    for rel in files:
+        p = root / rel
+        if not p.exists():
+            continue
+        # 只看**渲染出去的文本**, 注释里复述历史说法是允许的
+        src = "\n".join(ln for ln in p.read_text(encoding="utf-8").splitlines()
+                        if not ln.lstrip().startswith(("//", "*", "/*")))
+        for bad, why in banned.items():
+            assert bad not in src, f"{rel} 又出现了 {why}"
+
+    # 正面: 两个词都还在
+    cells = (root / "stock-analysis/decision-board/cells.tsx").read_text(encoding="utf-8")
+    assert re.search(r"已\{trend\.duration\}天", cells), "六态徽标没用统一说法"
+    assert "已{v.days}天" in cells, "结论徽标没用统一说法"
+    review = (root / "stock-analysis/StockReviewDialog.tsx").read_text(encoding="utf-8")
+    assert "持续{rows.length}天" in review, "历史段没用「持续N天」"
+
+
+# ===== [R242] 没有结论的那一格 =====
+#
+# 用户: 「别搞什么下跌半年, 下跌多少天就表示多少天」。
+#
+# 结论列的徽标有两种。有结论时印结论标题(「候选池」), 三档都在通道中部时
+# 底层判不出结论, 那一格印的是补充层组合注记的标题 —— 而那些标题里带着
+# **模糊的时间词**(「半年低位」), 偏偏没有天数。
+#
+# 所以「状态」的定义扩一档: **徽标上印的是什么, 就数什么**。两种徽标都带
+# 「已N天」, 这也才对得上 R241「必须统一表达」那条。
+
+
+def test_R242_组合键与结论码不会撞():
+    """组合键必须一眼能与结论码分开, 否则 `count_trailing` 会把两种状态数到
+    一起 —— 「候选池」和「三档都在中部」连在一起报成一段。"""
+    from app.indicators.keltner import _VERDICTS
+
+    codes = {str(c) for c in _VERDICTS}
+    assert codes, "拿不到作者那张结论表, 这条测不了"
+    for c in codes:
+        assert not c.startswith("combo:"), (
+            f"结论码 {c!r} 撞上了组合键的前缀 —— 换一个前缀"
+        )
+
+
+def test_R242_有结论时状态键就是结论码():
+    """扩定义**不许动有结论那一路**。同一份三档, `state_key` 给的必须与作者
+    的 `verdict` 一字不差, 否则老徽标的天数会跟着变。"""
+    from app.indicators.keltner import verdict as _verdict
+
+    closes = _flat_then([10.0 - 0.025 * i for i in range(1, 101)])
+    codes = kg.verdict_codes(closes, [_ATR] * len(closes))
+    got = [c for c in codes if c and not c.startswith("combo:")]
+    assert got, "这份夹具一天结论都没出, 测不到"
+    # 反过来对一次: 有结论的那一天, state_key 必须原样返回那个 code
+    bands = {"s": {"pos": "below"}, "m": {"pos": "below"}, "l": {"pos": "below"}}
+    v = _verdict(bands)
+    assert kg.state_key(bands) == (str(v["code"]) if v else "combo:below|below|below")
+
+
+def test_R242_三档都在中部时给的是组合键而不是空():
+    """这一格原来是 `None`(= 什么都数不了)。现在它是一个**有名字的状态**,
+    才数得出「已N天」。"""
+    flat = [10.0] * 400
+    codes = kg.verdict_codes(flat, [_ATR] * len(flat))
+    assert codes[0] is not None, "横盘票的今天成了空 —— 那就又没天数了"
+    assert codes[0].startswith("combo:"), (
+        f"横盘票该落在组合键上, 拿到的是 {codes[0]!r}"
+    )
+    assert kg.count_trailing(codes, codes[0]) > 1, "横盘这么久却只数出 1 天"
+
+
+def test_R242_端到端_没有结论的票也拿得到_state_run():
+    """[R235 的教训] 单元测试全绿而链路是断的 —— 走完整条
+    `channels_for_symbols`, 断言接口真的返回了 `state_run`。"""
+    import datetime as dt
+
+    import polars as pl
+
+    from app.services import keltner_service as ks
+
+    # 一路横盘 —— 价格贴着三条均线, 三档全在通道中部, 底层判不出结论
+    closes = [10.0] * 400
+    dates = [dt.date(2025, 1, 1) + dt.timedelta(days=i) for i in range(len(closes))]
+
+    class _FakeRepo:
+        def get_enriched_latest(self):
+            return pl.DataFrame({
+                "symbol": ["000001.SZ"], "close": [closes[-1]], "atr_14": [_ATR],
+                "ma20": [10.0], "ma60": [10.0],
+            }), "2025-10-27"
+
+        def get_daily_batch(self, symbols, start, end, cols):
+            return pl.DataFrame({
+                "symbol": ["000001.SZ"] * len(closes), "date": dates,
+                "close": closes, "atr_14": [_ATR] * len(closes),
+            })
+
+    row = ks.channels_for_symbols(_FakeRepo(), ["000001.SZ"]).get("000001.SZ") or {}
+    assert not row.get("verdict"), "这份夹具本该判不出结论, 前提就错了"
+    run = row.get("state_run")
+    assert run, (
+        f"没结论的那一格没拿到 state_run —— 徽标上就还是没天数。拿到的是 {sorted(row)}"
+    )
+    assert run["days"] > 1, f"横盘这么久却报 {run['days']} 天"
+    assert run.get("since"), "没给起始日, 悬停里就核对不了"
+
+
+def test_R242_有结论时不另给一个平级的_state_run():
+    """两个天数摆在同一行里, 读的人得先判断哪个是哪个。有结论时天数只有
+    `verdict.days` 一份。"""
+    import datetime as dt
+
+    import polars as pl
+
+    from app.services import keltner_service as ks
+
+    closes = [10.0] * 200 + [10.0 - 0.025 * i for i in range(1, 101)]
+    dates = [dt.date(2025, 1, 1) + dt.timedelta(days=i) for i in range(len(closes))]
+    last = len(closes) - 1
+
+    def _ma(w: int) -> float:
+        return sum(closes[last + 1 - w:last + 1]) / w
+
+    class _FakeRepo:
+        def get_enriched_latest(self):
+            return pl.DataFrame({
+                "symbol": ["000001.SZ"], "close": [closes[-1]], "atr_14": [_ATR],
+                "ma20": [_ma(20)], "ma60": [_ma(60)],
+            }), "2025-10-27"
+
+        def get_daily_batch(self, symbols, start, end, cols):
+            return pl.DataFrame({
+                "symbol": ["000001.SZ"] * len(closes), "date": dates,
+                "close": closes, "atr_14": [_ATR] * len(closes),
+            })
+
+    row = ks.channels_for_symbols(_FakeRepo(), ["000001.SZ"]).get("000001.SZ") or {}
+    assert row.get("verdict"), "这份夹具本该有结论, 前提就错了"
+    assert "state_run" not in row, "有结论时又多给了一个平级天数, 同一行会出现两个数"
+
+
+def test_R242_没有结论那一格的徽标也写_已N天():
+    """两种徽标必须**同一个说法**(R241)。这条盯的是渲染出去的那段文本 ——
+    没结论那一格如果自己长出「N天」「持续N天」, 统一表达就又破了。"""
+    import pathlib
+
+    p = (pathlib.Path(__file__).resolve().parents[2] / "frontend" / "src"
+         / "components" / "stock-analysis" / "decision-board" / "cells.tsx")
+    if not p.exists():
+        import pytest as _pytest
+        _pytest.skip("拿不到前端源码(只跑后端时正常)")
+    src = "\n".join(ln for ln in p.read_text(encoding="utf-8").splitlines()
+                    if not ln.lstrip().startswith(("//", "*", "/*")))
+    assert "已{run.days}天{run.capped" in src, (
+        "没结论那一格的徽标没有按统一说法写「已N天」"
+    )

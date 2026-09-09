@@ -791,6 +791,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
                     {/* [R212] 结论 = 贵不贵(位置, 上) + 怎么办(动作, 下), 竖排一格 */}
                     <ConclusionCell v={r.kc?.verdict} ev={r.ev} geo={r.kc?.geo} runs={r.kc?.runs}
                                     energy={r.kc?.energy} ph={r.ph} p={r.play}
+                                    stateRun={r.kc?.state_run}
                                     onOpen={() => setReview({ symbol: r.symbol, name: r.name, tab: 'verdict' })} />
                     {/* [R106] AI 分析列: 报告胶囊(点开最近报告) + ✨生成/更新分析 + 🔔点位提醒
                         —— 原页头两个按钮整合到这里, 每个标的都有自己的一对动作 */}

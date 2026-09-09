@@ -579,10 +579,39 @@ def _tail_run(rows: list[dict], ok) -> int:
 VERDICT_TAIL = 250
 
 
+def state_key(bands: dict | None) -> str | None:
+    """[R242] 这一天的**状态键**。有结论就是结论码, 没结论就是三档组合。
+
+    用户: 「别搞什么下跌半年, 下跌多少天就表示多少天」。
+
+    结论列的徽标有两种: 有结论时印结论标题(「候选池」), 没结论时印组合注记的
+    标题(「半年低位」)。原来只有前者带天数, 后者是个**模糊的时间词却没有天数**
+    —— 而用户要的恰恰是天数。
+
+    所以"状态"的定义扩一档: **徽标上印的是什么, 就数什么**。两种都是状态,
+    都该有「已N天」, 这也才对得上「必须统一表达」那条。
+
+    组合键用三档位置码拼(如 `combo:inside|below|inside`), 与结论码不会撞。
+    """
+    from app.indicators.keltner import verdict as _verdict
+
+    if not bands or len(bands) < 3:
+        return None
+    v = _verdict(bands)
+    if v:
+        return str(v["code"])
+    try:
+        return "combo:" + "|".join(str(bands[k]["pos"]) for k in ("s", "m", "l"))
+    except (KeyError, TypeError):
+        return None
+
+
 def verdict_codes(closes: list[float] | None, atrs: list[float] | None,
                   *, ma20: list | None = None, ma60: list | None = None,
                   limit: int = VERDICT_TAIL) -> list[str | None]:
-    """[R239] 最近若干个交易日的**通道结论码**, **新→旧**。算不出的位置是 None。
+    """[R239] 最近若干个交易日的**状态键**(见 `state_key`), **新→旧**。
+
+    算不出的位置是 None。
 
     判定一个字都不是这里写的 —— 三档走作者的 `assess`, 结论走作者的 `verdict`。
     这一层只负责"把最近几天各是哪一档摆出来", 由调用方去数。
@@ -603,7 +632,7 @@ def verdict_codes(closes: list[float] | None, atrs: list[float] | None,
     只有本来就没有预计算列的长档在这里自己滚。传 None 时退回自己滚,
     那只是没有这两列时的退路(测试夹具走这条), 线上必须传。
     """
-    from app.indicators.keltner import assess, verdict as _verdict
+    from app.indicators.keltner import assess
 
     cs = [_f(c) for c in (closes or [])]
     as_ = [_f(a) for a in (atrs or [])]
@@ -633,8 +662,7 @@ def verdict_codes(closes: list[float] | None, atrs: list[float] | None,
                 bands = {}
                 break
             bands[k_] = got
-        v = _verdict(bands) if len(bands) == 3 else None
-        out.append(str(v["code"]) if v else None)
+        out.append(state_key(bands) if len(bands) == 3 else None)
     return out
 
 

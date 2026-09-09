@@ -122,7 +122,7 @@ export function VerdictHover({ v, note, children }: {
                           title={'这是**当前这一段**连着多少个交易日,不是历史累计。'
                             + '含今天;中间只要断一天(换了一档或没有结论)就从头重新起算。'
                             + (v.capped ? '\n\n已经数到能看到的最早一根,实际可能更长。' : '')}>
-                      {`已连着 ${v.days} 个交易日${v.capped ? '以上' : ''}`}
+                      {`已${v.days}天${v.capped ? '以上' : ''}`}
                       {v.since ? ` · 自 ${v.since}` : ''}
                     </span>
                   )}

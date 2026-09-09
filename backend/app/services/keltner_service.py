@@ -209,14 +209,9 @@ def channels_for_symbols(repo, symbols: list[str]) -> dict[str, dict]:
                 # 免得界面各处取一个忘一个。
                 #
                 # [R239] **拿徽标上这一档往回数**, 而不是要求两条路先在
-                # "今天"上达成一致。
-                #
-                # 之前的写法是: 历史那条路自己判一个"今天", 与这里的 v["code"]
-                # 一比, 对不上就整个作废。而这两条路的今天本来就常常不一样
-                # (enriched 快照 vs 日线批量; 数据日期差一天、末根不同…),
-                # 于是用户实测**每一行都变成「已1天?」** —— 那是一个必须成立、
-                # 却经常不成立的前提。现在没有这个前提了: 序列是逐日结论,
-                # 数的是"最近连着几天也是 v['code'] 这一档"。
+                # "今天"上达成一致。两条路的今天本来就常常不一样(enriched
+                # 快照 vs 日线批量), 那是个必须成立却经常不成立的前提, 结果
+                # 是全表每一行都退化成 1 天。
                 lm = long_map.get(sym) or {}
                 codes = lm.get("verdict_codes") or []
                 hist = kg.count_trailing(codes, v.get("code"))
@@ -226,13 +221,28 @@ def channels_for_symbols(repo, symbols: list[str]) -> dict[str, dict]:
                     if len(ds) >= hist:
                         v["since"] = ds[hist - 1]
                     if hist >= len(codes):
-                        # 数到序列尽头 = 这一段比取回来的还长, 天数是下界
                         v["capped"] = True
                 else:
-                    # 历史里最近一根就不是这一档(数据对不上, 或今天刚变),
-                    # 今天仍然算数 —— 但标明是下界, 不假装自己数出来了。
+                    # 历史里最近一根就不是这一档 —— 通常就是今天刚变。
                     v = dict(v, days=1, days_exact=False)
             row = dict(bands, verdict=v) if v else dict(bands)
+            if not v:
+                # [R242] **没有结论的那一格也要有天数。** 用户: 「别搞什么下跌
+                # 半年, 下跌多少天就表示多少天」—— 那一格徽标印的是组合注记
+                # 标题(「半年低位」), 一个模糊的时间词, 偏偏没有天数。
+                # 结论列每一个徽标都该带「已N天」, 这才叫统一表达。
+                lm = long_map.get(sym) or {}
+                codes = lm.get("verdict_codes") or []
+                key = kg.state_key(bands)
+                hist = kg.count_trailing(codes, key)
+                if hist:
+                    run = {"days": hist}
+                    ds = lm.get("verdict_dates") or []
+                    if len(ds) >= hist:
+                        run["since"] = ds[hist - 1]
+                    if hist >= len(codes):
+                        run["capped"] = True
+                    row["state_run"] = run
             # [R195] 几何量(速度/加速度/压缩/排列)。**零新增取数** —— 全部从
             # 已经算好的三档上下轨反推(轨 = MA ± k·ATR 是恒等式)。
             geo = kg.geometry(bands, close)
