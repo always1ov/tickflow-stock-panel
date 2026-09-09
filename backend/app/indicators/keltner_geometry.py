@@ -790,8 +790,10 @@ def band_energy(closes: list[float] | None, atrs: list[float] | None,
         "share": {k_: round(v, 3) for k_, v in share.items()},
         "rms": {k_: round(v, 3) for k_, v in raw.items()},
         "dominant": dom,
-        "dominant_cn": {"s": "高频(消息驱动)", "m": "中频(行情主体)",
-                        "l": "低频(老趋势)"}[dom],
+        # [R211] R200 那轮改大白话时漏了这里 —— 它是后端直接送到界面上的
+        # 一个词, 不在任何被扫描的文件里。「高频/中频/低频」正是那轮要清掉的行话。
+        "dominant_cn": {"s": "几天的短波动", "m": "一波行情的主体",
+                        "l": "长期老趋势"}[dom],
     }
 
 
@@ -830,7 +832,7 @@ PH_UNCLEAR = "unclear"          # 说不清
 # 的票也会落到这一档, 却配着「追进去的性价比很低」这种只对涨过头成立的话。
 # 现在按 spread 的符号分成两档, 文案各说各的。
 PHASE_CN = {
-    PH_COILING: "横着憋", PH_LAUNCHING: "刚启动",
+    PH_COILING: "横盘中", PH_LAUNCHING: "刚启动",
     PH_ADVANCING: "上升中", PH_STALLING: "涨势转弱",
     PH_OVEREXTENDED: "走过头", PH_DECLINING: "下跌中",
     PH_UNCLEAR: "看不出",

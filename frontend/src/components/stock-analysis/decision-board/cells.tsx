@@ -36,67 +36,15 @@ export const TD_BASE = 'align-middle py-2 text-center'
  */
 export const NUM = 'font-mono tabular-nums'
 
-// [R42] Keltner 位置配色。破上轨/贴上轨用暖色(偏贵), 破下轨/贴下轨用冷色(偏便宜),
-// 通道内保持中性 —— 位置是事实, 不替用户下买卖判断。
-const KELTNER_CLS: Record<KeltnerBand['pos'], string> = {
-  above: 'border-red-400/40 bg-red-400/10 text-red-400',
-  near_upper: 'border-amber-400/40 bg-amber-400/10 text-amber-400',
-  inside: 'border-border bg-base text-muted',
-  near_lower: 'border-sky-400/40 bg-sky-400/10 text-sky-300',
-  below: 'border-emerald-400/40 bg-emerald-400/10 text-emerald-400',
-}
-
-/**
- * 一档 Keltner 通道的单元格。
- *
- * 显示"贴上轨"这种五档文字, 悬停给出真实的上下轨价、通道内位置百分比,
- * 以及"还差几个 ATR 到轨" —— 只给一个标签等于让用户盲信一个没法复核的判断。
- * 该档算不出来(新股不够 120 根 / 均线列缺失)时显示 "—", 不编一个数出来。
- */
-/**
- * [R198] 三档竖排成一格。短/中/长本来就是**同一个指标在三个尺度上的读数**
- * (共用同一个 ATR 分母), 拆成三列是把一件事摊成三份看; 合成一格之后每行三条,
- * 上下一对比就知道三个尺度是不是同向 —— 那正是这套指标最该被读出来的东西。
- *
- * 原来的 `KeltnerCell`(单档一列)随之删掉, 没有留下没人调的死代码。
- * 悬停照旧给真实的上下轨价、通道内位置、还差几个 ATR 到轨 —— 只给一个标签
- * 等于让用户盲信一个没法复核的判断。该档算不出来时显示 "—", 不编一个数出来。
- */
-export function ChannelStackCell({ kc, close }: {
-  kc?: { s?: KeltnerBand; m?: KeltnerBand; l?: KeltnerBand } | null
-  close?: number | null
-}) {
-  const rows: [string, KeltnerBand | undefined][] = [
-    ['短期', kc?.s], ['中期', kc?.m], ['长期', kc?.l],
-  ]
-  return (
-    <td className={`${TD_BASE} whitespace-nowrap px-1.5`}>
-      <div className="inline-flex flex-col items-center gap-0.5">
-        {rows.map(([tag, band]) => (
-          <span key={tag} className="flex items-center gap-1">
-            <span className="w-6 text-right text-[9px] text-muted/60">{tag}</span>
-            {band
-              ? (
-                <span
-                  className={`inline-flex whitespace-nowrap rounded border px-1 py-0.5 text-[10px] ${KELTNER_CLS[band.pos]}`}
-                  title={
-                    `${band.band_cn}通道 ${band.lower.toFixed(2)} ~ ${band.upper.toFixed(2)}`
-                    + `${close != null ? `,收盘 ${close.toFixed(2)}` : ''}\n`
-                    + `在这条通道里的位置 ${Math.round(band.pct * 100)}%(0% 贴下沿 / 100% 贴上沿)\n`
-                    + `离上沿还有 ${band.to_upper_atr ?? '—'} 倍日常波动 · 离下沿还有 ${band.to_lower_atr ?? '—'} 倍日常波动\n`
-                    + `${band.hint}\n一律按收盘算 —— 盘中拿实时价去比昨天的通道, 会半新半旧`
-                  }
-                >
-                  {band.pos_cn}
-                </span>
-              )
-              : <span className="text-[10px] text-muted/30">—</span>}
-          </span>
-        ))}
-      </div>
-    </td>
-  )
-}
+// [R211] `ChannelStackCell`(三档竖排那一列)在这里删掉了 —— 它并进了
+// `ChannelStateCell`。用户: 「趋势通道和通道态势可以放在一起吗」。
+//
+// **本来就该合**: 两列讲的是同一套指标的两个层次(一个是测量, 一个是从它推出来
+// 的结论), 拆成两列等于让人左右对眼去把结论和它的依据接起来。
+//
+// 合的时候顺手改了一处: 三档位置**只印到边的那几档**。多数票三档都在通道中部,
+// 把三个「通道内」逐行印出来是纯噪声 —— 恰恰是"哪一档到边了"才带信息。
+// 完整的三档轨价与位置百分比留在悬停。
 
 // [R44] 三档组合的结论配色。tone 由后端给, 界面不自己判 ——
 // 决策台、今日总览、悬停提示必须说同一句话。
@@ -179,13 +127,15 @@ function geoLines(geo?: ChannelGeometry | null, ev?: ChannelEvent | null,
  * 是用来扫的, 扫的时候没人会悬停。未确认的事件用虚一档的颜色, 因为
  * 「突破尝试」与「突破站稳」差的就是那两天。
  */
-export function VerdictCell({ v, ev, geo, runs, energy, ph, onOpen }: {
+export function VerdictCell({ v, ev, geo, runs, energy, ph, cls = '', onOpen }: {
   v?: KeltnerVerdict | null
   ev?: ChannelEvent | null
   geo?: ChannelGeometry | null
   runs?: ChannelRuns | null
   energy?: BandEnergy | null
   ph?: ChannelPhase | null
+  /** [R211] 额外类名 —— 结论区那道右分界线由调用方给 */
+  cls?: string
   onOpen: () => void
 }) {
   const evLine = ev && ev.code !== 'none' ? (
@@ -204,7 +154,7 @@ export function VerdictCell({ v, ev, geo, runs, energy, ph, onOpen }: {
     // 只有「中中中」是真的零信息(价格在三条通道都认可的区间里), 它照旧显示 "—"。
     const note = ev?.combo_note
     return (
-      <td className={`${TD_BASE} whitespace-nowrap px-1.5`}>
+      <td className={`${TD_BASE} whitespace-nowrap px-1.5 ${cls}`}>
         <button
           onClick={onOpen}
           className={note
@@ -223,7 +173,7 @@ export function VerdictCell({ v, ev, geo, runs, energy, ph, onOpen }: {
     )
   }
   return (
-    <td className={`${TD_BASE} whitespace-nowrap px-1.5`}>
+    <td className={`${TD_BASE} whitespace-nowrap px-1.5 ${cls}`}>
       <VerdictHover v={v} note={"点击摊开这只票过去每一档结论 —— 出现在哪几天、当时说了什么、之后走成什么样。"
         + geoLines(geo, ev, runs, energy, ph)}>
         <button
@@ -274,67 +224,88 @@ const PHASE_TEXT: Record<string, string> = {
 }
 
 /**
- * 「通道态势」列 —— 现在处在哪一段、走到哪一步、还有没有劲。
+ * 「走势」列 —— 一只票的方向, 两套判定叠在一格里。
  *
- * ## [R209] 这一列重做过一次, 原因值得记下来
+ * ## [R211] 这一列吞并了另外两列, 每一次都有理由
  *
- * 上一版摆的是三行:「下跌中 / 短线低 1.7 倍波动 / 速度没变」。用户:
- * 「通道态势这一列得重新做, 看不懂这样的表述」。**问题不在措辞, 在种类** ——
- * 后两行是**测量值**, 而这一列的位置(挨着「贵不贵」和「怎么办」)决定了它
- * 该出结论。「1.7 倍日常波动」这个单位再准确, 扫表的人也换算不出它意味着什么。
+ *   · 「量化通道」(三档原始位置) —— 它是**测量**, 而这一列是从它推出来的
+ *     **结论**。拆成两列等于让人左右对眼去把结论和它的依据接起来。
+ *     三档位置退到悬停: 「贵不贵」那一列已经把它翻成一句结论了。
+ *   · 「趋势」(六态) —— 用户: 「趋势和通道态势整合一起」。两者答的是同一个
+ *     问题(这只票往哪走), 只是**方法不同**: 六态看关键点, 通道看三条线的
+ *     相对位置。放在一格里, 它们什么时候一致、什么时候打架, 上下一对就看见了。
+ *     (真打架时「怎么办」那一列会直接判成「先别动」, 这里只是让人能核对。)
  *
- * 现在两行, 都是判断, **一个数字都没有**:
+ * 三行, 从上到下是「谁说的」→「走到哪」→「还有没有劲」:
  *
- *     下跌中              ← 处在哪一段(七档之一, 带方向)
- *     走到中段 · 速度平稳   ← 走到哪一步了 + 还有没有劲
+ *     上涨趋势 15天        ← 六态(作者的判定, 点开是逐日复盘)
+ *     上升中 · 走到中段     ← 通道给的阶段 + 走到哪一步
+ *     速度平稳             ← 还有没有劲
  *
- * 「走到哪一步」的门槛直接用打分那一层已经在用的那三个(SPREAD_LAUNCH /
- * SPREAD_MATURE / TORN_ATR), 不另编一套 —— 界面上说「走了很长」的那一刻,
- * 打分那边也正好在扣分, 两边永远对得上。
+ * **一个数字都没有。** 数字全在悬停里 —— 扫表时用不上, 要核对时又必须有。
  *
- * 数字全部退到悬停: 扫表时用不上, 要核对时又必须有。点开是 27 种组合速查。
- *
- * ## 为什么是这几个量, 不是全部
- *
- * 几何层一共算出十来个。逐个问"它能不能改变我今天的动作":
- *   · **阶段**     能 —— 唯一直接回答「现在该盯什么」的, 一个词顶三个数。
- *   · **三线间距** 能 —— 但它的价值在**排序**(升序扫是「刚立住的」, 降序扫是
- *                  「走得最远该收的」), 所以留作排序键, 显示上收成「走到哪一步」。
- *   · **快慢**     能 —— 与间距正交: 间距说走了多远, 快慢说还有没有劲。
- *   · **挤了几天** 只在「横着憋」那一档有意义 —— 退到悬停。
- *
- * 明确不进这一列的: 压缩指数(与间距单调对应, 同一件事投两次票)、频段能量
- * (回答「这波是谁在推」, 属于研究不属于今天的动作)、离各自中线(与旁边
- * 「量化通道」列讲的是同一件事)、三档位置码(已由「贵不贵」列翻成人话)。
+ * 两个点击目标: 上面那个徽标进逐日复盘(六态的历史), 下面两行进 27 种组合
+ * 速查(通道的全貌)。各自对应它上面写的那套判定。
  */
-export function ChannelStateCell({ geo, runs, ph, onOpenCombo }: {
+export function ChannelStateCell({ trend, geo, runs, ph, kc, close, trendCls,
+                                  onOpenReview, onOpenCombo }: {
+  /** [R211] 六态趋势 —— 合过来的那一列。作者的判定, 只读不改 */
+  trend?: { state: string; state_cn: string; duration: number; since?: string
+            action?: string; intraday?: boolean } | null
   geo?: ChannelGeometry | null
   runs?: ChannelRuns | null
   ph?: ChannelPhase | null
-  /** 点开 27 种组合速查(带这只票的读数与高亮) */
+  kc?: { s?: KeltnerBand; m?: KeltnerBand; l?: KeltnerBand } | null
+  close?: number | null
+  /** 六态徽标的配色(由 TrendStateBar 那套给, 两处必须同色) */
+  trendCls?: string
+  /** 点六态徽标 → 逐日复盘 */
+  onOpenReview?: () => void
+  /** 点下面两行 → 27 种组合速查 */
   onOpenCombo?: () => void
+  /** 追加类名(结论区分界线之类) */
+  cls?: string
 }) {
-  if (!geo || !ph) {
-    return <td className={`${TD_BASE} px-1.5`}><span className="text-[10px] text-muted/30">—</span></td>
-  }
-  // 悬停里才给数字 —— 扫表时用不上, 要核对时又必须有
-  const gap = geo.spread >= 0
+  // 三档位置只在悬停里给 —— 「贵不贵」列已经把它翻成一句结论了
+  const at = ([['短期', kc?.s], ['中期', kc?.m], ['长期', kc?.l]] as const)
+    .filter(([, b]) => b && b.pos !== 'inside')
+  const gap = !geo ? '' : geo.spread >= 0
     ? `短线高出长线 ${geo.spread.toFixed(1)} 倍日常波动`
     : `短线低于长线 ${Math.abs(geo.spread).toFixed(1)} 倍日常波动`
-  const tip = [`${ph.cn} —— ${ph.why}`, `该盯什么:${ph.watch}`, '', gap,
+  const tip = !ph ? '' : [
+    `${ph.cn} —— ${ph.why}`, `该盯什么:${ph.watch}`, '', gap,
+    at.length ? '现在到边的:' + at.map(([t, b]) => `${t}${b!.pos_cn}`).join('、') : '三档都在通道中部',
     runs?.compress_days ? `三条线已经这样挤在一起 ${runs.compress_days} 天` : '',
-    '', '点开看 27 种组合系统各怎么说'].filter(Boolean).join('\n')
+    '',
+    ...([['短期', kc?.s], ['中期', kc?.m], ['长期', kc?.l]] as const)
+      .filter(([, b]) => b)
+      .map(([t, b]) => `${t}通道 ${b!.lower.toFixed(2)} ~ ${b!.upper.toFixed(2)}`
+        + `,现在${b!.pos_cn}(位置 ${Math.round(b!.pct * 100)}%)`),
+    close != null ? `收盘 ${close.toFixed(2)}` : '',
+    '', '点这两行看 27 种组合系统各怎么说'].filter(Boolean).join('\n')
   return (
     <td className={`${TD_BASE} whitespace-nowrap px-1.5`}>
-      <button type="button" onClick={onOpenCombo} title={tip}
-              className="inline-flex cursor-pointer flex-col items-center gap-0.5 leading-tight transition-colors duration-hover hover:brightness-125">
-        <span className={`text-[11px] font-medium ${PHASE_TEXT[ph.code] ?? 'text-muted'}`}>
-          {ph.cn}
-        </span>
-        <span className="text-[9px] text-muted">
-          {ph.maturity_cn} · {ph.pace_cn}
-        </span>
-      </button>
+      <div className="inline-flex flex-col items-center gap-0.5 leading-tight">
+        {trend ? (
+          <button onClick={onOpenReview}
+                  className={`inline-flex cursor-pointer whitespace-nowrap rounded border px-1.5 py-0.5 text-[10px] transition-colors hover:brightness-125 ${trendCls ?? ''}`}
+                  title={`${trend.state_cn} · 第 ${trend.duration} 天`
+                    + (trend.since ? `,自 ${trend.since}` : '')
+                    + (trend.action ? `\n${trend.action}` : '')
+                    + '\n\n点开翻这只票的逐日状态复盘'}>
+            {trend.state_cn} {trend.duration}天{trend.intraday ? <span className="ml-0.5 opacity-70">*</span> : null}
+          </button>
+        ) : <span className="text-[10px] text-muted/30">—</span>}
+        {!!ph && (
+          <button type="button" onClick={onOpenCombo} title={tip}
+                  className="inline-flex cursor-pointer flex-col items-center gap-0.5 leading-tight transition-colors duration-hover hover:brightness-125">
+            <span className={`text-[10px] ${PHASE_TEXT[ph.code] ?? 'text-muted'}`}>
+              {ph.cn} · {ph.maturity_cn}
+            </span>
+            <span className="text-[9px] text-muted">{ph.pace_cn}</span>
+          </button>
+        )}
+      </div>
     </td>
   )
 }

@@ -677,6 +677,25 @@ function VerdictEdgeCard({ e, forwardDays }: {
  */
 function ChannelPanel({ ch }: { ch: NonNullable<StockReview['channel']> }) {
   const { geo, runs, energy, event, explain } = ch
+  // [R211] 数字 → 状态词。分界只在这里定一处, 说明写在感叹号弹窗里。
+  const pace = geo.accel.level === 'accel' ? '比之前快'
+    : geo.accel.level === 'decel' ? '比之前慢' : '速度没变'
+  const agree = geo.compress == null ? '—'
+    : geo.compress_level === 'tight' ? '几乎一致'
+      : geo.compress_level === 'loose' ? '完全分开' : '有些分歧'
+  const squeeze = runs.compress_days >= 20 ? `挤了 ${runs.compress_days} 天`
+    : runs.compress_days > 0 ? '刚挤上没几天' : '现在没挤在一起'
+  const quarter = runs.compress_avg == null ? '—'
+    : runs.compress_avg >= 0.6 ? '多数时候挤在一起'
+      : runs.compress_avg <= 0.3 ? '多数时候是分开的' : '一半一半'
+  const atRail = (() => {
+    const c = geo.combo
+    if (!c || c.length !== 3) return '—'
+    const hit = ([['短期', c[0]], ['中期', c[1]], ['长期', c[2]]] as const)
+      .filter(([, v]) => v !== '中')
+      .map(([tag, v]) => `${tag}到${v === '上' ? '上' : '下'}沿`)
+    return hit.length ? hit.join(' · ') : '三档都在中部'
+  })()
   const cell = (label: string, value: string, title?: string, tone?: string) => (
     <div key={label} className="min-w-0 flex-1 basis-[104px] bg-elevated/40 px-3 py-2 text-center" title={title}>
       <div className="truncate text-[10px] text-muted">{label}</div>
@@ -695,23 +714,41 @@ function ChannelPanel({ ch }: { ch: NonNullable<StockReview['channel']> }) {
           ))}
         </ul>
       )}
+      {/* [R211] **格子里放状态词, 不放数字。**
+          用户: 「用数字看不懂, 还是直接告诉当前数据代表什么的状态更好,
+          至于详细含义解释就放在叹号里面一起」。
+          `+1.4` / `-1.3` / `10%` / `中下中` 这些扫一眼没有任何意义 —— 得先知道
+          「多少算大」才读得出好坏, 而那正是不该逼用户记的东西。
+          数字全部退到悬停(要核对时仍然拿得到), 「多少算大」的分界写在感叹号里。 */}
       <div className="flex flex-wrap gap-px overflow-hidden rounded-card bg-border/70">
-        {cell('快慢变化', `${geo.accel.gain_atr >= 0 ? '+' : ''}${geo.accel.gain_atr.toFixed(1)}`,
-          '最近这一段比之前那一段走得快了还是慢了(单位:倍日常波动)。零表示速度没变。不是越大越好 —— 冲得太猛常出现在一波的末尾',
+        {cell('快慢', pace,
+          `最近这十天比之前那一段${geo.accel.gain_atr >= 0 ? '多' : '少'}走了 `
+          + `${Math.abs(geo.accel.gain_atr).toFixed(1)} 倍日常波动。`
+          + '不是越大越好 —— 冲得太猛常出现在一波的末尾',
           geo.accel.level === 'accel' ? 'text-red-400'
             : geo.accel.level === 'decel' ? 'text-emerald-400' : 'text-foreground')}
-        {cell('快慢', geo.accel.level_cn || '—', '比前一段是快了、慢了, 还是没变')}
-        {cell('三线间距', geo.spread.toFixed(1),
-          '短线和长线离多远, 带方向。接近零 = 挤在一起, 方向还没出来;适中 = 趋势立住了;太大 = 已经走了很长一段, 再追不划算')}
-        {cell('还重合多少', geo.compress != null ? `${(geo.compress * 100).toFixed(0)}%` : '—',
-          '短、中、长三种看法认的价还有多少是重合的。越高说明三种看法越一致')}
-        {cell('挤了几天', `${runs.compress_days} 天`,
-          '到今天为止连着多少天三种看法都一致 —— 也就是这只票「横了多久」')}
-        {cell('这季平均', runs.compress_avg != null ? `${(runs.compress_avg * 100).toFixed(0)}%` : '—',
-          '整个季度平均有多一致。跟「挤了几天」一起看:连着的天数是零、平均却很高 = 刚刚才走出来')}
-        {cell('波动来自', energy ? energy.dominant_cn.replace(/\(.*/, '') : '—',
-          energy ? `几天的短波动 ${(energy.share.s * 100).toFixed(0)}% / 一波行情的主体 ${(energy.share.m * 100).toFixed(0)}% / 长期老趋势 ${(energy.share.l * 100).toFixed(0)}%` : undefined)}
-        {cell('三档位置', geo.combo ?? '—', '短、中、长各自在自己通道里的高低')}
+        {cell('走到哪一步', ch.phase?.maturity_cn ?? '—',
+          (geo.spread >= 0
+            ? `短线高出长线 ${geo.spread.toFixed(1)} 倍日常波动`
+            : `短线低于长线 ${Math.abs(geo.spread).toFixed(1)} 倍日常波动`)
+          + '。接近零 = 方向还没出来;适中 = 趋势立住了;太大 = 已经走了很长一段')}
+        {cell('三种看法', agree,
+          geo.compress != null
+            ? `短、中、长三种看法认的价还有 ${(geo.compress * 100).toFixed(0)}% 是重合的。越高说明越一致`
+            : undefined)}
+        {cell('挤在一起', squeeze,
+          `到今天为止连着 ${runs.compress_days} 天三种看法都认同一个价`)}
+        {cell('这季多数时候', quarter,
+          runs.compress_avg != null
+            ? `整个季度平均重合 ${(runs.compress_avg * 100).toFixed(0)}%。跟「挤在一起」一起看:`
+              + '连着的天数是零、平均却很高 = 刚刚才走出来'
+            : undefined)}
+        {cell('波动来自', energy ? energy.dominant_cn : '—',
+          energy ? `几天的短波动 ${(energy.share.s * 100).toFixed(0)}% / `
+            + `一波行情的主体 ${(energy.share.m * 100).toFixed(0)}% / `
+            + `长期老趋势 ${(energy.share.l * 100).toFixed(0)}%` : undefined)}
+        {cell('哪几档到边了', atRail,
+          '短、中、长各自在自己通道里的高低。三档都在中部时这一格没有信息')}
       </div>
       {!!event.combo_note && (
         <p className="rounded border border-amber-400/30 bg-amber-400/[0.06] px-2.5 py-1.5 text-[10px] leading-relaxed text-amber-300/90">
