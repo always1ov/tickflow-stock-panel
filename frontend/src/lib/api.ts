@@ -843,6 +843,10 @@ export interface ChannelPhase {
   why: string
   /** 这一段该盯什么。**不是买卖指令** —— 那是把握分与六态的事 */
   watch: string
+  /** [R209] 走到哪一步了: 刚起步 / 走到中段 / 走了很长 / 走过头了。**不带数字** */
+  maturity_cn: string
+  /** [R209] 还有没有劲: 还在加速 / 速度平稳 / 正在放慢 */
+  pace_cn: string
 }
 
 export interface ChannelEvent {

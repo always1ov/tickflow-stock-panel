@@ -14,7 +14,7 @@ import { storage } from '@/lib/storage'
 import { buildBoardHtml } from '@/lib/decisionBoardHtmlExport'
 import { DEFAULT_EXPORT_KEYS } from '@/lib/decisionBoardExportColumns'
 import { ExportColumnsDialog } from '@/components/stock-analysis/decision-board/ExportColumnsDialog'
-import { ChannelStackCell, ChannelStateCell, NUM, PlaybookCell, TD_BASE, UrgencyLine, VerdictCell } from '@/components/stock-analysis/decision-board/cells'
+import { ChannelStackCell, ChannelStateCell, NUM, PlaybookCell, TD_BASE, VerdictCell } from '@/components/stock-analysis/decision-board/cells'
 import { ComboTableDialog } from '@/components/stock-analysis/decision-board/ComboTableDialog'
 import { LotsLink } from '@/components/stock-analysis/decision-board/LotsLink'
 import { GlossaryButton } from '@/components/stock-analysis/decision-board/GlossaryDialog'
@@ -42,10 +42,10 @@ const BOARD_COLS = [
   // [R205] **整张表唯一的收敛层, 所以在最左边。** 决策台有五套彼此平行的判定
   // (该动了/六态/通道结论/通道阶段/AI 信号), 这一列替人做完那次五路合成,
   // 并且**指出它们什么时候打架** —— 那是最该停手、却最容易被忽略的时刻。
-  { label: '怎么办', w: '13%' },
+  { label: '怎么办', w: '16%' },
   // [R198] 「该动」不再单独占一列 —— 它挪进了标的格的第二行。判定本身没变,
   // 只是从"另一列"变成"这只票名字底下的一句话", 扫表时不用左右对眼。
-  { label: '标的', w: '11%' },       // 名字 + 该动两行
+  { label: '标的', w: '8%' },        // [R209] 只剩名字+代码一行了, 从 11% 收到 8%
   { label: '现价', w: '3.5%' },
   { label: '涨跌', w: '3.5%' },
   { label: '仓位', w: '3%' },
@@ -677,9 +677,13 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
                     {/* 点标的即切换分析(免搜索) */}
                     {/* [R157b] 当前个股整行常驻高亮 + 左侧一道靛蓝边: 搜索后先弹出关键价位
                         弹窗, 闪烁那 1.8 秒多半被弹窗盖住, 关掉弹窗还得一眼认得出它在哪 */}
-                    {/* [R198] 「该动了」从独立一列挪进标的格的第二行。判定一个字
-                        没改, 只是从"另一列"变成"这只票名字底下的一句话" ——
-                        自选一多, 左右对眼比上下读一行累得多。 */}
+                    {/* [R209] 「该动了」那两行从这里撤掉了。用户: 「已经有怎么办的列了,
+                        标的里面的那些就不多余了」—— **说得对, 那是同一句话印了两遍**:
+                        「怎么办」列本来就是把「该动了」合成进去的一层(它是五套判定里的
+                        一套), 于是同一只票的「生命线跌破 399.85 已跌破 3.6%」左右各印
+                        一份。R198 当初把它挪进标的格是为了省一列, 现在收敛层顶上了,
+                        它就成了纯重复。
+                        判定本身一个字没动 —— 排序键、「只看要动的」筛选照旧走它。 */}
                     <td className={`${TD_BASE} px-3 text-center border-l-2 ${active ? 'border-l-accent' : 'border-l-transparent'}`}>
                       <button onClick={() => (onPreview ?? onSelect)(r.symbol, r.name)}
                               className="mx-auto flex min-h-[2.25rem] flex-col items-center justify-center gap-0.5 text-center cursor-pointer group">
@@ -689,7 +693,6 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
                           <span className={`${NUM} text-[9px] text-muted`}>{r.symbol}</span>
                         </span>
                       </button>
-                      <UrgencyLine u={r.urg} />
                     </td>
                     <td className={`${TD_BASE} ${NUM} whitespace-nowrap px-2 text-foreground`}>{r.close != null ? r.close.toFixed(2) : '—'}</td>
                     <td className={`${TD_BASE} ${NUM} whitespace-nowrap px-2 ${up ? 'text-red-400' : down ? 'text-emerald-400' : 'text-muted'}`}>

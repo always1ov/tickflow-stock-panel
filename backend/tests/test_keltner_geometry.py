@@ -533,3 +533,40 @@ def test_文案里没有漏掉的f前缀():
                      "torn": False, "nested": nested}, {"compress_days": 12})
         for text in (p["why"], p["watch"]):
             assert not re.search(r"[—,、。\s]f[一-鿿]", text), f"混进了 f 前缀: {text}"
+
+
+# ---------------------------------------------- [R209] 走到哪一步 / 还有没有劲
+
+
+@pytest.mark.parametrize("sp,expect", [
+    (0.4, "刚起步"), (-0.4, "刚起步"),
+    (1.5, "走到中段"), (-1.5, "走到中段"),
+    (3.6, "走了很长"), (-3.6, "走了很长"),
+    (6.2, "走过头了"), (-6.2, "走过头了"),
+])
+def test_走到哪一步按打分那一层的同一组门槛分档(sp, expect):
+    """**门槛必须与打分同源。** 界面上说「走了很长」的那一刻, 打分那边也该正好
+    在扣分 —— 两边各编一套的话, 用户会看到"界面说走过头了但分数还很高"。"""
+    p = g.phase({"spread": sp, "accel": {"a1": 0.0}, "compress": 0.0,
+                 "torn": abs(sp) >= g.TORN_ATR, "nested": False})
+    assert p["maturity_cn"] == expect
+
+
+@pytest.mark.parametrize("a1,expect", [
+    (0.3, "还在加速"), (0.0, "速度平稳"), (-0.3, "正在放慢"),
+])
+def test_还有没有劲三档(a1, expect):
+    p = g.phase({"spread": 2.0, "accel": {"a1": a1}, "compress": 0.1,
+                 "torn": False, "nested": False})
+    assert p["pace_cn"] == expect
+
+
+def test_这两个读数里一个数字都没有():
+    """这一列重做的**全部理由**: 上一版摆的是「短线低 1.7 倍波动 / 速度没变」,
+    那还是测量值。扫表的人换算不出「1.7 倍日常波动」意味着什么。"""
+    import itertools
+    for sp, a1 in itertools.product((-6.2, -1.5, 0.3, 2.2, 6.2), (-0.3, 0.0, 0.3)):
+        p = g.phase({"spread": sp, "accel": {"a1": a1}, "compress": 0.3,
+                     "torn": abs(sp) >= g.TORN_ATR, "nested": False})
+        for k in ("cn", "maturity_cn", "pace_cn"):
+            assert not any(ch.isdigit() for ch in p[k]), f"{k} 里有数字: {p[k]}"

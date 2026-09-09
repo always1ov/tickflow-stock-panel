@@ -174,7 +174,7 @@ def playbook(*, position: dict | None, trend: dict | None, exit_line: dict | Non
                       f"{(event or {}).get('cn')}:{(event or {}).get('why') or ''}"),
                 "conflicts": conflicts}
     if not held and ph_code == "coiling":
-        return {**_mk(SHAPE, "在酝酿",
+        return {**_mk(SHAPE, "酝酿中",
                       f"{(phase or {}).get('why') or ''} —— {(phase or {}).get('watch') or ''}"),
                 "conflicts": conflicts}
 

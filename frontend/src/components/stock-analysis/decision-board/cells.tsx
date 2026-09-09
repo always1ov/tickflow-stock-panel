@@ -4,7 +4,7 @@
  * [R167] 从 WatchlistDecisionBoard.tsx 拆出。各自带着自己的配色表 —— 配色表是
  * 实现细节, 不该摆在 933 行主文件的顶部让人以为是全局约定。
  */
-import type { BandEnergy, ChannelEvent, ChannelGeometry, ChannelPhase, ChannelRuns, KeltnerBand, KeltnerVerdict, Playbook, Urgency } from '@/lib/api'
+import type { BandEnergy, ChannelEvent, ChannelGeometry, ChannelPhase, ChannelRuns, KeltnerBand, KeltnerVerdict, Playbook } from '@/lib/api'
 import { VerdictHover } from '@/components/stock-analysis/VerdictHover'
 
 /**
@@ -248,75 +248,18 @@ export function VerdictCell({ v, ev, geo, runs, energy, ph, onOpen }: {
 
 
 
-// [R178] 「该动了」配色。急的用暖色、无事的彻底压暗 —— 这一列的作用是让眼睛
-// 在 80 行里一秒找到该看的那几行, 所以对比要拉开, 不能像别的列那样克制。
-const URGENCY_CLS: Record<Urgency['level'], string> = {
-  triggered: 'border-red-400/50 bg-red-400/15 text-red-400 font-medium',
-  near: 'border-amber-400/40 bg-amber-400/10 text-amber-400',
-  flip: 'border-violet-400/40 bg-violet-400/10 text-violet-300',
-  band: 'border-sky-400/30 bg-sky-400/5 text-sky-300/90',
-  idle: 'border-transparent text-muted/30',
-}
-
-// [R193] 方向标。**档位管急不急, 方向管买还是卖 —— 两个正交的维度**,
-// 原来只显示了前者。同样一个琥珀色的「逼近」, 可能是"再跌一点就破止损"
-// 也可能是"再涨一点就转强", 不标方向的话扫表时长得一模一样。
-const SIDE_CLS: Record<string, string> = {
-  sell: 'border-rose-400/50 bg-rose-400/15 text-rose-300',
-  buy: 'border-sky-400/50 bg-sky-400/15 text-sky-300',
-  info: 'border-border/50 text-muted/70',
-}
-
-/**
- * 「该动了」单元格。
- *
- * [R193] 用户: 「这一列要把话说清楚, 太简洁了, 这也不行, 会误人子弟」。
- *
- * 原来只画一个「逼近 0.5%」的胶囊, 其余全在悬停的 title 里。**一列 80 行是
- * 用来扫的, 扫的时候没人会悬停** —— 所以那句解释等于不存在, 而缺了它,
- * 「该卖」和「该买」在这一列里完全同形。这是这一列唯一一处真会害人的地方。
- *
- * 现在单元格自己说三件事:
- *   ① 档位 + 距离   —— 有多急(已触发那一档给的是"已经破了多少", 不再是假的 0.0%)
- *   ② 方向          —— 买还是卖, 单独一个色块, 不靠语义色去暗示
- *   ③ 哪条线 / 该干嘛 —— 带上具体价位, 能直接照着挂单
- *
- * 判定还没回来时显示 "—" 而不是"无事" —— 那是两件事, 混在一起会让人以为
- * 今天真没事。每一档背后都是一条写死的规则(见 services/watchlist_urgency.py),
- * 这里显示的是后端给的原话, 前端不自己编。
- */
-/**
- * [R198] 「该动了」由**独立一列**改成挂在标的名字下面的一行。
- *
- * 判定一个字没改(见 services/watchlist_urgency.py), 换的只是位置: 自选一多,
- * 左右对眼比上下读一行累得多 —— 「这只票该动」和「这只票叫什么」本来就该
- * 挨在一起。R193 那条纪律照旧: **方向要直接写出来**, 不能只给一个档位 ——
- * 同样是「逼近」, 可能是"再跌一点破止损"也可能是"再涨一点转强", 两个相反的
- * 动作不标方向就长得一模一样。
- */
-export function UrgencyLine({ u }: { u?: Urgency }) {
-  if (!u || u.level === 'idle') return null
-  const side = u.side ?? 'info'
-  return (
-    <div className="mt-0.5 flex flex-col items-center gap-0.5" title={u.reason}>
-      <span className="flex items-center gap-1">
-        <span className={`inline-flex items-center gap-1 whitespace-nowrap rounded border px-1.5 py-0.5 text-[10px] ${URGENCY_CLS[u.level]}`}>
-          {u.label}
-          {u.distance != null && (
-            <span className={`${NUM} opacity-70`}>{(u.distance * 100).toFixed(1)}%</span>
-          )}
-        </span>
-        {!!u.side_cn && (
-          <span className={`inline-flex shrink-0 rounded border px-1 py-0.5 text-[10px] font-medium ${SIDE_CLS[side]}`}>
-            {u.side_cn}
-          </span>
-        )}
-      </span>
-      {!!u.what && <span className="text-[9px] leading-tight text-secondary/90">{u.what}</span>}
-      {!!u.action && <span className="text-[9px] leading-tight text-muted/80">{u.action}</span>}
-    </div>
-  )
-}
+// [R209] 「该动了」的单元格(UrgencyLine)与它那两张配色表在这里删掉了。
+//
+// 用户: 「已经有怎么办的列了, 标的里面的那些就不多余了」。**同一句话印了两遍** ——
+// 「怎么办」列本来就是把「该动了」当成五套判定之一合成进去的, 于是同一只票的
+// 「生命线跌破 399.85 已跌破 3.6%」左右各印一份。
+//
+// R193 那条纪律没有丢, 只是搬了家: **方向要直接写出来**(「逼近·买」而不是光一个
+// 「逼近」)现在由 PlaybookCell 的标题承担 —— 同样是「逼近」, 可能是再跌一点破止损,
+// 也可能是再涨一点转强, 两个相反的动作不标方向就长得一模一样。
+//
+// 判定本身(services/watchlist_urgency.py)一个字没动, 排序键与「只看要动的」筛选
+// 照旧走它。删掉的只是这一处重复的显示 —— 按 R198 立的规矩: 不留没人调的死代码。
 
 // [R201] 阶段配色 —— 与复盘弹窗那张 PHASE_CLS 同一套语义, 只是这里要更淡:
 // 决策台一屏 80 行, 整列都是实色会盖过「该动了」那一列的红。
@@ -331,83 +274,66 @@ const PHASE_TEXT: Record<string, string> = {
 }
 
 /**
- * [R201] 「通道态势」列 —— 延伸指标里**唯一值得占一列**的那一组。
+ * 「通道态势」列 —— 现在处在哪一段、走到哪一步、还有没有劲。
  *
- * ## 为什么是这三个, 不是全部
+ * ## [R209] 这一列重做过一次, 原因值得记下来
  *
- * 几何层一共算出十来个量。逐个问"它能不能改变我今天的动作":
+ * 上一版摆的是三行:「下跌中 / 短线低 1.7 倍波动 / 速度没变」。用户:
+ * 「通道态势这一列得重新做, 看不懂这样的表述」。**问题不在措辞, 在种类** ——
+ * 后两行是**测量值**, 而这一列的位置(挨着「贵不贵」和「怎么办」)决定了它
+ * 该出结论。「1.7 倍日常波动」这个单位再准确, 扫表的人也换算不出它意味着什么。
  *
- *   · **阶段**      能。它是唯一直接回答「现在该盯什么」的; 而且它是
- *                   压缩/间距/快慢三个量合起来的判定, 一个词顶三个数。
- *   · **三线间距**  能。一个带符号的数同时给方向(正=朝上)与成熟度
- *                   (接近 0 没出方向 / 适中趋势立住 / 太大追不动了),
- *                   而且**可排序** —— 想找"刚立住的"就升序扫这一列。
- *   · **快慢变化**  能。它与间距正交: 间距说走了多远, 快慢说还有没有劲。
- *                   同样是间距 2.5, 提速和变慢是两个完全不同的处境。
- *   · **挤了几天**  能, 但只在"憋着劲"那一档才有意义 —— 所以只在有值时显示,
- *                   不占固定行高。
+ * 现在两行, 都是判断, **一个数字都没有**:
  *
- * 明确**不进列**的那几个, 以及理由:
+ *     下跌中              ← 处在哪一段(七档之一, 带方向)
+ *     走到中段 · 速度平稳   ← 走到哪一步了 + 还有没有劲
  *
- *   · 还重合多少(压缩指数) —— 与间距单调对应(|间距| 越大重合越少), 摆两个
- *     等于同一件事投两次票, 占地方还让人以为是两条独立证据。
- *   · 波动主要来自(频段能量) —— 它回答的是"这波是谁在推", 属于**研究**而不是
- *     **今天的动作**; 留在悬停与复盘里。
- *   · 离各自中线多远 —— 与旁边「量化通道」那一列讲的是同一件事(位置), 重复。
- *   · 三档位置码(如「上中下」) —— 已经由「结论」列翻成人话了, 码本身是给
- *     台账分组用的, 不是给人扫的。
+ * 「走到哪一步」的门槛直接用打分那一层已经在用的那三个(SPREAD_LAUNCH /
+ * SPREAD_MATURE / TORN_ATR), 不另编一套 —— 界面上说「走了很长」的那一刻,
+ * 打分那边也正好在扣分, 两边永远对得上。
  *
- * R193 的教训在这里同样成立: **一列 80 行是用来扫的, 扫的时候没人会悬停。**
- * 所以这一列摆的是能被"扫"出来的东西(一个词 + 一个带符号的数), 细节留悬停。
+ * 数字全部退到悬停: 扫表时用不上, 要核对时又必须有。点开是 27 种组合速查。
+ *
+ * ## 为什么是这几个量, 不是全部
+ *
+ * 几何层一共算出十来个。逐个问"它能不能改变我今天的动作":
+ *   · **阶段**     能 —— 唯一直接回答「现在该盯什么」的, 一个词顶三个数。
+ *   · **三线间距** 能 —— 但它的价值在**排序**(升序扫是「刚立住的」, 降序扫是
+ *                  「走得最远该收的」), 所以留作排序键, 显示上收成「走到哪一步」。
+ *   · **快慢**     能 —— 与间距正交: 间距说走了多远, 快慢说还有没有劲。
+ *   · **挤了几天** 只在「横着憋」那一档有意义 —— 退到悬停。
+ *
+ * 明确不进这一列的: 压缩指数(与间距单调对应, 同一件事投两次票)、频段能量
+ * (回答「这波是谁在推」, 属于研究不属于今天的动作)、离各自中线(与旁边
+ * 「量化通道」列讲的是同一件事)、三档位置码(已由「贵不贵」列翻成人话)。
  */
 export function ChannelStateCell({ geo, runs, ph, onOpenCombo }: {
   geo?: ChannelGeometry | null
   runs?: ChannelRuns | null
   ph?: ChannelPhase | null
-  /** [R203] 点开 27 种组合速查(带这只票的读数与高亮) */
+  /** 点开 27 种组合速查(带这只票的读数与高亮) */
   onOpenCombo?: () => void
 }) {
-  if (!geo) {
+  if (!geo || !ph) {
     return <td className={`${TD_BASE} px-1.5`}><span className="text-[10px] text-muted/30">—</span></td>
   }
-  // [R207] 用户: 「间距 -1.7 匀速 这类描述太含糊」。**说得对, 那是两个残句拼的**:
-  //   ·「间距」没说是谁和谁之间;「-1.7」没有单位; 负号要人自己想是什么意思。
-  //   ·「匀速」单独摆着不知道在讲什么 —— 匀速地涨? 匀速地跌?
-  // 现在每一行都是一句完整的话: 谁比谁高(低)多少、比之前快了还是慢了。
-  const a = geo.accel
-  const fast = a?.level === 'accel' ? '比之前快'
-    : a?.level === 'decel' ? '比之前慢' : '速度没变'
-  const fastCls = a?.level === 'accel' ? 'text-red-400/80'
-    : a?.level === 'decel' ? 'text-emerald-400/80' : 'text-muted'
+  // 悬停里才给数字 —— 扫表时用不上, 要核对时又必须有
   const gap = geo.spread >= 0
-    ? `短线高 ${geo.spread.toFixed(1)} 倍波动`
-    : `短线低 ${Math.abs(geo.spread).toFixed(1)} 倍波动`
+    ? `短线高出长线 ${geo.spread.toFixed(1)} 倍日常波动`
+    : `短线低于长线 ${Math.abs(geo.spread).toFixed(1)} 倍日常波动`
+  const tip = [`${ph.cn} —— ${ph.why}`, `该盯什么:${ph.watch}`, '', gap,
+    runs?.compress_days ? `三条线已经这样挤在一起 ${runs.compress_days} 天` : '',
+    '', '点开看 27 种组合系统各怎么说'].filter(Boolean).join('\n')
   return (
     <td className={`${TD_BASE} whitespace-nowrap px-1.5`}>
-      <button type="button" onClick={onOpenCombo}
-              className="inline-flex cursor-pointer flex-col items-center gap-0.5 leading-tight transition-colors duration-hover hover:brightness-125"
-              title="点开三档组合速查 —— 27 种组合系统各怎么说, 并高亮这只票现在在哪一格">
-        {!!ph && (
-          <span className={`text-[10px] ${PHASE_TEXT[ph.code] ?? 'text-muted'}`}
-                title={`${ph.why}\n该盯什么:${ph.watch}`}>
-            {ph.cn}
-          </span>
-        )}
-        <span className="text-[9px] text-muted"
-              title={'短线比长线高(低)多少 —— 单位是「倍日常波动」, 1 倍就是这只票平常一天大致会走的幅度。\n\n'
-                + '接近 0 = 方向还没出来;适中 = 趋势立住了;差得太多 = 已经走了很长一段。'}>
-          {gap}
+      <button type="button" onClick={onOpenCombo} title={tip}
+              className="inline-flex cursor-pointer flex-col items-center gap-0.5 leading-tight transition-colors duration-hover hover:brightness-125">
+        <span className={`text-[11px] font-medium ${PHASE_TEXT[ph.code] ?? 'text-muted'}`}>
+          {ph.cn}
         </span>
-        <span className={`text-[9px] ${fastCls}`}
-              title="最近这十天比之前那一段走得快了还是慢了 —— 和上面那行正交:上面说走了多远, 这行说还有没有劲">
-          {fast}
+        <span className="text-[9px] text-muted">
+          {ph.maturity_cn} · {ph.pace_cn}
         </span>
-        {!!runs?.compress_days && (
-          <span className="text-[9px] text-muted/70"
-                title="到今天为止连着多少天三种看法都认同一个价 —— 也就是这只票横了多久">
-            横了 {runs.compress_days} 天
-          </span>
-        )}
       </button>
     </td>
   )

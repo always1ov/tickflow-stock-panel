@@ -861,8 +861,36 @@ def phase(geo: dict | None, runs: dict | None = None) -> dict | None:
     up = a1 is not None and a1 > ACCEL_FLAT
     down = a1 is not None and a1 < -ACCEL_FLAT
 
+    # [R209] 除了阶段名, 再给两个**不带数字**的读数: 走到哪一步了、还有没有劲。
+    #
+    # 用户: 「通道态势这一列得重新做, 看不懂这样的表述」。上一版那一列摆的是
+    # 「短线低 1.7 倍波动 / 速度没变」—— **那还是测量值**, 而且「倍日常波动」
+    # 这个单位再准确, 扫表的人也换算不出它意味着什么。
+    #
+    # 换成两个人话档位: 三线间距落在哪一档(刚起步/走到中段/走了很长/走过头),
+    # 快慢落在哪一档(还在加速/速度平稳/正在放慢)。**数字全部退到悬停**。
+    # 门槛直接用打分那一层已经在用的 SPREAD_LAUNCH / SPREAD_MATURE / TORN_ATR,
+    # 不另编一套 —— 界面上说「走了很长」的那一刻, 打分那边也正好在扣分。
+    def _maturity() -> str:
+        a = abs(sp)
+        if a >= TORN_ATR:
+            return "走过头了"
+        if a >= SPREAD_MATURE:
+            return "走了很长"
+        if a >= SPREAD_LAUNCH:
+            return "走到中段"
+        return "刚起步"
+
+    def _pace() -> str:
+        if up:
+            return "还在加速"
+        if down:
+            return "正在放慢"
+        return "速度平稳"
+
     def mk(code, why, watch, cn=None):
-        return {"code": code, "cn": cn or PHASE_CN[code], "why": why, "watch": watch}
+        return {"code": code, "cn": cn or PHASE_CN[code], "why": why, "watch": watch,
+                "maturity_cn": _maturity(), "pace_cn": _pace()}
 
     if geo.get("torn"):
         # [R207] 分方向。同一个 |间距| ≥ 5, 涨上去和跌下来该说的话完全相反 ——

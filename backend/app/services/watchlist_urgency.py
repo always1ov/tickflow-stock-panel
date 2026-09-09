@@ -46,7 +46,7 @@ LABELS = {
     TRIGGERED: "已触发",
     NEAR: "逼近",
     FLIP: "刚变盘",
-    BAND: "到轨",
+    BAND: "到轨",          # [R209] 实际显示的是「到上沿」/「到下沿」, 见 _mk 的 label
     IDLE: "无事",
 }
 # 越小越急。前端默认排序直接用它, 免得两边各编一套顺序(与 keltner verdict 的
@@ -156,6 +156,7 @@ def assess(*, position: dict | None, trend: dict | None,
         up = pos in ("above", "near_upper")
         return _mk(BAND, flip_d, kind="band_up" if up else "band_down",
                    side=SIDE_SELL if up else SIDE_BUY,
+                   label="到上沿" if up else "到下沿",
                    what=f"短期通道{pos_cn}",
                    action=("到上沿, 这个位置买是在最贵的地方; 持有的可考虑高抛"
                            if up else "到下沿, 相对便宜; 但要先确认趋势还在"))
@@ -216,14 +217,19 @@ def _num(v) -> float | None:
 
 
 def _mk(level: str, distance: float | None, *, kind: str, side: str,
-        what: str, action: str) -> dict:
+        what: str, action: str, label: str | None = None) -> dict:
     """一档判定。
 
     `reason` 是把 what + action 拼起来的整句, 留给悬停与导出; 界面上**这两半
     要分开显示** —— 「哪条线差多远」和「该干什么」是两行不同的信息。
+
+    [R209] `label` 可以逐档覆盖。加它是为了「到轨」那一档 —— 用户:
+    「到轨要说清楚到什么轨」。上沿和下沿是**两个相反的动作**(一个偏卖一个偏买),
+    共用一个「到轨」等于把它们画成同一件事; 旁边虽然有买/卖色块, 但标题本身
+    读起来仍然一模一样。改成「到上沿」「到下沿」, 标题自己就说清了。
     """
     reason = what + (f" —— {action}" if action else "")
-    return {"level": level, "label": LABELS[level], "order": ORDER[level],
+    return {"level": level, "label": label or LABELS[level], "order": ORDER[level],
             "distance": None if distance is None else round(distance, 4),
             "kind": kind, "side": side, "side_cn": SIDE_CN[side],
             "what": what, "action": action, "reason": reason}
