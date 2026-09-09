@@ -19,6 +19,25 @@
  *
  * 两个视图共用同一份数据(一次请求), 顶部可以互相切换 —— 从哪一列进来只决定
  * 默认落在哪个视图, 不把人锁死。
+ *
+ * ## [R228] 27 种组合速查并了进来, 成为第三个页签
+ *
+ * 用户: 「这两个弹窗也整合到一起, 外部入口就变成一个按钮了, 这样打开好看」。
+ *
+ * 原来是**两个各自铺满屏幕的模态**, 而且从决策台「走势」那一格里用两个挨着的
+ * 按钮分别打开 —— 点六态徽标出复盘、点它右边的阶段出组合速查。这两个按钮长得
+ * 不像按钮, 也没有任何东西告诉人它们通向不同的地方。
+ *
+ * 三个页签讲的其实是同一只票的同一件事, 只是切法不同:
+ *
+ *     趋势状态   六态在时间轴上怎么走的        (纵向 · 六态)
+ *     通道结论   通道结论在时间轴上怎么走的     (纵向 · 通道)
+ *     组合速查   通道的 27 格里我在哪一格       (横向 · 通道)
+ *
+ * 并进来之后, 组合速查的 `geo`/`runs` 直接取复盘接口的 `channel` —— 不再由
+ * 决策台把行数据透传进来。`review_service._channel` 的末日读数与逐日表末行
+ * 走同一条路, 所以三个页签看到的是同一天的同一份读数, 不会出现"这个弹窗说
+ * 挤了 12 天, 那个说 9 天"。
  */
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
@@ -28,8 +47,9 @@ import { QK } from '@/lib/queryKeys'
 import { cn } from '@/lib/cn'
 import { trendBadgeCls } from '@/components/stock-analysis/TrendStateBar'
 import { VerdictHover } from '@/components/stock-analysis/VerdictHover'
+import { ComboView } from '@/components/stock-analysis/decision-board/ComboView'
 
-export type ReviewTab = 'trend' | 'verdict'
+export type ReviewTab = 'trend' | 'verdict' | 'combo'
 
 // 与决策台「结论」列同一套配色 —— 两处不一样的话, 翻历史时得先在脑子里做一次换算
 const VERDICT_CLS: Record<KeltnerVerdict['tone'], string> = {
@@ -150,6 +170,7 @@ export function StockReviewDialog({ symbol, name, tab: initialTab, onClose }: {
               <span className="truncate text-[10px] text-muted">
                 {d.start} ~ {d.end} · {d.days} 个交易日
                 {tab === 'trend' && ` · 六态阈值 ${(d.threshold * 100).toFixed(0)}%${d.threshold_source !== 'default' ? `(${d.threshold_source})` : ''}`}
+                {tab === 'combo' && ' · 27 种组合,系统对每一种怎么说'}
               </span>
             )}
           </div>
@@ -159,7 +180,10 @@ export function StockReviewDialog({ symbol, name, tab: initialTab, onClose }: {
                   R200 那轮清行话时把它换成了「这个价贵不贵」—— 那是在解释它**说什么**,
                   可页签要的是**这一栏叫什么**, 换掉之后反而对不上这一层在别处的名字
                   (`keltner.verdict` / 感叹号说明 / 复盘统计口径都叫通道结论)。 */}
-              {([['trend', '趋势状态'], ['verdict', '通道结论']] as const).map(([k, label]) => (
+              {/* [R228] 第三个页签「组合速查」—— 原来是另一个铺满屏幕的模态。
+                  三个页签的排序是有讲究的: 前两个是**纵向**(同一个判定在时间轴上
+                  怎么走的), 第三个是**横向**(同一天里 27 格各是什么样)。 */}
+              {([['trend', '趋势状态'], ['verdict', '通道结论'], ['combo', '组合速查']] as const).map(([k, label]) => (
                 <button
                   key={k}
                   onClick={() => setTab(k)}
@@ -186,18 +210,27 @@ export function StockReviewDialog({ symbol, name, tab: initialTab, onClose }: {
           </div>
         </div>
 
-        {q.isLoading && (
-          <div className="flex items-center justify-center gap-2 py-16 text-xs text-muted">
-            <Loader2 className="h-4 w-4 animate-spin" /> 正在回算 {days} 个交易日…
-          </div>
-        )}
-        {q.isError && <div className="px-4 py-16 text-center text-xs text-red-400">复盘数据加载失败</div>}
-        {d?.error && <div className="px-4 py-16 text-center text-xs text-muted">{d.error}</div>}
+        {/* [R228] 组合速查**不等这次请求**: 27 格的表是恒定的、另一个 query、
+            缓存一天, 而它只用 channel 里的末日读数去高亮"你在哪一格"。
+            让它陪着复盘转圈是白等 —— 表先出来, 读数带随后补上。 */}
+        {tab === 'combo' ? (
+          <ComboView geo={d?.channel?.geo} runs={d?.channel?.runs} />
+        ) : (
+          <>
+            {q.isLoading && (
+              <div className="flex items-center justify-center gap-2 py-16 text-xs text-muted">
+                <Loader2 className="h-4 w-4 animate-spin" /> 正在回算 {days} 个交易日…
+              </div>
+            )}
+            {q.isError && <div className="px-4 py-16 text-center text-xs text-red-400">复盘数据加载失败</div>}
+            {d?.error && <div className="px-4 py-16 text-center text-xs text-muted">{d.error}</div>}
 
-        {d && !d.error && tab === 'trend' && (
-          <TrendView d={d} rows={trendRows} onlyMarked={onlyMarked} onToggleMarked={() => setOnlyMarked((v) => !v)} />
+            {d && !d.error && tab === 'trend' && (
+              <TrendView d={d} rows={trendRows} onlyMarked={onlyMarked} onToggleMarked={() => setOnlyMarked((v) => !v)} />
+            )}
+            {d && !d.error && tab === 'verdict' && <VerdictView d={d} segments={segments} />}
+          </>
         )}
-        {d && !d.error && tab === 'verdict' && <VerdictView d={d} segments={segments} />}
       </div>
     </div>
   )

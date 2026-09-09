@@ -15,7 +15,6 @@ import { buildBoardHtml } from '@/lib/decisionBoardHtmlExport'
 import { DEFAULT_EXPORT_KEYS } from '@/lib/decisionBoardExportColumns'
 import { ExportColumnsDialog } from '@/components/stock-analysis/decision-board/ExportColumnsDialog'
 import { ChannelStateCell, ConclusionCell, NUM, TD_BASE } from '@/components/stock-analysis/decision-board/cells'
-import { ComboTableDialog } from '@/components/stock-analysis/decision-board/ComboTableDialog'
 import { LotsLink } from '@/components/stock-analysis/decision-board/LotsLink'
 import { GlossaryButton } from '@/components/stock-analysis/decision-board/GlossaryDialog'
 // [R169] 合并视图(手填 ⊕ 上游批次登记), 字段说明见 api.ts 的 EffectivePosition
@@ -123,8 +122,9 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
   // 默认顺序 = 「该动了」判定从急到缓。「走势」表头循环一圈之后回到它。
   const DEFAULT_SORT = { key: 'urgency' as SortKey, dir: 'asc' as const }
   const [sort, setSort] = useState<{ key: SortKey; dir: 'asc' | 'desc' }>(DEFAULT_SORT)
-  // [R203] 27 种组合速查 —— 存整行, 因为弹窗要拿这只票的 geo/runs 做读数带与高亮
-  const [combo, setCombo] = useState<{ name: string; geo?: KeltnerBands['geo']; runs?: KeltnerBands['runs'] } | null>(null)
+  // [R228] 27 种组合速查的独立弹窗状态在这里删掉了。用户: 「这两个弹窗也整合到
+  // 一起, 外部入口就变成一个按钮了」。它已经是复盘弹窗的第三个页签, 而且 geo/runs
+  // 改由复盘接口的 `channel` 给 —— 决策台不必再把行数据透传进弹窗。
   // 「只看要动的」—— 自选一多, 默认列 80 行本身就是噪音
   const [actionableOnly, setActionableOnly] = useState(false)
   const toggleSort = (key: SortKey) =>
@@ -601,11 +601,8 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
         </button>
       </div>
 
-      {/* [R48] 逐日复盘: 趋势 / 三档结论 / 涨停按同一条时间轴排开 */}
-      {combo && (
-        <ComboTableDialog name={combo.name} geo={combo.geo} runs={combo.runs}
-                          onClose={() => setCombo(null)} />
-      )}
+      {/* [R48] 逐日复盘: 趋势 / 三档结论 / 涨停按同一条时间轴排开
+          [R228] 27 种组合速查已经并成它的第三个页签 —— 这里只剩一个弹窗 */}
       {review && (
         <StockReviewDialog symbol={review.symbol} name={review.name} tab={review.tab} onClose={() => setReview(null)} />
       )}
@@ -790,8 +787,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
                     <ChannelStateCell
                       trend={r.trend} trendCls={r.trend ? trendBadgeCls(r.trend.state) : undefined}
                       geo={r.kc?.geo} runs={r.kc?.runs} ph={r.ph} kc={r.kc} close={r.close}
-                      onOpenReview={() => setReview({ symbol: r.symbol, name: r.name, tab: 'trend' })}
-                      onOpenCombo={() => setCombo({ name: r.name, geo: r.kc?.geo, runs: r.kc?.runs })} />
+                      onOpenReview={() => setReview({ symbol: r.symbol, name: r.name, tab: 'trend' })} />
                     {/* [R212] 结论 = 贵不贵(位置, 上) + 怎么办(动作, 下), 竖排一格 */}
                     <ConclusionCell v={r.kc?.verdict} ev={r.ev} geo={r.kc?.geo} runs={r.kc?.runs}
                                     energy={r.kc?.energy} ph={r.ph} p={r.play}

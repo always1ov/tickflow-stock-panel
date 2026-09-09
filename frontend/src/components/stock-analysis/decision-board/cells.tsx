@@ -256,11 +256,20 @@ const PHASE_TEXT: Record<string, string> = {
  *
  * **一个数字都没有。** 数字全在悬停里 —— 扫表时用不上, 要核对时又必须有。
  *
- * 两个点击目标: 上面那个徽标进逐日复盘(六态的历史), 下面两行进 27 种组合
- * 速查(通道的全貌)。各自对应它上面写的那套判定。
+ * ## [R228] 整格**一个**点击目标, 不再是两个
+ *
+ * 用户: 「这两个弹窗也整合到一起, 外部入口就变成一个按钮了, 这样打开好看」。
+ *
+ * 原来这一格里有两个挨着的按钮: 六态徽标进逐日复盘、右边的阶段进 27 种组合
+ * 速查。**它们通向两个不同的全屏模态, 而格子里没有任何东西说得出这件事** ——
+ * 两段文字长得一样、挨在一起, 谁也猜不到点左半边和点右半边打开的不是同一个东西。
+ *
+ * 现在两个弹窗并成了一个(见 `StockReviewDialog` 的三个页签), 这一格也就
+ * 只剩一个按钮: 整格可点, 落在「趋势状态」页签, 通道那两个页签在弹窗顶上换。
+ * 悬停也跟着并成一份 —— 原来是两半各自一份提示, 鼠标从左挪到右提示整个换掉。
  */
 export function ChannelStateCell({ trend, geo, runs, ph, kc, close, trendCls,
-                                  onOpenReview, onOpenCombo }: {
+                                  onOpenReview }: {
   /** [R211] 六态趋势 —— 合过来的那一列。作者的判定, 只读不改 */
   trend?: { state: string; state_cn: string; duration: number; since?: string
             action?: string; intraday?: boolean } | null
@@ -271,10 +280,8 @@ export function ChannelStateCell({ trend, geo, runs, ph, kc, close, trendCls,
   close?: number | null
   /** 六态徽标的配色(由 TrendStateBar 那套给, 两处必须同色) */
   trendCls?: string
-  /** 点六态徽标 → 逐日复盘 */
+  /** [R228] 整格点开 → 复盘弹窗(趋势 / 通道结论 / 组合速查 三个页签) */
   onOpenReview?: () => void
-  /** 点下面两行 → 27 种组合速查 */
-  onOpenCombo?: () => void
   /** 追加类名(结论区分界线之类) */
   cls?: string
 }) {
@@ -284,8 +291,17 @@ export function ChannelStateCell({ trend, geo, runs, ph, kc, close, trendCls,
   const gap = !geo ? '' : geo.spread >= 0
     ? `短线高出长线 ${geo.spread.toFixed(1)} 倍日常波动`
     : `短线低于长线 ${Math.abs(geo.spread).toFixed(1)} 倍日常波动`
-  const tip = !ph ? '' : [
-    `${ph.cn} —— ${ph.why}`, `该盯什么:${ph.watch}`, '', gap,
+  // [R228] 一份悬停, 按「六态怎么说 → 通道怎么说 → 依据」排。
+  // 原来是两半各一份: 鼠标从徽标挪到阶段, 提示整个换掉一份, 而这一格
+  // 讲的本来就是同一只票的方向。末尾那句从「点这两行…」改成整格的去处。
+  const tip = [
+    trend ? `【六态】${trend.state_cn} · 第 ${trend.duration} 天`
+      + (trend.since ? `,自 ${trend.since}` : '') : '',
+    trend?.action ?? '',
+    ...(ph ? ['', `【通道】${ph.cn} —— ${ph.why}`, `该盯什么:${ph.watch}`] : []),
+    // 第三行那句(三个尺度对齐到第几步)原来自带一份悬停, 一并收进来
+    ph?.align ? `【${ph.align.cn}】${ph.align.why}` : (ph ? `快慢:${ph.pace_cn}` : ''),
+    '', gap,
     at.length ? '现在到边的:' + at.map(([t, b]) => `${t}${b!.pos_cn}`).join('、') : '三档都在通道中部',
     runs?.compress_days ? `三条线已经这样挤在一起 ${runs.compress_days} 天` : '',
     '',
@@ -294,41 +310,39 @@ export function ChannelStateCell({ trend, geo, runs, ph, kc, close, trendCls,
       .map(([t, b]) => `${t}通道 ${b!.lower.toFixed(2)} ~ ${b!.upper.toFixed(2)}`
         + `,现在${b!.pos_cn}(位置 ${Math.round(b!.pct * 100)}%)`),
     close != null ? `收盘 ${close.toFixed(2)}` : '',
-    '', '点这两行看 27 种组合系统各怎么说'].filter(Boolean).join('\n')
+    '', '点开:逐日复盘 / 通道结论 / 27 种组合速查'].filter(Boolean).join('\n')
   return (
     // [R217] 与「结论」列同一个形状: **固定两行**, 高度对齐, 行与行不再糊在一起。
     //   行 1: 六态徽标 + 阶段·成熟度(原来阶段自己占一行)
     //   行 2: 快慢一行
     // 用户: 「每一列的内容应该就是一部分, 而不是内容上面一部分下面一部分」。
     <td className={`${TD_BASE} whitespace-nowrap px-1.5`}>
-      <div className="mx-auto flex flex-col items-center gap-0.5 leading-tight">
+      {/* [R228] **整格一个 button**。原来格子里有两个 button, 通向两个不同的
+          全屏模态, 而外观上分不出来。合并之后按钮边界与格子边界重合, 悬停整格
+          一起亮 —— "这一格可以点开"这件事本身第一次是看得见的。
+          内部的徽标一律降成 span: button 里套 button 是非法 HTML。 */}
+      <button type="button" onClick={onOpenReview} title={tip}
+              className="mx-auto flex w-full cursor-pointer flex-col items-center gap-0.5 rounded-btn px-1 py-0.5 leading-tight transition-colors duration-hover hover:bg-elevated/40">
         <span className="flex flex-wrap items-center justify-center gap-1">
           {trend ? (
-            <button onClick={onOpenReview}
-                    className={`inline-flex cursor-pointer whitespace-nowrap rounded border px-1.5 py-0.5 text-[10px] transition-colors hover:brightness-125 ${trendCls ?? ''}`}
-                    title={`${trend.state_cn} · 第 ${trend.duration} 天`
-                      + (trend.since ? `,自 ${trend.since}` : '')
-                      + (trend.action ? `\n${trend.action}` : '')
-                      + '\n\n点开翻这只票的逐日状态复盘'}>
+            <span className={`inline-flex whitespace-nowrap rounded border px-1.5 py-0.5 text-[10px] ${trendCls ?? ''}`}>
               {trend.state_cn} {trend.duration}天{trend.intraday ? <span className="ml-0.5 opacity-70">*</span> : null}
-            </button>
+            </span>
           ) : <span className="text-[10px] text-muted/30">—</span>}
           {!!ph && (
-            <button type="button" onClick={onOpenCombo} title={tip}
-                    className={`cursor-pointer whitespace-nowrap text-[10px] transition-colors duration-hover hover:brightness-125 ${PHASE_TEXT[ph.code] ?? 'text-muted'}`}>
+            <span className={`whitespace-nowrap text-[10px] ${PHASE_TEXT[ph.code] ?? 'text-muted'}`}>
               {ph.cn} · {ph.maturity_cn}
-            </button>
+            </span>
           )}
         </span>
         {/* [R224] 第二行给「三个尺度走到第几步」, 而不是一个警告。
             R223 那版是成对冲突检查, 实测超过一半的行挂警告 —— 那是噪声。
             三者是滞后阶梯(价格最快→六态→均线最慢), 不一致 = 转折还没走完。 */}
         {ph?.align ? (
-          <span className={`cursor-help text-[9px] ${
+          <span className={`text-[9px] ${
             ph.align.level === 3 ? 'text-red-400/80'
               : ph.align.level === 0 ? 'text-emerald-400/80'
-              : ph.align.level === null ? 'text-muted' : 'text-amber-300/85'}`}
-                title={ph.align.why}>
+              : ph.align.level === null ? 'text-muted' : 'text-amber-300/85'}`}>
             {ph.align.cn}
           </span>
         ) : (
@@ -336,7 +350,7 @@ export function ChannelStateCell({ trend, geo, runs, ph, kc, close, trendCls,
             {ph ? ph.pace_cn : <span className="text-transparent select-none">·</span>}
           </span>
         )}
-      </div>
+      </button>
     </td>
   )
 }

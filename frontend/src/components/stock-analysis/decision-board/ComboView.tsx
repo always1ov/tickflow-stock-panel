@@ -16,10 +16,19 @@
  *
  * 表本身**由后端生成**(`/api/stock-analysis/combo-table`), 不在前端写死一份 ——
  * 誊抄的表会漂: 底层哪天改了措辞, 这里就开始说假话, 而且没有任何东西会报错。
+ *
+ * ## [R228] 从**弹窗**降成**视图**
+ *
+ * 用户: 「这两个弹窗也整合到一起, 外部入口就变成一个按钮了, 这样打开好看」。
+ *
+ * 它和逐日复盘弹窗讲的是同一只票的同一件事(通道), 只是一个横着看 27 格、
+ * 一个竖着看 120 天 —— 却是两个各自铺满屏幕的模态, 从决策台同一个格子里
+ * 用两个挨着的按钮分别打开。现在并进复盘弹窗当第三个页签(`ReviewTab`),
+ * 这个文件只留视图, 外壳(遮罩/标题/关闭)交给那边。
  */
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { ChevronDown, X } from 'lucide-react'
+import { ChevronDown } from 'lucide-react'
 import { api, type ChannelGeometry, type ChannelRuns, type ComboTableRow } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { cn } from '@/lib/cn'
@@ -189,11 +198,16 @@ function ComboGroups({ rows, here }: { rows: ComboTableRow[]; here: string | nul
   )
 }
 
-export function ComboTableDialog({ onClose, geo, runs, name }: {
-  onClose: () => void
+/**
+ * 「组合速查」页签的内容。**没有外壳** —— 遮罩、标题、关闭按钮都在
+ * `StockReviewDialog` 那边, 这里只负责内容(R228)。
+ *
+ * `geo`/`runs` 由复盘接口的 `channel` 给, 与它逐日表末行是同一条路算出来的
+ * (`review_service._channel` 的注释)—— 所以三个页签看到的是同一天的同一份读数。
+ */
+export function ComboView({ geo, runs }: {
   geo?: ChannelGeometry | null
   runs?: ChannelRuns | null
-  name?: string
 }) {
   const q = useQuery({
     queryKey: QK.comboTable,
@@ -202,41 +216,24 @@ export function ComboTableDialog({ onClose, geo, runs, name }: {
   })
   const here = geo?.combo ?? null
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
-         onClick={onClose}>
-      <div role="dialog" aria-modal="true"
-           className="flex max-h-[88vh] w-full max-w-4xl flex-col overflow-hidden rounded-lg border border-border bg-surface shadow-2xl"
-           onClick={e => e.stopPropagation()}>
-        <header className="flex items-center gap-2 border-b border-border px-4 py-3">
-          <span className="text-sm font-medium text-foreground">
-            三档组合速查{name ? ` · ${name}` : ''}
-          </span>
-          <span className="text-[10px] text-muted">27 种组合,系统对每一种怎么说</span>
-          <button onClick={onClose} className="ml-auto text-muted hover:text-foreground">
-            <X className="h-4 w-4" />
-          </button>
-        </header>
+    <div className="min-h-0 flex-1 space-y-3 overflow-auto px-4 py-3">
+      {!!geo && <LiveStrip geo={geo} runs={runs} />}
 
-        <div className="min-h-0 flex-1 space-y-3 overflow-auto px-4 py-3">
-          {!!geo && <LiveStrip geo={geo} runs={runs} />}
+      {/* [R225] 27 行的表改成**分组卡片**。用户: 「把这部分做好看一点, 好丑。
+          看看怎么显示更有价值而不是一堆数据」。
 
-          {/* [R225] 27 行的表改成**分组卡片**。用户: 「把这部分做好看一点, 好丑。
-              看看怎么显示更有价值而不是一堆数据」。
+          原来是一张 27 行的表, 每行三行字, 而「几何含义」开头那半句
+          (「短期在上沿、中期在上沿、长期在上沿」)和左边的「短中长」列
+          **说的是同一件事** —— 27 行里印了 27 遍纯重复。整体是一堵字墙。
 
-              原来是一张 27 行的表, 每行三行字, 而「几何含义」开头那半句
-              (「短期在上沿、中期在上沿、长期在上沿」)和左边的「短中长」列
-              **说的是同一件事** —— 27 行里印了 27 遍纯重复。整体是一堵字墙。
-
-              三处改动:
-                ① 「你现在在这一格」提成顶上的主卡, 不再是列表里一行高亮 ——
-                   打开这个弹窗第一件想知道的就是它
-                ② 其余按**偏贵 / 中性 / 偏便宜**分三组, 而不是按字典序摊平 ——
-                   要的是"我这一格在贵贱谱系的哪一端, 旁边是什么"
-                ③ 重复的那半句退到悬停; 常见度画成点不写字;
-                   七个「几乎不出现」的默认收起来 */}
-          <ComboGroups rows={q.data?.rows ?? []} here={here} />
-        </div>
-      </div>
+          三处改动:
+            ① 「你现在在这一格」提成顶上的主卡, 不再是列表里一行高亮 ——
+               打开这个弹窗第一件想知道的就是它
+            ② 其余按**偏贵 / 中性 / 偏便宜**分三组, 而不是按字典序摊平 ——
+               要的是"我这一格在贵贱谱系的哪一端, 旁边是什么"
+            ③ 重复的那半句退到悬停; 常见度画成点不写字;
+               七个「几乎不出现」的默认收起来 */}
+      <ComboGroups rows={q.data?.rows ?? []} here={here} />
     </div>
   )
 }
