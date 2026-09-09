@@ -468,3 +468,37 @@ def test_R258_复盘表那一列叫结论():
     assert ">结论</th>" in src, "复盘逐日表那一列没改成「结论」"
     # 脚注曾经指着一个**已经不存在的页签**(R200 的旧名, R223 已改回「通道结论」)
     assert "切到上方的「通道结论」" in src, "脚注还指着旧页签名"
+
+
+def test_R261_走了多远那一行是统一色():
+    """用户: 「趋势列的描述都没有统一颜色, 有些是白色字体」。
+
+    **这是 R257 留下的错**: 那一版把文字从「阶段」换成了「走了多远」(成熟度),
+    却忘了换配色 —— 颜色仍按阶段码取, 于是同一句「走到中段」在上升中的票上是
+    红的、在下跌中的票上是绿的、在横盘中的票上是近白的(`text-secondary`)。
+    **颜色在说阶段, 文字在说走了多远, 两码事。**
+
+    成熟度是一句事实读数, 不是判断, 所以统一给次要色。
+    """
+    root = _BOARD.parent
+    cells = (root / "decision-board" / "cells.tsx").read_text(encoding="utf-8")
+    body = "\n".join(ln for ln in cells.splitlines()
+                     if not ln.lstrip().startswith(("//", "*", "/*", "{/*")))
+
+    assert "PHASE_TEXT" not in body, (
+        "「阶段配色」那张表又回来了 —— 它按**已经不显示的东西**给文字上色"
+    )
+    i = body.index("{ph.maturity_cn}")
+    line = body[body.rindex("<span", 0, i):i]
+    assert "text-muted" in line and "${" not in line, (
+        f"「走了多远」那一行的颜色又变成按条件取了: {line.strip()}"
+    )
+
+
+def test_R261_徽标与力度仍各自按含义上色():
+    """撤的是**挂错对象**的那一处配色, 不是把整列刷成一个颜色 ——
+    六态徽标按状态、力度按排列层级, 那两处的颜色说的正是它们自己的意思。"""
+    root = _BOARD.parent
+    cells = (root / "decision-board" / "cells.tsx").read_text(encoding="utf-8")
+    assert "${trendCls ?? ''}" in cells, "六态徽标的配色没了"
+    assert "ph.align.level === 3 ? 'text-red-400/80'" in cells, "力度那一行的配色没了"

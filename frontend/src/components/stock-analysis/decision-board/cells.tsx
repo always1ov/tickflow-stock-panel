@@ -252,17 +252,16 @@ function VerdictInner({ v, ev, geo, runs, energy, ph, stateRun, onOpen }: {
 // 判定本身(services/watchlist_urgency.py)一个字没动, 排序键与「只看要动的」筛选
 // 照旧走它。删掉的只是这一处重复的显示 —— 按 R198 立的规矩: 不留没人调的死代码。
 
-// [R201] 阶段配色 —— 与复盘弹窗那张 PHASE_CLS 同一套语义, 只是这里要更淡:
-// 决策台一屏 80 行, 整列都是实色会盖过「该动了」那一列的红。
-const PHASE_TEXT: Record<string, string> = {
-  coiling: 'text-secondary',
-  launching: 'text-red-300',
-  advancing: 'text-red-400',
-  stalling: 'text-amber-300',
-  overextended: 'text-amber-400',
-  declining: 'text-emerald-400',
-  unclear: 'text-muted',
-}
+// [R261] 那张「阶段配色」表在这里删掉了 —— **它是 R257 留下的错**。
+//
+// R257 把这一行的文字从「阶段」换成了「走了多远」(成熟度), 却**忘了换配色**:
+// 颜色仍按阶段码取, 于是同一句「走到中段」在上升中的票上是红的、在下跌中的
+// 票上是绿的、在横盘中的票上是近白的。用户: 「趋势列的描述都没有统一颜色,
+// 有些是白色字体」—— **颜色在说阶段, 文字在说走了多远, 两码事。**
+//
+// 成熟度是一句**事实读数**(这一段走了多远), 不是判断, 所以统一给次要色。
+// 那张表改完就没人用了, 按守则一并删, 不留死代码。
+
 
 /**
  * 「走势」列 —— 一只票的方向, 两套判定叠在一格里。
@@ -372,7 +371,7 @@ export function ChannelStateCell({ trend, geo, runs, ph, kc, close, trendCls,
             现在三行各管一件事: **方向(六态) / 走了多远(成熟度) / 还有没有劲**。
             阶段的完整说明与「该盯什么」照旧在悬停里, 一个字没丢。 */}
         {!!ph && (
-          <span className={`whitespace-nowrap text-[10px] ${PHASE_TEXT[ph.code] ?? 'text-muted'}`}>
+          <span className="whitespace-nowrap text-[10px] text-muted">
             {ph.maturity_cn}
           </span>
         )}
