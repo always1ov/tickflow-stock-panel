@@ -65,8 +65,13 @@ def long_trend_map(repo, symbols: list[str], *, with_closes: bool = False) -> di
         # [R195] 多要一列 atr_14 —— 压缩指数与"在轨外连续几天"要按 ATR 归一化算
         # 历史序列。**这一次批量读本来就在发生**(长期档的 MA120 没有预计算列,
         # 全自选每天都要走这里滚一遍), 多带一列几乎不花钱; 另起一条取数路才贵。
+        # [R238] 多要 ma20/ma60 两列。**不是为了省计算, 是为了同源** ——
+        # 复盘与决策台徽标都吃这两个预计算列, verdict_run 自己滚的话数出来的
+        # 逐日结论就和界面上另外两处不是一套, 天数对不上(用户: 「数字本身就
+        # 不对」)。长档没有预计算列, 仍然自己滚。
         df = repo.get_daily_batch(symbols, end - timedelta(days=span), end,
-                                  ["symbol", "date", "close", "atr_14"])
+                                  ["symbol", "date", "close", "atr_14",
+                                   "ma20", "ma60"])
     except Exception as e:  # noqa: BLE001
         logger.debug("keltner long trend batch failed: %s", e)
         return {}
@@ -123,7 +128,10 @@ def long_trend_map(repo, symbols: list[str], *, with_closes: bool = False) -> di
                     # [R237] 带上日期 —— 用户要的是"进入这个状态的起始日期",
                     # 光有天数不够: 天数每天变, 起始日不会变, 两个一起给才对得
                     # 起账(也才能让人回头去 K 线上核对那一天到底发生了什么)。
-                    vr = kg.verdict_run(cl, atrs, sub["date"].to_list())
+                    vr = kg.verdict_run(
+                        cl, atrs, sub["date"].to_list(),
+                        ma20=sub["ma20"].to_list() if "ma20" in sub.columns else None,
+                        ma60=sub["ma60"].to_list() if "ma60" in sub.columns else None)
                     if vr:
                         ent["verdict_run"] = vr
             except Exception as e:  # noqa: BLE001

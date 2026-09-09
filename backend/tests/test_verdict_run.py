@@ -375,3 +375,86 @@ def test_接口把起始日一起返回():
     assert v.get("since"), f"接口没返回起始日, 拿到的是 {sorted(v)}"
     # 起始日必须落在这一段里: 天数 N ⇒ since 是倒数第 N 个交易日
     assert v["since"] == str(dates[-v["days"]])
+
+
+def test_徽标上必须写明是_已连着_而不是历史累计():
+    """[R238] 用户: 「我不是要历史总数哦」。
+
+    光写「候选池 75天」可以读成两种完全不同的意思:
+
+        已经**连续**处于候选池 75 个交易日   ← 这里算的
+        历史上**累计** 75 天是候选池         ← 用户担心的
+
+    一个「已」字就是这句话的全部意思, 不是修饰。而且**必须在徽标上**说清楚
+    —— 一列 80 行是用来扫的, 不能指望用户逐个悬停去确认口径(R193 的教训)。
+
+    这条是文案守卫: 将来谁把「已」顺手删掉, 这里会红。
+    """
+    import pathlib
+
+    root = pathlib.Path(__file__).resolve().parents[2] / "frontend" / "src" / "components"
+    for rel in ("stock-analysis/decision-board/cells.tsx", "today/VerdictTag.tsx"):
+        p = root / rel
+        if not p.exists():
+            import pytest as _pytest
+            _pytest.skip(f"拿不到 {p}(只跑后端时正常)")
+        src = p.read_text(encoding="utf-8")
+        assert "v.days_exact === false ? '?' : ''" in src, (
+            f"{rel} 里找不到时长徽标 —— 改名了? 这条测试要同步更新"
+        )
+        # **匹配 JSX 里那一段本身**, 不是"附近有没有这个字"。
+        # 第一版写的是"往前 200 字里找「已」", 变异测试当场证明它是假的:
+        # 把「已」从徽标上删掉, 它照样绿 —— 因为上面注释里就有「已经连着」。
+        assert "已{v.capped" in src, (
+            f"{rel} 的时长徽标没写「已」—— 「候选池 75天」会被读成历史累计, "
+            f"而它说的是「已经连着 75 天」。这两个是完全不同的数。"
+        )
+
+
+def test_短中档吃传进来的均线列而不是自己滚():
+    """[R238] 用户: 「数字本身就不对」。
+
+    根子是同一条 MA20 在系统里有过**两套算法**:
+
+        复盘 `_bands_for_row`            预计算列 ma20/ma60 + 自己滚 ma120
+        决策台徽标 `channels_for_symbols`  预计算列 ma20/ma60 + 自己滚 ma120
+        verdict_run(改之前)              三条全自己滚        ← 只有它不同源
+
+    于是这里数出来的**逐日结论**和用户在复盘里逐日看到的不是一套, 天数当然
+    对不上 —— 而两边都印在界面上, 谁也说不清哪个是真的。
+
+    这条用一组**故意与自己滚不一样**的均线来证明: 传了就必须听传进来的。
+    """
+    closes = _flat_then([9.4, 9.4, 9.4, 9.4])
+    n = len(closes)
+    atrs = [_ATR] * n
+
+    rolled = kg.verdict_run(closes, atrs)
+    assert rolled is not None
+
+    # 造一组"短中档一直贴在价格上"的均线 —— 价格永远在通道正中, 该判不出结论
+    flat20 = list(closes)
+    flat60 = list(closes)
+    given = kg.verdict_run(closes, atrs, ma20=flat20, ma60=flat60)
+    assert given is None, (
+        f"传了均线列却还在自己滚 —— 拿传进来的算该是「三档都在中部」(无结论), "
+        f"自己滚会得到 {rolled['code']}"
+    )
+
+
+def test_均线列长度对不上时安静退回自己滚():
+    """长度不对 = 这份列不可信, 退回自己滚而不是崩、也不是半用半不用。"""
+    closes = _flat_then([9.4, 9.4])
+    n = len(closes)
+    got = kg.verdict_run(closes, [_ATR] * n, ma20=[1.0, 2.0], ma60=None)
+    assert got is not None and got["days"] == 2
+
+
+def test_批量里真的把两列均线要出来了():
+    """[R238] 接线: 不多要这两列, 上面那条性质就是空的。"""
+    import inspect
+
+    from app.services import keltner_service
+    src = inspect.getsource(keltner_service.long_trend_map)
+    assert '"ma20", "ma60"' in src, "日线批量没要预计算均线列"
+    assert "ma20=sub[" in src, "要来了却没传给 verdict_run"

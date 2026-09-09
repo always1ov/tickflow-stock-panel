@@ -121,10 +121,11 @@ export function VerdictHover({ v, note, children }: {
                     <span className="ml-1 text-[10px] font-normal text-muted"
                           title={v.days_exact === false
                             ? '这只票的历史不够长,只能确认到今天 —— 实际可能已经连着很多天'
-                            : '按交易日算,含今天。中间只要断一天(换了一档或没有结论)就重新起算'}>
+                            : '这是**当前这一段**连着多少个交易日,不是历史累计。'
+                              + '含今天;中间只要断一天(换了一档或没有结论)就从头重新起算。'}>
                       {v.days_exact === false
                         ? '只能确认到今天'
-                        : `已 ${v.capped ? '超过 ' : ''}${v.days} 个交易日${v.since ? ` · 自 ${v.since}` : ''}`}
+                        : `已连着 ${v.capped ? '超过 ' : ''}${v.days} 个交易日${v.since ? ` · 自 ${v.since}` : ''}`}
                     </span>
                   )}
                 </span>

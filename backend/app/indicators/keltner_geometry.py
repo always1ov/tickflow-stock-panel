@@ -571,7 +571,8 @@ def _tail_run(rows: list[dict], ok) -> int:
 
 
 def verdict_run(closes: list[float] | None, atrs: list[float] | None,
-                dates: list | None = None) -> dict | None:
+                dates: list | None = None,
+                ma20: list | None = None, ma60: list | None = None) -> dict | None:
     """[R233] 当前这条**通道结论**已经连着挂了几天。
 
     返回 `{code, days, since}`;当天没有结论时返回 None。`dates` 传了才有
@@ -595,12 +596,25 @@ def verdict_run(closes: list[float] | None, atrs: list[float] | None,
     原料就是 `series()` 用的那一串收盘价与 ATR, **不新增任何取数**。
     往回最多数 `MAX_LOOKBACK` 天。
 
-    ## 这里判定的"今天"未必等于快照的"今天"
+    ## [R238] 短/中档必须用**预计算列**, 不许自己滚
 
-    这个函数自己滚均线, 而 `channels_for_symbols` 的三档是拿 enriched 快照里
-    **预计算的 `ma20`/`ma60`** 拼的。两条路在最后一根上可能差一点(停牌行被
-    `drop_nulls` 掉、批量末根与快照末根不是同一天), 于是两个 code 对不上。
-    **那种情况怎么处理归调用方决定** —— 见 `keltner_service` 里 R234 那段。
+    用户: 「数字本身就不对」。
+
+    起因是同一条 MA20 在这个系统里有过两套算法:
+
+        复盘弹窗 `_bands_for_row`      预计算列 ma20/ma60 + 自己滚 ma120
+        决策台徽标 `channels_for_symbols` 预计算列 ma20/ma60 + 自己滚 ma120
+        **本函数(改之前)**            三条全自己滚          ← 只有这里不同源
+
+    于是这里数出来的**逐日结论**与用户在复盘里逐日看到的不是同一套, 天数当然
+    对不上 —— 而两边都印在界面上, 谁也说不清哪个是真的。
+
+    现在短档与中档一律吃传进来的 `ma20`/`ma60`(调用方从日线表直接取), 与另外
+    两处同源。**只有长档还自己滚** —— 它本来就没有预计算列, 这也正是
+    `long_trend_map` 存在的理由。
+
+    `ma20`/`ma60` 传 None 时退回自己滚, 那只是**没有这两列时的退路**(测试夹具
+    走的就是这条); 线上调用必须把列传进来, 否则又会分叉成两套。
     """
     from app.indicators.keltner import assess, verdict as _verdict
 
@@ -610,7 +624,11 @@ def verdict_run(closes: list[float] | None, atrs: list[float] | None,
     if n == 0 or len(as_) != n or any(c is None for c in cs):
         return None
     vals: list[float] = [c for c in cs]  # type: ignore[misc]
-    ma = {k_: _rolling_mean(vals, WINDOW[k_]) for k_ in ("s", "m", "l")}
+    # 长档永远自己滚(没有预计算列); 短中档优先吃传进来的那两列, 见上面 R238。
+    ma = {"l": _rolling_mean(vals, WINDOW["l"])}
+    for key, col in (("s", ma20), ("m", ma60)):
+        ma[key] = ([_f(x) for x in col] if col is not None and len(col) == n
+                   else _rolling_mean(vals, WINDOW[key]))
 
     def _code_at(i: int) -> str | None:
         a = as_[i]
