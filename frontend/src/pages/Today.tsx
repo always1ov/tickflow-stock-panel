@@ -529,7 +529,10 @@ export function Today() {
                           <LotBadge h={h} />
                         </td>
                         <td className="px-2 py-1.5 text-right font-mono">{h.close?.toFixed(2) ?? '—'}</td>
-                        <td className="px-2 py-1.5 text-right font-mono text-muted" title="在决策台持有标记旁填「仓%」后显示">
+                        {/* [R215] 决策台的「仓%」输入框撤了(用户: 「不需要仓位比例」),
+                            所以这里不能再让人去那儿填。以前填过的照常显示。 */}
+                        <td className="px-2 py-1.5 text-right font-mono text-muted"
+                            title="仓位比例(占总资金 %)。已经不再提供填写入口, 这里显示的是以前填过的值">
                           {h.weight != null ? `${h.weight}%` : '—'}
                         </td>
                         <td className={`px-2 py-1.5 text-right font-mono ${h.pnl_pct == null ? 'text-muted' : h.pnl_pct > 0 ? 'text-red-400' : h.pnl_pct < 0 ? 'text-emerald-400' : 'text-muted'}`}>

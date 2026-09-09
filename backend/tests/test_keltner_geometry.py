@@ -337,9 +337,17 @@ def test_基线常量就是三段的天数跨度():
 
 # ---------- ⑨ [R199] 阶段判定 ----------
 
-def _geo(spread, a1, o=0.3, torn=False, nested=False):
-    return {"spread": spread, "accel": {"a1": a1}, "compress": o,
-            "torn": torn, "nested": nested}
+def _geo(spread, a1, o=0.3, torn=False, nested=None):
+    """[R215] `nested` 默认**按 spread 推**, 不再让调用方随便填。
+
+    原来它默认 False, 于是这份 helper 造得出 `spread=0.7 且 nested=False` 这种
+    **真的 `geometry()` 永远不会返回**的形状(|间距| ≤ 1 必然 nested)。
+    「刚启动」那一档就是靠这个假形状显得有人走 —— 实际线上一次都没到过。
+    与 R214 里 `verdict={"side": "sell"}` 那条测试是同一个毛病:
+    **假数据自己对得上, 于是死路看着像活路。**
+    """
+    return {"spread": spread, "accel": {"a1": a1}, "compress": o, "torn": torn,
+            "nested": abs(spread) <= g.NESTED_ATR if nested is None else nested}
 
 
 def test_阶段是三个量一起读出来的():
@@ -645,3 +653,113 @@ def test_间距的解释按方向与远近分四档():
 def test_没有输入时安静返回空():
     assert g.explain(None) == []
     assert g.explain({}) == []
+
+
+# ================================================================
+# [R215] 阶段表全组合核对 —— 用户: 「下跌中贴下轨的怎么会是涨势转弱, 正常吗」
+#
+# 不正常。截图那一格是 下跌趋势 7 天 / 涨势转弱·走到中段 / 正在放慢。穷举之后
+# 是三类毛病, 同一个根: **`phase()` 只读了短线中枢与长线中枢的间距和快慢,
+# 措辞却在替它没看过的两件事打包票** —— 三条线是不是真排成一列, 以及价格在哪儿。
+#
+#   ① 「涨势转弱」说的是"有一段涨势, 正在转弱"。价格已经跌到三条线之下时,
+#      转弱这件事**已经完成了**(中枢滞后: 均线还没交叉, 价格早走完了)。
+#   ② 「三条线稳稳朝上/朝下散开」—— 间距只比了短和长两条, 中线在哪儿没看过。
+#   ③ 「刚启动」「看不出」两个阶段**一次都出不来**: NESTED_ATR 恰好等于
+#      SPREAD_LAUNCH(都是 1.0), "挤在一起"那一档把"刚走出来"的区间整个吞了。
+#
+# 下面守的是**性质**, 不是几个用例 —— 与 R214 的组合矩阵同一个路子。
+
+_PHASE_GRID = (-4.0, -2.0, -1.0, 0.0, 1.0, 2.0, 4.0)
+
+
+def _phase_cases():
+    """用真的 `geometry()` 造 geo, 不手搓 —— 手搓造得出现实里不存在的形状。"""
+    atr = 1.0
+    for ma_s in _PHASE_GRID:
+        for ma_m in _PHASE_GRID:
+            for ma_l in _PHASE_GRID:
+                bands = {key: {"mid": ma, "atr": atr,
+                               "upper": ma + g.K[key] * atr, "lower": ma - g.K[key] * atr}
+                         for key, ma in (("s", ma_s), ("m", ma_m), ("l", ma_l))}
+                for close in (ma_s - 3, ma_s - 2, ma_s, ma_s + 2, ma_s + 3):
+                    geo = g.geometry(bands, close)
+                    if geo:
+                        yield geo
+
+
+def test_每个阶段都到得了():
+    """一个永远出不来的阶段和没写是一回事 —— 而且看起来还像写了。
+
+    `PH_LAUNCHING` 就这么躺了很多轮: `today.py` 的 `_COILING_PHASES` 里正列着它,
+    等于候选路 C 又瘸了一半(R210 刚修过那条路的另一半)。
+    """
+    seen = {g.phase(geo)["code"] for geo in _phase_cases() if g.phase(geo)}
+    missing = set(g.PHASE_CN) - seen
+    assert not missing, f"这些阶段在全枚举里一次都没出现(等于没写): {sorted(missing)}"
+
+
+def test_排列不干净就不许说三条线散开():
+    """间距只比了短和长两条。中线没排到中间时, 「散开」这句话就是假的。"""
+    bad = []
+    for geo in _phase_cases():
+        p = g.phase(geo)
+        if not p:
+            continue
+        if p["code"] == g.PH_ADVANCING and geo["stack"] != g.STACK_BULL \
+                and "稳稳朝上散开" in p["why"]:
+            bad.append(("advancing", geo["stack"], geo["spread"]))
+        if p["code"] == g.PH_DECLINING and geo["stack"] != g.STACK_BEAR \
+                and "三条线朝下散开" in p["why"]:
+            bad.append(("declining", geo["stack"], geo["spread"]))
+    assert not bad, f"{len(bad)} 例排列不干净却说了「散开」, 前 3: {bad[:3]}"
+
+
+def test_价格位置与阶段名不许打架():
+    """价格已经跌穿三条线还叫「涨势转弱」, 或者已经翻上三条线还只说「下跌中」。"""
+    bad = []
+    for geo in _phase_cases():
+        p = g.phase(geo)
+        if not p:
+            continue
+        d = geo["d"]
+        below = all(d[key] < 0 for key in ("s", "m", "l"))
+        above = all(d[key] > 0 for key in ("s", "m", "l"))
+        if p["code"] in (g.PH_STALLING, g.PH_ADVANCING) and below \
+                and "价格已经跌到三条线之下" not in p["why"]:
+            bad.append(("涨势档没说价格已跌穿", p["cn"], geo["spread"], d))
+        if p["code"] == g.PH_DECLINING and above and "反弹" not in p["why"]:
+            bad.append(("下跌档没说眼下在反弹", p["cn"], geo["spread"], d))
+    assert not bad, f"{len(bad)} 例阶段名与价格位置打架, 前 3: {bad[:3]}"
+
+
+def test_用户撞见的那一格():
+    """中枢还是短线高出长线, 但价格已经跌穿三条线 —— 不该再叫「涨势转弱」。"""
+    atr = 1.0
+    mas = {"s": 0.0, "m": -0.6, "l": -2.0}
+    bands = {key: {"mid": ma, "atr": atr,
+                   "upper": ma + g.K[key] * atr, "lower": ma - g.K[key] * atr}
+             for key, ma in mas.items()}
+    geo = g.geometry(bands, -2.5)          # 收在三条线之下, 贴着短期下轨
+    assert geo["spread"] > 0, "这一格的前提就是中枢还朝上"
+    assert all(geo["d"][key] < 0 for key in ("s", "m", "l"))
+    p = g.phase({**geo, "accel": {"a1": -0.3}})   # 正在放慢
+    assert p["cn"] == g.PHASE_STALLING_DONE_CN
+    assert p["cn"] != "涨势转弱"
+    assert "价格已经跌到三条线之下" in p["why"]
+    assert "均线还没掉头" in p["why"]
+
+
+def test_刚启动要的是重合度松开加提速():
+    """「挤在一起」这一档里面再分一层, 用的是现成的重合度门槛与快慢档。
+
+    一个阈值都没新立 —— `SPREAD_LAUNCH` 与打分层共用, 动它就是改口径。
+    """
+    tight = _geo(0.7, 0.12, o=0.95)      # 还高度重合 → 还是横着
+    assert g.phase(tight)["code"] == g.PH_COILING
+    loose_up = _geo(0.7, 0.12, o=0.6)    # 重合松开 + 在加速 → 刚启动
+    assert g.phase(loose_up)["code"] == g.PH_LAUNCHING
+    loose_flat = _geo(0.7, 0.0, o=0.6)   # 松开了却没劲 → 看不出
+    assert g.phase(loose_flat)["code"] == g.PH_UNCLEAR
+    loose_down = _geo(0.7, -0.12, o=0.6)
+    assert g.phase(loose_down)["code"] == g.PH_UNCLEAR

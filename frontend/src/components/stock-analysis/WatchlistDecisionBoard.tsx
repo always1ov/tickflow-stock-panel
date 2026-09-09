@@ -741,23 +741,13 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
                       >
                         {r.held ? '持有' : '空仓'}
                       </button>
-                      {/* [R212] 仓% 从「成本」格挪到这里。用户: 「成本这一列去掉仓位比例」。
-                          **不是删掉这个能力** —— 今日总览的组合总仓位、净值回撤纪律、
-                          超配提醒全靠它, 没别的地方能填。挪到「仓位」格才是它本来的位置:
-                          持有与否 + 占多少仓, 本来就是同一件事的两半。 */}
-                      {r.held && (
-                        <input
-                          type="number" min={0} max={100}
-                          defaultValue={r.weight ?? ''}
-                          placeholder="仓%"
-                          title="仓位比例(占总资金 %),可选 —— 填了之后今日总览能算组合总仓位、净值回撤纪律与超配提醒。批次页给不出这个数(它不知道总资金),只能在这里填。"
-                          onBlur={(e) => {
-                            const v = e.target.value === '' ? null : Number(e.target.value)
-                            if (v !== r.weight) setPos.mutate({ symbol: r.symbol, held: true, cost: manualCost, weight: v })
-                          }}
-                          className={`mt-1 w-12 h-5 px-1 rounded bg-base border border-border text-[10px] ${NUM} text-right text-foreground focus:outline-none focus:border-accent/50`}
-                        />
-                      )}
+                      {/* [R215] 仓% 输入框撤掉。用户: 「不需要仓位比例」。
+                          R212 把它从「成本」格挪到这里, 这一轮索性不显示了 ——
+                          这一格只回答一件事: 这只票拿没拿。
+
+                          **存着的值没有删**: 上面 setPos 一直原样带着 r.weight 回写,
+                          所以以前填过的仓位比例仍然在, 今日总览的组合总仓位、
+                          净值回撤纪律照旧按它算。只是不再有地方新填。 */}
                     </td>
                     {/* 成本+仓位%:仅持有时可填。生命线=20日线, 自动计算无需手填;
                         仓位% 供今日总览算组合总仓位/净值回撤, 不填不影响其他功能。
