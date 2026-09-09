@@ -909,14 +909,21 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
                           )}
                           {/* [fork 增强] 到价预案:AI watch_points(涨至/跌至 → 对应操作),提前有准备 */}
                           {(r.sig.watch_points ?? []).length > 0 && (
-                            <div className="flex flex-wrap gap-x-2.5 gap-y-0.5 mt-0.5">
+                            /* [R253] **一个预案一行**, 不再"能挤就挤、挤不下才换行"。
+                               用户: 「ai信号显示成这样换行」。
+                               原来是 `flex-wrap` —— 同样三个预案, 列宽够时挤成一行、
+                               不够时折成两三行, **每一行高度都不一样**, 一屏扫下去
+                               行与行对不齐。现在固定竖排: 行是高了点, 但高度一致,
+                               而且价位天然对齐(方向词都是三个字 + 等宽数字),
+                               眼睛顺着一列往下扫就行。 */
+                            <div className="mt-0.5 flex flex-col gap-y-0.5">
                               {(r.sig.watch_points ?? []).map((p, i) => (
                                 <span
                                   key={i}
-                                  className="inline-flex items-center gap-1 text-[10px] font-mono whitespace-nowrap"
+                                  className="inline-flex items-center gap-1.5 text-[10px] font-mono whitespace-nowrap"
                                   title={p.reason ? `${p.label ?? ''} — ${p.reason}` : p.label}
                                 >
-                                  <span className={p.direction === 'up' ? 'text-red-400' : 'text-emerald-400'}>
+                                  <span className={`tabular-nums ${p.direction === 'up' ? 'text-red-400' : 'text-emerald-400'}`}>
                                     {p.direction === 'up' ? '↑涨至' : '↓跌至'} {p.price.toFixed(2)}
                                   </span>
                                   {p.action && <span className="text-foreground/80">{p.action}</span>}

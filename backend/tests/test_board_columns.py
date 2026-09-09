@@ -285,3 +285,20 @@ def test_R252_决策台表头背景是实心的():
     head = src[src.index("<thead"):src.index(">", src.index("<thead")) + 1]
     assert "bg-surface/" not in head, f"表头背景又半透明了: {head}"
     assert "bg-surface" in head, "表头没有背景色 —— 行会直接透上来"
+
+
+def test_R253_到价预案固定竖排一个一行():
+    """用户: 「ai信号显示成这样换行」。
+
+    原来是 `flex-wrap` —— 同样三个预案, 列宽够时挤成一行、不够时折成两三行,
+    **每一行高度都不一样**, 一屏扫下去行与行对不齐。改成固定竖排: 行高一致,
+    价位也天然对齐(方向词都是三个字 + 等宽数字)。
+    """
+    body = _board_body()
+    i = body.index("watch_points ?? []).length > 0")
+    block = body[i:i + 700]
+    assert "flex flex-col" in block, "到价预案没有固定竖排"
+    assert "flex-wrap" not in block, (
+        "到价预案又变回「能挤就挤、挤不下才换行」了 —— 那会让每一行高度都不一样"
+    )
+    assert "whitespace-nowrap" in block, "单个预案自己不该再折行"
