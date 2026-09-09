@@ -630,11 +630,8 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
                   <button onClick={() => toggleSort(sort.key === 'close' ? 'changePct' : 'close')}
                           className={`${thBtn} whitespace-nowrap`}
                           title="现价与当日涨跌。点这里在「现价」「涨跌」之间轮换排序目标, 再点同一个翻方向">
+                    {/* [R250] 同上 —— 表头只印列名, 三处一致(标的除外, 它本来就只有一个排序目标) */}
                     现价/涨跌
-                    {(['close', 'changePct'] as const).includes(sort.key as 'close')
-                      && <span className="ml-0.5 text-[9px] text-accent">
-                        {sort.key === 'close' ? '价' : '涨跌'}
-                      </span>}
                     {caret(sort.key)}
                   </button>
                 </th>
@@ -653,11 +650,9 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
                       + '  六态 —— 多头在前\n'
                       + '  间距 —— 升序是刚走出来的(找起点), 降序是走得最远的(找该收的)\n'
                       + '  短期 / 中期 / 长期 —— 各自在通道里的高低, 升序最便宜在前'}>
+                    {/* [R250] 表头**只有「走势」两个字** —— 与「结论」那一列同一条:
+                        排序目标是内部分层, 不该印在表头上。轮换照旧, 说明在悬停里。 */}
                     走势
-                    {(['trend', 'spread', 'ks', 'km', 'kl'] as const).includes(sort.key as 'trend')
-                      && <span className="ml-0.5 text-[9px] text-accent">
-                        {{ trend: '六态', spread: '间距', ks: '短', km: '中', kl: '长' }[sort.key as 'trend']}
-                      </span>}
                     {caret(sort.key)}
                   </button>
                 </th>
