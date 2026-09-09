@@ -811,3 +811,76 @@ def test_刚启动要的是重合度松开加提速():
     assert g.phase(loose_flat)["code"] == g.PH_UNCLEAR
     loose_down = _geo(0.7, -0.12, o=0.6)
     assert g.phase(loose_down)["code"] == g.PH_UNCLEAR
+
+
+# ================================================================
+# [R221] 联网交叉验证之后补的三条
+#
+# 拿 Keltner 通道的公开资料对了一遍(StockCharts / Raschke 版定义 / 多周期
+# 分析的通行做法), 再用蒙特卡洛量了组合表的真实频率。结论有三:
+#
+#   ① 「收盘站上上轨」在上升趋势里是**强势延续**而不是超买卖点 —— 与本系统
+#      `high_short_only`(拿着, 别在这加仓) 和 R212「上沿+多头不是卖」一致 ✓
+#   ② 多周期冲突时**长周期为准** —— 与 `verdict()` 先判"短期与长期反向"
+#      (超跌反弹 / 强势深调) 一致 ✓
+#   ③ **但三档的门槛松紧不一样**, 而这一点原来没在任何地方说过。
+
+
+def test_三档门槛按各自波动折算是越长越松():
+    """[R221] 这是交叉验证挖出来的那件事, 闭式的, 不依赖任何模拟。
+
+    价格绕 MA_n 的离散度按 √n 增长, 而 ATR 倍数只从 2 涨到 3 —— 倍数追不上
+    离散度, 于是长期档反而是最容易到边的那一个。「三档同时到上沿」因此
+    **不是三重确认**。
+    """
+    sigma_ratio = {key: (g.WINDOW[key] / g.WINDOW["s"]) ** 0.5 for key in ("s", "m", "l")}
+    eff = {key: g.K[key] / sigma_ratio[key] for key in ("s", "m", "l")}
+    assert eff["s"] > eff["m"] > eff["l"], eff
+    assert eff["s"] == pytest.approx(2.00, abs=0.01)
+    assert eff["m"] == pytest.approx(1.44, abs=0.02)
+    assert eff["l"] == pytest.approx(1.22, abs=0.02)
+
+
+def test_组合表每一格都标了有多常见():
+    """27 行摆在一起看着像 27 种势均力敌的情形, 实际不是 —— 四格占一多半,
+    七格几乎不出现。不标出来, 人会把常态当警报, 也会对着永远不亮的格子研究。"""
+    rows = g.combo_table()
+    assert len(rows) == 27
+    assert all(r["rarity"] for r in rows), [r["combo"] for r in rows if not r["rarity"]]
+    by = {r["combo"]: r["rarity"] for r in rows}
+    assert by["上上上"] == "很常见" and by["下下下"] == "很常见"
+    assert by["下上下"] == "几乎不出现"
+
+
+def test_三档同向那两格必须带上不是三重确认这句():
+    """[R221] 底层的方向没说错, 但语气会让人以为这是罕见的极端信号 ——
+    而它们恰恰是最常见的两格。底层禁止改, 所以校正写在补充层。"""
+    for code in ("上上上", "下下下"):
+        assert code in g.COMBO_NOTES, code
+        assert code not in g.COMBO_CLEAN, code
+        title, detail = g.COMBO_NOTES[code]
+        assert "三重确认" in title or "三重确认" in detail, code
+    row = next(r for r in g.combo_table() if r["combo"] == "上上上")
+    assert row["note"] and row["verdict"], "注记与底层结论要并排出现, 不是替换"
+    assert row["verdict"]["title"] == "大顶区域", "底层结论一个字都不许改"
+
+
+def test_均线是简单均线而不是指数均线():
+    """[R221] 标准 Keltner(Raschke 版)用 EMA20 ± 2×ATR10, 本系统用 SMA。
+
+    **这不是疏漏, 是几何层的前提**: 「MA_n ≈ (n−1)/2 天前的价格」这条恒等式
+    与由它推出的「匀速时 a1 精确为 0」只在简单均线下成立。换成 EMA, 整个
+    二阶推导(速度/加速度/匀速基准)就只剩近似。
+
+    这条测试钉住的是**别人来"顺手改成 EMA"的时候会红**。
+    """
+    import inspect
+    from app.indicators import pipeline
+    src = inspect.getsource(pipeline)
+    assert 'rolling_mean(20).over("symbol").alias("ma20")' in src, \
+        "ma20 必须是简单均线 —— 换成 EMA 会毁掉几何层的恒等式"
+    # 恒等式本身再验一遍(与前面那条匀速测试同源, 这里只钉 SMA 这个前提)
+    v, atr = 0.4, 1.0
+    path = [100.0 + v * t for t in range(200)]
+    b = _bands(path[-1], _ma_of(path, 20), _ma_of(path, 60), _ma_of(path, 120), atr)
+    assert g.geometry(b, path[-1])["accel"]["a1"] == pytest.approx(0.0, abs=2e-3)

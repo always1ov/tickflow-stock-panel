@@ -134,6 +134,8 @@ export function ComboTableDialog({ onClose, geo, runs, name }: {
             <thead className="sticky top-0 bg-surface">
               <tr className="border-b border-border/60 text-[10px] text-muted">
                 <th className="w-16 py-1.5 text-left font-normal">短中长</th>
+                <th className="w-16 py-1.5 text-left font-normal"
+                    title="这一格在真实行情里出现得有多频繁。四格占了一多半, 七格几乎不出现 —— 「三档同时到上沿」听着像罕见的极端信号, 其实是最常见的几种之一">常见度</th>
                 <th className="w-20 py-1.5 text-left font-normal">系统结论</th>
                 <th className="py-1.5 text-left font-normal">几何含义</th>
               </tr>
@@ -148,6 +150,11 @@ export function ComboTableDialog({ onClose, geo, runs, name }: {
                     <td className="py-1.5 font-mono tabular-nums text-foreground/90">
                       {r.combo}
                       {on && <span className="ml-1 text-[9px] text-accent">现在</span>}
+                    </td>
+                    <td className={cn('py-1.5 text-[10px]',
+                      r.rarity?.startsWith('很常见') ? 'text-amber-300/80'
+                        : r.rarity === '几乎不出现' ? 'text-muted/40' : 'text-muted/70')}>
+                      {r.rarity ?? ''}
                     </td>
                     <td className={cn('py-1.5', r.verdict ? TONE_CLS[r.verdict.tone] ?? 'text-muted' : 'text-muted/50')}>
                       {r.verdict?.title ?? '（无结论）'}
@@ -171,6 +178,10 @@ export function ComboTableDialog({ onClose, geo, runs, name }: {
           <p className="pt-1 text-[10px] leading-relaxed text-muted/70">
             「系统结论」这一列是**直接调底层判定生成的**,不是誊抄 —— 底层怎么说,这里就怎么显示,
             不会有一份对照表偷偷说着过时的话。带 ▸ 的是补充:那几格底层的措辞与这一格的事实对不太上。
+            <br />
+            「常见度」是蒙特卡洛量出来的:三档的门槛按各自波动折算是 2.00 / 1.44 / 1.22 倍标准差,
+            <b className="text-foreground/80">越长的那一档越松、越容易到边</b>,所以「三档同时到同一边」并不是三重确认,
+            它在毫无趋势的行情里也常出现。
           </p>
         </div>
       </div>

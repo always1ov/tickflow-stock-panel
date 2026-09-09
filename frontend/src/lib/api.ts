@@ -884,6 +884,9 @@ export interface Playbook {
 export interface ComboTableRow {
   combo: string
   shape: string
+  /** [R221] 这一格有多常见。27 行看着势均力敌, 实际四格占一多半、
+   *  七格几乎不出现 —— 不标出来会把常态当警报。 */
+  rarity?: string
   read: string
   verdict: { title: string; code: string; tone: KeltnerVerdict['tone']
              action: string; detail: string } | null
