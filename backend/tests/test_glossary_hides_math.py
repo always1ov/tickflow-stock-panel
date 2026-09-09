@@ -1,32 +1,29 @@
-"""[fork 增强] R198 决策台角上那个感叹号 —— **只讲怎么读, 不讲怎么算**。
+"""[fork 增强] 界面上**不许泄露算法** —— 只讲怎么读, 不讲怎么算。
 
-用户: 「点击就显示这些东西的含义, 但是**不能告诉别人具体是怎么算出来的**」。
+用户原话(R198): 「点击就显示这些东西的含义, 但是**不能告诉别人具体是怎么算出来的**」。
 这与把 Keltner 改名成「量化波动通道」是同一个目的: 指标本身是要藏的。
 
-文案是会漂的 —— 下次改一句话时顺手补一个「(即三带交集除以短带宽度)」就泄了。
-所以拿测试扫那个文件。这是**前端文件的内容检查**, 放在后端测试里只是因为
-本仓库没有前端测试运行器(package.json 里没有 vitest/jest)。
+[R259] **决策台角上那个感叹号(词汇表)删掉了** —— 用户: 「删除掉感叹号」。
+`GlossaryDialog.tsx` 随之成了孤儿文件, 一并删(守则 R198: 不留没人调的死代码)。
+守它那一半测试跟着退役, **但这一条纪律本身留着** ——
+
+    藏不藏得住取决于**最松的那一处**, 不是最严的那一处。
+
+R200 那一轮真的在别处翻出过泄露: 决策台悬停里写着「破轨门槛 2 / 2.5 / 3」,
+今日总览的 title 里写着「三条带的交集 / 短带宽度」。R201 又在**导出的 HTML**
+里翻出「短期 MA20±2ATR / 中期 MA60±2.5ATR / 长期 MA120±3ATR」—— 那是所有面里
+最该守的一个, 因为屏幕上的东西只有本人看得到, 导出的文件是拿去发给别人的。
+
+文案是会漂的, 所以拿测试扫。这是**前端文件的内容检查**, 放在后端测试里只是
+因为本仓库没有前端测试运行器(package.json 里没有 vitest/jest)。
 """
 import re
 from pathlib import Path
 
 import pytest
 
-GLOSSARY = (Path(__file__).resolve().parents[2] / "frontend" / "src" / "components"
-            / "stock-analysis" / "decision-board" / "GlossaryDialog.tsx")
-
-
-@pytest.fixture(scope="module")
-def text() -> str:
-    assert GLOSSARY.exists(), f"文件不在了: {GLOSSARY}"
-    return GLOSSARY.read_text(encoding="utf-8")
-
-
-def _body(text: str) -> str:
-    """只查真正显示给用户的那部分 —— 文件头的注释是写给维护者的, 允许提到算法。"""
-    marker = "const GROUPS"
-    i = text.index(marker)
-    return text[i:]
+_SRC = Path(__file__).resolve().parents[2] / "frontend" / "src"
+_FRONT = _SRC / "components" / "stock-analysis"
 
 
 # 泄露算法的几类词。分开列是为了失败时一眼看出泄的是哪一类。
@@ -40,52 +37,16 @@ FORBIDDEN = {
 }
 
 
-@pytest.mark.parametrize("kind", sorted(FORBIDDEN))
-def test_文案不泄露算法(text, kind):
-    body = _body(text)
-    hit = [w for w in FORBIDDEN[kind] if w in body]
-    assert not hit, f"「{kind}」泄露了: {hit} —— 这一份只该讲怎么读"
-
-
-def test_确实讲了怎么读(text):
-    """反过来也要守: 光藏不说等于没有这个按钮。每一条都得有「读法」。"""
-    body = _body(text)
-    assert body.count("read:") >= 10, "条目太少, 这个说明就没用"
-    assert body.count("meaning:") == body.count("read:"), "每条都要有含义 + 读法两段"
-
-
-def test_覆盖了本次新增的那几个词(text):
-    body = _body(text)
-    # [R211] 跟着界面走: R209 删掉了「该动了」那一列(并进「怎么办」),
-    # R211 把「量化通道」与「通道态势」合成了一列。**说明必须跟着界面改** ——
-    # 用户看到的第一句就是「这个叹号里面的东西不对」, 说的正是这个。
-    for term in ("三条线", "分歧", "倍日常波动",          # 几何含义那一节
-                 "先别动", "今天就得动",                  # 「怎么办」列
-                 "上升中", "下跌中", "涨过头", "跌过头",  # 「通道」列的阶段
-                 "走到哪一步", "还有没有劲",
-                 "突破尝试", "主升浪", "横盘中"):
-        assert term in body, f"新词「{term}」没有解释"
-
-
-def test_挂在决策台上(text):
-    """写了没挂上等于没写。"""
-    board = (GLOSSARY.parent.parent / "WatchlistDecisionBoard.tsx").read_text(encoding="utf-8")
-    assert "GlossaryButton" in board
-
-
 # ================================================================
-# [R200] 不能只守感叹号那一份
+# [R200] 把同一把尺子量到**所有出现在屏幕上、以及能外传出去**的通道文案
 #
-# 只扫 GlossaryDialog 是不够的: 这一轮真的在别处翻出了泄露 —— 决策台悬停里
+# R200 那一轮真的在别处翻出了泄露 —— 决策台悬停里
 # 写着「破轨门槛 2 / 2.5 / 3」, 今日总览的 title 里写着「三条带的交集 / 短带
 # 宽度」「最高/最低收盘 ≤ 1.35」「(9.5:20:30)」。那几处和感叹号一样是**用户
 # 眼睛能看到的**, 藏不藏得住取决于最松的那一处, 不是最严的那一处。
 #
-# 所以把同一把尺子量到所有出现在屏幕上的通道文案。判据仍是"只查显示部分":
+# 判据仍是"只查显示部分":
 # 每个文件都从各自的第一段可显示内容开始扫, 文件头的注释是写给维护者的。
-
-_FRONT = GLOSSARY.parent.parent          # frontend/src/components/stock-analysis
-_SRC = _FRONT.parent.parent              # frontend/src
 
 # 文件 → 从哪个标记之后才算"显示区"
 SURFACES = {
@@ -145,8 +106,8 @@ JARGON = ["拉开", "脱开", "粘合", "撕裂", "分离度", "偏离度", "频
           "归一化", "带通", "尺度撕裂", "压缩指数"]
 
 
-@pytest.mark.parametrize("path,marker", sorted(
-    {**SURFACES, GLOSSARY: "const GROUPS"}.items(), key=lambda kv: kv[0].name))
+@pytest.mark.parametrize("path,marker", sorted(SURFACES.items(),
+                                              key=lambda kv: kv[0].name))
 def test_界面文案不用行话(path: Path, marker: str):
     hit = [w for w in JARGON if w in _visible(path, marker)]
     assert not hit, f"{path.name} 里还有行话: {hit} —— 换成「挤在一起/走开/间距」这类说法"

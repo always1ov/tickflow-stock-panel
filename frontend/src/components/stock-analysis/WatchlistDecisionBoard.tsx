@@ -16,7 +16,6 @@ import { DEFAULT_EXPORT_KEYS } from '@/lib/decisionBoardExportColumns'
 import { ExportColumnsDialog } from '@/components/stock-analysis/decision-board/ExportColumnsDialog'
 import { ChannelStateCell, ConclusionCell, NUM, TD_BASE } from '@/components/stock-analysis/decision-board/cells'
 import { LotsLink } from '@/components/stock-analysis/decision-board/LotsLink'
-import { GlossaryButton } from '@/components/stock-analysis/decision-board/GlossaryDialog'
 // [R169] 合并视图(手填 ⊕ 上游批次登记), 字段说明见 api.ts 的 EffectivePosition
 type Position = EffectivePosition
 type WatchPoint = { direction: 'up' | 'down'; price: number; label?: string; action?: string; reason?: string }
@@ -547,7 +546,6 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
           <span className="text-xs font-medium text-foreground">自选决策台</span>
           <span className="text-[10px] text-muted">{rows.length} 只 · 持有 {heldCount}</span>
           {/* [R198] 角上的感叹号 —— 点开只讲这些词怎么读, 不讲怎么算出来的 */}
-          <GlossaryButton />
         </span>
         <button
           onClick={() => setActionableOnly((v) => !v)}
