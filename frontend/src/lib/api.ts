@@ -734,7 +734,10 @@ export interface StockReview {
     /** [R199] 阶段判定 —— 三个几何量单看都答不了「我该怎么办」, 合起来才回答
      *  「现在处在哪一段」。watch 是这一段该盯什么, 不是买卖指令。 */
     phase: ChannelPhase | null
-    explain: string[]
+    /** [R212] 一行一条: 名称 · 数值 · 这个数意味着什么。
+     *  数值保留(能核对), 后面跟一句「所以呢」—— 只给数字看不懂, 只给状态词
+     *  又得不到结论, 三样一起才成立。 */
+    explain: { label: string; value: string; why: string }[]
   } | null
   /** [R199] 偏买档 vs 偏卖档的分离度 —— 「位置结论在这只票上灵不灵」。
    *  与趋势那栏的 side_edge 完全平行。 */

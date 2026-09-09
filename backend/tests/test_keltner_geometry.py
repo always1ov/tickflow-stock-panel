@@ -570,3 +570,78 @@ def test_这两个读数里一个数字都没有():
                      "torn": abs(sp) >= g.TORN_ATR, "nested": False})
         for k in ("cn", "maturity_cn", "pace_cn"):
             assert not any(ch.isdigit() for ch in p[k]), f"{k} 里有数字: {p[k]}"
+
+
+# ================================================================
+# [R212] explain(): 数据 + 一句解释
+#
+# 这一块改过三版, 每一版错在同一地方的不同侧面:
+#   v1 只给数字   → 「用数字看不懂」(得先知道"多少算大")
+#   v2 只给状态词 → 「仍旧看不懂, 获取不到结论性信息」(「走到中段」然后呢?)
+#   v3 三样一起   → 名称(在说什么) + 数值(能核对) + 解释(所以呢)
+
+
+def _full_geo(spread=-1.3, a1=0.15, o=0.10, level="loose", combo="中下中"):
+    return {"accel": {"level": g.ACCEL_UP if a1 > g.ACCEL_FLAT
+                      else g.ACCEL_DOWN if a1 < -g.ACCEL_FLAT else g.ACCEL_STEADY,
+                      "a1": a1, "gain_atr": round(a1 * g.SPAN1, 2)},
+            "spread": spread, "compress": o, "compress_level": level,
+            "torn": abs(spread) >= g.TORN_ATR, "nested": abs(spread) <= g.NESTED_ATR,
+            "stack": g.STACK_BEAR if spread < 0 else g.STACK_BULL, "combo": combo,
+            "d": {"s": -0.3, "m": -1.1, "l": 0.2}}
+
+
+def test_每一条都同时给出名称数值和解释():
+    rows = g.explain(_full_geo(), {"compress_days": 0, "compress_avg": 0.25},
+                     {"dominant": "s", "dominant_cn": "几天的短波动"})
+    assert rows, "一条都没有"
+    for r in rows:
+        assert set(r) == {"label", "value", "why"}, r
+        assert r["label"] and r["value"] and r["why"], r
+        # **解释必须真的解释**, 不能只是把数值换个说法
+        assert len(r["why"]) >= 12, f"解释太短, 等于没说: {r}"
+
+
+def test_覆盖那七样读数():
+    rows = g.explain(_full_geo(), {"compress_days": 0, "compress_avg": 0.25},
+                     {"dominant": "m", "dominant_cn": "一波行情的主体"})
+    labels = {r["label"] for r in rows}
+    for want in ("最近快慢", "三线间距", "三种看法", "连着挤了", "这季平均",
+                 "波动来自", "三档位置"):
+        assert want in labels, f"少了「{want}」"
+
+
+def test_数值里必须带得出数字或原词():
+    """数值那一列的存在意义就是**能核对** —— 换成一句话就白改了。"""
+    rows = g.explain(_full_geo(), {"compress_days": 12, "compress_avg": 0.7},
+                     {"dominant": "l", "dominant_cn": "长期老趋势"})
+    numeric = [r for r in rows if any(c.isdigit() for c in r["value"])]
+    assert len(numeric) >= 5, f"只有 {len(numeric)} 条带得出数: {rows}"
+
+
+def test_挤了几天与这季平均要合起来解释():
+    """两个数分开看都读不出东西, 合起来才分得清「刚走出来」和「反复挤回去」。"""
+    just_out = g.explain(_full_geo(), {"compress_days": 0, "compress_avg": 0.75}, None)
+    why = next(r["why"] for r in just_out if r["label"] == "这季平均")
+    assert "刚刚才走出来" in why
+
+    flaky = g.explain(_full_geo(), {"compress_days": 3, "compress_avg": 0.25}, None)
+    why = next(r["why"] for r in flaky if r["label"] == "这季平均")
+    assert "反复散开又挤回去" in why
+
+
+def test_间距的解释按方向与远近分四档():
+    for sp, kw in ((0.4, "方向还没真正出来"), (2.0, "行情的主体"),
+                   (3.6, "已经走了很长"), (6.2, "没有一个共同认可的合理价")):
+        rows = g.explain(_full_geo(spread=sp), None, None)
+        why = next(r["why"] for r in rows if r["label"] == "三线间距")
+        assert kw in why, f"间距 {sp} 的解释不对: {why}"
+    # 跌得太深不能配追高的话
+    deep = g.explain(_full_geo(spread=-6.2), None, None)
+    why = next(r["why"] for r in deep if r["label"] == "三线间距")
+    assert "别急着抄" in why and "追" not in why
+
+
+def test_没有输入时安静返回空():
+    assert g.explain(None) == []
+    assert g.explain({}) == []

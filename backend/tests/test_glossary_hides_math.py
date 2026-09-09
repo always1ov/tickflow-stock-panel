@@ -160,7 +160,8 @@ def test_后端给界面的那几句话也是大白话():
            "spread": 2.2, "compress": 0.1, "torn": False, "nested": False,
            "stack": kg.STACK_BULL, "d": {"s": 1.2, "m": 2.0, "l": 3.1}}
     runs = {"compress_days": 0, "above_run": 4, "below_run": 0}
-    texts = kg.explain(geo)
+    # [R212] explain 现在一行一条 {label,value,why} —— 三样都要扫
+    texts = [x for r in kg.explain(geo, runs) for x in (r['label'], r['value'], r['why'])]
     ph = kg.phase(geo, runs)
     texts += [ph["cn"], ph["why"], ph["watch"]]
     ev = kg.event(state="UT", duration=3, geo=geo, run=runs)

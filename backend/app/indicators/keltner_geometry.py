@@ -308,47 +308,139 @@ def geometry(bands: dict | None, close) -> dict | None:
     }
 
 
-def explain(g: dict | None) -> list[str]:
-    """把几何量翻成几句能直接摆在界面上的**大白话**。**只描述, 不下买卖判断** ——
-    同一个"走得越来越快"在趋势初期是启动、在末端是赶顶, 那是趋势状态与把握分的事。
+def explain(g: dict | None, runs: dict | None = None,
+            energy: dict | None = None) -> list[dict]:
+    """把几何量翻成**一行一条**的读数: 名称 · 数值 · 这个数意味着什么。
 
-    ## 用词的两条规矩(R200)
+    返回 [{label, value, why}, ...]。
 
-    1. **不用行话。** 用户原话「别用拉开脱开这种词, 不够通俗易懂」。所以这里
-       没有"粘合/脱开/撕裂/分离度/偏离度"—— 一律换成"挤在一起/走开/离得太远/
-       间距/离中线多远"。
-    2. **不说出指标本名与参数。** 与把 Keltner 改名成「量化波动通道」同一个目的。
-       所以单位不写"个 ATR"而写"倍日常波动"(读法一样, 但没有点名), 也不出现
-       均线周期与倍数。
+    ## [R212] 为什么是这个形状
+
+    这一块改过三版, 每一版都错在同一个地方的不同侧面:
+
+      v1  只给数字(`+1.4` `-1.3` `10%` `中下中`)。用户: 「用数字看不懂」——
+          对的: 要先知道"多少算大"才读得出好坏, 而那正是不该逼人记的东西。
+      v2  只给状态词(`比之前快` `走到中段` `完全分开`)。用户: 「仍旧看不懂,
+          获取不到结论性信息」—— 也对: 「走到中段」**然后呢**? 状态词还是状态,
+          该做的那步合成仍然留给了用户。
+      v3  用户自己给了答案: 「你干脆保持数据, 然后在后面加一行解释」。
+
+    所以三样一起给, 缺一不可:
+        **数值**  能核对(这是它区别于一句空话的地方)
+        **名称**  知道这个数在说什么
+        **解释**  这个数**意味着什么** —— 「所以呢」的那一半
+
+    格子放不下第三样, 所以这一块不再是格子墙, 是一张三列的表。
+
+    ## 边界
+
+    **只描述, 不下买卖判断** —— 同一个"走得越来越快"在趋势初期是启动、在末端
+    是赶顶, 那是「怎么办」那一层的事。这里的"意味着什么"说的是**这个数本身在
+    说什么**, 不是"你今天该不该动手"。
+
+    用词照旧守 R200 两条: 不用行话; 不说出指标本名与参数(单位写「倍日常波动」)。
     """
     if not g:
         return []
-    out: list[str] = []
+    out: list[dict] = []
+    r = runs or {}
+
+    def add(label, value, why):
+        out.append({"label": label, "value": value, "why": why})
+
+    # ---- 快慢 ----
     ac = g.get("accel") or {}
     lvl, gain = ac.get("level"), ac.get("gain_atr")
-    if lvl == ACCEL_UP:
-        out.append(f"最近走得比前一段快 —— 这十天多走了 {gain:.1f} 倍日常波动的距离")
-    elif lvl == ACCEL_DOWN:
-        out.append(f"最近走得比前一段慢 —— 这十天少走了 {abs(gain):.1f} 倍日常波动的距离")
-    else:
-        out.append("速度没变 —— 这十天和之前那一段走得一样快")
+    if gain is not None:
+        val = f"{'+' if gain >= 0 else '−'}{abs(gain):.1f} 倍波动"
+        if lvl == ACCEL_UP:
+            add("最近快慢", val,
+                f"这十天比前一段多走了 {abs(gain):.1f} 倍日常波动 —— 还在加力。"
+                "但不是越大越好: 冲得太猛往往出现在一波的末尾, 不是起点")
+        elif lvl == ACCEL_DOWN:
+            add("最近快慢", val,
+                f"这十天比前一段少走了 {abs(gain):.1f} 倍日常波动 —— 推力在退。"
+                "趋势本身还没坏, 但该开始想「什么情况下我就走」")
+        else:
+            add("最近快慢", val,
+                "这十天和之前那一段走得一样快 —— 没有新的力量进来, 也没有在退。"
+                "单看这一条不构成任何理由")
 
-    sp, o = g.get("spread"), g.get("compress")
-    if g.get("torn"):
-        out.append(f"短线和长线离得太远(差 {abs(sp):.1f} 倍日常波动), 已经没有一个"
-                   "共同认可的合理价 —— 同一个价钱, 按短线看是贵到极点, 按长线看还没到位")
-    elif g.get("nested"):
-        out.append(f"三条线几乎挤在一块(只差 {abs(sp):.1f} 倍日常波动)"
-                   " —— 短、中、长三种看法认的是同一个价, 这是横盘磨底的样子")
-    elif o is not None:
-        out.append(f"三条线还有 {o:.0%} 是重合的"
-                   + (f", 排列{'朝上' if sp > 0 else '朝下'}, 首尾差 {abs(sp):.1f} 倍日常波动"
-                      if g.get("stack") in (STACK_BULL, STACK_BEAR) else ", 三条线正在互相穿过"))
+    # ---- 三线间距 ----
+    sp = g.get("spread")
+    if sp is not None:
+        up = sp >= 0
+        who = "短线高出长线" if up else "短线低于长线"
+        val = f"{sp:+.1f} 倍波动"
+        a = abs(sp)
+        if a >= TORN_ATR:
+            add("三线间距", val,
+                f"{who} {a:.1f} 倍日常波动 —— 差到这个程度, 短线看和长线看已经"
+                "没有一个共同认可的合理价了。"
+                + ("这个位置再追进去性价比很低" if up else
+                   "跌到这个程度往往还要磨一段, 别急着抄"))
+        elif a >= SPREAD_MATURE:
+            add("三线间距", val,
+                f"{who} {a:.1f} 倍日常波动 —— 这一段已经走了很长。"
+                + ("再追的性价比在下降" if up else "反弹起来会比较猛, 但那多半只是反弹"))
+        elif a >= SPREAD_LAUNCH:
+            add("三线间距", val,
+                f"{who} {a:.1f} 倍日常波动 —— 方向已经立住了, 这一段是行情的主体")
+        else:
+            add("三线间距", val,
+                f"{who}才 {a:.1f} 倍日常波动 —— 两边贴得很近, **方向还没真正出来**。"
+                "这时候猜方向没有胜算")
 
-    d = g.get("d") or {}
-    if all(k_ in d for k_ in ("s", "m", "l")):
-        out.append(f"眼下价格离各自中线: 短期 {d['s']:+.1f} / 中期 {d['m']:+.1f} / 长期 {d['l']:+.1f}"
-                   " 倍日常波动(正的偏贵、负的偏便宜, 越大越极端)")
+    # ---- 三种看法还剩多少重合 ----
+    o = g.get("compress")
+    if o is not None:
+        lv = g.get("compress_level")
+        add("三种看法", f"还重合 {o:.0%}",
+            "短、中、长三种看法认的价几乎完全重合 —— **没有分歧就没有趋势**, "
+            "现在是横盘状态" if lv == "tight" else
+            "三种看法认的价已经基本不重合 —— 分歧就是趋势, 方向是明确的" if lv == "loose" else
+            "三种看法还有一部分重合 —— 方向在出来的路上, 但还不算立住")
+
+    # ---- 挤了几天 + 这季平均: 两个数必须一起解释 ----
+    cd, avg = r.get("compress_days"), r.get("compress_avg")
+    if cd is not None:
+        add("连着挤了", f"{cd} 天",
+            f"到今天为止连着 {cd} 天三种看法都认同一个价 —— 憋得越久, "
+            "走出来那一下通常越干脆" if cd else
+            "今天三种看法并不一致 —— 不在憋着劲的状态里")
+    if avg is not None:
+        both = f"(连着 {cd} 天)" if cd is not None else ""
+        add("这季平均", f"重合 {avg:.0%}",
+            f"这个季度平均有 {avg:.0%} 的时候三种看法是一致的。" + (
+                f"而现在连着的天数是 0{both} —— **刚刚才走出来**, 这是最值得盯的一种"
+                if avg >= 0.6 and not cd else
+                f"现在也正挤着{both} —— 长期横盘, 在等一个方向"
+                if avg >= 0.6 else
+                f"现在却正挤着{both} —— 反复散开又挤回去, 别把它当成蓄势"
+                if cd else
+                "多数时候是分开的 —— 这只票一直在走趋势, 不是横盘股"))
+
+    # ---- 波动主要来自哪 ----
+    if energy and energy.get("dominant"):
+        dom = energy["dominant"]
+        add("波动来自", energy.get("dominant_cn") or "",
+            "主要是几天里的短促跳动 —— 更像消息和情绪在推, 趋势本身的力量不强。"
+            "这种来得快去得也快" if dom == "s" else
+            "主要来自一波行情的主体 —— 正走在主升段上, 这是趋势最扎实的一段"
+            if dom == "m" else
+            "主要来自更早就在的老趋势 —— 劲都在过去, 近期反而平静, 动能在衰减")
+
+    # ---- 三档各自在哪 ----
+    combo = g.get("combo")
+    if combo and len(combo) == 3:
+        at = [f"{t}到{v}沿" for t, v in zip(("短期", "中期", "长期"), combo) if v != "中"]
+        add("三档位置", combo,
+            "三档都在自己通道的中部 —— 位置上没有可说的, 该听趋势和信号的"
+            if not at else
+            "、".join(at) + " —— " + (
+                "三档同向, 三种尺度看法一致 —— 这种最扎实"
+                if len(set(combo)) == 1 else
+                "三档并不同步, 短期的动作还没被中长期确认"))
     return out
 
 

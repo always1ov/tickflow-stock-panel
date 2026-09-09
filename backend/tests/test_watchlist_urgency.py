@@ -4,6 +4,8 @@
 纪律(出场线)永远压过形态(翻转价), 形态永远压过位置(到轨)。
 以及一条老规矩: **AI 不参与判定** —— 它可以在旁边解释, 不许决定顺序。
 """
+import pytest
+
 from app.services import watchlist_urgency as u
 
 
@@ -209,7 +211,9 @@ def test_每一档都说清哪条线以及该干什么():
         _u(position=_FLAT, trend={"flip_up": 412.3, "flip_up_distance_pct": 0.005, "duration": 6}),
         _u(position=_HELD, trend={"flip_down": 370.0, "flip_down_distance_pct": -0.004, "duration": 9}),
         _u(trend={"duration": 1, "state_cn": "上涨趋势", "side": "多头"}),
-        _u(bands={"s": {"pos": "near_upper", "pos_cn": "贴上轨"}}, trend={"duration": 5}),
+        # [R212] 到轨这一档要给方向, 就得先知道趋势在哪一侧 —— 见下面那一组
+        _u(bands={"s": {"pos": "near_upper", "pos_cn": "贴上轨"}},
+           trend={"duration": 5, "state": "DT", "state_cn": "下跌趋势"}),
     ]
     for got in cases:
         assert got["what"], got
@@ -232,10 +236,23 @@ def test_没有价位时也不崩只是少说一句():
     assert got["level"] == u.NEAR and "转强价" in got["what"]
 
 
-def test_上轨和下轨是相反的方向():
-    up = _u(bands={"s": {"pos": "near_upper", "pos_cn": "贴上轨"}}, trend={"duration": 5})
-    down = _u(bands={"s": {"pos": "near_lower", "pos_cn": "贴下轨"}}, trend={"duration": 5})
-    assert up["side"] == u.SIDE_SELL and down["side"] == u.SIDE_BUY
+def test_上轨和下轨的方向要看趋势在哪一侧():
+    """[R212] 原来这条写的是「上轨恒为卖、下轨恒为买」—— **那正是用户报的那个
+    矛盾的来源**: 一只正在上涨的票碰到上沿就被判成卖, 而它昨天刚因为"逼近转强价"
+    被判成买。上下沿确实相反, 但相反的前提是**同一个趋势侧**。"""
+    bull_up = _u(bands={"s": {"pos": "near_upper", "pos_cn": "贴上轨"}},
+                 trend={"duration": 5, "state": "UT", "state_cn": "上涨趋势"})
+    bull_dn = _u(bands={"s": {"pos": "near_lower", "pos_cn": "贴下轨"}},
+                 trend={"duration": 5, "state": "UT", "state_cn": "上涨趋势"})
+    assert bull_up["side"] != u.SIDE_SELL, "上涨趋势里到上沿不该叫卖"
+    assert bull_dn["side"] == u.SIDE_BUY
+
+    bear_up = _u(bands={"s": {"pos": "near_upper", "pos_cn": "贴上轨"}},
+                 trend={"duration": 5, "state": "DT", "state_cn": "下跌趋势"})
+    bear_dn = _u(bands={"s": {"pos": "near_lower", "pos_cn": "贴下轨"}},
+                 trend={"duration": 5, "state": "DT", "state_cn": "下跌趋势"})
+    assert bear_up["side"] == u.SIDE_SELL
+    assert bear_dn["side"] != u.SIDE_BUY, "下跌趋势里到下沿不该叫买"
 
 
 def test_转多第一天是买方向转空第一天是卖方向():
@@ -279,3 +296,72 @@ def test_文案里不许有markdown粗体():
                 _u(position=_FLAT, trend={"flip_up": 1.0, "flip_up_distance_pct": 0.005, "duration": 6}),
                 _u(bands={"s": {"pos": "above", "pos_cn": "破上轨"}}, trend={"duration": 5})):
         assert "**" not in got["reason"], got
+
+
+# ================================================================
+# [R212] 到轨这一档必须看趋势方向
+#
+# 用户: 「有矛盾, 马上逼近上沿了又叫买, 到上沿了又叫卖, 很奇怪到底是买还是卖」。
+#
+# 原来这一档是无脑的 `上沿→卖 / 下沿→买`, **一眼都不看趋势**。于是同一只正在
+# 上涨的票: 昨天离转强价 1.5% 报「逼近·买」, 今天站上去顺带碰到上沿, 立刻翻成
+# 「到上沿·卖」—— 前后两天相反的动作, 而这两件事说的其实是**同一次突破**。
+#
+# 转强价(六态关键点)与短期通道上沿常常挨得很近: 站上去在六态那套里是"转强",
+# 在通道那套里是"到顶"。**谁对取决于趋势在哪一侧**, 不取决于哪一档先命中。
+
+def _band(pos, pos_cn):
+    return {"s": {"pos": pos, "pos_cn": pos_cn}}
+
+
+def _at(pos, pos_cn, state=None, cn=None):
+    t = {"state": state, "state_cn": cn} if state else None
+    return u.assess(position=None, trend=t, exit_line=None, bands=_band(pos, pos_cn))
+
+
+def test_上涨趋势里到上沿不是卖出信号():
+    """**这就是用户报的那个矛盾。** 沿着上沿走是趋势票的常态。"""
+    got = _at("near_upper", "贴上轨", "UT", "上涨趋势")
+    assert got["level"] == u.BAND
+    assert got["side"] != u.SIDE_SELL, "上涨趋势里到上沿还在叫卖"
+    assert "常态" in got["action"] and "止盈线" in got["action"]
+
+
+def test_下跌趋势里到上沿才是卖():
+    got = _at("near_upper", "贴上轨", "DT", "下跌趋势")
+    assert got["side"] == u.SIDE_SELL
+    assert "反弹" in got["action"]
+
+
+def test_下跌趋势里到下沿不是买入信号():
+    """往下走的时候下沿会跟着一路下移 —— 拿它抄底正是最容易亏的做法。"""
+    got = _at("near_lower", "贴下轨", "DT", "下跌趋势")
+    assert got["side"] != u.SIDE_BUY, "下跌趋势里到下沿还在叫买"
+    assert "下移" in got["action"]
+
+
+def test_上涨趋势里到下沿是买但要提醒别当破位():
+    got = _at("near_lower", "贴下轨", "UT", "上涨趋势")
+    assert got["side"] == u.SIDE_BUY
+    assert "甩人" in got["action"]
+
+
+@pytest.mark.parametrize("pos,pos_cn", [("near_upper", "贴上轨"), ("near_lower", "贴下轨")])
+def test_趋势读不到时退回中性不替用户猜方向(pos, pos_cn):
+    got = _at(pos, pos_cn)
+    assert got["side"] == u.SIDE_INFO
+    assert "自己看日 K" in got["action"]
+
+
+def test_与几何层的事件判定同向():
+    """同一件事两层不能给相反的说法 —— `keltner_geometry.event` 早就写对了
+    (破上轨在 UT 里是趋势内加速、在空头侧才是反弹遇阻), 这一层现在跟上。"""
+    from app.indicators import keltner_geometry as kg
+    geo = {"spread": 2.0, "accel": {"a1": 0.1}, "compress": 0.1,
+           "torn": False, "nested": False, "stack": kg.STACK_BULL,
+           "d": {"s": 1.5, "m": 2.0, "l": 3.0}}
+    ev = kg.event(state="UT", duration=5, geo=geo, run={"above_run": 3, "below_run": 0,
+                                                        "compress_days": 0})
+    assert ev["code"] in (kg.EV_TREND_ACCEL, kg.EV_MAIN_ADVANCE), ev
+    # 几何层说"趋势内提速/主升浪", 该动了那一层就不能说"卖"
+    assert _at("above", "破上轨", "UT", "上涨趋势")["side"] != u.SIDE_SELL

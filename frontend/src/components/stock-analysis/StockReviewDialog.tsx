@@ -665,91 +665,47 @@ function VerdictEdgeCard({ e, forwardDays }: {
 }
 
 /**
- * ③ 依据 —— 先用**大白话**说一遍, 再摆那几个数。
+ * ③ 依据 —— **数据 + 一句解释**, 一行一条。
  *
- * [R200] 用户: 「这些大白话的描述很适合放到系统里面展示」。后端 `explain()`
- * 早就把几何量翻成了几句人话, 但一直只在接口里躺着没人显示 —— 这一版把它摆
- * 到数字前面。顺序是有意的: **先读一遍句子就够了**, 下面那排数字是留给要核
- * 对的时候看的。
+ * ## [R212] 这一块改过三版, 每一版都错在同一个地方的不同侧面
  *
- * 用词同样守 R200 那两条: 不用「拉开/脱开/粘合/撕裂/分离度/频段」这类行话,
- * 也不点破指标本名与参数(单位写「倍日常波动」而不是「个 ATR」)。
+ *   v1  只给数字(`+1.4` `-1.3` `10%` `中下中`)。用户: 「用数字看不懂」——
+ *       对的: 得先知道"多少算大"才读得出好坏, 而那正是不该逼人记的东西。
+ *   v2  只给状态词(`比之前快` `走到中段` `完全分开`)。用户: 「仍旧看不懂,
+ *       获取不到结论性信息」—— 也对: 「走到中段」**然后呢**? 该做的那一步
+ *       合成仍然留给了用户。
+ *   v3  用户自己给了答案: 「你干脆保持数据, 然后在后面加一行解释」。
+ *
+ * 三样缺一不可: **名称**(这个数在说什么)、**数值**(能核对)、**解释**(所以呢)。
+ * 格子放不下第三样, 所以这里从格子墙改成了一张三列的表。
+ *
+ * 文案在后端(`keltner_geometry.explain`), 前端只排版 —— 「多少算大」的分界
+ * 只该有一处定义。
  */
 function ChannelPanel({ ch }: { ch: NonNullable<StockReview['channel']> }) {
-  const { geo, runs, energy, event, explain } = ch
-  // [R211] 数字 → 状态词。分界只在这里定一处, 说明写在感叹号弹窗里。
-  const pace = geo.accel.level === 'accel' ? '比之前快'
-    : geo.accel.level === 'decel' ? '比之前慢' : '速度没变'
-  const agree = geo.compress == null ? '—'
-    : geo.compress_level === 'tight' ? '几乎一致'
-      : geo.compress_level === 'loose' ? '完全分开' : '有些分歧'
-  const squeeze = runs.compress_days >= 20 ? `挤了 ${runs.compress_days} 天`
-    : runs.compress_days > 0 ? '刚挤上没几天' : '现在没挤在一起'
-  const quarter = runs.compress_avg == null ? '—'
-    : runs.compress_avg >= 0.6 ? '多数时候挤在一起'
-      : runs.compress_avg <= 0.3 ? '多数时候是分开的' : '一半一半'
-  const atRail = (() => {
-    const c = geo.combo
-    if (!c || c.length !== 3) return '—'
-    const hit = ([['短期', c[0]], ['中期', c[1]], ['长期', c[2]]] as const)
-      .filter(([, v]) => v !== '中')
-      .map(([tag, v]) => `${tag}到${v === '上' ? '上' : '下'}沿`)
-    return hit.length ? hit.join(' · ') : '三档都在中部'
-  })()
-  const cell = (label: string, value: string, title?: string, tone?: string) => (
-    <div key={label} className="min-w-0 flex-1 basis-[104px] bg-elevated/40 px-3 py-2 text-center" title={title}>
-      <div className="truncate text-[10px] text-muted">{label}</div>
-      <b className={cn('block truncate font-mono text-[13px] font-medium', tone ?? 'text-foreground')}>{value}</b>
-    </div>
-  )
+  const { event, explain } = ch
   return (
     <div className="mx-4 mt-3 space-y-2">
-      <div className="text-[10px] text-muted">依据(上面两条结论就是从这些话和数读出来的)</div>
+      <div className="text-[10px] text-muted">依据(上面两条结论就是从这些读数出来的)</div>
+      {/* [R212] **数据保留, 后面跟一句解释。** 用户: 「你干脆保持数据, 然后在
+          后面加一行解释」。格子放不下第三样, 所以这里是表不是格子墙。 */}
       {!!explain?.length && (
-        <ul className="space-y-1 rounded-card border border-border/50 bg-elevated/25 px-3 py-2">
-          {explain.map(t => (
-            <li key={t} className="flex gap-1.5 text-[11px] leading-relaxed text-secondary">
-              <span className="select-none text-muted">·</span><span>{t}</span>
-            </li>
+        <div className="overflow-hidden rounded-card border border-border/50">
+          {explain.map((r, i) => (
+            <div key={r.label}
+                 className={cn('flex items-start gap-2 px-3 py-1.5',
+                   i % 2 ? 'bg-elevated/20' : 'bg-elevated/35')}>
+              <span className="w-14 shrink-0 text-[10px] text-muted">{r.label}</span>
+              <span className="w-20 shrink-0 font-mono text-[11px] tabular-nums text-foreground/90">
+                {r.value}
+              </span>
+              <span className="min-w-0 flex-1 text-[10px] leading-relaxed text-secondary">
+                {r.why}
+              </span>
+            </div>
           ))}
-        </ul>
+        </div>
       )}
-      {/* [R211] **格子里放状态词, 不放数字。**
-          用户: 「用数字看不懂, 还是直接告诉当前数据代表什么的状态更好,
-          至于详细含义解释就放在叹号里面一起」。
-          `+1.4` / `-1.3` / `10%` / `中下中` 这些扫一眼没有任何意义 —— 得先知道
-          「多少算大」才读得出好坏, 而那正是不该逼用户记的东西。
-          数字全部退到悬停(要核对时仍然拿得到), 「多少算大」的分界写在感叹号里。 */}
-      <div className="flex flex-wrap gap-px overflow-hidden rounded-card bg-border/70">
-        {cell('快慢', pace,
-          `最近这十天比之前那一段${geo.accel.gain_atr >= 0 ? '多' : '少'}走了 `
-          + `${Math.abs(geo.accel.gain_atr).toFixed(1)} 倍日常波动。`
-          + '不是越大越好 —— 冲得太猛常出现在一波的末尾',
-          geo.accel.level === 'accel' ? 'text-red-400'
-            : geo.accel.level === 'decel' ? 'text-emerald-400' : 'text-foreground')}
-        {cell('走到哪一步', ch.phase?.maturity_cn ?? '—',
-          (geo.spread >= 0
-            ? `短线高出长线 ${geo.spread.toFixed(1)} 倍日常波动`
-            : `短线低于长线 ${Math.abs(geo.spread).toFixed(1)} 倍日常波动`)
-          + '。接近零 = 方向还没出来;适中 = 趋势立住了;太大 = 已经走了很长一段')}
-        {cell('三种看法', agree,
-          geo.compress != null
-            ? `短、中、长三种看法认的价还有 ${(geo.compress * 100).toFixed(0)}% 是重合的。越高说明越一致`
-            : undefined)}
-        {cell('挤在一起', squeeze,
-          `到今天为止连着 ${runs.compress_days} 天三种看法都认同一个价`)}
-        {cell('这季多数时候', quarter,
-          runs.compress_avg != null
-            ? `整个季度平均重合 ${(runs.compress_avg * 100).toFixed(0)}%。跟「挤在一起」一起看:`
-              + '连着的天数是零、平均却很高 = 刚刚才走出来'
-            : undefined)}
-        {cell('波动来自', energy ? energy.dominant_cn : '—',
-          energy ? `几天的短波动 ${(energy.share.s * 100).toFixed(0)}% / `
-            + `一波行情的主体 ${(energy.share.m * 100).toFixed(0)}% / `
-            + `长期老趋势 ${(energy.share.l * 100).toFixed(0)}%` : undefined)}
-        {cell('哪几档到边了', atRail,
-          '短、中、长各自在自己通道里的高低。三档都在中部时这一格没有信息')}
-      </div>
       {!!event.combo_note && (
         <p className="rounded border border-amber-400/30 bg-amber-400/[0.06] px-2.5 py-1.5 text-[10px] leading-relaxed text-amber-300/90">
           组合「{event.combo_note.combo}」· {event.combo_note.title}:{event.combo_note.detail}

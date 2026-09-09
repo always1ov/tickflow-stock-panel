@@ -127,15 +127,13 @@ function geoLines(geo?: ChannelGeometry | null, ev?: ChannelEvent | null,
  * 是用来扫的, 扫的时候没人会悬停。未确认的事件用虚一档的颜色, 因为
  * 「突破尝试」与「突破站稳」差的就是那两天。
  */
-export function VerdictCell({ v, ev, geo, runs, energy, ph, cls = '', onOpen }: {
+function VerdictInner({ v, ev, geo, runs, energy, ph, onOpen }: {
   v?: KeltnerVerdict | null
   ev?: ChannelEvent | null
   geo?: ChannelGeometry | null
   runs?: ChannelRuns | null
   energy?: BandEnergy | null
   ph?: ChannelPhase | null
-  /** [R211] 额外类名 —— 结论区那道右分界线由调用方给 */
-  cls?: string
   onOpen: () => void
 }) {
   const evLine = ev && ev.code !== 'none' ? (
@@ -154,7 +152,7 @@ export function VerdictCell({ v, ev, geo, runs, energy, ph, cls = '', onOpen }: 
     // 只有「中中中」是真的零信息(价格在三条通道都认可的区间里), 它照旧显示 "—"。
     const note = ev?.combo_note
     return (
-      <td className={`${TD_BASE} whitespace-nowrap px-1.5 ${cls}`}>
+      <>
         <button
           onClick={onOpen}
           className={note
@@ -169,11 +167,11 @@ export function VerdictCell({ v, ev, geo, runs, energy, ph, cls = '', onOpen }: 
           {note ? note.title : '—'}
         </button>
         {evLine}
-      </td>
+      </>
     )
   }
   return (
-    <td className={`${TD_BASE} whitespace-nowrap px-1.5 ${cls}`}>
+      <>
       <VerdictHover v={v} note={"点击摊开这只票过去每一档结论 —— 出现在哪几天、当时说了什么、之后走成什么样。"
         + geoLines(geo, ev, runs, energy, ph)}>
         <button
@@ -184,7 +182,7 @@ export function VerdictCell({ v, ev, geo, runs, energy, ph, cls = '', onOpen }: 
         </button>
       </VerdictHover>
       {evLine}
-    </td>
+    </>
   )
 }
 
@@ -333,13 +331,10 @@ const PLAY_CLS: Record<string, string> = {
  *
  * 这一列**不产生任何新判定** —— 每句话都能追到某一层的原话。
  */
-export function PlaybookCell({ p }: { p?: Playbook | null }) {
-  if (!p) {
-    return <td className={`${TD_BASE} px-2`}><span className="text-[10px] text-muted/30">—</span></td>
-  }
+function PlaybookInner({ p }: { p?: Playbook | null }) {
+  if (!p) return <span className="text-[10px] text-muted/30">—</span>
   const more = p.conflicts.length && p.level !== 'conflict'
   return (
-    <td className={`${TD_BASE} px-2`}>
       <div className="inline-flex max-w-[13rem] flex-col items-center gap-0.5 leading-tight">
         <span className={`inline-flex whitespace-nowrap rounded border px-1.5 py-0.5 text-[10px] ${PLAY_CLS[p.tone] ?? PLAY_CLS.muted}`}
               title={p.why}>
@@ -354,6 +349,36 @@ export function PlaybookCell({ p }: { p?: Playbook | null }) {
             另有 {p.conflicts.length} 处判定不一致
           </span>
         )}
+      </div>
+  )
+}
+
+/**
+ * [R212] 「结论」列 —— 贵不贵在上、怎么办在下, 合成一格。
+ *
+ * 用户: 「怎么办和贵不贵合成为一列叫做结论, 贵不贵在上换行怎么办在下」。
+ *
+ * 我先前主张分成两列并排, 理由是"它们打架时最该被看见"。**竖排同样看得见** ——
+ * 上下两行落在同一格里, 一眼就能对上; 而且省一列。所以按用户说的合。
+ *
+ * 顺序是有讲究的: 上面「贵不贵」是**位置**(这个价现在算贵还是便宜),
+ * 下面「怎么办」是**动作**(所以今天该干嘛) —— 从事实到结论, 自上而下读。
+ */
+export function ConclusionCell({ v, ev, geo, runs, energy, ph, p, onOpen }: {
+  v?: KeltnerVerdict | null
+  ev?: ChannelEvent | null
+  geo?: ChannelGeometry | null
+  runs?: ChannelRuns | null
+  energy?: BandEnergy | null
+  ph?: ChannelPhase | null
+  p?: Playbook | null
+  onOpen: () => void
+}) {
+  return (
+    <td className={`${TD_BASE} px-2`}>
+      <div className="flex flex-col items-center gap-1">
+        <VerdictInner v={v} ev={ev} geo={geo} runs={runs} energy={energy} ph={ph} onOpen={onOpen} />
+        <PlaybookInner p={p} />
       </div>
     </td>
   )

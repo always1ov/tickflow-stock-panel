@@ -14,7 +14,7 @@ import { storage } from '@/lib/storage'
 import { buildBoardHtml } from '@/lib/decisionBoardHtmlExport'
 import { DEFAULT_EXPORT_KEYS } from '@/lib/decisionBoardExportColumns'
 import { ExportColumnsDialog } from '@/components/stock-analysis/decision-board/ExportColumnsDialog'
-import { ChannelStateCell, NUM, PlaybookCell, TD_BASE, VerdictCell } from '@/components/stock-analysis/decision-board/cells'
+import { ChannelStateCell, ConclusionCell, NUM, TD_BASE } from '@/components/stock-analysis/decision-board/cells'
 import { ComboTableDialog } from '@/components/stock-analysis/decision-board/ComboTableDialog'
 import { LotsLink } from '@/components/stock-analysis/decision-board/LotsLink'
 import { GlossaryButton } from '@/components/stock-analysis/decision-board/GlossaryDialog'
@@ -39,30 +39,24 @@ const SIGNAL_RANK: Record<string, number> = { buy: 0, sell: 1, hold: 2, watch: 3
  * **顺序必须与 thead 里的 <th> 一一对应。**
  */
 const BOARD_COLS = [
-  // [R205] **整张表唯一的收敛层, 所以在最左边。** 决策台有五套彼此平行的判定
-  // (该动了/六态/通道结论/通道阶段/AI 信号), 这一列替人做完那次五路合成,
-  // 并且**指出它们什么时候打架** —— 那是最该停手、却最容易被忽略的时刻。
-  { label: '怎么办', w: '16%' },
-  // [R211] 「贵不贵」上提到第二位。用户: 「怎么办和贵不贵这两个当作结论」。
-  // **刻意不合成一格**: 「贵不贵」是「怎么办」的五个输入之一, 而它们打架的
-  // 时候恰恰最该被看见(那时「怎么办」会判成「先别动」) —— 并排才对得上,
-  // 挤进一格反而会让人以为结论主要来自它。两列之间划一道分界当作结论区。
-  { label: '贵不贵', w: '7%' },
-  // [R198] 「该动」不再单独占一列 —— 它挪进了标的格的第二行。判定本身没变,
-  // 只是从"另一列"变成"这只票名字底下的一句话", 扫表时不用左右对眼。
-  { label: '标的', w: '8%' },        // [R209] 只剩名字+代码一行了, 从 11% 收到 8%
-  { label: '现价', w: '3.5%' },
-  { label: '涨跌', w: '3.5%' },
+  { label: '标的', w: '9%' },
+  // [R212] 「现价」「涨跌」合成一列。用户: 「这两列合成为『现价/涨跌』这样为一列」。
+  // 两个数天生一起读 —— 拆成两列只是让眼睛多跳一次。
+  { label: '现价/涨跌', w: '6%' },
   { label: '仓位', w: '3%' },
   { label: '成本', w: '6%' },        // 两个输入框
   { label: '浮盈', w: '3.5%' },
-  { label: '止盈线', w: '5%' },      // 两行
-  // [R211] 「量化通道」(三档原始位置)与「通道态势」(阶段/成熟度/快慢)合成一列。
-  // 用户: 「趋势通道和通道态势可以放在一起吗」—— **可以, 而且本来就该合**:
-  // 两列讲的是同一套指标的两个层次(一个是测量, 一个是从它推出来的结论),
-  // 拆成两列等于让人左右对眼去把结论和它的依据接起来。
-  // 合完是三行: 阶段 / 走到哪一步·还有没有劲 / 哪几档到边了。
+  // [R212] 「止盈线」那一列撤掉了。用户: 「止盈线这一列不要了」。
+  // **信息没丢**: 出场线破了或逼近, 「结论」列会直接判成「按纪律走」/「盯着」
+  // 并把线价写在徽标上 —— 那比单独一列更早进视线。排序键与判定都还在。
+  // [R211] 「量化通道」(测量) + 「通道态势」(结论) + 「趋势」(六态) 三列并一列。
+  // 六态与通道阶段答的是同一个问题(往哪走), 只是方法不同 —— 放一格里,
+  // 它们什么时候一致、什么时候打架, 上下一对就看见了。
   { label: '走势', w: '11%' },
+  // [R212] 「贵不贵」(位置) + 「怎么办」(动作) 合成一列, 竖排, 摆在 AI 之前。
+  // 用户: 「贵不贵在上换行怎么办在下」「结论这行放在 ai 分析前一列」。
+  // 顺序是有讲究的: 上面是事实(这个价算贵还是便宜), 下面是结论(所以今天该干嘛)。
+  { label: '结论', w: '16%' },
   { label: 'AI 分析', w: '7%' },     // R130 上下两行: 报告胶囊 / ✨分析 + 🔔提醒
   { label: 'AI 信号', w: '' },       // 不给宽度, 吃掉剩下的 —— 只有它是整段文字
 ] as const
@@ -630,24 +624,22 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
             </colgroup>
             <thead className="sticky top-0 bg-surface/95 backdrop-blur text-[10px] text-muted">
               <tr className="text-left">
+                <th className="whitespace-nowrap px-3 py-2.5 font-normal text-center"><button onClick={() => toggleSort('name')} className={thBtn} title="标的名称;第二行是「该动了」判定 —— 已触发 > 逼近 > 刚变盘 > 到轨 > 无事,纯规则,AI 不参与">标的{caret('name')}</button></th>
                 <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center">
-                  <button onClick={() => toggleSort('play')} className={thBtn}
-                          title={'把「该动了 / 六态趋势 / 通道结论 / 通道阶段 / AI 信号」这五套判定合成一句话。\n\n'
-                            + '排序按急迫程度: 纪律已破 > 今天就得动 > 判定打架 > 盯着 > 留意 > 没事。\n\n'
-                            + '「先别动」那一档最值得看 —— 五套判定互相矛盾时系统原来从不提一句, 而那恰恰是最该停手的时刻。'}>
-                    怎么办{caret('play')}
+                  <button onClick={() => toggleSort(sort.key === 'close' ? 'changePct' : 'close')}
+                          className={`${thBtn} whitespace-nowrap`}
+                          title="现价与当日涨跌。点这里在「现价」「涨跌」之间轮换排序目标, 再点同一个翻方向">
+                    现价/涨跌
+                    {(['close', 'changePct'] as const).includes(sort.key as 'close')
+                      && <span className="ml-0.5 text-[9px] text-accent">
+                        {sort.key === 'close' ? '价' : '涨跌'}
+                      </span>}
+                    {caret(sort.key)}
                   </button>
                 </th>
-                <th className="whitespace-nowrap px-1.5 py-2.5 font-normal text-center"><button onClick={() => toggleSort('verdict')} className={thBtn} title={'这个价位现在算贵还是算便宜 —— 三档位置合起来读出的一句话。\n\n'
-                    + '它说的是**位置**, 不是方向: 同一个「短线冲高」, 在上涨趋势里是常态, 在下跌趋势里是撞到阻力。\n\n'
-                    + '排序把该减的和该吸的分到两头: 降序 = 偏贵的在前, 升序 = 偏便宜的在前。'}>贵不贵{caret('verdict')}</button></th>
-                <th className="whitespace-nowrap px-3 py-2.5 font-normal text-center"><button onClick={() => toggleSort('name')} className={thBtn} title="标的名称;第二行是「该动了」判定 —— 已触发 > 逼近 > 刚变盘 > 到轨 > 无事,纯规则,AI 不参与">标的{caret('name')}</button></th>
-                <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center"><button onClick={() => toggleSort('close')} className={thBtn}>现价{caret('close')}</button></th>
-                <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center"><button onClick={() => toggleSort('changePct')} className={thBtn}>涨跌{caret('changePct')}</button></th>
                 <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center"><button onClick={() => toggleSort('held')} className={thBtn}>仓位{caret('held')}</button></th>
                 <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center"><button onClick={() => toggleSort('cost')} className={thBtn} title="持仓成本价(仅持有且填了成本的票有)">成本{caret('cost')}</button></th>
                 <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center"><button onClick={() => toggleSort('pnl')} className={thBtn}>浮盈{caret('pnl')}</button></th>
-                <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center"><button onClick={() => toggleSort('exit')} className={thBtn} title="ATR 三阶段出场线(止损/保本/移动止盈),仅持有+填成本的票有;跌破自动推送。按「离触发还有多远」排序 —— 线价本身不同票差几十倍没有可比性">止盈线{caret('exit')}</button></th>
                 {/* [R42] Keltner 三档: 一眼看出这只票贴着哪条轨。收盘口径, 与个股分析图表同一组公式 */}
                 {/* [R198] 三档合一。排序键仍是三个 —— 点表头在 短→中→长 之间轮换,
                     再点同一个翻方向。合并的是显示不是能力。 */}
@@ -667,6 +659,21 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
                     {(['trend', 'spread', 'ks', 'km', 'kl'] as const).includes(sort.key as 'trend')
                       && <span className="ml-0.5 text-[9px] text-accent">
                         {{ trend: '六态', spread: '间距', ks: '短', km: '中', kl: '长' }[sort.key as 'trend']}
+                      </span>}
+                    {caret(sort.key)}
+                  </button>
+                </th>
+                <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center">
+                  <button onClick={() => toggleSort(sort.key === 'verdict' ? 'play' : 'verdict')}
+                          className={`${thBtn} whitespace-nowrap`}
+                          title={'两行: 上面「贵不贵」是这个价现在算贵还是算便宜(位置),\n'
+                            + '下面「怎么办」是把五套判定合成的一句话(动作)。\n\n'
+                            + '点这里在「贵不贵」「怎么办」之间轮换排序目标, 再点同一个翻方向。\n'
+                            + '「怎么办」按急迫程度排: 按纪律走 > 今天就得动 > 先别动 > 盯着 > 留意 > 没事。'}>
+                    结论
+                    {(['verdict', 'play'] as const).includes(sort.key as 'verdict')
+                      && <span className="ml-0.5 text-[9px] text-accent">
+                        {sort.key === 'verdict' ? '贵不贵' : '怎么办'}
                       </span>}
                     {caret(sort.key)}
                   </button>
@@ -694,10 +701,6 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
                     className={`scroll-mt-10 border-t border-border/30 transition-colors duration-500 hover:bg-elevated/40 ${
                       flashing ? 'bg-accent/25' : active ? 'bg-accent/[0.10]' : ''}`}
                   >
-                    {/* [R205] 收敛层 —— 整张表唯一一列"该怎么办", 所以在最左边 */}
-                    <PlaybookCell p={r.play} />
-                    <VerdictCell cls="border-r-2 border-r-border/70" v={r.kc?.verdict} ev={r.ev} geo={r.kc?.geo} runs={r.kc?.runs} energy={r.kc?.energy} ph={r.ph}
-                                 onOpen={() => setReview({ symbol: r.symbol, name: r.name, tab: 'verdict' })} />
                     {/* 点标的即切换分析(免搜索) */}
                     {/* [R157b] 当前个股整行常驻高亮 + 左侧一道靛蓝边: 搜索后先弹出关键价位
                         弹窗, 闪烁那 1.8 秒多半被弹窗盖住, 关掉弹窗还得一眼认得出它在哪 */}
@@ -718,9 +721,12 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
                         </span>
                       </button>
                     </td>
-                    <td className={`${TD_BASE} ${NUM} whitespace-nowrap px-2 text-foreground`}>{r.close != null ? r.close.toFixed(2) : '—'}</td>
-                    <td className={`${TD_BASE} ${NUM} whitespace-nowrap px-2 ${up ? 'text-red-400' : down ? 'text-emerald-400' : 'text-muted'}`}>
-                      {r.changePct != null ? `${(r.changePct * 100).toFixed(2)}%` : '—'}
+                    {/* [R212] 现价与涨跌并成一格 —— 两个数天生一起读 */}
+                    <td className={`${TD_BASE} ${NUM} whitespace-nowrap px-2`}>
+                      <span className="text-foreground">{r.close != null ? r.close.toFixed(2) : '—'}</span>
+                      <span className={`ml-1.5 text-[10px] ${up ? 'text-red-400' : down ? 'text-emerald-400' : 'text-muted'}`}>
+                        {r.changePct != null ? `${r.changePct > 0 ? '+' : ''}${(r.changePct * 100).toFixed(2)}%` : '—'}
+                      </span>
                     </td>
                     {/* 仓位:持有/空仓 切换。
                         [R169] 写回时一律用 manualCost 而不是 r.cost —— r.cost 可能是批次
@@ -735,6 +741,23 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
                       >
                         {r.held ? '持有' : '空仓'}
                       </button>
+                      {/* [R212] 仓% 从「成本」格挪到这里。用户: 「成本这一列去掉仓位比例」。
+                          **不是删掉这个能力** —— 今日总览的组合总仓位、净值回撤纪律、
+                          超配提醒全靠它, 没别的地方能填。挪到「仓位」格才是它本来的位置:
+                          持有与否 + 占多少仓, 本来就是同一件事的两半。 */}
+                      {r.held && (
+                        <input
+                          type="number" min={0} max={100}
+                          defaultValue={r.weight ?? ''}
+                          placeholder="仓%"
+                          title="仓位比例(占总资金 %),可选 —— 填了之后今日总览能算组合总仓位、净值回撤纪律与超配提醒。批次页给不出这个数(它不知道总资金),只能在这里填。"
+                          onBlur={(e) => {
+                            const v = e.target.value === '' ? null : Number(e.target.value)
+                            if (v !== r.weight) setPos.mutate({ symbol: r.symbol, held: true, cost: manualCost, weight: v })
+                          }}
+                          className={`mt-1 w-12 h-5 px-1 rounded bg-base border border-border text-[10px] ${NUM} text-right text-foreground focus:outline-none focus:border-accent/50`}
+                        />
+                      )}
                     </td>
                     {/* 成本+仓位%:仅持有时可填。生命线=20日线, 自动计算无需手填;
                         仓位% 供今日总览算组合总仓位/净值回撤, 不填不影响其他功能。
@@ -760,18 +783,6 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
                               r.costSource === 'lots' ? 'border-accent/35 placeholder:text-accent/70' : 'border-border'
                             }`}
                           />
-                          <input
-                            type="number"
-                            min={0} max={100}
-                            defaultValue={r.weight ?? ''}
-                            placeholder="仓%"
-                            title="仓位比例(占总资金 %),可选 —— 填了之后今日总览能算组合总仓位、净值回撤纪律与超配提醒。批次页给不出这个数(它不知道总资金),只能在这里填。"
-                            onBlur={(e) => {
-                              const v = e.target.value === '' ? null : Number(e.target.value)
-                              if (v !== r.weight) setPos.mutate({ symbol: r.symbol, held: true, cost: manualCost, weight: v })
-                            }}
-                            className={`w-12 h-6 px-1 rounded bg-base border border-border text-[11px] ${NUM} text-right text-foreground focus:outline-none focus:border-accent/50`}
-                          />
                           <LotsLink symbol={r.symbol} lotCount={r.lotCount} driftPct={r.costDriftPct} lotCost={r.lotCost} />
                         </span>
                       ) : (
@@ -785,30 +796,16 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
                     <td className={`${TD_BASE} ${NUM} whitespace-nowrap px-2 ${r.pnl == null ? 'text-muted' : r.pnl > 0 ? 'text-red-400' : r.pnl < 0 ? 'text-emerald-400' : 'text-muted'}`}>
                       {r.pnl != null ? `${(r.pnl * 100).toFixed(1)}%` : '—'}
                     </td>
-                    {/* [fork 增强] 持仓出场线:当前生效线位 + 距离; 逼近变琥珀, 跌破变红 */}
-                    <td className={`${TD_BASE} whitespace-nowrap px-2`}>
-                      {r.exit ? (
-                        <span
-                          className={`inline-flex flex-col items-end text-[10px] ${NUM} leading-tight ${
-                            r.exit.triggered ? 'text-red-400' : r.exit.distance_pct > -0.03 ? 'text-amber-300' : 'text-muted'
-                          }`}
-                          title={`${r.exit.stage_cn} · ${r.exit.line_cn}\n成本 ${r.exit.cost ?? '—'} · 浮盈 ${r.exit.profit_atr ?? '—'}×ATR · 持仓最高 ${r.exit.highest_close ?? '—'}\n跌破 ${r.exit.line.toFixed(2)} → ${r.exit.action}(k=${r.exit.k}, ATR14=${r.exit.atr})${r.exit.lifeline ? `\n生命线(20日线) ${r.exit.lifeline.toFixed(2)} — 收盘跌破无条件清仓` : ''}`}
-                        >
-                          <span>{r.exit.line.toFixed(2)}</span>
-                          <span className="whitespace-nowrap text-[9px] opacity-80">
-                            {r.exit.stage === 'fatal' ? '生命线破位!' : r.exit.triggered ? '已触发' : `距 ${(r.exit.distance_pct * 100).toFixed(1)}%`}
-                          </span>
-                        </span>
-                      ) : (
-                        <span className="text-[10px] text-muted/40">—</span>
-                      )}
-                    </td>
                     {/* [R42] Keltner 三档位置 */}
                     <ChannelStateCell
                       trend={r.trend} trendCls={r.trend ? trendBadgeCls(r.trend.state) : undefined}
                       geo={r.kc?.geo} runs={r.kc?.runs} ph={r.ph} kc={r.kc} close={r.close}
                       onOpenReview={() => setReview({ symbol: r.symbol, name: r.name, tab: 'trend' })}
                       onOpenCombo={() => setCombo({ name: r.name, geo: r.kc?.geo, runs: r.kc?.runs })} />
+                    {/* [R212] 结论 = 贵不贵(位置, 上) + 怎么办(动作, 下), 竖排一格 */}
+                    <ConclusionCell v={r.kc?.verdict} ev={r.ev} geo={r.kc?.geo} runs={r.kc?.runs}
+                                    energy={r.kc?.energy} ph={r.ph} p={r.play}
+                                    onOpen={() => setReview({ symbol: r.symbol, name: r.name, tab: 'verdict' })} />
                     {/* [R106] AI 分析列: 报告胶囊(点开最近报告) + ✨生成/更新分析 + 🔔点位提醒
                         —— 原页头两个按钮整合到这里, 每个标的都有自己的一对动作 */}
                     <td className={`${TD_BASE} whitespace-nowrap px-2 text-center`}>

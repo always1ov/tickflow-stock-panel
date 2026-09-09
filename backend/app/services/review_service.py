@@ -515,12 +515,13 @@ def _channel(df: pl.DataFrame, rows: list[dict]) -> dict | None:
         t = (last.get("trend") or {})
         ev = kg.event(state=t.get("state"), duration=t.get("day"), geo=geo, run=runs)
         note = kg.combo_note(bands)
-        return {"geo": geo, "runs": runs, "energy": kg.band_energy(closes, atrs),
+        energy = kg.band_energy(closes, atrs)
+        return {"geo": geo, "runs": runs, "energy": energy,
                 "event": dict(ev, combo_note=note) if note else ev,
                 # [R199] 阶段判定 —— 三个几何量单看都答不了"我该怎么办",
                 # 合起来才回答"现在处在哪一段"
                 "phase": kg.phase(geo, runs),
-                "explain": kg.explain(geo)}
+                "explain": kg.explain(geo, runs, energy)}
     except Exception as e:  # noqa: BLE001
         logger.debug("review channel geometry skipped: %s", e)
         return None

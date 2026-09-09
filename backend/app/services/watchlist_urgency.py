@@ -148,21 +148,77 @@ def assess(*, position: dict | None, trend: dict | None,
                    action=("转多第一天 —— 买点窗口从今天起算, 但要量能配合"
                            if bull else "转空第一天 —— 持有的该考虑减了"))
 
-    # ④ 到轨 —— 短期通道贴/破上下轨
+    # ④ 到轨 —— 短期通道贴/破上下轨。**必须看趋势方向**, 见下。
     s_band = (bands or {}).get("s") or {}
     pos = s_band.get("pos")
     if pos in _band_positions():
-        pos_cn = s_band.get("pos_cn") or "到轨"
-        up = pos in ("above", "near_upper")
-        return _mk(BAND, flip_d, kind="band_up" if up else "band_down",
-                   side=SIDE_SELL if up else SIDE_BUY,
-                   label="到上沿" if up else "到下沿",
-                   what=f"短期通道{pos_cn}",
-                   action=("到上沿, 这个位置买是在最贵的地方; 持有的可考虑高抛"
-                           if up else "到下沿, 相对便宜; 但要先确认趋势还在"))
+        return _band_call(pos, s_band, trend, flip_d)
 
     return _mk(IDLE, None, kind="none", side=SIDE_INFO,
                what="没有触到任何线", action="")
+
+
+# 多头三态。只引用不做副本。
+_BULLISH = ("UT", "NR", "SR")
+
+
+def _band_call(pos: str, band: dict, trend: dict | None,
+               flip_d: float | None) -> dict:
+    """到轨 → 一档判定。**这一档必须看趋势方向。**
+
+    ## [R212] 这里原来有个真 bug
+
+    用户: 「有矛盾, 马上逼近上沿了又叫买, 到上沿了又叫卖, 很奇怪到底是买还是卖」。
+
+    原来这一档是无脑的: `上沿 → 卖 / 下沿 → 买`, **一眼都不看趋势**。于是同一只
+    正在上涨的票, 昨天离转强价 1.5% 报「逼近·买」, 今天站上去顺带碰到上沿,
+    立刻翻成「到上沿·卖」—— 前后两天给出相反的动作, 而这两件事说的其实是
+    **同一次突破**。
+
+    错在哪: 转强价(六态关键点)与短期通道上沿常常挨得很近, 站上去这件事在六态
+    那套里是"转强"、在通道那套里是"到顶"。**谁对取决于趋势在哪一侧**, 而不是
+    取决于哪一档判定先命中。
+
+    这一条 `keltner_geometry.event` 里早就写对了(破上轨在 UT 里是趋势内加速、
+    在空头侧才是反弹遇阻), 只是「该动了」这一层当时没跟上。现在对齐:
+
+        到上沿 + 多头侧 → **不是卖**。沿着上沿走是趋势票的常态, 要减看止盈线
+        到上沿 + 空头侧 → 卖。反弹撞到阻力, 方向没变
+        到下沿 + 多头侧 → 买侧, 但要提醒这更像甩人下车而不是破位
+        到下沿 + 空头侧 → **不是买**。往下走的时候下沿会跟着往下移
+        趋势读不到     → 退回中性, 不替用户猜方向
+    """
+    pos_cn = band.get("pos_cn") or "到轨"
+    up = pos in ("above", "near_upper")
+    state = (trend or {}).get("state")
+    cn = (trend or {}).get("state_cn") or ""
+    bull = None if state is None else state in _BULLISH
+    label = "到上沿" if up else "到下沿"
+    what = f"短期通道{pos_cn}"
+
+    if up:
+        if bull is True:
+            return _mk(BAND, flip_d, kind="band_up", side=SIDE_INFO, label=label,
+                       what=f"{what}(趋势还在多头侧{f'·{cn}' if cn else ''})",
+                       action="沿着上沿走是趋势票的常态 —— 不必因为「到高位了」就减。"
+                              "真要减看止盈线, 别拿到轨当卖出理由")
+        if bull is False:
+            return _mk(BAND, flip_d, kind="band_up", side=SIDE_SELL, label=label,
+                       what=f"{what}(趋势在空头侧{f'·{cn}' if cn else ''})",
+                       action="逆势冲到上沿多半是反弹撞到阻力, 不是突破 —— 持有的可考虑高抛")
+        return _mk(BAND, flip_d, kind="band_up", side=SIDE_INFO, label=label,
+                   what=what, action="到上沿了。趋势读不到, 是突破还是撞顶得自己看日 K")
+
+    if bull is True:
+        return _mk(BAND, flip_d, kind="band_down", side=SIDE_BUY, label=label,
+                   what=f"{what}(趋势还在多头侧{f'·{cn}' if cn else ''})",
+                   action="趋势没坏而掉到下沿, 更像甩人下车 —— 相对便宜, 但别把甩人当破位")
+    if bull is False:
+        return _mk(BAND, flip_d, kind="band_down", side=SIDE_INFO, label=label,
+                   what=f"{what}(趋势在空头侧{f'·{cn}' if cn else ''})",
+                   action="往下走的时候下沿会跟着一路下移 —— 别拿「到下沿」当抄底理由")
+    return _mk(BAND, flip_d, kind="band_down", side=SIDE_INFO, label=label,
+               what=what, action="到下沿了。趋势读不到, 是超跌还是破位得自己看日 K")
 
 
 def _nearest_flip(trend: dict | None, held: bool) -> tuple[float | None, dict]:
