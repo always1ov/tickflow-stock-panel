@@ -570,51 +570,38 @@ def _tail_run(rows: list[dict], ok) -> int:
     return run
 
 
-def verdict_run(closes: list[float] | None, atrs: list[float] | None,
-                dates: list | None = None,
-                ma20: list | None = None, ma60: list | None = None) -> dict | None:
-    """[R233] 当前这条**通道结论**已经连着挂了几天。
+# [R240] 逐日结论序列往回取多少根。用户: 「我要确定性的显示多少天」——
+# 所以取回**整段可用历史**(线上窗口 260 个自然日 ≈ 178 个交易日), 而不是
+# 截一小段然后把长的段标成下界。
+#
+# 实测过成本(145 只自选, 300 根序列): limit=60 是 146ms, limit=250 是 399ms。
+# 多花的 0.25 秒挂在一个 5 分钟缓存一次的批量上, 换"数字是准的"值得。
+VERDICT_TAIL = 250
 
-    返回 `{code, days, since}`;当天没有结论时返回 None。`dates` 传了才有
-    `since`(进入这一档的那个交易日), 不传就只有天数。
 
-    用户: 「『候选、调到位了』也是要显示这个状态持续多少天了」。
+def verdict_codes(closes: list[float] | None, atrs: list[float] | None,
+                  *, ma20: list | None = None, ma60: list | None = None,
+                  limit: int = VERDICT_TAIL) -> list[str | None]:
+    """[R239] 最近若干个交易日的**通道结论码**, **新→旧**。算不出的位置是 None。
 
-    六态徽标一直带着「上涨趋势 15 天」, 而它旁边的通道结论只有一个 4 字标签 ——
-    于是「调到位了」看不出是**今天刚到位**还是**已经这样磨了三周**。这两件事
-    要做的动作完全不同: 第一天是"刚出现的机会", 第 20 天更像"它就是不涨"。
+    判定一个字都不是这里写的 —— 三档走作者的 `assess`, 结论走作者的 `verdict`。
+    这一层只负责"把最近几天各是哪一档摆出来", 由调用方去数。
 
-    ## 口径
+    ## 为什么要交出整串, 而不是在这里数完
 
-    逐日重建三档 → 走作者的 `verdict()` → 从今天往回数**同一个 code** 连续几天。
-    中间断一天就停(与 `_tail_run` 同一条纪律): 「调到位了」出现 3 天、隔一天、
-    再出现 2 天, 那是两次独立的出现, 说成 5 天会把这一档持续了多久说多。
+    原来这里直接返回"连着几天"(`verdict_run`), 数的时候拿**自己算的今天**当
+    基准。可徽标上那一档是 `channels_for_symbols` 从 enriched 快照拼的, 两边
+    只要在最后一根上对不上(数据日期差一天、复权口径不同…), 天数就整个作废,
+    界面上**每一行都变成「已1天?」** —— 用户实测正是这样。
 
-    **判定一个字没自己写** —— 三条均线在这里滚(长期档本来就没有预计算列),
-    但 `assess` / `verdict` 全是作者那两个函数。这一层只负责数天数。
+    交出整串之后, 由调用方拿**它自己的那一档**往回数, 就不再需要两条路在
+    "今天"上达成一致 —— 少了一个必须成立、却经常不成立的前提。
 
-    原料就是 `series()` 用的那一串收盘价与 ATR, **不新增任何取数**。
-    往回最多数 `MAX_LOOKBACK` 天。
+    ## 短中档吃预计算列
 
-    ## [R238] 短/中档必须用**预计算列**, 不许自己滚
-
-    用户: 「数字本身就不对」。
-
-    起因是同一条 MA20 在这个系统里有过两套算法:
-
-        复盘弹窗 `_bands_for_row`      预计算列 ma20/ma60 + 自己滚 ma120
-        决策台徽标 `channels_for_symbols` 预计算列 ma20/ma60 + 自己滚 ma120
-        **本函数(改之前)**            三条全自己滚          ← 只有这里不同源
-
-    于是这里数出来的**逐日结论**与用户在复盘里逐日看到的不是同一套, 天数当然
-    对不上 —— 而两边都印在界面上, 谁也说不清哪个是真的。
-
-    现在短档与中档一律吃传进来的 `ma20`/`ma60`(调用方从日线表直接取), 与另外
-    两处同源。**只有长档还自己滚** —— 它本来就没有预计算列, 这也正是
-    `long_trend_map` 存在的理由。
-
-    `ma20`/`ma60` 传 None 时退回自己滚, 那只是**没有这两列时的退路**(测试夹具
-    走的就是这条); 线上调用必须把列传进来, 否则又会分叉成两套。
+    `ma20`/`ma60` 由调用方从日线表直接给, 与复盘、决策台徽标同源;
+    只有本来就没有预计算列的长档在这里自己滚。传 None 时退回自己滚,
+    那只是没有这两列时的退路(测试夹具走这条), 线上必须传。
     """
     from app.indicators.keltner import assess, verdict as _verdict
 
@@ -622,53 +609,50 @@ def verdict_run(closes: list[float] | None, atrs: list[float] | None,
     as_ = [_f(a) for a in (atrs or [])]
     n = len(cs)
     if n == 0 or len(as_) != n or any(c is None for c in cs):
-        return None
+        return []
     vals: list[float] = [c for c in cs]  # type: ignore[misc]
-    # 长档永远自己滚(没有预计算列); 短中档优先吃传进来的那两列, 见上面 R238。
     ma = {"l": _rolling_mean(vals, WINDOW["l"])}
     for key, col in (("s", ma20), ("m", ma60)):
         ma[key] = ([_f(x) for x in col] if col is not None and len(col) == n
                    else _rolling_mean(vals, WINDOW[key]))
 
-    def _code_at(i: int) -> str | None:
+    out: list[str | None] = []
+    for i in range(n - 1, max(-1, n - 1 - max(0, limit)), -1):
         a = as_[i]
         if a is None or a <= 0:
-            return None
+            out.append(None)
+            continue
         bands: dict[str, dict] = {}
         for k_ in ("s", "m", "l"):
             m = ma[k_][i]
             if m is None:
-                return None
+                bands = {}
+                break
             got = assess(close=vals[i], ma=m, atr=a, n=K[k_])
             if not got:
-                return None
+                bands = {}
+                break
             bands[k_] = got
-        v = _verdict(bands)
-        return str(v["code"]) if v else None
-
-    today = _code_at(n - 1)
-    if today is None:
-        # 三档都在通道中部(底层返回 None), 或者当天算不出来。
-        # 这时候"持续几天"没有可说的 —— 不给 0, 给 None, 让界面照旧什么都不显示。
-        return None
-    days = 0
-    first = n - 1                      # 这一段的**第一个**交易日下标
-    for i in range(n - 1, max(-1, n - 1 - MAX_LOOKBACK), -1):
-        if _code_at(i) != today:
-            break
-        days += 1
-        first = i
-    # today 就是最后一根算出来的, 所以循环第一轮必然命中 —— days ≥ 1。
-    out: dict = {"code": today, "days": days}
-    if dates is not None and len(dates) == n:
-        # 进入这一档的那个交易日。**是"哪一天开始"而不是"多久以前"** ——
-        # 天数会随每天收盘变, 起始日不会, 界面上两个一起给才对得起账。
-        out["since"] = str(dates[first])
-    # 数到了回看上限 = 这一段比我们能看到的还长, 天数是**下界**。
-    # 不标出来的话, "250 天"会被读成"正好 250 天"。
-    if days >= min(n, MAX_LOOKBACK):
-        out["capped"] = True
+        v = _verdict(bands) if len(bands) == 3 else None
+        out.append(str(v["code"]) if v else None)
     return out
+
+
+def count_trailing(codes: list[str | None] | None, code: str | None) -> int:
+    """从头(=最近一天)数, 连着等于 `code` 的有几个。**中断即停。**
+
+    「候选池」出现 3 天、隔一天、再 2 天 —— 报 2 不是 5。那是两次独立的出现;
+    报 5 会让人以为它已经在这个位置磨了一周, 而实际上刚回来两天。
+    与在轨外天数、六态 duration 同一条纪律。纯函数。
+    """
+    if not codes or not code:
+        return 0
+    n = 0
+    for c in codes:
+        if c != code:
+            break
+        n += 1
+    return n
 
 
 def runs(rows: list[dict]) -> dict:

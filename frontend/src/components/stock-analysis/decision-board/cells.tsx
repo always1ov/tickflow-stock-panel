@@ -206,13 +206,19 @@ function VerdictInner({ v, ev, geo, runs, energy, ph, onOpen }: {
               用户: 「我不是要历史总数哦」—— 光写「候选池 75天」可以读成
               "历史上累计 75 天处于候选池", 而这里说的是"已经连着 75 天"。
               一字之差是两个完全不同的数, 徽标上必须自己说清楚, 不能指望
-              用户去悬停里确认。 */}
+              用户去悬停里确认。
+
+              [R240] 问号去掉了。用户: 「我要确定性的显示多少天」。
+              R239 之前那个 `?` 会全表出现 —— 因为它挂在"两条路必须先对上
+              今天"这个经常不成立的前提上。前提没了之后, 数不出来只剩一种
+              情形: **历史里最近一根就不是这一档 = 今天刚变**。那时「已1天」
+              本来就是正确答案, 不是兜底, 自然不该带问号。 */}
           {v.days != null && (
-            <span className={v.days_exact === false ? 'ml-0.5 opacity-40' : 'ml-0.5 opacity-70'}
-                  title={v.days_exact === false
-                    ? '这只票的历史不够长,只能确认到今天 —— 实际可能已经连着很多天'
-                    : `自 ${v.since ?? '—'} 起,已连着 ${v.days} 个交易日`}>
-              已{v.capped ? '超过' : ''}{v.days}天{v.days_exact === false ? '?' : ''}
+            <span className="ml-0.5 opacity-70"
+                  title={v.since
+                    ? `自 ${v.since} 起,已连着 ${v.days} 个交易日`
+                    : '今天刚变成这一档'}>
+              已{v.days}天{v.capped ? '+' : ''}
             </span>
           )}
         </button>

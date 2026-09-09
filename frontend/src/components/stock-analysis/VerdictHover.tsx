@@ -119,13 +119,11 @@ export function VerdictHover({ v, note, children }: {
                       徽标上只放得下数字, 这里给能核对的那一份。 */}
                   {v.days != null && (
                     <span className="ml-1 text-[10px] font-normal text-muted"
-                          title={v.days_exact === false
-                            ? '这只票的历史不够长,只能确认到今天 —— 实际可能已经连着很多天'
-                            : '这是**当前这一段**连着多少个交易日,不是历史累计。'
-                              + '含今天;中间只要断一天(换了一档或没有结论)就从头重新起算。'}>
-                      {v.days_exact === false
-                        ? '只能确认到今天'
-                        : `已连着 ${v.capped ? '超过 ' : ''}${v.days} 个交易日${v.since ? ` · 自 ${v.since}` : ''}`}
+                          title={'这是**当前这一段**连着多少个交易日,不是历史累计。'
+                            + '含今天;中间只要断一天(换了一档或没有结论)就从头重新起算。'
+                            + (v.capped ? '\n\n已经数到能看到的最早一根,实际可能更长。' : '')}>
+                      {`已连着 ${v.days} 个交易日${v.capped ? '以上' : ''}`}
+                      {v.since ? ` · 自 ${v.since}` : ''}
                     </span>
                   )}
                 </span>

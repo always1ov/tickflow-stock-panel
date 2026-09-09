@@ -31,9 +31,7 @@ export function VerdictTag({ v, holding }: { v?: KeltnerVerdict | null; holding?
         {v.title}
         {/* [R233] 这一档挂了几天 —— 第 1 天与第 20 天该做的事完全不同 */}
         {v.days != null && (
-          <span className={v.days_exact === false ? 'ml-0.5 opacity-40' : 'ml-0.5 opacity-70'}>
-            已{v.capped ? '超过' : ''}{v.days}天{v.days_exact === false ? '?' : ''}
-          </span>
+          <span className="ml-0.5 opacity-70">已{v.days}天{v.capped ? '+' : ''}</span>
         )}
       </span>
     </VerdictHover>

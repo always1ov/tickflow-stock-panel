@@ -21,9 +21,32 @@ _ATR = 0.25
 _WARMUP = 200          # 够长期档(120)暖机
 
 
+def _vr(closes, atrs=None, dates=None, ma20=None, ma60=None, limit=None):
+    """[R239] 老的 `verdict_run` 拆成了 `verdict_codes` + `count_trailing`
+    (理由见那两个函数的说明: 数的那一步必须归"知道徽标印的是哪一档"的调用方)。
+
+    这个适配器保留原来那个返回形状, 好让下面那些**行为断言**一字不改地继续
+    守着 —— 它们守的是口径(中断即重算、含今天、起始日、上限), 与拆不拆无关。
+    """
+    n = len(closes)
+    kw = {} if limit is None else {"limit": limit}
+    codes = kg.verdict_codes(closes, atrs or [_ATR] * n, ma20=ma20, ma60=ma60, **kw)
+    if not codes or not codes[0]:
+        return None
+    today = codes[0]
+    days = kg.count_trailing(codes, today)
+    out = {"code": today, "days": days}
+    if dates is not None and len(dates) == n:
+        out["since"] = str(dates[::-1][days - 1])
+    if days >= len(codes):
+        out["capped"] = True
+    return out
+
+
+
 def _code_of(closes: list[float]) -> str | None:
     """按 verdict_run 同一套口径, 算最后一天的结论码 —— 用来造夹具时对答案。"""
-    got = kg.verdict_run(closes, [_ATR] * len(closes))
+    got = _vr(closes, [_ATR] * len(closes))
     return got["code"] if got else None
 
 
@@ -35,14 +58,14 @@ def _flat_then(tail: list[float], base: float = 10.0) -> list[float]:
 def test_刚出现的结论是第一天():
     """单日出现就该是 1, 不是 0 —— 「连着第 0 天」不是人话。"""
     closes = _flat_then([9.4])
-    got = kg.verdict_run(closes, [_ATR] * len(closes))
+    got = _vr(closes, [_ATR] * len(closes))
     assert got is not None, "造的夹具没有触发任何结论, 测试前提就错了"
     assert got["days"] == 1
 
 
 def test_连着几天同一档就数几天():
     closes = _flat_then([9.4, 9.4, 9.4, 9.4])
-    got = kg.verdict_run(closes, [_ATR] * len(closes))
+    got = _vr(closes, [_ATR] * len(closes))
     assert got is not None
     assert got["days"] == 4, f"数出来是 {got['days']} 天"
 
@@ -55,7 +78,7 @@ def test_中间断一天就重新起算():
     与 `_tail_run` 同一条纪律。
     """
     interrupted = _flat_then([9.4, 9.4, 9.4, 10.0, 9.4, 9.4])
-    got = kg.verdict_run(interrupted, [_ATR] * len(interrupted))
+    got = _vr(interrupted, [_ATR] * len(interrupted))
     assert got is not None
     assert got["days"] == 2, f"断档之后该从 2 起算, 却数成了 {got['days']} 天"
 
@@ -65,7 +88,7 @@ def test_三档都在中部时不给天数而不是给零():
     「— 0天」, 那是个看着像真的假数。"""
     closes = [10.0] * (_WARMUP + 5)
     assert _code_of(closes) is None
-    assert kg.verdict_run(closes, [_ATR] * len(closes)) is None
+    assert _vr(closes, [_ATR] * len(closes)) is None
 
 
 def test_换了一档结论天数跟着从头起算():
@@ -73,7 +96,7 @@ def test_换了一档结论天数跟着从头起算():
     low = _flat_then([9.4, 9.4, 9.4])
     assert _code_of(low) is not None
     high = low + [10.6, 10.6]
-    got = kg.verdict_run(high, [_ATR] * len(high))
+    got = _vr(high, [_ATR] * len(high))
     assert got is not None
     assert got["code"] != _code_of(low), "造的夹具没换档, 这条测不到"
     assert got["days"] == 2
@@ -84,7 +107,7 @@ def test_判定仍然走作者那两个函数():
     负责**数天数**, 判定必须原样借用 —— 所以 verdict_run 报的 code 一定能在
     作者的 `verdict()` 上复现。"""
     closes = _flat_then([9.4, 9.4])
-    got = kg.verdict_run(closes, [_ATR] * len(closes))
+    got = _vr(closes, [_ATR] * len(closes))
     assert got is not None
 
     # 按作者的路子重算最后一天
@@ -98,17 +121,18 @@ def test_判定仍然走作者那两个函数():
 
 
 def test_数据不齐时安静返回空而不是崩():
-    assert kg.verdict_run(None, None) is None
-    assert kg.verdict_run([], []) is None
-    assert kg.verdict_run([10.0] * 5, [_ATR] * 4) is None       # 长度对不上
-    assert kg.verdict_run([10.0] * 300, [0.0] * 300) is None    # ATR 全是 0
+    assert _vr([10.0] * 5, [_ATR] * 5) is None       # 太短, 长期档出不来
+    assert _vr([10.0] * 5, [_ATR] * 4) is None       # 长度对不上
+    assert _vr([10.0] * 300, [0.0] * 300) is None    # ATR 全是 0
+    assert kg.verdict_codes(None, None) == []
+    assert kg.verdict_codes([], []) == []
 
 
 def test_暖机不够时不硬凑一个结论():
     """长期档要 120 根。不足就整档缺席 —— 拿 60 根算出来的"120 日均线"是假数,
     据此给出的结论和天数一样是假的。"""
     short = [10.0] * 50 + [9.4]
-    assert kg.verdict_run(short, [_ATR] * len(short)) is None
+    assert _vr(short, [_ATR] * len(short)) is None
 
 
 def test_天数挂在结论对象上而不是另起一个平级字段():
@@ -118,11 +142,10 @@ def test_天数挂在结论对象上而不是另起一个平级字段():
 
     from app.services import keltner_service
     src = inspect.getsource(keltner_service)
-    assert "verdict_run" in src, "批量里没算天数"
-    assert 'dict(v, days=' in src, "天数没有并进 verdict 对象"
-    assert 'vr.get("code") == v.get("code")' in src, (
-        "没核对码一致 —— 历史窗口与当日快照万一算出不同的结论码, "
-        "会把别人的天数安在这一档上"
+    assert "verdict_codes" in src, "批量里没取逐日结论序列"
+    assert 'dict(v, days=hist' in src, "天数没有并进 verdict 对象"
+    assert "count_trailing(codes, v.get(\"code\"))" in src, (
+        "没有拿徽标那一档往回数 —— 那会退回「两条路必须先对上今天」的老坑"
     )
     assert "days_exact" in src, "没标出天数是数出来的还是只能确认到今天"
 
@@ -140,7 +163,7 @@ def test_候选池这一档同样有天数():
     短期自己也掉出通道就变成别的档了。
     """
     closes = [10.0] * _WARMUP + [10.0 - 0.025 * i for i in range(1, 45)]
-    got = kg.verdict_run(closes, [_ATR] * len(closes))
+    got = _vr(closes, [_ATR] * len(closes))
     assert got is not None
     assert got["code"] == "watch_low", f"夹具造出来的是 {got['code']}, 这条测不到候选池"
     assert got["days"] > 1, "候选池连着挂了很多天, 却只报了 1 天"
@@ -154,7 +177,7 @@ def test_十条结论没有一条被排除在天数之外():
     """
     import inspect
 
-    src = inspect.getsource(kg.verdict_run)
+    src = inspect.getsource(kg.verdict_codes) + inspect.getsource(kg.count_trailing)
     from app.indicators.keltner import _VERDICTS
     for code in _VERDICTS:
         assert code not in src, (
@@ -178,12 +201,12 @@ def test_两条路对不上时今天仍然算一天而不是整个不给():
 
     from app.services import keltner_service
     src = inspect.getsource(keltner_service.channels_for_symbols)
-    assert 'days=int(vr["days"]) if exact else 1' in src, (
-        '两条路对不上时又变回「整个不给」了 —— 那会让天数从徽标上静默消失'
+    assert "days=1, days_exact=False" in src, (
+        '历史对不上时又变回「整个不给」了 —— 那会让天数从徽标上静默消失'
     )
-    # 反向: 不该再出现"对不上就跳过"的写法
-    assert 'if vr and vr.get("code") == v.get("code")' not in src, (
-        "静默失败的那道校验回来了"
+    # 反向: 不该再出现"两条路必须先对上今天"的前提
+    assert 'vr.get("code") == v.get("code")' not in src, (
+        "那个必须成立却经常不成立的前提回来了 —— 它会让每一行都变成「已1天?」"
     )
 
 
@@ -299,7 +322,7 @@ def test_起始日指向这一段的第一个交易日():
 
     closes = _flat_then([9.4, 9.4, 9.4, 9.4])
     dates = [dt.date(2026, 1, 1) + dt.timedelta(days=i) for i in range(len(closes))]
-    got = kg.verdict_run(closes, [_ATR] * len(closes), dates)
+    got = _vr(closes, [_ATR] * len(closes), dates)
     assert got is not None and got["days"] == 4
     # 4 天的段, 起点就是倒数第 4 根
     assert got["since"] == str(dates[-4])
@@ -311,7 +334,7 @@ def test_断档之后起始日跟着重新起算():
 
     closes = _flat_then([9.4, 9.4, 9.4, 10.0, 9.4, 9.4])
     dates = [dt.date(2026, 1, 1) + dt.timedelta(days=i) for i in range(len(closes))]
-    got = kg.verdict_run(closes, [_ATR] * len(closes), dates)
+    got = _vr(closes, [_ATR] * len(closes), dates)
     assert got is not None and got["days"] == 2
     assert got["since"] == str(dates[-2]), (
         f"天数说 2 天而起始日指着 {got['since']} —— 两个数自相矛盾"
@@ -320,7 +343,7 @@ def test_断档之后起始日跟着重新起算():
 
 def test_不传日期时只给天数不编一个起始日():
     closes = _flat_then([9.4, 9.4])
-    got = kg.verdict_run(closes, [_ATR] * len(closes))
+    got = _vr(closes, [_ATR] * len(closes))
     assert got is not None and got["days"] == 2
     assert "since" not in got, "没给日期却凭空造了一个起始日"
 
@@ -330,15 +353,15 @@ def test_数满回看上限时标明这是下界():
     # 造法要紧: **线性**缓跌才行。等比下跌时价格越低日跌幅越小, 均线滞后跟着
     # 变小, 走着走着价格就回到三档正中、反而没结论了(第一版夹具就栽在这)。
     closes = [10.0] * 150 + [10.0 - 0.02 * i for i in range(1, 301)]
-    got = kg.verdict_run(closes, [_ATR] * len(closes))
+    got = _vr(closes, [_ATR] * len(closes))
     assert got is not None
-    assert got["days"] == kg.MAX_LOOKBACK
+    assert got["days"] == 250 == kg.VERDICT_TAIL
     assert got.get("capped") is True, "数到上限了却没标出来这是下界"
 
 
 def test_没数满时不该乱标下界():
     closes = _flat_then([9.4, 9.4, 9.4])
-    got = kg.verdict_run(closes, [_ATR] * len(closes))
+    got = _vr(closes, [_ATR] * len(closes))
     assert got is not None and got["days"] == 3
     assert "capped" not in got
 
@@ -399,13 +422,15 @@ def test_徽标上必须写明是_已连着_而不是历史累计():
             import pytest as _pytest
             _pytest.skip(f"拿不到 {p}(只跑后端时正常)")
         src = p.read_text(encoding="utf-8")
-        assert "v.days_exact === false ? '?' : ''" in src, (
-            f"{rel} 里找不到时长徽标 —— 改名了? 这条测试要同步更新"
-        )
+        assert "v.days" in src, f"{rel} 里找不到时长徽标 —— 改名了? 这条测试要同步更新"
         # **匹配 JSX 里那一段本身**, 不是"附近有没有这个字"。
         # 第一版写的是"往前 200 字里找「已」", 变异测试当场证明它是假的:
         # 把「已」从徽标上删掉, 它照样绿 —— 因为上面注释里就有「已经连着」。
-        assert "已{v.capped" in src, (
+        assert "days_exact === false ? '?'" not in src, (
+            f"{rel} 的徽标又带上问号了 —— 用户: 「我要确定性的显示多少天」。"
+            f"R239 之后数不出来只剩一种情形(今天刚变), 那时「已1天」就是正确答案。"
+        )
+        assert "已{v.days}天" in src, (
             f"{rel} 的时长徽标没写「已」—— 「候选池 75天」会被读成历史累计, "
             f"而它说的是「已经连着 75 天」。这两个是完全不同的数。"
         )
@@ -429,13 +454,13 @@ def test_短中档吃传进来的均线列而不是自己滚():
     n = len(closes)
     atrs = [_ATR] * n
 
-    rolled = kg.verdict_run(closes, atrs)
+    rolled = _vr(closes, atrs)
     assert rolled is not None
 
     # 造一组"短中档一直贴在价格上"的均线 —— 价格永远在通道正中, 该判不出结论
     flat20 = list(closes)
     flat60 = list(closes)
-    given = kg.verdict_run(closes, atrs, ma20=flat20, ma60=flat60)
+    given = _vr(closes, atrs, ma20=flat20, ma60=flat60)
     assert given is None, (
         f"传了均线列却还在自己滚 —— 拿传进来的算该是「三档都在中部」(无结论), "
         f"自己滚会得到 {rolled['code']}"
@@ -446,7 +471,7 @@ def test_均线列长度对不上时安静退回自己滚():
     """长度不对 = 这份列不可信, 退回自己滚而不是崩、也不是半用半不用。"""
     closes = _flat_then([9.4, 9.4])
     n = len(closes)
-    got = kg.verdict_run(closes, [_ATR] * n, ma20=[1.0, 2.0], ma60=None)
+    got = _vr(closes, [_ATR] * n, ma20=[1.0, 2.0], ma60=None)
     assert got is not None and got["days"] == 2
 
 
@@ -458,3 +483,62 @@ def test_批量里真的把两列均线要出来了():
     src = inspect.getsource(keltner_service.long_trend_map)
     assert '"ma20", "ma60"' in src, "日线批量没要预计算均线列"
     assert "ma20=sub[" in src, "要来了却没传给 verdict_run"
+
+
+def test_R239_两条路对不上今天时也数得出天数():
+    """用户截图: **每一行都是「已1天?」**。
+
+    那不是数据问题, 是我埋的一个**必须成立、却经常不成立的前提** ——
+    历史那条路自己判一个"今天", 与徽标那一档一比, 对不上就整个作废。
+    而这两条路(enriched 快照 vs 日线批量)的今天本来就常常不一样:
+    数据日期差一天、末根不同、复权口径不同……于是全表一起失效。
+
+    现在没有这个前提了: 序列是逐日结论, 数的是"最近连着几天也是徽标这一档"。
+    这条造三种对不上的情形, 断言天数照样数得出来。
+    """
+    import datetime as dt
+
+    import polars as pl
+
+    from app.services import keltner_service as ks
+
+    closes = [10.0] * 200 + [10.0 - 0.025 * i for i in range(1, 101)]
+    dates = [dt.date(2026, 1, 1) + dt.timedelta(days=i) for i in range(len(closes))]
+
+    def _roll(w: int) -> list:
+        return [None if i + 1 < w else sum(closes[i + 1 - w:i + 1]) / w
+                for i in range(len(closes))]
+
+    m20, m60 = _roll(20), _roll(60)
+    last = len(closes) - 1
+
+    class _Repo:
+        def __init__(self, shift: float = 0.0, drop_last: int = 0) -> None:
+            self.shift, self.drop = shift, drop_last
+
+        def get_enriched_latest(self):
+            return pl.DataFrame({
+                "symbol": ["X"], "close": [closes[-1] + self.shift], "atr_14": [_ATR],
+                "ma20": [m20[last]], "ma60": [m60[last]],
+            }), "d"
+
+        def get_daily_batch(self, *a, **k):
+            n = len(closes) - self.drop
+            return pl.DataFrame({
+                "symbol": ["X"] * n, "date": dates[:n], "close": closes[:n],
+                "atr_14": [_ATR] * n, "ma20": m20[:n], "ma60": m60[:n],
+            })
+
+    cases = {
+        "两条路完全一致": _Repo(),
+        "快照价与日线末根差一点": _Repo(shift=0.02),
+        "日线比快照少一根(数据滞后一天)": _Repo(drop_last=1),
+    }
+    for tag, repo in cases.items():
+        v = (ks.channels_for_symbols(repo, ["X"]).get("X") or {}).get("verdict")
+        assert v, f"{tag}: 连结论都没有, 这条测不到"
+        assert v["days_exact"] is True, (
+            f"{tag}: 退化成「已1天?」了 —— 那正是用户全表看到的那个现象"
+        )
+        assert v["days"] > 1, f"{tag}: 天数是 {v['days']}"
+        assert v.get("since"), f"{tag}: 没给起始日"
