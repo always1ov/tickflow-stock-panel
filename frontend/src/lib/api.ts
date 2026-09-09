@@ -29,6 +29,34 @@ export class ApiError extends Error {
 const DEFAULT_REQUEST_TIMEOUT_MS = 30_000
 /** 同步计算型接口 (回测/筛选等) 的放宽超时: 合法耗时可能远超轮询类接口。 */
 const COMPUTE_REQUEST_TIMEOUT_MS = 300_000
+/**
+ * [R231] **会真正调大模型的接口**的放宽超时。
+ *
+ * 用户: 「检查一遍我的 ai, 用不了了, 一直报错请求超时(30s)·
+ * /api/stock-analysis/signal/688802.SH」。
+ *
+ * 根因是一次**同步上游带进来的回归**, 不是 fork 自己写坏的: 作者在
+ * `f03bc38`(2026-09-07)给 `request()` 加了全局 30s 闸(理由正当 —— 后端
+ * 依赖 polars, 偶发挂起时无超时会占满浏览器同源连接池)。他给自己的回测/
+ * 筛选接口开了 `COMPUTE_REQUEST_TIMEOUT_MS` 豁免, 但**fork 的 AI 接口一个
+ * 都没拿到豁免** —— 09-08 那次合并 v0.2.3 之后, 它们就被静默套上了 30 秒。
+ * 而一次 LLM 出文本超过 30 秒是常态, 不是异常。
+ *
+ * 症状为什么是"有的 AI 能用、有的不能": 个股分析 / 复盘 / 财报三个走的是
+ * **原生 fetch**(压根不过 `request()`), 没有闸; 信号 / 今日总览 AI /
+ * 梯队 AI / 自选分组这几个走 `request()`, 于是全被掐。
+ *
+ * 取 300s 与 COMPUTE 同档: 再长就该改成任务化轮询而不是拉长同步等待。
+ *
+ * **只给真的会出一段文本的那几个。** 以下**故意**留在 30s:
+ *   · `/ai/status`、`/ai-group/apply`、`/ladder-ai/reports`、
+ *     `/today/ai/track-record`、`/ai/save` —— 只是 CRUD 或读状态, 压根不调模型,
+ *     那正是这道闸本来要防的东西;
+ *   · `/strategies/ai/test` —— 它调模型, 但发的是「Reply exactly: OK」。
+ *     **连通性测试要的就是快失败**: 一句 OK 都要等五分钟, 那本身就是"不通",
+ *     让用户干等比直接报错更坏。这是有意的例外, 不是漏改。
+ */
+const AI_REQUEST_TIMEOUT_MS = 300_000
 
 async function request<T>(path: string, init?: RequestOptions): Promise<T> {
   const { quiet, timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS, ...fetchInit } = init ?? {}
@@ -3917,7 +3945,7 @@ export const api = {
     request<{
       groups?: { name: string; symbols: string[]; names: string[]; reason: string }[]
       ungrouped?: string[]; ungrouped_names?: string[]; total?: number; error?: string
-    }>('/api/watchlist/ai-group', { method: 'POST' }),
+    }>('/api/watchlist/ai-group', { method: 'POST', timeoutMs: AI_REQUEST_TIMEOUT_MS }),
   watchlistAiGroupApply: (groups: { name: string; symbols: string[] }[], replaceExisting: boolean) =>
     request<{ ok: boolean; groups_created: number; symbols_assigned: number; groups: WatchlistGroup[] }>(
       '/api/watchlist/ai-group/apply',
@@ -4024,7 +4052,8 @@ export const api = {
   generateStockSignal: (symbol: string) =>
     request<{ symbol: string; signal?: string; confidence?: number; reason?: string; close?: number | null; created_at?: string; error?: string }>(
       `/api/stock-analysis/signal/${encodeURIComponent(symbol)}`,
-      { method: 'POST' },
+      // [R231] 这就是用户报的那一个: 「请求超时(30s)· /api/stock-analysis/signal/…」
+      { method: 'POST', timeoutMs: AI_REQUEST_TIMEOUT_MS },
     ),
 
   // timeframe='all' 时不传参数 → 后端不过滤周期, 返回日线+分钟合并列表
@@ -4111,7 +4140,8 @@ export const api = {
   regimeSeesaw: (kind: 'concept' | 'industry' = 'concept') =>
     request<SeesawResult>(`/api/regime/seesaw?kind=${kind}`),
   regimeSeesawDetect: (kind: 'concept' | 'industry' = 'concept') =>
-    request<SeesawResult>(`/api/regime/seesaw/detect?kind=${kind}`, { method: 'POST' }),
+    request<SeesawResult>(`/api/regime/seesaw/detect?kind=${kind}`,
+      { method: 'POST', timeoutMs: AI_REQUEST_TIMEOUT_MS }),
   mainlineFilterUpdate: (payload: { min_members?: number; max_members?: number; blacklist?: string[]; exclude_st?: boolean }) =>
     request<MainlineFilter>('/api/settings/preferences/mainline-filter', {
       method: 'PUT',
@@ -4323,7 +4353,8 @@ export const api = {
     request<UsageNote>(`/api/usage-notes/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(patch) }),
   // [R180] 让 AI 凝练这一条(图片走多模态)
   usageNoteDigest: (id: string) =>
-    request<UsageNote>(`/api/usage-notes/${encodeURIComponent(id)}/digest`, { method: 'POST' }),
+    request<UsageNote>(`/api/usage-notes/${encodeURIComponent(id)}/digest`,
+      { method: 'POST', timeoutMs: AI_REQUEST_TIMEOUT_MS }),
 
   // [R180] 传图片/文本文件, 建一条带附件的记录。落盘即返回, 凝练是单独一步 ——
   // 上传要立刻有反馈, 不能卡在一次几十秒的 AI 调用上。
@@ -4343,7 +4374,8 @@ export const api = {
     request<{ summary: NewsDeskSummary | null }>('/api/usage-notes/summary'),
 
   usageNotesSummaryBuild: () =>
-    request<{ summary: NewsDeskSummary }>('/api/usage-notes/summary', { method: 'POST' }),
+    request<{ summary: NewsDeskSummary }>('/api/usage-notes/summary',
+      { method: 'POST', timeoutMs: AI_REQUEST_TIMEOUT_MS }),
 
   usageNoteDelete: (id: string) =>
     request<{ ok: boolean }>(`/api/usage-notes/${encodeURIComponent(id)}`, { method: 'DELETE' }),
@@ -4430,6 +4462,7 @@ export const api = {
   ladderAiReview: (payload: { date: string; stats: Record<string, unknown>; tiers: unknown[] }, messages: { role: 'user' | 'assistant'; content: string }[] = [], reportId?: string) =>
     request<{ text: string; report_id: string | null }>('/api/screener/ladder-ai', {
       method: 'POST',
+      timeoutMs: AI_REQUEST_TIMEOUT_MS,
       body: JSON.stringify({ ...payload, messages, report_id: reportId ?? '' }),
     }),
   ladderAiReports: () =>
@@ -4771,7 +4804,9 @@ export const api = {
   todayAi: (note?: string) =>
     request<{ brief?: string; picks?: TodayPick[]; analyzed?: number
               verify?: TodayPickVerify; note?: string; error?: string }>(
-      '/api/today/ai', { method: 'POST', body: JSON.stringify({ note: note || null }) }),
+      '/api/today/ai',
+      { method: 'POST', timeoutMs: AI_REQUEST_TIMEOUT_MS,
+        body: JSON.stringify({ note: note || null }) }),
   /** [R121] AI 优选历史命中率 —— 「靠不靠谱」的硬证据, 纯事后统计 */
   todayAiTrackRecord: () => request<AiTrackRecord>('/api/today/ai/track-record'),
   /** [R133] 规则层把握分体检: 分层胜率/排名段/因子归因/同期基准 */
@@ -4780,7 +4815,8 @@ export const api = {
   // [R175] 显式生成 AI 提炼。今天已经跑过的话服务端直接回存档 —— 打开弹窗
   // 不会自动调它, 免得点一次烧一次。
   todayScoreLedgerDigest: () =>
-    request<PatternDigest>('/api/today/score-ledger/digest', { method: 'POST' }),
+    request<PatternDigest>('/api/today/score-ledger/digest',
+      { method: 'POST', timeoutMs: AI_REQUEST_TIMEOUT_MS }),
 
   todayScoreLedgerDigestHistory: (limit = 30) =>
     request<{ entries: PatternDigest[] }>(
@@ -5085,6 +5121,7 @@ export const api = {
   customSignalsAiGenerate: (description: string) =>
     request<CustomSignalAIGenerateResult>('/api/custom-signals/ai/generate', {
       method: 'POST',
+      timeoutMs: AI_REQUEST_TIMEOUT_MS,
       body: JSON.stringify({ description }),
     }),
 

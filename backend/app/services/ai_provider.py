@@ -472,7 +472,11 @@ async def generate_ai_text(
                 text = await _run_openai_once(
                     messages, temperature=temperature, max_tokens=max_tokens, timeout=timeout)
             _mark_served(prof)
-            return text
+            # [R232] 剥掉内联的思考段(MiniMax 一类把 <think>…</think> 写在
+            # content 里)。做在这个唯一出口上 —— 每个调用方各剥一遍必然漏。
+            # 剥完为空会退回原文, 见 ai_reasoning 的说明。
+            from app.services.ai_reasoning import strip_reasoning
+            return strip_reasoning(text)
         except Exception as exc:
             errors.append((prof, exc))
             last = i == len(profiles) - 1
@@ -524,12 +528,16 @@ async def stream_ai_text(
         token = _ACTIVE_PROFILE.set(prof)
         started = False
         try:
+            # [R232] 流式也要剥思考段, 而且**必须有状态** —— <think> 六个字符
+            # 可以正好跨在两个 chunk 之间, 逐块 replace 抓不住。见 ai_reasoning。
+            from app.services.ai_reasoning import StreamStripper
+            stripper = StreamStripper()
             if is_codex_cli_provider():
                 text = await _run_codex_cli(
                     messages, max_tokens=max_tokens, timeout=max(timeout, 600.0))
                 started = True
                 _mark_served(prof)
-                yield text
+                yield stripper.feed(text) + stripper.flush()
                 return
             async for chunk in _stream_openai(
                 messages, temperature=temperature, max_tokens=max_tokens, timeout=timeout,
@@ -538,7 +546,12 @@ async def stream_ai_text(
                 if not started:
                     _mark_served(prof)
                 started = True
-                yield chunk
+                out = stripper.feed(chunk)
+                if out:
+                    yield out
+            tail = stripper.flush()
+            if tail:
+                yield tail
             return
         except Exception as exc:
             errors.append((prof, exc))
