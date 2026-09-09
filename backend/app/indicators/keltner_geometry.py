@@ -570,8 +570,12 @@ def _tail_run(rows: list[dict], ok) -> int:
     return run
 
 
-def verdict_run(closes: list[float] | None, atrs: list[float] | None) -> dict | None:
-    """[R233] 当前这条**通道结论**已经连着挂了几天。返回 {code, days} 或 None。
+def verdict_run(closes: list[float] | None, atrs: list[float] | None,
+                dates: list | None = None) -> dict | None:
+    """[R233] 当前这条**通道结论**已经连着挂了几天。
+
+    返回 `{code, days, since}`;当天没有结论时返回 None。`dates` 传了才有
+    `since`(进入这一档的那个交易日), 不传就只有天数。
 
     用户: 「『候选、调到位了』也是要显示这个状态持续多少天了」。
 
@@ -630,12 +634,23 @@ def verdict_run(closes: list[float] | None, atrs: list[float] | None) -> dict | 
         # 这时候"持续几天"没有可说的 —— 不给 0, 给 None, 让界面照旧什么都不显示。
         return None
     days = 0
+    first = n - 1                      # 这一段的**第一个**交易日下标
     for i in range(n - 1, max(-1, n - 1 - MAX_LOOKBACK), -1):
         if _code_at(i) != today:
             break
         days += 1
+        first = i
     # today 就是最后一根算出来的, 所以循环第一轮必然命中 —— days ≥ 1。
-    return {"code": today, "days": days}
+    out: dict = {"code": today, "days": days}
+    if dates is not None and len(dates) == n:
+        # 进入这一档的那个交易日。**是"哪一天开始"而不是"多久以前"** ——
+        # 天数会随每天收盘变, 起始日不会, 界面上两个一起给才对得起账。
+        out["since"] = str(dates[first])
+    # 数到了回看上限 = 这一段比我们能看到的还长, 天数是**下界**。
+    # 不标出来的话, "250 天"会被读成"正好 250 天"。
+    if days >= min(n, MAX_LOOKBACK):
+        out["capped"] = True
+    return out
 
 
 def runs(rows: list[dict]) -> dict:

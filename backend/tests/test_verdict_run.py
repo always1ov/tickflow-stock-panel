@@ -285,3 +285,93 @@ def test_R236_只要有结论天数就一定在():
     v = (ks.channels_for_symbols(_Repo(60), ["X"]).get("X") or {})["verdict"]
     assert v["days"] == 1, "算不出历史时该退化成「至少 1 天」而不是消失"
     assert v["days_exact"] is False, "不精确却没标出来 —— 那是在假装自己知道"
+
+
+# ---------------------------------------------------------------- [R237] 起始日
+
+def test_起始日指向这一段的第一个交易日():
+    """用户: 「记录进入该状态的起始日期」。
+
+    **天数每天变, 起始日不会变** —— 后者才是能拿去核对的那个数(回 K 线上看
+    那天到底发生了什么)。所以两个都要给, 不能只给天数。
+    """
+    import datetime as dt
+
+    closes = _flat_then([9.4, 9.4, 9.4, 9.4])
+    dates = [dt.date(2026, 1, 1) + dt.timedelta(days=i) for i in range(len(closes))]
+    got = kg.verdict_run(closes, [_ATR] * len(closes), dates)
+    assert got is not None and got["days"] == 4
+    # 4 天的段, 起点就是倒数第 4 根
+    assert got["since"] == str(dates[-4])
+
+
+def test_断档之后起始日跟着重新起算():
+    """口径的两半必须一致: 天数从 2 起算, 起始日就不能还指着断档之前那天。"""
+    import datetime as dt
+
+    closes = _flat_then([9.4, 9.4, 9.4, 10.0, 9.4, 9.4])
+    dates = [dt.date(2026, 1, 1) + dt.timedelta(days=i) for i in range(len(closes))]
+    got = kg.verdict_run(closes, [_ATR] * len(closes), dates)
+    assert got is not None and got["days"] == 2
+    assert got["since"] == str(dates[-2]), (
+        f"天数说 2 天而起始日指着 {got['since']} —— 两个数自相矛盾"
+    )
+
+
+def test_不传日期时只给天数不编一个起始日():
+    closes = _flat_then([9.4, 9.4])
+    got = kg.verdict_run(closes, [_ATR] * len(closes))
+    assert got is not None and got["days"] == 2
+    assert "since" not in got, "没给日期却凭空造了一个起始日"
+
+
+def test_数满回看上限时标明这是下界():
+    """`MAX_LOOKBACK` 天封顶。不标的话「250天」会被读成"正好 250 天"。"""
+    # 造法要紧: **线性**缓跌才行。等比下跌时价格越低日跌幅越小, 均线滞后跟着
+    # 变小, 走着走着价格就回到三档正中、反而没结论了(第一版夹具就栽在这)。
+    closes = [10.0] * 150 + [10.0 - 0.02 * i for i in range(1, 301)]
+    got = kg.verdict_run(closes, [_ATR] * len(closes))
+    assert got is not None
+    assert got["days"] == kg.MAX_LOOKBACK
+    assert got.get("capped") is True, "数到上限了却没标出来这是下界"
+
+
+def test_没数满时不该乱标下界():
+    closes = _flat_then([9.4, 9.4, 9.4])
+    got = kg.verdict_run(closes, [_ATR] * len(closes))
+    assert got is not None and got["days"] == 3
+    assert "capped" not in got
+
+
+def test_接口把起始日一起返回():
+    """[R237] 端到端: `channels_for_symbols` 的 verdict 里要能直接读到 since。"""
+    import datetime as dt
+
+    import polars as pl
+
+    from app.services import keltner_service as ks
+
+    closes = [10.0] * 200 + [10.0 - 0.025 * i for i in range(1, 101)]
+    dates = [dt.date(2026, 1, 1) + dt.timedelta(days=i) for i in range(len(closes))]
+    last = len(closes) - 1
+
+    def _ma(w: int) -> float:
+        return sum(closes[last + 1 - w:last + 1]) / w
+
+    class _Repo:
+        def get_enriched_latest(self):
+            return pl.DataFrame({
+                "symbol": ["X"], "close": [closes[-1]], "atr_14": [_ATR],
+                "ma20": [_ma(20)], "ma60": [_ma(60)],
+            }), "d"
+
+        def get_daily_batch(self, *a, **k):
+            return pl.DataFrame({
+                "symbol": ["X"] * len(closes), "date": dates,
+                "close": closes, "atr_14": [_ATR] * len(closes),
+            })
+
+    v = (ks.channels_for_symbols(_Repo(), ["X"]).get("X") or {})["verdict"]
+    assert v.get("since"), f"接口没返回起始日, 拿到的是 {sorted(v)}"
+    # 起始日必须落在这一段里: 天数 N ⇒ since 是倒数第 N 个交易日
+    assert v["since"] == str(dates[-v["days"]])

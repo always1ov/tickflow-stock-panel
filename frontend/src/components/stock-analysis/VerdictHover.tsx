@@ -115,14 +115,16 @@ export function VerdictHover({ v, note, children }: {
                   {/* [R233] 连着第几天。**中间断一天就重新起算** ——
                       出现 3 天、隔一天、再 2 天是两次独立的出现, 说成 5 天
                       会把这一档持续了多久说多。 */}
+                  {/* [R237] 状态时长的完整说法: 已经多久 + 从哪天起。
+                      徽标上只放得下数字, 这里给能核对的那一份。 */}
                   {v.days != null && (
                     <span className="ml-1 text-[10px] font-normal text-muted"
                           title={v.days_exact === false
                             ? '这只票的历史不够长,只能确认到今天 —— 实际可能已经连着很多天'
-                            : '这一档结论已经连着挂了几天(含今天)。中间断一天就重新起算'}>
+                            : '按交易日算,含今天。中间只要断一天(换了一档或没有结论)就重新起算'}>
                       {v.days_exact === false
                         ? '只能确认到今天'
-                        : `连着第 ${v.days} 天`}
+                        : `已 ${v.capped ? '超过 ' : ''}${v.days} 个交易日${v.since ? ` · 自 ${v.since}` : ''}`}
                     </span>
                   )}
                 </span>

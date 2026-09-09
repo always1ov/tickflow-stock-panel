@@ -120,7 +120,10 @@ def long_trend_map(repo, symbols: list[str], *, with_closes: bool = False) -> di
                     # [R233] 当前通道结论已经连着挂了几天。用户: 「『候选、
                     # 调到位了』也是要显示这个状态持续多少天了」。同一份
                     # closes/atrs, 不新增取数; 判定仍走作者的 verdict()。
-                    vr = kg.verdict_run(cl, atrs)
+                    # [R237] 带上日期 —— 用户要的是"进入这个状态的起始日期",
+                    # 光有天数不够: 天数每天变, 起始日不会变, 两个一起给才对得
+                    # 起账(也才能让人回头去 K 线上核对那一天到底发生了什么)。
+                    vr = kg.verdict_run(cl, atrs, sub["date"].to_list())
                     if vr:
                         ent["verdict_run"] = vr
             except Exception as e:  # noqa: BLE001
@@ -221,6 +224,13 @@ def channels_for_symbols(repo, symbols: list[str]) -> dict[str, dict]:
                 vr = (long_map.get(sym) or {}).get("verdict_run")
                 exact = bool(vr) and vr.get("code") == v.get("code")
                 v = dict(v, days=int(vr["days"]) if exact else 1, days_exact=exact)
+                if exact:
+                    # [R237] 起始交易日与"数到上限了"的标记。只有 exact 时才给
+                    # —— 对不上时那一段根本不是这一档的, 它的起始日安上去是错的。
+                    if vr.get("since"):
+                        v["since"] = str(vr["since"])
+                    if vr.get("capped"):
+                        v["capped"] = True
             row = dict(bands, verdict=v) if v else dict(bands)
             # [R195] 几何量(速度/加速度/压缩/排列)。**零新增取数** —— 全部从
             # 已经算好的三档上下轨反推(轨 = MA ± k·ATR 是恒等式)。

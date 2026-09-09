@@ -650,9 +650,14 @@ export interface KeltnerVerdict {
    *  结论, 天数由段卡片自己算, 这里为 undefined。 */
   days?: number
   /** [R236] 上面那个 days 是**数出来的**还是**只能确认到今天**。
-   *  false 表示历史读数不可用(暖机不足 120 根 / 缺 ATR / 两条路对不上),
-   *  那时 days 恒为 1, 含义是"至少 1 天"而不是"就是第 1 天"。 */
+   *  false 表示历史读数不可用(这只票太新 / 两条路对不上), 那时 days 恒为 1,
+   *  含义是"至少 1 天"而不是"就是第 1 天"。 */
   days_exact?: boolean
+  /** [R237] 进入这一档的那个**交易日**(YYYY-MM-DD)。天数每天变, 它不变 ——
+   *  可以拿它回 K 线上核对那天到底发生了什么。`days_exact` 为 false 时没有。 */
+  since?: string
+  /** [R237] 这一段比回看上限还长, `days` 是**下界**而不是准确值。 */
+  capped?: boolean
 }
 
 /**
