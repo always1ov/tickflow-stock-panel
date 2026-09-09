@@ -308,9 +308,7 @@ def score_opportunities(
             state=t.get("state"),
             above_ma20=g.get("above_ma20"), above_ma20_prev=g.get("above_ma20_prev"),
             close=g.get("close") if g.get("close") is not None else t.get("close"),
-            ma120=g.get("ma120"), ma120_rising=g.get("ma120_rising"),
-            # [R189] G4 红绿节拍。R188 起 _trend_payload 就带着它了, 白捡
-            rhythm_level=(t.get("rhythm") or {}).get("level"))
+            ma120=g.get("ma120"), ma120_rising=g.get("ma120_rising"))
         if not gates["ok"]:
             # 被挡下的只计数不进列表。计数要报给界面 —— "今天 40 只候选被门槛
             # 挡掉 28 只"本身就是市场状态, 藏起来用户会以为系统没干活
@@ -365,7 +363,7 @@ def score_opportunities(
             duration=c["duration"], state=t.get("state"), rs_pct=rs_pct,
             vol_ratio=vr, turnover_rate=turn, channel_pct=cpct,
             near_breakout=c["near_breakout"], coiling="coiling" in c["kinds"],
-            template=tpl, rhythm=t.get("rhythm"), geo=geo, runs=kc.get("runs"))
+            template=tpl)
 
         close = t.get("close") or (signals.get(sym) or {}).get("close")
         try:
@@ -405,10 +403,13 @@ def score_opportunities(
             "template": ({"passed": tpl["passed"], "known": tpl["known"],
                           "total": tpl["total"], "text": _tt.summary(tpl),
                           "criteria": tpl["criteria"]} if tpl else None),
-            "rhythm": t.get("rhythm"),
-            # [R195] 量化波动通道的几何与事件。**几何进了分**(spread→质地,
-            # accel→时机), 所以和 template 一样摆在 notes 之外 —— notes 那一栏
-            # 的规矩是"一分不加一分不减", 混进去会让边界读不清。
+            # [R229] "rhythm"(红绿节拍)这一项删掉了 —— 规则层整层退役。
+            #
+            # [R195 加, R229 降级] 量化波动通道的几何与事件。R195~R197 期间
+            # 它**进过分**(spread→质地, accel→时机), 所以当时刻意摆在 notes
+            # 之外。现在按用户要求从打分里整个剥离, 它和 notes 是同一个身份了
+            # ——「一分不加一分不减」。位置没挪, 是因为前端按键名取, 挪了要动
+            # 五处展示; 身份的说明写在这儿, 以及 opportunity_score 的权重表上。
             "geo": geo,
             "runs": kc.get("runs"),
             "energy": kc.get("energy"),
@@ -441,17 +442,16 @@ def score_opportunities(
                 # 没上榜的存 None 让 ctx 的过滤把它丢掉 —— 绝大多数行都没上榜,
                 # 存一堆 false 只是白占盘; 分组时"缺这个键"就是没上榜。
                 "dragon": True if e.get("dragon") else None,
-                # [R188] 红绿节拍与磨底时长。**只存能分组的那两个键**, 不存整个
-                # rhythm 对象 —— 台账要按天攒几个月, 每行多塞一个 dict 到后面
-                # 就是几 MB。天数不落, 因为它每天都在变、不适合做分组维度。
-                "rhythm": (t.get("rhythm") or {}).get("level"),
-                "basing_days": ((t.get("rhythm") or {}).get("basing") or {}).get("days"),
+                # [R188 加, R229 删] 红绿节拍与磨底时长两个分组维度不再落账 ——
+                # 规则层整层退役。历史行里的 rhythm / basing_days 照旧躺在账上,
+                # 台账的读侧按 SCORING_VERSION 分版本解读, 老行不会被新口径污染。
                 # [R189] 趋势模板过了几条。只在八条全判得出时落 —— 判不全的
                 # 那个 passed 和判得全的不是同一把尺子, 混在一档里统计会骗人。
                 "tpl_passed": (tpl["passed"] if tpl and tpl.get("complete") else None),
-                # [R195] 通道几何三个分组维度。加速度档位与事件是这次最该被验证的
-                # 两个 —— 「主升浪特征之后是不是真的更好」直接决定 MAIN_ADVANCE
-                # 那五条阈值该不该继续这么定。
+                # [R195] 通道几何三个分组维度。**R229 之后这几个维度反而更重要**:
+                # 通道延申已经不进分了, 台账是它唯一能证明自己值不值一份权重的
+                # 地方 —— 「主升浪特征之后是不是真的更好」得先有答案, 才谈得上
+                # 让它重新进分。台账「只记不反馈」, 记着不等于在打分。
                 "chan_event": (chan_event or {}).get("code"),
                 "accel": ((geo or {}).get("accel") or {}).get("level"),
                 "combo": (geo or {}).get("combo"),
@@ -1464,20 +1464,22 @@ _AI_SYSTEM = """你是用户的盘前参谋,有 15 年 A 股一线交易经验�
 
 每只候选带一份 `把握分分解`,那是规则层的自评,结构固定:
 
-- **门槛**:这只票已经通过四道硬门槛(六态在多头侧 / 收盘站上生命线 MA20 且连续两日 / 不在长期下跌趋势里 / 红绿节拍不是「反复失败」)。**没过门槛的票压根不会送到你面前**,所以不必再核这四件事。
-- **质地**(0~100):这只票的长周期结构 —— 趋势模板八条过了几条、磨底磨了多久磨得好不好、相对大盘强弱、六态状态、**量化波动通道的三线间距**。**它以月计变化**,今天和上周基本是同一个数。
-- **时机**(0~100):今天是不是那一天 —— 信号第几天、量比、通道位置、换手率、**快慢变化**。**它逐日变化**。这几条曲线都是**区间最优**不是越大越好 —— 量比峰值在 1.3~2.5(超过 4 说明这波已经走完了),通道位置甜区在 0.50~0.65(刚站上生命线,越接近 1.0 越是追高)。
+- **门槛**:这只票已经通过三道硬门槛(六态在多头侧 / 收盘站上生命线 MA20 且连续两日 / 不在长期下跌趋势里)。**没过门槛的票压根不会送到你面前**,所以不必再核这三件事。
+- **质地**(0~100):这只票的长周期结构 —— 趋势模板八条过了几条、相对大盘强弱、六态状态。**它以月计变化**,今天和上周基本是同一个数。
+- **时机**(0~100):今天是不是那一天 —— 信号第几天、量比、通道位置、换手率。**它逐日变化**。这几条曲线都是**区间最优**不是越大越好 —— 量比峰值在 1.3~2.5(超过 4 说明这波已经走完了),通道位置甜区在 0.50~0.65(刚站上生命线,越接近 1.0 越是追高)。
 - **总分 = √(质地 × 时机)**。所以两根轴要**分开读**,这正是分解存在的理由:
   - 质地高、时机低 → 「好票,但今天不是买点」。该说的是等什么(回踩到哪、放量到什么程度),不是现在追。
   - 质地低、时机高 → 「今天是有动静,但这票本身结构不行」。该说的是为什么不值得占仓位。
   - 两个都高才是「高概率的有苗头的东西」。
 - `partial: true` 表示某个因子**没有数据**,那一份权重是靠剩下的因子顶上来的 —— 这种候选的总分偏乐观,同分时优先选 partial 为 false 的。
 
-### 「量化波动通道」那几个数怎么读
+### 「量化波动通道」那几个数怎么读(**它们不进把握分**)
+
+这一组读数在「注记」栏里,和 AI 信号、主线、胜率一样是**背景**:一分不加一分不减,把握分里没有它们的任何一份。它们回答的是「这只票现在长什么样」,不是「它排第几」。别拿它们去解释分数高低。
 
 - **快慢变化**(单位:倍日常波动 / 10 日):最近这十天比之前那一段多走(少走)了多少。**速度没变时它精确为 0**,不是近似。但它和量比一样是**区间最优**:冲得太猛往往是拉升末端的赶顶,不是好事。
 - **三线间距**(单位:倍日常波动,带符号):短线和长线离多远。接近 0 是三条线挤在一起、方向还没出来;1.5~3 是趋势已经立住的甜区;超过 5 是「离得太远」——短线看和长线看已经没有一个共同认可的合理价,这一段走过头了。
-- **三线还重合多少**:0~1,1 = 三种看法认的是同一个价。它**没有方向**(往下走的票重合度和往上走的一样低),所以只用来读形态,打分用带符号的三线间距。
+- **三线还重合多少**:0~1,1 = 三种看法认的是同一个价。它**没有方向**(往下走的票重合度和往上走的一样低),所以只用来读形态。
 - **通道事件**:位置 × 六态方向 × 连着几天在沿外。**「突破尝试」与「突破站稳」差的只是那两天** —— 前者可能是假的,别当成同一回事。「主升浪特征」要五条同时成立才给。
 
 写给用户看的话要用**大白话**:说「三条线挤在一起」不说「均线粘合」,说「离得太远」不说「尺度撕裂」,说「最近走得比前一段慢」不说「加速度转负」。也**不要**在输出里写出均线周期、ATR 倍数这类参数。
@@ -1560,14 +1562,13 @@ def _candidate_market_data(repo, cands: list[dict]) -> list[dict]:
         # [R189] 分解改成两轴。**这一步对 AI 尤其重要**: 「质地 92 / 时机 41」
         # 直接告诉它该说"好票但今天不是买点", 而合成后的 61 分说不出这句话。
         axes = c.get("axes") or {}
-        rhy = c.get("rhythm") or {}
         item = {
             "symbol": c["symbol"], "name": c["name"], "信号摘要": c["text"],
             "把握分分解": {
                 "总分": c["score"],
                 "算法": "把握分 = √(质地 × 时机) —— 两边都得像样, 不许互相补贴",
                 "门槛": ("已通过(六态多头侧 / 站上生命线 MA20 连续两日 / "
-                         "非长期下跌 / 红绿节拍不是反复失败)"),
+                         "非长期下跌)"),
                 "质地": axes.get("quality"),
                 "时机": axes.get("timing"),
                 "partial": bool(c.get("partial")),
@@ -1580,29 +1581,36 @@ def _candidate_market_data(repo, cands: list[dict]) -> list[dict]:
                     "相对大盘20日": c.get("rs_pct"),
                     "距触发价%": c.get("gap_pct"),
                     "趋势模板": (c.get("template") or {}).get("text"),
-                    "磨底天数": (rhy.get("basing") or {}).get("days"),
-                    "节拍": rhy.get("label"),
-                    # [R195] 量化波动通道的几何与事件。**几何进了分**(分离度→质地,
-                    # 加速度→时机), 所以摆在"原始输入"里让 AI 能核对。
-                    "通道快慢变化": ((c.get("geo") or {}).get("accel") or {}).get("level_cn"),
-                    "三线间距": (c.get("geo") or {}).get("spread"),
-                    "三线还重合多少": (c.get("geo") or {}).get("compress"),
-                    "三档位置": (c.get("geo") or {}).get("combo"),
-                    "通道事件": (c.get("channel_event") or {}).get("cn"),
-                    "现在处在": (c.get("channel_phase") or {}).get("cn"),
-                    "已经挤了几天": (c.get("runs") or {}).get("compress_days"),
-                    "这季平均重合": (c.get("runs") or {}).get("compress_avg"),
-                    "波动主要来自": (c.get("energy") or {}).get("dominant_cn"),
                 },
             },
             "规则依据": c["why"],
         }
-        notes = c.get("notes") or []
+        # [R229] 量化波动通道的那一组读数**从「原始输入」搬到注记里**。
+        #
+        # R195~R197 期间它确实进过分(分离度→质地, 加速度→时机), 摆在"原始输入"
+        # 底下是对的。现在它已从打分里整个剥离, 再留在那儿就是**在骗 AI**:
+        # 「把握分分解 → 原始输入」这个位置本身就在说"这些数算出了上面那个分",
+        # 而它们一个也没有。搬到「注记」栏, 与 AI 信号/主线/胜率同一个身份。
+        notes = [
+            {"项": n.get("label"), "倾向": n.get("tone"), "说明": n.get("text")}
+            for n in (c.get("notes") or [])
+        ]
+        chan = {
+            "三档位置": (c.get("geo") or {}).get("combo"),
+            "现在处在": (c.get("channel_phase") or {}).get("cn"),
+            "通道事件": (c.get("channel_event") or {}).get("cn"),
+            "三线间距": (c.get("geo") or {}).get("spread"),
+            "三线还重合多少": (c.get("geo") or {}).get("compress"),
+            "通道快慢变化": ((c.get("geo") or {}).get("accel") or {}).get("level_cn"),
+            "已经挤了几天": (c.get("runs") or {}).get("compress_days"),
+            "这季平均重合": (c.get("runs") or {}).get("compress_avg"),
+            "波动主要来自": (c.get("energy") or {}).get("dominant_cn"),
+        }
+        chan = {k: v for k, v in chan.items() if v is not None}
+        if chan:
+            notes.append({"项": "量化波动通道", "倾向": "neutral", "说明": chan})
         if notes:
-            item["注记(不参与把握分, 只作背景)"] = [
-                {"项": n.get("label"), "倾向": n.get("tone"), "说明": n.get("text")}
-                for n in notes
-            ]
+            item["注记(不参与把握分, 只作背景)"] = notes
         try:
             df = _load_kline(repo, c["symbol"])
             if df.is_empty():

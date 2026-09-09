@@ -17,7 +17,7 @@ from app.services import opportunity_score as osc
 _TPL_FULL = {"passed": 8, "known": 8, "total": 8}
 _RHY_FULL = {"level": "building", "basing": {"days": 90}}
 # [R195] 趋势已确立(短长分离 2.4 个 ATR)且适度加速 —— 两个新因子都在甜区
-_GEO_FULL = {"spread": 2.4, "accel": {"a1": 0.10}}
+# [R229] `_GEO_FULL` 删了 —— 通道几何已从打分里剥离, score_candidate 不再收它。
 
 
 def _bands_with_geo() -> dict:
@@ -38,7 +38,7 @@ def _bands_with_geo() -> dict:
 def _s(**kw):
     base = dict(duration=1, state="UT", rs_pct=6.0, vol_ratio=1.6,
                 turnover_rate=5.0, channel_pct=0.56,
-                template=_TPL_FULL, rhythm=_RHY_FULL, geo=_GEO_FULL)
+                template=_TPL_FULL)
     base.update(kw)
     return osc.score_candidate(**base)
 
@@ -53,20 +53,21 @@ def _gate(**kw):
     return osc.check_gates(**base)
 
 
-# ---- [R189] G4 红绿节拍 ----
+# ---- [R229] 门槛只剩三道 ----
 
 
-def test_repeatedly_failing_rhythm_is_vetoed():
-    """「同一个位置撞五次没过去」是唯一一种次数越多越该躲的形态 ——
-    靠打分压不住(次数正是它最多), 只能否决。"""
-    assert osc.GATE_RHYTHM in _gate(rhythm_level="failing")["failed"]
+def test_gates_are_exactly_three():
+    """R189 加的第四道 G4(红绿节拍「反复失败」)已随规则层整层退役。
+    这条盯的是**数量**: 门槛是否决制, 悄悄多一道或少一道都不会有别的测试报错。"""
+    assert set(osc.GATE_CN) == {osc.GATE_TREND, osc.GATE_LIFELINE, osc.GATE_LONG_DOWN}
+    assert set(osc.GATE_WHY) == set(osc.GATE_CN), "每一道都得有一句人话解释"
+    assert not hasattr(osc, "GATE_RHYTHM"), "红绿节拍那道门槛不该还留着"
 
 
-@pytest.mark.parametrize("level", [None, "none", "choppy", "building"])
-def test_only_failing_is_vetoed_never_the_others(level):
-    """**没有"必须蓄势"门槛**: 一路上涨从没磨过底的强势股压根没有循环,
-    不该被挡在外面。蓄势是加分项, 不是准入条件。"""
-    assert _gate(rhythm_level=level) == {"ok": True, "failed": []}
+def test_gate_signature_no_longer_takes_rhythm():
+    """签名里留一个没人读的形参, 下次改的人会以为它还在起作用。"""
+    import inspect
+    assert "rhythm_level" not in inspect.signature(osc.check_gates).parameters
 
 
 def test_ideal_candidate_passes_all_gates():
@@ -172,14 +173,13 @@ def test_stronger_six_state_scores_higher():
 def test_already_run_candidate_is_clearly_worse_than_fresh_one():
     """v1 里这两只都会顶到 100 分并列; v2 必须拉开明显差距。"""
     fresh = _s(duration=1, vol_ratio=1.6, channel_pct=0.55, rs_pct=6.0)["score"]
-    # [R195] 已经走完的那只同时是在减速的 —— 量比 5.0、贴上轨、跑赢 45 个点的票
-    # 十有八九处在拉升末端。原来两只共用同一份几何, 新因子对二者一样, 白白
-    # 稀释了差距; 让它带上自己的加速度才是这个例子该有的样子。
-    ran = _s(duration=1, vol_ratio=5.0, channel_pct=1.05, rs_pct=45.0,
-             geo={"spread": 5.5, "accel": {"a1": -0.22}})["score"]
-    # [R189] 门限由 30 降到 25: 两只票的**质地一样**(同一份模板与节拍), 差别
-    # 全在时机轴上, 而几何平均对单轴摆幅的响应是开方的 —— 这是它换来"不许
-    # 互相补贴"的代价, 不是区分度丢了。25 分仍然是隔着好几个名次的距离。
+    # [R229] 原来这一行还带一份 geo(减速中的几何), 用来把差距拉开。几何已经
+    # 不进分, 拿掉之后两只票的差别**全部**落在时机轴的三个因子上 —— 这正是
+    # 该测的东西, 不该靠一个已经退出打分的因子来撑门限。
+    ran = _s(duration=1, vol_ratio=5.0, channel_pct=1.05, rs_pct=45.0)["score"]
+    # [R189] 门限由 30 降到 25: 两只票的**质地一样**(同一份模板), 差别全在
+    # 时机轴上, 而几何平均对单轴摆幅的响应是开方的 —— 这是它换来"不许互相
+    # 补贴"的代价, 不是区分度丢了。25 分仍然是隔着好几个名次的距离。
     assert fresh - ran >= 25, f"区分度不足: {fresh} vs {ran}"
 
 
@@ -195,8 +195,7 @@ def test_no_clamp_is_needed():
     """满分只能靠两根轴的每个因子都到峰值拿到, 不是靠加项堆出来后被夹平。"""
     best = osc.score_candidate(duration=1, state="UT", rs_pct=14.0, vol_ratio=1.8,
                                turnover_rate=5.0, channel_pct=0.58,
-                               template=_TPL_FULL, rhythm=_RHY_FULL,
-                               geo={"spread": 2.5, "accel": {"a1": 0.12}})
+                               template=_TPL_FULL)
     assert best["score"] == 100
     assert all(v is not None and v >= 99 for v in best["axes"].values())
 
@@ -218,14 +217,21 @@ def test_whole_axis_missing_falls_back_to_the_other_one():
     """整根轴取不到时退回另一根 —— 不能把"没读到质地"当成"质地 0",
     那会让缺数据的票直接从榜上消失。"""
     r = osc.score_candidate(duration=1, state=None, rs_pct=None, vol_ratio=1.6,
-                            turnover_rate=5.0, channel_pct=0.56, geo=None)
+                            turnover_rate=5.0, channel_pct=0.56)
     assert r["axes"]["quality"] is None
     assert r["partial"] is True          # 界面必须说清楚这一档没算进去
     # [R201] 分数仍由活着的那根轴给出, 只是按覆盖率打了个折(见 confidence())。
     # 关键是它**没有变成 0** —— 那才叫"缺数据的票凭空消失"。
     assert r["score"] > 0
     assert r["score"] == round(r["axes"]["timing"] * r["confidence"])
-    assert 0.8 < r["confidence"] < 1.0, "整根轴缺席只该温和打折, 不该腰斩"
+    # [R229] 这里原来断言 0.8 < confidence < 1.0。**那个折扣不是"整轴缺席"给的**
+    # —— 它来自当时时机轴还有第五个因子 accel, 而这个例子没喂 geo, 于是时机轴
+    # 自己就没满。accel 随通道延申退出打分之后, 四个时机因子这里全都喂到了,
+    # `confidence` 按设计正是 1.0(见 confidence() 的 docstring: 整根缺席的那根
+    # 轴不参与, 这件事由 partial 与 coverage 如实报出去)。改成断言真正该成立的:
+    # 缺一整根轴不会把分数打没, 而覆盖率与 partial 把话说清楚了。
+    assert r["confidence"] == 1.0
+    assert r["coverage"]["quality"] == 0.0 and r["coverage"]["timing"] == 1.0
 
 
 def test_full_coverage_is_not_partial():
@@ -276,9 +282,53 @@ def test_curves_are_sorted_and_bounded(curve):
     assert all(0 <= p[1] <= 100 for p in curve)
 
 
-def test_weights_sum_to_one():
-    assert sum(osc.QUALITY_WEIGHTS.values()) == pytest.approx(1.0)
+def test_timing_weights_are_exactly_r134s_four():
+    """[R229] 加速度退出之后, 时机轴一字不差地回到 R134 推出来的那四个数 ——
+    这条同时守住"回到原值"和"和仍是 1"。"""
+    assert osc.TIMING_WEIGHTS == {"fresh": 0.31, "pos": 0.32,
+                                  "vol_ratio": 0.26, "turnover": 0.11}
     assert sum(osc.TIMING_WEIGHTS.values()) == pytest.approx(1.0)
+
+
+def test_quality_weights_are_exactly_r189s_three():
+    """[R229] 质地轴同样回到 R189 的原值。**它的和是 0.75 而不是 1.0**,
+    这是刻意的 —— 见下一条。"""
+    assert osc.QUALITY_WEIGHTS == {"template": 0.40, "rs": 0.20, "state": 0.15}
+
+
+def test_only_the_ratios_of_the_weight_table_reach_the_score():
+    """质地轴的和不等于 1.0, 而这**不影响任何一个数** —— 这条把那句话证出来。
+
+    `_blend` 是按"实际覆盖到的权重之和"除的, 覆盖率也是相对整表求的, 所以整张
+    表同乘一个常数, 分数、覆盖率、置信、partial 全部逐位相同。有了这条, 就不必
+    为了"看起来加得起来是 1"去把 .40/.20/.15 各除以 0.75 —— 那只会引入一组
+    无限小数, 把「这些数就是 R189 当初定的」变成近似。
+    """
+    before = _s()
+    orig = dict(osc.QUALITY_WEIGHTS)
+    try:
+        osc.QUALITY_WEIGHTS.update({k: v * 4 / 3 for k, v in orig.items()})
+        assert sum(osc.QUALITY_WEIGHTS.values()) == pytest.approx(1.0)
+        after = _s()
+    finally:
+        osc.QUALITY_WEIGHTS.clear()
+        osc.QUALITY_WEIGHTS.update(orig)
+    assert after == before, "权重表整体缩放竟然改变了结果 —— _blend 不再是尺度无关的了"
+
+
+def test_channel_extension_is_out_of_the_score():
+    """[R229] 用户: 「撤销所有量化通道延申有关的东西」。
+
+    **盯的是接口而不是数值** —— 数值测试会在有人偷偷把因子加回来时照样通过
+    (只要曲线中性), 而接口一旦回来, 这条立刻红。
+    """
+    import inspect
+    assert "spread" not in osc.QUALITY_WEIGHTS
+    assert "accel" not in osc.TIMING_WEIGHTS
+    assert "spread" not in osc.FACTOR_CN and "accel" not in osc.FACTOR_CN
+    assert not hasattr(osc, "spread_score") and not hasattr(osc, "accel_score")
+    assert not hasattr(osc, "SPREAD_CURVE") and not hasattr(osc, "ACCEL_CURVE")
+    assert "geo" not in inspect.signature(osc.score_candidate).parameters
 
 
 # ------------------------------------------------------- [R189] 两根轴
@@ -300,8 +350,7 @@ def test_geometric_mean_refuses_to_average_a_lopsided_pair():
     """好票+坏时点 不该和 平庸票+平庸时点 打平 —— 那正是三维度加权的毛病。"""
     lopsided = osc.score_candidate(
         duration=12, state="UT", rs_pct=14.0, vol_ratio=4.5, turnover_rate=22.0,
-        channel_pct=1.15, template=_TPL_FULL, rhythm=_RHY_FULL,
-        geo={"spread": 2.4, "accel": {"a1": -0.18}})
+        channel_pct=1.15, template=_TPL_FULL)
     q, t = lopsided["axes"]["quality"], lopsided["axes"]["timing"]
     assert q > 90 and t < 40, f"造的例子不对: 质地 {q} 时机 {t}"
     # 算术平均会给 (95+35)/2 ≈ 65; 几何平均给 √(95×35) ≈ 58 —— 必须更低
@@ -312,8 +361,7 @@ def test_one_axis_near_zero_kills_the_score():
     """任一边趋近 0, 合成分也趋近 0 —— 不许互相补贴。"""
     r = osc.score_candidate(duration=20, state="UT", rs_pct=14.0, vol_ratio=0.1,
                             turnover_rate=0.1, channel_pct=1.8,
-                            template=_TPL_FULL, rhythm=_RHY_FULL,
-                            geo={"spread": 2.4, "accel": {"a1": -0.28}})
+                            template=_TPL_FULL)
     assert r["axes"]["quality"] > 90
     assert r["score"] < 40, f"时机烂到底了还有 {r['score']} 分"
 
@@ -327,20 +375,16 @@ def test_score_is_the_geometric_mean_exactly():
 # ------------------------------------------------------- [R189] 质地的两个新因子
 
 
-def test_building_beats_choppy_but_does_not_run_the_show():
-    """「蓄势该加多少分」的答案就在这两条断言之间:
-    够让同档次的票分出先后(> 2 分), 不够让它一个人把票抬进前排(< 12 分)。"""
-    building = _s(rhythm={"level": "building", "basing": {"days": 90}})["score"]
-    choppy = _s(rhythm={"level": "choppy", "basing": {"days": 90}})["score"]
-    assert 2 <= building - choppy <= 12, f"蓄势的边际是 {building - choppy} 分"
-
-
-def test_never_having_based_is_not_a_penalty():
-    """一路上涨从没跌出过多头的强势股 cycles=0、磨底 0 天 —— 给它低分等于
-    惩罚"没磨过底", 方向就反了。"""
-    never = _s(rhythm={"level": "none", "basing": {"days": 0}})["score"]
-    choppy = _s(rhythm={"level": "choppy", "basing": {"days": 90}})["score"]
-    assert never >= choppy - 1
+def test_quality_axis_has_no_rhythm_factor_left():
+    """[R229] 磨底节拍随红绿节拍规则层退役。**同时盯三件事**, 因为它们会各自
+    悄悄复活: 权重表里没有这个键、因子中文名里没有、score_candidate 也不再
+    接受 rhythm/runs 两个形参(留着形参就等于留一个骗人的接口)。"""
+    import inspect
+    assert "base" not in osc.QUALITY_WEIGHTS
+    assert "base" not in osc.FACTOR_CN
+    assert not hasattr(osc, "base_score")
+    params = inspect.signature(osc.score_candidate).parameters
+    assert "rhythm" not in params and "runs" not in params
 
 
 def test_template_needs_all_eight_known_or_it_sits_out():
@@ -400,11 +444,13 @@ def test_ties_break_on_quality_not_on_alphabet():
     gate = {"above_ma20": True, "above_ma20_prev": True, "close": 10.0,
             "ma120": 8.0, "ma120_rising": True, "closes": closes, "ret_120d": 0.30}
     ex = {"gate": gate, "channel_pct": 0.6, "vol_ratio": 1.6, "turnover": 4.0}
-    # 两只时机完全一样, 只有磨底长短不同 —— 分数四舍五入后打平, 质地不同。
-    # 代码字典序上 A 在前, 但 Z 磨得更久(质地更高), 必须排在 A 前面。
+    # 两只时机完全一样, 只有 20 日相对强度略有差别 —— 分数四舍五入后打平,
+    # 质地不同。代码字典序上 A 在前, 但 Z 跑得更强(质地更高), 必须排在 A 前面。
+    # [R229] 原来这里用磨底天数拉开质地; 红绿节拍已整层退役, 换成还在的因子。
+    # 差值刻意取得很小(8% vs 9%): 大了就不是"平分兜底"这条要测的情形了。
     trends = {
-        "AAA.SH": dict(base_t, rhythm={"level": "building", "basing": {"days": 72}}),
-        "ZZZ.SH": dict(base_t, rhythm={"level": "building", "basing": {"days": 90}}),
+        "AAA.SH": dict(base_t),
+        "ZZZ.SH": dict(base_t, ret_20d=0.09),
     }
     ranked, _ = score_opportunities(
         trends, {}, {"AAA.SH": "甲", "ZZZ.SH": "乙"}, bench_ret=0.02,
@@ -420,12 +466,12 @@ def test_incomplete_candidates_are_flagged_and_lose_ties():
     from app.api.today import score_opportunities
     base_t = {"state": "UT", "state_cn": "上涨趋势", "side": "多头", "duration": 2,
               "close": 10.0, "as_of": "2026-08-31", "signal": "转多",
-              "signal_desc": "突破", "ret_20d": 0.08,
-              "rhythm": {"level": "building", "basing": {"days": 90}}}
+              "signal_desc": "突破", "ret_20d": 0.08}
     closes = [10.0 * (1.004 ** i) for i in range(290)]
     gate = {"above_ma20": True, "above_ma20_prev": True, "close": 10.0,
             "ma120": 8.0, "ma120_rising": True, "closes": closes, "ret_120d": 0.30}
-    # [R195] 通道读数(含几何层)也要喂, 否则两只都会因为缺 spread/accel 而 partial
+    # [R195 加, R229 改] 通道读数还是要喂 —— 几何虽已退出打分, 但 bands 里的
+    # 短期档位置仍然是时机轴的 pos 因子, 不喂两只都会 partial。
     bands = _bands_with_geo()
     ranked, _ = score_opportunities(
         trends := {"AAA.SH": dict(base_t), "ZZZ.SH": dict(base_t)}, {},
@@ -473,17 +519,14 @@ def _sparse():
     """只有六态和新鲜度 —— 别的一概读不到。"""
     return osc.score_candidate(duration=1, state="UT", rs_pct=None, vol_ratio=None,
                                turnover_rate=None, channel_pct=None,
-                               template=None, rhythm=None, geo=None, runs=None)
+                               template=None)
 
 
 def test_数据稀薄的票不再排在因子齐全的同类票前面():
     sparse = _sparse()
     full = osc.score_candidate(duration=1, state="UT", rs_pct=4.0, vol_ratio=1.5,
                                turnover_rate=3.0, channel_pct=0.60,
-                               template={"passed": 6, "known": 8, "total": 8},
-                               rhythm={"level": "none", "basing": {"days": 10}},
-                               geo={"spread": 1.5, "accel": {"a1": 0.05}},
-                               runs={"compress_days": 8})
+                               template={"passed": 6, "known": 8, "total": 8})
     # 稀薄那只两根轴都是满分(因为只剩两个满分因子), 齐全那只反而不是
     assert sparse["axes"]["quality"] == 100.0 and sparse["axes"]["timing"] == 100.0
     assert full["axes"]["quality"] < 100.0
@@ -529,8 +572,7 @@ def test_满分仍然拿得到():
     """置信系数不能把天花板压下来 —— 因子都到峰值且都读到了就是 100。"""
     best = osc.score_candidate(duration=1, state="UT", rs_pct=14.0, vol_ratio=1.8,
                                turnover_rate=5.0, channel_pct=0.58,
-                               template=_TPL_FULL, rhythm=_RHY_FULL,
-                               geo={"spread": 2.5, "accel": {"a1": 0.12}})
+                               template=_TPL_FULL)
     assert best["confidence"] == 1.0 and best["score"] == 100
 
 
@@ -561,13 +603,14 @@ def test_所有无信息的取值都锚在中性五十():
     """v2 里"没读到/没发生"的默认值散在 55~60, 于是每只票的底子都被垫高了
     一截, 合成分整体上移、区分度更窄。统一锚到 50: 无信息就是无信息。"""
     assert osc._piecewise(0.0, osc.RS_CURVE) == 50            # 与大盘同步
-    assert osc._piecewise(0.0, osc.ACCEL_CURVE) == 50         # 速度没变
-    assert osc._piecewise(0.5, osc.SPREAD_CURVE) == 50        # 方向还没出来
-    assert osc.RHYTHM_SCORE["none"] == 50                     # 没有循环
-    assert osc.BASING_DAYS_NEUTRAL == 50
-    assert osc._piecewise(0.0, osc.BASING_DAYS_CURVE) == 50
-    # 震荡是**负面信息**, 必须低于"无信息"; 蓄势必须高于
-    assert osc.RHYTHM_SCORE["choppy"] < 50 < osc.RHYTHM_SCORE["building"]
+    assert osc.FRESH_COILING == 55                            # 路 C: 不知道新不新鲜
+    # [R229] 原来这里还锚着四个值: spread ≈0、accel =0(量化通道延申)、红绿节拍
+    # 的「没有循环」与磨底天数中性值。四个因子都已退出打分, 锚点随之作废。
+    #
+    # 剩下这两条**仍然是这条纪律的全部现役覆盖面** —— 现在进分的七个因子里,
+    # 只有相对强度和新鲜度有"无信息"这个取值(模板判不全是缺席不是中性,
+    # 六态/量比/换手/位置读不到就是 None)。所以这条测试没有被削弱, 是覆盖面
+    # 本来就跟着因子一起缩小了。
 
 
 # ================================================================

@@ -105,28 +105,6 @@ def _trend_by_date(df: pl.DataFrame, threshold: float) -> dict[str, dict]:
     return out
 
 
-def _rhythm(df: pl.DataFrame, threshold: float) -> dict | None:
-    """[R188] 红绿节拍与磨底时长。
-
-    **就地重新 compute 一次, 不复用 _trend_by_date 里那份。** 试过把它挂在
-    函数属性上传出来 —— 那是并发不安全的: 两个复盘请求同时进来, A 票会拿到
-    B 票的节拍。而 compute 是纯函数、输入是已经在内存里的 list, 贵的是加载
-    dataframe 那一步, 那一步这里已经做过了, 再算一次几乎不花钱。
-
-    失败只降级为 None —— 这是个注记, 不该让它把整份复盘拖垮。
-    """
-    try:
-        from app.services.trend_rhythm import assess
-        closes = [float(c) for c in df["close"]]
-        dates = [str(d) for d in df["date"]]
-        if len(closes) < 30:
-            return None
-        return assess(compute(closes, dates, threshold)["steps"])
-    except Exception as e:  # noqa: BLE001
-        logger.debug("review rhythm skipped: %s", e)
-        return None
-
-
 def _bands_for_row(close, ma20, ma60, ma120, atr) -> dict:
     """当天的三档通道读数。与决策台走同一个 ``assess``, 只是输入换成当天的值。"""
     bands: dict[str, dict] = {}
@@ -624,9 +602,8 @@ def review_for_symbol(repo, symbol: str, days: int = DEFAULT_DAYS) -> dict:
         # 两条都只用已经算好的段统计, 不新增取数。
         "side_edge": _side_edge(trend_outcomes),
         "now": _now(rows, trend_outcomes),
-        # [R188] 磨底磨了多久 + 磨得好不好。用户: 「其实我是想知道一个票磨底
-        # 磨了多久」—— 复盘弹窗正是看这只票历史的地方, 这个数该在这儿。
-        "rhythm": _rhythm(df, thr),
+        # [R188 加, R229 删] "rhythm"(磨底与红绿节拍)不再进复盘载荷 ——
+        # 用户: 「红绿节拍移除掉」, 整个规则层退役。
         # [R198] 量化波动通道的几何层。复盘是"看清楚"的地方 —— 决策台只给一格,
         # 这里要把速度/加速度/压缩/频段摊开。原料就是同一份 df, 不新增取数。
         "channel": _channel(df, rows),

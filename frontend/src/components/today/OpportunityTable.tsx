@@ -45,10 +45,10 @@ const BOARD_LIMIT_CN: Record<string, string> = {
 const AXIS_META = [
   { key: 'quality', cn: '质地', cls: 'bg-red-400',
     what: '这只票的长周期结构 —— 以月计变化',
-    hint: '趋势模板(八条) / 磨底节拍 / 相对强度 / 六态状态 / 三线间距' },
+    hint: '趋势模板(八条) / 相对强度 / 六态状态' },
   { key: 'timing', cn: '时机', cls: 'bg-sky-400',
     what: '今天是不是那一天 —— 逐日变化',
-    hint: '新鲜度 / 通道位置 / 量比(区间最优,峰在 1.3~2.5) / 换手率 / 加速度' },
+    hint: '新鲜度 / 通道位置 / 量比(区间最优,峰在 1.3~2.5) / 换手率' },
 ] as const
 
 /** 两轴一高一低时该说的那句话 —— 这正是合成分说不出来的东西。 */
@@ -313,9 +313,9 @@ export function OpportunityTable({ rows, pickedSymbols, onOpen, live }: {
           <tr className="border-b border-border/40 text-[10px] text-muted">
             <th className="w-14 px-3 py-1.5 text-center font-normal"
                 title={'上面那个是今天的名次, 下面那个小字才是把握分。\n\n'
-                  + '把握分 = √(质地 × 时机) × 置信。质地=长周期结构(趋势模板/磨底节拍/相对强度/六态/三线间距), 以月计变化;'
-                  + '时机=今天是不是那一天(新鲜度/通道位置/量比/换手/快慢变化), 逐日变化。一边好一边差不会被平均成中等 —— 两条细条就是这两根轴。\n\n'
-                  + '为什么名次在前: 把握分是十个因子平均出来的, 实际取值挤在 65~82 这一段, '
+                  + '把握分 = √(质地 × 时机) × 置信。质地=长周期结构(趋势模板/相对强度/六态), 以月计变化;'
+                  + '时机=今天是不是那一天(新鲜度/通道位置/量比/换手), 逐日变化。一边好一边差不会被平均成中等 —— 两条细条就是这两根轴。\n\n'
+                  + '为什么名次在前: 把握分是七个因子平均出来的, 实际取值挤在中间一段, '
                   + '「68 分」本身读不出好坏; 名次和分位是相对的, 一眼就知道该不该往下看。'}>
               名次
             </th>
@@ -449,15 +449,16 @@ function ActionCell({ action }: { action?: TodayAction | null }) {
 
 /** 展开行: 把两根轴拆到因子这一层, 外加注记全文与建仓路径。 */
 function OpportunityDetail({ o, live }: { o: TodayOpportunity; live?: boolean }) {
+  // [R229] 磨底节拍(base)、三线间距(spread)、快慢变化(accel)三项从这里删掉了 ——
+  // 前两个随红绿节拍规则层与量化通道延申一起退出打分, accel 同理。后端不再返回
+  // 这几个 key, 留着只会在展开行里印出一串「—」。
   const F_CN: Record<string, string> = {
-    template: '趋势模板', base: '磨底节拍', rs: '相对强度', state: '六态状态',
-    spread: '三线间距',
+    template: '趋势模板', rs: '相对强度', state: '六态状态',
     fresh: '新鲜度', pos: '通道位置', vol_ratio: '量比', turnover: '换手率',
-    accel: '快慢变化',
   }
   const AXIS_FACTORS: Record<string, string[]> = {
-    quality: ['template', 'base', 'rs', 'state', 'spread'],
-    timing: ['fresh', 'pos', 'vol_ratio', 'turnover', 'accel'],
+    quality: ['template', 'rs', 'state'],
+    timing: ['fresh', 'pos', 'vol_ratio', 'turnover'],
   }
   const verdict = axisVerdict(o.axes?.quality, o.axes?.timing)
   return (
@@ -551,31 +552,20 @@ function OpportunityDetail({ o, live }: { o: TodayOpportunity; live?: boolean })
             </div>
           )}
 
-          {/* [R188/R189] 磨了多久 + 磨得好不好。两个数凑一起才完整 ——
-              「磨了 87 天」不说好坏, 「蓄势」不说久暂。 */}
-          {!!o.rhythm && (o.rhythm.basing.days > 0 || o.rhythm.cycles > 0) && (
-            <div className="text-muted">
-              <span className="text-foreground/90">磨底节拍</span>
-              {o.rhythm.basing.days > 0 && (
-                <span className="ml-2 font-mono text-[10px]">
-                  磨底 {o.rhythm.basing.days} 天
-                  {o.rhythm.basing.low != null && o.rhythm.basing.high != null
-                    && ` · 箱体 ${o.rhythm.basing.low.toFixed(2)}~${o.rhythm.basing.high.toFixed(2)}`}
-                </span>
-              )}
-              {o.rhythm.cycles > 0 && (
-                <span className="ml-2">{o.rhythm.label}:{o.rhythm.reason}</span>
-              )}
-            </div>
-          )}
+          {/* [R188 加, R229 删]「磨底节拍」那一块在这里删掉了 —— 红绿节拍
+              规则层整层退役, 后端不再返回 rhythm。 */}
 
-          {/* [R195] 量化波动通道的几何与事件。**几何进了分**(分离度→质地、
-              加速度→时机), 所以摆在依据区而不是注记区 —— 注记那一栏的规矩是
-              「一分不加一分不减」, 混进去边界就读不清了。 */}
+          {/* [R195 加, R229 降级] 量化波动通道的几何与事件。
+              R195~R197 期间几何**进了分**(分离度→质地、加速度→时机), 所以当时
+              摆在依据区而不是注记区。现在它已从打分里整个剥离, 身份与注记相同:
+              一分不加一分不减。位置留在这儿是因为它信息量大、该被看见, 但
+              标题上明写了「不进把握分」, 免得再被当成分数的依据。 */}
           {!!o.geo && (
             <div className="rounded border border-border/40 bg-surface/40 px-2.5 py-2">
               <div className="mb-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
                 <span className="text-foreground/90">量化波动通道</span>
+                <span className="text-[10px] text-muted/70"
+                      title="这一组读数只描述形态, 不参与把握分 —— 与主线/AI 信号/历史胜率同一条规矩">不进把握分</span>
                 {!!o.channel_event && o.channel_event.code !== 'none' && (
                   <span className={cn('rounded border px-1.5 py-0.5 text-[10px]',
                     o.channel_event.confirmed

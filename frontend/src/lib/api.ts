@@ -234,9 +234,8 @@ export interface TodayOpportunity {
     passed: number; known: number; total: number; text: string
     criteria: { code: string; label: string; pass: boolean | null; detail: string }[]
   } | null
-  /** [R189] 红绿节拍与磨底时长(trend_rhythm 的返回值) */
-  rhythm?: TrendRhythm | null
-  /** [R195] 量化波动通道的几何层 —— 分离度进质地轴、加速度进时机轴 */
+  /** [R195 加, R229 降级] 量化波动通道的几何层。**不进把握分** ——
+   *  与主线/AI 信号/历史胜率同一条规矩: 一分不加一分不减, 只作背景。 */
   geo?: ChannelGeometry | null
   /** [R195] 位置 × 六态 × 在轨外天数 → 事件 */
   channel_event?: ChannelEvent | null
@@ -722,8 +721,6 @@ export interface StockReview {
     flip_down: number | null; flip_up: number | null
     close: number
   } | null
-  /** [R188] 红绿节拍与磨底时长 —— 「这只票磨底磨了多久」 */
-  rhythm?: TrendRhythm | null
   /** [R198] 量化波动通道的几何层 —— 复盘是唯一有地方把它摊开的位置 */
   channel?: {
     geo: ChannelGeometry
@@ -945,29 +942,8 @@ export interface BandEnergy {
   lead_cn?: string
 }
 
-/** [R188] 红绿节拍 —— 反复进多头又跌出, 是蓄势还是反复失败。
- *
- *  **档位不是分数**: 这东西还没被台账验证过, 给分数就会有人想加进把握分。
- *  低点不抬高是否决项 —— 「同一位置撞五次没过去」次数最多, 却最该躲开。 */
-export interface TrendRhythm {
-  level: 'building' | 'choppy' | 'failing' | 'none'
-  label: string
-  cycles: number
-  low_rising: boolean | null
-  high_rising: boolean | null
-  red_share_rising: boolean | null
-  dip_shallower: boolean | null
-  reason: string
-  /** 磨底磨了多久 + 箱体上下沿(那就是突破价与破位价) */
-  basing: {
-    days: number
-    high: number | null
-    low: number | null
-    range_pct: number | null
-    since: string | null
-    is_basing: boolean
-  }
-}
+// [R187 加, R229 删] `TrendRhythm`(红绿节拍与磨底时长)在这里删掉了 ——
+// 用户: 「红绿节拍移除掉」, 整个规则层退役, 后端已不再返回这个对象。
 
 export interface TrendInfo {
   state: LivermoreState
@@ -989,9 +965,6 @@ export interface TrendInfo {
    *  价位回答"到哪儿", 距离才回答"还有多急" —— 买点侧原来缺的就是这个数。 */
   flip_down_distance_pct?: number | null
   flip_up_distance_pct?: number | null
-  /** [R188] 红绿节拍与磨底时长。零成本算出来的 —— 六态 compute 已经跑完,
-   *  steps 就在手上, 原来用完即弃。 */
-  rhythm?: TrendRhythm | null
   /** [R29] 本轮高/低水位收盘价(上关键点在趋势态下就等于 leg_high) */
   leg_high?: number | null
   leg_low?: number | null

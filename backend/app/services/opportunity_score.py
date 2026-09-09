@@ -29,12 +29,10 @@ v1(R12 起累积到 R47)是"底分 + 八项加减"。它有三个结构性毛病
     位置 + 斜率两个条件同时成立才算长期下跌, 与 market_mode 判指数同源。
     只用位置的话, 一只刚从底部拉起、还没回到 MA120 上方的强势股会被误杀;
     只用斜率的话, 高位刚拐头的票会被漏掉。
-  · G4 [R189] 红绿节拍不是"反复失败" —— 至少两轮进多头又跌出、且每轮低点
-    更低。这是唯一一种"次数越多越该躲"的形态, 靠打分压不住它(次数正是它
-    最多), 只能否决。**没有对应的"必须蓄势"门槛**: 蓄势是加分项, 一路上涨
-    从没磨过底的票压根没有循环, 不该被挡在外面。
+  · G4 [R189 加, R229 删] 红绿节拍不是"反复失败"。整个红绿节拍规则层已按
+    用户要求退役(「红绿节拍移除掉」), 这道门槛随之取消 —— 现在是三道。
 
-四道门槛叠加等价于一句话: **只做上升趋势中继的早期, 不做底部反转。**
+三道门槛叠加等价于一句话: **只做上升趋势中继的早期, 不做底部反转。**
 这是用户"跌破生命线的不看、长期是下跌趋势的也不看"的必然推论, 是一个
 真实且持续存在的机会成本(底部反转第一波必然错过), 不是可以调参消除的。
 
@@ -47,10 +45,14 @@ v1(R12 起累积到 R47)是"底分 + 八项加减"。它有三个结构性毛病
 
 改成按**变化速度**分的两根轴, 并用几何平均合成(详见「两根轴」那一节):
 
-  | 轴   | 因子                                        |
-  |------|---------------------------------------------|
-  | 质地 | 趋势模板 / 磨底节拍 / 相对强度 / 六态状态   |
-  | 时机 | 新鲜度 / 通道位置 / 量比 / 换手率           |
+  | 轴   | 因子                            |
+  |------|---------------------------------|
+  | 质地 | 趋势模板 / 相对强度 / 六态状态  |
+  | 时机 | 新鲜度 / 通道位置 / 量比 / 换手 |
+
+  [R229] 这张表回到了 R189 刚定下时的样子。中间这两天进过又退出的三项 ——
+  磨底节拍(红绿节拍, 用户要求整层退役)、三线间距与加速度(量化通道延申,
+  用户要求从打分里剥离)—— 都不在了。通道延申本身没删, 只是降成注记。
 
     把握分 = √(质地 × 时机)
 
@@ -129,27 +131,25 @@ from app.indicators.livermore import BULLISH   # 多头三态 UT/NR/SR, 只引�
 GATE_TREND = "trend_side"        # 六态必须在多头侧
 GATE_LIFELINE = "lifeline"       # 收盘必须站上生命线(MA20), 连续两日
 GATE_LONG_DOWN = "long_down"     # 不能处在长期下跌趋势里
-GATE_RHYTHM = "rhythm_failing"   # [R189] 不能是"同一个位置反复撞不过去"
+# [R229] 第四道 `rhythm_failing`(红绿节拍判为"反复失败")在这里删掉了 ——
+# 用户: 「红绿节拍移除掉」, 整个规则层退役。质地轴那一侧的说明见 QUALITY_WEIGHTS。
 
 GATE_CN = {
     GATE_TREND: "逆势(六态在空头侧)",
     GATE_LIFELINE: "跌破生命线(MA20)",
     GATE_LONG_DOWN: "长期下跌趋势",
-    GATE_RHYTHM: "反复失败(低点一路下移)",
 }
 GATE_WHY = {
     GATE_TREND: "六态在空头侧 —— 逆势的「突破」多半是反弹",
     GATE_LIFELINE: "收盘在 MA20 之下 —— 生命线都没站上, 谈不上趋势中继",
     GATE_LONG_DOWN: "收盘在 MA120 之下且 MA120 向下 —— 长期方向还没转",
-    GATE_RHYTHM: "反复进多头又跌出, 而每次的低点更低 —— 撞第五次和撞第一次不一样",
 }
 
 
 def check_gates(*, state: str | None, above_ma20: bool | None,
                 above_ma20_prev: bool | None, close: float | None,
-                ma120: float | None, ma120_rising: bool | None,
-                rhythm_level: str | None = None) -> dict:
-    """四道硬门槛。返回 {"ok": bool, "failed": [code...]}。纯函数。
+                ma120: float | None, ma120_rising: bool | None) -> dict:
+    """三道硬门槛。返回 {"ok": bool, "failed": [code...]}。纯函数。
 
     **数据缺失一律放行**, 不当作不通过 —— 门槛的职责是"挡掉明确不该看的",
     不是"挡掉我们没读到的"。新股不足 120 根算不出 MA120, 不该因此被判长期下跌。
@@ -165,14 +165,6 @@ def check_gates(*, state: str | None, above_ma20: bool | None,
     if (close is not None and ma120 is not None
             and ma120_rising is False and close < ma120):
         failed.append(GATE_LONG_DOWN)
-    # [R189] 红绿节拍判为"反复失败" —— 定义是**至少两轮循环且低点不抬高**
-    # (见 trend_rhythm)。这是门槛而不是扣分, 因为它和另外三道是同一类判断:
-    # "明确不该看"。次数多寡在这里帮不上忙 —— 撞同一个位置撞五次, 次数正是
-    # 最多的那个, 只数次数会把它排到最前面。
-    # 门槛之外**不设"蓄势"门槛**: 蓄势是加分项不是准入条件, 一只一路上涨
-    # 从没磨过底的强势股压根没有循环, 不该因此被挡在外面。
-    if rhythm_level == "failing":
-        failed.append(GATE_RHYTHM)
     return {"ok": not failed, "failed": failed}
 
 
@@ -278,7 +270,7 @@ AXIS_TIMING = "timing"     # 时机: 今天是不是那一天 —— 逐日变�
 
 AXIS_CN = {AXIS_QUALITY: "质地", AXIS_TIMING: "时机"}
 AXIS_WHAT = {
-    AXIS_QUALITY: "这只票的长周期结构好不好(趋势模板 / 磨底节拍 / 相对强度 / 六态)",
+    AXIS_QUALITY: "这只票的长周期结构好不好(趋势模板 / 相对强度 / 六态 / 三线间距)",
     AXIS_TIMING: "今天是不是那一天(信号新鲜度 / 量比 / 通道位置 / 换手)",
 }
 
@@ -286,150 +278,69 @@ AXIS_WHAT = {
 #
 #   template .40  八条模板是四个因子里唯一被公开检验过的一组标准, 而且它是
 #                 8 条的合成, 分辨率天然最高(0~8 档), 该给最大的一份。
-#   base     .25  用户明确要的那件事(「磨了多久」+「红绿节拍」)。给 .25 而不是
-#                 更多的理由: 它管的是**模板还没通过之前**那一段, 一旦结构确认
-#                 了, 底是怎么磨出来的就成了历史; 而"反复失败"那一侧已经由
-#                 门槛 G4 单独否决掉, 不需要再靠权重去压。
+#   base     .25  [R229 已删, 见下]
 #   rs       .20  唯一一个"相对市场"的量, 与另外三个都不相关 —— 不相关的因子
 #                 便宜, 权重该保住。
 #   state    .15  六态是本 fork 的招牌, 但它和模板的均线排列讲的是同一件事的
 #                 两种说法, 重叠最多; 而且 G1 门槛已经用它筛过一道了。同一个
 #                 事实投两次票, 第二次该轻。
 #
-# 这四个数和 R134 的 WEIGHTS 一样是**先验**, 等台账攒够样本按分层单调性调。
-# 「蓄势该加多少分」的答案就落在 base 这 .25 里: 蓄势与震荡在 base 上差 45 分
-# (见 RHYTHM_SCORE), 折进质地是 11 分, 再经几何平均落到把握分上约 5~6 分 ——
-# 够让同档次的票分出先后, 不够让它一个人把一只结构不行的票抬进前排。
-# [R195] 加入量化波动通道几何层的 spread。**原有四项按原比例缩到 0.85**,
-# 新因子占 0.15 —— 这样保住 R189 那个性质: 老因子之间的**相对**比例仍然是从
-# R134 推出来的, 不是重编的(0.40:0.25:0.20:0.15 = 0.34:0.21:0.17:0.13)。
+# 这几个数和 R134 的 WEIGHTS 一样是**先验**, 等台账攒够样本按分层单调性调。
 #
-#   spread .15  短长均线间距(ATR 归一化, **带符号**)。为什么用它而不用压缩指数:
-#               压缩指数没有方向 —— 下跌趋势的重叠度与上涨趋势一样是 0。
-#               spread 一个数同时表达方向与分离度。它与 base(磨底节拍)有部分
-#               重叠(粘合 ⟺ 磨底), 所以压到 .15; 但 base 说不了「已分离 2~3 个
-#               ATR 的趋势确立态」, 那一段是 spread 独有的。
-# 用精确的 0.85 倍而不是两位小数圆整值 —— 圆整会让「相对比例不变」这句话
-# 变成近似(0.11×0.85=0.0935, 写成 0.10 就把换手率抬高了 7%)。
-QUALITY_WEIGHTS = {"template": 0.34, "base": 0.2125, "rs": 0.17, "state": 0.1275,
-                   "spread": 0.15}
+# ## [R229] 量化通道延申从打分里**整个剥离**, 权重回到 R189/R134 那一套
+#
+# 用户: 「撤销所有量化通道延申有关的东西」「现在的评分系统被改崩了, 很混乱」
+# 「反正评分系统最近已经稳定运行一阵子的了, 然后这两天被我大改动」。
+#
+# 这两天往打分里塞了三样东西, 全部退出:
+#
+#   [R195] spread(三线间距) 进质地 .15, 原有四项按 0.85 缩
+#   [R195] accel(加速度)    进时机 .15, 原有四项按 0.85 缩
+#   [R197] compress_days    换掉磨底那一半的判据
+#
+# 再加上同一轮里按用户要求退役的红绿节拍(base), 质地轴就只剩下 R189 编的
+# 那三项, 而且**数字直接写回 R189 的原值**, 不是从 0.34 反推回去的 ——
+# 0.40 : 0.20 : 0.15 就是当初定的比例, 中间那趟 ×0.85 从头到尾没有改变过它,
+# 现在只是把那层缩放脱掉。时机轴同理, 四个数一字不差地回到 R134 推出来的
+# .31 / .32 / .26 / .11。
+#
+#   template .40  八条模板是唯一被公开检验过的一组标准, 又是 8 条的合成,
+#                 分辨率天然最高(0~8 档), 该给最大的一份。
+#   rs       .20  唯一一个"相对市场"的量, 与另外两个都不相关 ——
+#                 不相关的因子便宜, 权重该保住。
+#   state    .15  六态是本 fork 的招牌, 但它和模板的均线排列讲的是同一件事的
+#                 两种说法, 重叠最多; 而且 G1 门槛已经用它筛过一道了。
+#                 同一个事实投两次票, 第二次该轻。
+#
+# **通道延申没有被删, 是被降级**: 阶段 / 事件 / 三尺度对齐 / 27 组合速查 /
+# 匀速基准 / 频段能量全都还在界面上, 只是从此**一分不加一分不减** —— 与
+# AI 信号、主线、胜率、龙虎榜同一条规矩(见 today.py 的 notes 那一栏)。
+# 它要重新进分, 得先拿台账证明自己值那个权重, 而不是靠一句"应该有用"。
+QUALITY_WEIGHTS = {"template": 0.40, "rs": 0.20, "state": 0.15}
 
 # 时机轴的权重 —— 由 R134 旧有效权重归一化得到, 见上面「轴内权重哪来的」。
-# [R195] 同样按原比例缩到 0.85, 让出 0.15 给加速度:
-#   accel .15   二阶导。与 pos 正交 —— 位置说"贵不贵", 加速度说"这波还在不在
-#               加速"。0.31:0.32:0.26:0.11 → 0.26:0.27:0.22:0.10, 相对关系不变。
-TIMING_WEIGHTS = {"fresh": 0.2635, "pos": 0.272, "vol_ratio": 0.221,
-                  "turnover": 0.0935, "accel": 0.15}
+# [R195 加, R229 退] accel 让出去的那 .15 收回来, 四项回到原值。
+TIMING_WEIGHTS = {"fresh": 0.31, "pos": 0.32, "vol_ratio": 0.26, "turnover": 0.11}
 
 AXIS_FACTORS = {AXIS_QUALITY: QUALITY_WEIGHTS, AXIS_TIMING: TIMING_WEIGHTS}
 
 FACTOR_CN = {
-    "template": "趋势模板", "base": "磨底节拍", "rs": "相对强度", "state": "六态状态",
-    "spread": "三线间距",
+    "template": "趋势模板", "rs": "相对强度", "state": "六态状态",
     "fresh": "新鲜度", "vol_ratio": "量比", "turnover": "换手率", "pos": "通道位置",
-    "accel": "加速度",
 }
 
-# [R195] 短长均线间距(ATR) → 0~100。**倒 U, 且零点不在中间**:
-#   < 0    空头排列且已分开 —— 最差
-#   ≈ 0    均线粘合, 方向未定 —— 中性偏下
-#   1.5~3  趋势已确立但还没走过头 —— 甜区
-#   > 5    尺度撕裂(短带与长带没有共同价格区间) —— 走太远, 回落
-# 门槛 G1/G2/G3 已经保证了多头侧, 这条曲线是在"已过门槛"的前提下读的。
-SPREAD_CURVE: Curve = ((-4.0, 4), (-2.0, 12), (-0.5, 34), (0.5, 50), (1.5, 80),
-                       (2.5, 100), (4.0, 82), (5.0, 54), (7.0, 24), (10.0, 8))
-
-# [R195] 加速度 a1(ATR/天) → 0~100。同样倒 U 而不是单调:
-#   强减速 → 涨势钝化, 最差
-#   匀速   → 中性
-#   适度加速 → 甜区(这波刚起来)
-#   过度加速 → 拉升末端的赶顶, 回落(与量比曲线同一个道理)
-# 峰值 0.12 约在合成样本的 75 分位 —— "比大多数时候快, 但没到极端"。
-ACCEL_CURVE: Curve = ((-0.30, 6), (-0.15, 20), (-0.05, 38), (0.0, 50), (0.06, 80),
-                      (0.12, 100), (0.20, 86), (0.30, 55), (0.45, 24), (0.70, 8))
-
-
-def spread_score(geo: dict | None) -> float | None:
-    """短长均线间距 → 0~100。geo 是 keltner_geometry.geometry 的返回值。"""
-    if not geo or geo.get("spread") is None:
-        return None
-    return _piecewise(float(geo["spread"]), SPREAD_CURVE)
-
-
-def accel_score(geo: dict | None) -> float | None:
-    """加速度 → 0~100。"""
-    a1 = ((geo or {}).get("accel") or {}).get("a1")
-    if a1 is None:
-        return None
-    return _piecewise(float(a1), ACCEL_CURVE)
+# [R195 加, R229 删] SPREAD_CURVE / ACCEL_CURVE 与 spread_score() /
+# accel_score() 在这里删掉了 —— 量化通道延申已从打分里整个剥离, 见
+# QUALITY_WEIGHTS 上面那段。按 R198 的规矩: 不留没人调的死代码。
 
 # 趋势模板通过条数 → 0~100。**上凸**: 8/8 与 7/8 的差距要比 4/8 与 3/8 的大 ——
 # 模板的意义在"全部满足", 差一条就还不是那个形态, 差四条只是差得更多而已。
 TEMPLATE_CURVE: Curve = ((0, 0), (2, 10), (4, 30), (5, 45), (6, 62), (7, 82), (8, 100))
 
-# 红绿节拍档位 → 0~100。
-#   蓄势 100 / 震荡 55 —— 差 45 分, 这就是「蓄势加多少分」的原始刻度。
-#   没循环 60: **中性偏上, 不是低分**。一路上涨从没跌出过多头的强势股恰恰是
-#     cycles=0, 给它低分等于惩罚"没磨过底", 方向反了。
-#   反复失败 0: 正常到不了这里(G4 已经否决), 留着是为了万一门槛没喂到值。
-RHYTHM_SCORE = {"building": 100.0, "choppy": 42.0, "none": 50.0, "failing": 0.0}
-
-# 磨底天数 → 0~100。同样**从中性 60 起步**, 只上不下 —— 天数少不是缺点,
-# 只是"这只票不是靠磨底磨出来的"。磨过一年以上开始回落: 那不再是蓄势,
-# 是这只票没人要。
-BASING_DAYS_CURVE: Curve = ((0, 50), (20, 54), (45, 76), (90, 100), (200, 100),
-                            (320, 76), (500, 52))
-
-# 天数中性值 —— 用在"时长这一半不该说话"的时候, 见 base_score。
-BASING_DAYS_NEUTRAL = 50.0
-
-# base 因子内部: 档位六成、天数四成。「磨得好不好」是有区分度的信息,
-# 「磨了多久」没有质量做前提时只是时间 —— 用户要看的天数在界面上单独显示
-# (R188), 不必在分数里也让它当家。
-BASE_LEVEL_W = 0.6
-
 # 趋势模板要**八条全都判得出来**才计入, 否则这个因子缺席(权重让给另外三个)。
 # 不做"按 known 缩放": 一只上市半年的次新股 3 条全过缩放成 8 条满分, 那是
 # 凭空造出来的质地。次新股本来就不该由这套模板来评价。
 TEMPLATE_MIN_KNOWN = 8
-
-
-def base_score(rhythm: dict | None, compress_days: int | None = None) -> float | None:
-    """磨底与节拍 → 0~100。rhythm 是 trend_rhythm.assess 的返回值。
-
-    [R197] **时长这一半的判据换成压缩持续天数。** 原来用 trend_rhythm.basing
-    的"最高收盘/最低收盘 ≤ 1.35"——那是**绝对幅度**, 对一只 ATR 3% 的票和一只
-    ATR 1% 的票意义完全不同: 同样 35% 的箱体, 前者只是正常波动, 后者是死死
-    摁住。压缩持续天数用的是"三条带的交集 ≥ 80% 连续几天", 全程按 ATR 归一化,
-    这一点是对的。
-
-    **只换判据, 不换问题** —— 回答的仍然是用户那句「我想知道一个票磨底磨了
-    多久」。档位那一半照旧走红绿节拍(它量的是"磨得好不好", 与"多久"正交)。
-    压缩天数取不到时回落到原来的 basing.days, 不因为换判据就丢结果。
-    """
-    if not rhythm:
-        return None
-    lvl = RHYTHM_SCORE.get(str(rhythm.get("level") or "none"))
-    days = ((rhythm.get("basing") or {}).get("days"))
-    if lvl is None and days is None:
-        return None
-    if lvl is None:
-        lvl = RHYTHM_SCORE["none"]
-    # [R197] 优先用 ATR 归一化的压缩天数, 取不到才回落到绝对箱体那个口径
-    if compress_days is not None:
-        days = compress_days
-    if days is None:
-        return lvl
-    # **时长只在蓄势时才算数。** 这一条是整个因子的关键:
-    # 低点一路抬高、红段越来越长, 那么磨得越久力量攒得越足 —— 天数是好事;
-    # 但同一个位置来回震荡, 磨三个月并不比磨三周更接近突破, 只是更久而已。
-    # 不加这个条件的话, 一只震荡了 90 天的票会排在一只一路上涨从没磨过底的
-    # 强势股前面 —— 而后者恰恰是这套系统最该抓的那种。
-    if str(rhythm.get("level")) == "building":
-        days_part = _piecewise(float(days), BASING_DAYS_CURVE)
-    else:
-        days_part = BASING_DAYS_NEUTRAL
-    return BASE_LEVEL_W * lvl + (1 - BASE_LEVEL_W) * days_part
 
 
 def template_score(tpl: dict | None) -> float | None:
@@ -515,9 +426,7 @@ def score_candidate(*, duration: int | None, state: str | None,
                     near_breakout: bool = False,
                     coiling: bool = False,
                     template: dict | None = None,
-                    rhythm: dict | None = None,
-                    geo: dict | None = None,
-                    runs: dict | None = None) -> dict:
+                    ) -> dict:
     """质地 × 时机 两轴打分。返回 {score, axes, factors, coverage, partial}。纯函数。
 
     rs_pct: 个股 20 日收益 − 大盘 20 日收益, 单位**百分点**(如 +6.0 表示跑赢 6 个点)。
@@ -527,11 +436,9 @@ def score_candidate(*, duration: int | None, state: str | None,
     coiling:  [R201] 这只是"通道憋着劲/刚走出来"那一路进来的 —— 同样没有信号
               新鲜度, 而且比 near_breakout 更早一步。
     template: trend_template.assess 的返回值(可缺)。
-    rhythm:   trend_rhythm.assess 的返回值(可缺)。
-    geo:      [R195] keltner_geometry.geometry 的返回值(可缺) —— 量化波动通道的
-              几何层, 供 spread(进质地)与 accel(进时机)两个因子。
-    runs:     [R197] keltner_geometry.runs 的返回值(可缺) —— 其中的
-              compress_days 用来替换磨底那一半的判据(见 base_score)。
+    [R229] `rhythm` / `runs` / `geo` 三个形参删掉了 —— 分别是红绿节拍的返回值、
+    磨底那一半的 `compress_days` 来源、以及量化通道延申的几何层。三样都已退出
+    打分, 形参留着就等于留一个骗人的接口: 下一个人会以为传进来还有用。
     """
     fresh: float | None
     fresh_from: str
@@ -553,17 +460,14 @@ def score_candidate(*, duration: int | None, state: str | None,
     factors: dict[str, float | None] = {
         # --- 质地(慢变) ---
         "template": template_score(template),
-        "base": base_score(rhythm, (runs or {}).get("compress_days")),
         "rs": _piecewise(float(rs_pct), RS_CURVE) if rs_pct is not None else None,
         "state": STATE_SCORE.get(state or "") if state else None,
-        "spread": spread_score(geo),
         # --- 时机(快变) ---
         "fresh": fresh,
         "vol_ratio": _piecewise(float(vol_ratio), VOL_RATIO_CURVE) if vol_ratio else None,
         "turnover": (_piecewise(float(turnover_rate), TURNOVER_CURVE)
                      if turnover_rate else None),
         "pos": _piecewise(float(channel_pct), POS_CURVE) if channel_pct is not None else None,
-        "accel": accel_score(geo),
     }
 
     quality, cov_q = _blend(factors, QUALITY_WEIGHTS)

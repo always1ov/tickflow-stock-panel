@@ -57,10 +57,19 @@ RANK_CUTS = (1, 3, 5, 10, 15, 20)
 #
 # 升到 v3 意味着 v2 攒下的样本从统计里退场, 用户明确接受了这件事:
 # 「不管是前面的红绿节拍还是现在的六态升级, 只要能有提升我不在乎台账重新开始验证」。
-SCORING_VERSION = 3
-# 归因轴中文名(v3)。v2 的三维度与 v1 的八项加减保留在下面, 老记录还要按它解读。
+#
+# [R229] 升到 v4。同一轮里评分口径动了两处, 都让 v3 的分数不再可比:
+#   · 红绿节拍规则层整层退役(用户「红绿节拍移除掉」)—— 质地轴少了「磨底节拍」,
+#     硬门槛从四道减到三道;
+#   · 量化通道延申从打分里整个剥离(用户「撤销所有量化通道延申有关的东西」)——
+#     质地轴的三线间距、时机轴的加速度双双退出, 两轴权重回到 R189/R134 的原值。
+# 同一只票在 v3 和 v4 下算出来的把握分不是同一个数, 分层胜率混在一起就是拿
+# 两把尺子量同一段路。v3 的样本因此从统计里退场, 记录本身留着(读侧按版本分档)。
+SCORING_VERSION = 4
+# 归因轴中文名(v4)。v3 的因子多两项, 但轴的含义没变, 老记录共用这一份即可;
+# v2 的三维度与 v1 的八项加减保留在下面, 老记录还要按它解读。
 FACTOR_LABELS = {
-    "quality": "质地(趋势模板/磨底节拍/相对强度/六态)",
+    "quality": "质地(趋势模板/相对强度/六态)",
     "timing": "时机(新鲜度/通道位置/量比/换手)",
 }
 # v2 的三维度 —— 只用于解读 SCORING_VERSION == 2 的历史记录
@@ -453,25 +462,6 @@ def _state_titles() -> dict[str, str]:
     return {code: cn for code, (cn, _en) in STATE_LABELS.items()}
 
 
-def _rhythm_cn(v: str) -> str:
-    from app.services.trend_rhythm import LEVEL_CN
-    return LEVEL_CN.get(v, v)
-
-
-def _basing_bucket(v) -> str:
-    try:
-        d = int(v)
-    except (TypeError, ValueError):
-        return "—"
-    if d < 20:
-        return "没在磨(<20天)"
-    if d < 60:
-        return "磨 20-60 天"
-    if d < 120:
-        return "磨 60-120 天"
-    return "磨 120 天以上"
-
-
 def _mainline_label(v) -> str:
     try:
         r = int(v)
@@ -518,13 +508,9 @@ LABEL_DIMS: list[dict] = [
      "fmt": lambda v: _state_titles().get(str(v), str(v))},
     {"key": "mainline_rank", "label": "主线归属", "fmt": _mainline_label},
     {"key": "dragon", "label": "龙虎榜", "fmt": lambda v: "上榜" if v else "未上榜"},
-    # [R188] 红绿节拍。这一条正是加注册表的意义 —— R175 说「以后往界面加什么
-    # 结论, 落进 ctx 再登记一行就能回答"我历史上好不好使"」, 这是第一次兑现。
-    {"key": "rhythm", "label": "红绿节拍",
-     "fmt": lambda v: _rhythm_cn(str(v))},
-    # 磨底时长分档。天数本身是连续量, 直接当分组维度会碎成几百档 ——
-    # 分成四段才看得出"磨得久的是不是真的更好"。
-    {"key": "basing_days", "label": "磨底时长", "fmt": _basing_bucket},
+    # [R188 加, R229 删]「红绿节拍」与「磨底时长」两个分组维度在这里删掉了 ——
+    # 规则层整层退役, today.py 也不再往 ctx 里落这两个键。留着的话它们会在
+    # v4 的统计里永远是空组 —— 空组比没有这一行更容易被读成"这一档没样本"。
     # [R189] 趋势模板通过条数。这一维是本次改动最该被验证的那个 ——
     # 「8 条全过的票是不是真的更好」直接决定 TEMPLATE_CURVE 那条上凸曲线
     # 该不该继续凸下去。

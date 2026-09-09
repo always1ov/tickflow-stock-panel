@@ -67,7 +67,8 @@ def assess(closes: list[float] | None, rs_6m: float | None = None) -> dict:
 
     返回 {passed, known, total, criteria, complete}。
     **不返回分数** —— 八条通过几条是事实, "通过 6 条值多少分"是打分的事,
-    归 opportunity_score 管(与 trend_rhythm 同一条纪律)。
+    归 opportunity_score 管(本项目所有规则层共守的一条纪律: 判定层只出事实与档位,
+    分数在打分层给)。
     """
     cs = [c for c in (closes or []) if c is not None]
     n = len(cs)

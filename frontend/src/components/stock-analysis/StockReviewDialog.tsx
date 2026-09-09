@@ -430,54 +430,9 @@ function TrendView({ d, rows, onlyMarked, onToggleMarked }: {
       {d.now && <NowCard now={d.now} forwardDays={d.forward_days} />}
       {d.side_edge && <SideEdgeCard edge={d.side_edge} forwardDays={d.forward_days} />}
 
-      {/* [R188] 磨底磨了多久 + 磨得好不好。用户原话:「其实我是想知道一个票磨底
-          磨了多久」。两个数必须一起给: 「磨了 87 天」不说好坏, 「蓄势」不说久暂。 */}
-      {d.rhythm && (d.rhythm.basing.days > 0 || d.rhythm.cycles > 0) && (
-        <div className="mx-4 mt-3 rounded border border-border/60 bg-elevated/25 px-3 py-2">
-          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-[11px]">
-            <span className="text-muted">磨底</span>
-            <b className="font-mono text-[13px] text-foreground">
-              {d.rhythm.basing.days} 天
-              {!d.rhythm.basing.is_basing && (
-                <span className="ml-1 text-[10px] font-normal text-muted/70">(还不算磨底)</span>
-              )}
-            </b>
-            {d.rhythm.basing.low != null && d.rhythm.basing.high != null && (
-              <span className="font-mono text-muted"
-                    title="箱体上下沿 —— 上沿就是突破价, 下沿就是破位价">
-                箱体 {d.rhythm.basing.low.toFixed(2)} ~ {d.rhythm.basing.high.toFixed(2)}
-                {d.rhythm.basing.range_pct != null
-                  && ` (${(d.rhythm.basing.range_pct * 100).toFixed(0)}%)`}
-              </span>
-            )}
-            <span className={cn(
-              'rounded border px-1.5 py-0.5 text-[10px]',
-              d.rhythm.level === 'building' ? 'border-red-400/40 bg-red-400/10 text-red-400'
-                : d.rhythm.level === 'failing' ? 'border-emerald-400/40 bg-emerald-400/10 text-emerald-400'
-                : 'border-border text-muted',
-            )}>
-              {d.rhythm.label}
-            </span>
-            {d.rhythm.cycles > 0 && (
-              <span className="text-muted/70">{d.rhythm.cycles} 轮红绿</span>
-            )}
-          </div>
-          <p className="mt-1 text-[10px] leading-relaxed text-muted">
-            {d.rhythm.reason}
-            {/* [R191] 这句原来写着「不参与把握分, 还在等台账验证」—— R189 之后
-                不成立了: 反复失败已经是硬门槛 G4(直接否决), 蓄势进了质地轴。
-                过期的口径说明比没有说明更坏, 它会让人按错的规则读这个标。 */}
-            <span className="ml-1 opacity-70">
-              —— 判定看的是<b className="font-medium">几何形状不是次数</b>: 低点不抬高的「反复」是下台阶, 不是夯实。
-              {d.rhythm.level === 'failing'
-                ? '「反复失败」是买入门槛之一 —— 这只票现在会被机会评分直接挡掉。'
-                : d.rhythm.level === 'building'
-                  ? '「蓄势」计入把握分的质地轴。'
-                  : ''}
-            </span>
-          </p>
-        </div>
-      )}
+      {/* [R188 加, R229 删]「磨底 N 天 / 箱体 / 红绿轮数 / 反复失败」那一块
+          在这里删掉了。用户: 「红绿节拍移除掉」—— 整个规则层退役, 复盘接口
+          不再返回 rhythm。 */}
 
       {/* ---- 以下是依据(测量), 摆在结论后面 ---- */}
 
