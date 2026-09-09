@@ -318,7 +318,7 @@ export function ChannelStateCell({ trend, geo, runs, ph, kc, close, trendCls,
   // 原来是两半各一份: 鼠标从徽标挪到阶段, 提示整个换掉一份, 而这一格
   // 讲的本来就是同一只票的方向。末尾那句从「点这两行…」改成整格的去处。
   const tip = [
-    trend ? `【六态】${trend.state_cn} · 第 ${trend.duration} 天`
+    trend ? `【六态】${trend.state_cn} · 已${trend.duration}天`
       + (trend.since ? `,自 ${trend.since}` : '') : '',
     trend?.action ?? '',
     ...(ph ? ['', `【通道】${ph.cn} —— ${ph.why}`, `该盯什么:${ph.watch}`] : []),
@@ -349,7 +349,11 @@ export function ChannelStateCell({ trend, geo, runs, ph, kc, close, trendCls,
         <span className="flex flex-wrap items-center justify-center gap-1">
           {trend ? (
             <span className={`inline-flex whitespace-nowrap rounded border px-1.5 py-0.5 text-[10px] ${trendCls ?? ''}`}>
-              {trend.state_cn} {trend.duration}天{trend.intraday ? <span className="ml-0.5 opacity-70">*</span> : null}
+              {/* [R249] 「已N天」—— 与结论列那个天数**同一个说法**。
+                  同一行里六态写「3天」、结论写「已25天」, 读的人得先判断这两个
+                  数是不是一回事(是的: 都是尾部连续段、都按交易日、都是"到今天
+                  还在")。用户: 「必须要统一表达, 不能又两种多种表述」。 */}
+              {trend.state_cn} 已{trend.duration}天{trend.intraday ? <span className="ml-0.5 opacity-70">*</span> : null}
             </span>
           ) : <span className="text-[10px] text-muted/30">—</span>}
           {!!ph && (

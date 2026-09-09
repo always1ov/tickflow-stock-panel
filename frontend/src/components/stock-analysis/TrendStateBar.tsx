@@ -64,7 +64,9 @@ export function TrendStateBar({ symbol, trend }: { symbol: string; trend: TrendD
         </span>
       )}
       <span className="text-xs text-foreground/90">
-        第 <span className="font-mono font-semibold">{trend.duration}</span> 天
+        {/* [R249] 「已N天」—— 与决策台徽标同一个说法。这里原来写「第 N 天」,
+            同一个数在两处叫两个名字, 读的人得先确认它们是不是一回事。 */}
+        已 <span className="font-mono font-semibold">{trend.duration}</span> 天
         <span className="text-muted"> · 自 {trend.since}</span>
         {trend.entered_from_cn && <span className="text-muted"> · 由「{trend.entered_from_cn}」转入</span>}
       </span>

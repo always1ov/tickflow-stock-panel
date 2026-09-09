@@ -42,9 +42,6 @@ const BOARD_COLS = [
   // [R212] 「现价」「涨跌」合成一列。用户: 「这两列合成为『现价/涨跌』这样为一列」。
   // 两个数天生一起读 —— 拆成两列只是让眼睛多跳一次。
   { label: '现价/涨跌', w: '6%' },
-  { label: '仓位', w: '3%' },
-  { label: '成本', w: '6%' },        // 两个输入框
-  { label: '浮盈', w: '3.5%' },
   // [R212] 「止盈线」那一列撤掉了。用户: 「止盈线这一列不要了」。
   // **信息没丢**: 出场线破了或逼近, 「结论」列会直接判成「按纪律走」/「盯着」
   // 并把线价写在徽标上 —— 那比单独一列更早进视线。排序键与判定都还在。
@@ -56,6 +53,13 @@ const BOARD_COLS = [
   // 用户: 「贵不贵在上换行怎么办在下」「结论这行放在 ai 分析前一列」。
   // 顺序是有讲究的: 上面是事实(这个价算贵还是便宜), 下面是结论(所以今天该干嘛)。
   { label: '结论', w: '16%' },
+  // [R249] 账目三列从「现价」后面挪到这里。用户: 「我有点乱, 是否有好办法整理
+  // 好顺序调整显示和列」。**原来它们把判断切开了** —— 扫表时要连着读
+  // 「走势 → 结论」, 中间却横着三列只有持仓那几只才用得上的账目。
+  // 现在一行从左到右是: 认票 → 凭什么 → 我的账 → 别人的意见。
+  { label: '仓位', w: '3%' },
+  { label: '成本', w: '6%' },        // 两个输入框
+  { label: '浮盈', w: '3.5%' },
   { label: 'AI 分析', w: '7%' },     // R130 上下两行: 报告胶囊 / ✨分析 + 🔔提醒
   { label: 'AI 信号', w: '' },       // 不给宽度, 吃掉剩下的 —— 只有它是整段文字
 ] as const
@@ -634,9 +638,6 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
                     {caret(sort.key)}
                   </button>
                 </th>
-                <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center"><button onClick={() => toggleSort('held')} className={thBtn}>仓位{caret('held')}</button></th>
-                <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center"><button onClick={() => toggleSort('cost')} className={thBtn} title="持仓成本价(仅持有且填了成本的票有)">成本{caret('cost')}</button></th>
-                <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center"><button onClick={() => toggleSort('pnl')} className={thBtn}>浮盈{caret('pnl')}</button></th>
                 {/* [R42] Keltner 三档: 一眼看出这只票贴着哪条轨。收盘口径, 与个股分析图表同一组公式 */}
                 {/* [R198] 三档合一。排序键仍是三个 —— 点表头在 短→中→长 之间轮换,
                     再点同一个翻方向。合并的是显示不是能力。 */}
@@ -675,6 +676,9 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
                     {caret(sort.key)}
                   </button>
                 </th>
+                <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center"><button onClick={() => toggleSort('held')} className={thBtn}>仓位{caret('held')}</button></th>
+                <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center"><button onClick={() => toggleSort('cost')} className={thBtn} title="持仓成本价(仅持有且填了成本的票有)">成本{caret('cost')}</button></th>
+                <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center"><button onClick={() => toggleSort('pnl')} className={thBtn}>浮盈{caret('pnl')}</button></th>
                 <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center"><button onClick={() => toggleSort('report')} className={thBtn} title="最近一份 AI 分析报告(点击胶囊打开) · ✨生成/更新分析 · 🔔点位提醒">AI 分析{caret('report')}</button></th>
                 <th className="whitespace-nowrap px-4 py-2.5 font-normal text-left"><button onClick={() => toggleSort('signal')} className={thBtn}>AI 信号{caret('signal')}</button></th>
               </tr>
@@ -725,6 +729,18 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
                         {r.changePct != null ? `${r.changePct > 0 ? '+' : ''}${(r.changePct * 100).toFixed(2)}%` : '—'}
                       </span>
                     </td>
+                    {/* [R42] Keltner 三档位置 */}
+                    <ChannelStateCell
+                      trend={r.trend} trendCls={r.trend ? trendBadgeCls(r.trend.state) : undefined}
+                      geo={r.kc?.geo} runs={r.kc?.runs} ph={r.ph} kc={r.kc} close={r.close}
+                      onOpenReview={() => setReview({ symbol: r.symbol, name: r.name, tab: 'trend' })} />
+                    {/* [R212] 结论 = 贵不贵(位置, 上) + 怎么办(动作, 下), 竖排一格 */}
+                    <ConclusionCell v={r.kc?.verdict} ev={r.ev} geo={r.kc?.geo} runs={r.kc?.runs}
+                                    energy={r.kc?.energy} ph={r.ph} p={r.play}
+                                    stateRun={r.kc?.state_run}
+                                    onOpen={() => setReview({ symbol: r.symbol, name: r.name, tab: 'verdict' })} />
+                    {/* [R249] 账目三格挪到判断之后 —— 原来它们横在
+                        「现价」与「走势」之间, 把要连着读的两列判断切开了。 */}
                     {/* 仓位:持有/空仓 切换。
                         [R169] 写回时一律用 manualCost 而不是 r.cost —— r.cost 可能是批次
                         派生出来的, 直接回写会把"批次算的"固化成"我填的", 之后改批次就不
@@ -783,16 +799,6 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
                     <td className={`${TD_BASE} ${NUM} whitespace-nowrap px-2 ${r.pnl == null ? 'text-muted' : r.pnl > 0 ? 'text-red-400' : r.pnl < 0 ? 'text-emerald-400' : 'text-muted'}`}>
                       {r.pnl != null ? `${(r.pnl * 100).toFixed(1)}%` : '—'}
                     </td>
-                    {/* [R42] Keltner 三档位置 */}
-                    <ChannelStateCell
-                      trend={r.trend} trendCls={r.trend ? trendBadgeCls(r.trend.state) : undefined}
-                      geo={r.kc?.geo} runs={r.kc?.runs} ph={r.ph} kc={r.kc} close={r.close}
-                      onOpenReview={() => setReview({ symbol: r.symbol, name: r.name, tab: 'trend' })} />
-                    {/* [R212] 结论 = 贵不贵(位置, 上) + 怎么办(动作, 下), 竖排一格 */}
-                    <ConclusionCell v={r.kc?.verdict} ev={r.ev} geo={r.kc?.geo} runs={r.kc?.runs}
-                                    energy={r.kc?.energy} ph={r.ph} p={r.play}
-                                    stateRun={r.kc?.state_run}
-                                    onOpen={() => setReview({ symbol: r.symbol, name: r.name, tab: 'verdict' })} />
                     {/* [R106] AI 分析列: 报告胶囊(点开最近报告) + ✨生成/更新分析 + 🔔点位提醒
                         —— 原页头两个按钮整合到这里, 每个标的都有自己的一对动作 */}
                     <td className={`${TD_BASE} whitespace-nowrap px-2 text-center`}>
