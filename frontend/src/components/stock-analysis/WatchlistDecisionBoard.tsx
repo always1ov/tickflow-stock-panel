@@ -668,11 +668,12 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
                             + '下面「怎么办」是把五套判定合成的一句话(动作)。\n\n'
                             + '点这里在「贵不贵」「怎么办」之间轮换排序目标, 再点同一个翻方向。\n'
                             + '「怎么办」按急迫程度排: 按纪律走 > 今天就得动 > 先别动 > 盯着 > 留意 > 没事。'}>
+                    {/* [R250] 表头**只有「结论」两个字**。用户: 「别搞贵不贵怎么办,
+                        我就只想显示结论两个字」。
+                        原来点一下会在表头缀出「贵不贵」/「怎么办」标出当前排序目标 ——
+                        那是把**内部分层**摆到表头上, 而这一列对外就叫「结论」。
+                        排序照旧在两者之间轮换, 说明留在悬停里。 */}
                     结论
-                    {(['verdict', 'play'] as const).includes(sort.key as 'verdict')
-                      && <span className="ml-0.5 text-[9px] text-accent">
-                        {sort.key === 'verdict' ? '贵不贵' : '怎么办'}
-                      </span>}
                     {caret(sort.key)}
                   </button>
                 </th>

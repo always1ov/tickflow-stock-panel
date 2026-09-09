@@ -111,3 +111,29 @@ def test_六态天数与结论天数同一个说法():
         bar_body = "\n".join(ln for ln in bar.read_text(encoding="utf-8").splitlines()
                              if not ln.lstrip().startswith(("//", "*", "/*")))
         assert "第 <span" not in bar_body, "复盘条又写回「第 N 天」了"
+
+
+def test_R250_结论表头只有结论两个字():
+    """用户: 「别搞贵不贵怎么办, 我就只想显示结论两个字」。
+
+    原来点一下会在表头缀出「贵不贵」/「怎么办」标当前排序目标 —— 那是把
+    **内部分层**摆到表头上, 而这一列对外就叫「结论」。排序照旧在两者之间
+    轮换, 说明留在悬停里。
+
+    `_headers()` 已经把 JSX 表达式剥掉了, 所以那个缀字在它眼里是隐形的 ——
+    这条得直接盯源码。
+    """
+    src = _src()
+    th = src[src.index("<thead"):src.index("</thead>")]
+    conclusion = th[th.index("toggleSort(sort.key === 'verdict'"):]
+    conclusion = conclusion[:conclusion.index("</th>")]
+    body = conclusion[conclusion.index(">") + 1:]      # 跳过 <button …> 那一串属性
+    for bad in ("贵不贵", "怎么办"):
+        assert bad not in body.split("title=")[0] or "{/*" in body, "先粗筛"
+    # 精确一点: 渲染区(去掉注释与 title 属性)里不许出现这两个词
+    render = body
+    render = __import__("re").sub(r"\{/\*.*?\*/\}", "", render, flags=16)   # re.S
+    render = __import__("re").sub(r"title=\{[^}]*(?:\}[^}]*)*?\}", "", render, flags=16)
+    assert "贵不贵" not in render and "怎么办" not in render, (
+        f"表头又缀上排序目标了 —— 用户只要「结论」两个字。渲染区: {render.strip()[:200]}"
+    )
