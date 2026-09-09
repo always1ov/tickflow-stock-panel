@@ -334,3 +334,39 @@ def test_R253_到价预案固定竖排一个一行():
         "到价预案又变回「能挤就挤、挤不下才换行」了 —— 那会让每一行高度都不一样"
     )
     assert "whitespace-nowrap" in block, "单个预案自己不该再折行"
+
+
+def test_R255_结论列与AI信号列同一套排版():
+    """用户: 「结论列也要像 ai 信号列那样排版」。
+
+        贵不贵 已N天      ← 一行
+        怎么办            ← 一行
+        说明文字…         ← 整段折行, 不再单行截断
+
+    R217 当初把这一列压成**固定两行**(徽标横排 + 说明 `truncate`), 是因为那时
+    它会摞到五层、每行高度还不一样。**那个顾虑现在不成立了** —— 隔壁 AI 信号列
+    R253 起就是固定竖排三行到价预案, 行高本来就由它撑着。
+    """
+    root = _BOARD.parent
+    cells = (root / "decision-board" / "cells.tsx").read_text(encoding="utf-8")
+    body = "\n".join(ln for ln in cells.splitlines()
+                     if not ln.lstrip().startswith(("//", "*", "/*")))
+    # 只取**渲染那一段**(从 `return (` 起)。
+    # 试过用 `\n}` 收尾 —— 会停在 props 类型那个 `}) {` 上, 整段渲染代码没被检查到;
+    # 换 `\n}\n` 又因为这个函数正好在文件末尾(没有末行换行)而找不到。
+    # 从 `return (` 起到下一个顶层声明为止最稳。
+    i = body.index("export function ConclusionCell")
+    blk = body[body.index("return (", i):]
+    m = re.search(r"\n(?:export )?(?:function|const) ", blk)
+    if m:
+        blk = blk[:m.start()]
+
+    assert "flex-col items-start" in blk, "结论列没有竖排左对齐"
+    assert "flex flex-wrap items-center justify-center" not in blk, (
+        "两个徽标又横排回去了"
+    )
+    assert "whitespace-normal break-words" in blk, (
+        "说明又变回单行截断了 —— AI 信号那一列的理由是整段折行的"
+    )
+    assert "truncate" not in blk, "说明还在用 truncate 截断"
+    assert "!text-left" in blk, "竖排之后必须左对齐, 否则三行的左边缘参差不齐"

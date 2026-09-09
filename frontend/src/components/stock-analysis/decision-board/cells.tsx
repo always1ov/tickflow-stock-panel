@@ -455,19 +455,30 @@ export function ConclusionCell({ v, ev, geo, runs, energy, ph, p, stateRun, onOp
     more ? '另有判定不一致:\n' + p!.conflicts.join('\n') : '',
   ].filter(Boolean).join('\n\n')
   return (
-    <td className={`${TD_BASE} px-2`}>
-      <div className="mx-auto flex max-w-[15rem] flex-col items-center gap-0.5 leading-tight">
-        <span className="flex flex-wrap items-center justify-center gap-1">
-          <VerdictInner v={v} ev={ev} geo={geo} runs={runs} energy={energy} ph={ph}
-                        stateRun={stateRun} onOpen={onOpen} />
-          <PlaybookInner p={p} />
-        </span>
-        {line2 ? (
-          <span className={`w-full truncate text-[9px] ${evOn ? EVENT_CLS[ev!.code] ?? 'text-muted' : 'text-muted'}`}
+    // [R255] 排版跟「AI 信号」那一列对齐。用户: 「结论列也要像 ai 信号列那样排版」。
+    //
+    //   贵不贵 已N天      ← 一行
+    //   怎么办            ← 一行
+    //   说明文字…         ← 整段折行, 不再单行截断
+    //
+    // R217 当初把这一列压成**固定两行**(徽标横排 + 说明截断), 是因为那时它会摞到
+    // 五层、每行高度还不一样, 行与行糊成一片。**那个顾虑现在不成立了**: 隔壁
+    // AI 信号列 R253 起就是固定竖排三行到价预案, 行高本来就由它撑着 —— 结论列
+    // 竖排不会再让任何一行变高, 反而两列的读法终于一致(都是从上往下一件一件读)。
+    //
+    // 左对齐也跟着 AI 信号列: 竖排之后居中会让三行的左边缘参差不齐。
+    <td className={`${TD_BASE} px-2 !text-left`}>
+      <div className="flex max-w-[15rem] flex-col items-start gap-0.5 leading-tight">
+        <VerdictInner v={v} ev={ev} geo={geo} runs={runs} energy={energy} ph={ph}
+                      stateRun={stateRun} onOpen={onOpen} />
+        <PlaybookInner p={p} />
+        {line2 && (
+          <span className={`w-full whitespace-normal break-words text-[9px] leading-snug ${
+            evOn ? EVENT_CLS[ev!.code] ?? 'text-muted' : 'text-muted'}`}
                 title={tip}>
             {line2}
           </span>
-        ) : <span className="text-[9px] text-transparent select-none">·</span>}
+        )}
       </div>
     </td>
   )
