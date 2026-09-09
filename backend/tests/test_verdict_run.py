@@ -184,3 +184,53 @@ def test_两条路对不上时今天仍然算一天而不是整个不给():
     assert 'if vr and vr.get("code") == v.get("code")' not in src, (
         "静默失败的那道校验回来了"
     )
+
+
+# ---------------------------------------------------------------- 整条链
+
+def test_端到端_天数真的出现在接口返回的_verdict_里():
+    """[R234] 用户: 「外面还是没显示持续天数时常」。
+
+    前面那些测试**全绿, 链路却是断的** —— R234 那个坑就是这么漏过去的:
+    `verdict_run` 自己测得好好的, 而 `channels_for_symbols` 把它的结果丢掉了。
+    单元测试盯不到"两个模块之间", 所以这里补一条走完整条链的。
+
+    造一只票喂进 `channels_for_symbols`, 断言**接口真的返回了 days**。
+    两个数据源刻意用同一份收盘价算(快照的 ma20/ma60 与历史那条路一致),
+    这是最常见的情形; 对不上的情形由上面那条 R234 的测试守。
+    """
+    import datetime as dt
+
+    import polars as pl
+
+    from app.services import keltner_service as ks
+
+    # 长期横盘后持续缓跌 —— 短期在通道中部而中期到下沿, 落在「候选池」
+    closes = [10.0] * 200 + [10.0 - 0.025 * i for i in range(1, 101)]
+    dates = [dt.date(2025, 1, 1) + dt.timedelta(days=i) for i in range(len(closes))]
+    last = len(closes) - 1
+
+    def _ma(w: int) -> float:
+        return sum(closes[last + 1 - w:last + 1]) / w
+
+    class _FakeRepo:
+        def get_enriched_latest(self):
+            return pl.DataFrame({
+                "symbol": ["000001.SZ"], "close": [closes[-1]], "atr_14": [_ATR],
+                "ma20": [_ma(20)], "ma60": [_ma(60)],
+            }), "2025-10-27"
+
+        def get_daily_batch(self, symbols, start, end, cols):
+            return pl.DataFrame({
+                "symbol": ["000001.SZ"] * len(closes), "date": dates,
+                "close": closes, "atr_14": [_ATR] * len(closes),
+            })
+
+    out = ks.channels_for_symbols(_FakeRepo(), ["000001.SZ"])
+    v = (out.get("000001.SZ") or {}).get("verdict")
+    assert v, "整条链没算出结论, 这条测不到天数"
+    assert "days" in v, (
+        f"接口返回的 verdict 里没有 days —— 徽标上就不会有天数。"
+        f"拿到的是 {sorted(v)}"
+    )
+    assert v["days"] > 1, f"这只票连着挂了很多天「{v['title']}」, 却只报了 {v['days']} 天"
