@@ -6,6 +6,7 @@
  */
 import type { BandEnergy, ChannelEvent, ChannelGeometry, ChannelPhase, ChannelRuns, KeltnerBand, KeltnerVerdict, Playbook } from '@/lib/api'
 import { VerdictHover } from '@/components/stock-analysis/VerdictHover'
+import { dayCount } from '@/lib/duration'
 
 /**
  * [R194] 决策台单元格的统一基线。**整张表只有这一处定义垂直对齐与行内边距。**
@@ -107,7 +108,7 @@ function geoLines(geo?: ChannelGeometry | null, ev?: ChannelEvent | null,
   if (geo.compress != null || runs?.compress_days || runs?.compress_avg != null) {
     L.push('[重合] ' + [
       geo.compress != null ? `三条线还有 ${(geo.compress * 100).toFixed(0)}% 重合` : '',
-      runs?.compress_days ? `已${runs.compress_days}天` : '',
+      runs?.compress_days ? dayCount(runs.compress_days, runs.compress_capped) : '',
       runs?.compress_avg != null ? `整个季度平均 ${(runs.compress_avg * 100).toFixed(0)}%` : '',
     ].filter(Boolean).join(' · '))
   }
@@ -125,8 +126,8 @@ function geoLines(geo?: ChannelGeometry | null, ev?: ChannelEvent | null,
   }
   if (runs?.above_run || runs?.below_run) {
     L.push('[在轨外] ' + (runs.above_run
-      ? `已${runs.above_run}天站在短线上沿之外`
-      : `已${runs.below_run}天掉在短线下沿之外`))
+      ? `${dayCount(runs.above_run, runs.above_capped)}站在短线上沿之外`
+      : `${dayCount(runs.below_run, runs.below_capped)}掉在短线下沿之外`))
   }
   if (ev?.why) L.push('', `【事件】${ev.cn} —— ${ev.why}`)
   if (ev?.combo_note) {
@@ -310,6 +311,8 @@ export function ChannelStateCell({ trend, geo, runs, ph, kc, close, trendCls,
                                   onOpenReview }: {
   /** [R211] 六态趋势 —— 合过来的那一列。作者的判定, 只读不改 */
   trend?: { state: string; state_cn: string; duration: number; since?: string
+            /** [R245] 天数撞上了回看窗口 —— 是下界不是准数, 徽标上写 `+` */
+            duration_capped?: boolean
             action?: string; intraday?: boolean } | null
   geo?: ChannelGeometry | null
   runs?: ChannelRuns | null
@@ -333,7 +336,7 @@ export function ChannelStateCell({ trend, geo, runs, ph, kc, close, trendCls,
   // 原来是两半各一份: 鼠标从徽标挪到阶段, 提示整个换掉一份, 而这一格
   // 讲的本来就是同一只票的方向。末尾那句从「点这两行…」改成整格的去处。
   const tip = [
-    trend ? `【六态】${trend.state_cn} · 已${trend.duration}天`
+    trend ? `【六态】${trend.state_cn} · ${dayCount(trend.duration, trend.duration_capped)}`
       + (trend.since ? `,自 ${trend.since}` : '') : '',
     trend?.action ?? '',
     ...(ph ? ['', `【通道】${ph.cn} —— ${ph.why}`, `该盯什么:${ph.watch}`] : []),
@@ -341,7 +344,7 @@ export function ChannelStateCell({ trend, geo, runs, ph, kc, close, trendCls,
     ph?.align ? `【${ph.align.cn}】${ph.align.why}` : (ph ? `快慢:${ph.pace_cn}` : ''),
     '', gap,
     at.length ? '现在到边的:' + at.map(([t, b]) => `${t}${b!.pos_cn}`).join('、') : '三档都在通道中部',
-    runs?.compress_days ? `三条线已${runs.compress_days}天挤在一起` : '',
+    runs?.compress_days ? `三条线${dayCount(runs.compress_days, runs.compress_capped)}挤在一起` : '',
     '',
     ...([['短期', kc?.s], ['中期', kc?.m], ['长期', kc?.l]] as const)
       .filter(([, b]) => b)
@@ -364,7 +367,7 @@ export function ChannelStateCell({ trend, geo, runs, ph, kc, close, trendCls,
         <span className="flex flex-wrap items-center justify-center gap-1">
           {trend ? (
             <span className={`inline-flex whitespace-nowrap rounded border px-1.5 py-0.5 text-[10px] ${trendCls ?? ''}`}>
-              {trend.state_cn} 已{trend.duration}天{trend.intraday ? <span className="ml-0.5 opacity-70">*</span> : null}
+              {trend.state_cn} {dayCount(trend.duration, trend.duration_capped)}{trend.intraday ? <span className="ml-0.5 opacity-70">*</span> : null}
             </span>
           ) : <span className="text-[10px] text-muted/30">—</span>}
           {!!ph && (

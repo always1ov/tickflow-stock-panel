@@ -37,26 +37,28 @@ _SLOPE_LOOKBACK = 20
 # 自然日约 285 个交易日。只有 with_closes=True 时才用这个跨度。
 _LOOKBACK_DAYS_LONG = 420
 
-# [R244] **逐日结论那条路单独要一个更长的窗口。**
+# [R244/R245] **整条 Keltner 历史路的窗口。**
 #
-# 用户: 「候选池显示的天数不正确」。根子是我把两个数搞混了 ——
+# 用户: 「候选池显示的天数不正确」→「最优解, 替我完善」。
 #
-#   `VERDICT_TAIL = 250` 说的是"最多往回数 250 天", 可 `verdict_codes` 里的
-#   长期档要**自己滚 MA120**(日线表只预计算到 ma60, 没有 ma120 列, 而
-#   `pipeline.py` 是作者的、不能加), 于是序列**最老的 119 天一律是 None**。
-#   260 个自然日 ≈ 178 根 K, 扣掉 119 根暖机, **真正判得出结论的只有 59 天**。
+# 这一层所有的"连着几天"(逐日结论、磨底、在轨外)都从 `series()`/`verdict_codes()`
+# 派生, 而它们的长期档要**自己滚 MA120** —— 日线表只预计算到 `ma60`, 没有
+# `ma120` 列, 而 `pipeline.py` 是作者的、不能加。于是序列**最老的 119 天一律
+# 算不出来**。
 #
-# 所以一只挂了大半年的「候选池」, 徽标上封顶只能印到 59 —— 而且(见下面 capped
-# 的修法)当时连下界标记都不给, 那 59 看着像个准数。
+#     260 个自然日 ≈ 185 根 K  −  120 根暖机  =  只剩 66 天数得出来
 #
-# 要数得到 N 天就得取 N + 119 根: 250 + 119 = 369 根 ≈ 520 个自然日。
-# 实测 145 只自选, 这条路从 178 根加到 370 根多花约 0.2 秒, 挂在 5 分钟缓存
-# 一次的批量上。
+# 而这一层承诺的上限是 250(`VERDICT_TAIL` / `MAX_LOOKBACK`)。**那两个常数
+# 从来就是空话** —— 一只挂了大半年的「候选池」封顶印 59, 磨了一年的底封顶
+# 印 66, 而且都不标下界, 看着像准数。
 #
-# **只有逐日结论吃这个长窗口。** 压缩指数/在轨外天数/频段能量仍旧只看原来那
-# 260 天的切片 —— 它们的读数会被窗口长度改变(实测 16 个具名场景里
-# `compress_days` 从 59 跳到 250), 那是另一件事, 不该搭这次的车悄悄变掉。
-_LOOKBACK_DAYS_VERDICT = 520
+#     520 个自然日 ≈ 371 根 K  −  120 根暖机  =  252 天, 刚好盖住 250
+#
+# R244 时只把这个窗口给了逐日结论, 几何那几个数还留在 260 天上 —— 那是刻意
+# 的保守(不想在一次修 bug 里顺手改掉别的读数)。R245 用户说「最优解」,
+# 于是**统一到一个窗口**: 同一份序列派生的量没道理各看各的历史长度,
+# 两套窗口本身就是下一个 bug 的温床。
+_LOOKBACK_DAYS_HISTORY = 520
 
 # 算历史序列至少要够长期档滚一遍
 WINDOW_LONG = 120
@@ -82,10 +84,8 @@ def long_trend_map(repo, symbols: list[str], *, with_closes: bool = False) -> di
     """
     end = date.today()
     span = _LOOKBACK_DAYS_LONG if with_closes else _LOOKBACK_DAYS
-    # [R244] 逐日结论要更长的窗口(理由见 _LOOKBACK_DAYS_VERDICT)。多取的这一段
-    # **只喂给 verdict_codes** —— 其余每一处仍旧按 `geo_span` 切, 读数一个不变。
-    geo_span = span
-    span = max(span, _LOOKBACK_DAYS_VERDICT)
+    # [R245] 整条历史路统一到这一个窗口, 不再分"几何看短的、结论看长的"。
+    span = max(span, _LOOKBACK_DAYS_HISTORY)
     try:
         # [R195] 多要一列 atr_14 —— 压缩指数与"在轨外连续几天"要按 ATR 归一化算
         # 历史序列。**这一次批量读本来就在发生**(长期档的 MA120 没有预计算列,
@@ -104,22 +104,13 @@ def long_trend_map(repo, symbols: list[str], *, with_closes: bool = False) -> di
         return {}
     has_atr = "atr_14" in df.columns
     out: dict[str, dict] = {}
-    for sym, full in df.drop_nulls("close").sort("date").group_by("symbol"):
+    for sym, sub in df.drop_nulls("close").sort("date").group_by("symbol"):
         name = str(sym[0] if isinstance(sym, tuple) else sym).upper()
-        # [R244] `full` 是加长后的整段, `sub` 是**原来那个窗口**。
-        # 除了逐日结论, 每一处都还吃 `sub` —— 加长窗口是为了把天数数够,
-        # 不是为了顺手改动别的指标的读数。
-        #
-        # 锚在**这只票自己最后一根**上, 不是 `date.today()`: 数据不新鲜时
-        # (停牌、退市、快照滞后)按今天切会把几何那条路整段饿死 —— 那是拿
-        # "多取一点历史"换来一个新的失效模式, 不划算。数据新鲜时两者等价。
-        sub = full
-        if "date" in full.columns and full.height:
-            last = full["date"].max()
-            if last is not None:
-                cut = full.filter(pl.col("date") >= last - timedelta(days=geo_span))
-                if cut.height:
-                    sub = cut
+        # [R245] 一份序列, 一个窗口。R244 在这里分过两套(几何看 260 天、结论看
+        # 520 天), 那是为了不在修 bug 时顺手改别的读数 —— 但同一份序列派生的
+        # 量各看各的历史长度, 本身就是下一个 bug 的温床, 而且被它挡住的那几个
+        # 数(磨底、在轨外)恰恰也是截断的。统一之后就没有"哪个数吃哪个窗口"
+        # 这回事了。
         closes = sub["close"].to_list()
         ent: dict = {}
         if closes:
@@ -164,22 +155,13 @@ def long_trend_map(repo, symbols: list[str], *, with_closes: bool = False) -> di
                     # [R239] 交出**逐日结论序列**(新→旧)而不是在这里数完。
                     # 数的那一步归 channels_for_symbols —— 只有它知道徽标上
                     # 印的是哪一档。理由见 kg.verdict_codes 的说明。
-                    #
-                    # [R244] **只有这一处吃加长后的 `full`。** 长期档要自己滚
-                    # MA120(日线表没有这个预计算列), 序列最老的 119 天必然是
-                    # None —— 用原来那 260 天的窗口, 判得出结论的只剩 59 天,
-                    # 一只挂了大半年的「候选池」封顶就印 59。见
-                    # `_LOOKBACK_DAYS_VERDICT` 上面那段。
-                    vc = [float(c) for c in full["close"].to_list()]
-                    va = [None if a is None else float(a)
-                          for a in full["atr_14"].to_list()]
                     codes = kg.verdict_codes(
-                        vc, va,
-                        ma20=full["ma20"].to_list() if "ma20" in full.columns else None,
-                        ma60=full["ma60"].to_list() if "ma60" in full.columns else None)
+                        cl, atrs,
+                        ma20=sub["ma20"].to_list() if "ma20" in sub.columns else None,
+                        ma60=sub["ma60"].to_list() if "ma60" in sub.columns else None)
                     if codes:
                         ent["verdict_codes"] = codes
-                        ds = [str(d) for d in full["date"].to_list()]
+                        ds = [str(d) for d in sub["date"].to_list()]
                         ent["verdict_dates"] = ds[::-1][:len(codes)]
             except Exception as e:  # noqa: BLE001
                 logger.debug("channel runs skipped for %s: %s", name, e)

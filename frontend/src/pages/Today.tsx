@@ -472,7 +472,7 @@ export function Today() {
                         <td className="px-2 py-1.5 text-center text-[10px]">
                           {h.trend_cn ? (
                             <span className={h.trend_side === '多头' ? 'text-red-400' : 'text-emerald-400'}>
-                              {h.trend_cn} {h.trend_duration}天
+                              {h.trend_cn} 已{h.trend_duration}天{h.trend_duration_capped ? '以上' : ''}
                             </span>
                           ) : '—'}
                         </td>

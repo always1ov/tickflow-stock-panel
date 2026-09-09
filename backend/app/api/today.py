@@ -1114,6 +1114,9 @@ def _build_overview(repo, engine=None) -> dict:
             "exit_triggered": (ex or {}).get("triggered", False),
             "trend_cn": (t or {}).get("state_cn"),
             "trend_duration": (t or {}).get("duration"),
+            # [R245] 天数撞上回看窗口时是**下界** —— 持仓体检那一栏与导出件
+            # 都要跟着写「以上」, 否则同一个数在决策台带 `+` 而在这里不带。
+            "trend_duration_capped": (t or {}).get("duration_capped"),
             "trend_side": (t or {}).get("side"),
             "signal": (sig or {}).get("signal"),
             "stance": stance, "stance_why": stance_why,

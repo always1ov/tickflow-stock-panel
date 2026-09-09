@@ -582,11 +582,17 @@ def test_R241_时长说法全界面统一():
         "已连着 ": "「已连着 N 个交易日」—— 换成「已N天」",
         "已经这样 ": "「已经这样 N 天」—— 换成「已N天」",
     }
+    # [R245] 名单原来只有四个文件 —— 而「第 N 天」当时正躺在 TrendStateBar 里,
+    # 「N天」躺在两处导出和今日总览里。**守卫的覆盖面比守卫本身重要**:
+    # 漏掉的文件等于没守。
     files = [
         "stock-analysis/decision-board/cells.tsx",
+        "stock-analysis/decision-board/ComboView.tsx",
         "stock-analysis/VerdictHover.tsx",
         "stock-analysis/StockReviewDialog.tsx",
+        "stock-analysis/TrendStateBar.tsx",
         "today/VerdictTag.tsx",
+        "today/OpportunityTable.tsx",
     ]
     for rel in files:
         p = root / rel
@@ -600,10 +606,24 @@ def test_R241_时长说法全界面统一():
 
     # 正面: 两个词都还在
     cells = (root / "stock-analysis/decision-board/cells.tsx").read_text(encoding="utf-8")
-    assert re.search(r"已\{trend\.duration\}天", cells), "六态徽标没用统一说法"
     assert "已{v.days}天" in cells, "结论徽标没用统一说法"
     review = (root / "stock-analysis/StockReviewDialog.tsx").read_text(encoding="utf-8")
     assert "持续{rows.length}天" in review, "历史段没用「持续N天」"
+
+    # [R245] 六态徽标改走共用的 `dayCount` —— 说法从"每处各写一遍"变成
+    # **一个地方定义、各处引用**。这才叫统一, 靠 grep 盯字面只是次优。
+    dur = (root.parent / "lib" / "duration.ts")
+    assert dur.exists(), "lib/duration.ts 没了 —— 说法又散回各处了"
+    src = dur.read_text(encoding="utf-8")
+    assert "`已${n}天${capped ? '+' : ''}`" in src, (
+        "dayCount 的写法变了 —— 徽标上的说法得是「已N天」加可选的 `+`"
+    )
+    # 盯的必须是**徽标那一行**。只写 `"dayCount(trend.duration…" in cells` 会被
+    # 同文件里悬停那一行满足 —— 变异测试当场证明了这一点(把徽标改回硬编码,
+    # 那条守卫照样绿)。守卫盯错了地方等于没守。
+    assert "{trend.state_cn} {dayCount(trend.duration, trend.duration_capped)}" in cells, (
+        "六态**徽标**没走共用的 dayCount —— 它会漏掉 `+`"
+    )
 
 
 # ===== [R242] 没有结论的那一格 =====
@@ -855,56 +875,170 @@ def test_R244_端到端_长期挂着的候选池数得出远超暖机上限的�
     assert v.get("capped") is True, "整段比能看到的还长, 却没标成下界"
 
 
-def test_R244_加长窗口不许改动别的指标的读数():
-    """**加长窗口是为了把天数数够, 不是顺手改别的。**
+def test_R245_磨底天数不再被暖机边界截断():
+    """[R245] 用户: 「最优解, 替我完善」。
 
-    压缩指数/在轨外天数/频段能量的读数**会**被窗口长度改变(实测
-    `compress_days` 能从 59 跳到 250)。所以多取的那一段只喂给逐日结论,
-    其余每一处仍旧按原来的窗口切。这条把它钉死。
+    R244 只把长窗口给了逐日结论, 几何那几个数还留在 260 天上 —— **它们是
+    同一类截断**: 一只磨了一年底的票, `compress_days` 封顶只能报 66
+    (185 根 K 减去 120 根暖机), 而且不标下界。
+
+    这条造一只**一路横盘**的票(O 恒等于 1, 从头粘到尾), 断言天数远超那个
+    老天花板, 并且标成了下界。
     """
     from app.services import keltner_service as ks
-    from tests.fixtures import market_archetypes as fx
 
-    watch = ("close", "close_prev", "ma20", "ma20_prev", "above_ma20",
-             "above_ma20_prev", "ma120", "ma120_prev", "ma120_rising",
-             "runs", "energy")
-
-    def once(name, widen):
-        cl = list(fx.closes(name))
-        if len(cl) < 420:
-            cl = [cl[0]] * (420 - len(cl)) + cl
-        keep = ks._LOOKBACK_DAYS_VERDICT
-        ks._LOOKBACK_DAYS_VERDICT = keep if widen else ks._LOOKBACK_DAYS
-        try:
-            return ks.long_trend_map(_fake_repo(cl, fx.atrs(cl)), ["X"]).get("X", {})
-        finally:
-            ks._LOOKBACK_DAYS_VERDICT = keep
-
-    checked = 0
-    for name in fx.SCENARIOS:
-        narrow, wide = once(name, False), once(name, True)
-        for k in watch:
-            checked += 1
-            assert narrow.get(k) == wide.get(k), (
-                f"{name} · {k} 被加长的窗口改变了 —— 那是搭车改动, 不是这次要修的\n"
-                f"  窄窗 {narrow.get(k)}\n  宽窗 {wide.get(k)}"
-            )
-        # 正面: 逐日结论那一路确实变长了
-        assert (kg.judgeable_span(wide.get("verdict_codes") or [])
-                >= kg.judgeable_span(narrow.get("verdict_codes") or [])), \
-            f"{name}: 窗口加长了, 判得出结论的天数反而没变多"
-    assert checked >= 100, f"只核了 {checked} 组, 覆盖不够"
+    closes = [10.0] * 400
+    ent = ks.long_trend_map(_fake_repo(closes), ["X"]).get("X") or {}
+    r = ent.get("runs") or {}
+    assert r, "这份夹具连 runs 都没算出来, 前提就错了"
+    assert r["compress_days"] > 100, (
+        f"横盘 400 根却只报 {r['compress_days']} 天 —— 又被暖机边界截断了"
+        f"(老窗口的天花板是 66 天)"
+    )
+    assert r["compress_capped"] is True, "一路数到底了却没标下界"
 
 
-def test_R244_窗口够长期档暖机之后还能数满_VERDICT_TAIL():
-    """`VERDICT_TAIL = 250` 是承诺的上限, 窗口必须真的支撑得起它 ——
-    否则那个常数就是句空话(这正是用户撞上的)。"""
+def test_R245_段自己结束时不许标下界():
+    """反面。数到一半遇上**算得出、但不满足条件**的日子 = 这一段真的结束了,
+    那是个准数, 不该带 `+`。"""
+    rows = [{"o": 0.2, "d_s": 0.0, "close": 10.0, "atr": 0.2}] * 50 \
+        + [{"o": 0.95, "d_s": 0.0, "close": 10.0, "atr": 0.2}] * 5
+    r = kg.runs(rows)
+    assert r["compress_days"] == 5, f"数出来是 {r['compress_days']}"
+    assert r["compress_capped"] is False, "段自己结束了却被标成下界"
+
+
+def test_R245_撞上算不出来的那些天也算下界():
+    """**第三堵墙**, 也是最阴的一堵 —— 它长在数据中间而不是尽头。
+
+    `series()` 给算不出来的日子返回 `{}`。原来 `_tail_run` 写的是
+    `if not r or not ok(r): break` —— 把"那天算不出来"和"那天不满足条件"
+    并成了一支, 于是撞上暖机墙时天数照样是下界, 却被当成准数印出去。
+    """
+    rows = [{}] * 50 + [{"o": 0.95, "d_s": 0.0, "close": 10.0, "atr": 0.2}] * 7
+    r = kg.runs(rows)
+    assert r["compress_days"] == 7
+    assert r["compress_capped"] is True, (
+        "撞上暖机墙(空行)却没标下界 —— 这正是 `not r or not ok(r)` 那个写法的毛病"
+    )
+
+
+def test_R245_零天谈不上下界():
+    """今天就不满足条件时天数是 0, 那不是"至少 0 天"。"""
+    rows = [{"o": 0.1, "d_s": 0.0, "close": 10.0, "atr": 0.2}] * 200
+    r = kg.runs(rows)
+    assert r["compress_days"] == 0
+    assert r["compress_capped"] is False, "0 天被标成了下界"
+    assert r["above_capped"] is False and r["below_capped"] is False
+
+
+def test_R245_三个天数各自带各自的下界标记():
+    """三个天数是三件事, 不能共用一个标记。"""
+    r = kg.runs([{"o": 0.95, "d_s": 9.9, "close": 10.0, "atr": 0.2}] * 300)
+    assert r["compress_days"] and r["above_run"], "夹具没同时触发两个连续段"
+    for k in ("compress_capped", "above_capped", "below_capped"):
+        assert k in r, f"runs 里少了 {k}"
+    assert r["below_run"] == 0 and r["below_capped"] is False, (
+        "下轨那一路一天都没有, 却跟着上轨一起被标了下界"
+    )
+
+
+def test_R245_只有一个历史窗口():
+    """[R245] R244 分过两套窗口(几何 260 天 / 结论 520 天)。同一份序列派生的
+    量各看各的历史长度是下一个 bug 的温床 —— 这条钉死"只有一个"。"""
+    import inspect
+
+    from app.services import keltner_service as ks
+    assert not hasattr(ks, "_LOOKBACK_DAYS_VERDICT"), "两套窗口又回来了"
+    src = inspect.getsource(ks.long_trend_map)
+    assert "_LOOKBACK_DAYS_HISTORY" in src, "没有用统一的历史窗口"
+    assert "geo_span" not in src, "按窗口切两份序列的写法又回来了"
+
+
+def test_R244_窗口够长期档暖机之后还能数满每一个承诺的上限():
+    """`VERDICT_TAIL` 与 `MAX_LOOKBACK` 都是**承诺的上限**, 窗口必须真的
+    支撑得起它们 —— 否则那两个常数就是空话(这正是用户撞上的: 承诺 250,
+    实际只数得到 59 / 66)。
+
+    这条是**整类 bug 的总闸**: 以后谁再动窗口或动上限, 对不上就红。
+    """
     from app.services import keltner_service as ks
 
-    bars = ks._LOOKBACK_DAYS_VERDICT * 5 // 7      # 自然日 → 交易日, 扣掉周末
+    bars = ks._LOOKBACK_DAYS_HISTORY * 5 // 7      # 自然日 → 交易日, 扣掉周末
     usable = bars - kg.WINDOW["l"] + 1
-    assert usable >= kg.VERDICT_TAIL, (
-        f"窗口 {ks._LOOKBACK_DAYS_VERDICT} 个自然日 ≈ {bars} 根 K, 扣掉 "
-        f"{kg.WINDOW['l']} 根暖机只剩 {usable} 天 —— 够不着 VERDICT_TAIL="
-        f"{kg.VERDICT_TAIL}, 那个上限还是句空话"
+    for cap, name in ((kg.VERDICT_TAIL, "VERDICT_TAIL"),
+                      (kg.MAX_LOOKBACK, "MAX_LOOKBACK")):
+        assert usable >= cap, (
+            f"窗口 {ks._LOOKBACK_DAYS_HISTORY} 个自然日 ≈ {bars} 根 K, 扣掉 "
+            f"{kg.WINDOW['l']} 根暖机只剩 {usable} 天 —— 够不着 {name}={cap}, "
+            f"那个上限还是句空话"
+        )
+
+
+# ===== [R245] 六态那一路的同一类截断 =====
+
+def test_R245_六态天数不再把窗口长度当成天数报出去():
+    """六态的 `duration` **零暖机** —— 喂多少根就能数多少天。所以窗口取 180 时,
+    一只走了两年上涨趋势的票印的是「已180天」: 那不是天数, 是**窗口长度**,
+    却长得和准数一模一样。
+
+    这条盯两件事: 上限抬到了与通道那一层同一个数; 铺满窗口时标成下界。
+    """
+    import datetime as dt
+
+    from app.services import livermore_service as ls
+
+    assert ls.WINDOW_TRADING_DAYS >= kg.MAX_LOOKBACK, (
+        f"六态封在 {ls.WINDOW_TRADING_DAYS} 天而通道封在 {kg.MAX_LOOKBACK} 天 —— "
+        f"同一行里两个徽标各自封在不同的天花板上, 读的人无从分辨"
     )
+
+    n = ls.WINDOW_TRADING_DAYS + 200
+    closes = [round(10.0 * (1.004 ** i), 4) for i in range(n)]     # 一路单边, 状态不变
+    dates = [str(dt.date(2024, 1, 1) + dt.timedelta(days=i)) for i in range(n)]
+
+    win = ls.WINDOW_TRADING_DAYS
+    p = ls._trend_payload(closes[-win:], dates[-win:], 0.05, "test")
+    assert p["duration"] == win, "夹具没铺满窗口, 这条测不到"
+    assert p["duration_capped"] is True, (
+        "段铺满了整个窗口 —— 那是下界, 却没标出来"
+    )
+
+
+def test_R245_六态天数是数出来的时候不标下界():
+    """反面: 段在窗口内自己结束了, 那是准数。"""
+    import datetime as dt
+
+    from app.services import livermore_service as ls
+
+    n = ls.WINDOW_TRADING_DAYS
+    # 先跌一大段再涨一小段 —— 最新那一段在窗口内开始, 数得出确切天数
+    closes = [round(20.0 * (0.995 ** i), 4) for i in range(n - 40)]
+    closes += [round(closes[-1] * (1.01 ** i), 4) for i in range(1, 41)]
+    dates = [str(dt.date(2024, 1, 1) + dt.timedelta(days=i)) for i in range(len(closes))]
+    p = ls._trend_payload(closes, dates, 0.05, "test")
+    assert p["duration"] < len(closes), "夹具没造出「段在窗口内开始」, 这条测不到"
+    assert p["duration_capped"] is False, "自己结束的段被标成了下界"
+
+
+def test_R245_抬高六态窗口不许动到评分():
+    """**这条是安全带。** `duration` 会喂进 `score_candidate` 的 `FRESH_CURVE`,
+    而用户刚让我把评分整个回退到 R134 并说过「评分系统被改崩了」——
+    抬窗口绝不能顺手改一分。
+
+    `FRESH_CURVE` 尾端是 `(20, 5)`: duration ≥ 20 一律 5 分。老窗口 180、新窗口
+    250, 两个都远在 20 之外, 所以分数一样。这条把它钉死。
+    """
+    from app.services.opportunity_score import FRESH_CURVE, score_candidate
+
+    assert FRESH_CURVE[-1][0] <= 20, (
+        f"FRESH_CURVE 的尾端挪到了 {FRESH_CURVE[-1][0]} 天 —— 一旦超过窗口长度, "
+        f"抬窗口就会改变评分, 这条安全带就失效了"
+    )
+    base = dict(state="UT", rs_pct=5.0, vol_ratio=1.2,
+                turnover_rate=3.0, channel_pct=0.5)
+    ref = score_candidate(duration=20, **base)
+    for d in (66, 180, 250, 400, 9999):
+        assert score_candidate(duration=d, **base) == ref, (
+            f"duration={d} 的评分与 duration=20 不一样 —— 抬窗口会改动打分"
+        )

@@ -34,9 +34,23 @@ from app.indicators.livermore import (
 
 logger = logging.getLogger(__name__)
 
-WINDOW_TRADING_DAYS = 180
-# 180 交易日 ≈ 260+ 日历日,留足节假日余量
-_CALENDAR_SPAN_DAYS = 320
+# [R245] 180 → 250 个交易日。
+#
+# 六态的 `duration` **零暖机** —— 喂多少根它就能数多少天。于是窗口取 180 时,
+# 一只走了两年上涨趋势的票, 徽标上印的是「已180天」: 那不是测出来的天数,
+# 是**窗口长度本身**, 却长得和一个准数一模一样。用户: 「我要确定性的显示
+# 多少天」。
+#
+# 250 个交易日 ≈ 一年, 与通道那一层的 `VERDICT_TAIL` / `MAX_LOOKBACK` 同一个
+# 上限 —— **全系统的天数上限只有一个数**, 否则同一行里两个徽标各自封在不同
+# 的天花板上, 读的人无从分辨。数到上限时标 `capped`, 徽标上写 `+`。
+#
+# 几乎不花钱: 原来就按 _CALENDAR_SPAN_DAYS 取回来了, 再 `.tail(180)` 扔掉一截。
+# 评分不受影响 —— `FRESH_CURVE` 尾端是 (20, 5), duration ≥ 20 一律 5 分,
+# 有测试守着。
+WINDOW_TRADING_DAYS = 250
+# 250 交易日 ≈ 355 日历日, 再留足节假日余量
+_CALENDAR_SPAN_DAYS = 400
 # 状态转换在 N 天内视为"新信号"(转多/转空/回升/回撤徽章)
 SIGNAL_FRESH_DAYS = 5
 _MIN_DAYS = 40
@@ -160,6 +174,9 @@ def _trend_payload(closes: list[float], dates: list[str], threshold: float, sour
                               last.get("flip_down"), last.get("flip_up")),
         "side": "多头" if st in BULLISH else "空头",
         "duration": res["duration"],
+        # [R245] 天数是数出来的还是**没得数了**。六态零暖机, 所以段一旦铺满
+        # 整个窗口, 报出来的就是窗口长度本身 —— 那是下界, 徽标上要写 `+`。
+        "duration_capped": bool(closes) and res["duration"] >= len(closes),
         "since": res["since"],
         "entered_from": res["entered_from"],
         "entered_from_cn": frm_cn,

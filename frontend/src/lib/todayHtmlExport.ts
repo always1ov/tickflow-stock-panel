@@ -100,7 +100,7 @@ export function buildTodayHtml(d: TodayOverview, brief: string | null,
         <td class="num" style="color:${h.pnl_pct == null ? '#8a919f' : h.pnl_pct > 0 ? bull : bear}">${h.pnl_pct != null ? (h.pnl_pct * 100).toFixed(1) + '%' : '—'}</td>
         <td class="num" style="color:${h.exit_triggered ? bull : '#1f2329'}">${h.line != null ? h.line.toFixed(2) + (h.exit_triggered ? ' 已触发' : '') : '—'}</td>
         <td>${esc(h.stage_cn ?? '—')}</td>
-        <td style="color:${h.trend_side === '多头' ? bull : bear}">${h.trend_cn ? `${esc(h.trend_cn)} ${h.trend_duration}天` : '—'}</td>
+        <td style="color:${h.trend_side === '多头' ? bull : bear}">${h.trend_cn ? `${esc(h.trend_cn)} 已${h.trend_duration}天${h.trend_duration_capped ? '以上' : ''}` : '—'}</td>
         <td style="color:${h.stance === '离场' ? bull : h.stance === '减仓' ? '#c78326' : '#4e5666'};font-weight:${h.stance === '离场' ? 700 : 400}">${esc(h.stance)}</td>
       </tr>`).join('')
 

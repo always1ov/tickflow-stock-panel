@@ -560,14 +560,36 @@ def series(closes: list[float] | None, atrs: list[float] | None) -> list[dict]:
     return out
 
 
-def _tail_run(rows: list[dict], ok) -> int:
-    """从最后一根往回数, 连续满足 ok 的天数。中间断一天就停。"""
+def _tail_run(rows: list[dict], ok) -> tuple[int, bool]:
+    """从最后一根往回数, 连续满足 ok 的天数。中间断一天就停。
+
+    返回 `(天数, 是不是下界)`。
+
+    [R245] **第二个值是新加的, 而它才是这次要修的东西。** 原来只返回天数,
+    于是"数到 30 天它自己断了"和"数到 30 天没历史了"长得**一模一样** ——
+    前者是准数, 后者是下界, 差别是"磨了一个月"与"至少磨了一个月, 也可能是
+    一年"。段自己结束才是准数; 撞上下面这三堵墙都只是**没得数了**:
+
+        · 撞上 MAX_LOOKBACK          回看上限
+        · 数完了整段历史             窗口就这么长
+        · 撞上算不出来的那些天       长期档要 120 根暖机, 更早的行是 {}
+
+    第三堵墙最阴 —— 它长在数据中间而不是尽头, 所以连"数完了"都不像。
+    """
+    window = rows[-MAX_LOOKBACK:]
     run = 0
-    for r in reversed(rows[-MAX_LOOKBACK:]):
-        if not r or not ok(r):
-            break
+    for r in reversed(window):
+        if not r:
+            # 空行 = 那天**算不出来**(暖机不够)。不是"这一段结束了", 是没得数了。
+            # 这一支单独摆出来: 写成 `not r or not ok(r)` 就会把第三堵墙误当成
+            # 段的自然结束, 天数照样是下界, 却被当成准数印出去。
+            return run, True
+        if not ok(r):
+            # 停在一个**算得出、但不满足条件**的日子上 = 这一段真的结束了
+            return run, False
         run += 1
-    return run
+    # 一路数到底: 要么撞上回看上限, 要么整段历史就这么长 —— 都只是下界
+    return run, True
 
 
 # [R240] 逐日结论序列往回取多少根。用户: 「我要确定性的显示多少天」——
@@ -650,7 +672,7 @@ def verdict_codes(closes: list[float] | None, atrs: list[float] | None,
         a = as_[i]
         if a is None or a <= 0:
             out.append(None)
-            continue
+            break            # 见下面「到第一个变化就收手」
         bands: dict[str, dict] = {}
         for k_ in ("s", "m", "l"):
             m = ma[k_][i]
@@ -662,7 +684,27 @@ def verdict_codes(closes: list[float] | None, atrs: list[float] | None,
                 bands = {}
                 break
             bands[k_] = got
-        out.append(state_key(bands) if len(bands) == 3 else None)
+        key = state_key(bands) if len(bands) == 3 else None
+        out.append(key)
+        # [R245] **到第一个变化就收手。**
+        #
+        # 用户: 「我的理解是这里不是已经有最新总结好的时间了吗, 怎么那么麻烦
+        # 你还搞不定?」—— 对, 贵的那部分是白花的。
+        #
+        # 下游只有 `count_trailing` 和 `judgeable_span`, 而它们**只读前导那一段**:
+        #
+        #     count_trailing(codes, x)  x == codes[0] 时数前导连续段, 一变就 break;
+        #                               x != codes[0] 时直接返回 0
+        #     judgeable_span(codes)     数到第一个 None 为止
+        #
+        # 两个都在第一个"与今天不同"的位置停下。所以**再往前算一天都是白算** ——
+        # 而原来是无脑算满 250 天: 一段 25 天的「候选池」要跑 250 次 `assess`×3
+        # + `verdict`, 十倍的白工, 145 只票乘起来就是那 0.3 秒。
+        #
+        # 多留的这一个"变了的"位置是**哨兵**, 不能省: `judgeable_span` 靠它区分
+        # 「段自己结束了」(准数)与「没得数了」(下界)。
+        if key != out[0]:
+            break
     return out
 
 
@@ -709,14 +751,19 @@ def runs(rows: list[dict]) -> dict:
     · compress_days  连续 O ≥ COMPRESS_TIGHT —— **这是新的「磨底磨了多久」**
     · above_run      连续收盘在短期上轨之上 —— 1 天是突破, ≥2 天是站稳
     · below_run      连续收盘在短期下轨之下
+
+    [R245] 每个天数都配一个 `*_capped` —— **数出来的**还是**没得数了**。
+    见 `_tail_run`。
     """
     rows = [r for r in rows if r is not None]
     if not rows:
         return {"compress_days": 0, "above_run": 0, "below_run": 0,
+                "compress_capped": False, "above_capped": False,
+                "below_capped": False,
                 "box_high": None, "box_low": None, "box_range_atr": None}
-    cd = _tail_run(rows, lambda r: r.get("o", 0.0) >= COMPRESS_TIGHT)
-    up = _tail_run(rows, lambda r: r.get("d_s", 0.0) > K["s"])
-    dn = _tail_run(rows, lambda r: r.get("d_s", 0.0) < -K["s"])
+    cd, cd_cap = _tail_run(rows, lambda r: r.get("o", 0.0) >= COMPRESS_TIGHT)
+    up, up_cap = _tail_run(rows, lambda r: r.get("d_s", 0.0) > K["s"])
+    dn, dn_cap = _tail_run(rows, lambda r: r.get("d_s", 0.0) < -K["s"])
     box_hi = box_lo = box_rng = None
     if cd >= 1:
         seg = [r["close"] for r in rows[-cd:] if "close" in r]
@@ -728,6 +775,10 @@ def runs(rows: list[dict]) -> dict:
             if atr_now:
                 box_rng = round((box_hi - box_lo) / atr_now, 2)
     return {"compress_days": cd, "above_run": up, "below_run": dn,
+            # [R245] 天数是数出来的(False)还是没得数了(True)。0 天谈不上下界。
+            "compress_capped": bool(cd and cd_cap),
+            "above_capped": bool(up and up_cap),
+            "below_capped": bool(dn and dn_cap),
             "box_high": box_hi, "box_low": box_lo, "box_range_atr": box_rng}
 
 

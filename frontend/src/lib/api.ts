@@ -534,6 +534,8 @@ export interface TodayHolding {
   symbol: string; name: string; close: number | null; cost: number | null; pnl_pct: number | null
   stage_cn: string | null; line: number | null; line_cn: string | null; distance_pct: number | null
   exit_triggered: boolean; trend_cn: string | null; trend_duration: number | null
+  /** [R245] 天数撞上回看窗口 —— 是下界不是准数 */
+  trend_duration_capped?: boolean | null
   trend_side: string | null; signal: string | null
   stance: string; stance_why: string
   weight?: number | null
@@ -968,6 +970,12 @@ export interface ChannelRuns {
   /** 连续多少天收盘在短期上轨之上。1 天 = 突破, ≥2 天 = 站稳 */
   above_run: number
   below_run: number
+  /** [R245] 天数是**数出来的**(false)还是**没得数了**(true) —— 撞上回看上限、
+   *  数完了整段历史、或撞上长期档暖机不够算不出来的那些天。true 时徽标要写 `+`:
+   *  「磨了 250 天」和「至少磨了 250 天」是两个数。0 天谈不上下界, 恒为 false。 */
+  compress_capped?: boolean
+  above_capped?: boolean
+  below_capped?: boolean
   box_high: number | null
   box_low: number | null
   box_range_atr: number | null
@@ -1000,6 +1008,9 @@ export interface TrendInfo {
   action: string
   side: '多头' | '空头'
   duration: number
+  /** [R245] 天数是**数出来的**还是**没得数了**。六态零暖机, 所以一段铺满整个
+   *  回看窗口时, 报出来的就是**窗口长度本身** —— 那是下界, 徽标上要写 `+`。 */
+  duration_capped?: boolean
   since: string
   entered_from: LivermoreState | null
   entered_from_cn: string | null

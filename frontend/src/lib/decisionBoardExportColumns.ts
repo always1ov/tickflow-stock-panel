@@ -17,6 +17,7 @@
  * 这里单独定义, 不复用界面的 class。
  */
 import type { ExitLine, KeltnerBand, KeltnerBands, TrendInfo, Urgency, ChannelPhase } from '@/lib/api'
+import { dayCount } from '@/lib/duration'
 
 /** 导出用的一行 —— 与决策台 sortedRows 的形状一致(结构化取用, 不强耦合) */
 export type ExportRow = {
@@ -146,7 +147,7 @@ export const EXPORT_COLUMNS: ExportColumn[] = [
     key: 'trend', label: '趋势', group: '趋势', on: true,
     cell: (r) => (r.trend
       ? {
-          text: `${r.trend.state_cn} ${r.trend.duration}天`,
+          text: `${r.trend.state_cn} ${dayCount(r.trend.duration, r.trend.duration_capped)}`,
           style: `color:${r.trend.side === '多头' ? BULL : BEAR}`,
         }
       : { text: '—' }),
@@ -167,7 +168,8 @@ export const EXPORT_COLUMNS: ExportColumn[] = [
       const days = r.kc?.runs?.compress_days
       return {
         text: [r.ph?.cn, `间距 ${g.spread.toFixed(1)}`, fast,
-               days ? `挤 ${days} 天` : null].filter(Boolean).join(' · '),
+               days ? `挤 ${dayCount(days, r.kc?.runs?.compress_capped)}` : null]
+                 .filter(Boolean).join(' · '),
       }
     },
   },
@@ -190,7 +192,7 @@ export const EXPORT_COLUMNS: ExportColumn[] = [
   //   列 —— 勾上这四个、取消其余, 就是原来那个弹窗导出的东西。
   {
     key: 'dur', label: '持续', group: '趋势', align: 'right', on: false,
-    cell: (r) => ({ text: r.trend ? `${r.trend.duration} 天` : '—' }),
+    cell: (r) => ({ text: r.trend ? dayCount(r.trend.duration, r.trend.duration_capped) : '—' }),
   },
   {
     key: 'flipDown', label: '跌破转弱', group: '趋势', align: 'right', on: false,
