@@ -83,34 +83,54 @@ function geoLines(geo?: ChannelGeometry | null, ev?: ChannelEvent | null,
   // [R200] 阶段摆在最前面。悬停这一片本来全是测量 —— 先给一句"现在处在哪一段、
   // 该盯什么", 后面那些数才有落点。这句话之前只有复盘弹窗里有。
   if (ph) L.push('', `【${ph.cn}】${ph.why}`, `该盯什么:${ph.watch}`)
+
+  // [R219] **一个话题一行, 不许拆到上下两处。** 用户: 「每一列的内容应该就是
+  // 一部分, 而不是内容上面一部分下面一部分」。
+  //
+  // 原来这段是流水账: 快慢在最上面, 「三条线还有 X% 重合」在第三行, 而同属
+  // 重合这个话题的「已经这样 N 天」「这季平均 Y%」掉到第五、六行, 中间隔着
+  // 「价格离各自中线」。读的人得自己把同一件事从两处捡回来拼上。
+  //
+  // 现在每行以 [话题] 开头, 同一话题的数全在那一行里, 顺序也按"先看什么"排:
+  // 位置 → 间距 → 重合 → 快慢 → 起伏 → 在轨外。
   L.push('', '—— 量化波动通道 ——')
-  const a = geo.accel
-  if (a?.level_cn) {
-    L.push(`最近这十天比前一段${a.gain_atr >= 0 ? '多' : '少'}走了 ${Math.abs(a.gain_atr).toFixed(1)} 倍日常波动(${a.level_cn})`)
-  }
-  if (geo.torn) L.push(`短线和长线离得太远(差 ${Math.abs(geo.spread).toFixed(1)} 倍日常波动),已经没有共同认可的合理价`)
-  else if (geo.nested) L.push(`三条线几乎挤在一块(只差 ${Math.abs(geo.spread).toFixed(1)} 倍日常波动)`)
-  else if (geo.compress != null) {
-    L.push(`三条线还有 ${(geo.compress * 100).toFixed(0)}% 重合,`
-      + (geo.spread >= 0
+  const at2 = (x: number) => `${x >= 0 ? '' : '-'}${Math.abs(x).toFixed(1)}`
+  L.push(`[位置] 价格离各自中线:短期 ${at2(geo.d.s)} / 中期 ${at2(geo.d.m)} / 长期 ${at2(geo.d.l)} 倍日常波动(正的偏贵、负的偏便宜)`)
+  L.push('[间距] ' + (geo.torn
+    ? `短线和长线离得太远(差 ${Math.abs(geo.spread).toFixed(1)} 倍日常波动),已经没有共同认可的合理价`
+    : geo.nested
+      ? `三条线几乎挤在一块,只差 ${Math.abs(geo.spread).toFixed(1)} 倍日常波动`
+      : geo.spread >= 0
         ? `短线高出长线 ${geo.spread.toFixed(1)} 倍日常波动`
         : `短线低于长线 ${Math.abs(geo.spread).toFixed(1)} 倍日常波动`))
+  // 重合的三个数原来散在三处 —— 它们回答的是同一个问题, 并成一行
+  if (geo.compress != null || runs?.compress_days || runs?.compress_avg != null) {
+    L.push('[重合] ' + [
+      geo.compress != null ? `三条线还有 ${(geo.compress * 100).toFixed(0)}% 重合` : '',
+      runs?.compress_days ? `已经这样 ${runs.compress_days} 天` : '',
+      runs?.compress_avg != null ? `整个季度平均 ${(runs.compress_avg * 100).toFixed(0)}%` : '',
+    ].filter(Boolean).join(' · '))
   }
-  L.push(`眼下价格离各自中线:短期 ${geo.d.s.toFixed(1)} / 中期 ${geo.d.m.toFixed(1)} / 长期 ${geo.d.l.toFixed(1)} 倍日常波动(正的偏贵、负的偏便宜)`)
-  if (runs?.compress_days) L.push(`三条线已经这样挤在一起 ${runs.compress_days} 天`)
-  if (runs?.compress_avg != null) L.push(`整个季度平均重合 ${(runs.compress_avg * 100).toFixed(0)}%`)
+  const a = geo.accel
+  if (a?.level_cn) {
+    L.push(`[快慢] 最近这十天比前一段${a.gain_atr >= 0 ? '多' : '少'}走了 ${Math.abs(a.gain_atr).toFixed(1)} 倍日常波动(${a.level_cn})`)
+  }
   if (energy) {
     const sh = energy.share
-    L.push(`波动主要来自:${energy.dominant_cn}`
-      + (energy.lead_cn ? `(${energy.lead_cn})` : ''))
-    L.push(`几天的短波动 ${(sh.s * 100).toFixed(0)}% / 一波行情的主体 ${(sh.m * 100).toFixed(0)}% / 长期老趋势 ${(sh.l * 100).toFixed(0)}%`)
-    L.push('(三份各 33% 是「就是一路匀速走」的样子,偏离 33% 的那部分才是信息)')
+    // [R219] 尾注跟着 R217 改基准一起更正 —— 原来写「各 33% 是一路匀速走的
+    // 样子」, 那是**老基准**的说法。现在的零假设是"这只票什么也没发生"。
+    L.push(`[起伏] 主要来自${energy.dominant_cn}${energy.lead_cn ? `(${energy.lead_cn})` : ''}`
+      + ` —— 短波动 ${(sh.s * 100).toFixed(0)}% / 行情主体 ${(sh.m * 100).toFixed(0)}%`
+      + ` / 老趋势 ${(sh.l * 100).toFixed(0)}%(和纯噪声比,各 33% 是不偏不倚)`)
   }
-  if (runs?.above_run) L.push(`连着 ${runs.above_run} 天站在短线上沿之外`)
-  if (runs?.below_run) L.push(`连着 ${runs.below_run} 天掉在短线下沿之外`)
-  if (ev?.why) L.push('', `事件:${ev.cn} —— ${ev.why}`)
+  if (runs?.above_run || runs?.below_run) {
+    L.push('[在轨外] ' + (runs.above_run
+      ? `连着 ${runs.above_run} 天站在短线上沿之外`
+      : `连着 ${runs.below_run} 天掉在短线下沿之外`))
+  }
+  if (ev?.why) L.push('', `【事件】${ev.cn} —— ${ev.why}`)
   if (ev?.combo_note) {
-    L.push('', `组合「${ev.combo_note.combo}」补充 · ${ev.combo_note.title}`, ev.combo_note.detail)
+    L.push('', `【组合补充】「${ev.combo_note.combo}」· ${ev.combo_note.title}`, ev.combo_note.detail)
   }
   return L.join('\n')
 }
