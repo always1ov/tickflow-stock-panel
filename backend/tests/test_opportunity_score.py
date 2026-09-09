@@ -571,72 +571,12 @@ def test_所有无信息的取值都锚在中性五十():
 
 
 # ================================================================
-# [R204] 因子自选 —— 用户自己想到的那个解法
+# [R218] 因子自选(R204)整块删掉了 —— 用户: 「不搞自选了」。
 #
-# 用户: 「为了解决"因子越多挤得越狠", 因子我可以在今日总览页面自定义选择哪些开启」。
-# 这确实是对的解法: 带宽窄是**「平均」的固有性质**, 少平均几个带宽就回来了。
-
-
-def test_关掉因子不被当成缺数据罚一次():
-    """**这是这个开关能不能用的关键。**
-
-    关掉的因子如果进了覆盖率分母, 每关一个就要被置信系数扣一次 —— 那等于
-    告诉用户「这个开关你最好别动」, 开关就白给了。
-    """
-    kw = dict(duration=1, state="UT", rs_pct=4.0, vol_ratio=1.5, turnover_rate=3.0,
-              channel_pct=0.60, template={"passed": 6, "known": 8, "total": 8},
-              rhythm={"level": "none", "basing": {"days": 10}},
-              geo={"spread": 1.5, "accel": {"a1": 0.05}}, runs={"compress_days": 8})
-    few = osc.score_candidate(**kw, enabled={"template", "state", "fresh", "pos"})
-    assert few["coverage"] == {"quality": 1.0, "timing": 1.0}
-    assert few["confidence"] == 1.0
-    assert few["partial"] is False
-
-
-def test_关掉因子确实改变了分数():
-    """不改变分数的开关是个装饰。"""
-    kw = dict(duration=1, state="UT", rs_pct=4.0, vol_ratio=1.5, turnover_rate=3.0,
-              channel_pct=0.60, template={"passed": 6, "known": 8, "total": 8},
-              rhythm={"level": "none", "basing": {"days": 10}},
-              geo={"spread": 1.5, "accel": {"a1": 0.05}}, runs={"compress_days": 8})
-    assert osc.score_candidate(**kw)["score"] != osc.score_candidate(
-        **kw, enabled={"template", "state", "fresh", "pos"})["score"]
-
-
-def test_裁剪不改变留下来那些因子的相对比例():
-    """关掉换手率不该改变趋势模板与磨底节拍之间的相对轻重 —— 那是另一回事。"""
-    got = osc.enabled_weights(osc.QUALITY_WEIGHTS, {"template", "base"})
-    assert got == {"template": osc.QUALITY_WEIGHTS["template"],
-                   "base": osc.QUALITY_WEIGHTS["base"]}
-    ratio_before = osc.QUALITY_WEIGHTS["template"] / osc.QUALITY_WEIGHTS["base"]
-    assert got["template"] / got["base"] == pytest.approx(ratio_before)
-
-
-def test_全关或没传都等于全开():
-    assert osc.enabled_weights(osc.QUALITY_WEIGHTS, None) == osc.QUALITY_WEIGHTS
-    assert osc.enabled_weights(osc.QUALITY_WEIGHTS, set()) == osc.QUALITY_WEIGHTS
-    # 一个都不认识 → 整表原样返回, 而不是把这根轴清空
-    assert osc.enabled_weights(osc.QUALITY_WEIGHTS, {"不存在"}) == osc.QUALITY_WEIGHTS
-
-
-def test_因子少了带宽确实变宽():
-    """开关存在的**全部理由**。测不出这一条, 这个功能就没有意义。"""
-    import itertools
-    def spread_of(enabled):
-        scores = []
-        for dur, st, vr, cp, tp in itertools.product(
-                (1, 3, 5), ("UT", "NR", "SR"), (0.8, 1.5, 3.0),
-                (0.52, 0.65, 0.85), (4, 6, 8)):
-            scores.append(osc.score_candidate(
-                duration=dur, state=st, rs_pct=4.0, vol_ratio=vr, turnover_rate=3.0,
-                channel_pct=cp, template={"passed": tp, "known": 8, "total": 8},
-                rhythm={"level": "none", "basing": {"days": 10}},
-                geo={"spread": 1.5, "accel": {"a1": 0.05}},
-                runs={"compress_days": 8}, enabled=enabled)["score"])
-        scores.sort()
-        n = len(scores)
-        return scores[int(n * 0.9)] - scores[int(n * 0.1)]
-
-    wide = spread_of({"template", "state", "fresh", "pos"})
-    narrow = spread_of(None)
-    assert wide > narrow, f"关掉一半因子后带宽 {wide} 反而不比全开的 {narrow} 宽"
+# 那一节原来守着五条: 关掉不算缺数据 / 开关真能改分 / 裁剪不改相对比例 /
+# 全关等于全开 / 少几个因子带宽确实变宽。功能没了, 断言也一起走 ——
+# 留着测一个不存在的能力就是下一个「看起来像在用」的死代码。
+#
+# 结论本身没有作废, 只是搬进了 docs/scoring-and-rules.md:
+# 实测 10 因子 p10~p90 = 23 分, 8 因子 = 26 分, 带宽窄是「平均」的固有性质。
+# 出路在名次与分位(R201), 不在这个旋钮。

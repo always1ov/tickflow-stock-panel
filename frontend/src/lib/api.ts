@@ -498,15 +498,8 @@ export interface TodayPrefs {
   /** [R40] 只看这几个板; 空 = 全看 */
   boards: string[]
   /** [R204] 参与打分的因子键; 空 = 全开(与 boards 同一个约定) */
-  factors?: string[]
   /** [R204] 因子目录 —— 只在 GET /prefs 与总览里给, 保存时不用回传。
    *  从后端权重表推出来的, 前端不写死一份免得漂。 */
-  factor_catalog?: {
-    key: string; cn: string
-    axis: 'quality' | 'timing'; axis_cn: string
-    /** 轴内权重 */
-    weight: number
-  }[]
 }
 export interface TodayHolding {
   symbol: string; name: string; close: number | null; cost: number | null; pnl_pct: number | null

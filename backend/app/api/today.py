@@ -147,21 +147,7 @@ def coiling_phase(bands_row: dict | None) -> dict | None:
     return ph if ph and ph["code"] in _COILING_PHASES else None
 
 
-def factor_catalog() -> list[dict]:
-    """[R204] 打分因子目录 —— 界面画「参与打分的因子」勾选框要用。
-
-    **从权重表推, 不另抄一份。** 抄一份的话, 哪天权重表加了个因子而这里忘了跟,
-    界面上就少一个勾选框, 而那个因子照样在打分 —— 用户以为自己关掉了全部,
-    实际没有。
-    """
-    from app.services import opportunity_score as osc
-    return [
-        {"key": k_, "cn": osc.FACTOR_CN.get(k_, k_), "axis": axis,
-         "axis_cn": osc.AXIS_CN[axis], "weight": round(w, 4)}
-        for axis, table in ((osc.AXIS_QUALITY, osc.QUALITY_WEIGHTS),
-                            (osc.AXIS_TIMING, osc.TIMING_WEIGHTS))
-        for k_, w in table.items()
-    ]
+# [R218] `factor_catalog()` 随因子勾选面板一起删掉, 见 pages/Today.tsx 的说明。
 
 
 def score_opportunities(
@@ -169,7 +155,6 @@ def score_opportunities(
     bench_ret: float | None = None,
     extras: dict[str, dict] | None = None,
     bench_ret_120d: float | None = None,
-    factors: list[str] | None = None,
 ) -> tuple[list[dict], dict]:
     """[R134] 买入机会评分 v2。返回 (完整排序列表, 门槛体检)。
 
@@ -357,9 +342,7 @@ def score_opportunities(
             duration=c["duration"], state=t.get("state"), rs_pct=rs_pct,
             vol_ratio=vr, turnover_rate=turn, channel_pct=cpct,
             near_breakout=c["near_breakout"], coiling="coiling" in c["kinds"],
-            template=tpl, rhythm=t.get("rhythm"), geo=geo, runs=kc.get("runs"),
-            # [R204] 用户勾的因子。空 = 全开(与板块过滤同一个约定)。
-            enabled=set(factors) if factors else None)
+            template=tpl, rhythm=t.get("rhythm"), geo=geo, runs=kc.get("runs"))
 
         close = t.get("close") or (signals.get(sym) or {}).get("close")
         try:
@@ -1082,8 +1065,7 @@ def _build_overview(repo, engine=None) -> dict:
     # [R133] 先拿到**完整**排序列表, 再按门槛截断。台账记完整的那份 ——
     # 只记显示出来的 10 条, 等于只用样本里最好的一段去证明样本好。
     ranked_all, gate_info = score_opportunities(trends, signals, names, bench_ret, extras,
-                                               bench_ret_120d=bench_ret_120d,
-                                               factors=prefs.get("factors"))
+                                               bench_ret_120d=bench_ret_120d)
     opportunities, opp_filtered = filter_opportunities(
         ranked_all, prefs["min_score"], prefs["max_show"], prefs.get("boards"))
     # [R210] 空了就得说清是空在哪一步 —— 候选池空 / 门槛全挡 / 你自己的板块过滤,
@@ -1336,7 +1318,7 @@ def _build_overview(repo, engine=None) -> dict:
                   "text": _gate_text(gate_info)},
         # [R204] 目录跟着 prefs 一起给 —— 界面画勾选框要用, 而它是从权重表
         # 推出来的, 前端写死一份就会漂。
-        "prefs": {**prefs, "factor_catalog": factor_catalog()},
+        "prefs": prefs,
         "position_hint": {
             "posture_cap": POSTURE_CAPS.get(posture, 0.3),
             "max_single": prefs["max_single"], "target_vol": prefs["target_vol"],
@@ -1385,9 +1367,6 @@ class PrefsModel(BaseModel):
     pyramid_days: int | None = Field(default=None, ge=1, le=5)
     # [R40] 板块过滤; 传 [] 或全选都等于不过滤
     boards: list[str] | None = Field(default=None, max_length=12)
-    # [R204] 参与打分的因子; 传 [] 或全选都等于全开。两根轴各自至少留一个,
-    # 否则后端按"没改"处理(见 today_prefs._factors)。
-    factors: list[str] | None = Field(default=None, max_length=20)
 
 
 @router.get("/prefs")
@@ -1397,7 +1376,7 @@ def get_prefs():
     目录从权重表推, 不另抄一份 —— 抄一份就会和打分漂开。
     """
     from app.services import today_prefs
-    return {**today_prefs.load(), "factor_catalog": factor_catalog()}
+    return today_prefs.load()
 
 
 @router.put("/prefs")
@@ -1410,7 +1389,7 @@ def put_prefs(body: PrefsModel):
                             pyramid_probe=body.pyramid_probe,
                             pyramid_confirm=body.pyramid_confirm,
                             pyramid_days=body.pyramid_days,
-                            boards=body.boards, factors=body.factors)
+                            boards=body.boards)
 
 
 _AI_SYSTEM = """你是用户的盘前参谋,有 15 年 A 股一线交易经验。输入分两部分:今日总览 JSON(市场天气/需要行动/持仓体检),和每只候选买入机会的真实日 K 数据。一次调用完成两件事:先做任务二(优选),再基于优选结果写任务一(导读),两者结论必须一致。

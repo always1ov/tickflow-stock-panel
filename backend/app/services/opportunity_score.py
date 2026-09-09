@@ -489,36 +489,9 @@ def confidence(cov_q: float, cov_t: float) -> float:
     return geo_mean ** (CONFIDENCE_EXP * 2)  # 再开平方 —— 两轴齐全时正是四次根
 
 
-# [R204] 用户可以在今日总览关掉某几个因子。
-#
-# 为什么给这个开关: 把握分的取值挤在中间一段(实测 p10~p90 只有 17 分), 而这是
-# **「平均」的固有性质** —— 因子越多挤得越狠。用户自己想到了对的解法:
-# 「因子我可以在今日总览页面自定义选择哪些开启」。少平均几个, 带宽就回来了。
-#
-# 关键是**「你关掉的」与「我们没读到的」必须分开**:
-#
-#   · 没读到 → 覆盖率下降 → 置信系数打折(见 confidence())
-#   · 你关掉 → **压根不进分母**, 一分不扣
-#
-# 混在一起的话, 每关掉一个因子就会被置信系数罚一次 —— 那等于告诉用户
-# 「这个开关你最好别动」, 开关就白给了。
-#
-# 至少要留一个因子: 两根轴全空会让每只票都是 0 分, 那不是筛选是清屏。
-MIN_ENABLED = 1
-
-
-def enabled_weights(weights: dict[str, float],
-                    enabled: set[str] | None) -> dict[str, float]:
-    """按用户勾选裁剪权重表。裁完为空则整表原样返回(见 MIN_ENABLED)。
-
-    **不重新归一化** —— `_blend` 本来就按"还在的那些"的权重和去除, 所以
-    裁剪后各因子的**相对**比例自动保持不变。这一点很重要: 关掉换手率不该
-    改变趋势模板与磨底节拍之间的相对轻重。
-    """
-    if not enabled:
-        return weights
-    got = {k_: w for k_, w in weights.items() if k_ in enabled}
-    return got if len(got) >= MIN_ENABLED else weights
+# [R218] 因子开关(R204)删掉了 —— 用户: 「不搞自选了」。
+# 连同 `enabled_weights` / `MIN_ENABLED` / `score_candidate(enabled=)` 一起,
+# 不留半截。带宽问题的出路在名次与分位(R201), 不在这个旋钮。
 
 
 def _blend(parts: dict[str, float | None], weights: dict[str, float]) -> tuple[float | None, float]:
@@ -544,8 +517,7 @@ def score_candidate(*, duration: int | None, state: str | None,
                     template: dict | None = None,
                     rhythm: dict | None = None,
                     geo: dict | None = None,
-                    runs: dict | None = None,
-                    enabled: set[str] | None = None) -> dict:
+                    runs: dict | None = None) -> dict:
     """质地 × 时机 两轴打分。返回 {score, axes, factors, coverage, partial}。纯函数。
 
     rs_pct: 个股 20 日收益 − 大盘 20 日收益, 单位**百分点**(如 +6.0 表示跑赢 6 个点)。
@@ -560,8 +532,6 @@ def score_candidate(*, duration: int | None, state: str | None,
               几何层, 供 spread(进质地)与 accel(进时机)两个因子。
     runs:     [R197] keltner_geometry.runs 的返回值(可缺) —— 其中的
               compress_days 用来替换磨底那一半的判据(见 base_score)。
-    enabled:  [R204] 用户在今日总览勾选的因子键。None = 全开。**关掉的因子
-              不进覆盖率分母**, 所以不会被置信系数罚。
     """
     fresh: float | None
     fresh_from: str
@@ -596,12 +566,8 @@ def score_candidate(*, duration: int | None, state: str | None,
         "accel": accel_score(geo),
     }
 
-    # [R204] 先按用户勾选裁权重, 再合成 —— 于是覆盖率只在"你要的那些"上算,
-    # 关掉一个因子不会被置信系数当成"没读到"罚一次。
-    qw = enabled_weights(QUALITY_WEIGHTS, enabled)
-    tw = enabled_weights(TIMING_WEIGHTS, enabled)
-    quality, cov_q = _blend(factors, qw)
-    timing, cov_t = _blend(factors, tw)
+    quality, cov_q = _blend(factors, QUALITY_WEIGHTS)
+    timing, cov_t = _blend(factors, TIMING_WEIGHTS)
     axes: dict[str, float | None] = {AXIS_QUALITY: quality, AXIS_TIMING: timing}
 
     # 几何平均。一根轴整根缺席时退回另一根 —— 不能把"没读到质地"当成"质地 0",
