@@ -320,11 +320,16 @@ export function ChannelStateCell({ trend, geo, runs, ph, kc, close, trendCls,
             </button>
           )}
         </span>
-        {/* [R223] 六态与阶段打架时, 第二行换成那句话 —— 用户: 「图形对不上结论啊」。
-            不替用户选边(两边量的不是同一个东西, 谁都没算错), 但必须让他看见。 */}
-        {ph?.gap ? (
-          <span className="cursor-help text-[9px] text-amber-300/85" title={ph.gap.why}>
-            ⚠ {ph.gap.cn}
+        {/* [R224] 第二行给「三个尺度走到第几步」, 而不是一个警告。
+            R223 那版是成对冲突检查, 实测超过一半的行挂警告 —— 那是噪声。
+            三者是滞后阶梯(价格最快→六态→均线最慢), 不一致 = 转折还没走完。 */}
+        {ph?.align ? (
+          <span className={`cursor-help text-[9px] ${
+            ph.align.level === 3 ? 'text-red-400/80'
+              : ph.align.level === 0 ? 'text-emerald-400/80'
+              : ph.align.level === null ? 'text-muted' : 'text-amber-300/85'}`}
+                title={ph.align.why}>
+            {ph.align.cn}
           </span>
         ) : (
           <span className="text-[9px] text-muted">

@@ -17,9 +17,10 @@
  * 表本身**由后端生成**(`/api/stock-analysis/combo-table`), 不在前端写死一份 ——
  * 誊抄的表会漂: 底层哪天改了措辞, 这里就开始说假话, 而且没有任何东西会报错。
  */
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { X } from 'lucide-react'
-import { api, type ChannelGeometry, type ChannelRuns } from '@/lib/api'
+import { ChevronDown, X } from 'lucide-react'
+import { api, type ChannelGeometry, type ChannelRuns, type ComboTableRow } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { cn } from '@/lib/cn'
 
@@ -99,6 +100,95 @@ function LiveStrip({ geo, runs }: { geo: ChannelGeometry; runs?: ChannelRuns | n
   )
 }
 
+/** 常见度画成三颗点 —— 写字占地方, 而这一列只需要"多还是少"。 */
+function Dots({ rarity }: { rarity?: string }) {
+  const n = rarity?.startsWith('很常见') ? 3 : rarity === '常见' ? 2
+    : rarity === '偶尔' ? 1 : 0
+  return (
+    <span className="inline-flex gap-[2px]" title={`这一格${rarity ?? ''}`}>
+      {[0, 1, 2].map(i => (
+        <i key={i} className={cn('h-[3px] w-[3px] rounded-full',
+          i < n ? 'bg-amber-300/70' : 'bg-border')} />
+      ))}
+    </span>
+  )
+}
+
+/** 一行 —— 一格组合。`hero` 是"你现在在这一格"那张主卡。 */
+function Row({ r, hero }: { r: ComboTableRow; hero?: boolean }) {
+  return (
+    <div className={cn('flex gap-2.5 px-2.5 py-1.5',
+      hero ? 'rounded-card border border-accent/40 bg-accent/10'
+        : 'border-b border-border/20 last:border-0')}>
+      <span className={cn('shrink-0 font-mono tabular-nums',
+        hero ? 'text-[13px] text-foreground' : 'text-[11px] text-foreground/85')}
+        title={r.shape}>
+        {r.combo}
+      </span>
+      <span className="mt-[5px] shrink-0"><Dots rarity={r.rarity} /></span>
+      <span className={cn('w-[4.5rem] shrink-0 text-[11px]',
+        r.verdict ? TONE_CLS[r.verdict.tone] ?? 'text-muted' : 'text-muted/50')}>
+        {r.verdict?.title ?? '（无结论）'}
+      </span>
+      <span className="min-w-0 flex-1 text-[11px] leading-relaxed text-secondary">
+        {r.read}
+        {!!r.note && (
+          <span className="mt-0.5 block text-[10px] leading-relaxed text-amber-300/85">
+            ▸ {r.note.title}:{r.note.detail}
+          </span>
+        )}
+      </span>
+    </div>
+  )
+}
+
+// 三组。按**偏贵 / 中性 / 偏便宜**分, 而不是按字典序 —— 打开这张表想知道的是
+// "我这一格在贵贱谱系的哪一端, 旁边是什么", 字典序回答不了这个。
+const GROUPS = [
+  { key: 'sell', cn: '偏贵 · 别在这加', tones: ['sell', 'avoid'], cls: 'text-red-400/80' },
+  { key: 'mid', cn: '中性 · 还不到动手的时候', tones: ['hold', 'watch', ''], cls: 'text-secondary' },
+  { key: 'buy', cn: '偏便宜 · 低吸侧', tones: ['buy'], cls: 'text-sky-300/80' },
+] as const
+
+function ComboGroups({ rows, here }: { rows: ComboTableRow[]; here: string | null }) {
+  const [showRare, setShowRare] = useState(false)
+  const mine = rows.find(r => r.combo === here) ?? null
+  const rare = (r: ComboTableRow) => r.rarity === '几乎不出现'
+  const rest = rows.filter(r => r.combo !== here)
+  const hiddenCount = rest.filter(r => rare(r) && !showRare).length
+  return (
+    <div className="space-y-3">
+      {mine && (
+        <div>
+          <div className="mb-1 text-[10px] text-muted">你现在在这一格</div>
+          <Row r={mine} hero />
+        </div>
+      )}
+      {GROUPS.map(g => {
+        const items = rest.filter(r => g.tones.includes((r.verdict?.tone ?? '') as never))
+          .filter(r => showRare || !rare(r))
+        if (!items.length) return null
+        return (
+          <div key={g.key}>
+            <div className={cn('mb-0.5 text-[10px]', g.cls)}>{g.cn}</div>
+            <div className="overflow-hidden rounded-card border border-border/40">
+              {items.map(r => <Row key={r.combo} r={r} />)}
+            </div>
+          </div>
+        )
+      })}
+      {(hiddenCount > 0 || showRare) && (
+        <button type="button" onClick={() => setShowRare(v => !v)}
+                className="flex items-center gap-1 text-[10px] text-muted hover:text-foreground">
+          <ChevronDown className={cn('h-3 w-3 transition-transform', showRare && 'rotate-180')} />
+          {showRare ? '收起几乎不出现的那几格'
+            : `还有 ${hiddenCount} 格几乎不出现(中线跑到短线与长线的另一侧, 几何上近乎不可能)`}
+        </button>
+      )}
+    </div>
+  )
+}
+
 export function ComboTableDialog({ onClose, geo, runs, name }: {
   onClose: () => void
   geo?: ChannelGeometry | null
@@ -130,59 +220,21 @@ export function ComboTableDialog({ onClose, geo, runs, name }: {
         <div className="min-h-0 flex-1 space-y-3 overflow-auto px-4 py-3">
           {!!geo && <LiveStrip geo={geo} runs={runs} />}
 
-          <table className="w-full text-[11px]">
-            <thead className="sticky top-0 bg-surface">
-              <tr className="border-b border-border/60 text-[10px] text-muted">
-                <th className="w-16 py-1.5 text-left font-normal">短中长</th>
-                <th className="w-16 py-1.5 text-left font-normal"
-                    title="这一格在真实行情里出现得有多频繁。四格占了一多半, 七格几乎不出现 —— 「三档同时到上沿」听着像罕见的极端信号, 其实是最常见的几种之一">常见度</th>
-                <th className="w-20 py-1.5 text-left font-normal">系统结论</th>
-                <th className="py-1.5 text-left font-normal">几何含义</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(q.data?.rows ?? []).map(r => {
-                const on = r.combo === here
-                return (
-                  <tr key={r.combo}
-                      className={cn('border-b border-border/25 align-top',
-                        on && 'bg-accent/10 ring-1 ring-inset ring-accent/40')}>
-                    <td className="py-1.5 font-mono tabular-nums text-foreground/90">
-                      {r.combo}
-                      {on && <span className="ml-1 text-[9px] text-accent">现在</span>}
-                    </td>
-                    <td className={cn('py-1.5 text-[10px]',
-                      r.rarity?.startsWith('很常见') ? 'text-amber-300/80'
-                        : r.rarity === '几乎不出现' ? 'text-muted/40' : 'text-muted/70')}>
-                      {r.rarity ?? ''}
-                    </td>
-                    <td className={cn('py-1.5', r.verdict ? TONE_CLS[r.verdict.tone] ?? 'text-muted' : 'text-muted/50')}>
-                      {r.verdict?.title ?? '（无结论）'}
-                    </td>
-                    <td className="py-1.5 leading-relaxed text-secondary">
-                      <span className="text-muted/80">{r.shape}</span>
-                      <span className="mx-1 text-muted/50">·</span>
-                      {r.read}
-                      {!!r.note && (
-                        <span className="mt-0.5 block text-[10px] leading-relaxed text-amber-300/85">
-                          ▸ {r.note.title}:{r.note.detail}
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-          {q.isLoading && <p className="py-4 text-center text-[11px] text-muted">加载中…</p>}
-          <p className="pt-1 text-[10px] leading-relaxed text-muted/70">
-            「系统结论」这一列是**直接调底层判定生成的**,不是誊抄 —— 底层怎么说,这里就怎么显示,
-            不会有一份对照表偷偷说着过时的话。带 ▸ 的是补充:那几格底层的措辞与这一格的事实对不太上。
-            <br />
-            「常见度」是蒙特卡洛量出来的:三档的门槛按各自波动折算是 2.00 / 1.44 / 1.22 倍标准差,
-            <b className="text-foreground/80">越长的那一档越松、越容易到边</b>,所以「三档同时到同一边」并不是三重确认,
-            它在毫无趋势的行情里也常出现。
-          </p>
+          {/* [R225] 27 行的表改成**分组卡片**。用户: 「把这部分做好看一点, 好丑。
+              看看怎么显示更有价值而不是一堆数据」。
+
+              原来是一张 27 行的表, 每行三行字, 而「几何含义」开头那半句
+              (「短期在上沿、中期在上沿、长期在上沿」)和左边的「短中长」列
+              **说的是同一件事** —— 27 行里印了 27 遍纯重复。整体是一堵字墙。
+
+              三处改动:
+                ① 「你现在在这一格」提成顶上的主卡, 不再是列表里一行高亮 ——
+                   打开这个弹窗第一件想知道的就是它
+                ② 其余按**偏贵 / 中性 / 偏便宜**分三组, 而不是按字典序摊平 ——
+                   要的是"我这一格在贵贱谱系的哪一端, 旁边是什么"
+                ③ 重复的那半句退到悬停; 常见度画成点不写字;
+                   七个「几乎不出现」的默认收起来 */}
+          <ComboGroups rows={q.data?.rows ?? []} here={here} />
         </div>
       </div>
     </div>

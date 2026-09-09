@@ -979,67 +979,90 @@ def test_注记只补话不改底层结论():
 
 
 # ================================================================
-# [R223] 六态与阶段对不上的时候必须说出来
+# [R224] R223 的那一节整块删了 —— `trend_phase_gap` 已经被 `alignment` 取代
 #
-# 用户: 「好多不对的, 可能是因为一些组合没有结论的, 像这些特殊的你要描述清楚
-# 情况说清楚, 不然图形对不上结论啊」—— 截图里并排着「自然回升 10天 + 下跌中」
-# 「下跌趋势 6天 + 涨势转弱」这样的行。
+# R223 我给「六态 vs 阶段」加了一处成对冲突检查。用户随后问「怎么那么多打架的」,
+# 一量才发现是**我造成的**:
 #
-# **不是某一边算错了。** 两边量的根本不是同一个东西:
-#     六态 看价格的高低点(利弗莫尔关键点) —— 价格一转向它就转
-#     阶段 看三条均线的中枢 —— 而均线是滞后算子
-# 所以转折那一段它们必然对不上, 而那恰恰是最值得知道的一段。
+#     六态 vs 通道结论  29.8%
+#     六态 vs 阶段      33.2%   ← R223 加的
+#     至少报一个        51.5%   ← 超过一半的行挂着警告
+#
+# **N 个判定做成对检查就有 N(N−1)/2 个警报**, 而它们并不独立。R205 立的规矩
+# (「一半的票都显示打架就没人看了」)被我自己破了。
+#
+# 换成 `alignment`: 三者不是三个意见, 是一个**滞后阶梯**(价格最快 → 六态 →
+# 均线中枢最慢), 不一致本身就是"转折走到第几步"的读数。**报进度, 不报警。**
+# 下面那一节测的就是它。
+
+# ================================================================
+# [R224] 具名场景 —— 不许随机抽样
+#
+# 用户: 「不允许随机抽取, 必须是精心挑选」。**这条批评是对的, 我已经栽过两次**:
+# 用随机游走量红绿节拍, 400 条全判 `failing`(随机游走结构上产不出「蓄势」);
+# 用随机抽的因子量相关性, 而其中六个是我独立抽的 —— 那测的是我的抽样。
+#
+# 换成手工构造的具名场景之后**第一轮就又抓到一个自己的错**: 摆动幅度给了
+# 0.4%, ATR 塌到接近 0, 于是「缓慢爬升」被判成"大顶区域 + 涨过头"。
+# 真实日线波动约 2%, 改过来才对。这条教训写在 fixtures 里。
 
 
-def _ph(code):
-    return {"code": code, "cn": g.PHASE_CN[code]}
+def _scen(name):
+    import sys, pathlib
+    sys.path.insert(0, str(pathlib.Path(__file__).parent))
+    from fixtures.market_archetypes import SCENARIOS, atrs
+    c = SCENARIOS[name][1]
+    a = atrs(c)
+    bands = {key: k.assess(close=c[-1], ma=sum(c[-w:]) / w, atr=a[-1], n=g.K[key])
+             for key, w in (("s", 20), ("m", 60), ("l", 120))}
+    geo = g.geometry(bands, c[-1])
+    return c, a, bands, geo, g.runs(g.series(c, a))
 
 
-@pytest.mark.parametrize("state,code", [
-    ("NR", g.PH_DECLINING),      # 六态多头, 阶段在跌势侧
-    ("UT", g.PH_DECLINING),
-    ("SR", g.PH_DECLINING),
-    ("DT", g.PH_ADVANCING),      # 六态空头, 阶段在涨势侧
-    ("DT", g.PH_STALLING),
-    ("NREA", g.PH_LAUNCHING),
-])
-def test_六态与阶段相反时要报出来(state, code):
-    got = g.trend_phase_gap(state, _ph(code))
-    assert got, (state, code)
-    assert got["cn"] == "六态与通道不一致"
-    # 必须解释**为什么**会不一致, 不能只挂个警告
-    assert "均线" in got["why"] and ("滞后" in got["why"] or "后转" in got["why"])
+def test_样本的波动幅度必须像真的():
+    """ATR 塌了整套样本就废 —— 这一条钉住那个教训。
+
+    真实 A 股日线 ATR 约占价格 2~3%。样本低于 0.8% 就说明摆动写小了,
+    那时任何一根 K 线在 ATR 尺度上都成天文数字, 一切判定跟着失真。
+    """
+    for name in ("蓄势突破前", "缓慢爬升", "下跌途中"):
+        c, a, *_ = _scen(name)
+        pct = a[-1] / c[-1]
+        assert 0.008 <= pct <= 0.06, f"{name}: ATR 占价格 {pct:.1%}, 不像真的"
 
 
-@pytest.mark.parametrize("state,code", [
-    ("UT", g.PH_ADVANCING), ("NR", g.PH_LAUNCHING), ("NR", g.PH_STALLING),
-    ("DT", g.PH_DECLINING), ("NREA", g.PH_DECLINING),
-])
-def test_方向一致时不该报(state, code):
-    assert g.trend_phase_gap(state, _ph(code)) is None, (state, code)
+def test_横盘场景必须判成挤在一起():
+    """场景名就是断言 —— 「蓄势突破前」判不出压缩就是系统的问题。"""
+    *_, geo, runs = _scen("蓄势突破前")
+    assert geo["nested"], geo["spread"]
+    assert g.phase(geo, runs)["code"] == g.PH_COILING
 
 
-@pytest.mark.parametrize("code", [g.PH_COILING, g.PH_UNCLEAR])
-@pytest.mark.parametrize("state", ["UT", "NR", "SR", "SREA", "NREA", "DT"])
-def test_不表态的阶段一律不算打架(state, code):
-    """横盘中 / 看不出本来就不指方向。把它们算进来会让一半的行都挂标记,
-    那这个标记三天后就没人看了(R205 立的规矩)。"""
-    assert g.trend_phase_gap(state, _ph(code)) is None, (state, code)
+def test_挤在一起的时候三尺度不许报方向():
+    """[R224] 具名场景抓到的: 纯横盘的「蓄势突破前」因为 spread 恰好差一点点负,
+    被报成「正在转空」。横盘票三个符号本来就随时翻号, 拿它们数票是错的。"""
+    *_, geo, _ = _scen("蓄势突破前")
+    al = g.alignment("NR", geo)
+    assert al["level"] is None and "挤在一起" in al["cn"], al
 
 
-def test_走过头按间距的符号定方向():
-    """`overextended` 一个 code 两个方向 —— 得看 spread 的符号才知道是涨过头
-    还是跌过头, 光看 code 判不了。"""
-    up = {"code": g.PH_OVEREXTENDED, "cn": g.PHASE_OVEREXTENDED_CN["up"]}
-    dn = {"code": g.PH_OVEREXTENDED, "cn": g.PHASE_OVEREXTENDED_CN["down"]}
-    assert g.trend_phase_gap("UT", up, {"spread": 6.0}) is None      # 多头 + 涨过头 = 一致
-    assert g.trend_phase_gap("DT", up, {"spread": 6.0})              # 空头 + 涨过头 = 打架
-    assert g.trend_phase_gap("DT", dn, {"spread": -6.0}) is None     # 空头 + 跌过头 = 一致
-    assert g.trend_phase_gap("UT", dn, {"spread": -6.0})             # 多头 + 跌过头 = 打架
-    # 拿不到 spread 就不猜方向
-    assert g.trend_phase_gap("DT", up, None) is None
+def test_趋势场景三尺度要一致():
+    for name in ("主升浪", "涨过头"):
+        *_, geo, _ = _scen(name)
+        assert g.alignment("UT", geo)["level"] == 3, name
+    for name in ("下跌途中", "破位下跌", "跌过头"):
+        *_, geo, _ = _scen(name)
+        assert g.alignment("DT", geo)["level"] == 0, name
 
 
-def test_缺输入时安静返回空():
-    assert g.trend_phase_gap(None, _ph(g.PH_DECLINING)) is None
-    assert g.trend_phase_gap("UT", None) is None
+def test_具名场景一个都不许算崩():
+    """整套场景跑通 —— 几何/阶段/事件/三尺度都得给得出东西。"""
+    import sys, pathlib
+    sys.path.insert(0, str(pathlib.Path(__file__).parent))
+    from fixtures.market_archetypes import SCENARIOS
+    for name in SCENARIOS:
+        *_, geo, runs = _scen(name)
+        assert geo, name
+        assert g.phase(geo, runs), name
+        assert g.event(state="NR", duration=3, geo=geo, run=runs), name
+        assert g.alignment("NR", geo), name
