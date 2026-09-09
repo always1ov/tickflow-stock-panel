@@ -197,9 +197,23 @@ def channels_for_symbols(repo, symbols: list[str]) -> dict[str, dict]:
                 # [R233] 结论徽标要能说"这一档已经连着几天了" —— 天数与结论是
                 # 同一件事的两半, 挂在 verdict 里而不是另起一个平级字段,
                 # 免得界面各处取一个忘一个。
+                #
+                # [R234] 这里原来写的是「两个 code 对不上就**不给**天数」,
+                # 那是个静默失败的坑。
+                #
+                # 上面这三档是拿 enriched 快照里预计算的 ma20/ma60 拼的, 而
+                # verdict_run 自己滚均线 —— 最后一根本来就可能差一点(停牌行被
+                # drop_nulls 掉、批量末根与快照末根不是同一天)。于是一种**常见
+                # 情况**被当成异常处理, 天数从徽标上消失, 而界面上没有任何线索
+                # 说明为什么。
+                #
+                # 现在对不上时**今天仍然算数**: 徽标上印的就是 v["code"], 说它
+                # 「连着第 1 天」是真话(按历史那条路的读法, 昨天不是这一档)。
+                # 一个偏保守的数字远好过一个消失的字段。
                 vr = (long_map.get(sym) or {}).get("verdict_run")
-                if vr and vr.get("code") == v.get("code"):
-                    v = dict(v, days=int(vr["days"]))
+                if vr:
+                    same = vr.get("code") == v.get("code")
+                    v = dict(v, days=int(vr["days"]) if same else 1)
             row = dict(bands, verdict=v) if v else dict(bands)
             # [R195] 几何量(速度/加速度/压缩/排列)。**零新增取数** —— 全部从
             # 已经算好的三档上下轨反推(轨 = MA ± k·ATR 是恒等式)。

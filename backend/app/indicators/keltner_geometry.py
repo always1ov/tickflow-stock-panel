@@ -590,6 +590,13 @@ def verdict_run(closes: list[float] | None, atrs: list[float] | None) -> dict | 
 
     原料就是 `series()` 用的那一串收盘价与 ATR, **不新增任何取数**。
     往回最多数 `MAX_LOOKBACK` 天。
+
+    ## 这里判定的"今天"未必等于快照的"今天"
+
+    这个函数自己滚均线, 而 `channels_for_symbols` 的三档是拿 enriched 快照里
+    **预计算的 `ma20`/`ma60`** 拼的。两条路在最后一根上可能差一点(停牌行被
+    `drop_nulls` 掉、批量末根与快照末根不是同一天), 于是两个 code 对不上。
+    **那种情况怎么处理归调用方决定** —— 见 `keltner_service` 里 R234 那段。
     """
     from app.indicators.keltner import assess, verdict as _verdict
 
@@ -622,11 +629,12 @@ def verdict_run(closes: list[float] | None, atrs: list[float] | None) -> dict | 
         # 三档都在通道中部(底层返回 None), 或者当天算不出来。
         # 这时候"持续几天"没有可说的 —— 不给 0, 给 None, 让界面照旧什么都不显示。
         return None
-    days = 1
-    for i in range(n - 2, max(-1, n - 1 - MAX_LOOKBACK), -1):
+    days = 0
+    for i in range(n - 1, max(-1, n - 1 - MAX_LOOKBACK), -1):
         if _code_at(i) != today:
             break
         days += 1
+    # today 就是最后一根算出来的, 所以循环第一轮必然命中 —— days ≥ 1。
     return {"code": today, "days": days}
 
 

@@ -160,3 +160,27 @@ def test_十条结论没有一条被排除在天数之外():
             f"verdict_run 里出现了 `{code}` —— 它不该认识任何具体的结论码, "
             f"只该数「今天这个码往回连着几天」"
         )
+
+
+def test_两条路对不上时今天仍然算一天而不是整个不给():
+    """[R234] 用户: 「个股页面的外面并没有显示, 只是点击的里面」。
+
+    `channels_for_symbols` 的三档是拿 enriched 快照里**预计算的** ma20/ma60
+    拼的, 而 `verdict_run` 自己滚均线 —— 最后一根本来就可能差一点(停牌行被
+    drop_nulls 掉、批量末根与快照末根不是同一天)。
+
+    原来那道「对不上就不给天数」的校验把这种**常见情况**当成了异常, 天数
+    静默消失, 界面上没有任何线索。这条盯的是修好之后的行为: 对不上时今天
+    仍然算数(徽标上印的就是那个 code), 保底 1 天。
+    """
+    import inspect
+
+    from app.services import keltner_service
+    src = inspect.getsource(keltner_service.channels_for_symbols)
+    assert 'days=int(vr["days"]) if same else 1' in src, (
+        '两条路对不上时又变回「整个不给」了 —— 那会让天数从徽标上静默消失'
+    )
+    # 反向: 不该再出现"对不上就跳过"的写法
+    assert 'if vr and vr.get("code") == v.get("code")' not in src, (
+        "静默失败的那道校验回来了"
+    )
