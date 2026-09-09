@@ -534,8 +534,6 @@ export interface TodayHolding {
   symbol: string; name: string; close: number | null; cost: number | null; pnl_pct: number | null
   stage_cn: string | null; line: number | null; line_cn: string | null; distance_pct: number | null
   exit_triggered: boolean; trend_cn: string | null; trend_duration: number | null
-  /** [R245] 天数撞上回看窗口 —— 是下界不是准数 */
-  trend_duration_capped?: boolean | null
   trend_side: string | null; signal: string | null
   stance: string; stance_why: string
   weight?: number | null
@@ -644,22 +642,15 @@ export interface KeltnerVerdict {
   tone: 'sell' | 'buy' | 'hold' | 'avoid' | 'watch'
   /** 排序权重, 越大越偏卖。由后端给 —— 界面不自己编一套顺序 */
   rank: number
+  /** [R246] 这一档**从今天往回连着几天**(交易日, 含今天)。中断即重算, 不累计 */
+  days?: number
+  /** 这一段的第一个交易日 —— 天数每天变, 它不变, 拿它可以回 K 线上核对 */
+  since?: string
+  /** 天数是**下界**: 序列到头了, 或再往前那天算不出来。徽标上写 `+` */
+  capped?: boolean
   /** 哪几档共振, 如"短期破上轨、中期也贴上轨" */
   bands_text: string
   bands_aligned: number
-  /** [R233] 这一档结论已经连着挂了几天(含今天)。中间断一天就重新起算。
-   *  只有决策台/今日总览那份"今天的读数"带它 —— 复盘的逐日行是**当天**的
-   *  结论, 天数由段卡片自己算, 这里为 undefined。 */
-  days?: number
-  /** [R236] 上面那个 days 是**数出来的**还是**只能确认到今天**。
-   *  false 表示历史读数不可用(这只票太新 / 两条路对不上), 那时 days 恒为 1,
-   *  含义是"至少 1 天"而不是"就是第 1 天"。 */
-  days_exact?: boolean
-  /** [R237] 进入这一档的那个**交易日**(YYYY-MM-DD)。天数每天变, 它不变 ——
-   *  可以拿它回 K 线上核对那天到底发生了什么。`days_exact` 为 false 时没有。 */
-  since?: string
-  /** [R237] 这一段比能取回的历史还长, `days` 是**下界**而不是准确值。 */
-  capped?: boolean
 }
 
 /**
@@ -939,9 +930,6 @@ export interface ComboTableRow {
   note: { title: string; detail: string } | null
 }
 
-/** [R242] 没有通道结论时, 那一格徽标(组合注记标题)的状态时长 */
-export interface StateRun { days: number; since?: string; capped?: boolean }
-
 export interface KeltnerBands {
   s?: KeltnerBand
   m?: KeltnerBand
@@ -953,11 +941,9 @@ export interface KeltnerBands {
   runs?: ChannelRuns | null
   /** [R197] 频段能量分布 —— 这只票的波动主要来自哪个周期 */
   energy?: BandEnergy | null
-  /**
-   * [R242] 当前状态连着多少天。有结论时与 `verdict.days` 同值; 没结论时数的是
-   * 三档组合本身 —— 结论列每一个徽标都该带「已N天」, 这才叫统一表达。
-   */
-  state_run?: StateRun | null
+  /** [R246] 三档都在通道中部(判不出结论)那一格的时长 —— 那一格徽标印的是
+   *  组合注记的标题, 同样要有天数。有结论时天数在 `verdict` 里, 这里缺席 */
+  state_run?: { days: number; since?: string; capped?: boolean } | null
 }
 
 export interface ChannelRuns {
@@ -970,12 +956,6 @@ export interface ChannelRuns {
   /** 连续多少天收盘在短期上轨之上。1 天 = 突破, ≥2 天 = 站稳 */
   above_run: number
   below_run: number
-  /** [R245] 天数是**数出来的**(false)还是**没得数了**(true) —— 撞上回看上限、
-   *  数完了整段历史、或撞上长期档暖机不够算不出来的那些天。true 时徽标要写 `+`:
-   *  「磨了 250 天」和「至少磨了 250 天」是两个数。0 天谈不上下界, 恒为 false。 */
-  compress_capped?: boolean
-  above_capped?: boolean
-  below_capped?: boolean
   box_high: number | null
   box_low: number | null
   box_range_atr: number | null
@@ -1008,9 +988,6 @@ export interface TrendInfo {
   action: string
   side: '多头' | '空头'
   duration: number
-  /** [R245] 天数是**数出来的**还是**没得数了**。六态零暖机, 所以一段铺满整个
-   *  回看窗口时, 报出来的就是**窗口长度本身** —— 那是下界, 徽标上要写 `+`。 */
-  duration_capped?: boolean
   since: string
   entered_from: LivermoreState | null
   entered_from_cn: string | null

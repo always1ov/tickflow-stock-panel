@@ -104,7 +104,7 @@ function LiveStrip({ geo, runs }: { geo: ChannelGeometry; runs?: ChannelRuns | n
           )}
         </>)}
       {!!runs?.compress_days && block('重合', '到今天为止连着多少天三种看法都认同一个价 —— 也就是这只票横了多久',
-        <>横了{num(String(runs.compress_days))}天{runs.compress_capped ? '以上' : ''}</>)}
+        <>横了{num(String(runs.compress_days))}天</>)}
     </div>
   )
 }

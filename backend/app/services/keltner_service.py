@@ -37,29 +37,6 @@ _SLOPE_LOOKBACK = 20
 # 自然日约 285 个交易日。只有 with_closes=True 时才用这个跨度。
 _LOOKBACK_DAYS_LONG = 420
 
-# [R244/R245] **整条 Keltner 历史路的窗口。**
-#
-# 用户: 「候选池显示的天数不正确」→「最优解, 替我完善」。
-#
-# 这一层所有的"连着几天"(逐日结论、磨底、在轨外)都从 `series()`/`verdict_codes()`
-# 派生, 而它们的长期档要**自己滚 MA120** —— 日线表只预计算到 `ma60`, 没有
-# `ma120` 列, 而 `pipeline.py` 是作者的、不能加。于是序列**最老的 119 天一律
-# 算不出来**。
-#
-#     260 个自然日 ≈ 185 根 K  −  120 根暖机  =  只剩 66 天数得出来
-#
-# 而这一层承诺的上限是 250(`VERDICT_TAIL` / `MAX_LOOKBACK`)。**那两个常数
-# 从来就是空话** —— 一只挂了大半年的「候选池」封顶印 59, 磨了一年的底封顶
-# 印 66, 而且都不标下界, 看着像准数。
-#
-#     520 个自然日 ≈ 371 根 K  −  120 根暖机  =  252 天, 刚好盖住 250
-#
-# R244 时只把这个窗口给了逐日结论, 几何那几个数还留在 260 天上 —— 那是刻意
-# 的保守(不想在一次修 bug 里顺手改掉别的读数)。R245 用户说「最优解」,
-# 于是**统一到一个窗口**: 同一份序列派生的量没道理各看各的历史长度,
-# 两套窗口本身就是下一个 bug 的温床。
-_LOOKBACK_DAYS_HISTORY = 520
-
 # 算历史序列至少要够长期档滚一遍
 WINDOW_LONG = 120
 
@@ -84,16 +61,12 @@ def long_trend_map(repo, symbols: list[str], *, with_closes: bool = False) -> di
     """
     end = date.today()
     span = _LOOKBACK_DAYS_LONG if with_closes else _LOOKBACK_DAYS
-    # [R245] 整条历史路统一到这一个窗口, 不再分"几何看短的、结论看长的"。
-    span = max(span, _LOOKBACK_DAYS_HISTORY)
     try:
         # [R195] 多要一列 atr_14 —— 压缩指数与"在轨外连续几天"要按 ATR 归一化算
         # 历史序列。**这一次批量读本来就在发生**(长期档的 MA120 没有预计算列,
         # 全自选每天都要走这里滚一遍), 多带一列几乎不花钱; 另起一条取数路才贵。
-        # [R238] 多要 ma20/ma60 两列。**不是为了省计算, 是为了同源** ——
-        # 复盘与决策台徽标都吃这两个预计算列, 逐日结论自己滚均线的话数出来的
-        # 逐日结论就和界面上另外两处不是一套, 天数对不上(用户: 「数字本身就
-        # 不对」)。长档没有预计算列, 仍然自己滚。
+        # [R246] 多要 ma20/ma60 两列: 逐日状态要与复盘、徽标**同源**。
+        # 自己滚均线的话逐日结论就和界面另外两处不是一套, 天数对不上。
         df = repo.get_daily_batch(symbols, end - timedelta(days=span), end,
                                   ["symbol", "date", "close", "atr_14",
                                    "ma20", "ma60"])
@@ -106,11 +79,6 @@ def long_trend_map(repo, symbols: list[str], *, with_closes: bool = False) -> di
     out: dict[str, dict] = {}
     for sym, sub in df.drop_nulls("close").sort("date").group_by("symbol"):
         name = str(sym[0] if isinstance(sym, tuple) else sym).upper()
-        # [R245] 一份序列, 一个窗口。R244 在这里分过两套(几何看 260 天、结论看
-        # 520 天), 那是为了不在修 bug 时顺手改别的读数 —— 但同一份序列派生的
-        # 量各看各的历史长度, 本身就是下一个 bug 的温床, 而且被它挡住的那几个
-        # 数(磨底、在轨外)恰恰也是截断的。统一之后就没有"哪个数吃哪个窗口"
-        # 这回事了。
         closes = sub["close"].to_list()
         ent: dict = {}
         if closes:
@@ -152,17 +120,17 @@ def long_trend_map(repo, symbols: list[str], *, with_closes: bool = False) -> di
                     e = kg.band_energy(cl, atrs)
                     if e:
                         ent["energy"] = e
-                    # [R239] 交出**逐日结论序列**(新→旧)而不是在这里数完。
+                    # [R246] 逐日状态序列(新→旧, 到第一个变化就收手)。
                     # 数的那一步归 channels_for_symbols —— 只有它知道徽标上
-                    # 印的是哪一档。理由见 kg.verdict_codes 的说明。
-                    codes = kg.verdict_codes(
+                    # 印的是哪一档。同一份序列, 不新增取数。
+                    states = kg.state_series(
                         cl, atrs,
                         ma20=sub["ma20"].to_list() if "ma20" in sub.columns else None,
                         ma60=sub["ma60"].to_list() if "ma60" in sub.columns else None)
-                    if codes:
-                        ent["verdict_codes"] = codes
+                    if states:
+                        ent["states"] = states
                         ds = [str(d) for d in sub["date"].to_list()]
-                        ent["verdict_dates"] = ds[::-1][:len(codes)]
+                        ent["state_dates"] = ds[::-1][:len(states)]
             except Exception as e:  # noqa: BLE001
                 logger.debug("channel runs skipped for %s: %s", name, e)
         if with_closes:
@@ -186,6 +154,36 @@ def _ma120_map(repo, symbols: list[str]) -> dict[str, float]:
     """
     return {k: v["ma120"] for k, v in long_trend_map(repo, symbols).items()
             if v.get("ma120") is not None}
+
+
+def _state_run(key: str | None, lm: dict) -> dict | None:
+    """[R246] `key` 这一档从今天往回连着几天。
+
+    返回 `{"days": N, "since": "YYYY-MM-DD", "capped": bool}`, 数不出来给 None。
+
+    口径: **中断即重算, 不累计。**「候选池」出现 3 天、隔一天、再 2 天,
+    报的是 2 天 —— 那是两次独立的出现, 报 5 天会让人以为它在这个位置磨了一周。
+    与"在轨外连续几天"、六态的 duration 同一条纪律。含今天(今天成立就是第 1 天)。
+
+    `capped` = 天数是**下界**: 序列到头了, 或再往前那天算不出来(长期档要 120
+    根暖机, 更早的日子判不了)。徽标上写 `+`。
+    """
+    seq = lm.get("states") or []
+    if not key or not seq or seq[0] != key:
+        return None
+    days = 0
+    for s in seq:
+        if s != key:
+            break
+        days += 1
+    out: dict = {"days": days}
+    dates = lm.get("state_dates") or []
+    if len(dates) >= days:
+        out["since"] = dates[days - 1]
+    # 哨兵: 后面那天是别的档 = 这一段自己结束了(准数); 是 None 或没有了 = 下界
+    if days >= len(seq) or seq[days] is None:
+        out["capped"] = True
+    return out
 
 
 def channels_for_symbols(repo, symbols: list[str]) -> dict[str, dict]:
@@ -233,49 +231,7 @@ def channels_for_symbols(repo, symbols: list[str]) -> dict[str, dict]:
             # [R44] 三档组合的结论跟着一起返回 —— 界面不必自己再拼一遍规则,
             # 也保证决策台、今日总览、悬停提示说的是同一句话
             v = verdict(bands)
-            if v:
-                # [R233] 结论徽标要能说"这一档已经连着几天了" —— 天数与结论是
-                # 同一件事的两半, 挂在 verdict 里而不是另起一个平级字段,
-                # 免得界面各处取一个忘一个。
-                #
-                # [R239] **拿徽标上这一档往回数**, 而不是要求两条路先在
-                # "今天"上达成一致。两条路的今天本来就常常不一样(enriched
-                # 快照 vs 日线批量), 那是个必须成立却经常不成立的前提, 结果
-                # 是全表每一行都退化成 1 天。
-                lm = long_map.get(sym) or {}
-                codes = lm.get("verdict_codes") or []
-                hist = kg.count_trailing(codes, v.get("code"))
-                if hist:
-                    v = dict(v, days=hist, days_exact=True)
-                    ds = lm.get("verdict_dates") or []
-                    if len(ds) >= hist:
-                        v["since"] = ds[hist - 1]
-                    # [R244] 上限是**判得出结论的天数**, 不是序列长度。
-                    # 写成 len(codes) 时永远不成立(见 kg.judgeable_span),
-                    # 于是被窗口截断的天数从来不标下界, 看着像个准数。
-                    if hist >= kg.judgeable_span(codes):
-                        v["capped"] = True
-                else:
-                    # 历史里最近一根就不是这一档 —— 通常就是今天刚变。
-                    v = dict(v, days=1, days_exact=False)
             row = dict(bands, verdict=v) if v else dict(bands)
-            if not v:
-                # [R242] **没有结论的那一格也要有天数。** 用户: 「别搞什么下跌
-                # 半年, 下跌多少天就表示多少天」—— 那一格徽标印的是组合注记
-                # 标题(「半年低位」), 一个模糊的时间词, 偏偏没有天数。
-                # 结论列每一个徽标都该带「已N天」, 这才叫统一表达。
-                lm = long_map.get(sym) or {}
-                codes = lm.get("verdict_codes") or []
-                key = kg.state_key(bands)
-                hist = kg.count_trailing(codes, key)
-                if hist:
-                    run = {"days": hist}
-                    ds = lm.get("verdict_dates") or []
-                    if len(ds) >= hist:
-                        run["since"] = ds[hist - 1]
-                    if hist >= kg.judgeable_span(codes):   # [R244] 同上
-                        run["capped"] = True
-                    row["state_run"] = run
             # [R195] 几何量(速度/加速度/压缩/排列)。**零新增取数** —— 全部从
             # 已经算好的三档上下轨反推(轨 = MA ± k·ATR 是恒等式)。
             geo = kg.geometry(bands, close)
@@ -286,5 +242,17 @@ def channels_for_symbols(repo, symbols: list[str]) -> dict[str, dict]:
                 row["runs"] = lm["runs"]
             if lm.get("energy"):
                 row["energy"] = lm["energy"]
+            # [R246] **最近这一档连着几天。** 用户: 「显示每个个股的通道结论里面
+            # 的最近的状态和持续时间」。
+            #
+            # 拿**徽标上印的那一档**往回数, 而不是要求逐日序列先和快照在"今天"
+            # 上达成一致 —— 两条路的今天本来就常常不一样(enriched 快照 vs
+            # 日线批量: 数据日期差一天、末根不同), 要求一致会让全表退化成 1 天。
+            run = _state_run(kg.state_key(bands), lm)
+            if run:
+                if v:
+                    v.update(run)          # 天数并进 verdict, 免得界面各处取一个忘一个
+                else:
+                    row["state_run"] = run  # 没结论那一格印的是组合注记, 同样要天数
             out[sym] = row
     return out

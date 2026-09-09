@@ -110,23 +110,7 @@ export function VerdictHover({ v, note, children }: {
             <div className={`w-1 shrink-0 ${TONE_BAR[v.tone]}`} />
             <div className="min-w-0 flex-1 px-3 py-2.5">
               <div className="flex items-baseline justify-between gap-2">
-                <span className={`text-xs font-medium ${TONE_ACCENT[v.tone]}`}>
-                  {v.title}
-                  {/* [R233] 连着第几天。**中间断一天就重新起算** ——
-                      出现 3 天、隔一天、再 2 天是两次独立的出现, 说成 5 天
-                      会把这一档持续了多久说多。 */}
-                  {/* [R237] 状态时长的完整说法: 已经多久 + 从哪天起。
-                      徽标上只放得下数字, 这里给能核对的那一份。 */}
-                  {v.days != null && (
-                    <span className="ml-1 text-[10px] font-normal text-muted"
-                          title={'这是**当前这一段**连着多少个交易日,不是历史累计。'
-                            + '含今天;中间只要断一天(换了一档或没有结论)就从头重新起算。'
-                            + (v.capped ? '\n\n已经数到能看到的最早一根,实际可能更长。' : '')}>
-                      {`已${v.days}天${v.capped ? '以上' : ''}`}
-                      {v.since ? ` · 自 ${v.since}` : ''}
-                    </span>
-                  )}
-                </span>
+                <span className={`text-xs font-medium ${TONE_ACCENT[v.tone]}`}>{v.title}</span>
                 <span className="shrink-0 text-[9px] text-muted">{TONE_CN[v.tone]}</span>
               </div>
 

@@ -560,60 +560,23 @@ def series(closes: list[float] | None, atrs: list[float] | None) -> list[dict]:
     return out
 
 
-def _tail_run(rows: list[dict], ok) -> tuple[int, bool]:
-    """从最后一根往回数, 连续满足 ok 的天数。中间断一天就停。
-
-    返回 `(天数, 是不是下界)`。
-
-    [R245] **第二个值是新加的, 而它才是这次要修的东西。** 原来只返回天数,
-    于是"数到 30 天它自己断了"和"数到 30 天没历史了"长得**一模一样** ——
-    前者是准数, 后者是下界, 差别是"磨了一个月"与"至少磨了一个月, 也可能是
-    一年"。段自己结束才是准数; 撞上下面这三堵墙都只是**没得数了**:
-
-        · 撞上 MAX_LOOKBACK          回看上限
-        · 数完了整段历史             窗口就这么长
-        · 撞上算不出来的那些天       长期档要 120 根暖机, 更早的行是 {}
-
-    第三堵墙最阴 —— 它长在数据中间而不是尽头, 所以连"数完了"都不像。
-    """
-    window = rows[-MAX_LOOKBACK:]
+def _tail_run(rows: list[dict], ok) -> int:
+    """从最后一根往回数, 连续满足 ok 的天数。中间断一天就停。"""
     run = 0
-    for r in reversed(window):
-        if not r:
-            # 空行 = 那天**算不出来**(暖机不够)。不是"这一段结束了", 是没得数了。
-            # 这一支单独摆出来: 写成 `not r or not ok(r)` 就会把第三堵墙误当成
-            # 段的自然结束, 天数照样是下界, 却被当成准数印出去。
-            return run, True
-        if not ok(r):
-            # 停在一个**算得出、但不满足条件**的日子上 = 这一段真的结束了
-            return run, False
+    for r in reversed(rows[-MAX_LOOKBACK:]):
+        if not r or not ok(r):
+            break
         run += 1
-    # 一路数到底: 要么撞上回看上限, 要么整段历史就这么长 —— 都只是下界
-    return run, True
-
-
-# [R240] 逐日结论序列往回取多少根。用户: 「我要确定性的显示多少天」——
-# 所以取回**整段可用历史**(线上窗口 260 个自然日 ≈ 178 个交易日), 而不是
-# 截一小段然后把长的段标成下界。
-#
-# 实测过成本(145 只自选, 300 根序列): limit=60 是 146ms, limit=250 是 399ms。
-# 多花的 0.25 秒挂在一个 5 分钟缓存一次的批量上, 换"数字是准的"值得。
-VERDICT_TAIL = 250
+    return run
 
 
 def state_key(bands: dict | None) -> str | None:
-    """[R242] 这一天的**状态键**。有结论就是结论码, 没结论就是三档组合。
+    """这一天**结论列徽标上印的是什么**。
 
-    用户: 「别搞什么下跌半年, 下跌多少天就表示多少天」。
+    有结论就是结论码(「候选池」= `watch_low`); 三档都在通道中部时底层判不出
+    结论, 那一格印的是补充层组合注记的标题, 所以拿三档位置拼一个键。
 
-    结论列的徽标有两种: 有结论时印结论标题(「候选池」), 没结论时印组合注记的
-    标题(「半年低位」)。原来只有前者带天数, 后者是个**模糊的时间词却没有天数**
-    —— 而用户要的恰恰是天数。
-
-    所以"状态"的定义扩一档: **徽标上印的是什么, 就数什么**。两种都是状态,
-    都该有「已N天」, 这也才对得上「必须统一表达」那条。
-
-    组合键用三档位置码拼(如 `combo:inside|below|inside`), 与结论码不会撞。
+    判定一个字都不是这里写的 —— 走作者的 `verdict`(`keltner.py` 只读)。
     """
     from app.indicators.keltner import verdict as _verdict
 
@@ -623,36 +586,28 @@ def state_key(bands: dict | None) -> str | None:
     if v:
         return str(v["code"])
     try:
-        return "combo:" + "|".join(str(bands[k]["pos"]) for k in ("s", "m", "l"))
+        return "|".join(str(bands[k]["pos"]) for k in ("s", "m", "l"))
     except (KeyError, TypeError):
         return None
 
 
-def verdict_codes(closes: list[float] | None, atrs: list[float] | None,
-                  *, ma20: list | None = None, ma60: list | None = None,
-                  limit: int = VERDICT_TAIL) -> list[str | None]:
-    """[R239] 最近若干个交易日的**状态键**(见 `state_key`), **新→旧**。
+def state_series(closes: list[float] | None, atrs: list[float] | None, *,
+                 ma20: list | None = None, ma60: list | None = None,
+                 limit: int = MAX_LOOKBACK) -> list[str | None]:
+    """最近这几天各是哪一档, **新→旧**, **到第一个与今天不同的那天为止**。
 
-    算不出的位置是 None。
+    用户: 「显示每个个股的通道结论里面的最近的状态和持续时间」。
 
-    判定一个字都不是这里写的 —— 三档走作者的 `assess`, 结论走作者的 `verdict`。
-    这一层只负责"把最近几天各是哪一档摆出来", 由调用方去数。
+    调用方要的只是"今天这一档连着几天", 所以**走到第一个变化就收手** ——
+    再往前算都是白算(一段 25 天的「候选池」不必算满 250 天)。
 
-    ## 为什么要交出整串, 而不是在这里数完
+    多留的那一天是**哨兵**, 不能省:
 
-    原来这里直接返回"连着几天"(`verdict_run`), 数的时候拿**自己算的今天**当
-    基准。可徽标上那一档是 `channels_for_symbols` 从 enriched 快照拼的, 两边
-    只要在最后一根上对不上(数据日期差一天、复权口径不同…), 天数就整个作废,
-    界面上**每一行都变成「已1天?」** —— 用户实测正是这样。
+        它是别的档   这一段自己结束了 —— 天数是准数
+        它是 None    算不到了(窗口到头, 或长期档 120 根暖机不够) —— 天数是下界
 
-    交出整串之后, 由调用方拿**它自己的那一档**往回数, 就不再需要两条路在
-    "今天"上达成一致 —— 少了一个必须成立、却经常不成立的前提。
-
-    ## 短中档吃预计算列
-
-    `ma20`/`ma60` 由调用方从日线表直接给, 与复盘、决策台徽标同源;
-    只有本来就没有预计算列的长档在这里自己滚。传 None 时退回自己滚,
-    那只是没有这两列时的退路(测试夹具走这条), 线上必须传。
+    短/中档吃调用方传进来的**预计算列** ma20/ma60(与复盘、决策台徽标同源);
+    长期档没有预计算列, 只能在这里自己滚。
     """
     from app.indicators.keltner import assess
 
@@ -670,79 +625,25 @@ def verdict_codes(closes: list[float] | None, atrs: list[float] | None,
     out: list[str | None] = []
     for i in range(n - 1, max(-1, n - 1 - max(0, limit)), -1):
         a = as_[i]
-        if a is None or a <= 0:
-            out.append(None)
-            break            # 见下面「到第一个变化就收手」
         bands: dict[str, dict] = {}
-        for k_ in ("s", "m", "l"):
-            m = ma[k_][i]
-            if m is None:
-                bands = {}
-                break
-            got = assess(close=vals[i], ma=m, atr=a, n=K[k_])
-            if not got:
-                bands = {}
-                break
-            bands[k_] = got
+        if a is not None and a > 0:
+            for k_ in ("s", "m", "l"):
+                m = ma[k_][i]
+                if m is None:
+                    bands = {}
+                    break
+                got = assess(close=vals[i], ma=m, atr=a, n=K[k_])
+                if not got:
+                    bands = {}
+                    break
+                bands[k_] = got
         key = state_key(bands) if len(bands) == 3 else None
         out.append(key)
-        # [R245] **到第一个变化就收手。**
-        #
-        # 用户: 「我的理解是这里不是已经有最新总结好的时间了吗, 怎么那么麻烦
-        # 你还搞不定?」—— 对, 贵的那部分是白花的。
-        #
-        # 下游只有 `count_trailing` 和 `judgeable_span`, 而它们**只读前导那一段**:
-        #
-        #     count_trailing(codes, x)  x == codes[0] 时数前导连续段, 一变就 break;
-        #                               x != codes[0] 时直接返回 0
-        #     judgeable_span(codes)     数到第一个 None 为止
-        #
-        # 两个都在第一个"与今天不同"的位置停下。所以**再往前算一天都是白算** ——
-        # 而原来是无脑算满 250 天: 一段 25 天的「候选池」要跑 250 次 `assess`×3
-        # + `verdict`, 十倍的白工, 145 只票乘起来就是那 0.3 秒。
-        #
-        # 多留的这一个"变了的"位置是**哨兵**, 不能省: `judgeable_span` 靠它区分
-        # 「段自己结束了」(准数)与「没得数了」(下界)。
-        if key != out[0]:
+        # 变了就停(那一项是哨兵)。`key is None` 单独写出来是因为今天本身就
+        # 判不出来时 `None != None` 不成立 —— 不写会一路空转到 limit。
+        if key is None or key != out[0]:
             break
     return out
-
-
-def judgeable_span(codes: list[str | None] | None) -> int:
-    """[R244] 从最近一天往回, 连着**判得出结论**的有几天(遇到第一个 None 就停)。
-
-    这是"我们最多能数到多少"的上限, 与 `len(codes)` **不是一回事** ——
-    序列里最老的那些天算不出结论(长期档要 120 根暖机, 缺 ATR 的天也算不出),
-    它们照样占着位置。
-
-    `len(codes)` 当上限用是我埋的那个 bug: 判据写成 `hist >= len(codes)`,
-    而 hist 数到暖机边界就停了, 永远够不着 `len(codes)` —— 于是**一个被窗口
-    截断的天数, 从来不会被标成下界**, 看着像个准数。用户: 「候选池显示的
-    天数不正确」。
-    """
-    n = 0
-    for c in (codes or []):
-        if c is None:
-            break
-        n += 1
-    return n
-
-
-def count_trailing(codes: list[str | None] | None, code: str | None) -> int:
-    """从头(=最近一天)数, 连着等于 `code` 的有几个。**中断即停。**
-
-    「候选池」出现 3 天、隔一天、再 2 天 —— 报 2 不是 5。那是两次独立的出现;
-    报 5 会让人以为它已经在这个位置磨了一周, 而实际上刚回来两天。
-    与在轨外天数、六态 duration 同一条纪律。纯函数。
-    """
-    if not codes or not code:
-        return 0
-    n = 0
-    for c in codes:
-        if c != code:
-            break
-        n += 1
-    return n
 
 
 def runs(rows: list[dict]) -> dict:
@@ -751,19 +652,14 @@ def runs(rows: list[dict]) -> dict:
     · compress_days  连续 O ≥ COMPRESS_TIGHT —— **这是新的「磨底磨了多久」**
     · above_run      连续收盘在短期上轨之上 —— 1 天是突破, ≥2 天是站稳
     · below_run      连续收盘在短期下轨之下
-
-    [R245] 每个天数都配一个 `*_capped` —— **数出来的**还是**没得数了**。
-    见 `_tail_run`。
     """
     rows = [r for r in rows if r is not None]
     if not rows:
         return {"compress_days": 0, "above_run": 0, "below_run": 0,
-                "compress_capped": False, "above_capped": False,
-                "below_capped": False,
                 "box_high": None, "box_low": None, "box_range_atr": None}
-    cd, cd_cap = _tail_run(rows, lambda r: r.get("o", 0.0) >= COMPRESS_TIGHT)
-    up, up_cap = _tail_run(rows, lambda r: r.get("d_s", 0.0) > K["s"])
-    dn, dn_cap = _tail_run(rows, lambda r: r.get("d_s", 0.0) < -K["s"])
+    cd = _tail_run(rows, lambda r: r.get("o", 0.0) >= COMPRESS_TIGHT)
+    up = _tail_run(rows, lambda r: r.get("d_s", 0.0) > K["s"])
+    dn = _tail_run(rows, lambda r: r.get("d_s", 0.0) < -K["s"])
     box_hi = box_lo = box_rng = None
     if cd >= 1:
         seg = [r["close"] for r in rows[-cd:] if "close" in r]
@@ -775,10 +671,6 @@ def runs(rows: list[dict]) -> dict:
             if atr_now:
                 box_rng = round((box_hi - box_lo) / atr_now, 2)
     return {"compress_days": cd, "above_run": up, "below_run": dn,
-            # [R245] 天数是数出来的(False)还是没得数了(True)。0 天谈不上下界。
-            "compress_capped": bool(cd and cd_cap),
-            "above_capped": bool(up and up_cap),
-            "below_capped": bool(dn and dn_cap),
             "box_high": box_hi, "box_low": box_lo, "box_range_atr": box_rng}
 
 

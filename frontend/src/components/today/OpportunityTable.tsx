@@ -639,7 +639,7 @@ function OpportunityDetail({ o, live }: { o: TodayOpportunity; live?: boolean })
                 <div className="mt-1 flex flex-wrap gap-x-3 text-[10px] text-muted">
                   {!!o.runs?.compress_days && (
                     <span title="到今天为止连着多少天三种看法都一致 —— 也就是这只票「横了多久」。按波动幅度算,所以大盘股和小盘股之间也能比">
-                      已经挤了 <b className="font-mono text-foreground/90">{o.runs.compress_days}</b> 天{o.runs.compress_capped ? '以上' : ''}
+                      已经挤了 <b className="font-mono text-foreground/90">{o.runs.compress_days}</b> 天
                     </span>
                   )}
                   {o.runs?.compress_avg != null && (

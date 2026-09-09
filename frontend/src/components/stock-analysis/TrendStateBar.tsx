@@ -64,11 +64,7 @@ export function TrendStateBar({ symbol, trend }: { symbol: string; trend: TrendD
         </span>
       )}
       <span className="text-xs text-foreground/90">
-        {/* [R245] 原来写「第 N 天」—— R241 把说法统一成「已N天」时漏了这个文件。
-            同一个数在决策台徽标上叫「已3天」、在这里叫「第 3 天」, 读的人得先
-            确认这两个是不是一回事。`+` 见 lib/duration。 */}
-        已 <span className="font-mono font-semibold">{trend.duration}</span> 天
-        {trend.duration_capped && <span title="回看窗口就这么长,真实天数只多不少">以上</span>}
+        第 <span className="font-mono font-semibold">{trend.duration}</span> 天
         <span className="text-muted"> · 自 {trend.since}</span>
         {trend.entered_from_cn && <span className="text-muted"> · 由「{trend.entered_from_cn}」转入</span>}
       </span>

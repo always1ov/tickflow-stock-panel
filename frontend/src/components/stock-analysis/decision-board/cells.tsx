@@ -6,7 +6,6 @@
  */
 import type { BandEnergy, ChannelEvent, ChannelGeometry, ChannelPhase, ChannelRuns, KeltnerBand, KeltnerVerdict, Playbook } from '@/lib/api'
 import { VerdictHover } from '@/components/stock-analysis/VerdictHover'
-import { dayCount } from '@/lib/duration'
 
 /**
  * [R194] 决策台单元格的统一基线。**整张表只有这一处定义垂直对齐与行内边距。**
@@ -108,7 +107,7 @@ function geoLines(geo?: ChannelGeometry | null, ev?: ChannelEvent | null,
   if (geo.compress != null || runs?.compress_days || runs?.compress_avg != null) {
     L.push('[重合] ' + [
       geo.compress != null ? `三条线还有 ${(geo.compress * 100).toFixed(0)}% 重合` : '',
-      runs?.compress_days ? dayCount(runs.compress_days, runs.compress_capped) : '',
+      runs?.compress_days ? `已经这样 ${runs.compress_days} 天` : '',
       runs?.compress_avg != null ? `整个季度平均 ${(runs.compress_avg * 100).toFixed(0)}%` : '',
     ].filter(Boolean).join(' · '))
   }
@@ -126,8 +125,8 @@ function geoLines(geo?: ChannelGeometry | null, ev?: ChannelEvent | null,
   }
   if (runs?.above_run || runs?.below_run) {
     L.push('[在轨外] ' + (runs.above_run
-      ? `${dayCount(runs.above_run, runs.above_capped)}站在短线上沿之外`
-      : `${dayCount(runs.below_run, runs.below_capped)}掉在短线下沿之外`))
+      ? `连着 ${runs.above_run} 天站在短线上沿之外`
+      : `连着 ${runs.below_run} 天掉在短线下沿之外`))
   }
   if (ev?.why) L.push('', `【事件】${ev.cn} —— ${ev.why}`)
   if (ev?.combo_note) {
@@ -149,9 +148,28 @@ function geoLines(geo?: ChannelGeometry | null, ev?: ChannelEvent | null,
  * 是用来扫的, 扫的时候没人会悬停。未确认的事件用虚一档的颜色, 因为
  * 「突破尝试」与「突破站稳」差的就是那两天。
  */
+/**
+ * [R246] 天数徽标: `已N天`, 是下界时加 `+`。
+ *
+ * 「已」字不是修饰, 是这句话的全部意思 —— 光写「候选池 25天」可以读成"历史上
+ * 累计 25 天处于候选池", 而这里说的是"已经**连着** 25 天"。一字之差是两个数。
+ *
+ * `+` = 数到头了(序列到尽头, 或再往前那天算不出来), 真实天数只多不少。
+ */
+function Days({ d }: { d?: { days?: number; since?: string; capped?: boolean } | null }) {
+  if (!d?.days) return null
+  return (
+    <span className="ml-0.5 opacity-70"
+          title={d.since ? `自 ${d.since} 起, 连着 ${d.days} 个交易日${d.capped ? '以上' : ''}。中间断一天就从头重新起算` : undefined}>
+      已{d.days}天{d.capped ? '+' : ''}
+    </span>
+  )
+}
+
+
 function VerdictInner({ v, ev, geo, runs, energy, ph, stateRun, onOpen }: {
   v?: KeltnerVerdict | null
-  /** [R242] 没有结论时那一格的状态时长 —— 与 v.days 同一套口径 */
+  /** [R246] 没结论那一格的时长 */
   stateRun?: { days: number; since?: string; capped?: boolean } | null
   ev?: ChannelEvent | null
   geo?: ChannelGeometry | null
@@ -174,10 +192,6 @@ function VerdictInner({ v, ev, geo, runs, energy, ph, stateRun, onOpen }: {
     // 两格写了注记, 那就把注记的标题当徽标摆出来, 而不是一个 "—"。
     // 只有「中中中」是真的零信息(价格在三条通道都认可的区间里), 它照旧显示 "—"。
     const note = ev?.combo_note
-    // [R242] **没有结论的那一格也要有天数。** 用户: 「别搞什么下跌半年,
-    // 下跌多少天就表示多少天」—— 这一格印的是组合注记标题(「半年低位」),
-    // 一个模糊的时间词却偏偏没有天数。结论列每个徽标都带「已N天」才叫统一。
-    const run = stateRun
     return (
         <button
           onClick={onOpen}
@@ -191,12 +205,7 @@ function VerdictInner({ v, ev, geo, runs, energy, ph, stateRun, onOpen }: {
             + geoLines(geo, ev, runs, energy, ph)}
         >
           {note ? note.title : '—'}
-          {run?.days != null && (
-            <span className="ml-0.5 opacity-70"
-                  title={run.since ? `自 ${run.since} 起,已${run.days}天` : undefined}>
-              已{run.days}天{run.capped ? '+' : ''}
-            </span>
-          )}
+          <Days d={stateRun} />
         </button>
     )
   }
@@ -208,32 +217,7 @@ function VerdictInner({ v, ev, geo, runs, energy, ph, stateRun, onOpen }: {
           className={`inline-flex cursor-pointer whitespace-nowrap rounded border px-1 py-0.5 text-[10px] transition-colors hover:brightness-125 ${VERDICT_CLS[v.tone]}`}
         >
           {v.title}
-          {/* [R233] 用户: 「『候选、调到位了』也是要显示这个状态持续多少天了」。
-              六态徽标一直带着天数, 而它旁边的结论只有 4 个字 —— 于是「调到位了」
-              看不出是今天刚到位, 还是已经这样磨了三周。这两种要做的事完全不同。 */}
-          {/* [R236/R237] 状态时长。列很窄, 起始日等细节放悬停(见 VerdictHover)。
-              不精确时画淡并加 `?`: 「至少 1 天」和「数出来就是第 1 天」
-              不是一回事, 不能长得一样。
-
-              [R238] **那个「已」字不是修饰, 是这句话的全部意思。**
-              用户: 「我不是要历史总数哦」—— 光写「候选池 75天」可以读成
-              "历史上累计 75 天处于候选池", 而这里说的是"已经连着 75 天"。
-              一字之差是两个完全不同的数, 徽标上必须自己说清楚, 不能指望
-              用户去悬停里确认。
-
-              [R240] 问号去掉了。用户: 「我要确定性的显示多少天」。
-              R239 之前那个 `?` 会全表出现 —— 因为它挂在"两条路必须先对上
-              今天"这个经常不成立的前提上。前提没了之后, 数不出来只剩一种
-              情形: **历史里最近一根就不是这一档 = 今天刚变**。那时「已1天」
-              本来就是正确答案, 不是兜底, 自然不该带问号。 */}
-          {v.days != null && (
-            <span className="ml-0.5 opacity-70"
-                  title={v.since
-                    ? `自 ${v.since} 起,已${v.days}天`
-                    : '今天刚变成这一档'}>
-              已{v.days}天{v.capped ? '+' : ''}
-            </span>
-          )}
+          <Days d={v} />
         </button>
       </VerdictHover>
   )
@@ -311,8 +295,6 @@ export function ChannelStateCell({ trend, geo, runs, ph, kc, close, trendCls,
                                   onOpenReview }: {
   /** [R211] 六态趋势 —— 合过来的那一列。作者的判定, 只读不改 */
   trend?: { state: string; state_cn: string; duration: number; since?: string
-            /** [R245] 天数撞上了回看窗口 —— 是下界不是准数, 徽标上写 `+` */
-            duration_capped?: boolean
             action?: string; intraday?: boolean } | null
   geo?: ChannelGeometry | null
   runs?: ChannelRuns | null
@@ -336,7 +318,7 @@ export function ChannelStateCell({ trend, geo, runs, ph, kc, close, trendCls,
   // 原来是两半各一份: 鼠标从徽标挪到阶段, 提示整个换掉一份, 而这一格
   // 讲的本来就是同一只票的方向。末尾那句从「点这两行…」改成整格的去处。
   const tip = [
-    trend ? `【六态】${trend.state_cn} · ${dayCount(trend.duration, trend.duration_capped)}`
+    trend ? `【六态】${trend.state_cn} · 第 ${trend.duration} 天`
       + (trend.since ? `,自 ${trend.since}` : '') : '',
     trend?.action ?? '',
     ...(ph ? ['', `【通道】${ph.cn} —— ${ph.why}`, `该盯什么:${ph.watch}`] : []),
@@ -344,7 +326,7 @@ export function ChannelStateCell({ trend, geo, runs, ph, kc, close, trendCls,
     ph?.align ? `【${ph.align.cn}】${ph.align.why}` : (ph ? `快慢:${ph.pace_cn}` : ''),
     '', gap,
     at.length ? '现在到边的:' + at.map(([t, b]) => `${t}${b!.pos_cn}`).join('、') : '三档都在通道中部',
-    runs?.compress_days ? `三条线${dayCount(runs.compress_days, runs.compress_capped)}挤在一起` : '',
+    runs?.compress_days ? `三条线已经这样挤在一起 ${runs.compress_days} 天` : '',
     '',
     ...([['短期', kc?.s], ['中期', kc?.m], ['长期', kc?.l]] as const)
       .filter(([, b]) => b)
@@ -367,7 +349,7 @@ export function ChannelStateCell({ trend, geo, runs, ph, kc, close, trendCls,
         <span className="flex flex-wrap items-center justify-center gap-1">
           {trend ? (
             <span className={`inline-flex whitespace-nowrap rounded border px-1.5 py-0.5 text-[10px] ${trendCls ?? ''}`}>
-              {trend.state_cn} {dayCount(trend.duration, trend.duration_capped)}{trend.intraday ? <span className="ml-0.5 opacity-70">*</span> : null}
+              {trend.state_cn} {trend.duration}天{trend.intraday ? <span className="ml-0.5 opacity-70">*</span> : null}
             </span>
           ) : <span className="text-[10px] text-muted/30">—</span>}
           {!!ph && (
@@ -443,7 +425,7 @@ function PlaybookInner({ p }: { p?: Playbook | null }) {
  */
 export function ConclusionCell({ v, ev, geo, runs, energy, ph, p, stateRun, onOpen }: {
   v?: KeltnerVerdict | null
-  /** [R242] 无结论那一格的状态时长 */
+  /** [R246] 没结论那一格的时长 */
   stateRun?: { days: number; since?: string; capped?: boolean } | null
   ev?: ChannelEvent | null
   geo?: ChannelGeometry | null
