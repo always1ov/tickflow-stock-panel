@@ -98,12 +98,17 @@ def test_中断即重算不累计():
     assert got["since"] == "d5"
 
 
-def test_徽标那一档与序列今天不一致时不给天数():
+def test_徽标那一档与序列今天不一致时保底一天():
     """两条路(enriched 快照 vs 日线批量)的"今天"本来就可能不一样。
-    对不上时**不编一个数**, 让上层退回"今天刚变"。"""
-    assert ks._state_run("a", {"states": ["b", "b"]}) is None
+
+    **[R248] 这条原来断言的是"不给天数"—— 那正是错的行为**, 也是用户
+    「怎么不显示天数了?」撞到的东西。徽标印的是今天的真相, 至少 1 天。
+    详见 `_state_run` 里那段。
+    """
+    assert ks._state_run("a", {"states": ["b", "b"]}) == {"days": 1, "capped": True}
+    assert ks._state_run("a", {}) == {"days": 1, "capped": True}
+    # 连徽标那一档都没有时才真的不给 —— 那是"这一格没有状态", 另一回事
     assert ks._state_run(None, {"states": ["a"]}) is None
-    assert ks._state_run("a", {}) is None
 
 
 def test_数到序列尽头时标成下界():
@@ -226,3 +231,92 @@ def test_徽标上写的是_已N天_不是历史累计():
     assert "已{d.days}天{d.capped ? '+' : ''}" in src, "徽标没按统一写法渲染天数"
     assert "<Days d={v} />" in src, "有结论那一格没渲染天数"
     assert "<Days d={stateRun} />" in src, "没结论那一格没渲染天数"
+
+
+# ===== [R248] 徽标上有一档, 就一定有天数 =====
+#
+# 用户: 「怎么不显示天数了?」
+#
+# R246 在两条路对不上时返回 `None`, 注释里写着「让上层退回今天刚变」——
+# **那个兜底根本没写**, 于是对不上的行天数整个不显示。
+#
+# 这是同一件事第二次栽(R234 也是), 所以规矩钉死: 徽标印的是今天的真相,
+# 说它「已1天」是真话; **一个偏保守的数字远好过一个消失的字段** ——
+# "算不出来"和"功能没部署"在界面上长得一模一样, 而这两种要做的事完全不同。
+
+
+def test_R248_两条路对不上时保底一天而不是整个不给():
+    got = ks._state_run("a", {"states": ["b", "b", "b"]})
+    assert got is not None, "对不上就整个不给了 —— 徽标上的天数会静默消失"
+    assert got["days"] == 1
+    assert got["capped"] is True, "这是下界(真实天数可能更多), 该带 `+`"
+
+
+def test_R248_没有历史时也保底一天():
+    assert ks._state_run("a", {})["days"] == 1
+    assert ks._state_run("a", {"states": []})["days"] == 1
+
+
+def test_R248_连徽标那一档都没有时才不给():
+    """这一格本来就没有状态 —— 那是真的没得说, 与"算不出来"不是一回事。"""
+    assert ks._state_run(None, {"states": ["a"]}) is None
+
+
+def test_R248_端到端_快照与日线对不上时徽标仍有天数():
+    """**这条是用户实际撞到的那个现象。**
+
+    徽标那一档来自 enriched 快照, 逐日序列来自日线批量 —— 两者在最后一根上
+    本来就可能不一样(复权口径、不是同一天收的)。造一份"快照价与日线末根差
+    一点"的数据, 断言天数没有消失。
+    """
+    import datetime as dt
+
+    closes = [10.0] * 370 + [round(10.0 - 0.025 * i, 4) for i in range(1, 31)]
+    n = len(closes)
+    dates = _trading_days(n)
+
+    def ma(w, i):
+        return None if i + 1 < w else sum(closes[i + 1 - w:i + 1]) / w
+
+    class _Skewed:
+        def get_enriched_latest(self):
+            # 快照价比日线末根低一点 —— 足以把这一格判成另一档
+            return pl.DataFrame({
+                "symbol": ["X"], "close": [closes[-1] - 0.15], "atr_14": [_ATR],
+                "ma20": [ma(20, n - 1)], "ma60": [ma(60, n - 1)],
+            }), str(_END)
+
+        def get_daily_batch(self, symbols, start, end, cols):
+            keep = [i for i, d in enumerate(dates) if start <= d <= end]
+            return pl.DataFrame({
+                "symbol": ["X"] * len(keep), "date": [dates[i] for i in keep],
+                "close": [closes[i] for i in keep], "atr_14": [_ATR] * len(keep),
+                "ma20": [ma(20, i) for i in keep], "ma60": [ma(60, i) for i in keep],
+            })
+
+    row = ks.channels_for_symbols(_Skewed(), ["X"]).get("X") or {}
+    v = row.get("verdict")
+    assert v, "这份夹具本该有结论, 前提就错了"
+    assert v.get("days"), (
+        f"两条路对不上, 天数就整个消失了 —— 这正是用户看到的现象。拿到的是 {sorted(v)}"
+    )
+
+
+def test_R248_只要有结论就一定有天数():
+    """总闸: 遍历一组走势各异的夹具, 每一只只要出了结论就必须带天数。"""
+    from tests.fixtures import market_archetypes as fx
+
+    checked = 0
+    for name in fx.SCENARIOS:
+        cl = list(fx.closes(name))
+        if len(cl) < 400:
+            cl = [cl[0]] * (400 - len(cl)) + cl
+        row = _row(cl)
+        v = row.get("verdict")
+        if not v:
+            assert (row.get("state_run") or {}).get("days"), \
+                f"{name}: 没结论那一格也没天数"
+        else:
+            assert v.get("days"), f"{name}: 出了结论「{v['title']}」却没有天数"
+        checked += 1
+    assert checked >= 10, f"只核了 {checked} 个场景"
