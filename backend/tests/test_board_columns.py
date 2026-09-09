@@ -370,3 +370,63 @@ def test_R255_结论列与AI信号列同一套排版():
     )
     assert "truncate" not in blk, "说明还在用 truncate 截断"
     assert "!text-left" in blk, "竖排之后必须左对齐, 否则三行的左边缘参差不齐"
+
+
+def test_R257_走势列的三行各管一件事():
+    """用户: 「走势我也想重排描述, 现在的版本我觉得抓不住重点」。
+
+    毛病是**「阶段」和「六态」在抢同一件事 —— 方向**:
+
+        自然回升 已3天      六态说在涨
+        横盘中 · 走到中段    阶段说没走          ← 打架, 而界面不提
+        正在转多
+
+    而且阶段与成熟度量的根本不是同一个东西(前者看三线重合度、后者看短长线
+    间距), 于是能凑出「横盘中 · 走到中段」这种**自相矛盾**的话 ——
+    见 `test_R257_横盘中确实会配上走了一段`。
+
+    现在三行各管一件事: **方向(六态) / 走了多远(成熟度) / 还有没有劲**。
+    """
+    root = _BOARD.parent
+    cells = (root / "decision-board" / "cells.tsx").read_text(encoding="utf-8")
+    body = "\n".join(ln for ln in cells.splitlines()
+                     if not ln.lstrip().startswith(("//", "*", "/*", "{/*")))
+    i = body.index("export function ChannelStateCell")
+    blk = body[body.index("return (", i):]
+
+    assert "{ph.cn} · {ph.maturity_cn}" not in blk, (
+        "「阶段」那个词又印回徽标上了 —— 它和六态抢方向, 而且会跟成熟度自相矛盾"
+    )
+    assert "{ph.maturity_cn}" in blk, "「走了多远」那一行没了"
+    assert "{trend.state_cn} 已{trend.duration}天" in blk, "方向那一行没了"
+
+
+def test_R257_阶段的说明必须留在悬停里():
+    """撤的是**徽标上那个词**, 不是这一层的判定 —— 阶段的 `why` 与「该盯什么」
+    照旧要给得出来, 否则就是把信息删了而不是理顺了。"""
+    root = _BOARD.parent
+    cells = (root / "decision-board" / "cells.tsx").read_text(encoding="utf-8")
+    assert "【通道】${ph.cn}" in cells, "阶段从悬停里也没了 —— 那是删信息, 不是理顺"
+    assert "该盯什么" in cells, "「该盯什么」没了"
+
+
+def test_R257_横盘中确实会配上走了一段():
+    """把这次改动的**依据**钉住: 阶段与成熟度是两个量, 真的能凑出自相矛盾的话。
+
+    哪天底层改了让它们不再打架, 这条会红 —— 那时就该回头看看徽标上要不要
+    把阶段加回来。
+    """
+    from itertools import product
+
+    from app.indicators import keltner_geometry as kg
+    got = set()
+    for sp in [x / 10 for x in range(-80, 81, 2)]:
+        for a1, o in product((-0.5, 0.0, 0.5), (0.0, 0.5, 0.9, 1.0)):
+            ph = kg.phase({"spread": sp, "accel": {"a1": a1}, "compress": o},
+                          {"compress_days": 30})
+            if ph and ph["cn"] == "横盘中":
+                got.add(ph["maturity_cn"])
+    assert got - {"刚起步"}, (
+        "「横盘中」现在只配「刚起步」了 —— 两者不再打架, "
+        "可以回头考虑把阶段加回徽标"
+    )

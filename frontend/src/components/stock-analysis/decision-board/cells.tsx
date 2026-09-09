@@ -362,12 +362,20 @@ export function ChannelStateCell({ trend, geo, runs, ph, kc, close, trendCls,
               {trend.state_cn} 已{trend.duration}天{trend.intraday ? <span className="ml-0.5 opacity-70">*</span> : null}
             </span>
           ) : <span className="text-[10px] text-muted/30">—</span>}
-          {!!ph && (
-            <span className={`whitespace-nowrap text-[10px] ${PHASE_TEXT[ph.code] ?? 'text-muted'}`}>
-              {ph.cn} · {ph.maturity_cn}
-            </span>
-          )}
         </span>
+        {/* [R257] **「阶段」那个词从徽标上撤下来了**, 这一行只留「走了多远」。
+            用户: 「现在的版本我觉得抓不住重点」。
+            毛病是**阶段和六态在抢同一件事 —— 方向**: 截图那只票六态说「自然回升」
+            (在涨)、阶段说「横盘中」(没走), 两句话打架而界面不提。而且阶段与成熟度
+            量的根本不是同一个东西(前者看三线重合、后者看短长线间距), 于是能凑出
+            「横盘中 · 走到中段」这种自相矛盾的话 —— 穷举确认过真的会出现。
+            现在三行各管一件事: **方向(六态) / 走了多远(成熟度) / 还有没有劲**。
+            阶段的完整说明与「该盯什么」照旧在悬停里, 一个字没丢。 */}
+        {!!ph && (
+          <span className={`whitespace-nowrap text-[10px] ${PHASE_TEXT[ph.code] ?? 'text-muted'}`}>
+            {ph.maturity_cn}
+          </span>
+        )}
         {/* [R224] 第二行给「三个尺度走到第几步」, 而不是一个警告。
             R223 那版是成对冲突检查, 实测超过一半的行挂警告 —— 那是噪声。
             三者是滞后阶梯(价格最快→六态→均线最慢), 不一致 = 转折还没走完。 */}
