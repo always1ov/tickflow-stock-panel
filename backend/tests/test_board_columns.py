@@ -430,3 +430,41 @@ def test_R257_横盘中确实会配上走了一段():
         "「横盘中」现在只配「刚起步」了 —— 两者不再打架, "
         "可以回头考虑把阶段加回徽标"
     )
+
+
+def test_R258_界面上不再出现贵不贵():
+    """用户: 「别用这么傻逼的描述」(指着复盘表那个「贵不贵」列头)。
+
+    这一层在别处一律叫**通道结论**(`keltner.verdict` / 决策台那一列 / 复盘上方
+    那个页签 / 复盘统计口径), 只有几处自己起了个口语名字。一个东西两个名字,
+    读的人得先确认它们是不是一回事。
+
+    扫的是**渲染出去的文本** —— 注释里复述历史说法是允许的。
+    """
+    root = _BOARD.parents[2]            # frontend/src
+    if not root.exists():
+        pytest.skip("拿不到前端源码(只跑后端时正常)")
+    bad = []
+    for f in list(root.rglob("*.tsx")) + list(root.rglob("*.ts")):
+        in_block = False
+        for i, ln in enumerate(f.read_text(encoding="utf-8").splitlines(), 1):
+            t = ln.strip()
+            if in_block:
+                in_block = not any(x in t for x in ("*/", "*/}"))
+                continue
+            if t.startswith(("//", "*")):
+                continue
+            if t.startswith(("/*", "{/*")):
+                in_block = not any(x in t for x in ("*/", "*/}"))
+                continue
+            if "贵不贵" in ln:
+                bad.append(f"{f.relative_to(root)}:{i}")
+    assert not bad, "这些地方还印着「贵不贵」:\n  " + "\n  ".join(bad)
+
+
+def test_R258_复盘表那一列叫结论():
+    root = _BOARD.parent
+    src = (root / "StockReviewDialog.tsx").read_text(encoding="utf-8")
+    assert ">结论</th>" in src, "复盘逐日表那一列没改成「结论」"
+    # 脚注曾经指着一个**已经不存在的页签**(R200 的旧名, R223 已改回「通道结论」)
+    assert "切到上方的「通道结论」" in src, "脚注还指着旧页签名"

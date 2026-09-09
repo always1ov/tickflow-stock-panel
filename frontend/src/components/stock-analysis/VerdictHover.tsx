@@ -142,7 +142,7 @@ export function VerdictHover({ v, note, children }: {
                 </div>
               )}
               <div className="mt-1.5 text-[9px] leading-relaxed text-muted/80">
-                这是「位置」结论 —— 说的是贵不贵, 不是会不会继续涨。
+                这是「位置」结论 —— 说的是这个价算高还是算低, 不是会不会继续涨。
                 清仓与否看止盈线/生命线, 优先级在通道之上。收盘口径。
               </div>
             </div>

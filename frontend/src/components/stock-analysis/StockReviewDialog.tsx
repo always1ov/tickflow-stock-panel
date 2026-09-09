@@ -507,7 +507,11 @@ function TrendView({ d, rows, onlyMarked, onToggleMarked }: {
               <th className="whitespace-nowrap px-2 py-2 text-right font-normal">收盘</th>
               <th className="whitespace-nowrap px-2 py-2 text-right font-normal">涨跌</th>
               <th className="whitespace-nowrap px-3 py-2 text-left font-normal">六态状态</th>
-              <th className="whitespace-nowrap px-2 py-2 text-center font-normal" title="当天这个价位算贵还是算便宜 —— 与决策台「贵不贵」列同一句话, 悬停看完整卡片">贵不贵</th>
+              {/* [R258] 列头从「贵不贵」改成「结论」。用户: 「别用这么傻逼的描述」。
+                  这一层在别处一律叫**通道结论**(`keltner.verdict` / 决策台那一列 /
+                  上方那个页签 / 复盘统计口径), 只有这里自己起了个口语名字。
+                  一个东西在界面上有两个名字, 读的人得先确认它们是不是一回事。 */}
+              <th className="whitespace-nowrap px-2 py-2 text-center font-normal" title="当天三档通道合起来给出的那一句结论 —— 与决策台「结论」列同一句话, 悬停看完整卡片">结论</th>
             </tr>
           </thead>
           <tbody>
@@ -562,7 +566,9 @@ function TrendView({ d, rows, onlyMarked, onToggleMarked }: {
 
       <div className="border-t border-border/60 px-4 py-2 text-[10px] leading-relaxed text-muted">
         收盘口径, 与决策台「趋势」列同一个状态机、同一个阈值(含你自己调过的那个)。
-        「贵不贵」列悬停看完整卡片, 要摊开每一档说了什么、之后走成什么样, 切到上方的「这个价贵不贵」。
+        {/* [R258] 「这个价贵不贵」是 R200 那轮清行话时的旧页签名, R223 已经改回
+            「通道结论」—— 这句脚注一直指着一个**不存在的页签**。 */}
+        「结论」列悬停看完整卡片, 要摊开每一档说了什么、之后走成什么样, 切到上方的「通道结论」。
       </div>
     </>
   )

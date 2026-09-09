@@ -680,7 +680,7 @@ title={'三行: 六态趋势 / 通道给的阶段·走到哪一步 / 还有没�
                 <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center">
                   <button onClick={() => cycleSort('play')}
                           className={`${thBtn} whitespace-nowrap`}
-title={'两行: 上面「贵不贵」是这个价现在算贵还是算便宜(位置),\n'
+title={'两行: 上面是**位置** —— 这个价现在算高还是算低,\n'
                             + '下面「怎么办」是把五套判定合成的一句话(动作)。\n\n'
                             + '点这里按「怎么办」的急迫程度排: 按纪律走 > 今天就得动 > 先别动 > '
                             + '盯着 > 留意 > 没事。\n'
