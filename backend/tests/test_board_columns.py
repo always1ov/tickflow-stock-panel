@@ -175,25 +175,58 @@ def _board_body() -> str:
     return "\n".join(out)
 
 
-def test_R251_箭头不许拿当前排序键跟自己比():
-    """`caret(sort.key)` —— 判等恒真, 那个箭头就永远亮着。
+def test_R254_每列三下一圈():
+    """用户: 「我也不想切换那么多下」「点击第三下就恢复原状」。
 
-    这一条盯的是**写法本身**: 传进去的必须是这一列自己的排序目标(字面量),
-    不能是当前排序键。
+        第 1 下  最该看的在前
+        第 2 下  反过来
+        第 3 下  回默认(该动了)
+
+    取代了两套并存的老写法: `toggleSort` 的"再点一下翻方向"(永远回不到默认)
+    与 `TREND_SORTS` 的"轮换五个目标"(六下一圈, 而且一个方向永远点不到)。
     """
     body = _board_body()
-    assert "caret(sort.key)" not in body, (
-        "箭头又拿当前排序键跟自己比了 —— 判等恒真, 那一列的箭头会永远亮着"
+    assert "cycleSort" in body, "没有统一的三态循环"
+    for dead in ("toggleSort(", "cycleTrendSort", "TREND_SORTS"):
+        assert dead not in body, f"老写法「{dead}」又回来了 —— 两套并存就是下一个 bug"
+    blk = body[body.index("const cycleSort"):]
+    blk = blk[:blk.index("\n\n")]
+    assert "return DEFAULT_SORT" in blk, "第三下没有回默认"
+
+
+def test_R254_每列只剩一个排序目标():
+    """一列多个目标是「点太多下」的根 —— 走势列曾经塞了 5 个(R211 三列并一列
+    时带来的), 轮换一圈要 6 下。现在一列一个, 表头的箭头也就只需要认一个键。"""
+    body = _board_body()
+    for one in ("caret('name')", "caret('changePct')", "caret('trend')",
+                "caret('play')", "caret('held')", "caret('cost')",
+                "caret('pnl')", "caret('report')", "caret('signal')"):
+        assert one in body, f"表头少了 {one}"
+    # 反面: 不许再出现多目标的写法
+    assert "caret('trend', " not in body and "caret('close'" not in body, (
+        "又有列挂上多个排序目标了"
     )
 
 
-def test_R251_多目标的列把自己的目标全列给箭头():
-    """漏列一个, 按那个目标排时这一列的箭头就不亮 —— 反过来的毛病。"""
+def test_R254_点不到的排序键全删掉():
+    """[守则 R198] 不留没人调的死代码。
+
+    砍掉的: close / spread / ks·km·kl / verdict —— 这几个原来靠"轮换目标"才
+    够得着; exit 与 confidence 更早就**没有任何表头能选中**(止盈线那一列 R212
+    撤了, 置信度 R178 换掉了), 一直是死代码。
+    """
     body = _board_body()
-    for cols in ("'close', 'changePct'",
-                 "'trend', 'spread', 'ks', 'km', 'kl'",
-                 "'verdict', 'play'"):
-        assert f"caret({cols})" in body, f"表头少给箭头列出目标: caret({cols})"
+    keys = body[body.index("type SortKey"):]
+    keys = keys[:keys.index("\nconst ")]
+    for dead in ("'close'", "'spread'", "'ks'", "'km'", "'kl'",
+                 "'verdict'", "'exit'", "'confidence'"):
+        assert dead not in keys, f"排序键 {dead} 点不到却还留着"
+    # 比较器里也不该还有它们的分支
+    cmp_ = body[body.index("const sortedRows"):]
+    cmp_ = cmp_[:cmp_.index("const arr = ")]
+    for dead in ("case 'close'", "case 'spread'", "case 'ks'", "case 'verdict'",
+                 "case 'exit'", "case 'confidence'"):
+        assert dead not in cmp_, f"比较器里还留着 {dead} 的分支"
 
 
 def test_R251_越小越要紧的那几个必须升序打头():
@@ -205,11 +238,10 @@ def test_R251_越小越要紧的那几个必须升序打头():
     for key, why in (("urgency", "该动了: order 越小越急"),
                      ("play", "怎么办: 按纪律走=0, 没事=5"),
                      ("signal", "AI 信号: 买入=0, 观望=3"),
-                     ("spread", "间距: 刚走出来的在前"),
-                     ("ks", "通道位置: 最便宜的在前")):
+                     ("name", "标的: A → Z")):
         assert f"{key}: 'asc'" in block, f"{key} 的首次方向不是升序 —— {why}"
     for key, why in (("trend", "六态: 值取了负, 降序才是多头在前"),
-                     ("verdict", "贵不贵: rank 越大越偏卖"),
+                     ("changePct", "涨跌: 涨最多在前"),
                      ("report", "AI 报告: 最新在前")):
         assert f"{key}: 'desc'" in block, f"{key} 的首次方向不是降序 —— {why}"
 
@@ -234,7 +266,7 @@ def test_R251_表头说的和实际做的一致():
     """
     src = _src()
     th = src[src.index("<thead"):src.index("</thead>")]
-    assert "按急迫程度排" in th, "「怎么办」的排序说明没了"
+    assert "急迫程度排" in th, "「怎么办」的排序说明没了"
     body = _board_body()
     block = body[body.index("FIRST_DIR"):]
     assert "play: 'asc'" in block[:block.index("}")], (

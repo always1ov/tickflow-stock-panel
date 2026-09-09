@@ -21,8 +21,19 @@ import { GlossaryButton } from '@/components/stock-analysis/decision-board/Gloss
 type Position = EffectivePosition
 type WatchPoint = { direction: 'up' | 'down'; price: number; label?: string; action?: string; reason?: string }
 type Signal = { signal: string; confidence: number; reason: string; close: number | null; created_at: string; watch_points?: WatchPoint[] }
-type SortKey = 'play' | 'urgency' | 'name' | 'close' | 'changePct' | 'held' | 'cost' | 'pnl' | 'exit'
-  | 'trend' | 'ks' | 'km' | 'kl' | 'spread' | 'verdict' | 'confidence' | 'signal' | 'report'
+// [R254] 排序目标从 18 个砍到 10 个 —— **每列只留一个**。
+//
+// 用户: 「我也不想切换那么多下」「点击第三下就恢复原状」。
+//
+// 原来「走势」一列塞了 5 个目标(六态/间距/短中长), 那是 R211 把三列并成一列时
+// 带来的; 「结论」2 个、「现价/涨跌」2 个。轮换一圈要点 6 下, 而且**一个方向
+// 永远点不到**(只在目标之间乒乓, dir 恒为首次方向)。
+//
+// 砍掉的是: close(现价) / spread(间距) / ks·km·kl(三档位置) / verdict(贵不贵) /
+// exit(止盈线, R212 那一列早撤了) / confidence(置信度, R178 换掉了)。
+// 后两个本来就**没有任何表头能选中**, 是死代码。
+type SortKey = 'urgency' | 'name' | 'changePct' | 'trend' | 'play'
+  | 'held' | 'cost' | 'pnl' | 'signal' | 'report'
 const SIGNAL_RANK: Record<string, number> = { buy: 0, sell: 1, hold: 2, watch: 3 }
 /**
  * [R194] 决策台的列宽表 —— colgroup 与空表提示的 colSpan 同源。
@@ -135,62 +146,43 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
    * [R251] 每个排序目标**第一次点击**该往哪边排。
    *
    * 原来的规矩是「除了名称一律降序」—— 那对"数值越大越好"的列没问题, 可对
-   * **越小越要紧**的那几个恰好是反的:
+   * **越小越要紧**的那几个恰好是反的: 「怎么办」(0=按纪律走)与「AI 信号」
+   * (0=买入)都会把最不该先看的顶到最前面, 而表头 title 写的正好相反。
    *
-   *   怎么办  order 0=按纪律走 … 5=没事   降序把「没事」顶到最前面
-   *   AI信号  0=买入 … 3=观望            降序把「观望」顶到最前面
-   *
-   * 而表头 title 明明写着「按急迫程度排: 按纪律走 > 今天就得动 > …」。
-   * 一列的排序方向和它自己的说明相反, 这是**看不出来的错** —— 表面上排了序,
-   * 排出来的却是最不该先看的那些。
-   *
-   * 现在按「**第一下就把最该看的顶到最前面**」逐个定, 与默认排序(该动了, 升序)
-   * 同一个方向感。
+   * 口径: **第一下就把最该看的顶到最前面**, 与默认排序(该动了, 升序)同一个方向感。
    */
   const FIRST_DIR: Record<SortKey, 'asc' | 'desc'> = {
     urgency: 'asc',        // order 越小越急
     play: 'asc',           // 同上 —— 按纪律走 > 今天就得动 > … > 没事
-    signal: 'asc',         // buy > sell > hold > watch
+    signal: 'asc',         // 买入 > 卖出 > 持有 > 观望
     name: 'asc',           // A → Z
-    spread: 'asc',         // 刚从挤在一起走出来的在前(找起点)
-    ks: 'asc', km: 'asc', kl: 'asc',   // 通道内位置: 最便宜的在前(低吸候选)
     trend: 'desc',         // 值取了负 —— 降序 = 多头在前
-    verdict: 'desc',       // rank 越大越偏卖 —— 降序 = 该减的在前
-    close: 'desc', changePct: 'desc',
-    held: 'desc', cost: 'desc', pnl: 'desc', exit: 'asc',
-    confidence: 'desc', report: 'desc',
+    changePct: 'desc',     // 涨最多在前
+    held: 'desc', cost: 'desc', pnl: 'desc', report: 'desc',
   }
-  const toggleSort = (key: SortKey) =>
-    setSort((s) => (s.key === key
-      ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' }
-      : { key, dir: FIRST_DIR[key] }))
-  // [R211] 「走势」表头点击 = 依次轮换五个排序目标, **走完一圈回到默认顺序**。
-  // 用户: 「点击应该是一直循环所有形态, 其中包括遍历完成后会轮到取消所有形态
-  // 变成原来的样子」。所以这里不走 toggleSort 的"再点一下翻方向"—— 五个目标
-  // 各自带一个天然合理的方向(见下), 循环里第六站是"取消"。
-  const TREND_SORTS: { key: SortKey; dir: 'asc' | 'desc' }[] = [
-    { key: 'trend', dir: 'desc' },    // 六态: 多头在前
-    { key: 'spread', dir: 'asc' },    // 间距: 刚从挤在一起走出来的在前(找起点)
-    { key: 'ks', dir: 'asc' },        // 三档: 最便宜的在前(低吸候选)
-    { key: 'km', dir: 'asc' },
-    { key: 'kl', dir: 'asc' },
-  ]
-  const cycleTrendSort = () => {
-    const i = TREND_SORTS.findIndex(x => x.key === sort.key)
-    // 不在这一圈里 → 从头开始; 走到最后一个 → 取消, 回默认顺序
-    setSort(i < 0 ? TREND_SORTS[0]
-      : i === TREND_SORTS.length - 1 ? DEFAULT_SORT
-        : TREND_SORTS[i + 1])
-  }
-  // [R251] **箭头只在这一列真的被选中时才出**。
-  //
-  // 原来多目标那三列传的是当前排序键本身 —— 于是判等恒真, 按「成本」排时
-  // 现价/涨跌、走势、结论 的箭头**全都亮着**, 加上成本自己一共四个,
-  // 根本看不出按哪一列排。
-  //
-  // 之前有缀字挡着(缀字只在该列选中时才出现), R250 把缀字去掉之后这个 bug
-  // 就裸出来了 —— 用户: 「检查每列的排序, 我感觉有点不对劲」。
-  // 现在收可变参数: 多目标的列把自己的目标全列上。
+
+  /**
+   * [R254] **每一列都是三下一圈**: 最该看的在前 → 反过来 → 回默认。
+   *
+   * 用户: 「我也不想切换那么多下」「点击第三下就恢复原状」。
+   *
+   *     走势      多头在前 ↔ 空头在前
+   *     结论      最急在前 ↔ 最闲在前
+   *     现价/涨跌  涨最多 ↔ 跌最惨
+   *     …其余列同理
+   *
+   * 取代了两套并存的老写法: `toggleSort` 的"再点一下翻方向"(永远回不到默认)
+   * 与 `TREND_SORTS` 的"轮换五个目标"(六下一圈, 而且一个方向点不到)。
+   * 一列一个目标之后, 这两件事合成了同一条规则。
+   */
+  const cycleSort = (key: SortKey) =>
+    setSort((s) => {
+      if (s.key !== key) return { key, dir: FIRST_DIR[key] }
+      if (s.dir === FIRST_DIR[key]) {
+        return { key, dir: FIRST_DIR[key] === 'asc' ? 'desc' : 'asc' }
+      }
+      return DEFAULT_SORT          // 第三下: 回默认(该动了)
+    })
   const caret = (...keys: SortKey[]) =>
     keys.includes(sort.key)
       ? (sort.dir === 'asc' ? <ArrowUp className="h-2.5 w-2.5" /> : <ArrowDown className="h-2.5 w-2.5" />)
@@ -435,27 +427,11 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
         // [R205] 「怎么办」按急迫程度排 —— order 越小越该先看
         case 'play': return r.play ? r.play.order : 9
         case 'name': return r.name
-        case 'close': return r.close
         case 'changePct': return r.changePct
         case 'held': return r.held ? 1 : 0
         case 'cost': return r.cost
         case 'pnl': return r.pnl
-        // 止盈线按"离触发还有多远"排, 不按线价 —— 线价本身没有可比性
-        // (不同票价格量级差几十倍), 距离才是要盯的那个数
-        case 'exit': return r.exit ? r.exit.distance_pct : null
         case 'trend': return r.trend ? -(TREND_RANK[r.trend.state] ?? 9) : null
-        // 三档通道按通道内位置排(0=贴下轨, 1=贴上轨, 轨外会越界)。
-        // 升序 = 最便宜的在前(低吸候选), 降序 = 最贵的在前(高抛候选)
-        case 'ks': return r.kc?.s?.pct ?? null
-        case 'km': return r.kc?.m?.pct ?? null
-        case 'kl': return r.kc?.l?.pct ?? null
-        // 结论按后端给的 rank 排(越大越偏卖): 降序把该减的顶到最上面,
-        // 升序把该吸的顶上来。权重由后端定, 界面不自己编一套。
-        // [R201] 三线间距。升序 = 刚从挤在一起走出来的排前面(找起点),
-        // 降序 = 走得最远的排前面(找该收的)。带符号, 空头排列自然沉底。
-        case 'spread': return r.kc?.geo?.spread ?? null
-        case 'verdict': return r.kc?.verdict?.rank ?? null
-        case 'confidence': return r.sig?.confidence ?? null
         case 'signal': return r.sig ? (SIGNAL_RANK[r.sig.signal] ?? 9) : null
         case 'report': {
           const rep = reportsBySymbol.get(r.symbol)
@@ -673,14 +649,14 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
                 就是要划走的行, 让它透出来没有任何好处。 */}
             <thead className="sticky top-0 z-20 bg-surface text-[10px] text-muted">
               <tr className="text-left">
-                <th className="whitespace-nowrap px-3 py-2.5 font-normal text-center"><button onClick={() => toggleSort('name')} className={thBtn} title="标的名称;第二行是「该动了」判定 —— 已触发 > 逼近 > 刚变盘 > 到轨 > 无事,纯规则,AI 不参与">标的{caret('name')}</button></th>
+                <th className="whitespace-nowrap px-3 py-2.5 font-normal text-center"><button onClick={() => cycleSort('name')} className={thBtn} title="标的名称;第二行是「该动了」判定 —— 已触发 > 逼近 > 刚变盘 > 到轨 > 无事,纯规则,AI 不参与">标的{caret('name')}</button></th>
                 <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center">
-                  <button onClick={() => toggleSort(sort.key === 'close' ? 'changePct' : 'close')}
+                  <button onClick={() => cycleSort('changePct')}
                           className={`${thBtn} whitespace-nowrap`}
-                          title="现价与当日涨跌。点这里在「现价」「涨跌」之间轮换排序目标, 再点同一个翻方向">
+                          title="现价与当日涨跌。点这里按涨跌幅排: 涨最多在前 → 跌最惨在前 → 回默认顺序">
                     {/* [R250] 同上 —— 表头只印列名, 三处一致(标的除外, 它本来就只有一个排序目标) */}
                     现价/涨跌
-                    {caret('close', 'changePct')}
+                    {caret('changePct')}
                   </button>
                 </th>
                 {/* [R42] Keltner 三档: 一眼看出这只票贴着哪条轨。收盘口径, 与个股分析图表同一组公式 */}
@@ -691,40 +667,38 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
                       表头看着就断成两截 —— 用户: 「量化通道我不喜欢这样搞, 不美观」。
                       现在只在名字后面缀一个 6px 的目标名 + 箭头, 永不换行。 */}
                   <button
-                    onClick={cycleTrendSort}
+                    onClick={() => cycleSort('trend')}
                     className={`${thBtn} whitespace-nowrap`}
-                    title={'三行: 六态趋势 / 通道给的阶段·走到哪一步 / 还有没有劲。\n\n'
-                      + '点这里依次轮换五个排序目标, **再点一下取消排序、回到默认顺序**:\n'
-                      + '  六态 —— 多头在前\n'
-                      + '  间距 —— 升序是刚走出来的(找起点), 降序是走得最远的(找该收的)\n'
-                      + '  短期 / 中期 / 长期 —— 各自在通道里的高低, 升序最便宜在前'}>
+title={'三行: 六态趋势 / 通道给的阶段·走到哪一步 / 还有没有劲。\n\n'
+                      + '点这里按六态排: 多头在前 → 空头在前 → 回默认顺序。'}>
                     {/* [R250] 表头**只有「走势」两个字** —— 与「结论」那一列同一条:
                         排序目标是内部分层, 不该印在表头上。轮换照旧, 说明在悬停里。 */}
                     走势
-                    {caret('trend', 'spread', 'ks', 'km', 'kl')}
+                    {caret('trend')}
                   </button>
                 </th>
                 <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center">
-                  <button onClick={() => toggleSort(sort.key === 'verdict' ? 'play' : 'verdict')}
+                  <button onClick={() => cycleSort('play')}
                           className={`${thBtn} whitespace-nowrap`}
-                          title={'两行: 上面「贵不贵」是这个价现在算贵还是算便宜(位置),\n'
+title={'两行: 上面「贵不贵」是这个价现在算贵还是算便宜(位置),\n'
                             + '下面「怎么办」是把五套判定合成的一句话(动作)。\n\n'
-                            + '点这里在「贵不贵」「怎么办」之间轮换排序目标, 再点同一个翻方向。\n'
-                            + '「怎么办」按急迫程度排: 按纪律走 > 今天就得动 > 先别动 > 盯着 > 留意 > 没事。'}>
+                            + '点这里按「怎么办」的急迫程度排: 按纪律走 > 今天就得动 > 先别动 > '
+                            + '盯着 > 留意 > 没事。\n'
+                            + '最急在前 → 最闲在前 → 回默认顺序。'}>
                     {/* [R250] 表头**只有「结论」两个字**。用户: 「别搞贵不贵怎么办,
                         我就只想显示结论两个字」。
                         原来点一下会在表头缀出「贵不贵」/「怎么办」标出当前排序目标 ——
                         那是把**内部分层**摆到表头上, 而这一列对外就叫「结论」。
                         排序照旧在两者之间轮换, 说明留在悬停里。 */}
                     结论
-                    {caret('verdict', 'play')}
+                    {caret('play')}
                   </button>
                 </th>
-                <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center"><button onClick={() => toggleSort('held')} className={thBtn}>仓位{caret('held')}</button></th>
-                <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center"><button onClick={() => toggleSort('cost')} className={thBtn} title="持仓成本价(仅持有且填了成本的票有)">成本{caret('cost')}</button></th>
-                <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center"><button onClick={() => toggleSort('pnl')} className={thBtn}>浮盈{caret('pnl')}</button></th>
-                <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center"><button onClick={() => toggleSort('report')} className={thBtn} title="最近一份 AI 分析报告(点击胶囊打开) · ✨生成/更新分析 · 🔔点位提醒">AI 分析{caret('report')}</button></th>
-                <th className="whitespace-nowrap px-4 py-2.5 font-normal text-left"><button onClick={() => toggleSort('signal')} className={thBtn}>AI 信号{caret('signal')}</button></th>
+                <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center"><button onClick={() => cycleSort('held')} className={thBtn}>仓位{caret('held')}</button></th>
+                <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center"><button onClick={() => cycleSort('cost')} className={thBtn} title="持仓成本价(仅持有且填了成本的票有)">成本{caret('cost')}</button></th>
+                <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center"><button onClick={() => cycleSort('pnl')} className={thBtn}>浮盈{caret('pnl')}</button></th>
+                <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center"><button onClick={() => cycleSort('report')} className={thBtn} title="最近一份 AI 分析报告(点击胶囊打开) · ✨生成/更新分析 · 🔔点位提醒">AI 分析{caret('report')}</button></th>
+                <th className="whitespace-nowrap px-4 py-2.5 font-normal text-left"><button onClick={() => cycleSort('signal')} className={thBtn}>AI 信号{caret('signal')}</button></th>
               </tr>
             </thead>
             <tbody>
