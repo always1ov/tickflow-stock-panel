@@ -141,3 +141,102 @@ def test_R250_表头只印列名不印排序目标():
     # 正面: 三个列名都还在
     for name in ("结论", "走势", "现价/涨跌"):
         assert name in render, f"表头把「{name}」弄丢了"
+
+
+# ===== [R251] 每列的排序 =====
+#
+# 用户: 「检查每列的排序, 我感觉有点不对劲」。查出三个:
+#
+#   ① 多目标那三列传的是**当前排序键本身**给箭头函数 —— 判等恒真, 箭头永远亮。
+#      按「成本」排时四个箭头一起亮, 看不出按哪列排。
+#      (R250 把表头缀字去掉之后这个 bug 才裸出来 —— 缀字之前一直在替它遮丑)
+#   ② 「怎么办」首次点击是降序, 而 order 越小越急 —— **把「没事」顶到最前面**,
+#      与表头 title 写的「按纪律走 > 今天就得动 > …」正好相反。
+#   ③ 「AI 信号」同理 —— 把「观望」顶到最前面。
+#
+# ②③ 是**看不出来的错**: 表面上排了序, 排出来的却是最不该先看的那些。
+
+
+def _board_body() -> str:
+    """去掉注释的源码 —— 注释里复述 bug 是允许的, 不能算数。"""
+    out, in_block = [], False
+    for ln in _src().splitlines():
+        t = ln.strip()
+        if in_block:
+            if "*/" in t:
+                in_block = False
+            continue
+        if t.startswith("/*"):
+            in_block = "*/" not in t
+            continue
+        if t.startswith("//"):
+            continue
+        out.append(ln)
+    return "\n".join(out)
+
+
+def test_R251_箭头不许拿当前排序键跟自己比():
+    """`caret(sort.key)` —— 判等恒真, 那个箭头就永远亮着。
+
+    这一条盯的是**写法本身**: 传进去的必须是这一列自己的排序目标(字面量),
+    不能是当前排序键。
+    """
+    body = _board_body()
+    assert "caret(sort.key)" not in body, (
+        "箭头又拿当前排序键跟自己比了 —— 判等恒真, 那一列的箭头会永远亮着"
+    )
+
+
+def test_R251_多目标的列把自己的目标全列给箭头():
+    """漏列一个, 按那个目标排时这一列的箭头就不亮 —— 反过来的毛病。"""
+    body = _board_body()
+    for cols in ("'close', 'changePct'",
+                 "'trend', 'spread', 'ks', 'km', 'kl'",
+                 "'verdict', 'play'"):
+        assert f"caret({cols})" in body, f"表头少给箭头列出目标: caret({cols})"
+
+
+def test_R251_越小越要紧的那几个必须升序打头():
+    """`order` / `SIGNAL_RANK` 都是**越小越要紧**。首次点击给降序, 就是把最不该
+    先看的顶到最前面 —— 而且看不出来, 因为它确实排序了。"""
+    body = _board_body()
+    block = body[body.index("FIRST_DIR"):]
+    block = block[:block.index("}")]
+    for key, why in (("urgency", "该动了: order 越小越急"),
+                     ("play", "怎么办: 按纪律走=0, 没事=5"),
+                     ("signal", "AI 信号: 买入=0, 观望=3"),
+                     ("spread", "间距: 刚走出来的在前"),
+                     ("ks", "通道位置: 最便宜的在前")):
+        assert f"{key}: 'asc'" in block, f"{key} 的首次方向不是升序 —— {why}"
+    for key, why in (("trend", "六态: 值取了负, 降序才是多头在前"),
+                     ("verdict", "贵不贵: rank 越大越偏卖"),
+                     ("report", "AI 报告: 最新在前")):
+        assert f"{key}: 'desc'" in block, f"{key} 的首次方向不是降序 —— {why}"
+
+
+def test_R251_每个排序键都定了首次方向():
+    """漏一个就会 undefined —— 那一列点下去方向是随机的(实际是 undefined,
+    比较时当 desc 处理), 而且悄无声息。"""
+    body = _board_body()
+    keys = re.findall(r"'([a-zA-Z]+)'", body[body.index("type SortKey"):body.index("\n", body.index("type SortKey") + 200)])
+    block = body[body.index("FIRST_DIR"):]
+    block = block[:block.index("\n  }")]
+    for k in keys:
+        assert re.search(rf"\b{k}: '(asc|desc)'", block), f"排序键「{k}」没定首次方向"
+
+
+def test_R251_表头说的和实际做的一致():
+    """[R214 的教训] 判定写对了、接线接错了, 而测试恰好只测了判定。
+
+    「怎么办」的表头 title 写着「按急迫程度排: 按纪律走 > …」—— 那句话只有在
+    升序时才成立。说明与行为不一致时, **说明会赢**(用户信它), 于是排出来的表
+    与预期相反而没人发现。
+    """
+    src = _src()
+    th = src[src.index("<thead"):src.index("</thead>")]
+    assert "按急迫程度排" in th, "「怎么办」的排序说明没了"
+    body = _board_body()
+    block = body[body.index("FIRST_DIR"):]
+    assert "play: 'asc'" in block[:block.index("}")], (
+        "表头说「按纪律走排最前」, 而首次点击是降序 —— 说明与行为相反"
+    )

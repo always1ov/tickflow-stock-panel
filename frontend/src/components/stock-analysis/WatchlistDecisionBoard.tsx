@@ -131,8 +131,39 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
   // 改由复盘接口的 `channel` 给 —— 决策台不必再把行数据透传进弹窗。
   // 「只看要动的」—— 自选一多, 默认列 80 行本身就是噪音
   const [actionableOnly, setActionableOnly] = useState(false)
+  /**
+   * [R251] 每个排序目标**第一次点击**该往哪边排。
+   *
+   * 原来的规矩是「除了名称一律降序」—— 那对"数值越大越好"的列没问题, 可对
+   * **越小越要紧**的那几个恰好是反的:
+   *
+   *   怎么办  order 0=按纪律走 … 5=没事   降序把「没事」顶到最前面
+   *   AI信号  0=买入 … 3=观望            降序把「观望」顶到最前面
+   *
+   * 而表头 title 明明写着「按急迫程度排: 按纪律走 > 今天就得动 > …」。
+   * 一列的排序方向和它自己的说明相反, 这是**看不出来的错** —— 表面上排了序,
+   * 排出来的却是最不该先看的那些。
+   *
+   * 现在按「**第一下就把最该看的顶到最前面**」逐个定, 与默认排序(该动了, 升序)
+   * 同一个方向感。
+   */
+  const FIRST_DIR: Record<SortKey, 'asc' | 'desc'> = {
+    urgency: 'asc',        // order 越小越急
+    play: 'asc',           // 同上 —— 按纪律走 > 今天就得动 > … > 没事
+    signal: 'asc',         // buy > sell > hold > watch
+    name: 'asc',           // A → Z
+    spread: 'asc',         // 刚从挤在一起走出来的在前(找起点)
+    ks: 'asc', km: 'asc', kl: 'asc',   // 通道内位置: 最便宜的在前(低吸候选)
+    trend: 'desc',         // 值取了负 —— 降序 = 多头在前
+    verdict: 'desc',       // rank 越大越偏卖 —— 降序 = 该减的在前
+    close: 'desc', changePct: 'desc',
+    held: 'desc', cost: 'desc', pnl: 'desc', exit: 'asc',
+    confidence: 'desc', report: 'desc',
+  }
   const toggleSort = (key: SortKey) =>
-    setSort((s) => (s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: key === 'name' ? 'asc' : 'desc' }))
+    setSort((s) => (s.key === key
+      ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' }
+      : { key, dir: FIRST_DIR[key] }))
   // [R211] 「走势」表头点击 = 依次轮换五个排序目标, **走完一圈回到默认顺序**。
   // 用户: 「点击应该是一直循环所有形态, 其中包括遍历完成后会轮到取消所有形态
   // 变成原来的样子」。所以这里不走 toggleSort 的"再点一下翻方向"—— 五个目标
@@ -151,8 +182,19 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
       : i === TREND_SORTS.length - 1 ? DEFAULT_SORT
         : TREND_SORTS[i + 1])
   }
-  const caret = (key: SortKey) =>
-    sort.key === key ? (sort.dir === 'asc' ? <ArrowUp className="h-2.5 w-2.5" /> : <ArrowDown className="h-2.5 w-2.5" />) : null
+  // [R251] **箭头只在这一列真的被选中时才出**。
+  //
+  // 原来多目标那三列传的是当前排序键本身 —— 于是判等恒真, 按「成本」排时
+  // 现价/涨跌、走势、结论 的箭头**全都亮着**, 加上成本自己一共四个,
+  // 根本看不出按哪一列排。
+  //
+  // 之前有缀字挡着(缀字只在该列选中时才出现), R250 把缀字去掉之后这个 bug
+  // 就裸出来了 —— 用户: 「检查每列的排序, 我感觉有点不对劲」。
+  // 现在收可变参数: 多目标的列把自己的目标全列上。
+  const caret = (...keys: SortKey[]) =>
+    keys.includes(sort.key)
+      ? (sort.dir === 'asc' ? <ArrowUp className="h-2.5 w-2.5" /> : <ArrowDown className="h-2.5 w-2.5" />)
+      : null
   const thBtn = 'inline-flex items-center gap-0.5 hover:text-foreground cursor-pointer'
 
   const enriched = useQuery({
@@ -632,7 +674,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
                           title="现价与当日涨跌。点这里在「现价」「涨跌」之间轮换排序目标, 再点同一个翻方向">
                     {/* [R250] 同上 —— 表头只印列名, 三处一致(标的除外, 它本来就只有一个排序目标) */}
                     现价/涨跌
-                    {caret(sort.key)}
+                    {caret('close', 'changePct')}
                   </button>
                 </th>
                 {/* [R42] Keltner 三档: 一眼看出这只票贴着哪条轨。收盘口径, 与个股分析图表同一组公式 */}
@@ -653,7 +695,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
                     {/* [R250] 表头**只有「走势」两个字** —— 与「结论」那一列同一条:
                         排序目标是内部分层, 不该印在表头上。轮换照旧, 说明在悬停里。 */}
                     走势
-                    {caret(sort.key)}
+                    {caret('trend', 'spread', 'ks', 'km', 'kl')}
                   </button>
                 </th>
                 <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center">
@@ -669,7 +711,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
                         那是把**内部分层**摆到表头上, 而这一列对外就叫「结论」。
                         排序照旧在两者之间轮换, 说明留在悬停里。 */}
                     结论
-                    {caret(sort.key)}
+                    {caret('verdict', 'play')}
                   </button>
                 </th>
                 <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center"><button onClick={() => toggleSort('held')} className={thBtn}>仓位{caret('held')}</button></th>
