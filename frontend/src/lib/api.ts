@@ -2775,6 +2775,8 @@ export type PaperScope = 'market' | 'watchlist'
 export interface PaperLot {
   id: string
   symbol: string
+  /** [R247] 股票名称 */
+  name?: string | null
   cost_price: number
   qty: number
   buy_date: string | null
@@ -2878,7 +2880,10 @@ export interface PaperExitStats {
 }
 
 export interface PaperPosition {
-  symbol: string; shares: number; cost: number
+  symbol: string
+  /** [R247] 股票名称。取不到时缺席 —— 界面退回只显示代码 */
+  name?: string | null
+  shares: number; cost: number
   price: number | null
   opened_on: string
   pnl_pct: number | null
@@ -2890,7 +2895,10 @@ export interface PaperPosition {
 export interface PaperOrder {
   ts: string; date: string
   action: 'buy' | 'sell'
-  symbol: string; shares: number; price: number
+  symbol: string
+  /** [R247] 股票名称 */
+  name?: string | null
+  shares: number; price: number
   amount?: number
   reason: string
   /** 有值 = 这一笔被拒了。拒单也留痕: "想买但买不成"和"没想买"是两件事 */

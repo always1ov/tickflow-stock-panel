@@ -129,6 +129,19 @@ def _scope_or_400(scope: str) -> str:
     return scope
 
 
+def _name_map(repo, symbols: list[str]) -> dict[str, str]:
+    """[R247] {代码: 名称}。取不到就整个空着 —— 界面退回只显示代码, 不崩。"""
+    # `if x` 要在 str() **之前** —— str(None) 是 "NONE", 会被当成一个代码去查
+    syms = sorted({str(x).upper() for x in symbols if x})
+    if not syms:
+        return {}
+    try:
+        return {k: v for k, v in (repo.get_name_map(syms) or {}).items() if v}
+    except Exception as e:  # noqa: BLE001
+        logger.debug("paper: name map skipped: %s", e)
+        return {}
+
+
 @router.get("/traders/{trader_id}/books/{scope}")
 def get_book(trader_id: str, scope: str, request: Request) -> dict[str, Any]:
     """单个操作员的全部家当: 持仓 / 成交流水 / 净值曲线。
@@ -153,13 +166,28 @@ def get_book(trader_id: str, scope: str, request: Request) -> dict[str, Any]:
             "market_value": round((px or 0) * int(pos.get("shares") or 0), 2),
         })
     positions.sort(key=lambda p: -(p["market_value"] or 0))
+    orders = list(reversed(bk.get("orders") or []))[:300]   # 新→旧: 先看最近做了什么
+
+    # [R247] 带上股票名称。用户: 「个股没有显示正确的名称只是代码」——
+    # 一屏代码谁也认不出来是哪只票, 交易软件从来都是「名称 + 代码」。
+    # 名称走 repo 的统一映射(与自选、今日总览同一份), 这一层不自己维护。
+    summary = _book_summary(t, scope, prices)
+    names = _name_map(request.app.state.repo,
+                      [p["symbol"] for p in positions]
+                      + [str(o.get("symbol") or "") for o in orders]
+                      + [str(l.get("symbol") or "") for l in (summary.get("lots") or [])])
+    for p_ in positions:
+        p_["name"] = names.get(p_["symbol"])
+    orders = [dict(o, name=names.get(str(o.get("symbol") or ""))) for o in orders]
+    for l in (summary.get("lots") or []):
+        l["name"] = names.get(str(l.get("symbol") or ""))
+
     return {
         "id": t.get("id"), "name": t.get("name"),
         "max_positions": pt.clamp_max_positions(t.get("max_positions")),
-        **_book_summary(t, scope, prices),
+        **summary,
         "positions": positions,
-        # 新 → 旧: 打开先看到最近做了什么
-        "orders": list(reversed(bk.get("orders") or []))[:300],
+        "orders": orders,
         "nav_history": bk.get("nav_history") or [],
     }
 

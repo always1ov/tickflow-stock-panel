@@ -18,7 +18,6 @@ import {
 } from '@/lib/api'
 import { storage } from '@/lib/storage'
 import { PageHeader } from '@/components/PageHeader'
-import { PaperEquityChart } from '@/components/paper/PaperEquityChart'
 import { toast } from '@/components/Toast'
 import { QK } from '@/lib/queryKeys'
 // [R171] 交易计划: 三条线 / 出场归因标 / 出场分布
@@ -76,6 +75,24 @@ function pnlCls(v: number | null | undefined): string {
  * 仪表盘: 九个数挤成一段话, 扫一眼说不出哪个是哪个。瓦片条一格一个数,
  * 宽度自己平分, 才是参考项目那个版式。
  */
+/**
+ * [R247] 标的格: **名称在上、代码在下**。
+ *
+ * 用户: 「个股没有显示正确的名称只是代码」。一屏 `600584.SH` 谁也认不出是哪只票 ——
+ * 交易软件从来都是名称当主、代码当辅, 因为人记的是「长电科技」不是那串数字。
+ * 名称由后端 `repo.get_name_map` 给(与自选、今日总览同一份), 取不到就只剩代码,
+ * 不编一个。
+ */
+function Sym({ symbol, name }: { symbol: string; name?: string | null }) {
+  return (
+    <span className="flex flex-col leading-tight">
+      <span className="truncate font-medium text-foreground/90">{name || symbol}</span>
+      {!!name && <span className="font-mono text-[9px] text-muted/70">{symbol}</span>}
+    </span>
+  )
+}
+
+
 function MetricStrip({ children }: { children: ReactNode }) {
   return (
     <div className="flex flex-wrap gap-px overflow-hidden rounded-card bg-border/70">
@@ -334,21 +351,10 @@ function TraderCard({ t, runningScope, onRun, onLifeline, onPlanCheck, onOpen, o
         </button>
       </header>
 
-      {/* [R186] 净值曲线 —— 这一页最该有的那样东西。
-          注释里一直写着"这两条曲线的差就是我这份自选有没有价值", 可**曲线从来
-          没画出来过**: nav_history 从 R59 起就在存, 界面上却只有一个总资产数字。
-          那个数只说明现在几块钱; 一路冲到 +30% 又跌回来, 和一路平着走, 在总资产
-          上看不出任何区别。两本账画在同一张图里, 差值一眼可见。 */}
-      {/* [R190] 高度由 168 提到 260 —— 参考项目的 `.mp-equity` 就是固定 260px。
-          净值曲线是这一页的主角, 168px 里两条线挤在一起, 看不出谁在什么时候
-          领先, 而"两条曲线的差"正是这一页要回答的问题。 */}
-      <div className="border-t border-border/60 px-4 pb-2 pt-3">
-        <PaperEquityChart books={t.books} height={260} />
-      </div>
-
-      {/* [R190] 两本账**纵向排开**, 不再左右各半。对比靠上面那张图(两条线本来就
-          画在一起), 而指标条要的是整行宽度。 */}
-      <div className="divide-y divide-border/60">
+      {/* [R247] 两本账**左右各半**。用户: 「分割为左右, 分别是全市场和自选」。
+          R190 曾把它们纵向排开, 理由是"对比靠上面那张净值曲线" —— 现在曲线撤了,
+          对比就得靠这两栏并排。窄屏(<1280px)退回上下, 否则表会挤成一团。 */}
+      <div className="grid grid-cols-1 divide-y divide-border/60 xl:grid-cols-2 xl:divide-x xl:divide-y-0">
         {t.books.map(b => (
           <BookPane key={b.scope} b={b} traderId={t.id}
             busy={runningScope === b.scope}
@@ -527,7 +533,7 @@ function BookPane({ b, traderId, busy, onRun, onLifeline, onPlanCheck, onOpen, o
               <tbody>
                 {positions.map(p => (
                   <tr key={p.symbol} className="border-b border-border/25 last:border-0">
-                    <td className="whitespace-nowrap px-1.5 py-1 font-mono text-foreground/90">{p.symbol}</td>
+                    <td className="whitespace-nowrap px-1.5 py-1"><Sym symbol={p.symbol} name={p.name} /></td>
                     <td className="whitespace-nowrap px-1.5 py-1 text-right font-mono tabular-nums text-muted">{p.shares}</td>
                     <td className="whitespace-nowrap px-1.5 py-1 text-right font-mono tabular-nums text-muted">
                       {p.cost.toFixed(2)} / {p.price?.toFixed(2) ?? '—'}
@@ -561,7 +567,7 @@ function BookPane({ b, traderId, busy, onRun, onLifeline, onPlanCheck, onOpen, o
               <tbody>
                 {b.lots.map(l => (
                   <tr key={l.id} className="border-t border-border/25">
-                    <td className="whitespace-nowrap px-1.5 py-1 font-mono text-foreground/80">{l.symbol}</td>
+                    <td className="whitespace-nowrap px-1.5 py-1"><Sym symbol={l.symbol} name={l.name} /></td>
                     <td className="px-1.5 py-1 text-right font-mono text-muted">{l.cost_price.toFixed(2)}</td>
                     <td className="px-1.5 py-1 text-right font-mono text-muted">{l.qty}</td>
                     <td className="px-1.5 py-1 text-right font-mono text-foreground/70">
@@ -848,7 +854,11 @@ function OrderRow({ o, dense = false }: { o: PaperOrder; dense?: boolean }) {
               : 'border-emerald-400/40 bg-emerald-400/10 text-emerald-400'}`}>
           {buy ? '买入' : '卖出'}
         </span>
-        <span className="ml-1.5 font-mono text-[10px] text-secondary">{o.symbol}</span>
+        {/* [R247] 名称 + 代码。翻流水时「它昨天买了什么」问的是名字, 不是代码 */}
+        <span className="ml-1.5 inline-flex whitespace-nowrap text-[10px] text-secondary">
+          {o.name || o.symbol}
+          {!!o.name && <span className="ml-1 font-mono text-[9px] text-muted/70">{o.symbol}</span>}
+        </span>
       </td>
       <td className={`whitespace-nowrap ${px2} text-right font-mono tabular-nums text-secondary`}>
         {o.rejected ? '—' : `${o.shares} @ ${o.price}`}
