@@ -1262,6 +1262,14 @@ export function Screener() {
         <StrategyPoolDialog
           pool={pool}
           onConfirm={(newPool) => {
+            // 新增的日线策略立即自动扫描, 免去手动点刷新; 纯排序/删除不重跑
+            if (assetType === 'stock') {
+              const prev = new Set(pool)
+              const addedDaily = newPool.filter(
+                id => !prev.has(id) && !(strategyMap.get(id)?.timeframes?.includes('1m') ?? false),
+              )
+              if (addedDaily.length > 0) requestRunAll({ date: asOf || undefined, strategyIds: addedDaily })
+            }
             reorderPool(newPool)
           }}
           onClose={() => setShowPoolDialog(false)}
@@ -1283,6 +1291,11 @@ export function Screener() {
             throw new Error(`策略 ${id} 已保存但未加载，请检查策略代码`)
           }
           addToPool(id)
+          // 新建策略为日线时立即扫描, 免去手动点刷新 (分钟策略仍手动单跑)
+          const preset = data.presets.find(s => s.id === id)
+          if (assetType === 'stock' && preset && !preset.timeframes?.includes('1m')) {
+            requestRunAll({ date: asOf || undefined, strategyIds: [id] })
+          }
         }}
       />
 
@@ -1290,8 +1303,13 @@ export function Screener() {
         open={showComposite}
         onClose={() => setShowComposite(false)}
         onSavedId={async id => {
-          await qc.fetchQuery({ queryKey: QK.screenerStrategies('all'), queryFn: () => api.screenerStrategies(), staleTime: 0 })
+          const data = await qc.fetchQuery({ queryKey: QK.screenerStrategies('all'), queryFn: () => api.screenerStrategies(), staleTime: 0 })
           addToPool(id)
+          // 新建叠加策略为日线时立即扫描, 免去手动点刷新 (分钟策略仍手动单跑)
+          const preset = data.presets.find(s => s.id === id)
+          if (assetType === 'stock' && preset && !preset.timeframes?.includes('1m')) {
+            requestRunAll({ date: asOf || undefined, strategyIds: [id] })
+          }
         }}
       />
 

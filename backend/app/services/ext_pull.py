@@ -12,6 +12,7 @@ from typing import Any
 
 import httpx
 
+from app.market_time import cn_now, cn_today
 from app.services.ext_data import (
     ExtConfig,
     ExtConfigStore,
@@ -43,14 +44,19 @@ def outbound_headers(user_headers: dict[str, str] | None = None) -> dict[str, st
 
 
 def _in_time_window(start: str | None, end: str | None) -> bool:
-    """检查当前本地时间是否在每日时间窗口内。
+    """检查当前北京时间是否在每日时间窗口内。
 
     start/end 为 "HH:MM" 格式。两者都为 None 时不限制(返回 True)。
     支持跨午夜窗口(如 22:00-02:00)。
+
+    用北京时间而不是本地时间: 这个窗口是照着 A 股交易时段设的, 而
+    market_time 模块开篇就写明「服务器/容器本地时区不可靠 (python:slim
+    镜像默认 UTC)」。UTC 容器里 9:30-15:00 的窗口实际落在北京 17:30-23:00,
+    每天都在收盘之后。
     """
     if not start or not end:
         return True
-    now = datetime.now().strftime("%H:%M")
+    now = cn_now().strftime("%H:%M")
     if start <= end:
         return start <= now < end
     # 跨午夜: 如 22:00-02:00
@@ -251,18 +257,25 @@ async def fetch_and_ingest(
     config: ExtConfig,
     data_dir,
     target_date: date | None = None,
+    *,
+    keep_strategy_cache: bool = False,
 ) -> tuple[int, str]:
     """执行一次拉取: 请求外部 API → 解析响应 → 写入 Parquet。
 
     target_date 默认当日; 历史回补传入目标日期 (写入对应分区)。
+    keep_strategy_cache=True 由定时拉取循环传入: 例行刷新不清策略结果缓存。
     Returns:
         (rows_written, date_str)
     """
-    day = target_date or date.today()
+    # 同上: 落盘分区按北京日期, 否则 UTC 容器在北京时间 08:00 之前写的是前一天。
+    day = target_date or cn_today()
     rows = await fetch_rows_for_date(config, day)
     if not rows:
         raise ValueError("提取到的行数为 0")
-    n = rows_to_parquet(rows, config, data_dir, snapshot_date=day)
+    n = rows_to_parquet(
+        rows, config, data_dir, snapshot_date=day,
+        keep_strategy_cache=keep_strategy_cache,
+    )
     return n, day.isoformat()
 
 
@@ -483,7 +496,7 @@ class PullScheduler:
                     fresh.pull.last_run = datetime.now(timezone.utc).isoformat()
                     fresh.pull.last_status = "skipped"
                     fresh.pull.last_message = "不在拉取时间窗口内"
-                    store.upsert(fresh)
+                    store.upsert(fresh, keep_strategy_cache=True)
                     logger.info("PullScheduler: %s skipped (outside time window)", config.id)
                     interval = max(pull.schedule_minutes * 60, 60)
                     await asyncio.sleep(interval)
@@ -491,12 +504,16 @@ class PullScheduler:
 
                 # 先执行一次 (启用即拉取, 让用户立刻看到生效)
                 try:
-                    n, d = await fetch_and_ingest(fresh, self._data_dir)
+                    # 例行定时刷新: 不清策略结果缓存 (见 invalidate_ext_caches),
+                    # 否则策略页每轮拉取后整页空白, 直到下次全量重算完成。
+                    n, d = await fetch_and_ingest(
+                        fresh, self._data_dir, keep_strategy_cache=True
+                    )
                     fresh.pull.last_run = datetime.now(timezone.utc).isoformat()
                     fresh.pull.last_status = "success"
                     fresh.pull.last_message = f"{n} rows @ {d}"
                     fresh.pull.last_rows = n
-                    store.upsert(fresh)
+                    store.upsert(fresh, keep_strategy_cache=True)
                     logger.info("PullScheduler: %s success, %d rows", config.id, n)
                 except Exception as e:
                     fresh2 = store.get(config.id)
@@ -504,7 +521,7 @@ class PullScheduler:
                         fresh2.pull.last_run = datetime.now(timezone.utc).isoformat()
                         fresh2.pull.last_status = "error"
                         fresh2.pull.last_message = str(e)[:200]
-                        store.upsert(fresh2)
+                        store.upsert(fresh2, keep_strategy_cache=True)
                     logger.warning("PullScheduler: %s error: %s", config.id, e)
 
                 # 间隔取自最新配置 (每次重新读取, 修复改间隔不生效)
@@ -516,7 +533,7 @@ class PullScheduler:
                     latest.pull.next_run = datetime.fromtimestamp(
                         next_dt, tz=UTC
                     ).isoformat()
-                    store.upsert(latest)
+                    store.upsert(latest, keep_strategy_cache=True)
 
                 await asyncio.sleep(interval)
                 if not self._running:
