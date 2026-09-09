@@ -320,9 +320,17 @@ export function ChannelStateCell({ trend, geo, runs, ph, kc, close, trendCls,
             </button>
           )}
         </span>
-        <span className="text-[9px] text-muted">
-          {ph ? ph.pace_cn : <span className="text-transparent select-none">·</span>}
-        </span>
+        {/* [R223] 六态与阶段打架时, 第二行换成那句话 —— 用户: 「图形对不上结论啊」。
+            不替用户选边(两边量的不是同一个东西, 谁都没算错), 但必须让他看见。 */}
+        {ph?.gap ? (
+          <span className="cursor-help text-[9px] text-amber-300/85" title={ph.gap.why}>
+            ⚠ {ph.gap.cn}
+          </span>
+        ) : (
+          <span className="text-[9px] text-muted">
+            {ph ? ph.pace_cn : <span className="text-transparent select-none">·</span>}
+          </span>
+        )}
       </div>
     </td>
   )

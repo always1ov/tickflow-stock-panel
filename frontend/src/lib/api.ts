@@ -851,6 +851,12 @@ export interface ChannelPhase {
   maturity_cn: string
   /** [R209] 还有没有劲: 还在加速 / 速度平稳 / 正在放慢 */
   pace_cn: string
+  /** [R223] 六态与这个阶段在说相反的话时才有值。
+   *
+   *  两边量的不是同一个东西 —— 六态看价格的高低点, 阶段看三条均线的中枢,
+   *  而均线是滞后的。转折那一段它们必然对不上, 这个字段负责把它说出来,
+   *  而不是让两个相反的标签上下一摞。 */
+  gap?: { cn: string; why: string } | null
 }
 
 export interface ChannelEvent {

@@ -976,3 +976,70 @@ def test_注记只补话不改底层结论():
     from app.indicators.keltner import POS_ABOVE, verdict
     live = verdict({k_: {"pos": POS_ABOVE} for k_ in ("s", "m", "l")})
     assert rows["上上上"]["verdict"]["title"] == live["title"]
+
+
+# ================================================================
+# [R223] 六态与阶段对不上的时候必须说出来
+#
+# 用户: 「好多不对的, 可能是因为一些组合没有结论的, 像这些特殊的你要描述清楚
+# 情况说清楚, 不然图形对不上结论啊」—— 截图里并排着「自然回升 10天 + 下跌中」
+# 「下跌趋势 6天 + 涨势转弱」这样的行。
+#
+# **不是某一边算错了。** 两边量的根本不是同一个东西:
+#     六态 看价格的高低点(利弗莫尔关键点) —— 价格一转向它就转
+#     阶段 看三条均线的中枢 —— 而均线是滞后算子
+# 所以转折那一段它们必然对不上, 而那恰恰是最值得知道的一段。
+
+
+def _ph(code):
+    return {"code": code, "cn": g.PHASE_CN[code]}
+
+
+@pytest.mark.parametrize("state,code", [
+    ("NR", g.PH_DECLINING),      # 六态多头, 阶段在跌势侧
+    ("UT", g.PH_DECLINING),
+    ("SR", g.PH_DECLINING),
+    ("DT", g.PH_ADVANCING),      # 六态空头, 阶段在涨势侧
+    ("DT", g.PH_STALLING),
+    ("NREA", g.PH_LAUNCHING),
+])
+def test_六态与阶段相反时要报出来(state, code):
+    got = g.trend_phase_gap(state, _ph(code))
+    assert got, (state, code)
+    assert got["cn"] == "六态与通道不一致"
+    # 必须解释**为什么**会不一致, 不能只挂个警告
+    assert "均线" in got["why"] and ("滞后" in got["why"] or "后转" in got["why"])
+
+
+@pytest.mark.parametrize("state,code", [
+    ("UT", g.PH_ADVANCING), ("NR", g.PH_LAUNCHING), ("NR", g.PH_STALLING),
+    ("DT", g.PH_DECLINING), ("NREA", g.PH_DECLINING),
+])
+def test_方向一致时不该报(state, code):
+    assert g.trend_phase_gap(state, _ph(code)) is None, (state, code)
+
+
+@pytest.mark.parametrize("code", [g.PH_COILING, g.PH_UNCLEAR])
+@pytest.mark.parametrize("state", ["UT", "NR", "SR", "SREA", "NREA", "DT"])
+def test_不表态的阶段一律不算打架(state, code):
+    """横盘中 / 看不出本来就不指方向。把它们算进来会让一半的行都挂标记,
+    那这个标记三天后就没人看了(R205 立的规矩)。"""
+    assert g.trend_phase_gap(state, _ph(code)) is None, (state, code)
+
+
+def test_走过头按间距的符号定方向():
+    """`overextended` 一个 code 两个方向 —— 得看 spread 的符号才知道是涨过头
+    还是跌过头, 光看 code 判不了。"""
+    up = {"code": g.PH_OVEREXTENDED, "cn": g.PHASE_OVEREXTENDED_CN["up"]}
+    dn = {"code": g.PH_OVEREXTENDED, "cn": g.PHASE_OVEREXTENDED_CN["down"]}
+    assert g.trend_phase_gap("UT", up, {"spread": 6.0}) is None      # 多头 + 涨过头 = 一致
+    assert g.trend_phase_gap("DT", up, {"spread": 6.0})              # 空头 + 涨过头 = 打架
+    assert g.trend_phase_gap("DT", dn, {"spread": -6.0}) is None     # 空头 + 跌过头 = 一致
+    assert g.trend_phase_gap("UT", dn, {"spread": -6.0})             # 多头 + 跌过头 = 打架
+    # 拿不到 spread 就不猜方向
+    assert g.trend_phase_gap("DT", up, None) is None
+
+
+def test_缺输入时安静返回空():
+    assert g.trend_phase_gap(None, _ph(g.PH_DECLINING)) is None
+    assert g.trend_phase_gap("UT", None) is None

@@ -412,7 +412,11 @@ def get_urgency(request: Request, symbols: str = Query(..., description="逗号�
             # 该盯什么" —— 决策台悬停要的是后者。纯函数, 不新增取数。
             ph = kg.phase(kc.get("geo"), kc.get("runs"))
             if ph:
-                phases[sym] = ph
+                # [R223] 六态与阶段对不上时把话说出来。用户: 「好多不对的……
+                # 不然图形对不上结论啊」。两边量的不是同一个东西(价格高低点 vs
+                # 均线中枢), 转折段必然对不上 —— 不替用户选边, 但必须让他看见。
+                gap = kg.trend_phase_gap(t.get("state"), ph, kc.get("geo"))
+                phases[sym] = dict(ph, gap=gap) if gap else ph
         except Exception as e:  # noqa: BLE001
             logger.debug("channel event skipped for %s: %s", sym, e)
     urgency = watchlist_urgency.assess_many(

@@ -155,7 +155,11 @@ export function StockReviewDialog({ symbol, name, tab: initialTab, onClose }: {
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <div className="flex overflow-hidden rounded-btn border border-border/60">
-              {([['trend', '趋势状态'], ['verdict', '这个价贵不贵']] as const).map(([k, label]) => (
+              {/* [R223] 页签名改回「通道结论」。用户: 「名称改回原来的通道结论」。
+                  R200 那轮清行话时把它换成了「这个价贵不贵」—— 那是在解释它**说什么**,
+                  可页签要的是**这一栏叫什么**, 换掉之后反而对不上这一层在别处的名字
+                  (`keltner.verdict` / 感叹号说明 / 复盘统计口径都叫通道结论)。 */}
+              {([['trend', '趋势状态'], ['verdict', '通道结论']] as const).map(([k, label]) => (
                 <button
                   key={k}
                   onClick={() => setTab(k)}
