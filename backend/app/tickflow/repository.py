@@ -2208,10 +2208,64 @@ class KlineRepository:
         或断电时会留下半截文件, 之后 scan_parquet glob 整条链路报错。
         临时文件后缀 .tmp 不匹配 *.parquet glob, 不会被扫描误读。
         Windows 下目标正被并发读取时由 replace_with_retry 短退避穿过。
+
+        [fork R214] 临时文件名必须**每次写入唯一**。原来是固定的
+        ``out.name + ".tmp"``, 于是两个并发写入者会写进同一个临时文件:
+
+            A: write_parquet(part.parquet.tmp)   ← 大, 写到一半
+            B: write_parquet(part.parquet.tmp)   ← 小, 从头覆盖并写完
+            B: replace(part.parquet.tmp → part.parquet)
+            A: 继续往一个已经被改名走的路径写 / replace 时 FileNotFoundError
+
+        发布出去的就是半截文件, 读端报
+        ``ComputeError: parquet: File out of specification``(Invalid thrift /
+        must end with PAR1 / wrong page size 都见过)。这正是整套测试跑起来
+        约 1/3 概率随机失败的那个错。
+
+        本方法的三个调用点里, ``save_index_instruments`` 与
+        ``save_etf_instruments`` **不持 _write_lock**; 而且 ``_write_lock``
+        是实例级的, 同一个数据目录上开两个 repo 就完全不互斥。所以靠锁堵不住,
+        得让两个写入者的临时文件天生不同名 —— ``EnrichedPublication.write_parquet``
+        早就是这么做的(带 uuid 后缀), 这里补齐。
+
+        文件名前缀一个点 + uuid: 隐藏文件, 且与 enriched 那边的命名一致。
+        finally 里清理, 免得写失败时留一地临时文件。
         """
-        tmp = out.with_name(out.name + ".tmp")
-        df.write_parquet(tmp)
-        replace_with_retry(tmp, out)
+        tmp = out.with_name(f".{out.name}.{uuid.uuid4().hex}.tmp")
+        try:
+            df.write_parquet(tmp)
+            replace_with_retry(tmp, out)
+        finally:
+            tmp.unlink(missing_ok=True)
+
+    @staticmethod
+    def _read_parquet_pinned(path: Path) -> pl.DataFrame:
+        """读一个**可能正在被并发替换**的分区文件。空/不存在返回空表。
+
+        [fork R214] 必须先 ``open`` 再把文件对象交给 polars, 不能直接传路径。
+
+        ``replace_with_retry`` 的注释里写着「Linux 的 inode 交换语义」无并发问题 ——
+        那句话对 ``os.replace`` 本身成立, 对 ``pl.read_parquet(路径)`` **不成立**:
+        polars 的流式 parquet 读并不是打开一次读到底, 它会先取 footer、再回头按
+        字节区间去拿 row group, 中间**按路径重新取数**。这期间发生一次
+        ``os.replace``, 拿到的就是新文件的字节配上旧文件的偏移, 于是:
+
+            parquet: File out of specification: The page header reported the wrong page size
+            parquet: File out of specification: Invalid thrift: end of file
+            (更糟的一种) Rust 侧直接 panic → pyo3_runtime.PanicException
+
+        最后那种是 ``BaseException`` 的子类, ``except Exception`` **兜不住**。
+
+        实测: 一读一写并发跑 4 轮, 传路径 24 次异常, 传已打开的文件对象 0 次。
+        句柄一旦开好就钉住 inode, 替换换的是目录项, 换不走正在读的那份数据。
+
+        这就是整套测试跑起来约 1/3 概率随机挂在 parquet 上的原因。
+        """
+        try:
+            with path.open("rb") as fh:
+                return pl.read_parquet(fh)
+        except FileNotFoundError:
+            return pl.DataFrame()
 
     def _write_daily_partition(self, df: pl.DataFrame, table: str) -> None:
         """按 date 分区写入 parquet，每个日期一个文件，支持 merge-upsert。"""
@@ -2267,7 +2321,8 @@ class KlineRepository:
             ).sort(["symbol", "date"])
 
         for _ in range(retries):
-            existing = pl.read_parquet(out) if out.exists() else pl.DataFrame()
+            # 锁外读 —— 必须用钉住句柄的读法, 否则会撞上并发替换(见该方法注释)
+            existing = self._read_parquet_pinned(out)
             base_fp = self._partition_fingerprint(out)
             merged = _merge(existing)
             with self._write_lock:
@@ -2277,7 +2332,7 @@ class KlineRepository:
             return
         # 乐观重试耗尽 (罕见: 高频并发写同一分区): 退回锁内全量模式保证正确性
         with self._write_lock:
-            existing = pl.read_parquet(out) if out.exists() else pl.DataFrame()
+            existing = self._read_parquet_pinned(out)
             self._write_partition_locked(out, _merge(existing), existing, publication)
 
     def _write_partition_locked(
@@ -2431,9 +2486,16 @@ class KlineRepository:
 
     @staticmethod
     def _partition_rows(path: Path) -> int:
-        """读某分区文件的行数 (仅元数据, 不加载数据); 失败返回 0。"""
+        """读某分区文件的行数 (仅元数据, 不加载数据); 失败返回 0。
+
+        [fork R214] 同样走钉住句柄的读法。这里本来就有 try/except 兜底, 但
+        并发替换撞出来的最坏情况是 Rust 侧 panic → ``PanicException``,
+        那是 ``BaseException`` 的子类, ``except Exception`` 接不住, 会直接
+        炸穿调用栈。用文件对象读就不会走到那一步。
+        """
         try:
-            return int(pl.scan_parquet(path).select(pl.len()).collect().item())
+            with path.open("rb") as fh:
+                return int(pl.scan_parquet(fh).select(pl.len()).collect().item())
         except Exception:  # noqa: BLE001
             return 0
 

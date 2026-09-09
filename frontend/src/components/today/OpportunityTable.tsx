@@ -1,13 +1,31 @@
 /**
  * [fork 增强] 今日总览「值得关注」表 + 门槛漏斗。
  *
- * [R167] 从 Today.tsx 拆出。对外只暴露 OpportunityTable / GateFunnel 两个组件;
- * 把握分格、通道位置格、盘中格、注记胶囊、出手结论、展开详情全部是内部实现。
+ * [R167] 从 Today.tsx 拆出。对外暴露 OpportunityTable / GateFunnel 两个组件, 外加
+ * posWord / volWord 两个阈值函数(导出件要用同一份分界)。把握分格、走势格、
+ * 盘中格、出手结论、展开详情都是内部实现。
+ *
+ * [R214] 列结构重建: 10 列 → 6 列(开实时行情时 7 列)。
+ *
+ *   名次 │ 名称 │ **结论** │ **走势** │ [盘中] │ 建议仓位 │ 展开
+ *
+ * 改了两件事, 都是把决策台 R211/R212 那两轮的结论搬过来 —— 同一套东西,
+ * 两个页面不该有两种说法:
+ *
+ *   ① **结论提到依据前面。** 原来的顺序是 信号 → 位置 → 量比 → 距关键点 → 出手,
+ *      也就是让人**先读四格证据、再读那一句结论**。现在「结论」紧跟名称,
+ *      「走势」在它后面回答"凭什么"。
+ *   ② **三列数字并成一格状态词。** 位置 68% / 量比 1.82 / 距关键点 -2.55% ——
+ *      每一个都得先知道"多少算多"才读得出好坏, 而那正是不该逼人记的。
+ *      数字全退到悬停。
+ *
+ * 撤掉的只有「注记·不计分」那一列(它自己写着不计分, 展开行里有全文)。
+ * 其余信息一个没丢, 只是换了位置。
  */
 import { Fragment, useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 import type {
-  TodayAction, TodayGates, TodayLive, TodayNote, TodayOpportunity, TodayOverview,
+  TodayAction, TodayGates, TodayLive, TodayOpportunity, TodayOverview,
 } from '@/lib/api'
 import { cn } from '@/lib/cn'
 
@@ -104,20 +122,95 @@ function ScoreCell({ o, rank, total }: { o: TodayOpportunity; rank: number; tota
   )
 }
 
-/** 通道位置: 0.5 = 恰好站在生命线上, 1.0 = 贴上轨。甜区在刚站上那一段。 */
-function PositionCell({ pct }: { pct?: number | null }) {
-  if (pct == null) return <span className="text-[10px] text-muted/50">—</span>
-  const p = Math.round(pct * 100)
-  const tone = pct >= 0.5 && pct <= 0.66 ? 'text-danger'
-    : pct >= 0.85 ? 'text-success' : 'text-secondary'
-  const hint = pct >= 0.5 && pct <= 0.66 ? '刚站上生命线,位置便宜'
-    : pct >= 0.95 ? '已到通道上沿,这个位置买是在最贵的地方'
-    : pct >= 0.78 ? '空间已经走掉一半' : '通道中段'
+/**
+ * [R214] 三个原始数字 → 三句状态词。
+ *
+ * 「位置 68% / 量比 1.82 / 距关键点 -2.55%」三列并排, 每一个都要人先知道
+ * **多少算多** 才读得出好坏 —— 而那正是不该逼人记的东西。这三列合成一格
+ * 「走势」, 只说状态词, 数字全退到悬停。做法与决策台 R211 那一轮完全一样,
+ * 两个页面对同一件事得用同一种说法。
+ *
+ * 配色沿用原来的(涨红跌绿): 红 = 位置便宜/量刚好, 绿 = 已经贵了/量过头。
+ *
+ * 两个函数都 export 出去给 todayHtmlExport 用 —— **「多少算多」的分界只该有
+ * 一处定义**(R212 立的规矩)。分界抄成两份, 屏幕说「放量刚好」而导出说
+ * 「量太大」的那天就没法查了。
+ */
+export function posWord(pct: number): { cn: string; tone: string; why: string } {
+  if (pct >= 0.95) return { cn: '已到上沿', tone: 'text-success', why: '这个位置买是在最贵的地方' }
+  if (pct >= 0.78) return { cn: '空间走掉一半', tone: 'text-secondary', why: '还能走,但便宜的那一段过去了' }
+  if (pct >= 0.5 && pct <= 0.66) return { cn: '刚站上生命线', tone: 'text-danger', why: '方向出来了而位置还便宜 —— 甜区' }
+  if (pct >= 0.5) return { cn: '通道中段', tone: 'text-secondary', why: '不贵也不便宜' }
+  return { cn: '还在生命线下', tone: 'text-muted', why: '方向还没站住' }
+}
+
+export function volWord(v: number): { cn: string; tone: string; why: string } {
+  if (v >= 1.3 && v <= 2.5) return { cn: '放量刚好', tone: 'text-danger', why: '有增量,还没到人尽皆知' }
+  if (v > 4) return { cn: '量太大了', tone: 'text-success', why: '这波多半已经走了一段' }
+  if (v < 0.8) return { cn: '几乎没量', tone: 'text-success', why: '突破成色存疑' }
+  return { cn: '量能平平', tone: 'text-secondary', why: '既没放大,也没缩到没有' }
+}
+
+/**
+ * 「走势」—— 信号 + 六态 + 位置 + 量能 + 距关键点, 一格里三行。
+ *
+ * 为什么合成一格: 它们回答的是同一个问题(**凭什么把这只挑出来**)。
+ * 拆成四列, 人得左右对眼把依据接起来; 并成一格, 上下一扫就是一条链:
+ * 出了什么信号 → 现在贵不贵、有没有量 → 离该动手的价还有多远。
+ */
+function TrendCell({ o }: { o: TodayOpportunity }) {
+  const p = o.channel_pct != null ? posWord(o.channel_pct) : null
+  const v = o.vol_ratio != null ? volWord(o.vol_ratio) : null
   return (
-    <span className={cn('font-mono', tone)}
-          title={`量化波动通道·短期 位置 ${p}%(0=下轨 / 50=生命线 MA20 / 100=上轨)—— ${hint}`}>
-      {p}%
-    </span>
+    <div className="flex min-w-[10rem] flex-col gap-1">
+      <div className="flex flex-wrap items-center gap-1.5 text-foreground/85">
+        <span>{o.text}</span>
+        {o.trend_state_cn && (
+          <span title="六态趋势状态 —— 门槛要求必须在多头侧(上涨趋势/自然回升/次级回升)"
+                className="whitespace-nowrap rounded bg-border/40 px-1 py-0.5 text-[9px] text-muted">
+            {o.trend_state_cn}
+          </span>
+        )}
+        {o.fresh_from === 'near_breakout' && (
+          <span title="这只是靠「逼近触发价」进来的:突破还没发生,跑道最长但也最未经确认"
+                className="whitespace-nowrap rounded bg-sky-400/15 px-1 py-0.5 text-[9px] text-sky-300">
+            尚未突破
+          </span>
+        )}
+        {o.intraday && (
+          <span title="这个信号由盘中实时价触发,收盘可能收回去 —— 只记录观察,收盘确认后再动手"
+                className="rounded bg-amber-400/15 px-1 py-0.5 text-[9px] text-amber-300">
+            盘中·待收盘确认
+          </span>
+        )}
+      </div>
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px]">
+        {p && (
+          <span className={p.tone}
+                title={`量化波动通道·短期 位置 ${Math.round(o.channel_pct! * 100)}%`
+                  + `(0=下轨 / 50=生命线 MA20 / 100=上轨)—— ${p.why}`}>
+            {p.cn}
+          </span>
+        )}
+        {v && (
+          <span className={v.tone} title={`量比 ${o.vol_ratio!.toFixed(2)} —— ${v.why}`}>
+            {v.cn}
+          </span>
+        )}
+        {/* [R158] 「-2.55%」要人翻译一次; 直接说「已过 2.6%」「还差 7.0%」。
+            这一个本来就是"词 + 数"的样子, 已经是对的, 原样保留。 */}
+        {o.gap_pct != null && (
+          <span className={o.gap_pct <= 0 ? 'text-danger'
+            : o.gap_pct <= 1.5 ? 'text-warning' : 'text-secondary'}
+            title={'收盘价相对关键点(转多的关键点 / 回升待突破的关键点 / AI 触发价)。不参与打分'
+              + (o.pivot != null ? `\n关键点 ${o.pivot}` : '')}>
+            {o.gap_pct <= 0 ? '已过关键点 ' : o.gap_pct <= 1.5 ? '就差 ' : '还差 '}
+            <span className="font-mono">{Math.abs(o.gap_pct).toFixed(1)}%</span>
+          </span>
+        )}
+        {!p && !v && o.gap_pct == null && <span className="text-muted/50">—</span>}
+      </div>
+    </div>
   )
 }
 
@@ -170,21 +263,13 @@ function LiveCell({ live, closePct }: { live?: TodayLive | null; closePct?: numb
   )
 }
 
-function NoteChips({ notes }: { notes?: TodayNote[] }) {
-  if (!notes?.length) return <span className="text-[10px] text-muted/50">—</span>
-  return (
-    <span className="flex flex-wrap gap-1">
-      {notes.map(n => (
-        <span key={n.key}
-              title={`${n.text}\n\n（注记只作佐证,不参与把握分)`}
-              className={cn('whitespace-nowrap rounded px-1.5 py-0.5 text-[9px]',
-                NOTE_TONE[n.tone] ?? NOTE_TONE.info)}>
-          {n.label}
-        </span>
-      ))}
-    </span>
-  )
-}
+// [R214] 「注记·不计分」那一列撤了, NoteChips 随之删除 —— 它只是个预览,
+// 展开行里本来就把每一条注记连同全文一起列着(还带着「一分不加一分不减」
+// 那段口径说明), 预览没了不丢信息。这一列自己写着「不计分」, 那就是版面上
+// 优先级最低的东西, 该让位给结论。
+//
+// 留着一个没人调的组件比删掉更糟: 这一轮刚在 `_conflicts` 规则② 和
+// `frontend/src/lib/button.ts` 上各栽过一次 —— 没人用的代码看起来像在用。
 
 /** [R134] 门槛漏斗 —— 熊市里机会区空空如也时, 这一行说明系统在干活 */
 export function GateFunnel({ gates }: { gates?: TodayGates | null }) {
@@ -235,27 +320,25 @@ export function OpportunityTable({ rows, pickedSymbols, onOpen, live }: {
               名次
             </th>
             <th className="px-2 py-1.5 text-left font-normal">名称</th>
-            <th className="px-2 py-1.5 text-left font-normal">信号</th>
+            {/* [R214] 结论提到依据前面。原来的顺序是 信号 → 位置 → 量比 →
+                距关键点 → 出手, 也就是**先读四格证据, 再读那一句结论** ——
+                跟决策台 R212 「结论」列的排法正好相反。这一列现在紧跟名称。 */}
+            <th className="px-2 py-1.5 text-left font-normal"
+                title={'今天这一天能不能下手, 一句结论。不进评分不改名次。\n今天动手: 已确认上涨趋势、信号 ≤3 天、贴着关键点(高出不到 5%)、没贴上轨、盘中没跌回关键点下方、大盘不在防守档\n收盘再动: 方向对但还差一个确认 —— 盘中临时信号 / 回升途中盘中刚过关键点 / 距触发价 2% 以内 / 转多第 4~5 天 / 盘中回落。收盘站稳(守住)关键点再动\n不动手: 大盘防守 / 盘中跌破生命线 / 当日涨幅到板幅 70% / 已高出关键点 5%+ / 贴上轨 / 转多第 6 天起 / 回升还没突破'}>
+              结论
+            </th>
+            <th className="px-2 py-1.5 text-left font-normal"
+                title={'凭什么把这只挑出来 —— 信号 + 六态 + 位置 + 量能 + 距关键点, 一格里三行。\n\n'
+                  + '位置、量能原来是两列数字(68% / 1.82), 现在只说状态词: '
+                  + '要读懂那两个数字, 得先知道"多少算多", 而那正是不该逼人记的。数字全在悬停里。'}>
+              走势
+            </th>
             {live && (
               <th className="px-2 py-1.5 text-right font-normal"
                   title="盘中现价与变化。**不参与把握分** —— 把握分冻在收盘口径, 盘中一动不动">
                 盘中
               </th>
             )}
-            <th className="hidden px-2 py-1.5 text-right font-normal md:table-cell"
-                title="量化波动通道·短期 的位置(收盘口径)。50% = 恰好站在生命线 MA20 上;甜区 50%~65%">位置</th>
-            <th className="hidden px-2 py-1.5 text-right font-normal md:table-cell"
-                title="量比。区间最优:峰在 1.3~2.5,超过 4 说明这波已经走完了">量比</th>
-            <th className="hidden px-2 py-1.5 text-right font-normal xl:table-cell"
-                title="收盘价相对关键点(转多的关键点 / 回升待突破的关键点 / AI 触发价)。「已过」= 已在关键点上方, 「还差」= 还在下方。不参与打分">距关键点</th>
-            <th className="px-2 py-1.5 text-left font-normal"
-                title={'今天这一天能不能下手, 一句结论。不进评分不改名次。\n今天动手: 已确认上涨趋势、信号 ≤3 天、贴着关键点(高出不到 5%)、没贴上轨、盘中没跌回关键点下方、大盘不在防守档\n收盘再动: 方向对但还差一个确认 —— 盘中临时信号 / 回升途中盘中刚过关键点 / 距触发价 2% 以内 / 转多第 4~5 天 / 盘中回落。收盘站稳(守住)关键点再动\n不动手: 大盘防守 / 盘中跌破生命线 / 当日涨幅到板幅 70% / 已高出关键点 5%+ / 贴上轨 / 转多第 6 天起 / 回升还没突破'}>
-              出手
-            </th>
-            <th className="hidden px-2 py-1.5 text-left font-normal lg:table-cell"
-                title="主线 / AI 信号 / 历史胜率 / 通道结论 —— 全部只作佐证,一分不加一分不减">
-              注记·不计分
-            </th>
             <th className="hidden px-2 py-1.5 text-right font-normal sm:table-cell">建议仓位</th>
             <th className="w-7 px-1 py-1.5" aria-label="展开" />
           </tr>
@@ -272,7 +355,7 @@ export function OpportunityTable({ rows, pickedSymbols, onOpen, live }: {
               <Fragment key={o.symbol}>
                 {firstBelow && (
                   <tr>
-                    <td colSpan={live ? 11 : 10}
+                    <td colSpan={live ? 7 : 6}
                         className="border-y border-dashed border-warning/30 bg-warning/[0.05] px-3 py-1.5 text-[10px] leading-relaxed text-warning/90">
                       以下没到你的把握分门槛,是矮子里拔高个 —— 摆出来是为了让你知道
                       今天最好的也就这样,不是推荐。真要动手,先想清楚为什么今天非做不可。
@@ -305,65 +388,17 @@ export function OpportunityTable({ rows, pickedSymbols, onOpen, live }: {
                       {picked && <span className="text-[9px] text-amber-300">★ AI 优选</span>}
                     </div>
                   </td>
-                  <td className="px-2 py-2 align-top text-foreground/85">
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <span>{o.text}</span>
-                      {o.trend_state_cn && (
-                        <span title="六态趋势状态 —— 门槛要求必须在多头侧(上涨趋势/自然回升/次级回升)"
-                              className="whitespace-nowrap rounded bg-border/40 px-1 py-0.5 text-[9px] text-muted">
-                          {o.trend_state_cn}
-                        </span>
-                      )}
-                      {o.fresh_from === 'near_breakout' && (
-                        <span title="这只是靠「逼近触发价」进来的:突破还没发生,跑道最长但也最未经确认"
-                              className="whitespace-nowrap rounded bg-sky-400/15 px-1 py-0.5 text-[9px] text-sky-300">
-                          尚未突破
-                        </span>
-                      )}
-                      {o.intraday && (
-                        <span title="这个信号由盘中实时价触发,收盘可能收回去 —— 只记录观察,收盘确认后再动手"
-                              className="rounded bg-amber-400/15 px-1 py-0.5 text-[9px] text-amber-300">
-                          盘中·待收盘确认
-                        </span>
-                      )}
-                    </div>
+                  <td className="px-2 py-2 align-top">
+                    <ActionCell action={o.action} />
+                  </td>
+                  <td className="px-2 py-2 align-top">
+                    <TrendCell o={o} />
                   </td>
                   {live && (
                     <td className="whitespace-nowrap px-2 py-2 text-right align-top">
                       <LiveCell live={o.live} closePct={o.channel_pct} />
                     </td>
                   )}
-                  <td className="hidden whitespace-nowrap px-2 py-2 text-right align-top md:table-cell">
-                    <PositionCell pct={o.channel_pct} />
-                  </td>
-                  <td className="hidden whitespace-nowrap px-2 py-2 text-right align-top font-mono md:table-cell">
-                    {o.vol_ratio == null ? <span className="text-[10px] text-muted/50">—</span> : (
-                      <span className={o.vol_ratio >= 1.3 && o.vol_ratio <= 2.5 ? 'text-danger'
-                        : o.vol_ratio < 0.8 || o.vol_ratio > 4 ? 'text-success' : 'text-secondary'}
-                        title={o.vol_ratio >= 1.3 && o.vol_ratio <= 2.5 ? '有增量,还没到人尽皆知'
-                          : o.vol_ratio > 4 ? '量太大,这波多半已经走了一段'
-                          : o.vol_ratio < 0.8 ? '没量,突破成色存疑' : ''}>
-                        {o.vol_ratio.toFixed(2)}
-                      </span>
-                    )}
-                  </td>
-                  <td className="hidden whitespace-nowrap px-2 py-2 text-right align-top font-mono xl:table-cell">
-                    {/* [R158] 「-2.55%」要人翻译一次; 直接说「已过 2.6%」「还差 7.0%」 */}
-                    {o.gap_pct == null ? <span className="text-[10px] text-muted/50">—</span> : (
-                      <span className={o.gap_pct <= 0 ? 'text-danger'
-                        : o.gap_pct <= 1.5 ? 'text-warning' : 'text-secondary'}
-                        title={o.pivot != null ? `关键点 ${o.pivot}` : undefined}>
-                        <span className="mr-0.5 font-sans text-[9px] opacity-70">{o.gap_pct <= 0 ? '已过' : '还差'}</span>
-                        {Math.abs(o.gap_pct).toFixed(1)}%
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-2 py-2 align-top">
-                    <ActionCell action={o.action} />
-                  </td>
-                  <td className="hidden px-2 py-2 align-top lg:table-cell">
-                    <NoteChips notes={o.notes} />
-                  </td>
                   <td className="hidden whitespace-nowrap px-2 py-2 text-right align-top sm:table-cell">
                     {o.advice ? (
                       <span title={`${o.advice.why} —— 仅供参考的上限建议, 不是操作指令`}
@@ -427,7 +462,7 @@ function OpportunityDetail({ o, live }: { o: TodayOpportunity; live?: boolean })
   const verdict = axisVerdict(o.axes?.quality, o.axes?.timing)
   return (
     <tr className="border-b border-border/25 bg-base/40">
-      <td colSpan={live ? 10 : 9} className="px-4 py-3">
+      <td colSpan={live ? 7 : 6} className="px-4 py-3">
         <div className="animate-rise-in space-y-2.5 text-[11px] leading-5">
           {/* [R189] 两轴的结论先说 —— 「质地 92 / 时机 41」的意思是"好票但今天
               不是买点", 而合成后的 61 分说不出这句话。那正是拆成两轴的理由。 */}

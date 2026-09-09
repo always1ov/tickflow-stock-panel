@@ -65,9 +65,27 @@ def test_趋势与AI相反算打架(trend, sig, keyword):
 
 
 def test_趋势往上而位置已经偏卖算打架():
-    r = _run(trend=_UT, verdict={"side": "sell", "title": "该止盈了"})
+    """[R214] 这条测试**自己就是 bug 的藏身处**, 值得留个记号。
+
+    它原来传的是 `verdict={"side": "sell", ...}` —— 一个 `keltner.verdict()`
+    **永远不会返回**的形状。真实的 verdict 里 `side` 只有 "high"/"low"(贴的是
+    上轨还是下轨), 偏买偏卖叫 `tone`。测试自己捏了个对得上的假数据, 于是
+    规则② 在测试里天天绿, 在线上一次都没跑过。
+
+    现在按真函数的输出取, 并且用 `keltner.verdict` 真算一遍(见
+    test_playbook_combo_matrix.py 的全组合穷举)。
+    """
+    r = _run(trend=_UT, verdict={"side": "high", "tone": "sell", "title": "该止盈了"})
     assert r["level"] == pb.CONFLICT
     assert "该止盈了" in r["conflicts"][0]
+
+
+def test_假verdict形状不该再骗过测试():
+    """把上一条的教训钉住: `side` 里不会出现 buy/sell, 拿它比就是恒假。"""
+    from app.indicators import keltner as k
+    r = _run(trend=_UT, verdict={"side": "sell", "title": "该止盈了"})
+    assert r["level"] != pb.CONFLICT, "side 不该再被当成偏买偏卖来读"
+    assert k.SIDE_HIGH == "high" and k.SIDE_LOW == "low"
 
 
 def test_走过头了而AI还在喊买算打架():

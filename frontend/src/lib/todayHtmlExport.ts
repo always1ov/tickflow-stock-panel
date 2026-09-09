@@ -5,6 +5,8 @@
  * 可存档/分享的 HTML 字符串。放在 lib 而不是 components, 因为它没有任何渲染语义。
  */
 import type { TodayOverview, TodayPick } from '@/lib/api'
+// 位置/量能的状态词与屏幕共用一份定义 —— 「多少算多」的分界只该有一处
+import { posWord, volWord } from '@/components/today/OpportunityTable'
 
 // ===== 自包含 HTML 导出(内联样式浅色排版, 无脚本无外链, 可存档/分享) =====
 //
@@ -20,7 +22,9 @@ import type { TodayOverview, TodayPick } from '@/lib/api'
 //      全市场/成交额) + 主线 + 姿态理由
 //   2. AI 导读与优选 —— 优选带上 R121 的核对结论(已核对/存疑/待查), 驳回的
 //      单独列出。**存档件尤其不能只印结论不印核对状态**
-//   3. 值得关注 —— 两轴分解、位置、量比、距触发、注记, 与屏幕列一一对应
+//   3. 值得关注 —— [R214] 跟着屏幕改成 把握 / 名称 / 结论 / 走势 / 建议仓位:
+//      结论提到依据前面, 位置与量比从数字换成状态词(共用屏幕那份阈值),
+//      注记退到每行下面的小字。仍然与屏幕列一一对应。
 
 function esc(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -51,19 +55,41 @@ export function buildTodayHtml(d: TodayOverview, brief: string | null,
       <li><i style="background:${a.severity === 'high' ? bull : '#c78326'}"></i>
         <b>${esc(a.name)}</b>${sym(a.name, a.symbol)} ${esc(a.text)}</li>`).join('')
 
-  const oppRows = d.opportunities.map(o => `
+  // [R214] 列结构跟着屏幕走: 把握 / 名称 / 结论 / 走势 / 建议仓位。
+  //
+  // 屏幕上「位置」「量比」两列数字换成了状态词, 这里也换 —— 而且**直接调屏幕
+  // 那两个函数**, 不在这边抄一份阈值。分界抄成两份, 屏幕说「放量刚好」而存档
+  // 说「量太大」的那天就没法查了。存档件与屏幕说的不是同一件事, 比没有存档更糟。
+  //
+  // 「注记·不计分」的独立列跟着屏幕撤掉, 挪到下面那行小字里 —— 它本来就写着
+  // 不计分, 是版面上优先级最低的东西, 但不该丢。
+  const oppRows = d.opportunities.map(o => {
+    const p = o.channel_pct != null ? posWord(o.channel_pct) : null
+    const v = o.vol_ratio != null ? volWord(o.vol_ratio) : null
+    const trend = [
+      esc(o.text),
+      o.trend_state_cn ? `<span class="adv" style="background:#f0f1f3;color:#5b6472">${esc(o.trend_state_cn)}</span>` : '',
+      o.intraday ? '<span class="adv" style="background:#fdf0e3;color:#c78326">盘中·待收盘确认</span>' : '',
+    ].filter(Boolean).join(' ')
+    const words = [
+      p ? `<span title="${esc(p.why)}">${esc(p.cn)}</span>` : '',
+      v ? `<span title="${esc(v.why)}">${esc(v.cn)}</span>` : '',
+      o.gap_pct == null ? ''
+        : `${o.gap_pct <= 0 ? '已过关键点' : o.gap_pct <= 1.5 ? '就差' : '还差'} ${Math.abs(o.gap_pct).toFixed(1)}%`,
+    ].filter(Boolean).join(' · ')
+    const notes = (o.notes ?? [])
+      .map(n => `<span class="adv" style="${noteStyle[n.tone] ?? noteStyle.info}">${esc(n.label)}</span>`)
+      .join(' ')
+    return `
       <tr>
         <td class="num"><b class="score">${o.score}${o.partial ? '<sup>*</sup>' : ''}</b>${dimBar(o)}</td>
         <td class="name"><b>${esc(o.name)}</b>${sym(o.name, o.symbol)}${o.board ? ` <span class="adv" style="background:#eef1f5;color:#5b6472">${esc(o.board)}</span>` : ''}</td>
-        <td class="sig">${esc(o.text)}${o.trend_state_cn ? ` <span class="adv" style="background:#f0f1f3;color:#5b6472">${esc(o.trend_state_cn)}</span>` : ''}${o.intraday ? ' <span class="adv" style="background:#fdf0e3;color:#c78326">盘中·待收盘确认</span>' : ''}</td>
-        <td class="num">${o.channel_pct == null ? '—' : `${Math.round(o.channel_pct * 100)}%`}</td>
-        <td class="num">${o.vol_ratio == null ? '—' : o.vol_ratio.toFixed(2)}</td>
-        <td class="num">${o.gap_pct == null ? '—' : `${o.gap_pct <= 0 ? '已过' : '还差'} ${Math.abs(o.gap_pct).toFixed(1)}%`}</td>
         <td>${o.action ? `<span class="adv" style="${o.action.code === 'today' ? 'background:#e6ecfb;color:#3451a8;font-weight:600' : o.action.code === 'after_close' ? 'background:#fdf0e3;color:#c78326' : noteStyle.info}">${esc(o.action.label)}</span><br><span style="font-size:10px;color:#5b6472">${esc(o.action.reason)}</span>` : '—'}</td>
-        <td>${(o.notes ?? []).map(n => `<span class="adv" style="${noteStyle[n.tone] ?? noteStyle.info}">${esc(n.label)}</span>`).join(' ') || '—'}</td>
+        <td class="sig">${trend}${words ? `<br><span style="font-size:10px;color:#5b6472">${words}</span>` : ''}</td>
         <td>${o.advice ? `<span class="adv">${esc(o.advice.text)}</span>` : '—'}</td>
       </tr>
-      <tr class="sub"><td></td><td colspan="8">${esc(o.why || '')}${o.advice?.plan ? ` · <span style="color:#1c6ea4">建仓路径:${esc(o.advice.plan)}</span>` : ''}</td></tr>`).join('')
+      <tr class="sub"><td></td><td colspan="4">${esc(o.why || '')}${notes ? ` · 佐证(不计分):${notes}` : ''}${o.advice?.plan ? ` · <span style="color:#1c6ea4">建仓路径:${esc(o.advice.plan)}</span>` : ''}</td></tr>`
+  }).join('')
 
   const holdRows = d.holdings.map(h => `
       <tr>
@@ -179,10 +205,10 @@ export function buildTodayHtml(d: TodayOverview, brief: string | null,
   </table>` : '<div class="empty">暂无持仓标记</div>'}
   <h2>🎯 值得关注(${d.opportunities.length}·把握分 ≥ ${d.prefs.min_score}${d.opportunities_filtered > 0 ? `,滤掉 ${d.opportunities_filtered} 只` : ''})</h2>
   ${d.opportunities.length ? `<table>
-    <thead><tr><th class="num">把握</th><th>名称</th><th>信号</th><th class="num">位置</th><th class="num">量比</th><th class="num">距关键点</th><th>出手</th><th>注记·不计分</th><th>建议仓位</th></tr></thead>
+    <thead><tr><th class="num">把握</th><th>名称</th><th>结论</th><th>走势</th><th>建议仓位</th></tr></thead>
     <tbody>${oppRows}</tbody>
   </table>
-  <div class="meta" style="margin:6px 0 0">把握分 = √(质地 × 时机),先过四道硬门槛才打分;两条竖线依次是质地与时机的得分。质地 = 趋势模板八条 / 磨底节拍 / 相对强度 / 六态(以月计变化);时机 = 新鲜度 / 通道位置 / 量比 / 换手(逐日变化)。用几何平均是为了不让一边补另一边 —— 质地 95 时机 15 不该和两边都 55 打平。分数带 * 表示有因子缺数据,总分偏乐观。位置 = 量化波动通道·短期 的位置(50% 恰好站在生命线 MA20 上,甜区 50%~65%)。注记一律不参与打分。</div>`
+  <div class="meta" style="margin:6px 0 0">把握分 = √(质地 × 时机),先过四道硬门槛才打分;两条竖线依次是质地与时机的得分。质地 = 趋势模板八条 / 磨底节拍 / 相对强度 / 六态(以月计变化);时机 = 新鲜度 / 通道位置 / 量比 / 换手(逐日变化)。用几何平均是为了不让一边补另一边 —— 质地 95 时机 15 不该和两边都 55 打平。分数带 * 表示有因子缺数据,总分偏乐观。「走势」那一列是凭什么把这只挑出来:信号 + 六态 + 位置 + 量能 + 距关键点。位置与量能只说状态词 —— 要读懂 68% 和 1.82,得先知道多少算多。佐证(主线 / AI 信号 / 历史胜率 / 通道结论)在每行下面的小字里,一律不参与打分。</div>`
     : '<div class="empty">今日没有把握足够的买入机会 —— 等待比出手更常见</div>'}
 
   <p class="foot">牛来 · 六态趋势 + ATR 出场线 + 生命线(20日线) + 把握分 v3(四门槛 + 质地×时机) · 仅个人参考,不构成投资建议</p>

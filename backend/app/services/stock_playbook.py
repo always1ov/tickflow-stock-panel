@@ -90,11 +90,36 @@ def _conflicts(*, held: bool, trend: dict | None, verdict: dict | None,
     elif bull_trend is False and sig in _AI_BULL:
         out.append(f"趋势已经在空头侧({trend.get('state_cn')}),但 AI 说买入")
 
-    # ② 趋势 vs 通道位置。verdict.side 是后端给的偏买/偏卖侧
-    side = (verdict or {}).get("side")
-    if bull_trend is True and side == "sell":
+    # ② 趋势 vs 通道位置
+    #
+    # [R214] **这条规则从写下那天起一次都没触发过。** 原来读的是
+    # `verdict["side"]` —— 那个字段的取值域是 `("high", "low")`(贴的是上轨
+    # 还是下轨), 代码却拿 `"sell"` / `"buy"` 去比。偏买偏卖在 verdict 里叫
+    # `tone`, 不叫 `side`。**两套词汇对不上, 条件恒假。**
+    #
+    # 穷举 125 种通道组合 × 7 种趋势, 这条规则命中 0 次 —— 也就是说
+    # 「趋势往上但位置已经该止盈」「趋势往下但位置看着便宜」这两类最典型的
+    # 打架, 系统一次都没报过。用户说的「你没处理好组合表的所有情况」,
+    # 根子就在这里。
+    #
+    # 病因与 R210 那个「候选路 C 是死代码」一模一样: 判定写对了、接线接错了,
+    # 而测试恰好只测了判定。所以这次补的是**穷举式**的回归测试
+    # (test_playbook_combo_matrix.py), 让"某条规则从来不触发"这件事本身失败。
+    #
+    # `avoid`(下跌途中·别碰)与 `sell` 同属偏卖侧 —— 原来的写法连这个都漏了。
+    # `hold`(拿着别加)与 `watch`(还不到时候)是不表态, 照旧不算打架:
+    # 「只有短期到上沿」的强势票天天都是这一档, 报打架等于把这一列变成噪音。
+    #
+    # `sell` 与 `avoid` 同属偏卖侧, 但**话不一样**: 「该止盈了」是贵,
+    # 「下跌途中」不是贵而是通道整体在往下走。共用一句「贵了」会说出
+    # 「位置上已经是『下跌途中』—— 贵了」这种不通的话。
+    tone = (verdict or {}).get("tone")
+    if bull_trend is True and tone == "sell":
         out.append(f"趋势往上,但位置上已经是「{verdict.get('title')}」—— 贵了")
-    elif bull_trend is False and side == "buy":
+    elif bull_trend is True and tone == "avoid":
+        out.append(f"六态还挂着多头,但三档通道已经是「{verdict.get('title')}」"
+                   "—— 通道结构比六态先转向了")
+    elif bull_trend is False and tone == "buy":
         out.append(f"趋势往下,但位置上看是「{verdict.get('title')}」—— 便宜不等于该买")
 
     # ③ 阶段 vs AI: 走过头了/后劲不足 的时候 AI 还在喊买

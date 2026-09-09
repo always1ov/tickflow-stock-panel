@@ -152,7 +152,7 @@ def assess(*, position: dict | None, trend: dict | None,
     s_band = (bands or {}).get("s") or {}
     pos = s_band.get("pos")
     if pos in _band_positions():
-        return _band_call(pos, s_band, trend, flip_d)
+        return _band_call(pos, s_band, trend, flip_d, bands or {})
 
     return _mk(IDLE, None, kind="none", side=SIDE_INFO,
                what="没有触到任何线", action="")
@@ -162,9 +162,19 @@ def assess(*, position: dict | None, trend: dict | None,
 _BULLISH = ("UT", "NR", "SR")
 
 
+def _verdict_tone(bands: dict) -> str | None:
+    """三档组合的偏买/偏卖语气。取自作者的 `keltner.verdict`, 不另立一套。
+
+    延后 import: `keltner` 是纯函数模块, 但这里保持与 `_band_positions` 同样的
+    写法, 免得模块级互相牵连。
+    """
+    from app.indicators.keltner import verdict
+    return (verdict(bands) or {}).get("tone")
+
+
 def _band_call(pos: str, band: dict, trend: dict | None,
-               flip_d: float | None) -> dict:
-    """到轨 → 一档判定。**这一档必须看趋势方向。**
+               flip_d: float | None, bands: dict) -> dict:
+    """到轨 → 一档判定。**这一档必须看趋势方向, 也必须看另外两档。**
 
     ## [R212] 这里原来有个真 bug
 
@@ -187,6 +197,23 @@ def _band_call(pos: str, band: dict, trend: dict | None,
         到下沿 + 多头侧 → 买侧, 但要提醒这更像甩人下车而不是破位
         到下沿 + 空头侧 → **不是买**。往下走的时候下沿会跟着往下移
         趋势读不到     → 退回中性, 不替用户猜方向
+
+    ## [R214] 只看趋势还不够 —— 还得看另外两档
+
+    穷举 125 种通道组合 × 7 种趋势之后, 上面那张表还剩一类会打架:
+
+        三档全在下沿 + 六态还在多头侧 → 这里说「到下沿·买(相对便宜)」,
+        而作者的 `verdict` 在同一组数据上说的是「下跌途中 —— 别抄,
+        下轨会一路下移」。**同一格里上下两行, 一个叫买一个叫别买。**
+
+    错因和 R212 是同一种, 只是漏看的东西不同: 那次漏看趋势, 这次漏看
+    **另外两档通道**。「趋势没坏而掉到下沿 = 甩人下车」这句话成立的前提是
+    大级别还在上面 —— 长期档也在下沿的时候, 那就不是洗盘, 是真的在往下走。
+
+    作者的 `verdict` 早就把这件事分得很清楚了(`dip_in_uptrend` 短下沿+长上沿
+    = 最好的低吸位置; `falling_all_bands` 三档全下沿 = 别抄), 所以这里**不另立
+    一套判据**, 直接问它一句语气: 想给的方向与它相反就降级成中性, 把话让给
+    「结论」上行。少动一次 —— 两套判据打架时不给动手的理由(AGENTS.md 第 10 条)。
     """
     pos_cn = band.get("pos_cn") or "到轨"
     up = pos in ("above", "near_upper")
@@ -195,13 +222,26 @@ def _band_call(pos: str, band: dict, trend: dict | None,
     bull = None if state is None else state in _BULLISH
     label = "到上沿" if up else "到下沿"
     what = f"短期通道{pos_cn}"
+    # 三档组合明确偏卖(该止盈 / 别碰)时, 不许再说"买", 也不许再说"不必减"。
+    # 中性语气(hold / watch / 无结论)不拦 —— 「只有短期到上沿」的强势票天天
+    # 都是 hold, 拦了等于把最常见的一档也变成中性废话。
+    # 反方向不用拦: 短期在上沿时三档组合的语气只可能是 sell/hold/watch,
+    # 不存在"偏买", 所以没有对称的那半边(有也是死代码)。
+    bearish_bands = _verdict_tone(bands) in ("sell", "avoid")
 
     if up:
-        if bull is True:
+        if bull is True and not bearish_bands:
             return _mk(BAND, flip_d, kind="band_up", side=SIDE_INFO, label=label,
                        what=f"{what}(趋势还在多头侧{f'·{cn}' if cn else ''})",
                        action="沿着上沿走是趋势票的常态 —— 不必因为「到高位了」就减。"
                               "真要减看止盈线, 别拿到轨当卖出理由")
+        if bull is True:
+            # 趋势还在多头侧, 但中期/长期也到了上沿 —— 大一级别也涨到位了。
+            # 既不说"该减"(趋势没坏, 减仓理由归止盈线), 也不再说"不必减"。
+            return _mk(BAND, flip_d, kind="band_up", side=SIDE_INFO, label=label,
+                       what=f"{what}(趋势还在多头侧{f'·{cn}' if cn else ''}, 但大级别也到上沿了)",
+                       action="不是只有短期高 —— 大一级的通道也到上沿了, "
+                              "「沿上轨走是常态」这句话在这里不成立。看「贵不贵」那一行")
         if bull is False:
             return _mk(BAND, flip_d, kind="band_up", side=SIDE_SELL, label=label,
                        what=f"{what}(趋势在空头侧{f'·{cn}' if cn else ''})",
@@ -209,11 +249,21 @@ def _band_call(pos: str, band: dict, trend: dict | None,
         return _mk(BAND, flip_d, kind="band_up", side=SIDE_INFO, label=label,
                    what=what, action="到上沿了。趋势读不到, 是突破还是撞顶得自己看日 K")
 
-    if bull is True:
+    if bull is True and not bearish_bands:
         return _mk(BAND, flip_d, kind="band_down", side=SIDE_BUY, label=label,
                    what=f"{what}(趋势还在多头侧{f'·{cn}' if cn else ''})",
                    action="趋势没坏而掉到下沿, 更像甩人下车 —— 相对便宜, 但别把甩人当破位")
+    if bull is True:
+        # 三档都在下沿。六态还挂多头, 但通道结构已经整体下移 —— 不给买方向。
+        return _mk(BAND, flip_d, kind="band_down", side=SIDE_INFO, label=label,
+                   what=f"{what}(趋势还挂多头{f'·{cn}' if cn else ''}, 但三档通道整体在下沿)",
+                   action="不只是短期掉下来 —— 大级别通道也在下沿, 这不是洗盘。"
+                          "六态还没转过来而已, 别拿它当低吸理由")
     if bull is False:
+        # 通道结构说这个位置便宜(low_short_only / bottom_confirmed)时**也走这一句** ——
+        # 那两条结论的原文本来就带着「趋势没坏的话」这个前提, 而这里前提正好不成立。
+        # 所以「别抄」不是在跟它们唱反调, 是在替它们把前提兑现。真正的分歧
+        # (如短下沿 + 长上沿的强势深调撞上空头六态)由「结论」那一行报打架。
         return _mk(BAND, flip_d, kind="band_down", side=SIDE_INFO, label=label,
                    what=f"{what}(趋势在空头侧{f'·{cn}' if cn else ''})",
                    action="往下走的时候下沿会跟着一路下移 —— 别拿「到下沿」当抄底理由")
