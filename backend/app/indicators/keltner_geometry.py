@@ -639,9 +639,17 @@ def state_series(closes: list[float] | None, atrs: list[float] | None, *,
                 bands[k_] = got
         key = state_key(bands) if len(bands) == 3 else None
         out.append(key)
-        # 变了就停(那一项是哨兵)。`key is None` 单独写出来是因为今天本身就
-        # 判不出来时 `None != None` 不成立 —— 不写会一路空转到 limit。
-        if key is None or key != out[0]:
+        # [R256] **只在"算不出来"时停, 不再在"跟今天这一档不一样"时停。**
+        #
+        # 原来的写法把提前退出绑在**序列自己的 day 0** 上, 于是序列里只剩
+        # 「它自己今天那一档」的连续段。可数天数的是调用方, 它手上的是
+        # **快照那一档** —— 两边只要对不上(日线末根比快照晚一天、那一根读数
+        # 不同), 序列里就**根本找不到要数的那一档**, 全表退化成「已1天+」。
+        # 用户截图里几乎每一行都是那个数。
+        #
+        # 停在第一个 None 上是另一回事, 那是真的没得数了(长期档 120 根暖机,
+        # 更早的日子判不了) —— 而且它把循环钉在几十次以内, 不会空转到 limit。
+        if key is None:
             break
     return out
 

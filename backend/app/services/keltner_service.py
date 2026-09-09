@@ -156,7 +156,7 @@ def _ma120_map(repo, symbols: list[str]) -> dict[str, float]:
             if v.get("ma120") is not None}
 
 
-def _state_run(key: str | None, lm: dict) -> dict | None:
+def _state_run(key: str | None, lm: dict, as_of: str | None) -> dict | None:
     """[R246] `key` 这一档从今天往回连着几天。
 
     返回 `{"days": N, "since": "YYYY-MM-DD", "capped": bool}`, 数不出来给 None。
@@ -182,22 +182,41 @@ def _state_run(key: str | None, lm: dict) -> dict | None:
     "算不出来"和"功能没部署"在界面上长得一模一样, 而这两种要做的事完全不同。
     """
     seq = lm.get("states") or []
+    dates = lm.get("state_dates") or []
     if not key:
         return None
-    if not seq or seq[0] != key:
-        # 对不上 / 没有历史 —— 今天这一档仍然成立, 至少 1 天
-        return {"days": 1, "capped": True}
-    days = 0
-    for s in seq:
-        if s != key:
-            break
-        days += 1
+
+    # [R256] **序列里到底有没有"今天"?** 拿快照日期与序列最新一根的日期对一下,
+    # 三种情形要分开 —— 混成一种就会差一天, 或者整段作废(用户截图里那个
+    # 全表「已1天+」)。
+    #
+    #   ① 同一天, 且序列这一档就是徽标那一档  → 序列的头就是今天, 直接数
+    #   ② 同一天, 但序列判成了别的档          → 那一根是今天的另一个读数,
+    #                                          跳过它; 今天以**徽标**为准算 1 天
+    #   ③ 不是同一天(日线比快照滞后)          → 序列里压根没有今天,
+    #                                          今天单算 1 天, 再从序列的头接着数
+    same_day = bool(as_of and dates and str(dates[0]) == str(as_of))
+    if same_day and seq and seq[0] == key:
+        today, start = 0, 0
+    elif same_day:
+        today, start = 1, 1
+    else:
+        today, start = 1, 0
+
+    n = 0
+    while start + n < len(seq) and seq[start + n] == key:
+        n += 1
+    days = today + n
+    if days <= 0:
+        return None
+
     out: dict = {"days": days}
-    dates = lm.get("state_dates") or []
-    if len(dates) >= days:
-        out["since"] = dates[days - 1]
-    # 哨兵: 后面那天是别的档 = 这一段自己结束了(准数); 是 None 或没有了 = 下界
-    if days >= len(seq) or seq[days] is None:
+    if n and len(dates) > start + n - 1:
+        out["since"] = str(dates[start + n - 1])
+    elif today and as_of:
+        out["since"] = str(as_of)          # 今天刚变成这一档
+    # 数到判得出结论的尽头 = 天数是下界(序列到头了, 或再往前那天算不出来)
+    if start + n >= len(seq) or seq[start + n] is None:
         out["capped"] = True
     return out
 
@@ -213,7 +232,7 @@ def channels_for_symbols(repo, symbols: list[str]) -> dict[str, dict]:
         return {}
 
     try:
-        df, _as_of = repo.get_enriched_latest()
+        df, as_of = repo.get_enriched_latest()
     except Exception as e:  # noqa: BLE001
         logger.warning("keltner enriched snapshot unavailable: %s", e)
         return {}
@@ -264,7 +283,7 @@ def channels_for_symbols(repo, symbols: list[str]) -> dict[str, dict]:
             # 拿**徽标上印的那一档**往回数, 而不是要求逐日序列先和快照在"今天"
             # 上达成一致 —— 两条路的今天本来就常常不一样(enriched 快照 vs
             # 日线批量: 数据日期差一天、末根不同), 要求一致会让全表退化成 1 天。
-            run = _state_run(kg.state_key(bands), lm)
+            run = _state_run(kg.state_key(bands), lm, as_of)
             if run:
                 if v:
                     v.update(run)          # 天数并进 verdict, 免得界面各处取一个忘一个

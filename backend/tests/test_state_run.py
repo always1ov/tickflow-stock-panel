@@ -67,16 +67,26 @@ def _decline(n: int, base: float = 10.0, total: int = 400) -> list[float]:
     return [base] * (total - n) + [round(base - 0.025 * i, 4) for i in range(1, n + 1)]
 
 
+def _run(key, states, dates=None, as_of=None):
+    """`_state_run` 的调用适配器。
+
+    [R256] 多收了一个 `as_of`(enriched 快照的日期)—— 用它跟序列最新一根的日期
+    对一下, 才分得清「序列里有今天」和「日线滞后一天」。默认让两者同一天。
+    """
+    dates = dates or [f"d{len(states) - i}" for i in range(len(states))]
+    return ks._state_run(key, {"states": states, "state_dates": dates},
+                         as_of if as_of is not None else (dates[0] if dates else None))
+
+
 # ---------------------------------------------------------------- 口径
 
 def test_刚出现的那一档是第一天():
     """今天这一档成立就是第 1 天。**没有"第 0 天"** —— 那不是人话。"""
-    assert ks._state_run("a", {"states": ["a", "b"], "state_dates": ["d1", "d0"]})["days"] == 1
+    assert _run("a", ["a", "b"], ["d1", "d0"])["days"] == 1
 
 
 def test_连着几天就数几天():
-    lm = {"states": ["a", "a", "a", "b"], "state_dates": ["d3", "d2", "d1", "d0"]}
-    got = ks._state_run("a", lm)
+    got = _run("a", ["a", "a", "a", "b"], ["d3", "d2", "d1", "d0"])
     assert got["days"] == 3
     assert got["since"] == "d1", "起始日该指向这一段的第一个交易日"
     assert not got.get("capped"), "段自己结束了, 是准数不该标下界"
@@ -91,9 +101,8 @@ def test_中断即重算不累计():
     """
     # 断档**后面还得再出现同一档**, 否则"中断即重算"和"累计出现次数"给的是
     # 同一个数, 这条就测不到东西(变异测试当场证明过)。
-    lm = {"states": ["a", "a", "x", "a", "a", "a"],
-          "state_dates": ["d6", "d5", "d4", "d3", "d2", "d1"]}
-    got = ks._state_run("a", lm)
+    got = _run("a", ["a", "a", "x", "a", "a", "a"],
+               ["d6", "d5", "d4", "d3", "d2", "d1"])
     assert got["days"] == 2, f"断档之后该从 2 起算, 却数成了 {got['days']} 天(累计是 5)"
     assert got["since"] == "d5"
 
@@ -105,33 +114,40 @@ def test_徽标那一档与序列今天不一致时保底一天():
     「怎么不显示天数了?」撞到的东西。徽标印的是今天的真相, 至少 1 天。
     详见 `_state_run` 里那段。
     """
-    assert ks._state_run("a", {"states": ["b", "b"]}) == {"days": 1, "capped": True}
-    assert ks._state_run("a", {}) == {"days": 1, "capped": True}
+    # [R256] 序列的今天判成了别的档 —— 那一根跳过, 今天以徽标为准算 1 天。
+    # **不再标下界**: 历史还长着, 只是这一档确实是今天才有的。
+    assert _run("a", ["b", "b"]) == {"days": 1, "since": "d2"}
+    # 连历史都没有时才是下界(下一根是什么, 无从知道)
+    assert _run("a", []) == {"days": 1, "capped": True}
     # 连徽标那一档都没有时才真的不给 —— 那是"这一格没有状态", 另一回事
-    assert ks._state_run(None, {"states": ["a"]}) is None
+    assert _run(None, ["a"]) is None
 
 
 def test_数到序列尽头时标成下界():
-    assert ks._state_run("a", {"states": ["a", "a"]}).get("capped") is True
+    assert _run("a", ["a", "a"]).get("capped") is True
 
 
 def test_再往前那天算不出来时也标成下界():
     """长期档要 120 根暖机, 更早的日子判不了 —— 那是**没得数了**, 不是段结束。
     不标下界的话, 一个被截断的天数会被当成准数印出去。"""
-    assert ks._state_run("a", {"states": ["a", "a", None]}).get("capped") is True
+    assert _run("a", ["a", "a", None]).get("capped") is True
 
 
 def test_段自己结束时不许乱标下界():
-    assert not ks._state_run("a", {"states": ["a", "x", "x"]}).get("capped")
+    assert not _run("a", ["a", "x", "x"]).get("capped")
 
 
 # ---------------------------------------------------------------- 序列
 
-def test_序列到第一个变化就收手():
-    """调用方只要"今天这一档连着几天", 再往前算都是白算 ——
-    一段 25 天的「候选池」不该跑满 250 天。多留的那一天是哨兵。
+def test_R256_序列只在算不出来时停():
+    """[R256] **提前退出不能绑在序列自己的今天上。**
 
-    喂**预计算的** ma20/ma60(与线上、与复盘同源), 自己滚均线得到的是另一套。
+    原来是「跟 out[0] 不一样就停」, 于是序列里只剩它自己那一档的连续段。可数
+    天数的是调用方, 它手上的是**快照那一档** —— 两边一对不上, 序列里根本找不到
+    要数的那一档, 全表退化成「已1天+」(用户截图)。
+
+    现在只在**算不出来**时停(长期档 120 根暖机, 更早的日子判不了)。那既是真的
+    没得数了, 也把循环钉在几十次以内, 不会空转到 limit。
     """
     closes = _decline(40)
     n = len(closes)
@@ -143,9 +159,16 @@ def test_序列到第一个变化就收手():
                           ma20=[ma(20, i) for i in range(n)],
                           ma60=[ma(60, i) for i in range(n)])
     assert seq[0] == "watch_low", f"夹具今天是 {seq[0]}, 这条测不到"
-    assert len(seq) < 30, f"没有提前收手, 算了 {len(seq)} 天(上限是 {kg.MAX_LOOKBACK})"
-    assert seq[-1] != seq[0], "最后一项该是哨兵(与今天不同的那一档)"
-    assert all(x == seq[0] for x in seq[:-1]), "中间混进了别的档"
+    # 今天这一档只连着十几天, 而序列该一直数到"算不出来"为止。
+    # 老写法(绑自己的今天)交出来的是 15+1 项 —— **只看长度就能分辨**;
+    # 只数"有几种不同的档"不行, 老写法也有两种(连续段 + 那个哨兵),
+    # 变异测试当场证明过那条断言是空的。
+    run0 = next(i for i, x in enumerate(seq) if x != seq[0])
+    assert len(seq) > run0 * 3 and len(seq) > 100, (
+        f"序列只有 {len(seq)} 项而今天这一档才连着 {run0} 天 —— "
+        f"提前退出又绑回自己的今天了, 两条路一对不上就会全表「已1天+」"
+    )
+    assert all(x is not None for x in seq), "算不出来的那些天不该留在序列里"
 
 
 def test_判定仍然走作者那两个函数():
@@ -246,20 +269,21 @@ def test_徽标上写的是_已N天_不是历史累计():
 
 
 def test_R248_两条路对不上时保底一天而不是整个不给():
-    got = ks._state_run("a", {"states": ["b", "b", "b"]})
+    got = _run("a", ["b", "b", "b"])
     assert got is not None, "对不上就整个不给了 —— 徽标上的天数会静默消失"
     assert got["days"] == 1
-    assert got["capped"] is True, "这是下界(真实天数可能更多), 该带 `+`"
+    # [R256] 历史还长着, 只是这一档今天才有 —— 那是准数, 不该带 `+`
+    assert not got.get("capped")
 
 
 def test_R248_没有历史时也保底一天():
-    assert ks._state_run("a", {})["days"] == 1
-    assert ks._state_run("a", {"states": []})["days"] == 1
+    assert _run("a", [])["days"] == 1
+    assert _run("a", [])["days"] == 1
 
 
 def test_R248_连徽标那一档都没有时才不给():
     """这一格本来就没有状态 —— 那是真的没得说, 与"算不出来"不是一回事。"""
-    assert ks._state_run(None, {"states": ["a"]}) is None
+    assert _run(None, ["a"]) is None
 
 
 def test_R248_端到端_快照与日线对不上时徽标仍有天数():
@@ -320,3 +344,99 @@ def test_R248_只要有结论就一定有天数():
             assert v.get("days"), f"{name}: 出了结论「{v['title']}」却没有天数"
         checked += 1
     assert checked >= 10, f"只核了 {checked} 个场景"
+
+
+# ===== [R256] 序列里到底有没有「今天」 =====
+#
+# 用户: 「有的个股怎么没显示完整」—— 截图里几乎每一行都是「已1天+」。
+#
+# 根因是提前退出绑在**序列自己的今天**上(见 test_R256_序列只在算不出来时停)。
+# 修好之后还得把这三种情形分开数, 混成一种就会差一天:
+#
+#   ① 同一天, 序列这一档就是徽标那一档  → 序列的头就是今天, 直接数
+#   ② 同一天, 序列判成了别的档          → 跳过那一根, 今天以徽标为准算 1 天
+#   ③ 日线比快照滞后                    → 序列里没有今天, 今天单算, 再接着数
+
+
+def test_R256_同一天且对得上时直接数序列():
+    got = _run("a", ["a", "a", "a", "x"], ["d4", "d3", "d2", "d1"], as_of="d4")
+    assert got["days"] == 3 and got["since"] == "d2"
+
+
+def test_R256_同一天但序列判成别的档时跳过那一根():
+    """那一根是**今天的另一个读数**(复权口径/取数时点不同), 不是昨天 ——
+    拿它当昨天数会把天数多算一天。"""
+    got = _run("a", ["b", "a", "a"], ["d3", "d2", "d1"], as_of="d3")
+    assert got["days"] == 3, f"应当是 今天1 + 序列里的2 = 3, 得到 {got['days']}"
+    assert got["since"] == "d1"
+
+
+def test_R256_日线滞后时今天单算再接着数():
+    """序列最新一根是**昨天** —— 今天不在里面, 得由徽标补上, 否则少一天。
+    这正是修之前「日线滞后一天就少数一天」的那个差错。"""
+    got = _run("a", ["a", "a", "a"], ["d3", "d2", "d1"], as_of="d4")
+    assert got["days"] == 4, f"应当是 今天1 + 序列里的3 = 4, 得到 {got['days']}"
+    assert got["since"] == "d1"
+
+
+def test_R256_今天刚变成这一档时起始日就是今天():
+    got = _run("a", ["b", "b"], ["d2", "d1"], as_of="d2")
+    assert got["days"] == 1 and got["since"] == "d2"
+
+
+def test_R256_端到端_日线滞后不再少数一天():
+    """整条链: 日线批量比 enriched 快照少最后一根(数据滞后是常态)。"""
+    from app.services import keltner_service as ks
+
+    closes = _decline(40)
+    full = _row(closes)
+    v_full = (full.get("verdict") or {})
+
+    n = len(closes)
+    dates = _trading_days(n)
+
+    def ma(w, i):
+        return None if i + 1 < w else sum(closes[i + 1 - w:i + 1]) / w
+
+    class _Lagging:
+        def get_enriched_latest(self):
+            return pl.DataFrame({
+                "symbol": ["X"], "close": [closes[-1]], "atr_14": [_ATR],
+                "ma20": [ma(20, n - 1)], "ma60": [ma(60, n - 1)],
+            }), str(dates[-1])
+
+        def get_daily_batch(self, symbols, start, end, cols):
+            keep = [i for i, d in enumerate(dates) if start <= d <= end][:-1]   # 少最后一根
+            return pl.DataFrame({
+                "symbol": ["X"] * len(keep), "date": [dates[i] for i in keep],
+                "close": [closes[i] for i in keep], "atr_14": [_ATR] * len(keep),
+                "ma20": [ma(20, i) for i in keep], "ma60": [ma(60, i) for i in keep],
+            })
+
+    v_lag = (ks.channels_for_symbols(_Lagging(), ["X"]).get("X") or {}).get("verdict") or {}
+    assert v_full.get("days") and v_lag.get("days"), "两边都该有天数"
+    assert v_lag["days"] == v_full["days"], (
+        f"日线滞后一天就少数了一天: 完整 {v_full['days']} vs 滞后 {v_lag['days']}"
+    )
+
+
+def test_R256_三档都在中部那一格也有名字():
+    """用户: 「有的个股怎么没显示完整」, 箭头指的是印着 `—` 的那两行。
+
+    27 种组合里**只有这一格**是光秃秃的(120 格有结论、4 格有补充层注记)。
+    它其实有含义: 价格落在三条通道都认可的公共区间里 —— 那不是「没数据」,
+    是「位置上没有可说的」。**底层判定一个字没动**, 改的只是这一格印什么。
+    """
+    import pathlib
+
+    p = (pathlib.Path(__file__).resolve().parents[2] / "frontend" / "src"
+         / "components" / "stock-analysis" / "decision-board" / "cells.tsx")
+    if not p.exists():
+        import pytest
+        pytest.skip("拿不到前端源码(只跑后端时正常)")
+    body = "\n".join(ln for ln in p.read_text(encoding="utf-8").splitlines()
+                     if not ln.lstrip().startswith(("//", "*", "/*", "{/*")))
+    assert "note.title : '通道中部'" in body, (
+        "「中中中」那一格又变回光秃秃的 `—` 了 —— 旁边还跟着「已N天」, "
+        "读起来是「什么都没有, 已经 1 天」"
+    )
