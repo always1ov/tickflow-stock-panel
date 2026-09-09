@@ -297,3 +297,56 @@ def test_有候选过了门槛却空了要明说是bug():
     from app.api.today import empty_reason
     why = empty_reason([{"x": 1}], [], {"candidates": 1, "blocked": {}}, None)
     assert "bug" in why
+
+
+# ================================================================
+# [R226] 候选路 C 的取材面 —— 用户: 「值得关注还是很少结果, 到底和以前哪里不一样了」
+#
+# 查出来是 R215 那次改动: 那之前「挤在一起」是整整一档, 全部算 coiling、
+# 全部能进路 C; R215 按重合度与快慢把它拆成 横盘中 / 刚启动 / 看不出 三种,
+# 而 `_COILING_PHASES` 只收了前两种 —— 第三种就此被挡在候选之外, 取材面
+# 一次缩掉 44%(系统性网格 3087 格: 2940 → 1660)。
+#
+# **而且我在 R215 的台账里把方向写反了**, 写的是「路 C 的出票量因此会上升」。
+# 错在: launching 本来就在同一个分支里、本来就算 coiling, 让它可达一格没多;
+# 真正发生的是 unclear 被切出去丢了。
+#
+# 这一节守的是"路 C 的取材面不许再被悄悄改小"。
+
+
+def test_挤在一起那一档的三种全都要能进路C():
+    """`phase()` 在 nested 分支里能返回的每一种, 都必须在 `_COILING_PHASES` 里。
+
+    **这条是按"分支能产出什么"写的, 不是按当前的三个名字写死的** —— 以后
+    那个分支再细分出第四种, 这条会红, 而不是又悄悄丢一批候选。
+    """
+    import itertools
+    from app.api.today import _COILING_PHASES
+    from app.indicators import keltner_geometry as kg
+
+    produced = set()
+    for sp, o, a1 in itertools.product(
+            [round(x * 0.1, 2) for x in range(-9, 11)],      # nested 区(不含 -1.0 边界)
+            [round(x * 0.05, 2) for x in range(0, 21)],
+            [-0.30, -0.15, -0.06, 0.0, 0.06, 0.15, 0.30]):
+        geo = {"spread": sp, "accel": {"a1": a1}, "compress": o,
+               "torn": False, "nested": abs(sp) <= kg.NESTED_ATR}
+        if not geo["nested"] and o < kg.COMPRESS_TIGHT:
+            continue          # 不在「挤在一起」那一档里
+        produced.add(kg.phase(geo)["code"])
+    missing = produced - set(_COILING_PHASES)
+    assert not missing, (
+        f"「挤在一起」这一档会产出 {sorted(produced)}, 而 _COILING_PHASES 只收了 "
+        f"{sorted(_COILING_PHASES)} —— 漏掉的 {sorted(missing)} 会被挡在候选路 C 之外, "
+        f"值得关注就会莫名其妙变少(R215 正是这么丢了 44% 取材面)")
+
+
+def test_看不出这一档确实是酝酿而不是别的():
+    """把「为什么它该进路 C」钉住: 三条线还挤着、重合已松开、但没在加速 ——
+    这是**比刚启动更早一步**的酝酿, 不是"没结论"。"""
+    from app.indicators import keltner_geometry as kg
+    geo = {"spread": 0.7, "accel": {"a1": 0.0}, "compress": 0.6,
+           "torn": False, "nested": True}
+    ph = kg.phase(geo)
+    assert ph["code"] == kg.PH_UNCLEAR
+    assert "分是分开了" in ph["watch"] or "没有力气" in ph["watch"]
