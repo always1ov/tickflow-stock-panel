@@ -124,3 +124,39 @@ def test_天数挂在结论对象上而不是另起一个平级字段():
         "没核对码一致 —— 历史窗口与当日快照万一算出不同的结论码, "
         "会把别人的天数安在这一档上"
     )
+
+
+def test_候选池这一档同样有天数():
+    """用户: 「进入候选多少天也有的吧?」—— 有。
+
+    「候选池」(`watch_low`)是 10 条结论里的一条, `verdict_run` **没有任何
+    码的白名单**, 所以它和「调到位了」走的是同一条路。这条测试把它钉死:
+    这一档恰恰是最需要天数的 —— 它的含义就是"大级别位置到了、等一个入场点",
+    等了 3 天和等了 30 天完全是两回事。
+
+    造法: 短期在通道中部、中期已经到下沿。要让 MA20 追上价格而 MA60 还在
+    高位, 需要一段**持续但不陡**的下行 —— 斜率太小中期到不了下沿, 太大
+    短期自己也掉出通道就变成别的档了。
+    """
+    closes = [10.0] * _WARMUP + [10.0 - 0.025 * i for i in range(1, 45)]
+    got = kg.verdict_run(closes, [_ATR] * len(closes))
+    assert got is not None
+    assert got["code"] == "watch_low", f"夹具造出来的是 {got['code']}, 这条测不到候选池"
+    assert got["days"] > 1, "候选池连着挂了很多天, 却只报了 1 天"
+
+
+def test_十条结论没有一条被排除在天数之外():
+    """[R233] 防的是"只给某几档算天数"这种半吊子实现 —— 那样用户会发现
+    有的徽标带天数有的不带, 而且看不出规律。
+
+    盯的是实现本身: `verdict_run` 里不该出现任何按 code 分支的逻辑。
+    """
+    import inspect
+
+    src = inspect.getsource(kg.verdict_run)
+    from app.indicators.keltner import _VERDICTS
+    for code in _VERDICTS:
+        assert code not in src, (
+            f"verdict_run 里出现了 `{code}` —— 它不该认识任何具体的结论码, "
+            f"只该数「今天这个码往回连着几天」"
+        )
