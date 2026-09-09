@@ -866,15 +866,19 @@ export function Today() {
             )}
             <GateFunnel gates={d.gates} />
             {d.opportunities.length === 0 ? (
-              /* [R201] 走到这里只剩一种情形: **候选池本身是空的** ——
-                 一只票都没进来, 保底也没得保。门槛再松也变不出候选,
-                 所以这句话要说的是"今天没有可看的", 不是"我替你滤掉了"。 */
-              <div className="px-4 py-5 text-xs leading-relaxed text-muted">
-                今天没有一只票走到可以看的位置 —— 等待比出手更常见。
-                <span className="ml-1 text-muted/70">
-                  (候选要么是六态当天转多/回升,要么已经贴到买点,要么通道正憋着劲;
-                  三条路今天一条都没人走到)
-                </span>
+              /* [R210] 空页必须自己说清是空在哪一步。候选池空 / 门槛全挡 /
+                 板块过滤滤没了, 对用户是完全不同的三件事 —— 最后那种一键就能撤,
+                 原来却和前两种共用一句「今日没有把握足够的买入机会」。 */
+              <div className="space-y-2 px-4 py-5 text-xs leading-relaxed text-muted">
+                <p>{d.opportunities_empty_why ?? '今天没有一只票走到可以看的位置 —— 等待比出手更常见。'}</p>
+                {boardFilter.length > 0 && (
+                  <button
+                    onClick={() => toggleBoard(null)}
+                    className="rounded-btn border border-accent/40 px-2 py-1 text-[11px] text-accent transition-colors hover:bg-accent/10"
+                  >
+                    去掉板块过滤,看全部
+                  </button>
+                )}
               </div>
             ) : (
               <OpportunityTable

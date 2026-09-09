@@ -89,6 +89,54 @@ def suggest_position(score: int, atr_pct: float | None,
     return {"fraction": round(frac, 2), "text": text, "why": why}
 
 
+def coiling_candidates(trends: dict[str, dict], bands_map: dict[str, dict],
+                       *, exclude: set[str] | None = None,
+                       limit: int = 80) -> list[str]:
+    """[R210] 候选路 C 的选票 —— 通道憋着劲 / 刚走出来, 且六态还在多头侧。
+
+    ## 这个函数是来补一个真 bug 的
+
+    R201 加路 C 时把判定写在了 `score_opportunities` 里, 遍历的是 `extras`。
+    可 `extras` **只给 `cand_syms` 备料**, 而 `cand_syms` 恰恰就是路 A/B 已经
+    选出来的那批 —— 于是路 C 的第一行 `if sym in cands: continue` 把每一个都
+    跳过了。**它一次都没跑过。**
+
+    后果正是用户看到的那个: 熊市里路 A(当天转多/回升)和路 B(贴到买点 2% 内)
+    可以连着几天一只都没有, 候选池整个是空的 —— 而保底(FLOOR_ROWS)是从候选池
+    里取的, 池子空了它也保不出东西来。
+
+    修法是把选票提到 `cand_syms` 之前: `bands_map` 早就覆盖了**全部自选**
+    (它是按 持仓 ∪ 自选 算的), 所以这里能用, 不新增任何取数。
+
+    ## 为什么排在 A/B 之后
+
+    路 C 的票**连方向都还没出来**, 比"今天刚转多"和"已经贴到买点"都弱一档。
+    所以它只填 A/B 用剩的额度, 不跟它们抢。
+    """
+    from app.indicators import keltner_geometry as kg
+    from app.indicators.livermore import BULLISH
+
+    if limit <= 0:
+        return []
+    skip = exclude or set()
+    out: list[str] = []
+    for sym, bands in bands_map.items():
+        if sym in skip or not bands:
+            continue
+        if (trends.get(sym) or {}).get("state") not in BULLISH:
+            continue
+        geo = bands.get("geo")
+        if not geo:
+            continue
+        try:
+            ph = kg.phase(geo, bands.get("runs"))
+        except Exception:  # noqa: BLE001
+            continue
+        if ph and ph["code"] in _COILING_PHASES:
+            out.append(sym)
+    return sorted(out)[:limit]
+
+
 def factor_catalog() -> list[dict]:
     """[R204] 打分因子目录 —— 界面画「参与打分的因子」勾选框要用。
 
@@ -555,6 +603,39 @@ def filter_opportunities(
     return shown, len(ranked) - len(passed)
 
 
+def empty_reason(ranked: list[dict], shown: list[dict], gates: dict,
+                 boards: list[str] | None) -> str | None:
+    """[R210] 机会区空了的时候, **说清楚是空在哪一步**。返回 None = 不空。
+
+    保底(FLOOR_ROWS)保证了"候选池非空 ⇒ 页面非空", 所以真空下来只可能是
+    上游某一步断了。而那几步对用户来说是完全不同的三件事:
+
+      · 候选池本身是空的      —— 今天确实没什么可看的, 这是市场状态
+      · 候选有但全被门槛挡下  —— 有票但都不该看, 门槛在干活
+      · 板块过滤把它们滤没了  —— **是你自己的筛选, 一键就能撤**
+
+    原来这三种情形共用一句「今日没有把握足够的买入机会」, 第三种最冤:
+    用户明明只要点一下「全部」就有票, 却被告知"今天没机会"。
+    """
+    if shown:
+        return None
+    if boards and ranked:
+        return (f"只看{'/'.join(boards)} —— 这个板今天一只候选都没有。"
+                f"去掉板块过滤还有 {len(ranked)} 只。")
+    if ranked:
+        return "有候选也过了门槛, 却一条都没显示 —— 这是 bug, 保底本该兜住。"
+    from app.services import opportunity_score as osc
+
+    blocked = gates.get("blocked") or {}
+    if gates.get("candidates") and blocked:
+        why = "、".join(f"{osc.GATE_CN.get(k, k)} {v} 只"
+                        for k, v in sorted(blocked.items(), key=lambda kv: -kv[1]))
+        return (f"{gates['candidates']} 只候选全被硬门槛挡下({why})—— "
+                f"门槛在干活, 今天这批确实不该看。")
+    return ("今天没有一只票走到可以看的位置 —— 三条候选路(当天转多/回升、"
+            "已经贴到买点、通道正憋着劲)一条都没人走到。")
+
+
 def rank_opportunities(
     trends: dict[str, dict], signals: dict[str, dict], names: dict[str, str],
     min_score: int = _OPP_MIN_SCORE, max_show: int = _OPP_MAX_SHOW,
@@ -861,6 +942,12 @@ def _build_overview(repo, engine=None) -> dict:
         *(s for s, t in trends.items() if t.get("signal") in ("转多", "回升")),
         *ai_buy_syms,
     })[:80]
+    # [R210] 路 C 填 A/B 用剩的额度。**必须在这里加而不是在 score_opportunities
+    # 里加** —— extras(门槛原料/通道/量能)只给 cand_syms 备, 不进这个名单的票
+    # 后面根本拿不到原料, 路 C 就永远是死代码(R201 犯的正是这个错)。
+    if len(cand_syms) < 80:
+        cand_syms = sorted({*cand_syms, *coiling_candidates(
+            trends, bands_map, exclude=set(cand_syms), limit=80 - len(cand_syms))})
     if cand_syms:
         # [R137] **盘后与盘中分成两份, 不再互相覆盖。**
         #
@@ -996,6 +1083,9 @@ def _build_overview(repo, engine=None) -> dict:
                                                factors=prefs.get("factors"))
     opportunities, opp_filtered = filter_opportunities(
         ranked_all, prefs["min_score"], prefs["max_show"], prefs.get("boards"))
+    # [R210] 空了就得说清是空在哪一步 —— 候选池空 / 门槛全挡 / 你自己的板块过滤,
+    # 对用户是完全不同的三件事, 最后那种一键就能撤。
+    opp_empty_why = empty_reason(ranked_all, opportunities, gate_info, prefs.get("boards"))
     # [R18] 盘中口径标注: 实时价确实参与了判定的趋势类新信号是"临时信号",
     # 收盘价可能收回去 —— 标记出来, 前端提示"待收盘确认", 防止盘中追假信号
     for o in opportunities:
@@ -1235,6 +1325,7 @@ def _build_overview(repo, engine=None) -> dict:
         "actions": actions,
         "opportunities": opportunities,
         "opportunities_filtered": opp_filtered,
+        "opportunities_empty_why": opp_empty_why,
         # [R134] 门槛体检: 今天有多少候选被哪条硬门槛挡下。
         # 这不是调试信息 —— "40 只候选被挡掉 28 只"本身就是市场状态的读数,
         # 藏起来的话, 熊市里机会区空空如也会被读成"系统没干活"。

@@ -139,3 +139,123 @@ def test_scores_are_clamped_to_0_100():
                "b": {"signal": "sell", "confidence": 100}}
     shown, _ = rank_opportunities(trends, signals, names)
     assert all(0 <= o["score"] <= 100 for o in shown)
+
+
+# ================================================================
+# [R210] 候选路 C 必须真的产出候选
+#
+# R201 加路 C 时判定写在 `score_opportunities` 里、遍历 `extras`, 而 extras
+# **只给 cand_syms 备料** —— cand_syms 恰恰就是路 A/B 选出来的那批, 于是
+# 路 C 的 `if sym in cands: continue` 把每一个都跳过了。**它一次都没跑过。**
+#
+# 当时也"有测试": `test_憋着劲那一路拿到的是中性新鲜度` 测的是
+# `score_candidate(coiling=True)` 这个**纯函数**, 它当然是绿的 —— 但没有
+# 任何一条测试问过"路 C 到底选不选得出票来"。这一组补的就是那个缺口。
+
+
+def _coiling_bands(spread=0.3, compress_days=40):
+    """造一份「三条线挤在一起」的通道读数(路 C 认的形态)。"""
+    return {
+        "s": {"pos": "inside", "pct": 0.55},
+        "geo": {"spread": spread, "accel": {"a1": 0.0}, "compress": 0.95,
+                "torn": False, "nested": True,
+                "d": {"s": 0.1, "m": 0.1, "l": 0.1}},
+        "runs": {"compress_days": compress_days},
+    }
+
+
+def _quiet_trend(state="UT"):
+    """今天什么信号都没有的多头票 —— 路 A 和路 B 都选不到它。"""
+    return {"state": state, "state_cn": "上涨趋势", "side": "多头",
+            "duration": 30, "close": 10.0, "as_of": "2026-09-09",
+            "signal": None, "signal_desc": ""}
+
+
+def test_路C能从全是安静的自选里选出候选():
+    """**这条是核心**: 一只信号都没有、也没贴买点的自选, 只要通道在憋着劲
+    就该进候选池 —— 否则熊市里池子是空的, 保底也保不出东西。"""
+    from app.api.today import coiling_candidates
+    trends = {f"S{i:03d}": _quiet_trend() for i in range(5)}
+    bands = {s: _coiling_bands() for s in trends}
+    got = coiling_candidates(trends, bands)
+    assert len(got) == 5, f"路 C 一只都没选出来: {got}"
+
+
+def test_路C只认多头侧():
+    from app.api.today import coiling_candidates
+    trends = {"A": _quiet_trend("UT"), "B": _quiet_trend("DT")}
+    trends["B"]["side"] = "空头"
+    bands = {"A": _coiling_bands(), "B": _coiling_bands()}
+    assert coiling_candidates(trends, bands) == ["A"]
+
+
+def test_路C不认已经在走的票():
+    """advancing/declining 是「已经在走」, 不是「有苗头」—— 那属于错过了。"""
+    from app.api.today import coiling_candidates
+    trends = {"A": _quiet_trend()}
+    running = _coiling_bands(spread=2.5)
+    running["geo"].update(compress=0.05, nested=False, accel={"a1": 0.15})
+    assert coiling_candidates(trends, {"A": running}) == []
+
+
+def test_路C不跟AB抢额度():
+    from app.api.today import coiling_candidates
+    trends = {f"S{i}": _quiet_trend() for i in range(4)}
+    bands = {s: _coiling_bands() for s in trends}
+    got = coiling_candidates(trends, bands, exclude={"S0", "S1"}, limit=1)
+    assert len(got) == 1 and got[0] not in ("S0", "S1")
+
+
+def test_路C缺通道读数时安静跳过而不是崩():
+    from app.api.today import coiling_candidates
+    trends = {"A": _quiet_trend(), "B": _quiet_trend(), "C": _quiet_trend()}
+    bands = {"A": {}, "B": {"geo": None}, "C": _coiling_bands()}
+    assert coiling_candidates(trends, bands) == ["C"]
+
+
+def test_全是安静自选时页面不该是空的():
+    """把整条链走一遍 —— 这是用户报的那个现象: 「一个票都不显示出来了」。"""
+    from app.api.today import coiling_candidates, rank_opportunities
+    names = {f"S{i:03d}": f"票{i}" for i in range(6)}
+    trends = {s: _quiet_trend() for s in names}
+    bands = {s: _coiling_bands() for s in names}
+    picked = coiling_candidates(trends, bands)
+    assert picked, "路 C 没选出票, 后面都不用测了"
+    # 模拟 overview: 只给路 C 选中的票备料
+    extras = {s: {"gate": {"above_ma20": True, "above_ma20_prev": True,
+                           "close": 10.0, "ma120": 8.0, "ma120_rising": True},
+                  "channel_pct": 0.55, "bands": bands[s]} for s in picked}
+    shown, _ = rank_opportunities(trends, {}, names, extras=extras, min_score=60)
+    assert shown, "路 C 选出来了, 但一条都没显示 —— 保底也没兜住"
+    assert all(o["fresh_from"] == "coiling" for o in shown), \
+        "这批该走路 C 的新鲜度(中性档), 而不是别的来源"
+
+
+# ---------------------------------------------- [R210] 空页要说清空在哪一步
+
+
+def test_空页原因分得清三种情形():
+    from app.api.today import empty_reason
+    gates_blocked = {"candidates": 12, "passed": 0, "blocked_total": 12,
+                     "blocked": {"trend_side": 9, "lifeline": 5}}
+    # ① 候选池本身是空的 —— 市场状态
+    why = empty_reason([], [], {"candidates": 0, "blocked": {}}, None)
+    assert "三条候选路" in why
+    # ② 有候选但全被门槛挡下 —— 门槛在干活
+    why = empty_reason([], [], gates_blocked, None)
+    assert "门槛" in why and "12 只" in why and "逆势" in why
+    # ③ 板块过滤滤没了 —— **这是用户自己的筛选, 一键就能撤**
+    why = empty_reason([{"x": 1}] * 7, [], {"candidates": 7, "blocked": {}}, ["北交所"])
+    assert "北交所" in why and "去掉板块过滤还有 7 只" in why
+
+
+def test_不空的时候不给原因():
+    from app.api.today import empty_reason
+    assert empty_reason([1], [1], {"candidates": 1, "blocked": {}}, None) is None
+
+
+def test_有候选过了门槛却空了要明说是bug():
+    """保底本该兜住这种情形。真出现了就是 bug, 不能装作是市场没机会。"""
+    from app.api.today import empty_reason
+    why = empty_reason([{"x": 1}], [], {"candidates": 1, "blocked": {}}, None)
+    assert "bug" in why

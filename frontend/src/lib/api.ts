@@ -539,6 +539,8 @@ export interface TodayOverview {
   actions: TodayActionItem[]
   opportunities: TodayOpportunity[]
   opportunities_filtered: number
+  /** [R210] 机会区为空时的原因(候选池空 / 门槛全挡 / 板块过滤滤没了)。非空时为 null */
+  opportunities_empty_why?: string | null
   /** [R134] 三道硬门槛的漏斗统计 */
   gates?: TodayGates | null
   prefs: TodayPrefs
