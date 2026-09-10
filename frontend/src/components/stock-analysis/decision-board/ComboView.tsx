@@ -32,6 +32,8 @@ import { ChevronDown } from 'lucide-react'
 import { api, type ChannelGeometry, type ChannelRuns, type ComboTableRow } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { cn } from '@/lib/cn'
+import { storage } from '@/lib/storage'
+import { ReviewDisclosure } from '@/components/stock-analysis/ReviewDisclosure'
 
 const TONE_CLS: Record<string, string> = {
   sell: 'text-red-400',
@@ -159,41 +161,83 @@ const GROUPS = [
   { key: 'buy', cn: '偏便宜 · 低吸侧', tones: ['buy'], cls: 'text-sky-300/80' },
 ] as const
 
+/** 我这一格落在贵贱谱系的哪一段 —— 收起对照表之后, 由这一行来回答。 */
+function whichGroup(r: ComboTableRow | null) {
+  if (!r) return null
+  return GROUPS.find(g => g.tones.includes((r.verdict?.tone ?? '') as never)) ?? null
+}
+
+/**
+ * [R270] 其余 26 格**默认收起**。
+ *
+ * 用户: 「尤其是组合速查好多内容都是展示和个股当前状态没关系的, 相当于很多说明了」。
+ * 说得准: 打开这一页, 除了「你现在在这一格」那一张, 剩下二十多行讲的是**别的格子**
+ * 什么样 —— 那是查表用的参考资料, 和这只票今天的状态没有关系, 却铺满了整屏。
+ *
+ * R225 当初摆开它们是有道理的(「有了对照, 『短线冲高』才知道是偏贵那一头还是偏
+ * 便宜那一头」), 但**那个对照只需要一句话**, 不需要二十多行: 收起时用一行说清
+ * 「你这一格属于偏贵/中性/偏便宜哪一段、另外两段各有几格」, 想逐格看再展开。
+ */
 function ComboGroups({ rows, here }: { rows: ComboTableRow[]; here: string | null }) {
   const [showRare, setShowRare] = useState(false)
+  const [open, setOpen] = useState(() => storage.reviewComboRestOpen.get(false))
   const mine = rows.find(r => r.combo === here) ?? null
+  const mineGroup = whichGroup(mine)
   const rare = (r: ComboTableRow) => r.rarity === '几乎不出现'
   const rest = rows.filter(r => r.combo !== here)
   const hiddenCount = rest.filter(r => rare(r) && !showRare).length
+  const counts = GROUPS.map(g => ({
+    g, n: rest.filter(r => g.tones.includes((r.verdict?.tone ?? '') as never)).length,
+  })).filter(x => x.n > 0)
   return (
     <div className="space-y-3">
-      {mine && (
+      {mine ? (
         <div>
-          <div className="mb-1 text-[10px] text-muted">你现在在这一格</div>
+          <div className="mb-1 flex flex-wrap items-baseline gap-x-2 text-[10px] text-muted">
+            <span>你现在在这一格</span>
+            {mineGroup && (
+              <span className={mineGroup.cls}>· 落在「{mineGroup.cn}」这一段</span>
+            )}
+          </div>
           <Row r={mine} hero />
         </div>
+      ) : (
+        <div className="rounded-card border border-border/40 px-2.5 py-2 text-[10px] text-muted">
+          这只票今天算不出三档组合 —— 下面是 27 格的对照表
+        </div>
       )}
-      {GROUPS.map(g => {
-        const items = rest.filter(r => g.tones.includes((r.verdict?.tone ?? '') as never))
-          .filter(r => showRare || !rare(r))
-        if (!items.length) return null
-        return (
-          <div key={g.key}>
-            <div className={cn('mb-0.5 text-[10px]', g.cls)}>{g.cn}</div>
-            <div className="overflow-hidden rounded-card border border-border/40">
-              {items.map(r => <Row key={r.combo} r={r} />)}
-            </div>
-          </div>
-        )
-      })}
-      {(hiddenCount > 0 || showRare) && (
-        <button type="button" onClick={() => setShowRare(v => !v)}
-                className="flex items-center gap-1 text-[10px] text-muted hover:text-foreground">
-          <ChevronDown className={cn('h-3 w-3 transition-transform', showRare && 'rotate-180')} />
-          {showRare ? '收起几乎不出现的那几格'
-            : `还有 ${hiddenCount} 格几乎不出现(中线跑到短线与长线的另一侧, 几何上近乎不可能)`}
-        </button>
-      )}
+
+      <ReviewDisclosure
+        label={`其余 ${rest.length} 格`}
+        note={`(查表用的对照, 与这只票今天无关 —— ${counts.map(x => `${x.g.cn.split(' · ')[0]} ${x.n}`).join(' / ')})`}
+        defaultOpen={open}
+        onOpenChange={(v) => { setOpen(v); storage.reviewComboRestOpen.set(v) }}
+        className="mx-0"
+      >
+        <div className="space-y-3">
+          {GROUPS.map(g => {
+            const items = rest.filter(r => g.tones.includes((r.verdict?.tone ?? '') as never))
+              .filter(r => showRare || !rare(r))
+            if (!items.length) return null
+            return (
+              <div key={g.key}>
+                <div className={cn('mb-0.5 text-[10px]', g.cls)}>{g.cn}</div>
+                <div className="overflow-hidden rounded-card border border-border/40">
+                  {items.map(r => <Row key={r.combo} r={r} />)}
+                </div>
+              </div>
+            )
+          })}
+          {(hiddenCount > 0 || showRare) && (
+            <button type="button" onClick={() => setShowRare(v => !v)}
+                    className="flex items-center gap-1 text-[10px] text-muted hover:text-foreground">
+              <ChevronDown className={cn('h-3 w-3 transition-transform', showRare && 'rotate-180')} />
+              {showRare ? '收起几乎不出现的那几格'
+                : `还有 ${hiddenCount} 格几乎不出现(中线跑到短线与长线的另一侧, 几何上近乎不可能)`}
+            </button>
+          )}
+        </div>
+      </ReviewDisclosure>
     </div>
   )
 }

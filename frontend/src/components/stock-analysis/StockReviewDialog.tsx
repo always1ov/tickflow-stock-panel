@@ -41,7 +41,7 @@
  */
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { CalendarRange, ChevronDown, Loader2, X } from 'lucide-react'
+import { CalendarRange, Loader2, X } from 'lucide-react'
 import { api, type KeltnerVerdict, type ReviewRow, type StockReview } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { cn } from '@/lib/cn'
@@ -49,6 +49,7 @@ import { storage } from '@/lib/storage'
 import { trendBadgeCls } from '@/components/stock-analysis/TrendStateBar'
 import { VerdictHover } from '@/components/stock-analysis/VerdictHover'
 import { ComboView } from '@/components/stock-analysis/decision-board/ComboView'
+import { ReviewDisclosure } from '@/components/stock-analysis/ReviewDisclosure'
 
 export type ReviewTab = 'trend' | 'verdict' | 'combo'
 
@@ -321,50 +322,46 @@ const EDGE_CLS: Record<string, string> = {
   thin: 'border-border/60 bg-elevated/20 text-muted',
 }
 
-function SideEdgeCard({ edge, forwardDays }: {
+/**
+ * [R270] 六态在这只票上灵不灵 —— **压成一枚芯片**, 挂在「现在」那一行右边。
+ *
+ * 和 R269 对通道那侧做的是同一件事, 理由也一样: 样本够时它是个判断(多头侧比
+ * 空头侧好多少), 样本不够时它连判断都不是 —— 两种情况都没有理由占一整块;
+ * 而它占掉的那一块, 正是逐日表被顶出屏幕的原因之一。完整说明进「依据」。
+ */
+function SideEdgeChip({ edge, forwardDays }: {
   edge: NonNullable<StockReview['side_edge']>
   forwardDays: number
 }) {
-  const sides: [string, { episodes: number; avg_fwd: number | null; win: number }][] = [
-    ['多头侧 UT/NR/SR', edge.bull], ['空头侧 DT/NREA/SREA', edge.bear],
-  ]
   return (
-    <div className={cn('mx-4 mt-4 rounded-lg border px-3 py-2.5', EDGE_CLS[edge.level] ?? EDGE_CLS.flat)}>
-      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <span className="text-[10px] text-muted">六态在这只票上</span>
-        <b className="text-[13px] font-semibold">{edge.label}</b>
-        {edge.spread != null && (
-          <span className="font-mono text-[10px] opacity-80"
-                title={`多头侧平均 − 空头侧平均。两边差得越多, 说明六态在这只票上越有用`}>
-            两边差 {(edge.spread * 100).toFixed(1)} 个点
-          </span>
-        )}
-        {edge.level !== 'thin' && (
-          <span className="ml-auto flex flex-wrap gap-x-3 text-[10px]">
-            {sides.map(([name, v]) => (
-              <span key={name} title={`${v.episodes} 段已够 ${forwardDays} 个交易日, 其中 ${v.win} 段收涨`}>
-                <span className="text-muted">{name}</span>
-                <b className={cn('ml-1 font-mono', chgCls(v.avg_fwd))}>{pct(v.avg_fwd)}</b>
-                <span className="ml-1 opacity-60">{v.win}/{v.episodes}</span>
-              </span>
-            ))}
-          </span>
-        )}
-      </div>
-      <p className="mt-1 text-[10px] leading-relaxed opacity-90">{edge.text}</p>
-    </div>
+    <span
+      className={cn('ml-auto inline-flex shrink-0 items-baseline gap-1.5 rounded border px-1.5 py-0.5 text-[10px]',
+        EDGE_CLS[edge.level] ?? EDGE_CLS.flat)}
+      title={edge.text}
+    >
+      <span className="text-muted">六态在这只票上</span>
+      <b>{edge.label}</b>
+      {edge.level !== 'thin' && edge.spread != null && (
+        <span className="font-mono opacity-80" title="多头侧平均 − 空头侧平均。两边差得越多, 说明六态在这只票上越有用">
+          差 {(edge.spread * 100).toFixed(1)} 点
+        </span>
+      )}
+      {edge.level !== 'thin' && (
+        <span
+          className="opacity-70"
+          title={`多头侧 ${edge.bull.episodes} 段够 ${forwardDays} 个交易日、${edge.bull.win} 段收涨;`
+            + ` 空头侧 ${edge.bear.episodes} 段、${edge.bear.win} 段收涨`}
+        >
+          {edge.bull.win}/{edge.bull.episodes} · {edge.bear.win}/{edge.bear.episodes}
+        </span>
+      )}
+    </span>
   )
 }
 
-/**
- * [R191] 「现在」条 —— 当前这一段与它自己的历史对上。
- *
- * 这些数原来全在页面上, 只是**散在三个地方**: 今天什么状态在表格第一行,
- * 这个状态平均持续多久在小结的悬停里, 翻转价压根没有。要回答「我现在在哪」
- * 得来回对三次。合成一句之后, 打开复盘第一眼就是答案。
- */
-function NowCard({ now, forwardDays }: {
+function NowCard({ now, edge, forwardDays }: {
   now: NonNullable<StockReview['now']>
+  edge: StockReview['side_edge']
   forwardDays: number
 }) {
   const bull = now.side === '多头'
@@ -400,6 +397,8 @@ function NowCard({ now, forwardDays }: {
             </span>
           )}
         </span>
+        {/* [R270] 六态灵不灵压成一枚芯片贴在这里 —— 原来它是下面独立的一整块 */}
+        {!!edge && <SideEdgeChip edge={edge} forwardDays={forwardDays} />}
       </div>
       <p className="mt-1 text-[10px] leading-relaxed text-muted">
         {now.scored > 0 ? (
@@ -417,6 +416,82 @@ function NowCard({ now, forwardDays }: {
   )
 }
 
+/**
+ * [R270] 趋势状态那一栏的「依据」—— 涨跌停计数 + 封板率 + 涨停出在什么状态下。
+ *
+ * 这三样都是**这一整段时间的统计**, 不是"现在该怎么办"。它们原来常驻在结论与
+ * 逐日表之间: 四张 `text-2xl` 的计数卡就占掉近百像素, 加上封板率和状态芯片,
+ * 一共三百多 —— 而逐日表才是这一栏的正文。
+ *
+ * 收起时**不渲染**, 因为收的正是这几张大卡片。展开状态记在本地。
+ */
+function TrendStatsPanel({ d }: { d: StockReview }) {
+  const [open, setOpen] = useState(() => storage.reviewTrendStatsOpen.get(false))
+  const st = d.stats
+  const total = st.limit_ups + st.broken_limit_ups + st.limit_downs
+  return (
+    <ReviewDisclosure
+      label="依据"
+      note={total > 0
+        ? `(这 ${d.days} 天里 涨停 ${st.limit_ups} · 炸板 ${st.broken_limit_ups} · 跌停 ${st.limit_downs})`
+        : `(这 ${d.days} 天里没有涨跌停)`}
+      defaultOpen={open}
+      onOpenChange={(v) => { setOpen(v); storage.reviewTrendStatsOpen.set(v) }}
+    >
+      <div className="grid grid-cols-4 gap-2">
+        <div className="rounded-lg border border-red-400/20 bg-red-400/[0.05] px-3 py-2">
+          <div className="text-[10px] text-muted">涨停</div>
+          <div className="mt-0.5 font-mono text-lg font-bold text-red-400">{st.limit_ups}</div>
+        </div>
+        <div className="rounded-lg border border-border/60 bg-elevated/20 px-3 py-2">
+          <div className="text-[10px] text-muted">最高连板</div>
+          <div className="mt-0.5 font-mono text-lg font-bold text-foreground">{st.max_streak}</div>
+        </div>
+        <div className="rounded-lg border border-border/60 bg-elevated/20 px-3 py-2">
+          <div className="text-[10px] text-muted" title="盘中最高触及涨停但收盘没封住">炸板</div>
+          <div className="mt-0.5 font-mono text-lg font-bold text-amber-400">{st.broken_limit_ups}</div>
+        </div>
+        <div className="rounded-lg border border-emerald-400/20 bg-emerald-400/[0.05] px-3 py-2">
+          <div className="text-[10px] text-muted">跌停</div>
+          <div className="mt-0.5 font-mono text-lg font-bold text-emerald-400">{st.limit_downs}</div>
+        </div>
+      </div>
+
+      {/* [R191] 封板率。「涨停 6 / 炸板 5」两个并排的计数要自己去除才读得出
+          「这票封不住板」, 而那是这几张卡片里唯一能直接改变操作的信息。 */}
+      {st.seal && (
+        <div className="mt-1.5 text-[10px] leading-relaxed text-muted">
+          <span className={cn('font-mono',
+            st.seal.rate >= 0.75 ? 'text-red-400'
+              : st.seal.rate < 0.5 ? 'text-amber-400' : 'text-secondary')}>
+            封板率 {(st.seal.rate * 100).toFixed(0)}%
+          </span>
+          <span className="ml-2">{st.seal.text}</span>
+        </div>
+      )}
+
+      {/* 涨停出在什么状态下 —— 趋势里出的板和下跌途中的反抽完全是两回事 */}
+      {st.limit_up_states.length > 0 && (
+        <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[10px] text-muted">
+          <span>涨停出现在:</span>
+          {st.limit_up_states.map((x) => (
+            <span key={x.state_cn} className="rounded border border-border/60 bg-elevated/30 px-1.5 py-0.5 text-secondary">
+              {x.state_cn} {x.n} 次
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* 六态灵不灵的完整说明 —— 上面那枚芯片只放得下结论 */}
+      {!!d.side_edge && (
+        <p className="mt-1.5 text-[10px] leading-relaxed text-secondary">
+          <span className="text-muted">六态在这只票上:</span> {d.side_edge.text}
+        </p>
+      )}
+    </ReviewDisclosure>
+  )
+}
+
 function TrendView({ d, rows, onlyMarked, onToggleMarked }: {
   d: StockReview
   rows: ReviewRow[]
@@ -427,67 +502,26 @@ function TrendView({ d, rows, onlyMarked, onToggleMarked }: {
     <>
       {/* [R191] 结论在最上面, 测量在下面。
           原来顺序反过来: 打开先看见四个计数和一堆均值, 得自己换算才知道该怎么办。
-          用户: 「不喜欢单纯的展示」—— 展示不是没用, 但它该在结论后面当依据。 */}
-      {d.now && <NowCard now={d.now} forwardDays={d.forward_days} />}
-      {d.side_edge && <SideEdgeCard edge={d.side_edge} forwardDays={d.forward_days} />}
+          用户: 「不喜欢单纯的展示」—— 展示不是没用, 但它该在结论后面当依据。
+
+          [R270] 用户: 「这三个都要处理排版抓住重点」。R191 把测量挪到了结论后面,
+          但**仍然是常驻的**: 四张 text-2xl 的计数卡加上封板率、涨停出现在,
+          又是三百多像素横在结论与逐日表之间, 逐日表照样被顶出屏幕。
+          既然它们自己就叫「依据」, 那就该跟通道那侧一样收起来。 */}
+      {d.now && <NowCard now={d.now} edge={d.side_edge} forwardDays={d.forward_days} />}
 
       {/* [R188 加, R229 删]「磨底 N 天 / 箱体 / 红绿轮数 / 反复失败」那一块
           在这里删掉了。用户: 「红绿节拍移除掉」—— 整个规则层退役, 复盘接口
           不再返回 rhythm。 */}
 
-      {/* ---- 以下是依据(测量), 摆在结论后面 ---- */}
-
-      <div className="grid grid-cols-4 gap-3 px-4 pt-4">
-        <div className="rounded-lg border border-red-400/20 bg-red-400/[0.05] px-4 py-3">
-          <div className="text-[10px] text-muted">涨停</div>
-          <div className="mt-1 font-mono text-2xl font-bold text-red-400">{d.stats.limit_ups}</div>
-        </div>
-        <div className="rounded-lg border border-border/60 bg-elevated/20 px-4 py-3">
-          <div className="text-[10px] text-muted">最高连板</div>
-          <div className="mt-1 font-mono text-2xl font-bold text-foreground">{d.stats.max_streak}</div>
-        </div>
-        <div className="rounded-lg border border-border/60 bg-elevated/20 px-4 py-3">
-          <div className="text-[10px] text-muted" title="盘中最高触及涨停但收盘没封住">炸板</div>
-          <div className="mt-1 font-mono text-2xl font-bold text-amber-400">{d.stats.broken_limit_ups}</div>
-        </div>
-        <div className="rounded-lg border border-emerald-400/20 bg-emerald-400/[0.05] px-4 py-3">
-          <div className="text-[10px] text-muted">跌停</div>
-          <div className="mt-1 font-mono text-2xl font-bold text-emerald-400">{d.stats.limit_downs}</div>
-        </div>
-      </div>
-
-      {/* [R191] 封板率。「涨停 6 / 炸板 5」两个并排的计数要自己去除才读得出
-          「这票封不住板」, 而那是这四张卡片里唯一能直接改变操作的信息。 */}
-      {d.stats.seal && (
-        <div className="px-4 pt-2 text-[10px] leading-relaxed text-muted">
-          <span className={cn('font-mono',
-            d.stats.seal.rate >= 0.75 ? 'text-red-400'
-              : d.stats.seal.rate < 0.5 ? 'text-amber-400' : 'text-secondary')}>
-            封板率 {(d.stats.seal.rate * 100).toFixed(0)}%
-          </span>
-          <span className="ml-2">{d.stats.seal.text}</span>
-        </div>
-      )}
-
-      {/* 涨停出在什么状态下 —— 趋势里出的板和下跌途中的反抽完全是两回事 */}
-      {d.stats.limit_up_states.length > 0 && (
-        <div className="flex flex-wrap items-center gap-1.5 px-4 pt-2 text-[10px] text-muted">
-          <span>涨停出现在:</span>
-          {d.stats.limit_up_states.map((s) => (
-            <span key={s.state_cn} className="rounded border border-border/60 bg-elevated/30 px-1.5 py-0.5 text-secondary">
-              {s.state_cn} {s.n} 次
-            </span>
-          ))}
-        </div>
-      )}
-
-      {/* [R177] 每种状态之后普遍怎么走 —— 上面「涨停出现在」回答的是另一个问题。
-          [R191] 降到判定条下面: 它现在是 side_edge 那个结论的**分档依据**。 */}
+      {/* 每种状态之后普遍怎么走 —— 复盘的正题, 留在正文之上 */}
       <OutcomeChips
         items={d.trend_outcomes ?? []}
         forwardDays={d.forward_days}
         hint={`分档依据 —— 各状态出现后 ${d.forward_days} 日表现(按段计, 一段=一次;样本小, 括号里是「几段收涨/几段已兑现」)`}
       />
+
+      <TrendStatsPanel d={d} />
 
       <div className="flex items-center justify-end px-4 pt-3">
         <button
@@ -500,7 +534,7 @@ function TrendView({ d, rows, onlyMarked, onToggleMarked }: {
         </button>
       </div>
 
-      <div className="mt-2 overflow-auto border-t border-border/60">
+      <div className="mt-2 min-h-0 flex-1 overflow-auto border-t border-border/60">
         <table className="w-full text-xs">
           <thead className="sticky top-0 z-10 bg-surface">
             <tr className="border-b border-border/60 text-[10px] text-muted">
@@ -712,19 +746,13 @@ function EvidencePanel({ ch, edge }: {
   const rows = explain?.length ?? 0
   if (!rows && !phase?.why && !edge) return null
   return (
-    <div className="mx-4 mt-2">
-      <button
-        type="button"
-        onClick={() => { const v = !open; setOpen(v); storage.reviewEvidenceOpen.set(v) }}
-        aria-expanded={open}
-        className="inline-flex items-center gap-1 text-[10px] text-muted transition-colors hover:text-secondary"
-      >
-        <ChevronDown className={cn('h-3 w-3 transition-transform', open && 'rotate-180')} />
-        依据{rows > 0 && ` · ${rows} 项读数`}
-        <span className="opacity-60">(上面两条结论就是从这些读数出来的)</span>
-      </button>
-      {open && (
-        <div className="mt-1.5 space-y-2">
+    <ReviewDisclosure
+      label={rows > 0 ? `依据 · ${rows} 项读数` : '依据'}
+      note="(上面两条结论就是从这些读数出来的)"
+      defaultOpen={open}
+      onOpenChange={(v) => { setOpen(v); storage.reviewEvidenceOpen.set(v) }}
+    >
+        <div className="space-y-2">
           {!!phase?.why && (
             <p className="text-[10px] leading-relaxed text-secondary">
               <span className="text-muted">阶段判定:</span> {phase.why}
@@ -753,8 +781,7 @@ function EvidencePanel({ ch, edge }: {
             </div>
           )}
         </div>
-      )}
-    </div>
+    </ReviewDisclosure>
   )
 }
 

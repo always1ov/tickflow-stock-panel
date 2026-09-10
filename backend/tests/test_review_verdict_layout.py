@@ -109,8 +109,107 @@ def test_R269_组合注记还在(dlg):
     assert "combo_note" in dlg
 
 
-def test_R269_收起时不渲染而不是靠样式藏(dlg):
-    """`hidden` 藏起来的话, 七行表照样进 DOM、照样参与布局计算 ——
-    版面是省下来了, 但长列表里这种"藏着的重排"是卡顿的常见来源。"""
+def test_R269_依据走的是共用折叠件(dlg):
+    """[R270] 「收起时不渲染」这条保证挪进了 `ReviewDisclosure`(见
+    `test_R270_共用件收起时不渲染`), 这里只钉住依据确实走了那个件 ——
+    自己另写一套开合就绕过了那条保证。"""
     ev = dlg[dlg.index("function EvidencePanel"):dlg.index("function VerdictView")]
-    assert "{open && (" in ev
+    assert "<ReviewDisclosure" in ev
+    assert "{open && (" not in ev, "别在这里另写一套开合"
+
+
+# ================================================================
+# [R270] 另外两个页签同一个病, 同一个治法
+# ================================================================
+#
+# 用户: 「这三个都是要处理排版抓住重点, 都同样的问题, 尤其是组合速查好多内容都是
+# 展示和个股当前状态没关系的, 相当于很多说明了」。
+#
+#   趋势状态   四张 text-2xl 的涨跌停计数卡 + 封板率 + 涨停出现在 —— 三百多像素
+#              横在结论与逐日表之间, 而代码注释自己就写着「以下是依据(测量)」
+#   组合速查   26 行别的格子长什么样 —— 查表用的参考资料, 与这只票今天无关
+
+COMBO = "components/stock-analysis/decision-board/ComboView.tsx"
+
+
+@pytest.fixture(scope="module")
+def combo() -> str:
+    return code_of(COMBO)
+
+
+@pytest.fixture(scope="module")
+def disclosure() -> str:
+    return code_of("components/stock-analysis/ReviewDisclosure.tsx")
+
+
+def test_R270_三处折叠只有一份实现(dlg, combo, disclosure):
+    """同一段折叠逻辑抄三遍 —— 这个仓库刚为「抄了四遍的 _code_lines」付过一次代价。"""
+    assert "export function ReviewDisclosure" in disclosure
+    assert "<ReviewDisclosure" in dlg and "<ReviewDisclosure" in combo
+    # 三处都不许各写各的开合按钮
+    assert dlg.count("aria-expanded={open}") == 0, "折叠按钮该只在共用件里"
+    assert combo.count("aria-expanded={open}") == 0
+
+
+def test_R270_共用件收起时不渲染(disclosure):
+    """收的正是长表格与二十多行卡片 —— `hidden` 藏起来照样进 DOM、照样参与布局。"""
+    assert "{open && <div" in disclosure
+    assert "hidden" not in disclosure
+
+
+def test_R270_趋势的涨跌停统计默认收起(dlg):
+    assert "function TrendStatsPanel" in dlg
+    assert "storage.reviewTrendStatsOpen.get(false)" in dlg
+
+
+def test_R270_六态灵不灵压成芯片(dlg):
+    """和通道那侧同一个判断: 样本够时是个判断, 不够时连判断都不是 ——
+    两种情况都没理由占一整块。"""
+    assert "function SideEdgeChip" in dlg
+    assert "function SideEdgeCard" not in dlg, "旧的整块卡片没拆掉"
+
+
+def test_R270_六态的完整说明收进依据没丢(dlg):
+    """芯片只放得下结论。说明可以收起, 不能丢 —— 那是"为什么这么判"。"""
+    panel = dlg[dlg.index("function TrendStatsPanel"):dlg.index("function TrendView")]
+    assert "{d.side_edge.text}" in panel
+
+
+def test_R270_逐日表拿到剩余全部高度(dlg):
+    """头部省下来的空间要真的给到正文, 否则这次改动等于没改。"""
+    view = dlg[dlg.index("function TrendView"):dlg.index("function VerdictHeader")]
+    assert "min-h-0 flex-1 overflow-auto" in view
+
+
+def test_R270_趋势页签顺序也是结论在前(dlg):
+    """一眼定调 → 复盘正题 → 依据 → 逐日表。"""
+    view = dlg[dlg.index("function TrendView"):dlg.index("function VerdictHeader")]
+    assert view.index("<NowCard") < view.index("<OutcomeChips") < view.index("<TrendStatsPanel")
+
+
+def test_R270_组合速查其余格子默认收起(combo):
+    """**用户点名的那一处**: 除了「你现在在这一格」, 剩下二十多行讲的是别的格子。"""
+    assert "storage.reviewComboRestOpen.get(false)" in combo
+    assert "其余 ${rest.length} 格" in combo
+
+
+def test_R270_收起时用一行给出贵贱定位(combo):
+    """R225 当初摆开 26 格是有道理的(有了对照才知道自己在贵贱谱系哪一端), 但
+    **那个对照只需要一句话**。收起后没有这一行, 就真的丢信息了。"""
+    assert "function whichGroup" in combo
+    assert "落在「{mineGroup.cn}」这一段" in combo
+
+
+def test_R270_算不出组合时也不留白(combo):
+    """geo 缺失时 mine 是 null —— 原来整块「你现在在这一格」直接不出现,
+    人看到的是一张没头没尾的对照表。"""
+    assert "这只票今天算不出三档组合" in combo
+
+
+def test_R270_三个页签的展开状态各记各的(dlg, combo):
+    """常看读数的人和常查 27 格的人不是同一种用法, 混成一个开关谁都不合适。"""
+    keys = code_of("lib/storage.ts")
+    for k in ("reviewEvidenceOpen", "reviewTrendStatsOpen", "reviewComboRestOpen"):
+        assert k in keys, f"{k} 没注册"
+    assert "reviewTrendStatsOpen" in dlg and "reviewEvidenceOpen" in dlg
+    assert "reviewComboRestOpen" in combo

@@ -41,6 +41,10 @@ export const storage = {
 
   /** [R269] 复盘·通道结论里那块「依据」是否展开 —— 默认收起, 正文让给历史段落 */
   reviewEvidenceOpen:   kv<boolean>('review-evidence-open'),
+  /** [R270] 复盘·趋势状态里那堆涨跌停计数是否展开 —— 默认收起, 正文让给逐日表 */
+  reviewTrendStatsOpen: kv<boolean>('review-trend-stats-open'),
+  /** [R270] 组合速查里「其余 26 格」是否展开 —— 那是查表用的参考, 与今天无关 */
+  reviewComboRestOpen:  kv<boolean>('review-combo-rest-open'),
 
   /** [R100] 个股弹窗最近查看(全局, 弹窗内随意切换用) */
   recentStocks:         kv<{ symbol: string; name: string }[]>('recent-stocks'),
