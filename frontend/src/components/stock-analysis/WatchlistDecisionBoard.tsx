@@ -17,7 +17,7 @@ import { storage } from '@/lib/storage'
 import { buildBoardHtml } from '@/lib/decisionBoardHtmlExport'
 import { DEFAULT_EXPORT_KEYS } from '@/lib/decisionBoardExportColumns'
 import { ExportColumnsDialog } from '@/components/stock-analysis/decision-board/ExportColumnsDialog'
-import { ChannelStateCell, ConclusionCell, SpreadCell, NUM, TD_BASE } from '@/components/stock-analysis/decision-board/cells'
+import { ChannelStateCell, ConclusionCell, NUM, TD_BASE } from '@/components/stock-analysis/decision-board/cells'
 import { LotsLink } from '@/components/stock-analysis/decision-board/LotsLink'
 // [R169] 合并视图(手填 ⊕ 上游批次登记), 字段说明见 api.ts 的 EffectivePosition
 type Position = EffectivePosition
@@ -34,8 +34,10 @@ type Signal = { signal: string; confidence: number; reason: string; close: numbe
 // 砍掉的是: close(现价) / spread(间距) / ks·km·kl(三档位置) / verdict(贵不贵) /
 // exit(止盈线, R212 那一列早撤了) / confidence(置信度, R178 换掉了)。
 // 后两个本来就**没有任何表头能选中**, 是死代码。
-// [R277] `spread` 回到排序键里。R254 当初删它是因为它**点不到**(只能靠"轮换
-// 目标"够着), 而不是因为按间距排没用 —— 现在它有了自己的表头, 前提变了。
+// [R277 → R297] `spread` 进来又出去了, **两次都是同一条判据: 点不到就删。**
+// R254 删它是因为它只能靠"轮换目标"够着; R277 加回来是因为那一版给了它自己的
+// 表头(前提变了); R297 那一列并进「结论」, 表头没了, 前提又变回去 ——
+// 这不是反复, 是同一条规矩在三种版面下各判了一次。
 // [R284] `held` / `cost` / `report` 三个键删掉了 —— 它们的表头随列合并消失,
 // 留着就是**点不到的死键**(R254 立的规矩, R277 已把它做成了机器核对)。
 //
@@ -44,7 +46,7 @@ type Signal = { signal: string; confidence: number; reason: string; close: numbe
 //   · cost   —— 按成本价排 166 只票没有任何决策含义
 //   · report —— 「上次 AI 分析是什么时候」不是决策输入; 胶囊照旧可点开
 // 合并后的「持仓」列排 `pnl`(亏最多的先看), 「AI 信号」列照旧排 `signal`。
-type SortKey = 'urgency' | 'name' | 'changePct' | 'trend' | 'spread' | 'play'
+type SortKey = 'urgency' | 'name' | 'changePct' | 'trend' | 'play'
   | 'pnl' | 'signal'
 const SIGNAL_RANK: Record<string, number> = { buy: 0, sell: 1, hold: 2, watch: 3 }
 /**
@@ -72,15 +74,21 @@ const BOARD_COLS = [
   // 六态与通道阶段答的是同一个问题(往哪走), 只是方法不同 —— 放一格里,
   // 它们什么时候一致、什么时候打架, 上下一对就看见了。
   { label: '走势', w: '9.5%' },
-  // [R277] 「间距」从「走势」里拆出来单独一列。用户: 「那把走势列的分离度拆分
-  // 出来成为完整的一列」。它与加速度是同一个量的一阶与二阶(实测: 间距 ≈ 50×速度,
-  // 加速度是它的变化率), 所以两个读数同格 —— 详见 cells.tsx 的 SpreadCell。
-  // 走势列因此从三行降到两行, 宽度 11%→9%, 匀 5% 给这一列。
-  { label: '进度', w: '5.5%' },
+  // [R277 加, R297 删] 「进度」那一列并进「结论」了。用户: 「个股分析页面的
+  // 进度列和结论列看看怎么合并和显示哪些内容」。
+  //
+  // **两列本来就是一层**: 同源(都从 `phase()`/`geo` 出), 而且点开去的是同一个
+  // 地方(复盘弹窗的「通道结论」页)。进度那两个读数是结论的**刻度**, 不是第四条
+  // 结论 —— 与 R211「测量与结论拆两列等于让人左右对眼把结论和它的依据接起来」
+  // 同一条理由, 这次轮到它自己。并法见 cells.tsx 的 `ConclusionCell`:
+  // **行数一行没加**, 两个读数各自并进已有的两行。
+  //
   // [R212] 「贵不贵」(位置) + 「怎么办」(动作) 合成一列, 竖排, 摆在 AI 之前。
   // 用户: 「贵不贵在上换行怎么办在下」「结论这行放在 ai 分析前一列」。
   // 顺序是有讲究的: 上面是事实(这个价算贵还是便宜), 下面是结论(所以今天该干嘛)。
-  { label: '结论', w: '18%' },
+  // [R297] 18% → 21%: 吃掉「进度」5.5% 里的大半, 余下匀给 AI 信号(它吃剩下的)。
+  // 内容上限跟着抬到 23rem —— R283 的教训: 那个上限低于列宽时, 光加列宽没用。
+  { label: '结论', w: '21%' },
   // [R249] 账目三列从「现价」后面挪到这里。用户: 「我有点乱, 是否有好办法整理
   // 好顺序调整显示和列」。**原来它们把判断切开了** —— 扫表时要连着读
   // 「走势 → 结论」, 中间却横着三列只有持仓那几只才用得上的账目。
@@ -250,9 +258,14 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
     signal: 'asc',         // 买入 > 卖出 > 持有 > 观望
     name: 'asc',           // A → Z
     trend: 'desc',         // 值取了负 —— 降序 = 多头在前
-    // [R277] 间距按**带符号**排, 降序 = 多头拉得最开的在最前面。
-    // 用 |间距| 的话, 一只崩得最惨的票会和一只走得最强的票并排在顶上。
-    spread: 'desc',
+    // [R277 加, R297 删] `spread` 这个排序目标退役了 —— **理由与 R254 当初删它
+    // 时逐字相同: 它点不到了。** R277 之所以把它加回来, 正是因为那一版给了它
+    // 一个自己的列头; 现在那一列并进「结论」, 而「结论」已经有自己的目标
+    // (`play`, 按急迫程度), 一列一个目标是 R254 立的规矩。
+    //
+    // **能力上损失有限**: 「走得最远」里真正要决策的那一半, `play` 排序已经
+    // 顶上来了(「该想退出计划了」是 SHAPE 档), 而「该止盈了」「大顶区域」
+    // 「高位回落」本来就是结论徽标上的词, 扫一眼就在。
     changePct: 'desc',     // 涨最多在前
     pnl: 'desc',           // 浮盈最高在前; 再点一下就是亏最多在前
   }
@@ -601,8 +614,6 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
         case 'changePct': return r.changePct
         case 'pnl': return r.pnl
         case 'trend': return r.trend ? -(TREND_RANK[r.trend.state] ?? 9) : null
-        // [R277] 带符号 —— 正的是多头拉开, 负的是空头拉开, 两头不该混在一起
-        case 'spread': return r.kc?.geo?.spread ?? null
         case 'signal': return r.sig ? (SIGNAL_RANK[r.sig.signal] ?? 9) : null
       }
     }
@@ -901,7 +912,8 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
                     onClick={() => cycleSort('trend')}
                     className={`${thBtn} whitespace-nowrap`}
 title={'两行: 六态趋势 / 价格·六态·均线三个尺度转到第几步。\n'
-                      + '「走到哪一步」与「还有没有劲」搬到右边的「进度」列了。\n\n'
+                      + '「走到哪一步」与「还有没有劲」在右边的「结论」列里,\n'
+                      + '各自贴着它修饰的那一行(R297 起)。\n\n'
                       + '点这里按六态排: 多头在前 → 空头在前 → 回默认顺序。'}>
                     {/* [R250] 表头**只有「走势」两个字** —— 与「结论」那一列同一条:
                         排序目标是内部分层, 不该印在表头上。轮换照旧, 说明在悬停里。 */}
@@ -909,29 +921,17 @@ title={'两行: 六态趋势 / 价格·六态·均线三个尺度转到第几步
                     {caret('trend')}
                   </button>
                 </th>
-                {/* [R277] 从走势列拆出来的分离度 + 它的变化率(快慢)。
-                    [R284] 列名 **「间距」→「进度」**。用户: 「间距这个名称别人看了会
-                    看不懂, 换个能看懂的名称」。「间距」是内部测量词(短线中枢与长线
-                    中枢差多少), 外人无从理解; 而这一格下面两行写的是「走到中段」
-                    和「跌势在缓」—— **「进度」把这两行都读得通**, 「间距」一行都读不通。 */}
-                <th className="whitespace-nowrap px-1.5 py-2.5 font-normal text-center">
-                  <button
-                    onClick={() => cycleSort('spread')}
-                    className={`${thBtn} whitespace-nowrap`}
-title={'两行: 这一段走到哪一步了(刚起步/走到中段/走了很长/走过头了)\n'
-                      + '      / 这个速度还撑不撑得住(还在加速/速度平稳/正在放慢…)。\n\n'
-                      + '这两个读数是同一个量的两层: 上面一行量的是**现在走得多快**,\n'
-                      + '快慢量的是**这个速度在往哪变**。数字在悬停里。\n\n'
-                      + '点这里按进度排(带符号): 多头走得最远在前 → 空头走得最远在前 → 回默认顺序。'}>
-                    进度
-                    {caret('spread')}
-                  </button>
-                </th>
+                {/* [R297] 「进度」那一列并到「结论」里去了 —— 那两个读数是结论的
+                    刻度, 不是第四条结论。见下面「结论」表头的说明。 */}
                 <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center">
                   <button onClick={() => cycleSort('play')}
                           className={`${thBtn} whitespace-nowrap`}
-title={'两行: 上面是**位置** —— 这个价现在算高还是算低,\n'
-                            + '下面「怎么办」是把五套判定合成的一句话(动作)。\n\n'
+title={'三行, 每行都是「一个判定 + 它的刻度」:\n'
+                            + '  ① 这个价现在算高还是算低 · 已经这样几天 · 这一段走到哪一步了\n'
+                            + '  ② 今天该干嘛(五套判定合成的一句话) · 这个速度还撑不撑得住\n'
+                            + '  ③ 事件 · 理由 · 另有几处判定不一致\n\n'
+                            + '[R297] ①② 右边那两个词原来是独立的「进度」列 —— 它们是结论的刻度,\n'
+                            + '不是第四条结论, 所以各自贴回它修饰的那一行。数字全在格子的悬停里。\n\n'
                             + '点这里按「怎么办」的急迫程度排: 按纪律走 > 今天就得动 > 先别动 > '
                             + '盯着 > 留意 > 没事。\n'
                             + '最急在前 → 最闲在前 → 回默认顺序。'}>
@@ -1019,11 +1019,9 @@ title={'我在这只票上的账: 拿没拿 / 买入成本 / 现在浮盈多少�
                       trend={r.trend} trendCls={r.trend ? trendBadgeCls(r.trend.state) : undefined}
                       geo={r.kc?.geo} runs={r.kc?.runs} ph={r.ph} kc={r.kc} close={r.close}
                       onOpenReview={() => setReview({ symbol: r.symbol, name: r.name, tab: 'trend' })} />
-                    {/* [R277] 间距 —— 分离度 + 它的变化率。点开进「通道结论」页签,
-                        因为这一列的历史在那儿(走势列进的是「趋势」页签)。 */}
-                    <SpreadCell geo={r.kc?.geo} ph={r.ph} runs={r.kc?.runs}
-                                onOpenReview={() => setReview({ symbol: r.symbol, name: r.name, tab: 'verdict' })} />
-                    {/* [R212] 结论 = 贵不贵(位置, 上) + 怎么办(动作, 下), 竖排一格 */}
+                    {/* [R212 → R297] 结论 = 贵不贵(位置) + 怎么办(动作) + 事件理由,
+                        三行竖排; 每行右边贴着它自己的刻度(走到哪一步 / 快慢),
+                        那两个读数原来是独立的「进度」列。 */}
                     <ConclusionCell v={r.kc?.verdict} ev={r.ev} geo={r.kc?.geo} runs={r.kc?.runs}
                                     energy={r.kc?.energy} ph={r.ph} p={r.play}
                                     stateRun={r.kc?.state_run}

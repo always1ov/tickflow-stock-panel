@@ -60,9 +60,10 @@ def test_列的顺序是_认票_凭什么_我的账_别人的意见():
     """这条把**顺序本身**钉住 —— 它是这次重排的全部内容, 不写下来下次就会漂回去。"""
     assert _cols(_src()) == [
         "标的", "现价/涨跌",          # 认票
-        # [R277] 从「走势」里拆出来独立成列 —— 它仍属"凭什么"那一段, 所以插在
-        # 走势与结论之间。[R284] 列名「间距」→「进度」(用户: 别人看不懂)。
-        "走势", "进度", "结论",       # 凭什么(判断必须连着, 不许被账目切开)
+        # [R277 加, R297 删] 「进度」并回「结论」了 —— 用户: 「进度列和结论列
+        # 看看怎么合并」。它是结论的**刻度**(走到哪一步 / 还有没有劲), 不是
+        # 第四条结论, 所以贴回它修饰的那两行, 而不是自己占一列。
+        "走势", "结论",               # 凭什么(判断必须连着, 不许被账目切开)
         # [R284] 「成本」「浮盈」两列删掉(用户: 「删除掉浮盈和成本列」)——
         # 它们为 5% 的行占着 9% 的宽度(持有 8 / 自选 166)。成本**输入框**保留,
         # 挪进这一格: 它是出场线的输入, 不是展示。
@@ -77,7 +78,7 @@ def test_账目三列必须排在判断之后():
     """R249 之前它们在「现价」与「走势」之间。这条独立于上面那条写 ——
     就算以后列增减, **判断不许被账目切开**这条纪律也得留着。"""
     cols = _cols(_src())
-    judge = max(cols.index("走势"), cols.index("进度"), cols.index("结论"))
+    judge = max(cols.index("走势"), cols.index("结论"))   # [R297] 「进度」并进结论了
     ledger = cols.index("持仓")     # [R284] 账目从三列收成一列
     assert ledger > judge, (
         f"账目列插到判断列中间了 —— 扫表时「走势→结论」读不连贯。当前顺序: {cols}"
@@ -155,12 +156,14 @@ def test_R250_表头只印列名不印排序目标():
         assert bad not in render, (
             f"表头又缀上排序目标「{bad}」了 —— 用户只要列名本身"
         )
-    # [R277] 「间距」从禁用词里拿掉了 —— **它现在是一个列名, 不再是排序目标**。
-    # 但原来的意图一个字不改: 它不许再作为分层缀在「走势」头上。
-    trend_th = render[render.index("走势") - 400:render.index("走势") + 200]
-    assert "进度" not in trend_th, "「进度」又缀回走势表头上了 —— 它该是独立一列"
+    # [R277 → R297] 「间距/进度」不再是列名了(那一列并进「结论」), 于是它回到
+    # **禁用词**那一侧: 表头上不许出现它 —— 无论是缀在「走势」头上(R250 原本
+    # 防的那件事), 还是缀在「结论」头上(R297 之后新的犯错方式)。
+    # 守的规矩一个字没变: **表头只印列名。**
+    assert "进度" not in render, "「进度」缀回表头了 —— 它已经不是一列, 表头只印列名"
+    assert "间距" not in render, "「间距」缀回表头了"
     # 正面: 列名都还在
-    for name in ("结论", "走势", "进度", "现价/涨跌", "持仓"):
+    for name in ("结论", "走势", "现价/涨跌", "持仓"):
         assert name in render, f"表头把「{name}」弄丢了"
 
 
@@ -220,8 +223,10 @@ def test_R254_每列只剩一个排序目标():
     时带来的), 轮换一圈要 6 下。现在一列一个, 表头的箭头也就只需要认一个键。"""
     body = _board_body()
     # [R284] held / cost / report 三个随列消失, 见 test_R254_点不到的排序键全删掉
+    # [R297] `spread` 也随列消失 —— 「进度」并进「结论」, 而「结论」已经有
+    # `play` 了; 一列一个目标正是这条在守的规矩。
     for one in ("caret('name')", "caret('changePct')", "caret('trend')",
-                "caret('play')", "caret('spread')",
+                "caret('play')",
                 "caret('pnl')", "caret('signal')"):
         assert one in body, f"表头少了 {one}"
     # 反面: 不许再出现多目标的写法
@@ -240,19 +245,20 @@ def test_R254_点不到的排序键全删掉():
     body = _board_body()
     keys = body[body.index("type SortKey"):]
     keys = keys[:keys.index("\nconst ")]
-    # [R277] `spread` 从这张名单里拿掉了 —— **它不再点不到**: 间距独立成列之后
-    # 有了自己的表头按钮。这条测的从来是"有没有够不着的死键", 不是"spread 不许
-    # 存在"; 下面 `test_R277_每个排序键都够得着` 把这个意图直接测出来, 不再靠
-    # 手写名单跟进(名单是要人记得改的东西, 而人不会记得)。
+    # [R277 → R297] `spread` 出去又回来了, **两次都是同一条判据: 点不到就删。**
+    # R277 把它从名单里拿掉, 是因为那一版给了「进度」自己的表头(它不再点不到);
+    # R297 那一列并进「结论」, 表头没了, 它又够不着了, 于是回到名单上。
+    # 这条测的从来是"有没有够不着的死键", 不是"某个键不许存在" ——
+    # `test_R277_每个排序键都够得着` 把这个意图直接测出来, 名单只是兜底。
     # [R284] held / cost / report 加进来 —— 它们的表头随列合并/撤销消失了
     for dead in ("'close'", "'ks'", "'km'", "'kl'", "'held'", "'cost'", "'report'",
-                 "'verdict'", "'exit'", "'confidence'"):
+                 "'spread'", "'verdict'", "'exit'", "'confidence'"):
         assert dead not in keys, f"排序键 {dead} 点不到却还留着"
     # 比较器里也不该还有它们的分支
     cmp_ = body[body.index("const sortedRows"):]
     cmp_ = cmp_[:cmp_.index("const arr = ")]
     for dead in ("case 'close'", "case 'ks'", "case 'verdict'", "case 'held'",
-                 "case 'cost'", "case 'report'",
+                 "case 'cost'", "case 'report'", "case 'spread'",
                  "case 'exit'", "case 'confidence'"):
         assert dead not in cmp_, f"比较器里还留着 {dead} 的分支"
 
@@ -307,22 +313,23 @@ def test_R277_导出的快慢与屏幕同一个产地():
         assert bad not in blk, f"导出又自己造了一套快慢措辞: {bad}"
 
 
-def test_R277_间距按带符号排不按绝对值():
-    """[R251 那条的形状] 表头写着「多头拉得最开在前 → 空头拉得最开在前」——
-    那句话只有**带符号**才成立。
+def test_R297_按间距排退役了而且退干净了():
+    """[R277 → R297] R277 那条钉的是「按间距排必须带符号」(取绝对值的话, 崩得
+    最惨的票会和走得最强的票并排顶在最前面, 而且看不出来)。
 
-    取了绝对值的话, 一只崩得最惨的票会和一只走得最强的票并排顶在最前面, 而且
-    看不出来(它确实排序了, 只是排的不是表头说的那件事)。变异验证时这一处是
-    12 个里唯一没被抓到的, 所以补这一条。
+    **那个排序目标随列退役了**, 于是这条改成钉"退干净": 键、比较器分支、表头
+    按钮、以及表头里那句「带符号」的说明, 四处必须一起没。留下任何一处都是
+    R254 反复在治的那种死代码 —— 尤其是那句说明: 它会指着一个点不到的行为。
+
+    **退役的判据与 R254/R277 逐字相同: 点不到就删。** 那一列并进「结论」,
+    而「结论」已经有 `play`(按急迫程度), 一列一个目标是 R254 立的规矩。
     """
     body = _board_body()
-    cmp_ = body[body.index("case 'spread'"):]
-    cmp_ = cmp_[:cmp_.index("\n", cmp_.index("case 'spread'") + 10)]
-    assert "Math.abs" not in cmp_, (
-        f"间距排序取了绝对值 —— 空头拉得最开的会混进多头最强的里面: {cmp_.strip()}")
+    assert "case 'spread'" not in body, "比较器里还留着按间距排的分支"
+    assert "cycleSort('spread')" not in body, "还有表头能点到它"
     src = _src()
     th = src[src.index("<thead"):src.index("</thead>")]
-    assert "带符号" in th, "表头没说清是带符号排 —— 说明与行为得对得上"
+    assert "带符号" not in th, "表头还留着那句说明 —— 它指着一个已经点不到的行为"
 
 
 def test_R277_表头上的排序目标都得是真键():
@@ -516,22 +523,88 @@ def test_R257_走势列的三行各管一件事():
     assert "{ph.pace_cn}" not in blk, "快慢也一样, 它属于「间距」列"
 
 
-def test_R277_成熟度与快慢在间距那一格里():
-    """正面: 搬家不是删除。两个读数都要在新格子里真的渲染出来。
+def test_R297_成熟度与快慢并进结论那一格且各自贴住它修饰的那一行():
+    """[R277 → R297] 正面: **合并不是删除**, 两个读数都得在新格子里真的渲染出来。
 
     **加速度此前在决策台上根本看不见** —— 走势列那一行写的是
     `align ? align.cn : pace_cn`, 而 `alignment()` 只要六态/位置/间距三样都在
     就返回非空(几乎永远), 于是快慢那一支轮不上; 悬停里被同一个三元顶掉。
-    它只剩「结论」列悬停里的一行。这条钉住它现在有自己的位置。
+    R277 给了它一个位置, R297 换了个位置, 这条一路钉住它没再消失。
+
+    **顺序是这次合并的全部内容, 所以一并钉住**:
+      · 成熟度贴着**结论徽标**那一行 —— 它与「已N天」是同一个问题的两把尺
+        (走了多久 / 走了多远), 都在回答"到什么程度了";
+      · 快慢贴着**怎么办**那一行 —— 它是前瞻的那一半, 「该止盈了·正在放慢」
+        与「该止盈了·还在加速」是两句不同的话。
+    对调的话两行都读不通, 而且不会有任何东西报错。
     """
+    from tests.frontend_source import code_of
+    code = code_of("components/stock-analysis/decision-board/cells.tsx")
+    blk = code[code.index("export function ConclusionCell"):]
+    blk = blk[blk.index("return ("):]
+    assert "ph?.maturity_cn" in blk, "结论列没印成熟度 —— 合并把它弄丢了"
+    assert "ph?.pace_cn" in blk, "结论列没印快慢 —— 加速度又看不见了"
+    assert blk.index("<VerdictInner") < blk.index("ph?.maturity_cn") < blk.index("<PlaybookInner"), (
+        "成熟度没有贴着结论徽标那一行"
+    )
+    assert blk.index("<PlaybookInner") < blk.index("ph?.pace_cn"), (
+        "快慢没有贴着「怎么办」那一行"
+    )
+
+
+def test_R297_合并后结论列吃掉了进度那一列的宽度():
+    """**R283 那一课**: 「结论」一直被挤的真原因不是列宽, 是**内容的 `max-w` 上限**
+    低于列宽 —— 那一版列宽 18% 在常见视口上有 300px 出头, 内容却被硬卡在 240px,
+    光加列宽一点用都没有。**两者得一起动。**
+
+    R297 往这一列里加了两个读数, 如果只删掉「进度」那一列而不抬这两个数, 就是
+    把 R283 那个 bug 原样重犯一遍。所以正反各钉一条:
+      · 列宽真的涨了(吃掉「进度」原来那 5.5% 的大半);
+      · 内容上限不再是瓶颈 —— 它得比列宽在常见视口上折算出来的像素还宽。
+    """
+    src = _src()
+    blk = src[src.index("const BOARD_COLS = ["):]
+    blk = blk[:blk.index("] as const")]
+    m = re.search(r"label: '结论', w: '(\d+(?:\.\d+)?)%'", blk)
+    assert m, "「结论」那一列没有宽度了"
+    pct = float(m.group(1))
+    assert pct >= 21, f"「结论」列宽还是 {pct}% —— 并进来两个读数却没给它宽度"
+
     root = _BOARD.parent
     cells = (root / "decision-board" / "cells.tsx").read_text(encoding="utf-8")
-    body = "\n".join(ln for ln in cells.splitlines()
-                     if not ln.lstrip().startswith(("//", "*", "/*", "{/*")))
-    i = body.index("export function SpreadCell")
-    blk = body[body.index("return (", i):]
-    assert "{ph.maturity_cn}" in blk, "间距列没印成熟度"
-    assert "{ph.pace_cn}" in blk, "间距列没印快慢 —— 加速度又看不见了"
+    cap = re.search(r"flex max-w-\[(\d+(?:\.\d+)?)rem\]", cells)
+    assert cap, "结论列内容的 max-w 上限没了"
+    rem = float(cap.group(1))
+    # 常见视口按 1400px 表宽折算 —— R283 就是在这个量级上撞到上限的
+    assert rem * 16 >= 1400 * pct / 100, (
+        f"内容上限 {rem}rem({rem * 16:.0f}px)低于列宽 {pct}%(约 {1400 * pct / 100:.0f}px)"
+        " —— 又变成 R283 那个「加了列宽也没用」的局面"
+    )
+
+
+def test_R297_合并没有把结论列摞成五行():
+    """**这条是那次合并唯一真正的风险守卫。**
+
+    直接把「进度」两行摞到「结论」下面就是五行 —— 那正是 R217 撤过的病
+    (「原来这一列会摞到五层…每行高度还不一样, 上一行的尾巴挂到下一行的表头
+    底下, 行与行糊成一片」)。**病根是行数与行高参差, 不是每行的内容量**,
+    所以两个读数得**并进已有的行**, 而不是各占一行。
+
+    钉法: 那个纵向 flex 容器的直接子节点必须仍是**三个**(结论行 / 怎么办行 /
+    说明行)。多一个就是摞上去了。
+    """
+    from tests.frontend_source import code_of
+    code = code_of("components/stock-analysis/decision-board/cells.tsx")
+    blk = code[code.index("export function ConclusionCell"):]
+    outer = blk[blk.index("flex max-w-["):]
+    outer = outer[:outer.index("</div>")]
+    # 顶层子节点 = 缩进恰好 8 空格的**开**标签(容器本身缩进 6, 嵌套的更深)。
+    # 收尾标签 `</span>` 也落在这个缩进上, 得排掉 —— 不排的话三行会数成五个,
+    # 而"五"恰好就是这条要防的那个数, 会给出一条看着像真的假警报(第一版就是)。
+    top = [ln.strip() for ln in outer.splitlines()
+           if (ln.startswith("        <") and not ln.startswith("        </"))
+           or ln.startswith("        {")]
+    assert len(top) == 3, f"结论列的行数变了(该是三行), 现在是 {len(top)}: {top}"
 
 
 def test_R277_走势列不再回退到快慢():
@@ -648,17 +721,25 @@ def test_R261_走了多远那一行是统一色():
     assert "PHASE_TEXT" not in body, (
         "「阶段配色」那张表又回来了 —— 它按**已经不显示的东西**给文字上色"
     )
-    # [R277] 成熟度搬到 SpreadCell 了, 这条跟着搬 —— **守的规矩一个字没变**:
-    # 成熟度是事实读数不是判断, 所以统一次要色, 不许挂条件配色。
-    # 从 SpreadCell 的 `return (` 起算 —— 那一格的**悬停文案**里也提到成熟度,
-    # 直接 index 会命中悬停那一处, 而这条问的是渲染出去的那一行的颜色。
-    body = body[body.index("export function SpreadCell"):]
+    # [R277 → R297] 成熟度先搬到 SpreadCell、再并进 ConclusionCell, 这条一路跟着搬
+    # —— **守的规矩一个字没变**: 成熟度是事实读数不是判断, 所以统一次要色,
+    # 不许挂条件配色。快慢正相反(R278): 它**是**判断(在往多头还是空头变),
+    # 所以按 `level` 上色 —— 两者用的是同一个 `Qualifier`, 差别只在传不传 `cls`。
+    body = body[body.index("export function ConclusionCell"):]
     body = body[body.index("return ("):]
-    i = body.index("{ph.maturity_cn}")
-    line = body[body.rindex("<span", 0, i):i]
-    assert "text-muted" in line and "${" not in line, (
-        f"「走了多远」那一行的颜色又变成按条件取了: {line.strip()}"
+    def _tag(mark: str) -> str:
+        """含 `mark` 的那一整个 `<Qualifier … />` —— **必须切到 `/>`**:
+        `cls=` 写在 `text=` 的下一行, 只切到属性名那里的话它永远看不见
+        (第一版就是这么错的, 本仓库这个坑的又一次)。"""
+        i = body.index(mark)
+        return body[body.rindex("<Qualifier", 0, i):body.index("/>", i) + 2]
+
+    assert "cls=" not in _tag("ph?.maturity_cn"), (
+        "「走了多远」挂上条件配色了 —— 它该走 Qualifier 的默认次要色"
     )
+    # 反面配对: 快慢必须**有** cls —— 两个都统一次要色的话, 「跌得更急」与
+    # 「跌势在缓」会变成同一个颜色, 那才是真的丢信息。
+    assert "PACE_CLS" in _tag("ph?.pace_cn"), "快慢没按方向上色 —— 加速与减速会变成同一个颜色"
 
 
 def test_R261_徽标与第二行仍各自按含义上色():

@@ -267,11 +267,29 @@ function VerdictInner({ v, ev, geo, runs, energy, ph, stateRun, onOpen }: {
 
 
 /**
- * [R277] 「间距」列 —— 从「走势」里拆出来的分离度, 外加它的导数(快慢)。
+ * [R277 → R297] 「进度」列(成熟度 + 快慢)**并进「结论」列了**, 不再是独立一列。
  *
- * 用户: 「那把走势列的分离度拆分出来成为完整的一列」。
+ * 用户: 「个股分析页面的进度列和结论列看看怎么合并和显示哪些内容」。
  *
- * ## 为什么这两个读数该在一格里
+ * ## 本来就是一层
+ *
+ * 两列同源(都从 `phase()`/`geo` 出), 而且**点开去的是同一个地方**(复盘弹窗的
+ * 「通道结论」页)。一列说这一档是什么、今天该干嘛, 另一列说这一段走到什么程度 ——
+ * 后者是前者的**刻度**, 不是第四条结论。这与 R211「测量与结论拆两列等于让人
+ * 左右对眼把结论和它的依据接起来」是同一条理由, 只是这次轮到它自己。
+ *
+ * ## 怎么并的: **不摞行, 各自归队**
+ *
+ * 直接摞上去就是五行 —— 那正是 R217 撤过的病(行与行糊成一片)。**行数一行没加**,
+ * 进度那两个读数各自并进已有的两行里, 每一行都因此成了一句完整的话:
+ *
+ *     超买回落 已3天  走到中段     ← 哪一档 · 走了多久 · 走了多远(同一个"到什么程度")
+ *     该止盈了 41.20  正在放慢     ← 今天该干嘛 · 这个判断还稳不稳(前瞻的那一半)
+ *     突破确认? · 生命线跌破 …     ← 事件 · 理由(原样)
+ *
+ * R217 那个坑的病根是**行数**与行高参差, 不是每行的内容量 —— 所以这么并是安全的。
+ *
+ * ## 为什么这两个读数原本该在一格里(R277 的论证, 原样保留)
  *
  * 分离度与加速度**不是两件事, 是同一件事的一阶与二阶**。实测(合成路径, 真均线):
  *
@@ -314,46 +332,30 @@ const PACE_CLS: Record<string, string> = {
   steady: 'text-muted',
 }
 
-export function SpreadCell({ geo, ph, runs, onOpenReview }: {
-  geo?: ChannelGeometry | null
-  ph?: ChannelPhase | null
-  runs?: ChannelRuns | null
-  /** 点开 → 复盘弹窗的「通道结论」页签(这一列的完整历史在那儿) */
-  onOpenReview?: () => void
+// [R297] 「进度」并进「结论」之后, 那两个读数在这里的角色是**刻度而不是结论**,
+// 所以它们不戴徽标: 一行里只有一枚带框的东西, 那枚就是这一行在说的那件事。
+// 成熟度统一次要色(R261: 它是事实读数, 挂条件配色等于让颜色说另一件事);
+// 快慢照旧按 `level` 上色(R278: 它**是**判断 —— 在往多头还是空头变)。
+const MATURITY_TIP = '这一段走到哪一步了(刚起步 / 走到中段 / 走了很长 / 走过头了)。'
+  + '\n量的是这一段走得多远, 不是走了多少天 —— 一只慢牛走三年也可以一直是「刚起步」。'
+  + '\n数字在这一格的悬停里(那一行以 [间距] 开头)。'
+const PACE_TIP = '这个速度还撑不撑得住(还在加速 / 速度平稳 / 正在放慢;跌势里换成跌势在缓 / 跌得更急)。'
+  + '\n它是上一行那个读数的变化率 —— 上面说现在多快, 这里说这个速度在往哪变。'
+  + '\n红=往上使劲, 绿=往下使劲。数字在这一格的悬停里(那一行以 [快慢] 开头)。'
+
+function Qualifier({ text, title, cls = 'text-muted' }: {
+  text?: string | null; title: string; cls?: string
 }) {
-  if (!ph) {
-    return <td className={`${TD_BASE} whitespace-nowrap px-1.5 text-[12px] text-muted/30`}>—</td>
-  }
-  const sp = geo?.spread
-  const tip = [
-    `【间距】${ph.maturity_cn}`,
-    sp == null ? '' : sp >= 0
-      ? `短线中枢高出长线中枢 ${sp.toFixed(1)} 倍日常波动`
-      : `短线中枢低于长线中枢 ${Math.abs(sp).toFixed(1)} 倍日常波动`,
-    '它量的是**这一段走得多快**(间距 ≈ 50 × 速度), 不是走了多少天 ——',
-    '一只慢牛走三年, 间距也可以一直很小。',
-    '',
-    `【快慢】${ph.pace_cn}`,
-    geo?.accel?.gain_atr == null ? ''
-      : `最近这十天比前一段${geo.accel.gain_atr >= 0 ? '多' : '少'}走了 `
-        + `${Math.abs(geo.accel.gain_atr).toFixed(1)} 倍日常波动`,
-    '这是间距的变化率 —— 间距说现在多快, 快慢说这个速度还撑不撑得住。',
-    runs?.compress_days ? `\n三条线已经这样挤在一起 ${runs.compress_days} 天` : '',
-    '',
-    '点开:通道结论(逐日 / 27 种组合速查)',
-  ].filter(Boolean).join('\n')
+  if (!text) return null
   return (
-    <td className={`${TD_BASE} whitespace-nowrap px-1.5`}>
-      <button type="button" onClick={onOpenReview} title={tip}
-              className="mx-auto flex w-full cursor-pointer flex-col items-center gap-0.5 rounded-btn px-1 py-0.5 leading-snug transition-colors duration-hover hover:bg-elevated/40">
-        <span className="whitespace-nowrap text-[12px] text-muted">{ph.maturity_cn}</span>
-        <span className={`whitespace-nowrap text-[11px] ${PACE_CLS[geo?.accel?.level ?? ''] ?? 'text-muted'}`}>
-          {ph.pace_cn}
-        </span>
-      </button>
-    </td>
+    <span className={`whitespace-nowrap text-[11px] ${cls}`} title={title}>{text}</span>
   )
 }
+
+// [R277 加, R297 删] `SpreadCell`(「进度」那一列的单元格)在这里删掉了。
+// 它的两个读数并进了 `ConclusionCell` 的前两行(见上面那段说明), 悬停里的
+// 数字本来就已经在「结论」列的 `geoLines()` 里(`[间距]` 与 `[快慢]` 两行)——
+// **那份重复是这次合并顺带清掉的**: 同一个量原来一列印档位、另一列悬停印数字。
 
 /**
  * 「走势」列 —— 一只票的方向, 两套判定叠在一格里。
@@ -571,9 +573,10 @@ export function ConclusionCell({ v, ev, geo, runs, energy, ph, p, stateRun, onOp
   p?: Playbook | null
   onOpen: () => void
 }) {
-  // [R217] **整列固定两行**, 见下面的说明。
-  //   行 1: 贵不贵 · 怎么办 两个徽标横排
-  //   行 2: 一行说明(截断), 事件与"另有 N 处分歧"都并进这一行
+  // [R217 → R255 → R297] 三行, 每行"判定 + 它的刻度":
+  //   行 1: 结论徽标(含已N天) + 走到哪一步
+  //   行 2: 怎么办徽标(含价) + 快慢
+  //   行 3: 事件 · 理由 · 另有 N 处分歧(整段折行)
   const evOn = ev && ev.code !== 'none'
   const more = p && p.conflicts.length && p.level !== 'conflict'
   const line2 = [
@@ -603,10 +606,24 @@ export function ConclusionCell({ v, ev, geo, runs, energy, ph, p, stateRun, onOp
       {/* [R283] `max-w-[15rem]`(240px) → `19rem`(304px)。**这个上限才是「结论」
           一直被挤的真原因** —— 这一列 18% 宽在常见视口上有 300px 出头, 而内容被
           硬卡在 240px, 光加列宽一点用都没有。两者得一起动。 */}
-      <div className="flex max-w-[19rem] flex-col items-start gap-0.5 leading-snug">
-        <VerdictInner v={v} ev={ev} geo={geo} runs={runs} energy={energy} ph={ph}
-                      stateRun={stateRun} onOpen={onOpen} />
-        <PlaybookInner p={p} />
+      <div className="flex max-w-[23rem] flex-col items-start gap-0.5 leading-snug">
+        {/* [R297] 行1 = 哪一档 + **走到什么程度**。
+            「已N天」与「走到中段」是**同一个问题的两把尺**(走了多久 / 走了多远),
+            所以它们贴着同一枚徽标, 而不是各占一行 —— 这也正是原来那两列
+            分开时读不顺的地方: 结论在左边、刻度在右边隔着一整列。 */}
+        <span className="flex flex-wrap items-baseline gap-x-1.5">
+          <VerdictInner v={v} ev={ev} geo={geo} runs={runs} energy={energy} ph={ph}
+                        stateRun={stateRun} onOpen={onOpen} />
+          <Qualifier text={ph?.maturity_cn} title={MATURITY_TIP} />
+        </span>
+        {/* [R297] 行2 = 今天该干嘛 + **这个判断还稳不稳**。
+            快慢是**前瞻的那一半**: 「该止盈了 · 正在放慢」与「该止盈了 · 还在加速」
+            是两句不同的话, 而动作那一枚徽标自己说不出这个差别。 */}
+        <span className="flex flex-wrap items-baseline gap-x-1.5">
+          <PlaybookInner p={p} />
+          <Qualifier text={ph?.pace_cn} title={PACE_TIP}
+                     cls={PACE_CLS[geo?.accel?.level ?? ''] ?? 'text-muted'} />
+        </span>
         {line2 && (
           <span className={`w-full whitespace-normal break-words text-[11px] leading-snug ${
             evOn ? EVENT_CLS[ev!.code] ?? 'text-muted' : 'text-muted'}`}
