@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import pytest
 
+from tests.frontend_source import code_lines, read_src
+
 from app.services import watchlist_ai_text as ai_text
 
 # 一小份主数据: 覆盖普通股、ETF、带前缀、以及一对同名票
@@ -382,45 +384,11 @@ def test_端点_不回传整段原文(tmp_path, monkeypatch):
 
 
 def _src(rel: str) -> str:
-    from pathlib import Path
-    p = Path(__file__).resolve().parents[2] / "frontend" / "src" / rel
-    return p.read_text(encoding="utf-8")
+    return read_src(rel)
 
 
 def _code_lines(text: str) -> str:
-    """只留代码行 —— 断言查的标识符常常也写在我自己加的注释里。
-
-    **注释要按块剥, 不能只看行首。** 只剥首行的话, 跨行 `{/* … */}` 里除第一行以外的
-    说明文字全都留在结果里, 断言照样被自己的注释喂饱 —— 这个坑在这个仓库里踩过五次。
-    """
-    out: list[str] = []
-    in_block = False
-    for ln in text.splitlines():
-        line = ln
-        while True:
-            if in_block:
-                end = line.find("*/")
-                if end < 0:
-                    line = ""
-                    break
-                line = line[end + 2:]
-                in_block = False
-                continue
-            start = line.find("/*")
-            if start < 0:
-                break
-            head = line[:start].rstrip().removesuffix("{")
-            end = line.find("*/", start + 2)
-            if end < 0:
-                line = head
-                in_block = True
-                break
-            line = head + line[end + 2:].removeprefix("}")
-        stripped = line.strip()
-        if not stripped or stripped.startswith("//"):
-            continue
-        out.append(line)
-    return "\n".join(out)
+    return code_lines(text)
 
 
 def test_前端_接的是新端点():

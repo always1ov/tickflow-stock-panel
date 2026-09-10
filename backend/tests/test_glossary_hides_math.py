@@ -51,7 +51,9 @@ FORBIDDEN = {
 # 文件 → 从哪个标记之后才算"显示区"
 SURFACES = {
     _FRONT / "decision-board" / "cells.tsx": "function geoLines",
-    _FRONT / "StockReviewDialog.tsx": "function ChannelPanel",
+    # [R269] 三个区块合并重排后锚点跟着挪。挪到 VerdictHeader 是**扩大**了扫描面:
+    # 老锚点 ChannelPanel 排在阶段卡与位置结论卡之后, 那两块的文案一直没被扫到。
+    _FRONT / "StockReviewDialog.tsx": "function VerdictHeader",
     _SRC / "components" / "today" / "OpportunityTable.tsx":
         '<span className="text-foreground/90">量化波动通道</span>',
     # [R201] **导出的 HTML 是所有面里最该守的一个** —— 屏幕上的东西只有本人看得到,

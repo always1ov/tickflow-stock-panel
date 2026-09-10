@@ -13,22 +13,17 @@ from pathlib import Path
 
 import pytest
 
+from tests.frontend_source import code_lines, read_src
+
 FRONTEND = Path(__file__).resolve().parents[2] / "frontend" / "src"
 
 
 def _src(rel: str) -> str:
-    return (FRONTEND / rel).read_text(encoding="utf-8")
+    return read_src(rel)
 
 
 def _code_lines(text: str) -> str:
-    """只留代码行 —— 断言里查的标识符常常也写在我自己加的说明文字里。"""
-    out = []
-    for ln in text.splitlines():
-        s = ln.strip()
-        if s.startswith(("//", "/*", "*", "{/*")):
-            continue
-        out.append(ln)
-    return "\n".join(out)
+    return code_lines(text)
 
 
 @pytest.fixture

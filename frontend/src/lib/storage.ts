@@ -39,6 +39,9 @@ export const storage = {
   /** [R266] 消息面总览是否展开 —— 默认收起(那一段很长), 但看惯了展开的人不该每次重点 */
   newsDeskSummaryOpen:  kv<boolean>('news-desk-summary-open'),
 
+  /** [R269] 复盘·通道结论里那块「依据」是否展开 —— 默认收起, 正文让给历史段落 */
+  reviewEvidenceOpen:   kv<boolean>('review-evidence-open'),
+
   /** [R100] 个股弹窗最近查看(全局, 弹窗内随意切换用) */
   recentStocks:         kv<{ symbol: string; name: string }[]>('recent-stocks'),
 

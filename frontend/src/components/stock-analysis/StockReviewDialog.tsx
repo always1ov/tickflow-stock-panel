@@ -41,10 +41,11 @@
  */
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { CalendarRange, Loader2, X } from 'lucide-react'
+import { CalendarRange, ChevronDown, Loader2, X } from 'lucide-react'
 import { api, type KeltnerVerdict, type ReviewRow, type StockReview } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { cn } from '@/lib/cn'
+import { storage } from '@/lib/storage'
 import { trendBadgeCls } from '@/components/stock-analysis/TrendStateBar'
 import { VerdictHover } from '@/components/stock-analysis/VerdictHover'
 import { ComboView } from '@/components/stock-analysis/decision-board/ComboView'
@@ -257,7 +258,7 @@ function OutcomeChips({ items, forwardDays, hint }: {
 }) {
   if (items.length === 0) return null
   return (
-    <div className="px-4 pt-4">
+    <div className="px-4 pt-2.5">
       <div className="mb-1.5 text-[10px] text-muted">{hint}</div>
       <div className="flex flex-wrap gap-1.5">
         {items.map((o) => {
@@ -601,28 +602,24 @@ const PHASE_CLS: Record<string, string> = {
   unclear: 'border-border/60 bg-elevated/30 text-muted',
 }
 
-function PhaseCard({ ch }: { ch: NonNullable<StockReview['channel']> }) {
-  const ph = ch.phase
-  if (!ph) return null
-  return (
-    <div className={cn('mx-4 mt-4 rounded-lg border px-3 py-2.5', PHASE_CLS[ph.code] ?? PHASE_CLS.unclear)}>
-      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <span className="text-[10px] text-muted">现在处在</span>
-        <b className="text-[13px] font-semibold">{ph.cn}</b>
-        {ch.event.code !== 'none' && (
-          <span className="text-[10px] opacity-90">
-            {ch.event.cn}{ch.event.confirmed ? '' : '(未确认)'}
-          </span>
-        )}
-      </div>
-      <p className="mt-1 text-[10px] leading-relaxed opacity-90">{ph.why}</p>
-      <p className="mt-1 text-[10px] leading-relaxed">
-        <span className="text-muted">该盯什么:</span> {ph.watch}
-      </p>
-    </div>
-  )
-}
-
+/**
+ * [R269] 判定条 —— 阶段 + 该盯什么 + 位置结论, **压成一块**。
+ *
+ * 用户: 「排版不合理, 要抓住重点, 下面的都看不到了」。改之前这一栏从上到下是
+ * 四个各自带边框的区块: 阶段卡、位置结论卡、七行依据表、分档芯片, 加起来吃掉约
+ * 550px, 而**真正要看的段卡片列表**只剩一屏的零头, 一次露一张半。
+ *
+ * 一个复盘面板的正文是那串历史段落 —— 头部是用来"一眼定调"的, 不是用来读的。
+ * 所以这里只留两样:
+ *
+ *   · **现在处在哪一段** —— 一眼定调
+ *   · **该盯什么** —— 这一栏唯一的行动指引, 必须常驻
+ *
+ * 阶段的成因(`why`)、位置结论的说明(`text`)、七行读数全部下沉到「依据」里收起 ——
+ * 那张表自己都写着「上面两条结论就是从这些读数出来的」, **依据不该压在结论和正文
+ * 中间**。位置结论只留一枚芯片: 样本够时它是个判断(偏买/偏卖差多少), 样本不够时
+ * 它连判断都不是, 更没有理由占一整块。
+ */
 const EDGE_CLS2: Record<string, string> = {
   both: 'border-red-400/40 bg-red-400/[0.07] text-red-300',
   offense: 'border-red-400/30 bg-red-400/[0.05] text-red-300/90',
@@ -632,40 +629,65 @@ const EDGE_CLS2: Record<string, string> = {
   thin: 'border-border/60 bg-elevated/20 text-muted',
 }
 
-function VerdictEdgeCard({ e, forwardDays }: {
-  e: NonNullable<StockReview['verdict_edge']>; forwardDays: number
+function VerdictHeader({ ch, edge, forwardDays }: {
+  ch: NonNullable<StockReview['channel']>
+  edge: StockReview['verdict_edge']
+  forwardDays: number
 }) {
+  const ph = ch.phase
+  if (!ph) return null
   return (
-    <div className={cn('mx-4 mt-3 rounded-lg border px-3 py-2.5', EDGE_CLS2[e.level] ?? EDGE_CLS2.flat)}>
+    <div className={cn('mx-4 mt-3 rounded-lg border px-3 py-2', PHASE_CLS[ph.code] ?? PHASE_CLS.unclear)}>
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <span className="text-[10px] text-muted">位置结论在这只票上</span>
-        <b className="text-[13px] font-semibold">{e.label}</b>
-        {e.spread != null && (
-          <span className="font-mono text-[10px] opacity-80" title="偏买档平均 − 偏卖档平均。两边差得越多, 说明这套位置结论越有用">
-            两边差 {(e.spread * 100).toFixed(1)} 个点
+        <span className="text-[10px] text-muted">现在处在</span>
+        <b className="text-[13px] font-semibold">{ph.cn}</b>
+        {ch.event.code !== 'none' && (
+          <span className="text-[10px] opacity-90">
+            {ch.event.cn}{ch.event.confirmed ? '' : '(未确认)'}
           </span>
         )}
-        {e.level !== 'thin' && (
-          <span className="ml-auto flex flex-wrap gap-x-3 text-[10px]">
-            {([['偏买档', e.buy], ['偏卖档', e.sell]] as const).map(([n, v]) => (
-              <span key={n} title={`${v.episodes} 段已够 ${forwardDays} 个交易日, 其中 ${v.win} 段收涨`}>
-                <span className="text-muted">{n}</span>
-                <b className={cn('ml-1 font-mono', chgCls(v.avg_fwd))}>{pct(v.avg_fwd)}</b>
-                <span className="ml-1 opacity-60">{v.win}/{v.episodes}</span>
+        {!!edge && (
+          <span
+            className={cn('ml-auto inline-flex shrink-0 items-baseline gap-1.5 rounded border px-1.5 py-0.5 text-[10px]',
+              EDGE_CLS2[edge.level] ?? EDGE_CLS2.flat)}
+            title={edge.text}
+          >
+            <span className="text-muted">位置结论</span>
+            <b>{edge.label}</b>
+            {edge.level !== 'thin' && edge.spread != null && (
+              <span className="font-mono opacity-80" title="偏买档平均 − 偏卖档平均。两边差得越多, 说明这套位置结论越有用">
+                差 {(edge.spread * 100).toFixed(1)} 点
               </span>
-            ))}
+            )}
+            {edge.level !== 'thin' && (
+              <span
+                className="opacity-70"
+                title={`偏买档 ${edge.buy.episodes} 段够 ${forwardDays} 个交易日、${edge.buy.win} 段收涨;`
+                  + ` 偏卖档 ${edge.sell.episodes} 段、${edge.sell.win} 段收涨`}
+              >
+                {edge.buy.win}/{edge.buy.episodes} · {edge.sell.win}/{edge.sell.episodes}
+              </span>
+            )}
           </span>
         )}
       </div>
-      <p className="mt-1 text-[10px] leading-relaxed opacity-90">{e.text}</p>
+      {/* 这一栏唯一的行动指引 —— 别的都能收起, 它不行 */}
+      <p className="mt-1.5 text-[11px] leading-relaxed">
+        <span className="text-muted">该盯什么:</span> {ph.watch}
+      </p>
+      {!!ch.event.combo_note && (
+        <p className="mt-1 text-[10px] leading-relaxed opacity-90">
+          组合「{ch.event.combo_note.combo}」· {ch.event.combo_note.title}:{ch.event.combo_note.detail}
+        </p>
+      )}
     </div>
   )
 }
 
 /**
- * ③ 依据 —— **数据 + 一句解释**, 一行一条。
+ * [R269] 依据 —— 默认收起的一条。
  *
- * ## [R212] 这一块改过三版, 每一版都错在同一个地方的不同侧面
+ * ## [R212] 表里那三样为什么缺一不可(原样保留)
  *
  *   v1  只给数字(`+1.4` `-1.3` `10%` `中下中`)。用户: 「用数字看不懂」——
  *       对的: 得先知道"多少算大"才读得出好坏, 而那正是不该逼人记的东西。
@@ -675,39 +697,62 @@ function VerdictEdgeCard({ e, forwardDays }: {
  *   v3  用户自己给了答案: 「你干脆保持数据, 然后在后面加一行解释」。
  *
  * 三样缺一不可: **名称**(这个数在说什么)、**数值**(能核对)、**解释**(所以呢)。
- * 格子放不下第三样, 所以这里从格子墙改成了一张三列的表。
- *
  * 文案在后端(`keltner_geometry.explain`), 前端只排版 —— 「多少算大」的分界
  * 只该有一处定义。
+ *
+ * R269 改的只是**它在版面上的位置**: 内容一个字没动, 从常驻改成收起。要核对读数的
+ * 时候展开一次就够, 而正文那串段落是每次都要翻的。展开状态记在本地。
  */
-function ChannelPanel({ ch }: { ch: NonNullable<StockReview['channel']> }) {
-  const { event, explain } = ch
+function EvidencePanel({ ch, edge }: {
+  ch: NonNullable<StockReview['channel']>
+  edge: StockReview['verdict_edge']
+}) {
+  const { explain, phase } = ch
+  const [open, setOpen] = useState(() => storage.reviewEvidenceOpen.get(false))
+  const rows = explain?.length ?? 0
+  if (!rows && !phase?.why && !edge) return null
   return (
-    <div className="mx-4 mt-3 space-y-2">
-      <div className="text-[10px] text-muted">依据(上面两条结论就是从这些读数出来的)</div>
-      {/* [R212] **数据保留, 后面跟一句解释。** 用户: 「你干脆保持数据, 然后在
-          后面加一行解释」。格子放不下第三样, 所以这里是表不是格子墙。 */}
-      {!!explain?.length && (
-        <div className="overflow-hidden rounded-card border border-border/50">
-          {explain.map((r, i) => (
-            <div key={r.label}
-                 className={cn('flex items-start gap-2 px-3 py-1.5',
-                   i % 2 ? 'bg-elevated/20' : 'bg-elevated/35')}>
-              <span className="w-14 shrink-0 text-[10px] text-muted">{r.label}</span>
-              <span className="w-20 shrink-0 font-mono text-[11px] tabular-nums text-foreground/90">
-                {r.value}
-              </span>
-              <span className="min-w-0 flex-1 text-[10px] leading-relaxed text-secondary">
-                {r.why}
-              </span>
+    <div className="mx-4 mt-2">
+      <button
+        type="button"
+        onClick={() => { const v = !open; setOpen(v); storage.reviewEvidenceOpen.set(v) }}
+        aria-expanded={open}
+        className="inline-flex items-center gap-1 text-[10px] text-muted transition-colors hover:text-secondary"
+      >
+        <ChevronDown className={cn('h-3 w-3 transition-transform', open && 'rotate-180')} />
+        依据{rows > 0 && ` · ${rows} 项读数`}
+        <span className="opacity-60">(上面两条结论就是从这些读数出来的)</span>
+      </button>
+      {open && (
+        <div className="mt-1.5 space-y-2">
+          {!!phase?.why && (
+            <p className="text-[10px] leading-relaxed text-secondary">
+              <span className="text-muted">阶段判定:</span> {phase.why}
+            </p>
+          )}
+          {!!edge && (
+            <p className="text-[10px] leading-relaxed text-secondary">
+              <span className="text-muted">位置结论:</span> {edge.text}
+            </p>
+          )}
+          {rows > 0 && (
+            <div className="overflow-hidden rounded-card border border-border/50">
+              {explain!.map((r, i) => (
+                <div key={r.label}
+                     className={cn('flex items-start gap-2 px-3 py-1.5',
+                       i % 2 ? 'bg-elevated/20' : 'bg-elevated/35')}>
+                  <span className="w-14 shrink-0 text-[10px] text-muted">{r.label}</span>
+                  <span className="w-20 shrink-0 font-mono text-[11px] tabular-nums text-foreground/90">
+                    {r.value}
+                  </span>
+                  <span className="min-w-0 flex-1 text-[10px] leading-relaxed text-secondary">
+                    {r.why}
+                  </span>
+                </div>
+              ))}
             </div>
-          ))}
+          )}
         </div>
-      )}
-      {!!event.combo_note && (
-        <p className="rounded border border-amber-400/30 bg-amber-400/[0.06] px-2.5 py-1.5 text-[10px] leading-relaxed text-amber-300/90">
-          组合「{event.combo_note.combo}」· {event.combo_note.title}:{event.combo_note.detail}
-        </p>
       )}
     </div>
   )
@@ -716,19 +761,23 @@ function ChannelPanel({ ch }: { ch: NonNullable<StockReview['channel']> }) {
 function VerdictView({ d, segments }: { d: StockReview; segments: Segment[] }) {
   return (
     <>
-      {/* [R199] 三层, 从上到下: 现在在哪一段 → 这套结论灵不灵 → 依据 */}
-      {!!d.channel && <PhaseCard ch={d.channel} />}
-      {!!d.verdict_edge && <VerdictEdgeCard e={d.verdict_edge} forwardDays={d.forward_days} />}
-      {!!d.channel && <ChannelPanel ch={d.channel} />}
+      {/* [R269] 头部只留「一眼定调 + 该盯什么」, 读数与说明收进「依据」。
+          正文是下面那串历史段落 —— 改之前四个常驻区块吃掉约 550px, 正文一屏
+          只露一张半卡片, 那是把主次弄反了。 */}
+      {!!d.channel && (
+        <VerdictHeader ch={d.channel} edge={d.verdict_edge} forwardDays={d.forward_days} />
+      )}
 
-      {/* 各档结论在这只票上过去好不好使 */}
+      {/* 各档结论在这只票上过去好不好使 —— 复盘的正题, 留在正文之上 */}
       <OutcomeChips
         items={d.outcomes}
         forwardDays={d.forward_days}
         hint={`分档依据 —— 各档结论出现后 ${d.forward_days} 日表现(按段计, 一段=一次;括号里是「几段收涨/几段已兑现」)`}
       />
 
-      <div className="mt-3 flex-1 overflow-auto border-t border-border/60 p-4">
+      {!!d.channel && <EvidencePanel ch={d.channel} edge={d.verdict_edge} />}
+
+      <div className="mt-2 flex-1 overflow-auto border-t border-border/60 p-4">
         {segments.length === 0 && (
           <div className="py-14 text-center text-[11px] text-muted">
             这段时间里三档通道一直在中部 —— 位置上没有可说的, 听趋势和信号的
