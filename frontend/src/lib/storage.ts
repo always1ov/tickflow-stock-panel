@@ -36,6 +36,9 @@ export const storage = {
   /** [R192] 模拟盘当前看的是哪个操作员 —— 一页只显示一个, 刷新后该回到原处 */
   paperTrader:          kv<string | null>('paper-trader'),
 
+  /** [R266] 消息面总览是否展开 —— 默认收起(那一段很长), 但看惯了展开的人不该每次重点 */
+  newsDeskSummaryOpen:  kv<boolean>('news-desk-summary-open'),
+
   /** [R100] 个股弹窗最近查看(全局, 弹窗内随意切换用) */
   recentStocks:         kv<{ symbol: string; name: string }[]>('recent-stocks'),
 

@@ -40,7 +40,18 @@ import { toast } from '@/components/Toast'
 import { QK } from '@/lib/queryKeys'
 import { PageHeader } from '@/components/PageHeader'
 import { EmptyState } from '@/components/EmptyState'
+import { CollapsibleText } from '@/components/CollapsibleText'
+import { storage } from '@/lib/storage'
 import { cn } from '@/lib/cn'
+
+/** [R266] 收起时留几行。
+ *
+ * 总览给 6 行 —— 够看清开头是「今天什么基调」还是「有几条埋伏待验证」, 决定要不要展开;
+ * 卡片给 8 行 —— 一条记录的头两三句通常就说清了是什么事, 再多是细节。
+ * 两者都只是**收起高度**, 真实内容一个字不少, 展开即见。
+ */
+const SUMMARY_LINES = 6
+const NOTE_LINES = 8
 
 const TA_CLS =
   'w-full rounded-lg bg-base border border-border px-3 py-2 text-[13px] leading-relaxed text-foreground placeholder:text-muted/40 focus:outline-none focus:border-accent/60 transition-colors resize-y'
@@ -187,7 +198,14 @@ function NoteCard({ note, onDigest, digesting }: {
               而这条记录之后要进综合、进决策, 得能翻回去核对。 */}
           {note.digest ? (
             <div className="flex-1">
-              <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-foreground">{note.digest}</p>
+              {/* [R266] 收起到固定行数 —— 卡片墙里一条长记录原来会撑出上千像素的卡片,
+                  同一行旁边那条只有一句话, 高度差到整面墙没法看。 */}
+              <CollapsibleText
+                lines={NOTE_LINES}
+                className="whitespace-pre-wrap text-[13px] leading-relaxed text-foreground"
+              >
+                {note.digest}
+              </CollapsibleText>
               {(note.content || note.attachment) && (
                 <button
                   onClick={() => setShowRaw(v => !v)}
@@ -205,16 +223,26 @@ function NoteCard({ note, onDigest, digesting }: {
                 </button>
               )}
               {showRaw && (
-                <p className="mt-1 whitespace-pre-wrap rounded border border-border/40 bg-base/50 px-2 py-1.5 text-[11px] leading-relaxed text-muted">
+                /* 原文可能很长(整份研报的文字) —— 给个上限自己滚, 不让它把卡片顶穿 */
+                <p className="mt-1 max-h-48 overflow-y-auto whitespace-pre-wrap rounded border border-border/40 bg-base/50 px-2 py-1.5 text-[11px] leading-relaxed text-muted">
                   {note.content || <span className="italic opacity-70">(只有附件, 没有正文)</span>}
                 </p>
               )}
             </div>
           ) : (
             <div className="flex-1">
-              <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-foreground">
-                {note.content || <span className="italic text-muted">(只有附件)</span>}
-              </p>
+              {note.content ? (
+                <CollapsibleText
+                  lines={NOTE_LINES}
+                  className="whitespace-pre-wrap text-[13px] leading-relaxed text-foreground"
+                >
+                  {note.content}
+                </CollapsibleText>
+              ) : (
+                <p className="text-[13px] leading-relaxed">
+                  <span className="italic text-muted">(只有附件)</span>
+                </p>
+              )}
               {note.attachment && (
                 <span
                   className="mt-1 inline-flex items-center gap-1 text-[10px] text-warning/80"
@@ -316,6 +344,8 @@ export function UsageNotes() {
   const [draft, setDraft] = useState('')
   const [filter, setFilter] = useState<'all' | NoteStatus>('all')
   const [search, setSearch] = useState('')
+  // [R266] 总览默认收起 —— 但用户上次展开过就照他的来
+  const [summaryOpen, setSummaryOpen] = useState(() => storage.newsDeskSummaryOpen.get(false))
 
   const create = useMutation({
     mutationFn: () => api.usageNoteCreate(draft),
@@ -458,25 +488,41 @@ export function UsageNotes() {
               </button>
             </div>
             {summary?.text ? (
-              <p className="whitespace-pre-wrap text-[12px] leading-relaxed text-foreground/90">
+              /* [R266] 这一段是 AI 综合出来的, 动辄几十行 —— 原来全量铺开, 一进页面
+                 就把整屏吃光, 下面的输入框和卡片墙全被顶到屏外。收起到几行, 想读再展开;
+                 展开与否记在本地, 看惯了展开的人不用每次重点。 */
+              <CollapsibleText
+                lines={SUMMARY_LINES}
+                defaultOpen={summaryOpen}
+                onOpenChange={(v) => { setSummaryOpen(v); storage.newsDeskSummaryOpen.set(v) }}
+                moreLabel="展开全文"
+                className="whitespace-pre-wrap text-[12px] leading-relaxed text-foreground/90"
+              >
                 {summary.text}
-              </p>
+              </CollapsibleText>
             ) : (
               <p className="text-[11px] text-muted">
                 还没有总览。下面记几条之后点「生成总览」——
                 之后每次 AI 做决策(今日导读·优选 / 个股信号 / 模拟交易)都会先看这一段。
               </p>
             )}
-            <p className="mt-1.5 text-[10px] text-muted/60">
-              总览只作背景参考,<b className="font-medium">不会覆盖价格与规则层的事实</b>
-              (趋势状态、出场线、通道位置、把握分)。两者冲突时以价格与规则为准。
-            </p>
+            {/* [R266] 这段边界说明只在展开时出现: 收起时是在扫一眼, 两行小字白占地方;
+                真要细读这段总览的时候, 才需要看见"它不会覆盖规则层"这条界限。 */}
+            {(summaryOpen || !summary?.text) && (
+              <p className="mt-1.5 text-[10px] text-muted/60">
+                总览只作背景参考,<b className="font-medium">不会覆盖价格与规则层的事实</b>
+                (趋势状态、出场线、通道位置、把握分)。两者冲突时以价格与规则为准。
+              </p>
+            )}
           </section>
 
           {/* 新增区: 单行起步, 聚焦时长高 */}
           <div className="rounded-card border border-border bg-surface p-3">
             <div className="flex items-start gap-2">
               <textarea
+                // [R266] rows 默认是 2, min-h 只管下限 —— 空着时按意图该是一行,
+                // 实际却白占了一行高。写死 rows=1, 聚焦或有草稿时再靠 min-h 长高。
+                rows={1}
                 className={cn(TA_CLS, draft ? 'min-h-[72px]' : 'min-h-[38px] focus:min-h-[72px]')}
                 placeholder="记一条观察… (Ctrl+Enter 保存)"
                 value={draft}
