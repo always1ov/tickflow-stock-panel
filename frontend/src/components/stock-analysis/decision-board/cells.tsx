@@ -78,6 +78,23 @@ const EVENT_CLS: Record<string, string> = {
 }
 
 /** 几何量摊成悬停里的几行 —— 速度/加速度/压缩/排列, 外加 27 组合的补充注记。 */
+/**
+ * [R298] 「现在处在哪一段 · 该盯什么」——**全系统这一处产地。**
+ *
+ * 用户问「结论列和走势列有必要合并吗」, 查下来两列不该合(两套判定, 打架时要
+ * 上下对得出来), **但它们的悬停里确实各印了一份这两句话**: 走势列写
+ * `【通道】上升中 —— why`, 结论列写 `【上升中】why` —— 同两句、两个格式、
+ * 两个产地。这是本仓库反复清的那一类(R296 `LiveStrip` vs `EvidencePanel`、
+ * R249 天数印两遍), 这次借这个问题一并收成一处。
+ *
+ * 阶段是**通道层**的读数(`phase(geo, runs)`), 所以格式跟着「结论」列那一份走。
+ */
+function phaseLines(ph?: ChannelPhase | null): string[] {
+  if (!ph) return []
+  return ['', `【${ph.cn}】${ph.why}`, `该盯什么:${ph.watch}`]
+}
+
+
 function geoLines(geo?: ChannelGeometry | null, ev?: ChannelEvent | null,
                   runs?: ChannelRuns | null, energy?: BandEnergy | null,
                   ph?: ChannelPhase | null): string {
@@ -85,7 +102,7 @@ function geoLines(geo?: ChannelGeometry | null, ev?: ChannelEvent | null,
   const L: string[] = []
   // [R200] 阶段摆在最前面。悬停这一片本来全是测量 —— 先给一句"现在处在哪一段、
   // 该盯什么", 后面那些数才有落点。这句话之前只有复盘弹窗里有。
-  if (ph) L.push('', `【${ph.cn}】${ph.why}`, `该盯什么:${ph.watch}`)
+  L.push(...phaseLines(ph))
 
   // [R219] **一个话题一行, 不许拆到上下两处。** 用户: 「每一列的内容应该就是
   // 一部分, 而不是内容上面一部分下面一部分」。
@@ -424,7 +441,9 @@ export function ChannelStateCell({ trend, geo, runs, ph, kc, close, trendCls,
       // [R286] 转折日在悬停里也说一句 —— 可见行只放得下两个字
       + (trend.flipped ? ',今天就是转折日' : '') : '',
     trend?.action ?? '',
-    ...(ph ? ['', `【通道】${ph.cn} —— ${ph.why}`, `该盯什么:${ph.watch}`] : []),
+    // [R298] 原来这里另写了一份(`【通道】阶段名 —— why`), 与「结论」列 `geoLines()`
+    // 里那份**是同两句话、两个格式、两个产地**。走同一个 `phaseLines`。
+    ...phaseLines(ph),
     // 第三行那句(三个尺度对齐到第几步)原来自带一份悬停, 一并收进来
     // [R277] 悬停里那个 `: 快慢:${ph.pace_cn}` 回退也去掉了 —— 与可见行同一个理由:
     // 它几乎轮不上(align 基本永远非空), 而快慢现在有自己的列。
@@ -601,17 +620,27 @@ export function ConclusionCell({ v, ev, geo, runs, energy, ph, p, stateRun, onOp
     // AI 信号列 R253 起就是固定竖排三行到价预案, 行高本来就由它撑着 —— 结论列
     // 竖排不会再让任何一行变高, 反而两列的读法终于一致(都是从上往下一件一件读)。
     //
-    // 左对齐也跟着 AI 信号列: 竖排之后居中会让三行的左边缘参差不齐。
-    <td className={`${TD_BASE} px-2 !text-left`}>
+    // [R255 → R298] **左对齐改回居中。** 用户: 「每列都居中对齐好」。
+    //
+    // R255 那句理由(「竖排之后居中会让三行的左边缘参差不齐」)在**当时**是对的:
+    // 那一版三行分别是徽标 / 徽标 / 一整段折行说明, 三种宽度差得很远。
+    // R297 之后前两行各自变成「徽标 + 一个短词」, 宽度接近了, 而第三行绝大多数
+    // 情况是**一行以内**(事件 4 字 + why 二十来字, 23rem 装得下)——
+    // 参差的前提没了, 而整张表除这一列外都是居中的。
+    //
+    // 这一列于是回到 `TD_BASE` 的默认(居中), 不再自己覆写; 容器加 `mx-auto`
+    // 与 `items-center` —— 光有 `text-center` 不够: 带 `max-w` 的块级容器
+    // 不会自己居中, 而 `items-start` 会把两行徽标钉在左边。
+    <td className={`${TD_BASE} px-2`}>
       {/* [R283] `max-w-[15rem]`(240px) → `19rem`(304px)。**这个上限才是「结论」
           一直被挤的真原因** —— 这一列 18% 宽在常见视口上有 300px 出头, 而内容被
           硬卡在 240px, 光加列宽一点用都没有。两者得一起动。 */}
-      <div className="flex max-w-[23rem] flex-col items-start gap-0.5 leading-snug">
+      <div className="mx-auto flex max-w-[23rem] flex-col items-center gap-0.5 leading-snug">
         {/* [R297] 行1 = 哪一档 + **走到什么程度**。
             「已N天」与「走到中段」是**同一个问题的两把尺**(走了多久 / 走了多远),
             所以它们贴着同一枚徽标, 而不是各占一行 —— 这也正是原来那两列
             分开时读不顺的地方: 结论在左边、刻度在右边隔着一整列。 */}
-        <span className="flex flex-wrap items-baseline gap-x-1.5">
+        <span className="flex flex-wrap items-baseline justify-center gap-x-1.5">
           <VerdictInner v={v} ev={ev} geo={geo} runs={runs} energy={energy} ph={ph}
                         stateRun={stateRun} onOpen={onOpen} />
           <Qualifier text={ph?.maturity_cn} title={MATURITY_TIP} />
@@ -619,7 +648,7 @@ export function ConclusionCell({ v, ev, geo, runs, energy, ph, p, stateRun, onOp
         {/* [R297] 行2 = 今天该干嘛 + **这个判断还稳不稳**。
             快慢是**前瞻的那一半**: 「该止盈了 · 正在放慢」与「该止盈了 · 还在加速」
             是两句不同的话, 而动作那一枚徽标自己说不出这个差别。 */}
-        <span className="flex flex-wrap items-baseline gap-x-1.5">
+        <span className="flex flex-wrap items-baseline justify-center gap-x-1.5">
           <PlaybookInner p={p} />
           <Qualifier text={ph?.pace_cn} title={PACE_TIP}
                      cls={PACE_CLS[geo?.accel?.level ?? ''] ?? 'text-muted'} />

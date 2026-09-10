@@ -477,7 +477,17 @@ def test_R255_结论列与AI信号列同一套排版():
     if m:
         blk = blk[:m.start()]
 
-    assert "flex-col items-start" in blk, "结论列没有竖排左对齐"
+    # [R255 → R298] **左对齐改回居中。** 用户: 「每列都居中对齐好」。
+    # R255 那句理由(竖排之后居中会让三行的左边缘参差不齐)在当时是对的; R297
+    # 之后前两行各自是「徽标 + 一个短词」宽度接近了, 而第三行绝大多数在一行以内,
+    # 参差的前提没了。**这条守的规矩一个字没变**: 竖排, 不许再横排回去。
+    assert "flex-col items-center" in blk, "结论列没有竖排居中"
+    assert "flex-col items-start" not in blk, "又靠左了 —— 整张表除它以外都居中"
+    # 光有 `text-center` 不够: 带 `max-w` 的块级容器不会自己居中(这一处漏了的话
+    # 整格看着还是靠左, 而 `text-center` 明明写着 —— 最难查的那种"改了没效果")
+    assert "mx-auto flex max-w-[" in blk, "带 max-w 的容器没有 mx-auto, 整格还是靠左"
+    assert "!text-left" not in blk, "还覆写着左对齐"
+    # 反面照旧: 两个徽标不许又挤回同一行(那是 R217 那版, R255 拆开的)
     assert "flex flex-wrap items-center justify-center" not in blk, (
         "两个徽标又横排回去了"
     )
@@ -485,7 +495,6 @@ def test_R255_结论列与AI信号列同一套排版():
         "说明又变回单行截断了 —— AI 信号那一列的理由是整段折行的"
     )
     assert "truncate" not in blk, "说明还在用 truncate 截断"
-    assert "!text-left" in blk, "竖排之后必须左对齐, 否则三行的左边缘参差不齐"
 
 
 def test_R257_走势列的三行各管一件事():
@@ -626,8 +635,20 @@ def test_R257_阶段的说明必须留在悬停里():
     照旧要给得出来, 否则就是把信息删了而不是理顺了。"""
     root = _BOARD.parent
     cells = (root / "decision-board" / "cells.tsx").read_text(encoding="utf-8")
-    assert "【通道】${ph.cn}" in cells, "阶段从悬停里也没了 —— 那是删信息, 不是理顺"
+    # [R298] 这两句话**收成了一处产地**(`phaseLines`)。原来走势列写
+    # `【通道】${ph.cn} —— ${ph.why}`、结论列写 `【${ph.cn}】${ph.why}` ——
+    # 同两句、两个格式、两个产地, 与 R296 撤 `LiveStrip` 是同一类。
+    # 这条守的规矩一个字没变(阶段的 why 与「该盯什么」必须还给得出来),
+    # 只是锚点从"走势列那个字面量"换成"那一处产地 + 两列都在用它"。
+    assert "function phaseLines" in cells, "阶段那两句没有唯一产地"
+    assert "${ph.cn}】${ph.why}" in cells, "阶段从悬停里也没了 —— 那是删信息, 不是理顺"
     assert "该盯什么" in cells, "「该盯什么」没了"
+    from tests.frontend_source import code_of
+    code = code_of("components/stock-analysis/decision-board/cells.tsx")
+    assert code.count("phaseLines(ph)") == 2, (
+        f"用到 phaseLines 的地方有 {code.count('phaseLines(ph)')} 处 —— 该是走势列与结论列各一"
+    )
+    assert "【通道】" not in code, "又有人另写了一份阶段文案"
 
 
 def test_R257_横盘中确实会配上走了一段():
