@@ -1053,6 +1053,16 @@ export interface BandEnergy {
 // [R187 加, R229 删] `TrendRhythm`(红绿节拍与磨底时长)在这里删掉了 ——
 // 用户: 「红绿节拍移除掉」, 整个规则层退役, 后端已不再返回这个对象。
 
+/** [R292] 「说明」抽屉里的词条 */
+export interface GlossaryTerms {
+  /** 六态六档, 按强弱从强到弱 */
+  trend: { code: string; title: string; en: string; side: '多头' | '空头'
+           meaning: string; action: string }[]
+  /** 通道结论十档, 按偏买 → 偏卖 */
+  verdict: { code: string; title: string; action: string; meaning: string
+             tone: KeltnerVerdict['tone']; rank: number }[]
+}
+
 export interface TrendInfo {
   state: LivermoreState
   state_cn: string
@@ -5005,6 +5015,11 @@ export const api = {
   /** [R203] 27 种组合速查表。无参数、结果恒定 —— 前端按天缓存即可 */
   comboTable: () =>
     request<{ rows: ComboTableRow[] }>('/api/stock-analysis/combo-table'),
+
+  /** [R292] 「说明」词条: 六态六档 + 通道结论十档各是什么意思。
+   *  名字与结论文案的正主在后端 —— 前端誊抄一份的话, 底层改了措辞那份就开始
+   *  说假话。无参数、结果恒定, 与 comboTable 同一条路。 */
+  glossary: () => request<GlossaryTerms>('/api/stock-analysis/glossary'),
 
   stockKeltner: (symbols: string[]) =>
     request<{ keltner: Record<string, KeltnerBands> }>(

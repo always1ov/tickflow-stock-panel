@@ -61,7 +61,18 @@ SURFACES = {
     # 白纸黑字写着「短期 MA20±2ATR / 中期 MA60±2.5ATR / 长期 MA120±3ATR」。
     # 这条规则的教训就是"扫描面要跟着**能外传的东西**走, 不是跟着屏幕走"。
     _SRC / "lib" / "decisionBoardHtmlExport.ts": "export function buildBoardHtml",
+    # [R292] 「说明」抽屉 —— 它整篇就是解释这些词是什么意思, **是全仓库最容易
+    # 顺手把算法一起讲出来的地方**。R259 删掉的那个感叹号词汇表当年守的就是它,
+    # 现在这块内容回来了, 守卫也得跟回来(纪律管到哪儿守卫就得扫到哪儿, R279)。
+    _FRONT / "ReviewHelpSheet.tsx": "export function HelpButton",
 }
+
+# [R292] 后端也有一处**释义文案**: 六态那六句「是什么意思」。前端扫不到它 ——
+# 它是后端字符串, 运行时才到界面上。R279 吃过一模一样的亏(纪律管前后端, 守卫
+# 只扫前端, 后端两处就在眼皮底下活了下来), 所以这里把那个文件一并扫了。
+_BACKEND_SURFACES = (
+    Path(__file__).resolve().parents[1] / "app" / "services" / "glossary.py",
+)
 
 # 显示区里也躲不开的技术词(它们是数据本身或纯样式), 逐条豁免而不是整类放行。
 _ALLOW = ("gain_atr", "compress_avg", "compress_days", "atr", "energy.share",
@@ -136,3 +147,37 @@ def test_后端给界面的那几句话也是大白话():
     assert not hit, f"后端文案里还有行话: {hit}"
     # 单位也不点名 —— 与改名成「量化波动通道」同一个目的
     assert "ATR" not in blob, "界面文案里不该出现指标本名的单位"
+
+
+@pytest.mark.parametrize("kind", list(FORBIDDEN))
+@pytest.mark.parametrize("path", _BACKEND_SURFACES, ids=lambda p: p.name)
+def test_R292_后端的释义文案也不许讲算法(path: Path, kind: str):
+    """六态那六句「是什么意思」是**新写的界面文案**, 而且住在后端 ——
+    前端那把尺子够不着它。
+
+    这正是 R279 那一课的形状: 纪律管前后端两侧, 守卫只扫一侧, 另一侧就在
+    眼皮底下活下来。所以这条单独扫这个文件的**字符串**(不含 docstring 与注释:
+    那些是写给维护者的, 本来就该讲清楚)。
+    """
+    import ast
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    docs = {ast.get_docstring(n, clean=False) for n in ast.walk(tree)
+            if isinstance(n, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef))}
+    texts = [n.value for n in ast.walk(tree)
+             if isinstance(n, ast.Constant) and isinstance(n.value, str) and n.value not in docs]
+    blob = "\n".join(texts)
+    bad = [w for w in FORBIDDEN[kind] if w in blob]
+    assert not bad, f"{path.name} 的释义文案里泄露了{kind}: {bad}"
+
+
+def test_R292_说明抽屉的词条真的来自后端():
+    """反面: 前端誊抄一份就会漂 —— 底层改了措辞那份就开始说假话, 而且不会报错。
+    (R203 的 27 格速查表当初就是为这个理由做成端点的。)"""
+    from tests.frontend_source import code_of
+    src = code_of("components/stock-analysis/ReviewHelpSheet.tsx")
+    assert "api.glossary()" in src, "说明抽屉没走后端那份词条"
+    # 六态那六个名字不许出现在**代码**里 —— 出现即意味着誊抄。
+    # **先剥注释**: 文件头那段说明里举「自然回撤」当例子是应该的(讲清楚这个抽屉
+    # 是干什么用的), 它不渲染。第一版没剥就直接扫, 当场被自己的注释绊倒。
+    for name in ("上涨趋势", "自然回升", "次级回升", "次级回撤", "自然回撤", "下跌趋势"):
+        assert name not in src, f"「{name}」被誊抄进前端了 —— 名字的正主在后端"

@@ -41,8 +41,9 @@ export const storage = {
 
   /** [R269] 复盘·通道结论里那块「依据」是否展开 —— 默认收起, 正文让给历史段落 */
   reviewEvidenceOpen:   kv<boolean>('review-evidence-open'),
-  /** [R270] 复盘·趋势状态里那堆涨跌停计数是否展开 —— 默认收起, 正文让给逐日表 */
-  reviewTrendStatsOpen: kv<boolean>('review-trend-stats-open'),
+  // [R270 加, R292 删] `reviewTrendStatsOpen` 在这里删掉了 —— 它记的是「趋势状态」
+  // 那堆涨跌停计数折叠区的开合, 而那一块整个撤了(计数压成头部一行小字)。
+  // **不留没人读的键**: 留着的话下一个人会以为界面上还有那个开关。
   /** [R270] 组合速查里「其余 26 格」是否展开 —— 那是查表用的参考, 与今天无关 */
   reviewComboRestOpen:  kv<boolean>('review-combo-rest-open'),
 

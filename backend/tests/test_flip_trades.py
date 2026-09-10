@@ -705,27 +705,23 @@ def test_R288_结论那一栏买卖比六态频繁(review):
     )
 
 
-def test_R288_两个页签都挂上了而且都在正文最上面():
+def test_R288_两个页签都挂上了而且都排在正文最前面():
     """同一件事在两个页签上必须在同一个相对位置 —— 一边在最上面、一边在别处的话,
     读的人得重新找一遍。
 
-    [R289] 位置从「分档依据之后」改成了**正文第一块**: 那些背景资料整批收进了
-    全景面板, 而用户点名这一栏是重点。两个页签一起改, 不许只改一边。
+    [R292] 「全景」面板整个撤了(用户: 「剩下的东西都不需要了」), 所以位置改成
+    钉**它排在逐日表 / 卡片流之前**。用户点名这一栏是重点。
     """
     from tests.frontend_source import code_of
     dlg = code_of("components/stock-analysis/StockReviewDialog.tsx")
-    for fn, tag in (("function TrendView", "<FlipTradesBar"),
-                    ("function VerdictView", "<FlipTradesPanel")):
+    for fn, tag, body_tag in (("function TrendView", "<FlipTradesBar", "<table"),
+                              ("function VerdictView", "<FlipTradesPanel", "{segments.map")):
         blk = dlg[dlg.index(fn):]
         blk = blk[:blk.index("\nfunction ", 1)] if "\nfunction " in blk[1:] else blk
         body = blk[blk.index("return ("):]
-        # 钉行首, 不是钉子串 —— `{false && <… />}` 照样含有它。
-        assert f"\n{' ' * (10 if tag == '<FlipTradesBar' else 6)}{tag}" in body, (
-            f"{fn} 没有无条件挂上这一栏"
-        )
-        # 全景面板里那些块**必须排在它后面** —— 面板是正文之后才渲染的一层
-        assert body.index(tag) < body.index("<ReviewOverviewSheet"), (
-            f"{fn} 里这一栏被排到全景面板后面去了"
+        assert tag in body, f"{fn} 没挂上这一栏"
+        assert body.index(tag) < body.index(body_tag), (
+            f"{fn} 里这一栏排到正文后面去了"
         )
 
 
@@ -733,7 +729,10 @@ def test_R288_两栏的口径各写各的():
     """两栏长得一样, 所以**口径那一句是唯一能分辨它们的东西**, 不许省。"""
     from tests.frontend_source import code_of
     dlg = code_of("components/stock-analysis/StockReviewDialog.tsx")
-    assert 'title="按转折买卖"' in dlg and 'title="按结论买卖"' in dlg
+    # [R292] 六态那栏的栏目名搬到了 `HeadRow` 的左栏(三行共用一条左边缘), 所以
+    # 它传给组件的 `title` 是空的 —— 名字仍然印在屏幕上, 只是换了个地方出。
+    assert 'label="按转折买卖"' in dlg, "六态那栏的栏目名没了"
+    assert 'title="按结论买卖"' in dlg, "结论那栏的栏目名没了"
     assert "转折次日开盘进出" in dlg, "六态那栏的口径没了"
     assert "结论换档的次日开盘进出" in dlg, "结论那栏的口径没了"
 
@@ -792,73 +791,105 @@ def _fn_body(src: str, name: str) -> str:
     return blk[:blk.index("\nfunction ", 1)] if "\nfunction " in blk[1:] else blk
 
 
-def test_R289_背景资料收进全景而不是删掉():
-    """**收起来 ≠ 删掉。** 时间轴、分档依据、涨跌停计数、「现在」整卡, 一个都不许丢 ——
-    只是不再压在逐日表前面。这条正着钉: 它们必须仍然渲染, 只不过在面板里。
+def test_R292_状态轴与涨跌停在头部那张卡里():
+    """用户: 「120 天里 涨跌停 找个位置也放到图片里面, 状态轴也是」。"""
+    body = _fn_body(_dialog(), "function TrendView")
+    head = body[body.index("return ("):body.index("<table")]
+    assert "<StateTimeline" in head, "状态色带没进头部"
+    assert "涨停 {st.limit_ups}" in head, "涨跌停计数没进头部"
+    assert "跌停 {st.limit_downs}" in head
+
+
+def test_R292_头部三行共用一条左栏():
+    """用户: 「图片这部分要对齐, 感觉太乱了, 没有边界感」。
+
+    毛病是上一版三段各自 `px-4 pt-N`, 没有框也没有共同的左边缘。现在整块是一张
+    有边框的卡, 行与行一条细分割线, **每行左边一栏固定宽度放标签** —— 三行的
+    内容于是从同一条竖线开始, 「对齐」有了依据而不是靠 padding 凑。
     """
     body = _fn_body(_dialog(), "function TrendView")
-    sheet = body[body.index("<ReviewOverviewSheet"):]
-    for tag in ("<NowCard", "<StateTimeline", "<OutcomeChips", "<TrendStatsPanel"):
-        assert tag in sheet, f"{tag} 在重排时弄丢了 —— 要的是收起来, 不是删掉"
+    head = body[body.index("return ("):body.index("<table")]
+    assert "divide-y divide-border/40 rounded-lg border border-border/60" in head, (
+        "头部没有边框与行间分割线 —— 那正是「没有边界感」说的东西"
+    )
+    assert head.count("<HeadRow") == 3, f"头部该是三行, 现在 {head.count('<HeadRow')} 行"
+    row = _dialog()[_dialog().index("function HeadRow"):]
+    assert "w-[4.5rem] shrink-0" in row, "标签栏没有固定宽度 —— 三行对不齐"
 
 
-def test_R289_收起来的东西不许在正文里再露一次():
-    """收了一份又在正文留一份, 等于没收 —— 而且同一块东西出现两处最难查。"""
-    body = _fn_body(_dialog(), "function TrendView")
-    main = body[body.index("return ("):body.index("<ReviewOverviewSheet")]
-    for tag in ("<NowCard", "<StateTimeline", "<OutcomeChips", "<TrendStatsPanel"):
-        assert tag not in main, f"{tag} 收进全景了却还在正文里印一份"
-
-
-def test_R289_每一段并进了逐日表():
-    """用户: 「按照转折点买卖和底部部分可以融合到一起显示」。
-
-    融合 = 那三格长在逐日表的行里, 而不是另起一张表。两张表本来就是同一条
-    时间轴 —— 逐日表标「转折」的行, 正是每一段的起点。
+def test_R292_那些不要的东西真的删干净了():
+    """用户: 「剩下的东西都不需要了」。**删是删掉, 不是藏起来** ——
+    留着没人调的组件, 下一个人会以为界面上还有那一块(本仓库 R198 的规矩)。
     """
-    body = _fn_body(_dialog(), "function TrendView")
-    assert "<FlipTradeCells leg={legs.get(r.date)} />" in body, "每一段没并进逐日表的行里"
-    assert "legsByFlipDate(d.flip_trades)" in body, "没有按转折日建索引"
-    # 反面: 趋势状态页不许再单独挂那张「每一段」折叠表 —— 那就成了两处印同一份
-    assert "<FlipTradesPanel" not in body, "趋势状态页还留着独立的「每一段」表"
+    dlg = _dialog()
+    # `EvidencePanel` **不在这张单子上**: 它本来就是默认收起的一条(约 20px),
+    # 不是用户嫌的那种压着正文的常驻块 —— 第一版顺手把它也删了, 那是过头。
+    # 它由 `test_R269_依据排在正文之前` 正着守着。
+    for gone in ("function NowCard", "function SideEdgeChip", "function OutcomeChips",
+                 "function TrendStatsPanel", "ReviewOverviewSheet"):
+        assert gone not in dlg, f"{gone} 还留在源码里 —— 没人调的死代码"
+    from pathlib import Path as _P
+    root = _P(__file__).resolve().parents[2] / "frontend" / "src"
+    assert not (root / "components" / "stock-analysis" / "ReviewOverviewSheet.tsx").exists(), (
+        "全景面板那个文件还在 —— 已经没人 import 它了"
+    )
+    # 跟着退役的两个 localStorage 键也不许留 —— 留着等于说界面上还有那两个开关
+    # 钉 `kv(...)` 里那个**真正的键名**, 不钉变量名 —— 删掉的那两行上面留了一段
+    # 说明为什么删, 里面按名字提到了它们(该写)。这条第一版没剥注释就直接扫,
+    # 又被自己的注释绊了一次(本仓库这个坑的第 N 次)。
+    storage = (root / "lib" / "storage.ts").read_text(encoding="utf-8")
+    # 只有「趋势状态」那块折叠区退役了。「通道结论」那条「依据」还在(见上面
+    # 那条注释), 它的键当然也得留着 —— 第一版把两个一起列进来, 是同一个过头。
+    for key in ("'review-trend-stats-open'",):
+        assert f"kv<boolean>({key})" not in storage, (
+            f"{key} 还留在 storage 里, 但已经没人读了"
+        )
 
 
-def test_R289_融合时挤掉了重复的列():
-    """并表不是把两张表贴在一起。原来「每一段」有 7 列, 其中两列在逐日表里
-    已经有了: 「转折日」就是行自己的日期,「变成什么」就是同一行的六态状态。
-    并过来只留三格。"""
+def test_R292_说明抽屉不是盖满而是从右边推进来():
+    """用户: 「全景按钮做得不够好, 我点进去全屏了」。
+
+    **说得对, 而且那还是个 bug**: R289 那版的面板是 `absolute inset-0`, 而我漏了
+    给它加定位祖先 —— 于是它一路冒到最外层那个 `fixed inset-0` 上, 真的盖满了
+    整个屏幕。这里正反各钉一条: 抽屉本身只占右侧一条, 外面那层 `relative` 得在。
+
+    形态上也该是抽屉: 词汇表是**边看边查**的东西, 盖掉正文等于逼人先记住要查
+    什么再翻回去。
+    """
     from tests.frontend_source import code_of
-    panel = code_of("components/stock-analysis/FlipTradesPanel.tsx")
-    cells = panel[panel.index("export function FlipTradeCells"):]
-    cells = cells[:cells.index("\nexport function ")] if "\nexport function " in cells[1:] else cells
-    assert cells.count("<td") - cells.count("<td /") == 3, (
-        "并进逐日表的不是三格 —— 多半把重复的列也搬过来了"
+    sheet = code_of("components/stock-analysis/ReviewHelpSheet.tsx")
+    assert "inset-y-0 right-0" in sheet and "w-[min(26rem,92%)]" in sheet, (
+        "说明面板还是盖满正文的形状"
+    )
+    assert "inset-0" not in sheet, "还留着盖满的写法"
+    dlg = code_of("components/stock-analysis/StockReviewDialog.tsx")
+    assert "relative flex min-h-0 flex-1 flex-col" in dlg, (
+        "抽屉没有定位祖先 —— 它会冒到最外层, 又变成全屏(R289 就是这么错的)"
     )
 
 
-def test_R289_两个页签都有全景按钮():
-    src = _dialog()
+def test_R292_说明抽屉两个页签共用一处():
+    """它讲的是六态与结论**两边**的词, 每个页签各挂一份就是同一份东西的两个副本。"""
+    dlg = _dialog()
+    assert dlg.count("<ReviewHelpSheet") == 1, "说明抽屉挂了不止一处"
     for fn in ("function TrendView", "function VerdictView"):
-        body = _fn_body(src, fn)
-        assert "<OverviewButton" in body, f"{fn} 没有全景入口"
-        assert "<ReviewOverviewSheet" in body, f"{fn} 没有全景面板"
+        assert "<HelpButton" in _fn_body(dlg, fn), f"{fn} 没有说明入口"
 
 
-def test_R289_全景面板只动透明度和位移():
-    """AGENTS.md 前端硬规则①: 只动 `transform` / `opacity`, 不许 `transition-all`。
-    并且 `motion-reduce` 下要能整个关掉。"""
+def test_R292_说明抽屉只动透明度和位移():
+    """AGENTS.md 前端硬规则①: 只动 `transform` / `opacity`, 不许 `transition-all`。"""
     from tests.frontend_source import code_of
-    code = code_of("components/stock-analysis/ReviewOverviewSheet.tsx")
+    code = code_of("components/stock-analysis/ReviewHelpSheet.tsx")
     assert "transition-all" not in code, "用了 transition-all —— 每帧触发布局重排"
     assert "transition-[opacity,transform]" in code, "没写明要过渡的属性"
     assert "motion-reduce:transition-none" in code, "没照顾 prefers-reduced-motion"
-    assert "ease-out" in code, "进场该用 ease-out —— ease-in 会让界面显得迟钝"
+    assert "ease-out" in code, "进场该用 ease-out"
 
 
-def test_R289_Esc_关的是全景这一层():
-    """模态套模态最容易出的错: 按 Esc 把外层的复盘弹窗一起关了。"""
+def test_R292_Esc_关的是说明这一层():
+    """模态套抽屉最容易出的错: 按 Esc 把外层的复盘弹窗一起关了。"""
     from tests.frontend_source import code_of
-    code = code_of("components/stock-analysis/ReviewOverviewSheet.tsx")
+    code = code_of("components/stock-analysis/ReviewHelpSheet.tsx")
     i = code.index("Escape")
     assert "stopPropagation" in code[i - 60:i + 120], "Esc 会穿透到外层的复盘弹窗"
 

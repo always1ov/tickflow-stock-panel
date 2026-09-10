@@ -41,7 +41,10 @@ def test_R269_头部合并成一块判定条(dlg):
 def test_R269_该盯什么必须常驻(dlg):
     """**这一栏唯一的行动指引。** 别的都能收起, 它不行 ——
     收起来这一栏就只剩「现在处在下跌中」这种定性词, 没有一条能照着做的。"""
-    head = dlg[dlg.index("function VerdictHeader"):dlg.index("function EvidencePanel")]
+    # [R292] 切片锚点跟着挪 —— `EvidencePanel` 现在排在 `VerdictHeader` 之前,
+    # 原来那个 `index(A):index(B)` 切出来是空串, 断言变成永真。**守的东西没变。**
+    head = dlg[dlg.index("function VerdictHeader"):]
+    head = head[:head.index("\nfunction ", 1)]
     assert "该盯什么" in head and "{ph.watch}" in head
 
 
@@ -54,7 +57,9 @@ def test_R269_位置结论压成一枚芯片(dlg):
     而文件自己的注释都写着「这一层在别处一律叫通道结论」。守的规矩一个字没变:
     它得压成一枚芯片, 不许再占一整块。
     """
-    head = dlg[dlg.index("function VerdictHeader"):dlg.index("function EvidencePanel")]
+    # [R292] 同上一条: 切片锚点跟着组件顺序挪, 守的东西没变
+    head = dlg[dlg.index("function VerdictHeader"):]
+    head = head[:head.index("\nfunction ", 1)]
     assert "通道结论" in head
     assert "{edge.label}" in head
     assert "edge.level !== 'thin'" in head, "样本不够时不该还摆着两边的胜率"
@@ -75,11 +80,17 @@ def test_R269_依据展开状态记在本地(dlg):
     assert "reviewEvidenceOpen" in code_of("lib/storage.ts")
 
 
-def test_R269_依据排在正文之前但在分档芯片之后(dlg):
-    """顺序即优先级: 一眼定调 → 复盘正题(各档好不好使) → 依据 → 历史段落。
-    依据摆在芯片前面, 就又变回"读数横在中间"了。"""
+def test_R269_依据排在正文之前(dlg):
+    """顺序即优先级: 一眼定调 → 按结论买卖 → 状态轴 → 依据 → 历史段落。
+
+    [R292] 「分档芯片」(各档结论之后 5 日表现)整块撤了 —— 用户: 「剩下的东西
+    都不需要了」。所以这条不再拿它当中间锚点, 改成钉**依据仍排在正文之前**:
+    读数不许横在结论和历史段落中间, 这条原意一个字没变。
+    """
     view = dlg[dlg.index("function VerdictView"):]
-    assert view.index("<VerdictHeader") < view.index("<OutcomeChips") < view.index("<EvidencePanel")
+    view = view[:view.index("\nfunction ", 1)]
+    assert "<OutcomeChips" not in view, "分档芯片又回到「通道结论」页了"
+    assert view.index("<VerdictHeader") < view.index("<EvidencePanel") < view.index("{segments.map")
 
 
 def test_R269_正文区拿到剩余全部高度(dlg):
@@ -163,22 +174,30 @@ def test_R270_共用件收起时不渲染(disclosure):
     assert "hidden" not in disclosure
 
 
-def test_R270_趋势的涨跌停统计默认收起(dlg):
-    assert "function TrendStatsPanel" in dlg
-    assert "storage.reviewTrendStatsOpen.get(false)" in dlg
+def test_R292_趋势的涨跌停压成头部一行(dlg):
+    """[R270 → R292] R270 把那四张 `text-2xl` 的计数卡收进折叠区; R292 用户点名
+    要它**回到版面上**(「120 天里 涨跌停 找个位置也放到图片里面」), 于是整块
+    折叠区撤掉, 三个数压成头部卡里的一行小字。
+
+    守的东西没变: **这三个数不许再占掉正文的高度**。所以正反各一条。
+    """
+    assert "function TrendStatsPanel" not in dlg, "那块折叠区又回来了"
+    assert "storage.reviewTrendStatsOpen" not in dlg
+    view = dlg[dlg.index("function TrendView"):]
+    view = view[:view.index("\nfunction ", 1)]
+    assert "涨停 {st.limit_ups}" in view, "涨跌停计数丢了 —— 要的是压成一行, 不是删掉"
 
 
-def test_R270_六态灵不灵压成芯片(dlg):
-    """和通道那侧同一个判断: 样本够时是个判断, 不够时连判断都不是 ——
-    两种情况都没理由占一整块。"""
-    assert "function SideEdgeChip" in dlg
-    assert "function SideEdgeCard" not in dlg, "旧的整块卡片没拆掉"
+def test_R292_六态灵不灵整块撤掉了(dlg):
+    """[R270 → R292] R270 把它从一整块压成一枚芯片; R292 用户: 「剩下的东西都
+    不需要了」—— 整块撤掉, 连芯片带说明。
 
-
-def test_R270_六态的完整说明收进依据没丢(dlg):
-    """芯片只放得下结论。说明可以收起, 不能丢 —— 那是"为什么这么判"。"""
-    panel = dlg[dlg.index("function TrendStatsPanel"):dlg.index("function TrendView")]
-    assert "{d.side_edge.text}" in panel
+    **这是一次真的删内容**, 不是收起来, 所以单独写一条钉住: 别哪天又冒出来
+    一个半吊子的版本(留个芯片不留说明, 那才是最糟的 —— 结论摆着而凭什么没了)。
+    后端仍在算 `side_edge`(复盘接口的其它消费方要), 只是界面上不印。
+    """
+    for gone in ("function SideEdgeChip", "function SideEdgeCard", "{d.side_edge.text}"):
+        assert gone not in dlg, f"{gone} 又回来了"
 
 
 def test_R270_逐日表拿到剩余全部高度(dlg):
@@ -187,10 +206,17 @@ def test_R270_逐日表拿到剩余全部高度(dlg):
     assert "min-h-0 flex-1 overflow-auto" in view
 
 
-def test_R270_趋势页签顺序也是结论在前(dlg):
-    """一眼定调 → 复盘正题 → 依据 → 逐日表。"""
-    view = dlg[dlg.index("function TrendView"):dlg.index("function VerdictHeader")]
-    assert view.index("<NowCard") < view.index("<OutcomeChips") < view.index("<TrendStatsPanel")
+def test_R292_趋势页签顺序是战绩在前(dlg):
+    """[R270 → R292] 顺序的**原则**没变(重的在前), 变的是什么最重。
+
+    用户: 「在趋势状态里面, 功能按转折买卖部分才是重点, 在个股页面外面显示
+    当前趋势状态和是否是转折是重点」—— 分工说清楚了: 外面那张表回答"今天
+    怎么样", 点进来回答"这套转折在这只票上赚不赚钱"。所以战绩在前、现在在后、
+    这半年在第三行, 逐日表拿走剩下全部高度。
+    """
+    view = dlg[dlg.index("function TrendView"):]
+    view = view[:view.index("\nfunction ", 1)]
+    assert view.index("<FlipTradesBar") < view.index("现在") < view.index("<StateTimeline") < view.index("<table")
 
 
 def test_R270_组合速查其余格子默认收起(combo):
@@ -214,10 +240,13 @@ def test_R270_算不出组合时也不留白(combo):
 
 def test_R270_三个页签的展开状态各记各的(dlg, combo):
     """常看读数的人和常查 27 格的人不是同一种用法, 混成一个开关谁都不合适。"""
+    # [R292] 「趋势状态」那块折叠区撤了, 它那个键跟着退役 —— 剩两处折叠。
+    # **不留没人读的键**: 留着的话下一个人会以为界面上还有那个开关。
     keys = code_of("lib/storage.ts")
-    for k in ("reviewEvidenceOpen", "reviewTrendStatsOpen", "reviewComboRestOpen"):
+    for k in ("reviewEvidenceOpen", "reviewComboRestOpen"):
         assert k in keys, f"{k} 没注册"
-    assert "reviewTrendStatsOpen" in dlg and "reviewEvidenceOpen" in dlg
+    assert "reviewTrendStatsOpen" not in keys, "退役的键还留着"
+    assert "reviewEvidenceOpen" in dlg
     assert "reviewComboRestOpen" in combo
 
 

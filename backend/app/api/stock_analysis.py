@@ -456,6 +456,21 @@ def get_combo_table() -> dict:
     return {"rows": kg.combo_table()}
 
 
+@router.get("/glossary")
+def get_glossary() -> dict:
+    """[R292] 「说明」—— 六态状态与通道结论各是什么意思。
+
+    用户: 「把全景按钮改成说明或者帮助按钮, 里面是解释每个六态状态、结论状态
+    是什么意思」。
+
+    与 `/combo-table` 同一条路: **无参数、无取数、结果恒定**, 而且**名字与结论
+    文案的正主在后端** —— 前端誊抄一份的话, 底层改了措辞那份就开始说假话, 且
+    没有任何东西会报错。口径与不泄露算法的取舍见 `services/glossary.py`。
+    """
+    from app.services import glossary
+    return glossary.terms()
+
+
 @router.get("/review")
 def get_review(request: Request, symbol: str = Query(...),
                days: int = Query(120, ge=10, le=250)):
