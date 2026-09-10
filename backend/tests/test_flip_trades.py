@@ -889,13 +889,21 @@ def test_R292_说明抽屉两个页签共用一处():
     assert dlg.count("<ReviewHelpSheet") == 1, (
         f"说明抽屉挂了 {dlg.count('<ReviewHelpSheet')} 处 —— 两个页签该共用一处"
     )
+    # [R300] **入口也收成了一处** —— 用户: 「"说明"这个按钮合并到这里
+    # "趋势状态 通道结论 说明"」。原来两个 View 各写一个 `<HelpButton>`,
+    # 那是同一件东西的两个副本(这条测的正是这个); 现在它在页签组里, 一处。
+    assert dlg.count("setHelp((v) => !v)") == 1, "说明入口不是一处"
     for fn in ("function TrendView", "function VerdictView"):
-        assert "<HelpButton" in _fn_body(dlg, fn), f"{fn} 没有说明入口"
-    # 抽屉挂在两个页签**外面**才谈得上共用 —— 挂进任一个 View 里, 切页签就没了
-    for fn in ("function TrendView", "function VerdictView"):
-        assert "<ReviewHelpSheet" not in _fn_body(dlg, fn), (
-            f"抽屉挂进了 {fn} 里 —— 切到另一个页签就没了"
+        body = _fn_body(dlg, fn)
+        assert "<ReviewHelpSheet" not in body, f"抽屉挂进了 {fn} 里 —— 切页签就没了"
+        assert "setHelp" not in body and "onHelp" not in body, (
+            f"{fn} 里还留着说明入口 —— 它该只在页签那一行"
         )
+    # 入口必须落在**抽屉盖不住的那一行**: 抽屉盖的是正文, 入口跟着正文走的话
+    # 打开之后既关不掉、也切不了页签。钉住它与页签是同一组。
+    head = dlg[dlg.index("([['trend', '趋势状态']"):]
+    head = head[:head.index("</div>")]
+    assert "setHelp((v) => !v)" in head, "说明入口没和页签在同一组里"
 
 
 def test_R292_说明抽屉只动透明度和位移():
@@ -1031,7 +1039,10 @@ def test_R293_两个页签的头部是同一个形状():
     # 剩两个 —— 规矩没变, 覆盖面跟着少一个。
     bodies = {fn: _fn_body(dlg, fn) for fn in ("function TrendView", "function VerdictView")}
     for fn, head in bodies.items():
-        head = head[:head.index("<HelpButton")]
+        # [R300] 头部到哪儿为止: 原来切到 `<HelpButton>`(它就在头部卡后面),
+        # 那个按钮搬进页签组之后改切到**逐日表**——两页的头部都在表之前, 而且
+        # 这个界标比按钮稳(表是这一页的正文, 不会再搬家)。
+        head = head[:head.index("<table")]
         assert "HEAD_CARD" in head, f"{fn} 的头部不是那张共用的带边框卡"
         assert head.count("<HeadRow") == 3, f"{fn} 的头部该是三行"
         assert "<StateTimeline" in head, f"{fn} 的头部没有状态轴"

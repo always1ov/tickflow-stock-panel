@@ -41,7 +41,7 @@
  */
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { CalendarRange, Loader2, X } from 'lucide-react'
+import { CalendarRange, HelpCircle, Loader2, X } from 'lucide-react'
 import { api, type KeltnerVerdict, type ReviewRow, type StockReview } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { cn } from '@/lib/cn'
@@ -50,7 +50,7 @@ import { trendBadgeCls } from '@/components/stock-analysis/TrendStateBar'
 import { VerdictHover } from '@/components/stock-analysis/VerdictHover'
 import { comboHistory } from '@/components/stock-analysis/decision-board/ComboView'
 import { FlipTradesBar, FlipTradeCells, legsByFlipDate } from '@/components/stock-analysis/FlipTradesPanel'
-import { ReviewHelpSheet, HelpButton } from '@/components/stock-analysis/ReviewHelpSheet'
+import { ReviewHelpSheet } from '@/components/stock-analysis/ReviewHelpSheet'
 import { HeadRow, HEAD_CARD } from '@/components/stock-analysis/ReviewHeadRow'
 import { StateTimeline } from '@/components/stock-analysis/StateTimeline'
 import { ReviewDisclosure } from '@/components/stock-analysis/ReviewDisclosure'
@@ -206,6 +206,28 @@ export function StockReviewDialog({ symbol, name, tab: initialTab, onClose }: {
                   {label}
                 </button>
               ))}
+              {/* [R292 → R300] 「说明」从正文右下角**搬进页签组**。用户画了一下
+                  想要的样子: 「趋势状态 通道结论 说明」。
+
+                  搬对了三件事:
+                  ① **它本来就是两个页签共用的一件东西**(R292 立过"共用一处"),
+                     挂在正文里却要在两个 View 各写一遍入口 —— 现在只剩一处;
+                  ② 它原来紧挨着「只看转折的日子」, 而那是个**筛选正文**的开关,
+                     两个作用完全不同的按钮长得一样、还挨着;
+                  ③ 抽屉盖住的是正文, 页签这一行照旧能点 —— 入口跟着留在
+                     盖不住的那一行, 才关得掉、也才切得了页签。
+
+                  **它不是页签**(点了不换页, 是推出一层抽屉), 所以给一条发丝分隔线
+                  和一个问号图标; 但**开着的时候和选中的页签一样亮** —— 那时它确实
+                  是当前占着屏幕的那一层, 亮着是实话。 */}
+              <button
+                onClick={() => setHelp((v) => !v)}
+                title="六态状态与通道结论各是什么意思"
+                className={`flex items-center gap-1 border-l border-border/60 px-2.5 py-1 text-[10px] transition-colors cursor-pointer ${
+                  help ? 'bg-sky-400/15 text-sky-300' : 'text-muted hover:text-foreground'}`}
+              >
+                <HelpCircle className="h-3 w-3" />说明
+              </button>
             </div>
             <div className="flex overflow-hidden rounded-btn border border-border/60">
               {RANGES.map((n) => (
@@ -242,11 +264,10 @@ export function StockReviewDialog({ symbol, name, tab: initialTab, onClose }: {
 
             {d && !d.error && tab === 'trend' && (
               <TrendView d={d} rows={trendRows} onlyMarked={onlyMarked}
-                         onToggleMarked={() => setOnlyMarked((v) => !v)}
-                         onHelp={() => setHelp(true)} />
+                         onToggleMarked={() => setOnlyMarked((v) => !v)} />
             )}
             {d && !d.error && tab === 'verdict' && (
-              <VerdictView d={d} segments={segments} onHelp={() => setHelp(true)} />
+              <VerdictView d={d} segments={segments} />
             )}
             {/* 抽屉挂在页签内容之后、`relative` 容器之内 —— 它盖住的是**正文**,
                 页签与日期档照样能点(翻着说明换页签是常事)。 */}
@@ -260,12 +281,11 @@ export function StockReviewDialog({ symbol, name, tab: initialTab, onClose }: {
 
 // ===== 趋势视图: 这个状态是怎么走到今天的 =====
 
-function TrendView({ d, rows, onlyMarked, onToggleMarked, onHelp }: {
+function TrendView({ d, rows, onlyMarked, onToggleMarked }: {
   d: StockReview
   rows: ReviewRow[]
   onlyMarked: boolean
   onToggleMarked: () => void
-  onHelp: () => void
 }) {
   const legs = legsByFlipDate(d.flip_trades)
   const bull = d.now?.side === '多头'
@@ -345,7 +365,6 @@ function TrendView({ d, rows, onlyMarked, onToggleMarked, onHelp }: {
         >
           只看有事的日子
         </button>
-        <HelpButton onClick={onHelp} />
       </div>
 
       {/* ── 正文: 逐日表, 转折那几行内联带上这一笔做了什么 ── */}
@@ -501,8 +520,8 @@ function EvidencePanel({ ch, edge }: {
 }
 
 
-function VerdictView({ d, segments, onHelp }: {
-  d: StockReview; segments: Segment[]; onHelp: () => void
+function VerdictView({ d, segments }: {
+  d: StockReview; segments: Segment[]
 }) {
   // [R295] 与「趋势状态」那张表同一个开关。用户: 「通道结论那部分也想要这样的记录」
   const [onlyMarked, setOnlyMarked] = useState(false)
@@ -644,7 +663,6 @@ function VerdictView({ d, segments, onHelp }: {
         >
           只看换档的日子
         </button>
-        <HelpButton onClick={onHelp} />
       </div>
 
       {/* [R295] 正文换成**与「趋势状态」同一形状的逐日记录表**。

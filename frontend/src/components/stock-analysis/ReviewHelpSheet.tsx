@@ -26,30 +26,17 @@
  */
 import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { HelpCircle, Loader2, X } from 'lucide-react'
+import { Loader2, X } from 'lucide-react'
 import { api } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { cn } from '@/lib/cn'
 import { trendBadgeCls } from '@/components/stock-analysis/TrendStateBar'
 import { ComboGroups } from '@/components/stock-analysis/decision-board/ComboView'
 
-/** 打开说明的那个按钮。与页签、日期档同一套外观 —— 它是同一层级的控件 */
-export function HelpButton({ onClick }: { onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      title="六态状态与通道结论各是什么意思"
-      className="inline-flex items-center gap-1 rounded-btn border border-border/60 px-2 py-1 text-[10px] text-muted transition-colors hover:text-foreground"
-    >
-      <HelpCircle className="h-3 w-3" />
-      说明
-    </button>
-  )
-}
-
-// 结论那十档的语气配色。与决策台、复盘逐日表同一套 —— 同一个结论在三处
-// 必须是同一个颜色, 否则读的人得先确认它们是不是一回事。
+// [R292 加, R300 删] `HelpButton` 在这里删掉了 —— 用户: 「"说明"这个按钮合并到
+// 这里"趋势状态 通道结论 说明"」。入口搬进了页签组, 那一处直接写在
+// `StockReviewDialog` 里(它要跟着页签共用同一套选中态与边框, 抽出来反而是
+// 两处定义同一个外观)。**只剩一个入口了**, 组件本身没有第二个调用方。
 const TONE_CLS: Record<string, string> = {
   sell: 'border-red-400/40 bg-red-400/10 text-red-400',
   buy: 'border-sky-400/40 bg-sky-400/10 text-sky-300',
