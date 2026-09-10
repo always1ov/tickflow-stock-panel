@@ -691,10 +691,10 @@ function VerdictHeader({ ch, edge, forwardDays }: {
               EDGE_CLS2[edge.level] ?? EDGE_CLS2.flat)}
             title={edge.text}
           >
-            <span className="text-muted">位置结论</span>
+            <span className="text-muted">通道结论</span>
             <b>{edge.label}</b>
             {edge.level !== 'thin' && edge.spread != null && (
-              <span className="font-mono opacity-80" title="偏买档平均 − 偏卖档平均。两边差得越多, 说明这套位置结论越有用">
+              <span className="font-mono opacity-80" title="偏买档平均 − 偏卖档平均。两边差得越多, 说明这套通道结论越有用">
                 差 {(edge.spread * 100).toFixed(1)} 点
               </span>
             )}
@@ -765,7 +765,7 @@ function EvidencePanel({ ch, edge }: {
           )}
           {!!edge && (
             <p className="text-[10px] leading-relaxed text-secondary">
-              <span className="text-muted">位置结论:</span> {edge.text}
+              <span className="text-muted">通道结论:</span> {edge.text}
             </p>
           )}
           {rows > 0 && (

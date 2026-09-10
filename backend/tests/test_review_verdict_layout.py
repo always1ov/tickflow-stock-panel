@@ -47,9 +47,15 @@ def test_R269_该盯什么必须常驻(dlg):
 
 def test_R269_位置结论压成一枚芯片(dlg):
     """样本够时它是个判断(偏买/偏卖差多少), 样本不够时它连判断都不是 ——
-    两种情况都没有理由占一整块。"""
+    两种情况都没有理由占一整块。
+
+    [R279] 这一栏的名字**从「位置结论」改成了「通道结论」** —— 同一个东西
+    在这个弹窗里原来有三个名字(页签叫通道结论、逐日表列头叫结论、这里叫位置结论),
+    而文件自己的注释都写着「这一层在别处一律叫通道结论」。守的规矩一个字没变:
+    它得压成一枚芯片, 不许再占一整块。
+    """
     head = dlg[dlg.index("function VerdictHeader"):dlg.index("function EvidencePanel")]
-    assert "位置结论" in head
+    assert "通道结论" in head
     assert "{edge.label}" in head
     assert "edge.level !== 'thin'" in head, "样本不够时不该还摆着两边的胜率"
 

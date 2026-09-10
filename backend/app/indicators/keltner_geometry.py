@@ -1339,7 +1339,7 @@ def phase(geo: dict | None, runs: dict | None = None) -> dict | None:
             return mk(PH_OVEREXTENDED,
                       f"短线已经高出长线 {sp:.1f} 倍日常波动 —— 涨得太远, "
                       f"短线看和长线看已经没有一个共同认可的合理价",
-                      "这个位置再争论「贵不贵」没有意义 —— 按短线看是贵, 按长线看还没到。"
+                      "这个位置再争论「通道结论」没有意义 —— 按短线看是贵, 按长线看还没到。"
                       "先想清楚你做的是哪一段; 现在追进去性价比很低",
                       cn=PHASE_OVEREXTENDED_CN["up"])
         return mk(PH_OVEREXTENDED,

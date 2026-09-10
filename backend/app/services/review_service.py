@@ -443,7 +443,7 @@ def _verdict_edge(outcomes: list[dict]) -> dict:
     tail = f"(说便宜的 {buy['episodes']} 段平均 {b:+.1%}, 说贵的 {sell['episodes']} 段平均 {r:+.1%})"
     if b >= SIDE_EDGE and r <= -SIDE_EDGE:
         out.update(level="both", label="买卖都能用",
-                   text="说便宜的之后真涨、说贵的之后真跌 —— 这只票的位置结论可以照着做。" + tail)
+                   text="说便宜的之后真涨、说贵的之后真跌 —— 这只票的通道结论可以照着做。" + tail)
     elif b >= SIDE_EDGE:
         out.update(level="offense", label="只能用来买",
                    text="说便宜的之后确实涨, 但说贵的之后也没怎么跌 —— 拿它找买点, "
@@ -455,7 +455,7 @@ def _verdict_edge(outcomes: list[dict]) -> dict:
     elif b < r:
         out.update(level="inverted", label="说买的反而更差",
                    text="说便宜的那几档之后反而比说贵的更差 —— 样本这么小时多半是巧合, "
-                        "但至少说明位置结论在这只票上没有正向信息。" + tail)
+                        "但至少说明通道结论在这只票上没有正向信息。" + tail)
     else:
         out.update(level="flat", label="看不出差别",
                    text="说便宜的和说贵的之后走势差不多 —— 在这只票上, 这个价位判断说明不了什么。" + tail)
