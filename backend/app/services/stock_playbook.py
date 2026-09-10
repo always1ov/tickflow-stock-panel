@@ -66,9 +66,21 @@ _AI_BULL = ("buy",)
 _AI_BEAR = ("sell",)
 
 
-def _mk(level: str, headline: str, why: str, *, price: float | None = None) -> dict:
+def _mk(level: str, headline: str, why: str, *, price: float | None = None,
+        note: str = "") -> dict:
+    """[R299] `why` 与 `note` 分开: **`why` 讲这只票, `note` 讲这套系统的道理。**
+
+    用户: 「内容要言简意赅精辟」「没帮助的东西就不要显示了」。
+
+    原来两者串成一个字符串, 于是「出场纪律优先于形态与模型」「各说各的时候,
+    等它们对齐比猜谁对划算」这类话跟着每一行印出去 —— **它们不随票变**,
+    一屏扫下来是同一句道理重复几十遍, 挤掉的正是那行真正的读数。
+
+    拆开之后 `note` 只进悬停(要核对时才看), 界面正文只留 `why`。
+    """
     return {"level": level, "label": LABELS[level], "order": ORDER[level],
-            "tone": TONE[level], "headline": headline, "why": why, "price": price}
+            "tone": TONE[level], "headline": headline, "why": why,
+            "note": note, "price": price}
 
 
 def _conflicts(*, held: bool, trend: dict | None, verdict: dict | None,
@@ -156,8 +168,8 @@ def playbook(*, position: dict | None, trend: dict | None, exit_line: dict | Non
         fatal = ex.get("stage") == "fatal"
         return {**_mk(EXIT,
                       "生命线破位,清仓" if fatal else f"{ex.get('stage_cn') or '出场线'}已破",
-                      (ex.get("action") or "按纪律处理")
-                      + " —— 这一条不看别的判定, 出场纪律优先于形态与模型",
+                      ex.get("action") or "按纪律处理",
+                      note="这一条不看别的判定 —— 出场纪律优先于形态与模型",
                       price=line),
                 "conflicts": conflicts}
 
@@ -175,8 +187,8 @@ def playbook(*, position: dict | None, trend: dict | None, exit_line: dict | Non
     # 下手的时候。先说分歧, 再说距离。
     if conflicts:
         return {**_mk(CONFLICT, f"几个判定不一致({len(conflicts)} 处)",
-                      conflicts[0] + (f";另有 {len(conflicts) - 1} 处" if len(conflicts) > 1 else "")
-                      + " —— 各说各的时候, 等它们对齐比猜谁对划算"),
+                      conflicts[0] + (f";另有 {len(conflicts) - 1} 处" if len(conflicts) > 1 else ""),
+                      note="各说各的时候, 等它们对齐比猜谁对划算"),
                 "conflicts": conflicts}
 
     # ④ 逼近某个价
@@ -203,7 +215,10 @@ def playbook(*, position: dict | None, trend: dict | None, exit_line: dict | Non
                       f"{(phase or {}).get('why') or ''} —— {(phase or {}).get('watch') or ''}"),
                 "conflicts": conflicts}
 
-    return {**_mk(IDLE, "没事", "五套判定都没有可说的 —— 今天不必看它"),
+    # [R299] 这一档的 `why` **本来就没有内容可说** —— 它只是把「没事」换个说法
+    # 再讲一遍。挪进 `note`(悬停)之后, 界面上这一档就只剩「没事」两个字,
+    # 而这正是它该占的分量: 一张 166 行的表里, 没事的那些行不该和要动的一样响。
+    return {**_mk(IDLE, "没事", "", note="五套判定都没有可说的 —— 今天不必看它"),
             "conflicts": conflicts}
 
 

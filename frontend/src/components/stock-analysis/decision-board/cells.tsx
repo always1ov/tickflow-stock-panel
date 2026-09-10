@@ -363,9 +363,13 @@ const PACE_TIP = '这个速度还撑不撑得住(还在加速 / 速度平稳 / �
 function Qualifier({ text, title, cls = 'text-muted' }: {
   text?: string | null; title: string; cls?: string
 }) {
-  if (!text) return null
+  // [R299] 缝隙由它自己带(`ml-1.5`), 不由网格的 `gap-x` 给 —— 没有刻度的时候
+  // 那道缝会把整格挤偏, 而这一列本来就该是"有就贴上、没有就当它不存在"。
+  // 空的时候仍要占住格子(返回 `null` 会让下一行的徽标补进来, 整个错位)。
+  if (!text) return <span aria-hidden />
   return (
-    <span className={`whitespace-nowrap text-[11px] ${cls}`} title={title}>{text}</span>
+    <span className={`ml-1.5 justify-self-start whitespace-nowrap text-[11px] ${cls}`}
+          title={title}>{text}</span>
   )
 }
 
@@ -562,7 +566,7 @@ function PlaybookInner({ p }: { p?: Playbook | null }) {
   if (!p) return <span className="text-[12px] text-muted/30">—</span>
   return (
       <span className={`inline-flex whitespace-nowrap rounded border px-1.5 py-0.5 text-[12px] ${PLAY_CLS[p.tone] ?? PLAY_CLS.muted}`}
-            title={p.why}>
+            title={[p.why, p.note].filter(Boolean).join('\n\n')}>
         {p.headline}
         {p.price != null && <span className="ml-1 font-mono tabular-nums opacity-80">{p.price.toFixed(2)}</span>}
       </span>
@@ -598,6 +602,12 @@ export function ConclusionCell({ v, ev, geo, runs, energy, ph, p, stateRun, onOp
   //   行 3: 事件 · 理由 · 另有 N 处分歧(整段折行)
   const evOn = ev && ev.code !== 'none'
   const more = p && p.conflicts.length && p.level !== 'conflict'
+  // [R299] 第三行**只在真有话说的时候才出现**。用户: 「没帮助的东西就不要显示了」。
+  //
+  // 「没事」那一档的 `why` 已经在后端挪进 `note` 了(它只是把「没事」换个说法再
+  // 讲一遍), 于是这一行自然消失 —— 一张 166 行的表里, 没事的那些行不该和要动的
+  // 一样占三行。这里**不判断档位**, 只判断"有没有内容": 判据留在后端一处,
+  // 前端再写一个 `level === 'idle'` 就是同一个规则两处定义(R286 立过)。
   const line2 = [
     evOn ? `${ev!.cn}${ev!.confirmed ? '' : '?'}` : '',
     p?.why || '',
@@ -606,6 +616,7 @@ export function ConclusionCell({ v, ev, geo, runs, energy, ph, p, stateRun, onOp
   const tip = [
     evOn ? `${ev!.cn}${ev!.confirmed ? '' : '(未确认)'} —— ${ev!.why}` : '',
     p?.why || '',
+    p?.note || '',
     more ? '另有判定不一致:\n' + p!.conflicts.join('\n') : '',
   ].filter(Boolean).join('\n\n')
   return (
@@ -635,26 +646,41 @@ export function ConclusionCell({ v, ev, geo, runs, energy, ph, p, stateRun, onOp
       {/* [R283] `max-w-[15rem]`(240px) → `19rem`(304px)。**这个上限才是「结论」
           一直被挤的真原因** —— 这一列 18% 宽在常见视口上有 300px 出头, 而内容被
           硬卡在 240px, 光加列宽一点用都没有。两者得一起动。 */}
-      <div className="mx-auto flex max-w-[23rem] flex-col items-center gap-0.5 leading-snug">
+      {/* [R299] 两行**共用一条中轴**。用户看着截图: 「排版不好看」。
+          
+          R298 居中之后每一行各自居中, 而两行宽度不一样 ——「候选池 已1天+」比
+          「没事」宽出一大截, 于是徽标和刻度四个边缘全是散的, 看着像随手堆的。
+          
+          改成两列网格: **判定靠右、刻度靠左**, 整个网格居中。于是
+          
+              候选池 已1天+│走了很长
+                    没事  │速度平稳
+          
+          中间那条缝成了一条真的竖线, 两行锁在一起 —— 居中的同时有了对齐。
+          列宽用 `max-content`, 所以缝的位置由内容自己定, 不用写死任何数字。
+          
+          `gap-x` 故意不写, 改成刻度自己带 `ml-1.5` —— 没有刻度那一列时
+          (`ph` 为空), 写 `gap-x` 会留下一道空隙把整格挤偏。 */}
+      <div className="mx-auto grid max-w-[23rem] justify-center gap-y-0.5 leading-snug
+                      grid-cols-[max-content_max-content]">
         {/* [R297] 行1 = 哪一档 + **走到什么程度**。
             「已N天」与「走到中段」是**同一个问题的两把尺**(走了多久 / 走了多远),
-            所以它们贴着同一枚徽标, 而不是各占一行 —— 这也正是原来那两列
-            分开时读不顺的地方: 结论在左边、刻度在右边隔着一整列。 */}
-        <span className="flex flex-wrap items-baseline justify-center gap-x-1.5">
+            所以它们贴着同一枚徽标, 而不是各占一行。 */}
+        <span className="justify-self-end">
           <VerdictInner v={v} ev={ev} geo={geo} runs={runs} energy={energy} ph={ph}
                         stateRun={stateRun} onOpen={onOpen} />
-          <Qualifier text={ph?.maturity_cn} title={MATURITY_TIP} />
         </span>
+        <Qualifier text={ph?.maturity_cn} title={MATURITY_TIP} />
         {/* [R297] 行2 = 今天该干嘛 + **这个判断还稳不稳**。
             快慢是**前瞻的那一半**: 「该止盈了 · 正在放慢」与「该止盈了 · 还在加速」
             是两句不同的话, 而动作那一枚徽标自己说不出这个差别。 */}
-        <span className="flex flex-wrap items-baseline justify-center gap-x-1.5">
+        <span className="justify-self-end">
           <PlaybookInner p={p} />
-          <Qualifier text={ph?.pace_cn} title={PACE_TIP}
-                     cls={PACE_CLS[geo?.accel?.level ?? ''] ?? 'text-muted'} />
         </span>
+        <Qualifier text={ph?.pace_cn} title={PACE_TIP}
+                   cls={PACE_CLS[geo?.accel?.level ?? ''] ?? 'text-muted'} />
         {line2 && (
-          <span className={`w-full whitespace-normal break-words text-[11px] leading-snug ${
+          <span className={`col-span-2 whitespace-normal break-words text-center text-[11px] leading-snug ${
             evOn ? EVENT_CLS[ev!.code] ?? 'text-muted' : 'text-muted'}`}
                 title={tip}>
             {line2}

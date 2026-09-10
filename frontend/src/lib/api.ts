@@ -987,7 +987,11 @@ export interface Playbook {
   order: number
   tone: 'danger' | 'warn' | 'info' | 'muted'
   headline: string
+  /** 这只票为什么落到这一档 —— **只讲这只票**, 印在正文 */
   why: string
+  /** [R299] 这套系统在这一档的道理(如"出场纪律优先于形态与模型")——
+   *  **不随票变**, 所以只进悬停: 印在正文就是同一句话一屏重复几十遍。 */
+  note?: string
   price: number | null
   /** 互相矛盾的判定对。**任何档位都会带**, 不只是 conflict 档 */
   conflicts: string[]

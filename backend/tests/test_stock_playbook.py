@@ -36,7 +36,11 @@ def test_出场线已破压过一切():
              trend=_UT, signal={"signal": "buy"})
     assert r["level"] == pb.EXIT
     assert r["price"] == 12.3
-    assert "出场纪律优先" in r["why"]
+    # [R299] 那句道理从 `why` 挪到了 `note` —— **`why` 讲这只票, `note` 讲这套
+    # 系统的道理**。它不随票变, 印在正文就是一屏重复几十遍(用户: 「没帮助的
+    # 东西就不要显示了」)。守的规矩一个字没变: 那句话不许丢, 只是换了个字段。
+    assert "出场纪律优先" in r["note"], "那条纪律的道理没了 —— 那是删信息, 不是精简"
+    assert "出场纪律优先" not in r["why"], "又串回正文那一行了"
 
 
 def test_生命线破位单独说():
@@ -52,7 +56,9 @@ def test_打架时不显示还差多少到买点():
     r = _run(trend=_UT, signal={"signal": "sell"}, urgency=_NEAR_BUY)
     assert r["level"] == pb.CONFLICT, "分歧被「逼近」盖住了"
     assert "1.2%" not in r["why"], "分歧档里不该再报距离 —— 那是在催人下手"
-    assert "等它们对齐" in r["why"]
+    # [R299] 同上: 道理进 `note`, 正文只留"哪两个判定在打架"
+    assert "等它们对齐" in r["note"], "打架该怎么办的那句话没了"
+    assert "等它们对齐" not in r["why"], "又串回正文那一行了"
 
 
 @pytest.mark.parametrize("trend,sig,keyword", [
@@ -182,3 +188,37 @@ def test_文案里不许有markdown粗体():
             _run(urgency=_NEAR_BUY), _run(exit_line={"triggered": True, "line": 1.0})]
     for r in rows:
         assert "**" not in r["headline"] and "**" not in r["why"]
+
+
+def test_R299_没事那一档在正文里只剩两个字():
+    """用户看着一只什么也没发生的票: 「排版不好看, 内容要言简意赅精辟」
+    「没帮助的东西就不要显示了」。
+
+    截图里那一格是三行, 第三行写着「五套判定都没有可说的 —— 今天不必看它」——
+    **它把「没事」换个说法又讲了一遍**, 一个字的新信息都没有, 却是整格里最宽的
+    一行, 于是一张 166 行的表里"没事"的那些行和"要动"的一样响。
+
+    修法在**后端**而不是前端加一个 `level === 'idle'` 判断: 判据留一处
+    (R286 立过), 前端只问"有没有内容", 没有就不渲染那一行。
+    """
+    r = _run()
+    assert r["level"] == pb.IDLE
+    assert r["headline"] == "没事"
+    assert r["why"] == "", (
+        f"「没事」那一档还在正文里说话: {r['why']!r} —— 它没有内容可说"
+    )
+    # 反面: 不是删掉, 是降级。要核对时还得看得见
+    assert "今天不必看它" in r["note"], "那句话整个没了 —— 那是删信息, 不是精简"
+
+
+def test_R299_有事的那些档正文照旧有话说():
+    """反面配对: 别为了精简把**真正的读数**也一起吞了。
+
+    `why` 空掉只该发生在「没事」那一档; 别的档位那一行是唯一能告诉你
+    "凭什么落到这一档"的地方。
+    """
+    r = _run(position={"held": True},
+             exit_line={"triggered": True, "line": 12.3, "stage": "fatal",
+                        "stage_cn": "生命线", "action": "清仓"})
+    assert r["level"] == pb.EXIT and r["why"], "出场档的正文那一行空了"
+

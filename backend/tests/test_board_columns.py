@@ -481,11 +481,21 @@ def test_R255_结论列与AI信号列同一套排版():
     # R255 那句理由(竖排之后居中会让三行的左边缘参差不齐)在当时是对的; R297
     # 之后前两行各自是「徽标 + 一个短词」宽度接近了, 而第三行绝大多数在一行以内,
     # 参差的前提没了。**这条守的规矩一个字没变**: 竖排, 不许再横排回去。
-    assert "flex-col items-center" in blk, "结论列没有竖排居中"
+    # [R298 → R299] 居中的**做法**换了: 从"每行各自居中"改成"两行共用一条中轴"。
+    # 用户看着截图: 「排版不好看」—— 两行宽度不一样(「候选池 已1天+」比「没事」
+    # 宽出一大截), 各自居中之后四个边缘全是散的。改成两列网格: 判定靠右、
+    # 刻度靠左, 中间那条缝成了一条真的竖线, 两行锁在一起。
+    assert "grid-cols-[max-content_max-content]" in blk, "两行没有共用那条中轴"
+    # **两行都得靠右, 所以数个数而不是"在不在"。** 只钉"在不在"的话, 把第二行
+    # 那个 `justify-self-end` 拿掉照样绿 —— 而那正好就是中轴散掉的样子
+    # (第一版就是这么漏的, 变异当场抓到)。
+    assert blk.count("justify-self-end") == 2, (
+        f"靠右的判定格有 {blk.count('justify-self-end')} 个 —— 该是两行各一, 否则中轴对不上"
+    )
     assert "flex-col items-start" not in blk, "又靠左了 —— 整张表除它以外都居中"
-    # 光有 `text-center` 不够: 带 `max-w` 的块级容器不会自己居中(这一处漏了的话
-    # 整格看着还是靠左, 而 `text-center` 明明写着 —— 最难查的那种"改了没效果")
-    assert "mx-auto flex max-w-[" in blk, "带 max-w 的容器没有 mx-auto, 整格还是靠左"
+    # 光有 `justify-center` 不够: 带 `max-w` 的块级容器不会自己居中(这一处漏了
+    # 的话整格看着还是靠左 —— 最难查的那种「改了没效果」)
+    assert "mx-auto grid max-w-[" in blk, "带 max-w 的容器没有 mx-auto, 整格还是靠左"
     assert "!text-left" not in blk, "还覆写着左对齐"
     # 反面照旧: 两个徽标不许又挤回同一行(那是 R217 那版, R255 拆开的)
     assert "flex flex-wrap items-center justify-center" not in blk, (
@@ -581,7 +591,7 @@ def test_R297_合并后结论列吃掉了进度那一列的宽度():
 
     root = _BOARD.parent
     cells = (root / "decision-board" / "cells.tsx").read_text(encoding="utf-8")
-    cap = re.search(r"flex max-w-\[(\d+(?:\.\d+)?)rem\]", cells)
+    cap = re.search(r"(?:flex|grid) max-w-\[(\d+(?:\.\d+)?)rem\]", cells)
     assert cap, "结论列内容的 max-w 上限没了"
     rem = float(cap.group(1))
     # 常见视口按 1400px 表宽折算 —— R283 就是在这个量级上撞到上限的
@@ -605,15 +615,19 @@ def test_R297_合并没有把结论列摞成五行():
     from tests.frontend_source import code_of
     code = code_of("components/stock-analysis/decision-board/cells.tsx")
     blk = code[code.index("export function ConclusionCell"):]
-    outer = blk[blk.index("flex max-w-["):]
+    outer = blk[blk.index("grid max-w-["):]
     outer = outer[:outer.index("</div>")]
     # 顶层子节点 = 缩进恰好 8 空格的**开**标签(容器本身缩进 6, 嵌套的更深)。
-    # 收尾标签 `</span>` 也落在这个缩进上, 得排掉 —— 不排的话三行会数成五个,
-    # 而"五"恰好就是这条要防的那个数, 会给出一条看着像真的假警报(第一版就是)。
+    # 收尾标签 `</span>` 也落在这个缩进上, 得排掉 —— 不排的话会数多, 而数多
+    # 恰好就是这条要防的那件事, 会给出一条看着像真的假警报(第一版就是)。
     top = [ln.strip() for ln in outer.splitlines()
            if (ln.startswith("        <") and not ln.startswith("        </"))
            or ln.startswith("        {")]
-    assert len(top) == 3, f"结论列的行数变了(该是三行), 现在是 {len(top)}: {top}"
+    # [R299] 版面从"三个纵向子节点"换成两列网格, 于是**格子数**变成 5:
+    # 行1 两格(判定 / 刻度)、行2 两格、行3 一格跨两列。行数还是三行 ——
+    # 换算关系写在这儿, 免得下次看到 5 以为又摞上去了。
+    assert len(top) == 5, f"结论列的格子数变了(该是 2+2+1), 现在是 {len(top)}: {top}"
+    assert "col-span-2" in outer, "第三行没有跨两列 —— 它会被塞进判定那一列里"
 
 
 def test_R277_走势列不再回退到快慢():
