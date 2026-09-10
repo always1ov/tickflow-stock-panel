@@ -104,7 +104,7 @@ export function TickFlowKeySection({ right }: { right?: React.ReactNode }) {
       <p className="text-xs text-secondary leading-relaxed mb-4">
         在{' '}
         <a
-          href="https://tickflow.org/auth/register?ref=V3KDKGXPEA"
+          href="https://tickflow.org/auth/register"
           target="_blank"
           rel="noreferrer"
           className="text-accent hover:underline inline-flex items-baseline gap-0.5"

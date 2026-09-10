@@ -360,22 +360,6 @@ export function SettingsSystemPanel() {
           </span>
         </div>
 
-        <div className="flex items-center justify-between gap-4 py-2">
-          <div className="min-w-0">
-            <div className="text-sm text-foreground">检查更新</div>
-            <div className="text-[11px] text-muted truncate">前往 GitHub Releases 下载最新版本</div>
-          </div>
-          <a
-            href="https://github.com/shy3130/tickflow-stock-panel/releases/latest"
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-btn text-xs
-                       bg-elevated text-secondary hover:text-foreground transition-colors shrink-0"
-          >
-            <RefreshCw className="h-3.5 w-3.5" />
-            检查更新
-          </a>
-        </div>
       </section>
     </>
   )

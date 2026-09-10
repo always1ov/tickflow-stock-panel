@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { RefreshCw, Download, Lock, Loader2, X, Search, FileText, Database, Clock, CheckCircle2, Hourglass, Lightbulb, ExternalLink, ChartPie } from 'lucide-react'
+import { RefreshCw, Download, Lock, Loader2, X, Search, FileText, Database, Clock, CheckCircle2, Hourglass, Lightbulb, ChartPie } from 'lucide-react'
 import { PageHeader } from '@/components/PageHeader'
 import { EmptyState } from '@/components/EmptyState'
 import { useCapabilities, useCapabilityMatrix } from '@/lib/useSharedQueries'
@@ -91,17 +91,8 @@ export function Financials() {
                 关于数据源
               </div>
               <p className="mt-1.5 text-[11px] leading-relaxed text-secondary">
-                当前财务数据源需付费,后续会接入免费数据源。如你常用某个免费财务数据源,欢迎在 Issues 中多多推荐哈 ~
+                当前财务数据源需付费,可在数据源配置里换用其他已接入的来源。
               </p>
-              <a
-                href="https://github.com/shy3130/tickflow-stock-panel/issues"
-                target="_blank"
-                rel="noreferrer"
-                className="mt-2 inline-flex items-center gap-1 text-[11px] font-medium text-accent hover:underline"
-              >
-                前往 Issues 推荐
-                <ExternalLink className="h-3 w-3" />
-              </a>
             </div>
           </div>
         </div>
