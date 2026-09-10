@@ -804,7 +804,7 @@ export interface StockReview {
 /** 短期 MA20±2ATR / 中期 MA60±2.5ATR / 长期 MA120±3ATR */
 /** [R178] 决策台「该动了」判定。纯规则层产出, AI 不参与 —— 它只决定顺序, 不做判断。 */
 export interface Urgency {
-  /** triggered 已触发 > near 逼近 > flip 刚变盘 > band 到轨 > idle 无事 */
+  /** triggered 已触发 > near 逼近 > flip 刚转折 > band 到轨 > idle 无事 */
   level: 'triggered' | 'near' | 'flip' | 'band' | 'idle'
   label: string
   /** 越小越急; 直接拿来排序, 前端不另编一套顺序 */
@@ -1007,6 +1007,8 @@ export interface TrendInfo {
   action: string
   side: '多头' | '空头'
   duration: number
+  /** [R286] 今天就是转折日(昨天还不是这个状态)。与复盘逐日表的「转折」同一个字段 */
+  flipped?: boolean
   since: string
   entered_from: LivermoreState | null
   entered_from_cn: string | null

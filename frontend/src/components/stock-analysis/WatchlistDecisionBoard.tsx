@@ -537,7 +537,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
         }
       })
       .filter((r) => (heldOnly ? r.held : true))
-      // [R178] 「要动的」= 前四档(已触发/逼近/刚变盘/到轨), 无事档不算。
+      // [R178] 「要动的」= 前四档(已触发/逼近/刚转折/到轨), 无事档不算。
       // 判定还没回来时不过滤 —— 宁可多显示, 不能让表在加载中看起来是空的。
       .filter((r) => (actionableOnly ? (r.urg ? r.urg.level !== 'idle' : true) : true))
     // [R276] phases/plays 补进依赖表 —— 它们在上面的 map 里被读, 原来漏了。
@@ -880,7 +880,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
                 就是要划走的行, 让它透出来没有任何好处。 */}
             <thead className="sticky top-0 z-20 bg-surface text-[12px] text-muted">
               <tr className="text-left">
-                <th className="whitespace-nowrap px-3 py-2.5 font-normal text-center"><button onClick={() => cycleSort('name')} className={thBtn} title="标的名称;第二行是「该动了」判定 —— 已触发 > 逼近 > 刚变盘 > 到轨 > 无事,纯规则,AI 不参与">标的{caret('name')}</button></th>
+                <th className="whitespace-nowrap px-3 py-2.5 font-normal text-center"><button onClick={() => cycleSort('name')} className={thBtn} title="标的名称;第二行是「该动了」判定 —— 已触发 > 逼近 > 刚转折 > 到轨 > 无事,纯规则,AI 不参与">标的{caret('name')}</button></th>
                 <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center">
                   <button onClick={() => cycleSort('changePct')}
                           className={`${thBtn} whitespace-nowrap`}

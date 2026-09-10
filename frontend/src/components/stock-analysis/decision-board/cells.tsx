@@ -392,7 +392,9 @@ export function ChannelStateCell({ trend, geo, runs, ph, kc, close, trendCls,
                                   onOpenReview }: {
   /** [R211] 六态趋势 —— 合过来的那一列。作者的判定, 只读不改 */
   trend?: { state: string; state_cn: string; duration: number; since?: string
-            action?: string; intraday?: boolean } | null
+            action?: string; intraday?: boolean
+            /** [R286] 今天就是转折日 —— 后端给的读数, 不在这里推 */
+            flipped?: boolean } | null
   geo?: ChannelGeometry | null
   runs?: ChannelRuns | null
   ph?: ChannelPhase | null
@@ -416,7 +418,9 @@ export function ChannelStateCell({ trend, geo, runs, ph, kc, close, trendCls,
   // 讲的本来就是同一只票的方向。末尾那句从「点这两行…」改成整格的去处。
   const tip = [
     trend ? `【六态】${trend.state_cn} · 已${trend.duration}天`
-      + (trend.since ? `,自 ${trend.since}` : '') : '',
+      + (trend.since ? `,自 ${trend.since}` : '')
+      // [R286] 转折日在悬停里也说一句 —— 可见行只放得下两个字
+      + (trend.flipped ? ',今天就是转折日' : '') : '',
     trend?.action ?? '',
     ...(ph ? ['', `【通道】${ph.cn} —— ${ph.why}`, `该盯什么:${ph.watch}`] : []),
     // 第三行那句(三个尺度对齐到第几步)原来自带一份悬停, 一并收进来
@@ -455,6 +459,19 @@ export function ChannelStateCell({ trend, geo, runs, ph, kc, close, trendCls,
               {trend.state_cn} 已{trend.duration}天{trend.intraday ? <span className="ml-0.5 opacity-70">*</span> : null}
             </span>
           ) : <span className="text-[12px] text-muted/30">—</span>}
+          {/* [R286] 今天是不是转折。用户: 「走势这一列还要显示今天是不是转折,
+              我在趋势状态那部分发现了这个参数」。
+              **用词与复盘逐日表那个标记完全一致**(都叫「转折」, 都是琥珀色) ——
+              同一件事在两个页面上必须是同一个词, 否则读的人得先确认它们是不是
+              一回事(AGENTS.md 规则 12)。复盘那边带个「←」是因为它指着左边那一行,
+              这里没有"左边那一行"可指, 所以只留词。
+              判定不在这里做: `flipped` 是后端给的, 与复盘同一个字段(见 R286 注)。 */}
+          {trend?.flipped && (
+            <span className="whitespace-nowrap text-[11px] font-medium text-amber-400"
+                  title="今天六态状态发生了翻转 —— 昨天还不是这个状态">
+              转折
+            </span>
+          )}
         </span>
         {/* [R277] 「走了多远」(成熟度)那一行**搬到独立的「间距」列**去了 ——
             用户: 「那把走势列的分离度拆分出来成为完整的一列」。见 SpreadCell。

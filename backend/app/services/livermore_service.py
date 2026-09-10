@@ -160,6 +160,15 @@ def _trend_payload(closes: list[float], dates: list[str], threshold: float, sour
                               last.get("flip_down"), last.get("flip_up")),
         "side": "多头" if st in BULLISH else "空头",
         "duration": res["duration"],
+        # [R286] 今天是不是转折日。**取的就是 `compute()` 逐日给的那个 `flipped`**
+        # (`prev != state`), 与复盘逐日表上那个「← 转折」标记同一个字段、同一个值 ——
+        # 用户: 「个股分析的走势这一列还要显示今天是不是转折, 我在趋势状态那部分
+        # 发现了这个参数」。
+        #
+        # 它与 `duration == 1` 恒等(见 `test_R286_转折与已1天恒等`), 但**恒等不等于
+        # 该各算各的**: 决策台再推一遍就是第三处派生, 而这个仓库反复吃过同一个亏 ——
+        # 同一件事在几处各算各的, 哪天有一处漏改就开始各说各话。这里给出唯一的读数。
+        "flipped": bool(last.get("flipped")),
         "since": res["since"],
         "entered_from": res["entered_from"],
         "entered_from_cn": frm_cn,

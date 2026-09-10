@@ -645,3 +645,54 @@ def test_R261_徽标与力度仍各自按含义上色():
     cells = (root / "decision-board" / "cells.tsx").read_text(encoding="utf-8")
     assert "${trendCls ?? ''}" in cells, "六态徽标的配色没了"
     assert "ph.align.level === 3 ? 'text-red-400/80'" in cells, "力度那一行的配色没了"
+
+
+def test_R286_走势列显示今天是不是转折():
+    """用户: 「走势这一列还要显示今天是不是转折, 我在趋势状态那部分发现了这个参数」。
+
+    复盘的逐日表上转折那天挂着「← 转折」, 而决策台的走势列只有「已N天」——
+    同一件事在一个页面上标出来、在另一个页面上要读的人自己从天数里推。
+    """
+    from tests.frontend_source import code_of
+    code = code_of("components/stock-analysis/decision-board/cells.tsx")
+    blk = code[code.index("export function ChannelStateCell"):]
+    blk = blk[blk.index("return ("):]
+    assert "trend?.flipped" in blk or "trend.flipped" in blk, (
+        "走势列没读转折读数 —— 转折标记根本不会亮"
+    )
+    assert "转折" in blk, "走势列没把「转折」两个字印出来"
+
+
+def test_R286_转折的词与复盘那边一致():
+    """AGENTS.md 规则 12: 同一件事在两个页面上必须是同一个词。
+
+    复盘逐日表用的是「转折」+ 琥珀色。决策台这一格换成「刚翻转」「拐点」之类,
+    读的人就得先确认这两处说的是不是一回事 —— 这正是 R279 整理术语时的原话。
+    """
+    from tests.frontend_source import code_of
+    cells = code_of("components/stock-analysis/decision-board/cells.tsx")
+    review = code_of("components/stock-analysis/StockReviewDialog.tsx")
+    blk = cells[cells.index("export function ChannelStateCell"):]
+    blk = blk[blk.index("return ("):]
+
+    assert "转折" in review, "场景没搭对: 复盘那边的「转折」不见了"
+    for banned in ("刚翻转", "拐点", "变盘", "反转日"):
+        assert banned not in blk, f"走势列用了「{banned}」而复盘用「转折」—— 同一件事两个词"
+    assert "amber" in blk[blk.index("转折") - 400:blk.index("转折")], (
+        "转折标记没用琥珀色 —— 复盘那边用的是 amber, 两处该同色"
+    )
+
+
+def test_R286_转折不在前端自己推():
+    """`flipped` 与 `duration == 1` 恒等(后端 `test_R286_转折与已1天恒等` 钉住),
+    正因为恒等, 前端**更不该**自己再推一遍: 两处各算各的, 哪天有一处漏改就
+    开始各说各话。这一格只许读后端给的那个读数。
+    """
+    from tests.frontend_source import code_of
+    code = code_of("components/stock-analysis/decision-board/cells.tsx")
+    blk = code[code.index("export function ChannelStateCell"):]
+    blk = blk[blk.index("return ("):]
+    for derived in ("duration === 1", "duration == 1", "duration <= 1"):
+        assert derived not in blk, (
+            f"走势列自己从 `{derived}` 推转折了 —— 该读后端的 flipped"
+        )
