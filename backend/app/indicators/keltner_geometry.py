@@ -1207,11 +1207,26 @@ def phase(geo: dict | None, runs: dict | None = None) -> dict | None:
         return "刚起步"
 
     def _pace() -> str:
-        if up:
-            return "还在加速"
-        if down:
-            return "正在放慢"
-        return "速度平稳"
+        """[R277] **空头结构里要换一套说法** —— 原来两边共用一套, 说反了。
+
+        加速度是**带方向**的(`a1 = v1 − v2`, 符号表示"往多头还是往空头变"),
+        不是"变快还是变慢"。可「还在加速 / 正在放慢」这两个词读起来是后者。
+        于是一只**跌得越来越急**的票, a1 明显为负, 界面上写的是「正在放慢」——
+        实测确认过: spread=-2.0 / a1=-0.30 出来是「下跌中 · 正在放慢」。
+
+        这和 R207(「走得过头了」把只对涨过头成立的话配给了深跌票)、
+        R215①(「涨势转弱」配给了已经跌完的票)是同一族: **措辞只考虑了上涨那一侧。**
+
+        三条线挤在一起时不分方向 —— R224 已经立过规矩: 那时 `spread` 的正负
+        是噪声不是方向(差一点点就会翻号), 拿它挑措辞等于按噪声说话。
+        横盘里「还在加速」本来就该读成"开始往外走了", 与 PH_LAUNCHING 一致。
+        """
+        if not up and not down:
+            return "速度平稳"
+        bear = not geo.get("nested") and sp < 0
+        if bear:
+            return "跌势在缓" if up else "跌得更急"
+        return "还在加速" if up else "正在放慢"
 
     def mk(code, why, watch, cn=None):
         return {"code": code, "cn": cn or PHASE_CN[code], "why": why, "watch": watch,

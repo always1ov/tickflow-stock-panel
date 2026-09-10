@@ -162,8 +162,13 @@ export const EXPORT_COLUMNS: ExportColumn[] = [
     cell: (r) => {
       const g = r.kc?.geo
       if (!g) return { text: '—' }
-      const fast = g.accel?.level === 'accel' ? '提速'
-        : g.accel?.level === 'decel' ? '变慢' : '匀速'
+      // [R277] 快慢**直接用 `ph.pace_cn`, 不再自己从 `accel.level` 另算一套**。
+      //
+      // 原来这里写死 accel→提速 / decel→变慢, 那是**同一个方向错误的第三处**:
+      // 加速度带方向(负 = 往空头变), 所以一只加速下跌的票在这里导出成「变慢」。
+      // 更根本的毛病是**同一句话有两个产地** —— 屏幕上一套、导出件里另一套,
+      // 修了一处另一处照旧说反话。现在统一走后端那一份。
+      const fast = r.ph?.pace_cn ?? null
       const days = r.kc?.runs?.compress_days
       return {
         text: [r.ph?.cn, `间距 ${g.spread.toFixed(1)}`, fast,

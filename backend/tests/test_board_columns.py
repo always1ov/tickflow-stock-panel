@@ -60,7 +60,9 @@ def test_列的顺序是_认票_凭什么_我的账_别人的意见():
     """这条把**顺序本身**钉住 —— 它是这次重排的全部内容, 不写下来下次就会漂回去。"""
     assert _cols(_src()) == [
         "标的", "现价/涨跌",          # 认票
-        "走势", "结论",               # 凭什么(判断必须连着, 不许被账目切开)
+        # [R277] 「间距」从「走势」里拆出来独立成列 —— 它仍属"凭什么"那一段,
+        # 所以插在走势与结论之间, 而不是丢到账目后面。
+        "走势", "间距", "结论",       # 凭什么(判断必须连着, 不许被账目切开)
         "仓位", "成本", "浮盈",       # 我的账
         "AI 分析", "AI 信号",         # 别人的意见
     ]
@@ -70,7 +72,7 @@ def test_账目三列必须排在判断之后():
     """R249 之前它们在「现价」与「走势」之间。这条独立于上面那条写 ——
     就算以后列增减, **判断不许被账目切开**这条纪律也得留着。"""
     cols = _cols(_src())
-    judge = max(cols.index("走势"), cols.index("结论"))
+    judge = max(cols.index("走势"), cols.index("间距"), cols.index("结论"))
     ledger = min(cols.index("仓位"), cols.index("成本"), cols.index("浮盈"))
     assert ledger > judge, (
         f"账目列插到判断列中间了 —— 扫表时「走势→结论」读不连贯。当前顺序: {cols}"
@@ -134,12 +136,16 @@ def test_R250_表头只印列名不印排序目标():
     render = re.sub(r"\{/\*.*?\*/\}", "", th_block, flags=re.S)
     render = re.sub(r'title=(?:"[^"]*"|\{(?:[^{}]|\{[^{}]*\})*\})', "", render, flags=re.S)
 
-    for bad in ("贵不贵", "怎么办", "六态", "间距", "'价'", "涨跌'"):
+    for bad in ("贵不贵", "怎么办", "六态", "'价'", "涨跌'"):
         assert bad not in render, (
             f"表头又缀上排序目标「{bad}」了 —— 用户只要列名本身"
         )
-    # 正面: 三个列名都还在
-    for name in ("结论", "走势", "现价/涨跌"):
+    # [R277] 「间距」从禁用词里拿掉了 —— **它现在是一个列名, 不再是排序目标**。
+    # 但原来的意图一个字不改: 它不许再作为分层缀在「走势」头上。
+    trend_th = render[render.index("走势") - 400:render.index("走势") + 200]
+    assert "间距" not in trend_th, "「间距」又缀回走势表头上了 —— 它该是独立一列"
+    # 正面: 列名都还在
+    for name in ("结论", "走势", "间距", "现价/涨跌"):
         assert name in render, f"表头把「{name}」弄丢了"
 
 
@@ -218,15 +224,97 @@ def test_R254_点不到的排序键全删掉():
     body = _board_body()
     keys = body[body.index("type SortKey"):]
     keys = keys[:keys.index("\nconst ")]
-    for dead in ("'close'", "'spread'", "'ks'", "'km'", "'kl'",
+    # [R277] `spread` 从这张名单里拿掉了 —— **它不再点不到**: 间距独立成列之后
+    # 有了自己的表头按钮。这条测的从来是"有没有够不着的死键", 不是"spread 不许
+    # 存在"; 下面 `test_R277_每个排序键都够得着` 把这个意图直接测出来, 不再靠
+    # 手写名单跟进(名单是要人记得改的东西, 而人不会记得)。
+    for dead in ("'close'", "'ks'", "'km'", "'kl'",
                  "'verdict'", "'exit'", "'confidence'"):
         assert dead not in keys, f"排序键 {dead} 点不到却还留着"
     # 比较器里也不该还有它们的分支
     cmp_ = body[body.index("const sortedRows"):]
     cmp_ = cmp_[:cmp_.index("const arr = ")]
-    for dead in ("case 'close'", "case 'spread'", "case 'ks'", "case 'verdict'",
+    for dead in ("case 'close'", "case 'ks'", "case 'verdict'",
                  "case 'exit'", "case 'confidence'"):
         assert dead not in cmp_, f"比较器里还留着 {dead} 的分支"
+
+
+def test_R277_每个排序键都够得着():
+    """**把上一条那张手写名单换成机器核对。**
+
+    R254 那条列的是"已知的死键", 靠人记得往里加。这次 `spread` 复活就得手动
+    把它从名单里挑出来 —— 说明名单本身是要维护的东西, 而这仓库已经栽过一轮:
+    R272 的注册表漏登记也是同一个形状(手写名单 + 靠自觉)。
+
+    正确的写法是反过来: 枚举 `SortKey` 的全部取值, 逐个要求 thead 里真有一个
+    `cycleSort('x')` 能选中它。这样死键**一出现就红**, 不需要谁先发现它死了。
+    """
+    body = _board_body()
+    seg = body[body.index("type SortKey"):]
+    seg = seg[:seg.index("\nconst SIGNAL_RANK")]
+    keys = set(re.findall(r"'([a-zA-Z]+)'", seg))
+    assert len(keys) >= 10, f"没解析到排序键: {keys}"
+    src = _src()
+    th = src[src.index("<thead"):src.index("</thead>")]
+    # 默认排序键够得着 —— 它是"任一列点到第三下"回落的目标(cycleSort 的第三态),
+    # 所以不需要自己的表头按钮。这条第一次跑就抓到了 `urgency`, 而它并不是死键。
+    default_key = re.search(r"DEFAULT_SORT = \{ key: '([a-zA-Z]+)'", _board_body())
+    assert default_key, "找不到 DEFAULT_SORT —— 这条判不了哪个键是默认的"
+    reachable = {default_key.group(1)}
+    unreachable = sorted(k for k in keys
+                         if k not in reachable and f"cycleSort('{k}')" not in th)
+    assert not unreachable, (
+        f"这些排序键没有任何表头能选中, 也不是默认键, 是死代码: {unreachable}")
+
+
+def test_R277_导出的快慢与屏幕同一个产地():
+    """**同一句话不许有两个产地。**
+
+    导出那一列原来自己从 `accel.level` 另算一套(accel→提速 / decel→变慢)——
+    那是这次这个方向错误的**第三处**(屏幕可见行、屏幕悬停、导出件), 而且是
+    最不容易发现的一处: 导出件是拿去发给别人的, 自己未必会看。
+
+    更根本的毛病不是措辞而是**重复实现**: 两个产地必然漂移, 修了一处另一处
+    照旧说反话。这条钉住它只从后端那一份读。
+    """
+    from tests.frontend_source import code_of
+    body = code_of("lib/decisionBoardExportColumns.ts")
+    i = body.index("key: 'chanState'")
+    blk = body[i:body.index("},", body.index("cell:", i))]
+    assert "pace_cn" in blk, "导出的快慢没走 ph.pace_cn"
+    for bad in ("'提速'", "'变慢'", "'匀速'"):
+        assert bad not in blk, f"导出又自己造了一套快慢措辞: {bad}"
+
+
+def test_R277_间距按带符号排不按绝对值():
+    """[R251 那条的形状] 表头写着「多头拉得最开在前 → 空头拉得最开在前」——
+    那句话只有**带符号**才成立。
+
+    取了绝对值的话, 一只崩得最惨的票会和一只走得最强的票并排顶在最前面, 而且
+    看不出来(它确实排序了, 只是排的不是表头说的那件事)。变异验证时这一处是
+    12 个里唯一没被抓到的, 所以补这一条。
+    """
+    body = _board_body()
+    cmp_ = body[body.index("case 'spread'"):]
+    cmp_ = cmp_[:cmp_.index("\n", cmp_.index("case 'spread'") + 10)]
+    assert "Math.abs" not in cmp_, (
+        f"间距排序取了绝对值 —— 空头拉得最开的会混进多头最强的里面: {cmp_.strip()}")
+    src = _src()
+    th = src[src.index("<thead"):src.index("</thead>")]
+    assert "带符号" in th, "表头没说清是带符号排 —— 说明与行为得对得上"
+
+
+def test_R277_表头上的排序目标都得是真键():
+    """反向: 表头点了一个 `SortKey` 里没有的名字, 那一列点下去毫无反应 ——
+    而且不报错(TypeScript 会拦住字面量, 但拼错成另一个合法键它拦不住)。"""
+    body = _board_body()
+    seg = body[body.index("type SortKey"):]
+    seg = seg[:seg.index("\nconst SIGNAL_RANK")]
+    keys = set(re.findall(r"'([a-zA-Z]+)'", seg))
+    src = _src()
+    th = src[src.index("<thead"):src.index("</thead>")]
+    used = set(re.findall(r"cycleSort\('([a-zA-Z]+)'\)", th))
+    assert not (used - keys), f"表头用了不存在的排序键: {sorted(used - keys)}"
 
 
 def test_R251_越小越要紧的那几个必须升序打头():
@@ -397,8 +485,46 @@ def test_R257_走势列的三行各管一件事():
     assert "{ph.cn} · {ph.maturity_cn}" not in blk, (
         "「阶段」那个词又印回徽标上了 —— 它和六态抢方向, 而且会跟成熟度自相矛盾"
     )
-    assert "{ph.maturity_cn}" in blk, "「走了多远」那一行没了"
     assert "{trend.state_cn} 已{trend.duration}天" in blk, "方向那一行没了"
+    # [R277] 成熟度**搬去 SpreadCell 了**, 走势列于是只讲方向(六态 + 三尺度对齐)。
+    # 这条不再要求它出现在这一格里, 改成要求它**不在这里重复印一遍** ——
+    # 同一个读数印两列, 读的人得先确认它们是不是一回事。
+    assert "{ph.maturity_cn}" not in blk, (
+        "成熟度又印回走势列了 —— 它现在是「间距」列的内容, 两处都印是重复"
+    )
+    assert "{ph.pace_cn}" not in blk, "快慢也一样, 它属于「间距」列"
+
+
+def test_R277_成熟度与快慢在间距那一格里():
+    """正面: 搬家不是删除。两个读数都要在新格子里真的渲染出来。
+
+    **加速度此前在决策台上根本看不见** —— 走势列那一行写的是
+    `align ? align.cn : pace_cn`, 而 `alignment()` 只要六态/位置/间距三样都在
+    就返回非空(几乎永远), 于是快慢那一支轮不上; 悬停里被同一个三元顶掉。
+    它只剩「结论」列悬停里的一行。这条钉住它现在有自己的位置。
+    """
+    root = _BOARD.parent
+    cells = (root / "decision-board" / "cells.tsx").read_text(encoding="utf-8")
+    body = "\n".join(ln for ln in cells.splitlines()
+                     if not ln.lstrip().startswith(("//", "*", "/*", "{/*")))
+    i = body.index("export function SpreadCell")
+    blk = body[body.index("return (", i):]
+    assert "{ph.maturity_cn}" in blk, "间距列没印成熟度"
+    assert "{ph.pace_cn}" in blk, "间距列没印快慢 —— 加速度又看不见了"
+
+
+def test_R277_走势列不再回退到快慢():
+    """那个 `align ? align : pace_cn` 的回退基本走不到(见上一条), 属于
+    「写在那儿、看着像在用、其实轮不上」—— 与 R210 路 C、R214 规则②、
+    R215 ③ 同一族。快慢搬走之后更不该留着: 留着就是同一读数印两列。
+    """
+    # **必须先剥注释。** 这条第一次跑就红了, 而红的原因是我在那一行上面写的
+    # 说明里复述了 `ph.pace_cn` —— 本仓库第七次「断言被自己的注释喂饱」,
+    # 这次是反向(该消失的字眼被注释顶着不消失)。用共用的块级剥注释工具。
+    from tests.frontend_source import code_of
+    code = code_of("components/stock-analysis/decision-board/cells.tsx")
+    blk = code[code.index("export function ChannelStateCell"):]
+    assert "ph.pace_cn" not in blk, "走势列又回退到快慢了"
 
 
 def test_R257_阶段的说明必须留在悬停里():
@@ -488,6 +614,12 @@ def test_R261_走了多远那一行是统一色():
     assert "PHASE_TEXT" not in body, (
         "「阶段配色」那张表又回来了 —— 它按**已经不显示的东西**给文字上色"
     )
+    # [R277] 成熟度搬到 SpreadCell 了, 这条跟着搬 —— **守的规矩一个字没变**:
+    # 成熟度是事实读数不是判断, 所以统一次要色, 不许挂条件配色。
+    # 从 SpreadCell 的 `return (` 起算 —— 那一格的**悬停文案**里也提到成熟度,
+    # 直接 index 会命中悬停那一处, 而这条问的是渲染出去的那一行的颜色。
+    body = body[body.index("export function SpreadCell"):]
+    body = body[body.index("return ("):]
     i = body.index("{ph.maturity_cn}")
     line = body[body.rindex("<span", 0, i):i]
     assert "text-muted" in line and "${" not in line, (

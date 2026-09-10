@@ -264,6 +264,83 @@ function VerdictInner({ v, ev, geo, runs, energy, ph, stateRun, onOpen }: {
 
 
 /**
+ * [R277] 「间距」列 —— 从「走势」里拆出来的分离度, 外加它的导数(快慢)。
+ *
+ * 用户: 「那把走势列的分离度拆分出来成为完整的一列」。
+ *
+ * ## 为什么这两个读数该在一格里
+ *
+ * 分离度与加速度**不是两件事, 是同一件事的一阶与二阶**。实测(合成路径, 真均线):
+ *
+ *     匀速涨 0.10/天  → 间距 5.000, 加速度 0.0000    (第 150/300/399 天都是 5.000)
+ *     匀速涨 0.20/天  → 间距 10.00, 加速度 0.0000    (速度翻倍, 间距正好翻倍)
+ *     越涨越快        → 间距 8.084, 加速度 +0.0079
+ *     还在涨但越涨越慢 → 间距 1.916, 加速度 -0.0079
+ *
+ * 也就是 **间距 = 50 × 速度 ÷ ATR**, 而加速度是这个速度的变化率。一个是读数、
+ * 一个是读数在往哪走 —— 按 R219 的「一个话题一行, 不许拆到上下两处」, 它们
+ * 本来就该同格。而在此之前**加速度在决策台上根本看不见**: 走势列那一行写的是
+ * `align ? align : pace_cn`, 而 `alignment()` 几乎永远非空, 于是快慢那一支
+ * 轮不上; 悬停里被同一个三元顶掉。它只剩「结论」列悬停里的一行。
+ *
+ * ## 两条沿用的规矩
+ *
+ * - **数字全部退到悬停**(R209)。「间距 2.4 倍日常波动」再准确, 扫表的人也换算
+ *   不出它意味着什么 —— 正文给档位, 数字给要核对的人。
+ * - **成熟度是事实读数, 统一次要色**(R261)。挂条件配色会让同一句「走到中段」
+ *   在不同票上是不同颜色, 那是颜色在说另一件事。快慢不一样 —— 它**是**判断
+ *   (在往多头还是空头变), 所以按方向上色。
+ */
+const PACE_CLS: Record<string, string> = {
+  还在加速: 'text-red-400/85',
+  跌得更急: 'text-emerald-400/85',
+  跌势在缓: 'text-amber-300/85',
+  正在放慢: 'text-amber-300/85',
+  速度平稳: 'text-muted',
+}
+
+export function SpreadCell({ geo, ph, runs, onOpenReview }: {
+  geo?: ChannelGeometry | null
+  ph?: ChannelPhase | null
+  runs?: ChannelRuns | null
+  /** 点开 → 复盘弹窗的「通道结论」页签(这一列的完整历史在那儿) */
+  onOpenReview?: () => void
+}) {
+  if (!ph) {
+    return <td className={`${TD_BASE} whitespace-nowrap px-1.5 text-[10px] text-muted/30`}>—</td>
+  }
+  const sp = geo?.spread
+  const tip = [
+    `【间距】${ph.maturity_cn}`,
+    sp == null ? '' : sp >= 0
+      ? `短线中枢高出长线中枢 ${sp.toFixed(1)} 倍日常波动`
+      : `短线中枢低于长线中枢 ${Math.abs(sp).toFixed(1)} 倍日常波动`,
+    '它量的是**这一段走得多快**(间距 ≈ 50 × 速度), 不是走了多少天 ——',
+    '一只慢牛走三年, 间距也可以一直很小。',
+    '',
+    `【快慢】${ph.pace_cn}`,
+    geo?.accel?.gain_atr == null ? ''
+      : `最近这十天比前一段${geo.accel.gain_atr >= 0 ? '多' : '少'}走了 `
+        + `${Math.abs(geo.accel.gain_atr).toFixed(1)} 倍日常波动`,
+    '这是间距的变化率 —— 间距说现在多快, 快慢说这个速度还撑不撑得住。',
+    runs?.compress_days ? `\n三条线已经这样挤在一起 ${runs.compress_days} 天` : '',
+    '',
+    '点开:通道结论(逐日 / 27 种组合速查)',
+  ].filter(Boolean).join('\n')
+  return (
+    <td className={`${TD_BASE} whitespace-nowrap px-1.5`}>
+      <button type="button" onClick={onOpenReview} title={tip}
+              className="mx-auto flex w-full cursor-pointer flex-col items-center gap-0.5 rounded-btn px-1 py-0.5 leading-tight transition-colors duration-hover hover:bg-elevated/40">
+        <span className="whitespace-nowrap text-[10px] text-muted">{ph.maturity_cn}</span>
+        <span className={`whitespace-nowrap text-[9px] ${PACE_CLS[ph.pace_cn] ?? 'text-muted'}`}>
+          {ph.pace_cn}
+        </span>
+      </button>
+    </td>
+  )
+}
+
+/**
  * 「走势」列 —— 一只票的方向, 两套判定叠在一格里。
  *
  * ## [R211] 这一列吞并了另外两列, 每一次都有理由
@@ -328,7 +405,9 @@ export function ChannelStateCell({ trend, geo, runs, ph, kc, close, trendCls,
     trend?.action ?? '',
     ...(ph ? ['', `【通道】${ph.cn} —— ${ph.why}`, `该盯什么:${ph.watch}`] : []),
     // 第三行那句(三个尺度对齐到第几步)原来自带一份悬停, 一并收进来
-    ph?.align ? `【${ph.align.cn}】${ph.align.why}` : (ph ? `快慢:${ph.pace_cn}` : ''),
+    // [R277] 悬停里那个 `: 快慢:${ph.pace_cn}` 回退也去掉了 —— 与可见行同一个理由:
+    // 它几乎轮不上(align 基本永远非空), 而快慢现在有自己的列。
+    ph?.align ? `【${ph.align.cn}】${ph.align.why}` : '',
     '', gap,
     at.length ? '现在到边的:' + at.map(([t, b]) => `${t}${b!.pos_cn}`).join('、') : '三档都在通道中部',
     runs?.compress_days ? `三条线已经这样挤在一起 ${runs.compress_days} 天` : '',
@@ -362,22 +441,18 @@ export function ChannelStateCell({ trend, geo, runs, ph, kc, close, trendCls,
             </span>
           ) : <span className="text-[10px] text-muted/30">—</span>}
         </span>
-        {/* [R257] **「阶段」那个词从徽标上撤下来了**, 这一行只留「走了多远」。
-            用户: 「现在的版本我觉得抓不住重点」。
-            毛病是**阶段和六态在抢同一件事 —— 方向**: 截图那只票六态说「自然回升」
-            (在涨)、阶段说「横盘中」(没走), 两句话打架而界面不提。而且阶段与成熟度
-            量的根本不是同一个东西(前者看三线重合、后者看短长线间距), 于是能凑出
-            「横盘中 · 走到中段」这种自相矛盾的话 —— 穷举确认过真的会出现。
-            现在三行各管一件事: **方向(六态) / 走了多远(成熟度) / 还有没有劲**。
-            阶段的完整说明与「该盯什么」照旧在悬停里, 一个字没丢。 */}
-        {!!ph && (
-          <span className="whitespace-nowrap text-[10px] text-muted">
-            {ph.maturity_cn}
-          </span>
-        )}
+        {/* [R277] 「走了多远」(成熟度)那一行**搬到独立的「间距」列**去了 ——
+            用户: 「那把走势列的分离度拆分出来成为完整的一列」。见 SpreadCell。
+            这一列于是回到只讲**方向**: 六态说什么 + 三个尺度转到第几步。
+            [R257] 「阶段」那个词仍然不印在徽标上(它和六态抢方向), 完整说明在悬停。 */}
         {/* [R224] 第二行给「三个尺度走到第几步」, 而不是一个警告。
             R223 那版是成对冲突检查, 实测超过一半的行挂警告 —— 那是噪声。
-            三者是滞后阶梯(价格最快→六态→均线最慢), 不一致 = 转折还没走完。 */}
+            三者是滞后阶梯(价格最快→六态→均线最慢), 不一致 = 转折还没走完。
+            [R277] 原来这里是 `align ? align : pace_cn`。**那个回退基本走不到** ——
+            `alignment()` 只要六态/位置/间距三样都在就返回非空, 于是快慢那一支
+            几乎永远轮不上, 加速度在这一列上等于不显示(悬停里也被同一个三元顶掉)。
+            现在快慢有了自己的位置(间距列), 这里不再回退到它 —— 回退过去只会让
+            同一个读数在两列里各印一遍。算不出来就留空, 不拿别的东西冒充。 */}
         {ph?.align ? (
           <span className={`text-[9px] ${
             ph.align.level === 3 ? 'text-red-400/80'
@@ -386,9 +461,7 @@ export function ChannelStateCell({ trend, geo, runs, ph, kc, close, trendCls,
             {ph.align.cn}
           </span>
         ) : (
-          <span className="text-[9px] text-muted">
-            {ph ? ph.pace_cn : <span className="text-transparent select-none">·</span>}
-          </span>
+          <span className="text-transparent select-none text-[9px]">·</span>
         )}
       </button>
     </td>
