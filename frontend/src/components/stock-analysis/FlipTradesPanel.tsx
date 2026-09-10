@@ -74,18 +74,37 @@ const REASON_CN: Record<NonNullable<FlipTrades['reason']>, string> = {
   no_open: '缺开盘价, 这一栏算不出来(次日开盘是唯一能执行的时机)',
 }
 
-export function FlipTradesPanel({ ft }: { ft?: FlipTrades | null }) {
+/**
+ * [R288] 两个页签共用一处实现 —— 用户: 「通道结论这个部分也能这样搞类似的统计吗」。
+ *
+ * 差别全在文案(什么算一次变化、变化之后按什么动手), 版面与配色一个字不改:
+ * **两栏量的是同一件事**(真按它做赚了多少), 长得不一样只会让人以为它们不可比。
+ */
+export function FlipTradesPanel({ ft, title, basis, flipLabel, legNote, caveat }: {
+  ft?: FlipTrades | null
+  /** 栏目名, 如「按转折买卖」「按结论买卖」 */
+  title: string
+  /** 口径那一句 —— **必须写出来**, 这是两栏唯一的差别所在 */
+  basis: string
+  /** 明细表第一列的表头: 六态是「转折日」, 通道结论是「变化日」 */
+  flipLabel: string
+  /** 折叠条上那句「与屏幕上的什么一一对应」 */
+  legNote: string
+  /** 这一栏特有的、会让人高估的地方 —— 比如作者原话是"减一部分"而这里按清空模拟 */
+  caveat?: string
+}) {
   if (!ft) return null
 
   if (ft.reason) {
     return (
       <div className="mx-4 mt-3 rounded-btn border border-border/60 px-3 py-2 text-[10px] text-muted">
-        <span className="text-secondary">按转折买卖</span> · {REASON_CN[ft.reason]}
+        <span className="text-secondary">{title}</span> · {REASON_CN[ft.reason]}
       </div>
     )
   }
 
   const notes = [
+    caveat,
     ft.thin && `只走完 ${ft.bull.scored} 段多头, 样本太少, 这几个数只能当参考`,
     !!ft.blocked && `其中 ${ft.blocked} 笔的成交日当天涨停或跌停 —— 未必真成交得到这个价`,
     !!ft.pending && `${ft.pending} 那次转折的次日还没到, 没算进去`,
@@ -95,10 +114,8 @@ export function FlipTradesPanel({ ft }: { ft?: FlipTrades | null }) {
   return (
     <div className="mx-4 mt-3 rounded-btn border border-border/60 bg-elevated/20 px-3 py-2.5">
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-        <span className="text-[11px] text-secondary">按转折买卖</span>
-        <span className="text-[10px] text-muted">
-          转折次日开盘进出 · 转多买入、转空清仓(不做空)
-        </span>
+        <span className="text-[11px] text-secondary">{title}</span>
+        <span className="text-[10px] text-muted">{basis}</span>
       </div>
 
       {/* 三个数一行。**「跟着做」最大** —— 它就是用户带着的那个问题的答案,
@@ -126,10 +143,10 @@ export function FlipTradesPanel({ ft }: { ft?: FlipTrades | null }) {
 
       <ReviewDisclosure
         label="每一段"
-        note={`· ${ft.legs.length} 段, 与逐日表上标「转折」的那些天一一对应`}
+        note={`· ${ft.legs.length} 段, ${legNote}`}
         className="mx-0 mt-2"
       >
-        <LegTable legs={ft.legs} />
+        <LegTable legs={ft.legs} flipLabel={flipLabel} />
       </ReviewDisclosure>
     </div>
   )
@@ -148,15 +165,15 @@ function Stat({ label, value, big, title }: {
   )
 }
 
-function LegTable({ legs }: { legs: Leg[] }) {
+function LegTable({ legs, flipLabel }: { legs: Leg[]; flipLabel: string }) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-[10px]">
         <thead>
           <tr className="border-b border-border/60 text-muted">
-            <th className="whitespace-nowrap py-1 pr-2 text-left font-normal">转折日</th>
+            <th className="whitespace-nowrap py-1 pr-2 text-left font-normal">{flipLabel}</th>
             <th className="whitespace-nowrap px-2 py-1 text-left font-normal">动作</th>
-            <th className="whitespace-nowrap px-2 py-1 text-left font-normal">转成什么</th>
+            <th className="whitespace-nowrap px-2 py-1 text-left font-normal">变成什么</th>
             <th className="whitespace-nowrap px-2 py-1 text-right font-normal">成交</th>
             <th className="whitespace-nowrap px-2 py-1 text-right font-normal">了结</th>
             <th className="whitespace-nowrap px-2 py-1 text-right font-normal">持</th>

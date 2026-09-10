@@ -807,6 +807,14 @@ export interface StockReview {
     bear: { n: number; scored: number; win: number
             avg: number | null; best: number | null; worst: number | null }
   } | null
+  /** [R288] 同一套统计换到「通道结论」上 —— 用户: 「通道结论这个部分也能这样
+   *  搞类似的统计吗」。
+   *
+   *  与 `flip_trades` **结构完全一样**, 差别只在什么算一次变化、变化之后按什么
+   *  动手: 一次变化 = 结论换一档(含有结论 ↔ 没结论); 偏买建仓, 偏卖与回避清仓,
+   *  而「拿着」「等着」「三档都在中部」**一律维持上一天的仓位** —— 那三种是
+   *  作者写的原话(「拿着, 别在这加仓」「等短期入场点」), 不是买卖信号。 */
+  verdict_trades?: StockReview['flip_trades']
   /** [R191] 当前这一段与它自己的历史对照 —— 「我现在在哪、盯哪个价」 */
   now?: {
     date: string; state: string; state_cn: string | null; side: string | null

@@ -42,6 +42,80 @@ from __future__ import annotations
 
 from app.indicators.livermore import BULLISH, STATE_LABELS
 
+# 仓位只有两种。名字沿用六态那边的说法, 免得同一件事两个词(AGENTS.md 规则 12)。
+BULL = "多头"      # 满仓持有
+BEAR = "空头"      # 空仓 —— **不是做空**, A 股散户也做不了
+
+
+# ================================================================
+# 适配器 —— 把一套判定翻成「逐日仓位」
+# ================================================================
+#
+# 两个页签用的是同一台发动机(`simulate`), 差别全在这里: 什么算一次变化、
+# 变化之后手上该是满仓还是空仓。分开写而不是塞成一个 if, 是因为两套规则的
+# **形状不同** —— 六态每天非多即空, 通道结论有三种"不是动作"的状态。
+
+
+def trend_days(steps: list[dict]) -> list[dict]:
+    """[R287] 六态 → 逐日仓位。多头三态(上涨趋势/自然回升/次级回升)满仓, 其余空仓。
+
+    `steps` 直接吃 ``livermore.compute()`` 的输出, 原样带走 date/prev/flipped。
+    """
+    out = []
+    for st in steps:
+        state = st.get("state")
+        cn, _en = STATE_LABELS.get(state, (state or "—", ""))
+        out.append({**st, "state_cn": cn,
+                    "side": BULL if state in BULLISH else BEAR})
+    return out
+
+
+# 作者给每一档写的 `action` 就是这张表的依据 —— **不另立一套判断**:
+#
+#   强势深调「最好的低吸位置」/ 调整到位「低吸分量更足」/ 短线回调「趋势没坏
+#   就是低吸候选」                                          → buy   建仓
+#   该止盈了「可落袋一部分」/ 超跌反弹「反弹卖点, 不是买点」/
+#   大顶区域「动仓位基调, 不只减这一只」                     → sell  清仓
+#   下跌途中「别抄, 下轨会一路下移」                          → avoid 清仓
+#
+# 剩下三种**都不是动作**, 所以一律**维持上一天的仓位**:
+#   短线冲高「拿着, 别在这加仓」        hold
+#   候选池「大级别到位, 等短期入场点」/ 高位回落「别追, 等回到下沿再看」 watch
+#   三档都在通道中部 → `verdict()` 返回 None, 压根没有结论
+#
+# 把 hold/watch/无结论 当成卖出是这一层最容易犯的错: 那会让仓位天天翻,
+# 而作者的原话是「拿着」「等」。
+_TONE_SIDE = {"buy": BULL, "sell": BEAR, "avoid": BEAR}
+
+
+def verdict_days(rows: list[dict]) -> list[dict]:
+    """[R288] 通道结论 → 逐日仓位。
+
+    `rows` 是复盘逐日行(要带 `date` 与 `verdict`)。一次「变化」= **结论换了一档**
+    (含从有结论变成没结论), 与「通道结论」页签上那一张张卡片一一对应。
+
+    起手是**空仓** —— 窗口开头还没等到任何买入信号, 不许假设手上已经有票。
+    """
+    out: list[dict] = []
+    side = BEAR
+    prev_code: str | None = None
+    for r in rows:
+        v = r.get("verdict") or {}
+        code = v.get("code")
+        side = _TONE_SIDE.get(v.get("tone"), side)   # 认不出的一律维持, 不瞎动
+        out.append({
+            "date": r.get("date"),
+            "state": code,
+            "state_cn": v.get("title") or "没结论",
+            "side": side,
+            "prev": prev_code,
+            # 第一天的 prev 是 None, 与 `compute()` 开机那天同一个形状 ——
+            # `simulate` 会跳过它(那不是一次变化, 是"我们开始看了")
+            "flipped": bool(out) and code != prev_code,
+        })
+        prev_code = code
+    return out
+
 
 def _f(v) -> float | None:
     try:
@@ -67,16 +141,22 @@ def _blocked(bull: bool, i: int, limit_up, limit_down) -> bool:
 
 
 def _leg(flip_i: int, enter_i: int, steps, opens, dates, limit_up, limit_down) -> dict:
-    state = steps[enter_i]["state"]
-    cn, _en = STATE_LABELS.get(state, (state or "—", ""))
-    bull = state in BULLISH
+    # **信号取自转折日, 不是执行日。** 执行日的状态要等它自己收盘才知道 ——
+    # 下单那一刻(次日开盘)你手上只有转折日那个信号。转折连着两天出现时, 取错
+    # 会把方向标反, 并且把中间那个真实的来回整段吞掉。见
+    # `test_R288_连着两天转折时用的是下单那一刻知道的信号`。
+    #
+    # 价格那一侧仍然取执行日(开盘价、涨跌停标志都是那天的) —— 分得清清楚楚:
+    # **信号是昨天的, 成交是今天的**。
+    st = steps[flip_i]
+    bull = st["side"] == BULL
     return {
         "flip_date": dates[flip_i],
         "enter_date": dates[enter_i],
         "enter_price": opens[enter_i],
-        "state": state,
-        "state_cn": cn,
-        "side": "多头" if bull else "空头",
+        "state": st.get("state"),
+        "state_cn": st.get("state_cn") or st.get("state") or "—",
+        "side": st["side"],
         "blocked": _blocked(bull, enter_i, limit_up, limit_down),
     }
 
@@ -85,7 +165,10 @@ def simulate(steps: list[dict], opens: list, closes: list, *,
              limit_up: list | None = None, limit_down: list | None = None) -> dict:
     """按转折买卖跑一遍。口径见模块 docstring。
 
-    steps  ``livermore.compute()`` 的 steps 切片(要带 state / flipped / date)
+    steps  逐日 {date, side, flipped, prev, state, state_cn} —— 由下面两个适配器
+           之一产出。**`side` 是适配器算好的仓位, 不在这里判** ——
+           六态每天非多即空, 而通道结论有「拿着」「等着」「没结论」三种
+           **不是动作**的状态, 两套规则没法写成一个 if。
     opens  与 steps 等长的开盘价(前复权, 与 closes 同一口径)
     closes 与 steps 等长的收盘价 —— 只在最后一段还没走完时用得着
     limit_up / limit_down
@@ -182,12 +265,12 @@ def simulate(steps: list[dict], opens: list, closes: list, *,
     #    「尽可能减少买卖次数」, 把段数当买卖次数摆给他就是虚报手续费。
     for k, l in enumerate(legs):
         prev_side = legs[k - 1]["side"] if k else None
-        if l["side"] == "多头":
-            l["act"] = "持有" if prev_side == "多头" else "买入"
+        if l["side"] == BULL:
+            l["act"] = "持有" if prev_side == BULL else "买入"
         else:
-            l["act"] = "空仓" if prev_side == "空头" else "卖出"
+            l["act"] = "空仓" if prev_side == BEAR else "卖出"
 
-    done_bull = [l for l in legs if l["side"] == "多头" and not l["open_ended"]]
+    done_bull = [l for l in legs if l["side"] == BULL and not l["open_ended"]]
     eq = 1.0
     for l in done_bull:
         eq *= 1 + l["ret"]
@@ -209,8 +292,8 @@ def simulate(steps: list[dict], opens: list, closes: list, *,
         "skipped": skipped,
         "blocked": sum(1 for l in legs if l["blocked"]),
         "reason": None,
-        "bull": _side_stats([l for l in legs if l["side"] == "多头"]),
-        "bear": _side_stats([l for l in legs if l["side"] == "空头"]),
+        "bull": _side_stats([l for l in legs if l["side"] == BULL]),
+        "bear": _side_stats([l for l in legs if l["side"] == BEAR]),
     }
 
 

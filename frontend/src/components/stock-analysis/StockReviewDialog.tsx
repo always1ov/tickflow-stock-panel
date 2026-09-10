@@ -530,7 +530,13 @@ function TrendView({ d, rows, onlyMarked, onToggleMarked }: {
       {/* [R287] 「按转折买卖」—— 真按这些转折做, 拿到下次转折为止是赚是亏。
           排在「分档依据」之后、「依据」之前的理由写在 FlipTradesPanel 头上:
           那一栏是固定 5 日窗口的**测量**, 这一栏是执行一遍之后的**成绩单**。 */}
-      <FlipTradesPanel ft={d.flip_trades} />
+      <FlipTradesPanel
+        ft={d.flip_trades}
+        title="按转折买卖"
+        basis="转折次日开盘进出 · 转多买入、转空清仓(不做空)"
+        flipLabel="转折日"
+        legNote="与逐日表上标「转折」的那些天一一对应"
+      />
 
       <TrendStatsPanel d={d} />
 
@@ -818,6 +824,23 @@ function VerdictView({ d, segments }: { d: StockReview; segments: Segment[] }) {
         items={d.outcomes}
         forwardDays={d.forward_days}
         hint={`分档依据 —— 各档结论出现后 ${d.forward_days} 日表现(按段计, 一段=一次;括号里是「几段收涨/几段已兑现」)`}
+      />
+
+      {/* [R288] 与「趋势状态」那栏同一个位置逻辑: 「分档依据」是固定 5 日窗口的
+          测量, 这一栏是真按它做之后的成绩单, 而 EvidencePanel 是背景资料。
+
+          **这一栏在这个页签上尤其值钱**: 通道结论天天在变, 按它做要下多少单、
+          这些单子加起来到底赚不赚, 光看一排分档均值是看不出来的 ——
+          而用户的路子是「尽可能减少买卖次数」。 */}
+      <FlipTradesPanel
+        ft={d.verdict_trades}
+        title="按结论买卖"
+        basis="结论换档的次日开盘进出 · 偏买建仓、偏卖与回避清仓(不做空)"
+        flipLabel="变化日"
+        legNote="与下面那些卡片一一对应"
+        caveat={'「拿着」「等着」「三档都在中部」都不动手 —— 那是作者写的原话(「拿着, 别在这加仓」'
+                + '「等短期入场点」), 不是买卖信号。另: 「该止盈了」原话是「可落袋一部分」、'
+                + '「大顶区域」是「动仓位基调」, 这里一律按清空模拟, 比原话重。'}
       />
 
       {!!d.channel && <EvidencePanel ch={d.channel} edge={d.verdict_edge} />}

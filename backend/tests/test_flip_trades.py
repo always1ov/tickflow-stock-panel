@@ -7,7 +7,7 @@
 """
 import pytest
 
-from app.services.flip_trades import simulate
+from app.services.flip_trades import simulate, trend_days, verdict_days
 
 
 def _steps(states: list[str]) -> list[dict]:
@@ -23,7 +23,9 @@ def _steps(states: list[str]) -> list[dict]:
         out.append({"i": i, "date": f"d{i:02d}", "state": st, "prev": prev,
                     "flipped": prev != st})
         prev = st
-    return out
+    # [R288] 过一道 `trend_days` —— 仓位(side)现在由适配器算, `simulate` 只读。
+    # 这里不绕过它: 绕过就等于测的不是生产上跑的那条路。
+    return trend_days(out)
 
 
 # 一条**手工核算过**的最小路径。NR/NREA 分属多头侧与空头侧, 见 livermore.BULLISH。
@@ -202,7 +204,7 @@ _PATH_DATES = [f"2026-01-{i + 1:02d}" for i in range(len(_PATH))]
 
 @pytest.fixture()
 def real():
-    steps = compute(_PATH, _PATH_DATES, 0.06)["steps"]
+    steps = trend_days(compute(_PATH, _PATH_DATES, 0.06)["steps"])
     return steps, simulate(steps, _PATH_OPENS, _PATH)
 
 
@@ -439,7 +441,10 @@ def test_R287_这一栏真的挂在趋势状态页上():
     # **必须钉整行**。只查 `"<FlipTradesPanel" in blk` 是不够的 —— 把它包成
     # `{false && <FlipTradesPanel …/>}` 照样含有这个子串, 变异测试当场就漏了。
     # (R286 那条守卫是同一个形状, 那次是靠别的断言兜住的。)
-    assert "\n      <FlipTradesPanel ft={d.flip_trades} />" in blk, (
+    # **必须钉成"这一行以它开头"**。只查子串是不够的 —— 包成
+    # `{false && <FlipTradesPanel …/>}` 照样含有它, 变异测试当场就漏了。
+    # (R288 把 props 拆成多行之后, 这里从整行钉改成行首钉。)
+    assert "\n      <FlipTradesPanel" in blk, (
         "组件没有无条件渲染 —— 写好了却挂不上, 正是 R274 那个病"
     )
     # 顺序: 分档依据(OutcomeChips) → 这一栏 → 依据(TrendStatsPanel)
@@ -450,10 +455,17 @@ def test_R287_这一栏真的挂在趋势状态页上():
 
 def test_R287_口径必须印在界面上():
     """「次日开盘」是这一栏与作者那份跟随收益唯一的差别, 不写出来的话,
-    两个页面上两个不同的数就成了无头公案。"""
+    两个页面上两个不同的数就成了无头公案。
+
+    [R288] 口径那句话搬到调用方去了(两个页签各写各的), 所以这里改成两条:
+    ① 组件真的把它渲染出来(不是收了个 prop 就扔); ② 调用方真的传了。
+    第二条在 `test_R288_两栏的口径各写各的`。
+    """
     code = _panel()
-    assert "转折次日开盘进出" in code, "没写清是次日开盘成交"
-    assert "不做空" in code, "没写清空头段是清仓不是做空"
+    assert "{basis}" in code, "组件收下了口径却没印出来"
+    from tests.frontend_source import code_of
+    dlg = code_of("components/stock-analysis/StockReviewDialog.tsx")
+    assert dlg.count("不做空") == 2, "两个页签都得写清是清仓不是做空"
 
 
 def test_R287_空仓段不许被说成盈亏():
@@ -531,3 +543,213 @@ def test_R287_未完成的多头段不许进跟着做的复利():
     assert leg["ret"] == pytest.approx(0.2), "场景没搭对: 这笔浮盈得是非零的"
     assert s["follow"] == 0.0, "还没兑现的浮盈被算进「跟着做」了"
     assert s["trades"] == 1, "手确实下过单 —— 建仓次数该算, 只是结果还不知道"
+
+
+# ================================================================
+# [R288] 通道结论那一栏 —— 同一台发动机, 换一套「什么时候该有仓位」
+# ================================================================
+#
+# 用户: 「通道结论这个部分也能这样搞类似的统计吗」。
+#
+# 能, 但**比六态多一个难点**: 六态每天非多即空, 而通道结论有三种
+# **不是动作**的状态 —— 「拿着」(hold)、「等」(watch)、三档都在中部时压根
+# 没有结论。把它们当成卖出, 仓位就会天天翻, 而作者写的原话正是「拿着」「等」。
+
+
+def _rows(codes: list[str | None]) -> list[dict]:
+    """按 code 铺逐日行。tone/title 一律**从作者的表里取**, 不在测试里手写 ——
+    手写的话这些测试就变成在描述我以为的档位语气, 而不是真的那一套。"""
+    from app.indicators.keltner import _VERDICTS
+    out = []
+    for i, c in enumerate(codes):
+        v = None
+        if c:
+            title, _a, _d, _s, tone, _r = _VERDICTS[c]
+            v = {"code": c, "title": title, "tone": tone}
+        out.append({"date": f"d{i:02d}", "verdict": v})
+    return out
+
+
+def test_R288_买档建仓卖档与回避档清仓():
+    days = verdict_days(_rows(["bottom_confirmed",   # buy   调整到位
+                               "top_all_bands",      # sell  大顶区域
+                               "falling_all_bands"]))  # avoid 下跌途中
+    assert [d["side"] for d in days] == ["多头", "空头", "空头"]
+
+
+def test_R288_拿着和等着不是动作要维持仓位():
+    """**这一条是整件事最容易做错的地方。**
+
+    「短线冲高」的原话是「拿着, 别在这加仓」;「候选池」是「等短期入场点」;
+    「高位回落」是「别追, 等回到下沿再看」。三个都不是"卖出"。
+    当成卖出的话, 一只票会在「调整到位 → 短线冲高 → 该止盈了」这种再正常
+    不过的路径上被来回买卖两次。
+    """
+    days = verdict_days(_rows(["bottom_confirmed",   # buy    建仓
+                               "high_short_only",    # hold   拿着
+                               "watch_low",          # watch  等
+                               "watch_high",         # watch  等
+                               None,                 # 三档都在中部, 没结论
+                               "top_confirmed"]))    # sell   清仓
+    assert [d["side"] for d in days] == ["多头"] * 5 + ["空头"], (
+        "「拿着」「等着」「没结论」把仓位弄丢了"
+    )
+
+
+def test_R288_起手空仓不许假设手上已经有票():
+    days = verdict_days(_rows([None, "high_short_only", "watch_low"]))
+    assert [d["side"] for d in days] == ["空头"] * 3, (
+        "窗口开头还没等到任何买入信号, 不能当成已经持有"
+    )
+
+
+def test_R288_一次变化就是结论换一档():
+    """含**有结论 ↔ 没结论**那两种切换 —— 它们在页签上也是两张不同的卡片。"""
+    days = verdict_days(_rows(["watch_low", "watch_low", None, None, "watch_low"]))
+    assert [d["flipped"] for d in days] == [False, False, True, False, True]
+
+
+def test_R288_第一天不算变化():
+    """与 `compute()` 开机那天同一个道理: 昨天没有结论, 谈不上"换了一档"。"""
+    assert verdict_days(_rows(["top_all_bands"]))[0]["flipped"] is False
+
+
+def test_R288_跑得通同一台发动机():
+    codes = ["falling_all_bands", "bottom_confirmed", "bottom_confirmed",
+             "high_short_only", "top_confirmed", "top_confirmed"]
+    opens = [10.0, 10.0, 11.0, 12.0, 15.0, 14.0]
+    s = simulate(verdict_days(_rows(codes)), opens, opens)
+    assert s["reason"] is None and s["legs"], "接不上"
+    # d01 变 buy → d02 开盘 11.00 建仓;  d03 变 hold → **不动手, 但是新的一段**;
+    # d04 变 sell → d05 开盘 14.00 清仓。所以一个来回是 11.00 → 14.00, 中间
+    # 被那次「拿着」切成了两段 —— 这正好也验了跨段复利: (15/11)·(14/15) = 14/11。
+    assert [l["act"] for l in s["legs"]] == ["买入", "持有", "卖出"]
+    buy = s["legs"][0]
+    assert buy["enter_date"] == "d02" and buy["enter_price"] == pytest.approx(11.0)
+    assert s["trades"] == 1, "一次来回被数成了两次买卖"
+    assert s["follow"] == pytest.approx(14 / 11 - 1, abs=5e-4)
+
+
+def test_R288_连着两天转折时用的是下单那一刻知道的信号():
+    """**前视偏差, R288 这轮才现形。**
+
+    原来 `_leg` 取的是**执行日**那一天的 side —— 而执行日的状态要等它自己收盘
+    才知道。转折连着两天出现时, 这就等于:
+
+        d01 收盘 → 转成上涨趋势(多头), 你在 d02 开盘买入
+        d02 收盘 → 又转成自然回撤(空头)
+        ↑ 代码却拿 d02 收盘后才知道的「空头」去标 d02 开盘那一笔
+
+    结果是方向标反, 而且那一个真实的来回被整段吞掉。**下单那一刻你手上只有
+    转折日的信号**, 所以 side 必须取自转折日。
+
+    六态与通道结论**共用这条**: 后者更容易撞上 —— 通道结论天天在变。
+    """
+    days = _steps(["NREA", "UT", "NREA", "NREA"])
+    # d00 的 flipped 是 True(开机那天, prev 为 None), `simulate` 会跳过它
+    assert [d["flipped"] for d in days] == [True, True, True, False], "场景没搭对"
+    s = simulate(days, [9.0, 9.0, 10.0, 12.0], [9.0, 9.0, 10.0, 12.0])
+    first = s["legs"][0]
+    assert first["side"] == "多头", (
+        "d01 收盘转多、d02 开盘买入, 这一笔却按 d02 收盘后才知道的状态标了方向"
+    )
+    assert first["act"] == "买入" and first["state_cn"] == "上涨趋势"
+    assert first["enter_price"] == pytest.approx(10.0)
+    assert first["exit_price"] == pytest.approx(12.0), "买进又卖出的那个来回被吞了"
+    assert s["trades"] == 1
+
+
+def test_R288_复盘载荷两栏都带上了(review):
+    for key in ("flip_trades", "verdict_trades"):
+        ft = review[key]
+        assert ft["reason"] is None and ft["legs"], f"{key} 接线没接上: {ft['reason']}"
+        assert "thin" in ft, f"{key} 少了样本量标记"
+
+
+def test_R288_结论那一栏与页签上的卡片一一对应(review):
+    """与 R287 守的同一件事: 统计里那些日子, 必须就是屏幕上那些段的分界。
+
+    「通道结论」页签的卡片是按 `verdict.code` 分段的, 所以每一笔的 `flip_date`
+    都得是逐日行里**结论换了一档**的那一天。
+    """
+    rows = list(reversed(review["rows"]))          # 载荷是新→旧, 这里要按时间
+    changed = set()
+    prev = None
+    for i, r in enumerate(rows):
+        code = (r.get("verdict") or {}).get("code")
+        if i and code != prev:
+            changed.add(r["date"])
+        prev = code
+    assert changed, "场景没搭对: 这 120 天里结论一次都没变过"
+    for l in review["verdict_trades"]["legs"]:
+        assert l["flip_date"] in changed, (
+            f"{l['flip_date']} 在统计里是一次变化, 但逐日行的结论没换档 —— 两处不同源"
+        )
+
+
+def test_R288_结论那一栏买卖比六态频繁(review):
+    """**这本身就是个结论**, 不是巧合: 通道结论天天在变, 六态是趋势级的。
+
+    用户的哲学是「尽可能减少买卖次数」—— 这一栏摆出来最有价值的一件事,
+    正是让他看见按结论做要多下多少单。这条钉住两栏确实在量不同的东西
+    (真相等的话, 说明两栏接到同一份数据上去了)。
+    """
+    a, b = review["flip_trades"], review["verdict_trades"]
+    assert len(b["legs"]) > len(a["legs"]), (
+        f"结论 {len(b['legs'])} 段 / 六态 {len(a['legs'])} 段 —— 两栏多半接串了"
+    )
+
+
+def test_R288_两个页签都挂上了而且位置一致():
+    """同一件事在两个页签上必须在同一个相对位置 —— 一边在「分档依据」下面、
+    一边在别处的话, 读的人得重新找一遍。"""
+    from tests.frontend_source import code_of
+    dlg = code_of("components/stock-analysis/StockReviewDialog.tsx")
+    for fn, after, before in (("function TrendView", "<OutcomeChips", "<TrendStatsPanel"),
+                              ("function VerdictView", "<OutcomeChips", "<EvidencePanel")):
+        blk = dlg[dlg.index(fn):]
+        blk = blk[:blk.index("\nfunction ", 1)] if "\nfunction " in blk[1:] else blk
+        # 钉行首, 不是钉子串 —— `{false && <FlipTradesPanel …/>}` 照样含有它。
+        # 这是本轮变异测试第二次抓到同一个形状(R287 ⑭ 是第一次)。
+        assert "\n      <FlipTradesPanel" in blk, f"{fn} 没有无条件挂上这一栏"
+        assert blk.index(after) < blk.index("<FlipTradesPanel") < blk.index(before), (
+            f"{fn} 里这一栏的位置不对"
+        )
+
+
+def test_R288_两栏的口径各写各的():
+    """两栏长得一样, 所以**口径那一句是唯一能分辨它们的东西**, 不许省。"""
+    from tests.frontend_source import code_of
+    dlg = code_of("components/stock-analysis/StockReviewDialog.tsx")
+    assert 'title="按转折买卖"' in dlg and 'title="按结论买卖"' in dlg
+    assert "转折次日开盘进出" in dlg, "六态那栏的口径没了"
+    assert "结论换档的次日开盘进出" in dlg, "结论那栏的口径没了"
+
+
+def test_R288_按清空模拟这件事要说出来():
+    """作者给「该止盈了」写的是「可落袋一部分」、给「大顶区域」写的是
+    「动仓位基调」—— 都不是清仓。这里一律按清空算, **比原话重**, 不说就是
+    拿一个我自己定的口径冒充作者的判定。"""
+    from tests.frontend_source import code_of
+    dlg = code_of("components/stock-analysis/StockReviewDialog.tsx")
+    i = dlg.index('title="按结论买卖"')
+    blk = dlg[i:i + 700]
+    assert "可落袋一部分" in blk and "按清空模拟" in blk, "没交代模拟得比原话重"
+    assert "拿着" in blk and "等着" in blk, "没交代这三种状态不动手"
+    # 光有这段文字不够 —— 得真的传进 `caveat`, 否则它只是躺在源码里。
+    # (变异测试抓到的: 把 prop 改名成 `x_caveat`, 上面几条照样全绿。)
+    #
+    # **必须用词边界。** 第一版写的是 `"caveat={" in blk` —— 而 `x_caveat={`
+    # 正好含有这个子串, 于是那次重测又漏了。断言被自己的字面量骗过去,
+    # 是这个仓库反复吃的那一课的又一个变种。
+    import re
+    assert re.search(r"\bcaveat=\{", blk), "这段话没通过 caveat 传给组件"
+
+
+def test_R287_组件真的把提醒印出来():
+    """`caveat` 与样本量、撞板那几条走同一个 `notes` 列表渲染。收了不印,
+    等于把该说的话吞掉 —— 这一栏最贵的就是这些"别当真"的提示。"""
+    code = _panel()
+    i = code.index("const notes = [")
+    assert "caveat," in code[i:i + 120], "caveat 没进 notes"
+    assert "notes.map(" in code, "notes 根本没渲染"

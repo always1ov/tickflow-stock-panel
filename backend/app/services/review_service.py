@@ -626,20 +626,27 @@ def review_for_symbol(repo, symbol: str, days: int = DEFAULT_DAYS) -> dict:
         # [R287] 「按转折买卖」—— 每两个转折之间到底赚了多少。口径与取舍全在
         # `flip_trades` 的 docstring 里。**只切窗口内的那一段**: 统计必须与
         # 屏幕上那 120 行的转折标记一一对得上, 拿暖机段一起算就对不上了。
-        "flip_trades": _flip_trades(steps[offset:], col("open")[offset:],
-                                    closes[offset:], lu[offset:], ld[offset:]),
+        "flip_trades": _trades(flip_trades.trend_days(steps[offset:]),
+                               col("open")[offset:], closes[offset:],
+                               lu[offset:], ld[offset:]),
+        # [R288] 同一台发动机, 换一套「什么时候该有仓位」。用户: 「通道结论这个
+        # 部分也能这样搞类似的统计吗」。**输入直接就是逐日行** —— 那些行里的
+        # verdict 就是「通道结论」页签上一张张卡片的来源, 所以统计与卡片天然对齐。
+        "verdict_trades": _trades(flip_trades.verdict_days(rows),
+                                  col("open")[offset:], closes[offset:],
+                                  lu[offset:], ld[offset:]),
         "rows": out_rows,
     }
 
 
-def _flip_trades(steps, opens, closes, lu, ld) -> dict:
-    """[R287] 「按转折买卖」+ 一个样本量标记。
+def _trades(days, opens, closes, lu, ld) -> dict:
+    """[R287] 「按…买卖」+ 一个样本量标记。**两个页签共用这一处。**
 
     `thin` 在这里挂而不在 `flip_trades` 里挂, 是因为门槛 `MIN_SIDE_EPISODES`
     归这个模块管(R191 定的 3 段)。搬一份常量过去就是同一个数两处定义 ——
     R286 刚为这件事立过规矩。
     """
-    got = flip_trades.simulate(steps, opens, closes, limit_up=lu, limit_down=ld)
+    got = flip_trades.simulate(days, opens, closes, limit_up=lu, limit_down=ld)
     got["thin"] = got["bull"]["scored"] < MIN_SIDE_EPISODES
     return got
 
