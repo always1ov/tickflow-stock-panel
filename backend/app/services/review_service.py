@@ -278,12 +278,18 @@ def _side_edge(outcomes: list[dict]) -> dict:
 
     返回 {level, label, text, bull, bear, spread}。level 取值:
 
-      both     买卖都能用   —— 转多之后真涨, 转空之后真跌
-      defense  只能用来卖   —— 转空确实跌, 但转多不涨
-      offense  只能用来买   —— 转多确实涨, 但转空也没怎么跌
-      flat     看不出差别   —— 在这只票上六态说明不了什么
-      inverted 说买的反而更差 —— 多头侧之后反而不如空头侧
+      both     买卖都能判断   —— 转多之后真涨, 转空之后真跌
+      defense  只能用来判断卖 —— 转空确实跌, 但转多不涨
+      offense  只能用来判断买 —— 转多确实涨, 但转空也没怎么跌
+      flat     买卖都判断不了 —— 在这只票上六态说明不了什么
+      inverted 判断买的反而更差 —— 多头侧之后反而不如空头侧
       thin     样本不够, 不下结论
+
+    [R285] 五个档位名各加两个字, **点明它说的是「判断」而不是「动作」**。
+    用户指着「只能用来买」说: 「这类词都加多两个字, 比如只能用来判断买,
+    这样表述清楚」。原来那批名字有歧义 —— 「只能用来买」读起来像在叫人买入,
+    而它的意思是"这套判定在这只票上只有买那一侧灵"。**它评的是判定本身好不好使,
+    不是今天该干什么**; 少这两个字, 一个统计结论就被读成了操作指令。
 
     **defense / offense 是这一层最值钱的两个结论**: 它们说的是"这只票的六态
     只有一半能用", 而这件事在四个并排的均值里是看不出来的 —— 得把同侧的段
@@ -326,23 +332,23 @@ def _side_edge(outcomes: list[dict]) -> dict:
             f"空头侧 {bear['episodes']} 段平均 {r:+.1%})")
 
     if b < r:
-        out.update(level="inverted", label="说买的反而更差",
+        out.update(level="inverted", label="判断买的反而更差",
                    text="多头侧之后反而比空头侧更差 —— 样本这么小时多半是巧合, "
                         "但至少说明六态在这只票上没有正向信息, 别拿它做主要依据。" + tail)
     elif up_ok and down_ok:
-        out.update(level="both", label="买卖都能用",
+        out.update(level="both", label="买卖都能判断",
                    text="转多之后真涨、转空之后真跌 —— 这只票可以照六态找买点, "
                         "也可以照它离场。" + tail)
     elif down_ok:
-        out.update(level="defense", label="只能用来卖",
+        out.update(level="defense", label="只能用来判断卖",
                    text="转空之后确实跌, 但转多之后并不涨 —— 在这只票上, "
                         "六态是「离场信号」, 不是买入依据; 买点另找。" + tail)
     elif up_ok:
-        out.update(level="offense", label="只能用来买",
+        out.update(level="offense", label="只能用来判断买",
                    text="转多之后确实涨, 但转空之后也没怎么跌 —— 在这只票上, "
                         "六态是「买点线索」, 离场靠出场线与生命线, 别等它转空。" + tail)
     else:
-        out.update(level="flat", label="看不出差别",
+        out.update(level="flat", label="买卖都判断不了",
                    text="多头侧与空头侧之后的走势差不多 —— 在这只票上六态说明不了"
                         "什么, 排名和买卖点都别主要靠它。" + tail)
     return out
@@ -442,22 +448,22 @@ def _verdict_edge(outcomes: list[dict]) -> dict:
     out["spread"] = round(b - r, 4)
     tail = f"(说便宜的 {buy['episodes']} 段平均 {b:+.1%}, 说贵的 {sell['episodes']} 段平均 {r:+.1%})"
     if b >= SIDE_EDGE and r <= -SIDE_EDGE:
-        out.update(level="both", label="买卖都能用",
+        out.update(level="both", label="买卖都能判断",
                    text="说便宜的之后真涨、说贵的之后真跌 —— 这只票的通道结论可以照着做。" + tail)
     elif b >= SIDE_EDGE:
-        out.update(level="offense", label="只能用来买",
+        out.update(level="offense", label="只能用来判断买",
                    text="说便宜的之后确实涨, 但说贵的之后也没怎么跌 —— 拿它找买点, "
                         "别拿它当卖出理由。" + tail)
     elif r <= -SIDE_EDGE:
-        out.update(level="defense", label="只能用来卖",
+        out.update(level="defense", label="只能用来判断卖",
                    text="说贵的之后确实跌, 但说便宜的之后并不涨 —— 拿它躲开高位、找卖点, "
                         "买点另找依据。" + tail)
     elif b < r:
-        out.update(level="inverted", label="说买的反而更差",
+        out.update(level="inverted", label="判断买的反而更差",
                    text="说便宜的那几档之后反而比说贵的更差 —— 样本这么小时多半是巧合, "
                         "但至少说明通道结论在这只票上没有正向信息。" + tail)
     else:
-        out.update(level="flat", label="看不出差别",
+        out.update(level="flat", label="买卖都判断不了",
                    text="说便宜的和说贵的之后走势差不多 —— 在这只票上, 这个价位判断说明不了什么。" + tail)
     return out
 
