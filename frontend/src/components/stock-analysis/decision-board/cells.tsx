@@ -459,19 +459,13 @@ export function ChannelStateCell({ trend, geo, runs, ph, kc, close, trendCls,
               {trend.state_cn}{trend.intraday ? <span className="ml-0.5 opacity-70">*</span> : null}
             </span>
           ) : <span className="text-[12px] text-muted/30">—</span>}
-          {/* [R286] 今天是不是转折。用户: 「走势这一列还要显示今天是不是转折,
-              我在趋势状态那部分发现了这个参数」。
-              **用词与复盘逐日表那个标记完全一致**(都叫「转折」, 都是琥珀色) ——
-              同一件事在两个页面上必须是同一个词, 否则读的人得先确认它们是不是
-              一回事(AGENTS.md 规则 12)。复盘那边带个「←」是因为它指着左边那一行,
-              这里没有"左边那一行"可指, 所以只留词。
-              判定不在这里做: `flipped` 是后端给的, 与复盘同一个字段(见 R286 注)。 */}
-          {trend?.flipped && (
-            <span className="whitespace-nowrap text-[11px] font-medium text-amber-400"
-                  title="今天六态状态发生了翻转 —— 昨天还不是这个状态">
-              转折
-            </span>
-          )}
+          {/* [R286 加, R291 撤] 第一行那枚「转折」小标撤掉了。用户看着截图说
+              「显示不好看, 想想怎么设计今天就是转折的场景」——
+              **毛病是同一件事说了两遍**: 上面一枚琥珀「转折」, 下面一行琥珀
+              「转折后第 1 天」, 中间还夹着一个绿色徽标, 一个小格子里三种颜色、
+              两份同样的意思。
+              第二行本来就是"离转折多远"这个槽位, 转折当天它自己变成那句话就够了
+              (见下面)。**信息一点没少, 少的是重复。** */}
         </span>
         {/* [R277] 「走了多远」(成熟度)那一行**搬到独立的「间距」列**去了 ——
             用户: 「那把走势列的分离度拆分出来成为完整的一列」。见 SpreadCell。
@@ -493,10 +487,24 @@ export function ChannelStateCell({ trend, geo, runs, ph, kc, close, trendCls,
             一个事实, 并且直接回答扫这一列时真正想问的那句话 ——
             「这只票刚转, 还是已经走了一段?」
             三尺度对齐没删, 降进悬停当依据(R270「收起来, 不删」同一条路子)。 */}
+        {/* [R291] 转折当天**点亮成一枚芯片**, 平常是一枚同尺寸的透明框。
+            两点讲究:
+            ① **同一个盒子**(同样的 `px-1.5 py-px` 与边框宽度), 只是边框与底色
+               在平常那天是透明的 —— 于是**行高一格都不跳**, 一列扫下来
+               第二行的基线是齐的(R217「固定两行」那条规矩)。
+            ② 转折那天写「今天转折」而不是「转折后第 1 天」。两句话是同一个数,
+               但前者是大白话 —— 用户为这件事纠正过好几次(R206 档位名改大白话、
+               R284「别人看了会看不懂」、R285「加多两个字表述清楚」)。
+            琥珀色与复盘逐日表那个「转折」标记同色, 两个页面同一件事同一个颜色。 */}
         {trend ? (
-          <span className={`text-[11px] ${trend.flipped ? 'text-amber-400' : 'text-muted'}`}
-                title="从六态转折那天算起, 到今天第几个交易日。第 1 天就是今天刚转">
-            转折后第 {trend.duration} 天
+          <span className={`inline-flex whitespace-nowrap rounded border px-1.5 py-px text-[11px] ${
+            trend.flipped
+              ? 'border-amber-400/45 bg-amber-400/10 font-medium text-amber-300'
+              : 'border-transparent text-muted'}`}
+                title={trend.flipped
+                  ? '今天六态状态发生了翻转 —— 昨天还不是这个状态'
+                  : '从六态转折那天算起, 到今天第几个交易日'}>
+            {trend.flipped ? '今天转折' : <>转折后第 {trend.duration} 天</>}
           </span>
         ) : (
           <span className="text-transparent select-none text-[11px]">·</span>

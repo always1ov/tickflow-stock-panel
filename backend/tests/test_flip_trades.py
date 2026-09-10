@@ -883,3 +883,58 @@ def test_R290_决策台走势列不再印推断词():
     assert "转折后第 {trend.duration} 天" in render, "没换成「转折后第几天」"
     # 正面: 依据没丢, 还在悬停里
     assert "ph.align.cn" in blk[:blk.index("return (")], "三尺度对齐连悬停里都没了 —— 那是删不是收"
+
+
+def test_R291_转折那天只说一遍():
+    """用户看着截图: 「显示不好看, 想想怎么设计今天就是转折的场景」。
+
+    毛病是**同一件事说了两遍**: 第一行一枚琥珀「转折」小标, 第二行又是一行
+    琥珀「转折后第 1 天」, 中间还夹着一个绿色徽标 —— 一个小格子里三种颜色、
+    两份同样的意思。
+
+    现在合成一个槽位: 第二行本来就是"离转折多远", 转折当天它自己变成
+    「今天转折」。**信息一点没少, 少的是重复。**
+    """
+    from tests.frontend_source import code_of
+    code = code_of("components/stock-analysis/decision-board/cells.tsx")
+    blk = code[code.index("export function ChannelStateCell"):]
+    render = blk[blk.index("return ("):]
+    assert "今天转折" in render, "转折当天没有那句大白话"
+    assert "转折后第 {trend.duration} 天" in render, "平常那天的天数没了"
+    # 反面: 第一行不许再挂一枚独立的转折小标。
+    # **先剥掉 title 属性** —— 悬停里解释「什么叫转折」是应该的, 它不占版面,
+    # 不算重复。第一版没剥就直接数, 把两句 title 也数进去了。
+    import re
+    visible = re.sub(r'title=(?:"[^"]*"|\{(?:[^{}]|\{[^{}]*\})*\})', "", render, flags=re.S)
+    assert visible.count("转折") == 2, (
+        f"「转折」在可见文案里出现了 {visible.count('转折')} 次(该是 2: "
+        f"「今天转折」与「转折后第 N 天」这两个互斥分支) —— 多半又多了一处重复"
+    )
+
+
+def test_R291_两种状态用同一个盒子():
+    """行高不许跳。转折那天是芯片、平常是纯文字的话, 一列扫下来第二行的
+    基线会一行一个样(R217「固定两行」那条规矩)。所以两种状态共用同一套
+    `px-1.5 py-px` 与同样宽的边框, 只是平常那天边框透明。
+    """
+    from tests.frontend_source import code_of
+    code = code_of("components/stock-analysis/decision-board/cells.tsx")
+    blk = code[code.index("export function ChannelStateCell"):]
+    i = blk.index("今天转折")
+    box = blk[i - 700:i]
+    assert "inline-flex whitespace-nowrap rounded border px-1.5 py-px" in box, (
+        "两种状态没共用同一个盒子 —— 转折那行会比别的行高一截"
+    )
+    assert "border-transparent" in box, "平常那天的边框没设成透明"
+
+
+def test_R291_判定仍然只读后端那个字段():
+    """R286 立的规矩: `flipped` 是后端给的, 前端不许自己从 `duration` 推。
+    这次改的是**长什么样**, 不是**怎么判**。"""
+    from tests.frontend_source import code_of
+    code = code_of("components/stock-analysis/decision-board/cells.tsx")
+    blk = code[code.index("export function ChannelStateCell"):]
+    render = blk[blk.index("return ("):]
+    assert "trend.flipped ?" in render, "没读后端那个字段"
+    for derived in ("duration === 1", "duration == 1", "duration <= 1"):
+        assert derived not in render, f"又从 `{derived}` 自己推转折了"

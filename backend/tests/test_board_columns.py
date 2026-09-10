@@ -658,8 +658,14 @@ def test_R261_徽标与第二行仍各自按含义上色():
     root = _BOARD.parent
     cells = (root / "decision-board" / "cells.tsx").read_text(encoding="utf-8")
     assert "${trendCls ?? ''}" in cells, "六态徽标的配色没了"
-    assert "trend.flipped ? 'text-amber-400' : 'text-muted'" in cells, (
-        "第二行的配色没了 —— 转折那天该是琥珀色, 与逐日表那个标记同色"
+    # [R291] 转折那天点亮成一枚芯片(边框+底色+琥珀字), 平常是同尺寸的透明框 ——
+    # 同一个盒子只换颜色, 所以行高一格都不跳。守的规矩没变: 这一行的颜色
+    # 必须说这一行自己的意思(今天是不是转折)。
+    assert "border-amber-400/45 bg-amber-400/10 font-medium text-amber-300" in cells, (
+        "转折那天没点亮 —— 那一行该是琥珀芯片, 与复盘逐日表那个标记同色"
+    )
+    assert "'border-transparent text-muted'" in cells, (
+        "平常那天的透明框没了 —— 没有它, 转折行会比别的行高一截"
     )
 
 
