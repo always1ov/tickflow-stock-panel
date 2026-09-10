@@ -239,3 +239,15 @@ def test_R279_原始值没被登记成分组维度():
     src = Path(score_ledger.__file__).read_text(encoding="utf-8")
     code = "\n".join(ln for ln in src.splitlines() if not ln.lstrip().startswith("#"))
     assert '"key": "accel_a1"' not in code, "原始值被登记成分组维度了"
+
+
+def test_R280_AGENTS里那条规矩指向的是这个文件():
+    """AGENTS.md 第 12 条把这份名词表写成了执行入口。**指向不存在的文件 = 又一条
+    说假话的注释** —— 这仓库刚因为一句「与 SPREAD_CURVE 对齐」栽过(那个名字全仓
+    不存在)。规矩与它的执行处得对得上。
+    """
+    doc = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
+    assert "全局表达一致" in doc, "AGENTS.md 里那条规矩没了"
+    rel = "backend/tests/test_terminology.py"
+    assert rel in doc, f"规矩没指向执行处({rel})"
+    assert (ROOT / rel).exists()
