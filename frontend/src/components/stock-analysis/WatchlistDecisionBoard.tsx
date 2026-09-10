@@ -36,8 +36,16 @@ type Signal = { signal: string; confidence: number; reason: string; close: numbe
 // 后两个本来就**没有任何表头能选中**, 是死代码。
 // [R277] `spread` 回到排序键里。R254 当初删它是因为它**点不到**(只能靠"轮换
 // 目标"够着), 而不是因为按间距排没用 —— 现在它有了自己的表头, 前提变了。
+// [R284] `held` / `cost` / `report` 三个键删掉了 —— 它们的表头随列合并消失,
+// 留着就是**点不到的死键**(R254 立的规矩, R277 已把它做成了机器核对)。
+//
+// 各自的去处:
+//   · held   —— 「只看持有」那个按钮本来就在做这件事, 排序是重复入口
+//   · cost   —— 按成本价排 166 只票没有任何决策含义
+//   · report —— 「上次 AI 分析是什么时候」不是决策输入; 胶囊照旧可点开
+// 合并后的「持仓」列排 `pnl`(亏最多的先看), 「AI 信号」列照旧排 `signal`。
 type SortKey = 'urgency' | 'name' | 'changePct' | 'trend' | 'spread' | 'play'
-  | 'held' | 'cost' | 'pnl' | 'signal' | 'report'
+  | 'pnl' | 'signal'
 const SIGNAL_RANK: Record<string, number> = { buy: 0, sell: 1, hold: 2, watch: 3 }
 /**
  * [R194] 决策台的列宽表 —— colgroup 与空表提示的 colSpan 同源。
@@ -68,7 +76,7 @@ const BOARD_COLS = [
   // 出来成为完整的一列」。它与加速度是同一个量的一阶与二阶(实测: 间距 ≈ 50×速度,
   // 加速度是它的变化率), 所以两个读数同格 —— 详见 cells.tsx 的 SpreadCell。
   // 走势列因此从三行降到两行, 宽度 11%→9%, 匀 5% 给这一列。
-  { label: '间距', w: '5.5%' },
+  { label: '进度', w: '5.5%' },
   // [R212] 「贵不贵」(位置) + 「怎么办」(动作) 合成一列, 竖排, 摆在 AI 之前。
   // 用户: 「贵不贵在上换行怎么办在下」「结论这行放在 ai 分析前一列」。
   // 顺序是有讲究的: 上面是事实(这个价算贵还是便宜), 下面是结论(所以今天该干嘛)。
@@ -77,14 +85,18 @@ const BOARD_COLS = [
   // 好顺序调整显示和列」。**原来它们把判断切开了** —— 扫表时要连着读
   // 「走势 → 结论」, 中间却横着三列只有持仓那几只才用得上的账目。
   // 现在一行从左到右是: 认票 → 凭什么 → 我的账 → 别人的意见。
-  { label: '仓位', w: '3%' },
-  { label: '成本', w: '5.5%' },        // 两个输入框
-  { label: '浮盈', w: '3.5%' },
-  // [R283] 7% → 4%。这一列只有一枚报告胶囊和两个 6×6 的图标按钮, 却按第三宽的
-  // 比例占着位置; 而右边「结论」那一列要塞三枚徽标加一整段理由, 一直被挤到折行。
-  // **固定列总和守恒**(64.5%), 省下来的 3% 里 2% 给结论、其余补给标的/走势/间距 ——
-  // 字号整档上调之后, 这几列的内容都比原来要更多横向空间。
-  { label: 'AI 分析', w: '4%' },     // R130 上下两行: 报告胶囊 / ✨分析 + 🔔提醒
+  // [R284] **「成本」「浮盈」两列删掉**(用户: 「删除掉浮盈和成本列」), 只留「持仓」。
+  //
+  // 它们为 5% 的行占着 9% 的宽度: 持有 8 只 / 自选 166 只 —— 另外 158 行两格全是
+  // 一个 `—`。浮盈是**派生量**(现价与成本一减就有), 模拟盘与持仓页都在算;
+  // 决策台是用来"今天该动哪只"的, 赚了多少不进这个判断。
+  //
+  // **成本输入框保留, 挪进这一格**(只在持有时长出来): 它不是展示而是**录入**,
+  // 而且是出场线(止盈/止损)的输入 —— 整个删掉等于把那条线的来源砍了一半。
+  { label: '持仓', w: '5%' },
+  // [R284] 「AI 分析」整列撤掉 —— 用户: 「仅保留对投资决策最具影响力和决定性的
+  // 核心数据列」。**它压根不是数据列**: 一枚报告胶囊 + 两个图标按钮, 是操作入口。
+  // 三件东西并进「AI 信号」那一列的头一行(与信号徽标、时间同排), 一个不少。
   { label: 'AI 信号', w: '' },       // 不给宽度, 吃掉剩下的 —— 只有它是整段文字
 ] as const
 
@@ -101,6 +113,58 @@ const SIGNAL_META: Record<string, { label: string; cls: string }> = {
   sell: { label: '卖出', cls: 'border-emerald-400/40 bg-emerald-400/10 text-emerald-400' },
   hold: { label: '持有', cls: 'border-amber-400/40 bg-amber-400/10 text-amber-400' },
   watch: { label: '观望', cls: 'border-border bg-base text-muted' },
+}
+
+/**
+ * [R284] 「AI 分析」那一列撤掉之后, 它的三件东西(报告胶囊 / ✨生成分析 / 🔔点位提醒)
+ * 收成这个小组件, 挂在「AI 信号」列的头一行。
+ *
+ * 用户: 「仅保留对投资决策最具影响力和决定性的核心数据列」——
+ * **它压根不是数据列, 是操作入口**, 不该按第三宽的比例占着一整列。
+ *
+ * 抽成组件是因为它要在**两支**里各出一次: 有信号的那支挂在徽标旁边, 没信号的
+ * 那支挂在「未分析」旁边 —— 后者一漏, 没跑过分析的票就再也点不到那个 ✨。
+ *
+ * 配色: 报告胶囊原来是**紫色**, 这次去掉了。紫色在这张表里不表达任何市场含义
+ * (它只说"有报告"), 而表里每一种颜色都该有含义 —— 见 R284 的配色收敛。
+ */
+function AiActions({ r, onAnalyze, onPriceAlert, reports }: {
+  r: { symbol: string; name: string }
+  onAnalyze?: (symbol: string, name: string) => void
+  onPriceAlert?: (symbol: string, name: string) => void
+  reports?: { latest: { id: string; created_at: string }; count: number }
+}) {
+  const iconCls = 'grid h-6 w-6 place-items-center rounded-btn text-muted/50 '
+    + 'transition-colors duration-hover hover:bg-elevated hover:text-sky-300'
+  return (
+    <span className="inline-flex items-center gap-1">
+      {!!reports && (
+        <button
+          onClick={() => openHistoryReport(reports.latest.id)}
+          title={`打开最近报告(${new Date(reports.latest.created_at).toLocaleString()})${reports.count > 1 ? ` · 共 ${reports.count} 份` : ''}`}
+          className="inline-flex items-center gap-1 rounded-btn border border-border bg-elevated/60 px-1.5 py-0.5 text-[11px] text-secondary transition-colors duration-hover hover:text-foreground cursor-pointer"
+        >
+          <FileText className="h-2.5 w-2.5 shrink-0" />
+          {fmtAgo(reports.latest.created_at)}
+          {reports.count > 1 && <span className="opacity-60">·{reports.count}</span>}
+        </button>
+      )}
+      {onAnalyze && (
+        <button onClick={() => onAnalyze(r.symbol, r.name)}
+                title={`对 ${r.name} 生成/更新 AI 四维分析`}
+                aria-label={`对 ${r.name} 生成 AI 分析`} className={iconCls}>
+          <Sparkles className="h-3 w-3" />
+        </button>
+      )}
+      {onPriceAlert && (
+        <button onClick={() => onPriceAlert(r.symbol, r.name)}
+                title={`为 ${r.name} 设置价格点位提醒`}
+                aria-label={`为 ${r.name} 设置点位提醒`} className={iconCls}>
+          <Bell className="h-3 w-3" />
+        </button>
+      )}
+    </span>
+  )
 }
 
 function fmtAgo(iso?: string): string {
@@ -190,7 +254,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
     // 用 |间距| 的话, 一只崩得最惨的票会和一只走得最强的票并排在顶上。
     spread: 'desc',
     changePct: 'desc',     // 涨最多在前
-    held: 'desc', cost: 'desc', pnl: 'desc', report: 'desc',
+    pnl: 'desc',           // 浮盈最高在前; 再点一下就是亏最多在前
   }
 
   /**
@@ -535,17 +599,11 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
         case 'play': return r.play ? r.play.order : 9
         case 'name': return r.name
         case 'changePct': return r.changePct
-        case 'held': return r.held ? 1 : 0
-        case 'cost': return r.cost
         case 'pnl': return r.pnl
         case 'trend': return r.trend ? -(TREND_RANK[r.trend.state] ?? 9) : null
         // [R277] 带符号 —— 正的是多头拉开, 负的是空头拉开, 两头不该混在一起
         case 'spread': return r.kc?.geo?.spread ?? null
         case 'signal': return r.sig ? (SIGNAL_RANK[r.sig.signal] ?? 9) : null
-        case 'report': {
-          const rep = reportsBySymbol.get(r.symbol)
-          return rep ? new Date(rep.latest.created_at).getTime() : null
-        }
       }
     }
     const arr = [...rows]
@@ -843,7 +901,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
                     onClick={() => cycleSort('trend')}
                     className={`${thBtn} whitespace-nowrap`}
 title={'两行: 六态趋势 / 价格·六态·均线三个尺度转到第几步。\n'
-                      + '「走到哪一步」与「还有没有劲」搬到右边的「间距」列了。\n\n'
+                      + '「走到哪一步」与「还有没有劲」搬到右边的「进度」列了。\n\n'
                       + '点这里按六态排: 多头在前 → 空头在前 → 回默认顺序。'}>
                     {/* [R250] 表头**只有「走势」两个字** —— 与「结论」那一列同一条:
                         排序目标是内部分层, 不该印在表头上。轮换照旧, 说明在悬停里。 */}
@@ -851,17 +909,21 @@ title={'两行: 六态趋势 / 价格·六态·均线三个尺度转到第几步
                     {caret('trend')}
                   </button>
                 </th>
-                {/* [R277] 间距 —— 从走势列拆出来的分离度 + 它的变化率(快慢)。 */}
+                {/* [R277] 从走势列拆出来的分离度 + 它的变化率(快慢)。
+                    [R284] 列名 **「间距」→「进度」**。用户: 「间距这个名称别人看了会
+                    看不懂, 换个能看懂的名称」。「间距」是内部测量词(短线中枢与长线
+                    中枢差多少), 外人无从理解; 而这一格下面两行写的是「走到中段」
+                    和「跌势在缓」—— **「进度」把这两行都读得通**, 「间距」一行都读不通。 */}
                 <th className="whitespace-nowrap px-1.5 py-2.5 font-normal text-center">
                   <button
                     onClick={() => cycleSort('spread')}
                     className={`${thBtn} whitespace-nowrap`}
-title={'两行: 短线中枢与长线中枢拉开多少(刚起步/走到中段/走了很长/走过头了)\n'
+title={'两行: 这一段走到哪一步了(刚起步/走到中段/走了很长/走过头了)\n'
                       + '      / 这个速度还撑不撑得住(还在加速/速度平稳/正在放慢…)。\n\n'
-                      + '这两个读数是同一个量的两层: 间距量的是**现在走得多快**,\n'
+                      + '这两个读数是同一个量的两层: 上面一行量的是**现在走得多快**,\n'
                       + '快慢量的是**这个速度在往哪变**。数字在悬停里。\n\n'
-                      + '点这里按间距排(带符号): 多头拉得最开在前 → 空头拉得最开在前 → 回默认顺序。'}>
-                    间距
+                      + '点这里按进度排(带符号): 多头走得最远在前 → 空头走得最远在前 → 回默认顺序。'}>
+                    进度
                     {caret('spread')}
                   </button>
                 </th>
@@ -882,10 +944,16 @@ title={'两行: 上面是**位置** —— 这个价现在算高还是算低,\n'
                     {caret('play')}
                   </button>
                 </th>
-                <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center"><button onClick={() => cycleSort('held')} className={thBtn}>仓位{caret('held')}</button></th>
-                <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center"><button onClick={() => cycleSort('cost')} className={thBtn} title="持仓成本价(仅持有且填了成本的票有)">成本{caret('cost')}</button></th>
-                <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center"><button onClick={() => cycleSort('pnl')} className={thBtn}>浮盈{caret('pnl')}</button></th>
-                <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center"><button onClick={() => cycleSort('report')} className={thBtn} title="最近一份 AI 分析报告(点击胶囊打开) · ✨生成/更新分析 · 🔔点位提醒">AI 分析{caret('report')}</button></th>
+                {/* [R284] 账目三列并一列。表头也只剩一个, 排序目标取「浮盈」——
+                    「拿没拿」由「只看持有」那个按钮回答, 成本价排序没有决策含义。 */}
+                <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center">
+                  <button onClick={() => cycleSort('pnl')} className={thBtn}
+title={'我在这只票上的账: 拿没拿 / 买入成本 / 现在浮盈多少。\n'
+                            + '空仓时这一格只有一个按钮 —— 点它切成持有。\n\n'
+                            + '点这里按浮盈排: 赚最多在前 → 亏最多在前 → 回默认顺序。'}>
+                    持仓{caret('pnl')}
+                  </button>
+                </th>
                 <th className="whitespace-nowrap px-4 py-2.5 font-normal text-left"><button onClick={() => cycleSort('signal')} className={thBtn}>AI 信号{caret('signal')}</button></th>
               </tr>
             </thead>
@@ -960,111 +1028,45 @@ title={'两行: 上面是**位置** —— 这个价现在算高还是算低,\n'
                                     energy={r.kc?.energy} ph={r.ph} p={r.play}
                                     stateRun={r.kc?.state_run}
                                     onOpen={() => setReview({ symbol: r.symbol, name: r.name, tab: 'verdict' })} />
-                    {/* [R249] 账目三格挪到判断之后 —— 原来它们横在
-                        「现价」与「走势」之间, 把要连着读的两列判断切开了。 */}
-                    {/* 仓位:持有/空仓 切换。
+                    {/* [R284] **账目从三格收成一格。** 用户: 「删除掉浮盈和成本列」。
+                        空仓(158/166 行)时这一格只有一个按钮; 持有时才长出成本输入。
                         [R169] 写回时一律用 manualCost 而不是 r.cost —— r.cost 可能是批次
-                        派生出来的, 直接回写会把"批次算的"固化成"我填的", 之后改批次就不
-                        跟着动了。派生值必须保持派生。 */}
+                        派生出来的, 直接回写会把"批次算的"固化成"我填的"。派生值必须保持派生。 */}
                     <td className={`${TD_BASE} whitespace-nowrap px-2 text-center`}>
-                      <button
-                        onClick={() => setPos.mutate({ symbol: r.symbol, held: !r.held, cost: manualCost, weight: r.weight })}
-                        className={`whitespace-nowrap text-[12px] px-1.5 py-0.5 rounded border transition-colors cursor-pointer ${
-                          r.held ? 'border-amber-400/40 bg-amber-400/10 text-amber-400' : 'border-border bg-base text-muted hover:border-amber-400/30'
-                        }`}
-                      >
-                        {r.held ? '持有' : '空仓'}
-                      </button>
-                      {/* [R215] 仓% 输入框撤掉。用户: 「不需要仓位比例」。
-                          R212 把它从「成本」格挪到这里, 这一轮索性不显示了 ——
-                          这一格只回答一件事: 这只票拿没拿。
-
-                          **存着的值没有删**: 上面 setPos 一直原样带着 r.weight 回写,
-                          所以以前填过的仓位比例仍然在, 今日总览的组合总仓位、
-                          净值回撤纪律照旧按它算。只是不再有地方新填。 */}
-                    </td>
-                    {/* 成本+仓位%:仅持有时可填。生命线=20日线, 自动计算无需手填;
-                        仓位% 供今日总览算组合总仓位/净值回撤, 不填不影响其他功能。
-
-                        [R169] 成本框只装**手填值**: 批次页登记过而这里没填的, 走
-                        placeholder 显示批次加权均价(带「批」字), 一眼能分清"我填的"
-                        和"批次算的"。想改成自己的口径就直接往里敲, 敲了即变手填。 */}
-                    <td className={`${TD_BASE} whitespace-nowrap px-2`}>
-                      {r.held ? (
-                        <span className="inline-flex items-center gap-1">
-                          <input
-                            type="number"
-                            defaultValue={manualCost ?? ''}
-                            placeholder={r.costSource === 'lots' && r.lotCost != null ? `批 ${r.lotCost.toFixed(2)}` : '成本'}
-                            title={r.costSource === 'lots' && r.lotCost != null
-                              ? `成本来自「持仓提醒」页的 ${r.lotCount} 笔批次(数量加权均价 ${r.lotCost.toFixed(2)})。这里留空即跟随批次; 填了数字则以填的为准。`
-                              : '买入成本(手填)'}
-                            onBlur={(e) => {
-                              const v = e.target.value === '' ? null : Number(e.target.value)
-                              if (v !== manualCost) setPos.mutate({ symbol: r.symbol, held: true, cost: v, weight: r.weight })
-                            }}
-                            className={`w-16 h-6 px-1 rounded bg-base border text-[13px] ${NUM} text-right text-foreground focus:outline-none focus:border-accent/50 ${
-                              r.costSource === 'lots' ? 'border-accent/35 placeholder:text-accent/70' : 'border-border'
-                            }`}
-                          />
-                          <LotsLink symbol={r.symbol} lotCount={r.lotCount} driftPct={r.costDriftPct} lotCost={r.lotCost} />
-                        </span>
-                      ) : (
-                        // 空仓但批次还挂着 —— 多半是卖出后忘了删批次, 那两条监控规则还在跑
-                        r.lotCount > 0
-                          ? <LotsLink symbol={r.symbol} lotCount={r.lotCount} driftPct={null} lotCost={null} stale />
-                          : <span className="text-muted">—</span>
-                      )}
-                    </td>
-                    {/* 浮盈 */}
-                    <td className={`${TD_BASE} ${NUM} whitespace-nowrap px-2 ${r.pnl == null ? 'text-muted' : r.pnl > 0 ? 'text-red-400' : r.pnl < 0 ? 'text-emerald-400' : 'text-muted'}`}>
-                      {r.pnl != null ? `${(r.pnl * 100).toFixed(1)}%` : '—'}
-                    </td>
-                    {/* [R106] AI 分析列: 报告胶囊(点开最近报告) + ✨生成/更新分析 + 🔔点位提醒
-                        —— 原页头两个按钮整合到这里, 每个标的都有自己的一对动作 */}
-                    <td className={`${TD_BASE} whitespace-nowrap px-2 text-center`}>
-                      {/* [R130] 上下结构: 报告胶囊一行、两个动作一行。
-                          原来三件横排挤在 7% 宽的列里, 胶囊里的「17天前」被压得
-                          几乎贴着图标。竖过来之后胶囊能吃满列宽, 图标也不再被挤,
-                          顺带把两个图标按钮的点击区从 p-1 放大到 6×6。 */}
                       <div className="inline-flex flex-col items-center gap-1">
-                        {(() => {
-                          const rep = reportsBySymbol.get(r.symbol)
-                          if (!rep) return null
-                          return (
-                            <button
-                              onClick={() => openHistoryReport(rep.latest.id)}
-                              title={`打开最近报告(${new Date(rep.latest.created_at).toLocaleString()})${rep.count > 1 ? ` · 共 ${rep.count} 份` : ''}`}
-                              className="inline-flex w-full items-center justify-center gap-1 rounded-btn border border-violet-400/30 bg-violet-400/10 px-1.5 py-0.5 text-[12px] text-violet-300 transition-colors duration-hover hover:bg-violet-400/20 cursor-pointer"
-                            >
-                              <FileText className="h-2.5 w-2.5 shrink-0" />
-                              {fmtAgo(rep.latest.created_at)}
-                              {rep.count > 1 && <span className="text-violet-300/60">·{rep.count}</span>}
-                            </button>
-                          )
-                        })()}
-                        <div className="flex items-center gap-1.5">
-                          {onAnalyze && (
-                            <button
-                              onClick={() => onAnalyze(r.symbol, r.name)}
-                              title={`对 ${r.name} 生成/更新 AI 四维分析`}
-                              aria-label={`对 ${r.name} 生成 AI 分析`}
-                              className="grid h-6 w-6 place-items-center rounded-btn text-sky-300/60 transition-colors duration-hover hover:bg-sky-400/10 hover:text-sky-300"
-                            >
-                              <Sparkles className="h-3 w-3" />
-                            </button>
-                          )}
-                          {onPriceAlert && (
-                            <button
-                              onClick={() => onPriceAlert(r.symbol, r.name)}
-                              title={`为 ${r.name} 设置价格点位提醒`}
-                              aria-label={`为 ${r.name} 设置点位提醒`}
-                              className="grid h-6 w-6 place-items-center rounded-btn text-sky-300/60 transition-colors duration-hover hover:bg-sky-400/10 hover:text-sky-300"
-                            >
-                              <Bell className="h-3 w-3" />
-                            </button>
-                          )}
-                        </div>
+                        <button
+                          onClick={() => setPos.mutate({ symbol: r.symbol, held: !r.held, cost: manualCost, weight: r.weight })}
+                          className={`whitespace-nowrap text-[12px] px-1.5 py-0.5 rounded border transition-colors cursor-pointer ${
+                            r.held ? 'border-accent/40 bg-accent/10 text-accent' : 'border-border bg-base text-muted hover:border-accent/30'
+                          }`}
+                        >
+                          {r.held ? '持有' : '空仓'}
+                        </button>
+                        {r.held ? (
+                          <span className="inline-flex items-center gap-1">
+                            <input
+                              type="number"
+                              defaultValue={manualCost ?? ''}
+                              placeholder={r.costSource === 'lots' && r.lotCost != null ? `批 ${r.lotCost.toFixed(2)}` : '成本'}
+                              title={r.costSource === 'lots' && r.lotCost != null
+                                ? `成本来自「持仓提醒」页的 ${r.lotCount} 笔批次(数量加权均价 ${r.lotCost.toFixed(2)})。这里留空即跟随批次; 填了数字则以填的为准。`
+                                : '买入成本(手填) —— 出场线按它算'}
+                              onBlur={(e) => {
+                                const v = e.target.value === '' ? null : Number(e.target.value)
+                                if (v !== manualCost) setPos.mutate({ symbol: r.symbol, held: true, cost: v, weight: r.weight })
+                              }}
+                              className={`w-14 h-6 px-1 rounded bg-base border text-[12px] ${NUM} text-right text-foreground focus:outline-none focus:border-accent/50 ${
+                                r.costSource === 'lots' ? 'border-accent/35 placeholder:text-accent/70' : 'border-border'
+                              }`}
+                            />
+                            <LotsLink symbol={r.symbol} lotCount={r.lotCount} driftPct={r.costDriftPct} lotCost={r.lotCost} />
+                          </span>
+                        ) : (
+                          // 空仓但批次还挂着 —— 多半是卖出后忘了删批次, 那两条监控规则还在跑
+                          r.lotCount > 0
+                            ? <LotsLink symbol={r.symbol} lotCount={r.lotCount} driftPct={null} lotCost={null} stale />
+                            : null
+                        )}
                       </div>
                     </td>
                     {/* AI 信号:徽标 + 时间 + 理由整段换行(不截断)。
@@ -1075,11 +1077,13 @@ title={'两行: 上面是**位置** —— 这个价现在算高还是算低,\n'
                     <td className={`${TD_BASE} px-4 !text-left`}>
                       {r.sig ? (
                         <div className="flex flex-col gap-0.5">
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
                             <span className={`text-[12px] px-1.5 py-0.5 rounded border ${SIGNAL_META[r.sig.signal]?.cls ?? 'border-border text-muted'}`}>
                               {SIGNAL_META[r.sig.signal]?.label ?? r.sig.signal}
                             </span>
                             <span className="text-[11px] text-muted/50">{fmtAgo(r.sig.created_at)}</span>
+                            <AiActions r={r} onAnalyze={onAnalyze} onPriceAlert={onPriceAlert}
+                                       reports={reportsBySymbol.get(r.symbol)} />
                           </div>
                           {r.sig.reason && (
                             <span className="text-[12px] text-muted/80 leading-snug whitespace-normal break-words">{r.sig.reason}</span>
@@ -1110,7 +1114,14 @@ title={'两行: 上面是**位置** —— 这个价现在算高还是算低,\n'
                           )}
                         </div>
                       ) : (
-                        <span className="text-[12px] text-muted/50">未分析</span>
+                        /* [R284] **从没分析过的票也得够得着** —— AI 分析列撤掉之后
+                           操作入口只剩这里; 这一支要是只印「未分析」, 那些没跑过
+                           分析的票就再也点不到那个 ✨ 了。 */
+                        <span className="flex items-center gap-1.5">
+                          <span className="text-[12px] text-muted/50">未分析</span>
+                          <AiActions r={r} onAnalyze={onAnalyze} onPriceAlert={onPriceAlert}
+                                       reports={reportsBySymbol.get(r.symbol)} />
+                        </span>
                       )}
                     </td>
                   </tr>

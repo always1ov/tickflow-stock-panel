@@ -60,11 +60,16 @@ def test_列的顺序是_认票_凭什么_我的账_别人的意见():
     """这条把**顺序本身**钉住 —— 它是这次重排的全部内容, 不写下来下次就会漂回去。"""
     assert _cols(_src()) == [
         "标的", "现价/涨跌",          # 认票
-        # [R277] 「间距」从「走势」里拆出来独立成列 —— 它仍属"凭什么"那一段,
-        # 所以插在走势与结论之间, 而不是丢到账目后面。
-        "走势", "间距", "结论",       # 凭什么(判断必须连着, 不许被账目切开)
-        "仓位", "成本", "浮盈",       # 我的账
-        "AI 分析", "AI 信号",         # 别人的意见
+        # [R277] 从「走势」里拆出来独立成列 —— 它仍属"凭什么"那一段, 所以插在
+        # 走势与结论之间。[R284] 列名「间距」→「进度」(用户: 别人看不懂)。
+        "走势", "进度", "结论",       # 凭什么(判断必须连着, 不许被账目切开)
+        # [R284] 「成本」「浮盈」两列删掉(用户: 「删除掉浮盈和成本列」)——
+        # 它们为 5% 的行占着 9% 的宽度(持有 8 / 自选 166)。成本**输入框**保留,
+        # 挪进这一格: 它是出场线的输入, 不是展示。
+        "持仓",                       # 我的账
+        # [R284] 「AI 分析」整列撤掉 —— 它不是数据列, 是操作入口(胶囊 + 两个图标),
+        # 并进「AI 信号」列的头一行。
+        "AI 信号",                    # 别人的意见
     ]
 
 
@@ -72,8 +77,8 @@ def test_账目三列必须排在判断之后():
     """R249 之前它们在「现价」与「走势」之间。这条独立于上面那条写 ——
     就算以后列增减, **判断不许被账目切开**这条纪律也得留着。"""
     cols = _cols(_src())
-    judge = max(cols.index("走势"), cols.index("间距"), cols.index("结论"))
-    ledger = min(cols.index("仓位"), cols.index("成本"), cols.index("浮盈"))
+    judge = max(cols.index("走势"), cols.index("进度"), cols.index("结论"))
+    ledger = cols.index("持仓")     # [R284] 账目从三列收成一列
     assert ledger > judge, (
         f"账目列插到判断列中间了 —— 扫表时「走势→结论」读不连贯。当前顺序: {cols}"
     )
@@ -143,9 +148,9 @@ def test_R250_表头只印列名不印排序目标():
     # [R277] 「间距」从禁用词里拿掉了 —— **它现在是一个列名, 不再是排序目标**。
     # 但原来的意图一个字不改: 它不许再作为分层缀在「走势」头上。
     trend_th = render[render.index("走势") - 400:render.index("走势") + 200]
-    assert "间距" not in trend_th, "「间距」又缀回走势表头上了 —— 它该是独立一列"
+    assert "进度" not in trend_th, "「进度」又缀回走势表头上了 —— 它该是独立一列"
     # 正面: 列名都还在
-    for name in ("结论", "走势", "间距", "现价/涨跌"):
+    for name in ("结论", "走势", "进度", "现价/涨跌", "持仓"):
         assert name in render, f"表头把「{name}」弄丢了"
 
 
@@ -204,9 +209,10 @@ def test_R254_每列只剩一个排序目标():
     """一列多个目标是「点太多下」的根 —— 走势列曾经塞了 5 个(R211 三列并一列
     时带来的), 轮换一圈要 6 下。现在一列一个, 表头的箭头也就只需要认一个键。"""
     body = _board_body()
+    # [R284] held / cost / report 三个随列消失, 见 test_R254_点不到的排序键全删掉
     for one in ("caret('name')", "caret('changePct')", "caret('trend')",
-                "caret('play')", "caret('held')", "caret('cost')",
-                "caret('pnl')", "caret('report')", "caret('signal')"):
+                "caret('play')", "caret('spread')",
+                "caret('pnl')", "caret('signal')"):
         assert one in body, f"表头少了 {one}"
     # 反面: 不许再出现多目标的写法
     assert "caret('trend', " not in body and "caret('close'" not in body, (
@@ -228,13 +234,15 @@ def test_R254_点不到的排序键全删掉():
     # 有了自己的表头按钮。这条测的从来是"有没有够不着的死键", 不是"spread 不许
     # 存在"; 下面 `test_R277_每个排序键都够得着` 把这个意图直接测出来, 不再靠
     # 手写名单跟进(名单是要人记得改的东西, 而人不会记得)。
-    for dead in ("'close'", "'ks'", "'km'", "'kl'",
+    # [R284] held / cost / report 加进来 —— 它们的表头随列合并/撤销消失了
+    for dead in ("'close'", "'ks'", "'km'", "'kl'", "'held'", "'cost'", "'report'",
                  "'verdict'", "'exit'", "'confidence'"):
         assert dead not in keys, f"排序键 {dead} 点不到却还留着"
     # 比较器里也不该还有它们的分支
     cmp_ = body[body.index("const sortedRows"):]
     cmp_ = cmp_[:cmp_.index("const arr = ")]
-    for dead in ("case 'close'", "case 'ks'", "case 'verdict'",
+    for dead in ("case 'close'", "case 'ks'", "case 'verdict'", "case 'held'",
+                 "case 'cost'", "case 'report'",
                  "case 'exit'", "case 'confidence'"):
         assert dead not in cmp_, f"比较器里还留着 {dead} 的分支"
 
@@ -253,7 +261,10 @@ def test_R277_每个排序键都够得着():
     seg = body[body.index("type SortKey"):]
     seg = seg[:seg.index("\nconst SIGNAL_RANK")]
     keys = set(re.findall(r"'([a-zA-Z]+)'", seg))
-    assert len(keys) >= 10, f"没解析到排序键: {keys}"
+    # [R284] 原来这里写的是 `len(keys) >= 10` —— 那是想确认"解析真的解出来了",
+    # 却顺手把**键的个数**也钉住了; 列一增减就红, 而那跟这条测的东西无关。
+    # 改成点名几个必然存在的键: 解析坏了它们一个都出不来, 而加减列不影响。
+    assert {"urgency", "name", "signal"} <= keys, f"没解析到排序键: {keys}"
     src = _src()
     th = src[src.index("<thead"):src.index("</thead>")]
     # 默认排序键够得着 —— 它是"任一列点到第三下"回落的目标(cycleSort 的第三态),
@@ -330,7 +341,7 @@ def test_R251_越小越要紧的那几个必须升序打头():
         assert f"{key}: 'asc'" in block, f"{key} 的首次方向不是升序 —— {why}"
     for key, why in (("trend", "六态: 值取了负, 降序才是多头在前"),
                      ("changePct", "涨跌: 涨最多在前"),
-                     ("report", "AI 报告: 最新在前")):
+                     ("pnl", "持仓: 赚最多在前")):
         assert f"{key}: 'desc'" in block, f"{key} 的首次方向不是降序 —— {why}"
 
 
