@@ -1191,8 +1191,12 @@ export interface DataDoctorStore {
   cn: string
   /** user=不可重算(只能补齐) / derived=可重算(坏了删掉重跑) */
   kind: 'user' | 'derived'
+  /** [R272] 文件是怎么存的 —— 决定怎么读它(json / jsonl / parquet / dir / secret) */
+  fmt: string
   note: string
   exists: boolean
+  /** [R272] 占多大 —— 派生数据里最该清的往往就是最大的那个 */
+  bytes: number
   readable: boolean | null
   records: number | null
   /** 后加字段的缺失: 字段名 → 有几条缺它。这些能按默认值补齐 */

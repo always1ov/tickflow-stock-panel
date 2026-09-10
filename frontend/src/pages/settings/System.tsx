@@ -412,6 +412,11 @@ function DataDoctorSection() {
   const problems = (report?.stores ?? []).filter(
     s => s.exists && (s.readable === false || s.error
       || Object.keys(s.missing).length || Object.keys(s.incomplete).length))
+  // [R272] 派生数据里体积最大的几个 —— 删掉会自动重算, 是最省事的一档清理。
+  // 真机上 strategy_cache.json 有 10MB, 不把体积摆出来根本看不出该清哪个。
+  const bulky = (report?.stores ?? [])
+    .filter(s => s.exists && s.kind === 'derived' && s.bytes > 5 * 1024 * 1024)
+    .sort((a, b) => b.bytes - a.bytes)
 
   return (
     <section className="rounded-card border border-border bg-surface p-5 mt-6">
@@ -453,6 +458,11 @@ function DataDoctorSection() {
                   {s.kind === 'user' ? '用户数据 · 不可重算' : '派生数据 · 可重算'}
                 </span>
                 {s.records != null && <span className="text-[10px] text-muted">{s.records} 条</span>}
+                {s.bytes > 0 && (
+                  <span className="text-[10px] text-muted">
+                    {s.bytes > 1024 * 1024 ? `${(s.bytes / 1024 / 1024).toFixed(1)} MB` : `${(s.bytes / 1024).toFixed(1)} KB`}
+                  </span>
+                )}
                 {/* 补齐只对用户数据、且只补声明过默认值的那些 */}
                 {s.kind === 'user' && Object.keys(s.missing).length > 0 && (
                   <button
@@ -481,6 +491,22 @@ function DataDoctorSection() {
               {!!s.note && <p className="mt-0.5 text-[10px] text-muted/70">{s.note}</p>}
             </div>
           ))}
+
+          {bulky.length > 0 && (
+            <div className="rounded-btn border border-border/60 bg-elevated/20 px-3 py-2">
+              <div className="text-[11px] text-secondary">占地方的派生数据 —— 可重算,删了会自动重建</div>
+              <div className="mt-1 space-y-0.5">
+                {bulky.map(s => (
+                  <p key={s.rel} className="text-[10px] text-muted">
+                    <span className="text-secondary">{s.cn}</span>{' '}
+                    <span className="font-mono">{s.rel}</span> ·{' '}
+                    <b className="text-warning">{(s.bytes / 1024 / 1024).toFixed(1)} MB</b>
+                    {!!s.note && <span className="ml-1 opacity-70">{s.note}</span>}
+                  </p>
+                ))}
+              </div>
+            </div>
+          )}
 
           {report.orphans.length > 0 && (
             <div className="rounded-btn border border-border/60 bg-elevated/20 px-3 py-2">

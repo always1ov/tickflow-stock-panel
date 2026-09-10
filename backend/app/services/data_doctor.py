@@ -60,6 +60,19 @@ SHAPE_OPAQUE = "opaque"
 KIND_USER = "user"
 KIND_DERIVED = "derived"
 
+#: 文件是怎么存的 —— **和"记录怎么组织"是两回事, 第一版把这两件事混成了一维, 结果
+#: 拿 UTF-8 去读二进制 parquet、拿整份 `json.loads` 去读逐行 JSONL, 两处健康的数据
+#: 被报成「读不动」。体检误报比不报更糟: 人看两次假警报之后就再也不看它了。
+FMT_JSON = "json"
+"""整份是一个 JSON。"""
+FMT_JSONL = "jsonl"
+"""每行一个 JSON —— 整份丢给 `json.loads` 必然在第二行报 "Extra data"。"""
+FMT_PARQUET = "parquet"
+"""二进制列存 —— 一个字节都不能按文本读。"""
+FMT_DIR = "dir"
+FMT_SECRET = "secret"
+"""口令散列 / 明文 Key —— 一个字节都不读。"""
+
 
 @dataclass(frozen=True)
 class Store:
@@ -70,6 +83,8 @@ class Store:
     cn: str
     """给人看的名字。"""
     kind: str = KIND_USER
+    fmt: str = FMT_JSON
+    """怎么把它读进来。**跟 shape 是两回事** —— 见 FMT_* 的说明。"""
     shape: str = SHAPE_OPAQUE
     list_key: str = ""
     """record_list 藏在对象的哪个键下; 空表示文件本身就是数组。"""
@@ -86,8 +101,9 @@ class Store:
 
 #: 注册表。**新增任何 user_data 下的存储都要在这里登记** —— 有测试盯着。
 STORES: tuple[Store, ...] = (
-    Store("user_data/watchlist.parquet", "自选标的", shape=SHAPE_OPAQUE,
-          note="读盘时已自带老 schema 兼容(group_id → group_ids), 这里只查读不读得动"),
+    Store("user_data/watchlist.parquet", "自选标的", fmt=FMT_PARQUET,
+          fields={"symbol": None, "added_at": None, "note": None, "group_ids": None},
+          note="读盘时已自带老 schema 兼容(group_id → group_ids); 这里查列在不在, 不改"),
     Store("user_data/watchlist_groups.json", "自选分组", shape=SHAPE_RECORD_LIST,
           required=("id", "name"), fields={"color": "sky"},
           note="color 是后加的; 缺了前端会拿不到配色"),
@@ -120,20 +136,35 @@ STORES: tuple[Store, ...] = (
     Store("user_data/external_view_latest.json", "外部网页缓存", shape=SHAPE_OPAQUE,
           kind=KIND_DERIVED),
     Store("user_data/research_candidates.json", "回测候选池", shape=SHAPE_OPAQUE),
-    Store("user_data/alerts.jsonl", "告警流水", shape=SHAPE_OPAQUE,
-          note="逐行 JSONL, 只查读不读得动"),
-    Store("user_data/auth.json", "访问密码", shape=SHAPE_OPAQUE,
-          note="**不体检内容** —— 里面是口令散列, 不该被读出来放进任何报告"),
-    Store("user_data/secrets.json", "API Key", shape=SHAPE_OPAQUE,
-          note="**不体检内容** —— 里面是明文 Key, 不该被读出来放进任何报告"),
-    Store("user_data/lots", "持仓批次", shape=SHAPE_OPAQUE),
-    Store("user_data/monitor_rules", "监控规则", shape=SHAPE_OPAQUE),
-    Store("user_data/custom_signals", "自定义信号", shape=SHAPE_OPAQUE),
-    Store("user_data/custom_factors", "自定义因子", shape=SHAPE_OPAQUE),
-    Store("user_data/strategy_overrides", "策略参数覆盖", shape=SHAPE_OPAQUE),
-    Store("user_data/auction_scan", "竞价扫描", shape=SHAPE_OPAQUE, kind=KIND_DERIVED),
-    Store("user_data/news_desk", "消息面附件", shape=SHAPE_OPAQUE,
+    Store("user_data/alerts.jsonl", "告警流水", fmt=FMT_JSONL,
+          note="每行一个 JSON —— 整份 json.loads 必然在第二行报错, 得逐行读"),
+    Store("user_data/auth.json", "访问密码", fmt=FMT_SECRET,
+          note="**一个字节都不读** —— 里面是口令散列, 不该出现在任何报告里"),
+    Store("user_data/secrets.json", "API Key", fmt=FMT_SECRET,
+          note="**一个字节都不读** —— 里面是明文 Key, 不该出现在任何报告里"),
+    Store("user_data/lots", "持仓批次", fmt=FMT_DIR),
+    Store("user_data/monitor_rules", "监控规则", fmt=FMT_DIR),
+    Store("user_data/custom_signals", "自定义信号", fmt=FMT_DIR),
+    Store("user_data/custom_factors", "自定义因子", fmt=FMT_DIR),
+    Store("user_data/strategy_overrides", "策略参数覆盖", fmt=FMT_DIR),
+    Store("user_data/auction_scan", "竞价扫描", fmt=FMT_DIR, kind=KIND_DERIVED),
+    Store("user_data/news_desk", "消息面附件", fmt=FMT_DIR,
           note="图片凝练成功后原件即删, 目录里剩的是还没凝练成功的"),
+
+    # [R272] 下面这六处是**真机上跑了一次体检才发现漏登记的** —— 它们的路径不是
+    # `data_dir / "user_data" / "字面量"`, 而是走 `JsonReportStore(filename)` 或模块常量,
+    # 而第一版的守卫只认字面量, 于是它们全被当成了「孤儿」报给用户。
+    Store("user_data/ai_reports.json", "AI 大盘研判报告", kind=KIND_DERIVED,
+          shape=SHAPE_RECORD_LIST, required=("id",)),
+    Store("user_data/ai_stock_reports.json", "AI 个股分析报告", kind=KIND_DERIVED,
+          shape=SHAPE_RECORD_LIST, required=("id",)),
+    Store("user_data/ai_market_recaps.json", "AI 复盘归档", kind=KIND_DERIVED,
+          shape=SHAPE_RECORD_LIST, required=("id",)),
+    Store("user_data/ladder_ai_reports.json", "连板梯队 AI 复盘", kind=KIND_DERIVED,
+          shape=SHAPE_RECORD_LIST, required=("id",)),
+    Store("user_data/strategy_cache.json", "策略结果缓存", kind=KIND_DERIVED,
+          note="纯缓存, 最容易长得很大 —— 删掉会自动重算"),
+    Store("user_data/strategy_run_timings.json", "策略耗时统计", kind=KIND_DERIVED),
 )
 
 #: 内容一个字节都不读的存储 —— 里面是口令散列与明文 Key。
@@ -162,41 +193,99 @@ def _records(payload: Any, store: Store) -> list[dict] | None:
     return None
 
 
+def _read_payload(p: Path, store: Store, out: dict[str, Any]) -> Any | None:
+    """按声明的格式把内容读进来。读不动就在 out 上留下原因并返回 None。
+
+    **格式必须逐种处理, 不能一律 UTF-8 + json.loads。** 第一版就是那么写的, 于是
+    二进制 parquet 和逐行 JSONL 这两份完全健康的数据被报成「读不动」——
+    **体检误报比不报更糟**: 人看两次假警报之后就再也不看它了。
+    """
+    if store.fmt == FMT_SECRET:
+        out["readable"] = True
+        return None                      # 一个字节都不读
+    if store.fmt == FMT_PARQUET:
+        try:
+            import polars as pl
+            lf = pl.scan_parquet(p)
+            out["readable"] = True
+            out["records"] = int(lf.select(pl.len()).collect().item())
+            # parquet 的"字段"就是列 —— 缺列在这里查得出来
+            return {"__columns__": list(lf.collect_schema().names())}
+        except Exception as e:  # noqa: BLE001
+            out["readable"] = False
+            out["error"] = f"读不动: {e}"
+            return None
+    if store.fmt == FMT_JSONL:
+        bad = 0
+        rows: list[dict] = []
+        try:
+            for line in p.read_text(encoding="utf-8").splitlines():
+                if not line.strip():
+                    continue
+                try:
+                    obj = json.loads(line)
+                except Exception:  # noqa: BLE001, PERF203
+                    bad += 1
+                    continue
+                if isinstance(obj, dict):
+                    rows.append(obj)
+        except Exception as e:  # noqa: BLE001
+            out["readable"] = False
+            out["error"] = f"读不动: {e}"
+            return None
+        out["readable"] = True
+        out["records"] = len(rows)
+        if bad:
+            out["error"] = f"有 {bad} 行不是合法 JSON(多半是写到一半被打断的)"
+        return {"__rows__": rows}
+    try:
+        payload = json.loads(p.read_text(encoding="utf-8"))
+        out["readable"] = True
+        return payload
+    except Exception as e:  # noqa: BLE001
+        out["readable"] = False
+        out["error"] = f"读不动: {e}"
+        return None
+
+
 def inspect_store(data_dir: Path, store: Store) -> dict[str, Any]:
     """体检一处存储。**纯读, 不写盘。**"""
     p = Path(data_dir) / store.rel
     out: dict[str, Any] = {
-        "rel": store.rel, "cn": store.cn, "kind": store.kind,
-        "note": store.note, "exists": p.exists(),
+        "rel": store.rel, "cn": store.cn, "kind": store.kind, "fmt": store.fmt,
+        "note": store.note, "exists": p.exists(), "bytes": 0,
         "readable": None, "records": None,
         "missing": {}, "incomplete": {}, "error": "",
     }
     if not p.exists():
         return out
     if p.is_dir():
+        files = [f for f in p.rglob("*") if f.is_file()]
         out["readable"] = True
-        out["records"] = sum(1 for _ in p.rglob("*") if _.is_file())
+        out["records"] = len(files)
+        out["bytes"] = sum(f.stat().st_size for f in files)
         return out
-    if store.rel in NEVER_READ:
-        # 只看得见"在不在、多大", 内容一个字节不读
-        out["readable"] = True
-        out["records"] = None
-        return out
-    try:
-        payload = json.loads(p.read_text(encoding="utf-8"))
-        out["readable"] = True
-    except Exception as e:  # noqa: BLE001
-        out["readable"] = False
-        out["error"] = f"读不动: {e}"
+    out["bytes"] = p.stat().st_size
+
+    payload = _read_payload(p, store, out)
+    if payload is None:
         return out
 
-    rows = _records(payload, store)
-    if rows is None:
-        # opaque 或形状对不上都走这里。形状对不上本身值得报 —— 但只在声明了形状时才算异常
-        if store.shape != SHAPE_OPAQUE:
-            out["error"] = "结构和预期对不上(可能是更早的版本写的)"
+    # parquet: 只比列名
+    if isinstance(payload, dict) and "__columns__" in payload:
+        cols = set(payload["__columns__"])
+        out["missing"] = {k: out["records"] or 0 for k in store.fields if k not in cols}
         return out
-    out["records"] = len(rows)
+    if isinstance(payload, dict) and "__rows__" in payload:
+        rows: list[dict] | None = payload["__rows__"]
+    else:
+        rows = _records(payload, store)
+        if rows is None:
+            if store.shape != SHAPE_OPAQUE:
+                out["error"] = "结构和预期对不上(可能是更早的版本写的)"
+            return out
+        out["records"] = len(rows)
+
     for name in store.fields:
         n = sum(1 for r in rows if name not in r)
         if n:
@@ -223,8 +312,9 @@ def find_orphans(data_dir: Path) -> list[dict[str, Any]]:
         rel = f"{USER_DIR}/{p.name}"
         if rel in known:
             continue
-        # 备份文件是体检自己留下的, 不算孤儿
-        if ".bak-" in p.name or p.name.endswith(".tmp"):
+        # 备份不算孤儿: `.bak-时间戳` 是体检留的, `.bak` 是各个 store 自己留的
+        # (paper_traders / watchlist 保存时都会留一份)。把它们报成孤儿等于催人删备份。
+        if ".bak" in p.name or p.name.endswith(".tmp"):
             continue
         size = sum(f.stat().st_size for f in p.rglob("*") if f.is_file()) if p.is_dir() \
             else p.stat().st_size

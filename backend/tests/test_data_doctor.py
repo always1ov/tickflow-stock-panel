@@ -24,22 +24,56 @@ APP = Path(__file__).resolve().parents[1] / "app"
 # 注册表不许过时 —— 这一条是其余全部结论的前提
 # ================================================================
 
-def test_R271_注册表不许漏登记():
-    """扫源码里所有 `data_dir / "user_data" / "X"` 的引用, 没登记就红。
+#: [R272] 代码里出现、但**不在 user_data 下**的数据文件名 —— 逐条写明它在哪, 免得
+#: 把整类放行。这张排除表过时是**安全的**(顶多是忽略一个已经不存在的名字);
+#: 而下面那张注册表漏一项是**危险的**(体检会对着它说「一切正常」)。
+NOT_USER_DATA = {
+    "all.parquet": "kline 分区",
+    "part.parquet": "kline 分区",
+    "candidates.parquet": "回测候选",
+    "instruments.parquet": "证券主数据",
+    "instruments_etf.parquet": "ETF 主数据",
+    "instruments_index.parquet": "指数主数据",
+    "capabilities.json": "数据源能力探测",
+    "config.json": "自定义数据源配置",
+    "ext_configs.json": "扩展数据配置",
+    "manifest.json": "任务/挖掘 job_store",
+    "summary.json": "回测结果目录",
+    "events.jsonl": "任务事件流",
+}
 
-    这张表最大的风险是**它自己会过时**: 今天列全, 下次加个 store 又漏, 于是体检
-    报告说「一切正常」, 而漏掉的那个正在悄悄丢字段。靠人记得更新是靠不住的。
+
+def test_R272_注册表不许漏登记():
+    """扫**所有像数据文件名的字符串字面量**, 每一个要么登记、要么显式排除。
+
+    ## 第一版这条守卫是漏的, 而且是真机跑了一次体检才发现的
+
+    第一版只认 `data_dir / "user_data" / "字面量"` 这一种路径写法。可仓库里另外两种
+    写法根本不长那样: `JsonReportStore(filename)` 把文件名当构造参数传进去, 
+    `strategy_cache` 用的是模块常量。于是六处**在用**的存储没被登记, 真实体检把它们
+    当成「孤儿文件」报给了用户 —— 差一点就让人去删自己正在用的数据。
+
+    **补丁不该是再加两条正则** —— 那只是把洞挪个位置, 下一种写法照样漏。这一版反过来:
+    **宁可多收也不能漏**。多收的代价是维护一张小小的排除表(而且它过时是安全的),
+    漏收的代价是体检说假话。
     """
-    pat = re.compile(r'data_dir\s*/\s*"user_data"\s*/\s*"([^"]+)"')
+    pat = re.compile(r'"([a-z_0-9]+\.(?:json|jsonl|parquet))"')
     found: set[str] = set()
     for p in APP.rglob("*.py"):
         found.update(pat.findall(p.read_text(encoding="utf-8")))
-    known = {s.rel.split("/", 1)[1] for s in dd.STORES}
-    missing = sorted(found - known)
+    known = {Path(s.rel).name for s in dd.STORES}
+    missing = sorted(found - known - set(NOT_USER_DATA))
     assert not missing, (
-        "这些 user_data 存储在代码里用到了, 却没登记进 data_doctor.STORES —— "
-        f"体检会对着它们说「一切正常」: {missing}"
+        "这些数据文件名在代码里出现了, 却既没登记进 data_doctor.STORES、也没写进 "
+        f"NOT_USER_DATA —— 体检会把它们当孤儿报给用户: {missing}"
     )
+
+
+def test_R272_排除表和注册表不许打架():
+    """同一个名字不能既登记又排除 —— 那说明有人改了一处忘了另一处。"""
+    known = {Path(s.rel).name for s in dd.STORES}
+    both = known & set(NOT_USER_DATA)
+    assert not both, f"这些名字既登记又排除: {sorted(both)}"
 
 
 def test_R271_注册表自己不许有重复项():
@@ -281,3 +315,90 @@ def test_R271_端点补齐要显式点名(dd_dir, monkeypatch):
     """不接受"全都补"这种含糊指令 —— 改的是不可重算的用户数据。"""
     resp = _client(dd_dir, monkeypatch).post("/api/settings/data-doctor/heal", json={"rels": []})
     assert resp.status_code == 400
+
+
+# ================================================================
+# [R272] 格式要逐种处理 —— 真机体检暴露的两个误报
+# ================================================================
+#
+# 第一版对**任何**非目录文件都是 `read_text(encoding="utf-8")` + `json.loads`。
+# 于是真机上两份完全健康的数据被报成「读不动」:
+#
+#   watchlist.parquet  二进制列存 → 'utf-8' codec can't decode byte 0xea
+#   alerts.jsonl       每行一个 JSON → Extra data: line 2 column 1
+#
+# **体检误报比不报更糟**: 人看两次假警报之后就再也不看它了, 那些真问题也跟着被忽略。
+
+def test_R272_parquet不按文本读(dd_dir):
+    """二进制文件拿 UTF-8 去读, 必然报 codec 错 —— 那是体检自己的 bug, 不是数据坏了。"""
+    import polars as pl
+    pl.DataFrame({
+        "symbol": ["600519.SH"], "added_at": ["2026-01-01"],
+        "note": ["测试"], "group_ids": [["g1"]],
+    }).write_parquet(dd_dir / "user_data/watchlist.parquet")
+    got = next(s for s in dd.scan(dd_dir)["stores"] if s["rel"] == "user_data/watchlist.parquet")
+    assert got["readable"] is True, f"健康的 parquet 被报成读不动: {got['error']}"
+    assert got["error"] == ""
+    assert got["records"] == 1
+    assert got["missing"] == {}
+
+
+def test_R272_parquet缺列查得出来(dd_dir):
+    """parquet 的"字段"就是列。老版本写的表可能没有后加的那一列。"""
+    import polars as pl
+    pl.DataFrame({"symbol": ["600519.SH"], "added_at": ["2026-01-01"]}) \
+        .write_parquet(dd_dir / "user_data/watchlist.parquet")
+    got = next(s for s in dd.scan(dd_dir)["stores"] if s["rel"] == "user_data/watchlist.parquet")
+    assert got["readable"] is True
+    assert set(got["missing"]) == {"note", "group_ids"}
+
+
+def test_R272_真坏掉的parquet还是要报(dd_dir):
+    """放宽不能放宽到"什么都不查" —— 真读不动的还得报出来。"""
+    (dd_dir / "user_data/watchlist.parquet").write_bytes("这根本不是 parquet".encode())
+    got = next(s for s in dd.scan(dd_dir)["stores"] if s["rel"] == "user_data/watchlist.parquet")
+    assert got["readable"] is False and "读不动" in got["error"]
+
+
+def test_R272_jsonl逐行读(dd_dir):
+    """每行一个 JSON —— 整份 json.loads 必然在第二行报 "Extra data"。"""
+    (dd_dir / "user_data/alerts.jsonl").write_text(
+        '{"ts": 1, "rule_id": "a"}\n{"ts": 2, "rule_id": "b"}\n', encoding="utf-8")
+    got = next(s for s in dd.scan(dd_dir)["stores"] if s["rel"] == "user_data/alerts.jsonl")
+    assert got["readable"] is True, f"健康的 JSONL 被报成读不动: {got['error']}"
+    assert got["error"] == "" and got["records"] == 2
+
+
+def test_R272_jsonl写到一半的那行报出来但不算整份坏掉(dd_dir):
+    """追加写被打断会留下半行 —— 前面那些好行还在, 不该因为一行把整份判死。"""
+    (dd_dir / "user_data/alerts.jsonl").write_text(
+        '{"ts": 1}\n{"ts": 2}\n{"ts": 3, "半行', encoding="utf-8")
+    got = next(s for s in dd.scan(dd_dir)["stores"] if s["rel"] == "user_data/alerts.jsonl")
+    assert got["readable"] is True and got["records"] == 2
+    assert "1 行" in got["error"]
+
+
+def test_R272_store自己留的备份不算孤儿(dd_dir):
+    """`paper_traders.json.bak` / `watchlist.parquet.bak` 是各个 store 保存时自己留的。
+    把它们报成孤儿等于催人去删自己的备份。"""
+    for name in ("paper_traders.json.bak", "watchlist.parquet.bak",
+                 "positions.json.bak-20260101-000000"):
+        (dd_dir / "user_data" / name).write_text("{}", encoding="utf-8")
+    assert dd.scan(dd_dir)["orphans"] == []
+
+
+def test_R272_六处漏登记的都补上了():
+    """真机体检把这六处在用的存储当成了孤儿 —— 差一点让人去删自己正在用的数据。"""
+    known = {s.rel for s in dd.STORES}
+    for rel in ("user_data/ai_reports.json", "user_data/ai_stock_reports.json",
+                "user_data/ai_market_recaps.json", "user_data/ladder_ai_reports.json",
+                "user_data/strategy_cache.json", "user_data/strategy_run_timings.json"):
+        assert rel in known, f"{rel} 还没登记"
+
+
+def test_R272_报告带上体积(dd_dir):
+    """真机上 strategy_cache.json 有 10MB —— 派生数据里最该被清掉的那种,
+    不给体积就看不出来。"""
+    _write(dd_dir, "user_data/strategy_cache.json", {"x": "y" * 500})
+    got = next(s for s in dd.scan(dd_dir)["stores"] if s["rel"] == "user_data/strategy_cache.json")
+    assert got["bytes"] > 500
