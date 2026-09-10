@@ -731,6 +731,88 @@ class _Stages:
         return {"total_ms": total, "stages_ms": self.rows}
 
 
+class _Health:
+    """[fork 增强 R274] 今日总览的自检 —— **每一次静默跳过都要有人知道。**
+
+    用户: 「有没有办法验证今日总览的所有显示有没有问题、是否在正常工作」。
+
+    ## 问题不在"会不会崩", 在"崩了没人知道"
+
+    这一页的构建过程里有十几处 `try/except`, 每一处都是**只写一行日志然后继续**。
+    那个设计本身是对的 —— 中观算不出来不该拖垮整页, 少个注记也不该。但它**缺了
+    另一半**: 失败之后, 页面照常渲染, 那个区块只是空的或少一列, 而看的人**根本
+    分不出「今天真没有」和「算挂了」**。日志在服务器上, 没人会去翻。
+
+    所以这里把每次跳过就地记下来, 随响应一起带回界面。**不是另写一个自检工具去
+    重跑一遍** —— 重跑的那一次和你屏幕上看到的这一次未必是同一次结果, 而这里记的
+    就是**这一次渲染的真实情况**, 零猜测。
+
+    ## 两档, 因为后果不一样
+
+    - ``block``  整块内容没了(大盘红绿灯 / 中观 / 门槛)—— 界面上是空的, 得醒目
+    - ``detail`` 少个标或少一列(注记 / 胜率)—— 主体还在, 提一句就够
+
+    同一个 key 反复失败(比如逐只算 ATR 的循环)只记第一条错 + 计数, 否则一次网络
+    抖动就能刷出几百条一模一样的。
+    """
+
+    #: key → (给人看的名字, 档次)。**每一处 except 都要在这里登记** —— 有测试盯着:
+    #: 漏登记的那一处就退回了"静默跳过", 而那正是这个类要解决的问题。
+    SITES: dict[str, tuple[str, str]] = {
+        "alerts": ("监控告警(行动区)", "detail"),
+        "market_mode": ("大盘红绿灯", "block"),
+        "keltner": ("量化波动通道", "block"),
+        "vol_factor": ("量能因子", "detail"),
+        "gate_data": ("入选门槛(生命线/长期趋势)", "block"),
+        "win_rate": ("历史突破胜率", "detail"),
+        "annotations": ("候选注记", "detail"),
+        "meso": ("中观(板块/主线)", "block"),
+        "market_breadth": ("自选广度", "detail"),
+        "action_timing": ("「该动了」结论", "detail"),
+        "score_ledger": ("把握分台账", "detail"),
+        "portfolio_history": ("组合净值历史", "detail"),
+        "atr_snapshot": ("ATR 快照(仓位建议)", "block"),
+        "atr_load": ("单只 ATR", "detail"),
+        "focus_snapshot": ("关注清单快照", "detail"),
+    }
+
+    def __init__(self) -> None:
+        self.rows: dict[str, dict] = {}
+
+    def skip(self, key: str, err: object) -> None:
+        """记一次跳过。同一个 key 只留第一条错, 后面的只加计数。"""
+        row = self.rows.get(key)
+        if row is None:
+            cn, level = self.SITES.get(key, (key, "detail"))
+            self.rows[key] = {"key": key, "cn": cn, "level": level,
+                              "error": str(err)[:200], "n": 1}
+        else:
+            row["n"] += 1
+
+    def report(self, as_of: str | None) -> dict:
+        """随响应带出的自检结果。
+
+        ``stale_days`` 是**另一类问题**: 什么都没报错, 但整页数字是几天前的 ——
+        收盘后管道没跑就是这样。它和"算挂了"一样会让人看着假数据做决定, 所以一起报。
+        """
+        stale = None
+        if as_of:
+            try:
+                d = date.today() - date.fromisoformat(str(as_of)[:10])
+                stale = max(0, d.days)
+            except ValueError:
+                stale = None
+        blocks = [r for r in self.rows.values() if r["level"] == "block"]
+        details = [r for r in self.rows.values() if r["level"] == "detail"]
+        return {
+            "ok": not self.rows,
+            "as_of": as_of,
+            "stale_days": stale,
+            "blocks": sorted(blocks, key=lambda r: r["key"]),
+            "details": sorted(details, key=lambda r: r["key"]),
+        }
+
+
 def _build_overview(repo, engine=None) -> dict:
     """[R135] engine 为 StrategyEngine, 只用来把「策略命中」这个**注记**读出来
     (读策略页已写好的缓存, 不跑策略)。不传就没有那个标, 其余一切不变。"""
@@ -742,6 +824,7 @@ def _build_overview(repo, engine=None) -> dict:
     from app.services.position_exit import exit_lines_for_positions
 
     _st = _Stages()
+    _h = _Health()
     entries = watchlist.list_symbols()
     syms_raw = [str(e.get("symbol", "")).upper() for e in entries if e.get("symbol")]
     # 自选表只存代码; 中文名走 instruments 统一名称入口(股票+ETF+指数), 查不到再退回代码
@@ -828,6 +911,7 @@ def _build_overview(repo, engine=None) -> dict:
             })
     except Exception as e:  # noqa: BLE001
         logger.debug("today alerts skipped: %s", e)
+        _h.skip("alerts", e)
     sev_rank = SEVERITY_RANK
     actions.sort(key=lambda a: sev_rank.get(a["severity"], 9))
 
@@ -841,6 +925,7 @@ def _build_overview(repo, engine=None) -> dict:
         market = get_market_mode(repo)
     except Exception as e:  # noqa: BLE001
         logger.warning("today market mode skipped: %s", e)
+        _h.skip("market_mode", e)
     bench_ret = ((market or {}).get("metrics") or {}).get("ret_20d")
     # [R189] 趋势模板第 8 条要的基准一侧(半年超额收益)
     bench_ret_120d = ((market or {}).get("metrics") or {}).get("ret_120d")
@@ -873,6 +958,7 @@ def _build_overview(repo, engine=None) -> dict:
                     verdict_map[sym] = v
     except Exception as e:  # noqa: BLE001
         logger.debug("today keltner skipped: %s", e)
+        _h.skip("keltner", e)
 
     _st.mark("keltner")
 
@@ -921,6 +1007,7 @@ def _build_overview(repo, engine=None) -> dict:
                     live_rows[str(r["symbol"]).upper()] = r
         except Exception as e:  # noqa: BLE001
             logger.debug("today vol factor skipped: %s", e)
+            _h.skip("vol_factor", e)
         _st.mark("snapshot+live")
         # [R134] 门槛原料: 生命线(MA20 含前一日)与长期趋势(MA120 及斜率)。
         # 与 Keltner 长期档共用同一次批量读, 不新增 IO。
@@ -932,6 +1019,7 @@ def _build_overview(repo, engine=None) -> dict:
             gate_map = _ks.long_trend_map(repo, cand_syms, with_closes=True)
         except Exception as e:  # noqa: BLE001
             logger.warning("today gate data skipped: %s", e)
+            _h.skip("gate_data", e)
         _st.mark("gates")
         for s in cand_syms:
             ent = {}
@@ -970,6 +1058,7 @@ def _build_overview(repo, engine=None) -> dict:
             wins = bullish_win_rates_for_symbols(repo, cand_syms)
         except Exception as e:  # noqa: BLE001
             logger.debug("today win rate skipped: %s", e)
+            _h.skip("win_rate", e)
         for s in cand_syms:
             ent = extras.setdefault(s, {})
             if s in vol_map:
@@ -999,6 +1088,7 @@ def _build_overview(repo, engine=None) -> dict:
                 extras.setdefault(s_, {})["dragon"] = info
     except Exception as e:  # noqa: BLE001 —— 注记取不到只是少个标, 不该拖垮总览
         logger.debug("today annotations skipped: %s", e)
+        _h.skip("annotations", e)
 
     _st.mark("annotations")
 
@@ -1012,6 +1102,7 @@ def _build_overview(repo, engine=None) -> dict:
             extras.setdefault(s, {})["mainline"] = tag
     except Exception as e:  # noqa: BLE001
         logger.debug("today meso skipped: %s", e)
+        _h.skip("meso", e)
 
     _st.mark("meso")
 
@@ -1066,6 +1157,7 @@ def _build_overview(repo, engine=None) -> dict:
                     market_breadth["capped"] = True
     except Exception as e:  # noqa: BLE001
         logger.debug("today market breadth skipped: %s", e)
+        _h.skip("market_breadth", e)
 
     # [R11] 大盘红绿灯: 最终姿态与自选广度取更保守者(market 已在机会区前取好)
     breadth_posture, breadth_reason = posture, posture_reason
@@ -1086,6 +1178,7 @@ def _build_overview(repo, engine=None) -> dict:
             o["action"] = action_timing.decide(o, posture)
     except Exception as e:  # noqa: BLE001 —— 结论取不到只是少一列, 不拖垮总览
         logger.debug("today action timing skipped: %s", e)
+        _h.skip("action_timing", e)
 
     # ---- ④ 持仓体检 ----
     holdings: list[dict] = []
@@ -1143,6 +1236,7 @@ def _build_overview(repo, engine=None) -> dict:
                                     {o["symbol"] for o in opportunities}, True)
     except Exception as e:  # noqa: BLE001 —— 记账失败绝不能影响总览
         logger.debug("score ledger record skipped: %s", e)
+        _h.skip("score_ledger", e)
 
     _st.mark("ledger")
 
@@ -1182,6 +1276,7 @@ def _build_overview(repo, engine=None) -> dict:
                     })
             except Exception as e:  # noqa: BLE001
                 logger.warning("portfolio history skipped: %s", e)
+                _h.skip("portfolio_history", e)
             cap = POSTURE_CAPS.get(posture, 0.3)
             if total_weight / 100 > cap + 0.001:
                 actions.append({
@@ -1214,6 +1309,7 @@ def _build_overview(repo, engine=None) -> dict:
                     atr_map[str(r["symbol"]).upper()] = float(a) / float(c)
     except Exception as e:  # noqa: BLE001
         logger.debug("today atr snapshot skipped: %s", e)
+        _h.skip("atr_snapshot", e)
 
     # [R12] 仓位建议: 姿态定总仓位基调, 把握分×波动率定单票建议(仅展示, 不是指令)
     for o in opportunities:
@@ -1232,6 +1328,7 @@ def _build_overview(repo, engine=None) -> dict:
                         atr_pct = float(a) / float(c)
         except Exception as e:  # noqa: BLE001
             logger.debug("today atr load skipped for %s: %s", o["symbol"], e)
+            _h.skip("atr_load", e)
         o["advice"] = suggest_position(
             o["score"], atr_pct, prefs["max_single"] / 100, prefs["target_vol"] / 100)
         # [R15] 建仓路径: 有仓位建议才有路径; 关键点价位来自六态上关键点/AI 触发价
@@ -1250,10 +1347,14 @@ def _build_overview(repo, engine=None) -> dict:
         focus_list.save_snapshot(as_of, holdings, opportunities, bands_map)
     except Exception as e:  # noqa: BLE001
         logger.debug("focus snapshot skipped: %s", e)
+        _h.skip("focus_snapshot", e)
     perf = _st.done()
 
     return {
         "as_of": as_of,
+        # [R274] 自检 —— 这一次渲染里有哪些区块没算出来, 以及数据是不是陈的。
+        # 十几处 except 原本只写日志就继续, 界面上分不出「今天真没有」和「算挂了」。
+        "health": _h.report(as_of),
         # [R156] 各阶段耗时(ms)。用户说"慢"时打开 /api/today 看这一栏, 不用猜
         "perf": perf,
         "watchlist_total": len(syms),

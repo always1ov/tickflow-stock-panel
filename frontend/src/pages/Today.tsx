@@ -27,7 +27,7 @@ import {
 } from 'lucide-react'
 import {
   api, TODAY_BOARDS, type SignalAiSchedule, type TodayAiSchedule,
-  type TodayPick, type TodayPrefs,
+  type TodayHealth, type TodayPick, type TodayPrefs,
 } from '@/lib/api'
 import { toast } from '@/components/Toast'
 import { PageShell } from '@/components/PageShell'
@@ -294,6 +294,11 @@ export function Today() {
       {/* [R122] 时段提示条并入下方「市场天气」横幅 —— 三条通栏横幅(时段/天气/中观)
           在首屏堆掉近三分之一高度, 而时段只是一句"现在该怎么用这页"的说明,
           不值得独占一条。现在它是天气条右上角的一个徽章, 悬停看全文。 */}
+
+      {/* [R274] 自检条 —— **正常时一个像素都不占**, 出问题才现身。
+          这一页的构建过程里十几处 try/except 原本只写日志就继续: 页面照常渲染,
+          那个区块只是空的, 而看的人分不出「今天真没有」和「算挂了」。 */}
+      {!!d?.health && <TodayHealthBar h={d.health} />}
 
       {aiError && (
         <div className="flex items-start justify-between gap-3 rounded-lg border border-red-400/30 bg-red-400/[0.07] px-4 py-3 text-xs text-red-300">
@@ -853,5 +858,59 @@ export function Today() {
         />
       )}
     </PageShell>
+  )
+}
+
+
+/**
+ * [R274] 今日总览自检条。
+ *
+ * 三种情况分开说, 因为处置不一样:
+ *
+ *   整块没了    界面上那一块是空的 —— 醒目, 并说清是哪一块
+ *   少个标      主体还在, 只是少一列注记 —— 提一句, 不打断
+ *   数据陈了    什么都没报错, 但整页数字是几天前的(收盘后管道没跑) ——
+ *               这一条最阴: 页面看起来完全正常, 而你在用过期数字做决定
+ *
+ * **一切正常时不渲染任何东西。** 常驻一条"运行正常"的绿条, 看两天就成了背景板,
+ * 真出问题那天照样会被忽略。
+ */
+function TodayHealthBar({ h }: { h: TodayHealth }) {
+  const stale = (h.stale_days ?? 0) >= 1
+  if (h.ok && !stale) return null
+  return (
+    <div className={`rounded-lg border px-3 py-2 text-[11px] leading-relaxed ${
+      h.blocks.length || stale
+        ? 'border-warning/40 bg-warning/[0.07] text-warning'
+        : 'border-border bg-elevated/30 text-muted'
+    }`}>
+      {stale && (
+        <div>
+          <b>这一页的数据是 {h.as_of} 的</b>,距今 {h.stale_days} 天 ——
+          收盘后没跑数据管道时就是这样,下面所有数字都还是那天的。
+        </div>
+      )}
+      {h.blocks.length > 0 && (
+        <div className={stale ? 'mt-1' : undefined}>
+          <b>{h.blocks.length} 个区块没算出来</b>:
+          {h.blocks.map(b => (
+            <span key={b.key} className="ml-1.5" title={`${b.error}${b.n > 1 ? ` (共 ${b.n} 次)` : ''}`}>
+              {b.cn}
+            </span>
+          ))}
+          <span className="ml-1 opacity-80">—— 界面上这几块是空的,不是「今天没有」。</span>
+        </div>
+      )}
+      {h.details.length > 0 && (
+        <div className={`${h.blocks.length || stale ? 'mt-1 ' : ''}text-muted`}>
+          另有 {h.details.length} 处只影响细节(少个标或少一列):
+          {h.details.map(b => (
+            <span key={b.key} className="ml-1.5" title={`${b.error}${b.n > 1 ? ` (共 ${b.n} 次)` : ''}`}>
+              {b.cn}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }

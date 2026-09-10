@@ -552,8 +552,27 @@ export interface TodayPortfolio {
   count: number; avg_pnl: number | null; triggered: number; near_exit: number; bearish: number
   total_weight?: number | null; nav?: number | null; drawdown?: number | null; posture_cap?: number
 }
+/**
+ * [R274] 今日总览自检 —— 这一次渲染里有哪些区块没算出来。
+ *
+ * 构建过程里十几处 `try/except` 原本只写日志就继续: 页面照常渲染, 那个区块只是空的,
+ * 而看的人分不出「今天真没有」和「算挂了」。
+ */
+export interface TodayHealth {
+  ok: boolean
+  as_of: string | null
+  /** 数据陈了几天 —— 什么都没报错但整页是几天前的, 同样会让人看着假数据做决定 */
+  stale_days: number | null
+  /** 整块没了 —— 界面上是空的 */
+  blocks: { key: string; cn: string; error: string; n: number }[]
+  /** 少个标或少一列 —— 主体还在 */
+  details: { key: string; cn: string; error: string; n: number }[]
+}
+
 export interface TodayOverview {
   as_of: string | null
+  /** [R274] 自检结果 */
+  health?: TodayHealth
   watchlist_total: number
   trend_total: number
   live?: boolean
