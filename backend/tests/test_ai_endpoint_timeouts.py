@@ -45,7 +45,7 @@ AI_METHODS = {
     "generateStockSignal": "单只 AI 买卖信号(用户报的就是这个)",
     "todayAi": "今日总览 AI 导读·优选",
     "ladderAiReview": "连板梯队 AI 复盘",
-    "watchlistAiGroupSuggest": "自选 AI 一键分组(出方案那一步)",
+    "watchlistImportText": "粘整篇文章 → AI 认票并按小分队归类",
     "customSignalsAiGenerate": "自定义信号 AI 生成",
     "regimeSeesawDetect": "跷跷板 AI 甄别",
     "usageNoteDigest": "消息面单条凝练",
@@ -55,7 +55,6 @@ AI_METHODS = {
 
 # **故意**留在默认 30s 的。它们要么压根不调模型, 要么快失败才是对的。
 NOT_AI_METHODS = {
-    "watchlistAiGroupApply": "只落库, 不调模型",
     "strategyAiStatus": "读配置状态",
     "ladderAiReports": "读历史报告",
     "todayAiTrackRecord": "纯事后统计",

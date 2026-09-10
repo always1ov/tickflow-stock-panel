@@ -1197,6 +1197,10 @@ export interface WatchlistImportCandidate {
   quote?: string
   /** [R265] 没匹配上的原因(名称与代码对不上 / 重名 / 主数据里没有) */
   warn?: string
+  /** [R267] 它在文章里属于哪几个小分队(作者分好的, 可多个) */
+  groups?: string[]
+  /** [R267] 原文里被加粗 —— 作者标出的重点票 */
+  starred?: boolean
 }
 
 export interface WatchlistImportResult {
@@ -1207,6 +1211,8 @@ export interface WatchlistImportResult {
   unmatched_count: number
   /** [R265] 正文过长被截断送审 */
   truncated?: boolean
+  /** [R267] 文章里分好的小分队, 保持出现顺序 */
+  section_names?: string[]
 }
 
 /**
@@ -3966,16 +3972,6 @@ export const api = {
   watchlistGroups: () =>
     request<{ groups: WatchlistGroup[] }>('/api/watchlist/groups'),
   // [fork 增强] AI 一键分组: suggest 只出方案不落库, apply 才写入
-  watchlistAiGroupSuggest: () =>
-    request<{
-      groups?: { name: string; symbols: string[]; names: string[]; reason: string }[]
-      ungrouped?: string[]; ungrouped_names?: string[]; total?: number; error?: string
-    }>('/api/watchlist/ai-group', { method: 'POST', timeoutMs: AI_REQUEST_TIMEOUT_MS }),
-  watchlistAiGroupApply: (groups: { name: string; symbols: string[] }[], replaceExisting: boolean) =>
-    request<{ ok: boolean; groups_created: number; symbols_assigned: number; groups: WatchlistGroup[] }>(
-      '/api/watchlist/ai-group/apply',
-      { method: 'POST', body: JSON.stringify({ groups, replace_existing: replaceExisting }) },
-    ),
   watchlistGroupCreate: (name: string, color: WatchlistGroupColor) =>
     request<{ groups: WatchlistGroup[]; group: WatchlistGroup }>('/api/watchlist/groups', {
       method: 'POST',
@@ -4044,12 +4040,19 @@ export const api = {
       body: JSON.stringify({ text }),
       signal,
     }),
-  /** [R265] 粘一段话交给 AI 抽个股 —— 返回结构与截图/CSV 一致, 复用同一套确认流程。 */
+  /**
+   * [R265/R267] 粘整篇文章交给 AI 认票并按文中小分队归类。
+   *
+   * 返回结构与截图/CSV 一致, 复用同一套确认流程。**超时必须放宽**: 这一条要读完
+   * 整篇公众号文章再逐只输出, 默认那道 30s 闸根本不够 —— R267 是被
+   * test_ai_endpoint_timeouts 抓出来的, R265 加这个接口时漏了。
+   */
   watchlistImportText: (text: string, signal?: AbortSignal) =>
     request<WatchlistImportResult>('/api/watchlist/import-text', {
       method: 'POST',
       body: JSON.stringify({ text }),
       signal,
+      timeoutMs: AI_REQUEST_TIMEOUT_MS,
     }),
   watchlistRemove: (symbol: string) =>
     request<{ symbols: WatchlistEntry[] }>(

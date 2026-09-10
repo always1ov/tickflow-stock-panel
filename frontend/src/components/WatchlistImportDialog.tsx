@@ -28,6 +28,17 @@ const DROP_ACCEPT =
   'image/jpeg,image/png,image/webp,image/bmp,image/gif,text/csv,text/plain,' +
   '.csv,.txt,.jpg,.jpeg,.png,.webp,.bmp,.gif'
 
+/**
+ * [R267] 小分队 → 目标分组的两个哨兵值。
+ *
+ * 一个小分队有三种去向: 新建同名分组、并进某个已有分组、这一队不导入。后两种能用
+ * 分组 id 和一个固定串表示, 「新建」只能用哨兵 —— 组还不存在, 拿不到 id。**建组
+ * 推迟到点「导入」那一刻**: 在映射界面上改来改去的过程里就把组建出来, 用户改一次
+ * 主意就留下一个空分组, 还删不掉。
+ */
+const SECTION_NEW = '__new__'
+const SECTION_SKIP = '__skip__'
+
 interface RowState {
   eligible: boolean
   inWatchlist: boolean
@@ -158,6 +169,10 @@ export function WatchlistImportDialog({
   const [codesText, setCodesText] = useState('')
   const [showSkipped, setShowSkipped] = useState(false)
   const [targetGroupIds, setTargetGroupIds] = useState<string[]>([])
+  /** [R267] 文章里分好的小分队(按出现顺序); 非空即进入「分队映射」模式 */
+  const [sections, setSections] = useState<string[]>([])
+  /** [R267] 小分队名 → 目标分组 id / SECTION_NEW / SECTION_SKIP */
+  const [sectionMap, setSectionMap] = useState<Record<string, string>>({})
   const [newGroupOpen, setNewGroupOpen] = useState(false)
   const [newGroupName, setNewGroupName] = useState('')
   const [newGroupColor, setNewGroupColor] = useState<WatchlistGroupColor>(DEFAULT_WATCHLIST_GROUP_COLOR)
@@ -171,15 +186,39 @@ export function WatchlistImportDialog({
     return m
   }, [groups])
 
+  const sectionMode = sections.length > 0
+
+  /**
+   * [R267] 这一行要进哪几个分组。
+   *
+   * 分队模式下**每行各算各的** —— 文章里「船舶」那队进 A 组、「军工」那队进 B 组,
+   * 一个全局目标说不清这件事。一只票同时属于两个小分队就同时进两个分组, 这正是
+   * 自选多组模型该有的样子。返回值里可能有 SECTION_NEW(组还没建), 那种一定不在
+   * 现有成员关系里, 所以「已在所选分组」的判断天然为假, 不用特殊处理。
+   */
+  const rowTargets = useCallback((c: WatchlistImportCandidate): string[] => {
+    if (!sectionMode) return targetGroupIds
+    const out: string[] = []
+    for (const g of c.groups ?? []) {
+      const t = sectionMap[g]
+      if (!t || t === SECTION_SKIP) continue
+      if (!out.includes(t)) out.push(t)
+    }
+    return out
+  }, [sectionMode, sectionMap, targetGroupIds])
+
   const { eligible, skipped } = useMemo(() => {
     const eligible: Row[] = []
     const skipped: Row[] = []
     for (const c of candidates) {
-      const state = rowState(c.symbol, c.matched, membership, targetGroupIds)
-      ;(state.eligible ? eligible : skipped).push({ c, state })
+      const targets = rowTargets(c)
+      const state = rowState(c.symbol, c.matched, membership, targets)
+      // 分队模式下, 所属小分队全被设成「不导入」的票不该还能勾 —— 勾了也无处可去
+      const orphan = sectionMode && (c.groups?.length ?? 0) > 0 && targets.length === 0
+      ;(state.eligible && !orphan ? eligible : skipped).push({ c, state })
     }
     return { eligible, skipped }
-  }, [candidates, membership, targetGroupIds])
+  }, [candidates, membership, rowTargets, sectionMode])
   const skippedCount = skipped.length
   const matchedCount = useMemo(
     () => candidates.filter(c => c.matched && c.symbol).length,
@@ -209,6 +248,8 @@ export function WatchlistImportDialog({
     setSourceFile('')
     setPasteOpen(false)
     setCodesText('')
+    setSections([])
+    setSectionMap({})
     setShowSkipped(false)
     setNewGroupOpen(false)
     setNewGroupName('')
@@ -237,7 +278,9 @@ export function WatchlistImportDialog({
     const eligibleNow = new Set<string>()
     for (const c of candidates) {
       const sym = c.symbol
-      if (sym && rowState(sym, c.matched, membership, next).eligible) eligibleNow.add(sym)
+      // 分队模式下目标由映射决定, 全局芯片不参与
+      const targets = sectionMode ? rowTargets(c) : next
+      if (sym && rowState(sym, c.matched, membership, targets).eligible) eligibleNow.add(sym)
     }
     setSelected(prev => {
       let changed = false
@@ -261,6 +304,14 @@ export function WatchlistImportDialog({
       if (gen !== genRef.current) return
       setCandidates(res.candidates)
       setSelected(defaultSelection(res.candidates))
+      // [R267] 文章自己分好的小分队 —— 默认同名已有分组直接并入, 没有就新建同名。
+      // 这两个默认覆盖了绝大多数情况: 第一次导某个题材就建组, 之后再导就并进去。
+      const secs = res.section_names ?? []
+      setSections(secs)
+      setSectionMap(Object.fromEntries(secs.map(name => {
+        const hit = groups.find(g => g.name.trim().toLowerCase() === name.trim().toLowerCase())
+        return [name, hit ? hit.id : SECTION_NEW]
+      })))
       if (res.candidates.length > 0 && res.matched_count === 0) toast(NO_MATCH_MSG, 'error')
     } catch {
       /* 请求错误已由 request 封装弹出 */
@@ -442,6 +493,43 @@ export function WatchlistImportDialog({
     })
   }
 
+  /**
+   * [R267] 分队模式的导入: 先把要新建的组建出来, 再按「目标分组集合」分批写。
+   *
+   * 分批是必须的 —— `batchAdd` 一次调用只能给一组标的挂同一批分组, 而这里每个小分队
+   * 的去向不同。按去向集合归堆之后, 通常就是每队一次调用; 同时属于两队的票会落进
+   * 自己那一堆(去向是两个组), 一次调用就同时并进两个分组。
+   */
+  const confirmAddBySection = async (symbols: string[]) => {
+    const bySymbol = new Map(candidates.filter(c => c.symbol).map(c => [c.symbol!, c]))
+    // 1) 建组推迟到此刻 —— 在映射界面上改主意的过程里建组会留下删不掉的空分组
+    const idByName: Record<string, string> = {}
+    let created = 0
+    for (const name of sections) {
+      const target = sectionMap[name]
+      if (!target || target === SECTION_SKIP) continue
+      if (target !== SECTION_NEW) { idByName[name] = target; continue }
+      const color = WATCHLIST_GROUP_COLORS[created % WATCHLIST_GROUP_COLORS.length].id
+      const data = await api.watchlistGroupCreate(name, color)
+      qc.setQueryData(QK.watchlistGroups, { groups: data.groups })
+      idByName[name] = data.group.id
+      created += 1
+    }
+    // 2) 按去向集合归堆
+    const buckets = new Map<string, { gids: string[]; syms: string[] }>()
+    for (const sym of symbols) {
+      const gids = [...new Set((bySymbol.get(sym)?.groups ?? [])
+        .map(g => idByName[g]).filter((v): v is string => !!v))].sort()
+      const bucket = buckets.get(gids.join(',')) ?? { gids, syms: [] }
+      bucket.syms.push(sym)
+      buckets.set(gids.join(','), bucket)
+    }
+    for (const b of buckets.values()) {
+      await batchAdd.mutateAsync({ symbols: b.syms, groupIds: b.gids })
+    }
+    return created
+  }
+
   const confirmAdd = async () => {
     const symbols = [...selected]
     if (symbols.length === 0) {
@@ -450,6 +538,22 @@ export function WatchlistImportDialog({
     }
     const newCount = symbols.filter(sym => !membership.has(sym)).length
     const mergedCount = symbols.length - newCount
+    if (sectionMode) {
+      try {
+        const created = await confirmAddBySection(symbols)
+        const used = sections.filter(n => sectionMap[n] !== SECTION_SKIP).length
+        toast(
+          `已按 ${used} 个小分队导入 ${symbols.length} 只`
+          + (created > 0 ? `（新建 ${created} 个分组）` : '')
+          + (mergedCount > 0 ? `，其中 ${mergedCount} 只已在自选、只并入分组` : ''),
+          'success',
+        )
+        onClose()
+      } catch {
+        /* 已由 request 弹出 */
+      }
+      return
+    }
     try {
       await batchAdd.mutateAsync({ symbols, groupIds: targetGroupIds })
       const names = targetGroupIds
@@ -515,6 +619,8 @@ export function WatchlistImportDialog({
           />
           <div className="flex-1 min-w-0">
             <div className="flex items-baseline gap-2">
+              {/* [R267] 原文里加粗的是作者标出的重点票 —— 这个信号在文章里明摆着, 丢了可惜 */}
+              {c.starred && <span className="shrink-0 text-[11px] text-amber-400" title="原文里加粗标注">★</span>}
               <span className="font-medium text-foreground truncate">
                 {c.name || c.mention || (c.matched && sym ? sym : '未匹配')}
               </span>
@@ -524,6 +630,25 @@ export function WatchlistImportDialog({
               </span>
             </div>
             {status}
+            {/* [R267] 它属于哪几个小分队。同时挂两个标签的票会同时进两个分组 */}
+            {(c.groups?.length ?? 0) > 0 && (
+              <div className="mt-0.5 flex flex-wrap items-center gap-1">
+                {c.groups!.map(g => {
+                  const skip = sectionMap[g] === SECTION_SKIP
+                  return (
+                    <span
+                      key={g}
+                      title={skip ? `小分队「${g}」已设为不导入` : `来自小分队「${g}」`}
+                      className={`rounded px-1 py-px text-[9px] ${
+                        skip ? 'bg-elevated/40 text-muted/50 line-through' : 'bg-accent/10 text-accent/80'
+                      }`}
+                    >
+                      {g}
+                    </span>
+                  )
+                })}
+              </div>
+            )}
             {/* [R265] 原文里提到它的那半句 —— 让人一眼核对 AI 有没有抽错票 */}
             {c.quote && (
               <p className="text-[10px] text-muted truncate" title={c.quote}>「{c.quote}」</p>
@@ -546,7 +671,7 @@ export function WatchlistImportDialog({
             批量导入自选
           </h2>
           <p className="text-[11px] text-muted mt-0.5">
-            截图 / CSV / TXT / 代码均支持，也可粘一段话让 AI 认里面的票；
+            截图 / CSV / TXT / 代码均支持，也可粘整篇文章让 AI 认票并按文中小分队归类；
             一律按证券主数据匹配，已在自选的只并入分组不重复添加
           </p>
         </div>
@@ -574,7 +699,7 @@ export function WatchlistImportDialog({
               className="w-full inline-flex items-center justify-center gap-1.5 rounded-btn border border-dashed border-border bg-elevated/40 px-3 py-2 text-xs text-secondary hover:bg-elevated/70"
             >
               <Keyboard className="h-3.5 w-3.5 text-accent" />
-              或粘贴证券代码 / 一段话
+              或粘贴证券代码 / 整篇文章
             </button>
           ) : (
             <div className="space-y-2 rounded-btn border border-border bg-elevated/40 p-2.5">
@@ -586,14 +711,15 @@ export function WatchlistImportDialog({
                   if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') void runCodes()
                 }}
                 placeholder={'纯代码：600519、000001 平安银行\n\n'
-                  + '或直接粘一段话，交给 AI 认里面的票：\n'
-                  + '「今天复盘：光模块方向中际旭创、新易盛继续走强，消费电子里立讯精密补涨」'}
-                rows={4}
+                  + '或直接粘整篇文章（Markdown 也行），交给 AI 认里面的票：\n'
+                  + '文章里用 **船舶** **军工** 这样分好的小分队会被认出来，\n'
+                  + '导入时每队各进各的分组。'}
+                rows={5}
                 className="w-full resize-y rounded-btn border border-border bg-surface px-3 py-2 text-xs text-foreground placeholder:text-muted focus:border-accent/50 focus:outline-none"
               />
               <div className="flex items-center justify-between gap-2">
                 <span className="text-[11px] text-muted min-w-0">
-                  代码用「解析代码」，整段话用「AI 认股票」
+                  代码用「解析代码」，整篇文章用「AI 认股票」
                 </span>
                 <div className="flex items-center gap-1.5 shrink-0">
                   <button
@@ -617,7 +743,7 @@ export function WatchlistImportDialog({
                     type="button"
                     disabled={busy || !codesText.trim()}
                     onClick={() => void runText()}
-                    title="把整段话交给 AI，认出里面提到的个股（名字也认）"
+                    title="把整篇文章交给 AI：认出提到的个股（只有名字也认），并按文章自己分好的小分队归类"
                     className="h-7 px-2.5 rounded-btn text-xs inline-flex items-center gap-1.5 bg-accent text-white hover:bg-accent/90 disabled:opacity-40"
                   >
                     {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
@@ -688,6 +814,49 @@ export function WatchlistImportDialog({
       </div>
 
       <div className="px-4 py-3 border-t border-border shrink-0 space-y-2.5">
+        {/* [R267] 分队模式: 文章自己分好了队, 这里只决定每队去哪个分组。
+            全局的「导入到分组」在这种时候是错的 —— 一个全局目标说不清「船舶那队进 A、
+            军工那队进 B」, 所以整块换掉而不是并排摆两套。 */}
+        {sectionMode ? (
+          <div className="space-y-1.5">
+            <div className="flex items-baseline gap-2">
+              <span className="text-[11px] text-secondary">文章里分好的小分队</span>
+              <span className="text-[10px] text-muted">
+                各自导入到下面选定的分组;一只票同时属于两队就同时进两个分组
+              </span>
+            </div>
+            <div className="max-h-32 space-y-1 overflow-y-auto pr-1">
+              {sections.map(name => {
+                const target = sectionMap[name] ?? SECTION_NEW
+                const count = candidates.filter(c => c.matched && c.groups?.includes(name)).length
+                return (
+                  <div key={name} className="flex items-center gap-2">
+                    <span
+                      className={`min-w-0 flex-1 truncate text-[11px] ${
+                        target === SECTION_SKIP ? 'text-muted/50 line-through' : 'text-foreground'
+                      }`}
+                      title={name}
+                    >
+                      {name}
+                      <span className="ml-1 text-[10px] text-muted tabular-nums">{count} 只</span>
+                    </span>
+                    <span className="shrink-0 text-[10px] text-muted">→</span>
+                    <select
+                      value={target}
+                      onChange={e => setSectionMap(prev => ({ ...prev, [name]: e.target.value }))}
+                      aria-label={`小分队「${name}」导入到`}
+                      className="h-6 w-36 shrink-0 rounded-btn border border-border bg-base px-1.5 text-[11px] text-foreground focus:border-accent/50 focus:outline-none"
+                    >
+                      <option value={SECTION_NEW}>新建「{name}」</option>
+                      {groups.map(g => <option key={g.id} value={g.id}>并入 {g.name}</option>)}
+                      <option value={SECTION_SKIP}>不导入这一队</option>
+                    </select>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        ) : (
         <div className="space-y-1.5">
           <div className="flex items-start gap-2">
             <span className="text-[11px] text-secondary pt-1.5 shrink-0">导入到分组</span>
@@ -793,6 +962,7 @@ export function WatchlistImportDialog({
             </div>
           )}
         </div>
+        )}
 
         <div className="flex items-center justify-end gap-2">
           <button

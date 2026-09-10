@@ -196,33 +196,6 @@ def clear_group(group_id: str, request: Request):
     return {"symbols": _with_names(rows, request)}
 
 
-class AiGroupApplyRequest(BaseModel):
-    """应用 AI 分组方案(前端确认后回传, 可编辑过)。"""
-
-    groups: list[dict]
-    replace_existing: bool = False
-
-
-@router.post("/ai-group")
-async def ai_group_suggest(request: Request):
-    """[fork 增强] AI 一键分组: 只返回方案不落库, 前端确认后调 /ai-group/apply。"""
-    from app.services import watchlist_ai_group
-    return await watchlist_ai_group.generate(
-        request.app.state.repo, watchlist.list_symbols())
-
-
-@router.post("/ai-group/apply")
-def ai_group_apply(req: AiGroupApplyRequest, request: Request):
-    """应用 AI 分组方案: 建分组(重名复用)+ 逐只归组。"""
-    from app.services import watchlist_ai_group
-    if not req.groups:
-        raise HTTPException(400, "方案为空")
-    result = watchlist_ai_group.apply(req.groups, replace_existing=req.replace_existing)
-    result["groups"] = watchlist.list_groups()
-    result["symbols"] = _with_names(watchlist.list_symbols(), request)
-    return result
-
-
 class PositionIn(BaseModel):
     held: bool = False
     cost: float | None = None

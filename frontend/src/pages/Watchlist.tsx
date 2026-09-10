@@ -3,9 +3,8 @@ import { useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Trash2, RefreshCw, Star, X, Search, LayoutGrid, List, Rows3, BarChart3, Settings2, Plus, Check, Filter, Eye, EyeOff, Minus, ChevronsUp, Clock, RotateCcw, FileUp, FolderOpen, FolderMinus, FolderPlus, Sparkles, Loader2 } from 'lucide-react'
+import { Trash2, RefreshCw, Star, X, Search, LayoutGrid, List, Rows3, BarChart3, Settings2, Plus, Check, Filter, Eye, EyeOff, Minus, ChevronsUp, Clock, RotateCcw, FileUp, FolderOpen, FolderMinus, FolderPlus } from 'lucide-react'
 import { api, type KlineRow, type MinuteKlineRow, type WatchlistGroup, type WatchlistGroupColor } from '@/lib/api'
-import { toast } from '@/components/Toast'
 import { fetchMinuteBatchIncremental } from '@/lib/minuteBatchIncremental'
 import { QK } from '@/lib/queryKeys'
 import { storage } from '@/lib/storage'
@@ -685,38 +684,6 @@ export function Watchlist() {
     const g = (searchParams.get('group') as WatchlistGroupFilter | null) ?? 'all'
     setSelectedGroup(g)
   }, [searchParams])
-  // [fork 增强] AI 一键分组: 方案先进 state 供确认, 用户点应用才落库
-  const [aiGroupPlan, setAiGroupPlan] = useState<{
-    groups: { name: string; symbols: string[]; names: string[]; reason: string }[]
-    ungroupedNames: string[]
-    total: number
-  } | null>(null)
-  const aiGroupMut = useMutation({
-    mutationFn: () => api.watchlistAiGroupSuggest(),
-    onSuccess: (r) => {
-      if (r.error) { toast(r.error, 'error'); return }
-      if (!r.groups?.length) { toast('AI 没有给出可用分组,可重试', 'error'); return }
-      setAiGroupPlan({
-        groups: r.groups,
-        ungroupedNames: r.ungrouped_names ?? [],
-        total: r.total ?? 0,
-      })
-    },
-    onError: (e: Error) => toast(`AI 分组失败: ${e.message}`, 'error'),
-  })
-  const aiGroupApplyMut = useMutation({
-    mutationFn: ({ replace }: { replace: boolean }) =>
-      api.watchlistAiGroupApply(
-        (aiGroupPlan?.groups ?? []).map(g => ({ name: g.name, symbols: g.symbols })),
-        replace),
-    onSuccess: (r) => {
-      toast(`已分组:新建 ${r.groups_created} 个分组,归入 ${r.symbols_assigned} 只`, 'success')
-      setAiGroupPlan(null)
-      qc.invalidateQueries({ queryKey: QK.watchlist })
-      qc.invalidateQueries({ queryKey: QK.watchlistGroups })
-    },
-    onError: (e: Error) => toast(`应用失败: ${e.message}`, 'error'),
-  })
 
   const columnsLoaded = useRef(false)
 
@@ -1454,17 +1421,6 @@ export function Watchlist() {
             >
               <FileUp className="h-4 w-4" />
             </button>
-            {/* [fork 增强] AI 一键分组: 先出方案, 确认后才写入 */}
-            <button
-              onClick={() => aiGroupMut.mutate()}
-              disabled={aiGroupMut.isPending || rows.length < 4}
-              className="inline-flex items-center justify-center h-8 w-8 rounded-btn bg-elevated hover:bg-elevated/80 text-secondary hover:text-violet-300 transition-colors duration-hover ease-smooth disabled:opacity-40 disabled:cursor-not-allowed"
-              title="AI 一键分组:按题材把自选归拢成几组(先出方案,确认后才应用)"
-            >
-              {aiGroupMut.isPending
-                ? <Loader2 className="h-4 w-4 animate-spin" />
-                : <Sparkles className="h-4 w-4" />}
-            </button>
             <div className="w-px h-5 bg-border" />
             {/* 视图 */}
             <button
@@ -2048,86 +2004,6 @@ export function Watchlist() {
         existingBySymbol={groupBySymbol}
       />
 
-      {/* [fork 增强] AI 分组方案确认 —— 看清楚再决定是否写入 */}
-      <AnimatePresence>
-        {aiGroupPlan && (
-          <motion.div
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
-            onClick={() => setAiGroupPlan(null)}
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.96 }} transition={{ duration: 0.15 }}
-              className="flex max-h-[80vh] w-full max-w-lg flex-col rounded-2xl border border-border bg-surface shadow-2xl"
-              onClick={e => e.stopPropagation()}
-            >
-              <div className="flex items-center gap-2 border-b border-border/60 px-5 py-3">
-                <Sparkles className="h-4 w-4 text-violet-300" />
-                <span className="text-sm font-medium text-foreground">AI 分组方案</span>
-                <span className="text-[10px] text-muted">
-                  {aiGroupPlan.groups.length} 个分组 · 覆盖 {aiGroupPlan.total - aiGroupPlan.ungroupedNames.length}/{aiGroupPlan.total} 只
-                </span>
-                <button onClick={() => setAiGroupPlan(null)} className="ml-auto text-muted hover:text-foreground cursor-pointer">
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-              <div className="min-h-0 flex-1 space-y-3 overflow-auto px-5 py-4">
-                {aiGroupPlan.groups.map(g => (
-                  <div key={g.name}>
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-xs font-medium text-foreground">{g.name}</span>
-                      <span className="text-[10px] text-muted">{g.symbols.length} 只</span>
-                      {g.reason && <span className="truncate text-[10px] text-muted/70">{g.reason}</span>}
-                    </div>
-                    <div className="mt-1 flex flex-wrap gap-1">
-                      {g.names.map((n, i) => (
-                        <span key={g.symbols[i]} className="rounded bg-elevated/60 px-1.5 py-px text-[10px] text-secondary">{n}</span>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-                {aiGroupPlan.ungroupedNames.length > 0 && (
-                  <div className="border-t border-border/40 pt-2">
-                    <div className="text-[10px] text-muted">
-                      未归类 {aiGroupPlan.ungroupedNames.length} 只(保持原分组不动)
-                    </div>
-                    <div className="mt-1 flex flex-wrap gap-1">
-                      {aiGroupPlan.ungroupedNames.slice(0, 30).map(n => (
-                        <span key={n} className="rounded bg-elevated/30 px-1.5 py-px text-[10px] text-muted/70">{n}</span>
-                      ))}
-                      {aiGroupPlan.ungroupedNames.length > 30 && (
-                        <span className="text-[10px] text-muted/60">等 {aiGroupPlan.ungroupedNames.length} 只</span>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-              <div className="flex items-center gap-2 border-t border-border/60 px-5 py-3">
-                <span className="text-[10px] text-muted">同名分组会复用,不会重复创建</span>
-                <div className="ml-auto flex gap-2">
-                  <button
-                    onClick={() => setAiGroupPlan(null)}
-                    className="rounded-btn bg-elevated px-3 py-1.5 text-xs text-secondary cursor-pointer"
-                  >取消</button>
-                  <button
-                    onClick={() => aiGroupApplyMut.mutate({ replace: true })}
-                    disabled={aiGroupApplyMut.isPending}
-                    title="先清空所有自选的现有分组, 再按方案重新归组"
-                    className="rounded-btn border border-border bg-base px-3 py-1.5 text-xs text-secondary hover:text-foreground disabled:opacity-50 cursor-pointer"
-                  >清空后重分</button>
-                  <button
-                    onClick={() => aiGroupApplyMut.mutate({ replace: false })}
-                    disabled={aiGroupApplyMut.isPending}
-                    title="只移动方案涉及的标的, 其余保持原分组"
-                    className="rounded-btn bg-accent px-3 py-1.5 text-xs font-medium text-base disabled:opacity-50 cursor-pointer"
-                  >{aiGroupApplyMut.isPending ? '应用中…' : '应用方案'}</button>
-                </div>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   )
 }
