@@ -49,13 +49,15 @@ import { storage } from '@/lib/storage'
 import { trendBadgeCls } from '@/components/stock-analysis/TrendStateBar'
 import { VerdictHover } from '@/components/stock-analysis/VerdictHover'
 import { ComboView } from '@/components/stock-analysis/decision-board/ComboView'
-import { FlipTradesBar, FlipTradeCells, FlipTradeLine, legsByFlipDate } from '@/components/stock-analysis/FlipTradesPanel'
+import { FlipTradesBar, FlipTradeCells, legsByFlipDate } from '@/components/stock-analysis/FlipTradesPanel'
 import { ReviewHelpSheet, HelpButton } from '@/components/stock-analysis/ReviewHelpSheet'
 import { HeadRow, HEAD_CARD } from '@/components/stock-analysis/ReviewHeadRow'
 import { StateTimeline } from '@/components/stock-analysis/StateTimeline'
 import { ReviewDisclosure } from '@/components/stock-analysis/ReviewDisclosure'
 import {
-  BAND_CN, TREND_LEGEND, VERDICT_BAR, VERDICT_LEGEND,
+  // [R295] `BAND_CN` 与 `VERDICT_BAR` 跟着 `SegmentCard` 一起退了 ——
+  // 前者是那张卡上的三档名, 后者是卡片左边那条色条。
+  TREND_LEGEND, VERDICT_LEGEND,
   rangeHint, trendCells, verdictCells,
 } from '@/lib/reviewTimeline'
 
@@ -361,11 +363,11 @@ function TrendView({ d, rows, onlyMarked, onToggleMarked, onHelp }: {
               <th className="whitespace-nowrap px-2 py-2 text-left font-normal" title="按转折买卖: 这次转折的次日开盘该干什么">动作</th>
               <th className="whitespace-nowrap px-2 py-2 text-right font-normal" title="成交日与成交价 → 了结日与了结价, 都是开盘价">成交 → 了结</th>
               <th className="whitespace-nowrap px-2 py-2 text-right font-normal" title="多头段是真赚到的; 空头段是空仓期间股价的涨跌, 不是你的盈亏">结果</th>
-              {/* [R258] 列头从「贵不贵」改成「结论」。用户: 「别用这么傻逼的描述」。
-                  这一层在别处一律叫**通道结论**(`keltner.verdict` / 决策台那一列 /
-                  上方那个页签 / 复盘统计口径), 只有这里自己起了个口语名字。
-                  一个东西在界面上有两个名字, 读的人得先确认它们是不是一回事。 */}
-              <th className="whitespace-nowrap px-2 py-2 text-center font-normal" title="当天三档通道合起来给出的那一句结论 —— 与决策台「结论」列同一句话, 悬停看完整卡片">结论</th>
+              {/* [R52 加, R295 删] 「结论」那一列在这里删掉了。用户指着它: 「删掉这一列」。
+                  **它在这张表里本来就是外人**: 这一页从头到尾讲六态 —— 按转折买卖、
+                  转折后第几天、每一笔的成交 —— 而通道结论是**另一套判定**;
+                  它现在在自己那一页有一张一模一样的逐日表(R295)。
+                  截图里那一列绝大多数行还是「—」, 占着宽度却几乎不出信息。 */}
             </tr>
           </thead>
           <tbody>
@@ -398,22 +400,10 @@ function TrendView({ d, rows, onlyMarked, onToggleMarked, onHelp }: {
                   ) : <span className="text-[10px] text-muted/40">—</span>}
                 </td>
                 <FlipTradeCells leg={legs.get(r.date)} />
-                {/* [R52] 结论列在这张表里保留 —— 与「结论」视图不冲突: 那边是摊开的
-                    卡片流(每一档说了什么、之后走成什么样), 这里只是让状态和当天的
-                    通道位置能横着对上一眼("这个板是在什么位置上出的")。 */}
-                <td className="whitespace-nowrap px-2 py-1.5 text-center">
-                  {r.verdict ? (
-                    <VerdictHover v={r.verdict} note={`${r.date} 当天的读数。收盘口径。`}>
-                      <span className={`inline-flex cursor-help whitespace-nowrap rounded border px-1 py-0.5 text-[10px] ${VERDICT_CLS[r.verdict.tone]}`}>
-                        {r.verdict.title}
-                      </span>
-                    </VerdictHover>
-                  ) : <span className="text-[10px] text-muted/40">—</span>}
-                </td>
               </tr>
             ))}
             {rows.length === 0 && (
-              <tr><td colSpan={8} className="px-3 py-10 text-center text-[11px] text-muted">这段时间里没有涨跌停, 状态也没翻转过</td></tr>
+              <tr><td colSpan={7} className="px-3 py-10 text-center text-[11px] text-muted">这段时间里没有涨跌停, 状态也没翻转过</td></tr>
             )}
           </tbody>
         </table>
@@ -422,8 +412,10 @@ function TrendView({ d, rows, onlyMarked, onToggleMarked, onHelp }: {
       <div className="border-t border-border/60 px-4 py-2 text-[10px] leading-relaxed text-muted">
         收盘口径, 与决策台「趋势」列同一个状态机、同一个阈值(含你自己调过的那个)。
         {/* [R258] 「这个价贵不贵」是 R200 那轮清行话时的旧页签名, R223 已经改回
-            「通道结论」—— 这句脚注一直指着一个**不存在的页签**。 */}
-        「结论」列悬停看完整卡片, 要摊开每一档说了什么、之后走成什么样, 切到上方的「通道结论」。
+            「通道结论」—— 那句脚注一直指着一个**不存在的页签**。
+            [R295] 同一个病的第二次: 「结论」那一列删掉之后, "悬停看完整卡片"就
+            指着一列不存在的东西了, 跟着改。 */}
+        通道位置是另一套判定, 它有自己那一页 —— 同样一张逐日表, 切到上方的「通道结论」。
       </div>
     </>
   )
@@ -499,7 +491,10 @@ function EvidencePanel({ ch, edge }: {
 function VerdictView({ d, segments, onHelp }: {
   d: StockReview; segments: Segment[]; onHelp: () => void
 }) {
+  // [R295] 与「趋势状态」那张表同一个开关。用户: 「通道结论那部分也想要这样的记录」
+  const [onlyMarked, setOnlyMarked] = useState(false)
   const legs = legsByFlipDate(d.verdict_trades)
+  const rows = onlyMarked ? d.rows.filter((r) => r.verdict_flipped) : d.rows
   const ph = d.channel?.phase
   // 各档出现了几段 —— 与趋势那边「涨停 N · 跌停 N」同一个角色: 一行小字说完
   // 「这半年都出过什么」。**按语气分而不是按十档分**: 十个数一行放不下, 而且
@@ -576,26 +571,77 @@ function VerdictView({ d, segments, onHelp }: {
           常驻块, 而它本来就是收起来的; 那三样读数是 R212 改了三版才定下来的。 */}
       {!!d.channel && <EvidencePanel ch={d.channel} edge={d.verdict_edge} />}
 
-      <div className="flex justify-end px-4 pt-2">
+      <div className="flex items-center justify-end gap-2 px-4 pt-2">
+        <button
+          onClick={() => setOnlyMarked((v) => !v)}
+          title="只留下结论换了一档的那些天 —— 其余日子结论没变, 复盘时没有信息"
+          className={`rounded-btn border px-2 py-1 text-[10px] transition-colors cursor-pointer ${
+            onlyMarked ? 'border-sky-400/40 bg-sky-400/15 text-sky-300' : 'border-border/60 text-muted hover:text-foreground'}`}
+        >
+          只看换档的日子
+        </button>
         <HelpButton onClick={onHelp} />
       </div>
 
-      <div className="mt-2 min-h-0 flex-1 overflow-auto border-t border-border/60 p-4">
-        {segments.length === 0 && (
-          <div className="py-14 text-center text-[11px] text-muted">
-            这段时间里三档通道一直在中部 —— 位置上没有可说的, 听趋势和信号的
-          </div>
-        )}
-        <div className="space-y-2.5">
-          {segments.map((seg) => (
-            <SegmentCard key={seg.rows[0].date} seg={seg} forwardDays={d.forward_days}
-                         leg={legs.get(seg.rows[seg.rows.length - 1].date)} />
-          ))}
-        </div>
+      {/* [R295] 正文换成**与「趋势状态」同一形状的逐日记录表**。
+          用户指着那张表说: 「通道结论那部分也想要这样的记录」。
+
+          原来这里是一张张段落卡片。换成表之后**内容一样没丢**:
+            怎么做 / 为什么 / 依据 → 结论徽标的悬停(与决策台「结论」列同一张卡)
+            那一段做了什么         → 换档行内联的三列(动作 / 成交→了结 / 结果)
+          **两页于是可以左右对照着看**: 同一天六态说什么、通道说什么、各自该
+          动手没有 —— 那正是这个弹窗一直缺的一步。 */}
+      <div className="mt-2 min-h-0 flex-1 overflow-auto border-t border-border/60">
+        <table className="w-full text-xs">
+          <thead className="sticky top-0 z-10 bg-surface">
+            <tr className="border-b border-border/60 text-[10px] text-muted">
+              <th className="whitespace-nowrap px-3 py-2 text-left font-normal">日期</th>
+              <th className="whitespace-nowrap px-2 py-2 text-right font-normal">收盘</th>
+              <th className="whitespace-nowrap px-2 py-2 text-right font-normal">涨跌</th>
+              <th className="whitespace-nowrap px-3 py-2 text-left font-normal" title="当天三档通道合起来给出的那一句结论 —— 与决策台「结论」列同一句话, 悬停看完整卡片">通道结论</th>
+              <th className="whitespace-nowrap px-2 py-2 text-left font-normal" title="按结论买卖: 这次换档的次日开盘该干什么">动作</th>
+              <th className="whitespace-nowrap px-2 py-2 text-right font-normal" title="成交日与成交价 → 了结日与了结价, 都是开盘价">成交 → 了结</th>
+              <th className="whitespace-nowrap px-2 py-2 text-right font-normal" title="多头段是真赚到的; 空头段是空仓期间股价的涨跌, 不是你的盈亏">结果</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr
+                key={r.date}
+                className={`border-b border-border/30 hover:bg-elevated/30 ${r.verdict_flipped ? 'bg-amber-400/[0.05]' : ''}`}
+              >
+                <td className="whitespace-nowrap px-3 py-1.5 font-mono text-[10px] text-secondary">{r.date}</td>
+                <td className="whitespace-nowrap px-2 py-1.5 text-right font-mono tabular-nums text-foreground">{r.close.toFixed(2)}</td>
+                <td className={`whitespace-nowrap px-2 py-1.5 text-right font-mono tabular-nums ${chgCls(r.change_pct)}`}>
+                  {pct(r.change_pct, 2)}
+                  <LimitTag r={r} />
+                </td>
+                <td className="whitespace-nowrap px-3 py-1.5">
+                  {r.verdict ? (
+                    <VerdictHover v={r.verdict} note={`${r.date} 当天的读数。收盘口径。`}>
+                      <span className={`inline-flex cursor-help whitespace-nowrap rounded border px-1.5 py-0.5 text-[10px] ${VERDICT_CLS[r.verdict.tone]}`}>
+                        {r.verdict.title}
+                      </span>
+                    </VerdictHover>
+                  ) : <span className="text-[10px] text-muted/40">三档都在中部</span>}
+                  {r.verdict_flipped && (
+                    <span className="ml-1.5 text-[9px] text-amber-400" title="这天通道结论换了一档">
+                      ← 换档
+                    </span>
+                  )}
+                </td>
+                <FlipTradeCells leg={legs.get(r.date)} />
+              </tr>
+            ))}
+            {rows.length === 0 && (
+              <tr><td colSpan={7} className="px-3 py-10 text-center text-[11px] text-muted">这段时间里结论一档都没换过</td></tr>
+            )}
+          </tbody>
+        </table>
       </div>
 
       <div className="border-t border-border/60 px-4 py-2 text-[10px] leading-relaxed text-muted">
-        每一段就是决策台「结论」列当时悬停会看到的那张卡片。一律按收盘算, 用的是同一套通道。
+        「通道结论」列悬停看完整卡片 —— 与决策台「结论」列是同一张。一律按收盘算, 用的是同一套通道。
         历史是按<b className="text-secondary">当前</b>复权价重新算的 —— 期间除过权的话,
         同一天今天算出来的通道会和当时屏幕上略有出入, 复盘看的是形态与节奏。
       </div>
@@ -603,70 +649,9 @@ function VerdictView({ d, segments, onHelp }: {
   )
 }
 
-function SegmentCard({ seg, forwardDays, leg }: {
-  seg: Segment; forwardDays: number
-  /** [R293] 这一段起头那次换档触发的那一笔 —— 段首日就是它的触发日 */
-  leg?: NonNullable<StockReview['verdict_trades']>['legs'][number]
-}) {
-  const { v, rows } = seg
-  const newest = rows[0]              // rows 是新→旧
-  const oldest = rows[rows.length - 1]
-  const span = rows.reduce((a, r) => a * (1 + (r.change_pct ?? 0)), 1) - 1
-  const limitUps = rows.filter((r) => r.limit_up).length
-  const bands = (['s', 'm', 'l'] as const).filter((k) => oldest.bands[k])
-
-  return (
-    <div className="flex overflow-hidden rounded-lg border border-border/60 bg-elevated/20">
-      <div className={`w-1 shrink-0 ${VERDICT_BAR[v.tone]}`} />
-      <div className="min-w-0 flex-1 px-3 py-2.5">
-        <div className="flex flex-wrap items-baseline gap-2">
-          <span className={`inline-flex shrink-0 whitespace-nowrap rounded border px-1.5 py-0.5 text-[11px] ${VERDICT_CLS[v.tone]}`}>
-            {v.title}
-          </span>
-          <span className="shrink-0 font-mono text-[10px] text-secondary">
-            {rows.length > 1 ? `${oldest.date} ~ ${newest.date}` : newest.date}
-          </span>
-          <span className="shrink-0 text-[10px] text-muted">{rows.length} 天</span>
-          <span className={`shrink-0 font-mono text-[10px] ${chgCls(span)}`} title="这一段期间的累计涨跌">
-            期间 {pct(span)}
-          </span>
-          {limitUps > 0 && (
-            <span className="shrink-0 rounded border border-red-400/50 bg-red-400/15 px-1 text-[9px] text-red-300">
-              含 {limitUps} 次涨停
-            </span>
-          )}
-          <span
-            className={`ml-auto shrink-0 font-mono text-[10px] ${chgCls(newest.fwd)}`}
-            title={newest.fwd == null
-              ? `这一段结束还不到 ${forwardDays} 个交易日, 结果未知`
-              : `这一档最后一次出现(${newest.date})之后 ${forwardDays} 个交易日的涨跌`}
-          >
-            之后{forwardDays}日 {newest.fwd == null ? '待定' : pct(newest.fwd)}
-          </span>
-        </div>
-
-        {/* [R293] 这一段里手上做了什么。用户: 「关注重点是『调整到位』和这些
-            状态期间的买卖」—— 那就长在这一段自己的卡片上, 而不是让人去另一张
-            表里按日期找回来。段首日就是那一笔的触发日, 所以两边天然对齐。 */}
-        <FlipTradeLine leg={leg} />
-
-        {/* 徽标背后的三段 —— 这才是「结论」列真正的内容 */}
-        <div className="mt-2 rounded border border-border/60 bg-base/60 px-2 py-1.5">
-          <div className="text-[9px] text-muted">怎么做</div>
-          <div className="mt-0.5 text-[11px] leading-snug text-foreground">{v.action}</div>
-        </div>
-        <div className="mt-1.5 text-[10px] leading-relaxed text-secondary">{v.detail}</div>
-        <div className="mt-1.5 flex flex-wrap items-baseline gap-1.5">
-          <span className="text-[9px] text-muted">依据</span>
-          <span className="text-[10px] text-secondary">{v.bands_text}</span>
-          <span className="text-[9px] text-muted/70">·</span>
-          {bands.map((k) => (
-            <span key={k} className="rounded border border-border/60 px-1 text-[9px] text-muted">
-              {BAND_CN[k]}{oldest.bands[k]!.pos_cn}
-            </span>
-          ))}
-        </div>
-      </div>
-    </div>
-  )
-}
+// [R52 加, R295 删] `SegmentCard`(一段结论一张卡)在这里删掉了。
+// 用户指着「趋势状态」那张逐日表: 「通道结论那部分也想要这样的记录」——
+// 于是这一页的正文换成了同一形状的表。**卡片上的内容一样没丢**:
+//   怎么做 / 为什么 / 依据  → 结论徽标的悬停(与决策台「结论」列同一张卡)
+//   那一段做了什么          → 换档行内联的三列(动作 / 成交→了结 / 结果)
+// 留着卡片就是同一条时间轴印两遍, 而且两处哪天不同步了没人会发现。

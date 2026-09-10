@@ -104,3 +104,31 @@ def test_R294_三档都算不出来时不硬凑一个码():
     from app.indicators.keltner_geometry import combo_code
     assert combo_code({"s": {"pos": "inside"}, "m": {"pos": "inside"}}) is None
     assert combo_code(None) is None
+
+
+def test_R295_换档标记盖在逐日行上而且没错位():
+    """[R295] 「通道结论」那张逐日表靠它给换档那几行上标、加底色。
+
+    **两件事都要钉**: 有没有(字段在不在)、对不对(有没有盖串行)。
+    盖章发生在 `out_rows` 反转**之前** —— 顺序错一位的话, 标记会整体挪到相邻
+    那一天上, 而界面看着照样"有标记", 没人会发现。
+    """
+    import sys
+    sys.path.insert(0, str(__import__("pathlib").Path(__file__).parent))
+    from test_flip_trades import _Repo, _review_frame
+    from app.services import review_service as rs
+
+    d = rs.review_for_symbol(_Repo(_review_frame()), "600000.SH", 120)
+    rows = list(reversed(d["rows"]))            # 载荷是新→旧, 这里按时间正序
+    assert all("verdict_flipped" in r for r in rows), "逐日行没盖上换档标记"
+
+    # **独立算一遍**: 结论换档 = code 换了(含 有结论 ↔ 没结论), 第一天不算
+    want = {r["date"] for i, r in enumerate(rows)
+            if i and (r.get("verdict") or {}).get("code")
+            != (rows[i - 1].get("verdict") or {}).get("code")}
+    got = {r["date"] for r in rows if r["verdict_flipped"]}
+    assert got == want, f"标记盖串了: 多 {got - want} / 少 {want - got}"
+
+    # 每一笔的触发日都必须在标记里 —— 两处不同源的话表上就会出现"有成交没标记"
+    for leg in d["verdict_trades"]["legs"]:
+        assert leg["flip_date"] in got, f"{leg['flip_date']} 有成交却没标成换档"

@@ -701,6 +701,8 @@ export interface ReviewRow {
   bands: Partial<Record<'s' | 'm' | 'l', { pos: string; pos_cn: string }>>
   /** [R294] 三字位置码(如「上中下」), 也就是 27 格速查表的行号。三档缺一就为 null */
   combo?: string | null
+  /** [R295] 这天通道结论换档了(含「有结论 ↔ 没结论」)。口径归后端 `verdict_days` 管 */
+  verdict_flipped?: boolean
   verdict?: KeltnerVerdict | null
   /** [R51] 这天之后 forward_days 的涨跌(小数); 最近几天还不知道结果, 为 null */
   fwd: number | null

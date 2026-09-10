@@ -716,8 +716,10 @@ def test_R288_两个页签都挂上了而且都排在正文最前面():
     dlg = code_of("components/stock-analysis/StockReviewDialog.tsx")
     # [R293] 两个页签现在**同一个形状**: 摘要压成一条 `FlipTradesBar` 放在头部卡
     # 第一行, 明细并进各自的正文(逐日表 / 段落卡片)。
+    # [R295] 通道结论的正文也换成了逐日表(用户: 「通道结论那部分也想要这样的
+    # 记录」), 所以两边的正文锚点现在都是 `<table`。
     for fn, tag, body_tag in (("function TrendView", "<FlipTradesBar", "<table"),
-                              ("function VerdictView", "<FlipTradesBar", "{segments.map")):
+                              ("function VerdictView", "<FlipTradesBar", "<table")):
         blk = dlg[dlg.index(fn):]
         blk = blk[:blk.index("\nfunction ", 1)] if "\nfunction " in blk[1:] else blk
         body = blk[blk.index("return ("):]
@@ -1035,22 +1037,19 @@ def test_R293_两个页签的头部是同一个形状():
         assert "<StateTimeline" in head, f"{fn} 的头部没有状态轴"
 
 
-def test_R293_每一段的买卖长在那一段的卡片上():
-    """用户: 「关注重点是『调整到位』和这些状态期间的买卖」。
+def test_R295_每一笔长在换档那一行上():
+    """[R293 → R295] 融合的对象换了, 规矩没变: **明细并进正文**, 不单开一张表。
 
-    融合的做法与趋势那边一样: **明细并进正文**, 不再单开一张「每一段」表 ——
-    那张表与这里的卡片流本来就是同一条时间轴(每张卡片的起始日正是一次结论
-    换档, 也就是一笔的触发日), 拆成两处等于让人按日期在两边对眼。
+    R293 并进的是段落卡片; R295 用户指着「趋势状态」那张逐日表说「通道结论那
+    部分也想要这样的记录」, 于是正文换成同形状的表, 那一笔就并到**换档那一行**
+    上 —— 与趋势那边逐字同一套三列。
     """
-    dlg = _dialog()
-    verdict = _fn_body(dlg, "function VerdictView")
+    verdict = _fn_body(_dialog(), "function VerdictView")
     assert "legsByFlipDate(d.verdict_trades)" in verdict, "没有按换档日建索引"
-    # 段首日 = 触发日。rows 是新→旧, 所以段首是**最后一个**
-    assert "legs.get(seg.rows[seg.rows.length - 1].date)" in verdict, (
-        "取的不是段首那天 —— 段末那天不是这一笔的触发日"
+    assert "<FlipTradeCells leg={legs.get(r.date)} />" in verdict, "换档行上没长出那一笔"
+    assert "function SegmentCard" not in _dialog(), (
+        "段落卡片还留着 —— 同一条时间轴印两遍, 而且两处不同步没人会发现"
     )
-    card = _fn_body(dlg, "function SegmentCard")
-    assert "<FlipTradeLine leg={leg} />" in card, "卡片上没长出那一笔"
 
 
 def test_R293_那张独立的每一段表整个删了():
@@ -1214,3 +1213,60 @@ def test_R294_没进过这一格与算不出来分得开():
     combo = _combo()
     assert "这一格定不了" in combo, "三档缺档时没有独立说法"
     assert "头一回" in combo, "没进过这一格时没有独立说法"
+
+
+# ================================================================
+# [R295] 「结论」列离开趋势表, 通道结论拿到自己的逐日记录表
+# ================================================================
+#
+# 用户指着趋势状态那张表里的结论列: 「删掉这一列」; 又指着那张表本身:
+# 「通道结论那部分也想要这样的记录」。**两句是一件事** —— 那一列离开, 是因为
+# 它要在自己那一页有一张同样的表。
+
+
+def test_R295_趋势表里不再有通道结论():
+    """它在那张表里本来就是外人: 那一页从头到尾讲六态(按转折买卖、转折后第几天、
+    每一笔的成交), 而通道结论是**另一套判定**。截图里那一列绝大多数行还是「—」。
+    """
+    trend = _fn_body(_dialog(), "function TrendView")
+    assert "r.verdict" not in trend, "「结论」那一列又回到趋势表里了"
+    assert "<VerdictHover" not in trend, "结论悬停也不该留在这张表里"
+    # 空表那行的 colSpan 得跟着少一列 —— 少改这一处的话空表会歪一格
+    assert "colSpan={7}" in trend, "删了一列却没改 colSpan"
+
+
+def test_R295_通道结论有一张同形状的逐日表():
+    """同形状 = 同样七列、同样的转折行内联三格 —— **两页于是能左右对照着看**:
+    同一天六态说什么、通道说什么、各自该动手没有。"""
+    dlg = _dialog()
+    trend = _fn_body(dlg, "function TrendView")
+    verdict = _fn_body(dlg, "function VerdictView")
+    for both in ("<table className=\"w-full text-xs\">",
+                 "<FlipTradeCells leg={legs.get(r.date)} />",
+                 "只看", "colSpan={7}"):
+        assert both in trend and both in verdict, f"两张表不同形状, 差在: {both}"
+    assert "通道结论</th>" in verdict, "结论那一列没进新表"
+    assert "六态状态</th>" in trend and "六态状态</th>" not in verdict, "两张表的状态列串了"
+
+
+def test_R295_换档标记读后端不自己比():
+    """什么算一次换档归 `verdict_days` 管(含「有结论 ↔ 没结论」那两种切换)。
+    前端拿 `verdict.code` 再比一遍就是同一个规则两处定义(R286 立过)。"""
+    verdict = _fn_body(_dialog(), "function VerdictView")
+    # 钉**渲染条件**, 不只是钉字段名与字样 —— 包成 `{false && …}` 时两者照样在,
+    # 变异测试当场就漏了(本轮同一个坑的第 N 次)。
+    assert "{r.verdict_flipped && (" in verdict, "换档标记没有按标记渲染"
+    assert "← 换档" in verdict, "换档那天没有标记"
+    assert "${r.verdict_flipped ? 'bg-amber-400/[0.05]' : ''}" in verdict, (
+        "换档那一行没有底色 —— 一张 120 行的表, 靠底色才扫得出来"
+    )
+    for derived in ("verdict?.code !==", "verdict.code !==", "prevCode"):
+        assert derived not in verdict, f"前端自己比了一遍换档: {derived}"
+
+
+def test_R295_卡片上的内容一样没丢():
+    """**删卡片不是删内容。** 怎么做/为什么/依据 全在结论徽标的悬停里 ——
+    与决策台「结论」列悬停看到的是同一张卡, 一处内容两处用。"""
+    verdict = _fn_body(_dialog(), "function VerdictView")
+    assert "<VerdictHover v={r.verdict}" in verdict, "结论徽标没有完整卡片的悬停"
+    assert "悬停看完整卡片" in verdict, "脚注没告诉人去哪儿看完整卡片"

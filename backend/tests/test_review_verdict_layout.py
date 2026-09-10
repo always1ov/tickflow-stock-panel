@@ -27,6 +27,19 @@ def dlg() -> str:
     return code_of(REL)
 
 
+
+def _fn(src: str, name: str) -> str:
+    """从 `name` 起到**下一个顶层 function** 为止; 它是最后一个就到文件尾。
+
+    [R295] 加这个是因为 `SegmentCard` 删掉之后 `VerdictView` 成了文件里最后一个
+    函数, 而原来那三处写的是 `blk.index("\nfunction ", 1)` —— 找不到就抛
+    `ValueError`, 测试红在"切片崩了"而不是"版面错了"。
+    """
+    blk = src[src.index(name):]
+    j = blk.find("\nfunction ", 1)
+    return blk if j == -1 else blk[:j]
+
+
 # ================================================================
 # ① 头部压成一块
 # ================================================================
@@ -45,8 +58,7 @@ def test_R269_该盯什么必须常驻(dlg):
     """**这一栏唯一的行动指引。** 别的都能收起, 它不行 ——
     收起来这一栏就只剩「现在处在下跌中」这种定性词, 没有一条能照着做的。"""
     # [R293] 它现在长在 `VerdictView` 头部卡的「现在」行里
-    head = dlg[dlg.index("function VerdictView"):]
-    head = head[:head.index("\nfunction ", 1)]
+    head = _fn(dlg, "function VerdictView")
     assert "该盯什么" in head and "{ph.watch}" in head
 
 
@@ -69,8 +81,7 @@ def test_R269_位置结论压成一枚芯片(dlg):
     # **钉的是"这一页还读不读 `verdict_edge`"**, 不是钉某个字面量 —— 换个写法
     # (`d.verdict_edge?.label`)就绕过去的话, 这条等于没写(变异测试抓到过)。
     # 唯一合法的一处是传给 `EvidencePanel`: 那里面是「凭什么」, 收在折叠区里。
-    view = dlg[dlg.index("function VerdictView"):]
-    view = view[:view.index("\nfunction ", 1)]
+    view = _fn(dlg, "function VerdictView")
     uses = [ln for ln in view.splitlines() if "verdict_edge" in ln]
     assert len(uses) == 1 and "<EvidencePanel" in uses[0], (
         f"「通道结论灵不灵」又摆回这一页了: {uses}"
@@ -99,11 +110,12 @@ def test_R269_依据排在正文之前(dlg):
     都不需要了」。所以这条不再拿它当中间锚点, 改成钉**依据仍排在正文之前**:
     读数不许横在结论和历史段落中间, 这条原意一个字没变。
     """
-    view = dlg[dlg.index("function VerdictView"):]
-    view = view[:view.index("\nfunction ", 1)]
+    view = _fn(dlg, "function VerdictView")
     assert "<OutcomeChips" not in view, "分档芯片又回到「通道结论」页了"
     # [R293] 头部卡 → 依据 → 卡片流。头部卡的第一行就是「按结论买卖」(核心)。
-    assert view.index("<FlipTradesBar") < view.index("<EvidencePanel") < view.index("{segments.map")
+    # [R295] 正文从卡片流换成逐日表, 尾锚跟着换。顺序的意思一个字没变:
+    # 头部卡(核心在第一行) → 依据 → 正文。
+    assert view.index("<FlipTradesBar") < view.index("<EvidencePanel") < view.index("<table")
 
 
 def test_R269_正文区拿到剩余全部高度(dlg):
@@ -204,8 +216,7 @@ def test_R292_趋势的涨跌停压成头部一行(dlg):
     """
     assert "function TrendStatsPanel" not in dlg, "那块折叠区又回来了"
     assert "storage.reviewTrendStatsOpen" not in dlg
-    view = dlg[dlg.index("function TrendView"):]
-    view = view[:view.index("\nfunction ", 1)]
+    view = _fn(dlg, "function TrendView")
     assert "涨停 {st.limit_ups}" in view, "涨跌停计数丢了 —— 要的是压成一行, 不是删掉"
 
 
@@ -223,8 +234,7 @@ def test_R292_六态灵不灵整块撤掉了(dlg):
 
 def test_R270_逐日表拿到剩余全部高度(dlg):
     """头部省下来的空间要真的给到正文, 否则这次改动等于没改。"""
-    view = dlg[dlg.index("function TrendView"):]
-    view = view[:view.index("\nfunction ", 1)]
+    view = _fn(dlg, "function TrendView")
     assert "min-h-0 flex-1 overflow-auto" in view
 
 
@@ -236,8 +246,7 @@ def test_R292_趋势页签顺序是战绩在前(dlg):
     怎么样", 点进来回答"这套转折在这只票上赚不赚钱"。所以战绩在前、现在在后、
     这半年在第三行, 逐日表拿走剩下全部高度。
     """
-    view = dlg[dlg.index("function TrendView"):]
-    view = view[:view.index("\nfunction ", 1)]
+    view = _fn(dlg, "function TrendView")
     assert view.index("<FlipTradesBar") < view.index("现在") < view.index("<StateTimeline") < view.index("<table")
 
 

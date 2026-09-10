@@ -609,12 +609,26 @@ def test_R258_界面上不再出现贵不贵():
     assert not bad, "这些地方还印着「贵不贵」:\n  " + "\n  ".join(bad)
 
 
-def test_R258_复盘表那一列叫结论():
+def test_R258_那一列叫通道结论而且脚注指得对():
+    """[R258 → R295] 守的规矩一个字没变: **同一层判定在界面上只许一个名字**,
+    而且脚注不许指着不存在的东西。
+
+    变的是它长在哪儿: 用户指着「趋势状态」那张表里的结论列说「删掉这一列」——
+    它在那张表里本来就是外人(那一页从头到尾讲六态)。现在它在**自己那一页**
+    有一张同形状的逐日表(用户: 「通道结论那部分也想要这样的记录」), 列头就叫
+    「通道结论」—— 与页签、决策台那一列、统计口径同一个名字。
+    """
     root = _BOARD.parent
     src = (root / "StockReviewDialog.tsx").read_text(encoding="utf-8")
-    assert ">结论</th>" in src, "复盘逐日表那一列没改成「结论」"
-    # 脚注曾经指着一个**已经不存在的页签**(R200 的旧名, R223 已改回「通道结论」)
-    assert "切到上方的「通道结论」" in src, "脚注还指着旧页签名"
+    assert ">通道结论</th>" in src, "那一列的列头不叫「通道结论」"
+    # 反面: 趋势那张表里不许再有它
+    trend = src[src.index("function TrendView"):src.index("function HeadRow")
+                if "function HeadRow" in src else src.index("function EvidencePanel")]
+    assert "r.verdict" not in trend, "「结论」那一列又回到趋势状态那张表里了"
+    # 脚注曾经指着一个**已经不存在的页签**(R200 的旧名, R223 已改回「通道结论」);
+    # R295 又出过一次同形状的: 那一列删掉后脚注还写着"悬停看完整卡片"。
+    assert "切到上方的「通道结论」" in src, "趋势那页的脚注没指向通道结论页"
+    assert "「结论」列悬停看完整卡片" not in src, "脚注还指着一列已经不存在的东西"
 
 
 def test_R261_走了多远那一行是统一色():

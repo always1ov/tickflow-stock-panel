@@ -631,6 +631,11 @@ def review_for_symbol(repo, symbol: str, days: int = DEFAULT_DAYS) -> dict:
         # [R287] 「按转折买卖」—— 每两个转折之间到底赚了多少。口径与取舍全在
         # `flip_trades` 的 docstring 里。**只切窗口内的那一段**: 统计必须与
         # 屏幕上那 120 行的转折标记一一对得上, 拿暖机段一起算就对不上了。
+        # [R295] 逐日行补一个「今天换档了没有」—— 「通道结论」那一页也要一张
+        # 同样的逐日记录表(用户: 「通道结论那部分也想要这样的记录」)。
+        # **不让前端从 verdict.code 现比一遍**: 什么算一次换档归 `verdict_days` 管
+        # (含「有结论 ↔ 没结论」那两种切换), 前端再比一份就是同一个规则两处定义。
+        **_stamp_verdict_flips(rows),
         "flip_trades": _trades(flip_trades.trend_days(steps[offset:]),
                                col("open")[offset:], closes[offset:],
                                lu[offset:], ld[offset:]),
@@ -642,6 +647,14 @@ def review_for_symbol(repo, symbol: str, days: int = DEFAULT_DAYS) -> dict:
                                   lu[offset:], ld[offset:]),
         "rows": out_rows,
     }
+
+
+def _stamp_verdict_flips(rows: list[dict]) -> dict:
+    """[R295] 就地给每一行盖上 `verdict_flipped`。返回空字典只是为了能写在
+    返回字面量里 —— 盖章这件事必须发生在 `out_rows` 反转**之前**。"""
+    for row, day in zip(rows, flip_trades.verdict_days(rows), strict=True):
+        row["verdict_flipped"] = day["flipped"]
+    return {}
 
 
 def _trades(days, opens, closes, lu, ld) -> dict:
