@@ -580,15 +580,30 @@ def state_key(bands: dict | None) -> str | None:
     """
     from app.indicators.keltner import verdict as _verdict
 
-    if not bands or len(bands) < 3:
+    if not bands:
         return None
+    # [R263] **有结论就跟着作者走, 不自己再加一道"三档必须齐全"。**
+    #
+    # 作者的 `verdict()` 用的是 `(bands or {}).get(...)` —— **缺一档照样出结论**
+    # (新股不够 120 根时长档算不出来, 短中两档一样判得出「调整到位」)。
+    # 而这里原来要求 `len(bands) >= 3`, 于是那些票**徽标有结论、天数却整个消失** ——
+    # 用户: 「有漏网之鱼不显示天数」(截图: 臻宝科技 688797 的「调整到位」光秃秃)。
+    #
+    # 这一层比作者严, 就等于自己造了一类"有结论但没天数"的票, 而界面上看不出
+    # 是为什么。判定归作者, 这里只负责数 —— 他判得出的, 这里就得数得了。
     v = _verdict(bands)
     if v:
         return str(v["code"])
+    # 组合键是另一回事: 它字面上就是三档的位置, 缺档时按**有哪几档**拼,
+    # 带上档位字母 —— 否则「短下中下」与「短下长下」会拼成同一个键。
     try:
-        return "|".join(str(bands[k]["pos"]) for k in ("s", "m", "l"))
+        got = [(k, str(bands[k]["pos"])) for k in ("s", "m", "l") if bands.get(k)]
     except (KeyError, TypeError):
         return None
+    if not got:
+        return None
+    return "|".join(f"{k}={pos}" for k, pos in got) if len(got) < 3 \
+        else "|".join(pos for _, pos in got)
 
 
 def state_series(closes: list[float] | None, atrs: list[float] | None, *,
@@ -627,17 +642,17 @@ def state_series(closes: list[float] | None, atrs: list[float] | None, *,
         a = as_[i]
         bands: dict[str, dict] = {}
         if a is not None and a > 0:
+            # [R263] **能算几档算几档**, 与徽标那边一致。
+            # 原来是"缺一档就把这一天整个作废", 比作者的 `verdict()` 严 ——
+            # 长档算不出来的票(新股不够 120 根)于是一天都数不出来。
             for k_ in ("s", "m", "l"):
                 m = ma[k_][i]
                 if m is None:
-                    bands = {}
-                    break
+                    continue
                 got = assess(close=vals[i], ma=m, atr=a, n=K[k_])
-                if not got:
-                    bands = {}
-                    break
-                bands[k_] = got
-        key = state_key(bands) if len(bands) == 3 else None
+                if got:
+                    bands[k_] = got
+        key = state_key(bands) if bands else None
         out.append(key)
         # [R256] **只在"算不出来"时停, 不再在"跟今天这一档不一样"时停。**
         #

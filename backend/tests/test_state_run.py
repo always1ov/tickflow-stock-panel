@@ -440,3 +440,99 @@ def test_R256_三档都在中部那一格也有名字():
         "「中中中」那一格又变回光秃秃的 `—` 了 —— 旁边还跟着「已N天」, "
         "读起来是「什么都没有, 已经 1 天」"
     )
+
+
+# ===== [R263] 漏网之鱼: 缺一档的票 =====
+#
+# 用户: 「有漏网之鱼不显示天数」(截图: 臻宝科技 688797 的「调整到位」光秃秃)。
+#
+# **根因是这一层比作者严。** 作者的 `verdict()` 用 `(bands or {}).get(...)` ——
+# **缺一档照样出结论**(新股不够 120 根时长档算不出来, 短中两档一样判得出
+# 「调整到位」)。而 `state_key` 原来要求 `len(bands) >= 3`, 于是那些票
+# **徽标有结论、天数却整个消失** —— 界面上还看不出是为什么。
+#
+# 判定归作者, 这一层只负责数: **他判得出的, 这里就得数得了。**
+
+
+def test_R263_缺一档时结论与天数必须同进退():
+    """把这条纪律钉死: 只要作者判得出结论, `state_key` 就必须给得出键。"""
+    from app.indicators import keltner as kk
+
+    def bands(**kw):
+        return {x: {"pos": p} for x, p in kw.items()}
+
+    cases = [
+        ("三档齐全", bands(s=kk.POS_BELOW, m=kk.POS_BELOW, l=kk.POS_INSIDE)),
+        ("缺长档", bands(s=kk.POS_BELOW, m=kk.POS_BELOW)),
+        ("缺中档", bands(s=kk.POS_BELOW, l=kk.POS_INSIDE)),
+        ("只有短档", bands(s=kk.POS_BELOW)),
+        ("缺短档", bands(m=kk.POS_BELOW, l=kk.POS_BELOW)),
+    ]
+    for tag, b in cases:
+        v = kk.verdict(b)
+        key = kg.state_key(b)
+        if v:
+            assert key, (
+                f"{tag}: 作者判出了「{v['title']}」而 state_key 给不出键 —— "
+                f"徽标会有结论但没天数, 正是用户看到的那个"
+            )
+            assert key == v["code"], f"{tag}: 键与结论码对不上"
+
+
+def test_R263_组合键在缺档时带上档位字母():
+    """缺档时组合键要分得清是**哪几档** —— 「短下中下」与「短下长下」
+    不能拼成同一个键, 否则两种不同的状态会被数成一段。"""
+    from app.indicators import keltner as kk
+
+    a = kg.state_key({"s": {"pos": kk.POS_INSIDE}, "m": {"pos": kk.POS_INSIDE}})
+    b = kg.state_key({"s": {"pos": kk.POS_INSIDE}, "l": {"pos": kk.POS_INSIDE}})
+    assert a and b and a != b, f"缺档的两种组合拼成了同一个键: {a} / {b}"
+    # 三档齐全时仍是老写法(不带字母), 免得把已有的键全换掉
+    full = kg.state_key({k: {"pos": kk.POS_INSIDE} for k in ("s", "m", "l")})
+    assert "=" not in str(full), f"三档齐全的键被改了写法: {full}"
+
+
+def test_R263_逐日序列也能算几档算几档():
+    """序列要和徽标一样宽容 —— 否则徽标判得出、序列一天都数不出来。"""
+    closes = [10.0] * 50 + [round(10.0 - 0.05 * i, 4) for i in range(1, 31)]  # 80 根
+    n = len(closes)
+
+    def ma(w, i):
+        return None if i + 1 < w else sum(closes[i + 1 - w:i + 1]) / w
+
+    seq = kg.state_series(closes, [_ATR] * n,
+                          ma20=[ma(20, i) for i in range(n)],
+                          ma60=[ma(60, i) for i in range(n)])
+    assert seq and seq[0], f"80 根(长档算不出来)的票一天都没数出来: {seq[:3]}"
+
+
+def test_R263_端到端_长档算不出来的票也有天数():
+    """整条链。这只票只有 80 根 K, 长档算不出来 —— 修之前天数整个没有,
+    中间一版被 `len(closes) >= 120` 那道门挡成「已1天+」。
+
+    那道门是给**几何量**(压缩/在轨外/能量)设的, 它们确实要长期档;
+    逐日状态不该跟着一起卡。
+    """
+    from app.services import keltner_service as ks
+
+    closes = [10.0] * 50 + [round(10.0 - 0.05 * i, 4) for i in range(1, 31)]
+    row = _row(closes)
+    v = row.get("verdict") or {}
+    assert v.get("title"), f"这份夹具本该有结论, 拿到的是 {sorted(row)}"
+    assert "l" not in row, "夹具本该缺长档, 这条测不到"
+    assert v.get("days"), f"缺长档的票没有天数 —— 正是用户看到的漏网之鱼: {sorted(v)}"
+    assert v["days"] > 1, f"只报了 {v['days']} 天 —— 序列又被 120 根那道门挡住了"
+
+
+def test_R263_几何量仍然守着120根那道门():
+    """撤的是**逐日状态**那一道, 不是把门拆了 —— 压缩指数/在轨外/频段能量
+    确实要长期档, 用 80 根算出来的是假数。"""
+    import inspect
+
+    from app.services import keltner_service as ks
+    src = inspect.getsource(ks.long_trend_map)
+    assert "len(closes) >= WINDOW_LONG" in src, "几何量那道 120 根的门没了"
+    geo = src[src.index("len(closes) >= WINDOW_LONG"):]
+    geo = geo[:geo.index("[R263]")]
+    for must in ("kg.series", "kg.runs", "kg.band_energy"):
+        assert must in geo, f"{must} 跑到门外面去了 —— 它要长期档"

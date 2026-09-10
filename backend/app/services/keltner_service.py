@@ -120,19 +120,30 @@ def long_trend_map(repo, symbols: list[str], *, with_closes: bool = False) -> di
                     e = kg.band_energy(cl, atrs)
                     if e:
                         ent["energy"] = e
-                    # [R246] 逐日状态序列(新→旧, 到第一个变化就收手)。
-                    # 数的那一步归 channels_for_symbols —— 只有它知道徽标上
-                    # 印的是哪一档。同一份序列, 不新增取数。
-                    states = kg.state_series(
-                        cl, atrs,
-                        ma20=sub["ma20"].to_list() if "ma20" in sub.columns else None,
-                        ma60=sub["ma60"].to_list() if "ma60" in sub.columns else None)
-                    if states:
-                        ent["states"] = states
-                        ds = [str(d) for d in sub["date"].to_list()]
-                        ent["state_dates"] = ds[::-1][:len(states)]
             except Exception as e:  # noqa: BLE001
                 logger.debug("channel runs skipped for %s: %s", name, e)
+
+        # [R263] **逐日状态序列挪出那道 120 根的门。**
+        #
+        # 上面那道 `len(closes) >= WINDOW_LONG` 是给**几何量**(压缩/在轨外/能量)
+        # 设的 —— 它们确实要长期档。可逐日状态跟徽标一样, 缺一档照样判得出来
+        # (R263 已经让两边对齐了), 卡在那道门里就等于: 新股徽标有结论、天数却
+        # 永远是「已1天+」。用户: 「有漏网之鱼不显示天数」。
+        #
+        # 门槛降到短期档要的 20 根 —— 再少连一档都算不出, 那才是真没得数。
+        if has_atr and len(closes) >= kg.WINDOW["s"]:
+            try:
+                states = kg.state_series(
+                    [float(c) for c in closes],
+                    [None if a is None else float(a) for a in sub["atr_14"].to_list()],
+                    ma20=sub["ma20"].to_list() if "ma20" in sub.columns else None,
+                    ma60=sub["ma60"].to_list() if "ma60" in sub.columns else None)
+                if states:
+                    ent["states"] = states
+                    ds = [str(d) for d in sub["date"].to_list()]
+                    ent["state_dates"] = ds[::-1][:len(states)]
+            except Exception as e:  # noqa: BLE001
+                logger.debug("state series skipped for %s: %s", name, e)
         if with_closes:
             # 趋势模板要自己按 50/150/200 滚均线、按 250 根取 52 周高低,
             # 所以给序列而不是给几个算好的数 —— 口径归 trend_template 一处管。
