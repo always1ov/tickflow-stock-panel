@@ -1,19 +1,22 @@
 /**
- * [fork 增强 R292] 复盘弹窗里的「说明」抽屉 —— 六态与通道结论各是什么意思。
+ * [fork 增强 R292] 复盘弹窗的「说明」页 —— 六态与通道结论各是什么意思。
  *
  * 用户: 「把全景按钮改成说明或者帮助按钮, 里面是解释每个六态状态、结论状态是
  * 什么意思」。
  *
- * ## 为什么是**右侧抽屉**而不是盖满
+ * ## 它的形态改过两次, 每次都是同一个问题在推
  *
- * 上一版(R289 的「全景」)是一层盖住整个正文的面板, 用户第一句就是
- * 「全景按钮做得不够好, 我点进去全屏了」。**说得对**: 词汇表是**边看边查**的
- * 东西 —— 你正盯着某一行的「自然回撤」想不起来它什么意思, 这时候把那张表整个
- * 盖掉, 等于逼你先记住要查什么再翻回去。
+ *   R289 「全景」  一层盖住整个正文的面板 → 「我点进去全屏了」
+ *   R292 抽屉      从右边推进来占 26rem, 正文那一侧还看得见
+ *   R301 页签      **换掉正文, 不再盖任何东西**
  *
- * 抽屉从右边推进来, 占约 26rem, 正文那一侧仍然看得见 —— 一边对着行, 一边读
- * 释义。这也是「说明」和「全景」的根本差别: 全景是**另一批内容**(该并列),
- * 说明是**手边的注解**(该并排)。
+ * 用户最后一句是: 「说明点击后不是弹窗, 和趋势状态一样内容区域显示」。
+ *
+ * **抽屉那一版的理由(边看边查, 一边对着行一边读释义)在实际用起来时不成立** ——
+ * 26rem 的抽屉推开之后, 正文剩下的那一条恰恰是最右边几列, 而要对照的六态徽标
+ * 在最左边, 被盖住了。真要边看边查, 抽屉得停在正文左侧; 而那又和"从右边推进来"
+ * 的手势相反。既然这条路走不通, 就老老实实做成一页 —— 名实相符, 而且省掉了
+ * 绝对定位、过渡、Esc 拦截、关闭按钮四样东西。
  *
  * ## 词条为什么从后端取
  *
@@ -21,12 +24,12 @@
  * 誊抄一份的话, 底层哪天改了措辞, 那份誊抄就开始说假话 —— 而且**没有任何东西
  * 会报错**。R203 的 27 格速查表当初就是为这个理由做成端点的。
  *
- * 动效: 只推 `transform`(translate-x)与 `opacity`, 180ms ease-out,
- * `motion-reduce` 下整个关掉。Esc 只关这一层, 不许穿透到外面那个复盘弹窗。
+ * [R301] **没有动效了** —— 换页签不该有过渡(R301 之前那层 180ms 是抽屉推入的
+ * 手势, 页签之间切换加过渡只会让每次点击都慢一拍)。Esc 的拦截也一并去掉:
+ * 这一页不是"一层", Esc 该照旧关掉整个复盘弹窗。
  */
-import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Loader2, X } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import { api } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { cn } from '@/lib/cn'
@@ -45,65 +48,37 @@ const TONE_CLS: Record<string, string> = {
   watch: 'border-border bg-elevated/60 text-secondary',
 }
 
-export function ReviewHelpSheet({ open, onClose, here = null }: {
-  open: boolean
-  onClose: () => void
-  /** [R296] 你现在在 27 格的哪一格 —— 抽屉里那张表拿它高亮 */
+export function ReviewHelpView({ here = null }: {
+  /** [R296] 你现在在 27 格的哪一格 —— 那张表拿它高亮 */
   here?: string | null
 }) {
-  const [shown, setShown] = useState(false)
-  useEffect(() => {
-    if (!open) { setShown(false); return }
-    const id = requestAnimationFrame(() => setShown(true))
-    return () => cancelAnimationFrame(id)
-  }, [open])
-
-  useEffect(() => {
-    if (!open) return
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { e.stopPropagation(); onClose() }
-    }
-    window.addEventListener('keydown', onKey, true)
-    return () => window.removeEventListener('keydown', onKey, true)
-  }, [open, onClose])
-
-  // 结果恒定, 拉一次就够 —— 与 27 格速查表同一个缓存策略
+  // 结果恒定, 拉一次就够 —— 与 27 格速查表同一个缓存策略。
+  // [R301] `enabled` 去掉了: 这个组件只在「说明」页签选中时才挂载,
+  // "开着才拉"这件事由挂载与否表达, 再加一个开关就是两处说同一件事。
   const q = useQuery({
     queryKey: QK.glossary,
     queryFn: () => api.glossary(),
     staleTime: 24 * 3600_000,
-    enabled: open,
   })
   // [R296] 27 格谱系并进来了 —— 用户: 「组合速查合并到通道结论里面去」。
-  // **它进抽屉而不是进正文**: 那张表是**恒定的**(与今天这只票无关), 属于查表
-  // 用的参考; 而正文那一页讲的是这只票的时间序列。这条分界与 R292 定的同一条。
+  // **它进这一页而不是进那两页**: 那张表是**恒定的**(与今天这只票无关), 属于
+  // 查表用的参考; 那两页讲的是这只票的时间序列。这条分界与 R292 定的同一条 ——
+  // R301 把这一页从抽屉改成页签, 分界没变, 只是承载它的东西换了。
   const combo = useQuery({
     queryKey: QK.comboTable,
     queryFn: () => api.comboTable(),
     staleTime: 24 * 3600_000,
-    enabled: open,
   })
 
-  if (!open) return null
   return (
-    <div
-      className={cn(
-        'absolute inset-y-0 right-0 z-20 flex w-[min(26rem,92%)] flex-col',
-        'border-l border-border bg-surface shadow-2xl',
-        'transition-[opacity,transform] duration-[180ms] ease-out motion-reduce:transition-none',
-        shown ? 'translate-x-0 opacity-100' : 'translate-x-4 opacity-0',
-      )}
-    >
-      <div className="flex shrink-0 items-center gap-2 border-b border-border/60 px-3 py-2">
-        <span className="text-[11px] text-secondary">说明</span>
-        <span className="text-[10px] text-muted">这些词各是什么意思</span>
-        <button type="button" onClick={onClose}
-                className="ml-auto text-muted transition-colors hover:text-foreground">
-          <X className="h-3.5 w-3.5" />
-        </button>
-      </div>
-
-      <div className="min-h-0 flex-1 overflow-auto px-3 py-2.5">
+    // [R301] 与「趋势状态」「通道结论」同一个骨架: 一块占满剩余高度、自己滚动的
+    // 正文。**两栏铺开** —— 这一页横向有整个弹窗可用(抽屉那版只有 26rem),
+    // 六态六档与结论十档并排, 一屏就看得完, 不必上下翻。
+    <div className="min-h-0 flex-1 overflow-auto px-4 py-3">
+      <p className="mb-3 text-[10px] text-muted">
+        这些词各是什么意思 —— 与哪只票无关, 是这两层判定的固定词表。
+      </p>
+      <div className="[column-gap:1rem] lg:columns-2">
         {q.isLoading && (
           <div className="flex items-center gap-2 py-10 text-[11px] text-muted">
             <Loader2 className="h-3.5 w-3.5 animate-spin" /> 正在取…
@@ -176,7 +151,9 @@ function Section({ title, note, children }: {
   title: string; note: string; children: React.ReactNode
 }) {
   return (
-    <section className="mb-4 last:mb-0">
+    // [R301] `break-inside-avoid`: 两栏是 CSS multi-column, 默认会把一节从中间
+    // 劈开接到下一栏 —— 六态那六档被切成"三档在左栏、三档在右栏"就彻底读不成了。
+    <section className="mb-4 break-inside-avoid last:mb-0">
       <div className="mb-1.5 flex flex-wrap items-baseline gap-x-2">
         <h3 className="text-[11px] font-medium text-foreground">{title}</h3>
         <span className="text-[10px] text-muted">{note}</span>

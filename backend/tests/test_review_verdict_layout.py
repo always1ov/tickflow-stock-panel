@@ -155,7 +155,14 @@ def test_R269_组合注记还在(dlg):
     [R293] 钉**渲染出来的那一句**, 不是钉字段名: 包成 `{false && …}` 时字段名
     照样在, 变异测试当场就漏了(本仓库这个坑的又一次)。
     """
-    assert "组合「{d.channel.event.combo_note.combo}」" in dlg, "组合注记没渲染出来"
+    # [R301] 那一句从行内的「组合「XXX」· 标题: 正文」改成了 `SubRow` ——
+    # 三条子说明(该盯什么 / 这一格历来 / 组合注记)于是共用一条左栏, 正文的
+    # 起点终于对齐了(用户: 「现在的显示不对齐」)。**这条测的一个字没变**:
+    # 那一句得真的渲染出来, 而且格号与正文都在。
+    assert "label={`组合 ${d.channel.event.combo_note.combo}`}" in dlg, (
+        "组合注记没渲染出来(或者格号丢了 —— 注记不说是哪一格就没法核对)"
+    )
+    assert "{d.channel.event.combo_note.detail}" in dlg, "注记正文没了"
     assert "{!!d.channel?.event.combo_note && (" in dlg, "注记的显示条件被改掉了"
 
 

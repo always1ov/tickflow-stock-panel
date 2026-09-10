@@ -99,36 +99,46 @@ export function tradeNotes(ft: FlipTrades, caveat?: string): string[] {
  * 那两张表本来就是同一条时间轴(逐日表里标「转折」的行, 正是每一段的起点),
  * 拆成两张等于让人左右对眼去把日子接起来。
  */
-export function FlipTradesBar({ ft, title, basis, caveat }: {
+export function FlipTradesBar({ ft, basis, caveat }: {
   ft?: FlipTrades | null
-  title: string
   basis: string
   caveat?: string
 }) {
   if (!ft) return null
-  if (ft.reason) {
-    return (
-      <div className="text-[10px] text-muted">
-        <span className="text-secondary">{title}</span> · {REASON_CN[ft.reason]}
-      </div>
-    )
-  }
+  // [R301] `title` 这个入参删了 —— 两个调用方一直传的都是空串, 而这一栏的
+  // 标题本来就写在 `HeadRow` 的左栏里(「按转折买卖」/「按结论买卖」)。
+  // 留着就是"看起来在用、其实永远是空"的那类死参数。
+  if (ft.reason) return <div className="text-[10px] text-muted">{REASON_CN[ft.reason]}</div>
   const notes = tradeNotes(ft, caveat)
   return (
     <div>
-      <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-        <span className="text-[11px] text-secondary" title={basis}>{title}</span>
-        <Stat label="跟着做" value={ft.follow} big
+      {/* [R301] **四个数排成等宽格子**, 不再是一条 `flex-wrap` 的杂排。
+          用户: 「内容显示整理好划分好卡片布局, 现在的显示不对齐」。
+
+          原来这一行把三种字号(`text-lg` / `text-sm` / `text-[10px]`)、四个
+          长短不一的标签、外加 `basis` 一整句话全塞进同一条 `items-baseline`
+          里 —— **没有任何两样东西的边是对齐的**, 而且 `text-lg` 那个数把整行
+          撑高, 后面几个数被顶得偏下。
+
+          改成 `grid-cols-4`: 每格上标签下数值, 于是**标签与标签一条线、数值与
+          数值一条线**。四个数字号统一(`text-base`), 「跟着做」靠**它排第一 +
+          着色 + 加粗**来突出 —— 用更大的字号做强调, 代价正好是把这一行的
+          基线打散, 而这一行的毛病就是基线散。 */}
+      <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 sm:grid-cols-4">
+        <Stat label="跟着做" value={ft.follow} lead
               title="只把已经走完的多头段复利叠起来。空仓期不算收益。" />
         <Stat label="一直拿着" value={ft.hold}
               title="同一段区间买了就不动 —— 与「跟着做」同起点同终点, 所以能直接比。" />
         <Stat label="多赚" value={ft.excess}
               title="跟着做 − 一直拿着。正的才说明这套判定在这只票上真的帮上忙了。" />
-        <span className="text-[10px] text-muted" title="真正下过单的次数。连着的多头段是一次持仓, 不是两次买卖">
-          买卖 <b className="text-secondary">{ft.trades}</b> 次
-        </span>
-        <span className="text-[10px] text-muted">{basis}</span>
+        <div title="真正下过单的次数。连着的多头段是一次持仓, 不是两次买卖">
+          <div className="text-[10px] text-muted">买卖</div>
+          <div className="font-mono text-base tabular-nums text-secondary">{ft.trades} 次</div>
+        </div>
       </div>
+      {/* 口径**自己一行**。原来它跟在四个数后面挤在同一条 flex 里, 一句话把那
+          一行撑到换行, 数值就再也排不齐了 —— 它是脚注, 不是第五个指标。 */}
+      <p className="mt-1.5 text-[10px] leading-relaxed text-muted">{basis}</p>
       {notes.map((t) => (
         <p key={t} className="mt-1 text-[10px] leading-relaxed text-amber-300/90">{t}</p>
       ))}
@@ -188,18 +198,22 @@ export function FlipTradeCells({ leg }: { leg?: Leg }) {
 }
 
 
-/** 三个数各一格。**「跟着做」最大** —— 它就是用户带着的那个问题的答案,
- *  另外两个是它的参照物。 */
-function Stat({ label, value, big, title }: {
-  label: string; value: number | null; big?: boolean; title: string
+/** 一格 = 上标签下数值。**四格同字号** —— 「跟着做」是主角, 但它靠排第一 +
+ *  着色 + 加粗突出, 不靠更大的字号(R301: 大一号的代价正好是把这一排的基线
+ *  打散, 而"不对齐"就是用户指出来的毛病)。 */
+function Stat({ label, value, lead, title }: {
+  label: string; value: number | null
+  /** 这一格是这排数里的主角 —— 靠加粗与位置突出, **不靠更大的字号** */
+  lead?: boolean
+  title: string
 }) {
   return (
-    <span className="inline-flex items-baseline gap-1.5" title={title}>
-      <span className="text-[10px] text-muted">{label}</span>
-      <b className={cn('font-mono tabular-nums', big ? 'text-lg' : 'text-sm', chgCls(value))}>
+    <div title={title}>
+      <div className={cn('text-[10px]', lead ? 'text-secondary' : 'text-muted')}>{label}</div>
+      <div className={cn('font-mono text-base tabular-nums', lead && 'font-semibold', chgCls(value))}>
         {pct(value)}
-      </b>
-    </span>
+      </div>
+    </div>
   )
 }
 

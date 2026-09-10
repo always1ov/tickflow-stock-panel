@@ -71,7 +71,7 @@ SURFACES = {
     # 它是这个文件里**第一个顶层声明**, 也就是说扫描面从此覆盖全文。
     # **只许扩不许缩**(R258 栽过的跟头), 而这次是扩: 老锚点排在 `TONE_CLS`
     # 前面几行, 差别只有那段注释, 但方向必须是对的。
-    _FRONT / "ReviewHelpSheet.tsx": "const TONE_CLS",
+    _FRONT / "ReviewHelpView.tsx": "const TONE_CLS",
 }
 
 # [R292] 后端也有一处**释义文案**: 六态那六句「是什么意思」。前端扫不到它 ——
@@ -181,7 +181,7 @@ def test_R292_说明抽屉的词条真的来自后端():
     """反面: 前端誊抄一份就会漂 —— 底层改了措辞那份就开始说假话, 而且不会报错。
     (R203 的 27 格速查表当初就是为这个理由做成端点的。)"""
     from tests.frontend_source import code_of
-    src = code_of("components/stock-analysis/ReviewHelpSheet.tsx")
+    src = code_of("components/stock-analysis/ReviewHelpView.tsx")
     assert "api.glossary()" in src, "说明抽屉没走后端那份词条"
     # 六态那六个名字不许出现在**代码**里 —— 出现即意味着誊抄。
     # **先剥注释**: 文件头那段说明里举「自然回撤」当例子是应该的(讲清楚这个抽屉
@@ -196,7 +196,7 @@ def test_R292_说明抽屉的词条真的来自后端():
 _REACH = {
     _FRONT / "StockReviewDialog.tsx": "盘中最高触及涨停但收盘没封住",
     _FRONT / "decision-board" / "cells.tsx": "三条线还有",
-    _FRONT / "ReviewHelpSheet.tsx": "这些词各是什么意思",
+    _FRONT / "ReviewHelpView.tsx": "这些词各是什么意思",
 }
 
 

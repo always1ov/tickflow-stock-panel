@@ -20,5 +20,24 @@ export function HeadRow({ label, children }: { label: string; children: ReactNod
   )
 }
 
-/** 三张卡共用的外框: 一条细分割线隔开每一行 */
+/** 两张卡共用的外框: 一条细分割线隔开每一行 */
 export const HEAD_CARD = 'mx-4 mt-3 divide-y divide-border/40 rounded-lg border border-border/60'
+
+/**
+ * [R301] 一行里的**子条目**: 「该盯什么」「这一格历来」这类"小标签 + 一句话"。
+ *
+ * 用户: 「内容显示整理好划分好卡片布局, 现在的显示不对齐」。
+ *
+ * 它们原来是各写各的 `<p><span>该盯什么: </span>…</p>` —— 小标签宽度各不相同
+ * (「该盯什么」三字、「这一格历来」五字), 于是**正文的起点一行一个样**。
+ * `HeadRow` 在外层已经用一条固定左栏把三行对齐了; 这里做的是同一件事, 只是
+ * 降了一级 —— **同一条规矩用两次, 而不是两套写法。**
+ */
+export function SubRow({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="mt-1 flex gap-2">
+      <span className="w-[3.75rem] shrink-0 text-[10px] text-muted/70">{label}</span>
+      <div className="min-w-0 flex-1 text-[10px] leading-relaxed">{children}</div>
+    </div>
+  )
+}

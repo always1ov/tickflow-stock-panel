@@ -500,8 +500,12 @@ def test_R287_买卖次数与段数不许混为一谈():
     """界面上写的必须是 `trades`(建仓次数), 不是 `legs.length`。
     后端那个 bug 就是这么来的 —— 连着的多头段被当成了两次买卖。"""
     code = _panel()
-    i = code.index("买卖 <b")
-    assert "ft.trades" in code[i:i + 200], "「买卖 N 次」用的不是建仓次数"
+    # [R301] 那一格从行内的「买卖 <b>N</b> 次」变成了格子里的上标签下数值,
+    # 锚点跟着换成标签本身。**测的东西一个字没变**: 这一格取的必须是
+    # `ft.trades`(建仓次数), 不是 `legs.length`(段数)。
+    i = code.index(">买卖<")
+    assert "ft.trades" in code[i:i + 220], "「买卖 N 次」用的不是建仓次数"
+    assert "legs.length" not in code[i:i + 220], "又拿段数当买卖次数了"
 
 
 def test_R287_两处跟随收益都写明了各自的口径():
@@ -856,26 +860,94 @@ def test_R292_那些不要的东西真的删干净了():
         )
 
 
-def test_R292_说明抽屉不是盖满而是从右边推进来():
-    """用户: 「全景按钮做得不够好, 我点进去全屏了」。
+def test_R301_四个数排成等宽格子():
+    """用户: 「内容显示整理好划分好卡片布局, 现在的显示不对齐」。
 
-    **说得对, 而且那还是个 bug**: R289 那版的面板是 `absolute inset-0`, 而我漏了
-    给它加定位祖先 —— 于是它一路冒到最外层那个 `fixed inset-0` 上, 真的盖满了
-    整个屏幕。这里正反各钉一条: 抽屉本身只占右侧一条, 外面那层 `relative` 得在。
+    **不对齐的根在这一行**: 原来它把三种字号(`text-lg` / `text-sm` /
+    `text-[10px]`)、四个长短不一的标签、外加 `basis` 一整句话全塞进同一条
+    `flex flex-wrap items-baseline` 里 —— 没有任何两样东西的边是对齐的, 而且
+    `text-lg` 那个数把整行撑高, 后面几个数被顶得偏下。
 
-    形态上也该是抽屉: 词汇表是**边看边查**的东西, 盖掉正文等于逼人先记住要查
-    什么再翻回去。
+    改成格子之后**标签与标签一条线、数值与数值一条线**。这条正反各钉:
+    格子在、而且四个数**同一个字号**(用大一号做强调, 代价正好是把基线打散)。
+    """
+    code = _panel()
+    body = _fn(code, "FlipTradesBar")
+    assert "grid" in body and "sm:grid-cols-4" in body, "四个数不是排成格子的"
+    # **字号统一**要在整个文件上看: 三个百分比走 `Stat`(那是另一个函数),
+    # 「买卖 N 次」那格写在 `FlipTradesBar` 里 —— 只扫一个函数会漏掉另一半
+    # (第一版就这么错了, 数出来是 1 不是 4)。
+    assert "text-lg" not in code and "text-sm" not in code, (
+        "又有一个数用了不一样的字号 —— 这一排的基线会被它打散"
+    )
+    assert code.count("text-base") == 2, (
+        f"同字号的数值有 {code.count('text-base')} 处 —— 该是 Stat 一处 + 「买卖」那格一处"
+    )
+    # 口径必须**自己一行**: 它跟在四个数后面挤在同一条 flex 里时, 一句话就把
+    # 那一行撑到换行, 数值再也排不齐 —— 它是脚注, 不是第五个指标。
+    assert body.index("sm:grid-cols-4") < body.index("{basis}"), "口径又挤进那一排数里了"
+
+
+def test_R301_主角靠加粗不靠更大的字号():
+    """反面配对: 别为了"对齐"把「跟着做」也拍平成和别的一样。
+
+    它是用户带着的那个问题的答案, 必须能一眼认出来 —— 靠**排第一 + 着色 +
+    加粗**, 而不是靠字号(字号一大, 这一排的基线就散了, 那正是上一条的毛病)。
+    """
+    code = _panel()
+    # **用 `_fn` 取函数体**: 直接切到第一个 `\n}` 会停在解构参数那个 `}` 上,
+    # 整个渲染段落根本没被检查到(R295 在这个坑上栽过, 这次当场又栽了一次)。
+    stat = _fn(code, "Stat")
+    assert "lead && 'font-semibold'" in stat, "主角那一格没有加粗"
+    assert "lead ? 'text-secondary'" in stat, "主角那一格的标签没有着色"
+    assert "text-lg" not in stat, "又用字号做强调了"
+    # 用它的地方也得对上: 只有第一个数是主角
+    bar = code[code.index("export function FlipTradesBar"):]
+    assert bar.count(" lead\n") == 1, "主角不是恰好一个"
+
+
+def test_R301_三条子说明共用一条左栏():
+    """同一件事在两级上做: `HeadRow` 让三行的正文从同一条竖线开始, `SubRow` 让
+    行内那几条子说明也从同一条竖线开始。
+
+    原来它们是各写各的 `<p><span>该盯什么: </span>…</p>` —— 小标签宽度各不相同
+    (「该盯什么」三字、「这一格历来」五字), 于是正文的起点一行一个样。
+    这正是用户说的「不对齐」在「现在」那一行里的样子。
     """
     from tests.frontend_source import code_of
-    sheet = code_of("components/stock-analysis/ReviewHelpSheet.tsx")
-    assert "inset-y-0 right-0" in sheet and "w-[min(26rem,92%)]" in sheet, (
-        "说明面板还是盖满正文的形状"
+    head = code_of("components/stock-analysis/ReviewHeadRow.tsx")
+    assert "export function SubRow" in head, "没有共用的子条目行"
+    body = head[head.index("export function SubRow"):]
+    assert "shrink-0" in body and "w-[" in body, "子条目的左栏宽度不是写死的 —— 那就对不齐"
+
+    verdict = _fn_body(_dialog(), "function VerdictView")
+    assert verdict.count("<SubRow") == 3, (
+        f"「现在」那一行有 {verdict.count('<SubRow')} 条子说明 —— 该是三条"
+        "(该盯什么 / 这一格历来 / 组合注记)都走共用件"
     )
-    assert "inset-0" not in sheet, "还留着盖满的写法"
-    dlg = code_of("components/stock-analysis/StockReviewDialog.tsx")
-    assert "relative flex min-h-0 flex-1 flex-col" in dlg, (
-        "抽屉没有定位祖先 —— 它会冒到最外层, 又变成全屏(R289 就是这么错的)"
-    )
+    # 反面: 不许再有自己写一遍小标签的
+    assert "该盯什么: </span>" not in verdict, "又有一条自己写小标签了"
+
+
+def test_R301_说明是一页而不是盖上来的一层():
+    """这一条追了三版, 每一版都是同一个问题在推:
+
+        R289 「全景」  盖住整个正文的面板 → 用户: 「我点进去全屏了」
+        R292 抽屉      从右边推进来占 26rem, 正文那一侧还看得见
+        R301 页签      **换掉正文, 不再盖任何东西**
+
+    用户最后一句: 「说明点击后不是弹窗, 和趋势状态一样内容区域显示」。
+
+    **钉的是"它不盖东西"**, 而不是某一版的具体写法 —— 前两版栽的都是同一处:
+    一个绝对定位的层, 定位祖先漏了就冒到最外面去(R289 那次就真的全屏了)。
+    现在它是普通文档流里的一块, 那类 bug 从结构上不可能再犯。
+    """
+    from tests.frontend_source import code_of
+    view = code_of("components/stock-analysis/ReviewHelpView.tsx")
+    for gone in ("absolute", "inset-", "fixed", "z-20", "shadow-2xl"):
+        assert gone not in view, f"说明这一页还留着盖上来那一层的写法: {gone}"
+    # 正面: 与另外两页同一个骨架 —— 占满剩余高度、自己滚动
+    assert "min-h-0 flex-1 overflow-auto" in view, "说明页不是和另外两页一样的正文块"
 
 
 def test_R292_说明抽屉两个页签共用一处():
@@ -886,42 +958,38 @@ def test_R292_说明抽屉两个页签共用一处():
     名副其实的一处 —— 两个页签同一个 `help` 开关、同一个抽屉。
     """
     dlg = _dialog()
-    assert dlg.count("<ReviewHelpSheet") == 1, (
-        f"说明抽屉挂了 {dlg.count('<ReviewHelpSheet')} 处 —— 两个页签该共用一处"
+    assert dlg.count("<ReviewHelpView") == 1, (
+        f"说明页挂了 {dlg.count('<ReviewHelpView')} 处 —— 该只有一处"
     )
-    # [R300] **入口也收成了一处** —— 用户: 「"说明"这个按钮合并到这里
-    # "趋势状态 通道结论 说明"」。原来两个 View 各写一个 `<HelpButton>`,
-    # 那是同一件东西的两个副本(这条测的正是这个); 现在它在页签组里, 一处。
-    assert dlg.count("setHelp((v) => !v)") == 1, "说明入口不是一处"
+    # [R300 → R301] 入口也是一处, 而且**就在页签组里**。R300 时它还是个开关
+    # (`setHelp`), R301 之后它就是 `tab` 的第三个取值 —— 少一个状态。
+    assert dlg.count("setTab('help')") == 1, "说明入口不是一处"
+    assert "setHelp" not in dlg, "`help` 那个布尔状态还留着 —— 它已经是 tab 的一个取值了"
     for fn in ("function TrendView", "function VerdictView"):
         body = _fn_body(dlg, fn)
-        assert "<ReviewHelpSheet" not in body, f"抽屉挂进了 {fn} 里 —— 切页签就没了"
-        assert "setHelp" not in body and "onHelp" not in body, (
-            f"{fn} 里还留着说明入口 —— 它该只在页签那一行"
-        )
-    # 入口必须落在**抽屉盖不住的那一行**: 抽屉盖的是正文, 入口跟着正文走的话
-    # 打开之后既关不掉、也切不了页签。钉住它与页签是同一组。
+        assert "<ReviewHelpView" not in body, f"说明页挂进了 {fn} 里"
+        assert "onHelp" not in body, f"{fn} 里还留着说明入口 —— 它该只在页签那一行"
+    # 入口必须和另外两个页签在**同一组**里 —— 用户画的就是这三个挨着的样子
     head = dlg[dlg.index("([['trend', '趋势状态']"):]
     head = head[:head.index("</div>")]
-    assert "setHelp((v) => !v)" in head, "说明入口没和页签在同一组里"
+    assert "setTab('help')" in head, "说明入口没和页签在同一组里"
 
 
-def test_R292_说明抽屉只动透明度和位移():
-    """AGENTS.md 前端硬规则①: 只动 `transform` / `opacity`, 不许 `transition-all`。"""
+def test_R301_换页签没有过渡也不拦_Esc():
+    """[R292 → R301] R292 那两条钉的是**抽屉的动效**(只推 transform/opacity、
+    照顾 `motion-reduce`)与**Esc 只关这一层**。抽屉没了, 两条都该反过来:
+
+    · **换页签不该有过渡。** 那 180ms 是"一层推进来"的手势; 页签之间是**换内容**,
+      加过渡只会让每次点击都慢一拍(AGENTS.md 的动效判据: 高频动作不加动效)。
+    · **Esc 不该被这一页拦。** 它不是"一层"了, Esc 该照旧关掉整个复盘弹窗 ——
+      留着那个 `stopPropagation` 的话, 停在说明页时 Esc 会变成什么都不做。
+    """
     from tests.frontend_source import code_of
-    code = code_of("components/stock-analysis/ReviewHelpSheet.tsx")
-    assert "transition-all" not in code, "用了 transition-all —— 每帧触发布局重排"
-    assert "transition-[opacity,transform]" in code, "没写明要过渡的属性"
-    assert "motion-reduce:transition-none" in code, "没照顾 prefers-reduced-motion"
-    assert "ease-out" in code, "进场该用 ease-out"
-
-
-def test_R292_Esc_关的是说明这一层():
-    """模态套抽屉最容易出的错: 按 Esc 把外层的复盘弹窗一起关了。"""
-    from tests.frontend_source import code_of
-    code = code_of("components/stock-analysis/ReviewHelpSheet.tsx")
-    i = code.index("Escape")
-    assert "stopPropagation" in code[i - 60:i + 120], "Esc 会穿透到外层的复盘弹窗"
+    code = code_of("components/stock-analysis/ReviewHelpView.tsx")
+    assert "transition" not in code, "换页签加了过渡 —— 每次点击都慢一拍"
+    assert "Escape" not in code and "stopPropagation" not in code, (
+        "这一页还在拦 Esc —— 停在说明页时 Esc 就关不掉复盘弹窗了"
+    )
 
 
 # ---------------------------------------------------------------- R290
@@ -1245,7 +1313,7 @@ def test_R296_位置并进了通道结论那一页():
     assert "组合速查" not in dlg, "页签列表里还有「组合速查」"
 
 
-def test_R296_27格进了说明抽屉而不是正文():
+def test_R296_27格进了说明那一页而不是另外两页():
     """那张表是**恒定的**(与今天这只票无关, R203 起就是个常量端点), 属于查表用的
     参考; 正文那一页讲的是这只票的时间序列。混在一起就是 R292 撤全景图那一遍。
 
@@ -1254,7 +1322,7 @@ def test_R296_27格进了说明抽屉而不是正文():
     看 27 格的人照样会问, 所以那句话进抽屉里这一节。
     """
     from tests.frontend_source import code_of
-    sheet = code_of("components/stock-analysis/ReviewHelpSheet.tsx")
+    sheet = code_of("components/stock-analysis/ReviewHelpView.tsx")
     assert '<ComboGroups rows={combo.data.rows} here={here} />' in sheet, "27 格没进抽屉"
     assert "按位置换格买卖的成绩与「按结论买卖」那一栏逐字相同" in sheet, (
         "没有交代为什么不另立一栏「按位置买卖」—— 那个取舍会被当成漏做"

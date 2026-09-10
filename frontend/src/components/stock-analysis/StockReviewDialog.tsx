@@ -50,8 +50,8 @@ import { trendBadgeCls } from '@/components/stock-analysis/TrendStateBar'
 import { VerdictHover } from '@/components/stock-analysis/VerdictHover'
 import { comboHistory } from '@/components/stock-analysis/decision-board/ComboView'
 import { FlipTradesBar, FlipTradeCells, legsByFlipDate } from '@/components/stock-analysis/FlipTradesPanel'
-import { ReviewHelpSheet } from '@/components/stock-analysis/ReviewHelpSheet'
-import { HeadRow, HEAD_CARD } from '@/components/stock-analysis/ReviewHeadRow'
+import { ReviewHelpView } from '@/components/stock-analysis/ReviewHelpView'
+import { HeadRow, SubRow, HEAD_CARD } from '@/components/stock-analysis/ReviewHeadRow'
 import { StateTimeline } from '@/components/stock-analysis/StateTimeline'
 import { ReviewDisclosure } from '@/components/stock-analysis/ReviewDisclosure'
 import {
@@ -143,13 +143,14 @@ export function StockReviewDialog({ symbol, name, tab: initialTab, onClose }: {
 }) {
   // [R296] 'combo' 归一到 'verdict' —— 那一页并进去了。**不删这个入参值**:
   // 决策台那边可能还有地方带着它进来, 悄悄报错不如悄悄落到对的页上。
-  const [tab, setTab] = useState<'trend' | 'verdict'>(initialTab === 'trend' ? 'trend' : 'verdict')
+  const [tab, setTab] = useState<'trend' | 'verdict' | 'help'>(
+    initialTab === 'trend' ? 'trend' : 'verdict')
   const [days, setDays] = useState<number>(120)
   // 趋势视图专用: 只看有事的日子。120 行里找那几天转折是不现实的
   const [onlyMarked, setOnlyMarked] = useState(false)
-  // [R292] 「说明」抽屉在**弹窗这一层**, 两个页签共用 —— 它讲的是六态与结论
-  // 两边的词, 每个页签各挂一份就成了同一份东西的两个副本。
-  const [help, setHelp] = useState(false)
+  // [R292 → R300 → R301] 「说明」**成了第三个页签**, 不再是抽屉。
+  // 用户: 「说明点击后不是弹窗, 和趋势状态一样内容区域显示」。
+  // 于是那个 `help` 布尔量没了 —— 它现在就是 `tab` 的第三个取值, 少一个状态。
 
   const q = useQuery({
     queryKey: QK.stockReview(symbol, days),
@@ -206,25 +207,23 @@ export function StockReviewDialog({ symbol, name, tab: initialTab, onClose }: {
                   {label}
                 </button>
               ))}
-              {/* [R292 → R300] 「说明」从正文右下角**搬进页签组**。用户画了一下
-                  想要的样子: 「趋势状态 通道结论 说明」。
+              {/* [R292 → R300 → R301] 「说明」**成了真正的第三个页签**。
+                  用户: 「说明点击后不是弹窗, 和趋势状态一样内容区域显示」。
 
-                  搬对了三件事:
-                  ① **它本来就是两个页签共用的一件东西**(R292 立过"共用一处"),
-                     挂在正文里却要在两个 View 各写一遍入口 —— 现在只剩一处;
-                  ② 它原来紧挨着「只看转折的日子」, 而那是个**筛选正文**的开关,
-                     两个作用完全不同的按钮长得一样、还挨着;
-                  ③ 抽屉盖住的是正文, 页签这一行照旧能点 —— 入口跟着留在
-                     盖不住的那一行, 才关得掉、也才切得了页签。
+                  R300 把入口搬进这一组时它还是抽屉, 于是有个说不通的地方:
+                  它长得像页签、亮得像页签, 点下去却推出一层盖住正文的东西。
+                  **现在名实相符了** —— 一个页签, 换一块正文。
+                  跟着省掉的: 抽屉的绝对定位与那层过渡、Esc 拦截、关闭按钮,
+                  以及 `help` 那个布尔状态(它现在就是 `tab` 的第三个取值)。
 
-                  **它不是页签**(点了不换页, 是推出一层抽屉), 所以给一条发丝分隔线
-                  和一个问号图标; 但**开着的时候和选中的页签一样亮** —— 那时它确实
-                  是当前占着屏幕的那一层, 亮着是实话。 */}
+                  **仍留一条发丝分隔线**: 前两个页签讲的是**这只票**(时间序列),
+                  它讲的是**恒定的词表**(与哪只票无关)。同一组里的两类东西,
+                  分隔线是唯一还在说这件事的记号。 */}
               <button
-                onClick={() => setHelp((v) => !v)}
+                onClick={() => setTab('help')}
                 title="六态状态与通道结论各是什么意思"
                 className={`flex items-center gap-1 border-l border-border/60 px-2.5 py-1 text-[10px] transition-colors cursor-pointer ${
-                  help ? 'bg-sky-400/15 text-sky-300' : 'text-muted hover:text-foreground'}`}
+                  tab === 'help' ? 'bg-sky-400/15 text-sky-300' : 'text-muted hover:text-foreground'}`}
               >
                 <HelpCircle className="h-3 w-3" />说明
               </button>
@@ -245,35 +244,36 @@ export function StockReviewDialog({ symbol, name, tab: initialTab, onClose }: {
           </div>
         </div>
 
-        {/* [R228] 组合速查**不等这次请求**: 27 格的表是恒定的、另一个 query、
-            缓存一天, 而它只用 channel 里的末日读数去高亮"你在哪一格"。
-            让它陪着复盘转圈是白等 —— 表先出来, 读数带随后补上。 */}
-        {(
-          // [R292] **这一层 `relative` 是「说明」抽屉的定位祖先。**
-          // R289 漏了它(那次的改动只在内存里做了没落盘), 于是抽屉的
-          // `absolute inset-0` 一路冒到最外层那个 `fixed inset-0` 上 ——
-          // 用户看到的「点进去全屏了」就是这么来的。
-          <div className="relative flex min-h-0 flex-1 flex-col">
-            {q.isLoading && (
-              <div className="flex items-center justify-center gap-2 py-16 text-xs text-muted">
-                <Loader2 className="h-4 w-4 animate-spin" /> 正在回算 {days} 个交易日…
-              </div>
-            )}
-            {q.isError && <div className="px-4 py-16 text-center text-xs text-red-400">复盘数据加载失败</div>}
-            {d?.error && <div className="px-4 py-16 text-center text-xs text-muted">{d.error}</div>}
+        {/* [R301] 三个页签, 三块正文 —— **「说明」不再是盖上来的一层**。
+            用户: 「说明点击后不是弹窗, 和趋势状态一样内容区域显示」。
 
-            {d && !d.error && tab === 'trend' && (
-              <TrendView d={d} rows={trendRows} onlyMarked={onlyMarked}
-                         onToggleMarked={() => setOnlyMarked((v) => !v)} />
-            )}
-            {d && !d.error && tab === 'verdict' && (
-              <VerdictView d={d} segments={segments} />
-            )}
-            {/* 抽屉挂在页签内容之后、`relative` 容器之内 —— 它盖住的是**正文**,
-                页签与日期档照样能点(翻着说明换页签是常事)。 */}
-            <ReviewHelpSheet open={help} onClose={() => setHelp(false)} here={d?.channel?.geo?.combo ?? null} />
-          </div>
-        )}
+            **它单独一支, 而且排在加载判断之前**: 那张词表是恒定的(另一个 query、
+            缓存一天), 与这只票、与这次回算都无关。塞进下面那一支的话, 点「说明」
+            会先看到「正在回算 120 个交易日…」——**等一个它根本不需要的东西**。
+            R228 给 27 格速查表定的就是这条, 这里沿用。 */}
+        <div className="flex min-h-0 flex-1 flex-col">
+          {tab === 'help' ? (
+            <ReviewHelpView here={d?.channel?.geo?.combo ?? null} />
+          ) : (
+            <>
+              {q.isLoading && (
+                <div className="flex items-center justify-center gap-2 py-16 text-xs text-muted">
+                  <Loader2 className="h-4 w-4 animate-spin" /> 正在回算 {days} 个交易日…
+                </div>
+              )}
+              {q.isError && <div className="px-4 py-16 text-center text-xs text-red-400">复盘数据加载失败</div>}
+              {d?.error && <div className="px-4 py-16 text-center text-xs text-muted">{d.error}</div>}
+
+              {d && !d.error && tab === 'trend' && (
+                <TrendView d={d} rows={trendRows} onlyMarked={onlyMarked}
+                           onToggleMarked={() => setOnlyMarked((v) => !v)} />
+              )}
+              {d && !d.error && tab === 'verdict' && (
+                <VerdictView d={d} segments={segments} />
+              )}
+            </>
+          )}
+        </div>
       </div>
     </div>
   )
@@ -305,7 +305,6 @@ function TrendView({ d, rows, onlyMarked, onToggleMarked }: {
         <HeadRow label="按转折买卖">
           <FlipTradesBar
             ft={d.flip_trades}
-            title=""
             basis="转折次日开盘进出 · 转多买入、转空清仓(不做空)"
           />
         </HeadRow>
@@ -547,7 +546,6 @@ function VerdictView({ d, segments }: {
         <HeadRow label="按结论买卖">
           <FlipTradesBar
             ft={d.verdict_trades}
-            title=""
             basis="结论换档的次日开盘进出 · 偏买建仓、偏卖与回避清仓(不做空)"
             caveat={'「拿着」「等着」「三档都在中部」都不动手 —— 那是作者写的原话(「拿着, 别在这加仓」'
                     + '「等短期入场点」), 不是买卖信号。另: 「该止盈了」原话是「可落袋一部分」、'
@@ -582,15 +580,12 @@ function VerdictView({ d, segments }: {
               </span>
               {/* **这一栏唯一的行动指引。** 别的都能收, 它不行 —— 收起来这一页
                   就只剩「现在处在下跌中」这种定性词, 没有一条能照着做的(R269)。 */}
-              <p className="mt-1 leading-relaxed text-secondary">
-                <span className="text-muted">该盯什么: </span>{ph.watch}
-              </p>
+              <SubRow label="该盯什么"><span className="text-secondary">{ph.watch}</span></SubRow>
               {/* [R296] 这一格在这只票身上历来什么光景 —— 从「组合速查」并过来的。
                   按**段**不按天(R177): 一段连着 8 天算 1 次, 按天算的话那 8 天的
                   前瞻窗口互相重叠, 次数会被撑大。 */}
               {!!here && (
-                <p className="mt-1 leading-relaxed text-muted">
-                  <span className="opacity-70">这一格历来: </span>
+                <SubRow label="这一格历来">
                   {hist && hist.segs > 0 ? (
                     <>
                       这 {d.days} 天里进过 <b className="text-secondary">{hist.segs}</b> 段、共 {hist.days} 天
@@ -600,17 +595,17 @@ function VerdictView({ d, segments }: {
                       ) : <>, 还没有走完 {d.forward_days} 个交易日的段, 结果未知</>}
                     </>
                   ) : <>这 {d.days} 天里没进过这一格 —— 头一回</>}
-                </p>
+                </SubRow>
               )}
 
               {/* [R269] 27 格组合的那条注记是**判定的一部分**, 不许在重排里蒸发 ——
                   「中中上」「中中下」两格底层返回无结论, 而它们恰恰是"大级别到位、
                   等一个入场点"的另一半, 全靠这条注记说出来。 */}
               {!!d.channel?.event.combo_note && (
-                <p className="mt-1 leading-relaxed text-muted">
-                  组合「{d.channel.event.combo_note.combo}」· {d.channel.event.combo_note.title}:
+                <SubRow label={`组合 ${d.channel.event.combo_note.combo}`}>
+                  <b className="font-medium text-secondary">{d.channel.event.combo_note.title}</b>:{' '}
                   {d.channel.event.combo_note.detail}
-                </p>
+                </SubRow>
               )}
             </div>
           </HeadRow>
