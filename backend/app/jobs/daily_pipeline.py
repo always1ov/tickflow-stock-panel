@@ -13,6 +13,10 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
+# [R275] 只给类型注解用。文件有 `from __future__ import annotations`, 注解不求值,
+# 所以旧写法(只在函数体里 import)不会崩 —— 但它会让 F821 报一条假警报,
+# 而假警报正是真错的掩护。
+from datetime import date as _date
 from pathlib import Path
 
 import polars as pl

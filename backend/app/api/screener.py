@@ -509,8 +509,12 @@ def market_snapshot(request: Request):
         for k, v in list(r.items()):
             if isinstance(v, float) and not math.isfinite(v):
                 r[k] = None
-    rows = _rows_with_ext(rows, ext_value_maps)
-
+    # [R275] 这里原本有一行 `rows = _rows_with_ext(rows, ext_value_maps)`。
+    #
+    # **`ext_value_maps` 在这个函数里从来没被赋值** —— 是 R145 从别处(那边有这个局部量)
+    # 复制过来时带进来的。走到这一行必然 NameError, 整个接口 500, 于是行业分析、概念分析、
+    # 成分股弹窗三处的行情数字全空。而这个接口**压根没有"扩展列"这个概念**(它不收
+    # ext_columns 参数, 只出一份轻量行情快照), 所以正确的修法是整行删掉, 不是补个变量。
     return {"as_of": str(as_of), "rows": rows}
 
 
