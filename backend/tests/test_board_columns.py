@@ -99,19 +99,29 @@ def test_表头与_BOARD_COLS_一一对应():
         assert c == h, f"第 {i + 1} 列对不上: BOARD_COLS 是「{c}」, 表头是「{h}」"
 
 
-def test_六态天数与结论天数同一个说法():
-    """同一行里两个天数。六态写「3天」而结论写「已25天」时, 读的人得先判断
-    这两个数是不是一回事 —— 是的: 都是尾部连续段、都按交易日、都是「到今天还在」。
+def test_R290_六态天数只印一处且是转折口径():
+    """[R249 → R290] 这条守的规矩没变, 说法换了。
 
-    用户: 「必须要统一表达, 不能又两种多种表述」。
+    R249 立的是「同一个数不许有两种说法」。R290 用户点名要换说法:
+    「外面不再是显示"正在转多"这样的的字眼了, 这类词统一改成出现转折后的
+    第几天」—— 于是六态天数从徽标搬到第二行, 写成「转折后第 N 天」。
+
+    **搬家最容易出的错是搬完两头都留一份**, 那正好把 R249 那条规矩破掉。
+    所以这里正反各钉一条: 第二行有, 徽标上不许再有。
+
+    结论那一侧仍是「已N天」——**那是另一个锚点**(这一档结论连着多久), 与
+    「从转折那天数起」量的不是同一段, 分开叫反而更准。见名词表 NOT_A_CONFLICT。
     """
     root = _BOARD.parent
     cells = (root / "decision-board" / "cells.tsx").read_text(encoding="utf-8")
     # 只看渲染出去的文本, 注释里复述历史说法是允许的
     body = "\n".join(ln for ln in cells.splitlines()
                      if not ln.lstrip().startswith(("//", "*", "/*")))
-    assert "已{trend.duration}天" in body, "六态徽标没用统一说法「已N天」"
-    assert "已{d.days}天" in body, "结论徽标没用统一说法「已N天」"
+    assert "转折后第 {trend.duration} 天" in body, "走势列第二行没写成「转折后第 N 天」"
+    assert "已{trend.duration}天" not in body, (
+        "徽标上还留着一份天数 —— 同一个数印两处, 正是 R249 要防的"
+    )
+    assert "已{d.days}天" in body, "结论徽标那份天数没了"
 
     bar = (root / "TrendStateBar.tsx")
     if bar.exists():
@@ -496,7 +506,7 @@ def test_R257_走势列的三行各管一件事():
     assert "{ph.cn} · {ph.maturity_cn}" not in blk, (
         "「阶段」那个词又印回徽标上了 —— 它和六态抢方向, 而且会跟成熟度自相矛盾"
     )
-    assert "{trend.state_cn} 已{trend.duration}天" in blk, "方向那一行没了"
+    assert "{trend.state_cn}" in blk, "方向那一行没了"
     # [R277] 成熟度**搬去 SpreadCell 了**, 走势列于是只讲方向(六态 + 三尺度对齐)。
     # 这条不再要求它出现在这一格里, 改成要求它**不在这里重复印一遍** ——
     # 同一个读数印两列, 读的人得先确认它们是不是一回事。
@@ -638,13 +648,19 @@ def test_R261_走了多远那一行是统一色():
     )
 
 
-def test_R261_徽标与力度仍各自按含义上色():
-    """撤的是**挂错对象**的那一处配色, 不是把整列刷成一个颜色 ——
-    六态徽标按状态、力度按排列层级, 那两处的颜色说的正是它们自己的意思。"""
+def test_R261_徽标与第二行仍各自按含义上色():
+    """撤的是**挂错对象**的那一处配色, 不是把整列刷成一个颜色。
+
+    [R290] 第二行从「三尺度对齐」换成「转折后第 N 天」之后, 那一行的配色跟着
+    换了对象: 原来按 `align.level` 分四档, 现在只分**今天是不是转折日** ——
+    因为这一行现在讲的就是这件事。规矩没变: 颜色必须说这一行自己的意思。
+    """
     root = _BOARD.parent
     cells = (root / "decision-board" / "cells.tsx").read_text(encoding="utf-8")
     assert "${trendCls ?? ''}" in cells, "六态徽标的配色没了"
-    assert "ph.align.level === 3 ? 'text-red-400/80'" in cells, "力度那一行的配色没了"
+    assert "trend.flipped ? 'text-amber-400' : 'text-muted'" in cells, (
+        "第二行的配色没了 —— 转折那天该是琥珀色, 与逐日表那个标记同色"
+    )
 
 
 def test_R286_走势列显示今天是不是转折():

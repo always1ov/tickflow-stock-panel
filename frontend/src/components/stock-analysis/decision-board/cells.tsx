@@ -452,11 +452,11 @@ export function ChannelStateCell({ trend, geo, runs, ph, kc, close, trendCls,
         <span className="flex flex-wrap items-center justify-center gap-1">
           {trend ? (
             <span className={`inline-flex whitespace-nowrap rounded border px-1.5 py-0.5 text-[12px] ${trendCls ?? ''}`}>
-              {/* [R249] 「已N天」—— 与结论列那个天数**同一个说法**。
-                  同一行里六态写「3天」、结论写「已25天」, 读的人得先判断这两个
-                  数是不是一回事(是的: 都是尾部连续段、都按交易日、都是"到今天
-                  还在")。用户: 「必须要统一表达, 不能又两种多种表述」。 */}
-              {trend.state_cn} 已{trend.duration}天{trend.intraday ? <span className="ml-0.5 opacity-70">*</span> : null}
+              {/* [R290] 天数从徽标上**搬到了第二行**, 换成「转折后第 N 天」——
+                  用户: 「这类词统一改成出现转折后的第几天」。
+                  徽标上不再留一份: 同一个数印两遍, 读的人得先确认是不是一回事
+                  (R249 立的正是这条规矩, 这里是同一条规矩换了个说法执行)。 */}
+              {trend.state_cn}{trend.intraday ? <span className="ml-0.5 opacity-70">*</span> : null}
             </span>
           ) : <span className="text-[12px] text-muted/30">—</span>}
           {/* [R286] 今天是不是转折。用户: 「走势这一列还要显示今天是不是转折,
@@ -485,12 +485,18 @@ export function ChannelStateCell({ trend, geo, runs, ph, kc, close, trendCls,
             几乎永远轮不上, 加速度在这一列上等于不显示(悬停里也被同一个三元顶掉)。
             现在快慢有了自己的位置(间距列), 这里不再回退到它 —— 回退过去只会让
             同一个读数在两列里各印一遍。算不出来就留空, 不拿别的东西冒充。 */}
-        {ph?.align ? (
-          <span className={`text-[11px] ${
-            ph.align.level === 3 ? 'text-red-400/80'
-              : ph.align.level === 0 ? 'text-emerald-400/80'
-              : ph.align.level === null ? 'text-muted' : 'text-amber-300/85'}`}>
-            {ph.align.cn}
+        {/* [R290] 这一行原来印的是**三个尺度对齐到第几步**(「正在转多」那类词)。
+            用户: 「外面不再是显示"正在转多"这样的的字眼了, 这类词统一改成出现
+            转折后的第几天」。
+            换成天数是**降噪也是升信息**: 「正在转多」是一个推断(而且与徽标上的
+            六态抢方向, R257 为同一个毛病撤过「阶段」), 而"转折之后走了几天"是
+            一个事实, 并且直接回答扫这一列时真正想问的那句话 ——
+            「这只票刚转, 还是已经走了一段?」
+            三尺度对齐没删, 降进悬停当依据(R270「收起来, 不删」同一条路子)。 */}
+        {trend ? (
+          <span className={`text-[11px] ${trend.flipped ? 'text-amber-400' : 'text-muted'}`}
+                title="从六态转折那天算起, 到今天第几个交易日。第 1 天就是今天刚转">
+            转折后第 {trend.duration} 天
           </span>
         ) : (
           <span className="text-transparent select-none text-[11px]">·</span>

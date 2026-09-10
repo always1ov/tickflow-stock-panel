@@ -50,7 +50,8 @@ import { trendBadgeCls } from '@/components/stock-analysis/TrendStateBar'
 import { VerdictHover } from '@/components/stock-analysis/VerdictHover'
 import { ComboView } from '@/components/stock-analysis/decision-board/ComboView'
 import { ReviewDisclosure } from '@/components/stock-analysis/ReviewDisclosure'
-import { FlipTradesPanel } from '@/components/stock-analysis/FlipTradesPanel'
+import { FlipTradesPanel, FlipTradesBar, FlipTradeCells, legsByFlipDate } from '@/components/stock-analysis/FlipTradesPanel'
+import { ReviewOverviewSheet, OverviewButton } from '@/components/stock-analysis/ReviewOverviewSheet'
 import { StateTimeline } from '@/components/stock-analysis/StateTimeline'
 import {
   BAND_CN, TREND_LEGEND, VERDICT_BAR, VERDICT_LEGEND,
@@ -490,67 +491,96 @@ function TrendStatsPanel({ d }: { d: StockReview }) {
   )
 }
 
+/**
+ * [R289] 「趋势状态」重排 —— 用户: 「全景图很多东西我是不看的, 用一个按钮全部
+ * 藏起来, 点击按钮弹窗展示查看。我只关注最核心的东西 …… 我只要关注趋势、转折、
+ * 六态状态这些 …… 比如按照转折点买卖和底部部分可以融合到一起显示」。
+ *
+ * 三件事:
+ *
+ * ① **常驻的只剩三样**: 现在什么状态第几天 + 盯哪两个价 / 按转折买卖那三个数 /
+ *    逐日表。其余(时间轴、分档依据、涨跌停计数、历史统计那两句、六态灵不灵)
+ *    全进「全景」面板 —— **一个字没删**, 只是不再压着正文。
+ *
+ * ② **「每一段」那张表并进逐日表**。它俩本来就是同一条时间轴: 逐日表里标
+ *    「转折」的行, 正是每一段的起点。拆成两张, 读的人得左右对眼把日子接起来。
+ *    并的时候挤掉两列重复的 ——「转折日」就是行自己的日期,「变成什么」就是
+ *    同一行的六态状态。
+ *
+ * ③ **提醒跟着数字走**, 不进全景: 把 +143% 摆在正文而把「样本太少」收起来,
+ *    那是骗人。
+ */
 function TrendView({ d, rows, onlyMarked, onToggleMarked }: {
   d: StockReview
   rows: ReviewRow[]
   onlyMarked: boolean
   onToggleMarked: () => void
 }) {
+  const [overview, setOverview] = useState(false)
+  const legs = legsByFlipDate(d.flip_trades)
+  const bull = d.now?.side === '多头'
+  const gap = (line: number | null | undefined) =>
+    line == null || !d.now?.close ? null : (line - d.now.close) / d.now.close
+  const dn = gap(d.now?.flip_down)
+  const up = gap(d.now?.flip_up)
+
   return (
     <>
-      {/* [R191] 结论在最上面, 测量在下面。
-          原来顺序反过来: 打开先看见四个计数和一堆均值, 得自己换算才知道该怎么办。
-          用户: 「不喜欢单纯的展示」—— 展示不是没用, 但它该在结论后面当依据。
-
-          [R270] 用户: 「这三个都要处理排版抓住重点」。R191 把测量挪到了结论后面,
-          但**仍然是常驻的**: 四张 text-2xl 的计数卡加上封板率、涨停出现在,
-          又是三百多像素横在结论与逐日表之间, 逐日表照样被顶出屏幕。
-          既然它们自己就叫「依据」, 那就该跟通道那侧一样收起来。 */}
-      {d.now && <NowCard now={d.now} edge={d.side_edge} forwardDays={d.forward_days} />}
-
-      {/* [R188 加, R229 删]「磨底 N 天 / 箱体 / 红绿轮数 / 反复失败」那一块
-          在这里删掉了。用户: 「红绿节拍移除掉」—— 整个规则层退役, 复盘接口
-          不再返回 rhythm。 */}
-
-      {/* [R273] 全景 —— 头部只说今天, 逐日表 120 行滚下来记不住,
-          中间缺的就是这一层「这半年到底怎么走的」。它只占约 40px。 */}
-      <StateTimeline
-        hint={rangeHint(d.rows)}
-        legend={TREND_LEGEND}
-        bands={[{ cells: trendCells(d.rows) }]}
-      />
-
-      {/* 每种状态之后普遍怎么走 —— 复盘的正题, 留在正文之上 */}
-      <OutcomeChips
-        items={d.trend_outcomes ?? []}
-        forwardDays={d.forward_days}
-        hint={`分档依据 —— 各状态出现后 ${d.forward_days} 日表现(按段计, 一段=一次;样本小, 括号里是「几段收涨/几段已兑现」)`}
-      />
-
-      {/* [R287] 「按转折买卖」—— 真按这些转折做, 拿到下次转折为止是赚是亏。
-          排在「分档依据」之后、「依据」之前的理由写在 FlipTradesPanel 头上:
-          那一栏是固定 5 日窗口的**测量**, 这一栏是执行一遍之后的**成绩单**。 */}
-      <FlipTradesPanel
-        ft={d.flip_trades}
-        title="按转折买卖"
-        basis="转折次日开盘进出 · 转多买入、转空清仓(不做空)"
-        flipLabel="转折日"
-        legNote="与逐日表上标「转折」的那些天一一对应"
-      />
-
-      <TrendStatsPanel d={d} />
-
-      <div className="flex items-center justify-end px-4 pt-3">
-        <button
-          onClick={onToggleMarked}
-          title="只留下有涨跌停、或趋势翻转的那些天 —— 其余日子状态没变, 复盘时没有信息"
-          className={`rounded-btn border px-2 py-1 text-[10px] transition-colors cursor-pointer ${
-            onlyMarked ? 'border-sky-400/40 bg-sky-400/15 text-sky-300' : 'border-border/60 text-muted hover:text-foreground'}`}
-        >
-          只看有事的日子
-        </button>
+      {/* ── 头一行就是「按转折买卖」。用户: 「在趋势状态里面, 功能按转折买卖
+           部分才是重点; 在个股页面外面显示当前趋势状态和是否是转折是重点」。
+           —— 分工说得很清楚: **外面那张表**(决策台「走势」列, R286 已经在标
+           六态 + 转折)回答"今天怎么样"; **点进来这一页**要回答的是"这套转折
+           在这只票上到底赚不赚钱"。所以这三个数占头一行, 不再排在时间轴与
+           分档芯片后面。 */}
+      <div className="flex flex-wrap items-start gap-x-3 gap-y-2 px-4 pt-3">
+        <div className="min-w-0 flex-1">
+          <FlipTradesBar
+            ft={d.flip_trades}
+            title="按转折买卖"
+            basis="转折次日开盘进出 · 转多买入、转空清仓(不做空)"
+          />
+        </div>
+        <span className="flex shrink-0 items-center gap-2">
+          <button
+            onClick={onToggleMarked}
+            title="只留下有涨跌停、或趋势翻转的那些天 —— 其余日子状态没变, 复盘时没有信息"
+            className={`rounded-btn border px-2 py-1 text-[10px] transition-colors cursor-pointer ${
+              onlyMarked ? 'border-sky-400/40 bg-sky-400/15 text-sky-300' : 'border-border/60 text-muted hover:text-foreground'}`}
+          >
+            只看有事的日子
+          </button>
+          <OverviewButton onClick={() => setOverview(true)} />
+        </span>
       </div>
 
+      {/* ── 第二行降成小字: 今天在哪、盯哪两个价。
+           **降级不是删除** —— 决策台那一列只给状态与转折, 给不出这两个价位,
+           而复盘完总得知道接下来盯什么。NowCard 的其余部分(历史平均、两句
+           统计、六态灵不灵)进全景。 */}
+      {d.now && (
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-4 pt-1.5 text-[10px]">
+          <span className="text-muted">现在</span>
+          <b className={cn('font-medium', bull ? 'text-red-400' : 'text-emerald-400')}>
+            {d.now.state_cn} 第 {d.now.day} 天
+          </b>
+          <span className="flex flex-wrap gap-x-3 font-mono">
+            {d.now.flip_down != null && (
+              <span className="text-emerald-400/90" title="收盘跌破这个价转弱">
+                跌破 {d.now.flip_down.toFixed(2)}
+                {dn != null && <span className="ml-1 opacity-70">{(dn * 100).toFixed(1)}%</span>}
+              </span>
+            )}
+            {d.now.flip_up != null && (
+              <span className="text-red-400/90" title="收盘站上这个价转强">
+                站上 {d.now.flip_up.toFixed(2)}
+                {up != null && <span className="ml-1 opacity-70">+{(up * 100).toFixed(1)}%</span>}
+              </span>
+            )}
+          </span>
+        </div>
+      )}
+
+      {/* ── 正文: 逐日表, 转折那几行内联带上这一笔做了什么 ── */}
       <div className="mt-2 min-h-0 flex-1 overflow-auto border-t border-border/60">
         <table className="w-full text-xs">
           <thead className="sticky top-0 z-10 bg-surface">
@@ -559,6 +589,10 @@ function TrendView({ d, rows, onlyMarked, onToggleMarked }: {
               <th className="whitespace-nowrap px-2 py-2 text-right font-normal">收盘</th>
               <th className="whitespace-nowrap px-2 py-2 text-right font-normal">涨跌</th>
               <th className="whitespace-nowrap px-3 py-2 text-left font-normal">六态状态</th>
+              {/* [R289] 这三列就是原来「每一段」那张表, 并过来了 */}
+              <th className="whitespace-nowrap px-2 py-2 text-left font-normal" title="按转折买卖: 这次转折的次日开盘该干什么">动作</th>
+              <th className="whitespace-nowrap px-2 py-2 text-right font-normal" title="成交日与成交价 → 了结日与了结价, 都是开盘价">成交 → 了结</th>
+              <th className="whitespace-nowrap px-2 py-2 text-right font-normal" title="多头段是真赚到的; 空头段是空仓期间股价的涨跌, 不是你的盈亏">结果</th>
               {/* [R258] 列头从「贵不贵」改成「结论」。用户: 「别用这么傻逼的描述」。
                   这一层在别处一律叫**通道结论**(`keltner.verdict` / 决策台那一列 /
                   上方那个页签 / 复盘统计口径), 只有这里自己起了个口语名字。
@@ -595,6 +629,7 @@ function TrendView({ d, rows, onlyMarked, onToggleMarked }: {
                     </>
                   ) : <span className="text-[10px] text-muted/40">—</span>}
                 </td>
+                <FlipTradeCells leg={legs.get(r.date)} />
                 {/* [R52] 结论列在这张表里保留 —— 与「结论」视图不冲突: 那边是摊开的
                     卡片流(每一档说了什么、之后走成什么样), 这里只是让状态和当天的
                     通道位置能横着对上一眼("这个板是在什么位置上出的")。 */}
@@ -610,7 +645,7 @@ function TrendView({ d, rows, onlyMarked, onToggleMarked }: {
               </tr>
             ))}
             {rows.length === 0 && (
-              <tr><td colSpan={5} className="px-3 py-10 text-center text-[11px] text-muted">这段时间里没有涨跌停, 状态也没翻转过</td></tr>
+              <tr><td colSpan={8} className="px-3 py-10 text-center text-[11px] text-muted">这段时间里没有涨跌停, 状态也没翻转过</td></tr>
             )}
           </tbody>
         </table>
@@ -622,11 +657,26 @@ function TrendView({ d, rows, onlyMarked, onToggleMarked }: {
             「通道结论」—— 这句脚注一直指着一个**不存在的页签**。 */}
         「结论」列悬停看完整卡片, 要摊开每一档说了什么、之后走成什么样, 切到上方的「通道结论」。
       </div>
+
+      {/* ── 全景: 收起来的那些背景资料。一个字没删, 只是不再压着正文 ── */}
+      <ReviewOverviewSheet open={overview} onClose={() => setOverview(false)} title="趋势状态 · 全景">
+        {d.now && <NowCard now={d.now} edge={d.side_edge} forwardDays={d.forward_days} />}
+        <StateTimeline
+          hint={rangeHint(d.rows)}
+          legend={TREND_LEGEND}
+          bands={[{ cells: trendCells(d.rows) }]}
+        />
+        <OutcomeChips
+          items={d.trend_outcomes ?? []}
+          forwardDays={d.forward_days}
+          hint={`分档依据 —— 各状态出现后 ${d.forward_days} 日表现(按段计, 一段=一次;样本小, 括号里是「几段收涨/几段已兑现」)`}
+        />
+        <TrendStatsPanel d={d} />
+      </ReviewOverviewSheet>
     </>
   )
 }
 
-// ===== 结论视图: 把每天的悬停卡片摊开 =====
 
 /**
  * [R199] 「通道结论」栏的判定层 —— 结论在前, 数据降为依据。
@@ -803,29 +853,10 @@ function EvidencePanel({ ch, edge }: {
 }
 
 function VerdictView({ d, segments }: { d: StockReview; segments: Segment[] }) {
+  // [R289] 与「趋势状态」同一个处理: 背景资料收进全景, 正文留给卡片流。
+  const [overview, setOverview] = useState(false)
   return (
     <>
-      {/* [R269] 头部只留「一眼定调 + 该盯什么」, 读数与说明收进「依据」。
-          正文是下面那串历史段落 —— 改之前四个常驻区块吃掉约 550px, 正文一屏
-          只露一张半卡片, 那是把主次弄反了。 */}
-      {!!d.channel && (
-        <VerdictHeader ch={d.channel} edge={d.verdict_edge} forwardDays={d.forward_days} />
-      )}
-
-      {/* [R273] 结论色带 —— 一眼看出这只票大部分时间待在贵的一端还是便宜的一端 */}
-      <StateTimeline
-        hint={rangeHint(d.rows)}
-        legend={VERDICT_LEGEND}
-        bands={[{ cells: verdictCells(d.rows) }]}
-      />
-
-      {/* 各档结论在这只票上过去好不好使 —— 复盘的正题, 留在正文之上 */}
-      <OutcomeChips
-        items={d.outcomes}
-        forwardDays={d.forward_days}
-        hint={`分档依据 —— 各档结论出现后 ${d.forward_days} 日表现(按段计, 一段=一次;括号里是「几段收涨/几段已兑现」)`}
-      />
-
       {/* [R288] 与「趋势状态」那栏同一个位置逻辑: 「分档依据」是固定 5 日窗口的
           测量, 这一栏是真按它做之后的成绩单, 而 EvidencePanel 是背景资料。
 
@@ -843,7 +874,9 @@ function VerdictView({ d, segments }: { d: StockReview; segments: Segment[] }) {
                 + '「大顶区域」是「动仓位基调」, 这里一律按清空模拟, 比原话重。'}
       />
 
-      {!!d.channel && <EvidencePanel ch={d.channel} edge={d.verdict_edge} />}
+      <div className="flex justify-end px-4 pt-2">
+        <OverviewButton onClick={() => setOverview(true)} />
+      </div>
 
       <div className="mt-2 flex-1 overflow-auto border-t border-border/60 p-4">
         {segments.length === 0 && (
@@ -861,6 +894,24 @@ function VerdictView({ d, segments }: { d: StockReview; segments: Segment[] }) {
         历史是按<b className="text-secondary">当前</b>复权价重新算的 —— 期间除过权的话,
         同一天今天算出来的通道会和当时屏幕上略有出入, 复盘看的是形态与节奏。
       </div>
+      {/* [R289] 全景 —— 时间轴 / 分档依据 / 那七行读数, 一个字没删, 只是不再
+          压着正文。用户: 「全景图很多东西我是不看的, 用一个按钮全部藏起来」。 */}
+      <ReviewOverviewSheet open={overview} onClose={() => setOverview(false)} title="通道结论 · 全景">
+        {!!d.channel && (
+          <VerdictHeader ch={d.channel} edge={d.verdict_edge} forwardDays={d.forward_days} />
+        )}
+        <StateTimeline
+          hint={rangeHint(d.rows)}
+          legend={VERDICT_LEGEND}
+          bands={[{ cells: verdictCells(d.rows) }]}
+        />
+        <OutcomeChips
+          items={d.outcomes}
+          forwardDays={d.forward_days}
+          hint={`分档依据 —— 各档结论出现后 ${d.forward_days} 日表现(按段计, 一段=一次;括号里是「几段收涨/几段已兑现」)`}
+        />
+        {!!d.channel && <EvidencePanel ch={d.channel} edge={d.verdict_edge} />}
+      </ReviewOverviewSheet>
     </>
   )
 }

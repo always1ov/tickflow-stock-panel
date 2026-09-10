@@ -80,6 +80,116 @@ const REASON_CN: Record<NonNullable<FlipTrades['reason']>, string> = {
  * 差别全在文案(什么算一次变化、变化之后按什么动手), 版面与配色一个字不改:
  * **两栏量的是同一件事**(真按它做赚了多少), 长得不一样只会让人以为它们不可比。
  */
+/** 那几条「别当真」的提醒。**与数字同进同出** —— 数字在正文、提醒收进全景,
+ *  就等于把 +143% 摆出来而把「样本太少」藏起来, 那是骗人。 */
+export function tradeNotes(ft: FlipTrades, caveat?: string): string[] {
+  return [
+    caveat,
+    ft.thin && `只走完 ${ft.bull.scored} 段多头, 样本太少, 这几个数只能当参考`,
+    !!ft.blocked && `其中 ${ft.blocked} 笔的成交日当天涨停或跌停 —— 未必真成交得到这个价`,
+    !!ft.pending && `${ft.pending} 那次变化的次日还没到, 没算进去`,
+    !!ft.skipped.length && `有 ${ft.skipped.length} 次变化因为缺开盘价没能执行`,
+  ].filter(Boolean) as string[]
+}
+
+
+/**
+ * [R289] 压成一条的「按…买卖」—— 正文里常驻的就是这一条。
+ *
+ * 用户: 「我只关注最核心的东西 …… 比如按照转折点买卖和底部部分可以融合到一起
+ * 显示」。融合的做法是: **摘要留在正文顶上一行, 每一段那张表整个并进逐日表** ——
+ * 那两张表本来就是同一条时间轴(逐日表里标「转折」的行, 正是每一段的起点),
+ * 拆成两张等于让人左右对眼去把日子接起来。
+ */
+export function FlipTradesBar({ ft, title, basis, caveat }: {
+  ft?: FlipTrades | null
+  title: string
+  basis: string
+  caveat?: string
+}) {
+  if (!ft) return null
+  if (ft.reason) {
+    return (
+      <div className="text-[10px] text-muted">
+        <span className="text-secondary">{title}</span> · {REASON_CN[ft.reason]}
+      </div>
+    )
+  }
+  const notes = tradeNotes(ft, caveat)
+  return (
+    <div>
+      <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+        <span className="text-[11px] text-secondary" title={basis}>{title}</span>
+        <Stat label="跟着做" value={ft.follow} big
+              title="只把已经走完的多头段复利叠起来。空仓期不算收益。" />
+        <Stat label="一直拿着" value={ft.hold}
+              title="同一段区间买了就不动 —— 与「跟着做」同起点同终点, 所以能直接比。" />
+        <Stat label="多赚" value={ft.excess}
+              title="跟着做 − 一直拿着。正的才说明这套判定在这只票上真的帮上忙了。" />
+        <span className="text-[10px] text-muted" title="真正下过单的次数。连着的多头段是一次持仓, 不是两次买卖">
+          买卖 <b className="text-secondary">{ft.trades}</b> 次
+        </span>
+        <span className="text-[10px] text-muted">{basis}</span>
+      </div>
+      {notes.map((t) => (
+        <p key={t} className="mt-1 text-[10px] leading-relaxed text-amber-300/90">{t}</p>
+      ))}
+    </div>
+  )
+}
+
+
+/** 按「触发这一笔的那一天」索引 —— 逐日表就是拿这个把两张表接起来的 */
+export function legsByFlipDate(ft?: FlipTrades | null): Map<string, Leg> {
+  return new Map((ft?.legs ?? []).map((l) => [l.flip_date, l]))
+}
+
+
+/**
+ * [R289] 并进逐日表的那三格。**只有三格**, 因为原来那张表里另外两列是重复的:
+ * 「转折日」就是这一行自己的日期,「变成什么」就是同一行的六态状态列。
+ * 融合本来就该把重复的挤掉, 不然只是把两张表并排贴在一起。
+ */
+export function FlipTradeCells({ leg }: { leg?: Leg }) {
+  if (!leg) {
+    return (
+      <>
+        <td /><td /><td />
+      </>
+    )
+  }
+  return (
+    <>
+      <td className="whitespace-nowrap px-2 py-1.5">
+        <span className={cn('inline-flex rounded border px-1 py-px text-[10px]', ACT_CLS[leg.act])}>
+          {leg.act}
+        </span>
+        {leg.blocked && (
+          <span className="ml-1 text-[9px] text-amber-400"
+                title="成交日当天涨停或跌停, 未必真成交得到这个价">·封</span>
+        )}
+      </td>
+      <td className="whitespace-nowrap px-2 py-1.5 text-right font-mono text-[10px] tabular-nums text-muted">
+        <span className="text-secondary">{leg.enter_date.slice(5)} {leg.enter_price.toFixed(2)}</span>
+        <span className="mx-1 opacity-50">→</span>
+        {leg.exit_date.slice(5)} {leg.exit_price.toFixed(2)}
+        {leg.open_ended && (
+          <span className="ml-1 text-amber-400/80"
+                title="这一段还没走完 —— 按最后一天收盘价记, 不进胜负统计">未完</span>
+        )}
+      </td>
+      {/* 多头段是真金白银 → 涨红跌绿; 空头段是空仓期 → 灰字写「躲开/踏空」。
+          同一列两套写法是**故意的**: 它们根本不是同一种数。 */}
+      <td className={cn('whitespace-nowrap px-2 py-1.5 text-right font-mono text-[10px] tabular-nums',
+                        leg.side === '多头' ? chgCls(leg.ret) : 'text-muted')}>
+        {leg.side === '多头' ? pct(leg.ret) : idleText(leg.ret)}
+        <span className="ml-1 opacity-50">{leg.bars}天</span>
+      </td>
+    </>
+  )
+}
+
+
 export function FlipTradesPanel({ ft, title, basis, flipLabel, legNote, caveat }: {
   ft?: FlipTrades | null
   /** 栏目名, 如「按转折买卖」「按结论买卖」 */
@@ -103,13 +213,7 @@ export function FlipTradesPanel({ ft, title, basis, flipLabel, legNote, caveat }
     )
   }
 
-  const notes = [
-    caveat,
-    ft.thin && `只走完 ${ft.bull.scored} 段多头, 样本太少, 这几个数只能当参考`,
-    !!ft.blocked && `其中 ${ft.blocked} 笔的成交日当天涨停或跌停 —— 未必真成交得到这个价`,
-    !!ft.pending && `${ft.pending} 那次转折的次日还没到, 没算进去`,
-    !!ft.skipped.length && `有 ${ft.skipped.length} 次转折因为缺开盘价没能执行`,
-  ].filter(Boolean) as string[]
+  const notes = tradeNotes(ft, caveat)
 
   return (
     <div className="mx-4 mt-3 rounded-btn border border-border/60 bg-elevated/20 px-3 py-2.5">
