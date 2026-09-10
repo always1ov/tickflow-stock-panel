@@ -50,6 +50,11 @@ import { trendBadgeCls } from '@/components/stock-analysis/TrendStateBar'
 import { VerdictHover } from '@/components/stock-analysis/VerdictHover'
 import { ComboView } from '@/components/stock-analysis/decision-board/ComboView'
 import { ReviewDisclosure } from '@/components/stock-analysis/ReviewDisclosure'
+import { StateTimeline } from '@/components/stock-analysis/StateTimeline'
+import {
+  BAND_CN, TREND_LEGEND, VERDICT_BAR, VERDICT_LEGEND,
+  rangeHint, trendCells, verdictCells,
+} from '@/lib/reviewTimeline'
 
 export type ReviewTab = 'trend' | 'verdict' | 'combo'
 
@@ -61,16 +66,8 @@ const VERDICT_CLS: Record<KeltnerVerdict['tone'], string> = {
   avoid: 'border-border bg-base text-muted',
   watch: 'border-border bg-elevated/60 text-secondary',
 }
-const VERDICT_BAR: Record<KeltnerVerdict['tone'], string> = {
-  sell: 'bg-red-400',
-  buy: 'bg-sky-400',
-  hold: 'bg-amber-400',
-  avoid: 'bg-border',
-  watch: 'bg-secondary/60',
-}
 
 const RANGES = [60, 120, 250] as const
-const BAND_CN: Record<'s' | 'm' | 'l', string> = { s: '短期', m: '中期', l: '长期' }
 
 function pct(v: number | null | undefined, digits = 1): string {
   return v == null ? '—' : `${v > 0 ? '+' : ''}${(v * 100).toFixed(digits)}%`
@@ -216,7 +213,7 @@ export function StockReviewDialog({ symbol, name, tab: initialTab, onClose }: {
             缓存一天, 而它只用 channel 里的末日读数去高亮"你在哪一格"。
             让它陪着复盘转圈是白等 —— 表先出来, 读数带随后补上。 */}
         {tab === 'combo' ? (
-          <ComboView geo={d?.channel?.geo} runs={d?.channel?.runs} />
+          <ComboView geo={d?.channel?.geo} runs={d?.channel?.runs} rows={d?.rows ?? []} />
         ) : (
           <>
             {q.isLoading && (
@@ -514,6 +511,14 @@ function TrendView({ d, rows, onlyMarked, onToggleMarked }: {
           在这里删掉了。用户: 「红绿节拍移除掉」—— 整个规则层退役, 复盘接口
           不再返回 rhythm。 */}
 
+      {/* [R273] 全景 —— 头部只说今天, 逐日表 120 行滚下来记不住,
+          中间缺的就是这一层「这半年到底怎么走的」。它只占约 40px。 */}
+      <StateTimeline
+        hint={rangeHint(d.rows)}
+        legend={TREND_LEGEND}
+        bands={[{ cells: trendCells(d.rows) }]}
+      />
+
       {/* 每种状态之后普遍怎么走 —— 复盘的正题, 留在正文之上 */}
       <OutcomeChips
         items={d.trend_outcomes ?? []}
@@ -794,6 +799,13 @@ function VerdictView({ d, segments }: { d: StockReview; segments: Segment[] }) {
       {!!d.channel && (
         <VerdictHeader ch={d.channel} edge={d.verdict_edge} forwardDays={d.forward_days} />
       )}
+
+      {/* [R273] 结论色带 —— 一眼看出这只票大部分时间待在贵的一端还是便宜的一端 */}
+      <StateTimeline
+        hint={rangeHint(d.rows)}
+        legend={VERDICT_LEGEND}
+        bands={[{ cells: verdictCells(d.rows) }]}
+      />
 
       {/* 各档结论在这只票上过去好不好使 —— 复盘的正题, 留在正文之上 */}
       <OutcomeChips

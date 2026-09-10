@@ -213,3 +213,111 @@ def test_R270_三个页签的展开状态各记各的(dlg, combo):
         assert k in keys, f"{k} 没注册"
     assert "reviewTrendStatsOpen" in dlg and "reviewEvidenceOpen" in dlg
     assert "reviewComboRestOpen" in combo
+
+
+# ================================================================
+# [R273] 状态时间轴 —— 三个页签各一条
+# ================================================================
+#
+# 用户: 「这三个部分搞状态时间轴, 类似图片的」(指市场环境页那条色带)。
+#
+# 它补的是复盘弹窗一直缺的那一层: 头部只说今天, 逐日表 120 行滚下来记不住,
+# **中间缺一层「这半年到底怎么走的」**。一条色带扫一眼就有答案, 只占约 40px。
+
+TL = "components/stock-analysis/StateTimeline.tsx"
+LIB = "lib/reviewTimeline.ts"
+
+
+@pytest.fixture(scope="module")
+def timeline() -> str:
+    return code_of(TL)
+
+
+@pytest.fixture(scope="module")
+def tlib() -> str:
+    return code_of(LIB)
+
+
+def test_R273_三个页签都有时间轴(dlg, combo):
+    """趋势状态 + 通道结论在弹窗里, 组合速查在 ComboView 里。"""
+    assert dlg.count("<StateTimeline") == 2, "趋势状态与通道结论各要一条"
+    assert "<StateTimeline" in combo, "组合速查也要"
+
+
+def test_R273_时间轴必须按时间正序(tlib):
+    """**这条最容易错、又最不容易发现。**
+
+    复盘接口的 `rows` 是**新→旧**(表格要把最近的排在最前)。直接铺出来时间轴就是
+    倒着的 —— 而人读时间轴一律从左往右。倒过来之后图还是好看的, 只是**每一段的
+    含义全反了**, 光看颜色根本看不出来。
+    """
+    assert "function chrono" in tlib
+    assert "[...rows].reverse()" in tlib
+    # 三个构造函数都得过 chrono, 漏一个那一条就是倒的
+    for fn in ("trendCells", "verdictCells", "bandCells"):
+        body = tlib[tlib.index(f"function {fn}("):]
+        body = body[:body.index("\n}")]
+        assert "chrono(rows)" in body, f"{fn} 没走 chrono —— 这一条会是倒的"
+
+
+def test_R273_起止日期也从正序取(tlib):
+    """`rows[0]` 是最新的一天。直接拿它当"起", 表头就会写成「今天 → 半年前」。"""
+    body = tlib[tlib.index("function rangeHint("):]
+    body = body[:body.index("\n}")]
+    assert "chrono(rows)" in body
+
+
+def test_R273_六态用同色相深浅而不是六个杂色(tlib):
+    """六个各给一个独立颜色, 色带看起来就只是花的, 读不出方向。
+
+    A 股惯例多头红空头绿; 六个态排成一条从最多头到最空头的梯子, 用同一色相的深浅
+    表示「多头到什么程度」—— 这样一眼能看出段落的方向, 而不只是"变了"。
+    """
+    body = tlib[tlib.index("TREND_FILL"):tlib.index("TREND_LEGEND")]
+    assert body.count("bg-bull") == 3 and body.count("bg-bear") == 3
+
+
+def test_R273_通道结论沿用决策台那套配色(tlib):
+    """两处不一样的话, 翻历史时得先在脑子里做一次换算。"""
+    body = tlib[tlib.index("VERDICT_LEGEND"):]
+    body = body[:body.index("]")]
+    assert body.count("VERDICT_BAR.") == 5, "图例要直接引 VERDICT_BAR, 不许另抄一份色"
+
+
+def test_R273_组合速查画的是三档各自而不是合成结论(combo):
+    """**这和「通道结论」那条不是一回事**: 那边画的是三档合成后的那一句结论,
+    这边画的是三档各自在哪。27 格讲的正是三档的组合 —— 合成后的单条带子看不出
+    「短档先动、中档跟上、长档最后翻」这种节奏。"""
+    assert "bandCells(rows, k)" in combo
+    assert "['s', 'm', 'l'] as const" in combo
+    assert "verdictCells" not in combo, "组合速查画结论就和通道结论那条重复了"
+
+
+def test_R273_格子有最小宽度(timeline):
+    """250 天挤一条, 纯 flex-1 在窄容器上会被压成 0 宽 —— 整段消失。"""
+    assert "min-w-[2px]" in timeline
+
+
+def test_R273_图例和标题同一行(timeline):
+    """单独占一行的话, 三个页签一共多花 48px —— 那正是前两轮刚省下来的。"""
+    body = timeline[timeline.index("legend.map"):]
+    assert "ml-auto" in timeline, "起止日期靠右, 和图例挤在同一行"
+
+
+def test_R273_每一格都能悬停看清是哪天(timeline, tlib):
+    """色带只能给节奏, 具体哪天是什么状态得能查 —— 否则看出「这里变了」也没法往下追。"""
+    assert "title={c.title}" in timeline
+    for fn in ("trendCells", "verdictCells", "bandCells"):
+        body = tlib[tlib.index(f"function {fn}("):]
+        body = body[:body.index("\n}")]
+        assert "r.date" in body, f"{fn} 的悬停说明里没有日期"
+
+
+def test_R273_算不出来的那天不留空洞(tlib):
+    """六态/结论/档位都可能某天算不出来。跳过那天会让时间轴**悄悄变短**,
+    后面的日期全部错位; 给一个灰格子才是对的。"""
+    for fn in ("trendCells", "verdictCells", "bandCells"):
+        body = tlib[tlib.index(f"function {fn}("):]
+        body = body[:body.index("\n}")]
+        assert "bg-border/" in body, f"{fn} 没给算不出来的那天留位置"
+        assert "filter(" not in body, f"{fn} 把某些天过滤掉了 —— 时间轴会错位"

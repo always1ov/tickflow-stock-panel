@@ -29,7 +29,9 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { ChevronDown } from 'lucide-react'
-import { api, type ChannelGeometry, type ChannelRuns, type ComboTableRow } from '@/lib/api'
+import { api, type ChannelGeometry, type ChannelRuns, type ComboTableRow, type ReviewRow } from '@/lib/api'
+import { StateTimeline } from '@/components/stock-analysis/StateTimeline'
+import { BAND_CN, POS_LEGEND, bandCells, rangeHint } from '@/lib/reviewTimeline'
 import { QK } from '@/lib/queryKeys'
 import { cn } from '@/lib/cn'
 import { storage } from '@/lib/storage'
@@ -249,9 +251,11 @@ function ComboGroups({ rows, here }: { rows: ComboTableRow[]; here: string | nul
  * `geo`/`runs` 由复盘接口的 `channel` 给, 与它逐日表末行是同一条路算出来的
  * (`review_service._channel` 的注释)—— 所以三个页签看到的是同一天的同一份读数。
  */
-export function ComboView({ geo, runs }: {
+export function ComboView({ geo, runs, rows = [] }: {
   geo?: ChannelGeometry | null
   runs?: ChannelRuns | null
+  /** [R273] 逐日行 —— 只为画三档时间轴; 复盘接口本来就带着, 不必再要一次 */
+  rows?: ReviewRow[]
 }) {
   const q = useQuery({
     queryKey: QK.comboTable,
@@ -262,6 +266,22 @@ export function ComboView({ geo, runs }: {
   return (
     <div className="min-h-0 flex-1 space-y-3 overflow-auto px-4 py-3">
       {!!geo && <LiveStrip geo={geo} runs={runs} />}
+
+      {/* [R273] 三档各一条带子 —— **这和「通道结论」那条不是一回事**:
+          那边画的是三档合成后的**那一句结论**, 这边画的是三档**各自**在哪。
+          27 格讲的正是三档的组合, 所以这一栏的全景就该是三条并排 ——
+          「短档先动、中档跟上、长档最后翻」这种节奏, 合成后的单条带子看不出来。 */}
+      {rows.length > 0 && (
+        <StateTimeline
+          className="mx-0"
+          hint={rangeHint(rows)}
+          legend={POS_LEGEND}
+          bands={(['s', 'm', 'l'] as const).map(k => ({
+            label: BAND_CN[k].slice(0, 2),
+            cells: bandCells(rows, k),
+          }))}
+        />
+      )}
 
       {/* [R225] 27 行的表改成**分组卡片**。用户: 「把这部分做好看一点, 好丑。
           看看怎么显示更有价值而不是一堆数据」。
