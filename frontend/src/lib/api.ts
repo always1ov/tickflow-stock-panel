@@ -1191,6 +1191,12 @@ export interface WatchlistImportCandidate {
   name: string | null
   matched: boolean
   already_in_watchlist: boolean
+  /** [R265] 仅 AI 解析整段这条路: 原文里是怎么提它的 */
+  mention?: string
+  /** [R265] 原文里提到它的那半句, 用来核对 AI 有没有抽错 */
+  quote?: string
+  /** [R265] 没匹配上的原因(名称与代码对不上 / 重名 / 主数据里没有) */
+  warn?: string
 }
 
 export interface WatchlistImportResult {
@@ -1199,6 +1205,8 @@ export interface WatchlistImportResult {
   candidates: WatchlistImportCandidate[]
   matched_count: number
   unmatched_count: number
+  /** [R265] 正文过长被截断送审 */
+  truncated?: boolean
 }
 
 /**
@@ -4032,6 +4040,13 @@ export const api = {
   },
   watchlistImportCodes: (text: string, signal?: AbortSignal) =>
     request<WatchlistImportResult>('/api/watchlist/import-codes', {
+      method: 'POST',
+      body: JSON.stringify({ text }),
+      signal,
+    }),
+  /** [R265] 粘一段话交给 AI 抽个股 —— 返回结构与截图/CSV 一致, 复用同一套确认流程。 */
+  watchlistImportText: (text: string, signal?: AbortSignal) =>
+    request<WatchlistImportResult>('/api/watchlist/import-text', {
       method: 'POST',
       body: JSON.stringify({ text }),
       signal,

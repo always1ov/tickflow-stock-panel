@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { FileText, ImagePlus, Keyboard, Loader2, Plus, Upload, X } from 'lucide-react'
+import { FileText, ImagePlus, Keyboard, Loader2, Plus, Sparkles, Upload, X } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Modal } from '@/components/Modal'
 import { toast } from '@/components/Toast'
@@ -337,6 +337,31 @@ export function WatchlistImportDialog({
     await stage(signal => api.watchlistImportCodes(codesText.trim(), signal))
   }
 
+  /**
+   * [R265] 粘一段话交给 AI 抽个股。
+   *
+   * 与「解析代码」共用同一个输入框: 那条只认六位数字, 复盘笔记 / 研报 / 群消息里
+   * 的票多半**只有名字**, 老路一只都抽不出来。返回结构一致, 所以下面的勾选、
+   * 目标分组、"已在自选就并组不新增"整套照旧, 一行都不用改。
+   */
+  const runTextParse = async () => {
+    setSourceFile('')
+    setShowSkipped(false)
+    await stage(async signal => {
+      const res = await api.watchlistImportText(codesText.trim(), signal)
+      if (res.truncated) toast('正文过长, 已取前面一段解析', 'error')
+      return res
+    })
+  }
+
+  const runText = async () => {
+    if (!codesText.trim()) {
+      toast('请先粘贴要解析的内容', 'error')
+      return
+    }
+    await runTextParse()
+  }
+
   const onSourcePick = async (list: FileList | File[] | null | undefined) => {
     if (!list || list.length === 0) return
     const files = Array.from(list)
@@ -461,7 +486,9 @@ export function WatchlistImportDialog({
     const checked = !!sym && selected.has(sym)
     let status: ReactNode = null
     if (!c.matched || !sym) {
-      status = <span className="text-[10px] text-warning/90">{NO_MATCH_MSG}</span>
+      // [R265] AI 那条路知道**为什么**没匹配上(名称与代码对不上/重名/主数据里没有),
+      // 说清楚比统一一句「已跳过」有用得多 —— 尤其是"对不上"那种, 正是拦下一次错导。
+      status = <span className="text-[10px] text-warning/90">{c.warn || NO_MATCH_MSG}</span>
     } else if (state.inAllSelected) {
       status = <span className="text-[10px] text-muted">已在所选分组</span>
     } else if (state.inWatchlist) {
@@ -472,7 +499,8 @@ export function WatchlistImportDialog({
       )
     }
     return (
-      <li key={sym ?? c.code}>
+      // AI 那条路的未匹配项可能没有代码, 光用 code 做 key 会撞在一起
+      <li key={sym ?? `${c.code}|${c.mention ?? ''}`}>
         <label
           className={`flex items-center gap-3 px-3 py-2.5 text-sm ${
             state.eligible ? 'cursor-pointer hover:bg-elevated/50' : 'opacity-50 cursor-not-allowed'
@@ -488,7 +516,7 @@ export function WatchlistImportDialog({
           <div className="flex-1 min-w-0">
             <div className="flex items-baseline gap-2">
               <span className="font-medium text-foreground truncate">
-                {c.name || (c.matched && sym ? sym : '未匹配')}
+                {c.name || c.mention || (c.matched && sym ? sym : '未匹配')}
               </span>
               <span className="text-[11px] text-muted tabular-nums shrink-0">
                 {c.code}
@@ -496,6 +524,10 @@ export function WatchlistImportDialog({
               </span>
             </div>
             {status}
+            {/* [R265] 原文里提到它的那半句 —— 让人一眼核对 AI 有没有抽错票 */}
+            {c.quote && (
+              <p className="text-[10px] text-muted truncate" title={c.quote}>「{c.quote}」</p>
+            )}
           </div>
         </label>
       </li>
@@ -514,7 +546,8 @@ export function WatchlistImportDialog({
             批量导入自选
           </h2>
           <p className="text-[11px] text-muted mt-0.5">
-            截图 / CSV / TXT / 粘贴代码均支持，解析后按证券主数据匹配，可多选分组导入
+            截图 / CSV / TXT / 代码均支持，也可粘一段话让 AI 认里面的票；
+            一律按证券主数据匹配，已在自选的只并入分组不重复添加
           </p>
         </div>
         <button
@@ -541,7 +574,7 @@ export function WatchlistImportDialog({
               className="w-full inline-flex items-center justify-center gap-1.5 rounded-btn border border-dashed border-border bg-elevated/40 px-3 py-2 text-xs text-secondary hover:bg-elevated/70"
             >
               <Keyboard className="h-3.5 w-3.5 text-accent" />
-              或粘贴证券代码
+              或粘贴证券代码 / 一段话
             </button>
           ) : (
             <div className="space-y-2 rounded-btn border border-border bg-elevated/40 p-2.5">
@@ -552,13 +585,17 @@ export function WatchlistImportDialog({
                 onKeyDown={e => {
                   if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') void runCodes()
                 }}
-                placeholder={'示例：\n600519\n000001 平安银行\n515880 通信ETF国泰'}
+                placeholder={'纯代码：600519、000001 平安银行\n\n'
+                  + '或直接粘一段话，交给 AI 认里面的票：\n'
+                  + '「今天复盘：光模块方向中际旭创、新易盛继续走强，消费电子里立讯精密补涨」'}
                 rows={4}
                 className="w-full resize-y rounded-btn border border-border bg-surface px-3 py-2 text-xs text-foreground placeholder:text-muted focus:border-accent/50 focus:outline-none"
               />
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] text-muted">空格 / 逗号 / 换行分隔，Ctrl/⌘+Enter 解析</span>
-                <div className="flex items-center gap-1.5">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[11px] text-muted min-w-0">
+                  代码用「解析代码」，整段话用「AI 认股票」
+                </span>
+                <div className="flex items-center gap-1.5 shrink-0">
                   <button
                     type="button"
                     onClick={() => { setPasteOpen(false); setCodesText('') }}
@@ -570,10 +607,21 @@ export function WatchlistImportDialog({
                     type="button"
                     disabled={busy || !codesText.trim()}
                     onClick={() => void runCodes()}
-                    className="h-7 px-3 rounded-btn text-xs inline-flex items-center gap-1.5 bg-accent text-white hover:bg-accent/90 disabled:opacity-40"
+                    title="只认六位代码，不调 AI，最快"
+                    className="h-7 px-2.5 rounded-btn text-xs inline-flex items-center gap-1.5 border border-border bg-elevated text-secondary hover:text-foreground disabled:opacity-40"
                   >
-                    {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Keyboard className="h-3.5 w-3.5" />}
-                    解析
+                    <Keyboard className="h-3.5 w-3.5" />
+                    解析代码
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy || !codesText.trim()}
+                    onClick={() => void runText()}
+                    title="把整段话交给 AI，认出里面提到的个股（名字也认）"
+                    className="h-7 px-2.5 rounded-btn text-xs inline-flex items-center gap-1.5 bg-accent text-white hover:bg-accent/90 disabled:opacity-40"
+                  >
+                    {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                    AI 认股票
                   </button>
                 </div>
               </div>

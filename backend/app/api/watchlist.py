@@ -94,6 +94,12 @@ class ImportCodesRequest(BaseModel):
     text: str
 
 
+class ImportTextRequest(BaseModel):
+    """[R265] 粘一段话交给 AI 抽个股。与 ImportCodesRequest 同形但走完全不同的解析。"""
+
+    text: str
+
+
 def _with_names(rows: list[dict], request: Request) -> list[dict]:
     if not rows:
         return rows
@@ -353,6 +359,33 @@ def import_from_codes(req: ImportCodesRequest, request: Request):
         lambda: import_watchlist_codes(text, data_dir, existing_symbols=existing),
         "未识别到股票代码",
     )
+
+
+@router.post("/import-text")
+async def import_from_text(req: ImportTextRequest, request: Request):
+    """[fork 增强 R265] 粘一段话 → AI 抽出提到的个股 → 候选列表(不自动写入自选)。
+
+    与 import-codes 的分工: 那条只认六位数字, 这条认**名字**(复盘笔记/研报/群消息
+    里的票多半只有名字)。返回结构与截图/CSV 完全一致, 前端复用同一套勾选确认与
+    分组并入 —— 「历史已导入过」由候选上的 already_in_watchlist 与 add_batch 的
+    并组语义兜住, 本端点不做特殊处理。
+    """
+    from app.services import watchlist_ai_text
+
+    text = req.text.strip()
+    if not text:
+        raise HTTPException(400, "请粘贴要解析的内容")
+
+    existing = {r["symbol"] for r in watchlist.list_symbols()}
+    data_dir = request.app.state.repo.store.data_dir
+    result = await watchlist_ai_text.generate(text, data_dir, existing_symbols=existing)
+    # AI 那侧的失败是常态(没配 key / 限流 / 输出跑偏), 给可读原因而不是 500
+    if result.get("error"):
+        raise HTTPException(400, str(result["error"]))
+    if not result.get("candidates"):
+        raise HTTPException(400, "这段话里没认出个股")
+    result.pop("raw_text", None)
+    return result
 
 
 @router.post("/{symbol}/top")
