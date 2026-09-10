@@ -46,7 +46,7 @@ export function LotsLink({ symbol, lotCount, driftPct, lotCost, stale = false }:
       to={`/lots-registry?symbol=${encodeURIComponent(symbol)}`}
       title={title}
       aria-label={title}
-      className={`tap-target inline-flex h-6 shrink-0 items-center gap-0.5 rounded border bg-base px-1 text-[10px] font-mono transition-colors ${tone}`}
+      className={`tap-target inline-flex h-6 shrink-0 items-center gap-0.5 rounded border bg-base px-1 text-[12px] font-mono transition-colors ${tone}`}
     >
       <Layers className="h-2.5 w-2.5" />
       {lotCount}

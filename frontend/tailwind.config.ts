@@ -95,13 +95,21 @@ export default {
       },
       // FluxDown 桌面端以 13px 为主字号、12px 为辅助字号。保留显式像素字号
       // 给图表工具条使用，只统一语义字号，避免 K 线和表格几何发生漂移。
+      // [R283] 整档上调一级。用户: 「全局的字体也适当调整, 太小了不方便看」。
+      //
+      // **这里是最安全的那个杠杆**: 这套刻度全部写成 px, 不含 rem —— 所以调它
+      // 只放大字, 一个间距盒子都不动。相比之下改 `html { font-size }` 会把
+      // Tailwind 的 rem 间距(p-2 = 0.5rem 之类)一起缩放, 那是整页重排, 风险完全不同。
+      //
+      // 行高按 1.5~1.55 跟着走 —— 只加字号不加行高, 字挤在一起反而更难读,
+      // 「压抑」有一半来自行高而不是字号。
       fontSize: {
-        xs: ['12px', { lineHeight: '18px' }],
-        sm: ['13px', { lineHeight: '20px' }],
-        base: ['14px', { lineHeight: '22px' }],
-        lg: ['16px', { lineHeight: '24px' }],
-        xl: ['18px', { lineHeight: '26px' }],
-        '2xl': ['22px', { lineHeight: '30px' }],
+        xs: ['13px', { lineHeight: '20px' }],
+        sm: ['14px', { lineHeight: '22px' }],
+        base: ['15px', { lineHeight: '24px' }],
+        lg: ['17px', { lineHeight: '26px' }],
+        xl: ['19px', { lineHeight: '28px' }],
+        '2xl': ['23px', { lineHeight: '32px' }],
       },
       letterSpacing: {
         tighter: '-0.015em',

@@ -265,8 +265,10 @@ body {
   background: oklch(var(--base));
   color: oklch(var(--fg-primary));
   font-family: theme('fontFamily.sans');
-  font-size: 13px;
-  line-height: 1.5;
+  /* [R283] 13 → 14。只影响没写字号类的那些文字(正文段落), 与上面 Tailwind
+     刻度的整档上调是同一件事的两半。 */
+  font-size: 14px;
+  line-height: 1.55;
   letter-spacing: 0.005em;
   font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
   font-kerning: normal;

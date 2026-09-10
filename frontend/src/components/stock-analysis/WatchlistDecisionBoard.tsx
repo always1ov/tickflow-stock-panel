@@ -53,7 +53,7 @@ const SIGNAL_RANK: Record<string, number> = { buy: 0, sell: 1, hold: 2, watch: 3
  * **顺序必须与 thead 里的 <th> 一一对应。**
  */
 const BOARD_COLS = [
-  { label: '标的', w: '9%' },
+  { label: '标的', w: '9.5%' },
   // [R212] 「现价」「涨跌」合成一列。用户: 「这两列合成为『现价/涨跌』这样为一列」。
   // 两个数天生一起读 —— 拆成两列只是让眼睛多跳一次。
   { label: '现价/涨跌', w: '6%' },
@@ -63,24 +63,28 @@ const BOARD_COLS = [
   // [R211] 「量化通道」(测量) + 「通道态势」(结论) + 「趋势」(六态) 三列并一列。
   // 六态与通道阶段答的是同一个问题(往哪走), 只是方法不同 —— 放一格里,
   // 它们什么时候一致、什么时候打架, 上下一对就看见了。
-  { label: '走势', w: '9%' },
+  { label: '走势', w: '9.5%' },
   // [R277] 「间距」从「走势」里拆出来单独一列。用户: 「那把走势列的分离度拆分
   // 出来成为完整的一列」。它与加速度是同一个量的一阶与二阶(实测: 间距 ≈ 50×速度,
   // 加速度是它的变化率), 所以两个读数同格 —— 详见 cells.tsx 的 SpreadCell。
   // 走势列因此从三行降到两行, 宽度 11%→9%, 匀 5% 给这一列。
-  { label: '间距', w: '5%' },
+  { label: '间距', w: '5.5%' },
   // [R212] 「贵不贵」(位置) + 「怎么办」(动作) 合成一列, 竖排, 摆在 AI 之前。
   // 用户: 「贵不贵在上换行怎么办在下」「结论这行放在 ai 分析前一列」。
   // 顺序是有讲究的: 上面是事实(这个价算贵还是便宜), 下面是结论(所以今天该干嘛)。
-  { label: '结论', w: '16%' },
+  { label: '结论', w: '18%' },
   // [R249] 账目三列从「现价」后面挪到这里。用户: 「我有点乱, 是否有好办法整理
   // 好顺序调整显示和列」。**原来它们把判断切开了** —— 扫表时要连着读
   // 「走势 → 结论」, 中间却横着三列只有持仓那几只才用得上的账目。
   // 现在一行从左到右是: 认票 → 凭什么 → 我的账 → 别人的意见。
   { label: '仓位', w: '3%' },
-  { label: '成本', w: '6%' },        // 两个输入框
+  { label: '成本', w: '5.5%' },        // 两个输入框
   { label: '浮盈', w: '3.5%' },
-  { label: 'AI 分析', w: '7%' },     // R130 上下两行: 报告胶囊 / ✨分析 + 🔔提醒
+  // [R283] 7% → 4%。这一列只有一枚报告胶囊和两个 6×6 的图标按钮, 却按第三宽的
+  // 比例占着位置; 而右边「结论」那一列要塞三枚徽标加一整段理由, 一直被挤到折行。
+  // **固定列总和守恒**(64.5%), 省下来的 3% 里 2% 给结论、其余补给标的/走势/间距 ——
+  // 字号整档上调之后, 这几列的内容都比原来要更多横向空间。
+  { label: 'AI 分析', w: '4%' },     // R130 上下两行: 报告胶囊 / ✨分析 + 🔔提醒
   { label: 'AI 信号', w: '' },       // 不给宽度, 吃掉剩下的 —— 只有它是整段文字
 ] as const
 
@@ -681,7 +685,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
           <span className="text-xs font-medium text-foreground">自选决策台</span>
           {/* [R276] 两个数出自同一批票(当前这张表)。筛掉了多少写在后面, 免得
               「12 只」被读成"我的自选只剩 12 只了"。 */}
-          <span className="text-[10px] text-muted">
+          <span className="text-[12px] text-muted">
             {rows.length} 只 · 持有 {heldInView}
             {rows.length < totalRows && (
               <span className="opacity-60"> · 自选共 {totalRows}</span>
@@ -694,7 +698,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
           title={'只留下有触发的那几只: 出场线已破/逼近、离趋势翻转价 2% 以内、今日刚翻转、'
             + '短期通道到轨。判定是纯规则的(与推送焦点名单同一套到轨口径), AI 不参与。\n'
             + '自选一多, 默认列出全部本身就是噪音 —— 绝大多数票今天确实不需要你看。'}
-          className={`text-[10px] px-2 py-0.5 rounded-btn border transition-colors cursor-pointer ${
+          className={`text-[12px] px-2 py-0.5 rounded-btn border transition-colors cursor-pointer ${
             actionableOnly ? 'border-amber-400/40 bg-amber-400/10 text-amber-400' : 'border-border bg-base text-muted hover:text-foreground'
           }`}
         >
@@ -702,7 +706,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
         </button>
         <button
           onClick={() => setHeldOnly((v) => !v)}
-          className={`text-[10px] px-2 py-0.5 rounded-btn border transition-colors cursor-pointer ${
+          className={`text-[12px] px-2 py-0.5 rounded-btn border transition-colors cursor-pointer ${
             heldOnly ? 'border-accent/40 bg-accent/10 text-accent' : 'border-border bg-base text-muted hover:text-foreground'
           }`}
         >
@@ -723,7 +727,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
             + '那它在每个分组里都会出现。\n'
             + '这个选择会记住, 下次打开还是它; 分组万一被删掉会自动退回「全部分组」并提示。'}
           ariaLabel="按分组筛选"
-          triggerClassName={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-btn border transition-colors cursor-pointer ${
+          triggerClassName={`inline-flex items-center gap-1 text-[12px] px-2 py-0.5 rounded-btn border transition-colors cursor-pointer ${
             groupFilter === G_ALL
               ? 'border-border bg-base text-muted hover:text-foreground'
               : curGroup
@@ -742,7 +746,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
           onClick={refreshAll}
           disabled={refreshing}
           title="刷新行情/仓位/信号快照(不调用 AI、不计费)"
-          className="ml-auto inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-btn border border-border bg-base text-muted hover:text-foreground disabled:opacity-60 transition-colors cursor-pointer"
+          className="ml-auto inline-flex items-center gap-1 text-[12px] px-2 py-0.5 rounded-btn border border-border bg-base text-muted hover:text-foreground disabled:opacity-60 transition-colors cursor-pointer"
         >
           <RefreshCw className={`h-3 w-3 ${refreshing ? 'animate-spin' : ''}`} />
           刷新
@@ -755,7 +759,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
               + `点开可以选导哪些列 —— 原「六态汇总」就是其中一个预设。\n`
               + `导出的读法与屏幕一致(通道列写「贴上轨」而不是 0.87)。`
             : '当前列表是空的'}
-          className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-btn border border-sky-400/30 bg-sky-400/10 text-sky-300 hover:bg-sky-400/20 disabled:opacity-50 transition-colors cursor-pointer"
+          className="inline-flex items-center gap-1 text-[12px] px-2 py-0.5 rounded-btn border border-sky-400/30 bg-sky-400/10 text-sky-300 hover:bg-sky-400/20 disabled:opacity-50 transition-colors cursor-pointer"
         >
           <Download className="h-3 w-3" />
           导出
@@ -770,7 +774,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
               + `\n[R131] 只跑需要重算的 ${staleHeld.length} 只 —— 信号已看过最新一根 K 线的会跳过`
               + `\n(数据没更新时重跑, 喂给 AI 的还是同一份输入; 超过 ${SIGNAL_TTL_HOURS} 小时仍会重算)`
               + `\n想强制重跑某一只, 点它那行的 ✨`}
-            className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-btn border border-amber-400/30 bg-amber-400/10 text-amber-300 hover:bg-amber-400/20 disabled:opacity-60 transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1 text-[12px] px-2 py-0.5 rounded-btn border border-amber-400/30 bg-amber-400/10 text-amber-300 hover:bg-amber-400/20 disabled:opacity-60 transition-colors cursor-pointer"
           >
             {progress ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
             AI 分析持有{staleHeld.length > 0 && <span className="text-amber-300/70">·{staleHeld.length}</span>}
@@ -783,7 +787,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
             + `\n[R131] 只跑需要重算的 ${staleAll.length} 只 —— 信号已看过最新一根 K 线的会跳过`
             + `\n(数据没更新时重跑, 喂给 AI 的还是同一份输入, 花钱买不到新信息; 超过 ${SIGNAL_TTL_HOURS} 小时仍会重算)`
             + `\n想强制重跑某一只, 点它那行的 ✨`}
-          className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-btn border border-sky-400/30 bg-sky-400/10 text-sky-300 hover:bg-sky-400/20 disabled:opacity-60 transition-colors cursor-pointer"
+          className="inline-flex items-center gap-1 text-[12px] px-2 py-0.5 rounded-btn border border-sky-400/30 bg-sky-400/10 text-sky-300 hover:bg-sky-400/20 disabled:opacity-60 transition-colors cursor-pointer"
         >
           {progress ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
           {progress
@@ -816,7 +820,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
                 天数徽标(opacity < 1 会自己造一个层叠上下文)于是画到了表头上面,
                 滚动时表头被行内容穿透。背景也从 95% 半透明改成实心 —— 表头底下本来
                 就是要划走的行, 让它透出来没有任何好处。 */}
-            <thead className="sticky top-0 z-20 bg-surface text-[10px] text-muted">
+            <thead className="sticky top-0 z-20 bg-surface text-[12px] text-muted">
               <tr className="text-left">
                 <th className="whitespace-nowrap px-3 py-2.5 font-normal text-center"><button onClick={() => cycleSort('name')} className={thBtn} title="标的名称;第二行是「该动了」判定 —— 已触发 > 逼近 > 刚变盘 > 到轨 > 无事,纯规则,AI 不参与">标的{caret('name')}</button></th>
                 <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center">
@@ -931,14 +935,14 @@ title={'两行: 上面是**位置** —— 这个价现在算高还是算低,\n'
                         <span className="flex items-center gap-1.5">
                           {active && <Star className="h-2.5 w-2.5 shrink-0 text-accent" />}
                           <span className="max-w-[110px] truncate font-medium text-foreground transition-colors group-hover:text-sky-300">{r.name}</span>
-                          <span className={`${NUM} text-[9px] text-muted`}>{r.symbol}</span>
+                          <span className={`${NUM} text-[11px] text-muted`}>{r.symbol}</span>
                         </span>
                       </button>
                     </td>
                     {/* [R212] 现价与涨跌并成一格 —— 两个数天生一起读 */}
                     <td className={`${TD_BASE} ${NUM} whitespace-nowrap px-2`}>
                       <span className="text-foreground">{r.close != null ? r.close.toFixed(2) : '—'}</span>
-                      <span className={`ml-1.5 text-[10px] ${up ? 'text-red-400' : down ? 'text-emerald-400' : 'text-muted'}`}>
+                      <span className={`ml-1.5 text-[12px] ${up ? 'text-red-400' : down ? 'text-emerald-400' : 'text-muted'}`}>
                         {r.changePct != null ? `${r.changePct > 0 ? '+' : ''}${(r.changePct * 100).toFixed(2)}%` : '—'}
                       </span>
                     </td>
@@ -965,7 +969,7 @@ title={'两行: 上面是**位置** —— 这个价现在算高还是算低,\n'
                     <td className={`${TD_BASE} whitespace-nowrap px-2 text-center`}>
                       <button
                         onClick={() => setPos.mutate({ symbol: r.symbol, held: !r.held, cost: manualCost, weight: r.weight })}
-                        className={`whitespace-nowrap text-[10px] px-1.5 py-0.5 rounded border transition-colors cursor-pointer ${
+                        className={`whitespace-nowrap text-[12px] px-1.5 py-0.5 rounded border transition-colors cursor-pointer ${
                           r.held ? 'border-amber-400/40 bg-amber-400/10 text-amber-400' : 'border-border bg-base text-muted hover:border-amber-400/30'
                         }`}
                       >
@@ -999,7 +1003,7 @@ title={'两行: 上面是**位置** —— 这个价现在算高还是算低,\n'
                               const v = e.target.value === '' ? null : Number(e.target.value)
                               if (v !== manualCost) setPos.mutate({ symbol: r.symbol, held: true, cost: v, weight: r.weight })
                             }}
-                            className={`w-16 h-6 px-1 rounded bg-base border text-[11px] ${NUM} text-right text-foreground focus:outline-none focus:border-accent/50 ${
+                            className={`w-16 h-6 px-1 rounded bg-base border text-[13px] ${NUM} text-right text-foreground focus:outline-none focus:border-accent/50 ${
                               r.costSource === 'lots' ? 'border-accent/35 placeholder:text-accent/70' : 'border-border'
                             }`}
                           />
@@ -1031,7 +1035,7 @@ title={'两行: 上面是**位置** —— 这个价现在算高还是算低,\n'
                             <button
                               onClick={() => openHistoryReport(rep.latest.id)}
                               title={`打开最近报告(${new Date(rep.latest.created_at).toLocaleString()})${rep.count > 1 ? ` · 共 ${rep.count} 份` : ''}`}
-                              className="inline-flex w-full items-center justify-center gap-1 rounded-btn border border-violet-400/30 bg-violet-400/10 px-1.5 py-0.5 text-[10px] text-violet-300 transition-colors duration-hover hover:bg-violet-400/20 cursor-pointer"
+                              className="inline-flex w-full items-center justify-center gap-1 rounded-btn border border-violet-400/30 bg-violet-400/10 px-1.5 py-0.5 text-[12px] text-violet-300 transition-colors duration-hover hover:bg-violet-400/20 cursor-pointer"
                             >
                               <FileText className="h-2.5 w-2.5 shrink-0" />
                               {fmtAgo(rep.latest.created_at)}
@@ -1072,13 +1076,13 @@ title={'两行: 上面是**位置** —— 这个价现在算高还是算低,\n'
                       {r.sig ? (
                         <div className="flex flex-col gap-0.5">
                           <div className="flex items-center gap-1.5">
-                            <span className={`text-[10px] px-1.5 py-0.5 rounded border ${SIGNAL_META[r.sig.signal]?.cls ?? 'border-border text-muted'}`}>
+                            <span className={`text-[12px] px-1.5 py-0.5 rounded border ${SIGNAL_META[r.sig.signal]?.cls ?? 'border-border text-muted'}`}>
                               {SIGNAL_META[r.sig.signal]?.label ?? r.sig.signal}
                             </span>
-                            <span className="text-[9px] text-muted/50">{fmtAgo(r.sig.created_at)}</span>
+                            <span className="text-[11px] text-muted/50">{fmtAgo(r.sig.created_at)}</span>
                           </div>
                           {r.sig.reason && (
-                            <span className="text-[10px] text-muted/80 leading-snug whitespace-normal break-words">{r.sig.reason}</span>
+                            <span className="text-[12px] text-muted/80 leading-snug whitespace-normal break-words">{r.sig.reason}</span>
                           )}
                           {/* [fork 增强] 到价预案:AI watch_points(涨至/跌至 → 对应操作),提前有准备 */}
                           {(r.sig.watch_points ?? []).length > 0 && (
@@ -1093,7 +1097,7 @@ title={'两行: 上面是**位置** —— 这个价现在算高还是算低,\n'
                               {(r.sig.watch_points ?? []).map((p, i) => (
                                 <span
                                   key={i}
-                                  className="inline-flex items-center gap-1.5 text-[10px] font-mono whitespace-nowrap"
+                                  className="inline-flex items-center gap-1.5 text-[12px] font-mono whitespace-nowrap"
                                   title={p.reason ? `${p.label ?? ''} — ${p.reason}` : p.label}
                                 >
                                   <span className={`tabular-nums ${p.direction === 'up' ? 'text-red-400' : 'text-emerald-400'}`}>
@@ -1106,7 +1110,7 @@ title={'两行: 上面是**位置** —— 这个价现在算高还是算低,\n'
                           )}
                         </div>
                       ) : (
-                        <span className="text-[10px] text-muted/50">未分析</span>
+                        <span className="text-[12px] text-muted/50">未分析</span>
                       )}
                     </td>
                   </tr>

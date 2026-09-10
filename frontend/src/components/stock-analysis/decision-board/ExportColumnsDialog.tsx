@@ -59,7 +59,7 @@ export function ExportColumnsDialog({
       <div className="flex items-center gap-2 border-b border-border/60 px-4 py-3">
         <Download className="h-4 w-4 text-sky-400" />
         <h2 id="export-cols-title" className="text-sm font-medium text-foreground">导出 · 选列</h2>
-        <span className="text-[10px] text-muted">{rowCount} 只 · 已选 {keys.length} 列</span>
+        <span className="text-[12px] text-muted">{rowCount} 只 · 已选 {keys.length} 列</span>
         <button
           onClick={onClose}
           aria-label="关闭"
@@ -82,14 +82,14 @@ export function ExportColumnsDialog({
 
         {grouped.map(([group, cols]) => (
           <section key={group}>
-            <div className="mb-1 text-[10px] text-muted">{group}</div>
+            <div className="mb-1 text-[12px] text-muted">{group}</div>
             <div className="flex flex-wrap gap-1.5">
               {cols.map(c => (
                 <button
                   key={c.key}
                   onClick={() => toggle(c.key)}
                   className={cn(
-                    'inline-flex items-center gap-1 rounded-btn border px-2 py-0.5 text-[11px] transition-colors cursor-pointer',
+                    'inline-flex items-center gap-1 rounded-btn border px-2 py-0.5 text-[13px] transition-colors cursor-pointer',
                     picked.has(c.key)
                       ? 'border-sky-400/40 bg-sky-400/10 text-sky-300'
                       : 'border-border bg-base text-muted hover:text-foreground',
@@ -103,7 +103,7 @@ export function ExportColumnsDialog({
           </section>
         ))}
 
-        <p className="text-[10px] text-muted/70">
+        <p className="text-[12px] text-muted/70">
           导出的读法与屏幕一致(比如通道列写「贴上轨」而不是 0.87)——
           对不上的话你会怀疑哪个是错的。列序按上面的固定顺序，不随勾选先后变。
         </p>
@@ -113,12 +113,12 @@ export function ExportColumnsDialog({
         <button
           onClick={onExport}
           disabled={rowCount === 0 || keys.length === 0}
-          className="inline-flex items-center gap-1.5 rounded-btn border border-sky-400/40 bg-sky-400/15 px-2.5 py-1 text-[11px] text-sky-300 transition-colors cursor-pointer hover:bg-sky-400/25 disabled:opacity-40"
+          className="inline-flex items-center gap-1.5 rounded-btn border border-sky-400/40 bg-sky-400/15 px-2.5 py-1 text-[13px] text-sky-300 transition-colors cursor-pointer hover:bg-sky-400/25 disabled:opacity-40"
         >
           <Download className="h-3 w-3" />
           导出 {rowCount} 只 · {keys.length} 列
         </button>
-        <span className="text-[10px] text-muted/70">自包含 HTML,可存档、打印或转发</span>
+        <span className="text-[12px] text-muted/70">自包含 HTML,可存档、打印或转发</span>
       </div>
     </Modal>
   )
@@ -129,7 +129,7 @@ function Preset({ label, title, onClick }: { label: string; title?: string; onCl
     <button
       onClick={onClick}
       title={title}
-      className="rounded-btn border border-border bg-base px-2 py-0.5 text-[10px] text-muted transition-colors cursor-pointer hover:text-foreground"
+      className="rounded-btn border border-border bg-base px-2 py-0.5 text-[12px] text-muted transition-colors cursor-pointer hover:text-foreground"
     >
       {label}
     </button>

@@ -27,7 +27,10 @@ import { VerdictHover } from '@/components/stock-analysis/VerdictHover'
  * 水平方向一并统一成居中并写进这个常量, 于是表头与单元格天然对齐 ——
  * R194 那种"逐列核对表头与单元格是否同向"的活儿从此不存在。
  */
-export const TD_BASE = 'align-middle py-2 text-center'
+// [R283] `py-2` → `py-2.5`, 并把多行格子的 `leading-snug` 换成 `leading-snug`。
+// 用户: 「页面整体看起来有点压抑」。**压抑有一半来自行高不是字号** —— 字号整档
+// 调大之后行距不跟着松, 反而比原来更挤。
+export const TD_BASE = 'align-middle py-2.5 text-center'
 
 /**
  * 数字列的统一写法。`tabular-nums` 是**列对齐的关键**: 没有它, 比例字形下
@@ -196,8 +199,8 @@ function VerdictInner({ v, ev, geo, runs, energy, ph, stateRun, onOpen }: {
         <button
           onClick={onOpen}
           className={note
-            ? 'inline-flex cursor-pointer whitespace-nowrap rounded border border-border bg-elevated/60 px-1 py-0.5 text-[10px] text-secondary transition-colors hover:brightness-125'
-            : 'cursor-pointer text-[10px] text-muted/40 hover:text-sky-300'}
+            ? 'inline-flex cursor-pointer whitespace-nowrap rounded border border-border bg-elevated/60 px-1 py-0.5 text-[12px] text-secondary transition-colors hover:brightness-125'
+            : 'cursor-pointer text-[12px] text-muted/40 hover:text-sky-300'}
           title={(note
             ? `${note.title}:${note.detail}\n\n底层判定在这一格是空的 —— 这句话来自补充层。`
             : '三档都在通道中部 —— 位置上真的没有可说的, 听趋势和信号的')
@@ -220,7 +223,7 @@ function VerdictInner({ v, ev, geo, runs, energy, ph, stateRun, onOpen }: {
         + geoLines(geo, ev, runs, energy, ph)}>
         <button
           onClick={onOpen}
-          className={`inline-flex cursor-pointer whitespace-nowrap rounded border px-1 py-0.5 text-[10px] transition-colors hover:brightness-125 ${VERDICT_CLS[v.tone]}`}
+          className={`inline-flex cursor-pointer whitespace-nowrap rounded border px-1 py-0.5 text-[12px] transition-colors hover:brightness-125 ${VERDICT_CLS[v.tone]}`}
         >
           {v.title}
           <Days d={v} />
@@ -319,7 +322,7 @@ export function SpreadCell({ geo, ph, runs, onOpenReview }: {
   onOpenReview?: () => void
 }) {
   if (!ph) {
-    return <td className={`${TD_BASE} whitespace-nowrap px-1.5 text-[10px] text-muted/30`}>—</td>
+    return <td className={`${TD_BASE} whitespace-nowrap px-1.5 text-[12px] text-muted/30`}>—</td>
   }
   const sp = geo?.spread
   const tip = [
@@ -342,9 +345,9 @@ export function SpreadCell({ geo, ph, runs, onOpenReview }: {
   return (
     <td className={`${TD_BASE} whitespace-nowrap px-1.5`}>
       <button type="button" onClick={onOpenReview} title={tip}
-              className="mx-auto flex w-full cursor-pointer flex-col items-center gap-0.5 rounded-btn px-1 py-0.5 leading-tight transition-colors duration-hover hover:bg-elevated/40">
-        <span className="whitespace-nowrap text-[10px] text-muted">{ph.maturity_cn}</span>
-        <span className={`whitespace-nowrap text-[9px] ${PACE_CLS[geo?.accel?.level ?? ''] ?? 'text-muted'}`}>
+              className="mx-auto flex w-full cursor-pointer flex-col items-center gap-0.5 rounded-btn px-1 py-0.5 leading-snug transition-colors duration-hover hover:bg-elevated/40">
+        <span className="whitespace-nowrap text-[12px] text-muted">{ph.maturity_cn}</span>
+        <span className={`whitespace-nowrap text-[11px] ${PACE_CLS[geo?.accel?.level ?? ''] ?? 'text-muted'}`}>
           {ph.pace_cn}
         </span>
       </button>
@@ -441,17 +444,17 @@ export function ChannelStateCell({ trend, geo, runs, ph, kc, close, trendCls,
           一起亮 —— "这一格可以点开"这件事本身第一次是看得见的。
           内部的徽标一律降成 span: button 里套 button 是非法 HTML。 */}
       <button type="button" onClick={onOpenReview} title={tip}
-              className="mx-auto flex w-full cursor-pointer flex-col items-center gap-0.5 rounded-btn px-1 py-0.5 leading-tight transition-colors duration-hover hover:bg-elevated/40">
+              className="mx-auto flex w-full cursor-pointer flex-col items-center gap-0.5 rounded-btn px-1 py-0.5 leading-snug transition-colors duration-hover hover:bg-elevated/40">
         <span className="flex flex-wrap items-center justify-center gap-1">
           {trend ? (
-            <span className={`inline-flex whitespace-nowrap rounded border px-1.5 py-0.5 text-[10px] ${trendCls ?? ''}`}>
+            <span className={`inline-flex whitespace-nowrap rounded border px-1.5 py-0.5 text-[12px] ${trendCls ?? ''}`}>
               {/* [R249] 「已N天」—— 与结论列那个天数**同一个说法**。
                   同一行里六态写「3天」、结论写「已25天」, 读的人得先判断这两个
                   数是不是一回事(是的: 都是尾部连续段、都按交易日、都是"到今天
                   还在")。用户: 「必须要统一表达, 不能又两种多种表述」。 */}
               {trend.state_cn} 已{trend.duration}天{trend.intraday ? <span className="ml-0.5 opacity-70">*</span> : null}
             </span>
-          ) : <span className="text-[10px] text-muted/30">—</span>}
+          ) : <span className="text-[12px] text-muted/30">—</span>}
         </span>
         {/* [R277] 「走了多远」(成熟度)那一行**搬到独立的「间距」列**去了 ——
             用户: 「那把走势列的分离度拆分出来成为完整的一列」。见 SpreadCell。
@@ -466,14 +469,14 @@ export function ChannelStateCell({ trend, geo, runs, ph, kc, close, trendCls,
             现在快慢有了自己的位置(间距列), 这里不再回退到它 —— 回退过去只会让
             同一个读数在两列里各印一遍。算不出来就留空, 不拿别的东西冒充。 */}
         {ph?.align ? (
-          <span className={`text-[9px] ${
+          <span className={`text-[11px] ${
             ph.align.level === 3 ? 'text-red-400/80'
               : ph.align.level === 0 ? 'text-emerald-400/80'
               : ph.align.level === null ? 'text-muted' : 'text-amber-300/85'}`}>
             {ph.align.cn}
           </span>
         ) : (
-          <span className="text-transparent select-none text-[9px]">·</span>
+          <span className="text-transparent select-none text-[11px]">·</span>
         )}
       </button>
     </td>
@@ -504,9 +507,9 @@ const PLAY_CLS: Record<string, string> = {
  * 这一列**不产生任何新判定** —— 每句话都能追到某一层的原话。
  */
 function PlaybookInner({ p }: { p?: Playbook | null }) {
-  if (!p) return <span className="text-[10px] text-muted/30">—</span>
+  if (!p) return <span className="text-[12px] text-muted/30">—</span>
   return (
-      <span className={`inline-flex whitespace-nowrap rounded border px-1.5 py-0.5 text-[10px] ${PLAY_CLS[p.tone] ?? PLAY_CLS.muted}`}
+      <span className={`inline-flex whitespace-nowrap rounded border px-1.5 py-0.5 text-[12px] ${PLAY_CLS[p.tone] ?? PLAY_CLS.muted}`}
             title={p.why}>
         {p.headline}
         {p.price != null && <span className="ml-1 font-mono tabular-nums opacity-80">{p.price.toFixed(2)}</span>}
@@ -566,12 +569,15 @@ export function ConclusionCell({ v, ev, geo, runs, energy, ph, p, stateRun, onOp
     //
     // 左对齐也跟着 AI 信号列: 竖排之后居中会让三行的左边缘参差不齐。
     <td className={`${TD_BASE} px-2 !text-left`}>
-      <div className="flex max-w-[15rem] flex-col items-start gap-0.5 leading-tight">
+      {/* [R283] `max-w-[15rem]`(240px) → `19rem`(304px)。**这个上限才是「结论」
+          一直被挤的真原因** —— 这一列 18% 宽在常见视口上有 300px 出头, 而内容被
+          硬卡在 240px, 光加列宽一点用都没有。两者得一起动。 */}
+      <div className="flex max-w-[19rem] flex-col items-start gap-0.5 leading-snug">
         <VerdictInner v={v} ev={ev} geo={geo} runs={runs} energy={energy} ph={ph}
                       stateRun={stateRun} onOpen={onOpen} />
         <PlaybookInner p={p} />
         {line2 && (
-          <span className={`w-full whitespace-normal break-words text-[9px] leading-snug ${
+          <span className={`w-full whitespace-normal break-words text-[11px] leading-snug ${
             evOn ? EVENT_CLS[ev!.code] ?? 'text-muted' : 'text-muted'}`}
                 title={tip}>
             {line2}
