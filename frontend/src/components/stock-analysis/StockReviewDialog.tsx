@@ -49,7 +49,7 @@ import { storage } from '@/lib/storage'
 import { trendBadgeCls } from '@/components/stock-analysis/TrendStateBar'
 import { VerdictHover } from '@/components/stock-analysis/VerdictHover'
 import { ComboView } from '@/components/stock-analysis/decision-board/ComboView'
-import { FlipTradesPanel, FlipTradesBar, FlipTradeCells, legsByFlipDate } from '@/components/stock-analysis/FlipTradesPanel'
+import { FlipTradesBar, FlipTradeCells, FlipTradeLine, legsByFlipDate } from '@/components/stock-analysis/FlipTradesPanel'
 import { ReviewHelpSheet, HelpButton } from '@/components/stock-analysis/ReviewHelpSheet'
 import { StateTimeline } from '@/components/stock-analysis/StateTimeline'
 import { ReviewDisclosure } from '@/components/stock-analysis/ReviewDisclosure'
@@ -452,15 +452,24 @@ function HeadRow({ label, children }: { label: string; children: React.ReactNode
  *   ② 位置结论在这只票上灵不灵(偏买档 vs 偏卖档)  ← 要不要信它
  *   ③ 那八个数                                    ← 前两条的依据
  */
-const PHASE_CLS: Record<string, string> = {
-  coiling: 'border-border/60 bg-elevated/40 text-secondary',
-  launching: 'border-red-400/40 bg-red-400/[0.07] text-red-300',
-  advancing: 'border-red-400/50 bg-red-400/10 text-red-300',
-  stalling: 'border-amber-400/40 bg-amber-400/[0.07] text-amber-300',
-  overextended: 'border-amber-400/50 bg-amber-400/10 text-amber-300',
-  declining: 'border-emerald-400/40 bg-emerald-400/[0.07] text-emerald-300',
-  unclear: 'border-border/60 bg-elevated/30 text-muted',
+/** [R293] 阶段的纯文字色。`PHASE_CLS` 是整块卡的边框+底色, 这里要的是一行小字 */
+const PHASE_TEXT_CLS: Record<string, string> = {
+  coiling: 'text-secondary', launching: 'text-red-300', advancing: 'text-red-300',
+  stalling: 'text-amber-300', overextended: 'text-amber-300',
+  declining: 'text-emerald-300', unclear: 'text-muted',
 }
+
+/** [R293] 语气的纯文字色与大白话名 —— 与 `VERDICT_CLS` 同一套语义, 不同用法 */
+const VERDICT_TEXT_CLS: Record<string, string> = {
+  buy: 'text-sky-300', hold: 'text-amber-400', sell: 'text-red-400',
+  avoid: 'text-muted', watch: 'text-secondary',
+}
+const TONE_CN: Record<string, string> = {
+  buy: '偏买', hold: '拿着', sell: '偏卖', avoid: '回避', watch: '等着',
+}
+
+// [R269 加, R293 删] `PHASE_CLS`(阶段那张卡的边框+底色)在这里删掉了 ——
+// 那张卡整块搬进了头部卡的「现在」行, 只留一行小字, 用的是 `PHASE_TEXT_CLS`。
 
 /**
  * [R269] 依据 —— 默认收起的一条。
@@ -530,141 +539,101 @@ function EvidencePanel({ ch, edge }: {
 }
 
 
-/**
- * [R269] 判定条 —— 阶段 + 该盯什么 + 位置结论, **压成一块**。
- *
- * 用户: 「排版不合理, 要抓住重点, 下面的都看不到了」。改之前这一栏从上到下是
- * 四个各自带边框的区块: 阶段卡、位置结论卡、七行依据表、分档芯片, 加起来吃掉约
- * 550px, 而**真正要看的段卡片列表**只剩一屏的零头, 一次露一张半。
- *
- * 一个复盘面板的正文是那串历史段落 —— 头部是用来"一眼定调"的, 不是用来读的。
- * 所以这里只留两样:
- *
- *   · **现在处在哪一段** —— 一眼定调
- *   · **该盯什么** —— 这一栏唯一的行动指引, 必须常驻
- *
- * 阶段的成因(`why`)、位置结论的说明(`text`)、七行读数全部下沉到「依据」里收起 ——
- * 那张表自己都写着「上面两条结论就是从这些读数出来的」, **依据不该压在结论和正文
- * 中间**。位置结论只留一枚芯片: 样本够时它是个判断(偏买/偏卖差多少), 样本不够时
- * 它连判断都不是, 更没有理由占一整块。
- */
-const EDGE_CLS2: Record<string, string> = {
-  both: 'border-red-400/40 bg-red-400/[0.07] text-red-300',
-  offense: 'border-red-400/30 bg-red-400/[0.05] text-red-300/90',
-  defense: 'border-amber-400/40 bg-amber-400/[0.07] text-amber-300',
-  flat: 'border-border/60 bg-elevated/30 text-muted',
-  inverted: 'border-emerald-400/40 bg-emerald-400/[0.07] text-emerald-300',
-  thin: 'border-border/60 bg-elevated/20 text-muted',
-}
-
-function VerdictHeader({ ch, edge, forwardDays }: {
-  ch: NonNullable<StockReview['channel']>
-  edge: StockReview['verdict_edge']
-  forwardDays: number
-}) {
-  const ph = ch.phase
-  if (!ph) return null
-  return (
-    <div className={cn('mx-4 mt-3 rounded-lg border px-3 py-2', PHASE_CLS[ph.code] ?? PHASE_CLS.unclear)}>
-      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <span className="text-[10px] text-muted">现在处在</span>
-        <b className="text-[13px] font-semibold">{ph.cn}</b>
-        {ch.event.code !== 'none' && (
-          <span className="text-[10px] opacity-90">
-            {ch.event.cn}{ch.event.confirmed ? '' : '(未确认)'}
-          </span>
-        )}
-        {!!edge && (
-          <span
-            className={cn('ml-auto inline-flex shrink-0 items-baseline gap-1.5 rounded border px-1.5 py-0.5 text-[10px]',
-              EDGE_CLS2[edge.level] ?? EDGE_CLS2.flat)}
-            title={edge.text}
-          >
-            <span className="text-muted">通道结论</span>
-            <b>{edge.label}</b>
-            {edge.level !== 'thin' && edge.spread != null && (
-              <span className="font-mono opacity-80" title="偏买档平均 − 偏卖档平均。两边差得越多, 说明这套通道结论越有用">
-                差 {(edge.spread * 100).toFixed(1)} 点
-              </span>
-            )}
-            {edge.level !== 'thin' && (
-              <span
-                className="opacity-70"
-                title={`偏买档 ${edge.buy.episodes} 段够 ${forwardDays} 个交易日、${edge.buy.win} 段收涨;`
-                  + ` 偏卖档 ${edge.sell.episodes} 段、${edge.sell.win} 段收涨`}
-              >
-                {edge.buy.win}/{edge.buy.episodes} · {edge.sell.win}/{edge.sell.episodes}
-              </span>
-            )}
-          </span>
-        )}
-      </div>
-      {/* 这一栏唯一的行动指引 —— 别的都能收起, 它不行 */}
-      <p className="mt-1.5 text-[11px] leading-relaxed">
-        <span className="text-muted">该盯什么:</span> {ph.watch}
-      </p>
-      {!!ch.event.combo_note && (
-        <p className="mt-1 text-[10px] leading-relaxed opacity-90">
-          组合「{ch.event.combo_note.combo}」· {ch.event.combo_note.title}:{ch.event.combo_note.detail}
-        </p>
-      )}
-    </div>
-  )
-}
-
 function VerdictView({ d, segments, onHelp }: {
   d: StockReview; segments: Segment[]; onHelp: () => void
 }) {
+  const legs = legsByFlipDate(d.verdict_trades)
+  const ph = d.channel?.phase
+  // 各档出现了几段 —— 与趋势那边「涨停 N · 跌停 N」同一个角色: 一行小字说完
+  // 「这半年都出过什么」。**按语气分而不是按十档分**: 十个数一行放不下, 而且
+  // 用户真正要找的是"偏买的那几段"。
+  const byTone = segments.reduce<Record<string, number>>((acc, sg) => {
+    acc[sg.v.tone] = (acc[sg.v.tone] ?? 0) + 1
+    return acc
+  }, {})
+
   return (
     <>
-      {/* [R292] 「现在处在」那张卡回到正文 —— 它是这一页的「现在」行, 与
-          「趋势状态」那张卡的第二行同一个角色。 */}
-      {!!d.channel && (
-        <VerdictHeader ch={d.channel} edge={d.verdict_edge} forwardDays={d.forward_days} />
-      )}
-      {/* [R288] 与「趋势状态」那栏同一个位置逻辑: 「分档依据」是固定 5 日窗口的
-          测量, 这一栏是真按它做之后的成绩单, 而 EvidencePanel 是背景资料。
+      <div className="mx-4 mt-3 divide-y divide-border/40 rounded-lg border border-border/60">
+        {/* 用户: 「核心是按结论买卖」—— 与趋势那边一样, 它是第一行 */}
+        <HeadRow label="按结论买卖">
+          <FlipTradesBar
+            ft={d.verdict_trades}
+            title=""
+            basis="结论换档的次日开盘进出 · 偏买建仓、偏卖与回避清仓(不做空)"
+            caveat={'「拿着」「等着」「三档都在中部」都不动手 —— 那是作者写的原话(「拿着, 别在这加仓」'
+                    + '「等短期入场点」), 不是买卖信号。另: 「该止盈了」原话是「可落袋一部分」、'
+                    + '「大顶区域」是「动仓位基调」, 这里一律按清空模拟, 比原话重。'}
+          />
+        </HeadRow>
 
-          **这一栏在这个页签上尤其值钱**: 通道结论天天在变, 按它做要下多少单、
-          这些单子加起来到底赚不赚, 光看一排分档均值是看不出来的 ——
-          而用户的路子是「尽可能减少买卖次数」。 */}
-      <FlipTradesPanel
-        ft={d.verdict_trades}
-        title="按结论买卖"
-        basis="结论换档的次日开盘进出 · 偏买建仓、偏卖与回避清仓(不做空)"
-        flipLabel="变化日"
-        legNote="与下面那些卡片一一对应"
-        caveat={'「拿着」「等着」「三档都在中部」都不动手 —— 那是作者写的原话(「拿着, 别在这加仓」'
-                + '「等短期入场点」), 不是买卖信号。另: 「该止盈了」原话是「可落袋一部分」、'
-                + '「大顶区域」是「动仓位基调」, 这里一律按清空模拟, 比原话重。'}
-      />
+        {!!ph && (
+          <HeadRow label="现在">
+            <div className="text-[10px]">
+              <span className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <b className={cn('font-medium', PHASE_TEXT_CLS[ph.code] ?? 'text-secondary')}>{ph.cn}</b>
+                {d.channel!.event.code !== 'none' && (
+                  <span className="text-muted">
+                    {d.channel!.event.cn}{d.channel!.event.confirmed ? '' : '(未确认)'}
+                  </span>
+                )}
+              </span>
+              {/* **这一栏唯一的行动指引。** 别的都能收, 它不行 —— 收起来这一页
+                  就只剩「现在处在下跌中」这种定性词, 没有一条能照着做的(R269)。 */}
+              <p className="mt-1 leading-relaxed text-secondary">
+                <span className="text-muted">该盯什么: </span>{ph.watch}
+              </p>
+              {/* [R269] 27 格组合的那条注记是**判定的一部分**, 不许在重排里蒸发 ——
+                  「中中上」「中中下」两格底层返回无结论, 而它们恰恰是"大级别到位、
+                  等一个入场点"的另一半, 全靠这条注记说出来。 */}
+              {!!d.channel?.event.combo_note && (
+                <p className="mt-1 leading-relaxed text-muted">
+                  组合「{d.channel.event.combo_note.combo}」· {d.channel.event.combo_note.title}:
+                  {d.channel.event.combo_note.detail}
+                </p>
+              )}
+            </div>
+          </HeadRow>
+        )}
 
-      {/* [R292] 状态色带跟着搬回正文 —— 用户: 「状态轴也是」。
-          分档依据(各档结论之后 5 日表现)与那七行读数**整块撤掉**, 与
-          「趋势状态」那边同一个取舍(用户: 「剩下的东西都不需要了」)。 */}
-      <StateTimeline
-        hint={rangeHint(d.rows)}
-        legend={VERDICT_LEGEND}
-        bands={[{ cells: verdictCells(d.rows) }]}
-      />
+        <HeadRow label={`这 ${d.days} 天`}>
+          <div className="flex flex-wrap gap-x-3 text-[10px] text-muted">
+            <span>{segments.length} 段结论</span>
+            {(['buy', 'hold', 'watch', 'sell', 'avoid'] as const)
+              .filter((t) => byTone[t])
+              .map((t) => (
+                <span key={t} className={VERDICT_TEXT_CLS[t]}>{TONE_CN[t]} {byTone[t]} 段</span>
+              ))}
+          </div>
+          <div className="-mx-1 mt-1.5">
+            <StateTimeline
+              hint={rangeHint(d.rows)}
+              legend={VERDICT_LEGEND}
+              bands={[{ cells: verdictCells(d.rows) }]}
+            />
+          </div>
+        </HeadRow>
+      </div>
 
-      {/* [R269] 「依据」——**默认收起的一条**, 约 20px。R292 一度把它一起撤了,
-          那是过头了: 用户嫌的是**压着正文的常驻块**, 而它本来就是收起来的;
-          何况那三样读数(名称/数值/解释)是 R212 改了三版才定下来的。 */}
+      {/* [R269] 「依据」——**默认收起的一条**, 约 20px。用户嫌的是压着正文的
+          常驻块, 而它本来就是收起来的; 那三样读数是 R212 改了三版才定下来的。 */}
       {!!d.channel && <EvidencePanel ch={d.channel} edge={d.verdict_edge} />}
 
       <div className="flex justify-end px-4 pt-2">
         <HelpButton onClick={onHelp} />
       </div>
 
-      <div className="mt-2 flex-1 overflow-auto border-t border-border/60 p-4">
+      <div className="mt-2 min-h-0 flex-1 overflow-auto border-t border-border/60 p-4">
         {segments.length === 0 && (
           <div className="py-14 text-center text-[11px] text-muted">
             这段时间里三档通道一直在中部 —— 位置上没有可说的, 听趋势和信号的
           </div>
         )}
         <div className="space-y-2.5">
-          {segments.map((seg) => <SegmentCard key={seg.rows[0].date} seg={seg} forwardDays={d.forward_days} />)}
+          {segments.map((seg) => (
+            <SegmentCard key={seg.rows[0].date} seg={seg} forwardDays={d.forward_days}
+                         leg={legs.get(seg.rows[seg.rows.length - 1].date)} />
+          ))}
         </div>
       </div>
 
@@ -677,14 +646,11 @@ function VerdictView({ d, segments, onHelp }: {
   )
 }
 
-/**
- * 一段结论 = 决策台上当时悬停会看到的那张卡片, 加上"这几天实际走了什么"。
- *
- * 「之后 N 日」取这一段**最后一天**的前瞻收益 —— 一档结论连着出现几天时,
- * 真正该问的是"它最后一次说完之后怎么样了", 拿段首那天算等于把段内的涨跌
- * 也算进兑现里。
- */
-function SegmentCard({ seg, forwardDays }: { seg: Segment; forwardDays: number }) {
+function SegmentCard({ seg, forwardDays, leg }: {
+  seg: Segment; forwardDays: number
+  /** [R293] 这一段起头那次换档触发的那一笔 —— 段首日就是它的触发日 */
+  leg?: NonNullable<StockReview['verdict_trades']>['legs'][number]
+}) {
   const { v, rows } = seg
   const newest = rows[0]              // rows 是新→旧
   const oldest = rows[rows.length - 1]
@@ -721,6 +687,11 @@ function SegmentCard({ seg, forwardDays }: { seg: Segment; forwardDays: number }
             之后{forwardDays}日 {newest.fwd == null ? '待定' : pct(newest.fwd)}
           </span>
         </div>
+
+        {/* [R293] 这一段里手上做了什么。用户: 「关注重点是『调整到位』和这些
+            状态期间的买卖」—— 那就长在这一段自己的卡片上, 而不是让人去另一张
+            表里按日期找回来。段首日就是那一笔的触发日, 所以两边天然对齐。 */}
+        <FlipTradeLine leg={leg} />
 
         {/* 徽标背后的三段 —— 这才是「结论」列真正的内容 */}
         <div className="mt-2 rounded border border-border/60 bg-base/60 px-2 py-1.5">

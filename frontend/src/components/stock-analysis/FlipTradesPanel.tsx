@@ -34,12 +34,10 @@
  * 3. **空栏要自己解释。** 分不清"这段时间确实没转折"和"数据缺了算不出来",
  *    是这个仓库反复吃过的亏。
  *
- * 动效: 一个都没加 —— 折叠复用既有的 `ReviewDisclosure`(它只有雪佛龙的
- * `transition-transform`)。这一栏是读数, 不是需要"活起来"的东西。
+ * 动效: 一个都没加 —— 这一栏是读数, 不是需要"活起来"的东西。
  */
 import type { StockReview } from '@/lib/api'
 import { cn } from '@/lib/cn'
-import { ReviewDisclosure } from '@/components/stock-analysis/ReviewDisclosure'
 
 type FlipTrades = NonNullable<StockReview['flip_trades']>
 type Leg = FlipTrades['legs'][number]
@@ -190,72 +188,8 @@ export function FlipTradeCells({ leg }: { leg?: Leg }) {
 }
 
 
-export function FlipTradesPanel({ ft, title, basis, flipLabel, legNote, caveat }: {
-  ft?: FlipTrades | null
-  /** 栏目名, 如「按转折买卖」「按结论买卖」 */
-  title: string
-  /** 口径那一句 —— **必须写出来**, 这是两栏唯一的差别所在 */
-  basis: string
-  /** 明细表第一列的表头: 六态是「转折日」, 通道结论是「变化日」 */
-  flipLabel: string
-  /** 折叠条上那句「与屏幕上的什么一一对应」 */
-  legNote: string
-  /** 这一栏特有的、会让人高估的地方 —— 比如作者原话是"减一部分"而这里按清空模拟 */
-  caveat?: string
-}) {
-  if (!ft) return null
-
-  if (ft.reason) {
-    return (
-      <div className="mx-4 mt-3 rounded-btn border border-border/60 px-3 py-2 text-[10px] text-muted">
-        <span className="text-secondary">{title}</span> · {REASON_CN[ft.reason]}
-      </div>
-    )
-  }
-
-  const notes = tradeNotes(ft, caveat)
-
-  return (
-    <div className="mx-4 mt-3 rounded-btn border border-border/60 bg-elevated/20 px-3 py-2.5">
-      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-        <span className="text-[11px] text-secondary">{title}</span>
-        <span className="text-[10px] text-muted">{basis}</span>
-      </div>
-
-      {/* 三个数一行。**「跟着做」最大** —— 它就是用户带着的那个问题的答案,
-          另外两个是它的参照物。 */}
-      <div className="mt-2 flex flex-wrap items-baseline gap-x-6 gap-y-1.5">
-        <Stat label="跟着做" value={ft.follow} big
-              title="只把已经走完的多头段复利叠起来。空仓期不算收益。" />
-        <Stat label="一直拿着" value={ft.hold}
-              title="同一段区间买了就不动 —— 与「跟着做」同起点同终点, 所以能直接比。" />
-        <Stat label="多赚" value={ft.excess}
-              title="跟着做 − 一直拿着。正的才说明这套转折在这只票上真的帮上忙了。" />
-      </div>
-
-      <p className="mt-1.5 text-[10px] leading-relaxed text-muted">
-        {/* 「买卖 N 次」是用户交易哲学里最在意的数, 所以摆在最前面。
-            它**不等于段数** —— 连着的多头段(比如自然回升转上涨趋势)是一次持仓。 */}
-        买卖 <b className="text-secondary">{ft.trades}</b> 次 · 多头 {ft.bull.n} 段
-        {ft.bull.scored > 0 && <>(走完 {ft.bull.scored} 段, {ft.bull.win} 段收涨)</>}
-        {ft.from_date && ` · ${ft.from_date} → ${ft.to_date}`}
-      </p>
-
-      {notes.map((t) => (
-        <p key={t} className="mt-1 text-[10px] leading-relaxed text-amber-300/90">{t}</p>
-      ))}
-
-      <ReviewDisclosure
-        label="每一段"
-        note={`· ${ft.legs.length} 段, ${legNote}`}
-        className="mx-0 mt-2"
-      >
-        <LegTable legs={ft.legs} flipLabel={flipLabel} />
-      </ReviewDisclosure>
-    </div>
-  )
-}
-
+/** 三个数各一格。**「跟着做」最大** —— 它就是用户带着的那个问题的答案,
+ *  另外两个是它的参照物。 */
 function Stat({ label, value, big, title }: {
   label: string; value: number | null; big?: boolean; title: string
 }) {
@@ -269,54 +203,47 @@ function Stat({ label, value, big, title }: {
   )
 }
 
-function LegTable({ legs, flipLabel }: { legs: Leg[]; flipLabel: string }) {
+
+/**
+ * [R293] 并进「通道结论」卡片的那一行 —— 与逐日表那三格是**同一份内容**,
+ * 只是从 `<td>` 换成了行内排版(卡片不是表格)。
+ *
+ * 用户: 「通道结论这部分的关注重点是『调整到位』和这些状态期间的买卖」;
+ * 「你可以理解为核心是按结论买卖」—— 那就把"这一段里手上做了什么、结果如何"
+ * 直接长在那一段的卡片上, 而不是让人在另一张表里按日期找回来。
+ */
+export function FlipTradeLine({ leg }: { leg?: Leg }) {
+  if (!leg) return null
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-[10px]">
-        <thead>
-          <tr className="border-b border-border/60 text-muted">
-            <th className="whitespace-nowrap py-1 pr-2 text-left font-normal">{flipLabel}</th>
-            <th className="whitespace-nowrap px-2 py-1 text-left font-normal">动作</th>
-            <th className="whitespace-nowrap px-2 py-1 text-left font-normal">变成什么</th>
-            <th className="whitespace-nowrap px-2 py-1 text-right font-normal">成交</th>
-            <th className="whitespace-nowrap px-2 py-1 text-right font-normal">了结</th>
-            <th className="whitespace-nowrap px-2 py-1 text-right font-normal">持</th>
-            <th className="whitespace-nowrap py-1 pl-2 text-right font-normal">结果</th>
-          </tr>
-        </thead>
-        <tbody>
-          {legs.map((l) => (
-            <tr key={l.flip_date} className="border-b border-border/30 last:border-0">
-              <td className="whitespace-nowrap py-1 pr-2 font-mono text-secondary">{l.flip_date}</td>
-              <td className="whitespace-nowrap px-2 py-1">
-                <span className={cn('inline-flex rounded border px-1 py-px', ACT_CLS[l.act])}>
-                  {l.act}
-                </span>
-                {/* 撞板标记就挂在动作旁边 —— 它说的正是"这个动作未必做得成" */}
-                {l.blocked && (
-                  <span className="ml-1 text-amber-400"
-                        title="成交日当天涨停或跌停, 未必真成交得到这个价">·封</span>
-                )}
-              </td>
-              <td className="whitespace-nowrap px-2 py-1 text-muted">{l.state_cn}</td>
-              <td className="whitespace-nowrap px-2 py-1 text-right font-mono tabular-nums text-secondary">
-                {l.enter_date.slice(5)} {l.enter_price.toFixed(2)}
-              </td>
-              <td className="whitespace-nowrap px-2 py-1 text-right font-mono tabular-nums text-muted">
-                {l.exit_date.slice(5)} {l.exit_price.toFixed(2)}
-                {l.open_ended && <span className="ml-1 text-amber-400/80" title="这一段还没走完 —— 按最后一天收盘价记, 不进胜负统计">未完</span>}
-              </td>
-              <td className="whitespace-nowrap px-2 py-1 text-right font-mono tabular-nums text-muted">{l.bars}</td>
-              {/* 多头段是真金白银 → 涨红跌绿; 空头段是空仓期 → 灰字写「躲开/踏空」。
-                  同一列两套写法是**故意的**: 它们根本不是同一种数。 */}
-              <td className={cn('whitespace-nowrap py-1 pl-2 text-right font-mono tabular-nums',
-                                l.side === '多头' ? chgCls(l.ret) : 'text-muted')}>
-                {l.side === '多头' ? pct(l.ret) : idleText(l.ret)}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 rounded border border-border/60 bg-base/60 px-2 py-1">
+      <span className="text-[9px] text-muted">按结论买卖</span>
+      <span className={cn('inline-flex rounded border px-1 py-px text-[10px]', ACT_CLS[leg.act])}>
+        {leg.act}
+      </span>
+      {leg.blocked && (
+        <span className="text-[9px] text-amber-400"
+              title="成交日当天涨停或跌停, 未必真成交得到这个价">·封</span>
+      )}
+      <span className="font-mono text-[10px] tabular-nums text-muted">
+        <span className="text-secondary">{leg.enter_date.slice(5)} {leg.enter_price.toFixed(2)}</span>
+        <span className="mx-1 opacity-50">→</span>
+        {leg.exit_date.slice(5)} {leg.exit_price.toFixed(2)}
+        {leg.open_ended && (
+          <span className="ml-1 text-amber-400/80"
+                title="这一段还没走完 —— 按最后一天收盘价记, 不进胜负统计">未完</span>
+        )}
+      </span>
+      {/* 多头段是真金白银 → 涨红跌绿; 空头段是空仓期 → 灰字写「躲开/踏空」。
+          与逐日表那一列**同一套写法**: 它们根本不是同一种数。 */}
+      <span className={cn('ml-auto font-mono text-[10px] tabular-nums',
+                          leg.side === '多头' ? chgCls(leg.ret) : 'text-muted')}>
+        {leg.side === '多头' ? pct(leg.ret) : idleText(leg.ret)}
+        <span className="ml-1 opacity-50">{leg.bars}天</span>
+      </span>
     </div>
   )
 }
+
+// [R287 加, R293 删] `FlipTradesPanel`(整块面板 + 「每一段」折叠表)在这里删掉了。
+// 两个页签现在都是**摘要压成一条 + 明细并进正文**: 趋势状态并进逐日表(R289),
+// 通道结论并进那一张张段落卡片(R293)。留着那块面板就是同一份明细印两处。

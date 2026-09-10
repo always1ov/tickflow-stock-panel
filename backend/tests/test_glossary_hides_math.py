@@ -53,7 +53,10 @@ SURFACES = {
     _FRONT / "decision-board" / "cells.tsx": "function geoLines",
     # [R269] 三个区块合并重排后锚点跟着挪。挪到 VerdictHeader 是**扩大**了扫描面:
     # 老锚点 ChannelPanel 排在阶段卡与位置结论卡之后, 那两块的文案一直没被扫到。
-    _FRONT / "StockReviewDialog.tsx": "function VerdictHeader",
+    # [R293] `VerdictHeader` 整块并进了头部卡, 锚点再挪一次 —— **挪到 `LimitTag`**,
+    # 也就是这个文件里第一个会渲染出东西的组件。**扫描面只许扩不许缩**: 拿一个
+    # 靠后的锚点(比如 SegmentCard)会把前面所有文案漏掉, 而那正是 R258 栽过的跟头。
+    _FRONT / "StockReviewDialog.tsx": "function LimitTag",
     _SRC / "components" / "today" / "OpportunityTable.tsx":
         '<span className="text-foreground/90">量化波动通道</span>',
     # [R201] **导出的 HTML 是所有面里最该守的一个** —— 屏幕上的东西只有本人看得到,
@@ -181,3 +184,27 @@ def test_R292_说明抽屉的词条真的来自后端():
     # 是干什么用的), 它不渲染。第一版没剥就直接扫, 当场被自己的注释绊倒。
     for name in ("上涨趋势", "自然回升", "次级回升", "次级回撤", "自然回撤", "下跌趋势"):
         assert name not in src, f"「{name}」被誊抄进前端了 —— 名字的正主在后端"
+
+
+# 每个面里**必须扫得到**的一句已知文案。锚点往后挪一格就会把前面的文案漏掉,
+# 而"现在没有违规"照样全绿 —— 光测违规是抓不到扫描面缩水的(R258 就是这么失效的,
+# R279 为同一件事补过一次自校验)。
+_REACH = {
+    _FRONT / "StockReviewDialog.tsx": "盘中最高触及涨停但收盘没封住",
+    _FRONT / "decision-board" / "cells.tsx": "三条线还有",
+    _FRONT / "ReviewHelpSheet.tsx": "这些词各是什么意思",
+}
+
+
+@pytest.mark.parametrize("path,known", sorted(_REACH.items(), key=lambda kv: kv[0].name),
+                         ids=lambda v: v.name if isinstance(v, Path) else "known")
+def test_R293_扫描面没有偷偷缩水(path: Path, known: str):
+    """把一句**只存在于显示区靠前位置**的已知文案塞进来, 确认它真的被扫到了。
+
+    这条守的是"锚点"本身: `SURFACES` 里那个起点往后挪一格, 前面所有文案就
+    脱离了这把尺子, 而所有泄露测试照样全绿。变异测试抓到过这一手。
+    """
+    body = _visible(path, SURFACES[path])
+    assert known in body, (
+        f"{path.name} 的扫描面没覆盖到「{known}」—— 起点标记「{SURFACES[path]}」多半挪后了"
+    )

@@ -33,17 +33,19 @@ def dlg() -> str:
 
 def test_R269_头部合并成一块判定条(dlg):
     """三个各自带边框的区块 = 三份内外边距 + 三条边框, 光边距就吃掉近百像素。"""
-    assert "function VerdictHeader" in dlg
-    for gone in ("function PhaseCard", "function VerdictEdgeCard", "function ChannelPanel"):
+    # [R293] `VerdictHeader` 那块也并掉了 —— 它的两句话进了头部卡的「现在」行,
+    # 与「趋势状态」那张卡完全同构。守的规矩没变、还更紧了: **一个独立区块都不留。**
+    for gone in ("function PhaseCard", "function VerdictEdgeCard", "function ChannelPanel",
+                 "function VerdictHeader"):
         assert gone not in dlg, f"{gone} 还在 —— 旧的独立区块没拆干净"
+    assert 'label="现在"' in dlg, "「现在」那一行没并进头部卡"
 
 
 def test_R269_该盯什么必须常驻(dlg):
     """**这一栏唯一的行动指引。** 别的都能收起, 它不行 ——
     收起来这一栏就只剩「现在处在下跌中」这种定性词, 没有一条能照着做的。"""
-    # [R292] 切片锚点跟着挪 —— `EvidencePanel` 现在排在 `VerdictHeader` 之前,
-    # 原来那个 `index(A):index(B)` 切出来是空串, 断言变成永真。**守的东西没变。**
-    head = dlg[dlg.index("function VerdictHeader"):]
+    # [R293] 它现在长在 `VerdictView` 头部卡的「现在」行里
+    head = dlg[dlg.index("function VerdictView"):]
     head = head[:head.index("\nfunction ", 1)]
     assert "该盯什么" in head and "{ph.watch}" in head
 
@@ -57,12 +59,22 @@ def test_R269_位置结论压成一枚芯片(dlg):
     而文件自己的注释都写着「这一层在别处一律叫通道结论」。守的规矩一个字没变:
     它得压成一枚芯片, 不许再占一整块。
     """
-    # [R292] 同上一条: 切片锚点跟着组件顺序挪, 守的东西没变
-    head = dlg[dlg.index("function VerdictHeader"):]
-    head = head[:head.index("\nfunction ", 1)]
-    assert "通道结论" in head
-    assert "{edge.label}" in head
-    assert "edge.level !== 'thin'" in head, "样本不够时不该还摆着两边的胜率"
+    # [R293] 「通道结论灵不灵」那枚芯片**撤掉了** —— 与六态那枚一起(R292)。
+    # 它是**关于判定的元评价**, 而这一页现在只答两件事: 这一档是什么、按它做
+    # 赚没赚(用户: 「核心是按结论买卖」)。
+    #
+    # 这条于是从"压成一枚芯片"改成"整块不在了" —— 与 `test_R292_六态灵不灵
+    # 整块撤掉了` 成对, 防的是同一件事: 别哪天冒出个半吊子版本(留结论不留凭什么)。
+    assert "function SideEdgeChip" not in dlg, "六态那枚芯片又回来了"
+    # **钉的是"这一页还读不读 `verdict_edge`"**, 不是钉某个字面量 —— 换个写法
+    # (`d.verdict_edge?.label`)就绕过去的话, 这条等于没写(变异测试抓到过)。
+    # 唯一合法的一处是传给 `EvidencePanel`: 那里面是「凭什么」, 收在折叠区里。
+    view = dlg[dlg.index("function VerdictView"):]
+    view = view[:view.index("\nfunction ", 1)]
+    uses = [ln for ln in view.splitlines() if "verdict_edge" in ln]
+    assert len(uses) == 1 and "<EvidencePanel" in uses[0], (
+        f"「通道结论灵不灵」又摆回这一页了: {uses}"
+    )
 
 
 # ================================================================
@@ -90,7 +102,8 @@ def test_R269_依据排在正文之前(dlg):
     view = dlg[dlg.index("function VerdictView"):]
     view = view[:view.index("\nfunction ", 1)]
     assert "<OutcomeChips" not in view, "分档芯片又回到「通道结论」页了"
-    assert view.index("<VerdictHeader") < view.index("<EvidencePanel") < view.index("{segments.map")
+    # [R293] 头部卡 → 依据 → 卡片流。头部卡的第一行就是「按结论买卖」(核心)。
+    assert view.index("<FlipTradesBar") < view.index("<EvidencePanel") < view.index("{segments.map")
 
 
 def test_R269_正文区拿到剩余全部高度(dlg):
@@ -122,8 +135,16 @@ def test_R269_阶段成因与位置结论说明下沉但没丢(dlg):
 
 
 def test_R269_组合注记还在(dlg):
-    """27 格组合的那条注记是判定的一部分, 不能在重排里蒸发。"""
-    assert "combo_note" in dlg
+    """27 格组合的那条注记是判定的一部分, 不能在重排里蒸发。
+
+    「中中上」「中中下」两格底层返回无结论, 而它们恰恰是"大级别到位、等一个
+    入场点"的另一半 —— 全靠这条注记说出来。
+
+    [R293] 钉**渲染出来的那一句**, 不是钉字段名: 包成 `{false && …}` 时字段名
+    照样在, 变异测试当场就漏了(本仓库这个坑的又一次)。
+    """
+    assert "组合「{d.channel.event.combo_note.combo}」" in dlg, "组合注记没渲染出来"
+    assert "{!!d.channel?.event.combo_note && (" in dlg, "注记的显示条件被改掉了"
 
 
 def test_R269_依据走的是共用折叠件(dlg):
@@ -202,7 +223,8 @@ def test_R292_六态灵不灵整块撤掉了(dlg):
 
 def test_R270_逐日表拿到剩余全部高度(dlg):
     """头部省下来的空间要真的给到正文, 否则这次改动等于没改。"""
-    view = dlg[dlg.index("function TrendView"):dlg.index("function VerdictHeader")]
+    view = dlg[dlg.index("function TrendView"):]
+    view = view[:view.index("\nfunction ", 1)]
     assert "min-h-0 flex-1 overflow-auto" in view
 
 

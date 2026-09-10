@@ -714,8 +714,10 @@ def test_R288_两个页签都挂上了而且都排在正文最前面():
     """
     from tests.frontend_source import code_of
     dlg = code_of("components/stock-analysis/StockReviewDialog.tsx")
+    # [R293] 两个页签现在**同一个形状**: 摘要压成一条 `FlipTradesBar` 放在头部卡
+    # 第一行, 明细并进各自的正文(逐日表 / 段落卡片)。
     for fn, tag, body_tag in (("function TrendView", "<FlipTradesBar", "<table"),
-                              ("function VerdictView", "<FlipTradesPanel", "{segments.map")):
+                              ("function VerdictView", "<FlipTradesBar", "{segments.map")):
         blk = dlg[dlg.index(fn):]
         blk = blk[:blk.index("\nfunction ", 1)] if "\nfunction " in blk[1:] else blk
         body = blk[blk.index("return ("):]
@@ -729,10 +731,10 @@ def test_R288_两栏的口径各写各的():
     """两栏长得一样, 所以**口径那一句是唯一能分辨它们的东西**, 不许省。"""
     from tests.frontend_source import code_of
     dlg = code_of("components/stock-analysis/StockReviewDialog.tsx")
-    # [R292] 六态那栏的栏目名搬到了 `HeadRow` 的左栏(三行共用一条左边缘), 所以
-    # 它传给组件的 `title` 是空的 —— 名字仍然印在屏幕上, 只是换了个地方出。
+    # [R292/R293] 两栏的栏目名都搬到了 `HeadRow` 的左栏(三行共用一条左边缘),
+    # 所以传给组件的 `title` 都是空的 —— 名字仍然印在屏幕上, 只是换了个地方出。
     assert 'label="按转折买卖"' in dlg, "六态那栏的栏目名没了"
-    assert 'title="按结论买卖"' in dlg, "结论那栏的栏目名没了"
+    assert 'label="按结论买卖"' in dlg, "结论那栏的栏目名没了"
     assert "转折次日开盘进出" in dlg, "六态那栏的口径没了"
     assert "结论换档的次日开盘进出" in dlg, "结论那栏的口径没了"
 
@@ -743,8 +745,8 @@ def test_R288_按清空模拟这件事要说出来():
     拿一个我自己定的口径冒充作者的判定。"""
     from tests.frontend_source import code_of
     dlg = code_of("components/stock-analysis/StockReviewDialog.tsx")
-    i = dlg.index('title="按结论买卖"')
-    blk = dlg[i:i + 700]
+    i = dlg.index('label="按结论买卖"')
+    blk = dlg[i:i + 900]
     assert "可落袋一部分" in blk and "按清空模拟" in blk, "没交代模拟得比原话重"
     assert "拿着" in blk and "等着" in blk, "没交代这三种状态不动手"
     # 光有这段文字不够 —— 得真的传进 `caveat`, 否则它只是躺在源码里。
@@ -767,9 +769,11 @@ def test_R287_组件真的把提醒印出来():
     code = _panel()
     i = code.index("export function tradeNotes")
     assert "caveat," in code[i:i + 200], "caveat 没进 tradeNotes"
-    assert code.count("notes.map(") == 2, (
-        f"两处(整块面板 / 压缩成一条)都得渲染提醒, 现在只有 {code.count('notes.map(')} 处"
+    # [R293] 整块面板删了(明细并进两边的正文), 只剩压缩条这一处渲染。
+    assert code.count("notes.map(") == 1, (
+        f"提醒该有且只有一处渲染, 现在有 {code.count('notes.map(')} 处"
     )
+    assert "FlipTradesPanel" not in code, "整块面板又回来了 —— 同一份明细印两处"
 
 
 # ================================================================
@@ -969,3 +973,94 @@ def test_R291_判定仍然只读后端那个字段():
     assert "trend.flipped ?" in render, "没读后端那个字段"
     for derived in ("duration === 1", "duration == 1", "duration <= 1"):
         assert derived not in render, f"又从 `{derived}` 自己推转折了"
+
+
+# ================================================================
+# [R293] 「通道结论」照着「趋势状态」重排
+# ================================================================
+#
+# 用户: 「通道结论也复刻参考趋势状态改好的排版显示重点内容, 通道结论这部分的
+# 关注重点是『调整到位』和这些状态期间的买卖」;「你可以理解为核心是按结论买卖」;
+# 「你别搞错了, 趋势状态也是按出现转折买卖而且已经做好了不用再改了, 通道结论
+# 才是按结论买卖, 这是两个不同的核心」。
+
+
+def test_R293_两个页签是两个不同的核心():
+    """**这条是用户特意提醒的那句话。**
+
+    趋势状态吃 `flip_trades`(按六态**转折**买卖), 通道结论吃 `verdict_trades`
+    (按**结论**换档买卖)。两份数据、两套口径、两个标题 —— 接串了的话两页会显示
+    同一个数, 而那正是最难查的一类错(界面看着都对, 只是其中一页在说别人的事)。
+    """
+    dlg = _dialog()
+    trend = _fn_body(dlg, "function TrendView")
+    verdict = _fn_body(dlg, "function VerdictView")
+    assert "ft={d.flip_trades}" in trend and "ft={d.verdict_trades}" not in trend, (
+        "趋势状态那页接错了数据源"
+    )
+    assert "ft={d.verdict_trades}" in verdict and "ft={d.flip_trades}" not in verdict, (
+        "通道结论那页接错了数据源"
+    )
+    assert 'label="按转折买卖"' in trend and 'label="按结论买卖"' in verdict
+
+
+def test_R293_两个页签的头部是同一个形状():
+    """用户: 「复刻参考趋势状态改好的排版」。同构才谈得上"复刻" ——
+    一边是带边框三行卡、另一边是三段裸 flex 的话, 切页签就像换了个软件。
+    """
+    dlg = _dialog()
+    for fn in ("function TrendView", "function VerdictView"):
+        head = _fn_body(dlg, fn)
+        head = head[:head.index("<HelpButton")]
+        assert "divide-y divide-border/40 rounded-lg border border-border/60" in head, (
+            f"{fn} 的头部不是那张带边框的卡"
+        )
+        assert head.count("<HeadRow") == 3, f"{fn} 的头部该是三行"
+        assert "<StateTimeline" in head, f"{fn} 的头部没有状态轴"
+
+
+def test_R293_每一段的买卖长在那一段的卡片上():
+    """用户: 「关注重点是『调整到位』和这些状态期间的买卖」。
+
+    融合的做法与趋势那边一样: **明细并进正文**, 不再单开一张「每一段」表 ——
+    那张表与这里的卡片流本来就是同一条时间轴(每张卡片的起始日正是一次结论
+    换档, 也就是一笔的触发日), 拆成两处等于让人按日期在两边对眼。
+    """
+    dlg = _dialog()
+    verdict = _fn_body(dlg, "function VerdictView")
+    assert "legsByFlipDate(d.verdict_trades)" in verdict, "没有按换档日建索引"
+    # 段首日 = 触发日。rows 是新→旧, 所以段首是**最后一个**
+    assert "legs.get(seg.rows[seg.rows.length - 1].date)" in verdict, (
+        "取的不是段首那天 —— 段末那天不是这一笔的触发日"
+    )
+    card = _fn_body(dlg, "function SegmentCard")
+    assert "<FlipTradeLine leg={leg} />" in card, "卡片上没长出那一笔"
+
+
+def test_R293_那张独立的每一段表整个删了():
+    """留着就是同一份明细印两处 —— 而且两处哪天不同步了没人会发现。"""
+    from tests.frontend_source import code_of
+    panel = code_of("components/stock-analysis/FlipTradesPanel.tsx")
+    for gone in ("function FlipTradesPanel", "function LegTable", "flipLabel", "legNote"):
+        assert gone not in panel, f"{gone} 还留着 —— 那块面板该整个撤了"
+    assert "<FlipTradesPanel" not in _dialog(), "还有人在挂那块面板"
+
+
+def test_R293_行内那一笔与逐日表那三格说同一套话():
+    """两处是同一份内容换个排版。**空仓段的写法尤其不能各写各的** ——
+    一边写「躲开 8%」另一边写「-8%」的话, 后者会被读成亏了 8 个点。
+    """
+    from tests.frontend_source import code_of
+    panel = code_of("components/stock-analysis/FlipTradesPanel.tsx")
+    line = panel[panel.index("export function FlipTradeLine"):]
+    cells = panel[panel.index("export function FlipTradeCells"):]
+    cells = cells[:cells.index("\nexport function ")] if "\nexport function " in cells[1:] else cells
+    for shared in ("ACT_CLS[leg.act]", "idleText(leg.ret)", "leg.side === '多头' ? chgCls(leg.ret)"):
+        assert shared in line and shared in cells, f"两处的「{shared}」不一致"
+
+
+def test_R293_这N天那一行按语气分档而不是十档全铺():
+    """十个数一行放不下, 而且用户真正要找的是"偏买的那几段"。"""
+    verdict = _fn_body(_dialog(), "function VerdictView")
+    assert "byTone" in verdict, "没有按语气分档的计数"
+    assert "{segments.length} 段结论" in verdict, "没给总段数"
