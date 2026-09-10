@@ -424,7 +424,7 @@ function TrendView({ d, rows, onlyMarked, onToggleMarked }: {
                     按转折买卖, 通道结论是"顺带对一眼"的旁证, 不该插进主线中间。 */}
                 <td className="whitespace-nowrap px-2 py-1.5 text-center">
                   {r.verdict ? (
-                    <VerdictHover v={r.verdict} note={`${r.date} 当天的读数。收盘口径。`}>
+                    <VerdictHover v={r.verdict} note="收盘口径">
                       <span className={`inline-flex cursor-help whitespace-nowrap rounded border px-1 py-0.5 text-[10px] ${VERDICT_CLS[r.verdict.tone]}`}>
                         {r.verdict.title}
                       </span>
@@ -530,6 +530,8 @@ function VerdictView({ d, segments }: {
   // 它们是**这只票的事**, 所以常驻; 那 27 格谱系是恒定的参考, 进「说明」抽屉。
   const here = d.channel?.geo?.combo ?? null
   const hist = comboHistory(d.rows, here)
+  // [R302] 今天那一档。`rows` 是新→旧, 所以第一行就是今天。
+  const now = d.rows[0]?.verdict ?? null
   const ph = d.channel?.phase
   // 各档出现了几段 —— 与趋势那边「涨停 N · 跌停 N」同一个角色: 一行小字说完
   // 「这半年都出过什么」。**按语气分而不是按十档分**: 十个数一行放不下, 而且
@@ -544,12 +546,19 @@ function VerdictView({ d, segments }: {
       <div className={HEAD_CARD}>
         {/* 用户: 「核心是按结论买卖」—— 与趋势那边一样, 它是第一行 */}
         <HeadRow label="按结论买卖">
+          {/* [R302] 那段 ~100 字的口径偏差**从正文降进「说明」页**。用户:
+              「检查通道结论页面有没有废话, 没水平没用的内容就不要显示出来了」。
+
+              **它不随票变** —— 每一只票、每一次打开印的都是同一段, 而且用的是
+              琥珀警告色, 于是每张卡顶上常年挂着一块与这只票无关的黄字。这与
+              R299 在决策台清掉的是同一类(`why` 讲这只票 / `note` 讲这套系统)。
+
+              **不是删掉**: `thin`(样本太少)、`blocked`(撞板)那几条**是这只票的**,
+              照旧留在正文 —— 把数字摆出来而把"这个数不能当真"藏起来才是骗人
+              (`tradeNotes` 那条纪律)。挪走的只有恒定的那一段。 */}
           <FlipTradesBar
             ft={d.verdict_trades}
-            basis="结论换档的次日开盘进出 · 偏买建仓、偏卖与回避清仓(不做空)"
-            caveat={'「拿着」「等着」「三档都在中部」都不动手 —— 那是作者写的原话(「拿着, 别在这加仓」'
-                    + '「等短期入场点」), 不是买卖信号。另: 「该止盈了」原话是「可落袋一部分」、'
-                    + '「大顶区域」是「动仓位基调」, 这里一律按清空模拟, 比原话重。'}
+            basis="换档次日开盘进出 · 偏买建仓、偏卖与回避清仓(不做空);「拿着」「等着」不动手 —— 口径与作者原话的出入见「说明」"
           />
         </HeadRow>
 
@@ -557,9 +566,32 @@ function VerdictView({ d, segments }: {
           <HeadRow label="现在">
             <div className="text-[10px]">
               <span className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                <b className={cn('font-medium', PHASE_TEXT_CLS[ph.code] ?? 'text-secondary')}>{ph.cn}</b>
-                {/* [R296] 三档位置码 —— 结论是它的纯函数, 所以摆在结论旁边最省事:
-                    一眼看得出"这一档是从哪三格出来的"。 */}
+                {/* [R302] **今天那一档结论补回来了, 而且排在最前面。**
+                    用户: 「都围绕位置展开」。
+
+                    **这一页叫「通道结论」, 而它的头部卡里原来根本没有今天那一档
+                    结论** —— 要知道今天是「候选池」还是「大顶区域」, 得往下翻到
+                    那张 120 行表格的第一行去找。查这一页时才发现的: 头一位摆的是
+                    「阶段」(上升中/横盘中), 那是另一个读数, 而且它和结论**在抢
+                    同一件事**(R257 为一模一样的毛病把「阶段」从走势列撤过)。
+
+                    现在顺序是 **这一档 → 从哪三格来的 → 阶段 → 事件**:
+                    结论第一、它的坐标第二、背景往后 —— 这就是"围绕位置展开"。 */}
+                {!!now && (
+                  <VerdictHover v={now} note="今天这一档。收盘口径。">
+                    <b className={`inline-flex cursor-help whitespace-nowrap rounded border px-1.5 py-0.5 font-medium ${VERDICT_CLS[now.tone]}`}>
+                      {now.title}
+                      {!!now.days && (
+                        <span className="ml-1 opacity-70"
+                              title={now.since ? `自 ${now.since} 起连着 ${now.days} 个交易日${now.capped ? '以上' : ''}` : undefined}>
+                          已{now.days}天{now.capped ? '+' : ''}
+                        </span>
+                      )}
+                    </b>
+                  </VerdictHover>
+                )}
+                {/* [R296] 三档位置码 —— 结论是它的纯函数(R296 穷举 125 种验过),
+                    所以紧跟在结论后面: 一眼看得出"这一档是从哪三格出来的"。 */}
                 {here ? (
                   <span className="font-mono text-secondary" title="三档各在自己通道的上/中/下 —— 27 格速查表的行号, 完整的一览在「说明」里">
                     {here}
@@ -572,6 +604,7 @@ function VerdictView({ d, segments }: {
                     今天定不了这一格
                   </span>
                 )}
+                <span className={PHASE_TEXT_CLS[ph.code] ?? 'text-secondary'}>{ph.cn}</span>
                 {d.channel!.event.code !== 'none' && (
                   <span className="text-muted">
                     {d.channel!.event.cn}{d.channel!.event.confirmed ? '' : '(未确认)'}
@@ -675,7 +708,10 @@ function VerdictView({ d, segments }: {
               <th className="whitespace-nowrap px-3 py-2 text-left font-normal">日期</th>
               <th className="whitespace-nowrap px-2 py-2 text-right font-normal">收盘</th>
               <th className="whitespace-nowrap px-2 py-2 text-right font-normal">涨跌</th>
-              <th className="whitespace-nowrap px-3 py-2 text-left font-normal" title="当天三档通道合起来给出的那一句结论 —— 与决策台「结论」列同一句话, 悬停看完整卡片">通道结论</th>
+              {/* [R302] 表头 title 里原来还写着「与决策台「结论」列同一句话」——
+                  **那是讲给读代码的人听的**, 对着屏幕的人不关心它在别处叫什么。
+                  只留"这个数是什么、怎么看"。 */}
+              <th className="whitespace-nowrap px-3 py-2 text-left font-normal" title="当天三档通道合起来给出的那一句结论, 悬停看完整卡片">通道结论</th>
               <th className="whitespace-nowrap px-2 py-2 text-left font-normal" title="按结论买卖: 这次换档的次日开盘该干什么">动作</th>
               <th className="whitespace-nowrap px-2 py-2 text-right font-normal" title="成交日与成交价 → 了结日与了结价, 都是开盘价">成交 → 了结</th>
               <th className="whitespace-nowrap px-2 py-2 text-right font-normal" title="多头段是真赚到的; 空头段是空仓期间股价的涨跌, 不是你的盈亏">结果</th>
@@ -695,7 +731,7 @@ function VerdictView({ d, segments }: {
                 </td>
                 <td className="whitespace-nowrap px-3 py-1.5">
                   {r.verdict ? (
-                    <VerdictHover v={r.verdict} note={`${r.date} 当天的读数。收盘口径。`}>
+                    <VerdictHover v={r.verdict} note="收盘口径">
                       <span className={`inline-flex cursor-help whitespace-nowrap rounded border px-1.5 py-0.5 text-[10px] ${VERDICT_CLS[r.verdict.tone]}`}>
                         {r.verdict.title}
                       </span>

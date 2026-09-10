@@ -106,7 +106,7 @@ export function ReviewHelpView({ here = null }: {
 
             <Section
               title="通道结论"
-              note="「结论」那一列。十档按偏买 → 偏卖排, 与别处的排序同一个次序"
+              note="十档按偏买 → 偏卖排, 与别处的排序同一个次序"
             >
               {q.data.verdict.map((v) => (
                 <Term
@@ -117,6 +117,21 @@ export function ReviewHelpView({ here = null }: {
                   action={v.action}
                 />
               ))}
+              {/* [R302] 「按结论买卖」那一栏的**口径偏差**搬到这里。原来它常年
+                  挂在「通道结论」页头部卡上, 用琥珀警告色 —— 而它**不随票变**,
+                  每只票每次打开都是同一段。它属于"这十档怎么被翻成买卖动作",
+                  正好是这一节在讲的事。
+
+                  **搬走不等于藏起来**: 界面上那一行写着「口径与作者原话的出入见
+                  『说明』」, 指过来。真正该常驻正文的是「样本太少」「撞上涨跌停」
+                  那几条 —— 它们是**这只票的**, 一条没动。 */}
+              <div className="px-2.5 py-2 text-[10px] leading-relaxed text-muted">
+                <b className="font-medium text-secondary">按结论买卖的口径</b>:
+                「拿着」「等着」「三档都在中部」<b className="text-secondary">都不动手</b> ——
+                那是作者写的原话(「拿着, 别在这加仓」「等短期入场点」), 不是买卖信号。
+                另: 「该止盈了」原话是「可落袋一部分」、「大顶区域」是「动仓位基调」,
+                这里一律<b className="text-secondary">按清空模拟, 比原话重</b>。
+              </div>
             </Section>
 
             {/* [R296] 27 格 —— 上面十档结论**就是从这 27 格出来的**(穷举 125 种

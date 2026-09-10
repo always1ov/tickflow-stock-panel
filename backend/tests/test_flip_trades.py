@@ -742,27 +742,32 @@ def test_R288_两栏的口径各写各的():
     assert 'label="按转折买卖"' in dlg, "六态那栏的栏目名没了"
     assert 'label="按结论买卖"' in dlg, "结论那栏的栏目名没了"
     assert "转折次日开盘进出" in dlg, "六态那栏的口径没了"
-    assert "结论换档的次日开盘进出" in dlg, "结论那栏的口径没了"
+    # [R302] 结论那栏的口径句缩短了(那 100 字的偏差说明降进「说明」页), 但
+    # **口径本身一个字没省** —— 它仍然是唯一能分辨这两栏的东西。
+    assert "换档次日开盘进出" in dlg, "结论那栏的口径没了"
 
 
 def test_R288_按清空模拟这件事要说出来():
     """作者给「该止盈了」写的是「可落袋一部分」、给「大顶区域」写的是
     「动仓位基调」—— 都不是清仓。这里一律按清空算, **比原话重**, 不说就是
-    拿一个我自己定的口径冒充作者的判定。"""
+    拿一个我自己定的口径冒充作者的判定。
+
+    [R302] **这段话搬到「说明」页了**, 因为它每只票都一样(用户: 「没水平没用的
+    内容就不要显示出来了」)。守的规矩一个字没变 —— 它必须**还说得出来**,
+    而且正文得**指得到它**, 否则搬家就成了藏起来。所以这条改成两头都钉。
+    """
     from tests.frontend_source import code_of
+    view = code_of("components/stock-analysis/ReviewHelpView.tsx")
+    assert "可落袋一部分" in view and "按清空模拟" in view, "没交代模拟得比原话重"
+    assert "拿着" in view and "等着" in view, "没交代这三种状态不动手"
+    # 光有这段文字不够 —— 它得真的渲染在「通道结论」那一节里, 而不是躺在
+    # 源码某处。锚在那一节的 `Section` 上, 顺序也钉住。
+    i = view.index('title="通道结论"')
+    assert view.index("按结论买卖的口径", i) > i, "那段话没落在「通道结论」那一节里"
+    # **正文必须指得到**: 搬走而不留路标, 与直接删掉没区别。
     dlg = code_of("components/stock-analysis/StockReviewDialog.tsx")
-    i = dlg.index('label="按结论买卖"')
-    blk = dlg[i:i + 900]
-    assert "可落袋一部分" in blk and "按清空模拟" in blk, "没交代模拟得比原话重"
-    assert "拿着" in blk and "等着" in blk, "没交代这三种状态不动手"
-    # 光有这段文字不够 —— 得真的传进 `caveat`, 否则它只是躺在源码里。
-    # (变异测试抓到的: 把 prop 改名成 `x_caveat`, 上面几条照样全绿。)
-    #
-    # **必须用词边界。** 第一版写的是 `"caveat={" in blk` —— 而 `x_caveat={`
-    # 正好含有这个子串, 于是那次重测又漏了。断言被自己的字面量骗过去,
-    # 是这个仓库反复吃的那一课的又一个变种。
-    import re
-    assert re.search(r"\bcaveat=\{", blk), "这段话没通过 caveat 传给组件"
+    j = dlg.index('label="按结论买卖"')
+    assert "见「说明」" in dlg[j:j + 700], "正文没指向「说明」—— 那段口径就等于被藏了"
 
 
 def test_R287_组件真的把提醒印出来():
@@ -774,7 +779,13 @@ def test_R287_组件真的把提醒印出来():
     """
     code = _panel()
     i = code.index("export function tradeNotes")
-    assert "caveat," in code[i:i + 200], "caveat 没进 tradeNotes"
+    blk = code[i:i + 320]
+    # [R302] `caveat` 那个入参删了 —— 它装的是**每只票都一样**的口径偏差,
+    # 已经搬进「说明」页。这条纪律守的从来是**这只票的**那几条警告:
+    # 样本太少 / 撞上涨跌停 / 最后一次还没执行 —— 一条都不许少。
+    assert "caveat" not in blk, "口径偏差又塞回这几条「这只票的」警告里了"
+    for keep in ("ft.thin", "ft.blocked", "ft.pending", "ft.skipped"):
+        assert keep in blk, f"{keep} 那条警告没了 —— 把数字摆出来而把它藏起来是骗人"
     # [R293] 整块面板删了(明细并进两边的正文), 只剩压缩条这一处渲染。
     assert code.count("notes.map(") == 1, (
         f"提醒该有且只有一处渲染, 现在有 {code.count('notes.map(')} 处"
@@ -858,6 +869,55 @@ def test_R292_那些不要的东西真的删干净了():
         assert f"kv<boolean>({key})" not in storage, (
             f"{key} 还留在 storage 里, 但已经没人读了"
         )
+
+
+def test_R302_通道结论那一页头一个说的就是今天这一档():
+    """**这一页叫「通道结论」, 而它的头部卡里原来根本没有今天那一档结论。**
+
+    查废话时才发现的(用户: 「检查通道结论页面有没有废话」「都围绕位置展开」)——
+    要知道今天是「候选池」还是「大顶区域」, 得往下翻到那张 120 行表格的第一行。
+    头一位摆的反倒是「阶段」(上升中/横盘中): 那是另一个读数, 而且它和结论
+    **在抢同一件事**(R257 为一模一样的毛病把「阶段」从走势列撤过)。
+
+    现在顺序是 **这一档 → 从哪三格来的 → 阶段 → 事件**: 结论第一、它的坐标
+    第二、背景往后 —— 这就是"围绕位置展开"。顺序本身就是这条要钉的东西。
+    """
+    now = _fn_body(_dialog(), "function VerdictView")
+    head = now[now.index('label="现在"'):now.index('label={`这 ')]
+    assert "d.rows[0]?.verdict" in now, "头部卡拿不到今天那一档"
+    # **钉渲染条件, 不只钉字样。** 包成 `{false && …}` 时 `{now.title}` 照样在,
+    # 变异当场就漏了 —— 本轮这个坑的第 N 次(R292/R295 都栽过同一手)。
+    assert "{!!now && (" in head, "「现在」那一行没按条件渲染今天这一档结论"
+    assert "{now.title}" in head, "「现在」那一行没印今天这一档结论"
+    assert "{!!now.days && (" in head, "今天这一档连着几天没按条件渲染"
+    assert "已{now.days}天" in head, "今天这一档连着几天没印 —— 那是它的另一半"
+    for a, b in (("{now.title}", "{here}"), ("{here}", "{ph.cn}"),
+                 ("{ph.cn}", "d.channel!.event.cn")):
+        assert head.index(a) < head.index(b), (
+            f"「现在」那一行的顺序不对: {a} 该排在 {b} 前面(结论 → 坐标 → 阶段 → 事件)"
+        )
+
+
+def test_R302_不随票变的话不许常驻正文():
+    """用户: 「没水平没用的内容就不要显示出来了」。
+
+    **判据是"随不随票变"**, 不是"重不重要": 「按结论买卖」的口径偏差(「拿着」
+    不动手、卖出侧比作者原话重)重要得很, 但它每只票、每次打开都是同一段, 常驻
+    正文只是每张卡顶上挂一块恒定的琥珀色黄字。与 R299 在决策台清 `note` 同一条。
+
+    反面同样要钉: **这只票的**那几条警告(样本太少 / 撞板 / 还没执行)一条都不许
+    跟着搬走 —— 把数字摆出来而把"这个数不能当真"藏起来才是真骗人。
+    """
+    verdict = _fn_body(_dialog(), "function VerdictView")
+    head = verdict[:verdict.index('label="现在"')]
+    for gone in ("可落袋一部分", "动仓位基调", "按清空模拟", "caveat"):
+        assert gone not in head, f"那段恒定的口径偏差又回到正文了: {gone}"
+    # 正文那一行仍然得**指得到**它 —— 搬走不留路标等于删掉
+    assert "见「说明」" in head, "正文没有指向「说明」的路标"
+    # 反面: 这只票的警告一条不少(它们走 tradeNotes, 在 FlipTradesPanel 里)
+    code = _panel()
+    for keep in ("ft.thin", "ft.blocked", "ft.pending", "ft.skipped"):
+        assert keep in code, f"{keep} 那条「这只票的」警告没了"
 
 
 def test_R301_四个数排成等宽格子():

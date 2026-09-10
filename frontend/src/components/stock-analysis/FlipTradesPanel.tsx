@@ -78,11 +78,18 @@ const REASON_CN: Record<NonNullable<FlipTrades['reason']>, string> = {
  * 差别全在文案(什么算一次变化、变化之后按什么动手), 版面与配色一个字不改:
  * **两栏量的是同一件事**(真按它做赚了多少), 长得不一样只会让人以为它们不可比。
  */
-/** 那几条「别当真」的提醒。**与数字同进同出** —— 数字在正文、提醒收进全景,
- *  就等于把 +143% 摆出来而把「样本太少」藏起来, 那是骗人。 */
-export function tradeNotes(ft: FlipTrades, caveat?: string): string[] {
+/**
+ * 那几条「别当真」的提醒。**与数字同进同出** —— 数字在正文、提醒收进别处,
+ * 就等于把 +143% 摆出来而把「样本太少」藏起来, 那是骗人。
+ *
+ * [R302] `caveat` 那个入参删了。它当初装的是「按结论买卖」的**口径偏差**
+ * (「拿着」不动手、卖出侧比作者原话重), 而这条纪律守的是**这只票的**警告:
+ * 样本太少、撞上涨跌停、最后一次还没执行 —— 这些每只票各不相同, 不说就是骗人。
+ * 口径偏差正相反, 它**每只票都一样**, 常驻正文只是每张卡顶上挂一块恒定的黄字。
+ * 它搬到「说明」页的「通道结论」那一节去了, 正文那一行指过去。
+ */
+export function tradeNotes(ft: FlipTrades): string[] {
   return [
-    caveat,
     ft.thin && `只走完 ${ft.bull.scored} 段多头, 样本太少, 这几个数只能当参考`,
     !!ft.blocked && `其中 ${ft.blocked} 笔的成交日当天涨停或跌停 —— 未必真成交得到这个价`,
     !!ft.pending && `${ft.pending} 那次变化的次日还没到, 没算进去`,
@@ -99,17 +106,16 @@ export function tradeNotes(ft: FlipTrades, caveat?: string): string[] {
  * 那两张表本来就是同一条时间轴(逐日表里标「转折」的行, 正是每一段的起点),
  * 拆成两张等于让人左右对眼去把日子接起来。
  */
-export function FlipTradesBar({ ft, basis, caveat }: {
+export function FlipTradesBar({ ft, basis }: {
   ft?: FlipTrades | null
   basis: string
-  caveat?: string
 }) {
   if (!ft) return null
   // [R301] `title` 这个入参删了 —— 两个调用方一直传的都是空串, 而这一栏的
   // 标题本来就写在 `HeadRow` 的左栏里(「按转折买卖」/「按结论买卖」)。
   // 留着就是"看起来在用、其实永远是空"的那类死参数。
   if (ft.reason) return <div className="text-[10px] text-muted">{REASON_CN[ft.reason]}</div>
-  const notes = tradeNotes(ft, caveat)
+  const notes = tradeNotes(ft)
   return (
     <div>
       {/* [R301] **四个数排成等宽格子**, 不再是一条 `flex-wrap` 的杂排。
