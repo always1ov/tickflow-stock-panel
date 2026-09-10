@@ -31,6 +31,7 @@ import { api } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { cn } from '@/lib/cn'
 import { trendBadgeCls } from '@/components/stock-analysis/TrendStateBar'
+import { ComboGroups } from '@/components/stock-analysis/decision-board/ComboView'
 
 /** 打开说明的那个按钮。与页签、日期档同一套外观 —— 它是同一层级的控件 */
 export function HelpButton({ onClick }: { onClick: () => void }) {
@@ -57,7 +58,12 @@ const TONE_CLS: Record<string, string> = {
   watch: 'border-border bg-elevated/60 text-secondary',
 }
 
-export function ReviewHelpSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function ReviewHelpSheet({ open, onClose, here = null }: {
+  open: boolean
+  onClose: () => void
+  /** [R296] 你现在在 27 格的哪一格 —— 抽屉里那张表拿它高亮 */
+  here?: string | null
+}) {
   const [shown, setShown] = useState(false)
   useEffect(() => {
     if (!open) { setShown(false); return }
@@ -78,6 +84,15 @@ export function ReviewHelpSheet({ open, onClose }: { open: boolean; onClose: () 
   const q = useQuery({
     queryKey: QK.glossary,
     queryFn: () => api.glossary(),
+    staleTime: 24 * 3600_000,
+    enabled: open,
+  })
+  // [R296] 27 格谱系并进来了 —— 用户: 「组合速查合并到通道结论里面去」。
+  // **它进抽屉而不是进正文**: 那张表是**恒定的**(与今天这只票无关), 属于查表
+  // 用的参考; 而正文那一页讲的是这只票的时间序列。这条分界与 R292 定的同一条。
+  const combo = useQuery({
+    queryKey: QK.comboTable,
+    queryFn: () => api.comboTable(),
     staleTime: 24 * 3600_000,
     enabled: open,
   })
@@ -141,6 +156,28 @@ export function ReviewHelpSheet({ open, onClose }: { open: boolean; onClose: () 
                 />
               ))}
             </Section>
+
+            {/* [R296] 27 格 —— 上面十档结论**就是从这 27 格出来的**(穷举 125 种
+                三档位置验过: 同一个三字码永远给同一个结论, 零冲突)。所以它排在
+                结论后面: 先说这一档什么意思, 再说它是从哪几格来的。 */}
+            {!!combo.data && (
+              <Section
+                title="27 种位置组合"
+                note="三档各在上/中/下。上面那十档结论就是从这里出来的; 有 3 格没有结论"
+              >
+                <div className="px-2 py-2">
+                  {/* [R294 → R296] 那个取舍的交代。R294 时它印在「组合速查」页上
+                      (用户点名要那一页也有战绩, 不说会以为漏做了); R296 那一页
+                      并掉之后, 交代跟着搬到这里 —— 问题还在, 只是换了个人问。 */}
+                  <p className="mb-2 leading-relaxed text-muted">
+                    按位置换格买卖的成绩与「按结论买卖」那一栏逐字相同, 所以只摆一份:
+                    换格比换档密, 但多出来的换格两边同向 —— 只是把同一段多切几刀,
+                    而段与段之间没有缝, 复利一乘就抵回去了。
+                  </p>
+                  <ComboGroups rows={combo.data.rows} here={here} />
+                </div>
+              </Section>
+            )}
           </>
         )}
       </div>

@@ -879,22 +879,23 @@ def test_R292_说明抽屉不是盖满而是从右边推进来():
 
 
 def test_R292_说明抽屉两个页签共用一处():
-    """它讲的是六态与结论**两边**的词, 每个页签各挂一份就是同一份东西的两个副本。"""
+    """它讲的是六态与结论**两边**的词, 每个页签各挂一份就是同一份东西的两个副本。
+
+    [R294 → R296] R294 那阵子是**两处**: 组合速查走的是另一个分支(它不等复盘
+    请求, 见 R228), 只能自己挂一份。R296 把那一页并掉之后分支没了, 于是回到
+    名副其实的一处 —— 两个页签同一个 `help` 开关、同一个抽屉。
+    """
     dlg = _dialog()
-    # [R294] 组合速查走的是另一个分支(它不等复盘请求, 见 R228), 所以那一页要
-    # 自己挂一份 —— **两处是分支互斥的, 不会同时在场**。除此之外不许再多。
-    assert dlg.count("<ReviewHelpSheet") == 2, (
-        f"说明抽屉挂了 {dlg.count('<ReviewHelpSheet')} 处 —— 该是两处互斥分支各一"
+    assert dlg.count("<ReviewHelpSheet") == 1, (
+        f"说明抽屉挂了 {dlg.count('<ReviewHelpSheet')} 处 —— 两个页签该共用一处"
     )
     for fn in ("function TrendView", "function VerdictView"):
         assert "<HelpButton" in _fn_body(dlg, fn), f"{fn} 没有说明入口"
-    from tests.frontend_source import code_of
-    combo = code_of("components/stock-analysis/decision-board/ComboView.tsx")
-    # 钉**它的显示条件**, 不只是钉标签名 —— 包成 `{false && <HelpButton/>}` 时
-    # 标签名照样在, 变异测试当场就漏了(本轮第 N 次同一个坑)。
-    assert "{!!onHelp && (" in combo and "<HelpButton onClick={onHelp} />" in combo, (
-        "组合速查没有说明入口"
-    )
+    # 抽屉挂在两个页签**外面**才谈得上共用 —— 挂进任一个 View 里, 切页签就没了
+    for fn in ("function TrendView", "function VerdictView"):
+        assert "<ReviewHelpSheet" not in _fn_body(dlg, fn), (
+            f"抽屉挂进了 {fn} 里 —— 切到另一个页签就没了"
+        )
 
 
 def test_R292_说明抽屉只动透明度和位移():
@@ -1025,11 +1026,10 @@ def test_R293_两个页签的头部是同一个形状():
     """用户: 「复刻参考趋势状态改好的排版」。同构才谈得上"复刻" ——
     一边是带边框三行卡、另一边是三段裸 flex 的话, 切页签就像换了个软件。
     """
-    from tests.frontend_source import code_of
     dlg = _dialog()
+    # [R294 → R296] R294 时是三个页签; R296 把「组合速查」并进「通道结论」,
+    # 剩两个 —— 规矩没变, 覆盖面跟着少一个。
     bodies = {fn: _fn_body(dlg, fn) for fn in ("function TrendView", "function VerdictView")}
-    # [R294] 第三个页签也进来了 —— 用户: 「组合速查也要, 它是按照位置为核心」
-    bodies["ComboView"] = code_of("components/stock-analysis/decision-board/ComboView.tsx")
     for fn, head in bodies.items():
         head = head[:head.index("<HelpButton")]
         assert "HEAD_CARD" in head, f"{fn} 的头部不是那张共用的带边框卡"
@@ -1153,46 +1153,111 @@ def test_R294_只有段数会变(real):
     assert cut["bull"]["n"] + cut["bear"]["n"] > base["bull"]["n"] + base["bear"]["n"]
 
 
+_COMBO = "components/stock-analysis/decision-board/ComboView.tsx"
+
+
 def _combo() -> str:
     from tests.frontend_source import code_of
-    return code_of("components/stock-analysis/decision-board/ComboView.tsx")
+    return code_of(_COMBO)
 
 
-def test_R294_组合速查的核心是位置():
-    """用户: 「组合速查也要, 它是按照位置为核心」。
+def _fn(src: str, name: str) -> str:
+    """取一个具名函数的函数体 —— 认 `function f` 与 `export function f` 两种写法,
+    并且**认得出"它是文件里最后一个函数"**(那时候没有下一个 `function ` 可以切,
+    R295 在这个坑上踩过一次)。"""
+    i = src.index(f"function {name}")
+    rest = src[i + 1:]
+    j = rest.find("\nfunction ")
+    k = rest.find("\nexport function ")
+    cuts = [x for x in (j, k) if x >= 0]
+    return rest[:min(cuts)] if cuts else rest
 
-    三个页签的头一行装的是各自的核心, 一处一处对得上:
-        趋势状态 按转折买卖 / 通道结论 按结论买卖 / 组合速查 你在哪一格
+
+def test_R296_结论是位置的纯函数():
+    """**这条是那次融合的依据。**
+
+    合并之前得先证明两页监控的是同一个对象, 否则并页就是把两套判定糊在一起。
+    穷举 5³ = 125 种三档位置(每档 上轨之上/贴上轨/通道内/贴下轨/下轨之下),
+    看 `combo_code` 收出来的三字码能不能唯一决定 `verdict` 那一句话:
+
+      · 125 种位置收成 27 格 —— 一格不多一格不少
+      · **每一格只对应一个结论码, 零冲突** —— 所以「位置」不是独立的一层,
+        它是结论的坐标; 那一页原本就是这一页的展开
+      · 「中中上」「中中中」「中中下」三格没有结论 —— 其中两格靠 `combo_note`
+        说话(R269 钉过), 那正是"大级别到位、等一个入场点"的另一半
+
+    真出现冲突的话, 融合本身就是错的 —— 这条会先红。
     """
-    combo = _combo()
-    head = combo[combo.index("<div className={cn(HEAD_CARD"):]
-    assert head.index('label="你在这一格"') < head.index('label="这一格历来"'), "头一行不是位置"
-    assert "<FlipTradesBar" not in combo, "这一页不该有第四栏战绩(见下一条)"
+    import itertools
 
-
-def test_R294_不再立第四栏按位置买卖():
-    """**这条是那个取舍的守卫。**
-
-    换格比换档密, 但多出来的换格两边同向 —— 只是把同一段多切几刀, 而段与段
-    之间没有缝, 复利一乘就抵回去了(`test_R294_多切几刀不改变成绩` 证过)。
-    所以那四个数会与「按结论买卖」逐字相同, 印出来就是同一个数两个名字。
-
-    **而且必须在界面上说出来**: 用户点名要这一页也有, 不说的话他会以为漏了。
-    """
-    combo = _combo()
-    assert "按位置换格买卖的成绩与「通道结论」页那一栏" in combo, (
-        "没有在界面上交代为什么这一页不摆战绩 —— 用户会以为漏做了"
+    from app.indicators.keltner import (
+        POS_ABOVE, POS_BELOW, POS_INSIDE, POS_NEAR_LOWER, POS_NEAR_UPPER, verdict,
     )
-    for gone in ("verdict_trades", "flip_trades", "legsByFlipDate"):
-        assert gone not in combo, f"{gone} 又被搬到这一页来了"
+    from app.indicators.keltner_geometry import combo_code
+
+    positions = (POS_ABOVE, POS_NEAR_UPPER, POS_INSIDE, POS_NEAR_LOWER, POS_BELOW)
+    seen: dict[str, set[str | None]] = {}
+    for s, m, l in itertools.product(positions, repeat=3):
+        bands = {"s": {"pos": s}, "m": {"pos": m}, "l": {"pos": l}}
+        code = combo_code(bands)
+        assert code is not None
+        v = verdict(bands)
+        seen.setdefault(code, set()).add(None if v is None else v["code"])
+
+    assert len(seen) == 27, f"三字码收出来 {len(seen)} 格, 不是 27"
+    clash = {k: v for k, v in seen.items() if len(v) > 1}
+    assert not clash, f"同一格给出了不同结论 —— 位置不是结论的坐标, 那就不该并页: {clash}"
+    assert sorted(k for k, v in seen.items() if v == {None}) == ["中中上", "中中下", "中中中"], (
+        "没有结论的格子变了 —— 「中中上」「中中下」靠 combo_note 说话(R269)"
+    )
 
 
-def test_R294_这一格历来按段不按天():
+def test_R296_位置并进了通道结论那一页():
+    """用户: 「组合速查合并到通道结论里面去, 你看怎么融合」。
+
+    **本来就该合**(`test_R296_结论是位置的纯函数` 穷举 125 种三档位置证过:
+    同一个三字码永远给同一个结论, 零冲突)—— 两页监控的是同一个对象的两层。
+    融合的分界线沿用 R292 那条: **这只票的常驻在正文, 恒定的参考进抽屉。**
+
+        你在哪一格 / 这一格历来  → 「通道结论」头部卡的「现在」行
+        27 格谱系                → 「说明」抽屉里一节
+    """
+    from tests.frontend_source import code_of
+    dlg = _dialog()
+    now = _fn_body(dlg, "function VerdictView")
+    assert 'label="现在"' in now
+    assert "comboHistory(d.rows, here)" in now, "「这一格历来」没并到通道结论页"
+    assert "d.channel?.geo?.combo" in now, "「你在哪一格」没并到通道结论页"
+    # 反面: 那一页的外壳与页签整个撤了, 不许留成第三个入口
+    assert "function ComboView" not in code_of(_COMBO), "组合速查的外壳还留着"
+    assert "<ComboView" not in dlg, "还在渲染那一页"
+    assert "组合速查" not in dlg, "页签列表里还有「组合速查」"
+
+
+def test_R296_27格进了说明抽屉而不是正文():
+    """那张表是**恒定的**(与今天这只票无关, R203 起就是个常量端点), 属于查表用的
+    参考; 正文那一页讲的是这只票的时间序列。混在一起就是 R292 撤全景图那一遍。
+
+    **那个取舍的交代跟着搬**: R294 在「组合速查」页上印过一句"为什么这一页不摆
+    战绩"(换格两边同向, 复利乘回去与按结论买卖逐字相同)。那一页没了, 问题还在 ——
+    看 27 格的人照样会问, 所以那句话进抽屉里这一节。
+    """
+    from tests.frontend_source import code_of
+    sheet = code_of("components/stock-analysis/ReviewHelpSheet.tsx")
+    assert '<ComboGroups rows={combo.data.rows} here={here} />' in sheet, "27 格没进抽屉"
+    assert "按位置换格买卖的成绩与「按结论买卖」那一栏逐字相同" in sheet, (
+        "没有交代为什么不另立一栏「按位置买卖」—— 那个取舍会被当成漏做"
+    )
+    # 反面: 不许把战绩搬进那一节, 否则就是同一个数印两个名字
+    combo = code_of(_COMBO)
+    for gone in ("verdict_trades", "flip_trades", "legsByFlipDate", "<FlipTradesBar"):
+        assert gone not in combo, f"{gone} 又被搬到 27 格那一节来了"
+
+
+def test_R296_这一格历来按段不按天():
     """R177 的老规矩: 一段连着 8 天算 1 次。按天算的话那 8 天的前瞻窗口互相
     重叠, 次数会被撑大, 很薄的结论看着挺扎实。"""
-    combo = _combo()
-    fn = combo[combo.index("function comboHistory"):]
-    fn = fn[:fn.index("\nexport function ")]
+    fn = _fn(_combo(), "comboHistory")
     assert "if (prev !== here) segs += 1" in fn, "段数不是按「进出一次算一段」数的"
     # 前瞻取**段末**那天 —— 与「通道结论」那边同一个道理
     assert "!next || next.combo !== here" in fn, "前瞻收益取的不是段末那天"
@@ -1207,12 +1272,18 @@ def test_R294_位置码来自后端不在前端拼():
         assert hand not in combo, f"像是在前端手拼位置码: {hand}"
 
 
-def test_R294_没进过这一格与算不出来分得开():
-    """两句话是两件事: 「头一回」是这只票没走到过, 「定不了」是三档缺了一档。
-    混成一句的话, 数据缺失会被读成"这是个罕见位置"。"""
-    combo = _combo()
-    assert "这一格定不了" in combo, "三档缺档时没有独立说法"
-    assert "头一回" in combo, "没进过这一格时没有独立说法"
+def test_R296_没进过这一格与算不出来分得开():
+    """[R294 → R296] 规矩一个字没变, 只是搬到了「通道结论」那一页上。
+
+    两句话是两件事: 「头一回」是这只票没走到过, 「定不了」是三档缺了一档算不出
+    位置。混成一句的话, 数据缺失会被读成"这是个罕见位置"。
+    """
+    now = _fn_body(_dialog(), "function VerdictView")
+    assert "今天定不了这一格" in now, "三档缺档时没有独立说法"
+    assert "这 {d.days} 天里没进过这一格 —— 头一回" in now, "没进过这一格时没有独立说法"
+    # **关键那一条**: 「历来」整段必须挂在 `here` 上。挂空的话, 算不出位置的那天
+    # 会一路掉进 `segs === 0` 分支, 印出「头一回」—— 正是这条要防的那次误读。
+    assert "{!!here && (" in now, "「这一格历来」没有挂在位置码上"
 
 
 # ================================================================
@@ -1224,15 +1295,26 @@ def test_R294_没进过这一格与算不出来分得开():
 # 它要在自己那一页有一张同样的表。
 
 
-def test_R295_趋势表里不再有通道结论():
-    """它在那张表里本来就是外人: 那一页从头到尾讲六态(按转折买卖、转折后第几天、
-    每一笔的成交), 而通道结论是**另一套判定**。截图里那一列绝大多数行还是「—」。
+def test_R296_趋势表里的结论列恢复了():
+    """用户: 「趋势状态删除的那一列我需要恢复」。
+
+    R295 我按"它在这张表里是外人"把它删了 —— 用户要它回来, 那就回来。**它的
+    价值是横着对上一眼**: 同一行里六态说什么、通道位置说什么, 不必切页签。
+
+    回来时有三处必须一起对上, 少一处就歪:
+      ① 排在**成交三格之后** —— 这一页的主线是六态与按转折买卖, 结论是旁证;
+      ② 列头逐字叫「通道结论」(R258: 同一层判定只许一个名字);
+      ③ 空表那行的 `colSpan` 跟着回到 8。
     """
     trend = _fn_body(_dialog(), "function TrendView")
-    assert "r.verdict" not in trend, "「结论」那一列又回到趋势表里了"
-    assert "<VerdictHover" not in trend, "结论悬停也不该留在这张表里"
-    # 空表那行的 colSpan 得跟着少一列 —— 少改这一处的话空表会歪一格
-    assert "colSpan={7}" in trend, "删了一列却没改 colSpan"
+    assert "<VerdictHover v={r.verdict}" in trend, "「通道结论」那一列没回来"
+    assert trend.index("<FlipTradeCells") < trend.index("<VerdictHover"), (
+        "结论那一列插进了成交三格前面 —— 旁证不该打断主线"
+    )
+    assert ">通道结论</th>" in trend and ">结论</th>" not in trend, (
+        "列头没叫「通道结论」—— 两张表并排放着会是同一样东西两个名字(R258)"
+    )
+    assert "colSpan={8}" in trend, "加回一列却没改 colSpan"
 
 
 def test_R295_通道结论有一张同形状的逐日表():
@@ -1243,10 +1325,13 @@ def test_R295_通道结论有一张同形状的逐日表():
     verdict = _fn_body(dlg, "function VerdictView")
     for both in ("<table className=\"w-full text-xs\">",
                  "<FlipTradeCells leg={legs.get(r.date)} />",
-                 "只看", "colSpan={7}"):
+                 "只看"):
         assert both in trend and both in verdict, f"两张表不同形状, 差在: {both}"
     assert "通道结论</th>" in verdict, "结论那一列没进新表"
     assert "六态状态</th>" in trend and "六态状态</th>" not in verdict, "两张表的状态列串了"
+    # [R296] 列数不再相等: 趋势那张多一列「通道结论」(用户要它回来), 通道那张
+    # 不需要反过来长一列六态 —— 它有自己的结论列。两处 colSpan 各自对上自己。
+    assert "colSpan={8}" in trend and "colSpan={7}" in verdict, "空表那行的列数没对上"
 
 
 def test_R295_换档标记读后端不自己比():

@@ -27,17 +27,11 @@
  * 这个文件只留视图, 外壳(遮罩/标题/关闭)交给那边。
  */
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
 import { ChevronDown } from 'lucide-react'
-import { api, type ChannelGeometry, type ChannelRuns, type ComboTableRow, type ReviewRow } from '@/lib/api'
-import { StateTimeline } from '@/components/stock-analysis/StateTimeline'
-import { BAND_CN, POS_LEGEND, bandCells, rangeHint } from '@/lib/reviewTimeline'
-import { QK } from '@/lib/queryKeys'
+import { type ComboTableRow, type ReviewRow } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import { storage } from '@/lib/storage'
 import { ReviewDisclosure } from '@/components/stock-analysis/ReviewDisclosure'
-import { HeadRow, HEAD_CARD } from '@/components/stock-analysis/ReviewHeadRow'
-import { HelpButton } from '@/components/stock-analysis/ReviewHelpSheet'
 
 const TONE_CLS: Record<string, string> = {
   sell: 'text-red-400',
@@ -47,73 +41,12 @@ const TONE_CLS: Record<string, string> = {
   watch: 'text-secondary',
 }
 
-/**
- * 顶上那条「这只票现在的读数」。没有 geo 就整条不出现 —— 不摆空格子。
- *
- * [R219] **按话题分块, 一个话题一块。** 用户: 「每一列的内容应该就是一部分,
- * 而不是内容上面一部分下面一部分」。
- *
- * 原来是七个等宽格子平铺 + 底下一段独立的匀速基准。问题在于**「快慢」这一个
- * 话题被劈成了两半**: 数字(「这十天多走了 0.8 倍波动」)在格子里, 而它唯一
- * 能被核对的那句解释(「按匀速推中期该到 3.7, 实际 2.1」)掉到下面的段落里,
- * 中间还隔着「横了 12 天」。读的人得自己把同一件事从两处捡回来拼上。
- *
- * 现在四块, 每块自带标题, 同一话题的数与话都在自己那一块里:
- *
- *     位置 —— 三档在哪 + 离三条中线各多远
- *     间距 —— 短线比长线高(低)多少
- *     快慢 —— 这十天多走了多少 + 匀速基准那句对照
- *     重合 —— 横了多少天
- */
-function LiveStrip({ geo, runs }: { geo: ChannelGeometry; runs?: ChannelRuns | null }) {
-  const b = geo.baseline
-  const a = geo.accel
-  const accelCls = a.level === 'accel' ? 'text-red-400'
-    : a.level === 'decel' ? 'text-emerald-400' : 'text-foreground'
-  // crossing(两个尺度还没走到一边)是中性的 —— 不给红也不给绿, 见 R217
-  const baseCls = b?.level === 'lead' ? 'text-red-400'
-    : b?.level === 'lag' ? 'text-emerald-400' : 'text-foreground'
-  const block = (label: string, hint: string, body: React.ReactNode) => (
-    <div key={label} className="min-w-0 flex-1 basis-[210px] rounded-card border border-border/50 bg-elevated/30 px-2.5 py-1.5">
-      <div className="text-[11px] text-muted" title={hint}>{label}</div>
-      <div className="mt-0.5 text-[13px] leading-relaxed text-secondary">{body}</div>
-    </div>
-  )
-  const num = (x: string, cls = 'text-foreground/90') =>
-    <b className={cn('mx-0.5 font-mono font-medium', cls)}>{x}</b>
-  return (
-    <div className="flex flex-wrap gap-1.5">
-      {block('位置', '短期、中期、长期各自在自己通道里是高、是中、还是低;以及价格离三条中线各多远(正的偏贵、负的偏便宜)',
-        <>
-          三档{num(geo.combo ?? '—')}· 离中线 短{num(geo.d.s.toFixed(1))}/ 中{num(geo.d.m.toFixed(1))}/ 长{num(geo.d.l.toFixed(1))}倍波动
-        </>)}
-      {block('间距', '短线比长线高(低)多少。接近零 = 方向还没出来;适中 = 趋势立住了;差得太多 = 已经走了很长一段',
-        <>
-          {geo.spread >= 0 ? '短线高出长线' : '短线低于长线'}
-          {num(Math.abs(geo.spread).toFixed(1))}倍波动
-        </>)}
-      {/* 数字与它的对照句在同一块里 —— 这一块就是整个改动的由来 */}
-      {block('快慢', '最近这十天比之前那一段多走(少走)了多少。零表示速度没变;不是越大越好, 冲得太猛常出现在一波的末尾',
-        <>
-          <span>
-            这十天{a.gain_atr >= 0 ? '多' : '少'}走了{num(Math.abs(a.gain_atr).toFixed(1), accelCls)}倍波动
-          </span>
-          {b ? (
-            <span className="mt-0.5 block text-[12px] text-muted">
-              <b className={cn('mr-1', baseCls)}>{b.level_cn}</b>
-              按匀速推,短期{geo.d.s.toFixed(1)} 时中期该到{num(b.expect_m.toFixed(1))},实际{num(b.actual_m.toFixed(1))}
-            </span>
-          ) : (
-            <span className="mt-0.5 block text-[12px] text-muted/80">
-              价格离短期中线太近,这时候比快慢没有意义 —— 不给结论比给个假数强
-            </span>
-          )}
-        </>)}
-      {!!runs?.compress_days && block('重合', '到今天为止连着多少天三种看法都认同一个价 —— 也就是这只票横了多久',
-        <>横了{num(String(runs.compress_days))}天</>)}
-    </div>
-  )
-}
+// [R203 加, R296 删] `LiveStrip`(位置/间距/快慢/重合四个读数块)删掉了。
+// **它是 `EvidencePanel` 那七行读数的第二份**: 同一批量, 一份由后端 `explain`
+// 出文案(带 why), 一份在前端拿 `geo` 现排 —— 而且两处措辞还不一样
+// (「间距」vs「三线间距」、「快慢」vs「最近快慢」、「重合」vs「连着挤了」)。
+// 合并时正好撞上, 留后端那一份: 它更全(七行), 而且文案有唯一出处。
+
 
 /** 常见度画成三颗点 —— 写字占地方, 而这一列只需要"多还是少"。 */
 function Dots({ rarity }: { rarity?: string }) {
@@ -182,7 +115,7 @@ function whichGroup(r: ComboTableRow | null) {
  * 便宜那一头」), 但**那个对照只需要一句话**, 不需要二十多行: 收起时用一行说清
  * 「你这一格属于偏贵/中性/偏便宜哪一段、另外两段各有几格」, 想逐格看再展开。
  */
-function ComboGroups({ rows, here }: { rows: ComboTableRow[]; here: string | null }) {
+export function ComboGroups({ rows, here }: { rows: ComboTableRow[]; here: string | null }) {
   const [showRare, setShowRare] = useState(false)
   const [open, setOpen] = useState(() => storage.reviewComboRestOpen.get(false))
   const mine = rows.find(r => r.combo === here) ?? null
@@ -262,7 +195,7 @@ function ComboGroups({ rows, here }: { rows: ComboTableRow[]; here: string | nul
  * 按**段**不按天(R177 的老规矩): 一段连着 8 天的「上中下」算 1 次; 按天算的话
  * 那 8 天的前瞻窗口互相重叠, 次数会被撑大, 很薄的结论看着挺扎实。
  */
-function comboHistory(rows: ReviewRow[], here: string | null) {
+export function comboHistory(rows: ReviewRow[], here: string | null) {
   if (!here) return null
   // rows 是新→旧, 这里按时间正序走
   const asc = [...rows].reverse()
@@ -283,125 +216,11 @@ function comboHistory(rows: ReviewRow[], here: string | null) {
 }
 
 
-export function ComboView({ geo, runs, rows = [], days = 0, onHelp }: {
-  geo?: ChannelGeometry | null
-  runs?: ChannelRuns | null
-  /** [R273] 逐日行 —— 画三档时间轴; [R294] 还用来算「这一格历来」 */
-  rows?: ReviewRow[]
-  days?: number
-  onHelp?: () => void
-}) {
-  const q = useQuery({
-    queryKey: QK.comboTable,
-    queryFn: () => api.comboTable(),
-    staleTime: 24 * 3600_000,   // 表是恒定的 —— 一天内不必再问
-  })
-  const here = geo?.combo ?? null
-  const mine = q.data?.rows.find(r => r.combo === here) ?? null
-  const hist = comboHistory(rows, here)
-  return (
-    <div className="min-h-0 flex-1 space-y-3 overflow-auto px-4 py-3">
-      {/* [R294] 头部与另外两个页签**同一张卡、同一条左栏** —— 用户:
-          「组合速查也要」。差别只在行1 装的是什么:
-            趋势状态  按转折买卖   通道结论  按结论买卖   组合速查  你在哪一格
-          这一页的核心是**位置**, 所以行1 就是位置本身。 */}
-      <div className={cn(HEAD_CARD, 'mx-0 mt-0')}>
-        <HeadRow label="你在这一格">
-          {here ? (
-            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-[10px]">
-              <b className="font-mono text-[13px] text-foreground">{here}</b>
-              {/* 这里要的是**徽标**(带边框底色), 而 `TONE_CLS` 只是文字色 ——
-                  它给的是 27 格列表里那种一行小字。两者不混用。
-                  注释放在 `{cond && (…)}` **外面**: 表达式容器里只能有一个表达式,
-                  塞进去就成了两个子节点, JSX 直接不认(刚栽过一次)。 */}
-              {!!mine?.verdict && (
-                <span className={cn('inline-flex whitespace-nowrap rounded border border-current/40 px-1.5 py-0.5',
-                                    TONE_CLS[mine.verdict.tone] ?? 'text-muted')}>
-                  {mine.verdict.title}
-                </span>
-              )}
-              {!!mine?.verdict && <span className="text-secondary">{mine.verdict.action}</span>}
-              {!!mine?.rarity && <span className="text-muted">{mine.rarity}</span>}
-            </div>
-          ) : (
-            <span className="text-[10px] text-muted">三档里有档算不出来 —— 这一格定不了</span>
-          )}
-        </HeadRow>
+// [R228 加, R296 删] `ComboView`(「组合速查」那个页签的外壳)在这里删掉了。
+// 用户: 「组合速查合并到通道结论里面去」。**本来就该合** —— 穷举 125 种三档位置
+// 验过: 通道结论是这 27 格的**纯函数**(同一个三字码永远给同一个结论, 零冲突),
+// 两个页签监控的是同一个对象的两层。合并之后:
+//   你在哪一格 / 这一格历来  → 「通道结论」头部卡的「现在」行(这只票的事)
+//   27 格谱系                → 「说明」抽屉里一节(恒定的表, 查表用的参考)
+// 这条分界与 R292 定的是同一条: **常驻的是这只票的, 抽屉里是背景资料。**
 
-        <HeadRow label="这一格历来">
-          {hist && hist.segs > 0 ? (
-            <div className="text-[10px] text-muted">
-              这 {days} 天里进过 <b className="text-secondary">{hist.segs}</b> 段、共 {hist.days} 天
-              {hist.scored > 0 && (
-                <> · 走完的 {hist.scored} 段之后 5 日平均{' '}
-                  <b className={cn('font-mono', hist.avg == null ? '' : hist.avg > 0 ? 'text-red-400' : 'text-emerald-400')}>
-                    {hist.avg == null ? '—' : `${hist.avg > 0 ? '+' : ''}${(hist.avg * 100).toFixed(1)}%`}
-                  </b>
-                  , {hist.win} 段收涨
-                </>
-              )}
-              {hist.scored === 0 && <> · 还没有走完 5 个交易日的段, 结果未知</>}
-            </div>
-          ) : (
-            <span className="text-[10px] text-muted">这 {days} 天里没进过这一格 —— 头一回</span>
-          )}
-        </HeadRow>
-
-        <HeadRow label={`这 ${days} 天`}>
-          {/* [R273] 三档各一条带子 —— **这和「通道结论」那条不是一回事**:
-              那边画的是三档合成后的**那一句结论**, 这边画的是三档**各自**在哪。
-              27 格讲的正是三档的组合, 所以这一栏的全景就该是三条并排 ——
-              「短档先动、中档跟上、长档最后翻」这种节奏, 合成后的单条看不出来。 */}
-          {rows.length > 0 ? (
-            <div className="-mx-1">
-              <StateTimeline
-                className="mx-0"
-                hint={rangeHint(rows)}
-                legend={POS_LEGEND}
-                bands={(['s', 'm', 'l'] as const).map(k => ({
-                  label: BAND_CN[k].slice(0, 2),
-                  cells: bandCells(rows, k),
-                }))}
-              />
-            </div>
-          ) : <span className="text-[10px] text-muted">没有逐日数据</span>}
-        </HeadRow>
-      </div>
-
-      {/* [R294] **这一页没有第四栏「按位置买卖」。**
-          换格比换档频繁, 但多出来的那些换格两边同向 —— 只是把同一段行情多切
-          了几刀, 而段与段之间没有缝, 复利一乘就抵回去了。所以那四个数会与
-          「通道结论」那栏**逐字相同**, 印出来就是同一个数两个名字。
-          证明见后端 `test_R294_多切几刀不改变成绩`。 */}
-      <p className="text-[10px] leading-relaxed text-muted">
-        按位置换格买卖的成绩与「通道结论」页那一栏**完全相同** —— 换格比换档密,
-        但多出来的那些两边同向, 只是把同一段多切几刀, 不改变买卖次数与收益。
-        所以这里不再重复摆一份, 要看战绩去「通道结论」。
-      </p>
-
-      {!!geo && <LiveStrip geo={geo} runs={runs} />}
-
-      {!!onHelp && (
-        <div className="flex justify-end">
-          <HelpButton onClick={onHelp} />
-        </div>
-      )}
-
-      {/* [R225] 27 行的表改成**分组卡片**。用户: 「把这部分做好看一点, 好丑。
-          看看怎么显示更有价值而不是一堆数据」。
-
-          原来是一张 27 行的表, 每行三行字, 而「几何含义」开头那半句
-          (「短期在上沿、中期在上沿、长期在上沿」)和左边的「短中长」列
-          **说的是同一件事** —— 27 行里印了 27 遍纯重复。整体是一堵字墙。
-
-          三处改动:
-            ① 「你现在在这一格」提成顶上的主卡, 不再是列表里一行高亮 ——
-               打开这个弹窗第一件想知道的就是它
-            ② 其余按**偏贵 / 中性 / 偏便宜**分三组, 而不是按字典序摊平 ——
-               要的是"我这一格在贵贱谱系的哪一端, 旁边是什么"
-            ③ 重复的那半句退到悬停; 常见度画成点不写字;
-               七个「几乎不出现」的默认收起来 */}
-      <ComboGroups rows={q.data?.rows ?? []} here={here} />
-    </div>
-  )
-}

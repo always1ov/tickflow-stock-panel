@@ -48,7 +48,7 @@ import { cn } from '@/lib/cn'
 import { storage } from '@/lib/storage'
 import { trendBadgeCls } from '@/components/stock-analysis/TrendStateBar'
 import { VerdictHover } from '@/components/stock-analysis/VerdictHover'
-import { ComboView } from '@/components/stock-analysis/decision-board/ComboView'
+import { comboHistory } from '@/components/stock-analysis/decision-board/ComboView'
 import { FlipTradesBar, FlipTradeCells, legsByFlipDate } from '@/components/stock-analysis/FlipTradesPanel'
 import { ReviewHelpSheet, HelpButton } from '@/components/stock-analysis/ReviewHelpSheet'
 import { HeadRow, HEAD_CARD } from '@/components/stock-analysis/ReviewHeadRow'
@@ -57,10 +57,14 @@ import { ReviewDisclosure } from '@/components/stock-analysis/ReviewDisclosure'
 import {
   // [R295] `BAND_CN` 与 `VERDICT_BAR` 跟着 `SegmentCard` 一起退了 ——
   // 前者是那张卡上的三档名, 后者是卡片左边那条色条。
-  TREND_LEGEND, VERDICT_LEGEND,
-  rangeHint, trendCells, verdictCells,
+  BAND_CN, POS_LEGEND, TREND_LEGEND, VERDICT_LEGEND,
+  bandCells, rangeHint, trendCells, verdictCells,
 } from '@/lib/reviewTimeline'
 
+// [R228 加, R296 删] 'combo' 那个页签没了 —— 用户: 「组合速查合并到通道结论
+// 里面去」。穷举 125 种三档位置验过: 通道结论是那 27 格的**纯函数**, 两个页签
+// 监控的是同一个对象的两层。**外部调用方传 'combo' 也不会炸**: 它在下面被
+// 归一成 'verdict', 见 `StockReviewDialog` 的第一行。
 export type ReviewTab = 'trend' | 'verdict' | 'combo'
 
 // 与决策台「结论」列同一套配色 —— 两处不一样的话, 翻历史时得先在脑子里做一次换算
@@ -137,7 +141,9 @@ export function StockReviewDialog({ symbol, name, tab: initialTab, onClose }: {
   tab: ReviewTab
   onClose: () => void
 }) {
-  const [tab, setTab] = useState<ReviewTab>(initialTab)
+  // [R296] 'combo' 归一到 'verdict' —— 那一页并进去了。**不删这个入参值**:
+  // 决策台那边可能还有地方带着它进来, 悄悄报错不如悄悄落到对的页上。
+  const [tab, setTab] = useState<'trend' | 'verdict'>(initialTab === 'trend' ? 'trend' : 'verdict')
   const [days, setDays] = useState<number>(120)
   // 趋势视图专用: 只看有事的日子。120 行里找那几天转折是不现实的
   const [onlyMarked, setOnlyMarked] = useState(false)
@@ -177,7 +183,7 @@ export function StockReviewDialog({ symbol, name, tab: initialTab, onClose }: {
               <span className="truncate text-[10px] text-muted">
                 {d.start} ~ {d.end} · {d.days} 个交易日
                 {tab === 'trend' && ` · 六态阈值 ${(d.threshold * 100).toFixed(0)}%${d.threshold_source !== 'default' ? `(${d.threshold_source})` : ''}`}
-                {tab === 'combo' && ' · 27 种组合,系统对每一种怎么说'}
+
               </span>
             )}
           </div>
@@ -190,7 +196,7 @@ export function StockReviewDialog({ symbol, name, tab: initialTab, onClose }: {
               {/* [R228] 第三个页签「组合速查」—— 原来是另一个铺满屏幕的模态。
                   三个页签的排序是有讲究的: 前两个是**纵向**(同一个判定在时间轴上
                   怎么走的), 第三个是**横向**(同一天里 27 格各是什么样)。 */}
-              {([['trend', '趋势状态'], ['verdict', '通道结论'], ['combo', '组合速查']] as const).map(([k, label]) => (
+              {([['trend', '趋势状态'], ['verdict', '通道结论']] as const).map(([k, label]) => (
                 <button
                   key={k}
                   onClick={() => setTab(k)}
@@ -220,15 +226,7 @@ export function StockReviewDialog({ symbol, name, tab: initialTab, onClose }: {
         {/* [R228] 组合速查**不等这次请求**: 27 格的表是恒定的、另一个 query、
             缓存一天, 而它只用 channel 里的末日读数去高亮"你在哪一格"。
             让它陪着复盘转圈是白等 —— 表先出来, 读数带随后补上。 */}
-        {tab === 'combo' ? (
-          // [R294] 组合速查也搬进 `relative` 容器 —— 「说明」抽屉挂在这一层,
-          // 留在外面的话切到这一页那个按钮就点了没反应。
-          <div className="relative flex min-h-0 flex-1 flex-col">
-            <ComboView geo={d?.channel?.geo} runs={d?.channel?.runs} rows={d?.rows ?? []}
-                       days={d?.days ?? 0} onHelp={() => setHelp(true)} />
-            <ReviewHelpSheet open={help} onClose={() => setHelp(false)} />
-          </div>
-        ) : (
+        {(
           // [R292] **这一层 `relative` 是「说明」抽屉的定位祖先。**
           // R289 漏了它(那次的改动只在内存里做了没落盘), 于是抽屉的
           // `absolute inset-0` 一路冒到最外层那个 `fixed inset-0` 上 ——
@@ -252,7 +250,7 @@ export function StockReviewDialog({ symbol, name, tab: initialTab, onClose }: {
             )}
             {/* 抽屉挂在页签内容之后、`relative` 容器之内 —— 它盖住的是**正文**,
                 页签与日期档照样能点(翻着说明换页签是常事)。 */}
-            <ReviewHelpSheet open={help} onClose={() => setHelp(false)} />
+            <ReviewHelpSheet open={help} onClose={() => setHelp(false)} here={d?.channel?.geo?.combo ?? null} />
           </div>
         )}
       </div>
@@ -363,11 +361,15 @@ function TrendView({ d, rows, onlyMarked, onToggleMarked, onHelp }: {
               <th className="whitespace-nowrap px-2 py-2 text-left font-normal" title="按转折买卖: 这次转折的次日开盘该干什么">动作</th>
               <th className="whitespace-nowrap px-2 py-2 text-right font-normal" title="成交日与成交价 → 了结日与了结价, 都是开盘价">成交 → 了结</th>
               <th className="whitespace-nowrap px-2 py-2 text-right font-normal" title="多头段是真赚到的; 空头段是空仓期间股价的涨跌, 不是你的盈亏">结果</th>
-              {/* [R52 加, R295 删] 「结论」那一列在这里删掉了。用户指着它: 「删掉这一列」。
-                  **它在这张表里本来就是外人**: 这一页从头到尾讲六态 —— 按转折买卖、
-                  转折后第几天、每一笔的成交 —— 而通道结论是**另一套判定**;
-                  它现在在自己那一页有一张一模一样的逐日表(R295)。
-                  截图里那一列绝大多数行还是「—」, 占着宽度却几乎不出信息。 */}
+              {/* [R52 加, R295 删, R296 恢复] 「结论」那一列回来了 —— 用户:
+                  「趋势状态删除的那一列我需要恢复」。
+                  它在这里的价值是**横着对上一眼**: 同一行里六态说什么、通道位置
+                  说什么。这一页有它自己的按转折买卖, 那一页有按结论买卖 ——
+                  两套判定各管各的, 而这一列让人不必切页签就知道另一套怎么说。 */}
+              {/* [R258] 名字必须与「通道结论」那一页、决策台那一列逐字一致 ——
+                  同一层判定在界面上只许一个名字。R296 恢复这一列时差点又叫回
+                  「结论」, 那样两张表并排放着就是同一样东西两个名字。 */}
+              <th className="whitespace-nowrap px-2 py-2 text-center font-normal" title="当天三档通道合起来给出的那一句结论 —— 与决策台「结论」列同一句话, 悬停看完整卡片">通道结论</th>
             </tr>
           </thead>
           <tbody>
@@ -400,10 +402,21 @@ function TrendView({ d, rows, onlyMarked, onToggleMarked, onHelp }: {
                   ) : <span className="text-[10px] text-muted/40">—</span>}
                 </td>
                 <FlipTradeCells leg={legs.get(r.date)} />
+                {/* [R296] 恢复。**排在成交三格之后** —— 这一页的主线是六态与
+                    按转折买卖, 通道结论是"顺带对一眼"的旁证, 不该插进主线中间。 */}
+                <td className="whitespace-nowrap px-2 py-1.5 text-center">
+                  {r.verdict ? (
+                    <VerdictHover v={r.verdict} note={`${r.date} 当天的读数。收盘口径。`}>
+                      <span className={`inline-flex cursor-help whitespace-nowrap rounded border px-1 py-0.5 text-[10px] ${VERDICT_CLS[r.verdict.tone]}`}>
+                        {r.verdict.title}
+                      </span>
+                    </VerdictHover>
+                  ) : <span className="text-[10px] text-muted/40">—</span>}
+                </td>
               </tr>
             ))}
             {rows.length === 0 && (
-              <tr><td colSpan={7} className="px-3 py-10 text-center text-[11px] text-muted">这段时间里没有涨跌停, 状态也没翻转过</td></tr>
+              <tr><td colSpan={8} className="px-3 py-10 text-center text-[11px] text-muted">这段时间里没有涨跌停, 状态也没翻转过</td></tr>
             )}
           </tbody>
         </table>
@@ -415,7 +428,7 @@ function TrendView({ d, rows, onlyMarked, onToggleMarked, onHelp }: {
             「通道结论」—— 那句脚注一直指着一个**不存在的页签**。
             [R295] 同一个病的第二次: 「结论」那一列删掉之后, "悬停看完整卡片"就
             指着一列不存在的东西了, 跟着改。 */}
-        通道位置是另一套判定, 它有自己那一页 —— 同样一张逐日表, 切到上方的「通道结论」。
+        「通道结论」列悬停看完整卡片; 要摊开每一档说了什么、之后走成什么样, 切到上方的「通道结论」那一页。
       </div>
     </>
   )
@@ -495,6 +508,10 @@ function VerdictView({ d, segments, onHelp }: {
   const [onlyMarked, setOnlyMarked] = useState(false)
   const legs = legsByFlipDate(d.verdict_trades)
   const rows = onlyMarked ? d.rows.filter((r) => r.verdict_flipped) : d.rows
+  // [R296] 「组合速查」并进来的两样: 你在哪一格 + 这一格历来。
+  // 它们是**这只票的事**, 所以常驻; 那 27 格谱系是恒定的参考, 进「说明」抽屉。
+  const here = d.channel?.geo?.combo ?? null
+  const hist = comboHistory(d.rows, here)
   const ph = d.channel?.phase
   // 各档出现了几段 —— 与趋势那边「涨停 N · 跌停 N」同一个角色: 一行小字说完
   // 「这半年都出过什么」。**按语气分而不是按十档分**: 十个数一行放不下, 而且
@@ -524,6 +541,20 @@ function VerdictView({ d, segments, onHelp }: {
             <div className="text-[10px]">
               <span className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
                 <b className={cn('font-medium', PHASE_TEXT_CLS[ph.code] ?? 'text-secondary')}>{ph.cn}</b>
+                {/* [R296] 三档位置码 —— 结论是它的纯函数, 所以摆在结论旁边最省事:
+                    一眼看得出"这一档是从哪三格出来的"。 */}
+                {here ? (
+                  <span className="font-mono text-secondary" title="三档各在自己通道的上/中/下 —— 27 格速查表的行号, 完整的一览在「说明」里">
+                    {here}
+                  </span>
+                ) : (
+                  /* [R294] 「今天定不了这一格」与下面那句「没进过这一格 —— 头一回」
+                     **是两件事**: 一个是三档缺了一档算不出来, 一个是这只票确实
+                     没走到过。合成一句的话, 数据缺失会被读成"这是个罕见位置"。 */
+                  <span className="text-muted/60" title="三档里有一档今天定不出位置(数据不够), 不是这个位置罕见">
+                    今天定不了这一格
+                  </span>
+                )}
                 {d.channel!.event.code !== 'none' && (
                   <span className="text-muted">
                     {d.channel!.event.cn}{d.channel!.event.confirmed ? '' : '(未确认)'}
@@ -535,6 +566,24 @@ function VerdictView({ d, segments, onHelp }: {
               <p className="mt-1 leading-relaxed text-secondary">
                 <span className="text-muted">该盯什么: </span>{ph.watch}
               </p>
+              {/* [R296] 这一格在这只票身上历来什么光景 —— 从「组合速查」并过来的。
+                  按**段**不按天(R177): 一段连着 8 天算 1 次, 按天算的话那 8 天的
+                  前瞻窗口互相重叠, 次数会被撑大。 */}
+              {!!here && (
+                <p className="mt-1 leading-relaxed text-muted">
+                  <span className="opacity-70">这一格历来: </span>
+                  {hist && hist.segs > 0 ? (
+                    <>
+                      这 {d.days} 天里进过 <b className="text-secondary">{hist.segs}</b> 段、共 {hist.days} 天
+                      {hist.scored > 0 ? (
+                        <>, 走完的 {hist.scored} 段之后 {d.forward_days} 日平均{' '}
+                          <b className={cn('font-mono', chgCls(hist.avg))}>{pct(hist.avg)}</b>, {hist.win} 段收涨</>
+                      ) : <>, 还没有走完 {d.forward_days} 个交易日的段, 结果未知</>}
+                    </>
+                  ) : <>这 {d.days} 天里没进过这一格 —— 头一回</>}
+                </p>
+              )}
+
               {/* [R269] 27 格组合的那条注记是**判定的一部分**, 不许在重排里蒸发 ——
                   「中中上」「中中下」两格底层返回无结论, 而它们恰恰是"大级别到位、
                   等一个入场点"的另一半, 全靠这条注记说出来。 */}
@@ -562,6 +611,21 @@ function VerdictView({ d, segments, onHelp }: {
               hint={rangeHint(d.rows)}
               legend={VERDICT_LEGEND}
               bands={[{ cells: verdictCells(d.rows) }]}
+            />
+          </div>
+          {/* [R296] 三档**各自**那三条带子 —— 从「组合速查」并过来的。
+              **与上面那条不是一回事**: 上面画的是三档合成后的那一句结论, 这里
+              画的是三档各自在哪。「短档先动、中档跟上、长档最后翻」这种节奏,
+              合成后的单条带子看不出来(R273 的原话)。 */}
+          <div className="-mx-1 mt-1">
+            <StateTimeline
+              className="mx-0"
+              hint=""
+              legend={POS_LEGEND}
+              bands={(['s', 'm', 'l'] as const).map((k) => ({
+                label: BAND_CN[k].slice(0, 2),
+                cells: bandCells(d.rows, k),
+              }))}
             />
           </div>
         </HeadRow>

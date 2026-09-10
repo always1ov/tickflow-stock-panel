@@ -304,10 +304,14 @@ def tlib() -> str:
     return code_of(LIB)
 
 
-def test_R273_三个页签都有时间轴(dlg, combo):
-    """趋势状态 + 通道结论在弹窗里, 组合速查在 ComboView 里。"""
-    assert dlg.count("<StateTimeline") == 2, "趋势状态与通道结论各要一条"
-    assert "<StateTimeline" in combo, "组合速查也要"
+def test_R273_每个页签都有时间轴(dlg):
+    """[R273 → R296] 页签从三个并成两个, 时间轴一条没少 —— 只是都在这个文件里了:
+    趋势状态一条(六态), 通道结论两条(合成结论 + 三档各自, 见下一条)。"""
+    assert dlg.count("<StateTimeline") == 3, (
+        f"时间轴有 {dlg.count('<StateTimeline')} 条 —— 该是趋势 1 条 + 通道 2 条"
+    )
+    for fn, n in (("function TrendView", 1), ("function VerdictView", 2)):
+        assert _fn(dlg, fn).count("<StateTimeline") == n, f"{fn} 的时间轴不是 {n} 条"
 
 
 def test_R273_时间轴必须按时间正序(tlib):
@@ -350,13 +354,22 @@ def test_R273_通道结论沿用决策台那套配色(tlib):
     assert body.count("VERDICT_BAR.") == 5, "图例要直接引 VERDICT_BAR, 不许另抄一份色"
 
 
-def test_R273_组合速查画的是三档各自而不是合成结论(combo):
-    """**这和「通道结论」那条不是一回事**: 那边画的是三档合成后的那一句结论,
-    这边画的是三档各自在哪。27 格讲的正是三档的组合 —— 合成后的单条带子看不出
-    「短档先动、中档跟上、长档最后翻」这种节奏。"""
-    assert "bandCells(rows, k)" in combo
-    assert "['s', 'm', 'l'] as const" in combo
-    assert "verdictCells" not in combo, "组合速查画结论就和通道结论那条重复了"
+def test_R273_三档各自那条与合成结论那条都在(dlg):
+    """**两条不是一回事**, 所以并页之后两条都得留下: 一条画三档合成后的那一句
+    结论, 一条画三档各自在哪。「短档先动、中档跟上、长档最后翻」这种节奏,
+    合成后的单条带子看不出来 —— 那正是 R273 当初立这一条的原话。
+
+    [R296] 它原本长在「组合速查」页上; 那一页并进「通道结论」时, 这条带子跟着
+    搬到同一张头部卡的「这 N 天」行里, **摆在合成结论那条下面**(先看结论怎么
+    走, 再看它是从哪三档来的 —— 与「现在」行里位置码排在结论后面同一个顺序)。
+    """
+    blk = _fn(dlg, "function VerdictView")
+    assert "verdictCells(d.rows)" in blk, "合成结论那条没了"
+    assert "bandCells(d.rows, k)" in blk, "三档各自那条没跟着搬过来"
+    assert "['s', 'm', 'l'] as const" in blk
+    assert blk.index("verdictCells(d.rows)") < blk.index("bandCells(d.rows, k)"), (
+        "三档各自那条摆到了合成结论前面 —— 先结论后拆解才是这一页的读法"
+    )
 
 
 def test_R273_格子有最小宽度(timeline):
