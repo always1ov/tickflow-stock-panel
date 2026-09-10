@@ -24,6 +24,7 @@ from datetime import date, timedelta
 import polars as pl
 
 from app.indicators import keltner as k
+from app.indicators import keltner_geometry as k_geo
 from app.indicators.livermore import BULLISH, STATE_LABELS, compute
 from app.services import flip_trades
 
@@ -577,6 +578,10 @@ def review_for_symbol(repo, symbol: str, days: int = DEFAULT_DAYS) -> dict:
             # 三档只带位置文字 —— 逐日全套读数会让这个响应大到没必要
             "bands": {key: {"pos": b["pos"], "pos_cn": b["pos_cn"]}
                       for key, b in bands.items()},
+            # [R294] 三字位置码(如「上中下」), 也就是 27 格速查表的行号。
+            # **在这儿算而不是让前端从 bands 拼**: 拼法归 `combo_code` 管,
+            # 前端再拼一份就是同一个规则两处定义(R286 立过的规矩)。
+            "combo": k_geo.combo_code(bands) if bands else None,
             "verdict": v,
             # 末尾不足 FORWARD_DAYS 的那几天为 None —— 还不知道结果, 不拿半截数据凑
             "fwd": None if fwd is None else round(fwd, 4),

@@ -74,3 +74,33 @@ def test_R292_最强与最弱那两档说得出方向(code):
     t = next(x for x in glossary.trend_terms() if x["code"] == code)
     assert ("向上" in t["meaning"]) is (code == "UT")
     assert ("向下" in t["meaning"]) is (code == "DT")
+
+
+# ---------------------------------------------------------------- R294
+#
+# 用户: 「组合速查也要, 它是按照位置为核心」。
+
+def test_R294_逐日行带上三字位置码():
+    """27 格速查表的行号。**在后端算而不是让前端从 bands 拼** ——
+    拼法归 `combo_code` 管, 前端再拼一份就是同一个规则两处定义。"""
+    import sys
+    sys.path.insert(0, str(__import__("pathlib").Path(__file__).parent))
+    from test_flip_trades import _Repo, _review_frame
+    from app.indicators.keltner_geometry import combo_code
+    from app.services import review_service as rs
+
+    d = rs.review_for_symbol(_Repo(_review_frame()), "600000.SH", 120)
+    got = [r["combo"] for r in d["rows"] if r["combo"]]
+    assert got, "一行都没有位置码"
+    assert all(len(c) == 3 and set(c) <= set("上中下") for c in got), f"码不合法: {set(got)}"
+    # 与底层那把尺子对得上 —— 抽一行现算一次
+    row = next(r for r in d["rows"] if r["combo"])
+    assert row["combo"] == combo_code({k: {"pos": b["pos"]} for k, b in row["bands"].items()})
+
+
+def test_R294_三档都算不出来时不硬凑一个码():
+    """缺档时 `combo_code` 返回 None —— 硬凑一个「中中中」会把"算不出来"
+    说成"在正中间", 那是两件事。"""
+    from app.indicators.keltner_geometry import combo_code
+    assert combo_code({"s": {"pos": "inside"}, "m": {"pos": "inside"}}) is None
+    assert combo_code(None) is None

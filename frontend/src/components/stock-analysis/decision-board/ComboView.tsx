@@ -36,6 +36,8 @@ import { QK } from '@/lib/queryKeys'
 import { cn } from '@/lib/cn'
 import { storage } from '@/lib/storage'
 import { ReviewDisclosure } from '@/components/stock-analysis/ReviewDisclosure'
+import { HeadRow, HEAD_CARD } from '@/components/stock-analysis/ReviewHeadRow'
+import { HelpButton } from '@/components/stock-analysis/ReviewHelpSheet'
 
 const TONE_CLS: Record<string, string> = {
   sell: 'text-red-400',
@@ -251,11 +253,43 @@ function ComboGroups({ rows, here }: { rows: ComboTableRow[]; here: string | nul
  * `geo`/`runs` 由复盘接口的 `channel` 给, 与它逐日表末行是同一条路算出来的
  * (`review_service._channel` 的注释)—— 所以三个页签看到的是同一天的同一份读数。
  */
-export function ComboView({ geo, runs, rows = [] }: {
+/**
+ * [R294] 这只票在**当前这一格**里待过几段、共几天、之后 5 日普遍怎么走。
+ *
+ * 用户: 「组合速查也要, 它是按照位置为核心」—— 那么这一页的头一行就该是
+ * **位置本身**: 你在哪一格、这一格在这只票身上历来是什么光景。
+ *
+ * 按**段**不按天(R177 的老规矩): 一段连着 8 天的「上中下」算 1 次; 按天算的话
+ * 那 8 天的前瞻窗口互相重叠, 次数会被撑大, 很薄的结论看着挺扎实。
+ */
+function comboHistory(rows: ReviewRow[], here: string | null) {
+  if (!here) return null
+  // rows 是新→旧, 这里按时间正序走
+  const asc = [...rows].reverse()
+  let segs = 0, days = 0, prev: string | null | undefined
+  const fwd: number[] = []
+  asc.forEach((r, i) => {
+    if (r.combo !== here) { prev = r.combo; return }
+    if (prev !== here) segs += 1
+    days += 1
+    // 段末那天的前瞻收益 —— 与「通道结论」那边取段末同一个道理:
+    // 真正该问的是"它最后一次说完之后怎么样了"
+    const next = asc[i + 1]
+    if ((!next || next.combo !== here) && r.fwd != null) fwd.push(r.fwd)
+    prev = r.combo
+  })
+  const avg = fwd.length ? fwd.reduce((a, b) => a + b, 0) / fwd.length : null
+  return { segs, days, scored: fwd.length, avg, win: fwd.filter(v => v > 0).length }
+}
+
+
+export function ComboView({ geo, runs, rows = [], days = 0, onHelp }: {
   geo?: ChannelGeometry | null
   runs?: ChannelRuns | null
-  /** [R273] 逐日行 —— 只为画三档时间轴; 复盘接口本来就带着, 不必再要一次 */
+  /** [R273] 逐日行 —— 画三档时间轴; [R294] 还用来算「这一格历来」 */
   rows?: ReviewRow[]
+  days?: number
+  onHelp?: () => void
 }) {
   const q = useQuery({
     queryKey: QK.comboTable,
@@ -263,24 +297,94 @@ export function ComboView({ geo, runs, rows = [] }: {
     staleTime: 24 * 3600_000,   // 表是恒定的 —— 一天内不必再问
   })
   const here = geo?.combo ?? null
+  const mine = q.data?.rows.find(r => r.combo === here) ?? null
+  const hist = comboHistory(rows, here)
   return (
     <div className="min-h-0 flex-1 space-y-3 overflow-auto px-4 py-3">
+      {/* [R294] 头部与另外两个页签**同一张卡、同一条左栏** —— 用户:
+          「组合速查也要」。差别只在行1 装的是什么:
+            趋势状态  按转折买卖   通道结论  按结论买卖   组合速查  你在哪一格
+          这一页的核心是**位置**, 所以行1 就是位置本身。 */}
+      <div className={cn(HEAD_CARD, 'mx-0 mt-0')}>
+        <HeadRow label="你在这一格">
+          {here ? (
+            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-[10px]">
+              <b className="font-mono text-[13px] text-foreground">{here}</b>
+              {/* 这里要的是**徽标**(带边框底色), 而 `TONE_CLS` 只是文字色 ——
+                  它给的是 27 格列表里那种一行小字。两者不混用。
+                  注释放在 `{cond && (…)}` **外面**: 表达式容器里只能有一个表达式,
+                  塞进去就成了两个子节点, JSX 直接不认(刚栽过一次)。 */}
+              {!!mine?.verdict && (
+                <span className={cn('inline-flex whitespace-nowrap rounded border border-current/40 px-1.5 py-0.5',
+                                    TONE_CLS[mine.verdict.tone] ?? 'text-muted')}>
+                  {mine.verdict.title}
+                </span>
+              )}
+              {!!mine?.verdict && <span className="text-secondary">{mine.verdict.action}</span>}
+              {!!mine?.rarity && <span className="text-muted">{mine.rarity}</span>}
+            </div>
+          ) : (
+            <span className="text-[10px] text-muted">三档里有档算不出来 —— 这一格定不了</span>
+          )}
+        </HeadRow>
+
+        <HeadRow label="这一格历来">
+          {hist && hist.segs > 0 ? (
+            <div className="text-[10px] text-muted">
+              这 {days} 天里进过 <b className="text-secondary">{hist.segs}</b> 段、共 {hist.days} 天
+              {hist.scored > 0 && (
+                <> · 走完的 {hist.scored} 段之后 5 日平均{' '}
+                  <b className={cn('font-mono', hist.avg == null ? '' : hist.avg > 0 ? 'text-red-400' : 'text-emerald-400')}>
+                    {hist.avg == null ? '—' : `${hist.avg > 0 ? '+' : ''}${(hist.avg * 100).toFixed(1)}%`}
+                  </b>
+                  , {hist.win} 段收涨
+                </>
+              )}
+              {hist.scored === 0 && <> · 还没有走完 5 个交易日的段, 结果未知</>}
+            </div>
+          ) : (
+            <span className="text-[10px] text-muted">这 {days} 天里没进过这一格 —— 头一回</span>
+          )}
+        </HeadRow>
+
+        <HeadRow label={`这 ${days} 天`}>
+          {/* [R273] 三档各一条带子 —— **这和「通道结论」那条不是一回事**:
+              那边画的是三档合成后的**那一句结论**, 这边画的是三档**各自**在哪。
+              27 格讲的正是三档的组合, 所以这一栏的全景就该是三条并排 ——
+              「短档先动、中档跟上、长档最后翻」这种节奏, 合成后的单条看不出来。 */}
+          {rows.length > 0 ? (
+            <div className="-mx-1">
+              <StateTimeline
+                className="mx-0"
+                hint={rangeHint(rows)}
+                legend={POS_LEGEND}
+                bands={(['s', 'm', 'l'] as const).map(k => ({
+                  label: BAND_CN[k].slice(0, 2),
+                  cells: bandCells(rows, k),
+                }))}
+              />
+            </div>
+          ) : <span className="text-[10px] text-muted">没有逐日数据</span>}
+        </HeadRow>
+      </div>
+
+      {/* [R294] **这一页没有第四栏「按位置买卖」。**
+          换格比换档频繁, 但多出来的那些换格两边同向 —— 只是把同一段行情多切
+          了几刀, 而段与段之间没有缝, 复利一乘就抵回去了。所以那四个数会与
+          「通道结论」那栏**逐字相同**, 印出来就是同一个数两个名字。
+          证明见后端 `test_R294_多切几刀不改变成绩`。 */}
+      <p className="text-[10px] leading-relaxed text-muted">
+        按位置换格买卖的成绩与「通道结论」页那一栏**完全相同** —— 换格比换档密,
+        但多出来的那些两边同向, 只是把同一段多切几刀, 不改变买卖次数与收益。
+        所以这里不再重复摆一份, 要看战绩去「通道结论」。
+      </p>
+
       {!!geo && <LiveStrip geo={geo} runs={runs} />}
 
-      {/* [R273] 三档各一条带子 —— **这和「通道结论」那条不是一回事**:
-          那边画的是三档合成后的**那一句结论**, 这边画的是三档**各自**在哪。
-          27 格讲的正是三档的组合, 所以这一栏的全景就该是三条并排 ——
-          「短档先动、中档跟上、长档最后翻」这种节奏, 合成后的单条带子看不出来。 */}
-      {rows.length > 0 && (
-        <StateTimeline
-          className="mx-0"
-          hint={rangeHint(rows)}
-          legend={POS_LEGEND}
-          bands={(['s', 'm', 'l'] as const).map(k => ({
-            label: BAND_CN[k].slice(0, 2),
-            cells: bandCells(rows, k),
-          }))}
-        />
+      {!!onHelp && (
+        <div className="flex justify-end">
+          <HelpButton onClick={onHelp} />
+        </div>
       )}
 
       {/* [R225] 27 行的表改成**分组卡片**。用户: 「把这部分做好看一点, 好丑。

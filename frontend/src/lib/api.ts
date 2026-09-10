@@ -699,6 +699,8 @@ export interface ReviewRow {
   } | null
   /** 当天三档位置; 算不出来的档缺席 */
   bands: Partial<Record<'s' | 'm' | 'l', { pos: string; pos_cn: string }>>
+  /** [R294] 三字位置码(如「上中下」), 也就是 27 格速查表的行号。三档缺一就为 null */
+  combo?: string | null
   verdict?: KeltnerVerdict | null
   /** [R51] 这天之后 forward_days 的涨跌(小数); 最近几天还不知道结果, 为 null */
   fwd: number | null

@@ -813,12 +813,16 @@ def test_R292_头部三行共用一条左栏():
     """
     body = _fn_body(_dialog(), "function TrendView")
     head = body[body.index("return ("):body.index("<table")]
-    assert "divide-y divide-border/40 rounded-lg border border-border/60" in head, (
-        "头部没有边框与行间分割线 —— 那正是「没有边界感」说的东西"
-    )
+    assert "{HEAD_CARD}" in head, "头部没有边框与行间分割线 —— 那正是「没有边界感」说的东西"
     assert head.count("<HeadRow") == 3, f"头部该是三行, 现在 {head.count('<HeadRow')} 行"
-    row = _dialog()[_dialog().index("function HeadRow"):]
+    # [R294] `HeadRow` 抽到了 `ReviewHeadRow.tsx` —— 三个页签共用一份实现, 于是
+    # 「三张卡长得一样」是**结构上保证的**, 不是靠三处各自抄对。
+    from tests.frontend_source import code_of
+    row = code_of("components/stock-analysis/ReviewHeadRow.tsx")
     assert "w-[4.5rem] shrink-0" in row, "标签栏没有固定宽度 —— 三行对不齐"
+    assert "divide-y divide-border/40 rounded-lg border border-border/60" in row, (
+        "共用的外框没了"
+    )
 
 
 def test_R292_那些不要的东西真的删干净了():
@@ -875,9 +879,20 @@ def test_R292_说明抽屉不是盖满而是从右边推进来():
 def test_R292_说明抽屉两个页签共用一处():
     """它讲的是六态与结论**两边**的词, 每个页签各挂一份就是同一份东西的两个副本。"""
     dlg = _dialog()
-    assert dlg.count("<ReviewHelpSheet") == 1, "说明抽屉挂了不止一处"
+    # [R294] 组合速查走的是另一个分支(它不等复盘请求, 见 R228), 所以那一页要
+    # 自己挂一份 —— **两处是分支互斥的, 不会同时在场**。除此之外不许再多。
+    assert dlg.count("<ReviewHelpSheet") == 2, (
+        f"说明抽屉挂了 {dlg.count('<ReviewHelpSheet')} 处 —— 该是两处互斥分支各一"
+    )
     for fn in ("function TrendView", "function VerdictView"):
         assert "<HelpButton" in _fn_body(dlg, fn), f"{fn} 没有说明入口"
+    from tests.frontend_source import code_of
+    combo = code_of("components/stock-analysis/decision-board/ComboView.tsx")
+    # 钉**它的显示条件**, 不只是钉标签名 —— 包成 `{false && <HelpButton/>}` 时
+    # 标签名照样在, 变异测试当场就漏了(本轮第 N 次同一个坑)。
+    assert "{!!onHelp && (" in combo and "<HelpButton onClick={onHelp} />" in combo, (
+        "组合速查没有说明入口"
+    )
 
 
 def test_R292_说明抽屉只动透明度和位移():
@@ -1008,13 +1023,14 @@ def test_R293_两个页签的头部是同一个形状():
     """用户: 「复刻参考趋势状态改好的排版」。同构才谈得上"复刻" ——
     一边是带边框三行卡、另一边是三段裸 flex 的话, 切页签就像换了个软件。
     """
+    from tests.frontend_source import code_of
     dlg = _dialog()
-    for fn in ("function TrendView", "function VerdictView"):
-        head = _fn_body(dlg, fn)
+    bodies = {fn: _fn_body(dlg, fn) for fn in ("function TrendView", "function VerdictView")}
+    # [R294] 第三个页签也进来了 —— 用户: 「组合速查也要, 它是按照位置为核心」
+    bodies["ComboView"] = code_of("components/stock-analysis/decision-board/ComboView.tsx")
+    for fn, head in bodies.items():
         head = head[:head.index("<HelpButton")]
-        assert "divide-y divide-border/40 rounded-lg border border-border/60" in head, (
-            f"{fn} 的头部不是那张带边框的卡"
-        )
+        assert "HEAD_CARD" in head, f"{fn} 的头部不是那张共用的带边框卡"
         assert head.count("<HeadRow") == 3, f"{fn} 的头部该是三行"
         assert "<StateTimeline" in head, f"{fn} 的头部没有状态轴"
 
@@ -1064,3 +1080,137 @@ def test_R293_这N天那一行按语气分档而不是十档全铺():
     verdict = _fn_body(_dialog(), "function VerdictView")
     assert "byTone" in verdict, "没有按语气分档的计数"
     assert "{segments.length} 段结论" in verdict, "没给总段数"
+
+
+# ================================================================
+# [R294] 为什么「组合速查」**不再立一栏「按位置买卖」**
+# ================================================================
+#
+# 用户: 「组合速查也要, 它是按照位置为核心」。
+#
+# 照前两个页签的样子, 第三栏该是「按三档位置组合换格买卖」。**但那个数会和
+# 「按结论买卖」一模一样** —— 而这个仓库最不该做的就是把同一个数印两遍。
+#
+# 原因是: 方向(该不该持仓)是**逐日**由那一格的语气定的, 而位置组合换格比结论
+# 换档更频繁 —— 多出来的那些换格**两边同向**, 于是只是把同一段行情多切了几刀。
+# 段与段之间没有缝(下一段的买入价就是上一段的卖出价), 所以复利一乘就telescoping
+# 回去了, 建仓次数也不变。
+#
+# 下面这条**把这件事证出来**, 而不是我拍脑袋说一句。
+
+def _resegment(days: list[dict]) -> list[dict]:
+    """在**方向没变**的地方多切几刀 —— 模拟"换格但没换边"的那些天。
+
+    **只在第一次与最后一次真转折之间切。** 第一版没设这个界, 结果多切出来的刀
+    落到了首尾之外:
+      · 切在第一次真转折**之前** → 整段区间的起点被往前挪, `hold` 换了个基准;
+      · 切在最后一段**里面** → 未完成的那一截被切出一半"已完成", 混进了复利。
+    两样都不是"多切几刀", 是"换了一段区间"。**第一遍跑出来红了, 红在场景上,
+    不在被测的性质上** —— 先怀疑变异/场景本身, 这是本轮的教训。
+    """
+    # **`i + 1 < len(days)` 这个条件不能少**: 窗口最后一天的转折没轮到执行
+    # (它只进 `pending`), 拿它当上界的话, 切点会落到最后那段未完成的段里面 ——
+    # 第二遍就红在这儿, 又是场景的问题。
+    real = [i for i, d in enumerate(days)
+            if d["flipped"] and d.get("prev") is not None and i + 1 < len(days)]
+    lo, hi = real[0], real[-1]
+    out = []
+    for i, d in enumerate(days):
+        extra = lo < i < hi and i % 2 == 0 and not d["flipped"]
+        out.append({**d, "flipped": d["flipped"] or extra})
+    return out
+
+
+def test_R294_多切几刀不改变成绩(real):
+    """**这是「不再立第三栏」的依据。**
+
+    同一条 side 序列, 只要多切的那些刀两边同向, 「跟着做」「一直拿着」「多赚」
+    「买卖次数」四个数一个都不会变 —— 变的只有段数。
+
+    **前提是切在首尾之间**(见 `_resegment` 的说明): 切到第一次转折之前会换掉
+    区间起点, 切进最后那段未完成的会把一截尾巴变成"已完成"。这两条恰恰也是
+    「按位置买卖」与「按结论买卖」唯一会差出来的地方, 差的只是那一头一尾。
+
+    所以「按位置买卖」印出来会与「按结论买卖」逐字相同, 那是同一个数两个名字
+    (R284 就为「同一纪律两个数」报过警, 这里是它的镜像)。
+    """
+    days, base = real
+    cut = simulate(_resegment(days), _PATH_OPENS, _PATH)
+    assert len(cut["legs"]) > len(base["legs"]), "场景没搭对: 没有真的多切出段来"
+    for k in ("follow", "hold", "excess", "trades"):
+        assert cut[k] == base[k], (
+            f"多切几刀之后 {k} 变了({base[k]} → {cut[k]}) —— "
+            f"那说明段与段之间有缝, 「跟着做」和「一直拿着」就不可比了"
+        )
+
+
+def test_R294_只有段数会变(real):
+    """反面: 别把上面那条读成"怎么切都一样"。**段数是会变的** ——
+    而段数正是「按位置买卖」唯一能多告诉你的东西(换格比换档频繁多少),
+    那一句话放在界面上说清楚就够了, 不值得再摆一栏数字。
+    """
+    days, base = real
+    cut = simulate(_resegment(days), _PATH_OPENS, _PATH)
+    assert cut["bull"]["n"] + cut["bear"]["n"] > base["bull"]["n"] + base["bear"]["n"]
+
+
+def _combo() -> str:
+    from tests.frontend_source import code_of
+    return code_of("components/stock-analysis/decision-board/ComboView.tsx")
+
+
+def test_R294_组合速查的核心是位置():
+    """用户: 「组合速查也要, 它是按照位置为核心」。
+
+    三个页签的头一行装的是各自的核心, 一处一处对得上:
+        趋势状态 按转折买卖 / 通道结论 按结论买卖 / 组合速查 你在哪一格
+    """
+    combo = _combo()
+    head = combo[combo.index("<div className={cn(HEAD_CARD"):]
+    assert head.index('label="你在这一格"') < head.index('label="这一格历来"'), "头一行不是位置"
+    assert "<FlipTradesBar" not in combo, "这一页不该有第四栏战绩(见下一条)"
+
+
+def test_R294_不再立第四栏按位置买卖():
+    """**这条是那个取舍的守卫。**
+
+    换格比换档密, 但多出来的换格两边同向 —— 只是把同一段多切几刀, 而段与段
+    之间没有缝, 复利一乘就抵回去了(`test_R294_多切几刀不改变成绩` 证过)。
+    所以那四个数会与「按结论买卖」逐字相同, 印出来就是同一个数两个名字。
+
+    **而且必须在界面上说出来**: 用户点名要这一页也有, 不说的话他会以为漏了。
+    """
+    combo = _combo()
+    assert "按位置换格买卖的成绩与「通道结论」页那一栏" in combo, (
+        "没有在界面上交代为什么这一页不摆战绩 —— 用户会以为漏做了"
+    )
+    for gone in ("verdict_trades", "flip_trades", "legsByFlipDate"):
+        assert gone not in combo, f"{gone} 又被搬到这一页来了"
+
+
+def test_R294_这一格历来按段不按天():
+    """R177 的老规矩: 一段连着 8 天算 1 次。按天算的话那 8 天的前瞻窗口互相
+    重叠, 次数会被撑大, 很薄的结论看着挺扎实。"""
+    combo = _combo()
+    fn = combo[combo.index("function comboHistory"):]
+    fn = fn[:fn.index("\nexport function ")]
+    assert "if (prev !== here) segs += 1" in fn, "段数不是按「进出一次算一段」数的"
+    # 前瞻取**段末**那天 —— 与「通道结论」那边同一个道理
+    assert "!next || next.combo !== here" in fn, "前瞻收益取的不是段末那天"
+
+
+def test_R294_位置码来自后端不在前端拼():
+    """拼法归 `combo_code` 管。前端再拼一份就是同一个规则两处定义(R286)。"""
+    combo = _combo()
+    assert "r.combo" in combo, "没用后端给的位置码"
+    # 反面: 不许在这里用 bands 现拼一个三字码
+    for hand in ("'上' :", "? '上'", "join('')"):
+        assert hand not in combo, f"像是在前端手拼位置码: {hand}"
+
+
+def test_R294_没进过这一格与算不出来分得开():
+    """两句话是两件事: 「头一回」是这只票没走到过, 「定不了」是三档缺了一档。
+    混成一句的话, 数据缺失会被读成"这是个罕见位置"。"""
+    combo = _combo()
+    assert "这一格定不了" in combo, "三档缺档时没有独立说法"
+    assert "头一回" in combo, "没进过这一格时没有独立说法"

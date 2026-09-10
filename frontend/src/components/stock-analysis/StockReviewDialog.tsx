@@ -51,6 +51,7 @@ import { VerdictHover } from '@/components/stock-analysis/VerdictHover'
 import { ComboView } from '@/components/stock-analysis/decision-board/ComboView'
 import { FlipTradesBar, FlipTradeCells, FlipTradeLine, legsByFlipDate } from '@/components/stock-analysis/FlipTradesPanel'
 import { ReviewHelpSheet, HelpButton } from '@/components/stock-analysis/ReviewHelpSheet'
+import { HeadRow, HEAD_CARD } from '@/components/stock-analysis/ReviewHeadRow'
 import { StateTimeline } from '@/components/stock-analysis/StateTimeline'
 import { ReviewDisclosure } from '@/components/stock-analysis/ReviewDisclosure'
 import {
@@ -218,7 +219,13 @@ export function StockReviewDialog({ symbol, name, tab: initialTab, onClose }: {
             缓存一天, 而它只用 channel 里的末日读数去高亮"你在哪一格"。
             让它陪着复盘转圈是白等 —— 表先出来, 读数带随后补上。 */}
         {tab === 'combo' ? (
-          <ComboView geo={d?.channel?.geo} runs={d?.channel?.runs} rows={d?.rows ?? []} />
+          // [R294] 组合速查也搬进 `relative` 容器 —— 「说明」抽屉挂在这一层,
+          // 留在外面的话切到这一页那个按钮就点了没反应。
+          <div className="relative flex min-h-0 flex-1 flex-col">
+            <ComboView geo={d?.channel?.geo} runs={d?.channel?.runs} rows={d?.rows ?? []}
+                       days={d?.days ?? 0} onHelp={() => setHelp(true)} />
+            <ReviewHelpSheet open={help} onClose={() => setHelp(false)} />
+          </div>
         ) : (
           // [R292] **这一层 `relative` 是「说明」抽屉的定位祖先。**
           // R289 漏了它(那次的改动只在内存里做了没落盘), 于是抽屉的
@@ -271,7 +278,7 @@ function TrendView({ d, rows, onlyMarked, onToggleMarked, onHelp }: {
 
   return (
     <>
-      <div className="mx-4 mt-3 divide-y divide-border/40 rounded-lg border border-border/60">
+      <div className={HEAD_CARD}>
         {/* 用户: 「在趋势状态里面, 功能按转折买卖部分才是重点」 —— 所以它是第一行。
             外面那张表(决策台「走势」列)回答"今天怎么样", 点进来回答"这套转折
             在这只票上到底赚不赚钱"。 */}
@@ -423,36 +430,7 @@ function TrendView({ d, rows, onlyMarked, onToggleMarked, onHelp }: {
 }
 
 
-/**
- * [R292] 头部那张卡的一行。**左栏宽度写死**, 三行的内容才会从同一条竖线开始 ——
- * 「对齐」这件事得有个依据, 不能靠每行各自的 padding 凑(上一版散就散在这儿)。
- */
-function HeadRow({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex gap-3 px-3 py-2">
-      <span className="w-[4.5rem] shrink-0 pt-px text-[10px] text-muted">{label}</span>
-      <div className="min-w-0 flex-1">{children}</div>
-    </div>
-  )
-}
-
-
-/**
- * [R199] 「通道结论」栏的判定层 —— 结论在前, 数据降为依据。
- *
- * 用户: 「如何排版和内容的显示才能更有价值, 而不是展示单纯的数据,
- *        对我有指导性意义」。
- *
- * R198 我在这里摆了八个指标格 —— 那正是 R191 之前「趋势状态」栏犯过的错:
- * **全是测量, 没有一条是结论**。压缩 0.9 是好是坏? 分离度 2.4 呢? 单看每一个
- * 都答不了"我该怎么办"。
- *
- * 所以这一版分三层, 从上到下依次是:
- *   ① 现在处在哪一段(阶段判定) + 这一段该盯什么   ← 唯一的行动指引
- *   ② 位置结论在这只票上灵不灵(偏买档 vs 偏卖档)  ← 要不要信它
- *   ③ 那八个数                                    ← 前两条的依据
- */
-/** [R293] 阶段的纯文字色。`PHASE_CLS` 是整块卡的边框+底色, 这里要的是一行小字 */
+/** [R293] 阶段的纯文字色。整块卡的边框+底色那套已随 VerdictHeader 一起撤了 */
 const PHASE_TEXT_CLS: Record<string, string> = {
   coiling: 'text-secondary', launching: 'text-red-300', advancing: 'text-red-300',
   stalling: 'text-amber-300', overextended: 'text-amber-300',
@@ -468,28 +446,7 @@ const TONE_CN: Record<string, string> = {
   buy: '偏买', hold: '拿着', sell: '偏卖', avoid: '回避', watch: '等着',
 }
 
-// [R269 加, R293 删] `PHASE_CLS`(阶段那张卡的边框+底色)在这里删掉了 ——
-// 那张卡整块搬进了头部卡的「现在」行, 只留一行小字, 用的是 `PHASE_TEXT_CLS`。
 
-/**
- * [R269] 依据 —— 默认收起的一条。
- *
- * ## [R212] 表里那三样为什么缺一不可(原样保留)
- *
- *   v1  只给数字(`+1.4` `-1.3` `10%` `中下中`)。用户: 「用数字看不懂」——
- *       对的: 得先知道"多少算大"才读得出好坏, 而那正是不该逼人记的东西。
- *   v2  只给状态词(`比之前快` `走到中段` `完全分开`)。用户: 「仍旧看不懂,
- *       获取不到结论性信息」—— 也对: 「走到中段」**然后呢**? 该做的那一步
- *       合成仍然留给了用户。
- *   v3  用户自己给了答案: 「你干脆保持数据, 然后在后面加一行解释」。
- *
- * 三样缺一不可: **名称**(这个数在说什么)、**数值**(能核对)、**解释**(所以呢)。
- * 文案在后端(`keltner_geometry.explain`), 前端只排版 —— 「多少算大」的分界
- * 只该有一处定义。
- *
- * R269 改的只是**它在版面上的位置**: 内容一个字没动, 从常驻改成收起。要核对读数的
- * 时候展开一次就够, 而正文那串段落是每次都要翻的。展开状态记在本地。
- */
 function EvidencePanel({ ch, edge }: {
   ch: NonNullable<StockReview['channel']>
   edge: StockReview['verdict_edge']
@@ -554,7 +511,7 @@ function VerdictView({ d, segments, onHelp }: {
 
   return (
     <>
-      <div className="mx-4 mt-3 divide-y divide-border/40 rounded-lg border border-border/60">
+      <div className={HEAD_CARD}>
         {/* 用户: 「核心是按结论买卖」—— 与趋势那边一样, 它是第一行 */}
         <HeadRow label="按结论买卖">
           <FlipTradesBar
