@@ -100,18 +100,69 @@ SPAN3 = LAG["l"] - LAG["m"]         # 30.0
 STEADY_RATIO_MID = (WINDOW["m"] - 1) / (WINDOW["s"] - 1)
 STEADY_RATIO_LONG = (WINDOW["l"] - 1) / (WINDOW["s"] - 1)
 
-# |a1| 小于它算匀速。0.05 ATR/天 = 10 天累积半个 ATR —— 见模块头「档位门槛是量出来的」
+# |a1| 小于它算匀速。0.05 ATR/天 = 10 天累积半个 ATR。
+#
+# [R278] **这个门槛的立论重新量过了, 原注释的三个数都不准。**
+# 原注释写:「合成日线上 |a1| 的中位数约 0.12, 取 0.05 时"匀速"约占两成, 两侧各四成」。
+# 拿本仓库 16 个具名场景逐日复算(1039 个交易日, 无随机抽取):
+#
+#     |a1| 中位数 = 0.088      (原注释: 约 0.12)
+#     加速 36.9% / 平稳 27.8% / 减速 35.3%   (原注释: 四成 / 两成 / 四成)
+#
+# **数值本身没动** —— 没有后验证据支持换一个数, 换了就是拿猜测替换猜测。
+# 改的只是这段说明: 它原来在用一组复算不出来的数字给 0.05 背书。
 ACCEL_FLAT = 0.05
 
-ACCEL_UP = "accel"       # 加速
-ACCEL_STEADY = "steady"  # 匀速
-ACCEL_DOWN = "decel"     # 减速
-ACCEL_CN = {ACCEL_UP: "加速", ACCEL_STEADY: "匀速", ACCEL_DOWN: "减速"}
+ACCEL_UP = "accel"       # 往多头方向变
+ACCEL_STEADY = "steady"  # 没变
+ACCEL_DOWN = "decel"     # 往空头方向变
+
+# [R278] 分离度的两个刻度从 phase() 那边提上来 —— `bear_structure()` 要用它,
+# 而那个函数必须和 `phase()` 判「下跌中」用**同一个式子**(见下)。移动而已, 值没动。
+SPREAD_LAUNCH = 1.0
+SPREAD_MATURE = 3.0
 
 # 短带与长带完全脱开的临界: |MA20−MA120| ≥ k_s + k_l = 5 个 ATR
 TORN_ATR = K["s"] + K["l"]
 # 短带被长带完全包住的临界: |MA20−MA120| ≤ k_l − k_s = 1 个 ATR
 NESTED_ATR = K["l"] - K["s"]
+
+
+def bear_structure(spread) -> bool:
+    """空头结构? —— **与 `phase()` 判「下跌中」是同一个式子, 一处定义。**
+
+    [R278] 原来这件事在两处各写了一遍: `phase()` 用 `sp <= -SPREAD_LAUNCH`,
+    而快慢措辞用 `not nested and sp < 0`。两个式子**几乎**等价, 差一个边界点:
+
+        spread = -1.00  →  阶段说「下跌中」, 而快慢说「正在放慢」(多头措辞)
+
+    窄归窄, 这正是本仓库反复犯的那个形状(同一件事两个产地, 必然漂移)。
+    """
+    return spread is not None and spread <= -SPREAD_LAUNCH
+
+
+# 快慢的说法**分方向**。同一个负加速度, 在涨的票上是"涨慢了", 在跌的票上是
+# "跌得更急" —— 共用一套就会在空头一侧说反话(R277 修的正是这个)。
+_PACE_BULL = {ACCEL_UP: "还在加速", ACCEL_STEADY: "速度平稳", ACCEL_DOWN: "正在放慢"}
+_PACE_BEAR = {ACCEL_UP: "跌势在缓", ACCEL_STEADY: "速度平稳", ACCEL_DOWN: "跌得更急"}
+
+# 拿不到方向时的中性说法(台账按 level 跨多只票分组, 那里根本没有"这一只的方向")。
+# **不用「加速/减速」** —— 那两个词在跌势里读反, 而中性场合恰恰无法纠正。
+# 「往上/往下」说的是 a1 的符号, 四个象限里字面永远成立。
+ACCEL_CN = {ACCEL_UP: "往上加速", ACCEL_STEADY: "速度平稳", ACCEL_DOWN: "往下加速"}
+
+
+def accel_cn(level: str | None, spread=None) -> str:
+    """加速度档位 → 人话。**全系统只有这一处产地。**
+
+    给了 `spread` 就按方向说(个股界面); 不给就用中性说法(台账那种跨票分组)。
+    """
+    if not level:
+        return ""
+    if spread is None:
+        return ACCEL_CN.get(level, "")
+    return (_PACE_BEAR if bear_structure(spread) else _PACE_BULL).get(level, "")
+
 
 # 压缩指数的三档。0.8 以上基本是"短带还包在里面"(粘合), 0.05 以下是"已经脱开"。
 COMPRESS_TIGHT = 0.80
@@ -312,7 +363,11 @@ def geometry(bands: dict | None, close) -> dict | None:
             # 近 10 天因为加速多走(少走)了几个 ATR —— 比 ATR/天 好读
             "gain_atr": round(a1 * SPAN1, 2),
             "level": level,
-            "level_cn": ACCEL_CN.get(level or "", ""),
+            # [R278] **这里带上方向。** 以前是 `ACCEL_CN.get(level)` 的三档中性词
+            # (加速/匀速/减速), 于是一只加速下跌的票在决策台悬停、组合速查、今日总览、
+            # HTML 导出四处都写着「减速」。`geometry()` 手上就有 spread, 没有理由
+            # 把方向丢掉让四个下游各自去猜(而它们都没猜)。
+            "level_cn": accel_cn(level, spread),
         },
         # --- 重叠 ---
         "compress": None if o is None else round(o, 3),
@@ -371,18 +426,28 @@ def explain(g: dict | None, runs: dict | None = None,
         out.append({"label": label, "value": value, "why": why})
 
     # ---- 快慢 ----
+    # [R278] 这里原来是**第三套措辞**(「还在加力」/「推力在退」), 而且和另外两套
+    # 一样只按 `level` 取词 —— 于是同一族毛病: 一只加速下跌的票在这儿写「推力在退」。
+    # 档位名统一走 `accel_cn(level, spread)`, 后面那句"该怎么读"再分方向说。
     ac = g.get("accel") or {}
     lvl, gain = ac.get("level"), ac.get("gain_atr")
     if gain is not None:
         val = f"{'+' if gain >= 0 else '−'}{abs(gain):.1f} 倍波动"
+        bear = bear_structure(g.get("spread"))
+        name = accel_cn(lvl, g.get("spread"))
         if lvl == ACCEL_UP:
             add("最近快慢", val,
-                f"这十天比前一段多走了 {abs(gain):.1f} 倍日常波动 —— 还在加力。"
-                "但不是越大越好: 冲得太猛往往出现在一波的末尾, 不是起点")
+                f"这十天比前一段多走了 {abs(gain):.1f} 倍日常波动 —— {name}。"
+                + ("跌势里往上使劲 = 卖压在减轻, 但这既可能是反弹的开头, "
+                   "也可能只是跌途中的一次喘息 —— 单看这一条分不出来"
+                   if bear else
+                   "但不是越大越好: 冲得太猛往往出现在一波的末尾, 不是起点"))
         elif lvl == ACCEL_DOWN:
             add("最近快慢", val,
-                f"这十天比前一段少走了 {abs(gain):.1f} 倍日常波动 —— 推力在退。"
-                "趋势本身还没坏, 但该开始想「什么情况下我就走」")
+                f"这十天比前一段少走了 {abs(gain):.1f} 倍日常波动 —— {name}。"
+                + ("跌势里继续往下使劲 —— 这不是「跌不动了」, 是还在往下砸"
+                   if bear else
+                   "趋势本身还没坏, 但该开始想「什么情况下我就走」"))
         else:
             add("最近快慢", val,
                 "这十天和之前那一段走得一样快 —— 没有新的力量进来, 也没有在退。"
@@ -1163,10 +1228,16 @@ PHASE_OVEREXTENDED_CN = {"up": "涨过头", "down": "跌过头"}
 # 用户: 「下跌中贴下轨的怎么会是涨势转弱, 正常吗」。不正常, 见 phase() 的注释。
 PHASE_STALLING_DONE_CN = "涨势已走完"
 
-# 分离度的两个刻度: 越过 LAUNCH 算真的脱开了, 越过 MATURE 算走了一大段。
-# 与 opportunity_score 的 SPREAD_CURVE 甜区(1.5~3)对齐, 不另立一套。
-SPREAD_LAUNCH = 1.0
-SPREAD_MATURE = 3.0
+# [R278] 这两个常量**提到文件头去了**(`bear_structure()` 要用), 这里原来那份
+# 重复定义一并删掉 —— 同一个名字在一个文件里定义两次, 改了上面那份而没人发现
+# 下面这份把它盖回去, 是最难查的一类错。
+#
+# 顺带纠正原注释的一句**假话**: 它写着「与 opportunity_score 的 SPREAD_CURVE
+# 甜区(1.5~3)对齐, 不另立一套」。**`SPREAD_CURVE` 这个名字全仓不存在**
+# (`git log -S` 确认历史上也从未存在过), 而 `opportunity_score` 的位置轴走的是
+# `channel_pct`(短期通道位置 0~1)配 `POS_CURVE`, **压根不看 spread**。
+# 也就是说这三个刻度只服务界面分档, 与把握分无关 —— 与 R229「几何整个从打分里
+# 剥离」是一致的, 只是这句注释一直没跟着改。
 
 
 def phase(geo: dict | None, runs: dict | None = None) -> dict | None:
@@ -1207,26 +1278,15 @@ def phase(geo: dict | None, runs: dict | None = None) -> dict | None:
         return "刚起步"
 
     def _pace() -> str:
-        """[R277] **空头结构里要换一套说法** —— 原来两边共用一套, 说反了。
+        """[R278] 直接走 `accel_cn(level, spread)` —— **不再在这里另写一份**。
 
-        加速度是**带方向**的(`a1 = v1 − v2`, 符号表示"往多头还是往空头变"),
-        不是"变快还是变慢"。可「还在加速 / 正在放慢」这两个词读起来是后者。
-        于是一只**跌得越来越急**的票, a1 明显为负, 界面上写的是「正在放慢」——
-        实测确认过: spread=-2.0 / a1=-0.30 出来是「下跌中 · 正在放慢」。
-
-        这和 R207(「走得过头了」把只对涨过头成立的话配给了深跌票)、
-        R215①(「涨势转弱」配给了已经跌完的票)是同一族: **措辞只考虑了上涨那一侧。**
-
-        三条线挤在一起时不分方向 —— R224 已经立过规矩: 那时 `spread` 的正负
-        是噪声不是方向(差一点点就会翻号), 拿它挑措辞等于按噪声说话。
-        横盘里「还在加速」本来就该读成"开始往外走了", 与 PH_LAUNCHING 一致。
+        R277 在这儿手写了一遍"空头就换套说法", 判据是 `not nested and sp < 0`;
+        而 `phase()` 自己判「下跌中」用的是 `sp <= -SPREAD_LAUNCH`。两个式子
+        **几乎**等价, 差一个边界点(`spread = -1.00` 时阶段说「下跌中」而快慢
+        说「正在放慢」)。同一件事两个产地, 必然漂移 —— 这次只差一个点, 下次
+        谁动了其中一个阈值就是一片。方向判据收进 `bear_structure()`, 一处定义。
         """
-        if not up and not down:
-            return "速度平稳"
-        bear = not geo.get("nested") and sp < 0
-        if bear:
-            return "跌势在缓" if up else "跌得更急"
-        return "还在加速" if up else "正在放慢"
+        return accel_cn(_accel_level(a1), sp)
 
     def mk(code, why, watch, cn=None):
         return {"code": code, "cn": cn or PHASE_CN[code], "why": why, "watch": watch,

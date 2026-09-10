@@ -291,12 +291,24 @@ function VerdictInner({ v, ev, geo, runs, energy, ph, stateRun, onOpen }: {
  *   在不同票上是不同颜色, 那是颜色在说另一件事。快慢不一样 —— 它**是**判断
  *   (在往多头还是空头变), 所以按方向上色。
  */
+/**
+ * [R278] 快慢的配色**按 `level`(也就是 a1 的符号)取, 不按那句话取**。
+ *
+ * R277 这里是按词映射的, 其中两个词的颜色与符号是反的:
+ * 「跌势在缓」(a1>0) 给了琥珀、「正在放慢」(a1<0) 也给了琥珀。
+ *
+ * 按符号取则**四个象限全对**, 而且不需要知道方向 —— A 股红涨绿跌:
+ *
+ *     a1 > 0  往上使劲  → 红   (涨势里=还在加速; 跌势里=跌势在缓, 都是偏多的一侧)
+ *     a1 < 0  往下使劲  → 绿   (涨势里=正在放慢; 跌势里=跌得更急, 都是偏空的一侧)
+ *
+ * 这也正是 `ComboView` 一直在用的规则 —— 那边的颜色从来没错过, 错的只有词:
+ * **颜色编的是符号, 词描述的是大小**, 而这个量的意义在符号上。
+ */
 const PACE_CLS: Record<string, string> = {
-  还在加速: 'text-red-400/85',
-  跌得更急: 'text-emerald-400/85',
-  跌势在缓: 'text-amber-300/85',
-  正在放慢: 'text-amber-300/85',
-  速度平稳: 'text-muted',
+  accel: 'text-red-400/85',
+  decel: 'text-emerald-400/85',
+  steady: 'text-muted',
 }
 
 export function SpreadCell({ geo, ph, runs, onOpenReview }: {
@@ -332,7 +344,7 @@ export function SpreadCell({ geo, ph, runs, onOpenReview }: {
       <button type="button" onClick={onOpenReview} title={tip}
               className="mx-auto flex w-full cursor-pointer flex-col items-center gap-0.5 rounded-btn px-1 py-0.5 leading-tight transition-colors duration-hover hover:bg-elevated/40">
         <span className="whitespace-nowrap text-[10px] text-muted">{ph.maturity_cn}</span>
-        <span className={`whitespace-nowrap text-[9px] ${PACE_CLS[ph.pace_cn] ?? 'text-muted'}`}>
+        <span className={`whitespace-nowrap text-[9px] ${PACE_CLS[geo?.accel?.level ?? ''] ?? 'text-muted'}`}>
           {ph.pace_cn}
         </span>
       </button>
