@@ -46,6 +46,14 @@ export const storage = {
   /** [R270] 组合速查里「其余 26 格」是否展开 —— 那是查表用的参考, 与今天无关 */
   reviewComboRestOpen:  kv<boolean>('review-combo-rest-open'),
 
+  /**
+   * [R276] 决策台当前只看哪个分组。取值: `'all'` / `'ungrouped'` / 分组 id。
+   *
+   * 用字符串哨兵而不是 `string | null`: 「未分组」本身就是一个可选项, 用 null 表示
+   * 它的话就和"没存过"撞在一起了 —— localStorage 分不出这两件事。
+   */
+  boardGroupFilter:     kv<string>('board-group-filter'),
+
   /** [R100] 个股弹窗最近查看(全局, 弹窗内随意切换用) */
   recentStocks:         kv<{ symbol: string; name: string }[]>('recent-stocks'),
 
