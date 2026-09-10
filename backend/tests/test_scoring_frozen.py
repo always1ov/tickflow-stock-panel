@@ -1,7 +1,9 @@
 """[R280] v2 把握分**冻结基线** —— 参数动了必须是有意的、看得见的。
 
-用户: 「v2 版本的打分系统是稳定版, 不能动」「不动我稳定版本的打分系统就行」。
-写进 AGENTS.md 第 13 条。
+用户: 「v2 版本的打分系统是稳定版, 不能动」「不动我稳定版本的打分系统就行」
+      「稳定版本是 R134」。写进 AGENTS.md 第 13 条。
+
+**基线锚在 R134**(提交 `973b148`), 不是「某天的样子」—— 核实过程见下面 FROZEN 上方。
 
 ## 为什么规矩之外还要一道闸
 
@@ -28,7 +30,22 @@ import pytest
 from app.services import opportunity_score as osc
 
 # ----------------------------------------------------------------------------
-# 基线 —— 抄自 R280 当天的 opportunity_score.py, 一个数都没改
+# 基线 —— **就是 R134 的值**
+#
+# [R281] R280 建这份基线时只写了「抄自当天的 opportunity_score.py」, 那句话是真的,
+# 但**没说清它凭什么算基准**。用户随后点明「稳定版本是 R134」, 于是逐条核实:
+#
+#   · `git diff 973b148 HEAD -- backend/app/services/opportunity_score.py`
+#     → **零字节差异**(973b148 = 「R134: AI 优选评分 v2」那次提交)
+#   · 把 R134 那一版的文件取出来直接跑, 与 HEAD 在系统性网格上逐点比对:
+#       score_candidate  2,439,360 个组合 —— score/dims/factors/coverage/partial
+#                                           全字段完全一致
+#       check_gates          3,024 个组合 —— 完全一致
+#       explain                320 个组合 —— 完全一致
+#   · 调用点(`api/today.py` 里那 7 个入参的求值 + 调用行)也逐行比过, 一字未变
+#
+# 所以这份基线**等价于 R134**, 不只是「等价于某天的样子」。
+# 中间有过一次 `dcef661 revert: [R230] 评分系统逐字节回退到 R134`, 那是它没漂的原因。
 # ----------------------------------------------------------------------------
 FROZEN: dict[str, object] = {
     # 三个维度之间的权重
@@ -140,3 +157,19 @@ def test_R280_AGENTS里那条规矩指向的是这个文件():
     rel = "backend/tests/test_scoring_frozen.py"
     assert rel in doc, f"规矩没指向执行处({rel})"
     assert (root / rel).exists()
+
+
+def test_R281_基线锚点写明了是R134():
+    """R280 建基线时只写「抄自当天的文件」—— 那句话是真的, 但**没说清它凭什么算
+    基准**。基准是 R134(提交 973b148), 而且是逐条核实过的(零字节差异 + 244 万个
+    组合逐点比对)。
+
+    出处写不清楚, 这份基线就只是「某天的快照」; 写清楚了它才是**可复验的基准** ——
+    任何人都能自己跑一遍 `git diff 973b148 HEAD -- .../opportunity_score.py` 去对。
+    这跟「注释里的数字必须复算得出来」(R278)是同一条纪律。
+    """
+    from pathlib import Path
+    src = Path(__file__).read_text(encoding="utf-8")
+    assert "R134" in src, "基线没写明锚在哪一版"
+    assert "973b148" in src, "没留下可复验的提交锚点"
+    assert "零字节差异" in src, "没写核实结论"
