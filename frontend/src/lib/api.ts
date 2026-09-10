@@ -1185,6 +1185,40 @@ export interface WatchlistGroup {
   color: WatchlistGroupColor
 }
 
+/** [R271] 一处存储的体检结果。 */
+export interface DataDoctorStore {
+  rel: string
+  cn: string
+  /** user=不可重算(只能补齐) / derived=可重算(坏了删掉重跑) */
+  kind: 'user' | 'derived'
+  note: string
+  exists: boolean
+  readable: boolean | null
+  records: number | null
+  /** 后加字段的缺失: 字段名 → 有几条缺它。这些能按默认值补齐 */
+  missing: Record<string, number>
+  /** 必填字段的缺失 —— 补不了, 只能报出来让人看 */
+  incomplete: Record<string, number>
+  error: string
+}
+
+export interface DataDoctorReport {
+  stores: DataDoctorStore[]
+  orphans: { rel: string; is_dir: boolean; bytes: number }[]
+  summary: {
+    checked: number; present: number; unreadable: number
+    with_missing: number; with_incomplete: number; orphans: number
+  }
+}
+
+export interface DataHealResult {
+  rel: string
+  ok: boolean
+  filled?: number
+  backup?: string
+  error?: string
+}
+
 export interface WatchlistImportCandidate {
   code: string
   symbol: string | null
@@ -4012,6 +4046,14 @@ export const api = {
       `/api/watchlist/groups/${encodeURIComponent(groupId)}/members/${encodeURIComponent(symbol)}`,
       { method: 'DELETE' },
     ),
+  /** [R271] 数据体检 —— 纯读, 不改任何东西 */
+  dataDoctorScan: () => request<DataDoctorReport>('/api/settings/data-doctor'),
+  /** [R271] 按默认值补齐指定存储的缺失字段 —— 改动前先备份 */
+  dataDoctorHeal: (rels: string[]) =>
+    request<{ results: DataHealResult[] }>('/api/settings/data-doctor/heal', {
+      method: 'POST',
+      body: JSON.stringify({ rels }),
+    }),
   watchlistOcrStatus: () =>
     request<{ provider: string; available: boolean }>('/api/watchlist/ocr-status'),
   watchlistImportImage: (file: File, signal?: AbortSignal, quiet = false) => {

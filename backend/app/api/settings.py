@@ -2287,3 +2287,35 @@ def update_review_push(req: ReviewPushIn) -> dict:
     if req.mode is not None:
         mode = preferences.set_review_push_mode(req.mode)
     return {"review_push_channels": saved, "review_push_mode": mode}
+
+
+class DataHealIn(BaseModel):
+    """[R271] 要补齐哪几处存储。空数组什么都不做 —— 不接受"全都补"这种含糊指令。"""
+
+    rels: list[str]
+
+
+@router.get("/data-doctor")
+def data_doctor_scan() -> dict:
+    """[fork 增强 R271] 数据体检 —— 盘上那些跟着功能一起长出来的老文件缺了什么。
+
+    **纯读, 不改任何东西。** 报告分三类: 用户数据(不可重算, 只能补齐)、
+    派生数据(可重算, 坏了删掉重跑)、孤儿文件(功能删了文件还在)。
+    """
+    from app.config import settings as cfg
+    from app.services import data_doctor
+    return data_doctor.scan(cfg.data_dir)
+
+
+@router.post("/data-doctor/heal")
+def data_doctor_heal(req: DataHealIn) -> dict:
+    """[fork 增强 R271] 按默认值补齐指定存储的缺失字段。
+
+    **改动前先备份, 一条记录都不删。** 只补声明过默认值的字段; 必填字段的缺失
+    不补 —— 补出来的是一条假记录, 那种只该报出来让人自己看。
+    """
+    from app.config import settings as cfg
+    from app.services import data_doctor
+    if not req.rels:
+        raise HTTPException(400, "没有指定要补齐的存储")
+    return data_doctor.heal(cfg.data_dir, req.rels)

@@ -4,10 +4,11 @@
  * 独立于实时监控, 放置影响整体应用行为的开关项。
  */
 import { useState, useCallback, useEffect } from 'react'
+import { toast } from '@/components/Toast'
 import { useQueryClient } from '@tanstack/react-query'
-import { Settings2, Trash2, RefreshCw, Bell, Volume2, Info, ExternalLink } from 'lucide-react'
+import { Settings2, Trash2, RefreshCw, Bell, Volume2, Info, ExternalLink, Stethoscope, Loader2, Wrench } from 'lucide-react'
 import { usePreferences, useVersion } from '@/lib/useSharedQueries'
-import { api } from '@/lib/api'
+import { api, type DataDoctorReport } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { PageHeader } from '@/components/PageHeader'
 import { refreshAlertToastConfig } from '@/components/AlertToast'
@@ -344,6 +345,8 @@ export function SettingsSystemPanel() {
         </div>
       </section>
 
+      <DataDoctorSection />
+
       <section className="rounded-card border border-border bg-surface p-5 mt-6">
         <div className="flex items-center gap-2 mb-4">
           <Info className="h-4 w-4 text-accent" />
@@ -362,6 +365,144 @@ export function SettingsSystemPanel() {
 
       </section>
     </>
+  )
+}
+
+
+// ===== [R271] 数据体检 =====
+
+/**
+ * 盘上那些跟着功能一起长出来的老文件, 到底缺了什么。
+ *
+ * 用户: 「我不断改这个系统, 不断沿用以前的数据 …… 我加了东西或者删除了东西,
+ * 但是系统没有重头开始, 会有残留的数据文件, 缺字段或者不完整」。
+ *
+ * 界面上要说清楚的是**三类的处置办法不一样**:
+ *   用户数据  不可重算 —— 只能按默认值补齐, 少一条就是真丢了
+ *   派生数据  可重算 —— 坏了删掉重跑, 补它是在给假数据续命
+ *   孤儿文件  功能删了文件还在 —— 只报, 不替人删
+ *
+ * **一个「一键全修」都不给。** 改的是不可重算的用户数据, 每一处都该是人点头的。
+ */
+function DataDoctorSection() {
+  const [report, setReport] = useState<DataDoctorReport | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [healing, setHealing] = useState('')
+
+  const run = async () => {
+    setBusy(true)
+    try { setReport(await api.dataDoctorScan()) }
+    catch { /* 已由 request 弹出 */ }
+    finally { setBusy(false) }
+  }
+
+  const heal = async (rel: string, cn: string) => {
+    setHealing(rel)
+    try {
+      const r = (await api.dataDoctorHeal([rel])).results[0]
+      if (!r?.ok) { toast(r?.error || '补齐失败', 'error'); return }
+      toast(r.filled
+        ? `「${cn}」补齐 ${r.filled} 条${r.backup ? `,已备份为 ${r.backup}` : ''}`
+        : `「${cn}」没有需要补的`, 'success')
+      setReport(await api.dataDoctorScan())
+    } catch { /* 已由 request 弹出 */ }
+    finally { setHealing('') }
+  }
+
+  const problems = (report?.stores ?? []).filter(
+    s => s.exists && (s.readable === false || s.error
+      || Object.keys(s.missing).length || Object.keys(s.incomplete).length))
+
+  return (
+    <section className="rounded-card border border-border bg-surface p-5 mt-6">
+      <div className="flex items-center gap-2 mb-1">
+        <Stethoscope className="h-4 w-4 text-accent" />
+        <h3 className="text-sm font-medium text-foreground">数据体检</h3>
+        <button
+          onClick={() => void run()}
+          disabled={busy}
+          className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-btn text-xs
+                     bg-elevated text-secondary hover:text-foreground transition-colors disabled:opacity-50"
+        >
+          {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+          {busy ? '体检中…' : '开始体检'}
+        </button>
+      </div>
+      <p className="text-[11px] leading-relaxed text-muted">
+        系统一直在改,盘上的老数据是早先的版本写的 —— 后加的字段老记录不会有。
+        这类缺失<b className="text-secondary">不会报错</b>,只会被当成「你没设过」静默处理。
+        体检只读不改;补齐前会先备份,并且<b className="text-secondary">一条记录都不删</b>。
+      </p>
+
+      {report && (
+        <div className="mt-3 space-y-3">
+          <div className="text-[11px] text-secondary">
+            查了 {report.summary.checked} 处,盘上有 {report.summary.present} 处
+            {report.summary.with_missing > 0 && <span className="text-warning">,{report.summary.with_missing} 处缺字段</span>}
+            {report.summary.unreadable > 0 && <span className="text-danger">,{report.summary.unreadable} 处读不动</span>}
+            {report.summary.orphans > 0 && <span className="text-muted">,{report.summary.orphans} 个孤儿文件</span>}
+            {problems.length === 0 && report.summary.orphans === 0 && <span className="text-emerald-400"> —— 没查出问题</span>}
+          </div>
+
+          {problems.map(s => (
+            <div key={s.rel} className="rounded-btn border border-border/60 bg-elevated/20 px-3 py-2">
+              <div className="flex flex-wrap items-baseline gap-x-2">
+                <span className="text-xs text-foreground">{s.cn}</span>
+                <span className="font-mono text-[10px] text-muted">{s.rel}</span>
+                <span className={`text-[10px] ${s.kind === 'user' ? 'text-amber-400' : 'text-muted'}`}>
+                  {s.kind === 'user' ? '用户数据 · 不可重算' : '派生数据 · 可重算'}
+                </span>
+                {s.records != null && <span className="text-[10px] text-muted">{s.records} 条</span>}
+                {/* 补齐只对用户数据、且只补声明过默认值的那些 */}
+                {s.kind === 'user' && Object.keys(s.missing).length > 0 && (
+                  <button
+                    onClick={() => void heal(s.rel, s.cn)}
+                    disabled={healing === s.rel}
+                    title="按默认值补上缺的字段。已有的值一个都不动,改动前先备份。"
+                    className="ml-auto inline-flex items-center gap-1 rounded-btn border border-accent/40 bg-accent/10 px-2 py-0.5 text-[10px] text-accent hover:bg-accent/20 disabled:opacity-50"
+                  >
+                    {healing === s.rel ? <Loader2 className="h-3 w-3 animate-spin" /> : <Wrench className="h-3 w-3" />}
+                    补齐
+                  </button>
+                )}
+              </div>
+              {!!s.error && <p className="mt-1 text-[10px] text-danger">{s.error}</p>}
+              {Object.entries(s.missing).map(([k, n]) => (
+                <p key={k} className="mt-0.5 text-[10px] text-warning/90">
+                  缺字段 <code className="font-mono">{k}</code> · {n} 条
+                  {s.kind === 'derived' && <span className="text-muted">(派生数据 —— 该做的是删掉重算,不是补)</span>}
+                </p>
+              ))}
+              {Object.entries(s.incomplete).map(([k, n]) => (
+                <p key={k} className="mt-0.5 text-[10px] text-danger/90">
+                  <code className="font-mono">{k}</code> 为空 · {n} 条 —— 补不了,得自己看这几条还要不要
+                </p>
+              ))}
+              {!!s.note && <p className="mt-0.5 text-[10px] text-muted/70">{s.note}</p>}
+            </div>
+          ))}
+
+          {report.orphans.length > 0 && (
+            <div className="rounded-btn border border-border/60 bg-elevated/20 px-3 py-2">
+              <div className="text-[11px] text-secondary">
+                孤儿文件 —— 现在的代码不读它们,多半是删掉的功能留下的
+              </div>
+              <div className="mt-1 space-y-0.5">
+                {report.orphans.map(o => (
+                  <p key={o.rel} className="font-mono text-[10px] text-muted">
+                    {o.rel}{o.is_dir ? '/' : ''} · {(o.bytes / 1024).toFixed(1)} KB
+                  </p>
+                ))}
+              </div>
+              <p className="mt-1 text-[10px] text-muted/70">
+                这里<b className="text-secondary">不替你删</b> —— 判断「没人读」靠的是一张手写清单,
+                清单漏一项就等于删了你的数据。确认之后自己到 data/user_data 下删。
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+    </section>
   )
 }
 
