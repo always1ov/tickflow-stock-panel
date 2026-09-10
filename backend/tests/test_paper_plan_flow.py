@@ -197,3 +197,48 @@ def test_sell_records_realized_pnl():
                        price=12.0, trade_date="2026-09-05", reason="走")
     assert e["cost"] == pytest.approx(round(cost, 4))
     assert e["pnl_pct"] == pytest.approx(round(e["price"] / cost - 1, 4))
+
+
+# ================================================================
+# [R264] 止盈提醒不随轮次衰减 —— 定下来的事, 用守卫钉住
+# ================================================================
+#
+# 模块里原先立着 `TARGET_NAG_LIMIT = 3`(「连刷三轮之后不再进上下文」), 逻辑从没写。
+# R264 的结论是**不接**: 一只票连着二十天挂在止盈线上方那正是主升浪, 按轮次静音
+# 等于对最该拿住的票减少信息。下面两条钉住这个决定 —— 谁要是哪天又去接那道限流,
+# 这两条会红。
+
+
+def test_R264_止盈提醒连刷多轮也不衰减(patched):
+    """连刷五轮, 每一轮都得照样提醒, 且账上不许长出按轮次的计数。"""
+    bk = _bought()
+    cost = bk["positions"]["600000.SH"]["cost"]
+    patched["prices"] = {"600000.SH": cost * 1.30}
+    for i in range(1, 6):
+        patched["as_of"] = f"2026-09-{9 + i:02d}"
+        res = run.check_plans(_Repo({}), _trader(bk), pt.SCOPE_MARKET)
+        assert res["reminders"] and res["reminders"][0]["kind"] == pp.KIND_TARGET, \
+            f"第 {i} 轮止盈提醒不见了 —— 止盈提醒不该随轮次衰减"
+        assert bk["plan_reminders"], f"第 {i} 轮提醒没落账, 下一轮模型就看不见"
+    # 账上不该为了限流长出计数字段
+    for k in bk:
+        assert "nag" not in k.lower(), f"账本长出了限流计数字段 {k}"
+
+
+def test_R264_第五轮的上下文里仍然摆着止盈那一段(patched, monkeypatch):
+    """真正要紧的是模型看得见 —— 落账了但上下文里被砍掉一样等于没提醒。"""
+    bk = _bought()
+    cost = bk["positions"]["600000.SH"]["cost"]
+    patched["prices"] = {"600000.SH": cost * 1.30}
+    tr = _trader(bk)
+    for i in range(5):
+        patched["as_of"] = f"2026-09-{10 + i:02d}"
+        run.check_plans(_Repo({}), tr, pt.SCOPE_MARKET)
+    ctx = run.build_context(_Repo({}), tr, pt.SCOPE_MARKET)
+    assert "已到止盈线" in ctx, "第五轮的上下文里没有止盈那一段"
+    assert "600000.SH" in ctx
+
+
+def test_R264_那个没接上的限流常量已经删掉(patched):
+    """常量留着而逻辑不在, 下一个人只会以为是漏掉的功能。"""
+    assert not hasattr(pp, "TARGET_NAG_LIMIT")
