@@ -801,6 +801,9 @@ export interface StockReview {
     pending: string | null
     /** 因为缺开盘价(停牌之类)没执行成的转折日 */
     skipped: string[]
+    /** [R303] 最后一段还拿着 —— 「跟着做」与「一直拿着」都含它的浮盈浮亏 */
+    open_bull?: boolean
+    /** 有几笔的成交日撞上了涨跌停 —— 这几笔的价不能当真 */
     blocked: number
     /** 一笔都做不成时的原因 —— 空栏必须自己解释 */
     reason: 'no_flip' | 'no_open' | null

@@ -90,6 +90,9 @@ const REASON_CN: Record<NonNullable<FlipTrades['reason']>, string> = {
  */
 export function tradeNotes(ft: FlipTrades): string[] {
   return [
+    // [R303] 最后一段还拿着 —— **两个数都含它的浮盈浮亏**。这是"这只票的"情况
+    // (不是每只票都还持仓), 所以它属于这几条常驻正文的警告, 不是「说明」页。
+    ft.open_bull && '最后一段还拿着没了结 ——「跟着做」与「一直拿着」都含这一段的浮盈浮亏, 它还会变',
     ft.thin && `只走完 ${ft.bull.scored} 段多头, 样本太少, 这几个数只能当参考`,
     !!ft.blocked && `其中 ${ft.blocked} 笔的成交日当天涨停或跌停 —— 未必真成交得到这个价`,
     !!ft.pending && `${ft.pending} 那次变化的次日还没到, 没算进去`,
@@ -132,9 +135,9 @@ export function FlipTradesBar({ ft, basis }: {
           基线打散, 而这一行的毛病就是基线散。 */}
       <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 sm:grid-cols-4">
         <Stat label="跟着做" value={ft.follow} lead
-              title="只把已经走完的多头段复利叠起来。空仓期不算收益。" />
+              title="按信号进出的复利。空仓期不算收益(手上是现金)。还没了结的那一段按最后一天收盘算 —— 与「一直拿着」同一个终点。" />
         <Stat label="一直拿着" value={ft.hold}
-              title="同一段区间买了就不动 —— 与「跟着做」同起点同终点, 所以能直接比。" />
+              title="同一段区间买了就不动。与「跟着做」**同起点同终点**, 所以两个数能直接比。" />
         <Stat label="多赚" value={ft.excess}
               title="跟着做 − 一直拿着。正的才说明这套判定在这只票上真的帮上忙了。" />
         <div title="真正下过单的次数。连着的多头段是一次持仓, 不是两次买卖">

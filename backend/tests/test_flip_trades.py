@@ -7,7 +7,7 @@
 """
 import pytest
 
-from app.services.flip_trades import simulate, trend_days, verdict_days
+from app.services.flip_trades import BEAR, BULL, simulate, trend_days, verdict_days
 
 
 def _steps(states: list[str]) -> list[dict]:
@@ -537,20 +537,32 @@ def test_R287_跟随比买入持有多赚多少只有一个名字():
     assert "多赚" in _panel(), "复盘页这一栏的说法没了"
 
 
-def test_R287_未完成的多头段不许进跟着做的复利():
-    """**这条是变异测试逼出来的。** 原来只有一条测「未完成的段不进胜负统计」,
-    而那个场景里未完成的恰好是**空头**段 —— 空头段本来就被 side 过滤掉了,
-    于是把 `not open_ended` 这个条件整个删掉, 那条测试照样全绿。
+def test_R303_未完成的多头段进对照数但不进胜负统计():
+    """[R287 → R303] **这条整个反过来了 —— 而且是用户点的名。**
 
-    真正要守的是: 最后一段是**多头**且还没走完时, 那笔浮盈**不许**算进「跟着做」。
-    算进去就是拿一个还没兑现的数去吹成绩 —— R177「只数已兑现」的原话。
+    R287 立它时守的是「未兑现的浮盈不许算进跟着做」(R177「只数已兑现」)。
+    用户: 「跟着买和一直拿的统计起点必须要一样」—— 而 `hold` 一路算到最后一天,
+    `follow` 却把最后那个还拿着的段丢掉, 两个数根本不是同一段。
+
+    **那条纪律没被推翻, 是被放回了它该管的地方**:
+      · 胜负统计(`bull.scored / win / avg`)照旧**只数已兑现** ——
+        一段没走完就谈不上"这次赢了还是输了";
+      · 而 `follow`/`hold` 那一对是**同区间对照**, 两边都必须 mark 到最后一天,
+        否则一只"从头到尾只买过一次、拿到今天"的票会算出「跟着做 0% /
+        一直拿着 +67%」, 而那两件事根本是同一件事。
+
+    这条于是正反都钉: 浮盈**要**进对照数, **不许**进胜负统计。
     """
     states = ["NREA", "NR", "NR", "NR"]
     s = simulate(_steps(states), [9.0, 9.0, 10.0, 10.0], [9.0, 9.0, 10.0, 12.0])
     leg = s["legs"][0]
     assert leg["side"] == "多头" and leg["open_ended"] is True, f"场景没搭对: {leg}"
     assert leg["ret"] == pytest.approx(0.2), "场景没搭对: 这笔浮盈得是非零的"
-    assert s["follow"] == 0.0, "还没兑现的浮盈被算进「跟着做」了"
+    assert s["follow"] == pytest.approx(0.2), "浮盈没进「跟着做」—— 两个数又不是同一段了"
+    assert s["follow"] == s["hold"], "只有这一段, 两个数必须相同"
+    assert s["bull"]["scored"] == 0, "未走完的段混进胜负统计了 —— 那条纪律没变"
+    assert s["bull"]["avg"] is None, "未走完的段被算进平均了"
+    assert s["open_bull"] is True, "没标出「最后一段还拿着」—— 那是这只票的情况, 得说出来"
     assert s["trades"] == 1, "手确实下过单 —— 建仓次数该算, 只是结果还不知道"
 
 
@@ -779,12 +791,12 @@ def test_R287_组件真的把提醒印出来():
     """
     code = _panel()
     i = code.index("export function tradeNotes")
-    blk = code[i:i + 320]
+    blk = code[i:i + 460]   # [R303] 多了「最后一段还拿着」那一条, 切片跟着放宽
     # [R302] `caveat` 那个入参删了 —— 它装的是**每只票都一样**的口径偏差,
     # 已经搬进「说明」页。这条纪律守的从来是**这只票的**那几条警告:
     # 样本太少 / 撞上涨跌停 / 最后一次还没执行 —— 一条都不许少。
     assert "caveat" not in blk, "口径偏差又塞回这几条「这只票的」警告里了"
-    for keep in ("ft.thin", "ft.blocked", "ft.pending", "ft.skipped"):
+    for keep in ("ft.open_bull", "ft.thin", "ft.blocked", "ft.pending", "ft.skipped"):
         assert keep in blk, f"{keep} 那条警告没了 —— 把数字摆出来而把它藏起来是骗人"
     # [R293] 整块面板删了(明细并进两边的正文), 只剩压缩条这一处渲染。
     assert code.count("notes.map(") == 1, (
@@ -800,6 +812,109 @@ def test_R287_组件真的把提醒印出来():
 # 用户: 「全景图很多东西我是不看的, 用一个按钮全部藏起来, 点击按钮弹窗展示查看。
 # 我只关注最核心的东西 …… 我只要关注趋势、转折、六态状态这些 …… 比如按照转折点
 # 买卖和底部部分可以融合到一起显示」。
+
+
+# ================================================================
+# [R303] 「跟着做」与「一直拿着」必须量同一段
+# ================================================================
+#
+# 用户: 「跟着买和一直拿的统计起点必须要一样」。
+#
+# **起点本来就一样**(两个数都从 `legs[0].enter_price` 起算, 空仓段对「跟着做」
+# 乘 1)。不一样的是**终点**: `hold` 一路算到最后一天收盘, 而 `follow` 只叠
+# **已走完**的多头段, 把最后那个还拿着的段整个丢掉。
+#
+# 于是"同一段区间"这句话在**当前还持仓**的票上是假的 —— 而那正是最常见的情形。
+
+
+def _hold_days(prices: list[float]) -> tuple[list[dict], list[float], list[float]]:
+    """一次买入、之后再没有信号 —— 拿到今天。用来钉那条最尖的不变量。"""
+    n = len(prices)
+    steps = [{"date": f"D{i + 1}", "side": BULL, "flipped": i == 1,
+              "prev": "DT" if i == 1 else "UT", "state": "UT", "state_cn": "上涨趋势"}
+             for i in range(n)]
+    steps[0]["side"] = BEAR
+    return steps, prices, prices
+
+
+def test_R303_界面上要说出最后一段还没了结():
+    """两个数现在含着一段**没兑现**的浮盈浮亏 —— 不说就是拿浮盈当成绩。
+
+    它属于「这只票的」那几条警告(不是每只票都还持仓), 所以常驻正文, 与
+    「样本太少」「撞上涨跌停」同一处 —— 而不是像恒定的口径偏差那样进「说明」页
+    (R302 定的那条分界)。
+    """
+    code = _panel()
+    i = code.index("export function tradeNotes")
+    blk = code[i:i + 420]
+    assert "ft.open_bull &&" in blk, "「最后一段还拿着」没进那几条警告"
+    assert "都含这一段的浮盈浮亏" in blk, "没说清这两个数含着未兑现的部分"
+    # 两个数的悬停也得改口: 「只把已经走完的多头段复利叠起来」已经不成立了
+    assert "只把已经走完的多头段复利叠起来" not in code, (
+        "「跟着做」的悬停还写着旧口径 —— 它现在也算最后那段未了结的"
+    )
+    assert "同起点同终点" in code, "没写明两个数是同一段区间"
+
+
+def test_R303_只买过一次而且还拿着时两个数必须逐字相同():
+    """**最尖的一条。**
+
+    如果这套判定从头到尾只发过一次买入信号, 而且到今天还拿着 —— 那「跟着做」
+    和「一直拿着」做的是**完全同一件事**: 同一天用同一个价买进, 一直拿到今天。
+    两个数必须逐字相同, 「多赚」必须是 0。
+
+    改之前 `follow` 是 0(没有"已走完"的多头段), `hold` 是那一段的全部涨幅,
+    于是「多赚」等于把这一段的涨幅整个记成负的。**当前还持仓的票全中这一条。**
+    """
+    steps, opens, closes = _hold_days([100, 100, 120, 150, 200])
+    r = simulate(steps, opens, closes)
+    assert r["follow"] == r["hold"], (
+        f"只买过一次还拿着, 两个数却不同: 跟着做 {r['follow']} vs 一直拿着 {r['hold']}"
+    )
+    assert r["excess"] == 0, f"「多赚」不是 0 而是 {r['excess']}"
+
+
+def test_R303_最后一段是空仓时一直拿着照旧吃到那一段():
+    """反面配对: **别把"终点对齐"改成"两个数一律相等"。**
+
+    最后一段是空仓的话, 跟着做确实什么也没赚(手上是现金), 而一直拿着要吃下
+    这一段的涨跌 —— 那正是这一栏最有价值的一半("躲开了多少"), 不许被抹平。
+    """
+    def d(name, side, flipped, prev, state):
+        return {"date": name, "side": side, "flipped": flipped, "prev": prev,
+                "state": state, "state_cn": state}
+
+    steps = [
+        d("D1", BULL, False, "UT", "UT"),
+        d("D2", BULL, True, "DT", "UT"),    # 转多 → D3 开盘买入 @100
+        d("D3", BULL, False, "UT", "UT"),
+        d("D4", BULL, False, "UT", "UT"),
+        d("D5", BEAR, True, "UT", "DT"),    # 转空 → D6 开盘清仓 @120
+        d("D6", BEAR, False, "DT", "DT"),
+        d("D7", BEAR, False, "DT", "DT"),   # 清仓之后才暴跌 —— 躲开了
+    ]
+    px = [100, 100, 100, 110, 120, 120, 60]
+    r = simulate(steps, px, px)
+    assert r["follow"] > 0, "多头那一段赚的没了"
+    assert r["hold"] < 0, "一直拿着没吃到最后那一段暴跌 —— 那是这一栏最有用的一半"
+    assert r["excess"] > 0, "躲开暴跌居然没算成「多赚」"
+
+
+def test_R303_两个数的起点和终点都取自同一根价():
+    """把"同一段"这件事**直接测出来**, 而不是靠上面两条各自的算术。
+
+    两边都必须是 `legs[0].enter_price → legs[-1].exit_price` 这一段:
+    起点同一个价、终点同一个价。任何一头取错, 这条就红。
+    """
+    steps, opens, closes = _hold_days([100, 100, 110, 90, 130])
+    r = simulate(steps, opens, closes)
+    legs = r["legs"]
+    span = legs[-1]["exit_price"] / legs[0]["enter_price"] - 1
+    # 容差取 1e-4: 两个数出口都 `round(…, 4)`, 比这更严会红在四舍五入上,
+    # 而这条问的是"取的是不是同一段", 不是小数位。
+    assert abs(r["hold"] - span) < 1e-4, "一直拿着不是这一整段"
+    # 只有一段多头 → 跟着做也必须正好是这一整段
+    assert abs(r["follow"] - span) < 1e-4, "跟着做没有量到同一段"
 
 
 def _dialog() -> str:

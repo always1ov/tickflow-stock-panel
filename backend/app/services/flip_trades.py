@@ -36,6 +36,12 @@
 转折如果次日还没到(窗口末尾), 那就是"信号有了、手还没动", 不许拿收盘价冒充成交
 价补一笔进去。
 
+[R303] **但那条纪律管的是胜负统计, 不是那两个对照数。** `follow` 与 `hold`
+必须量同一段区间 —— 同一个起点(第一次可执行的转折)、同一个终点(最后一天)。
+最后那个还拿着的多头段照旧按收盘 mark-to-market 算进 `follow`, 否则一只
+"从头到尾只买过一次、拿到今天"的票会算出「跟着做 0% / 一直拿着 +67%」,
+而那两件事根本是同一件事。胜负统计(`bull.scored / win / avg`)照旧只数已兑现。
+
 纯函数: 不读盘、不调网、不碰 repo。输入是已经对齐好的几条等长序列。
 """
 from __future__ import annotations
@@ -227,7 +233,7 @@ def simulate(steps: list[dict], opens: list, closes: list, *,
     empty = {"legs": [], "trades": 0,
              "reason": "no_open" if (skipped or pending or entries) else "no_flip", "follow": None, "hold": None, "excess": None,
              "from_date": None, "to_date": None, "pending": pending,
-             "skipped": skipped, "blocked": 0,
+             "skipped": skipped, "blocked": 0, "open_bull": False,
              "bull": _side_stats([]), "bear": _side_stats([])}
     if not entries:
         # pending 那一支也归到 no_open: 信号有了但一笔都没做成, 原因是"还没到
@@ -270,14 +276,35 @@ def simulate(steps: list[dict], opens: list, closes: list, *,
         else:
             l["act"] = "空仓" if prev_side == BEAR else "卖出"
 
-    done_bull = [l for l in legs if l["side"] == BULL and not l["open_ended"]]
+    # [R303] **两个数必须量同一段。** 用户: 「跟着买和一直拿的统计起点必须要一样」。
+    #
+    # 起点本来就一样(都是 `legs[0].enter_price`; 空仓段对「跟着做」乘 1)。
+    # **不一样的是终点**: `hold` 一路算到最后一天收盘, 而 `follow` 原来只叠
+    # **已走完**的多头段 —— 把最后那个还拿着的段整个丢掉了。
+    #
+    # 后果是系统性的, 而且专挑最常见的情形下手: 只要这只票**现在还持仓**,
+    # 这一段的浮盈就被从「跟着做」里扣掉、却留在「一直拿着」里。极端情形
+    # (从头到尾只买过一次、拿到今天)会算出「跟着做 0% / 一直拿着 +67%」——
+    # 而那两件事**根本是同一件事**。
+    #
+    # 所以最后那个未了结的多头段照旧按最后一天收盘 mark-to-market 乘进去,
+    # 与 `hold` 的终点严丝合缝。**「只数已兑现」那条纪律没有松**: 它守的是
+    # 分段胜负统计(`bull.scored / win / avg`), 那里照旧排除未完成的段 ——
+    # 一段没走完就谈不上"这次赢了还是输了", 但它的浮盈浮亏是实实在在的。
+    bull_legs = [l for l in legs if l["side"] == BULL]
     eq = 1.0
-    for l in done_bull:
-        eq *= 1 + l["ret"]
+    for l in bull_legs:
+        # **用原始比值复利, 不用 `l["ret"]`** —— 那个数是 `round(…, 4)` 过的,
+        # 一段一段乘起来会把四舍五入的误差累起来。R294 那条「多切几刀不改变
+        # 成绩」在 R303 把最后一段并进来之后当场红了(0.1582 → 0.1581),
+        # 红的正是这个: 切得越碎, 被乘进去的舍入误差越多。
+        eq *= l["exit_price"] / l["enter_price"]
 
     first, last = legs[0], legs[-1]
     hold = last["exit_price"] / first["enter_price"] - 1
     follow = eq - 1
+    # 未了结的那一段是**这只票的**情况, 得说出来: 两个数都含它的浮盈浮亏。
+    open_bull = bool(bull_legs and bull_legs[-1]["open_ended"])
     return {
         "legs": legs,
         # 真正下过单的次数 = 建仓次数(含最后那次还没卖的)。已完成的多头**段**数
@@ -291,6 +318,8 @@ def simulate(steps: list[dict], opens: list, closes: list, *,
         "pending": pending,
         "skipped": skipped,
         "blocked": sum(1 for l in legs if l["blocked"]),
+        # [R303] 最后一段还拿着 —— 「跟着做」与「一直拿着」都含它的浮盈浮亏
+        "open_bull": open_bull,
         "reason": None,
         "bull": _side_stats([l for l in legs if l["side"] == BULL]),
         "bear": _side_stats([l for l in legs if l["side"] == BEAR]),
