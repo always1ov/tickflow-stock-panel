@@ -762,6 +762,51 @@ export interface StockReview {
     bull: { episodes: number; avg_fwd: number | null; win: number }
     bear: { episodes: number; avg_fwd: number | null; win: number }
   } | null
+  /** [R287] 「按转折买卖」—— 每两个转折之间到底赚了多少。
+   *
+   *  口径: 转折日收盘才定 → **次日开盘**执行; 转入多头侧买入并持有, 转入空头侧
+   *  卖出清仓(不做空)。一段从这次执行价到下次转折的执行价, 段与段之间没有缝,
+   *  所以 follow 与 hold 量的是同一段区间, 可以直接比。 */
+  flip_trades?: {
+    legs: {
+      /** 触发这一笔的那次转折是哪天 —— 与逐日表上标「转折」的行对得上 */
+      flip_date: string
+      /** 成交日 = 转折日的次日; 价是那天的开盘价 */
+      enter_date: string; enter_price: number
+      exit_date: string; exit_price: number
+      state: string; state_cn: string
+      side: '多头' | '空头'
+      /** 这一段起头时手上该干什么。「持有」「空仓」= 转折了但不用动手 */
+      act: '买入' | '持有' | '卖出' | '空仓'
+      bars: number
+      /** 多头段是真赚到的; 空头段是空仓期间股价的涨跌, **不是你的盈亏** */
+      ret: number
+      /** 还没走完 —— 按最后一天收盘价记, 不进胜负统计 */
+      open_ended: boolean
+      /** 成交日撞上涨跌停, 未必成交得到这个价 */
+      blocked: boolean
+    }[]
+    /** 真正下过单的次数(建仓次数)。**不等于多头段数** —— 连着的多头段是一次持仓 */
+    trades: number
+    follow: number | null
+    hold: number | null
+    excess: number | null
+    from_date: string | null
+    to_date: string | null
+    /** 最新一次转折的次日还没到, 这个信号还没轮到执行 */
+    pending: string | null
+    /** 因为缺开盘价(停牌之类)没执行成的转折日 */
+    skipped: string[]
+    blocked: number
+    /** 一笔都做不成时的原因 —— 空栏必须自己解释 */
+    reason: 'no_flip' | 'no_open' | null
+    /** 已完成的多头段不足 3 段(与 side_edge 同一个门槛), 结论不能当真 */
+    thin: boolean
+    bull: { n: number; scored: number; win: number
+            avg: number | null; best: number | null; worst: number | null }
+    bear: { n: number; scored: number; win: number
+            avg: number | null; best: number | null; worst: number | null }
+  } | null
   /** [R191] 当前这一段与它自己的历史对照 —— 「我现在在哪、盯哪个价」 */
   now?: {
     date: string; state: string; state_cn: string | null; side: string | null

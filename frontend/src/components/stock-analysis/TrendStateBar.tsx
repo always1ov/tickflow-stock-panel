@@ -209,7 +209,11 @@ function TrendBacktestDialog({ symbol, onClose }: { symbol: string; onClose: () 
                       <th className="px-2 py-1.5 font-normal">假信号率</th>
                       <th className="px-2 py-1.5 font-normal">平均段长</th>
                       <th className="px-2 py-1.5 font-normal">跟随收益</th>
-                      <th className="px-2 py-1.5 font-normal">超额</th>
+                      {/* [R287] 「超额」→「多赚」。这一列是 跟随 − 买入持有, 与复盘页
+                          「按转折买卖」那一栏的「多赚」是同一个概念, 不该两个名字。
+                          而且「超额收益」在本仓库另有所指(个股 vs 大盘, 见
+                          trend_template.rs_6m) —— 这里叫「超额」正好撞上那个词。 */}
+                      <th className="px-2 py-1.5 font-normal" title="跟随收益 − 买入持有基准。正的才说明按这个阈值做真的帮上忙了">多赚</th>
                       <th className="px-2 py-1.5 font-normal">前半/后半</th>
                       <th className="px-2 py-1.5 font-normal">应用</th>
                     </tr>
@@ -250,7 +254,12 @@ function TrendBacktestDialog({ symbol, onClose }: { symbol: string; onClose: () 
                 </table>
               </div>
               <p className="text-[10px] text-muted leading-relaxed">
-                买入持有基准 {pct(grid[0]?.buyhold_return)}。跟随收益 = 仅多头状态持有的复利收益;
+                {/* [R287] 口径必须写出来。复盘页新增的「按转折买卖」量的是同一件事,
+                    但那边是**转折次日开盘**进出, 这边是**转折日收盘**进出 —— 两个数
+                    会差一个隔夜跳空, 而跳空恰恰在转折日最大。不点破的话, 用户在两个
+                    页面上看到两个不一样的"跟随收益", 只会以为其中一个算错了。 */}
+                买入持有基准 {pct(grid[0]?.buyhold_return)}。跟随收益 = 仅多头状态持有的复利收益
+                (<b>转折日收盘</b>进出;复盘页的「按转折买卖」按<b>次日开盘</b>算,两个数会差一个跳空);
                 假信号率 = 收益≤0 的多头段占比;前半/后半 = 窗口两半各自的跟随收益(差异大说明该阈值不稳定,谨防过拟合)。
               </p>
 

@@ -50,6 +50,7 @@ import { trendBadgeCls } from '@/components/stock-analysis/TrendStateBar'
 import { VerdictHover } from '@/components/stock-analysis/VerdictHover'
 import { ComboView } from '@/components/stock-analysis/decision-board/ComboView'
 import { ReviewDisclosure } from '@/components/stock-analysis/ReviewDisclosure'
+import { FlipTradesPanel } from '@/components/stock-analysis/FlipTradesPanel'
 import { StateTimeline } from '@/components/stock-analysis/StateTimeline'
 import {
   BAND_CN, TREND_LEGEND, VERDICT_BAR, VERDICT_LEGEND,
@@ -525,6 +526,11 @@ function TrendView({ d, rows, onlyMarked, onToggleMarked }: {
         forwardDays={d.forward_days}
         hint={`分档依据 —— 各状态出现后 ${d.forward_days} 日表现(按段计, 一段=一次;样本小, 括号里是「几段收涨/几段已兑现」)`}
       />
+
+      {/* [R287] 「按转折买卖」—— 真按这些转折做, 拿到下次转折为止是赚是亏。
+          排在「分档依据」之后、「依据」之前的理由写在 FlipTradesPanel 头上:
+          那一栏是固定 5 日窗口的**测量**, 这一栏是执行一遍之后的**成绩单**。 */}
+      <FlipTradesPanel ft={d.flip_trades} />
 
       <TrendStatsPanel d={d} />
 

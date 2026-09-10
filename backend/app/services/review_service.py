@@ -25,6 +25,7 @@ import polars as pl
 
 from app.indicators import keltner as k
 from app.indicators.livermore import BULLISH, STATE_LABELS, compute
+from app.services import flip_trades
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +43,10 @@ _CALENDAR_RATIO = 1.7
 # 一周左右正好是这些位置结论该兑现的尺度。
 FORWARD_DAYS = 5
 
-_WANT_COLS = ("date", "close", "change_pct", "ma20", "ma60", "atr_14",
+# [R287] `open` 是给「按转折买卖」那一栏用的 —— 信号收盘才定, 最早只能次日开盘
+# 执行。它与 `close` 同为前复权(原始价另存 raw_close/raw_high/raw_low), 所以
+# 开盘→开盘 的收益率与这里其余读数同一个口径。
+_WANT_COLS = ("date", "open", "close", "change_pct", "ma20", "ma60", "atr_14",
               "signal_limit_up", "signal_limit_down", "signal_broken_limit_up",
               "consecutive_limit_ups")
 
@@ -72,17 +76,22 @@ def _ma120(df: pl.DataFrame) -> list[float | None]:
     return [None if v is None else float(v) for v in s]
 
 
-def _trend_by_date(df: pl.DataFrame, threshold: float) -> dict[str, dict]:
-    """逐日六态状态 + 该状态到当天已经走了第几天。"""
+def _steps(df: pl.DataFrame, threshold: float) -> list[dict]:
+    """跑一次六态状态机。**整页只跑这一次** —— 逐日行与「按转折买卖」那一栏
+    用的必须是同一份 steps, 各跑各的就会有一处漏改的那天开始各说各话(R286)。"""
     closes = [float(c) for c in df["close"]]
     dates = [str(d) for d in df["date"]]
     if len(closes) < 2:
-        return {}
+        return []
     try:
-        steps = compute(closes, dates, threshold)["steps"]
+        return compute(closes, dates, threshold)["steps"]
     except Exception as e:  # noqa: BLE001
         logger.debug("review trend compute failed: %s", e)
-        return {}
+        return []
+
+
+def _trend_by_date(steps: list[dict]) -> dict[str, dict]:
+    """逐日六态状态 + 该状态到当天已经走了第几天。"""
     out: dict[str, dict] = {}
     run = 0
     prev_state = None
@@ -531,7 +540,8 @@ def review_for_symbol(repo, symbol: str, days: int = DEFAULT_DAYS) -> dict:
 
     from app.services.livermore_service import get_effective_threshold
     thr, thr_src = get_effective_threshold(sym)
-    trend_map = _trend_by_date(df, thr)
+    steps = _steps(df, thr)
+    trend_map = _trend_by_date(steps)
 
     cols = set(df.columns)
     ma120 = _ma120(df)
@@ -613,8 +623,25 @@ def review_for_symbol(repo, symbol: str, days: int = DEFAULT_DAYS) -> dict:
         # [R198] 量化波动通道的几何层。复盘是"看清楚"的地方 —— 决策台只给一格,
         # 这里要把速度/加速度/压缩/频段摊开。原料就是同一份 df, 不新增取数。
         "channel": _channel(df, rows),
+        # [R287] 「按转折买卖」—— 每两个转折之间到底赚了多少。口径与取舍全在
+        # `flip_trades` 的 docstring 里。**只切窗口内的那一段**: 统计必须与
+        # 屏幕上那 120 行的转折标记一一对得上, 拿暖机段一起算就对不上了。
+        "flip_trades": _flip_trades(steps[offset:], col("open")[offset:],
+                                    closes[offset:], lu[offset:], ld[offset:]),
         "rows": out_rows,
     }
+
+
+def _flip_trades(steps, opens, closes, lu, ld) -> dict:
+    """[R287] 「按转折买卖」+ 一个样本量标记。
+
+    `thin` 在这里挂而不在 `flip_trades` 里挂, 是因为门槛 `MIN_SIDE_EPISODES`
+    归这个模块管(R191 定的 3 段)。搬一份常量过去就是同一个数两处定义 ——
+    R286 刚为这件事立过规矩。
+    """
+    got = flip_trades.simulate(steps, opens, closes, limit_up=lu, limit_down=ld)
+    got["thin"] = got["bull"]["scored"] < MIN_SIDE_EPISODES
+    return got
 
 
 def _limit_up_states(rows: list[dict]) -> list[dict]:
