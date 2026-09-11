@@ -10,10 +10,8 @@ import logging
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
 
 import polars as pl
-
 from app.tickflow.capabilities import Cap, CapabilitySet
 
 logger = logging.getLogger(__name__)
@@ -69,8 +67,8 @@ def _fetch_table(
 
     # 自定义数据源分流
     if is_custom:
-        from app.services import preferences
         from app.data_providers import custom as custom_sources
+        from app.services import preferences
         try:
             provider = custom_sources.get_provider(preferences.get_financial_provider())
             df = provider.get_financials(table, symbols, latest_only=latest_only)

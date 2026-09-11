@@ -9,10 +9,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
-from fastapi import APIRouter, Request
-
 from app.enriched_generation import EnrichedPublication
 from app.indicators.pipeline import ENRICHED_COLUMNS
+from fastapi import APIRouter, Request
 
 logger = logging.getLogger(__name__)
 

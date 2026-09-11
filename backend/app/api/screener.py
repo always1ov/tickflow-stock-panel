@@ -7,19 +7,18 @@ import json
 import logging
 import math
 import os
-import re
 import time
 from dataclasses import asdict, replace
 from datetime import date, datetime
 from typing import Any, Optional
 
+from app.config import settings
+from app.db_safe import is_valid_ext_ident, quote_ident
+from app.services.screener import ScreenerService
 from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
-from app.config import settings
-from app.db_safe import is_valid_ext_ident, quote_ident
 from app.services import strategy_cache, strategy_run_queue
-from app.services.screener import ScreenerService
 from app.strategy import config as strategy_config
 
 logger = logging.getLogger(__name__)
@@ -1059,6 +1058,7 @@ class LadderAiRequest(BaseModel):
 
 # 战法清单报告存档: data/user_data/ladder_ai_reports.json, 保留最近 30 份
 from app.services.json_report_store import JsonReportStore
+
 _ladder_reports = JsonReportStore("ladder_ai_reports.json", 30, id_prefix="lar", id_with_symbol=False)
 
 

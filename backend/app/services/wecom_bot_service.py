@@ -23,7 +23,6 @@ import asyncio
 import json
 import logging
 import threading
-import time
 import uuid
 
 logger = logging.getLogger(__name__)
@@ -159,6 +158,7 @@ class WecomBotService:
     async def _connect_loop(self) -> None:
         """主连接循环: 连接 → 鉴权 → 心跳保活 → 断开 → 退避重连。"""
         import websockets
+
         from app.services import preferences
 
         attempt = 0

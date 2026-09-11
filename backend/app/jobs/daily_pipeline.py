@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
+
 # [R275] 只给类型注解用。文件有 `from __future__ import annotations`, 注解不求值,
 # 所以旧写法(只在函数体里 import)不会崩 —— 但它会让 F821 报一条假警报,
 # 而假警报正是真错的掩护。
@@ -20,16 +21,16 @@ from datetime import date as _date
 from pathlib import Path
 
 import polars as pl
+from app.config import settings
+from app.indicators.pipeline import filter_halt_days, run_pipeline
+from app.tickflow.capabilities import Cap, CapabilitySet
+from app.tickflow.pools import DEMO_SYMBOLS, get_pool
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
-from app.config import settings
-from app.indicators.pipeline import filter_halt_days, run_pipeline
 from app.services import index_sync, instrument_sync, kline_sync
 from app.services import preferences as _prefs
-from app.tickflow.capabilities import Cap, CapabilitySet
-from app.tickflow.pools import DEMO_SYMBOLS, get_pool
 from app.tickflow.repository import KlineRepository
 
 logger = logging.getLogger(__name__)
@@ -229,7 +230,9 @@ def run_now(
     #   付费档 + 今天有数据 → 实时行情接口拉一次覆写（1请求全市场）
     #   有历史数据 → batch K-line API 补齐缺口
     #   无任何数据 → batch K-line API 拉首次 1 年
-    from datetime import date as _date, timedelta as _td, datetime as _dt
+    from datetime import date as _date
+    from datetime import datetime as _dt
+    from datetime import timedelta as _td
     latest_daily = repo.latest_daily_date()
     today = _date.today()
     today_exists = latest_daily and latest_daily >= today
@@ -717,8 +720,9 @@ def run_now(
     else:
         try:
             emit("compute_regime", 90, "计算市场环境…")
-            from app.services import regime_builder
             from app.api.regime import invalidate_regime_cache
+
+            from app.services import regime_builder
             new_regime = regime_builder.compute_regime_incremental(repo, repo.store.data_dir)
             regime_days = new_regime.height if not new_regime.is_empty() else 0
             if regime_days:
@@ -868,6 +872,7 @@ def _push_phase_change_alert(data_dir) -> None:
     复用 quote_service.push_alerts 广播通道; 未发生切换静默返回。
     """
     from app.services.market_phase import PHASE_LABELS
+
     from app.services.regime_builder import latest_phase_transition
 
     tr = latest_phase_transition(data_dir)
@@ -895,7 +900,13 @@ def _run_tracked(fn, job_label: str) -> bool:
     重任务执行槽: 再挡一层僵尸并发(reap 后线程仍活时不得并行写 parquet)。
     返回 True 仅表示任务已成功并且执行槽已释放。
     """
-    from app.services.pipeline_jobs import JobCancelledError, job_store, release_run_slot, run_with_capacity, try_acquire_run_slot
+    from app.services.pipeline_jobs import (
+        JobCancelledError,
+        job_store,
+        release_run_slot,
+        run_with_capacity,
+        try_acquire_run_slot,
+    )
 
     # [fork R75] 自愈已内建在 job_store.create() 里 —— 单飞检查前先回收卡死任务,
     # 定时路径(没人开页面、没有轮询)也不会被僵尸挡到天天静默跳过。
@@ -969,7 +980,9 @@ def _note_today_official(written_rows: int, today) -> None:
 def _maybe_schedule_official_retry() -> None:
     """调度路径专用: 待确认标记还在 → 约 1 小时后重跑管道(有限次)。"""
     global _official_retry_count
-    from datetime import date as _date, datetime as _dt, timedelta as _td
+    from datetime import date as _date
+    from datetime import datetime as _dt
+    from datetime import timedelta as _td
     if _today_official_pending != _date.today():
         _official_retry_count = 0
         return
@@ -1030,8 +1043,8 @@ async def _run_scheduled_review(repo) -> None:
     import json
 
     try:
-        from app.services import market_recap_reports
         from app import secrets_store as ss
+        from app.services import market_recap_reports
 
         # AI Key 未配置时跳过(避免每日报错刷日志)
         if not ss.get_ai_key():
@@ -1096,6 +1109,7 @@ async def _stream_review_with_retry(repo, quote_service, depth_service) -> tuple
     """
     import asyncio
     import json
+
     from app.services.market_recap import recap_market_stream
 
     max_attempts = 3  # 初次 + 2 次重试
@@ -1270,7 +1284,8 @@ def signal_needs_refresh(created_at: str | None, as_of, now=None,
     多算一次), 方向刻意如此: 宁可多花一次调用, 也不能把没看过新数据的旧信号
     当成最新的用。时间阈值只是安全阀 —— 长假数据不更新时不至于永远不重算。
     """
-    from datetime import datetime, time as dt_time
+    from datetime import datetime
+    from datetime import time as dt_time
 
     from app.market_time import CN_TZ, cn_now
 
@@ -1304,6 +1319,7 @@ async def _run_scheduled_today_ai(repo) -> None:
             logger.info("scheduled today-ai skipped: AI key not configured")
             return
         from app.api.today import _build_overview, generate_today_ai
+
         from app.services import today_ai_store
 
         data = _build_overview(repo)
@@ -1330,7 +1346,7 @@ async def _run_scheduled_signal_ai(repo) -> None:
         if not ss.get_ai_key():
             logger.info("scheduled signal-ai skipped: AI key not configured")
             return
-        from app.services import effective_positions as positions_svc   # [R169] 含批次登记的票
+        from app.services import effective_positions as positions_svc  # [R169] 含批次登记的票
         from app.services import preferences as prefs
         from app.services import stock_signal, watchlist
 

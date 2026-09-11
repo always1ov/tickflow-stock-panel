@@ -12,7 +12,6 @@
 """
 from __future__ import annotations
 
-import json
 import logging
 import sys
 import threading
@@ -24,7 +23,6 @@ from pathlib import Path
 
 import duckdb
 import polars as pl
-
 from app.config import settings
 from app.enriched_generation import (
     EnrichedGenerationUnavailableError,
@@ -32,9 +30,10 @@ from app.enriched_generation import (
     bump_enriched_generation,
     get_enriched_generation,
 )
-from app.market_time import cn_today
 from app.parquet import scan_enriched_parquet
 from app.polars_guard import guarded_collect
+
+from app.market_time import cn_today
 
 logger = logging.getLogger(__name__)
 
@@ -556,7 +555,9 @@ class KlineRepository:
         (universe = instruments 全表), 不是自选子集 → 永不误删。自选为空时不删(无从判定)。
         """
         try:
-            from datetime import date as _date, timedelta
+            from datetime import date as _date
+            from datetime import timedelta
+
             from app.market_time import cn_today
             today = cn_today()
             with self._lock:
@@ -655,6 +656,7 @@ class KlineRepository:
             # 300 日历天 ≈ 210 交易日, 覆盖 filter_history 最大 lookback(90) + warmup(60)
             try:
                 from datetime import timedelta
+
                 from app.indicators.pipeline import compute_enriched_history_window
                 start_full = latest - timedelta(days=300)
                 read_cols = [c for c in ["symbol", "date", "open", "high", "low", "close",
@@ -812,6 +814,7 @@ class KlineRepository:
         优化: 优先使用 _enriched_history_cache (启动时已计算), 避免重复 compute_indicators。
         """
         from datetime import timedelta
+
         from app.indicators.pipeline import _ema_alpha
 
         started = time.perf_counter()
@@ -1084,6 +1087,7 @@ class KlineRepository:
                 return
 
             from datetime import timedelta
+
             from app.indicators.pipeline import compute_indicators, compute_signals
             start_full = latest - timedelta(days=300)
             read_cols = [c for c in ["symbol", "date", "open", "high", "low", "close",
@@ -1748,7 +1752,12 @@ class KlineRepository:
 
     def _compute_enriched_range(self, df: pl.DataFrame) -> pl.DataFrame:
         """对14列enriched数据即时计算完整指标+信号。输入应含足够预热行数。"""
-        from app.indicators.pipeline import compute_indicators, compute_signals, compute_limit_signals, filter_halt_days
+        from app.indicators.pipeline import (
+            compute_indicators,
+            compute_limit_signals,
+            compute_signals,
+            filter_halt_days,
+        )
         if df.is_empty() or df.height < 2:
             return df
         # 兜底过滤历史脏数据中的停牌日 (close 可能被填充为前收盘价)

@@ -20,11 +20,11 @@ from dataclasses import dataclass, field
 from typing import Any, Callable
 
 import polars as pl
+from app.strategy.custom_signals import _OP_BUILDERS  # type: ignore  # 复用运算符构造器
+from app.strategy.intraday_signals import INTRADAY_SIGNAL_LABELS, uses_intraday_signals
 
 from app.market_time import cn_today
 from app.strategy import config as _strategy_config
-from app.strategy.custom_signals import _OP_BUILDERS  # type: ignore  # 复用运算符构造器
-from app.strategy.intraday_signals import INTRADAY_SIGNAL_LABELS, uses_intraday_signals
 from app.strategy.monitor_rules import date_rule_in_window
 
 logger = logging.getLogger(__name__)

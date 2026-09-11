@@ -21,7 +21,6 @@ import sys
 import threading
 import time
 import traceback
-from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -100,7 +99,6 @@ def _guard_streams() -> None:
     修法: console=False 下把 stdout/stderr 换成丢弃写入的空对象 (devnull),
     让 logging / reconfigure / 任何 print 都安全落地。console=True 不动 (有真控制台)。
     """
-    import os
 
     class _NullStream:
         """丢弃所有写入的空流 (替代 None 的 stdout/stderr)。"""
@@ -251,8 +249,8 @@ def _wait_for_server(port: int, timeout: float = 60.0) -> bool:
 
     比 monkey-patch uvicorn 内部方法更健壮, 不依赖版本内部实现。
     """
-    import urllib.request
     import urllib.error
+    import urllib.request
 
     url = f"http://127.0.0.1:{port}/health"
     deadline = time.monotonic() + timeout

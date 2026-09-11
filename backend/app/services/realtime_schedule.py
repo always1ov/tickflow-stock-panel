@@ -21,7 +21,8 @@
 """
 from __future__ import annotations
 
-from datetime import datetime, time as dt_time
+from datetime import datetime
+from datetime import time as dt_time
 
 AUTO_ON = dt_time(9, 15)
 AUTO_OFF = dt_time(15, 5)

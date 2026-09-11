@@ -9,16 +9,15 @@ from dataclasses import asdict
 from datetime import date, timedelta
 from typing import Literal
 
-from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field
-
 from app.config import settings
 from app.services.backtest import (
     BacktestConfig,
     BacktestService,
     VectorbtUnavailable,
 )
+from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
@@ -439,8 +438,8 @@ def strategy_run(req: StrategyBacktestRequest, request: Request):
 
 # ── SSE 流式回测 (实时进度 + 可取消 + 支持重连) ───────────────────
 
-import time
 import hashlib
+import time
 
 
 class _BacktestJob:

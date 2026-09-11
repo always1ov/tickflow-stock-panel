@@ -17,8 +17,8 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-
 from app.config import settings
+
 from app import secrets_store
 
 from .capabilities import Cap, CapabilityLimits, CapabilitySet
@@ -118,7 +118,8 @@ def _probe_real(tiers: dict) -> tuple[CapabilitySet, list[str], set[Cap]]:
     返回 (capset, probe_log)。
     """
     from tickflow import TickFlow
-    from .client import _base_url, PAID_ENDPOINT
+
+    from .client import PAID_ENDPOINT, _base_url
 
     key = secrets_store.get_tickflow_key()
     # 探测专用客户端:强制走付费端点验证 key。
@@ -319,8 +320,8 @@ _DATASET_CAP_MAP: tuple[tuple[str, Cap], ...] = (
 def _augment_custom_sources(capset: CapabilitySet) -> None:
     """根据用户配置的数据源, 补充对应能力 (不覆盖 TickFlow 已有的)。"""
     try:
-        from app.services import preferences
         from app.data_providers import custom as custom_sources
+        from app.services import preferences
 
         daily_provider = preferences.get_daily_data_provider()
         adj_provider = preferences.get_adj_factor_provider()

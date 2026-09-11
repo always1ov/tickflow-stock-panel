@@ -9,11 +9,11 @@ import time
 from typing import Literal
 from urllib.parse import urlsplit
 
+from app.data_providers.custom.config import MAX_TIMEOUT
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field
 
 from app import secrets_store
-from app.data_providers.custom.config import MAX_TIMEOUT
 from app.tickflow import client as tf_client
 from app.tickflow.policy import (
     detect_capabilities,
@@ -55,17 +55,18 @@ class TickflowKeyIn(BaseModel):
 def get_settings() -> dict:
     """返回当前配置概况(Key 脱敏)。"""
     from app.config import settings
+
     from app.services import preferences
     from app.services.ai_provider import (
         ai_configured,
+        current_ai_context_window,
+        current_ai_max_output_tokens,
         current_ai_model,
         current_codex_command,
         current_codex_model,
         current_codex_reasoning_effort,
         current_openai_model,
         current_openai_reasoning_effort,
-        current_ai_context_window,
-        current_ai_max_output_tokens,
     )
 
     key = secrets_store.get_tickflow_key()
@@ -144,7 +145,8 @@ def save_tickflow_key(req: TickflowKeyIn, request: Request) -> dict:
     故自动切到默认付费端点(api.tickflow.org);free 档则清除自定义端点。
     """
     from app.tickflow.policy import (
-        base_tier_name, is_invalid_key,
+        base_tier_name,
+        is_invalid_key,
     )
 
     key = req.api_key.strip()
@@ -343,9 +345,12 @@ class AiSettingsIn(BaseModel):
 def save_ai_settings(req: AiSettingsIn) -> dict:
     """保存 AI 配置（全部持久化到 secrets.json）"""
     from app.config import settings
+
     from app.services.ai_provider import (
         OPENAI_PROVIDER,
         ai_configured,
+        current_ai_context_window,
+        current_ai_max_output_tokens,
         current_ai_model,
         current_ai_provider,
         current_codex_command,
@@ -353,8 +358,6 @@ def save_ai_settings(req: AiSettingsIn) -> dict:
         current_codex_reasoning_effort,
         current_openai_model,
         current_openai_reasoning_effort,
-        current_ai_context_window,
-        current_ai_max_output_tokens,
         normalize_codex_command,
         normalize_codex_model,
         normalize_codex_reasoning_effort,
@@ -726,6 +729,7 @@ def get_capability_matrix() -> dict:
     组装逻辑在 data_providers.capabilities, 本层保持薄。
     """
     from app.data_providers.capabilities import build_capability_matrix
+
     from app.services import preferences
     from app.tickflow import policy
 
@@ -1397,8 +1401,7 @@ def update_feishu_webhook(req: FeishuWebhookPrefsIn) -> dict:
     - url: 传入空串表示清空配置; 非空则需为合法的飞书自定义机器人地址。
     - secret: 机器人启用了「签名校验」时填密钥, 留空表示不验签。
     """
-    from app.services import preferences
-    from app.services import webhook_adapter
+    from app.services import preferences, webhook_adapter
 
     url = (req.url or "").strip()
     if url and not webhook_adapter.is_valid_feishu_url(url):
@@ -1423,8 +1426,7 @@ def update_wecom_webhook(req: WecomWebhookPrefsIn) -> dict:
     - url: 传入空串表示清空配置; 非空需为合法企业微信群推送 Webhook 地址, 或纯 key。
     - 用户可只填 key (webhook/send?key=xxx 的 xxx 部分), 后端自动补全为完整 URL。
     """
-    from app.services import preferences
-    from app.services import webhook_adapter
+    from app.services import preferences, webhook_adapter
 
     url = (req.url or "").strip()
     if url and not webhook_adapter.is_valid_wecom_url(url):
@@ -1450,8 +1452,7 @@ def update_dingtalk_webhook(req: DingtalkWebhookPrefsIn) -> dict:
     - keyword: 机器人「自定义关键词」之一; 推送正文不含时后端自动补上以通过校验。
       机器人未启用关键词校验时可留空。
     """
-    from app.services import preferences
-    from app.services import webhook_adapter
+    from app.services import preferences, webhook_adapter
 
     url = (req.url or "").strip()
     if url and not webhook_adapter.is_valid_dingtalk_url(url):
@@ -1559,8 +1560,7 @@ def test_webhook(req: WebhookTestIn) -> dict:
     未配置 / 地址非法 / 发送失败均返回 HTTP 200 + {ok: False}，
     前端统一读 detail 渲染绿/红，不抛 400。
     """
-    from app.services import preferences
-    from app.services import webhook_adapter
+    from app.services import preferences, webhook_adapter
 
     title = "TickFlow Stock Panel 推送测试"
     body = "如果你看到这条消息，说明推送配置正确 🎉"
@@ -2068,6 +2068,7 @@ class RealtimeKeysPerRoundIn(BaseModel):
 def get_realtime_keys_per_round() -> dict:
     """当前设置 + 已配置的 key 总数, 供界面显示"10 / 14"。"""
     from app.secrets_store import get_tickflow_keys
+
     from app.services import preferences
 
     return {
@@ -2085,6 +2086,7 @@ def update_realtime_keys_per_round(req: RealtimeKeysPerRoundIn) -> dict:
     代价是每轮容量变小(5 × 启用数), 全量刷完一遍的轮数相应变多。
     """
     from app.secrets_store import get_tickflow_keys
+
     from app.services import preferences
 
     count = preferences.set_realtime_keys_per_round(req.count)
@@ -2162,7 +2164,7 @@ def update_review_schedule(req: ReviewScheduleIn, request: Request) -> dict:
     sched = preferences.set_review_schedule(req.enabled, req.hour, req.minute)
 
     # 动态操作 APScheduler job
-    from app.jobs.daily_pipeline import _register_review_job, REVIEW_JOB_ID
+    from app.jobs.daily_pipeline import REVIEW_JOB_ID, _register_review_job
     scheduler = getattr(request.app.state, "scheduler", None)
     if scheduler:
         if sched["enabled"]:
@@ -2303,6 +2305,7 @@ def data_doctor_scan() -> dict:
     派生数据(可重算, 坏了删掉重跑)、孤儿文件(功能删了文件还在)。
     """
     from app.config import settings as cfg
+
     from app.services import data_doctor
     return data_doctor.scan(cfg.data_dir)
 
@@ -2315,6 +2318,7 @@ def data_doctor_heal(req: DataHealIn) -> dict:
     不补 —— 补出来的是一条假记录, 那种只该报出来让人自己看。
     """
     from app.config import settings as cfg
+
     from app.services import data_doctor
     if not req.rels:
         raise HTTPException(400, "没有指定要补齐的存储")

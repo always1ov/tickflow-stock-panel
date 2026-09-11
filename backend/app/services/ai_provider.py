@@ -13,14 +13,15 @@ import tempfile
 import time
 import tomllib
 from collections.abc import AsyncIterator, Callable, Sequence
-from typing import Any
 from contextvars import ContextVar
 from pathlib import Path
 from types import TracebackType
+from typing import Any
 from urllib.parse import urlsplit, urlunsplit
 
-from app import secrets_store
 from app.config import settings
+
+from app import secrets_store
 
 logger = logging.getLogger(__name__)
 

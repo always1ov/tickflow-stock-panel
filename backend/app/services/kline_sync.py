@@ -16,14 +16,14 @@ from collections.abc import Callable
 from datetime import date, datetime, timedelta
 
 import polars as pl
-
 from app.data_providers.base import AssetType
 from app.indicators.pipeline import filter_halt_days
+from app.tickflow.capabilities import Cap, CapabilitySet
+from app.tickflow.rate_limits import chunked, resolve_limit, sleep_between_batches
+
 from app.market_time import CN_TZ, cn_now, cn_today
 from app.services import preferences
-from app.tickflow.capabilities import Cap, CapabilitySet
 from app.tickflow.client import get_client
-from app.tickflow.rate_limits import chunked, resolve_limit, sleep_between_batches
 from app.tickflow.repository import KlineRepository, replace_with_retry
 
 logger = logging.getLogger(__name__)
@@ -292,7 +292,6 @@ def sync_daily_by_quotes(repo: KlineRepository) -> int:
     一个请求覆盖 ~5500 只股票,比 batch K-line 快几个数量级。
     返回写入的行数。
     """
-    from datetime import date as _date
 
     from app.tickflow.client import get_client
 

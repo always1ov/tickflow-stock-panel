@@ -2,21 +2,19 @@
 from __future__ import annotations
 
 import logging
-import math
 import time
-from datetime import date
 from typing import Callable
 
 import anyio
 import polars as pl
-from fastapi import APIRouter, File, HTTPException, Query, Request, UploadFile
-from pydantic import BaseModel
-
 from app.db_safe import is_valid_ext_ident, quote_ident
-from app.services import watchlist
 from app.services.watchlist_csv import import_watchlist_codes, import_watchlist_csv
 from app.services.watchlist_ocr import import_watchlist_image
 from app.services.watchlist_ocr.provider import get_ocr_provider
+from fastapi import APIRouter, File, HTTPException, Query, Request, UploadFile
+from pydantic import BaseModel
+
+from app.services import watchlist
 
 logger = logging.getLogger(__name__)
 
@@ -537,8 +535,8 @@ def watchlist_enriched(
     if ext_specs:
         db = repo.store.db
         data_dir = repo.store.data_dir
-        from app.services.ext_data import ExtConfigStore
         from app.api.ext_data import _read_ext_dataframe
+        from app.services.ext_data import ExtConfigStore
 
         ext_store = ExtConfigStore(data_dir)
         configs = {c.id: c for c in ext_store.load_all()}

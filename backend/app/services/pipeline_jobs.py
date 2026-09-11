@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import threading
 import uuid
 from collections.abc import Callable

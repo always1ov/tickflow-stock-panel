@@ -6,11 +6,11 @@ from datetime import date, datetime, timedelta
 from typing import Optional
 
 import polars as pl
+from app.indicators.pipeline import compute_enriched
+from app.tickflow.capabilities import Cap
 from fastapi import APIRouter, HTTPException, Query, Request
 
-from app.indicators.pipeline import compute_enriched
 from app.services import index_sync, kline_sync
-from app.tickflow.capabilities import Cap
 
 logger = logging.getLogger(__name__)
 

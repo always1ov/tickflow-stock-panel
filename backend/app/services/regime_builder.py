@@ -332,6 +332,7 @@ def _compute_batch(repo, enriched_dir, instruments, historical_shares,
     返回目标区间(不含 warmup)的含指标列 DataFrame。
     """
     from datetime import timedelta
+
     from app.indicators.pipeline import compute_indicators, compute_limit_signals
     warmup_start = batch_start - timedelta(days=warmup_days)
     df = pl.scan_parquet(enriched_dir / "**" / "*.parquet").filter(

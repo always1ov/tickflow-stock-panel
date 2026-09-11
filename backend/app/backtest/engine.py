@@ -17,7 +17,6 @@ from typing import Literal
 import numpy as np
 import polars as pl
 import pyarrow as pa
-
 from app.backtest.matrix import (
     MarketDataMatrix,
     MarketMatrix,
@@ -28,6 +27,7 @@ from app.backtest.matrix import (
 from app.config import settings
 from app.enriched_generation import EnrichedGenerationUnavailableError
 from app.parquet import scan_enriched_parquet
+
 from app.tickflow.repository import KlineRepository
 
 logger = logging.getLogger(__name__)

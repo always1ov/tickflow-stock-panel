@@ -7,6 +7,7 @@ import logging
 
 from fastapi import APIRouter, HTTPException, Request
 
+from app.api.data import invalidate_storage_cache
 from app.jobs import daily_pipeline
 from app.services.pipeline_jobs import (
     JobCancelledError,
@@ -15,7 +16,6 @@ from app.services.pipeline_jobs import (
     run_with_capacity,
     try_acquire_run_slot,
 )
-from app.api.data import invalidate_storage_cache
 
 # 长时间任务专用线程池（隔离于 FastAPI 默认线程池，防止阻塞请求处理）
 _long_task_executor = _cf.ThreadPoolExecutor(max_workers=2, thread_name_prefix="long-task")

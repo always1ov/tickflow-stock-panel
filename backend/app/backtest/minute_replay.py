@@ -17,7 +17,6 @@ from dataclasses import dataclass, field
 from datetime import date, timedelta
 
 import polars as pl
-
 from app.price_limits import is_risk_warning_name, price_limit_pct
 from app.strategy.engine import StrategyDataContext, StrategyDef, StrategyEngine
 
