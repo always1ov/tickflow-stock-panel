@@ -95,7 +95,7 @@ def build_table(res: dict) -> list[dict]:
 def _system_prompt(min_n: int, recent_days: int) -> str:
     return (
         "你在帮用户回看一套 A 股选股系统里那些**不参与打分的标签**"
-        "(通道结论、六态趋势、主线归属、龙虎榜)最近好不好使。\n"
+        "(通道档位、六态趋势、主线归属、龙虎榜)最近好不好使。\n"
         "用户给你的是一张**已经算好的**统计表: 每档标签的全期胜率、"
         f"最近 {recent_days} 个交易日的胜率、以及两者的背离。T+5 口径, "
         "收盘价对收盘价。\n\n"

@@ -44,7 +44,7 @@ function sessionPhaseHint(live: boolean | undefined): { label: string; hint: str
 
 // [R40] 板块徽章。20cm 的两个板(创业/科创)与 30cm 的北交所用暖色标出来 ——
 // 同一个把握分, 20cm 的票波动天然更大, 仓位不该一样。
-// [R47] 机会区的通道结论标。与决策台「结论」列、导出件同一份数据 ——
+// [R47] 机会区的通道档位标。与决策台「结论」列、导出件同一份数据 ——
 // tone 由后端给, 界面不自己判, 三处不会各说各的。
 const POSTURE_STYLE: Record<string, string> = {
   进攻: 'border-red-400/40 bg-red-400/10 text-red-400',
@@ -69,7 +69,7 @@ const POSTURE_STYLE: Record<string, string> = {
 // 「分」下面的三条细条 = 趋势强度 / 量能确认 / 位置成本, 长度就是各自的维度分。
 // 同样是 87 分, 三条的形状完全不同 —— 一眼看出这分是谁给的。
 //
-// 「注记」列摆的是**不参与打分**的佐证(主线/AI/历史胜率/通道结论)。单独成列
+// 「注记」列摆的是**不参与打分**的佐证(主线/AI/历史胜率/通道档位)。单独成列
 // 而不是混进信号里, 是为了让"哪些东西影响了排名"这件事在版面上就一目了然。
 function StatCell({ label, value, sub, tone, title }: {
   label: string

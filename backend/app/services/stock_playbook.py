@@ -6,7 +6,7 @@
 
     ① 该动了   (watchlist_urgency)  紧迫度 —— 今天先看谁
     ② 六态趋势 (livermore)          方向   —— 往上还是往下
-    ③ 通道结论 (keltner.verdict)    位置   —— 贵还是便宜
+    ③ 通道档位 (keltner.verdict)    位置   —— 贵还是便宜
     ④ 通道阶段 (keltner_geometry)   成熟度 —— 走到哪一段了
     ⑤ AI 信号  (stock_signal)       买卖   —— 模型怎么看
 

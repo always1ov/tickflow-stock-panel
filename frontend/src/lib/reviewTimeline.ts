@@ -63,7 +63,7 @@ export const POS_LEGEND = [
   { cls: 'bg-sky-400', label: '破下轨' },
 ]
 
-/** [R273] 通道结论色带的图例 —— 与 `VERDICT_BAR` 同一套色, 那是决策台「结论」列的配色。 */
+/** [R273] 通道档位色带的图例 —— 与 `VERDICT_BAR` 同一套色, 那是决策台「结论」列的配色。 */
 export const VERDICT_LEGEND = [
   { cls: VERDICT_BAR.sell, label: '偏卖' },
   { cls: VERDICT_BAR.hold, label: '持有' },
@@ -94,7 +94,7 @@ export function verdictCells(rows: ReviewRow[]): TimelineCell[] {
   return chrono(rows).map(r => ({
     key: r.date,
     cls: r.verdict ? VERDICT_BAR[r.verdict.tone] : 'bg-border/40',
-    title: r.verdict ? `${r.date} ${r.verdict.title}` : `${r.date} 三档都在中部, 位置上没结论`,
+    title: r.verdict ? `${r.date} ${r.verdict.title}` : `${r.date} 三档都在中部, 给不出档位`,
   }))
 }
 

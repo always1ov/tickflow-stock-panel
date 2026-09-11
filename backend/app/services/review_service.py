@@ -426,7 +426,7 @@ def _seal(limit_ups: int, broken: int) -> dict | None:
 
 
 def _verdict_edge(outcomes: list[dict]) -> dict:
-    """[R199] 通道结论在这只票上灵不灵 —— 与 R191 给六态做的那层完全平行。
+    """[R199] 通道档位在这只票上灵不灵 —— 与 R191 给六态做的那层完全平行。
 
     「各档结论出现后 5 日表现」原来是十来个并排的均值, 要自己在脑子里把偏买的
     几档和偏卖的几档分别合起来再相减, 才读得出"这套结论在这只票上有没有信息"。
@@ -459,7 +459,7 @@ def _verdict_edge(outcomes: list[dict]) -> dict:
     tail = f"(说便宜的 {buy['episodes']} 段平均 {b:+.1%}, 说贵的 {sell['episodes']} 段平均 {r:+.1%})"
     if b >= SIDE_EDGE and r <= -SIDE_EDGE:
         out.update(level="both", label="买卖都能判断",
-                   text="说便宜的之后真涨、说贵的之后真跌 —— 这只票的通道结论可以照着做。" + tail)
+                   text="说便宜的之后真涨、说贵的之后真跌 —— 这只票的通道档位可以照着做。" + tail)
     elif b >= SIDE_EDGE:
         out.update(level="offense", label="只能用来判断买",
                    text="说便宜的之后确实涨, 但说贵的之后也没怎么跌 —— 拿它找买点, "
@@ -471,7 +471,7 @@ def _verdict_edge(outcomes: list[dict]) -> dict:
     elif b < r:
         out.update(level="inverted", label="判断买的反而更差",
                    text="说便宜的那几档之后反而比说贵的更差 —— 样本这么小时多半是巧合, "
-                        "但至少说明通道结论在这只票上没有正向信息。" + tail)
+                        "但至少说明通道档位在这只票上没有正向信息。" + tail)
     else:
         out.update(level="flat", label="买卖都判断不了",
                    text="说便宜的和说贵的之后走势差不多 —— 在这只票上, 这个价位判断说明不了什么。" + tail)
@@ -481,7 +481,7 @@ def _verdict_edge(outcomes: list[dict]) -> dict:
 def _channel(df: pl.DataFrame, rows: list[dict]) -> dict | None:
     """[R198] 量化波动通道的几何 + 历史序列 + 事件。失败降级为 None。
 
-    复盘弹窗的「通道结论」栏原来只有逐段卡片, 而几何层(加速度/压缩/频段)在
+    复盘弹窗的「通道档位」栏原来只有逐段卡片, 而几何层(加速度/压缩/频段)在
     决策台上只挤得下一格悬停。这里是唯一有地方把它们摊开的位置。
     """
     try:
@@ -526,7 +526,7 @@ def _b(v) -> bool:
 
 
 def review_for_symbol(repo, symbol: str, days: int = DEFAULT_DAYS) -> dict:
-    """逐日复盘: 趋势状态 / 三档通道结论 / 涨停, 按同一条时间轴对齐。
+    """逐日复盘: 趋势状态 / 三档通道档位 / 涨停, 按同一条时间轴对齐。
 
     行按**新→旧**返回 —— 打开就该先看到最近几天, 那才是要复盘的部分。
     """
@@ -578,7 +578,7 @@ def review_for_symbol(repo, symbol: str, days: int = DEFAULT_DAYS) -> dict:
             # 三档只带位置文字 —— 逐日全套读数会让这个响应大到没必要
             "bands": {key: {"pos": b["pos"], "pos_cn": b["pos_cn"]}
                       for key, b in bands.items()},
-            # [R294] 三字位置码(如「上中下」), 也就是 27 格速查表的行号。
+            # [R294] 三字组合码(如「上中下」), 也就是 27 格速查表的行号。
             # **在这儿算而不是让前端从 bands 拼**: 拼法归 `combo_code` 管,
             # 前端再拼一份就是同一个规则两处定义(R286 立过的规矩)。
             "combo": k_geo.combo_code(bands) if bands else None,
@@ -631,7 +631,7 @@ def review_for_symbol(repo, symbol: str, days: int = DEFAULT_DAYS) -> dict:
         # [R287] 「按转折买卖」—— 每两个转折之间到底赚了多少。口径与取舍全在
         # `flip_trades` 的 docstring 里。**只切窗口内的那一段**: 统计必须与
         # 屏幕上那 120 行的转折标记一一对得上, 拿暖机段一起算就对不上了。
-        # [R295] 逐日行补一个「今天换档了没有」—— 「通道结论」那一页也要一张
+        # [R295] 逐日行补一个「今天换档了没有」—— 「通道档位」那一页也要一张
         # 同样的逐日记录表(用户: 「通道结论那部分也想要这样的记录」)。
         # **不让前端从 verdict.code 现比一遍**: 什么算一次换档归 `verdict_days` 管
         # (含「有结论 ↔ 没结论」那两种切换), 前端再比一份就是同一个规则两处定义。
@@ -641,7 +641,7 @@ def review_for_symbol(repo, symbol: str, days: int = DEFAULT_DAYS) -> dict:
                                lu[offset:], ld[offset:]),
         # [R288] 同一台发动机, 换一套「什么时候该有仓位」。用户: 「通道结论这个
         # 部分也能这样搞类似的统计吗」。**输入直接就是逐日行** —— 那些行里的
-        # verdict 就是「通道结论」页签上一张张卡片的来源, 所以统计与卡片天然对齐。
+        # verdict 就是「通道档位」页签上一张张卡片的来源, 所以统计与卡片天然对齐。
         "verdict_trades": _trades(flip_trades.verdict_days(rows),
                                   col("open")[offset:], closes[offset:],
                                   lu[offset:], ld[offset:]),

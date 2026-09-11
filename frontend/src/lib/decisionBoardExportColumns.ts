@@ -177,7 +177,7 @@ export const EXPORT_COLUMNS: ExportColumn[] = [
     },
   },
   {
-    key: 'verdict', label: '结论', group: '通道', on: true,
+    key: 'verdict', label: '档位', group: '通道', on: true,
     cell: (r) => (r.kc?.verdict
       ? { text: r.kc.verdict.title, style: TONE_STYLE[r.kc.verdict.tone] }
       : { text: '—' }),

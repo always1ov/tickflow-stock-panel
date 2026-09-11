@@ -40,7 +40,7 @@ SIGNAL_STALE_DAYS = 3
 MAX_REFRESH = 3
 
 # 界限说清楚: 禁的是**外部信息**, 不是"少给你看"。这套系统里的东西全都能用 ——
-# 趋势判定、通道结论、关键价位、日 K 走势、已有的 AI 个股分析, 想细看就开口要。
+# 趋势判定、通道档位、关键价位、日 K 走势、已有的 AI 个股分析, 想细看就开口要。
 _RULES = """铁律:
 1. **信息来源只能是这套系统**。你没有联网能力, 也不许凭记忆使用任何外部消息
    (新闻、公告、传闻、研报、行情网站)。系统没给的事实, 就当不知道。
@@ -239,14 +239,14 @@ def build_context(repo, trader: dict, scope: str) -> str:
             if o.get("board"):
                 bits.append(str(o["board"]))
             if o.get("verdict"):
-                bits.append(f"通道结论: {o['verdict'].get('title')} —— {o['verdict'].get('action')}")
+                bits.append(f"通道档位: {o['verdict'].get('title')} —— {o['verdict'].get('action')}")
             lines.append(f"- {' · '.join(bits)}")
             lines.append(f"  {o.get('text', '')}")
             if o.get("why"):
                 lines.append(f"  理由: {o['why']}")
     else:
         cands = market_candidates(repo)
-        lines.append(f"\n## 全市场候选({len(cands)} 条, 按成交额粗筛后取通道结论偏买的)")
+        lines.append(f"\n## 全市场候选({len(cands)} 条, 按成交额粗筛后取通道档位偏买的)")
         if not cands:
             lines.append("- (今天全市场没有符合条件的)")
         for c in cands:
@@ -255,7 +255,7 @@ def build_context(repo, trader: dict, scope: str) -> str:
             bits = [f"{c.get('name') or ''}({c['symbol']})",
                     f"收盘 {c['close']}", f"当日 {_fmt_pct(chg)}",
                     f"成交额 {float(c['amount']) / 1e8:.1f} 亿",
-                    f"通道结论: {v.get('title')} —— {v.get('action')}"]
+                    f"通道档位: {v.get('title')} —— {v.get('action')}"]
             if c.get("consecutive_limit_ups"):
                 bits.append(f"{c['consecutive_limit_ups']} 连板")
             lines.append(f"- {' · '.join(bits)}")
@@ -830,7 +830,7 @@ def symbol_detail(repo, symbol: str) -> str:
             out.append(f"- 通道三档: {' · '.join(band_bits)}")
         v = kc.get("verdict")
         if v:
-            out.append(f"- 通道结论: 【{v['title']}】{v['action']} —— {v['detail']}")
+            out.append(f"- 通道档位: 【{v['title']}】{v['action']} —— {v['detail']}")
     except Exception as e:  # noqa: BLE001
         logger.debug("keltner detail failed for %s: %s", sym, e)
 

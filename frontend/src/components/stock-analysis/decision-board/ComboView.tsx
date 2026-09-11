@@ -76,7 +76,7 @@ function Row({ r, hero }: { r: ComboTableRow; hero?: boolean }) {
       <span className="mt-[5px] shrink-0"><Dots rarity={r.rarity} /></span>
       <span className={cn('w-[4.5rem] shrink-0 text-[13px]',
         r.verdict ? TONE_CLS[r.verdict.tone] ?? 'text-muted' : 'text-muted/50')}>
-        {r.verdict?.title ?? '（无结论）'}
+        {r.verdict?.title ?? '（无档位）'}
       </span>
       <span className="min-w-0 flex-1 text-[13px] leading-relaxed text-secondary">
         {r.read}
@@ -205,7 +205,7 @@ export function comboHistory(rows: ReviewRow[], here: string | null) {
     if (r.combo !== here) { prev = r.combo; return }
     if (prev !== here) segs += 1
     days += 1
-    // 段末那天的前瞻收益 —— 与「通道结论」那边取段末同一个道理:
+    // 段末那天的前瞻收益 —— 与「通道档位」那边取段末同一个道理:
     // 真正该问的是"它最后一次说完之后怎么样了"
     const next = asc[i + 1]
     if ((!next || next.combo !== here) && r.fwd != null) fwd.push(r.fwd)
@@ -218,9 +218,9 @@ export function comboHistory(rows: ReviewRow[], here: string | null) {
 
 // [R228 加, R296 删] `ComboView`(「组合速查」那个页签的外壳)在这里删掉了。
 // 用户: 「组合速查合并到通道结论里面去」。**本来就该合** —— 穷举 125 种三档位置
-// 验过: 通道结论是这 27 格的**纯函数**(同一个三字码永远给同一个结论, 零冲突),
+// 验过: 通道档位是这 27 格的**纯函数**(同一个三字码永远给同一个结论, 零冲突),
 // 两个页签监控的是同一个对象的两层。合并之后:
-//   你在哪一格 / 这一格历来  → 「通道结论」头部卡的「现在」行(这只票的事)
+//   你在哪一格 / 这一格历来  → 「通道档位」头部卡的「现在」行(这只票的事)
 //   27 格谱系                → 「说明」抽屉里一节(恒定的表, 查表用的参考)
 // 这条分界与 R292 定的是同一条: **常驻的是这只票的, 抽屉里是背景资料。**
 

@@ -17,7 +17,7 @@ def _res(*, n_all: int, win_all: float, n_recent: int, min_n: int = 15) -> dict:
         "recorded_days": 60, "recent_days": 20, "min_label_n": min_n,
         "last_day": "2025-06-30",
         "labels": [{
-            "key": "verdict", "label": "通道结论",
+            "key": "verdict", "label": "通道档位",
             "items": [{
                 "value": "强势深调", "count": n_all, "recent_count": n_recent,
                 "stats": {"t5": {"n": n_all, "win_rate": win_all, "avg": 1.2}},

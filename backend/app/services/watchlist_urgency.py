@@ -248,7 +248,7 @@ def _band_call(pos: str, band: dict, trend: dict | None,
             return _mk(BAND, flip_d, kind="band_up", side=SIDE_INFO, label=label,
                        what=f"{what}(趋势还在多头侧{f'·{cn}' if cn else ''}, 但大级别也到上沿了)",
                        action="不是只有短期高 —— 大一级的通道也到上沿了, "
-                              "「沿上轨走是常态」这句话在这里不成立。看「通道结论」那一行")
+                              "「沿上轨走是常态」这句话在这里不成立。看「通道档位」那一行")
         if bull is False:
             return _mk(BAND, flip_d, kind="band_up", side=SIDE_SELL, label=label,
                        what=f"{what}(趋势在空头侧{f'·{cn}' if cn else ''})",

@@ -235,7 +235,7 @@ export interface TodayOpportunity {
   mainline?: TodayMainlineTag | null
   /** [R40] 板块归属(沪主板/深主板/创业板/科创板/北交所) */
   board?: string
-  /** [R47] 三档通道结论; 三档都在中部时为 null。与决策台「结论」列同一份 */
+  /** [R47] 三档通道档位; 三档都在中部时为 null。与决策台「结论」列同一份 */
   verdict?: KeltnerVerdict | null
   /** [R123] 量比 —— 突破是不是真的(也是 AI 优选的核心判据, 摆成列好让用户自己核) */
   vol_ratio?: number | null
@@ -300,7 +300,7 @@ export interface TodayOpportunity {
   /** 近 20 日相对大盘(百分点) */
   rs_pct?: number | null
   close?: number | null
-  /** 不参与打分的佐证: 主线/AI/历史胜率/通道结论/策略命中/龙虎榜 */
+  /** 不参与打分的佐证: 主线/AI/历史胜率/通道档位/策略命中/龙虎榜 */
   notes?: TodayNote[]
   /** [R137] 盘中视图 —— 与 score/axes **完全并列, 一分不进评分**。
    *  把握分冻在收盘口径(盘中一动不动, 是稳定的决策基准), 盘中的变化摆这里。
@@ -445,7 +445,7 @@ export interface LedgerStat { n: number; win_rate: number | null; avg: number | 
 export type LedgerStats = Record<'t1' | 't3' | 't5', LedgerStat>
 /** [R133] 规则层把握分体检 —— 与 AI 命中率互补: 那个只看 AI 挑的几只(有选择
  *  偏差), 这个看完整候选池, 才回答得了"把握分本身有没有区分度" */
-/** [R175] 一个标签维度(通道结论/六态趋势/主线归属/龙虎榜)下的各档表现。 */
+/** [R175] 一个标签维度(通道档位/六态趋势/主线归属/龙虎榜)下的各档表现。 */
 export interface LedgerLabelDim {
   key: string
   label: string
@@ -675,7 +675,7 @@ export interface KeltnerVerdict {
 /**
  * [R48] 逐日复盘 —— 决策台「趋势」「结论」两列点进去看的那份数据。
  *
- * 三样东西按同一条时间轴对齐: 六态状态、三档通道结论、涨停。与那两列
+ * 三样东西按同一条时间轴对齐: 六态状态、三档通道档位、涨停。与那两列
  * 同一个状态机、同一组公式、同一个阈值, 所以翻出来的历史能直接套回今天。
  */
 export interface ReviewRow {
@@ -699,9 +699,9 @@ export interface ReviewRow {
   } | null
   /** 当天三档位置; 算不出来的档缺席 */
   bands: Partial<Record<'s' | 'm' | 'l', { pos: string; pos_cn: string }>>
-  /** [R294] 三字位置码(如「上中下」), 也就是 27 格速查表的行号。三档缺一就为 null */
+  /** [R294] 三字组合码(如「上中下」), 也就是 27 格速查表的行号。三档缺一就为 null */
   combo?: string | null
-  /** [R295] 这天通道结论换档了(含「有结论 ↔ 没结论」)。口径归后端 `verdict_days` 管 */
+  /** [R295] 这天通道档位换档了(含「有结论 ↔ 没结论」)。口径归后端 `verdict_days` 管 */
   verdict_flipped?: boolean
   verdict?: KeltnerVerdict | null
   /** [R51] 这天之后 forward_days 的涨跌(小数); 最近几天还不知道结果, 为 null */
@@ -817,7 +817,7 @@ export interface StockReview {
     bear: { n: number; scored: number; win: number
             avg: number | null; best: number | null; worst: number | null }
   } | null
-  /** [R288] 同一套统计换到「通道结论」上 —— 用户: 「通道结论这个部分也能这样
+  /** [R288] 同一套统计换到「通道档位」上 —— 用户: 「通道结论这个部分也能这样
    *  搞类似的统计吗」。
    *
    *  与 `flip_trades` **结构完全一样**, 差别只在什么算一次变化、变化之后按什么
@@ -1072,7 +1072,7 @@ export interface GlossaryTerms {
   /** 六态六档, 按强弱从强到弱 */
   trend: { code: string; title: string; en: string; side: '多头' | '空头'
            meaning: string; action: string }[]
-  /** 通道结论十档, 按偏买 → 偏卖 */
+  /** 通道档位十档, 按偏买 → 偏卖 */
   verdict: { code: string; title: string; action: string; meaning: string
              tone: KeltnerVerdict['tone']; rank: number }[]
 }
@@ -5030,7 +5030,7 @@ export const api = {
   comboTable: () =>
     request<{ rows: ComboTableRow[] }>('/api/stock-analysis/combo-table'),
 
-  /** [R292] 「说明」词条: 六态六档 + 通道结论十档各是什么意思。
+  /** [R292] 「说明」词条: 六态六档 + 通道档位十档各是什么意思。
    *  名字与结论文案的正主在后端 —— 前端誊抄一份的话, 底层改了措辞那份就开始
    *  说假话。无参数、结果恒定, 与 comboTable 同一条路。 */
   glossary: () => request<GlossaryTerms>('/api/stock-analysis/glossary'),

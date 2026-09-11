@@ -39,7 +39,7 @@ export const storage = {
   /** [R266] 消息面总览是否展开 —— 默认收起(那一段很长), 但看惯了展开的人不该每次重点 */
   newsDeskSummaryOpen:  kv<boolean>('news-desk-summary-open'),
 
-  /** [R269] 复盘·通道结论里那块「依据」是否展开 —— 默认收起, 正文让给历史段落 */
+  /** [R269] 复盘·通道档位里那块「依据」是否展开 —— 默认收起, 正文让给历史段落 */
   reviewEvidenceOpen:   kv<boolean>('review-evidence-open'),
   // [R270 加, R292 删] `reviewTrendStatsOpen` 在这里删掉了 —— 它记的是「趋势状态」
   // 那堆涨跌停计数折叠区的开合, 而那一块整个撤了(计数压成头部一行小字)。

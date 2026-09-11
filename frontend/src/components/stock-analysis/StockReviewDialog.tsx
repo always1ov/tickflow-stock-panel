@@ -31,7 +31,7 @@
  * 三个页签讲的其实是同一只票的同一件事, 只是切法不同:
  *
  *     趋势状态   六态在时间轴上怎么走的        (纵向 · 六态)
- *     通道结论   通道结论在时间轴上怎么走的     (纵向 · 通道)
+ *     通道档位   通道档位在时间轴上怎么走的     (纵向 · 通道)
  *     组合速查   通道的 27 格里我在哪一格       (横向 · 通道)
  *
  * 并进来之后, 组合速查的 `geo`/`runs` 直接取复盘接口的 `channel` —— 不再由
@@ -62,7 +62,7 @@ import {
 } from '@/lib/reviewTimeline'
 
 // [R228 加, R296 删] 'combo' 那个页签没了 —— 用户: 「组合速查合并到通道结论
-// 里面去」。穷举 125 种三档位置验过: 通道结论是那 27 格的**纯函数**, 两个页签
+// 里面去」。穷举 125 种三档位置验过: 通道档位是那 27 格的**纯函数**, 两个页签
 // 监控的是同一个对象的两层。**外部调用方传 'combo' 也不会炸**: 它在下面被
 // 归一成 'verdict', 见 `StockReviewDialog` 的第一行。
 export type ReviewTab = 'trend' | 'verdict' | 'combo'
@@ -190,14 +190,14 @@ export function StockReviewDialog({ symbol, name, tab: initialTab, onClose }: {
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <div className="flex overflow-hidden rounded-btn border border-border/60">
-              {/* [R223] 页签名改回「通道结论」。用户: 「名称改回原来的通道结论」。
+              {/* [R223] 页签名改回「通道档位」。用户: 「名称改回原来的通道结论」。
                   R200 那轮清行话时把它换成了「这个价贵不贵」—— 那是在解释它**说什么**,
                   可页签要的是**这一栏叫什么**, 换掉之后反而对不上这一层在别处的名字
-                  (`keltner.verdict` / 感叹号说明 / 复盘统计口径都叫通道结论)。 */}
+                  (`keltner.verdict` / 感叹号说明 / 复盘统计口径都叫通道档位)。 */}
               {/* [R228] 第三个页签「组合速查」—— 原来是另一个铺满屏幕的模态。
                   三个页签的排序是有讲究的: 前两个是**纵向**(同一个判定在时间轴上
                   怎么走的), 第三个是**横向**(同一天里 27 格各是什么样)。 */}
-              {([['trend', '趋势状态'], ['verdict', '通道结论']] as const).map(([k, label]) => (
+              {([['trend', '趋势状态'], ['verdict', '通道档位']] as const).map(([k, label]) => (
                 <button
                   key={k}
                   onClick={() => setTab(k)}
@@ -221,7 +221,7 @@ export function StockReviewDialog({ symbol, name, tab: initialTab, onClose }: {
                   分隔线是唯一还在说这件事的记号。 */}
               <button
                 onClick={() => setTab('help')}
-                title="六态状态与通道结论各是什么意思"
+                title="六态状态与通道档位各是什么意思"
                 className={`flex items-center gap-1 border-l border-border/60 px-2.5 py-1 text-[10px] transition-colors cursor-pointer ${
                   tab === 'help' ? 'bg-sky-400/15 text-sky-300' : 'text-muted hover:text-foreground'}`}
               >
@@ -382,12 +382,12 @@ function TrendView({ d, rows, onlyMarked, onToggleMarked }: {
               {/* [R52 加, R295 删, R296 恢复] 「结论」那一列回来了 —— 用户:
                   「趋势状态删除的那一列我需要恢复」。
                   它在这里的价值是**横着对上一眼**: 同一行里六态说什么、通道位置
-                  说什么。这一页有它自己的按转折买卖, 那一页有按结论买卖 ——
+                  说什么。这一页有它自己的按转折买卖, 那一页有按档位买卖 ——
                   两套判定各管各的, 而这一列让人不必切页签就知道另一套怎么说。 */}
-              {/* [R258] 名字必须与「通道结论」那一页、决策台那一列逐字一致 ——
+              {/* [R258] 名字必须与「通道档位」那一页、决策台那一列逐字一致 ——
                   同一层判定在界面上只许一个名字。R296 恢复这一列时差点又叫回
                   「结论」, 那样两张表并排放着就是同一样东西两个名字。 */}
-              <th className="whitespace-nowrap px-2 py-2 text-center font-normal" title="当天三档通道合起来给出的那一句结论 —— 与决策台「结论」列同一句话, 悬停看完整卡片">通道结论</th>
+              <th className="whitespace-nowrap px-2 py-2 text-center font-normal" title="当天三档通道合起来给出的那一句结论 —— 与决策台「档位」列同一句话, 悬停看完整卡片">通道档位</th>
             </tr>
           </thead>
           <tbody>
@@ -421,7 +421,7 @@ function TrendView({ d, rows, onlyMarked, onToggleMarked }: {
                 </td>
                 <FlipTradeCells leg={legs.get(r.date)} />
                 {/* [R296] 恢复。**排在成交三格之后** —— 这一页的主线是六态与
-                    按转折买卖, 通道结论是"顺带对一眼"的旁证, 不该插进主线中间。 */}
+                    按转折买卖, 通道档位是"顺带对一眼"的旁证, 不该插进主线中间。 */}
                 <td className="whitespace-nowrap px-2 py-1.5 text-center">
                   {r.verdict ? (
                     <VerdictHover v={r.verdict} note="收盘口径">
@@ -443,10 +443,10 @@ function TrendView({ d, rows, onlyMarked, onToggleMarked }: {
       <div className="border-t border-border/60 px-4 py-2 text-[10px] leading-relaxed text-muted">
         收盘口径, 与决策台「趋势」列同一个状态机、同一个阈值(含你自己调过的那个)。
         {/* [R258] 「这个价贵不贵」是 R200 那轮清行话时的旧页签名, R223 已经改回
-            「通道结论」—— 那句脚注一直指着一个**不存在的页签**。
+            「通道档位」—— 那句脚注一直指着一个**不存在的页签**。
             [R295] 同一个病的第二次: 「结论」那一列删掉之后, "悬停看完整卡片"就
             指着一列不存在的东西了, 跟着改。 */}
-        「通道结论」列悬停看完整卡片; 要摊开每一档说了什么、之后走成什么样, 切到上方的「通道结论」那一页。
+        「通道档位」列悬停看完整卡片; 要摊开每一档说了什么、之后走成什么样, 切到上方的「通道档位」那一页。
       </div>
     </>
   )
@@ -493,7 +493,7 @@ function EvidencePanel({ ch, edge }: {
           )}
           {!!edge && (
             <p className="text-[10px] leading-relaxed text-secondary">
-              <span className="text-muted">通道结论:</span> {edge.text}
+              <span className="text-muted">通道档位:</span> {edge.text}
             </p>
           )}
           {rows > 0 && (
@@ -545,9 +545,9 @@ function VerdictView({ d, segments }: {
     <>
       <div className={HEAD_CARD}>
         {/* 用户: 「核心是按结论买卖」—— 与趋势那边一样, 它是第一行 */}
-        <HeadRow label="按结论买卖">
+        <HeadRow label="按档位买卖">
           {/* [R302] 那段 ~100 字的口径偏差**从正文降进「说明」页**。用户:
-              「检查通道结论页面有没有废话, 没水平没用的内容就不要显示出来了」。
+              「检查通道档位页面有没有废话, 没水平没用的内容就不要显示出来了」。
 
               **它不随票变** —— 每一只票、每一次打开印的都是同一段, 而且用的是
               琥珀警告色, 于是每张卡顶上常年挂着一块与这只票无关的黄字。这与
@@ -569,7 +569,7 @@ function VerdictView({ d, segments }: {
                 {/* [R302] **今天那一档结论补回来了, 而且排在最前面。**
                     用户: 「都围绕位置展开」。
 
-                    **这一页叫「通道结论」, 而它的头部卡里原来根本没有今天那一档
+                    **这一页叫「通道档位」, 而它的头部卡里原来根本没有今天那一档
                     结论** —— 要知道今天是「候选池」还是「大顶区域」, 得往下翻到
                     那张 120 行表格的第一行去找。查这一页时才发现的: 头一位摆的是
                     「阶段」(上升中/横盘中), 那是另一个读数, 而且它和结论**在抢
@@ -590,7 +590,7 @@ function VerdictView({ d, segments }: {
                     </b>
                   </VerdictHover>
                 )}
-                {/* [R296] 三档位置码 —— 结论是它的纯函数(R296 穷举 125 种验过),
+                {/* [R296] 三档组合码 —— 结论是它的纯函数(R296 穷举 125 种验过),
                     所以紧跟在结论后面: 一眼看得出"这一档是从哪三格出来的"。 */}
                 {here ? (
                   <span className="font-mono text-secondary" title="三档各在自己通道的上/中/下 —— 27 格速查表的行号, 完整的一览在「说明」里">
@@ -646,7 +646,7 @@ function VerdictView({ d, segments }: {
 
         <HeadRow label={`这 ${d.days} 天`}>
           <div className="flex flex-wrap gap-x-3 text-[10px] text-muted">
-            <span>{segments.length} 段结论</span>
+            <span>{segments.length} 段档位</span>
             {(['buy', 'hold', 'watch', 'sell', 'avoid'] as const)
               .filter((t) => byTone[t])
               .map((t) => (
@@ -685,7 +685,7 @@ function VerdictView({ d, segments }: {
       <div className="flex items-center justify-end gap-2 px-4 pt-2">
         <button
           onClick={() => setOnlyMarked((v) => !v)}
-          title="只留下结论换了一档的那些天 —— 其余日子结论没变, 复盘时没有信息"
+          title="只留下档位换过的那些天 —— 其余日子档位没变, 复盘时没有信息"
           className={`rounded-btn border px-2 py-1 text-[10px] transition-colors cursor-pointer ${
             onlyMarked ? 'border-sky-400/40 bg-sky-400/15 text-sky-300' : 'border-border/60 text-muted hover:text-foreground'}`}
         >
@@ -708,11 +708,11 @@ function VerdictView({ d, segments }: {
               <th className="whitespace-nowrap px-3 py-2 text-left font-normal">日期</th>
               <th className="whitespace-nowrap px-2 py-2 text-right font-normal">收盘</th>
               <th className="whitespace-nowrap px-2 py-2 text-right font-normal">涨跌</th>
-              {/* [R302] 表头 title 里原来还写着「与决策台「结论」列同一句话」——
+              {/* [R302] 表头 title 里原来还写着「与决策台「档位」列同一句话」——
                   **那是讲给读代码的人听的**, 对着屏幕的人不关心它在别处叫什么。
                   只留"这个数是什么、怎么看"。 */}
-              <th className="whitespace-nowrap px-3 py-2 text-left font-normal" title="当天三档通道合起来给出的那一句结论, 悬停看完整卡片">通道结论</th>
-              <th className="whitespace-nowrap px-2 py-2 text-left font-normal" title="按结论买卖: 这次换档的次日开盘该干什么">动作</th>
+              <th className="whitespace-nowrap px-3 py-2 text-left font-normal" title="当天三档通道合起来给出的那一句结论, 悬停看完整卡片">通道档位</th>
+              <th className="whitespace-nowrap px-2 py-2 text-left font-normal" title="按档位买卖: 这次换档的次日开盘该干什么">动作</th>
               <th className="whitespace-nowrap px-2 py-2 text-right font-normal" title="成交日与成交价 → 了结日与了结价, 都是开盘价">成交 → 了结</th>
               <th className="whitespace-nowrap px-2 py-2 text-right font-normal" title="多头段是真赚到的; 空头段是空仓期间股价的涨跌, 不是你的盈亏">结果</th>
             </tr>
@@ -738,7 +738,7 @@ function VerdictView({ d, segments }: {
                     </VerdictHover>
                   ) : <span className="text-[10px] text-muted/40">三档都在中部</span>}
                   {r.verdict_flipped && (
-                    <span className="ml-1.5 text-[9px] text-amber-400" title="这天通道结论换了一档">
+                    <span className="ml-1.5 text-[9px] text-amber-400" title="这天通道档位换了一档">
                       ← 换档
                     </span>
                   )}
@@ -747,14 +747,14 @@ function VerdictView({ d, segments }: {
               </tr>
             ))}
             {rows.length === 0 && (
-              <tr><td colSpan={7} className="px-3 py-10 text-center text-[11px] text-muted">这段时间里结论一档都没换过</td></tr>
+              <tr><td colSpan={7} className="px-3 py-10 text-center text-[11px] text-muted">这段时间里档位一次都没换过</td></tr>
             )}
           </tbody>
         </table>
       </div>
 
       <div className="border-t border-border/60 px-4 py-2 text-[10px] leading-relaxed text-muted">
-        「通道结论」列悬停看完整卡片 —— 与决策台「结论」列是同一张。一律按收盘算, 用的是同一套通道。
+        「通道档位」列悬停看完整卡片 —— 与决策台「档位」列是同一张。一律按收盘算, 用的是同一套通道。
         历史是按<b className="text-secondary">当前</b>复权价重新算的 —— 期间除过权的话,
         同一天今天算出来的通道会和当时屏幕上略有出入, 复盘看的是形态与节奏。
       </div>

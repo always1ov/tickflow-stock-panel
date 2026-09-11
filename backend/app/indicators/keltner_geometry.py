@@ -1339,7 +1339,7 @@ def phase(geo: dict | None, runs: dict | None = None) -> dict | None:
             return mk(PH_OVEREXTENDED,
                       f"短线已经高出长线 {sp:.1f} 倍日常波动 —— 涨得太远, "
                       f"短线看和长线看已经没有一个共同认可的合理价",
-                      "这个位置再争论「通道结论」没有意义 —— 按短线看是贵, 按长线看还没到。"
+                      "这个位置再争论「通道档位」没有意义 —— 按短线看是贵, 按长线看还没到。"
                       "先想清楚你做的是哪一段; 现在追进去性价比很低",
                       cn=PHASE_OVEREXTENDED_CN["up"])
         return mk(PH_OVEREXTENDED,
@@ -1417,9 +1417,9 @@ def phase(geo: dict | None, runs: dict | None = None) -> dict | None:
 # ## 打架多是我造成的
 #
 # 系统里有三套判定都在回答「这只票往哪走」, 而我给其中两对各加了一处冲突
-# 检查(R214 六态 vs 通道结论、R223 六态 vs 阶段)。实测 400 只:
+# 检查(R214 六态 vs 通道档位、R223 六态 vs 阶段)。实测 400 只:
 #
-#     六态 vs 通道结论  29.8%
+#     六态 vs 通道档位  29.8%
 #     六态 vs 阶段      33.2%
 #     至少报一个        51.5%   ← 超过一半的行挂着警告
 #

@@ -1,5 +1,5 @@
 /**
- * [fork 增强 R292] 复盘弹窗的「说明」页 —— 六态与通道结论各是什么意思。
+ * [fork 增强 R292] 复盘弹窗的「说明」页 —— 六态与通道档位各是什么意思。
  *
  * 用户: 「把全景按钮改成说明或者帮助按钮, 里面是解释每个六态状态、结论状态是
  * 什么意思」。
@@ -37,7 +37,7 @@ import { trendBadgeCls } from '@/components/stock-analysis/TrendStateBar'
 import { ComboGroups } from '@/components/stock-analysis/decision-board/ComboView'
 
 // [R292 加, R300 删] `HelpButton` 在这里删掉了 —— 用户: 「"说明"这个按钮合并到
-// 这里"趋势状态 通道结论 说明"」。入口搬进了页签组, 那一处直接写在
+// 这里"趋势状态 通道档位 说明"」。入口搬进了页签组, 那一处直接写在
 // `StockReviewDialog` 里(它要跟着页签共用同一套选中态与边框, 抽出来反而是
 // 两处定义同一个外观)。**只剩一个入口了**, 组件本身没有第二个调用方。
 const TONE_CLS: Record<string, string> = {
@@ -71,7 +71,7 @@ export function ReviewHelpView({ here = null }: {
   })
 
   return (
-    // [R301] 与「趋势状态」「通道结论」同一个骨架: 一块占满剩余高度、自己滚动的
+    // [R301] 与「趋势状态」「通道档位」同一个骨架: 一块占满剩余高度、自己滚动的
     // 正文。**两栏铺开** —— 这一页横向有整个弹窗可用(抽屉那版只有 26rem),
     // 六态六档与结论十档并排, 一屏就看得完, 不必上下翻。
     <div className="min-h-0 flex-1 overflow-auto px-4 py-3">
@@ -105,7 +105,7 @@ export function ReviewHelpView({ here = null }: {
             </Section>
 
             <Section
-              title="通道结论"
+              title="通道档位"
               note="十档按偏买 → 偏卖排, 与别处的排序同一个次序"
             >
               {q.data.verdict.map((v) => (
@@ -117,8 +117,8 @@ export function ReviewHelpView({ here = null }: {
                   action={v.action}
                 />
               ))}
-              {/* [R302] 「按结论买卖」那一栏的**口径偏差**搬到这里。原来它常年
-                  挂在「通道结论」页头部卡上, 用琥珀警告色 —— 而它**不随票变**,
+              {/* [R302] 「按档位买卖」那一栏的**口径偏差**搬到这里。原来它常年
+                  挂在「通道档位」页头部卡上, 用琥珀警告色 —— 而它**不随票变**,
                   每只票每次打开都是同一段。它属于"这十档怎么被翻成买卖动作",
                   正好是这一节在讲的事。
 
@@ -126,7 +126,7 @@ export function ReviewHelpView({ here = null }: {
                   『说明』」, 指过来。真正该常驻正文的是「样本太少」「撞上涨跌停」
                   那几条 —— 它们是**这只票的**, 一条没动。 */}
               <div className="px-2.5 py-2 text-[10px] leading-relaxed text-muted">
-                <b className="font-medium text-secondary">按结论买卖的口径</b>:
+                <b className="font-medium text-secondary">按档位买卖的口径</b>:
                 「拿着」「等着」「三档都在中部」<b className="text-secondary">都不动手</b> ——
                 那是作者写的原话(「拿着, 别在这加仓」「等短期入场点」), 不是买卖信号。
                 另: 「该止盈了」原话是「可落袋一部分」、「大顶区域」是「动仓位基调」,
@@ -139,15 +139,15 @@ export function ReviewHelpView({ here = null }: {
                 结论后面: 先说这一档什么意思, 再说它是从哪几格来的。 */}
             {!!combo.data && (
               <Section
-                title="27 种位置组合"
-                note="三档各在上/中/下。上面那十档结论就是从这里出来的; 有 3 格没有结论"
+                title="27 种三档组合"
+                note="三档各在上/中/下。上面那十档就是从这里出来的; 有 3 格给不出档位"
               >
                 <div className="px-2 py-2">
                   {/* [R294 → R296] 那个取舍的交代。R294 时它印在「组合速查」页上
                       (用户点名要那一页也有战绩, 不说会以为漏做了); R296 那一页
                       并掉之后, 交代跟着搬到这里 —— 问题还在, 只是换了个人问。 */}
                   <p className="mb-2 leading-relaxed text-muted">
-                    按位置换格买卖的成绩与「按结论买卖」那一栏逐字相同, 所以只摆一份:
+                    按三档组合换格买卖的成绩与「按档位买卖」那一栏逐字相同, 所以只摆一份:
                     换格比换档密, 但多出来的换格两边同向 —— 只是把同一段多切几刀,
                     而段与段之间没有缝, 复利一乘就抵回去了。
                   </p>

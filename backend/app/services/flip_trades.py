@@ -65,7 +65,7 @@ BEAR = "空头"      # 空仓 —— **不是做空**, A 股散户也做不了
 #
 # 两个页签用的是同一台发动机(`simulate`), 差别全在这里: 什么算一次变化、
 # 变化之后手上该是满仓还是空仓。分开写而不是塞成一个 if, 是因为两套规则的
-# **形状不同** —— 六态每天非多即空, 通道结论有三种"不是动作"的状态。
+# **形状不同** —— 六态每天非多即空, 通道档位有三种"不是动作"的状态。
 
 
 def trend_days(steps: list[dict]) -> list[dict]:
@@ -101,10 +101,10 @@ _TONE_SIDE = {"buy": BULL, "sell": BEAR, "avoid": BEAR}
 
 
 def verdict_days(rows: list[dict]) -> list[dict]:
-    """[R288] 通道结论 → 逐日仓位。
+    """[R288] 通道档位 → 逐日仓位。
 
     `rows` 是复盘逐日行(要带 `date` 与 `verdict`)。一次「变化」= **结论换了一档**
-    (含从有结论变成没结论), 与「通道结论」页签上那一张张卡片一一对应。
+    (含从有结论变成没结论), 与「通道档位」页签上那一张张卡片一一对应。
 
     起手是**空仓** —— 窗口开头还没等到任何买入信号, 不许假设手上已经有票。
     """
@@ -118,7 +118,7 @@ def verdict_days(rows: list[dict]) -> list[dict]:
         out.append({
             "date": r.get("date"),
             "state": code,
-            "state_cn": v.get("title") or "没结论",
+            "state_cn": v.get("title") or "没档位",
             "side": side,
             "prev": prev_code,
             # 第一天的 prev 是 None, 与 `compute()` 开机那天同一个形状 ——
@@ -197,7 +197,7 @@ def simulate(steps: list[dict], opens: list, closes: list, *,
 
     steps  逐日 {date, side, flipped, prev, state, state_cn} —— 由下面两个适配器
            之一产出。**`side` 是适配器算好的仓位, 不在这里判** ——
-           六态每天非多即空, 而通道结论有「拿着」「等着」「没结论」三种
+           六态每天非多即空, 而通道档位有「拿着」「等着」「没结论」三种
            **不是动作**的状态, 两套规则没法写成一个 if。
     opens  与 steps 等长的开盘价(前复权, 与 closes 同一口径)
     closes 与 steps 等长的收盘价 —— 只在最后一段还没走完时用得着

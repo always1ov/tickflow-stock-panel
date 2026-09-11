@@ -156,7 +156,7 @@ function geoLines(geo?: ChannelGeometry | null, ev?: ChannelEvent | null,
 }
 
 /**
- * 「通道结论」单元格 —— 三档组合翻成一句人话。
+ * 「通道档位」单元格 —— 三档组合翻成一句人话。
  *
  * 徽标只放 4-6 字的结论标题, 悬停给分段排版的完整卡片(R49, 见 VerdictHover),
  * 点击翻这只票的逐日复盘(R48) —— 这一列说的话在它身上过去好不好使, 只有
@@ -221,7 +221,7 @@ function VerdictInner({ v, ev, geo, runs, energy, ph, stateRun, onOpen }: {
           title={(note
             ? `${note.title}:${note.detail}\n\n底层判定在这一格是空的 —— 这句话来自补充层。`
             : '三档都在通道中部 —— 位置上真的没有可说的, 听趋势和信号的')
-            + '。点击翻这只票过去出过哪些结论'
+            + '。点击翻这只票过去出过哪些档位'
             + geoLines(geo, ev, runs, energy, ph)}
         >
           {/* [R256] 「中中中」那一格原来印一个光秃秃的 `—`, 旁边却跟着「已N天」——
@@ -236,7 +236,7 @@ function VerdictInner({ v, ev, geo, runs, energy, ph, stateRun, onOpen }: {
     )
   }
   return (
-      <VerdictHover v={v} note={"点击摊开这只票过去每一档结论 —— 出现在哪几天、当时说了什么、之后走成什么样。"
+      <VerdictHover v={v} note={"点击摊开这只票过去每一档 —— 出现在哪几天、当时说了什么、之后走成什么样。"
         + geoLines(geo, ev, runs, energy, ph)}>
         <button
           onClick={onOpen}
@@ -291,7 +291,7 @@ function VerdictInner({ v, ev, geo, runs, energy, ph, stateRun, onOpen }: {
  * ## 本来就是一层
  *
  * 两列同源(都从 `phase()`/`geo` 出), 而且**点开去的是同一个地方**(复盘弹窗的
- * 「通道结论」页)。一列说这一档是什么、今天该干嘛, 另一列说这一段走到什么程度 ——
+ * 「通道档位」页)。一列说这一档是什么、今天该干嘛, 另一列说这一段走到什么程度 ——
  * 后者是前者的**刻度**, 不是第四条结论。这与 R211「测量与结论拆两列等于让人
  * 左右对眼把结论和它的依据接起来」是同一条理由, 只是这次轮到它自己。
  *
@@ -425,7 +425,7 @@ export function ChannelStateCell({ trend, geo, runs, ph, kc, close, trendCls,
   close?: number | null
   /** 六态徽标的配色(由 TrendStateBar 那套给, 两处必须同色) */
   trendCls?: string
-  /** [R228] 整格点开 → 复盘弹窗(趋势 / 通道结论 / 组合速查 三个页签) */
+  /** [R228] 整格点开 → 复盘弹窗(趋势 / 通道档位 / 组合速查 三个页签) */
   onOpenReview?: () => void
   /** 追加类名(结论区分界线之类) */
   cls?: string
@@ -461,7 +461,7 @@ export function ChannelStateCell({ trend, geo, runs, ph, kc, close, trendCls,
       .map(([t, b]) => `${t}通道 ${b!.lower.toFixed(2)} ~ ${b!.upper.toFixed(2)}`
         + `,现在${b!.pos_cn}(位置 ${Math.round(b!.pct * 100)}%)`),
     close != null ? `收盘 ${close.toFixed(2)}` : '',
-    '', '点开:逐日复盘 / 通道结论 / 27 种组合速查'].filter(Boolean).join('\n')
+    '', '点开:逐日复盘 / 通道档位 / 27 种组合速查'].filter(Boolean).join('\n')
   return (
     // [R217] 与「结论」列同一个形状: **固定两行**, 高度对齐, 行与行不再糊在一起。
     //   行 1: 六态徽标 + 阶段·成熟度(原来阶段自己占一行)
@@ -551,7 +551,7 @@ const PLAY_CLS: Record<string, string> = {
 /**
  * [R205] 「怎么办」列 —— **整张表唯一的收敛层**, 所以放在最左边。
  *
- * 决策台上有五套彼此平行的判定(该动了 / 六态 / 通道结论 / 通道阶段 / AI 信号),
+ * 决策台上有五套彼此平行的判定(该动了 / 六态 / 通道档位 / 通道阶段 / AI 信号),
  * 每一套单独看都对, 摆在一起就是让用户每天在脑子里做一次五路合成。这一列
  * 替他做完那次合成: 一句话说该怎么办, 一行小字说凭什么。
  *
