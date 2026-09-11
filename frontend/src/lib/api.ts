@@ -696,6 +696,15 @@ export interface ReviewRow {
     day: number
     /** 转折那天 —— 复盘最想找的就是这些 */
     flipped: boolean
+    /** [R313] 六态里更细的那一档 —— **纯标注**。
+     *
+     *  `null` = 这一天没有更细的分法(或者没有可比的上一段)。
+     *  **它不是 `state`**: 多空判断、转折、打分全都不看它, 界面上也是挂在
+     *  状态旁边当注记而不是替换。判据与守卫见后端 `livermore_substate.py`。 */
+    sub_state?: 'SR' | 'SREA' | null
+    sub_state_cn?: string
+    flip_down?: number | null
+    flip_up?: number | null
   } | null
   /** 当天三档位置; 算不出来的档缺席 */
   bands: Partial<Record<'s' | 'm' | 'l', { pos: string; pos_cn: string }>>
@@ -828,6 +837,9 @@ export interface StockReview {
   /** [R191] 当前这一段与它自己的历史对照 —— 「我现在在哪、盯哪个价」 */
   now?: {
     date: string; state: string; state_cn: string | null; side: string | null
+    /** [R313] 细分档 —— 纯标注, 与逐日那份同一个产地(不另算一套) */
+    sub_state?: 'SR' | 'SREA' | null
+    sub_state_cn?: string
     day: number
     /** 这只票上这个状态平均持续几天(不是预测, 只为回答"在这一段的前段还是后段") */
     avg_days: number | null

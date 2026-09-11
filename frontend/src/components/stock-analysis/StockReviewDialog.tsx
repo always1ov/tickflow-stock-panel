@@ -76,6 +76,17 @@ const VERDICT_CLS: Record<KeltnerVerdict['tone'], string> = {
   watch: 'border-border bg-elevated/60 text-secondary',
 }
 
+/**
+ * [R313] 细分档的悬停说明 —— **一处定义**。
+
+ * 它出现在两处(「现在」那一行、逐日表每一行), 两处必须说同一句话:
+ * 同一个注记两种解释, 正是这仓库反复在治的那种病。
+ */
+const SUB_STATE_TIP = '六态里更细的那一档 —— 只是标注, 不是状态。\n'
+  + '它不参与多空判断、不触发转折、不进打分。\n\n'
+  + '次级回升:这一段反弹的高点还没超过上一段回升的高点(力度更弱)。\n'
+  + '次级回撤:这一段回落的低点还没跌破上一段回撤的低点(还没破位)。'
+
 const RANGES = [60, 120, 250] as const
 
 function pct(v: number | null | undefined, digits = 1): string {
@@ -315,6 +326,12 @@ function TrendView({ d, rows, onlyMarked, onToggleMarked }: {
               <b className={cn('font-medium', bull ? 'text-red-400' : 'text-emerald-400')}>
                 {d.now.state_cn} 第 {d.now.day} 天
               </b>
+              {/* [R313] 同上 —— 注记, 不是状态 */}
+              {d.now.sub_state_cn && (
+                <span className="text-[10px] text-muted/60" title={SUB_STATE_TIP}>
+                  ({d.now.sub_state_cn})
+                </span>
+              )}
               {/* 复盘完总得知道接下来盯什么 —— 决策台那一列给不出这两个价 */}
               {d.now.flip_down != null && (
                 <span className="font-mono text-emerald-400/90" title="收盘跌破这个价转弱">
@@ -411,6 +428,15 @@ function TrendView({ d, rows, onlyMarked, onToggleMarked }: {
                       >
                         {r.trend.state_cn} 第 {r.trend.day} 天
                       </span>
+                      {/* [R313] 细分档。**挂在状态旁边当注记, 不替换它** ——
+                          用户: 「只是显示, 不触发转折不参与评分」。所以它既不
+                          换徽标的词、也不换徽标的色(色编的是多空, 而细分档
+                          不改多空), 只在后面缀一个更暗的小字。 */}
+                      {r.trend.sub_state_cn && (
+                        <span className="ml-1 text-[9px] text-muted/60" title={SUB_STATE_TIP}>
+                          ({r.trend.sub_state_cn})
+                        </span>
+                      )}
                       {r.trend.flipped && (
                         <span className="ml-1.5 text-[9px] text-amber-400" title="这天六态状态发生了翻转">
                           ← 转折

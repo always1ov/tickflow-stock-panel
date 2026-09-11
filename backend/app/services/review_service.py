@@ -93,10 +93,16 @@ def _steps(df: pl.DataFrame, threshold: float) -> list[dict]:
 
 def _trend_by_date(steps: list[dict]) -> dict[str, dict]:
     """逐日六态状态 + 该状态到当天已经走了第几天。"""
+    from app.services.livermore_substate import substates
+
     out: dict[str, dict] = {}
     run = 0
     prev_state = None
-    for st in steps:
+    # [R313] 细分档 —— **纯标注, 只显示**。用户: 「补上那两态, 但只是显示,
+    # 不触发转折不参与评分」。它不进 `state`、不进 `side`、不碰 `flipped`,
+    # 只多出一个自己的字段; 判据与守卫见 `services/livermore_substate.py`。
+    subs = substates(steps)
+    for idx, st in enumerate(steps):
         state = st.get("state")
         run = run + 1 if state == prev_state else 1
         prev_state = state
@@ -111,6 +117,11 @@ def _trend_by_date(steps: list[dict]) -> dict[str, dict]:
             # 那一条得说清"再走到哪个价就换状态", 不然复盘完还是不知道盯什么。
             "flip_down": st.get("flip_down"),
             "flip_up": st.get("flip_up"),
+            # [R313] 细分档。None = 这一天没有更细的分法(或者没有可比的上一段)。
+            # **它不是 state** —— 多空、转折、打分全都不看它, 界面上也摆在
+            # 状态旁边当注记, 不是替换。
+            "sub_state": subs[idx],
+            "sub_state_cn": STATE_LABELS.get(subs[idx], ("", ""))[0] if subs[idx] else "",
         }
     return out
 
@@ -390,6 +401,10 @@ def _now(rows: list[dict], outcomes: list[dict]) -> dict | None:
         "date": last["date"],
         "state": state,
         "state_cn": t.get("state_cn"),
+        # [R313] 细分档 —— 直接从逐日那份带过来, **不在这里另算一套**。
+        # 同一个判定两处实现必然漂(R277/R294 反复治过)。
+        "sub_state": t.get("sub_state"),
+        "sub_state_cn": t.get("sub_state_cn"),
         "side": t.get("side"),
         "day": day,
         "avg_days": avg_days,
