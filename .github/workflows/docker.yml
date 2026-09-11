@@ -1,7 +1,8 @@
 name: Build and Push Docker Image
 
 # 触发:
-#   - push 到 main: 覆盖刷新 :latest + :sha(每次提交可追溯)
+#   - push 到 main / claude/upstream-clean: 覆盖刷新 :latest + :sha(每次提交可追溯)
+#   - push 到其他工作分支: 只出 :<sha> 与 :<分支名>, **不动 :latest**(见下方守卫)
 #   - 打 v* tag:    额外产出带版本号的镜像(如 :v0.1.43), 便于固定回溯
 #   - 手动:         网页 Actions → Run workflow
 #
@@ -12,7 +13,12 @@ name: Build and Push Docker Image
 #   前端 tsc/vite 这类 CPU 密集步骤慢 5~20 倍, 所以不再用 setup-qemu-action。
 on:
   push:
-    branches: [main, claude/upstream-clean]
+    branches:
+      - main
+      - claude/upstream-clean
+      # 可读性重构工作分支: 让「每次改好」都能自动出一版可部署镜像。
+      # 它只产出 :<sha> / :refactor-readability-maintainability, 不碰 :latest。
+      - refactor-readability-maintainability
     tags: ['v*']
   workflow_dispatch:
 
@@ -125,14 +131,25 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GHCR_PAT }}
 
+      # 标签方案。注释刻意写在 tags 块**外面**：tags 是一个块标量，
+      # metadata-action 按行切分它的内容，块内以 # 开头的行有被当成
+      # 一条标签定义（而非注释）的风险，不值得赌。
+      #   latest      仅发布分支(main / claude/upstream-clean)与 v* tag 覆盖 ——
+      #               必须带 enable 条件，否则工作分支的推送会顶掉用户实际
+      #               部署在拉的 :latest，直接污染线上。
+      #   <sha>       每次构建可追溯到具体提交，工作分支唯一稳定的标识。
+      #   <分支名>    斜杠转横线(claude/upstream-clean → claude-upstream-clean)，
+      #               让工作分支也能直接 pull 一个可读 tag，不必记 sha。
+      #   vX.Y.Z      打版本 tag 时的固定回溯点。
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=raw,value=latest
+            type=raw,value=latest,enable=${{ github.ref_type == 'tag' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/claude/upstream-clean' }}
             type=sha,prefix=
+            type=ref,event=branch
             type=ref,event=tag
 
       - name: Create multi-arch manifest
