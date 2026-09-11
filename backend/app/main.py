@@ -82,7 +82,10 @@ _DOCKERENV_PATH = Path("/.dockerenv")
 # 停机缺口自检的延迟秒数: 避开启动高峰, 又要在用户开始操作前跑完。
 _INTEGRITY_CHECK_DELAY_SECONDS = 30.0
 # matrix 缓存预热线程的退出等待上限 (秒)。
-_MATRIX_PREWARM_SHUTDOWN_TIMEOUT = 5.0
+# 用 int 而非 5.0: 该值会经 %s 打进停机告警日志, 整型渲染为 "5",
+# 保持与重构前 "did not stop within 5 seconds" 的日志文本一致,
+# 避免按该字符串做的日志检索/告警匹配失配。shutdown(timeout=5) 与 5.0 等价。
+_MATRIX_PREWARM_SHUTDOWN_TIMEOUT = 5
 
 # 追加文件日志: uvicorn (含 --reload 开发模式) 默认只有 StreamHandler, 同步/管道等
 # 运行时日志仅出现在 dev 终端, 关掉或滚屏后即丢失, 排查「同步后日志没落」时无处可查。
