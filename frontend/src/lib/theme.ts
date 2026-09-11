@@ -51,7 +51,20 @@ export function useTheme(): Theme {
 // ================================================================
 // 图表调色板 — ECharts / lightweight-charts 画布不吃 CSS 变量,
 // 所有图表组件统一从这里取色, 主题切换时依赖 useTheme 重建 option。
-// bull/bear/accent 等语义色双主题一致, 不在此重复定义。
+//
+// [R317] 关于**涨跌红绿**: 这里仍然不定义 bull/bear。K 线画布的涨跌色是
+// 各图表组件里硬编码的 `#C74040`(涨) / `#2D9B65`(跌), 分布在 9 个文件
+// (EChartsCandlestick / EChartsIntraday / EChartsMultiDayIntraday /
+//  StockInfoBar / MiniCandlestick / MiniIntraday / price-alerts /
+//  TradeKlineModal / stock-analysis/AnalysisKChart)。最后那个在六态冻结面内,
+// 所以这次**一个都没动** —— 只改其中 8 个反而会让"个股分析主图"与其它图
+// 的涨跌色不一致, 比不改更糟。
+//
+// 好消息是它们本来就不用改: 实测那两个硬编码值的色相是 **24.47° / 157.30°**,
+// 而本次重做后的语义 token 是 **22° / 158°** —— 相差 ≤2.5°, 本来就是同一个
+// 红绿族。(改之前 UI 侧的暗色 bull 是 28.54°、Tailwind emerald-400 是
+// 163.22°, 那才是真的"两个红、两个绿"。)所以这次重做反而把 UI 文字与
+// K 线画布拉到了同一族里。
 // ================================================================
 
 export interface ChartTheme {
@@ -83,32 +96,36 @@ export interface ChartTheme {
 
 // [R163] 暗色回到作者原版(Tailwind Zinc 灰阶) —— 与 index.css 的 html.dark 块一起还原。
 // 亮色仍是 R155 的 Radix Slate。
+//
+// [R317] 画布颜色与 UI token 重新对齐。canvas 不吃 CSS 变量, 所以这里必须把
+// index.css 的值抄一份成 hex —— 抄的时候要对得上, 否则同一屏里"轴上的灰"与
+// "界面上的灰"会是两种灰。下面每个值后面标了它对应的 token。
 const DARK: ChartTheme = {
-  text: '#A1A1AA',
-  textStrong: '#E4E4E7',
+  text: '#8e8e96',        // --fg-muted   (原 #A1A1AA, 那是旧的 zinc-400, 已与 token 脱节)
+  textStrong: '#fafafa',  // --fg-primary (原 #E4E4E7)
   grid: 'rgba(255,255,255,0.06)',
-  border: '#27272A',
-  crosshair: 'rgba(255,255,255,0.25)',
-  crosshairLabelBg: '#333',
-  tooltipBg: 'rgba(24,24,27,0.95)',
-  tooltipBorder: 'rgba(255,255,255,0.1)',
-  tooltipText: '#E4E4E7',
-  infoBarBg: 'rgba(39,39,42,0.6)',
+  border: '#3e3e42',      // --border     (原 #27272A)
+  crosshair: 'rgba(255,255,255,0.28)',
+  crosshairLabelBg: '#242429', // --elevated (原 #333)
+  tooltipBg: 'rgba(24,24,27,0.96)',   // --surface
+  tooltipBorder: 'rgba(255,255,255,0.12)',
+  tooltipText: '#fafafa', // --fg-primary (原 #E4E4E7)
+  infoBarBg: 'rgba(36,36,41,0.75)',   // --elevated (原 rgba(39,39,42,0.6))
   zoomFill: 'rgba(255,255,255,0.06)',
   fillSubtle: 'rgba(255,255,255,0.04)',
 }
 
 const LIGHT: ChartTheme = {
-  text: '#60646c',        // slate11
-  textStrong: '#1c2024',  // slate12
+  text: '#5a5e66',        // --fg-muted   (原 #60646c, 旧的 slate11)
+  textStrong: '#1c2024',  // --fg-primary
   grid: 'rgba(0,0,0,0.06)',
-  border: '#cdced6',      // slate7
+  border: '#cdced6',      // --border
   crosshair: 'rgba(0,0,0,0.3)',
   crosshairLabelBg: '#8b8d98', // slate9
   tooltipBg: 'rgba(255,255,255,0.97)',
   tooltipBorder: 'rgba(0,0,0,0.1)',
-  tooltipText: '#1c2024',
-  infoBarBg: 'rgba(240,240,243,0.85)',  // slate3 = base
+  tooltipText: '#1c2024', // --fg-primary
+  infoBarBg: 'rgba(240,240,243,0.85)',  // --base
   zoomFill: 'rgba(0,0,0,0.06)',
   fillSubtle: 'rgba(0,0,0,0.04)',
 }

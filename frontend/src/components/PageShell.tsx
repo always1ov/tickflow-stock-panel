@@ -39,8 +39,17 @@ const WIDTH: Record<ShellWidth, string> = {
   read: 'max-w-[1100px]',
 }
 
-/** 页面留白: 小屏窄一点(手机上每一个像素都是内容), 大屏给到 16px */
-const PAD = 'px-3 pb-4 pt-3 lg:px-4'
+/** 页面留白: 小屏窄一点(手机上每一个像素都是内容), 大屏给到 20px。
+ *
+ * [R317] 两处修正:
+ *   1. **与页头对齐**。PageShell 传给 PageHeader 的 className 里写的是
+ *      `lg:px-5`(20px), 而正文这里原本是 `lg:px-4`(16px) —— 大屏上页标题
+ *      与下方卡片左边缘差 4px。单看一页几乎察觉不到, 但"基准线不齐"正是
+ *      这个骨架当初要解决的问题, 留 4px 等于把问题留回去。现在两边都是 20px。
+ *   2. **纵向留白加一档**。字号刻度本次整体上移(sm 14→15 / base 15→16),
+ *      同一档留白在新字号下会显得更挤, 所以 pt-3→pt-4、pb-4→pb-5。
+ *      区块间距同步从 12px 提到 16px(见下方 space-y-4)。 */
+const PAD = 'px-3 pb-5 pt-4 lg:px-5'
 
 export function PageShell({
   title, subtitle, titleExtra, right, width = 'wide', className, bodyClassName, children,
@@ -69,7 +78,9 @@ export function PageShell({
       <main className={cn('min-h-0 flex-1 overflow-auto', PAD, className)}>
         {/* 限宽层与留白层分开: 合成一层的话, 宽屏上内容会贴着限宽边缘,
             左右留白反而消失 —— 那正是原来几页看着"顶到边"的原因 */}
-        <div className={cn('mx-auto w-full space-y-3', WIDTH[width], bodyClassName)}>
+        {/* [R317] 区块间距 12px -> 16px。字号整体上移之后, 12px 的区块间隙
+            与 8/10px 的卡片内间距已经拉不开层级, 上下两块会读成一整块。 */}
+        <div className={cn('mx-auto w-full space-y-4', WIDTH[width], bodyClassName)}>
           {children}
         </div>
       </main>

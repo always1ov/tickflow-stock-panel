@@ -2,6 +2,8 @@ import type { Config } from 'tailwindcss'
 import animate from 'tailwindcss-animate'
 
 // 设计语言 §6.0:暗色为主 + 低饱和靛蓝强调([R155] Radix Slate 骨架 / Indigo 强调) + 等宽数字
+// [R317] 「分层清晰 · 语义唯一」重做: token 层是本次视觉重构的主战场 ——
+// 组件里的类名一个字不动, 改这里的值就能全站生效(含六态相关的页面)。
 export default {
   darkMode: ['class'],
   // [R168] 把所有 hover: / group-hover: / peer-hover: 变体包进
@@ -103,13 +105,25 @@ export default {
       //
       // 行高按 1.5~1.55 跟着走 —— 只加字号不加行高, 字挤在一起反而更难读,
       // 「压抑」有一半来自行高而不是字号。
+      //
+      // [R317] **拉开档位差, 重建字阶**。
+      // 起因: 全站 `text-xs` 用了 993 次、`text-sm` 350 次, 而两档只差 1px
+      // (13 / 14) —— 相邻两级在屏幕上几乎分辨不出, 「层级」等于没有。字号是
+      // 冻结面里改不动的那些组件唯一能共用的层级杠杆, 所以必须在这一层拉开。
+      //
+      // xs 保持 13px **不动**: 它是密集表格的主力字号, 一动就是全站表格重排。
+      // 往上每档至少拉开 2px, 相邻两级才有明确的"级别感":
+      //   xs 13 → sm 15 → base 16 → lg 18 → xl 21 → 2xl 25 → 3xl 31
+      // 3xl 是补上的: 原本没定义, 落到 Tailwind 默认的 rem 值(会随根字号变),
+      // 与这套 px 刻度不是一套体系。
       fontSize: {
         xs: ['13px', { lineHeight: '20px' }],
-        sm: ['14px', { lineHeight: '22px' }],
-        base: ['15px', { lineHeight: '24px' }],
-        lg: ['17px', { lineHeight: '26px' }],
-        xl: ['19px', { lineHeight: '28px' }],
-        '2xl': ['23px', { lineHeight: '32px' }],
+        sm: ['15px', { lineHeight: '23px' }],
+        base: ['16px', { lineHeight: '25px' }],
+        lg: ['18px', { lineHeight: '27px' }],
+        xl: ['21px', { lineHeight: '30px' }],
+        '2xl': ['25px', { lineHeight: '34px' }],
+        '3xl': ['31px', { lineHeight: '40px' }],
       },
       letterSpacing: {
         tighter: '-0.015em',
@@ -127,14 +141,46 @@ export default {
         // [R126] skill Quick Reference 建议 0.5~1rem; Modern Dark Mode 那段给的是
         // --radius: 0.625rem(10px)。卡片按它走, 按钮/输入框按比例小一档 ——
         // 密集交易界面里控件多且小, 圆角跟卡片一样大会显得肉。
-        card: '10px',
-        btn: '7px',
-        input: '7px',
-        dialog: '14px',
+        //
+        // [R317] 整体上调一档(btn/input 7→8, card 10→12, dialog 14→16)。
+        // 半径与元素尺寸同向变化时才"稳": 原有刻度里 10px 的卡片配 7px 的按钮
+        // 比例是对的, 但 14px 的弹窗只比卡片大 4px, 大面上显得方。现在每一级
+        // 保持约 1.33 的比例(8 / 12 / 16), 控件仍然明显小于卡片。
+        card: '12px',
+        btn: '8px',
+        input: '8px',
+        dialog: '16px',
+      },
+      // [R317] 阴影走 CSS 变量, **两套模式各一份**。
+      //
+      // 起因: 全站 shadow-sm/lg/xl/2xl 共 148 处, 用的都是 Tailwind 默认值 ——
+      // 那是**为浅色背景调的黑色半透明投影**(shadow-2xl = rgb(0 0 0 / 0.25))。
+      // 放在近黑的主题上等于没有: 黑投影落在黑面板上, 什么也看不出来, 于是
+      // 弹窗和浮层"浮不起来"。而亮色模式又需要更柔和的投影, 硬编码一个值
+      // 必然顾此失彼。
+      //
+      // 现在两端都指向 --shadow-*: 亮色是低透明度冷灰投影(不脏), 暗色是更深的
+      // 纯黑投影 + 一道极淡的内高光(模拟受光的边缘)。组件里的 shadow-lg 之类
+      // 一个字没改, 换主题自动切。值见 src/index.css。
+      boxShadow: {
+        sm: 'var(--shadow-sm)',
+        DEFAULT: 'var(--shadow-sm)',
+        md: 'var(--shadow-md)',
+        lg: 'var(--shadow-lg)',
+        xl: 'var(--shadow-xl)',
+        '2xl': 'var(--shadow-2xl)',
+        card: 'var(--shadow-md)',
+        pop: 'var(--shadow-lg)',
+        dialog: 'var(--shadow-2xl)',
       },
       transitionTimingFunction: {
         // §6.0.4 Linear/Vercel 同款缓动
         smooth: 'cubic-bezier(0.16, 1, 0.3, 1)',
+        // [R317] 按 emil-design-eng §3 补三条「比 CSS 内置更有力」的曲线:
+        // 内置 ease-out 收得太软, 入场缺"手感应答"的感觉。
+        'out-strong': 'var(--ease-out-strong)',
+        'in-out-strong': 'var(--ease-in-out-strong)',
+        drawer: 'var(--ease-drawer)',
       },
       // [R168] `transition-ui` —— 用来替掉全项目 105 处 `transition-all`。
       //
@@ -168,13 +214,43 @@ export default {
       },
       keyframes: {
         // 列表项入场: 轻微上移 + 淡入(配 stagger 用)
+        //
+        // [R317] 终态写成 `transform: none` 而不是 `translateY(0)` —— 两者视觉
+        // 完全一样, 但差别在于**任何一个非 none 的 transform 都会让元素成为
+        // position:fixed 后代的包含块**。这几个动画都带 `both`, 动画结束后
+        // 终态会一直挂着, 于是列表项/弹窗内部的 fixed 元素(下拉、tooltip)会
+        // 相对这个祖先定位, 而不是相对视口 —— 一个平时看不出来、一旦出现就
+        // 很难查的错位。写成 none 之后动画结束不残留包含块。
         'rise-in': {
           from: { opacity: '0', transform: 'translateY(6px)' },
-          to: { opacity: '1', transform: 'translateY(0)' },
+          to: { opacity: '1', transform: 'none' },
+        },
+        // [R317] 补两个基础入场。emil-design-eng §Component Building Principles:
+        // **绝不从 scale(0) 入场** —— 现实里没有东西会凭空出现又凭空消失,
+        // 从 0.96 起手已经足够"有形", 观感自然得多。
+        'fade-in': {
+          from: { opacity: '0' },
+          to: { opacity: '1' },
+        },
+        // 弹窗/浮层: 从 0.96 放大到 1。模态框保持 transform-origin 居中
+        // (它不挂在某个触发器上, 而是相对视口居中), 所以不做 origin 修正。
+        'pop-in': {
+          from: { opacity: '0', transform: 'scale(0.96)' },
+          to: { opacity: '1', transform: 'none' },
+        },
+        // 通知条从下方推入(与 toast 的堆叠方向一致, 退出走同一路径)
+        'toast-in': {
+          from: { opacity: '0', transform: 'translateY(8px)' },
+          to: { opacity: '1', transform: 'none' },
         },
       },
       animation: {
-        'rise-in': 'rise-in 320ms cubic-bezier(0.16, 1, 0.3, 1) both',
+        // [R317] 320ms → 260ms。skill §4 的硬线是「UI 动效不超过 300ms」——
+        // 列表入场是高频操作, 超过这条线会让界面显钝。
+        'rise-in': 'rise-in 260ms cubic-bezier(0.16, 1, 0.3, 1) both',
+        'fade-in': 'fade-in 160ms ease-out both',
+        'pop-in': 'pop-in 180ms cubic-bezier(0.23, 1, 0.32, 1) both',
+        'toast-in': 'toast-in 220ms cubic-bezier(0.23, 1, 0.32, 1) both',
       },
     },
   },

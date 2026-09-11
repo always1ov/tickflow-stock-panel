@@ -120,8 +120,27 @@ export function Modal({
   }, [])
 
   return (
+    // [R317] 入场动效: 遮罩淡入 160ms + 面板从 scale(0.96) 放到 1(180ms)。
+    //
+    // 之前是硬切出现 —— 弹窗"啪"地一下盖上来, 没有任何"它是从哪来的"的交代。
+    // emil-design-eng 把弹窗归到「偶发使用 → 标准动效」那一档: 用户一天只开
+    // 几次, 加动效不会拖慢高频操作, 却能明确建立"这一层浮在页面之上"的空间感。
+    //
+    // 三条细节:
+    //   1. 曲线走 --ease-out-strong(cubic-bezier(0.23,1,0.32,1)), 内置 ease-out
+    //      收得太软, 入场缺少"应答"的手感。
+    //   2. 起手 0.96 而不是 0 —— 现实里没有东西凭空出现。
+    //   3. 两个动画类**追加**在调用方传入的 className 之后, 而不是塞进默认值里:
+    //      panelClassName / overlayClassName 是整体替换语义, 写进默认值的话,
+    //      凡是自己传了面板样式的调用点都会静默丢掉动效。
+    //   4. 终态在 keyframes 里是 `transform: none`(不是 scale(1)) —— 见
+    //      tailwind.config.ts 的说明: 非 none 的 transform 会成为 fixed 子元素
+    //      的包含块, 面板里的下拉/tooltip 会错位。
+    //
+    // 「减少动态效果」由 index.css 的全局规则接管(animation-duration → 0.01ms),
+    // 不需要在这里再判断一次。
     <div
-      className={overlayClassName}
+      className={`${overlayClassName} animate-fade-in`}
       onMouseDown={(e) => {
         // 仅记录"按下时确实在遮罩上"; 在面板内按下时记 false。
         mouseDownOnBackdrop.current = e.target === e.currentTarget
@@ -138,7 +157,7 @@ export function Modal({
         aria-labelledby={labelledBy}
         aria-label={labelledBy ? undefined : ariaLabel}
         tabIndex={-1}
-        className={`outline-none ${panelClassName}`}
+        className={`animate-pop-in outline-none ${panelClassName}`}
         onClick={(e) => e.stopPropagation()}
       >
         {children}
