@@ -5,7 +5,7 @@
  * 实现细节, 不该摆在 933 行主文件的顶部让人以为是全局约定。
  */
 import type { BandEnergy, ChannelEvent, ChannelGeometry, ChannelPhase, ChannelRuns, KeltnerBand } from '@/lib/api'
-import { COMBO_CHAR, POS_TEXT } from '@/lib/reviewTimeline'
+import { POS_FILL, POS_TEXT } from '@/lib/reviewTimeline'
 
 /**
  * [R194] 决策台单元格的统一基线。**整张表只有这一处定义垂直对齐与行内边距。**
@@ -429,95 +429,102 @@ export function PositionCell({ kc, geo, ev, runs, energy, ph, stateRun, onOpen }
 }) {
   const s = kc?.s
   const combo = geo?.combo ?? null
+  const pct = s ? Math.round(s.pct * 100) : null
   const tip = [
-    s ? `短期通道 ${s.pos_cn} —— 通道内位置 ${Math.round(s.pct * 100)}/100`
-        + '(0 = 贴下轨, 100 = 贴上轨; 出了轨会小于 0 或大于 100)\n'
-        + '**这不是涨跌幅** —— 它说的是收盘价落在这条通道的哪个高度'
+    s ? `短期通道 ${s.pos_cn} —— 收盘价落在通道的 ${pct}% 高度`
+        + '(0% = 贴着下轨, 100% = 贴着上轨; 出了轨会小于 0 或大于 100)\n'
+        + '**这不是涨跌幅** —— 涨跌在左边「现价/涨跌」那一列'
       : '短期通道这一档今天算不出来',
     s ? `短期通道区间 ${s.lower.toFixed(2)} ~ ${s.upper.toFixed(2)}` : '',
     '',
+    '下面那条轨上三个点 = 短 / 中 / 长各自在**自己那条通道**里的高度,',
+    '点越大越短期。左端是下轨, 右端是上轨。',
+    ...(['s', 'm', 'l'] as const)
+      .map((k, i2) => {
+        const b = kc?.[k]
+        return b ? `  ${'短中长'[i2]}期 ${b.pos_cn} ${Math.round(b.pct * 100)}%`
+                   + `(${b.lower.toFixed(2)} ~ ${b.upper.toFixed(2)})` : ''
+      }),
+    '',
     combo
-      ? `三档组合「${combo}」—— 短 / 中 / 长各在自己通道的哪一侧`
+      ? `三档组合码「${combo}」—— 27 格速查表的行号`
         + (stateRun ? `, 已连着 ${stateRun.days} 天${stateRun.capped ? '以上' : ''}`
                       + (stateRun.since ? `(自 ${stateRun.since} 起)` : '') : '')
       : '三档里缺了一档, 这个组合今天定不了(不是"罕见组合", 是算不出来)',
-    ...(['s', 'm', 'l'] as const)
-      .map((k, i) => {
-        const b = kc?.[k]
-        return b ? `  ${'短中长'[i]}期 ${b.pos_cn}(${b.lower.toFixed(2)} ~ ${b.upper.toFixed(2)})` : ''
-      }),
     '',
     '点开:通道档位(逐日档位 / 按档位买卖 / 27 种三档组合)',
   ].filter(Boolean).join('\n') + geoLines(geo, ev, runs, energy, ph)
 
   return (
     <td className={`${TD_BASE} whitespace-nowrap px-1.5`}>
-      {/* [R314] **两行各自报出自己是哪个尺度。**
+      {/* [R314 → R315] **不再用文字解释版面。**
 
-          用户指着这一格问: 「这个分数指的是短期通道的吗, 你干脆就说清楚,
-          比如只看短期只显示短期」。
+          用户: 「想想怎么表达会更好, 重新排版表达, 我想用百分比表示,
+          『短期 通道内 49/100 / 短中长 中中中』这样表达很 low」。
 
-          **他问得对, 而且这一格自己给了误导**: 第一行是短期那一档的读数,
-          第二行三个字却是 短/中/长 —— 两行的尺度不一样, 可谁都没说自己是谁。
-          更容易误会的是**第二行第一个字和第一行说的是同一件事**(`combo_code`
-          取的就是 s/m/l 三档的 `pos`), 只是精度不同: 一个 5 档 + 数, 一个 3 档。
-          不标尺度的话, 「通道内 49/100」与它下面那个「中」看着像两个读数。
+          **他说得对, 而且病根是我拿词去说空间。** R314 给两行各加了一个尺度
+          标签(短期 / 短中长)—— 那不是设计, 那是**替失败的版面写说明**。
+          「中中中」更糟: 三个一模一样的汉字, 看着像噪声不像读数。
 
-          **标签靠右成轴, 数据才对得齐。** 两个标签字数不等(短期 2 字 /
-          短中长 3 字), 各自居中的话两行的数据部分会错开 —— 这是 R298/R307
-          反复治过的那个病。所以用 `grid` 两列: 标签列右对齐、数据列左对齐,
-          整块再 `mx-auto` 居中。
+          位置这件事本来就该**画出来**:
 
-          标签是**说明不是读数**, 所以压到最暗、字号最小 —— 层次靠明度分,
-          与 R311 给 `/100` 定的规矩同一条。 */}
+              49% 通道内
+             ▏──·──●───·──▕     ← 一条轨, 左端下轨 右端上轨
+                                   三个点 = 短/中/长 各自的高度, 点越大越短期
+
+          于是两个标签都不需要了 —— 「49% 是什么的 49%」由它正下方那个点在轨
+          上的位置直接回答, 一个字都不用写。
+
+          **精度还升了。** 原来第二行是三个 3 档的字(上/中/下), 现在三个点走的
+          是各自的 `pct`(0~100 连续)—— 中期是刚进中部还是快贴上轨, 字看不出来,
+          点看得出来。27 格那个**组合码不是丢了, 是进了悬停** —— 它的用处是
+          去速查表查行号, 那是点开之后的事, 不是扫表时要读的。
+
+          **`%` 回来了**(用户要的)。R311 当初换成 `/100` 是为了躲开「被读成
+          涨跌幅」, 现在那件事由**轨**来保证: 一个点在一条有两个端点的轨上,
+          没人会把它读成涨跌。记法让位给图形, 是对的顺序。 */}
       <button type="button" onClick={onOpen} title={tip}
-              className="mx-auto grid w-fit cursor-pointer grid-cols-[max-content_max-content] items-baseline gap-x-1.5 gap-y-0.5 rounded-btn px-1 py-0.5 text-left leading-snug transition-colors duration-hover hover:bg-elevated/40">
-        <span className="justify-self-end text-[9px] text-muted/45">短期</span>
-        {s ? (
-          <span className="whitespace-nowrap text-[12px]">
-            <span className={POS_TEXT[s.pos] ?? 'text-muted'}>{s.pos_cn}</span>
-            {/* [R311] **`%` 换成 `/100`。** 用户指着这一格问: 「这个百分比是什么
-                意思, 要表达清楚, 是位置?」——`6%` 在一张股票表里默认被读成
-                **涨跌幅**(隔壁「现价/涨跌」那一列印的正是带 % 的涨跌), 而且
-                「贴下轨 6%」连读像「距离下轨 6%」, 那是**反的**: 它是从下轨往上
-                走了 6%。
-
-                `/100` 把刻度本身摆出来 —— 0 在下轨、100 在上轨, 一个不会被读成
-                涨跌幅的记法。轨外那两档读起来反而更顺: `-4/100`(低于 0)、
-                `107/100`(超过 100), 换成 `%` 时这两个数最容易被当成暴跌暴涨。
-
-                **数字跟着档位走同一个色**(R308): 两者说的是同一件事, 分色会
-                让人以为是两个读数。层次靠**明度**分: 档位名最亮、数次之、
-                `/100` 只是刻度, 压到最暗。
-
-                五个档位名都正好三个字(破上轨/贴上轨/通道内/贴下轨/破下轨),
-                数字再给一个定宽右对齐的槽, 于是整列的 `/100` 上下成一条线 ——
-                166 行扫下来, 眼睛顺着那条线走就行。 */}
-            <span className={`ml-1.5 font-mono tabular-nums ${POS_TEXT[s.pos] ?? 'text-muted'}`}>
-              <span className="inline-block w-[2.4em] text-right opacity-85">
-                {Math.round(s.pct * 100)}
+              className="mx-auto flex w-full max-w-[9rem] cursor-pointer flex-col items-stretch gap-y-1 rounded-btn px-1 py-1 leading-none transition-colors duration-hover hover:bg-elevated/40">
+        <span className="flex items-baseline justify-center gap-1.5">
+          {pct === null ? (
+            <span className="text-[12px] text-muted/30">—</span>
+          ) : (
+            <>
+              {/* 百分比是主角 —— 最大、最亮。等高数字让整列的 % 上下对齐。 */}
+              <span className={`font-mono text-[13px] tabular-nums ${POS_TEXT[s!.pos] ?? 'text-muted'}`}>
+                {pct}%
               </span>
-              <span className="opacity-40">/100</span>
-            </span>
-          </span>
-        ) : <span className="text-[12px] text-muted/30">—</span>}
-        {/* 第二行的尺度标签 —— 它同时说明了**读的顺序**: 短 → 中 → 长。
-            不写的话「中中中」三个字看不出哪个字对应哪一档。 */}
-        <span className="justify-self-end text-[9px] text-muted/45">短中长</span>
-        {combo ? (
-          <span className="font-mono text-[11px] tracking-[0.15em]">
-            {combo.split('').map((ch, i) => (
-              <span key={i} className={COMBO_CHAR[ch] ?? 'text-muted'}>{ch}</span>
-            ))}
-          </span>
-        ) : (
-          /* [R294] 「定不了」与「没进过这一格」是两件事 —— 这里是前者:
-             三档缺了一档算不出来, 不是这个组合罕见。混成一句的话数据缺失
-             会被读成"这是个稀有位置"。 */
-          <span className="text-[10px] text-muted/40" title="三档里缺了一档, 算不出组合">
-            组合定不了
-          </span>
-        )}
+              {/* 档位名是同一件事的粗粒度说法, 所以同色、压暗、更小 ——
+                  它多给的那点信息是**按 ATR 算的"近不近轨"**, 光看百分比得不到。 */}
+              <span className={`text-[10px] ${POS_TEXT[s!.pos] ?? 'text-muted'} opacity-55`}>
+                {s!.pos_cn}
+              </span>
+            </>
+          )}
+        </span>
+        {/* 通道轨。左端 = 下轨, 右端 = 上轨; 两道端帽把"这是一段有边界的区间"
+            说清楚, 于是上面那个百分比不再需要任何文字说明。 */}
+        <span className="relative block h-[7px] w-full px-[3px]">
+          <span className="absolute inset-x-[3px] top-1/2 h-px -translate-y-1/2 bg-border/70" />
+          <span className="absolute left-0 top-0 h-full w-px bg-border" />
+          <span className="absolute right-0 top-0 h-full w-px bg-border" />
+          {(['l', 'm', 's'] as const).map((k) => {
+            const b = kc?.[k]
+            if (!b) return null
+            // 轨外的点按在端帽上 —— 位置到头了, 但**数字照旧印真值**(107%),
+            // 所以"它出界了"这件事一个字没丢。
+            const x = Math.max(0, Math.min(100, b.pct * 100))
+            // 点越大越短期: 短是这一格的主角, 中长是背景。
+            const d = k === 's' ? 5 : k === 'm' ? 3.5 : 2.5
+            return (
+              <span key={k}
+                    className={`absolute top-1/2 rounded-full ${POS_FILL[b.pos] ?? 'bg-border'}`}
+                    style={{ left: `calc(3px + (100% - 6px) * ${x / 100})`,
+                             width: d, height: d,
+                             transform: 'translate(-50%, -50%)' }} />
+            )
+          })}
+        </span>
       </button>
     </td>
   )
