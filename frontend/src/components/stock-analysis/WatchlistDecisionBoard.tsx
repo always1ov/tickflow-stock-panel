@@ -63,10 +63,12 @@ const SIGNAL_RANK: Record<string, number> = { buy: 0, sell: 1, hold: 2, watch: 3
  * **顺序必须与 thead 里的 <th> 一一对应。**
  */
 const BOARD_COLS = [
-  { label: '标的', w: '9.5%' },
+  // [R309] 9.5% → 13%。名称原来截在 110px, 五个字以上就带省略号 ——
+  // **认票这件事上省 3% 是最亏的**: 认错票之后后面六列全白读。
+  { label: '标的', w: '13%' },
   // [R212] 「现价」「涨跌」合成一列。用户: 「这两列合成为『现价/涨跌』这样为一列」。
   // 两个数天生一起读 —— 拆成两列只是让眼睛多跳一次。
-  { label: '现价/涨跌', w: '6%' },
+  { label: '现价/涨跌', w: '7%' },
   // [R212] 「止盈线」那一列撤掉了。用户: 「止盈线这一列不要了」。
   // **信息没丢**: 出场线破了或逼近, 「结论」列会直接判成「按纪律走」/「盯着」
   // 并把线价写在徽标上 —— 那比单独一列更早进视线。排序键与判定都还在。
@@ -93,8 +95,11 @@ const BOARD_COLS = [
   // 用不了多少宽; 会长的是「怎么办」那一行事件与理由, 宽度给它。
   // [R308] 「位置」只剩两个短读数, 用不了那么宽; 省下的给「怎么办」——
   // 会长的是它那一行事件与理由。
-  { label: '位置', w: '7%' },
-  { label: '怎么办', w: '16%' },
+  { label: '位置', w: '7.5%' },
+  // [R309] 16% → 27%。R307 把这一行说明改成单行截断是**被 224px 逼的**,
+  // 不是因为截断更好。给够宽之后它基本不再截断 —— 截断那套机制照旧留着
+  // (行高仍然固定, 全文仍在悬停), 只是轮不上它出场了。
+  { label: '怎么办', w: '27%' },
   // [R249] 账目三列从「现价」后面挪到这里。用户: 「我有点乱, 是否有好办法整理
   // 好顺序调整显示和列」。**原来它们把判断切开了** —— 扫表时要连着读
   // 「走势 → 结论」, 中间却横着三列只有持仓那几只才用得上的账目。
@@ -107,11 +112,34 @@ const BOARD_COLS = [
   //
   // **成本输入框保留, 挪进这一格**(只在持有时长出来): 它不是展示而是**录入**,
   // 而且是出场线(止盈/止损)的输入 —— 整个删掉等于把那条线的来源砍了一半。
-  { label: '持仓', w: '5%' },
+  { label: '持仓', w: '6%' },
   // [R284] 「AI 分析」整列撤掉 —— 用户: 「仅保留对投资决策最具影响力和决定性的
   // 核心数据列」。**它压根不是数据列**: 一枚报告胶囊 + 两个图标按钮, 是操作入口。
   // 三件东西并进「AI 信号」那一列的头一行(与信号徽标、时间同排), 一个不少。
-  { label: 'AI 信号', w: '' },       // 不给宽度, 吃掉剩下的 —— 只有它是整段文字
+  // [R309] **「吃掉剩下的」这条改掉了 —— 它就是这一列涨到半张表的原因。**
+  //
+  // 表格是 `table-auto`(没有 `table-fixed`), 所以 colgroup 里的百分比是
+  // **建议**, 真正定宽的是内容: 不给宽度 = 纯内容驱动, 于是 AI 那段不换行的
+  // 理由把 max-content 顶到多高, 这一列就有多宽 —— 实测吃掉约 47%,
+  // **整张表的一半给了最不该占这么多的那一层**。
+  //
+  // 列序那条纪律写着「认票 → 凭什么 → 我的账 → 别人的意见」。AI 信号是
+  // **别人的意见** —— 它可以在场, 但不该比「我自己的判断」那三列加起来还宽。
+  // 现在 30% vs 44%(走势 + 位置 + 怎么办), 有守卫钉着这个次序。
+  //
+  // **光给宽度不够**(R283 那一课的又一次): `table-auto` 下内容的 max-content
+  // 说了算, 所以真正的闸是单元格里那道 `max-w` + 理由两行截断。两处一起动。
+  { label: 'AI 信号', w: '30%' },
+  //
+  // [R309] **上面这些宽度加起来必须正好 100%, 而且一列都不许留空。**
+  //
+  // 这不是强迫症: 只要有一列写成 `w: ''`, 它就成了**余量的垃圾桶** —— 谁拿着
+  // 余量, 谁就会在没人注意的时候长大, 而且长得无声无息(AI 信号那一列正是这么
+  // 从「一列」变成「半张表」的)。加起来正好 100 之后, 想给谁加宽就必须从另一列
+  // 身上明写着拿 —— **宽度从此是一笔要记账的东西。**
+  //
+  // `table-auto` 下百分比仍然只是建议(内容顶得开它), 所以这条守的是**设计
+  // 意图**; 真正的闸门是各单元格里那道 `max-w`。两者缺一不可, 守卫各钉一条。
 ] as const
 
 // [fork 增强] 六态排序权重:多头在前(上涨趋势 → 下跌趋势)
@@ -1019,7 +1047,7 @@ title={'我在这只票上的账: 拿没拿 / 买入成本 / 现在浮盈多少�
                               className="mx-auto flex min-h-[2.25rem] flex-col items-center justify-center gap-0.5 text-center cursor-pointer group">
                         <span className="flex items-center gap-1.5">
                           {active && <Star className="h-2.5 w-2.5 shrink-0 text-accent" />}
-                          <span className="max-w-[110px] truncate font-medium text-foreground transition-colors group-hover:text-sky-300">{r.name}</span>
+                          <span className="max-w-[140px] truncate font-medium text-foreground transition-colors group-hover:text-sky-300">{r.name}</span>
                           <span className={`${NUM} text-[11px] text-muted`}>{r.symbol}</span>
                         </span>
                       </button>
@@ -1091,8 +1119,13 @@ title={'我在这只票上的账: 拿没拿 / 买入成本 / 现在浮盈多少�
                         落在自己那一格的正中; 这一列是整段会换行的文字, 居中之后
                         每一行的起点都不一样, 读起来像被撕开的。 */}
                     <td className={`${TD_BASE} px-4 !text-left`}>
+                      {/* [R309] **这道 `max-w` 才是真闸门。** 表格是 `table-auto`,
+                          colgroup 里那 30% 只是建议 —— 内容的 max-content 说了算,
+                          而 AI 理由原来不换行也不截断, 于是它顶多宽这一列就多宽
+                          (实测把整张表的一半占了去)。列宽与内容上限必须一起动,
+                          这是 R283 那一课的又一次。 */}
                       {r.sig ? (
-                        <div className="flex flex-col gap-0.5">
+                        <div className="flex w-full max-w-[27rem] flex-col gap-0.5">
                           <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
                             <span className={`text-[12px] px-1.5 py-0.5 rounded border ${SIGNAL_META[r.sig.signal]?.cls ?? 'border-border text-muted'}`}>
                               {SIGNAL_META[r.sig.signal]?.label ?? r.sig.signal}
@@ -1101,8 +1134,15 @@ title={'我在这只票上的账: 拿没拿 / 买入成本 / 现在浮盈多少�
                             <AiActions r={r} onAnalyze={onAnalyze} onPriceAlert={onPriceAlert}
                                        reports={reportsBySymbol.get(r.symbol)} />
                           </div>
+                          {/* [R309] 理由**截到两行**, 全文进悬停。
+                              整张表其余每一格的行高都是定死的(R217/R253/R255/R307
+                              一路在收), 只有这一格例外: 一段长理由能把一行顶成五行,
+                              旁边六列跟着空着 —— 一屏扫 166 行时, 行高参差比少看
+                              几个字伤得多。**一个字没丢**: 悬停给全文。
+                              两行按这一列的宽度约合 100 字, 多数理由本来就印得全。 */}
                           {r.sig.reason && (
-                            <span className="text-[12px] text-muted/80 leading-snug whitespace-normal break-words">{r.sig.reason}</span>
+                            <span className="line-clamp-2 text-[12px] text-muted/80 leading-snug whitespace-normal break-words"
+                                  title={r.sig.reason}>{r.sig.reason}</span>
                           )}
                           {/* [fork 增强] 到价预案:AI watch_points(涨至/跌至 → 对应操作),提前有准备 */}
                           {(r.sig.watch_points ?? []).length > 0 && (

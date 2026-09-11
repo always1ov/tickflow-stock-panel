@@ -697,7 +697,10 @@ def test_R308_两列的宽度与内容上限对得上():
     )
     root = _BOARD.parent
     cells = (root / "decision-board" / "cells.tsx").read_text(encoding="utf-8")
-    cap = re.search(r"max-w-\[(\d+(?:\.\d+)?)rem\]", cells)
+    # [R309] **锚死在 PlayCell 上。** 原来抓的是整份 cells.tsx 里第一个 `max-w`,
+    # 碰巧是它 —— 哪天别的格先加一道上限, 这条就会去量错的那一个然后照样绿。
+    play_blk = cells[cells.index("export function PlayCell"):]
+    cap = re.search(r"max-w-\[(\d+(?:\.\d+)?)rem\]", play_blk)
     assert cap, "「怎么办」列内容的 max-w 上限没了"
     rem = float(cap.group(1))
     # 常见视口按 1400px 表宽折算 —— R283 就是在这个量级上撞到上限的
@@ -705,6 +708,86 @@ def test_R308_两列的宽度与内容上限对得上():
         f"内容上限 {rem}rem({rem * 16:.0f}px)低于列宽 {play_w}%(约 {1400 * play_w / 100:.0f}px)"
         " —— 又变成 R283 那个「加了列宽也没用」的局面"
     )
+
+    # [R309] **同一把尺子量 AI 那一列** —— 它正是没上限时长成半张表的那个。
+    ai_w = float(got["AI 信号"])
+    ai_td = src[src.index("{r.sig ? ("):]
+    ai_cap = re.search(r"max-w-\[(\d+(?:\.\d+)?)rem\]", ai_td[:600])
+    assert ai_cap, (
+        "「AI 信号」那一格没有 max-w 闸 —— `table-auto` 下 colgroup 那个百分比"
+        "只是建议, 没有闸它照样能把整张表顶开(R309 之前就是这样)"
+    )
+    ai_rem = float(ai_cap.group(1))
+    assert ai_rem * 16 >= 1400 * ai_w / 100, (
+        f"AI 那一列的内容上限 {ai_rem}rem 低于列宽 {ai_w}% —— 列里会空着一条"
+    )
+
+
+def test_R309_列宽加起来是一百且没有一列留空():
+    """[R309] **谁拿着余量, 谁就会无声无息地长大。**
+
+    改之前「AI 信号」写的是 `w: ''` —— 注释说得明明白白「不给宽度, 吃掉剩下的」。
+    而这张表是 `table-auto`, 不给宽度 = 纯内容驱动: AI 那段不换行的理由把
+    max-content 顶到多高, 这一列就有多宽。**实测吃掉约 47%, 整张表的一半。**
+
+    加起来正好 100 之后, 想给谁加宽就必须从另一列身上明写着拿 —— 宽度成了
+    一笔要记账的东西, 而不是"剩下的归谁"。
+    """
+    src = _src()
+    blk = src[src.index("const BOARD_COLS = ["):]
+    blk = blk[:blk.index("] as const")]
+    ws = re.findall(r"label: '([^']+)', w: '([^']*)'", blk)
+    assert len(ws) == len(_cols(src)), f"有列没被这条量到: {ws}"
+    empty = [lab for lab, w in ws if not w.strip()]
+    assert not empty, (
+        f"这些列没写宽度, 于是谁也管不住它们能长多大: {empty}\n"
+        "—— 「吃掉剩下的」正是 AI 信号那一列长成半张表的原因"
+    )
+    total = sum(float(w.rstrip('%')) for _, w in ws)
+    assert abs(total - 100) < 1e-9, (
+        f"列宽加起来是 {total}% 而不是 100% —— 差额会被浏览器按内容悄悄分掉, "
+        f"分给谁取决于哪一列的文字最长\n  {ws}"
+    )
+
+
+def test_R309_别人的意见不许比自己的判断占得宽():
+    """[R249 → R309] 列序那条纪律写的是 **认票 → 凭什么 → 我的账 → 别人的意见**。
+    R249 把它钉成了**顺序**, 这条把它钉成**分量**。
+
+    AI 信号是「别人的意见」: 它可以在场(而且删不得 —— 写信号的入口只有这张表,
+    `paper_trader_run` 还在读存下来的信号), 但它**不该比我自己那三列判断加起来
+    还宽**。改之前它一个人占 47%, 而走势 + 位置 + 怎么办 加起来才 32.5% ——
+    **版面把话语权给反了**, 而且没有任何东西会因此报错。
+    """
+    src = _src()
+    blk = src[src.index("const BOARD_COLS = ["):]
+    blk = blk[:blk.index("] as const")]
+    got = {lab: float(w.rstrip('%'))
+           for lab, w in re.findall(r"label: '([^']+)', w: '([^']+)%'", blk)}
+    judge = got["走势"] + got["位置"] + got["怎么办"]
+    assert got["AI 信号"] < judge, (
+        f"AI 信号占 {got['AI 信号']}%, 而我自己的判断三列加起来才 {judge}% —— "
+        "版面把话语权给反了"
+    )
+
+
+def test_R309_AI_理由截到两行且全文进悬停():
+    """[R217 → R253 → R255 → R307 → R309] **行高参差**这个病, 这张表一路在收:
+    R217 收的是一格摞五层, R253 收的是到价预案"能挤就挤", R255/R307 收的是
+    「怎么办」那一行说明。**只剩 AI 理由一直是整段不截断的** —— 一段长理由能把
+    一行顶成五行, 旁边六列跟着空着。一屏扫 166 行的时候, 行高参差比少看几个字
+    伤得多。
+
+    所以它跟这张表其余每一格一个待遇: **截断 + 全文进悬停**。
+    「截了却不给全文」是把话吞了, 那是另一种病, 所以两条一起钉。
+    """
+    src = _src()
+    blk = src[src.index("{r.sig.reason && ("):]
+    blk = blk[:blk.index(")}")]
+    assert "line-clamp-2" in blk, (
+        "AI 理由又变回整段不截断了 —— 它会一个人把行高顶起来, 旁边六列空着"
+    )
+    assert "title={r.sig.reason}" in blk, "截了却没给全文 —— 那是把话吞了, 不是排版"
 
 
 

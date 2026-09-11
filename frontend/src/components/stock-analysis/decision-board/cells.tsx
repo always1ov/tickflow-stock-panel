@@ -605,7 +605,7 @@ export function PlayCell({ p, ev, geo, ph }: {
   ].filter(Boolean).join('\n\n')
   return (
     <td className={`${TD_BASE} px-2`}>
-      <div className="mx-auto flex w-full max-w-[17rem] flex-col items-center gap-y-0.5 leading-snug">
+      <div className="mx-auto flex w-full max-w-[24rem] flex-col items-center gap-y-0.5 leading-snug">
         <div className="grid grid-cols-[max-content_max-content] items-baseline">
           <span className="justify-self-end"><PlaybookInner p={p} /></span>
           {/* [R308] 「走到哪一步」从「位置」列搬过来 —— 用户把那一列收成了两个
