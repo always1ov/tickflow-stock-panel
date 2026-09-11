@@ -298,7 +298,7 @@ export function ChannelStateCell({ trend, geo, runs, ph, kc, close, trendCls,
     ...([['短期', kc?.s], ['中期', kc?.m], ['长期', kc?.l]] as const)
       .filter(([, b]) => b)
       .map(([t, b]) => `${t}通道 ${b!.lower.toFixed(2)} ~ ${b!.upper.toFixed(2)}`
-        + `,现在${b!.pos_cn}(位置 ${Math.round(b!.pct * 100)}%)`),
+        + `,现在${b!.pos_cn}(位置 ${Math.round(b!.pct * 100)}/100)`),
     close != null ? `收盘 ${close.toFixed(2)}` : '',
     '', '点开:逐日复盘 / 通道档位 / 27 种组合速查'].filter(Boolean).join('\n')
   return (
@@ -430,8 +430,9 @@ export function PositionCell({ kc, geo, ev, runs, energy, ph, stateRun, onOpen }
   const s = kc?.s
   const combo = geo?.combo ?? null
   const tip = [
-    s ? `短期通道 ${s.pos_cn} —— 通道内位置 ${Math.round(s.pct * 100)}%`
-        + '(0 = 贴下轨, 100 = 贴上轨; 出了轨会小于 0 或大于 100)'
+    s ? `短期通道 ${s.pos_cn} —— 通道内位置 ${Math.round(s.pct * 100)}/100`
+        + '(0 = 贴下轨, 100 = 贴上轨; 出了轨会小于 0 或大于 100)\n'
+        + '**这不是涨跌幅** —— 它说的是收盘价落在这条通道的哪个高度'
       : '短期通道这一档今天算不出来',
     s ? `短期通道区间 ${s.lower.toFixed(2)} ~ ${s.upper.toFixed(2)}` : '',
     '',
@@ -456,10 +457,28 @@ export function PositionCell({ kc, geo, ev, runs, energy, ph, stateRun, onOpen }
         {s ? (
           <span className="whitespace-nowrap text-[12px]">
             <span className={POS_TEXT[s.pos] ?? 'text-muted'}>{s.pos_cn}</span>
-            {/* 百分比**跟着位置走同一个色** —— 两个数说的是同一件事, 分色会
-                让人以为是两个读数。等宽 + tabular-nums, 整列小数点对齐。 */}
-            <span className={`ml-1 font-mono tabular-nums ${POS_TEXT[s.pos] ?? 'text-muted'} opacity-70`}>
-              {Math.round(s.pct * 100)}%
+            {/* [R311] **`%` 换成 `/100`。** 用户指着这一格问: 「这个百分比是什么
+                意思, 要表达清楚, 是位置?」——`6%` 在一张股票表里默认被读成
+                **涨跌幅**(隔壁「现价/涨跌」那一列印的正是带 % 的涨跌), 而且
+                「贴下轨 6%」连读像「距离下轨 6%」, 那是**反的**: 它是从下轨往上
+                走了 6%。
+
+                `/100` 把刻度本身摆出来 —— 0 在下轨、100 在上轨, 一个不会被读成
+                涨跌幅的记法。轨外那两档读起来反而更顺: `-4/100`(低于 0)、
+                `107/100`(超过 100), 换成 `%` 时这两个数最容易被当成暴跌暴涨。
+
+                **数字跟着档位走同一个色**(R308): 两者说的是同一件事, 分色会
+                让人以为是两个读数。层次靠**明度**分: 档位名最亮、数次之、
+                `/100` 只是刻度, 压到最暗。
+
+                五个档位名都正好三个字(破上轨/贴上轨/通道内/贴下轨/破下轨),
+                数字再给一个定宽右对齐的槽, 于是整列的 `/100` 上下成一条线 ——
+                166 行扫下来, 眼睛顺着那条线走就行。 */}
+            <span className={`ml-1.5 font-mono tabular-nums ${POS_TEXT[s.pos] ?? 'text-muted'}`}>
+              <span className="inline-block w-[2.4em] text-right opacity-85">
+                {Math.round(s.pct * 100)}
+              </span>
+              <span className="opacity-40">/100</span>
             </span>
           </span>
         ) : <span className="text-[12px] text-muted/30">—</span>}
