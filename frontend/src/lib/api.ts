@@ -788,7 +788,8 @@ export interface StockReview {
       /** 还没走完 —— 按最后一天收盘价记, 不进胜负统计 */
       open_ended: boolean
       /** 成交日撞上涨跌停, 未必成交得到这个价 */
-      blocked: boolean
+      /** [R304] 信号次日是一字板挂不进去, 顺延了几个交易日才成交。0 = 次日就成了 */
+      delayed: number
     }[]
     /** 真正下过单的次数(建仓次数)。**不等于多头段数** —— 连着的多头段是一次持仓 */
     trades: number
@@ -803,8 +804,10 @@ export interface StockReview {
     skipped: string[]
     /** [R303] 最后一段还拿着 —— 「跟着做」与「一直拿着」都含它的浮盈浮亏 */
     open_bull?: boolean
-    /** 有几笔的成交日撞上了涨跌停 —— 这几笔的价不能当真 */
-    blocked: number
+    /** [R304] 有几笔因为一字板顺延过 —— 成交日比信号次日晚 */
+    delayed: number
+    /** [R304] 一直封到下一个信号、单子按作废算的那几个信号日 */
+    voided?: string[]
     /** 一笔都做不成时的原因 —— 空栏必须自己解释 */
     reason: 'no_flip' | 'no_open' | null
     /** 已完成的多头段不足 3 段(与 side_edge 同一个门槛), 结论不能当真 */

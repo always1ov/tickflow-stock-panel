@@ -141,38 +141,91 @@ def test_R287_开机那天不算转折():
 # 跌停日**同时就是转折日** —— 次日开盘要是继续一字跌停, 那一笔根本卖不掉, 而
 # 统计照样会拿那个开盘价给你算一个漂亮的"躲开了 10%"。不标出来就是在骗自己。
 
-def test_R287_执行日撞涨停的买入要标出来():
-    """转入多头 → 次日开盘买。那天要是涨停, 买单未必成交。"""
+# [R287 → R304] 这四条整个换了判据。用户: 「第一天转折的时候涨停收盘的时候
+# 也买不进去」「连续跌停买不进去」。
+#
+# R287 那版只看「当天涨跌停」这个标志, 而且**只贴标签、成交照记**。两处毛病:
+#   · 误报 —— 盘中打开过、尾盘才封回去的那种, 开盘价本来就成交得到;
+#   · 漏建模 —— 真的一字板, 模拟照样按那个拿不到的开盘价成交。
+# 现在判**一字板**(收盘在板上 且 开盘不低于收盘), 而且真的**顺延**。
+#
+# 一字板要 open == close, 所以这几条各自搭自己的价, 不用上面那套 `_CLOSES`。
+
+_SEAL_OPENS = [9.0, 9.5, 10.0, 11.0, 12.0, 10.0]
+
+
+def _seal_closes(sealed_i: int) -> list[float]:
+    """把第 `sealed_i` 天做成一字板(开盘 == 收盘), 其余天开收不同。"""
+    c = [9.2, 9.8, 10.5, 11.2, 12.4, 11.0]
+    c[sealed_i] = _SEAL_OPENS[sealed_i]
+    return c
+
+
+def test_R304_买入日一字涨停就顺延到下一个能成交的日子():
+    """转入多头 → 次日开盘买。那天要是一字涨停, **挂不进去** —— 顺延。"""
     lu = [False] * 6
-    lu[2] = True                      # d02 正是第一笔的买入日
-    s = simulate(_steps(_STATES), _OPENS, _CLOSES, limit_up=lu)
-    assert s["legs"][0]["blocked"] is True, "撞涨停的买入日没标出来"
-    assert s["blocked"] == 1
+    lu[2] = True                      # d02 正是第一笔的买入日, 做成一字板
+    s = simulate(_steps(_STATES), _SEAL_OPENS, _seal_closes(2), limit_up=lu)
+    leg = s["legs"][0]
+    assert leg["enter_date"] == "d03", f"没顺延, 还是按 d02 成交: {leg['enter_date']}"
+    assert leg["enter_price"] == 11.0, "顺延之后没用顺延到那天的开盘价"
+    assert leg["delayed"] == 1 and s["delayed"] == 1, "顺延了几天没记下来"
 
 
-def test_R287_执行日撞跌停的卖出要标出来():
-    """转入空头 → 次日开盘卖。那天要是跌停, 卖单未必成交。"""
+def test_R304_卖出日一字跌停就顺延():
+    """转入空头 → 次日开盘卖。那天要是一字跌停, **卖不掉** —— 顺延。"""
     ld = [False] * 6
     ld[4] = True                      # d04 是转入空头那一笔的执行日
-    s = simulate(_steps(_STATES), _OPENS, _CLOSES, limit_down=ld)
-    assert s["legs"][1]["blocked"] is True, "撞跌停的卖出日没标出来"
-    assert s["blocked"] == 1
+    s = simulate(_steps(_STATES), _SEAL_OPENS, _seal_closes(4), limit_down=ld)
+    assert s["legs"][1]["enter_date"] == "d05", "一字跌停那天居然卖掉了"
+    assert s["delayed"] == 1
 
 
-def test_R287_方向要对上不能反着标():
-    """买入日撞**跌停**是好事(买得更便宜, 而且跌停敢挂单就能成交), 不该报警;
-    卖出日撞**涨停**同理。反着标会把利好读成风险。"""
+def test_R304_方向要对上不能反着顺延():
+    """买入日撞**跌停**是好事(跌停敢挂单就买得到, 而且买得更便宜), 不该顺延;
+    卖出日撞**涨停**同理。反着判会把利好当成成交不了。"""
     lu, ld = [False] * 6, [False] * 6
-    ld[2] = True                      # 买入日跌停
-    lu[4] = True                      # 卖出日涨停
-    s = simulate(_steps(_STATES), _OPENS, _CLOSES, limit_up=lu, limit_down=ld)
-    assert s["blocked"] == 0, "买入日跌停 / 卖出日涨停被当成成交不了了"
+    ld[2] = True                      # 买入日一字跌停
+    lu[4] = True                      # 卖出日一字涨停
+    c = [9.2, 9.8, 10.5, 11.2, 12.4, 11.0]
+    c[2], c[4] = _SEAL_OPENS[2], _SEAL_OPENS[4]
+    s = simulate(_steps(_STATES), _SEAL_OPENS, c, limit_up=lu, limit_down=ld)
+    assert s["delayed"] == 0, "买入日跌停 / 卖出日涨停被当成成交不了了"
+    assert s["legs"][0]["enter_date"] == "d02", "买入被无谓地顺延了"
 
 
-def test_R287_不给涨跌停就老老实实说不知道():
+def test_R304_收盘封板但盘中打开过的不算封():
+    """**这是新判据比旧判据准的地方。** 盘中打开过、尾盘才封回去 —— 开盘价
+    本来就成交得到, 旧判据(只看「当天涨停」)会把它误报成风险并贴一句
+    "未必成交得到这个价"。一字板才是真的挂不进去。
+    """
+    lu = [False] * 6
+    lu[2] = True
+    # 开盘 10.00 < 收盘 10.50 —— 开盘那一刻没封板
+    s = simulate(_steps(_STATES), _SEAL_OPENS, _CLOSES, limit_up=lu)
+    assert s["delayed"] == 0, "盘中打开过的板被当成一字板了"
+    assert s["legs"][0]["enter_date"] == "d02"
+
+
+def test_R304_一直封到下一个信号那张单子就作废():
+    """顺延有硬边界: **不许越过下一个转折信号**。等到那时候状态已经变了,
+    这张单子在现实里也该撤了 —— 越过去就等于拿一个过期的理由下单。
+
+    撤掉的不许静默吞掉, 得报出是哪一天的信号。
+    """
+    lu = [False] * 6
+    lu[2] = lu[3] = True              # 买入日起连着封到下一个转折日(i=3)
+    c = list(_CLOSES)
+    c[2], c[3] = _SEAL_OPENS[2], _SEAL_OPENS[3]
+    s = simulate(_steps(_STATES), _SEAL_OPENS, c, limit_up=lu)
+    assert s["voided"] == ["d01"], f"作废的那次信号没报出来: {s['voided']}"
+    assert all(l["flip_date"] != "d01" for l in s["legs"]), "作废的单子还留着一段"
+
+
+def test_R304_不给涨跌停就一律当作能成交():
     s = simulate(_steps(_STATES), _OPENS, _CLOSES)
-    assert s["blocked"] == 0
-    assert all(l["blocked"] is False for l in s["legs"])
+    assert s["delayed"] == 0 and s["voided"] == []
+    assert all(l["delayed"] == 0 for l in s["legs"])
 
 
 def test_R287_停牌没有开盘价就跳过并说出来():
@@ -485,7 +538,11 @@ def test_R287_空仓段不许被说成盈亏():
 
 def test_R287_撞板与未完必须显形():
     code = _panel()
-    assert "未必真成交得到这个价" in code, "撞涨跌停的成交没有提示"
+    # [R287 → R304] 说法从「未必真成交得到这个价」换成事实陈述 —— 因为现在
+    # **真的顺延了**, 成交价就是顺延到那天的开盘价, 不再是个存疑的数。
+    assert "撞上一字板" in code, "撞一字板的成交没有提示"
+    assert "已按顺延到的那天开盘价算" in code, "没说清那几笔用的是哪天的价"
+    assert "未必真成交得到这个价" not in code, "还留着旧说法 —— 它现在是假的"
     assert "open_ended" in code, "未完成的段没有标记"
 
 
@@ -791,13 +848,14 @@ def test_R287_组件真的把提醒印出来():
     """
     code = _panel()
     i = code.index("export function tradeNotes")
-    blk = code[i:i + 460]   # [R303] 多了「最后一段还拿着」那一条, 切片跟着放宽
+    blk = code[i:i + 900]   # [R303/R304] 又多了两条, 切片跟着放宽
     # [R302] `caveat` 那个入参删了 —— 它装的是**每只票都一样**的口径偏差,
     # 已经搬进「说明」页。这条纪律守的从来是**这只票的**那几条警告:
     # 样本太少 / 撞上涨跌停 / 最后一次还没执行 —— 一条都不许少。
     assert "caveat" not in blk, "口径偏差又塞回这几条「这只票的」警告里了"
-    for keep in ("ft.open_bull", "ft.thin", "ft.blocked", "ft.pending", "ft.skipped"):
-        assert keep in blk, f"{keep} 那条警告没了 —— 把数字摆出来而把它藏起来是骗人"
+    for cond in ("ft.open_bull &&", "ft.thin &&", "!!ft.delayed &&",
+                 "!!ft.voided?.length &&", "!!ft.pending &&", "!!ft.skipped.length &&"):
+        assert cond in blk, f"{cond} 那条警告没按条件渲染 —— 把数字摆出来而把它藏起来是骗人"
     # [R293] 整块面板删了(明细并进两边的正文), 只剩压缩条这一处渲染。
     assert code.count("notes.map(") == 1, (
         f"提醒该有且只有一处渲染, 现在有 {code.count('notes.map(')} 处"
@@ -1031,8 +1089,14 @@ def test_R302_不随票变的话不许常驻正文():
     assert "见「说明」" in head, "正文没有指向「说明」的路标"
     # 反面: 这只票的警告一条不少(它们走 tradeNotes, 在 FlipTradesPanel 里)
     code = _panel()
-    for keep in ("ft.thin", "ft.blocked", "ft.pending", "ft.skipped"):
-        assert keep in code, f"{keep} 那条「这只票的」警告没了"
+    # [R304] `ft.blocked` 换成了 `ft.delayed` + `ft.voided` —— 一字板现在真的
+    # 顺延, 不再只是贴标签。守的规矩一个字没变: 这几条是**这只票的**, 不许
+    # 跟着恒定的口径偏差一起搬进「说明」页。
+    # **钉显示条件, 不钉字段名。** 包成 `false && \`…${ft.voided.length}…\`` 时
+    # 字段名照样在 —— 变异当场就漏了(本轮这个坑的第 N 次)。
+    for cond in ("ft.open_bull &&", "ft.thin &&", "!!ft.delayed &&",
+                 "!!ft.voided?.length &&", "!!ft.pending &&", "!!ft.skipped.length &&"):
+        assert cond in code, f"{cond} 那条「这只票的」警告没按条件渲染"
 
 
 def test_R301_四个数排成等宽格子():

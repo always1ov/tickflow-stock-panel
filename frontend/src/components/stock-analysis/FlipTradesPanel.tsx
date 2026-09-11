@@ -94,7 +94,11 @@ export function tradeNotes(ft: FlipTrades): string[] {
     // (不是每只票都还持仓), 所以它属于这几条常驻正文的警告, 不是「说明」页。
     ft.open_bull && '最后一段还拿着没了结 ——「跟着做」与「一直拿着」都含这一段的浮盈浮亏, 它还会变',
     ft.thin && `只走完 ${ft.bull.scored} 段多头, 样本太少, 这几个数只能当参考`,
-    !!ft.blocked && `其中 ${ft.blocked} 笔的成交日当天涨停或跌停 —— 未必真成交得到这个价`,
+    // [R287 → R304] 原来这里写的是「未必真成交得到这个价」—— 成交照记, 只贴个
+    // 标签。现在**真的顺延了**, 所以说法跟着变成事实陈述: 这几笔是隔了几天
+    // 才买/卖到的。用户: 「第一天转折的时候涨停收盘的时候也买不进去」。
+    !!ft.delayed && `其中 ${ft.delayed} 笔撞上一字板 —— 已按顺延到的那天开盘价算, 不是信号次日`,
+    !!ft.voided?.length && `有 ${ft.voided.length} 次信号一直封到下一个信号才打开, 那几张单子按作废算`,
     !!ft.pending && `${ft.pending} 那次变化的次日还没到, 没算进去`,
     !!ft.skipped.length && `有 ${ft.skipped.length} 次变化因为缺开盘价没能执行`,
   ].filter(Boolean) as string[]
@@ -181,9 +185,11 @@ export function FlipTradeCells({ leg }: { leg?: Leg }) {
         <span className={cn('inline-flex rounded border px-1 py-px text-[10px]', ACT_CLS[leg.act])}>
           {leg.act}
         </span>
-        {leg.blocked && (
+        {leg.delayed > 0 && (
           <span className="ml-1 text-[9px] text-amber-400"
-                title="成交日当天涨停或跌停, 未必真成交得到这个价">·封</span>
+                title={`信号次日是一字板, 挂不进去 —— 顺延 ${leg.delayed} 个交易日才成交`}>
+            ·延{leg.delayed}
+          </span>
         )}
       </td>
       <td className="whitespace-nowrap px-2 py-1.5 text-right font-mono text-[10px] tabular-nums text-muted">
@@ -243,9 +249,11 @@ export function FlipTradeLine({ leg }: { leg?: Leg }) {
       <span className={cn('inline-flex rounded border px-1 py-px text-[10px]', ACT_CLS[leg.act])}>
         {leg.act}
       </span>
-      {leg.blocked && (
+      {leg.delayed > 0 && (
         <span className="text-[9px] text-amber-400"
-              title="成交日当天涨停或跌停, 未必真成交得到这个价">·封</span>
+              title={`信号次日是一字板, 挂不进去 —— 顺延 ${leg.delayed} 个交易日才成交`}>
+          ·延{leg.delayed}
+        </span>
       )}
       <span className="font-mono text-[10px] tabular-nums text-muted">
         <span className="text-secondary">{leg.enter_date.slice(5)} {leg.enter_price.toFixed(2)}</span>

@@ -36,6 +36,12 @@
 转折如果次日还没到(窗口末尾), 那就是"信号有了、手还没动", 不许拿收盘价冒充成交
 价补一笔进去。
 
+[R304] **成交不了的不许记成交, 成交得到的不许过滤。** 这是两件事, 分界很干净:
+一字板(收盘在板上且开盘不低于收盘)是**真的挂不进去**, 所以顺延到下一个能成交
+的日子, 一直封到下一个信号就作废这张单; 而次日跳空低开、高开都是**成交得到**
+的, 一律如实成交如实记账 —— 在执行层加一个"跌太多就不买"的过滤, 测出来的就
+不是这套判定了, 是"这套判定 + 一个我编的过滤器", 而那个过滤器的参数没有依据。
+
 [R303] **但那条纪律管的是胜负统计, 不是那两个对照数。** `follow` 与 `hold`
 必须量同一段区间 —— 同一个起点(第一次可执行的转折)、同一个终点(最后一天)。
 最后那个还拿着的多头段照旧按收盘 mark-to-market 算进 `follow`, 否则一只
@@ -131,22 +137,38 @@ def _f(v) -> float | None:
     return f if f > 0 else None
 
 
-def _blocked(bull: bool, i: int, limit_up, limit_down) -> bool:
-    """这一笔的执行日会不会**根本成交不了**。
+def _sealed(bull: bool, i: int, opens, closes, limit_up, limit_down) -> bool:
+    """这一天的**开盘价**根本成交不了 —— 也就是**一字板**。
+
+    用户: 「第一天转折的时候涨停收盘的时候也买不进去」「连续跌停买不进去」。
+
+    ## 判据: 收盘在板上 **且** 开盘不低于收盘
+
+    涨停价是当天的上限, **开盘不可能高于它**。所以「收盘涨停」+「开盘 ≥ 收盘」
+    ⇒ 开盘就在涨停价上 ⇒ 开盘那一刻封着板, 你挂不进去。跌停同理反过来。
+
+    这比 R287 那版(只看「当天涨跌停」标志)**既更严也更准**:
+      · 更准 —— 盘中打开过、尾盘才封回去的那种, 开盘价是能成交的, 旧判据
+        把它也标成风险, 属于**误报**(把买得到的说成买不到);
+      · 更严 —— 认出来的这些是真的成交不了, 所以不再只贴一句"未必成交得到
+        这个价", 而是**真的顺延**(见 `simulate` 的第①步)。
+
+    **不需要 high/low**: R287 当时说判一字要 high/low 所以做不了 —— 那是错的,
+    `open` 与 `close` 加上板的标志已经够了。复盘那份 df 两样都取了。
 
     **方向必须对上**: 买入日撞涨停才买不进, 卖出日撞跌停才卖不掉。反过来是好事
     (买入日跌停买得更便宜, 卖出日涨停卖得更贵), 标成风险会把利好读成利空。
-
-    这里只用「当天涨停/跌停」这个已有的标志, 不去判一字板 —— 判一字要 high/low,
-    而复盘那份 df 里没有。所以措辞只能到"未必成交得到这个价"为止, 不能更硬。
     """
     flags = limit_up if bull else limit_down
-    if not flags or i >= len(flags):
+    if not flags or i >= len(flags) or not flags[i]:
         return False
-    return bool(flags[i])
+    o, c = opens[i], closes[i]
+    if o is None or c is None:
+        return False
+    return o >= c if bull else o <= c
 
 
-def _leg(flip_i: int, enter_i: int, steps, opens, dates, limit_up, limit_down) -> dict:
+def _leg(flip_i: int, enter_i: int, steps, opens, dates) -> dict:
     # **信号取自转折日, 不是执行日。** 执行日的状态要等它自己收盘才知道 ——
     # 下单那一刻(次日开盘)你手上只有转折日那个信号。转折连着两天出现时, 取错
     # 会把方向标反, 并且把中间那个真实的来回整段吞掉。见
@@ -163,7 +185,9 @@ def _leg(flip_i: int, enter_i: int, steps, opens, dates, limit_up, limit_down) -
         "state": st.get("state"),
         "state_cn": st.get("state_cn") or st.get("state") or "—",
         "side": st["side"],
-        "blocked": _blocked(bull, enter_i, limit_up, limit_down),
+        # [R304] 一字板顺延之后, 成交日与信号日之间可能隔了几天 —— 隔了几天
+        # 就是"这几天你想动手却动不了"。0 表示次日就成交了(正常情形)。
+        "delayed": enter_i - flip_i - 1,
     }
 
 
@@ -178,14 +202,15 @@ def simulate(steps: list[dict], opens: list, closes: list, *,
     opens  与 steps 等长的开盘价(前复权, 与 closes 同一口径)
     closes 与 steps 等长的收盘价 —— 只在最后一段还没走完时用得着
     limit_up / limit_down
-           与 steps 等长的当日涨停/跌停标志。给了就标出"这一笔的执行日撞上了
-           涨跌停, 未必成交得到这个价"; 不给就一律当作不知道(False), 不瞎猜
+           与 steps 等长的当日涨停/跌停标志。配合 opens/closes 判**一字板**
+           (见 `_sealed`): 撞上了就把成交顺延到下一个能成交的日子, 一直封到
+           下一个信号就把这张单子作废。不给就一律当作能成交, 不瞎猜
 
     返回::
 
         legs     每一段 {flip_date, enter_date, enter_price, exit_date,
                           exit_price, state, state_cn, side, bars, ret,
-                          open_ended, blocked, act}
+                          open_ended, delayed, act}
                  act 是这一段**起头时手上该干什么**: 买入 / 持有 / 卖出 / 空仓。
                  「持有」与「空仓」就是那些转折了但不用动手的段。
         trades   真正下过单的次数 = 建仓次数。**不等于多头段数** ——
@@ -196,7 +221,8 @@ def simulate(steps: list[dict], opens: list, closes: list, *,
         excess   follow − hold
         pending  最后一个还没轮到执行的转折日; 没有就是 None
         skipped  因为缺开盘价而没法执行的转折日
-        blocked  有几笔的执行日撞上了涨跌停 —— 这几笔的价不能当真
+        delayed  有几笔因为一字板顺延过 —— 成交日比信号日的次日晚
+        voided   一直封到下一个信号、单子作废的那几个信号日
         reason   一笔都做不成时的原因: "no_flip"(这段里六态没转过) /
                  "no_open"(缺开盘价, 算不了)。做成了就是 None。
                  **空栏必须自己解释** —— 读的人分不清"确实没有"和"算不出来"。
@@ -206,10 +232,25 @@ def simulate(steps: list[dict], opens: list, closes: list, *,
     opens = [_f(v) for v in opens]
     closes = [_f(v) for v in closes]
 
-    # ① 找出所有**能执行**的转折: 转折在 i, 手在 i+1 动。
+    # ① 找出所有**能执行**的转折: 转折在 i, 手在 i+1 动 —— 除非那天是一字板。
+    #
+    # [R304] **撞上一字板就顺延到下一个能成交的日子。** 用户: 「第一天转折的
+    # 时候涨停收盘的时候也买不进去」「连续跌停买不进去」。R287 那版只贴一句
+    # "未必成交得到这个价", 成交照记 —— 于是一只一字涨停三天的票, 模拟按
+    # 第一天的开盘价买进, 吃到了一段**现实里根本拿不到**的涨幅。
+    #
+    # 顺延有个硬边界: **不许越过下一个转折信号**。等到那时候状态已经变了,
+    # 这张单子在现实里也该撤了 —— 越过去就等于"拿着一个过期的理由下单"。
+    # 撤掉的那些单独计数(`voided`), 不许静默吞掉。
+    flips = [i for i, s in enumerate(steps)
+             if s.get("flipped") and s.get("state") is not None and s.get("prev") is not None]
+    nxt = {i: flips[k + 1] for k, i in enumerate(flips[:-1])}
+
     entries: list[tuple[int, int]] = []   # (转折日下标, 执行日下标)
     pending: str | None = None
     skipped: list[str] = []
+    voided: list[str] = []
+    delayed = 0
     for i, s in enumerate(steps):
         if not s.get("flipped") or s.get("state") is None:
             continue
@@ -223,17 +264,25 @@ def simulate(steps: list[dict], opens: list, closes: list, *,
         if j >= n:
             pending = dates[i]          # 信号有了, 次日还没到
             continue
+        bull = s.get("side") == BULL
+        limit = nxt.get(i, n)           # 下一个转折日; 没有就到窗口末
+        while j < n and j <= limit and _sealed(bull, j, opens, closes, limit_up, limit_down):
+            j += 1
+        if j >= n or j > limit:
+            voided.append(dates[i])     # 一直封到下一个信号 —— 这张单子作废
+            continue
         if opens[j] is None:
             skipped.append(dates[i])    # 停牌之类 —— 说出来, 不静默跳过
             continue
+        delayed += j - i - 1
         entries.append((i, j))
 
     # 一笔都没做成时的原因。`entries` 非空却仍然落到这里, 说明是价格那侧缺了
     # (末日收盘价也没有), 归 no_open —— 不能说成"六态没转过", 那是另一回事。
     empty = {"legs": [], "trades": 0,
-             "reason": "no_open" if (skipped or pending or entries) else "no_flip", "follow": None, "hold": None, "excess": None,
+             "reason": "no_open" if (skipped or pending or entries or voided) else "no_flip", "follow": None, "hold": None, "excess": None,
              "from_date": None, "to_date": None, "pending": pending,
-             "skipped": skipped, "blocked": 0, "open_bull": False,
+             "skipped": skipped, "delayed": 0, "voided": voided, "open_bull": False,
              "bull": _side_stats([]), "bear": _side_stats([])}
     if not entries:
         # pending 那一支也归到 no_open: 信号有了但一笔都没做成, 原因是"还没到
@@ -244,7 +293,7 @@ def simulate(steps: list[dict], opens: list, closes: list, *,
     #    段与段之间没有缝, 所以「跟着做」与「一直拿着」量的是同一段区间。
     legs: list[dict] = []
     for k, (flip_i, enter_i) in enumerate(entries):
-        leg = _leg(flip_i, enter_i, steps, opens, dates, limit_up, limit_down)
+        leg = _leg(flip_i, enter_i, steps, opens, dates)
         if k + 1 < len(entries):
             exit_i = entries[k + 1][1]
             leg["exit_date"] = dates[exit_i]
@@ -317,7 +366,9 @@ def simulate(steps: list[dict], opens: list, closes: list, *,
         "to_date": last["exit_date"],
         "pending": pending,
         "skipped": skipped,
-        "blocked": sum(1 for l in legs if l["blocked"]),
+        # [R304] 被一字板顺延过的笔数, 与"一直封到下一个信号、单子作废"的那几次
+        "delayed": sum(1 for l in legs if l["delayed"] > 0),
+        "voided": voided,
         # [R303] 最后一段还拿着 —— 「跟着做」与「一直拿着」都含它的浮盈浮亏
         "open_bull": open_bull,
         "reason": None,
