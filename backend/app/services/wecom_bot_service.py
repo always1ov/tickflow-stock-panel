@@ -208,6 +208,12 @@ class WecomBotService:
                     # 3. 心跳保活 + 接收循环
                     await self._maintain_connection(ws)
 
+            # 注意: asyncio.TimeoutError 自 Python 3.11 起就是内建 TimeoutError 的别名
+            # (两者是同一个类对象), 所以这里用内建 TimeoutError 捕获范围完全一致。
+            # 本项目所有发布路径都 >= 3.11 (Docker: python:3.11.16-slim,
+            # 桌面打包: uv python install 3.12), 因此安全。
+            # !! 若将来移植到 <= 3.10, 必须改回 asyncio.TimeoutError:
+            #    在那些版本上两者是不同的类, 内建 TimeoutError 会静默漏掉 asyncio 超时。
             except TimeoutError:
                 self._last_error = "鉴权响应超时"
                 logger.warning("智能机器人鉴权超时")
@@ -238,7 +244,7 @@ class WecomBotService:
                     raw = await asyncio.wait_for(ws.recv(), timeout=_HEARTBEAT_INTERVAL)
                     self._log_incoming(raw)
                     continue
-                except TimeoutError:
+                except TimeoutError:  # 同上: 3.11+ 与 asyncio.TimeoutError 是同一个类
                     pass  # 接收超时 → 到了心跳时间
                 # 发送业务层 ping 保活
                 await ws.send(json.dumps({"cmd": "ping"}))
