@@ -177,7 +177,7 @@ class _CacheEntry:
 class _InFlight:
     """同 key 正在计算的占位: leader 算完通过 done 唤醒所有跟随者复用结果。"""
 
-    __slots__ = ("df", "done", "error")
+    __slots__ = ("done", "df", "error")
 
     def __init__(self) -> None:
         self.done = threading.Event()

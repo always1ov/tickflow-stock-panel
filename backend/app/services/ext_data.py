@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 class ExtField:
     """扩展字段定义。"""
-    __slots__ = ("dtype", "label", "name")
+    __slots__ = ("name", "dtype", "label")
 
     def __init__(self, name: str, dtype: str = "string", label: str = "") -> None:
         self.name = name
@@ -38,23 +38,11 @@ class ExtField:
 class PullConfig:
     """定时拉取配置。"""
     __slots__ = (
+        "url", "method", "headers", "body", "response_path",
+        "field_map", "schedule_minutes", "enabled",
+        "last_run", "last_status", "last_message", "last_rows",
+        "next_run", "time_window_start", "time_window_end", "date_param",
         "auth",
-        "body",
-        "date_param",
-        "enabled",
-        "field_map",
-        "headers",
-        "last_message",
-        "last_rows",
-        "last_run",
-        "last_status",
-        "method",
-        "next_run",
-        "response_path",
-        "schedule_minutes",
-        "time_window_end",
-        "time_window_start",
-        "url",
     )
 
     def __init__(
@@ -162,16 +150,9 @@ def get_ext_api_key(config_id: str) -> str:
 class ExtConfig:
     """一个扩展数据源的完整配置。"""
     __slots__ = (
-        "code_map",
-        "created_at",
-        "description",
-        "fields",
-        "id",
-        "label",
-        "mode",
-        "pull",
-        "symbol_map",
-        "updated_at",
+        "id", "label", "mode", "fields", "description",
+        "symbol_map", "code_map",
+        "created_at", "updated_at", "pull",
     )
 
     def __init__(

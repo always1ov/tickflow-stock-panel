@@ -83,7 +83,11 @@ target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "UP", "B", "SIM", "RUF"]
-ignore = ["E501"]   # 长行交给 fmt
+# E501: 长行交给 fmt
+# RUF023: 不强制 __slots__ 按字母排序 —— 现有 __slots__ 是按语义分组写的
+#         (如 ext_data.PullConfig 分"请求构造/映射调度/运行状态/鉴权"四组),
+#         字母序会打散这层结构,且排序对属性访问无任何语义或性能影响。
+ignore = ["E501", "RUF023"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

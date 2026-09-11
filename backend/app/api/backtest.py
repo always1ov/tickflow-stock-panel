@@ -445,7 +445,7 @@ import time
 
 class _BacktestJob:
     """单个回测任务的状态, 存模块级供重连使用。"""
-    __slots__ = ("cancel_event", "done", "error", "finish_ts", "key", "progress", "result")
+    __slots__ = ("key", "cancel_event", "progress", "result", "error", "done", "finish_ts")
 
     def __init__(self, key: str):
         self.key = key
