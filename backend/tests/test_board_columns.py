@@ -543,303 +543,159 @@ def test_R253_到价预案固定竖排一个一行():
     assert "whitespace-nowrap" in block, "单个预案自己不该再折行"
 
 
-def test_R315_位置列是一个数加一条轨():
-    """[R255 → R298 → R299 → R307 → R308] 这条追了五版, **守的东西一路没变**:
-    这一格里每一件事各占一行(不许横排挤回去), 而且整列上下几十行要对得齐。
-
-    变的是"靠什么对齐", 而那取决于格子里有没有**两段不等长的东西**:
-
-      · 「怎么办」列 —— 徽标 + 快慢是一长一短两段, 各行长度都不一样, 所以要
-        一条真的竖线(`grid` 两列 + 徽标 `justify-self-end`)把两边缘钉住;
-      · 「位置」列 —— R308 之后每行**两段都是定宽的**(「贴上轨 92%」/「上中下」),
-        再摆一条中轴反而是多余的骨架: 居中就是对齐。等宽字体 + `tabular-nums`
-        让百分号和三字码上下自然成列。
-
-    [R310] 「怎么办」列删了, 于是这条只剩「位置」一列要守。
-
-    [R314 → R315] **两个尺度标签撤了, 因为位置该画不该写。** 用户: 「这样表达
-    很 low」。R314 那两个标签(短期 / 短中长)不是设计, 是**替失败的版面写说明**
-    —— 「49% 是什么的 49%」这个问题, 由那个点在一条有两个端点的轨上的位置直接
-    回答, 一个字都不用写。
-
-    于是这一格是**上下两块**: 一个数(居中)+ 一条铺满整格的轨。
-    对齐不再靠中轴, 靠的是**轨本身两端对齐** —— 166 行的轨左右端点都在同一个
-    x 上, 点的横坐标于是天然可比, 这比任何文字排版都强。
-    """
-    # **必须剥注释。** 这一格的注释里写着 `tabular-nums`、写着 `%`(讲的正是它们
-    # 为什么在), 读原文的话断言吃的是我自己的注释 —— 本仓库这个坑的第 N 次。
-    pos = _cell("PositionCell")
-    pos = pos[pos.index("return ("):]
-    assert "flex-col items-stretch" in pos, (
-        "轨不再铺满整格了 —— 轨要是各行宽度不一, 点的横坐标就不能横着比"
-    )
-    assert "mx-auto" in pos, "整块没居中"
-    # 尺度标签不许回来 —— 它们是上一版那个毛病的症状
-    for gone in (">短期<", ">短中长<"):
-        assert gone not in pos, f"尺度标签又写回去了({gone})—— 位置该画不该写"
-    # [R315] 等高数字那条挪去 `test_R315_百分比不许被读成涨跌幅`(那里连着
-    # 轨一起守); 三字码那条随码进悬停而退役 —— 见 `test_R315_位置列是短期
-    # 百分比加三档轨点` 的说明。这里只守版面骨架。
-
-    assert "flex-col items-start" not in pos, "「位置」又靠左了 —— 整张表都是居中的"
-    assert "!text-left" not in pos, "「位置」还覆写着左对齐"
-    assert "mx-auto" in pos, "「位置」的容器没有 mx-auto, 整格还是靠左"
-    # 反面: 两件事不许又挤回同一行(那是 R217 那版, R255 拆开的)
-    assert "flex flex-wrap items-center justify-center" not in pos, "「位置」又横排回去了"
-
-
-# [R255 → R307 → **R310 退役**] `test_R307_说明那一行单行截断且不参与列宽`
-# 钉的是「怎么办」那一行说明的形状(单行截断、不进网格、全文进悬停)。
-# **那一列 R310 整个删掉了, 它盯的东西不存在了。**
+# [R315 → **R316 退役**] R315 那五条(`位置列是一个数加一条轨` / `位置列是短期
+# 百分比加三档轨点` / `轨外的点按在端帽上而数字照印真值` / `三个点分得出谁是谁`
+# / `位置列的两块都在`)钉的都是那条横轨与轨上三个点。
 #
-# 规矩本身没退役 —— 「会长的那段文字必须截断且全文进悬停」现在由
-# `test_R309_AI_理由截到两行且全文进悬停` 守着, 那是这张表上仅剩的一段长文字。
-# 两条并成一条, 而不是留一条永远绿的空守卫。
-
-
-def test_R257_走势列的三行各管一件事():
-    """用户: 「走势我也想重排描述, 现在的版本我觉得抓不住重点」。
-
-    毛病是**「阶段」和「六态」在抢同一件事 —— 方向**:
-
-        自然回升 已3天      六态说在涨
-        横盘中 · 走到中段    阶段说没走          ← 打架, 而界面不提
-        正在转多
-
-    而且阶段与成熟度量的根本不是同一个东西(前者看三线重合度、后者看短长线
-    间距), 于是能凑出「横盘中 · 走到中段」这种**自相矛盾**的话 ——
-    见 `test_R257_横盘中确实会配上走了一段`。
-
-    现在三行各管一件事: **方向(六态) / 走了多远(成熟度) / 还有没有劲**。
-    """
-    root = _BOARD.parent
-    cells = (root / "decision-board" / "cells.tsx").read_text(encoding="utf-8")
-    body = "\n".join(ln for ln in cells.splitlines()
-                     if not ln.lstrip().startswith(("//", "*", "/*", "{/*")))
-    i = body.index("export function ChannelStateCell")
-    blk = body[body.index("return (", i):]
-
-    assert "{ph.cn} · {ph.maturity_cn}" not in blk, (
-        "「阶段」那个词又印回徽标上了 —— 它和六态抢方向, 而且会跟成熟度自相矛盾"
-    )
-    assert "{trend.state_cn}" in blk, "方向那一行没了"
-    # [R277] 成熟度**搬去 SpreadCell 了**, 走势列于是只讲方向(六态 + 三尺度对齐)。
-    # 这条不再要求它出现在这一格里, 改成要求它**不在这里重复印一遍** ——
-    # 同一个读数印两列, 读的人得先确认它们是不是一回事。
-    assert "{ph.maturity_cn}" not in blk, (
-        "成熟度又印回走势列了 —— 它现在是「间距」列的内容, 两处都印是重复"
-    )
-    assert "{ph.pace_cn}" not in blk, "快慢也一样, 它属于「间距」列"
-
-
-def test_R310_两个刻度随怎么办一起离场():
-    """[R277 → R297 → R307 → R308] 这两个读数一路在搬家, **一次都没丢**
-    (加速度曾经在决策台上根本看不见, R277 才给了它位置)。
-
-    R307 按"位置 / 动作"把它们分到两列, R308 又把它们并回一处 —— 因为
-    用户给「位置」列划的边界是**两个原始读数**(短期通道位置 + 三档组合),
-    而「走到哪一步」不是读数而是**判断**(这一段走了多远, 由三线重合度算出来)。
-    它跟「快慢」是同一层的东西: 都在修饰"所以今天该怎么办", 于是同去那一列。
-
-    [R310] 「怎么办」整列删掉, 这两个刻度跟着离场 —— **它们是那个判断的修饰,
-    判断没了, 修饰单独留在表上就成了没有主语的形容词。**
-
-    于是这条只剩反面那一半, 而那一半正是最要紧的: **它们不许漂回「位置」列。**
-    R307 就是这么判过一次的(把「走到哪一步」当成位置的刻度), R308 才改判 ——
-    它是由三线重合度算出来的**判断**, 不是读数。这一列只要读数。
-
-    它们没有消失: 复盘弹窗的通道页与导出件里都还在(见
-    `test_R277_导出的快慢与屏幕同一个产地`)。
-    """
-    pos = _cell("PositionCell")
-    assert "maturity_cn" not in pos, "「位置」列里混进了「走到哪一步」—— 那是判断, 不是读数"
-    assert "pace_cn" not in pos, "「位置」列里混进了快慢"
-    # 决策台上整个不许再有它们 —— 留一个孤零零的形容词比删了更难读
-    board = _board_body()
-    for gone in ("maturity_cn", "pace_cn"):
-        assert gone not in board, f"决策台上还留着 {gone} —— 它修饰的那个判断已经不在表上了"
-
-
-def test_R315_位置列是短期百分比加三档轨点():
-    """用户: 「关于位置列, 我只需要知道当前短期通道位置和短中长的轨道组合,
-    其他不关心」。
-
-    [R315] 正面变成: 短期那个**百分比**, 加轨上**三个点**(短/中/长各自的高度)。
-    三档组合码进了悬停 —— 它的用处是去 27 格速查表查行号, 那是点开之后的事,
-    不是扫表时要读的; 而**点比码精度更高**(码是 3 档, 点走的是连续 `pct`)。
-
-    反面照旧: **判定那一层一个字都不许留**。这一列不是"结论的窄版", 它是坐标。
-
-    ## 为什么砍掉判定不算丢信息
-
-    R296 穷举 125 种三档位置证过: 那十档判定是**这个三字码的纯函数** ——
-    同一个码永远给同一档, 零冲突(`test_R296_*`)。所以码里的信息一点不比
-    那一档少, 判定只是替人翻译了一遍; 用户不要翻译要坐标, 那就给坐标。
-    翻译本身没消失 —— 点开就是复盘的「通道档位」页, 逐日档位一天不落。
-    """
-    pos = _cell("PositionCell")
-    # 正面: 一个数 + 三个点
-    assert "{pct}%" in pos, "短期那个百分比没印 —— 用户点名要百分比"
-    assert "s!.pos_cn" in pos, "档位名没印 —— 它多给的是按 ATR 算的「近不近轨」"
-    assert "(['l', 'm', 's'] as const).map" in pos, (
-        "轨上没有画三档的点 —— 那样「短中长的轨道组合」就丢了"
-    )
-    # 三个点必须走**各自的** pct, 不是只画短期
-    assert "b.pct * 100" in pos, "点的位置不是按各自的 pct 算的"
-    # 反面: 判定那一层整层不许在
-    for gone in ("<VerdictInner", "<Days", "VERDICT_CLS", "<PlaybookInner",
-                 "line2", "conflicts", "ev!.cn"):
-        assert gone not in pos, f"「位置」列里还留着判定/动作那一层: {gone}"
-    # 判定没被删, 只是不在这张表上 —— 点开必须能到那一页
-    board = _src()
-    assert "tab: 'verdict'" in board[board.index("<PositionCell"):board.index("<PositionCell") + 400], (
-        "点「位置」格不去「通道档位」那一页了 —— 那样才是真把那十档删了"
-    )
-
-
-def test_R308_那份时长跟着组合走而不是消失():
-    """[R246 → R248 → R308] R246/R248 在同一件事上栽过两次: **一个后端还在算
-    的字段在界面上静默消失**, 而"算不出来"与"功能没部署"长得一模一样。
-
-    R308 砍掉十档判定时, `state_run`(后端 `keltner_service._state_run`, 按
-    `state_key(bands)` 数)一度在前端没人要了。它量的其实**就是三档组合那一格**
-    ——换了组合才重新计数——所以它跟着组合进悬停: 不占正文的行(用户只要两个
-    读数), 但那个数还在。
-    """
-    pos = _cell("PositionCell")
-    assert "stateRun" in pos, "`state_run` 又成了没人读的字段 —— R246/R248 那个坑"
-    assert "已连着 ${stateRun.days} 天" in pos, "那份时长没印出来"
-    # 它必须在**悬停**里, 不许挤进正文那两行
-    body = pos[pos.index("return ("):]
-    assert "stateRun" not in body, "时长挤进正文了 —— 用户只要两个读数"
-    board = _src()
-    assert "stateRun={r.kc?.state_run}" in board, "板子没把 `state_run` 递下去, 悬停里永远是空的"
-
-
-
-def test_R310_列宽与内容上限对得上():
-    """**R283 那一课**: 「结论」被挤的真原因不是列宽, 是内容的 `max-w` 上限
-    低于列宽 —— 光加列宽一点用都没有。两者得一起动。
-
-    [R310] 「怎么办」删了, 于是这条只剩 AI 那一列要量 —— **而它正是当初长成
-    半张表的那一个**, 也就是这把尺子最该量的对象。
-
-    闸不能高于列宽也不能低于列宽太多: 低了是 R283 那个「加了列宽也没用」;
-    高了等于**没有闸** —— `table-auto` 下内容能一路顶到闸那么宽, 列宽写多少
-    都不算数。所以这里两头都卡。
-    """
-    src = _src()
-    blk = src[src.index("const BOARD_COLS = ["):]
-    blk = blk[:blk.index("] as const")]
-    got = dict(re.findall(r"label: '([^']+)', w: '(\d+(?:\.\d+)?)%'", blk))
-    assert "AI 信号" in got, f"AI 那一列没拿到宽度: {got}"
-    ai_w = float(got["AI 信号"])
-    px = 1400 * ai_w / 100          # 常见视口按 1400px 表宽折算
-    ai_td = src[src.index("{r.sig ? ("):]
-    ai_cap = re.search(r"max-w-\[(\d+(?:\.\d+)?)rem\]", ai_td[:600])
-    assert ai_cap, (
-        "「AI 信号」那一格没有 max-w 闸 —— `table-auto` 下 colgroup 那个百分比"
-        "只是建议, 没有闸它照样能把整张表顶开(R309 之前就是这样)"
-    )
-    ai_rem = float(ai_cap.group(1))
-    assert ai_rem * 16 >= px, (
-        f"AI 的内容上限 {ai_rem}rem({ai_rem * 16:.0f}px)低于列宽 {ai_w}%"
-        f"(约 {px:.0f}px)—— R283 那个「加了列宽也没用」的局面"
-    )
-    assert ai_rem * 16 <= px * 1.25, (
-        f"AI 的内容上限 {ai_rem}rem({ai_rem * 16:.0f}px)比列宽 {px:.0f}px 高出太多"
-        " —— 那等于没有闸: 内容能一路顶到闸那么宽, 列宽写多少都不算数"
-    )
-
-
-# [R314 → **R315 退役**] `test_R314_两行都报出自己是哪个尺度` 钉的是那两个
-# 尺度标签(短期 / 短中长)。**用户把它们毙了**:「这样表达很 low」——
-# 说得对, 那不是设计, 是替失败的版面写说明。
+# **用户看了实物说「更加看不懂了」。** 复盘原因: 一条 7px 高的线, 两端那两道
+# 端帽在真实渲染里几乎看不见 —— 于是那条轨**没有任何刻度可言**, 而 `-3%` /
+# `134%` 这种越界百分比在没有参照物时比 `6/100` 还费解。
 #
-# 它守的意图 ——「读的人必须看得出这个数是哪个尺度的」—— 一个字没退, 换成了
-# 更强的守法: `test_R315_位置列是短期百分比加三档轨点` 要求那条轨真的画出来
-# (两道端帽 + 三个按各自 pct 落点的圆点), 而轨本身就在回答「49% 是什么的
-# 49%」。**图形替掉文字之后, 守卫也跟着从"有没有写这几个字"换成"有没有画这
-# 几样东西"。**
+# **图形不是万能药: 一个画不清楚的图, 比一句写清楚的话差得多。**
+#
+# 它们守的意图 ——「这个数得有参照物」「出界不许被抹平」「两块都不许消失」——
+# 一条都没退, 全部换成下面这几条: 参照物从"一条轨"换成**一句话**(低于下轨
+# 1.1%), 而话不需要渲染精度。
 
 
-def test_R315_百分比不许被读成涨跌幅():
-    """用户指着这一格问: 「这个百分比是什么意思, 要表达清楚, 是位置?」
+def test_R316_位置列是位置名加一句能交易的距离():
+    """用户在四个方案里选的这一版:「只说短期 + 一句能交易的距离」。
 
-    **`6%` 在一张股票表里默认被读成涨跌幅** —— 隔壁「现价/涨跌」那一列印的
-    正是带 `%` 的涨跌, 同一个符号在同一行里指两件事。更糟的是「贴下轨 6%」
-    连读像「距离下轨 6%」, 而那是**反的**: 它是从下轨往上走了 6%。
+    两行, 各管一件事:
+      · 位置名 —— 扫 166 行时只看这一行的**颜色**(红=上轨侧, 蓝=下轨侧);
+      · 离那条轨还有多远 —— **价格口径**, 能直接拿去下单的数。
 
-    R311 当时的办法是把 `%` 换成 `/100` —— 把刻度摆在脸上。
-
-    [R315] **`%` 回来了, 因为用户点名要**(「我想用百分比表示」)。**守的意图
-    一个字没变**, 换了个更可靠的守法: 那件事现在由**图形**保证 —— 一个点落在
-    一条有两个端点的轨上, 没人会把它读成涨跌幅。
-
-    这是正确的顺序: **能用图形说清的, 就不该靠记法去绕。** 记法那一版是在没有
-    图形时的权宜。
-
-    所以这条改成钉三件事: 轨在、轨有两端、悬停仍然点破那个最容易的误读。
+    第二行换口径是这一版的要害: 不再是"通道刻度 0~100"(抽象、会越界), 而是
+    价格百分比 —— 不需要先在脑子里把通道宽度换算一遍。
     """
     pos = _cell("PositionCell")
     body = pos[pos.index("return ("):]
-    assert "{pct}%" in body, "用户要的百分比没了"
-    # **轨是这个百分比的参照物 —— 没有它, `%` 就又回到会被读成涨跌幅的状态**
-    assert "bg-border/70" in body, "轨那条横线没了"
-    assert body.count("w-px bg-border") == 2, (
-        "轨的两道端帽不全 —— 少一端就不是「一段有边界的区间」, 百分比失去参照物"
+    assert "{s ? s.pos_cn : '—'}" in body, "位置名那一行没了, 或者没有兜底"
+    assert "{near.label}" in body and "{near.pct}%" in body, "离轨距离那一行没了"
+    # 尺度标签、横轨、轨上的点都不许回来 —— 它们是前两版那两个毛病的症状
+    for gone in (">短期<", ">短中长<", "bg-border/70", "POS_FILL"):
+        assert gone not in pos, f"前两版的东西又回来了: {gone}"
+
+
+def test_R316_距离口径与出场线逐字相同():
+    """**这条是这一版最要紧的一条。**
+
+    「还差多远」这件事仓库里早就有一个口径: `(线 − 现价) / 现价` ——
+    出场线的 `distance_pct`、六态的翻转距离都走它(R178 立的, 后端
+    `livermore_service._distance_pct` 有一份带注释的实现)。
+
+    这一列要是自己另算一套(比如拿轨价当分母), 同一个"还差多远"在一个界面上
+    就有了两种算法 —— 而两处定义同一件事必然漂, 这是本仓库反复在治的病。
+    """
+    pos = _cell("PositionCell")
+    gap = pos[pos.index("function railGap"):] if "function railGap" in pos else ""
+    if not gap:
+        from tests.frontend_source import code_of
+        code = code_of("components/stock-analysis/decision-board/cells.tsx")
+        gap = code[code.index("function railGap"):]
+    # 三条路都必须以**现价**作分母
+    for expr in ("(close - b.upper) / close", "(b.lower - close) / close",
+                 "(b.upper - close) / close", "(close - b.lower) / close"):
+        assert expr in gap, f"缺了这一路的距离算法: {expr}"
+    # 反面: 不许拿轨价当分母 —— 那就是第二套口径
+    for bad in ("/ b.upper", "/ b.lower", "/ (b.upper", "/ (b.lower"):
+        assert bad not in gap, f"拿轨价当分母了({bad})—— 与出场线口径就不一致了"
+
+
+def test_R316_看哪条轨跟着位置名走():
+    """**不另判一次。** 位置名已经说了在场的是哪条轨, 再写一套 if 判"该看上轨
+    还是下轨", 就是同一个判定两处实现。
+
+    只有「通道内」没有指定轨 —— 那时取**更近的那一条**(先撞上的就是它)。
+    """
+    from tests.frontend_source import code_of
+    code = code_of("components/stock-analysis/decision-board/cells.tsx")
+    gap = code[code.index("function railGap"):]
+    assert "b.pos === 'above'" in gap and "b.pos === 'below'" in gap, (
+        "破轨那两档没有跟着位置名走"
     )
-    # 等高数字: 整列的 % 要上下对齐
-    num_line = body[body.index("font-mono"):body.index("{pct}%")]
-    assert "tabular-nums" in num_line, "百分比不是等高数字 —— 整列的 % 会上下错开"
-    # 层次: 数最亮最大, 档位名同色压暗
-    assert "text-[13px]" in body and "text-[10px]" in body, "数与档位名的字号没拉开层次"
-    assert "opacity-55" in body, "档位名没压暗 —— 它会跟主角抢注意力"
-    # 悬停仍要点破那个最容易的误读
+    assert "up <= down ?" in gap, "「通道内」时没有取更近的那一条"
+
+
+def test_R316_方向由措辞承担数字不带负号():
+    """「低于下轨 -1.1%」是双重否定, 读的人要在脑子里再翻一次。
+
+    所以数字取绝对值, 方向全交给措辞: 高出 / 低于 / 距。
+    """
+    from tests.frontend_source import code_of
+    code = code_of("components/stock-analysis/decision-board/cells.tsx")
+    gap = code[code.index("function railGap"):]
+    assert "Math.abs(raw)" in gap, "数字没取绝对值 —— 会印出「低于下轨 -1.1%」"
+    for word in ("'高出上轨'", "'低于下轨'", "'距上轨'", "'距下轨'"):
+        assert word in gap, f"少了一种措辞: {word} —— 方向就没人承担了"
+
+
+def test_R316_现价是传进来的不是从_pct_反推的():
+    """`pct` 后端只留三位小数(`round(..., 3)`), 反推出来的收盘价会差几分钱。
+
+    这一列印的是**要拿去下单的数**, 差几分钱就是错的。所以现价从行数据直接传,
+    不从别的读数倒推。
+    """
+    pos = _cell("PositionCell")
+    assert "close?: number | null" in pos, "PositionCell 没有接收现价"
+    # 反面: 不许出现"拿 pct 和轨价反推收盘价"那种写法
+    from tests.frontend_source import code_of
+    code = code_of("components/stock-analysis/decision-board/cells.tsx")
+    gap = code[code.index("function railGap"):]
+    assert "b.pct" not in gap, (
+        "离轨距离又拐回通道刻度去算了 —— 它该只用现价与轨价。"
+        "(`railGap` 自己的返回字段也叫 `pct`, 所以这里禁的是**读 `b.pct`**, "
+        "不是禁这三个字母 —— 第一版就是这么写宽了然后假红的)"
+    )
+    # **锚在 `<PositionCell` 那个调用点上。** 走势列(`ChannelStateCell`)也收
+    # `close={r.close}`, 只查整份源码里有没有这个串, 把这一列的那个删掉照样绿
+    # —— R316 变异电池当场逼出来的, 与"锚在邻居身上"是同一族的假守卫。
+    board = _src()
+    call = board[board.index("<PositionCell"):]
+    call = call[:call.index("/>") + 2]
+    assert "close={r.close}" in call, "板子没把现价递给「位置」列, 这一列永远只能印 —"
+
+
+def test_R316_两行各自都有兜底():
+    """行高一会儿一行一会儿两行, 166 行扫下来就是锯齿(R217 那个病)。
+
+    算不出来时: 位置名给 `—`, 距离那一行也给 `—` —— **两行都还在**。
+    """
+    pos = _cell("PositionCell")
+    btn = pos[pos.index("<button"):]
+    btn = btn[:btn.index("</button>")]
+    assert "{s ? s.pos_cn : '—'}" in btn, "位置名那一行没有兜底"
+    assert "{near ? (" in btn and ") : (" in btn, "距离那一行没有兜底"
+    assert btn.count("text-muted/30") == 2, (
+        "两行的占位不全 —— 少一个那一行就会整个消失, 行高跟着跳"
+    )
+
+
+def test_R316_位置名按位置上色():
+    """扫 166 行时**只看第一行的颜色**: 红 = 在上轨那一侧, 蓝 = 下轨那一侧。
+
+    配色走共用的 `POS_TEXT` —— 与时间轴那条位置带同一份表, 不许在这里另抄
+    (R308 立的规矩: 两份色表分居两地, 只改一处就会漂, 而那种漂移不报错)。
+    """
+    pos = _cell("PositionCell")
+    body = pos[pos.index("return ("):]
+    assert "POS_TEXT[s.pos]" in body, "位置名没按位置上色 —— 那就没法靠颜色扫表了"
+    for local in ("bg-red-400'", "text-red-400'", "text-sky-400'"):
+        assert local not in body, f"这一格自己又抄了一份色({local})—— 色表只许一处"
+
+
+def test_R316_三档与组合码没丢只是进了悬停():
+    """用户选的是「只说短期」, 但**只说短期不等于把别的删了**。
+
+    三档各自的位置与距离、27 格那个组合码、R246 那份时长, 全在悬停里 ——
+    产出了却没人接, 与没做是一回事(`state_run` 就这么死过一轮)。
+    """
+    pos = _cell("PositionCell")
     tip = pos[:pos.index("return (")]
-    assert "不是涨跌幅" in tip, "悬停没点破那个最容易的误读"
-
-
-def test_R315_轨外的点按在端帽上而数字照印真值():
-    """`pct` 会小于 0 或大于 100(破轨)。**点的位置必须夹住**(否则画到格子外面),
-    但**数字不许跟着夹** —— 夹了就是把「它出界了」这件事悄悄抹掉。
-
-    这是 R246/R248 那条纪律在图形上的一次: 画得下与说得准是两件事, 画不下时
-    让位的是画, 不是数。
-    """
-    pos = _cell("PositionCell")
-    # **整个函数体都要看, 不能只看 `return (` 之后。** 夹取完全可以发生在上面
-    # 那个 `const pct = …` 里 —— 第一版守卫就只看了渲染那一段, 把夹取塞进变量
-    # 定义照样绿。这是 R315 变异电池当场逼出来的。
-    assert pos.count("Math.max(0, Math.min(100,") == 1, (
-        "夹取不止一处(或者没了)—— 它只该出现在**点的横坐标**那一路上"
-    )
-    assert "const x = Math.max(0, Math.min(100, b.pct * 100))" in pos, (
-        "轨外的点没夹住 —— 会画到格子外面"
-    )
-    # 数字那一路必须是**原值**
-    assert "const pct = s ? Math.round(s.pct * 100) : null" in pos, (
-        "百分比不是原值了 —— 一旦跟着夹, 107% 会被印成 100%, "
-        "「它出界了」这件事就悄悄没了(R246/R248 那条纪律)"
-    )
-
-
-def test_R315_三个点分得出谁是谁():
-    """三个点画在同一根轨上, 不标字。分不出谁是谁的话, 这张图就没有信息。
-
-    靠的是**大小**: 短期最大(这一格的主角), 长期最小。配色走 `POS_FILL` ——
-    与时间轴那条位置带**同一份表**, 不许在这里另抄一份(R308 立的规矩:
-    两份色表分居两地, 哪天只改一处就会漂, 而那种漂移没有任何东西会报错)。
-    """
-    pos = _cell("PositionCell")
-    body = pos[pos.index("return ("):]
-    assert "k === 's' ? 5" in body and "k === 'm' ? 3.5" in body, (
-        "三个点不再按短中长分大小 —— 那就分不出谁是谁了"
-    )
-    assert "POS_FILL[b.pos]" in body, "点没走共用的那份位置色表"
-    src = _cell("PositionCell")
-    for local in ("bg-red-400'", "bg-sky-400'"):
-        assert local not in src, f"这一格自己又抄了一份色({local})—— 色表只许一处"
+    assert "(['s', 'm', 'l'] as const)" in tip, "悬停里没有三档各自的位置"
+    assert "三档组合码" in tip, "悬停里没有 27 格那个组合码"
+    assert "stateRun" in tip, "R246 那份时长又没人读了"
+    assert "轨价 − 现价" in tip, "悬停没说清距离是什么口径"
 
 
 def test_R310_出场线的价格还在界面上():
@@ -955,33 +811,10 @@ def test_R309_AI_理由截到两行且全文进悬停():
 
 
 
-def test_R315_位置列的两块都在():
-    """R217 那个病: 一格摞到五层、每行高度还不一样, 上一行的尾巴挂到下一行的
-    表头底下。**病根是行数与行高参差**, 所以两列各自的块数都得钉死。
-
-      · 「位置」列 两块 = 一个百分比 / 一条轨
-
-    [R315] 重排之后仍是两块, 而且**两块都不许因为没数据而消失** ——
-    行高一会儿一块一会儿两块, 166 行扫下来就是锯齿(R217 那个病)。
-    算不出来时: 数那一块给 `—`, 轨那一块照画(只是上面没有点)。
-    """
-    pos = _cell("PositionCell")
-    btn = pos[pos.index("<button"):]
-    btn = btn[:btn.index("</button>")]
-    # 第一块: 有数印数, 没数印 `—` —— 两条路都在, 所以它不会整块消失
-    assert "pct === null ? (" in btn, "百分比那一块没有兜底"
-    assert "text-muted/30\">—</span>" in btn, "算不出来时没有占位, 那一块会整个消失"
-    # 第二块: 轨是**无条件画**的 —— 它不挂在任何数据上
-    rail = btn[btn.index("relative block h-[7px]"):]
-    assert rail.index("bg-border/70") < rail.index("{(['l', 'm', 's']"), (
-        "轨的横线跑到点后面去了 —— 它该是无条件先画的底"
-    )
-    assert "{(['l', 'm', 's'] as const).map" in btn, "轨上没有画点"
-    # 点是**单独**缺席的: 某一档算不出来只少一个点, 不影响轨与另外两个点
-    assert "if (!b) return null" in btn, (
-        "某一档算不出来时整条轨会塌 —— 缺一档只该少一个点"
-    )
-
+# [R315 → **R316 退役**] `test_R315_位置列的两块都在` 钉的是「一个数 + 一条轨」
+# 那个形状。轨没了, 由 `test_R316_两行各自都有兜底` 接手 —— 守的意图一个字没变:
+# **两块都不许因为没数据而消失**, 否则行高一会儿一块一会儿两块, 166 行扫下来
+# 就是锯齿(R217 那个病)。
 
 def test_R277_走势列不再回退到快慢():
     """那个 `align ? align : pace_cn` 的回退基本走不到(见上一条), 属于

@@ -5,7 +5,7 @@
  * 实现细节, 不该摆在 933 行主文件的顶部让人以为是全局约定。
  */
 import type { BandEnergy, ChannelEvent, ChannelGeometry, ChannelPhase, ChannelRuns, KeltnerBand } from '@/lib/api'
-import { POS_FILL, POS_TEXT } from '@/lib/reviewTimeline'
+import { POS_TEXT } from '@/lib/reviewTimeline'
 
 /**
  * [R194] 决策台单元格的统一基线。**整张表只有这一处定义垂直对齐与行内边距。**
@@ -381,69 +381,81 @@ export function ChannelStateCell({ trend, geo, runs, ph, kc, close, trendCls,
 // [R205] 「怎么办」配色。**只有两档是红的** —— 纪律已破和今天已触发。
 // 分歧档刻意用琥珀而不是红: 它说的是"别动", 不是"快动", 用红会被读反。
 /**
- * [R212 → R307 → R308] 「位置」列 —— **只有两个原始读数, 没有那十档判定。**
+ * [R308 → R315 → R316] 「位置」列 —— **一个位置名 + 一句能交易的距离。**
  *
- * 用户: 「关于位置列, 我只需要知道当前短期通道位置和短中长的轨道组合, 其他不关心」。
+ * 用户看过两版之后定的这一版:「只说短期 + 一句能交易的距离」。
  *
- * ## 为什么这么砍是站得住的
+ * ## 前两版为什么不行
  *
- * R296 穷举 125 种三档位置证过: 那十档判定是**这个三字码的纯函数** —— 同一个
- * 码永远给同一档, 零冲突。也就是说**三字码里的信息一点不比那一档少**, 判定只是
- * 替人把它翻译了一遍。用户不要那层翻译, 要坐标本身 —— 那就给坐标, 不丢东西。
+ * R311/R314 那版是 `贴下轨 6/100` 外加 `短期 / 短中长` 两个尺度标签 ——
+ * **拿词去解释版面**, 用户一句「这样表达很 low」毙了, 说得对。
  *
- * 于是这一格只剩:
+ * R315 换成横轨 + 三个点, 用户说「更加看不懂了」。复盘原因: 一条 7px 高的
+ * 线, 两端那两道端帽在真实渲染里几乎看不见, 于是**那条轨没有任何刻度可言**;
+ * 而 `-3%` / `134%` 这种越界百分比, 在没有参照物时比 `6/100` 还费解。
+ * **图形不是万能药 —— 一个画不清楚的图, 比一句写清楚的话差得多。**
  *
- *     贴上轨 92%      ← 短期通道位置(0=贴下轨, 100=贴上轨; 轨外会出界)
- *     上中下          ← 短/中/长各在自己通道的哪一侧
+ * ## 这一版
  *
- * 判定那一档没有消失, 只是不在这张表上: 点开就是复盘的「通道档位」页, 那里有
- * 逐日的档位、按档位买卖、以及 27 种三档组合的全谱。
+ *     破下轨              ← 位置名, 按位置上色; 扫表时只看这一行的颜色
+ *     低于下轨 1.1%       ← 离那条轨还有多远, 价格口径
  *
- * ## 列名回到「位置」而且**不再撞名**
+ * 关键是第二行**换了口径**: 不再是"通道刻度 0~100"(抽象、会越界), 而是
+ * **价格百分比** —— 「低于下轨 1.1%」是一个能直接下单的数, 不需要先在脑子里
+ * 把通道宽度换算一遍。
  *
- * R306 那次撞名是因为拿「通道位置」去命名**那十档判定**, 而打分系统里
- * `channel_pct` 早就叫这个。现在这一列印的**就是** `channel_pct` 那个读数 ——
- * 两处指的是同一件事, 叫同一个名字正好是对的。
+ * 口径用仓库已有的那条: **(线 − 现价) / 现价**, 与出场线的 `distance_pct`、
+ * 六态的翻转距离**逐字相同**(R178 立的)。不另起一套 —— 同一个"还差多远"
+ * 在一个界面上有两种算法, 是这仓库反复在治的那种病。
  *
- * ## 三字码逐字上色, 但**不在前端拼码**
+ * 看**哪条轨**由位置名决定, 不另判一次:
  *
- * 码由后端 `combo_code` 给(R294: 拼法只许一处定义)。这里只是把**给定的字符串**
- * 按字上色 —— 上=红侧 / 下=蓝侧, 与时间轴那条位置带同一套色相(`POS_TEXT`
- * 与 `POS_FILL` 紧挨着放, 防漂移)。等宽字体让整列的码上下对齐, 一眼扫得出
- * 哪几只票在同一格。
+ *     破上轨   → 上轨, 「高出上轨 X%」
+ *     贴上轨   → 上轨, 「距上轨 X%」
+ *     通道内   → **更近的那一条**(先撞上的就是它)
+ *     贴下轨   → 下轨, 「距下轨 X%」
+ *     破下轨   → 下轨, 「低于下轨 X%」
+ *
+ * ## 三档组合去哪了
+ *
+ * 进悬停 —— 用户选的就是「只说短期」。悬停里三档各自一行, 带位置名、
+ * 价格距离与轨价, 外加 27 格那个组合码(它的用处是去速查表查行号,
+ * 那是点开之后的事)。
  */
-export function PositionCell({ kc, geo, ev, runs, energy, ph, stateRun, onOpen }: {
+export function PositionCell({ kc, geo, ev, runs, energy, ph, stateRun, close, onOpen }: {
   kc?: { s?: KeltnerBand; m?: KeltnerBand; l?: KeltnerBand } | null
   geo?: ChannelGeometry | null
   ev?: ChannelEvent | null
   runs?: ChannelRuns | null
   energy?: BandEnergy | null
   ph?: ChannelPhase | null
-  /** [R246 → R308] 这一格连着多久。**它量的就是三档组合那一格** ——
-      `state_run` 后端是按 `state_key(bands)` 数的, 换句话说换了组合才重新计数。
-      R308 砍掉十档判定之后它在前端一度没人要了; 不印等于把一个后端还在算的
-      数悄悄丢掉(R246/R248 栽过两次的正是"字段静默消失"), 所以它跟着组合
-      进悬停 —— 不占正文的行, 用户要的两个读数一个不多。 */
+  /** [R246 → R308] 这个三档组合连着多久 —— 后端按 `state_key(bands)` 数的。
+      不占正文的行, 只进悬停; 不印的话就是把一个后端还在算的数悄悄丢掉。 */
   stateRun?: { days: number; since?: string; capped?: boolean } | null
+  /** [R316] 算价格距离要用它。**不拿 `pct` 反推** —— `pct` 后端只留三位小数,
+      反推出来的收盘价会和真实值差几分钱, 而这一列印的是要拿去下单的数。 */
+  close?: number | null
   onOpen: () => void
 }) {
   const s = kc?.s
   const combo = geo?.combo ?? null
-  const pct = s ? Math.round(s.pct * 100) : null
+  const near = railGap(s, close)
   const tip = [
-    s ? `短期通道 ${s.pos_cn} —— 收盘价落在通道的 ${pct}% 高度`
-        + '(0% = 贴着下轨, 100% = 贴着上轨; 出了轨会小于 0 或大于 100)\n'
-        + '**这不是涨跌幅** —— 涨跌在左边「现价/涨跌」那一列'
+    s ? `短期通道 ${s.pos_cn} —— ${near ? near.full : '离轨距离算不出来(缺现价)'}`
       : '短期通道这一档今天算不出来',
-    s ? `短期通道区间 ${s.lower.toFixed(2)} ~ ${s.upper.toFixed(2)}` : '',
     '',
-    '下面那条轨上三个点 = 短 / 中 / 长各自在**自己那条通道**里的高度,',
-    '点越大越短期。左端是下轨, 右端是上轨。',
+    '距离口径: (轨价 − 现价) / 现价 —— 与出场线、六态翻转距离**同一个算法**,',
+    '也就是"现价还要动多少个百分点才碰到那条轨"。',
+    '',
+    '三档各自的位置:',
     ...(['s', 'm', 'l'] as const)
       .map((k, i2) => {
         const b = kc?.[k]
-        return b ? `  ${'短中长'[i2]}期 ${b.pos_cn} ${Math.round(b.pct * 100)}%`
-                   + `(${b.lower.toFixed(2)} ~ ${b.upper.toFixed(2)})` : ''
+        if (!b) return `  ${'短中长'[i2]}期 —— 算不出来`
+        const g = railGap(b, close)
+        return `  ${'短中长'[i2]}期 ${b.pos_cn}`
+          + (g ? ` · ${g.full}` : '')
+          + `(轨 ${b.lower.toFixed(2)} ~ ${b.upper.toFixed(2)})`
       }),
     '',
     combo
@@ -457,78 +469,54 @@ export function PositionCell({ kc, geo, ev, runs, energy, ph, stateRun, onOpen }
 
   return (
     <td className={`${TD_BASE} whitespace-nowrap px-1.5`}>
-      {/* [R314 → R315] **不再用文字解释版面。**
-
-          用户: 「想想怎么表达会更好, 重新排版表达, 我想用百分比表示,
-          『短期 通道内 49/100 / 短中长 中中中』这样表达很 low」。
-
-          **他说得对, 而且病根是我拿词去说空间。** R314 给两行各加了一个尺度
-          标签(短期 / 短中长)—— 那不是设计, 那是**替失败的版面写说明**。
-          「中中中」更糟: 三个一模一样的汉字, 看着像噪声不像读数。
-
-          位置这件事本来就该**画出来**:
-
-              49% 通道内
-             ▏──·──●───·──▕     ← 一条轨, 左端下轨 右端上轨
-                                   三个点 = 短/中/长 各自的高度, 点越大越短期
-
-          于是两个标签都不需要了 —— 「49% 是什么的 49%」由它正下方那个点在轨
-          上的位置直接回答, 一个字都不用写。
-
-          **精度还升了。** 原来第二行是三个 3 档的字(上/中/下), 现在三个点走的
-          是各自的 `pct`(0~100 连续)—— 中期是刚进中部还是快贴上轨, 字看不出来,
-          点看得出来。27 格那个**组合码不是丢了, 是进了悬停** —— 它的用处是
-          去速查表查行号, 那是点开之后的事, 不是扫表时要读的。
-
-          **`%` 回来了**(用户要的)。R311 当初换成 `/100` 是为了躲开「被读成
-          涨跌幅」, 现在那件事由**轨**来保证: 一个点在一条有两个端点的轨上,
-          没人会把它读成涨跌。记法让位给图形, 是对的顺序。 */}
       <button type="button" onClick={onOpen} title={tip}
-              className="mx-auto flex w-full max-w-[9rem] cursor-pointer flex-col items-stretch gap-y-1 rounded-btn px-1 py-1 leading-none transition-colors duration-hover hover:bg-elevated/40">
-        <span className="flex items-baseline justify-center gap-1.5">
-          {pct === null ? (
-            <span className="text-[12px] text-muted/30">—</span>
-          ) : (
-            <>
-              {/* 百分比是主角 —— 最大、最亮。等高数字让整列的 % 上下对齐。 */}
-              <span className={`font-mono text-[13px] tabular-nums ${POS_TEXT[s!.pos] ?? 'text-muted'}`}>
-                {pct}%
-              </span>
-              {/* 档位名是同一件事的粗粒度说法, 所以同色、压暗、更小 ——
-                  它多给的那点信息是**按 ATR 算的"近不近轨"**, 光看百分比得不到。 */}
-              <span className={`text-[10px] ${POS_TEXT[s!.pos] ?? 'text-muted'} opacity-55`}>
-                {s!.pos_cn}
-              </span>
-            </>
-          )}
+              className="mx-auto flex w-full cursor-pointer flex-col items-center gap-y-0.5 rounded-btn px-1 py-0.5 leading-snug transition-colors duration-hover hover:bg-elevated/40">
+        {/* 第一行: 位置名。**扫 166 行时只看这一行的颜色** ——
+            红 = 在上轨那一侧, 蓝 = 在下轨那一侧, 灰 = 通道内。 */}
+        <span className={`text-[12px] ${s ? POS_TEXT[s.pos] ?? 'text-muted' : 'text-muted/30'}`}>
+          {s ? s.pos_cn : '—'}
         </span>
-        {/* 通道轨。左端 = 下轨, 右端 = 上轨; 两道端帽把"这是一段有边界的区间"
-            说清楚, 于是上面那个百分比不再需要任何文字说明。 */}
-        <span className="relative block h-[7px] w-full px-[3px]">
-          <span className="absolute inset-x-[3px] top-1/2 h-px -translate-y-1/2 bg-border/70" />
-          <span className="absolute left-0 top-0 h-full w-px bg-border" />
-          <span className="absolute right-0 top-0 h-full w-px bg-border" />
-          {(['l', 'm', 's'] as const).map((k) => {
-            const b = kc?.[k]
-            if (!b) return null
-            // 轨外的点按在端帽上 —— 位置到头了, 但**数字照旧印真值**(107%),
-            // 所以"它出界了"这件事一个字没丢。
-            const x = Math.max(0, Math.min(100, b.pct * 100))
-            // 点越大越短期: 短是这一格的主角, 中长是背景。
-            const d = k === 's' ? 5 : k === 'm' ? 3.5 : 2.5
-            return (
-              <span key={k}
-                    className={`absolute top-1/2 rounded-full ${POS_FILL[b.pos] ?? 'bg-border'}`}
-                    style={{ left: `calc(3px + (100% - 6px) * ${x / 100})`,
-                             width: d, height: d,
-                             transform: 'translate(-50%, -50%)' }} />
-            )
-          })}
-        </span>
+        {/* 第二行: 离那条轨还有多远, **价格口径**。
+            它是这一格真正能拿去下单的那个数, 所以数字用等宽 + tabular-nums,
+            整列小数点上下对齐; 措辞压暗, 不跟第一行抢。 */}
+        {near ? (
+          <span className="text-[10px] text-muted">
+            {near.label}
+            <span className="ml-1 font-mono tabular-nums text-secondary">{near.pct}%</span>
+          </span>
+        ) : (
+          <span className="text-[10px] text-muted/30">—</span>
+        )}
       </button>
     </td>
   )
 }
+
+
+/**
+ * [R316] 离**在场的那条轨**还有多远 —— 价格口径。
+ *
+ * 口径 `(轨价 − 现价) / 现价` 与出场线的 `distance_pct`、六态的翻转距离
+ * 逐字相同(R178 立的)。**方向由措辞承担**(高出 / 低于 / 距), 所以数字取绝对值
+ * —— 「低于下轨 -1.1%」是双重否定, 读的人要在脑子里再翻一次。
+ *
+ * 看哪条轨**不另判一次**, 直接跟着位置名走; 只有「通道内」没有指定轨,
+ * 那时取**更近的那一条** —— 先撞上的就是它。
+ */
+function railGap(b?: KeltnerBand | null, close?: number | null):
+    { label: string; pct: string; full: string } | null {
+  if (!b || close == null || !(close > 0)) return null
+  const mk = (label: string, raw: number) => {
+    const pct = (Math.abs(raw) * 100).toFixed(1)
+    return { label, pct, full: `${label} ${pct}%` }
+  }
+  if (b.pos === 'above') return mk('高出上轨', (close - b.upper) / close)
+  if (b.pos === 'below') return mk('低于下轨', (b.lower - close) / close)
+  const up = (b.upper - close) / close
+  const down = (close - b.lower) / close
+  return up <= down ? mk('距上轨', up) : mk('距下轨', down)
+}
+
 
 
 
