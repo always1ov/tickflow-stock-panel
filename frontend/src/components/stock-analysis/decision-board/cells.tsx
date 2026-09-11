@@ -452,8 +452,27 @@ export function PositionCell({ kc, geo, ev, runs, energy, ph, stateRun, onOpen }
 
   return (
     <td className={`${TD_BASE} whitespace-nowrap px-1.5`}>
+      {/* [R314] **两行各自报出自己是哪个尺度。**
+
+          用户指着这一格问: 「这个分数指的是短期通道的吗, 你干脆就说清楚,
+          比如只看短期只显示短期」。
+
+          **他问得对, 而且这一格自己给了误导**: 第一行是短期那一档的读数,
+          第二行三个字却是 短/中/长 —— 两行的尺度不一样, 可谁都没说自己是谁。
+          更容易误会的是**第二行第一个字和第一行说的是同一件事**(`combo_code`
+          取的就是 s/m/l 三档的 `pos`), 只是精度不同: 一个 5 档 + 数, 一个 3 档。
+          不标尺度的话, 「通道内 49/100」与它下面那个「中」看着像两个读数。
+
+          **标签靠右成轴, 数据才对得齐。** 两个标签字数不等(短期 2 字 /
+          短中长 3 字), 各自居中的话两行的数据部分会错开 —— 这是 R298/R307
+          反复治过的那个病。所以用 `grid` 两列: 标签列右对齐、数据列左对齐,
+          整块再 `mx-auto` 居中。
+
+          标签是**说明不是读数**, 所以压到最暗、字号最小 —— 层次靠明度分,
+          与 R311 给 `/100` 定的规矩同一条。 */}
       <button type="button" onClick={onOpen} title={tip}
-              className="mx-auto flex w-full cursor-pointer flex-col items-center gap-0.5 rounded-btn px-1 py-0.5 leading-snug transition-colors duration-hover hover:bg-elevated/40">
+              className="mx-auto grid w-fit cursor-pointer grid-cols-[max-content_max-content] items-baseline gap-x-1.5 gap-y-0.5 rounded-btn px-1 py-0.5 text-left leading-snug transition-colors duration-hover hover:bg-elevated/40">
+        <span className="justify-self-end text-[9px] text-muted/45">短期</span>
         {s ? (
           <span className="whitespace-nowrap text-[12px]">
             <span className={POS_TEXT[s.pos] ?? 'text-muted'}>{s.pos_cn}</span>
@@ -482,6 +501,9 @@ export function PositionCell({ kc, geo, ev, runs, energy, ph, stateRun, onOpen }
             </span>
           </span>
         ) : <span className="text-[12px] text-muted/30">—</span>}
+        {/* 第二行的尺度标签 —— 它同时说明了**读的顺序**: 短 → 中 → 长。
+            不写的话「中中中」三个字看不出哪个字对应哪一档。 */}
+        <span className="justify-self-end text-[9px] text-muted/45">短中长</span>
         {combo ? (
           <span className="font-mono text-[11px] tracking-[0.15em]">
             {combo.split('').map((ch, i) => (
