@@ -91,8 +91,10 @@ const BOARD_COLS = [
   // [R307] 21% 一列拆成两列: 「档位」只说位置, 「怎么办」独立。
   // 用户: 「这一列我只想看位置, 表示位置」。档位那半只有一行(徽标 + 刻度),
   // 用不了多少宽; 会长的是「怎么办」那一行事件与理由, 宽度给它。
-  { label: '档位', w: '9%' },
-  { label: '怎么办', w: '14%' },
+  // [R308] 「位置」只剩两个短读数, 用不了那么宽; 省下的给「怎么办」——
+  // 会长的是它那一行事件与理由。
+  { label: '位置', w: '7%' },
+  { label: '怎么办', w: '16%' },
   // [R249] 账目三列从「现价」后面挪到这里。用户: 「我有点乱, 是否有好办法整理
   // 好顺序调整显示和列」。**原来它们把判断切开了** —— 扫表时要连着读
   // 「走势 → 结论」, 中间却横着三列只有持仓那几只才用得上的账目。
@@ -933,10 +935,14 @@ title={'两行: 六态趋势 / 价格·六态·均线三个尺度转到第几步
                     (`verdict.rank`), 两处定义同一件事必然漂。要按档位找票,
                     「怎么办」那一列的急迫程度已经把该动的顶到前面了。 */}
                 <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center"
-title={'一行: 这个价现在算高还是算低 · 已经这样几天 · 这一段走到哪一步了。\n\n'
-                      + '用户: 「这一列我只想看位置, 表示位置」—— 所以「怎么办」搬去了右边\n'
-                      + '那一列, 这里只剩位置本身与它的刻度。数字全在格子的悬停里。'}>
-                  档位
+title={'两行, 都是原始读数:\n'
+                      + '  ① 短期通道位置 —— 贴上轨 / 通道内 / 贴下轨…, 后面是通道内位置\n'
+                      + '     (0 = 贴下轨, 100 = 贴上轨; 出了轨会小于 0 或大于 100)\n'
+                      + '  ② 三档组合码 —— 短 / 中 / 长各在自己通道的哪一侧\n\n'
+                      + '用户: 「我只需要知道当前短期通道位置和短中长的轨道组合, 其他不关心」。\n'
+                      + '那十档判定是这个码的纯函数(穷举 125 种验过), 要看翻译好的那一档,\n'
+                      + '点开就是复盘的「通道档位」页。'}>
+                  位置
                 </th>
                 <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center">
                   <button onClick={() => cycleSort('play')}
@@ -1030,8 +1036,10 @@ title={'我在这只票上的账: 拿没拿 / 买入成本 / 现在浮盈多少�
                       trend={r.trend} trendCls={r.trend ? trendBadgeCls(r.trend.state) : undefined}
                       geo={r.kc?.geo} runs={r.kc?.runs} ph={r.ph} kc={r.kc} close={r.close}
                       onOpenReview={() => setReview({ symbol: r.symbol, name: r.name, tab: 'trend' })} />
-                    {/* [R307] 「档位」只说位置: 这一档 + 待了多久 + 这一段走多远 */}
-                    <PositionCell v={r.kc?.verdict} ev={r.ev} geo={r.kc?.geo} runs={r.kc?.runs}
+                    {/* [R308] 「位置」只有两个原始读数: 短期通道位置 + 三档组合码。
+                        那十档判定不在这张表上了 —— 它是这个码的纯函数(R296 验过),
+                        要看翻译好的那一档就点开复盘的「通道档位」页。 */}
+                    <PositionCell kc={r.kc} geo={r.kc?.geo} ev={r.ev} runs={r.kc?.runs}
                                   energy={r.kc?.energy} ph={r.ph} stateRun={r.kc?.state_run}
                                   onOpen={() => setReview({ symbol: r.symbol, name: r.name, tab: 'verdict' })} />
                     {/* [R307] 「怎么办」拿走动作那一半 */}

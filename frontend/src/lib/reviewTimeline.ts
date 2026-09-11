@@ -55,6 +55,28 @@ export const POS_FILL: Record<string, string> = {
   near_lower: 'bg-sky-400/50',
   below: 'bg-sky-400',
 }
+/**
+ * [R308] 同一套位置色的**文字版**。决策台「位置」列用它, 时间轴用上面那份填充版。
+ *
+ * **必须挨着 POS_FILL 放**: 两份要是分居两地, 哪天有人只改一处, 同一个「贴上轨」
+ * 在色带上是红的、在表格里是别的颜色 —— 而那种漂移没有任何东西会报错。
+ * 文字比色块需要更高的不透明度才读得清, 所以数值不同、**色相一致**。
+ */
+export const POS_TEXT: Record<string, string> = {
+  above: 'text-red-400',
+  near_upper: 'text-red-400/75',
+  inside: 'text-muted',
+  near_lower: 'text-sky-400/75',
+  below: 'text-sky-400',
+}
+
+/** [R308] 三字组合码里每个字的颜色 —— 与上面同一套色相(上=红侧, 下=蓝侧)。 */
+export const COMBO_CHAR: Record<string, string> = {
+  上: 'text-red-400/85',
+  中: 'text-muted',
+  下: 'text-sky-400/85',
+}
+
 export const POS_LEGEND = [
   { cls: 'bg-red-400', label: '破上轨' },
   { cls: 'bg-red-400/50', label: '贴上轨' },

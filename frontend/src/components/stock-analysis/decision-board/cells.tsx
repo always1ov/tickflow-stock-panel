@@ -4,8 +4,8 @@
  * [R167] 从 WatchlistDecisionBoard.tsx 拆出。各自带着自己的配色表 —— 配色表是
  * 实现细节, 不该摆在 933 行主文件的顶部让人以为是全局约定。
  */
-import type { BandEnergy, ChannelEvent, ChannelGeometry, ChannelPhase, ChannelRuns, KeltnerBand, KeltnerVerdict, Playbook } from '@/lib/api'
-import { VerdictHover } from '@/components/stock-analysis/VerdictHover'
+import type { BandEnergy, ChannelEvent, ChannelGeometry, ChannelPhase, ChannelRuns, KeltnerBand, Playbook } from '@/lib/api'
+import { COMBO_CHAR, POS_TEXT } from '@/lib/reviewTimeline'
 
 /**
  * [R194] 决策台单元格的统一基线。**整张表只有这一处定义垂直对齐与行内边距。**
@@ -49,16 +49,11 @@ export const NUM = 'font-mono tabular-nums'
 // 把三个「通道内」逐行印出来是纯噪声 —— 恰恰是"哪一档到边了"才带信息。
 // 完整的三档轨价与位置百分比留在悬停。
 
-// [R44] 三档组合的结论配色。tone 由后端给, 界面不自己判 ——
-// 决策台、今日总览、悬停提示必须说同一句话。
-const VERDICT_CLS: Record<KeltnerVerdict['tone'], string> = {
-  sell: 'border-red-400/40 bg-red-400/10 text-red-400',
-  buy: 'border-sky-400/40 bg-sky-400/10 text-sky-300',
-  hold: 'border-amber-400/40 bg-amber-400/10 text-amber-400',
-  avoid: 'border-border bg-base text-muted',
-  // [R45] 观察档: 还不到动手的时候, 用最淡的一档, 跟四个动作档区分开
-  watch: 'border-border bg-elevated/60 text-secondary',
-}
+// [R44 加, R308 删] `VERDICT_CLS`(那十档判定的徽标配色)在这里删掉了 ——
+// 用户: 「位置列我只需要知道当前短期通道位置和短中长的轨道组合」, 于是决策台上
+// 不再印那个徽标, 这份配色在本文件没有第二个调用方。复盘弹窗那边有它自己的一份
+// (它那儿还在印徽标), 不是同一处的重复。
+
 
 // [R195] 事件配色。**已确认与未确认必须一眼分得开** —— 「突破尝试」与
 // 「突破站稳」差的就是那两天, 把它们画成一样就是在鼓励追第一天的假突破。
@@ -155,107 +150,7 @@ function geoLines(geo?: ChannelGeometry | null, ev?: ChannelEvent | null,
   return L.join('\n')
 }
 
-/**
- * 「通道档位」单元格 —— 三档组合翻成一句人话。
- *
- * 徽标只放 4-6 字的结论标题, 悬停给分段排版的完整卡片(R49, 见 VerdictHover),
- * 点击翻这只票的逐日复盘(R48) —— 这一列说的话在它身上过去好不好使, 只有
- * 翻历史才知道。短期档在通道中部时显示 "—": 那时这一列确实没有信息。
- *
- * [R195] 徽标下面多一行**事件**。结论说的是"位置", 事件说的是"这是什么事" ——
- * 同一个「短线冲高」, 在上涨趋势里是趋势内加速、在下跌趋势里是反弹撞阻力,
- * 位置那一层分不出来。**摆在明面上而不是塞进悬停**: R193 的教训是一列 80 行
- * 是用来扫的, 扫的时候没人会悬停。未确认的事件用虚一档的颜色, 因为
- * 「突破尝试」与「突破站稳」差的就是那两天。
- */
-/**
- * [R246] 天数徽标: `已N天`, 是下界时加 `+`。
- *
- * 「已」字不是修饰, 是这句话的全部意思 —— 光写「候选池 25天」可以读成"历史上
- * 累计 25 天处于候选池", 而这里说的是"已经**连着** 25 天"。一字之差是两个数。
- *
- * `+` = 数到头了(序列到尽头, 或再往前那天算不出来), 真实天数只多不少。
- */
-function Days({ d }: { d?: { days?: number; since?: string; capped?: boolean } | null }) {
-  if (!d?.days) return null
-  return (
-    <span className="ml-0.5 opacity-70"
-          title={d.since ? `自 ${d.since} 起, 连着 ${d.days} 个交易日${d.capped ? '以上' : ''}。中间断一天就从头重新起算` : undefined}>
-      已{d.days}天{d.capped ? '+' : ''}
-    </span>
-  )
-}
 
-
-function VerdictInner({ v, ev, geo, runs, energy, ph, stateRun, onOpen }: {
-  v?: KeltnerVerdict | null
-  /** [R246] 没结论那一格的时长 */
-  stateRun?: { days: number; since?: string; capped?: boolean } | null
-  ev?: ChannelEvent | null
-  geo?: ChannelGeometry | null
-  runs?: ChannelRuns | null
-  energy?: BandEnergy | null
-  ph?: ChannelPhase | null
-  onOpen: () => void
-}) {
-  // [R217] 事件那一行**不在这里出了**。用户: 「每一列的内容应该就是一部分,
-  // 而不是内容上面一部分下面一部分」—— 原来这一列会摞到五层(结论徽标 / 事件行 /
-  // 怎么办徽标 / 两行折行的理由 / 另有 N 处), 每行高度还不一样, 于是上一行的
-  // 尾巴挂到下一行的表头底下, 行与行糊成一片。
-  // 现在整列固定两行, 事件并进第二行那句话里 —— [R307] 那一半已经拆去 `PlayCell`。
-  if (!v) {
-    // [R203] 底层在三格上返回「无结论」, 其中**两格是有信息的**:
-    // 「中中上」= 长期到了上沿而中短期都休整完了, 「中中下」= 长期到了下沿
-    // 而中短期已经企稳。它们正是「大级别位置到了、等一个入场点」的另一半。
-    //
-    // 底层是禁止改的, 所以这里不去改判定 —— 改的是**显示**: 补充层已经给这
-    // 两格写了注记, 那就把注记的标题当徽标摆出来, 而不是一个 "—"。
-    // 只有「中中中」是真的零信息(价格在三条通道都认可的区间里), 它照旧显示 "—"。
-    const note = ev?.combo_note
-    return (
-        <button
-          onClick={onOpen}
-          className={note
-            ? 'inline-flex cursor-pointer whitespace-nowrap rounded border border-border bg-elevated/60 px-1 py-0.5 text-[12px] text-secondary transition-colors hover:brightness-125'
-            : 'cursor-pointer text-[12px] text-muted/40 hover:text-sky-300'}
-          title={(note
-            ? `${note.title}:${note.detail}\n\n底层判定在这一格是空的 —— 这句话来自补充层。`
-            : '三档都在通道中部 —— 位置上真的没有可说的, 听趋势和信号的')
-            + '。点击翻这只票过去出过哪些档位'
-            + geoLines(geo, ev, runs, energy, ph)}
-        >
-          {/* [R256] 「中中中」那一格原来印一个光秃秃的 `—`, 旁边却跟着「已N天」——
-              读起来是「什么都没有, 已经 1 天」。用户: 「有的个股怎么没显示完整」。
-              27 种组合里**只有这一格**是这样(120 格有结论、4 格有补充层注记)。
-              它其实是有含义的: 价格落在三条通道都认可的公共区间里 —— 那不是
-              「没数据」, 是「位置上没有可说的」。给它一个名字, 与别的格一致。
-              **底层判定一个字没动**, 改的只是这一格印什么(与 R203 同一条路子)。 */}
-          {note ? note.title : '通道中部'}
-          <Days d={stateRun} />
-        </button>
-    )
-  }
-  return (
-      <VerdictHover v={v} note={"点击摊开这只票过去每一档 —— 出现在哪几天、当时说了什么、之后走成什么样。"
-        + geoLines(geo, ev, runs, energy, ph)}>
-        <button
-          onClick={onOpen}
-          className={`inline-flex cursor-pointer whitespace-nowrap rounded border px-1 py-0.5 text-[12px] transition-colors hover:brightness-125 ${VERDICT_CLS[v.tone]}`}
-        >
-          {v.title}
-          <Days d={v} />
-        </button>
-      </VerdictHover>
-  )
-}
-
-// ===== [R46] 自包含 HTML 导出 =====
-// 只导出「结论」列有内容的行 —— 三档都在通道中部的票没有位置信息,
-// 导出来只是占地方。导出件里第一行就写清导出了几只、总共几只, 免得
-// 看到 148 只自选导出 4 行时以为漏了。
-//
-// 与今日总览的导出同一套排版: 浅色、内联样式、无脚本无外链, 存档/打印/
-// 转发都不依赖这个应用。
 
 
 
@@ -574,52 +469,107 @@ function PlaybookInner({ p }: { p?: Playbook | null }) {
 }
 
 /**
- * [R212 → R307] **拆回两列: 「档位」只说位置, 「怎么办」独立成列。**
+ * [R212 → R307 → R308] 「位置」列 —— **只有两个原始读数, 没有那十档判定。**
  *
- * 用户: 「这一列我只想看位置, 表示位置」;「位置列也是, 都围绕位置展开」。
+ * 用户: 「关于位置列, 我只需要知道当前短期通道位置和短中长的轨道组合, 其他不关心」。
  *
- * R212 是用户自己要求合的(「怎么办和贵不贵合成为一列叫做结论」), 那时这一列
- * 叫「结论」—— 两样东西都是结论, 合得通。R306 改名成「档位」之后前提变了:
- * **「怎么办」不是档位**, 它是五套判定合成的动作, 跟这一列的名字对不上。
+ * ## 为什么这么砍是站得住的
  *
- * 拆开之后「档位」列里是一条干净的线 —— 「这一档 + 它的刻度」:
+ * R296 穷举 125 种三档位置证过: 那十档判定是**这个三字码的纯函数** —— 同一个
+ * 码永远给同一档, 零冲突。也就是说**三字码里的信息一点不比那一档少**, 判定只是
+ * 替人把它翻译了一遍。用户不要那层翻译, 要坐标本身 —— 那就给坐标, 不丢东西。
  *
- *     短线冲高 已1天+ │ 刚起步      ← 哪一档 · 待了多久 · 这一段走多远
+ * 于是这一格只剩:
  *
- * 而「怎么办」那一列拿走动作那一半(动作 · 这个判断还稳不稳 · 事件与理由)。
+ *     贴上轨 92%      ← 短期通道位置(0=贴下轨, 100=贴上轨; 轨外会出界)
+ *     上中下          ← 短/中/长各在自己通道的哪一侧
  *
- * **没有删掉任何东西** —— 决策台上「怎么办」是唯一的行动指引(R209 把标的列里
- * 那份重复的删掉之后就只剩它), 删了这张表就只剩读数没有结论。
+ * 判定那一档没有消失, 只是不在这张表上: 点开就是复盘的「通道档位」页, 那里有
+ * 逐日的档位、按档位买卖、以及 27 种三档组合的全谱。
+ *
+ * ## 列名回到「位置」而且**不再撞名**
+ *
+ * R306 那次撞名是因为拿「通道位置」去命名**那十档判定**, 而打分系统里
+ * `channel_pct` 早就叫这个。现在这一列印的**就是** `channel_pct` 那个读数 ——
+ * 两处指的是同一件事, 叫同一个名字正好是对的。
+ *
+ * ## 三字码逐字上色, 但**不在前端拼码**
+ *
+ * 码由后端 `combo_code` 给(R294: 拼法只许一处定义)。这里只是把**给定的字符串**
+ * 按字上色 —— 上=红侧 / 下=蓝侧, 与时间轴那条位置带同一套色相(`POS_TEXT`
+ * 与 `POS_FILL` 紧挨着放, 防漂移)。等宽字体让整列的码上下对齐, 一眼扫得出
+ * 哪几只票在同一格。
  */
-export function PositionCell({ v, ev, geo, runs, energy, ph, stateRun, onOpen }: {
-  v?: KeltnerVerdict | null
-  /** [R246] 没档位那一格的时长 */
-  stateRun?: { days: number; since?: string; capped?: boolean } | null
-  ev?: ChannelEvent | null
+export function PositionCell({ kc, geo, ev, runs, energy, ph, stateRun, onOpen }: {
+  kc?: { s?: KeltnerBand; m?: KeltnerBand; l?: KeltnerBand } | null
   geo?: ChannelGeometry | null
+  ev?: ChannelEvent | null
   runs?: ChannelRuns | null
   energy?: BandEnergy | null
   ph?: ChannelPhase | null
+  /** [R246 → R308] 这一格连着多久。**它量的就是三档组合那一格** ——
+      `state_run` 后端是按 `state_key(bands)` 数的, 换句话说换了组合才重新计数。
+      R308 砍掉十档判定之后它在前端一度没人要了; 不印等于把一个后端还在算的
+      数悄悄丢掉(R246/R248 栽过两次的正是"字段静默消失"), 所以它跟着组合
+      进悬停 —— 不占正文的行, 用户要的两个读数一个不多。 */
+  stateRun?: { days: number; since?: string; capped?: boolean } | null
   onOpen: () => void
 }) {
+  const s = kc?.s
+  const combo = geo?.combo ?? null
+  const tip = [
+    s ? `短期通道 ${s.pos_cn} —— 通道内位置 ${Math.round(s.pct * 100)}%`
+        + '(0 = 贴下轨, 100 = 贴上轨; 出了轨会小于 0 或大于 100)'
+      : '短期通道这一档今天算不出来',
+    s ? `短期通道区间 ${s.lower.toFixed(2)} ~ ${s.upper.toFixed(2)}` : '',
+    '',
+    combo
+      ? `三档组合「${combo}」—— 短 / 中 / 长各在自己通道的哪一侧`
+        + (stateRun ? `, 已连着 ${stateRun.days} 天${stateRun.capped ? '以上' : ''}`
+                      + (stateRun.since ? `(自 ${stateRun.since} 起)` : '') : '')
+      : '三档里缺了一档, 这个组合今天定不了(不是"罕见组合", 是算不出来)',
+    ...(['s', 'm', 'l'] as const)
+      .map((k, i) => {
+        const b = kc?.[k]
+        return b ? `  ${'短中长'[i]}期 ${b.pos_cn}(${b.lower.toFixed(2)} ~ ${b.upper.toFixed(2)})` : ''
+      }),
+    '',
+    '点开:通道档位(逐日档位 / 按档位买卖 / 27 种三档组合)',
+  ].filter(Boolean).join('\n') + geoLines(geo, ev, runs, energy, ph)
+
   return (
-    <td className={`${TD_BASE} px-2`}>
-      {/* [R299] 判定靠右、刻度靠左, 中间那条缝是一条真的竖线 —— 于是"居中"
-          有了依据, 而不是每行各自居中。
-          [R307] 拆成两列之后这里只剩**一行**, 那条中轴仍然留着: 它让同一列
-          上下几十行的徽标右边缘对齐、刻度左边缘也对齐, 一眼扫得下来。 */}
-      <div className="mx-auto grid w-fit grid-cols-[max-content_max-content] items-baseline leading-snug">
-        <span className="justify-self-end">
-          <VerdictInner v={v} ev={ev} geo={geo} runs={runs} energy={energy} ph={ph}
-                        stateRun={stateRun} onOpen={onOpen} />
-        </span>
-        {/* 「走到哪一步」**是位置的刻度**(这一段走了多远), 所以它留在这一列;
-            「快慢」是动量, 跟着「怎么办」走了。 */}
-        <Qualifier text={ph?.maturity_cn} title={MATURITY_TIP} />
-      </div>
+    <td className={`${TD_BASE} whitespace-nowrap px-1.5`}>
+      <button type="button" onClick={onOpen} title={tip}
+              className="mx-auto flex w-full cursor-pointer flex-col items-center gap-0.5 rounded-btn px-1 py-0.5 leading-snug transition-colors duration-hover hover:bg-elevated/40">
+        {s ? (
+          <span className="whitespace-nowrap text-[12px]">
+            <span className={POS_TEXT[s.pos] ?? 'text-muted'}>{s.pos_cn}</span>
+            {/* 百分比**跟着位置走同一个色** —— 两个数说的是同一件事, 分色会
+                让人以为是两个读数。等宽 + tabular-nums, 整列小数点对齐。 */}
+            <span className={`ml-1 font-mono tabular-nums ${POS_TEXT[s.pos] ?? 'text-muted'} opacity-70`}>
+              {Math.round(s.pct * 100)}%
+            </span>
+          </span>
+        ) : <span className="text-[12px] text-muted/30">—</span>}
+        {combo ? (
+          <span className="font-mono text-[11px] tracking-[0.15em]">
+            {combo.split('').map((ch, i) => (
+              <span key={i} className={COMBO_CHAR[ch] ?? 'text-muted'}>{ch}</span>
+            ))}
+          </span>
+        ) : (
+          /* [R294] 「定不了」与「没进过这一格」是两件事 —— 这里是前者:
+             三档缺了一档算不出来, 不是这个组合罕见。混成一句的话数据缺失
+             会被读成"这是个稀有位置"。 */
+          <span className="text-[10px] text-muted/40" title="三档里缺了一档, 算不出组合">
+            组合定不了
+          </span>
+        )}
+      </button>
     </td>
   )
 }
+
 
 
 /**
@@ -658,8 +608,16 @@ export function PlayCell({ p, ev, geo, ph }: {
       <div className="mx-auto flex w-full max-w-[17rem] flex-col items-center gap-y-0.5 leading-snug">
         <div className="grid grid-cols-[max-content_max-content] items-baseline">
           <span className="justify-self-end"><PlaybookInner p={p} /></span>
-          <Qualifier text={ph?.pace_cn} title={PACE_TIP}
-                     cls={PACE_CLS[geo?.accel?.level ?? ''] ?? 'text-muted'} />
+          {/* [R308] 「走到哪一步」从「位置」列搬过来 —— 用户把那一列收成了两个
+              原始读数(短期位置 + 三档组合), 而这个读数**不是位置**, 它是
+              「这一段走了多远」。它和「快慢」本来就是同一列(R277 的「进度」),
+              在这儿重新凑到一起: 一个说走了多远, 一个说还有没有劲。
+              **不是删掉** —— 用户只说了位置列不要它, 没说不要它。 */}
+          <span className="flex items-baseline">
+            <Qualifier text={ph?.maturity_cn} title={MATURITY_TIP} />
+            <Qualifier text={ph?.pace_cn} title={PACE_TIP}
+                       cls={PACE_CLS[geo?.accel?.level ?? ''] ?? 'text-muted'} />
+          </span>
         </div>
         {/* [R255 → R307] 从"整段折行"改回**单行截断**。用户第三次指着这一格说
             「排版还是非常有问题」。

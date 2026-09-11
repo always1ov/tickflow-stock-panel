@@ -241,19 +241,31 @@ def test_十条结论没有一条被排除在天数之外():
 
 def test_徽标上写的是_已N天_不是历史累计():
     """「已」字不是修饰, 是这句话的全部意思 —— 「候选池 25天」可以读成"历史上
-    累计 25 天", 而这里说的是"已经**连着** 25 天"。一字之差是两个数。"""
+    累计 25 天", 而这里说的是"已经**连着** 25 天"。一字之差是两个数。
+
+    [R308] 判定那一层整个离开了决策台(那一列只剩两个位置读数), 所以这条跟着
+    搬到它现在长的地方: 复盘的「通道档位」页。**写法一个字没改** —— 搬家时
+    顺手换个说法正是这条要防的。
+    """
     import pathlib
 
-    p = (pathlib.Path(__file__).resolve().parents[2] / "frontend" / "src"
-         / "components" / "stock-analysis" / "decision-board" / "cells.tsx")
-    if not p.exists():
+    root = (pathlib.Path(__file__).resolve().parents[2] / "frontend" / "src"
+            / "components" / "stock-analysis")
+    if not root.exists():
         import pytest
         pytest.skip("拿不到前端源码(只跑后端时正常)")
-    src = "\n".join(ln for ln in p.read_text(encoding="utf-8").splitlines()
-                    if not ln.lstrip().startswith(("//", "*", "/*")))
-    assert "已{d.days}天{d.capped ? '+' : ''}" in src, "徽标没按统一写法渲染天数"
-    assert "<Days d={v} />" in src, "有结论那一格没渲染天数"
-    assert "<Days d={stateRun} />" in src, "没结论那一格没渲染天数"
+
+    def _code(rel: str) -> str:
+        return "\n".join(ln for ln in (root / rel).read_text(encoding="utf-8").splitlines()
+                         if not ln.lstrip().startswith(("//", "*", "/*")))
+
+    dlg = _code("StockReviewDialog.tsx")
+    assert "已{now.days}天{now.capped ? '+' : ''}" in dlg, "徽标没按统一写法渲染天数"
+    assert "连着" in dlg, "悬停里没说清那是「连着」多少天"
+
+    # [R308] 反面: 决策台上不许再有一份 —— 同一个数两处写法就会漂
+    board = _code("decision-board/cells.tsx")
+    assert "已{" not in board, "决策台又印起「已N天」了 —— 判定连同它的时长在复盘页"
 
 
 # ===== [R248] 徽标上有一档, 就一定有天数 =====
@@ -423,22 +435,41 @@ def test_R256_端到端_日线滞后不再少数一天():
 def test_R256_三档都在中部那一格也有名字():
     """用户: 「有的个股怎么没显示完整」, 箭头指的是印着 `—` 的那两行。
 
-    27 种组合里**只有这一格**是光秃秃的(120 格有结论、4 格有补充层注记)。
+    27 种组合里**只有这一格**判不出结论(120 格有结论、4 格有补充层注记)。
     它其实有含义: 价格落在三条通道都认可的公共区间里 —— 那不是「没数据」,
     是「位置上没有可说的」。**底层判定一个字没动**, 改的只是这一格印什么。
+
+    [R256] 当时的办法是给它补一个名字「通道中部」, 顶在判定徽标的位置上。
+    [R308] 判定徽标从决策台撤了, 这一格现在印的是**三字码本身** ——
+    「中中中」比「通道中部」说得还准(它连是哪三档都写着), 而且它是所有 27 格
+    共用的同一种写法, 不是给这一格开的特例。**病没回来**: 那一行仍然不会
+    是光秃秃的 `—`。
+
+    所以这条守的东西一个字没变 —— 「中中中」必须有字, 而且必须**不是**
+    「算不出来」那句话(数据缺失与"位置上没得说"是两件事, R294 钉过)。
     """
     import pathlib
 
-    p = (pathlib.Path(__file__).resolve().parents[2] / "frontend" / "src"
-         / "components" / "stock-analysis" / "decision-board" / "cells.tsx")
-    if not p.exists():
+    root = (pathlib.Path(__file__).resolve().parents[2] / "frontend" / "src"
+            / "components" / "stock-analysis")
+    if not root.exists():
         import pytest
         pytest.skip("拿不到前端源码(只跑后端时正常)")
-    body = "\n".join(ln for ln in p.read_text(encoding="utf-8").splitlines()
+    body = "\n".join(ln for ln in (root / "decision-board" / "cells.tsx")
+                     .read_text(encoding="utf-8").splitlines()
                      if not ln.lstrip().startswith(("//", "*", "/*", "{/*")))
-    assert "note.title : '通道中部'" in body, (
-        "「中中中」那一格又变回光秃秃的 `—` 了 —— 旁边还跟着「已N天」, "
-        "读起来是「什么都没有, 已经 1 天」"
+    pos = body[body.index("export function PositionCell"):body.index("export function PlayCell")]
+    # 「中中中」走的是 `combo` 那条路(它不为空), 所以印的是码本身
+    assert "combo.split('')" in pos, (
+        "「中中中」那一格又没字了 —— 三档都在中部时 `verdict` 本来就是 null, "
+        "只有码本身还认得出这一格"
+    )
+    # 反面: 不许把它并进「算不出来」那一支(R294)
+    fallback = pos[pos.index("combo ? ("):]
+    assert "组合定不了" in fallback, "「算不出来」那一支没了"
+    assert body.count("组合定不了") == 1, (
+        "「算不出来」的说法不止一处 —— 它和「中中中」混起来的话, "
+        "数据缺失会被读成「这是个稀有位置」"
     )
 
 
