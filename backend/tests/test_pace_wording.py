@@ -280,15 +280,13 @@ def test_R278_界面上那句不进把握分还在():
 # 配色: 编的是符号, 不是那句话
 # ================================================================
 
-def test_R278_快慢配色按符号取():
-    """按词取色时,「跌势在缓」(a1>0) 和「正在放慢」(a1<0) 都给了琥珀 —— 两个
-    相反的符号一个颜色。按 `level` 取则四个象限全对, 且不需要知道方向。"""
-    from tests.frontend_source import code_of
-    src = code_of("components/stock-analysis/decision-board/cells.tsx")
-    blk = src[src.index("const PACE_CLS"):]
-    blk = blk[:blk.index("}")]
-    for key in ("accel", "decel", "steady"):
-        assert key in blk, f"PACE_CLS 少了 {key}"
-    for word in ("还在加速", "跌得更急", "正在放慢", "跌势在缓"):
-        assert word not in blk, f"PACE_CLS 又按词取色了({word})"
-    assert "PACE_CLS[geo?.accel?.level" in src, "取色没走 level"
+# [R278 → **R310 退役**] `test_R278_快慢配色按符号取` 钉的是前端 `PACE_CLS`
+# ——「颜色编的是符号(a1 的正负), 不是那句话的字面」。
+#
+# **那张配色表随「怎么办」列一起删了**(R310: 用户删掉了那一列, 两个刻度跟着
+# 离场), 而决策台之外唯一还印加速度的地方是今日总览的机会表, 它有意用的是
+# 无彩的 `text-muted` —— 那里不按符号上色是对的, 不是漏了。
+#
+# **所以这条没有可守的对象了, 而不是被绕过去了。** 它那条立论(符号 vs 字面)
+# 由这个文件里另外 17 条守着后端那份判定 —— 说法、阈值、方向判据、中性兜底、
+# 台账存码不存词, 一条都没退。颜色是那份判定的下游, 下游没了, 上游还在。

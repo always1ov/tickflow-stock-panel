@@ -4,7 +4,7 @@
  * [R167] 从 WatchlistDecisionBoard.tsx 拆出。各自带着自己的配色表 —— 配色表是
  * 实现细节, 不该摆在 933 行主文件的顶部让人以为是全局约定。
  */
-import type { BandEnergy, ChannelEvent, ChannelGeometry, ChannelPhase, ChannelRuns, KeltnerBand, Playbook } from '@/lib/api'
+import type { BandEnergy, ChannelEvent, ChannelGeometry, ChannelPhase, ChannelRuns, KeltnerBand } from '@/lib/api'
 import { COMBO_CHAR, POS_TEXT } from '@/lib/reviewTimeline'
 
 /**
@@ -54,24 +54,17 @@ export const NUM = 'font-mono tabular-nums'
 // 不再印那个徽标, 这份配色在本文件没有第二个调用方。复盘弹窗那边有它自己的一份
 // (它那儿还在印徽标), 不是同一处的重复。
 
-
-// [R195] 事件配色。**已确认与未确认必须一眼分得开** —— 「突破尝试」与
-// 「突破站稳」差的就是那两天, 把它们画成一样就是在鼓励追第一天的假突破。
-const EVENT_CLS: Record<string, string> = {
-  main_advance: 'text-red-300 font-medium',      // 主升浪: 五条全中
-  trend_accel: 'text-red-400/85',
-  breakout_hold: 'text-red-400/85',
-  breakout_try: 'text-amber-400/80',             // 未确认 —— 暖色但不实
-  pullback_end: 'text-amber-400/80',
-  coiling: 'text-secondary/80',
-  exhausting: 'text-amber-300',
-  bounce_cap: 'text-emerald-400/85',
-  shakeout: 'text-amber-400/80',
-  breakdown_try: 'text-emerald-400/70',
-  breakdown_hold: 'text-emerald-400/85',
-  none: 'text-muted/40',
-}
-
+// [R310] 「怎么办」列整个删掉了(用户: 「那就删除了怎么办」), 于是跟着它的
+// 这些东西也没了读者, 一并删除 —— 留着就是死代码:
+//
+//   · PlayCell / PlaybookInner / PLAY_CLS  —— 那一列本身与它的徽标配色
+//   · Qualifier / PACE_CLS                 —— 「走到哪一步」「快慢」两个刻度
+//   · MATURITY_TIP / PACE_TIP              —— 上面那两个的悬停说明
+//   · EVENT_CLS                            —— 事件配色(事件本身还在, 见
+//     `geoLines` 里的【事件】—— 那是悬停, 不需要配色)
+//
+// **判定层一个字没动**: `services/stock_playbook.py` 与它那 36 条测试照旧,
+// 接口也照旧返回 `playbook`, 只是前端不再取用。
 /** 几何量摊成悬停里的几行 —— 速度/加速度/压缩/排列, 外加 27 组合的补充注记。 */
 /**
  * [R298] 「现在处在哪一段 · 该盯什么」——**全系统这一处产地。**
@@ -224,55 +217,6 @@ function geoLines(geo?: ChannelGeometry | null, ev?: ChannelEvent | null,
  *   在不同票上是不同颜色, 那是颜色在说另一件事。快慢不一样 —— 它**是**判断
  *   (在往多头还是空头变), 所以按方向上色。
  */
-/**
- * [R278] 快慢的配色**按 `level`(也就是 a1 的符号)取, 不按那句话取**。
- *
- * R277 这里是按词映射的, 其中两个词的颜色与符号是反的:
- * 「跌势在缓」(a1>0) 给了琥珀、「正在放慢」(a1<0) 也给了琥珀。
- *
- * 按符号取则**四个象限全对**, 而且不需要知道方向 —— A 股红涨绿跌:
- *
- *     a1 > 0  往上使劲  → 红   (涨势里=还在加速; 跌势里=跌势在缓, 都是偏多的一侧)
- *     a1 < 0  往下使劲  → 绿   (涨势里=正在放慢; 跌势里=跌得更急, 都是偏空的一侧)
- *
- * 这也正是 `ComboView` 一直在用的规则 —— 那边的颜色从来没错过, 错的只有词:
- * **颜色编的是符号, 词描述的是大小**, 而这个量的意义在符号上。
- */
-const PACE_CLS: Record<string, string> = {
-  accel: 'text-red-400/85',
-  decel: 'text-emerald-400/85',
-  steady: 'text-muted',
-}
-
-// [R297] 「进度」并进「结论」之后, 那两个读数在这里的角色是**刻度而不是结论**,
-// 所以它们不戴徽标: 一行里只有一枚带框的东西, 那枚就是这一行在说的那件事。
-// 成熟度统一次要色(R261: 它是事实读数, 挂条件配色等于让颜色说另一件事);
-// 快慢照旧按 `level` 上色(R278: 它**是**判断 —— 在往多头还是空头变)。
-const MATURITY_TIP = '这一段走到哪一步了(刚起步 / 走到中段 / 走了很长 / 走过头了)。'
-  + '\n量的是这一段走得多远, 不是走了多少天 —— 一只慢牛走三年也可以一直是「刚起步」。'
-  + '\n数字在这一格的悬停里(那一行以 [间距] 开头)。'
-const PACE_TIP = '这个速度还撑不撑得住(还在加速 / 速度平稳 / 正在放慢;跌势里换成跌势在缓 / 跌得更急)。'
-  + '\n它是上一行那个读数的变化率 —— 上面说现在多快, 这里说这个速度在往哪变。'
-  + '\n红=往上使劲, 绿=往下使劲。数字在这一格的悬停里(那一行以 [快慢] 开头)。'
-
-function Qualifier({ text, title, cls = 'text-muted' }: {
-  text?: string | null; title: string; cls?: string
-}) {
-  // [R299] 缝隙由它自己带(`ml-1.5`), 不由网格的 `gap-x` 给 —— 没有刻度的时候
-  // 那道缝会把整格挤偏, 而这一列本来就该是"有就贴上、没有就当它不存在"。
-  // 空的时候仍要占住格子(返回 `null` 会让下一行的徽标补进来, 整个错位)。
-  if (!text) return <span aria-hidden />
-  return (
-    <span className={`ml-1.5 justify-self-start whitespace-nowrap text-[11px] ${cls}`}
-          title={title}>{text}</span>
-  )
-}
-
-// [R277 加, R297 删] `SpreadCell`(「进度」那一列的单元格)在这里删掉了。
-// 它的两个读数分别并进了 `PositionCell`(走到哪一步)与 `PlayCell`(快慢), 悬停里的
-// 数字本来就已经在「结论」列的 `geoLines()` 里(`[间距]` 与 `[快慢]` 两行)——
-// **那份重复是这次合并顺带清掉的**: 同一个量原来一列印档位、另一列悬停印数字。
-
 /**
  * 「走势」列 —— 一只票的方向, 两套判定叠在一格里。
  *
@@ -436,38 +380,6 @@ export function ChannelStateCell({ trend, geo, runs, ph, kc, close, trendCls,
 
 // [R205] 「怎么办」配色。**只有两档是红的** —— 纪律已破和今天已触发。
 // 分歧档刻意用琥珀而不是红: 它说的是"别动", 不是"快动", 用红会被读反。
-const PLAY_CLS: Record<string, string> = {
-  danger: 'border-red-400/45 bg-red-400/10 text-red-400',
-  warn: 'border-amber-400/40 bg-amber-400/10 text-amber-300',
-  info: 'border-sky-400/30 bg-sky-400/[0.07] text-sky-300',
-  muted: 'border-border/50 text-muted/50',
-}
-
-/**
- * [R205] 「怎么办」列 —— **整张表唯一的收敛层**, 所以放在最左边。
- *
- * 决策台上有五套彼此平行的判定(该动了 / 六态 / 通道档位 / 通道阶段 / AI 信号),
- * 每一套单独看都对, 摆在一起就是让用户每天在脑子里做一次五路合成。这一列
- * 替他做完那次合成: 一句话说该怎么办, 一行小字说凭什么。
- *
- * **最值钱的是「先别动」那一档。** 系统原来从不说这五套什么时候互相矛盾 ——
- * 而那恰恰是最该停手的时刻, 却是最容易被忽略的时刻(界面把它们并排摆着,
- * 谁都不提一句)。分歧档刻意排在「逼近」之前: 「还差 1.2% 到买点」这种话
- * 会诱人下手, 判定打架时不该让它出现在标题上。
- *
- * 这一列**不产生任何新判定** —— 每句话都能追到某一层的原话。
- */
-function PlaybookInner({ p }: { p?: Playbook | null }) {
-  if (!p) return <span className="text-[12px] text-muted/30">—</span>
-  return (
-      <span className={`inline-flex whitespace-nowrap rounded border px-1.5 py-0.5 text-[12px] ${PLAY_CLS[p.tone] ?? PLAY_CLS.muted}`}
-            title={[p.why, p.note].filter(Boolean).join('\n\n')}>
-        {p.headline}
-        {p.price != null && <span className="ml-1 font-mono tabular-nums opacity-80">{p.price.toFixed(2)}</span>}
-      </span>
-  )
-}
-
 /**
  * [R212 → R307 → R308] 「位置」列 —— **只有两个原始读数, 没有那十档判定。**
  *
@@ -572,72 +484,3 @@ export function PositionCell({ kc, geo, ev, runs, energy, ph, stateRun, onOpen }
 
 
 
-/**
- * [R307] 「怎么办」列 —— 五套判定合成的那一句动作。
- *
- * 两行:
- *
- *     该止盈了 41.20 │ 正在放慢       ← 今天该干嘛 · 这个判断还稳不稳
- *     突破确认? · 生命线跌破 399.85    ← 事件 · 理由(单行截断, 全文在悬停)
- */
-export function PlayCell({ p, ev, geo, ph }: {
-  p?: Playbook | null
-  ev?: ChannelEvent | null
-  geo?: ChannelGeometry | null
-  ph?: ChannelPhase | null
-}) {
-  const evOn = ev && ev.code !== 'none'
-  const more = p && p.conflicts.length && p.level !== 'conflict'
-  // [R299] 第二行**只在真有话说的时候才出现**。「没事」那一档的 `why` 已经在
-  // 后端挪进 `note` 了, 于是这一行自然消失 —— 一张 166 行的表里, 没事的那些行
-  // 不该和要动的一样占两行。这里**不判断档位**, 只判断"有没有内容":
-  // 判据留在后端一处(R286), 前端再写一个 `level === 'idle'` 就是两处定义。
-  const line2 = [
-    evOn ? `${ev!.cn}${ev!.confirmed ? '' : '?'}` : '',
-    p?.why || '',
-    more ? `(另有 ${p!.conflicts.length} 处判定不一致)` : '',
-  ].filter(Boolean).join(' · ')
-  const tip = [
-    evOn ? `${ev!.cn}${ev!.confirmed ? '' : '(未确认)'} —— ${ev!.why}` : '',
-    p?.why || '',
-    p?.note || '',
-    more ? '另有判定不一致:\n' + p!.conflicts.join('\n') : '',
-  ].filter(Boolean).join('\n\n')
-  return (
-    <td className={`${TD_BASE} px-2`}>
-      <div className="mx-auto flex w-full max-w-[24rem] flex-col items-center gap-y-0.5 leading-snug">
-        <div className="grid grid-cols-[max-content_max-content] items-baseline">
-          <span className="justify-self-end"><PlaybookInner p={p} /></span>
-          {/* [R308] 「走到哪一步」从「位置」列搬过来 —— 用户把那一列收成了两个
-              原始读数(短期位置 + 三档组合), 而这个读数**不是位置**, 它是
-              「这一段走了多远」。它和「快慢」本来就是同一列(R277 的「进度」),
-              在这儿重新凑到一起: 一个说走了多远, 一个说还有没有劲。
-              **不是删掉** —— 用户只说了位置列不要它, 没说不要它。 */}
-          <span className="flex items-baseline">
-            <Qualifier text={ph?.maturity_cn} title={MATURITY_TIP} />
-            <Qualifier text={ph?.pace_cn} title={PACE_TIP}
-                       cls={PACE_CLS[geo?.accel?.level ?? ''] ?? 'text-muted'} />
-          </span>
-        </div>
-        {/* [R255 → R307] 从"整段折行"改回**单行截断**。用户第三次指着这一格说
-            「排版还是非常有问题」。
-
-            R255 换成折行时这一列是**左对齐**的, 而且那时 `why` 还拖着规则层的
-            说教(R307 已经拆进悬停, 一句 74 字的剩了 23 字)。居中 + 多行 +
-            每行长度不一 = 几行各自一个宽度, 上面那条中轴全白对了。
-
-            **而且那一行原来在网格里**(`col-span-2`), 于是它一长就把两列撑开,
-            徽标跟着被推散 —— `max-w` 挡不住: `max-content` 先按内容算宽再被裁,
-            裁掉的是内容不是布局。现在它是网格**外面**的同级块, 铺满整格宽度、
-            单行截断, 行高从此固定。**信息一个字没丢**: 全文在悬停里。 */}
-        {line2 && (
-          <div className={`w-full truncate text-center text-[11px] leading-snug ${
-            evOn ? EVENT_CLS[ev!.code] ?? 'text-muted' : 'text-muted'}`}
-               title={tip}>
-            {line2}
-          </div>
-        )}
-      </div>
-    </td>
-  )
-}

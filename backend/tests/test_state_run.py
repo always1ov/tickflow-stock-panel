@@ -458,7 +458,11 @@ def test_R256_三档都在中部那一格也有名字():
     body = "\n".join(ln for ln in (root / "decision-board" / "cells.tsx")
                      .read_text(encoding="utf-8").splitlines()
                      if not ln.lstrip().startswith(("//", "*", "/*", "{/*")))
-    pos = body[body.index("export function PositionCell"):body.index("export function PlayCell")]
+    # [R310] 锚在**自己**身上, 不再切到隔壁 —— 隔壁那个 `PlayCell` 已经删了,
+    # 而这种"锚在邻居上"的写法 R310 一次打掉了 9 处。
+    i = body.index("export function PositionCell")
+    j = body.find("\nexport function ", i + 1)
+    pos = body[i:] if j == -1 else body[i:j]
     # 「中中中」走的是 `combo` 那条路(它不为空), 所以印的是码本身
     assert "combo.split('')" in pos, (
         "「中中中」那一格又没字了 —— 三档都在中部时 `verdict` 本来就是 null, "

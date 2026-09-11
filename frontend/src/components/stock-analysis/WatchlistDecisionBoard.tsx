@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Star, Wallet, Sparkles, Loader2, ArrowUp, ArrowDown, RefreshCw, FileText, Download, Bell, ChevronDown, Folder, Inbox, List } from 'lucide-react'
-import { api, type ChannelEvent, type ChannelPhase, type EffectivePosition, type Playbook, type ExitLine, type KeltnerBands, type TrendInfo, type Urgency } from '@/lib/api'
+import { api, type ChannelEvent, type ChannelPhase, type EffectivePosition, type ExitLine, type KeltnerBands, type TrendInfo, type Urgency } from '@/lib/api'
 // [R276] 分组下拉直接复用「加入自选」那个菜单 —— 定位/键盘/点外面关闭/配色全都现成
 import { WatchlistGroupMenu } from '@/components/WatchlistAddMenu'
 import { resolveWatchlistGroupColor } from '@/lib/watchlist-group-colors'
@@ -17,7 +17,7 @@ import { storage } from '@/lib/storage'
 import { buildBoardHtml } from '@/lib/decisionBoardHtmlExport'
 import { DEFAULT_EXPORT_KEYS } from '@/lib/decisionBoardExportColumns'
 import { ExportColumnsDialog } from '@/components/stock-analysis/decision-board/ExportColumnsDialog'
-import { ChannelStateCell, PositionCell, PlayCell, NUM, TD_BASE } from '@/components/stock-analysis/decision-board/cells'
+import { ChannelStateCell, PositionCell, NUM, TD_BASE } from '@/components/stock-analysis/decision-board/cells'
 import { LotsLink } from '@/components/stock-analysis/decision-board/LotsLink'
 // [R169] 合并视图(手填 ⊕ 上游批次登记), 字段说明见 api.ts 的 EffectivePosition
 type Position = EffectivePosition
@@ -46,7 +46,9 @@ type Signal = { signal: string; confidence: number; reason: string; close: numbe
 //   · cost   —— 按成本价排 166 只票没有任何决策含义
 //   · report —— 「上次 AI 分析是什么时候」不是决策输入; 胶囊照旧可点开
 // 合并后的「持仓」列排 `pnl`(亏最多的先看), 「AI 信号」列照旧排 `signal`。
-type SortKey = 'urgency' | 'name' | 'changePct' | 'trend' | 'play'
+// [R310] `play` 退役 —— **理由与 R254 当初那一串逐字相同: 它点不到了。**
+// 「怎么办」整列删掉之后它的表头没了, 留着就是死键。
+type SortKey = 'urgency' | 'name' | 'changePct' | 'trend'
   | 'pnl' | 'signal'
 const SIGNAL_RANK: Record<string, number> = { buy: 0, sell: 1, hold: 2, watch: 3 }
 /**
@@ -65,54 +67,39 @@ const SIGNAL_RANK: Record<string, number> = { buy: 0, sell: 1, hold: 2, watch: 3
 const BOARD_COLS = [
   // [R309] 9.5% → 13%。名称原来截在 110px, 五个字以上就带省略号 ——
   // **认票这件事上省 3% 是最亏的**: 认错票之后后面六列全白读。
-  { label: '标的', w: '13%' },
+  { label: '标的', w: '18%' },
   // [R212] 「现价」「涨跌」合成一列。用户: 「这两列合成为『现价/涨跌』这样为一列」。
   // 两个数天生一起读 —— 拆成两列只是让眼睛多跳一次。
-  { label: '现价/涨跌', w: '7%' },
+  { label: '现价/涨跌', w: '10%' },
   // [R212] 「止盈线」那一列撤掉了。用户: 「止盈线这一列不要了」。
   // **信息没丢**: 出场线破了或逼近, 「结论」列会直接判成「按纪律走」/「盯着」
   // 并把线价写在徽标上 —— 那比单独一列更早进视线。排序键与判定都还在。
   // [R211] 「量化通道」(测量) + 「通道态势」(结论) + 「趋势」(六态) 三列并一列。
   // 六态与通道阶段答的是同一个问题(往哪走), 只是方法不同 —— 放一格里,
   // 它们什么时候一致、什么时候打架, 上下一对就看见了。
-  { label: '走势', w: '9.5%' },
+  { label: '走势', w: '20%' },
   // [R277 加, R297 删] 「进度」那一列并进「结论」了。用户: 「个股分析页面的
   // 进度列和结论列看看怎么合并和显示哪些内容」。
-  //
-  // **两列本来就是一层**: 同源(都从 `phase()`/`geo` 出), 而且点开去的是同一个
-  // 地方(复盘弹窗的「通道档位」页)。进度那两个读数是结论的**刻度**, 不是第四条
-  // 结论 —— 与 R211「测量与结论拆两列等于让人左右对眼把结论和它的依据接起来」
-  // 同一条理由, 这次轮到它自己。并法见 cells.tsx 的 `ConclusionCell`:
-  // **行数一行没加**, 两个读数各自并进已有的两行。
-  //
   // [R212] 「贵不贵」(位置) + 「怎么办」(动作) 合成一列, 竖排, 摆在 AI 之前。
-  // 用户: 「贵不贵在上换行怎么办在下」「结论这行放在 ai 分析前一列」。
-  // 顺序是有讲究的: 上面是事实(这个价算贵还是便宜), 下面是结论(所以今天该干嘛)。
-  // [R297] 18% → 21%: 吃掉「进度」5.5% 里的大半, 余下匀给 AI 信号(它吃剩下的)。
-  // 内容上限跟着抬到 23rem —— R283 的教训: 那个上限低于列宽时, 光加列宽没用。
-  // [R307] 21% 一列拆成两列: 「档位」只说位置, 「怎么办」独立。
-  // 用户: 「这一列我只想看位置, 表示位置」。档位那半只有一行(徽标 + 刻度),
-  // 用不了多少宽; 会长的是「怎么办」那一行事件与理由, 宽度给它。
-  // [R308] 「位置」只剩两个短读数, 用不了那么宽; 省下的给「怎么办」——
-  // 会长的是它那一行事件与理由。
-  { label: '位置', w: '7.5%' },
-  // [R309] 16% → 27%。R307 把这一行说明改成单行截断是**被 224px 逼的**,
-  // 不是因为截断更好。给够宽之后它基本不再截断 —— 截断那套机制照旧留着
-  // (行高仍然固定, 全文仍在悬停), 只是轮不上它出场了。
-  { label: '怎么办', w: '27%' },
-  // [R249] 账目三列从「现价」后面挪到这里。用户: 「我有点乱, 是否有好办法整理
-  // 好顺序调整显示和列」。**原来它们把判断切开了** —— 扫表时要连着读
-  // 「走势 → 结论」, 中间却横着三列只有持仓那几只才用得上的账目。
-  // 现在一行从左到右是: 认票 → 凭什么 → 我的账 → 别人的意见。
-  // [R284] **「成本」「浮盈」两列删掉**(用户: 「删除掉浮盈和成本列」), 只留「持仓」。
+  // [R307] 那一列又拆成两列: 「档位」只说位置, 「怎么办」独立。
+  // [R308] 「位置」砍到只剩两个原始读数: 短期通道位置 + 三档组合码。
   //
-  // 它们为 5% 的行占着 9% 的宽度: 持有 8 只 / 自选 166 只 —— 另外 158 行两格全是
-  // 一个 `—`。浮盈是**派生量**(现价与成本一减就有), 模拟盘与持仓页都在算;
-  // 决策台是用来"今天该动哪只"的, 赚了多少不进这个判断。
+  // [R310] **「怎么办」整列删掉。** 用户: 「那就删除了怎么办」(在我把影响列清
+  // 之后)。它是五套判定的收敛层 —— 出场线/六态/通道档位/通道阶段/AI 信号,
+  // 按「纪律 > 时点 > 分歧 > 形态」挑出该说的那一句, 并指出它们互相不一致。
   //
-  // **成本输入框保留, 挪进这一格**(只在持有时长出来): 它不是展示而是**录入**,
-  // 而且是出场线(止盈/止损)的输入 —— 整个删掉等于把那条线的来源砍了一半。
-  { label: '持仓', w: '6%' },
+  // **删掉之后这张表只剩读数, 没有合成的结论**: 走势说方向、位置说坐标、
+  // AI 说别人的意见, 没有一列回答「所以今天我该干嘛」。这是用户看过影响清单
+  // 之后的决定, 不是疏漏 —— 判定层(`services/stock_playbook.py` 与它那 36 条
+  // 测试)一个字没动, 接口照旧返回 `playbook`, 只是界面不再读它。
+  //
+  // **一处真丢的信息已经接住了**: R212 撤「止盈线」那一列时的对价写在这儿 ——
+  // 「信息没丢: 出场线破了或逼近, 结论列会把线价写在徽标上」。查下来 `r.exit`
+  // 在整张表上零个渲染点, 那条线只从「怎么办」的 `price` 露过面。所以它搬进
+  // 「持仓」列 —— 出场线本来就是**关于我这笔仓位**的事, 归「我的账」比归
+  // 「凭什么」更准。
+  { label: '位置', w: '14%' },
+  { label: '持仓', w: '12%' },
   // [R284] 「AI 分析」整列撤掉 —— 用户: 「仅保留对投资决策最具影响力和决定性的
   // 核心数据列」。**它压根不是数据列**: 一枚报告胶囊 + 两个图标按钮, 是操作入口。
   // 三件东西并进「AI 信号」那一列的头一行(与信号徽标、时间同排), 一个不少。
@@ -129,7 +116,11 @@ const BOARD_COLS = [
   //
   // **光给宽度不够**(R283 那一课的又一次): `table-auto` 下内容的 max-content
   // 说了算, 所以真正的闸是单元格里那道 `max-w` + 理由两行截断。两处一起动。
-  { label: 'AI 信号', w: '30%' },
+  // [R310] 30% → 26%。**这不是我想收窄它, 是 R309 那条不变式逼的**:
+  // 「别人的意见不许比自己的判断占得宽」—— 「怎么办」一删, 判断那一侧少了
+  // 27%, 只剩 走势 + 位置 = 34%; AI 原样留着 30% 就会顶到 34% 的脸上。
+  // **守卫昨天刚立, 今天就抓到了这次删除的副作用** —— 这正是它该做的事。
+  { label: 'AI 信号', w: '26%' },
   //
   // [R309] **上面这些宽度加起来必须正好 100%, 而且一列都不许留空。**
   //
@@ -288,7 +279,6 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
    */
   const FIRST_DIR: Record<SortKey, 'asc' | 'desc'> = {
     urgency: 'asc',        // order 越小越急
-    play: 'asc',           // 同上 —— 按纪律走 > 今天就得动 > … > 没事
     signal: 'asc',         // 买入 > 卖出 > 持有 > 观望
     name: 'asc',           // A → Z
     trend: 'desc',         // 值取了负 —— 降序 = 多头在前
@@ -429,8 +419,8 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
   const phases: Record<string, ChannelPhase> = useMemo(
     () => urgencyQ.data?.phase ?? {}, [urgencyQ.data])
   // [R205] 「怎么办」与「该动了」同一趟返回 —— 它就是在那份判定之上再合成一层
-  const plays: Record<string, Playbook> = useMemo(
-    () => urgencyQ.data?.playbook ?? {}, [urgencyQ.data])
+  // [R310] `plays` 那一份不再取用 —— 「怎么办」列删了, 前端没有读者。
+  // **接口照旧返回 `playbook`**(后端判定层一个字没动), 这里只是不接。
 
   // [fork 增强] 持仓出场线(仅持有+填成本的票有;后端顺带把线同步为监控规则)
   const heldWithCost = Object.values(positions).some((p) => p.held && p.cost)
@@ -575,7 +565,6 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
           urg: urgency[symbol],
           ev: events[symbol],
           ph: phases[symbol],
-          play: plays[symbol],
           // [R169] 成本来源与批次信息 —— 让"这个成本是我填的还是批次算的"一眼可辨
           costSource: pos?.cost_source ?? null,
           lotCost: pos?.lot_cost ?? null,
@@ -591,7 +580,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
     // 实际不会串数据(四份都来自同一个 urgencyQ, 一起变), 但漏一个依赖是下一次
     // 拆查询时才会爆的雷, 现在补上不花钱。
   }, [enriched.data, positions, signals, heldOnly, actionableOnly, trends, exitLines,
-      keltner, urgency, events, phases, plays])
+      keltner, urgency, events, phases])
 
   const rows = useMemo(() => scoped.filter((r) => inGroup(r.symbol)), [scoped, inGroup])
 
@@ -642,8 +631,6 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
           const d = r.urg.distance == null ? 999 : Math.min(r.urg.distance * 100, 998)
           return r.urg.order * 1000 + d
         }
-        // [R205] 「怎么办」按急迫程度排 —— order 越小越该先看
-        case 'play': return r.play ? r.play.order : 9
         case 'name': return r.name
         case 'changePct': return r.changePct
         case 'pnl': return r.pnl
@@ -972,23 +959,6 @@ title={'两行, 都是原始读数:\n'
                       + '点开就是复盘的「通道档位」页。'}>
                   位置
                 </th>
-                <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center">
-                  <button onClick={() => cycleSort('play')}
-                          className={`${thBtn} whitespace-nowrap`}
-title={'两行:\n'
-                            + '  ① 今天该干嘛(五套判定合成的一句话) · 这个速度还撑不撑得住\n'
-                            + '  ② 事件 · 理由 · 另有几处判定不一致(单行截断, 全文在悬停)\n\n'
-                            + '「还撑不撑得住」原来是独立的「进度」列 —— 它是这个判断的刻度,\n'
-                            + '不是第二个判定, 所以贴回它修饰的那一行。\n\n'
-                            + '点这里按急迫程度排: 按纪律走 > 今天就得动 > 先别动 > '
-                            + '盯着 > 留意 > 没事。\n'
-                            + '最急在前 → 最闲在前 → 回默认顺序。'}>
-                    {/* [R250] 表头**只印列名**, 不缀当前排序目标 —— 那是把内部
-                        分层摆到表头上。排序照旧, 说明留在悬停里。 */}
-                    怎么办
-                    {caret('play')}
-                  </button>
-                </th>
                 {/* [R284] 账目三列并一列。表头也只剩一个, 排序目标取「浮盈」——
                     「拿没拿」由「只看持有」那个按钮回答, 成本价排序没有决策含义。 */}
                 <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center">
@@ -1070,8 +1040,6 @@ title={'我在这只票上的账: 拿没拿 / 买入成本 / 现在浮盈多少�
                     <PositionCell kc={r.kc} geo={r.kc?.geo} ev={r.ev} runs={r.kc?.runs}
                                   energy={r.kc?.energy} ph={r.ph} stateRun={r.kc?.state_run}
                                   onOpen={() => setReview({ symbol: r.symbol, name: r.name, tab: 'verdict' })} />
-                    {/* [R307] 「怎么办」拿走动作那一半 */}
-                    <PlayCell p={r.play} ev={r.ev} geo={r.kc?.geo} ph={r.ph} />
                     {/* [R284] **账目从三格收成一格。** 用户: 「删除掉浮盈和成本列」。
                         空仓(158/166 行)时这一格只有一个按钮; 持有时才长出成本输入。
                         [R169] 写回时一律用 manualCost 而不是 r.cost —— r.cost 可能是批次
@@ -1111,6 +1079,29 @@ title={'我在这只票上的账: 拿没拿 / 买入成本 / 现在浮盈多少�
                             ? <LotsLink symbol={r.symbol} lotCount={r.lotCount} driftPct={null} lotCost={null} stale />
                             : null
                         )}
+                        {/* [R212 → R310] **出场线的价格回到界面上。**
+
+                            R212 撤掉「止盈线」那一列时写下的对价是: 「信息没丢 ——
+                            出场线破了或逼近, 结论列会把线价写在徽标上」。R310 删掉
+                            那一列之后这句话就没人兑现了: 查过 `r.exit` 在整张表上
+                            **零个渲染点**, 那条线只从 `play.price` 露过面。
+
+                            旁边那个成本输入框的提示写着「出场线按它算」—— 不接住
+                            它的话, 你填的成本会算出一条**你再也看不到的线**。
+
+                            归「持仓」而不是别处: 出场线是**关于我这笔仓位**的事
+                            (它按我的成本、我的持有天数算), 属于「我的账」。
+                            只在持有且真有线时才长出来 —— 166 行里就那几行。 */}
+                        {r.held && r.exit && (
+                          <span className={`whitespace-nowrap text-[11px] ${
+                            r.exit.triggered ? 'text-red-400' : 'text-muted/70'}`}
+                                title={`${r.exit.stage_cn} —— ${r.exit.line_cn} ${r.exit.line.toFixed(2)}\n`
+                                       + `${r.exit.triggered ? '已破' : `还差 ${r.exit.distance_pct.toFixed(1)}%`}\n\n`
+                                       + r.exit.action}>
+                            {r.exit.line_cn}
+                            <span className={`ml-1 ${NUM}`}>{r.exit.line.toFixed(2)}</span>
+                          </span>
+                        )}
                       </div>
                     </td>
                     {/* AI 信号:徽标 + 时间 + 理由整段换行(不截断)。
@@ -1125,7 +1116,7 @@ title={'我在这只票上的账: 拿没拿 / 买入成本 / 现在浮盈多少�
                           (实测把整张表的一半占了去)。列宽与内容上限必须一起动,
                           这是 R283 那一课的又一次。 */}
                       {r.sig ? (
-                        <div className="flex w-full max-w-[27rem] flex-col gap-0.5">
+                        <div className="flex w-full max-w-[23rem] flex-col gap-0.5">
                           <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
                             <span className={`text-[12px] px-1.5 py-0.5 rounded border ${SIGNAL_META[r.sig.signal]?.cls ?? 'border-border text-muted'}`}>
                               {SIGNAL_META[r.sig.signal]?.label ?? r.sig.signal}

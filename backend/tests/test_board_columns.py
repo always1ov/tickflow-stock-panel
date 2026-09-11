@@ -29,6 +29,55 @@ def _src() -> str:
     return _BOARD.read_text(encoding="utf-8")
 
 
+def _strip_title(jsx: str) -> str:
+    """剥掉 JSX 里所有 `title={...}`, 只留**印出来**的部分。
+
+    [R310] **正则在这儿不够用。** `_headers()` 那一版用的是
+    `re.sub(r"\\{[^{}]*\\}", "", …)` 反复剥几遍, 对付简单表达式够了; 而出场线
+    那个 title 是**模板串套模板串**(`` `${a ? '已破' : `还差 ${b}%`}` ``),
+    嵌套三层, 正则剥不干净 —— 于是断言读到的是 title 里那份复述, 把**印出来**
+    的价格删掉照样绿。这是 R310 变异电池当场逼出来的。
+
+    所以这里真的数括号配对。
+    """
+    out, i = [], 0
+    while True:
+        j = jsx.find("title={", i)
+        if j == -1:
+            out.append(jsx[i:])
+            return "".join(out)
+        out.append(jsx[i:j])
+        k, depth = j + len("title={") - 1, 0
+        while k < len(jsx):
+            if jsx[k] == "{":
+                depth += 1
+            elif jsx[k] == "}":
+                depth -= 1
+                if depth == 0:
+                    break
+            k += 1
+        i = k + 1
+
+
+def _cell(fn: str) -> str:
+    """[R310] 某个单元格组件的源码(已剥注释)。
+
+    **这是本仓库栽得最多的那个坑的收口。** 以前每条守卫各写一遍
+    `code[code.index("export function A"):code.index("export function B")]` ——
+    锚在**隔壁那个组件**上。隔壁一改名、一搬家、一删除, 这些断言要么 ValueError
+    (还算走运, 至少红了), 要么悄悄把范围扩到文件末尾然后**照样绿**(R261 那条
+    就是这么假绿了一轮)。R310 删「怎么办」一次打掉 9 处。
+
+    改成锚在**自己**身上: 从自己开始, 切到下一个顶层 `export function`(或文件
+    末尾)。隔壁是谁、还在不在, 与这条守卫无关。
+    """
+    from tests.frontend_source import code_of
+    code = code_of("components/stock-analysis/decision-board/cells.tsx")
+    i = code.index(f"export function {fn}")
+    j = code.find("\nexport function ", i + 1)
+    return code[i:] if j == -1 else code[i:j]
+
+
 def _cols(src: str) -> list[str]:
     """BOARD_COLS 里的 label, 按声明顺序。"""
     block = src[src.index("const BOARD_COLS = ["):]
@@ -66,16 +115,19 @@ def test_列的顺序是_认票_凭什么_我的账_别人的意见():
         # [R306] 列名「结论」→「档位」。用户: 「结论这个名称改成位置」—— 问到
         # 「通道位置」与打分系统里 `channel_pct` 撞名时, 选了「通道档位」。
         # 界面上本来就满处是「这一档」「十档」「换档」, 它是十个档位。
-        # [R307] 「档位」又拆成两列。用户: 「这一列我只想看位置, 表示位置」——
-        # 「怎么办」不是档位(它是五套判定合成的动作), 跟这一列的名字对不上,
-        # 所以拿回自己一列。**它没被删** —— 决策台上它是唯一的行动指引。
+        # [R307] 「档位」又拆成两列。用户: 「这一列我只想看位置, 表示位置」。
+        # [R310] **「怎么办」整列删掉了。** 用户问「可以删除吗, 会有什么影响」,
+        # 看过影响清单(它是五套判定的收敛层; 删了这张表只剩读数没有结论;
+        # 出场线的价格会从界面上消失)之后决定: 「那就删除了怎么办」。
+        # 判定层一个字没动, 接口照旧返回 `playbook` —— 只是界面不读它了。
+        # 出场线那一处**已经接住**: 搬进「持仓」列, 见那一条的守卫。
         # [R308] 「档位」→「位置」。用户: 「关于位置列, 我只需要知道当前短期
         # 通道位置和短中长的轨道组合, 其他不关心」—— 那十档判定整个从这一列
         # 撤走(它在复盘的「通道档位」页里一天不落), 只剩两个原始读数。
         # **这次不撞名**: R306 那回撞名是拿「通道位置」去命名**那十档判定**,
         # 而打分系统里 `channel_pct` 早就叫这个; 现在这一列印的**就是**
         # `channel_pct` 那个读数 —— 两处指同一件事, 同名正好是对的。
-        "走势", "位置", "怎么办",      # 凭什么(判断必须连着, 不许被账目切开)
+        "走势", "位置",                # 凭什么(判断必须连着, 不许被账目切开)
         # [R284] 「成本」「浮盈」两列删掉(用户: 「删除掉浮盈和成本列」)——
         # 它们为 5% 的行占着 9% 的宽度(持有 8 / 自选 166)。成本**输入框**保留,
         # 挪进这一格: 它是出场线的输入, 不是展示。
@@ -90,7 +142,7 @@ def test_账目三列必须排在判断之后():
     """R249 之前它们在「现价」与「走势」之间。这条独立于上面那条写 ——
     就算以后列增减, **判断不许被账目切开**这条纪律也得留着。"""
     cols = _cols(_src())
-    judge = max(cols.index("走势"), cols.index("位置"), cols.index("怎么办"))
+    judge = max(cols.index("走势"), cols.index("位置"))
     ledger = cols.index("持仓")     # [R284] 账目从三列收成一列
     assert ledger > judge, (
         f"账目列插到判断列中间了 —— 扫表时「走势→结论」读不连贯。当前顺序: {cols}"
@@ -178,15 +230,14 @@ def test_R250_表头只印列名不印排序目标():
     render = re.sub(r"\{/\*.*?\*/\}", "", th_block, flags=re.S)
     render = re.sub(r'title=(?:"[^"]*"|\{(?:[^{}]|\{[^{}]*\})*\})', "", render, flags=re.S)
 
-    # [R307] 「怎么办」从禁用词里拿掉了 —— **它现在是一个列名, 不再是排序目标**
-    # (与 R277 给「进度」做过的同一件事)。原来的意图一个字不改: 它不许再作为
-    # **分层**缀在别的列头上, 由下面那条 `档位` 表头的检查兜住。
-    for bad in ("贵不贵", "六态", "'价'", "涨跌'"):
+    # [R307] 「怎么办」曾经从禁用词里拿掉过 —— 那时它是一个列名。
+    # [R310] 那一列删了, 于是它**回到禁用词那一侧**: 表头上不许再出现它,
+    # 无论是作为列名(已经没有了)还是缀在别人头上。与 R297 对「进度」做的
+    # 是同一件事 —— 守的规矩一个字没变: **表头只印列名。**
+    for bad in ("贵不贵", "六态", "'价'", "涨跌'", "怎么办"):
         assert bad not in render, (
             f"表头又缀上排序目标「{bad}」了 —— 用户只要列名本身"
         )
-    pos_th = render[render.index("位置") - 300:render.index("位置") + 60]
-    assert "怎么办" not in pos_th, "「怎么办」又缀回「位置」表头上了 —— 它该是独立一列"
     # [R277 → R297] 「间距/进度」不再是列名了(那一列并进「结论」), 于是它回到
     # **禁用词**那一侧: 表头上不许出现它 —— 无论是缀在「走势」头上(R250 原本
     # 防的那件事), 还是缀在「结论」头上(R297 之后新的犯错方式)。
@@ -194,7 +245,7 @@ def test_R250_表头只印列名不印排序目标():
     assert "进度" not in render, "「进度」缀回表头了 —— 它已经不是一列, 表头只印列名"
     assert "间距" not in render, "「间距」缀回表头了"
     # 正面: 列名都还在
-    for name in ("位置", "怎么办", "走势", "现价/涨跌", "持仓"):
+    for name in ("位置", "走势", "现价/涨跌", "持仓"):
         assert name in render, f"表头把「{name}」弄丢了"
 
 
@@ -256,8 +307,9 @@ def test_R254_每列只剩一个排序目标():
     # [R284] held / cost / report 三个随列消失, 见 test_R254_点不到的排序键全删掉
     # [R297] `spread` 也随列消失 —— 「进度」并进「结论」, 而「结论」已经有
     # `play` 了; 一列一个目标正是这条在守的规矩。
+    # [R310] `play` 也随列消失了 —— 「怎么办」整列删掉。**判据与前面每一次
+    # 逐字相同: 点不到就删。** 见 test_R310_按急迫程度排退役了而且退干净了。
     for one in ("caret('name')", "caret('changePct')", "caret('trend')",
-                "caret('play')",
                 "caret('pnl')", "caret('signal')"):
         assert one in body, f"表头少了 {one}"
     # 反面: 不许再出现多目标的写法
@@ -282,15 +334,16 @@ def test_R254_点不到的排序键全删掉():
     # 这条测的从来是"有没有够不着的死键", 不是"某个键不许存在" ——
     # `test_R277_每个排序键都够得着` 把这个意图直接测出来, 名单只是兜底。
     # [R284] held / cost / report 加进来 —— 它们的表头随列合并/撤销消失了
+    # [R310] `play` 加进来 —— 「怎么办」那一列删了, 它的表头跟着没了
     for dead in ("'close'", "'ks'", "'km'", "'kl'", "'held'", "'cost'", "'report'",
-                 "'spread'", "'verdict'", "'exit'", "'confidence'"):
+                 "'spread'", "'verdict'", "'exit'", "'confidence'", "'play'"):
         assert dead not in keys, f"排序键 {dead} 点不到却还留着"
     # 比较器里也不该还有它们的分支
     cmp_ = body[body.index("const sortedRows"):]
     cmp_ = cmp_[:cmp_.index("const arr = ")]
     for dead in ("case 'close'", "case 'ks'", "case 'verdict'", "case 'held'",
                  "case 'cost'", "case 'report'", "case 'spread'",
-                 "case 'exit'", "case 'confidence'"):
+                 "case 'exit'", "case 'confidence'", "case 'play'"):
         assert dead not in cmp_, f"比较器里还留着 {dead} 的分支"
 
 
@@ -382,8 +435,8 @@ def test_R251_越小越要紧的那几个必须升序打头():
     body = _board_body()
     block = body[body.index("FIRST_DIR"):]
     block = block[:block.index("}")]
+    # [R310] `play` 随列退役
     for key, why in (("urgency", "该动了: order 越小越急"),
-                     ("play", "怎么办: 按纪律走=0, 没事=5"),
                      ("signal", "AI 信号: 买入=0, 观望=3"),
                      ("name", "标的: A → Z")):
         assert f"{key}: 'asc'" in block, f"{key} 的首次方向不是升序 —— {why}"
@@ -407,18 +460,25 @@ def test_R251_每个排序键都定了首次方向():
 def test_R251_表头说的和实际做的一致():
     """[R214 的教训] 判定写对了、接线接错了, 而测试恰好只测了判定。
 
-    「怎么办」的表头 title 写着「按急迫程度排: 按纪律走 > …」—— 那句话只有在
-    升序时才成立。说明与行为不一致时, **说明会赢**(用户信它), 于是排出来的表
-    与预期相反而没人发现。
+    表头 title 里那句「怎么排」只有在方向对的时候才成立。说明与行为不一致时,
+    **说明会赢**(用户信它), 于是排出来的表与预期相反而没人发现。
+
+    [R310] 原来钉的是「怎么办」那一列(「按急迫程度排: 按纪律走 > …」), 那一列
+    删了。**规矩一个字没变, 换到还在的那一列上**: 「AI 信号」的表头说买入排在
+    最前, 而 `SIGNAL_RANK` 里买入 = 0 —— 同样只有升序才成立。
+
+    换主语而不是删掉这条: R214 那个病(说明与接线相反)跟具体哪一列无关。
     """
-    src = _src()
-    th = src[src.index("<thead"):src.index("</thead>")]
-    assert "急迫程度排" in th, "「怎么办」的排序说明没了"
     body = _board_body()
     block = body[body.index("FIRST_DIR"):]
-    assert "play: 'asc'" in block[:block.index("}")], (
-        "表头说「按纪律走排最前」, 而首次点击是降序 —— 说明与行为相反"
+    block = block[:block.index("}")]
+    assert "signal: 'asc'" in block, (
+        "AI 信号首次点击不是升序 —— 而 SIGNAL_RANK 里买入=0, 降序会把「观望」顶到最前"
     )
+    # 正面配对: 那张 rank 表确实是"越小越要紧"
+    rank = body[body.index("SIGNAL_RANK"):]
+    rank = rank[:rank.index("}")]
+    assert "buy: 0" in rank, "SIGNAL_RANK 变了, 上面那条升序的理由就不成立了"
 
 
 def test_R252_粘性表头必须有_z_index():
@@ -483,7 +543,7 @@ def test_R253_到价预案固定竖排一个一行():
     assert "whitespace-nowrap" in block, "单个预案自己不该再折行"
 
 
-def test_R308_两列各自竖排且各自对齐():
+def test_R310_位置列竖排且整列自然成列():
     """[R255 → R298 → R299 → R307 → R308] 这条追了五版, **守的东西一路没变**:
     这一格里每一件事各占一行(不许横排挤回去), 而且整列上下几十行要对得齐。
 
@@ -495,29 +555,16 @@ def test_R308_两列各自竖排且各自对齐():
         再摆一条中轴反而是多余的骨架: 居中就是对齐。等宽字体 + `tabular-nums`
         让百分号和三字码上下自然成列。
 
-    所以这条按列分开钉 —— 拿同一套断言套两列是**假守卫**: 「位置」列现在
-    根本没有 `justify-self-end` 可守。
+    [R310] 「怎么办」列删了, 于是这条只剩「位置」一列要守 —— 而它守的正是
+    **不靠中轴那一路**: 两行都定宽, 居中就是对齐, 靠的是等宽字体把百分号与
+    三字码上下排成列。
     """
     # **必须剥注释。** 位置那一格的注释里就写着「等宽 + tabular-nums」(讲的正是
     # 它为什么在), 读原文的话断言吃的是我自己的注释 —— 本仓库这个坑的第 N 次,
     # 而且这次是 R308 变异电池逼出来的: 把 `tabular-nums` 从代码里删掉, 守卫
     # 照样绿。
-    from tests.frontend_source import code_of
-    cells = code_of("components/stock-analysis/decision-board/cells.tsx")
-
-    def _blk(fn: str) -> str:
-        i = cells.index(f"export function {fn}")
-        blk = cells[cells.index("return (", i):]
-        m = re.search(r"\n(?:export )?(?:function|const) ", blk)
-        return blk[:m.start()] if m else blk
-
-    # 「怎么办」: 两段不等长 → 要那条竖线
-    play = _blk("PlayCell")
-    assert "grid-cols-[max-content_max-content]" in play, "「怎么办」没有那条中轴"
-    assert "justify-self-end" in play, "「怎么办」的徽标没靠右, 中轴对不上"
-
-    # 「位置」: 两行各自定宽 → 居中 + 等宽字体
-    pos = _blk("PositionCell")
+    pos = _cell("PositionCell")
+    pos = pos[pos.index("return ("):]
     assert "flex-col items-center" in pos, "「位置」列没竖排居中"
     # 锚在**百分比那一行自己**上, 同上一条的理由
     pct_span = pos[pos.rindex("<span", 0, pos.index("Math.round(s.pct * 100)")):
@@ -533,38 +580,20 @@ def test_R308_两列各自竖排且各自对齐():
     assert "font-mono" in combo_span, "三字码不是等宽字体 —— 整列的码对不齐, 扫不出同格的票"
     assert "tracking-[" in combo_span, "三字码没拉字距 —— 三个汉字挤在一起读不成三格"
 
-    # 两列共同的纪律
-    for fn, blk in (("PositionCell", pos), ("PlayCell", play)):
-        assert "flex-col items-start" not in blk, f"{fn} 又靠左了 —— 整张表都是居中的"
-        assert "!text-left" not in blk, f"{fn} 还覆写着左对齐"
-        assert "mx-auto" in blk, f"{fn} 的容器没有 mx-auto, 整格还是靠左"
-        # 反面: 两件事不许又挤回同一行(那是 R217 那版, R255 拆开的)
-        assert "flex flex-wrap items-center justify-center" not in blk, f"{fn} 又横排回去了"
+    assert "flex-col items-start" not in pos, "「位置」又靠左了 —— 整张表都是居中的"
+    assert "!text-left" not in pos, "「位置」还覆写着左对齐"
+    assert "mx-auto" in pos, "「位置」的容器没有 mx-auto, 整格还是靠左"
+    # 反面: 两件事不许又挤回同一行(那是 R217 那版, R255 拆开的)
+    assert "flex flex-wrap items-center justify-center" not in pos, "「位置」又横排回去了"
 
 
-def test_R307_说明那一行单行截断且不参与列宽():
-    """用户第三次指着这一格: 「排版还是非常有问题」。
-
-    **病根有两层**:
-      ① 那一行说明原来在网格里(`col-span-2`), 它一长就把两列撑开, 上面的徽标
-         跟着被推散 —— `max-w` 挡不住: `max-content` 先按内容算宽再被裁,
-         裁掉的是内容不是布局;
-      ② R255 把它从单行截断改成整段折行, 那时这一列是**左对齐**的; R298 改居中
-         之后, 居中 + 多行 + 每行长度不一 = 几行各自一个宽度, 中轴全白对了。
-
-    所以它现在是网格**外面**的同级块, 铺满整格宽度、单行截断, 行高固定。
-    **信息一个字没丢** —— 全文在悬停里(`tip` 连 `note` 一起给)。
-    """
-    # **必须剥注释。** 上面那段说明里就写着 `col-span-2`(讲的正是它为什么被
-    # 拿出来), 直接读原文的话断言会吃到自己的注释 —— 本仓库这个坑的第 N 次。
-    from tests.frontend_source import code_of
-    blk = code_of("components/stock-analysis/decision-board/cells.tsx")
-    blk = blk[blk.index("export function PlayCell"):]
-    assert "col-span-2" not in blk, "说明那一行又回到网格里了 —— 它一长就把徽标推散"
-    assert "w-full truncate text-center" in blk, "说明那一行不是单行截断"
-    assert "whitespace-normal break-words" not in blk, "又改回整段折行了"
-    assert "title={tip}" in blk, "全文没进悬停 —— 截断而不给全文就是把话吞了"
-
+# [R255 → R307 → **R310 退役**] `test_R307_说明那一行单行截断且不参与列宽`
+# 钉的是「怎么办」那一行说明的形状(单行截断、不进网格、全文进悬停)。
+# **那一列 R310 整个删掉了, 它盯的东西不存在了。**
+#
+# 规矩本身没退役 —— 「会长的那段文字必须截断且全文进悬停」现在由
+# `test_R309_AI_理由截到两行且全文进悬停` 守着, 那是这张表上仅剩的一段长文字。
+# 两条并成一条, 而不是留一条永远绿的空守卫。
 
 
 def test_R257_走势列的三行各管一件事():
@@ -602,7 +631,7 @@ def test_R257_走势列的三行各管一件事():
     assert "{ph.pace_cn}" not in blk, "快慢也一样, 它属于「间距」列"
 
 
-def test_R308_两个刻度都跟着怎么办走():
+def test_R310_两个刻度随怎么办一起离场():
     """[R277 → R297 → R307 → R308] 这两个读数一路在搬家, **一次都没丢**
     (加速度曾经在决策台上根本看不见, R277 才给了它位置)。
 
@@ -611,17 +640,23 @@ def test_R308_两个刻度都跟着怎么办走():
     而「走到哪一步」不是读数而是**判断**(这一段走了多远, 由三线重合度算出来)。
     它跟「快慢」是同一层的东西: 都在修饰"所以今天该怎么办", 于是同去那一列。
 
-    **正反各钉一条**: 位置列一个不许有(否则边界又糊了), 怎么办列两个都得在
-    (否则就是搬家搬丢了 —— 这两个读数最爱在搬家时蒸发)。
+    [R310] 「怎么办」整列删掉, 这两个刻度跟着离场 —— **它们是那个判断的修饰,
+    判断没了, 修饰单独留在表上就成了没有主语的形容词。**
+
+    于是这条只剩反面那一半, 而那一半正是最要紧的: **它们不许漂回「位置」列。**
+    R307 就是这么判过一次的(把「走到哪一步」当成位置的刻度), R308 才改判 ——
+    它是由三线重合度算出来的**判断**, 不是读数。这一列只要读数。
+
+    它们没有消失: 复盘弹窗的通道页与导出件里都还在(见
+    `test_R277_导出的快慢与屏幕同一个产地`)。
     """
-    from tests.frontend_source import code_of
-    code = code_of("components/stock-analysis/decision-board/cells.tsx")
-    pos = code[code.index("export function PositionCell"):code.index("export function PlayCell")]
-    play = code[code.index("export function PlayCell"):]
+    pos = _cell("PositionCell")
     assert "maturity_cn" not in pos, "「位置」列里混进了「走到哪一步」—— 那是判断, 不是读数"
     assert "pace_cn" not in pos, "「位置」列里混进了快慢"
-    assert "ph?.maturity_cn" in play, "「怎么办」列把「走到哪一步」弄丢了"
-    assert "ph?.pace_cn" in play, "「怎么办」列把快慢弄丢了"
+    # 决策台上整个不许再有它们 —— 留一个孤零零的形容词比删了更难读
+    board = _board_body()
+    for gone in ("maturity_cn", "pace_cn"):
+        assert gone not in board, f"决策台上还留着 {gone} —— 它修饰的那个判断已经不在表上了"
 
 
 def test_R308_位置列只有两个原始读数():
@@ -638,9 +673,7 @@ def test_R308_位置列只有两个原始读数():
     那一档少, 判定只是替人翻译了一遍; 用户不要翻译要坐标, 那就给坐标。
     翻译本身没消失 —— 点开就是复盘的「通道档位」页, 逐日档位一天不落。
     """
-    from tests.frontend_source import code_of
-    code = code_of("components/stock-analysis/decision-board/cells.tsx")
-    pos = code[code.index("export function PositionCell"):code.index("export function PlayCell")]
+    pos = _cell("PositionCell")
     # 正面: 两个读数
     assert "s.pos_cn" in pos, "短期通道位置那个名字没印"
     assert "Math.round(s.pct * 100)" in pos, "通道内百分比没印 —— 只有名字的话看不出离轨多近"
@@ -665,9 +698,7 @@ def test_R308_那份时长跟着组合走而不是消失():
     ——换了组合才重新计数——所以它跟着组合进悬停: 不占正文的行(用户只要两个
     读数), 但那个数还在。
     """
-    from tests.frontend_source import code_of
-    code = code_of("components/stock-analysis/decision-board/cells.tsx")
-    pos = code[code.index("export function PositionCell"):code.index("export function PlayCell")]
+    pos = _cell("PositionCell")
     assert "stateRun" in pos, "`state_run` 又成了没人读的字段 —— R246/R248 那个坑"
     assert "已连着 ${stateRun.days} 天" in pos, "那份时长没印出来"
     # 它必须在**悬停**里, 不许挤进正文那两行
@@ -678,39 +709,24 @@ def test_R308_那份时长跟着组合走而不是消失():
 
 
 
-def test_R308_两列的宽度与内容上限对得上():
+def test_R310_列宽与内容上限对得上():
     """**R283 那一课**: 「结论」被挤的真原因不是列宽, 是内容的 `max-w` 上限
     低于列宽 —— 光加列宽一点用都没有。两者得一起动。
 
-    R307 把 21% 拆成两列, 这条跟着换算: 位置那半只有两个短读数(「贴上轨 92%」
-    /「上中下」), 用不了多少宽; 会长的是「怎么办」那一行事件与理由, 宽度给它。
-    [R308] 判定撤走之后位置那半更窄了(9% → 7%), 省下的进了「怎么办」。
+    [R310] 「怎么办」删了, 于是这条只剩 AI 那一列要量 —— **而它正是当初长成
+    半张表的那一个**, 也就是这把尺子最该量的对象。
+
+    闸不能高于列宽也不能低于列宽太多: 低了是 R283 那个「加了列宽也没用」;
+    高了等于**没有闸** —— `table-auto` 下内容能一路顶到闸那么宽, 列宽写多少
+    都不算数。所以这里两头都卡。
     """
     src = _src()
     blk = src[src.index("const BOARD_COLS = ["):]
     blk = blk[:blk.index("] as const")]
     got = dict(re.findall(r"label: '([^']+)', w: '(\d+(?:\.\d+)?)%'", blk))
-    assert "位置" in got and "怎么办" in got, f"两列没都拿到宽度: {got}"
-    pos_w, play_w = float(got["位置"]), float(got["怎么办"])
-    assert play_w > pos_w, (
-        f"「怎么办」比「位置」还窄({play_w}% vs {pos_w}%) —— 会长的是它那一行说明"
-    )
-    root = _BOARD.parent
-    cells = (root / "decision-board" / "cells.tsx").read_text(encoding="utf-8")
-    # [R309] **锚死在 PlayCell 上。** 原来抓的是整份 cells.tsx 里第一个 `max-w`,
-    # 碰巧是它 —— 哪天别的格先加一道上限, 这条就会去量错的那一个然后照样绿。
-    play_blk = cells[cells.index("export function PlayCell"):]
-    cap = re.search(r"max-w-\[(\d+(?:\.\d+)?)rem\]", play_blk)
-    assert cap, "「怎么办」列内容的 max-w 上限没了"
-    rem = float(cap.group(1))
-    # 常见视口按 1400px 表宽折算 —— R283 就是在这个量级上撞到上限的
-    assert rem * 16 >= 1400 * play_w / 100, (
-        f"内容上限 {rem}rem({rem * 16:.0f}px)低于列宽 {play_w}%(约 {1400 * play_w / 100:.0f}px)"
-        " —— 又变成 R283 那个「加了列宽也没用」的局面"
-    )
-
-    # [R309] **同一把尺子量 AI 那一列** —— 它正是没上限时长成半张表的那个。
+    assert "AI 信号" in got, f"AI 那一列没拿到宽度: {got}"
     ai_w = float(got["AI 信号"])
+    px = 1400 * ai_w / 100          # 常见视口按 1400px 表宽折算
     ai_td = src[src.index("{r.sig ? ("):]
     ai_cap = re.search(r"max-w-\[(\d+(?:\.\d+)?)rem\]", ai_td[:600])
     assert ai_cap, (
@@ -718,9 +734,52 @@ def test_R308_两列的宽度与内容上限对得上():
         "只是建议, 没有闸它照样能把整张表顶开(R309 之前就是这样)"
     )
     ai_rem = float(ai_cap.group(1))
-    assert ai_rem * 16 >= 1400 * ai_w / 100, (
-        f"AI 那一列的内容上限 {ai_rem}rem 低于列宽 {ai_w}% —— 列里会空着一条"
+    assert ai_rem * 16 >= px, (
+        f"AI 的内容上限 {ai_rem}rem({ai_rem * 16:.0f}px)低于列宽 {ai_w}%"
+        f"(约 {px:.0f}px)—— R283 那个「加了列宽也没用」的局面"
     )
+    assert ai_rem * 16 <= px * 1.25, (
+        f"AI 的内容上限 {ai_rem}rem({ai_rem * 16:.0f}px)比列宽 {px:.0f}px 高出太多"
+        " —— 那等于没有闸: 内容能一路顶到闸那么宽, 列宽写多少都不算数"
+    )
+
+
+def test_R310_出场线的价格还在界面上():
+    """[R212 → R310] **一笔十几版之前立下的对价, 必须有人替它站着。**
+
+    R212 用户说「止盈线这一列不要了」, 那一列撤掉时写下的交换条件是:
+    「信息没丢 —— 出场线破了或逼近, 结论列会把线价写在徽标上」。
+
+    R310 删「怎么办」时查了一遍: `r.exit` 在整张表上**零个渲染点**, 那条线
+    只从 `play.price` 露过面。也就是说那一列一删, **这笔对价就没人兑现了**,
+    而且不会有任何东西报错 —— 只是有一天你发现止盈线看不见了。
+
+    所以它搬进「持仓」列。归那儿而不是别处: 出场线按**我的成本、我的持有
+    天数**算, 它是「我的账」里的事, 不是「凭什么」。而且旁边那个成本输入框
+    的提示写着「出场线按它算」—— 不接住它, 那句提示就成了假话。
+
+    这条钉三件事: 印出来了 / 印的是价不只是名 / 破没破分得开。
+    """
+    src = _src()
+    i = src.index("{r.held && r.exit && (")
+    blk = src[i:src.index("\n                        )}", i)]
+
+    # **必须先剥掉 `title`。** 那个悬停里本来就复述着线名、价格和已破/还差 ——
+    # 直接读整段的话, 把**印出来的**那个价删掉断言照样绿(这是 R310 变异电池
+    # 当场逼出来的, 与 `_headers()` 里"属性必须先剥"是同一个坑)。
+    render = _strip_title(blk)
+
+    assert "r.exit.line_cn" in render, "出场线只印了价没印是哪条线(止盈?止损?生命线?)"
+    assert "r.exit.line.toFixed(2)" in render, (
+        "出场线没印价 —— 只说「止盈线」而不给数字, 等于没说"
+    )
+    assert "r.exit.triggered" in render, (
+        "已破与没破长得一样 —— 那是这条线最要紧的一个状态; "
+        "写在 title 里不算, 扫表时看不见"
+    )
+    # 它必须在「持仓」那一格里, 不许飘到别处
+    td = src[:i]
+    assert td.rindex("<td") > td.rindex("<PositionCell"), "出场线跑到「持仓」以外的格子里了"
 
 
 def test_R309_列宽加起来是一百且没有一列留空():
@@ -755,16 +814,23 @@ def test_R309_别人的意见不许比自己的判断占得宽():
     R249 把它钉成了**顺序**, 这条把它钉成**分量**。
 
     AI 信号是「别人的意见」: 它可以在场(而且删不得 —— 写信号的入口只有这张表,
-    `paper_trader_run` 还在读存下来的信号), 但它**不该比我自己那三列判断加起来
-    还宽**。改之前它一个人占 47%, 而走势 + 位置 + 怎么办 加起来才 32.5% ——
+    `paper_trader_run` 还在读存下来的信号), 但它**不该比我自己的判断加起来
+    还宽**。R309 之前它一个人占 47%, 而判断那几列加起来才 32.5% ——
     **版面把话语权给反了**, 而且没有任何东西会因此报错。
+
+    [R310] **这条昨天刚立, 今天就抓到了一次真事故。** 删掉「怎么办」让判断那
+    一侧一下子少了 27%, 只剩 走势 + 位置; AI 原样留着 30% 就会顶到它们脸上。
+    于是 AI 跟着收到 26% —— **不是我想收窄它, 是这条不变式逼的。**
+
+    判断那一侧是**列出来的**而不是"除 AI 之外的都算": 标的/现价是认票、持仓是
+    我的账, 它们再宽也不代表我对这只票有判断。
     """
     src = _src()
     blk = src[src.index("const BOARD_COLS = ["):]
     blk = blk[:blk.index("] as const")]
     got = {lab: float(w.rstrip('%'))
            for lab, w in re.findall(r"label: '([^']+)', w: '([^']+)%'", blk)}
-    judge = got["走势"] + got["位置"] + got["怎么办"]
+    judge = got["走势"] + got["位置"]
     assert got["AI 信号"] < judge, (
         f"AI 信号占 {got['AI 信号']}%, 而我自己的判断三列加起来才 {judge}% —— "
         "版面把话语权给反了"
@@ -791,19 +857,17 @@ def test_R309_AI_理由截到两行且全文进悬停():
 
 
 
-def test_R308_两列各自的行数都是固定的():
+def test_R310_位置列的行数是固定的():
     """R217 那个病: 一格摞到五层、每行高度还不一样, 上一行的尾巴挂到下一行的
     表头底下。**病根是行数与行高参差**, 所以两列各自的块数都得钉死。
 
-      · 「位置」列 两行  = 短期通道位置 / 三档组合码
-      · 「怎么办」列 两块 = 那个网格 + 一行单行截断的说明
+      · 「位置」列 两行 = 短期通道位置 / 三档组合码
 
+    [R310] 「怎么办」列删了, 这条只剩「位置」一列要守。
     [R308] 「位置」列那两行**各自都有兜底**(`s` 为空给 `—`, `combo` 为空给
     「组合定不了」), 所以行数是真的定死的, 不是"通常两行"。
     """
-    from tests.frontend_source import code_of
-    code = code_of("components/stock-analysis/decision-board/cells.tsx")
-    pos = code[code.index("export function PositionCell"):code.index("export function PlayCell")]
+    pos = _cell("PositionCell")
     btn = pos[pos.index("<button"):]
     btn = btn[:btn.index("</button>")]
     # 两行各是一个三元, 所以恰好两组 `? (` … `) : `
@@ -814,15 +878,6 @@ def test_R308_两列各自的行数都是固定的():
         "短期位置那一行没有兜底 —— 算不出来时整行消失, 这一列就一会儿一行一会儿两行"
     )
     assert ") : (" in btn.split("{combo ? (")[1], "三档组合那一行没有兜底"
-
-    play = code[code.index("export function PlayCell"):]
-    outer = play[play.index("flex w-full max-w-["):]
-    outer = outer[:outer.index("\n      </div>")]
-    top = [ln.strip() for ln in outer.splitlines()
-           if (ln.startswith("        <") and not ln.startswith("        </"))
-           or ln.startswith("        {")]
-    assert len(top) == 2, f"「怎么办」列该是两块(网格 + 说明), 现在是 {len(top)}: {top}"
-
 
 
 def test_R277_走势列不再回退到快慢():
@@ -954,48 +1009,14 @@ def test_R258_那一列叫通道档位而且脚注指得对():
     )
 
 
-def test_R261_走了多远那一行是统一色():
-    """用户: 「趋势列的描述都没有统一颜色, 有些是白色字体」。
-
-    **这是 R257 留下的错**: 那一版把文字从「阶段」换成了「走了多远」(成熟度),
-    却忘了换配色 —— 颜色仍按阶段码取, 于是同一句「走到中段」在上升中的票上是
-    红的、在下跌中的票上是绿的、在横盘中的票上是近白的(`text-secondary`)。
-    **颜色在说阶段, 文字在说走了多远, 两码事。**
-
-    成熟度是一句事实读数, 不是判断, 所以统一给次要色。
-    """
-    root = _BOARD.parent
-    cells = (root / "decision-board" / "cells.tsx").read_text(encoding="utf-8")
-    body = "\n".join(ln for ln in cells.splitlines()
-                     if not ln.lstrip().startswith(("//", "*", "/*", "{/*")))
-
-    assert "PHASE_TEXT" not in body, (
-        "「阶段配色」那张表又回来了 —— 它按**已经不显示的东西**给文字上色"
-    )
-    # [R277 → R297] 成熟度先搬到 SpreadCell、再并进 ConclusionCell, 这条一路跟着搬
-    # —— **守的规矩一个字没变**: 成熟度是事实读数不是判断, 所以统一次要色,
-    # 不许挂条件配色。快慢正相反(R278): 它**是**判断(在往多头还是空头变),
-    # 所以按 `level` 上色 —— 两者用的是同一个 `Qualifier`, 差别只在传不传 `cls`。
-    # [R307 → R308] 成熟度先随「走到哪一步」去「档位」列, R308 又跟着「快慢」
-    # 一起并进「怎么办」—— 两个都是**判断的刻度**, 而「位置」列只要原始读数。
-    # **锚点必须跟着搬**: 原来这里切的是 PositionCell 起到文件末尾, R308 之后
-    # 那一段仍然包含 PlayCell, 于是断言照样绿 —— 那就成了假守卫。现在切死在
-    # PlayCell 上。
-    body = body[body.index("export function PlayCell"):]
-    body = body[body.index("return ("):]
-    def _tag(mark: str) -> str:
-        """含 `mark` 的那一整个 `<Qualifier … />` —— **必须切到 `/>`**:
-        `cls=` 写在 `text=` 的下一行, 只切到属性名那里的话它永远看不见
-        (第一版就是这么错的, 本仓库这个坑的又一次)。"""
-        i = body.index(mark)
-        return body[body.rindex("<Qualifier", 0, i):body.index("/>", i) + 2]
-
-    assert "cls=" not in _tag("ph?.maturity_cn"), (
-        "「走了多远」挂上条件配色了 —— 它该走 Qualifier 的默认次要色"
-    )
-    # 反面配对: 快慢必须**有** cls —— 两个都统一次要色的话, 「跌得更急」与
-    # 「跌势在缓」会变成同一个颜色, 那才是真的丢信息。
-    assert "PACE_CLS" in _tag("ph?.pace_cn"), "快慢没按方向上色 —— 加速与减速会变成同一个颜色"
+# [R261 → **R310 退役**] `test_R261_走了多远那一行是统一色` 钉的是
+# 「走了多远」用统一次要色、「快慢」按方向上色。**两个 `Qualifier` 随
+# 「怎么办」列一起删了**(它们是那个判断的刻度, 判断没了就是没有主语的形容词),
+# 于是这条没有可守的对象。
+#
+# 它那半条仍在的意图 ——「快慢的颜色编的是符号不是词」—— 由
+# `test_R278_*`(在别处)守着后端那份判定, 更靠前也更准。
+# 「这两个刻度不许漂回位置列」由 `test_R310_两个刻度随怎么办一起离场` 接手。
 
 
 def test_R261_徽标与第二行仍各自按含义上色():
