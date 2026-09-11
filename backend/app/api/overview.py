@@ -13,7 +13,6 @@ from fastapi import APIRouter, Request
 
 from app.services.ext_data import ExtConfig, ExtConfigStore
 from app.services.index_const import CORE_INDEX_NAMES, CORE_INDEX_SYMBOLS
-from app.services.screener import ScreenerService
 
 router = APIRouter(prefix="/api/overview", tags=["overview"])
 
@@ -312,32 +311,6 @@ def _top_rows(rows: list[dict], key: str, descending: bool, limit: int = 8) -> l
         }
         for r in filtered[:limit]
     ]
-
-
-def _pct_band_rows(values: list[float]) -> list[dict]:
-    bands = [
-        ("<-5%", None, -0.05),
-        ("-5~-3%", -0.05, -0.03),
-        ("-3~-1%", -0.03, -0.01),
-        ("-1~0%", -0.01, 0),
-        ("0~1%", 0, 0.01),
-        ("1~3%", 0.01, 0.03),
-        ("3~5%", 0.03, 0.05),
-        (">5%", 0.05, None),
-    ]
-    total = len(values) or 1
-    out = []
-    for label, low, high in bands:
-        count = 0
-        for v in values:
-            if low is None and v < high:
-                count += 1
-            elif high is None and v >= low:
-                count += 1
-            elif low is not None and high is not None and low <= v < high:
-                count += 1
-        out.append({"label": label, "count": count, "pct": count / total * 100})
-    return out
 
 
 def _build_overview(request: Request, as_of: date | None = None) -> dict:

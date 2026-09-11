@@ -316,6 +316,18 @@ def _top_rows(rows: list[dict], key: str, descending: bool, limit: int = 8) -> l
     ]
 
 
+def _in_pct_band(v: float, low: float | None, high: float | None) -> bool:
+    """v 是否落在半开区间 [low, high) 内; 两端可为 None 表示该侧无界。
+
+    分布直方图的首档(<-5%)没有下界、末档(>5%)没有上界, 所以两端都要允许 None。
+    """
+    if low is None:
+        return v < high
+    if high is None:
+        return v >= low
+    return low <= v < high
+
+
 def _pct_band_rows(values: list[float]) -> list[dict]:
     bands = [
         ("<-5%", None, -0.05),
@@ -330,14 +342,7 @@ def _pct_band_rows(values: list[float]) -> list[dict]:
     total = len(values) or 1
     out = []
     for label, low, high in bands:
-        count = 0
-        for v in values:
-            if low is None and v < high:
-                count += 1
-            elif high is None and v >= low:
-                count += 1
-            elif low is not None and high is not None and low <= v < high:
-                count += 1
+        count = sum(1 for v in values if _in_pct_band(v, low, high))
         out.append({"label": label, "count": count, "pct": count / total * 100})
     return out
 
