@@ -110,6 +110,48 @@ def set_threshold(symbol: str, threshold: float | None, source: str = "manual") 
     return {"symbol": sym or None, "threshold": eff, "source": src}
 
 
+def set_thresholds(items: list[dict]) -> dict:
+    """批量设置阈值覆盖。`items` = [{"symbol", "threshold"(None=清除), "source"}]。
+
+    **不是循环调 `set_threshold`。** 那个函数每次都 load → 改一条 → save,
+    166 只票就是 166 次整文件读写; 更要紧的是**中途出错会留下半套**(前 80 只
+    改了、后 86 只没改), 而用户看到的只有一个失败提示。
+
+    这里一次读、全改完、一次写: 要么全进要么全不进。写文件本身仍可能失败,
+    但那时**一条都没落盘**, 状态是干净的。
+
+    返回 {applied, cleared, skipped} —— `skipped` 是那些符号为空/阈值非法的,
+    点名报出去而不是静默丢掉。
+    """
+    store = _load_store()
+    applied: list[str] = []
+    cleared: list[str] = []
+    skipped: list[dict] = []
+    for it in items or []:
+        sym = str((it or {}).get("symbol") or "").strip().upper()
+        if not sym:
+            skipped.append({"symbol": "", "why": "没有标的代码"})
+            continue
+        thr = (it or {}).get("threshold")
+        src = str((it or {}).get("source") or "rule")
+        if thr is None:
+            store["overrides"].pop(sym, None)
+            cleared.append(sym)
+            continue
+        try:
+            val = _clamp(thr)
+        except (TypeError, ValueError):
+            skipped.append({"symbol": sym, "why": f"阈值不是数字: {thr!r}"})
+            continue
+        store["overrides"][sym] = {
+            "threshold": val, "source": src, "updated_at": _now_iso(),
+        }
+        applied.append(sym)
+    if applied or cleared:
+        _save_store(store)
+    return {"applied": applied, "cleared": cleared, "skipped": skipped}
+
+
 # ================================================================
 # 数据装载
 # ================================================================
@@ -463,6 +505,95 @@ _AI_SYSTEM_PROMPT = (
     '{"threshold": 0.08, "confidence": 75, "reason": "80字内的中文理由"}\n'
     "threshold 必须取自指标表中出现过的阈值。"
 )
+
+
+def _windows_for_symbols(repo, symbols: list[str]) -> dict[str, tuple[list[float], list[str]]]:
+    """一次批量读出这批票的收盘窗口。股票走一趟 `get_daily_batch`, ETF/指数逐只回退。
+
+    **与逐只 `_load_symbol_window` 拿到的窗口逐值相同** —— 同一个日历跨度、
+    同一个 `_closes_window` 裁剪, 差别只在 IO 从 N 趟变成 1 趟。
+    `bullish_win_rates_for_symbols` 已经把这条路走通了(R156), 这里复用同一套。
+    """
+    series: dict[str, tuple[list[float], list[str]]] = {}
+    syms = sorted({str(x).strip().upper() for x in symbols if x and str(x).strip()})
+    if not syms:
+        return series
+    stock_syms = [x for x in syms if repo.resolve_asset_type(x) == "stock"]
+    if stock_syms:
+        end = date.today()
+        start = end - timedelta(days=_CALENDAR_SPAN_DAYS)
+        try:
+            df = repo.get_daily_batch(stock_syms, start, end, ["symbol", "date", "close"])
+        except Exception as e:  # noqa: BLE001
+            logger.warning("livermore batch daily failed: %s", e)
+            df = pl.DataFrame()
+        if df is not None and not df.is_empty() and "symbol" in df.columns:
+            for sym, part in df.group_by("symbol"):
+                key = str(sym[0] if isinstance(sym, tuple) else sym).upper()
+                series[key] = _closes_window(part)
+    for x in syms:
+        if x in series:
+            continue
+        try:
+            series[x] = _load_symbol_window(repo, x)
+        except Exception as e:  # noqa: BLE001
+            logger.debug("livermore window for %s failed: %s", x, e)
+            series[x] = ([], [])
+    return series
+
+
+def _row_at(rows: list[dict], threshold: float) -> dict | None:
+    """网格里最贴近这个阈值的那一行。网格步长 1%, 所以"最近"就是它自己那一格。"""
+    if not rows:
+        return None
+    return min(rows, key=lambda r: abs(float(r["threshold"]) - float(threshold)))
+
+
+def batch_backtest(repo, symbols: list[str]) -> dict:
+    """[R312] 全量阈值回测 —— **纯计算, 一次 AI 都不调。**
+
+    单只那个弹窗会额外问一次 AI 当调参顾问; 这里不问, 三条理由:
+
+      ① **166 只票就是 166 次调用** —— 慢、要钱, 而这个按钮就挨在「刷新」
+         旁边, 那一带的东西全是不计费的;
+      ② 规则建议 `rule_suggest` 是**纯函数、可复算**, 而且样本不足时它会
+         明说"不足以支撑调参"而不是硬荐一个数 —— 批量场景要的正是这种克制;
+      ③ 想听 AI 的意见, 逐只打开那个弹窗就是, 入口一直在。
+
+    返回每只票一行: 现在用的阈值、建议的阈值、**两边各自的"多赚"**。
+    最后那一项是这张表的重点 —— 只说"建议 8%"是不可证伪的一句话,
+    把 `excess` 摆出来才知道这次调参到底值几个点。
+    """
+    out_rows: list[dict] = []
+    skipped: list[dict] = []
+    series = _windows_for_symbols(repo, symbols)
+    for sym in sorted(series):
+        closes, dates = series[sym]
+        if len(closes) < _MIN_DAYS:
+            skipped.append({"symbol": sym, "why": f"日 K 不足 {_MIN_DAYS} 天"})
+            continue
+        grid = backtest_thresholds(closes, dates)
+        rule = rule_suggest(grid)
+        cur, cur_src = get_effective_threshold(sym)
+        cur_row = _row_at(grid, cur)
+        sug_row = _row_at(grid, rule["threshold"])
+        out_rows.append({
+            "symbol": sym,
+            "window_days": len(closes),
+            "from": dates[0],
+            "to": dates[-1],
+            "current_threshold": cur,
+            "current_source": cur_src,
+            "suggested": rule["threshold"],
+            "reason": rule["reason"],
+            "sample_insufficient": rule["sample_insufficient"],
+            # 两边各自的"多赚"(跟随 − 买入持有), 与复盘页那一栏同一个概念
+            "excess_now": (cur_row or {}).get("excess"),
+            "excess_suggested": (sug_row or {}).get("excess"),
+            "flips_suggested": (sug_row or {}).get("flips"),
+            "false_rate_suggested": (sug_row or {}).get("false_rate"),
+        })
+    return {"rows": out_rows, "skipped": skipped}
 
 
 async def run_backtest(repo, symbol: str, use_ai: bool = True) -> dict:

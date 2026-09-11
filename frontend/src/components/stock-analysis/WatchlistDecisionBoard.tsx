@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Star, Wallet, Sparkles, Loader2, ArrowUp, ArrowDown, RefreshCw, FileText, Download, Bell, ChevronDown, Folder, Inbox, List } from 'lucide-react'
+import { Star, Wallet, Sparkles, Loader2, ArrowUp, ArrowDown, RefreshCw, FileText, Download, Bell, ChevronDown, Folder, Inbox, List, FlaskConical } from 'lucide-react'
 import { api, type ChannelEvent, type ChannelPhase, type EffectivePosition, type ExitLine, type KeltnerBands, type TrendInfo, type Urgency } from '@/lib/api'
 // [R276] 分组下拉直接复用「加入自选」那个菜单 —— 定位/键盘/点外面关闭/配色全都现成
 import { WatchlistGroupMenu } from '@/components/WatchlistAddMenu'
@@ -17,6 +17,7 @@ import { storage } from '@/lib/storage'
 import { buildBoardHtml } from '@/lib/decisionBoardHtmlExport'
 import { DEFAULT_EXPORT_KEYS } from '@/lib/decisionBoardExportColumns'
 import { ExportColumnsDialog } from '@/components/stock-analysis/decision-board/ExportColumnsDialog'
+import { TrendBacktestAllDialog } from '@/components/stock-analysis/TrendBacktestAllDialog'
 import { ChannelStateCell, PositionCell, NUM, TD_BASE } from '@/components/stock-analysis/decision-board/cells'
 import { LotsLink } from '@/components/stock-analysis/decision-board/LotsLink'
 // [R169] 合并视图(手填 ⊕ 上游批次登记), 字段说明见 api.ts 的 EffectivePosition
@@ -232,6 +233,9 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
   const flashTimer = useRef<number | undefined>(undefined)
   // [R182] 导出选列。六态汇总弹窗已并进导出 —— 勾上趋势那几列就是它。
   const [exportOpen, setExportOpen] = useState(false)
+  // [R312] 全量阈值回测的弹窗。只在点开时挂载 —— 它一挂载什么都不跑,
+  // 真正开跑要在里面再点一次(阈值是会落盘的东西, 不该被一次误触带起来)。
+  const [backtestAllOpen, setBacktestAllOpen] = useState(false)
   const [exportCols, setExportCols] = useState<string[]>(
     () => storage.boardExportCols.get(DEFAULT_EXPORT_KEYS) ?? DEFAULT_EXPORT_KEYS)
   const setCols = (keys: string[]) => {
@@ -841,6 +845,29 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
           <RefreshCw className={`h-3 w-3 ${refreshing ? 'animate-spin' : ''}`} />
           刷新
         </button>
+        {/* [R312] 「全量回测」。用户: 「在刷新后面加个一键回测所有个股」。
+
+            **摆在「刷新」紧后面是有讲究的**: 这一带全是不计费的东西。单只那个
+            弹窗跑完网格还会问一次 AI 当调参顾问, 批量不问 —— 166 只票就是 166
+            次调用, 而规则建议本身是纯函数、可复算。要听 AI 的逐只打开, 入口还在。
+
+            **它只回测, 不落盘。** 阈值一改这只票的六态整条历史跟着变(决策台的
+            方向、打分的趋势硬门槛、按转折买卖的全部统计都从它出), 而且没有
+            「撤销上一次批量」这回事。所以跑完先摆结果, 勾了才写。 */}
+        <button
+          onClick={() => setBacktestAllOpen(true)}
+          disabled={!rows.length}
+          title={rows.length
+            ? `对当前列表所见的 ${rows.length} 只各按 3%~15% 阈值网格跑一遍六态状态机。\n`
+              + '纯计算,不调用 AI、不计费。\n\n'
+              + '跑完先摆结果(现在多赚 → 改后多赚),勾选之后才写入 ——\n'
+              + '阈值一改,这只票的六态整条历史都会跟着重算。'
+            : '当前列表是空的'}
+          className="inline-flex items-center gap-1 text-[12px] px-2 py-0.5 rounded-btn border border-violet-400/30 bg-violet-400/10 text-violet-300 hover:bg-violet-400/20 disabled:opacity-50 transition-colors cursor-pointer"
+        >
+          <FlaskConical className="h-3 w-3" />
+          全量回测
+        </button>
         <button
           onClick={() => setExportOpen(true)}
           disabled={!exportRows.length}
@@ -1186,6 +1213,16 @@ title={'我在这只票上的账: 拿没拿 / 买入成本 / 现在浮盈多少�
           rowCount={exportRows.length}
           onClose={() => setExportOpen(false)}
           onExport={() => { exportHtml(); setExportOpen(false) }}
+        />
+      )}
+
+      {/* [R312] 回测的是**当前列表所见的那几只**, 不是整个自选 —— 「只看要动的」
+          「只看持有」「只看某个分组」开着的时候, 用户看到的是哪几只就跑哪几只,
+          按钮上的数字与这里传下去的数组是同一个来源。 */}
+      {backtestAllOpen && (
+        <TrendBacktestAllDialog
+          symbols={rows.map((r) => r.symbol)}
+          onClose={() => setBacktestAllOpen(false)}
         />
       )}
     </div>

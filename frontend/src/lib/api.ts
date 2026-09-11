@@ -1153,6 +1153,31 @@ export interface TrendBacktestResult {
   error?: string
 }
 
+/** [R312] 全量阈值回测里的一行 —— 每只票一条。 */
+export interface TrendBacktestBatchRow {
+  symbol: string
+  window_days: number
+  from: string
+  to: string
+  current_threshold: number
+  current_source: 'override' | 'default'
+  suggested: number
+  reason: string
+  /** 窗口内趋势段太少, 规则**拒绝**给建议(回落默认 6%) —— 不是"建议保持" */
+  sample_insufficient: boolean
+  /** 「多赚」= 跟随收益 − 买入持有, 现在这个阈值下 / 建议阈值下 各一份。
+   *  只说「建议 8%」是不可证伪的一句话, 这两个数才说得清值几个点。 */
+  excess_now: number | null
+  excess_suggested: number | null
+  flips_suggested: number | null
+  false_rate_suggested: number | null
+}
+
+export interface TrendBacktestBatchResult {
+  rows: TrendBacktestBatchRow[]
+  skipped: { symbol: string; why: string }[]
+}
+
 export interface PriceLevel {
   value: number
   label: string
@@ -5048,6 +5073,21 @@ export const api = {
     request<TrendBacktestResult>('/api/stock-analysis/trend/backtest', {
       method: 'POST', body: JSON.stringify({ symbol, use_ai: useAi }),
     }),
+
+  /** [R312] 全量阈值回测 —— 纯计算, 不调 AI、不计费。symbols 留空 = 整个自选。 */
+  stockTrendBacktestBatch: (symbols?: string[]) =>
+    request<TrendBacktestBatchResult>('/api/stock-analysis/trend/backtest-batch', {
+      method: 'POST', body: JSON.stringify({ symbols: symbols ?? [] }),
+    }),
+
+  /** [R312] 批量应用阈值 —— 一次读一次写, 要么全进要么全不进。 */
+  stockTrendSetThresholdBatch: (
+    items: { symbol: string; threshold: number | null; source?: 'manual' | 'ai' | 'rule' }[],
+  ) =>
+    request<{ applied: string[]; cleared: string[]; skipped: { symbol: string; why: string }[] }>(
+      '/api/stock-analysis/trend/threshold-batch',
+      { method: 'PUT', body: JSON.stringify({ items }) },
+    ),
 
   stockTrendSetThreshold: (symbol: string, threshold: number | null, source: 'manual' | 'ai' | 'rule' = 'manual') =>
     request<{ symbol: string | null; threshold: number; source: string }>('/api/stock-analysis/trend/threshold', {

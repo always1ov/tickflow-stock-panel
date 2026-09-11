@@ -503,6 +503,64 @@ async def trend_backtest(request: Request, req: TrendBacktestRequest):
     return await livermore_service.run_backtest(request.app.state.repo, req.symbol, req.use_ai)
 
 
+class TrendBacktestBatchRequest(BaseModel):
+    """[R312] 全量阈值回测请求。symbols 为空 = 整个自选。"""
+    symbols: list[str] = []
+
+
+# 一次批量的上限。自选 166 只是常态, 给到 400 留足余量;
+# 再多就该分批发 —— 一次请求算几千只票会把连接卡在那里超时。
+_BATCH_MAX = 400
+
+
+@router.post("/trend/backtest-batch")
+def trend_backtest_batch(request: Request, req: TrendBacktestBatchRequest):
+    """[R312] 全量阈值回测 —— **纯计算, 不调 AI、不计费**(与「刷新」同一带)。
+
+    单只那个弹窗会额外问一次 AI 当调参顾问; 批量不问 —— 166 只票就是 166 次
+    调用, 而规则建议本身是纯函数、可复算, 样本不足时还会明说不足以调参。
+    要听 AI 的意见, 逐只打开那个弹窗, 入口一直在。
+    """
+    from app.services import livermore_service, watchlist
+    syms = [x for x in (req.symbols or []) if str(x).strip()]
+    if not syms:
+        syms = sorted(watchlist.symbol_set())
+    if not syms:
+        raise HTTPException(400, "自选是空的,没有可回测的标的")
+    if len(syms) > _BATCH_MAX:
+        raise HTTPException(400, f"一次最多回测 {_BATCH_MAX} 只,收到 {len(syms)} 只")
+    return livermore_service.batch_backtest(request.app.state.repo, syms)
+
+
+class TrendThresholdBatchItem(BaseModel):
+    symbol: str
+    threshold: float | None = None
+    source: str = "rule"
+
+
+class TrendThresholdBatchRequest(BaseModel):
+    """[R312] 批量应用阈值。threshold=null = 清除该票覆盖。"""
+    items: list[TrendThresholdBatchItem] = []
+
+
+@router.put("/trend/threshold-batch")
+def set_trend_threshold_batch(req: TrendThresholdBatchRequest):
+    """[R312] 批量写入阈值覆盖 —— 一次读一次写, 要么全进要么全不进。
+
+    **不是循环调单只那个接口。** 那样 166 只就是 166 次整文件读写, 而且中途
+    出错会留下半套(前 80 只改了、后 86 只没改), 用户看到的只有一个失败提示。
+    """
+    from app.services import livermore_service
+    if not req.items:
+        raise HTTPException(400, "没有要应用的项")
+    if len(req.items) > _BATCH_MAX:
+        raise HTTPException(400, f"一次最多应用 {_BATCH_MAX} 只")
+    for it in req.items:
+        if it.source not in ("manual", "ai", "rule"):
+            raise HTTPException(400, f"source 无效: {it.source}")
+    return livermore_service.set_thresholds([it.model_dump() for it in req.items])
+
+
 class TrendThresholdRequest(BaseModel):
     """设置六态阈值。symbol 为空 = 改全局默认;threshold=null = 清除该票覆盖。"""
     symbol: str = ""
