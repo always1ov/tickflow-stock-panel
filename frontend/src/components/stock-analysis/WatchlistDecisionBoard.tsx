@@ -17,7 +17,7 @@ import { storage } from '@/lib/storage'
 import { buildBoardHtml } from '@/lib/decisionBoardHtmlExport'
 import { DEFAULT_EXPORT_KEYS } from '@/lib/decisionBoardExportColumns'
 import { ExportColumnsDialog } from '@/components/stock-analysis/decision-board/ExportColumnsDialog'
-import { ChannelStateCell, ConclusionCell, NUM, TD_BASE } from '@/components/stock-analysis/decision-board/cells'
+import { ChannelStateCell, PositionCell, PlayCell, NUM, TD_BASE } from '@/components/stock-analysis/decision-board/cells'
 import { LotsLink } from '@/components/stock-analysis/decision-board/LotsLink'
 // [R169] 合并视图(手填 ⊕ 上游批次登记), 字段说明见 api.ts 的 EffectivePosition
 type Position = EffectivePosition
@@ -88,7 +88,11 @@ const BOARD_COLS = [
   // 顺序是有讲究的: 上面是事实(这个价算贵还是便宜), 下面是结论(所以今天该干嘛)。
   // [R297] 18% → 21%: 吃掉「进度」5.5% 里的大半, 余下匀给 AI 信号(它吃剩下的)。
   // 内容上限跟着抬到 23rem —— R283 的教训: 那个上限低于列宽时, 光加列宽没用。
-  { label: '档位', w: '21%' },
+  // [R307] 21% 一列拆成两列: 「档位」只说位置, 「怎么办」独立。
+  // 用户: 「这一列我只想看位置, 表示位置」。档位那半只有一行(徽标 + 刻度),
+  // 用不了多少宽; 会长的是「怎么办」那一行事件与理由, 宽度给它。
+  { label: '档位', w: '9%' },
+  { label: '怎么办', w: '14%' },
   // [R249] 账目三列从「现价」后面挪到这里。用户: 「我有点乱, 是否有好办法整理
   // 好顺序调整显示和列」。**原来它们把判断切开了** —— 扫表时要连着读
   // 「走势 → 结论」, 中间却横着三列只有持仓那几只才用得上的账目。
@@ -923,24 +927,31 @@ title={'两行: 六态趋势 / 价格·六态·均线三个尺度转到第几步
                 </th>
                 {/* [R297] 「进度」那一列并到「结论」里去了 —— 那两个读数是结论的
                     刻度, 不是第四条结论。见下面「结论」表头的说明。 */}
+                {/* [R307] 「档位」**不挂排序目标**。R254 那条「点不到的排序键全
+                    删掉」把 `verdict` 删过一次, 这次拆列不把它加回来 —— 加回来
+                    就得再立一套"偏买→偏卖"的次序, 而那个次序后端已经有了
+                    (`verdict.rank`), 两处定义同一件事必然漂。要按档位找票,
+                    「怎么办」那一列的急迫程度已经把该动的顶到前面了。 */}
+                <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center"
+title={'一行: 这个价现在算高还是算低 · 已经这样几天 · 这一段走到哪一步了。\n\n'
+                      + '用户: 「这一列我只想看位置, 表示位置」—— 所以「怎么办」搬去了右边\n'
+                      + '那一列, 这里只剩位置本身与它的刻度。数字全在格子的悬停里。'}>
+                  档位
+                </th>
                 <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center">
                   <button onClick={() => cycleSort('play')}
                           className={`${thBtn} whitespace-nowrap`}
-title={'三行, 每行都是「一个判定 + 它的刻度」:\n'
-                            + '  ① 这个价现在算高还是算低 · 已经这样几天 · 这一段走到哪一步了\n'
-                            + '  ② 今天该干嘛(五套判定合成的一句话) · 这个速度还撑不撑得住\n'
-                            + '  ③ 事件 · 理由 · 另有几处判定不一致\n\n'
-                            + '[R297] ①② 右边那两个词原来是独立的「进度」列 —— 它们是档位的刻度,\n'
-                            + '不是第四个判定, 所以各自贴回它修饰的那一行。数字全在格子的悬停里。\n\n'
-                            + '点这里按「怎么办」的急迫程度排: 按纪律走 > 今天就得动 > 先别动 > '
+title={'两行:\n'
+                            + '  ① 今天该干嘛(五套判定合成的一句话) · 这个速度还撑不撑得住\n'
+                            + '  ② 事件 · 理由 · 另有几处判定不一致(单行截断, 全文在悬停)\n\n'
+                            + '「还撑不撑得住」原来是独立的「进度」列 —— 它是这个判断的刻度,\n'
+                            + '不是第二个判定, 所以贴回它修饰的那一行。\n\n'
+                            + '点这里按急迫程度排: 按纪律走 > 今天就得动 > 先别动 > '
                             + '盯着 > 留意 > 没事。\n'
                             + '最急在前 → 最闲在前 → 回默认顺序。'}>
-                    {/* [R250] 表头**只有「结论」两个字**。用户: 「别搞贵不贵怎么办,
-                        我就只想显示结论两个字」。
-                        原来点一下会在表头缀出「贵不贵」/「怎么办」标出当前排序目标 ——
-                        那是把**内部分层**摆到表头上, 而这一列对外就叫「结论」。
-                        排序照旧在两者之间轮换, 说明留在悬停里。 */}
-                    档位
+                    {/* [R250] 表头**只印列名**, 不缀当前排序目标 —— 那是把内部
+                        分层摆到表头上。排序照旧, 说明留在悬停里。 */}
+                    怎么办
                     {caret('play')}
                   </button>
                 </th>
@@ -1019,13 +1030,12 @@ title={'我在这只票上的账: 拿没拿 / 买入成本 / 现在浮盈多少�
                       trend={r.trend} trendCls={r.trend ? trendBadgeCls(r.trend.state) : undefined}
                       geo={r.kc?.geo} runs={r.kc?.runs} ph={r.ph} kc={r.kc} close={r.close}
                       onOpenReview={() => setReview({ symbol: r.symbol, name: r.name, tab: 'trend' })} />
-                    {/* [R212 → R297] 结论 = 贵不贵(位置) + 怎么办(动作) + 事件理由,
-                        三行竖排; 每行右边贴着它自己的刻度(走到哪一步 / 快慢),
-                        那两个读数原来是独立的「进度」列。 */}
-                    <ConclusionCell v={r.kc?.verdict} ev={r.ev} geo={r.kc?.geo} runs={r.kc?.runs}
-                                    energy={r.kc?.energy} ph={r.ph} p={r.play}
-                                    stateRun={r.kc?.state_run}
-                                    onOpen={() => setReview({ symbol: r.symbol, name: r.name, tab: 'verdict' })} />
+                    {/* [R307] 「档位」只说位置: 这一档 + 待了多久 + 这一段走多远 */}
+                    <PositionCell v={r.kc?.verdict} ev={r.ev} geo={r.kc?.geo} runs={r.kc?.runs}
+                                  energy={r.kc?.energy} ph={r.ph} stateRun={r.kc?.state_run}
+                                  onOpen={() => setReview({ symbol: r.symbol, name: r.name, tab: 'verdict' })} />
+                    {/* [R307] 「怎么办」拿走动作那一半 */}
+                    <PlayCell p={r.play} ev={r.ev} geo={r.kc?.geo} ph={r.ph} />
                     {/* [R284] **账目从三格收成一格。** 用户: 「删除掉浮盈和成本列」。
                         空仓(158/166 行)时这一格只有一个按钮; 持有时才长出成本输入。
                         [R169] 写回时一律用 manualCost 而不是 r.cost —— r.cost 可能是批次

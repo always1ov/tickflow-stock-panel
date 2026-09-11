@@ -222,3 +222,50 @@ def test_R299_有事的那些档正文照旧有话说():
                         "stage_cn": "生命线", "action": "清仓"})
     assert r["level"] == pb.EXIT and r["why"], "出场档的正文那一行空了"
 
+
+def test_R307_逼近与已触发那两档也把说教挪进悬停():
+    """[R299 → R307] **同一个毛病的第三处。** 用户指着截图: 「排版还是非常有问题」——
+    那一格的第三行是
+
+        到上沿 19.23(趋势还在多头侧·上涨趋势) —— 沿着上沿走是趋势票的常态 ——
+        不必因为「到高位了」就减。真要减看止盈线, 别拿到轨当卖出理由
+
+    **74 个字**, 而后面 51 个字**不随票变**: 每一只落到「到上沿 + 多头侧」这一
+    分支的票印的都是同一段。前 23 个字才是这只票的读数(带具体价与方向)。
+
+    `watchlist_urgency` 本来就把两者分成 `what` / `action` 两个字段, 是
+    `stock_playbook` 用 `f"{what} —— {action}"` 把它们又粘回去了。拆开即可。
+    """
+    r = _run(urgency={"level": "band", "label": "到上沿", "side_cn": "",
+                      "what": "到上沿 19.23(趋势还在多头侧·上涨趋势)",
+                      "action": "沿着上沿走是趋势票的常态 —— 不必因为「到高位了」就减。"
+                                "真要减看止盈线, 别拿到轨当卖出理由"})
+    assert r["level"] == pb.WATCH
+    assert r["why"] == "到上沿 19.23(趋势还在多头侧·上涨趋势)", (
+        f"正文那一行还拖着说教: {r['why']!r}"
+    )
+    assert "沿着上沿走是趋势票的常态" in r["note"], "那句道理没了 —— 那是删信息, 不是精简"
+    assert len(r["why"]) < len(r["note"]), "场景没搭对: 说教该比读数长得多"
+
+
+def test_R307_已触发那一档同样只留读数():
+    """反面配对: 别只修「逼近」那一支 —— 「今天已触发」走的是同一个粘法。"""
+    r = _run(exit_line={"triggered": False},
+             urgency={"level": "triggered", "side_cn": "卖",
+                      "what": "生命线 399.85 已跌破 3.6%",
+                      "action": "按纪律清仓, 别等反弹"})
+    assert r["level"] == pb.ACT
+    assert r["why"] == "生命线 399.85 已跌破 3.6%", f"正文还拖着说教: {r['why']!r}"
+    assert r["note"] == "按纪律清仓, 别等反弹"
+
+
+def test_R307_形态那两档也一样():
+    """「该想退出计划了」「酝酿中」原来是 `phase.why —— phase.watch` 粘起来的。
+    `why` 是这一段的读数, `watch` 是该盯什么 —— 后者不随票变, 进悬停。"""
+    ph = {"code": "coiling", "cn": "横盘中", "why": "三条线挤在一起, 方向还没选",
+          "watch": "等方向选出来再动, 别猜"}
+    r = _run(position={"held": False}, phase=ph)
+    assert r["level"] == pb.SHAPE and r["headline"] == "酝酿中"
+    assert r["why"] == "三条线挤在一起, 方向还没选", f"正文还拖着说教: {r['why']!r}"
+    assert r["note"] == "等方向选出来再动, 别猜"
+

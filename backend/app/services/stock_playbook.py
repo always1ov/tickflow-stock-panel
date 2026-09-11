@@ -177,7 +177,13 @@ def playbook(*, position: dict | None, trend: dict | None, exit_line: dict | Non
     if urg.get("level") == "triggered":
         side = urg.get("side_cn") or ""
         return {**_mk(ACT, f"{side}点已触发" if side else "已触发",
-                      f"{urg.get('what') or ''} —— {urg.get('action') or ''}".strip(" —"),
+                      # [R307] `what` 是**这只票的读数**(带具体价与百分比),
+                      # `action` 是**这一档该怎么办的道理**(每只落到同一分支的
+                      # 票都是同一句)。R299 已经为 EXIT/CONFLICT 拆过一次, 这里
+                      # 是同一个毛病的第三处 —— 串在一起会让一句 20 字的读数
+                      # 拖着 40 字的说教, 在一张 166 行的表里挤爆那一格。
+                      urg.get("what") or "",
+                      note=urg.get("action") or "",
                       price=ex.get("line")),
                 "conflicts": conflicts}
 
@@ -195,7 +201,8 @@ def playbook(*, position: dict | None, trend: dict | None, exit_line: dict | Non
     if urg.get("level") in ("near", "flip", "band"):
         side = urg.get("side_cn") or ""
         return {**_mk(WATCH, f"{urg.get('label')}{side and '·' + side}",
-                      f"{urg.get('what') or ''} —— {urg.get('action') or ''}".strip(" —"),
+                      urg.get("what") or "",
+                      note=urg.get("action") or "",
                       price=ex.get("line")),
                 "conflicts": conflicts}
 
@@ -204,7 +211,8 @@ def playbook(*, position: dict | None, trend: dict | None, exit_line: dict | Non
     ev_code = (event or {}).get("code")
     if held and ph_code in ("overextended", "stalling"):
         return {**_mk(SHAPE, "该想退出计划了",
-                      f"{(phase or {}).get('why') or ''} —— {(phase or {}).get('watch') or ''}"),
+                      (phase or {}).get("why") or "",
+                      note=(phase or {}).get("watch") or ""),
                 "conflicts": conflicts}
     if not held and ev_code in ("main_advance", "breakout_hold"):
         return {**_mk(SHAPE, "值得看一眼",
@@ -212,7 +220,8 @@ def playbook(*, position: dict | None, trend: dict | None, exit_line: dict | Non
                 "conflicts": conflicts}
     if not held and ph_code == "coiling":
         return {**_mk(SHAPE, "酝酿中",
-                      f"{(phase or {}).get('why') or ''} —— {(phase or {}).get('watch') or ''}"),
+                      (phase or {}).get("why") or "",
+                      note=(phase or {}).get("watch") or ""),
                 "conflicts": conflicts}
 
     # [R299] 这一档的 `why` **本来就没有内容可说** —— 它只是把「没事」换个说法

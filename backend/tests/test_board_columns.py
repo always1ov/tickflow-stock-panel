@@ -66,7 +66,10 @@ def test_列的顺序是_认票_凭什么_我的账_别人的意见():
         # [R306] 列名「结论」→「档位」。用户: 「结论这个名称改成位置」—— 问到
         # 「通道位置」与打分系统里 `channel_pct` 撞名时, 选了「通道档位」。
         # 界面上本来就满处是「这一档」「十档」「换档」, 它是十个档位。
-        "走势", "档位",               # 凭什么(判断必须连着, 不许被账目切开)
+        # [R307] 「档位」又拆成两列。用户: 「这一列我只想看位置, 表示位置」——
+        # 「怎么办」不是档位(它是五套判定合成的动作), 跟这一列的名字对不上,
+        # 所以拿回自己一列。**它没被删** —— 决策台上它是唯一的行动指引。
+        "走势", "档位", "怎么办",      # 凭什么(判断必须连着, 不许被账目切开)
         # [R284] 「成本」「浮盈」两列删掉(用户: 「删除掉浮盈和成本列」)——
         # 它们为 5% 的行占着 9% 的宽度(持有 8 / 自选 166)。成本**输入框**保留,
         # 挪进这一格: 它是出场线的输入, 不是展示。
@@ -81,7 +84,7 @@ def test_账目三列必须排在判断之后():
     """R249 之前它们在「现价」与「走势」之间。这条独立于上面那条写 ——
     就算以后列增减, **判断不许被账目切开**这条纪律也得留着。"""
     cols = _cols(_src())
-    judge = max(cols.index("走势"), cols.index("档位"))   # [R297] 「进度」并进去了
+    judge = max(cols.index("走势"), cols.index("档位"), cols.index("怎么办"))
     ledger = cols.index("持仓")     # [R284] 账目从三列收成一列
     assert ledger > judge, (
         f"账目列插到判断列中间了 —— 扫表时「走势→结论」读不连贯。当前顺序: {cols}"
@@ -155,10 +158,15 @@ def test_R250_表头只印列名不印排序目标():
     render = re.sub(r"\{/\*.*?\*/\}", "", th_block, flags=re.S)
     render = re.sub(r'title=(?:"[^"]*"|\{(?:[^{}]|\{[^{}]*\})*\})', "", render, flags=re.S)
 
-    for bad in ("贵不贵", "怎么办", "六态", "'价'", "涨跌'"):
+    # [R307] 「怎么办」从禁用词里拿掉了 —— **它现在是一个列名, 不再是排序目标**
+    # (与 R277 给「进度」做过的同一件事)。原来的意图一个字不改: 它不许再作为
+    # **分层**缀在别的列头上, 由下面那条 `档位` 表头的检查兜住。
+    for bad in ("贵不贵", "六态", "'价'", "涨跌'"):
         assert bad not in render, (
             f"表头又缀上排序目标「{bad}」了 —— 用户只要列名本身"
         )
+    pos_th = render[render.index("档位") - 300:render.index("档位") + 60]
+    assert "怎么办" not in pos_th, "「怎么办」又缀回「档位」表头上了 —— 它该是独立一列"
     # [R277 → R297] 「间距/进度」不再是列名了(那一列并进「结论」), 于是它回到
     # **禁用词**那一侧: 表头上不许出现它 —— 无论是缀在「走势」头上(R250 原本
     # 防的那件事), 还是缀在「结论」头上(R297 之后新的犯错方式)。
@@ -166,7 +174,7 @@ def test_R250_表头只印列名不印排序目标():
     assert "进度" not in render, "「进度」缀回表头了 —— 它已经不是一列, 表头只印列名"
     assert "间距" not in render, "「间距」缀回表头了"
     # 正面: 列名都还在
-    for name in ("档位", "走势", "现价/涨跌", "持仓"):
+    for name in ("档位", "怎么办", "走势", "现价/涨跌", "持仓"):
         assert name in render, f"表头把「{name}」弄丢了"
 
 
@@ -455,59 +463,56 @@ def test_R253_到价预案固定竖排一个一行():
     assert "whitespace-nowrap" in block, "单个预案自己不该再折行"
 
 
-def test_R255_结论列与AI信号列同一套排版():
-    """用户: 「结论列也要像 ai 信号列那样排版」。
+def test_R307_两列各自竖排且共用一条中轴():
+    """[R255 → R298 → R299 → R307] 这条追了四版, **守的东西一路没变**:
+    这一格里每一件事各占一行(不许横排挤回去), 而且行与行之间要有一条真的对齐线。
 
-        贵不贵 已N天      ← 一行
-        怎么办            ← 一行
-        说明文字…         ← 整段折行, 不再单行截断
+    R307 把一列拆成两列(用户: 「这一列我只想看位置」), 于是:
+      · 「档位」列一行  —— 徽标靠右 │ 刻度靠左
+      · 「怎么办」列两行 —— 同样的中轴, 底下再加一行单行截断的说明
 
-    R217 当初把这一列压成**固定两行**(徽标横排 + 说明 `truncate`), 是因为那时
-    它会摞到五层、每行高度还不一样。**那个顾虑现在不成立了** —— 隔壁 AI 信号列
-    R253 起就是固定竖排三行到价预案, 行高本来就由它撑着。
+    **那条中轴是两列各自的**, 所以两处都得有; 少一处那一列就散回去了。
     """
     root = _BOARD.parent
     cells = (root / "decision-board" / "cells.tsx").read_text(encoding="utf-8")
-    body = "\n".join(ln for ln in cells.splitlines()
-                     if not ln.lstrip().startswith(("//", "*", "/*")))
-    # 只取**渲染那一段**(从 `return (` 起)。
-    # 试过用 `\n}` 收尾 —— 会停在 props 类型那个 `}) {` 上, 整段渲染代码没被检查到;
-    # 换 `\n}\n` 又因为这个函数正好在文件末尾(没有末行换行)而找不到。
-    # 从 `return (` 起到下一个顶层声明为止最稳。
-    i = body.index("export function ConclusionCell")
-    blk = body[body.index("return (", i):]
-    m = re.search(r"\n(?:export )?(?:function|const) ", blk)
-    if m:
-        blk = blk[:m.start()]
+    for fn in ("PositionCell", "PlayCell"):
+        i = cells.index(f"export function {fn}")
+        blk = cells[cells.index("return (", i):]
+        m = re.search(r"\n(?:export )?(?:function|const) ", blk)
+        if m:
+            blk = blk[:m.start()]
+        assert "grid-cols-[max-content_max-content]" in blk, f"{fn} 没有那条中轴"
+        assert "justify-self-end" in blk, f"{fn} 的判定格没靠右, 中轴对不上"
+        assert "flex-col items-start" not in blk, f"{fn} 又靠左了 —— 整张表都是居中的"
+        assert "!text-left" not in blk, f"{fn} 还覆写着左对齐"
+        assert "mx-auto" in blk, f"{fn} 的容器没有 mx-auto, 整格还是靠左"
+        # 反面: 两件事不许又挤回同一行(那是 R217 那版, R255 拆开的)
+        assert "flex flex-wrap items-center justify-center" not in blk, f"{fn} 又横排回去了"
 
-    # [R255 → R298] **左对齐改回居中。** 用户: 「每列都居中对齐好」。
-    # R255 那句理由(竖排之后居中会让三行的左边缘参差不齐)在当时是对的; R297
-    # 之后前两行各自是「徽标 + 一个短词」宽度接近了, 而第三行绝大多数在一行以内,
-    # 参差的前提没了。**这条守的规矩一个字没变**: 竖排, 不许再横排回去。
-    # [R298 → R299] 居中的**做法**换了: 从"每行各自居中"改成"两行共用一条中轴"。
-    # 用户看着截图: 「排版不好看」—— 两行宽度不一样(「候选池 已1天+」比「没事」
-    # 宽出一大截), 各自居中之后四个边缘全是散的。改成两列网格: 判定靠右、
-    # 刻度靠左, 中间那条缝成了一条真的竖线, 两行锁在一起。
-    assert "grid-cols-[max-content_max-content]" in blk, "两行没有共用那条中轴"
-    # **两行都得靠右, 所以数个数而不是"在不在"。** 只钉"在不在"的话, 把第二行
-    # 那个 `justify-self-end` 拿掉照样绿 —— 而那正好就是中轴散掉的样子
-    # (第一版就是这么漏的, 变异当场抓到)。
-    assert blk.count("justify-self-end") == 2, (
-        f"靠右的判定格有 {blk.count('justify-self-end')} 个 —— 该是两行各一, 否则中轴对不上"
-    )
-    assert "flex-col items-start" not in blk, "又靠左了 —— 整张表除它以外都居中"
-    # 光有 `justify-center` 不够: 带 `max-w` 的块级容器不会自己居中(这一处漏了
-    # 的话整格看着还是靠左 —— 最难查的那种「改了没效果」)
-    assert "mx-auto grid max-w-[" in blk, "带 max-w 的容器没有 mx-auto, 整格还是靠左"
-    assert "!text-left" not in blk, "还覆写着左对齐"
-    # 反面照旧: 两个徽标不许又挤回同一行(那是 R217 那版, R255 拆开的)
-    assert "flex flex-wrap items-center justify-center" not in blk, (
-        "两个徽标又横排回去了"
-    )
-    assert "whitespace-normal break-words" in blk, (
-        "说明又变回单行截断了 —— AI 信号那一列的理由是整段折行的"
-    )
-    assert "truncate" not in blk, "说明还在用 truncate 截断"
+
+def test_R307_说明那一行单行截断且不参与列宽():
+    """用户第三次指着这一格: 「排版还是非常有问题」。
+
+    **病根有两层**:
+      ① 那一行说明原来在网格里(`col-span-2`), 它一长就把两列撑开, 上面的徽标
+         跟着被推散 —— `max-w` 挡不住: `max-content` 先按内容算宽再被裁,
+         裁掉的是内容不是布局;
+      ② R255 把它从单行截断改成整段折行, 那时这一列是**左对齐**的; R298 改居中
+         之后, 居中 + 多行 + 每行长度不一 = 几行各自一个宽度, 中轴全白对了。
+
+    所以它现在是网格**外面**的同级块, 铺满整格宽度、单行截断, 行高固定。
+    **信息一个字没丢** —— 全文在悬停里(`tip` 连 `note` 一起给)。
+    """
+    # **必须剥注释。** 上面那段说明里就写着 `col-span-2`(讲的正是它为什么被
+    # 拿出来), 直接读原文的话断言会吃到自己的注释 —— 本仓库这个坑的第 N 次。
+    from tests.frontend_source import code_of
+    blk = code_of("components/stock-analysis/decision-board/cells.tsx")
+    blk = blk[blk.index("export function PlayCell"):]
+    assert "col-span-2" not in blk, "说明那一行又回到网格里了 —— 它一长就把徽标推散"
+    assert "w-full truncate text-center" in blk, "说明那一行不是单行截断"
+    assert "whitespace-normal break-words" not in blk, "又改回整段折行了"
+    assert "title={tip}" in blk, "全文没进悬停 —— 截断而不给全文就是把话吞了"
+
 
 
 def test_R257_走势列的三行各管一件事():
@@ -545,92 +550,91 @@ def test_R257_走势列的三行各管一件事():
     assert "{ph.pace_cn}" not in blk, "快慢也一样, 它属于「间距」列"
 
 
-def test_R297_成熟度与快慢并进结论那一格且各自贴住它修饰的那一行():
-    """[R277 → R297] 正面: **合并不是删除**, 两个读数都得在新格子里真的渲染出来。
+def test_R307_走到哪一步归档位_快慢归怎么办():
+    """[R277 → R297 → R307] 这两个读数一路在搬家, **一次都没丢**(加速度曾经在
+    决策台上根本看不见, R277 才给了它位置)。这一版按"位置 / 动作"分家:
 
-    **加速度此前在决策台上根本看不见** —— 走势列那一行写的是
-    `align ? align.cn : pace_cn`, 而 `alignment()` 只要六态/位置/间距三样都在
-    就返回非空(几乎永远), 于是快慢那一支轮不上; 悬停里被同一个三元顶掉。
-    R277 给了它一个位置, R297 换了个位置, 这条一路钉住它没再消失。
+      · **走到哪一步**(这一段走了多远)是**位置的刻度** → 留在「档位」列
+      · **快慢**(这个速度还撑不撑得住)是那个判断的刻度 → 跟着「怎么办」走
 
-    **顺序是这次合并的全部内容, 所以一并钉住**:
-      · 成熟度贴着**结论徽标**那一行 —— 它与「已N天」是同一个问题的两把尺
-        (走了多久 / 走了多远), 都在回答"到什么程度了";
-      · 快慢贴着**怎么办**那一行 —— 它是前瞻的那一半, 「该止盈了·正在放慢」
-        与「该止盈了·还在加速」是两句不同的话。
-    对调的话两行都读不通, 而且不会有任何东西报错。
+    分错的话两列都读不通, 而且不会有任何东西报错。
     """
     from tests.frontend_source import code_of
     code = code_of("components/stock-analysis/decision-board/cells.tsx")
-    blk = code[code.index("export function ConclusionCell"):]
-    blk = blk[blk.index("return ("):]
-    assert "ph?.maturity_cn" in blk, "结论列没印成熟度 —— 合并把它弄丢了"
-    assert "ph?.pace_cn" in blk, "结论列没印快慢 —— 加速度又看不见了"
-    assert blk.index("<VerdictInner") < blk.index("ph?.maturity_cn") < blk.index("<PlaybookInner"), (
-        "成熟度没有贴着结论徽标那一行"
-    )
-    assert blk.index("<PlaybookInner") < blk.index("ph?.pace_cn"), (
-        "快慢没有贴着「怎么办」那一行"
-    )
+    pos = code[code.index("export function PositionCell"):code.index("export function PlayCell")]
+    play = code[code.index("export function PlayCell"):]
+    assert "ph?.maturity_cn" in pos and "ph?.pace_cn" not in pos, "「档位」列里混进了快慢"
+    assert "ph?.pace_cn" in play and "ph?.maturity_cn" not in play, "「怎么办」列里混进了走到哪一步"
 
 
-def test_R297_合并后结论列吃掉了进度那一列的宽度():
-    """**R283 那一课**: 「结论」一直被挤的真原因不是列宽, 是**内容的 `max-w` 上限**
-    低于列宽 —— 那一版列宽 18% 在常见视口上有 300px 出头, 内容却被硬卡在 240px,
-    光加列宽一点用都没有。**两者得一起动。**
+def test_R307_档位列只说位置():
+    """用户: 「这一列我只想看位置, 表示位置」。
 
-    R297 往这一列里加了两个读数, 如果只删掉「进度」那一列而不抬这两个数, 就是
-    把 R283 那个 bug 原样重犯一遍。所以正反各钉一条:
-      · 列宽真的涨了(吃掉「进度」原来那 5.5% 的大半);
-      · 内容上限不再是瓶颈 —— 它得比列宽在常见视口上折算出来的像素还宽。
+    正面: 这一列有档位徽标与它的刻度。
+    反面: **动作那一半一个字都不许留** —— 怎么办徽标、事件、理由, 全在隔壁。
+    """
+    from tests.frontend_source import code_of
+    code = code_of("components/stock-analysis/decision-board/cells.tsx")
+    pos = code[code.index("export function PositionCell"):code.index("export function PlayCell")]
+    assert "<VerdictInner" in pos, "「档位」列没有档位徽标"
+    for gone in ("<PlaybookInner", "line2", "conflicts", "ev!.cn"):
+        assert gone not in pos, f"「档位」列里还留着动作那一半: {gone}"
+
+
+
+def test_R307_两列的宽度与内容上限对得上():
+    """**R283 那一课**: 「结论」被挤的真原因不是列宽, 是内容的 `max-w` 上限
+    低于列宽 —— 光加列宽一点用都没有。两者得一起动。
+
+    R307 把 21% 拆成两列, 这条跟着换算: 档位那半只有一行(徽标 + 一个短词),
+    用不了多少宽; 会长的是「怎么办」那一行事件与理由, 宽度给它。
     """
     src = _src()
     blk = src[src.index("const BOARD_COLS = ["):]
     blk = blk[:blk.index("] as const")]
-    m = re.search(r"label: '档位', w: '(\d+(?:\.\d+)?)%'", blk)
-    assert m, "「档位」那一列没有宽度了"
-    pct = float(m.group(1))
-    assert pct >= 21, f"「结论」列宽还是 {pct}% —— 并进来两个读数却没给它宽度"
-
+    got = dict(re.findall(r"label: '([^']+)', w: '(\d+(?:\.\d+)?)%'", blk))
+    assert "档位" in got and "怎么办" in got, f"两列没都拿到宽度: {got}"
+    pos_w, play_w = float(got["档位"]), float(got["怎么办"])
+    assert play_w > pos_w, (
+        f"「怎么办」比「档位」还窄({play_w}% vs {pos_w}%) —— 会长的是它那一行说明"
+    )
     root = _BOARD.parent
     cells = (root / "decision-board" / "cells.tsx").read_text(encoding="utf-8")
-    cap = re.search(r"(?:flex|grid) max-w-\[(\d+(?:\.\d+)?)rem\]", cells)
-    assert cap, "结论列内容的 max-w 上限没了"
+    cap = re.search(r"max-w-\[(\d+(?:\.\d+)?)rem\]", cells)
+    assert cap, "「怎么办」列内容的 max-w 上限没了"
     rem = float(cap.group(1))
     # 常见视口按 1400px 表宽折算 —— R283 就是在这个量级上撞到上限的
-    assert rem * 16 >= 1400 * pct / 100, (
-        f"内容上限 {rem}rem({rem * 16:.0f}px)低于列宽 {pct}%(约 {1400 * pct / 100:.0f}px)"
+    assert rem * 16 >= 1400 * play_w / 100, (
+        f"内容上限 {rem}rem({rem * 16:.0f}px)低于列宽 {play_w}%(约 {1400 * play_w / 100:.0f}px)"
         " —— 又变成 R283 那个「加了列宽也没用」的局面"
     )
 
 
-def test_R297_合并没有把结论列摞成五行():
-    """**这条是那次合并唯一真正的风险守卫。**
 
-    直接把「进度」两行摞到「结论」下面就是五行 —— 那正是 R217 撤过的病
-    (「原来这一列会摞到五层…每行高度还不一样, 上一行的尾巴挂到下一行的表头
-    底下, 行与行糊成一片」)。**病根是行数与行高参差, 不是每行的内容量**,
-    所以两个读数得**并进已有的行**, 而不是各占一行。
+def test_R307_两列各自的行数都是固定的():
+    """R217 那个病: 一格摞到五层、每行高度还不一样, 上一行的尾巴挂到下一行的
+    表头底下。**病根是行数与行高参差**, 所以两列各自的块数都得钉死。
 
-    钉法: 那个纵向 flex 容器的直接子节点必须仍是**三个**(结论行 / 怎么办行 /
-    说明行)。多一个就是摞上去了。
+      · 「档位」列 一行  = 网格里两格(徽标 / 刻度)
+      · 「怎么办」列 两块 = 那个网格 + 一行单行截断的说明
     """
     from tests.frontend_source import code_of
     code = code_of("components/stock-analysis/decision-board/cells.tsx")
-    blk = code[code.index("export function ConclusionCell"):]
-    outer = blk[blk.index("grid max-w-["):]
-    outer = outer[:outer.index("</div>")]
-    # 顶层子节点 = 缩进恰好 8 空格的**开**标签(容器本身缩进 6, 嵌套的更深)。
-    # 收尾标签 `</span>` 也落在这个缩进上, 得排掉 —— 不排的话会数多, 而数多
-    # 恰好就是这条要防的那件事, 会给出一条看着像真的假警报(第一版就是)。
+    pos = code[code.index("export function PositionCell"):code.index("export function PlayCell")]
+    grid = pos[pos.index("grid-cols-["):]
+    grid = grid[:grid.index("</div>")]
+    cells_n = [ln.strip() for ln in grid.splitlines()
+               if (ln.startswith("        <") and not ln.startswith("        </"))]
+    assert len(cells_n) == 2, f"「档位」列该是两格(徽标/刻度), 现在是 {len(cells_n)}: {cells_n}"
+
+    play = code[code.index("export function PlayCell"):]
+    outer = play[play.index("flex w-full max-w-["):]
+    outer = outer[:outer.index("\n      </div>")]
     top = [ln.strip() for ln in outer.splitlines()
            if (ln.startswith("        <") and not ln.startswith("        </"))
            or ln.startswith("        {")]
-    # [R299] 版面从"三个纵向子节点"换成两列网格, 于是**格子数**变成 5:
-    # 行1 两格(判定 / 刻度)、行2 两格、行3 一格跨两列。行数还是三行 ——
-    # 换算关系写在这儿, 免得下次看到 5 以为又摞上去了。
-    assert len(top) == 5, f"结论列的格子数变了(该是 2+2+1), 现在是 {len(top)}: {top}"
-    assert "col-span-2" in outer, "第三行没有跨两列 —— 它会被塞进判定那一列里"
+    assert len(top) == 2, f"「怎么办」列该是两块(网格 + 说明), 现在是 {len(top)}: {top}"
+
 
 
 def test_R277_走势列不再回退到快慢():
@@ -776,7 +780,8 @@ def test_R261_走了多远那一行是统一色():
     # —— **守的规矩一个字没变**: 成熟度是事实读数不是判断, 所以统一次要色,
     # 不许挂条件配色。快慢正相反(R278): 它**是**判断(在往多头还是空头变),
     # 所以按 `level` 上色 —— 两者用的是同一个 `Qualifier`, 差别只在传不传 `cls`。
-    body = body[body.index("export function ConclusionCell"):]
+    # [R307] 成熟度跟着「走到哪一步」留在「档位」列了
+    body = body[body.index("export function PositionCell"):]
     body = body[body.index("return ("):]
     def _tag(mark: str) -> str:
         """含 `mark` 的那一整个 `<Qualifier … />` —— **必须切到 `/>`**:

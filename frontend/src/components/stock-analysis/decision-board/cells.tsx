@@ -202,7 +202,7 @@ function VerdictInner({ v, ev, geo, runs, energy, ph, stateRun, onOpen }: {
   // 而不是内容上面一部分下面一部分」—— 原来这一列会摞到五层(结论徽标 / 事件行 /
   // 怎么办徽标 / 两行折行的理由 / 另有 N 处), 每行高度还不一样, 于是上一行的
   // 尾巴挂到下一行的表头底下, 行与行糊成一片。
-  // 现在整列固定两行, 事件并进第二行那句话里, 见 ConclusionCell。
+  // 现在整列固定两行, 事件并进第二行那句话里 —— [R307] 那一半已经拆去 `PlayCell`。
   if (!v) {
     // [R203] 底层在三格上返回「无结论」, 其中**两格是有信息的**:
     // 「中中上」= 长期到了上沿而中短期都休整完了, 「中中下」= 长期到了下沿
@@ -374,7 +374,7 @@ function Qualifier({ text, title, cls = 'text-muted' }: {
 }
 
 // [R277 加, R297 删] `SpreadCell`(「进度」那一列的单元格)在这里删掉了。
-// 它的两个读数并进了 `ConclusionCell` 的前两行(见上面那段说明), 悬停里的
+// 它的两个读数分别并进了 `PositionCell`(走到哪一步)与 `PlayCell`(快慢), 悬停里的
 // 数字本来就已经在「结论」列的 `geoLines()` 里(`[间距]` 与 `[快慢]` 两行)——
 // **那份重复是这次合并顺带清掉的**: 同一个量原来一列印档位、另一列悬停印数字。
 
@@ -574,40 +574,74 @@ function PlaybookInner({ p }: { p?: Playbook | null }) {
 }
 
 /**
- * [R212] 「结论」列 —— 贵不贵在上、怎么办在下, 合成一格。
+ * [R212 → R307] **拆回两列: 「档位」只说位置, 「怎么办」独立成列。**
  *
- * 用户: 「怎么办和贵不贵合成为一列叫做结论, 贵不贵在上换行怎么办在下」。
+ * 用户: 「这一列我只想看位置, 表示位置」;「位置列也是, 都围绕位置展开」。
  *
- * 我先前主张分成两列并排, 理由是"它们打架时最该被看见"。**竖排同样看得见** ——
- * 上下两行落在同一格里, 一眼就能对上; 而且省一列。所以按用户说的合。
+ * R212 是用户自己要求合的(「怎么办和贵不贵合成为一列叫做结论」), 那时这一列
+ * 叫「结论」—— 两样东西都是结论, 合得通。R306 改名成「档位」之后前提变了:
+ * **「怎么办」不是档位**, 它是五套判定合成的动作, 跟这一列的名字对不上。
  *
- * 顺序是有讲究的: 上面「贵不贵」是**位置**(这个价现在算贵还是便宜),
- * 下面「怎么办」是**动作**(所以今天该干嘛) —— 从事实到结论, 自上而下读。
+ * 拆开之后「档位」列里是一条干净的线 —— 「这一档 + 它的刻度」:
+ *
+ *     短线冲高 已1天+ │ 刚起步      ← 哪一档 · 待了多久 · 这一段走多远
+ *
+ * 而「怎么办」那一列拿走动作那一半(动作 · 这个判断还稳不稳 · 事件与理由)。
+ *
+ * **没有删掉任何东西** —— 决策台上「怎么办」是唯一的行动指引(R209 把标的列里
+ * 那份重复的删掉之后就只剩它), 删了这张表就只剩读数没有结论。
  */
-export function ConclusionCell({ v, ev, geo, runs, energy, ph, p, stateRun, onOpen }: {
+export function PositionCell({ v, ev, geo, runs, energy, ph, stateRun, onOpen }: {
   v?: KeltnerVerdict | null
-  /** [R246] 没结论那一格的时长 */
+  /** [R246] 没档位那一格的时长 */
   stateRun?: { days: number; since?: string; capped?: boolean } | null
   ev?: ChannelEvent | null
   geo?: ChannelGeometry | null
   runs?: ChannelRuns | null
   energy?: BandEnergy | null
   ph?: ChannelPhase | null
-  p?: Playbook | null
   onOpen: () => void
 }) {
-  // [R217 → R255 → R297] 三行, 每行"判定 + 它的刻度":
-  //   行 1: 结论徽标(含已N天) + 走到哪一步
-  //   行 2: 怎么办徽标(含价) + 快慢
-  //   行 3: 事件 · 理由 · 另有 N 处分歧(整段折行)
+  return (
+    <td className={`${TD_BASE} px-2`}>
+      {/* [R299] 判定靠右、刻度靠左, 中间那条缝是一条真的竖线 —— 于是"居中"
+          有了依据, 而不是每行各自居中。
+          [R307] 拆成两列之后这里只剩**一行**, 那条中轴仍然留着: 它让同一列
+          上下几十行的徽标右边缘对齐、刻度左边缘也对齐, 一眼扫得下来。 */}
+      <div className="mx-auto grid w-fit grid-cols-[max-content_max-content] items-baseline leading-snug">
+        <span className="justify-self-end">
+          <VerdictInner v={v} ev={ev} geo={geo} runs={runs} energy={energy} ph={ph}
+                        stateRun={stateRun} onOpen={onOpen} />
+        </span>
+        {/* 「走到哪一步」**是位置的刻度**(这一段走了多远), 所以它留在这一列;
+            「快慢」是动量, 跟着「怎么办」走了。 */}
+        <Qualifier text={ph?.maturity_cn} title={MATURITY_TIP} />
+      </div>
+    </td>
+  )
+}
+
+
+/**
+ * [R307] 「怎么办」列 —— 五套判定合成的那一句动作。
+ *
+ * 两行:
+ *
+ *     该止盈了 41.20 │ 正在放慢       ← 今天该干嘛 · 这个判断还稳不稳
+ *     突破确认? · 生命线跌破 399.85    ← 事件 · 理由(单行截断, 全文在悬停)
+ */
+export function PlayCell({ p, ev, geo, ph }: {
+  p?: Playbook | null
+  ev?: ChannelEvent | null
+  geo?: ChannelGeometry | null
+  ph?: ChannelPhase | null
+}) {
   const evOn = ev && ev.code !== 'none'
   const more = p && p.conflicts.length && p.level !== 'conflict'
-  // [R299] 第三行**只在真有话说的时候才出现**。用户: 「没帮助的东西就不要显示了」。
-  //
-  // 「没事」那一档的 `why` 已经在后端挪进 `note` 了(它只是把「没事」换个说法再
-  // 讲一遍), 于是这一行自然消失 —— 一张 166 行的表里, 没事的那些行不该和要动的
-  // 一样占三行。这里**不判断档位**, 只判断"有没有内容": 判据留在后端一处,
-  // 前端再写一个 `level === 'idle'` 就是同一个规则两处定义(R286 立过)。
+  // [R299] 第二行**只在真有话说的时候才出现**。「没事」那一档的 `why` 已经在
+  // 后端挪进 `note` 了, 于是这一行自然消失 —— 一张 166 行的表里, 没事的那些行
+  // 不该和要动的一样占两行。这里**不判断档位**, 只判断"有没有内容":
+  // 判据留在后端一处(R286), 前端再写一个 `level === 'idle'` 就是两处定义。
   const line2 = [
     evOn ? `${ev!.cn}${ev!.confirmed ? '' : '?'}` : '',
     p?.why || '',
@@ -620,71 +654,30 @@ export function ConclusionCell({ v, ev, geo, runs, energy, ph, p, stateRun, onOp
     more ? '另有判定不一致:\n' + p!.conflicts.join('\n') : '',
   ].filter(Boolean).join('\n\n')
   return (
-    // [R255] 排版跟「AI 信号」那一列对齐。用户: 「结论列也要像 ai 信号列那样排版」。
-    //
-    //   贵不贵 已N天      ← 一行
-    //   怎么办            ← 一行
-    //   说明文字…         ← 整段折行, 不再单行截断
-    //
-    // R217 当初把这一列压成**固定两行**(徽标横排 + 说明截断), 是因为那时它会摞到
-    // 五层、每行高度还不一样, 行与行糊成一片。**那个顾虑现在不成立了**: 隔壁
-    // AI 信号列 R253 起就是固定竖排三行到价预案, 行高本来就由它撑着 —— 结论列
-    // 竖排不会再让任何一行变高, 反而两列的读法终于一致(都是从上往下一件一件读)。
-    //
-    // [R255 → R298] **左对齐改回居中。** 用户: 「每列都居中对齐好」。
-    //
-    // R255 那句理由(「竖排之后居中会让三行的左边缘参差不齐」)在**当时**是对的:
-    // 那一版三行分别是徽标 / 徽标 / 一整段折行说明, 三种宽度差得很远。
-    // R297 之后前两行各自变成「徽标 + 一个短词」, 宽度接近了, 而第三行绝大多数
-    // 情况是**一行以内**(事件 4 字 + why 二十来字, 23rem 装得下)——
-    // 参差的前提没了, 而整张表除这一列外都是居中的。
-    //
-    // 这一列于是回到 `TD_BASE` 的默认(居中), 不再自己覆写; 容器加 `mx-auto`
-    // 与 `items-center` —— 光有 `text-center` 不够: 带 `max-w` 的块级容器
-    // 不会自己居中, 而 `items-start` 会把两行徽标钉在左边。
     <td className={`${TD_BASE} px-2`}>
-      {/* [R283] `max-w-[15rem]`(240px) → `19rem`(304px)。**这个上限才是「结论」
-          一直被挤的真原因** —— 这一列 18% 宽在常见视口上有 300px 出头, 而内容被
-          硬卡在 240px, 光加列宽一点用都没有。两者得一起动。 */}
-      {/* [R299] 两行**共用一条中轴**。用户看着截图: 「排版不好看」。
-          
-          R298 居中之后每一行各自居中, 而两行宽度不一样 ——「候选池 已1天+」比
-          「没事」宽出一大截, 于是徽标和刻度四个边缘全是散的, 看着像随手堆的。
-          
-          改成两列网格: **判定靠右、刻度靠左**, 整个网格居中。于是
-          
-              候选池 已1天+│走了很长
-                    没事  │速度平稳
-          
-          中间那条缝成了一条真的竖线, 两行锁在一起 —— 居中的同时有了对齐。
-          列宽用 `max-content`, 所以缝的位置由内容自己定, 不用写死任何数字。
-          
-          `gap-x` 故意不写, 改成刻度自己带 `ml-1.5` —— 没有刻度那一列时
-          (`ph` 为空), 写 `gap-x` 会留下一道空隙把整格挤偏。 */}
-      <div className="mx-auto grid max-w-[23rem] justify-center gap-y-0.5 leading-snug
-                      grid-cols-[max-content_max-content]">
-        {/* [R297] 行1 = 哪一档 + **走到什么程度**。
-            「已N天」与「走到中段」是**同一个问题的两把尺**(走了多久 / 走了多远),
-            所以它们贴着同一枚徽标, 而不是各占一行。 */}
-        <span className="justify-self-end">
-          <VerdictInner v={v} ev={ev} geo={geo} runs={runs} energy={energy} ph={ph}
-                        stateRun={stateRun} onOpen={onOpen} />
-        </span>
-        <Qualifier text={ph?.maturity_cn} title={MATURITY_TIP} />
-        {/* [R297] 行2 = 今天该干嘛 + **这个判断还稳不稳**。
-            快慢是**前瞻的那一半**: 「该止盈了 · 正在放慢」与「该止盈了 · 还在加速」
-            是两句不同的话, 而动作那一枚徽标自己说不出这个差别。 */}
-        <span className="justify-self-end">
-          <PlaybookInner p={p} />
-        </span>
-        <Qualifier text={ph?.pace_cn} title={PACE_TIP}
-                   cls={PACE_CLS[geo?.accel?.level ?? ''] ?? 'text-muted'} />
+      <div className="mx-auto flex w-full max-w-[17rem] flex-col items-center gap-y-0.5 leading-snug">
+        <div className="grid grid-cols-[max-content_max-content] items-baseline">
+          <span className="justify-self-end"><PlaybookInner p={p} /></span>
+          <Qualifier text={ph?.pace_cn} title={PACE_TIP}
+                     cls={PACE_CLS[geo?.accel?.level ?? ''] ?? 'text-muted'} />
+        </div>
+        {/* [R255 → R307] 从"整段折行"改回**单行截断**。用户第三次指着这一格说
+            「排版还是非常有问题」。
+
+            R255 换成折行时这一列是**左对齐**的, 而且那时 `why` 还拖着规则层的
+            说教(R307 已经拆进悬停, 一句 74 字的剩了 23 字)。居中 + 多行 +
+            每行长度不一 = 几行各自一个宽度, 上面那条中轴全白对了。
+
+            **而且那一行原来在网格里**(`col-span-2`), 于是它一长就把两列撑开,
+            徽标跟着被推散 —— `max-w` 挡不住: `max-content` 先按内容算宽再被裁,
+            裁掉的是内容不是布局。现在它是网格**外面**的同级块, 铺满整格宽度、
+            单行截断, 行高从此固定。**信息一个字没丢**: 全文在悬停里。 */}
         {line2 && (
-          <span className={`col-span-2 whitespace-normal break-words text-center text-[11px] leading-snug ${
+          <div className={`w-full truncate text-center text-[11px] leading-snug ${
             evOn ? EVENT_CLS[ev!.code] ?? 'text-muted' : 'text-muted'}`}
-                title={tip}>
+               title={tip}>
             {line2}
-          </span>
+          </div>
         )}
       </div>
     </td>
