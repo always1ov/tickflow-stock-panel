@@ -975,6 +975,65 @@ def test_R303_两个数的起点和终点都取自同一根价():
     assert abs(r["follow"] - span) < 1e-4, "跟着做没有量到同一段"
 
 
+# ================================================================
+# [R305] 转入空头侧 = 清仓, 一个例外都没有
+# ================================================================
+#
+# 用户: 「转折进入下跌趋势一定清仓」。
+#
+# 这条**本来就成立**, 而且比用户说的还严 —— 空头侧三个态(次级回撤/自然回撤/
+# 下跌趋势)全部清仓, 不只下跌趋势。钉下来是因为它是这套打法的**纪律底线**:
+# 「趋势为王」的另一半就是趋势一坏立刻走人, 哪天有人往 `trend_days` 里加一句
+# 「回撤态先拿着看看」, 整套统计的性质就变了, 而且不会有任何东西报错。
+
+
+def test_R305_六态里空头侧一律清仓():
+    """**穷举六个态**, 不挑几个试 —— 挑着试就会漏掉刚加的那个。
+
+    多头三态(上涨趋势/自然回升/次级回升)满仓, 空头三态(次级回撤/自然回撤/
+    下跌趋势)清仓。这张表直接读 `livermore.BULLISH`(作者定的), 这一层
+    **不另立一套判断** —— 两处定义同一件事必然漂。
+    """
+    from app.indicators.livermore import BULLISH, STATE_LABELS
+
+    steps = [{"date": f"d{i}", "state": st, "prev": "UT", "flipped": True}
+             for i, st in enumerate(STATE_LABELS)]
+    got = {st: row["side"] for st, row in zip(STATE_LABELS, trend_days(steps))}
+    assert got == {"UT": BULL, "NR": BULL, "SR": BULL,
+                   "SREA": BEAR, "NREA": BEAR, "DT": BEAR}, f"六态→仓位 的表变了: {got}"
+    # 用户点名的那一条, 单独再钉一次 —— 它是这条纪律的名字
+    assert got["DT"] == BEAR, "转入下跌趋势居然没清仓"
+    # 反面: 这一层不许自己另编一套多空, 必须读作者那份
+    assert set(BULLISH) == {"UT", "NR", "SR"}, "作者的多头三态变了, 这条得重新审"
+
+
+def test_R305_转入下跌趋势真的走出一笔清仓():
+    """光有那张表不够 —— 得真的跑出一段空仓。
+
+    `trend_days` 给对了 `side`, 但 `simulate` 那边要是把空头段当成"不用动手",
+    表是对的而账是错的。所以这条从头跑到尾, 看那一笔的动作是不是「卖出」。
+    """
+    steps = _steps(["UT", "UT", "DT", "DT"])
+    s = simulate(steps, [10.0, 10.0, 10.0, 9.0], [10.0, 10.0, 10.0, 9.0])
+    sells = [l for l in s["legs"] if l["act"] == "卖出"]
+    assert sells, f"转入下跌趋势没走出清仓那一笔: {[l['act'] for l in s['legs']]}"
+    assert sells[0]["side"] == BEAR
+
+
+def test_R305_卖不掉的时候只许是一字板挡的():
+    """**唯一允许"转入下跌趋势却还拿着"的情形是物理上卖不掉** —— 一字跌停。
+
+    R304 给顺延开了这个口子, 这条守着它不被滥用: 没有涨跌停标志时, 转入下跌
+    趋势那一笔必须**当天就执行**(信号次日开盘), 不许无缘无故往后拖。
+    """
+    steps = _steps(["UT", "UT", "DT", "DT", "DT"])
+    px = [10.0, 10.0, 10.0, 9.0, 8.0]
+    s = simulate(steps, px, px)          # 不给涨跌停 = 一律当能成交
+    sell = next(l for l in s["legs"] if l["act"] == "卖出")
+    assert sell["delayed"] == 0, "没有一字板却把清仓往后拖了"
+    assert s["voided"] == [], "没有一字板却有单子作废"
+
+
 def _dialog() -> str:
     from tests.frontend_source import code_of
     return code_of("components/stock-analysis/StockReviewDialog.tsx")
