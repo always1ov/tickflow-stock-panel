@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from app.config import settings
@@ -62,7 +62,7 @@ def save(result: dict, *, source: str = "manual") -> dict:
         "pairs": [{k: v for k, v in p.items() if not k.startswith("series_")}
                   for p in (result.get("pairs") or [])],
         "ai": result.get("ai") or None,
-        "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "created_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "source": source,
     }
     # [R72] 读-改-写上锁 + 原子落盘(CONTRIBUTING §6.2): 定时和手动可能同时保存

@@ -3,14 +3,13 @@ from __future__ import annotations
 
 import logging
 from datetime import date, datetime, timedelta
-from typing import Optional
 
 import polars as pl
-from app.indicators.pipeline import compute_enriched
-from app.tickflow.capabilities import Cap
 from fastapi import APIRouter, HTTPException, Query, Request
 
+from app.indicators.pipeline import compute_enriched
 from app.services import index_sync, kline_sync
+from app.tickflow.capabilities import Cap
 
 logger = logging.getLogger(__name__)
 
@@ -33,8 +32,8 @@ def get_index_daily(
     request: Request,
     symbol: str = Query(..., description="指数代码, 如 000001.SH"),
     days: int = Query(120, ge=10, le=2000),
-    start_date: Optional[str] = Query(None, description="起始日期 YYYY-MM-DD, 优先于 days"),
-    end_date: Optional[str] = Query(None, description="截止日期 YYYY-MM-DD, 默认今天"),
+    start_date: str | None = Query(None, description="起始日期 YYYY-MM-DD, 优先于 days"),
+    end_date: str | None = Query(None, description="截止日期 YYYY-MM-DD, 默认今天"),
 ):
     """读取指数日 K。指数数据使用独立 kline_index_* parquet。"""
     repo = request.app.state.repo

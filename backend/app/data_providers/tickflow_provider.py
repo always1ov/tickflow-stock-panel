@@ -6,13 +6,13 @@ from collections.abc import Callable
 from datetime import datetime
 
 import polars as pl
+
 from app.data_providers.base import AssetType, ProviderCapabilities
 from app.data_providers.normalizer import (
     normalize_adj_factors,
     normalize_daily,
     normalize_instruments,
 )
-
 from app.tickflow.client import get_client
 
 logger = logging.getLogger(__name__)

@@ -19,14 +19,14 @@ import time
 from datetime import date, timedelta
 
 import polars as pl
+
+from app.services.ext_data import ExtConfigStore
 from app.services.market_overview_builder import (
     _dimension_field,
     _dimension_values,
     _read_ext_rows,
     _symbol_keys,
 )
-
-from app.services.ext_data import ExtConfigStore
 
 logger = logging.getLogger(__name__)
 

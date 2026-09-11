@@ -8,7 +8,7 @@ import re
 import shutil
 import tempfile
 import time
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Literal
 
@@ -952,8 +952,8 @@ async def run_pull(request: Request, config_id: str):
         # 写回执行状态, 让前端"上次执行"面板立即反映
         updated = store.get(config_id)
         if updated and updated.pull:
-            from datetime import datetime, timezone
-            updated.pull.last_run = datetime.now(timezone.utc).isoformat()
+            from datetime import datetime
+            updated.pull.last_run = datetime.now(UTC).isoformat()
             updated.pull.last_status = "success"
             updated.pull.last_message = f"{n} rows @ {d}"
             updated.pull.last_rows = n
@@ -963,8 +963,8 @@ async def run_pull(request: Request, config_id: str):
         # 失败也写回状态, 记录错误信息
         failed = store.get(config_id)
         if failed and failed.pull:
-            from datetime import datetime, timezone
-            failed.pull.last_run = datetime.now(timezone.utc).isoformat()
+            from datetime import datetime
+            failed.pull.last_run = datetime.now(UTC).isoformat()
             failed.pull.last_status = "error"
             failed.pull.last_message = str(e)[:200]
             store.upsert(failed)

@@ -17,7 +17,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +74,7 @@ def record(as_of: str | None, picks: list[dict], closes: dict[str, float]) -> di
     entry = {
         "as_of": day,
         "picks": rows,
-        "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "created_at": datetime.now(UTC).isoformat(timespec="seconds"),
     }
     with lock_for(_path()):
         entries = [e for e in _read() if e.get("as_of") != day]   # 当天重复生成 → 覆盖
@@ -91,6 +91,7 @@ def _forward_returns(repo, symbol: str, as_of: str, entry_close: float | None) -
         return out
     try:
         import polars as pl
+
         from app.services.stock_analyzer import _load_kline
         df = _load_kline(repo, symbol)     # 与优选送审同一条读取路径, 口径一致
         if df is None or df.is_empty() or "date" not in df.columns:

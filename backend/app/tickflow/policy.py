@@ -17,9 +17,9 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from app.config import settings
 
 from app import secrets_store
+from app.config import settings
 
 from .capabilities import Cap, CapabilityLimits, CapabilitySet
 
@@ -201,7 +201,7 @@ def _probe_real(tiers: dict) -> tuple[CapabilitySet, list[str], set[Cap]]:
         unis = tf.universes.list()
         if not unis:
             raise RuntimeError("no universes available")
-        first_id = unis[0]["id"] if isinstance(unis[0], dict) else getattr(unis[0], "id")
+        first_id = unis[0]["id"] if isinstance(unis[0], dict) else unis[0].id
         return tf.quotes.get_by_universes([first_id], as_dataframe=False)
 
     try_call(Cap.QUOTE_POOL, _probe_pool, defaults(Cap.QUOTE_POOL))

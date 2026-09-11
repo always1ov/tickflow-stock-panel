@@ -19,9 +19,8 @@ from types import TracebackType
 from typing import Any
 from urllib.parse import urlsplit, urlunsplit
 
-from app.config import settings
-
 from app import secrets_store
+from app.config import settings
 
 logger = logging.getLogger(__name__)
 

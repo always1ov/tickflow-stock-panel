@@ -127,7 +127,7 @@ def list_presets() -> list[dict]:
     return [{"key": p.key, "name": p.name} for p in PRESETS]
 
 
-def _in_session(p: _Preset, now: "datetime | None" = None) -> bool:
+def _in_session(p: _Preset, now: datetime | None = None) -> bool:
     """该市场此刻是否在交易时段(北京时间; 周末一律休市)。"""
     from datetime import datetime as _dt
     n = now or _dt.now()

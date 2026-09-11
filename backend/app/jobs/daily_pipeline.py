@@ -21,16 +21,16 @@ from datetime import date as _date
 from pathlib import Path
 
 import polars as pl
-from app.config import settings
-from app.indicators.pipeline import filter_halt_days, run_pipeline
-from app.tickflow.capabilities import Cap, CapabilitySet
-from app.tickflow.pools import DEMO_SYMBOLS, get_pool
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
+from app.config import settings
+from app.indicators.pipeline import filter_halt_days, run_pipeline
 from app.services import index_sync, instrument_sync, kline_sync
 from app.services import preferences as _prefs
+from app.tickflow.capabilities import Cap, CapabilitySet
+from app.tickflow.pools import DEMO_SYMBOLS, get_pool
 from app.tickflow.repository import KlineRepository
 
 logger = logging.getLogger(__name__)
@@ -721,7 +721,6 @@ def run_now(
         try:
             emit("compute_regime", 90, "计算市场环境…")
             from app.api.regime import invalidate_regime_cache
-
             from app.services import regime_builder
             new_regime = regime_builder.compute_regime_incremental(repo, repo.store.data_dir)
             regime_days = new_regime.height if not new_regime.is_empty() else 0
@@ -872,7 +871,6 @@ def _push_phase_change_alert(data_dir) -> None:
     复用 quote_service.push_alerts 广播通道; 未发生切换静默返回。
     """
     from app.services.market_phase import PHASE_LABELS
-
     from app.services.regime_builder import latest_phase_transition
 
     tr = latest_phase_transition(data_dir)
@@ -1319,7 +1317,6 @@ async def _run_scheduled_today_ai(repo) -> None:
             logger.info("scheduled today-ai skipped: AI key not configured")
             return
         from app.api.today import _build_overview, generate_today_ai
-
         from app.services import today_ai_store
 
         data = _build_overview(repo)

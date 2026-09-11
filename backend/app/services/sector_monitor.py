@@ -10,9 +10,9 @@ from pathlib import Path
 from typing import Any
 
 import polars as pl
-from app.services.index_const import CORE_INDEX_NAMES as CORE_INDICES
 
 from app.services.ext_data import ExtConfig, ExtConfigStore
+from app.services.index_const import CORE_INDEX_NAMES as CORE_INDICES
 
 SECTOR_KINDS = {"index", "concept", "industry"}
 _VALUE_SEP = re.compile(r"[\u3001,\uff0c;\uff1b|]+")

@@ -7,11 +7,11 @@ from __future__ import annotations
 from datetime import date
 from pathlib import Path
 
-from app.strategy.intraday_signals import INTRADAY_SIGNAL_LABELS, uses_intraday_signals
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from app.strategy import monitor_rules
+from app.strategy.intraday_signals import INTRADAY_SIGNAL_LABELS, uses_intraday_signals
 
 router = APIRouter(prefix="/api/monitor-rules", tags=["monitor-rules"])
 
@@ -122,10 +122,9 @@ class RuleModel(BaseModel):
 def get_options(request: Request):
     """返回可选字段、信号列、运算符、枚举,供前端表单使用。"""
     from app.indicators.pipeline import ENRICHED_COLUMNS
+    from app.services.kline_sync import intraday_monitor_support
     from app.strategy.custom_signals import ALLOWED_FIELDS
     from app.strategy.custom_signals import load_all as load_csg
-
-    from app.services.kline_sync import intraday_monitor_support
 
     # 阈值字段 (带中文标签)
     threshold_fields = [

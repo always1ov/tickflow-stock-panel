@@ -17,6 +17,7 @@ from typing import Literal
 import numpy as np
 import polars as pl
 import pyarrow as pa
+
 from app.backtest.matrix import (
     MarketDataMatrix,
     MarketMatrix,
@@ -27,7 +28,6 @@ from app.backtest.matrix import (
 from app.config import settings
 from app.enriched_generation import EnrichedGenerationUnavailableError
 from app.parquet import scan_enriched_parquet
-
 from app.tickflow.repository import KlineRepository
 
 logger = logging.getLogger(__name__)
@@ -177,7 +177,7 @@ class _CacheEntry:
 class _InFlight:
     """同 key 正在计算的占位: leader 算完通过 done 唤醒所有跟随者复用结果。"""
 
-    __slots__ = ("done", "df", "error")
+    __slots__ = ("df", "done", "error")
 
     def __init__(self) -> None:
         self.done = threading.Event()
@@ -812,8 +812,8 @@ class BacktestEngine:
         entries: pl.Series | None,
         exits: pl.Series | None,
         config: MatcherConfig,
-        progress_cb: "Callable[[dict], None] | None" = None,
-        cancel_event: "threading.Event | None" = None,
+        progress_cb: Callable[[dict], None] | None = None,
+        cancel_event: threading.Event | None = None,
         entry_signal_ids: list[str] | None = None,
         exit_signal_ids: list[str] | None = None,
     ) -> SimResult:
@@ -838,7 +838,7 @@ class BacktestEngine:
         )
 
     @staticmethod
-    def _resolve_entry_prices(matrix: "MarketMatrix", config: "MatcherConfig") -> np.ndarray:
+    def _resolve_entry_prices(matrix: MarketMatrix, config: MatcherConfig) -> np.ndarray:
         """入场价矩阵: 分钟策略的逐格覆盖有限值处优先, 否则按 open/close 惯例。"""
         base = matrix.open if config.entry_fill == "open_t+1" else matrix.close
         if matrix.entry_price is None:
@@ -850,8 +850,8 @@ class BacktestEngine:
         matrix: MarketMatrix,
         raw_candidates: int,
         config: MatcherConfig,
-        progress_cb: "Callable[[dict], None] | None",
-        cancel_event: "threading.Event | None",
+        progress_cb: Callable[[dict], None] | None,
+        cancel_event: threading.Event | None,
         options: SimulationOptions | None = None,
     ) -> SimResult:
         options = options or SimulationOptions()
@@ -1164,8 +1164,8 @@ class BacktestEngine:
         matrix: MarketMatrix,
         raw_candidates: int,
         config: MatcherConfig,
-        progress_cb: "Callable[[dict], None] | None" = None,
-        cancel_event: "threading.Event | None" = None,
+        progress_cb: Callable[[dict], None] | None = None,
+        cancel_event: threading.Event | None = None,
         options: SimulationOptions | None = None,
     ) -> SimResult:
         """Run independent-candidate simulation on a prebuilt MarketMatrix."""
@@ -1179,8 +1179,8 @@ class BacktestEngine:
         entries: pl.Series | None,
         exits: pl.Series | None,
         config: MatcherConfig,
-        progress_cb: "Callable[[dict], None] | None" = None,
-        cancel_event: "threading.Event | None" = None,
+        progress_cb: Callable[[dict], None] | None = None,
+        cancel_event: threading.Event | None = None,
         entry_signal_ids: list[str] | None = None,
         exit_signal_ids: list[str] | None = None,
     ) -> SimResult:
@@ -1708,8 +1708,8 @@ class BacktestEngine:
         entries: pl.Series | None,
         exits: pl.Series | None,
         config: MatcherConfig,
-        progress_cb: "Callable[[dict], None] | None" = None,
-        cancel_event: "threading.Event | None" = None,
+        progress_cb: Callable[[dict], None] | None = None,
+        cancel_event: threading.Event | None = None,
         entry_signal_ids: list[str] | None = None,
         exit_signal_ids: list[str] | None = None,
     ) -> SimResult:
@@ -1735,8 +1735,8 @@ class BacktestEngine:
         self,
         matrix: MarketMatrix,
         config: MatcherConfig,
-        progress_cb: "Callable[[dict], None] | None" = None,
-        cancel_event: "threading.Event | None" = None,
+        progress_cb: Callable[[dict], None] | None = None,
+        cancel_event: threading.Event | None = None,
         options: SimulationOptions | None = None,
     ) -> SimResult:
         """Run the production Python matcher on a prebuilt MarketMatrix."""
@@ -1748,8 +1748,8 @@ class BacktestEngine:
         self,
         matrix: MarketMatrix,
         config: MatcherConfig,
-        progress_cb: "Callable[[dict], None] | None",
-        cancel_event: "threading.Event | None",
+        progress_cb: Callable[[dict], None] | None,
+        cancel_event: threading.Event | None,
         options: SimulationOptions | None = None,
     ) -> SimResult:
         options = options or SimulationOptions()
@@ -2213,8 +2213,8 @@ class BacktestEngine:
         entries: pl.Series | None,
         exits: pl.Series | None,
         config: MatcherConfig,
-        progress_cb: "Callable[[dict], None] | None" = None,
-        cancel_event: "threading.Event | None" = None,
+        progress_cb: Callable[[dict], None] | None = None,
+        cancel_event: threading.Event | None = None,
         entry_signal_ids: list[str] | None = None,
         exit_signal_ids: list[str] | None = None,
     ) -> SimResult:

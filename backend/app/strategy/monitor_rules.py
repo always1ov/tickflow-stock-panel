@@ -18,7 +18,7 @@ import json
 import logging
 import math
 import re
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 from app.services.fs_utils import atomic_write_text
@@ -434,7 +434,7 @@ def normalize(rule: dict) -> dict:
             c for c in r["webhook_channels"]
             if c in ("feishu", "wecom", "dingtalk", "custom", "email")
         ]
-    r.setdefault("created_at", datetime.now(timezone.utc).isoformat())
+    r.setdefault("created_at", datetime.now(UTC).isoformat())
     return r
 
 

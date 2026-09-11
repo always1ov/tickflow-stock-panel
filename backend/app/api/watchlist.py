@@ -3,18 +3,18 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Callable
+from collections.abc import Callable
 
 import anyio
 import polars as pl
-from app.db_safe import is_valid_ext_ident, quote_ident
-from app.services.watchlist_csv import import_watchlist_codes, import_watchlist_csv
-from app.services.watchlist_ocr import import_watchlist_image
-from app.services.watchlist_ocr.provider import get_ocr_provider
 from fastapi import APIRouter, File, HTTPException, Query, Request, UploadFile
 from pydantic import BaseModel
 
+from app.db_safe import is_valid_ext_ident, quote_ident
 from app.services import watchlist
+from app.services.watchlist_csv import import_watchlist_codes, import_watchlist_csv
+from app.services.watchlist_ocr import import_watchlist_image
+from app.services.watchlist_ocr.provider import get_ocr_provider
 
 logger = logging.getLogger(__name__)
 

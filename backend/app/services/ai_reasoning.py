@@ -96,7 +96,7 @@ class StreamStripper:
     # 推理本身受 max_tokens 约束, 几 KB 顶天, 不会撑爆。
     _FALLBACK_KEEP = 4000
 
-    __slots__ = ("_inside", "_buf", "_emitted")
+    __slots__ = ("_buf", "_emitted", "_inside")
 
     def __init__(self) -> None:
         self._inside = False

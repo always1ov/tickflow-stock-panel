@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from app.config import settings
@@ -48,7 +48,7 @@ def save(result: dict, *, as_of: str | None, source: str = "manual") -> dict:
         # [R147] 这次的补充说明一起存 —— 隔天再看这份结论时, 得知道当时问的是什么,
         # 否则一句"今天只看半导体"产出的窄结论会被误读成"今天全市场就这几只"
         "note": (result.get("note") or "")[:500],
-        "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "created_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "source": source,
     }
     # [R72] 原子落盘: 定时和手动撞在一起时不留半截文件(整文件覆盖, 无读-改-写)

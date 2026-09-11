@@ -317,7 +317,6 @@ async def analyze_rotation_stream(
         level: 行业层级(1/2/3), 仅 kind=industry 有效。
     """
     from app.services.market_overview_builder import build_market_overview
-
     from app.services.rps_rotation import build_rps_rotation
 
     dim = _dim_label(kind)

@@ -20,9 +20,8 @@ import logging
 from collections.abc import Callable
 from datetime import date, datetime, timedelta
 
-from app.tickflow.capabilities import Cap, CapabilitySet
-
 from app.services import kline_sync
+from app.tickflow.capabilities import Cap, CapabilitySet
 from app.tickflow.repository import KlineRepository
 
 logger = logging.getLogger(__name__)
@@ -51,6 +50,7 @@ def _resolve_universe(capset: CapabilitySet) -> list[str]:
     from pathlib import Path
 
     import polars as pl
+
     from app.config import settings
     from app.tickflow.pools import DEMO_SYMBOLS
     from app.tickflow.pools import get_pool as _get_pool

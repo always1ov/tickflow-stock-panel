@@ -9,11 +9,11 @@ import time
 from typing import Literal
 from urllib.parse import urlsplit
 
-from app.data_providers.custom.config import MAX_TIMEOUT
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field
 
 from app import secrets_store
+from app.data_providers.custom.config import MAX_TIMEOUT
 from app.tickflow import client as tf_client
 from app.tickflow.policy import (
     detect_capabilities,
@@ -55,7 +55,6 @@ class TickflowKeyIn(BaseModel):
 def get_settings() -> dict:
     """返回当前配置概况(Key 脱敏)。"""
     from app.config import settings
-
     from app.services import preferences
     from app.services.ai_provider import (
         ai_configured,
@@ -345,7 +344,6 @@ class AiSettingsIn(BaseModel):
 def save_ai_settings(req: AiSettingsIn) -> dict:
     """保存 AI 配置（全部持久化到 secrets.json）"""
     from app.config import settings
-
     from app.services.ai_provider import (
         OPENAI_PROVIDER,
         ai_configured,
@@ -729,7 +727,6 @@ def get_capability_matrix() -> dict:
     组装逻辑在 data_providers.capabilities, 本层保持薄。
     """
     from app.data_providers.capabilities import build_capability_matrix
-
     from app.services import preferences
     from app.tickflow import policy
 
@@ -2068,7 +2065,6 @@ class RealtimeKeysPerRoundIn(BaseModel):
 def get_realtime_keys_per_round() -> dict:
     """当前设置 + 已配置的 key 总数, 供界面显示"10 / 14"。"""
     from app.secrets_store import get_tickflow_keys
-
     from app.services import preferences
 
     return {
@@ -2086,7 +2082,6 @@ def update_realtime_keys_per_round(req: RealtimeKeysPerRoundIn) -> dict:
     代价是每轮容量变小(5 × 启用数), 全量刷完一遍的轮数相应变多。
     """
     from app.secrets_store import get_tickflow_keys
-
     from app.services import preferences
 
     count = preferences.set_realtime_keys_per_round(req.count)
@@ -2305,7 +2300,6 @@ def data_doctor_scan() -> dict:
     派生数据(可重算, 坏了删掉重跑)、孤儿文件(功能删了文件还在)。
     """
     from app.config import settings as cfg
-
     from app.services import data_doctor
     return data_doctor.scan(cfg.data_dir)
 
@@ -2318,7 +2312,6 @@ def data_doctor_heal(req: DataHealIn) -> dict:
     不补 —— 补出来的是一条假记录, 那种只该报出来让人自己看。
     """
     from app.config import settings as cfg
-
     from app.services import data_doctor
     if not req.rels:
         raise HTTPException(400, "没有指定要补齐的存储")

@@ -208,7 +208,7 @@ class WecomBotService:
                     # 3. 心跳保活 + 接收循环
                     await self._maintain_connection(ws)
 
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 self._last_error = "鉴权响应超时"
                 logger.warning("智能机器人鉴权超时")
             except Exception as e:  # noqa: BLE001 — 网络/断开, 可重连
@@ -238,11 +238,11 @@ class WecomBotService:
                     raw = await asyncio.wait_for(ws.recv(), timeout=_HEARTBEAT_INTERVAL)
                     self._log_incoming(raw)
                     continue
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     pass  # 接收超时 → 到了心跳时间
                 # 发送业务层 ping 保活
                 await ws.send(json.dumps({"cmd": "ping"}))
-            except Exception as e:  # noqa: BLE001 — 连接断开, 抛给上层重连
+            except Exception:  # noqa: BLE001 — 连接断开, 抛给上层重连
                 raise
 
     def _log_incoming(self, raw) -> None:

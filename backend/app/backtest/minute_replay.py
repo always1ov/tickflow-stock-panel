@@ -14,9 +14,10 @@ from __future__ import annotations
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import date, timedelta
+from datetime import UTC, date, timedelta
 
 import polars as pl
+
 from app.price_limits import is_risk_warning_name, price_limit_pct
 from app.strategy.engine import StrategyDataContext, StrategyDef, StrategyEngine
 
@@ -74,9 +75,8 @@ def _trigger_hhmm(value) -> str:
 
     if hasattr(value, "astimezone"):
         if value.tzinfo is None:
-            from datetime import timezone
 
-            value = value.replace(tzinfo=timezone.utc)
+            value = value.replace(tzinfo=UTC)
         return value.astimezone(CN_TZ).strftime("%H:%M")
     text = str(value or "")
     if len(text) >= 16 and text[13] == ":":

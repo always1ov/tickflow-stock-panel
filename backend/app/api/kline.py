@@ -8,15 +8,14 @@ import math
 from datetime import date, timedelta
 from functools import lru_cache
 from pathlib import Path
-from typing import Optional
 from zoneinfo import ZoneInfo
+
+from fastapi import APIRouter, HTTPException, Query, Request, Response
 
 from app.db_safe import is_valid_ext_ident
 from app.indicators.pipeline import compute_enriched
-from app.price_limits import is_risk_warning_name, price_limit_pct
-from fastapi import APIRouter, HTTPException, Query, Request, Response
-
 from app.market_time import cn_now, cn_today, in_continuous_session
+from app.price_limits import is_risk_warning_name, price_limit_pct
 from app.services import kline_sync
 
 logger = logging.getLogger(__name__)
@@ -360,9 +359,9 @@ def get_daily(
     request: Request,
     symbol: str = Query(..., description="标的代码,如 000001.SZ"),
     days: int = Query(120, ge=10, le=2000),
-    start_date: Optional[str] = Query(None, description="起始日期 YYYY-MM-DD, 优先于 days"),
-    end_date: Optional[str] = Query(None, description="截止日期 YYYY-MM-DD, 默认今天"),
-    ext_columns: Optional[str] = Query(None, description="逗号分隔的 ext 列: config_id.field_name"),
+    start_date: str | None = Query(None, description="起始日期 YYYY-MM-DD, 优先于 days"),
+    end_date: str | None = Query(None, description="截止日期 YYYY-MM-DD, 默认今天"),
+    ext_columns: str | None = Query(None, description="逗号分隔的 ext 列: config_id.field_name"),
     refresh_live: bool = Query(False, description="先现拉一次这只票的实时行情再返回(单票, 15s 冷却)"),
 ):
     """读取本地 enriched 表中某只股票的日 K。
@@ -456,7 +455,7 @@ def get_daily(
     )
 
 
-def _attach_ext(resp: dict, repo, symbol: str, ext_columns: Optional[str]) -> dict:
+def _attach_ext(resp: dict, repo, symbol: str, ext_columns: str | None) -> dict:
     """按 ext_columns 规格为单只股票 LEFT JOIN 扩展数据，平铺到 stock_info['ext']。
 
     key 形如 "{config_id}__{field_name}"，与自选列表 enriched 接口保持一致。
@@ -727,6 +726,7 @@ def get_minute_batch(request: Request, body: dict):
     from datetime import datetime
 
     import polars as pl
+
     from app.tickflow.capabilities import Cap
 
     symbols: list[str] = body.get("symbols", [])
@@ -1209,9 +1209,6 @@ async def sync_minute(request: Request):
     """
     import asyncio
 
-    from app.services.preferences import get_minute_sync_days
-    from app.tickflow.pools import get_pool
-
     from app.api.data import invalidate_storage_cache
     from app.services.pipeline_jobs import (
         JobCancelledError,
@@ -1220,6 +1217,8 @@ async def sync_minute(request: Request):
         run_with_capacity,
         try_acquire_run_slot,
     )
+    from app.services.preferences import get_minute_sync_days
+    from app.tickflow.pools import get_pool
 
     repo = request.app.state.repo
     capset = request.app.state.capabilities
@@ -1508,8 +1507,6 @@ async def repair_daily(request: Request):
         if not capset.has(Cap.KLINE_DAILY_BATCH):
             raise HTTPException(status_code=403, detail="需要 Pro+ 权限 (batch K-line)")
 
-        from app.services.repair_daily import run_repair_daily
-
         from app.api.data import invalidate_storage_cache
         from app.services.pipeline_jobs import (
             JobCancelledError,
@@ -1518,6 +1515,7 @@ async def repair_daily(request: Request):
             run_with_capacity,
             try_acquire_run_slot,
         )
+        from app.services.repair_daily import run_repair_daily
 
         job_id, is_new = job_store.create()
         if not is_new:

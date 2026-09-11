@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import UTC, date, datetime, timezone
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -490,7 +490,7 @@ class PullScheduler:
 
                 # 时间窗口检查: 不在窗口内则跳过本次拉取
                 if not _in_time_window(pull.time_window_start, pull.time_window_end):
-                    fresh.pull.last_run = datetime.now(timezone.utc).isoformat()
+                    fresh.pull.last_run = datetime.now(UTC).isoformat()
                     fresh.pull.last_status = "skipped"
                     fresh.pull.last_message = "不在拉取时间窗口内"
                     store.upsert(fresh, keep_strategy_cache=True)
@@ -506,7 +506,7 @@ class PullScheduler:
                     n, d = await fetch_and_ingest(
                         fresh, self._data_dir, keep_strategy_cache=True
                     )
-                    fresh.pull.last_run = datetime.now(timezone.utc).isoformat()
+                    fresh.pull.last_run = datetime.now(UTC).isoformat()
                     fresh.pull.last_status = "success"
                     fresh.pull.last_message = f"{n} rows @ {d}"
                     fresh.pull.last_rows = n
@@ -515,7 +515,7 @@ class PullScheduler:
                 except Exception as e:
                     fresh2 = store.get(config.id)
                     if fresh2 and fresh2.pull:
-                        fresh2.pull.last_run = datetime.now(timezone.utc).isoformat()
+                        fresh2.pull.last_run = datetime.now(UTC).isoformat()
                         fresh2.pull.last_status = "error"
                         fresh2.pull.last_message = str(e)[:200]
                         store.upsert(fresh2, keep_strategy_cache=True)

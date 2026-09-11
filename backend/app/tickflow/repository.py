@@ -23,6 +23,7 @@ from pathlib import Path
 
 import duckdb
 import polars as pl
+
 from app.config import settings
 from app.enriched_generation import (
     EnrichedGenerationUnavailableError,
@@ -30,10 +31,9 @@ from app.enriched_generation import (
     bump_enriched_generation,
     get_enriched_generation,
 )
+from app.market_time import cn_today
 from app.parquet import scan_enriched_parquet
 from app.polars_guard import guarded_collect
-
-from app.market_time import cn_today
 
 logger = logging.getLogger(__name__)
 
@@ -237,7 +237,7 @@ class DataStore:
         for sql in statements:
             try:
                 self.db.execute(sql)
-            except Exception as e:  # noqa: BLE001
+            except Exception:  # noqa: BLE001
                 # 空数据目录(首次启动)或权限问题时 DuckDB 会抛 IOException;
                 # 跨版本/平台也可能抛 CatalogException 等。空目录缺视图不影响启动
                 # (后续同步写入数据后会重新刷新视图),这里一律降级为 debug 日志。

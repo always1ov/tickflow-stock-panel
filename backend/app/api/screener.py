@@ -10,15 +10,15 @@ import os
 import time
 from dataclasses import asdict, replace
 from datetime import date, datetime
-from typing import Any, Optional
+from typing import Any
 
-from app.config import settings
-from app.db_safe import is_valid_ext_ident, quote_ident
-from app.services.screener import ScreenerService
 from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
+from app.config import settings
+from app.db_safe import is_valid_ext_ident, quote_ident
 from app.services import strategy_cache, strategy_run_queue
+from app.services.screener import ScreenerService
 from app.strategy import config as strategy_config
 
 logger = logging.getLogger(__name__)
@@ -28,19 +28,19 @@ router = APIRouter(prefix="/api/screener", tags=["screener"])
 
 class CustomRequest(BaseModel):
     conditions: list[str]
-    order_by: Optional[str] = None
+    order_by: str | None = None
     limit: int = 30
-    pool: Optional[list[str]] = None
-    as_of: Optional[date] = None
-    ext_columns: Optional[str] = None
+    pool: list[str] | None = None
+    as_of: date | None = None
+    ext_columns: str | None = None
     asset_type: str = "stock"
 
 
 class PresetRequest(BaseModel):
     strategy_id: str
-    pool: Optional[list[str]] = None
-    as_of: Optional[date] = None
-    ext_columns: Optional[str] = None
+    pool: list[str] | None = None
+    as_of: date | None = None
+    ext_columns: str | None = None
     asset_type: str = "stock"
     timeframe: str = "1d"
 
@@ -90,7 +90,7 @@ def _safe_ext_value(value: Any) -> Any:
 _ext_value_map_cache: dict[tuple[str, str], tuple[Any, dict[str, Any]]] = {}
 
 
-def _ext_parquet_signature(cfg, data_dir) -> Optional[tuple]:
+def _ext_parquet_signature(cfg, data_dir) -> tuple | None:
     """该扩展配置底层 parquet 文件的 (路径, mtime) 签名; 出错返回 None (禁用缓存)。"""
     try:
         from app.api.ext_data import _parquet_glob
@@ -103,7 +103,7 @@ def _ext_parquet_signature(cfg, data_dir) -> Optional[tuple]:
         return None
 
 
-def _load_ext_value_maps(repo, ext_columns: Optional[str]) -> dict[str, dict[str, Any]]:
+def _load_ext_value_maps(repo, ext_columns: str | None) -> dict[str, dict[str, Any]]:
     """按请求加载扩展列，返回 {输出列名: {symbol: value}}。
 
     策略结果缓存是共享文件，不能被不同 ext_columns 组合污染；因此扩展列只在
@@ -164,7 +164,7 @@ def _load_ext_value_maps(repo, ext_columns: Optional[str]) -> dict[str, dict[str
     return value_maps
 
 
-def _row_with_ext(row: dict, ext_values: dict[str, dict[str, Any]], symbol: Optional[str] = None) -> dict:
+def _row_with_ext(row: dict, ext_values: dict[str, dict[str, Any]], symbol: str | None = None) -> dict:
     next_row = dict(row)
     sym = symbol or next_row.get("symbol")
     for out_col, value_map in ext_values.items():
@@ -363,7 +363,7 @@ def _cached_with_realtime(request: Request) -> dict:
 @router.get("/cached")
 def get_cached(
     request: Request,
-    ext_columns: Optional[str] = Query(None, description="逗号分隔: config_id.field_name"),
+    ext_columns: str | None = Query(None, description="逗号分隔: config_id.field_name"),
 ):
     """读取策略结果缓存, 并叠加监控引擎本轮实时算出的结果。
 
@@ -423,7 +423,7 @@ def get_cached_summary(request: Request):
 def get_cached_result(
     strategy_id: str,
     request: Request,
-    ext_columns: Optional[str] = Query(None, description="逗号分隔: config_id.field_name"),
+    ext_columns: str | None = Query(None, description="逗号分隔: config_id.field_name"),
 ):
     """按需返回单个策略的完整明细及其今日失效行。"""
     cached = _cached_with_realtime(request)
@@ -632,7 +632,7 @@ def _run_all_progressive(
 
 
 @router.post("/run_all")
-def run_all(request: Request, body: Optional[dict] = None):
+def run_all(request: Request, body: dict | None = None):
     """批量运行指定策略；注册、路由和执行均由 StrategyEngine 负责。"""
     from datetime import date as date_type
 
@@ -771,9 +771,9 @@ def run_all(request: Request, body: Optional[dict] = None):
 @router.get("/limit-ladder")
 def limit_ladder(
     request: Request,
-    as_of: Optional[date] = None,
+    as_of: date | None = None,
     direction: str = Query("up", description="up=涨停梯队 | down=跌停梯队"),
-    ext_columns: Optional[str] = Query(None, description="逗号分隔: config_id.field_name"),
+    ext_columns: str | None = Query(None, description="逗号分隔: config_id.field_name"),
 ):
     """连板/连跌梯队 — 按连板数分组, 含三状态。
     返回: tiers = [{ boards, count, stocks: [{symbol,name,change_pct,status,...}] }]
@@ -937,7 +937,7 @@ def limit_ladder(
                         & (pl.col("_sealed") == True)  # noqa: E712
                     ).then(pl.lit("real"))
                     .when(
-                        (pl.col("_sealed") == False)  # noqa: E712
+                        pl.col("_sealed") == False  # noqa: E712
                     ).then(pl.lit("fake"))
                     .when(
                         (pl.col("status") == status_main)

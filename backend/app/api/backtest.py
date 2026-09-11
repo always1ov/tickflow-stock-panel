@@ -9,15 +9,16 @@ from dataclasses import asdict
 from datetime import date, timedelta
 from typing import Literal
 
+from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel, Field
+
 from app.config import settings
 from app.services.backtest import (
     BacktestConfig,
     BacktestService,
     VectorbtUnavailable,
 )
-from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +46,7 @@ def _get_engine(request: Request):
 
 def _resolve_start(req: BaseModel, end: date, default_days: int) -> date:
     """未传 start 使用默认区间；显式传 null/空值表示全部历史。"""
-    start = getattr(req, "start")
+    start = req.start
     if start is not None:
         return start
     if "start" in req.model_fields_set:
@@ -444,7 +445,7 @@ import time
 
 class _BacktestJob:
     """单个回测任务的状态, 存模块级供重连使用。"""
-    __slots__ = ("key", "cancel_event", "progress", "result", "error", "done", "finish_ts")
+    __slots__ = ("cancel_event", "done", "error", "finish_ts", "key", "progress", "result")
 
     def __init__(self, key: str):
         self.key = key

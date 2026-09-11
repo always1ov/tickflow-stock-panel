@@ -16,15 +16,16 @@ import logging
 import math
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable
+from typing import Any
 
 import polars as pl
-from app.strategy.custom_signals import _OP_BUILDERS  # type: ignore  # 复用运算符构造器
-from app.strategy.intraday_signals import INTRADAY_SIGNAL_LABELS, uses_intraday_signals
 
 from app.market_time import cn_today
 from app.strategy import config as _strategy_config
+from app.strategy.custom_signals import _OP_BUILDERS  # type: ignore  # 复用运算符构造器
+from app.strategy.intraday_signals import INTRADAY_SIGNAL_LABELS, uses_intraday_signals
 from app.strategy.monitor_rules import date_rule_in_window
 
 logger = logging.getLogger(__name__)
@@ -353,9 +354,9 @@ class MonitorRuleEngine:
         # 历史窗口加载器: (target_date, lookback_days) → 多日 enriched DataFrame。
         # 用于声明 filter_history 的策略 (如反包), 实时监控时拼历史窗口 + 今日行情跑选股。
         # 为 None 时, filter_history 策略仍会被跳过 (保持旧行为, 不破坏无历史场景)。
-        self._history_loader: Callable[[_dt.date, int], "pl.DataFrame"] | None = None
+        self._history_loader: Callable[[_dt.date, int], pl.DataFrame] | None = None
         # ETF 版历史窗口加载器 (asset_type=etf 的规则用)。为 None 时 ETF filter_history 策略跳过。
-        self._history_loader_etf: Callable[[_dt.date, int], "pl.DataFrame"] | None = None
+        self._history_loader_etf: Callable[[_dt.date, int], pl.DataFrame] | None = None
         self._active_matrix_snapshots: dict[str, Any] = {}
         # 本轮 evaluate() 产出的策略选股结果: strategy_id → {rows, total, as_of}
         # 供策略页实时回显复用 (/api/screener/cached 端点直接读取, 避免重跑)。

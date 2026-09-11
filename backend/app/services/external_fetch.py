@@ -106,24 +106,23 @@ def _client() -> httpx.Client:
 
 def _http_get(url: str) -> tuple[int, str, bytes, str]:
     """单跳 GET(不自动跟随重定向)。返回 (状态码, content-type, 内容, location)。"""
-    with _client() as client:
-        with client.stream("GET", url, headers={"User-Agent": _UA}) as resp:
-            location = resp.headers.get("location", "")
-            content_type = resp.headers.get("content-type", "")
-            if resp.is_redirect:
-                resp.close()
-                return resp.status_code, content_type, b"", location
-            chunks: list[bytes] = []
-            size = 0
-            for chunk in resp.iter_bytes():
-                size += len(chunk)
-                if size > MAX_BYTES:
-                    raise FetchError(
-                        f"页面超过 {MAX_BYTES // 1024 // 1024}MB 上限, 已中断 —— "
-                        "抓取模式是给数据接口/小页面用的",
-                    )
-                chunks.append(chunk)
-            return resp.status_code, content_type, b"".join(chunks), ""
+    with _client() as client, client.stream("GET", url, headers={"User-Agent": _UA}) as resp:
+        location = resp.headers.get("location", "")
+        content_type = resp.headers.get("content-type", "")
+        if resp.is_redirect:
+            resp.close()
+            return resp.status_code, content_type, b"", location
+        chunks: list[bytes] = []
+        size = 0
+        for chunk in resp.iter_bytes():
+            size += len(chunk)
+            if size > MAX_BYTES:
+                raise FetchError(
+                    f"页面超过 {MAX_BYTES // 1024 // 1024}MB 上限, 已中断 —— "
+                    "抓取模式是给数据接口/小页面用的",
+                )
+            chunks.append(chunk)
+        return resp.status_code, content_type, b"".join(chunks), ""
 
 
 def fetch(url: str, *, force: bool = False) -> dict:
