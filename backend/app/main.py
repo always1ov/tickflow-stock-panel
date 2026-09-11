@@ -82,7 +82,7 @@ _DOCKERENV_PATH = Path("/.dockerenv")
 # 停机缺口自检的延迟秒数: 避开启动高峰, 又要在用户开始操作前跑完。
 _INTEGRITY_CHECK_DELAY_SECONDS = 30.0
 # matrix 缓存预热线程的退出等待上限 (秒)。
-# 用 int 而非 5.0: 该值会经 %s 打进停机告警日志, 整型渲染为 "5",
+# 用 int 而非 5.0: 该值会经 %s 打进停机告警日志,整型渲染为 "5",
 # 保持与重构前 "did not stop within 5 seconds" 的日志文本一致,
 # 避免按该字符串做的日志检索/告警匹配失配。shutdown(timeout=5) 与 5.0 等价。
 _MATRIX_PREWARM_SHUTDOWN_TIMEOUT = 5
@@ -497,18 +497,18 @@ def _start_backend_extensions(app: FastAPI, store: DataStore, repo: KlineReposit
 async def _shutdown_services(app: FastAPI, repo: KlineRepository, matrix_prewarm_owner) -> None:
     """按启动的逆序停机。每步都容忍缺失 (某个服务没起来时不能拖住整个退出)。
 
-    不变量（改动前务必读懂）：
+    不变量(改动前务必读懂):
 
     1. **逆序**。本函数的执行顺序必须与 `_application_lifespan` 中的启动顺序
-       相反，否则会出现"依赖方先死、被依赖方还在跑"的窗口。当前为:
+       相反,否则会出现"依赖方先死、被依赖方还在跑"的窗口。当前为:
        watchdog → matrix 预热 → 挖掘管理器 → 调度器 → pull_scheduler →
        financial_scheduler → quote_service → depth_service → wecom_bot_service →
        minute_refresh。新增服务时请同步在这里插到对应位置。
-    2. **容错**。每个服务都走 `getattr(app.state, 名, None)` + 判空：服务没起来
-       就跳过，绝不抛错。停机路径上抛异常会掩盖真正的退出原因。
-    3. **每步独立**。不要在这里做跨服务的联动关闭，让每个服务自己负责自己的线程。
+    2. **容错**。每个服务都走 `getattr(app.state, 名, None)` + 判空:服务没起来
+       就跳过,绝不抛错。停机路径上抛异常会掩盖真正的退出原因。
+    3. **每步独立**。不要在这里做跨服务的联动关闭,让每个服务自己负责自己的线程。
     """
-    # 先摘掉 enriched 刷新回调，避免停机途中还有后台重算在改 repo 状态。
+    # 先摘掉 enriched 刷新回调,避免停机途中还有后台重算在改 repo 状态。
     repo._on_refresh_done = None  # noqa: SLF001
 
     watchdog = getattr(app.state, "watchdog", None)
@@ -527,8 +527,8 @@ async def _shutdown_services(app: FastAPI, repo: KlineRepository, matrix_prewarm
     if app.state.scheduler:
         app.state.scheduler.shutdown(wait=False)
 
-    # 停机的"表格段"：顺序即上面不变量 1 描述的逆序。
-    # 想加新服务时，在元组里补一行 (app.state 上的属性名, 停止方法名) 即可。
+    # 停机的"表格段":顺序即上面不变量 1 描述的逆序。
+    # 想加新服务时,在元组里补一行 (app.state 上的属性名, 停止方法名) 即可。
     for attr, method in (
         ("pull_scheduler", "stop"),
         ("financial_scheduler", "stop"),
@@ -551,22 +551,22 @@ async def _shutdown_services(app: FastAPI, repo: KlineRepository, matrix_prewarm
 
 @asynccontextmanager
 async def _application_lifespan(app: FastAPI):
-    # ── 阶段 0：日志与鉴权 ─────────────────────────────────────────
-    # 必须最先。免登录模式的大字警告、"是否已设过密码"的判定都放在最前，
-    # 这样后面任何一步抛错时，日志里已经能看出当前处于哪种鉴权模式。
+    # ── 阶段 0:日志与鉴权 ─────────────────────────────────────────
+    # 必须最先。免登录模式的大字警告、"是否已设过密码"的判定都放在最前,
+    # 这样后面任何一步抛错时,日志里已经能看出当前处于哪种鉴权模式。
     _log_startup_banner()
     _bootstrap_auth()
 
-    # ── 阶段 1：数据层（唯一基座）──────────────────────────────────
-    # 后续每一个服务都直接或间接依赖 store / repo，所以这两行必须排在全部
-    # _init_* / _start_* 之前；引用同时挂到 app.state 供路由与后台任务取用。
+    # ── 阶段 1:数据层(唯一基座)──────────────────────────────────
+    # 后续每一个服务都直接或间接依赖 store / repo,所以这两行必须排在全部
+    # _init_* / _start_* 之前;引用同时挂到 app.state 供路由与后台任务取用。
     store = DataStore()
     repo = KlineRepository(store)
     app.state.datastore = store
     app.state.repo = repo
 
-    # ── 阶段 2：数据层之上的初始化 ─────────────────────────────────
-    # 只依赖 store / repo；彼此之间无顺序约束，但都在能力探测之前。
+    # ── 阶段 2:数据层之上的初始化 ─────────────────────────────────
+    # 只依赖 store / repo;彼此之间无顺序约束,但都在能力探测之前。
     _load_custom_factors(store)
     _init_mining_manager(app, store)
     _prime_matrix_generation(repo)
@@ -577,15 +577,15 @@ async def _application_lifespan(app: FastAPI):
     _load_custom_data_sources()
     _check_data_dir_persistence(app)
 
-    # ── 阶段 3：能力探测 ───────────────────────────────────────────
-    # 硬约束：必须晚于 _load_custom_data_sources()。自定义数据源先注册，
+    # ── 阶段 3:能力探测 ───────────────────────────────────────────
+    # 硬约束:必须晚于 _load_custom_data_sources()。自定义数据源先注册,
     # 能力探测才能把它的数据集能力补进 capset。
     capset = detect_capabilities()
     app.state.capabilities = capset
     logger.info("ready; %d capabilities active", len(capset.all()))
 
-    # ── 阶段 4：独立后台服务（互不依赖，可任意顺序）────────────────
-    # 这些服务只依赖 store / repo / capset，彼此之间没有先后关系；
+    # ── 阶段 4:独立后台服务(互不依赖,可任意顺序)────────────────
+    # 这些服务只依赖 store / repo / capset,彼此之间没有先后关系;
     # 单独调换其中任意两行的顺序都不会改变行为。
     _init_quote_service(app, repo)
     depth_service = _init_depth_service(app, repo)
@@ -599,13 +599,13 @@ async def _application_lifespan(app: FastAPI):
     _start_financial_scheduler(app, store, capset)
     _start_watchdog(app, repo)
 
-    # ── 阶段 5：策略引擎 → matrix 预热 → 监控 → 二次开发 ────────────
-    # 顺序有硬约束，不可重排：
-    #   1) _init_strategy_engine 产出 screener 服务（A股 + ETF 两个实例）；
-    #   2) 监控引擎需要 screener 的 _load_enriched_history 作历史加载器，
-    #      所以必须晚于第 1 步；
-    #   3) matrix 预热要挂到 enriched 刷新完成回调上，故排在策略引擎之后；
-    #   4) 二次开发钩子最后跑，它只拿稳定只读上下文，失败也不影响核心启动。
+    # ── 阶段 5:策略引擎 → matrix 预热 → 监控 → 二次开发 ────────────
+    # 顺序有硬约束,不可重排:
+    #   1) _init_strategy_engine 产出 screener 服务(A股 + ETF 两个实例);
+    #   2) 监控引擎需要 screener 的 _load_enriched_history 作历史加载器,
+    #      所以必须晚于第 1 步;
+    #   3) matrix 预热要挂到 enriched 刷新完成回调上,故排在策略引擎之后;
+    #   4) 二次开发钩子最后跑,它只拿稳定只读上下文,失败也不影响核心启动。
     strategy_engine, screener_svc, etf_screener_svc = _init_strategy_engine(app, store, repo)
     matrix_prewarm_owner = _install_matrix_prewarm(repo, strategy_engine)
     _init_monitor_engine(app, store, repo, strategy_engine, screener_svc, etf_screener_svc)
