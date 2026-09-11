@@ -1,8 +1,15 @@
-"""FastAPI 入口。"""
+"""FastAPI 入口。
+
+启动顺序有依赖, 不是随便排的 —— 每个 `_init_*` / `_start_*` 辅助函数都注明了它
+"必须排在谁之后", 改动顺序前先读那一行注释。装配全部走具名步骤, 便于单点排查
+"哪个服务没起来": 启动日志里每步都有对应的一行 INFO/WARNING。
+"""
 from __future__ import annotations
 
 import logging
+import os
 import sys
+import threading
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -18,8 +25,11 @@ from app.api import (
     backtest,
     data,
     ext_data,
+    external_page,  # [fork 增强] R117 外部网页抓取模式(独立模块)
     factors,
     financials,
+    focus,  # [fork 增强] R159 推送焦点名单
+    global_indices,  # [fork 增强] R99 全球指数实时(独立模块)
     indices,
     intraday,
     kline,
@@ -37,9 +47,6 @@ from app.api import (
     stock_analysis,
     strategy,
     today,  # [fork 增强] 今日总览
-    external_page,  # [fork 增强] R117 外部网页抓取模式(独立模块)
-    focus,  # [fork 增强] R159 推送焦点名单
-    global_indices,  # [fork 增强] R99 全球指数实时(独立模块)
     usage_notes,  # [fork 增强] R93 使用观察笔记
     watchlist,
 )
@@ -56,8 +63,10 @@ from app.extensions.loader import (
 from app.jobs import daily_pipeline
 from app.services.matrix_prewarm_owner import MatrixCachePrewarmOwner
 from app.services.mining_process_lock import MiningProcessLock
+from app.services.paper_trader import StoreError as _PaperStoreError
 from app.services.quote_service import QuoteService
 from app.tickflow import client as tf_client
+from app.tickflow.capabilities import CapabilityDenied
 from app.tickflow.policy import detect_capabilities
 from app.tickflow.repository import DataStore, KlineRepository
 
@@ -66,6 +75,14 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 logger = logging.getLogger(__name__)
+
+# 容器环境标记: 存在即认为跑在容器内, 用于判定 data_dir 是否为持久化挂载点。
+_DOCKERENV_PATH = Path("/.dockerenv")
+
+# 停机缺口自检的延迟秒数: 避开启动高峰, 又要在用户开始操作前跑完。
+_INTEGRITY_CHECK_DELAY_SECONDS = 30.0
+# matrix 缓存预热线程的退出等待上限 (秒)。
+_MATRIX_PREWARM_SHUTDOWN_TIMEOUT = 5.0
 
 # 追加文件日志: uvicorn (含 --reload 开发模式) 默认只有 StreamHandler, 同步/管道等
 # 运行时日志仅出现在 dev 终端, 关掉或滚屏后即丢失, 排查「同步后日志没落」时无处可查。
@@ -90,8 +107,13 @@ if not getattr(sys, "frozen", False):
         logger.warning("文件日志初始化失败, 仅输出到终端: %s", _e)
 
 
-@asynccontextmanager
-async def _application_lifespan(app: FastAPI):
+# ================================================================
+# 启动步骤
+# ================================================================
+
+
+def _log_startup_banner() -> None:
+    """打印版本与数据源模式; 免登录模式另外大字警告。"""
     logger.info(
         "牛来 v%s starting (mode=%s)",
         __version__, tf_client.current_mode(),
@@ -108,20 +130,22 @@ async def _application_lifespan(app: FastAPI):
             + "=" * 72
         )
 
-    # 首次启动: 若配置了 AUTH_PASSWORD 环境变量且未设过密码, 用它初始化。
-    # 公网部署免 SSH 端口转发; 已设过密码则不覆盖 (改密码走 UI)。
+
+def _bootstrap_auth() -> None:
+    """首次启动: 若配置了 AUTH_PASSWORD 环境变量且未设过密码, 用它初始化。
+
+    公网部署免 SSH 端口转发; 已设过密码则不覆盖 (改密码走 UI)。
+    """
     try:
         from app.services import auth as auth_service
+
         auth_service.bootstrap_from_env()
     except Exception as e:  # noqa: BLE001
         logger.warning("auth bootstrap failed: %s", e)
 
-    # 数据层
-    store = DataStore()
-    repo = KlineRepository(store)
-    app.state.datastore = store
-    app.state.repo = repo
-    # 自定义/复合因子载入注册表 (P3); 单个失败只跳过该因子 (fail-隔离)
+
+def _load_custom_factors(store: DataStore) -> None:
+    """载入自定义/复合因子注册表 (P3); 单个失败只跳过该因子 (fail-隔离)。"""
     from app.factors.store import load_into_registry
 
     try:
@@ -130,75 +154,99 @@ async def _application_lifespan(app: FastAPI):
             logger.info("custom factors loaded: %s", len(loaded_factors))
     except Exception as exc:  # noqa: BLE001
         logger.warning("custom factors load failed: %s", exc)
+
+
+def _init_mining_manager(app: FastAPI, store: DataStore):
+    """恢复被中断的挖掘任务, 并把管理器挂到 app.state。"""
     from app.services.mining_manager import MiningJobManager
 
     mining_manager = MiningJobManager(store.data_dir)
-    recovered_mining_runs = mining_manager.recover_interrupted()
+    recovered = mining_manager.recover_interrupted()
     app.state.mining_manager = mining_manager
-    if recovered_mining_runs:
-        logger.warning("recovered %d interrupted mining runs", recovered_mining_runs)
-    # 在接受回测请求前固定 managed generation，避免首批并发 worker 各自创建版本。
-    if settings.backtest_matrix_disk_cache_enabled:
-        try:
-            repo.get_matrix_data_generation("stock")
-        except EnrichedGenerationUnavailableError as exc:
-            logger.warning("enriched generation requires a full rebuild: %s", exc)
-    # 指标异步预热标志: enriched 缓存在后台线程构建, 完成后置 True
+    if recovered:
+        logger.warning("recovered %d interrupted mining runs", recovered)
+    return mining_manager
+
+
+def _prime_matrix_generation(repo: KlineRepository) -> None:
+    """在接受回测请求前固定 managed generation, 避免首批并发 worker 各自创建版本。"""
+    if not settings.backtest_matrix_disk_cache_enabled:
+        return
+    try:
+        repo.get_matrix_data_generation("stock")
+    except EnrichedGenerationUnavailableError as exc:
+        logger.warning("enriched generation requires a full rebuild: %s", exc)
+
+
+def _arm_indicators_warmup_flag(app: FastAPI, repo: KlineRepository) -> None:
+    """指标异步预热标志: enriched 缓存在后台线程构建, 完成后置 True。"""
     app.state.indicators_ready = False
     repo._on_warmup_done = lambda: setattr(app.state, "indicators_ready", True)  # noqa: SLF001
 
-    # Polars 缓存预热 — enriched 的重计算 (107万行 compute_indicators) 推后台,
-    # instruments/index/ETF 仍同步 (毫秒级)。应用立即 ready, 指标算完后自动替换。
-    repo.refresh_cache(background=True)
 
-    # 自定义数据源配置(可选): 失败只记录错误, 不影响 TickFlow 基准路径。
+def _load_custom_data_sources() -> None:
+    """自定义数据源配置(可选): 失败只记录错误, 不影响 TickFlow 基准路径。"""
     try:
         from app.data_providers import custom as custom_sources
+
         custom_sources.load_all()
         logger.info("custom data sources loaded: %d", len(custom_sources.list_sources()))
     except Exception as e:  # noqa: BLE001
         logger.warning("custom data sources init failed: %s", e)
 
-    # [fork 增强] 数据持久化自检: 容器内 data_dir 不是挂载点 → 数据写在容器层,
-    # 重建容器(拉新镜像)会丢全部数据。数据页据此显示红色警告横幅。
-    # 仅容器环境判定(/.dockerenv); bind mount 与 named volume 都是挂载点。
+
+def _check_data_dir_persistence(app: FastAPI) -> None:
+    """[fork 增强] 数据持久化自检。
+
+    容器内 data_dir 不是挂载点 → 数据写在容器层, 重建容器(拉新镜像)会丢全部数据。
+    数据页据此显示红色警告横幅。仅容器环境判定(/.dockerenv); bind mount 与
+    named volume 都是挂载点。
+    """
     app.state.data_dir_persistent = True
     try:
-        import os as _os
-        if Path("/.dockerenv").exists():
-            app.state.data_dir_persistent = _os.path.ismount(str(settings.data_dir))
+        if _DOCKERENV_PATH.exists():
+            app.state.data_dir_persistent = os.path.ismount(str(settings.data_dir))
             if not app.state.data_dir_persistent:
                 logger.warning(
                     "数据目录 %s 未挂载持久化卷! 容器重建将丢失全部数据 — "
                     "请在 compose 的 volumes 挂载该路径", settings.data_dir)
     except Exception as e:  # noqa: BLE001
         logger.debug("data dir persistence check skipped: %s", e)
-    # 自定义源必须先注册,能力探测才能补充其数据集能力。
-    capset = detect_capabilities()
-    app.state.capabilities = capset
-    logger.info("ready; %d capabilities active", len(capset.all()))
 
-    # 全局行情服务
+
+def _init_quote_service(app: FastAPI, repo: KlineRepository) -> QuoteService:
+    """全局行情服务。
+
+    顺序是有原因的: QuoteService 需要访问 strategy_monitor 等单例, 所以先建
+    quote_service (set_repo/boot_check), 再创建 strategy_monitor 挂 app.state,
+    最后才 set_app_state 把整个 state 注入进去。
+    """
     qs = QuoteService()
     app.state.quote_service = qs
     qs.set_repo(repo)
     qs.boot_check()
 
-    # QuoteService 需要访问 strategy_monitor 等单例
-    # 先创建 strategy_monitor，再注入 app.state
     from app.strategy.monitor import StrategyMonitorService
+
     strategy_monitor = StrategyMonitorService()
     app.state.strategy_monitor = strategy_monitor
     qs.set_app_state(app.state)
+    return qs
 
-    # 五档盘口 sealed 服务(真假涨停/跌停, 独立旁路线)
+
+def _init_depth_service(app: FastAPI, repo: KlineRepository):
+    """五档盘口 sealed 服务(真假涨停/跌停, 独立旁路线)。"""
     from app.services.depth_service import DepthService
+
     depth_service = DepthService()
     depth_service.set_repo(repo)
     depth_service.set_app_state(app.state)
     app.state.depth_service = depth_service
+    return depth_service
 
-    # 启动调度器(若 enriched 数据为空,首次启动可手动 POST /api/pipeline/run)
+
+def _start_scheduler(app: FastAPI, repo: KlineRepository, capset) -> None:
+    """启动调度器(若 enriched 数据为空, 首次启动可手动 POST /api/pipeline/run)。"""
     try:
         daily_pipeline.set_app_state(app.state)  # 供 depth_finalize job 访问 depth_service
         scheduler = daily_pipeline.start_scheduler(repo, capset)
@@ -206,6 +254,7 @@ async def _application_lifespan(app: FastAPI):
         # [R61] 操盘手定时。默认全关 —— 一个会自动调用付费 API 的东西不该开箱就开着
         try:
             from app.services import paper_trader_schedule
+
             n = paper_trader_schedule.install(scheduler, repo)
             if n:
                 logger.info("装上 %d 个 AI 操盘手定时任务", n)
@@ -215,16 +264,21 @@ async def _application_lifespan(app: FastAPI):
         logger.warning("scheduler not started: %s", e)
         app.state.scheduler = None
 
-    # depth sealed: 启动补跑(当天文件不存在) + 盘中轮询(有能力时)
+
+def _boot_depth_sealed(depth_service) -> None:
+    """depth sealed: 启动补跑(当天文件不存在) + 盘中轮询(有能力时)。"""
     try:
         depth_service.boot_check()
         depth_service.start_polling()
     except Exception as e:  # noqa: BLE001
         logger.warning("depth_service init failed: %s", e)
 
-    # 盘中分钟增量刷新 (Expert 专有): 线程常驻, 开关/时段/能力门控在循环内每轮判断
+
+def _start_minute_refresh(app: FastAPI, repo: KlineRepository) -> None:
+    """盘中分钟增量刷新 (Expert 专有): 线程常驻, 开关/时段/能力门控在循环内每轮判断。"""
     try:
         from app.services.minute_refresh import MinuteRefreshService
+
         minute_refresh = MinuteRefreshService(repo)
         minute_refresh.set_app_state(app.state)
         app.state.minute_refresh = minute_refresh
@@ -232,22 +286,30 @@ async def _application_lifespan(app: FastAPI):
     except Exception as e:
         logger.warning("minute_refresh init failed: %s", e)
 
-    # 停机缺口自检: 延迟后台扫描, 发现最近交易日的盘中快照/缺口时自动创建
-    # 修复任务 (盘中停机→次日开实时场景, 不修则坏数据被"只刷今天"分支永久留存)
-    try:
-        import threading
 
+def _schedule_boot_integrity_check(app: FastAPI) -> None:
+    """停机缺口自检: 延迟后台扫描。
+
+    发现最近交易日的盘中快照/缺口时自动创建修复任务 (盘中停机→次日开实时场景,
+    不修则坏数据被"只刷今天"分支永久留存)。
+    """
+    try:
         from app.services.data_integrity import boot_integrity_check
 
-        timer = threading.Timer(30.0, boot_integrity_check, args=(app.state,))
+        timer = threading.Timer(
+            _INTEGRITY_CHECK_DELAY_SECONDS, boot_integrity_check, args=(app.state,),
+        )
         timer.daemon = True  # 不阻塞进程退出
         timer.start()
     except Exception as e:  # noqa: BLE001
         logger.warning("integrity boot check scheduling failed: %s", e)
 
-    # 企业微信智能机器人长连接(可选通道, 失败不阻断启动)
+
+def _init_wecom_bot(app: FastAPI) -> None:
+    """企业微信智能机器人长连接(可选通道, 失败不阻断启动)。"""
     try:
         from app.services.wecom_bot_service import WecomBotService
+
         wecom_bot_service = WecomBotService()
         wecom_bot_service.set_app_state(app.state)
         app.state.wecom_bot_service = wecom_bot_service
@@ -255,56 +317,84 @@ async def _application_lifespan(app: FastAPI):
     except Exception as e:  # noqa: BLE001
         logger.warning("wecom_bot_service init failed: %s", e)
 
-    # 内置扩展表 (概念/行业): 先创建 config (含拉取配置), 默认开启定时拉取。
-    # 必须在 pull_scheduler.refresh() 之前执行, 否则全新部署时 scheduler 读不到
-    # 刚创建的预设, 定时任务不会启动。
+
+async def _ensure_ext_presets(store: DataStore) -> None:
+    """内置扩展表 (概念/行业): 先创建 config (含拉取配置), 默认开启定时拉取。
+
+    必须在 pull_scheduler.refresh() 之前执行, 否则全新部署时 scheduler 读不到
+    刚创建的预设, 定时任务不会启动。
+    """
     try:
         from app.services.ext_presets import ensure_builtin_presets
+
         await ensure_builtin_presets(store.data_dir)
     except Exception as e:  # noqa: BLE001
         logger.warning("内置扩展表初始化失败 (不影响启动): %s", e)
 
-    # 扩展数据定时拉取: 在预设配置就绪后启动, 自动调度 enabled 的预设。
+
+def _start_pull_scheduler(app: FastAPI, store: DataStore) -> None:
+    """扩展数据定时拉取: 在预设配置就绪后启动, 自动调度 enabled 的预设。"""
     from app.services.ext_pull import pull_scheduler
+
     pull_scheduler.start(store.data_dir)
     pull_scheduler.refresh(store.data_dir)
     app.state.pull_scheduler = pull_scheduler
 
-    # 财务数据 (需 Expert 套餐): 仅初始化调度器供 /api/financials/sync/* 手动同步,
-    # 不启动自动调度——用户在「财务分析」页点「同步」手动拉取。
+
+def _start_financial_scheduler(app: FastAPI, store: DataStore, capset) -> None:
+    """财务数据 (需 Expert 套餐): 仅初始化调度器供 /api/financials/sync/* 手动同步。
+
+    不启动自动调度 —— 用户在「财务分析」页点「同步」手动拉取。
+    """
     from app.services.financial_sync import financial_scheduler
+
     financial_scheduler.start(store.data_dir, capset)
     app.state.financial_scheduler = financial_scheduler
 
-    # 自愈看门狗: 探测 polars 闸与写锁, 僵死时退出交由 supervisor 拉起 (兜底层)。
+
+def _start_watchdog(app: FastAPI, repo: KlineRepository) -> None:
+    """自愈看门狗: 探测 polars 闸与写锁, 僵死时退出交由 supervisor 拉起 (兜底层)。"""
     from app.watchdog import start_watchdog
+
     app.state.watchdog = start_watchdog(app.state, repo)
 
-    # 策略引擎
-    from app.strategy.engine import StrategyEngine
-    from app.strategy import config as strategy_config
-    from app.strategy.monitor import StrategyMonitorService
-    from app.services.screener import ScreenerService
 
-    _screener_svc = ScreenerService(repo)
-    _etf_screener_svc = ScreenerService(repo, asset_type="etf")
-    strategy_dirs = [
+def _strategy_search_dirs(store: DataStore) -> list[Path]:
+    """策略搜索路径: 内置 + 用户自定义 + AI 生成 + 复合。"""
+    return [
         Path(__file__).resolve().parent / "strategy" / "builtin",
         store.data_dir / "strategies" / "custom",
         store.data_dir / "strategies" / "ai",
         store.data_dir / "strategies" / "composite",
     ]
+
+
+def _init_strategy_engine(app: FastAPI, store: DataStore):
+    """策略引擎 + 两个选股服务 (A 股 / ETF)。
+
+    返回 `(strategy_engine, screener_svc, etf_screener_svc)`: 两个 screener 的
+    历史窗口加载器随后要复用到监控引擎, 让声明 filter_history 的策略也能跑实时监控。
+    """
+    from app.services.screener import ScreenerService
+    from app.strategy import config as strategy_config
+    from app.strategy.engine import StrategyEngine
+
+    screener_svc = ScreenerService(repo=app.state.repo)
+    etf_screener_svc = ScreenerService(repo=app.state.repo, asset_type="etf")
     strategy_engine = StrategyEngine(
-        strategy_dirs=strategy_dirs,
+        strategy_dirs=_strategy_search_dirs(store),
         override_loader=lambda sid: strategy_config.load_override(store.data_dir, sid),
     )
     app.state.strategy_engine = strategy_engine
-
     logger.info("strategy engine loaded: %d strategies", len(strategy_engine.list_strategies()))
+    return strategy_engine, screener_svc, etf_screener_svc
 
-    matrix_prewarm_owner = MatrixCachePrewarmOwner()
 
-    def _schedule_matrix_cache_prewarm() -> None:
+def _install_matrix_prewarm(repo: KlineRepository, strategy_engine) -> MatrixCachePrewarmOwner:
+    """回测 matrix 缓存预热: 挂到 enriched 刷新完成回调上, 后台独占跑一次。"""
+    owner = MatrixCachePrewarmOwner()
+
+    def _schedule() -> None:
         if (
             not settings.backtest_matrix_disk_cache_enabled
             or not settings.backtest_matrix_cache_prewarm
@@ -328,7 +418,7 @@ async def _application_lifespan(app: FastAPI):
 
                 with shared_heavy_job_limiter.slot(
                     "exclusive",
-                    cancel_event=matrix_prewarm_owner.cancel_event,
+                    cancel_event=owner.cancel_event,
                 ):
                     result = prewarm_matrix_cache(
                         BacktestEngine(repo),
@@ -336,7 +426,7 @@ async def _application_lifespan(app: FastAPI):
                         asset_type="stock",
                         latest_date=latest,
                         years=settings.backtest_matrix_cache_prewarm_years,
-                        cancel_event=matrix_prewarm_owner.cancel_event,
+                        cancel_event=owner.cancel_event,
                     )
                 logger.info("matrix cache prewarm done: %s", result)
             except (HeavyJobCancelledError, MatrixPrewarmCancelledError):
@@ -344,18 +434,23 @@ async def _application_lifespan(app: FastAPI):
             except Exception:  # noqa: BLE001
                 logger.exception("matrix cache prewarm failed")
 
-        if not matrix_prewarm_owner.schedule(_prewarm):
+        if not owner.schedule(_prewarm):
             logger.info("matrix cache prewarm already running or shutting down, skip")
 
-    repo._on_refresh_done = _schedule_matrix_cache_prewarm  # noqa: SLF001
+    repo._on_refresh_done = _schedule  # noqa: SLF001
     if repo.enriched_ready:
-        _schedule_matrix_cache_prewarm()
+        _schedule()
+    return owner
 
-    # 通用监控规则引擎: 启动时 reload 规则到内存态 (修复重启后告警失效)
-    from app.strategy.monitor import MonitorRuleEngine
-    from app.strategy import monitor_rules as mr_store
+
+def _init_monitor_engine(app: FastAPI, store: DataStore, repo: KlineRepository, strategy_engine,
+                         screener_svc, etf_screener_svc) -> None:
+    """通用监控规则引擎: 启动时 reload 规则到内存态 (修复重启后告警失效)。"""
     from app.services import preferences
     from app.services.sector_monitor import SectorMonitorService
+    from app.strategy import monitor_rules as mr_store
+    from app.strategy.monitor import MonitorRuleEngine
+
     monitor_engine = MonitorRuleEngine()
     sector_monitor_service = SectorMonitorService(repo)
     monitor_engine.set_strategy_engine(strategy_engine)
@@ -363,9 +458,9 @@ async def _application_lifespan(app: FastAPI):
     monitor_engine.set_sector_monitor_service(sector_monitor_service)
     # 复用 ScreenerService 的历史窗口加载器 (三级缓存, 启动预计算命中 ~0ms),
     # 让声明 filter_history 的策略 (如反包) 也能在实时监控里跑选股 → 盘中触发通知。
-    monitor_engine.set_history_loader(_screener_svc._load_enriched_history)
+    monitor_engine.set_history_loader(screener_svc._load_enriched_history)
     # ETF 版历史加载器: asset_type=etf 的 strategy 型规则用 (读 kline_etf_enriched)。
-    monitor_engine.set_history_loader_etf(_etf_screener_svc._load_enriched_history)
+    monitor_engine.set_history_loader_etf(etf_screener_svc._load_enriched_history)
 
     # 自动迁移: 把旧 strategy_monitor_ids 同步为 type=strategy 规则 (统一到监控页)
     try:
@@ -387,46 +482,102 @@ async def _application_lifespan(app: FastAPI):
     app.state.monitor_engine = monitor_engine
     app.state.sector_monitor_service = sector_monitor_service
 
-    # 源码内二次开发启动钩子: 仅暴露稳定只读上下文, 单个扩展失败不影响核心启动。
-    extension_registry = app.state.extension_registry
+
+def _start_backend_extensions(app: FastAPI, store: DataStore, repo: KlineRepository) -> None:
+    """源码内二次开发启动钩子: 仅暴露稳定只读上下文, 单个扩展失败不影响核心启动。"""
     start_backend_extensions(
         current_extension_context(data_dir=store.data_dir, repository=repo),
-        extension_registry,
+        app.state.extension_registry,
     )
+
+
+async def _shutdown_services(app: FastAPI, repo: KlineRepository, matrix_prewarm_owner) -> None:
+    """按启动的逆序停机。每步都容忍缺失 (某个服务没起来时不能拖住整个退出)。"""
+    repo._on_refresh_done = None  # noqa: SLF001
+
+    watchdog = getattr(app.state, "watchdog", None)
+    if watchdog:
+        await watchdog.stop()
+
+    if not matrix_prewarm_owner.shutdown(timeout=_MATRIX_PREWARM_SHUTDOWN_TIMEOUT):
+        logger.warning(
+            "matrix cache prewarm did not stop within %s seconds",
+            _MATRIX_PREWARM_SHUTDOWN_TIMEOUT,
+        )
+
+    mining_manager = getattr(app.state, "mining_manager", None)
+    if mining_manager:
+        mining_manager.shutdown()
+    if app.state.scheduler:
+        app.state.scheduler.shutdown(wait=False)
+
+    for attr, method in (
+        ("pull_scheduler", "stop"),
+        ("financial_scheduler", "stop"),
+        ("quote_service", "stop"),
+        ("depth_service", "stop_polling"),
+        ("wecom_bot_service", "stop"),
+        ("minute_refresh", "stop"),
+    ):
+        service = getattr(app.state, attr, None)
+        if service:
+            getattr(service, method)()
+
+    logger.info("shutdown")
+
+
+# ================================================================
+# 生命周期
+# ================================================================
+
+
+@asynccontextmanager
+async def _application_lifespan(app: FastAPI):
+    _log_startup_banner()
+    _bootstrap_auth()
+
+    # 数据层 —— 后续所有服务都依赖 store / repo。
+    store = DataStore()
+    repo = KlineRepository(store)
+    app.state.datastore = store
+    app.state.repo = repo
+
+    _load_custom_factors(store)
+    _init_mining_manager(app, store)
+    _prime_matrix_generation(repo)
+    _arm_indicators_warmup_flag(app, repo)
+    # Polars 缓存预热 — enriched 的重计算 (107万行 compute_indicators) 推后台,
+    # instruments/index/ETF 仍同步 (毫秒级)。应用立即 ready, 指标算完后自动替换。
+    repo.refresh_cache(background=True)
+    _load_custom_data_sources()
+    _check_data_dir_persistence(app)
+
+    # 自定义源必须先注册, 能力探测才能补充其数据集能力。
+    capset = detect_capabilities()
+    app.state.capabilities = capset
+    logger.info("ready; %d capabilities active", len(capset.all()))
+
+    _init_quote_service(app, repo)
+    depth_service = _init_depth_service(app, repo)
+    _start_scheduler(app, repo, capset)
+    _boot_depth_sealed(depth_service)
+    _start_minute_refresh(app, repo)
+    _schedule_boot_integrity_check(app)
+    _init_wecom_bot(app)
+    await _ensure_ext_presets(store)
+    _start_pull_scheduler(app, store)
+    _start_financial_scheduler(app, store, capset)
+    _start_watchdog(app, repo)
+
+    strategy_engine, screener_svc, etf_screener_svc = _init_strategy_engine(app, store, repo)
+    matrix_prewarm_owner = _install_matrix_prewarm(repo, strategy_engine)
+    _init_monitor_engine(app, store, repo, strategy_engine, screener_svc, etf_screener_svc)
+    _start_backend_extensions(app, store, repo)
 
     try:
         yield
     finally:
-        repo._on_refresh_done = None  # noqa: SLF001
-        wd = getattr(app.state, "watchdog", None)
-        if wd:
-            await wd.stop()
-        if not matrix_prewarm_owner.shutdown(timeout=5.0):
-            logger.warning("matrix cache prewarm did not stop within 5 seconds")
-        mmanager = getattr(app.state, "mining_manager", None)
-        if mmanager:
-            mmanager.shutdown()
-        if app.state.scheduler:
-            app.state.scheduler.shutdown(wait=False)
-        ps = getattr(app.state, "pull_scheduler", None)
-        if ps:
-            ps.stop()
-        fsc = getattr(app.state, "financial_scheduler", None)
-        if fsc:
-            fsc.stop()
-        qs = getattr(app.state, "quote_service", None)
-        if qs:
-            qs.stop()
-        dsvc = getattr(app.state, "depth_service", None)
-        if dsvc:
-            dsvc.stop_polling()
-        wbot = getattr(app.state, "wecom_bot_service", None)
-        if wbot:
-            wbot.stop()
-        mrs = getattr(app.state, "minute_refresh", None)
-        if mrs:
-            mrs.stop()
-        logger.info("shutdown")
+        await _shutdown_services(app, repo, matrix_prewarm_owner)
 
 
 @asynccontextmanager
@@ -485,6 +636,7 @@ async def auth_middleware(request: Request, call_next):
         return await call_next(request)
 
     from app.services import auth as auth_service
+
     # 情况 1+2: 未设密码
     if not auth_service.is_configured():
         # 本机/内网 → 放行(服务器主人可访问, 并去 /login 设密码)
@@ -507,40 +659,44 @@ async def auth_middleware(request: Request, call_next):
     return JSONResponse(status_code=401, content={"detail": "未登录或会话已过期"})
 
 
-# 路由
-app.include_router(core_router)
-app.include_router(auth_api.router)
-app.include_router(kline.router)
-app.include_router(watchlist.router)
-app.include_router(screener.router)
-app.include_router(backtest.router)
-app.include_router(factors.router)
-app.include_router(mining.router)
-app.include_router(paper_trading.router)  # [fork 增强] R59 AI 操盘手
-app.include_router(intraday.router)
-app.include_router(indices.router)
-app.include_router(overview.router)
-app.include_router(today.router)  # [fork 增强] 今日总览
-app.include_router(usage_notes.router)  # [fork 增强] R93 使用观察笔记
-app.include_router(focus.router)  # [fork 增强] R159 推送焦点名单
-app.include_router(global_indices.router)  # [fork 增强] R99 全球指数实时
-app.include_router(external_page.router)  # [fork 增强] R117 外部网页抓取模式
-app.include_router(abnormal.router)
-app.include_router(regime.router)
-app.include_router(analysis.router)
-app.include_router(pipeline.router)
-app.include_router(data.router)
-app.include_router(ext_data.router)
-app.include_router(financials.router)
-app.include_router(stock_analysis.router)
-app.include_router(market_recap.router)
-app.include_router(settings_api.router)
-app.include_router(strategy.router)
-app.include_router(signals.router)
-app.include_router(monitor_rules.router)
-app.include_router(lots.router)
-app.include_router(alerts.router)
-app.include_router(rps.router)
+def _register_routers(app: FastAPI) -> None:
+    """注册全部路由。顺序不代表优先级, 但 `/api/health` 等核心路由在最前。"""
+    app.include_router(core_router)
+    app.include_router(auth_api.router)
+    app.include_router(kline.router)
+    app.include_router(watchlist.router)
+    app.include_router(screener.router)
+    app.include_router(backtest.router)
+    app.include_router(factors.router)
+    app.include_router(mining.router)
+    app.include_router(paper_trading.router)  # [fork 增强] R59 AI 操盘手
+    app.include_router(intraday.router)
+    app.include_router(indices.router)
+    app.include_router(overview.router)
+    app.include_router(today.router)  # [fork 增强] 今日总览
+    app.include_router(usage_notes.router)  # [fork 增强] R93 使用观察笔记
+    app.include_router(focus.router)  # [fork 增强] R159 推送焦点名单
+    app.include_router(global_indices.router)  # [fork 增强] R99 全球指数实时
+    app.include_router(external_page.router)  # [fork 增强] R117 外部网页抓取模式
+    app.include_router(abnormal.router)
+    app.include_router(regime.router)
+    app.include_router(analysis.router)
+    app.include_router(pipeline.router)
+    app.include_router(data.router)
+    app.include_router(ext_data.router)
+    app.include_router(financials.router)
+    app.include_router(stock_analysis.router)
+    app.include_router(market_recap.router)
+    app.include_router(settings_api.router)
+    app.include_router(strategy.router)
+    app.include_router(signals.router)
+    app.include_router(monitor_rules.router)
+    app.include_router(lots.router)
+    app.include_router(alerts.router)
+    app.include_router(rps.router)
+
+
+_register_routers(app)
 
 # 二次开发路由与小粒度策略在所有核心路由后注册, 禁止覆盖核心路径。
 extension_registry, extension_load_errors = configure_backend_extensions(app)
@@ -549,13 +705,8 @@ app.state.extension_load_errors = extension_load_errors
 
 
 # 能力门控异常 → 403(而非默认 500)
-# 业务代码用 capset.require(Cap.X) 断言能力,缺失时抛 CapabilityDenied;
-# 若不注册 handler 会冒泡成 500 Internal Server Error,对前端不友好且语义错误。
-from fastapi import Request
-from fastapi.responses import JSONResponse
-from app.tickflow.capabilities import CapabilityDenied
-
-
+# 业务代码用 capset.require(Cap.X) 断言能力, 缺失时抛 CapabilityDenied;
+# 若不注册 handler 会冒泡成 500 Internal Server Error, 对前端不友好且语义错误。
 @app.exception_handler(CapabilityDenied)
 async def capability_denied_handler(request: Request, exc: CapabilityDenied) -> JSONResponse:
     return JSONResponse(
@@ -567,12 +718,10 @@ async def capability_denied_handler(request: Request, exc: CapabilityDenied) -> 
 # [fork 增强] R68 操盘手账本读不出来 → 503, 而且**不写**。
 # 这个 handler 存在的意义不在于状态码好看, 而在于让那条路走到"报错"为止:
 # 读不出来时如果按空账本继续跑, 下一次保存就会把其他操作员一起覆盖掉。
-from app.services.paper_trader import StoreError as _PaperStoreError
-
-
 @app.exception_handler(_PaperStoreError)
 async def paper_store_error_handler(request: Request, exc: _PaperStoreError) -> JSONResponse:
     return JSONResponse(status_code=503, content={"detail": str(exc)})
+
 
 # 生产期静态文件(前端 dist)
 _static = Path(settings.static_dir)
@@ -581,6 +730,7 @@ if _static.exists():
         # [fork R153] 带 hash 的产物: 一年 immutable 缓存 + 构建期预压缩直出。
         # 见 app/static_assets.py。API 路径不受影响。
         from app.static_assets import HashedAssets
+
         app.mount("/assets", HashedAssets(directory=_static / "assets"), name="assets")
 
     @app.get("/{full_path:path}", include_in_schema=False)
