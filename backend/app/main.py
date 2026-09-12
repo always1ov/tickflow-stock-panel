@@ -372,18 +372,23 @@ def _strategy_search_dirs(store: DataStore) -> list[Path]:
     ]
 
 
-def _init_strategy_engine(app: FastAPI, store: DataStore):
+def _init_strategy_engine(app: FastAPI, store: DataStore, repo: KlineRepository):
     """策略引擎 + 两个选股服务 (A 股 / ETF)。
 
     返回 `(strategy_engine, screener_svc, etf_screener_svc)`: 两个 screener 的
     历史窗口加载器随后要复用到监控引擎, 让声明 filter_history 的策略也能跑实时监控。
+
+    [R325] 签名补上 `repo`: R318 并进来的那次拆分, 调用处写的是三个参数、定义只收
+    两个 —— **应用一启动就 TypeError, 整个后端起不来**, 而 3900 条测试没有一条跑
+    lifespan, 所以全绿。现在 `tests/test_main_lifespan_wiring.py` 逐个核对每一步
+    的调用与定义的参数个数。
     """
     from app.services.screener import ScreenerService
     from app.strategy import config as strategy_config
     from app.strategy.engine import StrategyEngine
 
-    screener_svc = ScreenerService(repo=app.state.repo)
-    etf_screener_svc = ScreenerService(repo=app.state.repo, asset_type="etf")
+    screener_svc = ScreenerService(repo=repo)
+    etf_screener_svc = ScreenerService(repo=repo, asset_type="etf")
     strategy_engine = StrategyEngine(
         strategy_dirs=_strategy_search_dirs(store),
         override_loader=lambda sid: strategy_config.load_override(store.data_dir, sid),
