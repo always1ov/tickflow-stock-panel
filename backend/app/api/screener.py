@@ -965,6 +965,13 @@ def limit_ladder(
     df = df.with_columns(_one_word_limit_expr(status_main, df.columns).alias("is_one_word"))
 
     # 动态 JOIN 扩展数据
+    # [R320 同步上游] 上游 40c2468 在这一段原地补了「只取最新分区 + 去重」
+    # (`_dedup_ext`), 修的正是 R145 已经修过的同一个 bug。这里**取 fork 那版**:
+    # 通用路径 `_load_ext_value_maps` 本来就做了这两步(还多一层 mtime 缓存),
+    # 且本文件其余地方(两边都是)全靠它给的 `ext_values` 逐行贴值; 取上游那段
+    # 会把下游改回 DataFrame JOIN 那套 —— 少一份实现, 就少一处会漏掉去重的地方。
+    # 上游随之新增的 `test_limit_ladder_ext_timeseries.py` 保留, 用它验证 fork 路径
+    # 满足作者的行为要求。
     # [R145] 扩展列改走全站通用的 `_load_ext_value_maps`。
     #
     # 这里原来自己写了一份 JOIN, 漏掉了通用路径里**至关重要的两步**:
@@ -993,6 +1000,11 @@ def limit_ladder(
         for k, v in list(r.items()):
             if isinstance(v, float) and not math.isfinite(v):
                 r[k] = None
+    # [R320] R145 把 JOIN 换成 `_load_ext_value_maps` 时只做了「加载」这一半,
+    # 「逐行贴值」这一半漏了 —— 上面那段注释写着"值在 rows 生成后逐行贴上",
+    # 代码里却没有这一行, 梯队页配了扩展列也一直是空的。是作者随本次同步带来的
+    # `test_limit_ladder_ext_timeseries.py` 把它照出来的。
+    rows = _rows_with_ext(rows, ext_value_maps)
 
     # 按 boards 分组
     tiers: dict[int, list] = {}
