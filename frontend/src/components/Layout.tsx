@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import { useQuoteStream, useQuoteStreamStatus } from '@/lib/useQuoteStream'
 import { ToastContainer, toast } from '@/components/Toast'
+import { PageErrorBoundary } from '@/components/PageErrorBoundary'
 import { AlertToastContainer } from '@/components/AlertToast'
 import { AiAnalysisHost } from '@/components/financials/AiAnalysisHost'
 import { AiReportBubble } from '@/components/financials/AiReportBubble'
@@ -1438,15 +1439,19 @@ export function Layout() {
             与服务连接已断开 · 正在重连
           </div>
         )}
-        <Suspense
-          fallback={
-            <div className="flex items-center justify-center py-24">
-              <Loader2 className="h-5 w-5 animate-spin text-muted" />
-            </div>
-          }
-        >
-          <Outlet />
-        </Suspense>
+        {/* [R321] 边界在 Suspense **外面**: lazy chunk 拿不到时错是从 Suspense 里抛
+            出来的, 边界在里面就接不住。按路径复位 —— 换页即重来。 */}
+        <PageErrorBoundary resetKey={location.pathname}>
+          <Suspense
+            fallback={
+              <div className="flex items-center justify-center py-24">
+                <Loader2 className="h-5 w-5 animate-spin text-muted" />
+              </div>
+            }
+          >
+            <Outlet />
+          </Suspense>
+        </PageErrorBoundary>
       </motion.main>
       <ToastContainer />
       <AlertToastContainer />

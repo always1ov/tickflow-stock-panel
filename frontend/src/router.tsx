@@ -6,6 +6,7 @@ import { Auth } from './pages/Auth'
 import { useSettings } from './lib/useSharedQueries'
 import { Logo } from './components/Logo'
 import { ExtensionBoundary } from './extensions/ExtensionBoundary'
+import { RouteErrorPage } from './components/PageErrorBoundary'
 import {
   finalizeFrontendExtensions,
   getFrontendExtensionLoadErrors,
@@ -131,9 +132,11 @@ export function createAppRouter() {
   if (frontendExtensionErrors.length > 0) {
     console.error('部分前端扩展加载失败', frontendExtensionErrors)
   }
+  // [R321] 三条顶层路由各挂一个 errorElement: 正文区的错由 Layout 里的
+  // PageErrorBoundary 先接; 这里接的是**壳自己崩**与 404 —— 那两种情形下没有壳可用。
   return createBrowserRouter([
-  { path: '/onboarding', element: <Onboarding /> },
-  { path: '/login', element: <Auth /> },
+  { path: '/onboarding', element: <Onboarding />, errorElement: <RouteErrorPage /> },
+  { path: '/login', element: <Auth />, errorElement: <RouteErrorPage /> },
   {
     path: '/',
     element: (
@@ -141,6 +144,7 @@ export function createAppRouter() {
         <Layout />
       </OnboardingGuard>
     ),
+    errorElement: <RouteErrorPage />,
     children: [
       // [R64] 看板从根路径挪到 /dashboard, 根路径改去今日总览 ——
       // 看板是展示型的(看一眼有概念, 但不产出可执行的东西), 不该是每次打开
