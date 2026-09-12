@@ -20,6 +20,7 @@ import { ExportColumnsDialog } from '@/components/stock-analysis/decision-board/
 import { TrendBacktestAllDialog } from '@/components/stock-analysis/TrendBacktestAllDialog'
 import { ChannelStateCell, PositionCell, NUM, TD_BASE } from '@/components/stock-analysis/decision-board/cells'
 import { LotsLink } from '@/components/stock-analysis/decision-board/LotsLink'
+import { Hint } from '@/components/Hint'   // [R323] 表头说明点得开
 // [R169] 合并视图(手填 ⊕ 上游批次登记), 字段说明见 api.ts 的 EffectivePosition
 type Position = EffectivePosition
 type WatchPoint = { direction: 'up' | 'down'; price: number; label?: string; action?: string; reason?: string }
@@ -65,6 +66,31 @@ const SIGNAL_RANK: Record<string, number> = { buy: 0, sell: 1, hold: 2, watch: 3
  *
  * **顺序必须与 thead 里的 <th> 一一对应。**
  */
+/**
+ * [R323] 表头说明 —— **一份字两个出口**: 排序按钮上的 `title`(桌面悬停, 老习惯)
+ * 与旁边那个「?」(点一下 / 触屏摊开)。原来这些字内联在各个 `title=` 里, 只有
+ * 悬停一条路; 提成常量是为了两处**同一份**, 不誊抄。
+ */
+const HEAD_TIPS = {
+  name: '标的名称;第二行是「该动了」判定 —— 已触发 > 逼近 > 刚转折 > 到轨 > 无事,纯规则,AI 不参与',
+  changePct: '现价与当日涨跌。点这里按涨跌幅排: 涨最多在前 → 跌最惨在前 → 回默认顺序',
+  trend: '两行: 六态趋势 / 价格·六态·均线三个尺度转到第几步。\n'
+    + '「走到哪一步」与「还有没有劲」在右边的「档位」列里,\n'
+    + '各自贴着它修饰的那一行(R297 起)。\n\n'
+    + '点这里按六态排: 多头在前 → 空头在前 → 回默认顺序。',
+  pos: '两行:\n'
+    + '  ① 位置名 —— 收盘价落在**短期通道**的哪一档\n'
+    + '     (破上轨 / 贴上轨 / 通道内 / 贴下轨 / 破下轨)。扫表时看这一行的颜色。\n'
+    + '  ② 离那条轨还有多远 —— **价格口径**, 现价还要动多少个百分点才碰到它。\n'
+    + '     口径 (轨价 − 现价) / 现价, 与出场线、六态翻转距离是同一个算法。\n'
+    + '     看哪条轨跟着位置名走;「通道内」时取更近的那一条(先撞上的就是它)。\n\n'
+    + '用户选的就是「只说短期 + 一句能交易的距离」——\n'
+    + '短中长三档各自的位置与距离、27 格那个组合码, 都在悬停里。\n'
+    + '要看翻译好的那十档判定, 点开就是复盘的「通道档位」页。',
+  pnl: '我在这只票上的账: 拿没拿 / 买入成本 / 现在浮盈多少。\n'
+    + '空仓时这一格只有一个按钮 —— 点它切成持有。\n\n'
+    + '点这里按浮盈排: 赚最多在前 → 亏最多在前 → 回默认顺序。',
+} as const
 const BOARD_COLS = [
   // [R309] 9.5% → 13%。名称原来截在 110px, 五个字以上就带省略号 ——
   // **认票这件事上省 3% 是最亏的**: 认错票之后后面六列全白读。
@@ -939,15 +965,16 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
                 就是要划走的行, 让它透出来没有任何好处。 */}
             <thead className="sticky top-0 z-20 bg-surface text-[12px] text-muted">
               <tr className="text-left">
-                <th className="whitespace-nowrap px-3 py-2.5 font-normal text-center"><button onClick={() => cycleSort('name')} className={thBtn} title="标的名称;第二行是「该动了」判定 —— 已触发 > 逼近 > 刚转折 > 到轨 > 无事,纯规则,AI 不参与">标的{caret('name')}</button></th>
+                <th className="whitespace-nowrap px-3 py-2.5 font-normal text-center"><button onClick={() => cycleSort('name')} className={thBtn} title={HEAD_TIPS.name}>标的{caret('name')}</button><Hint title={HEAD_TIPS.name} className="ml-0.5" /></th>
                 <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center">
                   <button onClick={() => cycleSort('changePct')}
                           className={`${thBtn} whitespace-nowrap`}
-                          title="现价与当日涨跌。点这里按涨跌幅排: 涨最多在前 → 跌最惨在前 → 回默认顺序">
+                          title={HEAD_TIPS.changePct}>
                     {/* [R250] 同上 —— 表头只印列名, 三处一致(标的除外, 它本来就只有一个排序目标) */}
                     现价/涨跌
                     {caret('changePct')}
                   </button>
+                  <Hint title={HEAD_TIPS.changePct} className="ml-0.5" />
                 </th>
                 {/* [R42] Keltner 三档: 一眼看出这只票贴着哪条轨。收盘口径, 与个股分析图表同一组公式 */}
                 {/* [R198] 三档合一。排序键仍是三个 —— 点表头在 短→中→长 之间轮换,
@@ -959,15 +986,13 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
                   <button
                     onClick={() => cycleSort('trend')}
                     className={`${thBtn} whitespace-nowrap`}
-title={'两行: 六态趋势 / 价格·六态·均线三个尺度转到第几步。\n'
-                      + '「走到哪一步」与「还有没有劲」在右边的「档位」列里,\n'
-                      + '各自贴着它修饰的那一行(R297 起)。\n\n'
-                      + '点这里按六态排: 多头在前 → 空头在前 → 回默认顺序。'}>
+                    title={HEAD_TIPS.trend}>
                     {/* [R250] 表头**只有「走势」两个字** —— 与「结论」那一列同一条:
                         排序目标是内部分层, 不该印在表头上。轮换照旧, 说明在悬停里。 */}
                     走势
                     {caret('trend')}
                   </button>
+                  <Hint title={HEAD_TIPS.trend} className="ml-0.5" />
                 </th>
                 {/* [R297] 「进度」那一列并到「结论」里去了 —— 那两个读数是结论的
                     刻度, 不是第四条结论。见下面「结论」表头的说明。 */}
@@ -977,26 +1002,18 @@ title={'两行: 六态趋势 / 价格·六态·均线三个尺度转到第几步
                     (`verdict.rank`), 两处定义同一件事必然漂。要按档位找票,
                     「怎么办」那一列的急迫程度已经把该动的顶到前面了。 */}
                 <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center"
-title={'两行:\n'
-                      + '  ① 位置名 —— 收盘价落在**短期通道**的哪一档\n'
-                      + '     (破上轨 / 贴上轨 / 通道内 / 贴下轨 / 破下轨)。扫表时看这一行的颜色。\n'
-                      + '  ② 离那条轨还有多远 —— **价格口径**, 现价还要动多少个百分点才碰到它。\n'
-                      + '     口径 (轨价 − 现价) / 现价, 与出场线、六态翻转距离是同一个算法。\n'
-                      + '     看哪条轨跟着位置名走;「通道内」时取更近的那一条(先撞上的就是它)。\n\n'
-                      + '用户选的就是「只说短期 + 一句能交易的距离」——\n'
-                      + '短中长三档各自的位置与距离、27 格那个组合码, 都在悬停里。\n'
-                      + '要看翻译好的那十档判定, 点开就是复盘的「通道档位」页。'}>
+                    title={HEAD_TIPS.pos}>
                   位置
+                  <Hint title={HEAD_TIPS.pos} className="ml-0.5" />
                 </th>
                 {/* [R284] 账目三列并一列。表头也只剩一个, 排序目标取「浮盈」——
                     「拿没拿」由「只看持有」那个按钮回答, 成本价排序没有决策含义。 */}
                 <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center">
                   <button onClick={() => cycleSort('pnl')} className={thBtn}
-title={'我在这只票上的账: 拿没拿 / 买入成本 / 现在浮盈多少。\n'
-                            + '空仓时这一格只有一个按钮 —— 点它切成持有。\n\n'
-                            + '点这里按浮盈排: 赚最多在前 → 亏最多在前 → 回默认顺序。'}>
+                          title={HEAD_TIPS.pnl}>
                     持仓{caret('pnl')}
                   </button>
+                  <Hint title={HEAD_TIPS.pnl} className="ml-0.5" />
                 </th>
                 <th className="whitespace-nowrap px-4 py-2.5 font-normal text-left"><button onClick={() => cycleSort('signal')} className={thBtn}>AI 信号{caret('signal')}</button></th>
               </tr>

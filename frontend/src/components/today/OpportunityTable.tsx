@@ -28,6 +28,25 @@ import type {
   TodayAction, TodayGates, TodayLive, TodayOpportunity, TodayOverview,
 } from '@/lib/api'
 import { cn } from '@/lib/cn'
+import { Hint } from '@/components/Hint'   // [R323] 表头说明点得开
+
+/**
+ * [R323] 表头说明 —— 一份字两个出口: `<th title>`(桌面悬停)与旁边的「?」
+ * (点一下 / 触屏摊开)。原来内联在各个 `title=` 里, 只有悬停一条路。
+ */
+const HEAD_TIPS = {
+  rank: '上面那个是今天的名次, 下面那个小字才是把握分。\n\n'
+    + '把握分 = 趋势强度×45% + 量能确认×30% + 位置成本×25%。\n'
+    + '趋势强度=新鲜度(主导)/六态/相对强度;量能确认=量比(主导)/换手率;位置成本=通道位置。'
+    + '下面那三条细条就是这三档。\n\n'
+    + '为什么名次在前: 把握分是六个因子平均出来的, 实际取值挤在中间一段, '
+    + '「68 分」本身读不出好坏; 名次和分位是相对的, 一眼就知道该不该往下看。',
+  verdict: '今天这一天能不能下手, 一句结论。不进评分不改名次。\n今天动手: 已确认上涨趋势、信号 ≤3 天、贴着关键点(高出不到 5%)、没贴上轨、盘中没跌回关键点下方、大盘不在防守档\n收盘再动: 方向对但还差一个确认 —— 盘中临时信号 / 回升途中盘中刚过关键点 / 距触发价 2% 以内 / 转多第 4~5 天 / 盘中回落。收盘站稳(守住)关键点再动\n不动手: 大盘防守 / 盘中跌破生命线 / 当日涨幅到板幅 70% / 已高出关键点 5%+ / 贴上轨 / 转多第 6 天起 / 回升还没突破',
+  trend: '凭什么把这只挑出来 —— 信号 + 六态 + 位置 + 量能 + 距关键点, 一格里三行。\n\n'
+    + '位置、量能原来是两列数字(68% / 1.82), 现在只说状态词: '
+    + '要读懂那两个数字, 得先知道"多少算多", 而那正是不该逼人记的。数字全在悬停里。',
+  live: '盘中现价与变化。**不参与把握分** —— 把握分冻在收盘口径, 盘中一动不动',
+} as const
 
 const BOARD_CLS: Record<string, string> = {
   沪主板: 'bg-border/40 text-muted',
@@ -315,33 +334,30 @@ export function OpportunityTable({ rows, pickedSymbols, onOpen, live }: {
       <table className="w-full text-xs">
         <thead>
           <tr className="border-b border-border/40 text-[10px] text-muted">
-            <th className="w-14 px-3 py-1.5 text-center font-normal"
-                title={'上面那个是今天的名次, 下面那个小字才是把握分。\n\n'
-                  + '把握分 = 趋势强度×45% + 量能确认×30% + 位置成本×25%。\n'
-                  + '趋势强度=新鲜度(主导)/六态/相对强度;量能确认=量比(主导)/换手率;位置成本=通道位置。'
-                  + '下面那三条细条就是这三档。\n\n'
-                  + '为什么名次在前: 把握分是六个因子平均出来的, 实际取值挤在中间一段, '
-                  + '「68 分」本身读不出好坏; 名次和分位是相对的, 一眼就知道该不该往下看。'}>
+            <th className="w-14 whitespace-nowrap px-3 py-1.5 text-center font-normal"
+                title={HEAD_TIPS.rank}>
               名次
+              <Hint title={HEAD_TIPS.rank} className="ml-0.5" />
             </th>
             <th className="px-2 py-1.5 text-left font-normal">名称</th>
             {/* [R214] 结论提到依据前面。原来的顺序是 信号 → 位置 → 量比 →
                 距关键点 → 出手, 也就是**先读四格证据, 再读那一句结论** ——
                 跟决策台 R212 「结论」列的排法正好相反。这一列现在紧跟名称。 */}
-            <th className="px-2 py-1.5 text-left font-normal"
-                title={'今天这一天能不能下手, 一句结论。不进评分不改名次。\n今天动手: 已确认上涨趋势、信号 ≤3 天、贴着关键点(高出不到 5%)、没贴上轨、盘中没跌回关键点下方、大盘不在防守档\n收盘再动: 方向对但还差一个确认 —— 盘中临时信号 / 回升途中盘中刚过关键点 / 距触发价 2% 以内 / 转多第 4~5 天 / 盘中回落。收盘站稳(守住)关键点再动\n不动手: 大盘防守 / 盘中跌破生命线 / 当日涨幅到板幅 70% / 已高出关键点 5%+ / 贴上轨 / 转多第 6 天起 / 回升还没突破'}>
+            <th className="whitespace-nowrap px-2 py-1.5 text-left font-normal"
+                title={HEAD_TIPS.verdict}>
               结论
+              <Hint title={HEAD_TIPS.verdict} className="ml-0.5" />
             </th>
-            <th className="px-2 py-1.5 text-left font-normal"
-                title={'凭什么把这只挑出来 —— 信号 + 六态 + 位置 + 量能 + 距关键点, 一格里三行。\n\n'
-                  + '位置、量能原来是两列数字(68% / 1.82), 现在只说状态词: '
-                  + '要读懂那两个数字, 得先知道"多少算多", 而那正是不该逼人记的。数字全在悬停里。'}>
+            <th className="whitespace-nowrap px-2 py-1.5 text-left font-normal"
+                title={HEAD_TIPS.trend}>
               走势
+              <Hint title={HEAD_TIPS.trend} className="ml-0.5" />
             </th>
             {live && (
-              <th className="px-2 py-1.5 text-right font-normal"
-                  title="盘中现价与变化。**不参与把握分** —— 把握分冻在收盘口径, 盘中一动不动">
+              <th className="whitespace-nowrap px-2 py-1.5 text-right font-normal"
+                  title={HEAD_TIPS.live}>
                 盘中
+                <Hint title={HEAD_TIPS.live} className="ml-0.5" />
               </th>
             )}
             <th className="hidden px-2 py-1.5 text-right font-normal sm:table-cell">建议仓位</th>

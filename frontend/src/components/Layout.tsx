@@ -1,10 +1,12 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, Suspense } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, Suspense, lazy } from 'react'
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import { useQuoteStream, useQuoteStreamStatus } from '@/lib/useQuoteStream'
 import { ToastContainer, toast } from '@/components/Toast'
 import { PageErrorBoundary } from '@/components/PageErrorBoundary'
+// [R323] 名词说明弹窗 lazy: 词表连着 27 格速查表, 不该进入口 chunk。
+const GlossaryDialog = lazy(() => import('@/components/GlossaryDialog'))
 import { AlertToastContainer } from '@/components/AlertToast'
 import { AiAnalysisHost } from '@/components/financials/AiAnalysisHost'
 import { AiReportBubble } from '@/components/financials/AiReportBubble'
@@ -60,6 +62,7 @@ import {
   Sunrise,
   Globe2,
   CalendarClock,   // [R127] 实时行情自动开关
+  HelpCircle,      // [R323] 名词说明的全局入口
 } from 'lucide-react'
 import { Logo } from './Logo'
 import { api, type CapabilityMatrix, type IndexQuote } from '@/lib/api'
@@ -676,6 +679,8 @@ export function Layout() {
   const watchlistGroups = watchlistGroupsData?.groups ?? []
   // 自选二级菜单展开状态 — 默认当前在自选页时展开
   const [watchlistNavExpanded, setWatchlistNavExpanded] = useState(location.pathname === '/watchlist')
+  // [R323] 名词说明 —— 六态、通道档位各是什么意思, 从侧栏一步就到
+  const [glossaryOpen, setGlossaryOpen] = useState(false)
 
   // 侧边栏三态 — expanded(14rem) / rail(3.5rem 图标条) / hidden(0, 左缘悬浮按钮唤出)。
   // 仅桌面 (≥768px) 参与三态; 移动端 aside 以抽屉呈现, 由 drawerOpen 控制, 恒渲染完整形态。
@@ -1388,6 +1393,15 @@ export function Layout() {
         <div className={cn('border-t border-border py-3 shrink-0', railMode ? 'px-2 flex flex-col items-center gap-1' : 'px-2')}>
           <div className={railMode ? 'flex flex-col items-center gap-1' : 'flex items-center gap-1'}>
             <ThemeToggle />
+            <button
+              type="button"
+              onClick={() => setGlossaryOpen(true)}
+              aria-haspopup="dialog"
+              className="flex items-center justify-center rounded-btn p-2 text-foreground/80 transition-colors duration-hover ease-smooth hover:bg-elevated hover:text-foreground cursor-pointer"
+              title="名词说明 —— 六态状态、通道档位各是什么意思"
+            >
+              <HelpCircle className="h-4 w-4 shrink-0" />
+            </button>
             <NavLink
               to="/settings"
               title={railMode ? '设置' : undefined}
@@ -1455,6 +1469,11 @@ export function Layout() {
       </motion.main>
       <ToastContainer />
       <AlertToastContainer />
+      {glossaryOpen && (
+        <Suspense fallback={null}>
+          <GlossaryDialog onClose={() => setGlossaryOpen(false)} />
+        </Suspense>
+      )}
       <AiAnalysisHost />
       <AiReportBubble />
       <StockAnalysisHost />
