@@ -803,17 +803,22 @@ class _Health:
         else:
             row["n"] += 1
 
-    def report(self, as_of: str | None) -> dict:
-        """随响应带出的自检结果。
+    def report(self, as_of: str | None, *, now=None) -> dict:
+        """随响应带出的自检结果。``now`` 只给测试钉时点用, 生产走北京时间当下。
 
         ``stale_days`` 是**另一类问题**: 什么都没报错, 但整页数字是几天前的 ——
         收盘后管道没跑就是这样。它和"算挂了"一样会让人看着假数据做决定, 所以一起报。
         """
+        # [R319] 按**交易日**算, 不按自然日 —— 原来每个周末都会报「距今 1~3 天」,
+        # 而那时周五的定稿就是最新数据。口径与理由见 trading_day.stale_trading_days。
+        # 探针只读缓存不主动探(这是页面主查询, 不该为一次交易日探测多等几秒)。
         stale = None
         if as_of:
             try:
-                d = date.today() - date.fromisoformat(str(as_of)[:10])
-                stale = max(0, d.days)
+                from app.services import trading_day
+                stale = trading_day.stale_trading_days(
+                    date.fromisoformat(str(as_of)[:10]), now=now,
+                    today_is_trading=trading_day.cached_verdict(now))
             except ValueError:
                 stale = None
         blocks = [r for r in self.rows.values() if r["level"] == "block"]

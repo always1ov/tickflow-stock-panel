@@ -858,6 +858,9 @@ export function Layout() {
     mutationFn: (next: boolean) => api.updateRealtimeAuto(next),
     onSuccess: (res) => {
       qc.invalidateQueries({ queryKey: QK.preferences })
+      // [R319] 今日总览要跟着重取: 它的页头「● 实时中 / 收盘口径」和「盘中」列
+      // 都由后端按当前实时状态算, 开关一切它就该换脸 —— 原来要等下一个整点。
+      qc.invalidateQueries({ queryKey: QK.todayOverview })
       toast(res.realtime_auto ? `已开启自动行情(${res.window})` : '已关闭自动行情', 'success')
     },
   })

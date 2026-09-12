@@ -21,6 +21,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
+import { inRealtimeWindow } from '@/lib/marketClock'
 import {
   AlertTriangle, BarChart3, CheckCircle2, Download, Loader2, RefreshCw,
   SlidersHorizontal, Sparkles, Sunrise, Target,
@@ -78,8 +79,20 @@ export function Today() {
     queryKey: QK.todayOverview,
     queryFn: () => api.todayOverview(),
     staleTime: 60_000,
-    // [R27] 每小时自动刷新一次: 盘后数据落盘/定时 AI 跑完后不必手点
-    refetchInterval: 60 * 60 * 1000,
+    // [R27] 每小时自动刷新一次: 盘后数据落盘/定时 AI 跑完后不必手点。
+    //
+    // [R319] **盘中开着实时时改成 60 秒一刷。** 原来不分时段一律每小时, 于是
+    // 页头写着「● 实时中(N 只)」, 「盘中」列里的价格却可能是 59 分钟前的 ——
+    // 标签承诺的和数据给的不是一回事。后端行情层每 6 秒轮一次(quote_service
+    // DEFAULT_INTERVAL), 60 秒是决策台给「距离随实时价动」那些查询定的口径
+    // (WatchlistDecisionBoard 的 staleTime 注释), 这里跟它一致。
+    //
+    // 只在两个条件同时成立时提速: 后端说实时叠加层在(`live`), 且现在在实时窗口
+    // 里(工作日 09:15~15:05, 与 realtime_schedule 同一边界)。盘后 / 周末 / 实时
+    // 开关关着 → 回到每小时, 一次多余的重算都不做(每次重算是全量: 全部自选的
+    // 六态 + 打分 + 台账)。
+    refetchInterval: (query) =>
+      query.state.data?.live && inRealtimeWindow() ? 60_000 : 60 * 60 * 1000,
     refetchOnWindowFocus: true,
   })
   // AI 导读+优选合一: 一次调用同时产出导读正文与量价优选结果。
@@ -886,7 +899,10 @@ function TodayHealthBar({ h }: { h: TodayHealth }) {
     }`}>
       {stale && (
         <div>
-          <b>这一页的数据是 {h.as_of} 的</b>,距今 {h.stale_days} 天 ——
+          {/* [R319] 「落后 N 个交易日」, 不再是「距今 N 天」—— 后端已按交易日算,
+              周末不会再亮; 这里的措辞要跟着口径走, 否则周一早上看到「落后 1 个
+              交易日」还以为是自然日在数。 */}
+          <b>这一页的数据是 {h.as_of} 的</b>,比最新该落盘的日 K 落后 {h.stale_days} 个交易日 ——
           收盘后没跑数据管道时就是这样,下面所有数字都还是那天的。
         </div>
       )}

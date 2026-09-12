@@ -7,12 +7,12 @@ import { useState } from 'react'
 import { ChevronDown, Compass, Layers } from 'lucide-react'
 import type { TodayOverview } from '@/lib/api'
 import { cn } from '@/lib/cn'
+import { cnClock } from '@/lib/marketClock'
 
 function sessionPhaseHint(live: boolean | undefined): { label: string; hint: string } {
-  const now = new Date()
-  const bj = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Shanghai' }))
-  const day = bj.getDay()
-  const mins = bj.getHours() * 60 + bj.getMinutes()
+  // [R319] 时钟读数收口到 lib/marketClock —— 今日总览的刷新节奏也要看"现在是不是
+  // 盘中", 两处各自 new Date() 换时区, 边界迟早对不上。这里只保留提示语。
+  const { day, mins } = cnClock()
   if (day === 0 || day === 6) {
     return { label: '休市', hint: '周末休市 —— 复盘与做下周计划的时间,数据为上一交易日定稿。' }
   }

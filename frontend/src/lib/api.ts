@@ -561,7 +561,7 @@ export interface TodayPortfolio {
 export interface TodayHealth {
   ok: boolean
   as_of: string | null
-  /** 数据陈了几天 —— 什么都没报错但整页是几天前的, 同样会让人看着假数据做决定 */
+  /** 数据陈了几个**交易日**(R319 起按交易日算, 周末不计) —— 什么都没报错但整页是几天前的, 同样会让人看着假数据做决定 */
   stale_days: number | null
   /** 整块没了 —— 界面上是空的 */
   blocks: { key: string; cn: string; error: string; n: number }[]

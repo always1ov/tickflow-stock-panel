@@ -86,6 +86,9 @@ export function useToggleRealtimeQuotes() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: QK.preferences })
       qc.invalidateQueries({ queryKey: QK.quoteStatus })
+      // [R319] 今日总览的页头「● 实时中 / 收盘口径」与「盘中」列都由后端按当前
+      // 实时状态算 —— 开关一切它就该换脸, 原来要等下一个整点才重取。
+      qc.invalidateQueries({ queryKey: QK.todayOverview })
     },
   })
 }
