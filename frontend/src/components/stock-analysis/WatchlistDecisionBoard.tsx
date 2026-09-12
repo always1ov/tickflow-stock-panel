@@ -21,6 +21,7 @@ import { TrendBacktestAllDialog } from '@/components/stock-analysis/TrendBacktes
 import { ChannelStateCell, PositionCell, NUM, TD_BASE } from '@/components/stock-analysis/decision-board/cells'
 import { LotsLink } from '@/components/stock-analysis/decision-board/LotsLink'
 import { Hint } from '@/components/Hint'   // [R323] 表头说明点得开
+import { BoardSkeletonRows } from '@/components/stock-analysis/decision-board/BoardSkeletonRows'   // [R324] 首次加载骨架行
 // [R169] 合并视图(手填 ⊕ 上游批次登记), 字段说明见 api.ts 的 EffectivePosition
 type Position = EffectivePosition
 type WatchPoint = { direction: 'up' | 'down'; price: number; label?: string; action?: string; reason?: string }
@@ -1019,7 +1020,12 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
               </tr>
             </thead>
             <tbody>
-              {rows.length === 0 ? (
+              {/* [R324] 自选列表还没回来时先画骨架行 —— 原来这段时间印的是「自选为空」,
+                  加载中的表看起来像空表, 把人指去了错误的地方。只在 isLoading(本地
+                  没有缓存)时出现; 后台重取时上一份行还在, 不盖。 */}
+              {enriched.isLoading ? (
+                <BoardSkeletonRows cols={BOARD_COLS.length} />
+              ) : rows.length === 0 ? (
                 /* [R276] **原来这里一律写「自选为空」, 而那多半是假的。**
                    开着任一筛选把行数筛成 0 时, 这句话既说错了原因、又把人指向完全
                    错误的动作(去自选页添加标的)。现在分两种情况说, 并点名是谁挡的。 */

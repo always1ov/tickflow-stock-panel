@@ -43,6 +43,7 @@ import { LotBadge } from '@/components/today/LotBadge'   // [R169] 批次派生�
 import { OpportunityTable, GateFunnel } from '@/components/today/OpportunityTable'
 import { AiPickPanel } from '@/components/today/AiPickPanel'
 import { MarketStatusCard } from '@/components/today/MarketStatusCard'
+import { TodaySkeleton } from '@/components/today/TodaySkeleton'   // [R324] 首次加载骨架
 import { AiAskDialog } from '@/components/today/AiAskDialog'
 
 // [R179] 行动区四档配色。fatal 是"无条件清仓"那一档 —— 用最重的红并让整行的
@@ -363,9 +364,9 @@ export function Today() {
         </div>
       )}
 
-      {q.isLoading && (
-        <div className="flex items-center justify-center py-16"><Loader2 className="h-5 w-5 animate-spin text-muted" /></div>
-      )}
+      {/* [R324] 首次加载画版面的骨架, 不再是一个居中转圈 —— 内容填进来不跳。
+          只在 isLoading(本地没有任何缓存)时出现; 后台重取时上一份还在。 */}
+      {q.isLoading && <TodaySkeleton />}
       {q.isError && (
         <div className="rounded-lg border border-red-400/30 bg-red-400/10 px-4 py-3 text-xs text-red-400">
           总览加载失败:{(q.error as Error)?.message}
