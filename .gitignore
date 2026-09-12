@@ -30,6 +30,8 @@ node_modules/
 # ===== Vite =====
 frontend/dist/
 frontend/.vite/
+# R317 色板生成器(scripts/gen-theme-v2.cjs)的产物, 每跑一次就写
+frontend/.theme-v2.json
 backend/static/
 backend/app/static/
 
