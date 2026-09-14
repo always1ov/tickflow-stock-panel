@@ -163,3 +163,22 @@ jobs:
         run: |
           docker buildx imagetools inspect \
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
+      # 镜像 manifest 合成完毕后，通知 Coolify 拉新镜像重新部署。
+      # 只在发布分支与 v* tag 触发：工作分支不动 :latest，部署了也没意义。
+      # force=true 是因为 tag 固定为 latest，不强制 Coolify 会认为没变化而跳过。
+      # 隧道只放行 /api/v1/deploy 这一个路径，面板本体在公网不可达。
+      - name: Trigger Coolify deploy
+        if: github.ref_type == 'tag' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/claude/upstream-clean'
+        run: |
+          response=$(curl -s -w "\n%{http_code}" -X POST \
+            "https://coolify.always1ov.com/api/v1/deploy?uuid=${{ secrets.COOLIFY_UUID }}&force=true" \
+            -H "Authorization: Bearer ${{ secrets.COOLIFY_TOKEN }}")
+          body=$(echo "$response" | head -n -1)
+          code=$(echo "$response" | tail -n 1)
+          echo "HTTP $code"
+          echo "$body"
+          if [ "$code" != "200" ]; then
+            echo "::error::部署触发失败"
+            exit 1
+          fi
+          echo "::notice::部署已排队，去 Coolify 面板看进度"
