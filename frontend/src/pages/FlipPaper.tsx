@@ -27,7 +27,7 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { Eye, TrendingDown, TrendingUp } from 'lucide-react'
+import { ChevronDown, Eye, TrendingDown, TrendingUp } from 'lucide-react'
 import { api, type FlipOrder, type FlipPaper as FlipPaperData, type FlipRules,
   type FlipTodaySignal } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
@@ -36,6 +36,7 @@ import { Hint } from '@/components/Hint'
 import { Skeleton } from '@/components/data/Skeleton'
 import { useECharts } from '@/pages/backtest/charts/useECharts'
 import { cn } from '@/lib/cn'
+import { storage } from '@/lib/storage'
 
 const CAPITAL_OPTIONS = [100_000, 500_000, 1_000_000, 5_000_000]
 const POSITION_OPTIONS = [3, 5, 10, 20]
@@ -162,24 +163,79 @@ export function FlipPaper() {
  * 仍然在暗示"这里本来有个动作"。
  */
 function TodaySignals({ rows }: { rows: FlipTodaySignal[] }) {
-  const act = rows.filter((r) => r.stage === 'flipped' && r.act)
-  const rest = rows.filter((r) => !(r.stage === 'flipped' && r.act))
+  // [R331] 用户: 「今天该挂什么单显得太多了, 需要折叠展开的功能」。
+  //
+  // **折叠边界落在「今天是否可能成交」上**, 不是随便砍前 N 条:
+  //
+  //   常驻  已转折要动手  —— 今天真要挂的单
+  //   常驻  盘中越线      —— 收盘还站在这边就成交, 今天就要盯
+  //   收起  只是盯着      —— 还差几个点, 今天大概率不用动
+  //   收起  已转折但不用动手(转多而本来就拿着 / 转空而本来就空仓)
+  //
+  // 「盯着」那一段的条数随自选规模走(5% 以内就进名单), 自选上百只时它会把真要
+  // 动手的那两三行淹掉 —— 而那两三行正是这个区块存在的全部理由。
+  //
+  // **要动手的永远不进折叠区**, 这一条有守卫钉着: 折叠是为了让信号更显眼,
+  // 把信号自己折起来就本末倒置了。
+  const [watchOpen, setWatchOpen] = useState(() => storage.flipTodayWatchOpen.get(false))
+  const toggleWatch = () => {
+    setWatchOpen((v) => {
+      storage.flipTodayWatchOpen.set(!v)
+      return !v
+    })
+  }
+
+  const live = rows.filter((r) => (r.stage === 'flipped' && r.act) || r.stage === 'crossing')
+  const idle = rows.filter((r) => !((r.stage === 'flipped' && r.act) || r.stage === 'crossing'))
+  const actCount = rows.filter((r) => r.stage === 'flipped' && r.act).length
+
   return (
     <section className="overflow-hidden rounded-card border border-border/60 bg-surface/40">
       <SectionHead
         title="今天该挂什么单"
-        note={act.length ? `${act.length} 笔要动手` : '今天没有要动手的'}
-        hint={'**只有真转折才出手。**\n\n已转折 = 最新那根已落盘的日 K 让状态翻了面, 这才是动作。\n盘中越线 = 按此刻现价当收盘算会翻面 —— **不是出手理由**, 盘中价会变回去,\n14:30 跌破、14:58 拉回来的那天根本没有转折。\n\n触发价是作者的六态每天给的 flip_up / flip_down, 开盘前就定死,\n所以尾盘盯着它挂单是做得到的。'}
+        note={actCount ? `${actCount} 笔要动手` : '今天没有要动手的'}
+        hint={'**只有真转折才出手。**\n\n已转折 = 最新那根已落盘的日 K 让状态翻了面, 这才是动作。\n盘中越线 = 按此刻现价当收盘算会翻面 —— **不是出手理由**, 盘中价会变回去,\n14:30 跌破、14:58 拉回来的那天根本没有转折。\n\n触发价是作者的六态每天给的 flip_up / flip_down, 开盘前就定死,\n所以尾盘盯着它挂单是做得到的。\n\n下面「只是盯着」那一段默认收起 —— 它随自选规模走, 摊开会把真要动手的淹掉。'}
       />
+
       {rows.length === 0 ? (
         <div className="px-4 py-5 text-xs text-muted">
           自选里没有一只处在转折边上 —— <b className="text-secondary">今天不用动</b>。
         </div>
       ) : (
-        <div className="divide-y divide-border/30">
-          {act.map((r) => <SignalRow key={r.symbol} r={r} />)}
-          {rest.map((r) => <SignalRow key={r.symbol} r={r} />)}
-        </div>
+        <>
+          {live.length > 0 && (
+            <div className="divide-y divide-border/30">
+              {live.map((r) => <SignalRow key={r.symbol} r={r} />)}
+            </div>
+          )}
+          {live.length === 0 && (
+            <div className="px-4 py-3 text-xs text-muted">
+              今天没有要动手的 —— <b className="text-secondary">管住手</b>。
+            </div>
+          )}
+
+          {idle.length > 0 && (
+            <>
+              <button
+                type="button"
+                onClick={toggleWatch}
+                aria-expanded={watchOpen}
+                className="flex w-full items-center gap-1.5 border-t border-border/40 px-4 py-2 text-[11px] text-muted transition-colors hover:bg-elevated/40 hover:text-foreground cursor-pointer"
+              >
+                <ChevronDown className={cn('h-3 w-3 transition-transform duration-expand ease-smooth',
+                  watchOpen && 'rotate-180')} />
+                {watchOpen ? '收起' : '展开'}「只是盯着」的 {idle.length} 只
+                <span className="ml-auto opacity-70">今天大概率不用动</span>
+              </button>
+              {watchOpen && (
+                /* 限高 + 自己滚: 盯着的票可能几十只, 让它把整页顶长等于没折叠 */
+                <div className="max-h-64 divide-y divide-border/30 overflow-y-auto">
+                  {idle.map((r) => <SignalRow key={r.symbol} r={r} />)}
+                </div>
+              )}
+            </>
+          )}
+        </>
       )}
     </section>
   )
@@ -246,24 +302,70 @@ function Picker<T extends number>({ label, value, options, onChange, fmt }: {
   )
 }
 
+/**
+ * [R332] 「近一月 / 近三月」—— 用户: 「回溯是回溯, 时间跨度太长了, 看看怎么设计
+ * 能兼容注重当下」。
+ *
+ * **回溯那个参数不动。** 它给的是样本量: 转折是低频信号, 窗口短了只剩两三次
+ * 转折, 胜率和回撤都说明不了任何事。但两年的总收益回答不了"我最近做得怎么样"
+ * —— 一段半年前的暴涨能把最近三个月的亏损盖得严严实实。
+ *
+ * 所以**同一条净值曲线切一段再算一次**, 不重跑、不多打一次接口。
+ *
+ * 起点取"该窗口第一个交易日的前一天" —— 收益要算这一段**期间**的变化, 拿窗口
+ * 内第一天的净值当起点会把那一天自己的涨跌吃掉。
+ */
+function windowRet(nav: FlipPaperData['nav'], days: number): number | null {
+  if (nav.length < 2) return null
+  const i = Math.max(0, nav.length - 1 - days)
+  const base = nav[i].nav
+  if (!base) return null
+  return nav[nav.length - 1].nav / base - 1
+}
+
 function Summary({ d }: { d: FlipPaperData }) {
   const s = d.stats
+  // 20 / 60 个交易日 ≈ 一个月 / 三个月。**按交易日数不按自然日**: 这条曲线
+  // 本来就是逐交易日的, 拿自然日去切还要先做一次日历换算, 凭空多一层会漂的东西。
+  const m1 = windowRet(d.nav, 20)
+  const m3 = windowRet(d.nav, 60)
+  const enough = d.nav.length
   return (
-    <section className="grid grid-cols-2 divide-x divide-y divide-border/30 overflow-hidden rounded-card border border-border/60 bg-surface/40 sm:grid-cols-4 sm:divide-y-0">
-      <Stat label="总收益" value={pct(s.total_ret)} tone={s.total_ret >= 0 ? 'bull' : 'bear'}
-            sub={`本金 ${money(d.capital)} · ${s.days} 个交易日`} />
-      <Stat label="最大回撤" value={pct(s.max_drawdown)} tone="bear"
-            sub="净值从高点回落最深的一次" />
-      <Stat label="完整买卖" value={`${s.round_trips} 轮`}
-            sub={`买 ${s.buys} 次 · 卖 ${s.sells} 次`}
-            hint={'一次买入到卖出算一轮。**还拿着的那几只不算** —— 没兑现的盈亏\n不该混进胜负(与复盘页「只数已兑现」同一条纪律)。'} />
-      <Stat
-        label="胜率"
-        value={s.win_rate == null ? '—' : `${(s.win_rate * 100).toFixed(0)}%`}
-        sub={s.win_rate == null ? '一轮都没兑现, 算不出来' : `${s.win} 胜 / ${s.round_trips} 轮`}
-        hint={'空着不是 0 —— 「算不出来」与「一次没赢过」是两件事。'}
-      />
-    </section>
+    <>
+      {/* 当下那一行排在长期之前 —— 用户每天打开最先要问的是"最近怎么样" */}
+      <section className="grid grid-cols-2 divide-x divide-y divide-border/30 overflow-hidden rounded-card border border-border/60 bg-surface/40 sm:grid-cols-4 sm:divide-y-0">
+        <Stat label="近一月" value={enough >= 21 ? pct(m1) : '—'}
+              tone={m1 != null && m1 >= 0 ? 'bull' : 'bear'}
+              sub={enough >= 21 ? '最近 20 个交易日' : `只有 ${enough} 天, 不够一个月`}
+              hint={'**同一条净值曲线上切一段算的**, 不是另跑一次回测 ——\n回溯那个参数给的是样本量, 这两格回答的是"我最近做得怎么样"。\n\n天数不够时空着而不是拿全程凑数: 「算不出来」与「没赚到」是两件事。'} />
+        <Stat label="近三月" value={enough >= 61 ? pct(m3) : '—'}
+              tone={m3 != null && m3 >= 0 ? 'bull' : 'bear'}
+              sub={enough >= 61 ? '最近 60 个交易日' : `只有 ${enough} 天, 不够三个月`} />
+        <Stat label="现在拿着" value={`${d.positions.length} 只`}
+              sub={`仓位 ${d.nav.length ? pct((d.nav[d.nav.length - 1].market_value / d.nav[d.nav.length - 1].nav), 0) : '—'} · 现金 ${money(d.nav.at(-1)?.cash)}`}
+              hint={'这是**当下**的仓位, 与上面那两格一样看的是现在;\n下面那一排才是整个回溯窗口的长期成绩。'} />
+        <Stat label="最后一天" value={d.as_of ?? '—'}
+              sub={`回溯 ${d.nav[0]?.date ?? '—'} 起`}
+              hint={'日 K 要等收盘后落盘 —— 所以这里通常是上一个交易日,\n今天的要等 20:00 之后才会进来。'} />
+      </section>
+
+      {/* 长期成绩 —— 回溯窗口整段 */}
+      <section className="grid grid-cols-2 divide-x divide-y divide-border/30 overflow-hidden rounded-card border border-border/60 bg-surface/40 sm:grid-cols-4 sm:divide-y-0">
+        <Stat label="总收益" value={pct(s.total_ret)} tone={s.total_ret >= 0 ? 'bull' : 'bear'}
+              sub={`本金 ${money(d.capital)} · ${s.days} 个交易日`} />
+        <Stat label="最大回撤" value={pct(s.max_drawdown)} tone="bear"
+              sub="净值从高点回落最深的一次" />
+        <Stat label="完整买卖" value={`${s.round_trips} 轮`}
+              sub={`买 ${s.buys} 次 · 卖 ${s.sells} 次`}
+              hint={'一次买入到卖出算一轮。**还拿着的那几只不算** —— 没兑现的盈亏\n不该混进胜负(与复盘页「只数已兑现」同一条纪律)。'} />
+        <Stat
+          label="胜率"
+          value={s.win_rate == null ? '—' : `${(s.win_rate * 100).toFixed(0)}%`}
+          sub={s.win_rate == null ? '一轮都没兑现, 算不出来' : `${s.win} 胜 / ${s.round_trips} 轮`}
+          hint={'空着不是 0 —— 「算不出来」与「一次没赢过」是两件事。'}
+        />
+      </section>
+    </>
   )
 }
 
@@ -289,13 +391,24 @@ function Stat({ label, value, sub, tone, hint }: {
 function NavChart({ d }: { d: FlipPaperData }) {
   const option = useMemo(() => {
     if (!d.nav.length) return null
+    // [R332] **默认只框最近 120 个交易日(约半年), 但整段都在, 拖得回去。**
+    //
+    // 回溯两年时, 半年前的一段暴涨会把最近几个月压成一条平线 —— 图上什么都看
+    // 不出来。dataZoom 让默认视野落在当下, 而长期那条线一拖就回来, 两件事不用
+    // 二选一。窗口不足 120 天时 start=0, 也就是整段都显示。
+    const total = d.nav.length
+    const startPct = total > 120 ? ((total - 120) / total) * 100 : 0
     return {
-      grid: { left: 56, right: 16, top: 16, bottom: 28 },
+      grid: { left: 56, right: 16, top: 16, bottom: 52 },
       tooltip: { trigger: 'axis' as const },
       xAxis: { type: 'category' as const, data: d.nav.map((p) => p.date),
                axisLabel: { fontSize: 10 } },
       yAxis: { type: 'value' as const, scale: true,
                axisLabel: { fontSize: 10, formatter: (v: number) => money(v) } },
+      dataZoom: [
+        { type: 'inside' as const, start: startPct, end: 100 },
+        { type: 'slider' as const, start: startPct, end: 100, height: 18, bottom: 8 },
+      ],
       series: [{
         type: 'line' as const, name: '净值', data: d.nav.map((p) => p.nav),
         showSymbol: false, lineStyle: { width: 1.5 },
@@ -308,8 +421,8 @@ function NavChart({ d }: { d: FlipPaperData }) {
   return (
     <section className="overflow-hidden rounded-card border border-border/60 bg-surface/40">
       <SectionHead title="净值走势"
-                   note={`${d.nav[0]?.date} 起 · 最后一天 ${d.as_of ?? '—'}`} />
-      <div ref={ref} className="h-[260px] w-full" />
+                   note={`默认看最近半年 · 拖下面那条可回到 ${d.nav[0]?.date} 起的全程`} />
+      <div ref={ref} className="h-[280px] w-full" />
     </section>
   )
 }

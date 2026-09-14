@@ -196,3 +196,110 @@ def test_R329_今日信号排在页面最前():
     i_today = body.index("<TodaySignals")
     i_summary = body.index("<Summary")
     assert i_today < i_summary, "今天要动手的东西必须排在回测结论前面"
+
+
+# ── [R331] 折叠 ────────────────────────────────────────────────────────
+def _page() -> str:
+    from tests.frontend_source import code_of
+    return code_of("pages/FlipPaper.tsx")
+
+
+def _today_block() -> str:
+    code = _page()
+    blk = code[code.index("function TodaySignals"):]
+    return blk[:blk.index("function SignalRow")]
+
+
+def test_R331_要动手的永远不进折叠区():
+    """**折叠是为了让信号更显眼, 把信号自己折起来就本末倒置了。**"""
+    blk = _today_block()
+    live = next(l for l in blk.splitlines() if "const live = rows.filter" in l)
+    idle = next(l for l in blk.splitlines() if "const idle = rows.filter" in l)
+    assert "r.stage === 'flipped' && r.act" in live, "要动手的必须进常驻区"
+    assert idle.strip().startswith("const idle = rows.filter((r) => !("), \
+        "折叠区必须是常驻区的补集 —— 两套各写一份判据必然漂"
+    # 常驻区渲染在折叠开关**之前**, 且不受 watchOpen 控制
+    i_live = blk.index("{live.map((r) => <SignalRow")
+    i_toggle = blk.index("onClick={toggleWatch}")
+    assert i_live < i_toggle
+    head = blk[:i_toggle]
+    assert "watchOpen &&" not in head, "常驻区不许被折叠状态控制"
+
+
+def test_R331_盘中越线也常驻_它今天就可能成交():
+    blk = _today_block()
+    live = next(l for l in blk.splitlines() if "const live = rows.filter" in l)
+    assert "r.stage === 'crossing'" in live, (
+        "盘中越线收盘还站着就成交 —— 今天就要盯, 不该被折起来")
+
+
+def test_R331_折叠状态记在本地_刷新后还在():
+    blk = _today_block()
+    assert "storage.flipTodayWatchOpen.get(false)" in blk, "默认收起"
+    assert "storage.flipTodayWatchOpen.set(!v)" in blk, "改了要落盘, 否则刷新就忘"
+
+
+def test_R331_展开区限高自己滚():
+    """盯着的票可能几十只 —— 让它把整页顶长等于没折叠。"""
+    blk = _today_block()
+    open_blk = blk[blk.index("{watchOpen && ("):]
+    assert "max-h-64" in open_blk and "overflow-y-auto" in open_blk
+
+
+def test_R331_没有要动手的时候明说_不是留一片空白():
+    blk = _today_block()
+    assert "{live.length === 0 && (" in blk
+    assert "管住手" in blk, "空着不说话, 读的人分不清是没有还是没算出来"
+
+
+def test_R331_折叠按钮报出条数():
+    blk = _today_block()
+    assert "{idle.length} 只" in blk, "不写条数的话, 用户不知道展开会看到什么"
+
+
+# ── [R332] 注重当下 ────────────────────────────────────────────────────
+def test_R332_近期读数排在长期成绩之前():
+    """用户每天打开最先要问的是「我最近做得怎么样」, 不是两年总收益。"""
+    blk = _page()
+    blk = blk[blk.index("function Summary({ d }"):blk.index("function Stat({ label")]
+    i_now = blk.index("label=\"近一月\"")
+    i_long = blk.index("label=\"总收益\"")
+    assert i_now < i_long, "当下那一排必须排在长期那一排前面"
+    for k in ("近一月", "近三月", "现在拿着", "最后一天"):
+        assert k in blk, f"当下那一排少了「{k}」"
+
+
+def test_R332_近期收益是同一条曲线切一段_不另跑一次回测():
+    blk = _page()
+    assert "function windowRet(nav" in blk
+    fn = blk[blk.index("function windowRet(nav"):blk.index("function Summary({ d }")]
+    assert "nav[nav.length - 1].nav / base - 1" in fn
+    assert "api." not in fn and "useQuery" not in fn, "不许为这两格另打一次接口"
+    # 起点取窗口第一天的**前一天** —— 否则会把那天自己的涨跌吃掉
+    assert "nav.length - 1 - days" in fn
+
+
+def test_R332_天数不够时空着_不拿全程凑数():
+    blk = _page()
+    sm = blk[blk.index("function Summary({ d }"):blk.index("function Stat({ label")]
+    assert "enough >= 21 ? pct(m1) : '—'" in sm
+    assert "enough >= 61 ? pct(m3) : '—'" in sm
+    assert "不够一个月" in sm and "不够三个月" in sm, (
+        "空栏必须自己解释 —— 「算不出来」与「没赚到」是两件事")
+
+
+def test_R332_回溯参数没被动过():
+    """**回溯是回溯。** 它给的是样本量, 不该为了"看当下"把它砍短。"""
+    blk = _page()
+    assert "const YEAR_OPTIONS = [1, 2, 3, 5]" in blk, "回溯档位不许改"
+    assert "years" in blk
+
+
+def test_R332_净值图默认框最近一段_但整段拖得回去():
+    blk = _page()
+    fn = blk[blk.index("function NavChart({ d }"):blk.index("function Holdings({ d")]
+    assert "dataZoom" in fn, "没有 dataZoom 就回不到全程"
+    assert "total > 120 ? ((total - 120) / total) * 100 : 0" in fn, \
+        "不足 120 天时该显示整段, 不是硬砍"
+    assert "type: 'slider' as const" in fn, "只有 inside 的话用户不知道可以拖"
+    assert "d.nav.map((p) => p.nav)" in fn, "曲线本身仍是整段数据, 只是视野落在当下"

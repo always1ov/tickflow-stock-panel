@@ -33,8 +33,13 @@ export const storage = {
   strategyPoolMinute:   kv<string[]>('strategy-pool-1m'),
   /** [R95] prune 自动清理的备份 — 被移除的 ID 留底, 页面提供一键恢复 */
   strategyPoolPruneBackup: kv<{ at: string; removed: string[] } | null>('strategy-pool-prune-backup'),
-  /** [R192] 模拟盘当前看的是哪个操作员 —— 一页只显示一个, 刷新后该回到原处 */
-  paperTrader:          kv<string | null>('paper-trader'),
+  /**
+   * [R331] 今日信号里「只是盯着」那一段展开着没有。默认 **false(收起)** ——
+   * 那一段是"今天大概率不用动"的票, 数量随自选规模走, 摊开会把真要动手的淹掉。
+   *
+   * [R327] R192 那个 `paperTrader`(当前看哪个操作员)跟着 AI 操盘手一起没了。
+   */
+  flipTodayWatchOpen:   kv<boolean>('flip-today-watch-open'),
 
   /** [R266] 消息面总览是否展开 —— 默认收起(那一段很长), 但看惯了展开的人不该每次重点 */
   newsDeskSummaryOpen:  kv<boolean>('news-desk-summary-open'),
