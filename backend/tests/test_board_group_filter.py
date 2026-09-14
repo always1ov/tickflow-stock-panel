@@ -260,3 +260,57 @@ def test_R276_断言没被自己的注释喂饱():
     # 只出现在注释里的字眼, 剥完必须消失
     assert "宁可多显示" not in code
     assert re.search(r"\bconst G_ALL\b", code), "剥过头把代码也吃了"
+
+
+# ── [R330] 「只看转折」 ─────────────────────────────────────────────────
+def _board() -> str:
+    from tests.frontend_source import code_of
+    return code_of("components/stock-analysis/WatchlistDecisionBoard.tsx")
+
+
+def test_R330_只看转折的判据取_trend_flipped_不另立一套():
+    code = _board()
+    line = next(l for l in code.splitlines() if "flippedOnly ?" in l)
+    assert "r.trend.flipped" in line, "判据必须是 trend.flipped —— 与复盘、模拟盘同一个字段"
+    assert "r.trend ? " in line, "趋势没回来时不过滤 —— 加载中的表不该看起来是空的"
+
+
+def test_R330_它是独立开关_不跟只看要动的合并():
+    """那个是四档触发的并集, 转折只是其中一档。合并会让"只看真翻面的"做不到。"""
+    code = _board()
+    assert "const [flippedOnly, setFlippedOnly] = useState(false)" in code
+    act = next(l for l in code.splitlines() if "actionableOnly ?" in l)
+    assert "flipped" not in act, "「只看要动的」那条判据不许被改成只看转折"
+
+
+def test_R330_进了筛选依赖表():
+    code = _board()
+    dep = code[code.index("}, [enriched.data, positions, signals"):]
+    dep = dep[:dep.index("]")]
+    assert "flippedOnly" in dep, "漏进依赖表 = 切开关不重算, 而且不会报错"
+
+
+def test_R330_定位时这个筛选也算挡路的():
+    """**R276 立那段就是因为漏一个筛选会表现成"点了定位没反应"**, 且不报错。"""
+    code = _board()
+    assert "const byFlip = flippedOnly && !trends[sym]?.flipped" in code
+    blk = code[code.index("const blockers = ["):]
+    blk = blk[:blk.index("] as string[]") + 1] if "] as string[]" in blk else blk[:400]
+    assert "'只看转折'" in blk, "挡路清单里没有它 —— 用户会看不懂为什么定位不过去"
+    assert "if (byFlip) setFlippedOnly(false)" in code, "查出来了却不撤, 等于没查"
+
+
+def test_R330_空表提示里点名这个筛选():
+    code = _board()
+    blk = code[code.index("自选有 ${totalRows} 只"):]
+    blk = blk[:blk.index("之后一只不剩")]
+    assert "flippedOnly && '只看转折'" in blk, (
+        "一只不剩时不点名是谁挡的, 用户会以为自选空了(R276 那条同理)")
+
+
+def test_R330_按钮带计数_不点也知道今天有没有事():
+    code = _board()
+    assert "const flipCount = useMemo(" in code
+    btn = code[code.index("setFlippedOnly((v) => !v)"):]
+    btn = btn[:btn.index("</button>")]
+    assert "只看转折{flipCount > 0" in btn

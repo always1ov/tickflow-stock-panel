@@ -287,6 +287,13 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
   // 改由复盘接口的 `channel` 给 —— 决策台不必再把行数据透传进弹窗。
   // 「只看要动的」—— 自选一多, 默认列 80 行本身就是噪音
   const [actionableOnly, setActionableOnly] = useState(false)
+  // [R330] 「只看转折」—— 用户: 「再加个按钮只看趋势转折」。
+  //
+  // **它与「只看要动的」不是一回事, 所以是第三个开关而不是并进去**: 后者是四档
+  // 触发的并集(出场线破了/逼近、离翻转价 2% 以内、今日刚翻转、短期通道到轨),
+  // 转折只是其中一档。想「今天只看真翻面的那几只」时, 另外三档就是噪音 ——
+  // 而这正是整套模拟盘唯一认的那个信号(R327/R329: 只有真转折才出手)。
+  const [flippedOnly, setFlippedOnly] = useState(false)
   // [R276] 「只看某个分组」。用户: 「这里还要加个选择按钮, 能下拉菜单只看哪个分组」。
   //
   // 记进 localStorage: 分组是长期的编队(军工/稳定币/…), 你昨天在看哪一队, 今天
@@ -607,10 +614,14 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
       // [R178] 「要动的」= 前四档(已触发/逼近/刚转折/到轨), 无事档不算。
       // 判定还没回来时不过滤 —— 宁可多显示, 不能让表在加载中看起来是空的。
       .filter((r) => (actionableOnly ? (r.urg ? r.urg.level !== 'idle' : true) : true))
+      // [R330] 「只看转折」。判据取 `trend.flipped` —— 复盘逐日表、今日信号、
+      // 模拟盘认的是同一个字段(R286 起), **不在这里另立一套"算不算转折"**。
+      // 趋势还没回来时不过滤, 与上面那条同理: 加载中的表不该看起来是空的。
+      .filter((r) => (flippedOnly ? (r.trend ? !!r.trend.flipped : true) : true))
     // [R276] phases/plays 补进依赖表 —— 它们在上面的 map 里被读, 原来漏了。
     // 实际不会串数据(四份都来自同一个 urgencyQ, 一起变), 但漏一个依赖是下一次
     // 拆查询时才会爆的雷, 现在补上不花钱。
-  }, [enriched.data, positions, signals, heldOnly, actionableOnly, trends, exitLines,
+  }, [enriched.data, positions, signals, heldOnly, actionableOnly, flippedOnly, trends, exitLines,
       keltner, urgency, events, phases])
 
   const rows = useMemo(() => scoped.filter((r) => inGroup(r.symbol)), [scoped, inGroup])
@@ -693,6 +704,9 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
   // 「要动的」有几只 —— 显示在开关上, 用户不点也能一眼知道今天有没有事
   const actionCount = useMemo(
     () => Object.values(urgency).filter((u) => u.level !== 'idle').length, [urgency])
+  // [R330] 今天转折的有几只 —— 与上面那个同一条理由: 不点也能一眼知道今天有没有事
+  const flipCount = useMemo(
+    () => Object.values(trends).filter((t: any) => t?.flipped).length, [trends])
   // [R276] 自选一共几只(不受任何筛选影响) —— 空表提示和导出页脚要拿它当分母
   const totalRows = enriched.data?.rows?.length ?? 0
   const curGroup = groups.find((g) => g.id === groupFilter)
@@ -737,16 +751,21 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
     // 加分组筛选之后这个洞会更常撞到, 一并补齐。
     const byHeld = heldOnly && !positions[sym]?.held
     const byAction = actionableOnly && urgency[sym]?.level === 'idle'
+    // [R330] 新开关必须同步补进这里 —— R276 立这段时就是因为「漏了一个筛选」
+    // 会表现成"点了定位没反应", 而且不会有任何东西报错。
+    const byFlip = flippedOnly && !trends[sym]?.flipped
     const byGroup = !inGroup(sym)
     const blockers = [
       byHeld && '只看持有',
       byAction && '只看要动的',
+      byFlip && '只看转折',
       byGroup && `只看「${groupLabel}」`,
     ].filter(Boolean) as string[]
     if (!blockers.length) return
     pendingLocate.current = { symbol: sym, explicit: true }
     if (byHeld) setHeldOnly(false)
     if (byAction) setActionableOnly(false)
+    if (byFlip) setFlippedOnly(false)
     if (byGroup) setGroupFilter(G_ALL)
     toast(`这只票被${blockers.join(' / ')}挡住了 —— 已撤掉并定位`, 'success')
   }
@@ -824,6 +843,19 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
           }`}
         >
           只看要动的{actionCount > 0 && <span className="opacity-70">·{actionCount}</span>}
+        </button>
+        <button
+          onClick={() => setFlippedOnly((v) => !v)}
+          title={'只留下**今天六态翻面**的那几只 —— 昨天还不是这个状态。\n'
+            + '判据是 `trend.flipped`, 与复盘逐日表的「转折」、模拟盘认的信号同一个字段。\n\n'
+            + '与「只看要动的」的区别: 那个是四档触发的并集(出场线、逼近翻转价、'
+            + '今日转折、通道到轨), 转折只是其中一档。\n'
+            + '想按转折做的时候, 另外三档就是噪音 —— 而转折正是模拟盘唯一认的信号。'}
+          className={`text-[12px] px-2 py-0.5 rounded-btn border transition-colors cursor-pointer ${
+            flippedOnly ? 'border-sky-400/40 bg-sky-400/10 text-sky-300' : 'border-border bg-base text-muted hover:text-foreground'
+          }`}
+        >
+          只看转折{flipCount > 0 && <span className="opacity-70">·{flipCount}</span>}
         </button>
         <button
           onClick={() => setHeldOnly((v) => !v)}
@@ -1034,6 +1066,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
                     ? '自选为空 —— 去自选页添加标的'
                     : `自选有 ${totalRows} 只, 但当前筛选(${
                       [actionableOnly && '只看要动的', heldOnly && '只看持有',
+                        flippedOnly && '只看转折',
                         groupFilter !== G_ALL && `只看「${groupLabel}」`]
                         .filter(Boolean).join(' + ') || '无'
                     })之后一只不剩`}
