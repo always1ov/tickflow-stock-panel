@@ -3016,7 +3016,31 @@ export interface FlipSkipped {
   reason: 'sealed' | 'no_slot' | 'no_cash' | 'voided'
 }
 
+/**
+ * [R329] 今日信号。**只有 stage === 'flipped' 时 act 才有值** —— 盘中越线与
+ * 接近都不是出手理由(用户唯一的要求: 一定要根据转折才能出手)。
+ */
+export interface FlipTodaySignal {
+  symbol: string
+  name: string
+  /** flipped = 已转折(唯一能出手的); crossing = 盘中越线待收盘确认; watch = 还没到 */
+  stage: 'flipped' | 'crossing' | 'watch'
+  /** 只在 stage === 'flipped' 时非空 */
+  act: 'buy' | 'sell' | null
+  side: string
+  state_cn: string | null
+  /** 触发价 —— 开盘前就定死的那条线 */
+  flip_price: number | null
+  ref_price: number | null
+  /** 离触发价还有多少(负=要跌到) */
+  gap_pct: number | null
+  /** 参考价是不是盘中实时价 */
+  live: boolean
+}
+
 export interface FlipPaper {
+  /** [R329] 今天该挂什么单 */
+  today: FlipTodaySignal[]
   nav: FlipNavPoint[]
   orders: FlipOrder[]
   positions: FlipPosition[]

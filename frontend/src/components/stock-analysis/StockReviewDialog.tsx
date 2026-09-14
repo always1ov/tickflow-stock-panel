@@ -41,7 +41,7 @@
  */
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { CalendarRange, HelpCircle, Loader2, X } from 'lucide-react'
+import { CalendarRange, Loader2, X } from 'lucide-react'
 import { api, type KeltnerVerdict, type ReviewRow, type StockReview } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { cn } from '@/lib/cn'
@@ -50,7 +50,6 @@ import { trendBadgeCls } from '@/components/stock-analysis/TrendStateBar'
 import { VerdictHover } from '@/components/stock-analysis/VerdictHover'
 import { comboHistory } from '@/components/stock-analysis/decision-board/ComboView'
 import { FlipTradesBar, FlipTradeCells, legsByFlipDate } from '@/components/stock-analysis/FlipTradesPanel'
-import { ReviewHelpView } from '@/components/stock-analysis/ReviewHelpView'
 import { HeadRow, SubRow, HEAD_CARD } from '@/components/stock-analysis/ReviewHeadRow'
 import { StateTimeline } from '@/components/stock-analysis/StateTimeline'
 import { ReviewDisclosure } from '@/components/stock-analysis/ReviewDisclosure'
@@ -154,14 +153,15 @@ export function StockReviewDialog({ symbol, name, tab: initialTab, onClose }: {
 }) {
   // [R296] 'combo' 归一到 'verdict' —— 那一页并进去了。**不删这个入参值**:
   // 决策台那边可能还有地方带着它进来, 悄悄报错不如悄悄落到对的页上。
-  const [tab, setTab] = useState<'trend' | 'verdict' | 'help'>(
+  const [tab, setTab] = useState<'trend' | 'verdict'>(
     initialTab === 'trend' ? 'trend' : 'verdict')
   const [days, setDays] = useState<number>(120)
   // 趋势视图专用: 只看有事的日子。120 行里找那几天转折是不现实的
   const [onlyMarked, setOnlyMarked] = useState(false)
-  // [R292 → R300 → R301] 「说明」**成了第三个页签**, 不再是抽屉。
-  // 用户: 「说明点击后不是弹窗, 和趋势状态一样内容区域显示」。
-  // 于是那个 `help` 布尔量没了 —— 它现在就是 `tab` 的第三个取值, 少一个状态。
+  // [R329] 「说明」页签删掉了。用户: 「这个位置的说明按钮可以删除了, 外面设置
+  // 旁边已经有一个了」—— R323 在侧栏给了词表一个全局入口, 这里就成了第二个
+  // 通往同一份内容的门。**代价是 27 格速查表的「你在这一格」高亮没了**:
+  // 全局入口那边没有"当前是哪只票"这个上下文。这是用户看过之后的取舍。
 
   const q = useQuery({
     queryKey: QK.stockReview(symbol, days),
@@ -218,26 +218,6 @@ export function StockReviewDialog({ symbol, name, tab: initialTab, onClose }: {
                   {label}
                 </button>
               ))}
-              {/* [R292 → R300 → R301] 「说明」**成了真正的第三个页签**。
-                  用户: 「说明点击后不是弹窗, 和趋势状态一样内容区域显示」。
-
-                  R300 把入口搬进这一组时它还是抽屉, 于是有个说不通的地方:
-                  它长得像页签、亮得像页签, 点下去却推出一层盖住正文的东西。
-                  **现在名实相符了** —— 一个页签, 换一块正文。
-                  跟着省掉的: 抽屉的绝对定位与那层过渡、Esc 拦截、关闭按钮,
-                  以及 `help` 那个布尔状态(它现在就是 `tab` 的第三个取值)。
-
-                  **仍留一条发丝分隔线**: 前两个页签讲的是**这只票**(时间序列),
-                  它讲的是**恒定的词表**(与哪只票无关)。同一组里的两类东西,
-                  分隔线是唯一还在说这件事的记号。 */}
-              <button
-                onClick={() => setTab('help')}
-                title="六态状态与通道档位各是什么意思"
-                className={`flex items-center gap-1 border-l border-border/60 px-2.5 py-1 text-[10px] transition-colors cursor-pointer ${
-                  tab === 'help' ? 'bg-sky-400/15 text-sky-300' : 'text-muted hover:text-foreground'}`}
-              >
-                <HelpCircle className="h-3 w-3" />说明
-              </button>
             </div>
             <div className="flex overflow-hidden rounded-btn border border-border/60">
               {RANGES.map((n) => (
@@ -263,9 +243,7 @@ export function StockReviewDialog({ symbol, name, tab: initialTab, onClose }: {
             会先看到「正在回算 120 个交易日…」——**等一个它根本不需要的东西**。
             R228 给 27 格速查表定的就是这条, 这里沿用。 */}
         <div className="flex min-h-0 flex-1 flex-col">
-          {tab === 'help' ? (
-            <ReviewHelpView here={d?.channel?.geo?.combo ?? null} />
-          ) : (
+          {(
             <>
               {q.isLoading && (
                 <div className="flex items-center justify-center gap-2 py-16 text-xs text-muted">

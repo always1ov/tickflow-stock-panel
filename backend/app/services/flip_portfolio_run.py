@@ -24,7 +24,8 @@ from datetime import date, timedelta
 import polars as pl
 
 from app.indicators.livermore import compute
-from app.services import flip_portfolio, livermore_service, watchlist
+from app.services import flip_portfolio, flip_today, livermore_service, watchlist
+from app.services.live_quotes import watchlist_live_map
 
 logger = logging.getLogger(__name__)
 
@@ -75,6 +76,7 @@ def run(repo, *, symbols: list[str] | None = None,
         }
 
     out = flip_portfolio.simulate(series, capital=capital, max_positions=max_positions)
+    out["today"] = _today_signals(repo, series, out.get("positions") or [], names)
     out["symbols"] = sorted(series)
     out["missing"] = sorted(set(syms) - set(series))
     out["capital"] = capital
@@ -159,3 +161,42 @@ def _flags(df: pl.DataFrame, col: str) -> list[bool]:
     if col not in df.columns:
         return [False] * len(df)
     return [bool(v) if v is not None else False for v in df[col]]
+
+
+def _today_signals(repo, series: dict[str, dict], positions: list[dict],
+                   names: dict[str, str]) -> list[dict]:
+    """[R329] 今日信号 —— 「收盘前五分钟该挂什么单」。
+
+    **持仓取自模拟盘刚算完的那一份**, 不是真实持仓: 这一栏说的是"这套规则现在
+    会让我做什么", 而规则手上拿着什么由它自己的账决定。混进真钱持仓就成了另一
+    个问题的答案。
+
+    实时价拿不到就不传 —— `evaluate` 会退回收盘口径并标 `live=false`,
+    **不替用户去开那个要花额度的开关**。
+    """
+    held = {p["symbol"] for p in positions}
+    try:
+        live = watchlist_live_map(repo)
+    except Exception as e:  # noqa: BLE001
+        logger.debug("flip today: 实时叠加层读不到, 按收盘口径: %s", e)
+        live = {}
+
+    out: list[dict] = []
+    for sym, d in series.items():
+        closes = d.get("closes") or []
+        sig = flip_today.evaluate(
+            d.get("steps") or [],
+            held=sym in held,
+            last_close=closes[-1] if closes else None,
+            live_close=(live.get(sym) or {}).get("close"),
+        )
+        if sig is None:
+            continue
+        out.append({"symbol": sym, "name": names.get(sym, sym), **sig})
+
+    # 能出手的排最前, 其次盘中越线, 最后只是盯着 —— **版面顺序即急迫程度**
+    rank = {flip_today.STAGE_FLIPPED: 0, flip_today.STAGE_CROSSING: 1,
+            flip_today.STAGE_WATCH: 2}
+    out.sort(key=lambda r: (rank.get(r["stage"], 9), r["act"] is None,
+                            abs(r.get("gap_pct") or 0), r["symbol"]))
+    return out

@@ -27,8 +27,9 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { TrendingDown, TrendingUp } from 'lucide-react'
-import { api, type FlipOrder, type FlipPaper as FlipPaperData, type FlipRules } from '@/lib/api'
+import { Eye, TrendingDown, TrendingUp } from 'lucide-react'
+import { api, type FlipOrder, type FlipPaper as FlipPaperData, type FlipRules,
+  type FlipTodaySignal } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { PageHeader } from '@/components/PageHeader'
 import { Hint } from '@/components/Hint'
@@ -132,6 +133,7 @@ export function FlipPaper() {
 
         {d && !d.reason && (
           <>
+            <TodaySignals rows={d.today ?? []} />
             <Summary d={d} />
             <NavChart d={d} />
             <Holdings d={d} onOpen={(s) => navigate(`/stock-analysis?symbol=${s}`)} />
@@ -143,6 +145,85 @@ export function FlipPaper() {
         {/* 规则排在最后 —— 查证用的, 不该天天占首屏 */}
         {rules.data && <Rules r={rules.data} d={d} />}
       </div>
+    </div>
+  )
+}
+
+/**
+ * [R329] 今日信号 —— 「收盘前五分钟该挂什么单」。
+ *
+ * 用户唯一的要求: **一定要根据转折才能出手**。所以这一块的版面把三档拉得很开:
+ *
+ *   已转折    整行高亮 + 一个动作徽标(买入 / 清仓)—— 这是今天真要做的
+ *   盘中越线  无动作, 一句「收盘还站在这边才算数」—— 盘中价会变回去
+ *   只是盯着  最暗的一档, 只报距离
+ *
+ * **后两档连动作徽标的位置都没有**, 不是"灰掉"而是根本不渲染 —— 灰掉的按钮
+ * 仍然在暗示"这里本来有个动作"。
+ */
+function TodaySignals({ rows }: { rows: FlipTodaySignal[] }) {
+  const act = rows.filter((r) => r.stage === 'flipped' && r.act)
+  const rest = rows.filter((r) => !(r.stage === 'flipped' && r.act))
+  return (
+    <section className="overflow-hidden rounded-card border border-border/60 bg-surface/40">
+      <SectionHead
+        title="今天该挂什么单"
+        note={act.length ? `${act.length} 笔要动手` : '今天没有要动手的'}
+        hint={'**只有真转折才出手。**\n\n已转折 = 最新那根已落盘的日 K 让状态翻了面, 这才是动作。\n盘中越线 = 按此刻现价当收盘算会翻面 —— **不是出手理由**, 盘中价会变回去,\n14:30 跌破、14:58 拉回来的那天根本没有转折。\n\n触发价是作者的六态每天给的 flip_up / flip_down, 开盘前就定死,\n所以尾盘盯着它挂单是做得到的。'}
+      />
+      {rows.length === 0 ? (
+        <div className="px-4 py-5 text-xs text-muted">
+          自选里没有一只处在转折边上 —— <b className="text-secondary">今天不用动</b>。
+        </div>
+      ) : (
+        <div className="divide-y divide-border/30">
+          {act.map((r) => <SignalRow key={r.symbol} r={r} />)}
+          {rest.map((r) => <SignalRow key={r.symbol} r={r} />)}
+        </div>
+      )}
+    </section>
+  )
+}
+
+function SignalRow({ r }: { r: FlipTodaySignal }) {
+  const actionable = r.stage === 'flipped' && !!r.act
+  return (
+    <div className={cn('flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 text-xs',
+      actionable && 'bg-accent/[0.06]')}>
+      <span className="min-w-[9rem]">
+        <SymbolCell symbol={r.symbol} name={r.name} />
+      </span>
+
+      {actionable ? (
+        <span className={cn('inline-flex items-center gap-1 rounded px-2 py-0.5 text-[11px] font-medium',
+          r.act === 'buy' ? 'bg-bull/15 text-bull' : 'bg-bear/15 text-bear')}>
+          {r.act === 'buy' ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+          {r.act === 'buy' ? '买入' : '清仓'}
+        </span>
+      ) : (
+        /* 后两档**不渲染动作位** —— 灰掉的徽标仍在暗示这里本来有个动作 */
+        <span className="inline-flex items-center gap-1 text-[10px] text-muted">
+          <Eye className="h-3 w-3" />盯着
+        </span>
+      )}
+
+      <span className="text-[11px] text-secondary">
+        {r.stage === 'flipped' && <>已转折 · 现在是{r.state_cn}</>}
+        {r.stage === 'crossing' && (
+          <>按现价会转折 —— <b className="text-warning">收盘还站在这边才算数</b></>
+        )}
+        {r.stage === 'watch' && r.gap_pct != null && (
+          <>还差 {(Math.abs(r.gap_pct) * 100).toFixed(1)}% 到触发价</>
+        )}
+      </span>
+
+      {r.flip_price != null && (
+        <span className="ml-auto whitespace-nowrap text-[10px] tabular-nums text-muted">
+          触发 {r.flip_price.toFixed(2)}
+          {r.ref_price != null && <> · 现 {r.ref_price.toFixed(2)}</>}
+          {!r.live && <span className="ml-1 text-warning/70">昨收口径</span>}
+        </span>
+      )}
     </div>
   )
 }

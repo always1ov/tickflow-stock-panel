@@ -48,10 +48,11 @@ const TONE_CLS: Record<string, string> = {
   watch: 'border-border bg-elevated/60 text-secondary',
 }
 
-export function ReviewHelpView({ here = null }: {
-  /** [R296] 你现在在 27 格的哪一格 —— 那张表拿它高亮 */
-  here?: string | null
-}) {
+// [R329] `here`(「你现在在 27 格的哪一格」)删掉了 —— 复盘弹窗那个「说明」页签
+// 一撤, 唯一会传它的调用方就没了, 剩下的全局入口 `GlossaryDialog` 没有"当前是
+// 哪只票"这个上下文。**点不到就删**(R254/R277/R297 同一条判据): 留着一个永远
+// 是 null 的参数, 只会让下一个人以为高亮还在工作。
+export function ReviewHelpView() {
   // 结果恒定, 拉一次就够 —— 与 27 格速查表同一个缓存策略。
   // [R301] `enabled` 去掉了: 这个组件只在「说明」页签选中时才挂载,
   // "开着才拉"这件事由挂载与否表达, 再加一个开关就是两处说同一件事。
@@ -151,7 +152,7 @@ export function ReviewHelpView({ here = null }: {
                     换格比换档密, 但多出来的换格两边同向 —— 只是把同一段多切几刀,
                     而段与段之间没有缝, 复利一乘就抵回去了。
                   </p>
-                  <ComboGroups rows={combo.data.rows} here={here} />
+                  <ComboGroups rows={combo.data.rows} here={null} />
                 </div>
               </Section>
             )}

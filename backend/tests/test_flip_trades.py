@@ -1248,29 +1248,22 @@ def test_R301_说明是一页而不是盖上来的一层():
     assert "min-h-0 flex-1 overflow-auto" in view, "说明页不是和另外两页一样的正文块"
 
 
-def test_R292_说明抽屉两个页签共用一处():
-    """它讲的是六态与结论**两边**的词, 每个页签各挂一份就是同一份东西的两个副本。
+def test_R292_说明入口只有一处_已退役():
+    """**主语没了 —— 复盘弹窗的「说明」页签在 R329 删掉了。**
 
-    [R294 → R296] R294 那阵子是**两处**: 组合速查走的是另一个分支(它不等复盘
-    请求, 见 R228), 只能自己挂一份。R296 把那一页并掉之后分支没了, 于是回到
-    名副其实的一处 —— 两个页签同一个 `help` 开关、同一个抽屉。
+    用户: 「这个位置的说明按钮可以删除了, 外面设置旁边已经有一个了」。R323 给
+    词表加了侧栏全局入口, 这里就成了通往同一份内容的第二道门。
+
+    这条守卫原来钉的是「入口只有一处、就在页签组里」。那件事现在由**别处**接手:
+    `test_R323_侧栏有个问号_打开名词说明` 钉住全局入口, 而复盘弹窗里已经不存在
+    第二个入口 —— 下面这条断言就是它的新形态。
+
+    碑文照 R310 的规矩留着: 说清楚去处, 免得下一个人以为是漏删。
     """
     dlg = _dialog()
-    assert dlg.count("<ReviewHelpView") == 1, (
-        f"说明页挂了 {dlg.count('<ReviewHelpView')} 处 —— 该只有一处"
-    )
-    # [R300 → R301] 入口也是一处, 而且**就在页签组里**。R300 时它还是个开关
-    # (`setHelp`), R301 之后它就是 `tab` 的第三个取值 —— 少一个状态。
-    assert dlg.count("setTab('help')") == 1, "说明入口不是一处"
-    assert "setHelp" not in dlg, "`help` 那个布尔状态还留着 —— 它已经是 tab 的一个取值了"
-    for fn in ("function TrendView", "function VerdictView"):
-        body = _fn_body(dlg, fn)
-        assert "<ReviewHelpView" not in body, f"说明页挂进了 {fn} 里"
-        assert "onHelp" not in body, f"{fn} 里还留着说明入口 —— 它该只在页签那一行"
-    # 入口必须和另外两个页签在**同一组**里 —— 用户画的就是这三个挨着的样子
-    head = dlg[dlg.index("([['trend', '趋势状态']"):]
-    head = head[:head.index("</div>")]
-    assert "setTab('help')" in head, "说明入口没和页签在同一组里"
+    assert "<ReviewHelpView" not in dlg, "复盘弹窗不该再有说明页"
+    assert "setTab('help')" not in dlg, "说明入口已经搬去侧栏了"
+    assert "setHelp" not in dlg
 
 
 def test_R301_换页签没有过渡也不拦_Esc():
@@ -1622,7 +1615,8 @@ def test_R296_27格进了说明那一页而不是另外两页():
     """
     from tests.frontend_source import code_of
     sheet = code_of("components/stock-analysis/ReviewHelpView.tsx")
-    assert '<ComboGroups rows={combo.data.rows} here={here} />' in sheet, "27 格没进抽屉"
+    # [R329] `here` 删了(复盘那个页签一撤就没有调用方会传它了), 表本身照旧在这一页
+    assert '<ComboGroups rows={combo.data.rows}' in sheet, "27 格没进说明页"
     assert "按三档组合换格买卖的成绩与「按档位买卖」那一栏逐字相同" in sheet, (
         "没有交代为什么不另立一栏「按位置买卖」—— 那个取舍会被当成漏做"
     )
