@@ -37,6 +37,7 @@ import { Skeleton } from '@/components/data/Skeleton'
 import { useECharts } from '@/pages/backtest/charts/useECharts'
 import { cn } from '@/lib/cn'
 import { storage } from '@/lib/storage'
+import { refreshEvery, rhythmHint } from '@/lib/refreshRhythm'
 
 const CAPITAL_OPTIONS = [100_000, 500_000, 1_000_000, 5_000_000]
 const POSITION_OPTIONS = [3, 5, 10, 20]
@@ -93,11 +94,18 @@ export function FlipPaper() {
     queryKey: QK.flipPaper(capital, maxPositions, years),
     queryFn: () => api.flipPaper({ capital, maxPositions, years }),
     staleTime: 5 * 60_000,
+    // [R333] 自己刷, 不等人点。走 `derived` 档: 这一页的主体是日线派生的回测,
+    // 收盘落盘才会变; 但「今天该挂什么单」那一块带实时叠加层, 盘中是会动的 ——
+    // 所以盘中 5 分钟, 盘后 1 小时。
+    refetchInterval: refreshEvery('derived'),
+    refetchOnWindowFocus: true,
   })
   const rules = useQuery({
     queryKey: QK.flipPaperRules,
     queryFn: () => api.flipPaperRules(),
     staleTime: 24 * 3600_000,
+    // 规则口径改了要重新部署才生效 —— 轮询它没有意义
+    refetchInterval: refreshEvery('static'),
   })
 
   const d = q.data
@@ -105,7 +113,7 @@ export function FlipPaper() {
     <div className="flex h-full flex-col">
       <PageHeader
         title="转折模拟盘"
-        subtitle="非真实资金 · 只按六态转折买卖 · 每次打开当场重算"
+        subtitle={`非真实资金 · 只按六态转折买卖 · ${rhythmHint('derived')}`}
         right={
           <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
             <Picker label="本金" value={capital} options={CAPITAL_OPTIONS}

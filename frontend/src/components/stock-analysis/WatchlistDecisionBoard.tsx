@@ -21,6 +21,7 @@ import { TrendBacktestAllDialog } from '@/components/stock-analysis/TrendBacktes
 import { ChannelStateCell, PositionCell, NUM, TD_BASE } from '@/components/stock-analysis/decision-board/cells'
 import { LotsLink } from '@/components/stock-analysis/decision-board/LotsLink'
 import { Hint } from '@/components/Hint'   // [R323] 表头说明点得开
+import { refreshEvery } from '@/lib/refreshRhythm'   // [R333] 刷新节奏一处定义
 import { BoardSkeletonRows } from '@/components/stock-analysis/decision-board/BoardSkeletonRows'   // [R324] 首次加载骨架行
 // [R169] 合并视图(手填 ⊕ 上游批次登记), 字段说明见 api.ts 的 EffectivePosition
 type Position = EffectivePosition
@@ -409,8 +410,9 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
     queryKey: QK.stockSignals,
     queryFn: () => api.stockSignals(),
     staleTime: 30_000,
-    // [R27] 每小时自动拉一次: 定时任务批量刷完信号后, 页面开着也能自动看到新结果
-    refetchInterval: 60 * 60 * 1000,
+    // [R27 → R333] 原来写死一小时。AI 信号是定时任务批量刷的, 一天变不了几次,
+    // 所以归 `slow` 档(30 分钟)—— 比原来快一倍, 而它本来就不该按盘中节奏跑。
+    refetchInterval: refreshEvery('slow'),
   })
   const signals = useMemo(() => signalsQ.data?.signals ?? {}, [signalsQ.data])
 
@@ -424,6 +426,10 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
     queryFn: () => api.stockTrends(trendSyms.split(',')),
     enabled: trendSyms.length > 0,
     staleTime: 5 * 60_000,
+    // [R333] 六态是**日线派生**的: 收盘落盘才会翻面, 盘中不会变 —— 所以走
+    // `derived` 档而不是 `live`。行情那一侧有 SSE 管着(`watchlist-enriched`
+    // 在失效列表里), 但**判定层不在那个列表里**, 不自己刷就一直是打开那一刻的。
+    refetchInterval: refreshEvery('derived'),
   })
   const trends: Record<string, TrendInfo> = useMemo(() => trendsQ.data?.trends ?? {}, [trendsQ.data])
 
@@ -445,6 +451,11 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
     queryFn: () => api.stockUrgency(trendSyms.split(',')),
     enabled: trendSyms.length > 0,
     staleTime: 60_000,     // 比通道短: 距离随实时价动, 陈旧的紧迫度会误导
+    // [R333] 「该动了」**随实时价动**(距离出场线还有多远、离翻转价多近), 所以
+    // 走 `live` 档 —— 盘中一分钟一刷, 盘后半小时。上面那句注释说的就是这件事,
+    // 但在这之前它只有 staleTime 没有 refetchInterval: 没人碰这个页面时不会重取,
+    // 「陈旧的紧迫度会误导」那句话一直没被兑现。
+    refetchInterval: refreshEvery('live'),
   })
   const urgency: Record<string, Urgency> = useMemo(
     () => urgencyQ.data?.urgency ?? {}, [urgencyQ.data])
