@@ -1,0 +1,48 @@
+# .github/workflows/deploy.yml
+#
+# push 后触发 Coolify 重新部署。
+#
+# 必做（部署前）：
+#   1. Coolify 面板 → Keys & Tokens → 新建 API Token，权限只勾 Deploy，有效期设最长
+#   2. 应用页 → Webhooks → 复制 Deploy webhook URL 里的 uuid
+#   3. 仓库 Settings → Secrets and variables → Actions 建两个 secret：
+#        COOLIFY_TOKEN  上面那个 token，所有仓库可共用
+#        COOLIFY_UUID   该应用的 uuid，每个仓库不同
+#   4. 确认下方 branches 与本仓库的实际分支一致
+#
+# 按需改：
+#   COOLIFY_URL   换成自己的地址
+#   force         改代码用 false 即可；只改 compose 时 Coolify 可能跳过，需要 true 强制重建
+#
+# 前提：Cloudflare 隧道里放行了 /api/v1/deploy 这一个路径，且该条 ingress 规则
+#       必须排在通配符 *.域名 之前，否则会被通配符吃掉，请求永远打到 Traefik 上返回 404。
+
+name: Deploy to Coolify
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  COOLIFY_URL: https://coolify.always1ov.com
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Coolify deploy
+        run: |
+          response=$(curl -s -w "\n%{http_code}" -X POST \
+            "${COOLIFY_URL}/api/v1/deploy?uuid=${{ secrets.COOLIFY_UUID }}&force=false" \
+            -H "Authorization: Bearer ${{ secrets.COOLIFY_TOKEN }}")
+          body=$(echo "$response" | head -n -1)
+          code=$(echo "$response" | tail -n 1)
+          echo "HTTP $code"
+          echo "$body"
+          if [ "$code" != "200" ]; then
+            echo "::error::部署触发失败"
+            exit 1
+          fi
+          echo "::notice::部署已排队，去 Coolify 面板看进度"
