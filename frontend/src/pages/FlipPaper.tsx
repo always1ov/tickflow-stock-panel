@@ -64,6 +64,23 @@ function money(v: number | null | undefined): string {
   return v.toLocaleString('zh-CN', { maximumFractionDigits: 0 })
 }
 
+/**
+ * [R328] 标的那一格 —— **名称与代码相同时只印一个**。
+ *
+ * 维表里查不到名称的票(退市、新股还没进维表), 后端会退回代码。那时照旧
+ * 「名称 + 代码」两栏渲染, 印出来就是「000636.SZ 000636.SZ」—— 同一个字符串
+ * 重复两遍, 看着像渲染坏了。
+ */
+function SymbolCell({ symbol, name }: { symbol: string; name: string }) {
+  const named = name && name !== symbol
+  return (
+    <>
+      <span className="font-medium">{named ? name : symbol}</span>
+      {named && <span className="ml-1.5 font-mono text-[10px] text-muted">{symbol}</span>}
+    </>
+  )
+}
+
 export function FlipPaper() {
   const navigate = useNavigate()
   const [capital, setCapital] = useState(1_000_000)
@@ -247,8 +264,7 @@ function Holdings({ d, onOpen }: { d: FlipPaperData; onOpen: (s: string) => void
                   <td className="px-4 py-1.5">
                     <button onClick={() => onOpen(p.symbol)}
                             className="text-left hover:text-accent cursor-pointer">
-                      <span className="font-medium">{p.name}</span>
-                      <span className="ml-1.5 font-mono text-[10px] text-muted">{p.symbol}</span>
+                      <SymbolCell symbol={p.symbol} name={p.name} />
                     </button>
                   </td>
                   <td className="px-2 py-1.5 text-right tabular-nums">{p.shares.toLocaleString()}</td>
@@ -314,8 +330,7 @@ function Orders({ orders }: { orders: FlipOrder[] }) {
                     )}
                   </td>
                   <td className="px-2 py-1.5">
-                    <span className="font-medium">{o.name}</span>
-                    <span className="ml-1.5 font-mono text-[10px] text-muted">{o.symbol}</span>
+                    <SymbolCell symbol={o.symbol} name={o.name} />
                   </td>
                   <td className="px-2 py-1.5">
                     <span className={cn('inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium',

@@ -50,7 +50,7 @@ def run(repo, *, symbols: list[str] | None = None,
     if not syms:
         return {**flip_portfolio.simulate({}), "symbols": [], "reason": "no_watchlist"}
 
-    names = _names(syms)
+    names = _names(repo, syms)
     frames = _load_batch(repo, syms, years)
     series: dict[str, dict] = {}
     for sym in syms:
@@ -90,12 +90,26 @@ def _watchlist_symbols() -> list[str]:
         return []
 
 
-def _names(syms: list[str]) -> dict[str, str]:
+def _names(repo, syms: list[str]) -> dict[str, str]:
+    """{symbol: 名称}。
+
+    [R328] **名称从 repo 取, 不从自选条目取。** 第一版写的是
+    `watchlist.list_symbols()` 里的 `r.get("name")` —— 而自选表**根本没有 name
+    这一列**(schema 只有 symbol / added_at / note / group_ids), 于是每一行都走
+    `or r.get("symbol")` 那个回退, 整张持仓表印出来是「000636.SZ 000636.SZ」。
+    **没有任何东西会报错**, 因为回退本身是"成功"的。
+
+    `repo.get_name_map()` 是这个仓库解析名称的统一入口(自选页 `api/watchlist.py`
+    两处用的都是它), 合并了股票 + ETF + 指数三份维表。**不另走一条** —— 同一件事
+    两处实现, 哪天维表口径改了必然漂。
+    """
     try:
-        return {str(r.get("symbol", "")).upper(): str(r.get("name") or r.get("symbol") or "")
-                for r in watchlist.list_symbols()}
-    except Exception:  # noqa: BLE001
+        m = repo.get_name_map(syms)
+    except Exception as e:  # noqa: BLE001
+        logger.warning("flip portfolio: 名称解析失败, 退回代码: %s", e)
         return {s: s for s in syms}
+    # 维表里查不到的(退市、新股还没进维表)仍退回代码 —— 宁可印代码, 不印空白
+    return {s: str(m.get(s) or s) for s in syms}
 
 
 def _load_batch(repo, syms: list[str], years: int) -> dict[str, pl.DataFrame]:

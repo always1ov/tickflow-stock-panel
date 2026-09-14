@@ -21,6 +21,16 @@ class _Repo:
     def resolve_asset_type(self, sym: str) -> str:
         return "etf" if sym in self.etf else "stock"
 
+    def get_name_map(self, symbols=None):
+        """[R328] 名称的唯一来源 —— 与真 repo 同名同义。
+
+        第一版这个假 repo **没有这个方法**, 而被测代码当时是从自选条目里取
+        名称的; 测试的 fixture 又给自选塞了 `name` 字段 —— **造的数据比真实
+        数据更完整**, 于是那条路永远绿, 真实环境整张表印的却是代码。
+        """
+        m = {"A": "甲公司", "B": "乙公司", "E": "丙 ETF"}
+        return m if symbols is None else {k: v for k, v in m.items() if k in symbols}
+
     def get_daily_batch(self, syms, start, end, columns):
         self.batch_calls += 1
         parts = [self.frames[s].with_columns(pl.lit(s).alias("symbol"))
@@ -45,8 +55,10 @@ def _bars(closes: list[float], *, lu: list[bool] | None = None) -> pl.DataFrame:
 @pytest.fixture(autouse=True)
 def _no_watchlist_io(monkeypatch):
     monkeypatch.setattr(run_mod.watchlist, "symbol_set", lambda: frozenset({"A", "B"}))
+    # [R328] **不给 name** —— 真实的 watchlist.parquet schema 只有
+    # symbol / added_at / note / group_ids, 没有 name 这一列。
     monkeypatch.setattr(run_mod.watchlist, "list_symbols",
-                        lambda: [{"symbol": "A", "name": "甲"}, {"symbol": "B", "name": "乙"}])
+                        lambda: [{"symbol": "A"}, {"symbol": "B"}])
     monkeypatch.setattr(run_mod.livermore_service, "get_effective_threshold",
                         lambda s: (0.06, "default"))
 
@@ -110,7 +122,7 @@ def test_R327_名称带进流水_不是只有代码():
     repo = _Repo({"A": _bars([10.0, 11.0, 12.0] * 10)})
     out = run_mod.run(repo, symbols=["A"])
     if out["orders"]:
-        assert out["orders"][0]["name"] == "甲"
+        assert out["orders"][0]["name"] == "甲公司"
 
 
 def test_R327_本金与上限原样回显_界面要照口径写出来():
@@ -118,3 +130,62 @@ def test_R327_本金与上限原样回显_界面要照口径写出来():
     out = run_mod.run(repo, symbols=["A"], capital=250_000, max_positions=7)
     assert out["capital"] == 250_000
     assert out["max_positions"] == 7
+
+
+# ── [R328] 名称解析 ────────────────────────────────────────────────────
+def test_R328_名称从_repo_取_不从自选条目取():
+    """自选表没有 name 列 —— 从那里取必然每行都回退成代码。"""
+    repo = _Repo({"A": _bars([10.0] * 30)})
+    out = run_mod.run(repo, symbols=["A"])
+    assert out["positions"] or out["orders"], "先确认真的跑出了东西"
+    for row in out["positions"] + out["orders"]:
+        assert row["name"] == "甲公司"
+        assert row["name"] != row["symbol"], "印出代码就是没解析到名称"
+
+
+def test_R328_维表查不到时退回代码_不留空白():
+    """退市或还没进维表的票 —— 宁可印代码, 不印空白。
+
+    **直接测 `_names` 而不是走一遍 run。** 第一版走 run 然后 `for row in
+    positions + orders: assert ...` —— 而那组恒定价格根本不产生转折, 两个列表
+    都是空的, **循环一次都没执行**, 于是断言恒真。变异电池当场抓到: 把回退
+    改成空串照样绿。空集合上的断言等于没有断言。
+    """
+    repo = _Repo({})
+    assert run_mod._names(repo, ["Z"]) == {"Z": "Z"}, "查不到就退回代码"
+    assert run_mod._names(repo, ["A", "Z"]) == {"A": "甲公司", "Z": "Z"}, \
+        "查得到的用名称, 查不到的退回代码 —— 两者可以同时出现"
+
+
+def test_R328_退回的代码要真的印到行上():
+    """上一条钉的是 `_names` 的契约; 这一条钉它真的流到了每一行。
+
+    **必须先确认列表非空** —— 否则又是空集合上的断言。
+    """
+    repo = _Repo({"Z": _bars([10.0, 12.0, 9.0, 11.0] * 8)})   # 价格起伏才有转折
+    out = run_mod.run(repo, symbols=["Z"])
+    rows = out["positions"] + out["orders"]
+    assert rows, "这组价格该跑出转折, 跑不出来的话下面的断言是空的"
+    for row in rows:
+        assert row["name"] == "Z"
+
+
+def test_R328_名称解析失败不影响跑完(monkeypatch):
+    """名称只是显示 —— 它挂了不该把整个模拟盘带下水。"""
+    repo = _Repo({"A": _bars([10.0] * 30)})
+    monkeypatch.setattr(type(repo), "get_name_map",
+                        lambda self, symbols=None: (_ for _ in ()).throw(RuntimeError("维表炸了")))
+    out = run_mod.run(repo, symbols=["A"])
+    assert out["reason"] != "no_data", "名称解析失败不该让模拟盘跑不出来"
+    for row in out["positions"] + out["orders"]:
+        assert row["name"] == "A"
+
+
+def test_R328_走的是仓库统一的名称入口_不另开一条():
+    """**剥掉 docstring 再断言** —— 第一版直接查 `inspect.getsource`, 被
+    `_names` 自己那句「第一版写的是 `watchlist.list_symbols()`」喂饱当场红。
+    同一个坑这会话栽了两次, 于是收进 `tests/py_source.py`。"""
+    from tests.py_source import body_of
+    code = body_of(run_mod._names)
+    assert "repo.get_name_map" in code, "名称解析必须走 repo.get_name_map"
+    assert "list_symbols" not in code, "自选条目里没有 name, 从那里取是错的"

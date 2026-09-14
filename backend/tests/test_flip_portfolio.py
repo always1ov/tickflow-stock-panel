@@ -264,26 +264,15 @@ def test_R327_不给涨跌停标志就一律当能成交_不瞎猜():
 
 # ── 判据来源 ────────────────────────────────────────────────────────────
 def test_R327_多空判据来自_flip_trades_不自己造():
-    """**只看函数体, 不看整个模块。**
+    """**只看代码, 不看 docstring。**
 
     第一版拿 `inspect.getsource(fp)` 整个模块去查 "BULLISH" 不许出现 —— 结果
     被模块 docstring 里那句「不在这里重写一遍 `state in BULLISH`」喂饱, 断言
-    立刻红。同一个坑这仓库栽过五次(见 tests/frontend_source.py 的说明):
-    **断言查的标识符, 正好也写在解释它的文字里。** 剥掉文档, 只看代码。
+    立刻红。**断言查的标识符, 正好也写在解释它的文字里** —— 这仓库栽过很多次,
+    R328 起收进 `tests/py_source.py`。
     """
-    import ast
-    import inspect
-    tree = ast.parse(inspect.getsource(fp))
-    bodies = []
-    for node in ast.walk(tree):
-        if isinstance(node, ast.FunctionDef):
-            body = list(node.body)
-            if (body and isinstance(body[0], ast.Expr)
-                    and isinstance(body[0].value, ast.Constant)
-                    and isinstance(body[0].value.value, str)):
-                body = body[1:]          # 掐掉 docstring
-            bodies.append("\n".join(ast.unparse(n) for n in body))
-    code = "\n".join(bodies)
+    from tests.py_source import code_of
+    code = code_of(fp)
     assert "trend_days(steps)" in code, "每日多空必须问 flip_trades 要"
     assert "BULLISH" not in code, "多空归属不许在这里重写一遍"
 
@@ -363,3 +352,18 @@ def test_R327_同样的输入跑两遍逐值相同():
     }
     assert fp.simulate(series, capital=100_000, max_positions=2) == \
            fp.simulate(series, capital=100_000, max_positions=2)
+
+
+def test_R328_名称缺失时退回代码_simulate_自己那一层():
+    """`simulate` 是公开的纯函数, 它自己的契约要自己保证。
+
+    取数层 `_names` 已经不会给出空名称了, 所以这一层的 `or sym` 是**第二层
+    防御, 平时走不到** —— 变异电池演示过: 改掉它端到端测试照样绿。但别的调用方
+    直接喂一个空 name 是可能的, 所以这一层单独钉。
+    """
+    a = _mk(["UT", "DT"], [10.0, 9.0])
+    a["name"] = ""                     # 名称缺失
+    res = fp.simulate({"A": a}, capital=100_000, max_positions=1)
+    assert res["orders"], "先确认真的跑出了单子"
+    for o in res["orders"]:
+        assert o["name"] == "A", "名称空着时退回代码, 不留空白"
