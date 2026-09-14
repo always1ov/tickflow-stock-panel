@@ -2950,170 +2950,100 @@ export interface TickflowKeyRow {
 }
 
 /**
- * [R61] 选股范围。每个操作员带**两本独立的账**:
- *   market    只能从全市场候选里选
- *   watchlist 只能从我圈的自选里选
- * 这是这套系统最想问的那个问题的对照组 —— 我这份自选到底有没有价值。
- */
-export type PaperScope = 'market' | 'watchlist'
-
-/** 一本账的成绩 */
-/** [R183] 模拟盘持仓的批次视图。字段名与作者的批次一致, 界面可照批次表渲染。 */
-export interface PaperLot {
-  id: string
-  symbol: string
-  /** [R247] 股票名称 */
-  name?: string | null
-  cost_price: number
-  qty: number
-  buy_date: string | null
-  price: number | null
-  market_value: number | null
-  pnl_pct: number | null
-  trader_id: string
-  scope: string
-}
-
-/** [R183] 绩效指标。**null = 算不出来**(样本不足/没有基准), 不是 0。 */
-export interface PaperMetrics {
-  days: number
-  total_return: number | null
-  max_drawdown: number | null
-  sharpe: number | null
-  exposure: number | null
-  benchmark_return: number | null
-  excess_return: number | null
-}
-
-export interface PaperBook {
-  scope: PaperScope
-  scope_cn: string
-  /** [R63] 每本账各自的本金 —— 收益率各按各的算, 设成不同的数也照样可比 */
-  initial_capital: number
-  cash: number
-  nav: number
-  /** 相对初始资金的收益率(小数) */
-  return_pct: number
-  positions_count: number
-  orders_count: number
-  /** 记过净值的天数 */
-  days: number
-  last_run_at: string | null
-  last_error: string
-  last_note: string
-  /** [R171] 出场原因分布 —— 立计划之后真正的产出 */
-  exit_stats?: PaperExitStats
-  /** [R183] 持仓的**批次视图** —— 「我的批次」并进模拟盘后按批次的样子给出来。
-   *  是派生的: 唯一真相在账本里, 不写进作者的 lots.json(那会派生真实监控规则,
-   *  并经 effective_positions 污染决策台管真钱的那几列)。 */
-  lots?: PaperLot[]
-  /** [R183] 绩效。参考 MarketPulse 的 Metrics 补的; 算不出的是 null, 不用 0 顶替 */
-  metrics?: PaperMetrics
-  /** [R186] 净值曲线(只 date/nav 两个字段, 最近 260 点)。
-   *  nav_history 一直在存却从没画过 —— 总资产只说明现在几块钱, 曲线才说明
-   *  这一路是怎么走过来的。 */
-  nav_curve?: { date: string; nav: number }[]
-  /** [R171] 已到止盈线但系统没替它卖的, 会写进下一轮它的上下文 */
-  plan_reminders?: { symbol: string; kind: string; reason: string }[]
-}
-
-export interface PaperSchedule {
-  enabled: boolean
-  hour: number
-  minute: number
-}
-
-/** [R59] AI 操作员。名字就是模型名 —— 要比的是哪个模型用同一份信息做得更好 */
-export interface PaperTrader {
-  id: string
-  name: string
-  profile_id: string
-  created_at: string
-  /** [R63] 同时最多持有几只。两本账一视同仁 —— 要对照, 这个数就得对齐 */
-  max_positions: number
-  schedule: PaperSchedule
-  /** 两本账并排 —— 分开请求会让人下意识只看其中一边 */
-  books: PaperBook[]
-}
-
-/**
- * [R171] 买入时立的交易计划 —— 借鉴「持仓提醒」的批次: 按成本价 ± 止盈/止损%
- * 推出监控线, 按最长持有天数推出到期日。
+ * [fork 增强 R327] 转折模拟盘 —— 一个组合, 只按六态转折买卖。
  *
- * 纪律分两档: **止损线与到期日到了系统直接卖, 不问 AI**(和跌破生命线同一条道理);
- * **止盈线到了只提醒**, 由模型自己决定落袋还是让利润奔跑 —— 那是策略不是纪律。
+ * 替掉 R59 那套「AI 操盘手」。**没有状态**: 每次请求当场从日线重算, 不落盘、
+ * 不定时。规则文案从 `/api/flip-paper/rules` 取, 前端不誊抄 —— 誊一份的话口径
+ * 一改那份誊抄就开始说假话, 而且不会有任何东西报错。
  */
-export interface PaperPlan {
-  target_pct: number | null
-  stop_pct: number | null
-  hold_days: number | null
-  target_price: number | null
-  stop_price: number | null
-  due_date: string | null
-  /** 三条线是按哪个成本算出来的(加仓后会按新的加权成本重算) */
-  based_on_cost: number
-}
-
-/** [R171] 出场归因: 每笔卖出归到其中一类 */
-export type PaperExitReason = 'stop' | 'due' | 'target' | 'lifeline' | 'ai'
-
-export interface PaperExitStats {
-  counts: Record<PaperExitReason, number>
-  closed: number
-  wins: number
-  win_rate: number | null
-  positions_with_plan: number
-  positions_total: number
-}
-
-export interface PaperPosition {
-  symbol: string
-  /** [R247] 股票名称。取不到时缺席 —— 界面退回只显示代码 */
-  name?: string | null
-  shares: number; cost: number
-  price: number | null
-  opened_on: string
-  pnl_pct: number | null
+export interface FlipNavPoint {
+  date: string
+  nav: number
+  cash: number
   market_value: number
-  /** [R171] 买入时立的三条线; 升级前建的仓没有 */
-  plan?: PaperPlan | null
+  positions: number
+  ret: number
 }
 
-export interface PaperOrder {
-  ts: string; date: string
-  action: 'buy' | 'sell'
+export interface FlipOrder {
+  date: string
   symbol: string
-  /** [R247] 股票名称 */
-  name?: string | null
-  shares: number; price: number
-  amount?: number
+  name: string
+  act: 'buy' | 'sell'
+  shares: number
+  price: number
+  amount: number
+  fee: number
+  state_cn: string | null
   reason: string
-  /** 有值 = 这一笔被拒了。拒单也留痕: "想买但买不成"和"没想买"是两件事 */
-  rejected?: string
-  /** [R61] 跌破生命线的纪律强平 —— 这一路不问 AI */
-  lifeline?: boolean
-  /** 那一笔用的是实时价(生命线是全流程唯一允许用实时的地方) */
-  intraday?: boolean
-  /** [R171] 卖出归因。买入没有这个字段 */
-  exit_reason?: PaperExitReason
-  /** [R171] 卖出时的成本与已实现盈亏 */
-  cost?: number | null
-  pnl_pct?: number | null
-  /** [R171] 买入时立的计划(存一份在成交上, 便于复盘当时怎么想的) */
-  plan?: PaperPlan | null
-  /** [R171] 这笔强平是被计划的哪条线带走的 */
-  plan_hit?: 'stop' | 'due'
+  /** 信号日 —— 封板顺延时与成交日不同 */
+  signal_date: string
+  delayed: boolean
 }
 
-/** 一本账的全部家当 */
-export interface PaperBookDetail extends PaperBook {
-  id: string
+export interface FlipPosition {
+  symbol: string
   name: string
+  shares: number
+  cost: number | null
+  last: number
+  market_value: number
+  pnl: number
+  pnl_pct: number | null
+}
+
+export interface FlipStats {
+  days: number
+  orders: number
+  buys: number
+  sells: number
+  /** 一次完整买卖才算一轮 —— 还拿着的不算 */
+  round_trips: number
+  win: number
+  /** null = 一轮都没兑现, 算不出来(不是 0) */
+  win_rate: number | null
+  total_ret: number
+  max_drawdown: number
+  best: number | null
+  worst: number | null
+}
+
+/** 没能按信号动手的那些 —— 原因码在界面上逐条翻译, 空栏必须自己解释 */
+export interface FlipSkipped {
+  date: string
+  symbol: string
+  name: string
+  reason: 'sealed' | 'no_slot' | 'no_cash' | 'voided'
+}
+
+export interface FlipPaper {
+  nav: FlipNavPoint[]
+  orders: FlipOrder[]
+  positions: FlipPosition[]
+  stats: FlipStats
+  skipped: FlipSkipped[]
+  pending: { symbol: string; name: string; act: string; since: string }[]
+  as_of: string | null
+  /** 一天都跑不了时的原因; 跑得了就是 null */
+  reason: string | null
+  symbols: string[]
+  /** 自选里但取不到日线的那些 —— 不静默丢掉 */
+  missing: string[]
+  capital: number
   max_positions: number
-  positions: PaperPosition[]
-  /** 新 → 旧 */
-  orders: PaperOrder[]
-  nav_history: { date: string; nav: number; cash: number; market_value: number }[]
+}
+
+export interface FlipRules {
+  signal: string
+  execute: string
+  direction: string[]
+  sizing: string
+  universe: string
+  short: string
+  costs: { commission: number; stamp_tax: number; slippage_bps: number; lot: number }
+  caveat: string
+  vs_flip_trades: string
+  why_no_state: string
 }
 
 export interface AiProfile {
@@ -3566,89 +3496,18 @@ export const api = {
     ),
 
   // ===== [R59] AI 操盘手 =====
-  paperTraders: () =>
-    request<{ traders: PaperTrader[] }>('/api/paper-trading/traders'),
+  /** [R327] 转折模拟盘。无参就用默认本金/上限/回溯年数 */
+  flipPaper: (q?: { capital?: number; maxPositions?: number; years?: number }) => {
+    const p = new URLSearchParams()
+    if (q?.capital != null) p.set('capital', String(q.capital))
+    if (q?.maxPositions != null) p.set('max_positions', String(q.maxPositions))
+    if (q?.years != null) p.set('years', String(q.years))
+    const qs = p.toString()
+    return request<FlipPaper>(`/api/flip-paper${qs ? `?${qs}` : ''}`)
+  },
 
-  /**
-   * [R170] 各标的被**几个**操作员持有 —— 供「我的批次」表做对照标记。
-   *
-   * 刻意只有计数: 不带操作员身份、成本、理由。作者在 paper_trader 里写明界面不做
-   * "所有人持仓一览"(看完再去调提示词会破坏操作员隔离, 而隔离正是这个实验的价值)。
-   * 一个聚合数能回答"AI 那边也看上这只了吗", 又不泄露任何一本账。
-   */
-  /**
-   * [R171] 过一遍模型买入时立的交易计划。与生命线那个端点成对, 同样**不问 AI**:
-   * 止损线与到期日直接卖, 止盈线只记提醒(下一轮写进它的上下文)。
-   */
-  paperPlanCheck: (id: string, scope: PaperScope) =>
-    request<{ forced: PaperOrder[]; reminders: { symbol: string; kind: string; reason: string }[]; count: number }>(
-      `/api/paper-trading/traders/${encodeURIComponent(id)}/books/${scope}/plan-check`,
-      { method: 'POST' }),
-
-  paperHoldingsOverlap: () =>
-    request<{ overlap: Record<string, number>; trader_count: number }>(
-      '/api/paper-trading/holdings-overlap'),
-
-  paperBook: (id: string, scope: PaperScope) =>
-    request<PaperBookDetail>(
-      `/api/paper-trading/traders/${encodeURIComponent(id)}/books/${scope}`),
-
-  paperTraderCreate: (body: {
-    name: string; profile_id: string; capital: number; max_positions: number
-  }) =>
-    request<PaperTrader>('/api/paper-trading/traders', {
-      method: 'POST', body: JSON.stringify(body),
-    }),
-
-  /** 让这一本账按今天的信息做一次决策 */
-  paperBookRun: (id: string, scope: PaperScope) =>
-    request<{
-      date: string; scope: PaperScope; orders: PaperOrder[]; note: string
-      /** [R65] 它这一轮要求细看的几只 */
-      focus?: string[]
-      /** [R66] 它认为信号旧了、要求现场重出的几只 */
-      refreshed?: { symbol: string; ok: boolean; error: string }[]
-      raw: string
-    }>(
-      `/api/paper-trading/traders/${encodeURIComponent(id)}/books/${scope}/run`, { method: 'POST' }),
-
-  /** [R61] 生命线检查 —— 不问 AI, 也是全流程唯一用实时价的地方 */
-  paperBookLifeline: (id: string, scope: PaperScope) =>
-    request<{ forced: PaperOrder[]; count: number }>(
-      `/api/paper-trading/traders/${encodeURIComponent(id)}/books/${scope}/lifeline`,
-      { method: 'POST' }),
-
-  /** [R63] 操作员级设置(持仓只数上限对两本账一视同仁) */
-  paperTraderSettings: (id: string, maxPositions: number) =>
-    request<{ ok: boolean; max_positions: number }>(
-      `/api/paper-trading/traders/${encodeURIComponent(id)}/settings`,
-      { method: 'PUT', body: JSON.stringify({ max_positions: maxPositions }) }),
-
-  /** [R63] 改单本账的本金。会把这本账一并重置 —— 分母变了历史就读不懂了 */
-  paperBookCapital: (id: string, scope: PaperScope, capital: number) =>
-    request<{ ok: boolean; scope: PaperScope; initial_capital: number }>(
-      `/api/paper-trading/traders/${encodeURIComponent(id)}/books/${scope}/capital`,
-      { method: 'PUT', body: JSON.stringify({ initial_capital: capital }) }),
-
-  paperTraderSchedule: (id: string, s: PaperSchedule) =>
-    request<{ ok: boolean; schedule: PaperSchedule }>(
-      `/api/paper-trading/traders/${encodeURIComponent(id)}/schedule`,
-      { method: 'PUT', body: JSON.stringify(s) }),
-
-  /** 不给 scope 就是两本账一起重置 */
-  paperTraderReset: (id: string, scope?: PaperScope) =>
-    request<{ ok: boolean }>(
-      `/api/paper-trading/traders/${encodeURIComponent(id)}/reset${scope ? `?scope=${scope}` : ''}`,
-      { method: 'POST' }),
-
-  paperTraderDelete: (id: string) =>
-    request<{ deleted: string }>(`/api/paper-trading/traders/${encodeURIComponent(id)}`,
-      { method: 'DELETE' }),
-
-  /** 看一眼这本账这次会拿到什么 —— 判断"系统给的信息够不够"得先看清给了什么 */
-  paperBookContext: (id: string, scope: PaperScope) =>
-    request<{ context: string; system_prompt: string }>(
-      `/api/paper-trading/traders/${encodeURIComponent(id)}/books/${scope}/context`),
+  /** 规则说明从后端出 —— 前端不誊抄一份 */
+  flipPaperRules: () => request<FlipRules>('/api/flip-paper/rules'),
 
   /** [R56] 多 AI 档位: 列表顺序即优先级, 前面的先用, 用不了顺位往下 */
   aiProfiles: () =>

@@ -74,7 +74,8 @@ _EXPECTED_ROUTERS = (
     "backtest.router",
     "factors.router",
     "mining.router",
-    "paper_trading.router",
+    # [R327] R59 的 AI 操盘手换成了转折模拟盘, 路由跟着换名
+    "flip_paper.router",
     "intraday.router",
     "indices.router",
     "overview.router",

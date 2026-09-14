@@ -41,7 +41,7 @@ import {
   BarChart3,
   Gauge,
   Sparkles,
-  Bot,
+  Repeat,
   Layers3,
   Zap,
   Landmark,
@@ -112,7 +112,7 @@ const nav = [
   { to: '/abnormal', label: '异动监控', icon: Siren },
   // [R170] 上游这里叫「持仓提醒」; 在 fork 这边它是双 tab 外壳(我的批次 + AI 操盘手),
   // 所以叫「仓位中心」。旧路径 /paper-trading 仍可用(router 里重定向)。
-  { to: '/lots',       label: '模拟盘', icon: Bot },   // [R183] 原「仓位中心」双 tab, 现整页是 AI 模拟盘
+  { to: '/lots',       label: '模拟盘', icon: Repeat },   // [R327] 转折模拟盘 —— 纯规则, 图标从 Bot 换掉: 这里已经没有 AI
   { to: '/signals',    label: '信号库',   icon: Zap },
   { to: '/review',      label: '复盘',   icon: BookOpenCheck },
   // [fork 增强] R93 使用观察笔记

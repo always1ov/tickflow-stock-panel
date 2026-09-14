@@ -28,6 +28,7 @@ from app.api import (
     external_page,  # [fork 增强] R117 外部网页抓取模式(独立模块)
     factors,
     financials,
+    flip_paper,  # [fork 增强] R327 转折模拟盘
     focus,  # [fork 增强] R159 推送焦点名单
     global_indices,  # [fork 增强] R99 全球指数实时(独立模块)
     indices,
@@ -38,7 +39,6 @@ from app.api import (
     mining,
     monitor_rules,
     overview,
-    paper_trading,  # [fork 增强] R59 AI 操盘手
     pipeline,
     regime,
     rps,
@@ -64,7 +64,6 @@ from app.extensions.loader import (
 from app.jobs import daily_pipeline
 from app.services.matrix_prewarm_owner import MatrixCachePrewarmOwner
 from app.services.mining_process_lock import MiningProcessLock
-from app.services.paper_trader import StoreError as _PaperStoreError
 from app.services.quote_service import QuoteService
 from app.tickflow import client as tf_client
 from app.tickflow.capabilities import CapabilityDenied
@@ -255,15 +254,9 @@ def _start_scheduler(app: FastAPI, repo: KlineRepository, capset) -> None:
         daily_pipeline.set_app_state(app.state)  # 供 depth_finalize job 访问 depth_service
         scheduler = daily_pipeline.start_scheduler(repo, capset)
         app.state.scheduler = scheduler
-        # [R61] 操盘手定时。默认全关 —— 一个会自动调用付费 API 的东西不该开箱就开着
-        try:
-            from app.services import paper_trader_schedule
-
-            n = paper_trader_schedule.install(scheduler, repo)
-            if n:
-                logger.info("装上 %d 个 AI 操盘手定时任务", n)
-        except Exception as e:  # noqa: BLE001
-            logger.warning("paper trader schedule not installed: %s", e)
+        # [R327] R61 那套「操盘手定时」删掉了 —— AI 操盘手整个换成了转折模拟盘,
+        # 而后者是**纯函数**: 打开页面当场从日线重算, 没有需要每天推进的状态,
+        # 也就没有可定时的东西。
     except Exception as e:  # noqa: BLE001
         logger.warning("scheduler not started: %s", e)
         app.state.scheduler = None
@@ -712,7 +705,7 @@ def _register_routers(app: FastAPI) -> None:
     app.include_router(backtest.router)
     app.include_router(factors.router)
     app.include_router(mining.router)
-    app.include_router(paper_trading.router)  # [fork 增强] R59 AI 操盘手
+    app.include_router(flip_paper.router)  # [fork 增强] R327 转折模拟盘
     app.include_router(intraday.router)
     app.include_router(indices.router)
     app.include_router(overview.router)
@@ -761,12 +754,10 @@ async def capability_denied_handler(request: Request, exc: CapabilityDenied) -> 
     )
 
 
-# [fork 增强] R68 操盘手账本读不出来 → 503, 而且**不写**。
-# 这个 handler 存在的意义不在于状态码好看, 而在于让那条路走到"报错"为止:
-# 读不出来时如果按空账本继续跑, 下一次保存就会把其他操作员一起覆盖掉。
-@app.exception_handler(_PaperStoreError)
-async def paper_store_error_handler(request: Request, exc: _PaperStoreError) -> JSONResponse:
-    return JSONResponse(status_code=503, content={"detail": str(exc)})
+# [R327] R68 那个「操盘手账本读不出来 → 503 而且不写」的 handler 删掉了。
+# 它守的是一条具体的路: 账本读失败时若按空账本继续跑, 下一次保存会把其他
+# 操作员覆盖掉。**转折模拟盘不落盘**(每次请求当场重算), 没有账本, 也就没有
+# 这条路 —— 留着一个引用已删模块的 handler 只会让 import 炸掉。
 
 
 # 生产期静态文件(前端 dist)

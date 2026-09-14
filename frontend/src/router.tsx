@@ -24,7 +24,8 @@ const Financials = lazy(() => import('./pages/Financials').then(m => ({ default:
 const Data = lazy(() => import('./pages/Data').then(m => ({ default: m.Data })))
 const Monitor = lazy(() => import('./pages/Monitor').then(m => ({ default: m.Monitor })))
 // [R170] 仓位中心: 「我的批次」(真钱) 与「AI 操盘手」(模拟盘) 的双 tab 外壳
-const PositionsHub = lazy(() => import('./pages/PositionsHub').then(m => ({ default: m.PositionsHub })))
+// [R327] AI 操盘手换成转折模拟盘 —— 纯规则, 没有 AI
+const FlipPaper = lazy(() => import('./pages/FlipPaper').then(m => ({ default: m.FlipPaper })))
 const Lots = lazy(() => import('./pages/Lots').then(m => ({ default: m.Lots })))   // [R183] 上游批次登记, 保留路由
 const Dashboard = lazy(() => import('./pages/Dashboard').then(m => ({ default: m.Dashboard })))
 const AnalysisDetail = lazy(() => import('./pages/AnalysisDetail').then(m => ({ default: m.AnalysisDetail })))
@@ -166,12 +167,13 @@ export function createAppRouter() {
       // 上游把挖掘并进了因子页; 这条重定向让老书签(带 run/candidate 参数)仍然可用
       { path: 'mining', element: <MiningRedirect /> },
       // [R170] AI 操盘手并入仓位中心。路由保留并重定向: 书签、菜单设置里存的旧路径不能断。
-      { path: 'paper-trading', element: <Navigate to="/lots" replace /> },   // [R183] 整页就是模拟盘了
+      { path: 'paper-trading', element: <Navigate to="/lots" replace /> },   // [R327] 旧入口照旧指过来
       { path: 'financials', element: <Financials /> },
       { path: 'data', element: <Data /> },
       { path: 'monitor', element: <Monitor /> },
-      // [R183] /lots 现在是**模拟盘**(AI 全权打理), 不再是双 tab 外壳。
-      { path: 'lots', element: <PositionsHub /> },
+      // [R327] /lots 现在是**转折模拟盘**。路由保留不改名: 书签、菜单设置里
+      // 存的都是这个路径, 改名等于把用户存的入口作废。
+      { path: 'lots', element: <FlipPaper /> },
       // 上游的批次登记页保留一条自己的路由 —— 代码一行没动, 只是不在导航里。
       // 哪天想用回真钱批次登记, 它原封不动还在。
       { path: 'lots-registry', element: <Lots /> },

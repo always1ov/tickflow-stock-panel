@@ -13,7 +13,6 @@ import { DateShortcuts } from '@/components/DateShortcuts'
 import { StockPreviewDialog, toNavItems } from '@/components/StockPreviewDialog'
 import { boardTag } from '@/components/stock-table/primitives'
 // [R170] AI 操盘手对照标记 —— 只显示有几个操作员也拿着, 不泄露是谁/成本/理由
-import { AiHoldMark } from '@/components/lots/AiHoldMark'
 
 const emptyDraft = (): Lot => ({
   id: '',
@@ -105,16 +104,9 @@ export function Lots({ embedded = false }: { embedded?: boolean } = {}) {
     return m
   }, [dailyQuery.data])
 
-  // [R170] AI 操盘手模拟盘的持仓对照。只拿聚合计数; 拿不到也只是少个小标,
-  // 所以给长 staleTime 且失败不重试 —— 不值得为一个装饰性标记反复打接口。
-  const overlapQuery = useQuery({
-    queryKey: QK.paperOverlap,
-    queryFn: () => api.paperHoldingsOverlap(),
-    staleTime: 5 * 60_000,
-    retry: false,
-  })
-  const overlap = overlapQuery.data?.overlap ?? {}
-  const traderTotal = overlapQuery.data?.trader_count ?? 0
+  // [R327] R170 那个「几个 AI 操作员也在拿这只」的对照标记删掉了 —— AI 操盘手
+  // 整个换成了转折模拟盘, 那个计数没有来源了。顺带让这一页更接近上游原样,
+  // 以后同步上游在批次这一块的冲突面更小。
 
   const del = useMutation({
     mutationFn: api.lotDelete,
@@ -212,7 +204,6 @@ export function Lots({ embedded = false }: { embedded?: boolean } = {}) {
                             <span className="font-mono font-medium text-foreground">{lot.symbol}</span>
                             {(() => { const b = boardTag(lot.symbol); return b && <span className={`inline-flex items-center justify-center rounded px-1 text-[9px] font-bold leading-tight border ${b.color}`}>{b.label}</span> })()}
                             {symbolNames[lot.symbol] && <span className="text-secondary truncate max-w-28">{symbolNames[lot.symbol]}</span>}
-                            <AiHoldMark count={overlap[lot.symbol.toUpperCase()] ?? 0} traderTotal={traderTotal} />
                           </button>
                         </td>
                         <td className="px-2 py-2.5 text-right font-mono text-secondary">{lot.qty}</td>
