@@ -99,6 +99,10 @@ _EXPECTED_ROUTERS = (
     "lots.router",
     "alerts.router",
     "rps.router",
+    # [R326] 上游 v0.2.4 新增: 盘中板块轮动监控。**这条守卫正是这么用的** ——
+    # 同步上游时它当场报出「新增: ['sector_rotation.router']」, 确认是作者有意
+    # 新增的功能之后才登记进来。
+    "sector_rotation.router",
 )
 
 

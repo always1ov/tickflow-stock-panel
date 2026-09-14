@@ -221,6 +221,13 @@ def test_pro_tier_keeps_tickflow_minute_fallback(monkeypatch):
 
 
 def test_free_tier_skips_tickflow_index_minute_fallback(monkeypatch):
+    """[R326] 过去日期: 上游 0aa5f57c 起在碰数据源之前就快速失败。
+
+    这条守卫立的是「免费档不许去调 TickFlow」, 上游那次改动让它成立得更彻底
+    (连数据源都不碰了), 所以立论保留, 只把 source 的期望改成上游新的语义。
+    **但它从此不再覆盖原来那条路径了** —— 真正要守的"取数时不打 TickFlow"
+    由下面那条当日用例接手, 否则这条守卫会被上游的快速失败悄悄架空。
+    """
     get_client = MagicMock(side_effect=AssertionError("must not call TickFlow"))
     monkeypatch.setattr("app.services.preferences.get_minute_data_provider", lambda: "tickflow")
     monkeypatch.setattr("app.services.kline_sync.get_client", get_client)
@@ -231,5 +238,27 @@ def test_free_tier_skips_tickflow_index_minute_fallback(monkeypatch):
     )
 
     assert response.status_code == 200
-    assert response.json()["source"] == "none"
+    assert response.json()["source"] == "not_today", "非当日应在碰数据源之前就返回"
+    get_client.assert_not_called()
+
+
+def test_R326_free_tier_skips_tickflow_index_minute_on_today(monkeypatch):
+    """当日路径同样不许打 TickFlow —— 这才是上面那条原本守的那段。
+
+    上游给当日结果加了 10s 进程内缓存, 所以每次都得先清一次: 不清的话第二个
+    用例可能直接吃到上一个用例的缓存, **数据源一次都不被调用也照样绿**,
+    守卫就成了摆设。
+    """
+    indices._index_minute_cache.clear()
+    get_client = MagicMock(side_effect=AssertionError("must not call TickFlow"))
+    monkeypatch.setattr("app.services.preferences.get_minute_data_provider", lambda: "tickflow")
+    monkeypatch.setattr("app.services.kline_sync.get_client", get_client)
+
+    response = _client(_IndexRepo()).get(
+        "/api/index/minute",
+        params={"symbol": "000001.SH", "date": str(date.today())},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["source"] == "none", "当日没有能力也没有数据源时是 none"
     get_client.assert_not_called()

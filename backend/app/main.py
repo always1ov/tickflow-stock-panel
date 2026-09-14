@@ -43,6 +43,7 @@ from app.api import (
     regime,
     rps,
     screener,
+    sector_rotation,
     signals,
     stock_analysis,
     strategy,
@@ -736,6 +737,9 @@ def _register_routers(app: FastAPI) -> None:
     app.include_router(lots.router)
     app.include_router(alerts.router)
     app.include_router(rps.router)
+    # [R326 同步上游] v0.2.4 新增: 盘中板块轮动监控。上游那版是**裸调用**,
+    # 这里跟着 R318 的规矩进函数体 —— 路由注册只此一处, 不再有第二个注册点。
+    app.include_router(sector_rotation.router)
 
 
 _register_routers(app)

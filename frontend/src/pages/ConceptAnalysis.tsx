@@ -21,6 +21,7 @@ import { storage } from '@/lib/storage'
 import { fmtBigNum, fmtPct, priceColorClass } from '@/lib/format'
 import { cn } from '@/lib/cn'
 import { resolveDimension, type DimensionGroup, type StockRow } from '@/lib/analysis-adapter'
+import { SectorRotationCard } from '@/components/SectorRotationCard'
 
 const KEYWORDS = ['concept', '概念', 'theme', '题材', '板块']
 const CANDIDATE_FIELDS = ['concept', '概念', 'theme', '题材', '板块', 'concept_name', '概念名称']
@@ -383,6 +384,12 @@ export function ConceptAnalysis() {
       {/* [R60] 统一版式: 留白 px-3/lg:px-4、区块间距 12px, 与全站一致 */}
       <div className="min-h-full bg-[radial-gradient(circle_at_12%_0%,rgba(59,130,246,0.12),transparent_28%),radial-gradient(circle_at_85%_8%,rgba(244,63,94,0.08),transparent_28%)] px-3 pb-4 pt-3 lg:px-4">
         <div className="mx-auto w-full max-w-[1440px] space-y-3">
+          {/* [R326 同步上游] v0.2.4 新增的盘中板块轮动卡。上游随它一起把
+              这一页的留白改成了 px-6 py-5 / space-y-5 —— **版式那半不取**:
+              R60 把全站统一到了 px-3/lg:px-4 + space-y-3, 只改这两页会让它们
+              比别处宽出一圈。取卡片, 不取版式。 */}
+          <SectorRotationCard kind="concept" />
+
           <HeroPanel leading={leading[0]} falling={falling[0]} activeConcept={activeConcept} conceptBreadth={conceptBreadth} />
 
           <MarketPulse
