@@ -1464,8 +1464,11 @@ def update_dingtalk_webhook(req: DingtalkWebhookPrefsIn) -> dict:
     return {"dingtalk_webhook_url": saved_url, "dingtalk_keyword": saved_keyword}
 
 
-class WebhookTestIn(BaseModel):
-    channel: Literal["feishu", "wecom", "dingtalk"]   # [fork] dingtalk 是 fork 渠道
+# [R334] 这里原来还有一个**同名的** `WebhookTestIn`(fork 那版, 带 dingtalk 不带
+# custom/email)。它被下面 1500 多行处上游那个同名类整个遮蔽 —— Python 用后定义的,
+# 于是 fork 的 dingtalk 悄悄失效, 而**两个定义都还在文件里, 什么都不报错**。
+# 这就是「钉钉点测试报 422」的真正根因; 合并时两边各留一个类, 谁也没发现。
+# 现在只留下面那一个(已补全五个渠道), 并有守卫钉住本文件不许再出现同名类。
 class CustomWebhookPrefsIn(BaseModel):
     url: str
     # None preserves the stored secret; an explicit empty string clears it.
@@ -1547,7 +1550,15 @@ def update_email_smtp(req: EmailSmtpPrefsIn) -> dict:
 
 
 class WebhookTestIn(BaseModel):
-    channel: Literal["feishu", "wecom", "custom", "email"]
+    # [R334] **dingtalk 曾经在这里掉过一次。** 上游 5289cde1 加 custom/email 时
+    # 把这一行整行换掉, fork 的 dingtalk 跟着没了 —— 而下面的函数体里那段
+    # `elif req.channel == "dingtalk"` 还在, 于是它成了**永远执行不到的死代码**:
+    # pydantic 在进函数之前就把请求拒了, 用户点「测试」只看到一句英文校验错误。
+    #
+    # `Literal` 要的是静态字面量, 没法直接摊开 `PUSH_CHANNELS` 那个集合, 所以这里
+    # 只能手写一份 —— 但有守卫钉住它与 `preferences.PUSH_CHANNELS` 逐值相同,
+    # 下次再加渠道时漏改这里会当场红。
+    channel: Literal["feishu", "wecom", "dingtalk", "custom", "email"]
 
 
 @router.post("/preferences/webhook-test")
@@ -1700,7 +1711,7 @@ def update_webhook_enabled_default(req: WebhookEnabledDefaultIn) -> dict:
 
 
 class WebhookDefaultChannelsIn(BaseModel):
-    channels: list[str]  # 多选: feishu / wecom / custom / email; 空数组=不推送
+    channels: list[str]  # 多选, 合法值见 preferences.PUSH_CHANNELS; 空数组=不推送
 
 
 @router.put("/preferences/webhook-default-channels")
@@ -2264,7 +2275,7 @@ def update_signal_ai_schedule(req: SignalAiScheduleIn, request: Request) -> dict
 
 
 class ReviewPushIn(BaseModel):
-    channels: list[str]  # 多选: feishu / wecom / custom / email; 空数组=不推送
+    channels: list[str]  # 多选, 合法值见 preferences.PUSH_CHANNELS; 空数组=不推送
     mode: str | None = None  # 可选: auto=归档即推 / manual=仅显式 push; 不传则不变
 
 

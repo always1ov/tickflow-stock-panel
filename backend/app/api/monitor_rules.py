@@ -10,6 +10,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
+from app.services import preferences
 from app.strategy import monitor_rules
 from app.strategy.intraday_signals import INTRADAY_SIGNAL_LABELS, uses_intraday_signals
 
@@ -103,7 +104,7 @@ class RuleModel(BaseModel):
     severity: str = "info"    # info | warn | critical
     webhook_url: str = ""     # Webhook 推送地址 (推送到 QMT 等外部软件, 待定)
     webhook_enabled: bool = False  # 兼容老规则 (已由 webhook_channels 取代, 仅做向后兼容读)
-    webhook_channels: list[str] = []  # 合法值: feishu | wecom | custom | email
+    webhook_channels: list[str] = []  # 合法值见 preferences.PUSH_CHANNELS
     message: str = ""
     # abnormal 专属 (异动边缘监控): any | 3d | 10d | 30d
     abnormal_window: str = "any"
@@ -352,7 +353,12 @@ def save_rule(req: RuleModel, request: Request):
 
 
 # ── 批量设置推送渠道 ────────────────────────────────────
-_VALID_CHANNELS = {"feishu", "wecom", "dingtalk"}
+# [R334] 原来这里自己写了一份 `{"feishu", "wecom", "dingtalk"}` —— **漏掉了上游
+# 后加的 custom 与 email**, 于是前端明明提供这两个渠道, 批量设置时会被静静滤掉
+# (下面那行是 `if c in _VALID_CHANNELS`, 不匹配的直接丢, 不报错也不提示)。
+# 与测试按钮那处掉 dingtalk 是同一个病的两面: 渠道清单散在五个地方各自维护。
+# 改成引用那份权威集合, 这里就不会再漏。
+_VALID_CHANNELS = preferences.PUSH_CHANNELS
 
 
 class BatchChannelsIn(BaseModel):
