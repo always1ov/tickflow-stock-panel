@@ -41,6 +41,7 @@ import { refreshEvery, rhythmHint } from '@/lib/refreshRhythm'
 import { useTodayOverview } from '@/lib/useSharedQueries'      // [R342] 把握分(只排序)
 import { TodayHealthBar } from '@/components/today/TodayHealthBar'   // [R343] 数据自检条
 import { ScoreCell } from '@/components/today/ScoreCell'             // [R345] 名次那一格
+import { TodayControls } from '@/components/today/TodayControls'     // [R347] 门槛/体检/筛选
 import { toast } from '@/components/Toast'
 
 /** [R343] 姿态四档的配色 —— 与今日总览那张卡同一套语义, 不另立一份说法。 */
@@ -264,6 +265,13 @@ export function FlipPaper() {
             {shownBrief}
           </p>
         )}
+
+        {/* [R347] 门槛 / 体检 / 板块筛选 —— 与今日总览共用那一份实现。用户:
+            「门槛的东西非常重要, 体检和筛选功能也要能保留」。
+            **它只作用于打分那一层**: 板块过滤改的是哪些票拿得到名次, 门槛改的是
+            谁进候选池 —— 也就是只影响本页信号的**先后与标注**, 不影响谁在名单上
+            (名单只由六态选, R344), 更不影响谁能出手。守卫钉着这条。 */}
+        {ov && <TodayControls d={ov} refetch={() => today.refetch()} isFetching={today.isFetching} />}
 
         {q.isLoading && <LoadingSkeleton />}
         {q.isError && (

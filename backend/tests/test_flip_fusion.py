@@ -223,3 +223,68 @@ def test_R345_打分那份数据整条存着_不再只留几个字段():
     code = code_of(FLIP)
     assert "new Map<string, TodayOpportunity>()" in code
     assert "m.set(o.symbol, o)" in code, "存整条, 不再挑字段"
+
+
+# ── [R347] 门槛 / 体检 / 板块筛选 ───────────────────────────────────────
+#
+# 用户: 「门槛的东西非常重要, 体检和筛选功能也要能保留」。
+
+
+CTRL = "components/today/TodayControls.tsx"
+
+
+def test_R347_三样东西一处实现_两页共用():
+    """近 260 行的一组控件, **手抄一遍必漂** —— 板块过滤的乐观值、门槛的分位口径、
+    AI 定时那两个开关的文案, 任何一处改了另一处不改, 表现就是「两个页面对同一个
+    设置说法不一样」, 而两边都不报错。"""
+    ctrl = code_of(CTRL)
+    assert "export function TodayControls" in ctrl
+    for page in (FLIP, TODAY):
+        code = code_of(page)
+        assert "<TodayControls d=" in code, f"{page} 没挂上这组控件"
+        assert "from '@/components/today/TodayControls'" in code
+    # 两页都不许再自己写一份
+    for page in (FLIP, TODAY):
+        code = code_of(page)
+        assert "TODAY_BOARDS" not in code, f"{page} 自己又写了一份板块筛选"
+        assert "ScoreLedgerDialog" not in code, f"{page} 自己又挂了一份体检弹窗"
+
+
+def test_R347_三样都在():
+    """门槛、体检、板块筛选 —— 少一样这次改动就没做完。"""
+    ctrl = code_of(CTRL)
+    assert "TODAY_BOARDS.map" in ctrl, "板块筛选没了"
+    assert "<ScoreLedgerDialog" in ctrl, "体检弹窗没了"
+    # **锚在真正干活的那一处, 不是标识符**: `min_hist_pct` 在这文件里出现七次
+    # (toast 文案、显示值、比较……), 拿它当锚等于没有锚 —— 变异把滑块改坏照样绿。
+    # 这是这个仓库第四次栽在"锚太宽"上(R310/R333/R345)。
+    assert 'type="range" min={0} max={90} step={5}' in ctrl, "门槛那个滑块没了"
+    assert "prefsMut.mutate({ min_hist_pct: minPct })" in ctrl, "滑块松手不落库"
+    # [R133] 门槛旁边就是体检 —— 这个相邻关系是设计的一部分, 不是排版巧合。
+    # 按两个按钮各自的图标定位: 文案「体检」也出现在 title 里, 拿它排序会误判。
+    assert ctrl.index("<BarChart3") < ctrl.index("<SlidersHorizontal"), \
+        "体检(BarChart3)必须排在门槛(SlidersHorizontal)前面"
+
+
+def test_R347_板块过滤在后端做():
+    """前端筛的话会漏掉被 max_show 截掉的票 —— 你看到的"主板机会"是残缺的,
+    **而你不会知道**。"""
+    ctrl = code_of(CTRL)
+    assert "prefsMut.mutate({ boards: next })" in ctrl, "板块必须落库让后端筛"
+    assert "boardFilter.filter" in ctrl, "多选的加减逻辑没了"
+    # 乐观值这一层有三处才完整: 声明 / 点下去立刻亮 / 落库或失败后撤回。
+    # 只断言标识符存在的话, 删掉"立刻亮"那一处照样绿 —— 而那正是它存在的理由
+    # (不亮就看起来像"点了没反应", 用户会重复点)。
+    assert "setBoardDraft(next)" in ctrl, "点下去没有立刻亮 —— 乐观值这层白加了"
+    assert ctrl.count("setBoardDraft(null)") >= 2, "落库成功与失败两条路都要撤回乐观值"
+
+
+def test_R347_控件只作用于打分层_不碰六态名单():
+    """**界线。** 门槛/筛选改的是谁拿得到名次, 不是谁在名单上。"""
+    code = code_of(FLIP)
+    # 名单仍然只来自后端那份六态信号
+    assert "<TodaySignals rows={d.today ?? []}" in code
+    # 控件吃的是今日总览那份数据, 与模拟盘主查询无关
+    assert "<TodayControls d={ov}" in code, "控件必须挂在今日总览那份数据上"
+    blk = code[code.index("const q = useQuery({"):code.index("const rules = useQuery({")]
+    assert "prefs" not in blk and "boards" not in blk, "模拟盘主查询不该沾这些偏好"

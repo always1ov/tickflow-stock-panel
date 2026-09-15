@@ -21,21 +21,13 @@
  * 数据全部来自既有模块,零新计算;AI 导读可选(手动点击,一次调用)。
  */
 import { useState } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import {
-  BarChart3, Download, Loader2, RefreshCw,
-  SlidersHorizontal, Sparkles, Sunrise, Target,
-} from 'lucide-react'
-import {
-  api, TODAY_BOARDS, type SignalAiSchedule, type TodayAiSchedule,
-  type TodayPick, type TodayPrefs,
-} from '@/lib/api'
+import { Download, Loader2, RefreshCw, Sparkles, Sunrise, Target } from 'lucide-react'
+import { api, type TodayPick } from '@/lib/api'
 import { toast } from '@/components/Toast'
 import { PageShell } from '@/components/PageShell'
-import { ScoreLedgerDialog } from '@/components/ScoreLedgerDialog'
 import { QK } from '@/lib/queryKeys'
-import { cn } from '@/lib/cn'
 // [R167] 以下五块从本文件拆出 —— 拆前 1922 行, 一个文件装下了导出、表格、面板、
 // 弹窗和页面本体。缝按"对外暴露什么"划: 每个模块只导出 1~2 个组件, 其余是内部实现。
 import { buildTodayHtml } from '@/lib/todayHtmlExport'
@@ -45,6 +37,7 @@ import { MarketStatusCard } from '@/components/today/MarketStatusCard'
 import { TodaySkeleton } from '@/components/today/TodaySkeleton'   // [R324] 首次加载骨架
 import { AiAskDialog } from '@/components/today/AiAskDialog'
 import { TodayHealthBar } from '@/components/today/TodayHealthBar'   // [R341] 拆出去了, 模拟盘也用
+import { TodayControls } from '@/components/today/TodayControls'     // [R347] 门槛/体检/筛选
 import { useTodayOverview } from '@/lib/useSharedQueries'            // [R342] 节奏一处定义
 
 
@@ -96,73 +89,9 @@ export function Today() {
       toast(`AI 分析失败: ${e.message}`, 'error')
     },
   })
-  // [R27] AI 定时配置(门槛面板内)
-  const todayAiSched = useQuery({
-    queryKey: QK.todayAiSchedule,
-    queryFn: () => api.todayAiScheduleGet(),
-    staleTime: 5 * 60_000,
-  })
-  const signalAiSched = useQuery({
-    queryKey: QK.signalAiSchedule,
-    queryFn: () => api.signalAiScheduleGet(),
-    staleTime: 5 * 60_000,
-  })
-  const todayAiSchedMut = useMutation({
-    mutationFn: (body: TodayAiSchedule) => api.todayAiScheduleSet(body),
-    onSuccess: (r) => {
-      todayAiSched.refetch()
-      toast(r.enabled
-        ? `定时导读·优选已开启:工作日 ${String(r.hour).padStart(2, '0')}:${String(r.minute).padStart(2, '0')}`
-        : '定时导读·优选已关闭', 'success')
-    },
-    onError: (e: Error) => toast(e.message, 'error'),
-  })
-  const signalAiSchedMut = useMutation({
-    mutationFn: (body: SignalAiSchedule) => api.signalAiScheduleSet(body),
-    onSuccess: (r) => {
-      signalAiSched.refetch()
-      toast(r.enabled
-        ? `定时个股信号已开启:工作日 ${String(r.hour).padStart(2, '0')}:${String(r.minute).padStart(2, '0')} · ${r.scope === 'held' ? '只跑持有' : '全部自选'} · 间隔 ${r.gap_seconds}秒`
-        : '定时个股信号已关闭', 'success')
-    },
-    onError: (e: Error) => toast(e.message, 'error'),
-  })
-
-  const [prefsOpen, setPrefsOpen] = useState(false)
-  const [ledgerOpen, setLedgerOpen] = useState(false)   // [R133] 把握分体检弹窗
   // [R147] AI 分析前的补充说明弹窗。lastNote 只为"重试"沿用上一次问的话
   const [askOpen, setAskOpen] = useState(false)
   const [lastNote, setLastNote] = useState('')
-  // 滑块拖动中的即时值(null = 用服务端返回的偏好); 松手才落库
-  const [minPct, setMinPct] = useState<number | null>(null)
-  // [R140] 板块过滤的**乐观值**。null = 用服务端偏好。
-  //
-  // 原来按钮亮不亮完全取决于 `d.prefs.boards`, 而那要等一次 PUT + 一次 GET
-  // 回来才更新 —— 中间那段时间按钮纹丝不动, 看起来就是"点了没反应", 于是
-  // 用户会再点一次(第二次读到的还是旧的 boardFilter, 于是又发了一遍同样的
-  // 请求, 屏幕上叠出两个一样的 toast)。先本地亮起来, 服务端回来再对齐。
-  const [boardDraft, setBoardDraft] = useState<string[] | null>(null)
-  const prefsMut = useMutation({
-    mutationFn: (body: Partial<TodayPrefs>) => api.todaySavePrefs(body),
-    onSuccess: async (p, vars) => {
-      toast(
-        'boards' in vars
-          ? (p.boards.length ? `只看:${p.boards.join('、')}` : '板块过滤已取消,全部板块都看')
-          : `门槛已保存:只看历史前 ${100 - p.min_hist_pct}%,最多 ${p.max_show} 条`,
-        'success')
-      setMinPct(null)
-      setPicks(null)  // 候选集变了, 旧的 AI 优选结果不再对应
-      // 等这次重取真的落地再撤掉乐观值 —— 提前撤会让按钮闪回旧状态
-      await q.refetch()
-      setBoardDraft(null)
-    },
-    onError: (e: Error) => {
-      toast(`保存失败: ${e.message}`, 'error')
-      setMinPct(null)
-      setBoardDraft(null)   // 存失败就退回服务端的真实值, 不留一个假的高亮
-    },
-  })
-
   // [R19] 确定性刷新: 先全量拉一遍自选实时(轮转覆盖到每一只), 再刷新总览
   const refreshMut = useMutation({
     mutationFn: async () => {
@@ -195,13 +124,17 @@ export function Today() {
   const shownPicks = picks ?? aiCache?.picks ?? null
   // [R40] 板块过滤当前值。空 = 全看; 由服务端偏好驱动, 刷新/换设备都保持。
   // [R140] 落库期间用乐观值, 否则按钮要等一次往返才亮 —— 看起来像点了没反应。
-  const boardFilter = boardDraft ?? d?.prefs?.boards ?? []
-  /** 切换某个板块(传 null = 全部)。本地先切, 再落库。 */
-  const toggleBoard = (b: string | null) => {
-    const next = b === null ? []
-      : boardFilter.includes(b) ? boardFilter.filter(x => x !== b) : [...boardFilter, b]
-    setBoardDraft(next)
-    prefsMut.mutate({ boards: next })
+  // [R347] 板块过滤的**写**已经归 `TodayControls`(与模拟盘共用那一份)。
+  // 这一页只剩两处**读**: 状态行里那句「只看 X」, 与机会区空掉时那个「去掉过滤」。
+  // 后者直接打一次接口再重取 —— 不为一个按钮把整套乐观值逻辑再抄一遍回来。
+  const boardFilter = d?.prefs?.boards ?? []
+  const clearBoards = async () => {
+    try {
+      await api.todaySavePrefs({ boards: [] })
+      await q.refetch()
+    } catch (e) {
+      toast(`保存失败: ${(e as Error).message}`, 'error')
+    }
   }
   const shownAnalyzed = picks ? analyzed : (aiCache?.analyzed ?? 0)
   // 本次会话问过就用本次的, 否则用缓存里存的那句
@@ -351,6 +284,9 @@ export function Today() {
           {/* [R142] 市场状态 —— 原「市场天气」+「中观」合并。见组件上方注释 */}
           <MarketStatusCard d={d} meso={meso} mainline={mainline} />
 
+          {/* [R347] 门槛 / 体检 / 板块筛选 —— 一处实现, 与模拟盘共用 */}
+          <TodayControls d={d} refetch={() => q.refetch()} isFetching={q.isFetching} />
+
           {/* ② 机会区(已按把握分筛选排序; AI 优选可再精选) */}
           <section className="rounded-lg border border-border/60 bg-surface/40 overflow-hidden">
             <div className="flex flex-wrap items-center gap-2 border-b border-border/40 px-4 py-2.5">
@@ -396,266 +332,9 @@ export function Today() {
                   </span>
                 )}
               </span>
-              {/* [R40] 板块筛选。过滤在后端做 —— 前端筛的话会漏掉被 max_show 截掉的票,
-                  看到的"主板机会"是残缺的而你不会知道 */}
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => toggleBoard(null)}
-                  disabled={prefsMut.isPending}
-                  title="不过滤, 所有板块都看"
-                  className={`rounded-btn border px-2 py-0.5 text-[10px] transition-colors cursor-pointer disabled:opacity-50 ${
-                    boardFilter.length === 0
-                      ? 'border-sky-400/40 bg-sky-400/15 text-sky-300'
-                      : 'border-border bg-base text-muted hover:text-foreground'
-                  }`}
-                >
-                  全部
-                </button>
-                {/* [R140] 正在落库/重取时给个明确的进行态。/api/today 要跑
-                    Keltner 批量、MA120 批量、几十只的历史胜率, 一次好几秒 ——
-                    没有这个提示, 那几秒就是"点了没反应", 用户会重复点。 */}
-                {TODAY_BOARDS.map((b) => {
-                  const on = boardFilter.includes(b)
-                  return (
-                    <button
-                      key={b}
-                      onClick={() => toggleBoard(b)}
-                      disabled={prefsMut.isPending}
-                      title={`${on ? '取消' : '只看'}${b}(可多选)`}
-                      className={`rounded-btn border px-2 py-0.5 text-[10px] transition-colors cursor-pointer disabled:opacity-50 ${
-                        on
-                          ? 'border-sky-400/40 bg-sky-400/15 text-sky-300'
-                          : 'border-border bg-base text-muted hover:text-foreground'
-                      }`}
-                    >
-                      {b}
-                    </button>
-                  )
-                })}
-                {(prefsMut.isPending || (boardDraft !== null && q.isFetching)) && (
-                  <span className="inline-flex items-center gap-1 pl-1 text-[10px] text-muted">
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                    筛选中
-                  </span>
-                )}
-              </div>
-              <div className="ml-auto flex items-center gap-2">
-                {/* [R133] 门槛旁边就是体检 —— 调门槛前先看"这个门槛值不值",
-                    两个按钮挨着放, 才不会出现凭感觉拧滑块的情况 */}
-                <button
-                  onClick={() => setLedgerOpen(true)}
-                  title="把握分体检: 完整候选池的分层胜率/名次段/因子归因, 并可一键导出给外部做调参"
-                  className="inline-flex items-center gap-1 rounded-btn border border-border bg-base px-2.5 py-1 text-[10px] text-muted transition-colors cursor-pointer hover:text-foreground"
-                >
-                  <BarChart3 className="h-3 w-3" />
-                  体检
-                </button>
-                <button
-                  onClick={() => setPrefsOpen((v) => !v)}
-                  title="调整显示门槛(把握分下限与最多显示条数)"
-                  className={`inline-flex items-center gap-1 rounded-btn border px-2.5 py-1 text-[10px] transition-colors cursor-pointer ${
-                    prefsOpen ? 'border-sky-400/40 bg-sky-400/15 text-sky-300'
-                      : 'border-border bg-base text-muted hover:text-foreground'
-                  }`}
-                >
-                  <SlidersHorizontal className="h-3 w-3" />
-                  门槛
-                </button>
-              </div>
+              {/* [R347] 板块筛选 / 体检 / 门槛整组抽成 `TodayControls` —— 模拟盘也要用,
+                  手抄一遍必漂。见那个文件顶部说明。 */}
             </div>
-            {prefsOpen && (
-              <div className="flex flex-wrap items-center gap-x-5 gap-y-3 border-b border-border/40 bg-base/40 px-4 py-3">
-                {/* [R220] 门槛的单位从绝对把握分换成了历史分位。
-                    绝对分那个旋钮几乎没有作用(实测 60 分只挡掉约 1.6% 的候选),
-                    因为分数被"平均"挤在中间一段;分位天然均匀,拖到哪儿都真的在挡人。
-                    台账没攒够时**禁用并说明**,而不是让人拖一个没反应的旋钮。 */}
-                <label className={cn('flex items-center gap-2 text-[11px] text-muted',
-                                     !d.hist_pct_ready && 'opacity-60')}>
-                  <span className="whitespace-nowrap">入选门槛</span>
-                  <input
-                    type="range" min={0} max={90} step={5}
-                    disabled={!d.hist_pct_ready}
-                    value={minPct ?? d.prefs.min_hist_pct}
-                    onChange={(e) => setMinPct(Number(e.target.value))}
-                    onPointerUp={() => {
-                      if (minPct != null && minPct !== d.prefs.min_hist_pct) prefsMut.mutate({ min_hist_pct: minPct })
-                    }}
-                    className="w-36 accent-sky-400 cursor-pointer disabled:cursor-not-allowed"
-                  />
-                  <span className="w-24 whitespace-nowrap font-mono text-foreground">
-                    {(minPct ?? d.prefs.min_hist_pct) > 0
-                      ? `历史前 ${100 - (minPct ?? d.prefs.min_hist_pct)}%`
-                      : '不过滤'}
-                  </span>
-                  {!d.hist_pct_ready && (
-                    <span className="text-[10px] text-amber-300/80"
-                          title="分位要跟历史比才算得出来。台账攒够约一个月的记录(400 条)之后这个门槛自动开始起作用 —— 在那之前它谁也不挡, 而不是偷偷把页面挡空。">
-                      台账还没攒够,暂不起作用
-                    </span>
-                  )}
-                </label>
-                <label className="flex items-center gap-2 text-[11px] text-muted">
-                  <span className="whitespace-nowrap">最多显示</span>
-                  <input
-                    type="number" min={1} max={50}
-                    defaultValue={d.prefs.max_show}
-                    onBlur={(e) => {
-                      const v = Number(e.target.value)
-                      if (v && v !== d.prefs.max_show) prefsMut.mutate({ max_show: v })
-                    }}
-                    className="w-14 rounded border border-border bg-surface px-2 py-1 font-mono text-foreground outline-none focus:border-sky-400/50"
-                  />
-                  <span>条</span>
-                </label>
-                <label className="flex items-center gap-2 text-[11px] text-muted" title="单只票最多占总资金的比例;建议仓位 = 上限 × 把握分系数 × 波动率压缩">
-                  <span className="whitespace-nowrap">单票上限</span>
-                  <input
-                    type="number" min={5} max={100} step={5}
-                    defaultValue={d.prefs.max_single}
-                    onBlur={(e) => {
-                      const v = Number(e.target.value)
-                      if (v && v !== d.prefs.max_single) prefsMut.mutate({ max_single: v })
-                    }}
-                    className="w-14 rounded border border-border bg-surface px-2 py-1 font-mono text-foreground outline-none focus:border-sky-400/50"
-                  />
-                  <span>%</span>
-                </label>
-                <label className="flex items-center gap-2 text-[11px] text-muted" title="能接受的单日波动;票的日波幅(ATR/价)超过它时按比例压低建议仓位,只压不加">
-                  <span className="whitespace-nowrap">目标日波动</span>
-                  <input
-                    type="number" min={1} max={10}
-                    defaultValue={d.prefs.target_vol}
-                    onBlur={(e) => {
-                      const v = Number(e.target.value)
-                      if (v && v !== d.prefs.target_vol) prefsMut.mutate({ target_vol: v })
-                    }}
-                    className="w-14 rounded border border-border bg-surface px-2 py-1 font-mono text-foreground outline-none focus:border-sky-400/50"
-                  />
-                  <span>%</span>
-                </label>
-                {/* [R340] 「回撤纪律线」这个输入框跟着一起撤了。它**只喂一个消费者**
-                    —— `api/today.py` 里那条 `portfolio_drawdown` 提醒, 而那条提醒
-                    只出现在刚被删掉的「需要行动」区。留着就是一个调了不产生任何
-                    可见结果的旋钮, 比没有更坏。
-                    后端 `today_prefs` 的字段没动: 要把那一区加回来, 它原样还在。 */}
-                <label className="flex items-center gap-2 text-[11px] text-muted" title="建仓路径第一步: 试仓占目标仓位的比例(买'对不对')">
-                  <span className="whitespace-nowrap">试仓</span>
-                  <input
-                    type="number" min={10} max={60} step={5}
-                    defaultValue={d.prefs.pyramid_probe}
-                    onBlur={(e) => {
-                      const v = Number(e.target.value)
-                      if (v && v !== d.prefs.pyramid_probe) prefsMut.mutate({ pyramid_probe: v })
-                    }}
-                    className="w-14 rounded border border-border bg-surface px-2 py-1 font-mono text-foreground outline-none focus:border-sky-400/50"
-                  />
-                  <span>%</span>
-                </label>
-                <label className="flex items-center gap-2 text-[11px] text-muted" title="建仓路径第二步: 站稳关键点 N 日后加至目标仓位的比例(买'稳不稳'), 第三步回踩不破上满">
-                  <span className="whitespace-nowrap">确认加至</span>
-                  <input
-                    type="number" min={40} max={90} step={5}
-                    defaultValue={d.prefs.pyramid_confirm}
-                    onBlur={(e) => {
-                      const v = Number(e.target.value)
-                      if (v && v !== d.prefs.pyramid_confirm) prefsMut.mutate({ pyramid_confirm: v })
-                    }}
-                    className="w-14 rounded border border-border bg-surface px-2 py-1 font-mono text-foreground outline-none focus:border-sky-400/50"
-                  />
-                  <span>%</span>
-                </label>
-                <label className="flex items-center gap-2 text-[11px] text-muted" title="'站稳'的定义: 收盘连续 N 日守住关键点才执行加仓">
-                  <span className="whitespace-nowrap">站稳</span>
-                  <input
-                    type="number" min={1} max={5}
-                    defaultValue={d.prefs.pyramid_days}
-                    onBlur={(e) => {
-                      const v = Number(e.target.value)
-                      if (v && v !== d.prefs.pyramid_days) prefsMut.mutate({ pyramid_days: v })
-                    }}
-                    className="w-14 rounded border border-border bg-surface px-2 py-1 font-mono text-foreground outline-none focus:border-sky-400/50"
-                  />
-                  <span>日</span>
-                </label>
-                <span className="text-[10px] text-muted/70">
-                  把握分调高更严格;单票上限与目标日波动决定「建议仓位」;试仓/确认加至/站稳决定「建仓路径」。卖出提醒不受任何门槛影响。
-                </span>
-                {/* [R27] AI 定时自动运行 */}
-                <div className="flex w-full flex-wrap items-center gap-x-5 gap-y-2 border-t border-border/40 pt-3">
-                  <label className="flex items-center gap-2 text-[11px] text-muted" title="工作日到点自动生成导读·优选并存下来, 次日进页面直接看结果">
-                    <input
-                      type="checkbox"
-                      checked={todayAiSched.data?.enabled ?? false}
-                      onChange={(e) => todayAiSchedMut.mutate({
-                        enabled: e.target.checked,
-                        hour: todayAiSched.data?.hour ?? 18,
-                        minute: todayAiSched.data?.minute ?? 30,
-                      })}
-                      className="h-3.5 w-3.5 accent-violet-500"
-                    />
-                    <span className="whitespace-nowrap">定时导读·优选</span>
-                    <input
-                      type="time"
-                      value={`${String(todayAiSched.data?.hour ?? 18).padStart(2, '0')}:${String(todayAiSched.data?.minute ?? 30).padStart(2, '0')}`}
-                      onChange={(e) => {
-                        const [h, m] = e.target.value.split(':').map(Number)
-                        if (!Number.isNaN(h)) todayAiSchedMut.mutate({
-                          enabled: todayAiSched.data?.enabled ?? false, hour: h, minute: m,
-                        })
-                      }}
-                      className="rounded border border-border bg-surface px-1.5 py-0.5 font-mono text-foreground outline-none focus:border-violet-400/50"
-                    />
-                  </label>
-                  <label className="flex items-center gap-2 text-[11px] text-muted" title="工作日到点批量刷新个股 AI 信号; 每只之间留间隔, 不会打满接口">
-                    <input
-                      type="checkbox"
-                      checked={signalAiSched.data?.enabled ?? false}
-                      onChange={(e) => signalAiSchedMut.mutate({
-                        ...(signalAiSched.data ?? { hour: 19, minute: 0, scope: 'held' as const, gap_seconds: 20 }),
-                        enabled: e.target.checked,
-                      })}
-                      className="h-3.5 w-3.5 accent-violet-500"
-                    />
-                    <span className="whitespace-nowrap">定时个股信号</span>
-                    <input
-                      type="time"
-                      value={`${String(signalAiSched.data?.hour ?? 19).padStart(2, '0')}:${String(signalAiSched.data?.minute ?? 0).padStart(2, '0')}`}
-                      onChange={(e) => {
-                        const [h, m] = e.target.value.split(':').map(Number)
-                        if (!Number.isNaN(h) && signalAiSched.data) {
-                          signalAiSchedMut.mutate({ ...signalAiSched.data, hour: h, minute: m })
-                        }
-                      }}
-                      className="rounded border border-border bg-surface px-1.5 py-0.5 font-mono text-foreground outline-none focus:border-violet-400/50"
-                    />
-                    <select
-                      value={signalAiSched.data?.scope ?? 'held'}
-                      onChange={(e) => signalAiSched.data && signalAiSchedMut.mutate({
-                        ...signalAiSched.data, scope: e.target.value as 'held' | 'watchlist',
-                      })}
-                      className="rounded border border-border bg-surface px-1.5 py-0.5 text-foreground outline-none focus:border-violet-400/50"
-                    >
-                      <option value="held">只跑持有</option>
-                      <option value="watchlist">全部自选</option>
-                    </select>
-                    <span className="whitespace-nowrap">间隔</span>
-                    <input
-                      type="number" min={5} max={300}
-                      value={signalAiSched.data?.gap_seconds ?? 20}
-                      onChange={(e) => signalAiSched.data && signalAiSchedMut.mutate({
-                        ...signalAiSched.data, gap_seconds: Number(e.target.value) || 20,
-                      })}
-                      className="w-14 rounded border border-border bg-surface px-1.5 py-0.5 font-mono text-foreground outline-none focus:border-violet-400/50"
-                    />
-                    <span>秒/只</span>
-                  </label>
-                  <span className="text-[10px] text-muted/70">
-                    建议放在盘后日线落盘之后(17:30~20:00);个股多时用「只跑持有」更省
-                  </span>
-                </div>
-                {prefsMut.isPending && <Loader2 className="h-3 w-3 animate-spin text-muted" />}
-              </div>
-            )}
             {shownPicks && (
               <AiPickPanel
                 picks={shownPicks}
@@ -673,7 +352,7 @@ export function Today() {
                 <p>{d.opportunities_empty_why ?? '今天没有一只票走到可以看的位置 —— 等待比出手更常见。'}</p>
                 {boardFilter.length > 0 && (
                   <button
-                    onClick={() => toggleBoard(null)}
+                    onClick={clearBoards}
                     className="rounded-btn border border-accent/40 px-2 py-1 text-[11px] text-accent transition-colors hover:bg-accent/10"
                   >
                     去掉板块过滤,看全部
@@ -692,7 +371,6 @@ export function Today() {
 
         </>
       )}
-      {ledgerOpen && <ScoreLedgerDialog onClose={() => setLedgerOpen(false)} />}
       {askOpen && (
         <AiAskDialog
           initial={lastNote}
