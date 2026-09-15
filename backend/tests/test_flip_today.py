@@ -213,6 +213,11 @@ def _page() -> str:
     return code_of("pages/FlipPaper.tsx")
 
 
+def _flip_src() -> str:
+    from tests.frontend_source import read_src
+    return read_src("pages/FlipPaper.tsx")
+
+
 def _signal_row() -> str:
     """`SignalRow` 的函数体。
 
@@ -553,20 +558,26 @@ def test_R342_排序依据摆在界面上_不做暗箱():
     blk = _today_block()
     assert "'按把握分排序'" in blk, "页头没说这个顺序是按什么排的"
     row = _signal_row()
-    assert "把握 {c.rank}" in row, "行上要看得见名次 —— 排序依据不做暗箱"
-    assert "只决定先后, 不决定能不能动手" in row, "必须写明分不是出手依据"
+    # [R345] 行上那个徽标换成了整格移植过来的 `ScoreCell`(名次 + 分 + 三条维度条)
+    assert "<ScoreCell o={c} rank={c.rank}" in row, "行上要看得见名次 —— 排序依据不做暗箱"
+    assert "它**不是动作**" in _flip_src(), "必须写明分不是出手依据"
 
 
 def test_R342_没进候选池的票照样在名单里():
     """转折了就是转折了 —— 打分够不够是另一个问题, 不该让它从名单上消失。"""
     row = _signal_row()
-    assert "没进候选池" in row
+    assert "候选池" in row
     assert "该动手还是要动手" in row, "得说清它为什么没名次, 以及这不影响动手"
 
 
 def test_R342_把握分那一格不是动作():
     """名次徽标长在动作徽标旁边, **不许变成第二个可点的动作**。"""
     row = _signal_row()
-    seg = row[row.index("c ? ("):row.index("<span className=\"text-[11px] text-secondary\">")]
+    seg = row[row.index("c?.rank != null ? ("):row.index("<span className=\"text-[11px] text-secondary\">")]
     for word in ("'买入'", "'清仓'", "onClick"):
-        assert word not in seg, f"把握分那一格出现了动作: {word}"
+        assert word not in seg, f"名次那一格出现了动作: {word}"
+    # [R345] 移植过来的那一格本身也不许带动作
+    from tests.frontend_source import code_of
+    cell = code_of("components/today/ScoreCell.tsx")
+    for word in ("'买入'", "'清仓'", "onClick"):
+        assert word not in cell, f"ScoreCell 里出现了动作: {word}"

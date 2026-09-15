@@ -29,7 +29,7 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { ChevronDown, Eye, Loader2, Sparkles, TrendingDown, TrendingUp, Wallet } from 'lucide-react'
 import { api, type FlipOrder, type FlipPaper as FlipPaperData, type FlipRules,
-  type FlipTodaySignal } from '@/lib/api'
+  type FlipTodaySignal, type TodayOpportunity } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { PageHeader } from '@/components/PageHeader'
 import { Hint } from '@/components/Hint'
@@ -40,6 +40,7 @@ import { storage } from '@/lib/storage'
 import { refreshEvery, rhythmHint } from '@/lib/refreshRhythm'
 import { useTodayOverview } from '@/lib/useSharedQueries'      // [R342] 把握分(只排序)
 import { TodayHealthBar } from '@/components/today/TodayHealthBar'   // [R343] 数据自检条
+import { ScoreCell } from '@/components/today/ScoreCell'             // [R345] 名次那一格
 import { toast } from '@/components/Toast'
 
 /** [R343] 姿态四档的配色 —— 与今日总览那张卡同一套语义, 不另立一份说法。 */
@@ -137,14 +138,12 @@ export function FlipPaper() {
   // 打分(与今日总览页共享同一份缓存, 不多打一次接口)。
   const today = useTodayOverview()
   const ov = today.data
+  // [R345] 存整条 —— 「名次」那一格要画三条维度条, 只留分数与名次画不出来。
   const conv = useMemo(() => {
-    const m = new Map<string, Conviction>()
+    const m = new Map<string, TodayOpportunity>()
     for (const o of ov?.opportunities ?? []) {
       if (o.rank == null) continue
-      m.set(o.symbol, {
-        score: o.score ?? null, rank: o.rank,
-        total: o.rank_total ?? null, partial: !!o.partial,
-      })
+      m.set(o.symbol, o)
     }
     return m
   }, [ov])
@@ -190,10 +189,28 @@ export function FlipPaper() {
             {w.posture}
           </span>
         )}
+        // [R345] **多空要分红绿。** 并进页头时我把整行压成了一条灰字 ——
+        // 数字还在, 但"多 81 / 空 90"这种对照**靠颜色才读得快**, 全灰之后得逐字
+        // 读完才知道哪边多。配色沿用今日总览那张卡的语义(`text-bull` 红涨 /
+        // `text-bear` 绿跌), **不另立一份说法**。
+        // 刷新节奏保持 muted: 它是这一行里最不重要的东西, 该往后退。
         subtitle={w
-          ? `多 ${w.bull}/空 ${w.bear} · 转多 ${w.new_bull} 转空 ${w.new_bear}`
-            + (mainline ? ` · 主线 ${mainline}` : '')
-            + ` · ${rhythmHint('derived')}`
+          ? (
+            <>
+              多 <span className="text-bull">{w.bull}</span>
+              <span className="mx-0.5">/</span>
+              空 <span className="text-bear">{w.bear}</span>
+              <span className="mx-1">·</span>
+              转多 <span className="text-bull">{w.new_bull}</span>
+              {' '}转空 <span className="text-bear">{w.new_bear}</span>
+              {mainline && <>
+                <span className="mx-1">·</span>
+                主线 <span className="text-secondary">{mainline}</span>
+              </>}
+              <span className="mx-1">·</span>
+              {rhythmHint('derived')}
+            </>
+          )
           : `非真实资金 · 只按六态转折买卖 · ${rhythmHint('derived')}`}
         right={
           <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
@@ -307,11 +324,9 @@ export function FlipPaper() {
  * 末尾 —— 它被六态选中了就是选中了, 打分够不够是另一个问题。而反过来,
  * **打分选出来但六态没选中的票一行都不进来**(R344 删掉了 R343 合成的那些)。
  */
-type Conviction = { score: number | null; rank: number; total: number | null; partial: boolean }
-
 function TodaySignals({ rows, conviction }: {
   rows: FlipTodaySignal[]
-  conviction: Map<string, Conviction>
+  conviction: Map<string, TodayOpportunity>
 }) {
   // [R331] 用户: 「今天该挂什么单显得太多了, 需要折叠展开的功能」。
   //
@@ -447,7 +462,7 @@ function TodaySignals({ rows, conviction }: {
 /** [R339] 离清仓线多近才算"贴着了"。**只用来上色, 不产生任何动作。** */
 const NEAR_EXIT = 0.02
 
-function SignalRow({ r, c }: { r: FlipTodaySignal; c?: Conviction }) {
+function SignalRow({ r, c }: { r: FlipTodaySignal; c?: TodayOpportunity }) {
   const actionable = r.stage === 'flipped' && !!r.act
   // [R339] 用户: 「卖出也要上色, 这样看起来醒目」。
   //
@@ -494,20 +509,18 @@ function SignalRow({ r, c }: { r: FlipTodaySignal; c?: Conviction }) {
         )
       )}
 
-      {/* [R342] 把握分名次 —— **排序的依据摆出来, 不做暗箱**。
-          它不是动作: 拿不到名次的票照样在名单里, 只是排在后面。 */}
-      {c ? (
-        <span className="whitespace-nowrap rounded bg-elevated/60 px-1.5 py-0.5 text-[10px] text-muted"
-              title={`把握分 ${c.score?.toFixed(0) ?? '—'}${c.partial ? '(有因子缺席, 偏乐观)' : ''}`
-                     + ' —— 只决定先后, 不决定能不能动手'}>
-          把握 {c.rank}
-          {c.total != null && <span className="opacity-60">/{c.total}</span>}
-          {c.partial && <span className="ml-0.5 text-warning/70">部分</span>}
-        </span>
+      {/* [R345] 「名次」那一格整格移植自今日总览 —— 用户: 「这一列要移植」。
+          **不是只搬个数字**: 名次下面那三条维度条(红=趋势 45% / 蓝=量能 30% /
+          黄=位置 25%)才是它能被读懂的原因 —— 离开那三条颜色, 上面那个名次
+          就只是个号码, 说不出"为什么是这个名次"。
+          它**不是动作**: 拿不到名次的票照样在名单里, 只是排在本档末尾。 */}
+      {c?.rank != null ? (
+        <ScoreCell o={c} rank={c.rank} total={c.rank_total ?? 0} />
       ) : actionable && (
-        <span className="whitespace-nowrap text-[10px] text-muted/60"
+        <span className="w-14 shrink-0 text-center text-[9px] leading-tight text-muted/60"
               title="没过打分那三道硬门槛, 所以没有名次 —— 但它转折了, 该动手还是要动手">
-          没进候选池
+          没进
+          <br />候选池
         </span>
       )}
 

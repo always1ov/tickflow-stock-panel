@@ -114,8 +114,13 @@ def test_R343_市场状态并进页头_不自己占一张卡():
     head = code[code.index("<PageHeader"):code.index("<div className=\"min-h-0 flex-1")]
     assert "titleExtra={w && (" in head, "姿态是结论, 该在标题旁边"
     assert "POSTURE_TONE[w.posture]" in head
-    for must in ("多 ${w.bull}/空 ${w.bear}", "转多 ${w.new_bull} 转空 ${w.new_bear}"):
-        assert must in head, f"副标题少了「{must}」"
+    # [R345] 副标题从模板串改成了 JSX —— **多空要分红绿**。并进页头时我一度把
+    # 整行压成一条灰字: 数字还在, 但「多 81 / 空 90」这种对照**靠颜色才读得快**,
+    # 全灰之后得逐字读完才知道哪边多。配色沿用今日总览那张卡的语义。
+    assert '多 <span className="text-bull">{w.bull}</span>' in head, "多头数没上红"
+    assert '空 <span className="text-bear">{w.bear}</span>' in head, "空头数没上绿"
+    assert '转多 <span className="text-bull">{w.new_bull}</span>' in head
+    assert '转空 <span className="text-bear">{w.new_bear}</span>' in head
     assert "AI 导读" in head, "AI 导读也收进页头"
 
 
@@ -161,3 +166,54 @@ def test_R343_模拟盘主查询没被动过():
     blk = code[code.index("const q = useQuery({"):code.index("const rules = useQuery({")]
     assert "refetchInterval: refreshEvery('derived')" in blk, "模拟盘主查询的节奏被动了"
     assert "todayOverview" not in blk, "今日总览的数据不该混进模拟盘主查询"
+
+
+# ── [R345] 「名次」那一格整格移植 ───────────────────────────────────────
+#
+# 用户: 「这一列要移植」(截图是今日总览机会表的「名次」列: 名次/总数 + 把握分 +
+# 三条维度条)。**不是只搬个数字** —— 那三条颜色才是它能被读懂的原因: 离开它们,
+# 上面那个名次就只是个号码, 说不出"为什么是这个名次"。
+
+
+def _cell() -> str:
+    return code_of("components/today/ScoreCell.tsx")
+
+
+def test_R345_名次那一格是一处实现_两页共用():
+    """三条维度条的颜色、权重、悬停解释两处各写一遍, 哪天权重改了必然漂 ——
+    而漂的表现是「两个页面对同一只票给出不同的说法」, 看上去两边都没坏。"""
+    cell = _cell()
+    assert "export function ScoreCell" in cell
+    assert "export const DIM_META" in cell, "维度元数据也得跟着走, 否则还是两份"
+    for page in (FLIP, "components/today/OpportunityTable.tsx"):
+        code = code_of(page)
+        assert "from '@/components/today/ScoreCell'" in code, f"{page} 没复用那一处"
+        assert "function ScoreCell" not in code, f"{page} 自己又写了一份"
+
+
+def test_R345_三条维度条跟着一起搬():
+    """只搬名次不搬维度条 = 搬了个号码过来。"""
+    cell = _cell()
+    for key, cls in (("trend", "bg-red-400"), ("volume", "bg-sky-400"), ("position", "bg-amber-400")):
+        assert key in cell and cls in cell, f"少了维度 {key} 或它的颜色 {cls}"
+    # 权重锚在**它真正露面的两处**: `what` 文案 + 悬停里那条公式。
+    # 原来还有个 `w: '45%'` 字段, 全项目没人读 —— 变异把它改空界面一个字没变,
+    # 那不是守卫有洞, 是那份数据本来就是死的(已删)。
+    assert "权重 45%" in cell and "权重 30%" in cell and "权重 25%" in cell, "维度说明里少了权重"
+    assert "趋势强度×45% + 量能确认×30% + 位置成本×25%" in cell, "悬停里那条公式没了"
+    assert "w: '" not in cell, "又冒出一个没人读的权重字段"
+    assert 'style={{ width: `${Math.max(3, Math.min(100, v))}%` }}' in cell, \
+        "条长必须按分数画 —— 画成固定长度就只是装饰"
+
+
+def test_R345_模拟盘行上用的就是那一格():
+    row = code_of(FLIP)
+    row = row[row.index("function SignalRow"):]
+    assert "<ScoreCell o={c} rank={c.rank} total={c.rank_total ?? 0} />" in row
+
+
+def test_R345_打分那份数据整条存着_不再只留几个字段():
+    """三条维度条要 `dims`, 悬停要 `pct_rank` —— 只留分数与名次画不出来。"""
+    code = code_of(FLIP)
+    assert "new Map<string, TodayOpportunity>()" in code
+    assert "m.set(o.symbol, o)" in code, "存整条, 不再挑字段"

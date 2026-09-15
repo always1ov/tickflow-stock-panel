@@ -28,6 +28,8 @@ import type {
   TodayAction, TodayGates, TodayLive, TodayOpportunity, TodayOverview,
 } from '@/lib/api'
 import { cn } from '@/lib/cn'
+// [R345] 「名次」那一格连同三条维度条抽成共用组件 —— 模拟盘也用它
+import { DIM_META, ScoreCell, dimVerdict } from '@/components/today/ScoreCell'
 import { Hint } from '@/components/Hint'   // [R323] 表头说明点得开
 
 /**
@@ -62,27 +64,8 @@ const BOARD_LIMIT_CN: Record<string, string> = {
 // [R189 加, R230 回退] 一度改成「质地 × 时机」两根轴; 评分系统整体退回 R134
 // 之后回到三维度。**这一条不是审美选择** —— 这几条细条是分数的归因, 报的档位
 // 必须和真实算法一致, 不然用户核对的是一个不存在的东西。
-const DIM_META = [
-  { key: 'trend', cn: '趋势强度', cls: 'bg-red-400', w: '45%',
-    what: '这只票的方向有多强 —— 权重 45%',
-    hint: '新鲜度(主导) / 六态状态 / 相对强度' },
-  { key: 'volume', cn: '量能确认', cls: 'bg-sky-400', w: '30%',
-    what: '有没有人跟 —— 权重 30%',
-    hint: '量比(主导,区间最优,峰在 1.3~2.5) / 换手率' },
-  { key: 'position', cn: '位置成本', cls: 'bg-amber-400', w: '25%',
-    what: '买在什么位置 —— 权重 25%',
-    hint: '通道位置(甜区 50%~65%,越接近 100% 越是追高)' },
-] as const
 
 /** 某一档明显拖后腿时该说的那句话 —— 这正是合成分说不出来的东西。 */
-function dimVerdict(t?: number | null, v?: number | null, p?: number | null): string | null {
-  if (t == null || v == null || p == null) return null
-  if (t >= 70 && v < 50) return '形态到了但没人跟 —— 等放量,别自己先冲'
-  if (v >= 70 && p < 50) return '今天是有动静,但这个价已经不便宜 —— 追进去性价比低'
-  if (t < 50 && v >= 70) return '有量但方向还没出来 —— 不值得占仓位'
-  if (t >= 70 && v >= 70 && p >= 70) return '方向、量能、位置三样都在位'
-  return null
-}
 
 const NOTE_TONE: Record<string, string> = {
   good: 'bg-emerald-400/15 text-emerald-300',
@@ -90,60 +73,6 @@ const NOTE_TONE: Record<string, string> = {
   info: 'bg-border/50 text-muted',
 }
 
-/**
- * [R201] 「今天该看哪几只」这一格 —— **名次在前, 分数退到副位**。
- *
- * 为什么改: 把握分是五个因子加权平均再取几何平均, 而"平均"这件事本身就把
- * 取值挤向中间 —— 实测 p10~p90 只有 17 分(65~82)。于是 68 分这个数字对用户
- * **没有可读的含义**: 它既不是"及格", 也说不清是今天的第几档。名次和分位
- * 没有这个毛病, 它们天然是相对的, 一眼就知道该不该往下看。
- *
- * 分数仍然显示(台账要它做跨日比较, 用户也需要能核对), 只是不再当主角。
- */
-function ScoreCell({ o, rank, total }: { o: TodayOpportunity; rank: number; total: number }) {
-  const dims = o.dims
-  const detail = DIM_META
-    .map(d => `${d.cn} ${dims?.[d.key] ?? '无数据'} — ${d.what}`)
-    .join('\n')
-  const verdict = dimVerdict(dims?.trend, dims?.volume, dims?.position)
-  const pct = o.pct_rank != null ? Math.round((1 - o.pct_rank) * 100) : null
-  return (
-    <span
-      className="inline-flex w-14 shrink-0 flex-col items-center gap-1"
-      title={`今日候选里排第 ${rank}/${total}`
-        + (pct != null ? `(前 ${Math.max(1, pct)}%)` : '')
-        + `\n把握分 ${o.score} = 趋势强度×45% + 量能确认×30% + 位置成本×25%\n\n${detail}\n\n`
-        + (verdict ? `${verdict}\n\n` : '')
-        + (o.partial
-          ? '⚠ 有因子没读到,那一份权重是靠剩下的顶上来的 —— 总分偏乐观,同分时优先选没带 * 的'
-          : '三个维度的因子都齐全')}
-    >
-      <span className="font-mono text-[12px] font-semibold leading-none text-foreground">
-        {rank}
-        <span className="text-[9px] font-normal text-muted">/{total}</span>
-      </span>
-      <span className="font-mono text-[9px] leading-none text-muted">
-        {o.score}
-        {o.partial && (
-          <span className="text-warning" title="有因子没读到, 总分偏乐观">*</span>
-        )}
-      </span>
-      <span className="w-full space-y-[2px]">
-        {DIM_META.map(d => {
-          const v = dims?.[d.key]
-          return (
-            <span key={d.key} className="block h-[3px] overflow-hidden rounded-full bg-border/50">
-              {v != null && (
-                <span className={cn('block h-full rounded-full transition-ui duration-enter ease-smooth', d.cls)}
-                      style={{ width: `${Math.max(3, Math.min(100, v))}%` }} />
-              )}
-            </span>
-          )
-        })}
-      </span>
-    </span>
-  )
-}
 
 /**
  * [R214] 三个原始数字 → 三句状态词。
