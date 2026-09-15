@@ -288,3 +288,64 @@ def test_R347_控件只作用于打分层_不碰六态名单():
     assert "<TodayControls d={ov}" in code, "控件必须挂在今日总览那份数据上"
     blk = code[code.index("const q = useQuery({"):code.index("const rules = useQuery({")]
     assert "prefs" not in blk and "boards" not in blk, "模拟盘主查询不该沾这些偏好"
+
+
+# ── [R349] 「走势」那一格 ───────────────────────────────────────────────
+#
+# 用户: 「这一列也要有」(截图是今日总览机会表的「走势」列)。
+
+
+TREND = "components/today/TrendCell.tsx"
+
+
+def test_R349_走势那一格一处实现_两页共用():
+    """「多少算多」的分界一旦抄成两份, **屏幕说「放量刚好」而导出说「量太大」**
+    的那天就没法查了 —— R212 立的就是这条规矩。"""
+    cell = code_of(TREND)
+    assert "export function TrendCell" in cell
+    assert "export function posWord" in cell and "export function volWord" in cell, \
+        "分界函数得跟着组件走, 否则还是两处"
+    for page in (FLIP, "components/today/OpportunityTable.tsx"):
+        code = code_of(page)
+        assert "from '@/components/today/TrendCell'" in code, f"{page} 没复用那一处"
+        assert "function TrendCell" not in code, f"{page} 自己又写了一份"
+    # 导出件一直从 OpportunityTable 拿这两个函数, 转口导出保住那条 import
+    assert "export { posWord, volWord }" in code_of("components/today/OpportunityTable.tsx")
+    assert "from '@/components/today/OpportunityTable'" in code_of("lib/todayHtmlExport.ts")
+
+
+def test_R349_三样读数都在():
+    """位置 / 量能 / 距关键点 —— 少一样, 这一格就回答不了"凭什么是这一只"。"""
+    cell = code_of(TREND)
+    assert "posWord(o.channel_pct)" in cell, "位置没了"
+    assert "volWord(o.vol_ratio)" in cell, "量能没了"
+    assert "o.gap_pct != null" in cell, "距关键点没了"
+    # 三句状态词的分界值本身
+    assert "'放量刚好'" in cell and "'刚站上生命线'" in cell
+
+
+def test_R349_走势单独一行_不跟六态那句挤():
+    """两者回答的不是同一个问题: 六态那句说今天要不要动手, 走势说凭什么是这一只。
+    挤进同一行的话, 一行里会出现两套判据的措辞并排。"""
+    row = code_of(FLIP)
+    row = row[row.index("function SignalRow"):]
+    nxt = row.find("\nfunction ", 1)
+    row = row if nxt < 0 else row[:nxt]
+    assert "{c && (" in row and "<TrendCell o={c} />" in row
+    # 它排在六态那句之后 —— 主线在上, 依据在下
+    assert row.index("已转折 · 现在是") < row.index("<TrendCell"), \
+        "走势必须排在六态那句之后"
+
+
+def test_R349_没进候选池就没有这一行():
+    """没有名次就没有这些读数 —— 不留一个空位假装有。"""
+    row = code_of(FLIP)
+    row = row[row.index("function SignalRow"):]
+    seg = row[row.index("<TrendCell") - 200:row.index("<TrendCell")]
+    assert "{c && (" in seg, "必须由 c 是否存在决定渲不渲染"
+
+
+def test_R349_走势那一格不是动作():
+    cell = code_of(TREND)
+    for word in ("'买入'", "'清仓'", "onClick"):
+        assert word not in cell, f"走势那一格出现了动作: {word}"

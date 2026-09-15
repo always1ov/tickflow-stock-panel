@@ -41,6 +41,7 @@ import { refreshEvery, rhythmHint } from '@/lib/refreshRhythm'
 import { useTodayOverview } from '@/lib/useSharedQueries'      // [R342] 把握分(只排序)
 import { TodayHealthBar } from '@/components/today/TodayHealthBar'   // [R343] 数据自检条
 import { ScoreCell } from '@/components/today/ScoreCell'             // [R345] 名次那一格
+import { TrendCell } from '@/components/today/TrendCell'             // [R349] 走势那一格
 import { TodayControls } from '@/components/today/TodayControls'     // [R347] 门槛/体检/筛选
 import { toast } from '@/components/Toast'
 
@@ -486,6 +487,17 @@ const NEAR_EXIT = 0.02
 
 function SignalRow({ r, c }: { r: FlipTodaySignal; c?: TodayOpportunity }) {
   const actionable = r.stage === 'flipped' && !!r.act
+  // [R349] 「走势」那一格整格移植过来(用户: 「这一列也要有」)。
+  //
+  // **它单独占一行, 不跟六态那句挤在一起** —— 两者回答的不是同一个问题:
+  //
+  //     六态那句   今天要不要动手(已转折 / 盘中越线 / 还差多少)
+  //     走势那格   凭什么是这一只(位置贵不贵 / 有没有量 / 离关键点多远)
+  //
+  // 挤进同一行的话, 一行里会出现两套判据的措辞并排, 读的人得先分清哪句是哪套。
+  // 分两行, 上面一行是本页的主线, 下面一行是打分那一层的依据。
+  //
+  // 只在这只票**进了候选池**时才有 —— 没有名次就没有这些读数, 不留空位。
   // [R339] 用户: 「卖出也要上色, 这样看起来醒目」。
   //
   // 在这之前**买卖两种要动手的行共用同一个灰蓝底** `bg-accent/[0.06]` —— 徽标
@@ -501,11 +513,12 @@ function SignalRow({ r, c }: { r: FlipTodaySignal; c?: TodayOpportunity }) {
   const nearExit = !actionable && r.held && r.gap_pct != null
     && Math.abs(r.gap_pct) <= NEAR_EXIT
   return (
-    <div className={cn('flex flex-wrap items-center gap-x-3 gap-y-1 border-l-2 px-4 py-2.5 text-xs',
+    <div className={cn('border-l-2 px-4 py-2.5',
       buy && 'border-l-bull bg-bull/[0.07]',
       sell && 'border-l-bear bg-bear/[0.10]',
       nearExit && 'border-l-warning bg-warning/[0.07]',
       !actionable && !nearExit && 'border-l-transparent')}>
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
       <span className="min-w-[9rem]">
         <SymbolCell symbol={r.symbol} name={r.name} />
       </span>
@@ -569,6 +582,14 @@ function SignalRow({ r, c }: { r: FlipTodaySignal; c?: TodayOpportunity }) {
           {!r.live && <span className="ml-1 text-warning/70">昨收口径</span>}
         </span>
       )}
+    </div>
+
+    {/* [R349] 走势 —— 打分那一层的依据, 单独一行, 与名次那一格左边缘对齐 */}
+    {c && (
+      <div className="mt-1 pl-[3.75rem] text-[11px]">
+        <TrendCell o={c} />
+      </div>
+    )}
     </div>
   )
 }
