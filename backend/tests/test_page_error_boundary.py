@@ -106,7 +106,8 @@ def test_R321_路由级错误页认得_404():
     assert "useRouteError()" in page
     assert "isRouteErrorResponse(err) && err.status === 404" in page
     assert "没有这一页" in page
-    assert 'to="/today"' in page, "整页错误没有壳, 得给一条回家的路"
+    # [R351] 今日总览删了, 落地页换成模拟盘
+    assert 'to="/lots"' in page, "整页错误没有壳, 得给一条回家的路"
 
 
 # ---------- router ----------

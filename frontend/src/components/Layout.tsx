@@ -59,7 +59,6 @@ import {
   PanelLeft,
   PanelLeftClose,
   PanelLeftOpen,
-  Sunrise,
   Globe2,
   CalendarClock,   // [R127] 实时行情自动开关
   HelpCircle,      // [R323] 名词说明的全局入口
@@ -93,8 +92,6 @@ export const CORE_INDEXES = [
 type CoreIndex = (typeof CORE_INDEXES)[number]
 
 const nav = [
-  // [fork 增强] 今日总览: 决策汇聚层, 放首位
-  { to: '/today',           label: '今日总览', icon: Sunrise },
   { to: '/watchlist',  label: '自选',   icon: Star },
   { to: '/screener',   label: '策略',   icon: ScanSearch },
   { to: '/factors',    label: '因子', icon: Sigma },

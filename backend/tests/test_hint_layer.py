@@ -84,16 +84,18 @@ def test_R323_决策台五个有说明的表头_悬停与问号同一个键():
         assert th.count("HEAD_TIPS.") == 2, "悬停一处 + 「?」一处, 正好两处"
 
 
-def test_R323_今日机会表四个有说明的表头_悬停与问号同一个键():
-    ths = _hinted(_ths(OPP))
-    assert len(ths) == 4, f"机会表该有 4 个带「?」的表头, 现在 {len(ths)}"
-    for th in ths:
-        keys = set(re.findall(r"title=\{HEAD_TIPS\.(\w+)\}", th))
-        assert len(keys) == 1, f"同一个表头里悬停与「?」用了不同的键: {keys}"
+# [R323 → **R351 退役**] `test_R323_今日机会表四个有说明的表头_悬停与问号同一个键`
+# 钉的是今日总览机会表的四个表头。**那张表随页面一起删了**(今日总览的内容已经
+# 逐块融进模拟盘), 所以它**没有可守的对象了, 而不是被绕过去了**。
+#
+# 同一条立论(悬停与「?」必须用同一个键)在决策台那张表上照常有守卫盯着 ——
+# 见下面那三条, 它们把 OPP 从循环里去掉后继续跑。
+#
+# 模拟盘的信号行不是 `<table>`, 没有表头, 因此这条不需要"搬过去"。
 
 
 def test_R323_表头说明不再内联_全部来自_HEAD_TIPS():
-    for rel in (BOARD, OPP):
+    for rel in (BOARD,):   # [R351] OPP 那张表随今日总览一起删了
         code = code_of(rel)
         head = code[code.index("<thead"):code.index("</thead>")]
         assert "title={'" not in head and 'title="' not in head, f"{rel} 表头里还有内联的说明"
@@ -101,15 +103,16 @@ def test_R323_表头说明不再内联_全部来自_HEAD_TIPS():
 
 
 def test_R323_问号不许套在排序按钮里():
-    for th in _hinted(_ths(BOARD)) + _hinted(_ths(OPP)):
+    for th in _hinted(_ths(BOARD)):   # [R351] OPP 那张表没了
         if "<button" not in th:
             continue
         btn = th[th.index("<button"):th.index("</button>") + len("</button>")]
         assert "<Hint" not in btn, "button 套 button 是非法 HTML, 「?」必须是排序按钮的兄弟"
 
 
-def test_R323_两张表都真的_import_了_Hint():
-    for rel in (BOARD, OPP):
+def test_R323_决策台那张表真的_import_了_Hint():
+    # [R351] 原来是「两张表」, 机会表随今日总览一起删了
+    for rel in (BOARD,):
         assert "import { Hint } from '@/components/Hint'" in code_of(rel)
 
 

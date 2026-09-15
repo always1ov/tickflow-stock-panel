@@ -168,8 +168,13 @@ def test_R274_名录每一项都真的接在代码里(key):
 # ================================================================
 
 def _page() -> str:
+    """[R351] 今日总览删了 —— 这个 helper 指向模拟盘。
+
+    它现在是自检条、市场状态与那份 `/api/today` 数据唯一的落脚页, 下面那几条
+    守卫要守的东西一样没变, 只是换了一个文件去找。
+    """
     from tests.frontend_source import code_of
-    return code_of("pages/Today.tsx")
+    return code_of("pages/FlipPaper.tsx")
 
 
 def _bar() -> str:
@@ -187,7 +192,9 @@ def test_R274_自检条被挂在页面上():
     from tests.frontend_source import code_of
 
     assert "export function TodayHealthBar" in _bar()
-    for page in ("pages/Today.tsx", "pages/FlipPaper.tsx"):
+    # [R351] 今日总览删了, 自检条现在只挂在模拟盘上 —— 但「组件存在 ≠ 被挂上去」
+    # 这条立论不变, 只是要守的页面从两个变成一个。
+    for page in ("pages/FlipPaper.tsx",):
         code = code_of(page)
         assert "<TodayHealthBar h=" in code, f"{page} 没把自检条挂上去"
         assert "from '@/components/today/TodayHealthBar'" in code
@@ -363,10 +370,31 @@ def test_R319_市场时钟只有一处产地():
     win = clock[clock.index("export function inRealtimeWindow"):]
     assert "9 * 60 + 15" in win and "15 * 60 + 5" in win, "实时窗口边界与后端 realtime_schedule 不一致"
 
-    card = code_of("components/today/MarketStatusCard.tsx")
-    assert "cnClock()" in card, "MarketStatusCard 没用共用时钟"
-    assert "timeZone: 'Asia/Shanghai'" not in card, "MarketStatusCard 还自己换时区 —— 第二处产地"
-    assert "timeZone: 'Asia/Shanghai'" not in _page(), "Today.tsx 自己换时区 —— 第二处产地"
+    # [R351] `MarketStatusCard` 随今日总览一起删了 —— 它那段时段提示并进了模拟盘
+    # 页头。**立论一个字没变**(时钟只许有一处产地), 要扫的消费方换成了现存的这些。
+    #
+    # **改成全仓扫**, 而不是点名某几个文件: 点名的写法会随着文件增删反复失效,
+    # 而这条规矩本来就是"**谁都不许自己换时区**"。
+    from tests.frontend_source import SRC
+
+    # **两处已知欠账**, 早于 R319 就存在(那一轮只修了卡片与今日总览):
+    #   · SectorRotationCard.beijingDateParts()  自己算 {date, minutes}
+    #   · lib/kline.ts 的 cnToday() / cnNowHHMM() 配 MARKET_ALL_OVER='15:30'
+    # 两个都**真的在判时段**, 不是格式化时间戳 —— 立论说的就是它们。没有当场修:
+    # `marketClock` 现在只出 `{day, mins}`, 要接这两处得先给它加日期字符串的出口,
+    # 那是另一件事。**记在这儿而不是让守卫绕开它们** —— 名单摆在明面上, 才不会
+    # 被下一个人当成"本来就允许"。
+    KNOWN_DEBT = {"components/SectorRotationCard.tsx", "lib/kline.ts"}
+    offenders = {
+        f.relative_to(SRC).as_posix()
+        for f in SRC.rglob("*.ts*")
+        if f.name != "marketClock.ts" and "timeZone: 'Asia/Shanghai'" in f.read_text(encoding="utf-8")
+    }
+    assert not (offenders - KNOWN_DEBT), \
+        f"又出现了新的第二处产地: {sorted(offenders - KNOWN_DEBT)}"
+    # 欠账还清了就把名单也删掉 —— 不许留一份"曾经允许过"的清单
+    stale = KNOWN_DEBT - offenders
+    assert not stale, f"这些已经不再自己换时区了, 把它们从 KNOWN_DEBT 里删掉: {sorted(stale)}"
 
 
 def test_R319_健康条措辞跟着交易日口径走():

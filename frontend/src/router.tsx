@@ -41,8 +41,6 @@ const Settings = lazy(() => import('./pages/Settings').then(m => ({ default: m.S
 const Regime = lazy(() => import('./pages/Regime').then(m => ({ default: m.Regime })))
 const AbnormalMoves = lazy(() => import('./pages/AbnormalMoves').then(m => ({ default: m.AbnormalMoves })))
 const Dev = lazy(() => import('./pages/Dev').then(m => ({ default: m.Dev })))
-// [fork 增强] 今日总览(决策汇聚层)
-const Today = lazy(() => import('./pages/Today').then(m => ({ default: m.Today })))
 const ExternalPage = lazy(() => import('./pages/ExternalPage').then(m => ({ default: m.ExternalPage })))
 // [fork 增强] R93 使用观察笔记
 const UsageNotes = lazy(() => import('./pages/UsageNotes').then(m => ({ default: m.UsageNotes })))
@@ -147,13 +145,18 @@ export function createAppRouter() {
     ),
     errorElement: <RouteErrorPage />,
     children: [
-      // [R64] 看板从根路径挪到 /dashboard, 根路径改去今日总览 ——
-      // 看板是展示型的(看一眼有概念, 但不产出可执行的东西), 不该是每次打开
-      // 应用第一眼看到的那一页。今日总览才是决策汇聚层。
-      { index: true, element: <Navigate to="/today" replace /> },
+      // [R64] 看板从根路径挪到 /dashboard, 根路径改去决策汇聚层 —— 看板是
+      // 展示型的(看一眼有概念, 但不产出可执行的东西), 不该是每次打开应用
+      // 第一眼看到的那一页。
+      //
+      // [R351] 那个决策汇聚层从今日总览换成了模拟盘: 今日总览的内容已经
+      // 逐块融进模拟盘(R341~R350), 这一页删掉了。
+      { index: true, element: <Navigate to="/lots" replace /> },
       { path: 'dashboard', element: <Dashboard /> },
       { path: 'overview', element: <Navigate to="/dashboard" replace /> },
-      { path: 'today', element: <Today /> },
+      // [R351] 今日总览删了, 但**路由保留成重定向** —— 书签、菜单设置里存的
+      // 旧路径不能断(R170 对 /paper-trading 立的同一条规矩)。
+      { path: 'today', element: <Navigate to="/lots" replace /> },
       { path: 'analysis', element: <Navigate to="/settings?tab=ext-pages" replace /> },
       { path: 'analysis/:menuId', element: <AnalysisDetail /> },
       { path: 'concept-analysis', element: <ConceptAnalysis /> },

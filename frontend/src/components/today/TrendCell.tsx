@@ -74,7 +74,11 @@ export function TrendCell({ o }: { o: TodayOpportunity }) {
         {p && (
           <span className={p.tone}
                 title={`量化波动通道·短期 位置 ${Math.round(o.channel_pct! * 100)}%`
-                  + `(0=下轨 / 50=生命线 MA20 / 100=上轨)—— ${p.why}`}>
+                  // [R351] 原来这儿写的是「50=生命线 MA20」。**扫描面一扩就查出来了**:
+                  // 这一格以前不在 `test_glossary_hides_math` 的扫描面内(老锚点排在它后面),
+                  // 于是「MA20」在一个用户悬停就能看到的地方躺了很久。界面上只说
+                  // 「生命线」——**那是这套系统对外的说法**, 均线周期是实现细节。
+                  + `(0=下轨 / 50=生命线 / 100=上轨)—— ${p.why}`}>
             {p.cn}
           </span>
         )}

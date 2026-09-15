@@ -61,13 +61,15 @@ const _path = window.location.pathname
 if (_path !== '/login') {
   void queryClient.prefetchQuery({ queryKey: QK.settings, queryFn: api.settings })
 }
-if (_path === '/' || _path === '/today') {
+// [R351] 首屏预热跟着首页走: 今日总览删了, 落地页现在是模拟盘。
+// `/api/today` 那份数据**仍然要预热** —— 模拟盘拿它做把握分排序与页头的市场状态。
+if (_path === '/' || _path === '/lots' || _path === '/today') {
   void queryClient.prefetchQuery({
     queryKey: QK.todayOverview,
     queryFn: () => api.todayOverview(),
     staleTime: 60_000,
   })
-  import('./pages/Today').catch(() => { /* 真正需要时 lazy() 会再试, 这里只是预热 */ })
+  import('./pages/FlipPaper').catch(() => { /* 真正需要时 lazy() 会再试, 这里只是预热 */ })
 }
 
 async function bootstrap() {

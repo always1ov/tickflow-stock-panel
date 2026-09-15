@@ -12,49 +12,35 @@ from __future__ import annotations
 
 from tests.frontend_source import code_of
 
-TODAY = "pages/Today.tsx"
-TODAY_SK = "components/today/TodaySkeleton.tsx"
+FLIP = "pages/FlipPaper.tsx"   # [R351] 今日总览删了, 骨架那条立论落到模拟盘
 BOARD = "components/stock-analysis/WatchlistDecisionBoard.tsx"
 BOARD_SK = "components/stock-analysis/decision-board/BoardSkeletonRows.tsx"
 
 
-def test_R324_今日总览首次加载画骨架_不再转圈():
-    code = code_of(TODAY)
-    assert "{q.isLoading && <TodaySkeleton />}" in code
-    assert "import { TodaySkeleton } from '@/components/today/TodaySkeleton'" in code
-    # 原来那个居中转圈不许还在同一处
-    assert "{q.isLoading && (\n        <div className=\"flex items-center justify-center py-16\">" not in code
-
-
-def test_R324_今日骨架按真实版面摆():
-    """[R340] 区块数从三个降到一个 —— 「需要行动」「持仓体检」整块删了。
-
-    **这条断言的价值恰恰在这次体现了**: 删页面时它立刻变红, 逼着骨架跟着改。
-    骨架画出一个填不进东西的形状, 比直接转圈更糟 —— 它先许诺了一个版面, 然后食言。
+def test_R324_模拟盘首次加载画骨架_不再转圈():
+    """[R324 → R351] 今日总览删了, **这条立论跟着落到模拟盘**: 首次加载画出版面的
+    形状, 而不是一个居中转圈 —— 内容填进来不跳。模拟盘有自己的 `LoadingSkeleton`,
+    要守的东西一个字没变, 换的只是去哪个文件里找。
     """
-    code = code_of(TODAY_SK)
-    body = code[code.index("export function TodaySkeleton"):]
-    # 市场状态卡那排五个统计格, 与 MarketStatusCard 同一套栅格
-    assert "sm:grid-cols-3 lg:grid-cols-5" in body
-    assert "Array.from({ length: 5 }" in body
-    # 只剩「值得关注」一个 section
-    assert body.count("<SectionHead") == 1
-    assert 'role="status"' in body
-    assert "from '@/components/data/Skeleton'" in code, "复用仓库已有的 Skeleton 原语, 不另造一个"
+    code = code_of(FLIP)
+    assert "{q.isLoading && <LoadingSkeleton />}" in code
+    assert 'role="status"' in code, "骨架要报给读屏器"
 
 
-def test_R340_两块整个删干净_骨架跟着同步():
-    """**同步的是两个文件, 不是一句注释。** 骨架多画一块或少画一块都在说谎。
-
-    `code_of` 已经把注释剥掉了, 所以这里扫到的「需要行动」只可能来自真正会渲染
-    的文字 —— 说明它为什么被删的那段注释不会把断言喂饱。
+def test_R351_骨架的形状跟着版面走():
+    """**骨架与版面必须同步改。** 画出一个填不进东西的形状比直接转圈更糟 ——
+    它先许诺了一个版面, 然后食言。(R340 那条同名守卫钉的是今日总览的两块,
+    那一页没了; 立论搬到模拟盘, 对象换成「四格统计 + 一张曲线」。)
     """
-    page = code_of(TODAY)
-    sk = code_of(TODAY_SK)
-    for gone in ("需要行动", "持仓体检", "回撤纪律线"):
-        assert gone not in page, f"页面还留着「{gone}」"
-    assert page.count("<section") == 1, "页面只该剩「值得关注」一个 section"
-    assert sk[sk.index("export function TodaySkeleton"):].count("<SectionHead") == 1
+    code = code_of(FLIP)
+    sk = code[code.index("function LoadingSkeleton"):]
+    # 四格统计 —— 与 `Summary` 那一排同一套栅格
+    assert "sm:grid-cols-4" in sk and "Array.from({ length: 4 }" in sk
+    # 一张曲线
+    assert "h-[240px]" in sk, "净值曲线那块骨架没了"
+    body = code[code.index("{d && !d.reason && ("):]
+    assert "<Summary d={d} />" in body and "<NavChart d={d} />" in body, \
+        "骨架画了这两块, 页面上就得真有这两块"
 
 
 def test_R324_决策台加载中画骨架行_不印自选为空():
@@ -69,7 +55,9 @@ def test_R324_决策台加载中画骨架行_不印自选为空():
 
 
 def test_R324_骨架只认_isLoading_不认_isFetching():
-    for rel, needle in ((TODAY, "q.isLoading && <TodaySkeleton"), (BOARD, "enriched.isLoading ? (")):
+    # [R351] 今日总览那一项换成模拟盘 —— 立论不变: 后台重取时上一份数据还在,
+    # 盖骨架等于把已经能看的东西藏起来。
+    for rel, needle in ((FLIP, "q.isLoading && <LoadingSkeleton"), (BOARD, "enriched.isLoading ? (")):
         code = code_of(rel)
         assert needle in code
         assert needle.replace("isLoading", "isFetching") not in code, \

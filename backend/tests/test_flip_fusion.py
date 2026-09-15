@@ -21,7 +21,6 @@ from tests.frontend_source import code_of
 
 FLIP = "pages/FlipPaper.tsx"
 HEALTH = "components/today/TodayHealthBar.tsx"
-TODAY = "pages/Today.tsx"
 HOOK = "lib/useSharedQueries.ts"
 
 
@@ -142,10 +141,9 @@ def test_R343_自检条在最顶且不进折叠():
 def test_R343_自检条一处实现_两页共用():
     """同一个自检条两处各写一遍, 措辞和口径必然漂。"""
     assert "export function TodayHealthBar" in code_of(HEALTH)
-    for page in (TODAY, FLIP):
-        code = code_of(page)
-        assert "from '@/components/today/TodayHealthBar'" in code, f"{page} 没复用那一处"
-        assert "function TodayHealthBar" not in code, f"{page} 自己又写了一份"
+    code = code_of(FLIP)
+    assert "from '@/components/today/TodayHealthBar'" in code, "模拟盘没复用那一处"
+    assert "function TodayHealthBar" not in code, "模拟盘自己又写了一份"
 
 
 # ── 一处定义 ────────────────────────────────────────────────────────────
@@ -160,10 +158,9 @@ def test_R343_今日总览那份数据只有一处定义():
     assert "?.live" in blk and "inRealtimeWindow()" in blk, "两件事要同时看"
     assert "60_000" in blk and "60 * 60 * 1000" in blk, "两档节奏不全"
 
-    for rel in (FLIP, TODAY):
-        code = code_of(rel)
-        assert "useTodayOverview()" in code, f"{rel} 没走共用 hook"
-        assert "queryKey: QK.todayOverview" not in code, f"{rel} 自己又抄了一份查询"
+    code = code_of(FLIP)
+    assert "useTodayOverview()" in code, "模拟盘没走共用 hook"
+    assert "queryKey: QK.todayOverview" not in code, "模拟盘自己又抄了一份查询"
 
 
 def test_R343_模拟盘主查询没被动过():
@@ -191,10 +188,10 @@ def test_R345_名次那一格是一处实现_两页共用():
     cell = _cell()
     assert "export function ScoreCell" in cell
     assert "export const DIM_META" in cell, "维度元数据也得跟着走, 否则还是两份"
-    for page in (FLIP, "components/today/OpportunityTable.tsx"):
-        code = code_of(page)
-        assert "from '@/components/today/ScoreCell'" in code, f"{page} 没复用那一处"
-        assert "function ScoreCell" not in code, f"{page} 自己又写了一份"
+    # [R351] 机会表随今日总览一起删了 —— 现在只剩模拟盘一个调用方
+    code = code_of(FLIP)
+    assert "from '@/components/today/ScoreCell'" in code, "模拟盘没复用那一处"
+    assert "function ScoreCell" not in code, "模拟盘自己又写了一份"
 
 
 def test_R345_三条维度条跟着一起搬():
@@ -239,15 +236,13 @@ def test_R347_三样东西一处实现_两页共用():
     设置说法不一样」, 而两边都不报错。"""
     ctrl = code_of(CTRL)
     assert "export function TodayControls" in ctrl
-    for page in (FLIP, TODAY):
-        code = code_of(page)
-        assert "<TodayControls d=" in code, f"{page} 没挂上这组控件"
-        assert "from '@/components/today/TodayControls'" in code
-    # 两页都不许再自己写一份
-    for page in (FLIP, TODAY):
-        code = code_of(page)
-        assert "TODAY_BOARDS" not in code, f"{page} 自己又写了一份板块筛选"
-        assert "ScoreLedgerDialog" not in code, f"{page} 自己又挂了一份体检弹窗"
+    # [R351] 今日总览删了 —— 从此只剩模拟盘一个调用方。**立论反而更要紧**:
+    # 唯一的实现一旦被谁复制一份, 再也没有"另一页"会把它暴露出来。
+    code = code_of(FLIP)
+    assert "<TodayControls d=" in code, "模拟盘没挂上这组控件"
+    assert "from '@/components/today/TodayControls'" in code
+    assert "TODAY_BOARDS" not in code, "模拟盘自己又写了一份板块筛选"
+    assert "ScoreLedgerDialog" not in code, "模拟盘自己又挂了一份体检弹窗"
 
 
 def test_R347_三样都在():
@@ -305,13 +300,11 @@ def test_R349_走势那一格一处实现_两页共用():
     assert "export function TrendCell" in cell
     assert "export function posWord" in cell and "export function volWord" in cell, \
         "分界函数得跟着组件走, 否则还是两处"
-    for page in (FLIP, "components/today/OpportunityTable.tsx"):
-        code = code_of(page)
-        assert "from '@/components/today/TrendCell'" in code, f"{page} 没复用那一处"
-        assert "function TrendCell" not in code, f"{page} 自己又写了一份"
-    # 导出件一直从 OpportunityTable 拿这两个函数, 转口导出保住那条 import
-    assert "export { posWord, volWord }" in code_of("components/today/OpportunityTable.tsx")
-    assert "from '@/components/today/OpportunityTable'" in code_of("lib/todayHtmlExport.ts")
+    # [R351] 机会表与那份 HTML 导出件都随今日总览一起删了 —— 转口导出那一层
+    # 因此也没了(它当初存在的唯一理由就是不改导出件的 import)。
+    code = code_of(FLIP)
+    assert "from '@/components/today/TrendCell'" in code, "模拟盘没复用那一处"
+    assert "function TrendCell" not in code, "模拟盘自己又写了一份"
 
 
 def test_R349_三样读数都在():

@@ -57,8 +57,14 @@ SURFACES = {
     # 也就是这个文件里第一个会渲染出东西的组件。**扫描面只许扩不许缩**: 拿一个
     # 靠后的锚点(比如 SegmentCard)会把前面所有文案漏掉, 而那正是 R258 栽过的跟头。
     _FRONT / "StockReviewDialog.tsx": "function LimitTag",
-    _SRC / "components" / "today" / "OpportunityTable.tsx":
-        '<span className="text-foreground/90">量化波动通道</span>',
+    # [R351] 今日总览的机会表整个删了, 而那句「量化波动通道」**跟着 `TrendCell`
+    # 活到了模拟盘上** —— 扫描面跟着文案走, 不跟着文件名走。
+    #
+    # 锚点落在 `export function TrendCell`, **不是文件开头**。第一版图省事锚在
+    # 文件里第一个顶层声明上, 结果把 `posWord`/`volWord` 也圈了进去 —— 那两个函数
+    # 是**分界表**(`v < 0.8`、`pct >= 0.95`), 是实现不是文案, 立刻被判成泄露阈值。
+    # 这条规则守的是**用户看得见的字**, 不是源码里的常量; 锚点得从"开始渲染"那一行算。
+    _SRC / "components" / "today" / "TrendCell.tsx": "export function TrendCell",
     # [R201] **导出的 HTML 是所有面里最该守的一个** —— 屏幕上的东西只有本人看得到,
     # 导出的文件是拿去发给别人的。而它恰恰是 R200 那一轮漏掉的: 页头说明里
     # 白纸黑字写着「短期 MA20±2ATR / 中期 MA60±2.5ATR / 长期 MA120±3ATR」。

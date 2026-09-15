@@ -272,8 +272,11 @@ def test_R278_几何确实不进把握分():
 def test_R278_界面上那句不进把握分还在():
     """反面: 剥离这件事得让看的人知道, 否则它会被重新当成分数的依据。"""
     from tests.frontend_source import code_of
-    page = code_of("components/today/OpportunityTable.tsx")
-    assert "不进把握分" in page
+    # [R351] 今日总览删了, 但这句声明**跟着「走势」那一格活到了模拟盘上**。
+    # 措辞是「不参与打分」而不是「不进把握分」—— 同一个主张的两种说法, 立论不变:
+    # **剥离这件事得让看的人知道**, 否则它会被重新当成分数的依据。
+    page = code_of("components/today/TrendCell.tsx")
+    assert "不参与打分" in page
 
 
 # ================================================================
