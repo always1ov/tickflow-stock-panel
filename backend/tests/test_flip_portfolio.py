@@ -367,3 +367,118 @@ def test_R328_名称缺失时退回代码_simulate_自己那一层():
     assert res["orders"], "先确认真的跑出了单子"
     for o in res["orders"]:
         assert o["name"] == "A", "名称空着时退回代码, 不留空白"
+
+
+# ── [R357] 逐月收益 ─────────────────────────────────────────────────────
+#
+# 用户: 「最好是每个月的收益单独计算」。
+#
+# 替掉 R332 那两个**滚动窗口**(近一月 / 近三月)—— 那两格重叠, 近三月把近一月
+# 整个包在里面, 于是「哪个月在亏」这个问题它们回答不了, 而那正是按月看的意义。
+
+
+def _flat(dates: list[str]) -> dict:
+    """一只从不转折的票 —— 它一单也不会下, 净值因此**恒等于本金**。
+
+    用它来钉分月的**切法**: 收益全是 0, 任何一格不是 0 都说明基准取错了。
+    """
+    n = len(dates)
+    return _mk(["UT"] * n, [10.0] * n, name="平", dates=dates)
+
+
+def test_R357_按自然月切_一个月一格():
+    res = fp.simulate({"A": _flat(
+        ["2026-01-05", "2026-01-30", "2026-02-02", "2026-02-27", "2026-03-02"])},
+        capital=100_000, max_positions=1)
+    assert [m["month"] for m in res["monthly"]] == ["2026-01", "2026-02", "2026-03"]
+    assert [m["days"] for m in res["monthly"]] == [2, 2, 1]
+
+
+def test_R357_月与月不重叠_不是滚动窗口():
+    """**这一条就是 R332 退役的理由。**
+
+    造一个只有第三个月涨的曲线: 滚动的「近三月」会把那一次涨算进来, 于是前两个
+    月看上去也不差; 分月之后前两个月各自是 0, 涨的只有三月。
+    """
+    # 一月转多买进, 二月一动不动, 三月最后一天涨一截。
+    # (第一根的 `prev` 是 None, 所以 states 全填 UT 时**第一天就是转折日** ——
+    #  一月那一格因此带着买入的手续费, 这是真的, 不去假装它是 0。)
+    dates = ["2026-01-05", "2026-01-06", "2026-02-05", "2026-03-05", "2026-03-06"]
+    res = fp.simulate({"A": _mk(["UT"] * 5, [10.0, 10.0, 10.0, 10.0, 13.0],
+                                dates=dates)}, capital=100_000, max_positions=1)
+    rets = {m["month"]: m["ret"] for m in res["monthly"]}
+    assert rets["2026-02"] == 0.0, \
+        f"二月什么都没发生却沾上了别的月份的收益 —— 那正是滚动窗口的毛病: {rets}"
+    assert rets["2026-03"] > 0.25, f"三月那一截涨幅没有全部落在三月: {rets}"
+
+
+def test_R357_基准取上月末_不是本月第一天():
+    """本月第一天自己的涨跌**属于这个月**。
+
+    拿本月第一个交易日的净值当基准, 那一天的涨跌就被吃掉了 —— 一个月的第一天
+    涨 3%, 这个月凭空少 3%。R332 那个滚动窗口的注释里写着同一条。
+    """
+    # 一月买进, 二月第一天大涨, 之后不动
+    dates = ["2026-01-05", "2026-01-06", "2026-02-02", "2026-02-03"]
+    res = fp.simulate({"A": _mk(["DT", "UT", "UT", "UT"], [10.0, 10.0, 20.0, 20.0],
+                                dates=dates)}, capital=100_000, max_positions=1)
+    feb = next(m for m in res["monthly"] if m["month"] == "2026-02")
+    assert feb["ret"] > 0.5, \
+        f"二月第一天那根大涨被吃掉了(基准取成了本月第一天): ret={feb['ret']}"
+
+
+def test_R357_首月基准是本金():
+    """第一个月没有上个月可取 —— 与 `nav_rows` 逐日 `ret` 第一天同一条算法。"""
+    dates = ["2026-01-05", "2026-01-06"]
+    res = fp.simulate({"A": _mk(["DT", "UT"], [10.0, 10.0], dates=dates)},
+                      capital=100_000, max_positions=1)
+    jan = res["monthly"][0]
+    assert jan["ret"] == round(jan["nav"] / 100_000 - 1, 6)
+
+
+def test_R357_首尾两个月标残月():
+    """回测窗口的起点是「今天 - N 天」, **一个任意日期** —— 落在月中是常态;
+    最后一个月则是还没走完。不标出来就会拿半个月的 +2% 去和整月的 +2% 比。"""
+    res = fp.simulate({"A": _flat(["2026-01-15", "2026-02-10", "2026-03-11"])},
+                      capital=100_000, max_positions=1)
+    ms = res["monthly"]
+    assert ms[0]["partial"] is True and ms[-1]["partial"] is True
+    assert ms[1]["partial"] is False, "中间的整月不该标残"
+
+
+def test_R357_只有一个月时它既是首也是尾():
+    res = fp.simulate({"A": _flat(["2026-01-15", "2026-01-16"])},
+                      capital=100_000, max_positions=1)
+    assert len(res["monthly"]) == 1 and res["monthly"][0]["partial"] is True
+
+
+def test_R357_逐月末净值接得上净值曲线():
+    """每一格的 `nav` 必须真的是那个月最后一个交易日的净值 —— 分月只是**切**,
+    不是另算一条曲线。接不上就说明这一层自己造了数。"""
+    dates = ["2026-01-05", "2026-01-06", "2026-02-02", "2026-02-03", "2026-03-02"]
+    res = fp.simulate({"A": _mk(["DT", "UT", "UT", "DT", "UT"],
+                                [10.0, 11.0, 12.0, 9.0, 10.0], dates=dates)},
+                      capital=100_000, max_positions=1)
+    last_of_month = {}
+    for row in res["nav"]:
+        last_of_month[row["date"][:7]] = row["nav"]
+    assert {m["month"]: m["nav"] for m in res["monthly"]} == last_of_month
+
+
+def test_R357_一天都跑不了时逐月是空的_不是缺这个键():
+    """空栏与缺键是两件事 —— 前端 `d.monthly.length` 会在缺键时直接炸。"""
+    res = fp.simulate({}, capital=100_000, max_positions=1)
+    assert res["monthly"] == []
+
+
+def test_R357_最后一格接得上总收益():
+    """逐月连乘回去必须等于总收益 —— 不等就说明月与月之间漏了一段或重了一段。"""
+    dates = ["2026-01-05", "2026-01-06", "2026-02-02", "2026-02-03", "2026-03-02"]
+    res = fp.simulate({"A": _mk(["DT", "UT", "UT", "DT", "UT"],
+                                [10.0, 11.0, 12.0, 9.0, 10.0], dates=dates)},
+                      capital=100_000, max_positions=1)
+    prod = 1.0
+    for m in res["monthly"]:
+        prod *= 1 + m["ret"]
+    assert abs(prod - (1 + res["stats"]["total_ret"])) < 1e-6, \
+        f"逐月连乘 {prod - 1:.6f} 对不上总收益 {res['stats']['total_ret']}"

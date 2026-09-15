@@ -289,6 +289,7 @@ def simulate(
         "orders": orders,
         "positions": _positions(holdings, names, last_price),
         "stats": _stats(nav_rows, orders, round_trips, capital),
+        "monthly": _monthly(nav_rows, capital),
         "skipped": skipped,
         "pending": [{"symbol": s, "name": names.get(s, s), **p} for s, p in sorted(pending.items())],
         "as_of": calendar[-1],
@@ -374,6 +375,64 @@ def _positions(holdings: dict, names: dict, last_price: dict) -> list[dict]:
     return out
 
 
+def _monthly(nav_rows: list[dict], capital: float) -> list[dict]:
+    """[R357] 逐月收益 —— **每个月单独算, 月与月之间不重叠**。
+
+    用户: 「最好是每个月的收益单独计算」。
+
+    ## 它替掉的是什么
+
+    R332 给的是「近一月 / 近三月」两个**滚动窗口**(最近 20 / 60 个交易日)。
+    那两格有个绕不过去的毛病: **近三月把近一月整个包在里面**。九月赚了 10%、
+    七八月各亏 4%, 两格印出来是「近一月 +10% / 近三月 +2%」—— 读的人没有任何
+    办法从这两个数里还原出七月和八月各自发生了什么。而"哪个月在亏"正是按月
+    看的全部意义。
+
+    改成自然月之后每个数只属于它自己那一段, 12 个格子横着一排, 亏的月份自己
+    跳出来。
+
+    ## 基准取上个月最后一天, 不是本月第一天
+
+    收益算的是这一段**期间**的变化。拿本月第一个交易日的净值当基准, 会把那天
+    自己的涨跌吃掉 —— 一个月的第一天涨 3%, 这个月就凭空少 3%。R332 那个滚动
+    窗口当初栽过同一个坑, 注释里写着"起点取该窗口第一个交易日的前一天"。
+
+    第一个月没有上个月可取, 基准就是**本金** —— 与 `nav_rows` 里逐日 `ret`
+    第一天的算法同一条(那里也是 `prev = ... if nav_rows else capital`)。
+
+    ## 首尾两个月一律标 `partial`
+
+    回测窗口的起点是 `today - N 天`, **一个任意的日期** —— 它落在月中是常态,
+    于是第一个月天然是个残月。最后一个月则是还没走完。
+
+    这不是"可能"而是**结构上如此**, 所以不去猜也不设阈值(「首个交易日在 5 号
+    之前就算整月」那种判法要靠交易日历, 而这一层根本没有日历)。宁可把恰好
+    完整的那一次也标上 —— 代价是一句多余的提示, 而反过来漏标的代价是**拿半个
+    月的 +2% 去和整月的 +2% 比**。
+
+    `days` 一并给出, 让界面能说清这个月到底只有几天。
+    """
+    if not nav_rows:
+        return []
+    out: list[dict] = []
+    base = capital
+    for row in nav_rows:
+        month = str(row["date"])[:7]          # YYYY-MM-DD → YYYY-MM
+        if not out or out[-1]["month"] != month:
+            out.append({"month": month, "_base": base, "nav": row["nav"], "days": 1})
+        else:
+            out[-1]["nav"] = row["nav"]
+            out[-1]["days"] += 1
+        # 下一个月的基准 = 这个月最后一天的净值。逐行覆盖, 走完自然是月末那个值。
+        base = row["nav"]
+
+    for i, m in enumerate(out):
+        b = m.pop("_base")
+        m["ret"] = round(m["nav"] / b - 1, 6) if b else 0.0
+        m["partial"] = i == 0 or i == len(out) - 1
+    return out
+
+
 def _stats(nav_rows: list[dict], orders: list[dict], round_trips: list[float],
            capital: float) -> dict:
     if not nav_rows:
@@ -405,5 +464,6 @@ def _stats(nav_rows: list[dict], orders: list[dict], round_trips: list[float],
 
 def _empty(capital: float, reason: str) -> dict[str, Any]:
     return {"nav": [], "orders": [], "positions": [],
-            "stats": _stats([], [], [], capital), "skipped": [], "pending": [],
+            "stats": _stats([], [], [], capital), "monthly": [],
+            "skipped": [], "pending": [],
             "as_of": None, "reason": reason}

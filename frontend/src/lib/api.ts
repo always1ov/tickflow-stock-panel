@@ -3066,6 +3066,8 @@ export interface FlipPaper {
   orders: FlipOrder[]
   positions: FlipPosition[]
   stats: FlipStats
+  /** [R357] 逐月收益 —— 自然月, 月与月之间不重叠 */
+  monthly: FlipMonth[]
   skipped: FlipSkipped[]
   pending: { symbol: string; name: string; act: string; since: string }[]
   as_of: string | null
@@ -3076,6 +3078,25 @@ export interface FlipPaper {
   missing: string[]
   capital: number
   max_positions: number
+}
+
+/**
+ * [R357] 一个自然月的成绩。用户: 「最好是每个月的收益单独计算」。
+ *
+ * 替掉 R332 那两个**滚动窗口**(近一月 / 近三月)—— 那两格重叠, 近三月把近一月
+ * 整个包在里面, 读的人没法从这两个数还原出中间那两个月各自怎么样。
+ */
+export interface FlipMonth {
+  /** `YYYY-MM` */
+  month: string
+  /** 这个月**自己**的收益: 月末净值 / 上月末净值 - 1(首月基准是本金) */
+  ret: number
+  /** 月末净值 */
+  nav: number
+  /** 这个月有几个交易日 */
+  days: number
+  /** 首尾两个月是残月 —— 回测窗口从月中切进来 / 这个月还没走完 */
+  partial: boolean
 }
 
 export interface FlipRules {

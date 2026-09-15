@@ -52,14 +52,33 @@ const POSTURE_TONE: Record<string, string> = {
   观察: 'bg-muted/15 text-muted',
 }
 
-// [R339/R353] 回溯的上下界。R339 把档位砍到「半年~三年」, R353 改成可输入,
+// [R339/R353/R357] 回溯的上下界。R339 把档位砍到「半年~三年」, R353 改成可输入,
 // 于是"档位"这个概念没有了 —— 边界改由输入框的 min/max 表达, 与后端
-// `flip_paper.MIN_YEARS` / `MAX_YEARS` 对齐。
+// `flip_paper.MIN_YEARS` / `MAX_YEARS` 对齐(守卫逐值钉着两边相等)。
 //
 // R339 那条论证仍然成立, 而且现在更要紧: 半年 ≈ 120 个交易日, 转折是低频信号,
 // 那个窗口里可能只有两三次完整买卖 —— 胜率与最大回撤在那种样本量下**不是
 // "不好看", 是不成立**。既然现在能填任意值, 这句话更得让人看见: 完整买卖少于
 // 10 次时胜率会标黄并写明, 见 `Summary`。
+const YEARS_MIN = 0.5
+const YEARS_MAX = 3
+const YEARS_DEFAULT = 1
+
+/**
+ * [R357] **收上限之后, 存着的旧值必须钳一道。**
+ *
+ * 上限从 10 收到 3, 而 R353 把这三个参数落了 localStorage —— 之前填过 5 年的人
+ * 存里躺着一个 `5`, 打开页面直接送进 `queryKey` 打给后端, 换回一个 422
+ * 「Input should be less than or equal to 3」。**输入框的 `max` 救不了它**:
+ * 那道钳位只在人去改这个框时才发生, 而这个人根本没打算改它。
+ *
+ * 所以钳在**读出来的那一刻**, 不是等着谁去动那个框。
+ */
+function clampYears(v: unknown): number {
+  const n = Number(v)
+  if (!Number.isFinite(n)) return YEARS_DEFAULT
+  return Math.min(YEARS_MAX, Math.max(YEARS_MIN, n))
+}
 
 /** 没做成的原因 —— 逐条翻译。**空栏必须自己解释**: 读的人分不清"没有"和"算不出来" */
 const WHY_CN: Record<string, string> = {
@@ -107,7 +126,8 @@ export function FlipPaper() {
   // [R353] 三个参数可自己填, 并且**记住** —— 每次打开都退回默认值等于没配过。
   const [capital, setCapital] = useState(() => storage.flipCapital.get(1_000_000))
   const [maxPositions, setMaxPositions] = useState(() => storage.flipMaxPositions.get(10))
-  const [years, setYears] = useState(() => storage.flipYears.get(2))
+  // [R357] 读出来先钳 —— 存里可能躺着收上限之前填的 5 年 / 10 年, 见 `clampYears`
+  const [years, setYears] = useState(() => clampYears(storage.flipYears.get(YEARS_DEFAULT)))
   const putCapital = (v: number) => { storage.flipCapital.set(v); setCapital(v) }
   const putMaxPositions = (v: number) => { storage.flipMaxPositions.set(v); setMaxPositions(v) }
   const putYears = (v: number) => { storage.flipYears.set(v); setYears(v) }
@@ -211,7 +231,7 @@ export function FlipPaper() {
             {/* [R353] 三个都改成可输入。上下界与后端逐个对齐:
                 本金 > 0(给 1 万下限, 再低连一手都买不起);
                 最多持有 1~50(`flip_portfolio.MAX_POSITIONS_CAP`);
-                回溯 0.5~10 年(`flip_paper.MIN_YEARS` / `MAX_YEARS`)。
+                回溯 0.5~3 年(`flip_paper.MIN_YEARS` / `MAX_YEARS`)。
                 **前端钳到同一个区间, 不是等后端 422** —— 那种报错只会说
                 「Input should be less than or equal to 50」, 读的人不知道该填多少。 */}
             {/* [R354] 本金**以「万」计**。用户: 「我实际本金不超 100 万, 要合适我真实情况」。
@@ -226,7 +246,7 @@ export function FlipPaper() {
             <NumberField label="最多持有" value={maxPositions} onChange={putMaxPositions}
                          min={1} max={50} step={1} width="w-14" suffix="只" />
             <NumberField label="回溯" value={years} onChange={putYears}
-                         min={0.5} max={10} step={0.5} width="w-14" suffix="年" />
+                         min={YEARS_MIN} max={YEARS_MAX} step={0.5} width="w-14" suffix="年" />
           </div>
         }
       />
@@ -690,53 +710,89 @@ function NumberField({ label, value, onChange, min, max, step, width = 'w-20', s
 }
 
 /**
- * [R332] 「近一月 / 近三月」—— 用户: 「回溯是回溯, 时间跨度太长了, 看看怎么设计
- * 能兼容注重当下」。
+ * [R332 → R357] 逐月收益那一条。用户: 「最好是每个月的收益单独计算」。
  *
- * **回溯那个参数不动。** 它给的是样本量: 转折是低频信号, 窗口短了只剩两三次
- * 转折, 胜率和回撤都说明不了任何事。但两年的总收益回答不了"我最近做得怎么样"
- * —— 一段半年前的暴涨能把最近三个月的亏损盖得严严实实。
+ * ## R332 那两格为什么退役
  *
- * 所以**同一条净值曲线切一段再算一次**, 不重跑、不多打一次接口。
+ * R332 给的是「近一月 / 近三月」两个**滚动窗口**(最近 20 / 60 个交易日)。
+ * 它当时要解决的问题没有错 —— 两年的总收益回答不了"我最近做得怎么样"。
+ * 但那两个窗口**重叠**: 近三月把近一月整个包在里面。
  *
- * 起点取"该窗口第一个交易日的前一天" —— 收益要算这一段**期间**的变化, 拿窗口
- * 内第一天的净值当起点会把那一天自己的涨跌吃掉。
+ *     九月 +10% / 八月 -4% / 七月 -4%   →   印出来是「近一月 +10% / 近三月 +2%」
+ *
+ * 读的人**没有任何办法**从这两个数里还原出七月和八月各自发生了什么 —— 而
+ * 「哪个月在亏」正是按月看的全部意义。改成自然月之后每个数只属于它自己那一段。
+ *
+ * ## 数不在这里算
+ *
+ * 逐月收益由后端 `flip_portfolio._monthly` 给(基准取上月末、首尾标残月那两条
+ * 都在那儿, 有守卫钉着)。**前端不自己再切一遍曲线** —— 同一件事两处算, 哪天
+ * 基准口径改了必然漂, 而且不会有任何东西报错。
  */
-function windowRet(nav: FlipPaperData['nav'], days: number): number | null {
-  if (nav.length < 2) return null
-  const i = Math.max(0, nav.length - 1 - days)
-  const base = nav[i].nav
-  if (!base) return null
-  return nav[nav.length - 1].nav / base - 1
+function MonthStrip({ months }: { months: FlipPaperData['monthly'] }) {
+  if (!months.length) return null
+  // 最大月度波动 —— 柱高按它归一, 于是**柱子之间可比**。拿固定刻度的话,
+  // 一个 ±2% 的年份会所有柱子都贴着底, 什么也看不出来。
+  const peak = Math.max(...months.map((m) => Math.abs(m.ret)), 0.01)
+  return (
+    <section className="overflow-hidden rounded-card border border-border/60 bg-surface/40 px-3 py-2.5">
+      <div className="mb-2 flex items-center gap-0.5 text-[10px] text-muted">
+        逐月收益
+        <Hint title={'**每个月单独算, 月与月之间不重叠** —— 这个月的收益 =\n月末净值 / 上月末净值 - 1(第一个月的基准是本金)。\n\n基准取**上月最后一天**而不是本月第一天: 收益要算这一段期间的变化,\n拿本月第一个交易日当基准会把那一天自己的涨跌吃掉。\n\n**打叉的是残月**: 回测窗口从月中切进来(第一个月),\n或者这个月还没走完(最后一个月)—— 它们不该拿去和整月比。'} />
+        <span className="ml-1 opacity-70">{months.length} 个月 · 柱高按最大月度波动归一</span>
+      </div>
+      <div className="flex items-end gap-1 overflow-x-auto">
+        {months.map((m) => {
+          const up = m.ret >= 0
+          return (
+            <div key={m.month} className="flex min-w-[2.75rem] flex-1 flex-col items-center gap-1"
+                 title={`${m.month} · ${m.days} 个交易日${m.partial ? '(残月)' : ''}\n月末净值 ${money(m.nav)}`}>
+              <span className={cn('text-[10px] font-semibold tabular-nums',
+                up ? 'text-bull' : 'text-bear', m.partial && 'opacity-60')}>
+                {pct(m.ret, 1)}
+              </span>
+              {/* 柱子从中线往上/往下长 —— 亏的月份自己往下掉, 不用先读那个负号 */}
+              <div className="flex h-8 w-full flex-col justify-center">
+                <div className="flex h-4 items-end">
+                  {up && <div className={cn('w-full rounded-t-sm bg-bull/60', m.partial && 'opacity-50')}
+                              style={{ height: `${Math.max(2, (m.ret / peak) * 100)}%` }} />}
+                </div>
+                <div className="flex h-4 items-start">
+                  {!up && <div className={cn('w-full rounded-b-sm bg-bear/60', m.partial && 'opacity-50')}
+                               style={{ height: `${Math.max(2, (-m.ret / peak) * 100)}%` }} />}
+                </div>
+              </div>
+              <span className={cn('text-[9px] tabular-nums text-muted', m.partial && 'opacity-60')}>
+                {/* 一月与跨年的那个月印出年份, 其余只印月 —— 一排 12 格里
+                    「2026-01」占的宽是「03」的三倍, 而年份一年只需要说一次 */}
+                {m.month.endsWith('-01') ? m.month.replace('-', '/') : m.month.slice(5)}
+                {m.partial && <span className="text-warning/70" title="残月">✕</span>}
+              </span>
+            </div>
+          )
+        })}
+      </div>
+    </section>
+  )
 }
 
 function Summary({ d }: { d: FlipPaperData }) {
   const s = d.stats
-  // 20 / 60 个交易日 ≈ 一个月 / 三个月。**按交易日数不按自然日**: 这条曲线
-  // 本来就是逐交易日的, 拿自然日去切还要先做一次日历换算, 凭空多一层会漂的东西。
-  const m1 = windowRet(d.nav, 20)
-  const m3 = windowRet(d.nav, 60)
-  const enough = d.nav.length
   return (
     <>
-      {/* 当下那一行排在长期之前 —— 用户每天打开最先要问的是"最近怎么样" */}
-      <section className="grid grid-cols-2 divide-x divide-y divide-border/30 overflow-hidden rounded-card border border-border/60 bg-surface/40 sm:grid-cols-4 sm:divide-y-0">
-        <Stat label="近一月" value={enough >= 21 ? pct(m1) : '—'}
-              tone={m1 != null && m1 >= 0 ? 'bull' : 'bear'}
-              sub={enough >= 21 ? '最近 20 个交易日' : `只有 ${enough} 天, 不够一个月`}
-              hint={'**同一条净值曲线上切一段算的**, 不是另跑一次回测 ——\n回溯那个参数给的是样本量, 这两格回答的是"我最近做得怎么样"。\n\n天数不够时空着而不是拿全程凑数: 「算不出来」与「没赚到」是两件事。'} />
-        <Stat label="近三月" value={enough >= 61 ? pct(m3) : '—'}
-              tone={m3 != null && m3 >= 0 ? 'bull' : 'bear'}
-              sub={enough >= 61 ? '最近 60 个交易日' : `只有 ${enough} 天, 不够三个月`} />
+      {/* [R357] 逐月排在最前 —— 用户每天打开最先要问的是"最近哪个月在亏" */}
+      <MonthStrip months={d.monthly} />
+
+      <section className="grid grid-cols-2 divide-x divide-y divide-border/30 overflow-hidden rounded-card border border-border/60 bg-surface/40 sm:grid-cols-2 sm:divide-y-0">
         <Stat label="现在拿着" value={`${d.positions.length} 只`}
               sub={`仓位 ${d.nav.length ? pct((d.nav[d.nav.length - 1].market_value / d.nav[d.nav.length - 1].nav), 0) : '—'} · 现金 ${money(d.nav.at(-1)?.cash)}`}
-              hint={'这是**当下**的仓位, 与上面那两格一样看的是现在;\n下面那一排才是整个回溯窗口的长期成绩。'} />
+              hint={'这是**当下**的仓位, 与上面那条逐月一样看的是现在;\n下面那一排才是整个回溯窗口的成绩。'} />
         <Stat label="最后一天" value={d.as_of ?? '—'}
               sub={`回溯 ${d.nav[0]?.date ?? '—'} 起`}
               hint={'日 K 要等收盘后落盘 —— 所以这里通常是上一个交易日,\n今天的要等 20:00 之后才会进来。'} />
       </section>
 
-      {/* 长期成绩 —— 回溯窗口整段 */}
+      {/* 整段成绩 —— 回溯窗口从头到尾 */}
       <section className="grid grid-cols-2 divide-x divide-y divide-border/30 overflow-hidden rounded-card border border-border/60 bg-surface/40 sm:grid-cols-4 sm:divide-y-0">
         <Stat label="总收益" value={pct(s.total_ret)} tone={s.total_ret >= 0 ? 'bull' : 'bear'}
               sub={`本金 ${money(d.capital)} · ${s.days} 个交易日`} />

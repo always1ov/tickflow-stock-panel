@@ -287,35 +287,113 @@ def test_R331_折叠按钮报出条数():
     assert "{idle.length} 只" in blk, "不写条数的话, 用户不知道展开会看到什么"
 
 
-# ── [R332] 注重当下 ────────────────────────────────────────────────────
-def test_R332_近期读数排在长期成绩之前():
-    """用户每天打开最先要问的是「我最近做得怎么样」, 不是两年总收益。"""
-    blk = _page()
-    blk = blk[blk.index("function Summary({ d }"):blk.index("function Stat({ label")]
-    i_now = blk.index("label=\"近一月\"")
-    i_long = blk.index("label=\"总收益\"")
-    assert i_now < i_long, "当下那一排必须排在长期那一排前面"
-    for k in ("近一月", "近三月", "现在拿着", "最后一天"):
-        assert k in blk, f"当下那一排少了「{k}」"
+# ── [R332 → R357] 注重当下: 从滚动窗口改成逐月 ──────────────────────────
+#
+# 用户: 「最好是每个月的收益单独计算, 也不需要回溯那么多, 没多大意义,
+# 极少我手动去选择的时候看长期」。
+#
+# **R332 那三条守卫退役, 但它们的立论有两条原样搬了过来**:
+#   ① 当下那一块排在整段成绩之前(用户每天打开先问「最近怎么样」)
+#   ② 不为它另打一次接口
+# 退役掉的是第三条「天数不够就空着」—— 滚动窗口凑不满 20/60 天才需要空着,
+# 而自然月天然有长有短, 对应的问题变成了「这个月是不是残月」, 见下面那条。
 
 
-def test_R332_近期收益是同一条曲线切一段_不另跑一次回测():
-    blk = _page()
-    assert "function windowRet(nav" in blk
-    fn = blk[blk.index("function windowRet(nav"):blk.index("function Summary({ d }")]
-    assert "nav[nav.length - 1].nav / base - 1" in fn
-    assert "api." not in fn and "useQuery" not in fn, "不许为这两格另打一次接口"
-    # 起点取窗口第一天的**前一天** —— 否则会把那天自己的涨跌吃掉
-    assert "nav.length - 1 - days" in fn
-
-
-def test_R332_天数不够时空着_不拿全程凑数():
+def test_R357_逐月排在整段成绩之前():
+    """用户每天打开最先要问的是「最近哪个月在亏」, 不是整段总收益。"""
     blk = _page()
     sm = blk[blk.index("function Summary({ d }"):blk.index("function Stat({ label")]
-    assert "enough >= 21 ? pct(m1) : '—'" in sm
-    assert "enough >= 61 ? pct(m3) : '—'" in sm
-    assert "不够一个月" in sm and "不够三个月" in sm, (
-        "空栏必须自己解释 —— 「算不出来」与「没赚到」是两件事")
+    assert sm.strip()
+    assert sm.index("<MonthStrip months={d.monthly} />") < sm.index('label="总收益"'), \
+        "逐月那一条必须排在整段成绩前面"
+
+
+def test_R357_逐月的数来自后端_前端不自己再切一遍():
+    """[R332 立论照搬] 不另打一次接口; **另加一条**: 也不另算一遍。
+
+    基准取上月末、首尾标残月 —— 这两条口径在 `flip_portfolio._monthly` 里,
+    有守卫钉着。前端再实现一份的话, 哪天基准口径改了必然漂, 而且**不会有任何
+    东西报错**(AGENTS.md 规则 12)。
+    """
+    blk = _page()
+    strip = blk[blk.index("function MonthStrip({ months }"):blk.index("function Summary({ d }")]
+    assert strip.strip()
+    assert "api." not in strip and "useQuery" not in strip, "不许为这一条另打一次接口"
+    for math in ("/ base - 1", ".slice(0, 7)", "getMonth()"):
+        assert math not in strip, f"前端自己又切了一遍曲线: {math}"
+    # R332 那个滚动窗口的实现整个没了 —— 不是留着不用
+    assert "function windowRet" not in blk, "滚动窗口那份实现还留着"
+    assert "近一月" not in blk and "近三月" not in blk, "重叠的那两格还在"
+
+
+def test_R357_残月要标出来():
+    """**空栏必须自己解释**这条纪律换了个对象: 残月不该拿去和整月比。
+
+    回测窗口的起点是「今天 - N 天」, 落在月中是常态; 最后一个月还没走完。
+    一个半月的 +2% 和整月的 +2% 并排摆着, 不标就是在骗人。
+    """
+    blk = _page()
+    strip = blk[blk.index("function MonthStrip({ months }"):blk.index("function Summary({ d }")]
+    assert strip.strip()
+    # **标记必须看得见, 不能只在 tooltip 里。**
+    #
+    # 第一版写的是 `assert "m.partial" in strip and "残月" in strip` —— 变异电池
+    # 当场打绿: 把那个 ✕ 徽标整个删掉, `m.partial` 仍然在几个 `opacity-60` 的
+    # 类名里、「残月」仍然在 `title` 与那段 Hint 里, 断言被它们喂饱, 而**屏幕上
+    # 已经没有任何东西**告诉人这是残月了(得悬停才知道)。锚太宽 = 没有锚, 第八次。
+    #
+    # 改钉结构: `m.partial` 必须**条件渲染出一个元素**(`&& <`), 而不只是换个
+    # 类名 —— 后者只是淡一点, 淡一点不等于说清楚了。
+    cell = strip[strip.index("months.map((m) =>"):]
+    assert cell.strip()
+    assert "{m.partial && <" in cell, \
+        "残月只剩淡化或 tooltip —— 不悬停就看不见它是残月"
+    assert "残月" in cell, "没有一处用人话说出「残月」"
+    assert "m.days" in strip, "没说这个月到底有几个交易日"
+    # 数字与柱子也跟着淡下去 —— 徽标说明"它是残月", 淡化让它在一排里**不抢眼**,
+    # 两件事都做才算"不拿它去和整月比"。涨跌两根柱子各一处。
+    assert cell.count("m.partial && 'opacity-50'") == 2, "残月的柱子没淡化"
+
+
+def test_R357_柱高按最大月度波动归一_不是固定刻度():
+    """一个 ±2% 的年份, 拿固定刻度画会所有柱子都贴着底, 什么也看不出来。"""
+    blk = _page()
+    strip = blk[blk.index("function MonthStrip({ months }"):blk.index("function Summary({ d }")]
+    assert strip.strip()
+    assert "Math.max(...months.map((m) => Math.abs(m.ret))" in strip, "没有归一"
+    # **涨的那根和跌的那根都得按同一个 peak 量。** 只断言「出现过一次 peak」的话,
+    # 把其中一根改成固定刻度守卫照样绿 —— 而那比两根都固定还糟: 上下两半不同尺,
+    # 一个 +3% 的柱子可能画得比 -8% 的还高。变异电池打绿过一次。
+    assert strip.count("/ peak) * 100") == 2, \
+        "涨跌两根柱子必须按同一个 peak 量, 少一根就是上下两半不同尺"
+
+
+def test_R357_收上限之后存着的旧值要钳一道():
+    """**输入框的 max 救不了它。**
+
+    上限从 10 收到 3, 而 R353 把回溯落了 localStorage —— 之前填过 5 年的人存里
+    躺着一个 5, 打开页面直接送进 queryKey, 换回一个 422。输入框那道钳位只在
+    人去改那个框时才发生, 而这个人根本没打算改它。
+    """
+    blk = _page()
+    assert "function clampYears" in blk, "读出来没钳"
+    assert "clampYears(storage.flipYears.get(" in blk, \
+        "钳位没接在读出来的那一刻 —— 那就等于没钳"
+    # **函数体也要钉。** 只钉"有这个函数、也调了"的话, 把里面掏空成 `return n`
+    # 守卫照样绿 —— 一个只有壳子的钳位函数, 比没有更坏: 它看上去已经处理过了。
+    fn = blk[blk.index("function clampYears"):]
+    fn = fn[:fn.index("\n}\n")]
+    assert "Math.min(YEARS_MAX, Math.max(YEARS_MIN, n))" in fn, "钳位只剩个壳子"
+    assert "return YEARS_DEFAULT" in fn, "填了非数字时没有退路, 会把 NaN 送进 queryKey"
+
+
+def test_R357_默认回溯一年_正好十二个月格():
+    from app.services import flip_portfolio_run
+    assert flip_portfolio_run.DEFAULT_YEARS == 1
+    blk = _page()
+    assert "const YEARS_DEFAULT = 1" in blk
+    assert "clampYears(storage.flipYears.get(YEARS_DEFAULT))" in blk, \
+        "前端默认值与后端 DEFAULT_YEARS 对不上"
 
 
 def test_R353_三个参数都能自己填_不是档位():
@@ -377,12 +455,16 @@ def test_R353_边界与后端逐个对齐():
     「Input should be less than or equal to 50」, 读的人不知道该填多少。"""
     blk = _page()
     assert "min={1} max={50}" in blk, "最多持有的上界要对上 MAX_POSITIONS_CAP"
-    assert "min={0.5} max={10}" in blk, "回溯的上下界要对上 MIN_YEARS / MAX_YEARS"
+    # [R357] 回溯的两个界改走常量, 不再是字面量 —— 因为**同一对数字现在有三处
+    # 要对上**: 输入框、`clampYears`、后端。写死在输入框上时, 改了后端而漏改
+    # 前端只会在用户填到边界那天才暴露。
+    assert "min={YEARS_MIN} max={YEARS_MAX}" in blk, "回溯的上下界没走常量"
+    assert "const YEARS_MIN = 0.5" in blk and "const YEARS_MAX = 3" in blk
 
     from app.api import flip_paper
     from app.services import flip_portfolio
     assert flip_portfolio.MAX_POSITIONS_CAP == 50
-    assert flip_paper.MIN_YEARS == 0.5 and flip_paper.MAX_YEARS == 10
+    assert flip_paper.MIN_YEARS == 0.5 and flip_paper.MAX_YEARS == 3
 
 
 def test_R353_失焦才提交_不许边敲边跑():
@@ -416,7 +498,9 @@ def test_R353_填过的值要记住():
     blk = _page()
     for key in ("storage.flipCapital.get(1_000_000)",
                 "storage.flipMaxPositions.get(10)",
-                "storage.flipYears.get(2)"):
+                # [R357] 回溯这一个多套了一层 `clampYears` —— 收上限之后存里可能
+                # 躺着旧值。钳位不影响"记住"这条: 填过的仍然读得回来。
+                "storage.flipYears.get(YEARS_DEFAULT)"):
         assert key in blk, f"没从本地读回: {key}"
     for put in ("storage.flipCapital.set(v)", "storage.flipMaxPositions.set(v)",
                 "storage.flipYears.set(v)"):
