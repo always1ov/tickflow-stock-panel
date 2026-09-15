@@ -26,16 +26,35 @@ def test_R324_今日总览首次加载画骨架_不再转圈():
     assert "{q.isLoading && (\n        <div className=\"flex items-center justify-center py-16\">" not in code
 
 
-def test_R324_今日骨架按真实版面摆_四个区块():
+def test_R324_今日骨架按真实版面摆():
+    """[R340] 区块数从三个降到一个 —— 「需要行动」「持仓体检」整块删了。
+
+    **这条断言的价值恰恰在这次体现了**: 删页面时它立刻变红, 逼着骨架跟着改。
+    骨架画出一个填不进东西的形状, 比直接转圈更糟 —— 它先许诺了一个版面, 然后食言。
+    """
     code = code_of(TODAY_SK)
     body = code[code.index("export function TodaySkeleton"):]
     # 市场状态卡那排五个统计格, 与 MarketStatusCard 同一套栅格
     assert "sm:grid-cols-3 lg:grid-cols-5" in body
     assert "Array.from({ length: 5 }" in body
-    # 三个 section: 需要行动 / 持仓体检 / 机会
-    assert body.count("<SectionHead") == 3
+    # 只剩「值得关注」一个 section
+    assert body.count("<SectionHead") == 1
     assert 'role="status"' in body
     assert "from '@/components/data/Skeleton'" in code, "复用仓库已有的 Skeleton 原语, 不另造一个"
+
+
+def test_R340_两块整个删干净_骨架跟着同步():
+    """**同步的是两个文件, 不是一句注释。** 骨架多画一块或少画一块都在说谎。
+
+    `code_of` 已经把注释剥掉了, 所以这里扫到的「需要行动」只可能来自真正会渲染
+    的文字 —— 说明它为什么被删的那段注释不会把断言喂饱。
+    """
+    page = code_of(TODAY)
+    sk = code_of(TODAY_SK)
+    for gone in ("需要行动", "持仓体检", "回撤纪律线"):
+        assert gone not in page, f"页面还留着「{gone}」"
+    assert page.count("<section") == 1, "页面只该剩「值得关注」一个 section"
+    assert sk[sk.index("export function TodaySkeleton"):].count("<SectionHead") == 1
 
 
 def test_R324_决策台加载中画骨架行_不印自选为空():

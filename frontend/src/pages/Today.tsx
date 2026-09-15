@@ -1,29 +1,31 @@
 /**
  * [fork 增强] 今日总览 —— 决策汇聚层。
  *
- * 把六态趋势/AI 信号预案/持仓出场线/监控触发聚合成一屏, 版面顺序:
- * 市场状态(定基调) → 需要行动(持仓风险) → 持仓体检 → 值得关注(买什么)。
+ * 版面顺序: 市场状态(定基调) → 值得关注(买什么)。
  *
- * [R179] 风险排在机会前面。改之前是「值得关注」在上、「需要行动」在下, 而机会区
- * 有 300 行 —— 一句「已跌破生命线, 按纪律无条件清仓」要往下滚过整张机会表才看得见。
- * 道理很直白: **错过一个机会损失的是机会, 错过一条止损损失的是钱。**
- * (这个优先级其实早就写在代码里了 —— 区块注释一直是「① 行动区」「② 机会区」,
- *  只是版面没兑现。)
- * 行动区与持仓体检仍然相邻 —— 两者都是持仓管理, 连着看不用来回滚, 所以是
- * 整块一起上移, 不是把行动区单独插到中间。
- * 没有另做顶部横幅: 那会把同样的内容说两遍, 而重排一分不多花。
+ * [R340] **「需要行动」与「持仓体检」整块删掉**(用户: 「今日总览里面, 我截图的
+ * 这部分都可以删除了」)。这两块是 R7/R8 那一套 ATR 出场线纪律的门面 ——
+ * 生命线(20 日线)跌破就清仓、三阶段止损/保本/移动止盈。它们没坏, 但**与这套
+ * 系统现在走的路是两条**: R327 起模拟盘只认六态转折, R329 那条铁律是「一定要
+ * 根据转折才能出手」, R338 又把「手上这些 · 跌破离场线才清仓」做进了模拟盘。
+ * 同一屏上摆两套互相不认的离场纪律, 读的人每天要先决定信哪一个 —— 那不是信息,
+ * 是负担。
+ *
+ * **后端一个字没动**: `/api/today` 照旧算并返回 actions / holdings / portfolio,
+ * 只是这一页不再渲染。要恢复就把两个 section 加回来, 数据一直在。
+ * (代价是这几项仍在每次请求里白算 —— 知情保留, 换的是随时能改回来。)
+ *
+ * [R179] 那条「风险排在机会前面」的排序论证随被删的区块一起退役: 页面上已经
+ * 没有风险区了。它的精神搬去了模拟盘 —— 那一页「今天该挂什么单」就在最顶上。
  *
  * 数据全部来自既有模块,零新计算;AI 导读可选(手动点击,一次调用)。
- * 注意 AI 导读是**手动**生成的 —— 它虽然收到了行动区内容并被要求点名最需处理的
- * 1-2 件事, 但没点生成时它就是空的, 所以规则层的行动区必须自己站在显眼位置,
- * 不能指望 AI 那段话兜底。
  */
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { inRealtimeWindow } from '@/lib/marketClock'
 import {
-  AlertTriangle, BarChart3, CheckCircle2, Download, Loader2, RefreshCw,
+  BarChart3, Download, Loader2, RefreshCw,
   SlidersHorizontal, Sparkles, Sunrise, Target,
 } from 'lucide-react'
 import {
@@ -38,23 +40,11 @@ import { cn } from '@/lib/cn'
 // [R167] 以下五块从本文件拆出 —— 拆前 1922 行, 一个文件装下了导出、表格、面板、
 // 弹窗和页面本体。缝按"对外暴露什么"划: 每个模块只导出 1~2 个组件, 其余是内部实现。
 import { buildTodayHtml } from '@/lib/todayHtmlExport'
-import { VerdictTag } from '@/components/today/VerdictTag'
-import { LotBadge } from '@/components/today/LotBadge'   // [R169] 批次派生成本 / 到期提醒小标
 import { OpportunityTable, GateFunnel } from '@/components/today/OpportunityTable'
 import { AiPickPanel } from '@/components/today/AiPickPanel'
 import { MarketStatusCard } from '@/components/today/MarketStatusCard'
 import { TodaySkeleton } from '@/components/today/TodaySkeleton'   // [R324] 首次加载骨架
 import { AiAskDialog } from '@/components/today/AiAskDialog'
-
-// [R179] 行动区四档配色。fatal 是"无条件清仓"那一档 —— 用最重的红并让整行的
-// 标的名也跟着变红, 它必须一眼从其余项里跳出来; low 是已发生过的监控记录,
-// 整行压暗, 因为它不是此刻要处理的事。
-const ACTION_DOT: Record<string, string> = {
-  fatal: 'bg-red-500 ring-2 ring-red-500/30',
-  high: 'bg-red-400',
-  mid: 'bg-amber-300',
-  low: 'bg-muted/50',
-}
 
 
 // [R218] 「参与打分的因子」勾选面板(R204)在这里删掉了。用户: 「不搞自选了」。
@@ -378,141 +368,6 @@ export function Today() {
           {/* [R142] 市场状态 —— 原「市场天气」+「中观」合并。见组件上方注释 */}
           <MarketStatusCard d={d} meso={meso} mainline={mainline} />
 
-          {/* ① 行动区 */}
-          <section className="rounded-lg border border-border/60 bg-surface/40 overflow-hidden">
-            <div className="flex items-center gap-2 border-b border-border/40 px-4 py-2.5">
-              <AlertTriangle className="h-4 w-4 text-red-400" />
-              <span className="text-sm font-medium text-foreground">需要行动</span>
-              <span className="text-[10px] text-muted">{d.actions.length} 项</span>
-              <span
-                title={d.live
-                  ? '距离/价格按盘中最新价计算;"已跌破→清仓"的纪律判定仍以收盘为准'
-                  : `所有距离/价格为 ${d.as_of ?? '上一交易日'} 收盘快照 —— 盘中已变化的不会反映,打开左下角「实时行情」后自动实时`}
-                className={`rounded border px-1.5 py-0.5 text-[9px] ${d.live ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-400' : 'border-amber-400/30 bg-amber-400/10 text-amber-300'}`}
-              >
-                {d.live ? '分数收盘口径 · 盘中列实时' : `昨收快照 ${d.as_of ?? ''}`}
-              </span>
-            </div>
-            {d.actions.length === 0 ? (
-              <div className="flex items-center gap-2 px-4 py-5 text-xs text-muted">
-                <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-                今日无需操作 —— 这本身就是有价值的信息,管住手
-              </div>
-            ) : (
-              <ul className="grid lg:grid-cols-2 -mb-px">
-                {d.actions.map((a, i) => (
-                  <li key={i} className="border-b border-border/30 lg:odd:border-r">
-                    <button
-                      onClick={() => a.symbol && goStock(a.symbol, a.name)}
-                      className="flex w-full items-start gap-2.5 px-4 py-2.5 text-left hover:bg-elevated/40 transition-colors cursor-pointer"
-                    >
-                      <span className={`mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full ${ACTION_DOT[a.severity] ?? 'bg-amber-300'}`} />
-                      <span className={`text-xs leading-relaxed ${a.severity === 'low' ? 'opacity-70' : ''}`}>
-                        <span className={`font-medium ${a.severity === 'fatal' ? 'text-red-400' : 'text-foreground'}`}>{a.name}</span>
-                        {a.symbol && a.symbol !== a.name && <span className="ml-1.5 text-[9px] font-mono text-muted">{a.symbol}</span>}
-                        <span className="ml-2 text-foreground/80">{a.text}</span>
-                      </span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-
-          {/* ④ 持仓体检 */}
-          <section className="rounded-lg border border-border/60 bg-surface/40 overflow-hidden">
-            <div className="flex flex-wrap items-center gap-2 border-b border-border/40 px-4 py-2.5">
-              <span className="text-sm font-medium text-foreground">持仓体检</span>
-              <span className="text-[10px] text-muted">{d.holdings.length} 只(已触发/最接近出场线的排前面)</span>
-              {d.portfolio && (
-                <span className={`ml-auto text-[10px] ${d.portfolio.triggered > 0 ? 'text-red-400' : 'text-muted'}`}>
-                  组合:平均浮盈{' '}
-                  <span className={d.portfolio.avg_pnl == null ? '' : d.portfolio.avg_pnl > 0 ? 'text-red-400' : 'text-emerald-400'}>
-                    {d.portfolio.avg_pnl != null ? `${(d.portfolio.avg_pnl * 100).toFixed(1)}%` : '—'}
-                  </span>
-                  {' '}· 已触发出场 {d.portfolio.triggered} · 逼近出场线 {d.portfolio.near_exit} · 空头趋势 {d.portfolio.bearish}
-                  {d.portfolio.total_weight != null && (
-                    <span title="由各持仓「仓位%」汇总;超过姿态基调或回撤超纪律线会进「需要行动」">
-                      {' '}· 总仓位 {(d.portfolio.total_weight / 10).toFixed(1)}成
-                      {d.portfolio.posture_cap != null && `(基调≤${d.portfolio.posture_cap * 10}成)`}
-                      {d.portfolio.drawdown != null && ` · 距净值高点 -${(d.portfolio.drawdown * 100).toFixed(1)}%`}
-                    </span>
-                  )}
-                </span>
-              )}
-            </div>
-            {d.holdings.length === 0 ? (
-              <div className="px-4 py-5 text-xs text-muted">
-                暂无持仓标记 —— 在个股分析页决策台把持有的票标「持有」并填成本,这里就会出现仓位全景
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[720px] text-xs">
-                  <thead className="text-[10px] text-muted">
-                    <tr className="text-left">
-                      <th className="px-4 py-1.5 font-normal">标的</th>
-                      <th className="px-2 py-1.5 font-normal text-right">现价</th>
-                      <th className="px-2 py-1.5 font-normal text-right">仓位</th>
-                      <th className="px-2 py-1.5 font-normal text-right">浮盈</th>
-                      <th className="px-2 py-1.5 font-normal text-right">出场线</th>
-                      <th className="px-2 py-1.5 font-normal text-center">阶段</th>
-                      <th className="px-2 py-1.5 font-normal text-center">趋势</th>
-                      <th className="px-2 py-1.5 font-normal text-center">AI 信号</th>
-                      <th className="px-4 py-1.5 font-normal text-center">操作建议</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {d.holdings.map((h) => (
-                      <tr
-                        key={h.symbol}
-                        onClick={() => goStock(h.symbol, h.name)}
-                        className="border-t border-border/30 hover:bg-elevated/40 cursor-pointer"
-                      >
-                        <td className="px-4 py-1.5">
-                          <span className="font-medium text-foreground">{h.name}</span>
-                          {h.symbol !== h.name && <span className="ml-1.5 text-[9px] font-mono text-muted">{h.symbol}</span>}
-                          <VerdictTag v={h.heat?.verdict} holding />
-                          <LotBadge h={h} />
-                        </td>
-                        <td className="px-2 py-1.5 text-right font-mono">{h.close?.toFixed(2) ?? '—'}</td>
-                        {/* [R215] 决策台的「仓%」输入框撤了(用户: 「不需要仓位比例」),
-                            所以这里不能再让人去那儿填。以前填过的照常显示。 */}
-                        <td className="px-2 py-1.5 text-right font-mono text-muted"
-                            title="仓位比例(占总资金 %)。已经不再提供填写入口, 这里显示的是以前填过的值">
-                          {h.weight != null ? `${h.weight}%` : '—'}
-                        </td>
-                        <td className={`px-2 py-1.5 text-right font-mono ${h.pnl_pct == null ? 'text-muted' : h.pnl_pct > 0 ? 'text-red-400' : h.pnl_pct < 0 ? 'text-emerald-400' : 'text-muted'}`}>
-                          {h.pnl_pct != null ? `${(h.pnl_pct * 100).toFixed(1)}%` : '—'}
-                        </td>
-                        <td className={`px-2 py-1.5 text-right font-mono ${h.exit_triggered ? 'text-red-400' : (h.distance_pct ?? -1) > -0.03 ? 'text-amber-300' : 'text-muted'}`}>
-                          {h.line != null ? `${h.line.toFixed(2)}${h.exit_triggered ? ' 已触发' : h.distance_pct != null ? ` · 距${(Math.abs(h.distance_pct) * 100).toFixed(1)}%` : ''}` : '—'}
-                        </td>
-                        <td className="px-2 py-1.5 text-center text-[10px] text-muted">{h.stage_cn ?? '—'}</td>
-                        <td className="px-2 py-1.5 text-center text-[10px]">
-                          {h.trend_cn ? (
-                            <span className={h.trend_side === '多头' ? 'text-red-400' : 'text-emerald-400'}>
-                              {h.trend_cn} {h.trend_duration}天
-                            </span>
-                          ) : '—'}
-                        </td>
-                        <td className="px-2 py-1.5 text-center text-[10px] text-muted">{h.signal ?? '—'}</td>
-                        <td className="px-4 py-1.5 text-center text-[10px]" title={h.stance_why}>
-                          <span className={
-                            h.stance === '离场' ? 'font-semibold text-red-400'
-                              : h.stance === '减仓' ? 'text-amber-300'
-                                : h.stance === '加仓' ? 'text-red-300'
-                                  : 'text-muted'
-                          }>
-                            {h.stance}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </section>
           {/* ② 机会区(已按把握分筛选排序; AI 优选可再精选) */}
           <section className="rounded-lg border border-border/60 bg-surface/40 overflow-hidden">
             <div className="flex flex-wrap items-center gap-2 border-b border-border/40 px-4 py-2.5">
@@ -695,19 +550,11 @@ export function Today() {
                   />
                   <span>%</span>
                 </label>
-                <label className="flex items-center gap-2 text-[11px] text-muted" title="组合净值从高点回撤超过此值 → 需要行动区置顶'纪律性降仓'提醒(需在决策台填各持仓的仓位%)">
-                  <span className="whitespace-nowrap">回撤纪律线</span>
-                  <input
-                    type="number" min={3} max={30}
-                    defaultValue={d.prefs.max_drawdown}
-                    onBlur={(e) => {
-                      const v = Number(e.target.value)
-                      if (v && v !== d.prefs.max_drawdown) prefsMut.mutate({ max_drawdown: v })
-                    }}
-                    className="w-14 rounded border border-border bg-surface px-2 py-1 font-mono text-foreground outline-none focus:border-sky-400/50"
-                  />
-                  <span>%</span>
-                </label>
+                {/* [R340] 「回撤纪律线」这个输入框跟着一起撤了。它**只喂一个消费者**
+                    —— `api/today.py` 里那条 `portfolio_drawdown` 提醒, 而那条提醒
+                    只出现在刚被删掉的「需要行动」区。留着就是一个调了不产生任何
+                    可见结果的旋钮, 比没有更坏。
+                    后端 `today_prefs` 的字段没动: 要把那一区加回来, 它原样还在。 */}
                 <label className="flex items-center gap-2 text-[11px] text-muted" title="建仓路径第一步: 试仓占目标仓位的比例(买'对不对')">
                   <span className="whitespace-nowrap">试仓</span>
                   <input
