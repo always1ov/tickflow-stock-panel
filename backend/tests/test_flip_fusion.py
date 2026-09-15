@@ -695,3 +695,61 @@ def test_R360_名次空着时照样占住第一格():
     assert ") : <span />}" in row, "没名次时要留一个空占位"
     # 空占位必须仍在第一格 —— 即在 SymbolCell 之前
     assert row.index(") : <span />}") < row.index("<SymbolCell symbol={r.symbol}")
+
+
+# ── [R362] 六格并成一行 ─────────────────────────────────────────────────
+#
+# 用户: 「把图片显示的内容用一行显示」(截图是上排两格 + 下排四格)。
+
+
+def _stat_row() -> str:
+    code = code_of(FLIP)
+    row = code[code.index('<section className="grid grid-cols-2 divide-x'):]
+    row = row[:row.index("</section>")]
+    assert row.strip() and "<Stat label=" in row, "没切到统计那一排"
+    return row
+
+
+def test_R362_六格一行_不是两排():
+    """原来是两排: 上排两格说「当下」各占半屏 —— 一个「10 只」霸着 1000px。"""
+    import re
+    row = _stat_row()
+    for label in ("现在拿着", "最后一天", "总收益", "最大回撤", "完整买卖", "胜率"):
+        assert label in row, f"这一格掉出这一排了: {label}"
+    assert len(re.findall(r"<Stat[\s>]", row)) == 6, "不是六格"
+    # **整页只剩这一个统计排** —— 留着旧的那一排等于没并
+    code = code_of(FLIP)
+    assert code.count('<section className="grid grid-cols-2 divide-x') == 1, \
+        "还有第二排统计 —— 那就不是「一行显示」"
+
+
+def test_R362_当下那两格仍排在整段四格之前():
+    """[R332 立论照搬] 用户每天打开先问「最近怎么样」。
+
+    **那条次序还在, 只是不再靠换行表达** —— 六格一行, 左两格当下、右四格整段。
+    """
+    row = _stat_row()
+    assert row.index('label="现在拿着"') < row.index('label="总收益"'), "次序反了"
+    assert row.index('label="最后一天"') < row.index('label="总收益"')
+
+
+def test_R362_窄屏照样换行():
+    """六格横排在手机上一格只剩六十来像素, 数字会被压断。"""
+    row = _stat_row()
+    for cls in ("grid-cols-2", "sm:grid-cols-3", "lg:grid-cols-6"):
+        assert cls in row, f"少了这一档断点: {cls}"
+    # 换行的档位要有横线, 六格一行时**要关掉** —— 否则会在唯一那一行下面
+    # 多画一条线
+    assert "divide-y divide-border/30" in row and "lg:divide-y-0" in row, \
+        "divide-y 没按断点收掉"
+
+
+def test_R362_并成一行之后提示语没说假话():
+    """「下面那一排才是整段成绩」那句话在并成一行之后是假的 —— 下面没有那一排了。
+
+    **提示语跟着版面走**: 一句指错方向的说明比没有说明更坏, 它会让人去找一个
+    不存在的东西, 而且不会有任何东西报错。
+    """
+    row = _stat_row()
+    assert "下面那一排" not in row, "提示语还在指一个不存在的下一排"
+    assert "同一行右边那四格" in row, "没告诉读的人整段成绩现在在哪儿"

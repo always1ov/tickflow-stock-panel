@@ -870,17 +870,22 @@ function Summary({ d }: { d: FlipPaperData }) {
       {/* [R357] 逐月排在最前 —— 用户每天打开最先要问的是"最近哪个月在亏" */}
       <MonthStrip months={d.monthly} />
 
-      <section className="grid grid-cols-2 divide-x divide-border/30 overflow-hidden rounded-card border border-border/40 bg-base/30 sm:grid-cols-2">
+      {/* [R362] **六格并成一行**(用户: 「把图片显示的内容用一行显示」)。
+          原来是两排: 上排两格说"当下"(现在拿着 / 最后一天), 下排四格说"整段"
+          (总收益 / 最大回撤 / 完整买卖 / 胜率)。分两排的立论是 R332 立的
+          ——「当下排在整段之前」, 那条**次序**仍然在(两格仍排在四格左边),
+          只是不再靠换行来表达: 六格一行, 左两格当下、右四格整段, 中间由分隔线划。
+          分两排真正的代价是**上排那两格各占半屏**, 一个「10 只」霸着 1000px。
+
+          窄屏仍然换行: 2 格 → 3 格 → 6 格。`divide-y` 只在换行的档位上要,
+          六格一行时关掉, 否则会在唯一那一行下面画一条多余的线。 */}
+      <section className="grid grid-cols-2 divide-x divide-y divide-border/30 overflow-hidden rounded-card border border-border/40 bg-base/30 sm:grid-cols-3 lg:grid-cols-6 lg:divide-y-0">
         <Stat label="现在拿着" value={`${d.positions.length} 只`}
               sub={`仓位 ${d.nav.length ? pct((d.nav[d.nav.length - 1].market_value / d.nav[d.nav.length - 1].nav), 0) : '—'} · 现金 ${money(d.nav.at(-1)?.cash)}`}
-              hint={'这是**当下**的仓位, 与上面那条逐月一样看的是现在;\n下面那一排才是整个回溯窗口的成绩。'} />
+              hint={'这是**当下**的仓位, 与上面那条逐月一样看的是现在;\n同一行右边那四格才是整个回溯窗口的成绩。'} />
         <Stat label="最后一天" value={d.as_of ?? '—'}
               sub={`回溯 ${d.nav[0]?.date ?? '—'} 起`}
               hint={'日 K 要等收盘后落盘 —— 所以这里通常是上一个交易日,\n今天的要等 20:00 之后才会进来。'} />
-      </section>
-
-      {/* 整段成绩 —— 回溯窗口从头到尾 */}
-      <section className="grid grid-cols-2 divide-x divide-y divide-border/30 overflow-hidden rounded-card border border-border/40 bg-base/30 sm:grid-cols-4 sm:divide-y-0">
         <Stat label="总收益" value={pct(s.total_ret)} tone={s.total_ret >= 0 ? 'bull' : 'bear'}
               sub={`本金 ${money(d.capital)} · ${s.days} 个交易日`} />
         <Stat label="最大回撤" value={pct(s.max_drawdown)} tone="bear"
@@ -1208,8 +1213,11 @@ function SectionHead({ title, note, right, hint }: {
 function LoadingSkeleton() {
   return (
     <div role="status" aria-label="正在算" className="space-y-3">
-      <div className="grid grid-cols-2 divide-x divide-y divide-border/30 overflow-hidden rounded-card border border-border/60 bg-surface/40 sm:grid-cols-4 sm:divide-y-0">
-        {Array.from({ length: 4 }, (_, i) => (
+      {/* [R362] 六格 —— **跟着 `Summary` 那一排走**。少画两格就是先许诺一个版面
+          再食言(与下面净值图那块同一条纪律)。栅格断点也要逐个对上, 否则骨架
+          在窄屏上换行的位置与真东西不一样, 数据到位时版面会跳一下。 */}
+      <div className="grid grid-cols-2 divide-x divide-y divide-border/30 overflow-hidden rounded-card border border-border/60 bg-surface/40 sm:grid-cols-3 lg:grid-cols-6 lg:divide-y-0">
+        {Array.from({ length: 6 }, (_, i) => (
           <div key={i} className="space-y-1.5 px-4 py-2.5">
             <Skeleton w="w-12" h="h-2.5" />
             <Skeleton w="w-16" h="h-5" />
