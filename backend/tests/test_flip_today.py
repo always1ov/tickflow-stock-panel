@@ -338,6 +338,40 @@ def test_R353_三个参数都能自己填_不是档位():
         assert field in blk, f"这一项没改成可输入: {field}"
 
 
+def test_R354_数字输入框不许被喂格式化过的字符串():
+    """**这一条直接钉用户报的那个空框。**
+
+    第一版给 `NumberField` 开了个 `fmt` 钩子, 本金那格传的是千分位的 `money()` ——
+    于是 `value` 收到 `"1,000,000"`, 而 **`<input type="number">` 认不了带逗号的
+    字符串, 直接渲染成一个空框**。值一直在(查询照常按 100 万跑), 只是**看上去
+    像没填** —— tsc 与 eslint 都不会说一个字。
+
+    教训不是"把逗号去掉"而是**别给数字输入框留格式化的口子**: 数字要好读就换单位,
+    不是往框里塞排版。
+    """
+    blk = _page()
+    fn = blk[blk.index("function NumberField"):]
+    fn = fn[:fn.index("\n}\n")]
+    assert "value={draft ?? String(value)}" in fn, "value 必须是原始数字的字符串"
+    assert "fmt" not in fn, "又给数字输入框开了格式化的口子"
+    assert "money(" not in fn, "千分位函数不许出现在数字输入框里"
+
+
+def test_R354_本金以万计_对得上真实量级():
+    """用户: 「我实际本金不超 100 万, 要合适我真实情况」。
+
+    按元填的话 100 万写成 `1000000` —— 七位数在一个小框里既难读也难改, 而上限
+    原来给到 1 亿, 与真实量级差两个数量级。
+    """
+    blk = _page()
+    assert 'suffix="万"' in blk, "本金那格没标单位"
+    assert "min={1} max={1000} step={5}" in blk, "区间/步进没对上散户的量级"
+    # 换算只在这一处, 存的与送后端的仍然是元
+    assert "value={Math.round(capital / 10_000)}" in blk
+    assert "onChange={(v) => putCapital(v * 10_000)}" in blk
+    assert "max={100_000_000}" not in blk, "1 亿那个上限还在"
+
+
 def test_R353_边界与后端逐个对齐():
     """前端钳到同一个区间, **不是等后端 422** —— 那种报错只会说
     「Input should be less than or equal to 50」, 读的人不知道该填多少。"""

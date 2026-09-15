@@ -214,9 +214,15 @@ export function FlipPaper() {
                 回溯 0.5~10 年(`flip_paper.MIN_YEARS` / `MAX_YEARS`)。
                 **前端钳到同一个区间, 不是等后端 422** —— 那种报错只会说
                 「Input should be less than or equal to 50」, 读的人不知道该填多少。 */}
-            <NumberField label="本金" value={capital} onChange={putCapital}
-                         min={10_000} max={100_000_000} step={10_000}
-                         width="w-24" fmt={money} />
+            {/* [R354] 本金**以「万」计**。用户: 「我实际本金不超 100 万, 要合适我真实情况」。
+                原来按元填, 100 万写成 1000000 —— 七位数在一个小框里既难读也难改,
+                而且上限给到了 1 亿, 与真实量级差两个数量级。
+                换成万之后数字只剩三位, 一眼就是「100 万」; 区间 1~1000 万留了余量
+                但不再荒唐, 步进 5 万是散户实际会调的粒度。
+                **换算只在这一处**: 存进 state 与送给后端的仍然是元。 */}
+            <NumberField label="本金" value={Math.round(capital / 10_000)}
+                         onChange={(v) => putCapital(v * 10_000)}
+                         min={1} max={1000} step={5} width="w-16" suffix="万" />
             <NumberField label="最多持有" value={maxPositions} onChange={putMaxPositions}
                          min={1} max={50} step={1} width="w-14" suffix="只" />
             <NumberField label="回溯" value={years} onChange={putYears}
@@ -588,10 +594,20 @@ function SignalRow({ r, c }: { r: FlipTodaySignal; c?: TodayOpportunity }) {
  * 回溯 0.5~10 年), 填了 999 只就钳成 50 —— **让人看见它被钳到哪儿**, 比弹一句
  * 「超出范围」再把输入清空有用得多。填了不是数字的东西就退回当前值。
  *
- * `step` 给出这一栏的自然粒度(本金 1 万、持有 1 只、回溯半年), 上下箭头与滚轮
+ * `step` 给出这一栏的自然粒度(本金 5 万、持有 1 只、回溯半年), 上下箭头与滚轮
  * 因此是可用的 —— 想微调的人不必每次都全选重打。
+ *
+ * ## 这里**没有**格式化钩子, 是故意的
+ *
+ * [R354] 第一版给它开了个 `fmt`, 本金那格传的是千分位的 `money()` —— 于是
+ * `value` 收到的是 `"1,000,000"`, 而 **`<input type="number">` 认不了带逗号的
+ * 字符串, 直接渲染成一个空框**。用户截图里那个空的本金框就是这么来的:
+ * 值一直在(查询照常按 100 万跑), 只是**看上去像没填**。
+ *
+ * 教训不是"把逗号去掉"而是**别给数字输入框留格式化的口子** —— 数字要好读就
+ * 换单位(本金因此改成以「万」计), 不是往框里塞排版。
  */
-function NumberField({ label, value, onChange, min, max, step, width = 'w-20', suffix, fmt }: {
+function NumberField({ label, value, onChange, min, max, step, width = 'w-20', suffix }: {
   label: string
   value: number
   onChange: (v: number) => void
@@ -601,8 +617,6 @@ function NumberField({ label, value, onChange, min, max, step, width = 'w-20', s
   width?: string
   /** 单位, 跟在输入框右边 —— 放进框里会被光标挤 */
   suffix?: string
-  /** 只在**没有聚焦**时用来好看地显示(如本金的千分位); 一聚焦就退回原始数字好编辑 */
-  fmt?: (v: number) => string
 }) {
   const [draft, setDraft] = useState<string | null>(null)
   const commit = () => {
@@ -622,7 +636,7 @@ function NumberField({ label, value, onChange, min, max, step, width = 'w-20', s
         min={min}
         max={max}
         step={step}
-        value={draft ?? (fmt ? fmt(value) : String(value))}
+        value={draft ?? String(value)}
         onFocus={() => setDraft(String(value))}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={commit}
