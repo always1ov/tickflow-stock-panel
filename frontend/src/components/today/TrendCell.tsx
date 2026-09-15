@@ -38,17 +38,25 @@ export function volWord(v: number): { cn: string; tone: string; why: string } {
 }
 
 /**
- * 「走势」—— 信号 + 六态 + 位置 + 量能 + 距关键点, 一格里三行。
+ * 「走势」—— 信号 + 六态 + 位置 + 量能 + 距关键点, **一格一行**。
  *
  * 为什么合成一格: 它们回答的是同一个问题(**凭什么把这只挑出来**)。
- * 拆成四列, 人得左右对眼把依据接起来; 并成一格, 上下一扫就是一条链:
+ * 拆成四列, 人得左右对眼把依据接起来; 并成一格, 一扫就是一条链:
  * 出了什么信号 → 现在贵不贵、有没有量 → 离该动手的价还有多远。
+ *
+ * [R356] 原来这段写的是「一格里三行」, 那是它长在机会表里时的样子。那张表随今日
+ * 总览删了, **唯一的消费方现在是模拟盘的信号行** —— 在那儿多一行就是多一截行高,
+ * 而且只有"进了候选池"的票才多, 一屏扫下去参差不齐。见下面 `flex-wrap` 那段。
  */
 export function TrendCell({ o }: { o: TodayOpportunity }) {
   const p = o.channel_pct != null ? posWord(o.channel_pct) : null
   const v = o.vol_ratio != null ? volWord(o.vol_ratio) : null
   return (
-    <div className="flex min-w-[10rem] flex-col gap-1">
+    /* [R356] **一行, 不是两行。** 原来是 `flex-col`(信号一行、三个状态词一行),
+       那是机会表里"一格两行"的排法; 那张表随今日总览删了, 现在唯一的消费方是
+       模拟盘的信号行 —— 而在那儿分两行会让**有走势的票比没走势的高一截**,
+       一屏扫下去行高参差。摊成一行, 右边那片空地正好用上。 */
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
       <div className="flex flex-wrap items-center gap-1.5 text-foreground/85">
         <span>{o.text}</span>
         {o.trend_state_cn && (

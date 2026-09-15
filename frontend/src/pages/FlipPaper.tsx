@@ -492,17 +492,19 @@ const NEAR_EXIT = 0.02
 
 function SignalRow({ r, c }: { r: FlipTodaySignal; c?: TodayOpportunity }) {
   const actionable = r.stage === 'flipped' && !!r.act
-  // [R349] 「走势」那一格整格移植过来(用户: 「这一列也要有」)。
+  // [R349 → R356] 「走势」那一格整格移植过来(用户: 「这一列也要有」)。
   //
-  // **它单独占一行, 不跟六态那句挤在一起** —— 两者回答的不是同一个问题:
+  // 它与六态那句回答的不是同一个问题:
   //
   //     六态那句   今天要不要动手(已转折 / 盘中越线 / 还差多少)
   //     走势那格   凭什么是这一只(位置贵不贵 / 有没有量 / 离关键点多远)
   //
-  // 挤进同一行的话, 一行里会出现两套判据的措辞并排, 读的人得先分清哪句是哪套。
-  // 分两行, 上面一行是本页的主线, 下面一行是打分那一层的依据。
+  // **R349 我据此把它放成第二行**, 怕两套判据的措辞并排读的人分不清哪句是哪套。
+  // 那个顾虑本身没错, 但**分列同样能分清** —— 而分行要付的代价是行高随内容变
+  // (有走势的行两行高, 没走势的一行高), 一屏扫下去参差不齐。代价更大。
   //
-  // 只在这只票**进了候选池**时才有 —— 没有名次就没有这些读数, 不留空位。
+  // R356 起它是网格的**第五列**: 界线由栅格划, 不由换行划。
+  // 只在这只票**进了候选池**时才有读数 —— 但**格子照样占住**, 见下面那段。
   // [R339] 用户: 「卖出也要上色, 这样看起来醒目」。
   //
   // 在这之前**买卖两种要动手的行共用同一个灰蓝底** `bg-accent/[0.06]` —— 徽标
@@ -523,15 +525,17 @@ function SignalRow({ r, c }: { r: FlipTodaySignal; c?: TodayOpportunity }) {
       sell && 'border-l-bear bg-bear/[0.10]',
       nearExit && 'border-l-warning bg-warning/[0.07]',
       !actionable && !nearExit && 'border-l-transparent')}>
-      {/* [R350] 用户: 「你排版不对, 中间这么多空间」。
-          **两个毛病, 同一个根**: 原来是 `flex` + 触发价上一个 `ml-auto`。
-          在 2000px 宽屏上 `ml-auto` 把价格甩到最右边, 中间就空出一大条;
-          而 flex 各行按自己的内容宽度排, **行与行之间列也对不齐** ——
-          「离清仓线还有 10.0%」和「还差 15.2%」起点不同, 眼睛得逐行重找。
-          改成**定宽网格**: 每一列宽度固定, 行与行天然对齐, 一列扫到底。
-          再加一道 `max-w-[72rem]` —— 超宽屏上不再把一行内容拉成横贯两米,
-          左右都留白比中间空一条好读得多。 */}
-      <div className="grid max-w-[72rem] grid-cols-[minmax(9rem,12rem)_4.5rem_3.5rem_minmax(0,1fr)_auto] items-center gap-x-3 text-xs">
+      {/* [R350 → R356] **定宽网格**: 每一列宽度固定, 行与行天然对齐, 一列扫到底。
+          (R350 的起因: 原来是 `flex` + 触发价上一个 `ml-auto`, 宽屏上价格被甩到
+          最右、中间空一条, 而各行按自己内容宽度排, 列也对不齐。)
+
+          [R356] 用户: 「后面还有不少空间, 利用起来一行显示完整, 每行个股行高要一样」。
+          **两处跟着改**:
+          ① 去掉 `max-w-[72rem]` 并把走势并进同一行 —— 右边那片空地正好装它;
+          ② 行高由 `min-h-[3.5rem]` 定死。名次那一格本身有三行高(名次/分/三条),
+             而没进候选池的票只有两行字 —— **不定死的话, 行高就跟着"这只票有没有
+             进候选池"变**, 一屏扫下去参差不齐。这正是用户说的第二件事。 */}
+      <div className="grid min-h-[3.5rem] grid-cols-[minmax(9rem,11rem)_4.5rem_3.5rem_minmax(7rem,9rem)_minmax(0,1fr)_auto] items-center gap-x-3 text-xs">
         <span className="truncate">
           <SymbolCell symbol={r.symbol} name={r.name} />
         </span>
@@ -590,6 +594,12 @@ function SignalRow({ r, c }: { r: FlipTodaySignal; c?: TodayOpportunity }) {
           )}
         </span>
 
+        {/* [R356] 走势并进同一行的第五列 —— 原来它是第二行, 害得行高随内容变。
+            没进候选池的票这一格是空的, 但**格子照样占住**, 行高不受影响。 */}
+        <span className="min-w-0 text-[11px]">
+          {c && <TrendCell o={c} />}
+        </span>
+
         {/* [R350] 不再 `ml-auto` —— 它是网格的最后一列, 位置由栅格决定 */}
         <span className="whitespace-nowrap text-right text-[10px] tabular-nums text-muted">
           {r.flip_price != null && <>
@@ -599,16 +609,6 @@ function SignalRow({ r, c }: { r: FlipTodaySignal; c?: TodayOpportunity }) {
           </>}
         </span>
       </div>
-
-      {/* [R349] 走势 —— 打分那一层的依据, 单独一行。
-          [R350] 缩进对齐到**状态文字那一列**(标的 12rem + 动作 4.5rem + 名次 3.5rem
-          + 三道 gap 2.25rem ≈ 22.25rem), 而不是原来那个拍脑袋的 3.75rem ——
-          它现在压在标的名下面, 看着像是标的的一部分。 */}
-      {c && (
-        <div className="mt-1 max-w-[72rem] pl-[22.25rem] text-[11px]">
-          <TrendCell o={c} />
-        </div>
-      )}
     </div>
   )
 }

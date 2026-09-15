@@ -320,25 +320,76 @@ def test_R349_三样读数都在():
     assert "'放量刚好'" in cell and "'刚站上生命线'" in cell
 
 
-def test_R349_走势单独一行_不跟六态那句挤():
-    """两者回答的不是同一个问题: 六态那句说今天要不要动手, 走势说凭什么是这一只。
-    挤进同一行的话, 一行里会出现两套判据的措辞并排。"""
-    row = code_of(FLIP)
-    row = row[row.index("function SignalRow"):]
-    nxt = row.find("\nfunction ", 1)
-    row = row if nxt < 0 else row[:nxt]
-    assert "{c && (" in row and "<TrendCell o={c} />" in row
-    # 它排在六态那句之后 —— 主线在上, 依据在下
-    assert row.index("已转折 · 现在是") < row.index("<TrendCell"), \
-        "走势必须排在六态那句之后"
+def test_R356_走势并进同一行_自成一列():
+    """[R349 → R356] 用户: 「后面还有不少空间, 利用起来一行显示完整」。
+
+    **R349 我把它放成第二行**, 理由是「六态那句说要不要动手, 走势说凭什么是这一只,
+    挤在同一行读的人得先分清哪句是哪套」。那条理由没有错, 但**分列同样能分清** ——
+    而分行的代价是行高随内容变(见下一条), 那个代价更大。
+
+    所以现在它是**网格的第五列**: 与六态那句各占一格, 界线由栅格划, 不由换行划。
+    """
+    row = _row()
+    assert "<TrendCell o={c} />" in row
+    # 它在网格里, 不再是网格之外的第二行
+    grid = row[row.index('<div className="grid'):]
+    assert "<TrendCell o={c} />" in grid, "走势跑到网格外面去了 —— 那就又是第二行"
+    assert "pl-[22.25rem]" not in row, "还留着第二行那套缩进"
+    # 六态那句仍然在它自己的格子里, 排在走势之前
+    assert row.index("已转折 · 现在是") < row.index("<TrendCell"), "顺序变了"
 
 
-def test_R349_没进候选池就没有这一行():
-    """没有名次就没有这些读数 —— 不留一个空位假装有。"""
-    row = code_of(FLIP)
-    row = row[row.index("function SignalRow"):]
-    seg = row[row.index("<TrendCell") - 200:row.index("<TrendCell")]
-    assert "{c && (" in seg, "必须由 c 是否存在决定渲不渲染"
+def test_R356_走势那一格自己也是一行():
+    """**行高这件事有两处**, 这是容易漏掉的那一处。
+
+    信号行那边的 `min-h-[3.5rem]` 只管**下限**; 走势格自己若还是 `flex-col`
+    (机会表时代的排法), 它会把行**撑高**, 而且只撑"进了候选池"的那些行 ——
+    行高照样跟着"有没有名次"变, 用户说的第二件事等于没做。
+    """
+    cell = code_of(TREND)
+    body = cell[cell.index("export function TrendCell"):]
+    assert "flex-col" not in body, "走势格还是竖排, 会把行撑高一截"
+    assert "flex flex-wrap items-center" in body, "没有横排"
+
+
+def test_R356_行高定死_不随有没有走势变():
+    """**用户的第二件事**: 「每行个股行高要一样」。
+
+    名次那一格本身有三行高(名次 / 分 / 三条维度条), 而没进候选池的票只有两行字
+    —— 不定死的话, **行高就跟着"这只票有没有进候选池"变**, 一屏扫下去参差不齐。
+    """
+    row = _row()
+    grid_cls = _grid_class(row)
+    assert "min-h-[3.5rem]" in grid_cls, "行高没定死"
+    # **`items-center` 必须钉在网格那个 div 自己身上。** 只查 `"items-center" in row`
+    # 是不够的 —— 动作徽标那几个 span 用的是 `inline-flex items-center`, 断言会被
+    # 它们喂饱, 于是把网格上的这个类删掉守卫照样是绿的(变异电池当场抓到)。
+    # 「锚太宽 = 没有锚」, 本会话第七次。
+    assert "items-center" in grid_cls, "内容没垂直居中, 定了高也会看着歪"
+
+
+def test_R356_把右边那片空地用上():
+    """[R350 → R356] R350 我加了 `max-w-[72rem]` 防止一行横贯两米;
+    用户看了实机说「后面还有不少空间, 利用起来」—— 那道限宽因此撤掉,
+    多出来的宽度给了走势那一列。"""
+    row = _row()
+    assert "max-w-[72rem]" not in row, "还限着宽, 右边那片空地没用上"
+    # 六列: 标的 / 动作 / 名次 / 六态 / 走势 / 触发价
+    assert "grid-cols-[minmax(9rem,11rem)_4.5rem_3.5rem_minmax(7rem,9rem)_minmax(0,1fr)_auto]" in row, \
+        "列宽变了 —— 定宽网格是行与行对齐的前提"
+
+
+def test_R356_没进候选池时走势格空着但占位():
+    """格子不占位的话, 后面的触发价列会整体错开一格。
+
+    **锚必须是代码, 不能是注释** —— `code_of()` 会把注释整片剥掉(这是它的本职:
+    注释里写什么都不算数)。拿注释文字当切片锚, 切出来的要么报 `substring not
+    found`, 要么是个空串而让下面的断言恒真。本会话已经在这上面栽过两次。
+    """
+    row = _row()
+    # 空着时**格子还在**: 条件挂在 `{c && …}` 上, 而不是整个 <span> 上
+    assert '<span className="min-w-0 text-[11px]">\n          {c && <TrendCell o={c} />}' in row, \
+        "走势那一格要么没占位(条件套在 span 外), 要么不由 c 决定渲不渲染"
 
 
 def test_R349_走势那一格不是动作():
@@ -361,21 +412,34 @@ def _row() -> str:
     code = code_of(FLIP)
     blk = code[code.index("function SignalRow"):]
     nxt = blk.find("\nfunction ", 1)
-    return blk if nxt < 0 else blk[:nxt]
+    out = blk if nxt < 0 else blk[:nxt]
+    assert out.strip(), "切出来是空的 —— 空集合上的断言全是恒真的"
+    return out
+
+
+def _grid_class(row: str) -> str:
+    """网格那个 div **自己**的 class 串(不含行内其它元素的)。
+
+    行里还有好几个 `inline-flex items-center` 的徽标, 拿整行当锚去查布局类, 断言
+    会被它们喂饱。要钉网格的属性, 就得先把网格那一格单独切出来。
+    """
+    i = row.index('<div className="grid')
+    j = row.index('"', i + len('<div className="'))
+    cls = row[i + len('<div className="'):j]
+    assert "grid-cols-[" in cls, "切到的不是网格那个 div"
+    return cls
 
 
 def test_R350_信号行是定宽网格_不是flex():
-    """列宽固定, 行与行天然对齐, 一列能扫到底。"""
+    """列宽固定, 行与行天然对齐, 一列能扫到底。
+
+    (R350 的起因: 原来是 flex + 触发价上一个 `ml-auto`, 宽屏上价格被甩到最右、
+    中间空一条, 而各行按自己内容宽度排, 列也对不齐。**这一条立论没变**,
+    只是列数从五变六 —— 见 `test_R356_把右边那片空地用上`。)
+    """
     row = _row()
-    assert "grid-cols-[minmax(9rem,12rem)_4.5rem_3.5rem_minmax(0,1fr)_auto]" in row, \
-        "五列的宽度得写死 —— 由内容撑宽就回到了行行错位"
     assert "ml-auto" not in row, "ml-auto 会把最后一列甩到屏幕最右, 中间空一条"
-
-
-def test_R350_超宽屏上限宽():
-    """一行内容横贯两米不叫排版 —— 左右留白比中间空一条好读。"""
-    row = _row()
-    assert row.count("max-w-[72rem]") >= 2, "主行与走势行都要限宽, 否则两行右边界不齐"
+    assert row.count("grid-cols-[") == 1, "只该有一处列宽定义"
 
 
 def test_R350_名次那一格空着也占位():
@@ -384,11 +448,11 @@ def test_R350_名次那一格空着也占位():
     assert ") : <span />}" in row, "没名次时要留一个空占位, 不能整格不渲染"
 
 
-def test_R350_走势行缩进对齐到状态文字那一列():
-    """原来那个 3.75rem 是拍脑袋的 —— 走势压在标的名下面, 看着像标的的一部分。"""
-    row = _row()
-    assert "pl-[22.25rem]" in row, "缩进要对齐到状态文字那一列的起点"
-    assert "pl-[3.75rem]" not in row
+# [R350 → **R356 退役**] `test_R350_走势行缩进对齐到状态文字那一列` 钉的是
+# 走势作为**第二行**时的缩进量。R356 把它并进同一行自成一列, **那个缩进不存在了**
+# —— 它没有可守的对象了, 而不是被绕过去。对齐现在由栅格保证, 见
+# `test_R356_把右边那片空地用上` 里那条列宽断言。
+
 
 
 # ── [R352] AI 导读删掉, 连同它那个已经没有展示面的定时开关 ──────────────
