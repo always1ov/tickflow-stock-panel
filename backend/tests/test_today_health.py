@@ -187,7 +187,7 @@ def test_R274_自检条被挂在页面上():
     from tests.frontend_source import code_of
 
     assert "export function TodayHealthBar" in _bar()
-    for page in ("pages/Today.tsx", "components/today/TodayDigest.tsx"):
+    for page in ("pages/Today.tsx", "pages/FlipPaper.tsx"):
         code = code_of(page)
         assert "<TodayHealthBar h=" in code, f"{page} 没把自检条挂上去"
         assert "from '@/components/today/TodayHealthBar'" in code

@@ -25,9 +25,9 @@
  * 同样的结果, 所以缓存可以放心留着。
  */
 import { useMemo, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { ChevronDown, Eye, TrendingDown, TrendingUp, Wallet } from 'lucide-react'
+import { ChevronDown, Eye, Loader2, Sparkles, Target, TrendingDown, TrendingUp, Wallet } from 'lucide-react'
 import { api, type FlipOrder, type FlipPaper as FlipPaperData, type FlipRules,
   type FlipTodaySignal } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
@@ -38,8 +38,17 @@ import { useECharts } from '@/pages/backtest/charts/useECharts'
 import { cn } from '@/lib/cn'
 import { storage } from '@/lib/storage'
 import { refreshEvery, rhythmHint } from '@/lib/refreshRhythm'
-import { TodayDigest } from '@/components/today/TodayDigest'   // [R341] 底部补充带
 import { useTodayOverview } from '@/lib/useSharedQueries'      // [R342] 把握分(只排序)
+import { TodayHealthBar } from '@/components/today/TodayHealthBar'   // [R343] 数据自检条
+import { toast } from '@/components/Toast'
+
+/** [R343] 姿态四档的配色 —— 与今日总览那张卡同一套语义, 不另立一份说法。 */
+const POSTURE_TONE: Record<string, string> = {
+  进攻: 'bg-bull/15 text-bull',
+  谨慎: 'bg-warning/15 text-warning',
+  防守: 'bg-bear/15 text-bear',
+  观察: 'bg-muted/15 text-muted',
+}
 
 const CAPITAL_OPTIONS = [100_000, 500_000, 1_000_000, 5_000_000]
 const POSITION_OPTIONS = [3, 5, 10, 20]
@@ -122,12 +131,15 @@ export function FlipPaper() {
     refetchInterval: refreshEvery('static'),
   })
 
+  const d = q.data
+
   // [R342] 把握分只用来**排序与标注**, 不参与"能不能动手"。取自今日总览那份
   // 打分(与今日总览页共享同一份缓存, 不多打一次接口)。
   const today = useTodayOverview()
+  const ov = today.data
   const conv = useMemo(() => {
     const m = new Map<string, Conviction>()
-    for (const o of today.data?.opportunities ?? []) {
+    for (const o of ov?.opportunities ?? []) {
       if (o.rank == null) continue
       m.set(o.symbol, {
         score: o.score ?? null, rank: o.rank,
@@ -135,14 +147,69 @@ export function FlipPaper() {
       })
     }
     return m
-  }, [today.data])
+  }, [ov])
 
-  const d = q.data
+  // [R343] AI 导读 —— 手动点一次才跑。失败必须在页面上留痕: toast 一闪即逝,
+  // 用户会以为"点了没反应"。
+  const [brief, setBrief] = useState<string | null>(null)
+  const [aiError, setAiError] = useState<string | null>(null)
+  const aiMut = useMutation({
+    mutationFn: () => api.todayAi(),
+    onMutate: () => setAiError(null),
+    onSuccess: (r) => {
+      if (r.error) { setAiError(r.error); toast(r.error, 'error'); return }
+      setBrief(r.brief || null)
+    },
+    onError: (e: Error) => {
+      setAiError(`AI 分析失败: ${e.message}`)
+      toast(`AI 分析失败: ${e.message}`, 'error')
+    },
+  })
+
+  // [R343] 打分候选里**没出现在信号名单上**的那些 —— 既没转折, 也没到触发价
+  // 5% 以内。它们仍然进「只是盯着」(用户: 今日总览的东西「全都要」), 但:
+  //
+  //   · `act` 由构造决定恒为 null —— **结构上不可能变成一个动作**;
+  //   · `gap_pct` 为 null, 于是按下面那条排序规则一律落在有距离的票之后;
+  //   · 行上自己标明「打分候选」, 不冒充转折信号。
+  //
+  // 这是「全都要」与「只看六态」唯一能同时成立的位置: 折叠区里、无动作、排最后。
+  const rows = useMemo<SignalRowData[]>(() => {
+    const base: SignalRowData[] = d?.today ?? []
+    const have = new Set(base.map((r) => r.symbol))
+    const extra: SignalRowData[] = (ov?.opportunities ?? [])
+      .filter((o) => o.rank != null && !have.has(o.symbol))
+      .map((o) => ({
+        symbol: o.symbol, name: o.name, held: false,
+        stage: 'watch' as const, act: null, side: '',
+        state_cn: o.trend_state_cn ?? null,
+        flip_price: null, ref_price: o.close ?? null, gap_pct: null, live: false,
+        scoreOnly: true,
+      }))
+    return extra.length ? [...base, ...extra] : base
+  }, [d?.today, ov])
+
+  const w = ov?.weather
+  const mainline = ov?.meso?.mainline?.rows?.[0]?.member ?? null
+  const shownBrief = brief ?? ov?.ai?.brief ?? null
   return (
     <div className="flex h-full flex-col">
       <PageHeader
         title="转折模拟盘"
-        subtitle={`非真实资金 · 只按六态转折买卖 · ${rhythmHint('derived')}`}
+        // [R343] 市场状态并进页头 —— 定基调的东西不该自己占一张卡。
+        // 姿态是结论, 给它徽章的位置; 多空比与主线是依据, 跟在副标题里。
+        titleExtra={w && (
+          <span className={cn('shrink-0 rounded px-1.5 py-0.5 text-[11px] font-medium',
+            POSTURE_TONE[w.posture] ?? POSTURE_TONE.观察)}
+            title={w.posture_reason || undefined}>
+            {w.posture}
+          </span>
+        )}
+        subtitle={w
+          ? `多 ${w.bull}/空 ${w.bear} · 转多 ${w.new_bull} 转空 ${w.new_bear}`
+            + (mainline ? ` · 主线 ${mainline}` : '')
+            + ` · ${rhythmHint('derived')}`
+          : `非真实资金 · 只按六态转折买卖 · ${rhythmHint('derived')}`}
         right={
           <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
             <Picker label="本金" value={capital} options={CAPITAL_OPTIONS}
@@ -151,11 +218,37 @@ export function FlipPaper() {
                     onChange={setMaxPositions} fmt={(v) => `${v} 只`} />
             <Picker label="回溯" value={years} options={YEAR_OPTIONS}
                     onChange={setYears} fmt={fmtYears} />
+            {/* [R343] AI 导读收进页头一个按钮 —— 手动点一次才跑, 不自动 */}
+            <button
+              type="button"
+              onClick={() => aiMut.mutate()}
+              disabled={aiMut.isPending}
+              className="inline-flex items-center gap-1 rounded-btn border border-border px-1.5 py-0.5 text-muted transition-colors hover:bg-elevated/60 hover:text-foreground disabled:opacity-50 cursor-pointer"
+            >
+              {aiMut.isPending
+                ? <Loader2 className="h-3 w-3 animate-spin" />
+                : <Sparkles className="h-3 w-3" />}
+              AI 导读
+            </button>
           </div>
         }
       />
 
       <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-3 pb-4 pt-3 lg:px-4">
+        {/* [R343] 自检条排在最顶且**不进任何折叠** —— 它一切正常时一个像素都不占,
+            而它要说的是「你正在看的数字是几天前的」, 那句话被折起来就没有意义了。 */}
+        {!!ov?.health && <TodayHealthBar h={ov.health} />}
+        {aiError && (
+          <div className="rounded-card border border-danger/40 bg-danger/10 px-4 py-2 text-xs text-danger">
+            {aiError}
+          </div>
+        )}
+        {shownBrief && (
+          <p className="max-w-[80ch] rounded-card border border-border/60 bg-surface/40 px-4 py-2.5 text-[12px] leading-[1.8] text-foreground">
+            {shownBrief}
+          </p>
+        )}
+
         {q.isLoading && <LoadingSkeleton />}
         {q.isError && (
           <div className="rounded-card border border-danger/40 bg-danger/10 px-4 py-3 text-xs text-danger">
@@ -171,7 +264,7 @@ export function FlipPaper() {
 
         {d && !d.reason && (
           <>
-            <TodaySignals rows={d.today ?? []} conviction={conv} />
+            <TodaySignals rows={rows} conviction={conv} />
             <Summary d={d} />
             <NavChart d={d} />
             <Holdings d={d} onOpen={(s) => navigate(`/stock-analysis?symbol=${s}`)} />
@@ -180,12 +273,6 @@ export function FlipPaper() {
           </>
         )}
 
-        {/* [R341] 今日总览浓缩成一条摘要带挂在这儿当补充。用户: 「想把今日总览
-            里面的东西浓缩到模拟盘里面显示, 当作补充」「全都要, 尽可能节省空间」。
-            **本页原有的东西一个字没动** —— 这是一次纯插入, 位置也排在全部原有
-            内容之后: 版面顺序即重要性, 补充就该在补充的位置上。
-            它自己取数、自己折叠(默认收起, 收起时只占一行)。 */}
-        <TodayDigest />
 
         {/* 规则排在最后 —— 查证用的, 不该天天占首屏 */}
         {rules.data && <Rules r={rules.data} d={d} />}
@@ -235,8 +322,14 @@ export function FlipPaper() {
  */
 type Conviction = { score: number | null; rank: number; total: number | null; partial: boolean }
 
+/**
+ * [R343] 界面用的行。`scoreOnly` 是**前端合成**的那一类: 打分选出来但既没转折、
+ * 也没到触发价边上的票。它的 `act` 由构造决定恒为 `null`, 结构上不可能成为动作。
+ */
+type SignalRowData = FlipTodaySignal & { scoreOnly?: boolean }
+
 function TodaySignals({ rows, conviction }: {
-  rows: FlipTodaySignal[]
+  rows: SignalRowData[]
   conviction: Map<string, Conviction>
 }) {
   // [R331] 用户: 「今天该挂什么单显得太多了, 需要折叠展开的功能」。
@@ -271,12 +364,28 @@ function TodaySignals({ rows, conviction }: {
   const idle = rest.filter((r) => !r.held)  // 其余, 折叠
   const actCount = live.filter((r) => r.stage === 'flipped' && r.act).length
 
-  // [R342] **只重排, 不增删。** `slice()` 先拷一份 —— 直接 sort 会就地改
-  // 上面那个 filter 的产物, 而 React 的 props 数组不该被下游改。
-  // 名次小 = 打分更靠前; 没进候选池的(拿不到名次)一律排到末尾, 但**仍在名单里**。
-  const rank = (r: FlipTodaySignal) => conviction.get(r.symbol)?.rank ?? Number.MAX_SAFE_INTEGER
+  // [R342/R343] **排序只有一条原则, 四档都照它办**:
+  //
+  //     六态还能区分先后时, 按六态排;
+  //     六态区分不出来了, 才让打分接手。
+  //
+  // 「要动手」那一档**全都已经转折**, `gap_pct` 一律是 `null` —— 六态在这一档
+  // 已经没有剩余信息了。这正是它原来退化成**按股票代码字母序**的原因(后端那句
+  // `out.sort(...)` 的末位键是 `r["symbol"]`), 也正是该让打分接手的地方。
+  //
+  // 另外三档(盘中越线 / 手上这些 / 只是盯着)每一行都还有「离触发价多远」——
+  // 那是六态自己的读数, 轮不到打分说话, 所以它们保持后端给的距离序不动。
+  // 唯一的例外是前端合成的 `scoreOnly` 行: 它压根没有距离, 只能靠打分互相排,
+  // 且一律落在有距离的票之后。
+  //
+  // **只重排, 不增删。** `slice()` 先拷一份 —— 直接 sort 会就地改上面那个 filter
+  // 的产物, 而 React 的 props 数组不该被下游改。
+  const rank = (r: SignalRowData) => conviction.get(r.symbol)?.rank ?? Number.MAX_SAFE_INTEGER
   const ordered = live.slice().sort((a, b) => rank(a) - rank(b))
   const scored = live.filter((r) => conviction.has(r.symbol)).length
+  // 有距离的在前(保持后端的距离序), 合成的打分候选在后(它们之间按名次)
+  const idleSorted = idle.slice().sort((a, b) =>
+    Number(!!a.scoreOnly) - Number(!!b.scoreOnly) || (a.scoreOnly ? rank(a) - rank(b) : 0))
 
   return (
     <section className="overflow-hidden rounded-card border border-border/60 bg-surface/40">
@@ -340,7 +449,7 @@ function TodaySignals({ rows, conviction }: {
               {watchOpen && (
                 /* 限高 + 自己滚: 盯着的票可能几十只, 让它把整页顶长等于没折叠 */
                 <div className="max-h-64 divide-y divide-border/30 overflow-y-auto">
-                  {idle.map((r) => <SignalRow key={r.symbol} r={r} c={conviction.get(r.symbol)} />)}
+                  {idleSorted.map((r) => <SignalRow key={r.symbol} r={r} c={conviction.get(r.symbol)} />)}
                 </div>
               )}
             </>
@@ -354,7 +463,7 @@ function TodaySignals({ rows, conviction }: {
 /** [R339] 离清仓线多近才算"贴着了"。**只用来上色, 不产生任何动作。** */
 const NEAR_EXIT = 0.02
 
-function SignalRow({ r, c }: { r: FlipTodaySignal; c?: Conviction }) {
+function SignalRow({ r, c }: { r: SignalRowData; c?: Conviction }) {
   const actionable = r.stage === 'flipped' && !!r.act
   // [R339] 用户: 「卖出也要上色, 这样看起来醒目」。
   //
@@ -394,6 +503,13 @@ function SignalRow({ r, c }: { r: FlipTodaySignal; c?: Conviction }) {
           <span className="inline-flex items-center gap-1 text-[10px] text-secondary">
             <Wallet className="h-3 w-3" />持有
           </span>
+        ) : r.scoreOnly ? (
+          /* [R343] 打分候选 —— **不冒充转折信号**: 它既没转折也没到触发价边上,
+             行上就得这么写。同样没有动作位。 */
+          <span className="inline-flex items-center gap-1 text-[10px] text-muted/70"
+                title="打分选出来的候选, 但它既没转折, 也没到触发价 5% 以内 —— 本页的出手依据只有转折">
+            <Target className="h-3 w-3" />打分候选
+          </span>
         ) : (
           <span className="inline-flex items-center gap-1 text-[10px] text-muted">
             <Eye className="h-3 w-3" />盯着
@@ -425,6 +541,7 @@ function SignalRow({ r, c }: { r: FlipTodaySignal; c?: Conviction }) {
         )}
         {/* [R338] 拿着的票问的是"什么时候卖", 不是"什么时候买" —— 同一个距离,
             说法要对上它在你这儿的身份 */}
+        {r.scoreOnly && <>{r.state_cn ?? '还没到转折边上'}</>}
         {r.stage === 'watch' && r.gap_pct != null && (
           r.held
             ? <b className={cn(nearExit && 'text-warning')}>

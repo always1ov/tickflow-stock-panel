@@ -40,9 +40,6 @@ export const storage = {
    * [R327] R192 那个 `paperTrader`(当前看哪个操作员)跟着 AI 操盘手一起没了。
    */
   flipTodayWatchOpen:   kv<boolean>('flip-today-watch-open'),
-  // [R341] 模拟盘底部「补充 · 今日总览」的展开状态。默认收起 —— 它是补充,
-  // 默认摊开就会把本页的主线(今天该挂什么单)往下顶。
-  flipDigestOpen:       kv<boolean>('flip-digest-open'),
 
   /** [R266] 消息面总览是否展开 —— 默认收起(那一段很长), 但看惯了展开的人不该每次重点 */
   newsDeskSummaryOpen:  kv<boolean>('news-desk-summary-open'),
