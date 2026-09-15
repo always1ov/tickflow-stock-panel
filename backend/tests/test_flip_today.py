@@ -439,7 +439,7 @@ def test_R338_手上这段常驻_不进折叠区():
     # 折叠开关只作用在 idle 上; mine 那一段渲染时不许跟 watchOpen 沾边
     seg = blk[blk.index("{mine.length > 0 && ("):blk.index("{idle.length > 0 && (")]
     assert "watchOpen" not in seg, "手上这段一旦能被折起来, 就又回到只剩买入"
-    assert "mine.map((r) => <SignalRow" in seg
+    assert "mineSorted.map((r) => <SignalRow" in seg
 
 
 def test_R338_三段分流只由一个判据说了算():
@@ -522,8 +522,8 @@ def test_R339_样本量不够时胜率自己说出来():
 def test_R342_排序只重排不增删():
     """**这一条是整组的地基。** 分是用来排先后的, 不是用来筛名单的。"""
     blk = _today_block()
-    assert "const ordered = live.slice().sort(" in blk, "必须先拷一份再排"
-    # 排序的输入是 live 本身, 不是 live 的某个子集
+    # [R344] 排序收成一个 `byRank`, 四档共用 —— 各写一遍必然漂
+    assert "const ordered = byRank(live)" in blk, "排序的输入是 live 本身"
     assert "live.filter" not in blk.split("const ordered")[1].split("\n")[0], \
         "不许在排序那一行顺手过滤"
     # 没进候选池的排末尾, 但仍在名单里
@@ -537,12 +537,14 @@ def test_R342_分不参与能不能动手():
     pred = next(l for l in blk.splitlines() if "const isLive =" in l)
     for word in ("conviction", "rank", "score", "把握"):
         assert word not in pred, f"出手判据里混进了打分: {word}"
+    # [R344] 打分现在对四档都生效了, 这条界线因此更要紧: 它只管档内先后, 不管分档
+    assert "const mine = rest.filter((r) => r.held)" in blk, "分档判据被动过"
 
 
 def test_R342_slice先拷一份_不就地改props():
     """`sort` 是就地改。直接对 filter 的产物排没事, 但对 props 数组排会改到上游。"""
     blk = _today_block()
-    line = next(l for l in blk.splitlines() if "const ordered" in l)
+    line = next(l for l in blk.splitlines() if "const byRank" in l)
     assert ".slice().sort(" in line, "少了 slice() —— sort 会就地改"
 
 

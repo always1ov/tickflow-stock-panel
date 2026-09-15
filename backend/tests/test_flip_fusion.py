@@ -36,72 +36,59 @@ def _signal_row() -> str:
     return blk if nxt < 0 else blk[:nxt]
 
 
-# ── 底线: 打分候选在结构上不可能成为动作 ────────────────────────────────
-def test_R343_打分候选的act由构造恒为null():
-    """**这是整组的地基, 而且比 R341 那版更硬。**
+# ── 底线: 六态选, 打分排 ────────────────────────────────────────────────
+def test_R344_名单只由六态选_前端不合成任何一行():
+    """**这是整组的地基。**
 
-    R341 靠"另开一块 + 写明来源"划界 —— 那是**约定**, 改版面时会被顺手改掉。
-    这一版靠构造: 合成行的 `act` 写死 `null`, 它**在结构上不可能**变成一个动作。
+    用户: 「我的本意是不看我的自选了, 打分系统针对六态选出来的进行二次排序」。
+
+    R343 那一版往名单里塞了「打分候选」—— 打分选出来但六态没选中的票。方向是反的:
+    **那正是"打分自己选票"**, 而这套系统里选票这件事只归六态。打分的位置在它后面,
+    不在它旁边。
     """
     code = _flip()
-    blk = code[code.index("const rows = useMemo<SignalRowData[]>"):]
-    blk = blk[:blk.index("\n  }, [")]
-    assert "act: null" in blk, "合成的打分候选行必须写死 act: null"
-    assert "scoreOnly: true" in blk
-    # **变异逼出来的**: 只钉 act 不够。把 stage 改成 'flipped' 照样 act=null、
-    # 照样不可动手 —— 但行上会印出「已转折 · 现在是自然回升」, 那是**睁眼说瞎话**:
-    # 它压根没转折。不可动手与不说谎是两件事, 得分别钉。
-    assert "stage: 'watch' as const" in blk, \
-        "合成行的 stage 必须写死 watch —— 它没转折, 不许显示成转折"
-    # 名单来源只有两处: 后端给的信号 + 打分候选; 不许凭空冒出第三种
-    assert "d?.today ?? []" in blk
-    assert "ov?.opportunities ?? []" in blk
+    assert "<TodaySignals rows={d.today ?? []}" in code, \
+        "名单必须原样来自后端那份六态信号"
+    for banned in ("scoreOnly", "打分候选"):
+        assert banned not in code, f"前端又在合成名单: {banned}"
+    # **打分那份数据只准用来查分, 不准用来造行。** 不能简单地禁掉
+    # `opportunities` —— 查分本来就要读它; 钉的是"只在建把握分索引那一处出现"。
+    assert code.count("opportunities") == 1, \
+        "opportunities 出现在不止一处 —— 多出来的那处多半又在拿它造行"
+    conv = code[code.index("const conv = useMemo("):code.index("}, [ov])")]
+    assert "opportunities" in conv, "唯一那处必须是建把握分索引的地方"
 
 
-def test_R343_打分候选不冒充转折信号():
-    """它既没转折也没到触发价边上 —— 行上就得这么写, 不许看起来像个信号。"""
-    row = _signal_row()
-    assert "r.scoreOnly ? (" in row
-    assert "打分候选" in row
-    assert "本页的出手依据只有转折" in row, "必须点明它不是出手依据"
-    # 这一支里不许出现动作徽标
-    badge = "r.act === 'buy' ? '买入' : '清仓'"
-    seg = row[row.index("r.scoreOnly ? ("):]
-    assert badge not in seg
-
-
-def test_R343_打分不参与能不能动手():
-    """**铁律。** 把握分只碰顺序与标注, 不许碰 `isLive` 那个判据。"""
+def test_R344_四档内部都按打分重排():
+    """打分是**第二段**, 对六态选出来的**每一档**都生效 —— 不是只管其中一档。"""
     code = _flip()
-    pred = next(l for l in code.splitlines() if "const isLive =" in l)
-    for word in ("conviction", "rank", "score", "把握", "scoreOnly"):
-        assert word not in pred, f"出手判据里混进了打分: {word}"
-
-
-# ── 排序: 一条原则, 四档都照它办 ────────────────────────────────────────
-def test_R343_六态排不出来了才让打分接手():
-    """要动手那一档全都转折、`gap_pct` 全是 null —— 六态没有剩余信息了。
-    另外三档每行都还有「离触发价多远」, 那是六态自己的读数, 轮不到打分说话。"""
-    code = _flip()
-    # `return (` 在 `const rank` **之前**就出现过(FlipPaper 主体), 用它当右界会切出
-    # 空串, 而空串里什么都断言不到 —— 断言在空集合上恒真, 是这个仓库栽过的坑。
-    i = code.index("const rank = (r: SignalRowData)")
+    i = code.index("const rank = (r: FlipTodaySignal)")
     blk = code[i:code.index("return (", i)]
     assert blk.strip(), "切出来是空的, 下面的断言就全是摆设"
-    assert "const ordered = live.slice().sort((a, b) => rank(a) - rank(b))" in blk, \
-        "要动手那一档按名次排"
-    # 盯着那一档: 有距离的在前(保持后端距离序), 合成的打分候选在后
-    assert "Number(!!a.scoreOnly) - Number(!!b.scoreOnly)" in blk, \
-        "合成的打分候选必须落在有距离的票之后"
-    assert "a.scoreOnly ? rank(a) - rank(b) : 0" in blk, \
-        "只有没距离的那些才靠名次互相排 —— 有距离的保持六态给的顺序"
+    assert "const byRank = (rs: FlipTodaySignal[]) => rs.slice().sort((a, b) => rank(a) - rank(b))" in blk, \
+        "排序得是一处实现 —— 四档各写一遍必然漂"
+    for tier in ("const ordered = byRank(live)",
+                 "const mineSorted = byRank(mine)",
+                 "const idleSorted = byRank(idle)"):
+        assert tier in blk, f"这一档没参与二次排序: {tier}"
 
 
-def test_R343_只重排不增删():
+def test_R344_打分不参与分档():
+    """**界线。** 四档的边界只由六态定, 打分一分都不许掺和。"""
     code = _flip()
-    for line in ("const ordered = live.slice().sort(", "const idleSorted = idle.slice().sort("):
-        assert line in code, f"少了 slice() 或排错了对象: {line}"
-    assert "?? Number.MAX_SAFE_INTEGER" in code, "拿不到名次的排末尾, 不是被丢掉"
+    pred = next(l for l in code.splitlines() if "const isLive =" in l)
+    for word in ("conviction", "rank", "score", "把握"):
+        assert word not in pred, f"分档判据里混进了打分: {word}"
+    # 「手上这些」与「只是盯着」的边界是 held, 也不许沾打分
+    for line in ("const mine = rest.filter((r) => r.held)",
+                 "const idle = rest.filter((r) => !r.held)"):
+        assert line in code, f"分档判据被动过: {line}"
+
+
+def test_R344_只重排不增删():
+    code = _flip()
+    assert "rs.slice().sort(" in code, "少了 slice() —— sort 是就地改, 会改到上游 props"
+    assert "?? Number.MAX_SAFE_INTEGER" in code, "拿不到名次的排本档末尾, 不是被丢掉"
 
 
 # ── 融合: 不新增区块, 补充带已拆 ────────────────────────────────────────

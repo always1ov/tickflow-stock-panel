@@ -27,7 +27,7 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { ChevronDown, Eye, Loader2, Sparkles, Target, TrendingDown, TrendingUp, Wallet } from 'lucide-react'
+import { ChevronDown, Eye, Loader2, Sparkles, TrendingDown, TrendingUp, Wallet } from 'lucide-react'
 import { api, type FlipOrder, type FlipPaper as FlipPaperData, type FlipRules,
   type FlipTodaySignal } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
@@ -166,28 +166,13 @@ export function FlipPaper() {
     },
   })
 
-  // [R343] 打分候选里**没出现在信号名单上**的那些 —— 既没转折, 也没到触发价
-  // 5% 以内。它们仍然进「只是盯着」(用户: 今日总览的东西「全都要」), 但:
+  // [R344] **名单只由六态选, 前端不合成任何一行。**
   //
-  //   · `act` 由构造决定恒为 null —— **结构上不可能变成一个动作**;
-  //   · `gap_pct` 为 null, 于是按下面那条排序规则一律落在有距离的票之后;
-  //   · 行上自己标明「打分候选」, 不冒充转折信号。
+  // 用户: 「我的本意是不看我的自选了, 打分系统针对六态选出来的进行二次排序」。
   //
-  // 这是「全都要」与「只看六态」唯一能同时成立的位置: 折叠区里、无动作、排最后。
-  const rows = useMemo<SignalRowData[]>(() => {
-    const base: SignalRowData[] = d?.today ?? []
-    const have = new Set(base.map((r) => r.symbol))
-    const extra: SignalRowData[] = (ov?.opportunities ?? [])
-      .filter((o) => o.rank != null && !have.has(o.symbol))
-      .map((o) => ({
-        symbol: o.symbol, name: o.name, held: false,
-        stage: 'watch' as const, act: null, side: '',
-        state_cn: o.trend_state_cn ?? null,
-        flip_price: null, ref_price: o.close ?? null, gap_pct: null, live: false,
-        scoreOnly: true,
-      }))
-    return extra.length ? [...base, ...extra] : base
-  }, [d?.today, ov])
+  // R343 那一版往名单里塞了「打分候选」—— 打分选出来但六态没选中的票。方向是反的:
+  // **那正是"打分自己选票"**, 而这套系统里选票这件事只归六态。打分的位置在它后面,
+  // 不在它旁边。守卫直接钉"`rows` 只能是后端给的那份, 前端不许合成"。
 
   const w = ov?.weather
   const mainline = ov?.meso?.mainline?.rows?.[0]?.member ?? null
@@ -264,7 +249,7 @@ export function FlipPaper() {
 
         {d && !d.reason && (
           <>
-            <TodaySignals rows={rows} conviction={conv} />
+            <TodaySignals rows={d.today ?? []} conviction={conv} />
             <Summary d={d} />
             <NavChart d={d} />
             <Holdings d={d} onOpen={(s) => navigate(`/stock-analysis?symbol=${s}`)} />
@@ -304,32 +289,28 @@ export function FlipPaper() {
  * 所以这一段**常驻、不折叠**: 手上的票天天都该看见它的离场线。它**不带动作
  * 徽标** —— 没转折就不出手, 那条铁律没有因为这段而松动一毫米。
  *
- * [R342] 要动手的那一段**按把握分排序**。用户: 「值得关注应用了评分系统的,
- * 拿今天动手是否可以排个序?」
+ * [R342/R344] **两段式: 六态负责「选」, 打分负责「排」。**
  *
- * **这里有一条必须说死的界线**:
+ * 用户: 「打分系统针对六态选出来的进行二次排序」。
  *
- *     谁能出手 —— 只看六态转折。一分不看, 一票不多, 一票不少。
- *     先做哪个 —— 用打分排。
+ *     第一段  六态选出今天有话说的票, 并分进四档(能不能成交)
+ *     第二段  打分在每一档内部重排先后
  *
- * 这两件事在这之前**第二件根本没人回答**: 后端那句 `out.sort(...)` 的末位键是
+ * **界线**: 四档的边界(能不能动手 / 今天会不会成交 / 拿没拿着)**只由六态定**,
+ * 打分一分都不参与 —— `isLive` 那一行有守卫钉着。打分只管进了同一档之后谁排前面。
+ *
+ * 这件事在这之前**根本没人回答**: 后端那句 `out.sort(...)` 的末位键是
  * `r["symbol"]`, 而已转折那一档 `gap_pct` 恒为 None, 于是 6 笔买入的先后
  * **实际是按股票代码的字母序**。六笔单子摆在面前, 版面对"先做哪个"一个字都没说。
  *
- * 分**不改变名单**: 没进候选池的票(没过打分那三道硬门槛)照样在名单里, 只是排在
- * 有分的后面 —— 它转折了就是转折了, 打分够不够是另一个问题。守卫钉着这一条:
- * 排序前后的条数与集合必须**逐只相同**。
+ * 分**不改变名单**: 没进候选池的票(没过打分那三道硬门槛)照样在名单里, 只排在本档
+ * 末尾 —— 它被六态选中了就是选中了, 打分够不够是另一个问题。而反过来,
+ * **打分选出来但六态没选中的票一行都不进来**(R344 删掉了 R343 合成的那些)。
  */
 type Conviction = { score: number | null; rank: number; total: number | null; partial: boolean }
 
-/**
- * [R343] 界面用的行。`scoreOnly` 是**前端合成**的那一类: 打分选出来但既没转折、
- * 也没到触发价边上的票。它的 `act` 由构造决定恒为 `null`, 结构上不可能成为动作。
- */
-type SignalRowData = FlipTodaySignal & { scoreOnly?: boolean }
-
 function TodaySignals({ rows, conviction }: {
-  rows: SignalRowData[]
+  rows: FlipTodaySignal[]
   conviction: Map<string, Conviction>
 }) {
   // [R331] 用户: 「今天该挂什么单显得太多了, 需要折叠展开的功能」。
@@ -364,28 +345,31 @@ function TodaySignals({ rows, conviction }: {
   const idle = rest.filter((r) => !r.held)  // 其余, 折叠
   const actCount = live.filter((r) => r.stage === 'flipped' && r.act).length
 
-  // [R342/R343] **排序只有一条原则, 四档都照它办**:
+  // [R344] **两段式: 六态负责「选」, 打分负责「排」。**
   //
-  //     六态还能区分先后时, 按六态排;
-  //     六态区分不出来了, 才让打分接手。
+  // 用户: 「打分系统针对六态选出来的进行二次排序」。
   //
-  // 「要动手」那一档**全都已经转折**, `gap_pct` 一律是 `null` —— 六态在这一档
-  // 已经没有剩余信息了。这正是它原来退化成**按股票代码字母序**的原因(后端那句
-  // `out.sort(...)` 的末位键是 `r["symbol"]`), 也正是该让打分接手的地方。
+  // R343 我把这条理解成了「六态排不动了才轮到打分」—— 方向反了。正确的分工是
+  // 两段, 不是二选一:
   //
-  // 另外三档(盘中越线 / 手上这些 / 只是盯着)每一行都还有「离触发价多远」——
-  // 那是六态自己的读数, 轮不到打分说话, 所以它们保持后端给的距离序不动。
-  // 唯一的例外是前端合成的 `scoreOnly` 行: 它压根没有距离, 只能靠打分互相排,
-  // 且一律落在有距离的票之后。
+  //     第一段  六态选出今天有话说的那些票, 并把它们分进四档(能不能成交)
+  //     第二段  打分在**每一档内部**重排先后
+  //
+  // 四档的**边界仍然只由六态定**(能不能动手 / 今天会不会成交 / 拿没拿着) ——
+  // 打分一分都不参与那个判定, `isLive` 那一行有守卫钉着。打分只管进了同一档之后
+  // 谁排前面。
+  //
+  // 没进候选池的(拿不到名次)一律排到本档末尾, 但**仍在名单里** —— 它被六态选中
+  // 了就是选中了, 打分够不够是另一个问题。
   //
   // **只重排, 不增删。** `slice()` 先拷一份 —— 直接 sort 会就地改上面那个 filter
   // 的产物, 而 React 的 props 数组不该被下游改。
-  const rank = (r: SignalRowData) => conviction.get(r.symbol)?.rank ?? Number.MAX_SAFE_INTEGER
-  const ordered = live.slice().sort((a, b) => rank(a) - rank(b))
+  const rank = (r: FlipTodaySignal) => conviction.get(r.symbol)?.rank ?? Number.MAX_SAFE_INTEGER
+  const byRank = (rs: FlipTodaySignal[]) => rs.slice().sort((a, b) => rank(a) - rank(b))
+  const ordered = byRank(live)
+  const mineSorted = byRank(mine)
+  const idleSorted = byRank(idle)
   const scored = live.filter((r) => conviction.has(r.symbol)).length
-  // 有距离的在前(保持后端的距离序), 合成的打分候选在后(它们之间按名次)
-  const idleSorted = idle.slice().sort((a, b) =>
-    Number(!!a.scoreOnly) - Number(!!b.scoreOnly) || (a.scoreOnly ? rank(a) - rank(b) : 0))
 
   return (
     <section className="overflow-hidden rounded-card border border-border/60 bg-surface/40">
@@ -428,7 +412,7 @@ function TodaySignals({ rows, conviction }: {
                 <span className="ml-auto text-muted opacity-70">{mine.length} 只</span>
               </div>
               <div className="divide-y divide-border/30">
-                {mine.map((r) => <SignalRow key={r.symbol} r={r} c={conviction.get(r.symbol)} />)}
+                {mineSorted.map((r) => <SignalRow key={r.symbol} r={r} c={conviction.get(r.symbol)} />)}
               </div>
             </>
           )}
@@ -463,7 +447,7 @@ function TodaySignals({ rows, conviction }: {
 /** [R339] 离清仓线多近才算"贴着了"。**只用来上色, 不产生任何动作。** */
 const NEAR_EXIT = 0.02
 
-function SignalRow({ r, c }: { r: SignalRowData; c?: Conviction }) {
+function SignalRow({ r, c }: { r: FlipTodaySignal; c?: Conviction }) {
   const actionable = r.stage === 'flipped' && !!r.act
   // [R339] 用户: 「卖出也要上色, 这样看起来醒目」。
   //
@@ -503,13 +487,6 @@ function SignalRow({ r, c }: { r: SignalRowData; c?: Conviction }) {
           <span className="inline-flex items-center gap-1 text-[10px] text-secondary">
             <Wallet className="h-3 w-3" />持有
           </span>
-        ) : r.scoreOnly ? (
-          /* [R343] 打分候选 —— **不冒充转折信号**: 它既没转折也没到触发价边上,
-             行上就得这么写。同样没有动作位。 */
-          <span className="inline-flex items-center gap-1 text-[10px] text-muted/70"
-                title="打分选出来的候选, 但它既没转折, 也没到触发价 5% 以内 —— 本页的出手依据只有转折">
-            <Target className="h-3 w-3" />打分候选
-          </span>
         ) : (
           <span className="inline-flex items-center gap-1 text-[10px] text-muted">
             <Eye className="h-3 w-3" />盯着
@@ -541,7 +518,6 @@ function SignalRow({ r, c }: { r: SignalRowData; c?: Conviction }) {
         )}
         {/* [R338] 拿着的票问的是"什么时候卖", 不是"什么时候买" —— 同一个距离,
             说法要对上它在你这儿的身份 */}
-        {r.scoreOnly && <>{r.state_cn ?? '还没到转折边上'}</>}
         {r.stage === 'watch' && r.gap_pct != null && (
           r.held
             ? <b className={cn(nearExit && 'text-warning')}>
