@@ -21,6 +21,7 @@ from pydantic import BaseModel
 
 from app.services import auction_benchmark, dragon_tiger, market_recap_reports, preferences
 from app.services.market_recap import recap_market_stream
+from app.services.ndjson_heartbeat import with_heartbeat
 
 logger = logging.getLogger(__name__)
 
@@ -101,9 +102,14 @@ async def analyze_market(request: Request, req: AnalyzeRequest):
             raise HTTPException(400, f"as_of 格式应为 YYYY-MM-DD,收到: {req.as_of}")
 
     async def stream_gen():
-        async for chunk in recap_market_stream(
-            repo, quote_service, depth_service, as_of, req.focus,
-            mode=req.mode if req.mode in ("today", "continuity", "week") else "today",
+        # [合上游 48ddc68b] 作者给这一路加了空闲心跳保活(等 LLM 首包期间流上
+        # 零字节可达几分钟, 反向代理会按空闲超时切断)。**fork 那个 `mode` 参数
+        # 原样保留** —— 作者包的是"这个流", 传什么参数是另一回事, 两件事不冲突。
+        async for chunk in with_heartbeat(
+            recap_market_stream(
+                repo, quote_service, depth_service, as_of, req.focus,
+                mode=req.mode if req.mode in ("today", "continuity", "week") else "today",
+            ),
         ):
             yield chunk + "\n"
 
