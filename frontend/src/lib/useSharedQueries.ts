@@ -5,10 +5,36 @@
  * 只有管线进度等非 SSE 数据才用 refetchInterval。
  */
 import { useQuery } from '@tanstack/react-query'
-import { api } from './api'
+import { api, type TodayOverview } from './api'
+import { inRealtimeWindow } from './marketClock'
 import { QK } from './queryKeys'
 
 // ===== 全局共享 =====
+
+/**
+ * [R342] 今日总览那份数据 —— **一处定义**。
+ *
+ * 调用方现在有三个: 今日总览页、模拟盘底部的补充带、以及模拟盘「今天该挂什么单」
+ * 拿把握分排序。三处各写一遍 `useQuery` 的话, 刷新节奏迟早对不上, 而**同一份数据
+ * 两种节奏的表现是"两个页面上同一个数字不一样"** —— 这种不一致查起来极痛苦,
+ * 因为两边看上去都"没坏"。
+ *
+ * 节奏是 R319 定的: 只在**后端说实时叠加层在**(`live`)且**现在真在实时窗口里**时
+ * 才 60 秒一刷, 否则每小时。缺一个都不对 —— 只看时段, 关着实时也会每分钟白算一次
+ * 全量(全部自选的六态 + 打分 + 台账); 只看 live, 盘后叠加层残留时会一直刷。
+ */
+export function useTodayOverview() {
+  return useQuery({
+    queryKey: QK.todayOverview,
+    queryFn: () => api.todayOverview(),
+    staleTime: 60_000,
+    refetchInterval: (query) =>
+      (query.state.data as TodayOverview | undefined)?.live && inRealtimeWindow()
+        ? 60_000
+        : 60 * 60 * 1000,
+    refetchOnWindowFocus: true,
+  })
+}
 
 /** 能力检测 — Layout / Data / Keys 共用 */
 export function useCapabilities() {

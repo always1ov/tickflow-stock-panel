@@ -39,6 +39,7 @@ import { cn } from '@/lib/cn'
 import { storage } from '@/lib/storage'
 import { refreshEvery, rhythmHint } from '@/lib/refreshRhythm'
 import { TodayDigest } from '@/components/today/TodayDigest'   // [R341] 底部补充带
+import { useTodayOverview } from '@/lib/useSharedQueries'      // [R342] 把握分(只排序)
 
 const CAPITAL_OPTIONS = [100_000, 500_000, 1_000_000, 5_000_000]
 const POSITION_OPTIONS = [3, 5, 10, 20]
@@ -121,6 +122,21 @@ export function FlipPaper() {
     refetchInterval: refreshEvery('static'),
   })
 
+  // [R342] 把握分只用来**排序与标注**, 不参与"能不能动手"。取自今日总览那份
+  // 打分(与今日总览页共享同一份缓存, 不多打一次接口)。
+  const today = useTodayOverview()
+  const conv = useMemo(() => {
+    const m = new Map<string, Conviction>()
+    for (const o of today.data?.opportunities ?? []) {
+      if (o.rank == null) continue
+      m.set(o.symbol, {
+        score: o.score ?? null, rank: o.rank,
+        total: o.rank_total ?? null, partial: !!o.partial,
+      })
+    }
+    return m
+  }, [today.data])
+
   const d = q.data
   return (
     <div className="flex h-full flex-col">
@@ -155,7 +171,7 @@ export function FlipPaper() {
 
         {d && !d.reason && (
           <>
-            <TodaySignals rows={d.today ?? []} />
+            <TodaySignals rows={d.today ?? []} conviction={conv} />
             <Summary d={d} />
             <NavChart d={d} />
             <Holdings d={d} onOpen={(s) => navigate(`/stock-analysis?symbol=${s}`)} />
@@ -200,8 +216,29 @@ export function FlipPaper() {
  *
  * 所以这一段**常驻、不折叠**: 手上的票天天都该看见它的离场线。它**不带动作
  * 徽标** —— 没转折就不出手, 那条铁律没有因为这段而松动一毫米。
+ *
+ * [R342] 要动手的那一段**按把握分排序**。用户: 「值得关注应用了评分系统的,
+ * 拿今天动手是否可以排个序?」
+ *
+ * **这里有一条必须说死的界线**:
+ *
+ *     谁能出手 —— 只看六态转折。一分不看, 一票不多, 一票不少。
+ *     先做哪个 —— 用打分排。
+ *
+ * 这两件事在这之前**第二件根本没人回答**: 后端那句 `out.sort(...)` 的末位键是
+ * `r["symbol"]`, 而已转折那一档 `gap_pct` 恒为 None, 于是 6 笔买入的先后
+ * **实际是按股票代码的字母序**。六笔单子摆在面前, 版面对"先做哪个"一个字都没说。
+ *
+ * 分**不改变名单**: 没进候选池的票(没过打分那三道硬门槛)照样在名单里, 只是排在
+ * 有分的后面 —— 它转折了就是转折了, 打分够不够是另一个问题。守卫钉着这一条:
+ * 排序前后的条数与集合必须**逐只相同**。
  */
-function TodaySignals({ rows }: { rows: FlipTodaySignal[] }) {
+type Conviction = { score: number | null; rank: number; total: number | null; partial: boolean }
+
+function TodaySignals({ rows, conviction }: {
+  rows: FlipTodaySignal[]
+  conviction: Map<string, Conviction>
+}) {
   // [R331] 用户: 「今天该挂什么单显得太多了, 需要折叠展开的功能」。
   //
   // **折叠边界落在「今天是否可能成交」上**, 不是随便砍前 N 条:
@@ -234,12 +271,21 @@ function TodaySignals({ rows }: { rows: FlipTodaySignal[] }) {
   const idle = rest.filter((r) => !r.held)  // 其余, 折叠
   const actCount = live.filter((r) => r.stage === 'flipped' && r.act).length
 
+  // [R342] **只重排, 不增删。** `slice()` 先拷一份 —— 直接 sort 会就地改
+  // 上面那个 filter 的产物, 而 React 的 props 数组不该被下游改。
+  // 名次小 = 打分更靠前; 没进候选池的(拿不到名次)一律排到末尾, 但**仍在名单里**。
+  const rank = (r: FlipTodaySignal) => conviction.get(r.symbol)?.rank ?? Number.MAX_SAFE_INTEGER
+  const ordered = live.slice().sort((a, b) => rank(a) - rank(b))
+  const scored = live.filter((r) => conviction.has(r.symbol)).length
+
   return (
     <section className="overflow-hidden rounded-card border border-border/60 bg-surface/40">
       <SectionHead
         title="今天该挂什么单"
         note={[
           actCount ? `${actCount} 笔要动手` : '今天没有要动手的',
+          // [R342] 说明白这个顺序是谁排的 —— 不说的话读的人不知道该不该照着做
+          actCount && scored ? '按把握分排序' : null,
           mine.length ? `手上 ${mine.length} 只` : null,
         ].filter(Boolean).join(' · ')}
         hint={'**只有真转折才出手。**\n\n已转折 = 最新那根已落盘的日 K 让状态翻了面, 这才是动作。\n盘中越线 = 按此刻现价当收盘算会翻面 —— **不是出手理由**, 盘中价会变回去,\n14:30 跌破、14:58 拉回来的那天根本没有转折。\n\n触发价是作者的六态每天给的 flip_up / flip_down, 开盘前就定死,\n所以尾盘盯着它挂单是做得到的。\n\n「手上这些」是模拟盘现在拿着的票与各自的离场线 —— 常驻不折叠,\n买入天天有、卖出只在触发那天冒一次, 中间这段空白正是它补的。\n\n最下面「只是盯着」默认收起 —— 它随自选规模走, 摊开会把真要动手的淹掉。'}
@@ -251,12 +297,12 @@ function TodaySignals({ rows }: { rows: FlipTodaySignal[] }) {
         </div>
       ) : (
         <>
-          {live.length > 0 && (
+          {ordered.length > 0 && (
             <div className="divide-y divide-border/30">
-              {live.map((r) => <SignalRow key={r.symbol} r={r} />)}
+              {ordered.map((r) => <SignalRow key={r.symbol} r={r} c={conviction.get(r.symbol)} />)}
             </div>
           )}
-          {live.length === 0 && (
+          {ordered.length === 0 && (
             <div className="px-4 py-3 text-xs text-muted">
               今天没有要动手的 —— <b className="text-secondary">管住手</b>。
             </div>
@@ -273,7 +319,7 @@ function TodaySignals({ rows }: { rows: FlipTodaySignal[] }) {
                 <span className="ml-auto text-muted opacity-70">{mine.length} 只</span>
               </div>
               <div className="divide-y divide-border/30">
-                {mine.map((r) => <SignalRow key={r.symbol} r={r} />)}
+                {mine.map((r) => <SignalRow key={r.symbol} r={r} c={conviction.get(r.symbol)} />)}
               </div>
             </>
           )}
@@ -294,7 +340,7 @@ function TodaySignals({ rows }: { rows: FlipTodaySignal[] }) {
               {watchOpen && (
                 /* 限高 + 自己滚: 盯着的票可能几十只, 让它把整页顶长等于没折叠 */
                 <div className="max-h-64 divide-y divide-border/30 overflow-y-auto">
-                  {idle.map((r) => <SignalRow key={r.symbol} r={r} />)}
+                  {idle.map((r) => <SignalRow key={r.symbol} r={r} c={conviction.get(r.symbol)} />)}
                 </div>
               )}
             </>
@@ -308,7 +354,7 @@ function TodaySignals({ rows }: { rows: FlipTodaySignal[] }) {
 /** [R339] 离清仓线多近才算"贴着了"。**只用来上色, 不产生任何动作。** */
 const NEAR_EXIT = 0.02
 
-function SignalRow({ r }: { r: FlipTodaySignal }) {
+function SignalRow({ r, c }: { r: FlipTodaySignal; c?: Conviction }) {
   const actionable = r.stage === 'flipped' && !!r.act
   // [R339] 用户: 「卖出也要上色, 这样看起来醒目」。
   //
@@ -353,6 +399,23 @@ function SignalRow({ r }: { r: FlipTodaySignal }) {
             <Eye className="h-3 w-3" />盯着
           </span>
         )
+      )}
+
+      {/* [R342] 把握分名次 —— **排序的依据摆出来, 不做暗箱**。
+          它不是动作: 拿不到名次的票照样在名单里, 只是排在后面。 */}
+      {c ? (
+        <span className="whitespace-nowrap rounded bg-elevated/60 px-1.5 py-0.5 text-[10px] text-muted"
+              title={`把握分 ${c.score?.toFixed(0) ?? '—'}${c.partial ? '(有因子缺席, 偏乐观)' : ''}`
+                     + ' —— 只决定先后, 不决定能不能动手'}>
+          把握 {c.rank}
+          {c.total != null && <span className="opacity-60">/{c.total}</span>}
+          {c.partial && <span className="ml-0.5 text-warning/70">部分</span>}
+        </span>
+      ) : actionable && (
+        <span className="whitespace-nowrap text-[10px] text-muted/60"
+              title="没过打分那三道硬门槛, 所以没有名次 —— 但它转折了, 该动手还是要动手">
+          没进候选池
+        </span>
       )}
 
       <span className="text-[11px] text-secondary">

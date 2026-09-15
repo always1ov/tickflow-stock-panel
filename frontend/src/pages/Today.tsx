@@ -23,7 +23,6 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { inRealtimeWindow } from '@/lib/marketClock'
 import {
   BarChart3, Download, Loader2, RefreshCw,
   SlidersHorizontal, Sparkles, Sunrise, Target,
@@ -46,6 +45,7 @@ import { MarketStatusCard } from '@/components/today/MarketStatusCard'
 import { TodaySkeleton } from '@/components/today/TodaySkeleton'   // [R324] 首次加载骨架
 import { AiAskDialog } from '@/components/today/AiAskDialog'
 import { TodayHealthBar } from '@/components/today/TodayHealthBar'   // [R341] 拆出去了, 模拟盘也用
+import { useTodayOverview } from '@/lib/useSharedQueries'            // [R342] 节奏一处定义
 
 
 // [R218] 「参与打分的因子」勾选面板(R204)在这里删掉了。用户: 「不搞自选了」。
@@ -67,26 +67,8 @@ import { TodayHealthBar } from '@/components/today/TodayHealthBar'   // [R341] �
 export function Today() {
   const qc = useQueryClient()
   const navigate = useNavigate()
-  const q = useQuery({
-    queryKey: QK.todayOverview,
-    queryFn: () => api.todayOverview(),
-    staleTime: 60_000,
-    // [R27] 每小时自动刷新一次: 盘后数据落盘/定时 AI 跑完后不必手点。
-    //
-    // [R319] **盘中开着实时时改成 60 秒一刷。** 原来不分时段一律每小时, 于是
-    // 页头写着「● 实时中(N 只)」, 「盘中」列里的价格却可能是 59 分钟前的 ——
-    // 标签承诺的和数据给的不是一回事。后端行情层每 6 秒轮一次(quote_service
-    // DEFAULT_INTERVAL), 60 秒是决策台给「距离随实时价动」那些查询定的口径
-    // (WatchlistDecisionBoard 的 staleTime 注释), 这里跟它一致。
-    //
-    // 只在两个条件同时成立时提速: 后端说实时叠加层在(`live`), 且现在在实时窗口
-    // 里(工作日 09:15~15:05, 与 realtime_schedule 同一边界)。盘后 / 周末 / 实时
-    // 开关关着 → 回到每小时, 一次多余的重算都不做(每次重算是全量: 全部自选的
-    // 六态 + 打分 + 台账)。
-    refetchInterval: (query) =>
-      query.state.data?.live && inRealtimeWindow() ? 60_000 : 60 * 60 * 1000,
-    refetchOnWindowFocus: true,
-  })
+  // [R342] 节奏收到 useTodayOverview 一处定义 —— 三个调用方共用
+  const q = useTodayOverview()
   // AI 导读+优选合一: 一次调用同时产出导读正文与量价优选结果。
   // [R27] 结果已落盘, 页面进来先显示缓存(state 为 null 时回落到 q.data.ai),
   // 刷新/次日进来不再空白, 定时任务的产出也能直接看到。

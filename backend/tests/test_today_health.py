@@ -321,18 +321,17 @@ def test_R319_盘中开着实时时六十秒一刷():
     白算一次全量; 只看 live, 盘后叠加层残留时也会一直刷。"""
     from tests.frontend_source import code_of
 
-    # [R341] 这条查询现在有**两处**调用方: 今日总览页, 与模拟盘底部那条浓缩带。
-    # **两处必须同一个节奏** —— 同一份数据两种刷新口径就是第二处产地, 而且会
-    # 表现成"两个页面上的同一个数字不一样", 极难查。所以这条守卫对两个文件都跑。
-    for rel in ("pages/Today.tsx", "components/today/TodayDigest.tsx"):
-        page = code_of(rel)
-        q = page[page.index("queryKey: QK.todayOverview"):]
-        q = q[:q.index("refetchOnWindowFocus")]
-        assert "refetchInterval: (query) =>" in q, f"{rel}: 刷新间隔不是按状态算的函数"
-        assert "?.live" in q, f"{rel}: 没看后端的 live 标志"
-        assert "inRealtimeWindow()" in q, f"{rel}: 没看现在是不是实时窗口"
-        assert "60_000" in q and "60 * 60 * 1000" in q, f"{rel}: 两档节奏不全"
-        assert "from '@/lib/marketClock'" in page, f"{rel}: 时段判断没走共用的市场时钟"
+    # [R342] 这条查询的调用方涨到三个(今日总览页 / 模拟盘补充带 / 模拟盘按把握分
+    # 排序), 节奏因此收到 `useTodayOverview` **一处定义**。守卫跟着挪到那一处 ——
+    # 「三个调用方都不许自己抄一份」由 test_R342_今日总览那份数据只有一处定义 管。
+    page = code_of("lib/useSharedQueries.ts")
+    q = page[page.index("export function useTodayOverview"):]
+    q = q[:q.index("refetchOnWindowFocus")]
+    assert "refetchInterval: (query) =>" in q, "刷新间隔不是按状态算的函数"
+    assert "?.live" in q, "没看后端的 live 标志"
+    assert "inRealtimeWindow()" in q, "没看现在是不是实时窗口"
+    assert "60_000" in q and "60 * 60 * 1000" in q, "两档节奏(60 秒 / 每小时)不全"
+    assert "from './marketClock'" in page, "时段判断没走共用的市场时钟"
 
 
 def test_R319_两个实时开关都让今日总览重取():

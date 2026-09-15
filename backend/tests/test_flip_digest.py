@@ -52,22 +52,34 @@ def test_R341_对模拟盘是纯插入():
     assert idx == sorted(idx), f"版面顺序被动过: {order}"
 
 
-def test_R341_补充带自己取数_不动模拟盘那条查询():
-    """模拟盘那条 useQuery 一个参数都不该因为这次改动而变。"""
+def test_R341_模拟盘主查询没被动过():
+    """模拟盘那条 useQuery 一个参数都不该因为这几次改动而变。"""
     flip = code_of(FLIP)
     blk = flip[flip.index("const q = useQuery({"):flip.index("const rules = useQuery({")]
     assert "refetchInterval: refreshEvery('derived')" in blk, "模拟盘主查询的节奏被动了"
-    assert "todayOverview" not in blk, "补充带的数据不该混进模拟盘主查询"
-    # 补充带自己有一条
-    assert "queryKey: QK.todayOverview" in code_of(DIGEST)
+    assert "todayOverview" not in blk, "今日总览的数据不该混进模拟盘主查询"
 
 
-def test_R341_节奏跟今日总览走_不跟模拟盘():
-    """同一份数据两种刷新口径 = 第二处产地。"""
-    digest = code_of(DIGEST)
-    assert "inRealtimeWindow() \n" not in digest
-    assert "60 * 60 * 1000" in digest and "60_000" in digest, "与今日总览逐字相同的节奏"
-    assert "refreshEvery(" not in digest, "别套模拟盘那套档位 —— 这不是模拟盘的数据"
+def test_R342_今日总览那份数据只有一处定义():
+    """[R342] 调用方从两个涨到三个 —— 各写一份 `useQuery` 迟早漂。
+
+    **同一份数据两种刷新节奏的表现是「两个页面上同一个数字不一样」**, 而两边看上去
+    都"没坏", 查起来极痛苦。所以节奏收到 `useTodayOverview` 一处, 调用方只准调它。
+    """
+    hook = code_of("lib/useSharedQueries.ts")
+    blk = hook[hook.index("export function useTodayOverview"):]
+    blk = blk[:blk.index("\n}")]
+    assert "queryKey: QK.todayOverview" in blk
+    assert "refetchInterval: (query) =>" in blk, "刷新间隔不是按状态算的函数"
+    assert "?.live" in blk and "inRealtimeWindow()" in blk, "两件事要同时看"
+    assert "60_000" in blk and "60 * 60 * 1000" in blk, "两档节奏不全"
+
+    for rel in (DIGEST, FLIP, TODAY):
+        code = code_of(rel)
+        assert "useTodayOverview()" in code, f"{rel} 没走共用 hook"
+        assert "queryKey: QK.todayOverview" not in code, f"{rel} 自己又抄了一份查询"
+    assert "refreshEvery(" not in code_of(DIGEST), \
+        "别给它套模拟盘那套档位 —— 这不是模拟盘的数据"
 
 
 # ── 省空间 ──────────────────────────────────────────────────────────────

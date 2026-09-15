@@ -37,12 +37,11 @@
  * `derived` 档**: 这份数据是今日总览那边的口径, 换个节奏就是第二处产地。
  */
 import { useState } from 'react'
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { ChevronDown, Loader2, Sparkles } from 'lucide-react'
-import { api, type TodayOverview, type TodayOpportunity } from '@/lib/api'
-import { QK } from '@/lib/queryKeys'
-import { inRealtimeWindow } from '@/lib/marketClock'
+import { api, type TodayOpportunity } from '@/lib/api'
+import { useTodayOverview } from '@/lib/useSharedQueries'
 import { cn } from '@/lib/cn'
 import { storage } from '@/lib/storage'
 import { toast } from '@/components/Toast'
@@ -69,17 +68,8 @@ export function TodayDigest() {
     })
   }
 
-  const q = useQuery({
-    queryKey: QK.todayOverview,
-    queryFn: () => api.todayOverview(),
-    staleTime: 60_000,
-    // 与今日总览页逐字相同的节奏 —— 同一份数据不该有两种刷新口径
-    refetchInterval: (query) =>
-      (query.state.data as TodayOverview | undefined)?.live && inRealtimeWindow()
-        ? 60_000
-        : 60 * 60 * 1000,
-    refetchOnWindowFocus: true,
-  })
+  // [R342] 节奏不在这里定 —— 三个调用方共用 `useTodayOverview`
+  const q = useTodayOverview()
 
   const [brief, setBrief] = useState<string | null>(null)
   const [aiError, setAiError] = useState<string | null>(null)

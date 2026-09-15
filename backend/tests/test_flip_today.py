@@ -243,7 +243,8 @@ def test_R331_要动手的永远不进折叠区():
     assert "const rest = rows.filter((r) => !isLive(r))" in blk, \
         "折叠那一侧必须是常驻区的补集 —— 两套各写一份判据必然漂"
     # 常驻区渲染在折叠开关**之前**, 且不受 watchOpen 控制
-    i_live = blk.index("{live.map((r) => <SignalRow")
+    # [R342] 常驻区渲染的是排过序的 `ordered`(只重排不增删), 锚跟着走
+    i_live = blk.index("{ordered.map((r) => <SignalRow")
     i_toggle = blk.index("onClick={toggleWatch}")
     assert i_live < i_toggle
     head = blk[:i_toggle]
@@ -272,7 +273,7 @@ def test_R331_展开区限高自己滚():
 
 def test_R331_没有要动手的时候明说_不是留一片空白():
     blk = _today_block()
-    assert "{live.length === 0 && (" in blk
+    assert "{ordered.length === 0 && (" in blk
     assert "管住手" in blk, "空着不说话, 读的人分不清是没有还是没算出来"
 
 
@@ -504,3 +505,66 @@ def test_R339_样本量不够时胜率自己说出来():
     assert "样本太少不当数" in sm
     st = blk[blk.index("function Stat({ label"):]
     assert "tone === 'warn' && 'text-warning'" in st, "warn 这一档得真有颜色"
+
+
+# ── [R342] 把握分排序 ───────────────────────────────────────────────────
+#
+# 用户: 「值得关注应用了评分系统的, 拿今天动手是否可以排个序?」
+#
+# **界线必须说死**:
+#     谁能出手 —— 只看六态转折。一分不看, 一票不多, 一票不少。
+#     先做哪个 —— 用打分排。
+#
+# 第二件在这之前根本没人回答: 后端那句 `out.sort(...)` 末位键是 `r["symbol"]`,
+# 而已转折那一档 `gap_pct` 恒为 None, 于是 6 笔买入的先后**实际是按代码字母序**。
+
+
+def test_R342_排序只重排不增删():
+    """**这一条是整组的地基。** 分是用来排先后的, 不是用来筛名单的。"""
+    blk = _today_block()
+    assert "const ordered = live.slice().sort(" in blk, "必须先拷一份再排"
+    # 排序的输入是 live 本身, 不是 live 的某个子集
+    assert "live.filter" not in blk.split("const ordered")[1].split("\n")[0], \
+        "不许在排序那一行顺手过滤"
+    # 没进候选池的排末尾, 但仍在名单里
+    assert "?? Number.MAX_SAFE_INTEGER" in blk, \
+        "拿不到名次的票必须排末尾而不是被丢掉"
+
+
+def test_R342_分不参与能不能动手():
+    """**铁律。** 把握分只碰顺序, 不许碰 `isLive` 那个判据。"""
+    blk = _today_block()
+    pred = next(l for l in blk.splitlines() if "const isLive =" in l)
+    for word in ("conviction", "rank", "score", "把握"):
+        assert word not in pred, f"出手判据里混进了打分: {word}"
+
+
+def test_R342_slice先拷一份_不就地改props():
+    """`sort` 是就地改。直接对 filter 的产物排没事, 但对 props 数组排会改到上游。"""
+    blk = _today_block()
+    line = next(l for l in blk.splitlines() if "const ordered" in l)
+    assert ".slice().sort(" in line, "少了 slice() —— sort 会就地改"
+
+
+def test_R342_排序依据摆在界面上_不做暗箱():
+    """顺序是谁排的不说, 读的人不知道该不该照着做。"""
+    blk = _today_block()
+    assert "'按把握分排序'" in blk, "页头没说这个顺序是按什么排的"
+    row = _signal_row()
+    assert "把握 {c.rank}" in row, "行上要看得见名次 —— 排序依据不做暗箱"
+    assert "只决定先后, 不决定能不能动手" in row, "必须写明分不是出手依据"
+
+
+def test_R342_没进候选池的票照样在名单里():
+    """转折了就是转折了 —— 打分够不够是另一个问题, 不该让它从名单上消失。"""
+    row = _signal_row()
+    assert "没进候选池" in row
+    assert "该动手还是要动手" in row, "得说清它为什么没名次, 以及这不影响动手"
+
+
+def test_R342_把握分那一格不是动作():
+    """名次徽标长在动作徽标旁边, **不许变成第二个可点的动作**。"""
+    row = _signal_row()
+    seg = row[row.index("c ? ("):row.index("<span className=\"text-[11px] text-secondary\">")]
+    for word in ("'买入'", "'清仓'", "onClick"):
+        assert word not in seg, f"把握分那一格出现了动作: {word}"
