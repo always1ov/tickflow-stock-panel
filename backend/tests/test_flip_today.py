@@ -318,20 +318,75 @@ def test_R332_天数不够时空着_不拿全程凑数():
         "空栏必须自己解释 —— 「算不出来」与「没赚到」是两件事")
 
 
-def test_R339_回溯档位_最长三年_带短周期():
-    """**这条是 R332 那条守卫的替代品, 不是它的延续。**
+def test_R353_三个参数都能自己填_不是档位():
+    """[R339 → R353] 用户: 「这里我要能配置而不是选择或者默认」。
 
-    R332 我写的是「回溯参数没被动过 —— 它给的是样本量, 不该为了看当下砍短」。
-    论点本身没错, 但它**替用户做了决定**; R339 用户当面推翻:「回溯时间太长了,
-    只看近三年和短周期」。所以守卫改成钉新口径, 而"样本量不够"那件事改由**界面
-    自己说**(轮数少于 10 时胜率标黄), 不再靠一条测试替他拦着。
+    **档位这个概念取消了。** R339 我把它砍成「半年/1/2/3 年」四档并为此写了守卫;
+    这次用户要的是直接填 —— 于是边界改由输入框的 `min`/`max` 表达, 与后端对齐,
+    而不是由一份我挑的清单表达。
+
+    R339 那条论证(窗口短了样本量不成立)**仍然成立, 而且更要紧** —— 既然现在能
+    填任意值, 那句话更得让人看见: 完整买卖少于 10 轮时胜率标黄并写明, 见 `Summary`,
+    由 `test_R339_样本量不够时胜率自己说出来` 守着。
     """
     blk = _page()
-    assert "const YEAR_OPTIONS = [0.5, 1, 2, 3]" in blk, "最长三年, 且要有短周期档"
-    assert "5]" not in blk.split("YEAR_OPTIONS")[1][:40], "5 年那一档已经砍掉"
-    # 「0.5 年」没人这么讲话
-    assert "const fmtYears = (v: number) => (v < 1 ? `${Math.round(v * 12)} 个月`" in blk
-    assert "fmt={fmtYears}" in blk, "选择器必须用这个写法, 不许各写一份"
+    assert "const YEAR_OPTIONS" not in blk and "const CAPITAL_OPTIONS" not in blk \
+        and "const POSITION_OPTIONS" not in blk, "还留着写死的档位清单"
+    assert "<select" not in blk, "还在用下拉选择"
+    for field in ('<NumberField label="本金"', '<NumberField label="最多持有"',
+                  '<NumberField label="回溯"'):
+        assert field in blk, f"这一项没改成可输入: {field}"
+
+
+def test_R353_边界与后端逐个对齐():
+    """前端钳到同一个区间, **不是等后端 422** —— 那种报错只会说
+    「Input should be less than or equal to 50」, 读的人不知道该填多少。"""
+    blk = _page()
+    assert "min={1} max={50}" in blk, "最多持有的上界要对上 MAX_POSITIONS_CAP"
+    assert "min={0.5} max={10}" in blk, "回溯的上下界要对上 MIN_YEARS / MAX_YEARS"
+
+    from app.api import flip_paper
+    from app.services import flip_portfolio
+    assert flip_portfolio.MAX_POSITIONS_CAP == 50
+    assert flip_paper.MIN_YEARS == 0.5 and flip_paper.MAX_YEARS == 10
+
+
+def test_R353_失焦才提交_不许边敲边跑():
+    """**这三个值都进 `queryKey`。** 直接绑 `onChange` 的话, 敲「100000」这七个
+    字符会依次触发七次请求 —— 而每次请求是全部自选的六态 + 一整轮回测。
+    """
+    blk = _page()
+    fn = blk[blk.index("function NumberField"):]
+    fn = fn[:fn.index("\n}\n")]
+    assert "const [draft, setDraft]" in fn, "没有本地草稿 —— 那就是边敲边提交"
+    assert "onBlur={commit}" in fn, "失焦要提交"
+    assert "if (e.key === 'Enter')" in fn, "回车要提交"
+    # onChange 只许写草稿, 不许直接调用方
+    onchange = next(l for l in fn.splitlines() if "onChange={(e) =>" in l)
+    assert "setDraft(e.target.value)" in onchange and "onChange(" not in onchange.replace("onChange={(e) =>", ""), \
+        "onChange 里直接提交了 —— 每敲一个字符跑一次全量回测"
+
+
+def test_R353_越界钳到边界_而不是报错或清空():
+    """「填了 999 只就钳成 50」比弹一句「超出范围」再清空有用得多 ——
+    **让人看见它被钳到哪儿**。不是数字就退回当前值, 不留一个空框。"""
+    blk = _page()
+    fn = blk[blk.index("function NumberField"):]
+    fn = fn[:fn.index("\n}\n")]
+    assert "Math.min(max, Math.max(min, n))" in fn, "没有钳位"
+    assert "if (!Number.isFinite(n)) return" in fn, "填了非数字没有退回当前值"
+
+
+def test_R353_填过的值要记住():
+    """每次打开都退回默认值, 等于没配过。"""
+    blk = _page()
+    for key in ("storage.flipCapital.get(1_000_000)",
+                "storage.flipMaxPositions.get(10)",
+                "storage.flipYears.get(2)"):
+        assert key in blk, f"没从本地读回: {key}"
+    for put in ("storage.flipCapital.set(v)", "storage.flipMaxPositions.set(v)",
+                "storage.flipYears.set(v)"):
+        assert put in blk, f"改了没落盘: {put}"
 
 
 def test_R339_后端接受半年():

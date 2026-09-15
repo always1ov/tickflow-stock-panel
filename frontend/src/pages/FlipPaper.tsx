@@ -52,21 +52,14 @@ const POSTURE_TONE: Record<string, string> = {
   观察: 'bg-muted/15 text-muted',
 }
 
-const CAPITAL_OPTIONS = [100_000, 500_000, 1_000_000, 5_000_000]
-const POSITION_OPTIONS = [3, 5, 10, 20]
-// [R339] 用户: 「回溯时间太长了, 只看近三年和短周期」。
+// [R339/R353] 回溯的上下界。R339 把档位砍到「半年~三年」, R353 改成可输入,
+// 于是"档位"这个概念没有了 —— 边界改由输入框的 min/max 表达, 与后端
+// `flip_paper.MIN_YEARS` / `MAX_YEARS` 对齐。
 //
-// 砍掉 5 年、补进半年。**R332 里我为「不许砍短」写过守卫, 这次是用户当面推翻它**
-// —— 那条守卫的论点(回溯给的是样本量)没有错, 只是它不该替用户做决定; 现在守卫
-// 改成钉新口径, 并且把样本量那件事**摆到界面上说**, 而不是靠一条测试替他拦着。
-//
-// 半年 ≈ 120 个交易日。转折是低频信号, 这个窗口里可能只有两三次完整买卖 ——
-// 胜率、最大回撤在那种样本量下**不是"不好看", 是不成立**。所以下面的统计里
-// 完整买卖少于 10 次会明说, 见 `Summary`。
-const YEAR_OPTIONS = [0.5, 1, 2, 3]
-
-/** 回溯档位的写法: 不足一年按月说 —— 「0.5 年」没人这么讲话。 */
-const fmtYears = (v: number) => (v < 1 ? `${Math.round(v * 12)} 个月` : `${v} 年`)
+// R339 那条论证仍然成立, 而且现在更要紧: 半年 ≈ 120 个交易日, 转折是低频信号,
+// 那个窗口里可能只有两三次完整买卖 —— 胜率与最大回撤在那种样本量下**不是
+// "不好看", 是不成立**。既然现在能填任意值, 这句话更得让人看见: 完整买卖少于
+// 10 次时胜率会标黄并写明, 见 `Summary`。
 
 /** 没做成的原因 —— 逐条翻译。**空栏必须自己解释**: 读的人分不清"没有"和"算不出来" */
 const WHY_CN: Record<string, string> = {
@@ -111,9 +104,13 @@ function SymbolCell({ symbol, name }: { symbol: string; name: string }) {
 
 export function FlipPaper() {
   const navigate = useNavigate()
-  const [capital, setCapital] = useState(1_000_000)
-  const [maxPositions, setMaxPositions] = useState(10)
-  const [years, setYears] = useState(2)
+  // [R353] 三个参数可自己填, 并且**记住** —— 每次打开都退回默认值等于没配过。
+  const [capital, setCapital] = useState(() => storage.flipCapital.get(1_000_000))
+  const [maxPositions, setMaxPositions] = useState(() => storage.flipMaxPositions.get(10))
+  const [years, setYears] = useState(() => storage.flipYears.get(2))
+  const putCapital = (v: number) => { storage.flipCapital.set(v); setCapital(v) }
+  const putMaxPositions = (v: number) => { storage.flipMaxPositions.set(v); setMaxPositions(v) }
+  const putYears = (v: number) => { storage.flipYears.set(v); setYears(v) }
 
   const q = useQuery({
     queryKey: QK.flipPaper(capital, maxPositions, years),
@@ -211,12 +208,19 @@ export function FlipPaper() {
           : `非真实资金 · 只按六态转折买卖 · ${rhythmHint('derived')}`}
         right={
           <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
-            <Picker label="本金" value={capital} options={CAPITAL_OPTIONS}
-                    onChange={setCapital} fmt={money} />
-            <Picker label="最多持有" value={maxPositions} options={POSITION_OPTIONS}
-                    onChange={setMaxPositions} fmt={(v) => `${v} 只`} />
-            <Picker label="回溯" value={years} options={YEAR_OPTIONS}
-                    onChange={setYears} fmt={fmtYears} />
+            {/* [R353] 三个都改成可输入。上下界与后端逐个对齐:
+                本金 > 0(给 1 万下限, 再低连一手都买不起);
+                最多持有 1~50(`flip_portfolio.MAX_POSITIONS_CAP`);
+                回溯 0.5~10 年(`flip_paper.MIN_YEARS` / `MAX_YEARS`)。
+                **前端钳到同一个区间, 不是等后端 422** —— 那种报错只会说
+                「Input should be less than or equal to 50」, 读的人不知道该填多少。 */}
+            <NumberField label="本金" value={capital} onChange={putCapital}
+                         min={10_000} max={100_000_000} step={10_000}
+                         width="w-24" fmt={money} />
+            <NumberField label="最多持有" value={maxPositions} onChange={putMaxPositions}
+                         min={1} max={50} step={1} width="w-14" suffix="只" />
+            <NumberField label="回溯" value={years} onChange={putYears}
+                         min={0.5} max={10} step={0.5} width="w-14" suffix="年" />
           </div>
         }
       />
@@ -566,20 +570,70 @@ function SignalRow({ r, c }: { r: FlipTodaySignal; c?: TodayOpportunity }) {
   )
 }
 
-function Picker<T extends number>({ label, value, options, onChange, fmt }: {
-  label: string; value: T; options: readonly T[]
-  onChange: (v: T) => void; fmt: (v: T) => string
+/**
+ * [R353] 可输入的参数格。用户: 「这里我要能配置而不是选择或者默认」。
+ *
+ * 原来是三个 `<select>`, 只能在几个写死的档位里挑 —— 本金想填 30 万、最多持有
+ * 想填 7 只、回溯想填 18 个月, 一个都做不到。
+ *
+ * ## 为什么不是「边敲边生效」
+ *
+ * 这三个值都进 `queryKey`。直接绑 `onChange` 的话, **敲「100000」这七个字符会
+ * 依次触发七次请求**, 而每次请求是全部自选的六态 + 一整轮回测 —— 打到后端就是
+ * 七次全量重算。所以本地先存草稿, **失焦或回车才提交**。
+ *
+ * ## 越界怎么办
+ *
+ * 钳到合法区间而不是报错或者置空: 后端的边界是硬的(本金 > 0、最多持有 1~50、
+ * 回溯 0.5~10 年), 填了 999 只就钳成 50 —— **让人看见它被钳到哪儿**, 比弹一句
+ * 「超出范围」再把输入清空有用得多。填了不是数字的东西就退回当前值。
+ *
+ * `step` 给出这一栏的自然粒度(本金 1 万、持有 1 只、回溯半年), 上下箭头与滚轮
+ * 因此是可用的 —— 想微调的人不必每次都全选重打。
+ */
+function NumberField({ label, value, onChange, min, max, step, width = 'w-20', suffix, fmt }: {
+  label: string
+  value: number
+  onChange: (v: number) => void
+  min: number
+  max: number
+  step: number
+  width?: string
+  /** 单位, 跟在输入框右边 —— 放进框里会被光标挤 */
+  suffix?: string
+  /** 只在**没有聚焦**时用来好看地显示(如本金的千分位); 一聚焦就退回原始数字好编辑 */
+  fmt?: (v: number) => string
 }) {
+  const [draft, setDraft] = useState<string | null>(null)
+  const commit = () => {
+    if (draft === null) return
+    const n = Number(draft)
+    setDraft(null)
+    if (!Number.isFinite(n)) return          // 不是数字 —— 退回当前值, 不清空
+    const clamped = Math.min(max, Math.max(min, n))
+    if (clamped !== value) onChange(clamped)
+  }
   return (
     <label className="inline-flex items-center gap-1 text-muted">
       {label}
-      <select
-        value={value}
-        onChange={(e) => onChange(Number(e.target.value) as T)}
-        className="rounded-btn border border-border bg-base px-1.5 py-0.5 text-[10px] text-foreground cursor-pointer"
-      >
-        {options.map((o) => <option key={o} value={o}>{fmt(o)}</option>)}
-      </select>
+      <input
+        type="number"
+        inputMode="decimal"
+        min={min}
+        max={max}
+        step={step}
+        value={draft ?? (fmt ? fmt(value) : String(value))}
+        onFocus={() => setDraft(String(value))}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') { e.currentTarget.blur() }
+          if (e.key === 'Escape') { setDraft(null); e.currentTarget.blur() }
+        }}
+        title={`${min} ~ ${max}${suffix ?? ''} —— 超出会被钳到边界; 回车或点别处生效`}
+        className={cn(width, 'rounded-btn border border-border bg-base px-1.5 py-0.5 text-right text-[10px] text-foreground outline-none focus:border-accent/50')}
+      />
+      {suffix && <span className="text-[10px]">{suffix}</span>}
     </label>
   )
 }

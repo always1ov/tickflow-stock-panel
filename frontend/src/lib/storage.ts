@@ -40,6 +40,11 @@ export const storage = {
    * [R327] R192 那个 `paperTrader`(当前看哪个操作员)跟着 AI 操盘手一起没了。
    */
   flipTodayWatchOpen:   kv<boolean>('flip-today-watch-open'),
+  // [R353] 模拟盘那三个参数。用户: 「这里我要能配置而不是选择或者默认」——
+  // 既然能自己填, 就得记住; 每次打开都退回默认值等于没配过。
+  flipCapital:          kv<number>('flip-capital'),
+  flipMaxPositions:     kv<number>('flip-max-positions'),
+  flipYears:            kv<number>('flip-years'),
 
   /** [R266] 消息面总览是否展开 —— 默认收起(那一段很长), 但看惯了展开的人不该每次重点 */
   newsDeskSummaryOpen:  kv<boolean>('news-desk-summary-open'),
