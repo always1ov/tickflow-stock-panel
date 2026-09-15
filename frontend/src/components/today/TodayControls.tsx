@@ -28,7 +28,7 @@ import { useMutation } from '@tanstack/react-query'
 import { BarChart3, Loader2, SlidersHorizontal } from 'lucide-react'
 import {
   api, TODAY_BOARDS,
-  type SignalAiSchedule, type TodayAiSchedule, type TodayOverview, type TodayPrefs,
+  type SignalAiSchedule, type TodayOverview, type TodayPrefs,
 } from '@/lib/api'
 import { toast } from '@/components/Toast'
 import { cn } from '@/lib/cn'
@@ -54,25 +54,10 @@ export function TodayControls({ d, refetch, isFetching }: {
   // 请求, 屏幕上叠出两个一样的 toast)。先本地亮起来, 服务端回来再对齐。
   const [boardDraft, setBoardDraft] = useState<string[] | null>(null)
 
-  const todayAiSched = useQuery({
-    queryKey: QK.todayAiSchedule,
-    queryFn: () => api.todayAiScheduleGet(),
-    staleTime: 5 * 60_000,
-  })
   const signalAiSched = useQuery({
     queryKey: QK.signalAiSchedule,
     queryFn: () => api.signalAiScheduleGet(),
     staleTime: 5 * 60_000,
-  })
-  const todayAiSchedMut = useMutation({
-    mutationFn: (body: TodayAiSchedule) => api.todayAiScheduleSet(body),
-    onSuccess: (r) => {
-      todayAiSched.refetch()
-      toast(r.enabled
-        ? `定时导读·优选已开启:工作日 ${String(r.hour).padStart(2, '0')}:${String(r.minute).padStart(2, '0')}`
-        : '定时导读·优选已关闭', 'success')
-    },
-    onError: (e: Error) => toast(e.message, 'error'),
   })
   const signalAiSchedMut = useMutation({
     mutationFn: (body: SignalAiSchedule) => api.signalAiScheduleSet(body),
@@ -302,30 +287,11 @@ export function TodayControls({ d, refetch, isFetching }: {
           </span>
           {/* [R27] AI 定时自动运行 */}
           <div className="flex w-full flex-wrap items-center gap-x-5 gap-y-2 border-t border-border/40 pt-3">
-            <label className="flex items-center gap-2 text-[11px] text-muted" title="工作日到点自动生成导读·优选并存下来, 次日进页面直接看结果">
-              <input
-                type="checkbox"
-                checked={todayAiSched.data?.enabled ?? false}
-                onChange={(e) => todayAiSchedMut.mutate({
-                  enabled: e.target.checked,
-                  hour: todayAiSched.data?.hour ?? 18,
-                  minute: todayAiSched.data?.minute ?? 30,
-                })}
-                className="h-3.5 w-3.5 accent-violet-500"
-              />
-              <span className="whitespace-nowrap">定时导读·优选</span>
-              <input
-                type="time"
-                value={`${String(todayAiSched.data?.hour ?? 18).padStart(2, '0')}:${String(todayAiSched.data?.minute ?? 30).padStart(2, '0')}`}
-                onChange={(e) => {
-                  const [h, m] = e.target.value.split(':').map(Number)
-                  if (!Number.isNaN(h)) todayAiSchedMut.mutate({
-                    enabled: todayAiSched.data?.enabled ?? false, hour: h, minute: m,
-                  })
-                }}
-                className="rounded border border-border bg-surface px-1.5 py-0.5 font-mono text-foreground outline-none focus:border-violet-400/50"
-              />
-            </label>
+            {/* [R352] 「定时导读·优选」那个开关删了。用户: 「这部分和 ai 导读都不用了」。
+                它产出两样东西: 导读正文与 AI 优选 —— **两个展示面都已经没了**
+                (优选面板随今日总览一起删于 R351, 导读正文这次删)。留着就是又一个
+                调了不产生任何可见结果的旋钮, 和 R340 那个「回撤纪律线」一模一样。
+                后端定时任务与偏好字段没动, 要恢复把这个 label 加回来即可。 */}
             <label className="flex items-center gap-2 text-[11px] text-muted" title="工作日到点批量刷新个股 AI 信号; 每只之间留间隔, 不会打满接口">
               <input
                 type="checkbox"

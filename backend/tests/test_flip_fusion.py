@@ -126,7 +126,10 @@ def test_R343_市场状态并进页头_不自己占一张卡():
     assert "text-fuchsia-300" in head, "主线没上色(text-secondary 是灰阶不是颜色)"
     assert "mlStale ? 'text-muted' : 'text-fuchsia-300'" in head, "停更没降级成灰"
     assert "主线(停更)" in head, "停更没在标题上说出来"
-    assert "AI 导读" in head, "AI 导读也收进页头"
+    # [R352] 「AI 导读」那个按钮删了(用户: 「这部分和 ai 导读都不用了」) ——
+    # 这一条因此只守市场状态那部分。**顺手钉住它真的没了**, 免得哪天又被加回来
+    # 却没人记得当初为什么删。
+    assert "AI 导读" not in code_of(FLIP), "AI 导读已经删了, 不该再出现"
 
 
 def test_R343_自检条在最顶且不进折叠():
@@ -386,3 +389,41 @@ def test_R350_走势行缩进对齐到状态文字那一列():
     row = _row()
     assert "pl-[22.25rem]" in row, "缩进要对齐到状态文字那一列的起点"
     assert "pl-[3.75rem]" not in row
+
+
+# ── [R352] AI 导读删掉, 连同它那个已经没有展示面的定时开关 ──────────────
+#
+# 用户: 「这部分和 ai 导读都不用了, 删掉」。
+
+
+def test_R352_导读与它的定时开关一起消失():
+    """**一个开关的展示面没了, 开关本身就得跟着走。**
+
+    「定时导读·优选」产出两样东西 —— 导读正文与 AI 优选。优选面板随今日总览删于
+    R351, 导读正文这次删; 留着那个开关就是又一个**调了不产生任何可见结果的旋钮**,
+    与 R340 删掉的「回撤纪律线」一模一样。
+    """
+    ctrl = code_of(CTRL)
+    assert "定时导读" not in ctrl, "那个开关的产出已经没有展示面了, 不该还留着"
+    assert "todayAiSched" not in ctrl, "对应的 query/mutation 也该一起走"
+    # **对照组**: 「定时个股信号」的产出仍然显示在决策台的「AI 信号」列上, 它留着。
+    # 锚在**那个 label 的标记**上, 不是四个字 —— 这四个字也出现在 toast 文案里
+    # (`定时个股信号已开启:...`), 拿裸字符串扫的话把开关整个删掉照样绿。
+    assert '<span className="whitespace-nowrap">定时个股信号</span>' in ctrl, \
+        "这个开关有活的展示面(决策台 AI 信号列), 不该被误删"
+    assert "signalAiSchedMut.mutate({" in ctrl, "开关得真的能落库"
+
+
+def test_R352_前端那几个死包装也清了():
+    """`todayAi` / `todayAiTrackRecord` / `todayAiSchedule*` 在前端没有任何调用方。
+
+    命中率那条**从 R351 起就没人调了** —— 它只服务于已随今日总览删掉的优选面板。
+    「没人调的代码看起来像在用」这仓库栽过太多次, 顺手清干净。
+    **后端端点原样还在**, 删的只是前端那层包装。
+    """
+    api = code_of("lib/api.ts")
+    for name in ("todayAi:", "todayAiTrackRecord:", "todayAiScheduleGet:", "todayAiScheduleSet:"):
+        assert name not in api, f"前端还留着没人调的包装: {name}"
+    keys = code_of("lib/queryKeys.ts")
+    for name in ("todayAiSchedule:", "todayAiTrackRecord:"):
+        assert name not in keys, f"queryKeys 还留着死键: {name}"

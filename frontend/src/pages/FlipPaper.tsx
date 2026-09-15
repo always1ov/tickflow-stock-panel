@@ -25,9 +25,9 @@
  * 同样的结果, 所以缓存可以放心留着。
  */
 import { useMemo, useState } from 'react'
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { ChevronDown, Eye, Loader2, Sparkles, TrendingDown, TrendingUp, Wallet } from 'lucide-react'
+import { ChevronDown, Eye, TrendingDown, TrendingUp, Wallet } from 'lucide-react'
 import { api, type FlipOrder, type FlipPaper as FlipPaperData, type FlipRules,
   type FlipTodaySignal, type TodayOpportunity } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
@@ -43,7 +43,6 @@ import { TodayHealthBar } from '@/components/today/TodayHealthBar'   // [R343] �
 import { ScoreCell } from '@/components/today/ScoreCell'             // [R345] 名次那一格
 import { TrendCell } from '@/components/today/TrendCell'             // [R349] 走势那一格
 import { TodayControls } from '@/components/today/TodayControls'     // [R347] 门槛/体检/筛选
-import { toast } from '@/components/Toast'
 
 /** [R343] 姿态四档的配色 —— 与今日总览那张卡同一套语义, 不另立一份说法。 */
 const POSTURE_TONE: Record<string, string> = {
@@ -150,23 +149,6 @@ export function FlipPaper() {
     return m
   }, [ov])
 
-  // [R343] AI 导读 —— 手动点一次才跑。失败必须在页面上留痕: toast 一闪即逝,
-  // 用户会以为"点了没反应"。
-  const [brief, setBrief] = useState<string | null>(null)
-  const [aiError, setAiError] = useState<string | null>(null)
-  const aiMut = useMutation({
-    mutationFn: () => api.todayAi(),
-    onMutate: () => setAiError(null),
-    onSuccess: (r) => {
-      if (r.error) { setAiError(r.error); toast(r.error, 'error'); return }
-      setBrief(r.brief || null)
-    },
-    onError: (e: Error) => {
-      setAiError(`AI 分析失败: ${e.message}`)
-      toast(`AI 分析失败: ${e.message}`, 'error')
-    },
-  })
-
   // [R344] **名单只由六态选, 前端不合成任何一行。**
   //
   // 用户: 「我的本意是不看我的自选了, 打分系统针对六态选出来的进行二次排序」。
@@ -185,7 +167,6 @@ export function FlipPaper() {
   const ml = ov?.meso?.mainline
   const mainline = ml?.rows?.[0]?.member ?? null
   const mlStale = !!ml?.stale
-  const shownBrief = brief ?? ov?.ai?.brief ?? null
   return (
     <div className="flex h-full flex-col">
       <PageHeader
@@ -236,18 +217,6 @@ export function FlipPaper() {
                     onChange={setMaxPositions} fmt={(v) => `${v} 只`} />
             <Picker label="回溯" value={years} options={YEAR_OPTIONS}
                     onChange={setYears} fmt={fmtYears} />
-            {/* [R343] AI 导读收进页头一个按钮 —— 手动点一次才跑, 不自动 */}
-            <button
-              type="button"
-              onClick={() => aiMut.mutate()}
-              disabled={aiMut.isPending}
-              className="inline-flex items-center gap-1 rounded-btn border border-border px-1.5 py-0.5 text-muted transition-colors hover:bg-elevated/60 hover:text-foreground disabled:opacity-50 cursor-pointer"
-            >
-              {aiMut.isPending
-                ? <Loader2 className="h-3 w-3 animate-spin" />
-                : <Sparkles className="h-3 w-3" />}
-              AI 导读
-            </button>
           </div>
         }
       />
@@ -256,17 +225,6 @@ export function FlipPaper() {
         {/* [R343] 自检条排在最顶且**不进任何折叠** —— 它一切正常时一个像素都不占,
             而它要说的是「你正在看的数字是几天前的」, 那句话被折起来就没有意义了。 */}
         {!!ov?.health && <TodayHealthBar h={ov.health} />}
-        {aiError && (
-          <div className="rounded-card border border-danger/40 bg-danger/10 px-4 py-2 text-xs text-danger">
-            {aiError}
-          </div>
-        )}
-        {shownBrief && (
-          <p className="max-w-[80ch] rounded-card border border-border/60 bg-surface/40 px-4 py-2.5 text-[12px] leading-[1.8] text-foreground">
-            {shownBrief}
-          </p>
-        )}
-
         {/* [R347] 门槛 / 体检 / 板块筛选 —— 与今日总览共用那一份实现。用户:
             「门槛的东西非常重要, 体检和筛选功能也要能保留」。
             **它只作用于打分那一层**: 板块过滤改的是哪些票拿得到名次, 门槛改的是

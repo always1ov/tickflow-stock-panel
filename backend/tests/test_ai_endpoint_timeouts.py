@@ -43,7 +43,8 @@ API_TS = Path(__file__).resolve().parents[2] / "frontend" / "src" / "lib" / "api
 # 按路径找会命中先出现的那个读接口, 于是既漏判又误判。方法名是唯一的。
 AI_METHODS = {
     "generateStockSignal": "单只 AI 买卖信号(用户报的就是这个)",
-    "todayAi": "今日总览 AI 导读·优选",
+    # [R352] `todayAi` 删了(用户不要 AI 导读了) —— 名单跟着它一起去掉。
+    # 立论不变: **会真出一段文本的接口才放宽超时**, 这一条只是少了一个对象。
     "ladderAiReview": "连板梯队 AI 复盘",
     "watchlistImportText": "粘整篇文章 → AI 认票并按小分队归类",
     "customSignalsAiGenerate": "自定义信号 AI 生成",
@@ -57,7 +58,8 @@ AI_METHODS = {
 NOT_AI_METHODS = {
     "strategyAiStatus": "读配置状态",
     "ladderAiReports": "读历史报告",
-    "todayAiTrackRecord": "纯事后统计",
+    # [R352] `todayAiTrackRecord` 删了 —— 它从 R351 起就没人调(只服务于
+    # 已随今日总览删掉的优选面板)。
     "usageNotesSummaryGet": "读已存的那一段, 不重新生成",
     "strategyAiTest": "调模型, 但只发「Reply exactly: OK」—— 连通性测试要的就是快失败",
 }

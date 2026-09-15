@@ -5006,23 +5006,15 @@ export const api = {
     request<{ full_coverage?: boolean; rounds?: number; live_count?: number | null; error?: string }>(
       '/api/intraday/refresh-full', { method: 'POST' }),
   // [fork 增强] AI 定时配置(今日总览导读·优选 / 个股信号批量)
-  todayAiScheduleGet: () => request<TodayAiSchedule>('/api/settings/preferences/today-ai-schedule'),
-  todayAiScheduleSet: (body: TodayAiSchedule) =>
-    request<TodayAiSchedule>('/api/settings/preferences/today-ai-schedule',
-      { method: 'PUT', body: JSON.stringify(body) }),
+  // [R352] `todayAiScheduleGet` / `Set` 一并删 —— 那个开关排的是导读与优选,
+  // 两个展示面都没了。后端定时任务与偏好字段没动。
   signalAiScheduleGet: () => request<SignalAiSchedule>('/api/settings/preferences/signal-ai-schedule'),
   signalAiScheduleSet: (body: SignalAiSchedule) =>
     request<SignalAiSchedule>('/api/settings/preferences/signal-ai-schedule',
       { method: 'PUT', body: JSON.stringify(body) }),
-  /** [R147] note 可省 —— 不填就是原来的行为, 填了一起送进这次分析 */
-  todayAi: (note?: string) =>
-    request<{ brief?: string; picks?: TodayPick[]; analyzed?: number
-              verify?: TodayPickVerify; note?: string; error?: string }>(
-      '/api/today/ai',
-      { method: 'POST', timeoutMs: AI_REQUEST_TIMEOUT_MS,
-        body: JSON.stringify({ note: note || null }) }),
-  /** [R121] AI 优选历史命中率 —— 「靠不靠谱」的硬证据, 纯事后统计 */
-  todayAiTrackRecord: () => request<AiTrackRecord>('/api/today/ai/track-record'),
+  // [R352] `todayAi` / `todayAiTrackRecord` 删了。用户: 「这部分和 ai 导读都不用了」。
+  // 命中率那条其实**从 R351 起就没人调了**(它只服务于已随今日总览删掉的优选面板)。
+  // **后端两个端点原样还在** —— 这里删的只是前端那层包装, `git revert` 就能拿回来。
   /** [R133] 规则层把握分体检: 分层胜率/排名段/因子归因/同期基准 */
   todayScoreLedger: () => request<ScoreLedger>('/api/today/score-ledger'),
 
