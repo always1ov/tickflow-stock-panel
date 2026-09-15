@@ -40,7 +40,7 @@ _COLS = ("symbol", "date", "close", "signal_limit_up", "signal_limit_down")
 def run(repo, *, symbols: list[str] | None = None,
         capital: float = flip_portfolio.DEFAULT_CAPITAL,
         max_positions: int = flip_portfolio.DEFAULT_MAX_POSITIONS,
-        years: int = DEFAULT_YEARS) -> dict:
+        years: float = DEFAULT_YEARS) -> dict:
     """跑一遍转折模拟盘。`symbols` 不给就取当前自选。"""
     # `symbols is None` = 没指定, 用自选; `symbols == []` = **明确要空**, 就是空。
     # 用 `symbols or 自选` 会把这两件事混成一件 —— 「没给」与「给了个空的」不是
@@ -114,7 +114,7 @@ def _names(repo, syms: list[str]) -> dict[str, str]:
     return {s: str(m.get(s) or s) for s in syms}
 
 
-def _load_batch(repo, syms: list[str], years: int) -> dict[str, pl.DataFrame]:
+def _load_batch(repo, syms: list[str], years: float) -> dict[str, pl.DataFrame]:
     """一趟批量读。非股票(ETF/指数)批量接口给不了, 逐只回退 —— **不静默丢掉**。"""
     end = date.today()
     span = int((years * 250 + _WARMUP_BARS) * _CALENDAR_RATIO) + 30

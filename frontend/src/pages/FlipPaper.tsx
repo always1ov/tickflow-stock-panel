@@ -41,7 +41,19 @@ import { refreshEvery, rhythmHint } from '@/lib/refreshRhythm'
 
 const CAPITAL_OPTIONS = [100_000, 500_000, 1_000_000, 5_000_000]
 const POSITION_OPTIONS = [3, 5, 10, 20]
-const YEAR_OPTIONS = [1, 2, 3, 5]
+// [R339] 用户: 「回溯时间太长了, 只看近三年和短周期」。
+//
+// 砍掉 5 年、补进半年。**R332 里我为「不许砍短」写过守卫, 这次是用户当面推翻它**
+// —— 那条守卫的论点(回溯给的是样本量)没有错, 只是它不该替用户做决定; 现在守卫
+// 改成钉新口径, 并且把样本量那件事**摆到界面上说**, 而不是靠一条测试替他拦着。
+//
+// 半年 ≈ 120 个交易日。转折是低频信号, 这个窗口里可能只有两三次完整买卖 ——
+// 胜率、最大回撤在那种样本量下**不是"不好看", 是不成立**。所以下面的统计里
+// 完整买卖少于 10 次会明说, 见 `Summary`。
+const YEAR_OPTIONS = [0.5, 1, 2, 3]
+
+/** 回溯档位的写法: 不足一年按月说 —— 「0.5 年」没人这么讲话。 */
+const fmtYears = (v: number) => (v < 1 ? `${Math.round(v * 12)} 个月` : `${v} 年`)
 
 /** 没做成的原因 —— 逐条翻译。**空栏必须自己解释**: 读的人分不清"没有"和"算不出来" */
 const WHY_CN: Record<string, string> = {
@@ -121,7 +133,7 @@ export function FlipPaper() {
             <Picker label="最多持有" value={maxPositions} options={POSITION_OPTIONS}
                     onChange={setMaxPositions} fmt={(v) => `${v} 只`} />
             <Picker label="回溯" value={years} options={YEAR_OPTIONS}
-                    onChange={setYears} fmt={(v) => `${v} 年`} />
+                    onChange={setYears} fmt={fmtYears} />
           </div>
         }
       />
@@ -285,11 +297,31 @@ function TodaySignals({ rows }: { rows: FlipTodaySignal[] }) {
   )
 }
 
+/** [R339] 离清仓线多近才算"贴着了"。**只用来上色, 不产生任何动作。** */
+const NEAR_EXIT = 0.02
+
 function SignalRow({ r }: { r: FlipTodaySignal }) {
   const actionable = r.stage === 'flipped' && !!r.act
+  // [R339] 用户: 「卖出也要上色, 这样看起来醒目」。
+  //
+  // 在这之前**买卖两种要动手的行共用同一个灰蓝底** `bg-accent/[0.06]` —— 徽标
+  // 虽然分了红绿, 但一行里最先被看见的是整条底色, 而底色对买和卖说的是同一句话。
+  // 现在底色跟着方向走, 并在左边加一道 2px 的色条: 扫一眼就知道今天是要买还是要卖,
+  // 不用先去读徽标上那两个字。
+  //
+  // **另加一档"贴着清仓线"**: 手上的票离离场线 2% 以内时同样上琥珀色 —— 卖出这一侧
+  // 真正该醒目的不只是"今天要卖", 还有"明后天很可能要卖"。这一档**不带动作徽标**,
+  // 上色不是出手理由(铁律没动, 守卫钉着)。
+  const sell = actionable && r.act === 'sell'
+  const buy = actionable && r.act === 'buy'
+  const nearExit = !actionable && r.held && r.gap_pct != null
+    && Math.abs(r.gap_pct) <= NEAR_EXIT
   return (
-    <div className={cn('flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 text-xs',
-      actionable && 'bg-accent/[0.06]')}>
+    <div className={cn('flex flex-wrap items-center gap-x-3 gap-y-1 border-l-2 px-4 py-2.5 text-xs',
+      buy && 'border-l-bull bg-bull/[0.07]',
+      sell && 'border-l-bear bg-bear/[0.10]',
+      nearExit && 'border-l-warning bg-warning/[0.07]',
+      !actionable && !nearExit && 'border-l-transparent')}>
       <span className="min-w-[9rem]">
         <SymbolCell symbol={r.symbol} name={r.name} />
       </span>
@@ -324,7 +356,9 @@ function SignalRow({ r }: { r: FlipTodaySignal }) {
             说法要对上它在你这儿的身份 */}
         {r.stage === 'watch' && r.gap_pct != null && (
           r.held
-            ? <>离清仓线还有 {(Math.abs(r.gap_pct) * 100).toFixed(1)}%</>
+            ? <b className={cn(nearExit && 'text-warning')}>
+                离清仓线还有 {(Math.abs(r.gap_pct) * 100).toFixed(1)}%
+              </b>
             : <>还差 {(Math.abs(r.gap_pct) * 100).toFixed(1)}% 到触发价</>
         )}
       </span>
@@ -414,11 +448,19 @@ function Summary({ d }: { d: FlipPaperData }) {
         <Stat label="完整买卖" value={`${s.round_trips} 轮`}
               sub={`买 ${s.buys} 次 · 卖 ${s.sells} 次`}
               hint={'一次买入到卖出算一轮。**还拿着的那几只不算** —— 没兑现的盈亏\n不该混进胜负(与复盘页「只数已兑现」同一条纪律)。'} />
+        {/* [R339] 回溯能选到半年了, 而半年里转折可能只发生两三次。**样本量不够时
+            要自己说出来** —— 一个「67%」摆在那儿, 读的人不会自己去想它背后是 3 轮
+            还是 300 轮。10 轮是个朴素的门槛: 不是"到了就可信", 是"没到就别当数"。 */}
         <Stat
           label="胜率"
           value={s.win_rate == null ? '—' : `${(s.win_rate * 100).toFixed(0)}%`}
-          sub={s.win_rate == null ? '一轮都没兑现, 算不出来' : `${s.win} 胜 / ${s.round_trips} 轮`}
-          hint={'空着不是 0 —— 「算不出来」与「一次没赢过」是两件事。'}
+          tone={s.round_trips > 0 && s.round_trips < 10 ? 'warn' : undefined}
+          sub={s.win_rate == null
+            ? '一轮都没兑现, 算不出来'
+            : s.round_trips < 10
+              ? `只有 ${s.round_trips} 轮, 样本太少不当数`
+              : `${s.win} 胜 / ${s.round_trips} 轮`}
+          hint={'空着不是 0 —— 「算不出来」与「一次没赢过」是两件事。\n\n**轮数少于 10 时这一格会标黄**: 转折是低频信号, 回溯窗口短了\n可能只剩两三次完整买卖, 那种样本量下的胜率不是"不好看", 是**不成立**。\n想要能看的胜率就把回溯拉长 —— 这两件事没法兼得。'}
         />
       </section>
     </>
@@ -427,7 +469,8 @@ function Summary({ d }: { d: FlipPaperData }) {
 
 function Stat({ label, value, sub, tone, hint }: {
   label: string; value: string; sub?: string
-  tone?: 'bull' | 'bear'; hint?: string
+  /** [R339] 多一档 warn: 数字算得出来但**样本量撑不住它** —— 与涨跌无关 */
+  tone?: 'bull' | 'bear' | 'warn'; hint?: string
 }) {
   return (
     <div className="px-4 py-2.5">
@@ -436,10 +479,12 @@ function Stat({ label, value, sub, tone, hint }: {
         {hint && <Hint title={hint} />}
       </div>
       <div className={cn('mt-0.5 text-lg font-semibold tabular-nums',
-        tone === 'bull' && 'text-bull', tone === 'bear' && 'text-bear')}>
+        tone === 'bull' && 'text-bull', tone === 'bear' && 'text-bear',
+        tone === 'warn' && 'text-warning')}>
         {value}
       </div>
-      {sub && <div className="mt-0.5 text-[10px] text-muted">{sub}</div>}
+      {sub && <div className={cn('mt-0.5 text-[10px]',
+        tone === 'warn' ? 'text-warning/80' : 'text-muted')}>{sub}</div>}
     </div>
   )
 }

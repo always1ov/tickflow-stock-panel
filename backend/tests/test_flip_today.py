@@ -312,11 +312,63 @@ def test_R332_天数不够时空着_不拿全程凑数():
         "空栏必须自己解释 —— 「算不出来」与「没赚到」是两件事")
 
 
-def test_R332_回溯参数没被动过():
-    """**回溯是回溯。** 它给的是样本量, 不该为了"看当下"把它砍短。"""
+def test_R339_回溯档位_最长三年_带短周期():
+    """**这条是 R332 那条守卫的替代品, 不是它的延续。**
+
+    R332 我写的是「回溯参数没被动过 —— 它给的是样本量, 不该为了看当下砍短」。
+    论点本身没错, 但它**替用户做了决定**; R339 用户当面推翻:「回溯时间太长了,
+    只看近三年和短周期」。所以守卫改成钉新口径, 而"样本量不够"那件事改由**界面
+    自己说**(轮数少于 10 时胜率标黄), 不再靠一条测试替他拦着。
+    """
     blk = _page()
-    assert "const YEAR_OPTIONS = [1, 2, 3, 5]" in blk, "回溯档位不许改"
-    assert "years" in blk
+    assert "const YEAR_OPTIONS = [0.5, 1, 2, 3]" in blk, "最长三年, 且要有短周期档"
+    assert "5]" not in blk.split("YEAR_OPTIONS")[1][:40], "5 年那一档已经砍掉"
+    # 「0.5 年」没人这么讲话
+    assert "const fmtYears = (v: number) => (v < 1 ? `${Math.round(v * 12)} 个月`" in blk
+    assert "fmt={fmtYears}" in blk, "选择器必须用这个写法, 不许各写一份"
+
+
+def test_R339_后端接受半年():
+    """前端给得出来、后端收不下, 就是个下拉框点了没反应。
+
+    **不用 `inspect.signature(...).annotation` 比对** —— 这两个模块都开了
+    `from __future__ import annotations`, 注解全是字符串, `is float` 永远为假
+    (写第一版时就这么翻了车); 要拿 `get_type_hints` 真解出来才算数。
+    """
+    from typing import get_type_hints
+
+    from app.api import flip_paper
+    from app.services import flip_portfolio_run as run_mod
+
+    assert flip_paper.MIN_YEARS <= 0.5, "下限没放开, 半年会被 422 拒掉"
+    for fn in (flip_paper.get_flip_paper, run_mod.run, run_mod._load_batch):
+        assert get_type_hints(fn)["years"] is float, \
+            f"{fn.__name__} 的 years 还是 int —— 半年会被截断或拒掉"
+
+
+def test_R339_取数窗口按小数年算得通():
+    """`years` 只被拿去算取多少天日线 —— 小数必须一路算得通, 不许中途退化成整数。"""
+    from app.services import flip_portfolio_run as run_mod
+
+    seen: dict = {}
+
+    class _Repo:
+        def resolve_asset_type(self, sym): return "stock"
+        def get_daily_batch(self, syms, start, end, columns):
+            seen["span"] = (end - start).days
+            import polars as pl
+            return pl.DataFrame()
+        def get_daily_asset(self, *a, **k):
+            import polars as pl
+            return pl.DataFrame()
+
+    run_mod._load_batch(_Repo(), ["A"], 0.5)
+    half = seen["span"]
+    run_mod._load_batch(_Repo(), ["A"], 3)
+    three = seen["span"]
+    assert half < three, "半年取的天数必须真的比三年少"
+    # 半年 ≈ 125 交易日 + 60 根热身, 换算成日历日再加 30 —— 别退化成"按 0 年算"
+    assert half > 300, f"半年窗口只取了 {half} 天, 小数大概率在半路被截成 0"
 
 
 def test_R332_净值图默认框最近一段_但整段拖得回去():
@@ -403,3 +455,52 @@ def test_R338_持有与盯着在界面上分得开():
     blk = _signal_row()
     assert "r.held ? (" in blk and "持有" in blk
     assert "离清仓线还有" in blk, "拿着的票问的是什么时候卖, 不是什么时候买"
+
+
+# ── [R339] 卖出要醒目 ───────────────────────────────────────────────────
+#
+# 用户: 「卖出也要上色, 这样看起来醒目」。在这之前**买和卖共用同一个灰蓝底**
+# (`bg-accent/[0.06]`) —— 徽标是分了红绿, 但一行里最先被看见的是整条底色,
+# 而底色对买和卖说的是同一句话。
+
+
+def test_R339_买和卖不许共用一个底色():
+    """一行里最先被看见的是底色, 不是徽标上那两个字。"""
+    blk = _signal_row()
+    assert "bg-accent/[0.06]" not in blk, "买卖共用一个底色 = 扫一眼分不出今天是买是卖"
+    assert "buy && 'border-l-bull bg-bull/[0.07]'" in blk
+    assert "sell && 'border-l-bear bg-bear/[0.10]'" in blk
+    # 方向是从 act 来的, 不许另立一套
+    assert "const sell = actionable && r.act === 'sell'" in blk
+    assert "const buy = actionable && r.act === 'buy'" in blk
+
+
+def test_R339_贴着清仓线的持仓也上色():
+    """卖出这一侧该醒目的不只是「今天要卖」, 还有「明后天很可能要卖」。"""
+    blk = _signal_row()
+    assert "const NEAR_EXIT = 0.02" in _page()
+    assert "Math.abs(r.gap_pct) <= NEAR_EXIT" in blk
+    assert "nearExit && 'border-l-warning bg-warning/[0.07]'" in blk
+    # 只有**拿着的**才吃这一档 —— 不相干的票离它的买入线近, 与"要卖"无关
+    assert "r.held && r.gap_pct != null" in blk
+
+
+def test_R339_上色不是出手理由():
+    """**铁律。** 上了色照样不许长出动作徽标 —— 颜色是提醒, 不是信号。"""
+    blk = _signal_row()
+    # nearExit 必须建立在「不是 actionable」之上; 它一旦能独立成立就是新出手口径
+    assert "const nearExit = !actionable && r.held" in blk
+    badge = "r.act === 'buy' ? '买入' : '清仓'"
+    tail = blk[blk.index(") : ("):]
+    assert badge not in tail, "上色那一支里不许出现动作徽标"
+
+
+def test_R339_样本量不够时胜率自己说出来():
+    """**禁止造假。** 窗口能选到半年了, 3 轮算出来的 67% 不是"不好看", 是不成立。"""
+    blk = _page()
+    sm = blk[blk.index("function Summary({ d }"):blk.index("function Stat({ label")]
+    assert "s.round_trips > 0 && s.round_trips < 10 ? 'warn' : undefined" in sm, \
+        "轮数少必须标出来 —— 一个光秃秃的百分比读的人不会自己去想它背后有几轮"
+    assert "样本太少不当数" in sm
+    st = blk[blk.index("function Stat({ label"):]
+    assert "tone === 'warn' && 'text-warning'" in st, "warn 这一档得真有颜色"

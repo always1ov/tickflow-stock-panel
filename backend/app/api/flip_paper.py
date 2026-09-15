@@ -28,6 +28,10 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/flip-paper", tags=["flip-paper"])
 
 MAX_YEARS = 10
+# [R339] 回溯下限从"整 1 年"放到半年。用户: 「回溯时间太长了, 只看近三年和短周期」。
+# `years` 只被 `_load_batch` 拿去算要取多少天的日线, 小数一路算得通 —— 所以这里
+# 放开的是**取数窗口**, 不是任何判定口径(判定一个字没动)。
+MIN_YEARS = 0.5
 
 
 @router.get("")
@@ -37,8 +41,8 @@ def get_flip_paper(
     max_positions: int = Query(flip_portfolio.DEFAULT_MAX_POSITIONS, ge=1,
                                le=flip_portfolio.MAX_POSITIONS_CAP,
                                description="同时最多持有几只"),
-    years: int = Query(flip_portfolio_run.DEFAULT_YEARS, ge=1, le=MAX_YEARS,
-                       description="回溯几年"),
+    years: float = Query(flip_portfolio_run.DEFAULT_YEARS, ge=MIN_YEARS, le=MAX_YEARS,
+                         description="回溯几年(可带小数, 0.5 = 半年)"),
 ):
     """跑一遍转折模拟盘。标的取当前自选, 阈值取每只票自己的。
 
