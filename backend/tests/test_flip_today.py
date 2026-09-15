@@ -525,15 +525,45 @@ def test_R338_每行都带held_否则前端分不开():
     assert "held=is_held" in code, "判定用的和报出去的必须是同一个值, 不许各算一遍"
 
 
-def test_R338_手上这段常驻_不进折叠区():
-    """买入天天在最上面, 卖出这一侧也必须天天有位置 —— 折起来就等于没有。"""
+def test_R355_手上这段可折叠_但折叠条自己就是摘要():
+    """[R338 → R355] 用户: 「这部分也想能折叠展开」。
+
+    **R338 我为这一段写过「不许折叠」**, 理由是: 买入天天长出来, 卖出只在真触发
+    那天冒一次, 折起来就等于又回到只剩买入。用户当面推翻 —— 那条理由没有错,
+    但它不该替用户决定版面。
+
+    所以守卫**不是删掉而是换了个钉法**: 折叠可以, 但**折叠条必须把卖出侧的读数
+    带上**(拿着几只 / 其中几只贴到离场线)。收起来之后那一行仍然在说「你手上有
+    10 只, 2 只快到线了」—— **那才是 R338 真正要保的东西, 而不是"不许折"**。
+
+    顺带记一笔: R338 那条守卫写的是 `assert "watchOpen" not in seg`, 钉的是
+    **某一个变量名**而不是"不可折叠"这条性质 —— 我这次用 `mineOpen` 接上折叠,
+    它**照样是绿的**。钉名字不钉性质, 又一次。
+    """
     blk = _today_block()
-    assert "const mine = rest.filter((r) => r.held)" in blk
-    assert "const idle = rest.filter((r) => !r.held)" in blk
-    # 折叠开关只作用在 idle 上; mine 那一段渲染时不许跟 watchOpen 沾边
     seg = blk[blk.index("{mine.length > 0 && ("):blk.index("{idle.length > 0 && (")]
-    assert "watchOpen" not in seg, "手上这段一旦能被折起来, 就又回到只剩买入"
+    assert "onClick={toggleMine}" in seg, "没有折叠开关"
+    assert "{mineOpen && (" in seg, "展开区没受开关控制"
+    # **折叠条上必须有这两个数** —— 收起来之后卖出侧全靠它们
+    assert "{mine.length} 只" in seg, "折叠条上没说拿着几只"
+    assert "{mineNear} 只贴近离场线" in seg, "折叠条上没说几只快到线了 —— 收起来卖出侧就消失了"
     assert "mineSorted.map((r) => <SignalRow" in seg
+
+
+def test_R355_默认展开_且状态记住():
+    """它是卖出那一侧唯一天天有位置的东西, 默认收起等于把 R338 做的事撤回去。"""
+    blk = _today_block()
+    assert "storage.flipMineOpen.get(true)" in blk, "默认要展开"
+    assert "storage.flipMineOpen.set(!v)" in blk, "改了要落盘, 否则刷新就忘"
+
+
+def test_R355_贴近离场线的判据只有一处():
+    """条上说 2 只、展开却只有 1 行标黄 —— 两处各写一份必然这样。"""
+    blk = _today_block()
+    line = next(l for l in blk.splitlines() if "const mineNear" in l)
+    assert "<= NEAR_EXIT" in line, "折叠条上那个计数没走 NEAR_EXIT 那条判据"
+    row = _signal_row()
+    assert "<= NEAR_EXIT" in row, "行上那一档也得是同一条"
 
 
 def test_R338_三段分流只由一个判据说了算():

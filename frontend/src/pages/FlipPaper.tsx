@@ -340,6 +340,23 @@ function TodaySignals({ rows, conviction }: {
       return !v
     })
   }
+  // [R355] 用户: 「这部分也想能折叠展开」。
+  //
+  // **R338 我为这一段写过「不许折叠」的守卫**, 理由是: 买入天天长出来, 卖出只在
+  // 真触发那天冒一次, 折起来就等于又回到只剩买入。用户当面推翻它 —— 那条理由
+  // 没有错, 但它不该替用户决定版面。
+  //
+  // 守卫因此**不是删掉而是换了个钉法**: 折叠可以, 但**折叠条本身必须把卖出侧的
+  // 读数带上**(拿着几只 / 其中几只已经贴到离场线)。收起来之后那一行仍然在说
+  // 「你手上有 10 只, 2 只快到线了」—— 那才是 R338 真正要保的东西, 而不是"不许折"。
+  // 默认**展开**: 它是卖出那一侧唯一天天有位置的东西。
+  const [mineOpen, setMineOpen] = useState(() => storage.flipMineOpen.get(true))
+  const toggleMine = () => {
+    setMineOpen((v) => {
+      storage.flipMineOpen.set(!v)
+      return !v
+    })
+  }
 
   // **一个判据, 三段分流。** 常驻/折叠的边界只由 `isLive` 这一个函数说了算 ——
   // 以前是把同一段条件正着写一遍、反着再写一遍, 改一边漏一边就会出现"两边都收
@@ -376,6 +393,9 @@ function TodaySignals({ rows, conviction }: {
   const mineSorted = byRank(mine)
   const idleSorted = byRank(idle)
   const scored = live.filter((r) => conviction.has(r.symbol)).length
+  // [R355] 折叠条上那个「N 只贴近离场线」。**判据与行上那一档是同一条**
+  // (`NEAR_EXIT`)—— 两处各写一份的话, 会出现"条上说 2 只、展开却只有 1 行标黄"。
+  const mineNear = mine.filter((r) => r.gap_pct != null && Math.abs(r.gap_pct) <= NEAR_EXIT).length
 
   return (
     <section className="overflow-hidden rounded-card border border-border/60 bg-surface/40">
@@ -407,19 +427,36 @@ function TodaySignals({ rows, conviction }: {
             </div>
           )}
 
-          {/* [R338] 手上这些 —— **常驻, 没有折叠开关**。
+          {/* [R338 → R355] 手上这些 —— 可折叠, 但**折叠条自己就是摘要**。
               买入天天长出来, 卖出只在真触发那天冒一次; 中间那段空白就是这里补的。
+              所以收起来之后, 这一行仍然要说清「拿着几只、几只快到线了」——
+              否则就是把 R338 做的事整个撤回去。
               不带动作徽标: 没转折就不出手, 这一段只回答「离场线在哪、还有多远」。 */}
           {mine.length > 0 && (
             <>
-              <div className="flex items-center gap-1.5 border-t border-border/40 bg-elevated/20 px-4 py-2 text-[11px] text-secondary">
+              <button
+                type="button"
+                onClick={toggleMine}
+                aria-expanded={mineOpen}
+                className="flex w-full items-center gap-1.5 border-t border-border/40 bg-elevated/20 px-4 py-2 text-[11px] text-secondary transition-colors hover:bg-elevated/40 cursor-pointer"
+              >
+                <ChevronDown className={cn('h-3 w-3 shrink-0 text-muted transition-transform duration-expand ease-smooth',
+                  mineOpen && 'rotate-180')} />
                 <Wallet className="h-3 w-3" />
                 手上这些 · 跌破离场线才清仓
-                <span className="ml-auto text-muted opacity-70">{mine.length} 只</span>
-              </div>
-              <div className="divide-y divide-border/30">
-                {mineSorted.map((r) => <SignalRow key={r.symbol} r={r} c={conviction.get(r.symbol)} />)}
-              </div>
+                <span className="ml-auto flex items-center gap-2 text-muted">
+                  {/* 收起来也要看得见的那两个数 —— 卖出这一侧全靠它们 */}
+                  {mineNear > 0 && (
+                    <span className="text-warning">{mineNear} 只贴近离场线</span>
+                  )}
+                  <span className="opacity-70">{mine.length} 只</span>
+                </span>
+              </button>
+              {mineOpen && (
+                <div className="divide-y divide-border/30">
+                  {mineSorted.map((r) => <SignalRow key={r.symbol} r={r} c={conviction.get(r.symbol)} />)}
+                </div>
+              )}
             </>
           )}
 
