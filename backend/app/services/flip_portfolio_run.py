@@ -173,6 +173,12 @@ def _today_signals(repo, series: dict[str, dict], positions: list[dict],
 
     实时价拿不到就不传 —— `evaluate` 会退回收盘口径并标 `live=false`,
     **不替用户去开那个要花额度的开关**。
+
+    [R338] 每行**带上 `held`**。判据一个字没动 —— `evaluate` 早就知道这只票在不
+    在手上(它就是靠这个决定转空算"清仓"还是"本来就空仓"), 只是以前没写进返回值,
+    于是前端**没有任何办法**把"我拿着的"和"不相干的"分开。后果是手上票的卖出线
+    和几十只无关的票一起被折进「只是盯着」, 版面上只剩买入 —— 用户看到的正是
+    「有买入没有卖出」。
     """
     held = {p["symbol"] for p in positions}
     try:
@@ -184,15 +190,16 @@ def _today_signals(repo, series: dict[str, dict], positions: list[dict],
     out: list[dict] = []
     for sym, d in series.items():
         closes = d.get("closes") or []
+        is_held = sym in held
         sig = flip_today.evaluate(
             d.get("steps") or [],
-            held=sym in held,
+            held=is_held,
             last_close=closes[-1] if closes else None,
             live_close=(live.get(sym) or {}).get("close"),
         )
         if sig is None:
             continue
-        out.append({"symbol": sym, "name": names.get(sym, sym), **sig})
+        out.append({"symbol": sym, "name": names.get(sym, sym), "held": is_held, **sig})
 
     # 能出手的排最前, 其次盘中越线, 最后只是盯着 —— **版面顺序即急迫程度**
     rank = {flip_today.STAGE_FLIPPED: 0, flip_today.STAGE_CROSSING: 1,

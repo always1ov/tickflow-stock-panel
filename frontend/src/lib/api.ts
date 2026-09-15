@@ -3027,6 +3027,8 @@ export interface FlipTodaySignal {
   stage: 'flipped' | 'crossing' | 'watch'
   /** 只在 stage === 'flipped' 时非空 */
   act: 'buy' | 'sell' | null
+  /** [R338] 模拟盘现在拿着它吗 —— 版面据此把「手上这些」单独常驻一段 */
+  held: boolean
   side: string
   state_cn: string | null
   /** 触发价 —— 开盘前就定死的那条线 */

@@ -92,10 +92,14 @@ def test_R329_没有触发价就不报_不自己算一条():
 
 
 def test_R329_离得远的不进名单():
-    """离 20% 的票天天在名单里, 等于没有名单。"""
-    r = ft.evaluate(_steps(["UT", "UT"], flip_down=8.0), held=True, last_close=10.0)
+    """离 20% 的票天天在名单里, 等于没有名单。
+
+    [R338] 这条闸**只管没拿着的票** —— 手上拿着的那一侧另有守卫
+    (`test_R338_手上的票离触发价再远也要报`), 两条各管各的, 不重叠。
+    """
+    r = ft.evaluate(_steps(["UT", "UT"], flip_down=8.0), held=False, last_close=10.0)
     assert r is None
-    near = ft.evaluate(_steps(["UT", "UT"], flip_down=9.8), held=True, last_close=10.0)
+    near = ft.evaluate(_steps(["UT", "UT"], flip_down=9.8), held=False, last_close=10.0)
     assert near is not None and near["stage"] == ft.STAGE_WATCH
 
 
@@ -175,18 +179,23 @@ def test_R329_持仓取自模拟盘自己的账_不是真钱持仓():
 
 def test_R329_界面上后两档不渲染动作位():
     """**不是灰掉, 是根本不渲染** —— 灰掉的徽标仍在暗示这里本来有个动作。"""
-    from tests.frontend_source import code_of
-    code = code_of("pages/FlipPaper.tsx")
-    blk = code[code.index("function SignalRow"):]
-    blk = blk[:blk.index("\n}")]
+    blk = _signal_row()
     assert "const actionable = r.stage === 'flipped' && !!r.act" in blk, \
         "能不能动手只由这一条决定"
     assert "actionable ? (" in blk
-    # 动作徽标(买入/清仓)必须在 actionable 那一支里
+    # 动作徽标(买入/清仓)必须在 actionable 那一支里。
+    #
+    # **钉的是徽标那个三元, 不是"清仓"这两个字。** [R338] 之后另一支里有一句
+    # 「离清仓线还有 N%」—— 那是在说距离, 不是一个可点的动作; 拿裸字符串去扫
+    # 会把它误判成"动作词漏进来了", 于是逼着把话说得不像人话。区分办法是**带
+    # 引号的字面量**: 徽标里的 `'清仓'` 是 JS 字符串, 正文里的清仓是 JSX 文本。
+    badge = "r.act === 'buy' ? '买入' : '清仓'"
     head = blk[:blk.index(") : (")]
-    assert "'买入'" in head and "'清仓'" in head
+    assert badge in head, "动作徽标必须长在 actionable 这一支里"
     tail = blk[blk.index(") : ("):]
-    assert "买入" not in tail and "清仓" not in tail, "另一支里不许出现动作词"
+    assert badge not in tail, "另一支里不许出现动作徽标"
+    assert "'买入'" not in tail and "'清仓'" not in tail, \
+        "另一支里不许出现动作词的字面量(正文里说距离可以, 渲染成动作不行)"
 
 
 def test_R329_今日信号排在页面最前():
@@ -204,6 +213,20 @@ def _page() -> str:
     return code_of("pages/FlipPaper.tsx")
 
 
+def _signal_row() -> str:
+    """`SignalRow` 的函数体。
+
+    **不按 `"\\n}"` 截。** 剥注释后, 跨行的 `{/* … */}` 收尾会留下一个裸 `}`,
+    于是函数在中间被截断, 后半段的断言全部落空**却照样是绿的** —— 这个仓库里
+    「断言被自己的注释喂饱」已经是第六次, 这次换了个马甲: 注释不是喂饱断言,
+    是把断言要看的那段**整个切掉了**。改成截到下一个顶层 `function`。
+    """
+    code = _page()
+    blk = code[code.index("function SignalRow"):]
+    nxt = blk.find("\nfunction ", 1)
+    return blk if nxt < 0 else blk[:nxt]
+
+
 def _today_block() -> str:
     code = _page()
     blk = code[code.index("function TodaySignals"):]
@@ -213,11 +236,12 @@ def _today_block() -> str:
 def test_R331_要动手的永远不进折叠区():
     """**折叠是为了让信号更显眼, 把信号自己折起来就本末倒置了。**"""
     blk = _today_block()
-    live = next(l for l in blk.splitlines() if "const live = rows.filter" in l)
-    idle = next(l for l in blk.splitlines() if "const idle = rows.filter" in l)
-    assert "r.stage === 'flipped' && r.act" in live, "要动手的必须进常驻区"
-    assert idle.strip().startswith("const idle = rows.filter((r) => !("), \
-        "折叠区必须是常驻区的补集 —— 两套各写一份判据必然漂"
+    # [R338] 判据收成了一个 isLive, 常驻/折叠都建立在它之上 —— 论点没变,
+    # 反而更强: 以前是正反各写一遍, 现在正反同源, 想漂都漂不了。
+    pred = next(l for l in blk.splitlines() if "const isLive =" in l)
+    assert "r.stage === 'flipped' && !!r.act" in pred, "要动手的必须进常驻区"
+    assert "const rest = rows.filter((r) => !isLive(r))" in blk, \
+        "折叠那一侧必须是常驻区的补集 —— 两套各写一份判据必然漂"
     # 常驻区渲染在折叠开关**之前**, 且不受 watchOpen 控制
     i_live = blk.index("{live.map((r) => <SignalRow")
     i_toggle = blk.index("onClick={toggleWatch}")
@@ -228,8 +252,8 @@ def test_R331_要动手的永远不进折叠区():
 
 def test_R331_盘中越线也常驻_它今天就可能成交():
     blk = _today_block()
-    live = next(l for l in blk.splitlines() if "const live = rows.filter" in l)
-    assert "r.stage === 'crossing'" in live, (
+    pred = next(l for l in blk.splitlines() if "const isLive =" in l)
+    assert "r.stage === 'crossing'" in pred, (
         "盘中越线收盘还站着就成交 —— 今天就要盯, 不该被折起来")
 
 
@@ -303,3 +327,79 @@ def test_R332_净值图默认框最近一段_但整段拖得回去():
         "不足 120 天时该显示整段, 不是硬砍"
     assert "type: 'slider' as const" in fn, "只有 inside 的话用户不知道可以拖"
     assert "d.nav.map((p) => p.nav)" in fn, "曲线本身仍是整段数据, 只是视野落在当下"
+
+
+# ── [R338] 有买入就要有卖出 ─────────────────────────────────────────────
+#
+# 用户看着一屏 6 个「买入」、0 个「卖出」说: 「有买入就要有卖出」。
+#
+# **判据没坏** —— 转空要卖的分支一直在, 上面 `test_R329_三个空头态转入都算卖`
+# 一直是绿的。坏的是**版面让卖出没有位置**:
+#
+#   · 买入的候选是全部自选(几十上百只), 卖出的候选只有手上那几只 —— 天生不对等;
+#   · 手上那几只**离卖出线还有多远**, 被 WATCH_WITHIN 那道 5% 的闸挡掉了整行,
+#     挡不掉的又被折进「只是盯着」, 跟几十只不相干的票混在一起, 行上连"我拿着
+#     这只"都不标。
+#
+# 于是卖出只在真触发的那一天冒出来一次, 其余每天看上去都只有买入。
+# 这一组守卫钉的就是"卖出这一侧天天有位置"。
+
+
+def test_R338_手上的票离触发价再远也要报():
+    """**这条直接钉用户报的症状。** 拿着的票, 离场线不该因为"还远"就整行消失。"""
+    far = _steps(["UT", "UT"], flip_down=5.0)   # 现价 10 → 离清仓线 50%, 远得很
+    r = ft.evaluate(far, held=True, last_close=10.0)
+    assert r is not None, "手上拿着的票, 卖出线任何时候都要看得见"
+    assert r["stage"] == ft.STAGE_WATCH
+    assert r["flip_price"] == 5.0, "报的必须是卖出那条线"
+
+
+def test_R338_没拿着的票那道闸还在():
+    """闸是为了"不相干的票别刷屏" —— 不许借这次改动把它顺手拆了。"""
+    far = _steps(["DT", "DT"], flip_up=20.0)    # 现价 10 → 离买入线 100%
+    assert ft.evaluate(far, held=False, last_close=10.0) is None, \
+        "没拿着又离得远的票进名单, 等于没有名单"
+
+
+def test_R338_手上这段仍然不许出手():
+    """**铁律不因为多了一段版面而松动。** 没转折就没有动作, 拿着也一样。"""
+    for gap_price in (5.0, 9.9):               # 远的、近的都来一遍
+        r = ft.evaluate(_steps(["UT", "UT"], flip_down=gap_price),
+                        held=True, last_close=10.0)
+        assert r is not None and r["act"] is None, "没转折就不许出手"
+
+
+def test_R338_每行都带held_否则前端分不开():
+    """前端只能按返回值分段。不带 `held`, 「我拿着的」和「不相干的」就是一堆。"""
+    from tests.py_source import body_of
+    from app.services import flip_portfolio_run as run_mod
+    code = body_of(run_mod._today_signals).replace('"', "'")
+    assert "'held': is_held" in code, "每行必须带上 held"
+    assert "held=is_held" in code, "判定用的和报出去的必须是同一个值, 不许各算一遍"
+
+
+def test_R338_手上这段常驻_不进折叠区():
+    """买入天天在最上面, 卖出这一侧也必须天天有位置 —— 折起来就等于没有。"""
+    blk = _today_block()
+    assert "const mine = rest.filter((r) => r.held)" in blk
+    assert "const idle = rest.filter((r) => !r.held)" in blk
+    # 折叠开关只作用在 idle 上; mine 那一段渲染时不许跟 watchOpen 沾边
+    seg = blk[blk.index("{mine.length > 0 && ("):blk.index("{idle.length > 0 && (")]
+    assert "watchOpen" not in seg, "手上这段一旦能被折起来, 就又回到只剩买入"
+    assert "mine.map((r) => <SignalRow" in seg
+
+
+def test_R338_三段分流只由一个判据说了算():
+    """正着写一遍反着再写一遍, 改一边漏一边 —— 而且不报错。"""
+    blk = _today_block()
+    assert "const isLive = (r: FlipTodaySignal) =>" in blk, "常驻的判据只准有一处"
+    assert "const live = rows.filter(isLive)" in blk
+    assert "const rest = rows.filter((r) => !isLive(r))" in blk, \
+        "另外两段必须建立在 isLive 的补集上, 不许另写一份条件"
+
+
+def test_R338_持有与盯着在界面上分得开():
+    """"我拿着它"与"我在看它"是两件事, 一眼要能分开。"""
+    blk = _signal_row()
+    assert "r.held ? (" in blk and "持有" in blk
+    assert "离清仓线还有" in blk, "拿着的票问的是什么时候卖, 不是什么时候买"

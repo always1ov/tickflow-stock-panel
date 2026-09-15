@@ -52,6 +52,10 @@ ACT_BUY = "buy"
 ACT_SELL = "sell"
 
 # ③ 这一档只列**近的**。离触发价 20% 的票每天都在名单里, 等于没有名单。
+#
+# [R338] **但这条只对没拿着的票成立。** 它存在的理由是"不相干的票别刷屏" ——
+# 而手上拿着的票, 它的卖出线**从来不是不相干的**, 那是你唯一的离场依据。
+# 远近只说明"今天大概率不用动", 不说明"不用知道"。用户: 「有买入就要有卖出」。
 WATCH_WITHIN = 0.05
 
 
@@ -61,7 +65,9 @@ def evaluate(steps: list[dict], *, held: bool, last_close: float | None,
 
     steps       `livermore.compute()` 的输出(原样)。**最后一根必须是已落盘的
                 日 K** —— 盘中价不进 steps, 否则算出来的"转折"会随分时抖动。
-    held        模拟盘现在拿着它吗 —— 决定「转空」是「清仓」还是「本来就空仓」
+    held        模拟盘现在拿着它吗 —— 两处用到: ① 决定「转空」是「清仓」还是
+                「本来就空仓」; ② [R338] 拿着的票**不受 WATCH_WITHIN 那道闸**,
+                离触发价再远也报, 否则手上票的卖出线会整行消失
     last_close  最新已落盘收盘价
     live_close  此刻现价; None = 实时没开
 
@@ -132,7 +138,8 @@ def evaluate(steps: list[dict], *, held: bool, last_close: float | None,
             "live": True,
         }
 
-    if abs(gap) > WATCH_WITHIN:
+    # 手上拿着的不受 5% 这道闸限制 —— 见 WATCH_WITHIN 那段。
+    if not held and abs(gap) > WATCH_WITHIN:
         return None
     return {
         "stage": STAGE_WATCH,

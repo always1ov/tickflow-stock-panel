@@ -27,7 +27,7 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { ChevronDown, Eye, TrendingDown, TrendingUp } from 'lucide-react'
+import { ChevronDown, Eye, TrendingDown, TrendingUp, Wallet } from 'lucide-react'
 import { api, type FlipOrder, type FlipPaper as FlipPaperData, type FlipRules,
   type FlipTodaySignal } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
@@ -169,6 +169,17 @@ export function FlipPaper() {
  *
  * **后两档连动作徽标的位置都没有**, 不是"灰掉"而是根本不渲染 —— 灰掉的按钮
  * 仍然在暗示"这里本来有个动作"。
+ *
+ * [R338] 中间插一段**「手上这些」**。用户: 「有买入就要有卖出」。
+ *
+ * 在这之前, 这一块每天只长出买入 —— 不是判据坏了(转空要卖的代码一直在, 也一直
+ * 有守卫), 而是**版面让卖出没有位置**: 买入的候选是全部自选(几十上百只), 卖出
+ * 的候选只有模拟盘手上那几只, 两边天生不对等; 而手上那几只**离卖出线还有多远**
+ * 被折进了「只是盯着」, 跟几十只不相干的票混在一起, 行上连"我拿着这只"都不标。
+ * 于是卖出只在真触发的那一天冒出来一次, 其余每天看上去都只有买入。
+ *
+ * 所以这一段**常驻、不折叠**: 手上的票天天都该看见它的离场线。它**不带动作
+ * 徽标** —— 没转折就不出手, 那条铁律没有因为这段而松动一毫米。
  */
 function TodaySignals({ rows }: { rows: FlipTodaySignal[] }) {
   // [R331] 用户: 「今天该挂什么单显得太多了, 需要折叠展开的功能」。
@@ -177,8 +188,8 @@ function TodaySignals({ rows }: { rows: FlipTodaySignal[] }) {
   //
   //   常驻  已转折要动手  —— 今天真要挂的单
   //   常驻  盘中越线      —— 收盘还站在这边就成交, 今天就要盯
+  //   常驻  手上这些      —— [R338] 拿着的票, 离场线天天要看见
   //   收起  只是盯着      —— 还差几个点, 今天大概率不用动
-  //   收起  已转折但不用动手(转多而本来就拿着 / 转空而本来就空仓)
   //
   // 「盯着」那一段的条数随自选规模走(5% 以内就进名单), 自选上百只时它会把真要
   // 动手的那两三行淹掉 —— 而那两三行正是这个区块存在的全部理由。
@@ -193,16 +204,25 @@ function TodaySignals({ rows }: { rows: FlipTodaySignal[] }) {
     })
   }
 
-  const live = rows.filter((r) => (r.stage === 'flipped' && r.act) || r.stage === 'crossing')
-  const idle = rows.filter((r) => !((r.stage === 'flipped' && r.act) || r.stage === 'crossing'))
-  const actCount = rows.filter((r) => r.stage === 'flipped' && r.act).length
+  // **一个判据, 三段分流。** 常驻/折叠的边界只由 `isLive` 这一个函数说了算 ——
+  // 以前是把同一段条件正着写一遍、反着再写一遍, 改一边漏一边就会出现"两边都收
+  // 它"或"两边都不收它"的票, 而且不报错。
+  const isLive = (r: FlipTodaySignal) => (r.stage === 'flipped' && !!r.act) || r.stage === 'crossing'
+  const live = rows.filter(isLive)
+  const rest = rows.filter((r) => !isLive(r))
+  const mine = rest.filter((r) => r.held)   // [R338] 手上拿着的, 常驻
+  const idle = rest.filter((r) => !r.held)  // 其余, 折叠
+  const actCount = live.filter((r) => r.stage === 'flipped' && r.act).length
 
   return (
     <section className="overflow-hidden rounded-card border border-border/60 bg-surface/40">
       <SectionHead
         title="今天该挂什么单"
-        note={actCount ? `${actCount} 笔要动手` : '今天没有要动手的'}
-        hint={'**只有真转折才出手。**\n\n已转折 = 最新那根已落盘的日 K 让状态翻了面, 这才是动作。\n盘中越线 = 按此刻现价当收盘算会翻面 —— **不是出手理由**, 盘中价会变回去,\n14:30 跌破、14:58 拉回来的那天根本没有转折。\n\n触发价是作者的六态每天给的 flip_up / flip_down, 开盘前就定死,\n所以尾盘盯着它挂单是做得到的。\n\n下面「只是盯着」那一段默认收起 —— 它随自选规模走, 摊开会把真要动手的淹掉。'}
+        note={[
+          actCount ? `${actCount} 笔要动手` : '今天没有要动手的',
+          mine.length ? `手上 ${mine.length} 只` : null,
+        ].filter(Boolean).join(' · ')}
+        hint={'**只有真转折才出手。**\n\n已转折 = 最新那根已落盘的日 K 让状态翻了面, 这才是动作。\n盘中越线 = 按此刻现价当收盘算会翻面 —— **不是出手理由**, 盘中价会变回去,\n14:30 跌破、14:58 拉回来的那天根本没有转折。\n\n触发价是作者的六态每天给的 flip_up / flip_down, 开盘前就定死,\n所以尾盘盯着它挂单是做得到的。\n\n「手上这些」是模拟盘现在拿着的票与各自的离场线 —— 常驻不折叠,\n买入天天有、卖出只在触发那天冒一次, 中间这段空白正是它补的。\n\n最下面「只是盯着」默认收起 —— 它随自选规模走, 摊开会把真要动手的淹掉。'}
       />
 
       {rows.length === 0 ? (
@@ -220,6 +240,22 @@ function TodaySignals({ rows }: { rows: FlipTodaySignal[] }) {
             <div className="px-4 py-3 text-xs text-muted">
               今天没有要动手的 —— <b className="text-secondary">管住手</b>。
             </div>
+          )}
+
+          {/* [R338] 手上这些 —— **常驻, 没有折叠开关**。
+              买入天天长出来, 卖出只在真触发那天冒一次; 中间那段空白就是这里补的。
+              不带动作徽标: 没转折就不出手, 这一段只回答「离场线在哪、还有多远」。 */}
+          {mine.length > 0 && (
+            <>
+              <div className="flex items-center gap-1.5 border-t border-border/40 bg-elevated/20 px-4 py-2 text-[11px] text-secondary">
+                <Wallet className="h-3 w-3" />
+                手上这些 · 跌破离场线才清仓
+                <span className="ml-auto text-muted opacity-70">{mine.length} 只</span>
+              </div>
+              <div className="divide-y divide-border/30">
+                {mine.map((r) => <SignalRow key={r.symbol} r={r} />)}
+              </div>
+            </>
           )}
 
           {idle.length > 0 && (
@@ -265,10 +301,18 @@ function SignalRow({ r }: { r: FlipTodaySignal }) {
           {r.act === 'buy' ? '买入' : '清仓'}
         </span>
       ) : (
-        /* 后两档**不渲染动作位** —— 灰掉的徽标仍在暗示这里本来有个动作 */
-        <span className="inline-flex items-center gap-1 text-[10px] text-muted">
-          <Eye className="h-3 w-3" />盯着
-        </span>
+        /* 后两档**不渲染动作位** —— 灰掉的徽标仍在暗示这里本来有个动作。
+           [R338] 手上拿着的换个标记: 同样没有动作, 但"我拿着它"与"我在看它"
+           是两件事, 一眼要能分开。 */
+        r.held ? (
+          <span className="inline-flex items-center gap-1 text-[10px] text-secondary">
+            <Wallet className="h-3 w-3" />持有
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1 text-[10px] text-muted">
+            <Eye className="h-3 w-3" />盯着
+          </span>
+        )
       )}
 
       <span className="text-[11px] text-secondary">
@@ -276,8 +320,12 @@ function SignalRow({ r }: { r: FlipTodaySignal }) {
         {r.stage === 'crossing' && (
           <>按现价会转折 —— <b className="text-warning">收盘还站在这边才算数</b></>
         )}
+        {/* [R338] 拿着的票问的是"什么时候卖", 不是"什么时候买" —— 同一个距离,
+            说法要对上它在你这儿的身份 */}
         {r.stage === 'watch' && r.gap_pct != null && (
-          <>还差 {(Math.abs(r.gap_pct) * 100).toFixed(1)}% 到触发价</>
+          r.held
+            ? <>离清仓线还有 {(Math.abs(r.gap_pct) * 100).toFixed(1)}%</>
+            : <>还差 {(Math.abs(r.gap_pct) * 100).toFixed(1)}% 到触发价</>
         )}
       </span>
 
