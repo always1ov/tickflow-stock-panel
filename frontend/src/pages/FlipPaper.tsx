@@ -174,7 +174,15 @@ export function FlipPaper() {
   // 不在它旁边。守卫直接钉"`rows` 只能是后端给的那份, 前端不许合成"。
 
   const w = ov?.weather
-  const mainline = ov?.meso?.mainline?.rows?.[0]?.member ?? null
+  // [R346] 主线用**品红**, 沿用今日总览那张卡的语义(那儿是 `text-fuchsia-300`
+  // 配 `bg-fuchsia-400/15`)。上一版我给了个 `text-secondary` —— 那是灰阶不是颜色。
+  //
+  // **停更要变灰**: 原卡片对 `stale` 是换成 `text-muted` 并把标题改成
+  // 「主线(数据已停更)」。丢掉这一层的话, 一份几天前的主线会**长得跟今天的一模一样**
+  // —— 那比不显示更糟。
+  const ml = ov?.meso?.mainline
+  const mainline = ml?.rows?.[0]?.member ?? null
+  const mlStale = !!ml?.stale
   const shownBrief = brief ?? ov?.ai?.brief ?? null
   return (
     <div className="flex h-full flex-col">
@@ -205,7 +213,13 @@ export function FlipPaper() {
               {' '}转空 <span className="text-bear">{w.new_bear}</span>
               {mainline && <>
                 <span className="mx-1">·</span>
-                主线 <span className="text-secondary">{mainline}</span>
+                {mlStale ? '主线(停更)' : '主线'}{' '}
+                <span className={mlStale ? 'text-muted' : 'text-fuchsia-300'}
+                      title={mlStale
+                        ? `主线数据停在 ${ml?.date},已经 ${ml?.age_days} 天没更新 —— 只作展示`
+                        : `按 ${ml?.date} 的涨停梯队聚合`}>
+                  {mainline}
+                </span>
               </>}
               <span className="mx-1">·</span>
               {rhythmHint('derived')}
