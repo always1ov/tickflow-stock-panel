@@ -518,7 +518,7 @@ def test_R358_成绩挂在筛选卡的插槽上_不是搬进那个组件():
     for leak in ("FlipPaper", "monthly", "nav", "total_ret", "max_drawdown"):
         assert leak not in ctrl, f"模拟盘的数据结构漏进了这个共用组件: {leak}"
     code = code_of(FLIP)
-    assert "extra={summary}" in code, "模拟盘没把成绩接到插槽上"
+    assert "extra={cardBody}" in code, "模拟盘没把那一块接到插槽上"
 
 
 def test_R358_插槽与筛选条在同一张卡里():
@@ -601,4 +601,64 @@ def test_R358_打分那层挂了_成绩不跟着消失():
     code = code_of(FLIP)
     blk = code[code.index("{ov\n"):code.index("{q.isLoading &&")]
     assert blk.strip()
-    assert ": summary &&" in blk, "ov 拿不到时成绩没有退路, 会整块消失"
+    assert "{cardBody}" in blk, "ov 拿不到时这一块没有退路, 会整块消失"
+    # [R359] 退路里装的必须是**同一个** `cardBody` —— 另写一份等于两套版面,
+    # 改了一边忘了另一边只有在打分那层挂掉时才看得见, 那时没人在看。
+    assert blk.count("cardBody") == 2, "两条渲染路径没共用同一块内容"
+
+
+# ── [R359] 参数条也并进那张卡 ───────────────────────────────────────────
+#
+# 用户: 「这两个部分整合到一个卡片放在顶部」→「参数框也并进来, 标题行留在外面」。
+
+
+def test_R359_参数条不在页头了_在卡里():
+    """三个框原来在**页头最右边**, 与它们算出来的数字隔着大半个屏幕 ——
+    改完一个框, 眼睛要横穿整页才看得到结果变了什么。"""
+    code = code_of(FLIP)
+    head = code[code.index("<PageHeader"):code.index('<div className="min-h-0 flex-1')]
+    assert head.strip()
+    assert "NumberField" not in head, "参数框还留在页头"
+    assert "right={" not in head, "页头右槽还在 —— 里面那三个框该搬走了"
+    # 标题那一行**留在页头**, 这是用户点的名(「标题行留在外面」)。
+    # 锚带上行首的换行与缩进: 光写 `titleExtra={w && (` 的话, 改名成
+    # `xtitleExtra=` 照样含着这段, 断言过得去(变异电池当场打绿)。
+    assert "\n        titleExtra={w && (" in head, "标题行被一起搬走了 —— 用户要它留在外面"
+    assert "\n        subtitle={w" in head, "副标题(多空比/主线)也被搬走了"
+
+
+def test_R359_参数条紧挨着它算出来的东西():
+    """本金 / 最多持有 / 回溯**就是算出下面那些数字的那三个输入**。"""
+    code = code_of(FLIP)
+    body = code[code.index("const cardBody = ("):code.index("const w = ov?.weather")]
+    assert body.strip()
+    assert body.index("<ParamBar") < body.index("{summary}"), "参数条没排在成绩上方"
+
+
+def test_R359_参数条不跟着成绩一起消失():
+    """**跑不动的时候正是最需要这三个框的时候。**
+
+    `summary` 在 `d` 没有或 `reason` 非空时是 null —— 而回溯填过头、本金填成 0
+    这类毛病, 修的办法就是改这三个框。把参数条塞进 `Summary` 里, 出错时它会跟着
+    一起不见, 于是**没有任何办法把页面救回来**, 只能去清 localStorage。
+    """
+    code = code_of(FLIP)
+    body = code[code.index("const cardBody = ("):code.index("const w = ov?.weather")]
+    assert body.strip()
+    assert "<ParamBar" in body, "参数条不在 cardBody 这一层"
+    sm = code[code.index("function Summary({ d }"):code.index("function Stat({ label")]
+    assert sm.strip()
+    assert "<ParamBar" not in sm, "参数条嵌进了 Summary —— 跑不动时会跟着一起消失"
+
+
+def test_R359_说清楚筛选不进回测():
+    """板块/门槛与回测参数**并进了同一张卡**, 而它们一个进回测一个不进 ——
+    这件事不说出来就没人知道, 挨着放本身就在暗示它们是一回事。
+
+    (界线本身早有守卫: `test_R347_控件只作用于打分层_不碰六态名单`。这一条钉的
+    是**界线要说给人听**, 不是界线本身。)
+    """
+    code = code_of(FLIP)
+    bar = code[code.index("function ParamBar({"):code.index("function MonthStrip({ months }")]
+    assert bar.strip()
+    assert "不进这条曲线" in bar, "没告诉读的人筛选不影响回测"

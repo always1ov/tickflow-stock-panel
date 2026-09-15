@@ -46,7 +46,8 @@ def test_R351_骨架的形状跟着版面走():
     # (R358 用户: 「我是想合并到筛选的卡片里面」), 所以在整页里找, 不是只在
     # `{d && !d.reason}` 那一段里找 —— 那一段现在没有它了。
     assert "<Summary d={d} />" in code, "骨架画了四格统计, 页面上却没有 Summary"
-    assert "extra={summary}" in code, "Summary 没接到筛选卡上"
+    # [R359] 插槽里现在是「参数条 + 成绩」两样(用户: 「参数框也并进来」)
+    assert "extra={cardBody}" in code, "成绩没接到筛选卡上"
 
 
 def test_R324_决策台加载中画骨架行_不印自选为空():

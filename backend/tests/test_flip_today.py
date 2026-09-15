@@ -454,9 +454,13 @@ def test_R354_本金以万计_对得上真实量级():
     blk = _page()
     assert 'suffix="万"' in blk, "本金那格没标单位"
     assert "min={1} max={1000} step={5}" in blk, "区间/步进没对上散户的量级"
-    # 换算只在这一处, 存的与送后端的仍然是元
+    # 换算只在这一处, 存的与送后端的仍然是元。
+    # [R359] 三个框搬进了 `ParamBar`(用户: 「参数框也并进来」), 回调因此从
+    # `putCapital` 变成传进去的 `onCapital` —— **立论一个字没变**: 乘除只在这
+    # 一对里出现, 存进 state 与送给后端的都还是元。
     assert "value={Math.round(capital / 10_000)}" in blk
-    assert "onChange={(v) => putCapital(v * 10_000)}" in blk
+    assert "onChange={(v) => onCapital(v * 10_000)}" in blk
+    assert blk.count("10_000") == 2, "换算出现在不止这一对 —— 多一处必漂"
     assert "max={100_000_000}" not in blk, "1 亿那个上限还在"
 
 

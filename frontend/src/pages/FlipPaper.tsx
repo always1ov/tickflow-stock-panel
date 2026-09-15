@@ -178,6 +178,26 @@ export function FlipPaper() {
   // (筛选条在 / 不在)。跑不动时 `reason` 那条横幅另有位置, 这里给 null。
   const summary = d && !d.reason ? <Summary d={d} /> : null
 
+  /**
+   * [R359] 卡里那一块 = **参数条 + 成绩**。用户: 「这两个部分整合到一个卡片放在
+   * 顶部」, 追问后明确「参数框也并进来, 标题行留在外面」。
+   *
+   * **参数条必须排在成绩正上方**: 本金 / 最多持有 / 回溯**就是算出下面那些数字
+   * 的那三个输入**。它原来在页头最右边, 与它决定的东西隔着大半个屏幕。
+   *
+   * **而且参数条不跟着 `summary` 一起消失**: `summary` 在跑不动时是 null, 可
+   * 那正是最需要这三个框的时候 —— 回溯填过头、本金填成 0, 修的办法就是改它们。
+   * 把参数条塞进 `Summary` 里, 出错时它会跟着一起不见, 于是**没有任何办法把
+   * 页面救回来**, 只能清 localStorage。所以两者在这里并列, 不是嵌套。
+   */
+  const cardBody = (
+    <div className="space-y-3">
+      <ParamBar capital={capital} maxPositions={maxPositions} years={years}
+                onCapital={putCapital} onMaxPositions={putMaxPositions} onYears={putYears} />
+      {summary}
+    </div>
+  )
+
   const w = ov?.weather
   // [R346] 主线用**品红**, 沿用今日总览那张卡的语义(那儿是 `text-fuchsia-300`
   // 配 `bg-fuchsia-400/15`)。上一版我给了个 `text-secondary` —— 那是灰阶不是颜色。
@@ -230,29 +250,6 @@ export function FlipPaper() {
             </>
           )
           : `非真实资金 · 只按六态转折买卖 · ${rhythmHint('derived')}`}
-        right={
-          <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
-            {/* [R353] 三个都改成可输入。上下界与后端逐个对齐:
-                本金 > 0(给 1 万下限, 再低连一手都买不起);
-                最多持有 1~50(`flip_portfolio.MAX_POSITIONS_CAP`);
-                回溯 0.5~3 年(`flip_paper.MIN_YEARS` / `MAX_YEARS`)。
-                **前端钳到同一个区间, 不是等后端 422** —— 那种报错只会说
-                「Input should be less than or equal to 50」, 读的人不知道该填多少。 */}
-            {/* [R354] 本金**以「万」计**。用户: 「我实际本金不超 100 万, 要合适我真实情况」。
-                原来按元填, 100 万写成 1000000 —— 七位数在一个小框里既难读也难改,
-                而且上限给到了 1 亿, 与真实量级差两个数量级。
-                换成万之后数字只剩三位, 一眼就是「100 万」; 区间 1~1000 万留了余量
-                但不再荒唐, 步进 5 万是散户实际会调的粒度。
-                **换算只在这一处**: 存进 state 与送给后端的仍然是元。 */}
-            <NumberField label="本金" value={Math.round(capital / 10_000)}
-                         onChange={(v) => putCapital(v * 10_000)}
-                         min={1} max={1000} step={5} width="w-16" suffix="万" />
-            <NumberField label="最多持有" value={maxPositions} onChange={putMaxPositions}
-                         min={1} max={50} step={1} width="w-14" suffix="只" />
-            <NumberField label="回溯" value={years} onChange={putYears}
-                         min={YEARS_MIN} max={YEARS_MAX} step={0.5} width="w-14" suffix="年" />
-          </div>
-        }
       />
 
       <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-3 pb-4 pt-3 lg:px-4">
@@ -273,10 +270,10 @@ export function FlipPaper() {
             那种消失不报错、也看不出是哪儿出的问题。 */}
         {ov
           ? <TodayControls d={ov} refetch={() => today.refetch()}
-                           isFetching={today.isFetching} extra={summary} />
-          : summary && (
+                           isFetching={today.isFetching} extra={cardBody} />
+          : (
             <div className="rounded-card border border-border/60 bg-surface/40 px-4 py-3">
-              {summary}
+              {cardBody}
             </div>
           )}
 
@@ -746,6 +743,52 @@ function NumberField({ label, value, onChange, min, max, step, width = 'w-20', s
  * 都在那儿, 有守卫钉着)。**前端不自己再切一遍曲线** —— 同一件事两处算, 哪天
  * 基准口径改了必然漂, 而且不会有任何东西报错。
  */
+/**
+ * [R359] 参数条 —— 本金 / 最多持有 / 回溯。用户: 「参数框也并进来」。
+ *
+ * 它原来在**页头最右边**, 与它算出来的那些数字隔着大半个屏幕: 改完一个框, 眼睛
+ * 要横穿整页才看得到结果变了什么。现在它就贴在成绩上方。
+ *
+ * **这三个框是这一页唯一喂进回测的输入** —— 同一张卡里那排板块/门槛不是同一回事:
+ * 那些只改打分那一层的标注(谁拿得到名次), **一分钱都不进回测**。所以这一条
+ * 单独一行、与筛选条之间隔着分隔线, 不与板块按钮并排 —— 并排会让人以为筛掉
+ * 几个板块曲线也会跟着变。行尾那句话把这件事直接说出来: 两样东西并进同一张卡
+ * 之后, "它们互不相干"这件事不说就没人知道。
+ */
+function ParamBar({ capital, maxPositions, years, onCapital, onMaxPositions, onYears }: {
+  capital: number; maxPositions: number; years: number
+  onCapital: (v: number) => void
+  onMaxPositions: (v: number) => void
+  onYears: (v: number) => void
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
+      {/* [R353] 三个都改成可输入。上下界与后端逐个对齐:
+          本金 > 0(给 1 万下限, 再低连一手都买不起);
+          最多持有 1~50(`flip_portfolio.MAX_POSITIONS_CAP`);
+          回溯 0.5~3 年(`flip_paper.MIN_YEARS` / `MAX_YEARS`)。
+          **前端钳到同一个区间, 不是等后端 422** —— 那种报错只会说
+          「Input should be less than or equal to 50」, 读的人不知道该填多少。 */}
+      {/* [R354] 本金**以「万」计**。用户: 「我实际本金不超 100 万, 要合适我真实情况」。
+          原来按元填, 100 万写成 1000000 —— 七位数在一个小框里既难读也难改,
+          而且上限给到了 1 亿, 与真实量级差两个数量级。
+          换成万之后数字只剩三位, 一眼就是「100 万」; 区间 1~1000 万留了余量
+          但不再荒唐, 步进 5 万是散户实际会调的粒度。
+          **换算只在这一处**: 存进 state 与送给后端的仍然是元。 */}
+      <NumberField label="本金" value={Math.round(capital / 10_000)}
+                   onChange={(v) => onCapital(v * 10_000)}
+                   min={1} max={1000} step={5} width="w-16" suffix="万" />
+      <NumberField label="最多持有" value={maxPositions} onChange={onMaxPositions}
+                   min={1} max={50} step={1} width="w-14" suffix="只" />
+      <NumberField label="回溯" value={years} onChange={onYears}
+                   min={YEARS_MIN} max={YEARS_MAX} step={0.5} width="w-14" suffix="年" />
+      <span className="ml-auto text-muted/70">
+        上面那排板块与门槛只改打分的标注, 不进这条曲线
+      </span>
+    </div>
+  )
+}
+
 function MonthStrip({ months }: { months: FlipPaperData['monthly'] }) {
   if (!months.length) return null
   // 最大月度波动 —— 柱高按它归一, 于是**柱子之间可比**。拿固定刻度的话,
