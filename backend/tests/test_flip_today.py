@@ -573,7 +573,10 @@ def test_R342_没进候选池的票照样在名单里():
 def test_R342_把握分那一格不是动作():
     """名次徽标长在动作徽标旁边, **不许变成第二个可点的动作**。"""
     row = _signal_row()
-    seg = row[row.index("c?.rank != null ? ("):row.index("<span className=\"text-[11px] text-secondary\">")]
+    # [R350] 版面改成网格后, 原来那个右界(状态文字那个 span 的 className)变了。
+    # 改用**这个三元自己的收尾**当右界 —— 它跟着这一格走, 不跟旁边的样式走。
+    a = row.index("{c?.rank != null ? (")
+    seg = row[a:row.index(") : <span />}", a)]
     for word in ("'买入'", "'清仓'", "onClick"):
         assert word not in seg, f"名次那一格出现了动作: {word}"
     # [R345] 移植过来的那一格本身也不许带动作

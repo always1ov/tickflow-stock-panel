@@ -349,3 +349,47 @@ def test_R349_走势那一格不是动作():
     cell = code_of(TREND)
     for word in ("'买入'", "'清仓'", "onClick"):
         assert word not in cell, f"走势那一格出现了动作: {word}"
+
+
+# ── [R350] 版面: 定宽网格 ───────────────────────────────────────────────
+#
+# 用户: 「你排版不对, 中间这么多空间」。
+#
+# **两个毛病同一个根**: 原来是 flex + 触发价上一个 `ml-auto`。2000px 宽屏上
+# `ml-auto` 把价格甩到最右边, 中间空出一大条; 而 flex 各行按自己的内容宽度排,
+# **行与行之间列也对不齐** —— 「离清仓线还有 10.0%」和「还差 15.2%」起点不同,
+# 眼睛得逐行重找。
+
+
+def _row() -> str:
+    code = code_of(FLIP)
+    blk = code[code.index("function SignalRow"):]
+    nxt = blk.find("\nfunction ", 1)
+    return blk if nxt < 0 else blk[:nxt]
+
+
+def test_R350_信号行是定宽网格_不是flex():
+    """列宽固定, 行与行天然对齐, 一列能扫到底。"""
+    row = _row()
+    assert "grid-cols-[minmax(9rem,12rem)_4.5rem_3.5rem_minmax(0,1fr)_auto]" in row, \
+        "五列的宽度得写死 —— 由内容撑宽就回到了行行错位"
+    assert "ml-auto" not in row, "ml-auto 会把最后一列甩到屏幕最右, 中间空一条"
+
+
+def test_R350_超宽屏上限宽():
+    """一行内容横贯两米不叫排版 —— 左右留白比中间空一条好读。"""
+    row = _row()
+    assert row.count("max-w-[72rem]") >= 2, "主行与走势行都要限宽, 否则两行右边界不齐"
+
+
+def test_R350_名次那一格空着也占位():
+    """有名次的行和没名次的行, 后面所有列都得对齐。"""
+    row = _row()
+    assert ") : <span />}" in row, "没名次时要留一个空占位, 不能整格不渲染"
+
+
+def test_R350_走势行缩进对齐到状态文字那一列():
+    """原来那个 3.75rem 是拍脑袋的 —— 走势压在标的名下面, 看着像标的的一部分。"""
+    row = _row()
+    assert "pl-[22.25rem]" in row, "缩进要对齐到状态文字那一列的起点"
+    assert "pl-[3.75rem]" not in row

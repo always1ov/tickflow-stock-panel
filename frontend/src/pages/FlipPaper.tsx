@@ -518,78 +518,92 @@ function SignalRow({ r, c }: { r: FlipTodaySignal; c?: TodayOpportunity }) {
       sell && 'border-l-bear bg-bear/[0.10]',
       nearExit && 'border-l-warning bg-warning/[0.07]',
       !actionable && !nearExit && 'border-l-transparent')}>
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-      <span className="min-w-[9rem]">
-        <SymbolCell symbol={r.symbol} name={r.name} />
-      </span>
-
-      {actionable ? (
-        <span className={cn('inline-flex items-center gap-1 rounded px-2 py-0.5 text-[11px] font-medium',
-          r.act === 'buy' ? 'bg-bull/15 text-bull' : 'bg-bear/15 text-bear')}>
-          {r.act === 'buy' ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-          {r.act === 'buy' ? '买入' : '清仓'}
+      {/* [R350] 用户: 「你排版不对, 中间这么多空间」。
+          **两个毛病, 同一个根**: 原来是 `flex` + 触发价上一个 `ml-auto`。
+          在 2000px 宽屏上 `ml-auto` 把价格甩到最右边, 中间就空出一大条;
+          而 flex 各行按自己的内容宽度排, **行与行之间列也对不齐** ——
+          「离清仓线还有 10.0%」和「还差 15.2%」起点不同, 眼睛得逐行重找。
+          改成**定宽网格**: 每一列宽度固定, 行与行天然对齐, 一列扫到底。
+          再加一道 `max-w-[72rem]` —— 超宽屏上不再把一行内容拉成横贯两米,
+          左右都留白比中间空一条好读得多。 */}
+      <div className="grid max-w-[72rem] grid-cols-[minmax(9rem,12rem)_4.5rem_3.5rem_minmax(0,1fr)_auto] items-center gap-x-3 text-xs">
+        <span className="truncate">
+          <SymbolCell symbol={r.symbol} name={r.name} />
         </span>
-      ) : (
-        /* 后两档**不渲染动作位** —— 灰掉的徽标仍在暗示这里本来有个动作。
-           [R338] 手上拿着的换个标记: 同样没有动作, 但"我拿着它"与"我在看它"
-           是两件事, 一眼要能分开。 */
-        r.held ? (
-          <span className="inline-flex items-center gap-1 text-[10px] text-secondary">
-            <Wallet className="h-3 w-3" />持有
+
+        {actionable ? (
+          <span className={cn('inline-flex items-center justify-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium',
+            r.act === 'buy' ? 'bg-bull/15 text-bull' : 'bg-bear/15 text-bear')}>
+            {r.act === 'buy' ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+            {r.act === 'buy' ? '买入' : '清仓'}
           </span>
         ) : (
-          <span className="inline-flex items-center gap-1 text-[10px] text-muted">
-            <Eye className="h-3 w-3" />盯着
+          /* 后两档**不渲染动作位** —— 灰掉的徽标仍在暗示这里本来有个动作。
+             [R338] 手上拿着的换个标记: 同样没有动作, 但"我拿着它"与"我在看它"
+             是两件事, 一眼要能分开。 */
+          r.held ? (
+            <span className="inline-flex items-center gap-1 text-[10px] text-secondary">
+              <Wallet className="h-3 w-3" />持有
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1 text-[10px] text-muted">
+              <Eye className="h-3 w-3" />盯着
+            </span>
+          )
+        )}
+
+        {/* [R345] 「名次」那一格整格移植自今日总览 —— 用户: 「这一列要移植」。
+            **不是只搬个数字**: 名次下面那三条维度条(红=趋势 45% / 蓝=量能 30% /
+            黄=位置 25%)才是它能被读懂的原因 —— 离开那三条颜色, 上面那个名次
+            就只是个号码, 说不出"为什么是这个名次"。
+            它**不是动作**: 拿不到名次的票照样在名单里, 只是排在本档末尾。
+            [R350] 这一格无论有没有都占住那 3.5rem —— 空着也要占位, 否则有名次的
+            行和没名次的行后面所有列全都错开。 */}
+        {c?.rank != null ? (
+          <ScoreCell o={c} rank={c.rank} total={c.rank_total ?? 0} />
+        ) : actionable ? (
+          <span className="text-center text-[9px] leading-tight text-muted/60"
+                title="没过打分那三道硬门槛, 所以没有名次 —— 但它转折了, 该动手还是要动手">
+            没进
+            <br />候选池
           </span>
-        )
-      )}
+        ) : <span />}
 
-      {/* [R345] 「名次」那一格整格移植自今日总览 —— 用户: 「这一列要移植」。
-          **不是只搬个数字**: 名次下面那三条维度条(红=趋势 45% / 蓝=量能 30% /
-          黄=位置 25%)才是它能被读懂的原因 —— 离开那三条颜色, 上面那个名次
-          就只是个号码, 说不出"为什么是这个名次"。
-          它**不是动作**: 拿不到名次的票照样在名单里, 只是排在本档末尾。 */}
-      {c?.rank != null ? (
-        <ScoreCell o={c} rank={c.rank} total={c.rank_total ?? 0} />
-      ) : actionable && (
-        <span className="w-14 shrink-0 text-center text-[9px] leading-tight text-muted/60"
-              title="没过打分那三道硬门槛, 所以没有名次 —— 但它转折了, 该动手还是要动手">
-          没进
-          <br />候选池
+        <span className="min-w-0 truncate text-[11px] text-secondary">
+          {r.stage === 'flipped' && <>已转折 · 现在是{r.state_cn}</>}
+          {r.stage === 'crossing' && (
+            <>按现价会转折 —— <b className="text-warning">收盘还站在这边才算数</b></>
+          )}
+          {/* [R338] 拿着的票问的是"什么时候卖", 不是"什么时候买" —— 同一个距离,
+              说法要对上它在你这儿的身份 */}
+          {r.stage === 'watch' && r.gap_pct != null && (
+            r.held
+              ? <b className={cn(nearExit && 'text-warning')}>
+                  离清仓线还有 {(Math.abs(r.gap_pct) * 100).toFixed(1)}%
+                </b>
+              : <>还差 {(Math.abs(r.gap_pct) * 100).toFixed(1)}% 到触发价</>
+          )}
         </span>
-      )}
 
-      <span className="text-[11px] text-secondary">
-        {r.stage === 'flipped' && <>已转折 · 现在是{r.state_cn}</>}
-        {r.stage === 'crossing' && (
-          <>按现价会转折 —— <b className="text-warning">收盘还站在这边才算数</b></>
-        )}
-        {/* [R338] 拿着的票问的是"什么时候卖", 不是"什么时候买" —— 同一个距离,
-            说法要对上它在你这儿的身份 */}
-        {r.stage === 'watch' && r.gap_pct != null && (
-          r.held
-            ? <b className={cn(nearExit && 'text-warning')}>
-                离清仓线还有 {(Math.abs(r.gap_pct) * 100).toFixed(1)}%
-              </b>
-            : <>还差 {(Math.abs(r.gap_pct) * 100).toFixed(1)}% 到触发价</>
-        )}
-      </span>
-
-      {r.flip_price != null && (
-        <span className="ml-auto whitespace-nowrap text-[10px] tabular-nums text-muted">
-          触发 {r.flip_price.toFixed(2)}
-          {r.ref_price != null && <> · 现 {r.ref_price.toFixed(2)}</>}
-          {!r.live && <span className="ml-1 text-warning/70">昨收口径</span>}
+        {/* [R350] 不再 `ml-auto` —— 它是网格的最后一列, 位置由栅格决定 */}
+        <span className="whitespace-nowrap text-right text-[10px] tabular-nums text-muted">
+          {r.flip_price != null && <>
+            触发 {r.flip_price.toFixed(2)}
+            {r.ref_price != null && <> · 现 {r.ref_price.toFixed(2)}</>}
+            {!r.live && <span className="ml-1 text-warning/70">昨收口径</span>}
+          </>}
         </span>
-      )}
-    </div>
-
-    {/* [R349] 走势 —— 打分那一层的依据, 单独一行, 与名次那一格左边缘对齐 */}
-    {c && (
-      <div className="mt-1 pl-[3.75rem] text-[11px]">
-        <TrendCell o={c} />
       </div>
-    )}
+
+      {/* [R349] 走势 —— 打分那一层的依据, 单独一行。
+          [R350] 缩进对齐到**状态文字那一列**(标的 12rem + 动作 4.5rem + 名次 3.5rem
+          + 三道 gap 2.25rem ≈ 22.25rem), 而不是原来那个拍脑袋的 3.75rem ——
+          它现在压在标的名下面, 看着像是标的的一部分。 */}
+      {c && (
+        <div className="mt-1 max-w-[72rem] pl-[22.25rem] text-[11px]">
+          <TrendCell o={c} />
+        </div>
+      )}
     </div>
   )
 }
