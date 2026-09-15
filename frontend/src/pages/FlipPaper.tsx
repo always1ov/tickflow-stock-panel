@@ -174,6 +174,10 @@ export function FlipPaper() {
   // **那正是"打分自己选票"**, 而这套系统里选票这件事只归六态。打分的位置在它后面,
   // 不在它旁边。守卫直接钉"`rows` 只能是后端给的那份, 前端不许合成"。
 
+  // [R358] 成绩那一块并进筛选卡 —— 先在这里算好, 两条渲染路径共用同一个
+  // (筛选条在 / 不在)。跑不动时 `reason` 那条横幅另有位置, 这里给 null。
+  const summary = d && !d.reason ? <Summary d={d} /> : null
+
   const w = ov?.weather
   // [R346] 主线用**品红**, 沿用今日总览那张卡的语义(那儿是 `text-fuchsia-300`
   // 配 `bg-fuchsia-400/15`)。上一版我给了个 `text-secondary` —— 那是灰阶不是颜色。
@@ -260,7 +264,21 @@ export function FlipPaper() {
             **它只作用于打分那一层**: 板块过滤改的是哪些票拿得到名次, 门槛改的是
             谁进候选池 —— 也就是只影响本页信号的**先后与标注**, 不影响谁在名单上
             (名单只由六态选, R344), 更不影响谁能出手。守卫钉着这条。 */}
-        {ov && <TodayControls d={ov} refetch={() => today.refetch()} isFetching={today.isFetching} />}
+        {/* [R358] 成绩与净值图**并进筛选那张卡**。用户: 「净值走势图和这两行收益
+            都融合到页面开头的第一个卡片里面」→「我是想合并到筛选的卡片里面」。
+
+            **`ov` 拿不到时要有退路。** 筛选条吃的是今日总览那份数据(打分那一层),
+            而成绩吃的是模拟盘自己那份 —— 两份是各自独立的请求。挂在 `ov &&` 里
+            的话, **打分那一层一挂, 整段成绩跟着一起消失**, 而它明明算出来了。
+            那种消失不报错、也看不出是哪儿出的问题。 */}
+        {ov
+          ? <TodayControls d={ov} refetch={() => today.refetch()}
+                           isFetching={today.isFetching} extra={summary} />
+          : summary && (
+            <div className="rounded-card border border-border/60 bg-surface/40 px-4 py-3">
+              {summary}
+            </div>
+          )}
 
         {q.isLoading && <LoadingSkeleton />}
         {q.isError && (
@@ -278,8 +296,7 @@ export function FlipPaper() {
         {d && !d.reason && (
           <>
             <TodaySignals rows={d.today ?? []} conviction={conv} />
-            <Summary d={d} />
-            <NavChart d={d} />
+            {/* [R358] 成绩与净值图搬到筛选那张卡里了 —— 见上面那段 */}
             <Holdings d={d} onOpen={(s) => navigate(`/stock-analysis?symbol=${s}`)} />
             <Orders orders={d.orders} />
             <Skipped d={d} />
@@ -735,7 +752,9 @@ function MonthStrip({ months }: { months: FlipPaperData['monthly'] }) {
   // 一个 ±2% 的年份会所有柱子都贴着底, 什么也看不出来。
   const peak = Math.max(...months.map((m) => Math.abs(m.ret)), 0.01)
   return (
-    <section className="overflow-hidden rounded-card border border-border/60 bg-surface/40 px-3 py-2.5">
+    /* [R358] 这一块现在长在筛选那张卡**里面** —— 自己不再是一张卡, 不然就是
+       卡中卡(一圈边框套一圈边框)。 */
+    <section className="overflow-hidden">
       <div className="mb-2 flex items-center gap-0.5 text-[10px] text-muted">
         逐月收益
         <Hint title={'**每个月单独算, 月与月之间不重叠** —— 这个月的收益 =\n月末净值 / 上月末净值 - 1(第一个月的基准是本金)。\n\n基准取**上月最后一天**而不是本月第一天: 收益要算这一段期间的变化,\n拿本月第一个交易日当基准会把那一天自己的涨跌吃掉。\n\n**打叉的是残月**: 回测窗口从月中切进来(第一个月),\n或者这个月还没走完(最后一个月)—— 它们不该拿去和整月比。'} />
@@ -776,14 +795,35 @@ function MonthStrip({ months }: { months: FlipPaperData['monthly'] }) {
   )
 }
 
+/**
+ * [R358] 成绩那一块 —— **整块并进筛选那张卡**。
+ *
+ * 用户: 「净值走势图和这两行收益都融合到页面开头的第一个卡片里面」→
+ * 「我是想合并到筛选的卡片里面」。
+ *
+ * 在这之前它是**三张各自独立的卡**(逐月 / 两行读数 / 净值图)竖着摞在页面中段,
+ * 三圈边框、三个背景、三段外边距。并进去之后卡壳只剩一层, 内部用分隔线分块。
+ *
+ * ## 净值图默认收起, 而且是**真的不挂载**
+ *
+ * 用户要的是默认收起。这里有个会**静默失败**的坑: `useECharts` 的初始化 effect
+ * 依赖数组是 `[]`, 而且 `if (!chartRef.current) return` —— 图表的 div 若在首次
+ * 渲染时不存在, 那个 effect 就地返回, **之后再也不会重跑**。于是拿 `hidden`
+ * 之类的办法藏起来再展开, 展开后是一片空白: 不报错、控制台干净、数据也都在。
+ *
+ * 所以折叠必须**连 `<NavChart>` 一起不渲染**, 展开时整个组件重新挂载, init
+ * effect 才会带着一个真实的 ref 跑一遍。守卫钉着这条。
+ */
 function Summary({ d }: { d: FlipPaperData }) {
   const s = d.stats
+  const [navOpen, setNavOpen] = useState(() => storage.flipNavOpen.get(false))
+  const toggleNav = () => setNavOpen((v) => { storage.flipNavOpen.set(!v); return !v })
   return (
-    <>
+    <div className="space-y-3">
       {/* [R357] 逐月排在最前 —— 用户每天打开最先要问的是"最近哪个月在亏" */}
       <MonthStrip months={d.monthly} />
 
-      <section className="grid grid-cols-2 divide-x divide-y divide-border/30 overflow-hidden rounded-card border border-border/60 bg-surface/40 sm:grid-cols-2 sm:divide-y-0">
+      <section className="grid grid-cols-2 divide-x divide-border/30 overflow-hidden rounded-card border border-border/40 bg-base/30 sm:grid-cols-2">
         <Stat label="现在拿着" value={`${d.positions.length} 只`}
               sub={`仓位 ${d.nav.length ? pct((d.nav[d.nav.length - 1].market_value / d.nav[d.nav.length - 1].nav), 0) : '—'} · 现金 ${money(d.nav.at(-1)?.cash)}`}
               hint={'这是**当下**的仓位, 与上面那条逐月一样看的是现在;\n下面那一排才是整个回溯窗口的成绩。'} />
@@ -793,7 +833,7 @@ function Summary({ d }: { d: FlipPaperData }) {
       </section>
 
       {/* 整段成绩 —— 回溯窗口从头到尾 */}
-      <section className="grid grid-cols-2 divide-x divide-y divide-border/30 overflow-hidden rounded-card border border-border/60 bg-surface/40 sm:grid-cols-4 sm:divide-y-0">
+      <section className="grid grid-cols-2 divide-x divide-y divide-border/30 overflow-hidden rounded-card border border-border/40 bg-base/30 sm:grid-cols-4 sm:divide-y-0">
         <Stat label="总收益" value={pct(s.total_ret)} tone={s.total_ret >= 0 ? 'bull' : 'bear'}
               sub={`本金 ${money(d.capital)} · ${s.days} 个交易日`} />
         <Stat label="最大回撤" value={pct(s.max_drawdown)} tone="bear"
@@ -816,7 +856,33 @@ function Summary({ d }: { d: FlipPaperData }) {
           hint={'空着不是 0 —— 「算不出来」与「一次没赢过」是两件事。\n\n**轮数少于 10 时这一格会标黄**: 转折是低频信号, 回溯窗口短了\n可能只剩两三次完整买卖, 那种样本量下的胜率不是"不好看", 是**不成立**。\n想要能看的胜率就把回溯拉长 —— 这两件事没法兼得。'}
         />
       </section>
-    </>
+
+      {/* [R358] 净值走势 —— **默认收起**(用户点的名)。
+          折叠条上带着这条曲线自己的读数(起止那一段), 上面那排数字它不重复。 */}
+      {!!d.nav.length && (
+        <section className="overflow-hidden rounded-card border border-border/40 bg-base/30">
+          {/* 折叠条的样子与 R355「只是盯着」那条**同一套**: 旋转的 ChevronDown +
+              「收起/展开」+ 右边一句摘要。同一页上两种折叠长两个样, 读的人要认两次。 */}
+          <button
+            type="button"
+            onClick={toggleNav}
+            aria-expanded={navOpen}
+            className="flex w-full items-center gap-1.5 px-3 py-2 text-[11px] text-muted transition-colors hover:bg-elevated/40 hover:text-foreground cursor-pointer"
+          >
+            <ChevronDown className={cn('h-3 w-3 transition-transform duration-expand ease-smooth',
+              navOpen && 'rotate-180')} />
+            {navOpen ? '收起' : '展开'}净值走势
+            <span className="ml-auto opacity-70">
+              {d.nav[0]?.date} → {d.as_of ?? d.nav.at(-1)?.date}
+            </span>
+          </button>
+          {/* **连组件一起不渲染, 不是藏起来** —— `useECharts` 的 init effect 依赖
+              数组是 `[]` 且 ref 为空就地返回, 藏起来再展开会是一片空白且不报错。
+              见 `Summary` 的 docstring。 */}
+          {navOpen && <NavChart d={d} />}
+        </section>
+      )}
+    </div>
   )
 }
 
@@ -873,11 +939,15 @@ function NavChart({ d }: { d: FlipPaperData }) {
   const ref = useECharts(option, [option])
   if (!d.nav.length) return null
   return (
-    <section className="overflow-hidden rounded-card border border-border/60 bg-surface/40">
-      <SectionHead title="净值走势"
-                   note={`默认看最近半年 · 拖下面那条可回到 ${d.nav[0]?.date} 起的全程`} />
+    /* [R358] 标题与卡壳都归折叠条了 —— 这里只剩图本身。
+       **这个组件只在展开时才被挂载**(见 `Summary`), 所以 `useECharts` 的 init
+       effect 一定是带着真实的 ref 跑的。 */
+    <>
+      <div className="border-t border-border/40 px-3 pb-1 pt-2 text-[10px] text-muted">
+        默认看最近半年 · 拖下面那条可回到 {d.nav[0]?.date} 起的全程
+      </div>
       <div ref={ref} className="h-[280px] w-full" />
-    </section>
+    </>
   )
 }
 
@@ -1100,8 +1170,12 @@ function LoadingSkeleton() {
           </div>
         ))}
       </div>
-      <div className="rounded-card border border-border/60 bg-surface/40 p-4">
-        <Skeleton h="h-[240px]" rounded="rounded" />
+      {/* [R358] **那块 240px 的曲线骨架撤掉了。**
+          净值图现在默认收起 —— 画一块曲线大小的灰块, 等数据到了那儿却是一条
+          折叠条, 就是**先许诺一个版面然后食言**, 比直接转圈更糟。
+          换成一条折叠条大小的骨架, 与真到位的东西对得上。 */}
+      <div className="rounded-card border border-border/40 bg-base/30 px-3 py-2">
+        <Skeleton w="w-32" h="h-3" />
       </div>
     </div>
   )

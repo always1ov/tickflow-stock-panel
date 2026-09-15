@@ -103,9 +103,14 @@ def test_R343_补充带已经拆掉():
 def test_R343_模拟盘原有六块的顺序没被动过():
     code = _flip()
     body = code[code.index("export function FlipPaper"):code.index("function TodaySignals")]
-    order = ["<TodaySignals", "<Summary", "<NavChart", "<Holdings", "<Orders", "<Skipped", "<Rules"]
+    # [R358] `<Summary>` 与 `<NavChart>` 从这串里出列了 —— **不是被删掉**:
+    # 用户把它们并进了筛选那张卡(「我是想合并到筛选的卡片里面」), `Summary`
+    # 现在走 `extra={summary}` 这个插槽, `NavChart` 则收进 `Summary` 里的折叠区。
+    # 它们各自的守卫在 `test_R358_*`。这里只管**留在主列里的那几块**次序没乱。
+    order = ["<TodaySignals", "<Holdings", "<Orders", "<Skipped", "<Rules"]
     idx = [body.index(t) for t in order]
     assert idx == sorted(idx), f"版面顺序被动过: {order}"
+    assert "<NavChart" not in body, "净值图该在 Summary 的折叠区里, 不在主列"
 
 
 def test_R343_市场状态并进页头_不自己占一张卡():
@@ -491,3 +496,109 @@ def test_R352_前端那几个死包装也清了():
     keys = code_of("lib/queryKeys.ts")
     for name in ("todayAiSchedule:", "todayAiTrackRecord:"):
         assert name not in keys, f"queryKeys 还留着死键: {name}"
+
+
+# ── [R358] 成绩与净值图并进筛选那张卡 ───────────────────────────────────
+#
+# 用户: 「净值走势图和这两行收益都融合到页面开头的第一个卡片里面」, 追问后明确
+# 是「我是想合并到筛选的卡片里面」; 净值图「默认收起」。
+
+
+def test_R358_成绩挂在筛选卡的插槽上_不是搬进那个组件():
+    """**做成插槽, 不是把成绩搬进 `TodayControls`。**
+
+    那个组件管的是"看哪些票 / 什么门槛", 对模拟盘的净值、月度收益一无所知, 也不该
+    知道 —— 它当初立起来的理由就是**一处实现**(R347)。把某一页的数据结构焊进去,
+    下一个用它的页面就得先绕过这段。插槽只承诺一件事: 这块东西长在同一张卡里。
+    """
+    ctrl = code_of(CTRL)
+    assert "extra?: ReactNode" in ctrl, "没有插槽"
+    assert "{extra && <div" in ctrl, "插槽没渲染"
+    # 组件本身仍然对模拟盘一无所知
+    for leak in ("FlipPaper", "monthly", "nav", "total_ret", "max_drawdown"):
+        assert leak not in ctrl, f"模拟盘的数据结构漏进了这个共用组件: {leak}"
+    code = code_of(FLIP)
+    assert "extra={summary}" in code, "模拟盘没把成绩接到插槽上"
+
+
+def test_R358_插槽与筛选条在同一张卡里():
+    """用户要的就是"同一张卡"。卡壳必须包着**筛选条 + 插槽**两样。
+
+    钉的是结构而不是某个类名: 插槽那个 div 在卡壳之内、筛选条之后, 中间有条
+    分隔线。(旧版的卡壳直接长在筛选条那个 flex 容器上 —— 那种写法下插槽只能
+    排在卡外面, 或者被当成 flex 的又一个横排项。)
+    """
+    ctrl = code_of(CTRL)
+    shell = '<div className="rounded-card border border-border/60 bg-surface/40">'
+    assert shell in ctrl, "卡壳没有单独一层"
+    seg = ctrl[ctrl.index(shell):]
+    i_row = seg.index('<div className="flex flex-wrap items-center gap-2 px-4 py-2">')
+    i_extra = seg.index("{extra && <div")
+    assert i_row < i_extra, "插槽跑到筛选条前面去了"
+    assert "border-t border-border/40" in seg[i_extra:i_extra + 200], \
+        "插槽与筛选条之间没有分隔线 —— 两块东西糊成一团"
+
+
+def test_R358_净值图默认收起():
+    code = code_of(FLIP)
+    assert "storage.flipNavOpen.get(false)" in code, "默认不是收起"
+    assert "storage.flipNavOpen.set(!v)" in code, "折叠状态没记住"
+
+
+def test_R358_折起来时连组件一起不挂载_不是藏起来():
+    """**这一条挡的是一个会静默失败的坑。**
+
+    `useECharts` 的初始化 effect 依赖数组是 `[]`, 而且 `if (!chartRef.current)
+    return` —— 图表的 div 若在首次渲染时不存在, 那个 effect 就地返回, **之后
+    再也不会重跑**。于是用 `hidden` / `display:none` 之类藏起来再展开, 展开后是
+    一片空白: 不报错、控制台干净、数据也都在, 只是图没了。
+
+    所以折叠必须**连 `<NavChart>` 一起不渲染**。
+    """
+    from tests.frontend_source import code_of as _c
+    hook = _c("pages/backtest/charts/useECharts.ts")
+    assert "if (!chartRef.current) return" in hook and "}, [])" in hook, \
+        "这条守卫的前提变了 —— init effect 不再是一次性的, 重新想一遍"
+
+    code = code_of(FLIP)
+    sm = code[code.index("function Summary({ d }"):code.index("function Stat({ label")]
+    assert sm.strip()
+    assert "{navOpen && <NavChart d={d} />}" in sm, \
+        "净值图不是按 navOpen 条件挂载 —— 藏起来再展开会是一片空白且不报错"
+    for hide in ('hidden={', "display: 'none'", "'hidden'"):
+        assert hide not in sm, f"用了藏起来的办法: {hide}"
+
+
+def test_R358_折叠条与R355那条长一个样():
+    """同一页上两种折叠长两个样, 读的人要认两次。"""
+    code = code_of(FLIP)
+    sm = code[code.index("function Summary({ d }"):code.index("function Stat({ label")]
+    assert sm.strip()
+    assert "navOpen && 'rotate-180'" in sm, "没沿用旋转的 ChevronDown"
+    assert "{navOpen ? '收起' : '展开'}" in sm, "没沿用「收起/展开」那句"
+    assert "aria-expanded={navOpen}" in sm
+
+
+def test_R358_并进去之后不是卡中卡():
+    """插槽里那几块自己不能再带一圈卡壳 —— 否则是一圈边框套一圈边框。"""
+    code = code_of(FLIP)
+    strip = code[code.index("function MonthStrip({ months }"):code.index("function Summary({ d }")]
+    assert strip.strip()
+    assert "rounded-card" not in strip, "逐月那一块还带着自己的卡壳"
+    chart = code[code.index("function NavChart({ d }"):]
+    chart = chart[:chart.index("\nfunction ")]
+    assert "rounded-card" not in chart, "净值图还带着自己的卡壳"
+    assert "<SectionHead" not in chart, "标题该归折叠条, 不该图里再来一个"
+
+
+def test_R358_打分那层挂了_成绩不跟着消失():
+    """**两份数据是各自独立的请求。**
+
+    筛选条吃的是今日总览那份(打分那一层), 成绩吃的是模拟盘自己那份。把成绩挂在
+    `ov && ...` 里的话, 打分那一层一挂, **整段成绩跟着一起消失** —— 而它明明
+    算出来了。那种消失不报错, 也看不出是哪儿出的问题。
+    """
+    code = code_of(FLIP)
+    blk = code[code.index("{ov\n"):code.index("{q.isLoading &&")]
+    assert blk.strip()
+    assert ": summary &&" in blk, "ov 拿不到时成绩没有退路, 会整块消失"

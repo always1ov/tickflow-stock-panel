@@ -198,13 +198,23 @@ def test_R329_界面上后两档不渲染动作位():
         "另一支里不许出现动作词的字面量(正文里说距离可以, 渲染成动作不行)"
 
 
-def test_R329_今日信号排在页面最前():
+def test_R329_今日信号排在主列第一块():
+    """[R329 → **R358 缩水**] 原来钉的是「今天要动手的东西排在回测结论前面」。
+
+    **那一半被用户当面推翻了, 不是被我绕过去。** R358 用户: 「净值走势图和这两行
+    收益都融合到页面开头的第一个卡片里面」, 追问后明确是「我是想合并到筛选的卡片
+    里面」—— 而筛选那张卡本来就在今日信号**上面**。所以现在成绩确实排在了今天
+    要动手的东西前面, 这是用户点的名。
+
+    剩下这一半仍然成立而且仍然要钉: 今日信号是**主列的第一块**, 持仓 / 成交 /
+    没做成 / 规则都排在它后面。成绩并进了页头那张控制卡, 不占主列的位置。
+    """
     from tests.frontend_source import code_of
     code = code_of("pages/FlipPaper.tsx")
     body = code[code.index("{d && !d.reason && ("):]
     i_today = body.index("<TodaySignals")
-    i_summary = body.index("<Summary")
-    assert i_today < i_summary, "今天要动手的东西必须排在回测结论前面"
+    for later in ("<Holdings", "<Orders", "<Skipped"):
+        assert i_today < body.index(later), f"今日信号被 {later} 挤到后面去了"
 
 
 # ── [R331] 折叠 ────────────────────────────────────────────────────────

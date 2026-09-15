@@ -23,7 +23,7 @@
  * 板块过滤改的是哪些票拿得到名次, 门槛改的是谁进候选池 —— 也就是只影响**先后与标注**,
  * 不影响谁在名单上、更不影响谁能出手。守卫钉着这条。
  */
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { BarChart3, Loader2, SlidersHorizontal } from 'lucide-react'
 import {
@@ -36,11 +36,21 @@ import { ScoreLedgerDialog } from '@/components/ScoreLedgerDialog'
 import { useQuery } from '@tanstack/react-query'
 import { QK } from '@/lib/queryKeys'
 
-export function TodayControls({ d, refetch, isFetching }: {
+export function TodayControls({ d, refetch, isFetching, extra }: {
   d: TodayOverview
   /** 存完偏好要重取 —— 候选集变了 */
   refetch: () => Promise<unknown>
   isFetching: boolean
+  /**
+   * [R358] 挂在筛选条下面、**同一张卡里**的一块。用户: 「净值走势图和这两行收益
+   * 都融合到页面开头的第一个卡片里面」→「我是想合并到筛选的卡片里面」。
+   *
+   * **做成插槽而不是把成绩搬进来**: 这个组件管的是"看哪些票/什么门槛", 对模拟盘
+   * 的净值、月度收益一无所知, 也不该知道 —— 它当初立起来的理由就是**一处实现**
+   * (R347), 把某一页的数据结构焊进来, 下一个用它的页面就得先绕过这段。
+   * 插槽只承诺一件事: 这块东西长在同一张卡里, 与筛选条之间有条分隔线。
+   */
+  extra?: ReactNode
 }) {
   const [prefsOpen, setPrefsOpen] = useState(false)
   const [ledgerOpen, setLedgerOpen] = useState(false)   // [R133] 把握分体检弹窗
@@ -100,7 +110,11 @@ export function TodayControls({ d, refetch, isFetching }: {
 
   return (
     <>
-      <div className="flex flex-wrap items-center gap-2 rounded-card border border-border/60 bg-surface/40 px-4 py-2">
+      {/* [R358] 卡的外壳挪到这一层, 好让 `extra` 与筛选条**长在同一张卡里**。
+          里面那层只剩 flex 与内边距 —— 筛选条是横排的, 而 `extra` 是一整块,
+          塞进同一个 flex 容器会被当成又一个横排的项。 */}
+      <div className="rounded-card border border-border/60 bg-surface/40">
+      <div className="flex flex-wrap items-center gap-2 px-4 py-2">
         {/* [R40] 板块筛选。过滤在后端做 —— 前端筛的话会漏掉被 max_show 截掉的票,
             看到的"主板机会"是残缺的而你不会知道 */}
         <div className="flex items-center gap-1">
@@ -167,6 +181,8 @@ export function TodayControls({ d, refetch, isFetching }: {
             门槛
           </button>
         </div>
+      </div>
+      {extra && <div className="border-t border-border/40 px-4 py-3">{extra}</div>}
       </div>
       {prefsOpen && (
         <div className="flex flex-wrap items-center gap-x-5 gap-y-3 rounded-card border border-border/60 bg-base/40 px-4 py-3">

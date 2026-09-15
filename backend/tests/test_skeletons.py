@@ -31,16 +31,22 @@ def test_R351_骨架的形状跟着版面走():
     """**骨架与版面必须同步改。** 画出一个填不进东西的形状比直接转圈更糟 ——
     它先许诺了一个版面, 然后食言。(R340 那条同名守卫钉的是今日总览的两块,
     那一页没了; 立论搬到模拟盘, 对象换成「四格统计 + 一张曲线」。)
+
+    [R358] 净值图改成**默认收起**之后, 那块曲线骨架自己成了食言的那一个 ——
+    画一块 240px 的灰块, 数据到了那儿却是一条折叠条。所以这条守卫现在**反过来
+    钉它不在**。
     """
     code = code_of(FLIP)
     sk = code[code.index("function LoadingSkeleton"):]
     # 四格统计 —— 与 `Summary` 那一排同一套栅格
     assert "sm:grid-cols-4" in sk and "Array.from({ length: 4 }" in sk
-    # 一张曲线
-    assert "h-[240px]" in sk, "净值曲线那块骨架没了"
-    body = code[code.index("{d && !d.reason && ("):]
-    assert "<Summary d={d} />" in body and "<NavChart d={d} />" in body, \
-        "骨架画了这两块, 页面上就得真有这两块"
+    assert "h-[240px]" not in sk, \
+        "净值图已经默认收起了, 骨架还在画一块曲线大小的灰块 —— 先许诺再食言"
+    # 骨架画的东西页面上得真有。**`Summary` 现在挂在筛选卡的插槽上**
+    # (R358 用户: 「我是想合并到筛选的卡片里面」), 所以在整页里找, 不是只在
+    # `{d && !d.reason}` 那一段里找 —— 那一段现在没有它了。
+    assert "<Summary d={d} />" in code, "骨架画了四格统计, 页面上却没有 Summary"
+    assert "extra={summary}" in code, "Summary 没接到筛选卡上"
 
 
 def test_R324_决策台加载中画骨架行_不印自选为空():

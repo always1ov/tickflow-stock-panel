@@ -45,6 +45,8 @@ export const storage = {
   // [R355] 「手上这些」的展开状态。**默认展开** —— 见 FlipPaper 里那段说明:
   // 它是卖出那一侧唯一天天有位置的东西, 默认收起等于把 R338 做的事撤回去。
   flipMineOpen:         kv<boolean>('flip-mine-open'),
+  /** [R358] 净值走势图折起来没有 —— 默认收起 */
+  flipNavOpen:          kv<boolean>('flip-nav-open'),
   flipCapital:          kv<number>('flip-capital'),
   flipMaxPositions:     kv<number>('flip-max-positions'),
   flipYears:            kv<number>('flip-years'),
