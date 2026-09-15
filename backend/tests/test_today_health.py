@@ -172,30 +172,42 @@ def _page() -> str:
     return code_of("pages/Today.tsx")
 
 
-def test_R274_页面顶部有自检条():
-    page = _page()
-    assert "function TodayHealthBar" in page
-    assert "{!!d?.health && <TodayHealthBar h={d.health} />}" in page
+def _bar() -> str:
+    """[R341] 自检条从 `pages/Today.tsx` 拆成了独立组件 —— 模拟盘也要用它。
+
+    **下面那几条守的东西一个字没变**(正常时不渲染、陈数据要报、整块与少个标分开说、
+    措辞按交易日), 换的只是它们去哪个文件里找。
+    """
+    from tests.frontend_source import code_of
+    return code_of("components/today/TodayHealthBar.tsx")
+
+
+def test_R274_自检条被挂在页面上():
+    """组件存在不等于被挂上去了 —— 两页都得真的渲染它。"""
+    from tests.frontend_source import code_of
+
+    assert "export function TodayHealthBar" in _bar()
+    for page in ("pages/Today.tsx", "components/today/TodayDigest.tsx"):
+        code = code_of(page)
+        assert "<TodayHealthBar h=" in code, f"{page} 没把自检条挂上去"
+        assert "from '@/components/today/TodayHealthBar'" in code
 
 
 def test_R274_一切正常时不渲染任何东西():
     """常驻一条「运行正常」的绿条, 看两天就成了背景板 —— 真出问题那天照样被忽略。"""
-    page = _page()
-    body = page[page.index("function TodayHealthBar"):]
+    body = _bar()
     assert "if (h.ok && !stale) return null" in body
 
 
 def test_R274_陈数据也要报():
     """**这一条最阴**: 什么都没报错, 页面看起来完全正常, 而你在用几天前的数字做决定。"""
-    body = _page()
-    body = body[body.index("function TodayHealthBar"):]
+    body = _bar()
     assert "stale" in body and "h.stale_days" in body
 
 
 def test_R274_整块与少个标在界面上分开说():
     """分不开的话, 要么把小事报成大事、要么把大事说得像小事。"""
-    body = _page()
-    body = body[body.index("function TodayHealthBar"):]
+    body = _bar()
     assert "h.blocks.length" in body and "h.details.length" in body
     assert "不是「今天没有」" in body, "得说清空是因为算挂了, 不是今天真没有"
 
@@ -307,14 +319,20 @@ def test_R319_盘中开着实时时六十秒一刷():
     """`refetchInterval` 必须是**函数**, 而且同时看两件事: 后端说实时叠加层在
     (`live`)、现在在实时窗口里。缺一个都不对 —— 只看时段, 关着实时也会每分钟
     白算一次全量; 只看 live, 盘后叠加层残留时也会一直刷。"""
-    page = _page()
-    q = page[page.index("queryKey: QK.todayOverview"):]
-    q = q[:q.index("refetchOnWindowFocus")]
-    assert "refetchInterval: (query) =>" in q, "刷新间隔不是按状态算的函数"
-    assert "query.state.data?.live" in q, "没看后端的 live 标志"
-    assert "inRealtimeWindow()" in q, "没看现在是不是实时窗口"
-    assert "60_000" in q and "60 * 60 * 1000" in q, "两档节奏(60 秒 / 每小时)不全"
-    assert "from '@/lib/marketClock'" in page, "时段判断没走共用的市场时钟"
+    from tests.frontend_source import code_of
+
+    # [R341] 这条查询现在有**两处**调用方: 今日总览页, 与模拟盘底部那条浓缩带。
+    # **两处必须同一个节奏** —— 同一份数据两种刷新口径就是第二处产地, 而且会
+    # 表现成"两个页面上的同一个数字不一样", 极难查。所以这条守卫对两个文件都跑。
+    for rel in ("pages/Today.tsx", "components/today/TodayDigest.tsx"):
+        page = code_of(rel)
+        q = page[page.index("queryKey: QK.todayOverview"):]
+        q = q[:q.index("refetchOnWindowFocus")]
+        assert "refetchInterval: (query) =>" in q, f"{rel}: 刷新间隔不是按状态算的函数"
+        assert "?.live" in q, f"{rel}: 没看后端的 live 标志"
+        assert "inRealtimeWindow()" in q, f"{rel}: 没看现在是不是实时窗口"
+        assert "60_000" in q and "60 * 60 * 1000" in q, f"{rel}: 两档节奏不全"
+        assert "from '@/lib/marketClock'" in page, f"{rel}: 时段判断没走共用的市场时钟"
 
 
 def test_R319_两个实时开关都让今日总览重取():
@@ -355,7 +373,6 @@ def test_R319_市场时钟只有一处产地():
 def test_R319_健康条措辞跟着交易日口径走():
     """后端按交易日算了, 页面还写「距今 N 天」的话, 周一早上看到「1」会以为是
     自然日在数。措辞与口径必须一起换。"""
-    body = _page()
-    body = body[body.index("function TodayHealthBar"):]
+    body = _bar()
     assert "个交易日" in body, "健康条没说清是交易日"
     assert "距今 {h.stale_days} 天" not in body, "健康条还在说「距今 N 天」—— 那是自然日的说法"

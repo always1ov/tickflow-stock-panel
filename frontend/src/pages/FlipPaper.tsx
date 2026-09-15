@@ -38,6 +38,7 @@ import { useECharts } from '@/pages/backtest/charts/useECharts'
 import { cn } from '@/lib/cn'
 import { storage } from '@/lib/storage'
 import { refreshEvery, rhythmHint } from '@/lib/refreshRhythm'
+import { TodayDigest } from '@/components/today/TodayDigest'   // [R341] 底部补充带
 
 const CAPITAL_OPTIONS = [100_000, 500_000, 1_000_000, 5_000_000]
 const POSITION_OPTIONS = [3, 5, 10, 20]
@@ -162,6 +163,13 @@ export function FlipPaper() {
             <Skipped d={d} />
           </>
         )}
+
+        {/* [R341] 今日总览浓缩成一条摘要带挂在这儿当补充。用户: 「想把今日总览
+            里面的东西浓缩到模拟盘里面显示, 当作补充」「全都要, 尽可能节省空间」。
+            **本页原有的东西一个字没动** —— 这是一次纯插入, 位置也排在全部原有
+            内容之后: 版面顺序即重要性, 补充就该在补充的位置上。
+            它自己取数、自己折叠(默认收起, 收起时只占一行)。 */}
+        <TodayDigest />
 
         {/* 规则排在最后 —— 查证用的, 不该天天占首屏 */}
         {rules.data && <Rules r={rules.data} d={d} />}
