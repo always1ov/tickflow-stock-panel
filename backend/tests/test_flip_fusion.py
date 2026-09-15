@@ -379,8 +379,9 @@ def test_R356_把右边那片空地用上():
     多出来的宽度给了走势那一列。"""
     row = _row()
     assert "max-w-[72rem]" not in row, "还限着宽, 右边那片空地没用上"
-    # 六列: 标的 / 动作 / 名次 / 六态 / 走势 / 触发价
-    assert "grid-cols-[minmax(9rem,11rem)_4.5rem_3.5rem_minmax(7rem,9rem)_minmax(0,1fr)_auto]" in row, \
+    # 六列。[R360] 名次挪到了最前(用户: 「这列内容统一放到股票名称前面」):
+    #   名次 / 标的 / 动作 / 六态 / 走势 / 触发价
+    assert "grid-cols-[3.5rem_minmax(9rem,11rem)_4.5rem_minmax(7rem,9rem)_minmax(0,1fr)_auto]" in row, \
         "列宽变了 —— 定宽网格是行与行对齐的前提"
 
 
@@ -662,3 +663,35 @@ def test_R359_说清楚筛选不进回测():
     bar = code[code.index("function ParamBar({"):code.index("function MonthStrip({ months }")]
     assert bar.strip()
     assert "不进这条曲线" in bar, "没告诉读的人筛选不影响回测"
+
+
+# ── [R360] 名次挪到整行最前 ─────────────────────────────────────────────
+#
+# 用户: 「这列内容统一放到股票名称前面」。
+
+
+def test_R360_名次是整行第一格_排在标的前面():
+    """它回答的是「凭什么是这一只」—— **那个问题得在读到代码之前就摆在眼前**。
+
+    原来它夹在动作与六态中间: 眼睛先认票、再看要不要动手, 最后才补上理由。
+    现在名次先到, 一列扫下去就是一份从强到弱的名单。
+    """
+    row = _row()
+    i_rank = row.index("{c?.rank != null ? (")
+    i_sym = row.index("<SymbolCell symbol={r.symbol}")
+    i_act = row.index("r.act === 'buy' ? '买入' : '清仓'")
+    assert i_rank < i_sym < i_act, "名次 / 标的 / 动作 三者的次序不对"
+    # 列宽也得跟着挪 —— 只换 JSX 不换栅格, 名次会去占标的那 9~11rem,
+    # 而标的被挤进 3.5rem 里截成一两个字。**两处必须同时改**。
+    cols = row[row.index("grid-cols-["):row.index("] items-center")]
+    assert cols.startswith("grid-cols-[3.5rem_"), \
+        f"第一列不是名次那 3.5rem —— JSX 挪了栅格没挪: {cols}"
+
+
+def test_R360_名次空着时照样占住第一格():
+    """[R350 立论照搬] 空着不占位的话, 后面**所有**列整体左移一格 ——
+    而它现在是第一格, 错开的就不只是它后面几列, 是整行。"""
+    row = _row()
+    assert ") : <span />}" in row, "没名次时要留一个空占位"
+    # 空占位必须仍在第一格 —— 即在 SymbolCell 之前
+    assert row.index(") : <span />}") < row.index("<SymbolCell symbol={r.symbol}")

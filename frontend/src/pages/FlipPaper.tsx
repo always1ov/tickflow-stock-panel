@@ -569,7 +569,28 @@ function SignalRow({ r, c }: { r: FlipTodaySignal; c?: TodayOpportunity }) {
           ② 行高由 `min-h-[3.5rem]` 定死。名次那一格本身有三行高(名次/分/三条),
              而没进候选池的票只有两行字 —— **不定死的话, 行高就跟着"这只票有没有
              进候选池"变**, 一屏扫下去参差不齐。这正是用户说的第二件事。 */}
-      <div className="grid min-h-[3.5rem] grid-cols-[minmax(9rem,11rem)_4.5rem_3.5rem_minmax(7rem,9rem)_minmax(0,1fr)_auto] items-center gap-x-3 text-xs">
+      <div className="grid min-h-[3.5rem] grid-cols-[3.5rem_minmax(9rem,11rem)_4.5rem_minmax(7rem,9rem)_minmax(0,1fr)_auto] items-center gap-x-3 text-xs">
+        {/* [R345] 「名次」那一格整格移植自今日总览 —— 用户: 「这一列要移植」。
+            **不是只搬个数字**: 名次下面那三条维度条(红=趋势 45% / 蓝=量能 30% /
+            黄=位置 25%)才是它能被读懂的原因 —— 离开那三条颜色, 上面那个名次
+            就只是个号码, 说不出"为什么是这个名次"。
+            它**不是动作**: 拿不到名次的票照样在名单里, 只是排在本档末尾。
+            [R350] 这一格无论有没有都占住那 3.5rem —— 空着也要占位, 否则有名次的
+            行和没名次的行后面所有列全都错开。
+            [R360] **挪到标的前面, 成了整行的第一格**(用户: 「这列内容统一放到
+            股票名称前面」)。它原来夹在动作与六态之间, 而它回答的是「凭什么是
+            这一只」—— 那个问题得在读到代码之前就摆在眼前, 排在后面等于先认票
+            再补理由。 */}
+        {c?.rank != null ? (
+          <ScoreCell o={c} rank={c.rank} total={c.rank_total ?? 0} />
+        ) : actionable ? (
+          <span className="text-center text-[9px] leading-tight text-muted/60"
+                title="没过打分那三道硬门槛, 所以没有名次 —— 但它转折了, 该动手还是要动手">
+            没进
+            <br />候选池
+          </span>
+        ) : <span />}
+
         <span className="truncate">
           <SymbolCell symbol={r.symbol} name={r.name} />
         </span>
@@ -594,23 +615,6 @@ function SignalRow({ r, c }: { r: FlipTodaySignal; c?: TodayOpportunity }) {
             </span>
           )
         )}
-
-        {/* [R345] 「名次」那一格整格移植自今日总览 —— 用户: 「这一列要移植」。
-            **不是只搬个数字**: 名次下面那三条维度条(红=趋势 45% / 蓝=量能 30% /
-            黄=位置 25%)才是它能被读懂的原因 —— 离开那三条颜色, 上面那个名次
-            就只是个号码, 说不出"为什么是这个名次"。
-            它**不是动作**: 拿不到名次的票照样在名单里, 只是排在本档末尾。
-            [R350] 这一格无论有没有都占住那 3.5rem —— 空着也要占位, 否则有名次的
-            行和没名次的行后面所有列全都错开。 */}
-        {c?.rank != null ? (
-          <ScoreCell o={c} rank={c.rank} total={c.rank_total ?? 0} />
-        ) : actionable ? (
-          <span className="text-center text-[9px] leading-tight text-muted/60"
-                title="没过打分那三道硬门槛, 所以没有名次 —— 但它转折了, 该动手还是要动手">
-            没进
-            <br />候选池
-          </span>
-        ) : <span />}
 
         <span className="min-w-0 truncate text-[11px] text-secondary">
           {r.stage === 'flipped' && <>已转折 · 现在是{r.state_cn}</>}
