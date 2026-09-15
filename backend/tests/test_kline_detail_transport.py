@@ -221,12 +221,20 @@ def test_pro_tier_keeps_tickflow_minute_fallback(monkeypatch):
 
 
 def test_free_tier_skips_tickflow_index_minute_fallback(monkeypatch):
-    """[R326] 过去日期: 上游 0aa5f57c 起在碰数据源之前就快速失败。
+    """[R326→R348] 过去日期: 免费档不许去调 TickFlow。
 
-    这条守卫立的是「免费档不许去调 TickFlow」, 上游那次改动让它成立得更彻底
-    (连数据源都不碰了), 所以立论保留, 只把 source 的期望改成上游新的语义。
-    **但它从此不再覆盖原来那条路径了** —— 真正要守的"取数时不打 TickFlow"
-    由下面那条当日用例接手, 否则这条守卫会被上游的快速失败悄悄架空。
+    **立论三次没变, 期望值改了两次** —— 这条守卫的历史正好说明"钉立论不钉实现":
+
+      · 原本  过去日期会走到取数层, 免费档在那里被挡住, `source="none"`;
+      · R326  上游 `0aa5f57c` 改成在碰数据源之前就快速失败 → `source="not_today"`。
+              那次改动**让立论成立得更彻底, 却也把这条守卫架空了**(它不再经过
+              取数层), 所以当时补了一条当日用例去接管真正的那条路径;
+      · R348  上游 `881a0955` **把历史分时做成支持的了** —— `not_today` 收窄成
+              只对未来日期成立(并改名 `future`), 过去日期重新走取数层。
+              于是这条守卫**自己又活了过来**: 它现在真的在验"取数时不打 TickFlow",
+              `get_client.assert_not_called()` 才是它的主张, `source` 只是副产物。
+
+    期望值跟着上游走, 立论一个字没动。
     """
     get_client = MagicMock(side_effect=AssertionError("must not call TickFlow"))
     monkeypatch.setattr("app.services.preferences.get_minute_data_provider", lambda: "tickflow")
@@ -238,7 +246,9 @@ def test_free_tier_skips_tickflow_index_minute_fallback(monkeypatch):
     )
 
     assert response.status_code == 200
-    assert response.json()["source"] == "not_today", "非当日应在碰数据源之前就返回"
+    # 取数层返回空 —— 因为免费档被挡住了, 不是因为"非当日不给查"
+    assert response.json()["source"] == "none"
+    # **这一行才是主张**: 免费档一次都不许碰 TickFlow
     get_client.assert_not_called()
 
 

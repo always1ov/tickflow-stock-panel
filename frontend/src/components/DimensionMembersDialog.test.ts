@@ -1,6 +1,10 @@
+// [R348] 这个文件原来用 `node:test`, 而**项目里没有任何脚本会调用它** ——
+// 一个没人跑的测试, 守的东西等于没守。上游这次带进了 vitest(为它自己的
+// Indices.test.tsx), 顺手把这里换成同一个运行器, 并把 `pnpm test` 扩成跑全部,
+// 它才真正开始工作。断言库仍用 node:assert, 不为换运行器把断言也重写一遍。
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { test } from 'node:test'
+import { test } from 'vitest'
 
 const source = readFileSync(
   new URL('./DimensionMembersDialog.tsx', import.meta.url),
