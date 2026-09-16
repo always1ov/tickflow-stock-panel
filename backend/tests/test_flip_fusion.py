@@ -790,18 +790,37 @@ def test_R363_关键价位弹窗是一处实现_两页共用():
         assert "function LevelsDialog" not in code, f"{page} 自己又写了一份"
 
 
-def test_R363_标的与动作两格都能点_开的是同一个弹窗():
+def test_R364_两个可点的格子_各开各的表():
+    """[R363 → R364] 用户: 「还是别点买入了, 点「已转折 · 现在是自然回升」这样更合理」。
+
+    **两列点开的不是同一张表**, 这正是决策台 R51 立下的规矩:
+
+        标的那格   这只票现在贵不贵、关键价位在哪  → 关键价位(日 K)
+        六态那句   这个状态是怎么走到今天的        → 逐日复盘(趋势页)
+
+    R363 我把复盘那个入口挂在了**动作**那一格上, 还为此写了一整段"别让它看起来
+    像下单按钮"的辩解。用户直接把它挪开了 —— **要辩解才站得住的设计, 多半本来
+    就不该那么放**。挪到六态那句上反而更对得上内容。
+    """
     row = _signal_row()
-    assert row.count("onClick={() => onOpen(r.symbol, r.name)}") == 2, \
-        "不是两格可点 —— 用户说的是「这两列」"
-    # 两个入口各自包住哪一格: 标的那格包 SymbolCell, 动作那格包 actionable 那个三元
+    assert row.count("onClick={() => onOpen(r.symbol, r.name)}") == 1, "标的那格的入口不止一个"
+    assert row.count("onClick={() => onReview(r.symbol, r.name)}") == 1, "复盘入口不止一个"
     i_sym = row.index("<SymbolCell symbol={r.symbol}")
-    i_act = row.index("{actionable ? (")
-    clicks = [i for i in range(len(row))
-              if row.startswith("onClick={() => onOpen(r.symbol, r.name)}", i)]
-    assert len(clicks) == 2
-    assert clicks[0] < i_sym < clicks[1] < i_act, \
-        "两个入口没分别落在标的与动作那两格上"
+    i_state = row.index("已转折 · 现在是")
+    i_open = row.index("onClick={() => onOpen(r.symbol, r.name)}")
+    i_review = row.index("onClick={() => onReview(r.symbol, r.name)}")
+    assert i_open < i_sym, "关键价位那个入口没包住标的那一格"
+    assert i_sym < i_review < i_state, "复盘那个入口没包住六态那一句"
+
+
+def test_R364_两个入口开的不是同一个弹窗():
+    """合成一个弹窗的话, 这两列就白分了 —— 那正是 R51 当初要挡的事。"""
+    code = code_of(FLIP)
+    assert "<LevelsDialog" in code and "<StockReviewDialog" in code
+    assert 'tab="trend"' in code, "复盘没落在趋势状态那一页 —— 六态那句问的是状态怎么走的"
+    # 两个弹窗**各存各的 state**: 合成一个带 kind 的, "开着哪一个"与"开的是哪只票"
+    # 就绑死在一起, 而它们本来是两条互不相干的路
+    assert "const [levels, setLevels]" in code and "const [review, setReview]" in code
 
 
 def test_R363_弹窗挂在这一层_不是每行一个():
@@ -822,19 +841,26 @@ def test_R363_点开是弹窗_不是跳走():
         assert leave not in row, f"信号行上出现了跳页: {leave}"
 
 
-def test_R363_动作徽标没被做成看起来能下单的东西():
-    """**这一格里印着「买入」两个字。**
+def test_R364_动作那一格根本不可点():
+    """[R363 → R364] **这条守卫变强了, 不是被放松。**
 
-    把它做成看起来能按的按钮, 读的人第一反应会是"点它就下单" —— 而这一页从来
-    不下单, 也永远不会。所以只给鼠标指针与一句 title, 不给任何按钮外观。
+    R363 钉的是「动作那一格可以点, 但不许长得像个下单按钮」—— 要靠一句 title
+    和"不加按钮外观"撑着。用户看过实机后直接把入口挪走了, 于是现在钉的是最强的
+    那一版: **它根本不可点**。
 
-    (R329 那条铁律本身另有守卫钉着: 能不能出手只由 `actionable` 决定。这一条钉的
-    是**别让一个查看入口长得像一个下单按钮**。)
+    理由没变, 只是更彻底: 这一格里印着「买入」两个字, 任何可点的迹象都在暗示
+    "点它就下单" —— 而这一页从来不下单, 也永远不会。
+
+    (R329 那条铁律本身另有守卫: 能不能出手只由 `actionable` 决定。这一条钉的是
+    **别让它连"像个动作"都不许**。)
     """
     row = _signal_row()
     i_act = row.index("{actionable ? (")
-    btn = row[row.rindex("<button", 0, i_act):i_act]
-    assert btn.strip()
-    assert "不会下任何单" in btn, "没把「点开不是下单」说出来"
-    for chrome in ("border", "bg-", "rounded", "hover:bg", "shadow"):
-        assert chrome not in btn, f"动作那一格被加上了按钮外观: {chrome}"
+    # 边界取**六态那一格的 `<button` 起始**, 不是那句话本身 —— 那句话在按钮
+    # 里面, 拿它当界会把六态自己的 `<button ... cursor-pointer>` 一起圈进来,
+    # 于是这条守卫会指着隔壁那一格喊"动作又能点了"。(第一版就是这么红的。)
+    i_next = row.index('<button type="button" onClick={() => onReview')
+    seg = row[i_act:i_next]
+    assert seg.strip() and "'买入'" in seg, "切出来的不是动作那一格"
+    for clickable in ("<button", "onClick", "cursor-pointer", "role=\"button\""):
+        assert clickable not in seg, f"动作那一格又变得能点了: {clickable}"

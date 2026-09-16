@@ -44,6 +44,7 @@ import { ScoreCell } from '@/components/today/ScoreCell'             // [R345] �
 import { TrendCell } from '@/components/today/TrendCell'             // [R349] 走势那一格
 import { TodayControls } from '@/components/today/TodayControls'     // [R347] 门槛/体检/筛选
 import { LevelsDialog } from '@/components/stock-analysis/LevelsDialog' // [R363] 点标的弹日 K
+import { StockReviewDialog } from '@/components/stock-analysis/StockReviewDialog' // [R364] 点动作弹复盘
 
 /** [R343] 姿态四档的配色 —— 与今日总览那张卡同一套语义, 不另立一份说法。 */
 const POSTURE_TONE: Record<string, string> = {
@@ -366,6 +367,16 @@ function TodaySignals({ rows, conviction }: {
    */
   const [levels, setLevels] = useState<{ symbol: string; name: string } | null>(null)
   const openLevels = (symbol: string, name: string) => setLevels({ symbol, name })
+  /**
+   * [R364] 逐日复盘弹窗 —— 动作那一格点开的就是它(用户: 「买入弹出的应该是
+   * 这个弹窗」)。**与关键价位那个各是各的**, 两列点开不是同一张表(决策台 R51)。
+   *
+   * 两个弹窗**各存各的 state**, 不合成一个带 kind 的: 合起来的话"当前开着哪一个"
+   * 与"开的是哪只票"就绑死在一起, 而它们本来就是两条互不相干的路; 更要紧的是
+   * 那种写法下, 哪天想让两个都能开着(比如对着复盘看 K 线)要整个重写。
+   */
+  const [review, setReview] = useState<{ symbol: string; name: string } | null>(null)
+  const openReview = (symbol: string, name: string) => setReview({ symbol, name })
   // [R331] 用户: 「今天该挂什么单显得太多了, 需要折叠展开的功能」。
   //
   // **折叠边界落在「今天是否可能成交」上**, 不是随便砍前 N 条:
@@ -466,7 +477,8 @@ function TodaySignals({ rows, conviction }: {
         <>
           {ordered.length > 0 && (
             <div className="divide-y divide-border/30">
-              {ordered.map((r) => <SignalRow key={r.symbol} r={r} c={conviction.get(r.symbol)} onOpen={openLevels} />)}
+              {ordered.map((r) => <SignalRow key={r.symbol} r={r} c={conviction.get(r.symbol)}
+                                        onOpen={openLevels} onReview={openReview} />)}
             </div>
           )}
           {ordered.length === 0 && (
@@ -502,7 +514,8 @@ function TodaySignals({ rows, conviction }: {
               </button>
               {mineOpen && (
                 <div className="divide-y divide-border/30">
-                  {mineSorted.map((r) => <SignalRow key={r.symbol} r={r} c={conviction.get(r.symbol)} onOpen={openLevels} />)}
+                  {mineSorted.map((r) => <SignalRow key={r.symbol} r={r} c={conviction.get(r.symbol)}
+                                        onOpen={openLevels} onReview={openReview} />)}
                 </div>
               )}
             </>
@@ -524,7 +537,8 @@ function TodaySignals({ rows, conviction }: {
               {watchOpen && (
                 /* 限高 + 自己滚: 盯着的票可能几十只, 让它把整页顶长等于没折叠 */
                 <div className="max-h-64 divide-y divide-border/30 overflow-y-auto">
-                  {idleSorted.map((r) => <SignalRow key={r.symbol} r={r} c={conviction.get(r.symbol)} onOpen={openLevels} />)}
+                  {idleSorted.map((r) => <SignalRow key={r.symbol} r={r} c={conviction.get(r.symbol)}
+                                        onOpen={openLevels} onReview={openReview} />)}
                 </div>
               )}
             </>
@@ -536,6 +550,14 @@ function TodaySignals({ rows, conviction }: {
         一页只挂这一个: 同一时刻只可能开着一个弹窗。 */}
     <LevelsDialog symbol={levels?.symbol ?? null} name={levels?.name ?? ''}
                   onClose={() => setLevels(null)} />
+    {/* [R364] 逐日复盘 —— 与决策台「趋势」列点开的**是同一个组件**。
+        `tab="trend"` 落在趋势状态那一页: 动作那一格问的是「这个买入怎么来的」,
+        答案是那张逐日表上的转折与买卖, 不是三档结论。
+        它的 `symbol` 是必填的, 所以按决策台那边同一个写法条件渲染。 */}
+    {review && (
+      <StockReviewDialog symbol={review.symbol} name={review.name} tab="trend"
+                         onClose={() => setReview(null)} />
+    )}
     </>
   )
 }
@@ -543,10 +565,12 @@ function TodaySignals({ rows, conviction }: {
 /** [R339] 离清仓线多近才算"贴着了"。**只用来上色, 不产生任何动作。** */
 const NEAR_EXIT = 0.02
 
-function SignalRow({ r, c, onOpen }: {
+function SignalRow({ r, c, onOpen, onReview }: {
   r: FlipTodaySignal; c?: TodayOpportunity
-  /** [R363] 点标的或动作那一格 —— 弹关键价位, 不跳页 */
+  /** [R363] 点标的那一格 —— 弹关键价位(日 K + 压力支撑), 不跳页 */
   onOpen: (symbol: string, name: string) => void
+  /** [R364] 点动作那一格 —— 弹逐日复盘。**与上面不是同一张表**, 见那一格的注释 */
+  onReview: (symbol: string, name: string) => void
 }) {
   const actionable = r.stage === 'flipped' && !!r.act
   // [R349 → R356] 「走势」那一格整格移植过来(用户: 「这一列也要有」)。
@@ -623,16 +647,6 @@ function SignalRow({ r, c, onOpen }: {
           <SymbolCell symbol={r.symbol} name={r.name} />
         </button>
 
-        {/* [R363] 动作那一格也可点, 弹的是**同一个**关键价位弹窗。
-
-            **徽标的长相一个像素没动, 也没有加任何按钮外观。** 这一格里印着
-            「买入」两个字, 把它做成看起来能按的东西, 读的人第一反应会是"点它就
-            下单" —— 而这一页从来不下单, 也永远不会。所以只给鼠标指针与一句
-            title, 说清点开是看图, 不是下单。R329 那条铁律没有因此松动一毫米:
-            能不能出手仍然只由 `actionable` 决定, 这里只是个查看入口。 */}
-        <button type="button" onClick={() => onOpen(r.symbol, r.name)}
-                title="看日 K 与关键价位 —— 这里不会下任何单"
-                className="cursor-pointer text-left">
         {actionable ? (
           <span className={cn('inline-flex items-center justify-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium',
             r.act === 'buy' ? 'bg-bull/15 text-bull' : 'bg-bear/15 text-bear')}>
@@ -653,9 +667,26 @@ function SignalRow({ r, c, onOpen }: {
             </span>
           )
         )}
-        </button>
 
-        <span className="min-w-0 truncate text-[11px] text-secondary">
+        {/* [R364] **六态那句可点, 弹逐日复盘。**
+            用户: 「还是别点买入了, 点「已转折 · 现在是自然回升」这样更合理」。
+
+            R363 我把这个入口挂在了动作那一格上, 并为此写了一整段"别让它看起来
+            像下单按钮"的辩解 —— 用户直接把它挪开了。**要辩解才站得住的设计,
+            多半本来就不该那么放**: 一个印着「买入」两个字的格子, 无论加多少
+            title 都在暗示点它会下单。
+
+            挪到这里反而**更对得上内容**: 这一格印的就是「已转折 · 现在是自然
+            回升」, 而复盘弹窗那张逐日表正是把每一天的六态与转折排开 —— 点一句
+            状态, 看这个状态是怎么走到今天的。这也正是决策台 R51 的规矩:
+
+                标的那格   这只票现在贵不贵、关键价位在哪  → 关键价位(日 K)
+                六态那句   这个状态是怎么走到今天的        → 逐日复盘(趋势页)
+
+            **动作那一格因此退回不可点**, 一个像素没动。 */}
+        <button type="button" onClick={() => onReview(r.symbol, r.name)}
+                title={`看 ${r.name} 的逐日复盘 —— 这个状态是怎么走到今天的`}
+                className="min-w-0 cursor-pointer truncate text-left text-[11px] text-secondary transition-colors hover:text-sky-300">
           {r.stage === 'flipped' && <>已转折 · 现在是{r.state_cn}</>}
           {r.stage === 'crossing' && (
             <>按现价会转折 —— <b className="text-warning">收盘还站在这边才算数</b></>
@@ -669,7 +700,7 @@ function SignalRow({ r, c, onOpen }: {
                 </b>
               : <>还差 {(Math.abs(r.gap_pct) * 100).toFixed(1)}% 到触发价</>
           )}
-        </span>
+        </button>
 
         {/* [R356] 走势并进同一行的第五列 —— 原来它是第二行, 害得行高随内容变。
             没进候选池的票这一格是空的, 但**格子照样占住**, 行高不受影响。 */}
