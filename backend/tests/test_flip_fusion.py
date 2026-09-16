@@ -753,3 +753,88 @@ def test_R362_并成一行之后提示语没说假话():
     row = _stat_row()
     assert "下面那一排" not in row, "提示语还在指一个不存在的下一排"
     assert "同一行右边那四格" in row, "没告诉读的人整段成绩现在在哪儿"
+
+
+# ── [R363] 标的与动作两格可点, 弹关键价位 ───────────────────────────────
+#
+# 用户: 「点击这两列都要能像个股分析页面那样弹出弹窗」。
+
+LEVELS = "components/stock-analysis/LevelsDialog.tsx"
+SA = "pages/StockAnalysis.tsx"
+
+
+def test_R363_关键价位弹窗是一处实现_两页共用():
+    """它原来是 `pages/StockAnalysis.tsx` 里的私有组件(R28)。
+
+    模拟盘要用它 —— **不在那边抄一份**: 这个弹窗里有放大态、Esc 关闭、退场动画、
+    现价标签、`bare` 那一层去框。抄一份必然漂, 而漂的表现是「两个页面点同一只票
+    弹出来的东西不一样」, 两边都不报错。
+    """
+    import re
+
+    dlg = code_of(LEVELS)
+    assert "export function LevelsDialog" in dlg
+    # 那几样真本事都得跟着搬过来, 不是搬了个壳。
+    #
+    # **按词边界匹配, 不是裸 `in`。** 裸 `in` 挡不住改名: `setMaximizedX` 仍然
+    # 含着 `setMaximized`, 断言被它喂饱 —— 变异电池当场打绿两条。这与 R359 那次
+    # 的 `xtitleExtra` 是同一族毛病:**锚是别人的子串**, 本会话第二次。
+    for feat in ("setMaximized", "StockLevelsPanel", "StockLevelsPriceTag",
+                 "AnimatePresence"):
+        assert re.search(rf"\b{feat}\b", dlg), f"搬过来的时候丢了: {feat}"
+    assert "'Escape'" in dlg, "Esc 关闭丢了"
+
+    for page in (FLIP, SA):
+        code = code_of(page)
+        assert "from '@/components/stock-analysis/LevelsDialog'" in code, f"{page} 没复用那一处"
+        assert "function LevelsDialog" not in code, f"{page} 自己又写了一份"
+
+
+def test_R363_标的与动作两格都能点_开的是同一个弹窗():
+    row = _signal_row()
+    assert row.count("onClick={() => onOpen(r.symbol, r.name)}") == 2, \
+        "不是两格可点 —— 用户说的是「这两列」"
+    # 两个入口各自包住哪一格: 标的那格包 SymbolCell, 动作那格包 actionable 那个三元
+    i_sym = row.index("<SymbolCell symbol={r.symbol}")
+    i_act = row.index("{actionable ? (")
+    clicks = [i for i in range(len(row))
+              if row.startswith("onClick={() => onOpen(r.symbol, r.name)}", i)]
+    assert len(clicks) == 2
+    assert clicks[0] < i_sym < clicks[1] < i_act, \
+        "两个入口没分别落在标的与动作那两格上"
+
+
+def test_R363_弹窗挂在这一层_不是每行一个():
+    """三档几十上百行, 每行各挂一个就是几十上百个常驻的 AnimatePresence 与
+    Esc 监听 —— 而同一时刻只可能开着一个。"""
+    code = code_of(FLIP)
+    assert code.count("<LevelsDialog") == 1, "弹窗挂了不止一处"
+    row = _signal_row()
+    assert "<LevelsDialog" not in row, "弹窗挂进了每一行"
+    seg = code[code.index("function TodaySignals"):]
+    assert "<LevelsDialog" in seg, "弹窗没挂在 TodaySignals 这一层"
+
+
+def test_R363_点开是弹窗_不是跳走():
+    """跳走之后回来, 折叠状态、滚动位置、这一屏的上下文全没了。"""
+    row = _signal_row()
+    for leave in ("navigate(", "href=", "window.open", "/stock-analysis?symbol="):
+        assert leave not in row, f"信号行上出现了跳页: {leave}"
+
+
+def test_R363_动作徽标没被做成看起来能下单的东西():
+    """**这一格里印着「买入」两个字。**
+
+    把它做成看起来能按的按钮, 读的人第一反应会是"点它就下单" —— 而这一页从来
+    不下单, 也永远不会。所以只给鼠标指针与一句 title, 不给任何按钮外观。
+
+    (R329 那条铁律本身另有守卫钉着: 能不能出手只由 `actionable` 决定。这一条钉的
+    是**别让一个查看入口长得像一个下单按钮**。)
+    """
+    row = _signal_row()
+    i_act = row.index("{actionable ? (")
+    btn = row[row.rindex("<button", 0, i_act):i_act]
+    assert btn.strip()
+    assert "不会下任何单" in btn, "没把「点开不是下单」说出来"
+    for chrome in ("border", "bg-", "rounded", "hover:bg", "shadow"):
+        assert chrome not in btn, f"动作那一格被加上了按钮外观: {chrome}"

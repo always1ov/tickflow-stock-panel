@@ -43,6 +43,7 @@ import { TodayHealthBar } from '@/components/today/TodayHealthBar'   // [R343] �
 import { ScoreCell } from '@/components/today/ScoreCell'             // [R345] 名次那一格
 import { TrendCell } from '@/components/today/TrendCell'             // [R349] 走势那一格
 import { TodayControls } from '@/components/today/TodayControls'     // [R347] 门槛/体检/筛选
+import { LevelsDialog } from '@/components/stock-analysis/LevelsDialog' // [R363] 点标的弹日 K
 
 /** [R343] 姿态四档的配色 —— 与今日总览那张卡同一套语义, 不另立一份说法。 */
 const POSTURE_TONE: Record<string, string> = {
@@ -353,6 +354,18 @@ function TodaySignals({ rows, conviction }: {
   rows: FlipTodaySignal[]
   conviction: Map<string, TodayOpportunity>
 }) {
+  /**
+   * [R363] 关键价位弹窗。用户: 「点击这两列都要能像个股分析页面那样弹出弹窗」。
+   *
+   * **弹窗挂在这一层, 不是每行一个。** 三档几十上百行, 每行各挂一个
+   * `<LevelsDialog>` 就是几十上百个常驻的 `AnimatePresence` 与 Esc 监听 ——
+   * 而同一时刻只可能开着一个。行只负责报"点了谁"。
+   *
+   * `null` = 没开。弹窗常驻挂载、由 symbol 是否为 null 驱动, 关闭时退场动画
+   * 才播得完(这是那个组件自己的约定, 不是这里的选择)。
+   */
+  const [levels, setLevels] = useState<{ symbol: string; name: string } | null>(null)
+  const openLevels = (symbol: string, name: string) => setLevels({ symbol, name })
   // [R331] 用户: 「今天该挂什么单显得太多了, 需要折叠展开的功能」。
   //
   // **折叠边界落在「今天是否可能成交」上**, 不是随便砍前 N 条:
@@ -432,6 +445,7 @@ function TodaySignals({ rows, conviction }: {
   const mineNear = mine.filter((r) => r.gap_pct != null && Math.abs(r.gap_pct) <= NEAR_EXIT).length
 
   return (
+    <>
     <section className="overflow-hidden rounded-card border border-border/60 bg-surface/40">
       <SectionHead
         title="今天该挂什么单"
@@ -452,7 +466,7 @@ function TodaySignals({ rows, conviction }: {
         <>
           {ordered.length > 0 && (
             <div className="divide-y divide-border/30">
-              {ordered.map((r) => <SignalRow key={r.symbol} r={r} c={conviction.get(r.symbol)} />)}
+              {ordered.map((r) => <SignalRow key={r.symbol} r={r} c={conviction.get(r.symbol)} onOpen={openLevels} />)}
             </div>
           )}
           {ordered.length === 0 && (
@@ -488,7 +502,7 @@ function TodaySignals({ rows, conviction }: {
               </button>
               {mineOpen && (
                 <div className="divide-y divide-border/30">
-                  {mineSorted.map((r) => <SignalRow key={r.symbol} r={r} c={conviction.get(r.symbol)} />)}
+                  {mineSorted.map((r) => <SignalRow key={r.symbol} r={r} c={conviction.get(r.symbol)} onOpen={openLevels} />)}
                 </div>
               )}
             </>
@@ -510,7 +524,7 @@ function TodaySignals({ rows, conviction }: {
               {watchOpen && (
                 /* 限高 + 自己滚: 盯着的票可能几十只, 让它把整页顶长等于没折叠 */
                 <div className="max-h-64 divide-y divide-border/30 overflow-y-auto">
-                  {idleSorted.map((r) => <SignalRow key={r.symbol} r={r} c={conviction.get(r.symbol)} />)}
+                  {idleSorted.map((r) => <SignalRow key={r.symbol} r={r} c={conviction.get(r.symbol)} onOpen={openLevels} />)}
                 </div>
               )}
             </>
@@ -518,13 +532,22 @@ function TodaySignals({ rows, conviction }: {
         </>
       )}
     </section>
+    {/* [R363] 与个股分析页**同一个组件** —— 那边点标的弹的就是它(R28)。
+        一页只挂这一个: 同一时刻只可能开着一个弹窗。 */}
+    <LevelsDialog symbol={levels?.symbol ?? null} name={levels?.name ?? ''}
+                  onClose={() => setLevels(null)} />
+    </>
   )
 }
 
 /** [R339] 离清仓线多近才算"贴着了"。**只用来上色, 不产生任何动作。** */
 const NEAR_EXIT = 0.02
 
-function SignalRow({ r, c }: { r: FlipTodaySignal; c?: TodayOpportunity }) {
+function SignalRow({ r, c, onOpen }: {
+  r: FlipTodaySignal; c?: TodayOpportunity
+  /** [R363] 点标的或动作那一格 —— 弹关键价位, 不跳页 */
+  onOpen: (symbol: string, name: string) => void
+}) {
   const actionable = r.stage === 'flipped' && !!r.act
   // [R349 → R356] 「走势」那一格整格移植过来(用户: 「这一列也要有」)。
   //
@@ -591,10 +614,25 @@ function SignalRow({ r, c }: { r: FlipTodaySignal; c?: TodayOpportunity }) {
           </span>
         ) : <span />}
 
-        <span className="truncate">
+        {/* [R363] 标的可点 —— 弹关键价位(日 K + 压力支撑 + 六态趋势条),
+            与个股分析页点标的弹出来的**是同一个组件**(R28 那一个, 已摘成共用)。
+            不跳页: 跳走之后回来, 折叠状态、滚动位置、这一屏的上下文全没了。 */}
+        <button type="button" onClick={() => onOpen(r.symbol, r.name)}
+                title={`看 ${r.name} 的日 K 与关键价位`}
+                className="cursor-pointer truncate text-left transition-colors hover:text-sky-300">
           <SymbolCell symbol={r.symbol} name={r.name} />
-        </span>
+        </button>
 
+        {/* [R363] 动作那一格也可点, 弹的是**同一个**关键价位弹窗。
+
+            **徽标的长相一个像素没动, 也没有加任何按钮外观。** 这一格里印着
+            「买入」两个字, 把它做成看起来能按的东西, 读的人第一反应会是"点它就
+            下单" —— 而这一页从来不下单, 也永远不会。所以只给鼠标指针与一句
+            title, 说清点开是看图, 不是下单。R329 那条铁律没有因此松动一毫米:
+            能不能出手仍然只由 `actionable` 决定, 这里只是个查看入口。 */}
+        <button type="button" onClick={() => onOpen(r.symbol, r.name)}
+                title="看日 K 与关键价位 —— 这里不会下任何单"
+                className="cursor-pointer text-left">
         {actionable ? (
           <span className={cn('inline-flex items-center justify-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium',
             r.act === 'buy' ? 'bg-bull/15 text-bull' : 'bg-bear/15 text-bear')}>
@@ -615,6 +653,7 @@ function SignalRow({ r, c }: { r: FlipTodaySignal; c?: TodayOpportunity }) {
             </span>
           )
         )}
+        </button>
 
         <span className="min-w-0 truncate text-[11px] text-secondary">
           {r.stage === 'flipped' && <>已转折 · 现在是{r.state_cn}</>}

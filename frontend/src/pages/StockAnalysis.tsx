@@ -1,14 +1,12 @@
 import { useState, useEffect } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import { Sparkles, LineChart, History as HistoryIcon, Loader2, Bell, X, Maximize2, Minimize2, LocateFixed } from 'lucide-react'
+import { Sparkles, History as HistoryIcon, Loader2, Bell, LocateFixed } from 'lucide-react'
 import { PageHeader } from '@/components/PageHeader'
 import { StockFinancialSearch } from '@/components/financials/StockFinancialSearch'
 import { StockPreviewDialog } from '@/components/StockPreviewDialog'
 import { PriceAlertDialog } from '@/components/stock-analysis/PriceAlertDialog'
-import { StockLevelsPanel, StockLevelsPriceTag } from '@/components/stock-analysis/StockLevelsPanel'
+// [fork R363] 关键价位弹窗摘成了共用组件 —— 模拟盘也点标的弹它, 不抄第二份
+import { LevelsDialog } from '@/components/stock-analysis/LevelsDialog'
 import { WatchlistDecisionBoard } from '@/components/stock-analysis/WatchlistDecisionBoard'
-import { cn } from '@/lib/cn'
-import { useDialogBackdrop } from '@/lib/useDialogBackdrop'
 import { useLastStock } from '@/lib/useLastStock'
 import { toast } from '@/components/Toast'
 import {
@@ -223,78 +221,6 @@ export function StockAnalysis() {
 // 决策台占满整页后, 关键价位不再内联切换, 而是弹窗查看: 列表不会被推走,
 // 看完一只关掉即可继续扫下一只。动效/尺寸/可放大都对齐个股日 K 详情弹窗
 // (StockPreviewDialog), 两个弹窗手感一致, 不会一个丝滑一个生硬。
-function LevelsDialog({ symbol, name, onClose }: { symbol: string | null; name: string; onClose: () => void }) {
-  const [maximized, setMaximized] = useState(false)
-  const backdrop = useDialogBackdrop(onClose)
-
-  // Esc 关闭 —— 弹窗高频开关, 键盘退出比找关闭按钮快
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
-
-  // 关掉时重置放大态, 下次开回到常规尺寸
-  useEffect(() => { if (!symbol) setMaximized(false) }, [symbol])
-
-  return (
-    <AnimatePresence>
-      {symbol && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-            {...backdrop}
-          />
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 12 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.97, y: 8 }}
-            transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-            className={cn(
-              'relative rounded-card border border-border bg-base shadow-2xl overflow-hidden flex flex-col transition-ui duration-expand ease-smooth',
-              maximized ? 'w-screen h-screen max-w-none max-h-none' : 'w-[92vw] max-w-[1100px] max-h-[95vh]',
-            )}
-          >
-            {/* 顶栏: 与个股日 K 弹窗同款 —— 代码 + 名称在左, 行情摘要与操作在右 */}
-            <div className="flex shrink-0 items-center justify-between gap-3 px-4 py-3 sm:px-5">
-              <div className="flex min-w-0 items-center gap-2">
-                <LineChart className="h-4 w-4 shrink-0 text-sky-400" />
-                <span className="shrink-0 font-mono text-sm font-medium text-foreground">{symbol}</span>
-                {name && <span className="truncate text-xs text-muted">{name}</span>}
-              </div>
-              <div className="flex shrink-0 items-center gap-2">
-                <StockLevelsPriceTag symbol={symbol} />
-                <button
-                  onClick={() => setMaximized(v => !v)}
-                  title={maximized ? '缩小' : '放大'}
-                  className="rounded-md p-1 text-muted transition-colors hover:bg-elevated hover:text-foreground"
-                >
-                  {maximized ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
-                </button>
-                <button
-                  onClick={onClose}
-                  title="关闭(Esc)"
-                  className="rounded-md p-1 text-muted transition-colors hover:bg-elevated hover:text-foreground"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-            <div className="flex-1 overflow-auto px-4 pb-4 sm:px-5">
-              {/* bare: 去掉内层卡片外框与标题条 —— 弹窗里再套一层框正是"辣眼睛"的来源 */}
-              <StockLevelsPanel symbol={symbol} bare height={maximized ? 720 : 520} />
-            </div>
-          </motion.div>
-        </div>
-      )}
-    </AnimatePresence>
-  )
-}
-
 // ===== 二次确认弹窗 =====
 function ConfirmModal({ report, onView, onRedo, onClose }: {
   report: { id: string; created_at: string; focus: string }
