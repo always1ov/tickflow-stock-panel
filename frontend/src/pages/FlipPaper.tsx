@@ -27,7 +27,7 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { ChevronDown, Eye, TrendingDown, TrendingUp, Wallet } from 'lucide-react'
+import { ChevronDown, Eye, RefreshCw, TrendingDown, TrendingUp, Wallet } from 'lucide-react'
 import { api, type FlipOrder, type FlipPaper as FlipPaperData, type FlipRules,
   type FlipTodaySignal, type TodayOpportunity } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
@@ -176,6 +176,23 @@ export function FlipPaper() {
   // **那正是"打分自己选票"**, 而这套系统里选票这件事只归六态。打分的位置在它后面,
   // 不在它旁边。守卫直接钉"`rows` 只能是后端给的那份, 前端不许合成"。
 
+  /**
+   * [R365] 手动刷新。用户: 「除了自动定时我还要手动按钮有时候我想看实时情况会点一下」。
+   *
+   * **自动那一档一个字没动**(盘中 5 分钟 / 盘后 1 小时, `refreshEvery('derived')`)
+   * —— 这个按钮是补一条**当场要看**的路, 不是替掉节奏。
+   *
+   * **两个查询一起重取。** 这一页的数字来自两份互不相干的请求: 模拟盘自己那份
+   * (回测 + 今日信号, 带实时叠加层)与今日总览那份(打分 / 多空比 / 主线 / 自检条)。
+   * 只刷其中一个的话, 按钮说的是"刷新"而实际只刷了半页 —— 而另外半页看上去
+   * 也没坏, 没有任何东西会提示你它是旧的。
+   *
+   * **在飞就禁用。** 模拟盘那一趟是几百只票的六态 + 一整轮回测, 秒级。不禁的话
+   * 连点几下就是几趟全量重算堆在后端。
+   */
+  const refreshing = q.isFetching || today.isFetching
+  const refreshAll = () => { void q.refetch(); void today.refetch() }
+
   // [R358] 成绩那一块并进筛选卡 —— 先在这里算好, 两条渲染路径共用同一个
   // (筛选条在 / 不在)。跑不动时 `reason` 那条横幅另有位置, 这里给 null。
   const summary = d && !d.reason ? <Summary d={d} /> : null
@@ -252,6 +269,22 @@ export function FlipPaper() {
             </>
           )
           : `非真实资金 · 只按六态转折买卖 · ${rhythmHint('derived')}`}
+        // [R365] 手动刷新 —— 副标题那句说的是「它自己什么时候刷」, 这个按钮
+        // 回答的是「我现在就要刷」。两件事挨着放。
+        // (标签之间不能用 `{/* */}`, 那是子节点的写法 —— 这里要用 `//`,
+        //  与上面 titleExtra / subtitle 那两段注释同一个写法。)
+        right={
+          <button
+            type="button"
+            onClick={refreshAll}
+            disabled={refreshing}
+            title="立刻重取一次(模拟盘 + 打分两份一起) —— 自动刷新的节奏不受影响"
+            className="inline-flex items-center gap-1 rounded-btn border border-border bg-base px-2.5 py-1 text-[11px] text-muted transition-colors cursor-pointer hover:text-foreground disabled:opacity-60"
+          >
+            <RefreshCw className={cn('h-3 w-3', refreshing && 'animate-spin')} />
+            {refreshing ? '刷新中' : '刷新'}
+          </button>
+        }
       />
 
       <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-3 pb-4 pt-3 lg:px-4">

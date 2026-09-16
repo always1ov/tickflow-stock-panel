@@ -620,7 +620,12 @@ def test_R359_参数条不在页头了_在卡里():
     head = code[code.index("<PageHeader"):code.index('<div className="min-h-0 flex-1')]
     assert head.strip()
     assert "NumberField" not in head, "参数框还留在页头"
-    assert "right={" not in head, "页头右槽还在 —— 里面那三个框该搬走了"
+    # [R365] 原来这儿还写着 `assert "right={" not in head` —— **那是禁了整个右槽,
+    # 而这条守卫要护的是「那三个输入框不在页头」**。R365 往右槽放了个手动刷新
+    # 按钮(用户点的名), 守卫因此红了, 而它红得没有道理: 一个刷新按钮不是参数框。
+    # 锚太宽的另一个方向 —— 禁得比该禁的多。改钉真正的性质: 右槽里不许有输入。
+    for inp in ("<input", "NumberField", "onChange="):
+        assert inp not in head, f"页头右槽里出现了输入: {inp}"
     # 标题那一行**留在页头**, 这是用户点的名(「标题行留在外面」)。
     # 锚带上行首的换行与缩进: 光写 `titleExtra={w && (` 的话, 改名成
     # `xtitleExtra=` 照样含着这段, 断言过得去(变异电池当场打绿)。
@@ -864,3 +869,62 @@ def test_R364_动作那一格根本不可点():
     assert seg.strip() and "'买入'" in seg, "切出来的不是动作那一格"
     for clickable in ("<button", "onClick", "cursor-pointer", "role=\"button\""):
         assert clickable not in seg, f"动作那一格又变得能点了: {clickable}"
+
+
+# ── [R365] 手动刷新按钮 ─────────────────────────────────────────────────
+#
+# 用户: 「除了自动定时我还要手动按钮有时候我想看实时情况会点一下」。
+
+
+def test_R365_有手动刷新_而且自动那一档没被动过():
+    """**「除了自动定时」** —— 手动是补一条路, 不是替掉节奏。"""
+    code = code_of(FLIP)
+    assert "const refreshAll = () =>" in code, "没有手动刷新"
+    assert "refetchInterval: refreshEvery('derived')" in code, "自动那一档被动了"
+    # **两个分支各有一句**: 天气拿到了走 JSX 那支, 没拿到走后面那句模板串。
+    # 只断言"出现过"的话, 删掉其中一支照样绿 —— 另一支把断言喂饱了(变异电池
+    # 当场打绿)。而删掉的那一支正是**常态那一支**。
+    assert code.count("rhythmHint('derived')") == 2, \
+        "副标题那句节奏说明少了一支 —— 天气拿到/拿不到, 两种情形都得说"
+
+
+def test_R365_两个查询一起重取_不是只刷半页():
+    """这一页的数字来自**两份互不相干的请求**:
+
+        模拟盘那份   回测 + 今日信号(带实时叠加层)
+        今日总览那份 打分 / 多空比 / 主线 / 自检条
+
+    只刷其中一个的话, 按钮上写着「刷新」而实际只刷了半页 —— 而另外半页看上去
+    也没坏, **没有任何东西会提示你它是旧的**。
+    """
+    code = code_of(FLIP)
+    # 切到行尾就够 —— 它是个一行的函数。
+    # (别拿 `\n\n` 当界: `code_of` 会把注释剥掉并把空行压掉, 那个界根本不存在,
+    #  第一版就是这么 `ValueError: substring not found` 的。)
+    i = code.index("const refreshAll = () =>")
+    fn = code[i:code.index("\n", i)]
+    assert "q.refetch()" in fn, "模拟盘那份没重取"
+    assert "today.refetch()" in fn, "今日总览那份没重取"
+
+
+def test_R365_在飞就禁用_且转起来():
+    """模拟盘那一趟是几百只票的六态 + 一整轮回测, 秒级。不禁的话连点几下就是
+    几趟全量重算堆在后端。"""
+    code = code_of(FLIP)
+    assert "const refreshing = q.isFetching || today.isFetching" in code, \
+        "在飞的判据没把两份都算上"
+    head = code[code.index("<PageHeader"):code.index('<div className="min-h-0 flex-1')]
+    assert head.strip()
+    assert "disabled={refreshing}" in head, "在飞时没禁用"
+    assert "refreshing && 'animate-spin'" in head, "在飞时没有转起来 —— 点了像没反应"
+
+
+def test_R365_按钮在页头_挨着那句节奏说明():
+    """副标题那句说的是「它自己什么时候刷」, 这个按钮回答「我现在就要刷」。"""
+    code = code_of(FLIP)
+    head = code[code.index("<PageHeader"):code.index('<div className="min-h-0 flex-1')]
+    assert head.strip()
+    assert "onClick={refreshAll}" in head, "刷新按钮不在页头"
+    # 它是个按钮, 不是又一个输入框 —— 右槽当初就是为了腾掉参数框才空出来的(R359)
+    for inp in ("<input", "NumberField"):
+        assert inp not in head, f"页头右槽里又出现了输入: {inp}"
