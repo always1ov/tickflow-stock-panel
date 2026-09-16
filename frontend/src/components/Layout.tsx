@@ -613,7 +613,7 @@ function PlainNavLink({ item, collapsed, indent, dataSyncing, dataSyncJustDone }
             <span
               className={cn(
                 'pointer-events-none absolute left-0 top-1/2 h-4 -translate-y-1/2 w-[2.5px] rounded-full bg-accent transition-opacity duration-hover',
-                isActive ? 'opacity-100 shadow-[0_0_8px_rgba(59,130,246,0.6)]' : 'opacity-0',
+                isActive ? 'opacity-100' : 'opacity-0',
               )}
             />
             <Icon className={cn('h-4 w-4 shrink-0 transition-colors', isActive ? 'text-accent' : 'text-foreground/60 group-hover:text-foreground/85')} />
@@ -1026,7 +1026,8 @@ export function Layout() {
       <aside
         onMouseLeave={() => { if (overlayPreview) setOverlayPreview(false) }}
         className={cn(
-          'bg-surface flex flex-col min-h-0 overflow-hidden',
+          // [R368] 侧栏用它自己那一档(#F8FAFC), 不再与内容面板同色
+          'bg-sidebar flex flex-col min-h-0 overflow-hidden',
           isDesktop
             ? cn('h-full', navState === 'hidden' && !overlayPreview ? 'border-r-0' : 'border-r border-border')
             : cn(
@@ -1042,7 +1043,7 @@ export function Layout() {
           <div className={cn('flex', railMode ? 'flex-col items-center gap-2' : 'items-center gap-2')}>
             <Logo
               size={railMode ? 24 : 26}
-              className="shrink-0 drop-shadow-[0_0_8px_rgba(139,92,246,0.4)]"
+              className="shrink-0"
               style={{ color: BRAND }}
             />
             {!railMode && (
@@ -1162,7 +1163,7 @@ export function Layout() {
                     <span
                       className={cn(
                         'pointer-events-none absolute left-0 top-1/2 h-4 -translate-y-1/2 w-[2.5px] rounded-full bg-accent transition-opacity duration-hover',
-                        location.pathname === '/watchlist' ? 'opacity-100 shadow-[0_0_8px_rgba(59,130,246,0.6)]' : 'opacity-0',
+                        location.pathname === '/watchlist' ? 'opacity-100' : 'opacity-0',
                       )}
                     />
                     <Icon className={cn('h-4 w-4 shrink-0 transition-colors', location.pathname === '/watchlist' ? 'text-accent' : 'text-foreground/60 group-hover:text-foreground/85')} />
@@ -1346,7 +1347,7 @@ export function Layout() {
                   className={cn(
                     'relative inline-flex h-5 w-9 items-center rounded-full border transition-ui duration-expand focus-visible:outline-none focus-ring-custom focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-1 focus-visible:ring-offset-surface',
                     realtimeEnabled
-                      ? 'border-accent/50 bg-accent shadow-[0_0_6px_rgba(59,130,246,0.25)]'
+                      ? 'border-accent/50 bg-accent'
                       : 'border-border bg-elevated hover:border-muted',
                     realtimeToggleDisabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
                   )}
@@ -1418,7 +1419,7 @@ export function Layout() {
                   <span
                     className={cn(
                       'pointer-events-none absolute left-0 top-1/2 h-4 -translate-y-1/2 w-[2.5px] rounded-full bg-accent transition-opacity duration-hover',
-                      isActive ? 'opacity-100 shadow-[0_0_8px_rgba(59,130,246,0.6)]' : 'opacity-0',
+                      isActive ? 'opacity-100' : 'opacity-0',
                     )}
                   />
                   <Settings className={cn('h-4 w-4 shrink-0 transition-colors', isActive ? 'text-accent' : 'text-foreground/60 group-hover:text-foreground/85')} />

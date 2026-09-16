@@ -341,7 +341,7 @@ export function Review() {
           ) : !data || !data.as_of ? (
             <div className="flex flex-col items-center justify-center gap-4 rounded-card border border-border bg-surface/80 px-6 py-16">
               <div className="relative">
-                <div className="grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br from-accent/20 to-purple-500/15 border border-accent/30">
+                <div className="grid h-14 w-14 place-items-center rounded-2xl bg-accent-soft border border-accent/30">
                   <Database className="h-6 w-6 text-accent" strokeWidth={1.8} />
                 </div>
               </div>
@@ -812,7 +812,7 @@ function ReportPanel({
     return (
       <div className="flex min-h-[28rem] flex-col items-center justify-center gap-5 rounded-card border border-border bg-surface/80 px-6 py-16">
         <div className="relative">
-          <div className="grid h-20 w-20 place-items-center rounded-2xl bg-gradient-to-br from-accent/20 to-purple-500/15 border border-accent/30">
+          <div className="grid h-20 w-20 place-items-center rounded-2xl bg-accent-soft border border-accent/30">
             <BookOpenCheck className="h-9 w-9 text-accent" strokeWidth={1.8} />
           </div>
           <Sparkles className="absolute -right-1 -top-1 h-5 w-5 text-accent" />
@@ -886,7 +886,7 @@ function ReportPanel({
         {isLoading ? (
           <div className="flex flex-col items-center justify-center gap-3 py-16">
             <div className="relative">
-              <div className="grid h-11 w-11 place-items-center rounded-full bg-gradient-to-br from-accent/20 to-purple-500/15 border border-accent/30">
+              <div className="grid h-11 w-11 place-items-center rounded-full bg-accent-soft border border-accent/30">
                 <Sparkles className="h-5 w-5 animate-pulse text-accent" />
               </div>
               <RefreshCw className="absolute -inset-1 h-13 w-13 animate-spin text-accent/30" style={{ animationDuration: '3s' }} />

@@ -249,7 +249,7 @@ function ConfirmModal({ report, onView, onRedo, onClose }: {
             查看历史
           </button>
           <button onClick={onRedo}
-            className="flex-1 h-8 rounded-lg bg-gradient-to-r from-sky-500/20 to-blue-500/15 border border-sky-400/30 text-xs text-sky-300 hover:from-sky-500/30 transition-ui">
+            className="flex-1 h-8 rounded-lg bg-accent-soft border border-sky-400/30 text-xs text-sky-300 hover:from-sky-500/30 transition-ui">
             重新分析
           </button>
         </div>

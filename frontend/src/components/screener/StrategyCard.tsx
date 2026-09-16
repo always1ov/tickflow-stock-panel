@@ -105,7 +105,7 @@ export function StrategyCard({
 }: StrategyCardProps) {
   const cs = CARD_STYLES[cardSize]
   const activeCls = active
-    ? 'border-accent/50 bg-accent/10 shadow-[0_0_10px_rgba(59,130,246,0.1)]'
+    ? 'border-accent/50 bg-accent/10'
     : 'border-border bg-surface hover:border-accent/40 hover:bg-accent/[0.03]'
   const countCls = count === 0
     ? 'text-muted'

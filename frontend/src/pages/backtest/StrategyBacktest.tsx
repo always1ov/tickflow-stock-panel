@@ -731,7 +731,7 @@ function StrategyParamInput({ param, value, onChange }: {
           type="button"
           onClick={() => onChange(!checked)}
           className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 cursor-pointer ${
-            checked ? 'bg-accent shadow-[0_0_6px_rgba(59,130,246,0.3)]' : 'bg-elevated'
+            checked ? 'bg-accent' : 'bg-elevated'
           }`}
           aria-pressed={checked}
         >
@@ -1684,7 +1684,7 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
                 onClick={() => setSelectedStrategy(st.id)}
                 className={`px-2 py-1 rounded-btn text-[11px] border transition-all duration-150 ease-smooth cursor-pointer
                   ${selectedStrategy === st.id
-                    ? 'border-accent/50 bg-accent/10 text-accent shadow-[0_0_10px_rgba(59,130,246,0.1)]'
+                    ? 'border-accent/50 bg-accent/10 text-accent'
                     : 'border-border bg-base text-secondary hover:border-accent/40'
                   }`}
               >
@@ -1967,7 +1967,7 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
             onClick={handleRun}
             disabled={!selectedStrategy || strategyDetail.isLoading || backtestDataUnavailable}
             className="group w-full inline-flex items-center justify-center gap-2.5 rounded-btn border border-accent/40
-              bg-gradient-to-r from-accent to-blue-500 px-3 py-2.5 text-white shadow-[0_10px_24px_rgba(59,130,246,0.22)]
+              bg-accent px-3 py-2.5 text-white shadow-[0_10px_24px_rgba(59,130,246,0.22)]
               transition-all duration-150 ease-smooth hover:-translate-y-0.5 hover:shadow-[0_14px_28px_rgba(59,130,246,0.28)]
               disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
           >

@@ -184,7 +184,7 @@ function BubbleItem({ task, isLast, onPointerDown }: {
         {/* 生成中:顶部进度流光 */}
         {isWorking && (
           <div className="absolute inset-x-0 top-0 h-px overflow-hidden">
-            <div className="h-full w-1/2 bg-gradient-to-r from-transparent via-purple-200 to-transparent animate-bubble-progress" />
+            <div className="h-full w-1/2 bg-accent/20 animate-bubble-progress" />
           </div>
         )}
 

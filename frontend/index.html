@@ -4,15 +4,15 @@
     <meta charset="UTF-8" />
     <script>
       // 预渲染主题脚本: 首屏前设置 html.dark, 避免亮暗闪烁 (FOUC)。
-      // 默认暗色; 用户切过亮色后 (localStorage tf-theme=light) 保持亮色。
+      // [R368] 默认亮色; **显式切过暗色** (localStorage tf-theme=dark) 才加 .dark。
+      // 判据必须与 src/lib/theme.ts 的 getTheme() 逐字一致 —— 两处不一致的表现是
+      // 首屏先画一种再跳成另一种, 而两边看上去都"没坏"。
       (function () {
         try {
-          if (localStorage.getItem('tf-theme') !== 'light') {
+          if (localStorage.getItem('tf-theme') === 'dark') {
             document.documentElement.classList.add('dark')
           }
-        } catch (e) {
-          document.documentElement.classList.add('dark')
-        }
+        } catch (e) { /* 读不到就用默认的亮色 */ }
       })()
     </script>
     <!-- [fork R366] **这里故意没有 `viewport-fit=cover`。**

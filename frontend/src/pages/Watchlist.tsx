@@ -428,7 +428,7 @@ function RealtimeDot({ title = '实时监控中' }: { title?: string }) {
       {/* 外圈: 扩散晕 (ping 动画) */}
       <span className="absolute inline-flex h-full w-full rounded-full bg-accent/60 animate-ping motion-reduce:hidden" />
       {/* 内圈: 实心点 + 微辉光 */}
-      <span className="relative inline-flex rounded-full h-2 w-2 bg-accent shadow-[0_0_5px_rgba(61,214,140,0.6)]" />
+      <span className="relative inline-flex rounded-full h-2 w-2 bg-accent" />
     </span>
   )
 }

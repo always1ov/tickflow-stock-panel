@@ -19,7 +19,7 @@ export function QuoteConfigCard({ enabled, running, isTrading, lastFetchMs, inte
   onIntervalChange: (v: number) => void
 }) {
   const statusColor = running && isTrading
-    ? 'bg-accent shadow-[0_0_6px_rgba(61,214,140,0.5)]'
+    ? 'bg-accent'
     : enabled && running
       ? 'bg-warning/60'
       : 'bg-muted'
@@ -48,7 +48,7 @@ export function QuoteConfigCard({ enabled, running, isTrading, lastFetchMs, inte
           disabled={toggling}
           className={`relative inline-flex h-4 w-7 items-center rounded-full shrink-0 transition-colors duration-expand ${
             enabled
-              ? 'bg-accent shadow-[0_0_6px_rgba(59,130,246,0.3)]'
+              ? 'bg-accent'
               : 'bg-elevated'
           } ${toggling ? 'opacity-50' : 'cursor-pointer'}`}
         >

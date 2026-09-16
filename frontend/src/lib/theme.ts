@@ -1,7 +1,13 @@
-// 主题管理 — 暗色(默认) / 亮色切换
+// 主题管理 — 亮色(默认) / 暗色切换
+//
+// [R368] **默认从 dark 改成 light。** 用户: 「前端采用浅色蓝白配色」。
+//
+// 这是这次唯一一处默认值改动, 而且非改不可: 两套配色都在, 不把默认翻过来,
+// 新配色一个像素都不会出现在屏幕上 —— 那等于没做。暗色一套**原封不动**留着,
+// 切换按钮也没动, 想回去一下就回去。
 //
 // 机制:
-//   - 状态存 localStorage('tf-theme'), 默认 dark (保持老用户体验不变)
+//   - 状态存 localStorage('tf-theme'), 默认 light; 显式存过 'dark' 才是暗色
 //   - 生效方式: html.dark class (index.css 的 CSS variables + Tailwind darkMode:class)
 //   - index.html 里有预渲染内联脚本, 首屏前就设好 class, 避免闪烁 (FOUC)
 //   - UI token (bg-surface/text-foreground 等) 自动跟随;
@@ -15,9 +21,11 @@ export type Theme = 'dark' | 'light'
 
 export function getTheme(): Theme {
   try {
-    return localStorage.getItem(KEY) === 'light' ? 'light' : 'dark'
+    // [R368] 判据翻过来: **显式存过 'dark' 才是暗色**, 其余(含没存过)一律亮色。
+    // 之前存过 'light' 的人不受影响 —— 他们本来就要亮色。
+    return localStorage.getItem(KEY) === 'dark' ? 'dark' : 'light'
   } catch {
-    return 'dark'
+    return 'light'
   }
 }
 

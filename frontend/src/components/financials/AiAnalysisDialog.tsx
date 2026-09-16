@@ -101,9 +101,9 @@ export function AiAnalysisDialog({ task, mode, minimized }: Props) {
           className="w-full max-w-3xl max-h-[88vh] bg-surface/95 backdrop-blur-xl border border-border/50 rounded-2xl shadow-2xl flex flex-col overflow-hidden"
         >
           {/* ===== 头部 ===== */}
-          <div className="relative px-5 py-3.5 border-b border-border/50 bg-gradient-to-r from-purple-500/[0.06] via-fuchsia-500/[0.04] to-transparent">
+          <div className="relative px-5 py-3.5 border-b border-border/50 bg-accent-soft">
             <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-purple-500/20 to-fuchsia-500/15 border border-purple-400/30 shrink-0">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent-soft border border-purple-400/30 shrink-0">
                 {isHistory
                   ? <History className="h-4.5 w-4.5 text-purple-300" />
                   : <Sparkles className="h-4.5 w-4.5 text-purple-300" />}
@@ -166,7 +166,7 @@ export function AiAnalysisDialog({ task, mode, minimized }: Props) {
             {phase === 'loading' && !content && (
               <div className="flex flex-col items-center justify-center py-16 gap-3">
                 <div className="relative">
-                  <div className="h-10 w-10 rounded-full bg-gradient-to-br from-purple-500/20 to-fuchsia-500/15 border border-purple-400/30 flex items-center justify-center">
+                  <div className="h-10 w-10 rounded-full bg-accent-soft border border-purple-400/30 flex items-center justify-center">
                     <Sparkles className="h-4.5 w-4.5 text-purple-300 animate-pulse" />
                   </div>
                   <Loader2 className="absolute -inset-1 h-12 w-12 text-purple-400/40 animate-spin" style={{ animationDuration: '3s' }} />
@@ -231,7 +231,7 @@ export function AiAnalysisDialog({ task, mode, minimized }: Props) {
               {isHistory ? (
                 <button
                   onClick={handleStartNew}
-                  className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-gradient-to-r from-purple-500/20 to-fuchsia-500/15 border border-purple-400/30 text-xs font-medium text-purple-300 hover:from-purple-500/30 hover:to-fuchsia-500/20 transition-ui shrink-0"
+                  className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-accent-soft border border-purple-400/30 text-xs font-medium text-purple-300 hover:from-purple-500/30 hover:to-fuchsia-500/20 transition-ui shrink-0"
                   title="以此关注点重新生成新报告"
                 >
                   <RefreshCw className="h-3.5 w-3.5" />重新生成
@@ -240,7 +240,7 @@ export function AiAnalysisDialog({ task, mode, minimized }: Props) {
                 <button
                   onClick={handleStartNew}
                   disabled={isWorking}
-                  className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-gradient-to-r from-purple-500/20 to-fuchsia-500/15 border border-purple-400/30 text-xs font-medium text-purple-300 hover:from-purple-500/30 hover:to-fuchsia-500/20 disabled:opacity-40 disabled:cursor-not-allowed transition-ui shrink-0"
+                  className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-accent-soft border border-purple-400/30 text-xs font-medium text-purple-300 hover:from-purple-500/30 hover:to-fuchsia-500/20 disabled:opacity-40 disabled:cursor-not-allowed transition-ui shrink-0"
                   title={focus.trim() ? '按关注重点重新分析' : '重新分析'}
                 >
                   {isWorking ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : phase === 'done' ? <RefreshCw className="h-3.5 w-3.5" /> : <Send className="h-3.5 w-3.5" />}

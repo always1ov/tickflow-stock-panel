@@ -84,7 +84,7 @@ export function MinuteSyncConfig({ hasCap, onJobStart }: { hasCap: boolean; onJo
             onClick={handleToggle}
             disabled={!hasMinuteCap}
             className={`tap-target relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-expand shrink-0 ${
-              enabled ? 'bg-accent shadow-[0_0_6px_rgba(61,214,140,0.3)]' : 'bg-elevated'
+              enabled ? 'bg-accent' : 'bg-elevated'
             } ${!hasMinuteCap ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
           >
             <span

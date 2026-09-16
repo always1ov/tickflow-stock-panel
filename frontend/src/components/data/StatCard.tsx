@@ -208,13 +208,13 @@ export function StatCard({
   }
 
   return (
-    <div className={`rounded-card border ${borderCls} ${bgCls} flex flex-col transition-ui duration-enter ${active ? 'shadow-[0_0_16px_rgba(61,214,140,0.08)]' : ''}`}>
+    <div className={`rounded-card border ${borderCls} ${bgCls} flex flex-col transition-ui duration-enter ${active ? '' : ''}`}>
       <div className="flex items-center justify-between px-4 pt-4 pb-2">
         <h3 className="text-sm font-medium text-foreground">{title}</h3>
         <div className="flex items-center gap-1.5">
           {auto !== undefined && !loading && (
             <span className="inline-flex items-center gap-1 text-[10px] font-medium">
-              <span className={`inline-block h-1.5 w-1.5 rounded-full ${auto ? 'bg-accent shadow-[0_0_4px_rgba(61,214,140,0.5)]' : 'bg-muted'}`} />
+              <span className={`inline-block h-1.5 w-1.5 rounded-full ${auto ? 'bg-accent' : 'bg-muted'}`} />
               <span className={auto ? 'text-accent/70' : 'text-muted'}>{auto ? '自动' : '关闭'}</span>
             </span>
           )}

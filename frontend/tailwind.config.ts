@@ -26,6 +26,10 @@ export default {
         // §6.0.1 色板 — CSS variables 见 src/index.css
         base:      'oklch(var(--base) / <alpha-value>)',
         surface:   'oklch(var(--surface) / <alpha-value>)',
+        // [R368] 侧栏单独一档: 比白面板略灰、比页面底略白, 三层有分界
+        sidebar:   'oklch(var(--sidebar) / <alpha-value>)',
+        // [R368] 选中背景(浅蓝)。蓝色只用于必要的交互强调, 不铺大面板
+        'accent-soft': 'oklch(var(--accent-soft) / <alpha-value>)',
         elevated:  'oklch(var(--elevated) / <alpha-value>)',
         border:    'oklch(var(--border) / <alpha-value>)',
         foreground: 'oklch(var(--fg-primary) / <alpha-value>)',

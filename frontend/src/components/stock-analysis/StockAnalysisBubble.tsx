@@ -158,7 +158,7 @@ function BubbleItem({ task, isLast, onPointerDown }: {
       >
         {isWorking && (
           <div className="absolute inset-x-0 top-0 h-px overflow-hidden">
-            <div className="h-full w-1/2 bg-gradient-to-r from-transparent via-sky-200 to-transparent animate-sa-bubble-progress" />
+            <div className="h-full w-1/2 bg-accent/20 animate-sa-bubble-progress" />
           </div>
         )}
         <span className="flex h-4 w-4 items-center justify-center shrink-0">
