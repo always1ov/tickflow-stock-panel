@@ -82,7 +82,6 @@ _EXPECTED_ROUTERS = (
     "today.router",
     "usage_notes.router",
     "focus.router",
-    "global_indices.router",
     "external_page.router",
     "abnormal.router",
     "regime.router",

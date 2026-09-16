@@ -219,3 +219,48 @@ def test_R368_没有蓝紫渐变():
             elif "from-sky-" in seg and "to-blue-" in seg:
                 hits.append(f"{f.relative_to(SRC)}: {seg[:80]}")
     assert not hits, "蓝紫渐变回潮了:\n  " + "\n  ".join(hits)
+
+
+# ── [R369] 全球指数特性整个下线 ─────────────────────────────────────────
+#
+# 用户: 「删除这部分, 不需要了」(截图是设置页那张「全球指数」卡)。
+
+
+def test_R369_全球指数整个特性没了_不是只删了那张卡():
+    """**只删设置卡不算删。** 那样特性还在跑、还在打上游, 只是没了开关 ——
+    比留着更糟: 没有任何地方能让它停下来。
+
+    这一条同时钉住**该留的留住了**: 上游的 A 股指数页 `pages/Indices.tsx` 一个
+    字没动, 侧栏的 A 股指数卡照常在。
+    """
+    import pathlib
+
+    from tests.frontend_source import SRC, code_of
+
+    # ① fork 那两个后端模块真的删了(它们是 fork 独有的, 删掉不会与上游冲突)
+    back = pathlib.Path(__file__).resolve().parents[1] / "app"
+    for gone in ("services/global_indices.py", "api/global_indices.py"):
+        assert not (back / gone).exists(), f"后端模块还在: {gone}"
+
+    # ② 全仓不许再出现任何引用 —— 少摘一处就是"半死不活"
+    pats = ("global_indices", "global-indices", "globalIndices", "GlobalIndex")
+    hits = []
+    for root, exts in ((back, (".py",)), (SRC, (".ts", ".tsx"))):
+        for f in sorted(root.rglob("*")):
+            if f.suffix not in exts or "__pycache__" in str(f):
+                continue
+            txt = f.read_text(encoding="utf-8")
+            for p in pats:
+                if p in txt:
+                    # R369 自己那条说明历史的注释不算
+                    if all("R369" in ln for ln in txt.splitlines() if p in ln):
+                        continue
+                    hits.append(f"{f}: {p}")
+    assert not hits, "还有残留引用:\n  " + "\n  ".join(sorted(set(hits)))
+
+    # ③ **该留的留住**: 上游 A 股指数页还在, 侧栏 A 股指数卡还在
+    assert (SRC / "pages/Indices.tsx").exists(), "上游的 A 股指数页被误删了"
+    layout = code_of("components/Layout.tsx")
+    assert "function SidebarIndexQuotes({ rows, items, cnLive }" in layout, \
+        "侧栏 A 股指数卡被一起删掉了"
+    assert "{items.map(item => {" in layout, "A 股那几张卡的渲染没了"

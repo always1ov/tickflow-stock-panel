@@ -7,7 +7,6 @@ import {
   Zap,
   Webhook,
   ChevronDown,
-  BarChart3,   // [R102] 全球指数卡
 } from 'lucide-react'
 import {
   usePreferences,
@@ -182,23 +181,6 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
     qc.invalidateQueries({ queryKey: QK.preferences })
     qc.invalidateQueries({ queryKey: QK.quoteStatus })
   }, [toggleQuote, qc])
-
-  // [R102/R120] 全球指数选择 —— 独立接口/独立数据源。A 股那半边的
-  // toggleSidebarIndex / toggleIndicesPin 随上游 3c6ed99 一并下线(固定四只)。
-  const globalIdxOptions = useQuery({
-    queryKey: QK.globalIndexOptions,
-    queryFn: api.globalIndexOptions,
-  })
-  const toggleGlobalIndex = useCallback((key: string, visible: boolean) => {
-    const selected = new Set(globalIdxOptions.data?.selected ?? [])
-    if (visible) selected.add(key)
-    else selected.delete(key)
-    const ordered = (globalIdxOptions.data?.presets ?? []).map(p => p.key).filter(k => selected.has(k))
-    api.saveGlobalIndexSelection(ordered).then(() => {
-      qc.invalidateQueries({ queryKey: QK.globalIndexOptions })
-      qc.invalidateQueries({ queryKey: QK.globalIndices })
-    })
-  }, [globalIdxOptions.data, qc])
 
   const toggleLimitLadderMonitor = useCallback(async (enabled: boolean) => {
     await api.updateLimitLadderMonitor(enabled)
@@ -539,23 +521,8 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
 
         {/* [R120] A 股指数选择与「固定显示」随上游 3c6ed99 下线 —— 作者把展示层
             收敛为固定核心四只(services/index_const.py 单一权威), 不再给配置。
-            fork 的全球指数开关是独立数据源, 保留, 单独成卡。 */}
-        <Card icon={BarChart3} title="全球指数">
-          <p className="text-xs text-secondary mb-4">
-            与 A 股指数卡同格显示，但数据来源完全独立（公开行情源，多家候选轮试）。有时差，休市时显示最后成交值。
-          </p>
-          <div className="space-y-2">
-            {(globalIdxOptions.data?.presets ?? []).map(p => (
-              <ToggleRow
-                key={p.key}
-                label={p.name}
-                desc={p.key}
-                checked={(globalIdxOptions.data?.selected ?? []).includes(p.key)}
-                onChange={(v) => toggleGlobalIndex(p.key, v)}
-              />
-            ))}
-          </div>
-        </Card>
+            [R369] fork 那张「全球指数」卡也删了(用户: 「删除这部分, 不需要了」)——
+            整个特性连同后端两个模块一并下线, 见 FORK_NOTES R369。 */}
       </div>
 
       {/* ========== 右列 ========== */}

@@ -1909,26 +1909,6 @@ export interface AuctionScanPayload {
   error?: string
 }
 
-// [fork 增强] R99 全球指数实时
-export interface GlobalIndexQuote {
-  key: string
-  name: string
-  last: number
-  change?: number | null
-  change_pct?: number | null   // 小数制
-  updated_at?: number          // epoch 秒 —— 我们**抓取**的时刻, 不是行情的时刻
-  /** [R112] 该市场此刻是否在交易时段(北京时间) —— 休市时值静止是正常的 */
-  trading?: boolean
-  /** [R148] 行情**自己**说的时刻(epoch 秒); 这家不给就是 null */
-  quote_at?: number | null
-  /** [R148] 行情多久没动了(秒); null = 这家不给时刻, 说不出来 */
-  quote_age_s?: number | null
-  /** [R148] 盘中却半天没更新 —— 这个数已经不能当实时看了 */
-  stale?: boolean
-  source?: string
-  source_code?: string
-}
-
 // [fork 增强] R93 使用观察笔记
 export interface UsageNote {
   id: string
@@ -4568,13 +4548,6 @@ export const api = {
   // [fork 增强] R110 竞价一进二扫描(昨日首板 × 当下竞价)
   auctionScan: (refresh = false) =>
     request<AuctionScanPayload>(`/api/abnormal/auction-scan${refresh ? '?refresh=true' : ''}`),
-  // [fork 增强] R99 全球指数实时(独立模块, 新浪源)
-  globalIndices: () =>
-    request<{ items: GlobalIndexQuote[] }>('/api/global-indices'),
-  globalIndexOptions: () =>
-    request<{ presets: { key: string; name: string }[]; selected: string[] }>('/api/global-indices/options'),
-  saveGlobalIndexSelection: (keys: string[]) =>
-    request<{ selected: string[] }>('/api/global-indices/selection', { method: 'PUT', body: JSON.stringify({ keys }) }),
   // [fork 增强] R93 使用观察笔记: 纯文本, 增删改
   usageNotesList: () =>
     request<{ items: UsageNote[] }>('/api/usage-notes'),

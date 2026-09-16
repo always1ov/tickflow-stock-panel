@@ -175,9 +175,6 @@ export const QK = {
   usageNotes:           ['usage-notes'] as const,
   // R110 竞价一进二扫描
   auctionScan:          ['auction-scan'] as const,
-  // R99 全球指数(独立模块)
-  globalIndices:        ['global-indices'] as const,
-  globalIndexOptions:   ['global-index-options'] as const,
   // R117 外部网页抓取模式(按提示词分键: 改了提示 = 换一份结果)
   externalPageView:     (hint: string) => ['external-page-view', hint] as const,
 } as const

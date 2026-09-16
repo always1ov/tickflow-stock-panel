@@ -30,7 +30,6 @@ from app.api import (
     financials,
     flip_paper,  # [fork 增强] R327 转折模拟盘
     focus,  # [fork 增强] R159 推送焦点名单
-    global_indices,  # [fork 增强] R99 全球指数实时(独立模块)
     indices,
     intraday,
     kline,
@@ -723,7 +722,6 @@ def _register_routers(app: FastAPI) -> None:
     app.include_router(today.router)  # [fork 增强] 今日总览
     app.include_router(usage_notes.router)  # [fork 增强] R93 使用观察笔记
     app.include_router(focus.router)  # [fork 增强] R159 推送焦点名单
-    app.include_router(global_indices.router)  # [fork 增强] R99 全球指数实时
     app.include_router(external_page.router)  # [fork 增强] R117 外部网页抓取模式
     app.include_router(abnormal.router)
     app.include_router(regime.router)

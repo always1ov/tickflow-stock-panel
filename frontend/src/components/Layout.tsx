@@ -183,17 +183,15 @@ function MonitorBadge({ active }: { active: boolean }) {
   )
 }
 
-function SidebarIndexQuotes({ rows, items, globalRows, cnLive }: {
+function SidebarIndexQuotes({ rows, items, cnLive }: {
   rows: IndexQuote[] | undefined
   // [同步上游 3c6ed99] 作者把展示层指数收敛为固定核心四只(readonly 常量)
   items: readonly CoreIndex[]
-  /** [R102] 全球指数(独立数据源) — 与 A 股指数同格显示, 数据链各自独立 */
-  globalRows?: import('@/lib/api').GlobalIndexQuote[]
   /** [R119] A 股这几张卡此刻是不是真在跳(交易时段 + 数据来自实时缓存) */
   cnLive?: boolean
 }) {
-  const globals = globalRows ?? []
-  if (items.length === 0 && globals.length === 0) return null
+  // [R369] 全球指数整个特性下线(用户: 「删除这部分, 不需要了」), 这里只剩 A 股
+  if (items.length === 0) return null
   const quoteBySymbol = new Map((rows ?? []).map(q => [q.symbol, q]))
   // [R151] 用户定案:「都不显示延时, 能实时就行了」。卡面回到两态(在跳 / 静止),
   // 「延迟N分」徽标与黄点一并去掉 —— 那个标签本来是 R148 为了让"冻住的数看起来
@@ -205,7 +203,8 @@ function SidebarIndexQuotes({ rows, items, globalRows, cnLive }: {
   // 零视觉重量), 真要重新亮出来只是把徽标那几行加回来。
   //
   // 代价说清楚: 万一某天源真的又冻住, 卡面看起来会一切正常 —— 那时用悬停的
-  // 行情时刻, 或 /api/global-indices/debug 的 age_s 来判断。
+  // 行情时刻来判断。([R369] 原来这儿还提了 /api/global-indices/debug,
+  // 那个端点随全球指数特性一起下线了。)
   return (
     <div className="mt-2 grid grid-cols-2 gap-1.5 border-t border-border/60 pt-2">
       {items.map(item => {
@@ -244,38 +243,7 @@ function SidebarIndexQuotes({ rows, items, globalRows, cnLive }: {
           </NavLink>
         )
       })}
-      {globals.map(q => {
-        const pct = q.change_pct != null ? q.change_pct * 100 : null
-        const trading = q.trading !== false
-        // [R148/R151] 只认**行情自己**的时刻(`quote_age_s`), 不是我们抓取的时刻 ——
-        // 但按用户定案只进 title, 不占卡面。
-        const ageMin = q.quote_age_s != null ? q.quote_age_s / 60 : null
-        const ageText = ageMin == null
-          ? '该源不提供行情时刻, 无法判断新旧'
-          : ageMin < 1 ? '行情时刻: 1 分钟内' : `行情时刻: ${Math.round(ageMin)} 分钟前`
-        return (
-          <div
-            key={q.key}
-            className={cn('rounded bg-elevated/60 px-2 py-1.5', !trading && 'opacity-70')}
-            title={`${q.name}(全球·独立源) — ${
-              trading ? '交易中, 实时刷新' : '当前休市, 显示最后成交值'
-            } · ${ageText}${q.source ? ` · 源: ${q.source}${q.source_code ? `(${q.source_code})` : ''}` : ''}`}
-          >
-            <div className="flex items-center justify-between gap-1">
-              <span className="flex min-w-0 items-center gap-1 text-[10px] text-secondary">
-                {/* 交易中: 绿点脉冲(在实时跳); 休市: 灰点 */}
-                <span className={cn('h-1 w-1 shrink-0 rounded-full',
-                  trading ? 'bg-bull animate-pulse' : 'bg-muted/40')} />
-                <span className="truncate">{q.name}</span>
-              </span>
-              <span className={`text-[10px] font-mono ${indexPctClass(pct)}`}>{fmtIndexPct(pct)}</span>
-            </div>
-            <div className={`mt-0.5 truncate font-mono text-[10px] ${indexPctClass(pct)}`}>
-              {fmtIndexValue(q.last)}
-            </div>
-          </div>
-        )
-      })}
+      {/* [R369] 全球指数那一组卡整块删掉 —— 特性下线, 见 FORK_NOTES R369 */}
     </div>
   )
 }
@@ -828,15 +796,6 @@ export function Layout() {
     : null
   // [R102] A 股卡自身的可用性条件(全球卡不受其影响)
   const cnQuotesOk = !isWatchlistMode && (!realtimeUnavailable || !!realtimeProviderName)
-  const globalIdxQuery = useQuery({
-    queryKey: QK.globalIndices,
-    queryFn: api.globalIndices,
-    // [R112] 有市场在交易时就跟 A 股同频刷(8s), 全部休市时退到 60s ——
-    // 休市值静止, 高频拉只是白打上游
-    refetchInterval: (q: any) => (q?.state?.data?.items ?? []).some((i: any) => i.trading) ? 8000 : 60000,
-    placeholderData: (prev: { items: import('@/lib/api').GlobalIndexQuote[] } | undefined) => prev,
-    enabled: !navCollapsed && bootTier >= 1,   // [R154] 四指数先到, 纳指下一帧
-  })
   const realtimeToggleDisabled = toggleQuote.isPending || isPaused
   const realtimeActive = realtimeEnabled && isRunning && isTrading
   const realtimeStatusLabel = toggleQuote.isPending
@@ -1091,13 +1050,12 @@ export function Layout() {
               />
             </div>
           )}
-          {/* [R102] 指数报价 — A 股与全球指数同格, 数据链各自独立: A 股来自行情主链,
-              全球来自独立公开源; A 股实时不可用时全球卡照常显示。常驻显示(上游口径) */}
+          {/* [R102 → R369] 指数报价。全球指数那一半已随特性下线整个删掉,
+              这里只剩 A 股, 数据来自行情主链。常驻显示(上游口径) */}
           {!navCollapsed && (
             <SidebarIndexQuotes
               rows={cnQuotesOk ? sidebarIndexQuotes?.rows : undefined}
               items={cnQuotesOk ? sidebarIndexes : []}
-              globalRows={globalIdxQuery.data?.items}
               // [R119] 真在跳 = A 股交易时段 + 轮询在跑 + 数据确实来自实时缓存
               cnLive={isTrading && isRunning && sidebarIndexQuotes?.source === 'realtime'}
             />
@@ -1384,8 +1342,8 @@ export function Layout() {
                 )}
               </div>
             )}
-          {/* [R102] 指数卡的渲染点在上面(与全球指数同格) —— 作者这里新增的裸调用
-              会重复渲染一遍, 故不采纳; A 股可用性判据 cnQuotesOk 与作者同口径。 */}
+          {/* [R102] 指数卡的渲染点在上面 —— 作者这里新增的裸调用会重复渲染
+              一遍, 故不采纳; A 股可用性判据 cnQuotesOk 与作者同口径。 */}
         </div>
         )}
 
