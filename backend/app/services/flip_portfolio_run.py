@@ -75,13 +75,40 @@ def run(repo, *, symbols: list[str] | None = None,
         except Exception as e:  # noqa: BLE001
             logger.debug("flip portfolio compute failed for %s: %s", sym, e)
             continue
+        # [R367] **热身段只喂状态机, 不进账本。**
+        #
+        # 在这之前没有这一刀: `_load_batch` 为了让状态机热身多取了 60 根, 再按
+        # 1.7 折算成日历日, 于是 `years=1` 实际取到 557 天 ≈ 1.5 年 —— 而
+        # `simulate` 把**取到的全部**都跑了。结果是界面上参数框写着「回溯 1 年」,
+        # 卡片上印的却是「19 个月 / 375 个交易日」。**两个数都在屏幕上, 互相打脸。**
+        #
+        # 切在这里而不是取数那一层, 是因为**热身是真的需要**: `compute()` 头几十
+        # 根算出来的状态还没稳。所以仍然拿整条序列去算, 只把**账本的窗口**收回到
+        # 用户要的那一段 —— 转折标记(`flipped`)是 `compute()` 在全序列上算好后
+        # 原样带走的(`trend_days` 只读不算), 所以切完仍然对。
+        #
+        # **五条序列一个表达式切完, 不是五行各切各的。** 变异电池打出来的两个洞
+        # 都在这儿:
+        #   · 只切 `steps` 不切 `dates` → `_flatten` 按下标配对, 于是第 150 天的
+        #     状态贴到第 0 天的日期上, 整条曲线是错的**而且不报错**;
+        #   · 切了 `dates`/`closes` 忘了涨跌停那两条 → 封板标志落在别的日子上。
+        # 分成几行写就永远有"漏一条"这种可能; 并成一个 zip 之后, **漏不掉**。
+        #
+        # 短于窗口的票(新股)**不用特判**: `x[-250:]` 对 80 个元素的列表就是全部,
+        # Python 的负切片自己兜住了。第一版在这儿加了个 `if len(dates) > keep`,
+        # 变异把它改成 `if True` 守卫照样绿 —— 因为那个分支本来就是死的。
+        keep = _window_bars(years)
+        steps, dates, closes, lu, ld = (
+            x[-keep:] for x in (steps, dates, closes,
+                                _flags(df, "signal_limit_up"),
+                                _flags(df, "signal_limit_down")))
         series[sym] = {
             "name": names.get(sym, sym),
             "steps": steps,
             "dates": dates,
             "closes": closes,
-            "limit_up": _flags(df, "signal_limit_up"),
-            "limit_down": _flags(df, "signal_limit_down"),
+            "limit_up": lu,
+            "limit_down": ld,
         }
 
     out = flip_portfolio.simulate(series, capital=capital, max_positions=max_positions)
@@ -91,6 +118,16 @@ def run(repo, *, symbols: list[str] | None = None,
     out["capital"] = capital
     out["max_positions"] = max_positions
     return out
+
+
+def _window_bars(years: float) -> int:
+    """回溯 N 年 = 多少个交易日。
+
+    250 是这个仓库一贯的换算(`_load_batch` 取数时用的也是它)—— **两处必须同一个
+    数**: 取数按 250 估、账本按别的数切, 就会出现"要 1 年却切出 11 个月"这种
+    对不上的零头。至少留 2 根, 否则 `simulate` 连一次转折都判不了。
+    """
+    return max(2, round(years * 250))
 
 
 def _watchlist_symbols() -> list[str]:

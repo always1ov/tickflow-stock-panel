@@ -655,7 +655,14 @@ app.add_middleware(
 #   3. 已设密码              → 检查 session, 无效则 401(前端跳登录)
 # 白名单: /api/auth/* (设密码/登录本身)、/health 等探活。
 _AUTH_WHITELIST_PREFIX = ("/api/auth/",)
-_AUTH_WHITELIST_EXACT = ("/health", "/api/health", "/openapi.json", "/docs", "/redoc")
+# [fork R367] `"/api/health"` 从这里删掉了 —— **那个端点根本不存在**。
+# 探活的真实路径只有 `/health`(`app/api/routes.py` 里的 `@router.get("/health")`,
+# 而 `core_router` 是不带 prefix 挂上去的), Dockerfile 的 healthcheck 打的也是它。
+#
+# 白名单里多一条不存在的路径**不会报任何错**, 它只是永远不会被命中 —— 而它会
+# 骗人: 排查线上问题时照着这里去开 `/api/health`, 拿到的是 SPA 兜底的 index.html,
+# 于是把"端点不存在"误读成"路由没配上", 往完全错的方向查。这次就是这么栽的。
+_AUTH_WHITELIST_EXACT = ("/health", "/openapi.json", "/docs", "/redoc")
 
 
 @app.middleware("http")
@@ -696,7 +703,11 @@ async def auth_middleware(request: Request, call_next):
 
 
 def _register_routers(app: FastAPI) -> None:
-    """注册全部路由。顺序不代表优先级, 但 `/api/health` 等核心路由在最前。"""
+    """注册全部路由。顺序不代表优先级, 但 `/health` 等核心路由在最前。
+
+    ([fork R367] 这句原本写的是 `/api/health` —— 同样是个不存在的路径, 与上面
+    白名单那条是同一个笔误的两处落点。)
+    """
     app.include_router(core_router)
     app.include_router(auth_api.router)
     app.include_router(kline.router)
