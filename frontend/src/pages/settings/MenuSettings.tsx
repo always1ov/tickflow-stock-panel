@@ -45,10 +45,20 @@ const BUILTIN_PAGES: NavEntry[] = [
   { id: '/screener', label: '策略', type: 'builtin', visible: true },
   { id: '/factors', label: '因子', type: 'builtin', visible: true },
   { id: '/backtest', label: '回测', type: 'builtin', visible: true },
-  // [R170] 并入仓位中心。**id 保持 /paper-trading 不变** —— 用户已保存的菜单
-  // 排序/显隐是以 id 为键的, 换 id 会让那份配置对不上。点进去 router 会重定向到
-  // /lots?tab=paper, 行为不变。
-  { id: '/paper-trading', label: 'AI 操盘手 (仓位中心)', type: 'builtin', visible: true },
+  // [R170 → R370] 「AI 操盘手 (仓位中心)」这一条**删掉了**(用户: 「菜单设置
+  // 里面的菜单, 要是没有的, 就应该删除」)。
+  //
+  // 它早就是个空壳: R327 把整套 AI 操盘手换成了转折模拟盘, `/paper-trading`
+  // 只剩一条 `<Navigate to="/lots">` 重定向, 而**侧栏 `nav` 里根本没有它** ——
+  // 也就是说, 这一行给的是一个"排序与显隐都作用不到任何东西"的开关: 拖它、
+  // 勾掉它, 屏幕上不会有任何变化, 而且不报错。同一张表里 `/lots`「模拟盘」
+  // 才是真正在用的那一条。
+  //
+  // **路由那条不动**: router 里写着「书签、菜单设置里存的旧路径不能断」, 老书签
+  // 点进去仍然会落到 /lots。删的只是这张配置表里的一行。
+  //
+  // 已存过的 `nav_order` 里若带着 `/paper-trading` 也没关系 —— 下面合并时走的是
+  // `entryMap.get(id)`, 取不到就跳过, 不会把那份配置弄坏。
   { id: '/limit-ladder', label: '连板梯队', type: 'builtin', visible: true },
   { id: '/concept-analysis', label: '概念分析', type: 'builtin', visible: true },
   { id: '/industry-analysis', label: '行业分析', type: 'builtin', visible: true },
