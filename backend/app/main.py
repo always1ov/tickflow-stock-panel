@@ -770,13 +770,48 @@ if _static.exists():
 
         app.mount("/assets", HashedAssets(directory=_static / "assets"), name="assets")
 
+    # [fork R366] dist **根目录**下那几个真文件要按原样发出去, 不能落进下面的
+    # SPA 兜底。
+    #
+    # `/assets/**` 有自己的挂载, 而 `sw.js` / `manifest.webmanifest` / 那几个
+    # 图标 / `favicon.svg` 都在 dist 根 —— 它们原本会被兜底回一份 index.html,
+    # 于是:
+    #
+    #   · `navigator.serviceWorker.register('/sw.js')` 拿到 text/html, 注册失败
+    #   · `/manifest.webmanifest` 解析失败 → **整个"添加到主屏"就没了**
+    #   · 图标全是 HTML
+    #
+    # 而这一串**一个错都不会报到眼前**: 页面照常打开, 只是装不成 app。
+    # (favicon 其实早就在吃这个亏, 只是浏览器悄悄退回默认图标, 没人注意。)
+    _root_static = _static.resolve()
+
+    def _serve_root_file(rel: str) -> FileResponse | None:
+        """dist 根目录下的真文件 —— 没有就返回 None, 交给 SPA 兜底。"""
+        if not rel or rel.startswith("/") or "\\" in rel:
+            return None
+        try:
+            target = (_root_static / rel).resolve()
+            target.relative_to(_root_static)      # 越界(../)直接不认
+        except (ValueError, OSError):
+            return None
+        # index.html 仍然走兜底那条路 —— 它的缓存头是特意设的
+        if not target.is_file() or target.name == "index.html":
+            return None
+        # **sw.js 不许被缓存住**: 它自己就是更新机制, 缓存住等于把旧逻辑钉死。
+        cache = ("no-cache" if target.name == "sw.js"
+                 else "public, max-age=3600")
+        return FileResponse(target, headers={"Cache-Control": cache})
+
     @app.get("/{full_path:path}", include_in_schema=False)
-    def spa_fallback(full_path: str):  # noqa: ARG001
-        """所有未匹配路径回退到 index.html — React Router 接管。
+    def spa_fallback(full_path: str):
+        """dist 根目录下的真文件按原样发; 其余回退到 index.html — React Router 接管。
 
         index.html 禁止缓存 (Cache-Control: no-store), 确保浏览器每次拿到
         最新版本引用的 JS/CSS 文件名 (assets 带 hash, 可长缓存)。
         """
+        hit = _serve_root_file(full_path)
+        if hit is not None:
+            return hit
         index = _static / "index.html"
         if index.exists():
             return FileResponse(

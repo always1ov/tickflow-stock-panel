@@ -95,3 +95,26 @@ async function bootstrap() {
 }
 
 void bootstrap()
+
+/**
+ * [fork R366] 注册 service worker —— 装成主屏 app 的前提条件之一。
+ *
+ * 它做什么(以及**不做什么**)见 `public/sw.js`: 只缓存带哈希的构建产物与页面
+ * 外壳, **`/api/**` 一个字节都不碰**。
+ *
+ * ## 为什么放在 bootstrap 之后、而且不 await
+ *
+ * 注册是纯副作用, 页面不依赖它 —— 挡在首屏前面只会让首屏慢。失败也不该影响
+ * 任何事: 没有 HTTPS 的环境(比如直接用 IP 访问)注册必然失败, 那时这个面板
+ * 照常是个网页, 只是装不到主屏。所以 catch 掉, 不弹 toast、不报错。
+ *
+ * 开发时不注册: vite dev 的模块是不带哈希的, 缓存住会得到"改了代码没反应"这种
+ * 最难查的现象。
+ */
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {
+      /* 装不上就算了 —— 这个面板本来就是个网页, SW 只是让它能上主屏 */
+    })
+  })
+}

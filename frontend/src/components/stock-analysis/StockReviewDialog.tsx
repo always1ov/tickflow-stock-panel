@@ -186,7 +186,10 @@ export function StockReviewDialog({ symbol, name, tab: initialTab, onClose }: {
         className="flex max-h-[88vh] w-full max-w-5xl flex-col overflow-hidden rounded-lg border border-border bg-surface shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between gap-3 border-b border-border/60 px-4 py-3">
+        {/* [fork R366] 窄屏允许换行 —— 手机上标题 + 两个页签 + 三个天数档 + 关闭
+            挤在一行里放不下, 不换行的结果是右边那几个按钮被挤出屏幕外点不到。
+            宽屏 `sm:` 起恢复原来的一行不换。 */}
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 px-4 py-3 sm:flex-nowrap sm:gap-3">
           <div className="flex min-w-0 items-baseline gap-2.5">
             <CalendarRange className="h-4 w-4 self-center shrink-0 text-sky-400" />
             <span className="shrink-0 text-sm font-medium text-foreground">{name} 复盘</span>

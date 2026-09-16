@@ -15,9 +15,28 @@
         }
       })()
     </script>
+    <!-- [fork R366] **这里故意没有 `viewport-fit=cover`。**
+         第一版我加了它, 注释里还写着"内容自己躲开安全区(见 index.css 的
+         env(safe-area-*))" —— 而那段 CSS 根本不存在, 那句话是假的。加了 cover
+         却不配安全区内边距, 结果是内容钻到刘海与 Home 条底下。
+         补 CSS 也不合适: 外壳是 `h-screen`(100vh), 在 body 上加内边距会让它
+         超出一屏, 要连着改 Layout 的高度口径 —— 为一个不必要的 flag 动公共布局。
+         不加 cover 时 iOS 会自己把 webview 内缩, 刘海周围填 manifest 里的
+         background_color(#0B0B0F, 与页面同色), 看不出接缝。 -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="theme-color" content="#8B5CF6" />
+    <!-- [fork R366] 装成主屏 app。用户: 「手机端我只需要模拟盘页面和模拟盘里面
+         的那两个弹窗」—— manifest 的 start_url 因此直接指向 /lots, 从主屏图标
+         点进去就是模拟盘, 不必先落到首页再点两下。 -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <!-- iOS **不认 manifest 里的 icons**, 只认这一行; 也不认透明底 -->
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <!-- iOS 的"全屏"开关。Android 走 manifest 的 display: standalone -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="模拟盘" />
+    <!-- 刘海屏: 状态栏用半透明黑, 内容自己躲开安全区(见 index.css 的 env(safe-area-*)) -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>牛来 · Quant Terminal</title>
     <!-- [fork R153] 字体不再从 rsms.me / fonts.googleapis.com 拉取。
          两套字体(Inter Variable / JetBrains Mono)本来就已经通过 @fontsource 打进

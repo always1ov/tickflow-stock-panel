@@ -649,7 +649,26 @@ function SignalRow({ r, c, onOpen, onReview }: {
           ② 行高由 `min-h-[3.5rem]` 定死。名次那一格本身有三行高(名次/分/三条),
              而没进候选池的票只有两行字 —— **不定死的话, 行高就跟着"这只票有没有
              进候选池"变**, 一屏扫下去参差不齐。这正是用户说的第二件事。 */}
-      <div className="grid min-h-[3.5rem] grid-cols-[3.5rem_minmax(9rem,11rem)_4.5rem_minmax(7rem,9rem)_minmax(0,1fr)_auto] items-center gap-x-3 text-xs">
+      {/* [R366] **同一串格子, 两套栅格。** 用户: 「手机端我只需要模拟盘页面和
+          模拟盘里面的那两个弹窗」。
+
+          六列那条最窄也要 3.5+9+4.5+7 rem 加五道间距 ≈ **444px**, 而手机竖屏
+          是 390px —— 横向必然撑破。
+
+          **没有另写一份手机版的行。** 六个格子、次序、内容全都没动, 只是窄屏
+          换一张三列的栅格, 靠 `row-span` / `col-span` 让它们自己落成一张卡:
+
+              [名次] 中际旭创 300308.SZ  [买入]
+              [    ] 已转折 · 现在是自然回升
+              走势词 …
+              触发 82.50 · 现 83.10
+
+          另写一份的代价是**两套版面各自演化**, 哪天只改了一边, 手机上看到的与
+          电脑上不是同一件事, 而两边都不报错 —— 这仓库从 R212 起一直在躲这个坑。
+
+          `min-h` 与 `items-center` 只在宽屏生效: 卡片式那版行高本来就随内容,
+          定死反而会在只有两行字时留一截空。 */}
+      <div className="grid grid-cols-[3.5rem_minmax(0,1fr)_auto] gap-x-3 gap-y-1 text-xs sm:min-h-[3.5rem] sm:grid-cols-[3.5rem_minmax(9rem,11rem)_4.5rem_minmax(7rem,9rem)_minmax(0,1fr)_auto] sm:items-center sm:gap-y-0">
         {/* [R345] 「名次」那一格整格移植自今日总览 —— 用户: 「这一列要移植」。
             **不是只搬个数字**: 名次下面那三条维度条(红=趋势 45% / 蓝=量能 30% /
             黄=位置 25%)才是它能被读懂的原因 —— 离开那三条颜色, 上面那个名次
@@ -661,6 +680,8 @@ function SignalRow({ r, c, onOpen, onReview }: {
             股票名称前面」)。它原来夹在动作与六态之间, 而它回答的是「凭什么是
             这一只」—— 那个问题得在读到代码之前就摆在眼前, 排在后面等于先认票
             再补理由。 */}
+        {/* 窄屏竖跨两行 —— 右边那两行(标的+动作 / 六态)共用它这一格 */}
+        <div className="row-span-2 sm:row-span-1">
         {c?.rank != null ? (
           <ScoreCell o={c} rank={c.rank} total={c.rank_total ?? 0} />
         ) : actionable ? (
@@ -670,6 +691,7 @@ function SignalRow({ r, c, onOpen, onReview }: {
             <br />候选池
           </span>
         ) : <span />}
+        </div>
 
         {/* [R363] 标的可点 —— 弹关键价位(日 K + 压力支撑 + 六态趋势条),
             与个股分析页点标的弹出来的**是同一个组件**(R28 那一个, 已摘成共用)。
@@ -719,7 +741,7 @@ function SignalRow({ r, c, onOpen, onReview }: {
             **动作那一格因此退回不可点**, 一个像素没动。 */}
         <button type="button" onClick={() => onReview(r.symbol, r.name)}
                 title={`看 ${r.name} 的逐日复盘 —— 这个状态是怎么走到今天的`}
-                className="min-w-0 cursor-pointer truncate text-left text-[11px] text-secondary transition-colors hover:text-sky-300">
+                className="col-span-2 min-w-0 cursor-pointer truncate text-left text-[11px] text-secondary transition-colors hover:text-sky-300 sm:col-span-1">
           {r.stage === 'flipped' && <>已转折 · 现在是{r.state_cn}</>}
           {r.stage === 'crossing' && (
             <>按现价会转折 —— <b className="text-warning">收盘还站在这边才算数</b></>
@@ -737,12 +759,12 @@ function SignalRow({ r, c, onOpen, onReview }: {
 
         {/* [R356] 走势并进同一行的第五列 —— 原来它是第二行, 害得行高随内容变。
             没进候选池的票这一格是空的, 但**格子照样占住**, 行高不受影响。 */}
-        <span className="min-w-0 text-[11px]">
+        <span className="col-span-3 min-w-0 text-[11px] sm:col-span-1">
           {c && <TrendCell o={c} />}
         </span>
 
         {/* [R350] 不再 `ml-auto` —— 它是网格的最后一列, 位置由栅格决定 */}
-        <span className="whitespace-nowrap text-right text-[10px] tabular-nums text-muted">
+        <span className="col-span-3 whitespace-nowrap text-left text-[10px] tabular-nums text-muted sm:col-span-1 sm:text-right">
           {r.flip_price != null && <>
             触发 {r.flip_price.toFixed(2)}
             {r.ref_price != null && <> · 现 {r.ref_price.toFixed(2)}</>}
@@ -785,7 +807,7 @@ function SignalRow({ r, c, onOpen, onReview }: {
  * 教训不是"把逗号去掉"而是**别给数字输入框留格式化的口子** —— 数字要好读就
  * 换单位(本金因此改成以「万」计), 不是往框里塞排版。
  */
-function NumberField({ label, value, onChange, min, max, step, width = 'w-20', suffix }: {
+function NumberField({ label, value, onChange, min, max, step, width = 'w-20', suffix, title }: {
   label: string
   value: number
   onChange: (v: number) => void
@@ -795,6 +817,8 @@ function NumberField({ label, value, onChange, min, max, step, width = 'w-20', s
   width?: string
   /** 单位, 跟在输入框右边 —— 放进框里会被光标挤 */
   suffix?: string
+  /** [R366] 悬停/长按的说明 —— 窄屏藏起来的那句话挂在这儿 */
+  title?: string
 }) {
   const [draft, setDraft] = useState<string | null>(null)
   const commit = () => {
@@ -806,7 +830,7 @@ function NumberField({ label, value, onChange, min, max, step, width = 'w-20', s
     if (clamped !== value) onChange(clamped)
   }
   return (
-    <label className="inline-flex items-center gap-1 text-muted">
+    <label title={title} className="inline-flex items-center gap-1 text-muted">
       {label}
       <input
         type="number"
@@ -887,9 +911,15 @@ function ParamBar({ capital, maxPositions, years, onCapital, onMaxPositions, onY
                    min={1} max={1000} step={5} width="w-16" suffix="万" />
       <NumberField label="最多持有" value={maxPositions} onChange={onMaxPositions}
                    min={1} max={50} step={1} width="w-14" suffix="只" />
+      {/* [R366] 那句「筛选不进回测」在窄屏是藏起来的, 所以挂一份到这里的 title 上
+          —— 藏起来不等于没说过 */}
       <NumberField label="回溯" value={years} onChange={onYears}
-                   min={YEARS_MIN} max={YEARS_MAX} step={0.5} width="w-14" suffix="年" />
-      <span className="ml-auto text-muted/70">
+                   min={YEARS_MIN} max={YEARS_MAX} step={0.5} width="w-14" suffix="年"
+                   title="回溯几年。板块与门槛只改打分的标注, 不进这条曲线" />
+      {/* [R366] 窄屏藏掉这句 —— 手机上一行只放得下那三个框, 这句会换行占掉一整行。
+          **它不是可有可无**(R359 特意加的), 所以不是删: 宽屏照旧, 窄屏挪进
+          「回溯」那个框的 title 里, 长按仍看得到。 */}
+      <span className="ml-auto hidden text-muted/70 sm:inline">
         上面那排板块与门槛只改打分的标注, 不进这条曲线
       </span>
     </div>

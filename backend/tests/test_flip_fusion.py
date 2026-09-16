@@ -365,12 +365,15 @@ def test_R356_行高定死_不随有没有走势变():
     """
     row = _row()
     grid_cls = _grid_class(row)
-    assert "min-h-[3.5rem]" in grid_cls, "行高没定死"
+    # [R366] **带上 `sm:` 前缀断言。** 手机上折成了卡片式, 行高本来就随内容 ——
+    # 那儿定死反而会在只有两行字时留一截空。裸写 `"min-h-[3.5rem]"` 的话,
+    # `sm:min-h-[3.5rem]` 也含着它, 断言分不出这两件事(锚是别人的子串, 又一次)。
+    assert "sm:min-h-[3.5rem]" in grid_cls, "宽屏的行高没定死"
     # **`items-center` 必须钉在网格那个 div 自己身上。** 只查 `"items-center" in row`
     # 是不够的 —— 动作徽标那几个 span 用的是 `inline-flex items-center`, 断言会被
     # 它们喂饱, 于是把网格上的这个类删掉守卫照样是绿的(变异电池当场抓到)。
     # 「锚太宽 = 没有锚」, 本会话第七次。
-    assert "items-center" in grid_cls, "内容没垂直居中, 定了高也会看着歪"
+    assert "sm:items-center" in grid_cls, "内容没垂直居中, 定了高也会看着歪"
 
 
 def test_R356_把右边那片空地用上():
@@ -381,8 +384,8 @@ def test_R356_把右边那片空地用上():
     assert "max-w-[72rem]" not in row, "还限着宽, 右边那片空地没用上"
     # 六列。[R360] 名次挪到了最前(用户: 「这列内容统一放到股票名称前面」):
     #   名次 / 标的 / 动作 / 六态 / 走势 / 触发价
-    assert "grid-cols-[3.5rem_minmax(9rem,11rem)_4.5rem_minmax(7rem,9rem)_minmax(0,1fr)_auto]" in row, \
-        "列宽变了 —— 定宽网格是行与行对齐的前提"
+    assert "sm:grid-cols-[3.5rem_minmax(9rem,11rem)_4.5rem_minmax(7rem,9rem)_minmax(0,1fr)_auto]" in row, \
+        "宽屏那套列宽变了 —— 定宽网格是行与行对齐的前提"
 
 
 def test_R356_没进候选池时走势格空着但占位():
@@ -394,8 +397,12 @@ def test_R356_没进候选池时走势格空着但占位():
     """
     row = _row()
     # 空着时**格子还在**: 条件挂在 `{c && …}` 上, 而不是整个 <span> 上
-    assert '<span className="min-w-0 text-[11px]">\n          {c && <TrendCell o={c} />}' in row, \
-        "走势那一格要么没占位(条件套在 span 外), 要么不由 c 决定渲不渲染"
+    assert '{c && <TrendCell o={c} />}' in row, "走势那一格不由 c 决定渲不渲染"
+    # 条件挂在 `{c && …}` 上, **不是整个 <span> 上** —— 套在外面就不占位了。
+    i = row.index("{c && <TrendCell o={c} />}")
+    before = row[:i]
+    assert before.rstrip().endswith(">"), "走势那一格的 <span> 没包住它 —— 空着时不占位"
+    assert "<span className=\"col-span-3 min-w-0 text-[11px]" in row, "走势那一格的占位没了"
 
 
 def test_R349_走势那一格不是动作():
@@ -428,6 +435,9 @@ def _grid_class(row: str) -> str:
 
     行里还有好几个 `inline-flex items-center` 的徽标, 拿整行当锚去查布局类, 断言
     会被它们喂饱。要钉网格的属性, 就得先把网格那一格单独切出来。
+
+    [R366] 这一串里现在**两套栅格并存**(窄屏卡片 / 宽屏六列), 断言要自己分清
+    查的是哪一套 —— `sm:` 前缀就是分界。
     """
     i = row.index('<div className="grid')
     j = row.index('"', i + len('<div className="'))
@@ -445,7 +455,11 @@ def test_R350_信号行是定宽网格_不是flex():
     """
     row = _row()
     assert "ml-auto" not in row, "ml-auto 会把最后一列甩到屏幕最右, 中间空一条"
-    assert row.count("grid-cols-[") == 1, "只该有一处列宽定义"
+    # [R366] **两处**: 窄屏那张卡片栅格 + `sm:` 起那张六列。立论没变(仍然是
+    # 定宽网格而不是 flex), 只是同一个 div 上挂了两套。**不许再多**: 第三套
+    # 意味着又有一个宽度区间是谁也没看过的。
+    assert row.count("grid-cols-[") == 2, "栅格定义不是两套(窄屏一套 + sm: 一套)"
+    assert row.count("sm:grid-cols-[") == 1, "宽屏那套不见了"
 
 
 def test_R350_名次那一格空着也占位():
@@ -688,9 +702,14 @@ def test_R360_名次是整行第一格_排在标的前面():
     assert i_rank < i_sym < i_act, "名次 / 标的 / 动作 三者的次序不对"
     # 列宽也得跟着挪 —— 只换 JSX 不换栅格, 名次会去占标的那 9~11rem,
     # 而标的被挤进 3.5rem 里截成一两个字。**两处必须同时改**。
-    cols = row[row.index("grid-cols-["):row.index("] items-center")]
-    assert cols.startswith("grid-cols-[3.5rem_"), \
-        f"第一列不是名次那 3.5rem —— JSX 挪了栅格没挪: {cols}"
+    # [R366] 两套栅格的第一列**都**得是名次那 3.5rem —— 只改一套的话, 另一个
+    # 宽度区间里名次会去占标的的位置, 而那个区间没人看过。
+    cols = [c for c in _grid_class(row).split() if "grid-cols-[" in c]
+    assert len(cols) == 2, f"栅格不是两套: {cols}"
+    for c in cols:
+        body = c[c.index("grid-cols-["):]
+        assert body.startswith("grid-cols-[3.5rem_"), \
+            f"第一列不是名次那 3.5rem —— JSX 挪了栅格没挪: {c}"
 
 
 def test_R360_名次空着时照样占住第一格():
@@ -928,3 +947,197 @@ def test_R365_按钮在页头_挨着那句节奏说明():
     # 它是个按钮, 不是又一个输入框 —— 右槽当初就是为了腾掉参数框才空出来的(R359)
     for inp in ("<input", "NumberField"):
         assert inp not in head, f"页头右槽里又出现了输入: {inp}"
+
+
+# ── [R366] 手机端: PWA 壳 + 模拟盘窄屏版 ────────────────────────────────
+#
+# 用户: 「有没有办法做个 app 手机也能用」→「手机端我只需要模拟盘页面和模拟盘
+# 里面的那两个弹窗, 只看这三个」。
+
+SW = "../public/sw.js"
+
+
+def _pub(rel: str) -> str:
+    import pathlib
+    from tests.frontend_source import SRC
+    return (pathlib.Path(SRC).parent / "public" / rel).read_text(encoding="utf-8")
+
+
+def test_R366_service_worker_一个字节都不缓存API():
+    """**这条是这次改动里最要紧的一条。**
+
+    这一页的数字 5 分钟一刷, 盘中更是实时叠加层。把 `/api/**` 缓存下来, 手机上
+    就会看到几小时前的价格与信号 —— 而**它长得和新的一模一样**, 没有任何东西会
+    告诉你它是旧的。这正是自检条(R343)一直在防的事, 不能让 SW 从背后绕过去。
+    """
+    sw = _pub("sw.js")
+    assert "if (url.pathname.startsWith('/api/')) return" in sw, \
+        "SW 没有把 /api/ 整个放行 —— 一旦缓存, 手机上会看到假装是今天的旧数字"
+    # 放行必须发生在**任何一条缓存分支之前**
+    i_api = sw.index("startsWith('/api/')")
+    for later in ("caches.open(STATIC)", "caches.open(SHELL)", "caches.match(req)"):
+        assert i_api < sw.index(later), f"/api/ 的放行排在了 {later} 后面"
+
+
+def test_R366_只缓存带哈希的构建产物():
+    """文件名带内容哈希 = 改了就是新名字, 所以"缓存优先"永远不会给出过期的东西。
+
+    不带哈希的东西(比如 index.html)**不许缓存优先** —— 那会把人钉死在旧版本上。
+    """
+    sw = _pub("sw.js")
+    assert "/assets/" in sw and "isHashedAsset" in sw
+    nav = sw[sw.index("req.mode === 'navigate'"):]
+    assert "await fetch(req)" in nav, "页面外壳不是网络优先"
+    assert nav.index("await fetch(req)") < nav.index("caches.match"), \
+        "页面外壳成了缓存优先 —— 会把人钉死在旧版本上"
+
+
+def test_R366_manifest_直接开到模拟盘():
+    """用户: 「手机端我只需要模拟盘页面」—— 从主屏图标点进去就该是它,
+    不必先落到首页再点两下。"""
+    import json
+    m = json.loads(_pub("manifest.webmanifest"))
+    assert m["start_url"] == "/lots", "主屏图标没直接开到模拟盘"
+    assert m["display"] == "standalone", "不是独立窗口 —— 那就还是个网页"
+    sizes = {i["sizes"] for i in m["icons"]}
+    assert {"192x192", "512x512"} <= sizes, "缺 Android 要的图标尺寸"
+    assert any(i.get("purpose") == "maskable" for i in m["icons"]), \
+        "没有 maskable 图标 —— Android 各家裁切形状不同, 会把图形切掉一圈"
+
+
+def test_R366_iOS那几样单独挂在html上():
+    """**iOS 不认 manifest 里的 icons**, 也不认 display —— 各有各的 meta。"""
+    import pathlib
+    from tests.frontend_source import SRC
+    html = (pathlib.Path(SRC).parent / "index.html").read_text(encoding="utf-8")
+    assert 'rel="apple-touch-icon"' in html, "iOS 主屏图标没挂"
+    assert 'name="apple-mobile-web-app-capable" content="yes"' in html, "iOS 全屏没开"
+    assert 'rel="manifest"' in html
+
+
+def test_R366_要么不用cover_要么得真有安全区内边距():
+    """**这一条钉的是一对东西必须成对出现。**
+
+    第一版我在 viewport 上加了 `viewport-fit=cover`, 注释里还写着「内容自己躲开
+    安全区(见 index.css 的 env(safe-area-*))」—— 而那段 CSS 根本不存在。加了
+    cover 却不配内边距, 内容会钻到刘海与 Home 条底下, **而在没有刘海的机器上
+    一切正常**, 所以平时看不出来。
+
+    现在的选择是不加 cover(iOS 自己会内缩)。哪天真要铺到边, 这条守卫会逼着
+    同时把安全区内边距也写上。
+
+    (顺带记一笔第一版守卫怎么漏的: 它写 `assert "viewport-fit=cover" in html`,
+     **而我自己那条注释里就有这几个字** —— 把 meta 删掉照样绿, 断言被注释喂饱。
+     这是本会话第二次栽在"注释喂饱断言"上, 所以这里查的是 `<meta` 那一行本身。)
+    """
+    import pathlib
+    import re
+    from tests.frontend_source import SRC
+    html = (pathlib.Path(SRC).parent / "index.html").read_text(encoding="utf-8")
+    bare = re.sub(r"<!--.*?-->", "", html, flags=re.S)      # 注释说了不算
+    meta = re.search(r'<meta name="viewport"[^>]*>', bare)
+    assert meta, "viewport 那一行没了"
+    if "viewport-fit=cover" in meta.group(0):
+        css = (pathlib.Path(SRC) / "index.css").read_text(encoding="utf-8")
+        assert "env(safe-area-inset" in css,             "用了 viewport-fit=cover 却没有安全区内边距 —— 内容会钻到刘海底下"
+
+
+def test_R366_开发时不注册SW():
+    """vite dev 的模块不带哈希, 缓存住会得到「改了代码没反应」这种最难查的现象。"""
+    code = code_of("main.tsx")
+    assert "import.meta.env.PROD" in code, "开发环境也注册了 SW"
+    assert "navigator.serviceWorker.register('/sw.js')" in code
+
+
+def test_R366_信号行窄屏折成卡片_而不是另写一份():
+    """六列那条最窄也要 ≈444px, 而手机竖屏是 390px —— 横向必然撑破。
+
+    **没有另写一份手机版的行**: 六个格子、次序、内容全都没动, 只是窄屏换一张
+    三列的栅格, 靠 row-span / col-span 让它们自己落成一张卡。另写一份的代价是
+    两套版面各自演化, 哪天只改了一边, 手机上看到的与电脑上不是同一件事,
+    而两边都不报错。
+    """
+    row = _signal_row()
+    cls = _grid_class(row)
+    assert "grid-cols-[3.5rem_minmax(0,1fr)_auto]" in cls, "窄屏那套栅格没了"
+    assert "sm:grid-cols-[" in cls, "宽屏那套栅格没了"
+    # 名次竖跨两行, 六态横跨两列, 走势/触发价各占一整行 —— 这几样缺一样卡就散了
+    assert "row-span-2 sm:row-span-1" in row, "名次没竖跨 —— 右边两行会挤掉它"
+    assert "col-span-2 min-w-0 cursor-pointer" in row, "六态没横跨标的+动作那两列"
+    assert row.count("col-span-3") == 2, "走势与触发价没各占一整行"
+    # **只有一个 SignalRow** —— 没有手机版分身
+    code = code_of(FLIP)
+    assert code.count("function SignalRow") == 1, "又写了一份手机版的信号行"
+
+
+def test_R366_窄屏断点走共用那一个_不另立一套():
+    """两套断点会在某个宽度上互相打架, 而且**不报错** —— 只是那个宽度区间里
+    版面是谁也没看过的样子。"""
+    dlg = code_of("components/stock-analysis/LevelsDialog.tsx")
+    assert "useIsDesktop" in dlg, "弹窗自己造了个断点"
+    assert "matchMedia" not in dlg and "innerWidth" not in dlg, \
+        "弹窗绕开共用 hook 自己量宽度"
+
+
+def test_R366_根目录那几个文件按原样发_不落进SPA兜底():
+    """**这一条挡的是一个整串都不报错的失败。**
+
+    `/assets/**` 有自己的挂载, 而 `sw.js` / `manifest.webmanifest` / 图标 /
+    `favicon.svg` 都在 dist 根 —— 它们原本会被 SPA 兜底回一份 index.html:
+
+        · register('/sw.js') 拿到 text/html → 注册失败
+        · /manifest.webmanifest 解析失败 → **整个「添加到主屏」就没了**
+        · 图标全是 HTML
+
+    而这一串**一个错都不会报到眼前**: 页面照常打开, 只是装不成 app。
+
+    用真的 dist 目录跑一遍(没构建过就跳过), 逐个断言拿到的是真文件而不是 HTML。
+    """
+    import pathlib
+
+    import pytest
+    from fastapi.testclient import TestClient
+
+    from app.config import settings
+
+    static = pathlib.Path(settings.static_dir)
+    if not (static / "index.html").exists():
+        pytest.skip("前端没构建, 这条要真的 dist 才跑得了")
+
+    from app.main import app
+    with TestClient(app) as c:
+        for path, ctype, needle in (
+            ("/sw.js", "javascript", b"startsWith('/api/')"),
+            ("/manifest.webmanifest", "manifest+json", b'"start_url"'),
+            ("/icon-192.png", "image/png", b"\x89PNG"),
+            ("/apple-touch-icon.png", "image/png", b"\x89PNG"),
+            ("/favicon.svg", "image/svg", b"<svg"),
+        ):
+            r = c.get(path)
+            assert r.status_code == 200, f"{path} 拿不到"
+            assert ctype in r.headers["content-type"], \
+                f"{path} 的类型是 {r.headers['content-type']} —— 多半被兜底成了 index.html"
+            assert needle in r.content, f"{path} 的内容不对"
+
+        # sw.js 不许被缓存住 —— 它自己就是更新机制
+        assert "no-cache" in c.get("/sw.js").headers.get("cache-control", "")
+
+        # 认不出的路径仍然回 index.html(React Router 接管)
+        spa = c.get("/lots")
+        assert "text/html" in spa.headers["content-type"]
+
+        # **越界要挡住**: ../ 不许摸到 dist 外面去。
+        #
+        # 两处讲究, 第一版两处都写错了, 于是把 `relative_to` 那道检查删掉守卫
+        # 照样绿(变异电池打出来的):
+        #
+        #   ① **`/../x` 到不了 handler** —— Starlette 会先把它规范成 `/x`。
+        #      真能把 `../` 送进来的是**编码过的** `..%2f` / `%2e%2e`。
+        #   ② 路径得**真的逃得出去**。第一版用的是 `../app/main.py`, 而 static
+        #      是 `frontend/dist`, 往上一层是 `frontend/app/…` —— 那个目录根本
+        #      不存在, 于是照样落到兜底, 看上去"挡住了"。
+        #      要逃出去得是 `../../backend/app/main.py`。
+        escape = "/..%2f..%2fbackend%2fapp%2fmain.py"
+        r = c.get(escape)
+        assert b"spa_fallback" not in r.content, f"路径穿越没挡住: {escape}"
+        assert "text/html" in r.headers["content-type"], "越界的请求该落到 SPA 兜底"
