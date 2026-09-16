@@ -102,7 +102,7 @@ function ExternalWebsiteSettings() {
   })
 
   return (
-    <section className="rounded-2xl border border-border bg-surface p-6 bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.12),transparent_38%)]">
+    <section className="rounded-2xl border border-border bg-surface p-6">
       <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
         <div className="max-w-2xl">
           <div className="flex items-center gap-2 text-[10.5px] font-semibold uppercase tracking-wider text-cyan-400/80">
@@ -330,7 +330,7 @@ export function SettingsExtPagesPanel() {
   return (
     <div className="max-w-6xl space-y-6">
       <ExternalWebsiteSettings />
-      <section className="rounded-2xl border border-border bg-surface p-6 bg-[radial-gradient(circle_at_top_right,rgba(139,92,246,0.14),transparent_38%)]">
+      <section className="rounded-2xl border border-border bg-surface p-6">
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div>
             <div className="text-[10.5px] font-semibold uppercase tracking-wider text-accent/80">扩展页面</div>

@@ -109,35 +109,45 @@ export interface TierStyle {
 }
 
 const TIER_STYLE: Record<string, TierStyle> = {
+  // [R368] 五档全部改成**平色**, 并压到白底上读得清。
+  //
+  // 两件事一起修:
+  //   ① pro/expert 原本是紫→品红 / 蓝→紫→琥珀的**渐变标签 + 渐变文字**
+  //      (`WebkitBackgroundClip: 'text'`)—— 用户明令不要蓝紫渐变。
+  //   ② 这五档的色值全是**照着深色底调的**: `#a1a1aa`(free)、`#60a5fa`
+  //      (starter)、`#c084fc`(pro) 落在白卡片上对比只有 2 点几, 是看不清的。
+  //      换色本来就要把它们压下来。
+  //
+  // 档位之间仍然分得开 —— 靠色相(灰 / 蓝 / 紫 / 琥珀), 不靠渐变。
   none: {
     desc: '未配置 Key · 仅历史日K',
-    tagBg: { background: 'rgba(113,113,122,0.15)' },
-    dotStyle: { background: '#52525b' },
-    labelTextStyle: { color: '#71717a' },
+    tagBg: { background: 'rgba(102,112,133,0.10)' },
+    dotStyle: { background: '#98A2B3' },
+    labelTextStyle: { color: '#667085' },
   },
   free: {
     desc: '历史日K · 自选实时',
-    tagBg: { background: 'rgba(113,113,122,0.3)' },
-    dotStyle: { background: '#71717a' },
-    labelTextStyle: { color: '#a1a1aa' },
+    tagBg: { background: 'rgba(102,112,133,0.16)' },
+    dotStyle: { background: '#667085' },
+    labelTextStyle: { color: '#475467' },
   },
   starter: {
     desc: '除权因子 · 全市场实时',
-    tagBg: { background: 'rgba(59,130,246,0.2)' },
-    dotStyle: { background: '#3b82f6' },
-    labelTextStyle: { color: '#60a5fa' },
+    tagBg: { background: 'rgba(37,99,235,0.10)' },
+    dotStyle: { background: '#2563EB' },
+    labelTextStyle: { color: '#1D4ED8' },
   },
   pro: {
     desc: '分钟K · 盘口',
-    tagBg: { background: 'linear-gradient(135deg, rgba(168,85,247,0.2), rgba(124,58,237,0.15))' },
-    dotStyle: { background: 'linear-gradient(135deg, #a855f7, #7c3aed)' },
-    labelTextStyle: { background: 'linear-gradient(135deg, #c084fc, #a855f7)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' },
+    tagBg: { background: 'rgba(109,40,217,0.10)' },
+    dotStyle: { background: '#6D28D9' },
+    labelTextStyle: { color: '#6D28D9' },
   },
   expert: {
     desc: 'WebSocket · 财务数据',
-    tagBg: { background: 'linear-gradient(135deg, rgba(59,130,246,0.2), rgba(168,85,247,0.2), rgba(245,158,11,0.2))' },
-    dotStyle: { background: 'linear-gradient(135deg, #3b82f6, #a855f7, #f59e0b)' },
-    labelTextStyle: { background: 'linear-gradient(135deg, #60a5fa, #c084fc, #fbbf24)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' },
+    tagBg: { background: 'rgba(181,71,8,0.10)' },
+    dotStyle: { background: '#B54708' },
+    labelTextStyle: { color: '#B54708' },
   },
 }
 

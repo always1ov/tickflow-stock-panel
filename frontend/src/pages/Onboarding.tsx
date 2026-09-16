@@ -33,7 +33,9 @@ import { Logo } from '@/components/Logo'
 
 const STEPS = ['声明', '欢迎', '数据源', '能力路由', '完成'] as const
 
-const BRAND = '#8B5CF6'
+// [R368] 品牌色从紫 #8B5CF6 换成主题蓝 #2563EB。用户: 「不使用蓝紫渐变…」,
+// 而这一页的光晕、图标、卡片底纹全是拿它铺的。
+const BRAND = '#2563EB'
 
 const HIGHLIGHTS = [
   { icon: LineChart,   title: '看板与自选', desc: '市场全景看板、涨跌分布、情绪雷达,自定义自选列表', tint: 'text-accent' },
@@ -77,14 +79,8 @@ export function Onboarding() {
     <div className="relative min-h-screen bg-base overflow-hidden flex flex-col">
       {/* 背景光晕 —— 品牌 + 主色渐变 */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div
-          className="absolute -top-40 -left-40 h-[28rem] w-[28rem] rounded-full blur-[120px] opacity-20"
-          style={{ background: `radial-gradient(circle, ${BRAND}, transparent 70%)` }}
-        />
-        <div
-          className="absolute -bottom-40 -right-32 h-[26rem] w-[26rem] rounded-full blur-[120px] opacity-15"
-          style={{ background: 'radial-gradient(circle, oklch(var(--accent)), transparent 70%)' }}
-        />
+        {/* [R368] 两团 28rem 的模糊光晕删了 —— `blur-[120px]` 的彩色圆本身就是
+            用户点名不要的「发光效果 + 彩色大面板」, 而且它在浅底上会糊成一片脏色。 */}
         {/* 极淡网格底纹 */}
         <div
           className="absolute inset-0 opacity-[0.025]"
@@ -102,7 +98,8 @@ export function Onboarding() {
           <Logo
             size={24}
             className="shrink-0"
-            style={{ color: BRAND, filter: `drop-shadow(0 0 8px ${BRAND}55)` }}
+            // [R368] 去掉 drop-shadow 外发光, 只留颜色
+            style={{ color: BRAND }}
           />
           <span className="text-sm font-semibold tracking-tight">牛来</span>
         </div>

@@ -151,7 +151,7 @@ export function ExtDimensionAnalysis({
   subtitle,
   kindLabel = '维度',
   emptyHint = '还没有可用于分析的扩展数据。',
-  accentClass = 'bg-[radial-gradient(circle_at_top_right,rgba(59,130,246,0.16),transparent_36%)]',
+  accentClass = '',
   keywords = [],
   fallbackFieldNames = [],
 }: DimensionAnalysisProps) {

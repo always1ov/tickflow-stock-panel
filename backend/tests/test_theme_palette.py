@@ -161,6 +161,45 @@ def test_R368_全站没有发光():
     assert not hits, "发光回潮了:\n  " + "\n  ".join(hits)
 
 
+def test_R368_没有彩色大面板():
+    """用户: 「不使用…彩色大面板」。
+
+    **这一条是截图抓出来的, 不是断言抓出来的。** 第一版只扫 `bg-gradient-to-*`
+    这类方向类, 于是 `bg-[radial-gradient(…)]` 这种任意值写法整个漏网 —— 而登录
+    页那两片铺满整屏的紫+蓝光晕(`rgba(139,92,246,0.15)` / `rgba(59,130,246,0.12)`)
+    正是它。守卫全绿, 屏幕上一大片紫。
+
+    教训写在这儿: **扫类名的守卫只能挡住用类名写的东西。** 同一件事有第二种写法
+    时, 断言必须把那一种也覆盖掉, 否则它挡的是"我想到的那一半"。
+    """
+    hits = []
+    for f in sorted(SRC.rglob("*.tsx")):
+        for i, line in enumerate(f.read_text(encoding="utf-8").splitlines(), 1):
+            if "radial-gradient" not in line:
+                continue
+            # 品牌引导页那两处是**引导动画**, 走的是 token(oklch(var(--accent))),
+            # 跟着主题走, 不是写死的彩色面板 —— 放行。
+            if "Onboarding.tsx" in str(f) and "var(--accent)" in line:
+                continue
+            hits.append(f"{f.relative_to(SRC)}:{i}: {line.strip()[:90]}")
+    assert not hits, "彩色大面板回潮了:\n  " + "\n  ".join(hits)
+
+
+def test_R368_档位标签不用渐变_也不在白底上糊成一片():
+    """五档能力标签原本是紫→品红 / 蓝→紫→琥珀的**渐变标签 + 渐变文字**, 而且
+    色值全是照着深色底调的(`#a1a1aa` / `#60a5fa` / `#c084fc` 落在白卡片上对比
+    只有 2 点几)。"""
+    from tests.frontend_source import code_of
+    code = code_of("lib/capability-labels.tsx")
+    i = code.index("const TIER_STYLE")
+    blk = code[i:code.index("\n}", i)]
+    assert blk.strip()
+    assert "linear-gradient" not in blk, "档位标签还在用渐变"
+    assert "BackgroundClip: 'text'" not in blk, "还在用渐变文字"
+    for dark_only in ("#a1a1aa", "#60a5fa", "#c084fc", "#fbbf24"):
+        assert dark_only not in blk, f"这个色是给深色底调的, 白底上看不清: {dark_only}"
+
+
 def test_R368_没有蓝紫渐变():
     """用户: 「不使用蓝紫渐变」。
 

@@ -78,7 +78,7 @@ export function Auth() {
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-base px-4">
       {/* 背景辉光(与 Onboarding 风格一致) */}
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(139,92,246,0.15),transparent_40%),radial-gradient(circle_at_70%_80%,rgba(59,130,246,0.12),transparent_40%)]" />
+      <div className="pointer-events-none absolute inset-0" />
 
       <motion.div
         initial={{ opacity: 0, y: 16 }}

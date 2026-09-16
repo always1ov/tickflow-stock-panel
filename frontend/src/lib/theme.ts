@@ -123,19 +123,25 @@ const DARK: ChartTheme = {
   fillSubtle: 'rgba(255,255,255,0.04)',
 }
 
+// [R368] 亮色画布跟着新 token 重抄一遍。
+//
+// **R317 那条规矩在这儿最要紧**: canvas 不吃 CSS 变量, 所以这些 hex 是
+// index.css 的一份手抄件 —— 抄的时候要对得上, 否则同一屏里「轴上的灰」与
+// 「界面上的灰」是两种灰, **而两边看上去都没坏**。
+// 每个值后面标着它对应的 token, 改 token 就得回来改这里。
 const LIGHT: ChartTheme = {
-  text: '#5a5e66',        // --fg-muted   (原 #60646c, 旧的 slate11)
-  textStrong: '#1c2024',  // --fg-primary
-  grid: 'rgba(0,0,0,0.06)',
-  border: '#cdced6',      // --border
-  crosshair: 'rgba(0,0,0,0.3)',
-  crosshairLabelBg: '#8b8d98', // slate9
-  tooltipBg: 'rgba(255,255,255,0.97)',
-  tooltipBorder: 'rgba(0,0,0,0.1)',
-  tooltipText: '#1c2024', // --fg-primary
-  infoBarBg: 'rgba(240,240,243,0.85)',  // --base
-  zoomFill: 'rgba(0,0,0,0.06)',
-  fillSubtle: 'rgba(0,0,0,0.04)',
+  text: '#667085',        // --fg-muted    辅助文字
+  textStrong: '#101828',  // --fg-primary  主要文字
+  grid: 'rgba(16,24,40,0.06)',          // = fg-primary 的低透明度, 不用纯黑
+  border: '#E4E7EC',      // --border      普通边框
+  crosshair: 'rgba(16,24,40,0.28)',
+  crosshairLabelBg: '#475467',          // --fg-secondary: 十字线标签是深底白字
+  tooltipBg: 'rgba(255,255,255,0.97)',  // --surface
+  tooltipBorder: 'rgba(16,24,40,0.10)',
+  tooltipText: '#101828', // --fg-primary
+  infoBarBg: 'rgba(246,248,252,0.85)',  // --base       页面底
+  zoomFill: 'rgba(16,24,40,0.06)',
+  fillSubtle: 'rgba(16,24,40,0.04)',
 }
 
 export function chartTheme(theme: Theme): ChartTheme {

@@ -329,7 +329,7 @@ export function Review() {
           左右各空一大片, 右边的「历史复盘」栏也跟着被推到屏幕中间。改为贴左,
           上限放到 1600px —— 行长由正文自己的 max-w 控(见下方 prose), 不该让
           整页陪着一起窄。 */}
-      <div className="min-h-full bg-[radial-gradient(circle_at_15%_-5%,rgba(59,130,246,0.10),transparent_30%),radial-gradient(circle_at_85%_5%,rgba(139,92,246,0.08),transparent_30%)] px-3 pb-4 pt-3 lg:px-4">
+      <div className="min-h-full px-3 pb-4 pt-3 lg:px-4">
         <div className="w-full max-w-[1600px] space-y-3">
 
           {marketQuery.isLoading && !data ? (
