@@ -108,7 +108,7 @@ function ExternalWebsiteSettings() {
           <div className="flex items-center gap-2 text-[10.5px] font-semibold uppercase tracking-wider text-cyan-400/80">
             <Globe2 className="h-3.5 w-3.5" />外部网页
           </div>
-          <h2 className="mt-2 text-xl font-semibold tracking-tight text-foreground">把一个外部网页变成「盘面参考」里的一页</h2>
+          <h2 className="mt-2 text-xl font-semibold tracking-tight text-foreground">把一个外部网页变成「闲置功能」里的一页</h2>
           <p className="mt-2 text-sm leading-6 text-secondary">
             两种做法二选一：直接内嵌整站，或者由后端抓回原文、交给面板里配置的 AI 整理成统一表格再显示。
             无论哪种，牛来都不会把 TickFlow 数据、API Key 或登录凭据转发给对方。
