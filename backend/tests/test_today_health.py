@@ -385,16 +385,33 @@ def test_R319_市场时钟只有一处产地():
     # 那是另一件事。**记在这儿而不是让守卫绕开它们** —— 名单摆在明面上, 才不会
     # 被下一个人当成"本来就允许"。
     KNOWN_DEBT = {"components/SectorRotationCard.tsx", "lib/kline.ts"}
-    offenders = {
-        f.relative_to(SRC).as_posix()
+
+    # [R371] 上游新增了 `lib/format.ts` 的 cnDateFromUtc/cnDateTimeFromUtc: 把
+    # **调用方传进来的**时间戳按北京时间渲染, 自己从不取"现在"。上面那句立论说的是
+    # 「谁都不许自己换时区判时段」—— 纯格式化器不在其内(这条区分本来就写在 KNOWN_DEBT
+    # 上面那段注释里)。所以扫法收紧一层: 把**当前时刻**喂进时区格式化器的才算产地。
+    # 两张名单都双向自证, 谁也不能靠"曾经允许过"混进来。
+    now_fed = re.compile(r"\.(?:format|formatToParts)\(\s*new Date\(\)\s*\)")
+    shanghai = {
+        f.relative_to(SRC).as_posix(): src
         for f in SRC.rglob("*.ts*")
-        if f.name != "marketClock.ts" and "timeZone: 'Asia/Shanghai'" in f.read_text(encoding="utf-8")
+        if f.name != "marketClock.ts"
+        and "timeZone: 'Asia/Shanghai'" in (src := f.read_text(encoding="utf-8"))
     }
-    assert not (offenders - KNOWN_DEBT), \
-        f"又出现了新的第二处产地: {sorted(offenders - KNOWN_DEBT)}"
+    assert shanghai, "一个换时区的文件都没扫到 —— 扫法本身坏了"
+    clocks = {p for p, src in shanghai.items() if now_fed.search(src)}
+    formatters = set(shanghai) - clocks
+
+    assert not (clocks - KNOWN_DEBT), \
+        f"又出现了新的第二处产地: {sorted(clocks - KNOWN_DEBT)}"
     # 欠账还清了就把名单也删掉 —— 不许留一份"曾经允许过"的清单
-    stale = KNOWN_DEBT - offenders
+    stale = KNOWN_DEBT - clocks
     assert not stale, f"这些已经不再自己换时区了, 把它们从 KNOWN_DEBT 里删掉: {sorted(stale)}"
+
+    # 纯格式化器也得一个个过目 —— 新冒出来的必须先确认它真的只格式化传进来的时间戳
+    PURE_FORMATTERS = {"lib/format.ts"}
+    assert formatters == PURE_FORMATTERS, \
+        f"换时区的纯格式化器名单对不上: 多了 {sorted(formatters - PURE_FORMATTERS)}, 少了 {sorted(PURE_FORMATTERS - formatters)}"
 
 
 def test_R319_健康条措辞跟着交易日口径走():

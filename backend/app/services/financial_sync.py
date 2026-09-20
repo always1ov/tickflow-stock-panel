@@ -13,6 +13,7 @@ from pathlib import Path
 
 import polars as pl
 
+from app.services.fs_utils import atomic_write_parquet
 from app.tickflow.capabilities import Cap, CapabilitySet
 
 logger = logging.getLogger(__name__)
@@ -132,7 +133,7 @@ def _write_table(table: str, df: pl.DataFrame, data_dir: Path) -> int:
     out_dir = data_dir / "financials" / table
     out_dir.mkdir(parents=True, exist_ok=True)
     out_file = out_dir / "part.parquet"
-    df.write_parquet(out_file)
+    atomic_write_parquet(df, out_file)
 
     logger.info("sync_%s done: %d records written", table, len(df))
     return len(df)
