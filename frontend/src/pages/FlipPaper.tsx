@@ -542,18 +542,37 @@ function TodaySignals({ rows, conviction }: {
   const FULL: RowShape = { rank: true, trend: true }
   const PLAIN: RowShape = { rank: false, trend: false }
   /** 没进候选池那一组: 行只剩 ≈560px, 宽屏上排三列。 */
-  const plainList = 'divide-border/30 min-[1180px]:grid min-[1180px]:grid-cols-2 min-[1560px]:grid-cols-3'
-  const plainCell = (i: number) => cn(
+  // [R386] **列数要把触发价那一列算进去。**
+  //
+  // R385 我按「标的 176 + 动作 72 + 六态 256 + 间距」≈560px 定的三列 —— 漏了
+  // **触发价**: 它是 `auto` + `whitespace-nowrap`, 有值时要 ~175px, 一行实际
+  // 要 ~740px。而「手上这些」那一档每行都有触发价, 塞进 539px 的格子就**溢出
+  // 压到右边一列的字上**(用户截图里「现 46.23深科技」那种叠字)。
+  //
+  // 教训与 R385 同一条: `shape.trend` 为假**并不意味着触发价也没有** ——
+  // 名次与走势同进同出, 触发价是**第三个独立的东西**。
+  //
+  //     没触发价  0+176+72+112~256+间距 ≈ 560   → 1180 起两列, 1560 起三列
+  //     有触发价  再加 ~175                ≈ 740 → 1560 起两列, 三列放弃
+  //                                                (三列要 ≥2560 的视口, 不现实)
+  const plainCols = (hasPrice: boolean) => hasPrice
+    ? 'min-[1560px]:grid min-[1560px]:grid-cols-2'
+    : 'min-[1180px]:grid min-[1180px]:grid-cols-2 min-[1560px]:grid-cols-3'
+  const plainCell = (i: number, hasPrice: boolean) => cn(
     'min-w-0 border-b border-border/30',
-    // 两列时左边画竖缝; 三列时前两列画, 最右不画
-    i % 2 === 0 && 'min-[1180px]:border-r min-[1180px]:border-border/30',
-    i % 2 === 1 && 'min-[1560px]:border-r min-[1560px]:border-border/30',
-    (i + 1) % 3 === 0 && 'min-[1560px]:border-r-0',
+    hasPrice
+      // 只有两列: 左边那列画竖缝
+      ? i % 2 === 0 && 'min-[1560px]:border-r min-[1560px]:border-border/30'
+      // 两列时左边画竖缝; 三列时前两列画, 最右不画
+      : cn(i % 2 === 0 && 'min-[1180px]:border-r min-[1180px]:border-border/30',
+           i % 2 === 1 && 'min-[1560px]:border-r min-[1560px]:border-border/30',
+           (i + 1) % 3 === 0 && 'min-[1560px]:border-r-0'),
   )
   /** 一段(某一档)里的行 —— 进了候选池的在上、没进的在下, 各用各的版面。 */
   const renderRows = (list: FlipTodaySignal[]) => {
     const scored = list.filter((r) => conviction.has(r.symbol))
     const plain = list.filter((r) => !conviction.has(r.symbol))
+    const plainHasPrice = plain.some((r) => r.flip_price != null)
     return (
       <>
         {scored.length > 0 && (
@@ -565,9 +584,12 @@ function TodaySignals({ rows, conviction }: {
           </div>
         )}
         {plain.length > 0 && (
-          <div className={plainList}>
+          /* 触发价按**这一组**算, 不是整屏 —— 「要动手」那档没有触发价(转折已成,
+             不再有待触发的线), 「手上这些」那档每行都有。两档因此列数不同,
+             而组内仍然行行对齐。 */
+          <div className={cn('divide-border/30', plainCols(plainHasPrice))}>
             {plain.map((r, i) => (
-              <div key={r.symbol} className={plainCell(i)}>
+              <div key={r.symbol} className={plainCell(i, plainHasPrice)}>
                 <SignalRow r={r} shape={PLAIN} onOpen={openLevels} onReview={openReview} />
               </div>
             ))}

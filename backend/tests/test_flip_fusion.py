@@ -1419,3 +1419,62 @@ def test_R384_网格类只有一个产地():
     head = row[m.start():row.index(")}>", m.start())]
     assert "grid-cols-[" not in head, "网格那个 div 上又写死了列宽"
     assert "gridOf(shape)" in head, "没去 ROW_GRID 挑模板"
+
+
+# ── [R386] 列数要把触发价算进去 ──────────────────────────────────────────
+#
+# 用户截图: 「手上这些」那一档里, 触发价压到了右边一列的字上(「现 46.23深科技」)。
+#
+# **R385 我按「标的 176 + 动作 72 + 六态 112~256 + 间距」≈560px 定的三列, 漏了
+# 触发价** —— 它是 `auto` + `whitespace-nowrap`, 有值时要 ~175px, 一行实际要
+# ~740px, 塞进 539px 的格子就溢出。
+#
+# 教训与 R385 同一条, 而且是同一个错犯第二次:
+# **`shape.trend` 为假并不意味着触发价也没有。** 名次与走势同进同出(`conv` 只收
+# 有名次的), 而**触发价是第三个独立的东西** —— 「手上这些」那一档每行都有它,
+# 「要动手」那一档反而没有(转折已成, 不再有待触发的线)。
+#
+# 这个 bug **断言 class 串是抓不到的** —— 类名全都在, 只是算术错了。真正抓到它
+# 的是拿真浏览器量 `scrollWidth > clientWidth`。复现脚本的做法记在 FORK_NOTES
+# R386 里: 拦 `/api/flip-paper` 喂一档有触发价的持仓行, 在 7 个宽度上逐行量。
+
+
+def test_R386_列数把触发价算进去了():
+    """没触发价 ≈560px → 1180 起两列、1560 起三列;
+    有触发价 ≈740px → 1560 起两列, **三列直接放弃**(要 ≥2560 的视口)。"""
+    sig = _signals()
+    i = sig.index("const plainCols = (hasPrice: boolean) =>")
+    blk = sig[i:sig.index("const plainCell", i)]
+    assert blk.strip()
+    assert "hasPrice" in blk, "列数没看触发价"
+    # 有触发价那一支: 只到两列, 且断点是 1560(不是 1180)
+    assert "'min-[1560px]:grid min-[1560px]:grid-cols-2'" in blk, \
+        "有触发价时不是「1560 起两列」"
+    hi = blk[blk.index("?"):blk.index(":", blk.index("?"))]
+    assert "grid-cols-3" not in hi, "有触发价还排三列 —— 那正是撑破格子的那一版"
+    # 没触发价那一支照旧三列 —— 不能因为修这个 bug 把另一支也降级
+    lo = blk[blk.index(":", blk.index("?")):]
+    assert "min-[1560px]:grid-cols-3" in lo, "没触发价那一支的三列被顺手砍了"
+
+
+def test_R386_触发价按这一组算_不是整屏():
+    """「要动手」那档没有触发价(转折已成), 「手上这些」那档每行都有 ——
+    两档因此列数不同。按整屏算的话, 一档有触发价就把另一档也拖成两列。"""
+    sig = _signals()
+    i = sig.index("const renderRows = (list: FlipTodaySignal[]) => {")
+    blk = sig[i:sig.index("\n  }", i)]
+    assert "const plainHasPrice = plain.some((r) => r.flip_price != null)" in blk, \
+        "触发价不是从这一组的行里算的"
+    assert "plainCols(plainHasPrice)" in blk and "plainCell(i, plainHasPrice)" in blk, \
+        "算出来的 plainHasPrice 没真的用上"
+
+
+def test_R386_触发价那一格仍然不换行():
+    """`whitespace-nowrap` 是它宽度需求的来源 —— 去掉它「触发 45.85 · 现 46.23」
+    会在窄格里折行, 行高就跟着这一格变, 而 R356 定的是「每行个股行高要一样」。
+    所以它不许换行, 该让**列数**去适应它, 不是反过来。"""
+    row = _row()
+    i = row.index("触发 {r.flip_price.toFixed(2)}")
+    head = row[:i]
+    j = head.rindex("<span className=")
+    assert "whitespace-nowrap" in head[j:], "触发价那一格可以换行了 —— 行高会跟着它变"
