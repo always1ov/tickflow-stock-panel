@@ -330,9 +330,42 @@ export function FlipPaper() {
           <>
             <TodaySignals rows={d.today ?? []} conviction={conv} />
             {/* [R358] 成绩与净值图搬到筛选那张卡里了 —— 见上面那段 */}
-            <Holdings d={d} onOpen={(s) => navigate(`/stock-analysis?symbol=${s}`)} />
-            <Orders orders={d.orders} />
-            <Skipped d={d} />
+            {/* [R381] 「现在拿着」与「成交流水」并排 —— 两张都是 `min-w-[640px]`
+                的窄表, 单列铺在 1600px 上时右边一半是空的, 而它们又都是"回头看"
+                的东西, 本来就该放在一屏里对照着看(拿着的这几只, 是哪天买进来的)。
+
+                **断点是算出来的**: 内容区 ≈ 视口 − 侧栏 224 − 左右留白 32,
+                两列 640 + 12 的间隙要 1292 → 视口 ≥ 1548, 取 1560。
+                侧栏收起时会更宽松, 那只会更好看。**万一还是窄了也不会坏** ——
+                两张表自己带 `overflow-x-auto`, 最坏是卡片内部出现横向滚动条,
+                不是版面塌掉。
+                `items-start`: 两张表行数天生不对等(拿着几只 / 流水几十笔),
+                拉成等高会让短的那张下面挂一大片空白。
+
+                **第一版只是把两张表并排, 截图一看左边空了七百多像素** ——
+                「拿着 6 只」对「流水 30 笔」, 右边排到底左边早就完了。所以把
+                「有信号但没做成」也收进左列, 右列让流水竖跨两行。
+
+                **第二版又推翻了一次。** 先试的是「按 `col-start`/`row-start` 摆位,
+                DOM 顺序不动」—— 想法是让手机上的阅读顺序一个字不变。结果右列那块
+                `row-span-2` 把第一行撑高了, 左列两块中间裂开一道四百像素的缝:
+                跨行元素比它跨的两行都高时, 多出来的高度要分摊回那两行, 而分摊
+                不听我的。**摆位摆不出来就别硬摆** —— 改成左列一个容器装两块,
+                右列装流水, 高度各自算, 那道缝自然没有了。
+
+                代价是单列时顺序变成 拿着 → 没做成 → 流水(原来流水在中间)。
+                **这个代价是划算的**: 「没做成」是一句话的小结, 「流水」是几十行
+                的长表, 短的放前面本来就更好读; 而真正有顺序讲究的是「规则排在
+                最后」那一条, 它没动。 */}
+            <div className="grid gap-3 min-[1560px]:grid-cols-2 min-[1560px]:items-start">
+              <div className="min-w-0 space-y-3">
+                <Holdings d={d} onOpen={(s) => navigate(`/stock-analysis?symbol=${s}`)} />
+                <Skipped d={d} />
+              </div>
+              <div className="min-w-0">
+                <Orders orders={d.orders} />
+              </div>
+            </div>
           </>
         )}
 
@@ -668,8 +701,16 @@ function SignalRow({ r, c, onOpen, onReview }: {
           电脑上不是同一件事, 而两边都不报错 —— 这仓库从 R212 起一直在躲这个坑。
 
           `min-h` 与 `items-center` 只在宽屏生效: 卡片式那版行高本来就随内容,
-          定死反而会在只有两行字时留一截空。 */}
-      <div className="grid grid-cols-[3.5rem_minmax(0,1fr)_auto] gap-x-3 gap-y-1 text-xs sm:min-h-[3.5rem] sm:grid-cols-[3.5rem_minmax(9rem,11rem)_4.5rem_minmax(7rem,9rem)_minmax(0,1fr)_auto] sm:items-center sm:gap-y-0">
+          定死反而会在只有两行字时留一截空。
+
+          [R381] **六态那一列的上限 9rem → 16rem。** 用户: 「合理利用显示空间」。
+          9rem = 144px 装不下「按现价会转折 —— 收盘还站在这边才算数」, 于是盘中
+          越线那几行**一直被截成「…收盘还...」** —— 而截断的那半句正是这一档唯一
+          要说的话(收盘站不住就不算数)。更别扭的是: 它右边那格(走势)在没进候选池
+          的行上是**空的**, 宽屏上白白空着六百来像素, 左边却在截字。
+          16rem = 256px 刚好装下那句话(20 个字 × 11px)。**仍然是定宽列不是 `1fr`**,
+          行与行照旧对齐; `truncate` 也留着 —— 窄屏上它还得兜底。 */}
+      <div className="grid grid-cols-[3.5rem_minmax(0,1fr)_auto] gap-x-3 gap-y-1 text-xs sm:min-h-[3.5rem] sm:grid-cols-[3.5rem_minmax(9rem,11rem)_4.5rem_minmax(7rem,16rem)_minmax(0,1fr)_auto] sm:items-center sm:gap-y-0">
         {/* [R345] 「名次」那一格整格移植自今日总览 —— 用户: 「这一列要移植」。
             **不是只搬个数字**: 名次下面那三条维度条(红=趋势 45% / 蓝=量能 30% /
             黄=位置 25%)才是它能被读懂的原因 —— 离开那三条颜色, 上面那个名次
@@ -1283,15 +1324,30 @@ function Skipped({ d }: { d: FlipPaperData }) {
         note={`${d.skipped.length} 次`}
         hint={'这一栏存在的理由: **不说出来的话, 曲线会显得比实际更"顺"**。\n有信号却没动手的次数, 与做成的那些同样是这套打法的一部分。'}
       />
-      <div className="space-y-1.5 px-4 py-2.5 text-[11px]">
-        {Object.entries(byReason).map(([r, n]) => (
-          <div key={r} className="flex items-center gap-2">
-            <span className="min-w-[9rem] text-secondary">{WHY_CN[r] ?? r}</span>
-            <span className="tabular-nums text-muted">{n} 次</span>
-          </div>
-        ))}
+      {/* [R381] 「原因 + N 次」每行只有十几个字, 单列排下来右边整片是空的。
+          改成两列 —— 每一行的内容一个字没动。
+          下面两条(取不到日线 / 还在等成交)的值是一串股票名, 会很长,
+          所以**它们不进多列**, 各自独占一整行。
+
+          **列数只到 2, 不跟着视口往上加。** 这一块从 R381 起活在宽屏的**半幅
+          左列**里, 而 `sm:`/`xl:` 这些断点量的是**视口**不是它自己的宽度 ——
+          第一版写到 `2xl:grid-cols-4`, 1600px 上实际只有 650px 可用, 四列挤得
+          「6 次」两个字都拆行了。容器查询能量准, 但为这一块引一套新机制不值,
+          两列在半幅和全幅下都站得住。
+
+          原因那几句长短不一(「封板挂不进去」 vs 「一直封到反向转折, 这张单作废」),
+          所以次数靠右对齐、标签占剩下的宽 —— 标签自己换行, 次数永远在同一条竖线上。 */}
+      <div className="px-4 py-2.5 text-[11px]">
+        <div className="grid gap-x-8 gap-y-1.5 sm:grid-cols-2">
+          {Object.entries(byReason).map(([r, n]) => (
+            <div key={r} className="flex items-baseline justify-between gap-3">
+              <span className="min-w-0 text-secondary">{WHY_CN[r] ?? r}</span>
+              <span className="shrink-0 tabular-nums text-muted">{n} 次</span>
+            </div>
+          ))}
+        </div>
         {d.missing.length > 0 && (
-          <div className="flex items-start gap-2 pt-1">
+          <div className="flex items-start gap-2 pt-2">
             <span className="min-w-[9rem] shrink-0 text-warning">取不到日线</span>
             <span className="text-muted">
               {d.missing.join('、')} —— 这几只没进这次模拟, 不是它们没信号
@@ -1299,7 +1355,7 @@ function Skipped({ d }: { d: FlipPaperData }) {
           </div>
         )}
         {d.pending.length > 0 && (
-          <div className="flex items-start gap-2 pt-1">
+          <div className="flex items-start gap-2 pt-2">
             <span className="min-w-[9rem] shrink-0 text-secondary">还在等成交</span>
             <span className="text-muted">
               {d.pending.map((p) => `${p.name}(${p.act === 'buy' ? '买' : '卖'})`).join('、')}
@@ -1315,18 +1371,32 @@ function Rules({ r, d }: { r: FlipRules; d?: FlipPaperData }) {
   return (
     <section className="overflow-hidden rounded-card border border-border/60 bg-surface/40">
       <SectionHead title="这套规则" note="口径 —— 与后端同一份, 不是这里另写的" />
-      <div className="space-y-2 px-4 py-3 text-[11px] leading-relaxed">
-        <Rule k="信号" v={r.signal} />
-        <Rule k="成交" v={r.execute} />
-        <Rule k="方向" v={r.direction.join('; ')} />
-        <Rule k="仓位" v={`${r.sizing} —— 现在是 ${d?.max_positions ?? '—'} 只`} />
-        <Rule k="标的" v={`${r.universe}${d ? ` —— 现在 ${d.symbols.length} 只` : ''}`} />
-        <Rule k="不做空" v={r.short} />
-        <Rule k="成本" v={`佣金 ${(r.costs.commission * 10000).toFixed(1)}‱ 双边 · 印花税 ${(r.costs.stamp_tax * 10000).toFixed(1)}‱ 卖出单边 · 滑点 ${r.costs.slippage_bps}bp · ${r.costs.lot} 股一手`} />
-        <div className="mt-2 space-y-1.5 border-t border-border/40 pt-2 text-muted">
+      {/* [R381] 这一段是全页最浪费的一块: 七条「标签 + 一行值」竖着排在 1600px 上,
+          每行右边空掉三分之二, 还把下面的东西挤出首屏。改成两列 / 宽屏三列。
+          **口径一个字没改**, 七条还是那七条, 次序也没动 —— 这是查证用的清单,
+          顺序本身就是信息(先说信号怎么来, 再说怎么成交)。多列按**列优先**
+          没有意义, 所以用默认的行优先: 从左到右读, 和原来从上到下读是同一串。
+
+          「成本」那条值最长(佣金/印花税/滑点/一手), 让它在多列时独占一整行,
+          免得它一个人把整行的行高撑成两倍。
+
+          底下三段告诫是成段的话, 不是清单 —— 它们走自己的两列, 且保持顺序。 */}
+      <div className="px-4 py-3 text-[11px] leading-relaxed">
+        <div className="grid gap-x-8 gap-y-2 md:grid-cols-2 2xl:grid-cols-3">
+          <Rule k="信号" v={r.signal} />
+          <Rule k="成交" v={r.execute} />
+          <Rule k="方向" v={r.direction.join('; ')} />
+          <Rule k="仓位" v={`${r.sizing} —— 现在是 ${d?.max_positions ?? '—'} 只`} />
+          <Rule k="标的" v={`${r.universe}${d ? ` —— 现在 ${d.symbols.length} 只` : ''}`} />
+          <Rule k="不做空" v={r.short} />
+          <div className="md:col-span-2 2xl:col-span-3">
+            <Rule k="成本" v={`佣金 ${(r.costs.commission * 10000).toFixed(1)}‱ 双边 · 印花税 ${(r.costs.stamp_tax * 10000).toFixed(1)}‱ 卖出单边 · 滑点 ${r.costs.slippage_bps}bp · ${r.costs.lot} 股一手`} />
+          </div>
+        </div>
+        <div className="mt-3 grid gap-x-8 gap-y-1.5 border-t border-border/40 pt-2.5 text-muted xl:grid-cols-2">
           <p>{r.caveat}</p>
           <p>{r.vs_flip_trades}</p>
-          <p>{r.why_no_state}</p>
+          <p className="xl:col-span-2">{r.why_no_state}</p>
         </div>
       </div>
     </section>

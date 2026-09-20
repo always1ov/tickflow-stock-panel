@@ -107,9 +107,23 @@ def test_R343_模拟盘原有六块的顺序没被动过():
     # 用户把它们并进了筛选那张卡(「我是想合并到筛选的卡片里面」), `Summary`
     # 现在走 `extra={summary}` 这个插槽, `NavChart` 则收进 `Summary` 里的折叠区。
     # 它们各自的守卫在 `test_R358_*`。这里只管**留在主列里的那几块**次序没乱。
-    order = ["<TodaySignals", "<Holdings", "<Orders", "<Skipped", "<Rules"]
+    # [R381] **`<Skipped>` 与 `<Orders>` 对调了一次, 是有意的。**
+    #
+    # 用户: 「模拟盘页面的内容需要重新排版, 合理利用显示空间」。宽屏上「现在拿着」
+    # 与「成交流水」并排之后, 左列只装一块会空掉一大截(拿着 6 只 vs 流水 30 笔),
+    # 所以「没做成」收进左列 —— 而左列是一个容器, 容器里的东西在 DOM 里必须连着。
+    #
+    # 先试过「不动 DOM, 用 col-start/row-start 摆位」, 结果右列 row-span-2 把第一行
+    # 撑高、左列两块中间裂开一道四百像素的缝(跨行元素的多余高度怎么分摊不听我的)。
+    #
+    # **单列时的顺序因此变成 拿着 → 没做成 → 流水。** 这个代价是划算的: 「没做成」
+    # 是一句话的小结, 「流水」是几十行的长表, 短的放前面本来就更好读。
+    #
+    # 真正有讲究的那一条**没动**: 「规则排在最后」—— 它是查证用的, 不该天天占首屏。
+    order = ["<TodaySignals", "<Holdings", "<Skipped", "<Orders", "<Rules"]
     idx = [body.index(t) for t in order]
     assert idx == sorted(idx), f"版面顺序被动过: {order}"
+    assert body.index("<Rules") == max(idx), "「规则排在最后」这一条被动了"
     assert "<NavChart" not in body, "净值图该在 Summary 的折叠区里, 不在主列"
 
 
@@ -384,7 +398,10 @@ def test_R356_把右边那片空地用上():
     assert "max-w-[72rem]" not in row, "还限着宽, 右边那片空地没用上"
     # 六列。[R360] 名次挪到了最前(用户: 「这列内容统一放到股票名称前面」):
     #   名次 / 标的 / 动作 / 六态 / 走势 / 触发价
-    assert "sm:grid-cols-[3.5rem_minmax(9rem,11rem)_4.5rem_minmax(7rem,9rem)_minmax(0,1fr)_auto]" in row, \
+    # [R381] 六态那一列的上限 9rem → 16rem。**立论一个字没变**(把空地用上),
+    # 只是发现还有一处没用上: 9rem 装不下「按现价会转折 —— 收盘还站在这边才算数」,
+    # 左边在截字、右边那格空着六百像素。细节与变异见 test_R381_六态那句话能显示完整。
+    assert "sm:grid-cols-[3.5rem_minmax(9rem,11rem)_4.5rem_minmax(7rem,16rem)_minmax(0,1fr)_auto]" in row, \
         "宽屏那套列宽变了 —— 定宽网格是行与行对齐的前提"
 
 
@@ -1141,3 +1158,79 @@ def test_R366_根目录那几个文件按原样发_不落进SPA兜底():
         r = c.get(escape)
         assert b"spa_fallback" not in r.content, f"路径穿越没挡住: {escape}"
         assert "text/html" in r.headers["content-type"], "越界的请求该落到 SPA 兜底"
+
+
+# ── [R381] 重新排版:把宽屏上空着的那半边用起来 ──────────────────────────
+#
+# 用户: 「模拟盘页面的内容需要重新排版, 合理利用显示空间」。
+#
+# **这一轮是拿真数据看出来的, 不是拿空页面猜的。** 本地这套没有行情 Key, 直接
+# 开页面是空的 —— 空页面上"哪儿浪费"全看不见。所以用 Playwright 把
+# `/api/flip-paper` 拦下来喂一份像样的假数据(9 条信号 / 6 只持仓 / 46 笔流水 /
+# 23 次没做成 / 12 个月), 在 1366/1600/1920/390 四个宽度上各看一遍。
+#
+# 看出来三处, 都是**只改版面不改内容**:
+#   ① 六态那一列被 9rem 截字, 右边那格却空着六百像素
+#   ② 「现在拿着」与「成交流水」各占一整行, 两张都是 min-w-[640px] 的窄表
+#   ③ 「这套规则」七条竖着排, 「有信号但没做成」也是一条一行
+
+
+def test_R381_六态那句话能显示完整():
+    """9rem = 144px 装不下「按现价会转折 —— 收盘还站在这边才算数」, 盘中越线
+    那几行一直被截成「…收盘还...」 —— 而截掉的正是这一档唯一要说的话。
+
+    **仍然是定宽列, 不是 `1fr`**: 行与行要对齐, 这是 R350 定的。
+    """
+    from tests.frontend_source import code_of
+    code = code_of("pages/FlipPaper.tsx")
+    assert "sm:grid-cols-[3.5rem_minmax(9rem,11rem)_4.5rem_minmax(7rem,16rem)_minmax(0,1fr)_auto]" in code, \
+        "六态那一列的宽度被改回去了(或整条栅格被动过)"
+    # 窄屏那条一个字没动 —— R366 的卡片式布局靠它
+    assert "grid-cols-[3.5rem_minmax(0,1fr)_auto]" in code, "窄屏栅格被动了"
+
+
+def test_R381_现在拿着与成交流水在宽屏并排():
+    """两张都是 `min-w-[640px]` 的窄表, 各占一整行时右边一半是空的。
+
+    断点 1560 是算出来的: 内容区 ≈ 视口 − 侧栏 224 − 留白 32, 两列 640 + 12
+    的间隙要 1292 → 视口 ≥ 1548。**窄了也不会坏** —— 两张表自带
+    `overflow-x-auto`, 最坏是卡片内部出现横向滚动条。
+    """
+    from tests.frontend_source import code_of
+    code = code_of("pages/FlipPaper.tsx")
+    i = code.index("<TodaySignals")
+    blk = code[i:code.index("<Rules", i)]
+    assert blk.strip()
+    assert "min-[1560px]:grid-cols-2" in blk, "并排那层栅格没了"
+    # 左列装两块(拿着 + 没做成), 右列装流水 —— 左列只装一块的话会空掉一大截
+    left = blk[blk.index('className="min-w-0 space-y-3"'):]
+    left = left[:left.index("</div>")]
+    assert "<Holdings" in left and "<Skipped" in left, "左列没把「没做成」收进来"
+    assert "<Orders" not in left, "流水跑到左列去了"
+
+
+def test_R381_规则与没做成都改成多列():
+    """七条「标签 + 一行值」竖着排在 1600px 上, 每行右边空掉三分之二,
+    还把下面的东西挤出首屏。**口径一个字没改, 只是换了排法。**"""
+    from tests.frontend_source import code_of
+    code = code_of("pages/FlipPaper.tsx")
+
+    rules = code[code.index("function Rules("):]
+    rules = rules[:rules.index("\nfunction ")]
+    assert rules.strip()
+    assert "md:grid-cols-2 2xl:grid-cols-3" in rules, "规则没排成多列"
+    # 七条一条不少, 次序也没动 —— 这是查证用的清单, 顺序本身是信息
+    for k in ("信号", "成交", "方向", "仓位", "标的", "不做空", "成本"):
+        assert f'k="{k}"' in rules, f"规则少了一条: {k}"
+    assert rules.index('k="信号"') < rules.index('k="成交"') < rules.index('k="方向"'), \
+        "规则的次序被打乱了"
+    # 「成本」那条最长, 多列时独占一整行
+    assert "md:col-span-2 2xl:col-span-3" in rules, "「成本」没独占整行, 会把行高撑成两倍"
+
+    skipped = code[code.index("function Skipped("):]
+    skipped = skipped[:skipped.index("\nfunction ")]
+    assert skipped.strip()
+    # **列数只到 2**: 这一块活在半幅左列里, 而 sm:/xl: 量的是视口不是它自己的宽度
+    assert "sm:grid-cols-2" in skipped, "没做成那几条没排成两列"
+    assert "grid-cols-3" not in skipped and "grid-cols-4" not in skipped, \
+        "列数又往上加了 —— 它在半幅列里, 视口断点在这儿是假的"
