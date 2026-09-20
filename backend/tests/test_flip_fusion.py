@@ -17,6 +17,8 @@ R341 那一版做的是**挂一条补充带在底部**, 方向错了: 那还是"
 """
 from __future__ import annotations
 
+import re
+
 from tests.frontend_source import code_of
 
 FLIP = "pages/FlipPaper.tsx"
@@ -351,7 +353,7 @@ def test_R356_走势并进同一行_自成一列():
     row = _row()
     assert "<TrendCell o={c} />" in row
     # 它在网格里, 不再是网格之外的第二行
-    grid = row[row.index('<div className="grid'):]
+    grid = row[row.index("<div className={cn("):]
     assert "<TrendCell o={c} />" in grid, "走势跑到网格外面去了 —— 那就又是第二行"
     assert "pl-[22.25rem]" not in row, "还留着第二行那套缩进"
     # 六态那句仍然在它自己的格子里, 排在走势之前
@@ -372,7 +374,7 @@ def test_R356_走势那一格自己也是一行():
 
 
 def test_R356_行高定死_不随有没有走势变():
-    """**用户的第二件事**: 「每行个股行高要一样」。
+    """**用户的第二件事**: 「每行个股行高要一样」。(R383 起是"整屏统一决定撑不撑")
 
     名次那一格本身有三行高(名次 / 分 / 三条维度条), 而没进候选池的票只有两行字
     —— 不定死的话, **行高就跟着"这只票有没有进候选池"变**, 一屏扫下去参差不齐。
@@ -382,7 +384,17 @@ def test_R356_行高定死_不随有没有走势变():
     # [R366] **带上 `sm:` 前缀断言。** 手机上折成了卡片式, 行高本来就随内容 ——
     # 那儿定死反而会在只有两行字时留一截空。裸写 `"min-h-[3.5rem]"` 的话,
     # `sm:min-h-[3.5rem]` 也含着它, 断言分不出这两件事(锚是别人的子串, 又一次)。
-    assert "sm:min-h-[3.5rem]" in grid_cls, "宽屏的行高没定死"
+    # [R383] **这一条现在是有条件的, 守卫跟着说清楚。**
+    #
+    # 立论没变 —— 「行与行一样高」。但撑行高的理由只在**真有名次**时存在:
+    # 名次那一格三行高, 所以要把没名次的行也垫到同样高度。整屏一个名次都没有时
+    # (用户实机就是这样: 32 行全是「没进候选池」), 每行只有两行字, 再垫到
+    # 3.5rem 就是每行白送 26px —— 32 行八百多像素的滚动, 垫的是"和谁一样高"?
+    #
+    # 所以判据是: **撑不撑由整屏统一决定(`shape.rank`), 不是每行各自算。**
+    # 后者才会真的出现"行高跟着这只票有没有进候选池变", 那正是 R356 要挡的。
+    assert "shape.rank && 'sm:min-h-[3.5rem]'" in grid_cls, \
+        "行高要么没了, 要么改成每行各自算 —— 后者正是 R356 挡的那件事"
     # **`items-center` 必须钉在网格那个 div 自己身上。** 只查 `"items-center" in row`
     # 是不够的 —— 动作徽标那几个 span 用的是 `inline-flex items-center`, 断言会被
     # 它们喂饱, 于是把网格上的这个类删掉守卫照样是绿的(变异电池当场抓到)。
@@ -401,8 +413,10 @@ def test_R356_把右边那片空地用上():
     # [R381] 六态那一列的上限 9rem → 16rem。**立论一个字没变**(把空地用上),
     # 只是发现还有一处没用上: 9rem 装不下「按现价会转折 —— 收盘还站在这边才算数」,
     # 左边在截字、右边那格空着六百像素。细节与变异见 test_R381_六态那句话能显示完整。
-    assert "sm:grid-cols-[3.5rem_minmax(9rem,11rem)_4.5rem_minmax(7rem,16rem)_minmax(0,1fr)_auto]" in row, \
-        "宽屏那套列宽变了 —— 定宽网格是行与行对齐的前提"
+    # [R383] 这一串搬进了 `ROW_GRID`, 所以从 `_grid_class` 里查。它现在是
+    # **走势有内容**时的那一套; 整屏没走势时另有一套把那一格收成 0。
+    assert "sm:grid-cols-[3.5rem_minmax(9rem,11rem)_4.5rem_minmax(7rem,16rem)_minmax(0,1fr)_auto]" \
+        in _grid_class(row), "宽屏那套列宽变了 —— 定宽网格是行与行对齐的前提"
 
 
 def test_R356_没进候选池时走势格空着但占位():
@@ -455,12 +469,25 @@ def _grid_class(row: str) -> str:
 
     [R366] 这一串里现在**两套栅格并存**(窄屏卡片 / 宽屏六列), 断言要自己分清
     查的是哪一套 —— `sm:` 前缀就是分界。
+
+    [R383] 宽屏那套**从写死变成按这一屏的形状挑**(见 `ROW_GRID`), 于是它不再
+    写在 div 上, 而是由 `cn(...)` 从那张表里取。所以这里返回的是**两段拼起来**:
+    行上那个 `cn(...)` 的实参 + `ROW_GRID` 那张表。合起来才是"这一行可能长的样子",
+    分开看哪一段都不完整。
     """
-    i = row.index('<div className="grid')
-    j = row.index('"', i + len('<div className="'))
-    cls = row[i + len('<div className="'):j]
+    # **行容器也是 `cn(...)`**(它挂买卖底色), 所以不能只认 `<div className={cn(` ——
+    # 那会切到外层那个, 里头一个 grid-cols 都没有。认「cn 的第一个实参就是 'grid …'」。
+    m = re.search(r"<div className=\{cn\(\s*\n?\s*'grid ", row)
+    assert m, "找不到网格那个 div"
+    i = m.start()
+    j = row.index(")}>", i)
+    cls = row[i:j]
     assert "grid-cols-[" in cls, "切到的不是网格那个 div"
-    return cls
+    code = code_of(FLIP)
+    k = code.index("const ROW_GRID = {")
+    table = code[k:code.index("} as const", k)]
+    assert "sm:grid-cols-[" in table, "ROW_GRID 那张表里没有宽屏栅格"
+    return cls + "\n" + table
 
 
 def test_R350_信号行是定宽网格_不是flex():
@@ -475,8 +502,12 @@ def test_R350_信号行是定宽网格_不是flex():
     # [R366] **两处**: 窄屏那张卡片栅格 + `sm:` 起那张六列。立论没变(仍然是
     # 定宽网格而不是 flex), 只是同一个 div 上挂了两套。**不许再多**: 第三套
     # 意味着又有一个宽度区间是谁也没看过的。
-    assert row.count("grid-cols-[") == 2, "栅格定义不是两套(窄屏一套 + sm: 一套)"
-    assert row.count("sm:grid-cols-[") == 1, "宽屏那套不见了"
+    # [R383] 宽屏那套挪进了 `ROW_GRID`, 所以从「行 + 那张表」一起数。
+    # 窄屏 1 套 + 宽屏 2 套(走势有/无), 共 3 套。**不许再多**: 第四套意味着
+    # 又有一个宽度区间是谁也没看过的。
+    cls = _grid_class(row)
+    assert cls.count("grid-cols-[") == 3, f"栅格定义不是三套: {cls.count('grid-cols-[')}"
+    assert cls.count("sm:grid-cols-[") == 2, "宽屏那两套(走势有/无)不齐"
 
 
 def test_R350_名次那一格空着也占位():
@@ -722,7 +753,7 @@ def test_R360_名次是整行第一格_排在标的前面():
     # [R366] 两套栅格的第一列**都**得是名次那 3.5rem —— 只改一套的话, 另一个
     # 宽度区间里名次会去占标的的位置, 而那个区间没人看过。
     cols = [c for c in _grid_class(row).split() if "grid-cols-[" in c]
-    assert len(cols) == 2, f"栅格不是两套: {cols}"
+    assert len(cols) == 3, f"栅格不是三套(窄屏 1 + 宽屏 2): {cols}"
     for c in cols:
         body = c[c.index("grid-cols-["):]
         assert body.startswith("grid-cols-[3.5rem_"), \
@@ -1234,3 +1265,74 @@ def test_R381_规则与没做成都改成多列():
     assert "sm:grid-cols-2" in skipped, "没做成那几条没排成两列"
     assert "grid-cols-3" not in skipped and "grid-cols-4" not in skipped, \
         "列数又往上加了 —— 它在半幅列里, 视口断点在这儿是假的"
+
+
+# ── [R383] 没内容的列不该占宽 ────────────────────────────────────────────
+#
+# 用户(第二次说了): 「不是叫你重新排版模拟盘页面吗, 怎么一点都变化」。
+#
+# **R381 那一轮我拿自己造的假数据改的, 而那份假数据恰好把真问题遮住了。**
+# 用户实机是 32 行全「已转折」、全「没进候选池」、`flip_price` 为 null ——
+# 于是 R381 改的三处在他那一屏上一处都看不见(六态加宽只对「盘中越线」有效,
+# 另外两处全在折叠线以下)。照着他的数据形状量了一遍才看见真的浪费:
+#
+#     行宽 1688 · 走势那一格独占 1068 而且是空的(63%) · 行高被 min-h 撑着 56
+#
+# R356 定下定宽网格的立论是「行与行天然对齐」—— 那条立论要的是**行与行之间**
+# 对齐, 不是某一列必须占住某个绝对宽度。所以: 整屏都没有的那一列, 宽度给 0。
+
+
+def _signals() -> str:
+    code = code_of(FLIP)
+    blk = code[code.index("function TodaySignals"):]
+    out = blk[:blk.index("\nfunction ", 1)]
+    assert out.strip()
+    return out
+
+
+def test_R383_这一屏的形状只算一次_三段共用():
+    """分段各算各的话, 「要动手」那段和「只是盯着」那段会挑到不同的栅格,
+    上下两段列对不齐 —— **而且不报错**。所以从**全部行**算一次, 三段共用。"""
+    sig = _signals()
+    i = sig.index("const shape: RowShape = {")
+    blk = sig[i:sig.index("}", i)]
+    assert blk.strip()
+    for key in ("rank:", "trend:"):
+        assert key in blk, f"形状里少了 {key}"
+    # 算的是 `rows`(全部), 不是某一段
+    assert blk.count("rows.some(") == 2, "形状不是从全部行算的"
+    for seg in ("ordered.map", "mineSorted.map", "idleSorted.map"):
+        j = sig.index(seg)
+        assert "shape={shape}" in sig[j:j + 420], f"{seg} 那一段没传同一份 shape"
+
+
+def test_R383_整屏没走势时那一列收成0():
+    """走势整屏都空却还吃着 `1fr`, 就是把 63% 的行宽白白空在那儿。"""
+    code = code_of(FLIP)
+    i = code.index("const ROW_GRID = {")
+    table = code[i:code.index("} as const", i)]
+    assert table.strip()
+    assert "minmax(0,1fr)_auto]" in table, "走势有内容时那一套不见了"
+    assert "_0_auto]" in table, "整屏没走势时那一套没把走势收成 0"
+    assert table.count("sm:grid-cols-[") == 2, "宽屏栅格不是两套"
+    # 挑哪一套**只看 shape.trend**, 不许掺别的
+    assert "shape.trend ? ROW_GRID.wide : ROW_GRID.narrow" in code, "挑栅格的判据变了"
+
+
+def test_R383_行窄下来之后排两列():
+    """一行 620px 排完、而宽屏有 1600+ 时, 32 行排成两列能把滚动砍一半。
+    **走势有内容时保持单列** —— 那时行本来就要吃满宽度。"""
+    sig = _signals()
+    assert "const twoCol = !shape.trend" in sig, "两列的判据不是「这一屏没有走势」"
+    assert "min-[1560px]:grid-cols-2" in sig, "两列那层栅格没了"
+    # 两列时分隔线得画在格子上 —— `divide-y` 在两列栅格里只横着画, 竖缝没人画
+    assert "min-[1560px]:border-r" in sig, "两列之间没有竖缝"
+    assert "border-b border-border/30" in sig, "格子上没有横线"
+
+
+def test_R383_三段都用同一套列与同一个两列开关():
+    """三段各挑各的话, 「要动手」两列而「盯着」一列, 同一张卡里两种版面。"""
+    sig = _signals()
+    assert sig.count("className={listCls}") + sig.count("cn('max-h-64 overflow-y-auto', listCls)") == 3, \
+        "三段没有共用同一个列表容器类"
+    assert sig.count("className={cellCls(i)}") == 3, "三段没有共用同一个格子类"

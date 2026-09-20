@@ -445,8 +445,11 @@ def test_R379_看盘页的密度一个像素没动():
     assert "text-xs" in table or "text-[11px]" in table, "自选表格的紧凑字号没了"
     # 模拟盘信号行: R356 定下的行高与栅格没被放开
     flip = code_of("pages/FlipPaper.tsx")
-    assert "sm:min-h-[3.5rem]" in flip, "模拟盘信号行的行高被动了"
-    assert "grid-cols-[3.5rem_minmax(0,1fr)_auto]" in flip, "模拟盘信号行的栅格被动了"
+    # [R383] 行高改成由整屏统一决定撑不撑(整屏没名次就不撑 —— 那时每行只有两行字,
+    # 垫高是白送滚动)。**这不是"放开密度"而是相反**: 该紧的时候更紧了。
+    # 所以这里钉的从"写死 3.5rem"换成"那一档还在, 且由 shape 统一决定"。
+    assert "shape.rank && 'sm:min-h-[3.5rem]'" in flip, "模拟盘信号行的行高档位没了"
+    assert "grid-cols-[3.5rem_minmax(0,1fr)_auto]" in flip, "模拟盘信号行的窄屏栅格被动了"
 
 
 # ── [R382] 换皮肤别漏掉暗色 ──────────────────────────────────────────────

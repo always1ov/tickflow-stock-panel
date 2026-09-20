@@ -522,6 +522,27 @@ function TodaySignals({ rows, conviction }: {
   // (`NEAR_EXIT`)—— 两处各写一份的话, 会出现"条上说 2 只、展开却只有 1 行标黄"。
   const mineNear = mine.filter((r) => r.gap_pct != null && Math.abs(r.gap_pct) <= NEAR_EXIT).length
 
+  // [R383] **这一屏的形状** —— 三格各自"整屏有没有内容", 从**全部行**算一次,
+  // 三段共用同一份。分段各算各的话, 「要动手」那段和「只是盯着」那段会用上
+  // 不同的栅格, 上下两段列对不齐, 而且不报错。
+  const shape: RowShape = {
+    rank: rows.some((r) => conviction.get(r.symbol)?.rank != null),
+    trend: rows.some((r) => conviction.has(r.symbol)),
+  }
+  // 走势那一列整屏都空时, 一行 620px 就排完了 —— 而宽屏上有 1600+。
+  // 这种时候把行**排成两列**: 32 行的滚动直接砍一半。
+  // 走势有内容时行本来就要吃满宽度, 保持单列。
+  // 断点与 R381 那处并排用同一个(内容区 ≈ 视口 − 侧栏 224 − 留白 32)。
+  const twoCol = !shape.trend
+  const listCls = cn('divide-border/30', twoCol
+    ? 'min-[1560px]:grid min-[1560px]:grid-cols-2'
+    : 'divide-y')
+  /** 两列时分隔线画在每个格子上 —— `divide-y` 在两列栅格里只会横着画, 竖缝没人画。 */
+  const cellCls = (i: number) => twoCol
+    ? cn('min-w-0 border-b border-border/30',
+         i % 2 === 0 && 'min-[1560px]:border-r min-[1560px]:border-border/30')
+    : undefined
+
   return (
     <>
     <section className="overflow-hidden rounded-card border border-border/60 bg-surface/40">
@@ -543,9 +564,13 @@ function TodaySignals({ rows, conviction }: {
       ) : (
         <>
           {ordered.length > 0 && (
-            <div className="divide-y divide-border/30">
-              {ordered.map((r) => <SignalRow key={r.symbol} r={r} c={conviction.get(r.symbol)}
-                                        onOpen={openLevels} onReview={openReview} />)}
+            <div className={listCls}>
+              {ordered.map((r, i) => (
+                <div key={r.symbol} className={cellCls(i)}>
+                  <SignalRow r={r} c={conviction.get(r.symbol)} shape={shape}
+                             onOpen={openLevels} onReview={openReview} />
+                </div>
+              ))}
             </div>
           )}
           {ordered.length === 0 && (
@@ -580,9 +605,13 @@ function TodaySignals({ rows, conviction }: {
                 </span>
               </button>
               {mineOpen && (
-                <div className="divide-y divide-border/30">
-                  {mineSorted.map((r) => <SignalRow key={r.symbol} r={r} c={conviction.get(r.symbol)}
-                                        onOpen={openLevels} onReview={openReview} />)}
+                <div className={listCls}>
+                  {mineSorted.map((r, i) => (
+                    <div key={r.symbol} className={cellCls(i)}>
+                      <SignalRow r={r} c={conviction.get(r.symbol)} shape={shape}
+                                 onOpen={openLevels} onReview={openReview} />
+                    </div>
+                  ))}
                 </div>
               )}
             </>
@@ -603,9 +632,13 @@ function TodaySignals({ rows, conviction }: {
               </button>
               {watchOpen && (
                 /* 限高 + 自己滚: 盯着的票可能几十只, 让它把整页顶长等于没折叠 */
-                <div className="max-h-64 divide-y divide-border/30 overflow-y-auto">
-                  {idleSorted.map((r) => <SignalRow key={r.symbol} r={r} c={conviction.get(r.symbol)}
-                                        onOpen={openLevels} onReview={openReview} />)}
+                <div className={cn('max-h-64 overflow-y-auto', listCls)}>
+                  {idleSorted.map((r, i) => (
+                    <div key={r.symbol} className={cellCls(i)}>
+                      <SignalRow r={r} c={conviction.get(r.symbol)} shape={shape}
+                                 onOpen={openLevels} onReview={openReview} />
+                    </div>
+                  ))}
                 </div>
               )}
             </>
@@ -632,8 +665,36 @@ function TodaySignals({ rows, conviction }: {
 /** [R339] 离清仓线多近才算"贴着了"。**只用来上色, 不产生任何动作。** */
 const NEAR_EXIT = 0.02
 
-function SignalRow({ r, c, onOpen, onReview }: {
+/**
+ * [R383] 宽屏那套栅格 —— **按「这一屏到底有没有那些内容」选**, 不是写死一套。
+ *
+ * R356 定下定宽网格时的立论是「行与行天然对齐, 一列扫到底」—— 那条立论没错,
+ * 但它要的是**行与行之间**对齐, 不是某一列必须占住某个绝对宽度。实机量出来的
+ * 后果是: 一整屏 32 行全是「没进候选池」时, 走势那一格**独占 1068px 而且是空的**
+ * (行宽 1688, 63% 在那儿闲着), 触发价那格也是空的 —— 而左边的内容 620px 就排完了。
+ *
+ * 所以: 整屏都没有的那一列, 宽度给 0。**同一屏里所有行用同一套模板**, 行与行
+ * 照旧对齐 —— 变的是"这一屏需要几列", 不是"每行各自算各自的"。
+ */
+const ROW_GRID = {
+  /** 这一屏有走势读数 —— 它吃 `1fr`, 行铺满整宽(R356 那版) */
+  wide: 'sm:grid-cols-[3.5rem_minmax(9rem,11rem)_4.5rem_minmax(7rem,16rem)_minmax(0,1fr)_auto]',
+  /** 整屏都没有走势 —— 那一格收成 0。触发价那列是 `auto`, 空着自己就收, 不用另开一套 */
+  narrow: 'sm:grid-cols-[3.5rem_minmax(9rem,11rem)_4.5rem_minmax(7rem,16rem)_0_auto]',
+} as const
+
+/** 这一屏的行里, 哪几格真有东西 —— 决定用哪套栅格、要不要撑行高、能不能排两列。 */
+export interface RowShape {
+  /** 有没有任何一行拿得到名次(名次那一格是三行高的, 它决定要不要撑行高) */
+  rank: boolean
+  /** 有没有任何一行有走势读数 */
+  trend: boolean
+}
+
+function SignalRow({ r, c, shape, onOpen, onReview }: {
   r: FlipTodaySignal; c?: TodayOpportunity
+  /** [R383] 这一屏的形状 —— 同一屏所有行共用一份, 所以行与行仍然对齐 */
+  shape: RowShape
   /** [R363] 点标的那一格 —— 弹关键价位(日 K + 压力支撑), 不跳页 */
   onOpen: (symbol: string, name: string) => void
   /** [R364] 点动作那一格 —— 弹逐日复盘。**与上面不是同一张表**, 见那一格的注释 */
@@ -710,7 +771,14 @@ function SignalRow({ r, c, onOpen, onReview }: {
           的行上是**空的**, 宽屏上白白空着六百来像素, 左边却在截字。
           16rem = 256px 刚好装下那句话(20 个字 × 11px)。**仍然是定宽列不是 `1fr`**,
           行与行照旧对齐; `truncate` 也留着 —— 窄屏上它还得兜底。 */}
-      <div className="grid grid-cols-[3.5rem_minmax(0,1fr)_auto] gap-x-3 gap-y-1 text-xs sm:min-h-[3.5rem] sm:grid-cols-[3.5rem_minmax(9rem,11rem)_4.5rem_minmax(7rem,16rem)_minmax(0,1fr)_auto] sm:items-center sm:gap-y-0">
+      <div className={cn(
+        'grid grid-cols-[3.5rem_minmax(0,1fr)_auto] gap-x-3 gap-y-1 text-xs sm:items-center sm:gap-y-0',
+        shape.trend ? ROW_GRID.wide : ROW_GRID.narrow,
+        // [R383] 行高只在**真有名次**时撑 —— 名次那一格是三行高(名次/分/三条维度),
+        // 撑行高是为了让"有名次"和"没名次"的行一样高。整屏都没名次时, 每行只有
+        // 两行字, 再撑 3.5rem 就是每行白送 26px: 32 行就是 800 多像素的滚动。
+        shape.rank && 'sm:min-h-[3.5rem]',
+      )}>
         {/* [R345] 「名次」那一格整格移植自今日总览 —— 用户: 「这一列要移植」。
             **不是只搬个数字**: 名次下面那三条维度条(红=趋势 45% / 蓝=量能 30% /
             黄=位置 25%)才是它能被读懂的原因 —— 离开那三条颜色, 上面那个名次
