@@ -196,7 +196,7 @@ Keltner 三档、注记·不计分、焦点名单、收盘口径 vs 盘中口径
 | 项 | 值 |
 |---|---|
 | 镜像仓库 | `ghcr.io/always1ov/tickflow-stock-panel` |
-| Tag 策略 | **只产 `:latest`**（不含 `:sha` / `:v*`） |
+| Tag 策略 | 发布分支与 `v*` tag 覆盖 **`:latest`**；此外**每次构建都另出** `:<sha>` 与 `:<分支名>`（斜杠转横线），`v*` tag 另出 `:vX.Y.Z`。部署只拉 `:latest`，其余是可追溯用的 |
 | 部署方式 | `docker-compose.yml` 拉取预构建 `:latest`，不本地 build |
 | CI 工作流 | `.github/workflows/docker.yml`（push 到 **`main` 或 `claude/upstream-clean`** 自动刷 `:latest` + `:sha` **并自动触发 Coolify 部署**；其他工作分支只出 `:sha` / `:<分支名>`，不动 `:latest`；`v*` tag 另出版本号镜像；`workflow_dispatch` 手动兜底） |
 | 多架构 | `linux/amd64` + `linux/arm64` |
@@ -340,6 +340,13 @@ Keltner 三档、注记·不计分、焦点名单、收盘口径 vs 盘中口径
 - 顺带把「其他工作分支只出 `:sha` / `:<分支名>`，不动 `:latest`」也写进去——
   那条守卫在 `docker.yml` 的注释里写得很清楚，快照里却完全没有，同样会误导。
 
+**顺带修掉同一张表里第二处假话：**
+- 「Tag 策略：**只产 `:latest`**（不含 `:sha` / `:v*`）」—— 工作流的 `tags:` 块里
+  明明白白有 `type=sha` / `type=ref,event=branch` / `type=ref,event=tag`，**每次构建
+  都会另出** `:<sha>` 与 `:<分支名>`。这一行的原意（「部署只拉 latest，registry 保持
+  干净」）现在写成了事实描述，而那个事实早就不成立了。
+
 **已知注意事项 / 遗留：**
-- **这一行是从工作流文件抄的，会再次过期。** 改 `docker.yml` 的触发分支、tag
-  条件或部署步骤时，必须同时改这一行。
+- **这两行都是从工作流文件抄的，会再次过期。** 改 `docker.yml` 的触发分支、`tags:`
+  块或部署步骤时，必须同时改这两行。没有守卫钉着它们 —— 快照表是给人读的散文，
+  钉不住；能做的只有在改工作流时顺手回来看一眼。
