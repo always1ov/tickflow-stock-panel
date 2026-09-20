@@ -482,7 +482,11 @@ def _grid_class(row: str) -> str:
     i = m.start()
     j = row.index(")}>", i)
     cls = row[i:j]
-    assert "grid-cols-[" in cls, "切到的不是网格那个 div"
+    # [R384] **栅格串一个都不在 div 上了** —— 窄屏那套也挪进了 `ROW_GRID`
+    # (名次那列在窄屏同样要能收成 0)。所以只在 div 上断言「它挑了模板」,
+    # 列宽本身去表里查。div 上再写死一个 `grid-cols-` 就是两个打架, 不许。
+    assert "gridOf(shape)" in cls, "网格那个 div 没有去 ROW_GRID 挑模板"
+    assert "grid-cols-[" not in cls, "div 上又写死了列宽 —— 会和模板给的那个打架"
     code = code_of(FLIP)
     k = code.index("const ROW_GRID = {")
     table = code[k:code.index("} as const", k)]
@@ -505,9 +509,12 @@ def test_R350_信号行是定宽网格_不是flex():
     # [R383] 宽屏那套挪进了 `ROW_GRID`, 所以从「行 + 那张表」一起数。
     # 窄屏 1 套 + 宽屏 2 套(走势有/无), 共 3 套。**不许再多**: 第四套意味着
     # 又有一个宽度区间是谁也没看过的。
+    # [R384] 名次那一列也能收成 0 了, 于是 `ROW_GRID` 变成 2×2 = 4 套
+    # (名次有/无 × 走势有/无), 每套自带窄屏与宽屏两段。**不许再多**: 第五套
+    # 意味着又有一个组合是谁也没看过的。
     cls = _grid_class(row)
-    assert cls.count("grid-cols-[") == 3, f"栅格定义不是三套: {cls.count('grid-cols-[')}"
-    assert cls.count("sm:grid-cols-[") == 2, "宽屏那两套(走势有/无)不齐"
+    assert cls.count("sm:grid-cols-[") == 4, f"宽屏栅格不是四套: {cls.count('sm:grid-cols-[')}"
+    assert cls.count("grid-cols-[") == 8, "窄屏那四段没跟着配齐(每套都要有窄屏+宽屏)"
 
 
 def test_R350_名次那一格空着也占位():
@@ -753,11 +760,17 @@ def test_R360_名次是整行第一格_排在标的前面():
     # [R366] 两套栅格的第一列**都**得是名次那 3.5rem —— 只改一套的话, 另一个
     # 宽度区间里名次会去占标的的位置, 而那个区间没人看过。
     cols = [c for c in _grid_class(row).split() if "grid-cols-[" in c]
-    assert len(cols) == 3, f"栅格不是三套(窄屏 1 + 宽屏 2): {cols}"
+    assert len(cols) == 8, f"栅格不是四套(每套窄屏+宽屏两段): {cols}"
+    # [R384] 第一列**要么是名次那 3.5rem, 要么是 0**(整屏一个名次都没有时它收掉)。
+    # **立论没变**: 名次仍然是第一格, 挪 JSX 就必须挪栅格。加的是那个 0 ——
+    # 而 `0` 恰恰只有"名次在第一列"才讲得通: 它收掉的就是名次那一列。
     for c in cols:
         body = c[c.index("grid-cols-["):]
-        assert body.startswith("grid-cols-[3.5rem_"), \
-            f"第一列不是名次那 3.5rem —— JSX 挪了栅格没挪: {c}"
+        assert body.startswith("grid-cols-[3.5rem_") or body.startswith("grid-cols-[0_"), \
+            f"第一列既不是名次那 3.5rem 也不是收掉的 0 —— JSX 挪了栅格没挪: {c}"
+    # 四套里必须**两种都有** —— 只剩 3.5rem 说明收不掉了, 只剩 0 说明名次没位置了
+    assert any("[3.5rem_" in c for c in cols) and any("[0_" in c for c in cols), \
+        "名次那一列要么永远占着要么永远没有 —— 两种都得在"
 
 
 def test_R360_名次空着时照样占住第一格():
@@ -1314,9 +1327,9 @@ def test_R383_整屏没走势时那一列收成0():
     assert table.strip()
     assert "minmax(0,1fr)_auto]" in table, "走势有内容时那一套不见了"
     assert "_0_auto]" in table, "整屏没走势时那一套没把走势收成 0"
-    assert table.count("sm:grid-cols-[") == 2, "宽屏栅格不是两套"
-    # 挑哪一套**只看 shape.trend**, 不许掺别的
-    assert "shape.trend ? ROW_GRID.wide : ROW_GRID.narrow" in code, "挑栅格的判据变了"
+    assert table.count("sm:grid-cols-[") == 4, "宽屏栅格不是四套"
+    # [R384] 挑哪一套**只看 shape 那两个字段**, 不许掺别的
+    assert "[shape.rank && 'rank', shape.trend && 'trend']" in code, "挑栅格的判据变了"
 
 
 def test_R383_行窄下来之后排两列():
@@ -1336,3 +1349,83 @@ def test_R383_三段都用同一套列与同一个两列开关():
     assert sig.count("className={listCls}") + sig.count("cn('max-h-64 overflow-y-auto', listCls)") == 3, \
         "三段没有共用同一个列表容器类"
     assert sig.count("className={cellCls(i)}") == 3, "三段没有共用同一个格子类"
+
+
+# ── [R384] 「今天该挂什么单」这张卡本身太占地方 ─────────────────────────
+#
+# 用户: 「今天该挂什么单这个卡片也要重新设计很占用空间」。
+#
+# R383 之后量出来: **整张卡 1022px**, 而拆开是
+#     表头 44 + 16 个可视行 × 60px
+# 每行 60px 里**栅格只有 40px** —— 上下各 10px 的留白占掉三分之一;
+# 最左边那 56px 的格子, 32 行写了 32 遍同一句「没进候选池」。
+#
+# 三处一起改之后 **1022 → 453px(-56%)**, 32 条排成三列, 那句话在标题上说一次。
+
+
+def test_R384_名次那列整屏没名次时收成0():
+    """同一句话说 32 遍不是信息是噪音 —— 它该在区块标题上说一次。
+
+    **收成 0 而不是不渲染那一格**: 窄屏那套卡片版面(R366)靠 `row-span-2` /
+    `col-span-3` 把六个格子折成一张卡, 抽掉一格整套跨行跨列全要重算。
+    """
+    code = code_of(FLIP)
+    i = code.index("const ROW_GRID = {")
+    table = code[i:code.index("} as const", i)]
+    assert table.strip()
+    # **逐条切出来查, 不是在整张表里找一次。**
+    # 第一版写成 `for key in (...)` 里两次断言同一个字符串 —— 与 key 无关,
+    # 于是只改回其中一条照样绿(变异 M1 当场抓到)。「锚太宽 = 没有锚」。
+    entries = dict(re.findall(r"'([a-z ]*)': '([^']+)'", table))
+    assert set(entries) == {"rank trend", "rank", "trend", ""}, f"四套键对不上: {sorted(entries)}"
+    for key in ("trend", ""):          # 没名次的那两套
+        v = entries[key]
+        assert "grid-cols-[0_minmax(0,1fr)_auto]" in v, f"{key!r} 那套窄屏没收掉名次列"
+        assert "sm:grid-cols-[0_minmax(9rem,11rem)_" in v, f"{key!r} 那套宽屏没收掉名次列"
+    for key in ("rank trend", "rank"):  # 有名次的那两套要占住 3.5rem
+        v = entries[key]
+        assert "grid-cols-[3.5rem_minmax(0,1fr)_auto]" in v, f"{key!r} 那套窄屏把名次列收掉了"
+        assert "sm:grid-cols-[3.5rem_minmax(9rem,11rem)_" in v, f"{key!r} 那套宽屏把名次列收掉了"
+    row = _row()
+    # 0 宽的格子里不许再写字 —— 会溢出到隔壁
+    assert "actionable && shape.rank ? (" in row, \
+        "整屏没名次时还在往 0 宽的格子里写「没进候选池」"
+
+
+def test_R384_那句话改在标题上说一次():
+    """从行里撤掉的东西必须在别处说出来, 否则就是悄悄少了一条信息。"""
+    sig = _signals()
+    assert "rows.length && !shape.rank ? '都没进候选池' : null" in sig, \
+        "「没进候选池」从行里撤了, 但标题上没补上 —— 那条信息就这么没了"
+
+
+def test_R384_行留白跟着名次走():
+    """名次那一格是三行高, 留白撑着才不挤; 没名次时行只有两行字,
+    `py-2.5`(上下各 10px)在 40px 的栅格上占掉三分之一。"""
+    row = _row()
+    assert "shape.rank ? 'py-2.5' : 'py-1.5'" in row, "行留白没跟着 shape 走"
+
+
+def test_R384_行再窄下来就排三列():
+    """列数按**这一行到底要多宽**定, 不是拍脑袋:
+    有走势 → 单列; 没走势 ≈620 → 两列(1560 起); 再收掉名次 ≈560 → 三列(1900 起)。"""
+    sig = _signals()
+    assert "min-[1560px]:grid-cols-2" in sig, "两列那一档没了"
+    assert "!shape.rank && 'min-[1900px]:grid-cols-3'" in sig, \
+        "三列那一档没了, 或者它不再要求「连名次都没有」"
+    # 三列时最右那一列不画竖缝
+    assert "(i + 1) % 3 === 0 && 'min-[1900px]:border-r-0'" in sig, \
+        "三列时最右一列还在画竖缝"
+
+
+def test_R384_网格类只有一个产地():
+    """div 上写死一个、模板再给一个, 同一个元素上就有两个 `grid-cols-` ——
+    **而 CSS 里谁赢取决于样式表里谁排后面, 不是 class 串里谁排后面**。
+    那种冲突不报错, 只表现为「某些情况下列宽莫名其妙」。(这条是数 grid-cols
+    条数时当场抓到的, 不是想出来的。)"""
+    row = _row()
+    m = re.search(r"<div className=\{cn\(\s*\n?\s*'grid ", row)
+    assert m
+    head = row[m.start():row.index(")}>", m.start())]
+    assert "grid-cols-[" not in head, "网格那个 div 上又写死了列宽"
+    assert "gridOf(shape)" in head, "没去 ROW_GRID 挑模板"

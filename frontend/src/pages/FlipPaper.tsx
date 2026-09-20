@@ -533,14 +533,23 @@ function TodaySignals({ rows, conviction }: {
   // 这种时候把行**排成两列**: 32 行的滚动直接砍一半。
   // 走势有内容时行本来就要吃满宽度, 保持单列。
   // 断点与 R381 那处并排用同一个(内容区 ≈ 视口 − 侧栏 224 − 留白 32)。
+  // [R384] 列数按**这一行到底要多宽**来定, 不是拍脑袋:
+  //   有走势        行要吃满宽度        → 单列
+  //   没走势        标的176+动作72+六态256+间距 ≈ 620 → 两列(1560 起)
+  //   没走势没名次  名次那列再收掉 56   → ≈ 560, 1900 起塞得下三列
+  // 断点都是算出来的: 内容区 ≈ 视口 − 侧栏 224 − 留白 32, 再除以列数。
   const twoCol = !shape.trend
   const listCls = cn('divide-border/30', twoCol
-    ? 'min-[1560px]:grid min-[1560px]:grid-cols-2'
+    ? cn('min-[1560px]:grid min-[1560px]:grid-cols-2',
+         !shape.rank && 'min-[1900px]:grid-cols-3')
     : 'divide-y')
   /** 两列时分隔线画在每个格子上 —— `divide-y` 在两列栅格里只会横着画, 竖缝没人画。 */
   const cellCls = (i: number) => twoCol
-    ? cn('min-w-0 border-b border-border/30',
-         i % 2 === 0 && 'min-[1560px]:border-r min-[1560px]:border-border/30')
+    ? cn('min-w-0 border-b border-border/30 min-[1560px]:border-border/30',
+         // 两列: 左边那列画竖缝。三列: 前两列画 —— `(i+1)%3` 为 0 的是最右一列。
+         i % 2 === 0 && 'min-[1560px]:border-r',
+         !shape.rank && (i % 2 === 0 ? '' : 'min-[1900px]:border-r'),
+         !shape.rank && (i + 1) % 3 === 0 && 'min-[1900px]:border-r-0')
     : undefined
 
   return (
@@ -552,6 +561,9 @@ function TodaySignals({ rows, conviction }: {
           actCount ? `${actCount} 笔要动手` : '今天没有要动手的',
           // [R342] 说明白这个顺序是谁排的 —— 不说的话读的人不知道该不该照着做
           actCount && scored ? '按把握分排序' : null,
+          // [R384] 整屏一个名次都没有时, 这句话在标题上说**一次** ——
+          // 在这之前它印在每一行最左边那 3.5rem 里, 32 行就是 32 遍。
+          rows.length && !shape.rank ? '都没进候选池' : null,
           mine.length ? `手上 ${mine.length} 只` : null,
         ].filter(Boolean).join(' · ')}
         hint={'**只有真转折才出手。**\n\n已转折 = 最新那根已落盘的日 K 让状态翻了面, 这才是动作。\n盘中越线 = 按此刻现价当收盘算会翻面 —— **不是出手理由**, 盘中价会变回去,\n14:30 跌破、14:58 拉回来的那天根本没有转折。\n\n触发价是作者的六态每天给的 flip_up / flip_down, 开盘前就定死,\n所以尾盘盯着它挂单是做得到的。\n\n「手上这些」是模拟盘现在拿着的票与各自的离场线 —— 常驻不折叠,\n买入天天有、卖出只在触发那天冒一次, 中间这段空白正是它补的。\n\n最下面「只是盯着」默认收起 —— 它随自选规模走, 摊开会把真要动手的淹掉。'}
@@ -677,11 +689,28 @@ const NEAR_EXIT = 0.02
  * 照旧对齐 —— 变的是"这一屏需要几列", 不是"每行各自算各自的"。
  */
 const ROW_GRID = {
-  /** 这一屏有走势读数 —— 它吃 `1fr`, 行铺满整宽(R356 那版) */
-  wide: 'sm:grid-cols-[3.5rem_minmax(9rem,11rem)_4.5rem_minmax(7rem,16rem)_minmax(0,1fr)_auto]',
-  /** 整屏都没有走势 —— 那一格收成 0。触发价那列是 `auto`, 空着自己就收, 不用另开一套 */
-  narrow: 'sm:grid-cols-[3.5rem_minmax(9rem,11rem)_4.5rem_minmax(7rem,16rem)_0_auto]',
+  /** 有名次 + 有走势 —— R356 那版原样 */
+  'rank trend': 'grid-cols-[3.5rem_minmax(0,1fr)_auto] sm:grid-cols-[3.5rem_minmax(9rem,11rem)_4.5rem_minmax(7rem,16rem)_minmax(0,1fr)_auto]',
+  /** 有名次, 整屏没走势 */
+  'rank': 'grid-cols-[3.5rem_minmax(0,1fr)_auto] sm:grid-cols-[3.5rem_minmax(9rem,11rem)_4.5rem_minmax(7rem,16rem)_0_auto]',
+  /**
+   * [R384] **整屏一个名次都没有 —— 名次那一列收成 0。**
+   *
+   * 它本来是 3.5rem, 而整屏没名次时每一行都在那儿写同一句「没进候选池」——
+   * 32 行 32 遍。同一句话说 32 遍不是信息, 是噪音; 它该在区块标题上说一次
+   * (见 `SectionHead` 的 note)。
+   *
+   * **收成 0 而不是不渲染那一格**: 窄屏那套卡片版面(R366)靠 `row-span-2` /
+   * `col-span-3` 把六个格子折成一张卡, 抽掉一格整套跨行跨列全要重算。
+   * 给 0 宽度则一个 `col-span` 都不用动 —— 代价只有 `gap-x-3` 那 12px。
+   */
+  'trend': 'grid-cols-[0_minmax(0,1fr)_auto] sm:grid-cols-[0_minmax(9rem,11rem)_4.5rem_minmax(7rem,16rem)_minmax(0,1fr)_auto]',
+  '': 'grid-cols-[0_minmax(0,1fr)_auto] sm:grid-cols-[0_minmax(9rem,11rem)_4.5rem_minmax(7rem,16rem)_0_auto]',
 } as const
+
+/** 挑一套 —— 键就是「这一屏有什么」, 与 `RowShape` 一一对应。 */
+const gridOf = (shape: RowShape) =>
+  ROW_GRID[[shape.rank && 'rank', shape.trend && 'trend'].filter(Boolean).join(' ') as keyof typeof ROW_GRID]
 
 /** 这一屏的行里, 哪几格真有东西 —— 决定用哪套栅格、要不要撑行高、能不能排两列。 */
 export interface RowShape {
@@ -729,7 +758,11 @@ function SignalRow({ r, c, shape, onOpen, onReview }: {
   const nearExit = !actionable && r.held && r.gap_pct != null
     && Math.abs(r.gap_pct) <= NEAR_EXIT
   return (
-    <div className={cn('border-l-2 px-4 py-2.5',
+    <div className={cn('border-l-2 px-4',
+      // [R384] 整屏没名次时行只有两行字, `py-2.5`(上下各 10px)在 40px 的栅格上
+      // 占掉三分之一。有名次时那一格是三行高, 留白撑着才不挤 —— 所以跟着 shape 走,
+      // 与行高那一条同一个判据。
+      shape.rank ? 'py-2.5' : 'py-1.5',
       buy && 'border-l-bull bg-bull/[0.07]',
       sell && 'border-l-bear bg-bear/[0.10]',
       nearExit && 'border-l-warning bg-warning/[0.07]',
@@ -772,8 +805,12 @@ function SignalRow({ r, c, shape, onOpen, onReview }: {
           16rem = 256px 刚好装下那句话(20 个字 × 11px)。**仍然是定宽列不是 `1fr`**,
           行与行照旧对齐; `truncate` 也留着 —— 窄屏上它还得兜底。 */}
       <div className={cn(
-        'grid grid-cols-[3.5rem_minmax(0,1fr)_auto] gap-x-3 gap-y-1 text-xs sm:items-center sm:gap-y-0',
-        shape.trend ? ROW_GRID.wide : ROW_GRID.narrow,
+        // [R384] **窄屏那套栅格也挪进 `ROW_GRID` 了**(名次那列在窄屏同样要能收成 0)。
+        // 写死在这儿 + 模板再给一个, 同一个元素上就有两个 `grid-cols-`, 而 CSS 里
+        // 谁赢取决于**样式表里谁排后面**, 不是 class 串里谁排后面 —— 那种冲突不报错,
+        // 只表现为「某些情况下列宽莫名其妙」。守卫数 grid-cols 的条数时当场抓到的。
+        'grid gap-x-3 gap-y-1 text-xs sm:items-center sm:gap-y-0',
+        gridOf(shape),
         // [R383] 行高只在**真有名次**时撑 —— 名次那一格是三行高(名次/分/三条维度),
         // 撑行高是为了让"有名次"和"没名次"的行一样高。整屏都没名次时, 每行只有
         // 两行字, 再撑 3.5rem 就是每行白送 26px: 32 行就是 800 多像素的滚动。
@@ -794,7 +831,9 @@ function SignalRow({ r, c, shape, onOpen, onReview }: {
         <div className="row-span-2 sm:row-span-1">
         {c?.rank != null ? (
           <ScoreCell o={c} rank={c.rank} total={c.rank_total ?? 0} />
-        ) : actionable ? (
+        ) : actionable && shape.rank ? (
+          /* [R384] `shape.rank` 为假 = 整屏一个名次都没有, 那一列已经收成 0 宽,
+             再写字会溢出到隔壁格。这句话改在区块标题上说一次。 */
           <span className="text-center text-[9px] leading-tight text-muted/60"
                 title="没过打分那三道硬门槛, 所以没有名次 —— 但它转折了, 该动手还是要动手">
             没进
