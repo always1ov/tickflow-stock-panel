@@ -1961,8 +1961,8 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
             onClick={handleRun}
             disabled={!selectedStrategy || strategyDetail.isLoading || backtestDataUnavailable}
             className="group w-full inline-flex items-center justify-center gap-2.5 rounded-btn border border-accent/40
-              bg-accent px-3 py-2.5 text-white shadow-[0_10px_24px_rgba(59,130,246,0.22)]
-              transition-all duration-150 ease-smooth hover:-translate-y-0.5 hover:shadow-[0_14px_28px_rgba(59,130,246,0.28)]
+              bg-accent px-3 py-2.5 text-white shadow-md
+              transition-all duration-150 ease-smooth hover:-translate-y-0.5 hover:shadow-lg
               disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
           >
             <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/18 ring-1 ring-white/25 transition-transform group-hover:scale-105">

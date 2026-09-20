@@ -134,12 +134,15 @@ function BubbleItem({ task, isLast, onPointerDown }: {
   const isWorking = task.phase === 'loading' || task.phase === 'streaming'
   const isError = task.phase === 'error'
 
-  // 蓝色系(区别于财务分析的紫色)
+  // [R377] 与财务分析气泡同一套语义令牌(原来那句「蓝色系, 区别于财务分析的紫色」
+  // 已不成立: 紫色那套连同辉光一起在这一轮清掉了)。两个气泡从来不会同时出现在
+  // 同一处, 靠颜色区分本就没必要 —— 真正区分它们的是卡片上的标的名与「个股分析」
+  // 这几个字。三档配色的取舍见 AiReportBubble 同名变量上面那段。
   const accent = isWorking
-    ? 'from-sky-500/25 to-blue-500/20 text-sky-300 border-sky-300/40 shadow-[0_6px_24px_-10px_rgba(14,165,233,0.5)]'
+    ? 'bg-accent/10 text-accent border-accent/40'
     : isError
-      ? 'from-red-500/20 to-red-500/10 text-red-300 border-red-300/40 shadow-[0_6px_20px_-10px_rgba(239,68,68,0.4)]'
-      : 'from-emerald-500/20 to-emerald-500/10 text-emerald-300 border-emerald-300/40 shadow-[0_6px_20px_-10px_rgba(16,185,129,0.35)]'
+      ? 'bg-warning/10 text-warning border-warning/40'
+      : 'bg-elevated text-secondary border-border'
 
   return (
     <motion.div
@@ -154,7 +157,7 @@ function BubbleItem({ task, isLast, onPointerDown }: {
         role="button"
         tabIndex={0}
         title={isWorking ? '个股分析中,点击恢复' : isError ? '分析失败,点击重试' : '点击查看个股分析报告'}
-        className={`group relative flex w-full cursor-pointer items-center gap-1.5 overflow-hidden rounded-lg border bg-gradient-to-br px-2 py-1.5 backdrop-blur-xl transition-ui duration-expand hover:scale-[1.02] active:scale-[0.99] ${accent}`}
+        className={`group relative flex w-full cursor-pointer items-center gap-1.5 overflow-hidden rounded-lg border px-2 py-1.5 backdrop-blur-xl transition-ui duration-expand hover:scale-[1.02] active:scale-[0.99] ${accent}`}
       >
         {isWorking && (
           <div className="absolute inset-x-0 top-0 h-px overflow-hidden">
@@ -170,9 +173,9 @@ function BubbleItem({ task, isLast, onPointerDown }: {
           {task.name || task.symbol}
         </span>
         <span className="shrink-0 text-[9px] leading-none">
-          {isWorking ? <span className="text-sky-300/80">个股分析</span>
-            : isError ? <span className="text-red-300/80">失败</span>
-            : <span className="text-emerald-300/80">点击查看</span>}
+          {isWorking ? <span className="opacity-80">个股分析</span>
+            : isError ? <span className="opacity-80">失败</span>
+            : <span className="opacity-80">点击查看</span>}
         </span>
       </div>
       <style>{`

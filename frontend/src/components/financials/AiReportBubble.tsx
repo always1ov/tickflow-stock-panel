@@ -159,12 +159,17 @@ function BubbleItem({ task, isLast, onPointerDown }: {
   const isWorking = task.phase === 'loading' || task.phase === 'streaming'
   const isError = task.phase === 'error'
 
-  // 状态配色
+  // [R377] 状态配色 —— 原来是紫→品红的跨色相渐变 + 一圈写死成颜色字面量的辉光,
+  // 字色还是照深色底调的 `-300` 档(白卡片上对比只有 2 点几)。浅色蓝白配色那四条
+  // 禁令里占了两条(不用蓝紫渐变、不用发光效果), 所以三档都换成跟着主题走的语义
+  // 令牌: 生成中=主题蓝, 失败=警示琥珀(不能用红 —— 这仓库里红是「涨」), 完成=中性
+  // 一档(不能用绿 —— 绿是「跌」, 且禁令里还有「不用大面积绿色」)。三档靠图标
+  // (转圈/警示/对勾)与文案区分, 不只靠颜色。
   const accent = isWorking
-    ? 'from-purple-500/25 to-fuchsia-500/20 text-purple-300 border-purple-300/40 shadow-[0_6px_24px_-10px_rgba(168,85,247,0.5)]'
+    ? 'bg-accent/10 text-accent border-accent/40'
     : isError
-      ? 'from-red-500/20 to-red-500/10 text-red-300 border-red-300/40 shadow-[0_6px_20px_-10px_rgba(239,68,68,0.4)]'
-      : 'from-emerald-500/20 to-emerald-500/10 text-emerald-300 border-emerald-300/40 shadow-[0_6px_20px_-10px_rgba(16,185,129,0.35)]'
+      ? 'bg-warning/10 text-warning border-warning/40'
+      : 'bg-elevated text-secondary border-border'
 
   return (
     <motion.div
@@ -179,7 +184,7 @@ function BubbleItem({ task, isLast, onPointerDown }: {
         role="button"
         tabIndex={0}
         title={isWorking ? '生成中,点击恢复对话框' : isError ? '分析失败,点击重试' : '点击查看报告'}
-        className={`group relative flex w-full cursor-pointer items-center gap-1.5 overflow-hidden rounded-lg border bg-gradient-to-br px-2 py-1.5 backdrop-blur-xl transition-ui duration-expand hover:scale-[1.02] active:scale-[0.99] ${accent}`}
+        className={`group relative flex w-full cursor-pointer items-center gap-1.5 overflow-hidden rounded-lg border px-2 py-1.5 backdrop-blur-xl transition-ui duration-expand hover:scale-[1.02] active:scale-[0.99] ${accent}`}
       >
         {/* 生成中:顶部进度流光 */}
         {isWorking && (
@@ -207,11 +212,11 @@ function BubbleItem({ task, isLast, onPointerDown }: {
         {/* 状态后缀 */}
         <span className="shrink-0 text-[9px] leading-none">
           {isWorking ? (
-            <span className="text-purple-300/80">分析中</span>
+            <span className="opacity-80">分析中</span>
           ) : isError ? (
-            <span className="text-red-300/80">失败</span>
+            <span className="opacity-80">失败</span>
           ) : (
-            <span className="text-emerald-300/80">点击查看</span>
+            <span className="opacity-80">点击查看</span>
           )}
         </span>
       </div>

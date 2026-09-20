@@ -230,7 +230,7 @@ export function StockAnalysisDialog({ task, mode, minimized }: Props) {
               {isHistory ? (
                 <button
                   onClick={handleStartNew}
-                  className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-accent-soft border border-sky-400/30 text-xs font-medium text-sky-300 hover:from-sky-500/30 hover:to-blue-500/20 transition-ui shrink-0"
+                  className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-accent-soft border border-sky-400/30 text-xs font-medium text-sky-300 transition-ui shrink-0"
                   title="以此关注点重新生成新报告"
                 >
                   <RefreshCw className="h-3.5 w-3.5" />重新生成
@@ -239,7 +239,7 @@ export function StockAnalysisDialog({ task, mode, minimized }: Props) {
                 <button
                   onClick={handleStartNew}
                   disabled={isWorking}
-                  className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-accent-soft border border-sky-400/30 text-xs font-medium text-sky-300 hover:from-sky-500/30 hover:to-blue-500/20 disabled:opacity-40 disabled:cursor-not-allowed transition-ui shrink-0"
+                  className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-accent-soft border border-sky-400/30 text-xs font-medium text-sky-300 disabled:opacity-40 disabled:cursor-not-allowed transition-ui shrink-0"
                   title={focus.trim() ? '按关注重点重新分析' : '重新分析'}
                 >
                   {isWorking ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : phase === 'done' ? <RefreshCw className="h-3.5 w-3.5" /> : <Send className="h-3.5 w-3.5" />}

@@ -153,11 +153,33 @@ def test_R368_输入框边框走更深那一档_且不靠改组件():
 
 
 def test_R368_全站没有发光():
-    """用户: 「不使用…发光效果」。原来有 15 处 `shadow-[0_0_…]` 的彩色外发光。"""
+    """用户: 「不使用…发光效果」。原来有 15 处 `shadow-[0_0_…]` 的彩色外发光。
+
+    **[R377] 第一版只扫 `shadow-[0_0_…]` —— 正中无偏移的那种光晕。** 于是带偏移的
+    辉光(`shadow-[0_8px_24px_rgba(59,130,246,0.45)]`、`shadow-[0_6px_24px_-10px_…]`)
+    整个漏网: 上游 v0.3.0 新带进来的 AI 助手悬浮球就是一个, 仓里还蹲着 5 处存量,
+    守卫全绿。**和当初漏掉 `bg-[radial-gradient(…)]` 是同一类洞** —— 扫的是「我想到
+    的那一种写法」, 不是立论。
+
+    立论其实是**阴影里不许出现写死的颜色**: 辉光之所以是辉光, 在于它带色; 而写死
+    的色值同时也绕开了 `--accent`/`--border` 那套令牌, 换主题不会跟着变。所以判据
+    改成「任意值阴影里含颜色字面量(`rgba(` / `rgb(` / `#`)」—— 位移、模糊、扩散
+    随便写, 中性黑(`rgba(0,0,0,…)`)的抬升阴影也照旧放行, 那是层次不是发光。
+    走令牌的 `shadow-[0_2px_8px_oklch(var(--accent)/0.15)]` 同样放行。
+    """
+    # 中性黑的抬升阴影: 不带色相, 是「浮起来」不是「发光」
+    neutral = re.compile(r"rgba?\(\s*0\s*,\s*0\s*,\s*0\s*[,)]")
+    colored = re.compile(r"rgba?\(|#[0-9a-fA-F]{3,8}\b")
     hits = []
     for f in sorted(SRC.rglob("*.tsx")):
-        for m in re.finditer(r"(?:drop-)?shadow-\[0_0_[^\]]*\]", f.read_text(encoding="utf-8")):
-            hits.append(f"{f.relative_to(SRC)}: {m.group(0)}")
+        txt = f.read_text(encoding="utf-8")
+        for m in re.finditer(r"(?:drop-)?shadow-\[([^\]]*)\]", txt):
+            body = m.group(1)
+            if "0_0_" in body:                       # 正中光晕, 一律算发光
+                hits.append(f"{f.relative_to(SRC)}: {m.group(0)}")
+                continue
+            if colored.search(neutral.sub("", body)):  # 剩下的色值才是辉光
+                hits.append(f"{f.relative_to(SRC)}: {m.group(0)}")
     assert not hits, "发光回潮了:\n  " + "\n  ".join(hits)
 
 
@@ -211,13 +233,19 @@ def test_R368_没有蓝紫渐变():
     hits = []
     for f in sorted(SRC.rglob("*.tsx")):
         for line in f.read_text(encoding="utf-8").splitlines():
-            if "bg-gradient" not in line:
+            # [R377] 第一版要求 `bg-gradient` 与 `from-…/to-…` **写在同一行** —— 而那两个
+            # AI 气泡把方向类放在 className 上、把 `from-purple-500/25 to-fuchsia-500/20`
+            # 放在另一行的 `accent` 变量里, 于是一整条紫→品红渐变从守卫底下走过去了。
+            # 色阶类本来就常被抽成变量, 所以判据改成**单看色阶类**: 只要 `from-`/`to-`
+            # 落在禁色上, 不管方向类在不在同一行。
+            if "bg-gradient" not in line and not re.search(r"\b(?:from|via|to)-[a-z]+-\d", line):
                 continue
-            seg = line[line.index("bg-gradient"):]
-            if any(b in seg for b in banned):
-                hits.append(f"{f.relative_to(SRC)}: {seg[:80]}")
+            i = line.index("bg-gradient") if "bg-gradient" in line else 0
+            seg = line[i:]
+            if any(f"-{b}-" in seg or f"-{b}/" in seg for b in banned):
+                hits.append(f"{f.relative_to(SRC)}: {seg.strip()[:80]}")
             elif "from-sky-" in seg and "to-blue-" in seg:
-                hits.append(f"{f.relative_to(SRC)}: {seg[:80]}")
+                hits.append(f"{f.relative_to(SRC)}: {seg.strip()[:80]}")
     assert not hits, "蓝紫渐变回潮了:\n  " + "\n  ".join(hits)
 
 
