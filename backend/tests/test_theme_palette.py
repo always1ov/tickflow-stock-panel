@@ -17,6 +17,11 @@
 于是**铬色**换成了那一套暖白＋靛蓝。上面那张表因此拆成 `CHROME` 与 `MARKET`:
 铬色可以随皮肤换, **指标色冻结**。用户当场补的那句话就是这条规矩的来源 ——
 「我这个是炒股系统, 所以一些指标显示颜色要对要注意」。
+
+[R382] R379 只换了亮色, 而用户用的是暗色 —— 他截图问「怎么前端还是老样子」。
+版式那两轮(R380/R381)是主题无关的, 暗色下照常生效, 漏的只有颜色这一层。
+所以暗色的强调色也对齐到同一个靛蓝, 并补了一组钉暗色的守卫。
+**作者的黑(base/surface/elevated/border)一个字没动** —— R163 记着那是定过案的。
 """
 from __future__ import annotations
 
@@ -80,7 +85,8 @@ def _oklch_to_hex(L: float, C: float, H: float) -> str:
 
 
 def _light_block() -> str:
-    """`:root { … }` 那一段 —— **只看亮色**。暗色一套这次一个字没动。"""
+    """`:root { … }` 那一段 —— 只看亮色。
+    [R382] 暗色那一段现在也有守卫了, 见 `_dark_block`。"""
     css = CSS.read_text(encoding="utf-8")
     i = css.index(":root {")
     j = css.index("html.dark {")
@@ -89,9 +95,18 @@ def _light_block() -> str:
     return blk
 
 
+def _dark_block() -> str:
+    """`html.dark { … }` 那一段。[R382] 起暗色也有要钉的东西了。"""
+    css = CSS.read_text(encoding="utf-8")
+    i = css.index("html.dark {")
+    blk = css[i:css.index("\n}", i)]
+    assert blk.strip() and "--accent:" in blk
+    return blk
+
+
 def _token(blk: str, name: str) -> tuple[float, float, float]:
     m = re.search(rf"--{re.escape(name)}:\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)\s*;", blk)
-    assert m, f"亮色里找不到 --{name}"
+    assert m, f"这一段里找不到 --{name}"
     return float(m[1]), float(m[2]), float(m[3])
 
 
@@ -432,3 +447,69 @@ def test_R379_看盘页的密度一个像素没动():
     flip = code_of("pages/FlipPaper.tsx")
     assert "sm:min-h-[3.5rem]" in flip, "模拟盘信号行的行高被动了"
     assert "grid-cols-[3.5rem_minmax(0,1fr)_auto]" in flip, "模拟盘信号行的栅格被动了"
+
+
+# ── [R382] 换皮肤别漏掉暗色 ──────────────────────────────────────────────
+#
+# R379 只换了亮色, 而用户用的是暗色 —— 于是「换了皮肤」在他屏幕上基本没发生,
+# 他截图问「怎么前端还是老样子」。**版式那两轮(R380/R381)是主题无关的, 暗色下
+# 照常生效; 漏的只有颜色这一层。**
+#
+# 教训不是「暗色忘了改」, 是**「主题色」这个东西本来就不该分主题** —— 同一个
+# 产品在两套主题下得是同一个颜色, 否则它就是两个颜色。下面第一条钉的就是这个。
+
+
+def test_R382_两套主题是同一个品牌色():
+    """亮色靛蓝、暗色蓝 = 两个品牌色。明度可以按底色各调各的(暗底上要更亮),
+    但**色相必须一致** —— 色相才是「这是什么颜色」。"""
+    h_light = _token(_light_block(), "accent")[2]
+    h_dark = _token(_dark_block(), "accent")[2]
+    assert abs(h_light - h_dark) < 1.0, \
+        f"亮色主题色色相 {h_light:.2f}, 暗色 {h_dark:.2f} —— 两套主题成了两个品牌色"
+
+
+def test_R382_暗色的强调色不再借别处的值():
+    """原来 `--accent-hover: var(--t-blue-400)` / `--accent-soft: var(--elevated)`。
+
+    借值本身不是错, 错在**借的是不会跟着强调色走的东西**: 前者是蓝族色阶(换了
+    色相它不跟), 后者是中性灰(R379 把侧栏选中态改成「同色系药丸」之后, 暗色下
+    那颗药丸是灰的 —— 「选中」只剩字色在说, 底色一句话没说)。
+    """
+    blk = _dark_block()
+    assert "--accent-hover: var(" not in blk, "暗色的悬停档又去借别处的值了"
+    assert "--accent-soft: var(" not in blk, "暗色的选中底又借成中性灰了"
+    # 三档都得是同一个色相
+    h = _token(blk, "accent")[2]
+    for name in ("accent-text", "accent-hover", "accent-soft"):
+        assert abs(_token(blk, name)[2] - h) < 1.0, f"--{name} 与 --accent 不是同一个色相"
+    # 暗色里 hover 要**更亮**(与亮色相反 —— 亮色是压暗)
+    assert _token(blk, "accent-hover")[0] > _token(blk, "accent")[0], \
+        "暗色的 hover 比常态还暗 —— 暗底上那是往后退, 不是往前站"
+    # 选中底要坐在卡面之上、又远低于文字
+    assert _token(blk, "surface")[0] < _token(blk, "accent-soft")[0] < _token(blk, "accent")[0], \
+        "选中底的明度没夹在卡面与强调色之间"
+
+
+def test_R382_作者的黑一个字没动():
+    """R163 记着用户原话「还是用回以前作者的黑吧」—— 那是定过案的。
+    这一轮换的是强调色, **底子不许跟着动**。"""
+    blk = _dark_block()
+    for name, want in (("base", 0.1452), ("surface", 0.2103),
+                       ("elevated", 0.262), ("border", 0.365)):
+        got = _token(blk, name)[0]
+        assert abs(got - want) < 0.0005, f"--{name} 的明度动了: {got} != {want}"
+
+
+def test_R382_暗色的指标色也没被带着漂():
+    """与亮色那条同一个立论(用户: 「我这个是炒股系统, 指标显示颜色要对要注意」),
+    只是这次钉暗色那一份 —— 换皮肤扫到哪儿, 哪儿就得有这条。"""
+    blk = _dark_block()
+    for name, want_h in (("bull", 22.00), ("bear", 158.00), ("warning", 70.00)):
+        assert abs(_token(blk, name)[2] - want_h) < 0.01, f"--{name} 的色相被改了"
+    assert _token(blk, "danger") == _token(blk, "bull"), "--danger 不再等于 --bull"
+    # 主题色离涨跌足够远 —— 与亮色那条同样的隔离带
+    h_accent = _token(blk, "accent")[2]
+    for name in ("bull", "bear"):
+        h = _token(blk, name)[2]
+        d = min(abs(h_accent - h), 360 - abs(h_accent - h))
+        assert d >= 40, f"暗色主题色色相离 --{name} 只有 {d:.1f}°"
