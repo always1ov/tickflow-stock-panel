@@ -77,7 +77,11 @@ export function Settings() {
           (justify-center min-h-[60vh]), 宽屏下导航浮在屏幕正中、两侧各留一大片
           空白, 内容区反被挤窄。改为**贴左贴顶**: 导航紧跟应用侧栏、从顶部开始,
           内容区吃掉剩余宽度(上限 1500px 防超宽屏行长失控, 左对齐不居中)。 */}
-      <div className="px-3 pb-4 pt-3 lg:px-4">
+      {/* [R379 第二层] 设置区是**外围页** —— 这里没有一屏几百个数字要塞, 密度
+          不是它的目标, 所以留白给到 WavMint 那一档(手册 §1.3: 手机页边距 18px,
+          卡片间距 20~24px)。**只动这一个容器**, 七个面板一起受益, 不用逐个去改。
+          看盘那些页一个像素没碰。 */}
+      <div className="px-4 pb-8 pt-5 lg:px-6">
         <div className="w-full">
         <div className="flex gap-5 items-start">
           {/* ===== 竖向 Tab 侧栏 ===== */}

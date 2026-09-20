@@ -9,6 +9,7 @@ import {
 } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { Skeleton } from '@/components/data/Skeleton'
+import { SectionIntro } from '@/components/SectionIntro'
 import { ExternalViewRender } from '@/components/ExternalViewRender'   // [R117] 试运行预览
 
 function dtypeToColumnType(dtype: string): AnalysisColumn['type'] {
@@ -102,32 +103,32 @@ function ExternalWebsiteSettings() {
   })
 
   return (
-    <section className="rounded-2xl border border-border bg-surface p-6">
-      <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-        <div className="max-w-2xl">
-          <div className="flex items-center gap-2 text-[10.5px] font-semibold uppercase tracking-wider text-cyan-400/80">
-            <Globe2 className="h-3.5 w-3.5" />外部网页
-          </div>
-          {/* [R378] 原来写的是「变成『闲置功能』里的一页」—— 那句话从来就不对:
-              外部网页是**一级菜单**, 默认不在那个分组里。R378 之后它和别的菜单一样
-              拖得进去, 但那是用户自己拖的结果, 不是这里配出来的。 */}
-          <h2 className="mt-2 text-xl font-semibold tracking-tight text-foreground">把一个外部网页变成菜单里的一页</h2>
-          <p className="mt-2 text-sm leading-6 text-secondary">
-            两种做法二选一：直接内嵌整站，或者由后端抓回原文、交给面板里配置的 AI 整理成统一表格再显示。
-            无论哪种，牛来都不会把 TickFlow 数据、API Key 或登录凭据转发给对方。
-          </p>
-        </div>
+    <>
+    {/* [R378] 标题原来写的是「变成『闲置功能』里的一页」—— 那句话从来就不对:
+        外部网页是**一级菜单**, 默认不在那个分组里。
+        [R379] 这一块的手搓版收进 `SectionIntro` —— 连带修掉那个 `text-cyan-400/80`
+        的标签色: 它是照深色底调的, 白卡片上偏淡, 而且与另一页的 `text-accent` 不是
+        同一个颜色(同一个位置两种写法, 谁也不会记得同时改两处)。 */}
+    <SectionIntro
+      eyebrow="外部网页"
+      icon={<Globe2 className="h-3.5 w-3.5" />}
+      title="把一个外部网页变成菜单里的一页"
+      right={(
         <button
           type="button"
           onClick={() => setEnabled(value => !value)}
-          className={`inline-flex items-center gap-2 rounded-btn border px-3 py-1.5 text-xs transition-colors ${enabled ? 'border-success/40 bg-success/10 text-success' : 'border-border bg-elevated text-muted'}`}
+          className={`shrink-0 inline-flex items-center gap-2 rounded-btn border px-3 py-1.5 text-xs transition-colors ${enabled ? 'border-success/40 bg-success/10 text-success' : 'border-border bg-elevated text-muted'}`}
         >
           <span className={`h-2 w-2 rounded-full ${enabled ? 'bg-success' : 'bg-muted'}`} />
           {enabled ? '已启用' : '已停用'}
         </button>
-      </div>
-
-      <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-2">
+      )}
+    >
+      两种做法二选一：直接内嵌整站，或者由后端抓回原文、交给面板里配置的 AI 整理成统一表格再显示。
+      无论哪种，牛来都不会把 TickFlow 数据、API Key 或登录凭据转发给对方。
+    </SectionIntro>
+    <section className="mt-5 rounded-card border border-border bg-surface p-6 lg:p-7">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         {([
           { key: 'fetch' as const, icon: Sparkles, title: '抓取 + AI 整理', desc: '后端取回原文，AI 按固定结构整理成 KPI 卡 + 表格。对方禁 iframe、是 SPA 都不影响；每次解析会调一次 AI（同一份原文有缓存）。' },
           { key: 'iframe' as const, icon: Globe2, title: '内嵌整站', desc: '把对方页面原样塞进 iframe。省事，但对方禁止 iframe 时会白屏，也没法只挑关键信息。' },
@@ -230,6 +231,7 @@ function ExternalWebsiteSettings() {
         </div>
       </div>
     </section>
+    </>
   )
 }
 
@@ -333,24 +335,22 @@ export function SettingsExtPagesPanel() {
   return (
     <div className="max-w-6xl space-y-6">
       <ExternalWebsiteSettings />
-      <section className="rounded-2xl border border-border bg-surface p-6">
-        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-          <div>
-            <div className="text-[10.5px] font-semibold uppercase tracking-wider text-accent/80">扩展页面</div>
-            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-foreground">把扩展数据配置成左侧分析菜单</h2>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-secondary">
-              选择扩展数据源、分析模板、分组字段和列表列后，系统会生成一个可访问的动态分析页面。
-            </p>
-          </div>
+      {/* [R379] 这是第三处手搓 —— 守卫一开就把它抓出来了(我自己只记得两处)。 */}
+      <SectionIntro
+        eyebrow="扩展页面"
+        title="把扩展数据配置成左侧分析菜单"
+        right={(
           <button
             onClick={() => { resetForm(); setShowForm(true) }}
-            className="inline-flex items-center justify-center gap-1.5 rounded-btn bg-accent/90 px-3 py-1.5 text-xs font-medium text-base hover:bg-accent transition-colors"
+            className="shrink-0 inline-flex items-center justify-center gap-1.5 rounded-btn bg-accent/90 px-3 py-1.5 text-xs font-medium text-base hover:bg-accent transition-colors"
           >
             <Plus className="h-3.5 w-3.5" />
             新建页面
           </button>
-        </div>
-      </section>
+        )}
+      >
+        选择扩展数据源、分析模板、分组字段和列表列后，系统会生成一个可访问的动态分析页面。
+      </SectionIntro>
 
       {showForm && (
         <section className="rounded-card border border-border bg-surface p-5 space-y-4">

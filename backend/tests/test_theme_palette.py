@@ -368,3 +368,67 @@ def test_R379_主题色不许落进涨跌的色相带():
         h = _token(blk, name)[2]
         d = min(abs(h_accent - h), 360 - abs(h_accent - h))
         assert d >= 40, f"主题色色相 {h_accent:.1f} 离 --{name} 的 {h:.1f} 只有 {d:.1f}°"
+
+
+# ── [R379 第二层] 版式:页头放开 + 开篇块只有一个产地 ────────────────────
+#
+# 用户: 「我觉得现在的前端太像一个后台系统」。换色只解决一半 —— 剩下那一半是
+# **版式**: 52px 的页头配一条实边框, 那是工具栏不是页头。
+#
+# 这一层刻意只动**两个共用件**(PageHeader / SectionIntro)与**一个容器**
+# (设置区), 不逐页改: 逐页改既碰不全, 又必然随时间漂成 24 种样子。
+# 看盘页的密度(表格行高、字号、列宽、卡片内边距)一个像素没动 —— 那是
+# 这套工具的命根子, 不在这一层的范围里。
+
+
+def test_R379_页头有呼吸感而且只有一个产地():
+    """页头改一处 24 页受益。**这条钉的是那三个数没被调回去** ——
+    它们看着像"随手写的样式", 其实是这一层改动的全部内容。"""
+    from tests.frontend_source import code_of
+    code = code_of("components/PageHeader.tsx")
+    assert "min-h-[60px] px-4 py-3 border-b border-border/60" in code, \
+        "页头被调回紧凑工具栏那一档了"
+    assert "text-xl font-semibold leading-tight tracking-tight" in code, \
+        "页标题字号被调回去了"
+    # 徽标是药丸, baseline 对齐会让它坐歪 —— 这条是踩过才知道的
+    assert "flex min-w-0 items-center gap-2.5" in code, "标题行的对齐方式被动了"
+
+
+def test_R379_开篇块只有一个产地():
+    """小号大写标签 + 大标题 + 一段说明 —— 这个版式原来**手搓了两份**, 字号、
+    间距、标签颜色各写各的(一处 `text-accent/80`、另一处 `text-cyan-400/80`,
+    后者还是照深色底调的)。两份的下场是必然的: 谁也不会记得同时改两处,
+    于是同一个位置在两页长得不一样, **而且不报错**。
+
+    所以这条钉两头: 组件在, 且**没有人再手搓第二份**。
+    """
+    from tests.frontend_source import SRC, code_of
+    intro = code_of("components/SectionIntro.tsx")
+    for anchor in ("export function SectionIntro", "eyebrow", "text-2xl font-semibold"):
+        assert anchor in intro, f"SectionIntro 少了 {anchor}"
+
+    # 手搓的特征: 那串 eyebrow 的字号/字重/字距组合
+    hand_rolled = "text-[10.5px] font-semibold uppercase tracking-wider"
+    offenders = [
+        f.relative_to(SRC).as_posix()
+        for f in sorted(SRC.rglob("*.tsx"))
+        if f.name != "SectionIntro.tsx" and hand_rolled in code_of(f.relative_to(SRC).as_posix())
+    ]
+    assert not offenders, "又有人手搓开篇块了, 收进 SectionIntro:\n  " + "\n  ".join(offenders)
+
+
+def test_R379_看盘页的密度一个像素没动():
+    """**这一层最要紧的一条不是"改了什么", 是"没改什么"。**
+
+    WavMint 那套是给「一屏几张卡」的工具站做的: 48px 控件、96px 区块间距。
+    照搬到这里会把看盘要的信息密度毁掉 —— 一屏几百个数字才是这个工具的用处。
+    所以钉住两个最容易被顺手放大的地方: 表格行的紧凑字号与行距。
+    """
+    from tests.frontend_source import code_of
+    # 自选表格的行: 紧凑档位还在
+    table = code_of("components/stock-table/primitives.tsx")
+    assert "text-xs" in table or "text-[11px]" in table, "自选表格的紧凑字号没了"
+    # 模拟盘信号行: R356 定下的行高与栅格没被放开
+    flip = code_of("pages/FlipPaper.tsx")
+    assert "sm:min-h-[3.5rem]" in flip, "模拟盘信号行的行高被动了"
+    assert "grid-cols-[3.5rem_minmax(0,1fr)_auto]" in flip, "模拟盘信号行的栅格被动了"

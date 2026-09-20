@@ -28,6 +28,7 @@ import { Link } from 'react-router-dom'
 import { api } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { usePreferences } from '@/lib/useSharedQueries'
+import { SectionIntro } from '@/components/SectionIntro'
 import {
   BROWSE_GROUP,
   BROWSE_GROUP_ID,
@@ -486,16 +487,13 @@ export function SettingsMenuSettingsPanel() {
 
   return (
     <div className="max-w-5xl space-y-6">
-      <section className="rounded-2xl border border-border bg-surface p-6">
-        <div className="text-[10.5px] font-semibold uppercase tracking-wider text-accent/80">菜单设置</div>
-        <h2 className="mt-2 text-2xl font-semibold tracking-tight text-foreground">调整左侧菜单顺序</h2>
-        <p className="mt-2 max-w-3xl text-sm leading-6 text-secondary">
-          拖动左侧手柄调整菜单排列顺序，点击眼睛图标控制菜单在侧边栏中的显示或隐藏。
-          「{BROWSE_GROUP.label}」是一个分组，拖它整块一起挪；缩进的那几行是它的成员。
-          <strong className="font-medium text-foreground">任何一行都能拖进或拖出这个分组</strong>
-          ，也可以点那一行的「闲置」按钮一键收进去 / 放出来。
-        </p>
-      </section>
+      {/* [R379] 这一块的手搓版收进 `SectionIntro` —— 与扩展页面那一处合成一个产地 */}
+      <SectionIntro eyebrow="菜单设置" title="调整左侧菜单顺序">
+        拖动左侧手柄调整菜单排列顺序，点击眼睛图标控制菜单在侧边栏中的显示或隐藏。
+        「{BROWSE_GROUP.label}」是一个分组，拖它整块一起挪；缩进的那几行是它的成员。
+        <strong className="font-medium text-foreground">任何一行都能拖进或拖出这个分组</strong>
+        ，也可以点那一行的「闲置」按钮一键收进去 / 放出来。
+      </SectionIntro>
 
       <section className="rounded-card border border-border bg-surface overflow-hidden">
         <div className={`grid ${GRID_COLS} items-center border-b border-border px-4 py-2 text-[11px] text-muted`}>
