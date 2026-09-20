@@ -108,7 +108,10 @@ function ExternalWebsiteSettings() {
           <div className="flex items-center gap-2 text-[10.5px] font-semibold uppercase tracking-wider text-cyan-400/80">
             <Globe2 className="h-3.5 w-3.5" />外部网页
           </div>
-          <h2 className="mt-2 text-xl font-semibold tracking-tight text-foreground">把一个外部网页变成「闲置功能」里的一页</h2>
+          {/* [R378] 原来写的是「变成『闲置功能』里的一页」—— 那句话从来就不对:
+              外部网页是**一级菜单**, 默认不在那个分组里。R378 之后它和别的菜单一样
+              拖得进去, 但那是用户自己拖的结果, 不是这里配出来的。 */}
+          <h2 className="mt-2 text-xl font-semibold tracking-tight text-foreground">把一个外部网页变成菜单里的一页</h2>
           <p className="mt-2 text-sm leading-6 text-secondary">
             两种做法二选一：直接内嵌整站，或者由后端抓回原文、交给面板里配置的 AI 整理成统一表格再显示。
             无论哪种，牛来都不会把 TickFlow 数据、API Key 或登录凭据转发给对方。

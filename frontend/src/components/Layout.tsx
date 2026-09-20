@@ -76,7 +76,7 @@ import { toggleTheme, useTheme } from '@/lib/theme'
 import { setCurrentTotal as setAlertTotal, useUnreadAlerts } from '@/lib/monitorBadge'
 import { ExtensionSlot } from '@/extensions/ExtensionSlot'
 import { getFrontendExtensionNavigation } from '@/extensions/registry'
-import { BROWSE_GROUP, BROWSE_GROUP_ID, splitBrowseGroup } from '@/lib/navGroups'
+import { BROWSE_GROUP, BROWSE_GROUP_ID, browseMembersOf, splitBrowseGroup } from '@/lib/navGroups'
 
 // 品牌色 — 只用于 logo / brand 区域,不影响功能语义色
 const BRAND = '#8B5CF6'
@@ -896,7 +896,10 @@ export function Layout() {
   const hiddenIds = new Set(prefs?.nav_hidden ?? [])
   const shownNavItems = navItems.filter(n => !hiddenIds.has(n.to) && !hiddenIds.has(n.to.replace(/^\/analysis\//, '')))
   // [R67] 成员从顶层抽出来, 只在分组行下面出现 —— 分组行自己排在哪, 整块就在哪。
-  const { top: visibleNavItems, members: browseItems } = splitBrowseGroup(shownNavItems, n => n.to)
+  // [R378] 谁是成员由 `nav_order` 里那对首尾标记说了算(用户拖进拖出会改写它),
+  // 没存过就回落到默认名单 —— 侧栏与设置页读的是同一个函数, 不会各算各的。
+  const { top: visibleNavItems, members: browseItems } =
+    splitBrowseGroup(shownNavItems, n => n.to, browseMembersOf(savedOrder))
   const browsePaths = browseItems.map(n => n.to)
   // 所有成员全隐藏了就别留一个空表头
   const showBrowseGroup = browsePaths.length > 0

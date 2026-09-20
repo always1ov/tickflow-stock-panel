@@ -5,9 +5,12 @@ import {
   closestCenter,
   KeyboardSensor,
   PointerSensor,
+  useDroppable,
   useSensor,
   useSensors,
   type DragEndEvent,
+  type DragOverEvent,
+  type DragStartEvent,
 } from '@dnd-kit/core'
 import {
   arrayMove,
@@ -17,7 +20,10 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Eye, EyeOff, ExternalLink, GripVertical, Settings, Bell, Layers3 } from 'lucide-react'
+import {
+  Eye, EyeOff, ExternalLink, GripVertical, Settings, Bell, Layers3,
+  CornerDownRight, CornerLeftUp,
+} from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { api } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
@@ -25,6 +31,7 @@ import { usePreferences } from '@/lib/useSharedQueries'
 import {
   BROWSE_GROUP,
   BROWSE_GROUP_ID,
+  browseMembersOf,
   composeNavOrder,
   splitBrowseGroup,
 } from '@/lib/navGroups'
@@ -80,7 +87,40 @@ const BUILTIN_PAGES: NavEntry[] = [
 
 // ── Sortable row ──
 
-function SortableItem({ entry, hidden, onToggleHidden, badgeEnabled, onToggleBadge, indent, note }: {
+/** 表格列宽 —— 表头与每一行共用同一串, 分两处写迟早对不齐。 */
+const GRID_COLS = 'grid-cols-[2.5rem_1fr_4.5rem_3rem_3rem_3rem_3rem]'
+
+/**
+ * [R378] 空组的投放区 id。
+ *
+ * `SortableContext` 只在**成员行**上建可投放点, 组里一个成员都没有时整段就是
+ * 空的 —— 没有任何东西接得住拖过来的行, 于是「全拖出来之后再也拖不回去」。
+ * 所以空组时单独摆一个 `useDroppable`。
+ */
+const MEMBER_DROP_ID = 'dropzone:browse'
+
+/** 空组时的投放区 —— 它存在的唯一理由就是让空组还能接住东西。 */
+function EmptyMemberDropZone({ active }: { active: boolean }) {
+  const { setNodeRef, isOver } = useDroppable({ id: MEMBER_DROP_ID })
+  return (
+    <div
+      ref={setNodeRef}
+      className={`border-b border-border/70 py-4 pl-10 pr-4 text-xs transition-colors ${
+        isOver
+          ? 'bg-accent/10 text-accent'
+          : active
+            ? 'bg-elevated/25 text-secondary'
+            : 'bg-elevated/25 text-muted'
+      }`}
+    >
+      {active
+        ? `松手放到这里, 就收进「${BROWSE_GROUP.label}」`
+        : `组里现在是空的 —— 把任意一行拖到这里, 或点那一行的「闲置」按钮, 就能收进来。`}
+    </div>
+  )
+}
+
+function SortableItem({ entry, hidden, onToggleHidden, badgeEnabled, onToggleBadge, indent, note, onToggleGroup }: {
   entry: NavEntry
   hidden: boolean
   onToggleHidden: (id: string) => void
@@ -90,6 +130,14 @@ function SortableItem({ entry, hidden, onToggleHidden, badgeEnabled, onToggleBad
   indent?: boolean
   /** 代替路径显示的说明文字(分组行没有自己的页面, 显示 group:browse 没意义) */
   note?: string
+  /**
+   * [R378] 一键移入/移出「闲置功能」—— 拖拽之外的第二条路。
+   *
+   * 不是给拖不动的人留的备份, 是**键盘那条路**: dnd-kit 的键盘拖拽在单个列表
+   * 里好用, 跨到另一个容器要靠空格+方向键摸索落点, 谁也摸不准。分组行本身不给
+   * (它不能钻进自己肚子里), 所以这个 prop 是可选的。
+   */
+  onToggleGroup?: (id: string) => void
 }) {
   const {
     attributes,
@@ -111,7 +159,7 @@ function SortableItem({ entry, hidden, onToggleHidden, badgeEnabled, onToggleBad
     <div
       ref={setNodeRef}
       style={style}
-      className={`grid grid-cols-[2.5rem_1fr_4.5rem_3rem_3rem_3rem] items-center border-b border-border/70 py-3 pr-4 last:border-b-0 ${
+      className={`grid ${GRID_COLS} items-center border-b border-border/70 py-3 pr-4 last:border-b-0 ${
         indent ? 'pl-10 bg-elevated/25' : 'pl-4'
       } ${isDragging ? 'bg-elevated rounded-lg shadow-lg' : ''} ${hidden ? 'opacity-50' : ''}`}
     >
@@ -151,6 +199,20 @@ function SortableItem({ entry, hidden, onToggleHidden, badgeEnabled, onToggleBad
         >
           {hidden ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
         </button>
+      </div>
+      {/* [R378] 第 5 列: 移入 / 移出「闲置功能」 */}
+      <div className="flex justify-center">
+        {onToggleGroup && (
+          <button
+            onClick={() => onToggleGroup(entry.id)}
+            className="rounded p-1 text-muted transition-colors hover:bg-accent/10 hover:text-accent"
+            title={indent ? `移出「${BROWSE_GROUP.label}」` : `收进「${BROWSE_GROUP.label}」`}
+          >
+            {indent
+              ? <CornerLeftUp className="h-3.5 w-3.5" />
+              : <CornerDownRight className="h-3.5 w-3.5" />}
+          </button>
+        )}
       </div>
       <div className="flex justify-center">
         {entry.type === 'group' ? null : entry.type === 'builtin' ? (
@@ -285,9 +347,15 @@ export function SettingsMenuSettingsPanel() {
   }, [localOrder, prefs?.nav_order, allEntries, builtinPages])
 
   // [R67] 「闲置功能」的成员不在顶层排 —— 它们跟着分组行走, 组内单独排序。
+  // [R378] 谁是成员改由顺序里那对首尾标记说了算, 不再是写死的名单。
+  const effectiveOrder = useMemo(
+    () => localOrder ?? prefs?.nav_order ?? [],
+    [localOrder, prefs?.nav_order],
+  )
+  const memberSet = useMemo(() => browseMembersOf(effectiveOrder), [effectiveOrder])
   const { top: topEntries, members: memberEntries } = useMemo(
-    () => splitBrowseGroup(orderedEntries, e => e.id),
-    [orderedEntries],
+    () => splitBrowseGroup(orderedEntries, e => e.id, memberSet),
+    [orderedEntries, memberSet],
   )
 
   const saveNavOrder = useMutation({
@@ -308,30 +376,92 @@ export function SettingsMenuSettingsPanel() {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   )
 
-  /** 顶层排序: 分组行当一个整体挪, 成员始终跟在它后面重新落位。 */
+  // ── [R378] 一个拖拽上下文管两串 ────────────────────────────────────────
+  //
+  // R67 那版是**两个 DndContext**(顶层一个、组内一个), 于是"组内只能换先后、
+  // 拖不出去也拖不进来" —— 两个上下文之间没有任何联系, 从一个里拖出来的东西
+  // 另一个根本看不见。用户要的「都能拉进拉出」, 前提就是把它们并成一个。
+  //
+  // 并了之后仍是**两串**(两个 SortableContext), 不是一串扁的 —— 分组行要能
+  // 「整块挪」, 就必须让顶层那串里它只占一格, 成员不参与顶层排序。
+  const [dragging, setDragging] = useState<string | null>(null)
+  const containerOf = (id: string) => (memberSet.has(id) && id !== BROWSE_GROUP_ID ? 'members' : 'top')
+
+  /** 把一次跨容器的搬运落成新的扁平顺序; `overId` 是落点(空组时是投放区的 id)。 */
+  const moveAcross = (activeId: string, overId: string, to: 'top' | 'members') => {
+    const topIds = topEntries.map(e => e.id).filter(id => id !== activeId)
+    const memberIds = memberEntries.map(e => e.id).filter(id => id !== activeId)
+    if (to === 'members') {
+      const at = memberIds.indexOf(overId)
+      memberIds.splice(at < 0 ? memberIds.length : at, 0, activeId)
+    } else {
+      const at = topIds.indexOf(overId)
+      // 落不到具体某行(理论上不该发生)时放回分组行后面, 别塞到列表最前面
+      topIds.splice(at < 0 ? Math.max(topIds.indexOf(BROWSE_GROUP_ID) + 1, 0) : at, 0, activeId)
+    }
+    return composeNavOrder(topIds, memberIds)
+  }
+
+  const handleDragStart = (event: DragStartEvent) => setDragging(String(event.active.id))
+
+  /**
+   * 跨容器搬运在 `onDragOver` 就落, 不等松手 —— 拖到一半就能看见它已经缩进去了,
+   * 松手只是确认。等到 `onDragEnd` 再落, 整个拖拽过程里那一行都还待在原处, 看
+   * 不出自己到底会掉进哪一边。
+   */
+  const handleDragOver = (event: DragOverEvent) => {
+    const { active, over } = event
+    if (!over) return
+    const activeId = String(active.id)
+    const overId = String(over.id)
+    // 分组行不能钻进自己肚子里
+    if (activeId === BROWSE_GROUP_ID) return
+    const from = containerOf(activeId)
+    const to = overId === MEMBER_DROP_ID ? 'members' : containerOf(overId)
+    if (from === to) return
+    setLocalOrder(moveAcross(activeId, overId, to))
+  }
+
+  /** 松手: 同容器内换先后, 然后无论如何都存一次 —— 跨容器那一步已经在上面落过了。 */
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event
-    if (!over || active.id === over.id) return
+    setDragging(null)
+    if (!over) { setLocalOrder(null); return }
 
-    const ids = topEntries.map(e => e.id)
-    const oldIdx = ids.indexOf(active.id as string)
-    const newIdx = ids.indexOf(over.id as string)
-    if (oldIdx < 0 || newIdx < 0) return
-    const next = composeNavOrder(arrayMove(ids, oldIdx, newIdx), memberEntries.map(e => e.id))
+    const activeId = String(active.id)
+    const overId = String(over.id)
+    let topIds = topEntries.map(e => e.id)
+    let memberIds = memberEntries.map(e => e.id)
+
+    if (activeId !== overId && overId !== MEMBER_DROP_ID) {
+      const list = containerOf(activeId) === 'members' ? memberIds : topIds
+      const oldIdx = list.indexOf(activeId)
+      const newIdx = list.indexOf(overId)
+      if (oldIdx >= 0 && newIdx >= 0) {
+        const moved = arrayMove(list, oldIdx, newIdx)
+        if (containerOf(activeId) === 'members') memberIds = moved
+        else topIds = moved
+      }
+    }
+    const next = composeNavOrder(topIds, memberIds)
     setLocalOrder(next)
     saveNavOrder.mutate(next)
   }
 
-  /** 组内排序: 只动成员之间的先后, 分组行在顶层的位置不受影响。 */
-  const handleMemberDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event
-    if (!over || active.id === over.id) return
+  const handleDragCancel = () => { setDragging(null); setLocalOrder(null) }
 
-    const ids = memberEntries.map(e => e.id)
-    const oldIdx = ids.indexOf(active.id as string)
-    const newIdx = ids.indexOf(over.id as string)
-    if (oldIdx < 0 || newIdx < 0) return
-    const next = composeNavOrder(topEntries.map(e => e.id), arrayMove(ids, oldIdx, newIdx))
+  /** [R378] 一键移入/移出 —— 键盘那条路(跨容器的键盘拖拽摸不准落点)。 */
+  const toggleGroup = (id: string) => {
+    const inGroup = containerOf(id) === 'members'
+    const topIds = topEntries.map(e => e.id).filter(x => x !== id)
+    const memberIds = memberEntries.map(e => e.id).filter(x => x !== id)
+    if (inGroup) {
+      // 移出: 放在分组行整块的紧后面, 原位置附近, 不要甩到列表末尾
+      topIds.splice(Math.max(topIds.indexOf(BROWSE_GROUP_ID) + 1, 0), 0, id)
+    } else {
+      memberIds.push(id)
+    }
+    const next = composeNavOrder(topIds, memberIds)
     setLocalOrder(next)
     saveNavOrder.mutate(next)
   }
@@ -361,25 +491,31 @@ export function SettingsMenuSettingsPanel() {
         <h2 className="mt-2 text-2xl font-semibold tracking-tight text-foreground">调整左侧菜单顺序</h2>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-secondary">
           拖动左侧手柄调整菜单排列顺序，点击眼睛图标控制菜单在侧边栏中的显示或隐藏。
-          「{BROWSE_GROUP.label}」是一个分组，拖它整块一起挪；缩进的那几行是它的成员，
-          可以在组内单独排序、单独隐藏。
+          「{BROWSE_GROUP.label}」是一个分组，拖它整块一起挪；缩进的那几行是它的成员。
+          <strong className="font-medium text-foreground">任何一行都能拖进或拖出这个分组</strong>
+          ，也可以点那一行的「闲置」按钮一键收进去 / 放出来。
         </p>
       </section>
 
       <section className="rounded-card border border-border bg-surface overflow-hidden">
-        <div className="grid grid-cols-[2.5rem_1fr_4.5rem_3rem_3rem_3rem] items-center border-b border-border px-4 py-2 text-[11px] text-muted">
+        <div className={`grid ${GRID_COLS} items-center border-b border-border px-4 py-2 text-[11px] text-muted`}>
           <div />
           <div>菜单</div>
           <div>类型</div>
           <div className="text-center">显示</div>
+          <div className="text-center">闲置</div>
           <div className="text-center">设置</div>
           <div className="text-center">数字</div>
         </div>
 
+        {/* [R378] 一个上下文管两串 —— 两个上下文之间拖不过去, 那正是旧版的毛病 */}
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
+          onDragStart={handleDragStart}
+          onDragOver={handleDragOver}
           onDragEnd={handleDragEnd}
+          onDragCancel={handleDragCancel}
         >
           <SortableContext
             items={topEntries.map(e => e.id)}
@@ -394,29 +530,27 @@ export function SettingsMenuSettingsPanel() {
                   note={entry.id === BROWSE_GROUP_ID ? `${memberEntries.length} 项 · ${BROWSE_GROUP.hint}` : undefined}
                   badgeEnabled={entry.id === '/monitor' ? badgeEnabled : undefined}
                   onToggleBadge={entry.id === '/monitor' ? toggleBadge : undefined}
+                  onToggleGroup={entry.id === BROWSE_GROUP_ID ? undefined : toggleGroup}
                 />
-                {/* 组内成员单开一个拖拽上下文 —— 组内排序不该把分组行本身卷进去 */}
                 {entry.id === BROWSE_GROUP_ID && (
-                  <DndContext
-                    sensors={sensors}
-                    collisionDetection={closestCenter}
-                    onDragEnd={handleMemberDragEnd}
+                  <SortableContext
+                    items={memberEntries.map(e => e.id)}
+                    strategy={verticalListSortingStrategy}
                   >
-                    <SortableContext
-                      items={memberEntries.map(e => e.id)}
-                      strategy={verticalListSortingStrategy}
-                    >
-                      {memberEntries.map(m => (
-                        <SortableItem
-                          key={m.id}
-                          entry={m}
-                          indent
-                          hidden={hiddenSet.has(m.id)}
-                          onToggleHidden={toggleHidden}
-                        />
-                      ))}
-                    </SortableContext>
-                  </DndContext>
+                    {memberEntries.map(m => (
+                      <SortableItem
+                        key={m.id}
+                        entry={m}
+                        indent
+                        hidden={hiddenSet.has(m.id)}
+                        onToggleHidden={toggleHidden}
+                        onToggleGroup={toggleGroup}
+                      />
+                    ))}
+                    {memberEntries.length === 0 && (
+                      <EmptyMemberDropZone active={dragging !== null && dragging !== BROWSE_GROUP_ID} />
+                    )}
+                  </SortableContext>
                 )}
               </div>
             ))}
