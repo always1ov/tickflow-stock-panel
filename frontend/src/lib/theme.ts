@@ -129,19 +129,24 @@ const DARK: ChartTheme = {
 // index.css 的一份手抄件 —— 抄的时候要对得上, 否则同一屏里「轴上的灰」与
 // 「界面上的灰」是两种灰, **而两边看上去都没坏**。
 // 每个值后面标着它对应的 token, 改 token 就得回来改这里。
+// [R379] 跟着 index.css 的铬色一起换。**canvas 不吃 CSS 变量**, 这份 hex 是
+// index.css 的手抄件 —— 对不上就会出现「轴上的灰和界面上的灰是两种灰」,
+// 而且不会有任何东西报错(R317 立的规矩)。
+// 换的全是铬色(文字/网格/边框/十字线/浮层底), **涨跌那两个色不在这里**,
+// 它们在各自的图表组件里, 这一轮一个字没动。
 const LIGHT: ChartTheme = {
-  text: '#667085',        // --fg-muted    辅助文字
-  textStrong: '#101828',  // --fg-primary  主要文字
-  grid: 'rgba(16,24,40,0.06)',          // = fg-primary 的低透明度, 不用纯黑
-  border: '#E4E7EC',      // --border      普通边框
-  crosshair: 'rgba(16,24,40,0.28)',
-  crosshairLabelBg: '#475467',          // --fg-secondary: 十字线标签是深底白字
+  text: '#6B7488',        // --fg-muted    辅助文字
+  textStrong: '#222738',  // --fg-primary  主要文字
+  grid: 'rgba(34,39,56,0.06)',          // = fg-primary 的低透明度, 不用纯黑
+  border: '#E7EAF2',      // --border      普通边框
+  crosshair: 'rgba(34,39,56,0.28)',
+  crosshairLabelBg: '#596376',          // --fg-secondary: 十字线标签是深底白字
   tooltipBg: 'rgba(255,255,255,0.97)',  // --surface
-  tooltipBorder: 'rgba(16,24,40,0.10)',
-  tooltipText: '#101828', // --fg-primary
-  infoBarBg: 'rgba(246,248,252,0.85)',  // --base       页面底
-  zoomFill: 'rgba(16,24,40,0.06)',
-  fillSubtle: 'rgba(16,24,40,0.04)',
+  tooltipBorder: 'rgba(34,39,56,0.10)',
+  tooltipText: '#222738', // --fg-primary
+  infoBarBg: 'rgba(246,247,251,0.85)',  // --base       页面底
+  zoomFill: 'rgba(34,39,56,0.06)',
+  fillSubtle: 'rgba(34,39,56,0.04)',
 }
 
 export function chartTheme(theme: Theme): ChartTheme {

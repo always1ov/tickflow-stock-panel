@@ -569,21 +569,18 @@ function PlainNavLink({ item, collapsed, indent, dataSyncing, dataSyncJustDone }
           cn(
             'group relative flex items-center rounded-btn text-sm transition-ui duration-hover ease-smooth',
             collapsed ? 'justify-center px-0 py-2' : 'gap-2.5 px-3 py-1.5',
+            // [R379] 选中态从「灰底 + 左侧竖条」换成 WavMint 的**同色系药丸**:
+            // 浅靛蓝底 + 靛蓝字 + 加粗。手册 §6.3 说选中态该由「颜色、字重、图标」
+            // 同时给线索 —— 灰底那版只有底色在说话, 而灰底恰恰是后台系统的口音。
+            // 竖条一并去掉: 药丸自己就画出了范围, 再加一条竖线是两套指示叠着。
             isActive
-              ? 'bg-elevated text-foreground font-medium'
+              ? 'bg-accent-soft text-accent font-medium'
               : 'text-foreground/75 hover:bg-elevated/70 hover:text-foreground',
           )
         }
       >
         {({ isActive }) => (
           <>
-            {/* active 左侧 accent 竖条指示 */}
-            <span
-              className={cn(
-                'pointer-events-none absolute left-0 top-1/2 h-4 -translate-y-1/2 w-[2.5px] rounded-full bg-accent transition-opacity duration-hover',
-                isActive ? 'opacity-100' : 'opacity-0',
-              )}
-            />
             <Icon className={cn('h-4 w-4 shrink-0 transition-colors', isActive ? 'text-accent' : 'text-foreground/60 group-hover:text-foreground/85')} />
             {!collapsed && <span className="flex-1">{label}</span>}
             {!collapsed && badge && (
@@ -1117,16 +1114,10 @@ export function Layout() {
                     className={cn(
                       'group relative flex w-full items-center gap-2.5 rounded-btn px-3 py-1.5 text-sm transition-ui duration-hover ease-smooth',
                       location.pathname === '/watchlist'
-                        ? 'bg-elevated text-foreground font-medium'
+                        ? 'bg-accent-soft text-accent font-medium'
                         : 'text-foreground/75 hover:bg-elevated/70 hover:text-foreground',
                     )}
                   >
-                    <span
-                      className={cn(
-                        'pointer-events-none absolute left-0 top-1/2 h-4 -translate-y-1/2 w-[2.5px] rounded-full bg-accent transition-opacity duration-hover',
-                        location.pathname === '/watchlist' ? 'opacity-100' : 'opacity-0',
-                      )}
-                    />
                     <Icon className={cn('h-4 w-4 shrink-0 transition-colors', location.pathname === '/watchlist' ? 'text-accent' : 'text-foreground/60 group-hover:text-foreground/85')} />
                     <span className="flex-1 text-left">{label}</span>
                     {watchlistNavExpanded
@@ -1370,19 +1361,13 @@ export function Layout() {
                   'group relative flex items-center rounded-btn text-sm transition-ui duration-hover ease-smooth',
                   railMode ? 'justify-center px-0 py-2' : 'flex-1 gap-2.5 px-3 py-1.5',
                   isActive
-                    ? 'bg-elevated text-foreground font-medium'
+                    ? 'bg-accent-soft text-accent font-medium'
                     : 'text-foreground/75 hover:bg-elevated/70 hover:text-foreground',
                 )
               }
             >
               {({ isActive }) => (
                 <>
-                  <span
-                    className={cn(
-                      'pointer-events-none absolute left-0 top-1/2 h-4 -translate-y-1/2 w-[2.5px] rounded-full bg-accent transition-opacity duration-hover',
-                      isActive ? 'opacity-100' : 'opacity-0',
-                    )}
-                  />
                   <Settings className={cn('h-4 w-4 shrink-0 transition-colors', isActive ? 'text-accent' : 'text-foreground/60 group-hover:text-foreground/85')} />
                   {!railMode && <span>设置</span>}
                   {!railMode && version && (

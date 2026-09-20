@@ -12,6 +12,11 @@
      打错一位数字没有任何东西会报错, 屏幕上也只是"略微不对"。所以这里把 oklch
      **反解回 sRGB** 与用户给的 hex 逐个比。
   ② **那几条禁令没有回潮**: 发光、蓝紫渐变。
+
+[R379] 用户又给了一份 WavMint 视觉设计包, 说「现在的前端太像一个后台系统」,
+于是**铬色**换成了那一套暖白＋靛蓝。上面那张表因此拆成 `CHROME` 与 `MARKET`:
+铬色可以随皮肤换, **指标色冻结**。用户当场补的那句话就是这条规矩的来源 ——
+「我这个是炒股系统, 所以一些指标显示颜色要对要注意」。
 """
 from __future__ import annotations
 
@@ -24,22 +29,35 @@ from tests.frontend_source import SRC
 CSS = SRC / "index.css"
 
 # 用户逐值指定的那一套 —— **这张表就是需求本身**, 改它等于改需求
-PALETTE = {
-    "base": "#F6F8FC",
-    "sidebar": "#F8FAFC",
-    "border": "#E4E7EC",
-    "border-input": "#D0D5DD",
-    "fg-primary": "#101828",
-    "fg-secondary": "#475467",
-    "fg-muted": "#667085",
-    "accent": "#2563EB",
-    "accent-text": "#2563EB",
-    "accent-hover": "#1D4ED8",
-    "accent-soft": "#EFF6FF",
+#
+# [R379] 拆成两段, 因为它们来自**两次不同的要求, 改动权限也不同**:
+#
+#   · 铬色(界面本身的颜色)来自 R379 那份 WavMint 视觉设计包 —— 用户说
+#     「现在的前端太像一个后台系统」, 换的是皮肤。以后还可能再换。
+#   · 指标色(涨/跌/警示)来自 R368 用户逐值给的那三个 hex, **冻结**。
+#     用户原话: 「我这个是炒股系统, 所以一些指标显示颜色要对要注意」——
+#     红涨绿跌是看盘的人肌肉记忆里的东西, 换皮肤不能把它带着漂。
+#     下面 test_R379_换皮肤没有碰到任何指标色 专门钉这一段。
+CHROME = {
+    "base": "#F6F7FB",
+    "sidebar": "#FFFFFF",
+    "border": "#E7EAF2",
+    "border-input": "#DCE0EF",
+    "fg-primary": "#222738",
+    "fg-secondary": "#596376",
+    "fg-muted": "#6B7488",
+    "accent": "#4F5DE8",
+    "accent-text": "#4F5DE8",
+    "accent-hover": "#3E49CE",
+    "accent-soft": "#EFF1FD",
+}
+# **这三个不许动。** 值来自 R368, 与 WavMint 那份包无关。
+MARKET = {
     "bull": "#D92D20",
     "bear": "#15803D",
     "warning": "#B54708",
 }
+PALETTE = {**CHROME, **MARKET}
 
 
 # ── oklch → sRGB(反解, 用来把 CSS 里的数字翻回 hex)────────────────────
@@ -132,8 +150,13 @@ def test_R368_默认亮色_而且两处判据逐字一致():
 
 
 def test_R368_侧栏与内容面板不是同一档():
-    """用户把这两个背景分开指定了(#F8FAFC / #FFFFFF)——
-    同色的话两块贴在一起没有分界。"""
+    """侧栏必须有**自己的一档**, 不能直接写 `bg-surface`。
+
+    [R368] 当时两档是 #F8FAFC / #FFFFFF(侧栏更灰);
+    [R379] 换成 WavMint 工作台的分法后两档都是白, 分界改由**页底那条缝**给出 ——
+    所以这条断言钉的从来不是"两个颜色不一样", 而是**侧栏走的是自己那个令牌**:
+    只要它还是一档独立的变量, 下次想让侧栏再变灰就是改一个值的事, 不用回头
+    满仓库找 `bg-surface`。"""
     from tests.frontend_source import code_of
     layout = code_of("components/Layout.tsx")
     assert "'bg-sidebar flex flex-col min-h-0 overflow-hidden'" in layout, \
@@ -292,3 +315,56 @@ def test_R369_全球指数整个特性没了_不是只删了那张卡():
     assert "function SidebarIndexQuotes({ rows, items, cnLive }" in layout, \
         "侧栏 A 股指数卡被一起删掉了"
     assert "{items.map(item => {" in layout, "A 股那几张卡的渲染没了"
+
+
+# ── [R379] 换皮肤不许碰指标色 ────────────────────────────────────────────
+#
+# 用户在这一轮当场补的: 「我这个是炒股系统, 所以一些指标显示颜色要对要注意」。
+#
+# 换皮肤时最容易出的事不是"忘了改", 而是"顺手一起改了" —— 一遍全局替换把
+# 涨跌色也扫进去, 屏幕上红还是红、绿还是绿, 只是**换了一个红**, 谁也看不出来,
+# 而看盘的人靠的正是那个肌肉记忆。所以这一组钉的是「哪些东西这次不许动」。
+
+K_BULL, K_BEAR = "#C74040", "#2D9B65"
+
+
+def test_R379_换皮肤没有碰到任何指标色():
+    """三个语义 token 逐字对上 R368 冻结的那几个 hex。"""
+    blk = _light_block()
+    bad = []
+    for name, want in MARKET.items():
+        got = _oklch_to_hex(*_token(blk, name))
+        if got.upper() != want.upper():
+            bad.append(f"--{name}: 现在是 {got}, 冻结值是 {want}")
+    # `--danger` 与 `--bull` 同值 —— 破坏性按钮与价格格子的语境不重叠
+    assert _token(blk, "danger") == _token(blk, "bull"), "--danger 不再等于 --bull"
+    assert not bad, "指标色被换皮肤带着漂了:\n  " + "\n  ".join(bad)
+
+
+def test_R379_K线那两个常量没动():
+    """K 线的红绿是**写死在组件里的常量**(canvas 不吃 CSS 变量), 换皮肤时它们
+    既不会跟着变、也没有任何守卫拦着有人顺手改 —— 所以在这儿点名钉住。
+    它们是亮暗两套共用的, 改一处两套都变。"""
+    from tests.frontend_source import code_of
+    code = code_of("components/EChartsCandlestick.tsx")
+    # 先断言再切片 —— 直接 index() 的话改了色只会抛 ValueError, 看不出改了什么
+    assert f"bull: '{K_BULL}'" in code and f"bear: '{K_BEAR}'" in code, \
+        "K 线的涨跌红绿被改了(它是亮暗两套共用的常量)"
+    multi = code_of("components/EChartsMultiDayIntraday.tsx")
+    assert f"up: '{K_BULL}'" in multi and f"down: '{K_BEAR}'" in multi, \
+        "多日分时的涨跌色与 K 线对不上了"
+
+
+def test_R379_主题色不许落进涨跌的色相带():
+    """靛蓝离红绿很远, 现在当然没问题 —— **钉的是以后**。
+
+    下一次换皮肤如果挑了个偏红或偏绿的主题色, 界面上就会出现「不表示涨跌、
+    但看着像涨跌」的色块(选中态、主按钮、链接), 而那是**颜色在说假话**,
+    没有任何东西会报错。留 40° 的隔离带。
+    """
+    blk = _light_block()
+    h_accent = _token(blk, "accent")[2]
+    for name in ("bull", "bear"):
+        h = _token(blk, name)[2]
+        d = min(abs(h_accent - h), 360 - abs(h_accent - h))
+        assert d >= 40, f"主题色色相 {h_accent:.1f} 离 --{name} 的 {h:.1f} 只有 {d:.1f}°"

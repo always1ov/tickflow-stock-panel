@@ -131,11 +131,13 @@ const TIER_STYLE: Record<string, TierStyle> = {
     dotStyle: { background: '#667085' },
     labelTextStyle: { color: '#475467' },
   },
+  // [R379] 这一档的蓝跟着主题色一起换成靛蓝 —— 它代表的是"强调", 不是涨跌,
+  // 留在旧的 #2563EB 会和全站主题色差出一个色相, 两种蓝并排出现。
   starter: {
     desc: '除权因子 · 全市场实时',
-    tagBg: { background: 'rgba(37,99,235,0.10)' },
-    dotStyle: { background: '#2563EB' },
-    labelTextStyle: { color: '#1D4ED8' },
+    tagBg: { background: 'rgba(79,93,232,0.10)' },
+    dotStyle: { background: '#4F5DE8' },
+    labelTextStyle: { color: '#3E49CE' },
   },
   pro: {
     desc: '分钟K · 盘口',
