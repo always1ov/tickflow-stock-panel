@@ -198,7 +198,7 @@ Keltner 三档、注记·不计分、焦点名单、收盘口径 vs 盘中口径
 | 镜像仓库 | `ghcr.io/always1ov/tickflow-stock-panel` |
 | Tag 策略 | **只产 `:latest`**（不含 `:sha` / `:v*`） |
 | 部署方式 | `docker-compose.yml` 拉取预构建 `:latest`，不本地 build |
-| CI 工作流 | `.github/workflows/docker.yml`（push main 自动刷 latest，PR 仅构建不推，workflow_dispatch 手动兜底） |
+| CI 工作流 | `.github/workflows/docker.yml`（push 到 **`main` 或 `claude/upstream-clean`** 自动刷 `:latest` + `:sha` **并自动触发 Coolify 部署**；其他工作分支只出 `:sha` / `:<分支名>`，不动 `:latest`；`v*` tag 另出版本号镜像；`workflow_dispatch` 手动兜底） |
 | 多架构 | `linux/amd64` + `linux/arm64` |
 | 环境变量 | 模板 `.env.example`，真实值在 `.env`（`.gitignore` 已排除） |
 | 数据持久化 | `./data:/app/data`（`data/` 由 `.gitignore` 排除） |
@@ -319,3 +319,27 @@ Keltner 三档、注记·不计分、焦点名单、收盘口径 vs 盘中口径
 **安全提示：**
 - `GHCR_PAT` secret 现已存于仓库。任何能 push 仓代码的人不会泄漏 secret 值（GitHub 加密），但本身有 repo 写权限的人可以改 workflow 使用该 secret
 - 用户后续推荐：rotate PAT 或改用 GitHub App Token 以缩短 token 生命周期
+
+### 2026-09-20 — 修正「CI 工作流」那一行(它把我自己骗了)
+
+**改动文件：**
+- `AGENTS.md`（本文件）— 修改 — 「当前项目快照」里 CI 工作流那一行只写了 `push main`
+
+**问题：**
+- 那一行是 2026-08-11 首版写的，当时触发分支确实只有 `main`。后来 `docker.yml`
+  把 `claude/upstream-clean` 也加进了 `on.push.branches`，并在 merge job 末尾加了
+  「Trigger Coolify deploy」——**快照这一行一直没跟着改**。
+- 后果不是构建坏了，而是**这份文档在说假话**：本文件自己声明是「唯一可信的项目
+  状态源」，照着它读会得出「推到工作分支不会构建、不会部署」的结论。我这一轮
+  R377~R380 就是照着它，连着四次跟用户说「这些还没上线，要重新构建镜像重新
+  部署」——**而四次构建全都成功跑完并自动部署了**。用户反问「不是设置了改完就会
+  自动触发吗」，去查 Actions 才发现是文档旧了。
+
+**关键决策：**
+- 只改这一行的事实描述，触发规则、tag 策略、部署动作一个字节没动。
+- 顺带把「其他工作分支只出 `:sha` / `:<分支名>`，不动 `:latest`」也写进去——
+  那条守卫在 `docker.yml` 的注释里写得很清楚，快照里却完全没有，同样会误导。
+
+**已知注意事项 / 遗留：**
+- **这一行是从工作流文件抄的，会再次过期。** 改 `docker.yml` 的触发分支、tag
+  条件或部署步骤时，必须同时改这一行。
