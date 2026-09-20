@@ -22,7 +22,15 @@ export function PageHeader({ title, subtitle, titleExtra, right, className }: Pr
         {titleExtra}
         {subtitle && <span className="min-w-0 truncate text-xs leading-[18px] text-muted">{subtitle}</span>}
       </div>
-      {right && <div className="shrink-0">{right}</div>}
+      {/* [R374] 窄屏兜底: 工具栏多个按钮 + date input 等组合, 默认 shrink-0
+          会顶破 375px。改为 flex-wrap + 允许压缩 — left 已经 min-w-0 + truncate,
+          窄屏上 left 优先压短, right 内部自然换行, 整行不会被外层 flex 撑出去。
+          gap-y-1 让换行不致把 PageHeader 撑太高。 */}
+      {right && (
+        <div className="flex min-w-0 flex-wrap items-center justify-end gap-x-2 gap-y-1">
+          {right}
+        </div>
+      )}
     </header>
   )
 }

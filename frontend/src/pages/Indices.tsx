@@ -191,7 +191,10 @@ export function Indices() {
         </div>
       )}
     >
-      <div className="grid grid-cols-[15rem_1fr] gap-4">
+      {/* [R374] 窄屏堆叠: 原 grid-cols-[15rem_1fr] 固定 240px 左栏,
+          手机 375px 直接吃掉 65% 屏宽。默认 grid-cols-1 让左 sidebar
+          折到顶部堆叠, lg 才回两栏。 */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[15rem_1fr]">
         <aside className="rounded-card border border-border bg-surface p-3">
           <div className="mb-2 px-1 text-[11px] uppercase tracking-wider text-muted">核心指数</div>
           <div className="space-y-1">
@@ -215,7 +218,9 @@ export function Indices() {
                 实时缓存 {quotes.data?.count ?? 0} 只指数 · 日K来源 {daily.data?.source ?? '--'}
               </div>
             </div>
-            <div className="flex items-center gap-2 text-xs">
+            {/* [R374] date inputs 窄屏换行: 两个 input + "至" 标签在窄屏挤,
+                shrink-0 会顶破主区。加 flex-wrap 后窄屏自动第二行。 */}
+            <div className="flex flex-wrap items-center gap-2 text-xs">
               <input
                 type="date"
                 value={range.start}

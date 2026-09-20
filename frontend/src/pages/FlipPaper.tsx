@@ -31,6 +31,7 @@ import { ChevronDown, Eye, RefreshCw, TrendingDown, TrendingUp, Wallet } from 'l
 import { api, type FlipOrder, type FlipPaper as FlipPaperData, type FlipRules,
   type FlipTodaySignal, type TodayOpportunity } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
+import { getFlipHoldingDays } from '@/lib/flipHoldingDays'
 import { PageHeader } from '@/components/PageHeader'
 import { Hint } from '@/components/Hint'
 import { Skeleton } from '@/components/data/Skeleton'
@@ -1137,6 +1138,10 @@ function NavChart({ d }: { d: FlipPaperData }) {
 }
 
 function Holdings({ d, onOpen }: { d: FlipPaperData; onOpen: (s: string) => void }) {
+  const holdingDays = useMemo(
+    () => getFlipHoldingDays(d.orders, d.nav, d.as_of),
+    [d.orders, d.nav, d.as_of],
+  )
   return (
     <section className="overflow-hidden rounded-card border border-border/60 bg-surface/40">
       <SectionHead
@@ -1150,10 +1155,14 @@ function Holdings({ d, onOpen }: { d: FlipPaperData; onOpen: (s: string) => void
         </div>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[560px] text-xs">
+          <table className="w-full min-w-[640px] text-xs">
             <thead className="text-[10px] text-muted">
               <tr className="text-left">
                 <th className="px-4 py-1.5 font-normal">标的</th>
+                <th className="w-24 whitespace-nowrap px-2 py-1.5 text-right font-normal"
+                    title="买入当天算第 1 个交易日，统计至模拟盘最后一天；清仓后重置">
+                  持有天数
+                </th>
                 <th className="px-2 py-1.5 text-right font-normal">股数</th>
                 <th className="px-2 py-1.5 text-right font-normal">成本</th>
                 <th className="px-2 py-1.5 text-right font-normal">现价</th>
@@ -1169,6 +1178,9 @@ function Holdings({ d, onOpen }: { d: FlipPaperData; onOpen: (s: string) => void
                             className="text-left hover:text-accent cursor-pointer">
                       <SymbolCell symbol={p.symbol} name={p.name} />
                     </button>
+                  </td>
+                  <td className="whitespace-nowrap px-2 py-1.5 text-right tabular-nums text-secondary">
+                    {holdingDays.has(p.symbol) ? `${holdingDays.get(p.symbol)} 天` : '—'}
                   </td>
                   <td className="px-2 py-1.5 text-right tabular-nums">{p.shares.toLocaleString()}</td>
                   <td className="px-2 py-1.5 text-right tabular-nums">{p.cost?.toFixed(2) ?? '—'}</td>

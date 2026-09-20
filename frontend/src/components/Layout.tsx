@@ -119,7 +119,7 @@ const nav = [
 ] as const
 
 /**
- * [R57] 「盘面参考」分组 —— 这几页是看的, 不是用来做决定的。
+ * [R57] 「闲置功能」分组(R373 标签由「盘面参考」改来)—— 这几页是看的, 不是用来做决定的。
  *
  * 看板 / 连板梯队 / 概念分析 / 行业分析都是展示型的: 打开看两眼有概念, 但不
  * 产出任何可执行的东西(不给候选、不进把握分、不驱动仓位)。和今日总览/自选/
@@ -551,7 +551,7 @@ function AIConfigBadge({ configured, model }: { configured?: boolean; model?: st
 
 type NavItem = { to: string; label: string; icon: typeof Gauge; badge?: string }
 
-/** 普通菜单项 —— 顶层和「盘面参考」组里用的是同一个, 免得两处样式各走各的。 */
+/** 普通菜单项 —— 顶层和「闲置功能」组里用的是同一个, 免得两处样式各走各的。 */
 function PlainNavLink({ item, collapsed, indent, dataSyncing, dataSyncJustDone }: {
   item: NavItem
   collapsed: boolean
@@ -680,7 +680,7 @@ export function Layout() {
     return () => window.removeEventListener('keydown', onKey)
   }, [drawerOpen])
 
-  // [R57] 「盘面参考」分组默认折叠 —— 展示型的几页不该占主视野
+  // [R57] 「闲置功能」分组默认折叠 —— 展示型的几页不该占主视野
   const [browseOpen, setBrowseOpen] = useState(() => {
     try { return localStorage.getItem('tf-nav-browse-open') === '1' } catch { return false }
   })
@@ -1067,7 +1067,7 @@ export function Layout() {
             const { to, label, icon: Icon } = item
             // 「自选」项 — 开启分组侧栏且未整体收起时, 渲染为可展开父项 + 二级分组
             const isWatchlistExpandable = to === '/watchlist' && groupsInNav && !railMode && watchlistGroups.length > 0
-            // [R67] 「盘面参考」是菜单里实实在在的一行, 它排在哪整块就在哪 ——
+            // [R67] 「闲置功能」是菜单里实实在在的一行, 它排在哪整块就在哪 ——
             // 不再去猜"哪一页碰巧排最前"当表头, 成员也不会被中间的菜单切开。
             if (to === BROWSE_GROUP_ID) {
               if (!showBrowseGroup) return null

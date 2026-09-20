@@ -284,7 +284,7 @@ export function SettingsMenuSettingsPanel() {
     return result
   }, [localOrder, prefs?.nav_order, allEntries, builtinPages])
 
-  // [R67] 「盘面参考」的成员不在顶层排 —— 它们跟着分组行走, 组内单独排序。
+  // [R67] 「闲置功能」的成员不在顶层排 —— 它们跟着分组行走, 组内单独排序。
   const { top: topEntries, members: memberEntries } = useMemo(
     () => splitBrowseGroup(orderedEntries, e => e.id),
     [orderedEntries],

@@ -48,8 +48,14 @@ export function Settings() {
   const highlight = searchParams.get('highlight') ?? ''
 
   // 设置菜单收起状态 — 持久化到 localStorage
+  // [R374] 窄屏(<768px)首次访问默认收起 nav, 否则左 144px + gap 80px = 224px
+  // 直接顶掉右栏, 内容区只剩 151px 几乎不可读。用户已存的偏好不覆盖。
   const [collapsed, setCollapsed] = useState(() => {
-    try { return localStorage.getItem('tf-settings-nav-collapsed') === '1' } catch { return false }
+    try {
+      const stored = localStorage.getItem('tf-settings-nav-collapsed')
+      if (stored !== null) return stored === '1'
+      return !window.matchMedia('(min-width: 768px)').matches
+    } catch { return false }
   })
   const toggleCollapsed = () => {
     setCollapsed(prev => {

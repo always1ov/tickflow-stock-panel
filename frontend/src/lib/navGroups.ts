@@ -1,5 +1,7 @@
 /**
- * [fork 增强] R67 「盘面参考」分组 —— 它在菜单里是**一行**, 不是四行。
+ * [fork 增强] R67 「闲置功能」分组 —— 它在菜单里是**一行**, 不是四行。
+ *   [R373] 标签从「盘面参考」改成「闲置功能」(用户口径); 内部 id、localStorage
+ *   key、变量名都不动, 已存过的菜单顺序不会跟着这条改动漂。
  *
  * R57 引进这个分组时, 表头是"挂"在这一组第一个可见成员上的 —— 分组本身在
  * 「设置 → 菜单」里没有对应的一行。后果有三个:
@@ -19,8 +21,8 @@ export const BROWSE_GROUP_ID = 'group:browse'
 
 export const BROWSE_GROUP = {
   id: BROWSE_GROUP_ID,
-  label: '盘面参考',
-  hint: '展示型: 看盘面用, 不产出候选也不影响仓位',
+  label: '闲置功能',
+  hint: '闲置中, 不产出候选也不影响仓位',
   /**
    * 组内默认顺序 —— 用户在设置里可以自己调。
    * 注: 外部网页(/external-page)按用户要求不入组 —— 保持一级菜单, 可单独拖动。
@@ -30,7 +32,7 @@ export const BROWSE_GROUP = {
 
 const BROWSE_PATHS: ReadonlySet<string> = new Set<string>(BROWSE_GROUP.paths)
 
-/** 这一页是不是「盘面参考」的成员 —— 是的话它不在顶层出现。 */
+/** 这一页是不是「闲置功能」分组的成员 —— 是的话它不在顶层出现。 */
 export function isBrowsePath(path: string): boolean {
   return BROWSE_PATHS.has(path)
 }

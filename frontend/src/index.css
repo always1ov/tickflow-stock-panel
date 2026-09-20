@@ -291,6 +291,13 @@ html.dark {
   --shadow-xl: 0 16px 32px -8px oklch(var(--shadow-color) / 0.66), inset 0 1px 0 0 oklch(1 0 0 / 0.05);
   --shadow-2xl: 0 28px 56px -16px oklch(var(--shadow-color) / 0.72), inset 0 1px 0 0 oklch(1 0 0 / 0.06);
 
+  /* [R371] R368 新增的主题色也必须在暗色中覆盖, 否则会继承亮色底配上白字。
+   * 复用既有暗色色阶, 不另造色板, 不改变亮色配置与涨跌语义。 */
+  --sidebar: var(--surface);
+  --border-input: var(--border);
+  --accent-hover: var(--t-blue-400);
+  --accent-soft: var(--elevated);
+
   color-scheme: dark;
 }
 
