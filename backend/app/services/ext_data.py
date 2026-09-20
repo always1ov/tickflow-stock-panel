@@ -327,8 +327,11 @@ class ExtConfigStore:
         config.updated_at = datetime.now().isoformat()
         cp = self._config_path(config.id)
         cp.parent.mkdir(parents=True, exist_ok=True)
+        # [安全审查 run-1] 带 0600 写: 本文件里的 pull.headers / pull.body 是
+        # 自由填写的映射, 而需要 Cookie 或多 header 鉴权的接口**只能**填在那里 ——
+        # 也就是说它事实上承载凭据, 却和 secrets.json 走了两套权限标准。
         atomic_write_text(
-            cp, json.dumps(config.to_dict(), ensure_ascii=False, indent=2),
+            cp, json.dumps(config.to_dict(), ensure_ascii=False, indent=2), mode=0o600,
         )
         # 字段集/模式变化会改变扩展列集合: 失效扩展帧缓存与策略结果缓存。
         # 定时拉取循环的 last_run/next_run 例行回写传 keep_strategy_cache=True,

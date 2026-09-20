@@ -30,8 +30,34 @@ def _dir(data_dir: Path) -> Path:
     return directory
 
 
+def validate_id(factor_id: str) -> str:
+    """因子 id 白名单。**唯一的把关点就是这里** —— 见 `_path` 的说明。"""
+    fid = str(factor_id)
+    if CUSTOM_ID_PATTERN.match(fid) or COMPOSITE_ID_PATTERN.match(fid):
+        return fid
+    raise ValueError(f"非法因子 id: {factor_id!r}")
+
+
 def _path(data_dir: Path, factor_id: str) -> Path:
-    return _dir(data_dir) / f"{factor_id}.json"
+    """id → 文件路径。**校验放在这里, 不放在各个调用方**。
+
+    [安全审查 run-1] 这两条 `*_ID_PATTERN` 本来只接在 `to_spec` 上 —— 也就是
+    只管「新建/更新」那条路, 而 `_path`/`delete_one` 拿到的是路由的原始路径参数。
+    挡住穿越的实际上只有 Starlette 的 `[^/]+`: `%2F` 会被 uvicorn 解码成真斜杠、
+    于是单段路由不匹配, 但 **`%5C` 解码出来的反斜杠 `[^/]+` 照收** —— 在 POSIX
+    上它只是个普通文件名字符, 在 Windows 上它是路径分隔符, 而 `data_dir` 在
+    冻结的桌面版里就是 exe 同级的 `data/`, `custom_factors/` 与 `user_data/`
+    只隔一层。
+
+    同仓的 `MiningRunStore` / `ExtConfigStore` / `loader.save_config` 都是
+    「先白名单, 再 resolve, 再断言父目录」这一套; 这里补齐成同一套。
+    """
+    fid = validate_id(factor_id)
+    base = _dir(data_dir).resolve()
+    target = (base / f"{fid}.json").resolve()
+    if target.parent != base:
+        raise ValueError(f"因子路径越界: {factor_id!r}")
+    return target
 
 
 def load_all(data_dir: Path) -> list[dict]:
@@ -49,6 +75,15 @@ def save_one(data_dir: Path, definition: dict) -> None:
     target = _path(data_dir, str(definition["id"]))
     target.parent.mkdir(parents=True, exist_ok=True)
     atomic_write_text(target, json.dumps(definition, ensure_ascii=False, indent=2))
+
+
+def exists_one(data_dir: Path, factor_id: str) -> bool:
+    """定义文件是否存在 —— **不带副作用的存在性探测**。
+
+    [安全审查 run-1] 加这个函数是因为删除路由原本拿 `delete_one` 当探测用:
+    一个本意是「查有没有」的分支, 副作用是把文件删了。
+    """
+    return _path(data_dir, factor_id).exists()
 
 
 def delete_one(data_dir: Path, factor_id: str) -> bool:

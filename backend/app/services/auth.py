@@ -121,6 +121,25 @@ def set_password(password: str) -> None:
     logger.info("access password set")
 
 
+def _scrub_auth_password_env() -> None:
+    """一次性引导用完之后, 把明文口令从进程环境里抹掉。
+
+    [安全审查 run-1] `config.py` 和 `.env.example` 两处都写着「设置后不再读取」,
+    **行为上确实不再读, 但值一直在**: compose 用 `env_file` 把它注进进程环境,
+    又把 `.env` 只读挂在 `/app/.env`, 于是整个容器生命周期里都能从
+    `/proc/self/environ` 拿到它。而这是**登录口令本身**, 不是它的 PBKDF2 哈希 ——
+    把口令 200k 轮哈希存盘的意义, 被留在旁边的明文原件抵消了一半。子进程
+    (回测 worker 用 spawn) 继承的也是这份环境。
+
+    进程环境这一半能在代码里关掉; `.env` 文件那一半得由运维在设好密码后删掉
+    该行, `docs/deploy-password.md` 里已说明。
+    """
+    import os
+
+    if os.environ.pop("AUTH_PASSWORD", None) is not None:
+        logger.info("AUTH_PASSWORD scrubbed from process environment after bootstrap")
+
+
 def bootstrap_from_env() -> bool:
     """首次初始化: 若环境变量 AUTH_PASSWORD 已配置且尚未设过密码, 则用它设密码。
 
@@ -143,12 +162,15 @@ def bootstrap_from_env() -> bool:
         if isinstance(raw_pwd, str) and raw_pwd.strip():
             pwd = raw_pwd.strip()
     if not pwd:
+        _scrub_auth_password_env()
         return False
     if is_configured():
         # 已设过密码, 不覆盖 (避免环境变量反复重置用户在 UI 改的密码)
+        _scrub_auth_password_env()
         return False
     try:
         set_password(pwd)
+        _scrub_auth_password_env()
         logger.info("access password bootstrapped from AUTH_PASSWORD env (one-time)")
         return True
     except ValueError as e:

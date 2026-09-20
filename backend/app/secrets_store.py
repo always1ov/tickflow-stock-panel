@@ -7,7 +7,6 @@ UI 改 Key 时只动这个文件,不动 .env。
 """
 from __future__ import annotations
 
-import contextlib
 import json
 import logging
 import os
@@ -190,9 +189,16 @@ def save_ai_profiles(rows: list[dict]) -> list[dict]:
     current = load()
     current["ai_profiles"] = cleaned
     path = _path()
-    path.write_text(json.dumps(current, indent=2, ensure_ascii=False), encoding="utf-8")
-    with contextlib.suppress(OSError):
-        os.chmod(path, 0o600)
+    # [安全审查 run-1] 这里原本是 `path.write_text(...)` 之后再 `os.chmod`, 也就是
+    # 本模块另外两个写入方 (save/clear) 已经改用 atomic_write_text 要消灭的那个
+    # 写法, 而且是**直接打在正式路径上**: secrets.json 若尚不存在, 这条路会以
+    # 默认 umask 创建它并在之后才收窄; chmod 失败时则永远停在默认权限。写入也
+    # 不是原子的 —— 中途被 kill 会留下半截文件, load() 解析失败返回 {}, 下一次
+    # save() 就把 tickflow/ext_*/webhook/SMTP 全部凭据静默覆盖掉。
+    path.parent.mkdir(parents=True, exist_ok=True)
+    atomic_write_text(
+        path, json.dumps(current, indent=2, ensure_ascii=False), mode=0o600
+    )
     return cleaned
 
 

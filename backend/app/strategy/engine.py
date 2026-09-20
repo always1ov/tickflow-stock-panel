@@ -405,8 +405,13 @@ class StrategyEngine:
         except ValueError:
             raise
         except Exception:  # noqa: BLE001
-            # 文件读不到/语法错等: 不阻断, 让下方 exec_module 抛原样错误
-            pass
+            # 文件读不到/语法错等: 不阻断, 让下方 exec_module 抛原样错误。
+            # [安全审查 run-1] 但**不能静默**: 这一句的下一步就是 exec_module,
+            # 所以「复校验没跑成」和「复校验通过了」在日志里必须能分开看。
+            logger.warning(
+                "strategy pre-exec re-validation could not run for %s; "
+                "proceeding to import (see traceback)", path, exc_info=True,
+            )
 
         spec = importlib.util.spec_from_file_location(path.stem, path)
         if spec is None or spec.loader is None:

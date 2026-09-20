@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import threading
 import uuid
 from collections.abc import Callable
@@ -101,6 +102,24 @@ def _default_store_dir() -> Path:
 _STORE_DIR = _default_store_dir()
 
 
+_JOB_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+
+
+def is_valid_job_id(job_id: str) -> bool:
+    """job_id 白名单。
+
+    [安全审查 run-1] `_read_file` / `_write_file` 原本把 job_id 直接拼成文件名,
+    把「挡住穿越」这件事隐式外包给了路由正则 —— 而那个正则是 `[^/]+`:
+    `%2F` 解码成真斜杠后单段路由不匹配, 但 **`%5C` 解码出的反斜杠照收**,
+    在 Windows 上就是路径分隔符。`job_store/` 与 `user_data/` 是平级目录,
+    而 `GET /api/pipeline/jobs/{job_id}` 会把文件内容原样返回给调用方。
+
+    同仓的 `MiningRunStore._validate_run_id` / `ExtConfigStore._VALID_ID` 都是
+    这一套, 这里补齐。
+    """
+    return bool(_JOB_ID_RE.match(str(job_id)))
+
+
 class JobStore:
     def __init__(self, max_jobs: int = 50, store_dir: Path = _STORE_DIR) -> None:
         self._max_jobs = max_jobs
@@ -113,9 +132,23 @@ class JobStore:
 
     # ===== persistence =====
 
+    def _job_path(self, job_id: str) -> Path | None:
+        """job_id → 文件路径; 非法 id 返回 None (fail-closed)。"""
+        if not is_valid_job_id(job_id):
+            logger.warning("rejected job id for filesystem use: %r", job_id)
+            return None
+        base = self._store_dir.resolve()
+        path = (base / f"{job_id}.json").resolve()
+        if path.parent != base:
+            logger.warning("rejected out-of-store job path for id: %r", job_id)
+            return None
+        return path
+
     def _write_file(self, job: dict[str, Any]) -> None:
         """将 job 快照写入独立 JSON 文件(create/start/终态均落盘)。"""
-        path = self._store_dir / f"{job['id']}.json"
+        path = self._job_path(str(job.get("id", "")))
+        if path is None:
+            return
         try:
             path.write_text(
                 json.dumps(job, ensure_ascii=False, indent=None),
@@ -126,8 +159,8 @@ class JobStore:
 
     def _read_file(self, job_id: str) -> dict[str, Any] | None:
         """从磁盘读取单个 job 文件。"""
-        path = self._store_dir / f"{job_id}.json"
-        if not path.exists():
+        path = self._job_path(job_id)
+        if path is None or not path.exists():
             return None
         try:
             return json.loads(path.read_text("utf-8"))

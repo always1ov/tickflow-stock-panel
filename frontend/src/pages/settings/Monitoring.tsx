@@ -92,19 +92,29 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
   const minInterval = intervalData?.min_interval ?? 6
   const maxInterval = intervalData?.max_interval ?? 60
   const [intervalDraft, setIntervalDraft] = useState(interval)
+  // [安全审查 run-1] 这几项后端已改成「掩码串 + *_set 布尔」返回 —— 它们不是
+  // 「地址」而是凭据 (企微的 ?key=、钉钉的 ?access_token=、飞书的 /hook/<uuid>
+  // 末段, 以及两个签名密钥本身)。前端照 **本页既有的写法** 改成只写不读:
+  // 草稿从空开始、placeholder 用同一句「已保存；留空保持不变」、清除走独立按钮。
+  // 直接把掩码串塞进输入框是不行的 —— 用户改中间几个字符, 提交上去仍带掩码点,
+  // 后端会判成「没改」而静默忽略, 那比看不见更糟。
   const feishuWebhookUrl = prefs?.feishu_webhook_url ?? ''
+  const feishuWebhookUrlSet = prefs?.feishu_webhook_url_set ?? !!feishuWebhookUrl
   const feishuWebhookSecret = prefs?.feishu_webhook_secret ?? ''
-  const [feishuDraft, setFeishuDraft] = useState(feishuWebhookUrl)
-  const [feishuSecretDraft, setFeishuSecretDraft] = useState(feishuWebhookSecret)
+  const feishuWebhookSecretSet = prefs?.feishu_webhook_secret_set ?? !!feishuWebhookSecret
+  const [feishuDraft, setFeishuDraft] = useState('')
+  const [feishuSecretDraft, setFeishuSecretDraft] = useState('')
   const [feishuError, setFeishuError] = useState('')
   // 企业微信 webhook
   const wecomWebhookUrl = prefs?.wecom_webhook_url ?? ''
-  const [wecomDraft, setWecomDraft] = useState(wecomWebhookUrl)
+  const wecomWebhookUrlSet = prefs?.wecom_webhook_url_set ?? !!wecomWebhookUrl
+  const [wecomDraft, setWecomDraft] = useState('')
   const [wecomError, setWecomError] = useState('')
   // 钉钉 webhook (仅关键词模式: 地址 + 关键词)
   const dingtalkWebhookUrl = prefs?.dingtalk_webhook_url ?? ''
+  const dingtalkWebhookUrlSet = prefs?.dingtalk_webhook_url_set ?? !!dingtalkWebhookUrl
   const dingtalkKeyword = prefs?.dingtalk_keyword ?? ''
-  const [dingtalkDraft, setDingtalkDraft] = useState(dingtalkWebhookUrl)
+  const [dingtalkDraft, setDingtalkDraft] = useState('')
   const [dingtalkKeywordDraft, setDingtalkKeywordDraft] = useState(dingtalkKeyword)
   const [dingtalkError, setDingtalkError] = useState('')
   // 通用第三方 JSON webhook
@@ -128,9 +138,10 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
   // 企业微信智能机器人 (BotID + Secret, 长连接通道)
   const wecomBotId = prefs?.wecom_bot_id ?? ''
   const wecomBotSecret = prefs?.wecom_bot_secret ?? ''
+  const wecomBotSecretSet = prefs?.wecom_bot_secret_set ?? !!wecomBotSecret
   const wecomBotEnabled = prefs?.wecom_bot_enabled ?? false
   const [botIdDraft, setBotIdDraft] = useState(wecomBotId)
-  const [botSecretDraft, setBotSecretDraft] = useState(wecomBotSecret)
+  const [botSecretDraft, setBotSecretDraft] = useState('')
   const [botError, setBotError] = useState('')
   const [botStatus, setBotStatus] = useState<{connected: boolean; last_error: string} | null>(null)
   // 飞书渠道配置区展开态 (推送通知卡片内)
@@ -144,16 +155,16 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
   // 智能机器人配置区展开态
   const [botOpen, setBotOpen] = useState(false)
   useEffect(() => {
-    setFeishuDraft(feishuWebhookUrl)
-    setFeishuSecretDraft(feishuWebhookSecret)
-  }, [feishuWebhookUrl, feishuWebhookSecret])
+    setFeishuDraft('')
+    setFeishuSecretDraft('')
+  }, [feishuWebhookUrlSet, feishuWebhookSecretSet])
   useEffect(() => {
-    setWecomDraft(wecomWebhookUrl)
-  }, [wecomWebhookUrl])
+    setWecomDraft('')
+  }, [wecomWebhookUrlSet])
   useEffect(() => {
-    setDingtalkDraft(dingtalkWebhookUrl)
+    setDingtalkDraft('')
     setDingtalkKeywordDraft(dingtalkKeyword)
-  }, [dingtalkWebhookUrl, dingtalkKeyword])
+  }, [dingtalkWebhookUrlSet, dingtalkKeyword])
   useEffect(() => {
     setCustomDraft(customWebhookUrl)
     setCustomSecretDraft('')
@@ -164,8 +175,8 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
   }, [emailSmtpConfig, emailSmtpPasswordSet])
   useEffect(() => {
     setBotIdDraft(wecomBotId)
-    setBotSecretDraft(wecomBotSecret)
-  }, [wecomBotId, wecomBotSecret])
+    setBotSecretDraft('')
+  }, [wecomBotId, wecomBotSecretSet])
 
   const save = useCallback(async (cfg: Record<string, unknown>) => {
     try {
@@ -212,8 +223,18 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
       setFeishuError('地址需以 ' + FEISHU_PREFIX + ' 开头')
       return
     }
-    saveFeishuWebhook.mutate({ url, secret })
-  }, [feishuDraft, feishuSecretDraft, saveFeishuWebhook])
+    // 空 = 没动这一项: 回传掩码串, 后端识别为「保持原值」。清除走下面的按钮。
+    saveFeishuWebhook.mutate({
+      url: url || (feishuWebhookUrlSet ? feishuWebhookUrl : ''),
+      secret: secret || (feishuWebhookSecretSet ? feishuWebhookSecret : ''),
+    })
+  }, [feishuDraft, feishuSecretDraft, feishuWebhookUrl, feishuWebhookUrlSet,
+      feishuWebhookSecret, feishuWebhookSecretSet, saveFeishuWebhook])
+  const clearFeishu = useCallback(() => {
+    setFeishuDraft('')
+    setFeishuSecretDraft('')
+    saveFeishuWebhook.mutate({ url: '', secret: '' })
+  }, [saveFeishuWebhook])
 
   const saveWecomWebhook = useMutation({
     mutationFn: (url: string) => api.updateWecomWebhook(url),
@@ -232,8 +253,12 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
       setWecomError('请输入完整 Webhook 地址或纯 key (至少 20 位)')
       return
     }
-    saveWecomWebhook.mutate(url)
-  }, [wecomDraft, saveWecomWebhook])
+    saveWecomWebhook.mutate(url || (wecomWebhookUrlSet ? wecomWebhookUrl : ''))
+  }, [wecomDraft, wecomWebhookUrl, wecomWebhookUrlSet, saveWecomWebhook])
+  const clearWecom = useCallback(() => {
+    setWecomDraft('')
+    saveWecomWebhook.mutate('')
+  }, [saveWecomWebhook])
 
   const saveDingtalkWebhook = useMutation({
     mutationFn: ({ url, keyword }: { url: string; keyword: string }) => api.updateDingtalkWebhook(url, keyword),
@@ -253,12 +278,18 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
       setDingtalkError('请输入完整 Webhook 地址或纯 access_token (至少 20 位)')
       return
     }
-    if (url && !keyword) {
+    const effective = url || (dingtalkWebhookUrlSet ? dingtalkWebhookUrl : '')
+    if (effective && !keyword) {
       setDingtalkError('关键词模式下请填写机器人的自定义关键词, 否则钉钉会拒收消息')
       return
     }
-    saveDingtalkWebhook.mutate({ url, keyword })
-  }, [dingtalkDraft, dingtalkKeywordDraft, saveDingtalkWebhook])
+    saveDingtalkWebhook.mutate({ url: effective, keyword })
+  }, [dingtalkDraft, dingtalkKeywordDraft, dingtalkWebhookUrl, dingtalkWebhookUrlSet,
+      saveDingtalkWebhook])
+  const clearDingtalk = useCallback(() => {
+    setDingtalkDraft('')
+    saveDingtalkWebhook.mutate({ url: '', keyword: dingtalkKeywordDraft.trim() })
+  }, [dingtalkKeywordDraft, saveDingtalkWebhook])
 
   // 发送测试消息 (用已保存的配置验证 Webhook 是否通)
   const testDingtalk = useMutation({
@@ -341,8 +372,12 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
     onError: (err: any) => setBotError(String(err?.message ?? '保存失败')),
   })
   const submitBot = useCallback(() => {
-    saveWecomBot.mutate({ botId: botIdDraft.trim(), secret: botSecretDraft.trim() })
-  }, [botIdDraft, botSecretDraft, saveWecomBot])
+    // 空 = 没动 Secret: 回传掩码串, 后端识别为「保持原值」
+    saveWecomBot.mutate({
+      botId: botIdDraft.trim(),
+      secret: botSecretDraft.trim() || (wecomBotSecretSet ? wecomBotSecret : ''),
+    })
+  }, [botIdDraft, botSecretDraft, wecomBotSecret, wecomBotSecretSet, saveWecomBot])
 
   // 智能机器人长连接开关(不改动凭证): 开启→连接, 关闭→断开
   const toggleBotConnection = useMutation({
@@ -665,7 +700,7 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
                     <input
                       value={feishuDraft}
                       onChange={e => { setFeishuDraft(e.target.value); if (!testFeishu.isPending) testFeishu.reset() }}
-                      placeholder={FEISHU_PREFIX + 'xxxxxxxx'}
+                      placeholder={feishuWebhookUrlSet ? '已保存；留空保持不变' : FEISHU_PREFIX + 'xxxxxxxx'}
                       className="h-9 w-full rounded-btn border border-border bg-base px-3 text-xs font-mono text-foreground focus:outline-none focus:border-accent/50"
                     />
                   </label>
@@ -676,7 +711,7 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
                       type="password"
                       value={feishuSecretDraft}
                       onChange={e => { setFeishuSecretDraft(e.target.value); if (!testFeishu.isPending) testFeishu.reset() }}
-                      placeholder="机器人未启用签名校验则留空"
+                      placeholder={feishuWebhookSecretSet ? '已保存；留空保持不变' : '机器人未启用签名校验则留空'}
                       className="h-9 w-full rounded-btn border border-border bg-base px-3 text-xs font-mono text-foreground focus:outline-none focus:border-accent/50"
                     />
                   </label>
@@ -688,14 +723,23 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
                   <div className="mt-2 flex items-center gap-2">
                     <button
                       onClick={submitFeishu}
-                      disabled={saveFeishuWebhook.isPending || (feishuDraft.trim() === feishuWebhookUrl && feishuSecretDraft.trim() === feishuWebhookSecret)}
+                      disabled={saveFeishuWebhook.isPending || (!feishuDraft.trim() && !feishuSecretDraft.trim())}
                       className="px-3 py-1.5 rounded-btn bg-accent text-base text-xs font-medium disabled:opacity-50 cursor-pointer hover:bg-accent/90 transition-colors"
                     >
                       {saveFeishuWebhook.isPending ? '保存中…' : '保存'}
                     </button>
-                    <TestSendButton test={testFeishu} configured={!!feishuWebhookUrl} />
-                    {feishuWebhookUrl && (
-                      <span className="text-[10px] text-emerald-500">● 已配置</span>
+                    <TestSendButton test={testFeishu} configured={feishuWebhookUrlSet} />
+                    {feishuWebhookUrlSet && (
+                      <>
+                        <span className="text-[10px] text-emerald-500">● 已配置</span>
+                        <button
+                          onClick={clearFeishu}
+                          disabled={saveFeishuWebhook.isPending}
+                          className="px-2 py-1 rounded-btn border border-border text-[10px] text-muted disabled:opacity-50 cursor-pointer hover:text-danger hover:border-danger/40 transition-colors"
+                        >
+                          清除
+                        </button>
+                      </>
                     )}
                     <TestResult test={testFeishu} />
                   </div>
@@ -752,7 +796,7 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
                     <input
                       value={wecomDraft}
                       onChange={e => { setWecomDraft(e.target.value); if (!testWecom.isPending) testWecom.reset() }}
-                      placeholder={WECOM_PREFIX + '?key=xxxxxxxx' + ' 或直接填 key'}
+                      placeholder={wecomWebhookUrlSet ? '已保存；留空保持不变' : WECOM_PREFIX + '?key=xxxxxxxx' + ' 或直接填 key'}
                       className="h-9 w-full rounded-btn border border-border bg-base px-3 text-xs font-mono text-foreground focus:outline-none focus:border-accent/50"
                     />
                   </label>
@@ -764,14 +808,23 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
                   <div className="mt-2 flex items-center gap-2">
                     <button
                       onClick={submitWecom}
-                      disabled={saveWecomWebhook.isPending || wecomDraft.trim() === wecomWebhookUrl}
+                      disabled={saveWecomWebhook.isPending || !wecomDraft.trim()}
                       className="px-3 py-1.5 rounded-btn bg-accent text-base text-xs font-medium disabled:opacity-50 cursor-pointer hover:bg-accent/90 transition-colors"
                     >
                       {saveWecomWebhook.isPending ? '保存中…' : '保存'}
                     </button>
-                    <TestSendButton test={testWecom} configured={!!wecomWebhookUrl} />
-                    {wecomWebhookUrl && (
-                      <span className="text-[10px] text-emerald-500">● 已配置</span>
+                    <TestSendButton test={testWecom} configured={wecomWebhookUrlSet} />
+                    {wecomWebhookUrlSet && (
+                      <>
+                        <span className="text-[10px] text-emerald-500">● 已配置</span>
+                        <button
+                          onClick={clearWecom}
+                          disabled={saveWecomWebhook.isPending}
+                          className="px-2 py-1 rounded-btn border border-border text-[10px] text-muted disabled:opacity-50 cursor-pointer hover:text-danger hover:border-danger/40 transition-colors"
+                        >
+                          清除
+                        </button>
+                      </>
                     )}
                     <TestResult test={testWecom} />
                   </div>
@@ -828,7 +881,7 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
                     <input
                       value={dingtalkDraft}
                       onChange={e => setDingtalkDraft(e.target.value)}
-                      placeholder={DINGTALK_PREFIX + '?access_token=xxxxxxxx' + ' 或直接填 access_token'}
+                      placeholder={dingtalkWebhookUrlSet ? '已保存；留空保持不变' : DINGTALK_PREFIX + '?access_token=xxxxxxxx' + ' 或直接填 access_token'}
                       className="h-9 w-full rounded-btn border border-border bg-base px-3 text-xs font-mono text-foreground focus:outline-none focus:border-accent/50"
                     />
                   </label>
@@ -850,21 +903,30 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
                   <div className="mt-2 flex items-center gap-2">
                     <button
                       onClick={submitDingtalk}
-                      disabled={saveDingtalkWebhook.isPending || (dingtalkDraft.trim() === dingtalkWebhookUrl && dingtalkKeywordDraft.trim() === dingtalkKeyword)}
+                      disabled={saveDingtalkWebhook.isPending || (!dingtalkDraft.trim() && dingtalkKeywordDraft.trim() === dingtalkKeyword)}
                       className="px-3 py-1.5 rounded-btn bg-accent text-base text-xs font-medium disabled:opacity-50 cursor-pointer hover:bg-accent/90 transition-colors"
                     >
                       {saveDingtalkWebhook.isPending ? '保存中…' : '保存'}
                     </button>
                     <button
                       onClick={() => testDingtalk.mutate()}
-                      disabled={!dingtalkWebhookUrl || testDingtalk.isPending}
-                      title={dingtalkWebhookUrl ? '用已保存的配置发一条测试消息' : '请先保存配置'}
+                      disabled={!dingtalkWebhookUrlSet || testDingtalk.isPending}
+                      title={dingtalkWebhookUrlSet ? '用已保存的配置发一条测试消息' : '请先保存配置'}
                       className="px-3 py-1.5 rounded-btn border border-border bg-surface text-xs text-secondary hover:text-accent hover:border-accent/30 disabled:opacity-50 cursor-pointer transition-colors"
                     >
                       {testDingtalk.isPending ? '发送中…' : '测试'}
                     </button>
-                    {dingtalkWebhookUrl && (
-                      <span className="text-[10px] text-emerald-500">● 已配置</span>
+                    {dingtalkWebhookUrlSet && (
+                      <>
+                        <span className="text-[10px] text-emerald-500">● 已配置</span>
+                        <button
+                          onClick={clearDingtalk}
+                          disabled={saveDingtalkWebhook.isPending}
+                          className="px-2 py-1 rounded-btn border border-border text-[10px] text-muted disabled:opacity-50 cursor-pointer hover:text-danger hover:border-danger/40 transition-colors"
+                        >
+                          清除
+                        </button>
+                      </>
                     )}
                   </div>
 
@@ -1076,7 +1138,7 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
                       type="password"
                       value={botSecretDraft}
                       onChange={e => setBotSecretDraft(e.target.value)}
-                      placeholder="开启长连接 API 模式后获取的密钥"
+                      placeholder={wecomBotSecretSet ? '已保存；留空保持不变' : '开启长连接 API 模式后获取的密钥'}
                       className="h-9 w-full rounded-btn border border-border bg-base px-3 text-xs font-mono text-foreground focus:outline-none focus:border-accent/50"
                     />
                   </label>
@@ -1092,7 +1154,7 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
                   <div className="mt-2 flex items-center gap-2">
                     <button
                       onClick={submitBot}
-                      disabled={saveWecomBot.isPending || (botIdDraft.trim() === wecomBotId && botSecretDraft.trim() === wecomBotSecret)}
+                      disabled={saveWecomBot.isPending || (botIdDraft.trim() === wecomBotId && !botSecretDraft.trim())}
                       className="px-3 py-1.5 rounded-btn bg-accent text-base text-xs font-medium disabled:opacity-50 cursor-pointer hover:bg-accent/90 transition-colors"
                     >
                       {saveWecomBot.isPending ? '保存中…' : '保存并连接'}

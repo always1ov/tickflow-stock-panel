@@ -181,6 +181,38 @@ def _apply_auth(config_id: str, auth: dict | None, url: str, headers: dict[str, 
     return url
 
 
+def redact_secrets(text: str, config_id: str = "") -> str:
+    """把出站凭据从一段将要外泄的文字里擦掉。
+
+    [安全审查 run-1] `query` 型鉴权把 Key 拼进 URL 查询串, 而 httpx 的
+    `HTTPStatusError` 消息里带完整请求 URL ("... for url '<URL>'")。那串东西
+    会同时进三个地方: 测试/拉取接口返回给浏览器的错误体、写进 config.json 的
+    `pull.last_message`(还会被 `GET /api/ext-data` 原样吐回去), 以及
+    `data/backend.log` 和容器 stdout。也就是说, 一个**被刻意存成 0600、读回来
+    只给掩码**的 Key, 因为上游返回了个 401 就落进了三个没有这些保护的地方 ——
+    而触发它根本不需要攻击者: 过期、被吊销、429、500、302 都够了。
+
+    做法是按值擦除而不是按模式匹配 —— 凭据的形状是第三方定的, 猜不得。
+    """
+    raw = str(text or "")
+    if not raw:
+        return raw
+    from urllib.parse import quote
+
+    from app.services.ext_data import get_ext_api_key
+
+    secrets: list[str] = []
+    if config_id:
+        key = get_ext_api_key(config_id)
+        if key:
+            secrets.extend([key, quote(key, safe="")])
+    out = raw
+    for value in secrets:
+        if value:
+            out = out.replace(value, "***")
+    return out
+
+
 def _assert_rows_date(rows: list[dict], day: date) -> None:
     """金融契约: 响应行的 date 字段 (若提供) 必须与请求日期一致。
 
@@ -223,12 +255,26 @@ async def _request_json(pull: PullConfig, config_id: str, day: date | None = Non
             if "content-type" not in {k.lower() for k in headers}:
                 kwargs["headers"]["Content-Type"] = "application/json"
 
-        resp = await client.request(pull.method.upper(), url, **kwargs)
-        resp.raise_for_status()
+        try:
+            resp = await client.request(pull.method.upper(), url, **kwargs)
+            resp.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            # [安全审查 run-1] 单一收口点: httpx 把完整请求 URL 拼进异常消息,
+            # 而 query 型鉴权的 Key 就在那串 URL 里。在这里换一条擦过的消息,
+            # **保留异常类型与 response**, 这样上游按 status_code 做 429 退避的
+            # 逻辑不受影响; 下游三个出口 (HTTP 响应体 / last_message / 日志)
+            # 都吃这一份, 不必各自记得擦。
+            raise httpx.HTTPStatusError(
+                redact_secrets(str(exc), config_id),
+                request=exc.request,
+                response=exc.response,
+            ) from None
+        except httpx.HTTPError as exc:
+            raise type(exc)(redact_secrets(str(exc), config_id)) from None
         try:
             return resp.json()
         except Exception as e:
-            raise ValueError(f"响应不是有效 JSON: {e}") from e
+            raise ValueError(f"响应不是有效 JSON: {redact_secrets(str(e), config_id)}") from e
 
 
 async def fetch_rows_for_date(config: ExtConfig, target_date: date) -> list[dict]:

@@ -104,9 +104,31 @@ def _plugin_key_masked(name: str, api_key_env: str) -> str:
     return secrets_store.mask(key) if key else ""
 
 
+def _plugin_dir_checked(name: str) -> Path | None:
+    """插件名 → 目录; 非法或越界返回 None。
+
+    [安全审查 run-1] 本模块自己就定义了 `_NAME_RE`, 而且 `save_config` /
+    `delete_config` 都是「`_NAME_RE` + `is_relative_to` 逃逸检查」这一套 ——
+    只有 `plugin_manifest` / `plugin_dir_of` 这两个名字转路径的函数两样都没有。
+    `Path.__truediv__` 既认 `..` 也认绝对路径操作数, 所以 `../../../tmp/x` 或
+    `/tmp/x` 会直接走出插件树, 而下游是 `yaml.safe_load` 加
+    `importlib.import_module(entry.split(":")[0])`。
+    """
+    raw = str(name or "").strip().lower()
+    if not _NAME_RE.match(raw):
+        return None
+    base = plugins_dir().resolve()
+    target = (base / raw).resolve()
+    if target != base and base not in target.parents:
+        return None
+    return target
+
+
 def plugin_manifest(name: str) -> dict | None:
-    """读取指定插件的 plugin.yaml 清单。"""
-    plugin_dir = plugins_dir() / (name or "")
+    """读取指定插件的 plugin.yaml 清单。非法插件名一律当作不存在。"""
+    plugin_dir = _plugin_dir_checked(name)
+    if plugin_dir is None:
+        return None
     manifest_path = plugin_dir / "plugin.yaml"
     if not manifest_path.exists():
         return None
@@ -114,8 +136,9 @@ def plugin_manifest(name: str) -> dict | None:
 
 
 def plugin_dir_of(name: str) -> Path:
-    """返回插件目录路径。"""
-    return plugins_dir() / (name or "")
+    """返回插件目录路径。非法插件名返回一个必然不存在的占位路径 (fail-closed)。"""
+    checked = _plugin_dir_checked(name)
+    return checked if checked is not None else plugins_dir() / "__invalid__"
 
 
 def probe_plugin_key(name: str, api_key: str) -> tuple[bool, str]:

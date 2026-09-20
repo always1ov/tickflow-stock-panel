@@ -1,7 +1,14 @@
 """用户偏好设置持久化。
 
 存储位置: data/user_data/preferences.json
-沿用 secrets_store 的 merge-write 模式,但不做 chmod 0600 (非敏感数据)。
+沿用 secrets_store 的 merge-write 模式, **写入权限同样是 0600**。
+
+[安全审查 run-1] 这里原本写的是「但不做 chmod 0600 (非敏感数据)」。**那个分类
+早就不成立了**: 本文件现在存着飞书机器人的 HMAC 签名密钥、企微智能机器人的
+长连接密钥, 以及企微/钉钉的完整 webhook URL —— 而那两个 URL 的 `key=` /
+`access_token=` 查询参数**本身就是 bearer 凭据**。容器里进程跑在 root 下、
+`./data` 又是 host bind mount, 所以旁边的 `secrets.json`/`auth.json` 是 0600
+而这个文件按 umask 落盘, 是同一个目录里两套标准。
 """
 from __future__ import annotations
 
@@ -76,7 +83,7 @@ def save(updates: dict) -> dict:
         current = load()
         current.update(updates)
         atomic_write_text(
-            _path(), json.dumps(current, indent=2, ensure_ascii=False),
+            _path(), json.dumps(current, indent=2, ensure_ascii=False), mode=0o600,
         )
         _invalidate_cache()
     return current
@@ -204,16 +211,14 @@ def get_realtime_keys_per_round() -> int:
 
 
 def set_realtime_keys_per_round(count: int) -> int:
-    current = load()
+    # [安全审查 run-1] 原本是 _SAVE_LOCK 之外的一次裸 write_text —— 正是 save()
+    # 的 docstring 记录过的那个 read-modify-write 竞态, 而且绕开了 0600。
+    # 走 save() 一条路, 锁、原子性、权限三件事就都不会各写各的。
     try:
         value = max(0, min(64, int(count)))
     except (TypeError, ValueError):
         value = 0
-    current["realtime_keys_per_round"] = value
-    _path().write_text(
-        json.dumps(current, indent=2, ensure_ascii=False), encoding="utf-8",
-    )
-    _invalidate_cache()
+    save({"realtime_keys_per_round": value})
     return value
 
 

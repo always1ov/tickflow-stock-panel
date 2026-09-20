@@ -3348,10 +3348,17 @@ export interface Preferences {
   strategy_monitor_enabled: boolean
   strategy_monitor_ids: string[]
   system_notify_enabled: boolean
+  // [安全审查 run-1] 这几个 *_url / *_secret 现在返回的是**掩码串**, 不是真值 ——
+  // 它们本身就是凭据 (企微 ?key=、钉钉 ?access_token=、飞书 /hook/<uuid> 末段)。
+  // 只判真假的调用方不受影响 (掩码串非空); 要回显真值的地方只能靠 *_set 布尔。
   feishu_webhook_url?: string
+  feishu_webhook_url_set?: boolean
   feishu_webhook_secret?: string
+  feishu_webhook_secret_set?: boolean
   wecom_webhook_url?: string
+  wecom_webhook_url_set?: boolean
   dingtalk_webhook_url?: string
+  dingtalk_webhook_url_set?: boolean
   dingtalk_keyword?: string
   custom_webhook_url?: string
   custom_webhook_secret_set?: boolean
@@ -3359,6 +3366,7 @@ export interface Preferences {
   email_smtp_password_set?: boolean
   wecom_bot_id?: string
   wecom_bot_secret?: string
+  wecom_bot_secret_set?: boolean
   wecom_bot_enabled?: boolean
   webhook_enabled_default?: boolean
   webhook_default_channels?: string[]

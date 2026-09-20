@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import ast
+import importlib.util
 import logging
 import math
 import re
@@ -365,12 +366,30 @@ META = {{...}}，{entrypoint_requirement}。只输出完整 Python 代码。
         extra_allowed_import_modules: frozenset[str] = frozenset(),
         extra_allowed_calls: frozenset[str] = frozenset(),
     ) -> None:
-        """AST 级安全检查: import 白名单 + 危险内建调用拦截 + dunder 遍历拦截。
+        """AST 级安全检查: import 白名单 + 危险内建拦截 + dunder 遍历拦截。
 
         注意: AST 名单不是真正的沙箱, 只能拦截常见攻击模式。真正的隔离需要
         在受限子进程里执行策略 (后续 P0)。此处拦截已知的逃逸技巧:
         - __globals__ / __builtins__ / __class__ / __subclasses__ / __mro__ 等属性访问
         - ["__import__"] / ["__builtins__"] 等字符串下标访问
+
+        [安全审查 run-1] 补上两个**位置性**的漏洞 —— 名单本身没错, 错在只在
+        很窄的语法位置上看:
+
+        1. **危险内建只在「直接调用」的位置被拦**(`node.func` 是裸 `ast.Name`)。
+           换个名字再调就绕过去了: `_ev = eval` / `_ev("…")` 里 `_ev` 不在名单,
+           `eval` 那一次出现是 Load 而不是 Call.func。现在改成**凡是 Load 位置
+           的裸名**命中名单就拒 —— 危险内建连「被取到」都不允许, 不只是「被调用」。
+        2. **`from X import a, b` 只校验了 X, 从不看 a/b**。而白名单里
+           `app.backtest.matrix` 是个真模块, 它自己 `import os / shutil / json`
+           …… 于是 `from app.backtest.matrix import os` 完全合规地把真正的 `os`
+           绑进了策略命名空间, 随后 `os.system(...)` 是 `ast.Attribute` 调用,
+           上面那条 Call 检查根本不看。也就是说**白名单模块成了它本要排除的那些
+           模块的再导出口**。现在对每个被导入的名字问一句「它本身是不是一个未被
+           放行的模块」—— 用 `find_spec` 查, **只查不导入**, 不执行任何代码。
+
+        仓库原有的两条测试只钉了最朴素的 `import os` 和 `from os import path`,
+        正好落在这两个漏洞之外。
         """
         tree = ast.parse(code)
 
@@ -386,6 +405,19 @@ META = {{...}}，{entrypoint_requirement}。只输出完整 Python 代码。
                 module in allowed_import_modules
                 or module.split(".", 1)[0] in allowed_import_modules
             )
+
+        def _is_unallowed_module_name(name: str) -> bool:
+            """`from X import name` 里的 name 本身是不是一个未放行的模块。
+
+            用 `importlib.util.find_spec` 只做**查找**不做导入 —— 它不执行目标
+            模块的任何代码。查不到 (普通函数/常量/类) 就返回 False, 正常放行。
+            """
+            if _module_allowed(name):
+                return False
+            try:
+                return importlib.util.find_spec(name) is not None
+            except (ImportError, ValueError, AttributeError):
+                return False
 
         # dunder 属性名: 访问这些属性可逃逸出策略沙箱拿到 os/subprocess 等
         forbidden_dunder_attrs = {
@@ -407,9 +439,21 @@ META = {{...}}，{entrypoint_requirement}。只输出完整 Python 代码。
                 mod = node.module or ""
                 if not _module_allowed(mod):
                     raise ValueError(f"禁止 from {node.module} import (不在策略安全白名单)")
-            if isinstance(node, ast.Call):
-                if isinstance(node.func, ast.Name) and node.func.id in forbidden_calls:
-                    raise ValueError(f"禁止调用 {node.func.id}()")
+                for alias in node.names:
+                    if alias.name == "*":
+                        raise ValueError(
+                            f"禁止 from {mod} import * (星号导入会把整个模块命名空间铺进策略)"
+                        )
+                    if _is_unallowed_module_name(alias.name):
+                        raise ValueError(
+                            f"禁止 from {mod} import {alias.name} "
+                            f"({alias.name} 本身是模块, 不在策略安全白名单)"
+                        )
+            # 危险内建: 凡是 Load 位置的裸名都拒, 不只是直接调用的那一处 ——
+            # 否则 `_ev = eval` 这样换个名字就绕过去了。
+            if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load) \
+                    and node.id in forbidden_calls:
+                raise ValueError(f"禁止引用内建 {node.id} (策略不允许取到它, 更不允许调用)")
             # 拦截 dunder 属性访问: x.__globals__ / ().__class__ 等
             if isinstance(node, ast.Attribute) and node.attr in forbidden_dunder_attrs:
                 raise ValueError(f"禁止访问属性 {node.attr} (策略不允许 dunder 遍历逃逸)")

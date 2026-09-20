@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Literal
@@ -75,8 +76,31 @@ def _base_dir(request: Request) -> Path:
     return _data_dir(request) / "analysis_menus"
 
 
+MENU_ID_RE = re.compile(r"^[a-zA-Z0-9_]{1,64}$")
+
+
+def _validate_menu_id(menu_id: str) -> str:
+    """菜单标识白名单 —— 与 `AnalysisMenu.id` 的 pattern 是同一条规则。
+
+    [安全审查 run-1] 写入侧 `upsert_menu` 原本用 `menu_id.replace("_","").isalnum()`,
+    而 `isalnum()` 是 Unicode 感知的: 全角数字、CJK 都能过, 然后被更严的
+    `AnalysisMenu.id` ASCII pattern 在处理函数体内抛 pydantic 错 → 500 而不是 400。
+    删除侧 `delete_menu` 则**一点校验都没有**, 直接把路径参数拼进文件名再 unlink。
+    两边现在共用这一条 ASCII 规则, 且校验点收在 `_path` 这一处。
+    """
+    mid = str(menu_id)
+    if not MENU_ID_RE.match(mid):
+        raise HTTPException(400, "菜单标识只能包含字母、数字和下划线 (1-64 位)")
+    return mid
+
+
 def _path(request: Request, menu_id: str) -> Path:
-    return _base_dir(request) / f"{menu_id}.json"
+    mid = _validate_menu_id(menu_id)
+    base = _base_dir(request).resolve()
+    target = (base / f"{mid}.json").resolve()
+    if target.parent != base:
+        raise HTTPException(400, "菜单标识非法")
+    return target
 
 
 def _load_saved(request: Request) -> list[AnalysisMenu]:
@@ -153,8 +177,7 @@ def reorder_menus(request: Request, body: ReorderMenusReq):
 
 @router.post("/{menu_id}")
 def upsert_menu(request: Request, menu_id: str, body: UpsertAnalysisMenu):
-    if not menu_id.replace("_", "").isalnum():
-        raise HTTPException(400, "菜单标识只能包含字母、数字和下划线")
+    menu_id = _validate_menu_id(menu_id)
     existing = next((m for m in _load_saved(request) if m.id == menu_id), None)
     menu = AnalysisMenu(
         id=menu_id,

@@ -31,6 +31,38 @@ router = APIRouter(prefix="/api/settings", tags=["settings"])
 # 注意:Free 模式 SDK 实际走 free-api(免费数据通道),但 UI 显示统一用默认节点。
 DEFAULT_PAID_ENDPOINT = "https://api.tickflow.org"
 
+# [安全审查 run-1] 掩码回显的识别字符 —— secrets_store.mask 用的就是这个圆点。
+# 读接口返回掩码串, 用户没改就会把掩码串原样提交回来; 那不是新值, 不能覆盖真值。
+_MASK_BULLET = "•"
+
+
+def _is_masked_echo(value: str) -> bool:
+    """提交上来的值是不是读接口给出的掩码回显。"""
+    return _MASK_BULLET in (value or "")
+
+
+def _mask_secret_url(url: str) -> str:
+    """掩掉 webhook URL 里当凭据用的那一段, 保留可辨认的形状。
+
+    企微是 `?key=<凭据>`、钉钉是 `?access_token=<凭据>`、飞书是
+    `/open-apis/bot/v2/hook/<凭据>` —— 这三种形态里真正是 bearer 的部分
+    分别在查询值和末段路径上。
+    """
+    raw = (url or "").strip()
+    if not raw:
+        return ""
+    head, sep, query = raw.partition("?")
+    if sep and query:
+        parts = []
+        for kv in query.split("&"):
+            key, eq, val = kv.partition("=")
+            parts.append(f"{key}{eq}{secrets_store.mask(val)}" if eq and val else kv)
+        return f"{head}?{'&'.join(parts)}"
+    base, slash, last = raw.rpartition("/")
+    if slash and last:
+        return f"{base}{slash}{secrets_store.mask(last)}"
+    return secrets_store.mask(raw)
+
 
 def _sync_financial_scheduler_caps(app_state, capset) -> None:
     """把重新探测出的能力同步给财务调度器。
@@ -674,17 +706,28 @@ def get_preferences() -> dict:
         "strategy_monitor_enabled": preferences.get_strategy_monitor_enabled(),
         "strategy_monitor_ids": preferences.get_strategy_monitor_ids(),
         "system_notify_enabled": preferences.get_system_notify_enabled(),
-        "feishu_webhook_url": preferences.get_feishu_webhook_url(),
-        "feishu_webhook_secret": preferences.get_feishu_webhook_secret(),
-        "wecom_webhook_url": preferences.get_wecom_webhook_url(),
-        "dingtalk_webhook_url": preferences.get_dingtalk_webhook_url(),
+        # [安全审查 run-1] 这四个字段原本是**明文**返给浏览器的, 而同一个响应里
+        # 的兄弟字段 (custom_webhook_secret_set / email_smtp_password_set) 只返
+        # 布尔值。它们不是「地址」而是凭据: 企微的 `?key=`、钉钉的
+        # `?access_token=`、飞书的 `/hook/<uuid>` 末段, 以及两个签名密钥本身。
+        # 现在统一成「掩码串 + *_set 布尔」—— 掩码串非空, 所以只判真假的调用方
+        # (PriceAlertDialog / RuleEditor / Review / Monitor) 行为不变。
+        "feishu_webhook_url": _mask_secret_url(preferences.get_feishu_webhook_url()),
+        "feishu_webhook_url_set": bool(preferences.get_feishu_webhook_url()),
+        "feishu_webhook_secret": secrets_store.mask(preferences.get_feishu_webhook_secret()),
+        "feishu_webhook_secret_set": bool(preferences.get_feishu_webhook_secret()),
+        "wecom_webhook_url": _mask_secret_url(preferences.get_wecom_webhook_url()),
+        "wecom_webhook_url_set": bool(preferences.get_wecom_webhook_url()),
+        "dingtalk_webhook_url": _mask_secret_url(preferences.get_dingtalk_webhook_url()),
+        "dingtalk_webhook_url_set": bool(preferences.get_dingtalk_webhook_url()),
         "dingtalk_keyword": preferences.get_dingtalk_keyword(),
         "custom_webhook_url": preferences.get_custom_webhook_url(),
         "custom_webhook_secret_set": bool(secrets_store.get_custom_webhook_secret()),
         "email_smtp_config": preferences.get_email_smtp_config(),
         "email_smtp_password_set": bool(secrets_store.get_email_smtp_password()),
         "wecom_bot_id": preferences.get_wecom_bot_id(),
-        "wecom_bot_secret": preferences.get_wecom_bot_secret(),
+        "wecom_bot_secret": secrets_store.mask(preferences.get_wecom_bot_secret()),
+        "wecom_bot_secret_set": bool(preferences.get_wecom_bot_secret()),
         "wecom_bot_enabled": preferences.get_wecom_bot_enabled(),
         "webhook_enabled_default": preferences.get_webhook_enabled_default(),
         "webhook_default_channels": preferences.get_webhook_default_channels(),
@@ -757,6 +800,13 @@ def save_plugin_key(req: PluginKeyIn) -> dict:
     key = req.api_key.strip()
     if not key:
         return {"ok": False, "error": "key empty"}
+    # [安全审查 run-1] 这是三个同名兄弟路由里唯一没有 is_builtin 白名单的一个:
+    # DELETE /plugin-key/{name}、POST 和 DELETE /plugins/{name}/install 都先 gate
+    # 再动文件系统。少了这一道, 一个任意字符串会一路走到 plugins_dir()/name 的
+    # 路径拼接、yaml.safe_load, 以及按清单 entry 做的 importlib.import_module,
+    # 并且最后用它当 key 名写进共享的 secrets.json。
+    if not custom_sources.is_builtin(name):
+        raise HTTPException(status_code=404, detail=f"插件 '{name}' 不存在")
     ok, message = custom_sources.probe_plugin_key(name, key)
     if not ok:
         return {"ok": False, "reason": "invalid", "error": message}
@@ -776,8 +826,12 @@ def clear_plugin_key(name: str) -> dict:
     """清除插件的界面配置 Key(secrets.json);.env 里的同名变量仍然生效。"""
     from app.data_providers import custom as custom_sources
 
+    # [安全审查 run-1] gate 排在 plugin_manifest 之前 —— 原本是先读清单再判
+    # is_builtin, 也就是非法名字仍然先走了一趟路径拼接与 yaml 解析。
+    if not custom_sources.is_builtin(name):
+        raise HTTPException(status_code=404, detail=f"插件 '{name}' 不存在")
     manifest = custom_sources.plugin_manifest(name)
-    if manifest is None or not custom_sources.is_builtin(name):
+    if manifest is None:
         raise HTTPException(status_code=404, detail=f"插件 '{name}' 不存在")
     if not manifest.get("api_key_env"):
         raise HTTPException(status_code=400, detail=f"插件 '{name}' 不支持在界面配置 Key")
@@ -1402,6 +1456,9 @@ def update_feishu_webhook(req: FeishuWebhookPrefsIn) -> dict:
     from app.services import preferences, webhook_adapter
 
     url = (req.url or "").strip()
+    # [安全审查 run-1] 掩码回显 = 用户没改这一项, 保持原值 (下同)
+    if _is_masked_echo(url):
+        url = preferences.get_feishu_webhook_url()
     if url and not webhook_adapter.is_valid_feishu_url(url):
         raise HTTPException(
             status_code=400,
@@ -1409,8 +1466,16 @@ def update_feishu_webhook(req: FeishuWebhookPrefsIn) -> dict:
                    "(https://open.feishu.cn/open-apis/bot/v2/hook/...)",
         )
     saved_url = preferences.set_feishu_webhook_url(url)
-    saved_secret = preferences.set_feishu_webhook_secret((req.secret or "").strip())
-    return {"feishu_webhook_url": saved_url, "feishu_webhook_secret": saved_secret}
+    secret = (req.secret or "").strip()
+    if _is_masked_echo(secret):
+        secret = preferences.get_feishu_webhook_secret()
+    saved_secret = preferences.set_feishu_webhook_secret(secret)
+    return {
+        "feishu_webhook_url": _mask_secret_url(saved_url),
+        "feishu_webhook_url_set": bool(saved_url),
+        "feishu_webhook_secret": secrets_store.mask(saved_secret),
+        "feishu_webhook_secret_set": bool(saved_secret),
+    }
 
 
 class WecomWebhookPrefsIn(BaseModel):
@@ -1427,6 +1492,8 @@ def update_wecom_webhook(req: WecomWebhookPrefsIn) -> dict:
     from app.services import preferences, webhook_adapter
 
     url = (req.url or "").strip()
+    if _is_masked_echo(url):
+        url = preferences.get_wecom_webhook_url()
     if url and not webhook_adapter.is_valid_wecom_url(url):
         raise HTTPException(
             status_code=400,
@@ -1434,7 +1501,10 @@ def update_wecom_webhook(req: WecomWebhookPrefsIn) -> dict:
                    "(https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=... 或纯 key)",
         )
     saved_url = preferences.set_wecom_webhook_url(url)
-    return {"wecom_webhook_url": saved_url}
+    return {
+        "wecom_webhook_url": _mask_secret_url(saved_url),
+        "wecom_webhook_url_set": bool(saved_url),
+    }
 
 
 class DingtalkWebhookPrefsIn(BaseModel):
@@ -1453,6 +1523,8 @@ def update_dingtalk_webhook(req: DingtalkWebhookPrefsIn) -> dict:
     from app.services import preferences, webhook_adapter
 
     url = (req.url or "").strip()
+    if _is_masked_echo(url):
+        url = preferences.get_dingtalk_webhook_url()
     if url and not webhook_adapter.is_valid_dingtalk_url(url):
         raise HTTPException(
             status_code=400,
@@ -1461,7 +1533,11 @@ def update_dingtalk_webhook(req: DingtalkWebhookPrefsIn) -> dict:
         )
     saved_url = preferences.set_dingtalk_webhook_url(url)
     saved_keyword = preferences.set_dingtalk_keyword((req.keyword or "").strip())
-    return {"dingtalk_webhook_url": saved_url, "dingtalk_keyword": saved_keyword}
+    return {
+        "dingtalk_webhook_url": _mask_secret_url(saved_url),
+        "dingtalk_webhook_url_set": bool(saved_url),
+        "dingtalk_keyword": saved_keyword,
+    }
 
 
 # [R334] 这里原来还有一个**同名的** `WebhookTestIn`(fork 那版, 带 dingtalk 不带
@@ -1649,7 +1725,12 @@ def update_wecom_bot(req: WecomBotPrefsIn, request: Request) -> dict:
     bot_id = (req.bot_id or "").strip()
     secret = (req.secret or "").strip()
     preferences.set_wecom_bot_id(bot_id)
-    preferences.set_wecom_bot_secret(secret)
+    # [安全审查 run-1] 读回来的是掩码串, 原样提交回来时表示「没改」, 不能拿它
+    # 覆盖真值 —— 与 AI Key「留空即保持」是同一条语义。
+    if _is_masked_echo(secret):
+        secret = preferences.get_wecom_bot_secret()
+    else:
+        preferences.set_wecom_bot_secret(secret)
     # 凭证不齐时强制关闭(避免 enabled=True 但连不上)
     enabled = req.enabled and bool(bot_id) and bool(secret)
     preferences.set_wecom_bot_enabled(enabled)
@@ -1662,7 +1743,8 @@ def update_wecom_bot(req: WecomBotPrefsIn, request: Request) -> dict:
         status = bot_svc.status()
     return {
         "wecom_bot_id": preferences.get_wecom_bot_id(),
-        "wecom_bot_secret": preferences.get_wecom_bot_secret(),
+        "wecom_bot_secret": secrets_store.mask(preferences.get_wecom_bot_secret()),
+        "wecom_bot_secret_set": bool(preferences.get_wecom_bot_secret()),
         "wecom_bot_enabled": preferences.get_wecom_bot_enabled(),
         "wecom_bot_status": status,
     }

@@ -382,15 +382,23 @@ def delete_custom_factor(factor_id: str, request: Request, force: bool = Query(d
     data_dir = _data_dir(request)
     from app.factors.registry import get_factor
 
-    # 引用检查必须排在存在性判定之前: 下面用来探测「盘上是否有定义」的
-    # store.delete_one 本身就会删文件, 反过来会出现「拒绝删除」但定义已被删掉。
+    # [安全审查 run-1] id 先过白名单再碰文件系统 —— 路由的 `[^/]+` 只挡正斜杠,
+    # `%5C` 解码出的反斜杠会原样进来, 在 Windows 上就是路径分隔符。
+    try:
+        store.validate_id(factor_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    # 引用检查必须排在存在性判定之前。
     references = _find_references(data_dir, factor_id)
     if references and not force:
         raise HTTPException(
             status_code=409,
             detail={"message": "该因子仍有引用, 拒绝删除 (可带 force=true 强制)", "references": references},
         )
-    if get_factor(factor_id) is None and not store.delete_one(data_dir, factor_id):
+    # [安全审查 run-1] 这里原本用 `store.delete_one` 当存在性探测 —— 探测本身
+    # 就会删文件。换成无副作用的 `exists_one`, 真正的删除仍在下面那一处。
+    if get_factor(factor_id) is None and not store.exists_one(data_dir, factor_id):
         raise HTTPException(status_code=404, detail=f"因子不存在: {factor_id}")
     try:
         unregister_factor(factor_id)
