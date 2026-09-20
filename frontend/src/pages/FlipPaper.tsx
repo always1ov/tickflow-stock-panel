@@ -518,39 +518,68 @@ function TodaySignals({ rows, conviction }: {
   const mineSorted = byRank(mine)
   const idleSorted = byRank(idle)
   const scored = live.filter((r) => conviction.has(r.symbol)).length
+  const unscored = rows.length - rows.filter((r) => conviction.has(r.symbol)).length
   // [R355] 折叠条上那个「N 只贴近离场线」。**判据与行上那一档是同一条**
   // (`NEAR_EXIT`)—— 两处各写一份的话, 会出现"条上说 2 只、展开却只有 1 行标黄"。
   const mineNear = mine.filter((r) => r.gap_pct != null && Math.abs(r.gap_pct) <= NEAR_EXIT).length
 
-  // [R383] **这一屏的形状** —— 三格各自"整屏有没有内容", 从**全部行**算一次,
-  // 三段共用同一份。分段各算各的话, 「要动手」那段和「只是盯着」那段会用上
-  // 不同的栅格, 上下两段列对不齐, 而且不报错。
-  const shape: RowShape = {
-    rank: rows.some((r) => conviction.get(r.symbol)?.rank != null),
-    trend: rows.some((r) => conviction.has(r.symbol)),
+  // ── [R385] 分界线是**每一行进没进候选池**, 不是"整屏有没有" ──────────
+  //
+  // R383/R384 的判据是「整屏一行都没有才收」。实机打脸: 用户那一屏 32 行里
+  // **3 行有名次与走势, 29 行两样都没有** —— 于是 3 行把 29 行全拖住了,
+  // 29 行陪着撑 56px 的行高、陪着空出 `1fr` 那一整列走势。**混着才是常态**,
+  // "整屏"那个判据几乎永远不成立。
+  //
+  // 而这两类行本来就该分开: `conv` 只收 `rank != null` 的, 走势也只在有 `c` 时
+  // 渲染 —— **名次与走势永远同进同出**。所以一行要么两样都有(进了候选池),
+  // 要么两样都没有。按这条线拆成两组:
+  //
+  //     进了候选池  六列全开、单列铺满、行高撑住 —— 它们有东西要说
+  //     没进候选池  只剩 标的/动作/六态, 三列紧凑 —— 它们说的是同一句话
+  //
+  // **组内仍然行行对齐**(R350 那条立论要的就是这个), 变的是"两组各自多宽"。
+  // 次序也没动: `byRank` 本来就把没名次的排在本档末尾, 拆开正好是原来的顺序。
+  const FULL: RowShape = { rank: true, trend: true }
+  const PLAIN: RowShape = { rank: false, trend: false }
+  /** 没进候选池那一组: 行只剩 ≈560px, 宽屏上排三列。 */
+  const plainList = 'divide-border/30 min-[1180px]:grid min-[1180px]:grid-cols-2 min-[1560px]:grid-cols-3'
+  const plainCell = (i: number) => cn(
+    'min-w-0 border-b border-border/30',
+    // 两列时左边画竖缝; 三列时前两列画, 最右不画
+    i % 2 === 0 && 'min-[1180px]:border-r min-[1180px]:border-border/30',
+    i % 2 === 1 && 'min-[1560px]:border-r min-[1560px]:border-border/30',
+    (i + 1) % 3 === 0 && 'min-[1560px]:border-r-0',
+  )
+  /** 一段(某一档)里的行 —— 进了候选池的在上、没进的在下, 各用各的版面。 */
+  const renderRows = (list: FlipTodaySignal[]) => {
+    const scored = list.filter((r) => conviction.has(r.symbol))
+    const plain = list.filter((r) => !conviction.has(r.symbol))
+    return (
+      <>
+        {scored.length > 0 && (
+          <div className="divide-y divide-border/30">
+            {scored.map((r) => (
+              <SignalRow key={r.symbol} r={r} c={conviction.get(r.symbol)} shape={FULL}
+                         onOpen={openLevels} onReview={openReview} />
+            ))}
+          </div>
+        )}
+        {plain.length > 0 && (
+          <div className={plainList}>
+            {plain.map((r, i) => (
+              <div key={r.symbol} className={plainCell(i)}>
+                <SignalRow r={r} shape={PLAIN} onOpen={openLevels} onReview={openReview} />
+              </div>
+            ))}
+          </div>
+        )}
+      </>
+    )
   }
   // 走势那一列整屏都空时, 一行 620px 就排完了 —— 而宽屏上有 1600+。
   // 这种时候把行**排成两列**: 32 行的滚动直接砍一半。
   // 走势有内容时行本来就要吃满宽度, 保持单列。
   // 断点与 R381 那处并排用同一个(内容区 ≈ 视口 − 侧栏 224 − 留白 32)。
-  // [R384] 列数按**这一行到底要多宽**来定, 不是拍脑袋:
-  //   有走势        行要吃满宽度        → 单列
-  //   没走势        标的176+动作72+六态256+间距 ≈ 620 → 两列(1560 起)
-  //   没走势没名次  名次那列再收掉 56   → ≈ 560, 1900 起塞得下三列
-  // 断点都是算出来的: 内容区 ≈ 视口 − 侧栏 224 − 留白 32, 再除以列数。
-  const twoCol = !shape.trend
-  const listCls = cn('divide-border/30', twoCol
-    ? cn('min-[1560px]:grid min-[1560px]:grid-cols-2',
-         !shape.rank && 'min-[1900px]:grid-cols-3')
-    : 'divide-y')
-  /** 两列时分隔线画在每个格子上 —— `divide-y` 在两列栅格里只会横着画, 竖缝没人画。 */
-  const cellCls = (i: number) => twoCol
-    ? cn('min-w-0 border-b border-border/30 min-[1560px]:border-border/30',
-         // 两列: 左边那列画竖缝。三列: 前两列画 —— `(i+1)%3` 为 0 的是最右一列。
-         i % 2 === 0 && 'min-[1560px]:border-r',
-         !shape.rank && (i % 2 === 0 ? '' : 'min-[1900px]:border-r'),
-         !shape.rank && (i + 1) % 3 === 0 && 'min-[1900px]:border-r-0')
-    : undefined
 
   return (
     <>
@@ -561,9 +590,10 @@ function TodaySignals({ rows, conviction }: {
           actCount ? `${actCount} 笔要动手` : '今天没有要动手的',
           // [R342] 说明白这个顺序是谁排的 —— 不说的话读的人不知道该不该照着做
           actCount && scored ? '按把握分排序' : null,
-          // [R384] 整屏一个名次都没有时, 这句话在标题上说**一次** ——
-          // 在这之前它印在每一行最左边那 3.5rem 里, 32 行就是 32 遍。
-          rows.length && !shape.rank ? '都没进候选池' : null,
+          // [R384 → R385] 没进候选池的行**不再各自印一遍**那句话(32 行 32 遍),
+          // 改在这儿报个数。判据从「整屏都没有」换成「有几行没有」——
+          // 混着才是常态, 前者几乎永远不成立。
+          unscored ? `${unscored} 只没进候选池` : null,
           mine.length ? `手上 ${mine.length} 只` : null,
         ].filter(Boolean).join(' · ')}
         hint={'**只有真转折才出手。**\n\n已转折 = 最新那根已落盘的日 K 让状态翻了面, 这才是动作。\n盘中越线 = 按此刻现价当收盘算会翻面 —— **不是出手理由**, 盘中价会变回去,\n14:30 跌破、14:58 拉回来的那天根本没有转折。\n\n触发价是作者的六态每天给的 flip_up / flip_down, 开盘前就定死,\n所以尾盘盯着它挂单是做得到的。\n\n「手上这些」是模拟盘现在拿着的票与各自的离场线 —— 常驻不折叠,\n买入天天有、卖出只在触发那天冒一次, 中间这段空白正是它补的。\n\n最下面「只是盯着」默认收起 —— 它随自选规模走, 摊开会把真要动手的淹掉。'}
@@ -576,14 +606,7 @@ function TodaySignals({ rows, conviction }: {
       ) : (
         <>
           {ordered.length > 0 && (
-            <div className={listCls}>
-              {ordered.map((r, i) => (
-                <div key={r.symbol} className={cellCls(i)}>
-                  <SignalRow r={r} c={conviction.get(r.symbol)} shape={shape}
-                             onOpen={openLevels} onReview={openReview} />
-                </div>
-              ))}
-            </div>
+            <div>{renderRows(ordered)}</div>
           )}
           {ordered.length === 0 && (
             <div className="px-4 py-3 text-xs text-muted">
@@ -617,14 +640,7 @@ function TodaySignals({ rows, conviction }: {
                 </span>
               </button>
               {mineOpen && (
-                <div className={listCls}>
-                  {mineSorted.map((r, i) => (
-                    <div key={r.symbol} className={cellCls(i)}>
-                      <SignalRow r={r} c={conviction.get(r.symbol)} shape={shape}
-                                 onOpen={openLevels} onReview={openReview} />
-                    </div>
-                  ))}
-                </div>
+                <div>{renderRows(mineSorted)}</div>
               )}
             </>
           )}
@@ -644,14 +660,7 @@ function TodaySignals({ rows, conviction }: {
               </button>
               {watchOpen && (
                 /* 限高 + 自己滚: 盯着的票可能几十只, 让它把整页顶长等于没折叠 */
-                <div className={cn('max-h-64 overflow-y-auto', listCls)}>
-                  {idleSorted.map((r, i) => (
-                    <div key={r.symbol} className={cellCls(i)}>
-                      <SignalRow r={r} c={conviction.get(r.symbol)} shape={shape}
-                                 onOpen={openLevels} onReview={openReview} />
-                    </div>
-                  ))}
-                </div>
+                <div className="max-h-64 overflow-y-auto">{renderRows(idleSorted)}</div>
               )}
             </>
           )}

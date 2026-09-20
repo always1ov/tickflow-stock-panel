@@ -262,7 +262,9 @@ def test_R331_要动手的永远不进折叠区():
     # [R383] 每一行外面多包了一层格子 div(两列时要在它身上画分隔线),
     # 所以 map 的形状从 `(r) => <SignalRow` 变成 `(r, i) => (`。**锚跟着走,
     # 立论没变**: 常驻区仍然渲染在折叠开关之前。
-    i_live = blk.index("{ordered.map((r, i) => (")
+    # [R385] 三段都改走 `renderRows` —— 组内再按「进没进候选池」拆两半。
+    # **立论没变**: 常驻区仍然渲染在折叠开关之前。
+    i_live = blk.index("renderRows(ordered)")
     i_toggle = blk.index("onClick={toggleWatch}")
     assert i_live < i_toggle
     head = blk[:i_toggle]
@@ -648,7 +650,7 @@ def test_R355_手上这段可折叠_但折叠条自己就是摘要():
     # **折叠条上必须有这两个数** —— 收起来之后卖出侧全靠它们
     assert "{mine.length} 只" in seg, "折叠条上没说拿着几只"
     assert "{mineNear} 只贴近离场线" in seg, "折叠条上没说几只快到线了 —— 收起来卖出侧就消失了"
-    assert "mineSorted.map((r, i) => (" in seg   # [R383] 外面多包了一层格子 div
+    assert "renderRows(mineSorted)" in seg   # [R385] 改走统一的分组渲染
 
 
 def test_R355_默认展开_且状态记住():

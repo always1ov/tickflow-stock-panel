@@ -1303,68 +1303,64 @@ def _signals() -> str:
     return out
 
 
-def test_R383_这一屏的形状只算一次_三段共用():
-    """分段各算各的话, 「要动手」那段和「只是盯着」那段会挑到不同的栅格,
-    上下两段列对不齐 —— **而且不报错**。所以从**全部行**算一次, 三段共用。"""
-    sig = _signals()
-    i = sig.index("const shape: RowShape = {")
-    blk = sig[i:sig.index("}", i)]
-    assert blk.strip()
-    for key in ("rank:", "trend:"):
-        assert key in blk, f"形状里少了 {key}"
-    # 算的是 `rows`(全部), 不是某一段
-    assert blk.count("rows.some(") == 2, "形状不是从全部行算的"
-    for seg in ("ordered.map", "mineSorted.map", "idleSorted.map"):
-        j = sig.index(seg)
-        assert "shape={shape}" in sig[j:j + 420], f"{seg} 那一段没传同一份 shape"
+def test_R385_分界线是每一行进没进候选池():
+    """**R383/R384 的判据("整屏一行都没有才收")被实机打脸。**
 
+    用户那一屏 32 行里 3 行有名次与走势、29 行两样都没有 —— 于是 3 行把 29 行
+    全拖住: 29 行陪着撑 56px 的行高、陪着空出 `1fr` 那一整列走势。
+    **混着才是常态**, "整屏"那个判据几乎永远不成立。
 
-def test_R383_整屏没走势时那一列收成0():
-    """走势整屏都空却还吃着 `1fr`, 就是把 63% 的行宽白白空在那儿。"""
+    而这两类行本来就该分开: `conv` 只收 `rank != null` 的, 走势也只在有 `c` 时
+    渲染 —— **名次与走势永远同进同出**。这条守卫先把那个前提钉住, 再钉分组。
+    """
     code = code_of(FLIP)
-    i = code.index("const ROW_GRID = {")
-    table = code[i:code.index("} as const", i)]
-    assert table.strip()
-    assert "minmax(0,1fr)_auto]" in table, "走势有内容时那一套不见了"
-    assert "_0_auto]" in table, "整屏没走势时那一套没把走势收成 0"
-    assert table.count("sm:grid-cols-[") == 4, "宽屏栅格不是四套"
-    # [R384] 挑哪一套**只看 shape 那两个字段**, 不许掺别的
-    assert "[shape.rank && 'rank', shape.trend && 'trend']" in code, "挑栅格的判据变了"
+    # 前提: conv 只收有名次的 —— 这是"两样同进同出"的来源
+    i = code.index("const conv = useMemo(")
+    blk = code[i:code.index("}, [ov])", i)]
+    assert "if (o.rank == null) continue" in blk, \
+        "conv 收了没名次的条目 —— 那么「名次与走势同进同出」就不成立了, 分组的前提没了"
+    row = _row()
+    assert "{c && <TrendCell o={c} />}" in row, "走势不再由 c 决定 —— 同上"
 
-
-def test_R383_行窄下来之后排两列():
-    """一行 620px 排完、而宽屏有 1600+ 时, 32 行排成两列能把滚动砍一半。
-    **走势有内容时保持单列** —— 那时行本来就要吃满宽度。"""
     sig = _signals()
-    assert "const twoCol = !shape.trend" in sig, "两列的判据不是「这一屏没有走势」"
-    assert "min-[1560px]:grid-cols-2" in sig, "两列那层栅格没了"
-    # 两列时分隔线得画在格子上 —— `divide-y` 在两列栅格里只横着画, 竖缝没人画
-    assert "min-[1560px]:border-r" in sig, "两列之间没有竖缝"
-    assert "border-b border-border/30" in sig, "格子上没有横线"
+    assert "const FULL: RowShape = { rank: true, trend: true }" in sig, "进了候选池那一组的形状没了"
+    assert "const PLAIN: RowShape = { rank: false, trend: false }" in sig, "没进那一组的形状没了"
+    # 分组判据就是 conviction.has, 不掺别的
+    i = sig.index("const renderRows = (list: FlipTodaySignal[]) => {")
+    blk = sig[i:sig.index("\n  }", i)]
+    assert blk.strip()
+    assert "list.filter((r) => conviction.has(r.symbol))" in blk, "上半组不是「进了候选池」"
+    assert "list.filter((r) => !conviction.has(r.symbol))" in blk, "下半组不是「没进候选池」"
+    assert "shape={FULL}" in blk and "shape={PLAIN}" in blk, "两组没各用各的形状"
+    # 没进的那一组不传 c —— 传了就会去渲染走势, 而它那一列已经收成 0
+    assert re.search(r"<SignalRow r=\{r\} shape=\{PLAIN\}", blk), \
+        "没进候选池那一组还在传 c —— 走势那一列已经收成 0, 渲染出来会溢出"
 
 
-def test_R383_三段都用同一套列与同一个两列开关():
-    """三段各挑各的话, 「要动手」两列而「盯着」一列, 同一张卡里两种版面。"""
+def test_R385_三段都走同一个分组函数():
+    """三段各写一遍的话, 「要动手」分了组而「只是盯着」没分, 同一张卡里两种版面。"""
     sig = _signals()
-    assert sig.count("className={listCls}") + sig.count("cn('max-h-64 overflow-y-auto', listCls)") == 3, \
-        "三段没有共用同一个列表容器类"
-    assert sig.count("className={cellCls(i)}") == 3, "三段没有共用同一个格子类"
+    for seg in ("renderRows(ordered)", "renderRows(mineSorted)", "renderRows(idleSorted)"):
+        assert seg in sig, f"少了 {seg}"
+    assert sig.count("<SignalRow") == 2, \
+        "SignalRow 不是只在 renderRows 里渲染了两处(进/没进各一处) —— 有人又在别处单独渲染"
 
 
-# ── [R384] 「今天该挂什么单」这张卡本身太占地方 ─────────────────────────
-#
-# 用户: 「今天该挂什么单这个卡片也要重新设计很占用空间」。
-#
-# R383 之后量出来: **整张卡 1022px**, 而拆开是
-#     表头 44 + 16 个可视行 × 60px
-# 每行 60px 里**栅格只有 40px** —— 上下各 10px 的留白占掉三分之一;
-# 最左边那 56px 的格子, 32 行写了 32 遍同一句「没进候选池」。
-#
-# 三处一起改之后 **1022 → 453px(-56%)**, 32 条排成三列, 那句话在标题上说一次。
+def test_R385_没进候选池那组排三列():
+    """行只剩 标的/动作/六态 ≈560px, 宽屏上排三列; 1180 起先排两列。"""
+    sig = _signals()
+    assert "min-[1180px]:grid min-[1180px]:grid-cols-2" in sig, "两列那一档没了"
+    assert "min-[1560px]:grid-cols-3" in sig, "三列那一档没了"
+    # 竖缝: 两列时左列画, 三列时前两列画、最右不画
+    assert "i % 2 === 0 && 'min-[1180px]:border-r" in sig, "两列的竖缝没了"
+    assert "(i + 1) % 3 === 0 && 'min-[1560px]:border-r-0'" in sig, "三列时最右一列还在画竖缝"
 
 
-def test_R384_名次那列整屏没名次时收成0():
+def test_R384_名次那列在没进候选池那一组里收成0():
     """同一句话说 32 遍不是信息是噪音 —— 它该在区块标题上说一次。
+
+    (名字里原来写的是"整屏没名次" —— [R385] 判据改成按行分组之后那个说法不成立了,
+    现在是"没进候选池那一组"。**四套模板本身一个字没动**, 变的是谁来挑。)
 
     **收成 0 而不是不渲染那一格**: 窄屏那套卡片版面(R366)靠 `row-span-2` /
     `col-span-3` 把六个格子折成一张卡, 抽掉一格整套跨行跨列全要重算。
@@ -1393,10 +1389,16 @@ def test_R384_名次那列整屏没名次时收成0():
 
 
 def test_R384_那句话改在标题上说一次():
-    """从行里撤掉的东西必须在别处说出来, 否则就是悄悄少了一条信息。"""
+    """从行里撤掉的东西必须在别处说出来, 否则就是悄悄少了一条信息。
+
+    [R385] 判据从「整屏都没有」换成「有几行没有」—— 混着才是常态, 前者几乎
+    永远不成立。所以标题上**报个数**, 而不是一句"都没进"。
+    """
     sig = _signals()
-    assert "rows.length && !shape.rank ? '都没进候选池' : null" in sig, \
+    assert "unscored ? `${unscored} 只没进候选池` : null" in sig, \
         "「没进候选池」从行里撤了, 但标题上没补上 —— 那条信息就这么没了"
+    assert "const unscored = rows.length - rows.filter((r) => conviction.has(r.symbol)).length" in sig, \
+        "那个数不是从全部行算的"
 
 
 def test_R384_行留白跟着名次走():
@@ -1404,18 +1406,6 @@ def test_R384_行留白跟着名次走():
     `py-2.5`(上下各 10px)在 40px 的栅格上占掉三分之一。"""
     row = _row()
     assert "shape.rank ? 'py-2.5' : 'py-1.5'" in row, "行留白没跟着 shape 走"
-
-
-def test_R384_行再窄下来就排三列():
-    """列数按**这一行到底要多宽**定, 不是拍脑袋:
-    有走势 → 单列; 没走势 ≈620 → 两列(1560 起); 再收掉名次 ≈560 → 三列(1900 起)。"""
-    sig = _signals()
-    assert "min-[1560px]:grid-cols-2" in sig, "两列那一档没了"
-    assert "!shape.rank && 'min-[1900px]:grid-cols-3'" in sig, \
-        "三列那一档没了, 或者它不再要求「连名次都没有」"
-    # 三列时最右那一列不画竖缝
-    assert "(i + 1) % 3 === 0 && 'min-[1900px]:border-r-0'" in sig, \
-        "三列时最右一列还在画竖缝"
 
 
 def test_R384_网格类只有一个产地():
