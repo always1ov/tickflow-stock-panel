@@ -1249,25 +1249,22 @@ def _build_overview(repo, engine=None) -> dict:
     # close 就是 as_of 那天的真收盘, 可以当收益起点; 盘中(实时行情开着)则不记,
     # 免得把实时价当成收盘价算出一份假收益。
     #
-    # **不记的那几支必须说出来。** 这个 if 原本只有"成立"那一支有动作, 不成立时
-    # 一声不吭 —— 于是"开着实时行情看盘 → 台账天天不记"在界面上没有任何痕迹,
-    # 攒了几周之后点开体检, 只看到一句「台账还是空的」, 而那句话解释不了为什么。
-    # 不记本身是对的(实时价当收盘价会算出一份假收益), 错的是**不说**: 静默跳过
-    # 正是 `_SelfCheck` 这个类立起来要消灭的东西, 偏偏漏了它自己这一处。
+    # [R392] **不记 ≠ 出事, 所以这一支不进自检条。** 走到这里而条件不成立(盘中
+    # 有票在用实时价 / 拿不到 as_of), 当天的样本并不会因此丢 —— [R136] 起, 日线
+    # 管道落盘之后会自己跑一次 `_build_overview`, 那才是"每个数据日都被走到"的
+    # 保底路径, 这里只是顺手的重复触发(`record_day` 按 as_of 去重)。把一件本来
+    # 就对的常态塞进 `_h.skip`, 等于让自检条在每个盘中日都常驻一行 —— 而它立起来
+    # 的全部理由就是"一切正常时一个像素都不占"。
+    #
+    # **真该报的是"打算记却没记成"**: `record_day` 自己吞异常, 失败只体现在返回
+    # 值上, 不看的话写盘挂了和写成功在界面上长得一模一样。
     try:
         from app.services import score_ledger
-        live_n = sum(1 for t in trends.values() if t.get("intraday"))
-        if not as_of:
-            _h.skip("score_ledger", "这份快照没有日期可挂, 不记")
-        elif live_n:
-            _h.skip("score_ledger",
-                    f"盘中口径({live_n} 只在用实时价), 这一次不记 —— "
-                    "收盘后(或关掉实时行情)再打开一次才会落账")
-        else:
+        if as_of and not any(t.get("intraday") for t in trends.values()):
             r = score_ledger.record_day(as_of, ranked_all,
                                         {o["symbol"] for o in opportunities}, True)
             if not r.get("ok"):
-                _h.skip("score_ledger", "写台账失败, 原因见后端日志")
+                _h.skip("score_ledger", "这一天没记成(候选池是空的, 或写盘失败)")
     except Exception as e:  # noqa: BLE001 —— 记账失败绝不能影响总览
         logger.debug("score ledger record skipped: %s", e)
         _h.skip("score_ledger", e)

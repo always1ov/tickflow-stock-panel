@@ -11,7 +11,11 @@ import { toast } from '@/components/Toast'
  * 用户: 「我自选个股太多了, 不知道哪些才是我真的要推送通知的」。
  * 不让用户逐只勾(150 只没人勾得动), 而是按已有决策产出**自动分档**:
  *   持有   positions 标了持有 —— 任何时候都要推
- *   计划中 今日总览「值得关注」显示出来的 —— 今天/收盘打算动手的那几只
+ *   计划中 总览快照「值得关注」那一档 —— 今天/收盘打算动手的那几只
+ *
+ * [R392] 这三处原本写的是「今日总览」—— 那一页 R340/R351 已经拆掉并重定向到
+ * 模拟盘, 让人去"打开一次今日总览"是条走不通的路。快照本身还在(仍由
+ * `_build_overview` 产出, [R136] 起由日线管道保底), 改的只是怎么称呼它。
  *   观察   其余 —— 只记应用内, 不打外部渠道
  * 用户只在例外处动手: 钉住(永远推) / 静音(永远不推)。
  * 总开关默认关 —— 推送行为不能悄悄变, 看过名单觉得对了再打开。
@@ -85,7 +89,7 @@ export function FocusBar() {
             </span>
           ))}
           {!v.fresh && (
-            <span className="inline-flex items-center gap-1 text-[10px] text-warning" title="今日总览超过 7 天没构建, 名单失效期间推送门放行">
+            <span className="inline-flex items-center gap-1 text-[10px] text-warning" title="总览快照超过 7 天没构建, 名单失效期间推送门放行">
               <AlertTriangle className="h-3 w-3" />名单已过期, 放行中
             </span>
           )}
@@ -105,11 +109,11 @@ export function FocusBar() {
         {open && (
           <div className="border-t border-border/40 px-2 py-2">
             <div className="px-2 pb-1 text-[10px] text-muted">
-              名单来自今日总览(持有 + 值得关注), 每次构建自动刷新
+              名单来自总览快照(持有 + 值得关注), 每次构建自动刷新
               {v.as_of ? ` · 数据日 ${v.as_of}` : ''}。钉住/静音是你的例外, 长期有效。
             </div>
             {held.length + plan.length + band.length === 0 && (
-              <div className="px-2 py-2 text-[11px] text-muted">还没有持有 / 计划中 / 贴轨的票 —— 打开一次今日总览, 名单就会生成。</div>
+              <div className="px-2 py-2 text-[11px] text-muted">还没有持有 / 计划中 / 贴轨的票 —— 日线管道跑一次、或打开一次模拟盘, 名单就会生成。</div>
             )}
             <div className="grid gap-x-4 md:grid-cols-2 xl:grid-cols-3">
               <div>{held.map(it => <Row key={it.symbol} it={it} />)}</div>

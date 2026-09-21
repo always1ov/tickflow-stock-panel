@@ -228,9 +228,16 @@ export function ScoreLedgerDialog({ onClose }: { onClose: () => void }) {
         {/* 空态要说清**为什么**空 —— 「台账还是空的」本身回答不了任何问题。
             两个真实原因各有各的出路, 分开说:
               · 记了, 但全是换口径之前的 → 数量报出来, 免得以为一天都没攒
-              · 一天都没记 → 十有八九是只在盘中看盘(那时不记, 见下)
-            原来这里写的是「打开**今日总览**会自动记一天」—— 那一页在 R340/R343
-            已经拆掉了, 照这句话去做是做不到的。改成指这一页。 */}
+              · 一天都没记 → 日线管道还没跑完一次收盘更新
+
+            **这段话改过两轮, 两轮都是因为它在说假话**:
+              · 原文写「打开**今日总览**会自动记一天」—— 那一页 R340/R343 拆了;
+              · [R392] 我改成的「这一页每打开一次就记一天」同样不对: 记账发生在
+                `GET /api/today`(`_build_overview`)而不是这个弹窗, 而且 [R136]
+                起真正保底的是**日线管道** —— 它落盘之后自己跑一次, 不需要谁去
+                点开任何页面。原句还顺带许诺「顶上那条自检会写明这次记没记」,
+                而 `TodayHealthBar` 在一切正常时**整条不渲染**, 它只会说"没记"。
+            指路的话最容易写成假话: 写之前先确认那条路现在还在不在。 */}
         {d && d.recorded_days === 0 && (
           <div className="rounded border border-border/60 bg-base/40 px-3 py-6 text-center text-xs text-muted">
             {d.legacy_days
@@ -240,10 +247,10 @@ export function ScoreLedgerDialog({ onClose }: { onClose: () => void }) {
               : <>台账还是空的。</>}
             <br />
             <span className="text-[11px]">
-              这一页每打开一次就记一天, <span className="text-foreground">但只在收盘口径下记</span> ——
-              盘中开着实时行情时不记(那时的现价不是收盘价, 拿它当收益起点会算出一份假收益)。
-              <b className="font-medium text-foreground/90">所以只在盘中看盘的话, 台账会一直是空的</b>;
-              收盘后、或关掉实时行情再打开一次才会落账, 顶上那条自检会写明这次记没记。
+              每天的快照由<span className="text-foreground">日线管道</span>在数据落盘后自己记一份,
+              不需要谁去点开哪一页;<span className="text-foreground">只记收盘口径</span> ——
+              盘中的现价不是收盘价, 拿它当收益起点会算出一份假收益。
+              所以空着通常是<b className="font-medium text-foreground/90">日线管道还没跑完一次收盘更新</b>。
               收益还要等 T+5 走完才补齐, 所以至少得攒一周才看得出东西。
             </span>
           </div>

@@ -5031,8 +5031,19 @@ export const api = {
   // [R352] `todayAi` / `todayAiTrackRecord` 删了。用户: 「这部分和 ai 导读都不用了」。
   // 命中率那条其实**从 R351 起就没人调了**(它只服务于已随今日总览删掉的优选面板)。
   // **后端两个端点原样还在** —— 这里删的只是前端那层包装, `git revert` 就能拿回来。
-  /** [R133] 规则层把握分体检: 分层胜率/排名段/因子归因/同期基准 */
-  todayScoreLedger: () => request<ScoreLedger>('/api/today/score-ledger'),
+  /** [R133] 规则层把握分体检: 分层胜率/排名段/因子归因/同期基准
+   *
+   * [R392] **这是个同步计算型接口, 不是读一份存好的统计。** `evaluate()` 每次
+   * 都要把还缺收益的记录补算一遍 —— 逐只读日 K, 攒了几周之后就是几百只。弹窗
+   * 自己的转圈文案写的就是「正在补算历史收益…」, 而它却挂在默认的 30 秒闸上,
+   * 于是台账越厚越容易直接超时, 用户看到的是「读取台账失败」。
+   *
+   * 这正是 [R231] 那次漏掉的同一处: 当时按「会调大模型的接口」逐个开豁免,
+   * 隔壁的 `todayScoreLedgerDigest` 拿到了 AI 档, **这个纯计算的反而没人管**。
+   */
+  todayScoreLedger: () =>
+    request<ScoreLedger>('/api/today/score-ledger',
+      { timeoutMs: COMPUTE_REQUEST_TIMEOUT_MS }),
 
   // [R175] 显式生成 AI 提炼。今天已经跑过的话服务端直接回存档 —— 打开弹窗
   // 不会自动调它, 免得点一次烧一次。
