@@ -219,15 +219,32 @@ export function ScoreLedgerDialog({ onClose }: { onClose: () => void }) {
             <Loader2 className="h-4 w-4 animate-spin" /> 正在补算历史收益…
           </div>
         )}
-        {q.isError && <div className="py-8 text-xs text-danger">读取台账失败,请稍后重试</div>}
+        {q.isError && (
+          <div className="py-8 text-xs text-danger">
+            读取台账失败:{(q.error as Error)?.message || '未知错误'}
+          </div>
+        )}
 
+        {/* 空态要说清**为什么**空 —— 「台账还是空的」本身回答不了任何问题。
+            两个真实原因各有各的出路, 分开说:
+              · 记了, 但全是换口径之前的 → 数量报出来, 免得以为一天都没攒
+              · 一天都没记 → 十有八九是只在盘中看盘(那时不记, 见下)
+            原来这里写的是「打开**今日总览**会自动记一天」—— 那一页在 R340/R343
+            已经拆掉了, 照这句话去做是做不到的。改成指这一页。 */}
         {d && d.recorded_days === 0 && (
           <div className="rounded border border-border/60 bg-base/40 px-3 py-6 text-center text-xs text-muted">
-            台账还是空的。<br />
+            {d.legacy_days
+              ? <>台账里有 {d.legacy_days} 天, 但<span className="text-foreground">全是换打分口径之前</span>记的 ——
+                  两套分数刻度不同, 混在一起算胜率没有意义, 所以一张表都排不出来。
+                  它们仍在导出的 CSV 里。</>
+              : <>台账还是空的。</>}
+            <br />
             <span className="text-[11px]">
-              每次在<span className="text-foreground">收盘口径</span>下打开今日总览会自动记一天
-              (盘中开着实时行情时不记 —— 那时的现价不是收盘价, 拿它当收益起点会算出一份假收益)。
-              收益要等 T+5 走完才补齐, 所以至少得攒一周才看得出东西。
+              这一页每打开一次就记一天, <span className="text-foreground">但只在收盘口径下记</span> ——
+              盘中开着实时行情时不记(那时的现价不是收盘价, 拿它当收益起点会算出一份假收益)。
+              <b className="font-medium text-foreground/90">所以只在盘中看盘的话, 台账会一直是空的</b>;
+              收盘后、或关掉实时行情再打开一次才会落账, 顶上那条自检会写明这次记没记。
+              收益还要等 T+5 走完才补齐, 所以至少得攒一周才看得出东西。
             </span>
           </div>
         )}

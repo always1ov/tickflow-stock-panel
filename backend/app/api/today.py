@@ -1248,11 +1248,26 @@ def _build_overview(repo, engine=None) -> dict:
     # 判"定稿"看数据不看时钟: 只要没有任何一只用了实时价参与判定, 这份快照的
     # close 就是 as_of 那天的真收盘, 可以当收益起点; 盘中(实时行情开着)则不记,
     # 免得把实时价当成收盘价算出一份假收益。
+    #
+    # **不记的那几支必须说出来。** 这个 if 原本只有"成立"那一支有动作, 不成立时
+    # 一声不吭 —— 于是"开着实时行情看盘 → 台账天天不记"在界面上没有任何痕迹,
+    # 攒了几周之后点开体检, 只看到一句「台账还是空的」, 而那句话解释不了为什么。
+    # 不记本身是对的(实时价当收盘价会算出一份假收益), 错的是**不说**: 静默跳过
+    # 正是 `_SelfCheck` 这个类立起来要消灭的东西, 偏偏漏了它自己这一处。
     try:
         from app.services import score_ledger
-        if as_of and not any(t.get("intraday") for t in trends.values()):
-            score_ledger.record_day(as_of, ranked_all,
-                                    {o["symbol"] for o in opportunities}, True)
+        live_n = sum(1 for t in trends.values() if t.get("intraday"))
+        if not as_of:
+            _h.skip("score_ledger", "这份快照没有日期可挂, 不记")
+        elif live_n:
+            _h.skip("score_ledger",
+                    f"盘中口径({live_n} 只在用实时价), 这一次不记 —— "
+                    "收盘后(或关掉实时行情)再打开一次才会落账")
+        else:
+            r = score_ledger.record_day(as_of, ranked_all,
+                                        {o["symbol"] for o in opportunities}, True)
+            if not r.get("ok"):
+                _h.skip("score_ledger", "写台账失败, 原因见后端日志")
     except Exception as e:  # noqa: BLE001 —— 记账失败绝不能影响总览
         logger.debug("score ledger record skipped: %s", e)
         _h.skip("score_ledger", e)
