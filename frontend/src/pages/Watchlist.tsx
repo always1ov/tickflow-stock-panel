@@ -1894,6 +1894,9 @@ export function Watchlist() {
                 return renderBuiltinDataCell(r, col)
               }}
               className="rounded-card overflow-x-auto"
+              /* [R395] 窄屏钉住「代码/名称」—— 手机上这张表只露得出两列半,
+                 往右滑之后满屏数字对不上是哪一只票。宽屏不变。 */
+              pinFirstColumn
             />
           ) : !virtualizeCards ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3">

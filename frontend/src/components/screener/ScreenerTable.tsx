@@ -397,6 +397,13 @@ export function ScreenerTable({
         onSortToggle={onSortToggle}
         minWidth={Math.max(900, columns.filter(c => c.visible).length * 110)}
         rowKey={(r: any) => `${r.symbol}${r._expired ? '-expired' : ''}`}
+        /* [R395] 窄屏钉住第一列 —— 手机上这张表要往右滑, 滑过去就不知道哪一行是
+           哪一只票了。
+           **知情取舍**: 钉住的那一格必须是**不透明**的(要盖住从底下滑过去的内容),
+           而选中行的 `bg-accent/10` 是半透明的 —— 同一个元素上给两个底色会被
+           `twMerge` 合掉一个, 叠不起来。所以窄屏上选中行的第一格只有页面底色,
+           那 10% 的淡色高亮不延伸进来。宽屏 `lg:static` 之后完全照旧。 */
+        pinFirstColumn
         rowClassName={(r: any) => cn(
           r._expired
             ? 'border-border/50 opacity-40'

@@ -844,12 +844,16 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
           </span>
           {/* [R198] 角上的感叹号 —— 点开只讲这些词怎么读, 不讲怎么算出来的 */}
         </span>
+        {/* [R395] 这三个开关是 `py-0.5`, 算上边框实高 21px —— 手指点不准。
+            用仓库已有的 `.tap-target`(见 index.css): 它用一个 ::before 把**可点
+            范围**撑到 28px, **视觉尺寸一个像素不变** —— 这一页的密度是刻意的,
+            不能为了好点就把控件撑大。 */}
         <button
           onClick={() => setActionableOnly((v) => !v)}
           title={'只留下有触发的那几只: 出场线已破/逼近、离趋势翻转价 2% 以内、今日刚翻转、'
             + '短期通道到轨。判定是纯规则的(与推送焦点名单同一套到轨口径), AI 不参与。\n'
             + '自选一多, 默认列出全部本身就是噪音 —— 绝大多数票今天确实不需要你看。'}
-          className={`text-[12px] px-2 py-0.5 rounded-btn border transition-colors cursor-pointer ${
+          className={`tap-target text-[12px] px-2 py-0.5 rounded-btn border transition-colors cursor-pointer ${
             actionableOnly ? 'border-amber-400/40 bg-amber-400/10 text-amber-400' : 'border-border bg-base text-muted hover:text-foreground'
           }`}
         >
@@ -862,7 +866,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
             + '与「只看要动的」的区别: 那个是四档触发的并集(出场线、逼近翻转价、'
             + '今日转折、通道到轨), 转折只是其中一档。\n'
             + '想按转折做的时候, 另外三档就是噪音 —— 而转折正是模拟盘唯一认的信号。'}
-          className={`text-[12px] px-2 py-0.5 rounded-btn border transition-colors cursor-pointer ${
+          className={`tap-target text-[12px] px-2 py-0.5 rounded-btn border transition-colors cursor-pointer ${
             flippedOnly ? 'border-sky-400/40 bg-sky-400/10 text-sky-300' : 'border-border bg-base text-muted hover:text-foreground'
           }`}
         >
@@ -870,7 +874,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
         </button>
         <button
           onClick={() => setHeldOnly((v) => !v)}
-          className={`text-[12px] px-2 py-0.5 rounded-btn border transition-colors cursor-pointer ${
+          className={`tap-target text-[12px] px-2 py-0.5 rounded-btn border transition-colors cursor-pointer ${
             heldOnly ? 'border-accent/40 bg-accent/10 text-accent' : 'border-border bg-base text-muted hover:text-foreground'
           }`}
         >
@@ -1009,7 +1013,11 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
                 就是要划走的行, 让它透出来没有任何好处。 */}
             <thead className="sticky top-0 z-20 bg-surface text-[12px] text-muted">
               <tr className="text-left">
-                <th className="whitespace-nowrap px-3 py-2.5 font-normal text-center"><button onClick={() => cycleSort('name')} className={thBtn} title={HEAD_TIPS.name}>标的{caret('name')}</button><Hint title={HEAD_TIPS.name} className="ml-0.5" /></th>
+                {/* [R395] 窄屏把「标的」钉在左边缘 —— 手机上这张表要往右滑 160px 才
+                    看得完, 滑过去之后满屏读数不知道是哪一只票。`z-30` 要压过 thead
+                    自己的 `z-20`, 否则表头第一格会被同一层的其余表头盖住。
+                    宽屏 `lg:static` 之后与改动前逐像素相同。 */}
+                <th className="sticky left-0 z-30 bg-surface whitespace-nowrap px-3 py-2.5 font-normal text-center lg:static lg:bg-transparent"><button onClick={() => cycleSort('name')} className={thBtn} title={HEAD_TIPS.name}>标的{caret('name')}</button><Hint title={HEAD_TIPS.name} className="ml-0.5" /></th>
                 <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center">
                   <button onClick={() => cycleSort('changePct')}
                           className={`${thBtn} whitespace-nowrap`}
@@ -1108,7 +1116,13 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
                         一份。R198 当初把它挪进标的格是为了省一列, 现在收敛层顶上了,
                         它就成了纯重复。
                         判定本身一个字没动 —— 排序键、「只看要动的」筛选照旧走它。 */}
-                    <td className={`${TD_BASE} px-3 text-center border-l-2 ${active ? 'border-l-accent' : 'border-l-transparent'}`}>
+                    {/* [R395] 与表头那一格成对: 钉住的格子必须**不透明**, 否则
+                        从它底下滑过去的读数会透上来。
+                        **知情取舍**: 行的高亮(`bg-accent/25` 闪烁 / `bg-accent/[0.10]`
+                        当前)是半透明的, 同一个元素上叠不起两个底色, 所以窄屏上这一格
+                        只有页面底色。当前行的身份标记没丢 —— 左边那道靛蓝边还在, 而且
+                        它本来就是比淡色底更强的那个信号。 */}
+                    <td className={`${TD_BASE} sticky left-0 z-[1] bg-base px-3 text-center border-l-2 lg:static lg:bg-transparent ${active ? 'border-l-accent' : 'border-l-transparent'}`}>
                       <button onClick={() => (onPreview ?? onSelect)(r.symbol, r.name)}
                               className="mx-auto flex min-h-[2.25rem] flex-col items-center justify-center gap-0.5 text-center cursor-pointer group">
                         <span className="flex items-center gap-1.5">
@@ -1260,8 +1274,13 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
                         /* [R284] **从没分析过的票也得够得着** —— AI 分析列撤掉之后
                            操作入口只剩这里; 这一支要是只印「未分析」, 那些没跑过
                            分析的票就再也点不到那个 ✨ 了。 */
-                        <span className="flex items-center gap-1.5">
-                          <span className="text-[12px] text-muted/50">未分析</span>
+                        /* [R395] 窄屏上这一格只有 40 来 px 宽, 而这一行是
+                           「未分析 + 两个图标按钮」—— 不许换行的话三个字会被挤成
+                           一竖列(实测 12×52)。让整行可换行, 字本身不断。
+                           注意这里是**三元表达式的分支**不是 JSX 子节点位置,
+                           所以注释不能带花括号 —— 带了就等于两个相邻表达式。 */
+                        <span className="flex flex-wrap items-center justify-center gap-1.5">
+                          <span className="whitespace-nowrap text-[12px] text-muted/50">未分析</span>
                           <AiActions r={r} onAnalyze={onAnalyze} onPriceAlert={onPriceAlert}
                                        reports={reportsBySymbol.get(r.symbol)} />
                         </span>

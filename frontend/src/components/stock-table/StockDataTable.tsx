@@ -6,6 +6,7 @@
  * renderCell / renderExtraCol 注入。这样两个页面的特有交互得以保留，同时表头能力一致。
  */
 import { cloneElement, isValidElement, useRef, type ReactElement, type ReactNode } from 'react'
+import { cn } from '@/lib/cn'
 import { useVirtualizer, type VirtualItem } from '@tanstack/react-virtual'
 import type { ColumnConfig } from '@/lib/list-columns'
 import { UNSORTABLE_KEYS } from '@/lib/stock-table'
@@ -40,6 +41,25 @@ export interface StockDataTableProps {
   renderHeaderContent?: (col: ColumnConfig) => ReactNode | undefined
   /** 外层容器 className */
   className?: string
+  /**
+   * [R395] 窄屏把第一列钉在左边缘。
+   *
+   * 手机上这张表放不下 —— 实测自选页 390px 宽只露得出两列半, 其余要往右滑。
+   * 滑过去之后**行的身份就没了**: 满屏数字, 不知道哪一行是哪一只票。钉住
+   * 「代码/名称」那一列, 滑动时它不动, 数字与票始终对得上。
+   *
+   * **只在窄屏钉**(`lg:static`): 宽屏本来就放得下, 桌面一个像素不变。
+   */
+  pinFirstColumn?: boolean
+  /**
+   * 钉住的那一格要**盖住**从它下面滑过去的内容, 所以必须是不透明底色 ——
+   * 而底色是哪一个, 只有调用方知道: 行可能有选中态、失效态、涨跌态。
+   * 骨架自己已经垫了一层不透明的页面底色(实测行本身是透明的, 真正画出来的
+   * 是 `--base`), 这里只是**往上叠**。
+   * **有行高亮的表必须在这里把高亮一起给出来**, 否则第一列会和本行其余部分
+   * 差一个颜色 —— 那比不钉更难看。
+   */
+  pinnedCellClass?: (r: any) => string
 }
 
 function alignThClass(align: ColumnConfig['align']): string {
@@ -62,6 +82,8 @@ export function StockDataTable({
   extraHeader,
   renderHeaderContent,
   className = 'rounded-card border border-border overflow-x-auto',
+  pinFirstColumn = false,
+  pinnedCellClass = () => 'group-hover:bg-elevated/50',
 }: StockDataTableProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const visibleColumns = columns.filter(c => c.visible)
@@ -104,12 +126,26 @@ export function StockDataTable({
       data-index={virtualRow?.index}
       className={`transition-colors duration-hover ease-smooth group ${rowClassName(r)}`}
     >
-      {visibleColumns.map(col => {
+      {visibleColumns.map((col, i) => {
         // renderCell 返回的 <td> 无 key, 这里补上避免 React key 警告
         const cell = renderCell(r, col)
-        return isValidElement(cell)
-          ? cloneElement(cell as ReactElement, { key: col.id })
-          : cell
+        if (!isValidElement(cell)) return cell
+        const el = cell as ReactElement<{ className?: string }>
+        // 第一列钉住: 类名**合并**进调用方给的那一格, 而不是在外面再包一层 ——
+        // 多包一层 <td> 会把列数对不上, colSpan 的占位行会错位。
+        const extra = pinFirstColumn && i === 0
+          ? cn(
+              // **不透明底色写在骨架里, 不交给调用方** —— 它是"钉住"能成立的前提
+              // (要盖住从底下滑过去的内容), 漏了就是两层字叠在一起且不报错。
+              // 调用方只能用 `pinnedCellClass` 往上叠色, 叠不掉这一层的兜底。
+              'sticky left-0 z-[1] bg-base lg:static lg:bg-transparent',
+              pinnedCellClass(r),
+            )
+          : undefined
+        return cloneElement(el, {
+          key: col.id,
+          ...(extra ? { className: cn(el.props.className, extra) } : {}),
+        })
       })}
       {renderExtraCol && renderExtraCol(r)}
     </tr>
@@ -120,7 +156,7 @@ export function StockDataTable({
       <table className="w-full text-sm" style={{ minWidth: computedMinWidth }}>
         <thead className={theadClass}>
           <tr className="text-left text-secondary">
-            {visibleColumns.map(col => {
+            {visibleColumns.map((col, i) => {
               const sortable = isColSortable(col)
               const isSorted = sort?.key === col.id
               const dir = isSorted ? sort!.dir : null
@@ -128,7 +164,14 @@ export function StockDataTable({
               return (
                 <th
                   key={col.id}
-                  className={`${alignThClass(col.align)} ${sortable ? 'cursor-pointer select-none group' : ''}`}
+                  className={cn(
+                    alignThClass(col.align),
+                    sortable && 'cursor-pointer select-none group',
+                    // 表头那一格要同时钉住上边和左边, 否则往右滑时表头第一格会跑掉,
+                    // 而表体第一格还钉着 —— 两者错位比都不钉更让人分神。
+                    // 底色跟表头走(`bg-surface`), 不是行的底色。
+                    pinFirstColumn && i === 0 && 'sticky left-0 z-20 bg-surface lg:static lg:bg-transparent',
+                  )}
                   onClick={sortable ? () => onSortToggle!(col.id) : undefined}
                 >
                   {contentOverride !== undefined ? contentOverride : col.label}

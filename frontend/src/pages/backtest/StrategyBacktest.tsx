@@ -2037,12 +2037,15 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
 
         {/* 市场环境过滤: 只在指定环境的交易日入场(强制 T-1, 用前一日环境判定) */}
         <div className="rounded-btn border border-border bg-surface/50 px-3 py-2 space-y-1.5">
-          <div className="flex items-center gap-2">
+          {/* [R395] 窄屏要能换行: 这一行是「图标 + 标题 + 一句长说明 + 右侧输入框」,
+              不换行的话那句长说明会把右边的「最低分」挤成一个字宽竖着排(实测 19×48)。
+              `ml-auto` 只在同一行里才有意义, 换行之后它自然失效, 不用额外处理。 */}
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <Gauge className="h-3.5 w-3.5 text-accent" />
             <span className="text-xs font-medium text-foreground">环境过滤</span>
             <span className="text-[10px] text-muted">仅在前一日环境满足时入场(防未来函数)</span>
-            <div className="ml-auto flex items-center gap-1">
-              <span className="text-[10px] text-muted">最低分</span>
+            <div className="ml-auto flex shrink-0 items-center gap-1">
+              <span className="whitespace-nowrap text-[10px] text-muted">最低分</span>
               <input type="number" min={0} max={100} value={regimeMinScore} placeholder="不限"
                 onChange={e => setRegimeMinScore(e.target.value ? Number(e.target.value) : '')}
                 className="w-14 h-6 px-1 rounded border border-border bg-base text-[11px] text-foreground text-center focus:outline-none focus:border-accent/50" />
