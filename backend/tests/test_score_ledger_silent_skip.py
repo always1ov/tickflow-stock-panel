@@ -174,17 +174,48 @@ def test_R392_体检接口要走计算档超时():
         "体检接口还挂在默认 30 秒闸上 —— 它是同步计算型的, 台账一厚就会超时")
 
 
-def test_R392_界面上不许再指向已经拆掉的那一页():
-    """**剥注释之后再扫** —— 解释「以前指的是哪一页」那几段必然要写出旧名字,
-    不剥的话断言会被自己的注释喂饱(本仓库第八次)。"""
+def test_R393_前端界面上不许再出现已经拆掉的那一页():
+    """**整个 `frontend/src` 一起扫, 不是只扫这次改过的那两个文件。**
+
+    [R393] 第一版只扫 `ScoreLedgerDialog` 与 `FocusBar` —— 那正是 R258 栽过的
+    「扫描面比纪律小」: 这两个文件清干净之后, 下一处新写的「今日总览」照样能
+    溜进去, 而守卫全绿。用户明确划了范围(「渲染前端可以动的, 核心逻辑不允许」),
+    所以这条按那个范围钉满: 前端渲染文本一处都不许有。
+
+    **后端剩下的两处故意不进这条**, 理由写在 `test_terminology.py` 的
+    `NOT_A_CONFLICT` 里: 它们是**送给模型的提示词与 payload 键**, 不是界面,
+    而且那份 payload 按 [R121] 同时是校验 AI 有没有忠实用数的账本 —— 改键
+    等于动核心逻辑。
+
+    **剥注释之后再扫** —— 解释「以前指的是哪一页」那几段必然要写出旧名字,
+    不剥的话断言会被自己的注释喂饱(本仓库第八次)。
+    """
+    src = Path(__file__).resolve().parents[2] / "frontend" / "src"
+    if not src.is_dir():
+        pytest.skip("拿不到前端源码(只跑后端时正常)")
     offenders = []
-    for rel in (DIALOG, "components/monitor/FocusBar.tsx"):
+    for p in sorted(src.rglob("*.ts*")):
+        rel = str(p.relative_to(src))
         for i, ln in enumerate(_code(rel).splitlines(), 1):
             if DEAD_PAGE in ln:
                 offenders.append(f"{rel}:{i} {ln.strip()[:70]}")
     assert not offenders, (
-        f"这些渲染文本还在让用户去开「{DEAD_PAGE}」, 而那一页已经没有了:\n  "
+        f"这些渲染文本还在提「{DEAD_PAGE}」, 而那一页已经没有了:\n  "
         + "\n  ".join(offenders))
+
+
+def test_R393_存储体检的标签里也不许有已拆的那一页():
+    """数据体检那张表的 `cn` 是**纯展示名**(`rel` 才是键)—— 它照样会渲染到
+    界面上, 所以同一条纪律对它成立。
+
+    **只钉这一张表, 不整个后端扫**: `api/today.py` 那两处是提示词与 payload
+    键名, 不是界面(理由见 `test_terminology.py` 的 `NOT_A_CONFLICT`)。
+    """
+    from app.services.data_doctor import STORES
+    bad = [f"{s.rel} → 「{s.cn}」" for s in STORES if DEAD_PAGE in s.cn]
+    assert not bad, (
+        f"存储体检的标签里还有「{DEAD_PAGE}」(改 `cn` 即可, **别动 `rel`** ——"
+        f" 那是键, 动了体检就对不上这份存储):\n  " + "\n  ".join(bad))
 
 
 def test_R392_空态不许许诺自检条会报好消息():

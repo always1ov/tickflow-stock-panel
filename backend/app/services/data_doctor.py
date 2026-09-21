@@ -124,7 +124,10 @@ STORES: tuple[Store, ...] = (
     Store("user_data/ai_pick_ledger.json", "AI 优选台账", shape=SHAPE_OPAQUE),
     Store("user_data/portfolio_history.json", "组合净值历史", shape=SHAPE_OPAQUE),
     Store("user_data/preferences.json", "偏好设置", shape=SHAPE_OBJECT),
-    Store("user_data/today_prefs.json", "今日总览偏好", shape=SHAPE_OBJECT),
+    # [R393] 标签从「今日总览偏好」改成「总览门槛偏好」—— 那一页 R340/R351
+    # 拆了, 门槛现在长在模拟盘上。**只动 `cn`(给人看的名字), `rel` 是键,
+    # 动了会让体检对不上这份存储**。
+    Store("user_data/today_prefs.json", "总览门槛偏好", shape=SHAPE_OBJECT),
     Store("user_data/today_ai.json", "今日 AI 导读", shape=SHAPE_OPAQUE, kind=KIND_DERIVED),
     Store("user_data/market_mode.json", "大盘红绿灯", shape=SHAPE_OPAQUE, kind=KIND_DERIVED),
     Store("user_data/seesaw_history.json", "板块跷跷板", shape=SHAPE_OPAQUE, kind=KIND_DERIVED),
