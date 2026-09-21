@@ -364,7 +364,7 @@ export function ConceptAnalysis() {
         title="概念分析"
         subtitle={`${marketQuery.data?.as_of ?? rowsQuery.data?.date ?? '最新'} · ${stats.length} 个概念 · ${totalSymbols} 只标的`}
         right={
-          <div className="flex items-center gap-1">
+          <div className="flex flex-wrap items-center gap-1">
             {/* [R105] RPS 轮动入口移到「复盘」页(全站唯一入口, 弹窗内可切行业/概念) */}
             <button
               onClick={() => { rowsQuery.refetch(); marketQuery.refetch() }}

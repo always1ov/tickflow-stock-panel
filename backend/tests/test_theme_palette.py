@@ -405,8 +405,16 @@ def test_R379_页头有呼吸感而且只有一个产地():
         "页头被调回紧凑工具栏那一档了"
     assert "text-xl font-semibold leading-tight tracking-tight" in code, \
         "页标题字号被调回去了"
-    # 徽标是药丸, baseline 对齐会让它坐歪 —— 这条是踩过才知道的
-    assert "flex min-w-0 items-center gap-2.5" in code, "标题行的对齐方式被动了"
+    # 徽标是药丸, baseline 对齐会让它坐歪 —— 这条是踩过才知道的。
+    #
+    # [R394] 原来钉的是整串 `"flex min-w-0 items-center gap-2.5"`, 而这条在乎的
+    # 只有 `items-center` 那一个词。窄屏排版修好之后那一行还得加 `flex-wrap` /
+    # `basis-full` / `pl-11`(给悬浮汉堡让位), **对齐方式一个字没动**, 这条却红了
+    # —— 又一次「钉名字不钉性质」: 锚是那串字面量, 而纪律是那一个属性。
+    # 改成只问标题行是不是 `items-center`, 顺带明确禁掉它真正怕的 `items-baseline`。
+    title_row = code.split("<h1", 1)[0].rsplit("<div", 1)[-1]
+    assert "items-center" in title_row, "标题行的对齐方式被动了(徽标会坐歪)"
+    assert "items-baseline" not in title_row, "标题行用了 baseline 对齐, 药丸徽标会坐歪"
 
 
 def test_R379_开篇块只有一个产地():

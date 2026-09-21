@@ -260,7 +260,7 @@ export function Review() {
         titleExtra={<Sparkles className="h-4 w-4 text-accent" />}
         subtitle={`${displayDate}${data?.emotion ? ` · 情绪 ${data.emotion.label}` : ''}`}
         right={
-          <div className="flex items-center gap-1">
+          <div className="flex flex-wrap items-center gap-1">
             {/* [R105] 板块 RPS 轮动 —— 从行业/概念分析页收编到复盘的统一入口,
                 弹窗内可切行业/概念维度并标明数据出处 */}
             <button

@@ -454,7 +454,7 @@ export function Dev() {
         title="系统工具"
         subtitle="数据诊断与预警调试"
         right={
-          <div className="flex items-center gap-1 rounded-btn bg-elevated p-0.5">
+          <div className="flex flex-wrap items-center gap-1 rounded-btn bg-elevated p-0.5">
             <button
               onClick={() => setTab('seed')}
               className={cn(

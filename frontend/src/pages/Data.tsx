@@ -607,7 +607,7 @@ export function Data() {
         title="数据"
         subtitle="本地数据画像 · 同步状态 · 历史记录"
         right={
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             {!hasData && !isLoading && (
               <span className="text-xs text-accent animate-pulse">首次使用请点击右侧按钮同步数据</span>
             )}

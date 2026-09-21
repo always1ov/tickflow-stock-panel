@@ -164,7 +164,7 @@ export function Financials() {
         title="财务分析"
         subtitle="利润表 / 资负表 / 现金流 / 关键指标 / 股本 / AI分析"
         right={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <LastStockChip stock={lastStock} onSelect={pick} />
             {syncing && (
               <span className="text-xs text-accent/80 flex items-center gap-1.5">

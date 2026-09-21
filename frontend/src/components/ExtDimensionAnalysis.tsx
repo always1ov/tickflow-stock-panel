@@ -256,7 +256,7 @@ export function ExtDimensionAnalysis({
         title={activeTitle}
         subtitle={menu ? `${menu.template} · ${menu.data_source}` : subtitle}
         right={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <select
               value={activeConfigId}
               onChange={(e) => { setSelectedConfigId(e.target.value); setDimensionField(''); setSelectedGroup(null) }}

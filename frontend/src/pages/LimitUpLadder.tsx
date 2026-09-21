@@ -1563,7 +1563,7 @@ export function LimitUpLadder() {
           </div>
         }
         right={
-          <div className="flex items-center gap-1">
+          <div className="flex flex-wrap items-center gap-1">
             {/* 封单模式: 成交量/金额(仅 sealed 就绪时显示) — 胶囊式 */}
             {data?.sealed_ready && (
               <>

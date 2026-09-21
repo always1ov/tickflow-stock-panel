@@ -417,7 +417,7 @@ export function IndustryAnalysis() {
         title="行业分析"
         subtitle={`${industryLevelLabel} · ${marketQuery.data?.as_of ?? rowsQuery.data?.date ?? '最新'} · ${stats.length} 个行业 · ${totalSymbols} 只标的`}
         right={
-          <div className="flex items-center gap-1">
+          <div className="flex flex-wrap items-center gap-1">
             {/* [R105] RPS 轮动入口移到「复盘」页(全站唯一入口, 弹窗内可切行业/概念) */}
             <button
               onClick={() => { rowsQuery.refetch(); marketQuery.refetch() }}
