@@ -2,7 +2,8 @@ import { useEffect, useRef, useMemo, useState } from 'react'
 import { chartTheme, FIB2_ROLE_TARGET, fib2RoleColor, getTheme, levelColors, useLevelColors, useTheme } from '@/lib/theme'
 import * as echarts from 'echarts'
 import type { ECharts, EChartsOption } from 'echarts'
-import type { Fib2Grain, Fib2Overlay, KlineRow, LevelSeries } from '@/lib/api'
+import type { Fib2Grain, Fib2Overlay, KlineRow, LevelSeries, QuantMacdResult } from '@/lib/api'
+import { alignQuantMacd, quantMacdSeries } from '@/lib/quantMacdSeries'
 import { fib2Status } from '@/lib/fib2Status'
 import { Fib2GrainDialog } from './Fib2GrainDialog'
 
@@ -12,7 +13,9 @@ import { Fib2GrainDialog } from './Fib2GrainDialog'
  * 与 StockDailyKChart/EChartsCandlestick 刻意不复用:
  *   - 那套图表面向「行情浏览」,强调全套指标副图(MA/MACD/KDJ/BOLL)、涨停标记等;
  *   - 本图表面向「分析决策」,核心是【关键价位】(压力/支撑/密集区/枢轴/前高前低),
- *     通过开关按钮控制各价位组的显隐,布局更简洁(主图 + 成交量即可)。
+ *     通过开关按钮控制各价位组的显隐,布局更简洁(主图 + 一张副图)。
+ *   - [R415] 副图原来是成交量, 现在是用户自己的「量化MACD」(通达信公式逐行复刻,
+ *     算法在后端 `indicators/quant_macd.py`, 画法在 `lib/quantMacdSeries.ts`)。
  *
  * 预留接口(类型已定义,渲染逻辑留 hook,后续实现):
  *   - markers: 日期标记点(新闻/暴雷/利好 → markPoint)
@@ -25,8 +28,6 @@ import { Fib2GrainDialog } from './Fib2GrainDialog'
 const THEME = {
   bull: '#C74040',
   bear: '#2D9B65',
-  volUp: 'rgba(240,68,56,0.5)',
-  volDown: 'rgba(18,183,106,0.5)',
 }
 
 /** 当前主题的图表调色板 (buildOption 渲染时调用; 切换由组件 effect 触发重建)。 */
@@ -165,13 +166,16 @@ interface Props {
   fib2?: Fib2Overlay
   /** [R412] 标的代码 —— 只为「粗细档回测」那个按钮用; 不传就不显示那个按钮 */
   symbol?: string
+  /** [R415] 副图「量化MACD」的逐根数值; 没到就先空着(副图留白, 主图照画) */
+  quantMacd?: QuantMacdResult
   /** 预留:点击某根 K 线 */
   onDateClick?: (date: string) => void
   height?: number
   className?: string
 }
 
-const VOL_PANE_H = 90
+/** [R415] 副图高度 —— 沿用原成交量副图的 90 */
+const SUB_PANE_H = 90
 
 export function AnalysisKChart({
   rows,
@@ -189,6 +193,7 @@ export function AnalysisKChart({
   ranges,
   fib2,
   symbol,
+  quantMacd,
   onDateClick,
   height = 460,
   className,
@@ -245,14 +250,10 @@ export function AnalysisKChart({
     levels: fib2Raw ?? [],
   }), [rows, fib2, fib2Zone, fib2Raw])
 
-  const { dates: baseDates, candle, vols, dateIndex, zoomStart: baseZoom,
+  const { dates: baseDates, candle, dateIndex, zoomStart: baseZoom,
           alignedSeries: baseSeries } = useMemo(() => {
     const dates = rows.map(r => (typeof r.date === 'string' ? r.date.slice(0, 10) : String(r.date)))
     const candle = rows.map(r => [r.open, r.close, r.low, r.high])
-    const vols = rows.map(r => ({
-      value: r.volume ?? 0,
-      itemStyle: { color: r.close >= r.open ? THEME.volUp : THEME.volDown },
-    }))
     const dateIndex = new Map(dates.map((d, i) => [d, i]))
     // 默认显示最近 6 个月 ≈ 120 个交易日;数据不足则全部显示
     const showBars = 120
@@ -297,7 +298,7 @@ export function AnalysisKChart({
       }
     }
 
-    return { dates, candle, vols, dateIndex, zoomStart, alignedSeries }
+    return { dates, candle, dateIndex, zoomStart, alignedSeries }
   }, [rows, series, seriesDates])
 
   /**
@@ -347,16 +348,20 @@ export function AnalysisKChart({
   const buildOption = (): EChartsOption => {
     const priceLines = collectPriceLines(effLevels, activeTypes, pivotRank, LC, theme)
 
-    // 三段布局:主图 / 成交量 / 缩放条,从上到下累加,各段之间留间距,互不遮挡
-    //   [16 顶部] [mainH 主图] [8 间距] [volH 成交量] [12 间距] [SLIDER_H 缩放条] [8 底部]
+    // 三段布局:主图 / 量化MACD / 缩放条,从上到下累加,各段之间留间距,互不遮挡
+    //   [16 顶部] [mainH 主图] [14 间距] [subH 量化MACD] [26 日期+间距] [SLIDER_H 缩放条] [8 底部]
+    //
+    // [R415] 日期刻度从主图底下挪到副图底下, 间距跟着改。原来刻度夹在主图与
+    // 成交量之间, 成交量柱从底部往上长, 顶上那条被刻度压住看不出来; 换成量化MACD
+    // 以后 0 轴与叉点图标都贴近副图顶部, 出图就被日期字压住了。
     const SLIDER_H = 22
     const PAD_TOP = 16
-    const GAP_MAIN_VOL = 8        // 主图 ↔ 成交量
-    const GAP_VOL_SLIDER = 12     // 成交量 ↔ 缩放条(留足,避免遮挡)
+    const GAP_MAIN_SUB = 14       // 主图 ↔ 量化MACD(两边的纵轴刻度不再上下相撞)
+    const GAP_SUB_SLIDER = 26     // 量化MACD ↔ 缩放条: 日期刻度在这一段里
     const PAD_BOTTOM = 8
-    const volH = VOL_PANE_H
-    const mainH = height - PAD_TOP - GAP_MAIN_VOL - volH - GAP_VOL_SLIDER - SLIDER_H - PAD_BOTTOM
-    const volTop = PAD_TOP + mainH + GAP_MAIN_VOL
+    const subH = SUB_PANE_H
+    const mainH = height - PAD_TOP - GAP_MAIN_SUB - subH - GAP_SUB_SLIDER - SLIDER_H - PAD_BOTTOM
+    const subTop = PAD_TOP + mainH + GAP_MAIN_SUB
     const sliderBottom = PAD_BOTTOM
 
     // 预留:markPoint(新闻标记)
@@ -484,6 +489,8 @@ export function AnalysisKChart({
       },
     } : undefined
 
+    const qmacdSeries = quantMacdSeries(alignQuantMacd(dates, quantMacd), theme,
+                                        { xAxisIndex: 1, yAxisIndex: 1 })
     const series: any[] = [
       {
         name: 'K', type: 'candlestick', data: candle, animation: false,
@@ -497,10 +504,9 @@ export function AnalysisKChart({
         markPoint: markPointData.length ? { data: markPointData, animation: false } : undefined,
         markArea: markAreaData.length ? { silent: true, data: markAreaData } : undefined,
       },
-      {
-        name: '成交量', type: 'bar', xAxisIndex: 1, yAxisIndex: 1,
-        data: vols, animation: false,
-      },
+      // [R415] 副图: 量化MACD。按日期对齐到 `dates` —— 含二型的「未来」空槽,
+      // 那几格是 null, 不画。
+      ...qmacdSeries,
     ]
 
     // 价位水平线 —— 用 line series(恒定值)画水平线,endLabel 显示标签文字;
@@ -576,10 +582,12 @@ export function AnalysisKChart({
       })
     }
 
-    // 填充 seriesIndex → levelKey 映射(K/成交量索引 0/1 不参与联动)
+    // 填充 seriesIndex → levelKey 映射(K 线与副图那几条不参与联动)
     const keyMap = new Map<number, string>()
-    // series[0]=K线, series[1]=成交量, 之后是按 priceLines + CURVE_DEFS 顺序 push 的
-    let si = 2
+    // series[0]=K线, 接着是副图的 qmacdSeries.length 条, 之后才是按
+    // priceLines + CURVE_DEFS 顺序 push 的。**起点必须跟着副图条数走** ——
+    // 写死一个数, 副图多一条, 悬停价位线就会高亮到隔壁那条上去。
+    let si = 1 + qmacdSeries.length
     for (const p of priceLines) {
       keyMap.set(si++, levelKey(p.type, p.value))
     }
@@ -599,29 +607,33 @@ export function AnalysisKChart({
       // 预留 ~144px:最长标签(如「成交密集区(POC) 12.34」)约 13 字符,fontSize 9 等宽。
       grid: [
         { left: 56, right: 144, top: 16, height: mainH },
-        { left: 56, right: 144, top: volTop, height: volH },
+        { left: 56, right: 144, top: subTop, height: subH },
       ],
       xAxis: [
         {
           type: 'category', data: dates, boundaryGap: true,
           axisLine: { lineStyle: { color: CT().grid } },
-          axisLabel: { color: CT().text, fontSize: 10 },
+          // [R415] 日期刻度只在最底下那张图(量化MACD)下面写一次
+          axisLabel: { show: false },
           splitLine: { show: false },
           axisPointer: { show: true, label: { show: false } },
         },
         {
           type: 'category', gridIndex: 1, data: dates, boundaryGap: true,
-          axisLabel: { show: false }, axisLine: { show: false }, axisTick: { show: false },
+          axisLabel: { color: CT().text, fontSize: 10 },
+          axisLine: { lineStyle: { color: CT().grid } }, axisTick: { show: false },
         },
       ],
       yAxis: [
         { scale: true, splitLine: { lineStyle: { color: CT().grid } },
           axisLabel: { color: CT().text, fontSize: 10, fontFamily: 'JetBrains Mono, monospace' } },
-        { scale: true, gridIndex: 1, splitNumber: 2,
-          // 成交量区不画背景横线
+        // [R415] 不开 scale: 原文每根柱子都从 0 画起(STICKLINE 的第二个参数),
+        // 开了 scale 在全是正值的那一段 0 会掉出坐标轴, 柱子就没了根。
+        { scale: false, gridIndex: 1, splitNumber: 2,
+          // 副图不画背景横线
           splitLine: { show: false },
           axisLabel: { color: CT().text, fontSize: 9, fontFamily: 'JetBrains Mono, monospace',
-                       formatter: (v: number) => fmtVol(v) } },
+                       formatter: (v: number) => fmtSub(v) } },
       ],
       dataZoom: [
         { type: 'inside', xAxisIndex: [0, 1], start: zoomStart, end: 100 },
@@ -632,6 +644,11 @@ export function AnalysisKChart({
       // 不弹 hover tooltip(用户要求);但保留十字线 axisPointer 作为缩放/定位参照
       tooltip: { show: false },
       axisPointer: { link: [{ xAxisIndex: 'all' }] },
+      // [R415] 副图左上角的名字 —— 否则换掉成交量之后, 这块图是什么没有任何地方说
+      graphic: [{
+        type: 'text', left: 60, top: subTop + 2, silent: true,
+        style: { text: '量化MACD', fill: CT().text, fontSize: 9 },
+      }],
       series,
     }
   }
@@ -658,7 +675,7 @@ export function AnalysisKChart({
     }
     chartInstRef.current.setOption(buildOption(), true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rows, levels, series, seriesDates, activeTypes, pivotRank, markers, ranges, fib2, fib2Grain, effLevels, fib2Zone, height, theme, hoveredKey])
+  }, [rows, levels, series, seriesDates, activeTypes, pivotRank, markers, ranges, fib2, fib2Grain, effLevels, fib2Zone, height, theme, hoveredKey, quantMacd])
 
   // resize
   useEffect(() => {
@@ -1072,9 +1089,7 @@ function levelKey(type: string, value: number): string {
   return `${type}-${value.toFixed(2)}`
 }
 
-function fmtVol(v: number): string {
-  if (!v) return '0'
-  if (v >= 1e8) return (v / 1e8).toFixed(2) + '亿'
-  if (v >= 1e4) return (v / 1e4).toFixed(0) + '万'
-  return v.toFixed(0)
+/** [R415] 副图刻度: DIFF/DEA 是价格差, 两位小数够看; 0 就写 0 */
+function fmtSub(v: number): string {
+  return v === 0 ? '0' : v.toFixed(2)
 }

@@ -1247,6 +1247,23 @@ export interface StockLevels {
 
 export type Fib2Grain = 'coarse' | 'mid' | 'fine'
 
+/**
+ * [R415] 量化MACD 逐根数值。**只有画得出来的五样** —— 原文里 `:=` 的中间变量
+ * (MACD、柱1、OBV1~3…)在通达信里不画, 这里也不给。`null` = 那一根不画。
+ */
+export interface QuantMacdResult {
+  symbol: string
+  dates: string[]
+  diff: (number | null)[]
+  dea: (number | null)[]
+  /** 黄柱顶端 = DEA/4 */
+  yellow: (number | null)[]
+  /** 金叉图标高度 = 柱2 */
+  gold_icon: (number | null)[]
+  /** 死叉图标高度 = DEA*1.1 */
+  dead_icon: (number | null)[]
+}
+
 /** [R412] 一档粗细在这只票上的表现。**全是数得出来的量, 没有一个是收益。** */
 export interface Fib2GrainFit {
   grain: Fib2Grain
@@ -5077,6 +5094,14 @@ export const api = {
   // ===== 个股分析 =====
   stockAnalysisLevels: (symbol: string, days = 120) =>
     request<StockLevels>(`/api/stock-analysis/levels?symbol=${encodeURIComponent(symbol)}&days=${days}`),
+
+  /**
+   * [R415] 用户自己的「量化MACD」—— 通达信公式逐行复刻, 替换关键价位下方的成交量。
+   * 后端自己取约 1000 根做预热、并带上盘中实时那一根; 返回最近 `bars` 根。
+   */
+  stockQuantMacd: (symbol: string, bars = 400) =>
+    request<QuantMacdResult>(
+      `/api/stock-analysis/quant-macd?symbol=${encodeURIComponent(symbol)}&bars=${bars}`),
 
   // [fork 增强] 今日总览(决策汇聚层)
   todayOverview: () => request<TodayOverview>('/api/today'),

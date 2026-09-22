@@ -1,0 +1,28 @@
+# R415 — 关键价位下面的成交量换成用户自己的「量化MACD」(通达信公式逐行复刻)
+
+| # | 改动 | 涉及文件 | 冲突风险 | 单独回退 |
+|---|------|---------|:---:|---------|
+| R415 | 用户: 「想要用这个指标替换关键价位下面的成交量, 不再显示成交量, 换成我的量化MACD」「必须完美复刻」「我这个是量化指标, 和仓库系统里面的不一样的」。**一个独立指标**: 后端 `indicators/quant_macd.py` 自己从收盘价与成交量逐行算, **不读仓库任何现成 MACD 列**(有测试钉住: 往数据里塞一套假的 `macd_dif` 列, 输出不变)。**「完美复刻」在数值上靠三件事**: ① EMA 首值 = 第一根(通达信定义); ② **无效值传播** —— `MA(X,9)` 前 8 根、`REF` 首根无效, 含无效的运算仍无效、比较不成立(常见 pandas 翻译把 NaN 比较当 False 往下算, 前几十根和通达信对不上); ③ **约 1000 根历史预热**(`_QMACD_WARMUP_DAYS = 1500` 自然日), 最慢的 EMA26 起点差异衰减到 1e-27, 低于双精度, 所以显示的每一根都与通达信「从上市第一根算起」逐位一致; OBV 那一支对起点天然无关(EMA 与 MA 对常数平移等变, 在 OBV2 里抵消)。**画法照原文**(`lib/quantMacdSeries.ts`, 画法的唯一产地): 只画原文真正画的东西 —— DIFF 实心柱(≥0 红 / <0 绿)、DEA 空心柱(≥0 深红 / <0 绿)、金叉红色向上箭头(高度 = 柱2)、死叉绿色向下箭头(高度 = DEA×1.1)、黄柱(DEA/4); **`MACD:=…,STICK` 与 `柱1:=` 是 `:=` 中间变量, 通达信里不画, 这里也不画**; `COLOR0000CC` 是 BBGGRR 序 → **深红不是蓝**; 宽度 2 = 间距的 20%, 三种柱子同宽叠在同一位置; 画的先后 = 语句先后(黄柱最上)。暗色逐字照抄通达信四色, 亮色只把白底上看不见的绿(#009600)和黄(#AA8C00)压深。**带盘中实时那一根**: 与 K 线接口用同一个 `_maybe_inject_live_candle`, 主图最右那根蜡烛与副图最右那根柱子是同一份数据; 前端在日 K 刷新时一并失效。**版面**: 副图高度沿用成交量的 90; 出图发现主图的日期刻度压在副图顶上(原来成交量从底部往上长, 看不出来; 量化MACD 的 0 轴和叉点图标贴近顶部, 一下就压住了), 所以**日期刻度挪到副图底下**、主图↔副图间距 8→14、副图↔缩放条 12→26, 主图因此矮 20px; 副图左上角标「量化MACD」; 副图纵轴不开 scale(每根柱都从 0 画起, 开了 scale 0 会掉出坐标轴)。**悬停联动的下标起点**原来写死 `si = 2`(K 线 + 成交量), 现在跟着副图条数走 —— 写死的话副图多一条, 悬停价位线就会高亮到隔壁那条。 | 新增 `backend/app/indicators/quant_macd.py`、`backend/tests/test_quant_macd.py`(16 条, 含与独立 pandas 逐行翻译逐根比对到 1e-12、预热不变性、成交量单位不变性、实时一根、不读仓库 MACD 列)、`frontend/src/lib/quantMacdSeries.ts` + `.test.ts`(12 条); 改 `backend/app/api/stock_analysis.py`(`GET /api/stock-analysis/quant-macd`)、`frontend/src/lib/api.ts`、`lib/queryKeys.ts`、`lib/theme.ts`(`QUANT_MACD_COLORS`)、`components/stock-analysis/StockLevelsPanel.tsx`、`AnalysisKChart.tsx`(删成交量系列与 `fmtVol`/`volUp`/`volDown`); **打分系统 / `strategy/` / 六态 / 价位组 diff 全空**; 后端 pytest 4504 passed / 10 skipped 退出码 0; tsc 0、eslint 0 error、vitest 140 passed、vite build 0; 亮/暗两主题出图逐像素取色核对 | 低(新增为主; `AnalysisKChart` 只动副图与刻度位置) | 可(撤掉 `StockLevelsPanel` 的 `quantMacd` 属性即副图留白; 整条回退需把成交量系列加回) |
+
+**变异测试**: 22 个变异杀掉 21 个。唯一存活的是 `VA` 里 `CLOSE>REF` → `CLOSE>=REF` ——
+**等价变异**: 收盘价等于昨收的那一根, 下一行 `IF(CLOSE=REF(CLOSE,1),0,VA)` 走的是 0,
+VA 在那一根的值根本不会被用到, 两种写法结果逐位相同, 任何测试都不该也不能区分。
+
+**对用户给的那份 AI 转译代码的校对结论**(记下来, 免得下次重查):
+
+| 项 | 转译代码 | 结论 |
+|---|---|---|
+| DIFF / DEA / EMA 口径 | `ewm(span, adjust=False)` | ✅ 对 |
+| `SUM(X,0)` | `cumsum` | ✅ 对 |
+| OBV2 / OBV3 / MAC3 / 黄柱条件 | 逐项翻了 | ✅ 数学对 |
+| 画图的 7 行(4 条 STICKLINE、黄柱、2 个 DRAWICON) | **全丢了** | ❌ 只算数不画, 副图长什么样没翻 |
+| 柱1 / 柱2 | 没翻 | ❌ 柱2 是金叉图标的高度, 丢了就画不出金叉 |
+| `COLOR0000CC` | 当成蓝色 | ❌ BBGGRR 序, 是深红 |
+| `MACD:=…,STICK` | 当成要画的红绿柱 | ❌ `:=` 不画 |
+| 列名 | `vol` | ⚠️ 仓库里叫 `volume` |
+| `va.fillna(0)` | 有 | ⚠️ 多余(下一行平盘分支已兜住) |
+| 前几十根 | NaN 比较当 False 往下算 | ⚠️ 与通达信的无效传播不同; 预热够长后只影响最早那段 |
+
+**只能由用户对着通达信确认的三件事**(代码里无法自证):
+STICKLINE 宽度 2 的实际粗细、DRAWICON 图标 1/2 的形状、`CROSS` 在上一根恰好相等时的口径
+(浮点 DIFF/DEA 几乎碰不到)。

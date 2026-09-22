@@ -542,6 +542,64 @@ async def trend_backtest(request: Request, req: TrendBacktestRequest):
     return await livermore_service.run_backtest(request.app.state.repo, req.symbol, req.use_ai)
 
 
+# [R415] 量化MACD 取多少历史做预热。EMA 是递推的, 从哪一根开始算会影响之后的值,
+# 差异按 (1-α)^n 衰减; 1500 个自然日约 1000 根, 最慢的 EMA26 衰减到 1e-27 ——
+# 低于双精度, 显示出来的每一根都与通达信「从上市第一根算起」逐位一致。
+# 详细推导见 `indicators/quant_macd.py` 的模块说明。
+_QMACD_WARMUP_DAYS = 1500
+
+
+@router.get("/quant-macd")
+def quant_macd(
+    request: Request,
+    symbol: str = Query(..., description="标的代码,如 000001.SZ"),
+    bars: int = Query(400, ge=30, le=2000, description="返回最近多少根(预热另算)"),
+):
+    """[R415] 用户自己的「量化MACD」副图 —— 通达信公式逐行复刻, 替换关键价位下方的成交量。
+
+    **独立指标**: 不读仓库任何现成 MACD 列, 从收盘价与成交量自己算
+    (用户:「我这个是量化指标, 和仓库系统里面的不一样的」)。
+
+    **带上盘中实时那一根**: 与 K 线接口用同一个 `_maybe_inject_live_candle`,
+    所以图上最右那根蜡烛与这里最右那根柱子是同一根数据 —— 盘中看它才对得上。
+    """
+    if not symbol:
+        raise HTTPException(400, "symbol 不能为空")
+    from app.api.kline import _maybe_inject_live_candle
+    from app.indicators import quant_macd as qm
+    from app.market_time import cn_today   # 北京口径 —— R414 刚栽过 date.today() 的坑
+
+    repo = request.app.state.repo
+    end = cn_today()
+    asset_type = repo.resolve_asset_type(symbol)
+    df = repo.get_daily_asset(asset_type, symbol,
+                              end - timedelta(days=_QMACD_WARMUP_DAYS), end)
+    if df.is_empty() or not {"date", "close"}.issubset(df.columns):
+        return {"symbol": symbol, "dates": [], "diff": [], "dea": [],
+                "yellow": [], "gold_icon": [], "dead_icon": []}
+    cols = [c for c in ("date", "close", "volume") if c in df.columns]
+    rows = df.select(cols).to_dicts()
+    try:
+        rows = _maybe_inject_live_candle(request, symbol, rows, asset_type)
+    except Exception as e:  # noqa: BLE001
+        logger.debug("quant-macd live candle skipped: %s", e)
+
+    rows = [r for r in rows if r.get("close") is not None]
+    res = qm.compute([r["close"] for r in rows], [r.get("volume") for r in rows])
+
+    def tail(xs: list) -> list:
+        # 6 位小数 —— 比通达信显示的 3 位还多, 只为少传点字节, 不改变任何一根
+        return [None if x is None else round(x, 6) for x in xs[-bars:]]
+
+    return {
+        "symbol": symbol,
+        "dates": [str(r["date"])[:10] for r in rows][-bars:],
+        "diff": tail(res.diff), "dea": tail(res.dea),
+        "yellow": tail(res.yellow),
+        "gold_icon": tail(res.gold_icon), "dead_icon": tail(res.dead_icon),
+    }
+
+
 class Fib2GrainBacktestRequest(BaseModel):
     """[R412] 斐波那契二型粗细档回测请求。"""
     symbol: str

@@ -82,6 +82,7 @@ export const QK = {
                            ['kline', symbol, start, end, extColumns ?? ''] as const,
   klineLatest:          (symbol: string) => ['kline-latest', symbol] as const,
   stockLevels:          (symbol: string, days?: number) => ['stock-levels', symbol, days ?? 120] as const,
+  stockQuantMacd:       (symbol: string) => ['stock-quant-macd', symbol] as const,
   // [fork 增强] 六态趋势
   stockTrend:           (symbol: string) => ['stock-trend', symbol] as const,
   stockTrends:          (symbols: string) => ['stock-trends', symbols] as const,

@@ -33,6 +33,15 @@ export function StockLevelsPanel({ symbol, height = 480, bare = false }: StockLe
     staleTime: 60_000,
   })
 
+  // [R415] 副图的量化MACD。独立一支请求: 它要约 1000 根历史预热 EMA,
+  // 而主图只取 250 根 —— 两者口径不同, 不能从主图那份日 K 里现算。
+  const qmacdQ = useQuery({
+    queryKey: QK.stockQuantMacd(symbol),
+    queryFn: () => api.stockQuantMacd(symbol),
+    enabled: !!symbol,
+    staleTime: 15_000,
+  })
+
   const trendQ = useStockTrend(symbol)
   const qc = useQueryClient()
   const klineUpdatedAt = kline.dataUpdatedAt
@@ -43,6 +52,8 @@ export function StockLevelsPanel({ symbol, height = 480, bare = false }: StockLe
     if (!klineUpdatedAt || !symbol) return
     qc.invalidateQueries({ queryKey: QK.stockTrend(symbol) })
     qc.invalidateQueries({ queryKey: QK.stockLevels(symbol) })
+    // [R415] 副图跟主图同一根实时蜡烛走, 不然盘中两张图差一根
+    qc.invalidateQueries({ queryKey: QK.stockQuantMacd(symbol) })
   }, [klineUpdatedAt, symbol, qc])
 
   const liveRefresh = kline.data?.live_refresh
@@ -98,6 +109,8 @@ export function StockLevelsPanel({ symbol, height = 480, bare = false }: StockLe
         fib2={levelsQ.data?.fib2}
         // [R412] 只为图内那个「回测这三档」按钮用
         symbol={symbol}
+        // [R415] 副图: 用户自己的量化MACD, 取代原来的成交量
+        quantMacd={qmacdQ.data}
         height={height}
       />
     </div>

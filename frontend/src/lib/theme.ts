@@ -257,3 +257,24 @@ export function fib2RoleColor(backendHex: string, theme: Theme): string {
 export function useLevelColors(): Record<string, string> {
   return levelColors(useTheme())
 }
+
+// ================================================================
+// [R415] 量化MACD 副图的配色 —— **照用户的通达信公式原样**
+//
+// 原文用的是通达信的四个颜色名, 换算成 RGB(通达信是 BBGGRR 序):
+//
+//   COLORRED      → FF0000   DIFF ≥ 0 的实心柱
+//   COLORGREEN    → 00FF00   DIFF < 0 实心柱、DEA < 0 空心柱(两者**同一个绿**)
+//   COLOR0000CC   → CC0000   DEA ≥ 0 的空心柱 —— **是深红不是蓝**: BB=00 GG=00 RR=CC
+//   COLORYELLOW   → FFFF00   黄柱
+//
+// **暗色主题逐字照抄** —— 通达信本来就是黑底, 这就是用户在通达信里看到的颜色。
+// **亮色主题通达信没有**, 纯绿(00FF00)和纯黄(FFFF00)在白底上的对比度只有
+// 1.3 和 1.0, 等于没画(用户说过「不能搞浅色」)。所以亮色只把这两个压到
+// 看得见(≥3:1), **色相不变、谁用哪个色不变**; 两个红在白底上本来就够, 原样。
+export const QUANT_MACD_COLORS: Record<Theme, {
+  red: string; darkRed: string; green: string; yellow: string
+}> = {
+  dark:  { red: '#FF0000', darkRed: '#CC0000', green: '#00FF00', yellow: '#FFFF00' },
+  light: { red: '#FF0000', darkRed: '#CC0000', green: '#009600', yellow: '#AA8C00' },
+}
