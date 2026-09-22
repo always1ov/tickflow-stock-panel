@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, RefreshCw, Clock, LineChart, Star, RadioTower, Maximize2, Minimize2, Activity, Crosshair, CalendarRange } from 'lucide-react'
+import { X, RefreshCw, Clock, LineChart, Star, RadioTower, Maximize2, Minimize2, Activity, Crosshair, CalendarRange, Sparkles, Loader2 } from 'lucide-react'
 import { api } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { cn } from '@/lib/cn'
@@ -54,6 +54,14 @@ interface Props {
   initialView?: PreviewView
   /** [R427] 落在复盘页时先看哪一张: 趋势状态 / 通道档位 */
   reviewTab?: ReviewTab
+  /**
+   * [R428] AI 四维分析(技术 / 基本面 / 财务 / 消息面)。传了才在顶栏操作区出这个按钮。
+   * 流程(今日已分析过 → 确认查看 / 重新分析)仍归调用方, 这里只是入口 ——
+   * 用户: 「ai 四维分析想要放到弹窗里面去, 找个合适的位置, 外面就不要了」。
+   */
+  onAiAnalyze?: (symbol: string, name?: string) => void
+  /** [R428] 调用方正在查今日报告 / 发起分析 —— 按钮转圈并禁用, 防连点 */
+  aiBusy?: boolean
 }
 
 // ===== 板块标识（与 Screener 列表一致）=====
@@ -115,7 +123,7 @@ function pushRecentStock(symbol: string, name?: string) {
   return merged
 }
 
-export function StockPreviewDialog({ symbol: symbolProp, name: nameProp, onClose, triggerInfo, enableLevelsView = true, navList: navListSource, onNavigate, initialView, reviewTab = 'trend' }: Props) {
+export function StockPreviewDialog({ symbol: symbolProp, name: nameProp, onClose, triggerInfo, enableLevelsView = true, navList: navListSource, onNavigate, initialView, reviewTab = 'trend', onAiAnalyze, aiBusy = false }: Props) {
   // [R164] 作者的 navList/onNavigate 方向键切股与 fork R100 的最近查看并存: 父级 onNavigate 更新
   // symbolProp 后, 下面的 useEffect 会清掉内部 override, 两套不打架。
   // [R100] 弹窗内随意切换: 内部覆盖当前查看的股票; 外部换股/重开时回到外部指定。
@@ -499,6 +507,21 @@ export function StockPreviewDialog({ symbol: symbolProp, name: nameProp, onClose
                 >
                   <RadioTower className="h-4 w-4" />
                 </button>
+                {/* [R428] AI 四维分析 —— 从个股分析页头挪进来。和「自选」「加监控」排在一起:
+                    三个都是**对这只票做的事**; 后面的刷新 / 放大 / 关闭是**对这个弹窗做的事**。
+                    作用对象就是弹窗当前这只(含弹窗里切过的), 不用再看页头「当前」是谁。 */}
+                {onAiAnalyze && symbol && (
+                  <button
+                    type="button"
+                    onClick={() => onAiAnalyze(symbol, name)}
+                    disabled={aiBusy}
+                    className="p-1.5 rounded-btn text-sky-300 hover:bg-sky-400/10 transition-colors cursor-pointer disabled:opacity-40"
+                    title={`对 ${name || symbol} 生成 AI 四维分析(技术 / 基本面 / 财务 / 消息面)`}
+                    aria-label={`对 ${name || symbol} 生成 AI 四维分析`}
+                  >
+                    {aiBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                  </button>
+                )}
 
                 {/* 刷新 */}
                 <button

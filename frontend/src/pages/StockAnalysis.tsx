@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Sparkles, History as HistoryIcon, Loader2, Bell, LocateFixed } from 'lucide-react'
+import { History as HistoryIcon, Bell, LocateFixed } from 'lucide-react'
 import { PageHeader } from '@/components/PageHeader'
 import { StockFinancialSearch } from '@/components/financials/StockFinancialSearch'
 import { StockPreviewDialog, type PreviewView } from '@/components/StockPreviewDialog'
@@ -143,15 +143,9 @@ export function StockAnalysis() {
               >
                 <LocateFixed className="h-3.5 w-3.5" />
               </button>
-              {/* [R106] 搜索出的股(可能不在自选列表)也能分析/设提醒 —— 与列表行内同一对动作 */}
-              <button
-                onClick={() => handleAnalyze()}
-                disabled={checking}
-                title={`对 ${name || symbol} 生成 AI 四维分析`}
-                className="rounded p-1 text-sky-300/70 hover:bg-sky-400/10 hover:text-sky-300 transition-colors disabled:opacity-40"
-              >
-                {checking ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-              </button>
+              {/* [R106] 搜索出的股(可能不在自选列表)也能设提醒 —— 与列表行内同一个动作。
+                  [R428] 「AI 四维分析」那个按钮从这里挪进了个股弹窗顶栏 —— 用户: 「ai 四维
+                  分析想要放到弹窗里面去, 找个合适的位置, 外面就不要了」。 */}
               <button
                 onClick={() => openPriceAlert()}
                 title={`为 ${name || symbol} 设置价格点位提醒`}
@@ -189,7 +183,23 @@ export function StockAnalysis() {
         onClose={() => setShowLevels(false)}
       />
 
-      {/* 二次确认:已有历史报告 */}
+      {/* 个股日 K 详情对话框(点击名称/代码打开) */}
+      <StockPreviewDialog
+        symbol={previewSymbol}
+        name={previewSymbol === symbol ? name : undefined}
+        triggerInfo={null}
+        enableLevelsView
+        initialView={previewView}
+        // [R428] AI 四维分析的入口挪进了弹窗顶栏; 流程(查今日报告 → 确认)仍是这一页那一套
+        onAiAnalyze={(s, n) => handleAnalyze(s, n ?? s)}
+        aiBusy={checking}
+        onClose={() => setPreviewSymbol(null)}
+      />
+
+      {/* 二次确认:已有历史报告
+          [R428] 挪到个股弹窗**之后**渲染: 两者都是 fixed z-50, 同层级时后渲染的在上。
+          AI 入口进了弹窗之后, 这个确认框是从弹窗里触发的 —— 排在前面就会被弹窗盖住,
+          点了按钮看起来没反应。 */}
       {confirmReport && (
         <ConfirmModal
           report={confirmReport}
@@ -199,15 +209,6 @@ export function StockAnalysis() {
         />
       )}
 
-      {/* 个股日 K 详情对话框(点击名称/代码打开) */}
-      <StockPreviewDialog
-        symbol={previewSymbol}
-        name={previewSymbol === symbol ? name : undefined}
-        triggerInfo={null}
-        enableLevelsView
-        initialView={previewView}
-        onClose={() => setPreviewSymbol(null)}
-      />
 
       {showPriceAlerts && symbol && (
         <PriceAlertDialog
