@@ -17,6 +17,7 @@ import { RuleEditor } from '@/components/monitor/RuleEditor'
 import { PriceAlertDialog } from '@/components/stock-analysis/PriceAlertDialog'
 import { StockLevelsPanel, StockLevelsPriceTag } from '@/components/stock-analysis/StockLevelsPanel'
 import { StockReviewPanel, type ReviewTab } from '@/components/stock-analysis/StockReviewDialog'
+import { HERO_DAYS_DEFAULT, PreviewHero } from '@/components/stock-preview/PreviewHero'
 import { StockFinancialSearch } from '@/components/financials/StockFinancialSearch'
 import { buildMonitorPriceLines } from '@/lib/price-alerts'
 import { usePreferences } from '@/lib/useSharedQueries'
@@ -142,6 +143,8 @@ export function StockPreviewDialog({ symbol: symbolProp, name: nameProp, onClose
   // 自己的注释也写着「本图表面向分析决策, 核心是关键价位」。点进来先看到的
   // 该是压力/支撑/枢轴那几条线, 而不是一根还要自己看的 K 线。
   const [view, setView] = useState<PreviewView>(initialView ?? 'levels')
+  // [R429] 60 / 120 / 250 日 —— 新头部与复盘页**同一个值**(用户: 「直接按照图片」放在头部)
+  const [reviewDays, setReviewDays] = useState<number>(HERO_DAYS_DEFAULT)
   const [intradayDays, setIntradayDays] = useState<number | null>(loadIntradayDays)
   const [dateRange, setDateRange] = useState(getDefaultRange)
   const [showMonitorEditor, setShowMonitorEditor] = useState(false)
@@ -251,6 +254,9 @@ export function StockPreviewDialog({ symbol: symbolProp, name: nameProp, onClose
     if (prevSymbolRef.current == null && symbol != null) setView(initialViewRef.current ?? 'levels')
     prevSymbolRef.current = symbol
     setPriceAlertDraft(null)
+    // [R429] 天数提到弹窗里持有后, 复盘页 `key={symbol}` 重建已经带不走它了 ——
+    // 在这里补上原来的约定: 「60 日」是上一只票的上下文, 不带到下一只。
+    setReviewDays(HERO_DAYS_DEFAULT)
   }, [symbol])
 
   // 焦点股票注册: SSE quotes_updated 推送时精准 invalidate 当前股票日K,
@@ -331,6 +337,19 @@ export function StockPreviewDialog({ symbol: symbolProp, name: nameProp, onClose
               maximized ? 'w-screen h-screen max-w-none max-h-none' : 'w-[92vw] max-w-[1200px] max-h-[95vh]',
             )}
           >
+            {/* [R429] 新头部(用户给的排版图)。**加在最前面, 旧顶栏原样留着** ——
+                用户: 「你可以直接加在最前面, 后面等我叫你删除旧的」。 */}
+            {symbol && (
+              <PreviewHero
+                symbol={symbol} name={name}
+                days={reviewDays} onDaysChange={setReviewDays}
+                inWatchlist={inWatchlist} watchBusy={toggleWatchlist.isPending}
+                onWatchAdd={groupId => toggleWatchlist.mutate({ action: 'add', groupId })}
+                onWatchRemove={() => toggleWatchlist.mutate({ action: 'remove' })}
+                onAiAnalyze={onAiAnalyze} aiBusy={aiBusy}
+              />
+            )}
+
             {/* 顶栏: 单行 = 个股身份 + 视图/区间控件 + 操作按钮。纯样式重排, 交互逻辑不变 */}
             <div className="shrink-0 border-b border-border/60 bg-elevated/30">
               <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 pb-2 pt-2.5 sm:px-5">
@@ -701,7 +720,8 @@ export function StockPreviewDialog({ symbol: symbolProp, name: nameProp, onClose
               ) : view === 'review' ? (
                 // key 跟着票走: 切股时复盘页里的「只看有事的日子」「120 日」这类选择
                 // 是上一只票的上下文, 不该带到下一只
-                <StockReviewPanel key={symbol} symbol={symbol} tab={reviewTab} />
+                <StockReviewPanel key={symbol} symbol={symbol} tab={reviewTab}
+                                  days={reviewDays} onDaysChange={setReviewDays} />
               ) : (
                 <StockLevelsPanel symbol={symbol} bare height={maximized ? 720 : 520} />
               )}

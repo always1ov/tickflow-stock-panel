@@ -157,16 +157,21 @@ function toSegments(rows: ReviewRow[]): Segment[] {
  *
  * 文件名没改: 那两张表(TrendView / VerdictView)与它们的一大批守卫都认这个文件。
  */
-export function StockReviewPanel({ symbol, tab: initialTab }: {
+export function StockReviewPanel({ symbol, tab: initialTab, days: daysProp, onDaysChange }: {
   symbol: string
   /** 从哪一列点进来 —— 只决定默认视图 */
   tab: ReviewTab
+  /** [R429] 天数由弹窗持有(新头部那一组 60/120/250 与这里同一个值); 不传则自己管 */
+  days?: number
+  onDaysChange?: (d: number) => void
 }) {
   // [R296] 'combo' 归一到 'verdict' —— 那一页并进去了。**不删这个入参值**:
   // 决策台那边可能还有地方带着它进来, 悄悄报错不如悄悄落到对的页上。
   const [tab, setTab] = useState<'trend' | 'verdict'>(
     initialTab === 'trend' ? 'trend' : 'verdict')
-  const [days, setDays] = useState<number>(120)
+  const [ownDays, setOwnDays] = useState<number>(120)
+  const days = daysProp ?? ownDays
+  const setDays = onDaysChange ?? setOwnDays
   // 趋势视图专用: 只看有事的日子。120 行里找那几天转折是不现实的
   const [onlyMarked, setOnlyMarked] = useState(false)
   // [R329] 「说明」页签删掉了。用户: 「这个位置的说明按钮可以删除了, 外面设置

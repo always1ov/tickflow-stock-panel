@@ -1,0 +1,144 @@
+/**
+ * [R429] 个股弹窗的新头部 —— 按用户给的排版图做的第一块。
+ *
+ * 用户: 「我想重做整个弹窗, 我发你一点就修改一点」→ 发来头部的图:「你只需要看排版,
+ * 我里面的文字大都是占位符」。又定了几条:
+ *   · 新头部**加在最前面**, 旧顶栏原样留着, 「后面等我叫你删除旧的」;
+ *   · 60 / 120 / 250 日「直接按照图片」放在头部, 另补一个「AI 四维分析」入口(图里漏了);
+ *   · 「结论」那一句、「导出复盘」「使用说明」两个按钮**先占位**。
+ *
+ * 两行:
+ *
+ *     名称 代码  现价  涨跌幅  起 ~ 止 · N 个交易日  [☆]      [60日][120日][250日] [AI 四维分析] [导出复盘] [使用说明]
+ *     结论  (待定) ───────────────────────────────────────────────────────────────
+ *
+ * 天数与复盘页**是同一个值**(由弹窗持有, 两处都能改): 现在用到 60/120/250 的只有复盘。
+ * 「起 ~ 止 · N 个交易日」从弹窗已经在取的那份日 K 里数最后 N 根, 不为这一行另发请求 ——
+ * 复盘那份要"回算", 只为了头部一行字就每次开弹窗都回算一遍不划算。
+ */
+import { useQuery } from '@tanstack/react-query'
+import { Loader2, Sparkles, Star } from 'lucide-react'
+import { api } from '@/lib/api'
+import { QK } from '@/lib/queryKeys'
+import { toast } from '@/components/Toast'
+import { WatchlistAddMenu } from '@/components/WatchlistAddMenu'
+
+export const HERO_DAYS = [60, 120, 250] as const
+/** 打开弹窗、切到另一只票时的天数 */
+export const HERO_DAYS_DEFAULT = 120
+
+/**
+ * 头部按钮的统一形状: 独立方框、等高。
+ * 横向内边距和字色**不放进公共串**, 由各处自己给 —— 同一个元素上同时写 `px-3 px-0`
+ * 或 `text-foreground text-muted`, 谁生效看样式表里的先后而不是写的先后:
+ * 星星方框就这样被 `px-3` 挤成了 6px 宽。
+ */
+const BOX = 'inline-flex h-8 items-center justify-center rounded-btn border text-xs '
+  + 'transition-colors duration-hover disabled:opacity-40'
+const PILL = `${BOX} px-3`
+const SQUARE = `${BOX} w-8 border-border bg-surface hover:bg-elevated`
+const PILL_IDLE = 'border-border bg-surface text-foreground hover:bg-elevated'
+const PILL_ON = 'border-foreground bg-foreground text-surface font-medium'
+
+export function PreviewHero({
+  symbol, name, days, onDaysChange, inWatchlist, watchBusy, onWatchAdd, onWatchRemove,
+  onAiAnalyze, aiBusy = false,
+}: {
+  symbol: string
+  name?: string
+  days: number
+  onDaysChange: (d: number) => void
+  inWatchlist: boolean
+  watchBusy: boolean
+  onWatchAdd: (groupId?: string | null) => void
+  onWatchRemove: () => void
+  onAiAnalyze?: (symbol: string, name?: string) => void
+  aiBusy?: boolean
+}) {
+  // 与关键价位页同一个查询键 —— 同一份日 K, 不多发请求
+  const kline = useQuery({
+    queryKey: QK.analysisKline(symbol),
+    queryFn: () => api.klineDaily(symbol, 250, undefined, undefined, { refreshLive: true }),
+    enabled: !!symbol,
+    staleTime: 15_000,
+  })
+  const rows = kline.data?.rows ?? []
+  const last = rows.at(-1)
+  const prev = rows.at(-2)
+  const chg = last && prev && prev.close ? (last.close - prev.close) / prev.close : null
+  const tone = chg == null || chg === 0 ? 'text-muted' : chg > 0 ? 'text-bull' : 'text-bear'
+  const span = rows.slice(-days)
+  const dateOf = (r?: { date: unknown }) => (r ? String(r.date).slice(0, 10) : '')
+
+  const todo = (what: string) => toast(`「${what}」还没定, 先占着位置`, 'info')
+
+  return (
+    <div className="shrink-0 border-b border-border/60 px-4 pb-3 pt-4 sm:px-6">
+      {/* 第一行: 左边认票 + 行情, 右边这一页的操作。窄屏整行换下去, 不挤 */}
+      <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+        <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
+          <span className="truncate text-xl font-semibold text-foreground">{name || symbol}</span>
+          <span className="font-mono text-xs text-muted">{symbol}</span>
+          <span className={`font-mono text-xl font-semibold tabular-nums ${tone}`}>
+            {last ? last.close.toFixed(2) : '—'}
+          </span>
+          <span className={`font-mono text-sm tabular-nums ${tone}`}>
+            {chg == null ? '—' : `${chg > 0 ? '+' : ''}${(chg * 100).toFixed(2)}%`}
+          </span>
+          {span.length > 0 && (
+            <span className="text-xs text-muted">
+              {dateOf(span[0])} ~ {dateOf(span.at(-1))} · {span.length} 个交易日
+            </span>
+          )}
+          {/* 自选: 方框里一颗星。已在自选 = 实心金, 点了移出; 不在 = 空心, 点了选分组加入 */}
+          <span className="self-center">
+            {inWatchlist ? (
+              <button type="button" onClick={onWatchRemove} disabled={watchBusy}
+                      title="移出自选" aria-label={`将 ${symbol} 移出自选`}
+                      className={SQUARE}>
+                <Star className="h-4 w-4 fill-current text-[#FACC15]" />
+              </button>
+            ) : (
+              <WatchlistAddMenu onSelect={onWatchAdd} disabled={watchBusy}
+                                triggerClassName={`${SQUARE} text-muted`}
+                                ariaLabel={`将 ${symbol} 加入自选`}>
+                <Star className="h-4 w-4" />
+              </WatchlistAddMenu>
+            )}
+          </span>
+        </div>
+
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          {HERO_DAYS.map(n => (
+            <button key={n} type="button" onClick={() => onDaysChange(n)}
+                    aria-pressed={days === n}
+                    className={`${PILL} ${days === n ? PILL_ON : PILL_IDLE}`}>
+              {n} 日
+            </button>
+          ))}
+          {onAiAnalyze && (
+            <button type="button" onClick={() => onAiAnalyze(symbol, name)} disabled={aiBusy}
+                    title={`对 ${name || symbol} 生成 AI 四维分析(技术 / 基本面 / 财务 / 消息面)`}
+                    className={`${PILL} ${PILL_IDLE} gap-1.5`}>
+              {aiBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5 text-accent" />}
+              AI 四维分析
+            </button>
+          )}
+          <button type="button" onClick={() => todo('导出复盘')} className={`${PILL} ${PILL_IDLE}`}>
+            导出复盘
+          </button>
+          <button type="button" onClick={() => todo('使用说明')} className={`${PILL} ${PILL_IDLE}`}>
+            使用说明
+          </button>
+        </div>
+      </div>
+
+      {/* 第二行: 结论(占位)+ 一道细线把这一行拉满 */}
+      <div className="mt-3 flex items-center gap-3">
+        <span className="shrink-0 text-base font-semibold text-foreground">结论</span>
+        <span className="shrink-0 text-sm text-muted">(待定)</span>
+        <span className="h-px flex-1 bg-border/70" aria-hidden="true" />
+      </div>
+    </div>
+  )
+}
