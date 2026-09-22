@@ -463,7 +463,7 @@ def test_R256_三档都在中部那一格也有名字():
                      if not ln.lstrip().startswith(("//", "*", "/*", "{/*")))
     # [R310] 锚在**自己**身上, 不再切到隔壁 —— 隔壁那个 `PlayCell` 已经删了,
     # 而这种"锚在邻居上"的写法 R310 一次打掉了 9 处。
-    i = body.index("export function PositionCell")
+    i = body.index("export function PositionSegment")
     j = body.find("\nexport function ", i + 1)
     pos = body[i:] if j == -1 else body[i:j]
     # 三档都在中部 → 短期那一档的位置名就是「通道内」, 照常印, 后面跟着距离。

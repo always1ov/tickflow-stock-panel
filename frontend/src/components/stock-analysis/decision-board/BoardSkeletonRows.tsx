@@ -8,8 +8,8 @@
  */
 import { Skeleton } from '@/components/data/Skeleton'
 
-/** 每列一格的宽度 —— 与 BOARD_COLS 的顺序一致: 标的 / 现价涨跌 / 走势 / 位置 / 持仓 / AI 信号 */
-const CELL_W = ['w-16', 'w-12', 'w-20', 'w-14', 'w-10', 'w-3/4']
+/** 每列一格的宽度 —— 与 BOARD_COLS 的顺序一致: 标的 / 现价涨跌 / 走势/位置 / 持仓 / AI 信号 */
+const CELL_W = ['w-16', 'w-12', 'w-32', 'w-10', 'w-3/4']
 
 export function BoardSkeletonRows({ rows = 6, cols = CELL_W.length }: { rows?: number; cols?: number }) {
   return (

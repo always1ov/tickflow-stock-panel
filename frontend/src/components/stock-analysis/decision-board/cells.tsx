@@ -40,7 +40,7 @@ export const TD_BASE = 'align-middle py-2.5 text-center'
 export const NUM = 'font-mono tabular-nums'
 
 // [R211] `ChannelStackCell`(三档竖排那一列)在这里删掉了 —— 它并进了
-// `ChannelStateCell`。用户: 「趋势通道和通道态势可以放在一起吗」。
+// `ChannelStateCell`(R425 起叫 `TrendSegment`)。用户: 「趋势通道和通道态势可以放在一起吗」。
 //
 // **本来就该合**: 两列讲的是同一套指标的两个层次(一个是测量, 一个是从它推出来
 // 的结论), 拆成两列等于让人左右对眼去把结论和它的依据接起来。
@@ -249,9 +249,12 @@ function geoLines(geo?: ChannelGeometry | null, ev?: ChannelEvent | null,
  * 现在两个弹窗并成了一个(见 `StockReviewDialog` 的三个页签), 这一格也就
  * 只剩一个按钮: 整格可点, 落在「趋势状态」页签, 通道那两个页签在弹窗顶上换。
  * 悬停也跟着并成一份 —— 原来是两半各自一份提示, 鼠标从左挪到右提示整个换掉。
+ *
+ * [R425] 这件事又往外推了一层: 「走势」与「位置」两**列**也通向同一个弹窗,
+ * 于是两列并成一格, 按钮搬到外壳 `TrendPositionCell` 上, 这里退成左半边的内容
+ * (名字也从 `ChannelStateCell` 改成 `TrendSegment` —— 它已经不是一个格子了)。
  */
-export function ChannelStateCell({ trend, geo, runs, ph, kc, close, trendCls,
-                                  onOpenReview }: {
+export function TrendSegment({ trend, geo, runs, ph, kc, close, trendCls }: {
   /** [R211] 六态趋势 —— 合过来的那一列。作者的判定, 只读不改 */
   trend?: { state: string; state_cn: string; duration: number; since?: string
             action?: string; intraday?: boolean
@@ -264,10 +267,6 @@ export function ChannelStateCell({ trend, geo, runs, ph, kc, close, trendCls,
   close?: number | null
   /** 六态徽标的配色(由 TrendStateBar 那套给, 两处必须同色) */
   trendCls?: string
-  /** [R228] 整格点开 → 复盘弹窗(趋势 / 通道档位 / 组合速查 三个页签) */
-  onOpenReview?: () => void
-  /** 追加类名(结论区分界线之类) */
-  cls?: string
 }) {
   // 三档位置只在悬停里给 —— 「贵不贵」列已经把它翻成一句结论了
   const at = ([['短期', kc?.s], ['中期', kc?.m], ['长期', kc?.l]] as const)
@@ -300,20 +299,16 @@ export function ChannelStateCell({ trend, geo, runs, ph, kc, close, trendCls,
       .map(([t, b]) => `${t}通道 ${b!.lower.toFixed(2)} ~ ${b!.upper.toFixed(2)}`
         + `,现在${b!.pos_cn}(位置 ${Math.round(b!.pct * 100)}/100)`),
     close != null ? `收盘 ${close.toFixed(2)}` : '',
-    '', '点开:逐日复盘 / 通道档位 / 27 种组合速查'].filter(Boolean).join('\n')
+    '', OPEN_HINT].filter(Boolean).join('\n')
   return (
-    // [R217] 与「结论」列同一个形状: **固定两行**, 高度对齐, 行与行不再糊在一起。
-    //   行 1: 六态徽标 + 阶段·成熟度(原来阶段自己占一行)
-    //   行 2: 快慢一行
-    // 用户: 「每一列的内容应该就是一部分, 而不是内容上面一部分下面一部分」。
-    <td className={`${TD_BASE} whitespace-nowrap px-1.5`}>
-      {/* [R228] **整格一个 button**。原来格子里有两个 button, 通向两个不同的
-          全屏模态, 而外观上分不出来。合并之后按钮边界与格子边界重合, 悬停整格
-          一起亮 —— "这一格可以点开"这件事本身第一次是看得见的。
-          内部的徽标一律降成 span: button 里套 button 是非法 HTML。 */}
-      <button type="button" onClick={onOpenReview} title={tip}
-              className="mx-auto flex w-full cursor-pointer flex-col items-center gap-0.5 rounded-btn px-1 py-0.5 leading-snug transition-colors duration-hover hover:bg-elevated/40">
-        <span className="flex flex-wrap items-center justify-center gap-1">
+    // [R217] **固定两行**, 高度对齐, 行与行不再糊在一起。
+    //   行 1: 六态徽标
+    //   行 2: 转折后第 N 天
+    // [R425] 不再自己占一格、不再自己是按钮 —— 与「位置」并进 `TrendPositionCell`
+    // 那一个按钮里, 这里只交出左半边的两行(fragment, 由外壳的 2×2 网格排位,
+    // 左右同一行共用行高, 两条基线才齐)。悬停仍各半一份: 左半讲方向的依据。
+    <>
+        <span title={tip} className="flex flex-wrap items-center justify-center gap-1">
           {trend ? (
             <span className={`inline-flex whitespace-nowrap rounded border px-1.5 py-0.5 text-[12px] ${trendCls ?? ''}`}>
               {/* [R290] 天数从徽标上**搬到了第二行**, 换成「转折后第 N 天」——
@@ -373,8 +368,7 @@ export function ChannelStateCell({ trend, geo, runs, ph, kc, close, trendCls,
         ) : (
           <span className="text-transparent select-none text-[11px]">·</span>
         )}
-      </button>
-    </td>
+    </>
   )
 }
 
@@ -422,7 +416,7 @@ export function ChannelStateCell({ trend, geo, runs, ph, kc, close, trendCls,
  * 价格距离与轨价, 外加 27 格那个组合码(它的用处是去速查表查行号,
  * 那是点开之后的事)。
  */
-export function PositionCell({ kc, geo, ev, runs, energy, ph, stateRun, close, onOpen }: {
+export function PositionSegment({ kc, geo, ev, runs, energy, ph, stateRun, close }: {
   kc?: { s?: KeltnerBand; m?: KeltnerBand; l?: KeltnerBand } | null
   geo?: ChannelGeometry | null
   ev?: ChannelEvent | null
@@ -435,7 +429,6 @@ export function PositionCell({ kc, geo, ev, runs, energy, ph, stateRun, close, o
   /** [R316] 算价格距离要用它。**不拿 `pct` 反推** —— `pct` 后端只留三位小数,
       反推出来的收盘价会和真实值差几分钱, 而这一列印的是要拿去下单的数。 */
   close?: number | null
-  onOpen: () => void
 }) {
   const s = kc?.s
   const combo = geo?.combo ?? null
@@ -464,29 +457,77 @@ export function PositionCell({ kc, geo, ev, runs, energy, ph, stateRun, close, o
                       + (stateRun.since ? `(自 ${stateRun.since} 起)` : '') : '')
       : '三档里缺了一档, 这个组合今天定不了(不是"罕见组合", 是算不出来)',
     '',
-    '点开:通道档位(逐日档位 / 按档位买卖 / 27 种三档组合)',
+    OPEN_HINT,
   ].filter(Boolean).join('\n') + geoLines(geo, ev, runs, energy, ph)
 
   return (
-    <td className={`${TD_BASE} whitespace-nowrap px-1.5`}>
-      <button type="button" onClick={onOpen} title={tip}
-              className="mx-auto flex w-full cursor-pointer flex-col items-center gap-y-0.5 rounded-btn px-1 py-0.5 leading-snug transition-colors duration-hover hover:bg-elevated/40">
+    // [R425] 右半边的两行(fragment)。按钮在外壳 `TrendPositionCell` 上, 这里只画内容。
+    <>
         {/* 第一行: 位置名。**扫 166 行时只看这一行的颜色** ——
             红 = 在上轨那一侧, 蓝 = 在下轨那一侧, 灰 = 通道内。 */}
-        <span className={`text-[12px] ${s ? POS_TEXT[s.pos] ?? 'text-muted' : 'text-muted/30'}`}>
+        <span title={tip} className={`text-[12px] ${s ? POS_TEXT[s.pos] ?? 'text-muted' : 'text-muted/30'}`}>
           {s ? s.pos_cn : '—'}
         </span>
         {/* 第二行: 离那条轨还有多远, **价格口径**。
             它是这一格真正能拿去下单的那个数, 所以数字用等宽 + tabular-nums,
             整列小数点上下对齐; 措辞压暗, 不跟第一行抢。 */}
         {near ? (
-          <span className="text-[10px] text-muted">
+          <span title={tip} className="text-[10px] text-muted">
             {near.label}
             <span className="ml-1 font-mono tabular-nums text-secondary">{near.pct}%</span>
           </span>
         ) : (
           <span className="text-[10px] text-muted/30">—</span>
         )}
+    </>
+  )
+}
+
+/** [R425] 两半共用的去处说明 —— 一个按钮只有一个去处, 两份悬停就得说同一句。 */
+const OPEN_HINT = '点开:复盘(逐日趋势 / 通道档位 / 27 种组合速查, 在弹窗顶上切)'
+
+/**
+ * [R425] 「走势/位置」—— 原来的「走势」「位置」两列并成**一格、一个按钮**。
+ *
+ * 用户: 「个股分析页面的走势列和通道列合并成一个按钮入口」。
+ *
+ * 两格原本就通向**同一个**复盘弹窗(R228 把两个弹窗并成一个三页签的之后),
+ * 只是落在不同的页签 —— 两个挨着的按钮、一个去处, 正是 R228 当年在走势列
+ * 内部治过的那个毛病, 这回发生在两列之间。合并之后:
+ *
+ *     上涨趋势        破上轨          ← 左: 六态 / 右: 短期通道位置
+ *     转折后第 5 天   高出上轨 1.1%   ← 左: 离转折多远 / 右: 离那条轨多远
+ *
+ * - **一个按钮**, 边界与格子重合, 悬停整格一起亮; 点开落在「趋势」页签
+ *   (方向是先读的那件事), 通道档位在弹窗顶上切。
+ * - 两半各自保留自己的悬停 —— 讲的是两件事(方向的依据 / 位置的依据),
+ *   鼠标停在哪半就说哪半; 去处那句两半一样(`OPEN_HINT`)。
+ * - 行对齐: 两半各交出固定两行, 外壳是 2 行 × 2 列的网格(按列排), 左右同一行
+ *   共用行高、垂直居中 —— 左边的徽标带边框比右边的位置名高, 各自竖排时第一行
+ *   会一高一低(出图看到的), 网格里就齐了。
+ */
+export function TrendPositionCell({ trend, trendCls, geo, runs, ph, kc, close, ev, energy,
+                                    stateRun, onOpen }: {
+  trend?: Parameters<typeof TrendSegment>[0]['trend']
+  trendCls?: string
+  geo?: ChannelGeometry | null
+  runs?: ChannelRuns | null
+  ph?: ChannelPhase | null
+  kc?: { s?: KeltnerBand; m?: KeltnerBand; l?: KeltnerBand } | null
+  close?: number | null
+  ev?: ChannelEvent | null
+  energy?: BandEnergy | null
+  stateRun?: { days: number; since?: string; capped?: boolean } | null
+  onOpen: () => void
+}) {
+  return (
+    <td className={`${TD_BASE} whitespace-nowrap px-1.5`}>
+      {/* 整格**一个** button; 内部两半都是 span —— button 里套 button 是非法 HTML */}
+      <button type="button" onClick={onOpen}
+              className="mx-auto grid w-full cursor-pointer grid-flow-col grid-rows-2 items-center justify-center justify-items-center gap-x-3 gap-y-0.5 rounded-btn px-1 py-0.5 leading-snug transition-colors duration-hover hover:bg-elevated/40">
+        <TrendSegment trend={trend} trendCls={trendCls} geo={geo} runs={runs} ph={ph} kc={kc} close={close} />
+        <PositionSegment kc={kc} geo={geo} ev={ev} runs={runs} energy={energy} ph={ph}
+                         stateRun={stateRun} close={close} />
       </button>
     </td>
   )

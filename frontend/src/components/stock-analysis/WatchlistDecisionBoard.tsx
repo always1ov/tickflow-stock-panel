@@ -18,7 +18,7 @@ import { buildBoardHtml } from '@/lib/decisionBoardHtmlExport'
 import { DEFAULT_EXPORT_KEYS } from '@/lib/decisionBoardExportColumns'
 import { ExportColumnsDialog } from '@/components/stock-analysis/decision-board/ExportColumnsDialog'
 import { TrendBacktestAllDialog } from '@/components/stock-analysis/TrendBacktestAllDialog'
-import { ChannelStateCell, PositionCell, NUM, TD_BASE } from '@/components/stock-analysis/decision-board/cells'
+import { TrendPositionCell, NUM, TD_BASE } from '@/components/stock-analysis/decision-board/cells'
 import { LotsLink } from '@/components/stock-analysis/decision-board/LotsLink'
 import { Hint } from '@/components/Hint'   // [R323] 表头说明点得开
 import { refreshEvery } from '@/lib/refreshRhythm'   // [R333] 刷新节奏一处定义
@@ -76,19 +76,18 @@ const SIGNAL_RANK: Record<string, number> = { buy: 0, sell: 1, hold: 2, watch: 3
 const HEAD_TIPS = {
   name: '标的名称;第二行是「该动了」判定 —— 已触发 > 逼近 > 刚转折 > 到轨 > 无事,纯规则,AI 不参与',
   changePct: '现价与当日涨跌。点这里按涨跌幅排: 涨最多在前 → 跌最惨在前 → 回默认顺序',
-  trend: '两行: 六态趋势 / 价格·六态·均线三个尺度转到第几步。\n'
-    + '「走到哪一步」与「还有没有劲」在右边的「档位」列里,\n'
-    + '各自贴着它修饰的那一行(R297 起)。\n\n'
+  // [R425] 「走势」「位置」两列并成一列, 两份表头说明并成一份。原来 trend 那份还写着
+  // 「右边的『档位』列」—— 那一列 R308 就改名「位置」了, 一句过期的指路, 顺手去掉。
+  trendPos: '左右两半, 各两行:\n'
+    + '  左 ① 六态趋势  ② 转折后第几天(转折当天写「今天转折」)\n'
+    + '  右 ① 位置名 —— 收盘价落在**短期通道**的哪一档\n'
+    + '       (破上轨 / 贴上轨 / 通道内 / 贴下轨 / 破下轨)。扫表时看这一行的颜色。\n'
+    + '     ② 离那条轨还有多远 —— **价格口径**, 现价还要动多少个百分点才碰到它。\n'
+    + '       口径 (轨价 − 现价) / 现价, 与出场线、六态翻转距离是同一个算法。\n'
+    + '       看哪条轨跟着位置名走;「通道内」时取更近的那一条(先撞上的就是它)。\n\n'
+    + '短中长三档、27 格组合码、三个尺度对齐到第几步, 都在各半的悬停里。\n'
+    + '整格一个按钮, 点开是复盘(逐日趋势 / 通道档位 / 组合速查)。\n\n'
     + '点这里按六态排: 多头在前 → 空头在前 → 回默认顺序。',
-  pos: '两行:\n'
-    + '  ① 位置名 —— 收盘价落在**短期通道**的哪一档\n'
-    + '     (破上轨 / 贴上轨 / 通道内 / 贴下轨 / 破下轨)。扫表时看这一行的颜色。\n'
-    + '  ② 离那条轨还有多远 —— **价格口径**, 现价还要动多少个百分点才碰到它。\n'
-    + '     口径 (轨价 − 现价) / 现价, 与出场线、六态翻转距离是同一个算法。\n'
-    + '     看哪条轨跟着位置名走;「通道内」时取更近的那一条(先撞上的就是它)。\n\n'
-    + '用户选的就是「只说短期 + 一句能交易的距离」——\n'
-    + '短中长三档各自的位置与距离、27 格那个组合码, 都在悬停里。\n'
-    + '要看翻译好的那十档判定, 点开就是复盘的「通道档位」页。',
   pnl: '我在这只票上的账: 拿没拿 / 买入成本 / 现在浮盈多少。\n'
     + '空仓时这一格只有一个按钮 —— 点它切成持有。\n\n'
     + '点这里按浮盈排: 赚最多在前 → 亏最多在前 → 回默认顺序。',
@@ -106,7 +105,8 @@ const BOARD_COLS = [
   // [R211] 「量化通道」(测量) + 「通道态势」(结论) + 「趋势」(六态) 三列并一列。
   // 六态与通道阶段答的是同一个问题(往哪走), 只是方法不同 —— 放一格里,
   // 它们什么时候一致、什么时候打架, 上下一对就看见了。
-  { label: '走势', w: '20%' },
+  // [R425] 「走势」20% + 「位置」14% 并成一列, 宽度原数相加 —— 总和仍是 100。
+  { label: '走势/位置', w: '34%' },
   // [R277 加, R297 删] 「进度」那一列并进「结论」了。用户: 「个股分析页面的
   // 进度列和结论列看看怎么合并和显示哪些内容」。
   // [R212] 「贵不贵」(位置) + 「怎么办」(动作) 合成一列, 竖排, 摆在 AI 之前。
@@ -127,7 +127,6 @@ const BOARD_COLS = [
   // 在整张表上零个渲染点, 那条线只从「怎么办」的 `price` 露过面。所以它搬进
   // 「持仓」列 —— 出场线本来就是**关于我这笔仓位**的事, 归「我的账」比归
   // 「凭什么」更准。
-  { label: '位置', w: '14%' },
   { label: '持仓', w: '12%' },
   // [R284] 「AI 分析」整列撤掉 —— 用户: 「仅保留对投资决策最具影响力和决定性的
   // 核心数据列」。**它压根不是数据列**: 一枚报告胶囊 + 两个图标按钮, 是操作入口。
@@ -1034,29 +1033,17 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
                 <th className="whitespace-nowrap px-1.5 py-2.5 font-normal text-center">
                   {/* [R211] 排序标记压成同一行的一个小字。原来那个彩色徽标会换行,
                       表头看着就断成两截 —— 用户: 「量化通道我不喜欢这样搞, 不美观」。
-                      现在只在名字后面缀一个 6px 的目标名 + 箭头, 永不换行。 */}
+                      [R250] 表头**只印列名** —— 排序目标是内部分层, 不该印在表头上。
+                      [R425] 「走势」「位置」两列并成一列, 列名照 R212「现价/涨跌」的写法。
+                      排序仍只有一个目标(六态): 位置那半 R307 起就不挂排序。 */}
                   <button
                     onClick={() => cycleSort('trend')}
                     className={`${thBtn} whitespace-nowrap`}
-                    title={HEAD_TIPS.trend}>
-                    {/* [R250] 表头**只有「走势」两个字** —— 与「结论」那一列同一条:
-                        排序目标是内部分层, 不该印在表头上。轮换照旧, 说明在悬停里。 */}
-                    走势
+                    title={HEAD_TIPS.trendPos}>
+                    走势/位置
                     {caret('trend')}
                   </button>
-                  <Hint title={HEAD_TIPS.trend} className="ml-0.5" />
-                </th>
-                {/* [R297] 「进度」那一列并到「结论」里去了 —— 那两个读数是结论的
-                    刻度, 不是第四条结论。见下面「结论」表头的说明。 */}
-                {/* [R307] 「档位」**不挂排序目标**。R254 那条「点不到的排序键全
-                    删掉」把 `verdict` 删过一次, 这次拆列不把它加回来 —— 加回来
-                    就得再立一套"偏买→偏卖"的次序, 而那个次序后端已经有了
-                    (`verdict.rank`), 两处定义同一件事必然漂。要按档位找票,
-                    「怎么办」那一列的急迫程度已经把该动的顶到前面了。 */}
-                <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center"
-                    title={HEAD_TIPS.pos}>
-                  位置
-                  <Hint title={HEAD_TIPS.pos} className="ml-0.5" />
+                  <Hint title={HEAD_TIPS.trendPos} className="ml-0.5" />
                 </th>
                 {/* [R284] 账目三列并一列。表头也只剩一个, 排序目标取「浮盈」——
                     「拿没拿」由「只看持有」那个按钮回答, 成本价排序没有决策含义。 */}
@@ -1139,17 +1126,14 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
                         {r.changePct != null ? `${r.changePct > 0 ? '+' : ''}${(r.changePct * 100).toFixed(2)}%` : '—'}
                       </span>
                     </td>
-                    {/* [R42] Keltner 三档位置 */}
-                    <ChannelStateCell
+                    {/* [R425] 「走势」「位置」两格并成一格、一个按钮(见 TrendPositionCell)。
+                        [R308] 位置那半只有两个原始读数: 短期通道位置 + 离轨距离;
+                        那十档判定在复盘的「通道档位」页。 */}
+                    <TrendPositionCell
                       trend={r.trend} trendCls={r.trend ? trendBadgeCls(r.trend.state) : undefined}
                       geo={r.kc?.geo} runs={r.kc?.runs} ph={r.ph} kc={r.kc} close={r.close}
-                      onOpenReview={() => setReview({ symbol: r.symbol, name: r.name, tab: 'trend' })} />
-                    {/* [R308] 「位置」只有两个原始读数: 短期通道位置 + 三档组合码。
-                        那十档判定不在这张表上了 —— 它是这个码的纯函数(R296 验过),
-                        要看翻译好的那一档就点开复盘的「通道档位」页。 */}
-                    <PositionCell kc={r.kc} geo={r.kc?.geo} ev={r.ev} runs={r.kc?.runs}
-                                  energy={r.kc?.energy} ph={r.ph} stateRun={r.kc?.state_run} close={r.close}
-                                  onOpen={() => setReview({ symbol: r.symbol, name: r.name, tab: 'verdict' })} />
+                      ev={r.ev} energy={r.kc?.energy} stateRun={r.kc?.state_run}
+                      onOpen={() => setReview({ symbol: r.symbol, name: r.name, tab: 'trend' })} />
                     {/* [R284] **账目从三格收成一格。** 用户: 「删除掉浮盈和成本列」。
                         空仓(158/166 行)时这一格只有一个按钮; 持有时才长出成本输入。
                         [R169] 写回时一律用 manualCost 而不是 r.cost —— r.cost 可能是批次

@@ -1297,7 +1297,7 @@ def test_R290_决策台走势列不再印推断词():
     """
     from tests.frontend_source import code_of
     code = code_of("components/stock-analysis/decision-board/cells.tsx")
-    blk = code[code.index("export function ChannelStateCell"):]
+    blk = code[code.index("export function TrendSegment"):]
     render = blk[blk.index("return ("):]
     assert "{ph.align.cn}" not in render, "走势列还在印「正在转多」那类推断词"
     assert "转折后第 {trend.duration} 天" in render, "没换成「转折后第几天」"
@@ -1317,7 +1317,7 @@ def test_R291_转折那天只说一遍():
     """
     from tests.frontend_source import code_of
     code = code_of("components/stock-analysis/decision-board/cells.tsx")
-    blk = code[code.index("export function ChannelStateCell"):]
+    blk = code[code.index("export function TrendSegment"):]
     render = blk[blk.index("return ("):]
     assert "今天转折" in render, "转折当天没有那句大白话"
     assert "转折后第 {trend.duration} 天" in render, "平常那天的天数没了"
@@ -1339,7 +1339,7 @@ def test_R291_两种状态用同一个盒子():
     """
     from tests.frontend_source import code_of
     code = code_of("components/stock-analysis/decision-board/cells.tsx")
-    blk = code[code.index("export function ChannelStateCell"):]
+    blk = code[code.index("export function TrendSegment"):]
     i = blk.index("今天转折")
     box = blk[i - 700:i]
     assert "inline-flex whitespace-nowrap rounded border px-1.5 py-px" in box, (
@@ -1353,7 +1353,7 @@ def test_R291_判定仍然只读后端那个字段():
     这次改的是**长什么样**, 不是**怎么判**。"""
     from tests.frontend_source import code_of
     code = code_of("components/stock-analysis/decision-board/cells.tsx")
-    blk = code[code.index("export function ChannelStateCell"):]
+    blk = code[code.index("export function TrendSegment"):]
     render = blk[blk.index("return ("):]
     assert "trend.flipped ?" in render, "没读后端那个字段"
     for derived in ("duration === 1", "duration == 1", "duration <= 1"):

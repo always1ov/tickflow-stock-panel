@@ -127,7 +127,9 @@ def test_列的顺序是_认票_凭什么_我的账_别人的意见():
         # **这次不撞名**: R306 那回撞名是拿「通道位置」去命名**那十档判定**,
         # 而打分系统里 `channel_pct` 早就叫这个; 现在这一列印的**就是**
         # `channel_pct` 那个读数 —— 两处指同一件事, 同名正好是对的。
-        "走势", "位置",                # 凭什么(判断必须连着, 不许被账目切开)
+        # [R425] 「走势」「位置」并成一列一个按钮。用户: 「个股分析页面的走势列和
+        # 通道列合并成一个按钮入口」—— 两格本来就通向同一个复盘弹窗。
+        "走势/位置",                  # 凭什么(判断必须连着, 不许被账目切开)
         # [R284] 「成本」「浮盈」两列删掉(用户: 「删除掉浮盈和成本列」)——
         # 它们为 5% 的行占着 9% 的宽度(持有 8 / 自选 166)。成本**输入框**保留,
         # 挪进这一格: 它是出场线的输入, 不是展示。
@@ -142,7 +144,7 @@ def test_账目三列必须排在判断之后():
     """R249 之前它们在「现价」与「走势」之间。这条独立于上面那条写 ——
     就算以后列增减, **判断不许被账目切开**这条纪律也得留着。"""
     cols = _cols(_src())
-    judge = max(cols.index("走势"), cols.index("位置"))
+    judge = cols.index("走势/位置")
     ledger = cols.index("持仓")     # [R284] 账目从三列收成一列
     assert ledger > judge, (
         f"账目列插到判断列中间了 —— 扫表时「走势→结论」读不连贯。当前顺序: {cols}"
@@ -245,7 +247,7 @@ def test_R250_表头只印列名不印排序目标():
     assert "进度" not in render, "「进度」缀回表头了 —— 它已经不是一列, 表头只印列名"
     assert "间距" not in render, "「间距」缀回表头了"
     # 正面: 列名都还在
-    for name in ("位置", "走势", "现价/涨跌", "持仓"):
+    for name in ("走势/位置", "现价/涨跌", "持仓"):
         assert name in render, f"表头把「{name}」弄丢了"
 
 
@@ -568,7 +570,7 @@ def test_R316_位置列是位置名加一句能交易的距离():
     第二行换口径是这一版的要害: 不再是"通道刻度 0~100"(抽象、会越界), 而是
     价格百分比 —— 不需要先在脑子里把通道宽度换算一遍。
     """
-    pos = _cell("PositionCell")
+    pos = _cell("PositionSegment")
     body = pos[pos.index("return ("):]
     assert "{s ? s.pos_cn : '—'}" in body, "位置名那一行没了, 或者没有兜底"
     assert "{near.label}" in body and "{near.pct}%" in body, "离轨距离那一行没了"
@@ -587,7 +589,7 @@ def test_R316_距离口径与出场线逐字相同():
     这一列要是自己另算一套(比如拿轨价当分母), 同一个"还差多远"在一个界面上
     就有了两种算法 —— 而两处定义同一件事必然漂, 这是本仓库反复在治的病。
     """
-    pos = _cell("PositionCell")
+    pos = _cell("PositionSegment")
     gap = pos[pos.index("function railGap"):] if "function railGap" in pos else ""
     if not gap:
         from tests.frontend_source import code_of
@@ -636,8 +638,8 @@ def test_R316_现价是传进来的不是从_pct_反推的():
     这一列印的是**要拿去下单的数**, 差几分钱就是错的。所以现价从行数据直接传,
     不从别的读数倒推。
     """
-    pos = _cell("PositionCell")
-    assert "close?: number | null" in pos, "PositionCell 没有接收现价"
+    pos = _cell("PositionSegment")
+    assert "close?: number | null" in pos, "PositionSegment 没有接收现价"
     # 反面: 不许出现"拿 pct 和轨价反推收盘价"那种写法
     from tests.frontend_source import code_of
     code = code_of("components/stock-analysis/decision-board/cells.tsx")
@@ -647,11 +649,11 @@ def test_R316_现价是传进来的不是从_pct_反推的():
         "(`railGap` 自己的返回字段也叫 `pct`, 所以这里禁的是**读 `b.pct`**, "
         "不是禁这三个字母 —— 第一版就是这么写宽了然后假红的)"
     )
-    # **锚在 `<PositionCell` 那个调用点上。** 走势列(`ChannelStateCell`)也收
-    # `close={r.close}`, 只查整份源码里有没有这个串, 把这一列的那个删掉照样绿
-    # —— R316 变异电池当场逼出来的, 与"锚在邻居身上"是同一族的假守卫。
+    # **锚在调用点上**(R316 变异电池逼出来的: 只查整份源码有没有这个串, 删掉
+    # 这一处照样绿)。[R425] 走势与位置并成 `<TrendPositionCell` 一格, 现价从这一处
+    # 同时递给两半 —— 删了它, 位置那半就只能印 —。
     board = _src()
-    call = board[board.index("<PositionCell"):]
+    call = board[board.index("<TrendPositionCell"):]
     call = call[:call.index("/>") + 2]
     assert "close={r.close}" in call, "板子没把现价递给「位置」列, 这一列永远只能印 —"
 
@@ -661,9 +663,9 @@ def test_R316_两行各自都有兜底():
 
     算不出来时: 位置名给 `—`, 距离那一行也给 `—` —— **两行都还在**。
     """
-    pos = _cell("PositionCell")
-    btn = pos[pos.index("<button"):]
-    btn = btn[:btn.index("</button>")]
+    # [R425] 按钮搬到外壳 `TrendPositionCell` 上了, 这一半只画内容 —— 切它的 return 块
+    pos = _cell("PositionSegment")
+    btn = pos[pos.index("return ("):]
     assert "{s ? s.pos_cn : '—'}" in btn, "位置名那一行没有兜底"
     assert "{near ? (" in btn and ") : (" in btn, "距离那一行没有兜底"
     assert btn.count("text-muted/30") == 2, (
@@ -677,7 +679,7 @@ def test_R316_位置名按位置上色():
     配色走共用的 `POS_TEXT` —— 与时间轴那条位置带同一份表, 不许在这里另抄
     (R308 立的规矩: 两份色表分居两地, 只改一处就会漂, 而那种漂移不报错)。
     """
-    pos = _cell("PositionCell")
+    pos = _cell("PositionSegment")
     body = pos[pos.index("return ("):]
     assert "POS_TEXT[s.pos]" in body, "位置名没按位置上色 —— 那就没法靠颜色扫表了"
     for local in ("bg-red-400'", "text-red-400'", "text-sky-400'"):
@@ -690,7 +692,7 @@ def test_R316_三档与组合码没丢只是进了悬停():
     三档各自的位置与距离、27 格那个组合码、R246 那份时长, 全在悬停里 ——
     产出了却没人接, 与没做是一回事(`state_run` 就这么死过一轮)。
     """
-    pos = _cell("PositionCell")
+    pos = _cell("PositionSegment")
     tip = pos[:pos.index("return (")]
     assert "(['s', 'm', 'l'] as const)" in tip, "悬停里没有三档各自的位置"
     assert "三档组合码" in tip, "悬停里没有 27 格那个组合码"
@@ -733,7 +735,7 @@ def test_R310_出场线的价格还在界面上():
     )
     # 它必须在「持仓」那一格里, 不许飘到别处
     td = src[:i]
-    assert td.rindex("<td") > td.rindex("<PositionCell"), "出场线跑到「持仓」以外的格子里了"
+    assert td.rindex("<td") > td.rindex("<TrendPositionCell"), "出场线跑到「持仓」以外的格子里了"
 
 
 def test_R309_列宽加起来是一百且没有一列留空():
@@ -784,7 +786,7 @@ def test_R309_别人的意见不许比自己的判断占得宽():
     blk = blk[:blk.index("] as const")]
     got = {lab: float(w.rstrip('%'))
            for lab, w in re.findall(r"label: '([^']+)', w: '([^']+)%'", blk)}
-    judge = got["走势"] + got["位置"]
+    judge = got["走势/位置"]          # [R425] 两列并成一列, 宽度原数相加(20 + 14)
     assert got["AI 信号"] < judge, (
         f"AI 信号占 {got['AI 信号']}%, 而我自己的判断三列加起来才 {judge}% —— "
         "版面把话语权给反了"
@@ -826,7 +828,7 @@ def test_R277_走势列不再回退到快慢():
     # 这次是反向(该消失的字眼被注释顶着不消失)。用共用的块级剥注释工具。
     from tests.frontend_source import code_of
     code = code_of("components/stock-analysis/decision-board/cells.tsx")
-    blk = code[code.index("export function ChannelStateCell"):]
+    blk = code[code.index("export function TrendSegment"):]
     assert "ph.pace_cn" not in blk, "走势列又回退到快慢了"
 
 
@@ -933,7 +935,8 @@ def test_R258_那一列叫通道档位而且脚注指得对():
     # 这一层多了个名字。反过来它**不许**再叫「档位」: 那会让人以为表上那一格
     # 就是判定, 而判定在复盘页。导出件仍导判定, 所以仍叫「档位」。
     board = _src()
-    assert "{ label: '位置'," in board, "决策台那一列不叫「位置」了"
+    # [R425] 「位置」与「走势」并成一列「走势/位置」, 位置那半的名字仍是「位置」
+    assert "{ label: '走势/位置'," in board, "决策台那一列不叫「走势/位置」了"
     assert "{ label: '档位'," not in board, (
         "决策台那一列又叫回「档位」—— 它印的是坐标不是判定, 同名会被读成判定"
     )
@@ -984,7 +987,7 @@ def test_R286_走势列显示今天是不是转折():
     """
     from tests.frontend_source import code_of
     code = code_of("components/stock-analysis/decision-board/cells.tsx")
-    blk = code[code.index("export function ChannelStateCell"):]
+    blk = code[code.index("export function TrendSegment"):]
     blk = blk[blk.index("return ("):]
     assert "trend?.flipped" in blk or "trend.flipped" in blk, (
         "走势列没读转折读数 —— 转折标记根本不会亮"
@@ -1001,7 +1004,7 @@ def test_R286_转折的词与复盘那边一致():
     from tests.frontend_source import code_of
     cells = code_of("components/stock-analysis/decision-board/cells.tsx")
     review = code_of("components/stock-analysis/StockReviewDialog.tsx")
-    blk = cells[cells.index("export function ChannelStateCell"):]
+    blk = cells[cells.index("export function TrendSegment"):]
     blk = blk[blk.index("return ("):]
 
     assert "转折" in review, "场景没搭对: 复盘那边的「转折」不见了"
@@ -1019,9 +1022,30 @@ def test_R286_转折不在前端自己推():
     """
     from tests.frontend_source import code_of
     code = code_of("components/stock-analysis/decision-board/cells.tsx")
-    blk = code[code.index("export function ChannelStateCell"):]
+    blk = code[code.index("export function TrendSegment"):]
     blk = blk[blk.index("return ("):]
     for derived in ("duration === 1", "duration == 1", "duration <= 1"):
         assert derived not in blk, (
             f"走势列自己从 `{derived}` 推转折了 —— 该读后端的 flipped"
         )
+
+
+def test_R425_走势与位置并成一格_只有一个按钮():
+    """用户: 「个股分析页面的走势列和通道列合并成一个按钮入口」。
+
+    两格原本通向**同一个**复盘弹窗, 只是落在不同页签 —— 两个挨着的按钮、一个去处。
+    合并后这一格必须**恰好一个** button(外壳上), 两半都不许再自带按钮
+    (button 套 button 是非法 HTML, 而且又回到了两个点击目标)。
+    """
+    cell = _cell("TrendPositionCell")
+    assert cell.count("<button") == 1, "外壳上不是恰好一个按钮"
+    assert "<TrendSegment" in cell and "<PositionSegment" in cell, "两半没都放进这一格"
+    for seg in ("TrendSegment", "PositionSegment"):
+        body = _cell(seg)
+        assert "<button" not in body, f"{seg} 自己又长出了按钮 —— 那就是两个点击目标"
+        assert "<td" not in body, f"{seg} 自己又占了一格 —— 那就又是两列"
+    board = _src()
+    assert board.count("<TrendPositionCell") == 1, "板子上没用上合并后的那一格"
+    assert "tab: 'verdict'" not in board[board.index("<TrendPositionCell"):][:600], (
+        "还按两半分别落页签 —— 一个按钮只能有一个去处"
+    )

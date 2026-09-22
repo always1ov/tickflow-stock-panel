@@ -77,7 +77,8 @@ def _hinted(ths: list[str]) -> list[str]:
 
 def test_R323_决策台五个有说明的表头_悬停与问号同一个键():
     ths = _hinted(_ths(BOARD))
-    assert len(ths) == 5, f"决策台该有 5 个带「?」的表头, 现在 {len(ths)}"
+    # [R425] 5 → 4: 「走势」「位置」两列并成「走势/位置」一列, 两份说明并成 HEAD_TIPS.trendPos 一份
+    assert len(ths) == 4, f"决策台该有 4 个带「?」的表头, 现在 {len(ths)}"
     for th in ths:
         keys = set(re.findall(r"title=\{HEAD_TIPS\.(\w+)\}", th))
         assert len(keys) == 1, f"同一个表头里悬停与「?」用了不同的键: {keys}"
