@@ -19,14 +19,14 @@ def test_R433_现状紧跟头部_排在图表与价位之前():
     dlg = code_of(DLG)
     i = dlg.index("<StatusSection")
     assert dlg.index("<PreviewHero") < i < dlg.index("<ChartLevelsSection")
-    assert "days={reviewDays}" in dlg[i:dlg.index("/>", i)], "这一格历来没跟头部天数走"
+    # 与复盘块同一个天数 → 同一个复盘查询键, 不多发一次回算
+    assert "days={reviewDays}" in dlg[i:dlg.index("/>", i)], "现状没跟头部天数走"
 
 
 def test_R433_读数各自取自原来的产地():
     st = code_of(ST)
     assert "useStockTrend(symbol)" in st, "六态没走图上方那条六态条同一个查询"
     assert "useStockReview(symbol, days)" in st, "通道那几样没走复盘同一个查询"
-    assert "comboHistory(d.rows, here)" in st, "这一格历来另算了一份"
     assert "POS_FILL[b.pos]" in st and "b?.pos_cn" in st, "三档位置的颜色 / 名字没用原来那份"
     assert "VERDICT_CLS[now.tone]" in st
     # 通道这一层唯一能照着做的一句(R269: 别的都能收, 它不行)
@@ -68,3 +68,13 @@ def test_R436_副图不画红框_横格一直等间距():
     assert "export const QMACD_GRID_PAD = 0.25" in qm
     assert "min: lo - k * QMACD_GRID_PAD, max: hi + k * QMACD_GRID_PAD" in qm
     assert "QMACD_ROWS" not in qm and "quantMacdRange" not in qm
+
+
+def test_R438_现状里没有这一格历来():
+    """[R438] 用户看着「这一格历来(近 120 天) 5 段 +1.6% 3/4 段」: 「这没用了, 删掉」。"""
+    st = code_of(ST)
+    for w in ("这一格历来", "comboHistory", "HistoryCell"):
+        assert w not in st, f"「{w}」又回到现状块了"
+    # 六态成了第一格, 前面不该再有分隔竖线
+    trend = st[st.index("<Cell label={<>趋势状态 · 六态"):]
+    assert "md:border-l" not in trend[:trend.index("\n")]

@@ -5,14 +5,15 @@
  * **一整套新的买卖判定**, 用户选的是「先做现状, 规则写成草案给你审」—— 所以这里只有
  * 现成的读数, 一个新判定都没有:
  *
- *   这一格历来    27 格里今天这一格, 这只票历来进过几段、走完后怎么样(`comboHistory`,
- *                 与旧复盘页「这一格历来」同一个函数)
  *   趋势状态      六态, 与图上方那条六态条同一个查询(`useStockTrend`)
  *   跌破转弱 / 站上转强   同上, 距离是后端给的带符号的数
  *   通道档位      今天那一档 + 三字组合码 + 阶段, 下面是「该盯什么」——
  *                 那是通道这一层唯一能照着做的一句(R269: 别的都能收, 它不行)
  *   三档位置      短 / 中 / 长期各在自己通道的上轨 / 中轨 / 下轨哪一格, 色与时间轴
  *                 同一份(`POS_FILL`), 名字是后端给的 `pos_cn`
+ *
+ * [R438] 原来最前面还有一格「这一格历来」(27 格里今天这一格历来进过几段、走完后怎么样)。
+ * 用户: 「这没用了, 删掉」。
  *
  * 六态走的是六态接口(开实时行情时是盘中口径, 会标出来), 通道那几样走复盘接口
  * (收盘口径)。两者分别与图上方的六态条、下面的复盘表是同一份数, 不另算。
@@ -21,9 +22,8 @@ import type { ReactNode } from 'react'
 import type { StockReview } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import { BAND_CN, POS_FILL } from '@/lib/reviewTimeline'
-import { comboHistory } from '@/components/stock-analysis/decision-board/ComboView'
 import { useStockTrend } from '@/components/stock-analysis/TrendStateBar'
-import { VERDICT_CLS, chgCls, pct, useStockReview } from '@/components/stock-analysis/StockReviewDialog'
+import { VERDICT_CLS, pct, useStockReview } from '@/components/stock-analysis/StockReviewDialog'
 import { SectionTitle } from './SectionTitle'
 
 export function StatusSection({ symbol, days }: { symbol: string; days: number }) {
@@ -33,7 +33,6 @@ export function StatusSection({ symbol, days }: { symbol: string; days: number }
     <section>
       <SectionTitle title="现状" sub="走到哪一步、在什么位置" />
       <div className="mt-3 flex flex-wrap items-stretch gap-x-6 gap-y-4 rounded-card border border-border bg-surface p-4">
-        <HistoryCell d={d} />
         <TrendCell symbol={symbol} />
         <ChannelCell d={d} />
         <BandsCell d={d} />
@@ -52,41 +51,7 @@ function Cell({ label, children, className }: { label: ReactNode; children: Reac
   )
 }
 
-function Num({ value, caption, cls }: { value: ReactNode; caption: string; cls?: string }) {
-  return (
-    <div>
-      <div className={cn('font-mono text-lg font-semibold tabular-nums text-foreground', cls)}>{value}</div>
-      <div className="text-micro text-muted">{caption}</div>
-    </div>
-  )
-}
-
 const Pending = () => <div className="text-xs text-muted">…</div>
-
-// ── 这一格历来 ──
-function HistoryCell({ d }: { d?: StockReview }) {
-  if (!d) return <Cell label="这一格历来"><Pending /></Cell>
-  const here = d.channel?.geo?.combo ?? null
-  const hist = comboHistory(d.rows, here)
-  const N = d.forward_days
-  return (
-    <Cell label={`这一格历来(近 ${d.days} 天)`}>
-      {!here ? (
-        // [R294] 与「头一回」是两件事: 这里是三档缺一档算不出来, 不是位置罕见
-        <div className="text-xs text-muted" title="三档里有一档今天定不出位置(数据不够), 不是这个位置罕见">今天定不了这一格</div>
-      ) : !hist || hist.segs === 0 ? (
-        <div className="text-xs text-muted">这 {d.days} 天里没进过这一格 —— 头一回</div>
-      ) : (
-        <div className="flex items-start gap-5">
-          <Num value={`${hist.segs} 段`} caption={`共 ${hist.days} 天`} />
-          <Num value={hist.scored ? pct(hist.avg) : '—'} cls={chgCls(hist.avg)}
-               caption={hist.scored ? `走完后 ${N} 天` : `还没有走完 ${N} 天的段`} />
-          <Num value={hist.scored ? `${hist.win}/${hist.scored} 段` : '—'} caption="走完后收涨" />
-        </div>
-      )}
-    </Cell>
-  )
-}
 
 // ── 趋势状态 + 跌破转弱 / 站上转强 ──
 function TrendCell({ symbol }: { symbol: string }) {
@@ -97,8 +62,8 @@ function TrendCell({ symbol }: { symbol: string }) {
   const bull = t.side === '多头'
   return (
     <>
-      <Cell label={<>趋势状态 · 六态{t.intraday && <span className="ml-1.5 text-warning" title="实时价参与了六态判定, 收盘价可能改变结论 —— 定稿以收盘为准">盘中口径</span>}</>}
-            className="md:border-l md:border-border/60 md:pl-6">
+      {/* [R438] 「这一格历来」删了, 六态成了第一格 —— 前面不再画分隔竖线 */}
+      <Cell label={<>趋势状态 · 六态{t.intraday && <span className="ml-1.5 text-warning" title="实时价参与了六态判定, 收盘价可能改变结论 —— 定稿以收盘为准">盘中口径</span>}</>}>
         <div className="flex items-baseline gap-2">
           <span className={cn('text-xl font-semibold', bull ? 'text-bull' : 'text-bear')}>{t.state_cn}</span>
           {/* [R249] 「已 N 天」—— 与决策台徽标、六态条同一个说法 */}
