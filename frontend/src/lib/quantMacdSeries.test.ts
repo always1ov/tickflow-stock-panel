@@ -8,7 +8,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   alignQuantMacd, diffExposed, HOLLOW_DASH, ICON_DOWN, ICON_H, ICON_UP, quantMacdSeries, renderDiffRect,
-  STICK_RATIO, STICK_WIDTH, QMACD_GRID_SPLIT, QMACD_GRID_PAD, quantMacdGrid,
+  STICK_RATIO, STICK_WIDTH,
 } from './quantMacdSeries'
 import { QUANT_MACD_COLORS } from './theme'
 
@@ -119,7 +119,6 @@ describe('量化MACD: 画法照原文', () => {
       red: '#FF0000', darkRed: '#CC0000', green: '#00FF00', yellow: '#FFFF00',
       icon2: '#00DC00',   // 2 号图标自带的绿, 对着通达信截图量的
       paneBg: '#000000',  // 通达信的底色; 亮色主题下副图铺这个底
-      gridLine: '#800000', // [R434] 横格(点线); [R436] 外框撤了
     })
   })
 
@@ -176,45 +175,5 @@ describe('量化MACD: 按日期对到图上的 x 轴', () => {
   it('数据还没到: 整张副图留白, 长度仍与 x 轴一致', () => {
     const a = alignQuantMacd(['2026-09-01', '2026-09-02'], undefined)
     for (const v of Object.values(a)) expect(v).toEqual([null, null])
-  })
-})
-
-describe('[R436] 副图横格一直等间距, 里面两格, 往外按比例', () => {
-  const mk = (vals: number[]) => ({
-    diff: vals, dea: vals.map(() => null), yellow: vals.map(() => null),
-    gold_icon: vals.map(() => null), dead_icon: vals.map(() => null),
-  })
-  const cases: number[][] = [[-0.8, 1.9], [0, 2.4], [-3.1, 0], [-0.02, 0.013], [-120, 40], [0.5, 0.7], [-0.7, -0.2]]
-  it.each(cases)('数据 %j', (...vals: number[]) => {
-    const g = quantMacdGrid(mk(vals), 0, vals.length - 1)
-    const lo = Math.min(0, ...vals)
-    const hi = Math.max(0, ...vals)
-    const k = (hi - lo) / QMACD_GRID_SPLIT
-    // 纵轴是真实跨度(含 0), 不凑整行; 上下各多留 1/4 格
-    expect(QMACD_GRID_PAD).toBe(0.25)
-    expect(g.min).toBeCloseTo(lo - k * QMACD_GRID_PAD, 12)
-    expect(g.max).toBeCloseTo(hi + k * QMACD_GRID_PAD, 12)
-    expect(g.lines).toContain(0)                                   // 0 轴压在线上
-    for (let i = 1; i < g.lines.length; i++) {
-      expect(g.lines[i] - g.lines[i - 1]).toBeCloseTo(k, 9)          // 一直等间距
-    }
-    // 里面两格: 跨过 0 时三条线; 0 在边上时是 0 加里面两条
-    expect(g.lines.length).toBe(3)
-    // 极值上不画线(除了 0); 任何一条线离副图上下边都至少 1/4 格, 免得看着像一道框
-    for (const v of g.lines) {
-      if (v !== 0) { expect(v).toBeGreaterThan(lo + k * 1e-6); expect(v).toBeLessThan(hi - k * 1e-6) }
-      expect(v - g.min).toBeGreaterThanOrEqual(k * QMACD_GRID_PAD - k * 1e-9)
-      expect(g.max - v).toBeGreaterThanOrEqual(k * QMACD_GRID_PAD - k * 1e-9)
-    }
-  })
-
-  it('只看窗口里那一段 —— 窗口外的大柱子不把纵轴撑大', () => {
-    const g = quantMacdGrid(mk([50, -50, 1, -1, 2]), 2, 4)
-    expect(g.min).toBe(-1.25)       // 跨度 3 → 一格 1, 多留 1/4 格
-    expect(g.max).toBe(2.25)
-  })
-
-  it('一屏全是 0 / 没数据时也给一个框, 不除以 0', () => {
-    expect(quantMacdGrid(mk([0, 0]), 0, 1)).toEqual({ min: -1, max: 1, lines: [0] })
   })
 })

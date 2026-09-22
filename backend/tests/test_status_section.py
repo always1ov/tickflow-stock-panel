@@ -5,6 +5,7 @@ R433 用户排版图「结论后面加」: 上半是「现状」(现成读数), 
 所以这里钉两件事: 现状只用现成读数、各自取自原来的产地; 下半块没有被偷偷做进来。
 
 R434 用户: 「日分时关键价位放到右边, 量化macd是四行等高的行限制着的」。
+R439: 副图的红色横线整套撤掉(见 `test_R439_量化MACD副图不画红线`)。
 """
 from tests.frontend_source import code_of
 
@@ -48,27 +49,20 @@ def test_R434_视图切换靠右():
     assert 'className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-btn' in sec
 
 
-def test_R436_副图不画红框_横格一直等间距():
-    """[R434 → R436] 用户: 「量化macd别搞红框框出来, 你知道是一直等间距就行了,
-    可以里面等间距两格子, 再往外就等间距比例使用空间」。"""
+def test_R439_量化MACD副图不画红线():
+    """[R434 → R436 → R439] 副图的横格先是四行等高 + 红框, 再是三格等间距的红点线。
+    用户: 「量化macd还是有红线划分间距, 我不需要红线删掉」—— 整套撤掉, 回到 R423 的样子。"""
     chart = code_of(CHART)
-    assert "QUANT_MACD_COLORS.frame" not in chart, "红框又回来了"
-    assert "show: !isDark, backgroundColor: QUANT_MACD_COLORS.paneBg, borderWidth: 0" in chart
-    # 纵轴是窗口里的真实跨度, 横格由 markLine 按数据值画(0 一定压线)
-    assert "const qGrid = quantMacdGrid(qa, zoomStart, dates.length - 1)" in chart
-    assert "{ gridIndex: 1, min: qGrid.min, max: qGrid.max," in chart
-    assert "data: qGrid.lines.map(v => ({ yAxis: v }))" in chart
-    # 拖动缩放后按新窗口重算, 否则横格停在打开那一刻的窗口上
-    zoom = chart[chart.index("inst.on('datazoom'"):]
-    zoom = zoom[:zoom.index("\n      })")]
-    assert "quantMacdGrid(r.qa, from, to)" in zoom and "id: QMACD_GRID_ID" in zoom
+    for w in ("QMACD_GRID", "quantMacdGrid", "qmacdGridRef", "gridLine", "markLine: { data: g."):
+        assert w not in chart, f"「{w}」—— 副图横线又回来了"
+    assert "show: !isDark, backgroundColor: QUANT_MACD_COLORS.paneBg, borderWidth: 0" in chart, "外框回来了"
+    sub = chart[chart.index("{ scale: false, gridIndex: 1, splitNumber: 2,"):]
+    sub = sub[:sub.index("axisLabel")]
+    assert "splitLine: { show: false }" in sub, "副图背景横线又画出来了"
     qm = code_of(QM)
-    assert "export const QMACD_GRID_SPLIT = 3" in qm, "里面两格 = 跨度分三份"
-    # 上下各多留 1/4 格, 最外那条线才不会贴着边(贴边看着又是一道框)
-    assert "export const QMACD_GRID_PAD = 0.25" in qm
-    assert "min: lo - k * QMACD_GRID_PAD, max: hi + k * QMACD_GRID_PAD" in qm
-    assert "QMACD_ROWS" not in qm and "quantMacdRange" not in qm
-
+    for w in ("QMACD_GRID", "quantMacdGrid", "QMACD_ROWS", "quantMacdRange"):
+        assert w not in qm
+    assert "gridLine" not in code_of("lib/theme.ts")
 
 def test_R438_现状里没有这一格历来():
     """[R438] 用户看着「这一格历来(近 120 天) 5 段 +1.6% 3/4 段」: 「这没用了, 删掉」。"""
