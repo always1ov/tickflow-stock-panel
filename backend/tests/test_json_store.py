@@ -41,29 +41,7 @@ def test_lock_for_returns_the_same_lock_for_the_same_file(tmp_path):
 
 # ---------- AI 信号: 并发重出不能互丢 ----------
 
-def test_concurrent_signal_saves_keep_every_symbol(monkeypatch):
-    """多个操盘手同时 refresh 不同的票, 每一只的信号都要在。
-
-    修复前是"读全量 → 改一只 → 写全量"不上锁: 两个并发写各捧一份旧全量,
-    后写的把前一个刚写进去的信号盖掉 —— 表现为"明明刚重出过, 又没了"。
-    """
-    from app.services import stock_signal
-    from app.services.json_store import atomic_write_json, lock_for
-
-    def _fake_save(sym: str) -> None:
-        # 复刻 generate_signal 尾部的落盘段(前面的 AI 调用与解析不在本测试范围)
-        with lock_for(stock_signal._store_path()):
-            data = stock_signal.load_all()
-            data[sym] = {"signal": "hold", "created_at": "2026-08-25T00:00:00+00:00"}
-            atomic_write_json(stock_signal._store_path(), data)
-
-    syms = [f"60000{i}.SH" for i in range(8)]
-    threads = [threading.Thread(target=_fake_save, args=(s,)) for s in syms]
-    for t in threads:
-        t.start()
-    for t in threads:
-        t.join()
-
-    got = set(stock_signal.load_all())
-    assert got == set(syms), f"并发保存后丢了信号: {set(syms) - got}"
+# [R72 → R435 退役] `test_concurrent_signal_saves_keep_every_symbol` 钉的是 AI 信号那份
+# signals.json 的并发落盘(读-改-写上锁)。AI 信号整套停用, 那个模块删了; `lock_for` /
+# `atomic_write_json` 这对原语本身由本文件其余几条照测。
 

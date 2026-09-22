@@ -8,8 +8,9 @@
  */
 import { Skeleton } from '@/components/data/Skeleton'
 
-/** 每列一格的宽度 —— 与 BOARD_COLS 的顺序一致: 标的 / 现价涨跌 / 走势/位置 / 持仓 / AI 信号 */
-const CELL_W = ['w-16', 'w-12', 'w-32', 'w-10', 'w-3/4']
+/** 每列一格的宽度 —— 与 BOARD_COLS 的顺序一致: 标的 / 现价涨跌 / 走势/位置 / 持仓
+ *  ([R435] 末尾「AI 信号」那一格随列一起撤了) */
+const CELL_W = ['w-16', 'w-12', 'w-32', 'w-10']
 
 export function BoardSkeletonRows({ rows = 6, cols = CELL_W.length }: { rows?: number; cols?: number }) {
   return (
@@ -18,7 +19,7 @@ export function BoardSkeletonRows({ rows = 6, cols = CELL_W.length }: { rows?: n
         <tr key={r} className="border-t border-border/30" aria-hidden="true">
           {Array.from({ length: cols }, (_, c) => (
             <td key={c} className="px-3 py-3">
-              <Skeleton w={CELL_W[c] ?? 'w-12'} h="h-3" className={c === cols - 1 ? '' : 'mx-auto'} />
+              <Skeleton w={CELL_W[c] ?? 'w-12'} h="h-3" className="mx-auto" />
             </td>
           ))}
         </tr>

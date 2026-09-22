@@ -16,13 +16,15 @@ from app.services import stock_playbook as pb
 
 def _run(**kw):
     base = dict(position=None, trend=None, exit_line=None, urgency=None,
-                verdict=None, phase=None, event=None, signal=None)
+                verdict=None, phase=None, event=None)
     base.update(kw)
     return pb.playbook(**base)
 
 
 _UT = {"state": "UT", "state_cn": "上涨趋势"}
 _DT = {"state": "DT", "state_cn": "下跌趋势"}
+# [R435] AI 信号撤了之后, 测「打架」用规则层自己的分歧: 趋势往上而通道已经「该止盈了」
+_TOP = {"side": "high", "tone": "sell", "title": "该止盈了"}
 _NEAR_BUY = {"level": "near", "label": "逼近", "side_cn": "买",
              "what": "还差 1.2% 到买点", "action": "到价再看"}
 
@@ -33,7 +35,7 @@ def test_出场线已破压过一切():
     r = _run(exit_line={"triggered": True, "stage_cn": "止盈线", "line": 12.3,
                         "action": "清仓"},
              urgency={"level": "triggered", "side_cn": "买"},
-             trend=_UT, signal={"signal": "buy"})
+             trend=_UT, verdict=_TOP)
     assert r["level"] == pb.EXIT
     assert r["price"] == 12.3
     # [R299] 那句道理从 `why` 挪到了 `note` —— **`why` 讲这只票, `note` 讲这套
@@ -53,7 +55,7 @@ def test_生命线破位单独说():
 
 def test_打架时不显示还差多少到买点():
     """**这是本层最值钱的一条。** 判定分歧时报「还差 1.2%」等于在催人下手。"""
-    r = _run(trend=_UT, signal={"signal": "sell"}, urgency=_NEAR_BUY)
+    r = _run(trend=_UT, verdict=_TOP, urgency=_NEAR_BUY)
     assert r["level"] == pb.CONFLICT, "分歧被「逼近」盖住了"
     assert "1.2%" not in r["why"], "分歧档里不该再报距离 —— 那是在催人下手"
     # [R299] 同上: 道理进 `note`, 正文只留"哪两个判定在打架"
@@ -61,13 +63,16 @@ def test_打架时不显示还差多少到买点():
     assert "等它们对齐" not in r["why"], "又串回正文那一行了"
 
 
-@pytest.mark.parametrize("trend,sig,keyword", [
-    (_UT, "sell", "AI 说卖出"),
-    (_DT, "buy", "AI 说买入"),
-])
-def test_趋势与AI相反算打架(trend, sig, keyword):
-    r = _run(trend=trend, signal={"signal": sig})
-    assert r["level"] == pb.CONFLICT and keyword in r["conflicts"][0]
+def test_R435_AI信号不再参与打架():
+    """AI 信号整套停用: 「怎么办」不再收 AI 的意见, 与 AI 有关的三条打架规则一起撤了。"""
+    import inspect
+    for fn in (pb.playbook, pb._conflicts, pb.playbook_many):
+        params = inspect.signature(fn).parameters
+        assert "signal" not in params and "signals" not in params, f"{fn.__name__} 还收 AI 信号"
+    assert not hasattr(pb, "_AI_BULL") and not hasattr(pb, "_AI_BEAR")
+    with pytest.raises(TypeError):
+        pb.playbook(position=None, trend=_UT, exit_line=None, urgency=None, verdict=None,
+                    phase=None, event=None, signal={"signal": "sell"})
 
 
 def test_趋势往上而位置已经偏卖算打架():
@@ -94,10 +99,11 @@ def test_假verdict形状不该再骗过测试():
     assert k.SIDE_HIGH == "high" and k.SIDE_LOW == "low"
 
 
-def test_走过头了而AI还在喊买算打架():
-    r = _run(phase={"code": "overextended", "cn": "走得过头了"},
-             signal={"signal": "buy"})
-    assert r["level"] == pb.CONFLICT
+def test_R435_走过头了本身不算打架():
+    """原来那条是「走过头了而 AI 还在喊买」—— 打架的另一方是 AI, AI 撤了它就不成立;
+    空仓时单是走过头了, 不是两套判定相反。"""
+    r = _run(phase={"code": "overextended", "cn": "走得过头了"})
+    assert r["level"] != pb.CONFLICT and r["conflicts"] == []
 
 
 def test_持有且趋势没坏但已走过头_加减仓理由同时成立():
@@ -109,10 +115,11 @@ def test_持有且趋势没坏但已走过头_加减仓理由同时成立():
 
 # ---------- 不滥报 ----------
 
-@pytest.mark.parametrize("sig", ["watch", "hold", None])
-def test_观望与持有不算矛盾(sig):
-    """把不表态的也算成打架, 一半的票都会亮 —— 这一档就废了。"""
-    r = _run(trend=_UT, signal=None if sig is None else {"signal": sig})
+@pytest.mark.parametrize("tone", ["watch", "hold", None])
+def test_观望与持有不算矛盾(tone):
+    """把不表态的也算成打架, 一半的票都会亮 —— 这一档就废了。
+    [R435] 原来拿 AI 的「观望 / 持有」测, 现在拿通道档位的同名语气测。"""
+    r = _run(trend=_UT, verdict=None if tone is None else {"side": "high", "tone": tone, "title": "x"})
     assert r["conflicts"] == []
     assert r["level"] != pb.CONFLICT
 
@@ -124,7 +131,7 @@ def test_通道无结论不算矛盾():
 
 def test_趋势读不到时一条都不报():
     """半边数据推不出"相反", 硬报就是编。"""
-    r = _run(trend=None, signal={"signal": "sell"})
+    r = _run(trend=None, verdict=_TOP)
     assert r["conflicts"] == []
 
 
@@ -133,7 +140,7 @@ def test_趋势读不到时一条都不报():
 def test_已触发排在打架之前():
     r = _run(urgency={"level": "triggered", "side_cn": "卖", "what": "破位",
                       "action": "减"},
-             trend=_UT, signal={"signal": "sell"})
+             trend=_UT, verdict=_TOP)
     assert r["level"] == pb.ACT
     # 但分歧照旧带出来 —— 只是不当标题
     assert r["conflicts"], "已触发时也要把分歧作为附注带出去"
@@ -184,7 +191,7 @@ def test_不碰数据源():
 
 def test_文案里不许有markdown粗体():
     """后端文案在前端按纯文本渲染, `**` 会原样显示成星号(R175/R188 的老坑)。"""
-    rows = [_run(), _run(trend=_UT, signal={"signal": "sell"}),
+    rows = [_run(), _run(trend=_UT, verdict=_TOP),
             _run(urgency=_NEAR_BUY), _run(exit_line={"triggered": True, "line": 1.0})]
     for r in rows:
         assert "**" not in r["headline"] and "**" not in r["why"]

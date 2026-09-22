@@ -71,8 +71,11 @@ def test_ai_signal_no_longer_moves_the_score():
     by = {o["symbol"]: o for o in shown}
     assert set(by) == {"000001.SZ", "000002.SZ"}, "看空的票不再被悄悄藏起来"
     assert by["000001.SZ"]["score"] == by["000002.SZ"]["score"]
-    bear_note = {n["key"]: n for n in by["000002.SZ"]["notes"]}["ai"]
-    assert bear_note["tone"] == "bad" and "矛盾" in bear_note["text"]
+    # [R435] 原来看空那只要挂一枚显眼的「AI 看空」注记; AI 信号整套停用, 注记跟着撤了。
+    # 调用方(`_build_overview`)现在传进来的 signals 恒为空, 这里仍喂一份, 钉住的是
+    # 「就算有, 它也既不动分、也不再出注记」。
+    for sym in by:
+        assert "ai" not in {n["key"] for n in by[sym]["notes"]}, "AI 注记又回来了"
     assert "AI" not in "".join(by["000001.SZ"]["why"]), "注记不许混进评分理由"
 
 

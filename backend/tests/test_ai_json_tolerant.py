@@ -1,6 +1,5 @@
 """[fork 增强] R22 跨厂家 JSON 容错解析 + 信号词中文兼容。"""
 from app.services.ai_json import extract_json_object
-from app.services.stock_signal import _parse_signal
 
 
 # ---------- extract_json_object ----------
@@ -55,21 +54,5 @@ def test_think_block_with_braces_does_not_confuse():
     assert extract_json_object(text)["signal"] == "hold"
 
 
-# ---------- 信号解析(中文信号词 + 容错) ----------
-
-def test_chinese_signal_word_accepted():
-    """部分厂家模型用中文回信号词 → 映射回标准值, 不再'无法解析'。"""
-    parsed = _parse_signal('{"signal": "买入", "confidence": 75, "reason": "放量突破"}')
-    assert parsed is not None
-    assert parsed["signal"] == "buy"
-    assert parsed["confidence"] == 75
-
-
-def test_fenced_signal_accepted():
-    parsed = _parse_signal('```json\n{"signal": "watch", "confidence": 50, "reason": "等确认"}\n```')
-    assert parsed is not None
-    assert parsed["signal"] == "watch"
-
-
-def test_invalid_signal_word_rejected():
-    assert _parse_signal('{"signal": "梭哈", "confidence": 99, "reason": "冲"}') is None
+# [R435] 「信号解析(中文信号词 + 容错)」三条随 `stock_signal.py` 一起撤了 ——
+# 它们测的是那个模块的 `_parse_signal`。上面测的是共用的 `extract_json_object`, 照留。

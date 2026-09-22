@@ -60,7 +60,7 @@ def test_R276_归属没到之前不许筛():
     """
     code = code_of(BOARD)
     fn = code[code.index("const inGroup"):]
-    fn = fn[:fn.index("\n  const signalsQ")]
+    fn = fn[:fn.index("}, [groupFilter, groupOf, groupsReady])")]   # [R435] 原来截到下一行的 signalsQ, 它撤了
     assert "!groupsReady" in fn, "归属还没到时必须一律返回 true(不筛)"
 
 
@@ -207,12 +207,14 @@ def test_R276_表头两个数出自同一批():
     assert "rows.filter((r) => r.held).length" in code
 
 
-def test_R276_全自选持有数仍留给分析按钮():
-    """`heldCount` 不能跟着改成看得见的行数 —— 「分析持有」跑的是**全部**持有股
-    (heldSyms 走 allSyms), 拿看得见的行数去关那个按钮会对不上。"""
+def test_R435_分析持有按钮撤了_全自选持有数跟着撤():
+    """[R276 → R435] 原来这条钉的是「`heldCount` 不能跟着改成看得见的行数」——
+    它只为「AI 分析持有」那个按钮存在。按钮随 AI 信号撤了, 它也就不该留着(留着就是
+    "看起来在用、其实没人读"的那一类)。表头「持有 N」用的是 `heldInView`, 不受影响。"""
     code = code_of(BOARD)
-    assert "const heldCount = Object.values(positions).filter((p) => p.held).length" in code
-    assert "{heldCount > 0 && (" in code
+    assert "const heldCount" not in code and "heldCount" not in code
+    assert "runHeld" not in code and "runAll" not in code, "批量分析按钮还在"
+    assert "持有 {heldInView}" in code
 
 
 def test_R276_筛掉了多少要写出来():
@@ -285,7 +287,7 @@ def test_R330_它是独立开关_不跟只看要动的合并():
 
 def test_R330_进了筛选依赖表():
     code = _board()
-    dep = code[code.index("}, [enriched.data, positions, signals"):]
+    dep = code[code.index("}, [enriched.data, positions, heldOnly"):]   # [R435] signals 撤了
     dep = dep[:dep.index("]")]
     assert "flippedOnly" in dep, "漏进依赖表 = 切开关不重算, 而且不会报错"
 

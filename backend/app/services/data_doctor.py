@@ -120,7 +120,8 @@ STORES: tuple[Store, ...] = (
     Store("user_data/news_desk_summary.json", "消息面总览", shape=SHAPE_OBJECT,
           fields={"text": "", "as_of": "", "item_count": 0}),
     Store("user_data/score_ledger.json", "把握分台账", shape=SHAPE_OPAQUE),
-    Store("user_data/signals.json", "AI 个股信号", shape=SHAPE_OPAQUE),
+    # [R435] AI 信号已停用, 不再写这个文件; 旧数据留在盘上(回退时要用), 体检照旧认得它
+    Store("user_data/signals.json", "AI 个股信号(已停用)", shape=SHAPE_OPAQUE),
     Store("user_data/ai_pick_ledger.json", "AI 优选台账", shape=SHAPE_OPAQUE),
     Store("user_data/portfolio_history.json", "组合净值历史", shape=SHAPE_OPAQUE),
     Store("user_data/preferences.json", "偏好设置", shape=SHAPE_OBJECT),

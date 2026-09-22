@@ -42,7 +42,7 @@ API_TS = Path(__file__).resolve().parents[2] / "frontend" / "src" / "lib" / "api
 # 挂着一读一写两个方法(`/api/usage-notes/summary` 的 Get 与 Build 就是),
 # 按路径找会命中先出现的那个读接口, 于是既漏判又误判。方法名是唯一的。
 AI_METHODS = {
-    "generateStockSignal": "单只 AI 买卖信号(用户报的就是这个)",
+    # [R435] `generateStockSignal` 删了(AI 信号整套停用) —— 名单跟着它一起去掉。
     # [R352] `todayAi` 删了(用户不要 AI 导读了) —— 名单跟着它一起去掉。
     # 立论不变: **会真出一段文本的接口才放宽超时**, 这一条只是少了一个对象。
     "ladderAiReview": "连板梯队 AI 复盘",

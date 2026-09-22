@@ -772,34 +772,8 @@ def set_today_ai_schedule(enabled: bool, hour: int, minute: int) -> dict:
     return cfg
 
 
-def get_signal_ai_schedule() -> dict:
-    """个股 AI 信号批量定时 {"enabled", "hour", "minute", "scope", "gap_seconds"}。
-
-    scope: held=只跑持有 / watchlist=跑全部自选。个股数量多, gap_seconds 为每只
-    之间的间隔(默认 20 秒), 避免连续打满 AI 接口。默认 19:00 且只跑持有。
-    """
-    d = load().get("signal_ai_schedule") or {}
-    scope = str(d.get("scope", "held"))
-    return {
-        "enabled": bool(d.get("enabled", False)),
-        "hour": max(0, min(23, int(d.get("hour", 19) or 0))),
-        "minute": max(0, min(59, int(d.get("minute", 0) or 0))),
-        "scope": scope if scope in ("held", "watchlist") else "held",
-        "gap_seconds": max(5, min(300, int(d.get("gap_seconds", 20) or 20))),
-    }
-
-
-def set_signal_ai_schedule(enabled: bool, hour: int, minute: int,
-                           scope: str, gap_seconds: int) -> dict:
-    cfg = {
-        "enabled": bool(enabled),
-        "hour": max(0, min(23, int(hour))),
-        "minute": max(0, min(59, int(minute))),
-        "scope": scope if scope in ("held", "watchlist") else "held",
-        "gap_seconds": max(5, min(300, int(gap_seconds))),
-    }
-    save({"signal_ai_schedule": cfg})
-    return cfg
+# [R435] get / set_signal_ai_schedule 随 AI 信号停用撤了。偏好文件里已存的
+# `signal_ai_schedule` 键留着不清(无人读, 无害; 要回退时设置还在)。
 
 
 MINING_BUDGET_PROFILES = frozenset({"balanced", "strict"})

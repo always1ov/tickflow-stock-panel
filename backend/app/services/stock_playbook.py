@@ -8,7 +8,7 @@
     ② 六态趋势 (livermore)          方向   —— 往上还是往下
     ③ 通道档位 (keltner.verdict)    位置   —— 贵还是便宜
     ④ 通道阶段 (keltner_geometry)   成熟度 —— 走到哪一段了
-    ⑤ AI 信号  (stock_signal)       买卖   —— 模型怎么看
+    ⑤ AI 信号  (stock_signal)       买卖   —— 模型怎么看   [R435 停用, 已撤出]
 
 每一套单独看都对, 摆在一起就是**用户每天要在脑子里做一次五路合成**。
 这才是「数据堆砌」的真正来源 —— 不是数据太多, 是**没有收敛层**。
@@ -60,10 +60,9 @@ TONE = {
 # 多头三态 / 空头三态。只引用不做副本。
 from app.indicators.livermore import BULLISH  # noqa: E402
 
-# 判定打架时, 谁和谁算一对相反的意见。**只列真正相反的** ——
-# 「观望」与任何东西都不矛盾, 把它算进去会让一半的票都显示"打架", 那就废了。
-_AI_BULL = ("buy",)
-_AI_BEAR = ("sell",)
+# [R435] 原来这里有 `_AI_BULL` / `_AI_BEAR` 两组(判打架时 AI 哪几个词算多、算空)。
+# AI 信号整套停用, 与 AI 有关的三条打架规则(① 趋势 vs AI、③ 阶段 vs AI 两条)
+# 一起撤了; 剩下的都是规则层自己的分歧。
 
 
 def _mk(level: str, headline: str, why: str, *, price: float | None = None,
@@ -84,7 +83,7 @@ def _mk(level: str, headline: str, why: str, *, price: float | None = None,
 
 
 def _conflicts(*, held: bool, trend: dict | None, verdict: dict | None,
-               phase: dict | None, signal: dict | None) -> list[str]:
+               phase: dict | None) -> list[str]:
     """找出互相矛盾的判定对。返回人话描述, 空列表 = 没打架。
 
     **只认真正相反的**: 一边明确说多、另一边明确说空。「观望」「无结论」
@@ -94,14 +93,8 @@ def _conflicts(*, held: bool, trend: dict | None, verdict: dict | None,
     out: list[str] = []
     state = (trend or {}).get("state")
     bull_trend = state in BULLISH if state else None
-    sig = (signal or {}).get("signal")
 
-    # ① 趋势 vs AI
-    if bull_trend is True and sig in _AI_BEAR:
-        out.append(f"趋势还在多头侧({trend.get('state_cn')}),但 AI 说卖出")
-    elif bull_trend is False and sig in _AI_BULL:
-        out.append(f"趋势已经在空头侧({trend.get('state_cn')}),但 AI 说买入")
-
+    # [R435] ① 趋势 vs AI —— 随 AI 信号撤了
     # ② 趋势 vs 通道位置
     #
     # [R214] **这条规则从写下那天起一次都没触发过。** 原来读的是
@@ -134,12 +127,8 @@ def _conflicts(*, held: bool, trend: dict | None, verdict: dict | None,
     elif bull_trend is False and tone == "buy":
         out.append(f"趋势往下,但位置上看是「{verdict.get('title')}」—— 便宜不等于该买")
 
-    # ③ 阶段 vs AI: 走过头了/后劲不足 的时候 AI 还在喊买
+    # [R435] ③ 阶段 vs AI —— 随 AI 信号撤了
     ph = (phase or {}).get("code")
-    if ph in ("overextended", "stalling") and sig in _AI_BULL:
-        out.append(f"通道已经是「{phase.get('cn')}」,而 AI 说买入")
-    if ph == "declining" and sig in _AI_BULL:
-        out.append("三条线还在往下散开,而 AI 说买入")
 
     # ④ 持有 + 阶段说该想退出 + 趋势还没坏 —— 这一条只对持仓有意义
     if held and ph == "overextended" and bull_trend is True:
@@ -149,7 +138,7 @@ def _conflicts(*, held: bool, trend: dict | None, verdict: dict | None,
 
 def playbook(*, position: dict | None, trend: dict | None, exit_line: dict | None,
              urgency: dict | None, verdict: dict | None, phase: dict | None,
-             event: dict | None, signal: dict | None) -> dict:
+             event: dict | None) -> dict:
     """五套判定 → 一句「怎么办」。纯函数。
 
     返回 {level, label, order, tone, headline, why, price, conflicts}。
@@ -160,7 +149,7 @@ def playbook(*, position: dict | None, trend: dict | None, exit_line: dict | Non
     ex = exit_line or {}
     urg = urgency or {}
     conflicts = _conflicts(held=held, trend=trend, verdict=verdict,
-                           phase=phase, signal=signal)
+                           phase=phase)
 
     # ① 纪律: 出场线已破。**不参与讨论** —— 出场优先级是既定的
     if ex.get("triggered"):
@@ -233,7 +222,7 @@ def playbook(*, position: dict | None, trend: dict | None, exit_line: dict | Non
 
 def playbook_many(symbols: list[str], *, positions: dict, trends: dict,
                   exit_lines: dict, urgency: dict, keltner: dict,
-                  phases: dict, events: dict, signals: dict) -> dict[str, dict]:
+                  phases: dict, events: dict) -> dict[str, dict]:
     """批量。原料全是调用方已经算好的, **零新增取数**。"""
     out: dict[str, dict] = {}
     for sym in symbols:
@@ -242,5 +231,5 @@ def playbook_many(symbols: list[str], *, positions: dict, trends: dict,
             position=positions.get(sym), trend=trends.get(sym),
             exit_line=exit_lines.get(sym), urgency=urgency.get(sym),
             verdict=kc.get("verdict"), phase=phases.get(sym),
-            event=events.get(sym), signal=signals.get(sym))
+            event=events.get(sym))
     return out

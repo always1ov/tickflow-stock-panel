@@ -177,7 +177,8 @@ def test_no_clamp_is_needed_in_v2():
     assert o["partial"] is False
     assert "clamp" not in (o.get("factors") or {})
     # 注记堆满也不会把分数推过 100 —— 它们压根不参与
-    assert len(o["notes"]) >= 3
+    # [R435] 「AI 看多」那一枚随 AI 信号撤了, 堆得满的注记从三枚变两枚(主线 / 胜率)
+    assert len(o["notes"]) >= 2
 
 
 def test_partial_coverage_is_recorded_for_the_ledger():

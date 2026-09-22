@@ -534,10 +534,7 @@ export interface TodayAiCache {
   source: 'manual' | 'scheduled'
 }
 export interface TodayAiSchedule { enabled: boolean; hour: number; minute: number }
-export interface SignalAiSchedule {
-  enabled: boolean; hour: number; minute: number
-  scope: 'held' | 'watchlist'; gap_seconds: number
-}
+// [R435] SignalAiSchedule(个股 AI 信号批量定时)随 AI 信号停用撤了
 
 export interface TodayPrefs {
   min_hist_pct: number; max_show: number; max_single: number; target_vol: number; max_drawdown: number
@@ -552,7 +549,8 @@ export interface TodayHolding {
   symbol: string; name: string; close: number | null; cost: number | null; pnl_pct: number | null
   stage_cn: string | null; line: number | null; line_cn: string | null; distance_pct: number | null
   exit_triggered: boolean; trend_cn: string | null; trend_duration: number | null
-  trend_side: string | null; signal: string | null
+  trend_side: string | null
+  // [R435] `signal`(AI 信号)撤了; stance 也不再出「加仓」—— 见后端 holding_stance
   stance: string; stance_why: string
   weight?: number | null
   /** [R43] 高抛/低吸压力; 短期档在通道内时为 null */
@@ -4370,14 +4368,7 @@ export const api = {
       `/api/watchlist/positions/${encodeURIComponent(symbol)}`,
       { method: 'PUT', body: JSON.stringify({ held, cost, weight }) },
     ),
-  stockSignals: () =>
-    request<{ signals: Record<string, { signal: string; confidence: number; reason: string; close: number | null; created_at: string; watch_points?: { direction: 'up' | 'down'; price: number; label: string; action?: string; confidence?: number; reason: string }[] }> }>('/api/stock-analysis/signals'),
-  generateStockSignal: (symbol: string) =>
-    request<{ symbol: string; signal?: string; confidence?: number; reason?: string; close?: number | null; created_at?: string; error?: string }>(
-      `/api/stock-analysis/signal/${encodeURIComponent(symbol)}`,
-      // [R231] 这就是用户报的那一个: 「请求超时(30s)· /api/stock-analysis/signal/…」
-      { method: 'POST', timeoutMs: AI_REQUEST_TIMEOUT_MS },
-    ),
+  // [R435] stockSignals / generateStockSignal 随 AI 信号停用撤了(后端接口同步撤)
 
   // timeframe='all' 时不传参数 → 后端不过滤周期, 返回日线+分钟合并列表
   screenerStrategies: async (assetType?: 'stock' | 'etf' | 'index', timeframe: '1d' | '1m' | 'all' = '1d') => {
@@ -5137,10 +5128,7 @@ export const api = {
   // [fork 增强] AI 定时配置(今日总览导读·优选 / 个股信号批量)
   // [R352] `todayAiScheduleGet` / `Set` 一并删 —— 那个开关排的是导读与优选,
   // 两个展示面都没了。后端定时任务与偏好字段没动。
-  signalAiScheduleGet: () => request<SignalAiSchedule>('/api/settings/preferences/signal-ai-schedule'),
-  signalAiScheduleSet: (body: SignalAiSchedule) =>
-    request<SignalAiSchedule>('/api/settings/preferences/signal-ai-schedule',
-      { method: 'PUT', body: JSON.stringify(body) }),
+  // [R435] signalAiScheduleGet / Set 随 AI 信号停用撤了
   // [R352] `todayAi` / `todayAiTrackRecord` 删了。用户: 「这部分和 ai 导读都不用了」。
   // 命中率那条其实**从 R351 起就没人调了**(它只服务于已随今日总览删掉的优选面板)。
   // **后端两个端点原样还在** —— 这里删的只是前端那层包装, `git revert` 就能拿回来。

@@ -260,27 +260,9 @@ async def analyze_stock(request: Request, req: AnalyzeRequest):
     )
 
 
-# ================================================================
-# AI 买卖信号(自选决策台 P2)—— 结构化操作倾向, 与四维客观分析分开
-# ================================================================
-
-
-@router.get("/signals")
-def list_signals():
-    """全部已缓存的 AI 买卖信号 {SYMBOL: {signal, confidence, reason, close, created_at}}。"""
-    from app.services import stock_signal
-    return {"signals": stock_signal.load_all()}
-
-
-@router.post("/signal/{symbol}")
-async def generate_signal(symbol: str, request: Request):
-    """为单只标的生成(并缓存)一个 AI 买卖信号。前端「分析全部自选」逐只并发调用本接口。"""
-    if not symbol.strip():
-        raise HTTPException(400, "symbol 不能为空")
-    from app.services import stock_signal
-    repo = request.app.state.repo
-    data_dir = repo.store.data_dir
-    return await stock_signal.generate_signal(repo, data_dir, symbol)
+# [R435] 「AI 买卖信号」两个接口(GET /signals、POST /signal/{symbol})随 AI 信号
+# 整套停用撤了。用户: 「清除了ai信号这部分, 后续我打算用斐波那契二型重做这部分」。
+# 磁盘上的 `user_data/signals.json` 不删 —— 要回退时数据还在。
 
 
 # ================================================================
@@ -464,18 +446,11 @@ def get_urgency(request: Request, symbols: str = Query(..., description="逗号�
     urgency = watchlist_urgency.assess_many(
         syms, positions=positions, trends=trends, exit_lines=exits, keltner=keltner)
     # [R205] 「怎么办」收敛层 —— 五套判定合成一句话, 并指出它们什么时候打架。
-    # 原料全是上面已经算好的, **零新增取数**; AI 信号从本地缓存读, 不调模型。
+    # 原料全是上面已经算好的, **零新增取数**。[R435] AI 信号停用, 不再读。
     from app.services import stock_playbook
-    try:
-        from app.services import stock_signal
-        all_sigs = stock_signal.load_all()
-        sigs = {s_: (all_sigs.get(s_) or {}) for s_ in syms}
-    except Exception as e:  # noqa: BLE001
-        logger.debug("playbook: 读 AI 信号失败, 按没有信号处理: %s", e)
-        sigs = {}
     play = stock_playbook.playbook_many(
         syms, positions=positions, trends=trends, exit_lines=exits,
-        urgency=urgency, keltner=keltner, phases=phases, events=events, signals=sigs)
+        urgency=urgency, keltner=keltner, phases=phases, events=events)
     return {"urgency": urgency, "event": events, "phase": phases, "playbook": play}
 
 

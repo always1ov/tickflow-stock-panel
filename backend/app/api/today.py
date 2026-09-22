@@ -119,6 +119,8 @@ def score_opportunities(
     候选两路(与 v1 相同, 换的是打分不是选材):
       · 六态发出 转多/回升 信号
       · AI 看多且现价距上方触发价 2% 以内(逼近突破)
+        [R435] AI 信号停用后 `_build_overview` 传进来的 signals 是空的, 这一路眼下
+        没有候选; 代码留作二型重做时的槽位, 见那边的说明。
 
     **注记不参与打分**(extras 里的 win/mainline/verdict 与 AI 信号):
     它们照常挂在候选上给界面显示, 但一分不加一分不减。这是与 v1 最大的分野 ——
@@ -169,6 +171,7 @@ def score_opportunities(
             c["pivot"] = None
 
     # ---- 候选路 B: 逼近买入触发价 ----
+    # [R435] 眼下 signals 恒为空(AI 信号停用), 这一段不产生候选; 留给二型重做。
     for sym, sig in signals.items():
         if sym not in names or sig.get("signal") != "buy":
             continue
@@ -322,7 +325,7 @@ def score_opportunities(
             "energy": kc.get("energy"),
             "channel_event": chan_event,
             "channel_phase": chan_phase,
-            "notes": _annotations(sym, e, signals.get(sym) or {}),
+            "notes": _annotations(sym, e),
             # [R137] 盘中视图。**和 score/dims 完全并列, 一分不进评分** ——
             # 决策基准冻在收盘口径(盘中一动不动), 盘中的变化单独摆一份给人盯。
             "live": e.get("live"),
@@ -433,20 +436,12 @@ _NOTE_VERDICT_TONE = {
 }
 
 
-def _annotations(sym: str, e: dict, sig: dict) -> list[dict]:
-    """把不参与打分的佐证整理成一串标签。纯函数。"""
-    out: list[dict] = []
+def _annotations(sym: str, e: dict) -> list[dict]:
+    """把不参与打分的佐证整理成一串标签。纯函数。
 
-    # AI 信号: 只做佐证, 但**方向相反时要显眼**。v1 把它算成 -40 分等于把票
-    # 藏起来; 藏起来用户就不知道有过这个冲突, 更谈不上自己判断。
-    if sig.get("signal") == "sell":
-        out.append({"key": "ai", "tone": "bad", "label": "AI 看空",
-                    "text": "规则看多但 AI 看空 —— 结论互相矛盾, 自己定夺"})
-    elif sig.get("signal") == "buy":
-        conf = sig.get("confidence")
-        out.append({"key": "ai", "tone": "info",
-                    "label": f"AI 看多 {conf}" if conf is not None else "AI 看多",
-                    "text": "仅作佐证, 不参与把握分"})
+    [R435] 「AI 看多 / AI 看空」那一枚随 AI 信号一起撤了。
+    """
+    out: list[dict] = []
 
     ml = e.get("mainline")
     if ml:
@@ -671,11 +666,16 @@ _HEAT_GRACE_DAYS = 2
 
 
 def holding_stance(exit_triggered: bool, distance_pct: float | None,
-                   trend_side: str | None, ai_signal: str | None,
-                   trend_signal: str | None,
+                   trend_side: str | None,
                    heat: dict | None = None, pnl_pct: float | None = None,
                    trend_duration: int | None = None) -> tuple[str, str]:
-    """[R13] 持仓操作档位: 离场/减仓/加仓/持有(规则版, 只用已有字段)。
+    """[R13] 持仓操作档位: 离场/减仓/持有(规则版, 只用已有字段)。
+
+    [R435] AI 信号整套停用, 这里跟着去掉两处: 「AI 转看空 → 减仓」与「加仓」档。
+    加仓原来要求 趋势刚走强 + **AI 看多** + 离出场线够远, AI 一撤就少了一条腿 ——
+    用户选的是「加仓档不再出现」(尽可能减少买卖次数), 什么时候加仓等用斐波那契
+    二型重做这部分时再定, 不拿剩下两条凑一个更容易触发的加仓。
+    下面那段 R13 / R43 的说明保留原样, 讲的是当初的来龙去脉。
 
     离场纪律由出场线/生命线兜底(最高优先); 减仓是"趋势或 AI 转坏但还没破线"
     的中间档; 加仓要求趋势多头 + AI 看多 + 离出场线还有安全距离, 三者缺一不可。
@@ -699,8 +699,6 @@ def holding_stance(exit_triggered: bool, distance_pct: float | None,
         return "离场", "已跌破出场线,按纪律执行,不猜反弹"
     if trend_side == "空头":
         return "减仓", "持有票已处于空头趋势,先降低暴露"
-    if ai_signal == "sell":
-        return "减仓", "AI 转看空,与持仓方向矛盾"
     if distance_pct is not None and distance_pct >= -0.015:
         return "减仓", "距出场线不足 1.5%,提前减一部分比破线再动手从容"
 
@@ -711,13 +709,6 @@ def holding_stance(exit_triggered: bool, distance_pct: float | None,
         return "减仓", (f"已到通道上沿({heat['text']})、浮盈 {pnl_pct:.0%} ——"
                         f"可落袋一部分。趋势没坏, 剩下的继续按出场线拿")
 
-    if (trend_side == "多头" and ai_signal == "buy"
-            and trend_signal in ("转多", "回升")
-            and (distance_pct is None or distance_pct < -0.05)):
-        if high:
-            return "持有", (f"本来够加仓条件, 但已经贴到通道上沿({heat['text']})——"
-                            f"这个位置加仓是在最贵的地方下最重的注, 等回踩再说")
-        return "加仓", "趋势刚走强 + AI 看多 + 离出场线还有安全距离"
     return "持有", "无触发条件,按既定计划持有"
 
 
@@ -838,7 +829,7 @@ def _build_overview(repo, engine=None) -> dict:
     # [R169] 持仓改读合并视图(手填 ⊕ 批次): 字段与语义一字不变, 只是没手填成本时
     # 会用批次的加权平均补上。评分/门槛/注记全部原样, 本行之外没有任何改动。
     from app.services import effective_positions as positions_svc
-    from app.services import stock_signal, today_prefs, watchlist
+    from app.services import today_prefs, watchlist
     from app.services.livermore_service import trends_for_symbols
     from app.services.position_exit import exit_lines_for_positions
 
@@ -856,7 +847,12 @@ def _build_overview(repo, engine=None) -> dict:
     from app.services.live_quotes import as_live_entries, watchlist_live_map
     live = watchlist_live_map(repo)
     trends = trends_for_symbols(repo, syms, live=as_live_entries(live)) if syms else {}
-    signals = stock_signal.load_all()
+    # [R435] AI 信号整套停用(用户: 「清除了ai信号这部分, 后续我打算用斐波那契二型
+    # 重做这部分」)。**从源头断成空**, 下游那几处因此一起失效: 候选路 B「逼近买入
+    # 触发价」不再有候选、持仓档位不再看 AI(加仓档随之不出现)。候选路 B 的代码按
+    # 「一份 {代码: {signal, close, watch_points}}」的形状写, 留着 —— 二型重做时
+    # 接的正是这个槽位, 那时再决定它叫什么、怎么进候选。
+    signals: dict[str, dict] = {}
     pos_all = positions_svc.load_all()
     exit_lines = exit_lines_for_positions(repo)
     _st.mark("trends+exit_lines")
@@ -982,6 +978,7 @@ def _build_overview(repo, engine=None) -> dict:
     _st.mark("keltner")
 
     # [R134] 候选集要**同时覆盖两路**: 六态转强的, 和 AI 看多(逼近突破)的。
+    # [R435] 后一路眼下是空的(signals 从源头断成空), 候选集只剩六态转强那一路。
     # v1 只给前者算量能, 于是后者的量能维度整个缺席, 而缺维度会在维度间重归一化
     # —— 结果是"数据越少分越高"。这是个必须堵死的口子, 不是可选优化。
     extras: dict[str, dict] = {}
@@ -1206,14 +1203,13 @@ def _build_overview(repo, engine=None) -> dict:
             continue
         t = trends.get(sym)
         ex = exit_lines.get(sym)
-        sig = signals.get(sym)
         close = (ex or {}).get("close") or (t or {}).get("close")
         cost = pos.get("cost")
         heat = heat_map.get(sym)
         pnl_now = (close - cost) / cost if close and cost else None
         stance, stance_why = holding_stance(
             (ex or {}).get("triggered", False), (ex or {}).get("distance_pct"),
-            (t or {}).get("side"), (sig or {}).get("signal"), (t or {}).get("signal"),
+            (t or {}).get("side"),
             heat=heat, pnl_pct=pnl_now, trend_duration=(t or {}).get("duration"))
         holdings.append({
             "symbol": sym, "name": names.get(sym, sym),
@@ -1227,7 +1223,6 @@ def _build_overview(repo, engine=None) -> dict:
             "trend_cn": (t or {}).get("state_cn"),
             "trend_duration": (t or {}).get("duration"),
             "trend_side": (t or {}).get("side"),
-            "signal": (sig or {}).get("signal"),
             "stance": stance, "stance_why": stance_why,
             "heat": heat,
             "bands": bands_map.get(sym),

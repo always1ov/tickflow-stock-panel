@@ -101,34 +101,18 @@ export function PriceAlertDialog({
     }
   }, [currentPrice, levelsQuery.data?.levels])
 
-  // 缓存的 AI 信号(含 watch_points 推荐点位)
-  const signalsQ = useQuery({ queryKey: QK.stockSignals, queryFn: () => api.stockSignals(), staleTime: 30_000 })
-
-  // 推荐点位:优先 AI signal 的 watch_points;无则规则兜底(上方最近压力涨至 + 下方最近支撑跌至)
+  // 推荐点位: 上方最近压力涨至 + 下方最近支撑跌至。
+  // [R435] 原来优先用 AI 信号给的 watch_points, 规则版只是兜底; AI 信号停用后只剩规则版。
   const recoPoints = useMemo(() => {
-    type Reco = { direction: PriceAlertDirection; price: number; label: string; action: string; confidence: number | null; reason: string; ai: boolean }
+    type Reco = { direction: PriceAlertDirection; price: number; label: string; action: string; reason: string }
     if (currentPrice == null) return [] as Reco[]
-    const wp = signalsQ.data?.signals?.[symbol]?.watch_points ?? []
-    if (wp.length > 0) {
-      return wp
-        .filter(p => Number.isFinite(p.price) && p.price > 0)
-        .map((p): Reco => ({
-          direction: p.direction,
-          price: p.price,
-          label: p.label,
-          action: p.action || (p.direction === 'up' ? '突破关注' : '跌破防守'),
-          confidence: typeof p.confidence === 'number' ? p.confidence : null,
-          reason: p.reason,
-          ai: true,
-        }))
-    }
     const out: Reco[] = []
     const above = recommended.above[0]
     const below = recommended.below[0]
-    if (above) out.push({ direction: 'up', price: above.value, label: above.label, action: '突破关注', confidence: null, reason: '上方最近压力,突破需放量', ai: false })
-    if (below) out.push({ direction: 'down', price: below.value, label: below.label, action: '跌破防守', confidence: null, reason: '下方最近支撑,跌破转弱', ai: false })
+    if (above) out.push({ direction: 'up', price: above.value, label: above.label, action: '突破关注', reason: '上方最近压力,突破需放量' })
+    if (below) out.push({ direction: 'down', price: below.value, label: below.label, action: '跌破防守', reason: '下方最近支撑,跌破转弱' })
     return out
-  }, [currentPrice, signalsQ.data, symbol, recommended])
+  }, [currentPrice, recommended])
 
   useEffect(() => {
     if (target || currentPrice == null) return
@@ -349,7 +333,7 @@ export function PriceAlertDialog({
               <section className="mt-4 rounded-lg border border-sky-400/25 bg-sky-400/[0.05] p-3">
                 <div className="mb-2 flex items-center justify-between">
                   <span className="text-[11px] font-medium text-sky-300">
-                    🎯 推荐点位配置 {recoPoints.some(p => p.ai) ? '· AI' : '· 规则(未跑AI)'}
+                    🎯 推荐点位配置 · 规则
                   </span>
                   <button
                     onClick={() => createReco.mutate()}
@@ -405,9 +389,6 @@ export function PriceAlertDialog({
                         </span>
                         <span className="shrink-0 font-mono text-xs text-foreground">{p.price.toFixed(2)}</span>
                         {p.label && <span className="shrink-0 text-[10px] text-secondary">{p.label}</span>}
-                        {p.confidence != null && (
-                          <span className="ml-auto shrink-0 text-[10px] tabular-nums text-muted">置信 {p.confidence}%</span>
-                        )}
                       </div>
                       {p.reason && <span className="text-[10px] leading-snug text-muted/70">{p.reason}</span>}
                     </button>

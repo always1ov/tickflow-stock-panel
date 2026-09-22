@@ -32,7 +32,6 @@ export type ExportRow = {
   exit?: ExitLine
   kc?: KeltnerBands
   urg?: Urgency
-  sig?: { signal: string; confidence: number; reason: string } | null
   /** [R201] 现在处在哪一段 —— 决策台「通道态势」那一列的第一行 */
   ph?: ChannelPhase | null
 }
@@ -77,7 +76,7 @@ export type ExportColumn = {
   /** 默认是否勾选。默认 = 屏幕上那套列 */
   on: boolean
   /** 分组, 仅用于选列面板里的归类 */
-  group: '决策' | '行情' | '持仓' | '通道' | '趋势' | 'AI'
+  group: '决策' | '行情' | '持仓' | '通道' | '趋势'   // [R435] 'AI' 组随 AI 信号撤了
   cell: (r: ExportRow) => Cell
 }
 
@@ -182,14 +181,8 @@ export const EXPORT_COLUMNS: ExportColumn[] = [
       ? { text: r.kc.verdict.title, style: TONE_STYLE[r.kc.verdict.tone] }
       : { text: '—' }),
   },
-  {
-    key: 'confidence', label: '置信', group: 'AI', align: 'right', on: true,
-    cell: (r) => ({ text: r.sig ? `${Math.round(r.sig.confidence * 100)}%` : '—' }),
-  },
-  {
-    key: 'signal', label: 'AI 信号', group: 'AI', on: true,
-    cell: (r) => ({ text: r.sig ? `${r.sig.signal} · ${r.sig.reason}` : '—' }),
-  },
+  // [R435] 「置信」「AI 信号」两列随 AI 信号停用撤了。本地存过的选列里若还有这两个键,
+  //   按「不认得的键」处理(导出只认这张表里有的列)。
 
   // ↓ 原「六态汇总」独有的四列。屏幕上藏在「趋势」列的悬停里, 这里做成可勾选的
   //   列 —— 勾上这四个、取消其余, 就是原来那个弹窗导出的东西。

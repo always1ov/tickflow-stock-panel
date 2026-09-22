@@ -552,20 +552,11 @@ def test_R352_导读与它的定时开关一起消失():
     ctrl = code_of(CTRL)
     assert "定时导读" not in ctrl, "那个开关的产出已经没有展示面了, 不该还留着"
     assert "todayAiSched" not in ctrl, "对应的 query/mutation 也该一起走"
-    # **对照组**: 「定时个股信号」的产出仍然显示在决策台的「AI 信号」列上, 它留着。
-    # 不能拿裸四个字当锚 —— 这四个字也出现在 toast 文案里(`定时个股信号已开启:...`),
-    # 那样把开关整个删掉照样绿。
-    #
-    # [R400] 原来锚的是 `<span className="whitespace-nowrap">定时个股信号</span>`,
-    # 而 3.2 把这个 label 收进了 `<Field label={…}>` —— **标记变了, 开关一点没变**。
-    # 改钉那个真正不可少的东西: 这四个字必须挂在一个 checkbox 上。
-    # 逐个看每一处「定时个股信号」, 只要**有一处**是挂在勾选框上的就算数 ——
-    # 第一处恰好是 toast 文案(正是上面说的那个陷阱), 拿 `index()` 取会误判。
-    hits = [m.start() for m in re.finditer("定时个股信号", ctrl)]
-    assert hits, "这个开关有活的展示面(决策台 AI 信号列), 不该被误删"
-    assert any('type="checkbox"' in ctrl[max(0, i - 900):i] for i in hits), \
-        "「定时个股信号」没有一处挂在勾选框上 —— 剩下的可能只是 toast 文案"
-    assert "signalAiSchedMut.mutate({" in ctrl, "开关得真的能落库"
+    # [R435] 这里原来有一组**对照组**:「定时个股信号」的产出还显示在决策台的「AI 信号」
+    # 列上, 所以它得留着。现在 AI 信号整套停用, 那一列没了 —— 按这条自己的立论
+    # (「一个开关的展示面没了, 开关本身就得跟着走」), 它也跟着走了。
+    assert "定时个股信号" not in ctrl and "signalAiSched" not in ctrl, \
+        "「定时个股信号」的展示面(AI 信号列)已经撤了, 开关不该还留着"
 
 
 def test_R352_前端那几个死包装也清了():

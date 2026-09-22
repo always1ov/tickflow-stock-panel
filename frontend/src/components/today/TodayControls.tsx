@@ -28,14 +28,12 @@ import { useMutation } from '@tanstack/react-query'
 import { BarChart3, Loader2, SlidersHorizontal } from 'lucide-react'
 import {
   api, TODAY_BOARDS,
-  type SignalAiSchedule, type TodayOverview, type TodayPrefs,
+  type TodayOverview, type TodayPrefs,
 } from '@/lib/api'
 import { toast } from '@/components/Toast'
 import { cn } from '@/lib/cn'
-import { Button, Card, CardSection, Field, fieldInput, fieldSelect } from '@/components/ui'
+import { Button, Card, CardSection, Field, fieldInput } from '@/components/ui'
 import { ScoreLedgerDialog } from '@/components/ScoreLedgerDialog'
-import { useQuery } from '@tanstack/react-query'
-import { QK } from '@/lib/queryKeys'
 
 export function TodayControls({ d, refetch, isFetching, extra }: {
   d: TodayOverview
@@ -64,22 +62,6 @@ export function TodayControls({ d, refetch, isFetching, extra }: {
   // 用户会再点一次(第二次读到的还是旧的 boardFilter, 于是又发了一遍同样的
   // 请求, 屏幕上叠出两个一样的 toast)。先本地亮起来, 服务端回来再对齐。
   const [boardDraft, setBoardDraft] = useState<string[] | null>(null)
-
-  const signalAiSched = useQuery({
-    queryKey: QK.signalAiSchedule,
-    queryFn: () => api.signalAiScheduleGet(),
-    staleTime: 5 * 60_000,
-  })
-  const signalAiSchedMut = useMutation({
-    mutationFn: (body: SignalAiSchedule) => api.signalAiScheduleSet(body),
-    onSuccess: (r) => {
-      signalAiSched.refetch()
-      toast(r.enabled
-        ? `定时个股信号已开启:工作日 ${String(r.hour).padStart(2, '0')}:${String(r.minute).padStart(2, '0')} · ${r.scope === 'held' ? '只跑持有' : '全部自选'} · 间隔 ${r.gap_seconds}秒`
-        : '定时个股信号已关闭', 'success')
-    },
-    onError: (e: Error) => toast(e.message, 'error'),
-  })
 
   const prefsMut = useMutation({
     mutationFn: (body: Partial<TodayPrefs>) => api.todaySavePrefs(body),
@@ -280,67 +262,8 @@ export function TodayControls({ d, refetch, isFetching, extra }: {
           <span className="text-micro text-muted/70">
             把握分调高更严格;单票上限与目标日波动决定「建议仓位」;试仓/确认加至/站稳决定「建仓路径」。卖出提醒不受任何门槛影响。
           </span>
-          {/* [R27] AI 定时自动运行 */}
-          <div className="flex w-full flex-wrap items-center gap-x-s4 gap-y-g4 border-t border-border/40 pt-s2">
-            {/* [R352] 「定时导读·优选」那个开关删了。用户: 「这部分和 ai 导读都不用了」。
-                它产出两样东西: 导读正文与 AI 优选 —— **两个展示面都已经没了**
-                (优选面板随今日总览一起删于 R351, 导读正文这次删)。留着就是又一个
-                调了不产生任何可见结果的旋钮, 和 R340 那个「回撤纪律线」一模一样。
-                后端定时任务与偏好字段没动, 要恢复把这个 label 加回来即可。 */}
-            {/* [R400] 这一行原来的聚焦色写的是 violet, 而上面那八个框写的是 sky ——
-                **同一个弹出面板里, 聚焦时一半变蓝一半变紫**。收进 `fieldInput`
-                之后只剩强调色一种说法; 勾选框的 `accent-` 同理。 */}
-            <Field
-              label={<>
-                <input
-                  type="checkbox"
-                  checked={signalAiSched.data?.enabled ?? false}
-                  onChange={(e) => signalAiSchedMut.mutate({
-                    ...(signalAiSched.data ?? { hour: 19, minute: 0, scope: 'held' as const, gap_seconds: 20 }),
-                    enabled: e.target.checked,
-                  })}
-                  className="mr-g4 h-3.5 w-3.5 accent-accent"
-                />
-                定时个股信号
-              </>}
-              title="工作日到点批量刷新个股 AI 信号; 每只之间留间隔, 不会打满接口"
-            >
-              <input
-                type="time"
-                value={`${String(signalAiSched.data?.hour ?? 19).padStart(2, '0')}:${String(signalAiSched.data?.minute ?? 0).padStart(2, '0')}`}
-                onChange={(e) => {
-                  const [h, m] = e.target.value.split(':').map(Number)
-                  if (!Number.isNaN(h) && signalAiSched.data) {
-                    signalAiSchedMut.mutate({ ...signalAiSched.data, hour: h, minute: m })
-                  }
-                }}
-                className={fieldInput}
-              />
-              <select
-                value={signalAiSched.data?.scope ?? 'held'}
-                onChange={(e) => signalAiSched.data && signalAiSchedMut.mutate({
-                  ...signalAiSched.data, scope: e.target.value as 'held' | 'watchlist',
-                })}
-                className={fieldSelect}
-              >
-                <option value="held">只跑持有</option>
-                <option value="watchlist">全部自选</option>
-              </select>
-              <span className="whitespace-nowrap">间隔</span>
-              <input
-                type="number" min={5} max={300}
-                value={signalAiSched.data?.gap_seconds ?? 20}
-                onChange={(e) => signalAiSched.data && signalAiSchedMut.mutate({
-                  ...signalAiSched.data, gap_seconds: Number(e.target.value) || 20,
-                })}
-                className={cn(fieldInput, 'w-14')}
-              />
-              <span className="whitespace-nowrap">秒/只</span>
-            </Field>
-            <span className="text-micro text-muted/70">
-              建议放在盘后日线落盘之后(17:30~20:00);个股多时用「只跑持有」更省
-            </span>
-          </div>
+          {/* [R27 → R435] 「AI 定时自动运行」那一行撤了: 定时导读·优选早在 R352 删了,
+              剩下的「定时个股信号」随 AI 信号整套停用一起删(后端定时任务与接口同步撤)。 */}
           {prefsMut.isPending && <Loader2 className="h-3 w-3 animate-spin text-muted" />}
         </Card>
       )}

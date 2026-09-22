@@ -20,7 +20,7 @@ import {
 /** 原六态汇总的那几列 —— 标的与现价是任何视图都要的, 所以一并带上 */
 const TREND_PRESET = ['name', 'close', 'trend', 'dur', 'flipDown', 'flipUp', 'trendSignal']
 
-const GROUP_ORDER: ExportColumn['group'][] = ['决策', '行情', '持仓', '通道', '趋势', 'AI']
+const GROUP_ORDER: ExportColumn['group'][] = ['决策', '行情', '持仓', '通道', '趋势']
 
 export function ExportColumnsDialog({
   keys, onChange, onExport, onClose, rowCount,

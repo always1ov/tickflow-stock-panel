@@ -84,7 +84,7 @@ def test_R333_决策台判定层自己刷():
     code = code_of(BOARD)
     assert "refetchInterval: refreshEvery('derived')" in code, "六态没接 —— 它是日线派生"
     assert "refetchInterval: refreshEvery('live')" in code, "「该动了」没接 —— 它随实时价动"
-    assert "refetchInterval: refreshEvery('slow')" in code, "AI 信号没接"
+    # [R435] 原来还有一条「AI 信号走 slow 档」—— 那一列随 AI 信号撤了
     assert "refetchInterval: 60 * 60 * 1000" not in code, "那个写死的一小时该换掉了"
 
 

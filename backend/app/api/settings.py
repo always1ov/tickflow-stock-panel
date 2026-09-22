@@ -2275,12 +2275,7 @@ class TodayAiScheduleIn(BaseModel):
     minute: int = 30
 
 
-class SignalAiScheduleIn(BaseModel):
-    enabled: bool = False
-    hour: int = 19
-    minute: int = 0
-    scope: str = "held"          # held=只跑持有 / watchlist=全部自选
-    gap_seconds: int = 20        # 每只之间的间隔, 防打满 AI 接口
+# [R435] SignalAiScheduleIn(个股 AI 信号批量定时的入参)随 AI 信号停用撤了。
 
 
 def _require_ai_key(what: str) -> None:
@@ -2323,37 +2318,7 @@ def update_today_ai_schedule(req: TodayAiScheduleIn, request: Request) -> dict:
     return sched
 
 
-@router.get("/preferences/signal-ai-schedule")
-def get_signal_ai_schedule() -> dict:
-    """[fork 增强] 个股 AI 信号批量定时配置。"""
-    from app.services import preferences
-    return preferences.get_signal_ai_schedule()
-
-
-@router.put("/preferences/signal-ai-schedule")
-def update_signal_ai_schedule(req: SignalAiScheduleIn, request: Request) -> dict:
-    """保存个股 AI 信号批量定时并立即更新 job。"""
-    from app.services import preferences
-    if req.enabled:
-        _require_ai_key("个股 AI 信号")
-    sched = preferences.set_signal_ai_schedule(
-        req.enabled, req.hour, req.minute, req.scope, req.gap_seconds)
-
-    from app.jobs.daily_pipeline import SIGNAL_AI_JOB_ID, _register_signal_ai_job
-    scheduler = getattr(request.app.state, "scheduler", None)
-    if scheduler:
-        if sched["enabled"]:
-            _register_signal_ai_job(scheduler, request.app.state.repo,
-                                    sched["hour"], sched["minute"])
-            logger.info("scheduled_signal_ai enabled @%02d:%02d scope=%s gap=%ss",
-                        sched["hour"], sched["minute"], sched["scope"], sched["gap_seconds"])
-        else:
-            try:
-                scheduler.remove_job(SIGNAL_AI_JOB_ID)
-                logger.info("scheduled_signal_ai disabled (job removed)")
-            except Exception:  # noqa: BLE001
-                pass
-    return sched
+# [R435] GET / PUT /preferences/signal-ai-schedule 两个接口随 AI 信号停用撤了。
 
 
 class ReviewPushIn(BaseModel):

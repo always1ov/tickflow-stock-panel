@@ -1,14 +1,12 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Star, Wallet, Sparkles, Loader2, ArrowUp, ArrowDown, RefreshCw, FileText, Download, Bell, ChevronDown, Folder, Inbox, List, FlaskConical } from 'lucide-react'
+import { Star, Wallet, ArrowUp, ArrowDown, RefreshCw, Download, ChevronDown, Folder, Inbox, List, FlaskConical } from 'lucide-react'
 import { api, type ChannelEvent, type ChannelPhase, type EffectivePosition, type ExitLine, type KeltnerBands, type TrendInfo, type Urgency } from '@/lib/api'
 // [R276] 分组下拉直接复用「加入自选」那个菜单 —— 定位/键盘/点外面关闭/配色全都现成
 import { WatchlistGroupMenu } from '@/components/WatchlistAddMenu'
 import { resolveWatchlistGroupColor } from '@/lib/watchlist-group-colors'
 import { QK } from '@/lib/queryKeys'
-import { pickStale, SIGNAL_TTL_HOURS } from '@/lib/signalFreshness'   // [R131] 增量分析判据
 import { toast } from '@/components/Toast'
-import { useHistoryReports, openHistoryReport, loadHistory } from '@/lib/stockAnalysisStore'
 import { trendBadgeCls } from '@/components/stock-analysis/TrendStateBar'
 import type { PreviewView } from '@/components/StockPreviewDialog'
 // [R167] 导出与两个单元格从本文件拆出 —— 拆前 933 行, 顶部堆着两张配色表和一整份
@@ -25,8 +23,6 @@ import { refreshEvery } from '@/lib/refreshRhythm'   // [R333] 刷新节奏一�
 import { BoardSkeletonRows } from '@/components/stock-analysis/decision-board/BoardSkeletonRows'   // [R324] 首次加载骨架行
 // [R169] 合并视图(手填 ⊕ 上游批次登记), 字段说明见 api.ts 的 EffectivePosition
 type Position = EffectivePosition
-type WatchPoint = { direction: 'up' | 'down'; price: number; label?: string; action?: string; reason?: string }
-type Signal = { signal: string; confidence: number; reason: string; close: number | null; created_at: string; watch_points?: WatchPoint[] }
 // [R254] 排序目标从 18 个砍到 10 个 —— **每列只留一个**。
 //
 // 用户: 「我也不想切换那么多下」「点击第三下就恢复原状」。
@@ -49,12 +45,10 @@ type Signal = { signal: string; confidence: number; reason: string; close: numbe
 //   · held   —— 「只看持有」那个按钮本来就在做这件事, 排序是重复入口
 //   · cost   —— 按成本价排 166 只票没有任何决策含义
 //   · report —— 「上次 AI 分析是什么时候」不是决策输入; 胶囊照旧可点开
-// 合并后的「持仓」列排 `pnl`(亏最多的先看), 「AI 信号」列照旧排 `signal`。
+// 合并后的「持仓」列排 `pnl`(亏最多的先看)。[R435] 「AI 信号」列与它的 `signal` 键一起撤了。
 // [R310] `play` 退役 —— **理由与 R254 当初那一串逐字相同: 它点不到了。**
 // 「怎么办」整列删掉之后它的表头没了, 留着就是死键。
-type SortKey = 'urgency' | 'name' | 'changePct' | 'trend'
-  | 'pnl' | 'signal'
-const SIGNAL_RANK: Record<string, number> = { buy: 0, sell: 1, hold: 2, watch: 3 }
+type SortKey = 'urgency' | 'name' | 'changePct' | 'trend' | 'pnl'
 /**
  * [R194] 决策台的列宽表 —— colgroup 与空表提示的 colSpan 同源。
  *
@@ -95,10 +89,12 @@ const HEAD_TIPS = {
 const BOARD_COLS = [
   // [R309] 9.5% → 13%。名称原来截在 110px, 五个字以上就带省略号 ——
   // **认票这件事上省 3% 是最亏的**: 认错票之后后面六列全白读。
-  { label: '标的', w: '18%' },
+  // [R435] AI 信号那一列(26%)撤掉后重新分: 18/10/34/12 → 22/12/48/18。
+  // 大头给「走势/位置」—— 它是这张表里唯一的判断列, 最需要地方。
+  { label: '标的', w: '22%' },
   // [R212] 「现价」「涨跌」合成一列。用户: 「这两列合成为『现价/涨跌』这样为一列」。
   // 两个数天生一起读 —— 拆成两列只是让眼睛多跳一次。
-  { label: '现价/涨跌', w: '10%' },
+  { label: '现价/涨跌', w: '12%' },
   // [R212] 「止盈线」那一列撤掉了。用户: 「止盈线这一列不要了」。
   // **信息没丢**: 出场线破了或逼近, 「结论」列会直接判成「按纪律走」/「盯着」
   // 并把线价写在徽标上 —— 那比单独一列更早进视线。排序键与判定都还在。
@@ -106,7 +102,7 @@ const BOARD_COLS = [
   // 六态与通道阶段答的是同一个问题(往哪走), 只是方法不同 —— 放一格里,
   // 它们什么时候一致、什么时候打架, 上下一对就看见了。
   // [R425] 「走势」20% + 「位置」14% 并成一列, 宽度原数相加 —— 总和仍是 100。
-  { label: '走势/位置', w: '34%' },
+  { label: '走势/位置', w: '48%' },
   // [R277 加, R297 删] 「进度」那一列并进「结论」了。用户: 「个股分析页面的
   // 进度列和结论列看看怎么合并和显示哪些内容」。
   // [R212] 「贵不贵」(位置) + 「怎么办」(动作) 合成一列, 竖排, 摆在 AI 之前。
@@ -127,28 +123,11 @@ const BOARD_COLS = [
   // 在整张表上零个渲染点, 那条线只从「怎么办」的 `price` 露过面。所以它搬进
   // 「持仓」列 —— 出场线本来就是**关于我这笔仓位**的事, 归「我的账」比归
   // 「凭什么」更准。
-  { label: '持仓', w: '12%' },
-  // [R284] 「AI 分析」整列撤掉 —— 用户: 「仅保留对投资决策最具影响力和决定性的
-  // 核心数据列」。**它压根不是数据列**: 一枚报告胶囊 + 两个图标按钮, 是操作入口。
-  // 三件东西并进「AI 信号」那一列的头一行(与信号徽标、时间同排), 一个不少。
-  // [R309] **「吃掉剩下的」这条改掉了 —— 它就是这一列涨到半张表的原因。**
-  //
-  // 表格是 `table-auto`(没有 `table-fixed`), 所以 colgroup 里的百分比是
-  // **建议**, 真正定宽的是内容: 不给宽度 = 纯内容驱动, 于是 AI 那段不换行的
-  // 理由把 max-content 顶到多高, 这一列就有多宽 —— 实测吃掉约 47%,
-  // **整张表的一半给了最不该占这么多的那一层**。
-  //
-  // 列序那条纪律写着「认票 → 凭什么 → 我的账 → 别人的意见」。AI 信号是
-  // **别人的意见** —— 它可以在场, 但不该比「我自己的判断」那三列加起来还宽。
-  // 现在 30% vs 44%(走势 + 位置 + 怎么办), 有守卫钉着这个次序。
-  //
-  // **光给宽度不够**(R283 那一课的又一次): `table-auto` 下内容的 max-content
-  // 说了算, 所以真正的闸是单元格里那道 `max-w` + 理由两行截断。两处一起动。
-  // [R310] 30% → 26%。**这不是我想收窄它, 是 R309 那条不变式逼的**:
-  // 「别人的意见不许比自己的判断占得宽」—— 「怎么办」一删, 判断那一侧少了
-  // 27%, 只剩 走势 + 位置 = 34%; AI 原样留着 30% 就会顶到 34% 的脸上。
-  // **守卫昨天刚立, 今天就抓到了这次删除的副作用** —— 这正是它该做的事。
-  { label: 'AI 信号', w: '26%' },
+  { label: '持仓', w: '18%' },
+  // [R284 → R435] 「AI 分析」整列并进「AI 信号」列(R284), R435 连「AI 信号」列一起撤了 ——
+  // 用户: 「清除了ai信号这部分, 后续我打算用斐波那契二型重做这部分」。那一列头一行的
+  // 三个入口(报告胶囊 / ✨AI 四维分析 / 🔔点位提醒)按用户选的一起去掉: AI 四维分析在
+  // 个股弹窗里有入口(当天分析过会问要不要看报告), 点位提醒在弹窗里双击图就能设。
   //
   // [R309] **上面这些宽度加起来必须正好 100%, 而且一列都不许留空。**
   //
@@ -168,78 +147,9 @@ const TREND_RANK: Record<string, number> = { UT: 0, NR: 1, SR: 2, SREA: 3, NREA:
 const G_ALL = 'all'
 const G_UNGROUPED = 'ungrouped'
 
-// AI 信号 → 展示标签/配色。买入=红(A股涨红), 卖出=绿, 持有=琥珀, 观望=灰。
-const SIGNAL_META: Record<string, { label: string; cls: string }> = {
-  buy: { label: '买入', cls: 'border-red-400/40 bg-red-400/10 text-red-400' },
-  sell: { label: '卖出', cls: 'border-emerald-400/40 bg-emerald-400/10 text-emerald-400' },
-  hold: { label: '持有', cls: 'border-amber-400/40 bg-amber-400/10 text-amber-400' },
-  watch: { label: '观望', cls: 'border-border bg-base text-muted' },
-}
-
-/**
- * [R284] 「AI 分析」那一列撤掉之后, 它的三件东西(报告胶囊 / ✨生成分析 / 🔔点位提醒)
- * 收成这个小组件, 挂在「AI 信号」列的头一行。
- *
- * 用户: 「仅保留对投资决策最具影响力和决定性的核心数据列」——
- * **它压根不是数据列, 是操作入口**, 不该按第三宽的比例占着一整列。
- *
- * 抽成组件是因为它要在**两支**里各出一次: 有信号的那支挂在徽标旁边, 没信号的
- * 那支挂在「未分析」旁边 —— 后者一漏, 没跑过分析的票就再也点不到那个 ✨。
- *
- * 配色: 报告胶囊原来是**紫色**, 这次去掉了。紫色在这张表里不表达任何市场含义
- * (它只说"有报告"), 而表里每一种颜色都该有含义 —— 见 R284 的配色收敛。
- */
-function AiActions({ r, onAnalyze, onPriceAlert, reports }: {
-  r: { symbol: string; name: string }
-  onAnalyze?: (symbol: string, name: string) => void
-  onPriceAlert?: (symbol: string, name: string) => void
-  reports?: { latest: { id: string; created_at: string }; count: number }
-}) {
-  const iconCls = 'grid h-6 w-6 place-items-center rounded-btn text-muted/50 '
-    + 'transition-colors duration-hover hover:bg-elevated hover:text-sky-300'
-  return (
-    <span className="inline-flex items-center gap-1">
-      {!!reports && (
-        <button
-          onClick={() => openHistoryReport(reports.latest.id)}
-          title={`打开最近报告(${new Date(reports.latest.created_at).toLocaleString()})${reports.count > 1 ? ` · 共 ${reports.count} 份` : ''}`}
-          className="inline-flex items-center gap-1 rounded-btn border border-border bg-elevated/60 px-1.5 py-0.5 text-[11px] text-secondary transition-colors duration-hover hover:text-foreground cursor-pointer"
-        >
-          <FileText className="h-2.5 w-2.5 shrink-0" />
-          {fmtAgo(reports.latest.created_at)}
-          {reports.count > 1 && <span className="opacity-60">·{reports.count}</span>}
-        </button>
-      )}
-      {onAnalyze && (
-        <button onClick={() => onAnalyze(r.symbol, r.name)}
-                title={`对 ${r.name} 生成/更新 AI 四维分析`}
-                aria-label={`对 ${r.name} 生成 AI 分析`} className={iconCls}>
-          <Sparkles className="h-3 w-3" />
-        </button>
-      )}
-      {onPriceAlert && (
-        <button onClick={() => onPriceAlert(r.symbol, r.name)}
-                title={`为 ${r.name} 设置价格点位提醒`}
-                aria-label={`为 ${r.name} 设置点位提醒`} className={iconCls}>
-          <Bell className="h-3 w-3" />
-        </button>
-      )}
-    </span>
-  )
-}
-
-function fmtAgo(iso?: string): string {
-  if (!iso) return ''
-  const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000)
-  if (s < 60) return '刚刚'
-  if (s < 3600) return `${Math.floor(s / 60)}分前`
-  if (s < 86400) return `${Math.floor(s / 3600)}小时前`
-  return `${Math.floor(s / 86400)}天前`
-}
-
 /** 自选决策台 —— 个股分析页的整页主体: 一行一只自选, 点标的即弹出关键价位分析,
  *  并可标记仓位/成本、纵观对比浮盈。[R28] 起不再折叠(整页就它一个, 没有要让位的东西)。 */
-export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onAnalyze, onPriceAlert, locateNonce }: {
+export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, locateNonce }: {
   currentSymbol: string
   /** [R157] 页头「定位」按钮每按一次 +1: 把当前个股那一行滚到视野正中并闪一下 */
   locateNonce?: number
@@ -247,10 +157,6 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
   /** [R103] 点标的名称时打开整合版个股弹窗(最近查看+随意切换); 未传时退回仅选中。
       [R427] 第三个参数是落在哪一页: 点「走势/位置」传 'review' —— 复盘并进了这个弹窗 */
   onPreview?: (symbol: string, name: string, view?: PreviewView) => void
-  /** [R106] 行内 AI 分析(原页头「AI 个股分析」按钮, 整合进 AI 分析列, 每个标的都有) */
-  onAnalyze?: (symbol: string, name: string) => void
-  /** [R106] 行内点位提醒(原页头「点位提醒」按钮, 同上) */
-  onPriceAlert?: (symbol: string, name: string) => void
 }) {
   const qc = useQueryClient()
   const [heldOnly, setHeldOnly] = useState(false)
@@ -318,7 +224,6 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
    */
   const FIRST_DIR: Record<SortKey, 'asc' | 'desc'> = {
     urgency: 'asc',        // order 越小越急
-    signal: 'asc',         // 买入 > 卖出 > 持有 > 观望
     name: 'asc',           // A → Z
     trend: 'desc',         // 值取了负 —— 降序 = 多头在前
     // [R277 加, R297 删] `spread` 这个排序目标退役了 —— **理由与 R254 当初删它
@@ -406,16 +311,6 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
     return groupFilter === G_UNGROUPED ? ids.length === 0 : ids.includes(groupFilter)
   }, [groupFilter, groupOf, groupsReady])
 
-  const signalsQ = useQuery({
-    queryKey: QK.stockSignals,
-    queryFn: () => api.stockSignals(),
-    staleTime: 30_000,
-    // [R27 → R333] 原来写死一小时。AI 信号是定时任务批量刷的, 一天变不了几次,
-    // 所以归 `slow` 档(30 分钟)—— 比原来快一倍, 而它本来就不该按盘中节奏跑。
-    refetchInterval: refreshEvery('slow'),
-  })
-  const signals = useMemo(() => signalsQ.data?.signals ?? {}, [signalsQ.data])
-
   // [fork 增强] 六态趋势列 —— 批量一次拉取,零 AI 成本,基于日线收盘价
   const trendSyms = useMemo(
     () => ((enriched.data?.rows ?? []) as any[]).map((r) => String(r.symbol)).sort().join(','),
@@ -481,27 +376,12 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
   })
   const exitLines: Record<string, ExitLine> = useMemo(() => exitLinesQ.data?.lines ?? {}, [exitLinesQ.data])
 
-  // 历史报告整合: 每只自选显示最近一份 AI 分析报告(时间+份数), 点击直接打开报告弹窗。
-  // 数据来自 stockAnalysisStore(个股分析页挂载时已 loadHistory, 此处再调一次是安全去重)。
-  const { reports } = useHistoryReports()
-  useEffect(() => { loadHistory() }, [])
-  const reportsBySymbol = useMemo(() => {
-    const m = new Map<string, { latest: (typeof reports)[number]; count: number }>()
-    for (const r of reports) {  // reports 已按 created_at 降序 → 首见即最新
-      const cur = m.get(r.symbol)
-      if (cur) cur.count += 1
-      else m.set(r.symbol, { latest: r, count: 1 })
-    }
-    return m
-  }, [reports])
-
-  // 手动刷新:重新拉取行情/仓位/信号(不调用 AI、不计费)。盘中本就 SSE 自动刷新,
+  // 手动刷新:重新拉取行情/仓位(不调用 AI、不计费)。盘中本就 SSE 自动刷新,
   // 这个按钮主要给收盘后/关闭实时时,想一键看最新盘后快照用。
-  const refreshing = enriched.isFetching || positionsQ.isFetching || signalsQ.isFetching
+  const refreshing = enriched.isFetching || positionsQ.isFetching
   const refreshAll = () => {
     qc.invalidateQueries({ queryKey: QK.watchlistEnriched() })
     qc.invalidateQueries({ queryKey: QK.watchlistPositions })
-    qc.invalidateQueries({ queryKey: QK.stockSignals })
   }
 
   const setPos = useMutation({
@@ -513,86 +393,6 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
     },
   })
 
-  // 「分析全部/持有」—— 逐只并发(限 3)调用信号接口, 每完成一只即刷新, 显示进度。
-  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
-  const runBatch = async (syms: string[]) => {
-    if (progress) return
-    if (!syms.length) {
-      // 静默 return 会让按钮看起来"点了没反应" —— 空列表必须说明原因
-      toast('没有可分析的标的:行情数据未就绪或自选为空(只看持有时需先标记持有)', 'error')
-      return
-    }
-    setProgress({ done: 0, total: syms.length })
-    let done = 0
-    let failed = 0
-    let firstErr = ''
-    let idx = 0
-    const worker = async () => {
-      while (idx < syms.length) {
-        const s = syms[idx++]
-        try {
-          // 注意: 后端信号接口失败时返回 200 + {error} 而非抛 HTTP 错误,
-          // 必须检查响应体 —— 否则 AI 挂掉时(如 503)整批"成功"但信号纹丝不动
-          const res = await api.generateStockSignal(s)
-          if (res?.error) {
-            failed++
-            if (!firstErr) firstErr = res.error
-          }
-        } catch (e: any) {
-          // 单只失败不阻断, 但必须计数并保留首个错误 —— 全军覆没时(如 AI Key
-          // 失效/未配置)若静默吞掉, 用户看到的就是"点了没反应"
-          failed++
-          if (!firstErr) firstErr = e?.message ?? String(e)
-        }
-        done++
-        setProgress({ done, total: syms.length })
-        qc.invalidateQueries({ queryKey: QK.stockSignals })
-      }
-    }
-    await Promise.all(Array.from({ length: Math.min(3, syms.length) }, () => worker()))
-    setProgress(null)
-    qc.invalidateQueries({ queryKey: QK.stockSignals })
-    if (failed) {
-      toast(
-        `AI 分析完成:成功 ${syms.length - failed} 只,失败 ${failed} 只${firstErr ? ` — ${firstErr}` : ''}`,
-        failed === syms.length ? 'error' : 'success',
-      )
-    }
-  }
-  const allSyms = () => (enriched.data?.rows ?? []).map((r: any) => String(r.symbol))
-  const heldSyms = () => allSyms().filter((sym: string) => positions[sym]?.held)
-
-  // [R131] 批量分析改**增量**: 只跑"需要重算"的。判据见 lib/signalFreshness ——
-  // 主要看信号有没有见过最新那根 K 线, 数据没更新就没必要再花一次调用。
-  // 单只想强制重跑, 点行内那个 ✨(它不走这套过滤)。
-  const staleAll = useMemo(
-    () => pickStale(allSyms(), signals, enriched.data?.as_of),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [enriched.data, signals],
-  )
-  const staleHeld = useMemo(
-    () => pickStale(heldSyms(), signals, enriched.data?.as_of),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [enriched.data, signals, positions],
-  )
-
-  /** 跑增量批量, 并在结果里如实说明跳过了多少 */
-  const runIncremental = (stale: string[], total: number, what: string) => {
-    if (!total) {
-      toast(`没有可分析的标的:行情数据未就绪或自选为空${what === '持有' ? '(只看持有时需先标记持有)' : ''}`, 'error')
-      return
-    }
-    if (!stale.length) {
-      toast(`${what}的 ${total} 只都已是最新分析(基于当前数据基准日), 无需重算`, 'success')
-      return
-    }
-    const skipped = total - stale.length
-    if (skipped > 0) toast(`跳过 ${skipped} 只已是最新的, 开始分析 ${stale.length} 只`, 'success')
-    runBatch(stale)
-  }
-  const runAll = () => runIncremental(staleAll, allSyms().length, '全部')
-  const runHeld = () => runIncremental(staleHeld, heldSyms().length, '持有')
-
   // [R276] `scoped` = 过完「只看要动的」「只看持有」但**还没过分组**的那一批。
   // 分组下拉里那些数字要从它算 —— 见下面 groupCounts 的说明。
   const scoped = useMemo(() => {
@@ -601,7 +401,6 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
       .map((r: any) => {
         const symbol = String(r.symbol)
         const pos: Position | undefined = positions[symbol]
-        const sig: Signal | undefined = signals[symbol]
         const close = typeof r.close === 'number' ? r.close : null
         const cost = pos?.cost ?? null
         const pnl = pos?.held && cost && cost > 0 && close != null ? (close - cost) / cost : null
@@ -610,7 +409,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
         const kc: KeltnerBands | undefined = keltner[symbol]
         return {
           symbol, name: r.name ?? symbol, close, changePct: r.change_pct ?? null,
-          held: !!pos?.held, cost, weight: pos?.weight ?? null, pnl, sig, trend, exit, kc,
+          held: !!pos?.held, cost, weight: pos?.weight ?? null, pnl, trend, exit, kc,
           urg: urgency[symbol],
           ev: events[symbol],
           ph: phases[symbol],
@@ -632,7 +431,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
     // [R276] phases/plays 补进依赖表 —— 它们在上面的 map 里被读, 原来漏了。
     // 实际不会串数据(四份都来自同一个 urgencyQ, 一起变), 但漏一个依赖是下一次
     // 拆查询时才会爆的雷, 现在补上不花钱。
-  }, [enriched.data, positions, signals, heldOnly, actionableOnly, flippedOnly, trends, exitLines,
+  }, [enriched.data, positions, heldOnly, actionableOnly, flippedOnly, trends, exitLines,
       keltner, urgency, events, phases])
 
   const rows = useMemo(() => scoped.filter((r) => inGroup(r.symbol)), [scoped, inGroup])
@@ -688,7 +487,6 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
         case 'changePct': return r.changePct
         case 'pnl': return r.pnl
         case 'trend': return r.trend ? -(TREND_RANK[r.trend.state] ?? 9) : null
-        case 'signal': return r.sig ? (SIGNAL_RANK[r.sig.signal] ?? 9) : null
       }
     }
     const arr = [...rows]
@@ -701,11 +499,10 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
       return sort.dir === 'asc' ? c : -c
     })
     return arr
-  }, [rows, sort, reportsBySymbol])
+  }, [rows, sort])
 
-  // 全自选的持有数 —— **只用来决定「分析持有」那个按钮出不出现**。
-  // 那个按钮跑的是全部持有股(heldSyms 走 allSyms), 拿看得见的行数去关它会对不上。
-  const heldCount = Object.values(positions).filter((p) => p.held).length
+  // [R435] 「全自选持有数」(heldCount)原来只用来决定「AI 分析持有」那个按钮出不出现,
+  // 按钮随 AI 信号撤了, 它也跟着撤。
   // [R276] 表头那个「持有 N」改成**当前这张表里**有几只持有。
   //
   // 原来它是全自选的持有数, 和左边的「N 只」(已经被筛过)不是同一批票 ——
@@ -956,35 +753,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
           导出
           {exportRows.length > 0 && <span className="opacity-70">{exportRows.length}·{exportCols.length}列</span>}
         </button>
-        <span className="mx-0.5 h-3 w-px shrink-0 bg-border/60" aria-hidden />
-        {heldCount > 0 && (
-          <button
-            onClick={runHeld}
-            disabled={!!progress}
-            title={`只对标记为「持有」的自选生成 AI 买卖信号(省调用, 持仓优先)。`
-              + `\n[R131] 只跑需要重算的 ${staleHeld.length} 只 —— 信号已看过最新一根 K 线的会跳过`
-              + `\n(数据没更新时重跑, 喂给 AI 的还是同一份输入; 超过 ${SIGNAL_TTL_HOURS} 小时仍会重算)`
-              + `\n想强制重跑某一只, 点它那行的 ✨`}
-            className="inline-flex items-center gap-1 text-[12px] px-2 py-0.5 rounded-btn border border-amber-400/30 bg-amber-400/10 text-amber-300 hover:bg-amber-400/20 disabled:opacity-60 transition-colors cursor-pointer"
-          >
-            {progress ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
-            AI 分析持有{staleHeld.length > 0 && <span className="text-amber-300/70">·{staleHeld.length}</span>}
-          </button>
-        )}
-        <button
-          onClick={runAll}
-          disabled={!!progress}
-          title={`对自选逐只生成 AI 买卖信号(会调用 AI, 按只计费)。`
-            + `\n[R131] 只跑需要重算的 ${staleAll.length} 只 —— 信号已看过最新一根 K 线的会跳过`
-            + `\n(数据没更新时重跑, 喂给 AI 的还是同一份输入, 花钱买不到新信息; 超过 ${SIGNAL_TTL_HOURS} 小时仍会重算)`
-            + `\n想强制重跑某一只, 点它那行的 ✨`}
-          className="inline-flex items-center gap-1 text-[12px] px-2 py-0.5 rounded-btn border border-sky-400/30 bg-sky-400/10 text-sky-300 hover:bg-sky-400/20 disabled:opacity-60 transition-colors cursor-pointer"
-        >
-          {progress ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
-          {progress
-            ? `分析中 ${progress.done}/${progress.total}`
-            : <>AI 分析全部{staleAll.length > 0 && <span className="text-sky-300/70">·{staleAll.length}</span>}</>}
-        </button>
+        {/* [R435] 「AI 分析持有 / AI 分析全部」两个批量按钮随 AI 信号撤了 */}
       </div>
 
 
@@ -1050,7 +819,6 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
                   </button>
                   <Hint title={HEAD_TIPS.pnl} className="ml-0.5" />
                 </th>
-                <th className="whitespace-nowrap px-4 py-2.5 font-normal text-left"><button onClick={() => cycleSort('signal')} className={thBtn}>AI 信号{caret('signal')}</button></th>
               </tr>
             </thead>
             <tbody>
@@ -1195,78 +963,6 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
                           </span>
                         )}
                       </div>
-                    </td>
-                    {/* AI 信号:徽标 + 时间 + 理由整段换行(不截断)。
-                        [R211] **这一列靠左**。用户: 「ai 信号这一列里面的文字都是
-                        靠左对齐才好看」—— 说得对: 别的列是短标签, 居中让它们各自
-                        落在自己那一格的正中; 这一列是整段会换行的文字, 居中之后
-                        每一行的起点都不一样, 读起来像被撕开的。 */}
-                    <td className={`${TD_BASE} px-4 !text-left`}>
-                      {/* [R309] **这道 `max-w` 才是真闸门。** 表格是 `table-auto`,
-                          colgroup 里那 30% 只是建议 —— 内容的 max-content 说了算,
-                          而 AI 理由原来不换行也不截断, 于是它顶多宽这一列就多宽
-                          (实测把整张表的一半占了去)。列宽与内容上限必须一起动,
-                          这是 R283 那一课的又一次。 */}
-                      {r.sig ? (
-                        <div className="flex w-full max-w-[23rem] flex-col gap-0.5">
-                          <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
-                            <span className={`text-[12px] px-1.5 py-0.5 rounded border ${SIGNAL_META[r.sig.signal]?.cls ?? 'border-border text-muted'}`}>
-                              {SIGNAL_META[r.sig.signal]?.label ?? r.sig.signal}
-                            </span>
-                            <span className="text-[11px] text-muted/50">{fmtAgo(r.sig.created_at)}</span>
-                            <AiActions r={r} onAnalyze={onAnalyze} onPriceAlert={onPriceAlert}
-                                       reports={reportsBySymbol.get(r.symbol)} />
-                          </div>
-                          {/* [R309] 理由**截到两行**, 全文进悬停。
-                              整张表其余每一格的行高都是定死的(R217/R253/R255/R307
-                              一路在收), 只有这一格例外: 一段长理由能把一行顶成五行,
-                              旁边六列跟着空着 —— 一屏扫 166 行时, 行高参差比少看
-                              几个字伤得多。**一个字没丢**: 悬停给全文。
-                              两行按这一列的宽度约合 100 字, 多数理由本来就印得全。 */}
-                          {r.sig.reason && (
-                            <span className="line-clamp-2 text-[12px] text-muted/80 leading-snug whitespace-normal break-words"
-                                  title={r.sig.reason}>{r.sig.reason}</span>
-                          )}
-                          {/* [fork 增强] 到价预案:AI watch_points(涨至/跌至 → 对应操作),提前有准备 */}
-                          {(r.sig.watch_points ?? []).length > 0 && (
-                            /* [R253] **一个预案一行**, 不再"能挤就挤、挤不下才换行"。
-                               用户: 「ai信号显示成这样换行」。
-                               原来是 `flex-wrap` —— 同样三个预案, 列宽够时挤成一行、
-                               不够时折成两三行, **每一行高度都不一样**, 一屏扫下去
-                               行与行对不齐。现在固定竖排: 行是高了点, 但高度一致,
-                               而且价位天然对齐(方向词都是三个字 + 等宽数字),
-                               眼睛顺着一列往下扫就行。 */
-                            <div className="mt-0.5 flex flex-col gap-y-0.5">
-                              {(r.sig.watch_points ?? []).map((p, i) => (
-                                <span
-                                  key={i}
-                                  className="inline-flex items-center gap-1.5 text-[12px] font-mono whitespace-nowrap"
-                                  title={p.reason ? `${p.label ?? ''} — ${p.reason}` : p.label}
-                                >
-                                  <span className={`tabular-nums ${p.direction === 'up' ? 'text-red-400' : 'text-emerald-400'}`}>
-                                    {p.direction === 'up' ? '↑涨至' : '↓跌至'} {p.price.toFixed(2)}
-                                  </span>
-                                  {p.action && <span className="text-foreground/80">{p.action}</span>}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        /* [R284] **从没分析过的票也得够得着** —— AI 分析列撤掉之后
-                           操作入口只剩这里; 这一支要是只印「未分析」, 那些没跑过
-                           分析的票就再也点不到那个 ✨ 了。 */
-                        /* [R395] 窄屏上这一格只有 40 来 px 宽, 而这一行是
-                           「未分析 + 两个图标按钮」—— 不许换行的话三个字会被挤成
-                           一竖列(实测 12×52)。让整行可换行, 字本身不断。
-                           注意这里是**三元表达式的分支**不是 JSX 子节点位置,
-                           所以注释不能带花括号 —— 带了就等于两个相邻表达式。 */
-                        <span className="flex flex-wrap items-center justify-center gap-1.5">
-                          <span className="whitespace-nowrap text-[12px] text-muted/50">未分析</span>
-                          <AiActions r={r} onAnalyze={onAnalyze} onPriceAlert={onPriceAlert}
-                                       reports={reportsBySymbol.get(r.symbol)} />
-                        </span>
-                      )}
                     </td>
                   </tr>
                 )

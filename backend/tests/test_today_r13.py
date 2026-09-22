@@ -41,37 +41,30 @@ def test_rs_skipped_without_stock_return():
 
 
 # ---------- 持仓操作档位 ----------
+# [R435] AI 信号停用: 「AI 转看空 → 减仓」与「加仓」档一起撤了, holding_stance 不再收 AI 参数。
 
 def test_exit_trumps_everything():
-    stance, why = holding_stance(True, -0.10, "多头", "buy", "转多")
+    stance, why = holding_stance(True, -0.10, "多头")
     assert stance == "离场"
     assert "纪律" in why
 
 
 def test_bear_trend_means_reduce():
-    stance, _ = holding_stance(False, -0.10, "空头", "buy", None)
+    stance, _ = holding_stance(False, -0.10, "空头")
     assert stance == "减仓"
-
-
-def test_ai_sell_means_reduce():
-    stance, why = holding_stance(False, -0.10, "多头", "sell", None)
-    assert stance == "减仓"
-    assert "AI" in why
 
 
 def test_hugging_exit_line_means_reduce():
-    stance, _ = holding_stance(False, -0.01, "多头", "hold", None)
+    stance, _ = holding_stance(False, -0.01, "多头")
     assert stance == "减仓"
 
 
-def test_add_requires_all_three_conditions():
-    """加仓 = 趋势刚走强 + AI 看多 + 离出场线有安全距离, 缺一即持有。"""
-    assert holding_stance(False, -0.08, "多头", "buy", "转多")[0] == "加仓"
-    assert holding_stance(False, -0.08, "多头", "hold", "转多")[0] == "持有"
-    assert holding_stance(False, -0.08, "多头", "buy", None)[0] == "持有"
-    assert holding_stance(False, -0.03, "多头", "buy", "转多")[0] == "持有", \
-        "离出场线不足 5% 不给加仓"
+def test_R435_不再出加仓():
+    """原来「趋势刚走强 + AI 看多 + 离出场线够远」给加仓; AI 撤了之后这一档不出现
+    (用户选的「加仓档不再出现」)。"""
+    for dist in (-0.08, -0.20, None):
+        assert holding_stance(False, dist, "多头")[0] == "持有"
 
 
 def test_default_is_hold():
-    assert holding_stance(False, -0.10, "多头", "watch", None)[0] == "持有"
+    assert holding_stance(False, -0.10, "多头")[0] == "持有"

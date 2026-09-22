@@ -78,75 +78,70 @@ def test_helpers():
 
 
 # ---------- 决策接入 ----------
+#
+# [R435] AI 信号停用, 持仓档位不再收 AI 意见, 「加仓」档随之不出现(用户选的)。
+# 原来这里有两条「贴上沿挡住本该给的加仓 / 贴下沿不挡加仓」—— 加仓档没了, 它们
+# 守的那件事也就不存在了; 下面补了一条反面: 任何组合都不再出「加仓」。
 
 def _stance(**kw):
     base = dict(exit_triggered=False, distance_pct=-0.20, trend_side="多头",
-                ai_signal="buy", trend_signal="转多", heat=None,
-                pnl_pct=None, trend_duration=10)
+                heat=None, pnl_pct=None, trend_duration=10)
     base.update(kw)
     return holding_stance(
         base["exit_triggered"], base["distance_pct"], base["trend_side"],
-        base["ai_signal"], base["trend_signal"],
         heat=base["heat"], pnl_pct=base["pnl_pct"],
         trend_duration=base["trend_duration"])
 
 
-def test_upper_band_blocks_a_would_be_add():
-    """这条比减仓重要: 原来只看趋势和 AI, 不看价格在通道哪个位置 ——
-    那是在最贵的位置加最重的注。只要贴到上沿就挡, 不要求共振。"""
-    assert _stance()[0] == "加仓", "前提: 通道内时确实建议加"
-    for heat in (_high(strong=True), _high(strong=False)):
-        stance, why = _stance(heat=heat)
-        assert stance == "持有" and "最贵" in why
-
-
-def test_lower_band_does_not_block_adding():
-    """贴下轨是低吸位置, 不该挡加仓。"""
-    assert _stance(heat=_low())[0] == "加仓"
+def test_R435_任何组合都不再出加仓():
+    import itertools
+    for heat, pnl, side, dist, dur in itertools.product(
+            (None, _high(), _high(strong=False), _low()), (None, -0.05, 0.02, 0.35),
+            ("多头", "空头", None), (-0.20, -0.06, -0.01, None), (1, 3, 10, None)):
+        stance, _ = _stance(heat=heat, pnl_pct=pnl, trend_side=side,
+                            distance_pct=dist, trend_duration=dur)
+        assert stance in ("离场", "减仓", "持有"), stance
 
 
 def test_resonant_upper_band_with_profit_suggests_trimming():
-    stance, why = _stance(heat=_high(), pnl_pct=0.35, ai_signal=None, trend_signal=None)
+    stance, why = _stance(heat=_high(), pnl_pct=0.35)
     assert stance == "减仓" and "落袋" in why
     assert "趋势没坏" in why, "要说清这是止盈不是止损, 否则用户会以为该清仓"
 
 
 def test_short_band_alone_does_not_trigger_trimming():
     """只有短期贴上轨太常见 —— 每次都提示等于天天喊减仓。"""
-    assert _stance(heat=_high(strong=False), pnl_pct=0.35, ai_signal=None)[0] == "持有"
+    assert _stance(heat=_high(strong=False), pnl_pct=0.35)[0] == "持有"
 
 
 def test_no_trim_without_meaningful_profit():
     """浮亏还嫌它涨太急, 是自相矛盾。"""
-    assert _stance(heat=_high(), pnl_pct=-0.05, ai_signal=None)[0] == "持有"
-    assert _stance(heat=_high(), pnl_pct=0.02, ai_signal=None)[0] == "持有"
+    assert _stance(heat=_high(), pnl_pct=-0.05)[0] == "持有"
+    assert _stance(heat=_high(), pnl_pct=0.02)[0] == "持有"
 
 
 def test_freshly_turned_strong_is_never_trimmed():
     """主升浪起步就是沿着上轨走的, 这时候减就是卖飞 —— 本功能最大的风险。"""
     for d in (1, 2):
-        assert _stance(heat=_high(), pnl_pct=0.40, trend_duration=d,
-                       ai_signal=None)[0] == "持有"
-    assert _stance(heat=_high(), pnl_pct=0.40, trend_duration=3,
-                   ai_signal=None)[0] == "减仓", "过了保护期才谈落袋"
+        assert _stance(heat=_high(), pnl_pct=0.40, trend_duration=d)[0] == "持有"
+    assert _stance(heat=_high(), pnl_pct=0.40, trend_duration=3)[0] == "减仓", "过了保护期才谈落袋"
 
 
 def test_risk_driven_exits_still_outrank_the_upper_band():
-    """破线/转空/AI 看空都是"必须处理", 到上轨只是"可以落袋"。
-    撞上时说后者会让人误以为只是获利了结。"""
+    """破线/转空都是"必须处理", 到上轨只是"可以落袋"。
+    撞上时说后者会让人误以为只是获利了结。([R435] 原来还有一条「AI 看空」, 随 AI 撤了)"""
     assert _stance(exit_triggered=True, heat=_high(), pnl_pct=0.4)[0] == "离场"
-    for kw in ({"trend_side": "空头"}, {"ai_signal": "sell"}, {"distance_pct": -0.01}):
+    for kw in ({"trend_side": "空头"}, {"distance_pct": -0.01}):
         stance, why = _stance(heat=_high(), pnl_pct=0.4, **kw)
         assert stance == "减仓"
         assert "落袋" not in why, f"{kw} 的减仓理由不该被通道位置盖掉"
 
 
 def test_behaviour_is_unchanged_without_band_data():
-    """新股/指标列缺失时通道算不出来, 一切回到 R43 之前的判定。"""
-    assert _stance()[0] == "加仓"
-    assert _stance(ai_signal=None)[0] == "持有"
+    """新股/指标列缺失时通道算不出来, 一切回到 R43 之前的判定(去掉 AI 与加仓之后)。"""
+    assert _stance()[0] == "持有"
     assert _stance(exit_triggered=True)[0] == "离场"
-    assert holding_stance(False, -0.2, "多头", "buy", "转多")[0] == "加仓"
+    assert holding_stance(False, -0.2, "多头")[0] == "持有"
 
 
 # 机会区打分在 R47 改由三档「结论」驱动(不再是 pressure 的 side/level),

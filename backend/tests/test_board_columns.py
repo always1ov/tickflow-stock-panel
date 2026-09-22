@@ -136,7 +136,8 @@ def test_列的顺序是_认票_凭什么_我的账_别人的意见():
         "持仓",                       # 我的账
         # [R284] 「AI 分析」整列撤掉 —— 它不是数据列, 是操作入口(胶囊 + 两个图标),
         # 并进「AI 信号」列的头一行。
-        "AI 信号",                    # 别人的意见
+        # [R435] 「AI 信号」(别人的意见)整列撤了: AI 信号整套停用, 用户打算以后用
+        # 斐波那契二型重做。顺序纪律前三段不变, 第四段眼下空着。
     ]
 
 
@@ -311,8 +312,9 @@ def test_R254_每列只剩一个排序目标():
     # `play` 了; 一列一个目标正是这条在守的规矩。
     # [R310] `play` 也随列消失了 —— 「怎么办」整列删掉。**判据与前面每一次
     # 逐字相同: 点不到就删。** 见 test_R310_按急迫程度排退役了而且退干净了。
+    # [R435] `signal` 随「AI 信号」列退役
     for one in ("caret('name')", "caret('changePct')", "caret('trend')",
-                "caret('pnl')", "caret('signal')"):
+                "caret('pnl')"):
         assert one in body, f"表头少了 {one}"
     # 反面: 不许再出现多目标的写法
     assert "caret('trend', " not in body and "caret('close'" not in body, (
@@ -361,12 +363,12 @@ def test_R277_每个排序键都够得着():
     """
     body = _board_body()
     seg = body[body.index("type SortKey"):]
-    seg = seg[:seg.index("\nconst SIGNAL_RANK")]
+    seg = seg[:seg.index("\n")]          # [R435] SIGNAL_RANK 撤了, 类型现在就是一行
     keys = set(re.findall(r"'([a-zA-Z]+)'", seg))
     # [R284] 原来这里写的是 `len(keys) >= 10` —— 那是想确认"解析真的解出来了",
     # 却顺手把**键的个数**也钉住了; 列一增减就红, 而那跟这条测的东西无关。
     # 改成点名几个必然存在的键: 解析坏了它们一个都出不来, 而加减列不影响。
-    assert {"urgency", "name", "signal"} <= keys, f"没解析到排序键: {keys}"
+    assert {"urgency", "name", "pnl"} <= keys, f"没解析到排序键: {keys}"
     src = _src()
     th = src[src.index("<thead"):src.index("</thead>")]
     # 默认排序键够得着 —— 它是"任一列点到第三下"回落的目标(cycleSort 的第三态),
@@ -423,7 +425,7 @@ def test_R277_表头上的排序目标都得是真键():
     而且不报错(TypeScript 会拦住字面量, 但拼错成另一个合法键它拦不住)。"""
     body = _board_body()
     seg = body[body.index("type SortKey"):]
-    seg = seg[:seg.index("\nconst SIGNAL_RANK")]
+    seg = seg[:seg.index("\n")]
     keys = set(re.findall(r"'([a-zA-Z]+)'", seg))
     src = _src()
     th = src[src.index("<thead"):src.index("</thead>")]
@@ -432,14 +434,13 @@ def test_R277_表头上的排序目标都得是真键():
 
 
 def test_R251_越小越要紧的那几个必须升序打头():
-    """`order` / `SIGNAL_RANK` 都是**越小越要紧**。首次点击给降序, 就是把最不该
+    """`order` 是**越小越要紧**([R435] 原来还有 `SIGNAL_RANK`, 随 AI 信号撤了)。首次点击给降序, 就是把最不该
     先看的顶到最前面 —— 而且看不出来, 因为它确实排序了。"""
     body = _board_body()
     block = body[body.index("FIRST_DIR"):]
     block = block[:block.index("}")]
     # [R310] `play` 随列退役
     for key, why in (("urgency", "该动了: order 越小越急"),
-                     ("signal", "AI 信号: 买入=0, 观望=3"),
                      ("name", "标的: A → Z")):
         assert f"{key}: 'asc'" in block, f"{key} 的首次方向不是升序 —— {why}"
     for key, why in (("trend", "六态: 值取了负, 降序才是多头在前"),
@@ -474,13 +475,15 @@ def test_R251_表头说的和实际做的一致():
     body = _board_body()
     block = body[body.index("FIRST_DIR"):]
     block = block[:block.index("}")]
-    assert "signal: 'asc'" in block, (
-        "AI 信号首次点击不是升序 —— 而 SIGNAL_RANK 里买入=0, 降序会把「观望」顶到最前"
-    )
-    # 正面配对: 那张 rank 表确实是"越小越要紧"
-    rank = body[body.index("SIGNAL_RANK"):]
+    # [R435] 再换一次主语: 「AI 信号」列也撤了, 换到「走势/位置」—— 表头说「多头在前」,
+    # 而排序值是 −TREND_RANK(多头 = 0 取负后最大), 只有降序才成立。
+    assert "trend: 'desc'" in block, "走势首次点击不是降序 —— 表头说多头在前, 升序会把空头顶上来"
+    assert "case 'trend': return r.trend ? -(TREND_RANK[r.trend.state] ?? 9) : null" in body
+    rank = body[body.index("const TREND_RANK"):]
     rank = rank[:rank.index("}")]
-    assert "buy: 0" in rank, "SIGNAL_RANK 变了, 上面那条升序的理由就不成立了"
+    assert "UT: 0" in rank and "DT: 5" in rank, "TREND_RANK 变了, 上面那条降序的理由就不成立了"
+    tips = body[body.index("trendPos:"):]
+    assert "多头在前 → 空头在前" in tips[:tips.index("pnl:")], "表头没再说「多头在前」"
 
 
 def test_R252_粘性表头必须有_z_index():
@@ -528,21 +531,8 @@ def test_R252_决策台表头背景是实心的():
     assert "bg-surface" in head, "表头没有背景色 —— 行会直接透上来"
 
 
-def test_R253_到价预案固定竖排一个一行():
-    """用户: 「ai信号显示成这样换行」。
-
-    原来是 `flex-wrap` —— 同样三个预案, 列宽够时挤成一行、不够时折成两三行,
-    **每一行高度都不一样**, 一屏扫下去行与行对不齐。改成固定竖排: 行高一致,
-    价位也天然对齐(方向词都是三个字 + 等宽数字)。
-    """
-    body = _board_body()
-    i = body.index("watch_points ?? []).length > 0")
-    block = body[i:i + 700]
-    assert "flex flex-col" in block, "到价预案没有固定竖排"
-    assert "flex-wrap" not in block, (
-        "到价预案又变回「能挤就挤、挤不下才换行」了 —— 那会让每一行高度都不一样"
-    )
-    assert "whitespace-nowrap" in block, "单个预案自己不该再折行"
+# [R253 → R435 退役] `test_R253_到价预案固定竖排一个一行` 钉的是 AI 信号给的到价预案,
+# 随 AI 信号整套停用撤了。
 
 
 # [R315 → **R316 退役**] R315 那五条(`位置列是一个数加一条轨` / `位置列是短期
@@ -765,52 +755,24 @@ def test_R309_列宽加起来是一百且没有一列留空():
     )
 
 
-def test_R309_别人的意见不许比自己的判断占得宽():
-    """[R249 → R309] 列序那条纪律写的是 **认票 → 凭什么 → 我的账 → 别人的意见**。
-    R249 把它钉成了**顺序**, 这条把它钉成**分量**。
+def test_R435_判断那一列最宽():
+    """[R309 → R435] 原来这里钉的是「别人的意见(AI 信号)不许比自己的判断占得宽」。
+    AI 信号那一列撤了, 它空出来的 26% 大头给了「走势/位置」—— 这张表里唯一的判断列。
+    守的意图一个字没变: **版面的话语权跟着判断走**, 换成「它是最宽的一列」来钉。
 
-    AI 信号是「别人的意见」: 它可以在场(而且删不得 —— 写信号的入口只有这张表,
-    `paper_trader_run` 还在读存下来的信号), 但它**不该比我自己的判断加起来
-    还宽**。R309 之前它一个人占 47%, 而判断那几列加起来才 32.5% ——
-    **版面把话语权给反了**, 而且没有任何东西会因此报错。
-
-    [R310] **这条昨天刚立, 今天就抓到了一次真事故。** 删掉「怎么办」让判断那
-    一侧一下子少了 27%, 只剩 走势 + 位置; AI 原样留着 30% 就会顶到它们脸上。
-    于是 AI 跟着收到 26% —— **不是我想收窄它, 是这条不变式逼的。**
-
-    判断那一侧是**列出来的**而不是"除 AI 之外的都算": 标的/现价是认票、持仓是
-    我的账, 它们再宽也不代表我对这只票有判断。
+    ([R309] 那条说明里还写着「`paper_trader_run` 还在读存下来的信号」—— 那个模块
+    早就不在了, 说法是过时的; 这次核实过, AI 信号撤了之后没有别的读者。)
     """
     src = _src()
     blk = src[src.index("const BOARD_COLS = ["):]
     blk = blk[:blk.index("] as const")]
     got = {lab: float(w.rstrip('%'))
            for lab, w in re.findall(r"label: '([^']+)', w: '([^']+)%'", blk)}
-    judge = got["走势/位置"]          # [R425] 两列并成一列, 宽度原数相加(20 + 14)
-    assert got["AI 信号"] < judge, (
-        f"AI 信号占 {got['AI 信号']}%, 而我自己的判断三列加起来才 {judge}% —— "
-        "版面把话语权给反了"
-    )
+    assert "AI 信号" not in got
+    assert got["走势/位置"] == max(got.values()), f"判断那一列不是最宽的: {got}"
 
 
-def test_R309_AI_理由截到两行且全文进悬停():
-    """[R217 → R253 → R255 → R307 → R309] **行高参差**这个病, 这张表一路在收:
-    R217 收的是一格摞五层, R253 收的是到价预案"能挤就挤", R255/R307 收的是
-    「怎么办」那一行说明。**只剩 AI 理由一直是整段不截断的** —— 一段长理由能把
-    一行顶成五行, 旁边六列跟着空着。一屏扫 166 行的时候, 行高参差比少看几个字
-    伤得多。
-
-    所以它跟这张表其余每一格一个待遇: **截断 + 全文进悬停**。
-    「截了却不给全文」是把话吞了, 那是另一种病, 所以两条一起钉。
-    """
-    src = _src()
-    blk = src[src.index("{r.sig.reason && ("):]
-    blk = blk[:blk.index(")}")]
-    assert "line-clamp-2" in blk, (
-        "AI 理由又变回整段不截断了 —— 它会一个人把行高顶起来, 旁边六列空着"
-    )
-    assert "title={r.sig.reason}" in blk, "截了却没给全文 —— 那是把话吞了, 不是排版"
-
+# [R309 → R435 退役] `test_R309_AI_理由截到两行且全文进悬停` 随 AI 信号列撤了。
 
 
 # [R315 → **R316 退役**] `test_R315_位置列的两块都在` 钉的是「一个数 + 一条轨」

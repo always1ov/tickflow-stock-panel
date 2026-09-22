@@ -170,8 +170,8 @@ export function StockAnalysis() {
             setPreviewView(v)
             setPreviewSymbol(s)
           }}
-          onAnalyze={(s, n) => handleAnalyze(s, n)}
-          onPriceAlert={(s, n) => openPriceAlert(s, n)}
+          // [R435] 行内 ✨ / 🔔 随「AI 信号」列一起撤了: AI 四维分析走个股弹窗里的入口,
+          // 点位提醒走页头那个 🔔 或弹窗里双击图
         />
       </div>
 

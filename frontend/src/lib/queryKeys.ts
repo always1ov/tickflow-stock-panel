@@ -149,7 +149,6 @@ export const QK = {
   // R121 AI 优选历史命中率(纯事后统计)
   // R133 规则层把握分体检(完整候选池的分层胜率/因子归因)
   todayScoreLedger:     ['today-score-ledger'] as const,
-  signalAiSchedule:     ['signal-ai-schedule'] as const,
   // [R327] 转折模拟盘 —— 参数进键: 本金/上限/年数一改就是另一条曲线
   flipPaper:            (capital: number, maxPositions: number, years: number) =>
                           ['flip-paper', capital, maxPositions, years] as const,
@@ -167,7 +166,6 @@ export const QK = {
   // 自选决策台(持仓/出场线/AI 信号)
   watchlistPositions:   ['watchlist-positions'] as const,
   watchlistExitLines:   ['watchlist-exit-lines'] as const,
-  stockSignals:         ['stock-signals'] as const,
   // 六态趋势前缀失效(带 symbols 参数的实例见 stockTrends)
   stockTrendsAll:       ['stock-trends'] as const,
   // 个股分析顶栏行情摘要 —— 键形刻意与页内看板一致, 共享缓存不发第二次请求

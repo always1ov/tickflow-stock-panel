@@ -9,8 +9,8 @@ R212 只修了被用户撞见的那一格(到上沿 + 多头)。这份测试把*
     5 种短期位置 × 5 中期 × 5 长期 = 125 种通道组合
     × 7 种趋势(六态 + 读不到)
     × 持有 / 空仓
-    × 4 种 AI 信号(买 / 卖 / 观望 / 无)
-    = 7000 例
+    × 4 种 AI 信号(买 / 卖 / 观望 / 无)   [R435 撤: AI 信号停用, 这一维只剩「无」]
+    = 1750 例(R435 之前 7000)
 
 穷举跑出来两个真问题, 都已修:
 
@@ -44,7 +44,8 @@ POSES = (K.POS_ABOVE, K.POS_NEAR_UPPER, K.POS_INSIDE, K.POS_NEAR_LOWER, K.POS_BE
 STATE_CN = {"UT": "上涨趋势", "NR": "自然回升", "SR": "次级回升",
             "SREA": "次级回撤", "NREA": "自然回撤", "DT": "下跌趋势"}
 STATES = (*STATE_CN, None)
-SIGNALS = ("buy", "sell", "hold", None)
+# [R435] AI 信号停用, 「怎么办」不再收它的意见 —— 这一维只剩「没有」
+SIGNALS = (None,)
 
 
 def _bands(s, m, l):
@@ -112,8 +113,7 @@ def _cases():
                            exit_line={"triggered": False}, bands=bands)
             play = pb.playbook(position={"held": held}, trend=trend,
                                exit_line={"triggered": False}, urgency=urg,
-                               verdict=vd, phase=None, event=None,
-                               signal={"signal": sig} if sig else None)
+                               verdict=vd, phase=None, event=None)
             yield (s, m, l), state, held, sig, vd, urg, play
 
 
@@ -136,7 +136,7 @@ def test_全组合枚举里没有未标记的买卖矛盾():
             continue
         bad.append((combo, state, held, sig, vd["code"], vd["tone"],
                     urg["kind"], urg["side"], play["level"], play["headline"]))
-    assert n == 5 * 5 * 5 * 7 * 2 * 4, f"枚举规模不对: {n}"
+    assert n == 5 * 5 * 5 * 7 * 2 * len(SIGNALS), f"枚举规模不对: {n}"
     assert not bad, (
         f"{len(bad)}/{n} 例「贵不贵」与「怎么办」方向相反却没判成打架, "
         f"前 3 例: {bad[:3]}")
@@ -160,7 +160,7 @@ def test_方向相反时一定进先别动档():
     # ② 收敛层要把这件事说出来
     play = pb.playbook(position={"held": False}, trend=trend,
                        exit_line={"triggered": False}, urgency=urg,
-                       verdict=vd, phase=None, event=None, signal=None)
+                       verdict=vd, phase=None, event=None)
     assert play["level"] == pb.CONFLICT
     assert "通道结构比六态先转向" in play["conflicts"][0]
 
@@ -184,18 +184,16 @@ def test_只有短期到上沿的强势票不报打架():
                        exit_line={"triggered": False},
                        urgency=U.assess(position={"held": True}, trend=_trend("UT"),
                                         exit_line={"triggered": False}, bands=bands),
-                       verdict=vd, phase=None, event=None,
-                       signal={"signal": "hold"})
+                       verdict=vd, phase=None, event=None)
     assert play["level"] != pb.CONFLICT
     assert play["conflicts"] == []
 
 
 # ---------- 性质 B: 每条打架规则都得真的触发过 ----------
 
+# [R435] ① 趋势 vs AI、③ 阶段 vs AI 两条随 AI 信号撤了
 _RULE_MARKERS = {
-    "①趋势 vs AI": "AI 说",
     "②趋势 vs 通道位置": "位置上",
-    "③阶段 vs AI": "而 AI 说买入",
     "④持有+走过头+趋势没坏": "加仓与减仓的理由同时成立",
 }
 
@@ -212,8 +210,7 @@ def test_每条打架规则都至少触发过一次():
         vd = K.verdict(_bands(s, m, l))
         for state, sig, ph, held in itertools.product(STATES, SIGNALS, phases, (False, True)):
             cf = pb._conflicts(held=held, trend=_trend(state), verdict=vd,
-                               phase={"code": ph, "cn": ph} if ph else None,
-                               signal={"signal": sig} if sig else None)
+                               phase={"code": ph, "cn": ph} if ph else None)
             for name, marker in _RULE_MARKERS.items():
                 if any(marker in x for x in cf):
                     fired[name] += 1
@@ -232,13 +229,13 @@ def test_规则二读的是tone不是side():
     vd = K.verdict(_bands(K.POS_ABOVE, K.POS_ABOVE, K.POS_INSIDE))
     assert vd["code"] == "top_confirmed" and vd["tone"] == "sell"
     cf = pb._conflicts(held=False, trend=_trend("UT"), verdict=vd,
-                       phase=None, signal=None)
+                       phase=None)
     assert any("贵了" in x for x in cf), cf
     # 趋势往下 + 位置说便宜 → 也必须报
     vd2 = K.verdict(_bands(K.POS_NEAR_LOWER, K.POS_NEAR_LOWER, K.POS_INSIDE))
     assert vd2["tone"] == "buy"
     cf2 = pb._conflicts(held=False, trend=_trend("DT"), verdict=vd2,
-                        phase=None, signal=None)
+                        phase=None)
     assert any("便宜不等于该买" in x for x in cf2), cf2
 
 
@@ -251,7 +248,7 @@ def test_avoid语气也算偏卖且说的是自己的话():
     vd = K.verdict(_bands(K.POS_BELOW, K.POS_BELOW, K.POS_BELOW))
     assert vd["tone"] == "avoid"
     cf = pb._conflicts(held=False, trend=_trend("NR"), verdict=vd,
-                       phase=None, signal=None)
+                       phase=None)
     assert any("通道结构比六态先转向" in x for x in cf), cf
     assert not any("贵了" in x for x in cf), cf
 
@@ -263,5 +260,5 @@ def test_不表态的语气不算打架(tone):
     vd = {"tone": tone, "title": "随便", "side": K.SIDE_HIGH}
     for state in STATE_CN:
         assert not [x for x in pb._conflicts(held=False, trend=_trend(state),
-                                             verdict=vd, phase=None, signal=None)
+                                             verdict=vd, phase=None)
                     if "位置上" in x]

@@ -60,15 +60,5 @@ def test_today_ai_schedule_roundtrip_and_clamp(prefs):
     assert prefs.set_today_ai_schedule(True, 99, 99)["hour"] == 23
 
 
-def test_signal_ai_schedule_defaults(prefs):
-    cfg = prefs.get_signal_ai_schedule()
-    assert cfg["enabled"] is False
-    assert cfg["scope"] == "held", "默认只跑持有 —— 自选多时省调用"
-    assert cfg["gap_seconds"] == 20
-
-
-def test_signal_ai_schedule_validates_scope_and_gap(prefs):
-    cfg = prefs.set_signal_ai_schedule(True, 19, 30, "乱填", 1)
-    assert cfg["scope"] == "held", "非法 scope 回落 held"
-    assert cfg["gap_seconds"] == 5, "间隔下限 5 秒, 防打满接口"
-    assert prefs.set_signal_ai_schedule(True, 19, 30, "watchlist", 9999)["gap_seconds"] == 300
+# [R131 → R435 退役] 「个股 AI 信号批量定时」偏好的两条(默认值 / 校验)随 AI 信号整套停用
+# 撤了 —— get / set_signal_ai_schedule 已删, 反面由 test_scheduled_ai_jobs.py 钉。
