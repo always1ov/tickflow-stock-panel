@@ -1049,3 +1049,38 @@ def test_R425_走势与位置并成一格_只有一个按钮():
     assert "tab: 'verdict'" not in board[board.index("<TrendPositionCell"):][:600], (
         "还按两半分别落页签 —— 一个按钮只能有一个去处"
     )
+
+
+def test_R427_复盘并进个股弹窗_两个入口同一个弹窗():
+    """用户: 「两个图片是两个弹窗, 融合成一个, 以后点个股名称还是走势位置按钮
+    都跳转融合后的弹窗」。
+
+    钉三件事:
+      ① 复盘**不再有自己的弹窗外壳** —— `StockReviewDialog` 那个导出没了,
+         只剩只画内容的 `StockReviewPanel`;
+      ② 个股弹窗有「复盘」这一页, 画的就是那个面板;
+      ③ 决策台上**名字**与**走势/位置**走的是同一个 `onPreview`, 后者带 'review'。
+    """
+    from tests.frontend_source import code_of
+    review = code_of("components/stock-analysis/StockReviewDialog.tsx")
+    assert "export function StockReviewDialog" not in review, "复盘又长回了自己的弹窗"
+    assert "export function StockReviewPanel" in review
+    assert "fixed inset-0" not in review, "复盘面板自己画了遮罩 —— 那就又是第二个弹窗"
+
+    dlg = code_of("components/StockPreviewDialog.tsx")
+    assert "'review'" in dlg and "<StockReviewPanel" in dlg, "个股弹窗里没有复盘页"
+    assert "initialView" in dlg, "个股弹窗不能指定落在哪一页 —— 走势/位置就没法直达复盘"
+
+    board = _src()
+    assert "<StockReviewDialog" not in board, "决策台还自己挂着复盘弹窗"
+    call = board[board.index("<TrendPositionCell"):]
+    call = call[:call.index("/>") + 2]
+    assert "onPreview(r.symbol, r.name, 'review')" in call, "走势/位置没走个股弹窗的复盘页"
+    name_btn = board[board.index("(onPreview ?? onSelect)(r.symbol, r.name)") - 10:][:80]
+    assert "onPreview" in name_btn, "名字那一格没走个股弹窗"
+
+    import pathlib
+    root = pathlib.Path(__file__).resolve().parents[2] / "frontend" / "src"
+    for f in root.rglob("*.tsx"):
+        body = f.read_text(encoding="utf-8")
+        assert "<StockReviewDialog" not in body, f"{f.name} 还在开旧的复盘弹窗"

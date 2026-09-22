@@ -10,7 +10,7 @@ import { pickStale, SIGNAL_TTL_HOURS } from '@/lib/signalFreshness'   // [R131] 
 import { toast } from '@/components/Toast'
 import { useHistoryReports, openHistoryReport, loadHistory } from '@/lib/stockAnalysisStore'
 import { trendBadgeCls } from '@/components/stock-analysis/TrendStateBar'
-import { StockReviewDialog, type ReviewTab } from '@/components/stock-analysis/StockReviewDialog'
+import type { PreviewView } from '@/components/StockPreviewDialog'
 // [R167] 导出与两个单元格从本文件拆出 —— 拆前 933 行, 顶部堆着两张配色表和一整份
 // HTML 导出模板, 主组件被压在后面。
 import { storage } from '@/lib/storage'
@@ -244,8 +244,9 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
   /** [R157] 页头「定位」按钮每按一次 +1: 把当前个股那一行滚到视野正中并闪一下 */
   locateNonce?: number
   onSelect: (symbol: string, name: string) => void
-  /** [R103] 点标的名称时打开整合版个股弹窗(最近查看+随意切换); 未传时退回仅选中 */
-  onPreview?: (symbol: string, name: string) => void
+  /** [R103] 点标的名称时打开整合版个股弹窗(最近查看+随意切换); 未传时退回仅选中。
+      [R427] 第三个参数是落在哪一页: 点「走势/位置」传 'review' —— 复盘并进了这个弹窗 */
+  onPreview?: (symbol: string, name: string, view?: PreviewView) => void
   /** [R106] 行内 AI 分析(原页头「AI 个股分析」按钮, 整合进 AI 分析列, 每个标的都有) */
   onAnalyze?: (symbol: string, name: string) => void
   /** [R106] 行内点位提醒(原页头「点位提醒」按钮, 同上) */
@@ -269,9 +270,9 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
     setExportCols(keys)
     storage.boardExportCols.set(keys)
   }
-  // [R48] 逐日复盘弹窗 —— 「趋势」「结论」两列点进来的就是它。
-  // [R51] tab 记住是从哪一列进来的: 两列点开看的不是同一张表(见 StockReviewDialog)
-  const [review, setReview] = useState<{ symbol: string; name: string; tab: ReviewTab } | null>(null)
+  // [R48 → R427] 逐日复盘原来是这里自己挂的一个弹窗。用户: 「两个弹窗融合成一个,
+  // 以后点个股名称还是走势位置按钮都跳转融合后的弹窗」—— 现在它是个股弹窗的「复盘」页,
+  // 由页面那一个 StockPreviewDialog 统一打开(见 onPreview 的第三个参数)。
   // 排序:默认按置信度降序(信号最强的排前面;未分析的始终垫底)
   // [R178] 默认按「该动了」排, 不再按 AI 置信度。
   //
@@ -986,11 +987,6 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
         </button>
       </div>
 
-      {/* [R48] 逐日复盘: 趋势 / 三档结论 / 涨停按同一条时间轴排开
-          [R228] 27 种组合速查已经并成它的第三个页签 —— 这里只剩一个弹窗 */}
-      {review && (
-        <StockReviewDialog symbol={review.symbol} name={review.name} tab={review.tab} onClose={() => setReview(null)} />
-      )}
 
       {/* [R28] 关键价位改弹窗后, 页面里已没有 K 线图要让位 —— 表格直接吃满剩余视口高度 */}
       <div className="overflow-auto border-t border-border/60 max-h-[calc(100vh-210px)]">
@@ -1133,7 +1129,9 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
                       trend={r.trend} trendCls={r.trend ? trendBadgeCls(r.trend.state) : undefined}
                       geo={r.kc?.geo} runs={r.kc?.runs} ph={r.ph} kc={r.kc} close={r.close}
                       ev={r.ev} energy={r.kc?.energy} stateRun={r.kc?.state_run}
-                      onOpen={() => setReview({ symbol: r.symbol, name: r.name, tab: 'trend' })} />
+                      onOpen={() => (onPreview
+                        ? onPreview(r.symbol, r.name, 'review')
+                        : onSelect(r.symbol, r.name))} />
                     {/* [R284] **账目从三格收成一格。** 用户: 「删除掉浮盈和成本列」。
                         空仓(158/166 行)时这一格只有一个按钮; 持有时才长出成本输入。
                         [R169] 写回时一律用 manualCost 而不是 r.cost —— r.cost 可能是批次

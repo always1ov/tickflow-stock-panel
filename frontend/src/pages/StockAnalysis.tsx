@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Sparkles, History as HistoryIcon, Loader2, Bell, LocateFixed } from 'lucide-react'
 import { PageHeader } from '@/components/PageHeader'
 import { StockFinancialSearch } from '@/components/financials/StockFinancialSearch'
-import { StockPreviewDialog } from '@/components/StockPreviewDialog'
+import { StockPreviewDialog, type PreviewView } from '@/components/StockPreviewDialog'
 import { PriceAlertDialog } from '@/components/stock-analysis/PriceAlertDialog'
 // [fork R363] 关键价位弹窗摘成了共用组件 —— 模拟盘也点标的弹它, 不抄第二份
 import { LevelsDialog } from '@/components/stock-analysis/LevelsDialog'
@@ -28,6 +28,8 @@ export function StockAnalysis() {
   const [checking, setChecking] = useState(false)
   const [confirmReport, setConfirmReport] = useState<{ id: string; created_at: string; focus: string; symbol: string; name: string } | null>(null)
   const [previewSymbol, setPreviewSymbol] = useState<string | null>(null)
+  // [R427] 个股弹窗打开时落在哪一页: 点名字 → 关键价位(默认), 点「走势/位置」→ 复盘
+  const [previewView, setPreviewView] = useState<PreviewView | undefined>(undefined)
   const [showPriceAlerts, setShowPriceAlerts] = useState(false)
   // [R28] 关键价位分析弹窗:点决策台里的标的即弹出,关掉后列表原样还在
   const [showLevels, setShowLevels] = useState(false)
@@ -167,10 +169,11 @@ export function StockAnalysis() {
           currentSymbol={symbol}
           locateNonce={locateNonce}
           onSelect={onSelect}
-          onPreview={(s, n) => {
+          onPreview={(s, n, v) => {
             onSelect(s, n)
             // 整合弹窗自带关键价位视图, 不再叠一层 R28 的关键价位弹窗
             setShowLevels(false)
+            setPreviewView(v)
             setPreviewSymbol(s)
           }}
           onAnalyze={(s, n) => handleAnalyze(s, n)}
@@ -202,6 +205,7 @@ export function StockAnalysis() {
         name={previewSymbol === symbol ? name : undefined}
         triggerInfo={null}
         enableLevelsView
+        initialView={previewView}
         onClose={() => setPreviewSymbol(null)}
       />
 

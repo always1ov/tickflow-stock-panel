@@ -41,7 +41,7 @@
  */
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { CalendarRange, Loader2, X } from 'lucide-react'
+import { CalendarRange, Loader2 } from 'lucide-react'
 import { api, type KeltnerVerdict, type ReviewRow, type StockReview } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { cn } from '@/lib/cn'
@@ -144,12 +144,23 @@ function toSegments(rows: ReviewRow[]): Segment[] {
   return out
 }
 
-export function StockReviewDialog({ symbol, name, tab: initialTab, onClose }: {
+/**
+ * [R427] 复盘**不再是一个弹窗**, 是个股弹窗(`StockPreviewDialog`)里的「复盘」一页。
+ *
+ * 用户: 「两个图片是两个弹窗, 融合成一个, 以后点个股名称还是走势位置按钮都跳转
+ * 融合后的弹窗」。原来决策台上点名字开的是个股弹窗(日K / 分时 / 关键价位),
+ * 点「走势/位置」开的是这个复盘弹窗 —— 同一只票两个外框、两套顶栏、两个关闭。
+ *
+ * 现在这里只画**内容**: 顶上一行是本页自己的控件(趋势状态 / 通道档位 · 60/120/250 日
+ * · 回算区间与六态阈值), 下面是那两张表。外框、票名、切股、自选、关闭都归个股弹窗 ——
+ * 票名原来在这里写一遍「XX 复盘」, 个股弹窗顶栏已经有了, 不再重复。
+ *
+ * 文件名没改: 那两张表(TrendView / VerdictView)与它们的一大批守卫都认这个文件。
+ */
+export function StockReviewPanel({ symbol, tab: initialTab }: {
   symbol: string
-  name: string
   /** 从哪一列点进来 —— 只决定默认视图 */
   tab: ReviewTab
-  onClose: () => void
 }) {
   // [R296] 'combo' 归一到 'verdict' —— 那一页并进去了。**不删这个入参值**:
   // 决策台那边可能还有地方带着它进来, 悄悄报错不如悄悄落到对的页上。
@@ -179,93 +190,68 @@ export function StockReviewDialog({ symbol, name, tab: initialTab, onClose }: {
   const segments = useMemo(() => toSegments(d?.rows ?? []), [d])
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
-      <div
-        role="dialog"
-        aria-modal="true"
-        className="flex max-h-[88vh] w-full max-w-5xl flex-col overflow-hidden rounded-lg border border-border bg-surface shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* [fork R366] 窄屏允许换行 —— 手机上标题 + 两个页签 + 三个天数档 + 关闭
-            挤在一行里放不下, 不换行的结果是右边那几个按钮被挤出屏幕外点不到。
-            宽屏 `sm:` 起恢复原来的一行不换。 */}
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 px-4 py-3 sm:flex-nowrap sm:gap-3">
-          <div className="flex min-w-0 items-baseline gap-2.5">
-            <CalendarRange className="h-4 w-4 self-center shrink-0 text-sky-400" />
-            <span className="shrink-0 text-sm font-medium text-foreground">{name} 复盘</span>
-            <span className="shrink-0 font-mono text-[10px] text-muted">{symbol}</span>
-            {d && !d.error && (
-              <span className="truncate text-[10px] text-muted">
+    <div className="flex min-h-0 flex-col">
+      {/* 本页控件。[fork R366] 窄屏允许换行 —— 放不下时右边的按钮会被挤出去点不到。 */}
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 pb-2.5 sm:flex-nowrap sm:gap-3">
+        <div className="flex min-w-0 items-baseline gap-2.5">
+          <CalendarRange className="h-4 w-4 self-center shrink-0 text-sky-400" />
+          <span className="truncate text-[10px] text-muted">
+            {d && !d.error ? (
+              <>
                 {d.start} ~ {d.end} · {d.days} 个交易日
                 {tab === 'trend' && ` · 六态阈值 ${(d.threshold * 100).toFixed(0)}%${d.threshold_source !== 'default' ? `(${d.threshold_source})` : ''}`}
-
-              </span>
-            )}
+              </>
+            ) : '复盘'}
+          </span>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <div className="flex overflow-hidden rounded-btn border border-border/60">
+            {/* [R223] 页签名改回「通道档位」。用户: 「名称改回原来的通道结论」。
+                R200 那轮清行话时把它换成了「这个价贵不贵」—— 那是在解释它**说什么**,
+                可页签要的是**这一栏叫什么**, 换掉之后反而对不上这一层在别处的名字
+                (`keltner.verdict` / 感叹号说明 / 复盘统计口径都叫通道档位)。 */}
+            {([['trend', '趋势状态'], ['verdict', '通道档位']] as const).map(([k, label]) => (
+              <button
+                key={k}
+                onClick={() => setTab(k)}
+                className={`px-2.5 py-1 text-[10px] transition-colors cursor-pointer ${
+                  tab === k ? 'bg-sky-400/15 text-sky-300' : 'text-muted hover:text-foreground'}`}
+              >
+                {label}
+              </button>
+            ))}
           </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <div className="flex overflow-hidden rounded-btn border border-border/60">
-              {/* [R223] 页签名改回「通道档位」。用户: 「名称改回原来的通道结论」。
-                  R200 那轮清行话时把它换成了「这个价贵不贵」—— 那是在解释它**说什么**,
-                  可页签要的是**这一栏叫什么**, 换掉之后反而对不上这一层在别处的名字
-                  (`keltner.verdict` / 感叹号说明 / 复盘统计口径都叫通道档位)。 */}
-              {/* [R228] 第三个页签「组合速查」—— 原来是另一个铺满屏幕的模态。
-                  三个页签的排序是有讲究的: 前两个是**纵向**(同一个判定在时间轴上
-                  怎么走的), 第三个是**横向**(同一天里 27 格各是什么样)。 */}
-              {([['trend', '趋势状态'], ['verdict', '通道档位']] as const).map(([k, label]) => (
-                <button
-                  key={k}
-                  onClick={() => setTab(k)}
-                  className={`px-2.5 py-1 text-[10px] transition-colors cursor-pointer ${
-                    tab === k ? 'bg-sky-400/15 text-sky-300' : 'text-muted hover:text-foreground'}`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-            <div className="flex overflow-hidden rounded-btn border border-border/60">
-              {RANGES.map((n) => (
-                <button
-                  key={n}
-                  onClick={() => setDays(n)}
-                  className={`px-2 py-1 text-[10px] transition-colors cursor-pointer ${
-                    days === n ? 'bg-sky-400/15 text-sky-300' : 'text-muted hover:text-foreground'}`}
-                >
-                  {n}日
-                </button>
-              ))}
-            </div>
-            <button onClick={onClose} className="text-muted hover:text-foreground"><X className="h-4 w-4" /></button>
+          <div className="flex overflow-hidden rounded-btn border border-border/60">
+            {RANGES.map((n) => (
+              <button
+                key={n}
+                onClick={() => setDays(n)}
+                className={`px-2 py-1 text-[10px] transition-colors cursor-pointer ${
+                  days === n ? 'bg-sky-400/15 text-sky-300' : 'text-muted hover:text-foreground'}`}
+              >
+                {n}日
+              </button>
+            ))}
           </div>
         </div>
+      </div>
 
-        {/* [R301] 三个页签, 三块正文 —— **「说明」不再是盖上来的一层**。
-            用户: 「说明点击后不是弹窗, 和趋势状态一样内容区域显示」。
+      <div className="flex min-h-0 flex-1 flex-col">
+        {q.isLoading && (
+          <div className="flex items-center justify-center gap-2 py-16 text-xs text-muted">
+            <Loader2 className="h-4 w-4 animate-spin" /> 正在回算 {days} 个交易日…
+          </div>
+        )}
+        {q.isError && <div className="px-4 py-16 text-center text-xs text-red-400">复盘数据加载失败</div>}
+        {d?.error && <div className="px-4 py-16 text-center text-xs text-muted">{d.error}</div>}
 
-            **它单独一支, 而且排在加载判断之前**: 那张词表是恒定的(另一个 query、
-            缓存一天), 与这只票、与这次回算都无关。塞进下面那一支的话, 点「说明」
-            会先看到「正在回算 120 个交易日…」——**等一个它根本不需要的东西**。
-            R228 给 27 格速查表定的就是这条, 这里沿用。 */}
-        <div className="flex min-h-0 flex-1 flex-col">
-          {(
-            <>
-              {q.isLoading && (
-                <div className="flex items-center justify-center gap-2 py-16 text-xs text-muted">
-                  <Loader2 className="h-4 w-4 animate-spin" /> 正在回算 {days} 个交易日…
-                </div>
-              )}
-              {q.isError && <div className="px-4 py-16 text-center text-xs text-red-400">复盘数据加载失败</div>}
-              {d?.error && <div className="px-4 py-16 text-center text-xs text-muted">{d.error}</div>}
-
-              {d && !d.error && tab === 'trend' && (
-                <TrendView d={d} rows={trendRows} onlyMarked={onlyMarked}
-                           onToggleMarked={() => setOnlyMarked((v) => !v)} />
-              )}
-              {d && !d.error && tab === 'verdict' && (
-                <VerdictView d={d} segments={segments} />
-              )}
-            </>
-          )}
-        </div>
+        {d && !d.error && tab === 'trend' && (
+          <TrendView d={d} rows={trendRows} onlyMarked={onlyMarked}
+                     onToggleMarked={() => setOnlyMarked((v) => !v)} />
+        )}
+        {d && !d.error && tab === 'verdict' && (
+          <VerdictView d={d} segments={segments} />
+        )}
       </div>
     </div>
   )

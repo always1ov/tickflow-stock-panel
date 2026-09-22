@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, RefreshCw, Clock, LineChart, Star, RadioTower, Maximize2, Minimize2, Activity, Crosshair } from 'lucide-react'
+import { X, RefreshCw, Clock, LineChart, Star, RadioTower, Maximize2, Minimize2, Activity, Crosshair, CalendarRange } from 'lucide-react'
 import { api } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { cn } from '@/lib/cn'
@@ -16,6 +16,7 @@ import { DatePicker } from '@/components/DatePicker'
 import { RuleEditor } from '@/components/monitor/RuleEditor'
 import { PriceAlertDialog } from '@/components/stock-analysis/PriceAlertDialog'
 import { StockLevelsPanel, StockLevelsPriceTag } from '@/components/stock-analysis/StockLevelsPanel'
+import { StockReviewPanel, type ReviewTab } from '@/components/stock-analysis/StockReviewDialog'
 import { StockFinancialSearch } from '@/components/financials/StockFinancialSearch'
 import { buildMonitorPriceLines } from '@/lib/price-alerts'
 import { usePreferences } from '@/lib/useSharedQueries'
@@ -46,6 +47,13 @@ interface Props {
   navList?: NavItem[]
   /** 切股回调: 收到目标 symbol/name, 由调用方更新预览状态 */
   onNavigate?: (symbol: string, name?: string) => void
+  /**
+   * [R427] 打开时落在哪一页。不传 = 「关键价位」(R185 的默认)。
+   * 决策台点「走势/位置」时传 'review' —— 复盘原来是另一个弹窗, 现在是这里的一页。
+   */
+  initialView?: PreviewView
+  /** [R427] 落在复盘页时先看哪一张: 趋势状态 / 通道档位 */
+  reviewTab?: ReviewTab
 }
 
 // ===== 板块标识（与 Screener 列表一致）=====
@@ -56,7 +64,7 @@ const PRESETS: { label: string; months: number }[] = [
   { label: '1年', months: 12 },
 ]
 
-type PreviewView = 'daily' | 'intraday' | 'levels'
+export type PreviewView = 'daily' | 'intraday' | 'levels' | 'review'
 interface PriceAlertDraft {
   id: number
   targetPrice: number
@@ -107,7 +115,7 @@ function pushRecentStock(symbol: string, name?: string) {
   return merged
 }
 
-export function StockPreviewDialog({ symbol: symbolProp, name: nameProp, onClose, triggerInfo, enableLevelsView = true, navList: navListSource, onNavigate }: Props) {
+export function StockPreviewDialog({ symbol: symbolProp, name: nameProp, onClose, triggerInfo, enableLevelsView = true, navList: navListSource, onNavigate, initialView, reviewTab = 'trend' }: Props) {
   // [R164] 作者的 navList/onNavigate 方向键切股与 fork R100 的最近查看并存: 父级 onNavigate 更新
   // symbolProp 后, 下面的 useEffect 会清掉内部 override, 两套不打架。
   // [R100] 弹窗内随意切换: 内部覆盖当前查看的股票; 外部换股/重开时回到外部指定。
@@ -125,7 +133,7 @@ export function StockPreviewDialog({ symbol: symbolProp, name: nameProp, onClose
   // [R185] 默认落在「关键价位」而不是日K —— 这个弹窗是拿来做决策的, 图表模块
   // 自己的注释也写着「本图表面向分析决策, 核心是关键价位」。点进来先看到的
   // 该是压力/支撑/枢轴那几条线, 而不是一根还要自己看的 K 线。
-  const [view, setView] = useState<PreviewView>('levels')
+  const [view, setView] = useState<PreviewView>(initialView ?? 'levels')
   const [intradayDays, setIntradayDays] = useState<number | null>(loadIntradayDays)
   const [dateRange, setDateRange] = useState(getDefaultRange)
   const [showMonitorEditor, setShowMonitorEditor] = useState(false)
@@ -224,9 +232,15 @@ export function StockPreviewDialog({ symbol: symbolProp, name: nameProp, onClose
   // 仅当弹窗首次打开 (symbol 从 null 变非空) 时重置。
   // [R185] 重置目标跟着默认值一起从 daily 改成 levels —— 只改上面那个
   // useState 初值是不够的: 弹窗关掉再打开会走这一条, 又会跳回日K。
+  // [R427] 重置目标改成**入口指定的那一页**(不传仍是 levels)。第一版在上面另加了
+  // 一个「symbolProp 一变就重置」的 effect, 出图发现两处打架(这一条把复盘页又
+  // 盖回了关键价位), 而且它会在父级方向键切股时把当前页也重置掉 —— 正是本条
+  // 注释第一句要防的事。重置只该发生在这一处: 首次打开。
   const prevSymbolRef = useRef<string | null>(null)
+  const initialViewRef = useRef(initialView)
+  initialViewRef.current = initialView
   useEffect(() => {
-    if (prevSymbolRef.current == null && symbol != null) setView('levels')
+    if (prevSymbolRef.current == null && symbol != null) setView(initialViewRef.current ?? 'levels')
     prevSymbolRef.current = symbol
     setPriceAlertDraft(null)
   }, [symbol])
@@ -373,6 +387,20 @@ export function StockPreviewDialog({ symbol: symbolProp, name: nameProp, onClose
                       关键价位
                     </button>
                   )}
+                  {/* [R427] 第四个视图「复盘」—— 原来的复盘弹窗(趋势状态 / 通道档位)
+                      并进来了。用户: 「两个弹窗融合成一个」。 */}
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={view === 'review'}
+                    onClick={() => setView('review')}
+                    className={`inline-flex h-6 items-center gap-1 rounded px-2.5 text-[11px] transition-colors ${
+                      view === 'review' ? 'bg-accent/20 text-accent font-medium' : 'text-muted hover:text-secondary hover:bg-elevated/60'
+                    }`}
+                  >
+                    <CalendarRange className="h-3 w-3" />
+                    复盘
+                  </button>
                 </div>
                 <span className="h-4 w-px shrink-0 bg-border/70" />
                 {/* 区间选择 — 随视图切换 */}
@@ -647,6 +675,10 @@ export function StockPreviewDialog({ symbol: symbolProp, name: nameProp, onClose
                   onPriceDoubleClick={openPriceAlert}
                 />
                 </div>
+              ) : view === 'review' ? (
+                // key 跟着票走: 切股时复盘页里的「只看有事的日子」「120 日」这类选择
+                // 是上一只票的上下文, 不该带到下一只
+                <StockReviewPanel key={symbol} symbol={symbol} tab={reviewTab} />
               ) : (
                 <StockLevelsPanel symbol={symbol} bare height={maximized ? 720 : 520} />
               )}
@@ -654,7 +686,7 @@ export function StockPreviewDialog({ symbol: symbolProp, name: nameProp, onClose
             </div>
 
             {/* 扩展插槽: 对话框底部二开区 (无注册时不渲染) */}
-            {view !== 'levels' && (
+            {(view === 'daily' || view === 'intraday') && (
               <div className="shrink-0">
                 <ExtensionSlot
                   name="stock-preview.footer"

@@ -46,7 +46,7 @@ import { ScoreCell } from '@/components/today/ScoreCell'             // [R345] �
 import { TrendCell } from '@/components/today/TrendCell'             // [R349] 走势那一格
 import { TodayControls } from '@/components/today/TodayControls'     // [R347] 门槛/体检/筛选
 import { LevelsDialog } from '@/components/stock-analysis/LevelsDialog' // [R363] 点标的弹日 K
-import { StockReviewDialog } from '@/components/stock-analysis/StockReviewDialog' // [R364] 点动作弹复盘
+import { StockPreviewDialog } from '@/components/StockPreviewDialog' // [R364 → R427] 点动作弹复盘(个股弹窗的复盘页)
 
 /** [R343] 姿态四档的配色 —— 与今日总览那张卡同一套语义, 不另立一份说法。 */
 const POSTURE_TONE: Record<string, string> = {
@@ -695,14 +695,13 @@ function TodaySignals({ rows, conviction }: {
         一页只挂这一个: 同一时刻只可能开着一个弹窗。 */}
     <LevelsDialog symbol={levels?.symbol ?? null} name={levels?.name ?? ''}
                   onClose={() => setLevels(null)} />
-    {/* [R364] 逐日复盘 —— 与决策台「趋势」列点开的**是同一个组件**。
-        `tab="trend"` 落在趋势状态那一页: 动作那一格问的是「这个买入怎么来的」,
+    {/* [R364] 逐日复盘 —— 与决策台「走势/位置」点开的**是同一个弹窗**。
+        落在复盘 · 趋势状态那一页: 动作那一格问的是「这个买入怎么来的」,
         答案是那张逐日表上的转折与买卖, 不是三档结论。
-        它的 `symbol` 是必填的, 所以按决策台那边同一个写法条件渲染。 */}
-    {review && (
-      <StockReviewDialog symbol={review.symbol} name={review.name} tab="trend"
-                         onClose={() => setReview(null)} />
-    )}
+        [R427] 复盘并进了个股弹窗(用户: 「两个弹窗融合成一个」), 这里跟着换。 */}
+    <StockPreviewDialog symbol={review?.symbol ?? null} name={review?.name}
+                        initialView="review" reviewTab="trend"
+                        onClose={() => setReview(null)} />
     </>
   )
 }
