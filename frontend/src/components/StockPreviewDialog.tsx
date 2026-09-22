@@ -306,17 +306,21 @@ export function StockPreviewDialog({ symbol: symbolProp, name: nameProp, onClose
     }
   }, [dayOptions, effectiveIntradayDays, defaultIntradayDays])
 
+  // [R437] 新「图表与价位」有自己的视图(`chartView`), 旧顶栏的刷新原来只认旧的 `view` ——
+  // 新块在分时、旧的停在关键价位时, 点刷新刷的是关键价位那份。两个视图都刷(同一个就刷一次)。
   const handleRefresh = () => {
     if (!symbol) return
-    if (view === 'daily') {
-      qc.invalidateQueries({ queryKey: ['kline', symbol] })
-    } else if (view === 'intraday') {
-      qc.invalidateQueries({ queryKey: ['kline-minute-range', symbol] })
-      qc.invalidateQueries({ queryKey: ['kline-minute', symbol!] })
-    } else {
-      qc.invalidateQueries({ queryKey: QK.analysisKline(symbol) })
-      qc.invalidateQueries({ queryKey: QK.stockLevels(symbol) })
-      qc.invalidateQueries({ queryKey: QK.stockTrend(symbol) })
+    for (const v of new Set<PreviewView>([view, chartView])) {
+      if (v === 'daily') {
+        qc.invalidateQueries({ queryKey: ['kline', symbol] })
+      } else if (v === 'intraday') {
+        qc.invalidateQueries({ queryKey: ['kline-minute-range', symbol] })
+        qc.invalidateQueries({ queryKey: ['kline-minute', symbol!] })
+      } else {
+        qc.invalidateQueries({ queryKey: QK.analysisKline(symbol) })
+        qc.invalidateQueries({ queryKey: QK.stockLevels(symbol) })
+        qc.invalidateQueries({ queryKey: QK.stockTrend(symbol) })
+      }
     }
   }
 
@@ -424,6 +428,17 @@ export function StockPreviewDialog({ symbol: symbolProp, name: nameProp, onClose
                       addedDate={addedDate}
                     />
                   ) : chartView === 'intraday' ? (
+                    // [R437] 与旧分时页同一套: 上面一条信息栏(只要信息栏, 不画日 K), 下面多日分时。
+                    // R430 搬过来时漏了信息栏。区间与新日 K 同一个(同一份缓存, 不多发请求)
+                    <div className="flex flex-col gap-3">
+                    <StockPanel
+                      symbol={symbol}
+                      dateRange={heroRange}
+                      infoBarOnly
+                      prefetchSymbols={prefetchSymbols}
+                      intradayDays={effectiveIntradayDays}
+                      addedDate={addedDate}
+                    />
                     <StockMultiDayIntradayChart
                       symbol={symbol}
                       days={effectiveIntradayDays}
@@ -432,6 +447,7 @@ export function StockPreviewDialog({ symbol: symbolProp, name: nameProp, onClose
                       priceLines={monitorPriceLines}
                       onPriceDoubleClick={openPriceAlert}
                     />
+                    </div>
                   ) : (
                     <StockLevelsPanel symbol={symbol} bare height={maximized ? 720 : 520}
                                       controls={levelCtl} visibleBars={reviewDays} />

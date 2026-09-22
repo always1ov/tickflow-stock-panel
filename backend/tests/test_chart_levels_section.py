@@ -104,3 +104,28 @@ def test_R432_小开关照以前_那一类开着时接在后面():
 
 def test_R430_关不掉关键价位时没有这个视图():
     assert "levelsEnabled ? TABS : TABS.filter(t => t.key !== 'levels')" in code_of(SEC)
+
+
+def test_R437_新分时与旧分时同一套_信息栏不能漏():
+    """[R437] 用户: 「检查新的弹窗 ... 每个模块是否代码都几乎和以前一模一样, 尤其是图形部分」。
+    R430 搬分时视图时漏了图上方那条信息栏(`StockPanel infoBarOnly`)。新旧两处的分时图
+    与信息栏, 属性必须一样多 —— 只有区间(`dateRange`)按用户选的「图跟着头部走」换成 heroRange。"""
+    dlg = code_of(DLG)
+    sec = _sec(dlg)
+    new = sec[sec.rindex("chartView === 'intraday' ? ("):]      # 第一处是工具栏那格, 取最后一处
+    old = dlg[dlg.index("view === 'intraday' ? (\n                <div"):]
+    for tag in ("<StockMultiDayIntradayChart", "<StockPanel"):
+        new_call = _call(new, tag)
+        old_call = _call(old, tag)
+        norm = lambda c: re.sub(r"\s+", " ", c.replace("heroRange", "dateRange")).strip()
+        assert norm(new_call) == norm(old_call), f"新分时的 {tag} 与旧分时不一样:\n{new_call}\n----\n{old_call}"
+    assert "infoBarOnly" in _call(new, "<StockPanel")
+
+
+def test_R437_刷新同时认新旧两个视图():
+    """旧顶栏的刷新原来只看旧 `view`; 新块自己的 `chartView` 在分时时, 刷的却是关键价位那份。"""
+    dlg = code_of(DLG)
+    fn = dlg[dlg.index("const handleRefresh = () => {"):]
+    fn = fn[:fn.index("\n  }\n")]
+    assert "new Set<PreviewView>([view, chartView])" in fn
+    assert "view === 'daily'" not in fn, "分支得按循环变量判, 不是按旧 view"
