@@ -231,7 +231,7 @@ export interface AiFinancialReport {
 }
 
 // ===== 个股分析 =====
-export type LevelType = 'sr' | 'pivot' | 'extreme' | 'boll' | 'keltner_s' | 'keltner_m' | 'keltner_l' | 'atr_stop' | 'gap' | 'fib' | 'round' | 'livermore'
+export type LevelType = 'sr' | 'pivot' | 'extreme' | 'boll' | 'keltner_s' | 'keltner_m' | 'keltner_l' | 'atr_stop' | 'gap' | 'fib' | 'round' | 'livermore' | 'fib2'
 
 // [fork 增强] 今日总览(决策汇聚层)
 /** [R179] 四档: fatal 无条件清仓 > high 该处理了 > mid 要盯着 > low 已发生过的事(监控触发) */
@@ -1225,6 +1225,8 @@ export interface LevelSeries {
   keltner_m?: { upper: (number | null)[]; lower: (number | null)[] }
   keltner_l?: { upper: (number | null)[]; lower: (number | null)[] }
   atr?: { stop_loss: (number | null)[]; take_profit: (number | null)[] }
+  /** [R405] 斐波那契二型的短期均线(SMA3 往后移 3 根) */
+  fib2?: { dma3: (number | null)[] }
 }
 
 export interface StockLevels {
@@ -1235,6 +1237,22 @@ export interface StockLevels {
   /** dates 与 series 对齐;前端按自身 rows 的日期映射,缺失填 null */
   dates?: string[]
   series?: LevelSeries
+  /**
+   * [R405] 斐波那契二型里**画不成横线**的那几样: 强支撑区色带、上攻段底色、
+   * 首次回踩标记、均线往右探出的那几根。横线仍走 `levels.fib2`。
+   * 整块由「斐波那契二型」那一个开关控制显隐。
+   */
+  fib2?: Fib2Overlay
+}
+
+export interface Fib2Overlay {
+  /** 几条回撤线挤在一起的那个区间; strength = 挤了几条 */
+  zone?: { low: number; high: number; strength: number } | null
+  /** 单边上攻那一段的起止日期 */
+  thrust?: { start: string; end: string; days: number } | null
+  markers?: { date: string; label: string }[]
+  /** 平移之后露到最后一根之外的均线值 = 图上「未来」区那一段 */
+  dma3_future?: number[]
 }
 
 export interface AiStockReport {

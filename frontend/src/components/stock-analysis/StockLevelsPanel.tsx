@@ -92,6 +92,10 @@ export function StockLevelsPanel({ symbol, height = 480, bare = false }: StockLe
         series={levelsQ.data?.series}
         seriesDates={levelsQ.data?.dates}
         ranges={trendRanges}
+        // [R405] 斐波那契二型里画不成横线的那几样; 显隐由图内那个开关管。
+        // (这儿只能写 `//`: 属性列表不是 JSX 子节点位置, `{/* */}` 在这儿是语法错 ——
+        //  R401 在同一个坑里栽过一次。)
+        fib2={levelsQ.data?.fib2}
         height={height}
       />
     </div>

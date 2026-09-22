@@ -14,6 +14,7 @@ from __future__ import annotations
 import logging
 import math
 from datetime import date, timedelta
+from typing import Any
 
 import polars as pl
 from fastapi import APIRouter, HTTPException, Query, Request
@@ -128,9 +129,9 @@ def get_levels(
         return {"levels": {"sr": [], "pivot": [], "extreme": [],
                            "boll": [], "keltner_s": [], "keltner_m": [], "keltner_l": [],
                            "atr_stop": [], "gap": [], "fib": [], "round": [],
-                           "livermore": []},
+                           "livermore": [], "fib2": []},
                 "close": None, "summary": "无数据", "symbol": symbol,
-                "dates": [], "series": {}}
+                "dates": [], "series": {}, "fib2": {}}
 
     levels = compute_levels(df)
     # [fork 增强] 六态关键点 —— 上/下关键点作为一组关键价位(markLine + 点位提醒可用)
@@ -165,14 +166,52 @@ def get_levels(
     close = float(df.tail(1)["close"][0]) if "close" in df.columns else None
     # 日期 + 带状曲线序列(供前端画 Keltner/ATR/布林带曲线)
     dates = df["date"].to_list()
+    date_strs = [str(d) for d in dates]
     series = _build_series(df)
+
+    # [R405 · fork 增强] 斐波那契二型(帝纳波利点位)——**与六态同一个套路**:
+    # 在 API 层注入, 不进 `compute_levels`。两个理由:
+    #   · `compute_levels` 是作者的, 这一组是 fork 加的, 分开放边界才清楚;
+    #   · 它还有横线之外的东西(强支撑区色带、上攻段底色、首次回踩标记、
+    #     短期均线), 那些塞不进"一组横线"的结构。
+    # **只出位置, 不出动作**: 不进把握分、不产生提醒、不碰六态、不碰模拟盘。
+    fib2_overlay: dict[str, Any] = {}
+    try:
+        from app.indicators import dinapoli
+        res = dinapoli.compute(df)
+        levels["fib2"] = dinapoli.to_levels(res, close)
+        if not res.is_empty():
+            series["fib2"] = {"dma3": res.dma3}
+            zone = res.zone
+            thrust = None
+            if res.thrust and res.thrust[1] < len(date_strs):
+                s, e = res.thrust
+                thrust = {"start": date_strs[s], "end": date_strs[e],
+                          "days": e - s + 1}
+            marks = []
+            if (res.first_pullback_bar is not None
+                    and res.first_pullback_bar < len(date_strs)):
+                marks.append({"date": date_strs[res.first_pullback_bar],
+                              "label": "首次回踩"})
+            fib2_overlay = {
+                "zone": zone, "thrust": thrust, "markers": marks,
+                # 平移之后露到最后一根之外的那几个值 = 图上「未来」区那一段
+                "dma3_future": dinapoli.future_dma(
+                    [float(x) for x in df["close"].to_list()],
+                    dinapoli.DMA_LEN, dinapoli.DMA_SHIFT),
+            }
+    except Exception as e:  # noqa: BLE001
+        logger.debug("fib2 levels skipped: %s", e)
+        levels["fib2"] = []
+
     return {
         "levels": levels,
         "close": close,
         "summary": summarize_levels(levels, close),
         "symbol": symbol,
-        "dates": [str(d) for d in dates],
+        "dates": date_strs,
         "series": series,
+        "fib2": fib2_overlay,
     }
 
 

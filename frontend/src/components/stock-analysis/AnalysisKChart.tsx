@@ -2,7 +2,7 @@ import { useEffect, useRef, useMemo, useState } from 'react'
 import { chartTheme, getTheme, useTheme } from '@/lib/theme'
 import * as echarts from 'echarts'
 import type { ECharts, EChartsOption } from 'echarts'
-import type { KlineRow, LevelSeries } from '@/lib/api'
+import type { Fib2Overlay, KlineRow, LevelSeries } from '@/lib/api'
 
 /**
  * 个股分析专用日 K 图表。
@@ -31,7 +31,7 @@ const THEME = {
 const CT = () => chartTheme(getTheme())
 
 // ===== 价位类型(与后端 levels.py 的 LEVEL_TYPES 对齐) =====
-export type LevelType = 'sr' | 'pivot' | 'extreme' | 'boll' | 'keltner_s' | 'keltner_m' | 'keltner_l' | 'atr_stop' | 'gap' | 'fib' | 'round' | 'livermore'
+export type LevelType = 'sr' | 'pivot' | 'extreme' | 'boll' | 'keltner_s' | 'keltner_m' | 'keltner_l' | 'atr_stop' | 'gap' | 'fib' | 'round' | 'livermore' | 'fib2'
 
 export interface PriceLevel {
   value: number
@@ -41,6 +41,15 @@ export interface PriceLevel {
   strength?: 'strong' | 'medium' | 'weak'
   /** 档位(仅 pivot 有):0=P, 1=R1/S1, 2=R2/S2, 3=R3/S3 */
   rank?: number
+  /**
+   * [R405] 这一条线自己的颜色, 盖过所在组的颜色。
+   *
+   * 加这个是为了斐波那契二型: 它一组里有**三种意思不同**的线 ——
+   * 回撤位(金)、目标(蓝)、失效位(深灰)。规格 §12 说得很明白:
+   * 「每种颜色全站只表达一种含义」, 全涂成一个金色等于把三件事说成一件。
+   * 别的组不传这个字段, 行为与以前一字不差。
+   */
+  color?: string
 }
 
 /** 价位组开关配置:label = 按钮文案,color = markLine 颜色 */
@@ -58,6 +67,10 @@ export const LEVEL_GROUPS: { key: LevelType; label: string; color: string }[] = 
   { key: 'round',    label: '整数关口',  color: '#71717A' },   // 灰(心理位,弱视觉)
   // [fork 增强] 六态关键点(利弗莫尔上/下关键点,趋势确认/否决价)
   { key: 'livermore', label: '六态关键点', color: '#A78BFA' },  // 淡紫
+  // [R405 · fork 增强] 斐波那契二型(帝纳波利点位)。按一下整幅出来: 回撤线、
+  // 目标一二三、失效位、短期均线、上攻段底色、强支撑区色带、首次回踩标记。
+  // **只有位置, 没有动作** —— 和六态/量化通道撞不撞由用户自己看。
+  { key: 'fib2',     label: '斐波那契二型', color: '#A77A1C' },  // 金(规格 §12 的进场区色)
   // [R403] 「持仓止盈」这一组从图上撤了(用户: 「持仓止盈可以删除掉了」)。
   // **只撤图上的线** —— 决策台的止盈线列、盘中推送、AI 持仓上下文照旧, 见后端
   // `indicators/levels.py` 的 LEVEL_TYPES。
@@ -79,6 +92,9 @@ const CURVE_DEFS: { alignedKey: string; group: LevelType; endLabel: string; colo
   { alignedKey: 'keltner_l_lower',group: 'keltner_l', endLabel: '长期下沿', color: '#67E8F9', dashed: true },
   { alignedKey: 'atr_stop',       group: 'atr_stop',  endLabel: 'ATR下轨', color: '#EF4444', dashed: true },
   { alignedKey: 'atr_tp',         group: 'atr_stop',  endLabel: 'ATR上轨', color: '#F87171', dashed: true },
+  // [R405] 叫「二型均线」不叫「短期均线」: 后者在 `lib/signals.ts` 里已经指 MA5,
+  // 而这条是 3 日均线往后移 3 根 —— 同名两物正是名词表要防的。
+  { alignedKey: 'fib2_dma3',      group: 'fib2',      endLabel: '二型均线', color: '#8A8578', dashed: false },
 ]
 
 // 默认不打开任何价位组 —— 价位怎么看是用户的判断, 系统不替他预设。
@@ -113,6 +129,12 @@ interface Props {
   markers?: ChartMarker[]
   /** 预留:事件区间高亮 */
   ranges?: ChartRange[]
+  /**
+   * [R405] 斐波那契二型里画不成横线的那几样(强支撑区色带 / 上攻段底色 /
+   * 首次回踩标记)。**整块跟着「斐波那契二型」那个开关走** —— 开关没开就一样
+   * 都不画, 免得图上留下几块没人认领的色带。
+   */
+  fib2?: Fib2Overlay
   /** 预留:点击某根 K 线 */
   onDateClick?: (date: string) => void
   height?: number
@@ -135,6 +157,7 @@ export function AnalysisKChart({
   defaultLevelTypes = ['keltner_s'],
   markers,
   ranges,
+  fib2,
   onDateClick,
   height = 460,
   className,
@@ -198,6 +221,9 @@ export function AnalysisKChart({
         alignedSeries['atr_stop'] = align(series.atr.stop_loss)
         alignedSeries['atr_tp'] = align(series.atr.take_profit)
       }
+      if (series.fib2) {
+        alignedSeries['fib2_dma3'] = align(series.fib2.dma3)
+      }
     }
 
     return { dates, candle, vols, dateIndex, zoomStart, alignedSeries }
@@ -237,6 +263,50 @@ export function AnalysisKChart({
         itemStyle: { color: r.color ?? 'rgba(234,179,8,0.08)' },
         label: r.label ? { show: true, position: 'insideTop', distance: 6, color: '#EAB308', fontSize: 10 } : undefined,
       }, { xAxis: r.end }])
+
+    // [R405] 斐波那契二型的三样"画不成横线"的东西。**整块跟着那一个开关走** ——
+    // 开关没开就一样都不画, 图上不会留下没人认领的色带。
+    const fib2On = activeTypes.has('fib2')
+    if (fib2On && fib2) {
+      // 上攻段底色: 纵向铺满, 横向只盖推进那一段(xAxis 两端 = 日期区间)
+      const th = fib2.thrust
+      if (th && dateIndex.has(th.start) && dateIndex.has(th.end)) {
+        markAreaData.push([{
+          xAxis: th.start, name: `单边上攻 ${th.days} 天`,
+          itemStyle: { color: 'rgba(210,70,59,0.06)' },
+          label: { show: true, position: 'insideTop', distance: 6,
+                   color: '#D2463B', fontSize: 10 },
+        }, { xAxis: th.end }])
+      }
+      // 强支撑区: 横向铺满, 纵向只盖那个价格带(yAxis 两端 = 价格区间)。
+      // 透明度随重合条数走 —— 规格 §9: 1/2/3 条对应 20%/35%/50%。
+      const z = fib2.zone
+      if (z && z.high > 0) {
+        const alpha = Math.min(0.5, 0.2 + 0.15 * Math.max(0, z.strength - 1))
+        // 两条回撤挤得很近时色带会薄到看不见 —— 规格 §9 要求最小高度,
+        // 这里按价格给个下限(现价的千分之三), 比按像素算简单且不依赖坐标系。
+        const thin = Math.max(0, (rows.at(-1)?.close ?? z.high) * 0.003 - (z.high - z.low)) / 2
+        markAreaData.push([{
+          yAxis: z.low - thin, name: `强支撑区 · ${z.strength} 条回撤重合`,
+          itemStyle: { color: `rgba(167,122,28,${alpha})` },
+          label: { show: true, position: 'insideTopLeft', distance: 4,
+                   color: '#A77A1C', fontSize: 9 },
+        }, { yAxis: z.high + thin }])
+      }
+      // 首次回踩
+      for (const m of fib2.markers ?? []) {
+        const i = dateIndex.get(m.date)
+        if (i == null) continue
+        markPointData.push({
+          coord: [m.date, rows[i].high],
+          symbol: 'triangle', symbolSize: 9, symbolRotate: 180,
+          symbolOffset: [0, -10],
+          itemStyle: { color: '#A77A1C' },
+          label: { show: true, formatter: m.label, position: 'top',
+                   fontSize: 9, color: '#A77A1C' },
+        })
+      }
+    }
 
     const series: any[] = [
       {
@@ -407,7 +477,7 @@ export function AnalysisKChart({
     }
     chartInstRef.current.setOption(buildOption(), true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rows, levels, series, seriesDates, activeTypes, pivotRank, markers, ranges, height, theme, hoveredKey])
+  }, [rows, levels, series, seriesDates, activeTypes, pivotRank, markers, ranges, fib2, height, theme, hoveredKey])
 
   // resize
   useEffect(() => {
@@ -615,7 +685,8 @@ function collectPriceLines(
       // sr 组现为成交密集区水平点,直接画线即可,无需特判。
       if (p.type === 'boll' || p.type === 'keltner_s' || p.type === 'keltner_m'
           || p.type === 'keltner_l' || p.type === 'atr_stop') continue
-      out.push({ value: p.value, label: p.label, color: strengthColor(p.strength, g.color), type: p.type })
+      const c = p.color ?? strengthColor(p.strength, g.color)
+      out.push({ value: p.value, label: p.label, color: c, type: p.type })
     }
   }
   return out
