@@ -836,7 +836,11 @@ def test_R288_按清空模拟这件事要说出来():
     # **正文必须指得到**: 搬走而不留路标, 与直接删掉没区别。
     dlg = code_of("components/stock-analysis/StockReviewDialog.tsx")
     j = dlg.index('label="按档位买卖"')
-    assert "见「说明」" in dlg[j:j + 700], "正文没指向「说明」—— 那段口径就等于被藏了"
+    # [R431] 这句口径收成了常量 `VERDICT_BASIS`(个股弹窗「复盘」那张对比表也用它):
+    # 正文得用它, 它里面得有路标 —— 两头都钉, 搬家不许把路标搬丢
+    assert "basis={VERDICT_BASIS}" in dlg[j:j + 700], "正文没用那句口径"
+    basis = dlg[dlg.index("export const VERDICT_BASIS"):]
+    assert "见「说明」" in basis[:basis.index("\n")], "正文没指向「说明」—— 那段口径就等于被藏了"
 
 
 def test_R287_组件真的把提醒印出来():
@@ -1145,7 +1149,10 @@ def test_R302_不随票变的话不许常驻正文():
     for gone in ("可落袋一部分", "动仓位基调", "按清空模拟", "caveat"):
         assert gone not in head, f"那段恒定的口径偏差又回到正文了: {gone}"
     # 正文那一行仍然得**指得到**它 —— 搬走不留路标等于删掉
-    assert "见「说明」" in head, "正文没有指向「说明」的路标"
+    # [R431] 路标随口径一起收进了常量 `VERDICT_BASIS`, 正文用的就是它
+    assert "basis={VERDICT_BASIS}" in head, "正文没用那句口径"
+    const = _dialog()[_dialog().index("export const VERDICT_BASIS"):]
+    assert "见「说明」" in const[:const.index("\n")], "正文没有指向「说明」的路标"
     # 反面: 这只票的警告一条不少(它们走 tradeNotes, 在 FlipTradesPanel 里)
     code = _panel()
     # [R304] `ft.blocked` 换成了 `ft.delayed` + `ft.voided` —— 一字板现在真的
@@ -1431,17 +1438,29 @@ def test_R293_那张独立的每一段表整个删了():
     assert "<FlipTradesPanel" not in _dialog(), "还有人在挂那块面板"
 
 
-def test_R293_行内那一笔与逐日表那三格说同一套话():
-    """两处是同一份内容换个排版。**空仓段的写法尤其不能各写各的** ——
+def test_R293_每一笔只有一份写法():
+    """同一笔在不同地方必须说同一套话。**空仓段的写法尤其不能各写各的** ——
     一边写「躲开 8%」另一边写「-8%」的话, 后者会被读成亏了 8 个点。
+
+    [R431] 原来钉的是「行内那一笔(`FlipTradeLine`)与逐日表那三格」两处一致。
+    `FlipTradeLine` 自 R295 起就没有调用方了, R431 删掉; 同时个股弹窗「复盘」那张
+    新表也要画同样的一笔 —— 于是改成**一份实现**: `LegAct` / `LegFill` / `LegResult`,
+    旧表与新表都只许用它们。
     """
     from tests.frontend_source import code_of
     panel = code_of("components/stock-analysis/FlipTradesPanel.tsx")
-    line = panel[panel.index("export function FlipTradeLine"):]
-    cells = panel[panel.index("export function FlipTradeCells"):]
-    cells = cells[:cells.index("\nexport function ")] if "\nexport function " in cells[1:] else cells
-    for shared in ("ACT_CLS[leg.act]", "idleText(leg.ret)", "leg.side === '多头' ? chgCls(leg.ret)"):
-        assert shared in line and shared in cells, f"两处的「{shared}」不一致"
+    assert "function FlipTradeLine" not in panel
+    for fn, shared in (("export function LegAct", "ACT_CLS[leg.act]"),
+                       ("export function LegResult", "idleText(leg.ret)"),
+                       ("export function legResultCls", "leg.side === '多头' ? chgCls(leg.ret)")):
+        body = panel[panel.index(fn):]
+        body = body[:body.index("\n}\n")]
+        assert shared in body, f"「{shared}」不在 {fn} 里"
+        assert panel.count(shared) == 1, f"「{shared}」又写了第二份"
+    cells = panel[panel.index("export function FlipTradeCells"):panel.index("export function LegAct")]
+    new = code_of("components/stock-preview/ReviewSection.tsx")
+    for part in ("<LegAct leg=", "<LegFill leg=", "<LegResult leg=", "legResultCls("):
+        assert part in cells and part in new, f"「{part}」: 旧表与新表没走同一份实现"
 
 
 def test_R293_这N天那一行按语气分档而不是十档全铺():

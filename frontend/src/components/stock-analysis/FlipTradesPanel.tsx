@@ -40,7 +40,7 @@ import type { StockReview } from '@/lib/api'
 import { cn } from '@/lib/cn'
 
 type FlipTrades = NonNullable<StockReview['flip_trades']>
-type Leg = FlipTrades['legs'][number]
+export type Leg = FlipTrades['legs'][number]
 
 function pct(v: number | null | undefined, digits = 1): string {
   return v == null ? '—' : `${v > 0 ? '+' : ''}${(v * 100).toFixed(digits)}%`
@@ -67,7 +67,7 @@ const ACT_CLS: Record<Leg['act'], string> = {
   空仓: 'border-border/60 text-muted',
 }
 
-const REASON_CN: Record<NonNullable<FlipTrades['reason']>, string> = {
+export const REASON_CN: Record<NonNullable<FlipTrades['reason']>, string> = {
   no_flip: '这段时间里六态一次都没转折 —— 没有可统计的买卖',
   no_open: '缺开盘价, 这一栏算不出来(次日开盘是唯一能执行的时机)',
 }
@@ -113,6 +113,14 @@ export function tradeNotes(ft: FlipTrades): string[] {
  * 那两张表本来就是同一条时间轴(逐日表里标「转折」的行, 正是每一段的起点),
  * 拆成两张等于让人左右对眼去把日子接起来。
  */
+/** [R431] 四个数各自是什么 —— 这一栏与个股弹窗「复盘」那张对比表共用 */
+export const TRADE_STAT_TIPS = {
+  follow: '按信号进出的复利。空仓期不算收益(手上是现金)。还没了结的那一段按最后一天收盘算 —— 与「一直拿着」同一个终点。',
+  hold: '同一段区间买了就不动。与「跟着做」**同起点同终点**, 所以两个数能直接比。',
+  excess: '跟着做 − 一直拿着。正的才说明这套判定在这只票上真的帮上忙了。',
+  trades: '真正下过单的次数。连着的多头段是一次持仓, 不是两次买卖',
+} as const
+
 export function FlipTradesBar({ ft, basis }: {
   ft?: FlipTrades | null
   basis: string
@@ -139,12 +147,10 @@ export function FlipTradesBar({ ft, basis }: {
           基线打散, 而这一行的毛病就是基线散。 */}
       <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 sm:grid-cols-4">
         <Stat label="跟着做" value={ft.follow} lead
-              title="按信号进出的复利。空仓期不算收益(手上是现金)。还没了结的那一段按最后一天收盘算 —— 与「一直拿着」同一个终点。" />
-        <Stat label="一直拿着" value={ft.hold}
-              title="同一段区间买了就不动。与「跟着做」**同起点同终点**, 所以两个数能直接比。" />
-        <Stat label="多赚" value={ft.excess}
-              title="跟着做 − 一直拿着。正的才说明这套判定在这只票上真的帮上忙了。" />
-        <div title="真正下过单的次数。连着的多头段是一次持仓, 不是两次买卖">
+              title={TRADE_STAT_TIPS.follow} />
+        <Stat label="一直拿着" value={ft.hold} title={TRADE_STAT_TIPS.hold} />
+        <Stat label="多赚" value={ft.excess} title={TRADE_STAT_TIPS.excess} />
+        <div title={TRADE_STAT_TIPS.trades}>
           <div className="text-[10px] text-muted">买卖</div>
           <div className="font-mono text-base tabular-nums text-secondary">{ft.trades} 次</div>
         </div>
@@ -181,33 +187,62 @@ export function FlipTradeCells({ leg }: { leg?: Leg }) {
   }
   return (
     <>
-      <td className="whitespace-nowrap px-2 py-1.5">
-        <span className={cn('inline-flex rounded border px-1 py-px text-[10px]', ACT_CLS[leg.act])}>
-          {leg.act}
-        </span>
-        {leg.delayed > 0 && (
-          <span className="ml-1 text-[9px] text-amber-400"
-                title={`信号次日是一字板, 挂不进去 —— 顺延 ${leg.delayed} 个交易日才成交`}>
-            ·延{leg.delayed}
-          </span>
-        )}
-      </td>
+      <td className="whitespace-nowrap px-2 py-1.5"><LegAct leg={leg} /></td>
       <td className="whitespace-nowrap px-2 py-1.5 text-right font-mono text-[10px] tabular-nums text-muted">
-        <span className="text-secondary">{leg.enter_date.slice(5)} {leg.enter_price.toFixed(2)}</span>
-        <span className="mx-1 opacity-50">→</span>
-        {leg.exit_date.slice(5)} {leg.exit_price.toFixed(2)}
-        {leg.open_ended && (
-          <span className="ml-1 text-amber-400/80"
-                title="这一段还没走完 —— 按最后一天收盘价记, 不进胜负统计">未完</span>
-        )}
+        <LegFill leg={leg} />
       </td>
-      {/* 多头段是真金白银 → 涨红跌绿; 空头段是空仓期 → 灰字写「躲开/踏空」。
-          同一列两套写法是**故意的**: 它们根本不是同一种数。 */}
-      <td className={cn('whitespace-nowrap px-2 py-1.5 text-right font-mono text-[10px] tabular-nums',
-                        leg.side === '多头' ? chgCls(leg.ret) : 'text-muted')}>
-        {leg.side === '多头' ? pct(leg.ret) : idleText(leg.ret)}
-        <span className="ml-1 opacity-50">{leg.bars}天</span>
+      <td className={cn('whitespace-nowrap px-2 py-1.5 text-right font-mono text-[10px] tabular-nums', legResultCls(leg))}>
+        <LegResult leg={leg} />
       </td>
+    </>
+  )
+}
+
+/**
+ * [R431] 那三格的**内容**拆出来 —— 个股弹窗「复盘」那张逐日表要把六态与通道两笔
+ * 叠在同一格里(用户: 两套都显示), 格子外壳不同, 里面每一笔长什么样必须一样。
+ */
+export function LegAct({ leg }: { leg: Leg }) {
+  return (
+    <>
+      <span className={cn('inline-flex rounded border px-1 py-px text-[10px]', ACT_CLS[leg.act])}>
+        {leg.act}
+      </span>
+      {leg.delayed > 0 && (
+        <span className="ml-1 text-[9px] text-amber-400"
+              title={`信号次日是一字板, 挂不进去 —— 顺延 ${leg.delayed} 个交易日才成交`}>
+          ·延{leg.delayed}
+        </span>
+      )}
+    </>
+  )
+}
+
+export function LegFill({ leg }: { leg: Leg }) {
+  return (
+    <>
+      <span className="text-secondary">{leg.enter_date.slice(5)} {leg.enter_price.toFixed(2)}</span>
+      <span className="mx-1 opacity-50">→</span>
+      {leg.exit_date.slice(5)} {leg.exit_price.toFixed(2)}
+      {leg.open_ended && (
+        <span className="ml-1 text-amber-400/80"
+              title="这一段还没走完 —— 按最后一天收盘价记, 不进胜负统计">未完</span>
+      )}
+    </>
+  )
+}
+
+/** 多头段是真金白银 → 涨红跌绿; 空头段是空仓期 → 灰字写「躲开/踏空」。
+ *  同一列两套写法是**故意的**: 它们根本不是同一种数。 */
+export function legResultCls(leg: Leg): string {
+  return leg.side === '多头' ? chgCls(leg.ret) : 'text-muted'
+}
+
+export function LegResult({ leg }: { leg: Leg }) {
+  return (
+    <>
+      {leg.side === '多头' ? pct(leg.ret) : idleText(leg.ret)}
+      <span className="ml-1 opacity-50">{leg.bars}天</span>
     </>
   )
 }
@@ -233,47 +268,9 @@ function Stat({ label, value, lead, title }: {
 }
 
 
-/**
- * [R293] 并进「通道档位」卡片的那一行 —— 与逐日表那三格是**同一份内容**,
- * 只是从 `<td>` 换成了行内排版(卡片不是表格)。
- *
- * 用户: 「通道结论这部分的关注重点是『调整到位』和这些状态期间的买卖」;
- * 「你可以理解为核心是按档位买卖」—— 那就把"这一段里手上做了什么、结果如何"
- * 直接长在那一段的卡片上, 而不是让人在另一张表里按日期找回来。
- */
-export function FlipTradeLine({ leg }: { leg?: Leg }) {
-  if (!leg) return null
-  return (
-    <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 rounded border border-border/60 bg-base/60 px-2 py-1">
-      <span className="text-[9px] text-muted">按档位买卖</span>
-      <span className={cn('inline-flex rounded border px-1 py-px text-[10px]', ACT_CLS[leg.act])}>
-        {leg.act}
-      </span>
-      {leg.delayed > 0 && (
-        <span className="text-[9px] text-amber-400"
-              title={`信号次日是一字板, 挂不进去 —— 顺延 ${leg.delayed} 个交易日才成交`}>
-          ·延{leg.delayed}
-        </span>
-      )}
-      <span className="font-mono text-[10px] tabular-nums text-muted">
-        <span className="text-secondary">{leg.enter_date.slice(5)} {leg.enter_price.toFixed(2)}</span>
-        <span className="mx-1 opacity-50">→</span>
-        {leg.exit_date.slice(5)} {leg.exit_price.toFixed(2)}
-        {leg.open_ended && (
-          <span className="ml-1 text-amber-400/80"
-                title="这一段还没走完 —— 按最后一天收盘价记, 不进胜负统计">未完</span>
-        )}
-      </span>
-      {/* 多头段是真金白银 → 涨红跌绿; 空头段是空仓期 → 灰字写「躲开/踏空」。
-          与逐日表那一列**同一套写法**: 它们根本不是同一种数。 */}
-      <span className={cn('ml-auto font-mono text-[10px] tabular-nums',
-                          leg.side === '多头' ? chgCls(leg.ret) : 'text-muted')}>
-        {leg.side === '多头' ? pct(leg.ret) : idleText(leg.ret)}
-        <span className="ml-1 opacity-50">{leg.bars}天</span>
-      </span>
-    </div>
-  )
-}
+// [R293 加, R431 删] `FlipTradeLine`(同一笔的行内版本)在这里删掉了。它唯一的调用方
+// `SegmentCard` 在 R295 就撤了, 此后一直是孤儿; 留着它, 守卫还在钉"两处说同一套话",
+// 而另一处根本没人渲染。每一笔长什么样现在只有 `LegAct` / `LegFill` / `LegResult` 一份。
 
 // [R287 加, R293 删] `FlipTradesPanel`(整块面板 + 「每一段」折叠表)在这里删掉了。
 // 两个页签现在都是**摘要压成一条 + 明细并进正文**: 趋势状态并进逐日表(R289),

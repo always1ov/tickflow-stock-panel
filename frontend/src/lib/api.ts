@@ -762,6 +762,30 @@ export interface ReviewTrendOutcome {
   win: number
 }
 
+/**
+ * [R431] 复盘「六个状态在这只票上的历史表现」的一行。**只有测量**(用户: 只摆数, 不下结论)。
+ * 分段与 `trend_outcomes` 同一个口径(后端 `_state_history` 复用 `_episodes`)。
+ */
+export interface ReviewStateHistory {
+  key: LivermoreState
+  label: string
+  /** 出现过几段(含还在走的那段) */
+  n: number
+  /** 一共几天(含还在走的那段) */
+  days: number
+  /** 走完的段数 —— 下面两样只按走完的算 */
+  done: number
+  /** 这段里涨跌: 进段前一天收盘 → 段末收盘, 走完的段平均 */
+  avg_ret: number | null
+  /** 走完的段里涨着结束的段数 */
+  ret_win: number
+  /** 走完后 forward_days 天: 段末收盘起算; 与 trend_outcomes.avg_fwd(段首起算)不是一个数 */
+  after_scored: number
+  avg_after: number | null
+  /** 眼下正处在这个状态 */
+  current: boolean
+}
+
 export interface StockReview {
   symbol: string
   error?: string
@@ -783,6 +807,8 @@ export interface StockReview {
   outcomes: ReviewOutcome[]
   /** [R177] 「趋势状态」那一栏的同类统计: 每种六态之后普遍怎么走 */
   trend_outcomes: ReviewTrendOutcome[]
+  /** [R431] 六个状态都占一行, 按梯子顺序。老缓存里可能没有 */
+  state_history?: ReviewStateHistory[]
   /** [R191] 多头侧 vs 空头侧的分离度 —— 「六态在这只票上哪一半有用」。
    *  这是整栏唯一的**结论**, 其余都是测量。 */
   side_edge?: {

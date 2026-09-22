@@ -169,7 +169,8 @@ def _episodes(rows: list[dict], key_of, closes: list[float],
     def _flush():
         if cur_key is None:
             return
-        out.append({"key": cur_key, "start": rows[cur_start]["date"],
+        # [R431] "i" = 段首在 rows 里的下标 —— `_state_history` 要从它找段末收盘
+        out.append({"key": cur_key, "start": rows[cur_start]["date"], "i": cur_start,
                     "days": cur_days,
                     "fwd": _forward_returns(closes, offset + cur_start, horizon)})
 
@@ -225,6 +226,71 @@ def _trend_outcomes(rows: list[dict], closes: list[float], offset: int) -> list[
     eps = _episodes(rows, lambda r: (r.get("trend") or {}).get("state"),
                     closes, offset, FORWARD_DAYS)
     return _agg_episodes(eps, lambda k: STATE_LABELS.get(k, (k, ""))[0])
+
+
+def _state_history(rows: list[dict], closes: list[float], offset: int) -> list[dict]:
+    """[R431] 复盘「六个状态在这只票上的历史表现」那张表。
+
+    用户排版图第三块; 答复「只摆数, 不下结论」—— **这里只有测量**, 没有建议,
+    也没有折算成百分比的胜率(与 `_agg_episodes` 同一条纪律: 个位数样本折算成
+    百分比会被当统计结论用)。
+
+    分段**复用** `_episodes`(与 R177 同一个口径, 不另写一份), 在它之上多算:
+
+      days          这个状态在窗口里一共几天
+      avg_ret       这段里涨跌: 从**进段前一天收盘**到段末收盘。以前一天为底,
+                    是因为进段那天自己的涨跌也属于这一段
+      ret_win       走完的段里涨着结束的段数
+      avg_after     走完后 FORWARD_DAYS 天: 从段末收盘起算。与 R177 的 `avg_fwd`
+                    **不是一个数** —— 那个从段首起算, 量的是"进这个状态之后";
+                    这里量的是"这个状态结束之后"
+      current       眼下是不是正处在这个状态
+
+    **还在走的那一段**(覆盖窗口最后一天的那段)计次数与天数, 不计段里涨跌与
+    走完后 —— 它还没走完。窗口开头那段可能是从窗口外延续进来的, 天数与涨跌
+    只算窗口内那一截, 与 R177 同样处理。
+
+    六个状态**都占一行**, 按梯子顺序(`STATE_LABELS` 的顺序), 没出现过的也在 ——
+    表上缺一行, 读的人分不清是"没出现过"还是"漏了"。
+    """
+    eps = _episodes(rows, lambda r: (r.get("trend") or {}).get("state"),
+                    closes, offset, FORWARD_DAYS)
+    acc = {k: {"n": 0, "days": 0, "done": 0, "ret_sum": 0.0, "ret_win": 0,
+               "after_scored": 0, "after_sum": 0.0, "current": False}
+           for k in STATE_LABELS}
+    for e in eps:
+        a = acc.get(e["key"])
+        if a is None:
+            continue
+        a["n"] += 1
+        a["days"] += e["days"]
+        if e["i"] + e["days"] == len(rows):
+            a["current"] = True          # 还在走 —— 后两样无从谈起
+            continue
+        s = offset + e["i"]
+        t = s + e["days"] - 1
+        base = closes[s - 1] if s >= 1 else None
+        if base:
+            ret = closes[t] / base - 1
+            a["done"] += 1
+            a["ret_sum"] += ret
+            a["ret_win"] += 1 if ret > 0 else 0
+        after = _forward_returns(closes, t, FORWARD_DAYS)
+        if after is not None:
+            a["after_scored"] += 1
+            a["after_sum"] += after
+    return [{
+        "key": k,
+        "label": STATE_LABELS[k][0],
+        "n": a["n"],
+        "days": a["days"],
+        "done": a["done"],
+        "avg_ret": round(a["ret_sum"] / a["done"], 4) if a["done"] else None,
+        "ret_win": a["ret_win"],
+        "after_scored": a["after_scored"],
+        "avg_after": round(a["after_sum"] / a["after_scored"], 4) if a["after_scored"] else None,
+        "current": a["current"],
+    } for k, a in acc.items()]
 
 
 def _outcomes(rows: list[dict], closes: list[float], offset: int) -> list[dict]:
@@ -633,6 +699,9 @@ def review_for_symbol(repo, symbol: str, days: int = DEFAULT_DAYS) -> dict:
         # [R177] 「趋势状态」那一栏的同类统计 —— 原来那栏只有"涨停出在什么状态下",
         # 回答的是另一个问题; 这条补上"每种状态之后普遍怎么走"
         "trend_outcomes": trend_outcomes,
+        # [R431] 个股弹窗「复盘」那一块的「六个状态在这只票上的历史表现」。
+        # 与上面同一个分段口径, 多算段里涨跌 / 走完后; 只有测量, 不下结论。
+        "state_history": _state_history(rows, closes, offset),
         # [R191] 判定层。上面那些全是测量, 这两条才回答用户带着的问题:
         # 「六态在这只票上灵不灵」与「我现在在哪、盯什么价」。
         # 两条都只用已经算好的段统计, 不新增取数。

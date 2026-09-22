@@ -9,6 +9,7 @@
  */
 import type { ReactNode } from 'react'
 import { CandlestickChart, Clock, Crosshair } from 'lucide-react'
+import { SectionTitle } from './SectionTitle'
 
 export type ChartView = 'daily' | 'intraday' | 'levels'
 
@@ -33,11 +34,7 @@ export function ChartLevelsSection({ view, onViewChange, levelsEnabled = true, t
   const withSide = levelsEnabled && side
   return (
     <section>
-      <div className="flex items-center gap-3">
-        <span className="shrink-0 text-sm font-semibold text-foreground">图表与价位</span>
-        <span className="shrink-0 text-xs text-muted">价格、通道与关键价位</span>
-        <span className="h-px flex-1 bg-border/70" aria-hidden="true" />
-      </div>
+      <SectionTitle title="图表与价位" sub="价格、通道与关键价位" />
 
       <div className={`mt-3 grid gap-4 ${withSide ? 'lg:grid-cols-[minmax(0,1fr)_300px]' : ''}`}>
         <div className="min-w-0 rounded-card border border-border bg-surface p-4">

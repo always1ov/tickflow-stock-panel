@@ -21,6 +21,7 @@ import { StockReviewPanel, type ReviewTab } from '@/components/stock-analysis/St
 import { HERO_DAYS_DEFAULT, PreviewHero } from '@/components/stock-preview/PreviewHero'
 import { ChartLevelsSection, type ChartView } from '@/components/stock-preview/ChartLevelsSection'
 import { LevelSideList } from '@/components/stock-preview/LevelSideList'
+import { ReviewSection } from '@/components/stock-preview/ReviewSection'
 import { PILL, PILL_IDLE, PILL_ON } from '@/components/stock-preview/pill'
 import { StockFinancialSearch } from '@/components/financials/StockFinancialSearch'
 import { buildMonitorPriceLines } from '@/lib/price-alerts'
@@ -763,6 +764,11 @@ export function StockPreviewDialog({ symbol: symbolProp, name: nameProp, onClose
                                       controls={levelCtl} visibleBars={reviewDays} />
                   )}
                 </ChartLevelsSection>
+              </div>
+
+              {/* [R431] 新「复盘」(用户排版图第三块)。天数跟头部走; 旧的复盘页仍在旧顶栏里 */}
+              <div className="mb-4">
+                <ReviewSection symbol={symbol} days={reviewDays} />
               </div>
 
               <div className="rounded border border-border/50 bg-base/30 p-3">

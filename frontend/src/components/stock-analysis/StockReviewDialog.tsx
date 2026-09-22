@@ -67,7 +67,7 @@ import {
 export type ReviewTab = 'trend' | 'verdict' | 'combo'
 
 // 与决策台「结论」列同一套配色 —— 两处不一样的话, 翻历史时得先在脑子里做一次换算
-const VERDICT_CLS: Record<KeltnerVerdict['tone'], string> = {
+export const VERDICT_CLS: Record<KeltnerVerdict['tone'], string> = {
   sell: 'border-red-400/40 bg-red-400/10 text-red-400',
   buy: 'border-sky-400/40 bg-sky-400/10 text-sky-300',
   hold: 'border-amber-400/40 bg-amber-400/10 text-amber-400',
@@ -81,25 +81,25 @@ const VERDICT_CLS: Record<KeltnerVerdict['tone'], string> = {
  * 它出现在两处(「现在」那一行、逐日表每一行), 两处必须说同一句话:
  * 同一个注记两种解释, 正是这仓库反复在治的那种病。
  */
-const SUB_STATE_TIP = '六态里更细的那一档 —— 只是标注, 不是状态。\n'
+export const SUB_STATE_TIP = '六态里更细的那一档 —— 只是标注, 不是状态。\n'
   + '它不参与多空判断、不触发转折、不进打分。\n\n'
   + '次级回升:这一段反弹的高点还没超过上一段回升的高点(力度更弱)。\n'
   + '次级回撤:这一段回落的低点还没跌破上一段回撤的低点(还没破位)。'
 
 const RANGES = [60, 120, 250] as const
 
-function pct(v: number | null | undefined, digits = 1): string {
+export function pct(v: number | null | undefined, digits = 1): string {
   return v == null ? '—' : `${v > 0 ? '+' : ''}${(v * 100).toFixed(digits)}%`
 }
 
 // A股习惯: 涨红跌绿
-function chgCls(v: number | null | undefined): string {
+export function chgCls(v: number | null | undefined): string {
   if (v == null || v === 0) return 'text-muted'
   return v > 0 ? 'text-red-400' : 'text-emerald-400'
 }
 
 /** 涨停/跌停/炸板标。连板时把第几个板写出来 —— 复盘时"3 板"和"1 板"完全是两回事 */
-function LimitTag({ r }: { r: ReviewRow }) {
+export function LimitTag({ r }: { r: ReviewRow }) {
   if (r.limit_up) {
     return (
       <span
@@ -124,6 +124,22 @@ function LimitTag({ r }: { r: ReviewRow }) {
     )
   }
   return null
+}
+
+/**
+ * [R431] 两套买卖的口径各一句 —— 这一页的两个页签与个股弹窗「复盘」那张对比表共用,
+ * 同一条规则两处各写一遍, 迟早一处改了另一处没改。
+ */
+export const FLIP_BASIS = '转折次日开盘进出 · 转多买入、转空清仓(不做空)'
+export const VERDICT_BASIS = '换档次日开盘进出 · 偏买建仓、偏卖与回避清仓(不做空);「拿着」「等着」不动手 —— 口径与作者原话的出入见「说明」'
+
+/** [R431] 复盘数据。个股弹窗「复盘」那一块与本页同一个查询键、同一套选项 */
+export function useStockReview(symbol: string, days: number) {
+  return useQuery({
+    queryKey: QK.stockReview(symbol, days),
+    queryFn: () => api.stockReview(symbol, days),
+    staleTime: 5 * 60_000,
+  })
 }
 
 /** 连续同一档结论合成一段。rows 是新→旧, 段内也保持这个顺序。 */
@@ -179,11 +195,7 @@ export function StockReviewPanel({ symbol, tab: initialTab, days: daysProp, onDa
   // 通往同一份内容的门。**代价是 27 格速查表的「你在这一格」高亮没了**:
   // 全局入口那边没有"当前是哪只票"这个上下文。这是用户看过之后的取舍。
 
-  const q = useQuery({
-    queryKey: QK.stockReview(symbol, days),
-    queryFn: () => api.stockReview(symbol, days),
-    staleTime: 5 * 60_000,
-  })
+  const q = useStockReview(symbol, days)
   const d: StockReview | undefined = q.data
 
   const trendRows = useMemo(() => {
@@ -288,7 +300,7 @@ function TrendView({ d, rows, onlyMarked, onToggleMarked }: {
         <HeadRow label="按转折买卖">
           <FlipTradesBar
             ft={d.flip_trades}
-            basis="转折次日开盘进出 · 转多买入、转空清仓(不做空)"
+            basis={FLIP_BASIS}
           />
         </HeadRow>
 
@@ -468,7 +480,7 @@ const TONE_CN: Record<string, string> = {
 }
 
 
-function EvidencePanel({ ch, edge }: {
+export function EvidencePanel({ ch, edge }: {
   ch: NonNullable<StockReview['channel']>
   edge: StockReview['verdict_edge']
 }) {
@@ -556,7 +568,7 @@ function VerdictView({ d, segments }: {
               (`tradeNotes` 那条纪律)。挪走的只有恒定的那一段。 */}
           <FlipTradesBar
             ft={d.verdict_trades}
-            basis="换档次日开盘进出 · 偏买建仓、偏卖与回避清仓(不做空);「拿着」「等着」不动手 —— 口径与作者原话的出入见「说明」"
+            basis={VERDICT_BASIS}
           />
         </HeadRow>
 
