@@ -653,8 +653,11 @@ export function AnalysisKChart({
         { scale: false, gridIndex: 1, splitNumber: 2,
           // 副图不画背景横线
           splitLine: { show: false },
-          axisLabel: { color: CT().text, fontSize: 9, fontFamily: 'JetBrains Mono, monospace',
-                       formatter: (v: number) => fmtSub(v) } },
+          // [R423] 不写刻度数字。用户: 「有意义吗, 没意义就去掉」—— DIFF/DEA 是
+          // 价格差(元), 跟股价挂钩, 不同股票之间没法比; 看共振只看柱子在 0 上还是
+          // 0 下、有没有金叉死叉、出没出黄柱, 一个数都不用读。0 轴也不必标: 每根
+          // 柱都从 0 长出来, 柱根就是 0。
+          axisLabel: { show: false }, axisTick: { show: false } },
       ],
       dataZoom: [
         { type: 'inside', xAxisIndex: [0, 1], start: zoomStart, end: 100 },
@@ -1115,7 +1118,3 @@ function levelKey(type: string, value: number): string {
   return `${type}-${value.toFixed(2)}`
 }
 
-/** [R415] 副图刻度: DIFF/DEA 是价格差, 两位小数够看; 0 就写 0 */
-function fmtSub(v: number): string {
-  return v === 0 ? '0' : v.toFixed(2)
-}
