@@ -245,7 +245,8 @@ export function AnalysisKChart({
     levels: fib2Raw ?? [],
   }), [rows, fib2, fib2Zone, fib2Raw])
 
-  const { dates, candle, vols, dateIndex, zoomStart, alignedSeries } = useMemo(() => {
+  const { dates: baseDates, candle, vols, dateIndex, zoomStart: baseZoom,
+          alignedSeries: baseSeries } = useMemo(() => {
     const dates = rows.map(r => (typeof r.date === 'string' ? r.date.slice(0, 10) : String(r.date)))
     const candle = rows.map(r => [r.open, r.close, r.low, r.high])
     const vols = rows.map(r => ({
@@ -298,6 +299,44 @@ export function AnalysisKChart({
 
     return { dates, candle, vols, dateIndex, zoomStart, alignedSeries }
   }, [rows, series, seriesDates])
+
+  /**
+   * [R413] 「未来」区 —— 位移均线平移之后**露到最后一根之外**的那 3 个值。
+   *
+   * 它不是未来函数, 恰恰相反: 用的全是已经收盘的数据, 只是画到了右边
+   * (见后端 `dinapoli.displaced_sma` 的说明)。R405 就把数据发过来了, 一直没画,
+   * 因为画它要**往右扩几个空槽**, 而 x 轴是所有价位组共用的。
+   *
+   * 用户定的做法: 「避开影响就独立显示, 只为了看看而已, 别影响六态那些」。
+   * 所以这里的关键不是怎么画, 而是**什么时候不画**:
+   *
+   *     二型开关没开 → `futureDates` 为空 → dates/缩放/曲线全部原样,
+   *     整张图与加这段之前**逐字节相同**。
+   *
+   * 这样六态的分段底色、关键点线、所有别的组都碰不到 —— 它们只在二型开着的
+   * 时候才会跟着多出 3 个槽, 而那时候用户本来就在看二型。
+   */
+  const futureVals = activeTypes.has('fib2') ? (fib2?.dma3_future ?? []) : []
+  const { dates, zoomStart, alignedSeries, futureDates } = useMemo(() => {
+    if (!futureVals.length) {
+      return { dates: baseDates, zoomStart: baseZoom,
+               alignedSeries: baseSeries, futureDates: [] as string[] }
+    }
+    const futureDates = futureVals.map((_, i) => `未来${i + 1}`)
+    const dates = [...baseDates, ...futureDates]
+    // 二型均线是**唯一**有未来值的曲线; 别的曲线数组短 3 格, ECharts 画到
+    // 最后一个有值的点就停 —— 那正是对的, 它们本来就不知道明天。
+    const alignedSeries = { ...baseSeries }
+    if (alignedSeries['fib2_dma3']) {
+      alignedSeries['fib2_dma3'] = [...alignedSeries['fib2_dma3'], ...futureVals]
+    }
+    // 默认视窗仍然给 120 根**真实** K 线 —— 不补这一下, 多出来的空槽会把
+    // 真实 K 线挤掉 3 根。
+    const showBars = 120 + futureDates.length
+    const zoomStart = dates.length > showBars
+      ? Math.round((1 - showBars / dates.length) * 100) : 0
+    return { dates, zoomStart, alignedSeries, futureDates }
+  }, [baseDates, baseZoom, baseSeries, futureVals])
 
   // [R409] 当前主题下的价位组配色。单一产地在 `lib/theme.ts`;
   // `theme` 已经在 buildOption 的 useMemo 依赖里, 切主题会整张图重建。
@@ -377,7 +416,10 @@ export function AnalysisKChart({
         // [R410] 「强支撑区」里的「支撑」已经被「压力支撑」那一组占用了 ——
         // 同一个词两件事。改叫「回踩密集带」: 说的就是它本来的意思, 且不撞名。
         markAreaData.push([{
-          yAxis: z.low - thin, name: `回踩密集带 · ${z.strength} 条挤在一起`,
+          // [R413] **标上上下沿价格。** 用户: 这是"唯一真会拿来挂单的东西",
+          // 而在此之前这块色带上一个数字都没有 —— 读不出价就挂不了单。
+          yAxis: z.low - thin,
+          name: `回踩密集带 ${z.low.toFixed(2)}~${z.high.toFixed(2)} · ${z.strength} 条挤在一起`,
           itemStyle: {
             color: withAlpha(zc, alpha),
             borderColor: withAlpha(zc, 0.85), borderWidth: 1,
@@ -402,9 +444,50 @@ export function AnalysisKChart({
       }
     }
 
+    // [R413] 「未来」区的灰底。**没画成 3 根灰蜡烛**, 因为未来的开/高/低/收
+    // 根本不存在 —— 画出来就是编的, 而一根编出来的蜡烛在图上和真的长得一样。
+    // 这里只给 3 个空槽 + 一块中性灰底, 让人一眼看出"这一段还没发生",
+    // 均线自然探进去。
+    if (futureDates.length) {
+      markAreaData.push([{
+        xAxis: futureDates[0], name: '未来(均线已知)',
+        itemStyle: { color: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(34,39,56,0.05)' },
+        label: { show: true, position: 'insideTop', distance: 4,
+                 color: CT().text, fontSize: 9 },
+      }, { xAxis: futureDates[futureDates.length - 1] }])
+    }
+
+    // [R413] 现价贴签。用户: 「用来量『还差多少到位』」—— 在此之前只有 hover
+    // 时的十字线, 手一移开就没了, 而"离那条线还差多少"是要反复看的。
+    const lastClose = rows.at(-1)?.close
+    const nowLine = lastClose != null && Number.isFinite(lastClose) ? {
+      silent: true, symbol: 'none', animation: false,
+      z: 3,
+      data: [{ yAxis: lastClose }],
+      lineStyle: { color: CT().text, width: 1, type: 'dashed' as const, opacity: 0.45 },
+      label: {
+        // **单独占右边预留带的一列**, 不和价位标签抢位置。
+        //
+        // 前两版都出过图才发现不行: 放绘图区里(`insideStartTop`)会被贴得近的
+        // 价位线穿过去 —— 价位线和它在同一片画布上, 调 z/zlevel 压不住;
+        // 放左边(`start`)会被切掉 —— 左边距只有 56px, 刚够 y 轴刻度。
+        // 右边预留带 144px, 价位标签从 +6 起最宽约 66px, 所以让到 +78
+        // 就是一条干净的列。**这是结构上不重叠, 不是靠图层压。**
+        show: true, position: 'end' as const, distance: 78,
+        formatter: () => `现价 ${lastClose.toFixed(2)}`,
+        color: CT().textStrong, fontSize: 9,
+        fontFamily: 'JetBrains Mono, monospace',
+        // **不透明底**: 信息条那个 85% 的底在别的价位线贴得很近时压不住,
+        // 出图时「现价 15.50」被两条 15.7x 的虚线穿过去了。
+        backgroundColor: CT().tooltipBg, borderColor: CT().tooltipBorder,
+        borderWidth: 1, padding: [2, 5], borderRadius: 2,
+      },
+    } : undefined
+
     const series: any[] = [
       {
         name: 'K', type: 'candlestick', data: candle, animation: false,
+        markLine: nowLine,
         // z=2 让蜡烛始终在价位线(z=1)之上, hover 高亮价位线时不会被遮挡/变淡
         z: 2,
         itemStyle: {

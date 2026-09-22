@@ -132,3 +132,58 @@ def test_R410_开关上要如实说藏了几条():
     assert "这一档共" in blk, "title 里没写出这一档一共多少条"
     assert "disabled={total === 0}" in blk, \
         "能不能点按画出来的条数算了 —— 该按整档算, 否则藏光了开关就点不开"
+
+
+# ── [R413] 主图上那三样 ────────────────────────────────────
+def test_R413_未来区只在二型开着的时候才存在():
+    """**这一条是「别影响六态那些」的机器形式。**
+
+    画「未来」区要往右扩几个空槽, 而 x 轴是**所有价位组共用的** —— 扩了之后
+    六态的分段底色、所有组的价位线都会跟着多出 3 格。用户定的做法是
+    「避开影响就独立显示」, 落实成一句话就是:
+
+        二型开关没开 → 一个空槽都不加 → 整张图与加这段之前逐字节相同。
+
+    退化的方式很安静: 把那个 `activeTypes.has('fib2')` 去掉, 图上看起来只是
+    右边多了一小条灰底, 没人会觉得不对 —— 但那时候**每一只票、每一次打开都在
+    动共用坐标轴**, 而二型可能根本没开。
+    """
+    code = code_lines(read_src(CHART))
+    m = re.search(r"const futureVals = ([^\n]+)", code)
+    assert m, "未来区那个开关读不出来"
+    assert "activeTypes.has('fib2')" in m[1], \
+        f"未来区没有跟着二型开关走: {m[1]}"
+    # 空的时候必须原样返回基础数组, 不许重建(重建 = 每次渲染都换新引用)
+    i = code.index("const futureVals")
+    blk = code[i:i + 900]
+    assert "if (!futureVals.length)" in blk, "没有「没有未来值就原样返回」那条早返回"
+    assert "dates: baseDates" in blk, "早返回时没有把原来的 dates 原样交回去"
+
+
+def test_R413_现价贴签在右边单独占一列_不靠图层压():
+    """价位线和它在同一片画布上, **调 z/zlevel 压不住** —— 出图两次才看清楚。
+
+    所以做法是结构上不重叠: 让到价位标签右边一截, 单独占一列。
+    这条钉的是"让开的距离明显大于价位标签的距离", 而不是某个具体像素。
+    """
+    code = code_lines(read_src(CHART))
+    i = code.index("const nowLine")
+    blk = code[i:i + 800]
+    m = re.search(r"position: 'end' as const, distance: (\d+)", blk)
+    assert m, "现价贴签的位置读不出来"
+    now_d = int(m[1])
+    # 价位线/曲线的 endLabel 用的距离
+    others = [int(x) for x in re.findall(r"distance: (\d+),\n\s*\}", code)]
+    others += [int(x) for x in re.findall(r"padding: \[2, 5\], borderRadius: 2,\n\s*distance: (\d+)", code)]
+    assert now_d >= 40, f"现价贴签只让了 {now_d}px, 会和价位标签挤在一起"
+    for d in others:
+        assert now_d > d + 20, f"现价贴签({now_d})没比价位标签({d})让开足够"
+
+
+def test_R413_密集带标签带上下沿价格():
+    """一块没有数字的色带挂不了单 —— 而它是这一组里唯一真会拿来挂单的东西。"""
+    code = code_lines(read_src(CHART))
+    i = code.index("name: `回踩密集带")
+    line = code[i:i + 160]
+    assert "z.low.toFixed(2)" in line and "z.high.toFixed(2)" in line, \
+        f"密集带标签没带上下沿价格: {line}"
