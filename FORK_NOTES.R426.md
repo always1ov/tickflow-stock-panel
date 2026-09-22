@@ -1,0 +1,5 @@
+# R426 — 量化MACD 副图空白: 数据里一根 NaN 就让接口 500
+
+| # | 改动 | 涉及文件 | 冲突风险 | 单独回退 |
+|---|------|---------|:---:|---------|
+| R426 | 用户发来的关键价位截图里, 「量化MACD」副图**只有标题、整块空白**。查到一条确定的路: `/api/stock-analysis/quant-macd` 只挡了收盘价为 None 的行, **NaN 挡不住** —— 某一根收盘价是 NaN 时 EMA 从那根起全是 NaN, JSON 编码报「Out of range float values are not JSON compliant」→ 500 → 前端拿不到数据, 且不报任何错(测试夹具复现为 500)。库里是会有 NaN 的, K 线接口为此专门有 `_json_safe`。同一处还查出一个更隐蔽的: **成交量 NaN 时接口照常 200, 但 OBV 是累加, NaN 一路传下去, 从那根起黄柱永远不再出现**。修法: 收盘价不是有限数的那一根整根不参与(通达信里不存在没有收盘价的 K 线); 成交量不是有限数当缺失(None), 按通达信无效传播只影响那一根的黄柱; 输出前再兜底一次非有限值 → None。前端: 副图取数失败时在副图正中写「量化MACD 取数失败, 稍后点右上角刷新重试」, 不再让一块空白冒充"没有信号"。**线上那只票是不是正好中了 NaN 这条, 我这里连不到库、无法确认** —— 若部署后仍空白, 副图会显示失败提示或另有原因, 需要用户再截一张。 | 改 `backend/app/api/stock_analysis.py`(`quant_macd`)、`backend/tests/test_quant_macd.py`(+2 条: 收盘价 NaN 不许 500 且只丢那一根 / 成交量 NaN 不许带坏后面的黄柱)、`frontend/src/components/stock-analysis/AnalysisKChart.tsx`(`quantMacdError`)、`StockLevelsPanel.tsx`;**打分系统 / `strategy/` / 六态 diff 全空**;量化MACD 18 条全过 | 低 | 可(撤掉 `finite` 那几行与失败提示) |

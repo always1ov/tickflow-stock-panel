@@ -170,6 +170,8 @@ interface Props {
   symbol?: string
   /** [R415] 副图「量化MACD」的逐根数值; 没到就先空着(副图留白, 主图照画) */
   quantMacd?: QuantMacdResult
+  /** [R426] 副图取数失败 —— 在副图里明说, 不让一块空白冒充"没有信号" */
+  quantMacdError?: boolean
   /** 预留:点击某根 K 线 */
   onDateClick?: (date: string) => void
   /**
@@ -198,6 +200,7 @@ export function AnalysisKChart({
   fib2,
   symbol,
   quantMacd,
+  quantMacdError = false,
   onDateClick,
   height = 460,
   className,
@@ -669,7 +672,10 @@ export function AnalysisKChart({
       tooltip: { show: false },
       axisPointer: { link: [{ xAxisIndex: 'all' }] },
       // [R415] 副图左上角的名字 —— 否则换掉成交量之后, 这块图是什么没有任何地方说
-      graphic: [{
+      graphic: [...(quantMacdError ? [{
+        type: 'text' as const, left: 'center', top: subTop + subH / 2 - 6, silent: true,
+        style: { text: '量化MACD 取数失败, 稍后点右上角刷新重试', fill: CT().text, fontSize: 11 },
+      }] : []), {
         type: 'text', left: 60, top: subTop + 2, silent: true,
         // 亮色主题下它落在黑底上, 用浅灰才看得见
         style: { text: '量化MACD', fill: isDark ? CT().text : '#B4B4B4', fontSize: 9 },
@@ -703,7 +709,7 @@ export function AnalysisKChart({
     chartInstRef.current.resize()
     chartInstRef.current.setOption(buildOption(), true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rows, levels, series, seriesDates, activeTypes, pivotRank, markers, ranges, fib2, fib2Grain, effLevels, fib2Zone, height, theme, hoveredKey, quantMacd])
+  }, [rows, levels, series, seriesDates, activeTypes, pivotRank, markers, ranges, fib2, fib2Grain, effLevels, fib2Zone, height, theme, hoveredKey, quantMacd, quantMacdError])
 
   // resize
   useEffect(() => {

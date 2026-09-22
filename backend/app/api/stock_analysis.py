@@ -584,12 +584,27 @@ def quant_macd(
     except Exception as e:  # noqa: BLE001
         logger.debug("quant-macd live candle skipped: %s", e)
 
-    rows = [r for r in rows if r.get("close") is not None]
-    res = qm.compute([r["close"] for r in rows], [r.get("volume") for r in rows])
+    import math
+
+    def finite(x) -> bool:
+        return x is not None and isinstance(x, (int, float)) and math.isfinite(x)
+
+    # [R426] **非数值一律当"没有"。** 库里会出现 NaN(K 线接口为此专门有 `_json_safe`),
+    # 而这里原来只挡了 None:
+    #   · 收盘价 NaN → EMA 从那一根起全是 NaN → JSON 编码直接 500 → 前端副图整块留白,
+    #     且不报任何错(用户截图里就是一块只有标题的空图);
+    #   · 成交量 NaN → 接口照常 200, 但 OBV 是累加, NaN 一路传下去, **从那根起黄柱永远
+    #     不再出现** —— 更隐蔽。
+    # 收盘价不是数的那一根整根不参与(通达信里不存在没有收盘价的 K 线);
+    # 成交量不是数就当缺失(None), 按通达信的无效传播只影响那一根的黄柱。
+    rows = [r for r in rows if finite(r.get("close"))]
+    res = qm.compute([float(r["close"]) for r in rows],
+                     [float(r["volume"]) if finite(r.get("volume")) else None for r in rows])
 
     def tail(xs: list) -> list:
-        # 6 位小数 —— 比通达信显示的 3 位还多, 只为少传点字节, 不改变任何一根
-        return [None if x is None else round(x, 6) for x in xs[-bars:]]
+        # 6 位小数 —— 比通达信显示的 3 位还多, 只为少传点字节, 不改变任何一根。
+        # 非有限值兜底成 None: 算法里不该再产出它, 但一个 NaN 就能让整个响应 500。
+        return [round(x, 6) if finite(x) else None for x in xs[-bars:]]
 
     return {
         "symbol": symbol,

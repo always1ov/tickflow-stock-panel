@@ -111,6 +111,8 @@ export function StockLevelsPanel({ symbol, height = 480, bare = false }: StockLe
         symbol={symbol}
         // [R415] 副图: 用户自己的量化MACD, 取代原来的成交量
         quantMacd={qmacdQ.data}
+        // [R426] 取数失败要说出来 —— 原来失败时副图只剩标题, 看着像"这只票没有信号"
+        quantMacdError={qmacdQ.isError}
         height={height}
       />
     </div>

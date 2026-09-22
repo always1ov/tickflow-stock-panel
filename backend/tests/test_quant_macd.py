@@ -262,3 +262,39 @@ def test_R415_空数据不抛异常(monkeypatch):
     d = _client(monkeypatch, pl.DataFrame()).get(
         "/api/stock-analysis/quant-macd?symbol=000001.SZ").json()
     assert d["dates"] == [] and d["diff"] == []
+
+
+def test_R426_收盘价里有NaN也不许500_那一根不参与(monkeypatch):
+    """用户截图: 关键价位下面的量化MACD 只有标题, 整块空白。
+
+    复现出来的一条路: 某一根收盘价是 NaN → EMA 从那根起全 NaN → JSON 编码报
+    `Out of range float values are not JSON compliant` → 500 → 前端拿不到数据。
+    """
+    import math
+    df = _daily()
+    c = df["close"].to_list()
+    c[50] = float("nan")
+    df = df.with_columns(pl.Series("close", c))
+    r = _client(monkeypatch, df).get("/api/stock-analysis/quant-macd?symbol=000001.SZ")
+    assert r.status_code == 200, r.text[:200]
+    body = r.json()
+    assert len(body["dates"]) == len(body["diff"]) > 0
+    assert all(x is None or math.isfinite(x) for x in body["diff"] + body["dea"])
+    # NaN 那一根整根不在了, 后面照常有值(不是从那根起全废)
+    assert body["diff"][-1] is not None
+
+
+def test_R426_成交量里有NaN_黄柱不会从那根起永远消失(monkeypatch):
+    """OBV 是累加: 一根 NaN 量如果当数用, 会一路传下去, 此后黄柱一根都不出 ——
+    接口还是 200, 屏幕上只是"黄柱没了", 最隐蔽的那种坏。"""
+    df = _daily(600)
+    clean = _client(monkeypatch, df).get("/api/stock-analysis/quant-macd?symbol=000001.SZ").json()
+    v = df["volume"].cast(pl.Float64).to_list()
+    v[100] = float("nan")
+    dirty = _client(monkeypatch, df.with_columns(pl.Series("volume", v))) \
+        .get("/api/stock-analysis/quant-macd?symbol=000001.SZ").json()
+    tail_clean = [y is not None for y in clean["yellow"][-200:]]
+    tail_dirty = [y is not None for y in dirty["yellow"][-200:]]
+    assert any(tail_clean), "夹具里本来就没有黄柱, 这条测不出东西"
+    assert tail_dirty == tail_clean, "一根 NaN 量把后面的黄柱带坏了"
+    assert dirty["diff"] == clean["diff"], "量的事不该影响 DIFF"
