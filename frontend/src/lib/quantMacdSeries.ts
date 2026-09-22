@@ -12,21 +12,26 @@
  *   DRAWICON(CROSS(DEA,DIFF),DEA*1.1,2);         死叉图标 2
  *   STICKLINE(...,0,DEA/4,2,0),COLORYELLOW;      黄柱(实心)
  *
- * 照原文的几件事:
+ * [R417] 下面几条**全部是对着用户发来的通达信截图逐像素量出来的**, 不是按文档推的
+ * (R415 按文档推, 柱宽和空心柱都推错了):
  *
- * - **STICKLINE 的第 5 个参数**: 0 = 实心, 非 0 = 空心 —— DIFF 实心、DEA 空心、
- *   黄柱实心。
- * - **宽度都是 2**, 所以三种柱子**同宽、叠在同一个位置**。通达信的宽度以 10 为
- *   一个 K 线间距, 2 就是间距的 20%。
+ * - **柱宽 66%**: 截图里 K 线间距 15.1px, 实心柱 10px。通达信手册说「宽度 10 为
+ *   标准间距」, 照字面 2 就是 20% —— 与实际显示不符, 以实测为准。
+ * - **空心柱会盖住底下的东西**: 通达信画空心柱是先用底色把整块填掉、再描边。
+ *   DIFF 实心柱先画、DEA 空心柱后画, 所以 DIFF 只露出**超出 DEA 的那一截**;
+ *   DIFF 没 DEA 长时整根被盖住, 只看得见 DEA 的框。截图里「上面一截实心、下面
+ *   一个空框」就是这么来的。这里不去猜页面底色是什么, 而是直接只画露出来的那一截
+ *   (`diffExposed`) —— 结果与"先画再盖"逐像素相同。
+ * - **空心柱的边框是点线**(1 点 1 空), 不是实线。
+ * - **图标**: 带箭杆的箭头, 约 13×18px, **图标顶端对准数值**、水平居中于那根 K 线;
+ *   1 号红色朝上, 2 号绿色朝下。2 号的绿比柱子的绿暗一档(截图三个死叉箭头都在
+ *   #00DC00 附近, 而绿柱是 #00FF00) —— 那是通达信图标自带的颜色。
  * - **画的先后 = 原文语句的先后**: DIFF → DEA → 图标 → 黄柱, 后画的盖在上面。
- *   黄柱是最后一条语句, 所以它盖在 DIFF 实心柱的下四分之一上 —— 这也是原文的样子。
- * - **图标**: 通达信图标 1 是红色向上箭头、2 是绿色向下箭头。
  *
  * 颜色取 `lib/theme.ts` 的 `QUANT_MACD_COLORS`: 逐字照抄通达信, 亮暗两套主题
  * 同一份 —— 用户: 「颜色和柱子类型都得一样」。
  *
- * **只画原文画的, 不多一样也不少一样**: 没有 0 轴线、没有背景横线、没有悬停提示,
- * 原文没有的一律不加。
+ * **只画原文画的, 不多一样也不少一样**: 没有悬停提示, 原文没有的一律不加。
  */
 import { QUANT_MACD_COLORS } from '@/lib/theme'
 
@@ -57,10 +62,55 @@ export function alignQuantMacd(
   }
 }
 
-/** 通达信 STICKLINE 宽度 2 / 标准间距 10。 */
-export const STICK_WIDTH = '20%'
+/** 柱宽占 K 线间距的比例 —— 实测: 10px / 15.1px。三种柱子同宽(原文宽度都是 2)。 */
+export const STICK_RATIO = 0.66
+export const STICK_WIDTH = `${STICK_RATIO * 100}%`
+
+/** 空心柱的边框: 1 点 1 空的点线(实测, 见 DEA 那一条的说明)。 */
+export const HOLLOW_DASH = [1, 1]
+
+/** 图标外框(px), 实测。 */
+export const ICON_W = 13
+export const ICON_H = 18
+/** 1 号图标: 红色朝上箭头(箭头在上、箭杆在下)。坐标系 13×18。 */
+export const ICON_UP = 'path://M6.5,0 L13,9 L7.5,9 L7.5,18 L5.5,18 L5.5,9 L0,9 Z'
+/** 2 号图标: 绿色朝下箭头(箭杆在上、箭头在下)。 */
+export const ICON_DOWN = 'path://M5.5,0 L7.5,0 L7.5,9 L13,9 L6.5,18 L0,9 L5.5,9 Z'
+
+/**
+ * DIFF 实心柱被 DEA 空心柱盖住之后, 还露在外面的那一截 `[起, 止]`; 全被盖住为 null。
+ *
+ * - DEA 与 DIFF **同在 0 的一侧**且 DIFF 更长: 露出 DEA→DIFF 那一截;
+ * - 同侧但 DIFF 不比 DEA 长: 整根被盖住;
+ * - **分在 0 的两侧**(或 DEA 为 0): 空心柱盖的是另一侧, DIFF 整根都露着。
+ */
+export function diffExposed(diff: number | null, dea: number | null): [number, number] | null {
+  if (diff == null) return null
+  if (dea == null || dea === 0 || (diff >= 0) !== (dea >= 0)) return [0, diff]
+  return Math.abs(diff) > Math.abs(dea) ? [dea, diff] : null
+}
 
 const NONE = '-' // ECharts 里"这一根不画"
+
+/** DIFF 那一截的画法: 一个实心矩形, 宽度与别的柱子同一个比例。颜色按 DIFF 本身的正负。 */
+export function renderDiffRect(
+  _params: unknown,
+  api: {
+    value: (d: number) => number
+    coord: (v: [number, number]) => number[]
+    size: (v: [number, number]) => number[] | number
+  },
+) {
+  const i = api.value(0), lo = api.value(1), hi = api.value(2)
+  const a = api.coord([i, lo]), b = api.coord([i, hi])
+  const band = api.size([1, 0])
+  const w = (Array.isArray(band) ? band[0] : band) * STICK_RATIO
+  return {
+    type: 'rect',
+    shape: { x: a[0] - w / 2, y: Math.min(a[1], b[1]), width: w, height: Math.abs(a[1] - b[1]) },
+    style: { fill: hi >= 0 ? QUANT_MACD_COLORS.red : QUANT_MACD_COLORS.green },
+  }
+}
 
 /**
  * 返回五个系列, 顺序即画的先后(= 原文语句的先后)。
@@ -74,35 +124,49 @@ export function quantMacdSeries(
   const bar = {
     type: 'bar', ...axis, animation: false, silent: true,
     barWidth: STICK_WIDTH,
-    // 三种柱子叠在同一个位置 —— 原文三条 STICKLINE 画的是同一根 K 线的位置
+    // 柱子叠在同一个位置 —— 原文几条 STICKLINE 画的是同一根 K 线的位置
     barGap: '-100%',
   }
+  const icon = {
+    type: 'scatter', ...axis, animation: false, silent: true, z: 4,
+    symbolSize: [ICON_W, ICON_H],
+    // 图标顶端对准数值: 往下挪半个图标高
+    symbolOffset: [0, ICON_H / 2],
+  }
+  const diffData: [number, number, number][] = []
+  a.diff.forEach((v, i) => {
+    const seg = diffExposed(v, a.dea[i])
+    if (seg) diffData.push([i, seg[0], seg[1]])
+  })
   return [
     {
-      ...bar, name: 'DIFF', z: 2,
-      data: a.diff.map(v => v == null ? NONE : {
-        value: v,
-        itemStyle: { color: v >= 0 ? C.red : C.green },
-      }),
+      type: 'custom', ...axis, name: 'DIFF', z: 2, animation: false, silent: true,
+      clip: true, encode: { x: 0, y: [1, 2] },
+      renderItem: renderDiffRect,
+      data: diffData,
     },
     {
       ...bar, name: 'DEA', z: 3,
       data: a.dea.map(v => v == null ? NONE : {
         value: v,
-        // 空心: 不填充, 只描边
-        itemStyle: { color: 'transparent', borderColor: v >= 0 ? C.darkRed : C.green, borderWidth: 1 },
+        // 空心: 只描边。框里面本来就没画 DIFF(见 `diffExposed`), 看到的就是底色。
+        // 边框是**点线**(1 点 1 空): 截图里空心框的两条竖边亮度按 3 像素一个周期
+        // 起伏、且两条边同相 —— 实线怎么缩放都出不来这种纵向起伏, 正是 1 点 1 空
+        // 的点线被截图缩到 2/3 之后的样子。
+        itemStyle: {
+          color: 'transparent', borderColor: v >= 0 ? C.darkRed : C.green,
+          borderWidth: 1, borderType: HOLLOW_DASH,
+        },
       }),
     },
     {
-      type: 'scatter', ...axis, name: '金叉', animation: false, silent: true, z: 4,
-      symbol: 'arrow', symbolSize: 9,
+      ...icon, name: '金叉', symbol: ICON_UP,
       itemStyle: { color: C.red },
       data: a.gold_icon.map(v => v == null ? NONE : v),
     },
     {
-      type: 'scatter', ...axis, name: '死叉', animation: false, silent: true, z: 4,
-      symbol: 'arrow', symbolSize: 9, symbolRotate: 180,
-      itemStyle: { color: C.green },
+      ...icon, name: '死叉', symbol: ICON_DOWN,
+      itemStyle: { color: C.icon2 },
       data: a.dead_icon.map(v => v == null ? NONE : v),
     },
     {
