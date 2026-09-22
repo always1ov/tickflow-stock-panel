@@ -542,6 +542,31 @@ async def trend_backtest(request: Request, req: TrendBacktestRequest):
     return await livermore_service.run_backtest(request.app.state.repo, req.symbol, req.use_ai)
 
 
+class Fib2GrainBacktestRequest(BaseModel):
+    """[R412] 斐波那契二型粗细档回测请求。"""
+    symbol: str
+    use_ai: bool = True
+
+
+@router.post("/fib2/grain-backtest")
+async def fib2_grain_backtest(request: Request, req: Fib2GrainBacktestRequest):
+    """[R412] 粗细档回测 —— 评的是**「线画得准不准」**, 不是「跟着做赚不赚」。
+
+    用户: 「粗中细我看不懂, 这个调优能不能交给 ai 就像我六态设置了一个回测
+    按钮, 参考这种模式」。形状照搬六态那个(指标表 + 规则建议 + 可选 AI),
+    但**评的量完全不同**: 这一组不出买卖信号, 没有收益可算; 要算收益就得先编
+    一条买卖规则, 那等于把 R405 砍掉的判定层从后门接回来。
+
+    评的是: 历史上每一次上攻之后, 实际回踩的最低点有没有落在当时画出来的线上。
+    **必须除以线数** —— 细档线多, 蒙中的概率天然更高。
+    """
+    if not req.symbol.strip():
+        raise HTTPException(400, "symbol 不能为空")
+    from app.services import fib2_grain_service
+    return await fib2_grain_service.run_grain_backtest(
+        request.app.state.repo, req.symbol, req.use_ai)
+
+
 class TrendBacktestBatchRequest(BaseModel):
     """[R312] 全量阈值回测请求。symbols 为空 = 整个自选。"""
     symbols: list[str] = []

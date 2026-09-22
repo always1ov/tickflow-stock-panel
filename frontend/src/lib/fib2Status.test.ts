@@ -92,9 +92,9 @@ describe('fib2Status: 只报形态走到哪一步', () => {
     const s = line({
       close: 20,
       zone: null,
-      levels: [retrace(19), { value: 25, label: '第一站', color: FIB2_ROLE_TARGET }],
+      levels: [retrace(19), { value: 25, label: '上攻推算位一', color: FIB2_ROLE_TARGET }],
     })
-    expect(s).not.toContain('第一站')
+    expect(s).not.toContain('上攻推算位')
     expect(s).not.toContain('25')
   })
 

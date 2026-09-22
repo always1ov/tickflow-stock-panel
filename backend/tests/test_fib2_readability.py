@@ -115,7 +115,7 @@ def test_R410_推算位是按角色键过滤的_不是按标签文字():
     i = code.index("export function thinFib2")
     body = code[i:i + 1200]
     assert "FIB2_ROLE_TARGET" in body, "thinFib2 没按角色键挑推算位"
-    for name in ("第一站", "第二站", "第三站"):
+    for name in ("上攻推算位一", "上攻推算位二", "上攻推算位三"):
         assert name not in body, f"thinFib2 里又出现了标签文字「{name}」"
 
 

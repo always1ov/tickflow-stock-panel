@@ -24,7 +24,7 @@ function retrace(value: number, strong = false): PriceLevel {
   }
 }
 const target = (value: number): PriceLevel => ({
-  value, label: '第一站', type: 'fib2', side: 'resistance',
+  value, label: '上攻推算位一', type: 'fib2', side: 'resistance',
   strength: 'medium', color: FIB2_ROLE_TARGET,
 })
 const voidLine = (value: number): PriceLevel => ({

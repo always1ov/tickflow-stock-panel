@@ -96,6 +96,8 @@ export function StockLevelsPanel({ symbol, height = 480, bare = false }: StockLe
         // (这儿只能写 `//`: 属性列表不是 JSX 子节点位置, `{/* */}` 在这儿是语法错 ——
         //  R401 在同一个坑里栽过一次。)
         fib2={levelsQ.data?.fib2}
+        // [R412] 只为图内那个「回测这三档」按钮用
+        symbol={symbol}
         height={height}
       />
     </div>

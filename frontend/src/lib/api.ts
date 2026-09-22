@@ -1247,6 +1247,34 @@ export interface StockLevels {
 
 export type Fib2Grain = 'coarse' | 'mid' | 'fine'
 
+/** [R412] 一档粗细在这只票上的表现。**全是数得出来的量, 没有一个是收益。** */
+export interface Fib2GrainFit {
+  grain: Fib2Grain
+  k: number
+  /** 有完整回踩、能评估的上攻段数 */
+  samples: number
+  /** 实际回踩最低点落在某条回踩位上的次数 */
+  hits: number
+  zone_hits: number
+  /** 这些段里有几段算得出回踩密集带(zone_rate 的分母) */
+  zones: number
+  hit_rate: number | null
+  zone_rate: number | null
+  avg_lines: number | null
+  /** hit_rate ÷ avg_lines —— **防"线多蒙中"的那一下** */
+  per_line: number | null
+}
+
+export interface Fib2GrainBacktestResult {
+  symbol?: string
+  error?: string
+  window_days?: number
+  grid?: Fib2GrainFit[]
+  rule_suggestion?: { grain: Fib2Grain | null; reason: string }
+  ai?: { grain: Fib2Grain | null; reason: string } | null
+  ai_error?: string
+}
+
 export interface Fib2Overlay {
   /** 单边上攻那一段的起止日期。**与粗细档无关** —— 推进段不看摆点 */
   thrust?: { start: string; end: string; days: number } | null
@@ -5130,6 +5158,16 @@ export const api = {
   stockReview: (symbol: string, days = 120) =>
     request<StockReview>(
       `/api/stock-analysis/review?symbol=${encodeURIComponent(symbol)}&days=${days}`),
+
+  /**
+   * [R412] 斐波那契二型的粗细档回测。**评的是「线画得准不准」, 不是「赚不赚」** ——
+   * 这一组不出买卖信号, 没有收益可算; 要算收益就得先编一条买卖规则, 那等于把
+   * R405 砍掉的判定层从后门接回来。详见后端 `indicators/dinapoli_fit`。
+   */
+  fib2GrainBacktest: (symbol: string, useAi = true) =>
+    request<Fib2GrainBacktestResult>('/api/stock-analysis/fib2/grain-backtest', {
+      method: 'POST', body: JSON.stringify({ symbol, use_ai: useAi }),
+    }),
 
   stockTrendBacktest: (symbol: string, useAi = true) =>
     request<TrendBacktestResult>('/api/stock-analysis/trend/backtest', {

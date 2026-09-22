@@ -237,7 +237,7 @@ export const FIB2_ROLE_VOID = '#6B4D41'
 
 export const FIB2_ROLE: Record<string, { light: string; dark: string }> = {
   [FIB2_ROLE_RETRACE]: { light: '#E01DB5', dark: '#FCA2DF' },  // 回踩位 = 组色
-  [FIB2_ROLE_TARGET]: { light: '#1889E6', dark: '#86C0FC' },  // 第一站/第二站/第三站 —— 蓝(规格 §12)
+  [FIB2_ROLE_TARGET]: { light: '#1889E6', dark: '#86C0FC' },  // 上攻推算位一/二/三 —— 蓝(规格 §12)
   [FIB2_ROLE_VOID]: { light: '#6B4D41', dark: '#937E6D' },     // 这组作废 —— 暖褐, 退色(亮色第一版 #6A5746 离一型的金只有 ΔE 8.4, 往褐里压)
 }
 

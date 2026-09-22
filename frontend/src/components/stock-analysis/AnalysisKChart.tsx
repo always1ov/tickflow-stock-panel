@@ -4,6 +4,7 @@ import * as echarts from 'echarts'
 import type { ECharts, EChartsOption } from 'echarts'
 import type { Fib2Grain, Fib2Overlay, KlineRow, LevelSeries } from '@/lib/api'
 import { fib2Status } from '@/lib/fib2Status'
+import { Fib2GrainDialog } from './Fib2GrainDialog'
 
 /**
  * 个股分析专用日 K 图表。
@@ -46,7 +47,7 @@ export interface PriceLevel {
    * [R405] 这一条线自己的角色, 盖过所在组的颜色。
    *
    * 加这个是为了斐波那契二型: 它一组里有**三种意思不同**的线 ——
-   * 回踩位、推算位(第一站/二站/三站)、这组作废。规格 §12 说得很明白:
+   * 回踩位、上攻推算位一/二/三、这组作废。规格 §12 说得很明白:
    * 「每种颜色全站只表达一种含义」, 全涂成一个色等于把三件事说成一件。
    * 别的组不传这个字段, 行为与以前一字不差。
    *
@@ -85,7 +86,7 @@ export const LEVEL_GROUPS: { key: LevelType; label: string }[] = [
   { key: 'livermore', label: '六态关键点' },
   // [R405 · fork 增强] 斐波那契二型(帝纳波利点位)。按一下出来: 回踩位、
   // 这组作废、二型均线、上攻段底色、回踩密集带、首次回踩标记;
-  // 推算位(第一站/二站/三站)另有开关, 默认不画(R410)。
+  // 上攻推算位一/二/三另有开关, 默认不画(R410)。
   // **只有位置, 没有动作** —— 和六态/量化通道撞不撞由用户自己看。
   // [R410] 用户: 「目标1目标2失效位这些表达没能让用户抓得住重点看得懂,
   // 而且好多根线」—— 改名与减线都在这一轮, 理由写在 `dinapoli.to_levels`
@@ -162,6 +163,8 @@ interface Props {
    * 都不画, 免得图上留下几块没人认领的色带。
    */
   fib2?: Fib2Overlay
+  /** [R412] 标的代码 —— 只为「粗细档回测」那个按钮用; 不传就不显示那个按钮 */
+  symbol?: string
   /** 预留:点击某根 K 线 */
   onDateClick?: (date: string) => void
   height?: number
@@ -185,6 +188,7 @@ export function AnalysisKChart({
   markers,
   ranges,
   fib2,
+  symbol,
   onDateClick,
   height = 460,
   className,
@@ -213,6 +217,8 @@ export function AnalysisKChart({
    * 与当下要抓的「在哪里做 / 走不走」无关 —— 先让图安静下来, 想看再点。
    */
   const [fib2ShowTargets, setFib2ShowTargets] = useState(false)
+  /** [R412] 粗细档回测弹窗开着没有 */
+  const [fib2FitOpen, setFib2FitOpen] = useState(false)
   /** 双向联动高亮: hover 价位标签 ↔ hover 下方文字行。值为 levelKey, null=无高亮 */
   const [hoveredKey, setHoveredKey] = useState<string | null>(null)
 
@@ -699,7 +705,7 @@ export function AnalysisKChart({
                   想看一眼是一次点击的事。 */}
               <button
                 onClick={() => setFib2ShowTargets(v => !v)}
-                title={'上方推算位: 第一站 / 第二站 / 第三站\n'
+                title={'上攻推算位一 / 二 / 三\n'
                   + '由这一波的起点、最高点、回踩最低点三点推算, 是"涨上去会路过哪",\n'
                   + '不是"该不该去" —— 默认不画, 免得和眼下要看的位置混在一起。'}
                 className={`h-6 px-2 rounded-btn text-micro border transition-ui whitespace-nowrap ml-0.5 ${
@@ -713,8 +719,21 @@ export function AnalysisKChart({
                   ? { borderColor: targetColor + '66', backgroundColor: targetColor + '26', color: targetColor }
                   : undefined}
               >
-                上方推算位
+                上攻推算位
               </button>
+              {/* [R412] 粗细档回测。用户:「粗中细我看不懂, 这个调优能不能交给 ai
+                  就像我六态设置了一个回测按钮」。**评的是「线画得准不准」**,
+                  不是「跟着做赚不赚」—— 这一组不出买卖信号, 没有收益可算。 */}
+              {symbol && (
+                <button
+                  onClick={() => setFib2FitOpen(true)}
+                  title={'回看这只票近三年每一次上攻, 看当时画出来的线有没有说中\n'
+                    + '之后实际回踩的最低点 —— 评的是「线画得准不准」, 不是「赚不赚」。'}
+                  className="ml-0.5 h-6 rounded-btn border border-border/30 bg-base/40 px-2 text-micro text-muted transition-ui hover:border-border/60 hover:text-foreground"
+                >
+                  回测这三档
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -737,6 +756,14 @@ export function AnalysisKChart({
             </span>
           ))}
         </div>
+      )}
+      {fib2FitOpen && symbol && (
+        <Fib2GrainDialog
+          symbol={symbol}
+          current={fib2Grain}
+          onPick={setFib2Grain}
+          onClose={() => setFib2FitOpen(false)}
+        />
       )}
       {/* 图表:右侧预留带(grid.right 预留)显示价位标签文字,不压蜡烛 */}
       <div ref={chartRef} style={{ width: '100%', height }} />
@@ -911,7 +938,7 @@ function strengthColor(strength: string | undefined, base: string): string {
  *   · **离现价最近的几条**(上下各 `NEAR_EACH_SIDE` 条)—— 眼下真会碰到的。
  *     远在天边的回踩位对当下没有意义。
  *
- * 推算位(第一站/第二站/第三站)另由开关管, 默认不画 —— **按角色键过滤, 不按
+ * 上攻推算位一/二/三另由开关管, 默认不画 —— **按角色键过滤, 不按
  * 标签文字**, 否则后端改个名前端就会静默漏掉。
  *
  * **不改后端**: 后端照旧把整档算全发过来, 这里只决定画不画 —— 于是切档、
