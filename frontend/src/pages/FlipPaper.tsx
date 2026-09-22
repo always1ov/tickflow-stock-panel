@@ -220,8 +220,10 @@ export function FlipPaper() {
   )
 
   const w = ov?.weather
-  // [R346] 主线用**品红**, 沿用今日总览那张卡的语义(那儿是 `text-fuchsia-300`
-  // 配 `bg-fuchsia-400/15`)。上一版我给了个 `text-secondary` —— 那是灰阶不是颜色。
+  // [R346] 主线要有颜色 —— 上一版我给了个 `text-secondary`, 那是灰阶不是颜色。
+  // [R421] 原来沿用今日总览的品红(`text-fuchsia-300`), 按「全站禁止粉色」换成琥珀:
+  // 主线是"当前最强的那条", 琥珀/金是看盘软件里"领涨/焦点"的通行色, 且不占红绿。
+  // amber-300 是按主题取值的令牌(tailwind.config.ts), 亮色下自动压深, 一个类就够。
   //
   // **停更要变灰**: 原卡片对 `stale` 是换成 `text-muted` 并把标题改成
   // 「主线(数据已停更)」。丢掉这一层的话, 一份几天前的主线会**长得跟今天的一模一样**
@@ -259,7 +261,7 @@ export function FlipPaper() {
               {mainline && <>
                 <span className="mx-1">·</span>
                 {mlStale ? '主线(停更)' : '主线'}{' '}
-                <span className={mlStale ? 'text-muted' : 'text-fuchsia-300'}
+                <span className={mlStale ? 'text-muted' : 'text-amber-300'}
                       title={mlStale
                         ? `主线数据停在 ${ml?.date},已经 ${ml?.age_days} 天没更新 —— 只作展示`
                         : `按 ${ml?.date} 的涨停梯队聚合`}>

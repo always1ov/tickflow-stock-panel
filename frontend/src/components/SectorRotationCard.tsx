@@ -54,8 +54,9 @@ const HEAT_ROW_HEIGHT = 24
 const MAX_CUSTOM_SECTORS = 20
 // 走势线调色板 (≤20 条线各自可辨)
 const TREND_COLORS = [
-  '#60a5fa', '#f59e0b', '#34d399', '#f472b6', '#a78bfa', '#f87171', '#4ade80', '#fbbf24',
-  '#22d3ee', '#fb923c', '#818cf8', '#e879f9', '#4dd0e1', '#aed581', '#ffb74d', '#f06292',
+  // [R421] 三个粉 / 洋红(#f472b6 #e879f9 #f06292)按「全站禁止粉色」换成蓝灰 / 褐 / 浅灰
+  '#60a5fa', '#f59e0b', '#34d399', '#90a4ae', '#a78bfa', '#f87171', '#4ade80', '#fbbf24',
+  '#22d3ee', '#fb923c', '#818cf8', '#a1887f', '#4dd0e1', '#aed581', '#ffb74d', '#e0e0e0',
   '#9575cd', '#81c784', '#ffd54f', '#4fc3f7',
 ]
 

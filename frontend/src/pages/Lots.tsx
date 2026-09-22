@@ -217,7 +217,7 @@ export function Lots({ embedded = false }: { embedded?: boolean } = {}) {
                         <td className="px-2 py-2.5 text-right"><RemainingDays remind={lot.remind_date} /></td>
                         <td className="px-2 py-2.5">
                           {lot.remind_date ? (
-                            <span className="inline-flex items-center gap-1 text-rose-400">
+                            <span className="inline-flex items-center gap-1 text-amber-400">
                               <CalendarClock className="h-3 w-3" />
                               {lot.remind_date}
                               {lot.lead_days > 0 && <span className="text-muted">· 提前{lot.lead_days}天</span>}

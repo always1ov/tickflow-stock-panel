@@ -58,7 +58,8 @@ const STATUS_STYLE: Record<string, { bg: string; bar: string; nameCls: string; c
     bg: '',
     bar: 'border-l-2 border-bull/50',
     // 亮色用深酒红, 暗色保持近白 — 卡片底是淡红渐变, 双主题都要有对比度
-    nameCls: 'text-rose-900 dark:text-rose-50 text-[13px]',
+    // [R421] rose → red: 「全站禁止粉色」, rose-50 是带粉的白
+    nameCls: 'text-red-900 dark:text-zinc-50 text-[13px]',
     codeCls: 'text-muted/80',
     badge: '',
     badgeText: '',

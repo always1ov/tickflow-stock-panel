@@ -5,6 +5,7 @@ import type { ECharts, EChartsOption } from 'echarts'
 import type { Fib2Grain, Fib2Overlay, KlineRow, LevelSeries, QuantMacdResult } from '@/lib/api'
 import { alignQuantMacd, quantMacdSeries } from '@/lib/quantMacdSeries'
 import { levelsChartLayout, PAD_BOTTOM, SLIDER_H } from '@/lib/levelsChartLayout'
+import { futureSlotRenderer } from '@/lib/futureZone'
 import { fib2Status } from '@/lib/fib2Status'
 import { Fib2GrainDialog } from './Fib2GrainDialog'
 
@@ -412,7 +413,7 @@ export function AnalysisKChart({
         // 这个区常常只有两三条线的厚度 —— 光靠半透明填充, 在蜡烛底下几乎看不出
         // 边界在哪。重合越多越浓(这是它唯一的"强度"表达), 但起点比规格高一档。
         const alpha = Math.min(0.55, 0.30 + 0.12 * Math.max(0, z.strength - 1))
-        // [R409] 底色跟着组色走(二型整组从金挪到洋红, 免得和一型的金撞)
+        // [R409] 底色跟着组色走(二型整组从金挪开, 免得和一型的金撞)
         const zc = LC.fib2
         // 两条回撤挤得很近时色带会薄到看不见 —— 规格 §9 要求最小高度,
         // 这里按价格给个下限(现价的千分之三), 比按像素算简单且不依赖坐标系。
@@ -448,18 +449,10 @@ export function AnalysisKChart({
       }
     }
 
-    // [R413] 「未来」区的灰底。**没画成 3 根灰蜡烛**, 因为未来的开/高/低/收
-    // 根本不存在 —— 画出来就是编的, 而一根编出来的蜡烛在图上和真的长得一样。
-    // 这里只给 3 个空槽 + 一块中性灰底, 让人一眼看出"这一段还没发生",
-    // 均线自然探进去。
-    if (futureDates.length) {
-      markAreaData.push([{
-        xAxis: futureDates[0], name: '未来(均线已知)',
-        itemStyle: { color: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(34,39,56,0.05)' },
-        label: { show: true, position: 'insideTop', distance: 4,
-                 color: CT().text, fontSize: 9 },
-      }, { xAxis: futureDates[futureDates.length - 1] }])
-    }
+    // [R413] 「未来」区。**没画成 3 根灰蜡烛**, 因为未来的开/高/低/收根本不存在
+    // —— 画出来就是编的, 而一根编出来的蜡烛在图上和真的长得一样。
+    // [R420] 底色原来用 markArea 画在这里, 只盖住 3 格里的 2 格且太淡; 改为逐格
+    // 铺满的自画系列, 放在 series 数组**最后**(见下方), 不打乱悬停联动的下标。
 
     // [R413] 现价贴签。用户: 「用来量『还差多少到位』」—— 在此之前只有 hover
     // 时的十字线, 手一移开就没了, 而"离那条线还差多少"是要反复看的。
@@ -597,6 +590,31 @@ export function AnalysisKChart({
       keyMap.set(si++, def.group)
     }
     seriesKeyMapRef.current = keyMap
+
+    // [R420] 「未来」区: 逐格铺满的底色 + 交界竖虚线 + 标签(`lib/futureZone.ts`),
+    // 以及均线在未来这段加粗 —— 暗色主题的二型均线是浅粉, 压在底色上原来发灰。
+    // 都放在最后 push: keyMap 的下标只数到上面那几类, 这里不参与悬停联动。
+    if (futureDates.length) {
+      const base = dates.length - futureDates.length
+      series.push({
+        type: 'custom', name: '未来区', silent: true, animation: false, z: 0,
+        // 不裁: 缩得更小时三格比「未来」两个字还窄, 裁了字就没了。格子本身在最右端,
+        // 缩放时整格进出(dataZoom 按格过滤), 不会画出绘图区
+        clip: false, encode: { x: 0 },
+        renderItem: futureSlotRenderer(theme, futureDates.length, CT().textStrong),
+        data: futureDates.map((_, k) => [base + k]),
+      })
+      const dma = alignedSeries['fib2_dma3']
+      if (dma) {
+        // 从最后一根真实 K 线起画, 与历史那段接上
+        series.push({
+          type: 'line', name: '二型均线(未来段)', silent: true, animation: false,
+          smooth: true, symbol: 'none', z: 1,
+          lineStyle: { width: 2.2, color: LC.fib2, opacity: 1 },
+          data: dma.map((v, i) => (i >= base - 1 && v != null ? v : '-')),
+        })
+      }
+    }
 
     return {
       animation: false,
@@ -821,7 +839,7 @@ export function AnalysisKChart({
                     : 'text-muted bg-base/40 border-border/30 hover:border-border/60'
                 }`}
                 style={fib2ShowTargets
-                  // 推算位在图上是蓝的, 开关就得是蓝的 —— 用组色(洋红)会让
+                  // 推算位在图上是蓝的, 开关就得是蓝的 —— 用组色(靛青)会让
                   // 「开关什么颜色、线什么颜色」对不上, 那正是 R409 要除掉的毛病
                   ? { borderColor: targetColor + '66', backgroundColor: targetColor + '26', color: targetColor }
                   : undefined}

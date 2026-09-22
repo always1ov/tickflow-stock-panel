@@ -43,7 +43,7 @@ const SOURCE_BADGE_STYLE: Record<string, string> = {
   market:   'bg-purple-500/10 text-purple-400 border-purple-500/20',
   sector:   'bg-cyan-500/10 text-cyan-700 border-cyan-500/20 dark:text-cyan-300',
   abnormal: 'bg-orange-500/10 text-orange-500 border-orange-500/20 dark:text-orange-400',
-  volume_delta: 'bg-rose-500/10 text-rose-400 border-rose-500/20 dark:text-rose-300',
+  volume_delta: 'bg-indigo-500/10 text-indigo-500 border-indigo-500/20 dark:text-indigo-300',
   date:     'bg-violet-500/10 text-violet-500 border-violet-500/20 dark:text-violet-300',
 }
 
@@ -1012,7 +1012,7 @@ function RulesList({ rulesQuery, onEdit }: {
                 </div>
               ) : r.type === 'volume_delta' ? (
                 <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1 pl-0.5">
-                  <span className="rounded bg-rose-500/8 px-1.5 py-0.5 text-[9px] font-mono text-rose-500 dark:text-rose-300">
+                  <span className="rounded bg-indigo-500/8 px-1.5 py-0.5 text-[9px] font-mono text-indigo-500 dark:text-indigo-300">
                     {r.metric === 'amount'
                       ? `单轮增量 ≥ ${Math.round((r.threshold_amount ?? 1e6) / 1e4).toLocaleString()} 万元`
                       : `单轮增量 ≥ ${(r.threshold_volume ?? 9000).toLocaleString()} 手`}

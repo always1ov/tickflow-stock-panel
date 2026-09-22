@@ -141,11 +141,11 @@ def test_R343_市场状态并进页头_不自己占一张卡():
     assert '空 <span className="text-bear">{w.bear}</span>' in head, "空头数没上绿"
     assert '转多 <span className="text-bull">{w.new_bull}</span>' in head
     assert '转空 <span className="text-bear">{w.new_bear}</span>' in head
-    # [R346] 主线用品红, 沿用今日总览那张卡的语义(那儿是 fuchsia)。
+    # [R346] 主线要上色。[R421] 原品红按「全站禁止粉色」换成琥珀。
     # **停更要降级成灰并把标题改掉** —— 丢掉这一层, 一份几天前的主线会长得跟
     # 今天的一模一样, 那比不显示更糟。
-    assert "text-fuchsia-300" in head, "主线没上色(text-secondary 是灰阶不是颜色)"
-    assert "mlStale ? 'text-muted' : 'text-fuchsia-300'" in head, "停更没降级成灰"
+    assert "text-amber-300" in head, "主线没上色(text-secondary 是灰阶不是颜色)"
+    assert "mlStale ? 'text-muted' : 'text-amber-300'" in head, "停更没降级成灰"
     assert "主线(停更)" in head, "停更没在标题上说出来"
     # [R352] 「AI 导读」那个按钮删了(用户: 「这部分和 ai 导读都不用了」) ——
     # 这一条因此只守市场状态那部分。**顺手钉住它真的没了**, 免得哪天又被加回来

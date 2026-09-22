@@ -1788,7 +1788,7 @@ export const MARKET_PHASE_COLORS: Record<MarketPhase, string> = {
   ice: '#38bdf8',     // 天蓝(冻结)
   ignite: '#f59e0b',  // 琥珀(升温)
   rally: '#ef4444',   // 红(主升)
-  climax: '#d946ef',  // 品红(极端)
+  climax: '#991b1b',  // 深红(极端过热; R421 原品红按「禁止粉色」换掉 —— 比主升的红深一档)
   ebb: '#14b8a6',     // 青(退潮)
   repair: '#94a3b8',  // 灰(修复)
 }

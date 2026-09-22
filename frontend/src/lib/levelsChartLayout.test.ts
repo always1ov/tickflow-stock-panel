@@ -21,10 +21,15 @@ describe('关键价位图版面', () => {
     }
   })
 
-  it('副图: 主图的 55%, 限 180~300', () => {
-    expect(levelsChartLayout(520).subH).toBe(200)   // 个股预览: 主图 364
-    expect(levelsChartLayout(720).subH).toBe(300)   // 最大化: 主图 564, 封顶
-    expect(levelsChartLayout(320).subH).toBe(180)   // 窄屏: 保底
-    expect(subPaneHeight(1000)).toBe(300)
+  it('副图: 主图的 40%, 限 130~200(用户: 「副图调得太高了」)', () => {
+    expect(levelsChartLayout(520).subH).toBe(146)   // 个股预览: 主图 364
+    expect(levelsChartLayout(720).subH).toBe(200)   // 最大化: 主图 564, 封顶
+    expect(levelsChartLayout(320).subH).toBe(130)   // 窄屏: 保底
+    expect(subPaneHeight(1000)).toBe(200)
+    // 副图始终比主图矮一大截
+    for (const h of [320, 520, 720]) {
+      const L = levelsChartLayout(h)
+      if (L.mainH >= 325) expect(L.subH).toBeLessThanOrEqual(L.mainH * 0.4 + 0.5)
+    }
   })
 })

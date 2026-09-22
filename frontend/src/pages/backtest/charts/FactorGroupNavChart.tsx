@@ -9,7 +9,7 @@ const GROUP_COLORS = [
   '#f59e0b', // Q3 amber
   '#f97316', // Q4 orange
   '#ef4444', // Q5 red
-  '#ec4899', // Q6
+  '#3b82f6', // Q6 blue(R421 原粉色换掉)
   '#14b8a6', // Q7
   '#06b6d4', // Q8
   '#84cc16', // Q9

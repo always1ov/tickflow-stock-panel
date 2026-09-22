@@ -23,9 +23,15 @@ export const PAD_BOTTOM = 8
 /** R415 之前主图以外占掉的高度: 16 顶 + 8 间距 + 90 成交量 + 12 间距 + 22 缩放条 + 8 底。 */
 export const LEGACY_NON_MAIN = 156
 
-/** 副图高度: 主图的 55%, 限 180~300。 */
+/**
+ * 副图高度: 主图的 40%, 限 130~200。
+ *
+ * [R422] R419 首版给的是 55%、限 180~300, 用户: 「副图调得太高了, 你要合理调啊」——
+ * 最大化时副图 300px 快赶上主图一半, 看盘的重心被拉走了。40% 让副图明显比
+ * R418 的 90~130 高(图标不再深插进柱子), 又始终比主图矮一大截。
+ */
 export function subPaneHeight(mainH: number): number {
-  return Math.round(Math.min(300, Math.max(180, mainH * 0.55)))
+  return Math.round(Math.min(200, Math.max(130, mainH * 0.4)))
 }
 
 export interface LevelsChartLayout {

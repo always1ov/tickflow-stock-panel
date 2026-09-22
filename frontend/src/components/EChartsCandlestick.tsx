@@ -773,8 +773,9 @@ function buildOption(
       silent: true,
       lineStyle: { width: 1, color, type: 'dashed' as const }, itemStyle: { color },
     })
-    series.push(bollLine('boll_upper', '#E879F9', 'BOLL上'))
-    series.push(bollLine('boll_lower', '#E879F9', 'BOLL下'))
+    // [R421] 布林线原为洋红 #14B8A6, 按「全站禁止粉色」换成青(与 MA 的灰 / 蓝 / 橙 / 紫都分得开)
+    series.push(bollLine('boll_upper', '#14B8A6', 'BOLL上'))
+    series.push(bollLine('boll_lower', '#14B8A6', 'BOLL下'))
   }
 
   // ===== 子图区域 =====
@@ -1034,7 +1035,7 @@ export function EChartsCandlestick({
       if (d.ma20 != null) html += `<span style="color:${THEME.ma20}">MA20:${Number(d.ma20).toFixed(2)}</span>`
       if (d.ma60 != null) html += `<span style="color:${THEME.ma60}">MA60:${Number(d.ma60).toFixed(2)}</span>`
       if (d.boll_upper != null && activeIndicators.includes('boll')) {
-        html += `<span style="color:#E879F9">BOLL:${Number(d.boll_upper).toFixed(2)}/${Number(d.ma20).toFixed(2)}/${Number(d.boll_lower).toFixed(2)}</span>`
+        html += `<span style="color:#14B8A6">BOLL:${Number(d.boll_upper).toFixed(2)}/${Number(d.ma20).toFixed(2)}/${Number(d.boll_lower).toFixed(2)}</span>`
       }
       html += `</div>`
     }
@@ -1310,7 +1311,7 @@ export function EChartsCandlestick({
       if (d.ma20 != null) html += `<span style="color:${THEME.ma20}">MA20:${Number(d.ma20).toFixed(2)}</span>`
       if (d.ma60 != null) html += `<span style="color:${THEME.ma60}">MA60:${Number(d.ma60).toFixed(2)}</span>`
       if (d.boll_upper != null && activeIndicators.includes('boll')) {
-        html += `<span style="color:#E879F9">BOLL:${Number(d.boll_upper).toFixed(2)}/${Number(d.ma20).toFixed(2)}/${Number(d.boll_lower).toFixed(2)}</span>`
+        html += `<span style="color:#14B8A6">BOLL:${Number(d.boll_upper).toFixed(2)}/${Number(d.ma20).toFixed(2)}/${Number(d.boll_lower).toFixed(2)}</span>`
       }
       html += `</div>`
     }

@@ -876,7 +876,7 @@ function ScoreExplain({ stock }: { stock?: EnrichedStock }) {
         <span className="text-[11px] text-muted">涨幅 / 换手 / 成交 / 市值 / 量比 / 连板</span>
       </div>
       <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
-        <Part label="动能" value={parts.momentum} cls="bg-rose-400" />
+        <Part label="动能" value={parts.momentum} cls="bg-red-400" />
         <Part label="换手" value={parts.turnover} cls="bg-orange-400" />
         <Part label="成交" value={parts.amount} cls="bg-blue-400" />
         <Part label="市值" value={parts.cap} cls="bg-cyan-400" />

@@ -60,18 +60,17 @@ export default {
         // 只覆盖 300~600 这四档: 50/100/200 本来就是该淡的浅底(亮色模式里用作
         // 背景), 700+ 已经足够暗, 动它们只会把亮色模式弄糟。
         // 暗色一侧的值 = Tailwind 原值, 视觉零变化。
+        // [R421] fuchsia / rose 两族删掉: 「整个系统禁止少女系风格, 比如粉色」。
         amber: { 300: 'oklch(var(--t-amber-300) / <alpha-value>)', 400: 'oklch(var(--t-amber-400) / <alpha-value>)', 500: 'oklch(var(--t-amber-500) / <alpha-value>)', 600: 'oklch(var(--t-amber-600) / <alpha-value>)' },
         blue: { 300: 'oklch(var(--t-blue-300) / <alpha-value>)', 400: 'oklch(var(--t-blue-400) / <alpha-value>)', 500: 'oklch(var(--t-blue-500) / <alpha-value>)' },
         cyan: { 300: 'oklch(var(--t-cyan-300) / <alpha-value>)', 400: 'oklch(var(--t-cyan-400) / <alpha-value>)', 500: 'oklch(var(--t-cyan-500) / <alpha-value>)', 600: 'oklch(var(--t-cyan-600) / <alpha-value>)' },
         emerald: { 300: 'oklch(var(--t-emerald-300) / <alpha-value>)', 400: 'oklch(var(--t-emerald-400) / <alpha-value>)', 500: 'oklch(var(--t-emerald-500) / <alpha-value>)' },
-        fuchsia: { 300: 'oklch(var(--t-fuchsia-300) / <alpha-value>)', 400: 'oklch(var(--t-fuchsia-400) / <alpha-value>)', 500: 'oklch(var(--t-fuchsia-500) / <alpha-value>)' },
         green: { 400: 'oklch(var(--t-green-400) / <alpha-value>)', 500: 'oklch(var(--t-green-500) / <alpha-value>)' },
         indigo: { 400: 'oklch(var(--t-indigo-400) / <alpha-value>)' },
         lime: { 400: 'oklch(var(--t-lime-400) / <alpha-value>)' },
         orange: { 300: 'oklch(var(--t-orange-300) / <alpha-value>)', 400: 'oklch(var(--t-orange-400) / <alpha-value>)', 500: 'oklch(var(--t-orange-500) / <alpha-value>)' },
         purple: { 300: 'oklch(var(--t-purple-300) / <alpha-value>)', 400: 'oklch(var(--t-purple-400) / <alpha-value>)', 500: 'oklch(var(--t-purple-500) / <alpha-value>)' },
         red: { 300: 'oklch(var(--t-red-300) / <alpha-value>)', 400: 'oklch(var(--t-red-400) / <alpha-value>)', 500: 'oklch(var(--t-red-500) / <alpha-value>)' },
-        rose: { 300: 'oklch(var(--t-rose-300) / <alpha-value>)', 400: 'oklch(var(--t-rose-400) / <alpha-value>)', 500: 'oklch(var(--t-rose-500) / <alpha-value>)' },
         sky: { 300: 'oklch(var(--t-sky-300) / <alpha-value>)', 400: 'oklch(var(--t-sky-400) / <alpha-value>)', 500: 'oklch(var(--t-sky-500) / <alpha-value>)' },
         teal: { 300: 'oklch(var(--t-teal-300) / <alpha-value>)', 400: 'oklch(var(--t-teal-400) / <alpha-value>)', 500: 'oklch(var(--t-teal-500) / <alpha-value>)' },
         violet: { 300: 'oklch(var(--t-violet-300) / <alpha-value>)', 400: 'oklch(var(--t-violet-400) / <alpha-value>)', 500: 'oklch(var(--t-violet-500) / <alpha-value>)' },

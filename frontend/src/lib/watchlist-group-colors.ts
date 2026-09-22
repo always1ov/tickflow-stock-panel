@@ -17,8 +17,6 @@ export const WATCHLIST_GROUP_COLORS: readonly WatchlistGroupColorOption[] = [
   { id: 'blue', label: '蓝色', text: 'text-blue-400', border: 'border-blue-400/40', background: 'bg-blue-400/10', dot: 'bg-blue-400', ring: 'ring-blue-400/60' },
   { id: 'indigo', label: '靛蓝', text: 'text-indigo-400', border: 'border-indigo-400/40', background: 'bg-indigo-400/10', dot: 'bg-indigo-400', ring: 'ring-indigo-400/60' },
   { id: 'violet', label: '紫色', text: 'text-violet-400', border: 'border-violet-400/40', background: 'bg-violet-400/10', dot: 'bg-violet-400', ring: 'ring-violet-400/60' },
-  { id: 'fuchsia', label: '品红', text: 'text-fuchsia-400', border: 'border-fuchsia-400/40', background: 'bg-fuchsia-400/10', dot: 'bg-fuchsia-400', ring: 'ring-fuchsia-400/60' },
-  { id: 'rose', label: '玫红', text: 'text-rose-400', border: 'border-rose-400/40', background: 'bg-rose-400/10', dot: 'bg-rose-400', ring: 'ring-rose-400/60' },
   { id: 'orange', label: '橙色', text: 'text-orange-400', border: 'border-orange-400/40', background: 'bg-orange-400/10', dot: 'bg-orange-400', ring: 'ring-orange-400/60' },
   { id: 'amber', label: '金色', text: 'text-amber-400', border: 'border-amber-400/40', background: 'bg-amber-400/10', dot: 'bg-amber-400', ring: 'ring-amber-400/60' },
   { id: 'lime', label: '青柠', text: 'text-lime-400', border: 'border-lime-400/40', background: 'bg-lime-400/10', dot: 'bg-lime-400', ring: 'ring-lime-400/60' },
@@ -27,7 +25,18 @@ export const WATCHLIST_GROUP_COLORS: readonly WatchlistGroupColorOption[] = [
   { id: 'cyan', label: '青色', text: 'text-cyan-400', border: 'border-cyan-400/40', background: 'bg-cyan-400/10', dot: 'bg-cyan-400', ring: 'ring-cyan-400/60' },
 ]
 
+/**
+ * [R421] 「品红」「玫红」两个选项下架 —— 用户: 「整个系统禁止少女系风格, 比如粉色」。
+ * 后端仍认这两个 id(`services/watchlist.py`, 接口不动), 已经存成这两色的分组
+ * 按下表显示成相邻的严肃色, 下次改色时自然换掉。
+ */
+const RETIRED_COLORS: Record<string, WatchlistGroupColor> = {
+  fuchsia: 'violet',
+  rose: 'orange',
+}
+
 export function resolveWatchlistGroupColor(color?: string | null): WatchlistGroupColorOption {
-  return WATCHLIST_GROUP_COLORS.find(option => option.id === color)
+  const id = (color && RETIRED_COLORS[color]) || color
+  return WATCHLIST_GROUP_COLORS.find(option => option.id === id)
     ?? WATCHLIST_GROUP_COLORS[0]
 }

@@ -191,10 +191,15 @@ export function useChartTheme(): ChartTheme {
 //   ③ **量化通道三档留在同一个青族**, 靠明度走档(短→中→长 依次压深) ——
 //      它们本来就是一个指标的三个周期, 换成三个色相反而读不出"同一家";
 //      但**不再靠"更浅"区分**(原来长期是 #67E8F9, 亮底对比 1.35)。
-//   ④ **斐波那契二型整组从金色挪到洋红。** 一型(作者的)保住金 —— 斐波那契
+//   ④ **斐波那契二型整组从金色挪开。** 一型(作者的)保住金 —— 斐波那契
 //      配金是约定; 二型是 R405 新加的, 由它让路。两个名字只差一个字, 再同色
-//      就是最容易混的一对。二型组内仍分三种意思: 回撤(洋红)/目标(蓝)/
-//      失效位(暖灰), 见下面 FIB2_ROLE。
+//      就是最容易混的一对。二型组内仍分三种意思: 回撤(靛青)/目标(蓝)/
+//      失效位(暖褐), 见下面 FIB2_ROLE。
+//   ⑤ [R421] **全站不许有粉 / 洋红 / 玫红。** 用户: 「整个系统禁止少女系风格,
+//      比如粉色, 投资是一件很严肃的事情」。原来二型是洋红、ATR 是玫红、六态关键点
+//      是品紫(暗色那一份就是兰花粉紫), 三个一起换: 二型 → 靛青, 六态关键点 →
+//      宝蓝, ATR → 赭橙(警示色, 不借红 —— 红是涨)。守卫 `backend/tests/test_no_pink.py`
+//      扫整个前端与后端发出的颜色。
 //
 // 守卫在 `backend/tests/test_level_palette.py`: 两两 ΔE、离涨跌色的距离、
 // 两套主题的对比度下限、键与 LEVEL_GROUPS 对不对得上, 全部钉住。
@@ -207,20 +212,19 @@ export const LEVEL_PALETTE: Record<string, { light: string; dark: string }> = {
   gap:       { light: '#8E9618', dark: '#AAB520' },  // 橄榄 —— 跳空缺口
   round:     { light: '#758290', dark: '#93A0AE' },  // 中性中档 —— 整数关口是心理位
   pivot:     { light: '#9362F9', dark: '#9968FA' },  // 紫 —— 算出来的中枢(暗色第一版 #CABDFC 离二型目标只有 ΔE 8.4, 压饱和)
-  livermore: { light: '#9414B3', dark: '#D75AFA' },  // 品紫 —— 六态关键点
-  fib2:      { light: '#E01DB5', dark: '#FCA2DF' },  // 洋红 —— 斐波那契二型(让出金色那一组; = FIB2_ROLE_RETRACE)
+  livermore: { light: '#2859B1', dark: '#2288E8' },  // 宝蓝 —— 六态关键点(原品紫, R421 换掉)
+  fib2:      { light: '#322097', dark: '#7687BA' },  // 靛青 —— 斐波那契二型(让出金色那一组; = FIB2_ROLE_RETRACE; 原洋红, R421 换掉)
   // 曲线组(跟着行情漂的带/通道)
   boll:      { light: '#3D39F7', dark: '#7F96FA' },  // 靛蓝 —— 统计带
   keltner_s: { light: '#1C9DAE', dark: '#2EE2F9' },  // 青 · 短期(同族最亮一档)
   keltner_m: { light: '#147F86', dark: '#26C4CF' },  // 青 · 中期
   keltner_l: { light: '#0D626B', dark: '#1EA3B1' },  // 青 · 长期(同族最深一档)
-  // 玫红 —— 警示, 但**避开 K 线的正红**。暗色这一份第一版写的是 #FB4F9A,
-  // 守卫当场红: 它离暗色的 `--bull`(#FE595F, 界面上的"涨")只有 ΔE 8.9 ——
-  // 我挑色时只比了 K 线画布那两个 hex, 忘了界面文字用的是另一对。往洋红再推一档。
-  atr_stop:  { light: '#B31364', dark: '#F845AF' },
+  // 赭橙 —— 警示, 但**避开 K 线的正红**(红是涨)。R409 用的是玫红, R421 按
+  // 「禁止粉色」换成赭橙: 橙是通行的"注意", 且与压力支撑的橙隔开了明度。
+  atr_stop:  { light: '#9A3412', dark: '#E07A12' },
 }
 
-// 斐波那契二型组内的另外两种线。回撤线用组色(洋红), 所以这里只有两条。
+// 斐波那契二型组内的另外两种线。回撤线用组色(靛青), 所以这里只有两条。
 //
 // **键是后端 `indicators/dinapoli.py` 里那三个常量的字面值。** 后端按角色发
 // `color` 字段(R405 定的契约), 前端不能按主题改后端发来的 hex, 于是把后端那三个
@@ -231,12 +235,12 @@ export const LEVEL_PALETTE: Record<string, { light: string; dark: string }> = {
 // [R410] 三个角色键各给一个具名常量 —— 不只是好看: 前端要按角色过滤时
 // (比如「推算位默认不画」)如果去比对**标签文字**, 就等于把后端的中文名
 // 抄了一份到前端, 后端改名前端必漏。比角色键不会。
-export const FIB2_ROLE_RETRACE = '#E01DB5'
+export const FIB2_ROLE_RETRACE = '#322097'
 export const FIB2_ROLE_TARGET = '#1889E6'
 export const FIB2_ROLE_VOID = '#6B4D41'
 
 export const FIB2_ROLE: Record<string, { light: string; dark: string }> = {
-  [FIB2_ROLE_RETRACE]: { light: '#E01DB5', dark: '#FCA2DF' },  // 回踩位 = 组色
+  [FIB2_ROLE_RETRACE]: { light: '#322097', dark: '#7687BA' },  // 回踩位 = 组色
   [FIB2_ROLE_TARGET]: { light: '#1889E6', dark: '#86C0FC' },  // 上攻推算位一/二/三 —— 蓝(规格 §12)
   [FIB2_ROLE_VOID]: { light: '#6B4D41', dark: '#937E6D' },     // 这组作废 —— 暖褐, 退色(亮色第一版 #6A5746 离一型的金只有 ΔE 8.4, 往褐里压)
 }
@@ -248,9 +252,19 @@ export function levelColors(theme: Theme): Record<string, string> {
   return out
 }
 
+/**
+ * [R421] 已退役的角色键 → 现在的角色键。回撤位原来是洋红 `#E01DB5`, 换色之前
+ * 算好、还留在缓存里的响应仍带着它; 不认的键会**原样画出来** —— 那就是一条洋红线。
+ * (不放进 FIB2_ROLE: 那张表的键必须与后端常量逐字相等, 有守卫钉着。)
+ */
+const FIB2_ROLE_RETIRED: Record<string, string> = {
+  '#E01DB5': FIB2_ROLE_RETRACE,
+}
+
 /** 后端按角色发来的那个 hex → 当前主题该用的颜色(认不出来就原样用)。 */
 export function fib2RoleColor(backendHex: string, theme: Theme): string {
-  return FIB2_ROLE[backendHex]?.[theme] ?? backendHex
+  const key = FIB2_ROLE_RETIRED[backendHex.toUpperCase()] ?? backendHex
+  return FIB2_ROLE[key]?.[theme] ?? backendHex
 }
 
 /** hook: 当前主题下的价位组配色 (主题切换自动触发重渲染)。 */
