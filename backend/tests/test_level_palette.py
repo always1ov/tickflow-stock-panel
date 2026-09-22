@@ -49,7 +49,12 @@ CANDLE = {
 #   · 离涨跌色 ΔE 10 —— 改之前 ATR 通道是 5。
 #   · 对比度 亮 3.0 / 暗 5.0 —— 改之前亮色最低 1.35。WCAG 对非文字图形的线是 3.0,
 #     暗色底上本来就容易拉开, 所以门槛给高一档。
-MIN_PAIR_DE = 8.0
+#: [R424] 两两最小 ΔE, 按主题分。原来一律 8; 用户: 「不能很接近」。
+#: 亮色做不到 12 是白底的物理限制(黄 / 金一压深就成了橄榄土色), 见 theme.ts ⑥。
+MIN_PAIR_DE = {"dark": 12.0, "light": 11.0}
+#: 量化通道三档是同一个指标的三个周期, 刻意同族, 三档之间只要求分得出
+KELTNER = {"keltner_s", "keltner_m", "keltner_l"}
+MIN_FAMILY_DE = 9.5
 MIN_CANDLE_DE = 10.0
 MIN_CONTRAST = {"light": 3.0, "dark": 5.0}
 
@@ -176,8 +181,9 @@ def test_R409_任意两个指标色都分得开_两套主题各算一遍():
         for i, a in enumerate(names):
             for b in names[i + 1:]:
                 d = delta_e(cols[a], cols[b])
-                if d < MIN_PAIR_DE:
-                    bad.append(f"[{theme}] {a} × {b} 只差 ΔE {d:.1f}({cols[a]} / {cols[b]})")
+                floor = MIN_FAMILY_DE if {a, b} <= KELTNER else MIN_PAIR_DE[theme]
+                if d < floor:
+                    bad.append(f"[{theme}] {a} × {b} 只差 ΔE {d:.1f}(下限 {floor}; {cols[a]} / {cols[b]})")
     assert not bad, "有指标色撞在一起:\n  " + "\n  ".join(bad)
 
 
@@ -333,3 +339,44 @@ def test_R409_价位线的透明度有下限():
     normals = [float(x) for x in re.findall(r"dimming \? \(hit \? 1 : 0\.12\) : ([\d.]+)", code)]
     assert len(normals) == 2, f"常态 opacity 应该正好两处(价位线 + 曲线), 读到 {normals}"
     assert min(normals) >= 0.85, f"常态不透明度掉回去了: {normals}"
+
+
+#: [R424] 中性色 —— 不按色度要求(它们本来就不带颜色)
+NEUTRAL = {"extreme", "round", "livermore"}
+
+
+def test_R424_没有浅色_暗色一律饱和_亮色一律深():
+    """用户: 「关键价位指标的颜色不能用浅色的, 要用深色」。
+
+    「浅」在两套主题上是两回事, 分开钉:
+
+    - **暗色**: 黑底上要看得见就不可能"暗", 这里的「浅」是**粉彩** —— 明度高、色度低
+      (R409 那套的浅桃 #FCB177 色度 0.11 也算勉强, 浅靛 #7F96FA 那种才是典型)。
+      所以彩色一律色度 ≥ 0.10, 且明度 ≤ 0.87(再亮就发白)。
+    - **亮色**: 白底上的「浅」就是明度高。一律明度 ≤ 0.65。
+
+    中性色(前高前低 / 整数关口 / 六态关键点)不看色度 —— 它们本来就不带颜色。
+    """
+    bad: list[str] = []
+    for theme in ("light", "dark"):
+        for name, hex_ in _all_colors(theme).items():
+            L, a, b = oklab(hex_)
+            C = math.hypot(a, b)
+            if theme == "light" and L > 0.65:
+                bad.append(f"[light] {name} {hex_} 明度 {L:.2f} > 0.65, 浅了")
+            if theme == "dark" and name not in NEUTRAL:
+                if C < 0.10:
+                    bad.append(f"[dark] {name} {hex_} 色度 {C:.3f} < 0.10, 是粉彩")
+                if L > 0.87:
+                    bad.append(f"[dark] {name} {hex_} 明度 {L:.2f} > 0.87, 发白")
+    assert not bad, "有浅色:\n  " + "\n  ".join(bad)
+
+
+def test_R424_中性色按明度分开_三档():
+    """三个中性组靠明度占三档, 这是冷暖两侧排得开的前提 —— 哪天有人把其中一个挪近,
+    上面的两两 ΔE 会报, 但这里把"为什么是三档"钉成可读的样子。"""
+    for theme in ("light", "dark"):
+        pal = _palette()
+        Ls = {k: oklab(pal[k][theme])[0] for k in NEUTRAL}
+        order = sorted(Ls, key=Ls.get, reverse=(theme == "dark"))
+        assert order == ["livermore", "extreme", "round"], f"[{theme}] 中性三档的强弱次序乱了: {Ls}"

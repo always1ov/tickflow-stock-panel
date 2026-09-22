@@ -842,7 +842,7 @@ export function AnalysisKChart({
                     : 'text-muted bg-base/40 border-border/30 hover:border-border/60'
                 }`}
                 style={fib2ShowTargets
-                  // 推算位在图上是蓝的, 开关就得是蓝的 —— 用组色(靛青)会让
+                  // 推算位在图上是蓝的, 开关就得是蓝的 —— 用二型的组色会让
                   // 「开关什么颜色、线什么颜色」对不上, 那正是 R409 要除掉的毛病
                   ? { borderColor: targetColor + '66', backgroundColor: targetColor + '26', color: targetColor }
                   : undefined}

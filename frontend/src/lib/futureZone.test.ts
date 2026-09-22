@@ -60,6 +60,17 @@ describe('二型角色色: 换色前缓存里的旧键', () => {
     }
   })
 
+  it('[R424] 每一代退役的角色键都映射到现在的同一角色(缓存里的旧响应不会画成旧色)', async () => {
+    const { fib2RoleColor, FIB2_ROLE, FIB2_ROLE_RETRACE, FIB2_ROLE_TARGET, FIB2_ROLE_VOID } = await import('./theme')
+    const retired: [string, string][] = [
+      ['#E01DB5', FIB2_ROLE_RETRACE], ['#322097', FIB2_ROLE_RETRACE],
+      ['#1889E6', FIB2_ROLE_TARGET], ['#6B4D41', FIB2_ROLE_VOID],
+    ]
+    for (const t of ['light', 'dark'] as const) {
+      for (const [old, now] of retired) expect(fib2RoleColor(old, t)).toBe(FIB2_ROLE[now][t])
+    }
+  })
+
   it('标签短到三格放得下(默认缩放下三格约 23px, 9px 字最多两个)', () => {
     expect(FUTURE_LABEL.length).toBeLessThanOrEqual(2)
   })
