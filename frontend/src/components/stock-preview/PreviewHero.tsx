@@ -16,29 +16,15 @@
  * 「起 ~ 止 · N 个交易日」从弹窗已经在取的那份日 K 里数最后 N 根, 不为这一行另发请求 ——
  * 复盘那份要"回算", 只为了头部一行字就每次开弹窗都回算一遍不划算。
  */
-import { useQuery } from '@tanstack/react-query'
 import { Loader2, Sparkles, Star } from 'lucide-react'
-import { api } from '@/lib/api'
-import { QK } from '@/lib/queryKeys'
 import { toast } from '@/components/Toast'
 import { WatchlistAddMenu } from '@/components/WatchlistAddMenu'
+import { useAnalysisKline } from '@/components/stock-analysis/StockLevelsPanel'
+import { PILL, PILL_IDLE, PILL_ON, SQUARE } from './pill'
 
 export const HERO_DAYS = [60, 120, 250] as const
 /** 打开弹窗、切到另一只票时的天数 */
 export const HERO_DAYS_DEFAULT = 120
-
-/**
- * 头部按钮的统一形状: 独立方框、等高。
- * 横向内边距和字色**不放进公共串**, 由各处自己给 —— 同一个元素上同时写 `px-3 px-0`
- * 或 `text-foreground text-muted`, 谁生效看样式表里的先后而不是写的先后:
- * 星星方框就这样被 `px-3` 挤成了 6px 宽。
- */
-const BOX = 'inline-flex h-8 items-center justify-center rounded-btn border text-xs '
-  + 'transition-colors duration-hover disabled:opacity-40'
-const PILL = `${BOX} px-3`
-const SQUARE = `${BOX} w-8 border-border bg-surface hover:bg-elevated`
-const PILL_IDLE = 'border-border bg-surface text-foreground hover:bg-elevated'
-const PILL_ON = 'border-foreground bg-foreground text-surface font-medium'
 
 export function PreviewHero({
   symbol, name, days, onDaysChange, inWatchlist, watchBusy, onWatchAdd, onWatchRemove,
@@ -55,13 +41,8 @@ export function PreviewHero({
   onAiAnalyze?: (symbol: string, name?: string) => void
   aiBusy?: boolean
 }) {
-  // 与关键价位页同一个查询键 —— 同一份日 K, 不多发请求
-  const kline = useQuery({
-    queryKey: QK.analysisKline(symbol),
-    queryFn: () => api.klineDaily(symbol, 250, undefined, undefined, { refreshLive: true }),
-    enabled: !!symbol,
-    staleTime: 15_000,
-  })
+  // 与关键价位页同一份日 K(同一个查询键, 不多发请求)
+  const kline = useAnalysisKline(symbol)
   const rows = kline.data?.rows ?? []
   const last = rows.at(-1)
   const prev = rows.at(-2)

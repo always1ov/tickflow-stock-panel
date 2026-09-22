@@ -9,6 +9,7 @@ import re
 from tests.frontend_source import code_of
 
 HERO = "components/stock-preview/PreviewHero.tsx"
+PILL = "components/stock-preview/pill.ts"   # [R430] 按钮样式从头部挪出来, 新区块共用
 DLG = "components/StockPreviewDialog.tsx"
 
 
@@ -58,12 +59,13 @@ def test_R429_星星方框不叠冲突的内边距():
     """第一版方框写成 `${PILL} w-8 px-0`, 而 PILL 里有 `px-3`: 同一元素上两个 px-*
     谁生效看样式表先后, 结果 `px-3` 赢, 32px 的方框左右各吃掉 12px, 星星被挤成 6px 宽。"""
     hero = code_of(HERO)
-    box = _const(hero, "BOX")
-    square = _const(hero, "SQUARE")
+    styles = code_of(PILL)
+    box = _const(styles, "BOX")
+    square = _const(styles, "SQUARE")
     assert not re.search(r"\bpx-", box), "公共形状里带了横向内边距 —— 方框会跟它打架"
     assert not re.search(r"\bpx-", square), "方框自带了横向内边距"
     assert not re.search(r"\btext-(foreground|muted)\b", box + square), "公共形状里带了字色"
-    consts = {n: _const(hero, n) for n in ("BOX", "PILL", "SQUARE", "PILL_IDLE", "PILL_ON")}
+    consts = {n: _const(styles, n) for n in ("BOX", "PILL", "SQUARE", "PILL_IDLE", "PILL_ON")}
 
     def expand(expr: str) -> str:
         for _ in range(4):  # PILL / SQUARE 里还套着 ${BOX}

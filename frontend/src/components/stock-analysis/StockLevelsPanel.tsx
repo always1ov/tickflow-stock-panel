@@ -5,33 +5,51 @@ import { EmptyState } from '@/components/EmptyState'
 import { api } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { AnalysisKChart, type LevelType, type PriceLevel } from './AnalysisKChart'
+import type { LevelControls } from './levelControls'
 import { TrendStateBar, useStockTrend } from './TrendStateBar'
 
 interface StockLevelsPanelProps {
   symbol: string
   height?: number
   bare?: boolean
+  /** [R430] 开关由外面持有(个股弹窗右侧那张列表); 见 `AnalysisKChart` 同名入参 */
+  controls?: LevelControls
+  /** [R430] 默认显示最近多少根 K 线 */
+  visibleBars?: number
 }
 
 /**
- * 个股分析页与通用个股详情共用的关键价位主体。
- * 查询键、单票实时刷新与六态失效顺序保持一致，避免两个入口形成不同口径。
+ * 关键价位用的日 K(250 根, 带单票实时刷新)。[R430] 抽成 hook: 个股弹窗的头部与
+ * 右侧价位列表也要读这一份 —— 同一个查询键, 不多发请求, 选项也只写一处。
  */
-export function StockLevelsPanel({ symbol, height = 480, bare = false }: StockLevelsPanelProps) {
-  const kline = useQuery({
+export function useAnalysisKline(symbol: string) {
+  return useQuery({
     queryKey: QK.analysisKline(symbol),
     queryFn: () => api.klineDaily(symbol, 250, undefined, undefined, { refreshLive: true }),
     enabled: !!symbol,
     staleTime: 15_000,
     refetchOnMount: 'always',
   })
+}
 
-  const levelsQ = useQuery({
+/** 关键价位本身。[R430] 同上, 右侧价位列表按它数每一类有几条 */
+export function useStockLevels(symbol: string) {
+  return useQuery({
     queryKey: QK.stockLevels(symbol),
     queryFn: () => api.stockAnalysisLevels(symbol, 250),
     enabled: !!symbol,
     staleTime: 60_000,
   })
+}
+
+/**
+ * 个股分析页与通用个股详情共用的关键价位主体。
+ * 查询键、单票实时刷新与六态失效顺序保持一致，避免两个入口形成不同口径。
+ */
+export function StockLevelsPanel({ symbol, height = 480, bare = false, controls, visibleBars }: StockLevelsPanelProps) {
+  const kline = useAnalysisKline(symbol)
+
+  const levelsQ = useStockLevels(symbol)
 
   // [R415] 副图的量化MACD。独立一支请求: 它要约 1000 根历史预热 EMA,
   // 而主图只取 250 根 —— 两者口径不同, 不能从主图那份日 K 里现算。
@@ -113,6 +131,8 @@ export function StockLevelsPanel({ symbol, height = 480, bare = false }: StockLe
         quantMacd={qmacdQ.data}
         // [R426] 取数失败要说出来 —— 原来失败时副图只剩标题, 看着像"这只票没有信号"
         quantMacdError={qmacdQ.isError}
+        controls={controls}
+        visibleBars={visibleBars}
         height={height}
       />
     </div>
@@ -145,19 +165,8 @@ export function StockLevelsPanel({ symbol, height = 480, bare = false }: StockLe
 
 /** 顶栏行情摘要。与 StockLevelsPanel 共享查询键，不产生额外网络请求。 */
 export function StockLevelsPriceTag({ symbol }: { symbol: string }) {
-  const kline = useQuery({
-    queryKey: QK.analysisKline(symbol),
-    queryFn: () => api.klineDaily(symbol, 250, undefined, undefined, { refreshLive: true }),
-    enabled: !!symbol,
-    staleTime: 15_000,
-    refetchOnMount: 'always',
-  })
-  const levelsQ = useQuery({
-    queryKey: QK.stockLevels(symbol),
-    queryFn: () => api.stockAnalysisLevels(symbol, 250),
-    enabled: !!symbol,
-    staleTime: 60_000,
-  })
+  const kline = useAnalysisKline(symbol)
+  const levelsQ = useStockLevels(symbol)
   const rows = kline.data?.rows ?? []
   if (rows.length === 0) return null
   const last = rows[rows.length - 1]

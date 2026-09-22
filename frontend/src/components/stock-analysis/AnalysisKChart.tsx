@@ -8,6 +8,10 @@ import { levelsChartLayout, PAD_BOTTOM, SLIDER_H } from '@/lib/levelsChartLayout
 import { futureSlotRenderer } from '@/lib/futureZone'
 import { fib2Status } from '@/lib/fib2Status'
 import { Fib2GrainDialog } from './Fib2GrainDialog'
+import {
+  DEFAULT_LEVEL_TYPES, FIB2_BACKTEST_TITLE, FIB2_GRAINS, FIB2_TARGETS_TITLE, PIVOT_RANK_TITLES,
+  levelGroupStat, useLevelControls, type LevelControls,
+} from './levelControls'
 
 /**
  * 个股分析专用日 K 图表。
@@ -154,8 +158,15 @@ interface Props {
   series?: LevelSeries
   /** series 数据对应的日期数组(与 series 各数组对齐) */
   seriesDates?: string[]
-  /** 默认开启的价位组; 不传 = 全部不开 */
+  /** 默认开启的价位组; 不传 = 只开量化通道短期(R208) */
   defaultLevelTypes?: LevelType[]
+  /**
+   * [R430] 开关状态由外面持有(个股弹窗: 开关在图右边另一张卡片里)。
+   * 传了它, 图上方那一排开关就不画 —— 同一件事两处都能点, 只会让人找哪个才算数。
+   */
+  controls?: LevelControls
+  /** [R430] 默认显示最近多少根 K 线。个股弹窗里跟着头部的 60 / 120 / 250 日走 */
+  visibleBars?: number
   /** 预留:新闻/暴雷/利好日期标记 */
   markers?: ChartMarker[]
   /** 预留:事件区间高亮 */
@@ -183,6 +194,33 @@ interface Props {
 }
 
 
+/**
+ * 图上**实际画的**那份价位: 二型按选中的粗细档换掉, 再减线。
+ *
+ * [R430] 从图里抽出来 —— 个股弹窗右侧那张列表要按同一份数「画了几条」,
+ * 各算各的就会出现「列表说 5 条、图上画了 7 条」。
+ */
+export function useShownLevels(
+  levels: Record<LevelType, PriceLevel[]> | undefined,
+  fib2: Fib2Overlay | undefined,
+  rows: KlineRow[],
+  fib2Grain: Fib2Grain,
+  fib2ShowTargets: boolean,
+) {
+  // [R406] 选中档的线顶掉默认那一组。后端 `levels.fib2` 给的是中档, 这里按用户
+  // 选的档换掉 —— 切档因此不用重新请求, 点一下当场变。
+  const fib2Zone = fib2?.grain?.[fib2Grain]?.zone ?? null
+  const fib2Raw = fib2?.grain?.[fib2Grain]?.levels ?? null
+  const close = rows.at(-1)?.close
+  const fib2Shown = useMemo(
+    () => (fib2Raw ? thinFib2(fib2Raw, close, fib2Zone, fib2ShowTargets) : null),
+    [fib2Raw, close, fib2Zone, fib2ShowTargets])
+  const effLevels = useMemo(
+    () => (fib2Shown && levels ? { ...levels, fib2: fib2Shown } : levels),
+    [levels, fib2Shown])
+  return { effLevels, fib2Raw, fib2Zone }
+}
+
 export function AnalysisKChart({
   rows,
   levels,
@@ -193,8 +231,10 @@ export function AnalysisKChart({
   // 原来默认是空的 —— 图上一条线都没有, 每次打开都要自己点一次。而这十几个
   // 价位组里, 短期通道是唯一**每天都在动、且决策台整张表都在用**的那一个
   // (「贵不贵」「该动了」「通道态势」三列的位置判定都以它为准), 所以它是
-  // 最该默认在场的。别的组按需再点。
-  defaultLevelTypes = ['keltner_s'],
+  // 最该默认在场的。别的组按需再点。[R430] 值挪到 `levelControls.ts`, 一个产地。
+  defaultLevelTypes = DEFAULT_LEVEL_TYPES,
+  controls,
+  visibleBars = 120,
   markers,
   ranges,
   fib2,
@@ -211,40 +251,22 @@ export function AnalysisKChart({
   const seriesKeyMapRef = useRef<Map<number, string>>(new Map())
   // 主题: buildOption 内部用 CT() 动态取色, 这里只负责切换时触发重建
   const theme = useTheme()
-  const [activeTypes, setActiveTypes] = useState<Set<LevelType>>(new Set(defaultLevelTypes))
-  /** 枢轴点显示到第几档:1=只P+R1/S1, 2=到R2/S2, 3=全档(R3/S3) */
-  const [pivotRank, setPivotRank] = useState<1 | 2 | 3>(1)
-  /**
-   * [R406] 斐波那契二型的粗细档。**与枢轴点那个「档位」是同一个套路**:
-   * 一组价位里"显示到多细"由用户当场定, 而不是藏进配置。
-   *
-   * 差别在于枢轴点那个是前端过滤(每条线自带 rank), 这个是后端一次算三份 ——
-   * 摆点认得多细会改变算出来的线本身, 过滤不出来。
-   */
-  // [R410] 默认档 `mid` → `coarse`。用户: 「好多根线, 好难抓住…做不做在哪里做,
-  // 走不走这些」。实测中档 12 条、粗档 7 条 —— 默认少掉四成, 想看细的随时点。
-  const [fib2Grain, setFib2Grain] = useState<Fib2Grain>('coarse')
-  /**
-   * [R410] 上方那三条推算位默认不画。它们回答的是"涨上去以后会路过哪",
-   * 与当下要抓的「在哪里做 / 走不走」无关 —— 先让图安静下来, 想看再点。
-   */
-  const [fib2ShowTargets, setFib2ShowTargets] = useState(false)
+  // [R430] 开关状态: 外面传了就听外面的(个股弹窗), 没传自己持有(老入口一字不变)。
+  // 两条路都调一次 hook —— hook 不能按条件调。
+  const ownControls = useLevelControls(defaultLevelTypes)
+  const ctl = controls ?? ownControls
+  const { activeTypes, pivotRank, fib2Grain, fib2ShowTargets } = ctl
+  // [R406] 斐波那契二型的粗细档: 与枢轴点那个「档位」是同一个套路 —— 一组价位里
+  // "显示到多细"由用户当场定。差别在于枢轴点是前端过滤(每条线自带 rank),
+  // 这个是后端一次算三份, 摆点认得多细会改变算出来的线本身, 过滤不出来。
+  // [R410] 默认粗档、上攻推算位默认不画(用户: 「好多根线, 好难抓住」)。
   /** [R412] 粗细档回测弹窗开着没有 */
   const [fib2FitOpen, setFib2FitOpen] = useState(false)
   /** 双向联动高亮: hover 价位标签 ↔ hover 下方文字行。值为 levelKey, null=无高亮 */
   const [hoveredKey, setHoveredKey] = useState<string | null>(null)
 
   // 数据预处理 + 带状曲线序列对齐(后端 series 的日期范围可能与 rows 不同,需映射)
-  // [R406] 选中档的线顶掉默认那一组。后端 `levels.fib2` 给的是中档, 这里按用户
-  // 选的档换掉 —— 切档因此不用重新请求, 点一下当场变。
-  const fib2Zone = fib2?.grain?.[fib2Grain]?.zone ?? null
-  const fib2Raw = fib2?.grain?.[fib2Grain]?.levels ?? null
-  const fib2Shown = useMemo(
-    () => (fib2Raw ? thinFib2(fib2Raw, rows.at(-1)?.close, fib2Zone, fib2ShowTargets) : null),
-    [fib2Raw, rows, fib2Zone, fib2ShowTargets])
-  const effLevels = useMemo(
-    () => (fib2Shown && levels ? { ...levels, fib2: fib2Shown } : levels),
-    [levels, fib2Shown])
+  const { effLevels, fib2Raw, fib2Zone } = useShownLevels(levels, fib2, rows, fib2Grain, fib2ShowTargets)
   // [R411] 那一行「形态走到哪一步」。**读的是整档 `fib2Raw` 而不是画出来的
   // `fib2Shown`** —— 减线藏掉的那几条不该让这句话也跟着变, 它说的是形态,
   // 不是"图上现在画了几条"。
@@ -263,8 +285,11 @@ export function AnalysisKChart({
     const candle = rows.map(r => [r.open, r.close, r.low, r.high])
     const dateIndex = new Map(dates.map((d, i) => [d, i]))
     // 默认显示最近 6 个月 ≈ 120 个交易日;数据不足则全部显示
-    const showBars = 120
-    const zoomStart = dates.length > showBars ? Math.round((1 - showBars / dates.length) * 100) : 0
+    // [R430] 个股弹窗里改成跟头部的 60 / 120 / 250 日走(用户选的「图跟着头部走」)
+    const showBars = visibleBars
+    // [R430] 起点按**第几根**给(dataZoom 的 startValue), 不再按百分比取整 —— 250 根里
+    // 1% 是 2.5 根, 取整后「60 日」实际露出 62 根, 与头部那行「N 个交易日」对不上
+    const zoomStart = Math.max(0, dates.length - showBars)
 
     // 把后端 series(按 seriesDates 对齐)映射到前端 rows 的 dates 顺序
     const alignedSeries: Record<string, (number | null)[]> = {}
@@ -306,7 +331,7 @@ export function AnalysisKChart({
     }
 
     return { dates, candle, dateIndex, zoomStart, alignedSeries }
-  }, [rows, series, seriesDates])
+  }, [rows, series, seriesDates, visibleBars])
 
   /**
    * [R413] 「未来」区 —— 位移均线平移之后**露到最后一根之外**的那 3 个值。
@@ -340,11 +365,10 @@ export function AnalysisKChart({
     }
     // 默认视窗仍然给 120 根**真实** K 线 —— 不补这一下, 多出来的空槽会把
     // 真实 K 线挤掉 3 根。
-    const showBars = 120 + futureDates.length
-    const zoomStart = dates.length > showBars
-      ? Math.round((1 - showBars / dates.length) * 100) : 0
+    const showBars = visibleBars + futureDates.length
+    const zoomStart = Math.max(0, dates.length - showBars)
     return { dates, zoomStart, alignedSeries, futureDates }
-  }, [baseDates, baseZoom, baseSeries, futureVals])
+  }, [baseDates, baseZoom, baseSeries, futureVals, visibleBars])
 
   // [R409] 当前主题下的价位组配色。单一产地在 `lib/theme.ts`;
   // `theme` 已经在 buildOption 的 useMemo 依赖里, 切主题会整张图重建。
@@ -663,8 +687,8 @@ export function AnalysisKChart({
           axisLabel: { show: false }, axisTick: { show: false } },
       ],
       dataZoom: [
-        { type: 'inside', xAxisIndex: [0, 1], start: zoomStart, end: 100 },
-        { type: 'slider', xAxisIndex: [0, 1], bottom: sliderBottom, height: SLIDER_H, start: zoomStart, end: 100,
+        { type: 'inside', xAxisIndex: [0, 1], startValue: zoomStart, endValue: dates.length - 1 },
+        { type: 'slider', xAxisIndex: [0, 1], bottom: sliderBottom, height: SLIDER_H, startValue: zoomStart, endValue: dates.length - 1,
           borderColor: 'transparent', fillerColor: CT().zoomFill,
           handleStyle: { color: '#52525B' }, textStyle: { color: CT().text, fontSize: 10 } },
       ],
@@ -720,46 +744,24 @@ export function AnalysisKChart({
     return () => { window.removeEventListener('resize', onResize); inst.dispose(); chartInstRef.current = null }
   }, [])
 
-  const toggleType = (t: LevelType) => {
-    setActiveTypes(prev => {
-      const next = new Set(prev)
-      if (next.has(t)) next.delete(t)
-      else next.add(t)
-      return next
-    })
-  }
-
-
   return (
     <div className={className}>
       {/* 价位开关按钮组: 14 个价位组全排开, 一行放不下就整块换行
           (chip 自身 nowrap, 只在 chip 之间断行) */}
-      {levels && (
+      {/* [R430] 开关由外面持有时不画这一排 —— 开关在图右边那张卡片里 */}
+      {levels && !controls && (
         <div className="flex flex-wrap content-start items-center gap-1.5 mb-2">
           <span className="text-[10px] text-muted mr-1 shrink-0">关键价位</span>
           {/* 全部价位组一次排开(不折叠)—— 开关本身就是一眼扫过去挑, 藏起来反而要多点一次 */}
           {LEVEL_GROUPS.map(g => {
             const active = activeTypes.has(g.key)
-            // 枢轴点数量按当前档位过滤显示;其他组显示原始数量。
-            // [R406] 读 effLevels 而不是 levels —— 二型切了粗细档, 开关上那个数
-            // 必须跟着变, 否则显示的是中档的条数而图上画的是另一档。
-            const raw = effLevels?.[g.key] ?? []
-            const count = g.key === 'pivot'
-              ? raw.filter(p => p.rank === undefined || p.rank <= pivotRank).length
-              : raw.length
-            // [R410] 二型现在只画其中一部分(密集带里的 + 作废线 + 离现价最近的
-            // 几条), **所以要如实写出藏了几条**, 否则用户会以为这一档就这么多线。
-            // 能不能点也按**整档**算, 不按画出来的那几条算。
-            const total = g.key === 'fib2' ? (fib2Raw?.length ?? 0) : raw.length
-            const title = g.key === 'fib2' && total > count
-              ? `${g.label}: 画了 ${count} 条 / 这一档共 ${total} 条`
-                + `\n只画「挤在一起的」「这组作废」和「离现价最近的几条」——`
-                + `\n其余的对当下没有意义。想全看就切到更细的档。`
-              : `${g.label} (${count} 个)`
+            // [R406][R410] 数怎么算、能不能点、悬停写什么, 见 `levelGroupStat`
+            // (R430 抽出去, 与个股弹窗右侧那张列表共用)
+            const { count, total, title } = levelGroupStat(g.key, g.label, effLevels, fib2Raw, pivotRank)
             return (
               <button
                 key={g.key}
-                onClick={() => toggleType(g.key)}
+                onClick={() => ctl.toggleType(g.key)}
                 disabled={total === 0}
                 title={title}
                 className={`inline-flex shrink-0 whitespace-nowrap items-center gap-1 h-6 px-2 rounded-md text-[10px] font-medium border transition-ui disabled:opacity-30 disabled:cursor-not-allowed ${
@@ -783,8 +785,8 @@ export function AnalysisKChart({
               {([1, 2, 3] as const).map(r => (
                 <button
                   key={r}
-                  onClick={() => setPivotRank(r)}
-                  title={r === 1 ? 'P + R1/S1(3 个)' : r === 2 ? '到 R2/S2(5 个)' : '全档 R3/S3(7 个)'}
+                  onClick={() => ctl.setPivotRank(r)}
+                  title={PIVOT_RANK_TITLES[r]}
                   // [R409] 选中态跟着枢轴点那一组的颜色走。原来写死 #8B5CF6
                   // (旧组色), 改了组色这里就会是"选择器一个紫、图上的线另一个紫"
                   className={`h-6 px-2 rounded-btn text-micro font-mono border transition-ui ${
@@ -808,15 +810,11 @@ export function AnalysisKChart({
           {activeTypes.has('fib2') && fib2?.grain && (
             <div className="inline-flex shrink-0 items-center gap-0.5 ml-1 pl-2 border-l border-border/40">
               <span className="text-micro text-muted mr-1">粗细</span>
-              {([['coarse', '粗'], ['mid', '中'], ['fine', '细']] as const).map(([k, cn]) => (
+              {FIB2_GRAINS.map(([k, cn, tip]) => (
                 <button
                   key={k}
-                  onClick={() => setFib2Grain(k)}
-                  title={k === 'coarse'
-                    ? '只认大级别回调 —— 线少而稳, 重合更难出现但出现了更硬'
-                    : k === 'mid'
-                      ? '默认档'
-                      : '小回调也算 —— 线多而密, 更容易看到重合'}
+                  onClick={() => ctl.setFib2Grain(k)}
+                  title={tip}
                   // [R409] 同上: 选中态用二型的组色, 不再另写一个 hex
                   className={`h-6 px-2 rounded-btn text-micro border transition-ui whitespace-nowrap ${
                     fib2Grain === k
@@ -838,10 +836,8 @@ export function AnalysisKChart({
                   默认画出来只是让图更挤。收进开关而不是删掉 —— 数据本来就在,
                   想看一眼是一次点击的事。 */}
               <button
-                onClick={() => setFib2ShowTargets(v => !v)}
-                title={'上攻推算位一 / 二 / 三\n'
-                  + '由这一波的起点、最高点、回踩最低点三点推算, 是"涨上去会路过哪",\n'
-                  + '不是"该不该去" —— 默认不画, 免得和眼下要看的位置混在一起。'}
+                onClick={() => ctl.setFib2ShowTargets(v => !v)}
+                title={FIB2_TARGETS_TITLE}
                 className={`h-6 px-2 rounded-btn text-micro border transition-ui whitespace-nowrap ml-0.5 ${
                   fib2ShowTargets
                     ? 'text-foreground'
@@ -861,8 +857,7 @@ export function AnalysisKChart({
               {symbol && (
                 <button
                   onClick={() => setFib2FitOpen(true)}
-                  title={'回看这只票近三年每一次上攻, 看当时画出来的线有没有说中\n'
-                    + '之后实际回踩的最低点 —— 评的是「线画得准不准」, 不是「赚不赚」。'}
+                  title={FIB2_BACKTEST_TITLE}
                   className="ml-0.5 h-6 rounded-btn border border-border/30 bg-base/40 px-2 text-micro text-muted transition-ui hover:border-border/60 hover:text-foreground"
                 >
                   回测这三档
@@ -895,7 +890,7 @@ export function AnalysisKChart({
         <Fib2GrainDialog
           symbol={symbol}
           current={fib2Grain}
-          onPick={setFib2Grain}
+          onPick={ctl.setFib2Grain}
           onClose={() => setFib2FitOpen(false)}
         />
       )}

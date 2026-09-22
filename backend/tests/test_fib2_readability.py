@@ -26,6 +26,10 @@ from app.indicators import dinapoli as dn
 from tests.frontend_source import code_lines, read_src
 
 CHART = "components/stock-analysis/AnalysisKChart.tsx"
+# [R430] 开关状态与每类的计数从图里提了出来(个股弹窗的右侧列表与图共用), 默认值与
+# 「藏了几条」的说法现在都在这里; 图与右侧列表各自只剩「按整档判断能不能点」。
+CTL = "components/stock-analysis/levelControls.ts"
+SIDE = "components/stock-preview/LevelSideList.tsx"
 
 # 上攻途中两次浅回调 → 两条回踩位挤成密集带 → 三类线齐全的一份数据。
 # (与 `test_dinapoli_pivots` 里那份同源, 那边记着它是怎么搜出来的。)
@@ -94,7 +98,7 @@ def test_R410_默认档是最粗的那一档():
     **不钉字面量 `'coarse'`, 钉"它是 GRAINS 里最粗的那个"** —— 改档名或者加
     一档都不该让这条哑掉。
     """
-    code = code_lines(read_src(CHART))
+    code = code_lines(read_src(CTL))
     m = re.search(r"useState<Fib2Grain>\('(\w+)'\)", code)
     assert m, "读不出默认档"
     coarsest = max(dn.GRAINS, key=lambda k: dn.GRAINS[k])
@@ -103,7 +107,7 @@ def test_R410_默认档是最粗的那一档():
 
 def test_R410_推算位默认不画():
     """它们回答「涨上去会路过哪」, 与当下的「在哪里做 / 走不走」无关。"""
-    code = code_lines(read_src(CHART))
+    code = code_lines(read_src(CTL))
     m = re.search(r"const \[fib2ShowTargets, setFib2ShowTargets\] = useState\((\w+)\)", code)
     assert m, "推算位那个开关读不出来"
     assert m[1] == "false", "推算位又变成默认画了"
@@ -124,14 +128,15 @@ def test_R410_开关上要如实说藏了几条():
 
     所以开关的 title 必须同时给出"画了几条"和"这一档共几条"。
     """
-    src = read_src(CHART)
-    i = src.index("const total = g.key === 'fib2'")
+    src = read_src(CTL)
+    i = src.index("const total = key === 'fib2'")
     blk = src[i:i + 900]
     assert "fib2Raw?.length" in blk, "总条数不是从整档来的 —— 那就说不出藏了几条"
     assert "total > count" in blk, "没有判断「有没有藏」就直接写数, 会在没藏时也胡说"
     assert "这一档共" in blk, "title 里没写出这一档一共多少条"
-    assert "disabled={total === 0}" in blk, \
-        "能不能点按画出来的条数算了 —— 该按整档算, 否则藏光了开关就点不开"
+    for where in (CHART, SIDE):
+        assert "disabled={total === 0}" in read_src(where), \
+            f"{where}: 能不能点按画出来的条数算了 —— 该按整档算, 否则藏光了开关就点不开"
 
 
 # ── [R413] 主图上那三样 ────────────────────────────────────
