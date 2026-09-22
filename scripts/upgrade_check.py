@@ -14,6 +14,12 @@ def _git(root: Path, *args: str, check: bool = True) -> subprocess.CompletedProc
         cwd=root,
         capture_output=True,
         text=True,
+        # [R396] `merge-tree` 会把冲突文件的内容原样吐出来, 里面可能有二进制
+        # (作者 v0.3.0 往 README 里加了截图, 第一个字节就是 PNG 的 0x89)。
+        # 默认的严格 utf-8 解码会当场抛 UnicodeDecodeError, 整个预检跑不完 ——
+        # 而预检恰恰是同步上游前唯一的"先看看会撞哪儿"的工具。
+        # 这里只是看冲突文件名与重叠面, 坏字节替换掉不影响任何结论。
+        errors="replace",
         check=False,
     )
     if check and result.returncode != 0:
