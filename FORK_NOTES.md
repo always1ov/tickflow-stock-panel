@@ -42,7 +42,7 @@
 
 ## 上游基线与升级约定(按 docs/secondary-development.md §8)
 
-- **当前上游基线**: commit `d7ff7c0`(upstream/main, tag `v0.2.4`=`8d1efd9` 之后), 于 R326 并入; 此前 `cf137e0`(R320)、`d0a14b5`(这一条此前一直没登记 —— R320 预检时 `git merge-base` 查出真实基线早已是它而非下面写的 `8ef3d66`, 说明中间有一次同步没更新这一行; 以后以 `git merge-base HEAD upstream/main` 为准, 不信这一行)、`8ef3d66`(v0.2.3, R172)、`4cb30e4`(R166)、 `de5d5a9`(R164)、`576850d`(R152)、`dab8a2c`(`v0.2.2-26-gdab8a2c`, R120)、`4d27f31`(tag `v0.2.2`, R92)、`afbf432`(R82)、`e346e25`(R78)、`196af2f`(R71)、tag `v0.2.1`=`17ca245`(R69)。
+- **当前上游基线**: commit `28ba5be2`(upstream/main, tag `v0.3.0` 之后), 于 R396 并入 —— **作者在 v0.3.0 前后强推重写了历史**(904 条提交哈希全换), 与本 fork 已无共同祖先。R396 沿用上次同步的办法: 用一个合成提交把上游当前的树接在上次锚点 `ad1f40dd`(它的树与上游 `0cd46f95` 逐字节相同)之后, 三方合并的基线才落得回来。**以后 `git merge-base HEAD upstream/main` 会返回空, 那不等于「没有更新」** —— 判断有没有更新要看 `git diff <上次锚点> upstream/main`。此前 `d7ff7c0`(upstream/main, tag `v0.2.4`=`8d1efd9` 之后), 于 R326 并入; 此前 `cf137e0`(R320)、`d0a14b5`(这一条此前一直没登记 —— R320 预检时 `git merge-base` 查出真实基线早已是它而非下面写的 `8ef3d66`, 说明中间有一次同步没更新这一行; 以后以 `git merge-base HEAD upstream/main` 为准, 不信这一行)、`8ef3d66`(v0.2.3, R172)、`4cb30e4`(R166)、 `de5d5a9`(R164)、`576850d`(R152)、`dab8a2c`(`v0.2.2-26-gdab8a2c`, R120)、`4d27f31`(tag `v0.2.2`, R92)、`afbf432`(R82)、`e346e25`(R78)、`196af2f`(R71)、tag `v0.2.1`=`17ca245`(R69)。
   每次同步上游后更新这一行 —— 守则要求二开分支记录确切 Tag/commit, 不能只写"基于 v0.x"。
 - **升级预检**: 下次同步上游前先跑只读预演 `python3 scripts/upgrade_check.py <目标Tag>`,
   它会列出双方都改过的文件和可预见的文本冲突; 预演不动工作区, 但只看已提交内容。

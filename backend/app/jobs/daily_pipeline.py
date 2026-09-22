@@ -27,6 +27,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 
 from app.config import settings
 from app.indicators.pipeline import filter_halt_days, run_pipeline
+from app.market_time import cn_today
 from app.services import index_sync, instrument_sync, kline_sync
 from app.services import preferences as _prefs
 from app.tickflow.capabilities import Cap, CapabilitySet
@@ -234,7 +235,9 @@ def run_now(
     from datetime import datetime as _dt
     from datetime import timedelta as _td
     latest_daily = repo.latest_daily_date()
-    today = _date.today()
+    # 管道「今天」必须是北京日期: 美西主机 15:35 北京时间仍是本地昨天,
+    # date.today() 会把昨日日K当成已齐, 当日官方收盘价永远拉不进来。
+    today = cn_today()
     today_exists = latest_daily and latest_daily >= today
     new_daily_days = 0
 

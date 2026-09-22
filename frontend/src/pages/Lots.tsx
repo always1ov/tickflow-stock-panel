@@ -10,7 +10,8 @@ import { PageHeader } from '@/components/PageHeader'
 import { Modal } from '@/components/Modal'
 import { DatePicker } from '@/components/DatePicker'
 import { DateShortcuts } from '@/components/DateShortcuts'
-import { StockPreviewDialog, toNavItems } from '@/components/StockPreviewDialog'
+import { StockPreviewDialog } from '@/components/StockPreviewDialog'
+import { toNavItems } from '@/lib/listNav'
 import { boardTag } from '@/components/stock-table/primitives'
 // [R170] AI 操盘手对照标记 —— 只显示有几个操作员也拿着, 不泄露是谁/成本/理由
 
