@@ -121,6 +121,14 @@ export default {
       // 3xl 是补上的: 原本没定义, 落到 Tailwind 默认的 rem 值(会随根字号变),
       // 与这套 px 刻度不是一套体系。
       fontSize: {
+        // [R399] 规范五档 —— 每档差 ≥2px, 用途唯一。值见 src/index.css。
+        // **新增, 不动下面旧的那七档**: 旧档还有 1012 处 text-xs 等在用,
+        // 一次性改掉既没法验证也没法回退; 3.3 逐页迁移时一页一页换。
+        micro: ['var(--fs-micro)', { lineHeight: 'var(--lh-micro)' }],
+        body:  ['var(--fs-body)',  { lineHeight: 'var(--lh-body)' }],
+        title: ['var(--fs-title)', { lineHeight: 'var(--lh-title)' }],
+        page:  ['var(--fs-page)',  { lineHeight: 'var(--lh-page)' }],
+        hero:  ['var(--fs-hero)',  { lineHeight: 'var(--lh-hero)' }],
         xs: ['13px', { lineHeight: '20px' }],
         sm: ['15px', { lineHeight: '23px' }],
         base: ['16px', { lineHeight: '25px' }],
@@ -140,6 +148,18 @@ export default {
       spacing: {
         // 常用表单 h-9 从 36px 收到 FluxDown regular 控件的 32px。
         9: '2rem',
+        // [R399] 骨架刻度(8 基): 页面留白、区块间距、卡片内边距只许从这取。
+        s1: 'var(--space-1)', s2: 'var(--space-2)', s3: 'var(--space-3)',
+        s4: 'var(--space-4)', s5: 'var(--space-5)', s6: 'var(--space-6)',
+        // [R399] 行内密度刻度: **只允许**表格单元格 / 徽标 / 药丸用。
+        // 单列出来是为了让"这里是刻意的密集"在类名上就看得出来, 也让守卫能分开管。
+        g1: 'var(--gap-1)', g2: 'var(--gap-2)', g3: 'var(--gap-3)', g4: 'var(--gap-4)',
+      },
+      maxWidth: {
+        // [R399] 容器宽三档 —— 此前散着 12 种以上写法
+        full: 'var(--w-full)',
+        wide: 'var(--w-wide)',
+        read: 'var(--w-read)',
       },
       borderRadius: {
         // [R126] skill Quick Reference 建议 0.5~1rem; Modern Dark Mode 那段给的是
@@ -155,10 +175,14 @@ export default {
         // 弹窗 18)。手册 §8.4 的告诫是「圆角有层次, 但不任意」—— 小控件用 30px
         // 胶囊、大卡却用 4px 直角会明显改变风格。这一版仍保持约 1.3~1.4 的级差,
         // 控件明显小于卡片; 输入框留在 8px 不动, 密集表单里再大会显得肉。
-        card: '14px',
-        btn: '10px',
-        input: '8px',
-        dialog: '18px',
+        // [R399] 从 14/10/8/18 收到仪器盘的三档(4 / 6 / 10)。
+        // **这一处是直接改指向的** —— 246 处 rounded-card、782 处 rounded-btn
+        // 立刻跟着变。圆角是方向 A 最便宜也最见效的一步: 一改回去就能还原,
+        // 不像字号/间距那样牵动行高与密度。
+        card: 'var(--r-card)',
+        btn: 'var(--r-control)',
+        input: 'var(--r-control)',
+        dialog: 'var(--r-dialog)',
       },
       // [R317] 阴影走 CSS 变量, **两套模式各一份**。
       //
@@ -172,13 +196,16 @@ export default {
       // 纯黑投影 + 一道极淡的内高光(模拟受光的边缘)。组件里的 shadow-lg 之类
       // 一个字没改, 换主题自动切。值见 src/index.css。
       boxShadow: {
-        sm: 'var(--shadow-sm)',
-        DEFAULT: 'var(--shadow-sm)',
+        // [R399] 仪器盘: **静态面一律无影**, 层级靠 base/surface/elevated 三档
+        // 明度差 + 1px 边框。只有真正浮起来的(弹窗/下拉/悬浮卡)才留影 ——
+        // 下面 lg/xl/2xl 三档原样不动, 它们全用在浮层上。
+        sm: 'var(--shadow-flat)',
+        DEFAULT: 'var(--shadow-flat)',
+        card: 'var(--shadow-flat)',
         md: 'var(--shadow-md)',
         lg: 'var(--shadow-lg)',
         xl: 'var(--shadow-xl)',
         '2xl': 'var(--shadow-2xl)',
-        card: 'var(--shadow-md)',
         pop: 'var(--shadow-lg)',
         dialog: 'var(--shadow-2xl)',
       },

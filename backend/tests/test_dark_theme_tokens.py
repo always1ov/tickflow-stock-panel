@@ -14,7 +14,33 @@ from pathlib import Path
 CSS = Path(__file__).resolve().parents[2] / "frontend" / "src" / "index.css"
 
 # Timing curves are deliberately shared; every other theme token needs both modes.
-SHARED = {"--ease-out-strong", "--ease-in-out-strong", "--ease-drawer"}
+SHARED = {"--ease-out-strong", "--ease-in-out-strong", "--ease-drawer",
+          # [R399] `--shadow-flat` 的值就是 `none` —— 两套模式共用没有疑问。
+          # **按确切名字豁免, 不按 `--shadow-` 前缀**: 其余阴影是亮暗各一份的
+          # (亮色是低透明度冷灰投影, 暗色是纯黑投影 + 一道内高光), 前缀豁免
+          # 会把它们一起放过, 那正是这条守卫要拦的东西。
+          "--shadow-flat"}
+
+# [R399] 度量类 token 同样是**两套模式共用的**, 而且必须共用。
+#
+# 用户这一轮明确要求亮色也逐项打磨 —— 那就更不能让间距/字号/圆角各写一份:
+# **两套主题只该差在颜色上**。允许它们分别定义, 亮暗两边的密度就会慢慢漂,
+# 而这种漂没有任何东西会报错(两边单看都"对")。
+#
+# 按前缀豁免而不是把 27 个名字列进去: 列名字的话, 每加一档字号就要回来补一行,
+# 迟早漏 —— 而漏掉的那一档会被这条误判成"缺暗色定义", 于是有人就去给它补一份
+# 暗色值, 正好造成上面说的那种漂。
+SHARED_PREFIXES = (
+    "--space-",     # 骨架间距 8/16/24/32/48/64
+    "--gap-",       # 行内密度 2/4/6/8
+    "--fs-", "--lh-",  # 字号五档与对应行高
+    "--r-",         # 圆角三档
+    "--w-",         # 容器宽三档
+)
+
+
+def _is_shared(name: str) -> bool:
+    return name in SHARED or name.startswith(SHARED_PREFIXES)
 
 
 def _blocks(css: str) -> tuple[dict[str, str], dict[str, str]]:
@@ -65,8 +91,9 @@ def _luminance(color: tuple[float, float, float]) -> float:
 
 def test_every_theme_token_has_an_explicit_dark_definition():
     light, dark = _blocks(CSS.read_text(encoding="utf-8"))
-    assert set(light) - SHARED == set(dark), (
-        f"Missing dark tokens: {sorted(set(light) - SHARED - set(dark))}; "
+    shared = {n for n in light if _is_shared(n)}
+    assert set(light) - shared == set(dark), (
+        f"Missing dark tokens: {sorted(set(light) - shared - set(dark))}; "
         f"dark-only tokens: {sorted(set(dark) - set(light))}"
     )
 
