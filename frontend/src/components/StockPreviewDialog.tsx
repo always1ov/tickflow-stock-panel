@@ -21,6 +21,7 @@ import { StockReviewPanel, type ReviewTab } from '@/components/stock-analysis/St
 import { HERO_DAYS_DEFAULT, PreviewHero } from '@/components/stock-preview/PreviewHero'
 import { ChartLevelsSection, type ChartView } from '@/components/stock-preview/ChartLevelsSection'
 import { ReviewSection } from '@/components/stock-preview/ReviewSection'
+import { StatusSection } from '@/components/stock-preview/StatusSection'
 import { PILL, PILL_IDLE, PILL_ON } from '@/components/stock-preview/pill'
 import { StockFinancialSearch } from '@/components/financials/StockFinancialSearch'
 import { buildMonitorPriceLines } from '@/lib/price-alerts'
@@ -379,6 +380,10 @@ export function StockPreviewDialog({ symbol: symbolProp, name: nameProp, onClose
                 它的关闭按钮要滚下去才看得到; Esc / 点弹窗外照常能关。 */}
             <div className="min-h-0 flex-1 overflow-auto">
               <div className="space-y-6 px-4 pb-2 pt-4 sm:px-6">
+              {/* [R433] 新「现状」(用户排版图: 「结论后面加」)。只有现成读数 ——
+                  图里下半块那套买卖判定先写成草案给用户审, 审完再做。 */}
+              <StatusSection symbol={symbol} days={reviewDays} />
+
               {/* [R430] 新「图表与价位」(用户排版图第二块)。旧的日K/分时/关键价位/复盘
                   原样留在下面 —— 用户: 「新块加上, 旧的先留着」。 */}
               <div>

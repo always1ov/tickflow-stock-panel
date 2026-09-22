@@ -8,7 +8,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   alignQuantMacd, diffExposed, HOLLOW_DASH, ICON_DOWN, ICON_H, ICON_UP, quantMacdSeries, renderDiffRect,
-  STICK_RATIO, STICK_WIDTH,
+  STICK_RATIO, STICK_WIDTH, QMACD_ROWS, niceCeil, quantMacdRange,
 } from './quantMacdSeries'
 import { QUANT_MACD_COLORS } from './theme'
 
@@ -119,6 +119,8 @@ describe('量化MACD: 画法照原文', () => {
       red: '#FF0000', darkRed: '#CC0000', green: '#00FF00', yellow: '#FFFF00',
       icon2: '#00DC00',   // 2 号图标自带的绿, 对着通达信截图量的
       paneBg: '#000000',  // 通达信的底色; 亮色主题下副图铺这个底
+      frame: '#B00000',   // [R434] 副图外框(实线)
+      gridLine: '#800000', // [R434] 框里的横格(点线)
     })
   })
 
@@ -175,5 +177,39 @@ describe('量化MACD: 按日期对到图上的 x 轴', () => {
   it('数据还没到: 整张副图留白, 长度仍与 x 轴一致', () => {
     const a = alignQuantMacd(['2026-09-01', '2026-09-02'], undefined)
     for (const v of Object.values(a)) expect(v).toEqual([null, null])
+  })
+})
+
+describe('[R434] 副图四行等高, 0 轴压在横格上', () => {
+  const cases: [number, number][] = [
+    [-0.8, 1.9], [0, 2.4], [-3.1, 0], [-0.02, 0.013], [-120, 40], [0.5, 0.7], [-0.7, -0.2], [-1, 1],
+  ]
+  it.each(cases)('数据 [%s, %s]', (lo, hi) => {
+    const { min, max, step } = quantMacdRange(lo, hi)
+    expect(max - min).toBeCloseTo(QMACD_ROWS * step, 9)          // 正好四行
+    expect(min).toBeLessThanOrEqual(Math.min(lo, 0) + 1e-12)     // 装得下, 且柱根 0 在框里
+    expect(max).toBeGreaterThanOrEqual(Math.max(hi, 0) - 1e-12)
+    const zeroRow = -min / step                                  // 0 轴落在第几条线上
+    expect(Math.abs(zeroRow - Math.round(zeroRow))).toBeLessThan(1e-9)
+    expect(niceCeil(step)).toBeCloseTo(step, 12)                 // 行高是整齐的数, ECharts 不会再改它
+  })
+
+  it('挑最紧的那种分法 —— 柱子尽量撑满', () => {
+    // 全在 0 上方: 三上一下与四上都是行高 1, 取先找到的三上一下 ——
+    // 0 轴下留一行, 死叉箭头(尖朝下, 挂在值下面)有地方放
+    expect(quantMacdRange(0, 2.4)).toEqual({ min: -1, max: 3, step: 1 })
+    // 上 1.9 下 0.8: 三上一下 → 1.9/3 = 0.63 → 1, 0.8/1 → 1; 行高 1
+    expect(quantMacdRange(-0.8, 1.9).step).toBe(1)
+  })
+
+  it('整齐的数: 1 / 2 / 3 / 5 × 10ⁿ, 不被浮点误差推到下一档', () => {
+    expect(niceCeil(0.3)).toBeCloseTo(0.3, 12)
+    expect(niceCeil(0.31)).toBeCloseTo(0.5, 12)
+    expect(niceCeil(7)).toBe(10)
+    expect(niceCeil(0)).toBe(0)
+  })
+
+  it('一屏全是 0 时也给一个框, 不除以 0', () => {
+    expect(quantMacdRange(0, 0)).toEqual({ min: -2, max: 2, step: 1 })
   })
 })

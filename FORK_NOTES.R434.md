@@ -1,0 +1,5 @@
+# R434 — 视图切换挪到右边; 量化MACD 副图四行等高(外框 + 点线横格)
+
+| # | 改动 | 涉及文件 | 冲突风险 | 单独回退 |
+|---|------|---------|:---:|---------|
+| R434 | 用户: 「日分时关键价位放到右边, 量化macd是四行等高的行限制着的」。(1) 「图表与价位」卡片顶上那一行: 日 K / 分时 / 关键价位这组切换挪到右边, 左边是随视图变的那一格(分时天数 / 一句用法)。(2) 副图: 对着用户那张通达信截图(14.webp)量 —— 外面一圈实线红框, 里面等距的暗红点线横格, 其中一条就是 0 轴。做法是纵轴范围由新函数 `quantMacdRange` 按当前窗口里的数据现算: 正好 4 × 一个整齐的行高(1 / 2 / 3 / 5 × 10ⁿ), 0 轴以上几行、以下几行挑最紧的那种分法, 于是 0 轴恰好压在一条横格上; 交给 ECharts `splitNumber: 4` 时它按 nice(跨度 / 4) 取行高, 整齐的数取完还是它自己, 横格恰好 3 条(出图实测四行各约 36px)。上下界都把 0 算进去, 柱根永远在框里(R415 不开 scale 防的就是这个)。外框 `#B00000`、横格 `#800000` 进 `QUANT_MACD_COLORS`(钉颜色的测试一并更新); 截图有损压缩, 取的是近似值。暗色主题的副图底色仍是透明(R418 只给亮色铺黑底)。空心柱照旧用底色填充, 会盖住身后的横格 —— 通达信也是这样。 | 改 `frontend/src/components/stock-preview/ChartLevelsSection.tsx`、`stock-analysis/AnalysisKChart.tsx`、`frontend/src/lib/quantMacdSeries.ts`(`quantMacdRange` / `niceCeil` / `QMACD_ROWS`)、`frontend/src/lib/theme.ts`(两个颜色)、`frontend/src/lib/quantMacdSeries.test.ts`(+11 条); `backend/tests/test_status_section.py` 里 2 条; 变异 10 个全杀(首轮漏 2 个: 只钉了字段名没钉显示条件、没钉 `show: true`, 已收紧); 后端 4551 passed、vitest 166、tsc / eslint / build 0; 亮暗两套出图并按像素量了横格位置 | 低 | 可(副图 yAxis 回到 R423 的写法、grid 去掉边框; 切换组挪回左边) |

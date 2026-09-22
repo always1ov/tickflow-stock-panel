@@ -179,3 +179,48 @@ export function quantMacdSeries(
     },
   ]
 }
+
+
+/**
+ * [R434] 副图的纵轴范围 —— **四行等高**, 并且 0 轴正好压在其中一条横格上。
+ *
+ * 用户: 「量化macd是四行等高的行限制着的」。通达信那张副图外面一圈实线框, 里面是
+ * 等距的暗红点线横格, 其中一条就是 0 轴。这里的做法:
+ *
+ *   · 行高 `step` 取「整齐的数」(1 / 2 / 3 / 5 × 10ⁿ);
+ *   · 0 轴以上占 `above` 行、以下占 `4 − above` 行, 在能装下这一屏数据的分法里
+ *     挑行高最小的那一种 —— 柱子尽量撑满, 又不出框;
+ *   · 返回的 min / max 正好是 4 × step, 交给 ECharts 的 `splitNumber: 4` 时它会
+ *     原样用这个 step(整齐的数经它的取整还是它自己), 于是横格恰好 3 条。
+ *
+ * 纵轴随拖动的窗口变, 所以这是给 `yAxis.min / max` 的函数用的, 入参是当前窗口
+ * 里数据的上下界。
+ */
+export const QMACD_ROWS = 4
+
+const NICE = [1, 2, 3, 5, 10]
+
+export function niceCeil(v: number): number {
+  if (!(v > 0) || !Number.isFinite(v)) return 0
+  const e = Math.floor(Math.log10(v))
+  const base = 10 ** e
+  const f = v / base
+  // 浮点误差: 0.3 / 0.1 = 2.9999999999999996, 不能因此跳到下一档
+  const hit = NICE.find(n => f <= n * (1 + 1e-9)) ?? 10
+  return hit * base
+}
+
+export function quantMacdRange(lo: number, hi: number): { min: number; max: number; step: number } {
+  const up = Math.max(hi, 0)
+  const dn = Math.max(-lo, 0)
+  if (up === 0 && dn === 0) return { min: -2, max: 2, step: 1 }     // 一屏全是 0: 随便给个框
+  let best: { min: number; max: number; step: number } | null = null
+  for (let above = 0; above <= QMACD_ROWS; above++) {
+    const below = QMACD_ROWS - above
+    if ((up > 0 && above === 0) || (dn > 0 && below === 0)) continue
+    const need = Math.max(above ? up / above : 0, below ? dn / below : 0)
+    const step = niceCeil(need)
+    if (!best || step < best.step) best = { min: -below * step, max: above * step, step }
+  }
+  return best!
+}

@@ -35,9 +35,11 @@ export function ChartLevelsSection({ view, onViewChange, levelsEnabled = true, t
       <SectionTitle title="图表与价位" sub="价格、通道与关键价位" />
 
       <div className="mt-3 min-w-0 rounded-card border border-border bg-surface p-4">
+        {/* [R434] 视图切换靠右, 左边是随视图变的那一格。用户: 「日分时关键价位放到右边」 */}
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+          {toolbar}
           <div role="tablist" aria-label="图表视图"
-               className="inline-flex shrink-0 items-center gap-1 rounded-btn border border-border bg-elevated/60 p-1">
+               className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-btn border border-border bg-elevated/60 p-1">
             {tabs.map(({ key, label, Icon }) => (
               <button key={key} type="button" role="tab" aria-selected={view === key}
                       onClick={() => onViewChange(key)}
@@ -49,7 +51,6 @@ export function ChartLevelsSection({ view, onViewChange, levelsEnabled = true, t
               </button>
             ))}
           </div>
-          {toolbar}
         </div>
         <div className="mt-3">{children}</div>
       </div>

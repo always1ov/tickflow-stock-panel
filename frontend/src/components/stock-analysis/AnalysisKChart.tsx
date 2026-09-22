@@ -3,7 +3,7 @@ import { chartTheme, FIB2_ROLE_TARGET, QUANT_MACD_COLORS, fib2RoleColor, getThem
 import * as echarts from 'echarts'
 import type { ECharts, EChartsOption } from 'echarts'
 import type { Fib2Grain, Fib2Overlay, KlineRow, LevelSeries, QuantMacdResult } from '@/lib/api'
-import { alignQuantMacd, quantMacdSeries } from '@/lib/quantMacdSeries'
+import { alignQuantMacd, QMACD_ROWS, quantMacdRange, quantMacdSeries } from '@/lib/quantMacdSeries'
 import { levelsChartLayout, PAD_BOTTOM, SLIDER_H } from '@/lib/levelsChartLayout'
 import { futureSlotRenderer } from '@/lib/futureZone'
 import { fib2Status } from '@/lib/fib2Status'
@@ -654,8 +654,10 @@ export function AnalysisKChart({
       grid: [
         { left: 56, right: 144, top: 16, height: mainH },
         // [R418] 亮色主题下副图铺通达信的黑底 —— 颜色照抄通达信, 纯黄在白底上看不见
-        { left: 56, right: 144, top: subTop, height: subH,
-          show: !isDark, backgroundColor: QUANT_MACD_COLORS.paneBg, borderWidth: 0 },
+        // [R434] 外面一圈实线框, 与通达信那张副图一样(用户: 「四行等高的行限制着的」)
+        { left: 56, right: 144, top: subTop, height: subH, show: true,
+          backgroundColor: isDark ? 'transparent' : QUANT_MACD_COLORS.paneBg,
+          borderWidth: 1, borderColor: QUANT_MACD_COLORS.frame },
       ],
       xAxis: [
         {
@@ -679,9 +681,14 @@ export function AnalysisKChart({
           axisLabel: { color: CT().text, fontSize: 10, fontFamily: 'JetBrains Mono, monospace' } },
         // [R415] 不开 scale: 原文每根柱子都从 0 画起(STICKLINE 的第二个参数),
         // 开了 scale 在全是正值的那一段 0 会掉出坐标轴, 柱子就没了根。
-        { scale: false, gridIndex: 1, splitNumber: 2,
-          // 副图不画背景横线
-          splitLine: { show: false },
+        // [R434] 四行等高: 纵轴范围由 `quantMacdRange` 按当前窗口里的数据现算 ——
+        // 正好 4 × 整齐的行高, 0 轴压在其中一条横格上(通达信就是这样)。行高本身是
+        // 整齐的数, ECharts 按 splitNumber 取行高时会原样用它, 横格于是恰好 3 条。
+        // 上下界都把 0 算进去, 柱根永远在框里(R415 不开 scale 防的就是柱根掉出去)。
+        { gridIndex: 1, splitNumber: QMACD_ROWS,
+          min: (e: { min: number; max: number }) => quantMacdRange(e.min, e.max).min,
+          max: (e: { min: number; max: number }) => quantMacdRange(e.min, e.max).max,
+          splitLine: { show: true, lineStyle: { color: QUANT_MACD_COLORS.gridLine, type: 'dotted', width: 1 } },
           // [R423] 不写刻度数字。用户: 「有意义吗, 没意义就去掉」—— DIFF/DEA 是
           // 价格差(元), 跟股价挂钩, 不同股票之间没法比; 看共振只看柱子在 0 上还是
           // 0 下、有没有金叉死叉、出没出黄柱, 一个数都不用读。0 轴也不必标: 每根
