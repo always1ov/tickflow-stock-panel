@@ -268,13 +268,10 @@ export function useLevelColors(): Record<string, string> {
 //   COLOR0000CC   → CC0000   DEA ≥ 0 的空心柱 —— **是深红不是蓝**: BB=00 GG=00 RR=CC
 //   COLORYELLOW   → FFFF00   黄柱
 //
-// **暗色主题逐字照抄** —— 通达信本来就是黑底, 这就是用户在通达信里看到的颜色。
-// **亮色主题通达信没有**, 纯绿(00FF00)和纯黄(FFFF00)在白底上的对比度只有
-// 1.3 和 1.0, 等于没画(用户说过「不能搞浅色」)。所以亮色只把这两个压到
-// 看得见(≥3:1), **色相不变、谁用哪个色不变**; 两个红在白底上本来就够, 原样。
-export const QUANT_MACD_COLORS: Record<Theme, {
-  red: string; darkRed: string; green: string; yellow: string
-}> = {
-  dark:  { red: '#FF0000', darkRed: '#CC0000', green: '#00FF00', yellow: '#FFFF00' },
-  light: { red: '#FF0000', darkRed: '#CC0000', green: '#009600', yellow: '#AA8C00' },
-}
+// **两套主题都逐字照抄, 一个色都不改。** 用户: 「显示必须得和通达信显示的一样」
+// 「颜色和柱子类型都得一样」。R415 首版曾把亮色主题的绿、黄压深(纯绿、纯黄在
+// 白底上对比度只有 1.3 和 1.0), 那是自作主张, 已撤回 —— 白底上黄柱淡是通达信
+// 这组颜色放到白底上本来的样子, 不在这里替用户改。
+export const QUANT_MACD_COLORS = {
+  red: '#FF0000', darkRed: '#CC0000', green: '#00FF00', yellow: '#FFFF00',
+} as const

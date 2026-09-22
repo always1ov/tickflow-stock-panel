@@ -489,7 +489,7 @@ export function AnalysisKChart({
       },
     } : undefined
 
-    const qmacdSeries = quantMacdSeries(alignQuantMacd(dates, quantMacd), theme,
+    const qmacdSeries = quantMacdSeries(alignQuantMacd(dates, quantMacd),
                                         { xAxisIndex: 1, yAxisIndex: 1 })
     const series: any[] = [
       {
@@ -621,7 +621,9 @@ export function AnalysisKChart({
         {
           type: 'category', gridIndex: 1, data: dates, boundaryGap: true,
           axisLabel: { color: CT().text, fontSize: 10 },
-          axisLine: { lineStyle: { color: CT().grid } }, axisTick: { show: false },
+          // [R415] 不画轴线: 这条类目轴的轴线默认落在 0 处, 在副图里就是一条
+          // 0 轴横线 —— 原文没画这条线, 不能多画。
+          axisLine: { show: false }, axisTick: { show: false },
         },
       ],
       yAxis: [

@@ -22,11 +22,13 @@
  *   黄柱是最后一条语句, 所以它盖在 DIFF 实心柱的下四分之一上 —— 这也是原文的样子。
  * - **图标**: 通达信图标 1 是红色向上箭头、2 是绿色向下箭头。
  *
- * 颜色取 `lib/theme.ts` 的 `QUANT_MACD_COLORS`(暗色逐字照抄通达信; 亮色只把
- * 白底上看不见的绿与黄压深, 色相与分配不变)。
+ * 颜色取 `lib/theme.ts` 的 `QUANT_MACD_COLORS`: 逐字照抄通达信, 亮暗两套主题
+ * 同一份 —— 用户: 「颜色和柱子类型都得一样」。
+ *
+ * **只画原文画的, 不多一样也不少一样**: 没有 0 轴线、没有背景横线、没有悬停提示,
+ * 原文没有的一律不加。
  */
 import { QUANT_MACD_COLORS } from '@/lib/theme'
-import type { Theme } from '@/lib/theme'
 
 export interface QuantMacdAligned {
   diff: (number | null)[]
@@ -66,10 +68,9 @@ const NONE = '-' // ECharts 里"这一根不画"
  */
 export function quantMacdSeries(
   a: QuantMacdAligned,
-  theme: Theme,
   axis: { xAxisIndex: number; yAxisIndex: number },
 ): Record<string, unknown>[] {
-  const C = QUANT_MACD_COLORS[theme]
+  const C = QUANT_MACD_COLORS
   const bar = {
     type: 'bar', ...axis, animation: false, silent: true,
     barWidth: STICK_WIDTH,

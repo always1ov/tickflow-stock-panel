@@ -20,9 +20,9 @@ const ax = { xAxisIndex: 1, yAxisIndex: 1 }
 type Pt = { value: number; itemStyle: Record<string, unknown> } | '-'
 
 describe('量化MACD: 画法照原文', () => {
-  const s = quantMacdSeries(A, 'dark', ax)
+  const s = quantMacdSeries(A, ax)
   const byName = (n: string) => s.find(x => x.name === n)!
-  const C = QUANT_MACD_COLORS.dark
+  const C = QUANT_MACD_COLORS
 
   it('只画原文里画的那五样 —— `:=` 的 MACD 柱不画', () => {
     expect(s.map(x => x.name)).toEqual(['DIFF', 'DEA', '金叉', '死叉', '共振'])
@@ -54,17 +54,17 @@ describe('量化MACD: 画法照原文', () => {
   })
 
   it('COLOR0000CC 是深红不是蓝(通达信 BBGGRR 序)', () => {
-    for (const t of ['dark', 'light'] as const) {
-      const hex = QUANT_MACD_COLORS[t].darkRed.replace('#', '')
-      const [r, g, b] = [0, 2, 4].map(i => parseInt(hex.slice(i, i + 2), 16))
-      expect(r).toBeGreaterThan(150)
-      expect(g).toBe(0)
-      expect(b).toBe(0)
-    }
+    const hex = QUANT_MACD_COLORS.darkRed.replace('#', '')
+    const [r, g, b] = [0, 2, 4].map(i => parseInt(hex.slice(i, i + 2), 16))
+    expect(r).toBe(0xCC)
+    expect(g).toBe(0)
+    expect(b).toBe(0)
   })
 
-  it('暗色主题逐字照抄通达信的四个颜色', () => {
-    expect(QUANT_MACD_COLORS.dark).toEqual({
+  it('逐字照抄通达信的四个颜色, 亮暗主题同一份(用户: 「颜色和柱子类型都得一样」)', () => {
+    // 不按主题分: 这张表只有一份, 画法函数也不收主题参数 —— 想给亮色另配一套,
+    // 得先改掉这里, 让「和通达信不一样」成为一个看得见的决定
+    expect(QUANT_MACD_COLORS).toEqual({
       red: '#FF0000', darkRed: '#CC0000', green: '#00FF00', yellow: '#FFFF00',
     })
   })
@@ -88,20 +88,9 @@ describe('量化MACD: 画法照原文', () => {
     expect(byName('死叉')).toMatchObject({ symbol: 'arrow', symbolRotate: 180, itemStyle: { color: C.green } })
   })
 
-  it('亮色主题下每个颜色在白底上都看得见(≥3:1) —— 只压了绿和黄', () => {
-    const lum = (hex: string) => {
-      const [r, g, b] = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255)
-        .map(c => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4))
-      return 0.2126 * r + 0.7152 * g + 0.0722 * b
-    }
-    const bg = lum('#F6F7FB')
-    for (const [k, hex] of Object.entries(QUANT_MACD_COLORS.light)) {
-      const c = (bg + 0.05) / (lum(hex) + 0.05)
-      expect(c, `${k} ${hex} 对白底只有 ${c.toFixed(2)}`).toBeGreaterThanOrEqual(3)
-    }
-    // 两个红在白底上本来就够, 原样不动
-    expect(QUANT_MACD_COLORS.light.red).toBe(QUANT_MACD_COLORS.dark.red)
-    expect(QUANT_MACD_COLORS.light.darkRed).toBe(QUANT_MACD_COLORS.dark.darkRed)
+  it('只画原文里的东西: 没有悬停提示、没有额外的线', () => {
+    for (const x of s) expect(x.silent).toBe(true)
+    expect(s.every(x => x.type === 'bar' || x.type === 'scatter')).toBe(true)
   })
 })
 
