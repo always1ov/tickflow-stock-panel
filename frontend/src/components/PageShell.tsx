@@ -73,7 +73,12 @@ export function PageShell({
         subtitle={subtitle}
         titleExtra={titleExtra}
         right={right}
-        className="shrink-0 flex-wrap gap-x-4 gap-y-2 bg-base/95 px-3 lg:flex-nowrap lg:px-5"
+        // [R401] `bg-base/95` → `bg-base`。页头自 R401 起是粘住的, 内容会从它
+        // 底下滑过去 —— 留那 5% 透明, 滑过去的字就会淡淡地透出来, 两层字叠在
+        // 一起。半透明在"页头不动、内容也不从底下过"的时候看不出问题, 粘住之后
+        // 就是个真毛病了。(这一行经 `cn()` 会盖掉 PageHeader 自己那个 `bg-base`,
+        // 所以必须在这儿也改, 只改一处不生效。)
+        className="shrink-0 flex-wrap gap-x-4 gap-y-2 bg-base px-3 lg:flex-nowrap lg:px-5"
       />
       <main className={cn('min-h-0 flex-1 overflow-auto', PAD, className)}>
         {/* 限宽层与留白层分开: 合成一层的话, 宽屏上内容会贴着限宽边缘,

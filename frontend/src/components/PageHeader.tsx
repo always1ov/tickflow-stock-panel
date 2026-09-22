@@ -45,6 +45,15 @@ export function PageHeader({ title, subtitle, titleExtra, right, className }: Pr
         'min-h-[60px] px-4 py-3 border-b border-border/60 flex flex-wrap gap-4',
         // 窄屏顶对齐(右边那块可能三四行高), 宽屏回到居中 —— 宽屏本来就是一行。
         'items-start justify-between md:items-center lg:flex-nowrap',
+        // [R401] 页头粘在滚动容器顶上。**这是 R394 那条让位规则能成立的前提**:
+        // 那一轮给标题块加了 `pl-11`, 为的是让开 `Layout` 里那个
+        // `fixed left-3 top-3` 的悬浮汉堡。可 `fixed` 是**相对视口**的,
+        // 页头却跟着内容滚 —— 往下滚一点, 页头滚走了, 汉堡原地不动,
+        // 于是它就压在了下面第一排控件上(用户手机截图里压住的是「1年」;
+        // 实测滚 120px 之后压住的是「市场环境」那个页签)。让位让了个寂寞。
+        // 粘住之后, 汉堡底下**永远**是那块专门空出来的内边距。
+        // 背景要不透明: 内容从它底下滑过去, 半透明会两层字叠在一起。
+        'sticky top-0 z-20 bg-base',
         className,
       )}
     >

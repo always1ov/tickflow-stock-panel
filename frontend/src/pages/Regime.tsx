@@ -21,6 +21,7 @@ import {
 } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { useChartTheme } from '@/lib/theme'
+import { COMPACT_LEGEND, LEGEND_GRID_TOP } from '@/lib/echartsLegend'
 import { toast } from '@/components/Toast'
 import { Modal } from '@/components/Modal'
 import { cn } from '@/lib/cn'
@@ -46,6 +47,15 @@ function scoreToColor(score: number): string {
   if (score >= 30) return REGIME_STATE_COLORS.lean_weak
   return REGIME_STATE_COLORS.weak
 }
+
+/**
+ * [R401] 两张图的图例项。**单独列出来是为了让守卫数得着** ——
+ * 写在 option 里的话, 哪天有人加第七条曲线, 图例又会在手机上折成两行、
+ * 又一次画进绘图区, 而那件事在桌面上看不出来。
+ * `test_regime_legend_fits.py` 按最窄那档宽度算过, 加项会当场红。
+ */
+export const PHASE_LEGEND = ['首板', '2板+', '高度', '晋级率', '封板率']
+export const TREND_LEGEND = ['综合分', '涨停数', '赚钱', '投机', '抗跌', '趋势']
 
 // ── 时间范围 ──────────────────────────────────────────────
 // 1年=250 交易日, 2年=500 交易日; 自定义 1~1000; 全部走 start/end 日期范围。
@@ -124,12 +134,17 @@ function useEChart(
 
 // ── 页内通用 SectionTitle (对齐 Dashboard 渐变竖条风格) ────
 function SectionTitle({ icon: Icon, title, hint }: { icon: typeof Activity; title: string; hint?: ReactNode }) {
+  // [R401] 手机上标题被腰斩:「环境综合」换行「分趋势」。
+  // 原因和那两排药丸一样 —— 右边的 `hint` 是同一行里的兄弟, 它一长(这一张图
+  // 的说明有三小句), 标题就被压到只剩四个字宽(实测 375px 下 h2 只有 59px)。
+  // 标题**不许断**, 说明**可以断**, 而这一行**可以换行** —— 说明放不下就
+  // 整块挪到下一行去, 不去挤标题。
   return (
-    <div className="flex items-center gap-2">
-      <span className="h-3 w-0.5 rounded-full bg-gradient-to-b from-accent to-accent/30" />
-      <Icon className="h-3.5 w-3.5 text-accent" />
-      <h2 className="text-xs font-semibold text-foreground">{title}</h2>
-      {hint != null && <span className="ml-auto text-[10px] text-muted font-mono">{hint}</span>}
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+      <span className="h-3 w-0.5 shrink-0 rounded-full bg-gradient-to-b from-accent to-accent/30" />
+      <Icon className="h-3.5 w-3.5 shrink-0 text-accent" />
+      <h2 className="shrink-0 whitespace-nowrap text-xs font-semibold text-foreground">{title}</h2>
+      {hint != null && <span className="ml-auto min-w-0 text-[10px] text-muted font-mono">{hint}</span>}
     </div>
   )
 }
@@ -400,12 +415,18 @@ export function Regime() {
           ].join('<br/>')
         },
       },
+      // [R401] 紧凑图例: 默认的 25px 图标 + 10px 项间距是为桌面定的, 手机上
+      // 会把项挤到第二行, 而 `grid.top` 只给一行 —— 第二行就画进绘图区里,
+      // 和轴名、刻度叠成一团。取值与占几行的算法见 `lib/echartsLegend.ts`。
       legend: {
-        data: ['首板', '2板+', '高度', '晋级率', '封板率'],
+        data: PHASE_LEGEND,
         selected: { 封板率: false },
-        textStyle: { color: ct.text, fontSize: 10 }, top: 0,
+        textStyle: { color: ct.text, fontSize: COMPACT_LEGEND.fontSize }, top: 0,
+        itemWidth: COMPACT_LEGEND.itemWidth,
+        itemHeight: COMPACT_LEGEND.itemHeight,
+        itemGap: COMPACT_LEGEND.itemGap,
       },
-      grid: { left: 44, right: 44, top: 32, bottom: 44 },
+      grid: { left: 44, right: 44, top: LEGEND_GRID_TOP, bottom: 44 },
       xAxis: {
         type: 'category', data: dates, boundaryGap: false,
         axisLabel: { color: ct.text, fontSize: 10, formatter: (v: string) => v.slice(5) },
@@ -510,13 +531,17 @@ export function Regime() {
     return {
       backgroundColor: 'transparent',
       tooltip: { trigger: 'axis', backgroundColor: ct.tooltipBg, borderColor: ct.tooltipBorder, textStyle: { color: ct.tooltipText } },
+      // [R401] 同上 —— 这张图就是用户截图里图例压住轴名的那一张。
       legend: {
-        data: ['综合分', '涨停数', '赚钱', '投机', '抗跌', '趋势'],
-        textStyle: { color: ct.text, fontSize: 10 }, top: 0,
+        data: TREND_LEGEND,
+        textStyle: { color: ct.text, fontSize: COMPACT_LEGEND.fontSize }, top: 0,
+        itemWidth: COMPACT_LEGEND.itemWidth,
+        itemHeight: COMPACT_LEGEND.itemHeight,
+        itemGap: COMPACT_LEGEND.itemGap,
         // 默认只显示综合分 + 涨停数(简洁); 4 个子维度默认隐藏, 点图例展开看驱动因素
         selected: { '综合分': true, '涨停数': true, '赚钱': false, '投机': false, '抗跌': false, '趋势': false },
       },
-      grid: { left: 48, right: 64, top: 36, bottom: 56 },
+      grid: { left: 48, right: 64, top: LEGEND_GRID_TOP, bottom: 56 },
       xAxis: {
         type: 'category', data: dates, boundaryGap: false,
         axisLabel: { color: ct.text, fontSize: 10, formatter: (v: string) => v.slice(5) },
@@ -690,15 +715,19 @@ export function Regime() {
       titleExtra={<Activity className="h-4 w-4 text-accent" />}
       subtitle={view === 'phase' ? '涨停情绪 · 市场阶段 · 主线脉络' : '每日环境状态 · 赚钱效应 · 趋势分析'}
       right={(
-          <div className="flex items-center gap-2">
+          // [R401] 与下面视图药丸同一个毛病、同一个修法: 定高药丸 + 允许被压扁
+          // = 字换行之后画到药丸外面。这一组在窄屏上还会和重算按钮争宽度。
+          // (这里只能写 `//`: 括号里是**表达式位置**, `{/* */}` 只在 JSX 子节点
+          //  位置合法 —— R395 在同一个坑里栽过一次, 这次一次写对。)
+          <div className="flex flex-wrap items-center gap-2">
             {/* 时间范围按钮组 */}
-            <div className="flex items-center rounded-btn border border-border bg-base/60 p-0.5">
+            <div className="flex shrink-0 items-center rounded-btn border border-border bg-base/60 p-0.5">
               {(['1y', '2y', 'all'] as const).map(k => (
                 <button
                   key={k}
                   onClick={() => setRange(k)}
                   className={cn(
-                    'h-6 rounded-[5px] px-2.5 text-xs font-medium transition-colors',
+                    'h-6 shrink-0 whitespace-nowrap rounded-[5px] px-2.5 text-xs font-medium transition-colors',
                     isPresetKey(range, k)
                       ? 'bg-accent text-white shadow-sm'
                       : 'text-secondary hover:text-foreground',
@@ -710,38 +739,44 @@ export function Regime() {
               <button
                 onClick={() => setCustomOpen(true)}
                 className={cn(
-                  'inline-flex items-center gap-1 h-6 rounded-[5px] px-2.5 text-xs font-medium transition-colors',
+                  'inline-flex items-center gap-1 h-6 shrink-0 whitespace-nowrap rounded-[5px] px-2.5 text-xs font-medium transition-colors',
                   typeof range === 'object'
                     ? 'bg-accent text-white shadow-sm'
                     : 'text-secondary hover:text-foreground',
                 )}
               >
-                {typeof range === 'object' && <Pencil className="h-3 w-3" />}
+                {typeof range === 'object' && <Pencil className="h-3 w-3 shrink-0" />}
                 {customLabel}
               </button>
             </div>
             {/* 重算 */}
             <button onClick={handleRecompute} disabled={recomputing}
-              className="inline-flex items-center gap-1.5 h-7 px-3 rounded-btn border border-border bg-base text-xs text-secondary hover:text-accent disabled:opacity-50">
-              {recomputing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+              className="inline-flex shrink-0 items-center gap-1.5 h-7 whitespace-nowrap px-3 rounded-btn border border-border bg-base text-xs text-secondary hover:text-accent disabled:opacity-50">
+              {recomputing ? <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5 shrink-0" />}
               {recomputing ? '重算中…' : '重算'}
             </button>
           </div>
       )}
     >
-      {/* ── 视图切换: 市场环境 / 情绪周期 (两组内容 tab 隔离, 减少单页高度) ── */}
-      <div className="flex items-center gap-2">
-        <div className="flex items-center rounded-btn border border-border bg-base/60 p-0.5">
+      {/* ── 视图切换: 市场环境 / 情绪周期 (两组内容 tab 隔离, 减少单页高度) ──
+          [R401] 手机上这两个药丸里的字是断开的:「市场环」换行「境」, 而药丸
+          是 `h-7` 定高, 换出来的那个字直接画到药丸外面(实测 375px 下
+          `scrollHeight 34 > clientHeight 28`)。
+          根因不是字多, 是**这一行不许换行、药丸却又允许被压扁**: 右边那句
+          说明是同一个 flex 行里的兄弟, 它一长, 药丸组就被挤(默认 `shrink:1`)。
+          三处一起改才成立 —— 行可换行 / 药丸组不许被压 / 药丸里的字不许断。 */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex shrink-0 items-center rounded-btn border border-border bg-base/60 p-0.5">
           {([['regime', '市场环境', Activity], ['phase', '情绪周期', Flame]] as const).map(([k, label, Icon]) => (
             <button key={k} onClick={() => setView(k)}
-              className={cn('inline-flex items-center gap-1.5 h-7 rounded-[5px] px-3 text-xs font-medium transition-colors',
+              className={cn('inline-flex items-center gap-1.5 h-7 shrink-0 whitespace-nowrap rounded-[5px] px-3 text-xs font-medium transition-colors',
                 view === k ? 'bg-accent text-white shadow-sm' : 'text-secondary hover:text-foreground')}>
-              <Icon className="h-3.5 w-3.5" />
+              <Icon className="h-3.5 w-3.5 shrink-0" />
               {label}
             </button>
           ))}
         </div>
-        <span className="text-[10px] text-muted">两组内容同页切换 · 共用时间范围</span>
+        <span className="min-w-0 text-[10px] text-muted">两组内容同页切换 · 共用时间范围</span>
       </div>
 
       {/* ══ 情绪周期 tab: 阶段概览 + 时间轴 + 阶段×主线 + 主线排行 ══ */}
@@ -1019,17 +1054,19 @@ export function Regime() {
             </span>
           }
         />
-        <div className="mt-2 flex items-center gap-2">
-          <div className="flex items-center rounded-btn border border-border bg-base/60 p-0.5">
+        {/* [R401] 第三处同样的药丸组 —— 旁边那句说明比前两处还长。
+            守卫扫出来的, 我自己按截图改的时候漏了这一个。 */}
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <div className="flex shrink-0 items-center rounded-btn border border-border bg-base/60 p-0.5">
             {([['concept', '概念'], ['industry', '行业']] as const).map(([k, label]) => (
               <button key={k} onClick={() => setMainlineKind(k)}
-                className={cn('h-6 rounded-[5px] px-2.5 text-xs font-medium transition-colors',
+                className={cn('h-6 shrink-0 whitespace-nowrap rounded-[5px] px-2.5 text-xs font-medium transition-colors',
                   mainlineKind === k ? 'bg-accent text-white shadow-sm' : 'text-secondary hover:text-foreground')}>
                 {label}
               </button>
             ))}
           </div>
-          <span className="text-[10px] text-muted">窗口内 top1 天数排序 · 点击「过滤」配置宽基概念屏蔽</span>
+          <span className="min-w-0 text-[10px] text-muted">窗口内 top1 天数排序 · 点击「过滤」配置宽基概念屏蔽</span>
         </div>
         {filterOpen && (
           <MainlineFilterPanel
