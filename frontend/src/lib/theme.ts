@@ -279,4 +279,7 @@ export function useLevelColors(): Record<string, string> {
 export const QUANT_MACD_COLORS = {
   red: '#FF0000', darkRed: '#CC0000', green: '#00FF00', yellow: '#FFFF00',
   icon2: '#00DC00',
+  // [R418] 通达信的底色。亮色主题下这张副图铺这个底 —— 纯黄在白底上对比度只有
+  // 1.0, 放多大都看不见; 颜色一个不改, 改的是它们脚下的底, 让它回到通达信的样子。
+  paneBg: '#000000',
 } as const

@@ -66,6 +66,18 @@ export function alignQuantMacd(
 export const STICK_RATIO = 0.66
 export const STICK_WIDTH = `${STICK_RATIO * 100}%`
 
+/**
+ * [R418] 副图高度: 整张图的 1/4, 最少 100、最多 180。
+ *
+ * 用户: 「显示部分你可以自己决定多大合适, 只要我放大的时候看得清楚就行, 因为我
+ * 显示的 K 线多, 全景的时候像素是肯定不够的」。原来写死 90px —— 通达信那张副图
+ * 大约是它的 3 倍高, 空心框、黄柱、箭头挤在 90px 里, 放大了横向够、纵向仍然扁。
+ * 按比例给, 图大(弹窗最大化)副图跟着大; 上限免得主图被挤得太矮。
+ */
+export function subPaneHeight(chartHeight: number): number {
+  return Math.round(Math.min(180, Math.max(100, chartHeight * 0.25)))
+}
+
 /** 空心柱的边框: 1 点 1 空的点线(实测, 见 DEA 那一条的说明)。 */
 export const HOLLOW_DASH = [1, 1]
 
@@ -104,7 +116,9 @@ export function renderDiffRect(
   const i = api.value(0), lo = api.value(1), hi = api.value(2)
   const a = api.coord([i, lo]), b = api.coord([i, hi])
   const band = api.size([1, 0])
-  const w = (Array.isArray(band) ? band[0] : band) * STICK_RATIO
+  // [R418] 全景时一根 K 线可能不到 2px, 66% 就不到 1px, 画出来是一片糊 ——
+  // 最少给 1px, 至少每根都在
+  const w = Math.max(1, (Array.isArray(band) ? band[0] : band) * STICK_RATIO)
   return {
     type: 'rect',
     shape: { x: a[0] - w / 2, y: Math.min(a[1], b[1]), width: w, height: Math.abs(a[1] - b[1]) },
@@ -124,6 +138,7 @@ export function quantMacdSeries(
   const bar = {
     type: 'bar', ...axis, animation: false, silent: true,
     barWidth: STICK_WIDTH,
+    barMinWidth: 1,   // [R418] 与 DIFF 那一截同一个下限
     // 柱子叠在同一个位置 —— 原文几条 STICKLINE 画的是同一根 K 线的位置
     barGap: '-100%',
   }

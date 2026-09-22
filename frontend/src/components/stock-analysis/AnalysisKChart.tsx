@@ -1,9 +1,9 @@
 import { useEffect, useRef, useMemo, useState } from 'react'
-import { chartTheme, FIB2_ROLE_TARGET, fib2RoleColor, getTheme, levelColors, useLevelColors, useTheme } from '@/lib/theme'
+import { chartTheme, FIB2_ROLE_TARGET, QUANT_MACD_COLORS, fib2RoleColor, getTheme, levelColors, useLevelColors, useTheme } from '@/lib/theme'
 import * as echarts from 'echarts'
 import type { ECharts, EChartsOption } from 'echarts'
 import type { Fib2Grain, Fib2Overlay, KlineRow, LevelSeries, QuantMacdResult } from '@/lib/api'
-import { alignQuantMacd, quantMacdSeries } from '@/lib/quantMacdSeries'
+import { alignQuantMacd, quantMacdSeries, subPaneHeight } from '@/lib/quantMacdSeries'
 import { fib2Status } from '@/lib/fib2Status'
 import { Fib2GrainDialog } from './Fib2GrainDialog'
 
@@ -174,8 +174,6 @@ interface Props {
   className?: string
 }
 
-/** [R415] 副图高度 —— 沿用原成交量副图的 90 */
-const SUB_PANE_H = 90
 
 export function AnalysisKChart({
   rows,
@@ -359,7 +357,8 @@ export function AnalysisKChart({
     const GAP_MAIN_SUB = 14       // 主图 ↔ 量化MACD(两边的纵轴刻度不再上下相撞)
     const GAP_SUB_SLIDER = 26     // 量化MACD ↔ 缩放条: 日期刻度在这一段里
     const PAD_BOTTOM = 8
-    const subH = SUB_PANE_H
+    // [R418] 副图高度按整张图的比例给, 见 `subPaneHeight`
+    const subH = subPaneHeight(height)
     const mainH = height - PAD_TOP - GAP_MAIN_SUB - subH - GAP_SUB_SLIDER - SLIDER_H - PAD_BOTTOM
     const subTop = PAD_TOP + mainH + GAP_MAIN_SUB
     const sliderBottom = PAD_BOTTOM
@@ -607,7 +606,9 @@ export function AnalysisKChart({
       // 预留 ~144px:最长标签(如「成交密集区(POC) 12.34」)约 13 字符,fontSize 9 等宽。
       grid: [
         { left: 56, right: 144, top: 16, height: mainH },
-        { left: 56, right: 144, top: subTop, height: subH },
+        // [R418] 亮色主题下副图铺通达信的黑底 —— 颜色照抄通达信, 纯黄在白底上看不见
+        { left: 56, right: 144, top: subTop, height: subH,
+          show: !isDark, backgroundColor: QUANT_MACD_COLORS.paneBg, borderWidth: 0 },
       ],
       xAxis: [
         {
@@ -649,7 +650,8 @@ export function AnalysisKChart({
       // [R415] 副图左上角的名字 —— 否则换掉成交量之后, 这块图是什么没有任何地方说
       graphic: [{
         type: 'text', left: 60, top: subTop + 2, silent: true,
-        style: { text: '量化MACD', fill: CT().text, fontSize: 9 },
+        // 亮色主题下它落在黑底上, 用浅灰才看得见
+        style: { text: '量化MACD', fill: isDark ? CT().text : '#B4B4B4', fontSize: 9 },
       }],
       series,
     }

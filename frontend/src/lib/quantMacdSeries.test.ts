@@ -7,7 +7,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import {
-  alignQuantMacd, diffExposed, HOLLOW_DASH, ICON_DOWN, ICON_H, ICON_UP, quantMacdSeries, renderDiffRect,
+  alignQuantMacd, diffExposed, subPaneHeight, HOLLOW_DASH, ICON_DOWN, ICON_H, ICON_UP, quantMacdSeries, renderDiffRect,
   STICK_RATIO, STICK_WIDTH,
 } from './quantMacdSeries'
 import { QUANT_MACD_COLORS } from './theme'
@@ -79,6 +79,16 @@ describe('量化MACD: 画法照原文', () => {
     expect(renderDiffRect(null, api([1, 0, -0.3])).style.fill).toBe(C.green)
   })
 
+  it('全景时柱子再窄也至少 1px, 不会消失', () => {
+    const tiny = {
+      value: (d: number) => [0, 0.2, 0.3][d],
+      coord: ([x, y]: [number, number]) => [x, 100 - y * 100],
+      size: () => [0.8, 0],   // 一根 K 线不到 1px
+    }
+    expect(renderDiffRect(null, tiny).shape.width).toBe(1)
+    for (const n of ['DEA', '共振']) expect(byName(n).barMinWidth).toBe(1)
+  })
+
   it('DEA 空心: 不填充只描边; ≥0 深红, <0 绿 —— 等于 0 那根算深红', () => {
     const d = byName('DEA').data as Pt[]
     for (const p of d.slice(0, 3)) {
@@ -108,6 +118,7 @@ describe('量化MACD: 画法照原文', () => {
     expect(QUANT_MACD_COLORS).toEqual({
       red: '#FF0000', darkRed: '#CC0000', green: '#00FF00', yellow: '#FFFF00',
       icon2: '#00DC00',   // 2 号图标自带的绿, 对着通达信截图量的
+      paneBg: '#000000',  // 通达信的底色; 亮色主题下副图铺这个底
     })
   })
 
@@ -164,5 +175,14 @@ describe('量化MACD: 按日期对到图上的 x 轴', () => {
   it('数据还没到: 整张副图留白, 长度仍与 x 轴一致', () => {
     const a = alignQuantMacd(['2026-09-01', '2026-09-02'], undefined)
     for (const v of Object.values(a)) expect(v).toEqual([null, null])
+  })
+})
+
+describe('量化MACD: 副图高度', () => {
+  it('整张图的 1/4, 最少 100 最多 180 —— 放大时纵向也看得清, 主图不被挤没', () => {
+    expect(subPaneHeight(520)).toBe(130)   // 个股预览弹窗
+    expect(subPaneHeight(720)).toBe(180)   // 弹窗最大化
+    expect(subPaneHeight(300)).toBe(100)   // 下限
+    expect(subPaneHeight(1200)).toBe(180)  // 上限
   })
 })
