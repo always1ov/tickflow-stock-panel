@@ -1245,14 +1245,28 @@ export interface StockLevels {
   fib2?: Fib2Overlay
 }
 
+export type Fib2Grain = 'coarse' | 'mid' | 'fine'
+
 export interface Fib2Overlay {
-  /** 几条回撤线挤在一起的那个区间; strength = 挤了几条 */
-  zone?: { low: number; high: number; strength: number } | null
-  /** 单边上攻那一段的起止日期 */
+  /** 单边上攻那一段的起止日期。**与粗细档无关** —— 推进段不看摆点 */
   thrust?: { start: string; end: string; days: number } | null
+  /** 首次回踩等标记。同样与粗细档无关 */
   markers?: { date: string; label: string }[]
   /** 平移之后露到最后一根之外的均线值 = 图上「未来」区那一段 */
   dma3_future?: number[]
+  /**
+   * 粗细三档, 后端一次全算好。
+   *
+   * 原书对「多小的回调算噪音」没有硬公式, 这个档位就是在回答它:
+   * 粗 = 只认大级别回调(线少而稳), 细 = 小回调也算(线多而密)。
+   * 它不出买卖信号, 没有可回测的目标函数 —— 所以不是"待校准参数", 是旋钮,
+   * 哪一档合适用眼睛定。一次全给, 图上切换不用重新请求。
+   */
+  grain?: Record<Fib2Grain, {
+    k: number
+    levels: PriceLevel[]
+    zone: { low: number; high: number; strength: number } | null
+  }>
 }
 
 export interface AiStockReport {

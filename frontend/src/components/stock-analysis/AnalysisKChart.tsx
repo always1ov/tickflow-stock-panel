@@ -2,7 +2,7 @@ import { useEffect, useRef, useMemo, useState } from 'react'
 import { chartTheme, getTheme, useTheme } from '@/lib/theme'
 import * as echarts from 'echarts'
 import type { ECharts, EChartsOption } from 'echarts'
-import type { Fib2Overlay, KlineRow, LevelSeries } from '@/lib/api'
+import type { Fib2Grain, Fib2Overlay, KlineRow, LevelSeries } from '@/lib/api'
 
 /**
  * 个股分析专用日 K 图表。
@@ -171,10 +171,26 @@ export function AnalysisKChart({
   const [activeTypes, setActiveTypes] = useState<Set<LevelType>>(new Set(defaultLevelTypes))
   /** 枢轴点显示到第几档:1=只P+R1/S1, 2=到R2/S2, 3=全档(R3/S3) */
   const [pivotRank, setPivotRank] = useState<1 | 2 | 3>(1)
+  /**
+   * [R406] 斐波那契二型的粗细档。**与枢轴点那个「档位」是同一个套路**:
+   * 一组价位里"显示到多细"由用户当场定, 而不是藏进配置。
+   *
+   * 差别在于枢轴点那个是前端过滤(每条线自带 rank), 这个是后端一次算三份 ——
+   * 摆点认得多细会改变算出来的线本身, 过滤不出来。
+   */
+  const [fib2Grain, setFib2Grain] = useState<Fib2Grain>('mid')
   /** 双向联动高亮: hover 价位标签 ↔ hover 下方文字行。值为 levelKey, null=无高亮 */
   const [hoveredKey, setHoveredKey] = useState<string | null>(null)
 
   // 数据预处理 + 带状曲线序列对齐(后端 series 的日期范围可能与 rows 不同,需映射)
+  // [R406] 选中档的线顶掉默认那一组。后端 `levels.fib2` 给的是中档, 这里按用户
+  // 选的档换掉 —— 切档因此不用重新请求, 点一下当场变。
+  const effLevels = useMemo(() => {
+    const g = fib2?.grain?.[fib2Grain]
+    return g && levels ? { ...levels, fib2: g.levels } : levels
+  }, [levels, fib2, fib2Grain])
+  const fib2Zone = fib2?.grain?.[fib2Grain]?.zone ?? null
+
   const { dates, candle, vols, dateIndex, zoomStart, alignedSeries } = useMemo(() => {
     const dates = rows.map(r => (typeof r.date === 'string' ? r.date.slice(0, 10) : String(r.date)))
     const candle = rows.map(r => [r.open, r.close, r.low, r.high])
@@ -231,7 +247,7 @@ export function AnalysisKChart({
 
   // 构建 option
   const buildOption = (): EChartsOption => {
-    const priceLines = collectPriceLines(levels, activeTypes, pivotRank)
+    const priceLines = collectPriceLines(effLevels, activeTypes, pivotRank)
 
     // 三段布局:主图 / 成交量 / 缩放条,从上到下累加,各段之间留间距,互不遮挡
     //   [16 顶部] [mainH 主图] [8 间距] [volH 成交量] [12 间距] [SLIDER_H 缩放条] [8 底部]
@@ -280,7 +296,7 @@ export function AnalysisKChart({
       }
       // 强支撑区: 横向铺满, 纵向只盖那个价格带(yAxis 两端 = 价格区间)。
       // 透明度随重合条数走 —— 规格 §9: 1/2/3 条对应 20%/35%/50%。
-      const z = fib2.zone
+      const z = fib2Zone
       if (z && z.high > 0) {
         const alpha = Math.min(0.5, 0.2 + 0.15 * Math.max(0, z.strength - 1))
         // 两条回撤挤得很近时色带会薄到看不见 —— 规格 §9 要求最小高度,
@@ -477,7 +493,7 @@ export function AnalysisKChart({
     }
     chartInstRef.current.setOption(buildOption(), true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rows, levels, series, seriesDates, activeTypes, pivotRank, markers, ranges, fib2, height, theme, hoveredKey])
+  }, [rows, levels, series, seriesDates, activeTypes, pivotRank, markers, ranges, fib2, fib2Grain, effLevels, fib2Zone, height, theme, hoveredKey])
 
   // resize
   useEffect(() => {
@@ -508,8 +524,10 @@ export function AnalysisKChart({
           {/* 全部价位组一次排开(不折叠)—— 开关本身就是一眼扫过去挑, 藏起来反而要多点一次 */}
           {LEVEL_GROUPS.map(g => {
             const active = activeTypes.has(g.key)
-            // 枢轴点数量按当前档位过滤显示;其他组显示原始数量
-            const raw = levels[g.key] ?? []
+            // 枢轴点数量按当前档位过滤显示;其他组显示原始数量。
+            // [R406] 读 effLevels 而不是 levels —— 二型切了粗细档, 开关上那个数
+            // 必须跟着变, 否则显示的是中档的条数而图上画的是另一档。
+            const raw = effLevels?.[g.key] ?? []
             const count = g.key === 'pivot'
               ? raw.filter(p => p.rank === undefined || p.rank <= pivotRank).length
               : raw.length
@@ -536,13 +554,13 @@ export function AnalysisKChart({
           {/* 枢轴点档位选择器 —— 仅当枢轴点开启时显示 */}
           {activeTypes.has('pivot') && (levels.pivot?.length ?? 0) > 0 && (
             <div className="inline-flex shrink-0 items-center gap-0.5 ml-1 pl-2 border-l border-border/40">
-              <span className="text-[10px] text-muted mr-1">档位</span>
+              <span className="text-micro text-muted mr-1">档位</span>
               {([1, 2, 3] as const).map(r => (
                 <button
                   key={r}
                   onClick={() => setPivotRank(r)}
                   title={r === 1 ? 'P + R1/S1(3 个)' : r === 2 ? '到 R2/S2(5 个)' : '全档 R3/S3(7 个)'}
-                  className={`h-6 px-2 rounded-md text-[10px] font-mono border transition-ui ${
+                  className={`h-6 px-2 rounded-btn text-micro font-mono border transition-ui ${
                     pivotRank === r
                       ? 'bg-[#8B5CF6]/15 border-[#8B5CF6]/40 text-[#c4b5fd]'
                       : 'text-muted bg-base/40 border-border/30 hover:border-border/60'
@@ -553,15 +571,45 @@ export function AnalysisKChart({
               ))}
             </div>
           )}
+
+          {/* [R406] 斐波那契二型的粗细档 —— 仅当这一组开启时显示。
+              原书没定「多小的回调算噪音」, 这个旋钮就是在回答它;
+              它不出买卖信号, 没有可回测的目标函数, 所以哪一档合适**用眼睛定**。 */}
+          {activeTypes.has('fib2') && fib2?.grain && (
+            <div className="inline-flex shrink-0 items-center gap-0.5 ml-1 pl-2 border-l border-border/40">
+              <span className="text-micro text-muted mr-1">粗细</span>
+              {([['coarse', '粗'], ['mid', '中'], ['fine', '细']] as const).map(([k, cn]) => (
+                <button
+                  key={k}
+                  onClick={() => setFib2Grain(k)}
+                  title={k === 'coarse'
+                    ? '只认大级别回调 —— 线少而稳, 重合更难出现但出现了更硬'
+                    : k === 'mid'
+                      ? '默认档'
+                      : '小回调也算 —— 线多而密, 更容易看到重合'}
+                  className={`h-6 px-2 rounded-btn text-micro border transition-ui whitespace-nowrap ${
+                    fib2Grain === k
+                      ? 'bg-[#A77A1C]/15 border-[#A77A1C]/40 text-[#d6ab58]'
+                      : 'text-muted bg-base/40 border-border/30 hover:border-border/60'
+                  }`}
+                >
+                  {cn}
+                  <span className="ml-1 opacity-50 font-mono">
+                    {fib2.grain?.[k]?.levels.length ?? 0}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
       {/* 图表:右侧预留带(grid.right 预留)显示价位标签文字,不压蜡烛 */}
       <div ref={chartRef} style={{ width: '100%', height }} />
 
       {/* 价位统计面板:把当前开启的点位按"压力 / 支撑"结构化列出 */}
-      {levels && (
+      {effLevels && (
         <LevelOverview
-          levels={levels}
+          levels={effLevels}
           activeTypes={activeTypes}
           pivotRank={pivotRank}
           close={rows.length ? rows[rows.length - 1].close : undefined}

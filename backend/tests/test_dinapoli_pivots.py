@@ -398,3 +398,72 @@ def test_R405_界面用词是白话_不露原术语():
     blob = " ".join(p["label"] for p in out)
     for jargon in ("F3", "F5", "COP", "OP", "XOP", "Fib", "斐波那契", "DiNapoli"):
         assert jargon not in blob, f"界面标签里露了原术语: {jargon}"
+
+
+# ================================================================
+# [R406] 粗细档 —— 旋钮必须真的拧得动
+# ================================================================
+
+def test_R406_三档是三个不同的粗细():
+    assert dn.GRAINS == {"coarse": 5, "mid": dn.PIVOT_K, "fine": 2}
+    assert len(set(dn.GRAINS.values())) == 3, "三档撞值了, 等于只有两档"
+
+
+def test_R406_旋钮真的拧得动():
+    """**这条防的是"假旋钮"** —— 界面上给了三个按钮, 切来切去图上不变,
+    那比没有这个按钮更坏(用户会以为自己已经试过粗细了)。
+
+    数据是刻意构造的: 下标 8 那个 6.5 在 ±2 的窗口里是最低, 但 ±5 的窗口里
+    有下标 5 的 6.0 更低 —— 所以它只在「细」档才算一个回调。
+    """
+    #        0     1     2     3     4    5    6    7    8    9   10    11    12    13    14
+    lows = [10.0, 10.0, 10.0, 10.0, 10.0, 6.0, 7.0, 8.0, 6.5, 8.0, 9.0, 10.0, 11.0, 12.0, 20.0]
+    got = {name: dn.reactions_before(lows, 14, k=k, min_gap=0.0)
+           for name, k in dn.GRAINS.items()}
+    assert got["coarse"] == [5], got
+    assert got["fine"] == [8, 5], got
+    assert len({tuple(v) for v in got.values()}) > 1, "三档给出同一个结果 = 假旋钮"
+
+
+def test_R406_越细认得越多_方向不许反():
+    """粗 = 只认大级别回调(少而稳), 细 = 小回调也算(多而密)。
+    这是旋钮的**语义**, 反了的话界面上那两句说明就成了假话。"""
+    lows = [10.0, 10.0, 10.0, 10.0, 10.0, 6.0, 7.0, 8.0, 6.5, 8.0, 9.0, 10.0, 11.0, 12.0, 20.0]
+    n = {name: len(dn.reactions_before(lows, 14, k=k, min_gap=0.0))
+         for name, k in dn.GRAINS.items()}
+    assert n["coarse"] <= n["mid"] <= n["fine"], f"档位方向反了: {n}"
+
+
+def test_R406_平滑趋势里三档一样是对的_不是旋钮坏了():
+    """**这一条是留给下一个人的。**
+
+    一段干净的台阶式上涨里, 浅回调要么不存在、要么后来被更低的点盖住了 ——
+    于是粗细三档给出同一批反应点。那时候切档图上不变, **是对的**,
+    不要当成接线断了去"修"。旋钮咬不咬得住, 取决于有没有"浅且没被盖过"的回调。
+    """
+    # 三段干净的 V 型: 每条腿都是严格单调(没有平台), 谷底彼此隔开 6 根以上 ——
+    # 于是连最粗的档也认得出这三个谷底, 而最细的档也找不出第四个。
+    def leg(a: float, b: float, n: int) -> list[float]:
+        return [a + (b - a) * i / (n - 1) for i in range(1, n)]
+    lows = ([12.0] + leg(12, 7, 7) + leg(7, 14, 9) + leg(14, 9, 7)
+            + leg(9, 17, 9) + leg(17, 12, 7) + leg(12, 25, 9))
+    got = {name: dn.reactions_before(lows, len(lows) - 1, k=k, min_gap=0.0)
+           for name, k in dn.GRAINS.items()}
+    assert len({tuple(v) for v in got.values()}) == 1, f"这份数据本该三档一致: {got}"
+    assert len(got["mid"]) == 3, f"三个谷底应当都认得出来: {got['mid']}"
+
+
+def test_R406_compute也真的吃这个参数():
+    """接线断了的典型样子: 参数收下了但没往下传。"""
+    import polars as pl
+    # `compute` 要求至少 30 根 —— 第一版只给了 25 根, 三档一起返回空, 断言当场红。
+    # **是用例错不是接线错**, 记在这儿免得下次又照着改代码。
+    lows = ([10.0] * 5 + [6.0, 7.0, 8.0, 6.5, 8.0, 9.0]
+            + [10.0 + i * 0.6 for i in range(25)])
+    closes = [x + 0.3 for x in lows]
+    n = len(closes)
+    df = pl.DataFrame({"high": [c + 0.2 for c in closes], "low": lows,
+                       "close": closes, "atr_14": [0.4] * n})
+    got = {name: dn.compute(df, pivot_k=k).reactions for name, k in dn.GRAINS.items()}
+    assert len({tuple(v) for v in got.values()}) > 1, \
+        f"compute() 没把 pivot_k 往下传, 三档结果一样: {got}"

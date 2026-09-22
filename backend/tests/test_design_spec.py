@@ -36,9 +36,15 @@ TW = SRC.parent / "tailwind.config.ts"
 #:   ② `_tsx_text()` 改成**剥注释再数**(理由见那个函数):
 #:        2295→2285 / 2291→2282 / 1053→1047 / 44→42
 #: ② 那一截是一直躺在注释里的旧写法, **不是迁移成果** —— 只此一次, 以后不会再降。
+#:
+#: [R406] 「裸圆角」2285 → **945**: 不是迁移了 1340 处, 是**这条正则原来数错了** ——
+#: 它把 `rounded-btn`(780)/`rounded-card`(243)/`rounded-input`(52)这些**规范
+#: 想要的**语义 token 也算成了越界。真正要命的不是数字虚高, 而是: 把 `rounded-md`
+#: 迁成 `rounded-btn` 时这个数**一动不动**, 棘轮看不见它存在的意义所在的那种迁移。
+#: 详见 `_counts()`。另外「任意字号」2282 → 2280 是这一轮真迁的(两个档位选择器)。
 RATCHET = {
-    "裸圆角": 2285,        # rounded / -sm / -md / -lg / -xl / -2xl(非语义 token)
-    "任意字号": 2282,      # text-[Npx]
+    "裸圆角": 945,         # 真·裸圆角: rounded / -sm/-md/-lg/-xl/-2xl, 不含语义 token
+    "任意字号": 2280,      # text-[Npx]
     "硬编码色": 1047,      # text-/bg-/border- + Tailwind 调色板
     "任意容器宽": 42,      # max-w-[Npx]
 }
@@ -254,7 +260,18 @@ _PALETTE = ("slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|"
 
 
 def _counts(text: str) -> dict[str, int]:
-    raw_radius = [m for m in re.findall(r"\brounded(?:-(?:sm|md|lg|xl|2xl|3xl))?\b", text)]
+    # [R406] **把语义 token 排除在外** —— 这一条原来数的是"所有圆角"而不是
+    # 名字说的"裸圆角": `\brounded\b` 会把 `rounded-btn`(780 处)、`rounded-card`
+    # (243)、`rounded-input`(52)一起算进去, 而那三个正是规范**想要**的写法。
+    #
+    # 后果不只是数字虚高 1075。真正的毛病是: **把 `rounded-md` 迁成 `rounded-btn`
+    # 时这个数一动不动** —— 棘轮看不见它存在的意义所在的那种迁移, 于是"迁移让
+    # 数字往下走"这个前提根本不成立。(这一轮改档位选择器时当场撞上。)
+    #
+    # `rounded-full` 也不算越界: 药丸和圆点本来就该用它, 规范里没有、也不需要
+    # 一个语义名字。`(?![-\w])` 把这些全挡在外面, 只留真正光秃秃的那些。
+    raw_radius = [m for m in re.findall(
+        r"\brounded(?:-(?:sm|md|lg|xl|2xl|3xl))?(?![-\w])", text)]
     return {
         "裸圆角": len(raw_radius),
         "任意字号": len(re.findall(r"text-\[\d+px\]", text)),

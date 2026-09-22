@@ -63,6 +63,14 @@ MAX_REACTIONS = 5         # 往回最多取几个反应点
 TOL_ATR = 0.5             # 聚类容差 = 几倍 ATR
 STOP_BUFFER_ATR = 0.1     # 失效位在参照价位下方再让几倍 ATR
 
+# ── 粗细三档 ─────────────────────────────────────────────────
+# 原书对「什么算一个有意义的回调」**没有硬公式**(规格第 1 节自陈), 这四个数是
+# 规格作者替它补的。既然是人为补定的, 就不该藏在配置里当"待优化参数" ——
+# 这个指标不出买卖信号, 没有可回测的目标函数, 也就**没有"校准"这回事**。
+# 它是个**粗细旋钮**: 调大只认大级别回调(线少而稳), 调小小回调也算(线多而密),
+# 哪一档合适得用眼睛定。所以后端一次把三档都算出来, 图上直接切。
+GRAINS: dict[str, int] = {"coarse": 5, "mid": PIVOT_K, "fine": 2}
+
 # ── 配色(规格 §12)──────────────────────────────────────────
 # 「每种颜色全站只表达一种含义」。这一组里有三种意思不同的线, 不能一个色涂到底:
 #   回撤位 = 可能停下来的位置(金)   目标 = 往上推算的位置(蓝)
@@ -341,19 +349,24 @@ def first_pullback_after(closes: list[float], dma: list[float | None],
 # 总入口
 # ================================================================
 
-def compute(df: pl.DataFrame) -> Fib2:
-    """从日 K 算出全部位置。任何一步缺数据就返回空, 不抛异常。"""
+def compute(df: pl.DataFrame, *, pivot_k: int = PIVOT_K) -> Fib2:
+    """从日 K 算出全部位置。任何一步缺数据就返回空, 不抛异常。
+
+    `pivot_k` = 粗细档(见 `GRAINS`)。**只影响摆点认得多细**, 推进段和短期均线
+    与它无关 —— 所以三档共用同一段上攻、同一个首次回踩, 只有回撤线和强支撑区
+    会变多变少。
+    """
     need = {"high", "low", "close"}
     if df.is_empty() or not need.issubset(df.columns) or df.height < 30:
         return Fib2()
     try:
-        return _compute(df)
+        return _compute(df, pivot_k)
     except Exception as e:                          # noqa: BLE001
         logger.warning("dinapoli compute failed: %s", e)
         return Fib2()
 
 
-def _compute(df: pl.DataFrame) -> Fib2:
+def _compute(df: pl.DataFrame, pivot_k: int = PIVOT_K) -> Fib2:
     closes = [float(x) for x in df["close"].to_list()]
     highs = [float(x) for x in df["high"].to_list()]
     lows = [float(x) for x in df["low"].to_list()]
@@ -372,7 +385,7 @@ def _compute(df: pl.DataFrame) -> Fib2:
     last_atr = next((a for a in reversed(atr) if a and math.isfinite(a) and a > 0), None)
     tol = TOL_ATR * last_atr if last_atr else focus * 0.005
 
-    reacts = reactions_before(lows, focus_bar, min_gap=tol)
+    reacts = reactions_before(lows, focus_bar, k=pivot_k, min_gap=tol)
     if not reacts:
         return Fib2(dma3=dma, thrust=seg, focus=focus, focus_bar=focus_bar)
 

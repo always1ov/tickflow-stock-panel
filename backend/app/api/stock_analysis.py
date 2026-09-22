@@ -178,27 +178,42 @@ def get_levels(
     fib2_overlay: dict[str, Any] = {}
     try:
         from app.indicators import dinapoli
-        res = dinapoli.compute(df)
-        levels["fib2"] = dinapoli.to_levels(res, close)
-        if not res.is_empty():
-            series["fib2"] = {"dma3": res.dma3}
-            zone = res.zone
+
+        # 三档一次算完。纯几何, 250 根 K 线跑三遍是毫秒级 —— 与其让用户改个数
+        # 等一轮重算, 不如全给它, 图上切换零延迟。
+        grains: dict[str, Any] = {}
+        base: dinapoli.Fib2 | None = None
+        for name, k in dinapoli.GRAINS.items():
+            res = dinapoli.compute(df, pivot_k=k)
+            grains[name] = {
+                "k": k,
+                "levels": dinapoli.to_levels(res, close),
+                "zone": res.zone,
+            }
+            if name == "mid":
+                base = res
+        # levels.fib2 给中档 —— 它是默认档, 也让"只读 levels 的调用方"拿到能用的一组
+        levels["fib2"] = grains["mid"]["levels"]
+        if base is not None and not base.is_empty():
+            series["fib2"] = {"dma3": base.dma3}
             thrust = None
-            if res.thrust and res.thrust[1] < len(date_strs):
-                s, e = res.thrust
+            if base.thrust and base.thrust[1] < len(date_strs):
+                s, e = base.thrust
                 thrust = {"start": date_strs[s], "end": date_strs[e],
                           "days": e - s + 1}
             marks = []
-            if (res.first_pullback_bar is not None
-                    and res.first_pullback_bar < len(date_strs)):
-                marks.append({"date": date_strs[res.first_pullback_bar],
+            if (base.first_pullback_bar is not None
+                    and base.first_pullback_bar < len(date_strs)):
+                marks.append({"date": date_strs[base.first_pullback_bar],
                               "label": "首次回踩"})
             fib2_overlay = {
-                "zone": zone, "thrust": thrust, "markers": marks,
+                # 这两样与粗细档无关(推进段和均线都不看摆点), 所以不按档重复
+                "thrust": thrust, "markers": marks,
                 # 平移之后露到最后一根之外的那几个值 = 图上「未来」区那一段
                 "dma3_future": dinapoli.future_dma(
                     [float(x) for x in df["close"].to_list()],
                     dinapoli.DMA_LEN, dinapoli.DMA_SHIFT),
+                "grain": grains,
             }
     except Exception as e:  # noqa: BLE001
         logger.debug("fib2 levels skipped: %s", e)
