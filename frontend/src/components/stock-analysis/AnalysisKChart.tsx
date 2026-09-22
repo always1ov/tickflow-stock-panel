@@ -1,5 +1,5 @@
 import { useEffect, useRef, useMemo, useState } from 'react'
-import { chartTheme, getTheme, useTheme } from '@/lib/theme'
+import { chartTheme, fib2RoleColor, getTheme, levelColors, useLevelColors, useTheme } from '@/lib/theme'
 import * as echarts from 'echarts'
 import type { ECharts, EChartsOption } from 'echarts'
 import type { Fib2Grain, Fib2Overlay, KlineRow, LevelSeries } from '@/lib/api'
@@ -42,35 +42,50 @@ export interface PriceLevel {
   /** 档位(仅 pivot 有):0=P, 1=R1/S1, 2=R2/S2, 3=R3/S3 */
   rank?: number
   /**
-   * [R405] 这一条线自己的颜色, 盖过所在组的颜色。
+   * [R405] 这一条线自己的角色, 盖过所在组的颜色。
    *
    * 加这个是为了斐波那契二型: 它一组里有**三种意思不同**的线 ——
-   * 回撤位(金)、目标(蓝)、失效位(深灰)。规格 §12 说得很明白:
-   * 「每种颜色全站只表达一种含义」, 全涂成一个金色等于把三件事说成一件。
+   * 回撤位、目标、失效位。规格 §12 说得很明白:
+   * 「每种颜色全站只表达一种含义」, 全涂成一个色等于把三件事说成一件。
    * 别的组不传这个字段, 行为与以前一字不差。
+   *
+   * [R409] **它是角色标识, 不是最终颜色。** 值是后端
+   * `indicators/dinapoli.py` 那三个常量之一(恰好写成 hex, 且恰好就是亮色
+   * 那一份); 画之前一律过 `fib2RoleColor()` 换成当前主题该用的值 ——
+   * 后端不知道用户开的是亮色还是暗色, 它发不出"按主题分两套"的颜色。
    */
   color?: string
 }
 
-/** 价位组开关配置:label = 按钮文案,color = markLine 颜色 */
-export const LEVEL_GROUPS: { key: LevelType; label: string; color: string }[] = [
-  { key: 'sr',       label: '压力支撑',  color: '#F97316' },   // 橙(成交密集区,价量驱动)
-  { key: 'pivot',    label: '枢轴点',    color: '#8B5CF6' },   // 紫
-  { key: 'extreme',  label: '前高前低',  color: '#EAB308' },   // 黄
-  { key: 'boll',     label: '布林带',    color: '#F97316' },   // 橙(MA20±2σ 曲线)
-  { key: 'keltner_s',label: '量化通道短期',  color: '#06B6D4' },   // 青(MA20±2ATR 曲线)
-  { key: 'keltner_m',label: '量化通道中期',  color: '#22D3EE' },   // 浅青(MA60±2.5ATR 曲线)
-  { key: 'keltner_l',label: '量化通道长期',  color: '#67E8F9' },   // 更浅青(MA120±3ATR 曲线)
-  { key: 'atr_stop', label: 'ATR波动通道',  color: '#EF4444' },   // 红(警示)
-  { key: 'gap',      label: '缺口位',    color: '#EC4899' },   // 粉
-  { key: 'fib',      label: '斐波那契一型', color: '#F59E0B' },   // 金
-  { key: 'round',    label: '整数关口',  color: '#71717A' },   // 灰(心理位,弱视觉)
+/**
+ * 价位组开关配置:label = 按钮文案。
+ *
+ * [R409] **颜色不在这里了。** 原来每组在这一行写死一个 hex, 结果是:
+ * 压力支撑与布林带写成了同一个值(重叠时完全分不出谁是谁), 亮色主题下
+ * 四个组对白底的对比度只有 1.35~2.01(等于没画), ATR 波动通道离 K 线的
+ * 涨红只有 ΔE 5~6(一条指标线长得像一根阳线)。
+ *
+ * 现在配色**按主题分两套**, 单一产地是 `lib/theme.ts` 的 `LEVEL_PALETTE`
+ * (为什么这么排、量到了什么数, 都写在那儿)。这里只留"有哪些组、叫什么"。
+ */
+export const LEVEL_GROUPS: { key: LevelType; label: string }[] = [
+  { key: 'sr',       label: '压力支撑' },
+  { key: 'pivot',    label: '枢轴点' },
+  { key: 'extreme',  label: '前高前低' },
+  { key: 'boll',     label: '布林带' },          // MA20±2σ 曲线
+  { key: 'keltner_s',label: '量化通道短期' },     // MA20±2ATR 曲线
+  { key: 'keltner_m',label: '量化通道中期' },     // MA60±2.5ATR 曲线
+  { key: 'keltner_l',label: '量化通道长期' },     // MA120±3ATR 曲线
+  { key: 'atr_stop', label: 'ATR波动通道' },
+  { key: 'gap',      label: '缺口位' },
+  { key: 'fib',      label: '斐波那契一型' },
+  { key: 'round',    label: '整数关口' },
   // [fork 增强] 六态关键点(利弗莫尔上/下关键点,趋势确认/否决价)
-  { key: 'livermore', label: '六态关键点', color: '#A78BFA' },  // 淡紫
+  { key: 'livermore', label: '六态关键点' },
   // [R405 · fork 增强] 斐波那契二型(帝纳波利点位)。按一下整幅出来: 回撤线、
   // 目标一二三、失效位、短期均线、上攻段底色、强支撑区色带、首次回踩标记。
   // **只有位置, 没有动作** —— 和六态/量化通道撞不撞由用户自己看。
-  { key: 'fib2',     label: '斐波那契二型', color: '#A77A1C' },  // 金(规格 §12 的进场区色)
+  { key: 'fib2',     label: '斐波那契二型' },
   // [R403] 「持仓止盈」这一组从图上撤了(用户: 「持仓止盈可以删除掉了」)。
   // **只撤图上的线** —— 决策台的止盈线列、盘中推送、AI 持仓上下文照旧, 见后端
   // `indicators/levels.py` 的 LEVEL_TYPES。
@@ -80,21 +95,28 @@ export const LEVEL_GROUPS: { key: LevelType; label: string; color: string }[] = 
 //   alignedKey: alignedSeries 中的 key(由 series.boll/keltner/atr 对齐而来)
 //   group:      属于哪个价位开关组(开关该组即开关这条曲线)
 //   endLabel:   右侧端点标签(显示最新值的文字)
-const CURVE_DEFS: { alignedKey: string; group: LevelType; endLabel: string; color: string; dashed?: boolean }[] = [
-  { alignedKey: 'boll_upper',     group: 'boll',      endLabel: '布林上轨', color: '#F97316', dashed: true },
-  { alignedKey: 'boll_lower',     group: 'boll',      endLabel: '布林下轨', color: '#F97316', dashed: true },
-  { alignedKey: 'boll_mid',       group: 'boll',      endLabel: '布林中轨', color: '#FB923C', dashed: false },
-  { alignedKey: 'keltner_s_upper',group: 'keltner_s', endLabel: '短期上沿', color: '#06B6D4', dashed: true },
-  { alignedKey: 'keltner_s_lower',group: 'keltner_s', endLabel: '短期下沿', color: '#06B6D4', dashed: true },
-  { alignedKey: 'keltner_m_upper',group: 'keltner_m', endLabel: '中期上沿', color: '#22D3EE', dashed: true },
-  { alignedKey: 'keltner_m_lower',group: 'keltner_m', endLabel: '中期下沿', color: '#22D3EE', dashed: true },
-  { alignedKey: 'keltner_l_upper',group: 'keltner_l', endLabel: '长期上沿', color: '#67E8F9', dashed: true },
-  { alignedKey: 'keltner_l_lower',group: 'keltner_l', endLabel: '长期下沿', color: '#67E8F9', dashed: true },
-  { alignedKey: 'atr_stop',       group: 'atr_stop',  endLabel: 'ATR下轨', color: '#EF4444', dashed: true },
-  { alignedKey: 'atr_tp',         group: 'atr_stop',  endLabel: 'ATR上轨', color: '#F87171', dashed: true },
+//
+// [R409] **`color` 这一列去掉了** —— 每条曲线用它所属组的颜色, 由
+// `LEVEL_PALETTE` 一处给。原来这里另写了三个 hex(布林中轨 #FB923C、
+// ATR上轨 #F87171、二型均线 #8A8578), 于是同一个开关底下**冒出了组色之外的
+// 颜色**: 开关上的小圆点是一种色、图上的线是另一种, 而且那三个 hex 谁也没管,
+// 与别的组撞不撞没人知道(实测 ATR上轨 #F87171 离 K 线涨红只有 ΔE 6)。
+// 上/下轨靠位置就分得开, 中轨靠实线(`dashed: false`)分得开, 不需要再换色。
+const CURVE_DEFS: { alignedKey: string; group: LevelType; endLabel: string; dashed?: boolean }[] = [
+  { alignedKey: 'boll_upper',     group: 'boll',      endLabel: '布林上轨', dashed: true },
+  { alignedKey: 'boll_lower',     group: 'boll',      endLabel: '布林下轨', dashed: true },
+  { alignedKey: 'boll_mid',       group: 'boll',      endLabel: '布林中轨', dashed: false },
+  { alignedKey: 'keltner_s_upper',group: 'keltner_s', endLabel: '短期上沿', dashed: true },
+  { alignedKey: 'keltner_s_lower',group: 'keltner_s', endLabel: '短期下沿', dashed: true },
+  { alignedKey: 'keltner_m_upper',group: 'keltner_m', endLabel: '中期上沿', dashed: true },
+  { alignedKey: 'keltner_m_lower',group: 'keltner_m', endLabel: '中期下沿', dashed: true },
+  { alignedKey: 'keltner_l_upper',group: 'keltner_l', endLabel: '长期上沿', dashed: true },
+  { alignedKey: 'keltner_l_lower',group: 'keltner_l', endLabel: '长期下沿', dashed: true },
+  { alignedKey: 'atr_stop',       group: 'atr_stop',  endLabel: 'ATR下轨', dashed: true },
+  { alignedKey: 'atr_tp',         group: 'atr_stop',  endLabel: 'ATR上轨', dashed: true },
   // [R405] 叫「二型均线」不叫「短期均线」: 后者在 `lib/signals.ts` 里已经指 MA5,
   // 而这条是 3 日均线往后移 3 根 —— 同名两物正是名词表要防的。
-  { alignedKey: 'fib2_dma3',      group: 'fib2',      endLabel: '二型均线', color: '#8A8578', dashed: false },
+  { alignedKey: 'fib2_dma3',      group: 'fib2',      endLabel: '二型均线', dashed: false },
 ]
 
 // 默认不打开任何价位组 —— 价位怎么看是用户的判断, 系统不替他预设。
@@ -245,9 +267,13 @@ export function AnalysisKChart({
     return { dates, candle, vols, dateIndex, zoomStart, alignedSeries }
   }, [rows, series, seriesDates])
 
+  // [R409] 当前主题下的价位组配色。单一产地在 `lib/theme.ts`;
+  // `theme` 已经在 buildOption 的 useMemo 依赖里, 切主题会整张图重建。
+  const LC = levelColors(theme)
+
   // 构建 option
   const buildOption = (): EChartsOption => {
-    const priceLines = collectPriceLines(effLevels, activeTypes, pivotRank)
+    const priceLines = collectPriceLines(effLevels, activeTypes, pivotRank, LC, theme)
 
     // 三段布局:主图 / 成交量 / 缩放条,从上到下累加,各段之间留间距,互不遮挡
     //   [16 顶部] [mainH 主图] [8 间距] [volH 成交量] [12 间距] [SLIDER_H 缩放条] [8 底部]
@@ -310,17 +336,19 @@ export function AnalysisKChart({
         // 这个区常常只有两三条线的厚度 —— 光靠半透明填充, 在蜡烛底下几乎看不出
         // 边界在哪。重合越多越浓(这是它唯一的"强度"表达), 但起点比规格高一档。
         const alpha = Math.min(0.55, 0.30 + 0.12 * Math.max(0, z.strength - 1))
+        // [R409] 底色跟着组色走(二型整组从金挪到洋红, 免得和一型的金撞)
+        const zc = LC.fib2
         // 两条回撤挤得很近时色带会薄到看不见 —— 规格 §9 要求最小高度,
         // 这里按价格给个下限(现价的千分之三), 比按像素算简单且不依赖坐标系。
         const thin = Math.max(0, (rows.at(-1)?.close ?? z.high) * 0.003 - (z.high - z.low)) / 2
         markAreaData.push([{
           yAxis: z.low - thin, name: `强支撑区 · ${z.strength} 条回撤重合`,
           itemStyle: {
-            color: `rgba(167,122,28,${alpha})`,
-            borderColor: 'rgba(167,122,28,0.85)', borderWidth: 1,
+            color: withAlpha(zc, alpha),
+            borderColor: withAlpha(zc, 0.85), borderWidth: 1,
           },
           label: { show: true, position: 'insideTopLeft', distance: 4,
-                   color: isDark ? '#d6ab58' : '#8a6416', fontSize: 9,
+                   color: zc, fontSize: 9,
                    fontWeight: 'bold' },
         }, { yAxis: z.high + thin }])
       }
@@ -332,9 +360,9 @@ export function AnalysisKChart({
           coord: [m.date, rows[i].high],
           symbol: 'triangle', symbolSize: 9, symbolRotate: 180,
           symbolOffset: [0, -10],
-          itemStyle: { color: '#A77A1C' },
+          itemStyle: { color: LC.fib2 },
           label: { show: true, formatter: m.label, position: 'top',
-                   fontSize: 9, color: '#A77A1C' },
+                   fontSize: 9, color: LC.fib2 },
         })
       }
     }
@@ -364,7 +392,9 @@ export function AnalysisKChart({
     for (const p of priceLines) {
       const k = levelKey(p.type, p.value)
       const hit = hoveredKey === k
-      const opacity = dimming ? (hit ? 1 : 0.12) : 0.7
+      // [R409] 常态不透明度 0.7 → 0.9。叠在 strengthColor 的透明度之上,
+      // 原来最弱的一档实际只有 0.39 —— 那正是「颜色浅」的一半来源。
+      const opacity = dimming ? (hit ? 1 : 0.12) : 0.9
       const width = hit ? 2 : 1
       series.push({
         name: p.label, type: 'line', silent: false, animation: false,
@@ -402,23 +432,25 @@ export function AnalysisKChart({
       }
       // 曲线 key 用 group(同组上下轨联动),hover 命中时高亮
       const hit = hoveredKey === def.group
-      const opacity = dimming ? (hit ? 1 : 0.12) : 0.8
+      // [R409] 曲线用所属组的颜色 —— 开关上的小圆点与图上的线必须是同一个色
+      const curveColor = LC[def.group]
+      const opacity = dimming ? (hit ? 1 : 0.12) : 0.9
       const width = hit ? 1.8 : 1
       series.push({
         name: def.endLabel, type: 'line', data: data.map(v => v ?? '-'),
         smooth: true, symbol: 'none', silent: false, animation: false,
         z: 1,
         zlevel: hit ? 10 : 0,
-        lineStyle: { width, color: def.color, type: def.dashed === false ? 'solid' : 'dashed', opacity },
-        itemStyle: { color: def.color },
+        lineStyle: { width, color: curveColor, type: def.dashed === false ? 'solid' : 'dashed', opacity },
+        itemStyle: { color: curveColor },
         // 右侧端点标签:显示该通道的最新数值,距绘图区右缘留 6px 间距
         endLabel: lastVal != null ? {
           show: true,
           formatter: () => `${lastVal!.toFixed(2)}`,
-          color: def.color, fontSize: hit ? 10 : 9, fontFamily: 'JetBrains Mono, monospace',
+          color: curveColor, fontSize: hit ? 10 : 9, fontFamily: 'JetBrains Mono, monospace',
           fontWeight: hit ? 'bold' : 'normal',
           backgroundColor: hit ? CT().tooltipBg : CT().infoBarBg,
-          borderColor: hit ? def.color : 'transparent',
+          borderColor: hit ? curveColor : 'transparent',
           borderWidth: hit ? 1 : 0,
           padding: [2, 5], borderRadius: 2,
           distance: 6,
@@ -557,9 +589,9 @@ export function AnalysisKChart({
                     ? 'text-foreground'
                     : 'text-muted bg-base/40 border-border/30 hover:border-border/60'
                 }`}
-                style={active ? { borderColor: g.color + '66', backgroundColor: g.color + '1a' } : undefined}
+                style={active ? { borderColor: LC[g.key] + '66', backgroundColor: LC[g.key] + '1a' } : undefined}
               >
-                <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: active ? g.color : '#52525B' }} />
+                <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: active ? LC[g.key] : '#52525B' }} />
                 {g.label}
                 <span className="opacity-50">{count}</span>
               </button>
@@ -575,11 +607,16 @@ export function AnalysisKChart({
                   key={r}
                   onClick={() => setPivotRank(r)}
                   title={r === 1 ? 'P + R1/S1(3 个)' : r === 2 ? '到 R2/S2(5 个)' : '全档 R3/S3(7 个)'}
+                  // [R409] 选中态跟着枢轴点那一组的颜色走。原来写死 #8B5CF6
+                  // (旧组色), 改了组色这里就会是"选择器一个紫、图上的线另一个紫"
                   className={`h-6 px-2 rounded-btn text-micro font-mono border transition-ui ${
                     pivotRank === r
-                      ? 'bg-[#8B5CF6]/15 border-[#8B5CF6]/40 text-[#c4b5fd]'
+                      ? 'text-foreground'
                       : 'text-muted bg-base/40 border-border/30 hover:border-border/60'
                   }`}
+                  style={pivotRank === r
+                    ? { borderColor: LC.pivot + '66', backgroundColor: LC.pivot + '26', color: LC.pivot }
+                    : undefined}
                 >
                   {r}
                 </button>
@@ -602,11 +639,15 @@ export function AnalysisKChart({
                     : k === 'mid'
                       ? '默认档'
                       : '小回调也算 —— 线多而密, 更容易看到重合'}
+                  // [R409] 同上: 选中态用二型的组色, 不再另写一个 hex
                   className={`h-6 px-2 rounded-btn text-micro border transition-ui whitespace-nowrap ${
                     fib2Grain === k
-                      ? 'bg-[#A77A1C]/15 border-[#A77A1C]/40 text-[#d6ab58]'
+                      ? 'text-foreground'
                       : 'text-muted bg-base/40 border-border/30 hover:border-border/60'
                   }`}
+                  style={fib2Grain === k
+                    ? { borderColor: LC.fib2 + '66', backgroundColor: LC.fib2 + '26', color: LC.fib2 }
+                    : undefined}
                 >
                   {cn}
                   <span className="ml-1 opacity-50 font-mono">
@@ -647,6 +688,8 @@ function LevelOverview({
   hoveredKey: string | null
   onHover: (k: string | null) => void
 }) {
+  const theme = useTheme()
+  const palette = useLevelColors()
   // 收集当前显示的点位(同 collectPriceLines 的过滤逻辑)
   const visible: PriceLevel[] = []
   for (const g of LEVEL_GROUPS) {
@@ -676,7 +719,9 @@ function LevelOverview({
   }
 
   const Row = ({ p }: { p: PriceLevel }) => {
-    const color = LEVEL_GROUPS.find(g => g.key === p.type)?.color ?? CT().text
+    // [R409] 下方文字行的小圆点必须与图上那条线同色 —— 它是"这一行说的是哪条线"
+    // 的唯一线索。取值走同一个产地(LEVEL_PALETTE), 二型那三种线走角色映射。
+    const color = (p.color ? fib2RoleColor(p.color, theme) : palette[p.type]) ?? CT().text
     const k = levelKey(p.type, p.value)
     const hit = hoveredKey === k
     const dim = hoveredKey != null && !hit
@@ -736,6 +781,8 @@ function collectPriceLines(
   levels: Record<LevelType, PriceLevel[]> | undefined,
   active: Set<LevelType>,
   pivotRank: 1 | 2 | 3,
+  palette: Record<string, string>,
+  theme: 'dark' | 'light',
 ): { value: number; label: string; color: string; type: string }[] {
   if (!levels) return []
   const out: { value: number; label: string; color: string; type: string }[] = []
@@ -748,18 +795,31 @@ function collectPriceLines(
       // sr 组现为成交密集区水平点,直接画线即可,无需特判。
       if (p.type === 'boll' || p.type === 'keltner_s' || p.type === 'keltner_m'
           || p.type === 'keltner_l' || p.type === 'atr_stop') continue
-      const c = p.color ?? strengthColor(p.strength, g.color)
-      out.push({ value: p.value, label: p.label, color: c, type: p.type })
+      // [R409] 后端发来的 `color`(只有斐波那契二型会发)是**角色标识**, 不是
+      // 最终颜色 —— 两套主题要用两个值, 而后端不知道当前是哪套。
+      const base = p.color ? fib2RoleColor(p.color, theme) : palette[g.key]
+      out.push({ value: p.value, label: p.label, color: strengthColor(p.strength, base), type: p.type })
     }
   }
   return out
 }
 
 function strengthColor(strength: string | undefined, base: string): string {
-  // strong 用实色,medium 用 0.85,weak 用 0.55 透明
-  if (strength === 'weak') return base + '8C'
-  if (strength === 'medium') return base + 'D9'
+  // 强度靠透明度表达: 实色 / 次之 / 再次之。
+  //
+  // [R409] **原来是 D9(85%) 与 8C(55%)。** 而画线时还叠了一层
+  // `opacity: 0.9`(原 0.7), 于是"弱"这一档实际落到 0.55×0.7 ≈ 0.39 ——
+  // 用户那句「不能搞浅色」里最淡的一档就是它。现在收窄到 E6/BF, 叠完
+  // 仍有 0.72, 强弱还是看得出来, 但没有一条线淡到要凑近看。
+  if (strength === 'weak') return base + 'BF'
+  if (strength === 'medium') return base + 'E6'
   return base
+}
+
+/** `#RRGGBB` + 0~1 的透明度 → `rgba(...)`。色带/标记用, 只接受 6 位 hex。 */
+function withAlpha(hex: string, alpha: number): string {
+  const n = parseInt(hex.slice(1), 16)
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${alpha})`
 }
 
 /** 价位唯一标识: 同类型同价格视为同一点位(用于联动高亮)。 */
