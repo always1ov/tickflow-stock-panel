@@ -62,27 +62,27 @@ export function TickflowKeys() {
         <span className="text-[10px] text-muted">
           第 1 个是主 key(档位探测、付费端点、历史日 K 都走它); 其余用于实时行情池化, 每个免费 key 各 5 只额度
         </span>
-        <div className="ml-auto flex items-center gap-1.5">
+        <div className="ml-auto flex flex-wrap items-center gap-1.5">
           <button type="button" onClick={() => setReveal(v => !v)}
             title={reveal ? '隐藏明文' : '显示明文'}
-            className="inline-flex h-7 items-center gap-1 rounded-btn border border-border px-2 text-[11px] text-secondary transition-colors hover:border-accent/40 hover:text-accent">
+            className="inline-flex h-7 shrink-0 items-center gap-1 whitespace-nowrap rounded-btn border border-border px-2 text-[11px] text-secondary transition-colors hover:border-accent/40 hover:text-accent">
             {reveal ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
             {reveal ? '隐藏' : '明文'}
           </button>
           <button type="button" disabled={probe.isPending || list.length === 0}
             onClick={() => probe.mutate()}
             title="逐个真打一次接口判定死活。串行跑, 并发会把活的 key 也打成限流"
-            className="inline-flex h-7 items-center gap-1 rounded-btn border border-border px-2 text-[11px] text-secondary transition-colors hover:border-accent/40 hover:text-accent disabled:opacity-50">
+            className="inline-flex h-7 shrink-0 items-center gap-1 whitespace-nowrap rounded-btn border border-border px-2 text-[11px] text-secondary transition-colors hover:border-accent/40 hover:text-accent disabled:opacity-50">
             {probe.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Stethoscope className="h-3.5 w-3.5" />}
             验活
           </button>
           <button type="button" onClick={() => setRows([...list, ''])}
-            className="inline-flex h-7 items-center gap-1 rounded-btn border border-border px-2 text-[11px] text-secondary transition-colors hover:border-accent/40 hover:text-accent">
+            className="inline-flex h-7 shrink-0 items-center gap-1 whitespace-nowrap rounded-btn border border-border px-2 text-[11px] text-secondary transition-colors hover:border-accent/40 hover:text-accent">
             <Plus className="h-3.5 w-3.5" />加一个
           </button>
           <button type="button" disabled={save.isPending || rows === null}
             onClick={() => save.mutate(list.filter(k => k.trim()))}
-            className="inline-flex h-7 items-center gap-1 rounded-btn bg-accent px-2.5 text-[11px] font-medium text-white transition-opacity disabled:opacity-50">
+            className="inline-flex h-7 shrink-0 items-center gap-1 whitespace-nowrap rounded-btn bg-accent px-2.5 text-[11px] font-medium text-white transition-opacity disabled:opacity-50">
             {save.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
             保存
           </button>

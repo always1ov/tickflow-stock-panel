@@ -96,7 +96,7 @@ export function AbnormalMoves() {
           right={
             <Link
               to="/monitor"
-              className="inline-flex h-7 items-center gap-1 rounded border border-border bg-base px-2 text-[11px] text-secondary transition-colors hover:text-foreground"
+              className="inline-flex h-7 shrink-0 items-center gap-1 whitespace-nowrap rounded border border-border bg-base px-2 text-[11px] text-secondary transition-colors hover:text-foreground"
               title="在监控中心创建「异动监控」规则: 后台持续评估, 触发时统一走触发记录/站内通知/外部渠道推送, 无需保持本页打开"
             >
               <Settings2 className="h-3 w-3" />
@@ -412,7 +412,7 @@ function IntradayView({ onPreview }: {
           数据截至 {data?.cache_date ?? '—'}
           {q.isFetching && ' · 更新中…'}
         </span>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex flex-wrap items-center gap-2">
           <SegmentedControl
             value={boardFilter}
             onChange={v => setBoardFilter(v)}
@@ -424,13 +424,13 @@ function IntradayView({ onPreview }: {
           <button
             type="button"
             onClick={() => q.refetch()}
-            className="inline-flex h-7 items-center gap-1 rounded border border-border bg-base px-2 text-[11px] text-secondary transition-colors hover:text-foreground"
+            className="inline-flex h-7 shrink-0 items-center gap-1 whitespace-nowrap rounded border border-border bg-base px-2 text-[11px] text-secondary transition-colors hover:text-foreground"
             title="立即刷新"
           >
             <RefreshCw className={`h-3 w-3 ${q.isFetching ? 'animate-spin' : ''}`} />
             刷新
           </button>
-          <label className="flex items-center gap-1.5 text-[11px] text-secondary" title="过滤 ST/*ST 风险警示股票">
+          <label className="flex shrink-0 items-center gap-1.5 whitespace-nowrap text-[11px] text-secondary" title="过滤 ST/*ST 风险警示股票">
             <input type="checkbox" checked={excludeSt} onChange={e => setExcludeSt(e.target.checked)} className="h-3 w-3 accent-accent" />
             过滤ST
           </label>
@@ -711,7 +711,7 @@ function DeviationView({ onPreview }: {
               <button
                 type="button"
                 onClick={() => toggleEnabled(true)}
-                className="ml-auto inline-flex h-7 shrink-0 items-center gap-1 rounded border border-accent/40 bg-accent/10 px-2.5 text-[11px] font-medium text-accent transition-colors hover:bg-accent/15"
+                className="ml-auto inline-flex h-7 shrink-0 items-center gap-1 whitespace-nowrap rounded border border-accent/40 bg-accent/10 px-2.5 text-[11px] font-medium text-accent transition-colors hover:bg-accent/15"
               >
                 <Power className="h-3 w-3" />
                 开启实时计算
@@ -731,7 +731,7 @@ function DeviationView({ onPreview }: {
                 {data ? ` · 基准指数今日 ${(data.bench_rt_pct * 100).toFixed(2)}%` : ''}
               </span>
             )}
-            <div className="ml-auto flex items-center gap-2">
+            <div className="ml-auto flex flex-wrap items-center gap-2">
               <button
                 type="button"
                 aria-pressed={rulesOpen}
@@ -750,7 +750,7 @@ function DeviationView({ onPreview }: {
                 <button
                   type="button"
                   onClick={() => overview.refetch()}
-                  className="inline-flex h-7 items-center gap-1 rounded border border-border bg-base px-2 text-[11px] text-secondary transition-colors hover:text-foreground"
+                  className="inline-flex h-7 shrink-0 items-center gap-1 whitespace-nowrap rounded border border-border bg-base px-2 text-[11px] text-secondary transition-colors hover:text-foreground"
                   title="立即刷新"
                 >
                   <RefreshCw className={`h-3 w-3 ${updating ? 'animate-spin' : ''}`} />
@@ -811,7 +811,7 @@ function DeviationView({ onPreview }: {
               />
               只看自选
             </label>
-            <label className="flex items-center gap-1.5 text-[11px] text-secondary" title="过滤 ST/*ST 风险警示股票">
+            <label className="flex shrink-0 items-center gap-1.5 whitespace-nowrap text-[11px] text-secondary" title="过滤 ST/*ST 风险警示股票">
               <input
                 type="checkbox"
                 checked={excludeSt}
@@ -1048,14 +1048,19 @@ function SegmentedControl<T extends string>({ value, onChange, options }: {
   options: Array<{ value: T; label: string }>
 }) {
   return (
-    <div className="inline-flex h-7 overflow-hidden rounded border border-border bg-base">
+    // [R402] 用户手机截图: 「全板块」被拆成「全/板/块」竖着排, 「主板」成了
+    // 「主/板」。**定高 `h-7` 的盒子 + 允许被压扁 = 字换行之后画到盒子外面**,
+    // 实测 375px 下「全板块」这个按钮 `scrollHeight 53 > clientHeight 26`,
+    // 也就是三行字塞在一个一行高的盒子里。与 R401 的市场环境页是同一族。
+    // 两层一起改: 整组不许被压(`shrink-0`), 组里每个字不许断(`whitespace-nowrap`)。
+    <div className="inline-flex h-7 shrink-0 overflow-hidden rounded border border-border bg-base">
       {options.map(o => (
         <button
           key={o.value}
           type="button"
           aria-pressed={value === o.value}
           onClick={() => onChange(o.value)}
-          className={`px-2.5 text-[11px] transition-colors ${
+          className={`shrink-0 whitespace-nowrap px-2.5 text-[11px] transition-colors ${
             value === o.value ? 'bg-accent/10 text-accent' : 'text-muted hover:text-foreground'
           }`}
         >

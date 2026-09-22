@@ -1739,10 +1739,10 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
           disabled={!detail || strategyDetail.isLoading}
           className="group w-full rounded-btn border border-border bg-surface px-3 py-2.5 text-left transition-colors hover:border-accent/40 hover:bg-elevated/70 disabled:cursor-not-allowed disabled:opacity-55"
         >
-          <span className="flex items-center gap-2 text-xs font-semibold text-foreground">
-            <SlidersHorizontal className="h-3.5 w-3.5 text-accent" />
+          <span className="flex flex-wrap items-center gap-2 text-xs font-semibold text-foreground">
+            <SlidersHorizontal className="h-3.5 w-3.5 shrink-0 text-accent" />
             策略设置
-            <span className="ml-auto text-[10px] font-normal text-muted group-hover:text-accent">编辑</span>
+            <span className="ml-auto shrink-0 whitespace-nowrap text-[10px] font-normal text-muted group-hover:text-accent">编辑</span>
           </span>
           <span className="mt-1 flex min-w-0 items-center gap-1.5 text-[11px] font-medium text-secondary">
             <span className="truncate">{selectedStrategyName}</span>

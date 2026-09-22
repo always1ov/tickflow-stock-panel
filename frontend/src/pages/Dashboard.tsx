@@ -740,37 +740,23 @@ export function Dashboard() {
     // 硬塞进 PageHeader 会把这些挤成一行小字。它本来就在页内, 不影响页间对齐。
     <div className="min-h-full bg-base px-3 pb-4 pt-3 lg:px-4">
       {/* 无本地数据常驻引导卡片 —— 一键触发盘后管道获取数据(无 Key 也可) */}
-      {hasNoData && (
-        <FetchDataCard
-          isFetching={isFetching}
-          isStarting={startFetch.isPending}
-          fetchFailed={fetchFailed}
-          stage={fetchStatus.data?.stage}
-          fetchPct={fetchStatus.data?.progress}
-          onStart={() => startFetch.mutate()}
-          isTickflowProvider={isTickflowProvider}
-          providerLabel={providerLabel}
-        />
-      )}
-      {/* 首次使用自动弹窗(同会话仅一次) */}
-      <AnimatePresence>
-        {showWelcomeModal && (
-          <WelcomeFetchModal
-            isTickflowProvider={isTickflowProvider}
-            providerLabel={providerLabel}
-            onClose={() => setShowWelcomeModal(false)}
-            onStart={() => {
-              adjGate.guard(() => {
-                startFetch.mutate()
-                setShowWelcomeModal(false)
-              })
-            }}
-          />
-        )}
-      </AnimatePresence>
-      {/* 无除权因子能力时的同步前置确认 */}
-      {adjGate.dialog}
-      <div className="relative mb-1.5 flex flex-wrap items-center justify-between gap-2 overflow-hidden rounded-card border border-border bg-gradient-to-r from-surface/90 to-surface/70 px-3 py-1.5 shadow-[0_1px_3px_oklch(var(--border)/0.4)] backdrop-blur-sm">
+      {/*
+        [R402] 这一页**没有 `PageHeader`** —— 上面那条注释说明了原因(这条渐变条
+        是看板自己的仪表, 不是页标题)。代价是 R401 给页头加的"粘住"惠及不到它:
+        `Layout` 那个 `fixed left-3 top-3` 的悬浮汉堡是钉在视口上的, 而这一页
+        整页都跟着滚, 于是汉堡一路压在页面内容上。
+
+        补的是同一件事, 不是把它改成 PageHeader:
+          `sticky top-0` + **不透明的外层** —— 内容从底下滑过去不能透上来。
+            外层用 `-mx-3 px-3`(大屏 `-mx-4 px-4`)把页面左右留白也盖住, 否则
+            滑过去的内容会从渐变条两侧的缝里露出来。
+          `-mt-3 pt-3` 把页面顶部那道留白收进粘住的这一层, 不然它上面会留一条
+            会透内容的缝。
+          `pl-11` 给汉堡让位, 断点取 `lg` 与汉堡出现的断点一致。汉堡压住的只是
+            渐变条最左边那道 4px 装饰条, 上面没有任何信息。
+      */}
+      <div className="sticky top-0 z-20 -mx-3 -mt-3 mb-1.5 bg-base px-3 pt-3 lg:-mx-4 lg:px-4">
+      <div className="relative flex flex-wrap items-center justify-between gap-2 overflow-hidden rounded-card border border-border bg-gradient-to-r from-surface/90 to-surface/70 py-1.5 pl-11 pr-3 shadow-[0_1px_3px_oklch(var(--border)/0.4)] backdrop-blur-sm lg:pl-3">
         <div className="pointer-events-none absolute left-0 top-0 h-full w-1 bg-gradient-to-b from-accent to-accent/20" aria-hidden />
         <div className="flex items-center gap-2">
           <Gauge className="h-4 w-4 text-accent" />
@@ -809,6 +795,37 @@ export function Dashboard() {
           </button>
         </div>
       </div>
+      </div>{/* [R402] 粘住那一层的收尾 */}
+      {hasNoData && (
+        <FetchDataCard
+          isFetching={isFetching}
+          isStarting={startFetch.isPending}
+          fetchFailed={fetchFailed}
+          stage={fetchStatus.data?.stage}
+          fetchPct={fetchStatus.data?.progress}
+          onStart={() => startFetch.mutate()}
+          isTickflowProvider={isTickflowProvider}
+          providerLabel={providerLabel}
+        />
+      )}
+      {/* 首次使用自动弹窗(同会话仅一次) */}
+      <AnimatePresence>
+        {showWelcomeModal && (
+          <WelcomeFetchModal
+            isTickflowProvider={isTickflowProvider}
+            providerLabel={providerLabel}
+            onClose={() => setShowWelcomeModal(false)}
+            onStart={() => {
+              adjGate.guard(() => {
+                startFetch.mutate()
+                setShowWelcomeModal(false)
+              })
+            }}
+          />
+        )}
+      </AnimatePresence>
+      {/* 无除权因子能力时的同步前置确认 */}
+      {adjGate.dialog}
 
       {/* 自选实时模式提示: 大盘看板为盘后数据, 仅自选股实时。避免用户误读为全市场实时。 */}
       {quoteMode === 'watchlist' && (

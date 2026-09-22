@@ -65,14 +65,22 @@ export function WatchlistGroupBar({
 
   const clearDrag = () => { setDragIndex(null); setDropIndex(null) }
 
-  // 分组很多时标签栏横向滚动, 拖到边缘附近自动滚动, 保证能拖到视野外的位置
-  const autoScroll = (clientX: number) => {
+  /**
+   * 拖到标签栏边缘附近自动滚动, 保证能把分组拖到当前看不见的位置。
+   *
+   * [R402] **原来这一支是死的**: 它滚的是 `scrollLeft`, 且开头那句
+   * `scrollWidth <= clientWidth` 就返回 —— 而这一栏自从改成 `flex-wrap`
+   * (见上面那条 fork 增强)之后**永远不横向溢出**, 于是条件恒真, 整个函数
+   * 每次都在第一行返回。注释写着"横向滚动", 而这一栏早就不横向滚了。
+   * 现在它滚的是纵向 —— 那才是这一栏真正会溢出的方向。
+   */
+  const autoScroll = (clientY: number) => {
     const el = tablistRef.current
-    if (!el || el.scrollWidth <= el.clientWidth) return
+    if (!el || el.scrollHeight <= el.clientHeight) return
     const rect = el.getBoundingClientRect()
-    const edge = 48
-    if (clientX < rect.left + edge) el.scrollLeft -= 16
-    else if (clientX > rect.right - edge) el.scrollLeft += 16
+    const edge = 32
+    if (clientY < rect.top + edge) el.scrollTop -= 16
+    else if (clientY > rect.bottom - edge) el.scrollTop += 16
   }
 
   const handleDrop = () => {
@@ -97,8 +105,28 @@ export function WatchlistGroupBar({
           ref={tablistRef}
           role="tablist"
           aria-label="自选分组"
-          onDragOver={dragIndex != null ? e => autoScroll(e.clientX) : undefined}
-          className="flex min-w-0 flex-1 flex-wrap items-stretch gap-1 py-0.5"
+          onDragOver={dragIndex != null ? e => autoScroll(e.clientY) : undefined}
+          /*
+            [R402] **加一个高度上限 + 自己滚。**
+
+            用户: 「自选股看不到下面, 滚动下去也不行」。这一栏是 `flex-wrap`,
+            分组一多就往下堆, 而它**既没有高度上限, 也不滚** —— 它是
+            `flex flex-col h-full` 里的一个 flex 项, `min-height: auto` 让它
+            不肯缩到内容高度以下, 于是它有多高就占多高。
+
+            后果分两档, 用户遇到的是第二档:
+              分组中等多 → 表格被挤成一条缝(实测 375×780 下只剩 **184px**,
+                          而它里面有 6527px 的内容);
+              分组再多   → 整栏超出视口, 而外层是 `h-full` 没有页面级滚动,
+                          **下面的东西根本够不到, 也没有任何东西能滚**。
+
+            上限取 `34vh`: 手机上约 6 行药丸, 导航占掉三分之一, 表格仍留三分之二
+            —— 这一页的主角是表格, 分组是找路的。桌面上一行能排十几个, 34vh
+            本来就到不了, 所以不必分档。
+            **右侧那个操作按钮不在这一层**(它是兄弟节点), 所以滚的只是药丸,
+            按钮仍然钉在首行, 与上面那条 fork 增强的约定一致。
+          */
+          className="flex min-w-0 flex-1 flex-wrap items-stretch gap-1 py-0.5 max-h-[34vh] overflow-y-auto"
         >
           {tabs.map((tab, tabIndex) => {
             const active = selected === tab.id

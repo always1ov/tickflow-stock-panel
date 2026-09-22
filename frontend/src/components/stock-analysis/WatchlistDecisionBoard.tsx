@@ -853,7 +853,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
           title={'只留下有触发的那几只: 出场线已破/逼近、离趋势翻转价 2% 以内、今日刚翻转、'
             + '短期通道到轨。判定是纯规则的(与推送焦点名单同一套到轨口径), AI 不参与。\n'
             + '自选一多, 默认列出全部本身就是噪音 —— 绝大多数票今天确实不需要你看。'}
-          className={`tap-target text-[12px] px-2 py-0.5 rounded-btn border transition-colors cursor-pointer ${
+          className={`tap-target shrink-0 whitespace-nowrap text-[12px] px-2 py-0.5 rounded-btn border transition-colors cursor-pointer ${
             actionableOnly ? 'border-amber-400/40 bg-amber-400/10 text-amber-400' : 'border-border bg-base text-muted hover:text-foreground'
           }`}
         >
@@ -866,7 +866,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
             + '与「只看要动的」的区别: 那个是四档触发的并集(出场线、逼近翻转价、'
             + '今日转折、通道到轨), 转折只是其中一档。\n'
             + '想按转折做的时候, 另外三档就是噪音 —— 而转折正是模拟盘唯一认的信号。'}
-          className={`tap-target text-[12px] px-2 py-0.5 rounded-btn border transition-colors cursor-pointer ${
+          className={`tap-target shrink-0 whitespace-nowrap text-[12px] px-2 py-0.5 rounded-btn border transition-colors cursor-pointer ${
             flippedOnly ? 'border-sky-400/40 bg-sky-400/10 text-sky-300' : 'border-border bg-base text-muted hover:text-foreground'
           }`}
         >
@@ -874,7 +874,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, onA
         </button>
         <button
           onClick={() => setHeldOnly((v) => !v)}
-          className={`tap-target text-[12px] px-2 py-0.5 rounded-btn border transition-colors cursor-pointer ${
+          className={`tap-target shrink-0 whitespace-nowrap text-[12px] px-2 py-0.5 rounded-btn border transition-colors cursor-pointer ${
             heldOnly ? 'border-accent/40 bg-accent/10 text-accent' : 'border-border bg-base text-muted hover:text-foreground'
           }`}
         >

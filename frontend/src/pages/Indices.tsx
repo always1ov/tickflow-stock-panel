@@ -205,9 +205,15 @@ export function Indices() {
         <main className="min-w-0 rounded-card border border-border bg-surface p-3">
           <div className="mb-3 flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <Activity className="h-4 w-4 text-accent" />
-                <h2 className="truncate text-sm font-semibold text-foreground">
+              {/* [R402] 手机上指数名被压成 4px 宽 —— 也就是**一个字都看不见**。
+                  `truncate` 里含 `overflow:hidden`, 而 flex 项一旦 overflow 不是
+                  visible, 它的自动最小尺寸就变成 0 —— 于是它可以被旁边那三段
+                  (代码/点位/涨跌幅)挤到没有。那三段都是短数字, 谁也不肯让,
+                  最后让的全是标题。
+                  改成: 整行可换行 + 标题不许被压, 放不下就整段挪到下一行。 */}
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                <Activity className="h-4 w-4 shrink-0 text-accent" />
+                <h2 className="shrink-0 truncate text-sm font-semibold text-foreground">
                   {selectedInfo?.name || selectedSymbol || '未选择指数'}
                 </h2>
                 {selectedSymbol && <span className="font-mono text-xs text-muted">{selectedSymbol}</span>}
