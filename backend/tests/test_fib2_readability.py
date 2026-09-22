@@ -27,9 +27,9 @@ from tests.frontend_source import code_lines, read_src
 
 CHART = "components/stock-analysis/AnalysisKChart.tsx"
 # [R430] 开关状态与每类的计数从图里提了出来(个股弹窗的右侧列表与图共用), 默认值与
-# 「藏了几条」的说法现在都在这里; 图与右侧列表各自只剩「按整档判断能不能点」。
+# 「藏了几条」的说法现在都在这里; 两排开关各自只剩「按整档判断能不能点」。
 CTL = "components/stock-analysis/levelControls.ts"
-SIDE = "components/stock-preview/LevelSideList.tsx"
+SIDE = "components/stock-analysis/LevelToolbar.tsx"   # [R432] 右侧列表撤了, 方形按钮那排回到图上方
 
 # 上攻途中两次浅回调 → 两条回踩位挤成密集带 → 三类线齐全的一份数据。
 # (与 `test_dinapoli_pivots` 里那份同源, 那边记着它是怎么搜出来的。)

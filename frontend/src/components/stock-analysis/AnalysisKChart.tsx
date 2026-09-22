@@ -12,6 +12,7 @@ import {
   DEFAULT_LEVEL_TYPES, FIB2_BACKTEST_TITLE, FIB2_GRAINS, FIB2_TARGETS_TITLE, PIVOT_RANK_TITLES,
   levelGroupStat, useLevelControls, type LevelControls,
 } from './levelControls'
+import { LevelToolbar } from './LevelToolbar'
 
 /**
  * 个股分析专用日 K 图表。
@@ -161,8 +162,9 @@ interface Props {
   /** 默认开启的价位组; 不传 = 只开量化通道短期(R208) */
   defaultLevelTypes?: LevelType[]
   /**
-   * [R430] 开关状态由外面持有(个股弹窗: 开关在图右边另一张卡片里)。
-   * 传了它, 图上方那一排开关就不画 —— 同一件事两处都能点, 只会让人找哪个才算数。
+   * [R430] 开关状态由外面持有(个股弹窗), 切视图再切回来开着的那几类还在。
+   * [R432] 传了它, 图上方那排开关换成方形按钮那一排(`LevelToolbar`), 位置不变 ——
+   * R430 曾把开关挪到图右边的列表里, 用户: 「在右侧很不方便」。
    */
   controls?: LevelControls
   /** [R430] 默认显示最近多少根 K 线。个股弹窗里跟着头部的 60 / 120 / 250 日走 */
@@ -748,7 +750,12 @@ export function AnalysisKChart({
     <div className={className}>
       {/* 价位开关按钮组: 14 个价位组全排开, 一行放不下就整块换行
           (chip 自身 nowrap, 只在 chip 之间断行) */}
-      {/* [R430] 开关由外面持有时不画这一排 —— 开关在图右边那张卡片里 */}
+      {/* [R432] 开关由外面持有时(个股弹窗)画方形按钮那一排, 位置与这一排相同 */}
+      {levels && controls && (
+        <LevelToolbar groups={LEVEL_GROUPS} controls={controls} effLevels={effLevels}
+                      fib2Raw={fib2Raw} fib2={fib2}
+                      onOpenFit={symbol ? () => setFib2FitOpen(true) : undefined} />
+      )}
       {levels && !controls && (
         <div className="flex flex-wrap content-start items-center gap-1.5 mb-2">
           <span className="text-[10px] text-muted mr-1 shrink-0">关键价位</span>

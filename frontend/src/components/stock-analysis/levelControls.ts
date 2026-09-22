@@ -1,12 +1,12 @@
 /**
  * [R430] 关键价位图的「开了哪几类、枢轴点到第几档、二型粗细、推算位画不画」。
  *
- * 原来这几样是 `AnalysisKChart` 自己的 state, 开关也画在图的上方。个股弹窗重做后,
- * 开关挪到了图**右边**一张独立的卡片里(用户给的排版图), 两边得读写同一份 ——
- * 所以把状态提成一个 hook: 图不传就自己持有(个股分析页等老入口一字不变),
- * 传了就听外面的, 并且不再画自己那一排开关。
+ * 原来这几样是 `AnalysisKChart` 自己的 state。个股弹窗里由弹窗持有(切到日 K 再切
+ * 回来, 开着的那几类还在): 图不传就自己持有(个股分析页等老入口一字不变), 传了就
+ * 听外面的。[R432] 开关一度挪到图右边的列表里, 用户嫌不方便, 回到了图的上方
+ * (`LevelToolbar`, 方形按钮)。
  *
- * 每一类旁边那个数也在这里算(`levelGroupStat`), 图上方那排开关与右侧列表
+ * 每一类旁边那个数也在这里算(`levelGroupStat`), 老的那排小开关与方形按钮那排
  * 共用 —— 数散在两处写, 迟早一处按粗细档算、一处按中档算(R406 就踩过)。
  */
 import { useCallback, useMemo, useState, type Dispatch, type SetStateAction } from 'react'
@@ -24,8 +24,6 @@ export const DEFAULT_LEVEL_TYPES: LevelType[] = ['keltner_s']
 export interface LevelControls {
   activeTypes: Set<LevelType>
   toggleType: (t: LevelType) => void
-  /** 只开不关 —— 在日 K / 分时页点右侧某一类时用: 那一下的意思是「给我看它」 */
-  turnOn: (t: LevelType) => void
   clearAll: () => void
   /** 枢轴点显示到第几档: 1 = 只 P + R1/S1, 2 = 到 R2/S2, 3 = 全档 */
   pivotRank: PivotRank
@@ -50,14 +48,12 @@ export function useLevelControls(defaultTypes: LevelType[] = DEFAULT_LEVEL_TYPES
     else next.add(t)
     return next
   }), [])
-  const turnOn = useCallback((t: LevelType) => setActiveTypes(prev => (
-    prev.has(t) ? prev : new Set(prev).add(t))), [])
   const clearAll = useCallback(() => setActiveTypes(new Set()), [])
 
   return useMemo(() => ({
-    activeTypes, toggleType, turnOn, clearAll,
+    activeTypes, toggleType, clearAll,
     pivotRank, setPivotRank, fib2Grain, setFib2Grain, fib2ShowTargets, setFib2ShowTargets,
-  }), [activeTypes, toggleType, turnOn, clearAll, pivotRank, fib2Grain, fib2ShowTargets])
+  }), [activeTypes, toggleType, clearAll, pivotRank, fib2Grain, fib2ShowTargets])
 }
 
 /**

@@ -20,7 +20,6 @@ import { useLevelControls } from '@/components/stock-analysis/levelControls'
 import { StockReviewPanel, type ReviewTab } from '@/components/stock-analysis/StockReviewDialog'
 import { HERO_DAYS_DEFAULT, PreviewHero } from '@/components/stock-preview/PreviewHero'
 import { ChartLevelsSection, type ChartView } from '@/components/stock-preview/ChartLevelsSection'
-import { LevelSideList } from '@/components/stock-preview/LevelSideList'
 import { ReviewSection } from '@/components/stock-preview/ReviewSection'
 import { PILL, PILL_IDLE, PILL_ON } from '@/components/stock-preview/pill'
 import { StockFinancialSearch } from '@/components/financials/StockFinancialSearch'
@@ -374,6 +373,74 @@ export function StockPreviewDialog({ symbol: symbolProp, name: nameProp, onClose
               />
             )}
 
+            {/* [R432] 头部以下整块一起滚。用户: 「图表与价位这部分提取到结论后面」——
+                新的几块紧跟在头部(「结论」那一行)之后, 旧顶栏、切换条、信息条和旧内容
+                整体挪到新块后面, 等「后面再梳理一遍统一删除」。旧顶栏因此不再钉在顶上,
+                它的关闭按钮要滚下去才看得到; Esc / 点弹窗外照常能关。 */}
+            <div className="min-h-0 flex-1 overflow-auto">
+              <div className="space-y-6 px-4 pb-2 pt-4 sm:px-6">
+              {/* [R430] 新「图表与价位」(用户排版图第二块)。旧的日K/分时/关键价位/复盘
+                  原样留在下面 —— 用户: 「新块加上, 旧的先留着」。 */}
+              <div>
+                <ChartLevelsSection
+                  view={chartView}
+                  onViewChange={setChartView}
+                  levelsEnabled={enableLevelsView}
+                  toolbar={chartView === 'intraday' ? (
+                    <div className="flex flex-wrap items-center gap-2" aria-label="分时周期">
+                      {dayOptions.map(d => (
+                        <button key={d} type="button" aria-pressed={effectiveIntradayDays === d}
+                                onClick={() => selectIntradayDays(d)}
+                                className={`${PILL} ${effectiveIntradayDays === d ? PILL_ON : PILL_IDLE}`}>
+                          {d} 日
+                        </button>
+                      ))}
+                    </div>
+                  ) : chartView === 'levels' ? (
+                    <span className="text-xs text-muted">关键价位模式: 点开哪一类, 就画到图上</span>
+                  ) : (
+                    <span className="text-xs text-muted">区间跟上面的天数走</span>
+                  )}
+                >
+                  {chartView === 'daily' ? (
+                    <StockPanel
+                      symbol={symbol}
+                      height={420}
+                      showIntraday
+                      dateRange={heroRange}
+                      // 区间取到了还不够: 带分时小图时它默认只露最后 40 根
+                      visibleBars={reviewDays}
+                      priceLines={monitorPriceLines}
+                      onPriceDoubleClick={openPriceAlert}
+                      refetchIntervalMs={intradayRefetchMs}
+                      prefetchSymbols={prefetchSymbols}
+                      intradayDays={effectiveIntradayDays}
+                      dailyKlineFlex="flex-[1.4]"
+                      addedDate={addedDate}
+                    />
+                  ) : chartView === 'intraday' ? (
+                    <StockMultiDayIntradayChart
+                      symbol={symbol}
+                      days={effectiveIntradayDays}
+                      height={480}
+                      refetchIntervalMs={intradayRefetchMs}
+                      priceLines={monitorPriceLines}
+                      onPriceDoubleClick={openPriceAlert}
+                    />
+                  ) : (
+                    <StockLevelsPanel symbol={symbol} bare height={maximized ? 720 : 520}
+                                      controls={levelCtl} visibleBars={reviewDays} />
+                  )}
+                </ChartLevelsSection>
+              </div>
+
+              {/* [R431] 新「复盘」(用户排版图第三块)。天数跟头部走; 旧的复盘页仍在旧顶栏里 */}
+              <div>
+                <ReviewSection symbol={symbol} days={reviewDays} />
+              </div>
+              </div>
+
+              <div className="mt-6 border-t border-border/60">
             {/* 顶栏: 单行 = 个股身份 + 视图/区间控件 + 操作按钮。纯样式重排, 交互逻辑不变 */}
             <div className="shrink-0 border-b border-border/60 bg-elevated/30">
               <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 pb-2 pt-2.5 sm:px-5">
@@ -704,73 +771,10 @@ export function StockPreviewDialog({ symbol: symbolProp, name: nameProp, onClose
                 </div>
               )
             })()}
-
-            {/* 图表内容 — 内衬卡片容器, 图表区与弹窗背景分层 (纯样式) */}
-            <div className="flex-1 overflow-auto p-3 sm:p-4">
-              {/* [R430] 新「图表与价位」(用户排版图第二块)。旧的日K/分时/关键价位/复盘
-                  原样留在下面 —— 用户: 「新块加上, 旧的先留着」。 */}
-              <div className="mb-4">
-                <ChartLevelsSection
-                  view={chartView}
-                  onViewChange={setChartView}
-                  levelsEnabled={enableLevelsView}
-                  toolbar={chartView === 'intraday' ? (
-                    <div className="flex flex-wrap items-center gap-2" aria-label="分时周期">
-                      {dayOptions.map(d => (
-                        <button key={d} type="button" aria-pressed={effectiveIntradayDays === d}
-                                onClick={() => selectIntradayDays(d)}
-                                className={`${PILL} ${effectiveIntradayDays === d ? PILL_ON : PILL_IDLE}`}>
-                          {d} 日
-                        </button>
-                      ))}
-                    </div>
-                  ) : chartView === 'levels' ? (
-                    <span className="text-xs text-muted">关键价位模式: 在「关键价位」列表里点开哪一类, 就画到图上</span>
-                  ) : (
-                    <span className="text-xs text-muted">区间跟上面的天数走</span>
-                  )}
-                  side={(
-                    <LevelSideList symbol={symbol} controls={levelCtl}
-                                   showing={chartView === 'levels'} onReveal={() => setChartView('levels')} />
-                  )}
-                >
-                  {chartView === 'daily' ? (
-                    <StockPanel
-                      symbol={symbol}
-                      height={420}
-                      showIntraday
-                      dateRange={heroRange}
-                      // 区间取到了还不够: 带分时小图时它默认只露最后 40 根
-                      visibleBars={reviewDays}
-                      priceLines={monitorPriceLines}
-                      onPriceDoubleClick={openPriceAlert}
-                      refetchIntervalMs={intradayRefetchMs}
-                      prefetchSymbols={prefetchSymbols}
-                      intradayDays={effectiveIntradayDays}
-                      dailyKlineFlex="flex-[1.4]"
-                      addedDate={addedDate}
-                    />
-                  ) : chartView === 'intraday' ? (
-                    <StockMultiDayIntradayChart
-                      symbol={symbol}
-                      days={effectiveIntradayDays}
-                      height={480}
-                      refetchIntervalMs={intradayRefetchMs}
-                      priceLines={monitorPriceLines}
-                      onPriceDoubleClick={openPriceAlert}
-                    />
-                  ) : (
-                    <StockLevelsPanel symbol={symbol} bare height={maximized ? 720 : 520}
-                                      controls={levelCtl} visibleBars={reviewDays} />
-                  )}
-                </ChartLevelsSection>
               </div>
 
-              {/* [R431] 新「复盘」(用户排版图第三块)。天数跟头部走; 旧的复盘页仍在旧顶栏里 */}
-              <div className="mb-4">
-                <ReviewSection symbol={symbol} days={reviewDays} />
-              </div>
-
+              {/* 图表内容 — 内衬卡片容器, 图表区与弹窗背景分层 (纯样式) */}
+              <div className="p-3 sm:p-4">
               <div className="rounded border border-border/50 bg-base/30 p-3">
               {view === 'daily' ? (
                 <StockPanel
@@ -814,7 +818,9 @@ export function StockPreviewDialog({ symbol: symbolProp, name: nameProp, onClose
                 <StockLevelsPanel symbol={symbol} bare height={maximized ? 720 : 520} />
               )}
               </div>
+              </div>
             </div>
+
 
             {/* 扩展插槽: 对话框底部二开区 (无注册时不渲染) */}
             {(view === 'daily' || view === 'intraday') && (
