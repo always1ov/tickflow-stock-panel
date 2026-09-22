@@ -3,6 +3,7 @@ import { chartTheme, FIB2_ROLE_TARGET, fib2RoleColor, getTheme, levelColors, use
 import * as echarts from 'echarts'
 import type { ECharts, EChartsOption } from 'echarts'
 import type { Fib2Grain, Fib2Overlay, KlineRow, LevelSeries } from '@/lib/api'
+import { fib2Status } from '@/lib/fib2Status'
 
 /**
  * 个股分析专用日 K 图表。
@@ -226,6 +227,17 @@ export function AnalysisKChart({
   const effLevels = useMemo(
     () => (fib2Shown && levels ? { ...levels, fib2: fib2Shown } : levels),
     [levels, fib2Shown])
+  // [R411] 那一行「形态走到哪一步」。**读的是整档 `fib2Raw` 而不是画出来的
+  // `fib2Shown`** —— 减线藏掉的那几条不该让这句话也跟着变, 它说的是形态,
+  // 不是"图上现在画了几条"。
+  const fib2Line = useMemo(() => fib2Status({
+    dates: rows.map(r => (typeof r.date === 'string' ? r.date.slice(0, 10) : String(r.date))),
+    close: rows.at(-1)?.close,
+    thrust: fib2?.thrust,
+    markers: fib2?.markers,
+    zone: fib2Zone,
+    levels: fib2Raw ?? [],
+  }), [rows, fib2, fib2Zone, fib2Raw])
 
   const { dates, candle, vols, dateIndex, zoomStart, alignedSeries } = useMemo(() => {
     const dates = rows.map(r => (typeof r.date === 'string' ? r.date.slice(0, 10) : String(r.date)))
@@ -705,6 +717,25 @@ export function AnalysisKChart({
               </button>
             </div>
           )}
+        </div>
+      )}
+      {/* [R411] 形态走到哪一步 —— 把图上那四样(上攻段底色 / ▼首次回踩 /
+          回踩位与密集带 / 作废线)串成一句话。它们本来就是**一个有先后顺序的
+          形态**, 只是图上按位置摆着, 顺序要用户自己在脑子里拼。
+
+          **只报事实, 一个动词都没有**(用户在这一处明确选的): 不出「等待/买入」,
+          也不可能出「卖出」—— 二型的卖出逻辑是那三条推算位, 而那半套与
+          「趋势没坏就不给卖出理由」冲突, 已经定了不用。措辞的唯一产地在
+          `lib/fib2Status.ts`。 */}
+      {activeTypes.has('fib2') && fib2Line && (
+        <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-micro leading-5">
+          <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: LC.fib2 }} />
+          {fib2Line.map((seg, i) => (
+            <span key={seg} className={i === 0 ? 'text-secondary' : 'text-muted'}>
+              {i > 0 && <span className="mr-2 opacity-40">·</span>}
+              {seg}
+            </span>
+          ))}
         </div>
       )}
       {/* 图表:右侧预留带(grid.right 预留)显示价位标签文字,不压蜡烛 */}
