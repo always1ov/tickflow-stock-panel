@@ -3,7 +3,8 @@ import { chartTheme, FIB2_ROLE_TARGET, QUANT_MACD_COLORS, fib2RoleColor, getThem
 import * as echarts from 'echarts'
 import type { ECharts, EChartsOption } from 'echarts'
 import type { Fib2Grain, Fib2Overlay, KlineRow, LevelSeries, QuantMacdResult } from '@/lib/api'
-import { alignQuantMacd, quantMacdSeries, subPaneHeight } from '@/lib/quantMacdSeries'
+import { alignQuantMacd, quantMacdSeries } from '@/lib/quantMacdSeries'
+import { levelsChartLayout, PAD_BOTTOM, SLIDER_H } from '@/lib/levelsChartLayout'
 import { fib2Status } from '@/lib/fib2Status'
 import { Fib2GrainDialog } from './Fib2GrainDialog'
 
@@ -170,6 +171,10 @@ interface Props {
   quantMacd?: QuantMacdResult
   /** 预留:点击某根 K 线 */
   onDateClick?: (date: string) => void
+  /**
+   * [R419] 主图按这个高度算(与 R415 之前一样); 量化MACD 副图在它之外另加,
+   * 所以整张图比它高。见 `lib/levelsChartLayout.ts`。
+   */
   height?: number
   className?: string
 }
@@ -340,6 +345,8 @@ export function AnalysisKChart({
   // [R409] 当前主题下的价位组配色。单一产地在 `lib/theme.ts`;
   // `theme` 已经在 buildOption 的 useMemo 依赖里, 切主题会整张图重建。
   const LC = levelColors(theme)
+  // [R419] 纵向版面(主图原高 + 副图另加), 见 `lib/levelsChartLayout.ts`
+  const layout = levelsChartLayout(height)
   const targetColor = fib2RoleColor(FIB2_ROLE_TARGET, theme)
 
   // 构建 option
@@ -352,15 +359,8 @@ export function AnalysisKChart({
     // [R415] 日期刻度从主图底下挪到副图底下, 间距跟着改。原来刻度夹在主图与
     // 成交量之间, 成交量柱从底部往上长, 顶上那条被刻度压住看不出来; 换成量化MACD
     // 以后 0 轴与叉点图标都贴近副图顶部, 出图就被日期字压住了。
-    const SLIDER_H = 22
-    const PAD_TOP = 16
-    const GAP_MAIN_SUB = 14       // 主图 ↔ 量化MACD(两边的纵轴刻度不再上下相撞)
-    const GAP_SUB_SLIDER = 26     // 量化MACD ↔ 缩放条: 日期刻度在这一段里
-    const PAD_BOTTOM = 8
-    // [R418] 副图高度按整张图的比例给, 见 `subPaneHeight`
-    const subH = subPaneHeight(height)
-    const mainH = height - PAD_TOP - GAP_MAIN_SUB - subH - GAP_SUB_SLIDER - SLIDER_H - PAD_BOTTOM
-    const subTop = PAD_TOP + mainH + GAP_MAIN_SUB
+    // [R419] 数值统一由 `levelsChartLayout` 出: 主图与 R415 之前一样高, 副图另加。
+    const { mainH, subH, subTop } = layout
     const sliderBottom = PAD_BOTTOM
 
     // 预留:markPoint(新闻标记)
@@ -677,6 +677,9 @@ export function AnalysisKChart({
       })
       chartInstRef.current.on('globalout', () => setHoveredKey(null))
     }
+    // [R419] 画布高度跟着 `height`(最大化 / 还原)变, 先让 ECharts 量一次新尺寸;
+    // 尺寸没变时这一下什么也不做
+    chartInstRef.current.resize()
     chartInstRef.current.setOption(buildOption(), true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows, levels, series, seriesDates, activeTypes, pivotRank, markers, ranges, fib2, fib2Grain, effLevels, fib2Zone, height, theme, hoveredKey, quantMacd])
@@ -870,7 +873,8 @@ export function AnalysisKChart({
         />
       )}
       {/* 图表:右侧预留带(grid.right 预留)显示价位标签文字,不压蜡烛 */}
-      <div ref={chartRef} style={{ width: '100%', height }} />
+      {/* [R419] 画布高 = 主图(原高) + 副图, 比 `height` 高; 弹窗内容区本身可滚动 */}
+      <div ref={chartRef} style={{ width: '100%', height: layout.total }} />
 
       {/* 价位统计面板:把当前开启的点位按"压力 / 支撑"结构化列出 */}
       {effLevels && (

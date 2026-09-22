@@ -66,18 +66,6 @@ export function alignQuantMacd(
 export const STICK_RATIO = 0.66
 export const STICK_WIDTH = `${STICK_RATIO * 100}%`
 
-/**
- * [R418] 副图高度: 整张图的 1/4, 最少 100、最多 180。
- *
- * 用户: 「显示部分你可以自己决定多大合适, 只要我放大的时候看得清楚就行, 因为我
- * 显示的 K 线多, 全景的时候像素是肯定不够的」。原来写死 90px —— 通达信那张副图
- * 大约是它的 3 倍高, 空心框、黄柱、箭头挤在 90px 里, 放大了横向够、纵向仍然扁。
- * 按比例给, 图大(弹窗最大化)副图跟着大; 上限免得主图被挤得太矮。
- */
-export function subPaneHeight(chartHeight: number): number {
-  return Math.round(Math.min(180, Math.max(100, chartHeight * 0.25)))
-}
-
 /** 空心柱的边框: 1 点 1 空的点线(实测, 见 DEA 那一条的说明)。 */
 export const HOLLOW_DASH = [1, 1]
 
