@@ -55,7 +55,7 @@ LEVEL_TYPES = {
     "keltner_l": "Keltner长期",  # MA120 ± 3×ATR(牛熊趋势边界)
     "atr_stop": "ATR波动通道",    # close±nATR 动态波动带(中性命名,非操作指令)
     "gap": "缺口位",          # 未回补跳空缺口
-    "fib": "斐波那契",        # 回撤位 0.236~0.786
+    "fib": "斐波那契一型",    # 回撤位 0.236~0.786(近 120 日单一波段)
     "round": "整数关口",      # 心理整数位
     # [fork 增强] 六态关键点(利弗莫尔上/下关键点)。不在 compute_levels 内计算 ——
     # 需要每票各自的阈值配置,由 API 层(stock_analysis.get_levels)注入。

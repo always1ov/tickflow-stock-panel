@@ -54,7 +54,7 @@ export const LEVEL_GROUPS: { key: LevelType; label: string; color: string }[] = 
   { key: 'keltner_l',label: '量化通道长期',  color: '#67E8F9' },   // 更浅青(MA120±3ATR 曲线)
   { key: 'atr_stop', label: 'ATR波动通道',  color: '#EF4444' },   // 红(警示)
   { key: 'gap',      label: '缺口位',    color: '#EC4899' },   // 粉
-  { key: 'fib',      label: '斐波那契',  color: '#F59E0B' },   // 金
+  { key: 'fib',      label: '斐波那契一型', color: '#F59E0B' },   // 金
   { key: 'round',    label: '整数关口',  color: '#71717A' },   // 灰(心理位,弱视觉)
   // [fork 增强] 六态关键点(利弗莫尔上/下关键点,趋势确认/否决价)
   { key: 'livermore', label: '六态关键点', color: '#A78BFA' },  // 淡紫
