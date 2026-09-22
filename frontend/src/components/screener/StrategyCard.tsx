@@ -33,7 +33,7 @@ const CARD_STYLES: Record<CardSize, {
     card: 'relative inline-flex items-center gap-2 pl-3 pr-12 py-1.5 rounded-lg',
     name: 'text-xs',
     count: 'text-xs',
-    desc: 'text-[10px] text-muted leading-tight mt-0.5 line-clamp-1 max-w-[120px]',
+    desc: 'text-[10px] text-muted leading-tight mt-0.5 line-clamp-1 max-w-none sm:max-w-[120px]',
     icon: 'h-3.5 w-3.5',
   },
   large: {
@@ -41,7 +41,7 @@ const CARD_STYLES: Record<CardSize, {
     card: 'relative inline-flex flex-col items-start pl-3.5 pr-12 py-2.5 rounded-btn min-w-[100px]',
     name: 'text-xs',
     count: 'text-lg font-mono font-bold tabular-nums',
-    desc: 'text-[10px] text-muted leading-tight mt-0.5 line-clamp-2 max-w-[140px]',
+    desc: 'text-[10px] text-muted leading-tight mt-0.5 line-clamp-2 max-w-none sm:max-w-[140px]',
     icon: 'h-3.5 w-3.5',
   },
   hidden: {
@@ -123,7 +123,14 @@ export function StrategyCard({
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.12, ease: [0.16, 1, 0.3, 1] }}
-      className={`${cs.card} border transition-ui duration-hover text-left group ${activeCls}`}
+      // [R398] 窄屏上整张卡占满一列。
+      //
+      // 这些卡是 `inline-flex` 的 —— **按各自内容撑宽**。宽屏上一行能塞好几张,
+      // 平铺开来看不出问题; 到了手机上一行只放得下一张, 于是每张宽度都不一样,
+      // 右边缘成了锯齿(用户截图: 「跌破生命线」窄、「相对活力指数转强」几乎顶到边)。
+      //
+      // 只在 `sm`(640px)以下铺满, 宽屏的平铺一个像素不变。
+      className={`${cs.card} w-full sm:w-auto border transition-ui duration-hover text-left group ${activeCls}`}
     >
       {cardSize === 'large' ? (
         <>
@@ -196,7 +203,7 @@ export function StrategyCard({
             </div>
             <div className="flex items-center gap-1.5 mt-0.5">
               {description && (
-                <span className="text-[10px] text-muted leading-tight line-clamp-1 max-w-[120px]">{description}</span>
+                <span className="text-[10px] text-muted leading-tight line-clamp-1 max-w-none sm:max-w-[120px]">{description}</span>
               )}
               {hasExpired && (
                 <span className="text-[9px] font-mono text-red-400/80">{'-' + expiredCount}</span>
