@@ -14,6 +14,18 @@ if "tickflow" not in sys.modules:
     sys.modules["tickflow"] = _stub
 
 from app.api.kline import _maybe_inject_live_candle  # noqa: E402
+from app.market_time import cn_today  # noqa: E402
+
+# [R414] **「今天」一律取北京口径。**
+#
+# 被测代码那条守卫是 `enriched_date != cn_today()` —— 它必须是北京日期
+# (`kline.py` 里那段注释把两种时区的症状都写清楚了)。测试拿 `date.today()`
+# (容器是 UTC)去造数据, **在 UTC 16:00~24:00 这一段就和它差一天**, 于是
+# 叠加层的日期被判成「不是今天」, 注入被跳过, 断言全线落空。
+#
+# 也就是说这几条测试**每天到了北京午夜之后会自己变红**, 白天跑全绿。
+# 这比测错更坏: 它让人习惯性忽略红色。同一个坑 `test_abnormal_moves.py`
+# 里修过一次(那条注释还在), 但**没有扫一遍别处**, 于是这里漏了四处。
 
 
 def _request(overlay: pl.DataFrame | None, quote_service=None):
@@ -37,10 +49,10 @@ def _overlay(d: date, close=11.9):
 def test_overlay_row_becomes_today_candle():
     """免费档: 叠加层有当日行 → 追加为今日实时蜡烛(is_live), 指标一并带上。"""
     rows = [{"date": "2026-08-14", "close": 11.28}]
-    out = _maybe_inject_live_candle(_request(_overlay(date.today())), "600722.SH", rows)
+    out = _maybe_inject_live_candle(_request(_overlay(cn_today())), "600722.SH", rows)
     assert len(out) == 2
     live = out[-1]
-    assert live["date"] == str(date.today())
+    assert live["date"] == str(cn_today())
     assert live["close"] == 11.9
     assert live["is_live"] is True
     assert live["ma5"] == 11.5, "叠加层的指标字段要带进蜡烛"
@@ -50,7 +62,7 @@ def test_stale_overlay_date_is_not_injected():
     """叠加层还是上一交易日的行(周末/未开实时)→ 不注入, 防重复蜡烛。"""
     rows = [{"date": "2026-08-14", "close": 11.28}]
     out = _maybe_inject_live_candle(
-        _request(_overlay(date.today() - timedelta(days=3))), "600722.SH", rows)
+        _request(_overlay(cn_today() - timedelta(days=3))), "600722.SH", rows)
     assert out == rows
 
 
@@ -62,9 +74,9 @@ def test_no_overlay_no_quote_service_keeps_rows():
 
 def test_existing_today_row_is_overwritten_not_duplicated():
     """收盘后日线已落盘, 叠加层仍在 → 覆盖今日行而不是再加一根。"""
-    today = str(date.today())
+    today = str(cn_today())
     rows = [{"date": "2026-08-14", "close": 11.28}, {"date": today, "close": 11.5}]
-    out = _maybe_inject_live_candle(_request(_overlay(date.today())), "600722.SH", rows)
+    out = _maybe_inject_live_candle(_request(_overlay(cn_today())), "600722.SH", rows)
     assert len(out) == 2
     assert out[-1]["close"] == 11.9
 

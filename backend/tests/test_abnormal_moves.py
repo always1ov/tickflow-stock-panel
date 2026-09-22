@@ -5,6 +5,7 @@ from datetime import date, timedelta
 
 import polars as pl
 
+from app.market_time import cn_today
 from app.indicators.pipeline import (
     attach_deviation_columns,
     attach_deviation_columns_today,
@@ -316,7 +317,11 @@ def test_build_overview_cache_date_today_no_double_count() -> None:
 
     class _TodayRepo(_FakeRepo):
         def get_enriched_latest(self):
-            return self._df, date.today()
+            # [R414] 北京口径。被测代码判的是 `cache_date >= cn_today()`, 喂
+            # `date.today()` 在 UTC 16:00~24:00 会差一天 —— 本文件上面那条
+            # `test_benchmark_momentum_today_excludes_today_rows` 修过同一个坑,
+            # 当时没扫一遍别处, 这两处就漏了。
+            return self._df, cn_today()
 
     df = pl.DataFrame(
         {
@@ -341,7 +346,11 @@ def test_build_overview_negative_side_stricter_threshold() -> None:
 
     class _TodayRepo(_FakeRepo):
         def get_enriched_latest(self):
-            return self._df, date.today()
+            # [R414] 北京口径。被测代码判的是 `cache_date >= cn_today()`, 喂
+            # `date.today()` 在 UTC 16:00~24:00 会差一天 —— 本文件上面那条
+            # `test_benchmark_momentum_today_excludes_today_rows` 修过同一个坑,
+            # 当时没扫一遍别处, 这两处就漏了。
+            return self._df, cn_today()
 
     df = pl.DataFrame(
         {
