@@ -3,7 +3,7 @@ import { chartTheme, FIB2_ROLE_TARGET, QUANT_MACD_COLORS, fib2RoleColor, getThem
 import * as echarts from 'echarts'
 import type { ECharts, EChartsOption } from 'echarts'
 import type { Fib2Grain, Fib2Overlay, KlineRow, LevelSeries, QuantMacdResult } from '@/lib/api'
-import { alignQuantMacd, QMACD_ROWS, quantMacdRange, quantMacdSeries } from '@/lib/quantMacdSeries'
+import { alignQuantMacd, quantMacdGrid, quantMacdSeries, type QuantMacdAligned } from '@/lib/quantMacdSeries'
 import { levelsChartLayout, PAD_BOTTOM, SLIDER_H } from '@/lib/levelsChartLayout'
 import { futureSlotRenderer } from '@/lib/futureZone'
 import { fib2Status } from '@/lib/fib2Status'
@@ -36,6 +36,9 @@ const THEME = {
   bull: '#C74040',
   bear: '#2D9B65',
 }
+
+/** [R436] 副图横格那支系列的 id —— 缩放时按 id 只改它的 markLine */
+const QMACD_GRID_ID = 'qmacd-grid'
 
 /** 当前主题的图表调色板 (buildOption 渲染时调用; 切换由组件 effect 触发重建)。 */
 const CT = () => chartTheme(getTheme())
@@ -249,6 +252,8 @@ export function AnalysisKChart({
 }: Props) {
   const chartRef = useRef<HTMLDivElement>(null)
   const chartInstRef = useRef<ECharts | null>(null)
+  /** [R436] 副图横格要在拖动缩放后重算 —— 那一刻拿不到 buildOption 里的局部量, 存这儿 */
+  const qmacdGridRef = useRef<{ qa: QuantMacdAligned; n: number } | null>(null)
   /** seriesIndex → levelKey 映射, buildOption 填充, ECharts hover 事件反查 */
   const seriesKeyMapRef = useRef<Map<number, string>>(new Map())
   // 主题: buildOption 内部用 CT() 动态取色, 这里只负责切换时触发重建
@@ -510,8 +515,11 @@ export function AnalysisKChart({
       },
     } : undefined
 
-    const qmacdSeries = quantMacdSeries(alignQuantMacd(dates, quantMacd),
-                                        { xAxisIndex: 1, yAxisIndex: 1 })
+    const qa = alignQuantMacd(dates, quantMacd)
+    const qmacdSeries = quantMacdSeries(qa, { xAxisIndex: 1, yAxisIndex: 1 })
+    // [R436] 副图横格: 按当前窗口现算(拖动缩放后由 datazoom 那边再算一次, 见 qmacdGridRef)
+    const qGrid = quantMacdGrid(qa, zoomStart, dates.length - 1)
+    qmacdGridRef.current = { qa, n: dates.length }
     const series: any[] = [
       {
         name: 'K', type: 'candlestick', data: candle, animation: false,
@@ -645,6 +653,18 @@ export function AnalysisKChart({
       }
     }
 
+    // [R436] 副图的等间距横格。画成一支空系列上的 markLine: 位置按数据值给,
+    // 纵轴怎么变它都落在对的地方。放在最后 push, 不打乱 keyMap 的下标。
+    series.push({
+      id: QMACD_GRID_ID, type: 'line', name: '量化MACD横格', xAxisIndex: 1, yAxisIndex: 1,
+      data: [], silent: true, animation: false, z: 1,
+      markLine: {
+        silent: true, symbol: 'none', animation: false, label: { show: false },
+        lineStyle: { color: QUANT_MACD_COLORS.gridLine, type: 'dotted', width: 1 },
+        data: qGrid.lines.map(v => ({ yAxis: v })),
+      },
+    })
+
     return {
       animation: false,
       backgroundColor: 'transparent',
@@ -654,10 +674,9 @@ export function AnalysisKChart({
       grid: [
         { left: 56, right: 144, top: 16, height: mainH },
         // [R418] 亮色主题下副图铺通达信的黑底 —— 颜色照抄通达信, 纯黄在白底上看不见
-        // [R434] 外面一圈实线框, 与通达信那张副图一样(用户: 「四行等高的行限制着的」)
-        { left: 56, right: 144, top: subTop, height: subH, show: true,
-          backgroundColor: isDark ? 'transparent' : QUANT_MACD_COLORS.paneBg,
-          borderWidth: 1, borderColor: QUANT_MACD_COLORS.frame },
+        // [R434 加, R436 撤] 外面那圈红框撤了。用户: 「量化macd别搞红框框出来」
+        { left: 56, right: 144, top: subTop, height: subH,
+          show: !isDark, backgroundColor: QUANT_MACD_COLORS.paneBg, borderWidth: 0 },
       ],
       xAxis: [
         {
@@ -681,14 +700,11 @@ export function AnalysisKChart({
           axisLabel: { color: CT().text, fontSize: 10, fontFamily: 'JetBrains Mono, monospace' } },
         // [R415] 不开 scale: 原文每根柱子都从 0 画起(STICKLINE 的第二个参数),
         // 开了 scale 在全是正值的那一段 0 会掉出坐标轴, 柱子就没了根。
-        // [R434] 四行等高: 纵轴范围由 `quantMacdRange` 按当前窗口里的数据现算 ——
-        // 正好 4 × 整齐的行高, 0 轴压在其中一条横格上(通达信就是这样)。行高本身是
-        // 整齐的数, ECharts 按 splitNumber 取行高时会原样用它, 横格于是恰好 3 条。
-        // 上下界都把 0 算进去, 柱根永远在框里(R415 不开 scale 防的就是柱根掉出去)。
-        { gridIndex: 1, splitNumber: QMACD_ROWS,
-          min: (e: { min: number; max: number }) => quantMacdRange(e.min, e.max).min,
-          max: (e: { min: number; max: number }) => quantMacdRange(e.min, e.max).max,
-          splitLine: { show: true, lineStyle: { color: QUANT_MACD_COLORS.gridLine, type: 'dotted', width: 1 } },
+        // [R436] 纵轴 = 当前窗口里数据的真实跨度(含 0), 不凑整行; 横格不走 splitLine
+        // (ECharts 固定间距时从下沿起算, 0 不一定压线), 由最后那支 markLine 画。
+        // 上下界都含 0, 柱根永远在框里(R415 不开 scale 防的就是柱根掉出去)。
+        { gridIndex: 1, min: qGrid.min, max: qGrid.max,
+          splitLine: { show: false },
           // [R423] 不写刻度数字。用户: 「有意义吗, 没意义就去掉」—— DIFF/DEA 是
           // 价格差(元), 跟股价挂钩, 不同股票之间没法比; 看共振只看柱子在 0 上还是
           // 0 下、有没有金叉死叉、出没出黄柱, 一个数都不用读。0 轴也不必标: 每根
@@ -736,6 +752,20 @@ export function AnalysisKChart({
         }
       })
       chartInstRef.current.on('globalout', () => setHoveredKey(null))
+      // [R436] 拖动 / 滚轮缩放之后窗口变了, 副图的纵轴跨度与横格按新窗口重算
+      const inst = chartInstRef.current
+      inst.on('datazoom', () => {
+        const r = qmacdGridRef.current
+        if (!r) return
+        const dz = ((inst.getOption() as any).dataZoom ?? [])[0] ?? {}
+        const from = Math.floor(((dz.start ?? 0) / 100) * (r.n - 1))
+        const to = Math.ceil(((dz.end ?? 100) / 100) * (r.n - 1))
+        const g = quantMacdGrid(r.qa, from, to)
+        inst.setOption({
+          yAxis: [{}, { min: g.min, max: g.max }],
+          series: [{ id: QMACD_GRID_ID, markLine: { data: g.lines.map(v => ({ yAxis: v })) } }],
+        })
+      })
     }
     // [R419] 画布高度跟着 `height`(最大化 / 还原)变, 先让 ECharts 量一次新尺寸;
     // 尺寸没变时这一下什么也不做

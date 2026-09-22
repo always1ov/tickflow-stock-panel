@@ -48,10 +48,23 @@ def test_R434_视图切换靠右():
     assert 'className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-btn' in sec
 
 
-def test_R434_副图四行等高_外框加点线横格():
+def test_R436_副图不画红框_横格一直等间距():
+    """[R434 → R436] 用户: 「量化macd别搞红框框出来, 你知道是一直等间距就行了,
+    可以里面等间距两格子, 再往外就等间距比例使用空间」。"""
     chart = code_of(CHART)
-    assert "borderWidth: 1, borderColor: QUANT_MACD_COLORS.frame" in chart, "副图没有外框"
-    assert "splitNumber: QMACD_ROWS" in chart
-    assert "quantMacdRange(e.min, e.max).min" in chart and "quantMacdRange(e.min, e.max).max" in chart
-    assert "splitLine: { show: true, lineStyle: { color: QUANT_MACD_COLORS.gridLine, type: 'dotted'" in chart, "横格没画"
-    assert "export const QMACD_ROWS = 4" in code_of(QM)
+    assert "QUANT_MACD_COLORS.frame" not in chart, "红框又回来了"
+    assert "show: !isDark, backgroundColor: QUANT_MACD_COLORS.paneBg, borderWidth: 0" in chart
+    # 纵轴是窗口里的真实跨度, 横格由 markLine 按数据值画(0 一定压线)
+    assert "const qGrid = quantMacdGrid(qa, zoomStart, dates.length - 1)" in chart
+    assert "{ gridIndex: 1, min: qGrid.min, max: qGrid.max," in chart
+    assert "data: qGrid.lines.map(v => ({ yAxis: v }))" in chart
+    # 拖动缩放后按新窗口重算, 否则横格停在打开那一刻的窗口上
+    zoom = chart[chart.index("inst.on('datazoom'"):]
+    zoom = zoom[:zoom.index("\n      })")]
+    assert "quantMacdGrid(r.qa, from, to)" in zoom and "id: QMACD_GRID_ID" in zoom
+    qm = code_of(QM)
+    assert "export const QMACD_GRID_SPLIT = 3" in qm, "里面两格 = 跨度分三份"
+    # 上下各多留 1/4 格, 最外那条线才不会贴着边(贴边看着又是一道框)
+    assert "export const QMACD_GRID_PAD = 0.25" in qm
+    assert "min: lo - k * QMACD_GRID_PAD, max: hi + k * QMACD_GRID_PAD" in qm
+    assert "QMACD_ROWS" not in qm and "quantMacdRange" not in qm

@@ -182,45 +182,48 @@ export function quantMacdSeries(
 
 
 /**
- * [R434] 副图的纵轴范围 —— **四行等高**, 并且 0 轴正好压在其中一条横格上。
+ * [R436] 副图的横格 —— **一直等间距, 里面两格, 往外按同样的间距比例用空间**。
  *
- * 用户: 「量化macd是四行等高的行限制着的」。通达信那张副图外面一圈实线框, 里面是
- * 等距的暗红点线横格, 其中一条就是 0 轴。这里的做法:
+ * 用户: 「量化macd别搞红框框出来, 你知道是一直等间距就行了, 可以里面等间距两格子,
+ * 再往外就等间距比例使用空间」。R434 的做法是把纵轴凑成整整四行、外面加一圈红框;
+ * 这次改成通达信截图里那样:
  *
- *   · 行高 `step` 取「整齐的数」(1 / 2 / 3 / 5 × 10ⁿ);
- *   · 0 轴以上占 `above` 行、以下占 `4 − above` 行, 在能装下这一屏数据的分法里
- *     挑行高最小的那一种 —— 柱子尽量撑满, 又不出框;
- *   · 返回的 min / max 正好是 4 × step, 交给 ECharts 的 `splitNumber: 4` 时它会
- *     原样用这个 step(整齐的数经它的取整还是它自己), 于是横格恰好 3 条。
+ *   · 纵轴就是当前窗口里数据的真实跨度(含 0, 柱子都从 0 长出来), 不凑整行;
+ *   · 间距 = 跨度 ÷ 3。横格落在间距的整数倍上 —— **0 轴一定压在一条线上**;
+ *     于是跨度里通常有三条线、中间两整格, 上下各剩一截不满一格的空间, 按比例留着;
+ *   · 不画外框。落在数据上下极值上的线不画, 0 除外;
+ *   · 纵轴上下各多留 1/4 格(`QMACD_GRID_PAD`): 否则 0 离极值恰好接近整格时, 最外那条线
+ *     会贴着副图的上 / 下边, 看着又是一道框(R436 截图里缩放到上涨段就撞上了)。
  *
- * 纵轴随拖动的窗口变, 所以这是给 `yAxis.min / max` 的函数用的, 入参是当前窗口
- * 里数据的上下界。
+ * 入参是按 `dates` 对齐好的那份(`alignQuantMacd`), 以及当前窗口的首尾下标 ——
+ * 拖动缩放后窗口变了, 由图那边重算一次。
  */
-export const QMACD_ROWS = 4
+export const QMACD_GRID_SPLIT = 3
+/** 纵轴上下各多留几分之一格 —— 让最外那条线离边至少这么远 */
+export const QMACD_GRID_PAD = 0.25
 
-const NICE = [1, 2, 3, 5, 10]
-
-export function niceCeil(v: number): number {
-  if (!(v > 0) || !Number.isFinite(v)) return 0
-  const e = Math.floor(Math.log10(v))
-  const base = 10 ** e
-  const f = v / base
-  // 浮点误差: 0.3 / 0.1 = 2.9999999999999996, 不能因此跳到下一档
-  const hit = NICE.find(n => f <= n * (1 + 1e-9)) ?? 10
-  return hit * base
-}
-
-export function quantMacdRange(lo: number, hi: number): { min: number; max: number; step: number } {
-  const up = Math.max(hi, 0)
-  const dn = Math.max(-lo, 0)
-  if (up === 0 && dn === 0) return { min: -2, max: 2, step: 1 }     // 一屏全是 0: 随便给个框
-  let best: { min: number; max: number; step: number } | null = null
-  for (let above = 0; above <= QMACD_ROWS; above++) {
-    const below = QMACD_ROWS - above
-    if ((up > 0 && above === 0) || (dn > 0 && below === 0)) continue
-    const need = Math.max(above ? up / above : 0, below ? dn / below : 0)
-    const step = niceCeil(need)
-    if (!best || step < best.step) best = { min: -below * step, max: above * step, step }
+export function quantMacdGrid(
+  a: QuantMacdAligned, from: number, to: number,
+): { min: number; max: number; lines: number[] } {
+  let lo = 0
+  let hi = 0
+  for (const arr of [a.diff, a.dea, a.yellow, a.gold_icon, a.dead_icon]) {
+    for (let i = Math.max(0, from); i <= Math.min(to, arr.length - 1); i++) {
+      const v = arr[i]
+      if (v != null && Number.isFinite(v)) {
+        if (v < lo) lo = v
+        if (v > hi) hi = v
+      }
+    }
   }
-  return best!
+  if (hi === lo) return { min: -1, max: 1, lines: [0] }        // 一屏全是 0 / 没数据
+  const k = (hi - lo) / QMACD_GRID_SPLIT
+  const eps = k * 1e-9
+  const lines: number[] = []
+  for (let j = Math.ceil(lo / k - 1e-9); j <= Math.floor(hi / k + 1e-9); j++) {
+    const v = j === 0 ? 0 : j * k
+    if (v !== 0 && (Math.abs(v - lo) < eps || Math.abs(v - hi) < eps)) continue   // 边缘上的不画
+    lines.push(v)
+  }
+  return { min: lo - k * QMACD_GRID_PAD, max: hi + k * QMACD_GRID_PAD, lines }
 }

@@ -1,0 +1,5 @@
+# R436 — 量化MACD 副图撤掉红框, 横格一直等间距(里面两格, 往外按比例)
+
+| # | 改动 | 涉及文件 | 冲突风险 | 单独回退 |
+|---|------|---------|:---:|---------|
+| R436 | 用户: 「量化macd别搞红框框出来, 你知道是一直等间距就行了, 可以里面等间距两格子, 再往外就等间距比例使用空间」。R434 把纵轴凑成整整四行、外面一圈红框, 这次撤掉: ① 外框没了(`QUANT_MACD_COLORS.frame` 删除, 副图 `borderWidth: 0`); ② 新函数 `quantMacdGrid` 替掉 `QMACD_ROWS / niceCeil / quantMacdRange` —— 纵轴取当前窗口数据的真实跨度(含 0), 间距 = 跨度 ÷ 3, 横格落在间距整数倍上, 所以 0 轴一定压线、通常三条线两整格, 上下剩下不满一格的空间按比例留着; 落在数据极值上的线不画(0 除外); ③ 纵轴上下各多留 1/4 格(`QMACD_GRID_PAD`) —— 截图核查时缩放到上涨段, 最外那条线贴着副图上边, 看着又是一道框; ④ 横格改用一条空 series 的 markLine 按数据值画(固定 interval 的 splitLine 从轴最小值起算, 0 不一定压线); ⑤ 滚轮 / 滑块缩放后按新窗口重算纵轴与横格(`datazoom` 事件), 否则横格停在打开那一刻。实测: 初始窗口横格 0 / −k / −2k, 缩放到另一段变成 0 / k / 2k, k 都等于该窗口跨度的 1/3。只动副图的格子与纵轴, 柱子、图标、颜色一个没动。守卫 `test_R436_副图不画红框_横格一直等间距` + vitest `[R436]` 一组; 变异 7/7 杀死(不留余量 / 分四份 / 极值画线 / 0 不压线 / 缩放不重算 / 红框回来 / 不看窗口) | `frontend/src/lib/quantMacdSeries.ts`、`frontend/src/lib/quantMacdSeries.test.ts`、`frontend/src/lib/theme.ts`、`frontend/src/components/stock-analysis/AnalysisKChart.tsx`、`backend/tests/test_status_section.py` | 低(只在 fork 自己加的量化MACD 副图里) | 回退本提交即回到 R434 的四行等高 + 红框 |

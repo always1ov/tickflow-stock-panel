@@ -8,7 +8,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   alignQuantMacd, diffExposed, HOLLOW_DASH, ICON_DOWN, ICON_H, ICON_UP, quantMacdSeries, renderDiffRect,
-  STICK_RATIO, STICK_WIDTH, QMACD_ROWS, niceCeil, quantMacdRange,
+  STICK_RATIO, STICK_WIDTH, QMACD_GRID_SPLIT, QMACD_GRID_PAD, quantMacdGrid,
 } from './quantMacdSeries'
 import { QUANT_MACD_COLORS } from './theme'
 
@@ -119,8 +119,7 @@ describe('量化MACD: 画法照原文', () => {
       red: '#FF0000', darkRed: '#CC0000', green: '#00FF00', yellow: '#FFFF00',
       icon2: '#00DC00',   // 2 号图标自带的绿, 对着通达信截图量的
       paneBg: '#000000',  // 通达信的底色; 亮色主题下副图铺这个底
-      frame: '#B00000',   // [R434] 副图外框(实线)
-      gridLine: '#800000', // [R434] 框里的横格(点线)
+      gridLine: '#800000', // [R434] 横格(点线); [R436] 外框撤了
     })
   })
 
@@ -180,36 +179,42 @@ describe('量化MACD: 按日期对到图上的 x 轴', () => {
   })
 })
 
-describe('[R434] 副图四行等高, 0 轴压在横格上', () => {
-  const cases: [number, number][] = [
-    [-0.8, 1.9], [0, 2.4], [-3.1, 0], [-0.02, 0.013], [-120, 40], [0.5, 0.7], [-0.7, -0.2], [-1, 1],
-  ]
-  it.each(cases)('数据 [%s, %s]', (lo, hi) => {
-    const { min, max, step } = quantMacdRange(lo, hi)
-    expect(max - min).toBeCloseTo(QMACD_ROWS * step, 9)          // 正好四行
-    expect(min).toBeLessThanOrEqual(Math.min(lo, 0) + 1e-12)     // 装得下, 且柱根 0 在框里
-    expect(max).toBeGreaterThanOrEqual(Math.max(hi, 0) - 1e-12)
-    const zeroRow = -min / step                                  // 0 轴落在第几条线上
-    expect(Math.abs(zeroRow - Math.round(zeroRow))).toBeLessThan(1e-9)
-    expect(niceCeil(step)).toBeCloseTo(step, 12)                 // 行高是整齐的数, ECharts 不会再改它
+describe('[R436] 副图横格一直等间距, 里面两格, 往外按比例', () => {
+  const mk = (vals: number[]) => ({
+    diff: vals, dea: vals.map(() => null), yellow: vals.map(() => null),
+    gold_icon: vals.map(() => null), dead_icon: vals.map(() => null),
+  })
+  const cases: number[][] = [[-0.8, 1.9], [0, 2.4], [-3.1, 0], [-0.02, 0.013], [-120, 40], [0.5, 0.7], [-0.7, -0.2]]
+  it.each(cases)('数据 %j', (...vals: number[]) => {
+    const g = quantMacdGrid(mk(vals), 0, vals.length - 1)
+    const lo = Math.min(0, ...vals)
+    const hi = Math.max(0, ...vals)
+    const k = (hi - lo) / QMACD_GRID_SPLIT
+    // 纵轴是真实跨度(含 0), 不凑整行; 上下各多留 1/4 格
+    expect(QMACD_GRID_PAD).toBe(0.25)
+    expect(g.min).toBeCloseTo(lo - k * QMACD_GRID_PAD, 12)
+    expect(g.max).toBeCloseTo(hi + k * QMACD_GRID_PAD, 12)
+    expect(g.lines).toContain(0)                                   // 0 轴压在线上
+    for (let i = 1; i < g.lines.length; i++) {
+      expect(g.lines[i] - g.lines[i - 1]).toBeCloseTo(k, 9)          // 一直等间距
+    }
+    // 里面两格: 跨过 0 时三条线; 0 在边上时是 0 加里面两条
+    expect(g.lines.length).toBe(3)
+    // 极值上不画线(除了 0); 任何一条线离副图上下边都至少 1/4 格, 免得看着像一道框
+    for (const v of g.lines) {
+      if (v !== 0) { expect(v).toBeGreaterThan(lo + k * 1e-6); expect(v).toBeLessThan(hi - k * 1e-6) }
+      expect(v - g.min).toBeGreaterThanOrEqual(k * QMACD_GRID_PAD - k * 1e-9)
+      expect(g.max - v).toBeGreaterThanOrEqual(k * QMACD_GRID_PAD - k * 1e-9)
+    }
   })
 
-  it('挑最紧的那种分法 —— 柱子尽量撑满', () => {
-    // 全在 0 上方: 三上一下与四上都是行高 1, 取先找到的三上一下 ——
-    // 0 轴下留一行, 死叉箭头(尖朝下, 挂在值下面)有地方放
-    expect(quantMacdRange(0, 2.4)).toEqual({ min: -1, max: 3, step: 1 })
-    // 上 1.9 下 0.8: 三上一下 → 1.9/3 = 0.63 → 1, 0.8/1 → 1; 行高 1
-    expect(quantMacdRange(-0.8, 1.9).step).toBe(1)
+  it('只看窗口里那一段 —— 窗口外的大柱子不把纵轴撑大', () => {
+    const g = quantMacdGrid(mk([50, -50, 1, -1, 2]), 2, 4)
+    expect(g.min).toBe(-1.25)       // 跨度 3 → 一格 1, 多留 1/4 格
+    expect(g.max).toBe(2.25)
   })
 
-  it('整齐的数: 1 / 2 / 3 / 5 × 10ⁿ, 不被浮点误差推到下一档', () => {
-    expect(niceCeil(0.3)).toBeCloseTo(0.3, 12)
-    expect(niceCeil(0.31)).toBeCloseTo(0.5, 12)
-    expect(niceCeil(7)).toBe(10)
-    expect(niceCeil(0)).toBe(0)
-  })
-
-  it('一屏全是 0 时也给一个框, 不除以 0', () => {
-    expect(quantMacdRange(0, 0)).toEqual({ min: -2, max: 2, step: 1 })
+  it('一屏全是 0 / 没数据时也给一个框, 不除以 0', () => {
+    expect(quantMacdGrid(mk([0, 0]), 0, 1)).toEqual({ min: -1, max: 1, lines: [0] })
   })
 })
