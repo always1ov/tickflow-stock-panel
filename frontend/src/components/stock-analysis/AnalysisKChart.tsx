@@ -1,5 +1,5 @@
 import { useEffect, useRef, useMemo, useState } from 'react'
-import { chartTheme, fib2RoleColor, getTheme, levelColors, useLevelColors, useTheme } from '@/lib/theme'
+import { chartTheme, FIB2_ROLE_TARGET, fib2RoleColor, getTheme, levelColors, useLevelColors, useTheme } from '@/lib/theme'
 import * as echarts from 'echarts'
 import type { ECharts, EChartsOption } from 'echarts'
 import type { Fib2Grain, Fib2Overlay, KlineRow, LevelSeries } from '@/lib/api'
@@ -45,7 +45,7 @@ export interface PriceLevel {
    * [R405] 这一条线自己的角色, 盖过所在组的颜色。
    *
    * 加这个是为了斐波那契二型: 它一组里有**三种意思不同**的线 ——
-   * 回撤位、目标、失效位。规格 §12 说得很明白:
+   * 回踩位、推算位(第一站/二站/三站)、这组作废。规格 §12 说得很明白:
    * 「每种颜色全站只表达一种含义」, 全涂成一个色等于把三件事说成一件。
    * 别的组不传这个字段, 行为与以前一字不差。
    *
@@ -82,9 +82,13 @@ export const LEVEL_GROUPS: { key: LevelType; label: string }[] = [
   { key: 'round',    label: '整数关口' },
   // [fork 增强] 六态关键点(利弗莫尔上/下关键点,趋势确认/否决价)
   { key: 'livermore', label: '六态关键点' },
-  // [R405 · fork 增强] 斐波那契二型(帝纳波利点位)。按一下整幅出来: 回撤线、
-  // 目标一二三、失效位、短期均线、上攻段底色、强支撑区色带、首次回踩标记。
+  // [R405 · fork 增强] 斐波那契二型(帝纳波利点位)。按一下出来: 回踩位、
+  // 这组作废、二型均线、上攻段底色、回踩密集带、首次回踩标记;
+  // 推算位(第一站/二站/三站)另有开关, 默认不画(R410)。
   // **只有位置, 没有动作** —— 和六态/量化通道撞不撞由用户自己看。
+  // [R410] 用户: 「目标1目标2失效位这些表达没能让用户抓得住重点看得懂,
+  // 而且好多根线」—— 改名与减线都在这一轮, 理由写在 `dinapoli.to_levels`
+  // 与本文件的 `thinFib2`。
   { key: 'fib2',     label: '斐波那契二型' },
   // [R403] 「持仓止盈」这一组从图上撤了(用户: 「持仓止盈可以删除掉了」)。
   // **只撤图上的线** —— 决策台的止盈线列、盘中推送、AI 持仓上下文照旧, 见后端
@@ -152,7 +156,7 @@ interface Props {
   /** 预留:事件区间高亮 */
   ranges?: ChartRange[]
   /**
-   * [R405] 斐波那契二型里画不成横线的那几样(强支撑区色带 / 上攻段底色 /
+   * [R405] 斐波那契二型里画不成横线的那几样(回踩密集带色带 / 上攻段底色 /
    * 首次回踩标记)。**整块跟着「斐波那契二型」那个开关走** —— 开关没开就一样
    * 都不画, 免得图上留下几块没人认领的色带。
    */
@@ -200,18 +204,28 @@ export function AnalysisKChart({
    * 差别在于枢轴点那个是前端过滤(每条线自带 rank), 这个是后端一次算三份 ——
    * 摆点认得多细会改变算出来的线本身, 过滤不出来。
    */
-  const [fib2Grain, setFib2Grain] = useState<Fib2Grain>('mid')
+  // [R410] 默认档 `mid` → `coarse`。用户: 「好多根线, 好难抓住…做不做在哪里做,
+  // 走不走这些」。实测中档 12 条、粗档 7 条 —— 默认少掉四成, 想看细的随时点。
+  const [fib2Grain, setFib2Grain] = useState<Fib2Grain>('coarse')
+  /**
+   * [R410] 上方那三条推算位默认不画。它们回答的是"涨上去以后会路过哪",
+   * 与当下要抓的「在哪里做 / 走不走」无关 —— 先让图安静下来, 想看再点。
+   */
+  const [fib2ShowTargets, setFib2ShowTargets] = useState(false)
   /** 双向联动高亮: hover 价位标签 ↔ hover 下方文字行。值为 levelKey, null=无高亮 */
   const [hoveredKey, setHoveredKey] = useState<string | null>(null)
 
   // 数据预处理 + 带状曲线序列对齐(后端 series 的日期范围可能与 rows 不同,需映射)
   // [R406] 选中档的线顶掉默认那一组。后端 `levels.fib2` 给的是中档, 这里按用户
   // 选的档换掉 —— 切档因此不用重新请求, 点一下当场变。
-  const effLevels = useMemo(() => {
-    const g = fib2?.grain?.[fib2Grain]
-    return g && levels ? { ...levels, fib2: g.levels } : levels
-  }, [levels, fib2, fib2Grain])
   const fib2Zone = fib2?.grain?.[fib2Grain]?.zone ?? null
+  const fib2Raw = fib2?.grain?.[fib2Grain]?.levels ?? null
+  const fib2Shown = useMemo(
+    () => (fib2Raw ? thinFib2(fib2Raw, rows.at(-1)?.close, fib2Zone, fib2ShowTargets) : null),
+    [fib2Raw, rows, fib2Zone, fib2ShowTargets])
+  const effLevels = useMemo(
+    () => (fib2Shown && levels ? { ...levels, fib2: fib2Shown } : levels),
+    [levels, fib2Shown])
 
   const { dates, candle, vols, dateIndex, zoomStart, alignedSeries } = useMemo(() => {
     const dates = rows.map(r => (typeof r.date === 'string' ? r.date.slice(0, 10) : String(r.date)))
@@ -270,6 +284,7 @@ export function AnalysisKChart({
   // [R409] 当前主题下的价位组配色。单一产地在 `lib/theme.ts`;
   // `theme` 已经在 buildOption 的 useMemo 依赖里, 切主题会整张图重建。
   const LC = levelColors(theme)
+  const targetColor = fib2RoleColor(FIB2_ROLE_TARGET, theme)
 
   // 构建 option
   const buildOption = (): EChartsOption => {
@@ -341,8 +356,10 @@ export function AnalysisKChart({
         // 两条回撤挤得很近时色带会薄到看不见 —— 规格 §9 要求最小高度,
         // 这里按价格给个下限(现价的千分之三), 比按像素算简单且不依赖坐标系。
         const thin = Math.max(0, (rows.at(-1)?.close ?? z.high) * 0.003 - (z.high - z.low)) / 2
+        // [R410] 「强支撑区」里的「支撑」已经被「压力支撑」那一组占用了 ——
+        // 同一个词两件事。改叫「回踩密集带」: 说的就是它本来的意思, 且不撞名。
         markAreaData.push([{
-          yAxis: z.low - thin, name: `强支撑区 · ${z.strength} 条回撤重合`,
+          yAxis: z.low - thin, name: `回踩密集带 · ${z.strength} 条挤在一起`,
           itemStyle: {
             color: withAlpha(zc, alpha),
             borderColor: withAlpha(zc, 0.85), borderWidth: 1,
@@ -578,12 +595,21 @@ export function AnalysisKChart({
             const count = g.key === 'pivot'
               ? raw.filter(p => p.rank === undefined || p.rank <= pivotRank).length
               : raw.length
+            // [R410] 二型现在只画其中一部分(密集带里的 + 作废线 + 离现价最近的
+            // 几条), **所以要如实写出藏了几条**, 否则用户会以为这一档就这么多线。
+            // 能不能点也按**整档**算, 不按画出来的那几条算。
+            const total = g.key === 'fib2' ? (fib2Raw?.length ?? 0) : raw.length
+            const title = g.key === 'fib2' && total > count
+              ? `${g.label}: 画了 ${count} 条 / 这一档共 ${total} 条`
+                + `\n只画「挤在一起的」「这组作废」和「离现价最近的几条」——`
+                + `\n其余的对当下没有意义。想全看就切到更细的档。`
+              : `${g.label} (${count} 个)`
             return (
               <button
                 key={g.key}
                 onClick={() => toggleType(g.key)}
-                disabled={raw.length === 0}
-                title={`${g.label} (${count} 个)`}
+                disabled={total === 0}
+                title={title}
                 className={`inline-flex shrink-0 whitespace-nowrap items-center gap-1 h-6 px-2 rounded-md text-[10px] font-medium border transition-ui disabled:opacity-30 disabled:cursor-not-allowed ${
                   active
                     ? 'text-foreground'
@@ -655,6 +681,28 @@ export function AnalysisKChart({
                   </span>
                 </button>
               ))}
+              {/* [R410] 上方那三条推算位单独一个开关, 默认关。
+                  它们回答「涨上去会路过哪」, 与当下的「在哪里做 / 走不走」无关;
+                  默认画出来只是让图更挤。收进开关而不是删掉 —— 数据本来就在,
+                  想看一眼是一次点击的事。 */}
+              <button
+                onClick={() => setFib2ShowTargets(v => !v)}
+                title={'上方推算位: 第一站 / 第二站 / 第三站\n'
+                  + '由这一波的起点、最高点、回踩最低点三点推算, 是"涨上去会路过哪",\n'
+                  + '不是"该不该去" —— 默认不画, 免得和眼下要看的位置混在一起。'}
+                className={`h-6 px-2 rounded-btn text-micro border transition-ui whitespace-nowrap ml-0.5 ${
+                  fib2ShowTargets
+                    ? 'text-foreground'
+                    : 'text-muted bg-base/40 border-border/30 hover:border-border/60'
+                }`}
+                style={fib2ShowTargets
+                  // 推算位在图上是蓝的, 开关就得是蓝的 —— 用组色(洋红)会让
+                  // 「开关什么颜色、线什么颜色」对不上, 那正是 R409 要除掉的毛病
+                  ? { borderColor: targetColor + '66', backgroundColor: targetColor + '26', color: targetColor }
+                  : undefined}
+              >
+                上方推算位
+              </button>
             </div>
           )}
         </div>
@@ -815,6 +863,62 @@ function strengthColor(strength: string | undefined, base: string): string {
   if (strength === 'medium') return base + 'E6'
   return base
 }
+
+/**
+ * [R410] 斐波那契二型的线太多, 这里决定**画哪几条**。
+ *
+ * 用户: 「好多根线, 好难抓住之前说的做不做在哪里做, 走不走这些」。细档能出到
+ * 14 条回踩位 + 3 条推算位 + 作废线 + 均线, 将近二十根 —— 用户要在里面自己
+ * 找出"该看的那几条", 而这套东西的价值本来只在其中很少几条上。
+ *
+ * 留下的三类, 正好对着用户问的三件事:
+ *
+ *   · **密集带里的**(后端已标成 `strong`)—— 帝纳波利的全部意思就在"几条挤在
+ *     一起"这件事上, 单独一条本来就弱。这是「在哪里做」。**不论多远都留**:
+ *     密集带离现价远不代表它不重要, 恰恰是提前知道它在哪才有用。
+ *   · **作废线**(`strong`)—— 「走不走」的下界, 永远留。
+ *   · **离现价最近的几条**(上下各 `NEAR_EACH_SIDE` 条)—— 眼下真会碰到的。
+ *     远在天边的回踩位对当下没有意义。
+ *
+ * 推算位(第一站/第二站/第三站)另由开关管, 默认不画 —— **按角色键过滤, 不按
+ * 标签文字**, 否则后端改个名前端就会静默漏掉。
+ *
+ * **不改后端**: 后端照旧把整档算全发过来, 这里只决定画不画 —— 于是切档、
+ * 开关推算位都是零延迟, 也不会因为"藏起来了"就把数据丢掉(开关上会如实写
+ * 显示了几条、一共几条)。
+ */
+const NEAR_EACH_SIDE = 3
+
+export function thinFib2(
+  all: PriceLevel[],
+  close: number | undefined,
+  zone: { low: number; high: number } | null,
+  showTargets: boolean,
+): PriceLevel[] {
+  const kept = showTargets ? all : all.filter(p => p.color !== FIB2_ROLE_TARGET)
+  if (close == null || !Number.isFinite(close)) return kept
+  const keep = new Set<PriceLevel>()
+  for (const p of kept) {
+    // 密集带里的 + 作废线: 后端给的都是 strong, 一律留
+    if (p.strength === 'strong') keep.add(p)
+    if (zone && p.value >= zone.low && p.value <= zone.high) keep.add(p)
+  }
+  // 再补上离现价最近的几条(上下各几条), 已经留下的不重复占名额
+  for (const dir of [1, -1]) {
+    const side = kept
+      .filter(p => (dir > 0 ? p.value > close : p.value <= close))
+      .sort((a, b) => Math.abs(a.value - close) - Math.abs(b.value - close))
+    let n = 0
+    for (const p of side) {
+      if (n >= NEAR_EACH_SIDE) break
+      if (!keep.has(p)) n++
+      keep.add(p)
+    }
+  }
+  // 保持后端给的原顺序 —— 下方文字行按它排, 顺序跳来跳去比多几条还难读
+  return kept.filter(p => keep.has(p))
+}
+
 
 /** `#RRGGBB` + 0~1 的透明度 → `rgba(...)`。色带/标记用, 只接受 6 位 hex。 */
 function withAlpha(hex: string, alpha: number): string {

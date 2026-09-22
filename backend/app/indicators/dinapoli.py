@@ -301,10 +301,17 @@ def targets_from(a: float, b: float, c: float) -> list[dict]:
     span = b - a
     if span <= 0:
         return []
+    # [R410] 界面名从「目标一/二/三」改成「第一站/第二站/第三站」。用户:
+    # 「目标1目标2失效位这些表达没能让用户抓得住重点看得懂」。
+    #
+    # 「目标」在本仓库已经指别的东西(今日总览的**目标仓位**、波动压缩用的
+    # **目标日波动**), 同一个词第三个意思。而且「目标」听着像"要去达成的",
+    # 这三条其实只是**推算出来的、涨上去会路过的位置** —— 叫「站」更贴:
+    # 有先后、是路过、不含任何"该不该去"的意思。
     return [
-        {"key": "COP", "name": "目标一", "value": c + EXP_COP * span},
-        {"key": "OP", "name": "目标二", "value": c + EXP_OP * span},
-        {"key": "XOP", "name": "目标三", "value": c + EXP_XOP * span},
+        {"key": "COP", "name": "第一站", "value": c + EXP_COP * span},
+        {"key": "OP", "name": "第二站", "value": c + EXP_OP * span},
+        {"key": "XOP", "name": "第三站", "value": c + EXP_XOP * span},
     ]
 
 
@@ -427,8 +434,26 @@ def _compute(df: pl.DataFrame, pivot_k: int = PIVOT_K) -> Fib2:
 def to_levels(res: Fib2, close: float | None) -> list[dict]:
     """转成关键价位那一层认识的横线格式(与其余 12 组同构)。
 
-    界面用词按规格第 12 节的对照表走白话: 浅回撤 / 深回撤 / 目标一二三 /
-    失效位 —— 原术语(F3、F5、COP、OP、XOP)只留在代码和注释里。
+    界面用词走白话, 原术语(F3、F5、COP、OP、XOP)只留在代码和注释里。
+
+    [R410] **第一版那套白话没起到作用。** 用户: 「目标1目标2失效位这些表达
+    没能让用户抓得住重点看得懂, 而且好多根线, 好难抓住之前说的做不做在哪里做,
+    走不走这些」。三处改名, 每处都有具体理由, 不是换个好听的说法:
+
+      · **浅回撤 R1 → 浅回踩**。「回撤」在本仓库**已经有两个别的意思**, 而且
+        两个都动不了: ① 账户/组合口径的回撤(最大回撤、蒙卡回撤、组合回撤
+        纪律线、回撤止盈); ② 六态里作者命名的**自然回撤 / 次级回撤**。
+        同一个词第三个意思, 正是名词表要防的 —— 让最新来的这一组让路。
+        顺带**去掉 R 索引**: 那是摆点编号, 对看盘的人没有任何意义, 只是让
+        右边一排标签看起来像乱码。
+      · **失效位 → 这组作废**。「失效」太抽象, 而且容易被读成一条卖出线 ——
+        它**不是**。它的意思只有一个: 跌破之后这一整组位置不再成立, 这张图
+        别看了。写成「这组作废」, 主语和后果都在字面上。
+      · **目标一二三 → 第一站/第二站/第三站**(见 `targets_from`)。
+
+    **strength 改成按"在不在密集带里"给**(原来全是 medium)。帝纳波利这套
+    东西的价值本来就在「哪几条挤在一起」, 单独一条本来就弱 —— 让粗细浓淡
+    直接把这件事说出来, 不要用户自己去数。
     """
     from app.indicators.levels import _side                      # 复用同一套口径
 
@@ -445,11 +470,23 @@ def to_levels(res: Fib2, close: float | None) -> list[dict]:
         out.append({"value": r, "label": label, "type": "fib2",
                     "side": _side(r, close), "strength": strength, "color": color})
 
+    # 密集带的上下沿 —— 落在里面的那几条才是这套东西真正要说的话。
+    #
+    # **比的是四舍五入到分之后的值, 而且带半分的容差**: 出去的 `value` 是
+    # `round(v, 2)`(A 股报价到分), 而带的上下沿没有round。不带容差的话,
+    # 12.9844 的那条线会画在 12.98 上、也就是画在带的下沿**之下一丝**,
+    # 于是"带里那几条"和"标成 strong 那几条"会差一条 —— 屏幕上看不出来,
+    # 但那正是这个读数唯一要表达的东西。
+    lo = res.zone["low"] - 0.005 if res.zone else None
+    hi = res.zone["high"] + 0.005 if res.zone else None
+
     for x in res.levels:
-        cn = "浅回撤" if x["kind"] == "shallow" else "深回撤"
-        add(x["value"], f"{cn} R{x['k']}", "medium", C_RETR)
+        cn = "浅回踩" if x["kind"] == "shallow" else "深回踩"
+        v = round(float(x["value"]), 2)
+        in_zone = lo is not None and hi is not None and lo <= v <= hi
+        add(v, cn, "strong" if in_zone else "weak", C_RETR)
     for t in res.targets:
         add(t["value"], t["name"], "medium", C_TARGET)
     if res.invalid_at is not None:
-        add(res.invalid_at, "失效位", "strong", C_INVALID)
+        add(res.invalid_at, "这组作废", "strong", C_INVALID)
     return out

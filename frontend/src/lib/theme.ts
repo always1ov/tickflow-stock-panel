@@ -208,7 +208,7 @@ export const LEVEL_PALETTE: Record<string, { light: string; dark: string }> = {
   round:     { light: '#758290', dark: '#93A0AE' },  // 中性中档 —— 整数关口是心理位
   pivot:     { light: '#9362F9', dark: '#9968FA' },  // 紫 —— 算出来的中枢(暗色第一版 #CABDFC 离二型目标只有 ΔE 8.4, 压饱和)
   livermore: { light: '#9414B3', dark: '#D75AFA' },  // 品紫 —— 六态关键点
-  fib2:      { light: '#E01DB5', dark: '#FCA2DF' },  // 洋红 —— 斐波那契二型(让出金色那一组)
+  fib2:      { light: '#E01DB5', dark: '#FCA2DF' },  // 洋红 —— 斐波那契二型(让出金色那一组; = FIB2_ROLE_RETRACE)
   // 曲线组(跟着行情漂的带/通道)
   boll:      { light: '#3D39F7', dark: '#7F96FA' },  // 靛蓝 —— 统计带
   keltner_s: { light: '#1C9DAE', dark: '#2EE2F9' },  // 青 · 短期(同族最亮一档)
@@ -227,10 +227,18 @@ export const LEVEL_PALETTE: Record<string, { light: string; dark: string }> = {
 // 值当作**角色标识**用: 它们本身就是亮色那一份, 这里只补上暗色那一份。
 // 这层耦合是隐式的, 所以 `test_level_palette.py` 专门钉了一条
 // 「前后端三个角色键逐字对得上」—— 后端改常量而前端没跟, 会当场红。
+//
+// [R410] 三个角色键各给一个具名常量 —— 不只是好看: 前端要按角色过滤时
+// (比如「推算位默认不画」)如果去比对**标签文字**, 就等于把后端的中文名
+// 抄了一份到前端, 后端改名前端必漏。比角色键不会。
+export const FIB2_ROLE_RETRACE = '#E01DB5'
+export const FIB2_ROLE_TARGET = '#1889E6'
+export const FIB2_ROLE_VOID = '#6B4D41'
+
 export const FIB2_ROLE: Record<string, { light: string; dark: string }> = {
-  '#E01DB5': { light: '#E01DB5', dark: '#FCA2DF' },  // 回撤位 = 组色
-  '#1889E6': { light: '#1889E6', dark: '#86C0FC' },  // 目标一二三 —— 蓝(规格 §12)
-  '#6B4D41': { light: '#6B4D41', dark: '#937E6D' },  // 失效位 —— 暖褐, 退色(亮色第一版 #6A5746 离一型的金只有 ΔE 8.4, 往褐里压)
+  [FIB2_ROLE_RETRACE]: { light: '#E01DB5', dark: '#FCA2DF' },  // 回踩位 = 组色
+  [FIB2_ROLE_TARGET]: { light: '#1889E6', dark: '#86C0FC' },  // 第一站/第二站/第三站 —— 蓝(规格 §12)
+  [FIB2_ROLE_VOID]: { light: '#6B4D41', dark: '#937E6D' },     // 这组作废 —— 暖褐, 退色(亮色第一版 #6A5746 离一型的金只有 ΔE 8.4, 往褐里压)
 }
 
 /** 当前主题下每个价位组的颜色。 */

@@ -106,11 +106,16 @@ def test_R405_端点出得来斐波那契二型那一组线(client):
     pts = d["levels"]["fib2"]
     assert pts, "端点没给出二型的线"
     labels = {p["label"] for p in pts}
-    # 白话标签(规格 §12), 不是 F3/F5/COP
-    assert any(x.startswith("浅回撤") for x in labels)
-    assert any(x.startswith("深回撤") for x in labels)
-    assert {"目标一", "目标二", "目标三"} <= labels
-    assert "失效位" in labels
+    # 白话标签(规格 §12), 不是 F3/F5/COP。
+    # [R410] 名字换过一轮(用户: 「目标1目标2失效位这些表达没能让用户抓得住重点
+    # 看得懂」) —— 所以这里**不再逐字钉某个名字**, 只钉两件不会随措辞变的事:
+    #   ① 三类线都在(按角色键分, 那是稳定标识, 不是文案);
+    #   ② 原书术语一个都没漏到界面上。
+    import app.indicators.dinapoli as _dn
+    roles = {p["color"] for p in pts}
+    assert {_dn.C_RETR, _dn.C_TARGET, _dn.C_INVALID} <= roles, f"三类线没齐: {roles}"
+    for jargon in ("F3", "F5", "COP", "OP", "XOP", "FOCUS"):
+        assert not any(jargon in x for x in labels), f"原书术语「{jargon}」漏到界面了: {labels}"
     for p in pts:
         assert p["type"] == "fib2" and p["value"] > 0
 
@@ -122,7 +127,7 @@ def test_R405_画不成横线的那几样走叠加层(client):
     assert ov["thrust"] and ov["thrust"]["days"] >= 8, "上攻段没给出来"
     z = ov["grain"]["mid"]["zone"]
     assert z and z["high"] >= z["low"]
-    assert z["strength"] >= 2, "强支撑区至少要两条回撤重合"
+    assert z["strength"] >= 2, "回踩密集带至少要两条挤在一起"
     assert isinstance(ov.get("markers"), list)
     # 短期均线走 series(和量化通道同一个通道), 不塞进叠加层
     assert "fib2" in d["series"] and d["series"]["fib2"]["dma3"]
@@ -135,15 +140,19 @@ def test_R405_强支撑区必须真落在回撤线上(client):
     d = _levels(client)
     ov, pts = d["fib2"], d["levels"]["fib2"]
     z = ov["grain"]["mid"]["zone"]
-    lows = {round(p["value"], 2) for p in pts if p["label"].startswith(("浅回撤", "深回撤"))}
-    assert round(z["low"], 2) in lows, "区下沿不是某条回撤线"
-    assert round(z["high"], 2) in lows, "区上沿不是某条回撤线"
+    # [R410] 按**角色键**挑出回踩位, 不按标签前缀 —— 改一次名字就得改一次断言,
+    # 那种断言迟早会在某次改名后被"顺手放宽"掉。
+    import app.indicators.dinapoli as _dn
+    lows = {round(p["value"], 2) for p in pts if p["color"] == _dn.C_RETR}
+    assert round(z["low"], 2) in lows, "区下沿不是某条回踩位"
+    assert round(z["high"], 2) in lows, "区上沿不是某条回踩位"
 
 
 def test_R405_失效位在强支撑区下方(client):
     """「跌破它这组回撤就不成立」—— 位置在区下沿之下才说得通。"""
     d = _levels(client)
-    inv = next(p["value"] for p in d["levels"]["fib2"] if p["label"] == "失效位")
+    import app.indicators.dinapoli as _dn
+    inv = next(p["value"] for p in d["levels"]["fib2"] if p["color"] == _dn.C_INVALID)
     assert inv < d["fib2"]["grain"]["mid"]["zone"]["low"]
 
 

@@ -360,21 +360,43 @@ def test_R405_出线格式与其余价位组同构():
 
 
 def test_R405_三种意思不同的线用三种颜色():
-    """规格 §12:「每种颜色全站只表达一种含义」。回撤/目标/失效位是三件事。"""
-    n = 60
-    closes = [10.0] * 30 + [10.0 + i * 0.8 for i in range(1, 13)] + \
-             [19.6 - i * 0.5 for i in range(1, 19)]
-    closes = closes[:n]
+    """规格 §12:「每种颜色全站只表达一种含义」。回踩位/推算位/作废线是三件事。
+
+    [R410] **分类改成按几何来源, 不按标签文字。** 原来是拿 `label.startswith("目标")`
+    之类去分的 —— 那样一改名(而名字确实改了一轮)断言就落空, 而且落空的方式是
+    "所有线都被归进同一类", 于是"每类只有一种颜色"永远成立, **测试变绿而洞还在**。
+    现在直接问 `Fib2` 那个结果对象: 哪些值是回踩位、哪些是推算位、哪个是作废线。
+    """
+    # [R410] **换了一份数据**, 因为原来那份根本出不了作废线(没有密集带就没有
+    # 作废线), 于是这条断言一直只覆盖了三类里的两类, 而且是**绿着漏的** ——
+    # 分类拿不到的那一类不会报错, 只会不出现在结果里。这份是搜出来的:
+    # 上攻途中有两次浅回调, 两条回踩位挤到一起形成密集带, 三类线齐全。
+    closes = [10.0] * 30 + [
+        9.6, 10.6, 11.6, 11.2, 12.2, 13.1, 12.6, 12.2, 13.1, 14.1, 15.0,
+        14.7, 14.2, 13.9, 14.9, 14.5, 15.4, 16.3, 15.8, 15.4, 15.1, 14.8,
+        14.3, 14.0, 13.3, 12.6, 12.1, 11.8, 11.1, 10.6, 10.1, 9.8, 9.1,
+        8.6, 8.1, 7.6, 7.1,
+    ]
+    n = len(closes)
     df = pl.DataFrame({
         "high": [c + 0.2 for c in closes], "low": [c - 0.2 for c in closes],
         "close": closes, "atr_14": [0.5] * n,
     })
-    out = dn.to_levels(dn.compute(df), closes[-1])
+    res = dn.compute(df)
+    out = dn.to_levels(res, closes[-1])
+    kinds: dict[float, str] = {}
+    for x in res.levels:
+        kinds[round(float(x["value"]), 2)] = "回踩位"
+    for t in res.targets:
+        kinds[round(float(t["value"]), 2)] = "推算位"
+    if res.invalid_at is not None:
+        kinds[round(float(res.invalid_at), 2)] = "作废线"
+    assert len(set(kinds.values())) == 3, f"这份数据没同时出三类线, 测不出东西: {kinds}"
     by = {}
     for p in out:
-        kind = ("目标" if p["label"].startswith("目标")
-                else "失效位" if p["label"] == "失效位" else "回撤")
+        kind = kinds[round(float(p["value"]), 2)]
         by.setdefault(kind, set()).add(p["color"])
+    assert len(by) == 3, f"三类线没都画出来: {sorted(by)}"
     for kind, colors in by.items():
         assert len(colors) == 1, f"「{kind}」自己就用了多种颜色: {colors}"
     assert len({next(iter(c)) for c in by.values()}) == len(by), \

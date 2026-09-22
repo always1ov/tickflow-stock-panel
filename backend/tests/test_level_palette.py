@@ -108,16 +108,29 @@ def _palette() -> dict[str, dict[str, str]]:
     return out
 
 
+def _role_consts() -> dict[str, str]:
+    """`lib/theme.ts` 里那三个具名角色键 —— `FIB2_ROLE_RETRACE` 等。
+
+    [R410] 它们原来是直接写成字符串字面量当 `FIB2_ROLE` 的键的; 前端要按角色
+    过滤(推算位默认不画)时需要拿到名字, 所以提成了常量。这里跟着改解析。
+    """
+    src = read_src(THEME_TS)
+    out = dict(re.findall(r"export const (FIB2_ROLE_\w+) = '(#[0-9A-Fa-f]{6})'", src))
+    assert len(out) == 3, f"三个角色键常量读不全: {out}"
+    return out
+
+
 def _fib2_roles() -> dict[str, dict[str, str]]:
     """`lib/theme.ts` 的 FIB2_ROLE(键是后端那三个常量的字面值)。"""
     src = read_src(THEME_TS)
-    i = src.index("export const FIB2_ROLE")
+    i = src.index("export const FIB2_ROLE:")
     blk = src[i:src.index("\n}", i)]
+    consts = _role_consts()
     out: dict[str, dict[str, str]] = {}
     for key, light, dark in re.findall(
-            r"^\s*'(#[0-9A-Fa-f]{6})':\s*\{\s*light:\s*'(#[0-9A-Fa-f]{6})',\s*dark:\s*'(#[0-9A-Fa-f]{6})'",
+            r"^\s*\[(FIB2_ROLE_\w+)\]:\s*\{\s*light:\s*'(#[0-9A-Fa-f]{6})',\s*dark:\s*'(#[0-9A-Fa-f]{6})'",
             blk, re.M):
-        out[key] = {"light": light, "dark": dark}
+        out[consts[key]] = {"light": light, "dark": dark}
     assert out, "FIB2_ROLE 读不出来"
     return out
 
