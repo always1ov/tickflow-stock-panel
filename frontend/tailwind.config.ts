@@ -31,6 +31,14 @@ export default {
         // [R368] 选中背景(浅蓝)。蓝色只用于必要的交互强调, 不铺大面板
         'accent-soft': 'oklch(var(--accent-soft) / <alpha-value>)',
         elevated:  'oklch(var(--elevated) / <alpha-value>)',
+        // [R400] 「强调实底上的文字」单独一个名字。
+        //
+        // **不是新颜色, 是给一个已有角色起名**: 值与 `base` 完全相同(就是页面底色,
+        // 靛蓝实底上压它正好), 39 处主按钮现在写的是 `text-base`。问题出在
+        // `text-base` **同时是颜色和字号**(Tailwind 出厂的 16px 一档), 裸 class
+        // 串里靠 CSS 先后侥幸各管各的, 一旦进了 `cn()` 就会和字号撞组、**颜色被
+        // 丢掉且不报错**。基础件全部走 `cn()`, 所以这个歧义必须先拆掉。
+        'on-accent': 'oklch(var(--base) / <alpha-value>)',
         border:    'oklch(var(--border) / <alpha-value>)',
         foreground: 'oklch(var(--fg-primary) / <alpha-value>)',
         secondary:  'oklch(var(--fg-secondary) / <alpha-value>)',

@@ -433,7 +433,14 @@ def test_R356_没进候选池时走势格空着但占位():
     i = row.index("{c && <TrendCell o={c} />}")
     before = row[:i]
     assert before.rstrip().endswith(">"), "走势那一格的 <span> 没包住它 —— 空着时不占位"
-    assert "<span className=\"col-span-3 min-w-0 text-[11px]" in row, "走势那一格的占位没了"
+    # [R400] 原来这一行锚的是 `text-[11px]` —— 而那个字号只是**当时**的写法,
+    # 3.2 把它换成规范档位 `text-micro` 时这条就红了, 可它要钉的"占位"一点没变。
+    # 钉性质: 包住它的那个 <span> 占满走势那三列, 且不许被内容撑开。
+    span_open = row[:i].rstrip()
+    assert span_open.endswith(">"), "走势那一格的 <span> 没包住它 —— 空着时不占位"
+    tag = span_open[span_open.rindex("<span"):]
+    assert "col-span-3" in tag, f"走势那一格不再占满三列, 后面的列会整体错开: {tag}"
+    assert "min-w-0" in tag, f"走势那一格会被内容撑开, 定宽网格就不成立了: {tag}"
 
 
 def test_R349_走势那一格不是动作():
@@ -546,10 +553,18 @@ def test_R352_导读与它的定时开关一起消失():
     assert "定时导读" not in ctrl, "那个开关的产出已经没有展示面了, 不该还留着"
     assert "todayAiSched" not in ctrl, "对应的 query/mutation 也该一起走"
     # **对照组**: 「定时个股信号」的产出仍然显示在决策台的「AI 信号」列上, 它留着。
-    # 锚在**那个 label 的标记**上, 不是四个字 —— 这四个字也出现在 toast 文案里
-    # (`定时个股信号已开启:...`), 拿裸字符串扫的话把开关整个删掉照样绿。
-    assert '<span className="whitespace-nowrap">定时个股信号</span>' in ctrl, \
-        "这个开关有活的展示面(决策台 AI 信号列), 不该被误删"
+    # 不能拿裸四个字当锚 —— 这四个字也出现在 toast 文案里(`定时个股信号已开启:...`),
+    # 那样把开关整个删掉照样绿。
+    #
+    # [R400] 原来锚的是 `<span className="whitespace-nowrap">定时个股信号</span>`,
+    # 而 3.2 把这个 label 收进了 `<Field label={…}>` —— **标记变了, 开关一点没变**。
+    # 改钉那个真正不可少的东西: 这四个字必须挂在一个 checkbox 上。
+    # 逐个看每一处「定时个股信号」, 只要**有一处**是挂在勾选框上的就算数 ——
+    # 第一处恰好是 toast 文案(正是上面说的那个陷阱), 拿 `index()` 取会误判。
+    hits = [m.start() for m in re.finditer("定时个股信号", ctrl)]
+    assert hits, "这个开关有活的展示面(决策台 AI 信号列), 不该被误删"
+    assert any('type="checkbox"' in ctrl[max(0, i - 900):i] for i in hits), \
+        "「定时个股信号」没有一处挂在勾选框上 —— 剩下的可能只是 toast 文案"
     assert "signalAiSchedMut.mutate({" in ctrl, "开关得真的能落库"
 
 
@@ -583,7 +598,9 @@ def test_R358_成绩挂在筛选卡的插槽上_不是搬进那个组件():
     """
     ctrl = code_of(CTRL)
     assert "extra?: ReactNode" in ctrl, "没有插槽"
-    assert "{extra && <div" in ctrl, "插槽没渲染"
+    # [R400] 原来锚的是 `{extra && <div` —— 3.2 把那个 div 换成了 `<CardSection>`,
+    # 而"插槽渲染出来了"这件事一点没变。钉渲染本身, 不钉它当时用的是哪个标签。
+    assert re.search(r"\{extra && <\w", ctrl), "插槽没渲染"
     # 组件本身仍然对模拟盘一无所知
     for leak in ("FlipPaper", "monthly", "nav", "total_ret", "max_drawdown"):
         assert leak not in ctrl, f"模拟盘的数据结构漏进了这个共用组件: {leak}"
@@ -594,19 +611,28 @@ def test_R358_成绩挂在筛选卡的插槽上_不是搬进那个组件():
 def test_R358_插槽与筛选条在同一张卡里():
     """用户要的就是"同一张卡"。卡壳必须包着**筛选条 + 插槽**两样。
 
-    钉的是结构而不是某个类名: 插槽那个 div 在卡壳之内、筛选条之后, 中间有条
-    分隔线。(旧版的卡壳直接长在筛选条那个 flex 容器上 —— 那种写法下插槽只能
-    排在卡外面, 或者被当成 flex 的又一个横排项。)
+    钉的是结构而不是某个类名: 插槽在卡壳之内、筛选条之后, 中间有条分隔线。
+    (旧版的卡壳直接长在筛选条那个 flex 容器上 —— 那种写法下插槽只能排在卡外面,
+    或者被当成 flex 的又一个横排项。)
+
+    [R400] 卡壳与分隔线都搬进了共用的 `components/ui/Card`, 所以这里改成两段查:
+    **顺序**在这个文件里查, **分隔线**到那个基础件里查 —— 措辞/标签换了不该红,
+    真把分隔线拿掉了才该红。
     """
     ctrl = code_of(CTRL)
-    shell = '<div className="rounded-card border border-border/60 bg-surface/40">'
-    assert shell in ctrl, "卡壳没有单独一层"
-    seg = ctrl[ctrl.index(shell):]
-    i_row = seg.index('<div className="flex flex-wrap items-center gap-2 px-4 py-2">')
-    i_extra = seg.index("{extra && <div")
+    m = re.search(r"<Card [^>]*>", ctrl)
+    assert m, "卡壳没有单独一层"
+    seg = ctrl[m.start():]
+    i_row = seg.index("flex flex-wrap items-center")
+    i_extra = seg.index("{extra &&")
     assert i_row < i_extra, "插槽跑到筛选条前面去了"
-    assert "border-t border-border/40" in seg[i_extra:i_extra + 200], \
-        "插槽与筛选条之间没有分隔线 —— 两块东西糊成一团"
+    # 插槽走的必须是"卡内第二块"那个件 —— 它自带分隔线; 随便套个 div 就没有了
+    assert re.search(r"\{extra && <CardSection", seg), \
+        "插槽没走 CardSection —— 那条分隔线就没了, 两块东西会糊成一团"
+    card = code_of("components/ui/Card.tsx")
+    i_sec = card.index("export function CardSection")
+    assert "border-t" in card[i_sec:i_sec + 400], \
+        "CardSection 自己把分隔线弄丢了 —— 卡里那两块会糊成一团"
 
 
 def test_R358_净值图默认收起():

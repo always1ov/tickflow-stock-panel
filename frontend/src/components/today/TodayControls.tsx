@@ -32,6 +32,7 @@ import {
 } from '@/lib/api'
 import { toast } from '@/components/Toast'
 import { cn } from '@/lib/cn'
+import { Button, Card, CardSection, Field, fieldInput, fieldSelect } from '@/components/ui'
 import { ScoreLedgerDialog } from '@/components/ScoreLedgerDialog'
 import { useQuery } from '@tanstack/react-query'
 import { QK } from '@/lib/queryKeys'
@@ -113,86 +114,76 @@ export function TodayControls({ d, refetch, isFetching, extra }: {
       {/* [R358] 卡的外壳挪到这一层, 好让 `extra` 与筛选条**长在同一张卡里**。
           里面那层只剩 flex 与内边距 —— 筛选条是横排的, 而 `extra` 是一整块,
           塞进同一个 flex 容器会被当成又一个横排的项。 */}
-      <div className="rounded-card border border-border/60 bg-surface/40">
-      <div className="flex flex-wrap items-center gap-2 px-4 py-2">
+      <Card padding="none">
+      <div className="flex flex-wrap items-center gap-g4 px-s2 py-s1">
         {/* [R40] 板块筛选。过滤在后端做 —— 前端筛的话会漏掉被 max_show 截掉的票,
             看到的"主板机会"是残缺的而你不会知道 */}
-        <div className="flex items-center gap-1">
-          <button
+        <div className="flex items-center gap-g2">
+          <Button
+            size="xs"
+            selected={boardFilter.length === 0}
             onClick={() => toggleBoard(null)}
             disabled={prefsMut.isPending}
             title="不过滤, 所有板块都看"
-            className={`rounded-btn border px-2 py-0.5 text-[10px] transition-colors cursor-pointer disabled:opacity-50 ${
-              boardFilter.length === 0
-                ? 'border-sky-400/40 bg-sky-400/15 text-sky-300'
-                : 'border-border bg-base text-muted hover:text-foreground'
-            }`}
           >
             全部
-          </button>
+          </Button>
           {/* [R140] 正在落库/重取时给个明确的进行态。/api/today 要跑
               Keltner 批量、MA120 批量、几十只的历史胜率, 一次好几秒 ——
               没有这个提示, 那几秒就是"点了没反应", 用户会重复点。 */}
           {TODAY_BOARDS.map((b) => {
             const on = boardFilter.includes(b)
             return (
-              <button
+              <Button
                 key={b}
+                size="xs"
+                selected={on}
                 onClick={() => toggleBoard(b)}
                 disabled={prefsMut.isPending}
                 title={`${on ? '取消' : '只看'}${b}(可多选)`}
-                className={`rounded-btn border px-2 py-0.5 text-[10px] transition-colors cursor-pointer disabled:opacity-50 ${
-                  on
-                    ? 'border-sky-400/40 bg-sky-400/15 text-sky-300'
-                    : 'border-border bg-base text-muted hover:text-foreground'
-                }`}
               >
                 {b}
-              </button>
+              </Button>
             )
           })}
           {(prefsMut.isPending || (boardDraft !== null && isFetching)) && (
-            <span className="inline-flex items-center gap-1 pl-1 text-[10px] text-muted">
+            <span className="inline-flex items-center gap-g2 pl-g3 text-micro text-muted">
               <Loader2 className="h-3 w-3 animate-spin" />
               筛选中
             </span>
           )}
         </div>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-g4">
           {/* [R133] 门槛旁边就是体检 —— 调门槛前先看"这个门槛值不值",
               两个按钮挨着放, 才不会出现凭感觉拧滑块的情况 */}
-          <button
+          <Button
+            size="xs"
             onClick={() => setLedgerOpen(true)}
             title="把握分体检: 完整候选池的分层胜率/名次段/因子归因, 并可一键导出给外部做调参"
-            className="inline-flex items-center gap-1 rounded-btn border border-border bg-base px-2.5 py-1 text-[10px] text-muted transition-colors cursor-pointer hover:text-foreground"
           >
             <BarChart3 className="h-3 w-3" />
             体检
-          </button>
-          <button
+          </Button>
+          <Button
+            size="xs"
+            selected={prefsOpen}
             onClick={() => setPrefsOpen((v) => !v)}
             title="调整显示门槛(把握分下限与最多显示条数)"
-            className={`inline-flex items-center gap-1 rounded-btn border px-2.5 py-1 text-[10px] transition-colors cursor-pointer ${
-              prefsOpen ? 'border-sky-400/40 bg-sky-400/15 text-sky-300'
-                : 'border-border bg-base text-muted hover:text-foreground'
-            }`}
           >
             <SlidersHorizontal className="h-3 w-3" />
             门槛
-          </button>
+          </Button>
         </div>
       </div>
-      {extra && <div className="border-t border-border/40 px-4 py-3">{extra}</div>}
-      </div>
+      {extra && <CardSection>{extra}</CardSection>}
+      </Card>
       {prefsOpen && (
-        <div className="flex flex-wrap items-center gap-x-5 gap-y-3 rounded-card border border-border/60 bg-base/40 px-4 py-3">
+        <Card padding="md" className="flex flex-wrap items-center gap-x-s4 gap-y-s1 bg-base/40">
           {/* [R220] 门槛的单位从绝对把握分换成了历史分位。
               绝对分那个旋钮几乎没有作用(实测 60 分只挡掉约 1.6% 的候选),
               因为分数被"平均"挤在中间一段;分位天然均匀,拖到哪儿都真的在挡人。
               台账没攒够时**禁用并说明**,而不是让人拖一个没反应的旋钮。 */}
-          <label className={cn('flex items-center gap-2 text-[11px] text-muted',
-                               !d.hist_pct_ready && 'opacity-60')}>
-            <span className="whitespace-nowrap">入选门槛</span>
+          <Field label="入选门槛" disabled={!d.hist_pct_ready}>
             <input
               type="range" min={0} max={90} step={5}
               disabled={!d.hist_pct_ready}
@@ -201,7 +192,7 @@ export function TodayControls({ d, refetch, isFetching, extra }: {
               onPointerUp={() => {
                 if (minPct != null && minPct !== d.prefs.min_hist_pct) prefsMut.mutate({ min_hist_pct: minPct })
               }}
-              className="w-36 accent-sky-400 cursor-pointer disabled:cursor-not-allowed"
+              className="w-36 accent-accent cursor-pointer disabled:cursor-not-allowed"
             />
             <span className="w-24 whitespace-nowrap font-mono text-foreground">
               {(minPct ?? d.prefs.min_hist_pct) > 0
@@ -209,14 +200,13 @@ export function TodayControls({ d, refetch, isFetching, extra }: {
                 : '不过滤'}
             </span>
             {!d.hist_pct_ready && (
-              <span className="text-[10px] text-amber-300/80"
+              <span className="text-micro text-amber-300/80"
                     title="分位要跟历史比才算得出来。台账攒够约一个月的记录(400 条)之后这个门槛自动开始起作用 —— 在那之前它谁也不挡, 而不是偷偷把页面挡空。">
                 台账还没攒够,暂不起作用
               </span>
             )}
-          </label>
-          <label className="flex items-center gap-2 text-[11px] text-muted">
-            <span className="whitespace-nowrap">最多显示</span>
+          </Field>
+          <Field label="最多显示" unit="条">
             <input
               type="number" min={1} max={50}
               defaultValue={d.prefs.max_show}
@@ -224,12 +214,10 @@ export function TodayControls({ d, refetch, isFetching, extra }: {
                 const v = Number(e.target.value)
                 if (v && v !== d.prefs.max_show) prefsMut.mutate({ max_show: v })
               }}
-              className="w-14 rounded border border-border bg-surface px-2 py-1 font-mono text-foreground outline-none focus:border-sky-400/50"
+              className={cn(fieldInput, 'w-14')}
             />
-            <span>条</span>
-          </label>
-          <label className="flex items-center gap-2 text-[11px] text-muted" title="单只票最多占总资金的比例;建议仓位 = 上限 × 把握分系数 × 波动率压缩">
-            <span className="whitespace-nowrap">单票上限</span>
+          </Field>
+          <Field label="单票上限" unit="%" title="单只票最多占总资金的比例;建议仓位 = 上限 × 把握分系数 × 波动率压缩">
             <input
               type="number" min={5} max={100} step={5}
               defaultValue={d.prefs.max_single}
@@ -237,12 +225,10 @@ export function TodayControls({ d, refetch, isFetching, extra }: {
                 const v = Number(e.target.value)
                 if (v && v !== d.prefs.max_single) prefsMut.mutate({ max_single: v })
               }}
-              className="w-14 rounded border border-border bg-surface px-2 py-1 font-mono text-foreground outline-none focus:border-sky-400/50"
+              className={cn(fieldInput, 'w-14')}
             />
-            <span>%</span>
-          </label>
-          <label className="flex items-center gap-2 text-[11px] text-muted" title="能接受的单日波动;票的日波幅(ATR/价)超过它时按比例压低建议仓位,只压不加">
-            <span className="whitespace-nowrap">目标日波动</span>
+          </Field>
+          <Field label="目标日波动" unit="%" title="能接受的单日波动;票的日波幅(ATR/价)超过它时按比例压低建议仓位,只压不加">
             <input
               type="number" min={1} max={10}
               defaultValue={d.prefs.target_vol}
@@ -250,17 +236,15 @@ export function TodayControls({ d, refetch, isFetching, extra }: {
                 const v = Number(e.target.value)
                 if (v && v !== d.prefs.target_vol) prefsMut.mutate({ target_vol: v })
               }}
-              className="w-14 rounded border border-border bg-surface px-2 py-1 font-mono text-foreground outline-none focus:border-sky-400/50"
+              className={cn(fieldInput, 'w-14')}
             />
-            <span>%</span>
-          </label>
+          </Field>
           {/* [R340] 「回撤纪律线」这个输入框跟着一起撤了。它**只喂一个消费者**
               —— `api/today.py` 里那条 `portfolio_drawdown` 提醒, 而那条提醒
               只出现在刚被删掉的「需要行动」区。留着就是一个调了不产生任何
               可见结果的旋钮, 比没有更坏。
               后端 `today_prefs` 的字段没动: 要把那一区加回来, 它原样还在。 */}
-          <label className="flex items-center gap-2 text-[11px] text-muted" title="建仓路径第一步: 试仓占目标仓位的比例(买'对不对')">
-            <span className="whitespace-nowrap">试仓</span>
+          <Field label="试仓" unit="%" title="建仓路径第一步: 试仓占目标仓位的比例(买'对不对')">
             <input
               type="number" min={10} max={60} step={5}
               defaultValue={d.prefs.pyramid_probe}
@@ -268,12 +252,10 @@ export function TodayControls({ d, refetch, isFetching, extra }: {
                 const v = Number(e.target.value)
                 if (v && v !== d.prefs.pyramid_probe) prefsMut.mutate({ pyramid_probe: v })
               }}
-              className="w-14 rounded border border-border bg-surface px-2 py-1 font-mono text-foreground outline-none focus:border-sky-400/50"
+              className={cn(fieldInput, 'w-14')}
             />
-            <span>%</span>
-          </label>
-          <label className="flex items-center gap-2 text-[11px] text-muted" title="建仓路径第二步: 站稳关键点 N 日后加至目标仓位的比例(买'稳不稳'), 第三步回踩不破上满">
-            <span className="whitespace-nowrap">确认加至</span>
+          </Field>
+          <Field label="确认加至" unit="%" title="建仓路径第二步: 站稳关键点 N 日后加至目标仓位的比例(买'稳不稳'), 第三步回踩不破上满">
             <input
               type="number" min={40} max={90} step={5}
               defaultValue={d.prefs.pyramid_confirm}
@@ -281,12 +263,10 @@ export function TodayControls({ d, refetch, isFetching, extra }: {
                 const v = Number(e.target.value)
                 if (v && v !== d.prefs.pyramid_confirm) prefsMut.mutate({ pyramid_confirm: v })
               }}
-              className="w-14 rounded border border-border bg-surface px-2 py-1 font-mono text-foreground outline-none focus:border-sky-400/50"
+              className={cn(fieldInput, 'w-14')}
             />
-            <span>%</span>
-          </label>
-          <label className="flex items-center gap-2 text-[11px] text-muted" title="'站稳'的定义: 收盘连续 N 日守住关键点才执行加仓">
-            <span className="whitespace-nowrap">站稳</span>
+          </Field>
+          <Field label="站稳" unit="日" title="'站稳'的定义: 收盘连续 N 日守住关键点才执行加仓">
             <input
               type="number" min={1} max={5}
               defaultValue={d.prefs.pyramid_days}
@@ -294,31 +274,37 @@ export function TodayControls({ d, refetch, isFetching, extra }: {
                 const v = Number(e.target.value)
                 if (v && v !== d.prefs.pyramid_days) prefsMut.mutate({ pyramid_days: v })
               }}
-              className="w-14 rounded border border-border bg-surface px-2 py-1 font-mono text-foreground outline-none focus:border-sky-400/50"
+              className={cn(fieldInput, 'w-14')}
             />
-            <span>日</span>
-          </label>
-          <span className="text-[10px] text-muted/70">
+          </Field>
+          <span className="text-micro text-muted/70">
             把握分调高更严格;单票上限与目标日波动决定「建议仓位」;试仓/确认加至/站稳决定「建仓路径」。卖出提醒不受任何门槛影响。
           </span>
           {/* [R27] AI 定时自动运行 */}
-          <div className="flex w-full flex-wrap items-center gap-x-5 gap-y-2 border-t border-border/40 pt-3">
+          <div className="flex w-full flex-wrap items-center gap-x-s4 gap-y-g4 border-t border-border/40 pt-s2">
             {/* [R352] 「定时导读·优选」那个开关删了。用户: 「这部分和 ai 导读都不用了」。
                 它产出两样东西: 导读正文与 AI 优选 —— **两个展示面都已经没了**
                 (优选面板随今日总览一起删于 R351, 导读正文这次删)。留着就是又一个
                 调了不产生任何可见结果的旋钮, 和 R340 那个「回撤纪律线」一模一样。
                 后端定时任务与偏好字段没动, 要恢复把这个 label 加回来即可。 */}
-            <label className="flex items-center gap-2 text-[11px] text-muted" title="工作日到点批量刷新个股 AI 信号; 每只之间留间隔, 不会打满接口">
-              <input
-                type="checkbox"
-                checked={signalAiSched.data?.enabled ?? false}
-                onChange={(e) => signalAiSchedMut.mutate({
-                  ...(signalAiSched.data ?? { hour: 19, minute: 0, scope: 'held' as const, gap_seconds: 20 }),
-                  enabled: e.target.checked,
-                })}
-                className="h-3.5 w-3.5 accent-violet-500"
-              />
-              <span className="whitespace-nowrap">定时个股信号</span>
+            {/* [R400] 这一行原来的聚焦色写的是 violet, 而上面那八个框写的是 sky ——
+                **同一个弹出面板里, 聚焦时一半变蓝一半变紫**。收进 `fieldInput`
+                之后只剩强调色一种说法; 勾选框的 `accent-` 同理。 */}
+            <Field
+              label={<>
+                <input
+                  type="checkbox"
+                  checked={signalAiSched.data?.enabled ?? false}
+                  onChange={(e) => signalAiSchedMut.mutate({
+                    ...(signalAiSched.data ?? { hour: 19, minute: 0, scope: 'held' as const, gap_seconds: 20 }),
+                    enabled: e.target.checked,
+                  })}
+                  className="mr-g4 h-3.5 w-3.5 accent-accent"
+                />
+                定时个股信号
+              </>}
+              title="工作日到点批量刷新个股 AI 信号; 每只之间留间隔, 不会打满接口"
+            >
               <input
                 type="time"
                 value={`${String(signalAiSched.data?.hour ?? 19).padStart(2, '0')}:${String(signalAiSched.data?.minute ?? 0).padStart(2, '0')}`}
@@ -328,14 +314,14 @@ export function TodayControls({ d, refetch, isFetching, extra }: {
                     signalAiSchedMut.mutate({ ...signalAiSched.data, hour: h, minute: m })
                   }
                 }}
-                className="rounded border border-border bg-surface px-1.5 py-0.5 font-mono text-foreground outline-none focus:border-violet-400/50"
+                className={fieldInput}
               />
               <select
                 value={signalAiSched.data?.scope ?? 'held'}
                 onChange={(e) => signalAiSched.data && signalAiSchedMut.mutate({
                   ...signalAiSched.data, scope: e.target.value as 'held' | 'watchlist',
                 })}
-                className="rounded border border-border bg-surface px-1.5 py-0.5 text-foreground outline-none focus:border-violet-400/50"
+                className={fieldSelect}
               >
                 <option value="held">只跑持有</option>
                 <option value="watchlist">全部自选</option>
@@ -347,16 +333,16 @@ export function TodayControls({ d, refetch, isFetching, extra }: {
                 onChange={(e) => signalAiSched.data && signalAiSchedMut.mutate({
                   ...signalAiSched.data, gap_seconds: Number(e.target.value) || 20,
                 })}
-                className="w-14 rounded border border-border bg-surface px-1.5 py-0.5 font-mono text-foreground outline-none focus:border-violet-400/50"
+                className={cn(fieldInput, 'w-14')}
               />
-              <span>秒/只</span>
-            </label>
-            <span className="text-[10px] text-muted/70">
+              <span className="whitespace-nowrap">秒/只</span>
+            </Field>
+            <span className="text-micro text-muted/70">
               建议放在盘后日线落盘之后(17:30~20:00);个股多时用「只跑持有」更省
             </span>
           </div>
           {prefsMut.isPending && <Loader2 className="h-3 w-3 animate-spin text-muted" />}
-        </div>
+        </Card>
       )}
       {ledgerOpen && <ScoreLedgerDialog onClose={() => setLedgerOpen(false)} />}
     </>

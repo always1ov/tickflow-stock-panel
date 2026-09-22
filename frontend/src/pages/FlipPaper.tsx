@@ -34,6 +34,7 @@ import { QK } from '@/lib/queryKeys'
 import { getFlipHoldingDays } from '@/lib/flipHoldingDays'
 import { PageHeader } from '@/components/PageHeader'
 import { Hint } from '@/components/Hint'
+import { Button } from '@/components/ui'
 import { Skeleton } from '@/components/data/Skeleton'
 import { useECharts } from '@/pages/backtest/charts/useECharts'
 import { cn } from '@/lib/cn'
@@ -119,7 +120,7 @@ function SymbolCell({ symbol, name }: { symbol: string; name: string }) {
   return (
     <>
       <span className="font-medium">{named ? name : symbol}</span>
-      {named && <span className="ml-1.5 font-mono text-[10px] text-muted">{symbol}</span>}
+      {named && <span className="ml-1.5 font-mono text-micro text-muted">{symbol}</span>}
     </>
   )
 }
@@ -235,7 +236,7 @@ export function FlipPaper() {
         // [R343] 市场状态并进页头 —— 定基调的东西不该自己占一张卡。
         // 姿态是结论, 给它徽章的位置; 多空比与主线是依据, 跟在副标题里。
         titleExtra={w && (
-          <span className={cn('shrink-0 rounded px-1.5 py-0.5 text-[11px] font-medium',
+          <span className={cn('shrink-0 rounded px-1.5 py-0.5 text-micro font-medium',
             POSTURE_TONE[w.posture] ?? POSTURE_TONE.观察)}
             title={w.posture_reason || undefined}>
             {w.posture}
@@ -275,16 +276,15 @@ export function FlipPaper() {
         // (标签之间不能用 `{/* */}`, 那是子节点的写法 —— 这里要用 `//`,
         //  与上面 titleExtra / subtitle 那两段注释同一个写法。)
         right={
-          <button
-            type="button"
+          <Button
+            size="xs"
             onClick={refreshAll}
             disabled={refreshing}
             title="立刻重取一次(模拟盘 + 打分两份一起) —— 自动刷新的节奏不受影响"
-            className="inline-flex items-center gap-1 rounded-btn border border-border bg-base px-2.5 py-1 text-[11px] text-muted transition-colors cursor-pointer hover:text-foreground disabled:opacity-60"
           >
             <RefreshCw className={cn('h-3 w-3', refreshing && 'animate-spin')} />
             {refreshing ? '刷新中' : '刷新'}
-          </button>
+          </Button>
         }
       />
 
@@ -647,7 +647,7 @@ function TodaySignals({ rows, conviction }: {
                 type="button"
                 onClick={toggleMine}
                 aria-expanded={mineOpen}
-                className="flex w-full items-center gap-1.5 border-t border-border/40 bg-elevated/20 px-4 py-2 text-[11px] text-secondary transition-colors hover:bg-elevated/40 cursor-pointer"
+                className="flex w-full items-center gap-1.5 border-t border-border/40 bg-elevated/20 px-4 py-2 text-micro text-secondary transition-colors hover:bg-elevated/40 cursor-pointer"
               >
                 <ChevronDown className={cn('h-3 w-3 shrink-0 text-muted transition-transform duration-expand ease-smooth',
                   mineOpen && 'rotate-180')} />
@@ -673,7 +673,7 @@ function TodaySignals({ rows, conviction }: {
                 type="button"
                 onClick={toggleWatch}
                 aria-expanded={watchOpen}
-                className="flex w-full items-center gap-1.5 border-t border-border/40 px-4 py-2 text-[11px] text-muted transition-colors hover:bg-elevated/40 hover:text-foreground cursor-pointer"
+                className="flex w-full items-center gap-1.5 border-t border-border/40 px-4 py-2 text-micro text-muted transition-colors hover:bg-elevated/40 hover:text-foreground cursor-pointer"
               >
                 <ChevronDown className={cn('h-3 w-3 transition-transform duration-expand ease-smooth',
                   watchOpen && 'rotate-180')} />
@@ -878,12 +878,12 @@ function SignalRow({ r, c, shape, onOpen, onReview }: {
             不跳页: 跳走之后回来, 折叠状态、滚动位置、这一屏的上下文全没了。 */}
         <button type="button" onClick={() => onOpen(r.symbol, r.name)}
                 title={`看 ${r.name} 的日 K 与关键价位`}
-                className="cursor-pointer truncate text-left transition-colors hover:text-sky-300">
+                className="cursor-pointer truncate text-left transition-colors hover:text-accent">
           <SymbolCell symbol={r.symbol} name={r.name} />
         </button>
 
         {actionable ? (
-          <span className={cn('inline-flex items-center justify-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium',
+          <span className={cn('inline-flex items-center justify-center gap-1 rounded px-1.5 py-0.5 text-micro font-medium',
             r.act === 'buy' ? 'bg-bull/15 text-bull' : 'bg-bear/15 text-bear')}>
             {r.act === 'buy' ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
             {r.act === 'buy' ? '买入' : '清仓'}
@@ -893,11 +893,11 @@ function SignalRow({ r, c, shape, onOpen, onReview }: {
              [R338] 手上拿着的换个标记: 同样没有动作, 但"我拿着它"与"我在看它"
              是两件事, 一眼要能分开。 */
           r.held ? (
-            <span className="inline-flex items-center gap-1 text-[10px] text-secondary">
+            <span className="inline-flex items-center gap-1 text-micro text-secondary">
               <Wallet className="h-3 w-3" />持有
             </span>
           ) : (
-            <span className="inline-flex items-center gap-1 text-[10px] text-muted">
+            <span className="inline-flex items-center gap-1 text-micro text-muted">
               <Eye className="h-3 w-3" />盯着
             </span>
           )
@@ -921,7 +921,7 @@ function SignalRow({ r, c, shape, onOpen, onReview }: {
             **动作那一格因此退回不可点**, 一个像素没动。 */}
         <button type="button" onClick={() => onReview(r.symbol, r.name)}
                 title={`看 ${r.name} 的逐日复盘 —— 这个状态是怎么走到今天的`}
-                className="col-span-2 min-w-0 cursor-pointer truncate text-left text-[11px] text-secondary transition-colors hover:text-sky-300 sm:col-span-1">
+                className="col-span-2 min-w-0 cursor-pointer truncate text-left text-micro text-secondary transition-colors hover:text-accent sm:col-span-1">
           {r.stage === 'flipped' && <>已转折 · 现在是{r.state_cn}</>}
           {r.stage === 'crossing' && (
             <>按现价会转折 —— <b className="text-warning">收盘还站在这边才算数</b></>
@@ -939,12 +939,12 @@ function SignalRow({ r, c, shape, onOpen, onReview }: {
 
         {/* [R356] 走势并进同一行的第五列 —— 原来它是第二行, 害得行高随内容变。
             没进候选池的票这一格是空的, 但**格子照样占住**, 行高不受影响。 */}
-        <span className="col-span-3 min-w-0 text-[11px] sm:col-span-1">
+        <span className="col-span-3 min-w-0 text-micro sm:col-span-1">
           {c && <TrendCell o={c} />}
         </span>
 
         {/* [R350] 不再 `ml-auto` —— 它是网格的最后一列, 位置由栅格决定 */}
-        <span className="col-span-3 whitespace-nowrap text-left text-[10px] tabular-nums text-muted sm:col-span-1 sm:text-right">
+        <span className="col-span-3 whitespace-nowrap text-left text-micro tabular-nums text-muted sm:col-span-1 sm:text-right">
           {r.flip_price != null && <>
             触发 {r.flip_price.toFixed(2)}
             {r.ref_price != null && <> · 现 {r.ref_price.toFixed(2)}</>}
@@ -1027,9 +1027,9 @@ function NumberField({ label, value, onChange, min, max, step, width = 'w-20', s
           if (e.key === 'Escape') { setDraft(null); e.currentTarget.blur() }
         }}
         title={`${min} ~ ${max}${suffix ?? ''} —— 超出会被钳到边界; 回车或点别处生效`}
-        className={cn(width, 'rounded-btn border border-border bg-base px-1.5 py-0.5 text-right text-[10px] text-foreground outline-none focus:border-accent/50')}
+        className={cn(width, 'rounded-btn border border-border bg-base px-1.5 py-0.5 text-right text-micro text-foreground outline-none focus:border-accent/50')}
       />
-      {suffix && <span className="text-[10px]">{suffix}</span>}
+      {suffix && <span className="text-micro">{suffix}</span>}
     </label>
   )
 }
@@ -1073,7 +1073,7 @@ function ParamBar({ capital, maxPositions, years, onCapital, onMaxPositions, onY
   onYears: (v: number) => void
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
+    <div className="flex flex-wrap items-center gap-1.5 text-micro">
       {/* [R353] 三个都改成可输入。上下界与后端逐个对齐:
           本金 > 0(给 1 万下限, 再低连一手都买不起);
           最多持有 1~50(`flip_portfolio.MAX_POSITIONS_CAP`);
@@ -1115,7 +1115,7 @@ function MonthStrip({ months }: { months: FlipPaperData['monthly'] }) {
     /* [R358] 这一块现在长在筛选那张卡**里面** —— 自己不再是一张卡, 不然就是
        卡中卡(一圈边框套一圈边框)。 */
     <section className="overflow-hidden">
-      <div className="mb-2 flex items-center gap-0.5 text-[10px] text-muted">
+      <div className="mb-2 flex items-center gap-0.5 text-micro text-muted">
         逐月收益
         <Hint title={'**每个月单独算, 月与月之间不重叠** —— 这个月的收益 =\n月末净值 / 上月末净值 - 1(第一个月的基准是本金)。\n\n基准取**上月最后一天**而不是本月第一天: 收益要算这一段期间的变化,\n拿本月第一个交易日当基准会把那一天自己的涨跌吃掉。\n\n**打叉的是残月**: 回测窗口从月中切进来(第一个月),\n或者这个月还没走完(最后一个月)—— 它们不该拿去和整月比。'} />
         <span className="ml-1 opacity-70">{months.length} 个月 · 柱高按最大月度波动归一</span>
@@ -1126,7 +1126,7 @@ function MonthStrip({ months }: { months: FlipPaperData['monthly'] }) {
           return (
             <div key={m.month} className="flex min-w-[2.75rem] flex-1 flex-col items-center gap-1"
                  title={`${m.month} · ${m.days} 个交易日${m.partial ? '(残月)' : ''}\n月末净值 ${money(m.nav)}`}>
-              <span className={cn('text-[10px] font-semibold tabular-nums',
+              <span className={cn('text-micro font-semibold tabular-nums',
                 up ? 'text-bull' : 'text-bear', m.partial && 'opacity-60')}>
                 {pct(m.ret, 1)}
               </span>
@@ -1232,7 +1232,7 @@ function Summary({ d }: { d: FlipPaperData }) {
             type="button"
             onClick={toggleNav}
             aria-expanded={navOpen}
-            className="flex w-full items-center gap-1.5 px-3 py-2 text-[11px] text-muted transition-colors hover:bg-elevated/40 hover:text-foreground cursor-pointer"
+            className="flex w-full items-center gap-1.5 px-3 py-2 text-micro text-muted transition-colors hover:bg-elevated/40 hover:text-foreground cursor-pointer"
           >
             <ChevronDown className={cn('h-3 w-3 transition-transform duration-expand ease-smooth',
               navOpen && 'rotate-180')} />
@@ -1258,7 +1258,7 @@ function Stat({ label, value, sub, tone, hint }: {
 }) {
   return (
     <div className="px-4 py-2.5">
-      <div className="flex items-center gap-0.5 text-[10px] text-muted">
+      <div className="flex items-center gap-0.5 text-micro text-muted">
         {label}
         {hint && <Hint title={hint} />}
       </div>
@@ -1267,7 +1267,7 @@ function Stat({ label, value, sub, tone, hint }: {
         tone === 'warn' && 'text-warning')}>
         {value}
       </div>
-      {sub && <div className={cn('mt-0.5 text-[10px]',
+      {sub && <div className={cn('mt-0.5 text-micro',
         tone === 'warn' ? 'text-warning/80' : 'text-muted')}>{sub}</div>}
     </div>
   )
@@ -1308,7 +1308,7 @@ function NavChart({ d }: { d: FlipPaperData }) {
        **这个组件只在展开时才被挂载**(见 `Summary`), 所以 `useECharts` 的 init
        effect 一定是带着真实的 ref 跑的。 */
     <>
-      <div className="border-t border-border/40 px-3 pb-1 pt-2 text-[10px] text-muted">
+      <div className="border-t border-border/40 px-3 pb-1 pt-2 text-micro text-muted">
         默认看最近半年 · 拖下面那条可回到 {d.nav[0]?.date} 起的全程
       </div>
       <div ref={ref} className="h-[280px] w-full" />
@@ -1335,7 +1335,7 @@ function Holdings({ d, onOpen }: { d: FlipPaperData; onOpen: (s: string) => void
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full min-w-[640px] text-xs">
-            <thead className="text-[10px] text-muted">
+            <thead className="text-micro text-muted">
               <tr className="text-left">
                 <th className="px-4 py-1.5 font-normal">标的</th>
                 <th className="w-24 whitespace-nowrap px-2 py-1.5 text-right font-normal"
@@ -1391,7 +1391,7 @@ function Orders({ orders }: { orders: FlipOrder[] }) {
         note={`${orders.length} 笔 · 最近的在前`}
         right={rows.length > 30 && (
           <button onClick={() => setAll((v) => !v)}
-                  className="text-[10px] text-muted hover:text-foreground cursor-pointer">
+                  className="text-micro text-muted hover:text-foreground cursor-pointer">
             {all ? '只看最近 30 笔' : `展开全部 ${rows.length} 笔`}
           </button>
         )}
@@ -1401,7 +1401,7 @@ function Orders({ orders }: { orders: FlipOrder[] }) {
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full min-w-[640px] text-xs">
-            <thead className="text-[10px] text-muted">
+            <thead className="text-micro text-muted">
               <tr className="text-left">
                 <th className="px-4 py-1.5 font-normal">日期</th>
                 <th className="px-2 py-1.5 font-normal">标的</th>
@@ -1414,7 +1414,7 @@ function Orders({ orders }: { orders: FlipOrder[] }) {
             <tbody>
               {shown.map((o, i) => (
                 <tr key={`${o.date}-${o.symbol}-${i}`} className="border-t border-border/30">
-                  <td className="px-4 py-1.5 font-mono text-[10px] text-muted">
+                  <td className="px-4 py-1.5 font-mono text-micro text-muted">
                     {o.date}
                     {o.delayed && (
                       <span className="ml-1 text-warning"
@@ -1427,13 +1427,13 @@ function Orders({ orders }: { orders: FlipOrder[] }) {
                     <SymbolCell symbol={o.symbol} name={o.name} />
                   </td>
                   <td className="px-2 py-1.5">
-                    <span className={cn('inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium',
+                    <span className={cn('inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-micro font-medium',
                       o.act === 'buy' ? 'bg-bull/15 text-bull' : 'bg-bear/15 text-bear')}>
                       {o.act === 'buy' ? <TrendingUp className="h-2.5 w-2.5" /> : <TrendingDown className="h-2.5 w-2.5" />}
                       {o.act === 'buy' ? '买入' : '清仓'}
                     </span>
                   </td>
-                  <td className="px-2 py-1.5 text-[10px] text-secondary">
+                  <td className="px-2 py-1.5 text-micro text-secondary">
                     {o.reason}
                     {o.state_cn && <span className="ml-1 text-muted">({o.state_cn})</span>}
                   </td>
@@ -1475,7 +1475,7 @@ function Skipped({ d }: { d: FlipPaperData }) {
 
           原因那几句长短不一(「封板挂不进去」 vs 「一直封到反向转折, 这张单作废」),
           所以次数靠右对齐、标签占剩下的宽 —— 标签自己换行, 次数永远在同一条竖线上。 */}
-      <div className="px-4 py-2.5 text-[11px]">
+      <div className="px-4 py-2.5 text-micro">
         <div className="grid gap-x-8 gap-y-1.5 sm:grid-cols-2">
           {Object.entries(byReason).map(([r, n]) => (
             <div key={r} className="flex items-baseline justify-between gap-3">
@@ -1519,7 +1519,7 @@ function Rules({ r, d }: { r: FlipRules; d?: FlipPaperData }) {
           免得它一个人把整行的行高撑成两倍。
 
           底下三段告诫是成段的话, 不是清单 —— 它们走自己的两列, 且保持顺序。 */}
-      <div className="px-4 py-3 text-[11px] leading-relaxed">
+      <div className="px-4 py-3 text-micro leading-relaxed">
         <div className="grid gap-x-8 gap-y-2 md:grid-cols-2 2xl:grid-cols-3">
           <Rule k="信号" v={r.signal} />
           <Rule k="成交" v={r.execute} />
@@ -1557,7 +1557,7 @@ function SectionHead({ title, note, right, hint }: {
     <div className="flex items-center gap-2 border-b border-border/40 px-4 py-2.5">
       <span className="text-sm font-medium text-foreground">{title}</span>
       {hint && <Hint title={hint} />}
-      {note && <span className="text-[10px] text-muted">{note}</span>}
+      {note && <span className="text-micro text-muted">{note}</span>}
       {right && <span className="ml-auto">{right}</span>}
     </div>
   )

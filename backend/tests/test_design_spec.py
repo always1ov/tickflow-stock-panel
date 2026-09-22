@@ -30,17 +30,37 @@ TW = SRC.parent / "tailwind.config.ts"
 
 #: 迁移基线 —— **只许降不许升**。每完成一批迁移就把对应的数字调下来。
 #: 调高需要一个明确理由(比如合并上游带进来一批), 并且要在提交信息里说明。
+#: [R400] 这一轮的数字由**两件事**一起造成, 分开记清楚:
+#:   ① 3.2 真的迁移掉的(基础件收口 + 模拟盘一条链):
+#:        2305→2295 / 2336→2291 / 1071→1053 / 44→44
+#:   ② `_tsx_text()` 改成**剥注释再数**(理由见那个函数):
+#:        2295→2285 / 2291→2282 / 1053→1047 / 44→42
+#: ② 那一截是一直躺在注释里的旧写法, **不是迁移成果** —— 只此一次, 以后不会再降。
 RATCHET = {
-    "裸圆角": 2305,        # rounded / -sm / -md / -lg / -xl / -2xl(非语义 token)
-    "任意字号": 2336,      # text-[Npx]
-    "硬编码色": 1071,      # text-/bg-/border- + Tailwind 调色板
-    "任意容器宽": 44,      # max-w-[Npx]
+    "裸圆角": 2285,        # rounded / -sm / -md / -lg / -xl / -2xl(非语义 token)
+    "任意字号": 2282,      # text-[Npx]
+    "硬编码色": 1047,      # text-/bg-/border- + Tailwind 调色板
+    "任意容器宽": 42,      # max-w-[Npx]
 }
+
+#: [R400] 基础件所在目录。新写界面从这里取, 不再手写 class 串。
+UI = SRC / "components" / "ui"
 
 
 def _tsx_text() -> str:
+    """[R400] **剥注释再数。**
+
+    R399 这把棘轮原来连注释一起数, 于是有两个反向的毛病:
+      一、写清楚"这儿原来是 `focus:border-sky-400/50`, 为什么不再这么写"会让
+          数字**涨**, 也就是**解释清楚了反而算违规**(当场撞上过);
+      二、反过来, 删掉一段解释能让数字**降** —— 那不是迁移, 那是把理由删了。
+    AGENTS.md 第 12 条本来就写着"注释和 docstring 里复述旧说法是允许的"。
+    剥掉之后四个基线都往下走了一截, 那一截是**一直在里面的注释**, 不是这次迁移
+    的成果 —— 分得清这一点, 下次看这几个数才不会得出错的结论。
+    """
     try:
-        return "\n".join(p.read_text(encoding="utf-8") for p in SRC.rglob("*.tsx"))
+        return "\n".join(_strip_comments(p.read_text(encoding="utf-8"))
+                         for p in SRC.rglob("*.tsx"))
     except OSError:  # pragma: no cover
         pytest.skip("拿不到前端源码(只跑后端时正常)")
 
@@ -121,6 +141,108 @@ def test_R399_静态面无影_只有浮层留影():
     for k in ("sm", "DEFAULT", "card"):
         assert re.search(rf"{k}:\s*'var\(--shadow-flat\)'", tw), (
             f"boxShadow.{k} 还挂着投影 —— 静态面在仪器盘里不该有影")
+
+
+# ================================================================
+# 一·下 [R400] 基础件: 它自己必须是规范的样板
+# ================================================================
+
+def _strip_comments(src: str) -> str:
+    """**扫代码, 不扫注释。**
+
+    与 AGENTS.md 第 12 条同一个道理: 讲清楚"以前写的是 `sky-400/15`、为什么
+    不再这么写"恰恰**必须**把旧写法原样写出来。不剥注释的话, 这几条守卫会把
+    "解释清楚了"判成"违规", 于是逼人把理由删掉 —— 那正好是反的。
+    """
+    src = re.sub(r"/\*.*?\*/", "", src, flags=re.S)
+    return re.sub(r"(?<![:'\"])//[^\n]*", "", src)
+
+
+def _ui_sources() -> dict[str, str]:
+    try:
+        srcs = {p.name: _strip_comments(p.read_text(encoding="utf-8"))
+                for p in UI.glob("*.tsx")}
+    except OSError:  # pragma: no cover
+        pytest.skip("拿不到前端源码(只跑后端时正常)")
+    assert srcs, "components/ui/ 空了 —— 基础件整个没了"
+    return srcs
+
+
+def test_R400_基础件自己不许越界():
+    """**取值表这一处越界, 是会被抄到每个调用点的那种越界。**
+
+    别处还有两千多处待迁移(见下面的棘轮), 但这三个文件是样板, 从第一天起
+    就得是干净的 —— 所以这里不是棘轮而是硬线。
+    """
+    for name, src in _ui_sources().items():
+        assert not re.search(r"text-\[\d+px\]", src), f"{name} 里写了任意字号"
+        assert not re.search(r"\b(?:p|m|gap|px|py|mx|my)-\[\d+px\]", src), f"{name} 里写了任意间距"
+        assert not re.search(rf"(?:text|bg|border)-(?:{_PALETTE})-\d{{2,3}}", src), (
+            f"{name} 里写了调色板硬编码色 —— 基础件只许用语义色")
+        assert "transition-all" not in src, (
+            f"{name} 用了 transition-all(AGENTS.md 前端动效硬规则第 1 条)")
+
+
+def test_R400_基础件的样式一律过cn():
+    """**不过 `cn()` 的基础件, 它的 `className` 参数是假的。**
+
+    裸模板串拼出来的 class, 调用方传的 `px-s3` 与内置的 `px-s2` 会两个都留着,
+    最终哪个生效由 CSS 先后决定 —— 也就是"能传但不一定覆盖得掉", 而且不报错。
+    (`cn()` 认得本项目刻度这件事另有 `src/lib/cn.test.ts` 钉着。)
+    """
+    for name, src in _ui_sources().items():
+        assert "from '@/lib/cn'" in src, f"{name} 没有走 cn()"
+        assert not re.search(r"className=\{`", src), (
+            f"{name} 里有裸模板串拼 class —— 覆盖会失效, 请走 cn()")
+
+
+def test_R400_按钮不重复实现全局已有的交互反馈():
+    """按下缩放(R128)、焦点环(R124)、减少动效(R317)都是 `index.css` 里的全局规则。
+
+    在按钮里再写一遍不是"更保险", 是**多一处会和全局写岔的地方** —— 全局那条
+    按下反馈是 0.97 且排除了拖拽手柄, 组件里随手写个 0.95 就出现两种手感。
+    """
+    btn = _ui_sources()["Button.tsx"]
+    for banned in ("active:scale", "focus:ring", "focus-visible:", "motion-reduce:"):
+        assert banned not in btn, (
+            f"Button.tsx 自己实现了 `{banned}` —— 这件事 index.css 已经全局做了")
+
+
+def test_R400_主按钮字色不用那个有歧义的名字():
+    """`text-base` **同时是颜色和字号**(Tailwind 出厂 16px 一档)。
+
+    裸 class 串里靠 CSS 先后侥幸各管各的; 一旦进 `cn()` 就与字号撞组, **颜色被
+    静默丢掉**。基础件全部走 `cn()`, 所以主按钮必须用没有歧义的那个名字。
+    """
+    btn = _ui_sources()["Button.tsx"]
+    assert "text-on-accent" in btn, "主按钮的字色应当是 text-on-accent"
+    assert not re.search(r"\btext-base\b", btn), (
+        "Button.tsx 里出现了 text-base —— 它既是颜色又是字号, 进 cn() 会丢颜色")
+    tw = TW.read_text(encoding="utf-8")
+    assert "'on-accent'" in tw, "tailwind.config.ts 里没有 on-accent 这个语义色"
+
+
+def test_R400_输入框不写那句永远不生效的聚焦边框():
+    """`index.css` 里 `input:not([type='checkbox']):not([type='radio'])` 是 (0,2,1),
+    而 Tailwind 的 `.focus\\:border-*:focus` 只有 (0,2,0) —— **低一档, 抢不过**。
+
+    现状里那几个 `focus:border-sky-400/50` / `focus:border-violet-400/50` 从写下
+    那天起就没生效过。基础件不许把这句话抄进去: 抄进来就是一行"看起来在做事、
+    其实什么也没做"的代码, 而且会被后面几十个调用点跟着抄。
+    真要让边框跟着变, 得改 `index.css` 那条规则的适用范围。
+    """
+    fld = _ui_sources()["Field.tsx"]
+    assert not re.search(r"focus:border-", fld), (
+        "Field.tsx 写了 focus:border-… —— 那条被 index.css 的输入框规则压着, 不会生效")
+
+
+def test_R400_选中态全站只有强调色一种说法():
+    """现状里"选中"有 `sky-400/15`、`accent/10`、`violet-500/20` 三四种颜色 ——
+    同一件事换页面换颜色, 读的人得先确认它们是不是一回事(AGENTS.md 第 12 条)。"""
+    btn = _ui_sources()["Button.tsx"]
+    m = re.search(r"const SELECTED = '([^']*)'", btn)
+    assert m, "Button.tsx 里找不到选中态的取值"
+    assert "accent" in m.group(1), f"选中态没有用强调色: {m.group(1)}"
 
 
 # ================================================================
