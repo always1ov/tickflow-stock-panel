@@ -44,7 +44,7 @@ const EASE_SMOOTH: [number, number, number, number] = [0.16, 1, 0.3, 1]
 
 const WIDTH_STORAGE_KEY = 'assistant.width.v1'
 const DEFAULT_WIDTH = 720
-const MIN_WIDTH = 480
+export const MIN_WIDTH = 480
 
 function loadWidth(): number {
   try {
@@ -62,10 +62,23 @@ function saveWidth(width: number) {
   } catch { /* 存储不可用时仅内存态 */ }
 }
 
-function clampWidth(width: number): number {
-  // 右缘贴齐, 至少给页面主体留 64px 上下文。
-  const maxWidth = Math.max(MIN_WIDTH, window.innerWidth - 64)
-  return Math.min(Math.max(width, MIN_WIDTH), maxWidth)
+export function clampWidth(width: number): number {
+  const vw = window.innerWidth
+  // [R397] **收口的那一下必须是视口, 不是那个写死的下限。**
+  //
+  // 原来是 `Math.min(Math.max(width, MIN_WIDTH), Math.max(MIN_WIDTH, vw - 64))` ——
+  // 里外两个 `Math.max` 都在保证"无论如何至少 480px", 于是 390px 的手机上算出来
+  // 仍是 480: **抽屉比屏幕还宽 90px**。右缘贴齐之后左边整块被切出视口, 标题只剩
+  // 半个、每条快捷建议的首字都没了(用户截图)。而调用它的那个 resize 监听, 注释
+  // 写着「保证面板不越出视口」—— **注释承诺的事, 代码做不到**。
+  //
+  // 修法只加最后那个 `vw`: 不变式是"永不超过视口", 别的都在它之内。
+  // **窄屏铺满整屏是这条不变式的结果, 不需要单写一支** —— 我第一版写了个
+  // `if (vw <= MIN_WIDTH) return vw` 的早返回, 变异测试当场证明它与这里的 `vw`
+  // 完全重复(拿掉任意一个, 四条断言照样全绿)。两道看起来像两层防线, 其实只有
+  // 一层, 那比一层更坏。
+  const maxWidth = Math.max(MIN_WIDTH, vw - 64)
+  return Math.min(Math.max(width, MIN_WIDTH), maxWidth, vw)
 }
 
 export function AssistantDrawer() {
@@ -96,6 +109,10 @@ function DrawerPanel({
   const [status, setStatus] = useState<AssistantStatus | null>(null)
   const [suggests, setSuggests] = useState<QuickSuggest[]>([])
   const [width, setWidth] = useState(() => clampWidth(loadWidth()))
+  const [viewportWidth, setViewportWidth] = useState(() => window.innerWidth)
+  // 铺满整屏时没有"调宽"可言 —— 把手是 `touch-none` 的, 留在整页抽屉的左边缘
+  // 会把那一条竖带上的触摸滚动也吃掉。
+  const canResize = viewportWidth > MIN_WIDTH
   const panelRef = useRef<HTMLElement>(null)
   const draggingRef = useRef(false)
 
@@ -108,7 +125,10 @@ function DrawerPanel({
 
   // 窗口缩放后重新夹取宽度, 保证面板不越出视口。
   useEffect(() => {
-    const onResize = () => setWidth(prev => clampWidth(prev))
+    const onResize = () => {
+      setViewportWidth(window.innerWidth)
+      setWidth(prev => clampWidth(prev))
+    }
     window.addEventListener('resize', onResize)
     return () => window.removeEventListener('resize', onResize)
   }, [])
@@ -151,7 +171,8 @@ function DrawerPanel({
       <MessageList messages={messages} sending={sending} status={status} suggests={suggests} />
       <InputArea sending={sending} blocked={status ? !status.supports_tools : false} />
 
-      {/* 左缘拖拽调宽 */}
+      {/* 左缘拖拽调宽 —— 窄屏铺满时不渲染, 见 canResize */}
+      {canResize && (
       <div
         role="separator"
         aria-orientation="vertical"
@@ -165,6 +186,7 @@ function DrawerPanel({
       >
         <span className="absolute left-1/2 top-1/2 h-10 w-[3px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent/50 opacity-0 transition-opacity duration-150 ease-smooth group-hover/handle:opacity-100" />
       </div>
+      )}
     </motion.aside>
   )
 }
