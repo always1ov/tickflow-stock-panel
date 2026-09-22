@@ -283,30 +283,45 @@ export function AnalysisKChart({
     // [R405] 斐波那契二型的三样"画不成横线"的东西。**整块跟着那一个开关走** ——
     // 开关没开就一样都不画, 图上不会留下没人认领的色带。
     const fib2On = activeTypes.has('fib2')
+    // 两套主题分开给: 暗底上要更亮才浮得起来, 亮底上同样的值会糊成一片
+    const isDark = getTheme() === 'dark'
     if (fib2On && fib2) {
       // 上攻段底色: 纵向铺满, 横向只盖推进那一段(xAxis 两端 = 日期区间)
       const th = fib2.thrust
       if (th && dateIndex.has(th.start) && dateIndex.has(th.end)) {
         markAreaData.push([{
           xAxis: th.start, name: `单边上攻 ${th.days} 天`,
-          itemStyle: { color: 'rgba(210,70,59,0.06)' },
+          // [R407] 规格写的 6% 是在原型图的**白底**上定的, 放到实际主题上
+          // (尤其暗色)几乎看不见。加深并补一圈虚线边框, 段的起止才看得出来。
+          itemStyle: {
+            color: isDark ? 'rgba(210,70,59,0.20)' : 'rgba(210,70,59,0.13)',
+            borderColor: isDark ? 'rgba(210,70,59,0.45)' : 'rgba(210,70,59,0.32)',
+            borderWidth: 1, borderType: 'dashed',
+          },
           label: { show: true, position: 'insideTop', distance: 6,
-                   color: '#D2463B', fontSize: 10 },
+                   color: '#D2463B', fontSize: 10, fontWeight: 'bold' },
         }, { xAxis: th.end }])
       }
       // 强支撑区: 横向铺满, 纵向只盖那个价格带(yAxis 两端 = 价格区间)。
       // 透明度随重合条数走 —— 规格 §9: 1/2/3 条对应 20%/35%/50%。
       const z = fib2Zone
       if (z && z.high > 0) {
-        const alpha = Math.min(0.5, 0.2 + 0.15 * Math.max(0, z.strength - 1))
+        // [R407] 底色加深并补一圈实边框。用户: 「新指标的背景色看不清太淡了」。
+        // 这个区常常只有两三条线的厚度 —— 光靠半透明填充, 在蜡烛底下几乎看不出
+        // 边界在哪。重合越多越浓(这是它唯一的"强度"表达), 但起点比规格高一档。
+        const alpha = Math.min(0.55, 0.30 + 0.12 * Math.max(0, z.strength - 1))
         // 两条回撤挤得很近时色带会薄到看不见 —— 规格 §9 要求最小高度,
         // 这里按价格给个下限(现价的千分之三), 比按像素算简单且不依赖坐标系。
         const thin = Math.max(0, (rows.at(-1)?.close ?? z.high) * 0.003 - (z.high - z.low)) / 2
         markAreaData.push([{
           yAxis: z.low - thin, name: `强支撑区 · ${z.strength} 条回撤重合`,
-          itemStyle: { color: `rgba(167,122,28,${alpha})` },
+          itemStyle: {
+            color: `rgba(167,122,28,${alpha})`,
+            borderColor: 'rgba(167,122,28,0.85)', borderWidth: 1,
+          },
           label: { show: true, position: 'insideTopLeft', distance: 4,
-                   color: '#A77A1C', fontSize: 9 },
+                   color: isDark ? '#d6ab58' : '#8a6416', fontSize: 9,
+                   fontWeight: 'bold' },
         }, { yAxis: z.high + thin }])
       }
       // 首次回踩
