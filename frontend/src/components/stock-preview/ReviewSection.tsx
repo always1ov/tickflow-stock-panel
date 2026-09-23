@@ -16,6 +16,12 @@
  * 删旧的时候要先问它们去哪。[R438] 其中「这一格历来」用户已经说了「没用了」, 不用问。
  *
  * 数据与旧页同一个查询(`useStockReview`), 天数跟头部的 60 / 120 / 250 日走。
+ *
+ * [R440] 用户: 「逐日复盘可以保留样式, 但是内容必须和以前一模一样, 不多也不少」。
+ * R431 并表时改写过几句(开关悬停、动作表头、空表那句、脚注, 阈值挪进了脚注),
+ * 全部换回旧两张表的原话; 旧页页头的「六态阈值 N%」回到表头那一行。
+ * 并成一张表唯一多出来的是动作三格前的「六态」「通道」两个小字 —— 旧表靠页签区分,
+ * 并表之后只能靠它。
  */
 import { useMemo, useState } from 'react'
 import { Loader2 } from 'lucide-react'
@@ -83,15 +89,22 @@ function DailyCard({ d }: { d: StockReview }) {
   return (
     <div className="rounded-card border border-border bg-surface">
       <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
-        <span className="text-base font-semibold text-foreground">逐日复盘</span>
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <span className="text-base font-semibold text-foreground">逐日复盘</span>
+          {/* [R440] 旧「趋势状态」页页头那一句, 原样 */}
+          <span className="text-micro text-muted">
+            六态阈值 {(d.threshold * 100).toFixed(0)}%{d.threshold_source !== 'default' ? `(${d.threshold_source})` : ''}
+          </span>
+        </div>
         <div className="flex flex-wrap gap-2">
+          {/* [R440] 两个开关的悬停与旧两页逐字一致 */}
           <button type="button" onClick={() => setMarked(v => !v)} aria-pressed={marked}
-                  title="只留下有涨跌停、或六态转折的那些天 —— 其余日子状态没变, 复盘时没有信息"
+                  title="只留下有涨跌停、或趋势翻转的那些天 —— 其余日子状态没变, 复盘时没有信息"
                   className={`${PILL} ${marked ? PILL_ON : PILL_IDLE}`}>
             只看有事的日子
           </button>
           <button type="button" onClick={() => setShifted(v => !v)} aria-pressed={shifted}
-                  title="只留下通道档位换过的那些天 —— 其余日子档位没变, 复盘时没有信息"
+                  title="只留下档位换过的那些天 —— 其余日子档位没变, 复盘时没有信息"
                   className={`${PILL} ${shifted ? PILL_ON : PILL_IDLE}`}>
             只看换档的日子
           </button>
@@ -109,7 +122,7 @@ function DailyCard({ d }: { d: StockReview }) {
               <th className="whitespace-nowrap px-3 py-2 text-left font-normal"
                   title="当天三档通道合起来给出的那一句结论, 悬停看完整卡片">通道档位</th>
               <th className="whitespace-nowrap px-2 py-2 text-left font-normal"
-                  title="这次转折 / 换档的次日开盘该干什么。前面的小字说明是哪一套">动作</th>
+                  title={ACT_TIP}>动作</th>
               <th className="whitespace-nowrap px-2 py-2 text-right font-normal"
                   title="成交日与成交价 → 了结日与了结价, 都是开盘价">成交 → 了结</th>
               <th className="whitespace-nowrap px-4 py-2 text-right font-normal"
@@ -133,20 +146,32 @@ function DailyCard({ d }: { d: StockReview }) {
               </tr>
             ))}
             {rows.length === 0 && (
-              <tr><td colSpan={8} className="px-4 py-10 text-center text-xs text-muted">这段时间里没有这类日子</td></tr>
+              <tr><td colSpan={8} className="px-4 py-10 text-center text-xs text-muted">{emptyText(marked, shifted)}</td></tr>
             )}
           </tbody>
         </table>
       </div>
 
+      {/* [R440] 旧两页的脚注原样拼起来。旧「趋势状态」页脚注后半句「要摊开每一档 ... 切到上方的
+          「通道档位」那一页」不要了 —— 那一页的逐日内容就在这张表里, 没有「上方那一页」可切 */}
       <p className="px-4 py-3 text-micro leading-5 text-muted">
-        两列同源: 一律按收盘算, 六态与决策台「趋势」列同一个状态机、同一个阈值
-        (现在是 {(d.threshold * 100).toFixed(0)}%{d.threshold_source !== 'default' ? `, ${d.threshold_source}` : ''}),
-        通道与决策台同一套通道;「通道档位」悬停看完整卡片。
-        历史是按当前复权价重新算的 —— 期间除过权的话, 同一天今天算出来的通道会和当时屏幕上略有出入, 复盘看的是形态与节奏。
+        收盘口径, 与决策台「趋势」列同一个状态机、同一个阈值(含你自己调过的那个)。
+        「通道档位」列悬停看完整卡片 —— 与决策台「档位」列是同一张。一律按收盘算, 用的是同一套通道。
+        历史是按<b className="text-secondary">当前</b>复权价重新算的 —— 期间除过权的话,
+        同一天今天算出来的通道会和当时屏幕上略有出入, 复盘看的是形态与节奏。
       </p>
     </div>
   )
+}
+
+/** 「动作」表头: 旧两页各一句, 原样叠起来 */
+const ACT_TIP = '按转折买卖: 这次转折的次日开盘该干什么\n按档位买卖: 这次换档的次日开盘该干什么'
+
+/** 筛完一行不剩时那一句 —— 旧两页各自的原话; 两个开关都开就两句都说 */
+function emptyText(marked: boolean, shifted: boolean): string {
+  const a = '这段时间里没有涨跌停, 状态也没翻转过'
+  const b = '这段时间里档位一次都没换过'
+  return marked && shifted ? `${a}; ${b}` : shifted ? b : a
 }
 
 function TrendCell({ r }: { r: ReviewRow }) {
