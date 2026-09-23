@@ -18,9 +18,11 @@ import { ArrowDown, ArrowUp, KeyRound, Loader2, Plus, Save, Trash2 } from 'lucid
 import { api, type AiProfile } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { toast } from '@/components/Toast'
+import { buttonClass, TYPE } from '@/components/ui'
+import { cn } from '@/lib/cn'
 
 const INPUT = 'h-8 w-full rounded-input border border-border bg-surface px-2 text-xs text-foreground outline-none transition-colors focus:border-accent'
-const LABEL = 'mb-1 block text-[10px] font-medium text-secondary'
+const LABEL = 'mb-1 block text-micro font-medium text-secondary'
 
 // 一律按 OpenAI 兼容接口走 —— 地址、密钥、模型三样自己填就够了。
 // 不再列"常用配置"预设: 那种清单只在你正好用清单里那几家时省事, 否则先得
@@ -79,31 +81,31 @@ export function AiProfiles() {
     <section className="rounded-card border border-border bg-surface">
       <header className="flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-border px-3 py-2">
         <KeyRound className="h-3.5 w-3.5 shrink-0 text-accent" />
-        <h2 className="shrink-0 text-xs font-semibold text-foreground">AI 档位 · 按优先级</h2>
-        <span className="text-[10px] text-muted">
+        <h2 className={cn('shrink-0', TYPE.card)}>AI 档位 · 按优先级</h2>
+        <span className="text-micro text-muted">
           OpenAI 兼容接口 · 从上往下依次尝试 —— 上面那档用不了就自动换下一档
         </span>
         <div className="ml-auto flex items-center gap-1.5">
           {dirty && (
-            <span className="inline-flex items-center gap-1 rounded-btn border border-warning/30 bg-warning/10 px-2 py-0.5 text-[10px] text-warning">
+            <span className="inline-flex items-center gap-1 rounded-btn border border-warning/30 bg-warning/10 px-2 py-0.5 text-micro text-warning">
               <span className="h-1.5 w-1.5 rounded-full bg-warning" />
               有未保存改动 —— 保存后才生效
             </span>
           )}
           <button type="button" onClick={() => { setRows([...list, blank()]); setDirty(true) }}
-            className="inline-flex h-7 items-center gap-1 rounded-btn border border-border px-2 text-[11px] text-secondary transition-colors hover:border-accent/40 hover:text-accent">
+            className="inline-flex h-7 items-center gap-1 rounded-btn border border-border px-2 text-xs text-secondary transition-colors hover:border-accent/40 hover:text-accent">
             <Plus className="h-3.5 w-3.5" />加一档
           </button>
           <button type="button" disabled={save.isPending || rows === null}
             onClick={() => save.mutate(list)}
-            className="inline-flex h-7 items-center gap-1 rounded-btn bg-accent px-2.5 text-[11px] font-medium text-white transition-opacity disabled:opacity-50">
+            className={buttonClass({ variant: 'primary' }, 'gap-1')}>
             {save.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
             保存
           </button>
         </div>
       </header>
 
-      <div className="border-b border-border bg-elevated/40 px-3 py-2 text-[10px] leading-4 text-secondary">
+      <div className="border-b border-border bg-elevated/40 px-3 py-2 text-micro leading-4 text-secondary">
         换档只发生在<span className="text-foreground">这一档服务不了</span>的时候 ——
         额度用尽、限流、key 失效、对面宕机、或者这一档没有你填的那个模型。
         <span className="text-muted"> 请求本身有问题时不会换档: 那种错误换谁都一样失败,
@@ -120,7 +122,7 @@ export function AiProfiles() {
       )}
 
       {rows !== null && list.length === 0 && (
-        <div className="px-3 py-8 text-center text-[11px] text-muted">
+        <div className="px-3 py-8 text-center text-xs text-muted">
           还没有档位 —— 点「加一档」填第一个。<br />
           <span className="text-muted/70">配两家以上才有兜底的意义: 一家没额度了另一家顶上。</span>
         </div>
@@ -129,13 +131,13 @@ export function AiProfiles() {
       {list.map((r, i) => (
         <div key={r.id} className={`border-t border-border/60 px-3 py-2.5 ${r.enabled ? '' : 'opacity-50'}`}>
           <div className="mb-2 flex flex-wrap items-center gap-2">
-            <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-elevated font-mono text-[10px] text-secondary"
+            <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-elevated font-mono text-micro text-secondary"
               title={i === 0 ? '优先用这一档' : `前 ${i} 档都用不了时才轮到它`}>
               {i + 1}
             </span>
             <input className={`${INPUT} h-7 w-36`} placeholder="名字(自己看)"
               value={r.label} onChange={e => patch(i, { label: e.target.value })} />
-            <label className="flex shrink-0 items-center gap-1 text-[10px] text-secondary">
+            <label className="flex shrink-0 items-center gap-1 text-micro text-secondary">
               <input type="checkbox" className="h-3 w-3 accent-accent" checked={r.enabled}
                 onChange={e => patch(i, { enabled: e.target.checked })} />
               启用

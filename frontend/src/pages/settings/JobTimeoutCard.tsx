@@ -9,6 +9,7 @@ import { api, type Preferences } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { usePreferences } from '@/lib/useSharedQueries'
 import { toast } from '@/components/Toast'
+import { buttonClass, TYPE } from '@/components/ui'
 
 type TimeoutUnit = 'second' | 'minute' | 'hour'
 
@@ -114,8 +115,8 @@ export function JobTimeoutCard() {
         <div className="flex items-start gap-2.5">
           <Clock3 className="h-4 w-4 text-secondary mt-0.5" />
           <div>
-            <h2 className="text-sm font-medium text-foreground">超时设置</h2>
-            <p className="text-[11px] text-muted mt-1 leading-relaxed">
+            <h2 className={TYPE.card}>超时设置</h2>
+            <p className="text-xs text-muted mt-1 leading-relaxed">
               后台任务超过对应时间<b>没有任何进度</b>才判定卡死并自动终止；只要任务仍在推进（如慢带宽下的冷启动全市场拉取），无论总时长多久都不会被中断。保存时自动换算为秒，修改后对新建任务生效。
             </p>
           </div>
@@ -123,16 +124,16 @@ export function JobTimeoutCard() {
         <button
           onClick={() => saveJobTimeouts.mutate()}
           disabled={!timeoutValuesValid || !timeoutValuesChanged || saveJobTimeouts.isPending}
-          className="shrink-0 px-3 py-1.5 rounded-btn bg-accent text-white text-xs font-medium hover:bg-accent/90 disabled:opacity-40 transition-colors"
+          className={buttonClass({ variant: 'primary' }, 'shrink-0')}
         >
           {saveJobTimeouts.isPending ? '保存中...' : '保存'}
         </button>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <label className="rounded-lg border border-border/60 bg-elevated/20 px-3.5 py-3">
+        <label className="rounded-btn border border-border/60 bg-elevated/20 px-3.5 py-3">
           <span className="block text-xs font-medium text-foreground mb-1">普通任务停滞超时</span>
-          <span className="block text-[10px] text-muted mb-2">日 K 管道、扩展、修正与重算任务</span>
+          <span className="block text-micro text-muted mb-2">日 K 管道、扩展、修正与重算任务</span>
           <div className="flex items-center gap-2">
             <input
               type="number"
@@ -159,12 +160,12 @@ export function JobTimeoutCard() {
               <option value="hour">小时</option>
             </select>
           </div>
-          <span className="block text-[10px] text-muted/60 mt-1.5">默认 20 分钟无进度，最小 1 分钟</span>
+          <span className="block text-micro text-muted/60 mt-1.5">默认 20 分钟无进度，最小 1 分钟</span>
         </label>
 
-        <label className="rounded-lg border border-border/60 bg-elevated/20 px-3.5 py-3">
+        <label className="rounded-btn border border-border/60 bg-elevated/20 px-3.5 py-3">
           <span className="block text-xs font-medium text-foreground mb-1">长任务停滞超时</span>
-          <span className="block text-[10px] text-muted mb-2">分钟 K 全市场同步任务</span>
+          <span className="block text-micro text-muted mb-2">分钟 K 全市场同步任务</span>
           <div className="flex items-center gap-2">
             <input
               type="number"
@@ -191,7 +192,7 @@ export function JobTimeoutCard() {
               <option value="hour">小时</option>
             </select>
           </div>
-          <span className="block text-[10px] text-muted/60 mt-1.5">默认 30 分钟无进度，最小 1 分钟</span>
+          <span className="block text-micro text-muted/60 mt-1.5">默认 30 分钟无进度，最小 1 分钟</span>
         </label>
       </div>
 
@@ -199,7 +200,7 @@ export function JobTimeoutCard() {
         <div className="flex items-center justify-between gap-4">
           <div className="min-w-0">
             <span className="block text-xs font-medium text-foreground">数据传输压缩</span>
-            <span className="block text-[10px] text-muted mt-0.5 leading-relaxed">
+            <span className="block text-micro text-muted mt-0.5 leading-relaxed">
               大数据接口（分时、日K）启用 gzip 压缩，响应可缩至约 1/8，公网访问明显更快；本机或内网可关闭以节省服务端 CPU。任一子项开启时总开关为开，点击总开关一键全开/全关，子项可单独微调，立即生效。
             </span>
           </div>
@@ -247,8 +248,8 @@ function CompressToggleRow({ label, desc, enabled, pending, onToggle }: {
   return (
     <div className="flex items-center justify-between gap-4">
       <div className="min-w-0">
-        <span className="block text-[11px] font-medium text-secondary">{label}</span>
-        <span className="block text-[10px] text-muted/80 mt-0.5 leading-relaxed">{desc}</span>
+        <span className="block text-xs font-medium text-secondary">{label}</span>
+        <span className="block text-micro text-muted/80 mt-0.5 leading-relaxed">{desc}</span>
       </div>
       <button
         onClick={onToggle}

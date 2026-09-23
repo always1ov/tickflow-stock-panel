@@ -11,6 +11,7 @@ import { QK } from '@/lib/queryKeys'
 import { Skeleton } from '@/components/data/Skeleton'
 import { SectionIntro } from '@/components/SectionIntro'
 import { ExternalViewRender } from '@/components/ExternalViewRender'   // [R117] 试运行预览
+import { TYPE, buttonClass } from '@/components/ui'
 
 function dtypeToColumnType(dtype: string): AnalysisColumn['type'] {
   return dtype === 'int' || dtype === 'float' ? 'number' : 'string'
@@ -117,9 +118,9 @@ function ExternalWebsiteSettings() {
         <button
           type="button"
           onClick={() => setEnabled(value => !value)}
-          className={`shrink-0 inline-flex items-center gap-2 rounded-btn border px-3 py-1.5 text-xs transition-colors ${enabled ? 'border-success/40 bg-success/10 text-success' : 'border-border bg-elevated text-muted'}`}
+          className={`shrink-0 inline-flex items-center gap-2 rounded-btn border px-3 py-1.5 text-xs transition-colors ${enabled ? 'border-bear/40 bg-bear/10 text-bear' : 'border-border bg-elevated text-muted'}`}
         >
-          <span className={`h-2 w-2 rounded-full ${enabled ? 'bg-success' : 'bg-muted'}`} />
+          <span className={`h-2 w-2 rounded-full ${enabled ? 'bg-bear' : 'bg-muted'}`} />
           {enabled ? '已启用' : '已停用'}
         </button>
       )}
@@ -137,24 +138,24 @@ function ExternalWebsiteSettings() {
             key={opt.key}
             type="button"
             onClick={() => setMode(opt.key)}
-            className={`rounded-card border p-3 text-left transition-colors ${mode === opt.key ? 'border-accent/50 bg-accent/5' : 'border-border bg-base hover:bg-elevated/40'}`}
+            className={`rounded-card border p-3 text-left transition-colors ${mode === opt.key ? 'border-foreground bg-surface' : 'border-border bg-surface hover:bg-elevated'}`}
           >
-            <div className={`flex items-center gap-1.5 text-xs font-medium ${mode === opt.key ? 'text-accent' : 'text-foreground'}`}>
+            <div className={`flex items-center gap-1.5 text-xs font-medium text-foreground`}>
               <opt.icon className="h-3.5 w-3.5" />{opt.title}
-              {mode === opt.key && <span className="ml-auto text-[10px]">当前</span>}
+              {mode === opt.key && <span className="ml-auto text-micro">当前</span>}
             </div>
-            <p className="mt-1.5 text-[11px] leading-5 text-muted">{opt.desc}</p>
+            <p className="mt-1.5 text-xs leading-5 text-muted">{opt.desc}</p>
           </button>
         ))}
       </div>
 
       <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-[minmax(12rem,0.7fr)_minmax(20rem,2fr)]">
         <label className="space-y-1.5">
-          <span className="text-[11px] text-muted">页面名称</span>
+          <span className="text-xs text-muted">页面名称</span>
           <input value={name} maxLength={40} onChange={e => setName(e.target.value)} className="h-9 w-full rounded-btn border border-border bg-base px-3 text-xs text-foreground" />
         </label>
         <label className="space-y-1.5">
-          <span className="text-[11px] text-muted">网站地址</span>
+          <span className="text-xs text-muted">网站地址</span>
           <input value={url} onChange={e => setUrl(e.target.value)} placeholder="https://example.com/" className="h-9 w-full rounded-btn border border-border bg-base px-3 text-xs text-foreground" />
         </label>
       </div>
@@ -162,7 +163,7 @@ function ExternalWebsiteSettings() {
       {mode === 'fetch' && (
         <div className="mt-4 space-y-2">
           <label className="space-y-1.5 block">
-            <span className="text-[11px] text-muted">想从这一页看到什么（用大白话写，会拼进 AI 的提示词；留空则由 AI 自己判断）</span>
+            <span className="text-xs text-muted">想从这一页看到什么（用大白话写，会拼进 AI 的提示词；留空则由 AI 自己判断）</span>
             <textarea
               value={hint}
               maxLength={2000}
@@ -172,7 +173,7 @@ function ExternalWebsiteSettings() {
               className="w-full rounded-btn border border-border bg-base px-3 py-2 text-xs leading-6 text-foreground"
             />
           </label>
-          <div className="rounded-btn border border-border/60 bg-base/60 px-3 py-2 text-[11px] leading-5 text-muted">
+          <div className="rounded-btn border border-border/60 bg-base/60 px-3 py-2 text-xs leading-5 text-muted">
             AI 会被要求只输出固定结构：<span className="text-secondary">标题 · 顶部 KPI 卡 · 若干张表（列头/对齐/单位/涨跌染色）· 备注</span>。
             页面就按这个结构渲染，所以改提示词就能改看到的东西，不需要写代码。
             涨跌幅这类列会自动按正负红涨绿跌。原文超过 12000 字会被截断后再送 AI。
@@ -184,16 +185,16 @@ function ExternalWebsiteSettings() {
 
       {rawPeek && (
         <div className="mt-3 rounded-card border border-border bg-base/60 p-3">
-          <div className="text-[11px] text-muted">
+          <div className="text-xs text-muted">
             抓通了：HTTP {rawPeek.status} · {rawPeek.content_type || '未知类型'} · {rawPeek.bytes} 字节 · 清洗后 {rawPeek.source_chars} 字
           </div>
-          <pre className="mt-2 max-h-56 overflow-auto whitespace-pre-wrap break-all rounded bg-elevated/40 p-2 text-[10.5px] leading-5 text-secondary">{rawPeek.preview.slice(0, 2000)}</pre>
+          <pre className="mt-2 max-h-56 overflow-auto whitespace-pre-wrap break-all rounded bg-elevated/40 p-2 text-micro leading-5 text-secondary">{rawPeek.preview.slice(0, 2000)}</pre>
         </div>
       )}
 
       {preview && (
         <div className="mt-3 rounded-card border border-accent/30 bg-base/60 p-3">
-          <div className="mb-2 flex flex-wrap items-center gap-x-3 text-[11px] text-muted">
+          <div className="mb-2 flex flex-wrap items-center gap-x-3 text-xs text-muted">
             <span className="text-accent">试运行结果（页面上就是这个样子）</span>
             {preview.model && <span>档位 {preview.model}</span>}
             <span>原文 {preview.source_chars} 字</span>
@@ -202,7 +203,7 @@ function ExternalWebsiteSettings() {
         </div>
       )}
 
-      <div className="mt-4 flex flex-col gap-3 text-[11px] text-muted sm:flex-row sm:items-center sm:justify-between">
+      <div className="mt-4 flex flex-col gap-3 text-xs text-muted sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-1.5">
           <ShieldCheck className="h-3.5 w-3.5" />
           {mode === 'fetch'
@@ -225,7 +226,7 @@ function ExternalWebsiteSettings() {
               <ExternalLink className="h-3.5 w-3.5" />打开页面
             </Link>
           )}
-          <button onClick={() => save.mutate()} disabled={save.isPending || prefs.isLoading} className="inline-flex items-center gap-1.5 rounded-btn bg-accent px-3 py-1.5 text-xs font-medium text-base disabled:opacity-50">
+          <button onClick={() => save.mutate()} disabled={save.isPending || prefs.isLoading} className={buttonClass({ variant: 'primary' }, 'gap-1.5')}>
             <Save className="h-3.5 w-3.5" />{save.isPending ? '保存中…' : '保存设置'}
           </button>
         </div>
@@ -356,8 +357,8 @@ export function SettingsExtPagesPanel() {
         <section className="rounded-card border border-border bg-surface p-5 space-y-4">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <h3 className="text-sm font-medium text-foreground">{editingMenu ? '编辑扩展页面' : '新建扩展页面'}</h3>
-              <p className="mt-1 text-[11px] text-muted">菜单标识保存后不可在此处直接修改，如需更换标识请新建页面。</p>
+              <h3 className={TYPE.card}>{editingMenu ? '编辑扩展页面' : '新建扩展页面'}</h3>
+              <p className="mt-1 text-xs text-muted">菜单标识保存后不可在此处直接修改，如需更换标识请新建页面。</p>
             </div>
             <button onClick={() => { setShowForm(false); setError('') }} className="rounded p-1 text-muted hover:bg-elevated hover:text-foreground">
               <X className="h-4 w-4" />
@@ -366,7 +367,7 @@ export function SettingsExtPagesPanel() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <label className="space-y-1.5">
-              <span className="text-[11px] text-muted">菜单标识</span>
+              <span className="text-xs text-muted">菜单标识</span>
               <input
                 value={id}
                 disabled={!!editingMenu}
@@ -376,11 +377,11 @@ export function SettingsExtPagesPanel() {
               />
             </label>
             <label className="space-y-1.5">
-              <span className="text-[11px] text-muted">菜单名称</span>
+              <span className="text-xs text-muted">菜单名称</span>
               <input value={label} onChange={e => setLabel(e.target.value)} placeholder="如 概念热度" className="h-9 w-full rounded-btn border border-border bg-base px-3 text-xs text-foreground" />
             </label>
             <label className="space-y-1.5">
-              <span className="text-[11px] text-muted">扩展数据源</span>
+              <span className="text-xs text-muted">扩展数据源</span>
               <select
                 value={dataSource || activeConfig?.id || ''}
                 onChange={e => {
@@ -399,7 +400,7 @@ export function SettingsExtPagesPanel() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <label className="space-y-1.5">
-              <span className="text-[11px] text-muted">模板</span>
+              <span className="text-xs text-muted">模板</span>
               <select value={template} onChange={e => setTemplate(e.target.value as any)} className="h-9 w-full rounded-btn border border-border bg-base px-3 text-xs text-foreground">
                 <option value="dimension_rank">维度热度榜</option>
                 <option value="ranking">指标排名榜</option>
@@ -407,14 +408,14 @@ export function SettingsExtPagesPanel() {
               </select>
             </label>
             <label className="space-y-1.5">
-              <span className="text-[11px] text-muted">分组字段</span>
+              <span className="text-xs text-muted">分组字段</span>
               <select value={dimensionField} onChange={e => setDimensionField(e.target.value)} disabled={template !== 'dimension_rank'} className="h-9 w-full rounded-btn border border-border bg-base px-3 text-xs text-foreground disabled:opacity-50">
                 <option value="">请选择</option>
                 {fields.map(f => <option key={f.name} value={f.name}>{f.label || f.name}</option>)}
               </select>
             </label>
             <label className="space-y-1.5">
-              <span className="text-[11px] text-muted">排名字段</span>
+              <span className="text-xs text-muted">排名字段</span>
               <select value={rankField} onChange={e => setRankField(e.target.value)} disabled={template !== 'ranking'} className="h-9 w-full rounded-btn border border-border bg-base px-3 text-xs text-foreground disabled:opacity-50">
                 <option value="">请选择</option>
                 {numericFields.map(f => <option key={f.name} value={f.name}>{f.label || f.name}</option>)}
@@ -423,7 +424,7 @@ export function SettingsExtPagesPanel() {
           </div>
 
           <div>
-            <div className="text-[11px] text-muted mb-2">列表列配置</div>
+            <div className="text-xs text-muted mb-2">列表列配置</div>
             <div className="flex flex-wrap gap-2">
               {fields.filter(f => !['symbol', 'code'].includes(f.name)).map(f => {
                 const active = selectedColumns.includes(f.name)
@@ -431,7 +432,7 @@ export function SettingsExtPagesPanel() {
                   <button
                     key={f.name}
                     onClick={() => setSelectedColumns(cols => active ? cols.filter(c => c !== f.name) : [...cols, f.name])}
-                    className={`rounded-btn border px-3 py-1 text-[11px] transition-colors ${active ? 'border-accent/40 bg-accent/10 text-accent' : 'border-border bg-elevated/40 text-secondary hover:bg-elevated'}`}
+                    className={buttonClass({ size: 'xs', selected: active })}
                   >
                     {f.label || f.name}
                   </button>
@@ -457,11 +458,11 @@ export function SettingsExtPagesPanel() {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-medium text-foreground">{menu.label}</h3>
-                  {menu.builtin && <span className="rounded bg-accent/10 px-1.5 py-0.5 text-[10px] text-accent">默认</span>}
-                  {!menu.visible && <span className="rounded bg-muted/10 px-1.5 py-0.5 text-[10px] text-muted">已隐藏</span>}
+                  <h3 className={TYPE.card}>{menu.label}</h3>
+                  {menu.builtin && <span className="rounded bg-accent/10 px-1.5 py-0.5 text-micro text-accent">默认</span>}
+                  {!menu.visible && <span className="rounded bg-muted/10 px-1.5 py-0.5 text-micro text-muted">已隐藏</span>}
                 </div>
-                <p className="mt-1 text-[11px] text-muted font-mono">{menu.id}</p>
+                <p className="mt-1 text-xs text-muted font-mono">{menu.id}</p>
               </div>
               <div className="flex items-center gap-1">
                 <button onClick={() => editMenu(menu)} className="p-1 rounded text-muted hover:text-accent hover:bg-accent/10" title="编辑">
@@ -474,7 +475,7 @@ export function SettingsExtPagesPanel() {
                 )}
               </div>
             </div>
-            <div className="mt-3 space-y-1 text-[11px] text-secondary">
+            <div className="mt-3 space-y-1 text-xs text-secondary">
               <div>数据源：<span className="font-mono text-muted">{menu.data_source}</span></div>
               <div>模板：{menu.template}</div>
               {menu.dimension_field && <div>分组字段：{menu.dimension_field}</div>}

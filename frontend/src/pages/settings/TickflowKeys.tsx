@@ -16,6 +16,8 @@ import {
 import { api, type TickflowKeyRow } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { toast } from '@/components/Toast'
+import { buttonClass, TYPE } from '@/components/ui'
+import { cn } from '@/lib/cn'
 
 const INPUT = 'h-8 w-full rounded-input border border-border bg-surface px-2 font-mono text-xs text-foreground outline-none transition-colors focus:border-accent'
 
@@ -58,31 +60,31 @@ export function TickflowKeys() {
   return (
     <section className="rounded-card border border-border bg-surface">
       <header className="flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-border px-3 py-2">
-        <h2 className="shrink-0 text-xs font-semibold text-foreground">数据源 Key</h2>
-        <span className="text-[10px] text-muted">
+        <h2 className={cn('shrink-0', TYPE.card)}>数据源 Key</h2>
+        <span className="text-micro text-muted">
           第 1 个是主 key(档位探测、付费端点、历史日 K 都走它); 其余用于实时行情池化, 每个免费 key 各 5 只额度
         </span>
         <div className="ml-auto flex flex-wrap items-center gap-1.5">
           <button type="button" onClick={() => setReveal(v => !v)}
             title={reveal ? '隐藏明文' : '显示明文'}
-            className="inline-flex h-7 shrink-0 items-center gap-1 whitespace-nowrap rounded-btn border border-border px-2 text-[11px] text-secondary transition-colors hover:border-accent/40 hover:text-accent">
+            className="inline-flex h-7 shrink-0 items-center gap-1 whitespace-nowrap rounded-btn border border-border px-2 text-xs text-secondary transition-colors hover:border-accent/40 hover:text-accent">
             {reveal ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
             {reveal ? '隐藏' : '明文'}
           </button>
           <button type="button" disabled={probe.isPending || list.length === 0}
             onClick={() => probe.mutate()}
             title="逐个真打一次接口判定死活。串行跑, 并发会把活的 key 也打成限流"
-            className="inline-flex h-7 shrink-0 items-center gap-1 whitespace-nowrap rounded-btn border border-border px-2 text-[11px] text-secondary transition-colors hover:border-accent/40 hover:text-accent disabled:opacity-50">
+            className="inline-flex h-7 shrink-0 items-center gap-1 whitespace-nowrap rounded-btn border border-border px-2 text-xs text-secondary transition-colors hover:border-accent/40 hover:text-accent disabled:opacity-50">
             {probe.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Stethoscope className="h-3.5 w-3.5" />}
             验活
           </button>
           <button type="button" onClick={() => setRows([...list, ''])}
-            className="inline-flex h-7 shrink-0 items-center gap-1 whitespace-nowrap rounded-btn border border-border px-2 text-[11px] text-secondary transition-colors hover:border-accent/40 hover:text-accent">
+            className="inline-flex h-7 shrink-0 items-center gap-1 whitespace-nowrap rounded-btn border border-border px-2 text-xs text-secondary transition-colors hover:border-accent/40 hover:text-accent">
             <Plus className="h-3.5 w-3.5" />加一个
           </button>
           <button type="button" disabled={save.isPending || rows === null}
             onClick={() => save.mutate(list.filter(k => k.trim()))}
-            className="inline-flex h-7 shrink-0 items-center gap-1 whitespace-nowrap rounded-btn bg-accent px-2.5 text-[11px] font-medium text-white transition-opacity disabled:opacity-50">
+            className={buttonClass({ variant: 'primary' }, 'shrink-0 gap-1 whitespace-nowrap')}>
             {save.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
             保存
           </button>
@@ -96,14 +98,14 @@ export function TickflowKeys() {
       )}
 
       {rows !== null && list.length === 0 && (
-        <div className="px-3 py-8 text-center text-[11px] text-muted">还没有 key —— 点「加一个」填第一个。</div>
+        <div className="px-3 py-8 text-center text-xs text-muted">还没有 key —— 点「加一个」填第一个。</div>
       )}
 
       {list.map((k, i) => {
         const h = health[i]
         return (
           <div key={i} className="flex items-center gap-2 border-t border-border/60 px-3 py-2">
-            <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-elevated font-mono text-[10px] text-secondary"
+            <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-elevated font-mono text-micro text-secondary"
               title={i === 0 ? '主 key' : '池化 key'}>
               {i + 1}
             </span>
@@ -119,13 +121,13 @@ export function TickflowKeys() {
             {/* 验活结论。没验过就什么都不显示 —— 显示一个灰点会被当成"已验且没问题" */}
             {h && (h.alive
               ? (
-                <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded border border-emerald-400/40 bg-emerald-400/10 px-1.5 py-0.5 text-[10px] text-emerald-400">
+                <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded border border-bear/40 bg-bear/10 px-1.5 py-0.5 text-micro text-bear">
                   <CheckCircle2 className="h-3 w-3" />可用
                 </span>
               )
               : (
                 <span title={h.error || '接口调用失败'}
-                  className="inline-flex shrink-0 cursor-help items-center gap-1 whitespace-nowrap rounded border border-danger/40 bg-danger/10 px-1.5 py-0.5 text-[10px] text-danger">
+                  className="inline-flex shrink-0 cursor-help items-center gap-1 whitespace-nowrap rounded border border-danger/40 bg-danger/10 px-1.5 py-0.5 text-micro text-danger">
                   <AlertCircle className="h-3 w-3" />失效
                 </span>
               ))}
@@ -138,7 +140,7 @@ export function TickflowKeys() {
       })}
 
       {Object.keys(health).length > 0 && (
-        <div className="border-t border-border/60 px-3 py-2 text-[10px] leading-4 text-muted">
+        <div className="border-t border-border/60 px-3 py-2 text-micro leading-4 text-muted">
           失效的那几个悬停可以看接口返回的原因。删掉之后记得点「保存」——
           验活只是查, 不会自己动你的配置。
         </div>

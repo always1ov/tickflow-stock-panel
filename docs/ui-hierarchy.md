@@ -72,5 +72,5 @@
 - [x] 数据(`Data` + `data/*` + `ext-data/*`)
 - [x] 因子(`Factors` + `factors/*` + 因子页里的 `FactorDiscovery` / `MiningWorkbench` / `ResearchCandidatesDialog`)
 - [x] 回测(`Backtest` + `backtest/*`)
-- [ ] 设置(`Settings` + `settings/*`)
+- [x] 设置(`Settings` + `settings/*`)
 - [ ] 其余共用组件与弹窗

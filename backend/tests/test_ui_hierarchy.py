@@ -133,6 +133,19 @@ MIGRATED: list[str] = [
     "pages/backtest/components/PicksSymbolKlineModal.tsx",
     "pages/backtest/components/TradeKlineModal.tsx",
     "pages/backtest/components/paramSweep.tsx",
+    "pages/Settings.tsx",
+    "pages/settings/AI.tsx",
+    "pages/settings/AiProfiles.tsx",
+    "pages/settings/DataSourceEditor.tsx",
+    "pages/settings/DataSources.tsx",
+    "pages/settings/ExtPages.tsx",
+    "pages/settings/JobTimeoutCard.tsx",
+    "pages/settings/Keys.tsx",
+    "pages/settings/MenuSettings.tsx",
+    "pages/settings/Monitoring.tsx",
+    "pages/settings/System.tsx",
+    "pages/settings/TickflowKeys.tsx",
+    "pages/settings/Timeout.tsx",
 ]
 
 

@@ -113,14 +113,14 @@ export function Settings() {
                     'relative flex items-center rounded-btn text-sm transition-colors duration-hover ease-smooth',
                     collapsed ? 'justify-center px-0 py-2' : 'items-center gap-2 px-3 py-2 text-left',
                     activeTab.key === key
-                      ? 'bg-accent/10 text-accent font-medium'
+                      ? 'bg-accent-soft text-accent font-medium'
                       : 'text-secondary hover:text-foreground hover:bg-elevated/60',
                   )}
                 >
                   <Icon className="h-3.5 w-3.5 shrink-0" />
                   {!collapsed && <span>{label}</span>}
                   {!collapsed && badge && (
-                    <span className="ml-auto inline-flex items-center rounded-btn border border-amber-400/30 bg-amber-400/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-amber-400 shrink-0">
+                    <span className="ml-auto inline-flex items-center rounded-btn border border-warning/30 bg-warning/10 px-1.5 py-0.5 text-micro font-medium text-warning shrink-0">
                       {badge}
                     </span>
                   )}

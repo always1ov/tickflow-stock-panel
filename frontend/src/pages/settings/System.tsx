@@ -17,6 +17,7 @@ import {
   listZhVoices, previewVoice, activateVoice, getCurrentVoiceURI,
 } from '@/lib/voiceBroadcast'
 import { loadStockExternalTemplate, saveStockExternalTemplate } from '@/lib/stock-external-link'
+import { TYPE, buttonClass } from '@/components/ui'
 
 export function SettingsSystemPanel() {
   const qc = useQueryClient()
@@ -109,7 +110,7 @@ export function SettingsSystemPanel() {
       <section className="rounded-card border border-border bg-surface p-5">
         <div className="flex items-center gap-2 mb-4">
           <Settings2 className="h-4 w-4 text-accent" />
-          <h3 className="text-sm font-medium text-foreground">策略页</h3>
+          <h3 className={TYPE.card}>策略页</h3>
         </div>
 
         <ToggleRow
@@ -124,7 +125,7 @@ export function SettingsSystemPanel() {
       <section className="rounded-card border border-border bg-surface p-5 mt-6">
         <div className="flex items-center gap-2 mb-4">
           <Bell className="h-4 w-4 text-accent" />
-          <h3 className="text-sm font-medium text-foreground">通知弹窗</h3>
+          <h3 className={TYPE.card}>通知弹窗</h3>
         </div>
 
         <ToggleRow
@@ -142,7 +143,7 @@ export function SettingsSystemPanel() {
         <div className="flex items-center justify-between gap-4 py-2">
           <div className="min-w-0">
             <div className="text-sm text-foreground">最大弹窗个数</div>
-            <div className="text-[11px] text-muted truncate">同时显示的通知数量 (1-5), 超出丢弃最旧的</div>
+            <div className="text-xs text-muted truncate">同时显示的通知数量 (1-5), 超出丢弃最旧的</div>
           </div>
           <select
             value={toastMax}
@@ -176,7 +177,7 @@ export function SettingsSystemPanel() {
             <Volume2 className="h-3.5 w-3.5 text-muted" />
             <div>
               <div className="text-sm text-foreground">声效选择</div>
-              <div className="text-[11px] text-muted truncate">选择提示音风格</div>
+              <div className="text-xs text-muted truncate">选择提示音风格</div>
             </div>
           </div>
           <div className="flex items-center gap-1.5">
@@ -207,7 +208,7 @@ export function SettingsSystemPanel() {
       <section className="rounded-card border border-border bg-surface p-5 mt-6">
         <div className="flex items-center gap-2 mb-4">
           <Volume2 className="h-4 w-4 text-accent" />
-          <h3 className="text-sm font-medium text-foreground">语音播报</h3>
+          <h3 className={TYPE.card}>语音播报</h3>
         </div>
 
         <ToggleRow
@@ -227,7 +228,7 @@ export function SettingsSystemPanel() {
             <Volume2 className="h-3.5 w-3.5 text-muted" />
             <div>
               <div className="text-sm text-foreground">语音音色</div>
-              <div className="text-[11px] text-muted truncate">
+              <div className="text-xs text-muted truncate">
                 {voices.length === 0
                   ? '未检测到中文语音, 将用系统默认'
                   : '默认优先 Google 中国大陆 (音质最佳)'}
@@ -273,7 +274,7 @@ export function SettingsSystemPanel() {
         <div className="flex items-center justify-between gap-4 py-2">
           <div className="min-w-0">
             <div className="text-sm text-foreground">语速</div>
-            <div className="text-[11px] text-muted truncate">0.5 慢 — 2.0 快</div>
+            <div className="text-xs text-muted truncate">0.5 慢 — 2.0 快</div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <input
@@ -294,13 +295,13 @@ export function SettingsSystemPanel() {
       <section className="rounded-card border border-border bg-surface p-5 mt-6">
         <div className="flex items-center gap-2 mb-4">
           <ExternalLink className="h-4 w-4 text-accent" />
-          <h3 className="text-sm font-medium text-foreground">个股详情外链</h3>
+          <h3 className={TYPE.card}>个股详情外链</h3>
         </div>
 
         <div className="flex items-center justify-between gap-4 py-2">
           <div className="min-w-0">
             <div className="text-sm text-foreground">详情页 URL 模板</div>
-            <div className="text-[11px] text-muted truncate">{"支持 {code} {market} {symbol} · 留空关闭外链"}</div>
+            <div className="text-xs text-muted truncate">{"支持 {code} {market} {symbol} · 留空关闭外链"}</div>
           </div>
           <input
             value={extTpl}
@@ -318,13 +319,13 @@ export function SettingsSystemPanel() {
       <section className="rounded-card border border-border bg-surface p-5 mt-6">
         <div className="flex items-center gap-2 mb-4">
           <Trash2 className="h-4 w-4 text-accent" />
-          <h3 className="text-sm font-medium text-foreground">缓存</h3>
+          <h3 className={TYPE.card}>缓存</h3>
         </div>
 
         <div className="flex items-center justify-between gap-4 py-2">
           <div className="min-w-0">
             <div className="text-sm text-foreground">刷新前端缓存</div>
-            <div className="text-[11px] text-muted truncate">
+            <div className="text-xs text-muted truncate">
               清除页面缓存并强制重新加载 (不影响个人配置和本地股票数据)
             </div>
           </div>
@@ -350,13 +351,13 @@ export function SettingsSystemPanel() {
       <section className="rounded-card border border-border bg-surface p-5 mt-6">
         <div className="flex items-center gap-2 mb-4">
           <Info className="h-4 w-4 text-accent" />
-          <h3 className="text-sm font-medium text-foreground">关于</h3>
+          <h3 className={TYPE.card}>关于</h3>
         </div>
 
         <div className="flex items-center justify-between gap-4 py-2">
           <div className="min-w-0">
             <div className="text-sm text-foreground">版本</div>
-            <div className="text-[11px] text-muted truncate">当前安装的应用版本</div>
+            <div className="text-xs text-muted truncate">当前安装的应用版本</div>
           </div>
           <span className="font-mono text-xs text-secondary shrink-0">
             {versionData?.version ?? '—'}
@@ -422,7 +423,7 @@ function DataDoctorSection() {
     <section className="rounded-card border border-border bg-surface p-5 mt-6">
       <div className="flex items-center gap-2 mb-1">
         <Stethoscope className="h-4 w-4 text-accent" />
-        <h3 className="text-sm font-medium text-foreground">数据体检</h3>
+        <h3 className={TYPE.card}>数据体检</h3>
         <button
           onClick={() => void run()}
           disabled={busy}
@@ -433,7 +434,7 @@ function DataDoctorSection() {
           {busy ? '体检中…' : '开始体检'}
         </button>
       </div>
-      <p className="text-[11px] leading-relaxed text-muted">
+      <p className="text-xs leading-relaxed text-muted">
         系统一直在改,盘上的老数据是早先的版本写的 —— 后加的字段老记录不会有。
         这类缺失<b className="text-secondary">不会报错</b>,只会被当成「你没设过」静默处理。
         体检只读不改;补齐前会先备份,并且<b className="text-secondary">一条记录都不删</b>。
@@ -441,25 +442,25 @@ function DataDoctorSection() {
 
       {report && (
         <div className="mt-3 space-y-3">
-          <div className="text-[11px] text-secondary">
+          <div className="text-xs text-secondary">
             查了 {report.summary.checked} 处,盘上有 {report.summary.present} 处
             {report.summary.with_missing > 0 && <span className="text-warning">,{report.summary.with_missing} 处缺字段</span>}
             {report.summary.unreadable > 0 && <span className="text-danger">,{report.summary.unreadable} 处读不动</span>}
             {report.summary.orphans > 0 && <span className="text-muted">,{report.summary.orphans} 个孤儿文件</span>}
-            {problems.length === 0 && report.summary.orphans === 0 && <span className="text-emerald-400"> —— 没查出问题</span>}
+            {problems.length === 0 && report.summary.orphans === 0 && <span className="text-bear"> —— 没查出问题</span>}
           </div>
 
           {problems.map(s => (
             <div key={s.rel} className="rounded-btn border border-border/60 bg-elevated/20 px-3 py-2">
               <div className="flex flex-wrap items-baseline gap-x-2">
                 <span className="text-xs text-foreground">{s.cn}</span>
-                <span className="font-mono text-[10px] text-muted">{s.rel}</span>
-                <span className={`text-[10px] ${s.kind === 'user' ? 'text-amber-400' : 'text-muted'}`}>
+                <span className="font-mono text-micro text-muted">{s.rel}</span>
+                <span className={`text-micro ${s.kind === 'user' ? 'text-warning' : 'text-muted'}`}>
                   {s.kind === 'user' ? '用户数据 · 不可重算' : '派生数据 · 可重算'}
                 </span>
-                {s.records != null && <span className="text-[10px] text-muted">{s.records} 条</span>}
+                {s.records != null && <span className="text-micro text-muted">{s.records} 条</span>}
                 {s.bytes > 0 && (
-                  <span className="text-[10px] text-muted">
+                  <span className="text-micro text-muted">
                     {s.bytes > 1024 * 1024 ? `${(s.bytes / 1024 / 1024).toFixed(1)} MB` : `${(s.bytes / 1024).toFixed(1)} KB`}
                   </span>
                 )}
@@ -469,35 +470,35 @@ function DataDoctorSection() {
                     onClick={() => void heal(s.rel, s.cn)}
                     disabled={healing === s.rel}
                     title="按默认值补上缺的字段。已有的值一个都不动,改动前先备份。"
-                    className="ml-auto inline-flex items-center gap-1 rounded-btn border border-accent/40 bg-accent/10 px-2 py-0.5 text-[10px] text-accent hover:bg-accent/20 disabled:opacity-50"
+                    className={buttonClass({ size: 'xs' }, 'ml-auto gap-1')}
                   >
                     {healing === s.rel ? <Loader2 className="h-3 w-3 animate-spin" /> : <Wrench className="h-3 w-3" />}
                     补齐
                   </button>
                 )}
               </div>
-              {!!s.error && <p className="mt-1 text-[10px] text-danger">{s.error}</p>}
+              {!!s.error && <p className="mt-1 text-micro text-danger">{s.error}</p>}
               {Object.entries(s.missing).map(([k, n]) => (
-                <p key={k} className="mt-0.5 text-[10px] text-warning/90">
+                <p key={k} className="mt-0.5 text-micro text-warning/90">
                   缺字段 <code className="font-mono">{k}</code> · {n} 条
                   {s.kind === 'derived' && <span className="text-muted">(派生数据 —— 该做的是删掉重算,不是补)</span>}
                 </p>
               ))}
               {Object.entries(s.incomplete).map(([k, n]) => (
-                <p key={k} className="mt-0.5 text-[10px] text-danger/90">
+                <p key={k} className="mt-0.5 text-micro text-danger/90">
                   <code className="font-mono">{k}</code> 为空 · {n} 条 —— 补不了,得自己看这几条还要不要
                 </p>
               ))}
-              {!!s.note && <p className="mt-0.5 text-[10px] text-muted/70">{s.note}</p>}
+              {!!s.note && <p className="mt-0.5 text-micro text-muted/70">{s.note}</p>}
             </div>
           ))}
 
           {bulky.length > 0 && (
             <div className="rounded-btn border border-border/60 bg-elevated/20 px-3 py-2">
-              <div className="text-[11px] text-secondary">占地方的派生数据 —— 可重算,删了会自动重建</div>
+              <div className="text-xs text-secondary">占地方的派生数据 —— 可重算,删了会自动重建</div>
               <div className="mt-1 space-y-0.5">
                 {bulky.map(s => (
-                  <p key={s.rel} className="text-[10px] text-muted">
+                  <p key={s.rel} className="text-micro text-muted">
                     <span className="text-secondary">{s.cn}</span>{' '}
                     <span className="font-mono">{s.rel}</span> ·{' '}
                     <b className="text-warning">{(s.bytes / 1024 / 1024).toFixed(1)} MB</b>
@@ -510,17 +511,17 @@ function DataDoctorSection() {
 
           {report.orphans.length > 0 && (
             <div className="rounded-btn border border-border/60 bg-elevated/20 px-3 py-2">
-              <div className="text-[11px] text-secondary">
+              <div className="text-xs text-secondary">
                 孤儿文件 —— 现在的代码不读它们,多半是删掉的功能留下的
               </div>
               <div className="mt-1 space-y-0.5">
                 {report.orphans.map(o => (
-                  <p key={o.rel} className="font-mono text-[10px] text-muted">
+                  <p key={o.rel} className="font-mono text-micro text-muted">
                     {o.rel}{o.is_dir ? '/' : ''} · {(o.bytes / 1024).toFixed(1)} KB
                   </p>
                 ))}
               </div>
-              <p className="mt-1 text-[10px] text-muted/70">
+              <p className="mt-1 text-micro text-muted/70">
                 这里<b className="text-secondary">不替你删</b> —— 判断「没人读」靠的是一张手写清单,
                 清单漏一项就等于删了你的数据。确认之后自己到 data/user_data 下删。
               </p>
@@ -552,7 +553,7 @@ function ToggleRow({
     <div className="flex items-center justify-between gap-4 py-2">
       <div className="min-w-0">
         <div className="text-sm text-foreground">{label}</div>
-        <div className="text-[11px] text-muted truncate">{desc}</div>
+        <div className="text-xs text-muted truncate">{desc}</div>
       </div>
       <button
         onClick={() => onChange(!checked)}

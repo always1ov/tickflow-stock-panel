@@ -44,6 +44,8 @@ import { CAP_LABELS, TIER_RANK, tierRank, tierStyle, TierTag } from '@/lib/capab
 import { toast } from '@/components/Toast'
 import { DataSourceEditor } from './DataSourceEditor'
 import { TickFlowKeySection, TierHelpPopover, useInvalidateTierRelated } from './Keys'
+import { buttonClass, TYPE } from '@/components/ui'
+import { cn } from '@/lib/cn'
 
 const DATASET_LABEL: Record<string, string> = {
   realtime: '实时',
@@ -82,7 +84,7 @@ function TierReqChip({ tier, currentLabel }: { tier: string; currentLabel?: stri
       title={unmet
         ? `TickFlow 该能力需 ${text} — 当前档位 ${currentLabel}`
         : `TickFlow 该能力需 ${text}`}
-      className={`inline-flex h-[15px] shrink-0 items-center gap-1 rounded px-1.5 text-[9px] font-bold font-mono leading-none ${unmet ? 'ring-1 ring-warning/60' : ''}`}
+      className={`inline-flex h-[15px] shrink-0 items-center gap-1 rounded px-1.5 text-micro font-bold font-mono leading-none ${unmet ? 'ring-1 ring-warning/60' : ''}`}
       style={t.tagBg}
     >
       <span className="h-1 w-1 rounded-full shrink-0" style={t.dotStyle} />
@@ -92,7 +94,7 @@ function TierReqChip({ tier, currentLabel }: { tier: string; currentLabel?: stri
 }
 
 /** TickFlow「已适配全档位」标识: Expert 三色渐变(全档位体系里最醒目的身份色) */
-function AllTiersBadge({ size = 'text-[10px]' }: { size?: string }) {
+function AllTiersBadge({ size = 'text-micro' }: { size?: string }) {
   const t = tierStyle('expert')
   return (
     <span
@@ -107,13 +109,13 @@ function AllTiersBadge({ size = 'text-[10px]' }: { size?: string }) {
 
 /** 提供方标签样式: 当前项高亮(accent), 其余弱化可点; 未就绪源禁用置灰 */
 function tagCls(active: boolean, disabled = false, interactive = true) {
-  const base = 'inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] transition-colors select-none'
+  const base = 'inline-flex h-6 items-center gap-1 px-2 rounded-btn text-xs transition-colors select-none'
   if (disabled) return `${base} bg-elevated/40 text-muted/50 cursor-not-allowed`
-  if (!interactive) return `${base} cursor-default ${active ? 'bg-accent/15 text-accent font-medium' : 'bg-elevated/60 text-muted/70'}`
+  if (!interactive) return `${base} cursor-default ${active ? 'bg-foreground text-surface font-medium' : 'bg-elevated/60 text-muted'}`
   return `${base} cursor-pointer disabled:opacity-50 ${
     active
-      ? 'bg-accent/15 text-accent font-medium'
-      : 'bg-elevated/60 text-muted/70 hover:bg-accent/15 hover:text-accent'
+      ? 'bg-foreground text-surface font-medium'
+      : 'bg-elevated/60 text-secondary hover:bg-elevated hover:text-foreground'
   }`
 }
 
@@ -170,21 +172,21 @@ function CapabilityCard({ cap, pendingKey, onSelect }: {
   const unmet = !cap.usable
   const chipsEmpty = cap.candidates.length === 0 && cap.pending.length === 0
   return (
-    <div className="rounded-lg border border-border/50 bg-elevated/20 px-3 py-2.5 flex flex-col transition-colors hover:border-border">
+    <div className="rounded-btn border border-border/50 bg-elevated/20 px-3 py-2.5 flex flex-col transition-colors hover:border-border">
       <div className="flex items-center gap-1.5">
-        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-accent/10">
+        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-btn bg-accent/10">
           <Icon className="h-3 w-3 text-accent" />
         </span>
         <div className="text-xs font-medium text-foreground truncate">{cap.label}</div>
       </div>
-      {cap.desc && <div className="mt-1 text-[10px] text-muted/70 truncate">{cap.desc}</div>}
+      {cap.desc && <div className="mt-1 text-micro text-muted/70 truncate">{cap.desc}</div>}
 
       {/* 当前生效提供方 */}
       <div className="mt-2 flex items-center gap-1.5 min-w-0">
-        <span className="text-[9px] font-medium uppercase tracking-wider text-muted/50 shrink-0">当前</span>
+        <span className="text-micro font-medium uppercase tracking-wider text-muted/50 shrink-0">当前</span>
         {unmet ? (
           <span
-            className="inline-flex items-center gap-1 text-[11px] font-medium text-warning truncate"
+            className="inline-flex items-center gap-1 text-xs font-medium text-warning truncate"
             title={`「${cap.label}」当前路由的源无法提供该能力 — 可切换下方可用源, 或在数据源区接入其他源`}
           >
             <AlertTriangle className="h-3 w-3 shrink-0" />
@@ -193,7 +195,7 @@ function CapabilityCard({ cap, pendingKey, onSelect }: {
         ) : (
           <>
             <span className="h-1.5 w-1.5 rounded-full bg-accent shrink-0" />
-            <span className="text-[11px] font-medium text-foreground truncate">{cap.effective_display}</span>
+            <span className="text-xs font-medium text-foreground truncate">{cap.effective_display}</span>
           </>
         )}
       </div>
@@ -242,7 +244,7 @@ function CapabilityCard({ cap, pendingKey, onSelect }: {
           </span>
         ))}
         {chipsEmpty && (
-          <span className="text-[10px] text-muted/50">
+          <span className="text-micro text-muted/50">
             暂无可用提供方
           </span>
         )}
@@ -325,8 +327,8 @@ function CapabilityRoutingSection() {
       <div className="flex items-center justify-between mb-1 gap-3">
         <div className="flex items-center gap-2.5 min-w-0">
           <Route className="h-4 w-4 text-secondary shrink-0" />
-          <h2 className="text-sm font-medium text-foreground">能力路由</h2>
-          <span className="text-[10px] text-muted/60 shrink-0">{list.length} 个能力</span>
+          <h2 className={TYPE.card}>能力路由</h2>
+          <span className="text-micro text-muted/60 shrink-0">{list.length} 个能力</span>
         </div>
         {anyCustom && (
           <button
@@ -339,13 +341,13 @@ function CapabilityRoutingSection() {
           </button>
         )}
       </div>
-      <p className="text-[11px] text-muted mb-4">
+      <p className="text-xs text-muted mb-4">
         每个能力独立选择提供方 — 点标签即刻生效。选项只列出当前可提供该能力的源
         (各源按自身可用性过滤, 详见下方数据源介绍); 未就绪的源置灰提示。
       </p>
 
       {matrix.isError ? (
-        <div className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg border border-danger/20 bg-danger/5">
+        <div className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-btn border border-danger/20 bg-danger/5">
           <div className="flex items-center gap-2 text-xs text-danger min-w-0">
             <AlertCircle className="h-3.5 w-3.5 shrink-0" />
             <span className="truncate">能力矩阵加载失败: {(matrix.error as Error)?.message || '未知错误'}</span>
@@ -360,7 +362,7 @@ function CapabilityRoutingSection() {
       ) : matrix.isLoading || list.length === 0 ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
           {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="h-[120px] rounded-lg border border-border/50 bg-elevated/20 animate-pulse" />
+            <div key={i} className="h-[120px] rounded-btn border border-border/50 bg-elevated/20 animate-pulse" />
           ))}
         </div>
       ) : (
@@ -427,8 +429,8 @@ function PluginKeyConfig({ plugin }: { plugin: PluginDataSourceItem }) {
     <div>
       <div className="flex items-center gap-2 mb-2">
         <KeyRound className="h-3.5 w-3.5 text-secondary" />
-        <h3 className="text-xs font-medium text-foreground">API Key</h3>
-        <span className="text-[10px] text-muted/50 uppercase tracking-wider">{plugin.api_key_env}</span>
+        <h3 className={TYPE.card}>API Key</h3>
+        <span className="text-micro text-muted/50 uppercase tracking-wider">{plugin.api_key_env}</span>
       </div>
 
       {/* 申请说明 + 官网链接 (对齐 TickFlow Key 区话术) */}
@@ -456,7 +458,7 @@ function PluginKeyConfig({ plugin }: { plugin: PluginDataSourceItem }) {
       {/* 当前状态 */}
       <div className="flex items-center justify-between mb-4">
         <div className="min-w-0">
-          <div className="text-[10px] uppercase tracking-widest text-muted">状态</div>
+          <div className="text-micro uppercase tracking-widest text-muted">状态</div>
           <div className="mt-1 flex items-center gap-2 min-w-0">
             {plugin.available ? (
               <>
@@ -517,7 +519,7 @@ function PluginKeyConfig({ plugin }: { plugin: PluginDataSourceItem }) {
         <button
           type="submit"
           disabled={save.isPending || (!keyInput.trim() && !saved)}
-          className="w-full h-9 rounded-xl bg-accent text-white text-sm font-semibold flex items-center justify-center gap-2 hover:bg-accent/90 disabled:opacity-40 transition-ui"
+          className={buttonClass({ variant: 'primary' }, 'w-full justify-center gap-2')}
         >
           {save.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : saved ? <Check className="h-4 w-4" /> : <Save className="h-4 w-4" />}
           {save.isPending ? '验证中...' : saved ? '已保存' : '保存并检测'}
@@ -546,7 +548,7 @@ function CapabilityChips({ caps, servingSet, isTickFlow }: {
   servingSet: Set<string>
   isTickFlow: boolean
 }) {
-  if (caps.length === 0) return <span className="text-[10px] text-muted/40">未声明能力</span>
+  if (caps.length === 0) return <span className="text-micro text-muted/40">未声明能力</span>
   return (
     <div className="flex flex-wrap gap-1">
       {caps.map(cap => {
@@ -566,7 +568,7 @@ function CapabilityChips({ caps, servingSet, isTickFlow }: {
           <span
             key={cap.id}
             title={title}
-            className={`inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] leading-none ${cls}`}
+            className={`inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-micro leading-none ${cls}`}
           >
             {servingNow
               ? <Check className="h-2.5 w-2.5" />
@@ -723,9 +725,9 @@ export function SettingsDataSourcesPanel({ highlight }: { highlight?: string } =
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2.5 min-w-0">
             <Database className="h-4 w-4 text-secondary shrink-0" />
-            <h2 className="text-sm font-medium text-foreground">数据源</h2>
+            <h2 className={TYPE.card}>数据源</h2>
             <span
-              className="text-[10px] text-muted/40 font-mono truncate hidden lg:inline max-w-[480px]"
+              className="text-micro text-muted/40 font-mono truncate hidden lg:inline max-w-[480px]"
               title={sources.data?.config_dir}
             >
               {sources.data?.config_dir}
@@ -742,14 +744,14 @@ export function SettingsDataSourcesPanel({ highlight }: { highlight?: string } =
         </div>
 
         {/* 插件化说明 (置顶黄色提示条): 接入自有行情 → 把文档交给 AI */}
-        <div className="mb-4 flex items-start gap-2 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2.5">
+        <div className="mb-4 flex items-start gap-2 rounded-btn border border-warning/40 bg-warning/10 px-3 py-2.5">
           <Puzzle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warning" />
-          <div className="text-[11px] leading-relaxed text-muted">
+          <div className="text-xs leading-relaxed text-muted">
             <span className="text-secondary">数据源已插件化</span>
             ,接入自有行情?把文档发给 AI 即可自动接入:
-            <span className="mx-0.5 rounded bg-elevated/70 px-1 py-px font-mono text-[10px] text-secondary">docs/custom-data-source.md</span>
+            <span className="mx-0.5 rounded bg-elevated/70 px-1 py-px font-mono text-micro text-secondary">docs/custom-data-source.md</span>
             (自有 HTTP 接口) ·
-            <span className="mx-0.5 rounded bg-elevated/70 px-1 py-px font-mono text-[10px] text-secondary">docs/plugin-development.md</span>
+            <span className="mx-0.5 rounded bg-elevated/70 px-1 py-px font-mono text-micro text-secondary">docs/plugin-development.md</span>
             (插件开发)
           </div>
         </div>
@@ -788,7 +790,7 @@ export function SettingsDataSourcesPanel({ highlight }: { highlight?: string } =
                     editExisting.mutate(item.name)
                   }
                 }}
-                className={`relative text-left rounded-lg border px-3.5 py-3 transition-ui ${
+                className={`relative text-left rounded-btn border px-3.5 py-3 transition-ui ${
                   pluginUnavailable && !plugin?.api_key_env
                     ? 'border-border/40 bg-elevated/10 opacity-70'
                     : isSelected
@@ -810,7 +812,7 @@ export function SettingsDataSourcesPanel({ highlight }: { highlight?: string } =
                     <TierTag label={matrix.data.tickflow_tier} />
                   )}
                   {!customNames.has(item.name) && (
-                    <span className="shrink-0 rounded bg-warning/15 px-1 py-0.5 text-[9px] font-medium leading-none text-warning">第三方</span>
+                    <span className="shrink-0 rounded bg-warning/15 px-1 py-0.5 text-micro font-medium leading-none text-warning">第三方</span>
                   )}
                 </div>
 
@@ -821,7 +823,7 @@ export function SettingsDataSourcesPanel({ highlight }: { highlight?: string } =
 
                 {/* 底部: 状态提示 + 操作 */}
                 <div className="mt-2 pt-2 border-t border-border/50 flex items-center justify-between gap-2 min-h-[22px]">
-                  <span className="text-[10px] text-muted/50 truncate min-w-0">
+                  <span className="text-micro text-muted/50 truncate min-w-0">
                     {servingCount > 0
                       ? `服务中 ${servingCount} 项能力`
                       : pluginUnavailable
@@ -832,14 +834,14 @@ export function SettingsDataSourcesPanel({ highlight }: { highlight?: string } =
                     {pluginUnavailable ? (
                       plugin?.runtime !== 'none' && (
                         installing ? (
-                          <span className="inline-flex items-center gap-1 text-[10px] text-accent">
+                          <span className="inline-flex items-center gap-1 text-micro text-accent">
                             <RefreshCw className="h-2.5 w-2.5 animate-spin" /> 安装中...
                           </span>
                         ) : (
                           <button
                             onClick={(e) => { e.stopPropagation(); installMut.mutate(item.name) }}
                             disabled={installMut.isPending}
-                            className="rounded px-1.5 py-0.5 text-[10px] font-medium bg-accent/10 text-accent hover:bg-accent/20 transition-colors disabled:opacity-50"
+                            className="rounded px-1.5 py-0.5 text-micro font-medium bg-accent/10 text-accent hover:bg-accent/20 transition-colors disabled:opacity-50"
                           >
                             安装
                           </button>
@@ -850,7 +852,7 @@ export function SettingsDataSourcesPanel({ highlight }: { highlight?: string } =
                         <button
                           onClick={(e) => { e.stopPropagation(); switchProvider.mutate(item.name) }}
                           disabled={switchProvider.isPending}
-                          className="rounded px-1.5 py-0.5 text-[10px] font-medium bg-accent/10 text-accent hover:bg-accent/20 transition-colors disabled:opacity-50"
+                          className="rounded px-1.5 py-0.5 text-micro font-medium bg-accent/10 text-accent hover:bg-accent/20 transition-colors disabled:opacity-50"
                         >
                           套用
                         </button>
@@ -861,7 +863,7 @@ export function SettingsDataSourcesPanel({ highlight }: { highlight?: string } =
                             <button
                               onClick={(e) => { e.stopPropagation(); uninstallMut.mutate(item.name) }}
                               disabled={uninstallMut.isPending}
-                              className="text-[10px] text-muted/50 hover:text-danger transition-colors disabled:opacity-40"
+                              className="text-micro text-muted/50 hover:text-danger transition-colors disabled:opacity-40"
                               title="卸载依赖"
                             >
                               卸载
@@ -879,7 +881,7 @@ export function SettingsDataSourcesPanel({ highlight }: { highlight?: string } =
           {/* 新增数据源卡片 */}
           <button
             onClick={() => setSelected('__new__')}
-            className={`rounded-lg border border-dashed px-3.5 py-3 transition-ui flex items-center justify-center gap-1.5 text-sm ${
+            className={`rounded-btn border border-dashed px-3.5 py-3 transition-ui flex items-center justify-center gap-1.5 text-sm ${
               selected === '__new__'
                 ? 'border-accent/50 bg-accent/5 text-accent'
                 : 'border-border/50 text-muted hover:text-foreground hover:border-border hover:bg-elevated/30'
@@ -892,9 +894,9 @@ export function SettingsDataSourcesPanel({ highlight }: { highlight?: string } =
 
         {/* 错误提示 */}
         {errors.length > 0 && (
-          <div className="mt-3 flex items-start gap-1.5 px-3 py-2 rounded-lg bg-danger/5 border border-danger/20">
+          <div className="mt-3 flex items-start gap-1.5 px-3 py-2 rounded-btn bg-danger/5 border border-danger/20">
             <FileWarning className="h-3.5 w-3.5 text-danger shrink-0 mt-0.5" />
-            <div className="text-[11px] text-danger/80 leading-relaxed space-y-0.5">
+            <div className="text-xs text-danger/80 leading-relaxed space-y-0.5">
               {errors.map((err, idx) => (
                 <div key={idx}>
                   <span className="font-mono">{err.name || err.path}</span>: {err.errors.join('; ')}
@@ -904,7 +906,7 @@ export function SettingsDataSourcesPanel({ highlight }: { highlight?: string } =
           </div>
         )}
 
-        <div className="mt-3 flex items-center gap-3 text-[10px] text-muted/50 flex-wrap">
+        <div className="mt-3 flex items-center gap-3 text-micro text-muted/50 flex-wrap">
           <span>芯片: 高亮=服务中 · 灰=已适配 · <Lock className="inline h-2.5 w-2.5" />=需更高档位</span>
           <span className="text-muted/30">·</span>
           <span>单击卡片查看介绍与配置, 点「套用」让该源接管其适配的全部能力</span>
@@ -972,7 +974,7 @@ export function SettingsDataSourcesPanel({ highlight }: { highlight?: string } =
             onClick={() => setConfirmDelete(null)}
           />
           <div className="relative w-[90vw] max-w-[380px] rounded-card border border-border bg-base shadow-2xl p-6">
-            <h3 className="text-sm font-medium text-foreground mb-2">删除数据源</h3>
+            <h3 className={cn(TYPE.section, 'mb-2')}>删除数据源</h3>
             <p className="text-xs text-secondary mb-5">
               确认删除「{customList.find(s => s.name === confirmDelete)?.display_name || confirmDelete}」? 该数据源的配置文件将被移除,此操作不可撤销。
             </p>
@@ -1010,16 +1012,16 @@ function PluginDetail({ plugin, isActive, matrixCaps, servingSet }: {
     <section className="rounded-card border border-border bg-surface p-6">
       {/* 介绍 */}
       <div className="flex items-start gap-4">
-        <div className="h-11 w-11 rounded-xl bg-accent/10 flex items-center justify-center shrink-0">
+        <div className="h-11 w-11 rounded-btn bg-accent/10 flex items-center justify-center shrink-0">
           <Zap className="h-5 w-5 text-accent" />
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1 flex-wrap">
             <h3 className="text-base font-semibold text-foreground">{plugin.display_name}</h3>
-            <span className="text-[10px] text-muted/50 uppercase tracking-wider">插件 · {plugin.runtime}</span>
-            <span className="rounded bg-warning/15 px-1 py-0.5 text-[9px] font-medium leading-none text-warning">第三方</span>
+            <span className="text-micro text-muted/50 uppercase tracking-wider">插件 · {plugin.runtime}</span>
+            <span className="rounded bg-warning/15 px-1 py-0.5 text-micro font-medium leading-none text-warning">第三方</span>
             {isActive && (
-              <span className="inline-flex items-center gap-1 text-[10px] text-accent bg-accent/10 px-2 py-1 rounded">
+              <span className="inline-flex items-center gap-1 text-micro text-accent bg-accent/10 px-2 py-1 rounded">
                 <Check className="h-2.5 w-2.5" /> 服务中
               </span>
             )}
@@ -1055,7 +1057,7 @@ function PluginDetail({ plugin, isActive, matrixCaps, servingSet }: {
 
         {/* 能力适配表: 全部能力 × 该源适配状态 (样式对齐 TickFlow 能力档位表) */}
         <div className="min-w-0">
-          <div className="rounded-lg border border-border/60 bg-elevated/20 divide-y divide-border/50">
+          <div className="rounded-btn border border-border/60 bg-elevated/20 divide-y divide-border/50">
             {matrixCaps.map(cap => {
               const Icon = CAP_ICON[cap.id] ?? Database
               const serving = servingSet.has(cap.id)
@@ -1065,18 +1067,18 @@ function PluginDetail({ plugin, isActive, matrixCaps, servingSet }: {
                   <Icon className="h-3.5 w-3.5 text-secondary shrink-0" />
                   <div className="flex-1 min-w-0 truncate">
                     <span className="text-xs text-foreground">{cap.label}</span>
-                    <span className="ml-1.5 text-[10px] text-muted/60">{cap.desc}</span>
+                    <span className="ml-1.5 text-micro text-muted/60">{cap.desc}</span>
                   </div>
                   {serving ? (
-                    <span className="w-[56px] text-right text-[10px] text-bear inline-flex items-center justify-end gap-0.5 shrink-0">
+                    <span className="w-[56px] text-right text-micro text-bear inline-flex items-center justify-end gap-0.5 shrink-0">
                       <Check className="h-2.5 w-2.5" />服务中
                     </span>
                   ) : declaredCap ? (
-                    <span className={`w-[56px] text-right text-[10px] shrink-0 ${plugin.available ? 'text-secondary' : 'text-warning/80'}`}>
+                    <span className={`w-[56px] text-right text-micro shrink-0 ${plugin.available ? 'text-secondary' : 'text-warning/80'}`}>
                       {plugin.available ? '已适配' : '未就绪'}
                     </span>
                   ) : (
-                    <span className="w-[56px] text-right text-[10px] text-muted/30 shrink-0">—</span>
+                    <span className="w-[56px] text-right text-micro text-muted/30 shrink-0">—</span>
                   )}
                 </div>
               )
@@ -1103,7 +1105,7 @@ function TickFlowDetail({ active, matrix }: { active: boolean; matrix?: Capabili
   // 检测档位集群: API Key 标题行右侧 (检测档位徽章 + 档位说明 + 重检测 + 可用功能悬停)
   const tierCluster = tier ? (
     <div className="flex items-center gap-1.5 shrink-0">
-      <span className="text-[10px] text-muted/80">检测档位</span>
+      <span className="text-micro text-muted/80">检测档位</span>
       <TierTag label={tier} />
       <TierHelpPopover currentLabel={tfCaps?.label ?? tier} />
       <button
@@ -1123,19 +1125,19 @@ function TickFlowDetail({ active, matrix }: { active: boolean; matrix?: Capabili
           <ListChecks className="h-3 w-3" />
         </span>
         <div className="invisible absolute right-0 top-full z-20 pt-1.5 opacity-0 transition-ui duration-hover group-hover/caps:visible group-hover/caps:opacity-100">
-          <div className="w-64 rounded-md border border-border bg-surface py-2 pl-3 pr-3.5 shadow-2xl shadow-black/40">
+          <div className="w-64 rounded-btn border border-border bg-surface py-2 pl-3 pr-3.5 shadow-2xl shadow-black/40">
             <div className="mb-1.5 flex items-center justify-between">
               <span className="text-xs font-medium text-foreground">可用功能</span>
-              <span className="text-[10px] font-mono text-muted">{capEntries.length} 项</span>
+              <span className="text-micro font-mono text-muted">{capEntries.length} 项</span>
             </div>
             {capEntries.length > 0 ? (
               <div className="max-h-56 space-y-1 overflow-y-auto border-t border-border/60 pt-1.5">
                 {capEntries.map(([cap, lim]) => (
                   <div key={cap} className="flex min-w-0 items-baseline gap-2">
-                    <span className="min-w-0 flex-1 truncate text-[11px] text-secondary">
+                    <span className="min-w-0 flex-1 truncate text-xs text-secondary">
                       {CAP_LABELS[cap]?.name ?? cap}
                     </span>
-                    <span className="shrink-0 font-mono text-[10px] text-muted">
+                    <span className="shrink-0 font-mono text-micro text-muted">
                       {lim.rpm ? `${lim.rpm}/min` : lim.subscribe ? `${lim.subscribe} 订阅` : '—'}
                       {lim.batch ? ` · ${lim.batch}/次` : ''}
                     </span>
@@ -1143,11 +1145,11 @@ function TickFlowDetail({ active, matrix }: { active: boolean; matrix?: Capabili
                 ))}
               </div>
             ) : (
-              <div className="border-t border-border/60 pt-1.5 text-[11px] text-muted">
+              <div className="border-t border-border/60 pt-1.5 text-xs text-muted">
                 暂无 — 配置 API Key 后自动检测
               </div>
             )}
-            <div className="mt-1.5 border-t border-border/60 pt-1.5 text-[10px] text-muted/70">
+            <div className="mt-1.5 border-t border-border/60 pt-1.5 text-micro text-muted/70">
               根据 API Key 自动检测
             </div>
           </div>
@@ -1159,16 +1161,16 @@ function TickFlowDetail({ active, matrix }: { active: boolean; matrix?: Capabili
     <section className="rounded-card border border-border bg-surface p-6">
       {/* 介绍 */}
       <div className="flex items-start gap-4">
-        <div className="h-11 w-11 rounded-xl bg-accent/10 flex items-center justify-center shrink-0">
+        <div className="h-11 w-11 rounded-btn bg-accent/10 flex items-center justify-center shrink-0">
           <Database className="h-5 w-5 text-accent" />
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <h2 className="text-base font-semibold text-foreground">TickFlow</h2>
-            <span className="rounded bg-warning/15 px-1.5 py-0.5 text-[10px] font-medium text-warning">第三方</span>
+            <span className="rounded bg-warning/15 px-1.5 py-0.5 text-micro font-medium text-warning">第三方</span>
             <AllTiersBadge />
             {active && (
-              <span className="inline-flex items-center gap-1 text-[10px] text-accent bg-accent/10 px-2 py-1 rounded">
+              <span className="inline-flex items-center gap-1 text-micro text-accent bg-accent/10 px-2 py-1 rounded">
                 <Check className="h-2.5 w-2.5" /> 服务中
               </span>
             )}
@@ -1188,7 +1190,7 @@ function TickFlowDetail({ active, matrix }: { active: boolean; matrix?: Capabili
         <div className="min-w-0">
           {/* 能力档位表: 各能力所需档位 + 当前档位可用性 */}
           {caps.length > 0 && (
-            <div className="rounded-lg border border-border/60 bg-elevated/20 divide-y divide-border/50">
+            <div className="rounded-btn border border-border/60 bg-elevated/20 divide-y divide-border/50">
               {caps.map(cap => {
                 const Icon = CAP_ICON[cap.id] ?? Database
                 return (
@@ -1196,15 +1198,15 @@ function TickFlowDetail({ active, matrix }: { active: boolean; matrix?: Capabili
                     <Icon className="h-3.5 w-3.5 text-secondary shrink-0" />
                     <div className="flex-1 min-w-0 truncate">
                       <span className="text-xs text-foreground">{cap.label}</span>
-                      <span className="ml-1.5 text-[10px] text-muted/60">{cap.desc}</span>
+                      <span className="ml-1.5 text-micro text-muted/60">{cap.desc}</span>
                     </div>
                     <TierReqChip tier={cap.tf_tier} currentLabel={tier} />
                     {cap.tf_available ? (
-                      <span className="w-[52px] text-right text-[10px] text-bear inline-flex items-center justify-end gap-0.5 shrink-0">
+                      <span className="w-[52px] text-right text-micro text-bear inline-flex items-center justify-end gap-0.5 shrink-0">
                         <Check className="h-2.5 w-2.5" />可用
                       </span>
                     ) : (
-                      <span className="w-[52px] text-right text-[10px] text-warning/80 shrink-0">未解锁</span>
+                      <span className="w-[52px] text-right text-micro text-warning/80 shrink-0">未解锁</span>
                     )}
                   </div>
                 )

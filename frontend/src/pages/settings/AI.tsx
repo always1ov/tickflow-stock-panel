@@ -9,10 +9,12 @@ import { api, type SettingsState } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { AiProfiles } from '@/pages/settings/AiProfiles'
 import { useCardFlash, cardFlashCls } from '@/lib/useCardFlash'
+import { buttonClass, TYPE } from '@/components/ui'
+import { cn } from '@/lib/cn'
 
 // 统一的输入框样式(与项目其他设置页一致)
 const INPUT_CLS =
-  'w-full h-9 px-2.5 rounded-lg bg-base border-0 ring-1 ring-border/30 text-xs font-mono text-foreground placeholder:text-muted/30 focus:outline-none focus:ring-2 focus:ring-accent/30 transition-shadow'
+  'w-full h-9 px-2.5 rounded-btn bg-base border-0 ring-1 ring-border/30 text-xs font-mono text-foreground placeholder:text-muted/30 focus:outline-none focus:ring-2 focus:ring-accent/30 transition-shadow'
 
 // 空/非法输入 → undefined (后端保持原值), 合法正整数 → int
 const toPositiveInt = (v: string) => {
@@ -306,7 +308,7 @@ export function SettingsAIPanel({ highlight }: { highlight?: string } = {}) {
       {customUa && (
         <div className="flex gap-2">
           <input type="text" value={userAgent} onChange={e => setUserAgent(e.target.value)} placeholder="粘贴浏览器 User-Agent" className={`${INPUT_CLS} flex-1`} />
-          <button type="button" onClick={genRandomUa} title="随机生成浏览器 User-Agent" className="h-9 px-2.5 rounded-lg border border-border/50 text-xs text-secondary hover:text-accent hover:border-accent/30 transition-ui flex items-center gap-1.5 shrink-0">
+          <button type="button" onClick={genRandomUa} title="随机生成浏览器 User-Agent" className="h-9 px-2.5 rounded-btn border border-border/50 text-xs text-secondary hover:text-accent hover:border-accent/30 transition-ui flex items-center gap-1.5 shrink-0">
             <Shuffle className="h-3 w-3" /> 随机
           </button>
         </div>
@@ -332,7 +334,7 @@ export function SettingsAIPanel({ highlight }: { highlight?: string } = {}) {
         )
       }>
         <div className="flex items-center gap-3">
-          <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${(profilesManaged ? enabledProfiles.length > 0 : configured) ? 'bg-emerald-400/10 text-emerald-400' : 'bg-amber-400/10 text-amber-400'}`}>
+          <div className={`w-9 h-9 rounded-btn flex items-center justify-center shrink-0 ${(profilesManaged ? enabledProfiles.length > 0 : configured) ? 'bg-bear/10 text-bear' : 'bg-warning/10 text-warning'}`}>
             {(profilesManaged ? enabledProfiles.length > 0 : configured) ? <Wifi className="h-4.5 w-4.5" /> : <WifiOff className="h-4.5 w-4.5" />}
           </div>
           <div className="min-w-0">
@@ -355,8 +357,8 @@ export function SettingsAIPanel({ highlight }: { highlight?: string } = {}) {
           </div>
         </div>
         {testResult && (
-          <div className={`mt-3 rounded-btn border px-3 py-2 text-xs flex items-center gap-2 ${testResult.ok ? 'border-emerald-400/20 bg-emerald-400/[0.04] text-emerald-400' : 'border-danger/20 bg-danger/[0.04] text-danger'}`}>
-            <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${testResult.ok ? 'bg-emerald-400' : 'bg-danger'}`} />
+          <div className={`mt-3 rounded-btn border px-3 py-2 text-xs flex items-center gap-2 ${testResult.ok ? 'border-bear/20 bg-bear/[0.04] text-bear' : 'border-danger/20 bg-danger/[0.04] text-danger'}`}>
+            <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${testResult.ok ? 'bg-bear' : 'bg-danger'}`} />
             {testResult.msg}
           </div>
         )}
@@ -371,7 +373,7 @@ export function SettingsAIPanel({ highlight }: { highlight?: string } = {}) {
         icon={Settings2}
         title={configTitle}
         right={profilesManaged ? undefined : (
-          <span className="inline-flex items-center gap-1.5 text-[10px] text-muted/60" title={isCodexProvider ? 'Use local Codex CLI via codex exec' : 'Use OpenAI-compatible Chat Completions API'}>
+          <span className="inline-flex items-center gap-1.5 text-micro text-muted/60" title={isCodexProvider ? 'Use local Codex CLI via codex exec' : 'Use OpenAI-compatible Chat Completions API'}>
             <span className="rounded-btn border border-border/40 bg-base/50 px-1.5 py-px font-mono">{isCodexProvider ? 'codex exec' : 'Chat Completions'}</span>
             {isCodexProvider ? 'CLI' : '接口'}
           </span>
@@ -380,7 +382,7 @@ export function SettingsAIPanel({ highlight }: { highlight?: string } = {}) {
         <div className="space-y-4">
           {profilesManaged ? (
             <>
-              <div className="rounded-lg border border-accent/15 bg-accent/[0.03] px-3 py-2.5 text-[11px] leading-relaxed text-secondary">
+              <div className="rounded-btn border border-accent/15 bg-accent/[0.03] px-3 py-2.5 text-xs leading-relaxed text-secondary">
                 接口地址、模型与 API Key 已统一由上方「AI 档位」表管理: 全系统默认用第 1 档,
                 这一档服务不了时自动顺位切换。此处只保留对所有档位生效的全局参数。
               </div>
@@ -425,9 +427,9 @@ export function SettingsAIPanel({ highlight }: { highlight?: string } = {}) {
               </div>
 
               {isOpenAIProvider && (
-                <div className="rounded-lg border border-accent/15 bg-accent/[0.03] p-3">
+                <div className="rounded-btn border border-accent/15 bg-accent/[0.03] p-3">
                   <div className="mb-2.5">
-                    <span className="rounded-btn bg-accent/10 px-2 py-0.5 text-[10px] font-medium text-accent">OpenAI 专属</span>
+                    <span className="rounded-btn bg-accent/10 px-2 py-0.5 text-micro font-medium text-accent">OpenAI 专属</span>
                   </div>
                   <div className="max-w-xs">
                     <Field label="推理强度">
@@ -445,7 +447,7 @@ export function SettingsAIPanel({ highlight }: { highlight?: string } = {}) {
                       {showKey ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
                     </button>
                   </div>
-                  <button onClick={handleTest} disabled={testing || !apiKey} className="h-9 px-3 rounded-lg border border-border/50 text-xs text-secondary hover:text-accent hover:border-accent/30 disabled:opacity-40 transition-ui flex items-center gap-1.5 shrink-0">
+                  <button onClick={handleTest} disabled={testing || !apiKey} className="h-9 px-3 rounded-btn border border-border/50 text-xs text-secondary hover:text-accent hover:border-accent/30 disabled:opacity-40 transition-ui flex items-center gap-1.5 shrink-0">
                     {testing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Wifi className="h-3 w-3" />}
                     测试
                   </button>
@@ -471,9 +473,9 @@ export function SettingsAIPanel({ highlight }: { highlight?: string } = {}) {
         </div>
       </Card>
 
-      <div className="rounded-card border border-amber-400/20 bg-amber-400/[0.04] px-4 py-3 flex items-start gap-3">
-        <Shield className="h-4 w-4 text-amber-400/70 mt-0.5 shrink-0" />
-        <div className="text-[11px] text-amber-400/70 leading-relaxed">
+      <div className="rounded-card border border-warning/20 bg-warning/[0.04] px-4 py-3 flex items-start gap-3">
+        <Shield className="h-4 w-4 text-warning/70 mt-0.5 shrink-0" />
+        <div className="text-xs text-warning/70 leading-relaxed">
           {isCodexProvider
             ? 'Codex CLI 模式会复用本机已登录的 Codex 账户, 个股、财务、复盘等分析上下文会发送给 OpenAI/Codex。保存即表示确认仅在本机或可信内网使用。'
             : 'API Key 仅保存在本机项目文件中, 不会上传到任何服务器。请妥善保管。'}
@@ -481,12 +483,12 @@ export function SettingsAIPanel({ highlight }: { highlight?: string } = {}) {
       </div>
 
       <div className="flex gap-2">
-        <button onClick={() => save.mutate()} disabled={save.isPending || !canSave} className="flex-1 h-10 rounded-xl bg-accent text-white text-sm font-semibold flex items-center justify-center gap-2 hover:bg-accent/90 disabled:opacity-40 transition-ui">
+        <button onClick={() => save.mutate()} disabled={save.isPending || !canSave} className={buttonClass({ variant: 'primary' }, 'flex-1 justify-center gap-2')}>
           {save.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : saved ? <Check className="h-4 w-4" /> : <Save className="h-4 w-4" />}
           {save.isPending ? '保存中...' : saved ? '已保存' : '保存配置'}
         </button>
         {configured && !profilesManaged && (
-          <button onClick={() => setConfirmClear(true)} disabled={clear.isPending} className="h-10 px-4 rounded-xl bg-elevated text-secondary hover:text-danger text-sm flex items-center justify-center gap-1.5 hover:bg-elevated/80 disabled:opacity-50 transition-ui shrink-0" title="Clear AI provider configuration">
+          <button onClick={() => setConfirmClear(true)} disabled={clear.isPending} className="h-10 px-4 rounded-btn bg-elevated text-secondary hover:text-danger text-sm flex items-center justify-center gap-1.5 hover:bg-elevated/80 disabled:opacity-50 transition-ui shrink-0" title="Clear AI provider configuration">
             <Trash2 className="h-4 w-4" />
             清空
           </button>
@@ -497,7 +499,7 @@ export function SettingsAIPanel({ highlight }: { highlight?: string } = {}) {
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setConfirmClear(false)} />
           <div className="relative w-[90vw] max-w-[380px] rounded-card border border-border bg-base shadow-2xl p-6">
-            <h3 className="text-sm font-medium text-foreground mb-2">清空 AI 配置</h3>
+            <h3 className={cn(TYPE.section, 'mb-2')}>清空 AI 配置</h3>
             <p className="text-xs text-secondary mb-5 leading-relaxed">
               这会清空已保存的 provider、API Key、API 地址、模型和 Codex CLI 命令。之后可以重新配置。
             </p>
@@ -538,7 +540,7 @@ function Card({ icon: Icon, title, right, children, anchor }: CardProps) {
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2.5">
           <Icon className="h-4 w-4 text-secondary" />
-          <h2 className="text-sm font-medium text-foreground">{title}</h2>
+          <h2 className={TYPE.card}>{title}</h2>
         </div>
         {right}
       </div>
@@ -565,8 +567,8 @@ function Field({ label, hint, inline, children }: {
     return (
       <div className="flex items-center justify-between gap-3">
         <div>
-          <div className="text-[10px] text-muted/50 uppercase tracking-wider">{label}</div>
-          {hint && <div className="text-[10px] text-muted mt-0.5">{hint}</div>}
+          <div className="text-micro text-muted/50 uppercase tracking-wider">{label}</div>
+          {hint && <div className="text-micro text-muted mt-0.5">{hint}</div>}
         </div>
         {children}
       </div>
@@ -574,9 +576,9 @@ function Field({ label, hint, inline, children }: {
   }
   return (
     <div className="space-y-1.5">
-      <div className="text-[10px] text-muted/50 uppercase tracking-wider">{label}</div>
+      <div className="text-micro text-muted/50 uppercase tracking-wider">{label}</div>
       {children}
-      {hint && <div className="text-[10px] text-muted">{hint}</div>}
+      {hint && <div className="text-micro text-muted">{hint}</div>}
     </div>
   )
 }

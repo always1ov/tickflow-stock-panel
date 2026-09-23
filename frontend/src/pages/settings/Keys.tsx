@@ -19,6 +19,8 @@ import { useSettings } from '@/lib/useSharedQueries'
 import { QK } from '@/lib/queryKeys'
 import { tierStyle, tierBaseName, ALL_TIERS, TierTag } from '@/lib/capability-labels'
 import { TickflowKeys } from '@/pages/settings/TickflowKeys'
+import { buttonClass, TYPE } from '@/components/ui'
+import { cn } from '@/lib/cn'
 
 // ===== TickFlow 详情内嵌区块 (组合进数据源页的单一详情卡, 不再各自成卡) =====
 // 档位变化会重塑能力矩阵候选 (按档位过滤) → Key/档位相关写操作统一连带失效。
@@ -34,9 +36,9 @@ function SectionHeading({ icon: Icon, title, badge, right }: {
     <div className="flex items-center justify-between gap-2 mb-3">
       <div className="flex items-center gap-2 min-w-0">
         <Icon className="h-3.5 w-3.5 text-secondary shrink-0" />
-        <h3 className="text-xs font-medium text-foreground">{title}</h3>
+        <h3 className={TYPE.card}>{title}</h3>
         {badge && (
-          <span className="px-1.5 py-0.5 text-[10px] font-mono rounded bg-elevated text-muted shrink-0">{badge}</span>
+          <span className="px-1.5 py-0.5 text-micro font-mono rounded bg-elevated text-muted shrink-0">{badge}</span>
         )}
       </div>
       {right}
@@ -118,7 +120,7 @@ export function TickFlowKeySection({ right }: { right?: React.ReactNode }) {
       {/* 当前状态 */}
       <div className="flex items-center justify-between mb-4">
         <div className="min-w-0">
-          <div className="text-[10px] uppercase tracking-widest text-muted">状态</div>
+          <div className="text-micro uppercase tracking-widest text-muted">状态</div>
           <div className="mt-1 flex items-center gap-2 min-w-0">
             {mode === 'api_key' ? (
               <>
@@ -181,7 +183,7 @@ export function TickFlowKeySection({ right }: { right?: React.ReactNode }) {
         <button
           type="submit"
           disabled={save.isPending || (!keyInput.trim() && !saved)}
-          className="h-9 shrink-0 px-4 rounded-xl bg-accent text-white text-sm font-semibold flex items-center justify-center gap-2 hover:bg-accent/90 disabled:opacity-40 transition-ui"
+          className={buttonClass({ variant: 'primary' }, 'shrink-0 justify-center gap-2')}
         >
           {save.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : saved ? <Check className="h-4 w-4" /> : <Save className="h-4 w-4" />}
           {save.isPending ? '保存中...' : saved ? '已保存' : '保存并检测'}
@@ -190,7 +192,7 @@ export function TickFlowKeySection({ right }: { right?: React.ReactNode }) {
 
       {/* 检测中提示 —— 成功/失败后自动消失 */}
       {save.isPending && (
-        <div className="mt-2 flex items-start gap-1.5 rounded-btn border border-warning/30 bg-warning/10 px-3 py-2 text-[11px] leading-snug text-warning">
+        <div className="mt-2 flex items-start gap-1.5 rounded-btn border border-warning/30 bg-warning/10 px-3 py-2 text-xs leading-snug text-warning">
           <AlertCircle className="h-3.5 w-3.5 mt-px shrink-0" />
             <span>
               验证通过前请不要离开当前页面 · 如遇网络问题请点击
@@ -236,7 +238,7 @@ export function TickFlowKeySection({ right }: { right?: React.ReactNode }) {
             onClick={() => setConfirmClear(false)}
           />
           <div className="relative w-[90vw] max-w-[380px] rounded-card border border-border bg-base shadow-2xl p-6">
-            <h3 className="text-sm font-medium text-foreground mb-2">清除 API Key</h3>
+            <h3 className={cn(TYPE.section, 'mb-2')}>清除 API Key</h3>
             <p className="text-xs text-secondary mb-5">
               清除后将退回 None 档(仅历史日K),需要重新输入 Key 才能恢复。
             </p>
@@ -283,7 +285,7 @@ export function TierHelpPopover({ currentLabel }: { currentLabel: string }) {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -4, scale: 0.95 }}
               transition={{ duration: 0.15 }}
-              className="absolute top-full left-0 mt-1 z-50 w-72 bg-surface border border-border rounded-lg shadow-xl p-3.5 text-[11px] leading-relaxed"
+              className="absolute top-full left-0 mt-1 z-50 w-72 bg-surface border border-border rounded-btn shadow-xl p-3.5 text-xs leading-relaxed"
               onClick={e => e.stopPropagation()}
             >
               {/* 档位 tag 横排 */}
@@ -309,7 +311,7 @@ export function TierHelpPopover({ currentLabel }: { currentLabel: string }) {
                 })}
               </div>
 
-              <div className="mb-3 rounded-btn border border-warning/30 bg-warning/10 px-2.5 py-1.5 text-[11px] font-medium text-warning">
+              <div className="mb-3 rounded-btn border border-warning/30 bg-warning/10 px-2.5 py-1.5 text-xs font-medium text-warning">
                 高等档位包含较低档位的全部权益。
               </div>
 

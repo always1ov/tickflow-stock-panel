@@ -162,7 +162,7 @@ function SortableItem({ entry, hidden, onToggleHidden, badgeEnabled, onToggleBad
       style={style}
       className={`grid ${GRID_COLS} items-center border-b border-border/70 py-3 pr-4 last:border-b-0 ${
         indent ? 'pl-10 bg-elevated/25' : 'pl-4'
-      } ${isDragging ? 'bg-elevated rounded-lg shadow-lg' : ''} ${hidden ? 'opacity-50' : ''}`}
+      } ${isDragging ? 'bg-elevated rounded-btn shadow-lg' : ''} ${hidden ? 'opacity-50' : ''}`}
     >
       <div
         {...attributes}
@@ -177,12 +177,12 @@ function SortableItem({ entry, hidden, onToggleHidden, badgeEnabled, onToggleBad
           {entry.label}
         </span>
         {hidden && (
-          <span className="rounded bg-elevated px-1.5 py-0.5 text-[10px] text-muted shrink-0">已隐藏</span>
+          <span className="rounded bg-elevated px-1.5 py-0.5 text-micro text-muted shrink-0">已隐藏</span>
         )}
-        <span className={`truncate text-[11px] text-muted ${note ? '' : 'font-mono'}`}>{note ?? entry.id}</span>
+        <span className={`truncate text-xs text-muted ${note ? '' : 'font-mono'}`}>{note ?? entry.id}</span>
       </div>
       <div>
-        <span className={`inline-flex items-center rounded-btn px-2 py-0.5 text-[11px] ${
+        <span className={`inline-flex items-center rounded-btn px-2 py-0.5 text-xs ${
           entry.type === 'analysis' ? 'bg-accent/10 text-accent' : 'bg-elevated text-muted'
         }`}>
           {entry.type === 'builtin' ? '内置' : entry.type === 'group' ? '分组' : '扩展'}
@@ -496,7 +496,7 @@ export function SettingsMenuSettingsPanel() {
       </SectionIntro>
 
       <section className="rounded-card border border-border bg-surface overflow-hidden">
-        <div className={`grid ${GRID_COLS} items-center border-b border-border px-4 py-2 text-[11px] text-muted`}>
+        <div className={`grid ${GRID_COLS} items-center border-b border-border px-4 py-2 text-xs text-muted`}>
           <div />
           <div>菜单</div>
           <div>类型</div>
