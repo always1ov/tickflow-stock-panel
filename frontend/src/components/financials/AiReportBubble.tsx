@@ -205,12 +205,12 @@ function BubbleItem({ task, isLast, onPointerDown }: {
         </span>
 
         {/* 标的名(单行) */}
-        <span className="flex-1 min-w-0 text-[11px] font-medium text-foreground leading-none truncate">
+        <span className="flex-1 min-w-0 text-xs font-medium text-foreground leading-none truncate">
           {task.name || task.symbol}
         </span>
 
         {/* 状态后缀 */}
-        <span className="shrink-0 text-[9px] leading-none">
+        <span className="shrink-0 text-micro leading-none">
           {isWorking ? (
             <span className="opacity-80">分析中</span>
           ) : isError ? (

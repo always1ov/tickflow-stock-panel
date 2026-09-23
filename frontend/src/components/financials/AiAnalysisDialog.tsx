@@ -13,6 +13,7 @@ import {
   minimizeDialog, closeDialog, startAnalysis,
 } from '@/lib/aiReportStore'
 import { useDialogBackdrop } from '@/lib/useDialogBackdrop'
+import { TYPE } from '@/components/ui'
 
 interface Props {
   /** 当前展示的任务;活跃任务或历史报告 */
@@ -110,13 +111,13 @@ export function AiAnalysisDialog({ task, mode, minimized }: Props) {
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-semibold text-foreground truncate">
+                  <span className={cn('truncate', TYPE.section)}>
                     {isHistory ? '历史分析报告' : 'AI 财务分析'}
                   </span>
                   {task && <span className="text-xs text-secondary truncate">{task.name}</span>}
-                  {task && <span className="text-[10px] font-mono text-muted shrink-0">{task.symbol}</span>}
+                  {task && <span className="text-micro font-mono text-muted shrink-0">{task.symbol}</span>}
                 </div>
-                <div className="flex items-center gap-2 mt-0.5 text-[10px] text-muted">
+                <div className="flex items-center gap-2 mt-0.5 text-micro text-muted">
                   {meta?.summary ? (
                     <span className="flex items-center gap-1 truncate">
                       <Database className="h-2.5 w-2.5 shrink-0" />
@@ -172,7 +173,7 @@ export function AiAnalysisDialog({ task, mode, minimized }: Props) {
                   <Loader2 className="absolute -inset-1 h-12 w-12 text-purple-400/40 animate-spin" style={{ animationDuration: '3s' }} />
                 </div>
                 <div className="text-xs text-secondary">AI 正在分析财务数据…</div>
-                <div className="text-[10px] text-muted">读取利润表 / 资负表 / 现金流 / 核心指标,生成专业报告</div>
+                <div className="text-micro text-muted">读取利润表 / 资负表 / 现金流 / 核心指标,生成专业报告</div>
               </div>
             )}
 
@@ -211,7 +212,7 @@ export function AiAnalysisDialog({ task, mode, minimized }: Props) {
           {/* ===== 底部:自定义关注点输入 ===== */}
           <div className="border-t border-border/50 bg-surface/60 px-5 py-3">
             <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1.5 text-[10px] text-muted shrink-0">
+              <div className="flex items-center gap-1.5 text-micro text-muted shrink-0">
                 <Wand2 className="h-3 w-3" />
                 <span className="hidden sm:inline">关注重点</span>
               </div>
@@ -248,7 +249,7 @@ export function AiAnalysisDialog({ task, mode, minimized }: Props) {
                 </button>
               )}
             </div>
-            <p className="mt-1.5 text-[10px] text-muted/50 leading-relaxed">
+            <p className="mt-1.5 text-micro text-muted/50 leading-relaxed">
               {isHistory
                 ? '历史报告为静态记录;修改关注重点后将作为新任务重新生成。报告仅供参考,不构成投资建议。'
                 : '报告由项目已配置的 AI 模型基于本地财务数据生成;可在输入框追加关注点后重新生成。报告仅供参考,不构成投资建议。'}

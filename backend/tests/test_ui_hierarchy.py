@@ -85,6 +85,13 @@ MIGRATED: list[str] = [
     "components/ExtDimensionAnalysis.tsx",
     "components/SectorRotationCard.tsx",
     "components/SectionIntro.tsx",
+    "pages/Financials.tsx",
+    "components/financials/AiAnalysisDialog.tsx",
+    "components/financials/AiReportBubble.tsx",
+    "components/financials/ReportHistoryPanel.tsx",
+    "components/financials/StockFinancialDetail.tsx",
+    "components/financials/StockFinancialSearch.tsx",
+    "components/financials/AiAnalysisHost.tsx",
 ]
 
 

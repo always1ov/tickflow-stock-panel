@@ -68,6 +68,9 @@
 - [x] 复盘(`Review`)
 - [x] 信号(`Signals` + `signals/*`)
 - [x] 概念 / 行业分析(`ConceptAnalysis` / `IndustryAnalysis`)
-- [ ] 财务 / 数据 / 因子 / 回测(`Financials` / `Data` / `factors/*` / `backtest/*`)
+- [x] 财务(`Financials` + `financials/*`)
+- [ ] 数据(`Data` + `data/*`)
+- [ ] 因子(`Factors` + `factors/*`)
+- [ ] 回测(`Backtest` + `backtest/*`)
 - [ ] 设置(`Settings` + `settings/*`)
 - [ ] 其余共用组件与弹窗

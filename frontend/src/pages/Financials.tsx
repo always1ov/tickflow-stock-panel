@@ -13,6 +13,8 @@ import { LastStockChip } from '@/components/LastStockChip'
 import { useLastStock } from '@/lib/useLastStock'
 import { fmtBigNum } from '@/lib/format'
 import { toast } from '@/components/Toast'
+import { TYPE } from '@/components/ui'
+import { cn } from '@/lib/cn'
 
 const TABLE_LABELS: Record<string, string> = {
   metrics: '核心指标',
@@ -74,7 +76,7 @@ export function Financials() {
             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-warning/10">
               <Lock className="h-6 w-6 text-warning" />
             </div>
-            <h3 className="mt-4 text-base font-semibold text-foreground">财务数据不可用</h3>
+            <h3 className={cn('mt-4', TYPE.section)}>财务数据不可用</h3>
             <p className="mt-2 text-xs leading-relaxed text-secondary">
               当前数据源未提供财务数据。配置提供财务数据的数据源后,此页自动显示财务数据面板。
             </p>
@@ -90,7 +92,7 @@ export function Financials() {
                 <Lightbulb className="h-3.5 w-3.5 shrink-0" />
                 关于数据源
               </div>
-              <p className="mt-1.5 text-[11px] leading-relaxed text-secondary">
+              <p className="mt-1.5 text-xs leading-relaxed text-secondary">
                 当前财务数据源需付费,可在数据源配置里换用其他已接入的来源。
               </p>
             </div>
@@ -253,12 +255,12 @@ export function Financials() {
                     </div>
                     <div className="mt-2 text-xl font-semibold tabular-nums text-foreground">
                       {fmtBigNum(info?.rows ?? 0)}
-                      <span className="text-[10px] text-muted ml-1 font-normal">行</span>
+                      <span className="text-micro text-muted ml-1 font-normal">行</span>
                     </div>
-                    <div className="text-[11px] text-muted mt-0.5">
+                    <div className="text-xs text-muted mt-0.5">
                       {fmtBigNum(info?.symbols ?? 0)} 只标的
                     </div>
-                    <div className="mt-auto pt-2 border-t border-border/40 text-[10px] text-muted flex items-center gap-1">
+                    <div className="mt-auto pt-2 border-t border-border/40 text-micro text-muted flex items-center gap-1">
                       <Clock className="h-2.5 w-2.5 shrink-0" />
                       {lsTime
                         ? new Date(lsTime).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
@@ -310,7 +312,7 @@ export function Financials() {
                   <div className="w-full max-w-xl">
                     <StockFinancialSearch onSelect={pick} />
                   </div>
-                  <div className="text-[11px] text-muted">支持股票代码或名称模糊匹配，如 600000 / 浦发</div>
+                  <div className="text-xs text-muted">支持股票代码或名称模糊匹配，如 600000 / 浦发</div>
                 </div>
               )}
             </div>
