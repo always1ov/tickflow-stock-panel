@@ -27,6 +27,7 @@ import { api, type ProviderField } from '@/lib/api'
 import { usePreferences, useSettings } from '@/lib/useSharedQueries'
 import { QK } from '@/lib/queryKeys'
 import { Logo } from '@/components/Logo'
+import { TYPE, buttonClass } from '@/components/ui'
 
 // ===== 引导页:5 步向导 =====
 // 0. 声明  1. 欢迎  2. 数据源与 Key  3. 能力路由检测  4. 完成 → 写标记 → 进面板
@@ -165,7 +166,7 @@ function DisclaimerStep({ onNext }: { onNext: () => void }) {
         initial={{ scale: 0.85, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-        className="mx-auto w-fit rounded-2xl p-4 border border-warning/40"
+        className="mx-auto w-fit rounded-card p-4 border border-warning/40"
         style={{ background: 'linear-gradient(135deg, oklch(var(--warning) / 0.15), transparent)' }}
       >
         <AlertCircle className="h-8 w-8 text-warning" />
@@ -173,7 +174,7 @@ function DisclaimerStep({ onNext }: { onNext: () => void }) {
 
       <h1 className="mt-6 text-2xl font-bold text-foreground tracking-tight">使用前请知悉</h1>
 
-      <div className="mt-5 rounded-card border border-border bg-surface/80 backdrop-blur-sm p-5 text-left">
+      <div className="mt-5 rounded-card border border-border bg-surface p-5 text-left">
         <div className="flex items-start gap-2.5">
           <ShieldCheck className="h-4 w-4 text-accent shrink-0 mt-0.5" />
           <div className="space-y-2.5 text-sm text-secondary leading-relaxed">
@@ -194,7 +195,7 @@ function DisclaimerStep({ onNext }: { onNext: () => void }) {
       <div className="mt-6 flex items-center justify-center">
         <button
           onClick={onNext}
-          className="inline-flex items-center gap-2 px-6 h-11 rounded-xl bg-accent text-white text-sm font-semibold shadow-lg shadow-accent/20 hover:bg-accent/90 hover:shadow-accent/30 transition-ui"
+          className={buttonClass({ variant: 'primary', size: 'md' }, 'h-11 gap-2 px-6')}
         >
           我已了解,继续
           <ArrowRight className="h-4 w-4" />
@@ -214,7 +215,7 @@ function WelcomeStep({ onNext, onSkip }: { onNext: () => void; onSkip: () => voi
         initial={{ scale: 0.85, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-        className="mx-auto w-fit rounded-2xl p-4 border border-border"
+        className="mx-auto w-fit rounded-card p-4 border border-border"
         style={{ background: `linear-gradient(135deg, ${BRAND}22, transparent)` }}
       >
         <Sparkles className="h-8 w-8" style={{ color: BRAND }} />
@@ -237,14 +238,14 @@ function WelcomeStep({ onNext, onSkip }: { onNext: () => void; onSkip: () => voi
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: 0.04 * i + 0.1 }}
             whileHover={{ y: -2 }}
-            className="group flex items-start gap-2.5 rounded-card border border-border bg-surface/80 backdrop-blur-sm p-2.5 transition-colors hover:border-accent/30"
+            className="group flex items-start gap-2.5 rounded-card border border-border bg-surface p-2.5 transition-colors hover:border-accent/30"
           >
-            <div className="rounded-lg bg-elevated/50 p-1.5 shrink-0">
+            <div className="rounded-btn bg-elevated/50 p-1.5 shrink-0">
               <h.icon className={`h-4 w-4 ${h.tint} transition-transform group-hover:scale-110`} />
             </div>
             <div className="min-w-0">
               <div className="text-xs font-medium text-foreground">{h.title}</div>
-              <div className="mt-0.5 text-[11px] text-muted leading-snug line-clamp-2">{h.desc}</div>
+              <div className="mt-0.5 text-xs text-muted leading-snug line-clamp-2">{h.desc}</div>
             </div>
           </motion.div>
         ))}
@@ -253,14 +254,14 @@ function WelcomeStep({ onNext, onSkip }: { onNext: () => void; onSkip: () => voi
       <div className="mt-8 flex items-center justify-center gap-3">
         <button
           onClick={onNext}
-          className="inline-flex items-center gap-2 px-6 h-11 rounded-xl bg-accent text-white text-sm font-semibold shadow-lg shadow-accent/20 hover:bg-accent/90 hover:shadow-accent/30 transition-ui"
+          className={buttonClass({ variant: 'primary', size: 'md' }, 'h-11 gap-2 px-6')}
         >
           开始配置
           <ArrowRight className="h-4 w-4" />
         </button>
         <button
           onClick={onSkip}
-          className="px-4 h-11 rounded-xl text-sm text-secondary hover:text-foreground hover:bg-elevated transition-colors"
+          className={buttonClass({ variant: 'ghost', size: 'md' }, 'h-11')}
         >
           稍后再说
         </button>
@@ -366,10 +367,10 @@ function DataSourceStep({ onNext, onBack }: { onNext: () => void; onBack: () => 
   return (
     <div>
       <div className="flex items-center gap-2.5">
-        <div className="rounded-lg bg-accent/10 p-2">
+        <div className="rounded-btn bg-accent/10 p-2">
           <Database className="h-4 w-4 text-accent" />
         </div>
-        <h2 className="text-xl font-bold text-foreground">配置数据源</h2>
+        <h2 className={TYPE.page}>配置数据源</h2>
       </div>
       <p className="mt-2.5 text-sm text-secondary leading-relaxed">
         默认使用内置 <span className="text-foreground font-medium">TickFlow</span> 数据源(无需 Key 即可同步历史日K)。
@@ -407,26 +408,26 @@ function DataSourceStep({ onNext, onBack }: { onNext: () => void; onBack: () => 
                     {item.display_name.replace(/（.*?）|\(.*?\)/g, '').trim() || item.display_name}
                   </span>
                   {item.kind === 'builtin' ? (
-                    <span className="shrink-0 rounded bg-accent/15 px-1 py-0.5 text-[9px] font-medium leading-none text-accent">内置</span>
+                    <span className="shrink-0 rounded bg-accent/15 px-1 py-0.5 text-micro font-medium leading-none text-accent">内置</span>
                   ) : item.kind === 'custom' ? (
-                    <span className="text-[9px] text-muted/50 tracking-wider shrink-0">自有</span>
+                    <span className="text-micro text-muted/50 tracking-wider shrink-0">自有</span>
                   ) : (
-                    <span className="shrink-0 rounded bg-warning/15 px-1 py-0.5 text-[9px] font-medium leading-none text-warning">第三方</span>
+                    <span className="shrink-0 rounded bg-warning/15 px-1 py-0.5 text-micro font-medium leading-none text-warning">第三方</span>
                   )}
                 </div>
                 <div className="mt-1.5 flex items-center gap-1 pl-0.5">
                   {unavailable ? (
-                    <span className="text-[10px] text-muted">需安装依赖,见 设置 → 数据源</span>
+                    <span className="text-micro text-muted">需安装依赖,见 设置 → 数据源</span>
                   ) : needsKey ? (
-                    <span className="text-[10px] text-warning">需配置 API Key,见下方表单</span>
+                    <span className="text-micro text-warning">需配置 API Key,见下方表单</span>
                   ) : item.datasets.length > 0 ? (
                     item.datasets.slice(0, 4).map(ds => (
-                      <span key={ds} className="rounded bg-elevated/60 px-1 py-0.5 text-[10px] text-muted">
+                      <span key={ds} className="rounded bg-elevated/60 px-1 py-0.5 text-micro text-muted">
                         {DATASET_LABELS[ds] ?? ds}
                       </span>
                     ))
                   ) : (
-                    <span className="text-[10px] text-muted">未声明数据集</span>
+                    <span className="text-micro text-muted">未声明数据集</span>
                   )}
                 </div>
               </div>
@@ -446,22 +447,22 @@ function DataSourceStep({ onNext, onBack }: { onNext: () => void; onBack: () => 
             <div className="flex items-center gap-2">
               <KeyRound className="h-3.5 w-3.5 text-accent/80" />
               <span className="text-xs font-medium text-foreground">配置 {f.display} API Key</span>
-              <span className="rounded bg-elevated/70 px-1 py-px font-mono text-[9px] text-muted">{f.env}</span>
+              <span className="rounded bg-elevated/70 px-1 py-px font-mono text-micro text-muted">{f.env}</span>
               {f.configured ? (
-                <span className="ml-auto inline-flex items-center gap-1 text-[10px] text-bull">
+                <span className="ml-auto inline-flex items-center gap-1 text-micro text-bull">
                   <CheckCircle2 className="h-3 w-3" />
                   已配置
                 </span>
               ) : f.name === 'tickflow' && (
-                <span className="ml-auto text-[10px] text-muted/70">可选</span>
+                <span className="ml-auto text-micro text-muted/70">可选</span>
               )}
             </div>
-            <p className="mt-1.5 text-[11px] text-muted leading-relaxed">{f.copy}</p>
+            <p className="mt-1.5 text-xs text-muted leading-relaxed">{f.copy}</p>
             <a
               href={f.register.url}
               target="_blank"
               rel="noreferrer"
-              className="mt-1 inline-flex items-center gap-1 text-[11px] text-accent hover:underline"
+              className="mt-1 inline-flex items-center gap-1 text-xs text-accent hover:underline"
             >
               {f.register.label} ↗
             </a>
@@ -486,20 +487,20 @@ function DataSourceStep({ onNext, onBack }: { onNext: () => void; onBack: () => 
               <button
                 type="submit"
                 disabled={!val.trim() || saveKey.isPending}
-                className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-btn bg-accent px-3 text-xs font-medium text-white hover:bg-accent/90 disabled:opacity-50 transition-colors"
+                className={buttonClass({ variant: 'primary' }, 'shrink-0 gap-1.5')}
               >
                 {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
                 {pending ? '验证中…' : '验证并保存'}
               </button>
             </form>
             {err && (
-              <p className="mt-1.5 flex items-center gap-1 text-[11px] text-danger">
+              <p className="mt-1.5 flex items-center gap-1 text-xs text-danger">
                 <AlertCircle className="h-3 w-3 shrink-0" />
                 {err}
               </p>
             )}
             {msg && (
-              <p className="mt-1.5 flex items-center gap-1 text-[11px] text-bull">
+              <p className="mt-1.5 flex items-center gap-1 text-xs text-bull">
                 <CheckCircle2 className="h-3 w-3 shrink-0" />
                 {msg}
               </p>
@@ -511,14 +512,14 @@ function DataSourceStep({ onNext, onBack }: { onNext: () => void; onBack: () => 
       {/* 插件化提示: 自有数据源接入与切换在设置页, 向导保持极简 */}
       <div className="mt-3 flex items-start gap-2 rounded-card border border-border/60 bg-surface/60 px-3 py-2.5">
         <Puzzle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent/70" />
-        <div className="text-[11px] leading-relaxed text-muted">
+        <div className="text-xs leading-relaxed text-muted">
           <span className="text-secondary">数据源已插件化</span>
           ,接入自有行情或切换数据源请前往
-          <span className="mx-0.5 rounded bg-elevated/70 px-1 py-px font-mono text-[10px] text-secondary">设置 → 数据源</span>
+          <span className="mx-0.5 rounded bg-elevated/70 px-1 py-px font-mono text-micro text-secondary">设置 → 数据源</span>
           ,方法详见
-          <span className="mx-0.5 rounded bg-elevated/70 px-1 py-px font-mono text-[10px] text-secondary">docs/custom-data-source.md</span>
+          <span className="mx-0.5 rounded bg-elevated/70 px-1 py-px font-mono text-micro text-secondary">docs/custom-data-source.md</span>
           与
-          <span className="mx-0.5 rounded bg-elevated/70 px-1 py-px font-mono text-[10px] text-secondary">docs/plugin-development.md</span>
+          <span className="mx-0.5 rounded bg-elevated/70 px-1 py-px font-mono text-micro text-secondary">docs/plugin-development.md</span>
           。
         </div>
       </div>
@@ -534,7 +535,7 @@ function DataSourceStep({ onNext, onBack }: { onNext: () => void; onBack: () => 
         </button>
         <button
           onClick={onNext}
-          className="inline-flex items-center gap-2 px-5 h-9 rounded-xl bg-accent text-white text-sm font-semibold hover:bg-accent/90 transition-colors"
+          className={buttonClass({ variant: 'primary', size: 'md' }, 'gap-2 px-5')}
         >
           下一步
           <ArrowRight className="h-4 w-4" />
@@ -610,7 +611,7 @@ function ResultStep({ onNext, onBack }: { onNext: () => void; onBack: () => void
   return (
     <div>
       <div className="flex items-center gap-2.5">
-        <div className="rounded-lg bg-accent/10 p-2">
+        <div className="rounded-btn bg-accent/10 p-2">
           <Route className="h-4 w-4 text-accent" />
         </div>
         <h2 className="text-xl font-bold text-foreground">能力路由检测</h2>
@@ -624,13 +625,13 @@ function ResultStep({ onNext, onBack }: { onNext: () => void; onBack: () => void
 
       {/* 自动路由执行结果 */}
       {applyError && (
-        <div className="mt-2.5 flex items-start gap-1.5 rounded-btn border border-danger/30 bg-danger/10 px-3 py-2 text-[11px] leading-snug text-danger">
+        <div className="mt-2.5 flex items-start gap-1.5 rounded-btn border border-danger/30 bg-danger/10 px-3 py-2 text-xs leading-snug text-danger">
           <AlertCircle className="h-3.5 w-3.5 mt-px shrink-0" />
           <span>{applyError}</span>
         </div>
       )}
       {!applyError && appliedChanges !== null && (
-        <div className="mt-2.5 flex items-start gap-1.5 rounded-btn border border-bull/25 bg-bull/[0.06] px-3 py-2 text-[11px] leading-snug text-secondary">
+        <div className="mt-2.5 flex items-start gap-1.5 rounded-btn border border-bull/25 bg-bull/[0.06] px-3 py-2 text-xs leading-snug text-secondary">
           <CheckCircle2 className="h-3.5 w-3.5 mt-px shrink-0 text-bull" />
           {appliedChanges.length > 0 ? (
             <span>
@@ -668,17 +669,17 @@ function ResultStep({ onNext, onBack }: { onNext: () => void; onBack: () => void
                     <AlertCircle className="h-3.5 w-3.5 shrink-0 text-warning" />
                   )}
                   <span className="text-sm font-medium text-foreground">{r.label}</span>
-                  <span className="ml-auto shrink-0 text-[10px] font-medium text-secondary">
+                  <span className="ml-auto shrink-0 text-micro font-medium text-secondary">
                     {r.usable ? '可用' : '不可用'}
                   </span>
                 </div>
-                <div className="mt-1 flex items-center gap-1.5 pl-5 text-[10px] text-muted">
+                <div className="mt-1 flex items-center gap-1.5 pl-5 text-micro text-muted">
                   <span className="truncate">生效源:{r.effective_display}</span>
                   <span className="shrink-0 text-muted/50">·</span>
                   <span className="shrink-0">{r.desc}</span>
                 </div>
                 {!r.usable && (
-                  <div className="mt-1 pl-5 text-[10px] text-warning/80 leading-relaxed">
+                  <div className="mt-1 pl-5 text-micro text-warning/80 leading-relaxed">
     {r.candidates.length > 0
       ? `可切换候选:${r.candidates.map(c => c.display).join(' / ')}`
       : isTickflow && !hasKey
@@ -690,7 +691,7 @@ function ResultStep({ onNext, onBack }: { onNext: () => void; onBack: () => void
             ))}
           </div>
 
-          <div className="mt-3 flex items-center justify-between rounded-btn bg-elevated/50 px-3.5 py-2 text-[11px] text-muted">
+          <div className="mt-3 flex items-center justify-between rounded-btn bg-elevated/50 px-3.5 py-2 text-xs text-muted">
             <span>
               {usableCount}/{routes.length} 个数据集可用
               {isTickflow && !hasKey && ' · 未配置 TickFlow Key,按 None 档运行,历史日K不受影响'}
@@ -711,7 +712,7 @@ function ResultStep({ onNext, onBack }: { onNext: () => void; onBack: () => void
         </button>
         <button
           onClick={onNext}
-          className="inline-flex items-center gap-2 px-5 h-9 rounded-xl bg-accent text-white text-sm font-semibold hover:bg-accent/90 transition-colors"
+          className={buttonClass({ variant: 'primary', size: 'md' }, 'gap-2 px-5')}
         >
           下一步
           <ArrowRight className="h-4 w-4" />
@@ -750,7 +751,7 @@ function FinishStep({ onNext, onBack, pending }: { onNext: () => void; onBack: (
         className="mx-auto w-fit"
       >
         <div
-          className="relative rounded-2xl p-5 border border-border"
+          className="relative rounded-card p-5 border border-border"
           style={{ background: `linear-gradient(135deg, ${BRAND}22, transparent)` }}
         >
           <CheckCircle2 className="h-12 w-12 text-bear" />
@@ -777,7 +778,7 @@ function FinishStep({ onNext, onBack, pending }: { onNext: () => void; onBack: (
         transition={{ duration: 0.3, delay: 0.2 }}
         className="mt-5 flex items-start gap-2.5 rounded-card border border-accent/30 bg-accent/[0.06] px-4 py-3 text-left"
       >
-        <div className="rounded-lg bg-accent/15 p-1.5 shrink-0 mt-px">
+        <div className="rounded-btn bg-accent/15 p-1.5 shrink-0 mt-px">
           <Database className="h-4 w-4 text-accent" />
         </div>
         <div className="min-w-0">
@@ -796,9 +797,9 @@ function FinishStep({ onNext, onBack, pending }: { onNext: () => void; onBack: (
             initial={{ opacity: 0, x: -10 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.3, delay: 0.1 * i + 0.3 }}
-            className="flex items-center gap-3 rounded-card border border-border bg-surface/80 backdrop-blur-sm px-3.5 py-2.5"
+            className="flex items-center gap-3 rounded-card border border-border bg-surface px-3.5 py-2.5"
           >
-            <div className="rounded-lg bg-accent/10 p-1.5 shrink-0">
+            <div className="rounded-btn bg-accent/10 p-1.5 shrink-0">
               <t.icon className="h-3.5 w-3.5 text-accent" />
             </div>
             <span className="text-xs text-secondary">{t.text}</span>
@@ -818,7 +819,7 @@ function FinishStep({ onNext, onBack, pending }: { onNext: () => void; onBack: (
         <button
           onClick={onNext}
           disabled={pending}
-          className="inline-flex items-center gap-2 px-6 h-10 rounded-xl bg-accent text-white text-sm font-semibold shadow-lg shadow-accent/20 hover:bg-accent/90 hover:shadow-accent/30 disabled:opacity-60 transition-ui"
+          className={buttonClass({ variant: 'primary' }, 'gap-2')}
         >
           {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
           {pending ? '正在进入…' : '进入面板'}

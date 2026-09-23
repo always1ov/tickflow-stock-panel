@@ -17,6 +17,7 @@ import { Eye, EyeOff, Loader2, Lock, ShieldCheck, ShieldAlert, Sparkles } from '
 import { api } from '@/lib/api'
 import { Logo } from '@/components/Logo'
 import { cn } from '@/lib/cn'
+import { buttonClass } from '@/components/ui'
 
 export function Auth() {
   const navigate = useNavigate()
@@ -92,12 +93,12 @@ export function Auth() {
           <h1 className="text-lg font-semibold text-foreground">牛来</h1>
         </div>
 
-        <div className="rounded-card border border-border bg-surface/90 p-6 shadow-2xl backdrop-blur">
+        <div className="rounded-card border border-border bg-surface p-6 shadow-2xl">
           {/* 标题区: 图标 + 文案随模式切换 */}
           <div className="mb-5 flex items-center gap-2.5">
             <div className={cn(
-              'grid h-9 w-9 place-items-center rounded-lg',
-              isSetup ? 'bg-accent/15 text-accent' : 'bg-purple-500/15 text-purple-400',
+              'grid h-9 w-9 place-items-center rounded-btn',
+              isSetup ? 'bg-accent/15 text-accent' : 'bg-elevated text-secondary',
             )}>
               {isSetup ? <ShieldCheck className="h-5 w-5" /> : <Lock className="h-5 w-5" />}
             </div>
@@ -105,7 +106,7 @@ export function Auth() {
               <div className="text-sm font-medium text-foreground">
                 {isSetup ? '设置访问密码' : '登录访问'}
               </div>
-              <div className="text-[11px] text-muted">
+              <div className="text-xs text-muted">
                 {isSetup ? '首次使用, 请为面板设置访问密码' : '请输入访问密码以继续'}
               </div>
             </div>
@@ -145,7 +146,7 @@ export function Auth() {
 
             {/* 错误提示 */}
             {(localError || submitMut.error) && (
-              <div className="flex items-start gap-1.5 rounded-btn bg-danger/10 px-3 py-2 text-[11px] text-danger">
+              <div className="flex items-start gap-1.5 rounded-btn bg-danger/10 px-3 py-2 text-xs text-danger">
                 <ShieldAlert className="mt-px h-3.5 w-3.5 shrink-0" />
                 <span>{localError}</span>
               </div>
@@ -154,7 +155,7 @@ export function Auth() {
             <button
               type="submit"
               disabled={submitMut.isPending || !password}
-              className="inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-btn bg-accent text-sm font-medium text-white transition-colors hover:bg-accent/90 disabled:opacity-50"
+              className={buttonClass({ variant: 'primary' }, 'w-full justify-center gap-1.5')}
             >
               {submitMut.isPending ? (
                 <><Loader2 className="h-4 w-4 animate-spin" />处理中…</>
@@ -166,7 +167,7 @@ export function Auth() {
 
           {/* 提示: 设密码模式告知本机限制 */}
           {isSetup && (
-            <div className="mt-3 space-y-1.5 text-[10px] leading-relaxed text-muted/70">
+            <div className="mt-3 space-y-1.5 text-micro leading-relaxed text-muted/70">
               <p>
                 出于安全考虑, 首次设置密码需在服务器本机或内网访问时操作。公网环境下仅可登录。
               </p>
@@ -177,7 +178,7 @@ export function Auth() {
           )}
         </div>
 
-        <div className="mt-4 flex items-center justify-center gap-1.5 text-[10px] text-muted/60">
+        <div className="mt-4 flex items-center justify-center gap-1.5 text-micro text-muted/60">
           <Sparkles className="h-3 w-3" />
           自托管量化工作台 · 数据完全掌握在自己手里
         </div>

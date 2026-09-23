@@ -7,6 +7,7 @@ import { ExternalViewRender } from '@/components/ExternalViewRender'
 import { api } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { usePreferences } from '@/lib/useSharedQueries'
+import { buttonClass } from '@/components/ui'
 
 function validExternalUrl(raw: string | undefined): string | undefined {
   if (!raw) return undefined
@@ -90,7 +91,7 @@ function FetchModeBody({ hint }: { hint: string }) {
             </button>
             <Link
               to="/settings?tab=ext-pages"
-              className="inline-flex items-center gap-1.5 rounded-btn bg-accent px-3 py-1.5 text-xs font-medium text-base"
+              className={buttonClass({ variant: 'primary' }, 'gap-1.5')}
             >
               <Settings className="h-3.5 w-3.5" />去设置里改地址或提示
             </Link>
@@ -104,7 +105,7 @@ function FetchModeBody({ hint }: { hint: string }) {
   return (
     <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
       <ExternalViewRender view={data.spec} />
-      <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border pt-3 text-[11px] text-muted">
+      <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border pt-3 text-xs text-muted">
         {/* [R146] 把"多久以前"放在最前面。这一页现在**默认给的是缓存**,
             所以第一眼要能判断这份整理还新不新鲜 —— 时刻不如时长直观。 */}
         <span className="text-secondary">
@@ -155,7 +156,7 @@ export function ExternalPage() {
           <Globe2 className="mx-auto h-9 w-9 text-muted" />
           <h1 className="mt-4 text-lg font-semibold text-foreground">外部网页未启用</h1>
           <p className="mt-2 text-sm leading-6 text-muted">请先在扩展页面设置中填写完整的 HTTP(S) 地址并启用。</p>
-          <Link to="/settings?tab=ext-pages" className="mt-5 inline-flex items-center gap-1.5 rounded-btn bg-accent px-3 py-2 text-xs font-medium text-base">
+          <Link to="/settings?tab=ext-pages" className={buttonClass({ variant: 'primary' }, 'mt-5 gap-1.5')}>
             <Settings className="h-3.5 w-3.5" />前往设置
           </Link>
         </div>
@@ -171,8 +172,8 @@ export function ExternalPage() {
         right={(
           <div className="flex items-center gap-2">
             {isFetchMode
-              ? <span className="hidden items-center gap-1 text-[11px] text-muted lg:inline-flex"><Sparkles className="h-3 w-3" />抓取 + AI 整理</span>
-              : <span className="hidden text-[11px] text-muted lg:inline">若页面空白，请用新窗口打开</span>}
+              ? <span className="hidden items-center gap-1 text-xs text-muted lg:inline-flex"><Sparkles className="h-3 w-3" />抓取 + AI 整理</span>
+              : <span className="hidden text-xs text-muted lg:inline">若页面空白，请用新窗口打开</span>}
             {!isFetchMode && (
               <button
                 type="button"

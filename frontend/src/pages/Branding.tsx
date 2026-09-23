@@ -125,7 +125,7 @@ function Sample({ v }: { v: Variant }) {
         <div className="px-5 py-5 border-b border-border">
           <div className="flex items-center gap-2.5">
             <div
-              className="grid place-items-center h-7 w-7 rounded-md"
+              className="grid place-items-center h-7 w-7 rounded-btn"
               style={{
                 background: `${v.glow}1a`,
                 boxShadow: `0 0 12px ${v.glow}33`,
@@ -137,7 +137,7 @@ function Sample({ v }: { v: Variant }) {
               {v.name}
             </div>
           </div>
-          <div className="mt-2 text-[10px] uppercase tracking-[0.18em] text-secondary">
+          <div className="mt-2 text-micro uppercase tracking-[0.18em] text-secondary">
             {v.tagline}
           </div>
           <div
@@ -188,7 +188,7 @@ function Sample({ v }: { v: Variant }) {
           >
             {v.name}
           </div>
-          <div className="mt-1.5 text-[10px] uppercase tracking-[0.2em] text-secondary">
+          <div className="mt-1.5 text-micro uppercase tracking-[0.2em] text-secondary">
             {v.tagline}
           </div>
         </div>

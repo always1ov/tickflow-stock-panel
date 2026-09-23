@@ -178,6 +178,11 @@ MIGRATED: list[str] = [
     "custom/assistant/ui/messages.tsx",
     "custom/assistant/ui/AssistantDrawer.tsx",
     "custom/assistant/ui/DailyChartCard.tsx",
+    "pages/UsageNotes.tsx",
+    "pages/Onboarding.tsx",
+    "pages/Auth.tsx",
+    "pages/ExternalPage.tsx",
+    "pages/Branding.tsx",
 ]
 
 

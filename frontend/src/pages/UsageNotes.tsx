@@ -43,6 +43,7 @@ import { EmptyState } from '@/components/EmptyState'
 import { CollapsibleText } from '@/components/CollapsibleText'
 import { storage } from '@/lib/storage'
 import { cn } from '@/lib/cn'
+import { SEG, SEG_ITEM, SEG_OFF, SEG_ON, TYPE, buttonClass } from '@/components/ui'
 
 /** [R266] 收起时留几行。
  *
@@ -54,7 +55,7 @@ const SUMMARY_LINES = 6
 const NOTE_LINES = 8
 
 const TA_CLS =
-  'w-full rounded-lg bg-base border border-border px-3 py-2 text-[13px] leading-relaxed text-foreground placeholder:text-muted/40 focus:outline-none focus:border-accent/60 transition-colors resize-y'
+  'w-full rounded-btn bg-base border border-border px-3 py-2 text-xs leading-relaxed text-foreground placeholder:text-muted/40 focus:outline-none focus:border-accent/60 transition-colors resize-y'
 
 type NoteStatus = '' | 'pending' | 'verified' | 'rejected'
 
@@ -113,7 +114,7 @@ function StatusChip({ status, onCycle, busy }: { status: NoteStatus; onCycle: ()
       disabled={busy}
       title="点击切换: 随手记 → 待验证 → 已验证 → 不成立"
       className={cn(
-        'inline-flex h-6 items-center gap-1.5 rounded-btn border px-2 text-[10px] font-medium transition-colors cursor-pointer disabled:opacity-60',
+        'inline-flex h-6 items-center gap-1.5 rounded-btn border px-2 text-micro font-medium transition-colors cursor-pointer disabled:opacity-60',
         meta.cls,
       )}
     >
@@ -177,14 +178,14 @@ function NoteCard({ note, onDigest, digesting }: {
           <div className="flex items-center justify-end gap-2">
             <button
               onClick={() => setEditing(false)}
-              className="inline-flex h-7 items-center gap-1 rounded-btn border border-border bg-base px-2 text-[11px] text-secondary hover:text-foreground transition-colors"
+              className="inline-flex h-7 items-center gap-1 rounded-btn border border-border bg-base px-2 text-xs text-secondary hover:text-foreground transition-colors"
             >
               <X className="h-3 w-3" /> 取消
             </button>
             <button
               onClick={() => update.mutate({ content: draft })}
               disabled={update.isPending || !draft.trim()}
-              className="inline-flex h-7 items-center gap-1 rounded-btn bg-accent/15 px-2 text-[11px] font-medium text-accent hover:bg-accent/25 transition-colors disabled:opacity-50"
+              className="inline-flex h-7 items-center gap-1 rounded-btn bg-accent/15 px-2 text-xs font-medium text-accent hover:bg-accent/25 transition-colors disabled:opacity-50"
             >
               {update.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
               保存
@@ -202,14 +203,14 @@ function NoteCard({ note, onDigest, digesting }: {
                   同一行旁边那条只有一句话, 高度差到整面墙没法看。 */}
               <CollapsibleText
                 lines={NOTE_LINES}
-                className="whitespace-pre-wrap text-[13px] leading-relaxed text-foreground"
+                className="whitespace-pre-wrap text-xs leading-relaxed text-foreground"
               >
                 {note.digest}
               </CollapsibleText>
               {(note.content || note.attachment) && (
                 <button
                   onClick={() => setShowRaw(v => !v)}
-                  className="mt-1.5 inline-flex items-center gap-1 text-[10px] text-muted/70 transition-colors hover:text-foreground cursor-pointer"
+                  className="mt-1.5 inline-flex items-center gap-1 text-micro text-muted/70 transition-colors hover:text-foreground cursor-pointer"
                 >
                   <ChevronDown className={cn('h-3 w-3 transition-transform', showRaw && 'rotate-180')} />
                   {showRaw ? '收起原文' : '原文'}
@@ -224,7 +225,7 @@ function NoteCard({ note, onDigest, digesting }: {
               )}
               {showRaw && (
                 /* 原文可能很长(整份研报的文字) —— 给个上限自己滚, 不让它把卡片顶穿 */
-                <p className="mt-1 max-h-48 overflow-y-auto whitespace-pre-wrap rounded border border-border/40 bg-base/50 px-2 py-1.5 text-[11px] leading-relaxed text-muted">
+                <p className="mt-1 max-h-48 overflow-y-auto whitespace-pre-wrap rounded border border-border/40 bg-base/50 px-2 py-1.5 text-xs leading-relaxed text-muted">
                   {note.content || <span className="italic opacity-70">(只有附件, 没有正文)</span>}
                 </p>
               )}
@@ -234,18 +235,18 @@ function NoteCard({ note, onDigest, digesting }: {
               {note.content ? (
                 <CollapsibleText
                   lines={NOTE_LINES}
-                  className="whitespace-pre-wrap text-[13px] leading-relaxed text-foreground"
+                  className="whitespace-pre-wrap text-xs leading-relaxed text-foreground"
                 >
                   {note.content}
                 </CollapsibleText>
               ) : (
-                <p className="text-[13px] leading-relaxed">
+                <p className="text-xs leading-relaxed">
                   <span className="italic text-muted">(只有附件)</span>
                 </p>
               )}
               {note.attachment && (
                 <span
-                  className="mt-1 inline-flex items-center gap-1 text-[10px] text-warning/80"
+                  className="mt-1 inline-flex items-center gap-1 text-micro text-warning/80"
                   title="还没凝练成功 —— 原件暂时留着, 点 ✨ 重试。凝练成功后图片会被删掉, 只留要点。"
                 >
                   {note.kind === 'image' ? <ImageIcon className="h-3 w-3" /> : <Paperclip className="h-3 w-3" />}
@@ -267,7 +268,7 @@ function NoteCard({ note, onDigest, digesting }: {
               disabled={update.isPending}
               title={HORIZON_META[(note.horizon ?? 'news') as Horizon].hint}
               className={cn(
-                'rounded border px-1.5 py-0.5 text-[10px] transition-colors cursor-pointer',
+                'rounded border px-1.5 py-0.5 text-micro transition-colors cursor-pointer',
                 HORIZON_META[(note.horizon ?? 'news') as Horizon].cls,
               )}
             >
@@ -275,7 +276,7 @@ function NoteCard({ note, onDigest, digesting }: {
             </button>
             {note.horizon === 'thesis' && note.due_at && (
               <span
-                className={cn('text-[10px] tabular-nums',
+                className={cn('text-micro tabular-nums',
                   new Date(note.due_at) <= new Date() ? 'text-warning' : 'text-muted/60')}
                 title={new Date(note.due_at) <= new Date()
                   ? '到兑现检查点了 —— 回来把它标成「已验证」还是「不成立」'
@@ -284,7 +285,7 @@ function NoteCard({ note, onDigest, digesting }: {
                 {new Date(note.due_at) <= new Date() ? '⏰ 该核对' : `核对 ${fmtTime(note.due_at).slice(0, 5)}`}
               </span>
             )}
-            <span className="text-[10px] tabular-nums text-muted/60" title={`创建 ${note.created_at.replace('T', ' ')}`}>
+            <span className="text-micro tabular-nums text-muted/60" title={`创建 ${note.created_at.replace('T', ' ')}`}>
               {note.updated_at !== note.created_at ? `改 ${fmtTime(note.updated_at)}` : fmtTime(note.created_at)}
             </span>
             <div className="ml-auto flex items-center gap-0.5">
@@ -294,7 +295,7 @@ function NoteCard({ note, onDigest, digesting }: {
                 title={note.digest
                   ? '重新凝练(改过正文之后可以重来)'
                   : '让 AI 把这条凝练成要点。图片会直接读图。'}
-                className="rounded p-1 text-muted/60 transition-colors hover:bg-elevated hover:text-violet-300 disabled:opacity-40"
+                className="rounded p-1 text-muted/60 transition-colors hover:bg-elevated hover:text-foreground disabled:opacity-40"
               >
                 {digesting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
               </button>
@@ -440,18 +441,18 @@ export function UsageNotes() {
           {/* [R181] 到期埋伏提醒 —— 排在总览之前, 因为它是这一页唯一需要你"现在动手"的东西 */}
           {due.length > 0 && (
             <div className="rounded-card border border-warning/30 bg-warning/[0.07] px-3 py-2">
-              <div className="mb-1 text-[11px] font-medium text-warning">
+              <div className="mb-1 text-xs font-medium text-warning">
                 ⏰ {due.length} 条埋伏到兑现检查点了 —— 回来给个结论
               </div>
               <ul className="space-y-0.5">
                 {due.map(n => (
-                  <li key={n.id} className="text-[11px] leading-relaxed text-foreground/85">
+                  <li key={n.id} className="text-xs leading-relaxed text-foreground/85">
                     · {(n.digest || n.content).slice(0, 60)}
                     {(n.digest || n.content).length > 60 && '…'}
                   </li>
                 ))}
               </ul>
-              <p className="mt-1 text-[10px] text-muted/70">
+              <p className="mt-1 text-micro text-muted/70">
                 在下面找到它, 把状态点成「已验证」或「不成立」——
                 不给结论的话它会一直留在总览里影响之后的判断。
               </p>
@@ -461,14 +462,14 @@ export function UsageNotes() {
           {/* [R180] 一大段总的 —— 这一页最重要的产物: 之后每次 AI 决策都会带上它。
               所以放最上面, 并且把"多旧、基于几条"直接写在标题行上: 一段过期的
               消息面总结比没有更危险, 用户得一眼看见它的时效。 */}
-          <section className="rounded-card border border-violet-400/25 bg-violet-400/[0.05] p-3">
+          <section className="rounded-card border border-border bg-surface p-3">
             <div className="mb-1.5 flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-violet-300">
+              <span className={cn('inline-flex items-center gap-1.5', TYPE.card)}>
                 <Sparkles className="h-3.5 w-3.5" />
                 消息面总览
               </span>
               {summary && (
-                <span className="text-[10px] text-muted">
+                <span className="text-micro text-muted">
                   综合自 {summary.item_count} 条 · {fmtTime(summary.as_of)}
                   {staleDays != null && staleDays > 7 && (
                     <span className="ml-1.5 text-warning">已过期 {staleDays} 天,不再参与决策</span>
@@ -481,7 +482,7 @@ export function UsageNotes() {
                 title={'把下面全部条目重新综合成一段。\n'
                   + '这一段会被带进: 今日 AI 导读·优选 / AI 个股信号 / 模拟交易。\n'
                   + '不会进把握分、出场线、六态、通道位置 —— 那些是纯规则的, 必须保持可复现。'}
-                className="ml-auto inline-flex items-center gap-1 rounded-btn border border-violet-400/40 bg-violet-400/15 px-2 py-0.5 text-[10px] text-violet-300 transition-colors cursor-pointer hover:bg-violet-400/25 disabled:opacity-40"
+                className={buttonClass({ size: 'xs' }, 'ml-auto gap-1')}
               >
                 {rebuild.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
                 {summary ? '重新综合' : '生成总览'}
@@ -496,12 +497,12 @@ export function UsageNotes() {
                 defaultOpen={summaryOpen}
                 onOpenChange={(v) => { setSummaryOpen(v); storage.newsDeskSummaryOpen.set(v) }}
                 moreLabel="展开全文"
-                className="whitespace-pre-wrap text-[12px] leading-relaxed text-foreground/90"
+                className="whitespace-pre-wrap text-xs leading-relaxed text-foreground/90"
               >
                 {summary.text}
               </CollapsibleText>
             ) : (
-              <p className="text-[11px] text-muted">
+              <p className="text-xs text-muted">
                 还没有总览。下面记几条之后点「生成总览」——
                 之后每次 AI 做决策(今日导读·优选 / 个股信号 / 模拟交易)都会先看这一段。
               </p>
@@ -509,7 +510,7 @@ export function UsageNotes() {
             {/* [R266] 这段边界说明只在展开时出现: 收起时是在扫一眼, 两行小字白占地方;
                 真要细读这段总览的时候, 才需要看见"它不会覆盖规则层"这条界限。 */}
             {(summaryOpen || !summary?.text) && (
-              <p className="mt-1.5 text-[10px] text-muted/60">
+              <p className="mt-1.5 text-micro text-muted/60">
                 总览只作背景参考,<b className="font-medium">不会覆盖价格与规则层的事实</b>
                 (趋势状态、出场线、通道位置、把握分)。两者冲突时以价格与规则为准。
               </p>
@@ -560,7 +561,7 @@ export function UsageNotes() {
               <button
                 onClick={() => create.mutate()}
                 disabled={create.isPending || !draft.trim()}
-                className="inline-flex h-[38px] shrink-0 items-center gap-1 rounded-btn bg-accent px-3 text-xs font-medium text-white hover:bg-accent/90 transition-colors disabled:opacity-40"
+                className={buttonClass({ variant: 'primary' }, 'shrink-0 gap-1')}
               >
                 {create.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
                 添加
@@ -570,18 +571,18 @@ export function UsageNotes() {
 
           {/* 过滤 + 搜索 */}
           {notes.length > 0 && (
-            <div className="flex flex-wrap items-center gap-1.5">
+            <div className={cn(SEG, 'flex-wrap')}>
               {FILTERS.map(f => (
                 <button
                   key={f.key || 'plain'}
                   onClick={() => setFilter(f.key)}
                   className={cn(
-                    'inline-flex h-7 items-center gap-1 rounded-btn px-2.5 text-[11px] font-medium transition-colors cursor-pointer',
-                    filter === f.key ? 'bg-accent/15 text-accent' : 'text-muted hover:bg-elevated hover:text-secondary',
+                    SEG_ITEM,
+                    filter === f.key ? SEG_ON : SEG_OFF,
                   )}
                 >
                   {f.label}
-                  <span className="text-[10px] tabular-nums opacity-70">{counts[f.key] ?? 0}</span>
+                  <span className="text-micro tabular-nums opacity-70">{counts[f.key] ?? 0}</span>
                 </button>
               ))}
               <div className="relative ml-auto">
@@ -591,7 +592,7 @@ export function UsageNotes() {
                   value={search}
                   onChange={e => setSearch(e.target.value)}
                   placeholder="搜索…"
-                  className="h-7 w-40 rounded-btn border border-border bg-base pl-7 pr-2 text-[11px] text-foreground placeholder:text-muted/40 focus:outline-none focus:border-accent/50 transition-colors"
+                  className="h-7 w-40 rounded-btn border border-border bg-base pl-7 pr-2 text-xs text-foreground placeholder:text-muted/40 focus:outline-none focus:border-accent/50 transition-colors"
                 />
               </div>
             </div>
