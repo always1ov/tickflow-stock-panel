@@ -88,7 +88,7 @@ export const LEVEL_GROUPS: { key: LevelType; label: string }[] = [
   { key: 'keltner_l',label: '量化通道长期' },     // MA120±3ATR 曲线
   { key: 'atr_stop', label: 'ATR波动通道' },
   { key: 'gap',      label: '缺口位' },
-  { key: 'fib',      label: '斐波那契一型' },
+  { key: 'fib',      label: '斐波那契Ⅰ型' },   // [R446] 一型 → Ⅰ型(用户: 「换成罗马数字」)
   { key: 'round',    label: '整数关口' },
   // [fork 增强] 六态关键点(利弗莫尔上/下关键点,趋势确认/否决价)
   { key: 'livermore', label: '六态关键点' },
@@ -99,7 +99,7 @@ export const LEVEL_GROUPS: { key: LevelType; label: string }[] = [
   // [R410] 用户: 「目标1目标2失效位这些表达没能让用户抓得住重点看得懂,
   // 而且好多根线」—— 改名与减线都在这一轮, 理由写在 `dinapoli.to_levels`
   // 与本文件的 `thinFib2`。
-  { key: 'fib2',     label: '斐波那契二型' },
+  { key: 'fib2',     label: '斐波那契Ⅱ型' },
   // [R403] 「持仓止盈」这一组从图上撤了(用户: 「持仓止盈可以删除掉了」)。
   // **只撤图上的线** —— 决策台的止盈线列、盘中推送、AI 持仓上下文照旧, 见后端
   // `indicators/levels.py` 的 LEVEL_TYPES。
@@ -132,7 +132,7 @@ const CURVE_DEFS: { alignedKey: string; group: LevelType; endLabel: string; dash
   { alignedKey: 'atr_tp',         group: 'atr_stop',  endLabel: 'ATR上轨', dashed: true },
   // [R405] 叫「二型均线」不叫「短期均线」: 后者在 `lib/signals.ts` 里已经指 MA5,
   // 而这条是 3 日均线往后移 3 根 —— 同名两物正是名词表要防的。
-  { alignedKey: 'fib2_dma3',      group: 'fib2',      endLabel: '二型均线', dashed: false },
+  { alignedKey: 'fib2_dma3',      group: 'fib2',      endLabel: 'Ⅱ型均线', dashed: false },
 ]
 
 // 默认不打开任何价位组 —— 价位怎么看是用户的判断, 系统不替他预设。
@@ -640,7 +640,7 @@ export function AnalysisKChart({
       if (dma) {
         // 从最后一根真实 K 线起画, 与历史那段接上
         series.push({
-          type: 'line', name: '二型均线(未来段)', silent: true, animation: false,
+          type: 'line', name: 'Ⅱ型均线(未来段)', silent: true, animation: false,
           smooth: true, symbol: 'none', z: 1,
           lineStyle: { width: 2.2, color: LC.fib2, opacity: 1 },
           data: dma.map((v, i) => (i >= base - 1 && v != null ? v : '-')),

@@ -11,7 +11,7 @@ const api = (i: number) => ({
 const ps = (k: number) => ({ dataIndex: k, coordSys: { y: 10, height: 300 } })
 type G = { children: any[] }
 
-describe('斐波那契二型「未来」区', () => {
+describe('斐波那契Ⅱ型「未来」区', () => {
   const r = futureSlotRenderer('dark', 3, '#fafafa')
 
   it('三格首尾相接铺满 —— R413 用 markArea 只盖到第一格中间到第三格中间', () => {
