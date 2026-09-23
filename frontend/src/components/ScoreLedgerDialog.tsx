@@ -46,6 +46,7 @@ import { Modal } from '@/components/Modal'
 import { copyText } from '@/lib/clipboard'
 import { toast } from '@/components/Toast'
 import { cn } from '@/lib/cn'
+import { TYPE, buttonClass } from '@/components/ui'
 
 const HORIZONS: (keyof LedgerStats)[] = ['t1', 't3', 't5']
 const H_LABEL: Record<string, string> = { t1: 'T+1', t3: 'T+3', t5: 'T+5' }
@@ -69,9 +70,9 @@ function StatTable({ head, rows }: {
 }) {
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[26rem] border-collapse text-[11px]">
+      <table className="w-full min-w-[26rem] border-collapse text-xs">
         <thead>
-          <tr className="border-b border-border/60 text-[10px] text-muted">
+          <tr className="border-b border-border/60 text-micro text-muted">
             <th className="px-2 py-1 text-left font-normal">{head}</th>
             <th className="px-2 py-1 text-right font-normal">条数</th>
             {HORIZONS.map(h => (
@@ -105,9 +106,9 @@ function StatTable({ head, rows }: {
 function LabelDimTable({ dim, minN }: { dim: LedgerLabelDim; minN: number }) {
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[30rem] border-collapse text-[11px]">
+      <table className="w-full min-w-[30rem] border-collapse text-xs">
         <thead>
-          <tr className="border-b border-border/60 text-[10px] text-muted">
+          <tr className="border-b border-border/60 text-micro text-muted">
             <th className="px-2 py-1 text-left font-normal">{dim.label}</th>
             <th className="px-2 py-1 text-right font-normal">条数</th>
             <th className="px-2 py-1 text-center font-normal" title="全部记录日, T+5">全期</th>
@@ -197,11 +198,11 @@ export function ScoreLedgerDialog({ onClose }: { onClose: () => void }) {
       panelClassName="flex max-h-[86vh] w-[94vw] max-w-3xl flex-col rounded-card border border-border bg-surface shadow-xl"
     >
       <div className="flex items-center gap-2 border-b border-border/60 px-4 py-3">
-        <BarChart3 className="h-4 w-4 text-sky-400" />
-        <h2 id="score-ledger-title" className="text-sm font-medium text-foreground">
+        <BarChart3 className="h-4 w-4 text-secondary" />
+        <h2 id="score-ledger-title" className={TYPE.section}>
           把握分体检
         </h2>
-        <span className="text-[10px] text-muted">
+        <span className="text-micro text-muted">
           {d ? `${d.first_day ?? '—'} ~ ${d.last_day ?? '—'} · ${d.recorded_days} 个交易日 · ${d.total_rows} 条候选` : '加载中'}
         </span>
         <button
@@ -246,7 +247,7 @@ export function ScoreLedgerDialog({ onClose }: { onClose: () => void }) {
                   它们仍在导出的 CSV 里。</>
               : <>台账还是空的。</>}
             <br />
-            <span className="text-[11px]">
+            <span className="text-xs">
               每天的快照由<span className="text-foreground">日线管道</span>在数据落盘后自己记一份,
               不需要谁去点开哪一页;<span className="text-foreground">只记收盘口径</span> ——
               盘中的现价不是收盘价, 拿它当收益起点会算出一份假收益。
@@ -260,7 +261,7 @@ export function ScoreLedgerDialog({ onClose }: { onClose: () => void }) {
           <>
             {/* ① 总体 + 基准 */}
             <section>
-              <h3 className="mb-1 text-[11px] font-medium text-foreground">
+              <h3 className={cn('mb-1', TYPE.card)}>
                 总体表现<span className="ml-1.5 font-normal text-muted">胜率 / 平均收益 (样本数)</span>
               </h3>
               <StatTable head="范围" rows={[
@@ -271,19 +272,19 @@ export function ScoreLedgerDialog({ onClose }: { onClose: () => void }) {
                   stats: d.baseline.stats, dim: true,
                 }] : []),
               ]} />
-              <p className="mt-1 text-[10px] text-muted/80">
+              <p className="mt-1 text-micro text-muted/80">
                 跑不赢最后那行基准, 这套评分就没有存在价值 —— 直接买指数即可。
               </p>
             </section>
 
             {/* ② 分层单调性 —— 最关键 */}
             <section>
-              <h3 className="mb-1 text-[11px] font-medium text-foreground">
+              <h3 className={cn('mb-1', TYPE.card)}>
                 分层单调性
                 <span className="ml-1.5 font-normal text-muted">分数有没有信息量, 主要看这张</span>
               </h3>
               <div className={cn(
-                'mb-1.5 rounded border px-2.5 py-1.5 text-[11px]',
+                'mb-1.5 rounded border px-2.5 py-1.5 text-xs',
                 d.monotonic.ok === true && 'border-bull/30 bg-bull/10 text-bull',
                 d.monotonic.ok === false && 'border-danger/30 bg-danger/10 text-danger',
                 d.monotonic.ok === null && 'border-border/60 bg-base/40 text-muted',
@@ -297,7 +298,7 @@ export function ScoreLedgerDialog({ onClose }: { onClose: () => void }) {
 
             {/* ③ 名次段 —— 定「最多显示几条」 */}
             <section>
-              <h3 className="mb-1 text-[11px] font-medium text-foreground">
+              <h3 className={cn('mb-1', TYPE.card)}>
                 按名次<span className="ml-1.5 font-normal text-muted">用来定「最多显示几条」</span>
               </h3>
               <StatTable head="名次段" rows={d.ranks.map(r => ({
@@ -307,16 +308,16 @@ export function ScoreLedgerDialog({ onClose }: { onClose: () => void }) {
 
             {/* ④ 因子归因 */}
             <section>
-              <h3 className="mb-1 text-[11px] font-medium text-foreground">
+              <h3 className={cn('mb-1', TYPE.card)}>
                 维度归因
                 <span className="ml-1.5 font-normal text-muted">
                   T+5;高分组不明显强于低分组 = 这一维在白占权重
                 </span>
               </h3>
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[30rem] border-collapse text-[11px]">
+                <table className="w-full min-w-[30rem] border-collapse text-xs">
                   <thead>
-                    <tr className="border-b border-border/60 text-[10px] text-muted">
+                    <tr className="border-b border-border/60 text-micro text-muted">
                       <th className="px-2 py-1 text-left font-normal">因子</th>
                       <th className="px-2 py-1 text-center font-normal" title="这一维 ≥70 分">高分组</th>
                       <th className="px-2 py-1 text-center font-normal" title="40~70 分">中间</th>
@@ -348,13 +349,13 @@ export function ScoreLedgerDialog({ onClose }: { onClose: () => void }) {
             {/* ⑤ [R175] 回头看 —— 不参与打分的那批标签, 到底灵不灵 */}
             {!!d.labels?.length && (
               <section className="rounded border border-border/60 bg-base/40 p-2.5">
-                <h3 className="mb-1 text-[11px] font-medium text-foreground">
+                <h3 className={cn('mb-1', TYPE.card)}>
                   回头看 · 这些结论最近还灵吗
                   <span className="ml-1.5 font-normal text-muted">
                     T+5;这批标签<b className="font-medium text-foreground/90">一分不参与打分</b>,也正因如此从没被验证过
                   </span>
                 </h3>
-                <p className="mb-2 text-[10px] text-muted/80">
+                <p className="mb-2 text-micro text-muted/80">
                   「全期」是长期成色,「最近」是近 {d.recent_days ?? 20} 个记录日 ——
                   真正要看的是<b className="font-medium text-foreground/90">两者背离</b>:长期能赚的那档最近开始亏,才是这张表想告诉你的事。
                   单看全期看不出来,一年的均值会把最近一个月的转向稀释掉。
@@ -368,12 +369,12 @@ export function ScoreLedgerDialog({ onClose }: { onClose: () => void }) {
                 {/* AI 提炼 —— 只念上面那张表 */}
                 <div className="mt-3 border-t border-border/40 pt-2">
                   <div className="mb-1 flex flex-wrap items-center gap-2">
-                    <span className="text-[11px] font-medium text-foreground">AI 提炼</span>
+                    <span className={TYPE.card}>AI 提炼</span>
                     <button
                       onClick={onDigest}
                       disabled={digesting}
                       title="把上面那几张表交给 AI 念成人话。它只能引用表里的数字,样本不足的档不许下结论;今天已经跑过就直接返回存档"
-                      className="inline-flex items-center gap-1 rounded-btn border border-violet-400/40 bg-violet-400/15 px-2 py-0.5 text-[10px] text-violet-300 transition-colors cursor-pointer hover:bg-violet-400/25 disabled:opacity-40"
+                      className={buttonClass({ size: 'xs' }, 'gap-1')}
                     >
                       {digesting
                         ? <Loader2 className="h-3 w-3 animate-spin" />
@@ -381,20 +382,20 @@ export function ScoreLedgerDialog({ onClose }: { onClose: () => void }) {
                       {digest ? '重新提炼' : '让 AI 试着说两句'}
                     </button>
                     {digest?.as_of && (
-                      <span className="text-[10px] text-muted/70">{digest.as_of} 的提炼</span>
+                      <span className="text-micro text-muted/70">{digest.as_of} 的提炼</span>
                     )}
                   </div>
                   {digest?.text ? (
-                    <p className="whitespace-pre-wrap rounded border border-violet-400/20 bg-violet-400/5 px-2.5 py-2 text-[11px] leading-relaxed text-foreground/90">
+                    <p className="whitespace-pre-wrap rounded-btn border border-border bg-elevated/40 px-2.5 py-2 text-xs leading-relaxed text-foreground/90">
                       {digest.text}
                     </p>
                   ) : (
-                    <p className="text-[10px] text-muted/70">
+                    <p className="text-micro text-muted/70">
                       还没跑过。AI 只负责把上面的数字讲成人话 ——
                       分组和胜率都是代码算的,它说错了也不影响那些数。
                     </p>
                   )}
-                  <p className="mt-1 text-[10px] text-muted/60">
+                  <p className="mt-1 text-micro text-muted/60">
                     提炼结果<b className="font-medium text-foreground/80">不参与打分、不进任何提示词</b>,并且连同当时那张表一起存档 ——
                     三个月后能回头看它当时说得准不准。
                   </p>
@@ -403,13 +404,13 @@ export function ScoreLedgerDialog({ onClose }: { onClose: () => void }) {
             )}
 
             {!!d.legacy_days && (
-              <p className="rounded border border-warning/30 bg-warning/10 px-2.5 py-1.5 text-[10px] text-warning">
+              <p className="rounded border border-warning/30 bg-warning/10 px-2.5 py-1.5 text-micro text-warning">
                 另有 {d.legacy_days} 天是<b className="font-medium">换打分口径之前</b>记的,未计入上面任何一张表 ——
                 两套分数刻度不同,混在一起算胜率没有意义。它们仍在导出的 CSV 里
                 (scoring_version 列区分)。
               </p>
             )}
-            <p className="text-[10px] text-muted/80">
+            <p className="text-micro text-muted/80">
               口径: {d.caveat}
               {d.scoring_version ? ` · 打分口径 v${d.scoring_version}` : ''}
               {d.pending_symbols > 0 && ` · 还有 ${d.pending_symbols} 只标的的收益没补完, 下次打开继续补`}
@@ -424,7 +425,7 @@ export function ScoreLedgerDialog({ onClose }: { onClose: () => void }) {
           onClick={onCopy}
           disabled={!d?.summary_md}
           title="把上面四张表拼成一段 Markdown 复制走 —— 粘贴给外部即可直接分析, 不用自己抄数字"
-          className="inline-flex items-center gap-1.5 rounded-btn border border-sky-400/40 bg-sky-400/15 px-2.5 py-1 text-[11px] text-sky-300 transition-colors cursor-pointer hover:bg-sky-400/25 disabled:opacity-40"
+          className={buttonClass({}, 'gap-1.5')}
         >
           {copied ? <Check className="h-3 w-3" /> : <ClipboardCopy className="h-3 w-3" />}
           {copied ? '已复制' : '复制体检摘要'}
@@ -433,12 +434,12 @@ export function ScoreLedgerDialog({ onClose }: { onClose: () => void }) {
           href={api.todayScoreLedgerExportUrl()}
           download
           title="一行一候选的扁平 CSV: 因子增量各占一列, 可直接丢进表格透视或离线重算权重"
-          className="inline-flex items-center gap-1.5 rounded-btn border border-border bg-base px-2.5 py-1 text-[11px] text-muted transition-colors cursor-pointer hover:text-foreground"
+          className="inline-flex items-center gap-1.5 rounded-btn border border-border bg-base px-2.5 py-1 text-xs text-muted transition-colors cursor-pointer hover:text-foreground"
         >
           <Download className="h-3 w-3" />
           导出明细 CSV
         </a>
-        <span className="text-[10px] text-muted/70">
+        <span className="text-micro text-muted/70">
           摘要用于快速判断, CSV 用于重算权重 —— 要调参两个一起给
         </span>
       </div>

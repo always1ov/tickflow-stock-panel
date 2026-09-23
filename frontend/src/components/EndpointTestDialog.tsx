@@ -6,6 +6,7 @@ import { api, type EndpointItem } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { EXPERT_RANK, tierRank } from '@/lib/capability-labels'
 import { useDialogBackdrop } from '@/lib/useDialogBackdrop'
+import { TYPE, buttonClass } from '@/components/ui'
 
 interface EpResult {
   ok: boolean
@@ -93,17 +94,17 @@ export function EndpointTestDialog({ hasKey, tierLabel, currentEndpoint, onClose
           <div className="flex items-center justify-between px-5 py-3 border-b border-border shrink-0">
             <div className="flex items-center gap-2">
               <Wifi className="h-4 w-4 text-accent" />
-              <span className="text-sm font-medium text-foreground">端点测速</span>
+              <span className={TYPE.section}>端点测速</span>
             </div>
             <div className="flex items-center gap-3">
               {isFree && (
-                <span className="text-[10px] px-2 py-0.5 rounded bg-warning/10 text-warning/80">Free 模式</span>
+                <span className="text-micro px-2 py-0.5 rounded bg-warning/10 text-warning/80">Free 模式</span>
               )}
               <button
                 onClick={testAll}
                 disabled={isFree || anyTesting || endpoints.length === 0}
                 title={isFree ? 'Free 模式不可使用付费端点，请先配置 API Key' : undefined}
-                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-btn bg-accent/15 text-accent text-xs font-medium hover:bg-accent/25 disabled:opacity-50 transition-colors"
+                className={buttonClass({ variant: 'primary' }, 'gap-1.5')}
               >
                 {anyTesting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Play className="h-3 w-3" />}
                 全部测速
@@ -117,15 +118,15 @@ export function EndpointTestDialog({ hasKey, tierLabel, currentEndpoint, onClose
           {/* 当前使用 */}
           <div className="mx-4 mt-3 px-3 py-2 rounded-btn bg-accent/8 border border-accent/20 flex items-center gap-2 shrink-0">
             <span className="inline-block h-1.5 w-1.5 rounded-full bg-accent" />
-            <span className="text-[11px] text-secondary">当前使用</span>
-            <span className="text-[11px] font-medium text-foreground">{currentLabel}</span>
-            <span className="text-[10px] text-muted font-mono ml-auto">{currentEndpoint.replace('https://', '')}</span>
+            <span className="shrink-0 whitespace-nowrap text-xs text-secondary">当前使用</span>
+            <span className="min-w-0 truncate text-xs font-medium text-foreground">{currentLabel}</span>
+            <span className="ml-auto shrink-0 whitespace-nowrap text-micro text-muted font-mono">{currentEndpoint.replace('https://', '')}</span>
           </div>
 
           {/* Free 模式提示 —— 以下均为 Starter+ 付费端点 */}
           {isFree && (
             <div className="mx-4 mt-2 px-3 py-1.5 rounded-btn bg-warning/8 border border-warning/20 shrink-0">
-              <span className="text-[10px] text-warning/80 leading-snug">
+              <span className="text-micro text-warning/80 leading-snug">
                 以下均为 Starter+ 付费端点，Free 模式不可使用。配置 API Key 后可自动切换并测速选优。
               </span>
             </div>
@@ -148,7 +149,7 @@ export function EndpointTestDialog({ hasKey, tierLabel, currentEndpoint, onClose
           </div>
 
           {isFallback ? (
-            <span className="text-[10px] text-warning/70">远程获取失败，显示内置列表</span>
+            <span className="text-micro text-warning/70">远程获取失败，显示内置列表</span>
           ) : null}
         </motion.div>
       </div>
@@ -189,13 +190,13 @@ function EpRow({ ep, result, testing, isCurrent, isFree, canUsePremium, switchin
           <div className="flex items-center gap-1.5 flex-wrap min-w-0">
             <span className="text-xs font-medium text-foreground">{ep.label}</span>
             {isPremium && (
-              <span className="inline-flex items-center gap-0.5 text-[9px] px-1.5 py-px rounded-sm bg-warning/15 text-warning font-medium" title={ep.description ?? '需专线加速权限'}>
+              <span className="inline-flex items-center gap-0.5 text-micro px-1.5 py-px rounded-sm bg-warning/15 text-warning font-medium" title={ep.description ?? '需专线加速权限'}>
                 <Crown className="h-2.5 w-2.5" />
                 专线
               </span>
             )}
             {isCurrent && (
-              <span className="text-[9px] px-1.5 py-px rounded-sm bg-accent/15 text-accent font-medium">使用中</span>
+              <span className="text-micro px-1.5 py-px rounded-sm bg-accent/15 text-accent font-medium">使用中</span>
             )}
           </div>
           {/* 中位延迟 —— 测试中/前/后都占位,避免高度跳动 */}
@@ -203,7 +204,7 @@ function EpRow({ ep, result, testing, isCurrent, isFree, canUsePremium, switchin
             {isFree ? (
               // Free 模式:普通付费端点需 Starter+,premium 端点需 Expert+
               <span
-                className={`text-[10px] px-1.5 py-0.5 rounded-sm font-medium font-sans ${
+                className={`text-micro px-1.5 py-0.5 rounded-sm font-medium font-sans ${
                   isPremium
                     ? 'bg-warning/15 text-warning'
                     : 'bg-muted/10 text-muted/70'
@@ -213,26 +214,26 @@ function EpRow({ ep, result, testing, isCurrent, isFree, canUsePremium, switchin
                 {isPremium ? 'Expert+' : 'Starter+'}
               </span>
             ) : testing ? (
-              <span className="text-[11px] text-muted animate-pulse">测试中…</span>
+              <span className="text-xs text-muted animate-pulse">测试中…</span>
             ) : result && result.ok && median != null ? (
               <span className={median < 500 ? 'text-bear' : median < 1000 ? 'text-warning' : 'text-danger'}>
                 {median} ms
               </span>
             ) : result && !result.ok ? (
-              <span className="text-[11px] text-danger">{result.error ?? '不可达'}</span>
+              <span className="text-xs text-danger">{result.error ?? '不可达'}</span>
             ) : (
-              <span className="text-[11px] text-muted/40">—</span>
+              <span className="text-xs text-muted/40">—</span>
             )}
           </span>
         </div>
 
         {/* 第2行:description */}
-        <span className="block text-[10px] text-muted/70 leading-snug mt-0.5 break-words">{ep.description}</span>
+        <span className="block text-micro text-muted/70 leading-snug mt-0.5 break-words">{ep.description}</span>
 
         {/* 第3行:URL(左) / min~max·成功率(右) —— 副信息始终占位,行数不变 */}
         <div className="flex items-center gap-2 mt-0.5">
-          <span className="text-[10px] text-muted/50 font-mono truncate min-w-0" title={ep.url}>{ep.url.replace('https://', '')}</span>
-          <span className="ml-auto shrink-0 text-[9px] text-muted/50 font-mono whitespace-nowrap">
+          <span className="text-micro text-muted/50 font-mono truncate min-w-0" title={ep.url}>{ep.url.replace('https://', '')}</span>
+          <span className="ml-auto shrink-0 text-micro text-muted/50 font-mono whitespace-nowrap">
             {result && result.ok && result.min_ms != null
               ? `${result.min_ms}~${result.max_ms} · ${result.success}/${result.rounds}`
               : '\u00A0'}
@@ -244,7 +245,7 @@ function EpRow({ ep, result, testing, isCurrent, isFree, canUsePremium, switchin
       {isFree ? null : (isPremium && !canUsePremium) ? (
         // 专线端点:需 Expert 及以上套餐权限,当前套餐不足,不可应用
         <span
-          className="shrink-0 inline-flex items-center gap-1 px-2 py-1 rounded-btn text-[11px] font-medium bg-warning/10 text-warning/70 cursor-not-allowed select-none mt-0.5"
+          className="shrink-0 inline-flex items-center gap-1 px-2 py-1 rounded-btn text-xs font-medium bg-warning/10 text-warning/70 cursor-not-allowed select-none mt-0.5"
           title="需要 Expert 及以上套餐的专线加速权限"
         >
           <Crown className="h-3 w-3" />
@@ -254,7 +255,7 @@ function EpRow({ ep, result, testing, isCurrent, isFree, canUsePremium, switchin
         <button
           onClick={() => onApply(ep.url)}
           disabled={switching !== null}
-          className="shrink-0 inline-flex items-center gap-1 px-2 py-1 rounded-btn text-[11px] font-medium bg-accent/15 text-accent hover:bg-accent/25 disabled:opacity-50 transition-colors mt-0.5"
+          className={buttonClass({ size: 'xs' }, 'mt-0.5 shrink-0 gap-1')}
         >
           {switching === ep.url ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
           应用

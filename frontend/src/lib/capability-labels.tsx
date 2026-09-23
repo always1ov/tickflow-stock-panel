@@ -43,7 +43,7 @@ export function MissingCapChip({ capKey, label, to = '/settings?tab=data-sources
   )
   if (to == null) {
     return (
-      <span className={`text-[10px] text-warning/90 bg-warning/8 rounded px-1.5 py-px font-medium ${className}`} title="该数据当前不可用">
+      <span className={`text-micro text-warning/90 bg-warning/8 rounded px-1.5 py-px font-medium ${className}`} title="该数据当前不可用">
         {content}
       </span>
     )
@@ -52,7 +52,7 @@ export function MissingCapChip({ capKey, label, to = '/settings?tab=data-sources
     <button
       type="button"
       onClick={(e) => { e.stopPropagation(); navigate(to) }}
-      className={`text-[10px] text-warning/90 bg-warning/8 rounded px-1.5 py-px font-medium hover:bg-warning/15 transition-colors ${className}`}
+      className={`text-micro text-warning/90 bg-warning/8 rounded px-1.5 py-px font-medium hover:bg-warning/15 transition-colors ${className}`}
       title="前往 设置 → 数据源"
     >
       {content}
@@ -179,7 +179,7 @@ export function TierTag({ label, className = '' }: { label: string; className?: 
   const display = base === 'none' ? 'None' : base
   return (
     <span
-      className={`inline-flex h-[18px] max-w-[80px] shrink-0 items-center overflow-hidden rounded px-1.5 text-[10px] font-bold font-mono leading-none ${className}`}
+      className={`inline-flex h-[18px] max-w-[80px] shrink-0 items-center overflow-hidden rounded px-1.5 text-micro font-bold font-mono leading-none ${className}`}
       style={t.tagBg}
     >
       <span className="truncate capitalize" style={t.labelTextStyle}>{display}</span>

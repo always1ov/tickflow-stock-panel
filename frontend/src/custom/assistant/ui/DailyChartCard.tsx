@@ -65,7 +65,7 @@ function ChartShell({
         </defs>
         {children}
       </svg>
-      <div className="flex flex-wrap items-center justify-between gap-x-2 px-3 py-1.5 text-[11px]">
+      <div className="flex flex-wrap items-center justify-between gap-x-2 px-3 py-1.5 text-xs">
         <span className="font-mono text-muted">{footerLeft}</span>
         <span className="font-mono text-muted">{footerRight}</span>
       </div>

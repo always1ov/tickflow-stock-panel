@@ -10,6 +10,7 @@
 import { BookOpen, X } from 'lucide-react'
 import { Modal } from '@/components/Modal'
 import { ReviewHelpView } from '@/components/stock-analysis/ReviewHelpView'
+import { TYPE } from '@/components/ui'
 
 export function GlossaryDialog({ onClose }: { onClose: () => void }) {
   return (
@@ -20,8 +21,8 @@ export function GlossaryDialog({ onClose }: { onClose: () => void }) {
     >
       <div className="flex items-center gap-2 border-b border-border/60 px-4 py-2.5">
         <BookOpen className="h-4 w-4 shrink-0 text-accent" />
-        <h2 id="glossary-title" className="text-sm font-medium text-foreground">名词说明</h2>
-        <span className="hidden text-[10px] text-muted sm:inline">
+        <h2 id="glossary-title" className={TYPE.section}>名词说明</h2>
+        <span className="hidden text-micro text-muted sm:inline">
           六态状态 · 通道档位 · 27 种三档组合 —— 与哪只票无关的固定词表
         </span>
         <button

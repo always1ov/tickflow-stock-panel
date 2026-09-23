@@ -164,6 +164,20 @@ MIGRATED: list[str] = [
     "components/EChartsMultiDayIntraday.tsx",
     "components/LastStockChip.tsx",
     "components/WarmupBadge.tsx",
+    "components/ScoreLedgerDialog.tsx",
+    "components/EndpointTestDialog.tsx",
+    "components/AlertToast.tsx",
+    "components/GroupStatsSettings.tsx",
+    "components/ScoringEditor.tsx",
+    "components/ExternalViewRender.tsx",
+    "components/NavPager.tsx",
+    "components/GlossaryDialog.tsx",
+    "components/CollapsibleText.tsx",
+    "components/PageErrorBoundary.tsx",
+    "lib/capability-labels.tsx",
+    "custom/assistant/ui/messages.tsx",
+    "custom/assistant/ui/AssistantDrawer.tsx",
+    "custom/assistant/ui/DailyChartCard.tsx",
 ]
 
 

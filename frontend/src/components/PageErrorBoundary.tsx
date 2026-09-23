@@ -64,7 +64,7 @@ export function ErrorCard({ error, onRetry, homeLink }: {
               : '只是这一页没画出来 —— 其他页面不受影响, 侧栏照常可用。'}
           </p>
           {!stale && (
-            <pre className="mt-2 max-h-24 overflow-auto whitespace-pre-wrap break-all rounded-btn bg-elevated/60 px-2 py-1.5 font-mono text-[10px] leading-relaxed text-muted">
+            <pre className="mt-2 max-h-24 overflow-auto whitespace-pre-wrap break-all rounded-btn bg-elevated/60 px-2 py-1.5 font-mono text-micro leading-relaxed text-muted">
               {describe(error)}
             </pre>
           )}

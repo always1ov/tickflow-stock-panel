@@ -39,6 +39,7 @@ import {
   useAssistantStore,
 } from '../store'
 import { AssistantMessageView } from './messages'
+import { buttonClass } from '@/components/ui'
 
 const EASE_SMOOTH: [number, number, number, number] = [0.16, 1, 0.3, 1]
 
@@ -162,7 +163,7 @@ function DrawerPanel({
       style={{ right: 0, width }}
       className={cn(
         'fixed inset-y-0 z-[60] flex min-w-0 flex-col border-l border-border',
-        'bg-surface/95 shadow-2xl backdrop-blur-xl',
+        'bg-surface shadow-2xl',
       )}
       role="complementary"
       aria-label="AI 助手"
@@ -210,7 +211,7 @@ function DrawerHeader({
       <span className="text-sm font-semibold text-foreground">AI 助手</span>
       {status?.model && (
         <span
-          className="max-w-36 truncate rounded-btn bg-elevated px-1.5 py-0.5 font-mono text-[10px] text-muted"
+          className="max-w-36 truncate rounded-btn bg-elevated px-1.5 py-0.5 font-mono text-micro text-muted"
           title={`供应商: ${status.provider}`}
         >
           {status.model}
@@ -384,7 +385,7 @@ function EmptyState({ status, suggests }: { status: AssistantStatus | null; sugg
         <button
           type="button"
           onClick={() => navigate('/settings?tab=ai')}
-          className="mt-2 cursor-pointer rounded-btn bg-accent px-3 py-1.5 text-xs text-white transition-colors duration-150 ease-smooth hover:bg-accent/90"
+          className={buttonClass({ variant: 'primary' }, 'mt-2')}
         >
           去设置页配置
         </button>
@@ -405,7 +406,7 @@ function EmptyState({ status, suggests }: { status: AssistantStatus | null; sugg
         <button
           type="button"
           onClick={() => navigate('/settings?tab=ai')}
-          className="mt-2 cursor-pointer rounded-btn bg-accent px-3 py-1.5 text-xs text-white transition-colors duration-150 ease-smooth hover:bg-accent/90"
+          className={buttonClass({ variant: 'primary' }, 'mt-2')}
         >
           去设置页调整
         </button>
@@ -493,13 +494,13 @@ function InputArea({ sending, blocked }: { sending: boolean; blocked: boolean })
             disabled={!canSend}
             title="发送"
             aria-label="发送"
-            className="mr-1.5 mb-1.5 flex h-8 w-8 cursor-pointer items-center justify-center rounded-btn bg-accent text-white transition-all duration-150 ease-smooth hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-40"
+            className={buttonClass({ variant: 'primary', icon: true }, 'mr-1.5 mb-1.5')}
           >
             <SendHorizontal className="h-4 w-4" />
           </button>
         )}
       </div>
-      <div className="mt-1.5 px-1 text-[10px] text-muted">
+      <div className="mt-1.5 px-1 text-micro text-muted">
         ⌘K / Ctrl+K 呼出 · 左缘可拖拽调宽 · 回答基于本地数据, 不构成投资建议
       </div>
     </div>

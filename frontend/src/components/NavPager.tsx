@@ -24,7 +24,7 @@ export function NavPager({ nav, prevLabel, nextLabel }: NavPagerProps) {
       >
         <ChevronLeft className="h-3.5 w-3.5" />
       </button>
-      <span className="shrink-0 font-mono text-[11px] text-secondary tabular-nums whitespace-nowrap">
+      <span className="shrink-0 font-mono text-xs text-secondary tabular-nums whitespace-nowrap">
         {nav.navIdx + 1} / {nav.navTotal}
       </span>
       <button
@@ -49,7 +49,7 @@ export function NavWrapToast({ message }: { message: string | null }) {
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 8 }}
           transition={{ duration: 0.2 }}
-          className="pointer-events-none absolute bottom-4 left-1/2 z-30 -translate-x-1/2 rounded-full border border-border bg-surface/95 px-3 py-1.5 text-[11px] text-secondary shadow-lg backdrop-blur"
+          className="pointer-events-none absolute bottom-4 left-1/2 z-30 -translate-x-1/2 rounded-full border border-border bg-surface/95 px-3 py-1.5 text-xs text-secondary shadow-lg backdrop-blur"
         >
           {message}
         </motion.div>

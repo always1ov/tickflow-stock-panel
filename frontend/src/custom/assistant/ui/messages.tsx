@@ -55,7 +55,7 @@ export const AssistantMessage = memo(function AssistantMessage({
 /** 回答完成后的固定合规提示: 风险 + 数据口径。前端固定渲染, 不依赖模型自觉追加。 */
 function AnswerDisclaimer() {
   return (
-    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-0.5 border-t border-border/60 pt-1.5 text-[10px] leading-relaxed text-muted">
+    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-0.5 border-t border-border/60 pt-1.5 text-micro leading-relaxed text-muted">
       <span className="inline-flex items-center gap-1">
         <ShieldAlert className="h-3 w-3 shrink-0" />
         风险提示: AI 生成内容仅供参考, 不构成投资建议
@@ -192,8 +192,8 @@ function ToolCallRow({ call }: { call: ToolCallRecord }) {
       )}
       {hasArgs && (
         <details className="mt-0.5 pl-5 text-muted">
-          <summary className="cursor-pointer select-none text-[11px] hover:text-secondary">参数</summary>
-          <pre className="mt-1 overflow-x-auto rounded-btn bg-elevated/60 p-2 font-mono text-[11px] leading-relaxed text-secondary">
+          <summary className="cursor-pointer select-none text-xs hover:text-secondary">参数</summary>
+          <pre className="mt-1 overflow-x-auto rounded-btn bg-elevated/60 p-2 font-mono text-xs leading-relaxed text-secondary">
             {JSON.stringify(call.args, null, 2)}
           </pre>
         </details>

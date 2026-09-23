@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { ArrowDown, ArrowUp, Pencil, Plus, Save, Trash2, X } from 'lucide-react'
 import { api, type FactorColumn, type ScoringDirection } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
+import { buttonClass } from '@/components/ui'
 
 interface Props {
   value: Record<string, number>
@@ -55,16 +56,16 @@ function ScoringRow({ name, label, weight, direction, editing, onWeightChange, o
 }) {
   return (
     <div className="grid min-h-8 grid-cols-[minmax(4rem,6.5rem)_3.75rem_minmax(3.5rem,1fr)_2.25rem_1.75rem] items-center gap-1.5">
-      <span className="truncate text-right text-[11px] text-secondary" title={`${label} · ${name}`}>{label}</span>
+      <span className="truncate text-right text-xs text-secondary" title={`${label} · ${name}`}>{label}</span>
       {editing ? (
-        <div className="grid h-6 grid-cols-2 overflow-hidden rounded border border-border bg-base">
+        <div className="grid h-7 grid-cols-2 overflow-hidden rounded-btn border border-border bg-base">
           {([['high', ArrowUp, '偏好高值'], ['low', ArrowDown, '偏好低值']] as const).map(([value, Icon, title]) => (
             <button
               key={value}
               type="button"
               onClick={() => onDirectionChange(value)}
               className={`flex items-center justify-center transition-colors ${direction === value
-                ? value === 'high' ? 'bg-emerald-400/15 text-emerald-400' : 'bg-cyan-400/15 text-cyan-400'
+                ? 'bg-foreground font-medium text-surface'
                 : 'text-muted hover:bg-elevated hover:text-secondary'
               }`}
               title={title}
@@ -76,7 +77,7 @@ function ScoringRow({ name, label, weight, direction, editing, onWeightChange, o
           ))}
         </div>
       ) : (
-        <span className={`flex items-center justify-center gap-1 text-[10px] ${direction === 'low' ? 'text-cyan-400' : 'text-emerald-400'}`}>
+        <span className={`flex items-center justify-center gap-1 text-micro text-secondary`}>
           {direction === 'low' ? <ArrowDown className="h-3 w-3" /> : <ArrowUp className="h-3 w-3" />}
           {direction === 'low' ? '低值' : '高值'}
         </span>
@@ -89,15 +90,15 @@ function ScoringRow({ name, label, weight, direction, editing, onWeightChange, o
           step={1}
           value={weight}
           onChange={event => onWeightChange(Number(event.target.value))}
-          className="h-1 min-w-0 cursor-pointer accent-amber-400"
+          className="h-1 min-w-0 cursor-pointer accent-accent"
           aria-label={`${label}权重`}
         />
       ) : (
         <div className="h-1.5 min-w-0 overflow-hidden rounded-full bg-elevated">
-          <div className="h-full rounded-full bg-amber-400/70" style={{ width: `${Math.min(weight, 100)}%` }} />
+          <div className="h-full rounded-full bg-accent/70" style={{ width: `${Math.min(weight, 100)}%` }} />
         </div>
       )}
-      <span className="text-right font-mono text-[10px] text-muted">{weight}%</span>
+      <span className="text-right font-mono text-micro text-muted">{weight}%</span>
       {editing ? (
         <button
           type="button"
@@ -240,8 +241,8 @@ export function ScoringEditor({ value, directions, onChange, fallbackLabels = {}
       )}
 
       <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/40 pt-2">
-        <div className="text-[10px] text-muted">
-          权重 <span className={`font-mono text-xs font-medium ${editing && draftTotal !== 100 ? 'text-amber-400' : 'text-emerald-400'}`}>
+        <div className="text-micro text-muted">
+          权重 <span className={`font-mono text-xs font-medium ${editing && draftTotal !== 100 ? 'text-warning' : 'text-foreground'}`}>
             {editing ? draftTotal : visibleKeys.length > 0 ? 100 : 0}%
           </span>
         </div>
@@ -260,7 +261,7 @@ export function ScoringEditor({ value, directions, onChange, fallbackLabels = {}
           <button
             type="button"
             onClick={editing ? saveDraft : startEditing}
-            className="inline-flex h-7 items-center gap-1.5 rounded-btn border border-amber-400/40 bg-amber-400/10 px-2.5 text-[11px] text-amber-400 transition-colors hover:bg-amber-400/15"
+            className={buttonClass({ size: 'xs', variant: editing ? 'primary' : 'outline' }, 'gap-1.5')}
           >
             {editing ? <Save className="h-3.5 w-3.5" /> : <Pencil className="h-3.5 w-3.5" />}
             {editing ? '保存方案' : '编辑方案'}

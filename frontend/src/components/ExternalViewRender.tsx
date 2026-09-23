@@ -9,13 +9,14 @@
  */
 import { cn } from '@/lib/cn'
 import { cellToneClass, formatCell, type ExtSection, type ExtSpec, type ExtStat } from '@/lib/externalView'
+import { TYPE } from '@/components/ui'
 
 function StatCard({ label, value, hint, tone }: ExtStat) {
   return (
     <div className="rounded-card border border-border bg-surface px-4 py-3">
-      <div className="text-[11px] text-muted">{label}</div>
+      <div className="text-xs text-muted">{label}</div>
       <div className={cn('mt-1 text-xl font-semibold tabular-nums', cellToneClass(value, tone))}>{value || '—'}</div>
-      {hint && <div className="mt-1 text-[11px] text-muted">{hint}</div>}
+      {hint && <div className="mt-1 text-xs text-muted">{hint}</div>}
     </div>
   )
 }
@@ -25,8 +26,8 @@ function SectionTable({ section }: { section: ExtSection }) {
     <section className="rounded-card border border-border bg-surface">
       {(section.title || section.note) && (
         <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-border px-4 py-2.5">
-          {section.title && <h2 className="text-sm font-medium text-foreground">{section.title}</h2>}
-          {section.note && <span className="text-[11px] text-muted">{section.note}</span>}
+          {section.title && <h2 className={TYPE.card}>{section.title}</h2>}
+          {section.note && <span className="text-xs text-muted">{section.note}</span>}
         </div>
       )}
       {section.rows.length === 0 ? (
@@ -35,7 +36,7 @@ function SectionTable({ section }: { section: ExtSection }) {
         <div className="overflow-x-auto">
           <table className="w-full min-w-full text-xs">
             <thead>
-              <tr className="border-b border-border text-[11px] text-muted">
+              <tr className="border-b border-border text-xs text-muted">
                 {section.columns.map(col => (
                   <th
                     key={col.key}
@@ -75,9 +76,9 @@ export function ExternalViewRender({ view, compact = false }: { view: ExtSpec; c
     <div className={cn('space-y-4', compact && 'space-y-3')}>
       {(view.title || view.subtitle || view.updated_at) && (
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-          {view.title && <h1 className="text-base font-semibold text-foreground">{view.title}</h1>}
+          {view.title && <h1 className={TYPE.section}>{view.title}</h1>}
           {view.subtitle && <span className="text-xs text-secondary">{view.subtitle}</span>}
-          {view.updated_at && <span className="text-[11px] text-muted">数据时间 {view.updated_at}</span>}
+          {view.updated_at && <span className="text-xs text-muted">数据时间 {view.updated_at}</span>}
         </div>
       )}
 
@@ -92,7 +93,7 @@ export function ExternalViewRender({ view, compact = false }: { view: ExtSpec; c
       {view.sections.map((section, i) => <SectionTable key={i} section={section} />)}
 
       {view.notes.length > 0 && (
-        <ul className="space-y-1 rounded-card border border-border bg-surface px-4 py-3 text-[11px] leading-5 text-muted">
+        <ul className="space-y-1 rounded-card border border-border bg-surface px-4 py-3 text-xs leading-5 text-muted">
           {view.notes.map((n, i) => <li key={i}>· {n}</li>)}
         </ul>
       )}

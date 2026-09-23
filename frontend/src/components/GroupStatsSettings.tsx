@@ -8,6 +8,7 @@ import {
   type GroupStatsConfig,
   type GroupStatsConfigPatch,
 } from '@/lib/watchlistGroupStats'
+import { buttonClass } from '@/components/ui'
 
 /**
  * 分组「指标 + 排序」设置弹层 — 分组统计条与分组卡片共用。
@@ -57,7 +58,7 @@ export function GroupStatsSettings({
       </button>
       {open && (
         <div className="absolute right-0 top-full z-30 mt-1 w-64 rounded-card border border-border bg-base p-3 shadow-xl">
-          <div className="text-[10px] uppercase tracking-wider text-muted">指标</div>
+          <div className="text-micro text-muted">指标</div>
           <div className="mt-1 flex flex-wrap gap-1">
             {GROUP_METRICS.map(m => (
               <button
@@ -65,28 +66,20 @@ export function GroupStatsSettings({
                 type="button"
                 title={m.hint}
                 onClick={() => onChange({ metric: m.id })}
-                className={`px-2 py-0.5 rounded text-[11px] transition-colors ${
-                  config.metric === m.id
-                    ? 'bg-accent/15 text-accent'
-                    : 'bg-elevated text-secondary hover:text-foreground hover:bg-elevated/80'
-                }`}
+                className={buttonClass({ size: 'xs', selected: config.metric === m.id })}
               >
                 {m.label}
               </button>
             ))}
           </div>
-          <div className="mt-2.5 text-[10px] uppercase tracking-wider text-muted">排序</div>
+          <div className="mt-2.5 text-micro text-muted">排序</div>
           <div className="mt-1 flex flex-wrap gap-1">
             {GROUP_SORT_OPTIONS.map(s => (
               <button
                 key={s.id}
                 type="button"
                 onClick={() => onChange({ sort: s.id })}
-                className={`px-2 py-0.5 rounded text-[11px] transition-colors ${
-                  config.sort === s.id
-                    ? 'bg-accent/15 text-accent'
-                    : 'bg-elevated text-secondary hover:text-foreground hover:bg-elevated/80'
-                }`}
+                className={buttonClass({ size: 'xs', selected: config.sort === s.id })}
               >
                 {s.label}
               </button>
@@ -94,7 +87,7 @@ export function GroupStatsSettings({
           </div>
           {showCardLimit && (
             <>
-              <div className="mt-2.5 text-[10px] uppercase tracking-wider text-muted">卡片显示</div>
+              <div className="mt-2.5 text-micro text-muted">卡片显示</div>
               <div className="mt-1 flex items-center gap-2" title="分组卡片默认展示组内前 N 条, 可展开查看全部">
                 <button
                   type="button"
@@ -105,7 +98,7 @@ export function GroupStatsSettings({
                 >
                   <Minus className="h-3 w-3" />
                 </button>
-                <span className="w-16 text-center font-mono text-[11px] tabular-nums text-secondary">
+                <span className="w-16 text-center font-mono text-xs tabular-nums text-secondary">
                   前 {config.cardTopN} 条
                 </span>
                 <button
@@ -120,7 +113,7 @@ export function GroupStatsSettings({
               </div>
               <div className="mt-2 space-y-1.5">
                 <div className="flex items-center justify-between" title="分组卡片头部是否显示分组颜色底条">
-                  <span className="text-[11px] text-secondary">头部颜色</span>
+                  <span className="text-xs text-secondary">头部颜色</span>
                   <button
                     type="button"
                     role="switch"
@@ -139,7 +132,7 @@ export function GroupStatsSettings({
                   </button>
                 </div>
                 <div className="flex items-center justify-between" title="成员行左侧是否显示排名序号">
-                  <span className="text-[11px] text-secondary">序号</span>
+                  <span className="text-xs text-secondary">序号</span>
                   <button
                     type="button"
                     role="switch"
@@ -160,7 +153,7 @@ export function GroupStatsSettings({
               </div>
             </>
           )}
-          <div className="mt-2.5 text-[10px] leading-relaxed text-muted">
+          <div className="mt-2.5 text-micro leading-relaxed text-muted">
             {GROUP_METRICS.find(m => m.id === config.metric)?.hint}
           </div>
         </div>

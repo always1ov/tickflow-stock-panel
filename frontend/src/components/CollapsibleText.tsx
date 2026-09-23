@@ -100,7 +100,7 @@ export function CollapsibleText({
           onClick={toggle}
           aria-expanded={open}
           className={cn(
-            'mt-1 inline-flex items-center gap-1 text-[10px] text-muted/70 transition-colors hover:text-foreground cursor-pointer',
+            'mt-1 inline-flex items-center gap-1 text-micro text-muted/70 transition-colors hover:text-foreground cursor-pointer',
             toggleClassName,
           )}
         >
