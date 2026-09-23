@@ -8,3 +8,6 @@
 export { Button, buttonClass, type ButtonVariant, type ButtonSize, type ButtonStyleProps } from './Button'
 export { Card, CardSection, type CardPadding } from './Card'
 export { Field, fieldInput, fieldSelect } from './Field'
+export { SectionTitle } from './SectionTitle'
+export { TYPE } from './type'
+export { TABLE, THEAD, TH_ROW, TH, TR, TD } from './table'

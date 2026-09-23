@@ -10,5 +10,5 @@ export const BOX = 'inline-flex h-8 items-center justify-center rounded-btn bord
   + 'transition-colors duration-hover disabled:opacity-40'
 export const PILL = `${BOX} px-3`
 export const SQUARE = `${BOX} w-8 border-border bg-surface hover:bg-elevated`
-export const PILL_IDLE = 'border-border bg-surface text-foreground hover:bg-elevated'
-export const PILL_ON = 'border-foreground bg-foreground text-surface font-medium'
+// [R449] 两种状态的配色挪进了全站按钮(`components/ui/Button.tsx`), 这里直接用那一份
+export { OUTLINE as PILL_IDLE, SELECTED as PILL_ON } from '@/components/ui/Button'

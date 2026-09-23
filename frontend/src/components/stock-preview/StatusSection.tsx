@@ -29,7 +29,7 @@ import { cn } from '@/lib/cn'
 import { BAND_CN, POS_FILL } from '@/lib/reviewTimeline'
 import { useStockTrend } from '@/components/stock-analysis/TrendStateBar'
 import { pct, useStockReview } from '@/components/stock-analysis/StockReviewDialog'
-import { SectionTitle } from './SectionTitle'
+import { SectionTitle } from '@/components/ui'
 
 export function StatusSection({ symbol, days }: { symbol: string; days: number }) {
   const review = useStockReview(symbol, days).data

@@ -40,20 +40,29 @@ export type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'dan
 export type ButtonSize = 'xs' | 'sm' | 'md'
 
 const BASE =
-  'inline-flex items-center justify-center whitespace-nowrap rounded-btn font-medium ' +
+  'inline-flex items-center justify-center whitespace-nowrap rounded-btn ' +
   'transition-colors duration-hover ease-out cursor-pointer ' +
   'disabled:cursor-not-allowed disabled:opacity-50'
 
+/** [R449] 默认(描边)按钮 —— 个股弹窗那一套, 也导出给 `stock-preview/pill.ts` 用 */
+export const OUTLINE = 'border border-border bg-surface text-foreground hover:bg-elevated'
+
 const VARIANT: Record<ButtonVariant, string> = {
-  primary: 'bg-accent text-on-accent hover:bg-accent/90',
+  primary: 'bg-accent font-medium text-on-accent hover:bg-accent/90',
   secondary: 'bg-elevated text-secondary hover:bg-elevated/70 hover:text-foreground',
-  outline: 'border border-border bg-base text-muted hover:text-foreground',
+  // [R449] 与个股弹窗的按钮同一套(原 `stock-preview/pill.ts` 的 PILL_IDLE): 实底、
+  // 正常字色 —— 原来的灰字按钮在大字号下反而像被禁用了
+  outline: OUTLINE,
   ghost: 'text-muted hover:bg-elevated hover:text-foreground',
-  danger: 'border border-border bg-base text-muted hover:border-danger/40 hover:text-danger',
+  danger: 'border border-border bg-surface text-foreground hover:border-danger/40 hover:text-danger',
 }
 
-/** 选中态 —— 与 variant 正交。全站只有强调色这一种说法。 */
-const SELECTED = 'border border-accent/40 bg-accent-soft text-accent'
+/**
+ * 选中态 —— 与 variant 正交, 全站只有一种说法。
+ * [R449] 从强调色换成个股弹窗那套**黑白反相**(亮色主题黑底白字、暗色白底黑字):
+ * 用户要全站都像弹窗; 选中与否一眼就分得开, 也不和强调色的链接、主按钮抢。
+ */
+export const SELECTED = 'border border-foreground bg-foreground font-medium text-surface'
 
 /**
  * 横向取骨架刻度(8/16/24), 纵向取行内密度刻度(4/6/8)。
@@ -62,17 +71,19 @@ const SELECTED = 'border border-accent/40 bg-accent-soft text-accent'
  * 工具条。8 基套进纵向会让每个按钮长高 8~10px, 而 R399 已经就"两套刻度"
  * 给过理由(`test_design_spec.py`)。
  */
+// [R449] 定高, 与个股弹窗同一套: 默认一档 32px 高、13px 字(弹窗的 PILL)。
+// 同一排按钮高度一致, 不再随字号、边框各自长高。
 const SIZE: Record<ButtonSize, string> = {
-  xs: 'gap-g2 px-s1 py-g2 text-micro',
-  sm: 'gap-g3 px-s2 py-g3 text-body',
-  md: 'gap-g4 px-s3 py-g4 text-body',
+  xs: 'h-7 gap-g2 px-2 text-micro',
+  sm: 'h-8 gap-g3 px-3 text-xs',
+  md: 'h-9 gap-g4 px-4 text-sm',
 }
 
 /** 方形图标钮: 四边等距, 不然图标不在正中。 */
 const ICON_SIZE: Record<ButtonSize, string> = {
-  xs: 'gap-g2 p-g2 text-micro',
-  sm: 'gap-g3 p-g3 text-body',
-  md: 'gap-g4 p-g4 text-body',
+  xs: 'h-7 w-7 text-micro',
+  sm: 'h-8 w-8 text-xs',
+  md: 'h-9 w-9 text-sm',
 }
 
 export interface ButtonStyleProps {

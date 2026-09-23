@@ -10,7 +10,7 @@
  */
 import type { ReactNode } from 'react'
 import { CandlestickChart, Clock, Crosshair } from 'lucide-react'
-import { SectionTitle } from './SectionTitle'
+import { SectionTitle } from '@/components/ui'
 
 export type ChartView = 'daily' | 'intraday' | 'levels'
 

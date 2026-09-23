@@ -1,0 +1,5 @@
+# R449 — 全站文字层级与样式: 规范 + 基础件(全站迁移第一步)
+
+| # | 改动 | 涉及文件 | 冲突风险 | 单独回退 |
+|---|------|---------|:---:|---------|
+| R449 | 用户: 「全局都想要像弹窗这样大的字体和样式, 看着舒服」; 追问后: 「你要按照标题级别, 别无脑全部一样, 样式是肯定要改的」「全部都要」。这一步只立规范和基础件, 页面逐个迁移在后面的 R 行。① 层级(`components/ui/type.ts` 的 `TYPE`, 取值就是个股弹窗那一套, 相邻两级差 ≥2px): L1 页面标题 21px 粗 / L2 分区标题 18px 粗 / L3 卡片标题 15px 粗 / 正文 13px / 标签 11px 灰 / 读数 21px 粗。② 分区标题 `SectionTitle` 从 `stock-preview/` 挪进 `components/ui/`, 字号 15→18 —— 弹窗里分区标题原来比卡片标题(16px)还小, 层级是反的; 弹窗的卡片标题跟着改成 L3, 头部「结论(待定)」那一行也换成同一个组件。③ 基础件改成弹窗那一套: 按钮定高(默认 32px / 13px 字, 描边实底), 选中态从强调色换成黑白反相(弹窗的 `pill.ts` 直接转用这一份); 卡片实边框实底; 新增 `table.ts`(表头 11px 灰字浅灰底条, 内容 13px)。④ `docs/ui-hierarchy.md` 写清层级、迁移规则(写死的字号按角色落档, 不按数字一刀切)与按使用频率排的页面清单。守卫 `test_ui_hierarchy.py`: 层级取值、标题三级不许撞档、按钮与卡片取值、弹窗分区大于卡片标题, 以及 `MIGRATED` 清单里的文件一处写死字号都不许有; `test_R400_选中态…` 改钉反相, `test_R429_星星方框…` 改到 `Button.tsx` 读那两种状态的配色 | `frontend/src/components/ui/*`、`frontend/src/components/stock-preview/*`、`docs/ui-hierarchy.md`、`backend/tests/test_ui_hierarchy.py`、`backend/tests/test_design_spec.py`、`backend/tests/test_preview_hero.py` | 中(按钮、卡片基础件全站 33 处在用, 会一起变样; 上游没有这套基础件) | 回退本提交即回到强调色选中态与半透明卡片 |

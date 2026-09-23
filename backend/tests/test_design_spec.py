@@ -242,13 +242,19 @@ def test_R400_输入框不写那句永远不生效的聚焦边框():
         "Field.tsx 写了 focus:border-… —— 那条被 index.css 的输入框规则压着, 不会生效")
 
 
-def test_R400_选中态全站只有强调色一种说法():
+def test_R400_选中态全站只有一种说法():
     """现状里"选中"有 `sky-400/15`、`accent/10`、`violet-500/20` 三四种颜色 ——
-    同一件事换页面换颜色, 读的人得先确认它们是不是一回事(AGENTS.md 第 12 条)。"""
+    同一件事换页面换颜色, 读的人得先确认它们是不是一回事(AGENTS.md 第 12 条)。
+
+    [R449] 那一种说法从强调色换成个股弹窗的**黑白反相**。用户: 「全局都想要像弹窗
+    这样大的字体和样式」。弹窗那边(`stock-preview/pill.ts`)直接转用这一份。"""
     btn = _ui_sources()["Button.tsx"]
     m = re.search(r"const SELECTED = '([^']*)'", btn)
     assert m, "Button.tsx 里找不到选中态的取值"
-    assert "accent" in m.group(1), f"选中态没有用强调色: {m.group(1)}"
+    assert m.group(1) == "border border-foreground bg-foreground font-medium text-surface", (
+        f"选中态不是弹窗那套反相: {m.group(1)}")
+    pill = (SRC / "components" / "stock-preview" / "pill.ts").read_text(encoding="utf-8")
+    assert "SELECTED as PILL_ON" in pill, "弹窗的选中态没有用全站那一份"
 
 
 # ================================================================

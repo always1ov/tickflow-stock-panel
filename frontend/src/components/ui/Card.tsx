@@ -26,7 +26,9 @@ export function Card({ padding = 'md', className, ...rest }: {
 } & React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={cn('rounded-card border border-border/60 bg-surface/40',
+      // [R449] 与个股弹窗的卡片同一套: 实边框、实底 —— 原来半透明的边框和底色
+      // 叠在页底上发虚, 卡与卡之间深浅不一
+      className={cn('rounded-card border border-border bg-surface',
                     PADDING[padding], className)}
       {...rest}
     />

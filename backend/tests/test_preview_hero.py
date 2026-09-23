@@ -66,7 +66,11 @@ def test_R429_星星方框不叠冲突的内边距():
     assert not re.search(r"\bpx-", box), "公共形状里带了横向内边距 —— 方框会跟它打架"
     assert not re.search(r"\bpx-", square), "方框自带了横向内边距"
     assert not re.search(r"\btext-(foreground|muted)\b", box + square), "公共形状里带了字色"
-    consts = {n: _const(styles, n) for n in ("BOX", "PILL", "SQUARE", "PILL_IDLE", "PILL_ON")}
+    consts = {n: _const(styles, n) for n in ("BOX", "PILL", "SQUARE")}
+    # [R449] 两种状态的配色挪进了全站按钮, pill.ts 里只是转出去
+    btn = code_of("components/ui/Button.tsx")
+    consts["PILL_IDLE"] = _const(btn, "OUTLINE")
+    consts["PILL_ON"] = _const(btn, "SELECTED")
 
     def expand(expr: str) -> str:
         for _ in range(4):  # PILL / SQUARE 里还套着 ${BOX}

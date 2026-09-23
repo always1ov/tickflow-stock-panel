@@ -35,7 +35,7 @@ import {
   FlipTradeCells, REASON_CN, TRADE_STAT_TIPS, legsByFlipDate, tradeNotes,
 } from '@/components/stock-analysis/FlipTradesPanel'
 import { PILL, PILL_IDLE, PILL_ON } from './pill'
-import { SectionTitle } from './SectionTitle'
+import { SectionTitle, TYPE } from '@/components/ui'
 
 /** 走完不到这么多段, 「这只票的表现」就提醒样本太少(与图里脚注同一个数) */
 const THIN = 3
@@ -94,7 +94,7 @@ function DailyCard({ d }: { d: StockReview }) {
   return (
     <div className="rounded-card border border-border bg-surface">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-4 py-3">
-        <span className="text-base font-semibold text-foreground">逐日复盘</span>
+        <span className={TYPE.card}>逐日复盘</span>
         {/* 旧「趋势状态」页页头那一句 */}
         <span className="text-micro text-muted">
           {d.start} ~ {d.end} · {d.days} 个交易日
@@ -301,7 +301,7 @@ function StateHistory({ d }: { d: StockReview }) {
     <div className="mt-6">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-          <span className="text-base font-semibold text-foreground">六个状态在这只票上的历史表现</span>
+          <span className={TYPE.card}>六个状态在这只票上的历史表现</span>
           <span className="text-xs text-muted">同一个状态在不同股票上差别很大, 这里是这只票自己的记录 · 近 {d.days} 天</span>
         </div>
         <span className="font-mono text-xs text-muted">{d.start} → {d.end}</span>

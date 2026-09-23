@@ -21,6 +21,7 @@ import { Loader2, Sparkles, Star } from 'lucide-react'
 import { toast } from '@/components/Toast'
 import { WatchlistAddMenu } from '@/components/WatchlistAddMenu'
 import { useAnalysisKline } from '@/components/stock-analysis/StockLevelsPanel'
+import { SectionTitle } from '@/components/ui'
 import { PILL, PILL_IDLE, PILL_ON, SQUARE } from './pill'
 
 export const HERO_DAYS = [60, 120, 250] as const
@@ -113,11 +114,8 @@ export function PreviewHero({
       </div>
 
       {/* 第二行: 结论(占位)+ 一道细线把这一行拉满 */}
-      <div className="mt-3 flex items-center gap-3">
-        <span className="shrink-0 text-base font-semibold text-foreground">结论</span>
-        <span className="shrink-0 text-sm text-muted">(待定)</span>
-        <span className="h-px flex-1 bg-border/70" aria-hidden="true" />
-      </div>
+      {/* [R449] 与各分区同一个形状(标题 + 副标题 + 细线), 就用同一个组件 */}
+      <SectionTitle className="mt-3" title="结论" sub="(待定)" />
     </div>
   )
 }
