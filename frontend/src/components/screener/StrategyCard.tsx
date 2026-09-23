@@ -23,8 +23,8 @@ const CARD_STYLES: Record<CardSize, {
   mini: {
     wrap: 'gap-1',
     card: 'inline-flex items-center gap-1 px-2 py-0.5 rounded-btn',
-    name: 'text-[10px]',
-    count: 'text-[11px]',
+    name: 'text-micro',
+    count: 'text-xs',
     desc: '',
     icon: 'h-3 w-3',
   },
@@ -33,7 +33,7 @@ const CARD_STYLES: Record<CardSize, {
     card: 'relative inline-flex items-center gap-2 pl-3 pr-12 py-1.5 rounded-lg',
     name: 'text-xs',
     count: 'text-xs',
-    desc: 'text-[10px] text-muted leading-tight mt-0.5 line-clamp-1 max-w-none sm:max-w-[120px]',
+    desc: 'text-micro text-muted leading-tight mt-0.5 line-clamp-1 max-w-none sm:max-w-[120px]',
     icon: 'h-3.5 w-3.5',
   },
   large: {
@@ -41,7 +41,7 @@ const CARD_STYLES: Record<CardSize, {
     card: 'relative inline-flex flex-col items-start pl-3.5 pr-12 py-2.5 rounded-btn min-w-[100px]',
     name: 'text-xs',
     count: 'text-lg font-mono font-bold tabular-nums',
-    desc: 'text-[10px] text-muted leading-tight mt-0.5 line-clamp-2 max-w-none sm:max-w-[140px]',
+    desc: 'text-micro text-muted leading-tight mt-0.5 line-clamp-2 max-w-none sm:max-w-[140px]',
     icon: 'h-3.5 w-3.5',
   },
   hidden: {
@@ -137,25 +137,25 @@ export function StrategyCard({
           <button onClick={onRun} disabled={disabled}
             className="flex flex-col items-start cursor-pointer disabled:opacity-50 disabled:cursor-wait w-full">
             <div className="flex items-center gap-1.5 max-w-full">
-              <span className={`text-[9px] px-1 py-px rounded border font-medium leading-tight shrink-0 ${badgeCls}`}>{srcLabel}</span>
+              <span className={`text-micro px-1 py-px rounded border font-medium leading-tight shrink-0 ${badgeCls}`}>{srcLabel}</span>
               {timeframeBadge && (
-                <span className="text-[9px] px-1 py-px rounded border font-medium leading-tight shrink-0 border-sky-500/30 bg-sky-500/10 text-sky-400">{timeframeBadge}</span>
+                <span className="text-micro px-1 py-px rounded border font-medium leading-tight shrink-0 border-sky-500/30 bg-sky-500/10 text-sky-400">{timeframeBadge}</span>
               )}
               <span className="text-xs font-medium truncate text-foreground">{name}</span>
             </div>
             {description && (
-              <span className="text-[10px] text-muted leading-tight mt-0.5 line-clamp-1">{description}</span>
+              <span className="text-micro text-muted leading-tight mt-0.5 line-clamp-1">{description}</span>
             )}
             {count != null && !loading && (
               <div className="mt-1.5 flex items-center gap-2">
                 <div className="flex items-center gap-1">
                   <span className={`text-sm font-mono font-bold tabular-nums ${countCls}`}>{count}</span>
-                  <span className="text-[10px] text-muted">只</span>
+                  <span className="text-micro text-muted">只</span>
                 </div>
                 {hasExpired && (
                   <div className="flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-red-500/8 border border-red-500/15">
                     <TrendingDown className="h-2.5 w-2.5 text-red-400" />
-                    <span className="text-[10px] font-mono font-medium text-red-400">{expiredCount}</span>
+                    <span className="text-micro font-mono font-medium text-red-400">{expiredCount}</span>
                   </div>
                 )}
               </div>
@@ -164,7 +164,7 @@ export function StrategyCard({
               <span className="mt-1.5 text-sm font-mono font-bold text-muted/50 animate-pulse">···</span>
             )}
             {count == null && !loading && !computing && awaitRun && (
-              <span className="mt-1.5 text-[10px] text-muted/60 transition-colors group-hover:text-accent/80" title="自动计算未开启或失败 — 点击卡片实时计算">待计算</span>
+              <span className="mt-1.5 text-micro text-muted/60 transition-colors group-hover:text-accent/80" title="自动计算未开启或失败 — 点击卡片实时计算">待计算</span>
             )}
             {loading && <div className="mt-1 h-4 w-10 rounded bg-elevated animate-pulse" />}
           </button>
@@ -185,9 +185,9 @@ export function StrategyCard({
           <button onClick={onRun} disabled={disabled}
             className="flex flex-col items-start cursor-pointer disabled:opacity-50 disabled:cursor-wait min-w-0">
             <div className="flex items-center gap-1.5 min-w-0">
-              <span className={`text-[9px] px-1 py-px rounded border font-medium leading-tight shrink-0 ${badgeCls}`}>{srcLabel}</span>
+              <span className={`text-micro px-1 py-px rounded border font-medium leading-tight shrink-0 ${badgeCls}`}>{srcLabel}</span>
               {timeframeBadge && (
-                <span className="text-[9px] px-1 py-px rounded border font-medium leading-tight shrink-0 border-sky-500/30 bg-sky-500/10 text-sky-400">{timeframeBadge}</span>
+                <span className="text-micro px-1 py-px rounded border font-medium leading-tight shrink-0 border-sky-500/30 bg-sky-500/10 text-sky-400">{timeframeBadge}</span>
               )}
               <span className="text-xs font-medium truncate text-foreground">{name}</span>
               {count != null && !loading && (
@@ -197,16 +197,16 @@ export function StrategyCard({
                 <span className="text-xs font-mono font-bold text-muted/50 animate-pulse shrink-0">···</span>
               )}
               {count == null && !loading && !computing && awaitRun && (
-                <span className="text-[10px] text-muted/60 transition-colors group-hover:text-accent/80 shrink-0" title="自动计算未开启或失败 — 点击卡片实时计算">待计算</span>
+                <span className="text-micro text-muted/60 transition-colors group-hover:text-accent/80 shrink-0" title="自动计算未开启或失败 — 点击卡片实时计算">待计算</span>
               )}
               {loading && <span className="w-5 h-3 rounded bg-elevated animate-pulse shrink-0" />}
             </div>
             <div className="flex items-center gap-1.5 mt-0.5">
               {description && (
-                <span className="text-[10px] text-muted leading-tight line-clamp-1 max-w-none sm:max-w-[120px]">{description}</span>
+                <span className="text-micro text-muted leading-tight line-clamp-1 max-w-none sm:max-w-[120px]">{description}</span>
               )}
               {hasExpired && (
-                <span className="text-[9px] font-mono text-red-400/80">{'-' + expiredCount}</span>
+                <span className="text-micro font-mono text-red-400/80">{'-' + expiredCount}</span>
               )}
             </div>
           </button>
@@ -227,8 +227,8 @@ export function StrategyCard({
         <>
           <button onClick={onRun} disabled={disabled}
             className="flex items-center gap-1 cursor-pointer disabled:opacity-50 disabled:cursor-wait">
-            <span className="text-[8px] px-0.5 rounded bg-secondary/10 text-muted border border-border font-medium leading-tight">{srcLabel}</span>
-            <span className="text-[10px] font-medium whitespace-nowrap text-foreground">{name}</span>
+            <span className="text-micro px-0.5 rounded bg-secondary/10 text-muted border border-border font-medium leading-tight">{srcLabel}</span>
+            <span className="text-micro font-medium whitespace-nowrap text-foreground">{name}</span>
             {count != null && !loading && (
               <span className={`text-xs font-mono font-bold tabular-nums ${countCls}`}>{count}</span>
             )}
@@ -236,10 +236,10 @@ export function StrategyCard({
               <span className="text-xs font-mono font-bold text-muted/50 animate-pulse">···</span>
             )}
             {count == null && !loading && !computing && awaitRun && (
-              <span className="text-[9px] text-muted/60 transition-colors group-hover:text-accent/80 shrink-0" title="自动计算未开启或失败 — 点击卡片实时计算">待算</span>
+              <span className="text-micro text-muted/60 transition-colors group-hover:text-accent/80 shrink-0" title="自动计算未开启或失败 — 点击卡片实时计算">待算</span>
             )}
             {hasExpired && (
-              <span className="text-[9px] font-mono text-red-400/70">{'-' + expiredCount}</span>
+              <span className="text-micro font-mono text-red-400/70">{'-' + expiredCount}</span>
             )}
             {loading && <span className="w-4 h-2.5 rounded bg-elevated animate-pulse" />}
           </button>

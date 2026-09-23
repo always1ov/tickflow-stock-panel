@@ -4,6 +4,7 @@ import { X, Layers, Plus, Loader2, Search, Settings2 } from 'lucide-react'
 import { api, type ScreenerStrategy } from '@/lib/api'
 import { toPercentages, normalizeWeights } from '@/lib/weights'
 import { StrategySettingsDialog } from '@/components/screener/StrategySettingsDialog'
+import { TYPE } from '@/components/ui'
 
 interface Props {
   open: boolean
@@ -186,10 +187,10 @@ export function CompositeStrategyDialog({ open, onClose, onSavedId, editStrategy
             {/* 头部 */}
             <div className="flex items-center gap-2 border-b border-border px-4 py-3">
               <Layers className="h-4 w-4 text-teal-400" />
-              <span className="text-sm font-semibold text-foreground">
+              <span className={TYPE.section}>
                 {isEdit ? '编辑叠加策略' : '创建叠加策略'}
               </span>
-              <span className="text-[10px] text-muted/60">
+              <span className="text-micro text-muted/60">
                 引用多个子策略, 合并选股与回测信号
               </span>
               <button onClick={onClose} className="ml-auto text-muted hover:text-foreground">
@@ -208,7 +209,7 @@ export function CompositeStrategyDialog({ open, onClose, onSavedId, editStrategy
                     readOnly
                     disabled
                     placeholder="composite_..."
-                    className="w-full rounded-btn border border-border bg-elevated px-2 py-1.5 font-mono text-[11px] text-muted cursor-not-allowed"
+                    className="w-full rounded-btn border border-border bg-elevated px-2 py-1.5 font-mono text-xs text-muted cursor-not-allowed"
                   />
                 </div>
                 <div>
@@ -263,7 +264,7 @@ export function CompositeStrategyDialog({ open, onClose, onSavedId, editStrategy
                   <label className="text-xs font-medium text-foreground">
                     子策略（{children.length}）
                   </label>
-                  <span className="text-[10px] text-muted flex items-center gap-1.5">
+                  <span className="text-micro text-muted flex items-center gap-1.5">
                     权重
                     <span className={`font-mono ${children.length > 0 && totalPct !== 100 ? 'text-amber-400' : 'text-emerald-400'}`}>
                       {totalPct}%
@@ -293,7 +294,7 @@ export function CompositeStrategyDialog({ open, onClose, onSavedId, editStrategy
                           <Settings2 className="h-3 w-3 shrink-0 text-muted/50" />
                         </button>
                         {s?.source && (
-                          <span className={`rounded border px-1 text-[8px] ${BADGE_CLS[s.source] ?? ''}`}>
+                          <span className={`rounded border px-1 text-micro ${BADGE_CLS[s.source] ?? ''}`}>
                             {SRC_MAP[s.source] ?? s.source}
                           </span>
                         )}
@@ -307,7 +308,7 @@ export function CompositeStrategyDialog({ open, onClose, onSavedId, editStrategy
                           className="h-1 w-24 cursor-pointer accent-teal-400"
                           aria-label={`${s?.name ?? c.strategy_id}权重`}
                         />
-                        <span className="w-9 shrink-0 text-right font-mono text-[10px] text-muted">{Math.round(c.weight)}%</span>
+                        <span className="w-9 shrink-0 text-right font-mono text-micro text-muted">{Math.round(c.weight)}%</span>
                         <button onClick={() => removeChild(c.strategy_id)} className="text-danger/60 hover:text-danger">
                           <X className="h-3 w-3" />
                         </button>
@@ -347,11 +348,11 @@ export function CompositeStrategyDialog({ open, onClose, onSavedId, editStrategy
                       <Plus className="h-3 w-3 shrink-0 text-teal-400" />
                       <span className="flex-1 truncate">{s.name}</span>
                       {s.source && (
-                        <span className={`rounded border px-1 text-[8px] ${BADGE_CLS[s.source] ?? ''}`}>
+                        <span className={`rounded border px-1 text-micro ${BADGE_CLS[s.source] ?? ''}`}>
                           {SRC_MAP[s.source] ?? s.source}
                         </span>
                       )}
-                      <span className="font-mono text-[9px] text-muted/50">{s.id}</span>
+                      <span className="font-mono text-micro text-muted/50">{s.id}</span>
                     </button>
                   ))}
                 </div>

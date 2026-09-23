@@ -12,6 +12,7 @@ import { color } from '@/lib/colors'
 import { api } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { RangeField, ALL_BOARDS } from './StrategySettingsDialog'
+import { TYPE } from '@/components/ui'
 
 /** 与自定义策略模板内置默认一致 (CUSTOM_TEMPLATE 的 basic_filter 段) */
 export const BUILTIN_DEFAULT_BASIC_FILTER: DefaultStrategyBasicFilter = {
@@ -106,7 +107,7 @@ export function DefaultStrategyParamsDialog({ show, onClose }: Props) {
       <div className="flex items-center justify-between px-4 py-3 border-b border-border/50">
         <div className="flex items-center gap-2">
           <SlidersHorizontal className="h-4 w-4 text-accent" />
-          <span id="default-strategy-params-title" className="text-sm font-semibold text-foreground">默认基础参数</span>
+          <span id="default-strategy-params-title" className={TYPE.section}>默认基础参数</span>
         </div>
         <button onClick={onClose} className="p-1 rounded hover:bg-elevated text-muted hover:text-foreground transition-colors cursor-pointer" title="关闭">
           <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18M6 6l12 12" /></svg>
@@ -115,7 +116,7 @@ export function DefaultStrategyParamsDialog({ show, onClose }: Props) {
 
       {/* 内容 */}
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
-        <p className="text-[11px] text-muted leading-relaxed">
+        <p className="text-xs text-muted leading-relaxed">
           之后新建的策略（含 AI 生成）将默认使用以下基础过滤参数；已存在的策略不受影响，可用下方「一键应用」批量同步，或逐策略修改。
         </p>
         <div className="space-y-2">
@@ -124,21 +125,21 @@ export function DefaultStrategyParamsDialog({ show, onClose }: Props) {
           <RangeField label="成交额" minVal={bf.amount_min != null ? bf.amount_min / 1e8 : null} maxVal={bf.amount_max != null ? bf.amount_max / 1e8 : null} onMinChange={v => set('amount_min', v != null ? v * 1e8 : null)} onMaxChange={v => set('amount_max', v != null ? v * 1e8 : null)} unit="亿" step="0.5" />
           <RangeField label="换手率" minVal={bf.turnover_min} maxVal={bf.turnover_max} onMinChange={v => set('turnover_min', v)} onMaxChange={v => set('turnover_max', v)} unit="%" step="0.5" />
           <div className="flex items-start gap-1.5">
-            <span className="text-[11px] text-secondary w-16 shrink-0 text-right pt-0.5">板块</span>
+            <span className="text-xs text-secondary w-16 shrink-0 text-right pt-0.5">板块</span>
             <div className="flex flex-wrap gap-0.5">
               {ALL_BOARDS.map(b => {
                 const active = bf.boards.includes(b)
                 return (
                   <button key={b} onClick={() => { const next = active ? bf.boards.filter(x => x !== b) : [...bf.boards, b]; set('boards', next.length === 0 ? [...ALL_BOARDS] : next) }}
-                    className={`px-1.5 py-0.5 rounded text-[10px] font-medium border transition-colors cursor-pointer ${active ? `${color.select.border} ${color.select.bgLight} ${color.select.text}` : `border-border bg-base text-muted ${color.select.borderHover}`}`}>{b}</button>
+                    className={`px-1.5 py-0.5 rounded text-micro font-medium border transition-colors cursor-pointer ${active ? `${color.select.border} ${color.select.bgLight} ${color.select.text}` : `border-border bg-base text-muted ${color.select.borderHover}`}`}>{b}</button>
                 )
               })}
             </div>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="text-[11px] text-secondary w-16 shrink-0 text-right">ST</span>
+            <span className="text-xs text-secondary w-16 shrink-0 text-right">ST</span>
             <button onClick={() => set('exclude_st', !bf.exclude_st)}
-              className={`px-1.5 py-0.5 rounded text-[10px] font-medium border transition-colors cursor-pointer ${bf.exclude_st ? 'border-danger/40 bg-danger/10 text-danger' : 'border-border bg-base text-muted hover:border-danger/30'}`}>{bf.exclude_st ? '排除' : '包含'}</button>
+              className={`px-1.5 py-0.5 rounded text-micro font-medium border transition-colors cursor-pointer ${bf.exclude_st ? 'border-danger/40 bg-danger/10 text-danger' : 'border-border bg-base text-muted hover:border-danger/30'}`}>{bf.exclude_st ? '排除' : '包含'}</button>
           </div>
         </div>
       </div>
@@ -157,7 +158,7 @@ export function DefaultStrategyParamsDialog({ show, onClose }: Props) {
         )}
         {applyPhase === 'confirm' && (
           <div className="flex items-center gap-2">
-            <span className="flex-1 text-[11px] text-muted leading-tight">
+            <span className="flex-1 text-xs text-muted leading-tight">
               将覆盖全部 <span className="text-amber-500 font-medium">{strategyCount}</span> 个策略的基础参数（只动基础过滤，不碰各策略的参数/评分），重跑后生效。
             </span>
             <button onClick={() => setApplyPhase('idle')}

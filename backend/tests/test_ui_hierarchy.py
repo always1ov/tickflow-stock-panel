@@ -55,6 +55,18 @@ MIGRATED: list[str] = [
     "components/today/TrendCell.tsx",
     "components/Hint.tsx",
     "components/DateShortcuts.tsx",
+    "pages/Screener.tsx",
+    "components/data/SettingsModal.tsx",
+    "components/ui/segmented.ts",
+    "components/screener/CompositeStrategyDialog.tsx",
+    "components/screener/DefaultStrategyParamsDialog.tsx",
+    "components/screener/ScreenerFilter.tsx",
+    "components/screener/ScreenerTable.tsx",
+    "components/screener/StrategyBuilderDialog.tsx",
+    "components/screener/StrategyCard.tsx",
+    "components/screener/StrategyPoolDialog.tsx",
+    "components/screener/StrategySettingsDialog.tsx",
+    "components/screener/StrategyStoreDialog.tsx",
 ]
 
 

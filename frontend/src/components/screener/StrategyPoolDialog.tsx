@@ -3,6 +3,7 @@ import { motion, AnimatePresence, Reorder } from 'framer-motion'
 import { X, Plus, GripVertical, Upload, Loader2, Trash2, ListPlus } from 'lucide-react'
 import { api, type StrategyDetail } from '@/lib/api'
 import { useDialogBackdrop } from '@/lib/useDialogBackdrop'
+import { TYPE } from '@/components/ui'
 
 interface Props {
   pool: string[]
@@ -27,7 +28,7 @@ const SOURCE_LABEL: Record<string, string> = {
   invalid: '失效',
 }
 
-const TF_BADGE_CLS = 'text-[8px] px-1 py-px rounded border leading-tight shrink-0 border-sky-500/30 bg-sky-500/10 text-sky-400'
+const TF_BADGE_CLS = 'text-micro px-1 py-px rounded border leading-tight shrink-0 border-sky-500/30 bg-sky-500/10 text-sky-400'
 
 type SourceTab = 'all' | 'builtin' | 'custom' | 'ai'
 
@@ -201,9 +202,9 @@ export function StrategyPoolDialog({ pool, onConfirm, onClose }: Props) {
         >
           {/* 标题 */}
           <div className="flex items-center justify-between px-4 py-2.5 border-b border-border shrink-0">
-            <span className="text-sm font-medium text-foreground">
+            <span className={TYPE.section}>
               策略池 <span className="text-muted font-normal text-xs">{validDraft.length} / {allStrategies.length}</span>
-              {invalidPoolCount > 0 && <span className="ml-2 text-[10px] text-danger">{invalidPoolCount} 个失效</span>}
+              {invalidPoolCount > 0 && <span className="ml-2 text-micro text-danger">{invalidPoolCount} 个失效</span>}
             </span>
             <div className="flex items-center gap-2">
               <input
@@ -231,7 +232,7 @@ export function StrategyPoolDialog({ pool, onConfirm, onClose }: Props) {
           </div>
 
           {(importError || importMsg) && (
-            <div className={`mx-4 mt-2 px-3 py-2 rounded-btn border text-[11px] shrink-0 ${importError ? 'border-danger/20 bg-danger/10 text-danger' : 'border-emerald-400/20 bg-emerald-400/10 text-emerald-400'}`}>
+            <div className={`mx-4 mt-2 px-3 py-2 rounded-btn border text-xs shrink-0 ${importError ? 'border-danger/20 bg-danger/10 text-danger' : 'border-emerald-400/20 bg-emerald-400/10 text-emerald-400'}`}>
               {importError || importMsg}
             </div>
           )}
@@ -255,14 +256,14 @@ export function StrategyPoolDialog({ pool, onConfirm, onClose }: Props) {
                       <button
                         key={tab.id}
                         onClick={() => setActiveTab(tab.id)}
-                        className={`px-2.5 py-1 text-[11px] font-medium rounded-btn transition-colors cursor-pointer ${
+                        className={`px-2.5 py-1 text-xs font-medium rounded-btn transition-colors cursor-pointer ${
                           activeTab === tab.id
                             ? 'bg-accent/10 text-accent'
                             : 'text-muted hover:text-secondary hover:bg-elevated'
                         }`}
                       >
                         {tab.label}
-                        <span className="ml-1 text-[9px] opacity-60">{count}</span>
+                        <span className="ml-1 text-micro opacity-60">{count}</span>
                       </button>
                     )
                   })}
@@ -270,7 +271,7 @@ export function StrategyPoolDialog({ pool, onConfirm, onClose }: Props) {
                     onClick={handleAddGroup}
                     disabled={filteredAvailable.length === 0}
                     title="把当前分组剩余的策略全部加入策略池"
-                    className="ml-auto inline-flex items-center gap-1 px-2 py-1 rounded-btn text-[10px] text-accent border border-accent/25 bg-accent/8 hover:bg-accent/15 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer shrink-0"
+                    className="ml-auto inline-flex items-center gap-1 px-2 py-1 rounded-btn text-micro text-accent border border-accent/25 bg-accent/8 hover:bg-accent/15 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer shrink-0"
                   >
                     <ListPlus className="h-3 w-3" />
                     本组全加
@@ -280,8 +281,8 @@ export function StrategyPoolDialog({ pool, onConfirm, onClose }: Props) {
                   {activeTab === 'ai' && drafts.length > 0 && (
                     <div className="mb-3">
                       <div className="flex items-center justify-between px-1 mb-1">
-                        <span className="text-[10px] font-medium text-muted">草稿</span>
-                        <span className="text-[9px] text-muted">{drafts.length} 个待发布</span>
+                        <span className="text-micro font-medium text-muted">草稿</span>
+                        <span className="text-micro text-muted">{drafts.length} 个待发布</span>
                       </div>
                       <div className="space-y-0.5">
                         {drafts.map(s => (
@@ -290,15 +291,15 @@ export function StrategyPoolDialog({ pool, onConfirm, onClose }: Props) {
                             className="flex items-center gap-2 px-2.5 py-1.5 rounded-btn border border-purple-500/15 bg-purple-500/5"
                           >
                             <span className="flex-1 min-w-0">
-                              <span className="text-[12px] text-foreground block truncate">
-                                {s.name} <span className="text-[10px] text-muted font-mono">{s.id}</span>
+                              <span className="text-xs text-foreground block truncate">
+                                {s.name} <span className="text-micro text-muted font-mono">{s.id}</span>
                               </span>
-                              <span className="text-[10px] text-muted truncate block">{s.description}</span>
+                              <span className="text-micro text-muted truncate block">{s.description}</span>
                             </span>
                             <button
                               onClick={() => handlePublish(s.id)}
                               disabled={publishingId === s.id}
-                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-btn text-[10px] text-purple-400 border border-purple-500/25 bg-purple-500/10 hover:bg-purple-500/20 disabled:opacity-50 transition-colors cursor-pointer shrink-0"
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-btn text-micro text-purple-400 border border-purple-500/25 bg-purple-500/10 hover:bg-purple-500/20 disabled:opacity-50 transition-colors cursor-pointer shrink-0"
                             >
                               {publishingId === s.id && <Loader2 className="h-3 w-3 animate-spin" />}
                               发布
@@ -309,11 +310,11 @@ export function StrategyPoolDialog({ pool, onConfirm, onClose }: Props) {
                     </div>
                   )}
                   {activeTab === 'ai' && drafts.length > 0 && (
-                    <div className="px-1 mb-1 text-[10px] font-medium text-muted">待选</div>
+                    <div className="px-1 mb-1 text-micro font-medium text-muted">待选</div>
                   )}
                   <div className="space-y-0.5">
                     {filteredAvailable.length === 0 ? (
-                      <div className="flex items-center justify-center h-24 text-[11px] text-muted">
+                      <div className="flex items-center justify-center h-24 text-xs text-muted">
                         {available.length === 0 ? '全部已加入策略池' : '此分组无待选策略'}
                       </div>
                     ) : filteredAvailable.map(s => (
@@ -324,12 +325,12 @@ export function StrategyPoolDialog({ pool, onConfirm, onClose }: Props) {
                           hover:bg-accent/8 transition-colors cursor-pointer group text-left"
                       >
                         <span className="flex-1 min-w-0">
-                          <span className="text-[12px] text-foreground group-hover:text-accent transition-colors block truncate">
-                            {s.name} <span className="text-[10px] text-muted font-mono">{s.id}</span>
+                          <span className="text-xs text-foreground group-hover:text-accent transition-colors block truncate">
+                            {s.name} <span className="text-micro text-muted font-mono">{s.id}</span>
                           </span>
-                          <span className="text-[10px] text-muted truncate block">{s.description}</span>
+                          <span className="text-micro text-muted truncate block">{s.description}</span>
                         </span>
-                        <span className={`text-[8px] px-1 py-px rounded border leading-tight shrink-0 ${SOURCE_CLS[s.source] ?? SOURCE_CLS.builtin}`}>
+                        <span className={`text-micro px-1 py-px rounded border leading-tight shrink-0 ${SOURCE_CLS[s.source] ?? SOURCE_CLS.builtin}`}>
                           {SOURCE_LABEL[s.source] ?? '内置'}
                         </span>
                         {s.timeframes?.includes('1m') && (
@@ -346,12 +347,12 @@ export function StrategyPoolDialog({ pool, onConfirm, onClose }: Props) {
               <div className="flex flex-col min-h-0">
                 <div className="flex items-center gap-1.5 px-3 py-2 border-b border-border/60 shrink-0">
                   <GripVertical className="h-3 w-3 text-muted/50" />
-                  <span className="text-[10px] text-muted">已选 · 上下拖拽排序</span>
+                  <span className="text-micro text-muted">已选 · 上下拖拽排序</span>
                   <button
                     onClick={handleClearAll}
                     disabled={draftPool.length === 0}
                     title="清空已选策略池 (未点确定前可用「取消」恢复)"
-                    className="ml-auto inline-flex items-center gap-1 px-2 py-1 rounded-btn text-[10px] text-muted border border-border/60 hover:text-danger hover:border-danger/30 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer shrink-0"
+                    className="ml-auto inline-flex items-center gap-1 px-2 py-1 rounded-btn text-micro text-muted border border-border/60 hover:text-danger hover:border-danger/30 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer shrink-0"
                   >
                     <Trash2 className="h-3 w-3" />
                     清空
@@ -359,7 +360,7 @@ export function StrategyPoolDialog({ pool, onConfirm, onClose }: Props) {
                 </div>
                 <div className="flex-1 overflow-y-auto px-2 py-2">
                   {draftPool.length === 0 ? (
-                    <div className="flex items-center justify-center h-full text-[11px] text-muted">
+                    <div className="flex items-center justify-center h-full text-xs text-muted">
                       从左侧点击策略添加
                     </div>
                   ) : (
@@ -383,10 +384,10 @@ export function StrategyPoolDialog({ pool, onConfirm, onClose }: Props) {
                             whileDrag={{ scale: 1.02, zIndex: 50, boxShadow: '0 4px 12px rgba(0,0,0,0.2)' }}
                           >
                             <GripVertical className="h-3.5 w-3.5 text-accent/40 group-hover:text-accent/70 shrink-0" />
-                            <span className="flex-1 min-w-0 text-[12px] text-foreground truncate">
-                              {s?.name ?? id} <span className="text-[10px] text-muted font-mono">{id}</span>
+                            <span className="flex-1 min-w-0 text-xs text-foreground truncate">
+                              {s?.name ?? id} <span className="text-micro text-muted font-mono">{id}</span>
                             </span>
-                            <span className={`text-[8px] px-1 py-px rounded border leading-tight shrink-0 ${SOURCE_CLS[src] ?? SOURCE_CLS.builtin}`}>
+                            <span className={`text-micro px-1 py-px rounded border leading-tight shrink-0 ${SOURCE_CLS[src] ?? SOURCE_CLS.builtin}`}>
                               {SOURCE_LABEL[src] ?? '内置'}
                             </span>
                             {s?.timeframes?.includes('1m') && (
@@ -411,7 +412,7 @@ export function StrategyPoolDialog({ pool, onConfirm, onClose }: Props) {
 
           {/* 底部 */}
           <div className="flex items-center justify-between px-4 py-2 border-t border-border shrink-0">
-            <span className="text-[10px] text-muted">仅策略池中的策略会在扫描时运行</span>
+            <span className="text-micro text-muted">仅策略池中的策略会在扫描时运行</span>
             <div className="flex items-center gap-2">
               <button
                 onClick={onClose}

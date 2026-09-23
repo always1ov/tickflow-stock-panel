@@ -37,6 +37,8 @@ import {
   saveScreenerColumnConfig,
   type ColumnConfig,
 } from '@/lib/screener-columns'
+import { cn } from '@/lib/cn'
+import { SEG, SEG_ITEM, SEG_OFF, SEG_ON, TYPE, buttonClass } from '@/components/ui'
 
 // 获取策略为占位功能, 暂时隐藏入口; 恢复时改回 true
 const SHOW_STRATEGY_STORE = false
@@ -819,23 +821,20 @@ export function Screener() {
         right={
           <div className="flex flex-wrap items-center gap-2">
             {/* 资产类型切换: 股票 / ETF (分钟策略 asset_types 仅股票, ETF 列表自然不含) */}
-            <div className="flex items-center h-7 rounded-btn border border-border overflow-hidden">
+            {/* [R456] 分段切换 / 按钮一律全站那一套(docs/ui-hierarchy.md) */}
+            <div className={SEG}>
               {(['stock', 'etf'] as const).map(t => (
                 <button
                   key={t}
                   onClick={() => { setAssetType(t); setActiveStrategy(null); setResult(null); setShowAll(false) }}
-                  className={`h-full px-2.5 text-xs font-medium transition-colors
-                    cursor-pointer ${assetType === t
-                      ? 'bg-accent/10 text-accent'
-                      : 'text-muted hover:text-secondary hover:bg-elevated'
-                    }`}
+                  className={cn(SEG_ITEM, assetType === t ? SEG_ON : SEG_OFF)}
                 >
                   {t === 'stock' ? '股票' : 'ETF'}
                 </button>
               ))}
             </div>
             {/* 周期筛选: 全部 / 日线 / 分钟 — 只过滤卡片显示, 不影响池与执行路由 */}
-            <div className="flex items-center h-7 rounded-btn border border-border overflow-hidden">
+            <div className={SEG}>
               {(['all', '1d', '1m'] as const).map(tf => (
                 <button
                   key={tf}
@@ -844,11 +843,7 @@ export function Screener() {
                     setTfFilter(tf)
                     setActiveStrategy(null); setResult(null); setShowAll(false)
                   }}
-                  className={`h-full px-2.5 text-xs font-medium transition-colors cursor-pointer
-                    ${tfFilter === tf
-                      ? 'bg-accent/10 text-accent'
-                      : 'text-muted hover:text-secondary hover:bg-elevated'
-                    }`}
+                  className={cn(SEG_ITEM, tfFilter === tf ? SEG_ON : SEG_OFF)}
                 >
                   {tf === 'all' ? '全部' : tf === '1d' ? '日线' : '分钟'}
                 </button>
@@ -859,10 +854,7 @@ export function Screener() {
               onClick={() => reloadStrategies.mutate()}
               disabled={reloadStrategies.isPending}
               title="重新加载策略并运行全部策略，刷新当前符合条件的个股"
-              className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-btn
-                border border-border bg-surface text-xs font-medium text-muted
-                hover:text-accent hover:border-accent/50 transition-colors cursor-pointer
-                disabled:opacity-50 disabled:cursor-wait"
+              className={buttonClass({}, 'disabled:cursor-wait')}
             >
               <RefreshCw className={`h-3.5 w-3.5 ${reloadStrategies.isPending ? 'animate-spin' : ''}`} />
               重载
@@ -879,25 +871,17 @@ export function Screener() {
             <button
               onClick={() => setShowAll(v => { if (!v) setActiveStrategy(null); return !v })}
               title="显示全部策略个股"
-              className={`inline-flex items-center justify-center h-7 w-7 rounded-btn border transition-colors cursor-pointer
-                ${showAll
-                  ? 'border-accent/50 bg-accent/10 text-accent'
-                  : 'border-border bg-surface text-muted hover:text-secondary hover:border-accent/40'
-                }`}
+              className={buttonClass({ icon: true, selected: showAll })}
             >
               <Network className="h-3.5 w-3.5" />
             </button>
             {/* 卡片尺寸切换 */}
-            <div className="flex items-center h-7 rounded-btn border border-border overflow-hidden">
+            <div className={SEG}>
               {(['hidden', 'mini', 'normal', 'large'] as const).map(sz => (
                 <button
                   key={sz}
                   onClick={() => { setCardSize(sz); storage.screenerCardSize.set(sz) }}
-                  className={`h-full px-2 text-[10px] font-medium transition-colors cursor-pointer
-                    ${cardSize === sz
-                      ? 'bg-accent/10 text-accent'
-                      : 'text-muted hover:text-secondary hover:bg-elevated'
-                    }`}
+                  className={cn(SEG_ITEM, cardSize === sz ? SEG_ON : SEG_OFF)}
                 >
                   {sz === 'hidden' ? '隐藏' : sz === 'mini' ? '紧凑' : sz === 'normal' ? '标准' : '详细'}
                 </button>
@@ -906,22 +890,18 @@ export function Screener() {
             {/* 策略池按钮 */}
             <button
               onClick={() => setShowPoolDialog(true)}
-              className="inline-flex items-center gap-1.5 h-7 px-3 rounded-btn
-                border border-border bg-surface text-xs font-medium text-secondary
-                hover:text-accent hover:border-accent/50 transition-colors cursor-pointer"
+              className={buttonClass()}
             >
               <Layers className="h-3.5 w-3.5" />
               策略池
-              <span className="ml-0.5 min-w-[28px] h-4 flex items-center justify-center rounded-full bg-accent/15 text-accent text-[10px] font-bold">
+              <span className="ml-0.5 flex h-4 min-w-[28px] items-center justify-center rounded-full bg-accent/15 font-mono text-micro font-semibold text-accent">
                 {visiblePool.length}/{strategyPresets.length}
               </span>
             </button>
             {/* 创建叠加策略 */}
             <button
               onClick={() => setShowComposite(true)}
-              className="inline-flex items-center gap-1.5 h-7 px-3 rounded-btn
-                text-xs font-medium text-teal-400 border border-teal-500/20 bg-teal-500/5
-                hover:bg-teal-500/15 transition-colors cursor-pointer"
+              className={buttonClass()}
             >
               <Layers className="h-3.5 w-3.5" />
               叠加策略
@@ -929,9 +909,7 @@ export function Screener() {
             {/* 创建策略 */}
             <button
               onClick={() => { setBuilderMode('create'); setShowBuilder(true) }}
-              className="inline-flex items-center gap-1.5 h-7 px-3 rounded-btn
-                text-xs font-medium text-amber-400 border border-amber-400/20 bg-amber-400/5
-                hover:bg-amber-400/15 transition-colors cursor-pointer"
+              className={buttonClass()}
             >
               <Sparkles className="h-3.5 w-3.5" />
               创建策略 · AI
@@ -982,13 +960,13 @@ export function Screener() {
                     reorderPool(ids)
                     toast(`已按最近跑批记录恢复 ${ids.length} 个策略到池`, 'success')
                   }}
-                  className="rounded-btn bg-accent/15 px-2 py-1 text-[11px] font-medium text-accent hover:bg-accent/25 transition-colors"
+                  className="rounded-btn bg-accent/15 px-2 py-1 text-xs font-medium text-accent hover:bg-accent/25 transition-colors"
                 >
                   一键找回
                 </button>
                 <button
                   onClick={() => setRecoverDismissed(true)}
-                  className="rounded-btn px-2 py-1 text-[11px] text-muted hover:text-foreground transition-colors"
+                  className="rounded-btn px-2 py-1 text-xs text-muted hover:text-foreground transition-colors"
                 >
                   忽略
                 </button>
@@ -1005,13 +983,13 @@ export function Screener() {
               <div className="ml-auto flex items-center gap-1.5">
                 <button
                   onClick={() => { const n = restorePruned(); setPruneBackup(null); toast(`已恢复 ${n} 个策略到池(仍不存在的暂不显示, 待其恢复后自动出现)`, 'success') }}
-                  className="rounded-btn bg-warning/15 px-2 py-1 text-[11px] font-medium text-warning hover:bg-warning/25 transition-colors"
+                  className="rounded-btn bg-warning/15 px-2 py-1 text-xs font-medium text-warning hover:bg-warning/25 transition-colors"
                 >
                   恢复到策略池
                 </button>
                 <button
                   onClick={() => { dismissPruneBackup(); setPruneBackup(null) }}
-                  className="rounded-btn px-2 py-1 text-[11px] text-muted hover:text-foreground transition-colors"
+                  className="rounded-btn px-2 py-1 text-xs text-muted hover:text-foreground transition-colors"
                 >
                   不再提示
                 </button>
@@ -1076,7 +1054,7 @@ export function Screener() {
               className="space-y-3"
             >
               <div className="flex items-center justify-between">
-                <h2 className="text-sm font-medium text-foreground flex items-center gap-2">
+                <h2 className={cn('flex items-center gap-2', TYPE.card)}>
                   {!showAll && activeStrategy && (
                     <span className="text-secondary">{strategyIdToName[activeStrategy] ?? ''}</span>
                   )}
@@ -1085,14 +1063,14 @@ export function Screener() {
                   {filterActive(filter) && displayRows.length !== (showAll ? allRows.length : result!.total) && (
                     <span className="text-muted text-xs">/ {showAll ? allRows.length : result!.total}</span>
                   )}
-                  <span className="text-[11px] text-muted font-normal">
+                  <span className="text-xs text-muted font-normal">
                     · {displayPool.length} 策略
                     {!showAll && displayPool.length > 0 && (
                       <> · 共 {displayPool.reduce((sum, id) => sum + (hitCounts[id] ?? 0), 0)} 只</>
                     )}
                   </span>
                   {(runAll.isPending || run.isPending || singleCachedQuery.isFetching || fullCachedQuery.isFetching) && (
-                    <span className="text-[11px] text-muted animate-pulse">更新中…</span>
+                    <span className="text-xs text-muted animate-pulse">更新中…</span>
                   )}
                 </h2>
                 <div className="flex items-center gap-3">
@@ -1111,7 +1089,7 @@ export function Screener() {
                         <Filter className="h-3 w-3" />
                         筛选
                         {filterActive(filter) && (
-                          <span className="bg-accent text-base rounded-btn min-w-4 h-4 px-1 flex items-center justify-center text-[10px] font-bold leading-none">
+                          <span className="bg-accent text-base rounded-btn min-w-4 h-4 px-1 flex items-center justify-center text-micro font-bold leading-none">
                             {countActiveFilters(filter)}
                           </span>
                         )}
@@ -1250,7 +1228,7 @@ export function Screener() {
               <RefreshCw className="h-7 w-7 text-accent/60 animate-spin" />
               <div className="flex flex-col items-center gap-1.5">
                 <span className="text-sm text-secondary">正在准备完整策略结果</span>
-                <span className="text-[11px] text-muted">策略与日期 → 缓存摘要 → 当前明细 → 图表辅助数据</span>
+                <span className="text-xs text-muted">策略与日期 → 缓存摘要 → 当前明细 → 图表辅助数据</span>
               </div>
             </div>
           )}
@@ -1262,7 +1240,7 @@ export function Screener() {
               </div>
               <div className="flex flex-col items-center gap-1.5">
                 <span className="text-sm text-secondary">点击策略卡片查看选股结果</span>
-                <span className="text-[11px] text-muted">若提示 enriched 表无数据，请先运行盘后管道</span>
+                <span className="text-xs text-muted">若提示 enriched 表无数据，请先运行盘后管道</span>
               </div>
             </div>
           )}

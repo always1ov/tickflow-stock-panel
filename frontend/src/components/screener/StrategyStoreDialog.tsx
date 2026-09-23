@@ -1,6 +1,8 @@
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Store, Hammer, Download, Zap } from 'lucide-react'
 import { useDialogBackdrop } from '@/lib/useDialogBackdrop'
+import { TYPE } from '@/components/ui'
+import { cn } from '@/lib/cn'
 
 interface Props {
   open: boolean
@@ -32,7 +34,7 @@ export function StrategyStoreDialog({ open, onClose }: Props) {
           >
             {/* 标题 */}
             <div className="flex items-center justify-between px-4 py-2.5 border-b border-border shrink-0">
-              <span className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+              <span className={cn('flex items-center gap-1.5', TYPE.section)}>
                 <Store className="h-4 w-4 text-accent" />
                 获取策略
               </span>
@@ -50,14 +52,14 @@ export function StrategyStoreDialog({ open, onClose }: Props) {
                 </div>
               </div>
 
-              <h3 className="text-base font-semibold text-foreground mb-1.5">
+              <h3 className={cn('mb-1.5', TYPE.card)}>
                 不定时更新更多策略
               </h3>
               <p className="text-sm text-muted leading-relaxed max-w-[380px]">
                 敬请期待。
               </p>
 
-              <div className="mt-6 flex items-center gap-4 text-[11px] text-muted">
+              <div className="mt-6 flex items-center gap-4 text-xs text-muted">
                 <span className="flex items-center gap-1">
                   <Download className="h-3.5 w-3.5" />
                   一键下载

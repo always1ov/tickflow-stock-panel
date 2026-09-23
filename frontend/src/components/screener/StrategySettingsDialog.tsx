@@ -12,6 +12,7 @@ import { SignalPicker } from './SignalPicker'
 import { SignalTriggerActions } from '@/components/signals/SignalTriggerActions'
 import { Modal } from '@/components/Modal'
 import { ScoringEditor } from '@/components/ScoringEditor'
+import { TYPE } from '@/components/ui'
 
 // 内置列名 → 中文标签
 const FIELD_LABEL: Record<string, string> = {}
@@ -56,7 +57,7 @@ function Section({ icon: Icon, title, accent, defaultOpen = true, children, extr
         >
           <ChevronDown className={`h-3 w-3 text-muted/40 transition-transform duration-expand ${open ? '' : '-rotate-90'}`} />
           {Icon && <Icon className={`h-3.5 w-3.5 ${accent ?? 'text-muted'}`} />}
-          <span className="text-[11px] font-medium text-foreground/70">{title}</span>
+          <span className="text-xs font-medium text-foreground/70">{title}</span>
         </button>
         {extra && <div className="ml-auto flex items-center gap-1">{extra}</div>}
       </div>
@@ -92,25 +93,25 @@ export function RangeField({ label, minVal, maxVal, onMinChange, onMaxChange, un
 }) {
   return (
     <div className="flex items-center gap-1.5">
-      <span className="text-[11px] text-secondary w-16 shrink-0 text-right">{label}</span>
+      <span className="text-xs text-secondary w-16 shrink-0 text-right">{label}</span>
       <input
         type="number"
         value={minVal ?? ''}
         onChange={e => onMinChange(e.target.value === '' ? null : Number(e.target.value))}
         placeholder="最小"
         step={step}
-        className="w-20 px-1.5 py-0.5 rounded bg-base border border-border text-[11px] font-mono text-foreground text-center focus:outline-none focus:border-accent/50"
+        className="w-20 px-1.5 py-0.5 rounded bg-base border border-border text-xs font-mono text-foreground text-center focus:outline-none focus:border-accent/50"
       />
-      <span className="text-[10px] text-muted">~</span>
+      <span className="text-micro text-muted">~</span>
       <input
         type="number"
         value={maxVal ?? ''}
         onChange={e => onMaxChange(e.target.value === '' ? null : Number(e.target.value))}
         placeholder="最大"
         step={step}
-        className="w-20 px-1.5 py-0.5 rounded bg-base border border-border text-[11px] font-mono text-foreground text-center focus:outline-none focus:border-accent/50"
+        className="w-20 px-1.5 py-0.5 rounded bg-base border border-border text-xs font-mono text-foreground text-center focus:outline-none focus:border-accent/50"
       />
-      {unit && <span className="text-[10px] text-muted shrink-0">{unit}</span>}
+      {unit && <span className="text-micro text-muted shrink-0">{unit}</span>}
     </div>
   )
 }
@@ -128,7 +129,7 @@ function ParamField({ def, value, onChange }: {
     const checked = value === true || value === 'true' || value === 'True'
     return (
       <div className="flex items-center gap-2">
-        <span className="text-[11px] text-secondary w-16 shrink-0 text-right">{def.label}</span>
+        <span className="text-xs text-secondary w-16 shrink-0 text-right">{def.label}</span>
         <button
           type="button"
           onClick={() => onChange(!checked)}
@@ -147,11 +148,11 @@ function ParamField({ def, value, onChange }: {
   if (def.type === 'select' && def.options) {
     return (
       <div className="flex items-center gap-2">
-        <span className="text-[11px] text-secondary w-16 shrink-0 text-right">{def.label}</span>
+        <span className="text-xs text-secondary w-16 shrink-0 text-right">{def.label}</span>
         <select
           value={value ?? def.default}
           onChange={e => onChange(e.target.value)}
-          className="w-24 px-1.5 py-0.5 rounded bg-base border border-border text-[11px] font-mono text-foreground focus:outline-none focus:border-accent/50"
+          className="w-24 px-1.5 py-0.5 rounded bg-base border border-border text-xs font-mono text-foreground focus:outline-none focus:border-accent/50"
         >
           {def.options.map(o => {
             const val = paramOptionValue(o)
@@ -164,7 +165,7 @@ function ParamField({ def, value, onChange }: {
 
   return (
     <div className="flex items-center gap-2">
-      <span className="text-[11px] text-secondary w-16 shrink-0 text-right">{def.label}</span>
+      <span className="text-xs text-secondary w-16 shrink-0 text-right">{def.label}</span>
       <input
         type="number"
         value={value ?? def.default}
@@ -172,10 +173,10 @@ function ParamField({ def, value, onChange }: {
         step={def.step ?? 0.1}
         min={def.min}
         max={def.max}
-        className="w-20 px-1.5 py-0.5 rounded bg-base border border-border text-[11px] font-mono text-foreground text-center focus:outline-none focus:border-accent/50"
+        className="w-20 px-1.5 py-0.5 rounded bg-base border border-border text-xs font-mono text-foreground text-center focus:outline-none focus:border-accent/50"
       />
       {def.min != null && def.max != null && (
-        <span className="text-[10px] text-muted">{def.min}~{def.max}</span>
+        <span className="text-micro text-muted">{def.min}~{def.max}</span>
       )}
     </div>
   )
@@ -379,9 +380,9 @@ export function StrategySettingsDialog({ strategyId, onClose, onSaved, onAiModif
           <div className="flex items-center justify-between px-5 py-3 border-b border-border/50">
             <div className="flex items-center gap-2.5">
               <Settings2 className="h-4 w-4 text-accent" />
-              <span id="strategy-settings-title" className="text-sm font-semibold text-foreground">{detail?.name ?? strategyId}</span>
-              {detail && <span className="text-[10px] px-1.5 py-0.5 rounded bg-elevated text-muted">{{ builtin: '内置', custom: '自定义', ai: 'AI', composite: '叠加' }[detail.source] ?? detail.source}</span>}
-              <span className="text-[10px] text-muted/40 font-mono">{strategyId}</span>
+              <span id="strategy-settings-title" className={TYPE.section}>{detail?.name ?? strategyId}</span>
+              {detail && <span className="text-micro px-1.5 py-0.5 rounded bg-elevated text-muted">{{ builtin: '内置', custom: '自定义', ai: 'AI', composite: '叠加' }[detail.source] ?? detail.source}</span>}
+              <span className="text-micro text-muted/40 font-mono">{strategyId}</span>
             </div>
             <div className="flex items-center gap-2">
               {detail && (detail.source === 'ai' || detail.source === 'custom') && (
@@ -409,21 +410,21 @@ export function StrategySettingsDialog({ strategyId, onClose, onSaved, onAiModif
                 <div className="flex items-end gap-4">
                   <div className="flex-1 space-y-2">
                     <div className="flex items-center gap-2">
-                      <span className="text-[10px] text-muted/50 uppercase tracking-wider w-8 shrink-0">名称</span>
+                      <span className="text-micro text-muted/50 uppercase tracking-wider w-8 shrink-0">名称</span>
                       <input type="text" value={strategyName} onChange={e => setStrategyName(e.target.value)}
                         className="flex-1 h-8 px-3 rounded-lg bg-base border-0 ring-1 ring-border/30 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-accent/30 transition-shadow" />
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-[10px] text-muted/50 uppercase tracking-wider w-8 shrink-0">描述</span>
+                      <span className="text-micro text-muted/50 uppercase tracking-wider w-8 shrink-0">描述</span>
                       <input type="text" value={strategyDesc} onChange={e => setStrategyDesc(e.target.value)}
                         className="flex-1 h-8 px-3 rounded-lg bg-base border-0 ring-1 ring-border/30 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent/30 transition-shadow" />
                     </div>
                   </div>
                   <div className="flex items-center gap-1.5 pb-0.5 shrink-0">
-                    <span className="text-[10px] text-muted/50">显示上限</span>
+                    <span className="text-micro text-muted/50">显示上限</span>
                     <input type="number" value={displayLimit ?? ''} onChange={e => setDisplayLimit(e.target.value ? Number(e.target.value) : null)} step={1} min={10} max={200} placeholder="不限"
                       className="w-14 h-8 px-1.5 rounded-lg bg-base border border-border/40 text-xs font-mono text-foreground text-center focus:outline-none focus:border-accent/50" />
-                    <span className="text-[10px] text-muted/50">只</span>
+                    <span className="text-micro text-muted/50">只</span>
                   </div>
                 </div>
 
@@ -441,8 +442,8 @@ export function StrategySettingsDialog({ strategyId, onClose, onSaved, onAiModif
                   <div className="rounded-xl border border-teal-500/20 bg-teal-500/5 p-4 space-y-3">
                     <div className="flex items-center gap-2">
                       <Layers className="h-4 w-4 text-teal-400" />
-                      <span className="text-sm font-medium text-foreground">子策略与权重</span>
-                      <span className="text-[10px] text-muted flex items-center gap-1.5">
+                      <span className={TYPE.card}>子策略与权重</span>
+                      <span className="text-micro text-muted flex items-center gap-1.5">
                         共 {compositeChildren.length} 个 · 权重
                         <span className={`font-mono ${compositeChildren.length > 0 && compositeTotal !== 100 ? 'text-amber-400' : 'text-emerald-400'}`}>
                           {compositeTotal}%
@@ -451,7 +452,7 @@ export function StrategySettingsDialog({ strategyId, onClose, onSaved, onAiModif
                           <span className="text-amber-400/60">(保存时自动按比例归一)</span>
                         )}
                       </span>
-                      <button onClick={() => setShowAddChild(v => !v)} className="ml-auto inline-flex items-center gap-1 h-6 px-2 rounded-lg border border-teal-500/30 bg-teal-500/10 text-[11px] text-teal-400 hover:bg-teal-500/20">
+                      <button onClick={() => setShowAddChild(v => !v)} className="ml-auto inline-flex items-center gap-1 h-6 px-2 rounded-lg border border-teal-500/30 bg-teal-500/10 text-xs text-teal-400 hover:bg-teal-500/20">
                         <Plus className="h-3 w-3" />添加
                       </button>
                     </div>
@@ -459,13 +460,13 @@ export function StrategySettingsDialog({ strategyId, onClose, onSaved, onAiModif
                     {showAddChild && (
                       <div className="rounded-lg border border-border bg-base/60 p-2 space-y-1 max-h-48 overflow-y-auto">
                         {candidates.length === 0 ? (
-                          <div className="text-[11px] text-muted py-2 text-center">无可添加的策略</div>
+                          <div className="text-xs text-muted py-2 text-center">无可添加的策略</div>
                         ) : candidates.map(s => (
                           <button key={s.id} onClick={() => addCompositeChild(s)} className="flex w-full items-center gap-1.5 rounded px-2 py-1 text-left hover:bg-teal-500/10">
                             <Plus className="h-3 w-3 shrink-0 text-teal-400" />
                             <span className="flex-1 truncate text-xs text-foreground">{s.name}</span>
                             {s.source && (
-                              <span className={`rounded border px-1 text-[8px] ${SRC_CLS[s.source] ?? ''}`}>{SRC_LABEL[s.source] ?? s.source}</span>
+                              <span className={`rounded border px-1 text-micro ${SRC_CLS[s.source] ?? ''}`}>{SRC_LABEL[s.source] ?? s.source}</span>
                             )}
                           </button>
                         ))}
@@ -477,7 +478,7 @@ export function StrategySettingsDialog({ strategyId, onClose, onSaved, onAiModif
                       <div className="space-y-1.5">
                         {compositeChildren.map((c, i) => (
                           <div key={c.id} className="flex items-center gap-2 rounded-lg bg-base/60 px-3 py-2">
-                            <span className="text-[10px] text-muted/50 font-mono w-5">{i + 1}</span>
+                            <span className="text-micro text-muted/50 font-mono w-5">{i + 1}</span>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-1.5">
                                 <button
@@ -489,10 +490,10 @@ export function StrategySettingsDialog({ strategyId, onClose, onSaved, onAiModif
                                   {c.name || c.id}
                                 </button>
                                 {c.source && (
-                                  <span className={`rounded border px-1 text-[8px] shrink-0 ${SRC_CLS[c.source] ?? ''}`}>{SRC_LABEL[c.source] ?? c.source}</span>
+                                  <span className={`rounded border px-1 text-micro shrink-0 ${SRC_CLS[c.source] ?? ''}`}>{SRC_LABEL[c.source] ?? c.source}</span>
                                 )}
                               </div>
-                              <div className="text-[10px] text-muted/50 font-mono">{c.id}</div>
+                              <div className="text-micro text-muted/50 font-mono">{c.id}</div>
                             </div>
                             <div className="flex items-center gap-1.5 shrink-0">
                               <input
@@ -505,7 +506,7 @@ export function StrategySettingsDialog({ strategyId, onClose, onSaved, onAiModif
                                 className="h-1 w-24 cursor-pointer accent-teal-400"
                                 aria-label={`${c.name || c.id}权重`}
                               />
-                              <span className="w-9 text-right font-mono text-[10px] text-muted">{Math.round(c.weight)}%</span>
+                              <span className="w-9 text-right font-mono text-micro text-muted">{Math.round(c.weight)}%</span>
                               <button onClick={() => removeCompositeChild(c.id)} className="text-danger/50 hover:text-danger p-1">
                                 <Trash2 className="h-3 w-3" />
                               </button>
@@ -514,7 +515,7 @@ export function StrategySettingsDialog({ strategyId, onClose, onSaved, onAiModif
                         ))}
                       </div>
                     )}
-                    <div className="text-[10px] text-muted/60 pt-1 border-t border-border/30">
+                    <div className="text-micro text-muted/60 pt-1 border-t border-border/30">
                       提示: 权重按相对比例生效, 保存时自动归一; 修改后点底部"保存设置"生效。
                     </div>
                   </div>
@@ -525,7 +526,7 @@ export function StrategySettingsDialog({ strategyId, onClose, onSaved, onAiModif
                   {/* 列1：选股条件 */}
                     <Section icon={Filter} title="基础参数" accent="text-sky-400">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-[10px] text-muted">启用基础参数过滤</span>
+                        <span className="text-micro text-muted">启用基础参数过滤</span>
                         <button onClick={() => setBasicFilterEnabled(v => !v)}
                           className={`relative w-8 h-[18px] rounded-full transition-colors ${basicFilterEnabled ? 'bg-sky-500' : 'bg-border'}`}>
                           <span className={`absolute top-0.5 w-3.5 h-3.5 rounded-full bg-white transition-transform ${basicFilterEnabled ? 'left-[16px]' : 'left-0.5'}`} />
@@ -538,28 +539,28 @@ export function StrategySettingsDialog({ strategyId, onClose, onSaved, onAiModif
                       <RangeField label="换手率" minVal={basicFilter.turnover_min} maxVal={basicFilter.turnover_max} onMinChange={v => setBF('turnover_min', v)} onMaxChange={v => setBF('turnover_max', v)} unit="%" step="0.5" />
                       <div className="space-y-1.5">
                         <div className="flex items-start gap-1.5">
-                          <span className="text-[11px] text-secondary w-16 shrink-0 text-right pt-0.5">板块</span>
+                          <span className="text-xs text-secondary w-16 shrink-0 text-right pt-0.5">板块</span>
                           <div className="flex flex-wrap gap-0.5">
                             {ALL_BOARDS.map(b => {
                               const boards: string[] = basicFilter.boards ?? ALL_BOARDS
                               const active = boards.includes(b)
                               return (
                                 <button key={b} onClick={() => { const cur: string[] = basicFilter.boards ?? ALL_BOARDS; const next = active ? cur.filter(x => x !== b) : [...cur, b]; setBF('boards', next.length === 0 ? ALL_BOARDS : next) }}
-                                  className={`px-1.5 py-0.5 rounded text-[10px] font-medium border transition-colors cursor-pointer ${active ? `${color.select.border} ${color.select.bgLight} ${color.select.text}` : `border-border bg-base text-muted ${color.select.borderHover}`}`}>{b}</button>
+                                  className={`px-1.5 py-0.5 rounded text-micro font-medium border transition-colors cursor-pointer ${active ? `${color.select.border} ${color.select.bgLight} ${color.select.text}` : `border-border bg-base text-muted ${color.select.borderHover}`}`}>{b}</button>
                               )
                             })}
                           </div>
                         </div>
                         <div className="flex items-center gap-1.5">
-                          <span className="text-[11px] text-secondary w-16 shrink-0 text-right">ST</span>
+                          <span className="text-xs text-secondary w-16 shrink-0 text-right">ST</span>
                           <button onClick={() => setBF('exclude_st', !basicFilter.exclude_st)}
-                            className={`px-1.5 py-0.5 rounded text-[10px] font-medium border transition-colors cursor-pointer ${basicFilter.exclude_st ? 'border-danger/40 bg-danger/10 text-danger' : 'border-border bg-base text-muted hover:border-danger/30'}`}>{basicFilter.exclude_st ? '排除' : '包含'}</button>
+                            className={`px-1.5 py-0.5 rounded text-micro font-medium border transition-colors cursor-pointer ${basicFilter.exclude_st ? 'border-danger/40 bg-danger/10 text-danger' : 'border-border bg-base text-muted hover:border-danger/30'}`}>{basicFilter.exclude_st ? '排除' : '包含'}</button>
                         </div>
                         <div className="flex items-center gap-1.5">
-                          <span className="text-[11px] text-secondary w-16 shrink-0 text-right">自选</span>
+                          <span className="text-xs text-secondary w-16 shrink-0 text-right">自选</span>
                           <button onClick={() => setBF('watchlist_only', !basicFilter.watchlist_only)}
                             title="开启后本策略只作用于你的自选股：选股 (命中数/结果) 与实时监控都限定在自选范围内 (回测仍按全市场，因自选是当下概念)"
-                            className={`px-1.5 py-0.5 rounded text-[10px] font-medium border transition-colors cursor-pointer ${basicFilter.watchlist_only ? `${color.select.border} ${color.select.bgLight} ${color.select.text}` : 'border-border bg-base text-muted hover:border-accent/30'}`}>{basicFilter.watchlist_only ? '只看自选' : '不限'}</button>
+                            className={`px-1.5 py-0.5 rounded text-micro font-medium border transition-colors cursor-pointer ${basicFilter.watchlist_only ? `${color.select.border} ${color.select.bgLight} ${color.select.text}` : 'border-border bg-base text-muted hover:border-accent/30'}`}>{basicFilter.watchlist_only ? '只看自选' : '不限'}</button>
                         </div>
                       </div>
                     </div>
@@ -574,7 +575,7 @@ export function StrategySettingsDialog({ strategyId, onClose, onSaved, onAiModif
                         </div>
                       </Section>
                     ) : (
-                      <div className="rounded-xl border border-border/15 bg-surface/20 px-3.5 py-4 text-[11px] text-muted/50 text-center">无策略参数</div>
+                      <div className="rounded-xl border border-border/15 bg-surface/20 px-3.5 py-4 text-xs text-muted/50 text-center">无策略参数</div>
                     )}
                   </div>
 
@@ -596,18 +597,18 @@ export function StrategySettingsDialog({ strategyId, onClose, onSaved, onAiModif
                     <Section icon={TrendingUp} title="交易参数" accent="text-emerald-400">
                       <div className="space-y-2">
                         <div className="flex items-center gap-1.5">
-                          <span className="text-[11px] text-secondary w-12 shrink-0">止损</span>
+                          <span className="text-xs text-secondary w-12 shrink-0">止损</span>
                           <input type="number" value={stopLoss ?? ''} onChange={e => setStopLoss(e.target.value === '' ? null : Number(e.target.value))} step={0.01} min={-0.5} max={0}
-                            className="w-16 h-6 px-1.5 rounded bg-base border border-border text-[11px] font-mono text-foreground text-center focus:outline-none focus:border-accent/50" />
-                          <span className="text-[10px] text-muted">{stopLoss != null ? `${(stopLoss * 100).toFixed(1)}%` : '—'}</span>
+                            className="w-16 h-6 px-1.5 rounded bg-base border border-border text-xs font-mono text-foreground text-center focus:outline-none focus:border-accent/50" />
+                          <span className="text-micro text-muted">{stopLoss != null ? `${(stopLoss * 100).toFixed(1)}%` : '—'}</span>
                         </div>
                         <div className="flex items-center gap-1.5">
-                          <span className="text-[11px] text-secondary w-12 shrink-0">持有</span>
+                          <span className="text-xs text-secondary w-12 shrink-0">持有</span>
                           <input type="number" value={maxHoldDays ?? ''} onChange={e => setMaxHoldDays(e.target.value === '' ? null : Number(e.target.value))} step={1} min={1}
-                            className="w-16 h-6 px-1.5 rounded bg-base border border-border text-[11px] font-mono text-foreground text-center focus:outline-none focus:border-accent/50" />
-                          <span className="text-[10px] text-muted">天</span>
+                            className="w-16 h-6 px-1.5 rounded bg-base border border-border text-xs font-mono text-foreground text-center focus:outline-none focus:border-accent/50" />
+                          <span className="text-micro text-muted">天</span>
                         </div>
-                        <div className="text-[11px] text-muted pt-1 border-t border-border/10">
+                        <div className="text-xs text-muted pt-1 border-t border-border/10">
                           <span className="text-secondary">入场 </span><span className="text-foreground/70">{entrySignals.length > 0 ? `${entrySignals.length} 个触发器` : '无'}</span>
                           <span className="text-secondary ml-3">出场 </span><span className="text-foreground/70">{exitSignals.length > 0 ? `${exitSignals.length} 个触发器` : '无'}</span>
                         </div>
@@ -622,7 +623,7 @@ export function StrategySettingsDialog({ strategyId, onClose, onSaved, onAiModif
                       extra={<SignalTriggerActions kind="entry" signals={entrySignals} onChange={setEntrySignals} buttonClassName="rounded-md border border-border bg-base p-1 text-muted transition-colors cursor-pointer" iconClassName="h-3 w-3" />}
                     >
                       <SignalPicker signals={entrySignals} onChange={setEntrySignals} kind="entry" options={{ variant: 'dialog' }} />
-                      <div className="text-[10px] leading-4 text-muted/70">任一入场点满足即进入候选。</div>
+                      <div className="text-micro leading-4 text-muted/70">任一入场点满足即进入候选。</div>
                     </Section>
 
                     <Section
@@ -633,10 +634,10 @@ export function StrategySettingsDialog({ strategyId, onClose, onSaved, onAiModif
                       extra={<SignalTriggerActions kind="exit" signals={exitSignals} onChange={setExitSignals} buttonClassName="rounded-md border border-border bg-base p-1 text-muted transition-colors cursor-pointer" iconClassName="h-3 w-3" />}
                     >
                       <SignalPicker signals={exitSignals} onChange={setExitSignals} kind="exit" options={{ variant: 'dialog' }} />
-                      <div className="text-[10px] leading-4 text-muted/70">任一出场点满足即触发出场。</div>
+                      <div className="text-micro leading-4 text-muted/70">任一出场点满足即触发出场。</div>
                     </Section>
 
-                    <div className="rounded-xl border border-amber-400/20 bg-amber-400/[0.04] px-3 py-2 text-[10px] leading-4 text-muted">
+                    <div className="rounded-xl border border-amber-400/20 bg-amber-400/[0.04] px-3 py-2 text-micro leading-4 text-muted">
                       出入场触发器保存后对<b className="text-secondary">回测和监控</b>生效;选股扫描仍按策略本身的筛选规则,不受此影响。
                     </div>
 
@@ -658,7 +659,7 @@ export function StrategySettingsDialog({ strategyId, onClose, onSaved, onAiModif
               </button>
               {(detail?.source === 'ai' || detail?.source === 'custom' || detail?.source === 'composite') && (
                 <button onClick={() => { setDeleteError(''); setShowDeleteConfirm(true) }}
-                  className="text-[10px] text-danger hover:text-danger/80 transition-colors">删除策略</button>
+                  className="text-micro text-danger hover:text-danger/80 transition-colors">删除策略</button>
               )}
             </div>
             <div className="flex items-center gap-2">
@@ -695,14 +696,14 @@ export function StrategySettingsDialog({ strategyId, onClose, onSaved, onAiModif
                 <span className="text-danger text-lg">!</span>
               </div>
               <div>
-                <div className="text-sm font-semibold text-foreground">删除策略</div>
+                <div className={TYPE.section}>删除策略</div>
                 <div className="text-xs text-muted mt-1">确定要删除「{detail?.name ?? strategyId}」吗？</div>
               </div>
-              <div className="text-[11px] text-danger/70 bg-danger/[0.04] rounded-lg px-3 py-2 border border-danger/10">
+              <div className="text-xs text-danger/70 bg-danger/[0.04] rounded-lg px-3 py-2 border border-danger/10">
                 删除后无法恢复，策略文件、配置和关联数据将被永久清除。
               </div>
               {deleteError && (
-                <div className="text-[11px] text-danger bg-danger/10 rounded-lg px-3 py-2 border border-danger/20">
+                <div className="text-xs text-danger bg-danger/10 rounded-lg px-3 py-2 border border-danger/20">
                   {deleteError}
                 </div>
               )}

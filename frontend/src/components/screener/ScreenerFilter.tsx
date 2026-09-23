@@ -152,7 +152,7 @@ export function FilterPanel({ value, onChange, onClose, onReset }: {
           <Filter className="h-3.5 w-3.5 text-accent" />
           <span className="text-xs font-medium text-accent">筛选条件</span>
           {filterActive(value) && (
-            <span className="bg-accent/15 text-accent rounded-btn px-1.5 h-4 inline-flex items-center text-[10px] font-bold leading-none">
+            <span className="bg-accent/15 text-accent rounded-btn px-1.5 h-4 inline-flex items-center text-micro font-bold leading-none">
               {countActiveFilters(value)}
             </span>
           )}
@@ -162,7 +162,7 @@ export function FilterPanel({ value, onChange, onClose, onReset }: {
             <button
               onClick={onReset}
               title="清空全部筛选"
-              className="inline-flex items-center gap-1 px-1.5 h-6 rounded text-[11px]
+              className="inline-flex items-center gap-1 px-1.5 h-6 rounded text-xs
                 text-muted hover:text-danger hover:bg-danger/10 transition-colors"
             >
               <RotateCcw className="h-3 w-3" />
@@ -181,14 +181,14 @@ export function FilterPanel({ value, onChange, onClose, onReset }: {
 
       {/* 板块 + ST 快速筛选 (按钮组) */}
       <div className="flex flex-wrap items-center gap-1.5">
-        <span className="text-[11px] text-secondary shrink-0 w-10">市场</span>
+        <span className="text-xs text-secondary shrink-0 w-10">市场</span>
         {BOARDS.map(board => {
           const active = value.boards.includes(board)
           return (
             <button
               key={board}
               onClick={() => toggleBoard(board)}
-              className={`px-2 py-0.5 rounded text-[11px] transition-colors ${
+              className={`px-2 py-0.5 rounded text-xs transition-colors ${
                 active
                   ? 'bg-accent/15 text-accent'
                   : 'bg-elevated text-secondary hover:text-foreground hover:bg-elevated/80'
@@ -201,7 +201,7 @@ export function FilterPanel({ value, onChange, onClose, onReset }: {
         <span className="w-px h-4 bg-border mx-1" />
         <button
           onClick={() => onChange({ ...value, excludeST: !value.excludeST })}
-          className={`px-2 py-0.5 rounded text-[11px] transition-colors ${
+          className={`px-2 py-0.5 rounded text-xs transition-colors ${
             value.excludeST
               ? 'bg-accent/15 text-accent'
               : 'bg-elevated text-secondary hover:text-foreground hover:bg-elevated/80'
@@ -212,7 +212,7 @@ export function FilterPanel({ value, onChange, onClose, onReset }: {
         <button
           onClick={() => onChange({ ...value, watchlistOnly: !value.watchlistOnly })}
           title="只保留在「自选」里的标的"
-          className={`px-2 py-0.5 rounded text-[11px] transition-colors ${
+          className={`px-2 py-0.5 rounded text-xs transition-colors ${
             value.watchlistOnly
               ? 'bg-accent/15 text-accent'
               : 'bg-elevated text-secondary hover:text-foreground hover:bg-elevated/80'
@@ -227,34 +227,34 @@ export function FilterPanel({ value, onChange, onClose, onReset }: {
           const isRange = f.min !== f.max
           return (
             <div key={f.label} className="flex items-center gap-1.5">
-              <span className="text-[11px] text-secondary shrink-0 w-14 text-right">{f.label}</span>
+              <span className="text-xs text-secondary shrink-0 w-14 text-right">{f.label}</span>
               <input
                 type="number"
                 placeholder="最小"
                 value={value[f.min]}
                 onChange={(e) => set(f.min, e.target.value)}
                 step={f.step}
-                className="w-16 px-1.5 py-1 rounded-btn bg-base border border-border text-[11px] font-mono text-foreground text-center focus:outline-none focus:border-accent/50"
+                className="w-16 px-1.5 py-1 rounded-btn bg-base border border-border text-xs font-mono text-foreground text-center focus:outline-none focus:border-accent/50"
               />
               {isRange && (
                 <>
-                  <span className="text-[10px] text-muted">~</span>
+                  <span className="text-micro text-muted">~</span>
                   <input
                     type="number"
                     placeholder="最大"
                     value={value[f.max]}
                     onChange={(e) => set(f.max, e.target.value)}
                     step={f.step}
-                    className="w-16 px-1.5 py-1 rounded-btn bg-base border border-border text-[11px] font-mono text-foreground text-center focus:outline-none focus:border-accent/50"
+                    className="w-16 px-1.5 py-1 rounded-btn bg-base border border-border text-xs font-mono text-foreground text-center focus:outline-none focus:border-accent/50"
                   />
                 </>
               )}
-              {f.unit && <span className="text-[10px] text-muted shrink-0">{f.unit}</span>}
+              {f.unit && <span className="text-micro text-muted shrink-0">{f.unit}</span>}
             </div>
           )
         })}
       </div>
-      <div className="text-[10px] text-muted/70 pl-1">输入即生效 · 点击市场/ST 按钮切换</div>
+      <div className="text-micro text-muted/70 pl-1">输入即生效 · 点击市场/ST 按钮切换</div>
     </div>
   )
 }

@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion'
+import { TYPE } from '@/components/ui'
 import { X } from 'lucide-react'
 import { useDialogBackdrop } from '@/lib/useDialogBackdrop'
 
@@ -21,7 +22,7 @@ export function SettingsModal({ title, onClose, children, width = 'max-w-md' }: 
         className={`relative rounded-card border border-border bg-surface shadow-2xl mx-4 w-full ${width} max-h-[88vh] flex flex-col overflow-hidden`}
       >
         <div className="flex items-center justify-between px-5 py-3 border-b border-border shrink-0">
-          <h3 className="text-sm font-medium text-foreground">{title}</h3>
+          <h3 className={TYPE.section}>{title}</h3>
           <button onClick={onClose} className="p-0.5 rounded hover:bg-elevated text-secondary">
             <X className="h-4 w-4" />
           </button>

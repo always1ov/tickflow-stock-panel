@@ -25,6 +25,8 @@
 
 - **按钮**: `<Button>` / `buttonClass()`。默认 32px 高、13px 字、描边实底(小号 28px 高, 字仍是 13px —— 按钮一律正文级); 选中是黑白反相
   (亮色黑底白字、暗色白底黑字), 全站只有这一种选中态。
+- **分段切换**(「股票 / ETF」「全部 / 日线 / 分钟」这一类): `segmented.ts` 的 `SEG` / `SEG_ITEM` / `SEG_ON` / `SEG_OFF`。
+  外面一圈描边, 选中那一格反相, 总高 32px, 与旁边按钮齐平。
 - **卡片**: `<Card>`。实边框、实底、6px 圆角、无投影。
 - **表格**: `table.ts`。表头 11px 灰字浅灰底条, 内容 13px, 行间一道细线。
   **整页主列表**(自选、选股那张 `StockDataTable`)内容保持 15px —— 那是整页的主体, 本来就够大;
@@ -58,7 +60,7 @@
 - [x] 大盘(`Dashboard`)
 - [x] 监控(`Monitor` + `monitor/RuleEditor`)
 - [x] 模拟盘 / 批次(`FlipPaper` / `Lots`)
-- [ ] 选股(`Screener` + `screener/*`)
+- [x] 选股(`Screener` + `screener/*`)
 - [ ] 市场环境(`Regime` + `regime/*`)
 - [ ] 指数(`Indices`)
 - [ ] 异动(`AbnormalMoves`)
