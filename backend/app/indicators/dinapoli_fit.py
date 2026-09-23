@@ -25,13 +25,21 @@ R406 我写过:「这个指标不出买卖信号、不进把握分, **没有可�
 
 同一个命中率下, 线越少越好; 这也正好对上用户那条「大道至简」。
 
+## 评的就是图上那一组线
+
+[R483] 每一段都**截到那一段的顶那根, 用画图的同一个 `compute` 重画一遍当时的图**,
+评的就是那一刻图上真有的那几条线。原来这里另有一套: 「连续 8 根站上短期均线」切段、
+只拿摆点当锚、0.5×ATR 当容差 —— 那是 R473 之前的画法。R473~R480 画法改了七轮,
+这里一轮没跟, 粗细档建议评的一直是**图上已经不画的线**, 屏幕上看不出来。
+
 ## 不用未来数据
 
 每一段都只用**那一段结束时**已经知道的东西:
 
-  · 反应点只在聚焦点之前找(`reactions_before` 本身就是这个口径);
-  · 容差用**那一段结束那根的 ATR**, 不是最后一根的 —— 拿今天的 ATR 去量
-    三年前那一段, 等于把今天的波动率泄露回过去;
+  · 线是截到顶那根重画的 —— 顶之后的 K 线一根都没进去(摆点要右侧 k 根确认,
+    离顶太近的那几个当时还没确认, 这里也就不认, 与那一天图上的样子一致);
+  · 「落在线上」的容差是聚焦点的 `ZONE_PCT`, 与图上密集带同一把尺子, 不牵涉任何
+    会随时间变的量(原来用 ATR 时, 得专门防「拿今天的 ATR 量三年前」);
   · 实际回踩低点取的是那一段结束**之后**的行情, 那是被评估的答案, 不是输入。
 
 ## 最后一段不算数
@@ -42,16 +50,12 @@ R406 我写过:「这个指标不出买卖信号、不进把握分, **没有可�
 """
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass, field
 from typing import Any
 
 import polars as pl
 
-from app.indicators.dinapoli import (
-    GRAINS, MAX_REACTIONS, TOL_ATR, cluster_zone, displaced_sma, focus_of,
-    reactions_before, retracements, thrust_segments,
-)
+from app.indicators.dinapoli import GRAINS, ZONE_PCT, compute, upswings
 
 # 样本少于这个数就不给建议 —— 三次上攻里蒙对两次说明不了任何事。
 MIN_SAMPLES = 3
@@ -142,43 +146,32 @@ def pullback_low(
         if highs[j] > focus:
             stop = j
             break
-    if stop - start < min_bars:
+    # [R483] 只有**数据到头**才要这一道。站回聚焦点、或下一段上涨已经起来, 回踩就是走完了,
+    # 一两根也是完整的一次 —— 原来一律要够 min_bars, 急跌急拉那种回踩全被扔出样本。
+    if stop >= n and stop - start < min_bars:
+        return None
+    if stop <= start:
         return None
     return min(lows[start:stop])
 
 
 def _cases(df: pl.DataFrame, k: int) -> list[_Case]:
-    closes = [float(x) for x in df["close"].to_list()]
     highs = [float(x) for x in df["high"].to_list()]
     lows = [float(x) for x in df["low"].to_list()]
-    atr = ([None if x is None else float(x) for x in df["atr_14"].to_list()]
-           if "atr_14" in df.columns else [None] * len(closes))
-
-    dma = displaced_sma(closes, 3, 3)
-    segs = thrust_segments(closes, dma, highs, lows, atr)
+    ups = upswings(highs, lows)
     out: list[_Case] = []
-    for idx, seg in enumerate(segs):
-        s, e = seg
-        # **容差用这一段结束那根的 ATR** —— 用最后一根的等于把今天的波动率
-        # 泄露回过去, 那会让老的那几段被一把更宽/更窄的尺子量。
-        a = atr[e] if e < len(atr) else None
-        if a is None or not math.isfinite(a) or a <= 0:
-            continue
-        tol = TOL_ATR * a
-        focus, focus_bar = focus_of(highs, seg)
-        reacts = reactions_before(lows, focus_bar, k=k,
-                                  max_count=MAX_REACTIONS, min_gap=tol)
-        if not reacts:
+    for idx, (_, e) in enumerate(ups):
+        # 截到顶那根, 图上当时画的就是这一组 —— 与关键价位页同一个函数, 不另写一套
+        res = compute(df.head(e + 1), pivot_k=k)
+        if res.is_empty() or res.focus_bar != e or not res.levels:
             continue                      # 画不出线的段评不了
-        lv = retracements(focus, lows, reacts)
-        if not lv:
-            continue
-        nxt = segs[idx + 1][0] if idx + 1 < len(segs) else None
-        low = pullback_low(highs, lows, e, focus, nxt)
+        # 下一段上涨从它的底开始 —— 底那根本身就是这次回踩的最低点, 要算进窗口
+        nxt = ups[idx + 1][0] + 1 if idx + 1 < len(ups) else None
+        low = pullback_low(highs, lows, e, res.focus, nxt)
         if low is None:
             continue                      # 回踩还没走完 —— 最后一段通常落在这里
-        out.append(_Case(seg_end=e, focus=focus, low=low, tol=tol,
-                         levels=lv, zone=cluster_zone(lv, tol)))
+        out.append(_Case(seg_end=e, focus=res.focus, low=low, tol=ZONE_PCT * res.focus,
+                         levels=res.levels, zone=res.zone))
     return out
 
 

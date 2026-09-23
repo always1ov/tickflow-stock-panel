@@ -145,11 +145,11 @@ def test_R412_建议里不出现买卖字样():
 
 
 # ── 不用未来数据 ────────────────────────────────────────────
-def test_R412_容差用的是那一段结束那根的ATR_不是最后一根的():
+def test_R412_最后一根的ATR改不了早年那几段的结果():
     """拿今天的波动率去量三年前那一段, 等于把未来泄露回过去。
 
-    做法: 让**最后一根**的 ATR 大得离谱。如果容差取的是最后一根, 那么早年那几段
-    的容差会跟着变宽, 命中率就会变高 —— 两次结果不同即说明取错了。
+    做法: 让**最后一根**的 ATR 大得离谱, 两次结果必须一样。[R483] 容差改成按聚焦点的
+    百分比之后, 这条从"容差取对了哪一根"变成"没有任何一个量从最后一根漏回去"。
     """
     n = len(TWO_WAVES)
     normal = fit.backtest_grains(_df(TWO_WAVES, 0.5))
@@ -209,3 +209,27 @@ def test_R412_没有数据时如实报错不硬算(monkeypatch):
     d = TestClient(app).post("/api/stock-analysis/fib2/grain-backtest",
                              json={"symbol": "000001.SZ", "use_ai": False}).json()
     assert d.get("error"), f"空数据没报错: {d}"
+
+
+# ── 评的就是图上那一组 ──────────────────────────────────────
+def test_R483_评的就是图上那一组线_用对照图那一段验():
+    """[R483] 原来这里另有一套切段和挑锚(R473 之前的画法), 画法改了七轮它一轮没跟 ——
+    粗细档建议评的一直是图上已经不画的线。拿中际旭创对照图那一段接一次回踩 + 再创新高,
+    974.99 那一段被评估的必须正好是对照图上那五条, 而回踩停在 925 要算「中」、也在密集带里。"""
+    from tests.test_fib2_reference import F3_ON_CHART, F5_ON_CHART, FOCUS, _chart_df
+
+    ref = _chart_df()
+    tail = [(925.0, 931.0, 925.0, 928.0), (929.0, 950.0, 928.0, 948.0),
+            (948.0, 990.0, 945.0, 985.0), (985.0, 1000.0, 980.0, 995.0)]
+    df = pl.concat([ref, pl.DataFrame({
+        "open": [r[0] for r in tail], "high": [r[1] for r in tail],
+        "low": [r[2] for r in tail], "close": [r[3] for r in tail],
+        "atr_14": [45.0] * len(tail)})])
+    for grain, k in GRAINS.items():
+        case = next((c for c in fit._cases(df, k) if c.focus == FOCUS), None)
+        assert case is not None, f"[{grain}] 974.99 那一段没进样本"
+        got = sorted(round(x["value"], 2) for x in case.levels)
+        assert got == sorted(F3_ON_CHART | F5_ON_CHART), f"[{grain}] 评的线是 {got}"
+        assert case.low == 918.5, f"[{grain}] 回踩低点 {case.low}"
+    f = fit.evaluate_grain(df, "mid", GRAINS["mid"])
+    assert f.hits >= 1 and f.zone_hits >= 1, f.to_dict()

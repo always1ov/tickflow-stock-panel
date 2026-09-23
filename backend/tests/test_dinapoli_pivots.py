@@ -75,49 +75,27 @@ def test_R405_平台上的相等值也算摆点_不是漏判():
 
 
 # ================================================================
-# 推进段
+# 波段(ZigZag)
 # ================================================================
+# [R483] 这里原来是「连续 8 根站上短期均线」推进段(thrust_segments)的四条用例。那套切段
+# R473 起图上就不用了, R483 粗细档回测也改成按波段切之后再没人调它, 连函数带用例一起撤了。
 
-def _thrust_case(closes, dma, highs, lows, atr, **kw):
-    return dn.thrust_segments(closes, dma, highs, lows, atr, **kw)
-
-
-def test_R405_推进段要够长():
-    closes = [10.0] * 10
-    dma = [9.0] * 10                       # 全程 C > DMA
-    highs = [12.0] * 10
-    lows = [8.0] * 10
-    atr = [1.0] * 10
-    # 长度 10 >= 8, 幅度 12-8=4 >= 3×1 → 成立
-    assert _thrust_case(closes, dma, highs, lows, atr) == [(0, 9)]
-    # 把门槛抬到 11 根 → 不成立
-    assert _thrust_case(closes, dma, highs, lows, atr, min_len=11) == []
+# 两段像样的上涨, 中间一段 >5% 的回落, 末尾再回落 —— 每一步都走好几根
+_ZIG = ([10.0, 10.2, 10.1, 10.6, 11.2, 11.9, 12.4, 12.1, 11.6, 11.2, 11.0, 11.3,
+         12.0, 12.8, 13.5, 14.1, 13.6, 13.0, 12.6, 12.9])
 
 
-def test_R405_磨盘被幅度门槛滤掉():
-    """连着站在均线上方**不等于**一波推进 —— 横着走的一串小阳线也满足。"""
-    closes = [10.0] * 10
-    dma = [9.9] * 10
-    highs = [10.1] * 10
-    lows = [9.9] * 10                      # 幅度只有 0.2
-    atr = [1.0] * 10                       # 3×ATR = 3.0, 远够不着
-    assert _thrust_case(closes, dma, highs, lows, atr) == []
-
-
-def test_R405_跌回均线下方就断段():
-    closes = [10.0] * 5 + [8.0] + [10.0] * 9
-    dma = [9.0] * 15
-    highs = [12.0] * 15
-    lows = [8.0] * 15
-    atr = [1.0] * 15
-    # 下标 5 跌回下方 → 前段只有 5 根(不够 8), 后段 6..14 共 9 根成立
-    assert _thrust_case(closes, dma, highs, lows, atr) == [(6, 14)]
-
-
-def test_R405_ATR缺失时不硬算():
-    closes = [10.0] * 10
-    dma = [9.0] * 10
-    assert _thrust_case(closes, dma, [12.0] * 10, [8.0] * 10, [None] * 10) == []
+def test_R483_波段只看走过的K线_截到顶那根重跑_认出的还是这一段():
+    """粗细档回测靠这一条: 在每段的顶那根截断重画当时的图。截断重跑认出的若不是同一个顶,
+    回测评的就是一张那天根本不存在的图。"""
+    highs = [c + 0.1 for c in _ZIG]
+    lows = [c - 0.1 for c in _ZIG]
+    full = dn.upswings(highs, lows)
+    assert len(full) >= 2, f"用例没切出两段, 测不到东西: {full}"
+    for i, (b, e) in enumerate(full):
+        cut = dn.upswings(highs[:e + 1], lows[:e + 1])
+        assert cut[-1] == (b, e), f"截到第 {e} 根重跑认出 {cut[-1]}, 全量是 {(b, e)}"
+        assert cut[:-1] == full[:i], "截断重跑, 前面已经走完的段变了"
 
 
 # ================================================================

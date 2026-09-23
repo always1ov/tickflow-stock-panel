@@ -21,7 +21,8 @@
 
 一型(`levels._fibonacci_levels`)取近 120 日里**一个**波段(窗口内最高配最低),
 画 0.236~0.786 五条。二型锚在**推进段的最高点**上, 配**最多 5 个反应点**,
-每一对都算两条 —— 所以会有十条上下, 而**它的价值恰恰在于哪几条挤在一起**。
+每一对都算两条(R480 起最近那个只画浅的一条)—— 所以会有十条上下, 而**它的价值
+恰恰在于哪几条挤在一起**。
 一型只有一个波段, 天然不会有重合。
 
 ## 最软的一环是摆点
@@ -41,7 +42,6 @@ from __future__ import annotations
 import logging
 import math
 from dataclasses import dataclass, field
-from typing import Any
 
 import polars as pl
 
@@ -57,16 +57,14 @@ DMA_LEN, DMA_SHIFT = 3, 3  # 短期均线 = SMA(C,3) 往后移 3 根
 
 # ── 默认参数(规格替原书补的初值, 可调)────────────────────────
 PIVOT_K = 3               # 左右各看几根才算一个拐点
-THRUST_MIN = 8            # 连续几根站在短期均线上方才算一波推进
-THRUST_MIN_ATR = 3.0      # 这波的幅度至少几倍 ATR(过滤磨盘)
 MAX_REACTIONS = 5         # 往回最多取几个反应点
-TOL_ATR = 0.5             # 聚类容差 = 几倍 ATR
 # [R477] 回踩密集带的聚类容差改按价格百分比(聚焦点的 1%)。用户看了 R476 部署后的图:
-# 四条回撤线(930.30 / 921.95 / 902.69 / 889.17)被连成 889~930 一整块 —— 0.5×ATR 在
+# 四条回撤线(930.30 / 921.95 / 902.69 / 889.17)被连成 889~930 一整块 —— 原来的 0.5×ATR 在
 # 中际旭创上是 22 块, 间距 8 / 19 / 14 块的线一条接一条全连上了, 那块带说明不了"哪几条
 # 挤在一起"。按 1%(≈9.7 块): 921.95 与 930.30 相距 0.9%, 是两个锚量出同一处 —— 正是
-# 用户在对照图上画红框的那一带; 902.69 / 889.17 相距 1.5% 不算挤。TOL_ATR 仍留给粗细档
-# 回测(dinapoli_fit)用。
+# 用户在对照图上画红框的那一带; 902.69 / 889.17 相距 1.5% 不算挤。
+# [R483] 粗细档回测(dinapoli_fit)判「回踩落在线上」也用这把尺子 —— 原来它另用 0.5×ATR,
+# 同一件事两把尺子。R473 之前「连续 8 根站上短期均线、幅度 3 倍 ATR」的推进段也随之退役。
 ZONE_PCT = 0.01
 STOP_BUFFER_ATR = 0.1     # 失效位在参照价位下方再让几倍 ATR
 
@@ -89,8 +87,9 @@ STOP_BUFFER_ATR = 0.1     # 失效位在参照价位下方再让几倍 ATR
 # (≈21%)一定认得出; 974.99 → 929 的回落(≈4.7%)还不算拐, 聚焦点就是最近那个高点。
 ZIG_PCT = 0.05
 # 反应点去重: 只合并**几乎同价**的低点(平台 / 一字板那种同一条线数几遍)。原来用聚类容差
-# (0.5×ATR)当去重间距, 高价股 ATR 四五十, 858.00 / 863.52 / 870.17 这种相隔五六块的
-# 不同低点会被并成一个 —— 对方图上它们各有一条 F3(930.30 / 932.41 / 934.95)。
+# (0.5×ATR)当去重间距, 高价股 ATR 四五十, 858.00 / 870.17 这种相隔十来块的不同低点会被
+# 并成一个 —— 对方图上它们各有一条 F3(930.30 / 934.95)。[R483] 这里原来还写着 863.52 /
+# 932.41, R476 已查明那两个是 3×3 均线上的值, 不是锚、也不是 F3。
 REACT_DEDUP_PCT = 0.003
 
 # ── 粗细三档 ─────────────────────────────────────────────────
@@ -222,51 +221,6 @@ def pivot_highs(highs: list[float], k: int = PIVOT_K) -> list[int]:
 
 
 # ================================================================
-# 推进段
-# ================================================================
-
-def thrust_segments(
-    closes: list[float], dma: list[float | None], highs: list[float],
-    lows: list[float], atr: list[float | None],
-    *, min_len: int = THRUST_MIN, min_atr: float = THRUST_MIN_ATR,
-) -> list[tuple[int, int]]:
-    """所有满足条件的上涨推进段 `[s, e]`(下标闭区间)。
-
-    三个条件全要:
-      · 区间内每一根都 `C > DMA3x3`
-      · 长度 >= `min_len`
-      · `max(H[s..e]) - min(L[s-1..e]) >= min_atr × ATR[e]` —— **过滤磨盘**:
-        横着走的一串小阳线也能连着站在均线上方, 但它不是一波推进。
-    """
-    out: list[tuple[int, int]] = []
-    n = min(len(closes), len(dma))
-    s: int | None = None
-    for i in range(n):
-        above = dma[i] is not None and closes[i] > dma[i]
-        if above and s is None:
-            s = i
-        elif not above and s is not None:
-            _emit(out, s, i - 1, highs, lows, atr, min_len, min_atr)
-            s = None
-    if s is not None:
-        _emit(out, s, n - 1, highs, lows, atr, min_len, min_atr)
-    return out
-
-
-def _emit(out, s, e, highs, lows, atr, min_len, min_atr) -> None:
-    if e - s + 1 < min_len:
-        return
-    a = atr[e] if e < len(atr) else None
-    if a is None or not math.isfinite(a) or a <= 0:
-        return
-    top = max(highs[s:e + 1])
-    # 起点往前带一根 —— 一波推进的底在"站上均线的前一根"上, 不在第一根阳线上
-    bot = min(lows[max(0, s - 1):e + 1])
-    if top - bot >= min_atr * a:
-        out.append((s, e))
-
-
-# ================================================================
 # 聚焦点与反应点
 # ================================================================
 
@@ -291,9 +245,36 @@ def latest_upswing(
     起点不代表整组回撤线都失效。那一条在 `_compute` 里按**最远的反应点**判。
     一段上涨都没有(一路在跌), 返回 None。
     """
+    ups = upswings(highs, lows, pct=pct)
+    if not ups:
+        return None
+    e = ups[-1][1]
+    # [R476] 这段上攻的**底** = 上一次高过这个顶以来的最低点 —— 不是最后一小段波段的底。
+    # 对照图: 804 → 933 → 882 → 928 → 858 → 974.99, 中间几次回调都超过 5%, 按波段切会只剩
+    # 最后一小段(858 起), 836.13 那个锚就丢了。上一次高过 974.99 是 8 月那段 1050, 从那以后
+    # 最低是 804 —— 这一整段才是同一段上攻。(790 → 1050 那段顶比 974.99 高, 自然不算进来。)
+    j = next((i for i in range(e - 1, -1, -1) if highs[i] >= highs[e]), -1)
+    if j + 1 >= e:
+        return None
+    lo = min(lows[j + 1:e])
+    s = max(i for i in range(j + 1, e) if lows[i] == lo)
+    if e <= s:
+        return None
+    return s, e
+
+
+def upswings(
+    highs: list[float], lows: list[float], *, pct: float = ZIG_PCT,
+) -> list[tuple[int, int]]:
+    """按波段拐点(ZigZag, 反向走够 `pct` 才算拐)切出的每一段上涨 `[底, 顶]`, 按时间排。
+
+    最后一段若还在涨也算在内, 它的顶就是目前为止的最高点(不等右侧确认)。
+    **逐根往前推、只看已经走过的 K 线**: 截到第 t 根重跑, 前面切出来的段与全量跑的一样 ——
+    粗细档回测(`dinapoli_fit`)就靠这一条在每段的顶那根上重画当时的图。
+    """
     n = min(len(highs), len(lows))
     if n < 2:
-        return None
+        return []
 
     def up_th(b: int) -> float:        # 从底 b 往上走多少算拐
         return pct * lows[b]
@@ -329,21 +310,7 @@ def latest_upswing(
 
     if trend == 1:
         ups.append((bot, top))
-    if not ups:
-        return None
-    e = ups[-1][1]
-    # [R476] 这段上攻的**底** = 上一次高过这个顶以来的最低点 —— 不是最后一小段波段的底。
-    # 对照图: 804 → 933 → 882 → 928 → 858 → 974.99, 中间几次回调都超过 5%, 按波段切会只剩
-    # 最后一小段(858 起), 836.13 那个锚就丢了。上一次高过 974.99 是 8 月那段 1050, 从那以后
-    # 最低是 804 —— 这一整段才是同一段上攻。(790 → 1050 那段顶比 974.99 高, 自然不算进来。)
-    j = next((i for i in range(e - 1, -1, -1) if highs[i] >= highs[e]), -1)
-    if j + 1 >= e:
-        return None
-    lo = min(lows[j + 1:e])
-    s = max(i for i in range(j + 1, e) if lows[i] == lo)
-    if e <= s:
-        return None
-    return s, e
+    return ups
 
 
 def focus_of(highs: list[float], seg: tuple[int, int]) -> tuple[float, int]:
@@ -371,10 +338,20 @@ def reactions_before(
     全部意义。传 0 则不去重(供单元测试逐条验行为)。
     """
     cands = [i for i in pivot_lows(lows, k) if i < focus_bar]
+    return pick_anchors(lows, cands, focus_bar, max_count=max_count, min_gap=min_gap)
+
+
+def pick_anchors(
+    lows: list[float], cands, focus_bar: int, *,
+    max_count: int = MAX_REACTIONS, min_gap: float = 0.0,
+) -> list[int]:
+    """从候选下标里挑锚, **由近到远**: 其后没被更低的盖过、价位上不与已选的挤在一起、
+    最多 `max_count` 个。`reactions_before` 与图上那一组(`_compute`)共用这一段 ——
+    上面那两条规矩的来由见 `reactions_before`。"""
     out: list[int] = []
-    for i in reversed(cands):                      # 由近到远
+    for i in sorted(cands, reverse=True):          # 由近到远
         if lows[i] != min(lows[i:focus_bar + 1]):
-            continue
+            continue                               # 其后被更低的盖过
         if min_gap > 0 and any(abs(lows[i] - lows[j]) <= min_gap for j in out):
             continue                               # 价位上与已选的挤在一起
         out.append(i)
@@ -404,7 +381,8 @@ def retracements(focus: float, lows: list[float], reactions: list[int]) -> list[
 def targets_from(a: float, b: float, c: float) -> list[dict]:
     """三点推目标: `C + ratio × (B − A)`。
 
-    A = 主波段起点(最近那个反应点的低), B = FOCUS, C = 回撤以来的最低点。
+    A = 主波段起点(上攻起点那根的低, R476 起; 原来误取最近那个反应点), B = FOCUS,
+    C = 回撤以来的最低点。
     **锚在 C 上而不是锚在 FOCUS 上** —— 回撤越深, 目标越低, 这是这套算法
     自带的保守性, 不要"优化"掉。
     """
@@ -548,15 +526,7 @@ def _compute(df: pl.DataFrame, pivot_k: int = PIVOT_K) -> Fib2:
     for i in range(start + 1, focus_bar):
         if i in pivots or (breakout(i) and not breakout(i - 1)):
             cands.add(i)
-    reacts: list[int] = []
-    for i in sorted(cands, reverse=True):                 # 由近到远
-        if lows[i] != min(lows[i:focus_bar + 1]):
-            continue                                       # 其后被更低的盖过
-        if any(abs(lows[i] - lows[j]) <= gap for j in reacts):
-            continue                                       # 价位上与已选的挤在一起
-        reacts.append(i)
-        if len(reacts) >= MAX_REACTIONS:
-            break
+    reacts = pick_anchors(lows, cands, focus_bar, min_gap=gap)
     if not reacts:
         return Fib2(dma3=dma, thrust=seg, focus=focus, focus_bar=focus_bar)
     # [R474] 聚焦点之后已经跌破**最远那个反应点**(所有回撤线里最底下那个锚) —— 这一组
