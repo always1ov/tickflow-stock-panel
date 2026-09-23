@@ -532,11 +532,31 @@ def _compute(df: pl.DataFrame, pivot_k: int = PIVOT_K) -> Fib2:
     tol = ZONE_PCT * focus
 
     gap = focus * REACT_DEDUP_PCT
-    # [R476] 锚只在上攻段里找: 段内回调的低点(摆点, 其后未被更低的盖过) + 上攻起点那根的低点
-    reacts = [i for i in reactions_before(lows, focus_bar, k=pivot_k, min_gap=gap) if i > start]
-    if (lows[start] == min(lows[start:focus_bar + 1])
-            and not any(abs(lows[start] - lows[j]) <= gap for j in reacts)):
-        reacts = (reacts + [start])[:MAX_REACTIONS]
+    # [R476] 锚只在上攻段里找。[R480] 候选三类:
+    #   ① 上攻起点那根(第一根收回 3×3 均线上方的);
+    #   ② 段内回调的低点(摆点);
+    #   ③ 段内每次「回调完重新启动」的那一根 —— 收盘站上前一根最高价、且前一根自己不是这样的。
+    # ③ 是 R480 为对照图上的 F3 934.95 补的: 它反推的锚 870.17 是 858 之后那根大阳线的最低价,
+    # 与 836.13(804 之后那根大阳线)是同一种 K 线。段内别的启动根(第 7、10 根)后来被 858 盖过,
+    # 下面「其后未被更低的盖过」那一条自然把它们筛掉。
+    pivots = set(pivot_lows(lows, pivot_k))
+
+    def breakout(i: int) -> bool:
+        return i >= 1 and closes[i] > highs[i - 1]
+
+    cands = {start}
+    for i in range(start + 1, focus_bar):
+        if i in pivots or (breakout(i) and not breakout(i - 1)):
+            cands.add(i)
+    reacts: list[int] = []
+    for i in sorted(cands, reverse=True):                 # 由近到远
+        if lows[i] != min(lows[i:focus_bar + 1]):
+            continue                                       # 其后被更低的盖过
+        if any(abs(lows[i] - lows[j]) <= gap for j in reacts):
+            continue                                       # 价位上与已选的挤在一起
+        reacts.append(i)
+        if len(reacts) >= MAX_REACTIONS:
+            break
     if not reacts:
         return Fib2(dma3=dma, thrust=seg, focus=focus, focus_bar=focus_bar)
     # [R474] 聚焦点之后已经跌破**最远那个反应点**(所有回撤线里最底下那个锚) —— 这一组
@@ -546,6 +566,11 @@ def _compute(df: pl.DataFrame, pivot_k: int = PIVOT_K) -> Fib2:
         return Fib2(dma3=dma)
 
     lv = retracements(focus, lows, reacts)
+    # [R480] 最近那个锚只画 F3(38.2%), 不画 F5 —— 对照图: 870.17 那一组只有 934.95 一条, 括号往上
+    # 连到聚焦点; 它的 F5(910.21)那一行没被标注遮住, 却是空的, 也没有「1.000」锚点线。更早的
+    # 锚(858.00 / 836.13)F3、F5 都画。只有一个锚时照旧两条都画(对照图没给这种情况, 取保守的)。
+    if len(reacts) >= 2:
+        lv = [x for x in lv if not (x["k"] == 1 and x["kind"] == "deep")]
     zone = cluster_zone(lv, tol)
 
     # 主波段起点 A。[R476] 原来取的是 reacts[0] —— 那是**最近**的反应点, 与这行注释说的

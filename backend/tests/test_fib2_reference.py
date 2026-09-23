@@ -10,17 +10,20 @@
     858.00            930.30             902.69(被标注箭头盖住, 灰括号连着 930.30)
     836.13            921.95             889.17
 
+    870.17(无锚线)     934.95             —(对照图上这一行是空的, 没被标注遮住)
+
 读图时认错过的(R473 那一版的守卫就是照错的认识写的, R476 纠正):
   · 932.41 是**黑字**, 挨着蓝色折线上的红点 —— 那是 3×3 均线在那一点的值, 不是回撤线;
-  · 827.74 / 844.59 挨着底下红色折线上的点 —— 也是均线值, 不是锚点;
-  · 934.95 是 F3(下面标着 F3), 反推锚点 ≈870.17 —— 那是 858 之后那根大阳线的开盘价 / 最低价,
-    既不是回调低点也不是上攻起点, **这一条目前没能解释, 不钉**。
+  · 827.74 / 844.59 挨着底下红色折线上的点 —— 也是均线值, 不是锚点。
+[R480] 934.95 解释出来了: 锚 870.17 是 858 之后那根大阳线(回调完重新启动的那一根)的最低价,
+与 836.13 是同一种 K 线; 它是离聚焦点最近的锚, 对照图对它只画 F3、括号往上连到聚焦点。
 
 锚点怎么挑(R476 从这张图推出来的):
   · 上攻段的底 = 上一次高过聚焦点以来的最低点(804.02, 9 月初那根下影线);
   · 上攻从底之后**第一根收回 3×3 均线上方**的那根算起 —— 836.13 正是那根大阳线的最低价;
-  · 锚 = 上攻起点那根的低点 + 上攻段里回调的低点(858.00)。804、以及更早的 793 / 554 都在
-    起点之前, 对照图上没有它们的线。
+  · 锚 = 上攻起点那根的低点 + 上攻段里回调的低点(858.00)+ 每次回调完重新启动的那一根(870.17)。
+    804、以及更早的 793 / 554 都在起点之前, 对照图上没有它们的线。
+  · 最近那个锚只画 F3(R480)。
 """
 from __future__ import annotations
 
@@ -30,10 +33,10 @@ import pytest
 from app.indicators import dinapoli as dn
 
 FOCUS = 974.99
-F3_ON_CHART = {930.30, 921.95}
+F3_ON_CHART = {934.95, 930.30, 921.95}
 F5_ON_CHART = {902.69, 889.17}
-# 804.02 那一组(我们 R475 时画出来、对照图上没有的)
-NOT_ON_CHART = {909.68, 869.33}
+# 804.02 那一组(我们 R475 时画出来、对照图上没有的), 以及 870.17 的 F5(对照图上那一行是空的)
+NOT_ON_CHART = {909.68, 869.33, 910.21}
 
 
 def _lin(a: float, b: float, n: int) -> list[float]:
@@ -79,21 +82,29 @@ def test_R476_上攻起点之前的低点不当锚(grain: str):
     got = {round(x["value"], 2) for x in res.levels}
     assert not (got & NOT_ON_CHART), f"[{grain}] 画出了对照图上没有的 {sorted(got & NOT_ON_CHART)}"
     lows = [float(x) for x in _chart_df()["low"].to_list()]
-    assert sorted(lows[i] for i in res.reactions) == [836.13, 858.00]
+    assert sorted(lows[i] for i in res.reactions) == [836.13, 858.00, 870.17]
 
 
 @pytest.mark.parametrize("grain", list(dn.GRAINS))
-def test_R477_密集带只圈真挤在一起的那两条(grain: str):
-    """[R477] 用户看了 R476 部署后的图(889~930 被连成一整块):「肯定要处理啊」。
-    按价格 1% 聚类: 921.95 / 930.30(相距 0.9%, 两个锚量出同一处 —— 用户在对照图上画红框
-    的那一带)归一块; 902.69 / 889.17(1.5%)不算。「这组作废」跟着落到 902.69 下方。"""
+def test_R477_密集带只圈真挤在一起的那几条(grain: str):
+    """[R477] 用户看了 R476 部署后的图(889~930 被连成一整块):「肯定要处理啊」。按价格 1% 聚类。
+    [R480] 补上 934.95 之后, 挤在一起的是三条 F3: 921.95 / 930.30 / 934.95(彼此相距 ≤0.9%);
+    902.69 / 889.17 不算。「这组作废」落在 902.69 下方。"""
     res = dn.compute(_chart_df(), pivot_k=dn.GRAINS[grain])
     z = res.zone
-    assert z is not None and (round(z["low"], 2), round(z["high"], 2)) == (921.95, 930.30), \
+    assert z is not None and (round(z["low"], 2), round(z["high"], 2)) == (921.95, 934.95), \
         f"[{grain}] 密集带是 {z}"
-    assert z["strength"] == 2
+    assert z["strength"] == 3
     assert res.invalid_at is not None and 889.17 < res.invalid_at < 902.69, \
         f"[{grain}] 这组作废 {res.invalid_at} 应在 902.69 下方、889.17 上方"
+
+
+@pytest.mark.parametrize("grain", list(dn.GRAINS))
+def test_R480_线的条数与对照图一模一样(grain: str):
+    """不多不少: 三条 F3 + 两条 F5。"""
+    res = dn.compute(_chart_df(), pivot_k=dn.GRAINS[grain])
+    got = sorted(round(x["value"], 2) for x in res.levels)
+    assert got == sorted(F3_ON_CHART | F5_ON_CHART), f"[{grain}] {got}"
 
 
 def test_R473_聚焦点不等摆点确认():
