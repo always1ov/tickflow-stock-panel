@@ -48,7 +48,7 @@
 旧个股弹窗里待删的那部分(旧顶栏以下、`StockReviewDialog`)不迁 —— 等「统一删除」。
 
 - [x] 个股弹窗新块(R429~R448 已是这套; R449 修正分区 / 卡片标题的级别)
-- [ ] 外壳: 侧栏 / 导航(`Layout`)、`PageHeader`、`PageShell`
+- [x] 外壳: 侧栏 / 导航(`Layout`)、`PageHeader`、`PageShell`
 - [ ] 自选决策台(`StockAnalysis` + `WatchlistDecisionBoard` + `decision-board/*`)
 - [ ] 自选(`Watchlist`)
 - [ ] 大盘(`Dashboard`)

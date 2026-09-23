@@ -177,7 +177,7 @@ function MonitorBadge({ active }: { active: boolean }) {
   })()
   if (active || unread <= 0 || !badgeEnabled) return null
   return (
-    <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[9px] font-bold text-white animate-pulse">
+    <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-micro font-bold text-white animate-pulse">
       {unread > 99 ? '99+' : unread}
     </span>
   )
@@ -229,15 +229,15 @@ function SidebarIndexQuotes({ rows, items, cnLive }: {
               : ''}`}
           >
             <div className="flex items-center justify-between gap-1">
-              <span className="flex min-w-0 items-center gap-1 text-[10px] text-secondary">
+              <span className="flex min-w-0 items-center gap-1 text-micro text-secondary">
                 {/* [R119] 与全球卡同一套语义: 绿点脉冲=在跳, 灰点=静止 */}
                 <span className={cn('h-1 w-1 shrink-0 rounded-full',
                   cnLive ? 'bg-bull animate-pulse' : 'bg-muted/40')} />
                 <span className="truncate">{item.name}</span>
               </span>
-              <span className={`text-[10px] font-mono ${indexPctClass(pct)}`}>{fmtIndexPct(pct)}</span>
+              <span className={`text-micro font-mono ${indexPctClass(pct)}`}>{fmtIndexPct(pct)}</span>
             </div>
-            <div className={`mt-0.5 truncate font-mono text-[10px] ${indexPctClass(pct)}`}>
+            <div className={`mt-0.5 truncate font-mono text-micro ${indexPctClass(pct)}`}>
               {fmtIndexValue(value)}
             </div>
           </NavLink>
@@ -322,7 +322,7 @@ function DataSourceHealthBadge({ matrix }: { matrix: CapabilityMatrix | undefine
               ))}
         </span>
         {!loading && (
-          <span className={`ml-auto text-[10px] font-mono font-bold leading-none shrink-0 ${countCls}`}>
+          <span className={`ml-auto text-micro font-mono font-bold leading-none shrink-0 ${countCls}`}>
             {usableCount}/{caps.length}
           </span>
         )}
@@ -346,13 +346,13 @@ function DataSourceHealthBadge({ matrix }: { matrix: CapabilityMatrix | undefine
                 <DatabaseZap className="h-3.5 w-3.5 text-accent" />
                 数据源能力
               </span>
-              <span className={`text-[10px] font-mono font-bold ${countCls}`}>
+              <span className={`text-micro font-mono font-bold ${countCls}`}>
                 {loading ? '获取中…' : `${usableCount}/${caps.length} 可用`}
               </span>
             </div>
             <div className="space-y-1.5 border-t border-border/60 pt-2">
               {loading ? (
-                <div className="py-0.5 text-[11px] text-muted">正在获取能力路由状态…</div>
+                <div className="py-0.5 text-xs text-muted">正在获取能力路由状态…</div>
               ) : caps.map(c => (
                 <div key={c.id} className="flex min-w-0 items-center gap-2">
                   <span className={`h-2 w-2 shrink-0 rounded-[2px] ${capSquareCls(c)}`} />
@@ -360,21 +360,21 @@ function DataSourceHealthBadge({ matrix }: { matrix: CapabilityMatrix | undefine
                   <span className="ml-auto flex min-w-0 shrink items-center gap-1.5">
                     {c.usable ? (
                       <>
-                        <span className="truncate text-[11px] text-muted">{c.effective_display}</span>
+                        <span className="truncate text-xs text-muted">{c.effective_display}</span>
                         <CheckCircle2 className="h-3 w-3 shrink-0 text-accent" />
                       </>
                     ) : (
-                      <span className="text-[11px] text-muted/70">未接入</span>
+                      <span className="text-xs text-muted/70">未接入</span>
                     )}
                   </span>
                 </div>
               ))}
             </div>
             {/* 分时有分钟K功能替身 (intraday_monitor_support 三路可达), 不单独占能力格, 在此备注 */}
-            <div className="mt-1.5 text-[10px] leading-relaxed text-muted/70">
+            <div className="mt-1.5 text-micro leading-relaxed text-muted/70">
               分时信号监控可由分钟 K 数据驱动，不单独设能力格
             </div>
-            <div className="mt-2 flex items-center gap-1 border-t border-border/60 pt-1.5 text-[10px] text-muted">
+            <div className="mt-2 flex items-center gap-1 border-t border-border/60 pt-1.5 text-micro text-muted">
               点击前往数据源配置
               <ChevronRight className="h-3 w-3" />
             </div>
@@ -476,16 +476,16 @@ function AIConfigBadge({ configured, model }: { configured?: boolean; model?: st
         <Sparkles className="h-3.5 w-3.5 shrink-0 text-muted group-hover:text-purple-400 transition-colors" />
         {isConfigured ? (
           <>
-            <span className="truncate text-[11px] font-medium text-secondary group-hover:text-foreground transition-colors">
+            <span className="truncate text-xs font-medium text-secondary group-hover:text-foreground transition-colors">
               {shownModel || '已接入模型'}
             </span>
             {fallbackCount > 0 && (
-              <span className="shrink-0 font-mono text-[9px] leading-none text-muted/70" title="备用档位数(前一档用不了时自动顺位)">
+              <span className="shrink-0 font-mono text-micro leading-none text-muted/70" title="备用档位数(前一档用不了时自动顺位)">
                 +{fallbackCount}
               </span>
             )}
             {topDisabled && (
-              <span className="shrink-0 text-[9px] leading-none text-warning" title={`表里第 1 档「${topDisabled}」未启用, 已跳过`}>
+              <span className="shrink-0 text-micro leading-none text-warning" title={`表里第 1 档「${topDisabled}」未启用, 已跳过`}>
                 ⚠
               </span>
             )}
@@ -495,8 +495,8 @@ function AIConfigBadge({ configured, model }: { configured?: boolean; model?: st
           </>
         ) : (
           <>
-            <span className="text-[11px] text-secondary group-hover:text-foreground transition-colors">AI 配置</span>
-            <span className="ml-auto text-[11px] font-mono leading-none text-muted">未配置</span>
+            <span className="text-xs text-secondary group-hover:text-foreground transition-colors">AI 配置</span>
+            <span className="ml-auto text-xs font-mono leading-none text-muted">未配置</span>
           </>
         )}
         <span className={`ml-auto h-1.5 w-1.5 rounded-full shrink-0 ${isConfigured ? 'bg-bear' : 'bg-warning'}`} />
@@ -509,11 +509,11 @@ function AIConfigBadge({ configured, model }: { configured?: boolean; model?: st
           style={{ left: menuPos.left, top: menuPos.top }}
           className="fixed z-[60] w-60 rounded-card border border-border bg-surface p-1 shadow-xl"
         >
-          <div className="px-2 py-1 text-[9px] text-muted">
+          <div className="px-2 py-1 text-micro text-muted">
             首选档位 · 用不了时自动顺位试下一档
           </div>
           {managed.length === 0 ? (
-            <div className="px-2 py-2 text-[10px] text-muted">还没有档位 —— 去 AI 设置里添加</div>
+            <div className="px-2 py-2 text-micro text-muted">还没有档位 —— 去 AI 设置里添加</div>
           ) : managed.map((p, i) => {
             const label = p.label?.trim() || p.model
             const isPrimary = primary?.id === p.id
@@ -523,13 +523,13 @@ function AIConfigBadge({ configured, model }: { configured?: boolean; model?: st
                 onClick={() => !isPrimary && switchTo.mutate(p.id)}
                 disabled={switchTo.isPending}
                 className={cn(
-                  'flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-[11px] transition-colors disabled:opacity-60',
+                  'flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs transition-colors disabled:opacity-60',
                   isPrimary ? 'bg-accent/10 text-accent' : 'text-secondary hover:bg-elevated hover:text-foreground',
                 )}
               >
-                <span className="w-3 shrink-0 text-center font-mono text-[9px] text-muted">{i + 1}</span>
+                <span className="w-3 shrink-0 text-center font-mono text-micro text-muted">{i + 1}</span>
                 <span className="min-w-0 flex-1 truncate">{label}</span>
-                {!p.enabled && <span className="shrink-0 text-[9px] text-warning">未启用</span>}
+                {!p.enabled && <span className="shrink-0 text-micro text-warning">未启用</span>}
                 {isPrimary && <CheckCircle2 className="h-3 w-3 shrink-0" />}
               </button>
             )
@@ -538,7 +538,7 @@ function AIConfigBadge({ configured, model }: { configured?: boolean; model?: st
             <NavLink
               to="/settings?tab=ai"
               onClick={() => setMenuPos(null)}
-              className="block rounded px-2 py-1.5 text-[10px] text-muted transition-colors hover:bg-elevated hover:text-foreground"
+              className="block rounded px-2 py-1.5 text-micro text-muted transition-colors hover:bg-elevated hover:text-foreground"
             >
               管理档位(增删 / 改 Key / 排序) →
             </NavLink>
@@ -584,7 +584,7 @@ function PlainNavLink({ item, collapsed, indent, dataSyncing, dataSyncJustDone }
             <Icon className={cn('h-4 w-4 shrink-0 transition-colors', isActive ? 'text-accent' : 'text-foreground/60 group-hover:text-foreground/85')} />
             {!collapsed && <span className="flex-1">{label}</span>}
             {!collapsed && badge && (
-              <span className="ml-auto inline-flex items-center rounded-btn border border-amber-400/30 bg-amber-400/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-amber-400 shrink-0">
+              <span className="ml-auto inline-flex items-center rounded-btn border border-warning/30 bg-warning/10 px-1.5 py-0.5 text-micro font-semibold uppercase tracking-wider text-warning shrink-0">
                 {badge}
               </span>
             )}
@@ -1088,7 +1088,7 @@ export function Layout() {
                     {!railMode && (
                       <>
                         <span className="flex-1 text-left">{BROWSE_GROUP.label}</span>
-                        <span className="shrink-0 font-mono text-[10px] text-muted">{browsePaths.length}</span>
+                        <span className="shrink-0 font-mono text-micro text-muted">{browsePaths.length}</span>
                         {browseOpen
                           ? <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted" />
                           : <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted" />}
@@ -1140,7 +1140,7 @@ export function Layout() {
                     <NavLink
                       to="/watchlist"
                       className={({ isActive }) => cn(
-                        'flex items-center gap-2 rounded-btn py-1.5 pl-9 pr-3 text-[12px] transition-colors duration-hover ease-smooth',
+                        'flex items-center gap-2 rounded-btn py-1.5 pl-9 pr-3 text-xs transition-colors duration-hover ease-smooth',
                         isActive && !location.search
                           ? 'text-accent font-medium'
                           : 'text-foreground/60 hover:text-foreground hover:bg-elevated/50',
@@ -1151,7 +1151,7 @@ export function Layout() {
                       {(() => {
                         const info = navGroupPcts['all']
                         return info && info.pct != null ? (
-                          <span className={`ml-auto font-mono text-[10px] tabular-nums ${groupPctColor(info.pct)}`} title={groupPctTitle(info)}>
+                          <span className={`ml-auto font-mono text-micro tabular-nums ${groupPctColor(info.pct)}`} title={groupPctTitle(info)}>
                             {fmtPct(info.pct)}
                           </span>
                         ) : null
@@ -1167,7 +1167,7 @@ export function Layout() {
                           key={group.id}
                           to={groupPath}
                           className={cn(
-                            'flex items-center gap-2 rounded-btn py-1.5 pl-9 pr-3 text-[12px] transition-colors duration-hover ease-smooth',
+                            'flex items-center gap-2 rounded-btn py-1.5 pl-9 pr-3 text-xs transition-colors duration-hover ease-smooth',
                             isGroupActive
                               ? 'text-accent font-medium'
                               : 'text-foreground/60 hover:text-foreground hover:bg-elevated/50',
@@ -1176,7 +1176,7 @@ export function Layout() {
                           <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${color.dot}`} />
                           <span className="truncate">{group.name}</span>
                           {pctInfo && pctInfo.pct != null && (
-                            <span className={`ml-auto font-mono text-[10px] tabular-nums ${groupPctColor(pctInfo.pct)}`} title={groupPctTitle(pctInfo)}>
+                            <span className={`ml-auto font-mono text-micro tabular-nums ${groupPctColor(pctInfo.pct)}`} title={groupPctTitle(pctInfo)}>
                               {fmtPct(pctInfo.pct)}
                             </span>
                           )}
@@ -1215,11 +1215,11 @@ export function Layout() {
             <div>
               <div className="flex items-center justify-between">
                 <span className="text-xs text-secondary truncate">实时行情</span>
-                <span className="text-[10px] text-muted/80 bg-elevated px-1.5 py-0.5 rounded">
+                <span className="text-micro text-muted/80 bg-elevated px-1.5 py-0.5 rounded">
                   不可用
                 </span>
               </div>
-              <div className="mt-1.5 text-[10px] leading-snug text-muted">
+              <div className="mt-1.5 text-micro leading-snug text-muted">
                 当前数据源无实时行情权限,
                 <button
                   type="button"
@@ -1239,7 +1239,7 @@ export function Layout() {
                   <div className="text-xs font-medium leading-none text-foreground">实时行情</div>
                   {/* [R127] 允许换行: 侧栏只有 230px, 「fuyao · 等待交易时段 · 自动」
                       挤一行时数据源名会被截成空白。宁可占两行, 也别把信息挤没。 */}
-                  <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-1 gap-y-0.5 text-[10px] leading-tight">
+                  <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-1 gap-y-0.5 text-micro leading-tight">
                     <span className="truncate text-muted">{realtimeProviderName || realtimeModeLabel}</span>
                     <span className="shrink-0 text-border" aria-hidden="true">·</span>
                     <span className={`shrink-0 ${realtimeStatusClass}`}>{realtimeStatusLabel}</span>
@@ -1318,13 +1318,13 @@ export function Layout() {
             && (!realtimeUnavailable || realtimeProviderName)
             && (isPaused || (isWatchlistMode && !dismissFreeHint && !realtimeProviderName))
             && (
-              <div className="mt-1.5 text-[10px] leading-snug space-y-0.5">
+              <div className="mt-1.5 text-micro leading-snug space-y-0.5">
                 {isWatchlistMode && !dismissFreeHint && !realtimeProviderName && (
-                  <div className="flex items-start gap-1 text-amber-400/80">
+                  <div className="flex items-start gap-1 text-warning/80">
                     <span className="flex-1">自选实时模式监控前 5 只，全市场实时依赖数据源支持</span>
                     <button
                       onClick={() => setDismissFreeHint(true)}
-                      className="text-amber-400/50 hover:text-amber-400 shrink-0 transition-colors"
+                      className="text-warning/50 hover:text-warning shrink-0 transition-colors"
                       title="关闭提示"
                     >
                       <X className="h-2.5 w-2.5" />
@@ -1371,7 +1371,7 @@ export function Layout() {
                   <Settings className={cn('h-4 w-4 shrink-0 transition-colors', isActive ? 'text-accent' : 'text-foreground/60 group-hover:text-foreground/85')} />
                   {!railMode && <span>设置</span>}
                   {!railMode && version && (
-                    <span className="ml-auto font-mono text-[10px] text-muted/50 select-none shrink-0">
+                    <span className="ml-auto font-mono text-micro text-muted/50 select-none shrink-0">
                       {version}
                     </span>
                   )}
@@ -1392,7 +1392,7 @@ export function Layout() {
           <div
             role="status"
             aria-live="polite"
-            className="fixed bottom-4 left-1/2 z-[9998] flex -translate-x-1/2 items-center gap-1.5 rounded-full border border-warning/30 bg-warning/10 px-2.5 py-1 text-[11px] font-medium text-warning shadow-lg backdrop-blur-md"
+            className="fixed bottom-4 left-1/2 z-[9998] flex -translate-x-1/2 items-center gap-1.5 rounded-full border border-warning/30 bg-warning/10 px-2.5 py-1 text-xs font-medium text-warning shadow-lg backdrop-blur-md"
           >
             <WifiOff className="h-3 w-3 shrink-0 animate-pulse" />
             与服务连接已断开 · 正在重连

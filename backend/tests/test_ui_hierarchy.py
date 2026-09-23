@@ -20,6 +20,9 @@ MIGRATED: list[str] = [
     "components/stock-preview/ChartLevelsSection.tsx",
     "components/stock-preview/ReviewSection.tsx",
     "components/ui/SectionTitle.tsx",
+    "components/Layout.tsx",
+    "components/PageHeader.tsx",
+    "components/PageShell.tsx",
 ]
 
 
