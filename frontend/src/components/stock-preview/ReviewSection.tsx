@@ -2,9 +2,8 @@
  * [R431] 个股弹窗重做第三块:「复盘」。
  *
  * 用户给的排版图, 从上到下三样:
- *   1. 逐日复盘 —— 旧复盘页「趋势状态」「通道档位」两个页签各一张逐日表。R431 并成过
- *      一张, [R442] 用户: 「逐日复盘并没有和之前一模一样」—— 回到两张表、页签切换,
- *      内容逐格照抄旧页, 只换样式(见下方「1. 逐日复盘」);
+ *   1. 逐日复盘 —— 旧复盘页「趋势状态」那一页的逐日表, 逐格照抄, 只换样式
+ *      (R431 并表 → R442 拆回两张 → R444 只留趋势状态, 见下方「1. 逐日复盘」);
  *   2. 两套买卖的对比 —— 跟着做 / 一直拿着 / 多赚 / 买卖次数 / 规则, 一套一行
  *      ([R441] 「按档位买卖 · 通道」那一行删了, 只剩六态);
  *   3. 六个状态在这只票上的历史表现 —— **只摆数, 不下结论**(用户选的):
@@ -30,7 +29,7 @@ import { trendBadgeCls } from '@/components/stock-analysis/TrendStateBar'
 import { VerdictHover } from '@/components/stock-analysis/VerdictHover'
 import {
   EvidencePanel, FLIP_BASIS, LimitTag, SUB_STATE_TIP, VERDICT_CLS,
-  chgCls, pct, useStockReview, type ReviewTab,
+  chgCls, pct, useStockReview,
 } from '@/components/stock-analysis/StockReviewDialog'
 import {
   FlipTradeCells, REASON_CN, TRADE_STAT_TIPS, legsByFlipDate, tradeNotes,
@@ -41,12 +40,7 @@ import { SectionTitle } from './SectionTitle'
 /** 走完不到这么多段, 「这只票的表现」就提醒样本太少(与图里脚注同一个数) */
 const THIN = 3
 
-export function ReviewSection({ symbol, days, tab = 'trend' }: {
-  symbol: string
-  days: number
-  /** [R442] 逐日复盘先看哪一页 —— 与旧复盘页同一个入参(决策台「走势 / 位置」点进来带着它) */
-  tab?: ReviewTab
-}) {
+export function ReviewSection({ symbol, days }: { symbol: string; days: number }) {
   const q = useStockReview(symbol, days)
   const d: StockReview | undefined = q.data
   const ok = !!d && !d.error
@@ -66,7 +60,7 @@ export function ReviewSection({ symbol, days, tab = 'trend' }: {
         {d?.error && (
           <div className="rounded-card border border-border bg-surface px-4 py-16 text-center text-xs text-muted">{d.error}</div>
         )}
-        {ok && <DailyCard d={d} initialTab={tab} />}
+        {ok && <DailyCard d={d} />}
         {ok && <SummaryCard d={d} />}
       </div>
     </section>
@@ -76,11 +70,11 @@ export function ReviewSection({ symbol, days, tab = 'trend' }: {
 // ===== 1. 逐日复盘 =====
 //
 // [R442] 用户: 「逐日复盘并没有和之前一模一样」。R431 把旧复盘页「趋势状态」「通道档位」
-// 两个页签的逐日表并成了一张, 光换回原话(R440)不够 —— 并表本身就改了内容: 趋势表里的
-// 「通道档位」列多出了「← 换档」与「三档都在中部」、列的次序变了、两套动作挤进同一格、
-// 行高亮与筛选按两套取并集。这里回到**旧的两张表, 页签切换**, 每张表逐格照抄旧页
-// (`StockReviewDialog` 的 TrendView / VerdictView 里那两张表), 只换样式。
-// 守卫把新旧两张表去掉 className 之后逐字比对。
+// 两个页签的逐日表并成了一张, 光换回原话(R440)不够 —— 并表本身就改了内容。
+// [R444] 用户: 「我只看转折所以我有趋势状态就行了, 通道已经在结果列有显示」——
+// 只留旧「趋势状态」页那张表(它最后一列就是通道档位), 「通道档位」那一页与页签撤了。
+// 表、筛选开关、脚注逐格照抄旧页(`StockReviewDialog` 的 TrendView), 只换样式;
+// 守卫把新旧去掉 className 之后逐字比对。
 
 const TH = 'whitespace-nowrap px-2 py-2 font-normal'
 const TD = 'whitespace-nowrap px-2 py-2'
@@ -88,11 +82,8 @@ const BADGE = 'inline-flex whitespace-nowrap rounded-btn border px-1.5 py-0.5 te
 const MARK = 'ml-1.5 text-micro text-warning'
 const DASH = 'text-micro text-muted/40'
 
-function DailyCard({ d, initialTab }: { d: StockReview; initialTab: ReviewTab }) {
-  // 与旧页同一个归一: 'combo' 落到通道档位那一页
-  const [tab, setTab] = useState<'trend' | 'verdict'>(
-    initialTab === 'trend' ? 'trend' : 'verdict')
-  // 趋势视图专用: 只看有事的日子。与旧页一样挂在页签外面, 切页签不丢
+function DailyCard({ d }: { d: StockReview }) {
+  // 趋势视图专用: 只看有事的日子(与旧页同一个判据)
   const [onlyMarked, setOnlyMarked] = useState(false)
   const trendRows = useMemo(() => {
     const all = d?.rows ?? []
@@ -102,33 +93,16 @@ function DailyCard({ d, initialTab }: { d: StockReview; initialTab: ReviewTab })
 
   return (
     <div className="rounded-card border border-border bg-surface">
-      <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
-        <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
-          <span className="text-base font-semibold text-foreground">逐日复盘</span>
-          <span className="text-micro text-muted">
-            {d.start} ~ {d.end} · {d.days} 个交易日
-            {tab === 'trend' && ` · 六态阈值 ${(d.threshold * 100).toFixed(0)}%${d.threshold_source !== 'default' ? `(${d.threshold_source})` : ''}`}
-          </span>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {([['trend', '趋势状态'], ['verdict', '通道档位']] as const).map(([k, label]) => (
-            <button
-              key={k}
-              onClick={() => setTab(k)}
-              aria-pressed={tab === k}
-              className={`${PILL} ${tab === k ? PILL_ON : PILL_IDLE}`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-4 py-3">
+        <span className="text-base font-semibold text-foreground">逐日复盘</span>
+        {/* 旧「趋势状态」页页头那一句 */}
+        <span className="text-micro text-muted">
+          {d.start} ~ {d.end} · {d.days} 个交易日
+          {` · 六态阈值 ${(d.threshold * 100).toFixed(0)}%${d.threshold_source !== 'default' ? `(${d.threshold_source})` : ''}`}
+        </span>
       </div>
-
-      {tab === 'trend' && (
-        <TrendTable d={d} rows={trendRows} onlyMarked={onlyMarked}
-                    onToggleMarked={() => setOnlyMarked((v) => !v)} />
-      )}
-      {tab === 'verdict' && <VerdictTable d={d} />}
+      <TrendTable d={d} rows={trendRows} onlyMarked={onlyMarked}
+                  onToggleMarked={() => setOnlyMarked((v) => !v)} />
     </div>
   )
 }
@@ -223,81 +197,6 @@ function TrendTable({ d, rows, onlyMarked, onToggleMarked }: {
       <div className="px-4 py-3 text-micro leading-5 text-muted">
         收盘口径, 与决策台「趋势」列同一个状态机、同一个阈值(含你自己调过的那个)。
         「通道档位」列悬停看完整卡片; 要摊开每一档说了什么、之后走成什么样, 切到上方的「通道档位」那一页。
-      </div>
-    </>
-  )
-}
-
-/** 旧「通道档位」页那张逐日表。筛选开关与旧页一样挂在这一页里, 切走再回来就复位 */
-function VerdictTable({ d }: { d: StockReview }) {
-  const [onlyMarked, setOnlyMarked] = useState(false)
-  const legs = legsByFlipDate(d.verdict_trades)
-  const rows = onlyMarked ? d.rows.filter((r) => r.verdict_flipped) : d.rows
-  return (
-    <>
-      <div className="flex items-center justify-end gap-2 px-4 pb-3">
-        <button
-          onClick={() => setOnlyMarked((v) => !v)}
-          title="只留下档位换过的那些天 —— 其余日子档位没变, 复盘时没有信息"
-          className={`${PILL} ${onlyMarked ? PILL_ON : PILL_IDLE}`}
-        >
-          只看换档的日子
-        </button>
-      </div>
-
-      <div className="max-h-[560px] overflow-auto border-t border-border/60">
-        <table className="w-full text-xs">
-          <thead className="sticky top-0 z-10 bg-elevated">
-            <tr className="text-micro text-muted">
-              <th className={`${TH} pl-4 text-left`}>日期</th>
-              <th className={`${TH} text-right`}>收盘</th>
-              <th className={`${TH} text-right`}>涨跌</th>
-              <th className={`${TH} px-3 text-left`} title="当天三档通道合起来给出的那一句结论, 悬停看完整卡片">通道档位</th>
-              <th className={`${TH} text-left`} title="按档位买卖: 这次换档的次日开盘该干什么">动作</th>
-              <th className={`${TH} text-right`} title="成交日与成交价 → 了结日与了结价, 都是开盘价">成交 → 了结</th>
-              <th className={`${TH} pr-4 text-right`} title="多头段是真赚到的; 空头段是空仓期间股价的涨跌, 不是你的盈亏">结果</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => (
-              <tr
-                key={r.date}
-                className={cn('border-b border-border/30', r.verdict_flipped && 'bg-warning/[0.06]')}
-              >
-                <td className={`${TD} pl-4 font-mono text-secondary`}>{r.date}</td>
-                <td className={`${TD} text-right font-mono font-medium tabular-nums text-foreground`}>{r.close.toFixed(2)}</td>
-                <td className={`${TD} text-right font-mono tabular-nums ${chgCls(r.change_pct)}`}>
-                  {pct(r.change_pct, 2)}
-                  <LimitTag r={r} />
-                </td>
-                <td className={`${TD} px-3`}>
-                  {r.verdict ? (
-                    <VerdictHover v={r.verdict} note="收盘口径">
-                      <span className={`${BADGE} cursor-help ${VERDICT_CLS[r.verdict.tone]}`}>
-                        {r.verdict.title}
-                      </span>
-                    </VerdictHover>
-                  ) : <span className={DASH}>三档都在中部</span>}
-                  {r.verdict_flipped && (
-                    <span className={MARK} title="这天通道档位换了一档">
-                      ← 换档
-                    </span>
-                  )}
-                </td>
-                <FlipTradeCells leg={legs.get(r.date)} />
-              </tr>
-            ))}
-            {rows.length === 0 && (
-              <tr><td colSpan={7} className="px-4 py-10 text-center text-xs text-muted">这段时间里档位一次都没换过</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="px-4 py-3 text-micro leading-5 text-muted">
-        「通道档位」列悬停看完整卡片 —— 与决策台「档位」列是同一张。一律按收盘算, 用的是同一套通道。
-        历史是按<b className="text-secondary">当前</b>复权价重新算的 —— 期间除过权的话,
-        同一天今天算出来的通道会和当时屏幕上略有出入, 复盘看的是形态与节奏。
       </div>
     </>
   )

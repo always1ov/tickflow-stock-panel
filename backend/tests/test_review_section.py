@@ -61,12 +61,11 @@ def test_R431_当前状态那一行高亮_没出现过的也占一行():
 
 def test_R441_对比表没有按档位买卖那一行():
     """[R441] 用户指着「按档位买卖 · 通道 +1.2% +11.8% -10.6% 1 次 ...」那一行: 「删除」。
-    只删对比表那一行; 逐日表里通道的一笔笔动作是旧表原有内容, 留着(R440)。"""
+    只删对比表那一行。(逐日表里通道的一笔笔动作 R444 随「通道档位」那一页一起撤了。)"""
     sec = code_of(SEC)
     summary = sec[sec.index("function SummaryCard"):sec.index("function SystemRow")]
     assert "verdict_trades" not in summary and "按档位买卖" not in summary and "VERDICT_BASIS" not in sec
     assert "{ name: '按转折买卖 · 六态', ft: d.flip_trades, basis: FLIP_BASIS }" in summary
-    assert "legsByFlipDate(d.verdict_trades)" in sec, "逐日表里通道那一笔笔动作不该跟着删"
 
 
 def _strip_class(src: str) -> str:
@@ -113,33 +112,26 @@ def _pieces(src: str, view: str) -> list[str]:
     return [_strip_class(x) for x in (button, table, foot)]
 
 
-def test_R442_逐日复盘是旧两张表_去掉样式后逐字一样():
-    """[R442] 用户: 「逐日复盘并没有和之前一模一样」(之前一句: 「可以保留样式, 但是内容必须和
-    以前一模一样, 不多也不少」)。R431 并过表, R440 只换回了原话, 并表本身多出了东西。
-    现在是旧的两张表、页签切换: 两张表连同各自的筛选开关、脚注, 去掉 className 后必须与旧页逐字一样。"""
+def test_R444_逐日复盘就是旧趋势状态那张表_去掉样式后逐字一样():
+    """[R442 → R444] 用户: 「逐日复盘还是没完全一样啊, 我只看转折所以我有趋势状态就行了,
+    通道已经在结果列有显示, 所以才叫你和以前一模一样的显示这部分」。
+    只留旧「趋势状态」页那张表: 表、筛选开关、脚注去掉 className 后必须与旧页逐字一样。"""
     old, new = code_of(OLD), code_of(SEC)
-    for old_view, new_view in (("function TrendView(", "function TrendTable("),
-                               ("function VerdictView(", "function VerdictTable(")):
-        for o, n in zip(_pieces(old, old_view), _pieces(new, new_view)):
-            assert o == n, f"{new_view} 与旧页不一样:\n新: {n}\n旧: {o}"
-    # 两页的数据源与旧页一样: 趋势那页吃按转折买卖、通道那页吃按档位买卖
-    assert "legsByFlipDate(d.flip_trades)" in new[new.index("function TrendTable("):new.index("function VerdictTable(")]
-    assert "legsByFlipDate(d.verdict_trades)" in new[new.index("function VerdictTable("):]
-    # 筛选与旧页同一个判据
+    for o, n in zip(_pieces(old, "function TrendView("), _pieces(new, "function TrendTable(")):
+        assert o == n, f"与旧「趋势状态」页不一样:\n新: {n}\n旧: {o}"
+    assert "legsByFlipDate(d.flip_trades)" in new
     assert "r.limit_up || r.limit_down || r.broken_limit_up || r.trend?.flipped" in new
-    assert "const rows = onlyMarked ? d.rows.filter((r) => r.verdict_flipped) : d.rows" in new
-    # 页签、页头那一行与旧页同一句
-    for t in ("([['trend', '趋势状态'], ['verdict', '通道档位']] as const)",
-              "{d.start} ~ {d.end} · {d.days} 个交易日",
-              "{tab === 'trend' && ` · 六态阈值 ${(d.threshold * 100).toFixed(0)}%${d.threshold_source !== 'default' ? `(${d.threshold_source})` : ''}`}",
-              "initialTab === 'trend' ? 'trend' : 'verdict'"):
+    # 页头那一句(旧页在趋势状态页签下的样子)
+    for t in ("{d.start} ~ {d.end} · {d.days} 个交易日",
+              "` · 六态阈值 ${(d.threshold * 100).toFixed(0)}%${d.threshold_source !== 'default' ? `(${d.threshold_source})` : ''}`"):
         assert t in old and t in new, f"「{t}」与旧页对不上"
-    # 并表时代的东西不许回来
-    for gone in ("TradeCells six=", "[['六态', six], ['通道', ch]]", "emptyText(", "ACT_TIP", "setShifted"):
-        assert gone not in new, f"「{gone}」是并表时的东西"
+    # 通道档位那一页、页签、并表时代的东西都不许回来
+    for gone in ("VerdictTable", "只看换档的日子", "legsByFlipDate(d.verdict_trades)", "setTab(",
+                 "TradeCells six=", "emptyText(", "ACT_TIP", "setShifted"):
+        assert gone not in new, f"「{gone}」—— 用户只要趋势状态那张表"
 
 
-def test_R442_换票复位_先看哪一页跟着入口():
+def test_R442_换票复位():
     dlg = code_of(DLG)
     call = dlg[dlg.index("<ReviewSection"):dlg.index("/>", dlg.index("<ReviewSection"))]
-    assert "key={symbol}" in call and "tab={reviewTab}" in call
+    assert "key={symbol}" in call

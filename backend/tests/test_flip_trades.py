@@ -1462,7 +1462,8 @@ def test_R293_每一笔只有一份写法():
         assert part in cells, f"「{part}」: 旧表那三格没走同一份实现"
     # [R442] 新「复盘」块回到旧的两张表, 那三格直接用旧表同一个 `FlipTradeCells`
     new = code_of("components/stock-preview/ReviewSection.tsx")
-    assert new.count("<FlipTradeCells leg={legs.get(r.date)} />") == 2, "新表那三格没走旧表同一份实现"
+    # [R444] 只留趋势状态那一张表
+    assert new.count("<FlipTradeCells leg={legs.get(r.date)} />") == 1, "新表那三格没走旧表同一份实现"
 
 
 def test_R293_这N天那一行按语气分档而不是十档全铺():
