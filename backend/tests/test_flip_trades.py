@@ -1458,9 +1458,11 @@ def test_R293_每一笔只有一份写法():
         assert shared in body, f"「{shared}」不在 {fn} 里"
         assert panel.count(shared) == 1, f"「{shared}」又写了第二份"
     cells = panel[panel.index("export function FlipTradeCells"):panel.index("export function LegAct")]
-    new = code_of("components/stock-preview/ReviewSection.tsx")
     for part in ("<LegAct leg=", "<LegFill leg=", "<LegResult leg=", "legResultCls("):
-        assert part in cells and part in new, f"「{part}」: 旧表与新表没走同一份实现"
+        assert part in cells, f"「{part}」: 旧表那三格没走同一份实现"
+    # [R442] 新「复盘」块回到旧的两张表, 那三格直接用旧表同一个 `FlipTradeCells`
+    new = code_of("components/stock-preview/ReviewSection.tsx")
+    assert new.count("<FlipTradeCells leg={legs.get(r.date)} />") == 2, "新表那三格没走旧表同一份实现"
 
 
 def test_R293_这N天那一行按语气分档而不是十档全铺():

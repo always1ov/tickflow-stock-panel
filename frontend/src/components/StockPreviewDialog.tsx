@@ -457,7 +457,8 @@ export function StockPreviewDialog({ symbol: symbolProp, name: nameProp, onClose
 
               {/* [R431] 新「复盘」(用户排版图第三块)。天数跟头部走; 旧的复盘页仍在旧顶栏里 */}
               <div>
-                <ReviewSection symbol={symbol} days={reviewDays} />
+                {/* [R442] key 跟着票走、先看哪一页跟着入口走 —— 与旧复盘页一样 */}
+                <ReviewSection key={symbol} symbol={symbol} days={reviewDays} tab={reviewTab} />
               </div>
               </div>
 

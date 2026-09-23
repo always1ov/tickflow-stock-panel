@@ -2,9 +2,9 @@
  * [R431] 个股弹窗重做第三块:「复盘」。
  *
  * 用户给的排版图, 从上到下三样:
- *   1. 逐日复盘 —— 原来「趋势状态」「通道档位」两个页签各一张逐日表, 并成一张:
- *      六态状态与通道档位并排, 动作 / 成交→了结 / 结果**两套都显示**(用户选的),
- *      同一天两套都动了手就上下两行, 前面标「六态」「通道」;
+ *   1. 逐日复盘 —— 旧复盘页「趋势状态」「通道档位」两个页签各一张逐日表。R431 并成过
+ *      一张, [R442] 用户: 「逐日复盘并没有和之前一模一样」—— 回到两张表、页签切换,
+ *      内容逐格照抄旧页, 只换样式(见下方「1. 逐日复盘」);
  *   2. 两套买卖的对比 —— 跟着做 / 一直拿着 / 多赚 / 买卖次数 / 规则, 一套一行
  *      ([R441] 「按档位买卖 · 通道」那一行删了, 只剩六态);
  *   3. 六个状态在这只票上的历史表现 —— **只摆数, 不下结论**(用户选的):
@@ -19,10 +19,7 @@
  * 数据与旧页同一个查询(`useStockReview`), 天数跟头部的 60 / 120 / 250 日走。
  *
  * [R440] 用户: 「逐日复盘可以保留样式, 但是内容必须和以前一模一样, 不多也不少」。
- * R431 并表时改写过几句(开关悬停、动作表头、空表那句、脚注, 阈值挪进了脚注),
- * 全部换回旧两张表的原话; 旧页页头的「六态阈值 N%」回到表头那一行。
- * 并成一张表唯一多出来的是动作三格前的「六态」「通道」两个小字 —— 旧表靠页签区分,
- * 并表之后只能靠它。
+ * R440 只把改写过的几句换回原话, 仍是一张并表; R442 连并表一起撤了。
  */
 import { useMemo, useState } from 'react'
 import { Loader2 } from 'lucide-react'
@@ -33,11 +30,10 @@ import { trendBadgeCls } from '@/components/stock-analysis/TrendStateBar'
 import { VerdictHover } from '@/components/stock-analysis/VerdictHover'
 import {
   EvidencePanel, FLIP_BASIS, LimitTag, SUB_STATE_TIP, VERDICT_CLS,
-  chgCls, pct, useStockReview,
+  chgCls, pct, useStockReview, type ReviewTab,
 } from '@/components/stock-analysis/StockReviewDialog'
 import {
-  LegAct, LegFill, LegResult, REASON_CN, TRADE_STAT_TIPS, legResultCls, legsByFlipDate, tradeNotes,
-  type Leg,
+  FlipTradeCells, REASON_CN, TRADE_STAT_TIPS, legsByFlipDate, tradeNotes,
 } from '@/components/stock-analysis/FlipTradesPanel'
 import { PILL, PILL_IDLE, PILL_ON } from './pill'
 import { SectionTitle } from './SectionTitle'
@@ -45,7 +41,12 @@ import { SectionTitle } from './SectionTitle'
 /** 走完不到这么多段, 「这只票的表现」就提醒样本太少(与图里脚注同一个数) */
 const THIN = 3
 
-export function ReviewSection({ symbol, days }: { symbol: string; days: number }) {
+export function ReviewSection({ symbol, days, tab = 'trend' }: {
+  symbol: string
+  days: number
+  /** [R442] 逐日复盘先看哪一页 —— 与旧复盘页同一个入参(决策台「走势 / 位置」点进来带着它) */
+  tab?: ReviewTab
+}) {
   const q = useStockReview(symbol, days)
   const d: StockReview | undefined = q.data
   const ok = !!d && !d.error
@@ -65,7 +66,7 @@ export function ReviewSection({ symbol, days }: { symbol: string; days: number }
         {d?.error && (
           <div className="rounded-card border border-border bg-surface px-4 py-16 text-center text-xs text-muted">{d.error}</div>
         )}
-        {ok && <DailyCard d={d} />}
+        {ok && <DailyCard d={d} initialTab={tab} />}
         {ok && <SummaryCard d={d} />}
       </div>
     </section>
@@ -73,177 +74,231 @@ export function ReviewSection({ symbol, days }: { symbol: string; days: number }
 }
 
 // ===== 1. 逐日复盘 =====
+//
+// [R442] 用户: 「逐日复盘并没有和之前一模一样」。R431 把旧复盘页「趋势状态」「通道档位」
+// 两个页签的逐日表并成了一张, 光换回原话(R440)不够 —— 并表本身就改了内容: 趋势表里的
+// 「通道档位」列多出了「← 换档」与「三档都在中部」、列的次序变了、两套动作挤进同一格、
+// 行高亮与筛选按两套取并集。这里回到**旧的两张表, 页签切换**, 每张表逐格照抄旧页
+// (`StockReviewDialog` 的 TrendView / VerdictView 里那两张表), 只换样式。
+// 守卫把新旧两张表去掉 className 之后逐字比对。
 
-function DailyCard({ d }: { d: StockReview }) {
-  // 两个筛选各管各的, 都开 = 两类日子都留(并集)。都关 = 全部
-  const [marked, setMarked] = useState(false)
-  const [shifted, setShifted] = useState(false)
-  const six = useMemo(() => legsByFlipDate(d.flip_trades), [d])
-  const ch = useMemo(() => legsByFlipDate(d.verdict_trades), [d])
-  const rows = useMemo(() => {
-    if (!marked && !shifted) return d.rows
-    return d.rows.filter(r =>
-      (marked && (r.limit_up || r.limit_down || r.broken_limit_up || !!r.trend?.flipped))
-      || (shifted && !!r.verdict_flipped))
-  }, [d, marked, shifted])
+const TH = 'whitespace-nowrap px-2 py-2 font-normal'
+const TD = 'whitespace-nowrap px-2 py-2'
+const BADGE = 'inline-flex whitespace-nowrap rounded-btn border px-1.5 py-0.5 text-micro'
+const MARK = 'ml-1.5 text-micro text-warning'
+const DASH = 'text-micro text-muted/40'
+
+function DailyCard({ d, initialTab }: { d: StockReview; initialTab: ReviewTab }) {
+  // 与旧页同一个归一: 'combo' 落到通道档位那一页
+  const [tab, setTab] = useState<'trend' | 'verdict'>(
+    initialTab === 'trend' ? 'trend' : 'verdict')
+  // 趋势视图专用: 只看有事的日子。与旧页一样挂在页签外面, 切页签不丢
+  const [onlyMarked, setOnlyMarked] = useState(false)
+  const trendRows = useMemo(() => {
+    const all = d?.rows ?? []
+    if (!onlyMarked) return all
+    return all.filter((r) => r.limit_up || r.limit_down || r.broken_limit_up || r.trend?.flipped)
+  }, [d, onlyMarked])
 
   return (
     <div className="rounded-card border border-border bg-surface">
       <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
-        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
           <span className="text-base font-semibold text-foreground">逐日复盘</span>
-          {/* [R440] 旧「趋势状态」页页头那一句, 原样 */}
           <span className="text-micro text-muted">
-            六态阈值 {(d.threshold * 100).toFixed(0)}%{d.threshold_source !== 'default' ? `(${d.threshold_source})` : ''}
+            {d.start} ~ {d.end} · {d.days} 个交易日
+            {tab === 'trend' && ` · 六态阈值 ${(d.threshold * 100).toFixed(0)}%${d.threshold_source !== 'default' ? `(${d.threshold_source})` : ''}`}
           </span>
         </div>
         <div className="flex flex-wrap gap-2">
-          {/* [R440] 两个开关的悬停与旧两页逐字一致 */}
-          <button type="button" onClick={() => setMarked(v => !v)} aria-pressed={marked}
-                  title="只留下有涨跌停、或趋势翻转的那些天 —— 其余日子状态没变, 复盘时没有信息"
-                  className={`${PILL} ${marked ? PILL_ON : PILL_IDLE}`}>
-            只看有事的日子
-          </button>
-          <button type="button" onClick={() => setShifted(v => !v)} aria-pressed={shifted}
-                  title="只留下档位换过的那些天 —— 其余日子档位没变, 复盘时没有信息"
-                  className={`${PILL} ${shifted ? PILL_ON : PILL_IDLE}`}>
-            只看换档的日子
-          </button>
+          {([['trend', '趋势状态'], ['verdict', '通道档位']] as const).map(([k, label]) => (
+            <button
+              key={k}
+              onClick={() => setTab(k)}
+              aria-pressed={tab === k}
+              className={`${PILL} ${tab === k ? PILL_ON : PILL_IDLE}`}
+            >
+              {label}
+            </button>
+          ))}
         </div>
+      </div>
+
+      {tab === 'trend' && (
+        <TrendTable d={d} rows={trendRows} onlyMarked={onlyMarked}
+                    onToggleMarked={() => setOnlyMarked((v) => !v)} />
+      )}
+      {tab === 'verdict' && <VerdictTable d={d} />}
+    </div>
+  )
+}
+
+/** 旧「趋势状态」页那张逐日表 */
+function TrendTable({ d, rows, onlyMarked, onToggleMarked }: {
+  d: StockReview
+  rows: ReviewRow[]
+  onlyMarked: boolean
+  onToggleMarked: () => void
+}) {
+  const legs = legsByFlipDate(d.flip_trades)
+  return (
+    <>
+      <div className="flex items-center justify-end gap-2 px-4 pb-3">
+        <button
+          onClick={onToggleMarked}
+          title="只留下有涨跌停、或趋势翻转的那些天 —— 其余日子状态没变, 复盘时没有信息"
+          className={`${PILL} ${onlyMarked ? PILL_ON : PILL_IDLE}`}
+        >
+          只看有事的日子
+        </button>
       </div>
 
       <div className="max-h-[560px] overflow-auto border-t border-border/60">
         <table className="w-full text-xs">
           <thead className="sticky top-0 z-10 bg-elevated">
             <tr className="text-micro text-muted">
-              <th className="whitespace-nowrap px-4 py-2 text-left font-normal">日期</th>
-              <th className="whitespace-nowrap px-2 py-2 text-right font-normal">收盘</th>
-              <th className="whitespace-nowrap px-2 py-2 text-right font-normal">涨跌</th>
-              <th className="whitespace-nowrap px-3 py-2 text-left font-normal">六态状态</th>
-              <th className="whitespace-nowrap px-3 py-2 text-left font-normal"
-                  title="当天三档通道合起来给出的那一句结论, 悬停看完整卡片">通道档位</th>
-              <th className="whitespace-nowrap px-2 py-2 text-left font-normal"
-                  title={ACT_TIP}>动作</th>
-              <th className="whitespace-nowrap px-2 py-2 text-right font-normal"
-                  title="成交日与成交价 → 了结日与了结价, 都是开盘价">成交 → 了结</th>
-              <th className="whitespace-nowrap px-4 py-2 text-right font-normal"
-                  title="多头段是真赚到的; 空头段是空仓期间股价的涨跌, 不是你的盈亏">结果</th>
+              <th className={`${TH} pl-4 text-left`}>日期</th>
+              <th className={`${TH} text-right`}>收盘</th>
+              <th className={`${TH} text-right`}>涨跌</th>
+              <th className={`${TH} px-3 text-left`}>六态状态</th>
+              <th className={`${TH} text-left`} title="按转折买卖: 这次转折的次日开盘该干什么">动作</th>
+              <th className={`${TH} text-right`} title="成交日与成交价 → 了结日与了结价, 都是开盘价">成交 → 了结</th>
+              <th className={`${TH} text-right`} title="多头段是真赚到的; 空头段是空仓期间股价的涨跌, 不是你的盈亏">结果</th>
+              <th className={`${TH} pr-4 text-center`} title="当天三档通道合起来给出的那一句结论 —— 与决策台「档位」列同一句话, 悬停看完整卡片">通道档位</th>
             </tr>
           </thead>
           <tbody>
-            {rows.map(r => (
-              <tr key={r.date}
-                  className={cn('border-b border-border/30 align-top',
-                    (r.trend?.flipped || r.verdict_flipped) && 'bg-warning/[0.06]')}>
-                <td className="whitespace-nowrap px-4 py-2 font-mono text-secondary">{r.date}</td>
-                <td className="whitespace-nowrap px-2 py-2 text-right font-mono font-medium tabular-nums text-foreground">{r.close.toFixed(2)}</td>
-                <td className={cn('whitespace-nowrap px-2 py-2 text-right font-mono tabular-nums', chgCls(r.change_pct))}>
+            {rows.map((r) => (
+              <tr
+                key={r.date}
+                className={cn('border-b border-border/30', r.trend?.flipped && 'bg-warning/[0.06]')}
+              >
+                <td className={`${TD} pl-4 font-mono text-secondary`}>{r.date}</td>
+                <td className={`${TD} text-right font-mono font-medium tabular-nums text-foreground`}>{r.close.toFixed(2)}</td>
+                <td className={`${TD} text-right font-mono tabular-nums ${chgCls(r.change_pct)}`}>
                   {pct(r.change_pct, 2)}
                   <LimitTag r={r} />
                 </td>
-                <td className="whitespace-nowrap px-3 py-2"><TrendCell r={r} /></td>
-                <td className="whitespace-nowrap px-3 py-2"><VerdictCell r={r} /></td>
-                <TradeCells six={six.get(r.date)} ch={ch.get(r.date)} />
+                <td className={`${TD} px-3`}>
+                  {r.trend ? (
+                    <>
+                      <span
+                        className={`${BADGE} ${trendBadgeCls(r.trend.state)}`}
+                        title={`${r.trend.state_cn}(${r.trend.state_en})`}
+                      >
+                        {r.trend.state_cn} 第 {r.trend.day} 天
+                      </span>
+                      {r.trend.sub_state_cn && (
+                        <span className="ml-1 text-micro text-muted/60" title={SUB_STATE_TIP}>
+                          ({r.trend.sub_state_cn})
+                        </span>
+                      )}
+                      {r.trend.flipped && (
+                        <span className={MARK} title="这天六态状态发生了翻转">
+                          ← 转折
+                        </span>
+                      )}
+                    </>
+                  ) : <span className={DASH}>—</span>}
+                </td>
+                <FlipTradeCells leg={legs.get(r.date)} />
+                <td className={`${TD} pr-4 text-center`}>
+                  {r.verdict ? (
+                    <VerdictHover v={r.verdict} note="收盘口径">
+                      <span className={`${BADGE} cursor-help ${VERDICT_CLS[r.verdict.tone]}`}>
+                        {r.verdict.title}
+                      </span>
+                    </VerdictHover>
+                  ) : <span className={DASH}>—</span>}
+                </td>
               </tr>
             ))}
             {rows.length === 0 && (
-              <tr><td colSpan={8} className="px-4 py-10 text-center text-xs text-muted">{emptyText(marked, shifted)}</td></tr>
+              <tr><td colSpan={8} className="px-4 py-10 text-center text-xs text-muted">这段时间里没有涨跌停, 状态也没翻转过</td></tr>
             )}
           </tbody>
         </table>
       </div>
 
-      {/* [R440] 旧两页的脚注原样拼起来。旧「趋势状态」页脚注后半句「要摊开每一档 ... 切到上方的
-          「通道档位」那一页」不要了 —— 那一页的逐日内容就在这张表里, 没有「上方那一页」可切 */}
-      <p className="px-4 py-3 text-micro leading-5 text-muted">
+      <div className="px-4 py-3 text-micro leading-5 text-muted">
         收盘口径, 与决策台「趋势」列同一个状态机、同一个阈值(含你自己调过的那个)。
+        「通道档位」列悬停看完整卡片; 要摊开每一档说了什么、之后走成什么样, 切到上方的「通道档位」那一页。
+      </div>
+    </>
+  )
+}
+
+/** 旧「通道档位」页那张逐日表。筛选开关与旧页一样挂在这一页里, 切走再回来就复位 */
+function VerdictTable({ d }: { d: StockReview }) {
+  const [onlyMarked, setOnlyMarked] = useState(false)
+  const legs = legsByFlipDate(d.verdict_trades)
+  const rows = onlyMarked ? d.rows.filter((r) => r.verdict_flipped) : d.rows
+  return (
+    <>
+      <div className="flex items-center justify-end gap-2 px-4 pb-3">
+        <button
+          onClick={() => setOnlyMarked((v) => !v)}
+          title="只留下档位换过的那些天 —— 其余日子档位没变, 复盘时没有信息"
+          className={`${PILL} ${onlyMarked ? PILL_ON : PILL_IDLE}`}
+        >
+          只看换档的日子
+        </button>
+      </div>
+
+      <div className="max-h-[560px] overflow-auto border-t border-border/60">
+        <table className="w-full text-xs">
+          <thead className="sticky top-0 z-10 bg-elevated">
+            <tr className="text-micro text-muted">
+              <th className={`${TH} pl-4 text-left`}>日期</th>
+              <th className={`${TH} text-right`}>收盘</th>
+              <th className={`${TH} text-right`}>涨跌</th>
+              <th className={`${TH} px-3 text-left`} title="当天三档通道合起来给出的那一句结论, 悬停看完整卡片">通道档位</th>
+              <th className={`${TH} text-left`} title="按档位买卖: 这次换档的次日开盘该干什么">动作</th>
+              <th className={`${TH} text-right`} title="成交日与成交价 → 了结日与了结价, 都是开盘价">成交 → 了结</th>
+              <th className={`${TH} pr-4 text-right`} title="多头段是真赚到的; 空头段是空仓期间股价的涨跌, 不是你的盈亏">结果</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr
+                key={r.date}
+                className={cn('border-b border-border/30', r.verdict_flipped && 'bg-warning/[0.06]')}
+              >
+                <td className={`${TD} pl-4 font-mono text-secondary`}>{r.date}</td>
+                <td className={`${TD} text-right font-mono font-medium tabular-nums text-foreground`}>{r.close.toFixed(2)}</td>
+                <td className={`${TD} text-right font-mono tabular-nums ${chgCls(r.change_pct)}`}>
+                  {pct(r.change_pct, 2)}
+                  <LimitTag r={r} />
+                </td>
+                <td className={`${TD} px-3`}>
+                  {r.verdict ? (
+                    <VerdictHover v={r.verdict} note="收盘口径">
+                      <span className={`${BADGE} cursor-help ${VERDICT_CLS[r.verdict.tone]}`}>
+                        {r.verdict.title}
+                      </span>
+                    </VerdictHover>
+                  ) : <span className={DASH}>三档都在中部</span>}
+                  {r.verdict_flipped && (
+                    <span className={MARK} title="这天通道档位换了一档">
+                      ← 换档
+                    </span>
+                  )}
+                </td>
+                <FlipTradeCells leg={legs.get(r.date)} />
+              </tr>
+            ))}
+            {rows.length === 0 && (
+              <tr><td colSpan={7} className="px-4 py-10 text-center text-xs text-muted">这段时间里档位一次都没换过</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="px-4 py-3 text-micro leading-5 text-muted">
         「通道档位」列悬停看完整卡片 —— 与决策台「档位」列是同一张。一律按收盘算, 用的是同一套通道。
         历史是按<b className="text-secondary">当前</b>复权价重新算的 —— 期间除过权的话,
         同一天今天算出来的通道会和当时屏幕上略有出入, 复盘看的是形态与节奏。
-      </p>
-    </div>
-  )
-}
-
-/** 「动作」表头: 旧两页各一句, 原样叠起来 */
-const ACT_TIP = '按转折买卖: 这次转折的次日开盘该干什么\n按档位买卖: 这次换档的次日开盘该干什么'
-
-/** 筛完一行不剩时那一句 —— 旧两页各自的原话; 两个开关都开就两句都说 */
-function emptyText(marked: boolean, shifted: boolean): string {
-  const a = '这段时间里没有涨跌停, 状态也没翻转过'
-  const b = '这段时间里档位一次都没换过'
-  return marked && shifted ? `${a}; ${b}` : shifted ? b : a
-}
-
-function TrendCell({ r }: { r: ReviewRow }) {
-  if (!r.trend) return <span className="text-muted/40">—</span>
-  return (
-    <>
-      <span className={`inline-flex whitespace-nowrap rounded-btn border px-1.5 py-0.5 text-micro ${trendBadgeCls(r.trend.state)}`}
-            title={`${r.trend.state_cn}(${r.trend.state_en})`}>
-        {r.trend.state_cn} 第 {r.trend.day} 天
-      </span>
-      {/* [R313] 细分档: 注记, 不是状态 —— 不换徽标的词和色 */}
-      {r.trend.sub_state_cn && (
-        <span className="ml-1 text-micro text-muted/60" title={SUB_STATE_TIP}>({r.trend.sub_state_cn})</span>
-      )}
-      {r.trend.flipped && (
-        <span className="ml-1.5 text-micro text-warning" title="这天六态状态发生了翻转">← 转折</span>
-      )}
-    </>
-  )
-}
-
-function VerdictCell({ r }: { r: ReviewRow }) {
-  return (
-    <>
-      {r.verdict ? (
-        <VerdictHover v={r.verdict} note="收盘口径">
-          <span className={`inline-flex cursor-help whitespace-nowrap rounded-btn border px-1.5 py-0.5 text-micro ${VERDICT_CLS[r.verdict.tone]}`}>
-            {r.verdict.title}
-          </span>
-        </VerdictHover>
-      ) : <span className="text-muted">三档都在中部</span>}
-      {r.verdict_flipped && (
-        <span className="ml-1.5 text-micro text-warning" title="这天通道档位换了一档">← 换档</span>
-      )}
-    </>
-  )
-}
-
-/**
- * 动作 / 成交→了结 / 结果: 六态一笔、通道一笔, 同一天都有就上下两行。
- * 每一行固定高度 —— 三格里的第 n 行必须是同一笔, 对不齐就会读串。
- */
-function TradeCells({ six, ch }: { six?: Leg; ch?: Leg }) {
-  const legs = ([['六态', six], ['通道', ch]] as const)
-    .filter((x): x is readonly ['六态' | '通道', Leg] => !!x[1])
-  if (legs.length === 0) return <><td /><td /><td /></>
-  const LINE = 'flex h-5 items-center whitespace-nowrap'
-  return (
-    <>
-      <td className="px-2 py-2">
-        <div className="flex flex-col gap-1">
-          {legs.map(([src, l]) => (
-            <span key={src} className={LINE}>
-              <span className="mr-1.5 text-micro text-muted">{src}</span>
-              <LegAct leg={l} />
-            </span>
-          ))}
-        </div>
-      </td>
-      <td className="px-2 py-2 font-mono text-micro tabular-nums text-muted">
-        <div className="flex flex-col items-end gap-1">
-          {legs.map(([src, l]) => <span key={src} className={LINE}><LegFill leg={l} /></span>)}
-        </div>
-      </td>
-      <td className="px-4 py-2 font-mono text-micro tabular-nums">
-        <div className="flex flex-col items-end gap-1">
-          {legs.map(([src, l]) => (
-            <span key={src} className={cn(LINE, legResultCls(l))}><LegResult leg={l} /></span>
-          ))}
-        </div>
-      </td>
+      </div>
     </>
   )
 }
