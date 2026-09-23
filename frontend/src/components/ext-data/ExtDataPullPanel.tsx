@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { Loader2, Search, Check, Clock, Zap, Settings2, AlertCircle, CheckCircle2, Calendar, History, KeyRound } from 'lucide-react'
 import { api, type ExtDataBackfillResult, type ExtDataConfig, type ExtPullAuth } from '@/lib/api'
 import { toast } from '@/components/Toast'
+import { TYPE, buttonClass } from '@/components/ui'
+import { cn } from '@/lib/cn'
 
 const AUTH_TYPE_LABELS: Record<ExtPullAuth['type'], string> = {
   none: '无',
@@ -198,7 +200,7 @@ export function ExtDataPullPanel({ config, onSaved }: {
     <div className="space-y-3">
       {/* ===== 分区 ①: 请求配置 ===== */}
       <div className="space-y-2">
-        <div className="flex items-center gap-1.5 text-[11px] font-medium text-secondary">
+        <div className={cn('flex items-center gap-1.5', TYPE.card)}>
           <Settings2 className="h-3 w-3 text-muted" />
           <span>请求配置</span>
         </div>
@@ -206,7 +208,7 @@ export function ExtDataPullPanel({ config, onSaved }: {
         <div className="flex gap-1.5">
           <select
             value={method} onChange={e => setMethod(e.target.value)}
-            className="shrink-0 rounded-btn border border-border bg-elevated px-2 py-1.5 text-[11px] text-foreground"
+            className="shrink-0 rounded-btn border border-border bg-elevated px-2 py-1.5 text-xs text-foreground"
           >
             <option value="GET">GET</option>
             <option value="POST">POST</option>
@@ -214,40 +216,40 @@ export function ExtDataPullPanel({ config, onSaved }: {
           <input
             value={url} onChange={e => setUrl(e.target.value)}
             placeholder="https://api.example.com/data"
-            className="flex-1 min-w-0 rounded-btn border border-border bg-elevated px-2.5 py-1.5 text-[11px] font-mono text-foreground placeholder:text-muted/50"
+            className="flex-1 min-w-0 rounded-btn border border-border bg-elevated px-2.5 py-1.5 text-xs font-mono text-foreground placeholder:text-muted/50"
           />
         </div>
 
         <div>
-          <div className="text-[10px] text-muted mb-1">Headers (JSON，可选)</div>
+          <div className="text-micro text-muted mb-1">Headers (JSON，可选)</div>
           <textarea
             value={headerStr} onChange={e => setHeaderStr(e.target.value)}
             placeholder='{"X-Custom": "value"}'
             rows={2}
-            className="w-full rounded-btn border border-border bg-elevated px-2.5 py-1.5 text-[10px] font-mono text-foreground placeholder:text-muted/40 resize-none"
+            className="w-full rounded-btn border border-border bg-elevated px-2.5 py-1.5 text-xs font-mono text-foreground placeholder:text-muted/40 resize-none"
           />
         </div>
 
         {/* ===== 接口鉴权 (API Key) ===== */}
         <div className="rounded-card border border-border/60 bg-elevated/30 p-2.5 space-y-2">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5 text-[11px] font-medium text-secondary">
+            <div className={cn('flex items-center gap-1.5', TYPE.card)}>
               <KeyRound className="h-3 w-3 text-muted" />
               <span>接口鉴权 (API Key)</span>
             </div>
             {authType !== 'none' && keyInfo && (
-              <span className={`text-[9px] ${keyInfo.key_set ? 'text-emerald-500' : 'text-amber-500'}`}>
+              <span className={`text-micro ${keyInfo.key_set ? 'text-bear' : 'text-warning'}`}>
                 {keyInfo.key_set ? `已设置 ${keyInfo.masked_key}` : '未设置 Key'}
               </span>
             )}
           </div>
           <div className={`grid gap-2 ${authType === 'none' ? '' : 'grid-cols-2'}`}>
             <div>
-              <div className="text-[10px] text-muted mb-1">鉴权方式</div>
+              <div className="text-micro text-muted mb-1">鉴权方式</div>
               <select
                 value={authType}
                 onChange={e => setAuthType(e.target.value as ExtPullAuth['type'])}
-                className="w-full rounded-btn border border-border bg-elevated px-2 py-1.5 text-[11px] text-foreground"
+                className="w-full rounded-btn border border-border bg-elevated px-2 py-1.5 text-xs text-foreground"
               >
                 {Object.entries(AUTH_TYPE_LABELS).map(([v, label]) => (
                   <option key={v} value={v}>{label}</option>
@@ -256,21 +258,21 @@ export function ExtDataPullPanel({ config, onSaved }: {
             </div>
             {authType === 'query' && (
               <div>
-                <div className="text-[10px] text-muted mb-1">参数名</div>
+                <div className="text-micro text-muted mb-1">参数名</div>
                 <input
                   value={authParam} onChange={e => setAuthParam(e.target.value)}
                   placeholder="token"
-                  className="w-full rounded-btn border border-border bg-elevated px-2 py-1.5 text-[10px] font-mono text-foreground placeholder:text-muted/40"
+                  className="w-full rounded-btn border border-border bg-elevated px-2 py-1.5 text-xs font-mono text-foreground placeholder:text-muted/40"
                 />
               </div>
             )}
             {(authType === 'bearer' || authType === 'header') && (
               <div>
-                <div className="text-[10px] text-muted mb-1">请求头名称</div>
+                <div className="text-micro text-muted mb-1">请求头名称</div>
                 <input
                   value={authHeader} onChange={e => setAuthHeader(e.target.value)}
                   placeholder="Authorization"
-                  className="w-full rounded-btn border border-border bg-elevated px-2 py-1.5 text-[10px] font-mono text-foreground placeholder:text-muted/40"
+                  className="w-full rounded-btn border border-border bg-elevated px-2 py-1.5 text-xs font-mono text-foreground placeholder:text-muted/40"
                 />
               </div>
             )}
@@ -283,9 +285,9 @@ export function ExtDataPullPanel({ config, onSaved }: {
                 onChange={e => { setApiKey(e.target.value); setKeyDirty(true) }}
                 autoComplete="new-password"
                 placeholder={keyInfo?.key_set ? '输入新 Key 覆盖 · 清空后保存 = 删除' : '输入 API Key'}
-                className="w-full rounded-btn border border-border bg-elevated px-2.5 py-1.5 text-[11px] font-mono text-foreground placeholder:text-muted/40"
+                className="w-full rounded-btn border border-border bg-elevated px-2.5 py-1.5 text-xs font-mono text-foreground placeholder:text-muted/40"
               />
-              <div className="text-[9px] text-muted/70">
+              <div className="text-micro text-muted/70">
                 Key 仅存本机 secrets.json (不写入配置文件、不随配置导出)；随"保存配置 / 测试"一起生效。
               </div>
             </>
@@ -294,65 +296,65 @@ export function ExtDataPullPanel({ config, onSaved }: {
 
         {method === 'POST' && (
           <div>
-            <div className="text-[10px] text-muted mb-1">请求体 (JSON，可选)</div>
+            <div className="text-micro text-muted mb-1">请求体 (JSON，可选)</div>
             <textarea
               value={body} onChange={e => setBody(e.target.value)}
               placeholder='{"page": 1}'
               rows={2}
-              className="w-full rounded-btn border border-border bg-elevated px-2.5 py-1.5 text-[10px] font-mono text-foreground placeholder:text-muted/40 resize-none"
+              className="w-full rounded-btn border border-border bg-elevated px-2.5 py-1.5 text-xs font-mono text-foreground placeholder:text-muted/40 resize-none"
             />
           </div>
         )}
 
         <div className="grid grid-cols-2 gap-2">
           <div>
-            <div className="text-[10px] text-muted mb-1">响应数据路径</div>
+            <div className="text-micro text-muted mb-1">响应数据路径</div>
             <input
               value={responsePath} onChange={e => setResponsePath(e.target.value)}
               placeholder="data.list"
-              className="w-full rounded-btn border border-border bg-elevated px-2 py-1.5 text-[10px] font-mono text-foreground placeholder:text-muted/40"
+              className="w-full rounded-btn border border-border bg-elevated px-2 py-1.5 text-xs font-mono text-foreground placeholder:text-muted/40"
             />
           </div>
           <div>
-            <div className="text-[10px] text-muted mb-1">调度间隔 (分钟)</div>
+            <div className="text-micro text-muted mb-1">调度间隔 (分钟)</div>
             <input
               type="number" min={1} value={schedule} onChange={e => setSchedule(Number(e.target.value))}
-              className="w-full rounded-btn border border-border bg-elevated px-2 py-1.5 text-[10px] font-mono text-foreground"
+              className="w-full rounded-btn border border-border bg-elevated px-2 py-1.5 text-xs font-mono text-foreground"
             />
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-2">
           <div>
-            <div className="text-[10px] text-muted mb-1">拉取起始时间 (留空=不限)</div>
+            <div className="text-micro text-muted mb-1">拉取起始时间 (留空=不限)</div>
             <input
               type="time" value={timeWindowStart} onChange={e => setTimeWindowStart(e.target.value)}
-              className="w-full rounded-btn border border-border bg-elevated px-2 py-1.5 text-[10px] font-mono text-foreground"
+              className="w-full rounded-btn border border-border bg-elevated px-2 py-1.5 text-xs font-mono text-foreground"
             />
           </div>
           <div>
-            <div className="text-[10px] text-muted mb-1">拉取结束时间 (留空=不限)</div>
+            <div className="text-micro text-muted mb-1">拉取结束时间 (留空=不限)</div>
             <input
               type="time" value={timeWindowEnd} onChange={e => setTimeWindowEnd(e.target.value)}
-              className="w-full rounded-btn border border-border bg-elevated px-2 py-1.5 text-[10px] font-mono text-foreground"
+              className="w-full rounded-btn border border-border bg-elevated px-2 py-1.5 text-xs font-mono text-foreground"
             />
           </div>
         </div>
 
         <div>
-          <div className="text-[10px] text-muted mb-1">日期参数名 (接口支持按日查询时填, 如 date)</div>
+          <div className="text-micro text-muted mb-1">日期参数名 (接口支持按日查询时填, 如 date)</div>
           <div className="flex items-center gap-1.5">
             <input
               value={dateParam} onChange={e => setDateParam(e.target.value)}
               placeholder="date · 留空=接口只有当日快照"
-              className="flex-1 min-w-0 rounded-btn border border-border bg-elevated px-2 py-1.5 text-[10px] font-mono text-foreground placeholder:text-muted/40"
+              className="flex-1 min-w-0 rounded-btn border border-border bg-elevated px-2 py-1.5 text-xs font-mono text-foreground placeholder:text-muted/40"
             />
             <select
               aria-label="日期参数值格式"
               value={dateFormat} onChange={e => setDateFormat(e.target.value)}
               disabled={!dateParam.trim()}
               title="日期参数值的序列化格式; 时间戳 = 该交易日北京时间 00:00:00"
-              className="shrink-0 rounded-btn border border-border bg-elevated px-1.5 py-1.5 text-[10px] text-secondary outline-none focus:border-accent disabled:opacity-40"
+              className="shrink-0 rounded-btn border border-border bg-elevated px-1.5 py-1.5 text-xs text-secondary outline-none focus:border-accent disabled:opacity-40"
             >
               <option value="iso">YYYY-MM-DD</option>
               <option value="compact">YYYYMMDD</option>
@@ -363,34 +365,34 @@ export function ExtDataPullPanel({ config, onSaved }: {
         </div>
 
         <div>
-          <div className="text-[10px] text-muted mb-1">时间字段 (日内多行数据填, 如 ts · 竞价/分时快照)</div>
+          <div className="text-micro text-muted mb-1">时间字段 (日内多行数据填, 如 ts · 竞价/分时快照)</div>
           <input
             value={timeField} onChange={e => setTimeField(e.target.value)}
             placeholder="ts · 留空=每日快照表 (同代码一天一行)"
             title="配置后同一代码允许一天多行, 按代码+时间列去重"
-            className="w-full rounded-btn border border-border bg-elevated px-2.5 py-1.5 text-[10px] font-mono text-foreground placeholder:text-muted/40"
+            className="w-full rounded-btn border border-border bg-elevated px-2.5 py-1.5 text-xs font-mono text-foreground placeholder:text-muted/40"
           />
         </div>
 
         <div>
-          <div className="text-[10px] text-muted mb-1">拉取超时 (秒 · 大响应接口可调高)</div>
+          <div className="text-micro text-muted mb-1">拉取超时 (秒 · 大响应接口可调高)</div>
           <input
             type="number" min={5} max={300} step={5}
             value={timeoutSec}
             onChange={e => setTimeoutSec(Number(e.target.value))}
             title="单次拉取/测试/回补请求的超时, 默认 30 秒, 范围 5~300"
-            className="w-full rounded-btn border border-border bg-elevated px-2.5 py-1.5 text-[10px] font-mono text-foreground"
+            className="w-full rounded-btn border border-border bg-elevated px-2.5 py-1.5 text-xs font-mono text-foreground"
           />
         </div>
 
 
         <div>
-          <div className="text-[10px] text-muted mb-1">字段映射 (外部名 → 内部名，JSON，可选)</div>
+          <div className="text-micro text-muted mb-1">字段映射 (外部名 → 内部名，JSON，可选)</div>
           <textarea
             value={fieldMapStr} onChange={e => setFieldMapStr(e.target.value)}
             placeholder='{"code": "symbol", "val": "score"}'
             rows={2}
-            className="w-full rounded-btn border border-border bg-elevated px-2.5 py-1.5 text-[10px] font-mono text-foreground placeholder:text-muted/40 resize-none"
+            className="w-full rounded-btn border border-border bg-elevated px-2.5 py-1.5 text-xs font-mono text-foreground placeholder:text-muted/40 resize-none"
           />
         </div>
       </div>
@@ -398,7 +400,7 @@ export function ExtDataPullPanel({ config, onSaved }: {
       {/* ===== 分区 ②: 定时拉取状态 ===== */}
       <div className="rounded-card border border-border/60 bg-elevated/30 p-2.5 space-y-2">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1.5 text-[11px] font-medium text-secondary">
+          <div className={cn('flex items-center gap-1.5', TYPE.card)}>
             <Clock className="h-3 w-3 text-muted" />
             <span>定时拉取</span>
           </div>
@@ -422,7 +424,7 @@ export function ExtDataPullPanel({ config, onSaved }: {
         </div>
 
         {/* 状态文案 */}
-        <div className="text-[10px] leading-relaxed">
+        <div className="text-micro leading-relaxed">
           {enabled ? (
             <div className="space-y-0.5">
               <div className="flex items-center gap-1 text-accent">
@@ -445,16 +447,16 @@ export function ExtDataPullPanel({ config, onSaved }: {
         {pull?.last_run && (
           <div className="flex items-start gap-1.5 pt-1.5 border-t border-border/40">
             {pull.last_status === 'success' ? (
-              <CheckCircle2 className="h-3 w-3 text-emerald-500 shrink-0 mt-px" />
+              <CheckCircle2 className="h-3 w-3 text-bear shrink-0 mt-px" />
             ) : (
               <AlertCircle className="h-3 w-3 text-danger shrink-0 mt-px" />
             )}
             <div className="min-w-0 flex-1">
-              <div className={`text-[10px] font-medium ${pull.last_status === 'success' ? 'text-emerald-500' : 'text-danger'}`}>
+              <div className={`text-micro font-medium ${pull.last_status === 'success' ? 'text-bear' : 'text-danger'}`}>
                 {pull.last_message || (pull.last_status === 'success' ? '成功' : '失败')}
               </div>
               {fmtTime(pull.last_run) && (
-                <div className="text-[9px] text-muted">{fmtTime(pull.last_run)}</div>
+                <div className="text-micro text-muted">{fmtTime(pull.last_run)}</div>
               )}
             </div>
           </div>
@@ -467,7 +469,7 @@ export function ExtDataPullPanel({ config, onSaved }: {
           <button
             onClick={handleTest}
             disabled={testing || !url}
-            className="inline-flex items-center justify-center gap-1 px-2 py-2 rounded-btn border border-border bg-elevated text-xs text-foreground hover:bg-border/30 disabled:opacity-40 transition-colors"
+            className={buttonClass({}, 'gap-1.5')}
           >
             {testing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5" />}
             测试
@@ -475,7 +477,7 @@ export function ExtDataPullPanel({ config, onSaved }: {
           <button
             onClick={handleRun}
             disabled={running || !url}
-            className="inline-flex items-center justify-center gap-1 px-2 py-2 rounded-btn bg-accent/90 text-base text-xs font-medium hover:bg-accent disabled:opacity-40 transition-colors"
+            className={buttonClass({ variant: 'primary' }, 'gap-1.5')}
           >
             {running ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />}
             立即执行
@@ -484,7 +486,7 @@ export function ExtDataPullPanel({ config, onSaved }: {
         <button
           onClick={() => handleSave(false)}
           disabled={saving || !url}
-          className="w-full inline-flex items-center justify-center gap-1 py-2 rounded-btn bg-accent/90 text-base text-xs font-medium hover:bg-accent disabled:opacity-40 transition-colors"
+          className={buttonClass({ variant: 'primary' }, 'w-full gap-1.5')}
         >
           {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
           保存配置
@@ -494,39 +496,39 @@ export function ExtDataPullPanel({ config, onSaved }: {
       {/* ===== 分区 ④: 历史回补 (仅 timeseries + 接口支持按日查询) ===== */}
       {config.mode === 'timeseries' && (
         <div className="rounded-card border border-border/60 bg-elevated/30 p-2.5 space-y-2">
-          <div className="flex items-center gap-1.5 text-[11px] font-medium text-secondary">
+          <div className={cn('flex items-center gap-1.5', TYPE.card)}>
             <History className="h-3 w-3 text-muted" />
             <span>历史回补</span>
-            {!dateParam.trim() && <span className="text-[9px] text-muted/70">· 需先填日期参数名并保存</span>}
+            {!dateParam.trim() && <span className="text-micro text-muted/70">· 需先填日期参数名并保存</span>}
           </div>
           <div className="flex items-center gap-1.5">
             <input
               type="date" value={bfStart} onChange={e => setBfStart(e.target.value)}
-              className="flex-1 min-w-0 rounded-btn border border-border bg-elevated px-2 py-1.5 text-[10px] font-mono text-foreground"
+              className="flex-1 min-w-0 rounded-btn border border-border bg-elevated px-2 py-1.5 text-xs font-mono text-foreground"
             />
-            <span className="text-[10px] text-muted shrink-0">至</span>
+            <span className="text-micro text-muted shrink-0">至</span>
             <input
               type="date" value={bfEnd} onChange={e => setBfEnd(e.target.value)}
-              className="flex-1 min-w-0 rounded-btn border border-border bg-elevated px-2 py-1.5 text-[10px] font-mono text-foreground"
+              className="flex-1 min-w-0 rounded-btn border border-border bg-elevated px-2 py-1.5 text-xs font-mono text-foreground"
             />
             <button
               onClick={handleBackfill}
               disabled={bfRunning || !dateParam.trim() || !bfStart || !bfEnd}
               title="按本地交易日逐日拉取写入历史分区; 已有分区自动跳过, 可重复执行"
-              className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 rounded-btn bg-accent/90 text-base text-[10px] font-medium hover:bg-accent disabled:opacity-40 transition-colors"
+              className={buttonClass({ variant: 'primary' }, 'shrink-0 gap-1')}
             >
               {bfRunning ? <Loader2 className="h-3 w-3 animate-spin" /> : <History className="h-3 w-3" />}
               回补
             </button>
           </div>
-          <div className="text-[9px] text-muted/70">
+          <div className="text-micro text-muted/70">
             单次上限 120 天 (约数秒至数分钟, 取决于接口); 接口无该日数据自动记为空, 不覆盖已有分区。
           </div>
           {bfResult && (
             <div className="pt-1.5 border-t border-border/40 space-y-1">
-              <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-[10px] text-secondary">
+              <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-micro text-secondary">
                 <span>交易日 {bfResult.total_days}</span>
-                <span className="text-emerald-500">写入 {bfResult.fetched} 日 / {bfResult.rows_written} 行</span>
+                <span className="text-bear">写入 {bfResult.fetched} 日 / {bfResult.rows_written} 行</span>
                 <span>跳过已有 {bfResult.skipped_existing}</span>
                 <span>无数据 {bfResult.empty}</span>
                 {bfResult.failed.length > 0 && <span className="text-danger">失败 {bfResult.failed.length}</span>}
@@ -534,7 +536,7 @@ export function ExtDataPullPanel({ config, onSaved }: {
               {bfResult.failed.length > 0 && (
                 <div className="max-h-28 overflow-y-auto rounded-btn bg-base px-2 py-1.5 space-y-0.5">
                   {bfResult.failed.map(f => (
-                    <div key={f.date} className="text-[9px] text-danger/90 font-mono">
+                    <div key={f.date} className="text-micro text-danger/90 font-mono">
                       {f.date} · {f.reason}
                     </div>
                   ))}
@@ -547,8 +549,8 @@ export function ExtDataPullPanel({ config, onSaved }: {
 
       {/* ===== 结果展示 ===== */}
       {runResult && (
-        <div className="rounded-card border border-emerald-500/30 bg-emerald-500/[0.06] p-2.5 flex items-center justify-between text-[10px]">
-          <span className="text-emerald-500 font-medium flex items-center gap-1">
+        <div className="rounded-card border border-bear/30 bg-bear/[0.06] p-2.5 flex items-center justify-between text-xs">
+          <span className="text-bear font-medium flex items-center gap-1">
             <CheckCircle2 className="h-3 w-3" />拉取成功
           </span>
           <span className="text-secondary">{runResult.rows} 行 · {runResult.date}</span>
@@ -557,15 +559,15 @@ export function ExtDataPullPanel({ config, onSaved }: {
 
       {testResult && (
         <div className="rounded-card border border-accent/30 bg-accent/[0.04] p-2.5 space-y-1.5">
-          <div className="flex items-center justify-between text-[10px]">
+          <div className="flex items-center justify-between text-xs">
             <span className="text-accent font-medium">测试成功</span>
             <span className="text-secondary">{testResult.total_rows} 行</span>
           </div>
           {!testResult.has_symbol && (
-            <div className="text-[10px] text-amber-500">数据缺少 symbol 字段，请配置字段映射</div>
+            <div className="text-xs text-warning">数据缺少 symbol 字段，请配置字段映射</div>
           )}
           {testResult.preview.length > 0 && (
-            <pre className="text-[9px] font-mono text-muted bg-elevated rounded px-2 py-1.5 overflow-x-auto max-h-32">
+            <pre className="text-micro font-mono text-muted bg-elevated rounded px-2 py-1.5 overflow-x-auto max-h-32">
               {JSON.stringify(testResult.preview, null, 2)}
             </pre>
           )}
@@ -573,7 +575,7 @@ export function ExtDataPullPanel({ config, onSaved }: {
       )}
 
       {error && (
-        <div className="text-[10px] text-danger text-center bg-danger/[0.06] rounded-btn py-1.5">
+        <div className="text-xs text-danger text-center bg-danger/[0.06] rounded-btn py-1.5">
           {error}
         </div>
       )}

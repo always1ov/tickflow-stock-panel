@@ -19,6 +19,7 @@ import {
   WandSparkles,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import { cn } from '@/lib/cn'
 import { EndpointTestDialog } from '@/components/EndpointTestDialog'
 import { api, type ExtDataConfig } from '@/lib/api'
 import { toast } from '@/components/Toast'
@@ -58,6 +59,7 @@ import { Skeleton } from '@/components/data/Skeleton'
 import { ExtDataStatCard } from '@/components/ext-data/ExtDataStatCard'
 import { CreateExtDialog } from '@/components/ext-data/CreateExtDialog'
 import { EditExtDialog } from '@/components/ext-data/EditExtDialog'
+import { SEG, SEG_ITEM, SEG_OFF, SEG_ON, TYPE, buttonClass } from '@/components/ui'
 
 export function Data() {
   const qc = useQueryClient()
@@ -607,14 +609,14 @@ export function Data() {
         title="数据"
         subtitle="本地数据画像 · 同步状态 · 历史记录"
         right={
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2">
             {!hasData && !isLoading && (
               <span className="text-xs text-accent animate-pulse">首次使用请点击右侧按钮同步数据</span>
             )}
             <button
               onClick={() => adjGate.guard(() => startSync.mutate())}
               disabled={isStarting}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-btn bg-gradient-to-r from-accent/25 to-accent/10 border border-accent/30 text-accent text-xs font-medium hover:from-accent/35 hover:to-accent/20 disabled:opacity-40 transition-ui duration-hover"
+              className={buttonClass({ variant: 'primary' }, 'gap-1.5')}
             >
               {(isStarting || isRunning) ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -627,7 +629,7 @@ export function Data() {
               <button
                 onClick={() => setShowStopConfirm(true)}
                 title="停止当前同步任务"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-btn bg-danger/12 border border-danger/30 text-danger text-xs font-medium hover:bg-danger/20 transition-ui duration-150"
+                className={buttonClass({}, 'gap-1.5 border-danger/40 font-medium text-danger hover:bg-danger/10')}
               >
                 <Square className="h-3 w-3 fill-current" />
                 停止
@@ -635,7 +637,7 @@ export function Data() {
             )}
             <button
               onClick={() => setOpenSettings('pipeline-scope')}
-              className="inline-flex items-center gap-1 px-2 py-1 rounded-btn text-secondary hover:text-accent hover:bg-accent/8 text-xs transition-colors duration-hover"
+              className={buttonClass({}, 'gap-1.5')}
             >
               <CheckSquare className="h-3.5 w-3.5" />
               数据范围
@@ -643,47 +645,47 @@ export function Data() {
             <button
               onClick={() => setShowRepair(true)}
               disabled={!hasData || isRunning}
-              className="inline-flex items-center gap-1 px-2 py-1 rounded-btn text-secondary hover:text-accent hover:bg-accent/8 text-xs transition-colors duration-hover disabled:opacity-40 disabled:pointer-events-none"
+              className={buttonClass({}, 'gap-1.5')}
             >
               <WandSparkles className="h-3.5 w-3.5" />
               修正数据
             </button>
-            <div className="w-px h-4 bg-border" />
-            <div className="flex items-center gap-1.5">
+            <div className="h-5 w-px bg-border" />
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 onClick={() => setShowCreateExt(true)}
-                className="inline-flex items-center gap-1 px-2 py-1 rounded-btn text-secondary hover:text-accent hover:bg-accent/8 text-xs transition-colors duration-hover"
+                className={buttonClass({}, 'gap-1.5')}
               >
                 <Plus className="h-3.5 w-3.5" />
                 扩展数据
               </button>
               <button
                 onClick={() => setShowEndpointTest(true)}
-                className="inline-flex items-center gap-1 px-2 py-1 rounded-btn text-secondary hover:text-accent hover:bg-accent/8 text-xs transition-colors duration-hover"
+                className={buttonClass({}, 'gap-1.5')}
               >
                 <Wifi className="h-3.5 w-3.5" />
                 测试端点
               </button>
               <button
                 onClick={() => setOpenSettings('page-settings')}
-                className="inline-flex items-center gap-1 px-2 py-1 rounded-btn text-secondary hover:text-accent hover:bg-accent/8 text-xs transition-colors duration-hover"
+                className={buttonClass({}, 'gap-1.5')}
               >
                 <SlidersHorizontal className="h-3.5 w-3.5" />
                 页面设置
               </button>
-              <div className="w-px h-4 bg-border" />
+              <div className="h-5 w-px bg-border" />
               <Link
                 to="/settings?tab=data-sources&highlight=data-sources"
-                className="inline-flex items-center gap-1 px-2 py-1 rounded-btn text-secondary hover:text-accent hover:bg-accent/8 text-xs transition-colors duration-hover"
+                className={buttonClass({}, 'gap-1.5')}
                 title="切换数据源"
               >
                 <Database className="h-3.5 w-3.5" />
-                <span className="text-foreground/80 max-w-[120px] truncate">{activeDataSourceName}</span>
+                <span className="max-w-[120px] truncate">{activeDataSourceName}</span>
               </Link>
               <button
                 onClick={() => setShowClearConfirm(true)}
                 disabled={isRunning}
-                className="inline-flex items-center gap-1 px-2 py-1 rounded-btn text-muted hover:text-danger hover:bg-danger/8 text-xs transition-colors duration-hover disabled:opacity-40 disabled:pointer-events-none"
+                className={buttonClass({ variant: 'danger' }, 'gap-1.5')}
               >
                 <Trash2 className="h-3.5 w-3.5" />
                 清除数据
@@ -764,7 +766,7 @@ export function Data() {
           <div className="rounded-card border border-border bg-surface p-4">
             <div className="flex items-center gap-2 mb-3">
               <Calendar className="h-4 w-4 text-secondary" />
-              <h3 className="text-sm font-medium text-foreground">自动调度</h3>
+              <h3 className={TYPE.card}>自动调度</h3>
             </div>
             {isLoading ? (
               <div className="space-y-2">
@@ -774,11 +776,11 @@ export function Data() {
               </div>
             ) : (
               <div className="space-y-2">
-                <div className="flex items-center gap-1.5 text-[10px] text-muted pb-2 border-b border-border/50">
-                  <span className="text-accent/60 font-medium">盘前</span>
+                <div className="flex flex-wrap items-center gap-1.5 text-micro text-muted pb-2 border-b border-border/50">
+                  <span className="font-medium text-secondary">盘前</span>
                   <span>个股维表</span>
                   <span className="text-border">→</span>
-                  <span className="text-accent/60 font-medium">盘后</span>
+                  <span className="font-medium text-secondary">盘后</span>
                   {pipelineSteps.map((step, i) => (
                     <span key={step} className="contents">
                       {i > 0 && <span className="text-border">→</span>}
@@ -786,11 +788,11 @@ export function Data() {
                     </span>
                   ))}
                 </div>
-                <div className="flex items-center justify-between text-[11px]">
+                <div className="flex items-center justify-between text-xs">
                   <span className="text-muted">时区</span>
                   <span className="font-mono text-secondary">Asia/Shanghai</span>
                 </div>
-                <div className="flex items-center justify-between text-[11px]">
+                <div className="flex items-center justify-between text-xs">
                   <div className="flex items-center gap-1">
                     <span className="text-muted">盘前 · 个股维表</span>
                     <span className="text-muted/50">·</span>
@@ -837,7 +839,7 @@ export function Data() {
                     </motion.div>
                   )}
                 </AnimatePresence>
-                <div className="flex items-center justify-between text-[11px]">
+                <div className="flex items-center justify-between text-xs">
                   <div className="flex items-center gap-1">
                     <span className="text-muted">盘后 · 全量管道</span>
                     <span className="text-muted/50">·</span>
@@ -893,7 +895,7 @@ export function Data() {
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <HardDrive className="h-4 w-4 text-secondary" />
-                <h3 className="text-sm font-medium text-foreground">存储</h3>
+                <h3 className={TYPE.card}>存储</h3>
               </div>
               {isLoading ? (
                 <Skeleton w="w-12" />
@@ -920,7 +922,7 @@ export function Data() {
                 { label: '分钟 K',   files: s?.storage.minute_files,      size: s?.storage.minute_size_mb },
                 { label: '财务数据', files: s?.storage.financials_files,   size: s?.storage.financials_size_mb },
               ].map((item) => (
-                <div key={item.label} className="flex items-center justify-between text-[11px]">
+                <div key={item.label} className="flex items-center justify-between text-xs">
                   <span className="text-muted">{item.label}</span>
                   <div className="flex items-center gap-3">
                     <span className="font-mono text-secondary">{item.files ?? 0} 文件</span>
@@ -930,7 +932,7 @@ export function Data() {
               ))}
               {/* 扩展数据 */}
               {(extConfigs.data && (extConfigs.data.items?.length ?? 0) > 0) && (
-                <div className="flex items-center justify-between text-[11px] border-t border-border/50 pt-2 mt-1">
+                <div className="flex items-center justify-between text-xs border-t border-border/50 pt-2 mt-1">
                   <span className="text-muted">扩展数据</span>
                   <div className="flex items-center gap-3">
                     <span className="font-mono text-secondary">{s?.storage.ext_data_files ?? extConfigs.data.items.length} 文件</span>
@@ -989,7 +991,7 @@ export function Data() {
                 ))}
               </div>
             ) : (
-              <div className="px-5 py-8 text-center text-sm text-muted">
+              <div className="px-5 py-8 text-center text-xs text-muted">
                 暂无同步记录 — 点右上角"立即同步"开始。
               </div>
             )}
@@ -997,7 +999,7 @@ export function Data() {
         </div>
 
         {startSync.isError && (
-          <div className="rounded-btn border border-danger/40 bg-danger/5 px-3 py-2 text-sm text-danger">
+          <div className="rounded-btn border border-danger/40 bg-danger/5 px-3 py-2 text-xs text-danger">
             启动失败:{String((startSync.error as any).message)}
           </div>
         )}
@@ -1108,41 +1110,39 @@ export function Data() {
             <div className="space-y-4">
               <div className="rounded-card border border-border bg-base/30 p-4 space-y-3">
                 <div>
-                  <div className="text-sm font-medium text-foreground">指数日 K</div>
-                  <div className="text-[11px] text-muted mt-1">获取数据时会先刷新 CN_Index 维表，再向前扩展指数历史；指数不需要复权。</div>
+                  <div className={TYPE.card}>指数日 K</div>
+                  <div className="text-xs text-muted mt-1">获取数据时会先刷新 CN_Index 维表，再向前扩展指数历史；指数不需要复权。</div>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="flex items-center">
                     <button
                       onClick={() => setIndexExtendValue(v => Math.max(1, v - 1))}
                       disabled={!hasDailyBatchCap || !!activeJobId || syncIndexDaily.isPending}
-                      className="h-6 w-6 flex items-center justify-center rounded-l-btn bg-elevated border border-border text-secondary hover:bg-border/50 disabled:opacity-30 transition-colors text-xs"
+                      className="h-7 w-7 flex items-center justify-center rounded-l-btn bg-surface border border-border text-foreground hover:bg-elevated disabled:opacity-30 transition-colors text-xs"
                     >−</button>
-                    <div className="h-6 w-8 flex items-center justify-center border-y border-border text-[11px] font-mono tabular-nums text-foreground bg-base">
+                    <div className="h-7 w-9 flex items-center justify-center border-y border-border text-xs font-mono tabular-nums text-foreground bg-base">
                       {indexExtendValue}
                     </div>
                     <button
                       onClick={() => setIndexExtendValue(v => Math.min(indexExtendUnit === 'year' ? 10 : 36, v + 1))}
                       disabled={!hasDailyBatchCap || !!activeJobId || syncIndexDaily.isPending}
-                      className="h-6 w-6 flex items-center justify-center rounded-r-btn bg-elevated border border-border text-secondary hover:bg-border/50 disabled:opacity-30 transition-colors text-xs"
+                      className="h-7 w-7 flex items-center justify-center rounded-r-btn bg-surface border border-border text-foreground hover:bg-elevated disabled:opacity-30 transition-colors text-xs"
                     >+</button>
                   </div>
 
-                  <div className="flex rounded-btn border border-border overflow-hidden">
+                  <div className={SEG}>
                     {(['month', 'year'] as const).map(u => (
                       <button
                         key={u}
                         onClick={() => { setIndexExtendUnit(u); if (u === 'year' && indexExtendValue > 10) setIndexExtendValue(1); if (u === 'month' && indexExtendValue > 36) setIndexExtendValue(6) }}
                         disabled={!hasDailyBatchCap || !!activeJobId || syncIndexDaily.isPending}
-                        className={`px-2 py-0.5 text-[10px] font-medium transition-colors disabled:opacity-40 ${
-                          indexExtendUnit === u ? 'bg-accent/15 text-accent' : 'text-secondary hover:bg-elevated'
-                        }`}
+                        className={cn(SEG_ITEM, 'disabled:opacity-40', indexExtendUnit === u ? SEG_ON : SEG_OFF)}
                       >{u === 'month' ? '月' : '年'}</button>
                     ))}
                   </div>
                 </div>
 
-                <div className="text-[10px] text-muted">
+                <div className="text-xs text-muted">
                   预计扩展至 <span className="font-mono text-secondary">{indexTargetDateText}</span>
                   {indexEarliestDate && <span> (当前最早: <span className="font-mono text-secondary">{indexEarliestDate}</span>)</span>}
                 </div>
@@ -1151,7 +1151,7 @@ export function Data() {
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <div className="text-xs font-medium text-foreground">批次大小</div>
-                      <div className="text-[10px] text-muted mt-0.5">每批同步并计算的指数数量，默认 100。</div>
+                      <div className="text-micro text-muted mt-0.5">每批同步并计算的指数数量，默认 100。</div>
                     </div>
                     <div className="flex items-center gap-2">
                       <input
@@ -1170,20 +1170,20 @@ export function Data() {
                           updateIndexBatchSize.mutate(size)
                         }}
                         disabled={updateIndexBatchSize.isPending || !!activeJobId || syncIndexDaily.isPending}
-                        className="px-2.5 py-1 rounded-btn bg-elevated border border-border text-xs text-secondary hover:text-foreground disabled:opacity-40 transition-colors"
+                        className={buttonClass({ size: 'xs' })}
                       >
                         {updateIndexBatchSize.isPending ? '保存中…' : '保存'}
                       </button>
                     </div>
                   </div>
-                  <div className="text-[10px] text-muted">
+                  <div className="text-xs text-muted">
                     当前生效: <span className="font-mono text-secondary">{indexDailyBatchSize}</span>
                   </div>
                 </div>
                 <button
                   onClick={() => syncIndexDaily.mutate()}
                   disabled={!hasDailyBatchCap || !!activeJobId || syncIndexDaily.isPending}
-                  className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-btn bg-accent/90 text-base text-xs font-medium hover:bg-accent disabled:opacity-40 disabled:pointer-events-none transition-colors duration-hover"
+                  className={buttonClass({ variant: 'primary' }, 'w-full gap-1.5')}
                 >
                   {syncIndexDaily.isPending ? (
                     <>
@@ -1228,21 +1228,21 @@ export function Data() {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.97, y: 8 }}
               transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-              className="relative w-[90vw] max-w-[420px] rounded-card border border-border bg-base shadow-2xl p-6"
+              className="relative w-[90vw] max-w-[420px] rounded-card border border-border bg-surface shadow-2xl p-6"
             >
               <div className="flex items-start gap-3">
                 <div className="shrink-0 h-10 w-10 rounded-full bg-danger/12 flex items-center justify-center">
                   <AlertTriangle className="h-5 w-5 text-danger" />
                 </div>
                 <div className="min-w-0">
-                  <h3 className="text-sm font-semibold text-foreground mb-1.5">确认停止数据同步？</h3>
+                  <h3 className={cn(TYPE.section, 'mb-1.5')}>确认停止数据同步？</h3>
                   <p className="text-xs text-secondary leading-relaxed">
                     当前任务将在<span className="text-foreground font-medium">正在拉取的分块完成后</span>中断（协作式停止，不会损坏已写入的数据）。
                   </p>
-                  <p className="mt-2 text-[11px] text-danger/90 leading-relaxed">
+                  <p className="mt-2 text-xs text-danger/90 leading-relaxed">
                     停止后再次拉取需要重新走完整管道（拉取 → 指标计算 → 监控规则），无法从停止处续跑。
                   </p>
-                  <div className="mt-2 flex items-start gap-1.5 text-[11px] text-muted">
+                  <div className="mt-2 flex items-start gap-1.5 text-xs text-muted">
                     <Info className="h-3.5 w-3.5 shrink-0 mt-px text-muted" />
                     <span>已写入的部分数据会保留，下次同步时覆盖或补齐。</span>
                   </div>
@@ -1252,14 +1252,14 @@ export function Data() {
                 <button
                   onClick={() => setShowStopConfirm(false)}
                   disabled={stopSync.isPending}
-                  className="px-3 py-1.5 rounded-btn bg-elevated text-secondary hover:bg-elevated/80 text-sm transition-colors disabled:opacity-50"
+                  className={buttonClass()}
                 >
                   取消
                 </button>
                 <button
                   onClick={() => stopSync.mutate()}
                   disabled={stopSync.isPending}
-                  className="px-3 py-1.5 rounded-btn bg-danger/90 text-base text-sm font-medium hover:bg-danger disabled:opacity-50 transition-colors"
+                  className={buttonClass({}, 'border-danger bg-danger font-medium text-on-accent hover:bg-danger/90')}
                 >
                   {stopSync.isPending ? '停止中…' : '确认停止'}
                 </button>
@@ -1287,26 +1287,26 @@ export function Data() {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.97, y: 8 }}
               transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-              className="relative w-[90vw] max-w-[420px] rounded-card border border-border bg-base shadow-2xl p-6"
+              className="relative w-[90vw] max-w-[420px] rounded-card border border-border bg-surface shadow-2xl p-6"
             >
               <div className="flex items-start gap-3">
                 <div className="shrink-0 h-10 w-10 rounded-full bg-danger/12 flex items-center justify-center">
                   <AlertTriangle className="h-5 w-5 text-danger" />
                 </div>
                 <div className="min-w-0">
-                  <h3 className="text-sm font-semibold text-foreground mb-1.5">确认清除本地数据？</h3>
+                  <h3 className={cn(TYPE.section, 'mb-1.5')}>确认清除本地数据？</h3>
                   <p className="text-xs text-secondary leading-relaxed">
                     此操作将<span className="text-danger font-medium">永久删除</span>所有已同步的本地数据，包括：
                   </p>
-                  <ul className="mt-2 text-[11px] text-muted leading-relaxed space-y-0.5">
+                  <ul className="mt-2 text-xs text-muted leading-relaxed space-y-0.5">
                     <li>· 个股维表、日 K、除权因子</li>
                     <li>· Enriched 指标数据、分钟 K</li>
                     <li>· 财务数据、指数、ETF</li>
                   </ul>
-                  <p className="mt-2 text-[11px] text-danger/90">
+                  <p className="mt-2 text-xs text-danger/90">
                     操作不可恢复，需重新执行同步才能恢复数据。
                   </p>
-                  <div className="mt-2 flex items-start gap-1.5 text-[11px] text-warning">
+                  <div className="mt-2 flex items-start gap-1.5 text-xs text-warning">
                     <Info className="h-3.5 w-3.5 shrink-0 mt-px text-warning" />
                     <span>此操作不会清除扩展数据，如需删除请在扩展数据设置中单独操作。</span>
                   </div>
@@ -1316,14 +1316,14 @@ export function Data() {
                 <button
                   onClick={() => setShowClearConfirm(false)}
                   disabled={clearData.isPending}
-                  className="px-3 py-1.5 rounded-btn bg-elevated text-secondary hover:bg-elevated/80 text-sm transition-colors disabled:opacity-50"
+                  className={buttonClass()}
                 >
                   取消
                 </button>
                 <button
                   onClick={() => clearData.mutate()}
                   disabled={clearData.isPending}
-                  className="px-3 py-1.5 rounded-btn bg-danger/90 text-base text-sm font-medium hover:bg-danger disabled:opacity-50 transition-colors"
+                  className={buttonClass({}, 'border-danger bg-danger font-medium text-on-accent hover:bg-danger/90')}
                 >
                   {clearData.isPending ? '清除中…' : '清除数据'}
                 </button>

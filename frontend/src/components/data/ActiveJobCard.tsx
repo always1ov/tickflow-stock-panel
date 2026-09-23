@@ -5,6 +5,7 @@ import { formatDuration, formatLogTime } from '@/lib/format'
 import { Pill } from './StatCard'
 import { api, type PipelineJob } from '@/lib/api'
 import { toast } from '@/components/Toast'
+import { TYPE } from '@/components/ui'
 
 export const STAGE_LABELS: Record<string, string> = {
   init: '初始化',
@@ -92,7 +93,7 @@ export function ActiveJobCard({ job }: { job: PipelineJob }) {
         <div className="flex items-center gap-2.5">
           <Icon className={`h-5 w-5 ${meta.color} ${meta.spinning ? 'animate-spin' : ''}`} />
           <div>
-            <div className="text-sm font-medium text-foreground">
+            <div className={TYPE.card}>
               {meta.label}{!isDone && ` · ${stageLabel}`}
             </div>
             <div className="text-xs text-secondary font-mono mt-0.5">

@@ -63,7 +63,7 @@ export function PipelineScopeConfig() {
                   <div className="flex items-center gap-1.5">
                     <span className="text-xs font-medium text-foreground">{item.label}</span>
                   </div>
-                  <div className="text-[10px] text-muted leading-snug mt-0.5">{item.desc}</div>
+                  <div className="text-micro text-muted leading-snug mt-0.5">{item.desc}</div>
                 </div>
               </label>
             </div>
@@ -71,11 +71,11 @@ export function PipelineScopeConfig() {
         })}
       </div>
       {updateToggle.isPending && (
-        <div className="flex items-center gap-1.5 text-[10px] text-muted">
+        <div className="flex items-center gap-1.5 text-micro text-muted">
           <Loader2 className="h-3 w-3 animate-spin" />保存中…
         </div>
       )}
-      <div className="text-[10px] text-muted leading-relaxed pt-1">
+      <div className="text-micro text-muted leading-relaxed pt-1">
         数据通道基于免费接口,所有档位均可拉取。
       </div>
     </div>

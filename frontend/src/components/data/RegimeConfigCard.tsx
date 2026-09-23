@@ -4,6 +4,7 @@ import { Check, Loader2, Activity, Layers } from 'lucide-react'
 import { api } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { toast } from '@/components/Toast'
+import { buttonClass } from '@/components/ui'
 
 /**
  * 市场环境(regime) 计算设置 —— 控制盘后管道是否自动计算 + 全量回填分批参数。
@@ -92,7 +93,7 @@ export function RegimeConfigCard() {
             <Activity className="h-3.5 w-3.5 text-accent" />
             <span className="text-xs font-medium text-foreground">盘后自动计算</span>
           </div>
-          <div className="text-[10px] text-muted leading-snug mt-0.5">
+          <div className="text-micro text-muted leading-snug mt-0.5">
             默认关闭。开启后每次盘后管道自动增量计算环境状态; 首次或数据缺口较大时全量回填, 耗时与内存较高。
           </div>
         </div>
@@ -104,13 +105,13 @@ export function RegimeConfigCard() {
           <Layers className="h-3.5 w-3.5 text-accent" />
           <span className="text-xs font-medium text-foreground">全量回填分批参数</span>
         </div>
-        <div className="mt-0.5 text-[10px] text-muted leading-snug">
+        <div className="mt-0.5 text-micro text-muted leading-snug">
           全量重算时按批切片控制内存峰值。每批越小越省内存、批次越多越慢。仅在「全部」重算或首次回填时生效。
         </div>
 
         <div className="mt-2.5 grid grid-cols-2 gap-2.5">
           <div>
-            <label className="text-[10px] text-muted">每批天数(交易日)</label>
+            <label className="text-micro text-muted">每批天数(交易日)</label>
             <input
               type="number"
               min={25}
@@ -122,10 +123,10 @@ export function RegimeConfigCard() {
               disabled={updateParams.isPending}
               className="mt-1 h-7 w-full rounded-input border border-border bg-base px-2 text-xs text-foreground outline-none focus:border-accent disabled:opacity-50"
             />
-            <div className="mt-0.5 text-[9px] text-muted">范围 25 ~ 500 · 默认 60</div>
+            <div className="mt-0.5 text-micro text-muted">范围 25 ~ 500 · 默认 60</div>
           </div>
           <div>
-            <label className="text-[10px] text-muted">预热天数(日历日)</label>
+            <label className="text-micro text-muted">预热天数(日历日)</label>
             <input
               type="number"
               min={35}
@@ -137,13 +138,13 @@ export function RegimeConfigCard() {
               disabled={updateParams.isPending}
               className="mt-1 h-7 w-full rounded-input border border-border bg-base px-2 text-xs text-foreground outline-none focus:border-accent disabled:opacity-50"
             />
-            <div className="mt-0.5 text-[9px] text-muted">范围 35 ~ 90 · 默认 40</div>
+            <div className="mt-0.5 text-micro text-muted">范围 35 ~ 90 · 默认 40</div>
           </div>
         </div>
 
         {/* 快捷预设 */}
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
-          <span className="text-[10px] text-muted">快捷:</span>
+          <span className="text-micro text-muted">快捷:</span>
           {[
             { label: '省内存', batch: 30, warmup: 40 },
             { label: '默认', batch: 60, warmup: 40 },
@@ -153,11 +154,7 @@ export function RegimeConfigCard() {
               key={p.label}
               onClick={() => updateParams.mutate({ batch_days: p.batch, warmup_days: p.warmup })}
               disabled={updateParams.isPending}
-              className={`h-5 rounded-btn border px-2 text-[10px] transition-colors disabled:opacity-50 ${
-                batchDays === p.batch
-                  ? 'border-accent/40 bg-accent/10 text-accent'
-                  : 'border-border bg-base text-secondary hover:text-accent hover:border-accent/40'
-              }`}
+              className={buttonClass({ size: 'xs', selected: batchDays === p.batch })}
             >
               {p.label} {p.batch}天
             </button>
@@ -166,7 +163,7 @@ export function RegimeConfigCard() {
       </div>
 
       {(updateEnabled.isPending || updateParams.isPending) && (
-        <div className="flex items-center gap-1.5 text-[10px] text-muted">
+        <div className="flex items-center gap-1.5 text-micro text-muted">
           <Loader2 className="h-3 w-3 animate-spin" />保存中…
         </div>
       )}

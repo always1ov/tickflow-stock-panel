@@ -1,10 +1,13 @@
 import { CheckCircle2, XCircle, Loader2, AlertCircle } from 'lucide-react'
 import { formatDuration } from '@/lib/format'
+import { cn } from '@/lib/cn'
+import { TYPE } from '@/components/ui'
 
 export function SectionTitle({ icon: Icon, children }: { icon: React.ComponentType<{ className?: string }>; children: React.ReactNode }) {
   return (
-    <h2 className="flex items-center gap-2 text-xs font-medium uppercase tracking-widest text-secondary">
-      <Icon className="h-3.5 w-3.5" />
+    // [R465] 数据页的分区标题落 L2(与个股弹窗「现状」「复盘」同级), 原来是 12px 灰色大写字距
+    <h2 className={cn('flex items-center gap-2', TYPE.section)}>
+      <Icon className="h-4 w-4 text-secondary" />
       {children}
     </h2>
   )
@@ -28,7 +31,7 @@ export function HistoryRow({ job, onClick }: { job: any; onClick: () => void }) 
         <Icon className={`h-4 w-4 shrink-0 ${statusIcon.color} ${(statusIcon as any).spinning ? 'animate-spin' : ''}`} />
         <div className="min-w-0">
           <div className="font-mono text-xs text-foreground">{job.id}</div>
-          <div className="text-[11px] text-muted">
+          <div className="text-xs text-muted">
             {job.started_at ? new Date(job.started_at).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'}
             {' · '}
             {job.duration_s != null ? formatDuration(job.duration_s) : '...'}

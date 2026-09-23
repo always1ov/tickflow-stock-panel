@@ -1,5 +1,6 @@
 import { Check, Copy } from 'lucide-react'
 import type { ExtDataConfig } from '@/lib/api'
+import { buttonClass } from '@/components/ui'
 
 export function ExtDataApiPanel({ config, copied, setCopied }: {
   config: ExtDataConfig
@@ -35,9 +36,9 @@ export function ExtDataApiPanel({ config, copied, setCopied }: {
   return (
     <div className="space-y-2.5">
       <div>
-        <div className="text-[10px] text-muted mb-1">接口端点</div>
-        <div className="flex items-center gap-1.5 bg-elevated rounded-md px-2.5 py-1.5">
-          <code className="text-[11px] font-mono text-accent flex-1 select-all">{endpoint}</code>
+        <div className="text-micro text-muted mb-1">接口端点</div>
+        <div className="flex items-center gap-1.5 bg-elevated rounded-btn px-2.5 py-1.5">
+          <code className="text-xs font-mono text-accent flex-1 select-all">{endpoint}</code>
           <button onClick={() => handleCopy(endpoint)} className="text-muted hover:text-secondary transition-colors">
             {copied ? <Check className="h-3 w-3 text-accent" /> : <Copy className="h-3 w-3" />}
           </button>
@@ -45,29 +46,29 @@ export function ExtDataApiPanel({ config, copied, setCopied }: {
       </div>
 
       <div>
-        <div className="text-[10px] text-muted mb-1">请求体示例</div>
-        <pre className="bg-elevated rounded-md px-2.5 py-2 text-[10px] font-mono text-secondary overflow-x-auto whitespace-pre leading-relaxed">
+        <div className="text-micro text-muted mb-1">请求体示例</div>
+        <pre className="bg-elevated rounded-btn px-2.5 py-2 text-xs font-mono text-secondary overflow-x-auto whitespace-pre leading-relaxed">
           {exampleJson}
         </pre>
       </div>
 
       <div>
         <div className="flex items-center justify-between mb-1">
-          <span className="text-[10px] text-muted">cURL 示例</span>
+          <span className="text-micro text-muted">cURL 示例</span>
           <button
             onClick={() => handleCopy(curlCmd)}
-            className="text-[10px] text-accent hover:text-accent/80 flex items-center gap-0.5 transition-colors"
+            className={buttonClass({ size: 'xs' }, 'gap-1')}
           >
             {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
             复制
           </button>
         </div>
-        <pre className="bg-elevated rounded-md px-2.5 py-2 text-[10px] font-mono text-secondary overflow-x-auto whitespace-pre-wrap leading-relaxed break-all">
+        <pre className="bg-elevated rounded-btn px-2.5 py-2 text-xs font-mono text-secondary overflow-x-auto whitespace-pre-wrap leading-relaxed break-all">
           {curlCmd}
         </pre>
       </div>
 
-      <div className="text-[10px] text-muted leading-relaxed">
+      <div className="text-micro text-muted leading-relaxed">
         {config.mode === 'snapshot' ? (
           <><span className="text-secondary">date</span> 可选，默认当天；每次写入覆盖同日期数据</>
         ) : (

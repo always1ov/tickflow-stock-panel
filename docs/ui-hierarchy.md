@@ -69,7 +69,7 @@
 - [x] 信号(`Signals` + `signals/*`)
 - [x] 概念 / 行业分析(`ConceptAnalysis` / `IndustryAnalysis`)
 - [x] 财务(`Financials` + `financials/*`)
-- [ ] 数据(`Data` + `data/*`)
+- [x] 数据(`Data` + `data/*` + `ext-data/*`)
 - [ ] 因子(`Factors` + `factors/*`)
 - [ ] 回测(`Backtest` + `backtest/*`)
 - [ ] 设置(`Settings` + `settings/*`)

@@ -7,6 +7,8 @@ import { QK } from '@/lib/queryKeys'
 import { SettingsModal } from '@/components/data/SettingsModal'
 import { ExtDataPullPanel } from './ExtDataPullPanel'
 import { ExtDataApiPanel } from './ExtDataApiPanel'
+import { TYPE, SEG, SEG_ITEM, SEG_ON, SEG_OFF, buttonClass } from '@/components/ui'
+import { cn } from '@/lib/cn'
 
 export function ExtDataStatCard({ config, onDelete, deleting, onEdit }: {
   config: ExtDataConfig
@@ -68,15 +70,11 @@ export function ExtDataStatCard({ config, onDelete, deleting, onEdit }: {
   }
 
   return (
-    <div className={`rounded-card border flex flex-col transition-ui duration-enter ${
-      config.mode === 'snapshot'
-        ? 'border-blue-500/30 bg-blue-500/[0.03]'
-        : 'border-amber-500/30 bg-amber-500/[0.03]'
-    }`}>
+    <div className="rounded-card border border-border bg-surface flex flex-col">
       <div className="flex items-center justify-between px-4 pt-4 pb-2">
-        <h3 className="text-sm font-medium text-foreground">{config.label}</h3>
+        <h3 className={TYPE.card}>{config.label}</h3>
         <div className="flex items-center gap-1.5">
-          <span className={`text-[10px] px-1.5 py-px rounded font-medium ${
+          <span className={`text-micro px-1.5 py-px rounded font-medium ${
             config.mode === 'snapshot'
               ? 'bg-blue-500/10 text-blue-400'
               : 'bg-amber-500/10 text-amber-400'
@@ -92,7 +90,7 @@ export function ExtDataStatCard({ config, onDelete, deleting, onEdit }: {
         </div>
       </div>
 
-      <div className="px-4 pb-1.5 text-[10px] text-muted/70 leading-relaxed line-clamp-2">
+      <div className="px-4 pb-1.5 text-micro text-muted/70 leading-relaxed line-clamp-2">
         {config.description || `扩展数据 · ${config.mode === 'snapshot' ? '与标的 JOIN' : '与日K JOIN'}`}
       </div>
 
@@ -107,7 +105,7 @@ export function ExtDataStatCard({ config, onDelete, deleting, onEdit }: {
             {config.fields
               .filter(f => f.name !== 'symbol' && f.name !== 'code')
               .map((f) => (
-                <span key={f.name} className="inline-flex items-center gap-1 text-[10px] bg-elevated rounded px-1.5 py-0.5">
+                <span key={f.name} className="inline-flex items-center gap-1 text-micro bg-elevated rounded px-1.5 py-0.5">
                   <Tag className="h-2.5 w-2.5 text-muted" />
                   <span className="text-secondary">{f.label || f.name}</span>
                 </span>
@@ -125,7 +123,7 @@ export function ExtDataStatCard({ config, onDelete, deleting, onEdit }: {
           {fieldsExpanded && fieldsOverflow && (
             <button
               onClick={() => setFieldsExpanded(false)}
-              className="w-full flex items-center justify-center pt-1 text-[10px] text-muted hover:text-secondary transition-colors"
+              className="w-full flex items-center justify-center pt-1 text-micro text-muted hover:text-secondary transition-colors"
             >
               <ChevronUp className="h-3 w-3" />
             </button>
@@ -134,11 +132,11 @@ export function ExtDataStatCard({ config, onDelete, deleting, onEdit }: {
       </div>
 
       <div className="mt-auto px-4 pb-4 pt-2 border-t border-border/50">
-        <div className="flex justify-between text-[11px]">
+        <div className="flex justify-between text-xs">
           <span className="text-muted">标识</span>
           <span className="font-mono text-secondary">{config.id}</span>
         </div>
-        <div className="flex justify-between text-[11px] mt-1">
+        <div className="flex justify-between text-xs mt-1">
           <span className="text-muted">最新</span>
           <span className="text-secondary">{config.latest_sync_date ?? '—'}</span>
         </div>
@@ -172,28 +170,22 @@ export function ExtDataStatCard({ config, onDelete, deleting, onEdit }: {
                 修复代码格式
               </button>
 
-              <div className="flex gap-1 rounded-lg bg-elevated/60 p-0.5">
+              <div className={cn(SEG, 'flex w-full')}>
                 <button
                   onClick={() => setIngestTab('pull')}
-                  className={`flex-1 inline-flex items-center justify-center gap-1 py-1.5 rounded-md text-[10px] font-medium transition-colors ${
-                    ingestTab === 'pull' ? 'bg-surface text-foreground shadow-sm' : 'text-muted hover:text-secondary'
-                  }`}
+                  className={cn(SEG_ITEM, 'flex-1 justify-center', ingestTab === 'pull' ? SEG_ON : SEG_OFF)}
                 >
                   <RefreshCw className="h-3 w-3" />拉取
                 </button>
                 <button
                   onClick={() => setIngestTab('api')}
-                  className={`flex-1 inline-flex items-center justify-center gap-1 py-1.5 rounded-md text-[10px] font-medium transition-colors ${
-                    ingestTab === 'api' ? 'bg-surface text-foreground shadow-sm' : 'text-muted hover:text-secondary'
-                  }`}
+                  className={cn(SEG_ITEM, 'flex-1 justify-center', ingestTab === 'api' ? SEG_ON : SEG_OFF)}
                 >
                   <Code className="h-3 w-3" />推送
                 </button>
                 <button
                   onClick={() => setIngestTab('file')}
-                  className={`flex-1 inline-flex items-center justify-center gap-1 py-1.5 rounded-md text-[10px] font-medium transition-colors ${
-                    ingestTab === 'file' ? 'bg-surface text-foreground shadow-sm' : 'text-muted hover:text-secondary'
-                  }`}
+                  className={cn(SEG_ITEM, 'flex-1 justify-center', ingestTab === 'file' ? SEG_ON : SEG_OFF)}
                 >
                   <Upload className="h-3 w-3" />上传
                 </button>
@@ -228,15 +220,15 @@ export function ExtDataStatCard({ config, onDelete, deleting, onEdit }: {
                     {uploading ? (
                       <>
                         <Loader2 className="h-5 w-5 text-accent animate-spin" />
-                        <span className="text-[11px] text-muted">上传中…</span>
+                        <span className="text-xs text-muted">上传中…</span>
                       </>
                     ) : (
                       <>
                         <Upload className={`h-5 w-5 ${dragOver ? 'text-accent' : 'text-muted'}`} />
-                        <span className={`text-[11px] ${dragOver ? 'text-accent' : 'text-secondary'}`}>
+                        <span className={`text-xs ${dragOver ? 'text-accent' : 'text-secondary'}`}>
                           拖拽文件到此处上传
                         </span>
-                        <span className="text-[10px] text-muted">支持 CSV / Excel，需包含 symbol 列</span>
+                        <span className="text-micro text-muted">支持 CSV / Excel，需包含 symbol 列</span>
                       </>
                     )}
                   </div>
@@ -244,13 +236,13 @@ export function ExtDataStatCard({ config, onDelete, deleting, onEdit }: {
               )}
 
               {uploadResult && (
-                <div className="text-[11px] text-green-400 bg-green-500/10 rounded-lg px-3 py-2 text-center flex items-center justify-center gap-1.5 font-medium">
+                <div className="text-xs text-bear bg-bear/10 rounded-btn px-3 py-2 text-center flex items-center justify-center gap-1.5 font-medium">
                   <CheckCircle2 className="h-3.5 w-3.5" />上传成功 · {uploadResult.rows} 行 · {uploadResult.date}
                 </div>
               )}
               <button
                 onClick={() => setShowDelete(true)}
-                className="w-full text-center text-[10px] text-danger/60 hover:text-danger transition-colors"
+                className="w-full text-center text-micro text-danger/60 hover:text-danger transition-colors"
               >
                 删除此扩展
               </button>
@@ -283,11 +275,11 @@ export function ExtDataStatCard({ config, onDelete, deleting, onEdit }: {
                   <AlertTriangle className="h-5 w-5 text-danger" />
                 </div>
                 <div className="min-w-0">
-                  <h3 className="text-sm font-semibold text-foreground mb-1.5">确认删除「{config.label}」？</h3>
+                  <h3 className={cn(TYPE.section, 'mb-1.5')}>确认删除「{config.label}」？</h3>
                   <p className="text-xs text-secondary leading-relaxed">
                     将<span className="text-danger font-medium">永久删除</span>该扩展数据配置及其全部数据，包括字段、已上传/拉取的所有记录。
                   </p>
-                  <p className="mt-2 text-[11px] text-danger/90">
+                  <p className="mt-2 text-xs text-danger/90">
                     操作不可恢复。
                   </p>
                 </div>
@@ -296,14 +288,14 @@ export function ExtDataStatCard({ config, onDelete, deleting, onEdit }: {
                 <button
                   onClick={() => setShowDelete(false)}
                   disabled={deleting}
-                  className="px-3 py-1.5 rounded-btn bg-elevated text-secondary hover:bg-elevated/80 text-sm transition-colors disabled:opacity-50"
+                  className={buttonClass()}
                 >
                   取消
                 </button>
                 <button
                   onClick={() => { onDelete(); setShowDelete(false) }}
                   disabled={deleting}
-                  className="px-3 py-1.5 rounded-btn bg-danger/90 text-base text-sm font-medium hover:bg-danger disabled:opacity-50 transition-colors"
+                  className={buttonClass({}, 'border-danger bg-danger font-medium text-on-accent hover:bg-danger/90')}
                 >
                   {deleting ? '删除中…' : '确认删除'}
                 </button>

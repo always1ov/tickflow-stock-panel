@@ -67,7 +67,7 @@ export function DepthConfigContent({ disabled }: { disabled?: boolean }) {
       <div className="flex items-center justify-between gap-2">
         <div className={disabled ? 'opacity-50' : ''}>
           <div className="text-xs text-secondary">盘中轮询间隔</div>
-          <div className="text-[10px] text-muted">范围 {range.lo}~{range.hi} 秒 · 涨跌停过多时系统自动放慢</div>
+          <div className="text-micro text-muted">范围 {range.lo}~{range.hi} 秒 · 涨跌停过多时系统自动放慢</div>
         </div>
         <div className="flex items-center gap-1">
           <input
@@ -94,7 +94,7 @@ export function DepthConfigContent({ disabled }: { disabled?: boolean }) {
       <div className="flex items-center justify-between gap-2">
         <div className={disabled ? 'opacity-50' : ''}>
           <div className="text-xs text-secondary">盘后定版时间</div>
-          <div className="text-[10px] text-muted">范围 15:01~18:00 · 收盘后拉取最终盘口定版</div>
+          <div className="text-micro text-muted">范围 15:01~18:00 · 收盘后拉取最终盘口定版</div>
         </div>
         <div className="flex items-center gap-1">
           <input

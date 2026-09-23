@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { buttonClass } from '@/components/ui'
 
 export function ScheduleEditor({ value, onSave, loading, hint }: {
   value: { hour: number; minute: number }
@@ -18,7 +19,7 @@ export function ScheduleEditor({ value, onSave, loading, hint }: {
 
   return (
     <div className="flex items-center gap-2 pt-1.5">
-      <span className="text-[10px] text-muted">每日</span>
+      <span className="text-micro text-muted">每日</span>
       <input
         type="number" min={0} max={23} value={h}
         onChange={e => setH(Math.max(0, Math.min(23, Number(e.target.value))))}
@@ -33,11 +34,11 @@ export function ScheduleEditor({ value, onSave, loading, hint }: {
       <button
         onClick={handleSave}
         disabled={loading || (h === value.hour && m === value.minute)}
-        className="px-2.5 py-1 rounded-btn bg-accent/15 text-accent text-[11px] font-medium hover:bg-accent/25 disabled:opacity-40 transition-colors"
+        className={buttonClass({ variant: 'primary', size: 'xs' })}
       >
         {loading ? '保存中…' : '保存'}
       </button>
-      <span className="text-[10px] text-muted">工作日自动执行{hint ? ` · ${hint}` : ''}</span>
+      <span className="text-micro text-muted">工作日自动执行{hint ? ` · ${hint}` : ''}</span>
     </div>
   )
 }

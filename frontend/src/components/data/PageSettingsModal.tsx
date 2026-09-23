@@ -180,7 +180,7 @@ export function PageSettingsModal({
       <div className="flex items-center justify-end pt-1">
         <button
           onClick={reset}
-          className="px-2 py-0.5 rounded-btn text-[10px] text-secondary hover:text-foreground transition-colors"
+          className="px-2 py-0.5 rounded-btn text-micro text-secondary hover:text-foreground transition-colors"
         >
           恢复默认
         </button>
@@ -248,7 +248,7 @@ function SortableCardRow({
       </button>
       <div className="min-w-0 flex-1">
         <div className="text-xs font-medium text-foreground">{label}</div>
-        <div className="text-[10px] text-muted leading-snug">{desc}</div>
+        <div className="text-micro text-muted leading-snug">{desc}</div>
       </div>
     </div>
   )

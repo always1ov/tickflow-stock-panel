@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Activity, Settings } from 'lucide-react'
 import { Skeleton } from './Skeleton'
+import { TYPE, buttonClass } from '@/components/ui'
 
 export function QuoteConfigCard({ enabled, running, isTrading, lastFetchMs, intervalS, intervalMin, intervalMax, loading, onToggle, toggling, showIntervalEdit, onShowIntervalEdit, onIntervalChange }: {
   enabled: boolean
@@ -41,7 +42,7 @@ export function QuoteConfigCard({ enabled, running, isTrading, lastFetchMs, inte
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <Activity className="h-4 w-4 text-secondary" />
-          <h3 className="text-sm font-medium text-foreground">实时行情</h3>
+          <h3 className={TYPE.card}>实时行情</h3>
         </div>
         <button
           onClick={() => onToggle(!enabled)}
@@ -67,18 +68,18 @@ export function QuoteConfigCard({ enabled, running, isTrading, lastFetchMs, inte
         </div>
       ) : (
         <div className="space-y-2">
-          <div className="flex items-center justify-between text-[11px]">
+          <div className="flex items-center justify-between text-xs">
             <span className="text-muted">状态</span>
             <div className="flex items-center gap-1.5">
               <span className={`inline-block h-1.5 w-1.5 rounded-full ${statusColor} ${running && isTrading ? 'animate-pulse' : ''}`} />
               <span className="font-mono text-secondary">{statusText}</span>
             </div>
           </div>
-          <div className="flex items-center justify-between text-[11px]">
+          <div className="flex items-center justify-between text-xs">
             <span className="text-muted">交易时段</span>
             <span className={`font-mono ${isTrading ? 'text-accent' : 'text-muted'}`}>{isTrading ? '交易中' : '休市'}</span>
           </div>
-          <div className="flex items-center justify-between text-[11px]">
+          <div className="flex items-center justify-between text-xs">
             <div className="flex items-center gap-1">
               <span className="text-muted">轮询间隔</span>
               <button
@@ -91,7 +92,7 @@ export function QuoteConfigCard({ enabled, running, isTrading, lastFetchMs, inte
             </div>
             <span className="font-mono text-secondary">{intervalS}s</span>
           </div>
-          <div className="flex items-center justify-between text-[11px]">
+          <div className="flex items-center justify-between text-xs">
             <span className="text-muted">最后获取</span>
             <span className="font-mono text-secondary">{lastFetchTime ?? '—'}</span>
           </div>
@@ -130,7 +131,7 @@ function IntervalEditor({ min, max, value, onChange }: {
 
   return (
     <div className="mt-2 pt-2 border-t border-border/50">
-      <div className="text-[10px] text-muted mb-1.5">
+      <div className="text-micro text-muted mb-1.5">
         轮询间隔 <span className="text-muted/60">({min}s ~ {max}s)</span>
       </div>
       <div className="flex flex-wrap gap-1 mb-2">
@@ -138,11 +139,7 @@ function IntervalEditor({ min, max, value, onChange }: {
           <button
             key={p}
             onClick={() => { setDraft(p); onChange(p) }}
-            className={`px-1.5 py-0.5 rounded text-[10px] font-mono transition-colors ${
-              Math.abs(clamped - p) < 0.01
-                ? 'bg-accent/15 text-accent border border-accent/30'
-                : 'bg-elevated text-secondary hover:text-foreground border border-transparent'
-            }`}
+            className={buttonClass({ size: 'xs', selected: Math.abs(clamped - p) < 0.01 }, 'font-mono')}
           >
             {p}s
           </button>
@@ -156,7 +153,7 @@ function IntervalEditor({ min, max, value, onChange }: {
           onChange={e => { const v = parseFloat(e.target.value); setDraft(v); onChange(v) }}
           className="flex-1 h-1 accent-accent cursor-pointer"
         />
-        <span className="text-[10px] font-mono text-foreground w-8 text-right">
+        <span className="text-xs font-mono text-foreground w-9 text-right">
           {clamped < 1 ? clamped.toFixed(1) : clamped.toFixed(0)}s
         </span>
       </div>
