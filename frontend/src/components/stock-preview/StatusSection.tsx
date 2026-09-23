@@ -18,7 +18,7 @@
  * 格与格之间的分隔竖线, 「删除掉 ... 然后排版好显示」。那一格只剩阶段, 标题跟着从
  * 「通道档位」改叫「通道阶段」(档位是「短线回调」「候选池」那一类, 阶段是另一个读数,
  * 同一个标题底下换了东西就是一个名字两个意思)。四块等分一行、同一个结构:
- * 顶上一行小标题, 下面读数, 顶端对齐; 窄屏两块一行。
+ * 顶上一行小标题, 下面读数, 顶端对齐; 窄屏两块一行。[R448] 三档位置那一块不要小标题。
  *
  * 六态走的是六态接口(开实时行情时是盘中口径, 会标出来), 通道那几样走复盘接口
  * (收盘口径)。两者分别与图上方的六态条、下面的复盘表是同一份数, 不另算。
@@ -125,7 +125,8 @@ function BandsCell({ d }: { d?: StockReview }) {
   const bands = d?.rows[0]?.bands
   if (!bands) return null
   return (
-    <Cell label="三档位置">
+    // [R448] 不要小标题 —— 用户: 「删掉三档位置这四个字」。上轨 / 中轨 / 下轨与短中长期已经说清楚了
+    <div className="min-w-0">
       <div className="flex items-start gap-2">
         <div className="flex flex-col gap-1 pt-px text-micro leading-none text-muted" aria-hidden="true">
           <span className="flex h-2.5 items-center">上轨</span>
@@ -148,6 +149,6 @@ function BandsCell({ d }: { d?: StockReview }) {
           )
         })}
       </div>
-    </Cell>
+    </div>
   )
 }

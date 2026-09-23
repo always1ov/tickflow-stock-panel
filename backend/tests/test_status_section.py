@@ -82,5 +82,7 @@ def test_R445_现状块删掉打码的部分_没有分隔竖线_四块等分():
     assert '<Cell label="通道阶段">' in st and "通道档位" not in st
     # 四块同一个结构(小标题 + 读数), 等分一行, 窄屏两块一行
     assert "grid grid-cols-1 items-start" in st and "sm:grid-cols-2 lg:grid-cols-4" in st
-    for label in ('<Cell label="三档位置">', "<FlipCell label=\"跌破转弱\"", "<FlipCell label=\"站上转强\""):
+    for label in ("<FlipCell label=\"跌破转弱\"", "<FlipCell label=\"站上转强\""):
         assert label in st
+    # [R448] 用户: 「删掉三档位置这四个字」
+    assert "三档位置" not in st, "三档位置那块的小标题又回来了"
