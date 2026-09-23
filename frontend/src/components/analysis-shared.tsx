@@ -31,6 +31,7 @@ import type { DimensionGroup, QuoteMap } from '@/lib/analysis-adapter'
 import { computeQuoteMetrics } from '@/lib/analysis-adapter'
 import { fmtPct, priceColorClass } from '@/lib/format'
 import { useDialogBackdrop } from '@/lib/useDialogBackdrop'
+import { TYPE, buttonClass } from '@/components/ui'
 
 // ===== 配置类型 =====
 
@@ -91,7 +92,7 @@ export function AnalysisConfigDialog({
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.95 }}
-        className="bg-surface border border-border rounded-lg shadow-xl w-[420px]"
+        className="bg-surface border border-border rounded-btn shadow-xl w-[420px]"
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-4 pt-3 pb-2">
@@ -149,7 +150,7 @@ export function AnalysisConfigDialog({
             </div>
           )}
 
-          <div className="text-[10px] text-muted leading-relaxed">
+          <div className="text-micro text-muted leading-relaxed">
             系统自动检测数据结构：支持"个股→概念/行业"和"概念/行业→成分股列表"两种模式。
             {showHierarchyLevel ? ' 行业字段按 “-” 拆分为 1/2/3 级。' : ''}
           </div>
@@ -207,7 +208,7 @@ export function OverviewStatCards({
           <div className="mt-2 text-xl font-semibold tracking-tight text-foreground truncate">
             {card.value}
           </div>
-          <div className="mt-1 text-[11px] text-muted truncate">{card.hint}</div>
+          <div className="mt-1 text-xs text-muted truncate">{card.hint}</div>
         </div>
       ))}
     </div>
@@ -251,7 +252,7 @@ export function DimensionHeatmap({
         <span className="text-xs text-muted">热度分布（按标的覆盖数）</span>
         <button
           onClick={() => setShowAll(v => !v)}
-          className="text-[10px] text-muted hover:text-foreground flex items-center gap-0.5"
+          className="text-micro text-muted hover:text-foreground flex items-center gap-0.5"
         >
           {showAll ? '收起' : `展开全部 (${enriched.length})`}
           <ChevronDown className={`h-3 w-3 transition-transform ${showAll ? 'rotate-180' : ''}`} />
@@ -273,7 +274,7 @@ export function DimensionHeatmap({
             <button
               key={g.key}
               onClick={() => onSelect(active ? null : g.key)}
-              className="px-2.5 py-1.5 rounded-sm text-[11px] whitespace-nowrap cursor-pointer hover:brightness-125 transition-ui"
+              className="px-2.5 py-1.5 rounded-sm text-xs whitespace-nowrap cursor-pointer hover:brightness-125 transition-ui"
               style={{
                 fontSize: `${10 + size * 2}px`,
                 color: active ? '#fff' : `rgba(${r},${gr},${b},${0.6 + upRatio * 0.4})`,
@@ -333,8 +334,8 @@ export function DimensionGroupSidebar({
   return (
     <section className="rounded-card border border-border bg-surface overflow-hidden">
       <div className="px-4 py-3 border-b border-border">
-        <h3 className="text-sm font-medium text-foreground">{kindLabel}榜单</h3>
-        <p className="mt-0.5 text-[11px] text-muted">按覆盖标的数量排序</p>
+        <h3 className={TYPE.card}>{kindLabel}榜单</h3>
+        <p className="mt-0.5 text-xs text-muted">按覆盖标的数量排序</p>
       </div>
       <div className="p-3 border-b border-border/60">
         <div className="relative">
@@ -358,13 +359,13 @@ export function DimensionGroupSidebar({
               key={group.key}
               onClick={() => onSelect(group.key)}
               className={cn(
-                'w-full rounded-lg px-3 py-2 text-left transition-colors',
+                'w-full rounded-btn px-3 py-2 text-left transition-colors',
                 active ? 'border' : 'border border-transparent hover:bg-elevated/60',
               )}
               style={active ? { backgroundColor: accentBg, borderColor: accentBorder } : undefined}
             >
               <div className="flex items-center gap-2">
-                <span className="w-5 text-[10px] font-mono text-muted">#{i + 1}</span>
+                <span className="w-5 text-micro font-mono text-muted">#{i + 1}</span>
                 <span className="flex-1 truncate text-xs font-medium text-foreground">{group.key}</span>
                 <span className="font-mono text-xs text-secondary">{group.count}</span>
               </div>
@@ -379,7 +380,7 @@ export function DimensionGroupSidebar({
                 />
               </div>
               {/* 行情摘要 */}
-              <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-muted">
+              <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-micro text-muted">
                 {qm.avgPct != null && (
                   <span className={priceColorClass(qm.avgPct)}>
                     均幅 {fmtPct(qm.avgPct)}
@@ -428,7 +429,7 @@ export function QuoteSummaryBar({
   const downPct = (stats.downTotal / total) * 100
 
   return (
-    <div className="flex items-center gap-3 text-[11px]">
+    <div className="flex items-center gap-3 text-xs">
       <div className="flex-1 h-2 rounded-full overflow-hidden bg-elevated flex">
         <div className="h-full bg-bull/70 rounded-l-full" style={{ width: `${upPct}%` }} />
         <div className="flex-1" />
@@ -479,12 +480,12 @@ export function PresetFetchState({
     <div className="h-full grid place-items-center px-8 py-16">
       <div className="text-center max-w-md">
         <DownloadCloud className="mx-auto h-10 w-10 text-muted" strokeWidth={1.5} />
-        <h2 className="mt-4 text-base font-medium text-foreground">{title}</h2>
+        <h2 className={cn('mt-4', TYPE.section)}>{title}</h2>
         <p className="mt-2 text-sm text-secondary leading-relaxed">{hint}</p>
         <button
           onClick={onFetch}
           disabled={isLoading}
-          className="mt-5 inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:brightness-110 disabled:opacity-60"
+          className={buttonClass({ variant: 'primary' }, 'mt-5 gap-2')}
         >
           {isLoading ? (
             <><RefreshCw className="h-4 w-4 animate-spin" /> 获取中...</>

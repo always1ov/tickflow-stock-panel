@@ -104,32 +104,32 @@ export function VerdictHover({ v, note, children }: {
             position: 'fixed', left: pos.left, top: pos.top, width: CARD_W,
             transform: pos.below ? undefined : 'translateY(-100%)',
           }}
-          className="pointer-events-none z-[60] overflow-hidden rounded-lg border border-border bg-surface shadow-2xl"
+          className="pointer-events-none z-[60] overflow-hidden rounded-btn border border-border bg-surface shadow-2xl"
         >
           <div className="flex items-stretch">
             <div className={`w-1 shrink-0 ${TONE_BAR[v.tone]}`} />
             <div className="min-w-0 flex-1 px-3 py-2.5">
               <div className="flex items-baseline justify-between gap-2">
                 <span className={`text-xs font-medium ${TONE_ACCENT[v.tone]}`}>{v.title}</span>
-                <span className="shrink-0 text-[9px] text-muted">{TONE_CN[v.tone]}</span>
+                <span className="shrink-0 text-micro text-muted">{TONE_CN[v.tone]}</span>
               </div>
 
               {/* 怎么做 —— 这一行是用户真正要的那句, 排在最上面且最显眼 */}
               <div className="mt-2 rounded border border-border/60 bg-elevated/40 px-2 py-1.5">
-                <div className="text-[9px] text-muted">怎么做</div>
-                <div className="mt-0.5 text-[11px] leading-snug text-foreground">{v.action}</div>
+                <div className="text-micro text-muted">怎么做</div>
+                <div className="mt-0.5 text-xs leading-snug text-foreground">{v.action}</div>
               </div>
 
               <div className="mt-2">
-                <div className="text-[9px] text-muted">为什么</div>
-                <div className="mt-0.5 text-[10px] leading-relaxed text-secondary">{v.detail}</div>
+                <div className="text-micro text-muted">为什么</div>
+                <div className="mt-0.5 text-micro leading-relaxed text-secondary">{v.detail}</div>
               </div>
 
               <div className="mt-2 flex items-baseline gap-1.5">
-                <span className="shrink-0 text-[9px] text-muted">依据</span>
-                <span className="text-[10px] leading-snug text-secondary">{v.bands_text}</span>
+                <span className="shrink-0 text-micro text-muted">依据</span>
+                <span className="text-micro leading-snug text-secondary">{v.bands_text}</span>
                 <span
-                  className="ml-auto shrink-0 rounded border border-border/60 px-1 text-[9px] text-muted"
+                  className="ml-auto shrink-0 rounded border border-border/60 px-1 text-micro text-muted"
                   title="有几档通道指向同一边"
                 >
                   {v.bands_aligned} 档共振
@@ -137,11 +137,11 @@ export function VerdictHover({ v, note, children }: {
               </div>
 
               {note && (
-                <div className="mt-2 border-t border-border/40 pt-1.5 text-[9px] leading-relaxed text-muted">
+                <div className="mt-2 border-t border-border/40 pt-1.5 text-micro leading-relaxed text-muted">
                   {note}
                 </div>
               )}
-              <div className="mt-1.5 text-[9px] leading-relaxed text-muted/80">
+              <div className="mt-1.5 text-micro leading-relaxed text-muted/80">
                 这是「档位」—— 说的是这个价算高还是算低, 不是会不会继续涨。
                 清仓与否看止盈线/生命线, 优先级在通道之上。收盘口径。
               </div>

@@ -50,7 +50,7 @@ function pct(v: number | null | undefined, digits = 1): string {
 // 在这一栏是红、在逐日表是绿, 读的人得先确认哪个是涨。
 function chgCls(v: number | null | undefined): string {
   if (v == null || v === 0) return 'text-muted'
-  return v > 0 ? 'text-red-400' : 'text-emerald-400'
+  return v > 0 ? 'text-bull' : 'text-bear'
 }
 
 /** 空仓段那一格的话。**故意不带正负号也不带红绿** —— 见文件头第 1 条。 */
@@ -129,14 +129,14 @@ export function FlipTradesBar({ ft, basis }: {
   // [R301] `title` 这个入参删了 —— 两个调用方一直传的都是空串, 而这一栏的
   // 标题本来就写在 `HeadRow` 的左栏里(「按转折买卖」/「按档位买卖」)。
   // 留着就是"看起来在用、其实永远是空"的那类死参数。
-  if (ft.reason) return <div className="text-[10px] text-muted">{REASON_CN[ft.reason]}</div>
+  if (ft.reason) return <div className="text-micro text-muted">{REASON_CN[ft.reason]}</div>
   const notes = tradeNotes(ft)
   return (
     <div>
       {/* [R301] **四个数排成等宽格子**, 不再是一条 `flex-wrap` 的杂排。
           用户: 「内容显示整理好划分好卡片布局, 现在的显示不对齐」。
 
-          原来这一行把三种字号(`text-lg` / `text-sm` / `text-[10px]`)、四个
+          原来这一行把三种字号(`text-lg` / `text-sm` / `text-micro`)、四个
           长短不一的标签、外加 `basis` 一整句话全塞进同一条 `items-baseline`
           里 —— **没有任何两样东西的边是对齐的**, 而且 `text-lg` 那个数把整行
           撑高, 后面几个数被顶得偏下。
@@ -151,15 +151,15 @@ export function FlipTradesBar({ ft, basis }: {
         <Stat label="一直拿着" value={ft.hold} title={TRADE_STAT_TIPS.hold} />
         <Stat label="多赚" value={ft.excess} title={TRADE_STAT_TIPS.excess} />
         <div title={TRADE_STAT_TIPS.trades}>
-          <div className="text-[10px] text-muted">买卖</div>
+          <div className="text-micro text-muted">买卖</div>
           <div className="font-mono text-base tabular-nums text-secondary">{ft.trades} 次</div>
         </div>
       </div>
       {/* 口径**自己一行**。原来它跟在四个数后面挤在同一条 flex 里, 一句话把那
           一行撑到换行, 数值就再也排不齐了 —— 它是脚注, 不是第五个指标。 */}
-      <p className="mt-1.5 text-[10px] leading-relaxed text-muted">{basis}</p>
+      <p className="mt-1.5 text-micro leading-relaxed text-muted">{basis}</p>
       {notes.map((t) => (
-        <p key={t} className="mt-1 text-[10px] leading-relaxed text-amber-300/90">{t}</p>
+        <p key={t} className="mt-1 text-micro leading-relaxed text-warning/90">{t}</p>
       ))}
     </div>
   )
@@ -188,10 +188,10 @@ export function FlipTradeCells({ leg }: { leg?: Leg }) {
   return (
     <>
       <td className="whitespace-nowrap px-2 py-1.5"><LegAct leg={leg} /></td>
-      <td className="whitespace-nowrap px-2 py-1.5 text-right font-mono text-[10px] tabular-nums text-muted">
+      <td className="whitespace-nowrap px-2 py-1.5 text-right font-mono text-micro tabular-nums text-muted">
         <LegFill leg={leg} />
       </td>
-      <td className={cn('whitespace-nowrap px-2 py-1.5 text-right font-mono text-[10px] tabular-nums', legResultCls(leg))}>
+      <td className={cn('whitespace-nowrap px-2 py-1.5 text-right font-mono text-micro tabular-nums', legResultCls(leg))}>
         <LegResult leg={leg} />
       </td>
     </>
@@ -205,11 +205,11 @@ export function FlipTradeCells({ leg }: { leg?: Leg }) {
 export function LegAct({ leg }: { leg: Leg }) {
   return (
     <>
-      <span className={cn('inline-flex rounded border px-1 py-px text-[10px]', ACT_CLS[leg.act])}>
+      <span className={cn('inline-flex rounded border px-1 py-px text-micro', ACT_CLS[leg.act])}>
         {leg.act}
       </span>
       {leg.delayed > 0 && (
-        <span className="ml-1 text-[9px] text-amber-400"
+        <span className="ml-1 text-micro text-warning"
               title={`信号次日是一字板, 挂不进去 —— 顺延 ${leg.delayed} 个交易日才成交`}>
           ·延{leg.delayed}
         </span>
@@ -225,7 +225,7 @@ export function LegFill({ leg }: { leg: Leg }) {
       <span className="mx-1 opacity-50">→</span>
       {leg.exit_date.slice(5)} {leg.exit_price.toFixed(2)}
       {leg.open_ended && (
-        <span className="ml-1 text-amber-400/80"
+        <span className="ml-1 text-warning/80"
               title="这一段还没走完 —— 按最后一天收盘价记, 不进胜负统计">未完</span>
       )}
     </>
@@ -259,7 +259,7 @@ function Stat({ label, value, lead, title }: {
 }) {
   return (
     <div title={title}>
-      <div className={cn('text-[10px]', lead ? 'text-secondary' : 'text-muted')}>{label}</div>
+      <div className={cn('text-micro', lead ? 'text-secondary' : 'text-muted')}>{label}</div>
       <div className={cn('font-mono text-base tabular-nums', lead && 'font-semibold', chgCls(value))}>
         {pct(value)}
       </div>

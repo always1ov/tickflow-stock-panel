@@ -119,7 +119,7 @@ function ChartPill({
       type="button"
       onClick={onClick}
       title={title}
-      className={`px-2 py-0.5 rounded text-[10px] font-mono cursor-pointer transition-colors ${
+      className={`px-2 py-0.5 rounded text-micro font-mono cursor-pointer transition-colors ${
         active ? activeClass : 'bg-elevated text-muted hover:text-secondary'
       }`}
     >
@@ -214,7 +214,7 @@ export function StockDailyKChart({
           ))}
           {activeIndicators.includes('vol') && (
             <div className="ml-0.5 flex h-5 items-center gap-1.5 border-l border-border/70 pl-2">
-              <span className="text-[10px] text-muted">量比</span>
+              <span className="text-micro text-muted">量比</span>
               <button
                 type="button"
                 role="switch"
@@ -235,7 +235,7 @@ export function StockDailyKChart({
                 value={volumeCompare.days}
                 disabled={!volumeCompare.enabled}
                 onChange={event => updateVolumeCompare({ days: Number(event.target.value) })}
-                className="h-5 rounded border border-border bg-base px-1 text-[10px] text-secondary outline-none disabled:opacity-40"
+                className="h-5 rounded border border-border bg-base px-1 text-micro text-secondary outline-none disabled:opacity-40"
               >
                 {Array.from({ length: 20 }, (_, index) => index + 1).map(days => (
                   <option key={days} value={days}>前{days}日均量</option>

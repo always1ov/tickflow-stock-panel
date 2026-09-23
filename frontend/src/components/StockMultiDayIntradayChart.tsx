@@ -5,6 +5,7 @@ import { api, type MinuteKlineSession } from '@/lib/api'
 import { klineMinuteQueryOptions, klineMinuteRangeQueryOptions, minuteRefetchInterval } from '@/lib/kline'
 import { toast } from '@/components/Toast'
 import { EChartsMultiDayIntraday } from '@/components/EChartsMultiDayIntraday'
+import { buttonClass } from '@/components/ui'
 
 interface Props {
   symbol: string
@@ -148,7 +149,7 @@ export function StockMultiDayIntradayChart({
               <button
                 type="button"
                 onClick={() => syncMinute.mutate()}
-                className="inline-flex items-center gap-1.5 rounded-btn bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent/90"
+                className={buttonClass({ variant: 'primary' }, 'gap-1.5')}
               >
                 <Download className="h-3.5 w-3.5" />
                 获取近 {days} 日
@@ -164,7 +165,7 @@ export function StockMultiDayIntradayChart({
   return (
     <div style={{ height }}>
       {(showCoverage || (syncMinute.isPending && !isIndex)) && (
-        <div className="flex h-8 items-center justify-between gap-3 border-b border-border/60 bg-elevated/40 px-3 text-[11px]">
+        <div className="flex h-8 items-center justify-between gap-3 border-b border-border/60 bg-elevated/40 px-3 text-xs">
           {syncMinute.isPending ? (
             <span className="truncate text-accent flex items-center gap-1.5">
               <Loader2 className="h-3 w-3 animate-spin" />
@@ -197,7 +198,7 @@ export function StockMultiDayIntradayChart({
         priceLines={priceLines}
       />
       {syncMinute.isError && (
-        <div className="px-3 pt-1 text-center text-[11px] text-danger">{errorMessage(syncMinute.error)}</div>
+        <div className="px-3 pt-1 text-center text-xs text-danger">{errorMessage(syncMinute.error)}</div>
       )}
     </div>
   )

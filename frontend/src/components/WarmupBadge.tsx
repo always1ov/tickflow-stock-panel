@@ -52,7 +52,7 @@ export function WarmupBadge() {
         ref={anchorRef}
         type="button"
         onClick={() => setOpen(o => !o)}
-        className="inline-flex items-center gap-0.5 rounded-btn px-1.5 text-[10px] text-amber-500/70 transition-colors hover:bg-amber-400/10 hover:text-amber-500"
+        className="inline-flex items-center gap-0.5 rounded-btn px-1.5 text-micro text-warning/70 transition-colors hover:bg-warning/10 hover:text-warning"
         title="为什么开头可能没交易?"
       >
         <Info className="h-3 w-3" strokeWidth={1.5} />
@@ -75,13 +75,13 @@ export function WarmupBadge() {
                 exit={{ opacity: 0, y: -4, scale: 0.96 }}
                 transition={{ duration: 0.15 }}
                 style={{ position: 'fixed', top: pos.top, left: pos.left, width: 272 }}
-                className="z-[70] rounded-btn border border-border bg-surface p-3 text-[11px] leading-relaxed text-secondary shadow-2xl"
+                className="z-[70] rounded-btn border border-border bg-surface p-3 text-xs leading-relaxed text-secondary shadow-2xl"
                 onClick={e => e.stopPropagation()}
               >
                 <div className="mb-1.5 font-medium text-foreground">为什么开头几个月可能没有交易?</div>
                 <p className="text-muted">
                   技术指标 (MA / MACD / RSI 等) 需要历史数据才能算出。系统会自动在回测起点之前多取约
-                  <span className="font-medium text-amber-300"> 120 天 (≈4 个月)</span> 数据做预热。
+                  <span className="font-medium text-warning"> 120 天 (≈4 个月)</span> 数据做预热。
                 </p>
                 <p className="mt-1.5 text-muted">
                   若本地数据恰好从回测起点才开始, 开头几个月指标算不出、信号不触发,

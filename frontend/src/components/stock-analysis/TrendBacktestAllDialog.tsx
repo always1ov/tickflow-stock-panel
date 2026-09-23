@@ -37,6 +37,7 @@ import { FlaskConical, Loader2, X, Check } from 'lucide-react'
 import { api, type TrendBacktestBatchRow, type TrendBacktestBatchResult } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { toast } from '@/components/Toast'
+import { TYPE, buttonClass } from '@/components/ui'
 
 /** 小数 → 带符号百分数。`—` 表示这一格算不出来, 与 0% 不是一回事。 */
 function pct(v: number | null | undefined, digits = 1): string {
@@ -112,22 +113,22 @@ export function TrendBacktestAllDialog({ symbols, onClose }: {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
          onClick={onClose}>
       <div role="dialog" aria-modal="true"
-           className="flex max-h-[86vh] w-full max-w-4xl flex-col overflow-hidden rounded-lg border border-border bg-surface shadow-2xl"
+           className="flex max-h-[86vh] w-full max-w-4xl flex-col overflow-hidden rounded-btn border border-border bg-surface shadow-2xl"
            onClick={(e) => e.stopPropagation()}>
 
         <div className="flex items-center justify-between border-b border-border/60 px-4 py-3">
           <div className="flex items-center gap-2">
-            <FlaskConical className="h-4 w-4 text-violet-300" />
-            <span className="text-sm font-medium text-foreground">全量六态阈值回测</span>
-            <span className="font-mono text-[10px] text-muted">{symbols.length} 只</span>
+            <FlaskConical className="h-4 w-4 text-secondary" />
+            <span className={TYPE.section}>全量六态阈值回测</span>
+            <span className="font-mono text-micro text-muted">{symbols.length} 只</span>
             {result && (
-              <span className="text-[10px] text-muted">
+              <span className="text-micro text-muted">
                 {rows.length} 只跑出结果 · {changed} 只建议调整
                 {result.skipped.length > 0 && ` · ${result.skipped.length} 只数据不足`}
               </span>
             )}
           </div>
-          <button onClick={onClose} className="text-muted transition-colors hover:text-foreground">
+          <button onClick={onClose} className={buttonClass({ variant: 'ghost', icon: true })}>
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -145,7 +146,7 @@ export function TrendBacktestAllDialog({ symbols, onClose }: {
               <button
                 onClick={() => run.mutate()}
                 disabled={run.isPending}
-                className="inline-flex items-center gap-1.5 rounded-btn bg-accent px-4 py-2 text-xs font-medium text-white transition-[background-color,transform] duration-hover hover:bg-accent/90 active:scale-[0.97] disabled:opacity-50"
+                className={buttonClass({ variant: 'primary' }, 'gap-1.5')}
               >
                 {run.isPending
                   ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -156,9 +157,9 @@ export function TrendBacktestAllDialog({ symbols, onClose }: {
           )}
 
           {result && (
-            <div className="overflow-x-auto rounded-lg border border-border/60">
-              <table className="w-full min-w-[680px] text-[11px]">
-                <thead className="bg-elevated/40 text-[10px] text-muted">
+            <div className="overflow-x-auto rounded-btn border border-border/60">
+              <table className="w-full min-w-[680px] text-xs">
+                <thead className="bg-elevated/40 text-micro text-muted">
                   <tr>
                     <th className="w-8 px-2 py-1.5" />
                     <th className="px-2 py-1.5 text-left font-normal">标的</th>
@@ -197,12 +198,12 @@ export function TrendBacktestAllDialog({ symbols, onClose }: {
                         </td>
                         <td className="whitespace-nowrap px-2 py-1 font-mono text-foreground">
                           {r.symbol}
-                          <span className="ml-1 text-[9px] text-muted/60">{r.window_days}日</span>
+                          <span className="ml-1 text-micro text-muted/60">{r.window_days}日</span>
                         </td>
                         <td className="px-2 py-1 text-right font-mono tabular-nums">
                           {(r.current_threshold * 100).toFixed(0)}%
                           {r.current_source === 'override' && (
-                            <span className="ml-0.5 text-[9px] text-accent/70" title="这只票有自己的覆盖值">*</span>
+                            <span className="ml-0.5 text-micro text-accent/70" title="这只票有自己的覆盖值">*</span>
                           )}
                         </td>
                         <td className={`px-2 py-1 text-right font-mono tabular-nums ${
@@ -217,7 +218,7 @@ export function TrendBacktestAllDialog({ symbols, onClose }: {
                         </td>
                         {/* A 股红涨绿跌 —— 与整个界面同一套配色 */}
                         <td className={`px-2 py-1 text-right font-mono tabular-nums ${
-                          g === null ? 'text-muted/40' : g > 0 ? 'text-red-400' : g < 0 ? 'text-emerald-400' : 'text-muted'}`}>
+                          g === null ? 'text-muted/40' : g > 0 ? 'text-bull' : g < 0 ? 'text-bear' : 'text-muted'}`}>
                           {pct(g)}
                         </td>
                         <td className="max-w-[18rem] truncate px-2 py-1 text-muted/80" title={r.reason}>
@@ -232,7 +233,7 @@ export function TrendBacktestAllDialog({ symbols, onClose }: {
           )}
 
           {result && result.skipped.length > 0 && (
-            <p className="text-[10px] text-muted/60">
+            <p className="text-micro text-muted/60">
               没跑的 {result.skipped.length} 只:{result.skipped.slice(0, 12).map((x) => x.symbol).join('、')}
               {result.skipped.length > 12 && ` 等`} —— {result.skipped[0]?.why}
             </p>
@@ -241,7 +242,7 @@ export function TrendBacktestAllDialog({ symbols, onClose }: {
 
         {result && (
           <div className="flex items-center justify-between border-t border-border/60 px-4 py-3">
-            <span className="text-[11px] text-muted">
+            <span className="text-xs text-muted">
               选中 <b className="font-mono text-foreground">{picked.size}</b> 只
               {picked.size > 0 && ' —— 写入后这些票的六态历史会按新阈值重算'}
             </span>
@@ -249,7 +250,7 @@ export function TrendBacktestAllDialog({ symbols, onClose }: {
               onClick={() => apply.mutate(rows.filter((r) => picked.has(r.symbol))
                 .map((r) => ({ symbol: r.symbol, threshold: r.suggested, source: 'rule' as const })))}
               disabled={picked.size === 0 || apply.isPending}
-              className="inline-flex items-center gap-1.5 rounded-btn bg-accent px-3 py-1.5 text-xs font-medium text-white transition-[background-color,transform] duration-hover hover:bg-accent/90 active:scale-[0.97] disabled:opacity-40"
+              className={buttonClass({ variant: 'primary' }, 'gap-1.5')}
             >
               {apply.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
               应用选中的 {picked.size} 只

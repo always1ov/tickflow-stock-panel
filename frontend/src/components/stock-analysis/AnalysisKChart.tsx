@@ -764,7 +764,7 @@ export function AnalysisKChart({
       )}
       {levels && !controls && (
         <div className="flex flex-wrap content-start items-center gap-1.5 mb-2">
-          <span className="text-[10px] text-muted mr-1 shrink-0">关键价位</span>
+          <span className="text-micro text-muted mr-1 shrink-0">关键价位</span>
           {/* 全部价位组一次排开(不折叠)—— 开关本身就是一眼扫过去挑, 藏起来反而要多点一次 */}
           {LEVEL_GROUPS.map(g => {
             const active = activeTypes.has(g.key)
@@ -777,7 +777,7 @@ export function AnalysisKChart({
                 onClick={() => ctl.toggleType(g.key)}
                 disabled={total === 0}
                 title={title}
-                className={`inline-flex shrink-0 whitespace-nowrap items-center gap-1 h-6 px-2 rounded-md text-[10px] font-medium border transition-ui disabled:opacity-30 disabled:cursor-not-allowed ${
+                className={`inline-flex shrink-0 whitespace-nowrap items-center gap-1 h-6 px-2 rounded-btn text-micro font-medium border transition-ui disabled:opacity-30 disabled:cursor-not-allowed ${
                   active
                     ? 'text-foreground'
                     : 'text-muted bg-base/40 border-border/30 hover:border-border/60'
@@ -984,24 +984,24 @@ function LevelOverview({
         style={dim ? { opacity: 0.35 } : undefined}
       >
         <span className="h-1.5 w-1.5 rounded-full shrink-0 transition-transform" style={{ backgroundColor: color, transform: hit ? 'scale(1.5)' : 'scale(1)' }} />
-        <span className={`text-[11px] w-24 shrink-0 truncate ${hit ? 'text-foreground font-medium' : 'text-secondary'}`}>{p.label}</span>
-        <span className={`text-[11px] font-mono ${hit ? 'text-foreground font-bold' : 'text-foreground'}`}>{p.value.toFixed(2)}</span>
-        <span className="text-[9px] font-mono text-muted">{fmtPct(p.value)}</span>
+        <span className={`text-xs w-24 shrink-0 truncate ${hit ? 'text-foreground font-medium' : 'text-secondary'}`}>{p.label}</span>
+        <span className={`text-xs font-mono ${hit ? 'text-foreground font-bold' : 'text-foreground'}`}>{p.value.toFixed(2)}</span>
+        <span className="text-micro font-mono text-muted">{fmtPct(p.value)}</span>
       </div>
     )
   }
 
   return (
-    <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 rounded-lg border border-border/40 bg-base/20 px-3 py-2">
+    <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 rounded-btn border border-border/40 bg-base/20 px-3 py-2">
       {/* 当前价 */}
       <div className="sm:col-span-2 flex items-center gap-2 pb-1 border-b border-border/30 mb-0.5">
-        <span className="text-[10px] text-muted">当前价</span>
+        <span className="text-micro text-muted">当前价</span>
         <span className="text-xs font-mono font-medium text-foreground">{cur.toFixed(2)}</span>
       </div>
       {/* 压力位(从近到远,即从低到高)倒序展示:最高的在最上 */}
       {resistances.length > 0 && (
         <div>
-          <div className="text-[10px] font-medium text-bear mb-0.5">压力位 ↑</div>
+          <div className="text-micro font-medium text-bear mb-0.5">压力位 ↑</div>
           {[...resistances].reverse().map((p, i) => <Row key={`r-${i}`} p={p} />)}
         </div>
       )}
@@ -1009,13 +1009,13 @@ function LevelOverview({
       <div>
         {supports.length > 0 && (
           <>
-            <div className="text-[10px] font-medium text-bull mb-0.5">支撑位 ↓</div>
+            <div className="text-micro font-medium text-bull mb-0.5">支撑位 ↓</div>
             {supports.map((p, i) => <Row key={`s-${i}`} p={p} />)}
           </>
         )}
         {neutrals.length > 0 && (
           <div className={supports.length > 0 ? 'mt-2' : ''}>
-            {supports.length === 0 && <div className="text-[10px] font-medium text-muted mb-0.5">枢轴位</div>}
+            {supports.length === 0 && <div className="text-micro font-medium text-muted mb-0.5">枢轴位</div>}
             {neutrals.map((p, i) => <Row key={`n-${i}`} p={p} />)}
           </div>
         )}

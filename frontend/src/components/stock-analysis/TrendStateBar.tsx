@@ -11,6 +11,7 @@ import { FlaskConical, Loader2, Sparkles, TrendingUp, X } from 'lucide-react'
 import { api, type LivermoreState, type TrendBacktestResult, type TrendDetail } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { toast } from '@/components/Toast'
+import { TYPE, buttonClass } from '@/components/ui'
 
 // 状态 → 徽章样式。多头(上涨趋势/自然回升/次级回升)红系,空头绿系;
 // 趋势确认态(UT/DT)实心,其余中间态描边。
@@ -40,7 +41,7 @@ export function TrendStateBar({ symbol, trend }: { symbol: string; trend: TrendD
   if (!trend) return null
   if (trend.error) {
     return (
-      <div className="flex items-center gap-2 rounded-lg border border-border/50 bg-elevated/20 px-3 py-2 text-[11px] text-muted">
+      <div className="flex items-center gap-2 rounded-btn border border-border/50 bg-elevated/20 px-3 py-2 text-xs text-muted">
         <TrendingUp className="h-3.5 w-3.5" />
         六态趋势:{trend.error}
       </div>
@@ -48,7 +49,7 @@ export function TrendStateBar({ symbol, trend }: { symbol: string; trend: TrendD
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg border border-border/50 bg-elevated/20 px-3 py-2">
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-btn border border-border/50 bg-elevated/20 px-3 py-2">
       <span
         className={`inline-flex items-center gap-1 rounded-btn border px-2.5 py-0.5 text-xs ${trendBadgeCls(trend.state)}`}
         title={`${trend.state_en} · 窗口 ${trend.window_days} 个交易日${trend.intraday ? '\n⚠ 盘中临时口径:实时价参与状态判定,收盘确认为准\n(价位仍按已收盘日线算, 盘中冲高不会抬高转弱线)' : ''}`}
@@ -57,7 +58,7 @@ export function TrendStateBar({ symbol, trend }: { symbol: string; trend: TrendD
       </span>
       {trend.intraday && (
         <span
-          className="inline-flex rounded border border-amber-400/30 bg-amber-400/10 px-1.5 py-0.5 text-[10px] text-amber-300"
+          className="inline-flex rounded border border-warning/30 bg-warning/10 px-1.5 py-0.5 text-micro text-warning"
           title="实时价参与了六态判定,收盘价可能改变结论 —— 定稿以收盘为准"
         >
           盘中口径
@@ -72,7 +73,7 @@ export function TrendStateBar({ symbol, trend }: { symbol: string; trend: TrendD
       </span>
       {trend.signal && (
         <span
-          className={`inline-flex rounded-btn border px-2 py-0.5 text-[10px] ${SIGNAL_BADGE[trend.signal] ?? ''}`}
+          className={`inline-flex rounded-btn border px-2 py-0.5 text-micro ${SIGNAL_BADGE[trend.signal] ?? ''}`}
           title={trend.signal_desc ?? undefined}
         >
           {trend.signal}
@@ -82,7 +83,7 @@ export function TrendStateBar({ symbol, trend }: { symbol: string; trend: TrendD
           本轮最高收盘价(创新高当天等于当日收盘), 当触发价看没有参考价值。
           关键点降级为悬停可见的参考信息。 */}
       <span
-        className="text-[11px] font-mono text-muted"
+        className="text-xs font-mono text-muted"
         title={`本轮最高收盘 ${trend.leg_high?.toFixed(2) ?? '—'} · 本轮最低收盘 ${trend.leg_low?.toFixed(2) ?? '—'}\n上关键点 ${trend.up_pivot?.toFixed(2) ?? '—'} · 下关键点 ${trend.dn_pivot?.toFixed(2) ?? '—'}\n阈值 ${(trend.threshold * 100).toFixed(0)}%${trend.price_basis === 'closing' ? `\n价位按已收盘日线算(不含盘中实时价), 截至 ${trend.closing_as_of ?? '—'}` : ''}`}
       >
         {trend.flip_down != null && (
@@ -98,10 +99,10 @@ export function TrendStateBar({ symbol, trend }: { symbol: string; trend: TrendD
             下关键点 <span className="text-bear/90">{trend.dn_pivot?.toFixed(2) ?? '—'}</span></>
         )}
       </span>
-      <span className="text-[11px] text-amber-300/90">{trend.action}</span>
+      <span className="text-xs text-warning/90">{trend.action}</span>
       <button
         onClick={() => setShowBacktest(true)}
-        className="ml-auto inline-flex items-center gap-1 rounded-btn border border-violet-400/30 bg-violet-400/10 px-2 py-0.5 text-[10px] text-violet-300 hover:bg-violet-400/20 transition-colors cursor-pointer"
+        className="ml-auto inline-flex items-center gap-1 rounded-btn border border-violet-400/30 bg-violet-400/10 px-2 py-0.5 text-micro text-violet-300 hover:bg-violet-400/20 transition-colors cursor-pointer"
         title="按阈值网格回测近 180 个交易日,选择该票的合适回撤/回升阈值"
       >
         <FlaskConical className="h-3 w-3" />
@@ -165,17 +166,17 @@ function TrendBacktestDialog({ symbol, onClose }: { symbol: string; onClose: () 
       <div
         role="dialog"
         aria-modal="true"
-        className="flex max-h-[86vh] w-full max-w-3xl flex-col overflow-hidden rounded-lg border border-border bg-surface shadow-2xl"
+        className="flex max-h-[86vh] w-full max-w-3xl flex-col overflow-hidden rounded-btn border border-border bg-surface shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-border/60 px-4 py-3">
           <div className="flex items-center gap-2">
-            <FlaskConical className="h-4 w-4 text-violet-300" />
-            <span className="text-sm font-medium text-foreground">六态阈值回测调参</span>
-            <span className="text-[10px] font-mono text-muted">{symbol}</span>
-            {result && <span className="text-[10px] text-muted">{result.from} ~ {result.to} · {result.window_days} 个交易日</span>}
+            <FlaskConical className="h-4 w-4 text-secondary" />
+            <span className={TYPE.section}>六态阈值回测调参</span>
+            <span className="text-micro font-mono text-muted">{symbol}</span>
+            {result && <span className="text-micro text-muted">{result.from} ~ {result.to} · {result.window_days} 个交易日</span>}
           </div>
-          <button onClick={onClose} className="text-muted hover:text-foreground"><X className="h-4 w-4" /></button>
+          <button onClick={onClose} className={buttonClass({ variant: 'ghost', icon: true })}><X className="h-4 w-4" /></button>
         </div>
 
         <div className="flex-1 overflow-auto p-4 space-y-4">
@@ -188,7 +189,7 @@ function TrendBacktestDialog({ symbol, onClose }: { symbol: string; onClose: () 
               <button
                 onClick={() => run.mutate()}
                 disabled={run.isPending}
-                className="inline-flex items-center gap-1.5 rounded-btn bg-accent px-4 py-2 text-xs font-medium text-white hover:bg-accent/90 disabled:opacity-50"
+                className={buttonClass({ variant: 'primary' }, 'gap-1.5')}
               >
                 {run.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FlaskConical className="h-3.5 w-3.5" />}
                 {run.isPending ? '回测中…' : '一键回测'}
@@ -199,9 +200,9 @@ function TrendBacktestDialog({ symbol, onClose }: { symbol: string; onClose: () 
           {result && (
             <>
               {/* 指标表 */}
-              <div className="overflow-x-auto rounded-lg border border-border/60">
-                <table className="w-full min-w-[640px] text-[11px]">
-                  <thead className="bg-elevated/40 text-[10px] text-muted">
+              <div className="overflow-x-auto rounded-btn border border-border/60">
+                <table className="w-full min-w-[640px] text-xs">
+                  <thead className="bg-elevated/40 text-micro text-muted">
                     <tr className="text-right">
                       <th className="px-2 py-1.5 text-left font-normal">阈值</th>
                       <th className="px-2 py-1.5 font-normal">翻转</th>
@@ -227,9 +228,9 @@ function TrendBacktestDialog({ symbol, onClose }: { symbol: string; onClose: () 
                         <tr key={r.threshold} className={`border-t border-border/40 text-right ${isCurrent ? 'bg-accent/10' : isAi ? 'bg-violet-400/10' : ''}`}>
                           <td className="px-2 py-1 text-left">
                             {pct(r.threshold, 0)}
-                            {isCurrent && <span className="ml-1 text-[9px] text-accent">当前</span>}
-                            {isRule && <span className="ml-1 text-[9px] text-sky-300">规则荐</span>}
-                            {isAi && <span className="ml-1 text-[9px] text-violet-300">AI荐</span>}
+                            {isCurrent && <span className="ml-1 text-micro text-accent">当前</span>}
+                            {isRule && <span className="ml-1 text-micro text-sky-300">规则荐</span>}
+                            {isAi && <span className="ml-1 text-micro text-violet-300">AI荐</span>}
                           </td>
                           <td className="px-2 py-1">{r.flips}</td>
                           <td className="px-2 py-1">{r.bull_segs}</td>
@@ -242,7 +243,7 @@ function TrendBacktestDialog({ symbol, onClose }: { symbol: string; onClose: () 
                             <button
                               onClick={() => apply.mutate({ threshold: r.threshold, source: 'manual' })}
                               disabled={apply.isPending || isCurrent}
-                              className="rounded border border-border px-1.5 py-0.5 text-[9px] text-muted hover:text-foreground hover:border-accent/50 disabled:opacity-30"
+                              className="rounded border border-border px-1.5 py-0.5 text-micro text-muted hover:text-foreground hover:border-accent/50 disabled:opacity-30"
                             >
                               用
                             </button>
@@ -253,7 +254,7 @@ function TrendBacktestDialog({ symbol, onClose }: { symbol: string; onClose: () 
                   </tbody>
                 </table>
               </div>
-              <p className="text-[10px] text-muted leading-relaxed">
+              <p className="text-micro text-muted leading-relaxed">
                 {/* [R287] 口径必须写出来。复盘页新增的「按转折买卖」量的是同一件事,
                     但那边是**转折次日开盘**进出, 这边是**转折日收盘**进出 —— 两个数
                     会差一个隔夜跳空, 而跳空恰恰在转折日最大。不点破的话, 用户在两个
@@ -265,40 +266,40 @@ function TrendBacktestDialog({ symbol, onClose }: { symbol: string; onClose: () 
 
               {/* 建议卡片 */}
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div className="rounded-lg border border-sky-400/20 bg-sky-400/[0.06] px-3.5 py-3">
+                <div className="rounded-btn border border-sky-400/20 bg-sky-400/[0.06] px-3.5 py-3">
                   <div className="mb-1 flex items-center justify-between">
                     <span className="text-xs font-medium text-sky-300">规则建议 · {pct(result.rule_suggestion.threshold, 0)}</span>
                     <button
                       onClick={() => apply.mutate({ threshold: result.rule_suggestion.threshold, source: 'rule' })}
                       disabled={apply.isPending}
-                      className="rounded-btn border border-sky-400/40 px-2 py-0.5 text-[10px] text-sky-300 hover:bg-sky-400/10 disabled:opacity-40"
+                      className="rounded-btn border border-sky-400/40 px-2 py-0.5 text-micro text-sky-300 hover:bg-sky-400/10 disabled:opacity-40"
                     >
                       应用
                     </button>
                   </div>
-                  <p className="text-[10px] leading-relaxed text-muted">{result.rule_suggestion.reason}</p>
+                  <p className="text-micro leading-relaxed text-muted">{result.rule_suggestion.reason}</p>
                 </div>
-                <div className="rounded-lg border border-violet-400/20 bg-violet-400/[0.06] px-3.5 py-3">
+                <div className="rounded-btn border border-violet-400/20 bg-violet-400/[0.06] px-3.5 py-3">
                   {result.ai ? (
                     <>
                       <div className="mb-1 flex items-center justify-between">
                         <span className="inline-flex items-center gap-1 text-xs font-medium text-violet-300">
                           <Sparkles className="h-3 w-3" />
                           AI 推荐 · {pct(result.ai.threshold, 0)}
-                          <span className="text-[9px] text-violet-300/70">置信 {result.ai.confidence}%</span>
+                          <span className="text-micro text-violet-300/70">置信 {result.ai.confidence}%</span>
                         </span>
                         <button
                           onClick={() => apply.mutate({ threshold: result.ai!.threshold, source: 'ai' })}
                           disabled={apply.isPending}
-                          className="rounded-btn border border-violet-400/40 px-2 py-0.5 text-[10px] text-violet-300 hover:bg-violet-400/10 disabled:opacity-40"
+                          className="rounded-btn border border-violet-400/40 px-2 py-0.5 text-micro text-violet-300 hover:bg-violet-400/10 disabled:opacity-40"
                         >
                           应用
                         </button>
                       </div>
-                      <p className="text-[10px] leading-relaxed text-muted">{result.ai.reason}</p>
+                      <p className="text-micro leading-relaxed text-muted">{result.ai.reason}</p>
                     </>
                   ) : (
-                    <p className="text-[10px] leading-relaxed text-muted">
+                    <p className="text-micro leading-relaxed text-muted">
                       <Sparkles className="mr-1 inline h-3 w-3 text-violet-300/60" />
                       {result.ai_error ?? 'AI 未参与本次回测'}
                     </p>
@@ -313,7 +314,7 @@ function TrendBacktestDialog({ symbol, onClose }: { symbol: string; onClose: () 
           <button
             onClick={() => reset.mutate()}
             disabled={reset.isPending}
-            className="text-[10px] text-muted hover:text-foreground disabled:opacity-40"
+            className="text-micro text-muted hover:text-foreground disabled:opacity-40"
             title="清除该票的阈值覆盖,恢复全局默认"
           >
             恢复默认阈值
@@ -322,7 +323,7 @@ function TrendBacktestDialog({ symbol, onClose }: { symbol: string; onClose: () 
             <button
               onClick={() => run.mutate()}
               disabled={run.isPending}
-              className="inline-flex items-center gap-1 rounded-btn border border-border px-3 py-1 text-[10px] text-muted hover:text-foreground disabled:opacity-40"
+              className="inline-flex items-center gap-1 rounded-btn border border-border px-3 py-1 text-micro text-muted hover:text-foreground disabled:opacity-40"
             >
               {run.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <FlaskConical className="h-3 w-3" />}
               重新回测

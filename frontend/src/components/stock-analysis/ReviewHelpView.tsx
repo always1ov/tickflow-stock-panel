@@ -35,6 +35,7 @@ import { QK } from '@/lib/queryKeys'
 import { cn } from '@/lib/cn'
 import { trendBadgeCls } from '@/components/stock-analysis/TrendStateBar'
 import { ComboGroups } from '@/components/stock-analysis/decision-board/ComboView'
+import { TYPE } from '@/components/ui'
 
 // [R292 加, R300 删] `HelpButton` 在这里删掉了 —— 用户: 「"说明"这个按钮合并到
 // 这里"趋势状态 通道档位 说明"」。入口搬进了页签组, 那一处直接写在
@@ -76,16 +77,16 @@ export function ReviewHelpView() {
     // 正文。**两栏铺开** —— 这一页横向有整个弹窗可用(抽屉那版只有 26rem),
     // 六态六档与结论十档并排, 一屏就看得完, 不必上下翻。
     <div className="min-h-0 flex-1 overflow-auto px-4 py-3">
-      <p className="mb-3 text-[10px] text-muted">
+      <p className="mb-3 text-micro text-muted">
         这些词各是什么意思 —— 与哪只票无关, 是这两层判定的固定词表。
       </p>
       <div className="[column-gap:1rem] lg:columns-2">
         {q.isLoading && (
-          <div className="flex items-center gap-2 py-10 text-[11px] text-muted">
+          <div className="flex items-center gap-2 py-10 text-xs text-muted">
             <Loader2 className="h-3.5 w-3.5 animate-spin" /> 正在取…
           </div>
         )}
-        {q.isError && <div className="py-10 text-center text-[11px] text-red-400">说明加载失败</div>}
+        {q.isError && <div className="py-10 text-center text-xs text-bull">说明加载失败</div>}
 
         {q.data && (
           <>
@@ -96,7 +97,7 @@ export function ReviewHelpView() {
               {q.data.trend.map((t) => (
                 <Term
                   key={t.code}
-                  badge={<span className={cn('inline-flex whitespace-nowrap rounded border px-1.5 py-0.5 text-[10px]',
+                  badge={<span className={cn('inline-flex whitespace-nowrap rounded border px-1.5 py-0.5 text-micro',
                                              trendBadgeCls(t.code as Parameters<typeof trendBadgeCls>[0]))}>{t.title}</span>}
                   side={t.side}
                   meaning={t.meaning}
@@ -112,7 +113,7 @@ export function ReviewHelpView() {
               {q.data.verdict.map((v) => (
                 <Term
                   key={v.code}
-                  badge={<span className={cn('inline-flex whitespace-nowrap rounded border px-1.5 py-0.5 text-[10px]',
+                  badge={<span className={cn('inline-flex whitespace-nowrap rounded border px-1.5 py-0.5 text-micro',
                                              TONE_CLS[v.tone] ?? TONE_CLS.avoid)}>{v.title}</span>}
                   meaning={v.meaning}
                   action={v.action}
@@ -126,7 +127,7 @@ export function ReviewHelpView() {
                   **搬走不等于藏起来**: 界面上那一行写着「口径与作者原话的出入见
                   『说明』」, 指过来。真正该常驻正文的是「样本太少」「撞上涨跌停」
                   那几条 —— 它们是**这只票的**, 一条没动。 */}
-              <div className="px-2.5 py-2 text-[10px] leading-relaxed text-muted">
+              <div className="px-2.5 py-2 text-micro leading-relaxed text-muted">
                 <b className="font-medium text-secondary">按档位买卖的口径</b>:
                 「拿着」「等着」「三档都在中部」<b className="text-secondary">都不动手</b> ——
                 那是作者写的原话(「拿着, 别在这加仓」「等短期入场点」), 不是买卖信号。
@@ -171,8 +172,8 @@ function Section({ title, note, children }: {
     // 劈开接到下一栏 —— 六态那六档被切成"三档在左栏、三档在右栏"就彻底读不成了。
     <section className="mb-4 break-inside-avoid last:mb-0">
       <div className="mb-1.5 flex flex-wrap items-baseline gap-x-2">
-        <h3 className="text-[11px] font-medium text-foreground">{title}</h3>
-        <span className="text-[10px] text-muted">{note}</span>
+        <h3 className={TYPE.card}>{title}</h3>
+        <span className="text-micro text-muted">{note}</span>
       </div>
       <div className="divide-y divide-border/40 rounded-btn border border-border/60">{children}</div>
     </section>
@@ -186,12 +187,12 @@ function Term({ badge, side, meaning, action }: {
     <div className="px-2.5 py-2">
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
         {badge}
-        {!!side && <span className="text-[10px] text-muted">{side}侧</span>}
+        {!!side && <span className="text-micro text-muted">{side}侧</span>}
       </div>
-      <p className="mt-1 text-[10px] leading-relaxed text-secondary">{meaning}</p>
+      <p className="mt-1 text-micro leading-relaxed text-secondary">{meaning}</p>
       {/* 「该怎么办」是作者那一层的原话 —— 与释义分开排, 免得读成同一句 */}
       {!!action && (
-        <p className="mt-0.5 text-[10px] leading-relaxed text-muted">
+        <p className="mt-0.5 text-micro leading-relaxed text-muted">
           <span className="opacity-60">怎么做:</span> {action}
         </p>
       )}

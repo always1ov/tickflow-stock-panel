@@ -17,14 +17,14 @@ export function LastStockChip({
     <button
       onClick={() => onSelect?.(stock.symbol, stock.name)}
       title={`继续查看 ${stock.name}`}
-      className="group inline-flex items-center gap-1.5 rounded-lg border border-border/40 bg-elevated/40 px-2 py-1 hover:border-border hover:bg-elevated transition-colors"
+      className="group inline-flex items-center gap-1.5 rounded-btn border border-border/40 bg-elevated/40 px-2 py-1 hover:border-border hover:bg-elevated transition-colors"
     >
       <Clock className="h-3 w-3 text-muted shrink-0" />
       <span className="flex flex-col items-start leading-tight">
-        <span className="text-[11px] font-medium text-secondary group-hover:text-foreground transition-colors max-w-[7em] truncate">
+        <span className="text-xs font-medium text-secondary group-hover:text-foreground transition-colors max-w-[7em] truncate">
           {stock.name}
         </span>
-        <span className="text-[9px] font-mono text-muted">{stock.symbol}</span>
+        <span className="text-micro font-mono text-muted">{stock.symbol}</span>
       </span>
     </button>
   )

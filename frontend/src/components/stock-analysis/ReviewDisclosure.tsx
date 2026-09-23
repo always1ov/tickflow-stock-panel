@@ -43,7 +43,7 @@ export function ReviewDisclosure({
         type="button"
         onClick={() => { const v = !open; setOpen(v); onOpenChange?.(v) }}
         aria-expanded={open}
-        className="inline-flex items-center gap-1 text-[10px] text-muted transition-colors hover:text-secondary"
+        className="inline-flex items-center gap-1 text-micro text-muted transition-colors hover:text-secondary"
       >
         <ChevronDown className={cn('h-3 w-3 transition-transform', open && 'rotate-180')} />
         {label}

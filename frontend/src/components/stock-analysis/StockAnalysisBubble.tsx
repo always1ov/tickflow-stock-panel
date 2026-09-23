@@ -157,7 +157,7 @@ function BubbleItem({ task, isLast, onPointerDown }: {
         role="button"
         tabIndex={0}
         title={isWorking ? '个股分析中,点击恢复' : isError ? '分析失败,点击重试' : '点击查看个股分析报告'}
-        className={`group relative flex w-full cursor-pointer items-center gap-1.5 overflow-hidden rounded-lg border px-2 py-1.5 backdrop-blur-xl transition-ui duration-expand hover:scale-[1.02] active:scale-[0.99] ${accent}`}
+        className={`group relative flex w-full cursor-pointer items-center gap-1.5 overflow-hidden rounded-btn border px-2 py-1.5 backdrop-blur-xl transition-ui duration-expand hover:scale-[1.02] active:scale-[0.99] ${accent}`}
       >
         {isWorking && (
           <div className="absolute inset-x-0 top-0 h-px overflow-hidden">
@@ -169,10 +169,10 @@ function BubbleItem({ task, isLast, onPointerDown }: {
             : isError ? <AlertCircle className="h-3 w-3" />
             : <Check className="h-3 w-3" />}
         </span>
-        <span className="flex-1 min-w-0 text-[11px] font-medium text-foreground leading-none truncate">
+        <span className="flex-1 min-w-0 text-xs font-medium text-foreground leading-none truncate">
           {task.name || task.symbol}
         </span>
-        <span className="shrink-0 text-[9px] leading-none">
+        <span className="shrink-0 text-micro leading-none">
           {isWorking ? <span className="opacity-80">个股分析</span>
             : isError ? <span className="opacity-80">失败</span>
             : <span className="opacity-80">点击查看</span>}

@@ -149,9 +149,9 @@ export function StockLevelsPanel({ symbol, height = 480, bare = false, controls,
             <span className="text-sm font-medium text-foreground">关键价位分析</span>
           </div>
           <div className="flex shrink-0 items-baseline gap-2">
-            <span className="text-[10px] text-muted">{rows.length} 个交易日</span>
-            <span className="text-[10px] text-muted/60">·</span>
-            <span className="text-[10px] text-muted">当前价</span>
+            <span className="text-micro text-muted">{rows.length} 个交易日</span>
+            <span className="text-micro text-muted/60">·</span>
+            <span className="text-micro text-muted">当前价</span>
             <span className={`font-mono text-base font-bold ${isUp ? 'text-bull' : 'text-bear'}`}>
               {levelsQ.data?.close?.toFixed(2) ?? '—'}
             </span>
@@ -174,8 +174,8 @@ export function StockLevelsPriceTag({ symbol }: { symbol: string }) {
   const isUp = prev ? last.close >= prev.close : last.close >= last.open
   return (
     <span className="hidden items-baseline gap-2 sm:flex">
-      <span className="text-[10px] text-muted">{rows.length} 个交易日</span>
-      <span className="text-[10px] text-muted/60">·</span>
+      <span className="text-micro text-muted">{rows.length} 个交易日</span>
+      <span className="text-micro text-muted/60">·</span>
       <span className={`font-mono text-base font-bold ${isUp ? 'text-bull' : 'text-bear'}`}>
         {levelsQ.data?.close?.toFixed(2) ?? '—'}
       </span>

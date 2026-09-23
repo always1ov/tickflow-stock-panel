@@ -14,6 +14,7 @@ import {
 import { QK } from '@/lib/queryKeys'
 import { usePreferences } from '@/lib/useSharedQueries'
 import { useDialogBackdrop } from '@/lib/useDialogBackdrop'
+import { TYPE, buttonClass } from '@/components/ui'
 
 interface Props {
   symbol: string
@@ -270,22 +271,22 @@ export function PriceAlertDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-3 backdrop-blur-sm sm:p-4" {...backdrop}>
-      <div role="dialog" aria-modal="true" aria-labelledby="price-alert-title" className="flex max-h-[88vh] w-full max-w-2xl flex-col overflow-hidden rounded-lg border border-border bg-surface shadow-2xl" onClick={event => event.stopPropagation()}>
+      <div role="dialog" aria-modal="true" aria-labelledby="price-alert-title" className="flex max-h-[88vh] w-full max-w-2xl flex-col overflow-hidden rounded-btn border border-border bg-surface shadow-2xl" onClick={event => event.stopPropagation()}>
         <header className="flex items-center gap-3 border-b border-border/60 px-5 py-3.5">
-          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-md border border-sky-400/25 bg-sky-400/10 text-sky-400">
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-btn border border-border bg-elevated text-secondary">
             <Bell className="h-4 w-4" />
           </span>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <h2 id="price-alert-title" className="text-sm font-semibold text-foreground">点位提醒</h2>
+              <h2 id="price-alert-title" className={TYPE.section}>点位提醒</h2>
               <span className="truncate text-xs text-secondary">{name || symbol}</span>
-              <span className="shrink-0 font-mono text-[10px] text-muted">{symbol}</span>
+              <span className="shrink-0 font-mono text-micro text-muted">{symbol}</span>
             </div>
-            <div className="mt-0.5 text-[10px] text-muted">
+            <div className="mt-0.5 text-micro text-muted">
               当前价 <span className="font-mono text-foreground">{currentPrice?.toFixed(2) ?? '—'}</span>
             </div>
           </div>
-          <button onClick={onClose} className="rounded-md p-1.5 text-muted transition-colors hover:bg-elevated hover:text-foreground" title="关闭">
+          <button onClick={onClose} className={buttonClass({ variant: 'ghost', icon: true })} title="关闭">
             <X className="h-4 w-4" />
           </button>
         </header>
@@ -306,8 +307,8 @@ export function PriceAlertDialog({
           <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-[180px_1fr]">
               <div className="space-y-1.5">
-                <span className="text-[11px] text-muted">触发方向</span>
-                <div className="grid h-9 grid-cols-2 overflow-hidden rounded-md border border-border bg-base">
+                <span className="text-xs text-muted">触发方向</span>
+                <div className="grid h-9 grid-cols-2 overflow-hidden rounded-btn border border-border bg-base">
                   <button onClick={() => setDirection('up')} className={`inline-flex items-center justify-center gap-1 text-xs font-medium transition-colors ${direction === 'up' ? 'bg-bull/10 text-bull' : 'text-muted hover:text-foreground'}`}>
                     <ArrowUp className="h-3.5 w-3.5" />涨至
                   </button>
@@ -317,11 +318,11 @@ export function PriceAlertDialog({
                 </div>
               </div>
               <label className="space-y-1.5">
-                <span className="text-[11px] text-muted">目标价格</span>
+                <span className="text-xs text-muted">目标价格</span>
                 <div className="relative">
-                  <input type="number" min="0" step="0.01" value={target} onChange={event => updateTarget(event.target.value)} className="h-9 w-full rounded-md border border-border bg-base px-3 pr-14 font-mono text-sm text-foreground focus:border-sky-400/50 focus:outline-none" />
+                  <input type="number" min="0" step="0.01" value={target} onChange={event => updateTarget(event.target.value)} className="h-9 w-full rounded-btn border border-border bg-base px-3 pr-14 font-mono text-sm text-foreground focus:border-sky-400/50 focus:outline-none" />
                   {targetValid && currentPrice != null && (
-                    <span className={`absolute right-3 top-2.5 font-mono text-[10px] ${targetValue >= currentPrice ? 'text-bull' : 'text-bear'}`}>
+                    <span className={`absolute right-3 top-2.5 font-mono text-micro ${targetValue >= currentPrice ? 'text-bull' : 'text-bear'}`}>
                       {((targetValue / currentPrice - 1) * 100).toFixed(2)}%
                     </span>
                   )}
@@ -330,22 +331,22 @@ export function PriceAlertDialog({
             </div>
 
             {recoPoints.length > 0 && (
-              <section className="mt-4 rounded-lg border border-sky-400/25 bg-sky-400/[0.05] p-3">
+              <section className="mt-4 rounded-card border border-border bg-surface p-3">
                 <div className="mb-2 flex items-center justify-between">
-                  <span className="text-[11px] font-medium text-sky-300">
+                  <span className={TYPE.card}>
                     🎯 推荐点位配置 · 规则
                   </span>
                   <button
                     onClick={() => createReco.mutate()}
                     disabled={createReco.isPending}
-                    className="inline-flex items-center gap-1 rounded-md border border-sky-400/40 bg-sky-400/10 px-2 py-1 text-[10px] font-medium text-sky-300 transition-colors hover:bg-sky-400/20 disabled:opacity-50"
+                    className={buttonClass({ size: 'xs' }, 'gap-1')}
                   >
                     {createReco.isPending && <Loader2 className="h-3 w-3 animate-spin" />}
                     一键创建全部
                   </button>
                 </div>
                 {/* [fork 增强] 一键创建带哪些推送渠道, 就地可选(与下方「通知渠道」同一状态) */}
-                <div className="mb-2 flex flex-wrap items-center gap-1.5 text-[10px]">
+                <div className="mb-2 flex flex-wrap items-center gap-1.5 text-micro">
                   <span className="text-muted">推送到:</span>
                   <span className="rounded border border-border/60 bg-elevated/40 px-1.5 py-0.5 text-muted">站内 ✓</span>
                   {([
@@ -376,31 +377,31 @@ export function PriceAlertDialog({
                       key={i}
                       onClick={() => { setTarget(p.price.toFixed(2)); setDirection(p.direction); setSelectedLabel(p.label); setMessage(recoAlertMessage(p)) }}
                       title="点击填入下方表单微调(含到价操作提示,会随通知一起推送)"
-                      className="flex w-full flex-col gap-0.5 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-elevated/50"
+                      className="flex w-full flex-col gap-0.5 rounded-btn px-2 py-1.5 text-left transition-colors hover:bg-elevated/50"
                     >
                       <div className="flex items-center gap-2">
                         {/* 操作:最突出 */}
-                        <span className={`shrink-0 rounded px-1.5 py-0.5 text-[11px] font-semibold ${p.direction === 'up' ? 'bg-bull/15 text-bull' : 'bg-bear/15 text-bear'}`}>
+                        <span className={`shrink-0 rounded px-1.5 py-0.5 text-xs font-semibold ${p.direction === 'up' ? 'bg-bull/15 text-bull' : 'bg-bear/15 text-bear'}`}>
                           {p.action}
                         </span>
-                        <span className={`inline-flex shrink-0 items-center gap-0.5 text-[10px] ${p.direction === 'up' ? 'text-bull' : 'text-bear'}`}>
+                        <span className={`inline-flex shrink-0 items-center gap-0.5 text-micro ${p.direction === 'up' ? 'text-bull' : 'text-bear'}`}>
                           {p.direction === 'up' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}
                           {p.direction === 'up' ? '涨至' : '跌至'}
                         </span>
                         <span className="shrink-0 font-mono text-xs text-foreground">{p.price.toFixed(2)}</span>
-                        {p.label && <span className="shrink-0 text-[10px] text-secondary">{p.label}</span>}
+                        {p.label && <span className="shrink-0 text-micro text-secondary">{p.label}</span>}
                       </div>
-                      {p.reason && <span className="text-[10px] leading-snug text-muted/70">{p.reason}</span>}
+                      {p.reason && <span className="text-micro leading-snug text-muted/70">{p.reason}</span>}
                     </button>
                   ))}
                 </div>
-                <p className="mt-1.5 text-[9px] text-muted/60">到价时推送会带上"可考虑的操作"(如「可考虑突破关注买入」),收到通知即知此刻该做什么。点单条可微调,「一键创建全部」直接建这几个提醒。</p>
+                <p className="mt-1.5 text-micro text-muted/60">到价时推送会带上"可考虑的操作"(如「可考虑突破关注买入」),收到通知即知此刻该做什么。点单条可微调,「一键创建全部」直接建这几个提醒。</p>
               </section>
             )}
 
             <section className="mt-5">
               <div className="mb-2 flex items-center justify-between">
-                <span className="text-[11px] font-medium text-secondary">关键价位</span>
+                <span className="text-xs font-medium text-secondary">关键价位</span>
                 {levelsQuery.isLoading && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted" />}
               </div>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-x-4">
@@ -409,22 +410,22 @@ export function PriceAlertDialog({
                   { key: 'below', label: '下方', icon: ArrowDown, levels: recommended.below, color: 'text-bear' },
                 ] as const).map(group => (
                   <div key={group.key} className="min-w-0">
-                    <div className={`mb-1.5 flex items-center gap-1 text-[10px] ${group.color}`}>
+                    <div className={`mb-1.5 flex items-center gap-1 text-micro ${group.color}`}>
                       <group.icon className="h-3 w-3" />{group.label}
                     </div>
                     <div className="divide-y divide-border/50 border-y border-border/50">
                       {group.levels.length === 0 ? (
-                        <div className="py-5 text-center text-[10px] text-muted">暂无价位</div>
+                        <div className="py-5 text-center text-micro text-muted">暂无价位</div>
                       ) : group.levels.map(level => {
                         const selected = Math.abs(Number(target) - level.value) < 0.005
                         return (
                           <button key={`${level.type}-${level.value}`} onClick={() => selectLevel(level)} className={`flex h-10 w-full items-center gap-2 px-1.5 text-left transition-colors hover:bg-elevated/60 ${selected ? 'bg-sky-400/[0.08]' : ''}`}>
                             <span className="min-w-0 flex-1">
-                              <span className={`block truncate text-[11px] ${selected ? 'text-sky-300' : 'text-foreground'}`}>{level.label}</span>
-                              <span className="block truncate text-[9px] text-muted">{levelGroupLabel(level)}</span>
+                              <span className={`block truncate text-xs ${selected ? 'text-sky-300' : 'text-foreground'}`}>{level.label}</span>
+                              <span className="block truncate text-micro text-muted">{levelGroupLabel(level)}</span>
                             </span>
                             <span className="shrink-0 font-mono text-xs text-secondary">{level.value.toFixed(2)}</span>
-                            <span className={`grid h-4 w-4 shrink-0 place-items-center rounded-full border ${selected ? 'border-sky-400 bg-sky-400 text-white' : 'border-border text-transparent'}`}>
+                            <span className={`grid h-4 w-4 shrink-0 place-items-center rounded-full border ${selected ? 'border-foreground bg-foreground text-surface' : 'border-border text-transparent'}`}>
                               <Check className="h-2.5 w-2.5" />
                             </span>
                           </button>
@@ -438,19 +439,19 @@ export function PriceAlertDialog({
 
             <div className="mt-5 grid grid-cols-1 gap-4 border-t border-border/60 pt-4 sm:grid-cols-2">
               <label className="space-y-1.5">
-                <span className="text-[11px] text-muted">重复提醒</span>
-                <select value={cooldown} onChange={event => setCooldown(Number(event.target.value))} className="h-9 w-full rounded-md border border-border bg-base px-3 text-xs text-foreground focus:outline-none">
+                <span className="text-xs text-muted">重复提醒</span>
+                <select value={cooldown} onChange={event => setCooldown(Number(event.target.value))} className="h-9 w-full rounded-btn border border-border bg-base px-3 text-xs text-foreground focus:outline-none">
                   {COOLDOWNS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
                 </select>
               </label>
               <label className="space-y-1.5">
-                <span className="text-[11px] text-muted">自定义提示</span>
-                <input value={message} onChange={event => updateMessage(event.target.value)} placeholder="留空使用默认内容" className="h-9 w-full rounded-md border border-border bg-base px-3 text-xs text-foreground placeholder:text-muted/50 focus:outline-none" />
+                <span className="text-xs text-muted">自定义提示</span>
+                <input value={message} onChange={event => updateMessage(event.target.value)} placeholder="留空使用默认内容" className="h-9 w-full rounded-btn border border-border bg-base px-3 text-xs text-foreground placeholder:text-muted/50 focus:outline-none" />
               </label>
             </div>
 
             <div className="mt-4">
-              <span className="text-[11px] text-muted">通知渠道</span>
+              <span className="text-xs text-muted">通知渠道</span>
               <div className="mt-2 flex flex-wrap gap-4">
                 <label className="inline-flex items-center gap-2 text-xs text-foreground">
                   <input type="checkbox" checked disabled className="h-3.5 w-3.5 accent-sky-500" />站内
@@ -465,14 +466,14 @@ export function PriceAlertDialog({
                   <label key={channel.key} className={`inline-flex items-center gap-2 text-xs ${channel.configured ? 'text-foreground' : 'text-muted/60'}`}>
                     <input type="checkbox" checked={channels.includes(channel.key)} disabled={!channel.configured} onChange={() => toggleChannel(channel.key)} className="h-3.5 w-3.5 accent-sky-500" />
                     {channel.label}
-                    {!channel.configured && <span className="text-[9px]">未配置</span>}
+                    {!channel.configured && <span className="text-micro">未配置</span>}
                   </label>
                 ))}
               </div>
             </div>
 
             {(alreadyReached || duplicate) && (
-              <div className="mt-4 rounded-md border border-warning/30 bg-warning/5 px-3 py-2 text-[11px] text-warning">
+              <div className="mt-4 rounded-btn border border-warning/30 bg-warning/5 px-3 py-2 text-xs text-warning">
                 {duplicate ? '相同方向和价格的提醒已存在。' : '当前价格已处于触发区间,请调整目标价格或触发方向。'}
               </div>
             )}
@@ -494,20 +495,20 @@ export function PriceAlertDialog({
                   const isUp = alert.direction === 'up'
                   return (
                     <div key={rule.id} className={`flex items-center gap-3 px-2 py-3 ${rule.enabled ? '' : 'opacity-55'}`}>
-                      <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-md ${isUp ? 'bg-bull/10 text-bull' : 'bg-bear/10 text-bear'}`}>
+                      <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-btn ${isUp ? 'bg-bull/10 text-bull' : 'bg-bear/10 text-bear'}`}>
                         {isUp ? <ArrowUp className="h-3.5 w-3.5" /> : <ArrowDown className="h-3.5 w-3.5" />}
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-xs text-foreground">{rule.name}</span>
-                        <span className="mt-0.5 block font-mono text-[10px] text-muted">{isUp ? '涨至' : '跌至'} {alert.target.toFixed(2)} · {COOLDOWNS.find(item => item.value === rule.cooldown_seconds)?.label ?? `${rule.cooldown_seconds} 秒`}</span>
+                        <span className="mt-0.5 block font-mono text-micro text-muted">{isUp ? '涨至' : '跌至'} {alert.target.toFixed(2)} · {COOLDOWNS.find(item => item.value === rule.cooldown_seconds)?.label ?? `${rule.cooldown_seconds} 秒`}</span>
                       </span>
                       <button role="switch" aria-checked={rule.enabled} onClick={() => toggle.mutate(rule)} disabled={toggle.isPending} className={`relative h-5 w-9 shrink-0 rounded-full transition-colors ${rule.enabled ? 'bg-sky-500' : 'bg-elevated'}`} title={rule.enabled ? '停用' : '启用'}>
                         <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${rule.enabled ? 'translate-x-[18px]' : 'translate-x-0.5'}`} />
                       </button>
                       {confirmDelete === rule.id ? (
-                        <button onClick={() => remove.mutate(rule.id)} disabled={remove.isPending} className="h-7 rounded-md border border-danger/30 bg-danger/10 px-2 text-[10px] text-danger">确认</button>
+                        <button onClick={() => remove.mutate(rule.id)} disabled={remove.isPending} className="h-7 rounded-btn border border-danger/30 bg-danger/10 px-2 text-micro text-danger">确认</button>
                       ) : (
-                        <button onClick={() => setConfirmDelete(rule.id)} className="rounded-md p-1.5 text-muted hover:bg-danger/10 hover:text-danger" title="删除">
+                        <button onClick={() => setConfirmDelete(rule.id)} className="rounded-btn p-1.5 text-muted hover:bg-danger/10 hover:text-danger" title="删除">
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
                       )}
@@ -520,13 +521,13 @@ export function PriceAlertDialog({
         )}
 
         <footer className="flex min-h-14 items-center justify-between gap-3 border-t border-border/60 bg-base/30 px-5 py-2.5">
-          <Link to="/monitor" onClick={onClose} className="inline-flex items-center gap-1 text-[11px] text-muted hover:text-sky-400">
+          <Link to="/monitor" onClick={onClose} className="inline-flex items-center gap-1 text-xs text-muted hover:text-sky-400">
             监控中心<ExternalLink className="h-3 w-3" />
           </Link>
           <div className="flex items-center gap-2">
-            <button onClick={onClose} className="h-8 rounded-md border border-border px-3 text-xs text-secondary hover:text-foreground">取消</button>
+            <button onClick={onClose} className="h-8 rounded-btn border border-border px-3 text-xs text-secondary hover:text-foreground">取消</button>
             {tab === 'create' && (
-              <button onClick={() => save.mutate()} disabled={!targetValid || alreadyReached || duplicate || save.isPending} className="inline-flex h-8 items-center gap-1.5 rounded-md bg-sky-500 px-4 text-xs font-medium text-white transition-colors hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-40">
+              <button onClick={() => save.mutate()} disabled={!targetValid || alreadyReached || duplicate || save.isPending} className="inline-flex h-8 items-center gap-1.5 rounded-btn bg-sky-500 px-4 text-xs font-medium text-white transition-colors hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-40">
                 {save.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Bell className="h-3.5 w-3.5" />}
                 创建提醒
               </button>

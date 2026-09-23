@@ -1,0 +1,5 @@
+# R469 — 全站迁移 · 共用组件(一): 个股分析一族
+
+| # | 改动 | 涉及文件 | 冲突风险 | 单独回退 |
+|---|---|---|---|---|
+| R469 | 「其余共用组件」第一批 —— 新个股弹窗与决策台仍在用的个股分析组件按 R449 层级迁移: 写死字号全部落到 text-micro / text-xs; 六态阈值回测调参、全量六态阈值回测、点位提醒、AI 个股分析四个弹窗标题改 L2, 帮助页小节与榜单标题改 L3; 主按钮走 buttonClass primary, 关闭钮走 ghost 图标钮; 点位提醒与 AI 分析里装饰性的天蓝染色(推荐区块、一键创建、重试 / 重新分析)改中性描边或主色, 选中圆点改黑白反相; AI 分析弹窗去掉 95% 透明 + 背景模糊改实底; 非查表位置的琥珀换 warning, 涨跌幅的 red-400 / emerald-400 换 bull / bear(红涨绿跌不变, 只是改用令牌)。查表键里的身份色(持有 / 买入 / 卖出等)不动。不迁: StockReviewDialog、StateTimeline、ReviewHeadRow 与 StockPreviewDialog 旧顶栏以下 —— 只有待删的旧部分在用, 等「统一删除」。棘轮: 裸圆角 829→786, 任意字号 347→211, 硬编码色 846→804 | frontend/src/components/stock-analysis/{TrendStateBar,VerdictHover,FlipTradesPanel,ReviewHelpView,AnalysisKChart,TrendBacktestAllDialog,StockLevelsPanel,StockAnalysisDialog,StockAnalysisBubble,ReviewDisclosure,PriceAlertDialog}.tsx; frontend/src/components/{StockInfoBar,analysis-shared,StockDailyKChart,StockMultiDayIntradayChart,EChartsMultiDayIntraday,LastStockChip,WarmupBadge}.tsx; backend/tests/test_design_spec.py; backend/tests/test_ui_hierarchy.py | 中: 个股分析组件上游改得勤, className 行冲突概率高, 取上游逻辑、保留本处样式 | 可以: git revert 本提交, 同时把棘轮三个数字改回 |
