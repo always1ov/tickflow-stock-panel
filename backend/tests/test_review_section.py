@@ -135,3 +135,12 @@ def test_R442_换票复位():
     dlg = code_of(DLG)
     call = dlg[dlg.index("<ReviewSection"):dlg.index("/>", dlg.index("<ReviewSection"))]
     assert "key={symbol}" in call
+
+
+def test_R481_脚注不再指向已经没了的通道档位那一页():
+    """[R481] 用户:「删掉这半句」—— 逐日复盘脚注里的「切到上方的『通道档位』那一页」。那一页 R444
+    随页签撤了, 这半句指向一个找不到的地方。旧文件里那一份同步删(R444 那条守卫要求两份逐字一样)。"""
+    for f in (SEC, OLD):
+        src = code_of(f)
+        assert "切到上方的「通道档位」那一页" not in src, f"{f} 的脚注还指向那一页"
+    assert "「通道档位」列悬停看完整卡片。" in code_of(SEC)

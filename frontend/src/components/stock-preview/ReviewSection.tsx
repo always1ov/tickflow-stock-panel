@@ -196,7 +196,7 @@ function TrendTable({ d, rows, onlyMarked, onToggleMarked }: {
 
       <div className="px-4 py-3 text-micro leading-5 text-muted">
         收盘口径, 与决策台「趋势」列同一个状态机、同一个阈值(含你自己调过的那个)。
-        「通道档位」列悬停看完整卡片; 要摊开每一档说了什么、之后走成什么样, 切到上方的「通道档位」那一页。
+        「通道档位」列悬停看完整卡片。
       </div>
     </>
   )
