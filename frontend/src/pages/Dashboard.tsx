@@ -954,13 +954,6 @@ export function Dashboard() {
       <StockPreviewDialog
         symbol={previewStock?.symbol ?? null}
         name={previewStock?.name}
-        triggerInfo={previewStock?.alert ? {
-          price: previewStock.alert.price ?? null,
-          changePct: previewStock.alert.change_pct ?? null,
-          ts: previewStock.alert.ts,
-          signals: previewStock.alert.signals,
-          message: previewStock.alert.message,
-        } : null}
         navList={previewStock?.navList}
         onNavigate={(sym, n) => setPreviewStock(prev => prev ? { ...prev, symbol: sym, name: n, alert: undefined } : prev)}
         onClose={() => setPreviewStock(null)}

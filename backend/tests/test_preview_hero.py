@@ -20,11 +20,11 @@ def _const(src: str, name: str) -> str:
 
 
 def test_R429_新头部在最前面_旧顶栏还在():
+    """[R479] 旧顶栏删了(用户框出整块要删), 新头部是弹窗里唯一的顶栏, 排在所有内容之前。"""
     dlg = code_of(DLG)
     assert "<PreviewHero" in dlg, "弹窗里没有新头部"
-    # 用户: 「后面等我叫你删除旧的」—— 在那之前旧顶栏得在, 而且排在新头部之后
-    assert dlg.index("<PreviewHero") < dlg.index("onClick={() => setView('levels')}"), (
-        "新头部没排在旧顶栏前面")
+    assert "setView(" not in dlg, "旧顶栏的页签又回来了"
+    assert dlg.index("<PreviewHero") < dlg.index("<StatusSection")
 
 
 def test_R429_天数是同一个值_头部与复盘页共用():
@@ -32,10 +32,10 @@ def test_R429_天数是同一个值_头部与复盘页共用():
     hero = dlg[dlg.index("<PreviewHero"):]
     hero = hero[:hero.index("/>")]
     assert "days={reviewDays} onDaysChange={setReviewDays}" in hero
-    panel = dlg[dlg.index("<StockReviewPanel"):]
-    panel = panel[:panel.index("/>")]
-    assert "days={reviewDays}" in panel and "onDaysChange={setReviewDays}" in panel, (
-        "复盘页没接弹窗持有的天数 —— 头部点了 60 日, 复盘页还是 120 日")
+    # [R479] 旧复盘页删了, 天数的另一端是新「复盘」块
+    review = dlg[dlg.index("<ReviewSection"):]
+    review = review[:review.index("/>")]
+    assert "days={reviewDays}" in review, "复盘块没接弹窗持有的天数 —— 头部点了 60 日, 复盘还是 120 日"
     assert "export const HERO_DAYS = [60, 120, 250] as const" in code_of(HERO)
 
 

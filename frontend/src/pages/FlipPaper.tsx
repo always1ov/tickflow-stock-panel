@@ -696,11 +696,11 @@ function TodaySignals({ rows, conviction }: {
     <LevelsDialog symbol={levels?.symbol ?? null} name={levels?.name ?? ''}
                   onClose={() => setLevels(null)} />
     {/* [R364] 逐日复盘 —— 与决策台「走势/位置」点开的**是同一个弹窗**。
-        落在复盘 · 趋势状态那一页: 动作那一格问的是「这个买入怎么来的」,
-        答案是那张逐日表上的转折与买卖, 不是三档结论。
-        [R427] 复盘并进了个股弹窗(用户: 「两个弹窗融合成一个」), 这里跟着换。 */}
+        落在复盘: 动作那一格问的是「这个买入怎么来的」, 答案是那张逐日表上的转折与买卖,
+        不是三档结论。[R427] 复盘并进了个股弹窗(用户: 「两个弹窗融合成一个」), 这里跟着换。
+        [R479] 旧复盘页随旧顶栏删了, 打开时直接定位到新「复盘」块(逐日复盘就是原来那张表)。 */}
     <StockPreviewDialog symbol={review?.symbol ?? null} name={review?.name}
-                        initialView="review" reviewTab="trend"
+                        initialView="review"
                         onClose={() => setReview(null)} />
     </>
   )

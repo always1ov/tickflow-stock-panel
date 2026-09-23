@@ -666,7 +666,6 @@ export function Review() {
       {/* 个股日 K 详情 (龙虎榜单点击打开) */}
       <StockPreviewDialog
         symbol={previewSymbol}
-        triggerInfo={null}
         onClose={() => setPreviewSymbol(null)}
       />
     </>

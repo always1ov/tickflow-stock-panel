@@ -13,13 +13,13 @@ FT = "components/stock-analysis/FlipTradesPanel.tsx"
 
 
 def test_R431_复盘块排在图表与价位之后_旧内容之前_天数跟头部():
+    """[R479] 旧内容删了: 复盘块在图表与价位之后, 是弹窗里最后一块。"""
     dlg = code_of(DLG)
     i = dlg.index("<ReviewSection")
-    assert dlg.index("</ChartLevelsSection>") < i < dlg.index(
-        'className="rounded border border-border/50 bg-base/30 p-3"'), "位置不对"
+    assert dlg.index("</ChartLevelsSection>") < i, "位置不对"
     call = dlg[i:dlg.index("/>", i)]
     assert "days={reviewDays}" in call, "天数没跟头部的 60 / 120 / 250 日走"
-    assert "onClick={() => setView('review')}" in dlg, "旧的复盘页被删了 —— 用户说旧的先留着"
+    assert "onClick={() => setView('review')}" not in dlg, "旧复盘页又回来了"
 
 
 def test_R431_与旧复盘页同一个查询():

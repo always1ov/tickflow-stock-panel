@@ -921,7 +921,8 @@ def test_R364_两个入口开的不是同一个弹窗():
     # [R427] 复盘并进了个股弹窗(用户: 「两个弹窗融合成一个」), 这边开的是它的复盘页;
     # 「关键价位」与「复盘」仍是两个入口、两份内容 —— 这条守的事没变
     assert "<LevelsDialog" in code and "<StockPreviewDialog" in code
-    assert 'initialView="review" reviewTab="trend"' in code, "复盘没落在趋势状态那一页 —— 六态那句问的是状态怎么走的"
+    # [R479] 旧复盘页(和它的「趋势状态」页签)删了, 'review' 入口打开即定位到新「复盘」块
+    assert 'initialView="review"' in code, "复盘入口没指定落在复盘 —— 六态那句问的是状态怎么走的"
     # 两个弹窗**各存各的 state**: 合成一个带 kind 的, "开着哪一个"与"开的是哪只票"
     # 就绑死在一起, 而它们本来是两条互不相干的路
     assert "const [levels, setLevels]" in code and "const [review, setReview]" in code

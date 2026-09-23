@@ -15,15 +15,16 @@ def test_R428_页头不再有AI四维分析按钮():
 
 
 def test_R428_弹窗顶栏有入口_作用在弹窗当前这只():
+    """[R479] 旧顶栏删了, 入口只剩新头部那一个(R429 起就有)。"""
     dlg = code_of(DLG)
+    hero = code_of("components/stock-preview/PreviewHero.tsx")
     assert "onAiAnalyze?: (symbol: string, name?: string) => void" in dlg
-    btn = dlg[dlg.index("{onAiAnalyze && symbol && ("):]
+    call = dlg[dlg.index("<PreviewHero"):dlg.index("/>", dlg.index("<PreviewHero"))]
+    assert "onAiAnalyze={onAiAnalyze} aiBusy={aiBusy}" in call, "弹窗没把 AI 入口接进新头部"
+    btn = hero[hero.index("{onAiAnalyze && ("):]
     btn = btn[:btn.index("</button>")]
-    assert "onAiAnalyze(symbol, name)" in btn, "按钮没把弹窗当前这只(含弹窗里切过的)传出去"
+    assert "onAiAnalyze(symbol, name)" in btn, "按钮没把弹窗当前这只传出去"
     assert "disabled={aiBusy}" in btn, "查今日报告期间没防连点"
-    # 位置: 与「自选」「加监控」同一组(对这只票做的事), 排在刷新之前
-    assert dlg.index("{onAiAnalyze && symbol && (") < dlg.index("onClick={handleRefresh}")
-    assert dlg.index('title="加监控"') < dlg.index("{onAiAnalyze && symbol && (")
 
 
 def test_R428_确认框排在弹窗之后_不会被弹窗盖住():

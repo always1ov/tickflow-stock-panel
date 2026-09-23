@@ -183,6 +183,7 @@ MIGRATED: list[str] = [
     "pages/Auth.tsx",
     "pages/ExternalPage.tsx",
     "pages/Branding.tsx",
+    "components/StockPreviewDialog.tsx",
 ]
 
 

@@ -29,14 +29,27 @@ def _sec(dlg: str) -> str:
 
 
 def test_R432_新块紧跟头部_旧内容整体在后面():
+    """[R479] 旧内容删了(用户框出整块:「我是想删除掉框出来的这部分」)。顺序剩 头部 → 现状 →
+    图表与价位 → 复盘; 头部以下整块一起滚。"""
     dlg = code_of(DLG)
-    hero, sec, review = dlg.index("<PreviewHero"), dlg.index("<ChartLevelsSection"), dlg.index("<ReviewSection")
-    old_bar = dlg.index("onClick={() => setView('review')}")          # 旧顶栏
-    old_body = dlg.index('className="rounded border border-border/50 bg-base/30 p-3"')
-    assert hero < sec < review < old_bar < old_body, "顺序应是 头部 → 图表与价位 → 复盘 → 旧顶栏 → 旧内容"
-    # 头部以下整块一起滚: 滚动容器从头部之后开始, 把新块与旧顶栏都包进去
-    scroll = dlg.index('<div className="min-h-0 flex-1 overflow-auto">')
-    assert hero < scroll < sec and scroll < old_bar
+    hero, status = dlg.index("<PreviewHero"), dlg.index("<StatusSection")
+    sec, review = dlg.index("<ChartLevelsSection"), dlg.index("<ReviewSection")
+    assert hero < status < sec < review, "顺序应是 头部 → 现状 → 图表与价位 → 复盘"
+    scroll = dlg.index('className="min-h-0 flex-1 overflow-auto"')
+    assert hero < scroll < status
+
+
+def test_R479_旧顶栏与旧内容删干净了():
+    dlg = code_of(DLG)
+    for gone in ("setView(", "<StockReviewPanel", 'className="rounded border border-border/50 bg-base/30 p-3"',
+                 "<NavPager", "<StockFinancialSearch", "triggerInfo", "AB_STATUS_META", "setMaximized",
+                 "recent.filter("):
+        assert gone not in dlg, f"「{gone}」—— 旧顶栏 / 切换条 / 信息条 / 旧内容又回来了"
+    # 这几样不在框里, 删旧内容时必须留着
+    assert "useListNav<NavItem>(" in dlg, "方向键切股没了"
+    assert "<NavWrapToast" in dlg, "首尾循环提示没了"
+    assert "{showMonitorEditor && symbol && (" in dlg, "加监控的规则编辑器没了"
+    assert 'name="stock-preview.footer"' in dlg, "二开公开插槽 stock-preview.footer 没了"
 
 
 def test_R432_没有右侧列表了_开关回到图上方():
@@ -107,25 +120,28 @@ def test_R430_关不掉关键价位时没有这个视图():
 
 
 def test_R437_新分时与旧分时同一套_信息栏不能漏():
-    """[R437] 用户: 「检查新的弹窗 ... 每个模块是否代码都几乎和以前一模一样, 尤其是图形部分」。
-    R430 搬分时视图时漏了图上方那条信息栏(`StockPanel infoBarOnly`)。新旧两处的分时图
-    与信息栏, 属性必须一样多 —— 只有区间(`dateRange`)按用户选的「图跟着头部走」换成 heroRange。"""
+    """[R437] R430 搬分时视图时漏了图上方那条信息栏(`StockPanel infoBarOnly`)。原来靠与旧分时
+    逐字比对守; [R479] 旧分时删了, 把旧分时那一组属性写死在这里 —— 少一个都红。"""
     dlg = code_of(DLG)
     sec = _sec(dlg)
     new = sec[sec.rindex("chartView === 'intraday' ? ("):]      # 第一处是工具栏那格, 取最后一处
-    old = dlg[dlg.index("view === 'intraday' ? (\n                <div"):]
-    for tag in ("<StockMultiDayIntradayChart", "<StockPanel"):
-        new_call = _call(new, tag)
-        old_call = _call(old, tag)
-        norm = lambda c: re.sub(r"\s+", " ", c.replace("heroRange", "dateRange")).strip()
-        assert norm(new_call) == norm(old_call), f"新分时的 {tag} 与旧分时不一样:\n{new_call}\n----\n{old_call}"
-    assert "infoBarOnly" in _call(new, "<StockPanel")
+    bar = _call(new, "<StockPanel")
+    for attr in ("symbol={symbol}", "dateRange={heroRange}", "infoBarOnly", "prefetchSymbols={prefetchSymbols}",
+                 "intradayDays={effectiveIntradayDays}", "addedDate={addedDate}"):
+        assert attr in bar, f"分时信息栏少了 {attr}"
+    chart = _call(new, "<StockMultiDayIntradayChart")
+    for attr in ("symbol={symbol}", "days={effectiveIntradayDays}", "height={480}",
+                 "refetchIntervalMs={intradayRefetchMs}", "priceLines={monitorPriceLines}",
+                 "onPriceDoubleClick={openPriceAlert}"):
+        assert attr in chart, f"多日分时少了 {attr}"
 
 
 def test_R437_刷新同时认新旧两个视图():
-    """旧顶栏的刷新原来只看旧 `view`; 新块自己的 `chartView` 在分时时, 刷的却是关键价位那份。"""
+    """[R437] 刷新原来只看旧 `view`, 新块在分时时刷的却是关键价位那份。[R479] 旧 `view` 随旧顶栏
+    删了, 刷新只认 chartView —— 三个视图各刷各的那份。"""
     dlg = code_of(DLG)
     fn = dlg[dlg.index("const handleRefresh = () => {"):]
     fn = fn[:fn.index("\n  }\n")]
-    assert "new Set<PreviewView>([view, chartView])" in fn
-    assert "view === 'daily'" not in fn, "分支得按循环变量判, 不是按旧 view"
+    assert "chartView === 'daily'" in fn and "chartView === 'intraday'" in fn
+    assert "QK.stockQuantMacd(symbol)" in fn
+    assert "view ===" not in fn.replace("chartView ===", ""), "还在按旧 view 判"

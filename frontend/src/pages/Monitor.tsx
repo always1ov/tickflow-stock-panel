@@ -700,13 +700,6 @@ function AlertsList({ alertsQuery, confirmClear, setConfirmClear, total, enterTs
       <StockPreviewDialog
         symbol={memberPreview?.symbol ?? previewEv?.symbol ?? null}
         name={memberPreview?.name ?? previewEv?.name ?? undefined}
-        triggerInfo={previewEv ? {
-          price: previewEv.price ?? null,
-          changePct: previewEv.change_pct ?? null,
-          ts: previewEv.ts,
-          signals: previewEv.signals,
-          message: previewEv.message,
-        } : null}
         navList={previewNavList}
         onNavigate={handleNavigate}
         onClose={() => { setPreviewEv(null); setMemberPreview(null); setPreviewNavList([]) }}

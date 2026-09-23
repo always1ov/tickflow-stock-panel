@@ -1033,7 +1033,9 @@ def test_R427_复盘并进个股弹窗_两个入口同一个弹窗():
     assert "fixed inset-0" not in review, "复盘面板自己画了遮罩 —— 那就又是第二个弹窗"
 
     dlg = code_of("components/StockPreviewDialog.tsx")
-    assert "'review'" in dlg and "<StockReviewPanel" in dlg, "个股弹窗里没有复盘页"
+    # [R479] 旧复盘页随旧顶栏删了: 复盘就是新「复盘」块, 'review' 入口打开即定位到它
+    assert "<ReviewSection" in dlg and "if (iv === 'review') setPinReview(true)" in dlg and "<div ref={reviewRef}>" in dlg, \
+        "个股弹窗里没有复盘, 或 'review' 入口没定位到它"
     assert "initialView" in dlg, "个股弹窗不能指定落在哪一页 —— 走势/位置就没法直达复盘"
 
     board = _src()

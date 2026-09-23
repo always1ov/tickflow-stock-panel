@@ -187,7 +187,6 @@ export function StockAnalysis() {
       <StockPreviewDialog
         symbol={previewSymbol}
         name={previewSymbol === symbol ? name : undefined}
-        triggerInfo={null}
         enableLevelsView
         initialView={previewView}
         // [R428] AI 四维分析的入口挪进了弹窗顶栏; 流程(查今日报告 → 确认)仍是这一页那一套
