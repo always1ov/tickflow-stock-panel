@@ -297,7 +297,7 @@ def latest_upswing(
     trend = 0                 # 0 未定 / 1 上涨波段中 / -1 下跌波段中
     hi_i = lo_i = 0           # 未定时的最高 / 最低
     bot = top = 0             # 当前波段的底 / 顶
-    up_leg: tuple[int, int] | None = None     # 最近一段**已完成**的上涨
+    ups: list[tuple[int, int]] = []           # 每一段**已完成**的上涨, 按时间
     for i in range(n):
         if trend == 0:
             if highs[i] > highs[hi_i]:
@@ -312,7 +312,7 @@ def latest_upswing(
             if highs[i] > highs[top]:
                 top = i
             elif highs[top] - lows[i] >= dn_th(top):
-                up_leg = (bot, top)
+                ups.append((bot, top))
                 trend, bot = -1, i
         else:
             if lows[i] < lows[bot]:
@@ -321,12 +321,19 @@ def latest_upswing(
                 trend, top = 1, i                   # 新的上涨从这段下跌的底(bot)开始
 
     if trend == 1:
-        seg = (bot, top)
-    elif trend == -1 and up_leg is not None:
-        seg = up_leg
-    else:
+        ups.append((bot, top))
+    if not ups:
         return None
-    s, e = seg
+    e = ups[-1][1]
+    # [R476] 这段上攻的**底** = 上一次高过这个顶以来的最低点 —— 不是最后一小段波段的底。
+    # 对照图: 804 → 933 → 882 → 928 → 858 → 974.99, 中间几次回调都超过 5%, 按波段切会只剩
+    # 最后一小段(858 起), 836.13 那个锚就丢了。上一次高过 974.99 是 8 月那段 1050, 从那以后
+    # 最低是 804 —— 这一整段才是同一段上攻。(790 → 1050 那段顶比 974.99 高, 自然不算进来。)
+    j = next((i for i in range(e - 1, -1, -1) if highs[i] >= highs[e]), -1)
+    if j + 1 >= e:
+        return None
+    lo = min(lows[j + 1:e])
+    s = max(i for i in range(j + 1, e) if lows[i] == lo)
     if e <= s:
         return None
     return s, e
@@ -504,12 +511,25 @@ def _compute(df: pl.DataFrame, pivot_k: int = PIVOT_K) -> Fib2:
         return Fib2(dma3=dma)
 
     focus, focus_bar = focus_of(highs, seg)
+    # [R476] 上攻从**第一根收在 3×3 均线上方**的那根算起(DiNapoli 对推进的定义), 不从波段
+    # 最低点算起。用户:「就只有这张图了, 只能靠你推理出来了」—— 对照图只有两个标了 1.000
+    # 的锚: 858.00(上攻途中回调的低点)与 836.13 —— 后者正是 804 之后第一根大阳线(开 ≈838
+    # 收 ≈898)的最低价, 也正是那根第一次收回 3×3 均线上方。804 那根下影线在起点之前, 图上
+    # 没有它的线; 更早的 793、554 也没有。
+    start = next((i for i in range(seg[0] + 1, focus_bar + 1)
+                  if i < len(dma) and dma[i] is not None and closes[i] > dma[i]), seg[0])
+    seg = (start, focus_bar)
 
     # 容差先算出来 —— 反应点去重和点位聚类用的是同一把尺子, 本来就该一致
     last_atr = next((a for a in reversed(atr) if a and math.isfinite(a) and a > 0), None)
     tol = TOL_ATR * last_atr if last_atr else focus * 0.005
 
-    reacts = reactions_before(lows, focus_bar, k=pivot_k, min_gap=focus * REACT_DEDUP_PCT)
+    gap = focus * REACT_DEDUP_PCT
+    # [R476] 锚只在上攻段里找: 段内回调的低点(摆点, 其后未被更低的盖过) + 上攻起点那根的低点
+    reacts = [i for i in reactions_before(lows, focus_bar, k=pivot_k, min_gap=gap) if i > start]
+    if (lows[start] == min(lows[start:focus_bar + 1])
+            and not any(abs(lows[start] - lows[j]) <= gap for j in reacts)):
+        reacts = (reacts + [start])[:MAX_REACTIONS]
     if not reacts:
         return Fib2(dma3=dma, thrust=seg, focus=focus, focus_bar=focus_bar)
     # [R474] 聚焦点之后已经跌破**最远那个反应点**(所有回撤线里最底下那个锚) —— 这一组
@@ -521,7 +541,9 @@ def _compute(df: pl.DataFrame, pivot_k: int = PIVOT_K) -> Fib2:
     lv = retracements(focus, lows, reacts)
     zone = cluster_zone(lv, tol)
 
-    a = lows[reacts[0]]                             # 主波段起点
+    # 主波段起点 A。[R476] 原来取的是 reacts[0] —— 那是**最近**的反应点, 与这行注释说的
+    # 「起点」不是一回事; 现在有了明确的上攻起点, A 就取它那根的低点(DiNapoli 的定义)。
+    a = lows[start]
     c_pt = min(lows[focus_bar:]) if focus_bar < len(lows) else lows[-1]
     tgts = targets_from(a, focus, c_pt)
 
