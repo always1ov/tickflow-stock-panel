@@ -11,6 +11,8 @@ import { QK } from '@/lib/queryKeys'
 import { FactorICChart } from './charts/FactorICChart'
 import { FactorGroupNavChart } from './charts/FactorGroupNavChart'
 import { factorResultCandidate } from './researchCandidates'
+import { SEG, SEG_ITEM, SEG_ON, SEG_OFF, TYPE, THEAD, buttonClass } from '@/components/ui'
+import { cn } from '@/lib/cn'
 
 const formatDate = (date: Date) => date.toISOString().slice(0, 10)
 const monthsAgo = (months: number) => {
@@ -33,7 +35,7 @@ function StatCard({ label, value, highlight }: {
     ? 'text-bull' : highlight === 'bear' ? 'text-bear' : ''
   return (
     <div>
-      <div className="text-[11px] text-muted">{label}</div>
+      <div className="text-xs text-muted">{label}</div>
       <div className={`mt-1 text-lg font-mono font-semibold tracking-tight num ${colorCls}`}>
         {value ?? '—'}
       </div>
@@ -47,7 +49,7 @@ function LoadingPanel({ symbolsText }: { symbolsText: string }) {
       <div className="rounded-card border border-accent/25 bg-accent/[0.04] p-4">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <div className="text-sm font-medium text-foreground">正在计算因子分析</div>
+            <div className={TYPE.card}>正在计算因子分析</div>
             <div className="mt-1 text-xs text-muted">{symbolsText} · 完成后会一次性刷新 IC、分层收益和净值曲线。</div>
           </div>
           <div className="h-8 w-8 rounded-full border-2 border-accent/25 border-t-accent animate-spin" />
@@ -69,7 +71,7 @@ function LoadingPanel({ symbolsText }: { symbolsText: string }) {
       <div className="rounded-card border border-border bg-surface p-4">
         <div className="flex items-center justify-between">
           <div className="text-xs font-medium text-secondary">分层净值预览</div>
-          <div className="text-[11px] text-muted">等待后端返回完整结果</div>
+          <div className="text-xs text-muted">等待后端返回完整结果</div>
         </div>
         <div className="mt-4 h-[260px] rounded-btn border border-border bg-base/60 p-4">
           <div className="flex h-full items-end gap-2 opacity-70">
@@ -185,10 +187,7 @@ export function FactorBacktest({ initialFactorName = 'momentum_20d' }: { initial
         : rangeKey === 'all'
           ? '全部历史'
           : '自定义区间'
-  const rangeButtonCls = (key: string) => `rounded-btn px-2 py-1 text-[11px] font-medium transition-colors ${rangeKey === key
-    ? 'bg-accent/15 text-accent'
-    : 'text-muted hover:bg-elevated/70 hover:text-secondary'
-  }`
+  const rangeButtonCls = (key: string) => cn(SEG_ITEM, 'justify-center whitespace-nowrap px-1', rangeKey === key ? SEG_ON : SEG_OFF)
 
   return (
     <div className="h-full min-h-0 overflow-hidden rounded-card border border-border bg-surface/80 grid grid-cols-1 xl:grid-cols-[18rem_minmax(0,1fr)]">
@@ -196,7 +195,7 @@ export function FactorBacktest({ initialFactorName = 'momentum_20d' }: { initial
       <section className="space-y-3 border-b xl:border-b-0 xl:border-r border-border bg-base/25 px-3 py-3 xl:overflow-y-auto">
         <div className="border-b border-border/70 pb-2">
           <div className="text-xs font-semibold text-foreground">因子配置</div>
-          <div className="mt-0.5 text-[10px] leading-4 text-muted">选择因子、区间和分组方式。默认最近 3 个月。</div>
+          <div className="mt-0.5 text-micro leading-4 text-muted">选择因子、区间和分组方式。默认最近 3 个月。</div>
         </div>
 
         <div>
@@ -215,20 +214,19 @@ export function FactorBacktest({ initialFactorName = 'momentum_20d' }: { initial
             ))}
           </select>
           {factorDesc && (
-            <p className="mt-1 text-[11px] text-muted">{factorDesc}</p>
+            <p className="mt-1 text-xs text-muted">{factorDesc}</p>
           )}
         </div>
 
         <div>
           <label className="text-xs font-medium text-secondary block mb-1.5">资产类型</label>
-          <div className="inline-flex h-8 rounded-btn border border-border overflow-hidden mb-2">
+          <div className={cn(SEG, 'mb-2')}>
             {(['stock', 'etf'] as const).map(t => (
               <button
                 key={t}
                 type="button"
                 onClick={() => { setAssetType(t); setSymbols('') }}
-                className={`h-full px-3 text-xs font-medium transition-colors cursor-pointer
-                  ${assetType === t ? 'bg-accent/10 text-accent' : 'text-muted hover:text-foreground'}`}
+                className={cn(SEG_ITEM, 'px-3', assetType === t ? SEG_ON : SEG_OFF)}
               >
                 {t === 'stock' ? '股票' : 'ETF'}
               </button>
@@ -250,14 +248,14 @@ export function FactorBacktest({ initialFactorName = 'momentum_20d' }: { initial
         <div className="rounded-btn border border-border bg-surface p-2.5">
           <div className="flex items-center justify-between gap-2">
             <div className="text-xs font-medium text-foreground">回测区间</div>
-            <span className="shrink-0 rounded-full border border-accent/25 bg-accent/10 px-2 py-0.5 text-[10px] font-medium text-accent">
+            <span className="shrink-0 rounded-full border border-accent/25 bg-accent/10 px-2 py-0.5 text-micro font-medium text-accent">
               {rangeTitle}
             </span>
           </div>
 
           <div className="mt-2 grid grid-cols-2 gap-2">
             <div>
-              <label className="text-[11px] text-secondary block mb-1">开始</label>
+              <label className="text-xs text-secondary block mb-1">开始</label>
               <DatePicker
                 value={start}
                 onChange={setStart}
@@ -269,7 +267,7 @@ export function FactorBacktest({ initialFactorName = 'momentum_20d' }: { initial
               />
             </div>
             <div>
-              <label className="text-[11px] text-secondary block mb-1">结束</label>
+              <label className="text-xs text-secondary block mb-1">结束</label>
               <DatePicker
                 value={end}
                 onChange={setEnd}
@@ -280,7 +278,7 @@ export function FactorBacktest({ initialFactorName = 'momentum_20d' }: { initial
             </div>
           </div>
 
-          <div className="mt-2 flex rounded-input bg-base/60 p-0.5">
+          <div className={cn(SEG, 'mt-2 flex')}>
             <button type="button" onClick={() => applyRange(3)} className={`${rangeButtonCls('3m')} flex-1`}>3个月</button>
             <button type="button" onClick={() => applyRange(6)} className={`${rangeButtonCls('6m')} flex-1`}>6个月</button>
             <button type="button" onClick={() => applyRange(12)} className={`${rangeButtonCls('1y')} flex-1`}>1年</button>
@@ -305,7 +303,7 @@ export function FactorBacktest({ initialFactorName = 'momentum_20d' }: { initial
             </select>
           </div>
           <div>
-            <label className="text-[11px] text-secondary block mb-1">调仓频率</label>
+            <label className="text-xs text-secondary block mb-1">调仓频率</label>
             <select value={rebalance} onChange={e => setRebalance(e.target.value as any)} className={INPUT_CLS}>
               <option value="daily">日度</option>
               <option value="weekly">周度</option>
@@ -313,12 +311,12 @@ export function FactorBacktest({ initialFactorName = 'momentum_20d' }: { initial
             </select>
           </div>
           <div>
-            <label className="text-[11px] text-secondary block mb-1">佣金(万分之)</label>
+            <label className="text-xs text-secondary block mb-1">佣金(万分之)</label>
             <input type="number" min="0" value={fees} onChange={e => setFees(e.target.value)}
               className={INPUT_CLS} />
           </div>
           <div>
-            <label className="text-[11px] text-secondary block mb-1">滑点(bp)</label>
+            <label className="text-xs text-secondary block mb-1">滑点(bp)</label>
             <input type="number" min="0" value={slippage} onChange={e => setSlippage(e.target.value)}
               className={INPUT_CLS} />
           </div>
@@ -327,9 +325,7 @@ export function FactorBacktest({ initialFactorName = 'momentum_20d' }: { initial
         <button
           onClick={() => run.mutate()}
           disabled={run.isPending}
-          className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-btn
-            bg-accent text-sm font-medium text-white hover:bg-accent/90
-            transition-colors duration-150 ease-smooth disabled:opacity-50"
+          className={buttonClass({ variant: 'primary', size: 'md' }, 'w-full gap-1.5')}
         >
           <Play className="h-3.5 w-3.5" />
           {run.isPending ? '分析中…' : '开始因子分析'}
@@ -378,22 +374,22 @@ export function FactorBacktest({ initialFactorName = 'momentum_20d' }: { initial
             {/* IC/IR 指标 */}
             <div className="rounded-card border border-border bg-surface p-4">
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-medium text-foreground">因子预测能力</h3>
+                <h3 className={TYPE.card}>因子预测能力</h3>
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => saveCandidate.mutate()}
                     disabled={saveCandidate.isPending}
-                    className="inline-flex items-center gap-1 rounded-btn border border-border bg-base/50 px-2 py-1 text-[11px] text-secondary transition-colors hover:border-accent/40 hover:text-accent disabled:opacity-50"
+                    className="inline-flex items-center gap-1 rounded-btn border border-border bg-base/50 px-2 py-1 text-xs text-secondary transition-colors hover:border-accent/40 hover:text-accent disabled:opacity-50"
                   >
                     <BookmarkPlus className="h-3 w-3" />
                     {saveCandidate.isPending ? '保存中' : '保存候选'}
                   </button>
-                  <span className="text-[11px] text-muted">
+                  <span className="text-xs text-muted">
                     Rank IC · {rebalance === 'daily' ? '日度' : rebalance === 'weekly' ? '周度' : '月度'}调仓
                   </span>
                   {result.elapsed_ms > 0 && (
-                    <span className="flex items-center gap-1 text-[11px] text-muted">
+                    <span className="flex items-center gap-1 text-xs text-muted">
                       <Clock className="h-3 w-3" />
                       <span className="num">{result.elapsed_ms.toFixed(0)} ms</span>
                     </span>
@@ -452,14 +448,14 @@ export function FactorBacktest({ initialFactorName = 'momentum_20d' }: { initial
             {result.group_stats.length > 0 && (
               <div className="rounded-card border border-border overflow-hidden">
                 <table className="w-full text-sm">
-                  <thead className="bg-elevated">
-                    <tr className="text-left text-secondary">
-                      <th className="px-4 py-2.5 font-medium">分组</th>
-                      <th className="px-4 py-2.5 font-medium text-right">总收益</th>
-                      <th className="px-4 py-2.5 font-medium text-right">年化</th>
-                      <th className="px-4 py-2.5 font-medium text-right">最大回撤</th>
-                      <th className="px-4 py-2.5 font-medium text-right">夏普</th>
-                      <th className="px-4 py-2.5 font-medium text-right">胜率</th>
+                  <thead className={THEAD}>
+                    <tr className="text-left text-micro text-muted">
+                      <th className="px-4 py-2.5 font-normal">分组</th>
+                      <th className="px-4 py-2.5 font-normal text-right">总收益</th>
+                      <th className="px-4 py-2.5 font-normal text-right">年化</th>
+                      <th className="px-4 py-2.5 font-normal text-right">最大回撤</th>
+                      <th className="px-4 py-2.5 font-normal text-right">夏普</th>
+                      <th className="px-4 py-2.5 font-normal text-right">胜率</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -500,7 +496,7 @@ export function FactorBacktest({ initialFactorName = 'momentum_20d' }: { initial
             )}
 
             {/* 数据概要 */}
-            <div className="flex items-center gap-4 text-[11px] text-muted">
+            <div className="flex items-center gap-4 text-xs text-muted">
               <span>{result.n_symbols} 只标的</span>
               <span>{result.n_dates} 个交易日</span>
               <span>run_id: {result.run_id}</span>

@@ -249,11 +249,11 @@ export function StrategyNavChart({ result }: Props) {
   return (
     <div>
       <div className="flex flex-wrap items-center gap-4 px-4 pb-2">
-        <span className="flex items-center gap-1.5 text-[10px] text-secondary">
+        <span className="flex items-center gap-1.5 text-micro text-secondary">
           <span className="w-3 h-0.5 rounded bg-[#3b82f6]" />
           策略净值
         </span>
-        <span className="flex items-center gap-1.5 text-[10px] text-secondary">
+        <span className="flex items-center gap-1.5 text-micro text-secondary">
           <span className="w-3 h-0.5 rounded bg-[#f04438]" />
           回撤
         </span>
@@ -262,7 +262,7 @@ export function StrategyNavChart({ result }: Props) {
             type="button"
             onClick={() => toggleLegend('仓位')}
             title="点击显示/隐藏"
-            className={`flex items-center gap-1.5 text-[10px] text-secondary cursor-pointer transition-opacity ${
+            className={`flex items-center gap-1.5 text-micro text-secondary cursor-pointer transition-opacity ${
               hidden.has('仓位') ? 'opacity-40' : 'opacity-100'
             }`}
           >
@@ -275,7 +275,7 @@ export function StrategyNavChart({ result }: Props) {
             type="button"
             onClick={() => toggleLegend('同期上证指数')}
             title="点击显示/隐藏"
-            className={`flex items-center gap-1.5 text-[10px] text-secondary cursor-pointer transition-opacity ${
+            className={`flex items-center gap-1.5 text-micro text-secondary cursor-pointer transition-opacity ${
               hidden.has('同期上证指数') ? 'opacity-40' : 'opacity-100'
             }`}
           >
@@ -283,7 +283,7 @@ export function StrategyNavChart({ result }: Props) {
             同期上证指数
           </button>
         )}
-        <span className="ml-auto text-[10px] text-muted">滚轮缩放 · 拖动平移</span>
+        <span className="ml-auto text-micro text-muted">滚轮缩放 · 拖动平移</span>
       </div>
       <div ref={chartRef} className="h-[282px]" />
     </div>

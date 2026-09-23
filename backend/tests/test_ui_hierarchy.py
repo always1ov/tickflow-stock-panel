@@ -120,6 +120,19 @@ MIGRATED: list[str] = [
     "pages/backtest/FactorDiscovery.tsx",
     "pages/backtest/MiningWorkbench.tsx",
     "pages/backtest/ResearchCandidatesDialog.tsx",
+    "pages/Backtest.tsx",
+    "pages/backtest/AddFactorSignalDialog.tsx",
+    "pages/backtest/AutoMiningDialog.tsx",
+    "pages/backtest/FactorBacktest.tsx",
+    "pages/backtest/RobustnessValidation.tsx",
+    "pages/backtest/StrategyBacktest.tsx",
+    "pages/backtest/StrategyOptimizer.tsx",
+    "pages/backtest/StrategyWalkForward.tsx",
+    "pages/backtest/charts/FactorGroupNavChart.tsx",
+    "pages/backtest/charts/StrategyNavChart.tsx",
+    "pages/backtest/components/PicksSymbolKlineModal.tsx",
+    "pages/backtest/components/TradeKlineModal.tsx",
+    "pages/backtest/components/paramSweep.tsx",
 ]
 
 

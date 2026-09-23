@@ -1,0 +1,5 @@
+# R467 — 全站迁移 · 回测
+
+| # | 改动 | 涉及文件 | 冲突风险 | 单独回退 |
+|---|---|---|---|---|
+| R467 | 回测页按 R449 层级迁移: 写死字号全部落到 text-micro / text-xs; 页头策略 / 验证、仓位模拟 / 全量模拟、参数优化 / 步进优化、策略分组、快捷区间、兜底持有天数、股票 / ETF 都换成 SEG 分段控件(选中黑白反相, 窄侧栏里加 whitespace-nowrap 防止「自定义」「3个月」折行); 策略、高级设置页签、板块、区间设置钮、分时开关的选中态统一 SELECTED; 运行回测 / 开始优化 / 开始检验等主按钮走 buttonClass primary, 停止键红字描边, 原来红色实底的停止键走 danger 实底; 选择策略、回测区间、环境过滤、配置小节、因子预测能力标题改 L3, 高级策略设置与三个弹窗标题改 L2, 交易 / 标的回放弹窗里的代码改 L2; 回测统计卡读数从 14~16px 提到 21px 读数档, 步进统计同步; 逐日 / 选股 / 分组 / 优化 / 每折表头换 THEAD + 标签级表头; 琥珀色提示换 warning, 「因子加入信号条件」主按钮从琥珀实底改主色, 保存为策略的绿色描边改默认描边; 结果页签下划线从强调色改前景色。棘轮: 裸圆角 863→860, 任意字号 752→574, 硬编码色 897→877 | frontend/src/pages/Backtest.tsx; frontend/src/pages/backtest/*.tsx; frontend/src/pages/backtest/charts/FactorGroupNavChart.tsx; frontend/src/pages/backtest/charts/StrategyNavChart.tsx; frontend/src/pages/backtest/components/*.tsx; backend/tests/test_design_spec.py; backend/tests/test_ui_hierarchy.py; docs/ui-hierarchy.md | 中: StrategyBacktest 是三千行大文件, 上游改动它时 className 行冲突概率高, 取上游逻辑、保留本处样式 | 可以: git revert 本提交, 同时把棘轮三个数字改回 |

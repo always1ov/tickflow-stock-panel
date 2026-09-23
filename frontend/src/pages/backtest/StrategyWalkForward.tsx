@@ -22,6 +22,7 @@ import {
   SweepParamList,
   CombosHint,
 } from './components/paramSweep'
+import { THEAD, buttonClass } from '@/components/ui'
 
 const TODAY = new Date().toISOString().slice(0, 10)
 const THREE_YEARS_AGO = new Date(Date.now() - 3 * 365 * 864e5).toISOString().slice(0, 10)
@@ -29,9 +30,9 @@ const THREE_YEARS_AGO = new Date(Date.now() - 3 * 365 * 864e5).toISOString().sli
 function Stat({ label, value, hint, color }: { label: string; value: string; hint?: string; color?: string }) {
   return (
     <div className="rounded-input border border-border bg-elevated/40 p-2.5">
-      <div className="text-[11px] text-secondary">{label}</div>
-      <div className="mt-0.5 text-sm font-semibold" style={color ? { color } : undefined}>{value}</div>
-      {hint && <div className="mt-0.5 text-[10px] text-secondary">{hint}</div>}
+      <div className="text-xs text-secondary">{label}</div>
+      <div className="mt-0.5 text-xl font-semibold tabular-nums" style={color ? { color } : undefined}>{value}</div>
+      {hint && <div className="mt-0.5 text-micro text-secondary">{hint}</div>}
     </div>
   )
 }
@@ -63,7 +64,7 @@ function OosEquityChart({ curve }: { curve: { fold: number; date: string; value:
         <line x1={pad} y1={y(1)} x2={W - pad} y2={y(1)} stroke="currentColor" strokeWidth="0.5" className="text-border" strokeDasharray="3 3" />
         <path d={d} fill="none" stroke={up ? '#34d399' : '#f87171'} strokeWidth="1.5" />
       </svg>
-      <div className="mt-0.5 text-[10px] text-secondary">终值 {last.toFixed(4)} · {curve.length} 折</div>
+      <div className="mt-0.5 text-micro text-secondary">终值 {last.toFixed(4)} · {curve.length} 折</div>
     </div>
   )
 }
@@ -155,15 +156,15 @@ export function StrategyWalkForward() {
         {/* 滚动窗口 */}
         <div className="grid grid-cols-3 gap-1.5">
           <div>
-            <label className="mb-1 block text-[11px] text-secondary">训练(天)</label>
+            <label className="mb-1 block text-xs text-secondary">训练(天)</label>
             <input type="number" min={1} value={trainDays} onChange={e => setTrainDays(e.target.value)} className={INPUT_CLS} />
           </div>
           <div>
-            <label className="mb-1 block text-[11px] text-secondary">测试(天)</label>
+            <label className="mb-1 block text-xs text-secondary">测试(天)</label>
             <input type="number" min={1} value={testDays} onChange={e => setTestDays(e.target.value)} className={INPUT_CLS} />
           </div>
           <div>
-            <label className="mb-1 block text-[11px] text-secondary">步进(天)</label>
+            <label className="mb-1 block text-xs text-secondary">步进(天)</label>
             <input type="number" min={1} value={stepDays} onChange={e => setStepDays(e.target.value)} className={INPUT_CLS} />
           </div>
         </div>
@@ -178,14 +179,14 @@ export function StrategyWalkForward() {
 
         <SweepParamList params={sweep.params} sweeps={sweep.sweeps} updateSweep={sweep.updateSweep} />
         <CombosHint show={!!sweep.strategyId} combos={sweep.combos} gridError={sweep.gridError} />
-        <div className="text-[11px] text-secondary">每折跑 {sweep.combos || 0} 组优化 × N 折，耗时较长</div>
+        <div className="text-xs text-secondary">每折跑 {sweep.combos || 0} 组优化 × N 折，耗时较长</div>
 
         {task?.isPending ? (
-          <button onClick={stopWalkForward} className="inline-flex w-full items-center justify-center gap-1.5 rounded-btn bg-red-500/90 px-3 py-2 text-xs font-medium text-white hover:bg-red-500">
+          <button onClick={stopWalkForward} className={buttonClass({}, 'w-full justify-center gap-1.5 border-danger bg-danger font-medium text-on-accent hover:bg-danger/90')}>
             <Square className="h-3.5 w-3.5" /> 停止
           </button>
         ) : (
-          <button onClick={onRun} disabled={!canRun} className="inline-flex w-full items-center justify-center gap-1.5 rounded-btn bg-accent px-3 py-2 text-xs font-medium text-white hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed">
+          <button onClick={onRun} disabled={!canRun} className={buttonClass({ variant: 'primary' }, 'w-full justify-center gap-1.5')}>
             <Play className="h-3.5 w-3.5" /> 开始步进优化
           </button>
         )}
@@ -244,8 +245,8 @@ export function StrategyWalkForward() {
             {/* 每折表 */}
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
-                <thead>
-                  <tr className="border-b border-border text-secondary">
+                <thead className={THEAD}>
+                  <tr className="border-b border-border text-micro text-muted">
                     <th className="px-2 py-1.5 text-left">折</th>
                     <th className="px-2 py-1.5 text-left">测试区间</th>
                     <th className="px-2 py-1.5 text-left">最优参数</th>
@@ -282,7 +283,7 @@ export function StrategyWalkForward() {
             </div>
 
             {degradation != null && degradation > 0 && (
-              <div className="flex items-center gap-1.5 rounded-input border border-red-500/30 bg-red-500/5 px-3 py-2 text-[11px] text-red-400">
+              <div className="flex items-center gap-1.5 rounded-input border border-red-500/30 bg-red-500/5 px-3 py-2 text-xs text-red-400">
                 <TrendingDown className="h-3.5 w-3.5" />
                 样本外目标较样本内退化 {degradation.toFixed(3)}，提示参数可能过拟合训练区间。
               </div>

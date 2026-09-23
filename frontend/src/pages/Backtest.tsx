@@ -6,6 +6,8 @@ import { ResearchCandidatesDialog } from './backtest/ResearchCandidatesDialog'
 import { RobustnessValidation } from './backtest/RobustnessValidation'
 import { StrategyBacktest } from './backtest/StrategyBacktest'
 import { type ResearchCandidate } from '@/lib/api'
+import { SEG, SEG_ITEM, SEG_ON, SEG_OFF, buttonClass } from '@/components/ui'
+import { cn } from '@/lib/cn'
 
 type Tab = 'strategy' | 'robustness'
 
@@ -77,14 +79,14 @@ export function Backtest() {
               onClick={() => setCandidatesOpen(true)}
               aria-label="打开候选方案"
               title="候选方案"
-              className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-btn border border-border bg-surface px-2 text-[11px] font-medium text-secondary transition-colors hover:border-accent/40 hover:text-accent sm:px-2.5 sm:text-xs"
+              className={buttonClass({}, 'shrink-0 gap-1.5')}
             >
               <BookmarkCheck className="h-3.5 w-3.5" />
               <span>候选方案</span>
             </button>
             <span className="h-5 w-px shrink-0 bg-border" aria-hidden="true" />
             <nav className="min-w-0 flex-1 overflow-x-auto lg:flex-none" aria-label="回测视图">
-              <div className="inline-flex min-w-max items-center gap-0.5 rounded-btn border border-border bg-surface/80 p-0.5">
+              <div className={cn(SEG, 'min-w-max')}>
                 {(Object.keys(MODES) as Tab[]).map(tab => {
                   const mode = MODES[tab]
                   const Icon = mode.icon
@@ -95,10 +97,7 @@ export function Backtest() {
                       type="button"
                       onClick={() => changeTab(tab)}
                       aria-current={active ? 'page' : undefined}
-                      className={`inline-flex h-7 items-center gap-1 rounded-[5px] px-1.5 text-[11px] font-medium transition-colors sm:gap-1.5 sm:px-2.5 sm:text-xs ${active
-                        ? 'bg-accent text-white shadow-sm'
-                        : 'text-secondary hover:bg-elevated hover:text-foreground'
-                      }`}
+                      className={cn(SEG_ITEM, 'sm:gap-1.5', active ? SEG_ON : SEG_OFF)}
                     >
                       <Icon className="hidden h-3.5 w-3.5 sm:block" />
                       {mode.title}

@@ -22,6 +22,7 @@ import {
   SweepParamList,
   CombosHint,
 } from './components/paramSweep'
+import { THEAD, buttonClass } from '@/components/ui'
 
 const TODAY = new Date().toISOString().slice(0, 10)
 const ONE_YEAR_AGO = new Date(Date.now() - 365 * 864e5).toISOString().slice(0, 10)
@@ -109,11 +110,11 @@ export function StrategyOptimizer() {
         <CombosHint show={!!sweep.strategyId} combos={sweep.combos} gridError={sweep.gridError} />
 
         {task?.isPending ? (
-          <button onClick={stopOptimize} className="inline-flex w-full items-center justify-center gap-1.5 rounded-btn bg-red-500/90 px-3 py-2 text-xs font-medium text-white hover:bg-red-500">
+          <button onClick={stopOptimize} className={buttonClass({}, 'w-full justify-center gap-1.5 border-danger bg-danger font-medium text-on-accent hover:bg-danger/90')}>
             <Square className="h-3.5 w-3.5" /> 停止
           </button>
         ) : (
-          <button onClick={onRun} disabled={!canRun} className="inline-flex w-full items-center justify-center gap-1.5 rounded-btn bg-accent px-3 py-2 text-xs font-medium text-white hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed">
+          <button onClick={onRun} disabled={!canRun} className={buttonClass({ variant: 'primary' }, 'w-full justify-center gap-1.5')}>
             <Play className="h-3.5 w-3.5" /> 开始优化
           </button>
         )}
@@ -150,7 +151,7 @@ export function StrategyOptimizer() {
                 </div>
                 <div className="flex flex-wrap gap-1.5">
                   {Object.entries(result.best_params).map(([k, v]) => (
-                    <span key={k} className="rounded-full border border-border bg-surface px-2 py-0.5 text-[11px]">{k}: {String(v)}</span>
+                    <span key={k} className="rounded-full border border-border bg-surface px-2 py-0.5 text-xs">{k}: {String(v)}</span>
                   ))}
                 </div>
               </div>
@@ -162,8 +163,8 @@ export function StrategyOptimizer() {
 
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
-                <thead>
-                  <tr className="border-b border-border text-secondary">
+                <thead className={THEAD}>
+                  <tr className="border-b border-border text-micro text-muted">
                     <th className="px-2 py-1.5 text-left">#</th>
                     <th className="px-2 py-1.5 text-left">参数</th>
                     <th className="px-2 py-1.5 text-right">{result.objective}</th>
@@ -196,7 +197,7 @@ export function StrategyOptimizer() {
                 </tbody>
               </table>
               {result.results.length > 50 && (
-                <div className="mt-2 text-center text-[11px] text-secondary">
+                <div className="mt-2 text-center text-xs text-secondary">
                   仅显示前 50 组 · 共 {result.results.length} 组
                 </div>
               )}

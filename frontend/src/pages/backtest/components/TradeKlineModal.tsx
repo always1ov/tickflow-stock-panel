@@ -9,6 +9,8 @@ import { useListNav } from '@/lib/useListNav'
 import { tradeNavKey, type TradeNavItem } from '../tradeNav'
 import { fmtPct, fmtPrice, priceColorClass } from '@/lib/format'
 import { useDialogBackdrop } from '@/lib/useDialogBackdrop'
+import { TYPE, buttonClass } from '@/components/ui'
+import { cn } from '@/lib/cn'
 
 /** 单笔回放来自哪个入口: 决定切交易时同步翻哪张表的页 */
 export type TradeNavSource = 'daily' | 'trades'
@@ -141,14 +143,14 @@ export function TradeKlineModal({ trade, navItems, currentKey, onNavigate, onClo
             <div className="flex items-center justify-between gap-4 border-b border-border px-5 py-3">
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="font-mono text-sm font-semibold text-foreground">{trade.symbol}</span>
+                  <span className={cn('font-mono', TYPE.section)}>{trade.symbol}</span>
                   <span className="truncate text-sm text-foreground">{trade.name || '交易回放'}</span>
-                  <span className="rounded border border-accent/30 bg-accent/10 px-1.5 py-0.5 text-[10px] text-accent">交易回放</span>
+                  <span className="rounded border border-accent/30 bg-accent/10 px-1.5 py-0.5 text-micro text-accent">交易回放</span>
 
                   {/* 切交易: 上一笔 / n·N / 下一笔 */}
                   <NavPager nav={nav} prevLabel="上一笔" nextLabel="下一笔" />
                 </div>
-                <div className="mt-1 text-[11px] text-muted">
+                <div className="mt-1 text-xs text-muted">
                   {String(trade.entry_date).slice(0, 10)} 买入 → {String(trade.exit_date).slice(0, 10)} 卖出 · 持仓 {trade.duration ?? '—'} 天
                 </div>
               </div>
@@ -165,11 +167,7 @@ export function TradeKlineModal({ trade, navItems, currentKey, onNavigate, onClo
                 </div>
                 <button
                   onClick={() => setShowIntraday((v) => !v)}
-                  className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs transition-colors ${
-                    showIntraday
-                      ? 'border border-accent/30 bg-accent/15 text-accent'
-                      : 'border border-border bg-elevated text-secondary hover:border-accent/30'
-                  }`}
+                  className={buttonClass({ size: 'xs', selected: showIntraday }, 'gap-1')}
                 >
                   <Clock className="h-3 w-3" />
                   分时
