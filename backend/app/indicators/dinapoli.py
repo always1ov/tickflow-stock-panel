@@ -73,12 +73,10 @@ STOP_BUFFER_ATR = 0.1     # 失效位在参照价位下方再让几倍 ATR
 # 还没等摆点确认), 我们锚在几个月前那段「连续 8 根站上短期均线」的上攻上 —— 最近这波
 # 没凑够 8 根, 不算推进, 于是一直画着那组早已作废的线(图上自己都写着「已跌破这组作废」)。
 #
-# 新口径: 往回看 FOCUS_LOOKBACK 根里的最低点, 它之后的最高点就是聚焦点, 两者之间是这一波
-# 上涨。幅度仍要 ≥ THRUST_MIN_ATR × ATR(磨盘不算一波)。最低点就是最后一根 = 还在跌,
-# 不画 —— 下跌里到回撤线不是机会(AGENTS.md 第 10 条)。
-FOCUS_LOOKBACK = 60       # 约一个季度; 这是反推出来的口径里唯一一个人为定的数
-# 这一波至少要有几倍 ATR 才算(过滤磨盘)。原推进段用 3 倍; 对方图上中际旭创这一波
-# 974.99 − 827.74 ≈ 147, 而它的 ATR 在四五十 —— 3 倍正好卡在边上, 会整组不画。
+# 新口径(R474 定稿): 按波段拐点找最后一段上涨, 它的顶就是聚焦点 —— 见 `latest_upswing`。
+# (R473 曾用「近 60 根最低点之后的最高点」, 遇到中间隔着一段完整下跌的走势就错。)
+# 反向走够几倍 ATR 才算拐了(同时也是"一段上涨至少多大")。原推进段用 3 倍; 对方图上
+# 中际旭创这一波 974.99 − 827.74 ≈ 147, 而它的 ATR 在四五十 —— 3 倍正好卡在边上。
 UPSWING_MIN_ATR = 2.0
 # 反应点去重: 只合并**几乎同价**的低点(平台 / 一字板那种同一条线数几遍)。原来用聚类容差
 # (0.5×ATR)当去重间距, 高价股 ATR 四五十, 858.00 / 863.52 / 870.17 这种相隔五六块的
@@ -264,32 +262,72 @@ def _emit(out, s, e, highs, lows, atr, min_len, min_atr) -> None:
 
 def latest_upswing(
     highs: list[float], lows: list[float], atr: list[float | None],
-    *, lookback: int = FOCUS_LOOKBACK, min_atr: float = UPSWING_MIN_ATR,
+    *, min_atr: float = UPSWING_MIN_ATR,
 ) -> tuple[int, int] | None:
-    """[R473] 最近这一波上涨 `[s, e]`: s = 近 `lookback` 根的最低点(同价取最近那根),
-    e = 它之后的最高点(同价取最早那根, 与 `focus_of` 一致)。
+    """[R474] 最近一段**上涨波段** `[底, 顶]` —— 按波段拐点(ZigZag)找, 不按窗口最低点找。
 
-    **不等右侧摆点确认** —— 对方图上的聚焦点就是截图前一根的高点。聚焦点是
-    「这波到目前为止最高到了哪」, 创了新高它就跟着上移, 这正是帝纳波利的用法。
+    R473 用的是「近 60 根最低点之后的最高点」, 对着用户第二张截图(中际旭创)一推就错:
+    近 60 根最低是 7 月底那根下影线(≈790), 它之后最高是 8 月初的 ≈1050, 聚焦点就落在
+    1050 —— 而对照图是 974.99。真实走势是 790 → 1050 → 805 → 974.99 → 回落到 929:
+    **中间隔着一段完整的下跌**, 窗口最低点那一套看不见。对照图上那两条折线就是波段线,
+    聚焦点是最后一段上涨的顶。
 
-    还在跌(最低点就是最后一根)、或者这波幅度不到 `min_atr` 倍 ATR, 返回 None。
+    拐点规则: 反向走够 `min_atr × ATR`(ATR 取当时那个极值那根的, 不看后来的)才算
+    拐了。所以当前这段回落(974.99 → 929, ≈46 点 < 2×ATR)还不算下跌波段, 顶仍是
+    974.99, 而且**不等右侧摆点确认** —— 对照图上的聚焦点就是截图前一根的高点。
+
+    已经转成下跌波段也照样返回上一段上涨 —— 那正是回踩在量它。跌到什么程度算这组
+    不成立, 不在这里判: 一波上涨中间的小回调也会被切成几段, 只跌破「最后一小段」的
+    起点不代表整组回撤线都失效。那一条在 `_compute` 里按**最远的反应点**判。
+    一段上涨都没有(一路在跌), 返回 None。
     """
     n = min(len(highs), len(lows))
     if n < 2:
         return None
-    start = max(0, n - lookback)
-    lo = min(lows[start:n])
-    s = max(i for i in range(start, n) if lows[i] == lo)
-    if s >= n - 1:
+
+    last_ok: list[float | None] = [None]
+
+    def th(i: int) -> float:
+        a = atr[i] if i < len(atr) else None
+        if a is not None and math.isfinite(a) and a > 0:
+            last_ok[0] = a
+        a = last_ok[0]
+        return min_atr * a if a else math.inf
+
+    trend = 0                 # 0 未定 / 1 上涨波段中 / -1 下跌波段中
+    hi_i = lo_i = 0           # 未定时的最高 / 最低
+    bot = top = 0             # 当前波段的底 / 顶
+    up_leg: tuple[int, int] | None = None     # 最近一段**已完成**的上涨
+    for i in range(n):
+        if trend == 0:
+            if highs[i] > highs[hi_i]:
+                hi_i = i
+            if lows[i] < lows[lo_i]:
+                lo_i = i
+            if lo_i < i and highs[i] - lows[lo_i] >= th(lo_i) and highs[i] >= highs[hi_i]:
+                trend, bot, top = 1, lo_i, i
+            elif hi_i < i and highs[hi_i] - lows[i] >= th(hi_i) and lows[i] <= lows[lo_i]:
+                trend, top, bot = -1, hi_i, i
+        elif trend == 1:
+            if highs[i] > highs[top]:
+                top = i
+            elif highs[top] - lows[i] >= th(top):
+                up_leg = (bot, top)
+                trend, bot = -1, i
+        else:
+            if lows[i] < lows[bot]:
+                bot = i
+            elif highs[i] - lows[bot] >= th(bot):
+                trend, top = 1, i                   # 新的上涨从这段下跌的底(bot)开始
+
+    if trend == 1:
+        seg = (bot, top)
+    elif trend == -1 and up_leg is not None:
+        seg = up_leg
+    else:
         return None
-    hi = max(highs[s:n])
-    e = s + highs[s:n].index(hi)
+    s, e = seg
     if e <= s:
-        return None
-    a = atr[e] if e < len(atr) else None
-    if a is None or not math.isfinite(a) or a <= 0:
-        return None
-    if hi - lo < min_atr * a:
         return None
     return s, e
 
@@ -474,6 +512,11 @@ def _compute(df: pl.DataFrame, pivot_k: int = PIVOT_K) -> Fib2:
     reacts = reactions_before(lows, focus_bar, k=pivot_k, min_gap=focus * REACT_DEDUP_PCT)
     if not reacts:
         return Fib2(dma3=dma, thrust=seg, focus=focus, focus_bar=focus_bar)
+    # [R474] 聚焦点之后已经跌破**最远那个反应点**(所有回撤线里最底下那个锚) —— 这一组
+    # 整体不成立了, 不画。原来的做法是照样画着, 图上还自己写着「已跌破这组作废」。
+    # 下跌里的回撤线不是机会(AGENTS.md 第 10 条)。
+    if focus_bar + 1 < len(lows) and min(lows[focus_bar + 1:]) < min(lows[r] for r in reacts):
+        return Fib2(dma3=dma)
 
     lv = retracements(focus, lows, reacts)
     zone = cluster_zone(lv, tol)
