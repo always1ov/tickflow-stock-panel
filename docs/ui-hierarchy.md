@@ -70,7 +70,7 @@
 - [x] 概念 / 行业分析(`ConceptAnalysis` / `IndustryAnalysis`)
 - [x] 财务(`Financials` + `financials/*`)
 - [x] 数据(`Data` + `data/*` + `ext-data/*`)
-- [ ] 因子(`Factors` + `factors/*`)
+- [x] 因子(`Factors` + `factors/*` + 因子页里的 `FactorDiscovery` / `MiningWorkbench` / `ResearchCandidatesDialog`)
 - [ ] 回测(`Backtest` + `backtest/*`)
 - [ ] 设置(`Settings` + `settings/*`)
 - [ ] 其余共用组件与弹窗

@@ -112,6 +112,14 @@ MIGRATED: list[str] = [
     "components/ext-data/ExtDataPullPanel.tsx",
     "components/ext-data/ExtDataStatCard.tsx",
     "pages/Data.tsx",
+    "pages/Factors.tsx",
+    "pages/factors/FactorComposite.tsx",
+    "pages/factors/FactorEditor.tsx",
+    "pages/factors/FactorLibrary.tsx",
+    "pages/factors/GenerateFactorStrategyDialog.tsx",
+    "pages/backtest/FactorDiscovery.tsx",
+    "pages/backtest/MiningWorkbench.tsx",
+    "pages/backtest/ResearchCandidatesDialog.tsx",
 ]
 
 

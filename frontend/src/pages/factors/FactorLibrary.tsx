@@ -6,6 +6,8 @@ import { toast } from '@/components/Toast'
 import { api, type FactorLibraryItem } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { GenerateFactorStrategyDialog } from './GenerateFactorStrategyDialog'
+import { THEAD, TH_ROW, TYPE, buttonClass } from '@/components/ui'
+import { cn } from '@/lib/cn'
 
 const INPUT_CLS = 'rounded-input border border-border bg-surface px-2.5 py-1.5 text-xs focus:border-accent focus:outline-none'
 
@@ -44,7 +46,7 @@ export function FactorLibrary({ onInspect, onEdit }: { onInspect: (factorId: str
   }, [factors, query, kind, group])
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-card border border-border bg-surface/80">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-card border border-border bg-surface">
       <div className="flex flex-wrap items-center gap-2 border-b border-border px-3 py-2.5">
         <div className="relative">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3 w-3 -translate-y-1/2 text-muted" />
@@ -67,12 +69,12 @@ export function FactorLibrary({ onInspect, onEdit }: { onInspect: (factorId: str
           <option value="all">全部分组</option>
           {groups.map(name => <option key={name} value={name}>{name}</option>)}
         </select>
-        <span className="ml-auto text-[10px] text-muted">{lib.isLoading ? '加载中…' : `${filtered.length} / ${factors.length} 个因子`}</span>
+        <span className="ml-auto text-micro text-muted">{lib.isLoading ? '加载中…' : `${filtered.length} / ${factors.length} 个因子`}</span>
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto">
         {lib.isError && (
-          <div className="m-3 rounded-btn border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
+          <div className="m-3 rounded-btn border border-danger/30 bg-danger/10 px-3 py-2 text-xs text-danger">
             {String((lib.error as Error).message)}
           </div>
         )}
@@ -84,15 +86,15 @@ export function FactorLibrary({ onInspect, onEdit }: { onInspect: (factorId: str
         )}
         {!lib.isLoading && filtered.length > 0 && (
           <table className="w-full min-w-[760px] text-xs">
-            <thead className="sticky top-0 z-20 bg-elevated text-left text-[11px] text-secondary">
+            <thead className={cn(THEAD, 'z-20 text-left', TH_ROW)}>
               <tr>
-                <th className="px-3 py-2.5 font-medium">因子</th>
-                <th className="px-3 py-2.5 font-medium">分组</th>
-                <th className="px-3 py-2.5 font-medium">类型</th>
-                <th className="px-3 py-2.5 font-medium">公式</th>
-                <th className="px-3 py-2.5 font-medium" title="按需计算所需的最少历史交易日数">预热</th>
-                <th className="px-3 py-2.5 font-medium">适用</th>
-                <th className="w-24 px-3 py-2.5 text-right font-medium">操作</th>
+                <th className="px-3 py-2 font-normal">因子</th>
+                <th className="px-3 py-2 font-normal">分组</th>
+                <th className="px-3 py-2 font-normal">类型</th>
+                <th className="px-3 py-2 font-normal">公式</th>
+                <th className="px-3 py-2 font-normal" title="按需计算所需的最少历史交易日数">预热</th>
+                <th className="px-3 py-2 font-normal">适用</th>
+                <th className="w-24 px-3 py-2 text-right font-normal">操作</th>
               </tr>
             </thead>
             <tbody>
@@ -104,14 +106,14 @@ export function FactorLibrary({ onInspect, onEdit }: { onInspect: (factorId: str
                 >
                   <td className="px-3 py-2.5">
                     <div className="font-medium text-foreground">{item.label}</div>
-                    <div className="mt-0.5 font-mono text-[10px] text-muted">{item.id}</div>
+                    <div className="mt-0.5 font-mono text-micro text-muted">{item.id}</div>
                   </td>
                   <td className="px-3 py-2.5 text-secondary">{item.group}</td>
                   <td className="px-3 py-2.5">
-                    <span className={`inline-flex rounded-btn px-1.5 py-0.5 text-[10px] font-medium ${KIND_META[item.kind].cls}`}>
+                    <span className={`inline-flex rounded-btn px-1.5 py-0.5 text-micro font-medium ${KIND_META[item.kind].cls}`}>
                       {KIND_META[item.kind].label}
                     </span>
-                    {item.pit && <span className="ml-1 text-[10px] text-amber-500" title="点时数据: 仅使用公告日不晚于当日的财务数据">点时</span>}
+                    {item.pit && <span className="ml-1 text-micro text-warning" title="点时数据: 仅使用公告日不晚于当日的财务数据">点时</span>}
                   </td>
                   <td className="max-w-[22rem] px-3 py-2.5">
                     <span className="block truncate text-secondary" title={item.formula}>{item.formula}</span>
@@ -124,7 +126,7 @@ export function FactorLibrary({ onInspect, onEdit }: { onInspect: (factorId: str
                     <button
                       type="button"
                       onClick={event => { event.stopPropagation(); onInspect(item.id) }}
-                      className="inline-flex items-center gap-1 rounded-btn px-2 py-1 text-[10px] text-accent transition-colors hover:bg-accent/10"
+                      className={buttonClass({ variant: 'ghost', size: 'xs' }, 'gap-1 text-accent')}
                       title="去检验该因子（切到检验页并只选它）"
                     >
                       去检验 <ArrowRight className="h-3 w-3" />
@@ -226,17 +228,17 @@ function FactorDetailModal({
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <FlaskConical className="h-4 w-4 shrink-0 text-accent" />
-            <span id="factor-detail-title" className="truncate text-sm font-semibold text-foreground">{item.label}</span>
-            <span className={`inline-flex shrink-0 rounded-btn px-1.5 py-0.5 text-[10px] font-medium ${KIND_META[item.kind].cls}`}>
+            <span id="factor-detail-title" className={cn('truncate', TYPE.section)}>{item.label}</span>
+            <span className={`inline-flex shrink-0 rounded-btn px-1.5 py-0.5 text-micro font-medium ${KIND_META[item.kind].cls}`}>
               {KIND_META[item.kind].label}
             </span>
           </div>
-          <div className="mt-1 font-mono text-[11px] text-muted">{item.id}</div>
+          <div className="mt-1 font-mono text-xs text-muted">{item.id}</div>
         </div>
         <button
           type="button"
           onClick={onClose}
-          className="inline-flex h-8 w-8 shrink-0 items-center justify-center text-muted transition-colors hover:text-foreground"
+          className={buttonClass({ variant: 'ghost', icon: true }, 'shrink-0')}
           aria-label="关闭"
         >
           <X className="h-4 w-4" />
@@ -255,14 +257,14 @@ function FactorDetailModal({
                       value={groupDraft}
                       maxLength={24}
                       onChange={event => setGroupDraft(event.target.value)}
-                      className="h-6 w-32 rounded-input border border-border bg-base/60 px-1.5 text-xs text-foreground focus:border-accent focus:outline-none"
+                      className="h-7 w-32 rounded-input border border-border bg-base/60 px-1.5 text-xs text-foreground focus:border-accent focus:outline-none"
                       aria-label="修改分组"
                     />
                     <button
                       type="button"
                       onClick={() => setGroup.mutate()}
                       disabled={setGroup.isPending || !groupDraft.trim() || groupDraft.trim() === item.group}
-                      className="rounded-btn border border-border px-1.5 py-0.5 text-[10px] text-secondary transition-colors hover:border-accent/40 hover:text-accent disabled:opacity-40"
+                      className={buttonClass({ size: 'xs' })}
                     >
                       保存
                     </button>
@@ -272,21 +274,21 @@ function FactorDetailModal({
             </div>
           ))}
         </dl>
-        <div className="mt-4 rounded-btn border border-border bg-base/40 px-3 py-2 text-[11px] leading-relaxed text-muted">
+        <div className="mt-4 rounded-btn border border-border bg-base/40 px-3 py-2 text-xs leading-relaxed text-muted">
           方向说明：因子方向不预填，以最近一次检验的 IC 符号为准（IC 为正 = 值大看多）。到「检验」页运行后可查看。
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-2 border-t border-border px-4 py-3">
         {isDynamic && (
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-[10px] text-muted" title="生命周期流转">状态：</span>
+            <span className="text-micro text-muted" title="生命周期流转">状态：</span>
             {(['active', 'watch', 'retired', 'draft'] as const).map(status => (
               <button
                 key={status}
                 type="button"
                 onClick={() => setStatus.mutate(status)}
                 disabled={setStatus.isPending}
-                className="rounded-btn border border-border px-2 py-0.5 text-[10px] text-secondary transition-colors hover:border-accent/40 hover:text-accent disabled:opacity-40"
+                className={buttonClass({ size: 'xs' })}
               >
                 {status === 'active' ? '激活' : status === 'watch' ? '观察' : status === 'retired' ? '退役' : '回草稿'}
               </button>
@@ -297,7 +299,7 @@ function FactorDetailModal({
           <button
             type="button"
             onClick={() => { onClose(); onEdit(item.id) }}
-            className="inline-flex items-center gap-1 rounded-btn border border-accent/40 px-2.5 py-1.5 text-[11px] font-medium text-accent transition-colors hover:bg-accent/10"
+            className={buttonClass({}, 'gap-1')}
             title="在编辑器中打开该公式, 修改后保存为新版本"
           >
             <PenLine className="h-3 w-3" />
@@ -307,7 +309,7 @@ function FactorDetailModal({
         <button
           type="button"
           onClick={() => setGenerateOpen(true)}
-          className="inline-flex items-center gap-1 rounded-btn border border-accent/40 px-2.5 py-1.5 text-[11px] font-medium text-accent transition-colors hover:bg-accent/10"
+          className={buttonClass({}, 'gap-1')}
           title="按该因子生成单因子排名策略, 保存到自定义策略后可直接回测"
         >
           <Sparkles className="h-3 w-3" />
@@ -316,7 +318,7 @@ function FactorDetailModal({
         <button
           type="button"
           onClick={() => { onClose(); onInspect(item.id) }}
-          className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-btn bg-accent px-2.5 py-1.5 text-[11px] font-medium text-white transition-colors hover:bg-accent/90"
+          className={buttonClass({ variant: 'primary' }, 'ml-auto shrink-0 gap-1')}
         >
           检验此因子 <ArrowRight className="h-3 w-3" />
         </button>
@@ -327,14 +329,14 @@ function FactorDetailModal({
                 type="button"
                 onClick={() => removeFactor.mutate(false)}
                 disabled={removeFactor.isPending}
-                className="inline-flex shrink-0 items-center gap-1 rounded-btn bg-danger px-2.5 py-1.5 text-[11px] font-medium text-white transition-colors hover:bg-danger/90 disabled:opacity-40"
+                className={buttonClass({}, 'shrink-0 gap-1 border-danger bg-danger font-medium text-on-accent hover:bg-danger/90')}
               >
                 {removeFactor.isPending ? '删除中…' : '确认删除'}
               </button>
               <button
                 type="button"
                 onClick={() => { setConfirmDelete(false); setBlockedRefs(null) }}
-                className="inline-flex shrink-0 items-center rounded-btn border border-border px-2.5 py-1.5 text-[11px] text-secondary transition-colors hover:text-foreground"
+                className={buttonClass({}, 'shrink-0')}
               >
                 取消
               </button>
@@ -343,7 +345,7 @@ function FactorDetailModal({
             <button
               type="button"
               onClick={() => setConfirmDelete(true)}
-              className="inline-flex shrink-0 items-center gap-1 rounded-btn border border-danger/40 px-2.5 py-1.5 text-[11px] font-medium text-danger transition-colors hover:bg-danger/10"
+              className={buttonClass({ variant: 'danger' }, 'shrink-0 gap-1')}
               title="删除该自定义/复合因子; 被策略或复合因子引用时需强制删除"
             >
               <Trash2 className="h-3 w-3" />
@@ -352,22 +354,22 @@ function FactorDetailModal({
           )
         )}
         {blockedRefs && (
-          <div className="w-full rounded-btn border border-danger/40 bg-danger/10 px-3 py-2 text-[11px] leading-relaxed text-danger">
+          <div className="w-full rounded-btn border border-danger/40 bg-danger/10 px-3 py-2 text-xs leading-relaxed text-danger">
             <div className="font-medium">该因子仍被以下对象引用，删除后相关策略/复合因子将无法计算：</div>
-            <div className="mt-1 font-mono text-[10px] break-all text-danger/90">{blockedRefs.join('、')}</div>
+            <div className="mt-1 font-mono text-micro break-all text-danger/90">{blockedRefs.join('、')}</div>
             <div className="mt-2 flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => removeFactor.mutate(true)}
                 disabled={removeFactor.isPending}
-                className="rounded-btn bg-danger px-2.5 py-1 text-[11px] font-medium text-white transition-colors hover:bg-danger/90 disabled:opacity-40"
+                className="rounded-btn bg-danger px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-danger/90 disabled:opacity-40"
               >
                 {removeFactor.isPending ? '删除中…' : '仍要强制删除'}
               </button>
               <button
                 type="button"
                 onClick={() => setBlockedRefs(null)}
-                className="text-[11px] text-secondary underline-offset-2 transition-colors hover:text-foreground hover:underline"
+                className="text-xs text-secondary underline-offset-2 transition-colors hover:text-foreground hover:underline"
               >
                 收起
               </button>

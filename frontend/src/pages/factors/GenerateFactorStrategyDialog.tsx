@@ -4,6 +4,7 @@ import { Sparkles } from 'lucide-react'
 import { Modal } from '@/components/Modal'
 import { toast } from '@/components/Toast'
 import { api } from '@/lib/api'
+import { TYPE, SELECTED, buttonClass } from '@/components/ui'
 
 const INPUT_CLS = 'h-8 w-full rounded-input border border-border bg-surface px-2.5 text-xs text-foreground focus:border-accent focus:outline-none'
 
@@ -96,41 +97,41 @@ export function GenerateFactorStrategyDialog({
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <Sparkles className="h-4 w-4 shrink-0 text-accent" />
-            <span id="generate-factor-strategy-title" className="text-sm font-semibold text-foreground">因子生成策略</span>
+            <span id="generate-factor-strategy-title" className={TYPE.section}>因子生成策略</span>
           </div>
-          <p className="mt-1 font-mono text-[11px] text-muted">{item.id}</p>
+          <p className="mt-1 font-mono text-xs text-muted">{item.id}</p>
         </div>
-        <span className="shrink-0 rounded-btn bg-elevated px-1.5 py-0.5 text-[10px] text-secondary">{item.label}</span>
+        <span className="shrink-0 rounded-btn bg-elevated px-1.5 py-0.5 text-micro text-secondary">{item.label}</span>
       </div>
 
       <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-3">
-        <div className="rounded-btn border border-border bg-base/40 px-3 py-2 text-[11px] leading-relaxed text-secondary">
+        <div className="rounded-btn border border-border bg-base/40 px-3 py-2 text-xs leading-relaxed text-secondary">
           生成一个单因子排名策略：按因子值全市场排名打分，评分高于「入选评分下限」入场、跌破「离场评分上限」出场。
           入场/离场评分、每日入选上限都是策略参数，回测时可直接调。
         </div>
         <label className="block">
-          <span className="mb-1 block text-[10px] text-muted">策略名称</span>
+          <span className="mb-1 block text-micro text-muted">策略名称</span>
           <input type="text" value={name} maxLength={24} onChange={event => setName(event.target.value)} className={INPUT_CLS} />
         </label>
         <div>
-          <span className="mb-1 block text-[10px] text-muted">因子方向（打分方向）</span>
+          <span className="mb-1 block text-micro text-muted">因子方向（打分方向）</span>
           <div className="flex gap-1.5">
             {([['high', '值大加分'], ['low', '值小加分']] as const).map(([value, label]) => (
               <button
                 key={value}
                 type="button"
                 onClick={() => setDirection(value)}
-                className={`rounded-btn border px-2.5 py-1.5 text-[11px] transition-colors ${direction === value
-                  ? 'border-accent/50 bg-accent/10 text-accent'
+                className={`rounded-btn border px-2.5 py-1.5 text-xs transition-colors ${direction === value
+                  ? SELECTED
                   : 'border-border bg-base text-muted hover:border-accent/40'}`}
               >
                 {label}
               </button>
             ))}
           </div>
-          <p className="mt-1 text-[10px] text-muted">拿不准就先按默认生成，回测对比两个方向再定。</p>
+          <p className="mt-1 text-micro text-muted">拿不准就先按默认生成，回测对比两个方向再定。</p>
         </div>
-        <p className="text-[10px] leading-relaxed text-muted">
+        <p className="text-micro leading-relaxed text-muted">
           生成后：默认止损 -8%、最大持仓 30 个交易日、评分口径与检验/挖掘同一条计算管线（matrix_native）。策略文件保存在自定义策略目录，可在策略页查看。
         </p>
       </div>
@@ -141,7 +142,7 @@ export function GenerateFactorStrategyDialog({
           type="button"
           onClick={() => generate.mutate()}
           disabled={generate.isPending || !name.trim()}
-          className="inline-flex items-center gap-1.5 rounded-btn bg-accent px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50"
+          className={buttonClass({ variant: 'primary' }, 'gap-1.5')}
         >
           <Sparkles className="h-3.5 w-3.5" />
           {generate.isPending ? '生成中…' : '生成策略'}

@@ -6,6 +6,8 @@ import { toast } from '@/components/Toast'
 import { api, type ResearchCandidate, type ResearchCandidateStatus, type ScoringDirection } from '@/lib/api'
 import { fmtPct } from '@/lib/format'
 import { QK } from '@/lib/queryKeys'
+import { SEG, SEG_ITEM, SEG_ON, SEG_OFF, TYPE, buttonClass } from '@/components/ui'
+import { cn } from '@/lib/cn'
 
 const STATUS_OPTIONS: { value: ResearchCandidateStatus; label: string; icon: typeof Clock3 }[] = [
   { value: 'pending', label: '待验证', icon: Clock3 },
@@ -137,8 +139,8 @@ export function ResearchCandidatesDialog({ onClose, onLoadStrategy }: {
       <header className="flex shrink-0 items-center gap-3 border-b border-border px-4 py-3">
         <BookmarkCheck className="h-4 w-4 text-accent" />
         <div className="min-w-0">
-          <h2 id="research-candidates-title" className="text-sm font-semibold text-foreground">候选方案</h2>
-          <div className="mt-0.5 text-[11px] text-muted">仅保存研究定义、配置与指标摘要</div>
+          <h2 id="research-candidates-title" className={TYPE.section}>候选方案</h2>
+          <div className="mt-0.5 text-xs text-muted">仅保存研究定义、配置与指标摘要</div>
         </div>
         <button
           type="button"
@@ -151,22 +153,21 @@ export function ResearchCandidatesDialog({ onClose, onLoadStrategy }: {
         </button>
       </header>
 
-      <div className="flex shrink-0 items-center gap-1 border-b border-border bg-surface/50 px-4 py-2">
+      <div className="flex shrink-0 items-center gap-1 border-b border-border px-4 py-2">
+        <div className={SEG}>
         {([['all', '全部'], ['factor', '因子'], ['strategy', '策略']] as const).map(([value, label]) => (
           <button
             key={value}
             type="button"
             onClick={() => setKind(value)}
             aria-pressed={kind === value}
-            className={`rounded-btn px-3 py-1.5 text-xs font-medium transition-colors ${kind === value
-              ? 'bg-accent/15 text-accent'
-              : 'text-secondary hover:bg-elevated hover:text-foreground'
-            }`}
+            className={cn(SEG_ITEM, 'px-3', kind === value ? SEG_ON : SEG_OFF)}
           >
             {label}
           </button>
         ))}
-        <span className="ml-auto text-[11px] text-muted">{visible.length} 个</span>
+        </div>
+        <span className="ml-auto text-xs text-muted">{visible.length} 个</span>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
@@ -174,7 +175,7 @@ export function ResearchCandidatesDialog({ onClose, onLoadStrategy }: {
           <div className="px-4 py-10 text-center text-sm text-muted">加载中…</div>
         )}
         {candidates.isError && (
-          <div className="m-4 rounded-btn border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
+          <div className="m-4 rounded-btn border border-danger/30 bg-danger/10 px-3 py-2 text-xs text-danger">
             {String((candidates.error as Error).message)}
           </div>
         )}
@@ -195,15 +196,15 @@ export function ResearchCandidatesDialog({ onClose, onLoadStrategy }: {
             <div className="grid grid-cols-1 gap-3 px-4 py-3 md:grid-cols-[minmax(0,1fr)_8rem_7rem] md:items-center">
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className={`shrink-0 rounded border px-1.5 py-0.5 text-[9px] font-medium ${item.kind === 'factor'
+                  <span className={`shrink-0 rounded border px-1.5 py-0.5 text-micro font-medium ${item.kind === 'factor'
                     ? 'border-cyan-400/30 bg-cyan-400/10 text-cyan-400'
-                    : 'border-amber-400/30 bg-amber-400/10 text-amber-400'
+                    : 'border-warning/30 bg-warning/10 text-warning'
                   }`}>
                     {item.kind === 'factor' ? '因子' : '策略'}
                   </span>
-                  <span className="truncate text-sm font-medium text-foreground">{item.name}</span>
+                  <span className={cn('truncate', TYPE.card)}>{item.name}</span>
                 </div>
-                <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted">
+                <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
                   <span>{metricSummary(item)}</span>
                   {item.data_as_of && <span>数据截至 {item.data_as_of}</span>}
                   {item.kind === 'factor' && !factorSupported && !factorColumns.isLoading && (
@@ -227,7 +228,7 @@ export function ResearchCandidatesDialog({ onClose, onLoadStrategy }: {
                   <button
                     type="button"
                     onClick={() => onLoadStrategy(item)}
-                    className="inline-flex h-8 items-center gap-1.5 rounded-btn px-2 text-[11px] text-accent transition-colors hover:bg-accent/10"
+                    className={buttonClass({}, 'gap-1.5')}
                     title="把此候选保存的回测配置 (策略/区间/参数/费率/仓位/环境过滤) 回填到回测表单, 可直接复测"
                   >
                     <RotateCcw className="h-3.5 w-3.5" />
@@ -239,7 +240,7 @@ export function ResearchCandidatesDialog({ onClose, onLoadStrategy }: {
                     type="button"
                     onClick={() => linking ? setLinkDraft(null) : startLink(item)}
                     disabled={!canLink || strategies.isLoading || factorColumns.isLoading}
-                    className="inline-flex h-8 items-center gap-1.5 rounded-btn px-2 text-[11px] text-accent transition-colors hover:bg-accent/10 disabled:cursor-not-allowed disabled:text-muted disabled:opacity-50"
+                    className={buttonClass({}, 'gap-1.5')}
                     title={item.status !== 'validated' ? '验证通过后可加入策略' : factorSupported ? '加入策略评分' : '当前因子不可用于策略评分'}
                   >
                     <Link2 className="h-3.5 w-3.5" />
@@ -263,7 +264,7 @@ export function ResearchCandidatesDialog({ onClose, onLoadStrategy }: {
             {linking && linkDraft && (
               <div className="grid gap-3 border-t border-border/60 bg-surface/45 px-4 py-3 md:grid-cols-[minmax(12rem,1fr)_9rem_8rem_auto] md:items-end">
                 <label className="block min-w-0">
-                  <span className="mb-1 block text-[10px] text-muted">目标策略</span>
+                  <span className="mb-1 block text-micro text-muted">目标策略</span>
                   <select
                     value={linkDraft.strategyId}
                     onChange={event => setLinkDraft(current => current ? { ...current, strategyId: event.target.value } : current)}
@@ -277,15 +278,15 @@ export function ResearchCandidatesDialog({ onClose, onLoadStrategy }: {
                   </select>
                 </label>
                 <div>
-                  <span className="mb-1 block text-[10px] text-muted">评分方向</span>
+                  <span className="mb-1 block text-micro text-muted">评分方向</span>
                   <div className="grid h-8 grid-cols-2 overflow-hidden rounded-input border border-border bg-base">
                     {([['high', ArrowUp, '高值'], ['low', ArrowDown, '低值']] as const).map(([value, Icon, label]) => (
                       <button
                         key={value}
                         type="button"
                         onClick={() => setLinkDraft(current => current ? { ...current, direction: value } : current)}
-                        className={`flex items-center justify-center gap-1 text-[11px] transition-colors ${linkDraft.direction === value
-                          ? value === 'high' ? 'bg-emerald-400/15 text-emerald-400' : 'bg-cyan-400/15 text-cyan-400'
+                        className={`flex items-center justify-center gap-1 text-xs transition-colors ${linkDraft.direction === value
+                          ? 'bg-foreground font-medium text-surface'
                           : 'text-muted hover:bg-elevated'
                         }`}
                         title={`偏好${label}`}
@@ -299,7 +300,7 @@ export function ResearchCandidatesDialog({ onClose, onLoadStrategy }: {
                   </div>
                 </div>
                 <label className="block">
-                  <span className="mb-1 flex items-center justify-between text-[10px] text-muted">
+                  <span className="mb-1 flex items-center justify-between text-micro text-muted">
                     初始权重
                     {ic != null && <span>{ic < 0 ? 'IC<0 推荐低值' : 'IC≥0 推荐高值'}</span>}
                   </span>
@@ -317,7 +318,7 @@ export function ResearchCandidatesDialog({ onClose, onLoadStrategy }: {
                       } : current)}
                       className="h-8 w-full rounded-input border border-border bg-base px-2 pr-7 text-xs text-foreground focus:border-accent focus:outline-none"
                     />
-                    <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-muted">%</span>
+                    <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-micro text-muted">%</span>
                   </div>
                 </label>
                 <div className="flex items-center justify-end gap-2">
@@ -332,7 +333,7 @@ export function ResearchCandidatesDialog({ onClose, onLoadStrategy }: {
                     type="button"
                     onClick={() => applyFactor.mutate({ candidate: item, draft: linkDraft })}
                     disabled={!linkDraft.strategyId || applyFactor.isPending}
-                    className="inline-flex h-8 items-center gap-1.5 rounded-btn bg-accent px-3 text-xs font-medium text-white transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50"
+                    className={buttonClass({ variant: 'primary' }, 'gap-1.5')}
                   >
                     {applyFactor.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Link2 className="h-3.5 w-3.5" />}
                     应用
