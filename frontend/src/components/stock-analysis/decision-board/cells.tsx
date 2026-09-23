@@ -310,14 +310,14 @@ export function TrendSegment({ trend, geo, runs, ph, kc, close, trendCls }: {
     <>
         <span title={tip} className="flex flex-wrap items-center justify-center gap-1">
           {trend ? (
-            <span className={`inline-flex whitespace-nowrap rounded border px-1.5 py-0.5 text-[12px] ${trendCls ?? ''}`}>
+            <span className={`inline-flex whitespace-nowrap rounded border px-1.5 py-0.5 text-xs ${trendCls ?? ''}`}>
               {/* [R290] 天数从徽标上**搬到了第二行**, 换成「转折后第 N 天」——
                   用户: 「这类词统一改成出现转折后的第几天」。
                   徽标上不再留一份: 同一个数印两遍, 读的人得先确认是不是一回事
                   (R249 立的正是这条规矩, 这里是同一条规矩换了个说法执行)。 */}
               {trend.state_cn}{trend.intraday ? <span className="ml-0.5 opacity-70">*</span> : null}
             </span>
-          ) : <span className="text-[12px] text-muted/30">—</span>}
+          ) : <span className="text-xs text-muted/30">—</span>}
           {/* [R286 加, R291 撤] 第一行那枚「转折」小标撤掉了。用户看着截图说
               「显示不好看, 想想怎么设计今天就是转折的场景」——
               **毛病是同一件事说了两遍**: 上面一枚琥珀「转折」, 下面一行琥珀
@@ -356,7 +356,7 @@ export function TrendSegment({ trend, geo, runs, ph, kc, close, trendCls }: {
                R284「别人看了会看不懂」、R285「加多两个字表述清楚」)。
             琥珀色与复盘逐日表那个「转折」标记同色, 两个页面同一件事同一个颜色。 */}
         {trend ? (
-          <span className={`inline-flex whitespace-nowrap rounded border px-1.5 py-px text-[11px] ${
+          <span className={`inline-flex whitespace-nowrap rounded border px-1.5 py-px text-xs ${
             trend.flipped
               ? 'border-amber-400/45 bg-amber-400/10 font-medium text-amber-300'
               : 'border-transparent text-muted'}`}
@@ -366,7 +366,7 @@ export function TrendSegment({ trend, geo, runs, ph, kc, close, trendCls }: {
             {trend.flipped ? '今天转折' : <>转折后第 {trend.duration} 天</>}
           </span>
         ) : (
-          <span className="text-transparent select-none text-[11px]">·</span>
+          <span className="text-transparent select-none text-xs">·</span>
         )}
     </>
   )
@@ -465,19 +465,19 @@ export function PositionSegment({ kc, geo, ev, runs, energy, ph, stateRun, close
     <>
         {/* 第一行: 位置名。**扫 166 行时只看这一行的颜色** ——
             红 = 在上轨那一侧, 蓝 = 在下轨那一侧, 灰 = 通道内。 */}
-        <span title={tip} className={`text-[12px] ${s ? POS_TEXT[s.pos] ?? 'text-muted' : 'text-muted/30'}`}>
+        <span title={tip} className={`text-xs ${s ? POS_TEXT[s.pos] ?? 'text-muted' : 'text-muted/30'}`}>
           {s ? s.pos_cn : '—'}
         </span>
         {/* 第二行: 离那条轨还有多远, **价格口径**。
             它是这一格真正能拿去下单的那个数, 所以数字用等宽 + tabular-nums,
             整列小数点上下对齐; 措辞压暗, 不跟第一行抢。 */}
         {near ? (
-          <span title={tip} className="text-[10px] text-muted">
+          <span title={tip} className="text-micro text-muted">
             {near.label}
             <span className="ml-1 font-mono tabular-nums text-secondary">{near.pct}%</span>
           </span>
         ) : (
-          <span className="text-[10px] text-muted/30">—</span>
+          <span className="text-micro text-muted/30">—</span>
         )}
     </>
   )

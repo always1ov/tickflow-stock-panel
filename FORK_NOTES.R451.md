@@ -1,0 +1,5 @@
+# R451 — 全站迁移 · 自选决策台
+
+| # | 改动 | 涉及文件 | 冲突风险 | 单独回退 |
+|---|------|---------|:---:|---------|
+| R451 | 全站迁移第三步(规范见 `docs/ui-hierarchy.md`)。自选决策台整页换成个股弹窗那一套: 外框换成全站卡片(实边框实底); 「自选决策台」标题升到 L3(15px), 图标 16px; 工具条的「只看要动的 / 只看转折 / 只看持有 / 分组 / 刷新 / 全量回测 / 导出」一律全站按钮(32px 高、13px 字), 选中统一黑白反相 —— 原来四个开关各亮一种颜色(琥珀 / 天蓝 / 强调色), 回测与导出还各带一层紫、蓝底; 分组选中时仍按分组自己的颜色亮(那是分组的身份)。表头换成全站表格那一份(11px 灰字、浅灰实底条), 行内代码小字是标签级 11px, 涨跌与各徽标 13px, 涨跌色换成语义色 bull / bear, 持仓切换用全站小按钮(选中反相), 成本输入框 13px。导出选列弹窗: 标题 L2(18px, 规范补上「普通弹窗标题 = L2」一行), 分组名标签级, 列的开关与预设用全站按钮, 导出是主按钮。`cells` / `ComboView` / `LotsLink` / `StockAnalysis` 的写死字号按角色落档, 两处写死琥珀色换成 warning。`test_R252_决策台表头背景是实心的` 改钉全站表头 THEAD 是实心底。棘轮 裸圆角 941→938、任意字号 2232→2193、硬编码色 1016→988 | `frontend/src/components/stock-analysis/WatchlistDecisionBoard.tsx`、`frontend/src/components/stock-analysis/decision-board/*`、`frontend/src/pages/StockAnalysis.tsx`、`docs/ui-hierarchy.md`、`backend/tests/test_board_columns.py`、`backend/tests/test_ui_hierarchy.py`、`backend/tests/test_design_spec.py` | 低(决策台是 fork 自己的) | 回退本提交即回到原字号与各色开关 |

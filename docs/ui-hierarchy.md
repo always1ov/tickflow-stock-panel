@@ -12,6 +12,7 @@
 | 级别 | 用在哪 | 字号 | 取法 |
 |---|---|---|---|
 | L1 页面标题 | 页头; 弹窗里的票名 | 21px 粗 | `PageHeader` / `TYPE.page` |
+| L2 弹窗标题 | 普通弹窗的标题(比弹窗里的卡片、正文高一级; 个股弹窗那种整页大小的弹窗按页面算) | 18px 粗 | `TYPE.section` |
 | L2 分区标题 | 一页里分几块时每块顶上那一行(标题 + 副标题 + 细线) | 18px 粗 | `<SectionTitle>` |
 | L3 卡片标题 | 一张卡片自己的标题 | 15px 粗 | `TYPE.card` |
 | 正文 | 正文、说明、按钮、表格内容 | 13px | `TYPE.body` / `text-xs` |
@@ -49,7 +50,7 @@
 
 - [x] 个股弹窗新块(R429~R448 已是这套; R449 修正分区 / 卡片标题的级别)
 - [x] 外壳: 侧栏 / 导航(`Layout`)、`PageHeader`、`PageShell`
-- [ ] 自选决策台(`StockAnalysis` + `WatchlistDecisionBoard` + `decision-board/*`)
+- [x] 自选决策台(`StockAnalysis` + `WatchlistDecisionBoard` + `decision-board/*`)
 - [ ] 自选(`Watchlist`)
 - [ ] 大盘(`Dashboard`)
 - [ ] 监控(`Monitor` + `monitor/RuleEditor`)

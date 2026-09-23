@@ -527,8 +527,11 @@ def test_R252_决策台表头背景是实心的():
     表头读成花的。"""
     src = _src()
     head = src[src.index("<thead"):src.index(">", src.index("<thead")) + 1]
-    assert "bg-surface/" not in head, f"表头背景又半透明了: {head}"
-    assert "bg-surface" in head, "表头没有背景色 —— 行会直接透上来"
+    # [R451] 表头改用全站表格那一份(`components/ui/table.ts` 的 THEAD, 浅灰实底条)
+    assert "THEAD" in head, f"决策台表头没用全站表格的表头: {head}"
+    from tests.frontend_source import code_of
+    m = re.search(r"export const THEAD = '([^']*)'", code_of("components/ui/table.ts"))
+    assert m and re.search(r"\bbg-(elevated|surface)\b(?!/)", m.group(1)), f"表头背景不是实心的: {m and m.group(1)}"
 
 
 # [R253 → R435 退役] `test_R253_到价预案固定竖排一个一行` 钉的是 AI 信号给的到价预案,

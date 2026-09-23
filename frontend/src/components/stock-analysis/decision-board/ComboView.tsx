@@ -69,19 +69,19 @@ function Row({ r, hero }: { r: ComboTableRow; hero?: boolean }) {
       hero ? 'rounded-card border border-accent/40 bg-accent/10'
         : 'border-b border-border/20 last:border-0')}>
       <span className={cn('shrink-0 font-mono tabular-nums',
-        hero ? 'text-[13px] text-foreground' : 'text-[13px] text-foreground/85')}
+        hero ? 'text-xs text-foreground' : 'text-xs text-foreground/85')}
         title={r.shape}>
         {r.combo}
       </span>
       <span className="mt-[5px] shrink-0"><Dots rarity={r.rarity} /></span>
-      <span className={cn('w-[4.5rem] shrink-0 text-[13px]',
+      <span className={cn('w-[4.5rem] shrink-0 text-xs',
         r.verdict ? TONE_CLS[r.verdict.tone] ?? 'text-muted' : 'text-muted/50')}>
         {r.verdict?.title ?? '（无档位）'}
       </span>
-      <span className="min-w-0 flex-1 text-[13px] leading-relaxed text-secondary">
+      <span className="min-w-0 flex-1 text-xs leading-relaxed text-secondary">
         {r.read}
         {!!r.note && (
-          <span className="mt-0.5 block text-[12px] leading-relaxed text-amber-300/85">
+          <span className="mt-0.5 block text-xs leading-relaxed text-warning/85">
             ▸ {r.note.title}:{r.note.detail}
           </span>
         )}
@@ -130,7 +130,7 @@ export function ComboGroups({ rows, here }: { rows: ComboTableRow[]; here: strin
     <div className="space-y-3">
       {mine ? (
         <div>
-          <div className="mb-1 flex flex-wrap items-baseline gap-x-2 text-[12px] text-muted">
+          <div className="mb-1 flex flex-wrap items-baseline gap-x-2 text-xs text-muted">
             <span>你现在在这一格</span>
             {mineGroup && (
               <span className={mineGroup.cls}>· 落在「{mineGroup.cn}」这一段</span>
@@ -139,7 +139,7 @@ export function ComboGroups({ rows, here }: { rows: ComboTableRow[]; here: strin
           <Row r={mine} hero />
         </div>
       ) : (
-        <div className="rounded-card border border-border/40 px-2.5 py-2 text-[12px] text-muted">
+        <div className="rounded-card border border-border/40 px-2.5 py-2 text-xs text-muted">
           这只票今天算不出三档组合 —— 下面是 27 格的对照表
         </div>
       )}
@@ -158,7 +158,7 @@ export function ComboGroups({ rows, here }: { rows: ComboTableRow[]; here: strin
             if (!items.length) return null
             return (
               <div key={g.key}>
-                <div className={cn('mb-0.5 text-[12px]', g.cls)}>{g.cn}</div>
+                <div className={cn('mb-0.5 text-xs', g.cls)}>{g.cn}</div>
                 <div className="overflow-hidden rounded-card border border-border/40">
                   {items.map(r => <Row key={r.combo} r={r} />)}
                 </div>
@@ -167,7 +167,7 @@ export function ComboGroups({ rows, here }: { rows: ComboTableRow[]; here: strin
           })}
           {(hiddenCount > 0 || showRare) && (
             <button type="button" onClick={() => setShowRare(v => !v)}
-                    className="flex items-center gap-1 text-[12px] text-muted hover:text-foreground">
+                    className="flex items-center gap-1 text-xs text-muted hover:text-foreground">
               <ChevronDown className={cn('h-3 w-3 transition-transform', showRare && 'rotate-180')} />
               {showRare ? '收起几乎不出现的那几格'
                 : `还有 ${hiddenCount} 格几乎不出现(中线跑到短线与长线的另一侧, 几何上近乎不可能)`}

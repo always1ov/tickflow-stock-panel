@@ -11,6 +11,7 @@ import { useMemo } from 'react'
 import { Check, Download, X } from 'lucide-react'
 import { Modal } from '@/components/Modal'
 import { cn } from '@/lib/cn'
+import { TYPE, buttonClass } from '@/components/ui'
 import {
   DEFAULT_EXPORT_KEYS,
   EXPORT_COLUMNS,
@@ -57,15 +58,15 @@ export function ExportColumnsDialog({
       panelClassName="flex max-h-[86vh] w-[94vw] max-w-2xl flex-col rounded-card border border-border bg-surface shadow-xl"
     >
       <div className="flex items-center gap-2 border-b border-border/60 px-4 py-3">
-        <Download className="h-4 w-4 text-sky-400" />
-        <h2 id="export-cols-title" className="text-sm font-medium text-foreground">导出 · 选列</h2>
-        <span className="text-[12px] text-muted">{rowCount} 只 · 已选 {keys.length} 列</span>
+        <Download className="h-4 w-4 text-accent" />
+        <h2 id="export-cols-title" className={TYPE.section}>导出 · 选列</h2>
+        <span className="text-xs text-muted">{rowCount} 只 · 已选 {keys.length} 列</span>
         <button
           onClick={onClose}
           aria-label="关闭"
-          className="ml-auto rounded-btn border border-border bg-base p-1 text-muted transition-colors hover:text-foreground"
+          className={buttonClass({ icon: true }, 'ml-auto')}
         >
-          <X className="h-3.5 w-3.5" />
+          <X className="h-4 w-4" />
         </button>
       </div>
 
@@ -82,18 +83,13 @@ export function ExportColumnsDialog({
 
         {grouped.map(([group, cols]) => (
           <section key={group}>
-            <div className="mb-1 text-[12px] text-muted">{group}</div>
+            <div className={cn('mb-1.5', TYPE.label)}>{group}</div>
             <div className="flex flex-wrap gap-1.5">
               {cols.map(c => (
                 <button
                   key={c.key}
                   onClick={() => toggle(c.key)}
-                  className={cn(
-                    'inline-flex items-center gap-1 rounded-btn border px-2 py-0.5 text-[13px] transition-colors cursor-pointer',
-                    picked.has(c.key)
-                      ? 'border-sky-400/40 bg-sky-400/10 text-sky-300'
-                      : 'border-border bg-base text-muted hover:text-foreground',
-                  )}
+                  className={buttonClass({ selected: picked.has(c.key) }, 'gap-1')}
                 >
                   {picked.has(c.key) && <Check className="h-3 w-3" />}
                   {c.label}
@@ -103,7 +99,7 @@ export function ExportColumnsDialog({
           </section>
         ))}
 
-        <p className="text-[12px] text-muted/70">
+        <p className="text-xs text-muted/70">
           导出的读法与屏幕一致(比如通道列写「贴上轨」而不是 0.87)——
           对不上的话你会怀疑哪个是错的。列序按上面的固定顺序，不随勾选先后变。
         </p>
@@ -113,12 +109,12 @@ export function ExportColumnsDialog({
         <button
           onClick={onExport}
           disabled={rowCount === 0 || keys.length === 0}
-          className="inline-flex items-center gap-1.5 rounded-btn border border-sky-400/40 bg-sky-400/15 px-2.5 py-1 text-[13px] text-sky-300 transition-colors cursor-pointer hover:bg-sky-400/25 disabled:opacity-40"
+          className={buttonClass({ variant: 'primary' }, 'gap-1.5')}
         >
-          <Download className="h-3 w-3" />
+          <Download className="h-3.5 w-3.5" />
           导出 {rowCount} 只 · {keys.length} 列
         </button>
-        <span className="text-[12px] text-muted/70">自包含 HTML,可存档、打印或转发</span>
+        <span className="text-xs text-muted/70">自包含 HTML,可存档、打印或转发</span>
       </div>
     </Modal>
   )
@@ -129,7 +125,7 @@ function Preset({ label, title, onClick }: { label: string; title?: string; onCl
     <button
       onClick={onClick}
       title={title}
-      className="rounded-btn border border-border bg-base px-2 py-0.5 text-[12px] text-muted transition-colors cursor-pointer hover:text-foreground"
+      className={buttonClass()}
     >
       {label}
     </button>

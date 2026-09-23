@@ -133,7 +133,7 @@ export function StockAnalysis() {
             <span className="inline-flex shrink-0 items-center gap-1.5 text-xs text-muted">
               当前
               <span className="font-medium text-secondary">{name || symbol}</span>
-              <span className="font-mono text-[10px]">{symbol}</span>
+              <span className="font-mono text-micro">{symbol}</span>
               {/* [R157] 定位: 把这只票在决策台里的那一行滚到正中并闪一下。
                   不在自选 / 被「只看持有」挡住时会提示, 不会静默没反应 */}
               <button

@@ -6,6 +6,7 @@ import { api, type ChannelEvent, type ChannelPhase, type EffectivePosition, type
 import { WatchlistGroupMenu } from '@/components/WatchlistAddMenu'
 import { resolveWatchlistGroupColor } from '@/lib/watchlist-group-colors'
 import { QK } from '@/lib/queryKeys'
+import { cn } from '@/lib/cn'
 import { toast } from '@/components/Toast'
 import { trendBadgeCls } from '@/components/stock-analysis/TrendStateBar'
 import type { PreviewView } from '@/components/StockPreviewDialog'
@@ -21,6 +22,7 @@ import { LotsLink } from '@/components/stock-analysis/decision-board/LotsLink'
 import { Hint } from '@/components/Hint'   // [R323] 表头说明点得开
 import { refreshEvery } from '@/lib/refreshRhythm'   // [R333] 刷新节奏一处定义
 import { BoardSkeletonRows } from '@/components/stock-analysis/decision-board/BoardSkeletonRows'   // [R324] 首次加载骨架行
+import { TH_ROW, THEAD, TYPE, buttonClass } from '@/components/ui'   // [R451] 全站层级与样式
 // [R169] 合并视图(手填 ⊕ 上游批次登记), 字段说明见 api.ts 的 EffectivePosition
 type Position = EffectivePosition
 // [R254] 排序目标从 18 个砍到 10 个 —— **每列只留一个**。
@@ -625,15 +627,17 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, loc
   }
 
   return (
-    <div className="rounded-xl border border-border/60 bg-surface/40 overflow-hidden">
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 px-4 py-2.5">
+    // [R451] 全站迁移(docs/ui-hierarchy.md): 外框是卡片, 标题是 L3, 工具条按钮用全站按钮,
+    // 选中一律反相 —— 原来四个开关各亮一种颜色(琥珀 / 天蓝 / 强调色), 同一件事四种说法
+    <div className="overflow-hidden rounded-card border border-border bg-surface">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-2 px-4 py-3">
         {/* 决策台就是整页主体, 没有要让位的东西 —— 不再提供折叠 */}
         <span className="flex shrink-0 items-center gap-2">
-          <Wallet className="h-3.5 w-3.5 text-sky-400" />
-          <span className="text-xs font-medium text-foreground">自选决策台</span>
+          <Wallet className="h-4 w-4 text-accent" />
+          <span className={TYPE.card}>自选决策台</span>
           {/* [R276] 两个数出自同一批票(当前这张表)。筛掉了多少写在后面, 免得
               「12 只」被读成"我的自选只剩 12 只了"。 */}
-          <span className="text-[12px] text-muted">
+          <span className="text-xs text-muted">
             {rows.length} 只 · 持有 {heldInView}
             {rows.length < totalRows && (
               <span className="opacity-60"> · 自选共 {totalRows}</span>
@@ -650,9 +654,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, loc
           title={'只留下有触发的那几只: 出场线已破/逼近、离趋势翻转价 2% 以内、今日刚翻转、'
             + '短期通道到轨。判定是纯规则的(与推送焦点名单同一套到轨口径), AI 不参与。\n'
             + '自选一多, 默认列出全部本身就是噪音 —— 绝大多数票今天确实不需要你看。'}
-          className={`tap-target shrink-0 whitespace-nowrap text-[12px] px-2 py-0.5 rounded-btn border transition-colors cursor-pointer ${
-            actionableOnly ? 'border-amber-400/40 bg-amber-400/10 text-amber-400' : 'border-border bg-base text-muted hover:text-foreground'
-          }`}
+          className={buttonClass({ selected: actionableOnly }, 'shrink-0')}
         >
           只看要动的{actionCount > 0 && <span className="opacity-70">·{actionCount}</span>}
         </button>
@@ -663,17 +665,13 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, loc
             + '与「只看要动的」的区别: 那个是四档触发的并集(出场线、逼近翻转价、'
             + '今日转折、通道到轨), 转折只是其中一档。\n'
             + '想按转折做的时候, 另外三档就是噪音 —— 而转折正是模拟盘唯一认的信号。'}
-          className={`tap-target shrink-0 whitespace-nowrap text-[12px] px-2 py-0.5 rounded-btn border transition-colors cursor-pointer ${
-            flippedOnly ? 'border-sky-400/40 bg-sky-400/10 text-sky-300' : 'border-border bg-base text-muted hover:text-foreground'
-          }`}
+          className={buttonClass({ selected: flippedOnly }, 'shrink-0')}
         >
           只看转折{flipCount > 0 && <span className="opacity-70">·{flipCount}</span>}
         </button>
         <button
           onClick={() => setHeldOnly((v) => !v)}
-          className={`tap-target shrink-0 whitespace-nowrap text-[12px] px-2 py-0.5 rounded-btn border transition-colors cursor-pointer ${
-            heldOnly ? 'border-accent/40 bg-accent/10 text-accent' : 'border-border bg-base text-muted hover:text-foreground'
-          }`}
+          className={buttonClass({ selected: heldOnly }, 'shrink-0')}
         >
           只看持有
         </button>
@@ -692,28 +690,25 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, loc
             + '那它在每个分组里都会出现。\n'
             + '这个选择会记住, 下次打开还是它; 分组万一被删掉会自动退回「全部分组」并提示。'}
           ariaLabel="按分组筛选"
-          triggerClassName={`inline-flex items-center gap-1 text-[12px] px-2 py-0.5 rounded-btn border transition-colors cursor-pointer ${
-            groupFilter === G_ALL
-              ? 'border-border bg-base text-muted hover:text-foreground'
-              : curGroup
-                ? `${resolveWatchlistGroupColor(curGroup.color).border} ${resolveWatchlistGroupColor(curGroup.color).background} ${resolveWatchlistGroupColor(curGroup.color).text}`
-                : 'border-accent/40 bg-accent/10 text-accent'
-          }`}
+          // 选中某个分组时仍按分组自己的颜色亮 —— 那个颜色是分组的身份, 不是装饰
+          triggerClassName={buttonClass({ selected: groupFilter !== G_ALL && !curGroup }, cn('gap-1',
+            groupFilter !== G_ALL && curGroup && cn('border', resolveWatchlistGroupColor(curGroup.color).border,
+              resolveWatchlistGroupColor(curGroup.color).background, resolveWatchlistGroupColor(curGroup.color).text)))}
         >
-          {groupFilter === G_ALL ? <List className="h-3 w-3" />
-            : groupFilter === G_UNGROUPED ? <Inbox className="h-3 w-3" />
-              : <Folder className="h-3 w-3" />}
+          {groupFilter === G_ALL ? <List className="h-3.5 w-3.5" />
+            : groupFilter === G_UNGROUPED ? <Inbox className="h-3.5 w-3.5" />
+              : <Folder className="h-3.5 w-3.5" />}
           <span className="max-w-[7rem] truncate">{groupLabel}</span>
-          <ChevronDown className="h-3 w-3 opacity-70" />
+          <ChevronDown className="h-3.5 w-3.5 opacity-70" />
         </WatchlistGroupMenu>
-        <span className="mx-0.5 h-3 w-px shrink-0 bg-border/60" aria-hidden />
+        <span className="mx-0.5 h-4 w-px shrink-0 bg-border/60" aria-hidden />
         <button
           onClick={refreshAll}
           disabled={refreshing}
           title="刷新行情/仓位/信号快照(不调用 AI、不计费)"
-          className="ml-auto inline-flex items-center gap-1 text-[12px] px-2 py-0.5 rounded-btn border border-border bg-base text-muted hover:text-foreground disabled:opacity-60 transition-colors cursor-pointer"
+          className={buttonClass({}, 'ml-auto')}
         >
-          <RefreshCw className={`h-3 w-3 ${refreshing ? 'animate-spin' : ''}`} />
+          <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} />
           刷新
         </button>
         {/* [R312] 「全量回测」。用户: 「在刷新后面加个一键回测所有个股」。
@@ -734,9 +729,9 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, loc
               + '跑完先摆结果(现在多赚 → 改后多赚),勾选之后才写入 ——\n'
               + '阈值一改,这只票的六态整条历史都会跟着重算。'
             : '当前列表是空的'}
-          className="inline-flex items-center gap-1 text-[12px] px-2 py-0.5 rounded-btn border border-violet-400/30 bg-violet-400/10 text-violet-300 hover:bg-violet-400/20 disabled:opacity-50 transition-colors cursor-pointer"
+          className={buttonClass()}
         >
-          <FlaskConical className="h-3 w-3" />
+          <FlaskConical className="h-3.5 w-3.5" />
           全量回测
         </button>
         <button
@@ -747,9 +742,9 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, loc
               + `点开可以选导哪些列 —— 原「六态汇总」就是其中一个预设。\n`
               + `导出的读法与屏幕一致(通道列写「贴上轨」而不是 0.87)。`
             : '当前列表是空的'}
-          className="inline-flex items-center gap-1 text-[12px] px-2 py-0.5 rounded-btn border border-sky-400/30 bg-sky-400/10 text-sky-300 hover:bg-sky-400/20 disabled:opacity-50 transition-colors cursor-pointer"
+          className={buttonClass()}
         >
-          <Download className="h-3 w-3" />
+          <Download className="h-3.5 w-3.5" />
           导出
           {exportRows.length > 0 && <span className="opacity-70">{exportRows.length}·{exportCols.length}列</span>}
         </button>
@@ -775,13 +770,14 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, loc
                 天数徽标(opacity < 1 会自己造一个层叠上下文)于是画到了表头上面,
                 滚动时表头被行内容穿透。背景也从 95% 半透明改成实心 —— 表头底下本来
                 就是要划走的行, 让它透出来没有任何好处。 */}
-            <thead className="sticky top-0 z-20 bg-surface text-[12px] text-muted">
-              <tr className="text-left">
+            {/* [R451] 表头是标签那一级(11px 灰, 浅灰底条), 与全站表格同一套 */}
+            <thead className={cn(THEAD, 'z-20')}>
+              <tr className={cn(TH_ROW, 'text-left')}>
                 {/* [R395] 窄屏把「标的」钉在左边缘 —— 手机上这张表要往右滑 160px 才
                     看得完, 滑过去之后满屏读数不知道是哪一只票。`z-30` 要压过 thead
                     自己的 `z-20`, 否则表头第一格会被同一层的其余表头盖住。
                     宽屏 `lg:static` 之后与改动前逐像素相同。 */}
-                <th className="sticky left-0 z-30 bg-surface whitespace-nowrap px-3 py-2.5 font-normal text-center lg:static lg:bg-transparent"><button onClick={() => cycleSort('name')} className={thBtn} title={HEAD_TIPS.name}>标的{caret('name')}</button><Hint title={HEAD_TIPS.name} className="ml-0.5" /></th>
+                <th className="sticky left-0 z-30 bg-elevated whitespace-nowrap px-3 py-2.5 font-normal text-center lg:static lg:bg-transparent"><button onClick={() => cycleSort('name')} className={thBtn} title={HEAD_TIPS.name}>标的{caret('name')}</button><Hint title={HEAD_TIPS.name} className="ml-0.5" /></th>
                 <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center">
                   <button onClick={() => cycleSort('changePct')}
                           className={`${thBtn} whitespace-nowrap`}
@@ -878,15 +874,15 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, loc
                               className="mx-auto flex min-h-[2.25rem] flex-col items-center justify-center gap-0.5 text-center cursor-pointer group">
                         <span className="flex items-center gap-1.5">
                           {active && <Star className="h-2.5 w-2.5 shrink-0 text-accent" />}
-                          <span className="max-w-[140px] truncate font-medium text-foreground transition-colors group-hover:text-sky-300">{r.name}</span>
-                          <span className={`${NUM} text-[11px] text-muted`}>{r.symbol}</span>
+                          <span className="max-w-[140px] truncate font-medium text-foreground transition-colors group-hover:text-accent">{r.name}</span>
+                          <span className={`${NUM} text-micro text-muted`}>{r.symbol}</span>
                         </span>
                       </button>
                     </td>
                     {/* [R212] 现价与涨跌并成一格 —— 两个数天生一起读 */}
                     <td className={`${TD_BASE} ${NUM} whitespace-nowrap px-2`}>
                       <span className="text-foreground">{r.close != null ? r.close.toFixed(2) : '—'}</span>
-                      <span className={`ml-1.5 text-[12px] ${up ? 'text-red-400' : down ? 'text-emerald-400' : 'text-muted'}`}>
+                      <span className={`ml-1.5 text-xs ${up ? 'text-bull' : down ? 'text-bear' : 'text-muted'}`}>
                         {r.changePct != null ? `${r.changePct > 0 ? '+' : ''}${(r.changePct * 100).toFixed(2)}%` : '—'}
                       </span>
                     </td>
@@ -908,9 +904,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, loc
                       <div className="inline-flex flex-col items-center gap-1">
                         <button
                           onClick={() => setPos.mutate({ symbol: r.symbol, held: !r.held, cost: manualCost, weight: r.weight })}
-                          className={`whitespace-nowrap text-[12px] px-1.5 py-0.5 rounded border transition-colors cursor-pointer ${
-                            r.held ? 'border-accent/40 bg-accent/10 text-accent' : 'border-border bg-base text-muted hover:border-accent/30'
-                          }`}
+                          className={buttonClass({ size: 'xs', selected: r.held })}
                         >
                           {r.held ? '持有' : '空仓'}
                         </button>
@@ -927,7 +921,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, loc
                                 const v = e.target.value === '' ? null : Number(e.target.value)
                                 if (v !== manualCost) setPos.mutate({ symbol: r.symbol, held: true, cost: v, weight: r.weight })
                               }}
-                              className={`w-14 h-6 px-1 rounded bg-base border text-[12px] ${NUM} text-right text-foreground focus:outline-none focus:border-accent/50 ${
+                              className={`w-16 h-7 px-1.5 rounded-btn bg-base border text-xs ${NUM} text-right text-foreground focus:outline-none focus:border-accent/50 ${
                                 r.costSource === 'lots' ? 'border-accent/35 placeholder:text-accent/70' : 'border-border'
                               }`}
                             />
@@ -953,8 +947,8 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, loc
                             (它按我的成本、我的持有天数算), 属于「我的账」。
                             只在持有且真有线时才长出来 —— 166 行里就那几行。 */}
                         {r.held && r.exit && (
-                          <span className={`whitespace-nowrap text-[11px] ${
-                            r.exit.triggered ? 'text-red-400' : 'text-muted/70'}`}
+                          <span className={`whitespace-nowrap text-xs ${
+                            r.exit.triggered ? 'text-danger' : 'text-muted'}`}
                                 title={`${r.exit.stage_cn} —— ${r.exit.line_cn} ${r.exit.line.toFixed(2)}\n`
                                        + `${r.exit.triggered ? '已破' : `还差 ${r.exit.distance_pct.toFixed(1)}%`}\n\n`
                                        + r.exit.action}>

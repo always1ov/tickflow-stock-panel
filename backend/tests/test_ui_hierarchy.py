@@ -23,6 +23,13 @@ MIGRATED: list[str] = [
     "components/Layout.tsx",
     "components/PageHeader.tsx",
     "components/PageShell.tsx",
+    "pages/StockAnalysis.tsx",
+    "components/stock-analysis/WatchlistDecisionBoard.tsx",
+    "components/stock-analysis/decision-board/cells.tsx",
+    "components/stock-analysis/decision-board/ComboView.tsx",
+    "components/stock-analysis/decision-board/ExportColumnsDialog.tsx",
+    "components/stock-analysis/decision-board/LotsLink.tsx",
+    "components/stock-analysis/decision-board/BoardSkeletonRows.tsx",
 ]
 
 
