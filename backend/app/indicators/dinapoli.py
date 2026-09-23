@@ -61,6 +61,13 @@ THRUST_MIN = 8            # 连续几根站在短期均线上方才算一波推�
 THRUST_MIN_ATR = 3.0      # 这波的幅度至少几倍 ATR(过滤磨盘)
 MAX_REACTIONS = 5         # 往回最多取几个反应点
 TOL_ATR = 0.5             # 聚类容差 = 几倍 ATR
+# [R477] 回踩密集带的聚类容差改按价格百分比(聚焦点的 1%)。用户看了 R476 部署后的图:
+# 四条回撤线(930.30 / 921.95 / 902.69 / 889.17)被连成 889~930 一整块 —— 0.5×ATR 在
+# 中际旭创上是 22 块, 间距 8 / 19 / 14 块的线一条接一条全连上了, 那块带说明不了"哪几条
+# 挤在一起"。按 1%(≈9.7 块): 921.95 与 930.30 相距 0.9%, 是两个锚量出同一处 —— 正是
+# 用户在对照图上画红框的那一带; 902.69 / 889.17 相距 1.5% 不算挤。TOL_ATR 仍留给粗细档
+# 回测(dinapoli_fit)用。
+ZONE_PCT = 0.01
 STOP_BUFFER_ATR = 0.1     # 失效位在参照价位下方再让几倍 ATR
 
 # ── [R473] 聚焦点改取「最近这一波上涨的最高点」──────────────────
@@ -522,7 +529,7 @@ def _compute(df: pl.DataFrame, pivot_k: int = PIVOT_K) -> Fib2:
 
     # 容差先算出来 —— 反应点去重和点位聚类用的是同一把尺子, 本来就该一致
     last_atr = next((a for a in reversed(atr) if a and math.isfinite(a) and a > 0), None)
-    tol = TOL_ATR * last_atr if last_atr else focus * 0.005
+    tol = ZONE_PCT * focus
 
     gap = focus * REACT_DEDUP_PCT
     # [R476] 锚只在上攻段里找: 段内回调的低点(摆点, 其后未被更低的盖过) + 上攻起点那根的低点

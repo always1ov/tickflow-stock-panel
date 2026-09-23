@@ -82,6 +82,20 @@ def test_R476_上攻起点之前的低点不当锚(grain: str):
     assert sorted(lows[i] for i in res.reactions) == [836.13, 858.00]
 
 
+@pytest.mark.parametrize("grain", list(dn.GRAINS))
+def test_R477_密集带只圈真挤在一起的那两条(grain: str):
+    """[R477] 用户看了 R476 部署后的图(889~930 被连成一整块):「肯定要处理啊」。
+    按价格 1% 聚类: 921.95 / 930.30(相距 0.9%, 两个锚量出同一处 —— 用户在对照图上画红框
+    的那一带)归一块; 902.69 / 889.17(1.5%)不算。「这组作废」跟着落到 902.69 下方。"""
+    res = dn.compute(_chart_df(), pivot_k=dn.GRAINS[grain])
+    z = res.zone
+    assert z is not None and (round(z["low"], 2), round(z["high"], 2)) == (921.95, 930.30), \
+        f"[{grain}] 密集带是 {z}"
+    assert z["strength"] == 2
+    assert res.invalid_at is not None and 889.17 < res.invalid_at < 902.69, \
+        f"[{grain}] 这组作废 {res.invalid_at} 应在 902.69 下方、889.17 上方"
+
+
 def test_R473_聚焦点不等摆点确认():
     """974.99 后面只有一根 —— 分形摆点要左右各 k 根, 等它确认就永远画不出这张图。"""
     df = _chart_df()

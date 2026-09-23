@@ -28,15 +28,15 @@ def _staircase(n_flat: int = 20) -> pl.DataFrame:
     def seg(a: float, b: float, n: int) -> list[float]:
         return [a + (b - a) * i / (n - 1) for i in range(n)]
     closes = (seg(10, 10, n_flat) + seg(10, 7, 4) + seg(7, 13, 8) + seg(13, 10, 4)
-              + seg(10, 17, 8) + seg(17, 14, 4) + seg(14, 24, 12) + seg(24, 20, 6))
+              + seg(10, 17, 8) + seg(17, 15, 4) + seg(15, 24, 12) + seg(24, 20, 6))
+    # [R477] 第三级台阶的回调底 14 → 15: 密集带容差改按价格 1% 之后, 原来那份的回撤线
+    # 彼此都隔着 2% 以上, 凑不出密集带; 15 让两条线落到 1% 以内
     n = len(closes)
     return pl.DataFrame({
         "date": [f"2026-{1 + i // 28:02d}-{1 + i % 28:02d}" for i in range(n)],
         "open": closes, "high": [c + 0.2 for c in closes],
         "low": [c - 0.2 for c in closes], "close": closes,
-        # [R476] ATR 0.6 → 1.0: 锚只在上攻段里找之后, 最底下那个 6.8 在上攻起点之前、不再算锚,
-        # 剩下三条回撤线的间距比 0.5×0.6 的容差宽一点, 凑不出密集带; 放宽容差让它照样出来
-        "volume": [1000.0] * n, "atr_14": [1.0] * n,
+        "volume": [1000.0] * n, "atr_14": [0.6] * n,
     })
 
 
