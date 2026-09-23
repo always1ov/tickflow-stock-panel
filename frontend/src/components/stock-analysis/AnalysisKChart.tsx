@@ -541,7 +541,8 @@ export function AnalysisKChart({
       const hit = hoveredKey === k
       // [R409] 常态不透明度 0.7 → 0.9。叠在 strengthColor 的透明度之上,
       // 原来最弱的一档实际只有 0.39 —— 那正是「颜色浅」的一半来源。
-      const opacity = dimming ? (hit ? 1 : 0.12) : 0.9
+      // [R484] 斐波那契二型常态实色(理由见上面 collect 里那段)。悬停聚焦时照样淡化到 0.12。
+      const opacity = dimming ? (hit ? 1 : 0.12) : p.type === 'fib2' ? 1 : 0.9
       const width = hit ? 2 : 1
       series.push({
         name: p.label, type: 'line', silent: false, animation: false,
@@ -1047,7 +1048,11 @@ function collectPriceLines(
       // [R409] 后端发来的 `color`(只有斐波那契二型会发)是**角色标识**, 不是
       // 最终颜色 —— 两套主题要用两个值, 而后端不知道当前是哪套。
       const base = p.color ? fib2RoleColor(p.color, theme) : palette[g.key]
-      out.push({ value: p.value, label: p.label, color: strengthColor(p.strength, base), type: p.type })
+      // [R484] 斐波那契二型不按强弱淡化。用户: 「斐波那契2型的线颜色不够深」—— 不在密集带里的
+      // 那几条原来叠了 BF 再乘 0.9, 实际只剩 0.68。二型"哪几条挤在一起"已经由密集带那块底色
+      // 说了, 线本身不必再靠变淡来说一遍; 何况图上留下的二型线本来就是精选过的(见 thinFib2)。
+      out.push({ value: p.value, label: p.label,
+                 color: p.type === 'fib2' ? base : strengthColor(p.strength, base), type: p.type })
     }
   }
   return out

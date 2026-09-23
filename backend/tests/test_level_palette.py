@@ -275,8 +275,10 @@ def test_R409_价位线的透明度有下限():
     assert m, "strengthColor 的 medium 那一档读不出来"
     assert int(m[1], 16) >= 0xD9, f"中间那一档透明度 0x{m[1]} 比以前还低"
     # 画线时的常态 opacity(价位线与曲线各一处), 淡化态 0.12 是 hover 聚焦用的, 不算
-    normals = [float(x) for x in re.findall(r"dimming \? \(hit \? 1 : 0\.12\) : ([\d.]+)", code)]
-    assert len(normals) == 2, f"常态 opacity 应该正好两处(价位线 + 曲线), 读到 {normals}"
+    # [R484] 价位线那处多了一个「二型 ? 1 :」—— 二型常态实色, 其余照旧; 两个数都得过下限。
+    pat = r"dimming \? \(hit \? 1 : 0\.12\) : (?:p\.type === 'fib2' \? ([\d.]+) : )?([\d.]+)"
+    normals = [float(g) for m in re.findall(pat, code) for g in m if g]
+    assert len(normals) == 3, f"常态 opacity 应是价位线两个数(二型 / 其余)+ 曲线一个, 读到 {normals}"
     assert min(normals) >= 0.85, f"常态不透明度掉回去了: {normals}"
 
 
@@ -346,3 +348,22 @@ def test_R472_斐波那契二型是深紫():
     retired = src[src.index("const FIB2_ROLE_RETIRED"):]
     retired = retired[:retired.index("\n}")]
     assert "'#115E59': FIB2_ROLE_RETRACE" in retired, "R443~R471 的深青回撤位没进退役表"
+
+
+def test_R484_斐波那契二型的线够深_不再叠透明度():
+    """[R484] 用户: 「斐波那契2型的线颜色不够深」。两处一起改, 两处都钉:
+      · 亮色组色压深一档(对页底 ≥ 8:1; 原来 7.1), 换下来的旧键进退役表;
+      · 二型的线不按强弱淡化、常态实色 —— 原来不在密集带里的那几条叠了 BF 再乘 0.9,
+        实际只剩 0.68, 色值再深画出来也是浅的。"""
+    pal = _palette()
+    assert contrast(pal["fib2"]["light"], BG["light"]) >= 8.0, \
+        f"亮色二型 {pal['fib2']['light']} 对页底只有 {contrast(pal['fib2']['light'], BG['light']):.2f}:1"
+    src = read_src(THEME_TS)
+    retired = src[src.index("const FIB2_ROLE_RETIRED"):]
+    retired = retired[:retired.index("\n}")]
+    assert "'#7B07CE': FIB2_ROLE_RETRACE" in retired, "R472~R483 的回撤位没进退役表"
+    code = code_lines(read_src(CHART_TSX))
+    assert "color: p.type === 'fib2' ? base : strengthColor(p.strength, base)" in code, \
+        "二型的线又按强弱淡化了"
+    assert "const opacity = dimming ? (hit ? 1 : 0.12) : p.type === 'fib2' ? 1 : 0.9" in code, \
+        "二型的线常态不是实色了"

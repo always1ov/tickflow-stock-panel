@@ -125,7 +125,7 @@ GRAINS: dict[str, int] = {"coarse": 5, "mid": PIVOT_K, "fine": 2}
 # 很严肃的事情」。守卫在 `backend/tests/test_no_pink.py`。
 # [R424] 三个一起再换: 「关键价位指标的颜色不能用浅色的, 要用深色, 而且不能很接近」。
 # 值 = 前端 LEVEL_PALETTE / FIB2_ROLE 亮色那一份(前端据此查暗色值)。
-C_RETR = "#7B07CE"      # 回撤位 —— 深紫(= 斐波那契二型的组色; R443 换成深色, R472 深青 → 深紫)
+C_RETR = "#6A0DAD"      # 回撤位 —— 深紫(= 斐波那契二型的组色; R443 换成深色, R472 深青 → 深紫, R484 再压深一档)
 C_TARGET = "#0369A1"    # 目标一二三 —— 天蓝
 C_INVALID = "#854D0E"   # 失效位 —— 暗褐黄, 退色
 
