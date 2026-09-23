@@ -77,6 +77,9 @@ MIGRATED: list[str] = [
     "components/LadderAiReview.tsx",
     "components/RpsRotationDialog.tsx",
     "components/financials/MarkdownRenderer.tsx",
+    "pages/Signals.tsx",
+    "components/signals/CustomSignalDialog.tsx",
+    "components/signals/SignalTriggerActions.tsx",
 ]
 
 

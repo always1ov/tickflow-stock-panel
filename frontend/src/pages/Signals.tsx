@@ -9,6 +9,8 @@ import { CustomSignalDialog } from '@/components/signals/CustomSignalDialog'
 import { Skeleton } from '@/components/data/Skeleton'
 import { PageHeader } from '@/components/PageHeader'
 import { AnchorWrap } from '@/lib/useCardFlash'
+import { SEG, SEG_ITEM, SEG_OFF, SEG_ON, TYPE, buttonClass } from '@/components/ui'
+import { cn } from '@/lib/cn'
 
 type SignalSection = 'builtin' | 'custom'
 
@@ -110,7 +112,8 @@ function SignalsBody({ highlight }: { highlight: string }) {
     <div className="space-y-4">
       {/* 紧凑工具条: 分段切换 + 新建 */}
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="inline-flex rounded-btn border border-border bg-surface/80 p-0.5">
+        {/* [R462] 全站分段切换(docs/ui-hierarchy.md); 选中从琥珀实底换成反相 */}
+        <div className={SEG}>
           {tabs.map(tab => {
             const active = activeSection === tab.key
             return (
@@ -119,12 +122,10 @@ function SignalsBody({ highlight }: { highlight: string }) {
                 type="button"
                 onClick={() => setActiveSection(tab.key)}
                 aria-current={active ? 'page' : undefined}
-                className={`inline-flex h-7 items-center gap-1.5 rounded-[5px] px-2.5 text-[11px] font-medium transition-colors sm:text-xs ${active
-                  ? 'bg-amber-500/90 text-white shadow-sm'
-                  : 'text-secondary hover:bg-elevated hover:text-foreground'}`}
+                className={cn(SEG_ITEM, 'gap-1.5', active ? SEG_ON : SEG_OFF)}
               >
                 {tab.label}
-                <span className={`rounded px-1 py-px text-[10px] font-mono ${active ? 'bg-black/15 text-white' : 'bg-elevated text-muted'}`}>
+                <span className={`rounded px-1 py-px text-micro font-mono ${active ? 'bg-surface/20' : 'bg-elevated text-muted'}`}>
                   {tab.count}
                 </span>
               </button>
@@ -132,10 +133,10 @@ function SignalsBody({ highlight }: { highlight: string }) {
           })}
         </div>
         <div className="flex items-center gap-3">
-          <span className="text-[11px] text-muted">自定义信号保存为 <span className="font-mono text-secondary">csg_*</span> 列，条件字段可用行情指标与全部注册因子</span>
+          <span className="text-xs text-muted">自定义信号保存为 <span className="font-mono text-secondary">csg_*</span> 列，条件字段可用行情指标与全部注册因子</span>
           <button
             onClick={openNew}
-            className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-btn border border-amber-400/30 bg-amber-400/5 px-3 text-xs font-medium text-amber-400 transition-colors hover:bg-amber-400/10"
+            className={buttonClass({}, 'shrink-0 gap-1.5')}
           >
             <Plus className="h-3.5 w-3.5" />
             新建信号
@@ -152,13 +153,13 @@ function SignalsBody({ highlight }: { highlight: string }) {
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <h3 className="truncate text-sm font-medium text-foreground">{sig.name}</h3>
-                      <span className={`rounded px-1.5 py-0.5 text-[10px] ${KIND_CLASS[sig.kind]}`}>
+                      <h3 className={cn('truncate', TYPE.card)}>{sig.name}</h3>
+                      <span className={`rounded px-1.5 py-0.5 text-micro ${KIND_CLASS[sig.kind]}`}>
                         {KIND_LABEL[sig.kind]}
                       </span>
-                      {!sig.enabled && <span className="rounded bg-muted/10 px-1.5 py-0.5 text-[10px] text-muted">已停用</span>}
+                      {!sig.enabled && <span className="rounded bg-muted/10 px-1.5 py-0.5 text-micro text-muted">已停用</span>}
                     </div>
-                    <p className="mt-1 truncate font-mono text-[11px] text-muted">csg_{sig.id}</p>
+                    <p className="mt-1 truncate font-mono text-xs text-muted">csg_{sig.id}</p>
                   </div>
                   <div className="flex shrink-0 items-center gap-1">
                     <button onClick={() => toggleEnabled(sig)} title={sig.enabled ? '停用' : '启用'} className={`cursor-pointer rounded p-1 ${sig.enabled ? 'text-emerald-400 hover:bg-emerald-400/10' : 'text-muted hover:bg-elevated'}`}>
@@ -172,7 +173,7 @@ function SignalsBody({ highlight }: { highlight: string }) {
                         onClick={() => handleDeleteClick(sig)}
                         disabled={del.isPending}
                         title="再次点击确认删除"
-                        className="inline-flex animate-pulse cursor-pointer items-center gap-1 rounded-md border border-danger/30 bg-danger/15 px-1.5 py-0.5 text-[10px] font-medium text-danger disabled:opacity-50"
+                        className="inline-flex animate-pulse cursor-pointer items-center gap-1 rounded-md border border-danger/30 bg-danger/15 px-1.5 py-0.5 text-micro font-medium text-danger disabled:opacity-50"
                       >
                         <Trash2 className="h-2.5 w-2.5" />确认
                       </button>
@@ -190,7 +191,7 @@ function SignalsBody({ highlight }: { highlight: string }) {
                 </div>
                 <div className="mt-3 space-y-1">
                   {sig.conditions.map((c, i) => (
-                    <div key={i} className="flex items-center gap-1.5 text-[11px] text-secondary">
+                    <div key={i} className="flex items-center gap-1.5 text-xs text-secondary">
                       <span className="w-6 text-right text-muted/50">{i === 0 ? '当' : '且'}</span>
                       <span className="font-mono text-foreground/80">{fieldWithDays(c.left, c.leftDays, fields)}</span>
                       <span className="font-mono text-muted">{c.op}</span>
@@ -234,14 +235,14 @@ function SignalsBody({ highlight }: { highlight: string }) {
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <h4 className="truncate text-sm font-medium text-foreground">{sig.name}</h4>
-                      <span className={`rounded px-1.5 py-0.5 text-[10px] ${KIND_CLASS[sig.kind]}`}>
+                      <h4 className={cn('truncate', TYPE.card)}>{sig.name}</h4>
+                      <span className={`rounded px-1.5 py-0.5 text-micro ${KIND_CLASS[sig.kind]}`}>
                         {KIND_LABEL[sig.kind]}
                       </span>
                     </div>
-                    <p className="mt-1 truncate font-mono text-[11px] text-muted">{sig.id}</p>
+                    <p className="mt-1 truncate font-mono text-xs text-muted">{sig.id}</p>
                   </div>
-                  <span className="shrink-0 rounded border border-border bg-elevated px-1.5 py-0.5 text-[10px] text-muted">{sig.category}</span>
+                  <span className="shrink-0 rounded border border-border bg-elevated px-1.5 py-0.5 text-micro text-muted">{sig.category}</span>
                 </div>
                 <p className="mt-3 text-xs leading-5 text-secondary">{sig.description}</p>
               </div>

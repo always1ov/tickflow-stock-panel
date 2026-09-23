@@ -44,8 +44,8 @@ TW = SRC.parent / "tailwind.config.ts"
 #: 详见 `_counts()`。另外「任意字号」2282 → 2280 是这一轮真迁的(两个档位选择器)。
 RATCHET = {
     "裸圆角": 926,         # 真·裸圆角: rounded / -sm/-md/-lg/-xl/-2xl, 不含语义 token
-    "任意字号": 1289,      # text-[Npx]
-    "硬编码色": 948,      # text-/bg-/border- + Tailwind 调色板
+    "任意字号": 1259,      # text-[Npx]
+    "硬编码色": 943,      # text-/bg-/border- + Tailwind 调色板
     "任意容器宽": 42,      # max-w-[Npx]
 }
 
