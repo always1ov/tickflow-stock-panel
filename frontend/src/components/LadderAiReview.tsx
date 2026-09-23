@@ -21,6 +21,7 @@ import { api } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { SeesawPanel } from '@/components/regime/SeesawPanel'
 import { buildExtColumnsParam, getExtTags, loadExtFields } from '@/lib/ladderExtFields'
+import { TYPE, buttonClass } from '@/components/ui'
 
 type AiPayload = { date: string; stats: Record<string, unknown>; tiers: unknown[] }
 
@@ -74,7 +75,7 @@ export function LadderAiReview({ date }: { date?: string }) {
       <button
         onClick={() => setOpen(true)}
         title="AI 按打板战法(情绪周期/龙头/二进三/反包)复盘当日连板梯队, 输出候选清单; 弹窗内含「板块跷跷板」标签页"
-        className="inline-flex items-center gap-1 h-7 px-2.5 rounded-btn text-xs font-medium text-amber-400 border border-amber-400/25 bg-amber-400/5 hover:bg-amber-400/15 transition-colors cursor-pointer"
+        className={buttonClass({}, 'gap-1')}
       >
         <Sparkles className="h-3.5 w-3.5" />
         AI 打板复盘
@@ -182,12 +183,12 @@ function LadderAiDialog({ payload, loadingLadder, onClose }: {
             <Sparkles className="h-4 w-4" />
           </span>
           <div className="flex-1 min-w-0">
-            <h2 className="text-sm font-medium text-foreground">
+            <h2 className={TYPE.section}>
               {tab === 'ladder'
                 ? <>AI 打板复盘 · {viewingReport ? `${viewingReport.date} 存档` : (payload.date || '—')}</>
                 : '板块跷跷板'}
             </h2>
-            <p className="text-[11px] text-muted truncate">
+            <p className="text-xs text-muted truncate">
               {tab === 'ladder'
                 ? '打开即查看存档 · 生成需手动点击 · 带置信度 —— 高风险, 仅为复盘参考'
                 : '来自「市场环境」页主线强度数据 · 识别资金在两个板块间来回切换 —— 一边熄火往往是另一边点火'}
@@ -197,8 +198,8 @@ function LadderAiDialog({ payload, loadingLadder, onClose }: {
             {([['ladder', '打板复盘'], ['seesaw', '跷跷板']] as const).map(([k, label]) => (
               <button key={k} onClick={() => setTab(k)}
                 className={k === tab
-                  ? 'h-6 rounded-[5px] bg-amber-400/15 px-2.5 text-[11px] font-medium text-amber-300'
-                  : 'h-6 rounded-[5px] px-2.5 text-[11px] font-medium text-muted hover:text-secondary transition-colors'}>
+                  ? 'h-6 rounded-[5px] bg-amber-400/15 px-2.5 text-xs font-medium text-amber-300'
+                  : 'h-6 rounded-[5px] px-2.5 text-xs font-medium text-muted hover:text-secondary transition-colors'}>
                 {label}
               </button>
             ))}
@@ -208,8 +209,8 @@ function LadderAiDialog({ payload, loadingLadder, onClose }: {
               {([['concept', '概念'], ['industry', '行业']] as const).map(([k, label]) => (
                 <button key={k} onClick={() => setSeesawKind(k)}
                   className={k === seesawKind
-                    ? 'h-6 rounded-[5px] bg-accent/15 px-2.5 text-[11px] font-medium text-accent'
-                    : 'h-6 rounded-[5px] px-2.5 text-[11px] font-medium text-muted hover:text-secondary transition-colors'}>
+                    ? 'h-6 rounded-[5px] bg-accent/15 px-2.5 text-xs font-medium text-accent'
+                    : 'h-6 rounded-[5px] px-2.5 text-xs font-medium text-muted hover:text-secondary transition-colors'}>
                   {label}
                 </button>
               ))}
@@ -222,7 +223,7 @@ function LadderAiDialog({ payload, loadingLadder, onClose }: {
               onChange={e => e.target.value && loadReport(e.target.value)}
               disabled={loading}
               title="回看历史打板复盘(选中后可继续追问当时的盘面)"
-              className="h-7 max-w-[150px] rounded border border-border bg-base px-1.5 text-[11px] text-foreground focus:outline-none focus:border-amber-400/50 disabled:opacity-50 cursor-pointer"
+              className="h-7 max-w-[150px] rounded border border-border bg-base px-1.5 text-xs text-foreground focus:outline-none focus:border-amber-400/50 disabled:opacity-50 cursor-pointer"
             >
               <option value="" disabled>历史 ({reports.length})</option>
               {reports.map(r => (
@@ -232,7 +233,7 @@ function LadderAiDialog({ payload, loadingLadder, onClose }: {
           )}
           {tab === 'ladder' && reportId && (
             <button onClick={() => removeReport(reportId)} disabled={loading} title="删除当前查看的这份存档"
-              className="text-[11px] px-2 h-7 rounded border border-border bg-base text-muted hover:text-danger hover:border-danger/40 disabled:opacity-50 transition-colors cursor-pointer">
+              className="text-xs px-2 h-7 rounded border border-border bg-base text-muted hover:text-danger hover:border-danger/40 disabled:opacity-50 transition-colors cursor-pointer">
               删除
             </button>
           )}
@@ -240,7 +241,7 @@ function LadderAiDialog({ payload, loadingLadder, onClose }: {
           {tab === 'ladder' && (
           <button onClick={generate} disabled={loading || loadingLadder || !ladderReady}
             title={ladderReady ? '对当日梯队生成新清单(调用 AI, 结果自动存档)' : '当日梯队数据还没就绪 —— 拿空快照生成只会得到一份空报告'}
-            className="inline-flex items-center gap-1 text-[11px] px-2.5 h-7 rounded border border-amber-400/30 bg-amber-400/10 text-amber-300 hover:bg-amber-400/20 disabled:opacity-50 transition-colors cursor-pointer">
+            className="inline-flex items-center gap-1 text-xs px-2.5 h-7 rounded border border-amber-400/30 bg-amber-400/10 text-amber-300 hover:bg-amber-400/20 disabled:opacity-50 transition-colors cursor-pointer">
             {(loading && chat.length === 0) || loadingLadder ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
             {chat.length > 0 || reports.some(r => r.date === payload.date) ? '重新生成' : '生成清单'}
           </button>

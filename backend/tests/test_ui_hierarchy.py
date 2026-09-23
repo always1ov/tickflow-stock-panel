@@ -73,6 +73,10 @@ MIGRATED: list[str] = [
     "components/EChartsIntraday.tsx",
     "pages/AbnormalMoves.tsx",
     "pages/LimitUpLadder.tsx",
+    "pages/Review.tsx",
+    "components/LadderAiReview.tsx",
+    "components/RpsRotationDialog.tsx",
+    "components/financials/MarkdownRenderer.tsx",
 ]
 
 

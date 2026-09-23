@@ -65,7 +65,7 @@
 - [x] 指数(`Indices`)
 - [x] 异动(`AbnormalMoves`)
 - [x] 连板梯队(`LimitUpLadder`)
-- [ ] 复盘(`Review`)
+- [x] 复盘(`Review`)
 - [ ] 信号(`Signals` + `signals/*`)
 - [ ] 概念 / 行业分析(`ConceptAnalysis` / `IndustryAnalysis`)
 - [ ] 财务 / 数据 / 因子 / 回测(`Financials` / `Data` / `factors/*` / `backtest/*`)

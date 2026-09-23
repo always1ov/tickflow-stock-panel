@@ -33,6 +33,7 @@ import {
   startReviewGeneration, resetReview, isReviewGenerating,
   type ReviewPhase,
 } from '@/lib/reviewStore'
+import { SEG, SEG_ITEM, SEG_OFF, SEG_ON, TYPE, buttonClass } from '@/components/ui'
 
 // ================================================================
 // 涨跌幅格式化(注意单位差异)
@@ -265,7 +266,8 @@ export function Review() {
                 弹窗内可切行业/概念维度并标明数据出处 */}
             <button
               onClick={() => setShowRps(true)}
-              className="inline-flex items-center gap-1 rounded-btn border border-amber-400/40 bg-amber-400/15 px-2.5 py-1 text-[11px] text-amber-400 font-medium transition-colors hover:bg-amber-400/25 hover:border-amber-400/60"
+              // [R461] 页头这一排一律全站按钮(docs/ui-hierarchy.md)
+              className={buttonClass({}, 'gap-1')}
               title="板块涨幅 RPS 轮动矩阵(数据来自行业/概念分析页) —— 复盘时观察板块强弱轮动"
             >
               <Repeat className="h-3 w-3" />板块RPS轮动
@@ -273,29 +275,24 @@ export function Review() {
             <button
               onClick={() => { marketQuery.refetch() }}
               disabled={marketQuery.isFetching}
-              className="inline-flex items-center gap-1 rounded-btn border border-border bg-elevated px-2 py-1 text-[11px] text-secondary transition-colors hover:text-foreground disabled:opacity-50"
+              className={buttonClass({}, 'gap-1')}
               title="刷新市场数据"
             >
               <RefreshCw className={cn('h-3 w-3', marketQuery.isFetching && 'animate-spin')} />刷新
             </button>
             <button
               onClick={openSchedule}
-              className={cn(
-                'inline-flex items-center gap-1 rounded-btn border px-2 py-1 text-[11px] transition-colors',
-                reviewSched.enabled
-                  ? 'border-accent/40 bg-accent/10 text-accent hover:bg-accent/20'
-                  : 'border-border bg-elevated text-secondary hover:text-foreground',
-              )}
+              className={buttonClass({ selected: reviewSched.enabled }, 'gap-1')}
               title={reviewSched.enabled ? `定时复盘已开启 · 每日 ${String(reviewSched.hour).padStart(2,'0')}:${String(reviewSched.minute).padStart(2,'0')}` : '定时复盘'}
             >
               <Clock className="h-3 w-3" />定时
             </button>
             {/* 复盘模式: 当日 / 连读昨日(对照上一份) / 近7交易日纵览 */}
-            <div className="flex items-center rounded-btn bg-elevated/60 p-0.5">
+            <div className={SEG}>
               {([['today', '当日'], ['continuity', '连读昨日'], ['week', '近7日']] as const).map(([k, label]) => (
                 <button key={k} onClick={() => setRecapMode(k)}
                   title={k === 'continuity' ? '先回顾上一份复盘的观察要点是否兑现, 再结合今日复盘' : k === 'week' ? '以近7个交易日为主时间轴: 情绪演变/主线切换/量能趋势' : '按当日盘面直接复盘(原模式)'}
-                  className={`px-2.5 h-7 rounded-btn text-xs transition-ui cursor-pointer ${recapMode === k ? 'bg-accent/15 text-accent font-medium' : 'text-muted hover:text-foreground'}`}>
+                  className={cn(SEG_ITEM, recapMode === k ? SEG_ON : SEG_OFF)}>
                   {label}
                 </button>
               ))}
@@ -306,12 +303,7 @@ export function Review() {
             <button
               onClick={generate}
               disabled={isGenerating}
-              className={cn(
-                'inline-flex items-center gap-1.5 rounded-btn px-3.5 py-1.5 text-xs font-medium transition-ui',
-                isGenerating
-                  ? 'border border-accent/40 bg-accent/10 text-accent cursor-not-allowed'
-                  : 'bg-accent text-white shadow-sm shadow-accent/25 hover:bg-accent/90 hover:shadow hover:shadow-accent/30',
-              )}
+              className={buttonClass({ variant: 'primary' }, 'gap-1.5')}
             >
               {isGenerating ? (
                 <><RefreshCw className="h-3.5 w-3.5 animate-spin" />生成中…</>
@@ -433,7 +425,7 @@ export function Review() {
               <div className="mb-4 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Clock className="h-4 w-4 text-accent" />
-                  <h3 className="text-sm font-medium text-foreground">定时复盘</h3>
+                  <h3 className={TYPE.section}>定时复盘</h3>
                 </div>
                 <button
                   onClick={() => setShowSchedule(false)}
@@ -443,7 +435,7 @@ export function Review() {
                 </button>
               </div>
 
-              <p className="mb-4 text-[11px] leading-relaxed text-muted">
+              <p className="mb-4 text-xs leading-relaxed text-muted">
                 开启后,每个交易日到点自动生成大盘复盘报告并归档,静默执行。
                 下次打开本页即可在历史列表看到新报告;也可选推送到飞书。
               </p>
@@ -468,7 +460,7 @@ export function Review() {
               {/* 时间设置(仅开启时可编辑, 本地草稿) */}
               {draft.enabled && (
                 <div className="mt-3 flex items-center gap-2 rounded-btn bg-elevated/40 px-3 py-2.5">
-                  <span className="text-[11px] text-muted">每日</span>
+                  <span className="text-xs text-muted">每日</span>
                   <input
                     type="number" min={0} max={23} value={draft.hour}
                     onChange={e => setDraft(d => ({ ...d, hour: Math.max(0, Math.min(23, Number(e.target.value))) }))}
@@ -480,7 +472,7 @@ export function Review() {
                     onChange={e => setDraft(d => ({ ...d, minute: Math.max(0, Math.min(59, Number(e.target.value))) }))}
                     className="w-12 px-1.5 py-1 rounded-btn bg-base border border-border text-xs font-mono text-foreground text-center focus:outline-none focus:border-accent/50"
                   />
-                  <span className="text-[10px] text-muted/70">不早于 15:00 · 工作日执行</span>
+                  <span className="text-micro text-muted/70">不早于 15:00 · 工作日执行</span>
                 </div>
               )}
 
@@ -488,7 +480,7 @@ export function Review() {
               <div className="mt-3 rounded-btn bg-elevated/40 px-3 py-2.5">
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-foreground">生成后推送完整报告</span>
-                  <span className="text-[10px] text-muted/70">{reviewPushChannels.length === 0 ? '未开启' : `${reviewPushChannels.length} 个渠道`}</span>
+                  <span className="text-micro text-muted/70">{reviewPushChannels.length === 0 ? '未开启' : `${reviewPushChannels.length} 个渠道`}</span>
                 </div>
                 <div className="mt-2 space-y-1.5">
                   {/* 飞书(可用, 多选) */}
@@ -506,9 +498,9 @@ export function Review() {
                     <span className={cn('flex h-3 w-3 shrink-0 items-center justify-center rounded border', reviewPushChannels.includes('feishu') ? 'border-accent bg-accent text-white' : 'border-border')}>
                       {reviewPushChannels.includes('feishu') && <Check className="h-2.5 w-2.5" />}
                     </span>
-                    <span className="text-[11px] text-foreground">飞书</span>
-                    <span className="text-[9px] text-muted">群推送 Webhook</span>
-                    <span className={cn('ml-auto text-[9px]', feishuConfigured ? 'text-emerald-500' : 'text-warning')}>
+                    <span className="text-xs text-foreground">飞书</span>
+                    <span className="text-micro text-muted">群推送 Webhook</span>
+                    <span className={cn('ml-auto text-micro', feishuConfigured ? 'text-emerald-500' : 'text-warning')}>
                       {feishuConfigured ? '已配置' : '未配置'}
                     </span>
                   </button>
@@ -527,9 +519,9 @@ export function Review() {
                     <span className={cn('flex h-3 w-3 shrink-0 items-center justify-center rounded border', reviewPushChannels.includes('wecom') ? 'border-accent bg-accent text-white' : 'border-border')}>
                       {reviewPushChannels.includes('wecom') && <Check className="h-2.5 w-2.5" />}
                     </span>
-                    <span className="text-[11px] text-foreground">企业微信</span>
-                    <span className="text-[9px] text-muted">群推送 Webhook</span>
-                    <span className={cn('ml-auto text-[9px]', wecomConfigured ? 'text-emerald-500' : 'text-warning')}>
+                    <span className="text-xs text-foreground">企业微信</span>
+                    <span className="text-micro text-muted">群推送 Webhook</span>
+                    <span className={cn('ml-auto text-micro', wecomConfigured ? 'text-emerald-500' : 'text-warning')}>
                       {wecomConfigured ? '已配置' : '未配置'}
                     </span>
                   </button>
@@ -548,9 +540,9 @@ export function Review() {
                     <span className={cn('flex h-3 w-3 shrink-0 items-center justify-center rounded border', reviewPushChannels.includes('dingtalk') ? 'border-accent bg-accent text-white' : 'border-border')}>
                       {reviewPushChannels.includes('dingtalk') && <Check className="h-2.5 w-2.5" />}
                     </span>
-                    <span className="text-[11px] text-foreground">钉钉</span>
-                    <span className="text-[9px] text-muted">群机器人 · 关键词</span>
-                    <span className={cn('ml-auto text-[9px]', dingtalkConfigured ? 'text-emerald-500' : 'text-warning')}>
+                    <span className="text-xs text-foreground">钉钉</span>
+                    <span className="text-micro text-muted">群机器人 · 关键词</span>
+                    <span className={cn('ml-auto text-micro', dingtalkConfigured ? 'text-emerald-500' : 'text-warning')}>
                       {dingtalkConfigured ? '已配置' : '未配置'}
                     </span>
                   </button>
@@ -568,9 +560,9 @@ export function Review() {
                     <span className={cn('flex h-3 w-3 shrink-0 items-center justify-center rounded border', reviewPushChannels.includes('custom') ? 'border-accent bg-accent text-white' : 'border-border')}>
                       {reviewPushChannels.includes('custom') && <Check className="h-2.5 w-2.5" />}
                     </span>
-                    <span className="text-[11px] text-foreground">第三方系统</span>
-                    <span className="text-[9px] text-muted">JSON Webhook</span>
-                    <span className={cn('ml-auto text-[9px]', customConfigured ? 'text-emerald-500' : 'text-warning')}>
+                    <span className="text-xs text-foreground">第三方系统</span>
+                    <span className="text-micro text-muted">JSON Webhook</span>
+                    <span className={cn('ml-auto text-micro', customConfigured ? 'text-emerald-500' : 'text-warning')}>
                       {customConfigured ? '已配置' : '未配置'}
                     </span>
                   </button>
@@ -588,9 +580,9 @@ export function Review() {
                     <span className={cn('flex h-3 w-3 shrink-0 items-center justify-center rounded border', reviewPushChannels.includes('email') ? 'border-accent bg-accent text-white' : 'border-border')}>
                       {reviewPushChannels.includes('email') && <Check className="h-2.5 w-2.5" />}
                     </span>
-                    <span className="text-[11px] text-foreground">邮件</span>
-                    <span className="text-[9px] text-muted">SMTP</span>
-                    <span className={cn('ml-auto text-[9px]', emailConfigured ? 'text-emerald-500' : 'text-warning')}>
+                    <span className="text-xs text-foreground">邮件</span>
+                    <span className="text-micro text-muted">SMTP</span>
+                    <span className={cn('ml-auto text-micro', emailConfigured ? 'text-emerald-500' : 'text-warning')}>
                       {emailConfigured ? '已配置' : '未配置'}
                     </span>
                   </button>
@@ -598,15 +590,15 @@ export function Review() {
 
                 {/* 推送触发方式: auto=归档即推 / manual=仅归档不自动外发 */}
                 <div className="mt-2 flex items-center justify-between">
-                  <span className="text-[11px] text-foreground">推送触发方式</span>
+                  <span className="text-xs text-foreground">推送触发方式</span>
                   <div className="flex items-center gap-0.5 rounded-btn bg-base p-0.5">
                     <button
                       type="button"
                       disabled={pushModeMut.isPending}
                       onClick={() => pushModeMut.mutate('auto')}
                       className={cn(
-                        'rounded-btn px-2 py-0.5 text-[10px] transition-colors disabled:opacity-50',
-                        reviewPushMode === 'auto' ? 'bg-accent text-white' : 'text-muted hover:text-secondary',
+                        'rounded-btn px-2 py-0.5 text-micro transition-colors disabled:opacity-50',
+                        reviewPushMode === 'auto' ? 'bg-foreground font-medium text-surface' : 'text-muted hover:text-secondary',
                       )}
                     >
                       自动
@@ -616,8 +608,8 @@ export function Review() {
                       disabled={pushModeMut.isPending}
                       onClick={() => pushModeMut.mutate('manual')}
                       className={cn(
-                        'rounded-btn px-2 py-0.5 text-[10px] transition-colors disabled:opacity-50',
-                        reviewPushMode === 'manual' ? 'bg-accent text-white' : 'text-muted hover:text-secondary',
+                        'rounded-btn px-2 py-0.5 text-micro transition-colors disabled:opacity-50',
+                        reviewPushMode === 'manual' ? 'bg-foreground font-medium text-surface' : 'text-muted hover:text-secondary',
                       )}
                     >
                       手动确认
@@ -625,7 +617,7 @@ export function Review() {
                   </div>
                 </div>
 
-                <p className="mt-1.5 text-[10px] leading-relaxed text-muted/70">
+                <p className="mt-1.5 text-micro leading-relaxed text-muted/70">
                   {reviewPushMode === 'auto'
                     ? '定时与手动生成的复盘归档后都会自动推送完整报告。'
                     : '复盘仅归档保存，不自动外发。'}
@@ -645,7 +637,7 @@ export function Review() {
               </div>
 
               {!draft.enabled && (
-                <p className="mt-3 text-[10px] text-muted/70">
+                <p className="mt-3 text-micro text-muted/70">
                   当前: 已关闭。开启后将按设定时间自动复盘。
                 </p>
               )}
@@ -729,8 +721,8 @@ function MarketSummaryBar({ data }: { data: OverviewMarket }) {
           {score ?? '—'}
         </span>
         <div className="leading-tight">
-          <div className="text-[11px] font-medium text-foreground">{data.emotion?.label ?? '情绪'}</div>
-          <div className="text-[9px] text-secondary">情绪温度</div>
+          <div className="text-xs font-medium text-foreground">{data.emotion?.label ?? '情绪'}</div>
+          <div className="text-micro text-secondary">情绪温度</div>
         </div>
       </div>
 
@@ -740,8 +732,8 @@ function MarketSummaryBar({ data }: { data: OverviewMarket }) {
       <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
         {indices.map(idx => (
           <div key={idx.symbol} className="flex items-center gap-1">
-            <span className="text-[11px] text-secondary">{indexShort(idx.name, idx.symbol)}</span>
-            <span className={cn('font-mono text-[11px] font-semibold tabular-nums', pctClass(idx.change_pct))}>
+            <span className="text-xs text-secondary">{indexShort(idx.name, idx.symbol)}</span>
+            <span className={cn('font-mono text-xs font-semibold tabular-nums', pctClass(idx.change_pct))}>
               {fmtPctAlready(idx.change_pct, 2, true)}
             </span>
           </div>
@@ -751,7 +743,7 @@ function MarketSummaryBar({ data }: { data: OverviewMarket }) {
       <div className="hidden h-7 w-px bg-border sm:block" />
 
       {/* 涨跌结构 */}
-      <div className="flex items-center gap-1.5 text-[11px]">
+      <div className="flex items-center gap-1.5 text-xs">
         <span className="text-secondary">涨跌</span>
         <span className="font-mono font-semibold text-bull">{data.breadth?.up ?? 0}</span>
         <span className="text-muted">/</span>
@@ -759,14 +751,14 @@ function MarketSummaryBar({ data }: { data: OverviewMarket }) {
       </div>
 
       {/* 涨停结构 */}
-      <div className="flex items-center gap-1.5 text-[11px]">
+      <div className="flex items-center gap-1.5 text-xs">
         <span className="text-secondary">涨停</span>
         <span className="font-mono font-semibold text-bull">{data.limit?.limit_up ?? 0}</span>
         <span className="text-secondary">封板 {(data.limit?.seal_rate ?? 0).toFixed(0)}%</span>
       </div>
 
       {/* 成交额 */}
-      <div className="flex items-center gap-1.5 text-[11px]">
+      <div className="flex items-center gap-1.5 text-xs">
         <span className="text-secondary">成交</span>
         <span className="font-mono font-semibold text-foreground">{fmtBigNum(data.amount?.total)}</span>
       </div>
@@ -837,11 +829,11 @@ function ReportPanel({
           ].map((s) => (
             <div key={s.label} className="flex flex-col items-center gap-1 rounded-btn bg-elevated/40 px-2 py-2">
               <span className="text-base">{s.icon}</span>
-              <span className="text-[10px] text-secondary">{s.label}</span>
+              <span className="text-micro text-secondary">{s.label}</span>
             </div>
           ))}
         </div>
-        <div className="mt-2 flex items-center gap-1.5 text-[11px] text-muted">
+        <div className="mt-2 flex items-center gap-1.5 text-xs text-muted">
           <Sparkles className="h-3 w-3 text-accent" />
           点击右上角「生成复盘」开始
         </div>
@@ -873,10 +865,10 @@ function ReportPanel({
         </div>
         {showActions && (
           <div className="flex items-center gap-1">
-            <button onClick={onCopy} className="inline-flex items-center gap-1 rounded-btn bg-elevated px-2 py-1 text-[11px] text-secondary transition-colors hover:text-foreground hover:bg-elevated/70" title="复制全文">
+            <button onClick={onCopy} className="inline-flex items-center gap-1 rounded-btn bg-elevated px-2 py-1 text-xs text-secondary transition-colors hover:text-foreground hover:bg-elevated/70" title="复制全文">
               <Copy className="h-3 w-3" />复制
             </button>
-            <button onClick={onDownload} className="inline-flex items-center gap-1 rounded-btn bg-elevated px-2 py-1 text-[11px] text-secondary transition-colors hover:text-foreground hover:bg-elevated/70" title="下载为 Markdown">
+            <button onClick={onDownload} className="inline-flex items-center gap-1 rounded-btn bg-elevated px-2 py-1 text-xs text-secondary transition-colors hover:text-foreground hover:bg-elevated/70" title="下载为 Markdown">
               <Download className="h-3 w-3" />下载
             </button>
           </div>
@@ -935,7 +927,7 @@ function HistoryPanel({
       <div className="flex items-center gap-1.5 border-b border-border bg-gradient-to-r from-accent/5 to-transparent px-3 py-2.5">
         <History className="h-3.5 w-3.5 text-accent" />
         <span className="text-xs font-medium text-foreground">历史复盘</span>
-        <span className="font-mono text-[10px] text-muted">({reports.length})</span>
+        <span className="font-mono text-micro text-muted">({reports.length})</span>
       </div>
       <div className="max-h-[calc(100vh-26rem)] overflow-y-auto p-2">
         {loading ? (
@@ -943,8 +935,8 @@ function HistoryPanel({
         ) : empty ? (
           <div className="flex flex-col items-center justify-center gap-2 px-3 py-10 text-center">
             <History className="h-7 w-7 text-muted/40" strokeWidth={1.5} />
-            <div className="text-[11px] text-muted">暂无历史复盘</div>
-            <div className="text-[10px] text-muted/60">生成完成后自动归档</div>
+            <div className="text-xs text-muted">暂无历史复盘</div>
+            <div className="text-micro text-muted/60">生成完成后自动归档</div>
           </div>
         ) : (
           <div className="space-y-1">
@@ -961,8 +953,8 @@ function HistoryPanel({
                   <RefreshCw className="h-3.5 w-3.5 animate-spin text-accent" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-[11px] font-medium text-accent">生成中…</div>
-                  <div className="mt-0.5 truncate text-[10px] text-secondary">AI 正在复盘今日盘面</div>
+                  <div className="truncate text-xs font-medium text-accent">生成中…</div>
+                  <div className="mt-0.5 truncate text-micro text-secondary">AI 正在复盘今日盘面</div>
                 </div>
               </div>
             )}
@@ -978,17 +970,17 @@ function HistoryPanel({
                   onClick={() => onView(r)}
                 >
                   <div
-                    className="grid h-8 w-8 shrink-0 place-items-center rounded font-mono text-[10px] font-bold tabular-nums"
+                    className="grid h-8 w-8 shrink-0 place-items-center rounded font-mono text-micro font-bold tabular-nums"
                     style={{ color, backgroundColor: `${color}1a` }}
                   >
                     {r.emotion_score ?? '—'}
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5">
-                      <span className="truncate text-[11px] font-medium text-foreground">{r.emotion_label ?? '—'}</span>
-                      <span className="font-mono text-[10px] text-secondary">{r.as_of}</span>
+                      <span className="truncate text-xs font-medium text-foreground">{r.emotion_label ?? '—'}</span>
+                      <span className="font-mono text-micro text-secondary">{r.as_of}</span>
                       {r.mode && MODE_LABEL[r.mode] && (
-                        <span className="shrink-0 rounded border border-accent/30 bg-accent/10 px-1 py-px text-[9px] text-accent">
+                        <span className="shrink-0 rounded border border-accent/30 bg-accent/10 px-1 py-px text-micro text-accent">
                           {MODE_LABEL[r.mode]}
                         </span>
                       )}
@@ -998,19 +990,19 @@ function HistoryPanel({
                         ? (() => {
                             const pcts = parseIndexPcts(shortenIndexNames(r.summary).split('|')[0])
                             if (pcts.length === 0) {
-                              return <span className="truncate text-[10px] text-secondary">{r.content.slice(0, 40)}</span>
+                              return <span className="truncate text-micro text-secondary">{r.content.slice(0, 40)}</span>
                             }
                             return pcts.map((p) => (
-                              <span key={p.name} className="inline-flex items-center gap-0.5 text-[10px]">
+                              <span key={p.name} className="inline-flex items-center gap-0.5 text-micro">
                                 <span className="text-secondary">{p.name}</span>
                                 <span className={cn('font-mono font-medium tabular-nums', pctClass(p.pctNum))}>{p.pctStr}</span>
                               </span>
                             ))
                           })()
-                        : <span className="truncate text-[10px] text-secondary">{r.content.slice(0, 40)}</span>}
+                        : <span className="truncate text-micro text-secondary">{r.content.slice(0, 40)}</span>}
                     </div>
                     {r.created_at && (
-                      <div className="mt-0.5 font-mono text-[9px] text-muted">{fmtArchivedAt(r.created_at)}</div>
+                      <div className="mt-0.5 font-mono text-micro text-muted">{fmtArchivedAt(r.created_at)}</div>
                     )}
                   </div>
                   <button
@@ -1070,18 +1062,18 @@ function _DtPill({ item, idx, value, onOpenStock }: {
       className="group inline-flex items-center gap-1.5 rounded-btn border border-border/60 bg-elevated/40 py-0.5 pl-0.5 pr-2.5 transition-ui hover:border-accent/40 hover:bg-elevated/70"
       title={`查看 ${item.name ?? item.thscode} · 净买 ${fmtVolume(value ?? null)}`}
     >
-      <span className={cn('grid h-[18px] w-[18px] min-w-[18px] place-items-center rounded-full font-mono text-[9px] font-bold leading-none', _rankCls(idx))}>
+      <span className={cn('grid h-[18px] w-[18px] min-w-[18px] place-items-center rounded-full font-mono text-micro font-bold leading-none', _rankCls(idx))}>
         {idx + 1}
       </span>
-      <span className="text-[11px] text-foreground/90 transition-colors group-hover:text-accent">
+      <span className="text-xs text-foreground/90 transition-colors group-hover:text-accent">
         {item.name ?? item.thscode}
       </span>
       {(() => { const b = boardTag(item.thscode); return b && (
-        <span className={`inline-flex items-center rounded border px-1 text-[8px] font-bold leading-tight ${b.color}`}>
+        <span className={`inline-flex items-center rounded border px-1 text-micro font-bold leading-tight ${b.color}`}>
           {b.label}
         </span>
       ) })()}
-      <span className={cn('font-mono text-[10px] tabular-nums', priceColorClass(value ?? null))}>
+      <span className={cn('font-mono text-micro tabular-nums', priceColorClass(value ?? null))}>
         {fmtVolume(value ?? null)}
       </span>
     </button>
@@ -1100,7 +1092,7 @@ function _DtSummaryRow({ label, items, pick, onOpenStock }: {
       {/* 固定宽度标签槽: 无标签行(净卖)也占位, 保证四行药丸左缘对齐 */}
       <span className="flex w-16 shrink-0">
         {label && (
-          <span className="rounded-btn bg-base/70 px-2 py-0.5 text-[9px] font-medium tracking-wide text-muted">
+          <span className="rounded-btn bg-base/70 px-2 py-0.5 text-micro font-medium tracking-wide text-muted">
             {label}
           </span>
         )}
@@ -1164,7 +1156,7 @@ function DtStockTable({ items, tab, onOpenStock }: {
     <div className="overflow-hidden rounded-btn border border-border/60">
       {/* 表头 */}
       <div className={cn(
-        'group flex items-center gap-2 bg-elevated/50 px-2.5 py-1.5 text-[9px] font-medium uppercase tracking-wider text-muted/70',
+        'group flex items-center gap-2 bg-elevated/50 px-2.5 py-1.5 text-micro font-medium uppercase tracking-wider text-muted/70',
       )}>
         <span className="w-5 shrink-0 text-center">#</span>
         <span className="w-14 shrink-0"><_DtTh label="涨跌幅" sortKey="change" sort={sort} onSort={onSort} /></span>
@@ -1184,10 +1176,10 @@ function DtStockTable({ items, tab, onOpenStock }: {
             key={`${i.thscode}-${i.range_days ?? 1}`}
             type="button"
             onClick={() => onOpenStock(i.thscode)}
-            className="flex w-full items-center gap-2 border-t border-border/30 px-2.5 py-2 text-left text-[11px] transition-colors hover:bg-accent/[0.05]"
+            className="flex w-full items-center gap-2 border-t border-border/30 px-2.5 py-2 text-left text-xs transition-colors hover:bg-accent/[0.05]"
             title={`查看 ${i.name ?? i.thscode} 详情`}
           >
-            <span className={cn('w-5 shrink-0 text-center font-mono text-[9px] tabular-nums', idx < 3 ? 'text-amber-400/90' : 'text-muted/50')}>
+            <span className={cn('w-5 shrink-0 text-center font-mono text-micro tabular-nums', idx < 3 ? 'text-amber-400/90' : 'text-muted/50')}>
               {idx + 1}
             </span>
             <span className={cn('w-14 shrink-0 font-mono tabular-nums', priceColorClass(i.change ?? null))}>
@@ -1195,16 +1187,16 @@ function DtStockTable({ items, tab, onOpenStock }: {
             </span>
             <span className="min-w-0 flex-1">
               <span className="text-foreground">{i.name ?? '—'}</span>
-              <span className="ml-1.5 font-mono text-[9px] text-muted">{i.ticker ?? i.thscode}</span>
+              <span className="ml-1.5 font-mono text-micro text-muted">{i.ticker ?? i.thscode}</span>
               {(() => { const b = boardTag(i.thscode); return b && (
-                <span className={`ml-1 inline-flex items-center rounded border px-1 text-[8px] font-bold leading-tight ${b.color}`}>
+                <span className={`ml-1 inline-flex items-center rounded border px-1 text-micro font-bold leading-tight ${b.color}`}>
                   {b.label}
                 </span>
               ) })()}
               {i.hot_rank != null && i.hot_rank > 0 && i.hot_rank <= 99 && (
                 <span
                   className={cn(
-                    'ml-1.5 inline-flex items-center rounded px-1 text-[8px] font-medium leading-tight',
+                    'ml-1.5 inline-flex items-center rounded px-1 text-micro font-medium leading-tight',
                     i.hot_rank <= 10
                       ? 'border border-amber-500/30 bg-amber-500/10 text-amber-500'
                       : 'border border-border bg-elevated/50 text-muted/80',
@@ -1241,7 +1233,7 @@ function DtStockTable({ items, tab, onOpenStock }: {
             <span className="w-20 shrink-0 text-right font-mono tabular-nums text-muted">{fmtVolume(i.sell_value ?? null)}</span>
             <span className="w-11 shrink-0 text-right">
               <span className={cn(
-                'inline-flex rounded px-1 text-[8px] leading-tight',
+                'inline-flex rounded px-1 text-micro leading-tight',
                 i.range_days === 3
                   ? 'border border-sky-500/25 bg-sky-500/10 text-sky-400/90'
                   : 'border border-border/60 bg-elevated/50 text-muted/80',
@@ -1261,7 +1253,7 @@ function _DtSeatList({ seats, onOpenStock }: {
   onOpenStock: (s: string) => void
 }) {
   if (!seats.length) {
-    return <p className="py-4 text-center text-[11px] text-muted">本期无游资上榜数据</p>
+    return <p className="py-4 text-center text-xs text-muted">本期无游资上榜数据</p>
   }
   return (
     <div className="grid gap-1.5">
@@ -1270,13 +1262,13 @@ function _DtSeatList({ seats, onOpenStock }: {
           key={`${s.name}-${idx}`}
           className="flex items-start gap-2.5 rounded-btn border border-border/50 bg-elevated/30 px-2.5 py-2 transition-colors hover:border-accent/25"
         >
-          <span className={cn('grid h-5 w-5 shrink-0 place-items-center rounded-full font-mono text-[9px] font-bold leading-none', _rankCls(idx))}>
+          <span className={cn('grid h-5 w-5 shrink-0 place-items-center rounded-full font-mono text-micro font-bold leading-none', _rankCls(idx))}>
             {idx + 1}
           </span>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-0.5">
-              <span className="text-[11px] font-medium text-foreground" title={s.name ?? ''}>{s.name ?? '—'}</span>
-              <span className={cn('font-mono text-[10px] tabular-nums', priceColorClass(s.buying ?? null))}>
+              <span className="text-xs font-medium text-foreground" title={s.name ?? ''}>{s.name ?? '—'}</span>
+              <span className={cn('font-mono text-micro tabular-nums', priceColorClass(s.buying ?? null))}>
                 {fmtVolume(s.buying ?? null)}
               </span>
             </div>
@@ -1286,16 +1278,16 @@ function _DtSeatList({ seats, onOpenStock }: {
                   key={`${s.name}-${r.thscode}`}
                   type="button"
                   onClick={() => onOpenStock(r.thscode)}
-                  className="inline-flex items-baseline gap-1.5 rounded-btn border border-border/60 bg-surface/60 px-2 py-0.5 text-[10px] transition-ui hover:border-accent/40 hover:text-accent"
+                  className="inline-flex items-baseline gap-1.5 rounded-btn border border-border/60 bg-surface/60 px-2 py-0.5 text-micro transition-ui hover:border-accent/40 hover:text-accent"
                   title={`查看 ${r.name ?? r.thscode} 详情`}
                 >
                   <span>{r.name ?? r.thscode}</span>
                   {(() => { const b = boardTag(r.thscode); return b && (
-                    <span className={`inline-flex items-center self-center rounded border px-1 text-[8px] font-bold leading-tight ${b.color}`}>
+                    <span className={`inline-flex items-center self-center rounded border px-1 text-micro font-bold leading-tight ${b.color}`}>
                       {b.label}
                     </span>
                   ) })()}
-                  <span className={cn('font-mono text-[9px] tabular-nums', priceColorClass(r.hot_money_item_net_value ?? r.net_value ?? null))}>
+                  <span className={cn('font-mono text-micro tabular-nums', priceColorClass(r.hot_money_item_net_value ?? r.net_value ?? null))}>
                     {fmtVolume(r.hot_money_item_net_value ?? r.net_value ?? null)}
                   </span>
                 </button>
@@ -1346,8 +1338,8 @@ function DragonTigerCard({ date, onOpenStock }: {
         <span className="grid h-8 w-8 shrink-0 place-items-center rounded bg-elevated/60">
           <Trophy className="h-4 w-4 text-muted/50" />
         </span>
-        <span className="text-[11px] text-muted">龙虎榜需要 fuyao 数据源 (同花顺特色数据)</span>
-        <Link to="/settings?tab=data-sources" className="ml-auto inline-flex items-center gap-0.5 text-[10px] text-accent hover:underline">
+        <span className="text-xs text-muted">龙虎榜需要 fuyao 数据源 (同花顺特色数据)</span>
+        <Link to="/settings?tab=data-sources" className="ml-auto inline-flex items-center gap-0.5 text-micro text-accent hover:underline">
           前往配置 <ChevronRight className="h-3 w-3" />
         </Link>
       </div>
@@ -1361,8 +1353,8 @@ function DragonTigerCard({ date, onOpenStock }: {
         <span className="grid h-8 w-8 shrink-0 place-items-center rounded bg-elevated/60">
           <Trophy className="h-4 w-4 text-muted/50" />
         </span>
-        <span className="text-[11px] text-muted">龙虎榜暂不可用{d?.message ? ` (${d.message.slice(0, 40)})` : ''}</span>
-        <button onClick={() => q.refetch()} className="ml-auto text-[10px] text-accent hover:underline">重试</button>
+        <span className="text-xs text-muted">龙虎榜暂不可用{d?.message ? ` (${d.message.slice(0, 40)})` : ''}</span>
+        <button onClick={() => q.refetch()} className="ml-auto text-micro text-accent hover:underline">重试</button>
       </div>
     )
   }
@@ -1389,17 +1381,17 @@ function DragonTigerCard({ date, onOpenStock }: {
         </span>
         <span className="leading-tight">
           <span className="flex items-center gap-2">
-            <span className="text-[13px] font-semibold text-foreground">龙虎榜</span>
+            <span className="text-xs font-semibold text-foreground">龙虎榜</span>
             {isFallback && (
               <span
-                className="rounded border border-warning/30 bg-warning/10 px-1.5 py-px text-[9px] leading-tight text-warning"
+                className="rounded border border-warning/30 bg-warning/10 px-1.5 py-px text-micro leading-tight text-warning"
                 title="当日榜单未发布(约17:00后), 已自动显示上一期"
               >
                 当日未发布 · 显示上一期
               </span>
             )}
           </span>
-          <span className="mt-0.5 block text-[10px] text-muted">
+          <span className="mt-0.5 block text-micro text-muted">
             {/* [R132] 交易日的龙虎榜不可能是 0 只 —— 真出现 0 就是没发布/没拿到,
                 不能拿「0 只上榜」糊过去(那和"今天确实没人上榜"分不出来)。
                 后端现在会把空榜按未发布处理并回退上一期, 这里是最后一道兜底文案。 */}
@@ -1442,7 +1434,7 @@ function DragonTigerCard({ date, onOpenStock }: {
                     type="button"
                     onClick={() => setTab(t.key)}
                     className={cn(
-                      'rounded-btn px-3 py-1 text-[11px] transition-ui',
+                      'rounded-btn px-3 py-1 text-xs transition-ui',
                       tab === t.key
                         ? 'bg-accent/15 font-medium text-accent shadow-sm'
                         : 'text-secondary hover:text-foreground',

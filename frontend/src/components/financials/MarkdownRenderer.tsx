@@ -238,7 +238,7 @@ export function MarkdownRenderer({ content }: { content: string }) {
         <ol key={key++} className="my-4 space-y-2">
           {items.map((item, ii) => (
             <li key={ii} className="flex items-start gap-2 text-xs text-foreground/90 leading-relaxed">
-              <span className="mt-0.5 h-4 w-4 rounded-full bg-accent/10 text-accent text-[10px] font-mono flex items-center justify-center shrink-0">
+              <span className="mt-0.5 h-4 w-4 rounded-full bg-accent/10 text-accent text-micro font-mono flex items-center justify-center shrink-0">
                 {ii + 1}
               </span>
               <span className="flex-1 text-foreground">{renderInline(item, `ol-${key}-${ii}`)}</span>

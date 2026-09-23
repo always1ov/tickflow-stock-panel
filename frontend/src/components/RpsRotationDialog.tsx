@@ -8,6 +8,7 @@ import { cn } from '@/lib/cn'
 import { fmtPct } from '@/lib/format'
 import { MarkdownRenderer } from '@/components/financials/MarkdownRenderer'
 import { Modal } from '@/components/Modal'
+import { TYPE } from '@/components/ui'
 
 interface Props {
   onClose: () => void
@@ -165,7 +166,7 @@ export function RpsRotationDialog({ onClose, kind: initialKind = 'concept', allo
         if (!cell) {
           return (
             <td key={d} className="px-2 py-1 text-center text-muted/40">
-              <span className="text-[10px]">—</span>
+              <span className="text-micro">—</span>
             </td>
           )
         }
@@ -183,11 +184,11 @@ export function RpsRotationDialog({ onClose, kind: initialKind = 'concept', allo
           >
             <div className="flex flex-col items-center gap-0.5 leading-tight">
               <span className={cn(
-                'text-[11px] max-w-[84px] truncate',
+                'text-xs max-w-[84px] truncate',
                 isSelected ? 'text-accent font-medium' : 'text-secondary',
               )} title={name}>{name}</span>
               <span className={cn(
-                'text-[10px] tabular-nums',
+                'text-micro tabular-nums',
                 pct > 0 ? 'text-bull' : pct < 0 ? 'text-bear' : 'text-muted',
               )}>{fmtPct(pct)}</span>
             </div>
@@ -200,7 +201,7 @@ export function RpsRotationDialog({ onClose, kind: initialKind = 'concept', allo
           style={{ height: ROW_HEIGHT }}
           className="border-b border-border/30"
         >
-          <td className="sticky left-0 z-10 bg-surface px-2 text-center text-[10px] text-muted tabular-nums border-r border-border/40">
+          <td className="sticky left-0 z-10 bg-surface px-2 text-center text-micro text-muted tabular-nums border-r border-border/40">
             {displayIdx + 1}
           </td>
           {cells}
@@ -221,7 +222,7 @@ export function RpsRotationDialog({ onClose, kind: initialKind = 'concept', allo
           <div className="flex items-center justify-between px-4 py-2.5 border-b border-border shrink-0">
             <div className="flex items-center gap-2">
               <Repeat className="h-4 w-4 text-accent" />
-              <span id="rps-rotation-title" className="text-sm font-medium text-foreground">{dimLabel}涨幅轮动</span>
+              <span id="rps-rotation-title" className={TYPE.section}>{dimLabel}涨幅轮动</span>
               {allowKindSwitch && (
                 <div className="flex items-center rounded-btn border border-border bg-base/60 p-0.5">
                   {([['industry', '行业'], ['concept', '概念']] as const).map(([k, label]) => (
@@ -233,8 +234,8 @@ export function RpsRotationDialog({ onClose, kind: initialKind = 'concept', allo
                         setSelected(null)
                       }}
                       className={cn(
-                        'h-5 rounded-[5px] px-2 text-[10px] font-medium transition-colors',
-                        kind === k ? 'bg-accent/15 text-accent' : 'text-muted hover:text-secondary',
+                        'h-5 rounded-[5px] px-2 text-micro font-medium transition-colors',
+                        kind === k ? 'bg-foreground font-medium text-surface' : 'text-muted hover:text-secondary',
                       )}
                     >
                       {label}
@@ -242,11 +243,11 @@ export function RpsRotationDialog({ onClose, kind: initialKind = 'concept', allo
                   ))}
                 </div>
               )}
-              <span className="text-[11px] text-muted">
+              <span className="text-xs text-muted">
                 {conceptCount > 0 ? `${dates.length} 天 · ${conceptCount} 个${dimLabel}` : '暂无数据'}
               </span>
               {allowKindSwitch && (
-                <span className="hidden lg:inline text-[10px] text-muted/60">
+                <span className="hidden lg:inline text-micro text-muted/60">
                   数据来自「{dimLabel === '行业' ? '行业分析' : '概念分析'}」页的板块行情 · 按每日涨幅算 RPS 排名, 观察板块强弱轮动
                 </span>
               )}
@@ -258,8 +259,8 @@ export function RpsRotationDialog({ onClose, kind: initialKind = 'concept', allo
                       key={lv}
                       onClick={() => { setLevel(lv); setSelected(null) }}
                       className={cn(
-                        'h-5 rounded-[5px] px-2 text-[10px] font-medium transition-colors',
-                        level === lv ? 'bg-accent text-white shadow-sm' : 'text-secondary hover:text-foreground',
+                        'h-5 rounded-[5px] px-2 text-micro font-medium transition-colors',
+                        level === lv ? 'bg-foreground font-medium text-surface' : 'text-secondary hover:text-foreground',
                       )}
                     >
                       {lv}级
@@ -278,9 +279,9 @@ export function RpsRotationDialog({ onClose, kind: initialKind = 'concept', allo
             {/* 标题栏: 标题 + meta 摘要 + focus 输入 + 触发按钮 */}
             <div className="flex items-center gap-2 px-4 py-1.5 bg-elevated/30 shrink-0">
               <Sparkles className={cn('h-3.5 w-3.5 text-accent/60', analyzing && 'animate-pulse')} />
-              <span className="text-[11px] text-muted shrink-0">AI 轮动分析</span>
+              <span className="text-xs text-muted shrink-0">AI 轮动分析</span>
               {analysisMeta?.summary && (
-                <span className="text-[11px] text-accent/80 truncate">{analysisMeta.summary}</span>
+                <span className="text-xs text-accent/80 truncate">{analysisMeta.summary}</span>
               )}
               <div className="flex items-center gap-1.5 ml-auto">
                 <input
@@ -289,13 +290,13 @@ export function RpsRotationDialog({ onClose, kind: initialKind = 'concept', allo
                   onChange={e => setFocus(e.target.value)}
                   placeholder="关注点(可选)"
                   disabled={analyzing}
-                  className="w-28 px-2 py-0.5 text-[11px] bg-elevated/50 border border-border rounded-btn text-foreground placeholder:text-muted/50 focus:outline-none focus:border-accent/40 disabled:opacity-50"
+                  className="w-28 px-2 py-0.5 text-xs bg-elevated/50 border border-border rounded-btn text-foreground placeholder:text-muted/50 focus:outline-none focus:border-accent/40 disabled:opacity-50"
                 />
                 <button
                   onClick={() => runAnalysis(days, focus)}
                   disabled={analyzing}
                   className={cn(
-                    'inline-flex items-center gap-1 px-2 py-0.5 rounded-btn text-[11px] transition-colors cursor-pointer border',
+                    'inline-flex items-center gap-1 px-2 py-0.5 rounded-btn text-xs transition-colors cursor-pointer border',
                     analyzing
                       ? 'opacity-60 cursor-not-allowed border-border text-muted'
                       : 'bg-accent/10 text-accent border-accent/30 hover:bg-accent/20',
@@ -313,7 +314,7 @@ export function RpsRotationDialog({ onClose, kind: initialKind = 'concept', allo
             {/* 报告内容区: 四态渲染 */}
             <div ref={analysisRef} className="flex-1 min-h-0 overflow-auto">
               {analysisError ? (
-                <div className="flex items-center gap-2 px-4 py-4 text-[11px] text-danger">
+                <div className="flex items-center gap-2 px-4 py-4 text-xs text-danger">
                   <AlertCircle className="h-3.5 w-3.5 shrink-0" />
                   <span>{analysisError}</span>
                   <button
@@ -322,14 +323,14 @@ export function RpsRotationDialog({ onClose, kind: initialKind = 'concept', allo
                   >重试</button>
                 </div>
               ) : analysis || analyzing ? (
-                <div className="px-4 py-2.5 text-[12px] leading-relaxed">
+                <div className="px-4 py-2.5 text-xs leading-relaxed">
                   <MarkdownRenderer content={analysis} />
                   {analyzing && (
                     <span className="inline-block w-1.5 h-3.5 bg-accent animate-pulse align-middle ml-0.5" />
                   )}
                 </div>
               ) : (
-                <div className="px-4 py-4 text-center text-[11px] text-muted/60">
+                <div className="px-4 py-4 text-center text-xs text-muted/60">
                   点击「生成分析」,AI 将从主线研判 / 新晋强势 / 退潮预警 / 机构vs游资 等角度分析最近 {days} 天的概念轮动
                 </div>
               )}
@@ -339,7 +340,7 @@ export function RpsRotationDialog({ onClose, kind: initialKind = 'concept', allo
           {/* 工具栏 */}
           <div className="flex items-center gap-3 px-4 py-2 border-b border-border shrink-0">
             <div className="flex items-center gap-1.5">
-              <span className="text-[11px] text-muted">天数</span>
+              <span className="text-xs text-muted">天数</span>
               <input
                 type="range"
                 min={MIN_DAYS}
@@ -349,14 +350,14 @@ export function RpsRotationDialog({ onClose, kind: initialKind = 'concept', allo
                 onChange={e => setDays(Number(e.target.value))}
                 className="w-24 accent-accent cursor-pointer"
               />
-              <span className="text-[11px] text-secondary tabular-nums w-5">{days}</span>
+              <span className="text-xs text-secondary tabular-nums w-5">{days}</span>
             </div>
             <button
               onClick={() => setReversed(r => !r)}
               className={cn(
-                'inline-flex items-center gap-1 px-2 py-1 rounded-btn text-[11px] transition-colors cursor-pointer border',
+                'inline-flex items-center gap-1 px-2 py-1 rounded-btn text-xs transition-colors cursor-pointer border',
                 reversed
-                  ? 'bg-accent/10 text-accent border-accent/30'
+                  ? 'border-foreground bg-foreground font-medium text-surface'
                   : 'border-border text-muted hover:text-secondary hover:bg-elevated',
               )}
               title="翻转排序(高↔低)"
@@ -367,7 +368,7 @@ export function RpsRotationDialog({ onClose, kind: initialKind = 'concept', allo
             {selected && (
               <button
                 onClick={() => setSelected(null)}
-                className="text-[11px] text-accent hover:underline cursor-pointer"
+                className="text-xs text-accent hover:underline cursor-pointer"
               >
                 取消追踪「{selected}」
               </button>
@@ -381,11 +382,11 @@ export function RpsRotationDialog({ onClose, kind: initialKind = 'concept', allo
                 <div className="w-5 h-5 border-2 border-accent/30 border-t-accent rounded-full animate-spin" />
               </div>
             ) : error ? (
-              <div className="flex items-center justify-center py-16 text-[11px] text-danger">
+              <div className="flex items-center justify-center py-16 text-xs text-danger">
                 加载失败,请稍后重试
               </div>
             ) : rowCount === 0 ? (
-              <div className="flex items-center justify-center py-16 text-[11px] text-muted">
+              <div className="flex items-center justify-center py-16 text-xs text-muted">
                 暂无{dimLabel}数据,请先在「{kind === 'industry' ? '行业分析' : '概念分析'}」页配置并获取{dimLabel}数据源
               </div>
             ) : (
@@ -398,13 +399,13 @@ export function RpsRotationDialog({ onClose, kind: initialKind = 'concept', allo
                   {/* 表头: 日期列, 最新在最左 */}
                   <thead className="sticky top-0 z-20 bg-surface">
                     <tr>
-                      <th className="sticky left-0 z-30 bg-surface px-2 py-1.5 text-[10px] font-normal text-muted border-b border-r border-border/40">
+                      <th className="sticky left-0 z-30 bg-surface px-2 py-1.5 text-micro font-normal text-muted border-b border-r border-border/40">
                         #
                       </th>
                       {dates.map(d => (
                         <th
                           key={d}
-                          className="px-2 py-1.5 text-[10px] font-normal text-muted border-b border-border/40 whitespace-nowrap text-center"
+                          className="px-2 py-1.5 text-micro font-normal text-muted border-b border-border/40 whitespace-nowrap text-center"
                           title={d}
                         >
                           {shortDate(d)}
@@ -422,7 +423,7 @@ export function RpsRotationDialog({ onClose, kind: initialKind = 'concept', allo
                           className="border-b border-accent/20 bg-accent/5"
                         >
                           <td className="sticky left-0 z-30 bg-surface px-2 py-1 text-center border-r border-border/40">
-                            <span className="text-[10px] text-accent truncate block max-w-[44px]" title={selected}>
+                            <span className="text-micro text-accent truncate block max-w-[44px]" title={selected}>
                               {selected}
                             </span>
                           </td>
@@ -431,20 +432,20 @@ export function RpsRotationDialog({ onClose, kind: initialKind = 'concept', allo
                               {cell ? (
                                 <div className="flex flex-col items-center gap-0.5 leading-tight">
                                   <span className={cn(
-                                    'text-[11px] font-medium tabular-nums',
+                                    'text-xs font-medium tabular-nums',
                                     rankColorClass(cell.rank, conceptCount),
                                   )}>
                                     #{cell.rank}
                                   </span>
                                   <span className={cn(
-                                    'text-[10px] tabular-nums',
+                                    'text-micro tabular-nums',
                                     cell.pct > 0 ? 'text-bull' : cell.pct < 0 ? 'text-bear' : 'text-muted',
                                   )}>
                                     {fmtPct(cell.pct)}
                                   </span>
                                 </div>
                               ) : (
-                                <span className="text-[10px] text-muted/40">—</span>
+                                <span className="text-micro text-muted/40">—</span>
                               )}
                             </td>
                           ))}
@@ -474,7 +475,7 @@ export function RpsRotationDialog({ onClose, kind: initialKind = 'concept', allo
 
           {/* 底部提示 */}
           <div className="px-4 py-1.5 border-t border-border shrink-0">
-            <span className="text-[10px] text-muted">
+            <span className="text-micro text-muted">
               每列各自按当日涨幅排序 · 点击单元格追踪概念在各日的排名变化
             </span>
           </div>
