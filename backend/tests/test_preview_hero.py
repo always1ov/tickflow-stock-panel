@@ -83,3 +83,15 @@ def test_R429_星星方框不叠冲突的内边距():
         full = expand(expr) + " " + " ".join(consts[n] for n in consts if re.search(rf"\b{n}\b", expr))
         pads = set(re.findall(r"\bpx-[\w.]+", expand(full)))
         assert len(pads) <= 1, f"同一个元素叠了多个横向内边距: {pads} ← {expr}"
+
+
+def test_R472_新头部有刷新_与旧顶栏是同一个函数():
+    """[R472] 用户指着量化MACD 副图上「稍后点右上角刷新重试」: 「图片里面提到的刷新按钮没有了,
+    加回来」。刷新原来只在旧顶栏, 旧顶栏自 R432 起排到了新块后面, 右上角看不见它。"""
+    hero, dlg = code_of(HERO), code_of(DLG)
+    assert "onClick={onRefresh}" in hero and "<RefreshCw" in hero, "新头部没有刷新按钮"
+    call = dlg[dlg.index("<PreviewHero"):dlg.index("/>", dlg.index("<PreviewHero"))]
+    assert "onRefresh={handleRefresh}" in call, "新头部的刷新没接到弹窗那一个 handleRefresh"
+    # 那句提示说的就是量化MACD: 刷新得真的重取它
+    fn = dlg[dlg.index("const handleRefresh"):dlg.index("const selectIntradayDays")]
+    assert "QK.stockQuantMacd(symbol)" in fn, "刷新不重取量化MACD —— 图上的「点右上角刷新重试」是空话"

@@ -248,7 +248,7 @@ export const LEVEL_PALETTE: Record<string, { light: string; dark: string }> = {
   // ── 自定的(深色; 亮色 800 一档 / 暗色 600~700 一档) ──
   gap:       { light: '#3730A3', dark: '#4F46E5' },  // 靛 —— 作者原色是粉, 禁粉, 另选
   livermore: { light: '#1D4ED8', dark: '#3B82F6' },  // 蓝 —— 六态关键点
-  fib2:      { light: '#115E59', dark: '#0F766E' },  // 深青 —— 斐波那契二型(= FIB2_ROLE_RETRACE; 离一型的金隔 ≥ 60°)
+  fib2:      { light: '#7B07CE', dark: '#724EA0' },  // 深紫 —— 斐波那契二型(= FIB2_ROLE_RETRACE; 离一型的金隔 ≥ 60°)。[R472] 用户: 「斐波那契二型用深紫色」
 }
 
 /**
@@ -271,12 +271,12 @@ export const LEVEL_CURVE_COLOR: Record<string, string> = {
 // [R410] 三个角色键各给一个具名常量 —— 不只是好看: 前端要按角色过滤时
 // (比如「推算位默认不画」)如果去比对**标签文字**, 就等于把后端的中文名
 // 抄了一份到前端, 后端改名前端必漏。比角色键不会。
-export const FIB2_ROLE_RETRACE = '#115E59'
+export const FIB2_ROLE_RETRACE = '#7B07CE'
 export const FIB2_ROLE_TARGET = '#0369A1'
 export const FIB2_ROLE_VOID = '#854D0E'
 
 export const FIB2_ROLE: Record<string, { light: string; dark: string }> = {
-  [FIB2_ROLE_RETRACE]: { light: '#115E59', dark: '#0F766E' },  // 回踩位 = 组色
+  [FIB2_ROLE_RETRACE]: { light: '#7B07CE', dark: '#724EA0' },  // 回踩位 = 组色
   [FIB2_ROLE_TARGET]: { light: '#0369A1', dark: '#0369A1' },  // 上攻推算位一/二/三 —— 天蓝(规格 §12 要蓝)
   [FIB2_ROLE_VOID]: { light: '#854D0E', dark: '#A16207' },     // 这组作废 —— 暗褐黄, 退色(R443 深色)
 }
@@ -291,7 +291,7 @@ export function levelColors(theme: Theme): Record<string, string> {
 /**
  * [R421] 已退役的角色键 → 现在的角色键。回撤位原来是洋红 `#E01DB5`, 换色之前
  * 算好、还留在缓存里的响应仍带着它; 不认的键会**原样画出来** —— 那就是一条洋红线。
- * [R424] 三个角色键又整体换了一次, 旧键一并收进来。[R443] 第三次, 同上。
+ * [R424] 三个角色键又整体换了一次, 旧键一并收进来。[R443] 第三次, 同上。[R472] 回撤位第四次(深青 → 深紫)。
  * (不放进 FIB2_ROLE: 那张表的键必须与后端常量逐字相等, 有守卫钉着。)
  */
 const FIB2_ROLE_RETIRED: Record<string, string> = {
@@ -302,6 +302,7 @@ const FIB2_ROLE_RETIRED: Record<string, string> = {
   '#004631': FIB2_ROLE_RETRACE,   // R424~R442 的回撤位
   '#2F51A7': FIB2_ROLE_TARGET,    // R424~R442 的推算位
   '#472005': FIB2_ROLE_VOID,      // R424~R442 的作废线
+  '#115E59': FIB2_ROLE_RETRACE,   // R443~R471 的回撤位(深青)
 }
 
 /** 后端按角色发来的那个 hex → 当前主题该用的颜色(认不出来就原样用)。 */

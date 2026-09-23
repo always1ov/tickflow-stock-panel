@@ -7,17 +7,19 @@
  *   · 60 / 120 / 250 日「直接按照图片」放在头部, 另补一个「AI 四维分析」入口(图里漏了);
  *   · 「结论」那一句、「导出复盘」「使用说明」两个按钮**先占位**。
  *     [R447] 「使用说明」撤了。用户: 「删掉导出复盘后面的使用说明按钮, 不需要了」。
+ *   · [R472] 刷新按钮挪上来。它原来只在旧顶栏里, 而旧顶栏自 R432 起排到了新块后面, 要一路
+ *     滚到底才看得见 —— 量化MACD 取数失败时图上写的是「稍后点右上角刷新重试」, 右上角却没有。
  *
  * 两行:
  *
- *     名称 代码  现价  涨跌幅  起 ~ 止 · N 个交易日  [☆]      [60日][120日][250日] [AI 四维分析] [导出复盘]
+ *     名称 代码  现价  涨跌幅  起 ~ 止 · N 个交易日  [☆]      [60日][120日][250日] [AI 四维分析] [导出复盘] [⟳]
  *     结论  (待定) ───────────────────────────────────────────────────────────────
  *
  * 天数与复盘页**是同一个值**(由弹窗持有, 两处都能改): 现在用到 60/120/250 的只有复盘。
  * 「起 ~ 止 · N 个交易日」从弹窗已经在取的那份日 K 里数最后 N 根, 不为这一行另发请求 ——
  * 复盘那份要"回算", 只为了头部一行字就每次开弹窗都回算一遍不划算。
  */
-import { Loader2, Sparkles, Star } from 'lucide-react'
+import { Loader2, RefreshCw, Sparkles, Star } from 'lucide-react'
 import { toast } from '@/components/Toast'
 import { WatchlistAddMenu } from '@/components/WatchlistAddMenu'
 import { useAnalysisKline } from '@/components/stock-analysis/StockLevelsPanel'
@@ -30,7 +32,7 @@ export const HERO_DAYS_DEFAULT = 120
 
 export function PreviewHero({
   symbol, name, days, onDaysChange, inWatchlist, watchBusy, onWatchAdd, onWatchRemove,
-  onAiAnalyze, aiBusy = false,
+  onAiAnalyze, aiBusy = false, onRefresh,
 }: {
   symbol: string
   name?: string
@@ -42,6 +44,8 @@ export function PreviewHero({
   onWatchRemove: () => void
   onAiAnalyze?: (symbol: string, name?: string) => void
   aiBusy?: boolean
+  /** 重取这只票弹窗里的数据(与旧顶栏那个刷新是同一个函数) */
+  onRefresh: () => void
 }) {
   // 与关键价位页同一份日 K(同一个查询键, 不多发请求)
   const kline = useAnalysisKline(symbol)
@@ -109,6 +113,10 @@ export function PreviewHero({
           )}
           <button type="button" onClick={() => todo('导出复盘')} className={`${PILL} ${PILL_IDLE}`}>
             导出复盘
+          </button>
+          <button type="button" onClick={onRefresh} title="刷新" aria-label={`刷新 ${name || symbol} 的数据`}
+                  className={`${SQUARE} text-secondary hover:text-foreground`}>
+            <RefreshCw className="h-4 w-4" />
           </button>
         </div>
       </div>

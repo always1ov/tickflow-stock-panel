@@ -332,3 +332,17 @@ def test_R443_自定的是深色_不粉_分得开():
                 if d < MIN_CUSTOM_PAIR_DE:
                     bad.append(f"[{theme}] {x} × {y} 只差 ΔE {d:.1f}")
     assert not bad, "自定的颜色不合格:\n  " + "\n  ".join(bad)
+
+
+def test_R472_斐波那契二型是深紫():
+    """[R472] 用户: 「斐波那契二型用深紫色」。钉色相落在紫(290°~310°, 离禁粉的 315° 留余量),
+    且换下来的深青进了退役表 —— 缓存里还带着旧键的响应不能画成一条认不出的线。"""
+    pal = _palette()
+    for theme in ("light", "dark"):
+        _, a, b = oklab(pal["fib2"][theme])
+        hue = math.degrees(math.atan2(b, a)) % 360
+        assert 290 <= hue <= 310, f"[{theme}] 二型 {pal['fib2'][theme]} 色相 {hue:.0f}° 不是紫"
+    src = read_src(THEME_TS)
+    retired = src[src.index("const FIB2_ROLE_RETIRED"):]
+    retired = retired[:retired.index("\n}")]
+    assert "'#115E59': FIB2_ROLE_RETRACE" in retired, "R443~R471 的深青回撤位没进退役表"

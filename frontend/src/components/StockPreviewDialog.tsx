@@ -320,6 +320,9 @@ export function StockPreviewDialog({ symbol: symbolProp, name: nameProp, onClose
         qc.invalidateQueries({ queryKey: QK.analysisKline(symbol) })
         qc.invalidateQueries({ queryKey: QK.stockLevels(symbol) })
         qc.invalidateQueries({ queryKey: QK.stockTrend(symbol) })
+        // [R472] 关键价位图的量化MACD 副图是单独一个查询, 原来漏了 —— 它取数失败时
+        // 图上叫人「点右上角刷新重试」, 点了却不会重取。
+        qc.invalidateQueries({ queryKey: QK.stockQuantMacd(symbol) })
       }
     }
   }
@@ -375,6 +378,7 @@ export function StockPreviewDialog({ symbol: symbolProp, name: nameProp, onClose
                 onWatchAdd={groupId => toggleWatchlist.mutate({ action: 'add', groupId })}
                 onWatchRemove={() => toggleWatchlist.mutate({ action: 'remove' })}
                 onAiAnalyze={onAiAnalyze} aiBusy={aiBusy}
+                onRefresh={handleRefresh}
               />
             )}
 
