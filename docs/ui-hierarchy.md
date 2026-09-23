@@ -54,7 +54,7 @@
 - [x] 外壳: 侧栏 / 导航(`Layout`)、`PageHeader`、`PageShell`
 - [x] 自选决策台(`StockAnalysis` + `WatchlistDecisionBoard` + `decision-board/*`)
 - [x] 自选(`Watchlist`)
-- [ ] 大盘(`Dashboard`)
+- [x] 大盘(`Dashboard`)
 - [ ] 监控(`Monitor` + `monitor/RuleEditor`)
 - [ ] 模拟盘 / 批次(`FlipPaper` / `Lots`)
 - [ ] 选股(`Screener` + `screener/*`)

@@ -38,6 +38,12 @@ MIGRATED: list[str] = [
     "components/WatchlistImportDialog.tsx",
     "components/ListColumnCustomizer.tsx",
     "components/stock-table/StockDataTable.tsx",
+    "pages/Dashboard.tsx",
+    "components/SealedBadge.tsx",
+    "components/DimensionMembersDialog.tsx",
+    "components/data/ActiveJobCard.tsx",
+    "components/AdjFactorSyncGate.tsx",
+    "components/DatePicker.tsx",
 ]
 
 

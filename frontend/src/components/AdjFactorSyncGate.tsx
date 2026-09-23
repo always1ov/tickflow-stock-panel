@@ -4,6 +4,8 @@ import { motion } from 'framer-motion'
 import { AlertTriangle, Info } from 'lucide-react'
 import { api } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
+import { TYPE } from '@/components/ui'
+import { cn } from '@/lib/cn'
 
 // 无除权因子能力时的同步前置确认。
 // 背景: 除权因子不可用时同步静默降级 —— 日K按不复权价入库、enriched 直接用
@@ -59,16 +61,16 @@ export function useAdjFactorSyncGate() {
             <AlertTriangle className="h-5 w-5 text-warning" />
           </div>
           <div className="min-w-0">
-            <h3 className="text-sm font-semibold text-foreground mb-1.5">当前无除权因子能力</h3>
+            <h3 className={cn('mb-1.5', TYPE.section)}>当前无除权因子能力</h3>
             <p className="text-xs text-secondary leading-relaxed">
               本次同步的日K将以<span className="text-foreground font-medium">不复权价格</span>入库并计算指标,
               K 线可能包含除权跳空。后续配置除权因子能力后重新同步, 才能得到前复权口径的数据。
             </p>
-            <div className="mt-2 flex items-start gap-1.5 text-[11px] text-warning">
+            <div className="mt-2 flex items-start gap-1.5 text-xs text-warning">
               <Info className="h-3.5 w-3.5 shrink-0 mt-px text-warning" />
               <span>若期间发生除权(分红/送转)事件, 已有数据需要重新校准。</span>
             </div>
-            <label className="mt-3 flex items-center gap-1.5 text-[11px] text-muted cursor-pointer select-none">
+            <label className="mt-3 flex items-center gap-1.5 text-xs text-muted cursor-pointer select-none">
               <input
                 type="checkbox"
                 checked={noRemind}

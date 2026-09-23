@@ -240,7 +240,7 @@ export function DatePicker({
             ) : (
               <>
                 {/* 星期头 */}
-                <div className="grid grid-cols-7 text-center text-[10px] text-muted mb-1">
+                <div className="grid grid-cols-7 text-center text-micro text-muted mb-1">
                   {WEEKDAYS.map((w) => (
                     <div key={w}>{w}</div>
                   ))}

@@ -20,6 +20,7 @@ import { cnSignal } from '@/lib/signals'
 import { useCustomSignalNames } from '@/lib/useCustomSignalNames'
 import { strategyEventMeta, strategyName } from '@/lib/strategyMonitorEvents'
 import { boardTag } from '@/components/stock-table/primitives'
+import { TYPE, buttonClass } from '@/components/ui'
 
 function n(v: number | null | undefined) {
   return typeof v === 'number' && Number.isFinite(v) ? v : null
@@ -76,11 +77,11 @@ function SectionTitle({ icon: Icon, title, hint }: { icon: typeof Activity; titl
   return (
     <div className="mb-2 flex items-center justify-between gap-2">
       <div className="flex items-center gap-1.5">
-        <span className="h-3 w-0.5 rounded-full bg-gradient-to-b from-accent to-accent/30" />
-        <Icon className="h-3.5 w-3.5 text-accent" />
-        <h2 className="text-xs font-semibold text-foreground">{title}</h2>
+        <Icon className="h-4 w-4 text-accent" />
+        {/* [R453] 卡片标题是 L3(15px) —— 原来 13px, 与卡片里的内容一样大 */}
+        <h2 className={TYPE.card}>{title}</h2>
       </div>
-      {hint && <span className="font-mono text-[10px] text-muted">{hint}</span>}
+      {hint && <span className="font-mono text-micro text-muted">{hint}</span>}
     </div>
   )
 }
@@ -117,7 +118,7 @@ function MonitorWidget({ onStockClick, activeSymbol }: {
 
   if (events.length === 0) {
     return (
-      <div className="mt-1 py-6 text-center text-[11px] text-muted">暂无触发记录</div>
+      <div className="mt-1 py-6 text-center text-xs text-muted">暂无触发记录</div>
     )
   }
 
@@ -147,23 +148,23 @@ function MonitorWidget({ onStockClick, activeSymbol }: {
                   title={isSector ? '在监控中心查看板块告警' : ev.symbol ? `查看 ${ev.symbol} 日K` : undefined}
                   className={`inline-flex items-center gap-1 min-w-0 shrink-0 rounded hover:bg-elevated/60 transition-colors -mx-0.5 px-0.5 ${isSector || ev.symbol ? 'cursor-pointer' : 'cursor-default'}`}
                 >
-                  <span className="font-mono text-[10px] font-medium text-foreground/80 hover:text-accent">{ev.symbol?.replace(/\.(SH|SZ|BJ)$/, '')}</span>
+                  <span className="font-mono text-micro font-medium text-foreground/80 hover:text-accent">{ev.symbol?.replace(/\.(SH|SZ|BJ)$/, '')}</span>
                   {ev.symbol && (() => {
                     const board = boardTag(ev.symbol)
                     return board && (
-                      <span className={`inline-flex items-center justify-center h-3 w-3 rounded text-[7px] font-bold leading-none border ${board.color}`}>
+                      <span className={`inline-flex items-center justify-center h-3 w-3 rounded text-micro font-bold leading-none border ${board.color}`}>
                         {board.label}
                       </span>
                     )
                   })()}
-                  {ev.name && <span className="text-[10px] text-secondary truncate max-w-[5rem] hover:text-foreground">{ev.name}</span>}
+                  {ev.name && <span className="text-micro text-secondary truncate max-w-[5rem] hover:text-foreground">{ev.name}</span>}
                 </button>
                 <span className="flex-1" />
                 {ev.price != null && (
-                  <span className="text-[10px] font-mono text-foreground/60 shrink-0">{fmtPrice(ev.price)}</span>
+                  <span className="text-micro font-mono text-foreground/60 shrink-0">{fmtPrice(ev.price)}</span>
                 )}
                 {ev.change_pct != null && (
-                  <span className={cn('text-[10px] font-mono font-medium shrink-0 w-12 text-right', pct >= 0 ? 'text-danger' : 'text-bear')}>
+                  <span className={cn('text-micro font-mono font-medium shrink-0 w-12 text-right', pct >= 0 ? 'text-danger' : 'text-bear')}>
                     {fmtPct(pct)}
                   </span>
                 )}
@@ -173,22 +174,22 @@ function MonitorWidget({ onStockClick, activeSymbol }: {
                 <>
                   {ev.symbol ? (
                     <div className="mt-0.5 flex min-w-0 items-center gap-1.5">
-                      <span className={cn('shrink-0 text-[9px] font-medium', eventMeta.className)}>
+                      <span className={cn('shrink-0 text-micro font-medium', eventMeta.className)}>
                         {eventMeta.action}
                       </span>
                       {sname
-                        ? <span className="truncate text-[9px] font-medium text-amber-400">「{sname}」</span>
-                        : ev.message && <span className="truncate text-[9px] text-muted">{ev.message}</span>}
+                        ? <span className="truncate text-micro font-medium text-amber-400">「{sname}」</span>
+                        : ev.message && <span className="truncate text-micro text-muted">{ev.message}</span>}
                       <span className="flex-1" />
-                      <span className="text-[8px] text-muted/50 shrink-0 font-mono">
+                      <span className="text-micro text-muted/50 shrink-0 font-mono">
                         {ev.ts ? new Date(ev.ts).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : ''}
                       </span>
                     </div>
                   ) : (
                     <div className="mt-0.5 flex min-w-0 items-center gap-1.5">
-                      <span className="truncate text-[9px] text-muted">{ev.message}</span>
+                      <span className="truncate text-micro text-muted">{ev.message}</span>
                       <span className="flex-1" />
-                      <span className="text-[8px] text-muted/50 shrink-0 font-mono">
+                      <span className="text-micro text-muted/50 shrink-0 font-mono">
                         {ev.ts ? new Date(ev.ts).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : ''}
                       </span>
                     </div>
@@ -196,7 +197,7 @@ function MonitorWidget({ onStockClick, activeSymbol }: {
                   {ev.signals && ev.signals.length > 0 && (
                     <div className="mt-1 flex flex-wrap gap-1">
                       {ev.signals.map(signal => (
-                        <span key={signal} className="rounded bg-accent/8 px-1 py-px text-[8px] text-accent/80">{cnSignal(signal, customNames)}</span>
+                        <span key={signal} className="rounded bg-accent/8 px-1 py-px text-micro text-accent/80">{cnSignal(signal, customNames)}</span>
                       ))}
                     </div>
                   )}
@@ -204,20 +205,20 @@ function MonitorWidget({ onStockClick, activeSymbol }: {
               ) : (
                 <>
                   <div className="mt-0.5 flex items-center gap-1.5">
-                    <span className={cn('shrink-0 rounded px-1 py-px text-[8px] font-medium', _SOURCE_BADGE[ev.source] ?? 'bg-elevated text-muted')}>
+                    <span className={cn('shrink-0 rounded px-1 py-px text-micro font-medium', _SOURCE_BADGE[ev.source] ?? 'bg-elevated text-muted')}>
                       {_SOURCE_LABEL[ev.source] ?? ev.source}
                     </span>
                     {ev.message && (
-                      <span className="text-[9px] text-muted truncate flex-1">{ev.message}</span>
+                      <span className="text-micro text-muted truncate flex-1">{ev.message}</span>
                     )}
-                    <span className="text-[8px] text-muted/50 shrink-0 font-mono">
+                    <span className="text-micro text-muted/50 shrink-0 font-mono">
                       {ev.ts ? new Date(ev.ts).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : ''}
                     </span>
                   </div>
                   {ev.signals && ev.signals.length > 0 && (
                     <div className="mt-1 flex flex-wrap gap-1">
                       {ev.signals.map((s, j) => (
-                        <span key={j} className="rounded bg-accent/8 px-1 py-px text-[8px] text-accent/80">{cnSignal(s, customNames)}</span>
+                        <span key={j} className="rounded bg-accent/8 px-1 py-px text-micro text-accent/80">{cnSignal(s, customNames)}</span>
                       ))}
                     </div>
                   )}
@@ -236,9 +237,10 @@ function KpiCell({ label, value, sub, tone = 'neutral' }: { label: ReactNode; va
   const color = tone === 'bull' ? 'text-bull' : tone === 'bear' ? 'text-bear' : tone === 'accent' ? 'text-accent' : 'text-foreground'
   return (
     <div className="min-w-0 overflow-hidden rounded-lg border border-border bg-surface/80 px-2 py-1 shadow-[0_1px_2px_oklch(var(--border)/0.4)] backdrop-blur-sm transition-ui hover:border-accent/30 hover:shadow-[0_2px_8px_oklch(var(--accent)/0.15)]">
-      <div className="flex items-center gap-1 text-[11px] text-muted">{label}</div>
-      <div className={`mt-1 truncate font-mono text-lg font-semibold leading-none tabular-nums ${isPlain ? color : 'text-foreground'}`}>{value}</div>
-      {sub && <div className="mt-1 truncate text-[10px] text-muted">{sub}</div>}
+      <div className="flex items-center gap-1 text-xs text-muted">{label}</div>
+      {/* [R453] 读数级 21px */}
+      <div className={`mt-1 truncate font-mono text-xl font-semibold leading-none tabular-nums ${isPlain ? color : 'text-foreground'}`}>{value}</div>
+      {sub && <div className="mt-1 truncate text-micro text-muted">{sub}</div>}
     </div>
   )
 }
@@ -253,8 +255,8 @@ function IndexTicker({ item }: { item: OverviewMarket['indices'][number] }) {
     >
       <div className="truncate text-xs font-medium text-foreground">{item.name || item.symbol}</div>
       <div className={`font-mono text-xs font-semibold ${pctClass(pct)}`}>{fmtIndexPct(pct)}</div>
-      <div className="font-mono text-[10px] text-muted">{item.symbol}</div>
-      <div className={`flex items-center gap-1 font-mono text-[11px] ${pctClass(pct)}`}>
+      <div className="font-mono text-micro text-muted">{item.symbol}</div>
+      <div className={`flex items-center gap-1 font-mono text-xs ${pctClass(pct)}`}>
         {isUp ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
         {fmtPrice(item.last_price)}
       </div>
@@ -275,7 +277,7 @@ function BreadthBar({ data }: { data: OverviewMarket['breadth'] }) {
         <div className="bg-muted/45" style={{ width: `${flatW}%` }} />
         <div className="bg-bull/85" style={{ width: `${upW}%` }} />
       </div>
-      <div className="grid grid-cols-3 gap-1.5 text-[11px]">
+      <div className="grid grid-cols-3 gap-1.5 text-xs">
         <div className="rounded bg-bear/8 px-2 py-1 text-bear">跌 <span className="font-mono">{data.down}</span></div>
         <div className="rounded bg-elevated/70 px-2 py-1 text-muted">平 <span className="font-mono">{data.flat}</span></div>
         <div className="rounded bg-bull/8 px-2 py-1 text-bull">涨 <span className="font-mono">{data.up}</span></div>
@@ -292,13 +294,13 @@ function DistributionBars({ rows }: { rows: OverviewMarket['distribution'] }) {
         const positive = i >= 4
         return (
           <div key={r.label} className="flex h-full min-w-0 flex-col items-center justify-end gap-0.5">
-            <div className="font-mono text-[9px] text-muted">{r.count || ''}</div>
+            <div className="font-mono text-micro text-muted">{r.count || ''}</div>
             <div
               className={`w-2 rounded-full ${positive ? 'bg-gradient-to-t from-bull/45 to-bull/90' : 'bg-gradient-to-t from-bear/45 to-bear/90'}`}
               style={{ height: `${Math.max(4, r.count / maxCount * 86)}%` }}
               title={`${r.label}: ${r.count}只`}
             />
-            <div className="truncate text-[9px] text-muted">{r.label}</div>
+            <div className="truncate text-micro text-muted">{r.label}</div>
           </div>
         )
       })}
@@ -363,9 +365,9 @@ function EmotionRadar({ radar, score }: { radar: OverviewMarket['radar']; score:
         <polygon points={polygon} fill="url(#emotionRadarFill)" stroke={color} strokeWidth="2" />
         {points.map(p => <circle key={p.key} cx={p.x} cy={p.y} r="2.8" fill={color} stroke="oklch(var(--surface) / 0.9)" strokeWidth="1" />)}
         <circle cx={cx} cy={cy} r="29" fill="url(#emotionRadarCenter)" />
-        <text x={cx} y={cy + 7} textAnchor="middle" className="fill-foreground font-mono text-[24px] font-bold">{score}</text>
+        <text x={cx} y={cy + 7} textAnchor="middle" className="fill-foreground font-mono text-2xl font-bold">{score}</text>
         {points.map(p => (
-          <text key={`${p.key}-label`} x={p.lx} y={p.ly + 4} textAnchor="middle" className="fill-secondary text-[10px] font-medium">{p.label}</text>
+          <text key={`${p.key}-label`} x={p.lx} y={p.ly + 4} textAnchor="middle" className="fill-secondary text-micro font-medium">{p.label}</text>
         ))}
       </svg>
     </div>
@@ -376,7 +378,7 @@ function LadderMini({ limit }: { limit: OverviewMarket['limit'] }) {
   const tiers = limit.tiers.filter(t => t.boards >= 2).slice(0, 6)
   return (
     <div className="space-y-1.5">
-      <div className="flex items-center justify-between rounded bg-elevated/55 px-2 py-1.5 text-[11px]">
+      <div className="flex items-center justify-between rounded bg-elevated/55 px-2 py-1.5 text-xs">
         <span className="text-muted">封板率</span>
         <span className="font-mono text-accent">{(limit.seal_rate ?? 0).toFixed(0)}%</span>
       </div>
@@ -396,7 +398,7 @@ function LadderMini({ limit }: { limit: OverviewMarket['limit'] }) {
             {showStocks && (
               <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 pl-[50px]">
                 {stocks.map(s => (
-                  <span key={s.symbol} className="inline-flex items-center gap-0.5 text-[9px] text-secondary">
+                  <span key={s.symbol} className="inline-flex items-center gap-0.5 text-micro text-secondary">
                     {s.name || s.symbol}
                   </span>
                 ))}
@@ -412,7 +414,7 @@ function LadderMini({ limit }: { limit: OverviewMarket['limit'] }) {
 function MiniMetric({ label, value, cls = 'text-foreground' }: { label: string; value: string; cls?: string }) {
   return (
     <div className="rounded-md bg-elevated/45 px-2 py-1.5 border border-border/40">
-      <div className="text-[10px] text-muted">{label}</div>
+      <div className="text-micro text-muted">{label}</div>
       <div className={`mt-0.5 font-mono text-xs font-semibold ${cls}`}>{value}</div>
     </div>
   )
@@ -424,10 +426,10 @@ function StockList({ title, rows, mode, onStockClick, activeSymbol }: {
   activeSymbol?: string;
 }) {
   return (
-    <div className="rounded-card border border-border bg-surface/80 p-1.5 shadow-[0_1px_2px_oklch(var(--border)/0.4)] backdrop-blur-sm transition-shadow hover:shadow-[0_2px_8px_oklch(var(--border)/0.5)]">
+    <div className="rounded-card border border-border bg-surface p-3">
       <div className="mb-1 flex items-center justify-between">
-        <h3 className="text-xs font-semibold text-foreground">{title}</h3>
-        <span className="text-[9px] text-muted">TOP {Math.min(rows.length, 8)}</span>
+        <h3 className={TYPE.card}>{title}</h3>
+        <span className="text-micro text-muted">TOP {Math.min(rows.length, 8)}</span>
       </div>
       <div className="space-y-1">
         {rows.slice(0, 8).map((r, idx) => (
@@ -436,36 +438,36 @@ function StockList({ title, rows, mode, onStockClick, activeSymbol }: {
             className={`grid grid-cols-[18px_1fr_auto] items-center gap-1.5 rounded-md px-1.5 py-1 cursor-pointer transition-colors border ${r.symbol === activeSymbol ? 'bg-accent/10 border-accent/30' : 'bg-elevated/40 border-transparent hover:bg-elevated hover:brightness-110 hover:border-border/60'}`}
             onClick={() => onStockClick?.(r.symbol, r.name ?? undefined)}
           >
-            <span className="text-center font-mono text-[10px] text-muted">{idx + 1}</span>
+            <span className="text-center font-mono text-micro text-muted">{idx + 1}</span>
             <div className="min-w-0">
               <div className="flex items-center gap-1">
-                <span className="truncate text-[11px] text-foreground">{r.name || r.symbol}</span>
+                <span className="truncate text-xs text-foreground">{r.name || r.symbol}</span>
                 {(() => {
                   const board = boardTag(r.symbol)
                   return board ? (
-                    <span className={`shrink-0 inline-flex items-center justify-center h-3 px-1 rounded text-[8px] font-bold leading-none border ${board.color}`}>
+                    <span className={`shrink-0 inline-flex items-center justify-center h-3 px-1 rounded text-micro font-bold leading-none border ${board.color}`}>
                       {board.label}
                     </span>
                   ) : null
                 })()}
               </div>
-              <span className="font-mono text-[9px] text-muted">{r.symbol}</span>
+              <span className="font-mono text-micro text-muted">{r.symbol}</span>
             </div>
             <div className="text-right">
               {mode === 'amount' ? (
                 <>
-                  <div className="font-mono text-[11px] text-foreground">{fmtBigNum(r.amount)}</div>
-                  <div className={`font-mono text-[9px] ${pctClass(r.change_pct)}`}>{fmtStockPct(r.change_pct)}</div>
+                  <div className="font-mono text-xs text-foreground">{fmtBigNum(r.amount)}</div>
+                  <div className={`font-mono text-micro ${pctClass(r.change_pct)}`}>{fmtStockPct(r.change_pct)}</div>
                 </>
               ) : mode === 'active' ? (
                 <>
-                  <div className="font-mono text-[11px] text-accent">{fmtPrice(r.turnover_rate, 1)}%</div>
-                  <div className={`font-mono text-[9px] ${pctClass(r.change_pct)}`}>{fmtStockPct(r.change_pct)}</div>
+                  <div className="font-mono text-xs text-accent">{fmtPrice(r.turnover_rate, 1)}%</div>
+                  <div className={`font-mono text-micro ${pctClass(r.change_pct)}`}>{fmtStockPct(r.change_pct)}</div>
                 </>
               ) : (
                 <>
-                  <div className={`font-mono text-[11px] font-semibold ${pctClass(r.change_pct)}`}>{fmtStockPct(r.change_pct)}</div>
-                  <div className="font-mono text-[9px] text-muted">{fmtPrice(r.close)}</div>
+                  <div className={`font-mono text-xs font-semibold ${pctClass(r.change_pct)}`}>{fmtStockPct(r.change_pct)}</div>
+                  <div className="font-mono text-micro text-muted">{fmtPrice(r.close)}</div>
                 </>
               )}
             </div>
@@ -485,7 +487,7 @@ function RankColumn({ title, rows, tone, onStockClick, onDimensionClick, activeS
 }) {
   return (
     <div className="min-w-0 space-y-1">
-      <div className={`text-[10px] font-medium ${tone === 'bull' ? 'text-bull' : 'text-bear'}`}>{title}</div>
+      <div className={`text-micro font-medium ${tone === 'bull' ? 'text-bull' : 'text-bear'}`}>{title}</div>
       {rows.slice(0, 5).map((r, idx) => {
         const kind = r.source_field ? dimensionKindForSourceField(r.source_field) : null
         const clickable = !!(r.source_field && kind && onDimensionClick)
@@ -503,40 +505,40 @@ function RankColumn({ title, rows, tone, onStockClick, onDimensionClick, activeS
             isActive ? 'border-accent/30 bg-accent/10' : 'border-transparent bg-elevated/40'
           } ${clickable ? 'cursor-pointer hover:border-accent/40 hover:bg-elevated/70' : 'hover:border-border/60'}`}
         >
-          <span className="text-center font-mono text-[9px] text-muted">{idx + 1}</span>
+          <span className="text-center font-mono text-micro text-muted">{idx + 1}</span>
           <div className="min-w-0">
-            <div className="truncate text-[11px] text-foreground" title={r.name}>
+            <div className="truncate text-xs text-foreground" title={r.name}>
               {r.name}
-              {clickable && <span className="ml-1 text-[8px] text-muted/50">↗</span>}
+              {clickable && <span className="ml-1 text-micro text-muted/50">↗</span>}
             </div>
             <div className="mt-0.5 flex items-center gap-1">
-              <span className="shrink-0 font-mono text-[9px] text-muted">{r.count}只</span>
+              <span className="shrink-0 font-mono text-micro text-muted">{r.count}只</span>
               <span className="text-muted">·</span>
               {r.leader?.symbol ? (
                 <button
                   onClick={(e) => { e.stopPropagation(); onStockClick?.(r.leader!.symbol!, r.leader!.name ?? undefined) }}
-                  className="truncate text-[10px] font-medium text-secondary hover:text-accent cursor-pointer transition-colors"
+                  className="truncate text-micro font-medium text-secondary hover:text-accent cursor-pointer transition-colors"
                   title={r.leader?.symbol ?? undefined}
                 >{r.leader?.name ?? '—'}</button>
               ) : (
-                <span className="truncate text-[10px] text-muted">{r.leader?.name ?? '—'}</span>
+                <span className="truncate text-micro text-muted">{r.leader?.name ?? '—'}</span>
               )}
               {r.leader?.change_pct != null && (
-                <span className={`shrink-0 font-mono text-[9px] tabular-nums ${pctClass(r.leader.change_pct)}`}>
+                <span className={`shrink-0 font-mono text-micro tabular-nums ${pctClass(r.leader.change_pct)}`}>
                   {fmtStockPct(r.leader.change_pct)}
                 </span>
               )}
               {r.leader?.symbol && (() => {
                 const board = boardTag(r.leader!.symbol!)
                 return board ? (
-                  <span className={`shrink-0 inline-flex items-center justify-center h-3 px-1 rounded text-[8px] font-bold leading-none border ${board.color}`}>
+                  <span className={`shrink-0 inline-flex items-center justify-center h-3 px-1 rounded text-micro font-bold leading-none border ${board.color}`}>
                     {board.label}
                   </span>
                 ) : null
               })()}
             </div>
           </div>
-          <div className={`font-mono text-[10px] font-semibold ${pctClass(r.avg_pct)}`}>{fmtStockPct(r.avg_pct)}</div>
+          <div className={`font-mono text-micro font-semibold ${pctClass(r.avg_pct)}`}>{fmtStockPct(r.avg_pct)}</div>
         </div>
         )
       })}
@@ -553,7 +555,7 @@ function HotRankCard({ title, rank, configUrl, onStockClick, onDimensionClick, a
 }) {
   const hasData = (rank?.leading?.length ?? 0) > 0 || (rank?.lagging?.length ?? 0) > 0
   return (
-    <section className="rounded-card border border-border bg-surface/80 p-1.5 shadow-[0_1px_2px_oklch(var(--border)/0.4)] backdrop-blur-sm transition-shadow hover:shadow-[0_2px_8px_oklch(var(--border)/0.5)]">
+    <section className="rounded-card border border-border bg-surface p-3">
       <SectionTitle icon={Flame} title={title} hint="领涨/领跌 · 点击板块看成分股" />
       {hasData ? (
         <div className="grid grid-cols-2 gap-2">
@@ -562,10 +564,10 @@ function HotRankCard({ title, rank, configUrl, onStockClick, onDimensionClick, a
         </div>
       ) : (
         <div className="py-4 text-center">
-          <p className="text-[11px] text-muted">未配置扩展数据源</p>
+          <p className="text-xs text-muted">未配置扩展数据源</p>
           <Link
             to={configUrl}
-            className="mt-1.5 inline-block text-[11px] text-accent hover:text-accent/80 transition-colors"
+            className="mt-1.5 inline-block text-xs text-accent hover:text-accent/80 transition-colors"
           >
             前往配置 →
           </Link>
@@ -756,13 +758,13 @@ export function Dashboard() {
             渐变条最左边那道 4px 装饰条, 上面没有任何信息。
       */}
       <div className="sticky top-0 z-20 -mx-3 -mt-3 mb-1.5 bg-base px-3 pt-3 lg:-mx-4 lg:px-4">
-      <div className="relative flex flex-wrap items-center justify-between gap-2 overflow-hidden rounded-card border border-border bg-gradient-to-r from-surface/90 to-surface/70 py-1.5 pl-11 pr-3 shadow-[0_1px_3px_oklch(var(--border)/0.4)] backdrop-blur-sm lg:pl-3">
-        <div className="pointer-events-none absolute left-0 top-0 h-full w-1 bg-gradient-to-b from-accent to-accent/20" aria-hidden />
+      {/* [R453] 页头换成与全站卡片同一套(实边框实底), 页标题 L1 */}
+      <div className="relative flex flex-wrap items-center justify-between gap-2 overflow-hidden rounded-card border border-border bg-surface py-2 pl-11 pr-3 lg:pl-4">
         <div className="flex items-center gap-2">
-          <Gauge className="h-4 w-4 text-accent" />
-          <h1 className="text-base font-semibold text-foreground">市场看板</h1>
+          <Gauge className="h-5 w-5 text-accent" />
+          <h1 className={TYPE.page}>市场看板</h1>
           <span
-            className="rounded-btn border px-2 py-0.5 text-[10px] font-medium"
+            className="rounded-btn border px-2 py-0.5 text-xs font-medium"
             style={{
               color: scoreColor(score),
               borderColor: `${scoreColor(score)}40`,
@@ -772,7 +774,7 @@ export function Dashboard() {
             {data.emotion.label} · {score}
           </span>
         </div>
-        <div className="flex items-center gap-3 text-[11px] text-muted">
+        <div className="flex items-center gap-3 text-xs text-muted">
           {currentDate ? (
             <DatePicker
               value={currentDate}
@@ -789,9 +791,9 @@ export function Dashboard() {
           <button
             onClick={handleRefresh}
             disabled={manualFetching}
-            className="inline-flex items-center gap-1 rounded-btn border border-border bg-elevated px-2 py-1 text-[11px] text-secondary transition-colors hover:text-foreground disabled:opacity-50"
+            className={buttonClass({}, 'gap-1')}
           >
-            <RefreshCw className={`h-3 w-3 ${manualFetching ? 'animate-spin' : ''}`} />重载
+            <RefreshCw className={`h-3.5 w-3.5 ${manualFetching ? 'animate-spin' : ''}`} />重载
           </button>
         </div>
       </div>
@@ -829,7 +831,7 @@ export function Dashboard() {
 
       {/* 自选实时模式提示: 大盘看板为盘后数据, 仅自选股实时。避免用户误读为全市场实时。 */}
       {quoteMode === 'watchlist' && (
-        <div className="mb-1.5 flex items-start gap-2 rounded-card border border-amber-500/30 bg-amber-500/8 px-3 py-1.5 text-[11px] leading-relaxed">
+        <div className="mb-1.5 flex items-start gap-2 rounded-card border border-warning/30 bg-warning/10 px-3 py-1.5 text-xs leading-relaxed">
           <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
           <div className="min-w-0 flex-1 text-secondary">
             当前为「自选实时」模式,看板展示的大盘数据为<strong className="text-foreground">盘后快照</strong>(最新有数据日),并非盘中实时;
@@ -860,7 +862,7 @@ export function Dashboard() {
       <div className="grid grid-cols-1 gap-1.5 xl:grid-cols-[minmax(0,1fr)_20rem]">
         <main className="min-w-0 space-y-1.5">
           <div className="grid grid-cols-1 gap-1.5 lg:grid-cols-3">
-            <section className="rounded-card border border-border bg-surface/80 p-1.5 shadow-[0_1px_2px_oklch(var(--border)/0.4)] backdrop-blur-sm transition-shadow hover:shadow-[0_2px_8px_oklch(var(--border)/0.5)]">
+            <section className="rounded-card border border-border bg-surface p-3">
               <SectionTitle icon={BarChart3} title="涨跌分布 / 广度" hint={`${data.breadth.total}只`} />
               <DistributionBars rows={data.distribution} />
               <div className="mt-2">
@@ -873,14 +875,14 @@ export function Dashboard() {
             </section>
 
             <section
-              className="rounded-card border bg-surface/80 p-1.5 shadow-[0_1px_2px_oklch(var(--border)/0.4)] backdrop-blur-sm transition-shadow hover:shadow-[0_2px_8px_oklch(var(--border)/0.5)]"
+              className="rounded-card border bg-surface p-3"
               style={{ borderColor: `${scoreColor(score)}40` }}
             >
               <SectionTitle icon={Sparkles} title="情绪雷达" hint={`情绪评分 ${score}`} />
               <EmotionRadar radar={data.radar} score={score} />
             </section>
 
-            <section className="flex flex-col rounded-card border border-border bg-surface/80 p-1.5 shadow-[0_1px_2px_oklch(var(--border)/0.4)] backdrop-blur-sm transition-shadow hover:shadow-[0_2px_8px_oklch(var(--border)/0.5)]">
+            <section className="flex flex-col rounded-card border border-border bg-surface p-3">
               <div>
                 <SectionTitle icon={LineChart} title="趋势强度" hint="均线/新高低" />
                 <div className="grid grid-cols-3 gap-1.5">
@@ -924,16 +926,16 @@ export function Dashboard() {
         </main>
 
         <aside className="min-w-0 space-y-1.5">
-          <section className="rounded-card border border-border bg-surface/80 p-1.5 shadow-[0_1px_2px_oklch(var(--border)/0.4)] backdrop-blur-sm transition-shadow hover:shadow-[0_2px_8px_oklch(var(--border)/0.5)]">
-            <SectionTitle icon={Flame} title="涨停梯队" hint={<span className="inline-flex items-center gap-1">{`涨停 ${data.limit.limit_up}`}{isSealedDegrade && <span className="text-[9px] px-1 rounded bg-yellow-500/10 text-yellow-600 dark:text-yellow-500">{hasDepth ? '未修正' : '降级'}</span>}</span>} />
+          <section className="rounded-card border border-border bg-surface p-3">
+            <SectionTitle icon={Flame} title="涨停梯队" hint={<span className="inline-flex items-center gap-1">{`涨停 ${data.limit.limit_up}`}{isSealedDegrade && <span className="text-micro px-1 rounded bg-yellow-500/10 text-yellow-600 dark:text-yellow-500">{hasDepth ? '未修正' : '降级'}</span>}</span>} />
             <LadderMini limit={data.limit} />
           </section>
-          <section className="rounded-card border border-border bg-surface/80 p-1.5 shadow-[0_1px_2px_oklch(var(--border)/0.4)] backdrop-blur-sm transition-shadow hover:shadow-[0_2px_8px_oklch(var(--border)/0.5)]">
+          <section className="rounded-card border border-border bg-surface p-3">
             <div className="mb-2 flex items-center justify-between gap-2">
               <div className="flex items-center gap-1.5">
                 <BellRing className="h-3.5 w-3.5 text-accent" />
                 <h2 className="text-xs font-semibold text-foreground">监控中心</h2>
-                <span className="font-mono text-[10px] text-muted">实时信号</span>
+                <span className="font-mono text-micro text-muted">实时信号</span>
               </div>
               <Link to="/monitor" className="inline-flex items-center justify-center h-5 w-5 rounded text-muted hover:text-accent hover:bg-accent/10 transition-colors" title="进入监控中心">
                 <ArrowUpRight className="h-3.5 w-3.5" />
@@ -1003,17 +1005,17 @@ function FetchDataCard({
               ? '可通过 TickFlow 免费服务器拉取近 1 年全 A 股日K'
               : `将从当前数据源「${providerLabel}」拉取近 1 年全 A 股日K`}(约 5500 只),预计 1-3 分钟,期间可继续浏览其他页面。
           </p>
-          <p className="mt-1 text-[11px] text-warning/80 leading-relaxed">
+          <p className="mt-1 text-xs text-warning/80 leading-relaxed">
             ⓘ 获取数据后即可进行策略定制、回测验证、选股扫描等本地分析功能。
           </p>
-          <p className="mt-1 text-[11px] text-muted leading-relaxed">
+          <p className="mt-1 text-xs text-muted leading-relaxed">
             💡 配置 fuyao(同花顺 REST) Key 可解锁财务四表 / 龙虎榜 / 盘前风向标 / 竞价异动:
             <Link to="/settings?tab=data-sources" className="text-accent hover:text-accent/80 transition-colors">前往设置 →</Link>
           </p>
 
           {isFetching ? (
             <div className="mt-3">
-              <div className="flex items-center justify-between text-[11px] text-muted mb-1.5">
+              <div className="flex items-center justify-between text-xs text-muted mb-1.5">
                 <span className="inline-flex items-center gap-1.5">
                   <Loader2 className="h-3 w-3 animate-spin" />
                   {isStarting ? '正在启动同步任务…' : stageText}
@@ -1098,8 +1100,8 @@ function WelcomeFetchModal({
           同步期间可继续浏览其他页面,完成后看板自动刷新。
         </p>
         <div className="mx-auto mt-4 max-w-md rounded-btn bg-elevated/60 px-4 py-3 text-left">
-          <div className="text-[11px] font-medium text-secondary">获取完成后的推荐步骤</div>
-          <ol className="mt-1.5 space-y-1 text-[11px] text-muted leading-relaxed">
+          <div className="text-xs font-medium text-secondary">获取完成后的推荐步骤</div>
+          <ol className="mt-1.5 space-y-1 text-xs text-muted leading-relaxed">
             <li>1. <span className="text-secondary">配置 fuyao(同花顺 REST) Key</span> — 解锁财务四表 / 龙虎榜 / 盘前风向标 / 竞价异动</li>
             <li>2. <span className="text-secondary">分钟数据落盘(可选)</span> — 分钟策略回测与板块分时走势需要</li>
             <li>3. <span className="text-secondary">开始研究</span> — 自选加标的 → 策略扫描 → 回测验证</li>
@@ -1107,7 +1109,7 @@ function WelcomeFetchModal({
           <Link
             to="/settings?tab=data-sources"
             onClick={onClose}
-            className="mt-2 inline-flex items-center gap-0.5 text-[11px] text-accent hover:text-accent/80 transition-colors"
+            className="mt-2 inline-flex items-center gap-0.5 text-xs text-accent hover:text-accent/80 transition-colors"
           >
             前往设置 → 数据源
             <ArrowUpRight className="h-3 w-3 self-center" />

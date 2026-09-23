@@ -23,14 +23,14 @@ function SealedDirBlock({ title, color, counts, rawTotal }: {
   return (
     <div className="mb-2 last:mb-0">
       <div className={`flex items-center justify-between px-1 py-0.5 rounded bg-${color}/5 mb-1`}>
-        <span className={`text-[10px] font-medium text-${color}`}>{title}</span>
-        <span className="tabular-nums text-[10px]">
+        <span className={`text-micro font-medium text-${color}`}>{title}</span>
+        <span className="tabular-nums text-micro">
           <span className="text-muted line-through">{original}</span>
           <span className="text-muted/50 mx-1">→</span>
           <span className={`font-bold text-${color}`}>{fixed}</span>
         </span>
       </div>
-      <div className="flex gap-3 px-1 text-[10px]">
+      <div className="flex gap-3 px-1 text-micro">
         <span className={`flex items-center gap-0.5 text-${color}`}><span className={`h-1 w-1 rounded-full bg-${color}`} />真封 {real}</span>
         <span className="flex items-center gap-0.5 text-yellow-500"><span className="h-1 w-1 rounded-full bg-yellow-500" />假 {fake}</span>
         {pending > 0 && (
@@ -99,7 +99,7 @@ export function SealedBadge({ degraded, hasDepth, isHistorical, sealedReady, sea
           className="group inline-flex shrink-0 items-center gap-1 h-5 whitespace-nowrap px-2 rounded-btn bg-yellow-500/10 border border-yellow-500/30 cursor-help transition-ui hover:bg-yellow-500/20 hover:border-yellow-500/50"
         >
           <span className="h-1.5 w-1.5 rounded-full bg-yellow-500" />
-          <span className="whitespace-nowrap text-[10px] font-medium text-yellow-600 dark:text-yellow-500 leading-none">{label}</span>
+          <span className="whitespace-nowrap text-micro font-medium text-warning leading-none">{label}</span>
           <HelpCircle className="h-3 w-3 text-yellow-500/70 group-hover:text-yellow-500 transition-colors" />
         </button>
       </div>
@@ -113,7 +113,7 @@ export function SealedBadge({ degraded, hasDepth, isHistorical, sealedReady, sea
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: -4, scale: 0.95 }}
                 style={{ left: hintPos.left, top: hintPos.top }}
-                className="fixed z-50 w-64 bg-surface border border-border rounded-md shadow-xl p-3 text-[11px] text-secondary leading-relaxed"
+                className="fixed z-50 w-64 bg-surface border border-border rounded-md shadow-xl p-3 text-xs text-secondary leading-relaxed"
                 onClick={e => e.stopPropagation()}
               >
                 {degraded ? (
@@ -144,14 +144,14 @@ export function SealedBadge({ degraded, hasDepth, isHistorical, sealedReady, sea
                     <button
                       onClick={() => { runFix.mutate(); setShowHint(false) }}
                       disabled={runFix.isPending}
-                      className="flex-1 px-2 py-1.5 rounded text-[11px] bg-accent/15 text-accent hover:bg-accent/25 transition-colors text-center disabled:opacity-50"
+                      className="flex-1 px-2 py-1.5 rounded text-xs bg-accent/15 text-accent hover:bg-accent/25 transition-colors text-center disabled:opacity-50"
                     >
                       {runFix.isPending ? '修正中…' : '立即修正'}
                     </button>
                   )}
                   <button
                     onClick={() => { setShowHint(false); navigate('/settings?tab=monitoring&highlight=depth-fix') }}
-                    className={`${hasDepth && !isHistorical ? '' : 'w-full'} px-2 py-1.5 rounded text-[11px] bg-elevated text-secondary hover:text-foreground transition-colors text-center`}
+                    className={`${hasDepth && !isHistorical ? '' : 'w-full'} px-2 py-1.5 rounded text-xs bg-elevated text-secondary hover:text-foreground transition-colors text-center`}
                   >
                     去设置 →
                   </button>

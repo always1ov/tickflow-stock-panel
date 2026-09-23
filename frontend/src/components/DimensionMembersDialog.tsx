@@ -18,6 +18,8 @@ import { api, type DimensionIntradayPoint, type MarketSnapshotRow } from '@/lib/
 import { QK } from '@/lib/queryKeys'
 import { fmtBigNum, fmtPct, fmtPrice, priceColorClass } from '@/lib/format'
 import { useChartTheme } from '@/lib/theme'
+import { TYPE } from '@/components/ui'
+import { cn } from '@/lib/cn'
 
 export type DimensionKind = 'concept' | 'industry'
 
@@ -195,10 +197,10 @@ function DimensionMembersDialogContent({ target, onClose, onStockClick }: Omit<P
         </div>
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <h2 id={titleId} className="truncate text-sm font-semibold text-foreground">{target.value}</h2>
-            <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium ${accent.badgeCls}`}>{accent.badge}</span>
+            <h2 id={titleId} className={cn('truncate', TYPE.section)}>{target.value}</h2>
+            <span className={`shrink-0 rounded px-1.5 py-0.5 text-micro font-medium ${accent.badgeCls}`}>{accent.badge}</span>
           </div>
-          <div className="mt-0.5 flex items-center gap-2 text-[10px] text-muted">
+          <div className="mt-0.5 flex items-center gap-2 text-micro text-muted">
             <span>{membersQuery.data?.label ?? source?.configId ?? '扩展数据'}</span>
             {membersQuery.data?.date && <span>{membersQuery.data.date}</span>}
           </div>
@@ -262,7 +264,7 @@ function DimensionMembersDialogContent({ target, onClose, onStockClick }: Omit<P
             </select>
           </div>
 
-          <div className="grid shrink-0 grid-cols-[minmax(132px,1fr)_74px_74px_18px] border-b border-border bg-elevated/60 px-4 py-2 text-[10px] font-medium text-muted md:grid-cols-[minmax(180px,1fr)_90px_84px_88px_100px_18px]">
+          <div className="grid shrink-0 grid-cols-[minmax(132px,1fr)_74px_74px_18px] border-b border-border bg-elevated/60 px-4 py-2 text-micro font-medium text-muted md:grid-cols-[minmax(180px,1fr)_90px_84px_88px_100px_18px]">
             <span>股票</span><span className="text-right">现价</span><span className="text-right">涨跌幅</span>
             <span className="hidden text-right md:block">换手率</span><span className="hidden text-right md:block">成交额</span><span />
           </div>
@@ -288,9 +290,9 @@ function DimensionMembersDialogContent({ target, onClose, onStockClick }: Omit<P
                       <span className="min-w-0">
                         <span className="flex min-w-0 items-center gap-1.5">
                           <span className="min-w-0 truncate font-medium text-foreground">{row.name || row.symbol}</span>
-                          {board && <span className={`inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded border text-[9px] font-bold ${board.color}`}>{board.label}</span>}
+                          {board && <span className={`inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded border text-micro font-bold ${board.color}`}>{board.label}</span>}
                         </span>
-                        <span className="block font-mono text-[10px] text-muted">{row.symbol}</span>
+                        <span className="block font-mono text-micro text-muted">{row.symbol}</span>
                       </span>
                       <span className="text-right tabular-nums text-secondary">{fmtPrice(finite(row.close))}</span>
                       <span className={`text-right tabular-nums font-medium ${priceColorClass(finite(row.change_pct))}`}>{fmtPct(finite(row.change_pct))}</span>
@@ -305,7 +307,7 @@ function DimensionMembersDialogContent({ target, onClose, onStockClick }: Omit<P
           )}
 
           {total > rows.length && (
-            <div className="shrink-0 border-t border-border px-4 py-2 text-center text-[10px] text-muted">显示前 {rows.length} / {total} 只</div>
+            <div className="shrink-0 border-t border-border px-4 py-2 text-center text-micro text-muted">显示前 {rows.length} / {total} 只</div>
           )}
         </>
       )}
@@ -316,7 +318,7 @@ function DimensionMembersDialogContent({ target, onClose, onStockClick }: Omit<P
 function Summary({ label, value, className }: { label: string; value: string | number; className: string }) {
   return (
     <div className="flex items-baseline justify-center gap-1.5 px-2 py-2.5">
-      <span className="text-[10px] text-muted">{label}</span>
+      <span className="text-micro text-muted">{label}</span>
       <span className={`text-xs font-semibold tabular-nums ${className}`}>{value}</span>
     </div>
   )
@@ -361,22 +363,22 @@ function DimensionIntradaySection({ configId, field, value, date, kind }: {
     <section className="shrink-0 border-b border-border bg-surface/30">
       <div className="flex items-center gap-2 px-4 pt-2">
         <Activity className="h-3 w-3 text-muted" />
-        <span className="text-[10px] font-medium text-muted">分时走势 · 等权</span>
+        <span className="text-micro font-medium text-muted">分时走势 · 等权</span>
         {data?.member_count != null && data.members_with_minute != null && (
-          <span className="rounded bg-elevated px-1 py-px font-mono text-[9px] text-muted" title="有当日分钟数据的成分股数">
+          <span className="rounded bg-elevated px-1 py-px font-mono text-micro text-muted" title="有当日分钟数据的成分股数">
             {data.members_with_minute}/{data.member_count}只
           </span>
         )}
         {data?.basis && data.basis !== 'prev_close' && (
           <span
-            className="rounded bg-amber-500/10 px-1 py-px text-[9px] text-amber-600 dark:text-amber-400"
+            className="rounded bg-warning/10 px-1 py-px text-micro text-warning"
             title="前一交易日收盘缺失, 部分标的以当日首根分钟价为基准, 曲线起点约为 0"
           >
             基准:当日首价
           </span>
         )}
         {data?.status === 'ok' && (
-          <div className="ml-auto flex items-center gap-2.5 font-mono text-[10px]">
+          <div className="ml-auto flex items-center gap-2.5 font-mono text-micro">
             <span className="inline-flex items-center gap-1">
               <span className="h-[3px] w-3 rounded-full" style={{ background: INTRADAY_SECTOR_COLOR[kind] }} />
               <span className="text-muted">板块</span>
@@ -399,18 +401,18 @@ function DimensionIntradaySection({ configId, field, value, date, kind }: {
       {query.isLoading ? (
         <div className="mx-4 mb-2 mt-1.5 h-[132px] animate-pulse rounded-md bg-elevated/50" />
       ) : query.isError ? (
-        <div className="mx-4 mb-2 mt-1 grid h-[72px] place-items-center rounded-md border border-dashed border-border px-4 text-center text-[11px] text-muted">
+        <div className="mx-4 mb-2 mt-1 grid h-[72px] place-items-center rounded-md border border-dashed border-border px-4 text-center text-xs text-muted">
           分时加载失败:{String((query.error as Error).message)}
         </div>
       ) : data?.status === 'no_data' ? (
         <div className="mx-4 mb-2 mt-1 flex h-[96px] flex-col items-center justify-center gap-1 rounded-md border border-dashed border-border">
           <Database className="h-4 w-4 text-muted" />
-          <p className="text-[11px] text-muted">分钟数据未落盘, 暂无分时走势</p>
-          <p className="text-[10px] text-muted/70">需 TickFlow Pro+ 盘后分钟同步 / Expert 盘中增量, 或自定义分钟源</p>
-          <Link to="/data" className="text-[10px] text-accent hover:text-accent/80">前往数据页 →</Link>
+          <p className="text-xs text-muted">分钟数据未落盘, 暂无分时走势</p>
+          <p className="text-micro text-muted/70">需 TickFlow Pro+ 盘后分钟同步 / Expert 盘中增量, 或自定义分钟源</p>
+          <Link to="/data" className="text-micro text-accent hover:text-accent/80">前往数据页 →</Link>
         </div>
       ) : !data || data.status === 'empty' || data.points.length < 2 ? (
-        <div className="grid h-[44px] place-items-center text-[11px] text-muted">
+        <div className="grid h-[44px] place-items-center text-xs text-muted">
           {data?.reason === 'no_member_bars' ? '成分股当日无分钟数据 (ETF 等标的无分钟落盘)' : '暂无成分股分时数据'}
         </div>
       ) : (

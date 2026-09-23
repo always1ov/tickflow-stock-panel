@@ -46,7 +46,7 @@ function LogViewer({ log }: { log: PipelineJob['log'] }) {
   }, [displayLog])
 
   return (
-    <div ref={containerRef} className="rounded-btn bg-base/60 border border-border max-h-48 overflow-y-auto px-3 py-2 font-mono text-[11px] space-y-0.5">
+    <div ref={containerRef} className="rounded-btn bg-base/60 border border-border max-h-48 overflow-y-auto px-3 py-2 font-mono text-xs space-y-0.5">
       {displayLog.map((line, i) => (
         <div key={`${line.ts}-${i}`} className="flex gap-2 text-secondary">
           <span className="text-muted shrink-0">{formatLogTime(line.ts)}</span>
@@ -106,7 +106,7 @@ export function ActiveJobCard({ job }: { job: PipelineJob }) {
               onClick={cancelJob}
               disabled={cancelling}
               title="中断同步:任务在当前批次结束后停止;已拉取的数据保留,下次同步自动从断点续拉"
-              className="inline-flex items-center gap-1 rounded-btn border border-danger/40 bg-danger/10 px-2.5 py-1 text-[11px] text-danger transition-colors hover:bg-danger/20 disabled:opacity-50"
+              className="inline-flex items-center gap-1 rounded-btn border border-danger/40 bg-danger/10 px-2.5 py-1 text-xs text-danger transition-colors hover:bg-danger/20 disabled:opacity-50"
             >
               <Square className="h-3 w-3" />
               {cancelling ? '停止中…' : '取消'}
@@ -131,8 +131,8 @@ export function ActiveJobCard({ job }: { job: PipelineJob }) {
           </div>
           {job.stage_pct > 0 && (
             <div className="flex items-center justify-between mt-1">
-              <span className="text-[10px] text-muted">当前阶段</span>
-              <span className="text-[10px] font-mono text-secondary">{job.stage_pct}%</span>
+              <span className="text-micro text-muted">当前阶段</span>
+              <span className="text-micro font-mono text-secondary">{job.stage_pct}%</span>
             </div>
           )}
         </div>
@@ -158,7 +158,7 @@ export function ActiveJobCard({ job }: { job: PipelineJob }) {
         <div className="mt-3 rounded-btn border border-danger/40 bg-danger/5 px-3 py-2 text-xs text-danger">
           {job.error}
           {job.error.includes('超时自动取消') && (
-            <div className="mt-1 text-[10px] text-muted">
+            <div className="mt-1 text-micro text-muted">
               判定依据是「无进度」而非总时长, 任务只要仍在推进就不会被中断;
               若网络环境较慢可在 设置 → 网络设置 中调大停滞阈值。
             </div>
