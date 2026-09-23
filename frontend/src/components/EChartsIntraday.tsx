@@ -569,7 +569,7 @@ export function EChartsIntraday({
         <div className="inline-flex items-center rounded bg-elevated overflow-hidden">
           <button
             onClick={() => setYMode('adaptive')}
-            className={`px-2.5 py-0.5 text-[10px] font-mono cursor-pointer transition-colors ${
+            className={`px-2.5 py-0.5 text-xs font-mono cursor-pointer transition-colors ${
               yMode === 'adaptive'
                 ? 'bg-accent/20 text-accent'
                 : 'text-muted hover:text-secondary'
@@ -580,7 +580,7 @@ export function EChartsIntraday({
           <div className="w-px h-3 bg-border/40" />
           <button
             onClick={() => setYMode('limit')}
-            className={`px-2.5 py-0.5 text-[10px] font-mono cursor-pointer transition-colors ${
+            className={`px-2.5 py-0.5 text-xs font-mono cursor-pointer transition-colors ${
               yMode === 'limit'
                 ? 'bg-accent/20 text-accent'
                 : 'text-muted hover:text-secondary'
@@ -592,7 +592,7 @@ export function EChartsIntraday({
       </div>}
       <div style={{ backgroundColor: ct.infoBarBg }}>
         {/* 第一行: 日期 + OHLC */}
-        <div className="flex items-center gap-x-2 px-2 font-mono text-[11px] select-none flex-wrap" style={{ minHeight: 20 }}>
+        <div className="flex items-center gap-x-2 px-2 font-mono text-xs select-none flex-wrap" style={{ minHeight: 20 }}>
           {!d && <span className="text-muted">—</span>}
           {ohlc && (
             <>
@@ -610,7 +610,7 @@ export function EChartsIntraday({
           )}
         </div>
         {/* 第二行: 价格+均价+量+额 */}
-        <div className="flex flex-wrap items-center gap-x-2 px-2 font-mono text-[11px] select-none" style={{ minHeight: 20 }}>
+        <div className="flex flex-wrap items-center gap-x-2 px-2 font-mono text-xs select-none" style={{ minHeight: 20 }}>
           {d && (
             <>
               <span className="flex items-center gap-x-1">

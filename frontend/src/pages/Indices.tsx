@@ -8,6 +8,8 @@ import { useCapabilities } from '@/lib/useSharedQueries'
 import { EChartsCandlestick, type OHLC } from '@/components/EChartsCandlestick'
 import { EChartsIntraday } from '@/components/EChartsIntraday'
 import { PageShell } from '@/components/PageShell'
+import { TYPE } from '@/components/ui'
+import { cn } from '@/lib/cn'
 
 function defaultRange() {
   const now = new Date()
@@ -162,9 +164,9 @@ export function Indices() {
       >
         <div className="flex items-center justify-between gap-2">
           <span className="truncate text-xs font-medium">{item.name || item.symbol}</span>
-          <span className={`text-[10px] font-mono ${Number(pct ?? 0) >= 0 ? 'text-bull' : 'text-bear'}`}>{fmtPct(pct)}</span>
+          <span className={`text-micro font-mono ${Number(pct ?? 0) >= 0 ? 'text-bull' : 'text-bear'}`}>{fmtPct(pct)}</span>
         </div>
-        <div className="mt-0.5 flex items-center justify-between text-[10px] font-mono text-muted">
+        <div className="mt-0.5 flex items-center justify-between text-micro font-mono text-muted">
           <span>{item.symbol}</span>
           <span>{fmtNum(current)}</span>
         </div>
@@ -196,7 +198,7 @@ export function Indices() {
           折到顶部堆叠, lg 才回两栏。 */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[15rem_1fr]">
         <aside className="rounded-card border border-border bg-surface p-3">
-          <div className="mb-2 px-1 text-[11px] uppercase tracking-wider text-muted">核心指数</div>
+          <div className={cn('mb-2 px-1', TYPE.card)}>核心指数</div>
           <div className="space-y-1">
             {topRows.map(renderIndexItem)}
           </div>
@@ -274,7 +276,7 @@ export function Indices() {
                   <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
                     <Lock className="h-5 w-5 text-muted" />
                     <div className="text-xs text-secondary">指数分时数据不可用</div>
-                    <div className="text-[10px] text-muted">分钟K(批量)数据不可用</div>
+                    <div className="text-micro text-muted">分钟K(批量)数据不可用</div>
                   </div>
                 ) : (
                   <>
