@@ -9,17 +9,19 @@
  *     [R447] 「使用说明」撤了。用户: 「删掉导出复盘后面的使用说明按钮, 不需要了」。
  *   · [R472] 刷新按钮挪上来。它原来只在旧顶栏里, 而旧顶栏自 R432 起排到了新块后面, 要一路
  *     滚到底才看得见 —— 量化MACD 取数失败时图上写的是「稍后点右上角刷新重试」, 右上角却没有。
+ *   · [R478] 「加监控」从旧顶栏搬上来(用户: 「先帮我移植保留监控按钮到新的里面的合适的位置」),
+ *     放在自选星标旁边 —— 两个都是**对这只票做的事**, 旧顶栏里它们也挨着。
  *
  * 两行:
  *
- *     名称 代码  现价  涨跌幅  起 ~ 止 · N 个交易日  [☆]      [60日][120日][250日] [AI 四维分析] [导出复盘] [⟳]
+ *     名称 代码  现价  涨跌幅  起 ~ 止 · N 个交易日  [☆][监控]  [60日][120日][250日] [AI 四维分析] [导出复盘] [⟳]
  *     结论  (待定) ───────────────────────────────────────────────────────────────
  *
  * 天数与复盘页**是同一个值**(由弹窗持有, 两处都能改): 现在用到 60/120/250 的只有复盘。
  * 「起 ~ 止 · N 个交易日」从弹窗已经在取的那份日 K 里数最后 N 根, 不为这一行另发请求 ——
  * 复盘那份要"回算", 只为了头部一行字就每次开弹窗都回算一遍不划算。
  */
-import { Loader2, RefreshCw, Sparkles, Star } from 'lucide-react'
+import { Loader2, RadioTower, RefreshCw, Sparkles, Star } from 'lucide-react'
 import { toast } from '@/components/Toast'
 import { WatchlistAddMenu } from '@/components/WatchlistAddMenu'
 import { useAnalysisKline } from '@/components/stock-analysis/StockLevelsPanel'
@@ -32,7 +34,7 @@ export const HERO_DAYS_DEFAULT = 120
 
 export function PreviewHero({
   symbol, name, days, onDaysChange, inWatchlist, watchBusy, onWatchAdd, onWatchRemove,
-  onAiAnalyze, aiBusy = false, onRefresh,
+  onAiAnalyze, aiBusy = false, onRefresh, onAddMonitor,
 }: {
   symbol: string
   name?: string
@@ -46,6 +48,8 @@ export function PreviewHero({
   aiBusy?: boolean
   /** 重取这只票弹窗里的数据(与旧顶栏那个刷新是同一个函数) */
   onRefresh: () => void
+  /** 打开「加监控」规则编辑器(编辑器挂在弹窗那一层) */
+  onAddMonitor?: () => void
 }) {
   // 与关键价位页同一份日 K(同一个查询键, 不多发请求)
   const kline = useAnalysisKline(symbol)
@@ -93,6 +97,13 @@ export function PreviewHero({
               </WatchlistAddMenu>
             )}
           </span>
+          {onAddMonitor && (
+            <button type="button" onClick={onAddMonitor} title="加监控"
+                    aria-label={`给 ${name || symbol} 加监控`}
+                    className={`${SQUARE} self-center text-secondary hover:text-foreground`}>
+              <RadioTower className="h-4 w-4" />
+            </button>
+          )}
         </div>
 
         <div className="flex shrink-0 flex-wrap items-center gap-2">

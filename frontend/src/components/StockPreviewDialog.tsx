@@ -379,6 +379,7 @@ export function StockPreviewDialog({ symbol: symbolProp, name: nameProp, onClose
                 onWatchRemove={() => toggleWatchlist.mutate({ action: 'remove' })}
                 onAiAnalyze={onAiAnalyze} aiBusy={aiBusy}
                 onRefresh={handleRefresh}
+                onAddMonitor={() => setShowMonitorEditor(true)}
               />
             )}
 

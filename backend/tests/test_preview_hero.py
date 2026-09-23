@@ -95,3 +95,13 @@ def test_R472_新头部有刷新_与旧顶栏是同一个函数():
     # 那句提示说的就是量化MACD: 刷新得真的重取它
     fn = dlg[dlg.index("const handleRefresh"):dlg.index("const selectIntradayDays")]
     assert "QK.stockQuantMacd(symbol)" in fn, "刷新不重取量化MACD —— 图上的「点右上角刷新重试」是空话"
+
+
+def test_R478_新头部有加监控_打开的是弹窗那一个规则编辑器():
+    """[R478] 用户:「先帮我移植保留监控按钮到新的里面的合适的位置」。旧顶栏要删, 删之前
+    这个功能得先在新头部有一个入口; 打开的仍是弹窗层级那一个 RuleEditor(不在旧内容里)。"""
+    hero, dlg = code_of(HERO), code_of(DLG)
+    assert "onClick={onAddMonitor}" in hero and "<RadioTower" in hero, "新头部没有加监控"
+    call = dlg[dlg.index("<PreviewHero"):dlg.index("/>", dlg.index("<PreviewHero"))]
+    assert "onAddMonitor={() => setShowMonitorEditor(true)}" in call
+    assert "{showMonitorEditor && symbol && (" in dlg, "规则编辑器弹层不见了"
