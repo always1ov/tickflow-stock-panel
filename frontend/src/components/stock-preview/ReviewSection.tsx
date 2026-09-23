@@ -5,7 +5,8 @@
  *   1. 逐日复盘 —— 原来「趋势状态」「通道档位」两个页签各一张逐日表, 并成一张:
  *      六态状态与通道档位并排, 动作 / 成交→了结 / 结果**两套都显示**(用户选的),
  *      同一天两套都动了手就上下两行, 前面标「六态」「通道」;
- *   2. 两套买卖的对比 —— 跟着做 / 一直拿着 / 多赚 / 买卖次数 / 规则, 一套一行;
+ *   2. 两套买卖的对比 —— 跟着做 / 一直拿着 / 多赚 / 买卖次数 / 规则, 一套一行
+ *      ([R441] 「按档位买卖 · 通道」那一行删了, 只剩六态);
  *   3. 六个状态在这只票上的历史表现 —— **只摆数, 不下结论**(用户选的):
  *      图里那一列「一进这档就该走, 不抢反弹」是建议, 而自然回撤在上升趋势里并不
  *      算坏, 写「该走」就是多给一次卖出理由(交易哲学: 趋势没坏就不给卖出理由)。
@@ -31,7 +32,7 @@ import { TREND_FILL } from '@/lib/reviewTimeline'
 import { trendBadgeCls } from '@/components/stock-analysis/TrendStateBar'
 import { VerdictHover } from '@/components/stock-analysis/VerdictHover'
 import {
-  EvidencePanel, FLIP_BASIS, LimitTag, SUB_STATE_TIP, VERDICT_BASIS, VERDICT_CLS,
+  EvidencePanel, FLIP_BASIS, LimitTag, SUB_STATE_TIP, VERDICT_CLS,
   chgCls, pct, useStockReview,
 } from '@/components/stock-analysis/StockReviewDialog'
 import {
@@ -247,12 +248,13 @@ function TradeCells({ six, ch }: { six?: Leg; ch?: Leg }) {
   )
 }
 
-// ===== 2 + 3. 两套买卖的对比 / 六个状态的历史表现 =====
+// ===== 2 + 3. 按转折买卖(R441 起只剩这一套) / 六个状态的历史表现 =====
 
 function SummaryCard({ d }: { d: StockReview }) {
   const systems = [
     { name: '按转折买卖 · 六态', ft: d.flip_trades, basis: FLIP_BASIS },
-    { name: '按档位买卖 · 通道', ft: d.verdict_trades, basis: VERDICT_BASIS },
+    // [R441] 「按档位买卖 · 通道」那一行删了(用户指着它: 「删除」)。
+    // 逐日表里通道那一笔笔动作不动 —— 那是旧「通道档位」表的原有内容(R440)
   ]
   return (
     <div className="rounded-card border border-border bg-surface p-4">

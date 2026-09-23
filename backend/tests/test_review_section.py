@@ -63,7 +63,6 @@ def test_R431_口径与四个数的说明只有一个产地():
         assert old.count(text) == 1 and text not in sec, f"{const} 的原文又写了第二份"
         assert f"basis={{{const}}}" in old
     assert "{ name: '按转折买卖 · 六态', ft: d.flip_trades, basis: FLIP_BASIS }" in sec
-    assert "{ name: '按档位买卖 · 通道', ft: d.verdict_trades, basis: VERDICT_BASIS }" in sec
     assert ft.count("按信号进出的复利") == 1 and "按信号进出的复利" not in sec
     assert "title={TRADE_STAT_TIPS.follow}" in sec
 
@@ -123,3 +122,13 @@ def test_R440_逐日复盘内容与旧两张表一模一样():
     # 列与旧表一样多: 六态表的 8 列 ∪ 通道表的 7 列 = 同样这 8 个表头, 一列不多
     daily = new[new.index("function DailyCard"):new.index("function TrendCell")]
     assert len(re.findall(r"<th\b", daily)) == 8
+
+
+def test_R441_对比表没有按档位买卖那一行():
+    """[R441] 用户指着「按档位买卖 · 通道 +1.2% +11.8% -10.6% 1 次 ...」那一行: 「删除」。
+    只删对比表那一行; 逐日表里通道的一笔笔动作是旧表原有内容, 留着(R440)。"""
+    sec = code_of(SEC)
+    summary = sec[sec.index("function SummaryCard"):sec.index("function SystemRow")]
+    assert "verdict_trades" not in summary and "按档位买卖" not in summary and "VERDICT_BASIS" not in sec
+    assert "{ name: '按转折买卖 · 六态', ft: d.flip_trades, basis: FLIP_BASIS }" in summary
+    assert "legsByFlipDate(d.verdict_trades)" in sec, "逐日表里通道那一笔笔动作不该跟着删"
