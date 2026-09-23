@@ -75,9 +75,12 @@ STOP_BUFFER_ATR = 0.1     # 失效位在参照价位下方再让几倍 ATR
 #
 # 新口径(R474 定稿): 按波段拐点找最后一段上涨, 它的顶就是聚焦点 —— 见 `latest_upswing`。
 # (R473 曾用「近 60 根最低点之后的最高点」, 遇到中间隔着一段完整下跌的走势就错。)
-# 反向走够几倍 ATR 才算拐了(同时也是"一段上涨至少多大")。原推进段用 3 倍; 对方图上
-# 中际旭创这一波 974.99 − 827.74 ≈ 147, 而它的 ATR 在四五十 —— 3 倍正好卡在边上。
-UPSWING_MIN_ATR = 2.0
+# [R475] 反向走够百分之几才算拐了(同时也是"一段上涨至少多大")—— 与通达信 ZIG 同一个做法。
+# R474 用的是「2 倍 ATR」: 用户部署后发图, 选到了 7 月一段 4 天的小反弹 —— 7、8 月大跌把
+# ATR 抬到八九十, 门槛一百六七十点, 9 月 805 → 974.99 这一波(≈170)贴着门槛没被认出来。
+# 用户:「是不是对方用了最近的」—— 是。按百分比走, 门槛不被前面的大波动带偏, 最近这一波
+# (≈21%)一定认得出; 974.99 → 929 的回落(≈4.7%)还不算拐, 聚焦点就是最近那个高点。
+ZIG_PCT = 0.05
 # 反应点去重: 只合并**几乎同价**的低点(平台 / 一字板那种同一条线数几遍)。原来用聚类容差
 # (0.5×ATR)当去重间距, 高价股 ATR 四五十, 858.00 / 863.52 / 870.17 这种相隔五六块的
 # 不同低点会被并成一个 —— 对方图上它们各有一条 F3(930.30 / 932.41 / 934.95)。
@@ -261,8 +264,7 @@ def _emit(out, s, e, highs, lows, atr, min_len, min_atr) -> None:
 # ================================================================
 
 def latest_upswing(
-    highs: list[float], lows: list[float], atr: list[float | None],
-    *, min_atr: float = UPSWING_MIN_ATR,
+    highs: list[float], lows: list[float], *, pct: float = ZIG_PCT,
 ) -> tuple[int, int] | None:
     """[R474] 最近一段**上涨波段** `[底, 顶]` —— 按波段拐点(ZigZag)找, 不按窗口最低点找。
 
@@ -272,9 +274,10 @@ def latest_upswing(
     **中间隔着一段完整的下跌**, 窗口最低点那一套看不见。对照图上那两条折线就是波段线,
     聚焦点是最后一段上涨的顶。
 
-    拐点规则: 反向走够 `min_atr × ATR`(ATR 取当时那个极值那根的, 不看后来的)才算
-    拐了。所以当前这段回落(974.99 → 929, ≈46 点 < 2×ATR)还不算下跌波段, 顶仍是
-    974.99, 而且**不等右侧摆点确认** —— 对照图上的聚焦点就是截图前一根的高点。
+    拐点规则: 从极值反向走够 `pct`(按那个极值的价算)才算拐了 —— [R475] 原来是 2 倍
+    ATR, 大跌之后 ATR 被抬得很高, 最近那一波就认不出来了。当前这段回落(974.99 → 929,
+    ≈4.7% < 5%)还不算下跌波段, 顶仍是 974.99, 而且**不等右侧摆点确认** —— 对照图上的
+    聚焦点就是截图前一根的高点。
 
     已经转成下跌波段也照样返回上一段上涨 —— 那正是回踩在量它。跌到什么程度算这组
     不成立, 不在这里判: 一波上涨中间的小回调也会被切成几段, 只跌破「最后一小段」的
@@ -285,14 +288,11 @@ def latest_upswing(
     if n < 2:
         return None
 
-    last_ok: list[float | None] = [None]
+    def up_th(b: int) -> float:        # 从底 b 往上走多少算拐
+        return pct * lows[b]
 
-    def th(i: int) -> float:
-        a = atr[i] if i < len(atr) else None
-        if a is not None and math.isfinite(a) and a > 0:
-            last_ok[0] = a
-        a = last_ok[0]
-        return min_atr * a if a else math.inf
+    def dn_th(t: int) -> float:        # 从顶 t 往下走多少算拐
+        return pct * highs[t]
 
     trend = 0                 # 0 未定 / 1 上涨波段中 / -1 下跌波段中
     hi_i = lo_i = 0           # 未定时的最高 / 最低
@@ -304,20 +304,20 @@ def latest_upswing(
                 hi_i = i
             if lows[i] < lows[lo_i]:
                 lo_i = i
-            if lo_i < i and highs[i] - lows[lo_i] >= th(lo_i) and highs[i] >= highs[hi_i]:
+            if lo_i < i and highs[i] - lows[lo_i] >= up_th(lo_i) and highs[i] >= highs[hi_i]:
                 trend, bot, top = 1, lo_i, i
-            elif hi_i < i and highs[hi_i] - lows[i] >= th(hi_i) and lows[i] <= lows[lo_i]:
+            elif hi_i < i and highs[hi_i] - lows[i] >= dn_th(hi_i) and lows[i] <= lows[lo_i]:
                 trend, top, bot = -1, hi_i, i
         elif trend == 1:
             if highs[i] > highs[top]:
                 top = i
-            elif highs[top] - lows[i] >= th(top):
+            elif highs[top] - lows[i] >= dn_th(top):
                 up_leg = (bot, top)
                 trend, bot = -1, i
         else:
             if lows[i] < lows[bot]:
                 bot = i
-            elif highs[i] - lows[bot] >= th(bot):
+            elif highs[i] - lows[bot] >= up_th(bot):
                 trend, top = 1, i                   # 新的上涨从这段下跌的底(bot)开始
 
     if trend == 1:
@@ -499,7 +499,7 @@ def _compute(df: pl.DataFrame, pivot_k: int = PIVOT_K) -> Fib2:
 
     dma = displaced_sma(closes, DMA_LEN, DMA_SHIFT)
     # [R473] 不再取「最近一段连续 8 根站上短期均线」的推进段, 改取最近这一波上涨
-    seg = latest_upswing(highs, lows, atr)
+    seg = latest_upswing(highs, lows)
     if seg is None:
         return Fib2(dma3=dma)
 
