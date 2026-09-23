@@ -72,6 +72,7 @@ MIGRATED: list[str] = [
     "pages/Indices.tsx",
     "components/EChartsIntraday.tsx",
     "pages/AbnormalMoves.tsx",
+    "pages/LimitUpLadder.tsx",
 ]
 
 
