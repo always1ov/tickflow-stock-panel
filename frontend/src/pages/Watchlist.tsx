@@ -51,6 +51,7 @@ import {
   saveColumnConfig,
   buildExtColumnsParam,
 } from '@/lib/watchlist-columns'
+import { TYPE } from '@/components/ui'
 
 // ===== 板块标识（筛选/卡片用） =====
 // 注: boardTag（创/科/北 标签）已移至共享 @/components/stock-table/primitives
@@ -146,19 +147,19 @@ function renderExtValue(
           key={i}
           type="button"
           onClick={event => { event.stopPropagation(); onTagClick(tag) }}
-          className="inline-block px-1.5 py-px rounded text-[10px] font-medium leading-tight text-yellow-500 bg-yellow-500/10 hover:brightness-95"
+          className="inline-block px-1.5 py-px rounded text-micro font-medium leading-tight text-warning bg-warning/10 hover:brightness-95"
         >
           {tag}
         </button>
       ) : (
-        <span key={i} className="inline-block px-1.5 py-px rounded text-[10px] font-medium leading-tight text-yellow-500 bg-yellow-500/10">
+        <span key={i} className="inline-block px-1.5 py-px rounded text-micro font-medium leading-tight text-warning bg-warning/10">
           {tag}
         </span>
       ))}
       {!showAll && hiddenCount > 0 && (
         <button
           onClick={onToggle}
-          className="inline-block px-1.5 py-px rounded text-[10px] font-medium leading-tight text-accent bg-accent/10 hover:bg-accent/20 transition-colors"
+          className="inline-block px-1.5 py-px rounded text-micro font-medium leading-tight text-accent bg-accent/10 hover:bg-accent/20 transition-colors"
         >
           +{hiddenCount}
         </button>
@@ -166,7 +167,7 @@ function renderExtValue(
       {showAll && maxTags > 0 && tags.length > maxTags && (
         <button
           onClick={onToggle}
-          className="inline-block px-1.5 py-px rounded text-[10px] font-medium leading-tight text-muted hover:text-foreground transition-colors"
+          className="inline-block px-1.5 py-px rounded text-micro font-medium leading-tight text-muted hover:text-foreground transition-colors"
         >
           收起
         </button>
@@ -342,15 +343,15 @@ function StockSearchBox({
                     <span className="flex min-w-0 flex-1 items-center gap-1">
                       <span className="truncate text-secondary">{r.name}</span>
                       {r.asset_type === 'etf' && (
-                        <span className="shrink-0 px-1 py-0.5 rounded text-[10px] leading-none bg-accent/10 text-accent">ETF</span>
+                        <span className="shrink-0 px-1 py-0.5 rounded text-micro leading-none bg-accent/10 text-accent">ETF</span>
                       )}
                       {r.asset_type === 'index' && (
-                        <span className="shrink-0 px-1 py-0.5 rounded text-[10px] leading-none bg-sky-500/10 text-sky-400">指数</span>
+                        <span className="shrink-0 px-1 py-0.5 rounded text-micro leading-none bg-sky-500/10 text-sky-400">指数</span>
                       )}
                       {(() => {
                         const b = boardTag(r.symbol)
                         return b && (
-                          <span className={`shrink-0 px-1 py-0.5 rounded text-[10px] leading-none border ${b.color}`}>{b.label}</span>
+                          <span className={`shrink-0 px-1 py-0.5 rounded text-micro leading-none border ${b.color}`}>{b.label}</span>
                         )
                       })()}
                     </span>
@@ -530,7 +531,7 @@ const StockCard = React.memo(function StockCard({
           <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
             <button
               onClick={() => onConfirmRemove(r.symbol)}
-              className="px-1.5 py-0.5 rounded text-[10px] text-danger bg-danger/10 hover:bg-danger/20 transition-colors"
+              className="px-1.5 py-0.5 rounded text-micro text-danger bg-danger/10 hover:bg-danger/20 transition-colors"
             >
               确认
             </button>
@@ -569,12 +570,12 @@ const StockCard = React.memo(function StockCard({
             <span className="text-xs text-secondary truncate">{name}</span>
           )}
           {board && (
-            <span className={`shrink-0 inline-flex items-center justify-center px-1 h-[16px] rounded text-[9px] font-bold leading-none ${board.color}`}>
+            <span className={`shrink-0 inline-flex items-center justify-center px-1 h-[16px] rounded text-micro font-bold leading-none ${board.color}`}>
               {board.label}
             </span>
           )}
           {r.consecutive_limit_ups > 0 && (
-            <span className="shrink-0 inline-flex items-center justify-center px-1 h-[16px] rounded bg-danger/15 text-danger text-[9px] font-bold tabular-nums">
+            <span className="shrink-0 inline-flex items-center justify-center px-1 h-[16px] rounded bg-danger/15 text-danger text-micro font-bold tabular-nums">
               {r.consecutive_limit_ups === 1 ? '首板' : `${r.consecutive_limit_ups}连`}
             </span>
           )}
@@ -587,14 +588,14 @@ const StockCard = React.memo(function StockCard({
             {fmtPrice(price)}
           </span>
           {pct != null && (
-            <span className={`shrink-0 inline-flex items-center px-1.5 py-[2px] rounded text-[11px] tabular-nums ${pctBg}`}>
+            <span className={`shrink-0 inline-flex items-center px-1.5 py-[2px] rounded text-xs tabular-nums ${pctBg}`}>
               {fmtPct(pct)}
             </span>
           )}
         </div>
 
         {/* 第三行: 指标 */}
-        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[10px] text-muted leading-relaxed">
+        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-micro text-muted leading-relaxed">
           <span title="换手率">换手<span className={`font-mono ml-0.5 ${turnoverColor(r.turnover_rate)}`}>{r.turnover_rate != null ? `${r.turnover_rate.toFixed(2)}%` : '—'}</span></span>
           <span title="量比">量比<span className="font-mono ml-0.5">{fmtPrice(r.vol_ratio_5d)}</span></span>
           <span title="RSI14">RSI<span className="font-mono ml-0.5">{r.rsi_14 != null ? r.rsi_14.toFixed(1) : '—'}</span></span>
@@ -633,12 +634,12 @@ const StockCard = React.memo(function StockCard({
       {signals.length > 0 && (
         <div className="pl-4 pr-2.5 pt-1.5 pb-2 flex flex-wrap gap-1">
           {signals.slice(0, 3).map(s => (
-            <span key={s.label} className={`inline-block px-1.5 py-[1px] rounded text-[9px] font-medium leading-tight ${signalCls(s.type)}`}>
+            <span key={s.label} className={`inline-block px-1.5 py-[1px] rounded text-micro font-medium leading-tight ${signalCls(s.type)}`}>
               {s.label}
             </span>
           ))}
           {signals.length > 3 && (
-            <span className="inline-block px-1 py-[1px] rounded text-[9px] text-muted bg-elevated leading-tight">
+            <span className="inline-block px-1 py-[1px] rounded text-micro text-muted bg-elevated leading-tight">
               +{signals.length - 3}
             </span>
           )}
@@ -1352,7 +1353,7 @@ export function Watchlist() {
         titleExtra={
           <span className="inline-flex items-center gap-1.5">
             {/* 计数胶囊: 显示数/总数, mono 字体突出数字 */}
-            <span className="inline-flex items-baseline gap-0.5 px-2 py-0.5 rounded-md bg-elevated/70 text-[11px]">
+            <span className="inline-flex items-baseline gap-0.5 px-2 py-0.5 rounded-md bg-elevated/70 text-xs">
               <span className="font-mono font-semibold text-secondary tabular-nums">{sortedRows.length}</span>
               <span className="text-muted/50">/</span>
               <span className="font-mono text-muted tabular-nums">{rowsInSelectedGroup.length}</span>
@@ -1361,7 +1362,7 @@ export function Watchlist() {
             {/* 数据未就绪提示: 自选了但 enriched 缓存未覆盖 (新股/冷门/新用户未同步), 指标全为 null */}
             {pendingCount > 0 && (
               <span
-                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-medium bg-muted/15 text-muted border border-border/50 whitespace-nowrap"
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-micro font-medium bg-muted/15 text-muted border border-border/50 whitespace-nowrap"
                 title={`当前有 ${pendingCount} 只指标暂未就绪 (新股/冷门股或数据尚未同步), 等待每日数据更新后自动补全`}
               >
                 <Clock className="h-2.5 w-2.5" />
@@ -1371,7 +1372,7 @@ export function Watchlist() {
             {/* 过滤提示: 仅在有筛选隐藏时出现, 柔和橙色融入整体 */}
             {hiddenCount > 0 && (
               <span
-                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-medium bg-warning/12 text-warning/90 border border-warning/25 whitespace-nowrap"
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-micro font-medium bg-warning/12 text-warning/90 border border-warning/25 whitespace-nowrap"
                 title={`当前有 ${hiddenCount} 只被筛选条件隐藏,清除筛选可查看全部`}
               >
                 <Filter className="h-2.5 w-2.5" />
@@ -1533,7 +1534,7 @@ export function Watchlist() {
         <div className="px-5 py-2 border-b border-border bg-surface/50 max-h-[184px] overflow-y-auto">
           {/* 板块筛选 */}
           <div className="mb-2">
-            <div className="text-[10px] text-muted uppercase tracking-wider mb-0.5">板块</div>
+            <div className="text-micro text-muted uppercase tracking-wider mb-0.5">板块</div>
             <div className="flex flex-wrap gap-1">
               {BOARD_OPTIONS.map(board => {
                 const active = boardFilter.has(board)
@@ -1541,7 +1542,7 @@ export function Watchlist() {
                   <button
                     key={board}
                     onClick={() => toggleBoard(board)}
-                    className={`px-2 py-0.5 rounded text-[11px] transition-colors ${
+                    className={`px-2 py-0.5 rounded text-xs transition-colors ${
                       active
                         ? 'bg-accent/15 text-accent'
                         : 'bg-elevated text-secondary hover:text-foreground hover:bg-elevated/80'
@@ -1555,11 +1556,11 @@ export function Watchlist() {
           </div>
           {/* 排除 ST */}
           <div className="mb-2">
-            <div className="text-[10px] text-muted uppercase tracking-wider mb-0.5">风险警示</div>
+            <div className="text-micro text-muted uppercase tracking-wider mb-0.5">风险警示</div>
             <div className="flex flex-wrap gap-1">
               <button
                 onClick={toggleExcludeST}
-                className={`px-2 py-0.5 rounded text-[11px] transition-colors ${
+                className={`px-2 py-0.5 rounded text-xs transition-colors ${
                   excludeST
                     ? 'bg-accent/15 text-accent'
                     : 'bg-elevated text-secondary hover:text-foreground hover:bg-elevated/80'
@@ -1575,20 +1576,20 @@ export function Watchlist() {
             if (!items?.length) return null
             return (
               <div key={cat.label} className="mb-1.5 last:mb-0">
-                <div className="text-[10px] text-muted uppercase tracking-wider mb-0.5">{cat.label}</div>
+                <div className="text-micro text-muted uppercase tracking-wider mb-0.5">{cat.label}</div>
                 <div className="flex flex-wrap gap-x-2 gap-y-1">
                   {items.map(item => {
                     const f = filters[item.id] || {}
                     const hasFilter = !!f.min || !!f.max || !!f.text
                     return (
-                      <div key={item.id} className="flex items-center gap-0.5 text-[11px]">
+                      <div key={item.id} className="flex items-center gap-0.5 text-xs">
                         <span className={`whitespace-nowrap ${hasFilter ? 'text-accent' : 'text-secondary'}`}>{item.label}</span>
                         <input
                           type="number"
                           value={f.min ?? ''}
                           onChange={e => updateFilter(item.id, { min: e.target.value })}
                           placeholder="min"
-                          className={`w-12 h-5 rounded border text-[10px] px-1 placeholder:text-muted focus:outline-none ${
+                          className={`w-14 h-7 rounded-btn border text-xs px-1.5 placeholder:text-muted focus:outline-none ${
                             hasFilter ? 'border-accent/30 bg-accent/5' : 'border-border bg-elevated'
                           } text-foreground focus:border-accent/50`}
                         />
@@ -1598,7 +1599,7 @@ export function Watchlist() {
                           value={f.max ?? ''}
                           onChange={e => updateFilter(item.id, { max: e.target.value })}
                           placeholder="max"
-                          className={`w-12 h-5 rounded border text-[10px] px-1 placeholder:text-muted focus:outline-none ${
+                          className={`w-14 h-7 rounded-btn border text-xs px-1.5 placeholder:text-muted focus:outline-none ${
                             hasFilter ? 'border-accent/30 bg-accent/5' : 'border-border bg-elevated'
                           } text-foreground focus:border-accent/50`}
                         />
@@ -1610,7 +1611,7 @@ export function Watchlist() {
             )
           })}
           {hasActiveFilters && (
-            <button onClick={resetAllFilters} className="mt-1 text-[10px] text-danger hover:text-danger/80 transition-colors">
+            <button onClick={resetAllFilters} className="mt-1 text-micro text-danger hover:text-danger/80 transition-colors">
               重置全部筛选
             </button>
           )}
@@ -1751,7 +1752,7 @@ export function Watchlist() {
                             </span>
                           )}
                           {board ? (
-                            <span className={`shrink-0 inline-flex items-center justify-center w-[18px] h-[18px] rounded text-[9px] font-bold leading-none border ${board.color}`}>
+                            <span className={`shrink-0 inline-flex items-center justify-center w-[18px] h-[18px] rounded text-micro font-bold leading-none border ${board.color}`}>
                               {board.label}
                             </span>
                           ) : null}
@@ -1763,7 +1764,7 @@ export function Watchlist() {
                             <div className="flex items-center gap-1">
                               <button
                                 onClick={() => { remove.mutate(r.symbol); setConfirmRemove(null) }}
-                                className="px-1.5 py-0.5 rounded text-[10px] text-danger bg-danger/10 hover:bg-danger/20 transition-colors"
+                                className="px-1.5 py-0.5 rounded text-micro text-danger bg-danger/10 hover:bg-danger/20 transition-colors"
                               >
                                 确认
                               </button>
@@ -1840,12 +1841,12 @@ export function Watchlist() {
                       {signals.length > 0 && (
                         <div className="flex flex-wrap gap-0.5">
                           {signals.slice(0, 3).map((s) => (
-                            <span key={s.label} className={`inline-block px-1.5 py-px rounded text-[10px] font-medium leading-tight ${signalCls(s.type)}`}>
+                            <span key={s.label} className={`inline-block px-1.5 py-px rounded text-micro font-medium leading-tight ${signalCls(s.type)}`}>
                               {s.label}
                             </span>
                           ))}
                           {signals.length > 3 && (
-                            <span className="text-[10px] text-muted">+{signals.length - 3}</span>
+                            <span className="text-micro text-muted">+{signals.length - 3}</span>
                           )}
                         </div>
                       )}
@@ -1872,7 +1873,7 @@ export function Watchlist() {
                     return (
                       <td className="pl-3 pr-2 py-1.5 border-l border-border/30" style={{ width: iw + 4, minWidth: iw + 4, maxWidth: iw + 4, height: ih }}>
                         <div className="flex items-center justify-center">
-                          <span className="text-[10px] text-muted">—</span>
+                          <span className="text-micro text-muted">—</span>
                         </div>
                       </td>
                     )
@@ -1886,7 +1887,7 @@ export function Watchlist() {
                       <div className="flex items-center justify-center">
                         {intradayChartVisible
                           ? <MiniIntraday rows={rows} prevClose={r.prev_close} changePct={r.change_pct} width={iw - 4} height={ih} />
-                          : <span className="text-[10px] text-muted">分时</span>}
+                          : <span className="text-micro text-muted">分时</span>}
                       </div>
                     </td>
                   )
@@ -1948,7 +1949,7 @@ export function Watchlist() {
               transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
               className="relative w-[90vw] max-w-[380px] rounded-card border border-border bg-base shadow-2xl p-6"
             >
-              <h3 className="text-sm font-medium text-foreground mb-2">确认清空自选</h3>
+              <h3 className={cn('mb-2', TYPE.section)}>确认清空自选</h3>
               <p className="text-xs text-secondary mb-5">
                 将移除全部 {allSymbols.length} 只自选股，此操作不可恢复。
               </p>

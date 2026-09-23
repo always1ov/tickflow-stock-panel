@@ -3,6 +3,8 @@ import { createPortal } from 'react-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { Check, ChevronDown, ChevronUp, FolderCog, FolderInput, Pencil, Plus, Trash2, X, Eraser } from 'lucide-react'
 import { Modal } from '@/components/Modal'
+import { SELECTED, TYPE, buttonClass } from '@/components/ui'
+import { cn } from '@/lib/cn'
 import { api } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { usePreferences } from '@/lib/useSharedQueries'
@@ -158,7 +160,9 @@ export function WatchlistGroupBar({
                 onDragEnd={draggable ? clearDrag : undefined}
                 onClick={() => onSelect(tab.id)}
                 title={draggable ? `${tab.name} — 可拖拽调整分组顺序` : undefined}
-                className={`relative my-1.5 inline-flex shrink-0 items-center gap-1.5 rounded-btn border px-3 text-xs transition-colors ${
+                // [R452] 与全站按钮同高(32px); 「全部 / 未分组」选中是全站那套反相,
+                // 彩色分组选中仍亮它自己的颜色(颜色是分组的身份)
+                className={`relative my-1 inline-flex h-8 shrink-0 items-center gap-1.5 rounded-btn border px-3 text-xs transition-colors ${
                   draggable ? 'no-press cursor-grab active:cursor-grabbing' : ''
                 } ${
                   dragging ? 'opacity-40' : ''
@@ -166,7 +170,7 @@ export function WatchlistGroupBar({
                   active
                     ? color
                       ? `${color.text} ${color.border} ${color.background}`
-                      : 'border-accent/40 bg-accent/10 text-accent'
+                      : SELECTED
                     : color
                       ? `border-transparent ${color.text} hover:bg-elevated`
                       : 'border-transparent text-secondary hover:bg-elevated hover:text-foreground'
@@ -180,7 +184,7 @@ export function WatchlistGroupBar({
                 )}
                 {color && <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${color.dot}`} />}
                 <span>{tab.name}</span>
-                <span className={`font-mono text-[10px] tabular-nums ${active && !color ? 'text-accent/80' : 'text-muted'}`}>
+                <span className={`font-mono text-micro tabular-nums ${active && !color ? 'opacity-70' : 'text-muted'}`}>
                   {tab.count}
                 </span>
                 {pcts && (() => {
@@ -188,7 +192,7 @@ export function WatchlistGroupBar({
                   if (!info || info.pct == null || info.sampled === 0) return null
                   return (
                     <span
-                      className={`font-mono text-[10px] tabular-nums ${groupPctColor(info.pct)}`}
+                      className={`font-mono text-micro tabular-nums ${groupPctColor(info.pct)}`}
                       title={groupPctTitle(info)}
                     >
                       {fmtPct(info.pct)}
@@ -230,20 +234,20 @@ export function WatchlistGroupBar({
             onClick={() => setConfirmClear(false)}
           />
           <div className="relative w-[90vw] max-w-[380px] rounded-card border border-border bg-base shadow-2xl p-6">
-            <h3 className="text-sm font-medium text-foreground mb-2">清空分组</h3>
+            <h3 className={cn('mb-2', TYPE.section)}>清空分组</h3>
             <p className="text-xs text-secondary mb-5">
               确认清空「{tabs.find(t => t.id === selected)?.name}」分组? 分组内所有股票将转为未分组(不从自选中删除)。
             </p>
             <div className="flex items-center justify-end gap-2">
               <button
                 onClick={() => setConfirmClear(false)}
-                className="px-3 py-1.5 rounded-btn bg-elevated text-secondary hover:bg-elevated/80 text-sm transition-colors"
+                className={buttonClass()}
               >
                 取消
               </button>
               <button
                 onClick={() => { setConfirmClear(false); void onClearGroup?.(selected) }}
-                className="px-3 py-1.5 rounded-btn bg-warning/15 text-warning hover:bg-warning/25 text-sm font-medium transition-colors"
+                className={buttonClass({}, 'border-warning/40 bg-warning/10 font-medium text-warning hover:bg-warning/20')}
               >
                 确认清空
               </button>
@@ -400,8 +404,8 @@ function GroupManagerDialog({
     >
       <div className="flex items-center justify-between border-b border-border px-4 py-3">
         <div>
-          <h2 id="watchlist-groups-title" className="text-sm font-semibold text-foreground">管理自选分组</h2>
-          <p className="mt-0.5 text-[11px] text-muted">删除分组不会删除其中的股票</p>
+          <h2 id="watchlist-groups-title" className={TYPE.section}>管理自选分组</h2>
+          <p className="mt-0.5 text-xs text-muted">删除分组不会删除其中的股票</p>
         </div>
         <button type="button" onClick={onClose} className="h-8 w-8 inline-flex items-center justify-center text-muted hover:text-foreground" aria-label="关闭">
           <X className="h-4 w-4" />
@@ -412,7 +416,7 @@ function GroupManagerDialog({
       <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
         <div className="min-w-0">
           <div className="text-xs font-medium text-foreground">显示在侧边栏</div>
-          <div className="mt-0.5 text-[10px] text-muted">开启后可在左侧菜单展开分组子菜单</div>
+          <div className="mt-0.5 text-micro text-muted">开启后可在左侧菜单展开分组子菜单</div>
         </div>
         <button
           type="button"
@@ -451,7 +455,7 @@ function GroupManagerDialog({
           </button>
         </div>
         <div className="mt-2 flex items-start gap-2">
-          <span className="mt-1 shrink-0 text-[11px] text-muted">分组颜色</span>
+          <span className="mt-1 shrink-0 text-xs text-muted">分组颜色</span>
           <GroupColorPicker value={newColor} onChange={setNewColor} />
         </div>
         {error && <p className="mt-2 text-xs text-danger">{error}</p>}
@@ -496,7 +500,7 @@ function GroupManagerDialog({
                   type="button"
                   disabled={pending}
                   onClick={() => void run(async () => { await onDelete(group.id); setDeletingId(null) })}
-                  className="rounded px-2 py-1 text-[11px] text-danger bg-danger/10 hover:bg-danger/20 disabled:opacity-50"
+                  className="rounded px-2 py-1 text-xs text-danger bg-danger/10 hover:bg-danger/20 disabled:opacity-50"
                 >
                   确认
                 </button>
@@ -507,7 +511,7 @@ function GroupManagerDialog({
             ) : (
               <>
                 <span className={`min-w-0 flex-1 truncate text-xs ${color.text}`}>{group.name}</span>
-                <span className="font-mono text-[10px] text-muted tabular-nums">{counts[group.id] ?? 0} 只</span>
+                <span className="font-mono text-micro text-muted tabular-nums">{counts[group.id] ?? 0} 只</span>
                 {onReorder && groups.length > 1 && (
                   <>
                     <button
@@ -650,7 +654,7 @@ export function WatchlistGroupPicker({ groups, groupIds, symbol, disabled, onTog
               />
             ))}
             {memberGroups.length > 3 && (
-              <span className="ml-0.5 font-mono text-[9px] leading-none text-muted">+{memberGroups.length - 3}</span>
+              <span className="ml-0.5 font-mono text-micro leading-none text-muted">+{memberGroups.length - 3}</span>
             )}
           </span>
         )}
@@ -671,7 +675,7 @@ export function WatchlistGroupPicker({ groups, groupIds, symbol, disabled, onTog
           className="z-50 rounded-card border border-border bg-base p-1 shadow-xl"
           onClick={event => event.stopPropagation()}
         >
-          <div className="px-2 pb-1 pt-1.5 text-[10px] text-muted">加入分组（可多选）</div>
+          <div className="px-2 pb-1 pt-1.5 text-micro text-muted">加入分组（可多选）</div>
           {groups.length === 0 ? (
             <div className="px-2 py-2 text-xs text-muted">暂无分组，请先新建</div>
           ) : groups.map(group => {
@@ -699,7 +703,7 @@ export function WatchlistGroupPicker({ groups, groupIds, symbol, disabled, onTog
             )
           })}
           {groups.length > 0 && groupIds.length === 0 && (
-            <div className="border-t border-border/60 px-2 pb-1 pt-1.5 text-[10px] text-muted">
+            <div className="border-t border-border/60 px-2 pb-1 pt-1.5 text-micro text-muted">
               未加入任何分组 — 标的仍在自选中
             </div>
           )}

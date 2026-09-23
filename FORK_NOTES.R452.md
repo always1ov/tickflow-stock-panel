@@ -1,0 +1,5 @@
+# R452 — 全站迁移 · 自选
+
+| # | 改动 | 涉及文件 | 冲突风险 | 单独回退 |
+|---|------|---------|:---:|---------|
+| R452 | 全站迁移第四步(规范见 `docs/ui-hierarchy.md`)。自选页: 分组条改成与全站按钮同高(32px), 「全部 / 未分组」选中从强调色换成全站那套反相, 彩色分组选中仍亮自己的颜色(颜色是分组的身份), 数字角标 11px; 共用的股票表格 `StockDataTable`(自选、选股两页都用)表头从 15px 中粗换成标签级 11px 灰字、浅灰实底条 —— 原来表头比内容还显眼, 层级是反的; **整页主列表的内容保持 15px**(本来就够大, 规范补上这一条)。页内 32 处写死字号按角色落档(板块 / ETF / 指数 / 信号这些徽标与小标签 → 11px, 筛选项与卡片内容 → 13px), 筛选面板里的小输入框 10px / 20px 高 → 13px / 28px 高, 黄色徽标换成语义色 warning。分组卡片、分组涨跌条、加入自选菜单、导入弹窗、列设置弹窗的写死字号一并落档; 清空分组 / 清空自选 / 管理分组 / 导入 / 列设置这几个弹窗标题升到 L2(18px), 清空分组的两个按钮换成全站按钮。棘轮 任意字号与硬编码色下调到当前数 | `frontend/src/pages/Watchlist.tsx`、`frontend/src/components/Watchlist*.tsx`、`frontend/src/components/ListColumnCustomizer.tsx`、`frontend/src/components/stock-table/StockDataTable.tsx`、`frontend/src/components/ui/index.ts`、`docs/ui-hierarchy.md`、`backend/tests/test_ui_hierarchy.py`、`backend/tests/test_design_spec.py` | 中(`Watchlist.tsx` / `StockDataTable.tsx` 与上游同源, 上游改这两处时字号类会冲突, 以本 fork 的档位为准) | 回退本提交即回到原字号与强调色选中 |

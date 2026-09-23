@@ -30,6 +30,14 @@ MIGRATED: list[str] = [
     "components/stock-analysis/decision-board/ExportColumnsDialog.tsx",
     "components/stock-analysis/decision-board/LotsLink.tsx",
     "components/stock-analysis/decision-board/BoardSkeletonRows.tsx",
+    "pages/Watchlist.tsx",
+    "components/WatchlistGroups.tsx",
+    "components/WatchlistGroupCards.tsx",
+    "components/WatchlistGroupStatsBar.tsx",
+    "components/WatchlistAddMenu.tsx",
+    "components/WatchlistImportDialog.tsx",
+    "components/ListColumnCustomizer.tsx",
+    "components/stock-table/StockDataTable.tsx",
 ]
 
 

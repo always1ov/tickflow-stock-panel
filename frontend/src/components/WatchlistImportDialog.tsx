@@ -11,6 +11,7 @@ import {
   WATCHLIST_GROUP_COLORS,
   resolveWatchlistGroupColor,
 } from '@/lib/watchlist-group-colors'
+import { TYPE } from '@/components/ui'
 
 interface Props {
   open: boolean
@@ -592,12 +593,12 @@ export function WatchlistImportDialog({
     if (!c.matched || !sym) {
       // [R265] AI 那条路知道**为什么**没匹配上(名称与代码对不上/重名/主数据里没有),
       // 说清楚比统一一句「已跳过」有用得多 —— 尤其是"对不上"那种, 正是拦下一次错导。
-      status = <span className="text-[10px] text-warning/90">{c.warn || NO_MATCH_MSG}</span>
+      status = <span className="text-micro text-warning/90">{c.warn || NO_MATCH_MSG}</span>
     } else if (state.inAllSelected) {
-      status = <span className="text-[10px] text-muted">已在所选分组</span>
+      status = <span className="text-micro text-muted">已在所选分组</span>
     } else if (state.inWatchlist) {
       status = (
-        <span className="text-[10px] text-muted">
+        <span className="text-micro text-muted">
           {targetGroupIds.length > 0 ? '已在自选 · 将并入所选分组' : '已在自选'}
         </span>
       )
@@ -620,11 +621,11 @@ export function WatchlistImportDialog({
           <div className="flex-1 min-w-0">
             <div className="flex items-baseline gap-2">
               {/* [R267] 原文里加粗的是作者标出的重点票 —— 这个信号在文章里明摆着, 丢了可惜 */}
-              {c.starred && <span className="shrink-0 text-[11px] text-amber-400" title="原文里加粗标注">★</span>}
+              {c.starred && <span className="shrink-0 text-xs text-amber-400" title="原文里加粗标注">★</span>}
               <span className="font-medium text-foreground truncate">
                 {c.name || c.mention || (c.matched && sym ? sym : '未匹配')}
               </span>
-              <span className="text-[11px] text-muted tabular-nums shrink-0">
+              <span className="text-xs text-muted tabular-nums shrink-0">
                 {c.code}
                 {sym ? ` · ${sym}` : ''}
               </span>
@@ -639,7 +640,7 @@ export function WatchlistImportDialog({
                     <span
                       key={g}
                       title={skip ? `小分队「${g}」已设为不导入` : `来自小分队「${g}」`}
-                      className={`rounded px-1 py-px text-[9px] ${
+                      className={`rounded px-1 py-px text-micro ${
                         skip ? 'bg-elevated/40 text-muted/50 line-through' : 'bg-accent/10 text-accent/80'
                       }`}
                     >
@@ -651,7 +652,7 @@ export function WatchlistImportDialog({
             )}
             {/* [R265] 原文里提到它的那半句 —— 让人一眼核对 AI 有没有抽错票 */}
             {c.quote && (
-              <p className="text-[10px] text-muted truncate" title={c.quote}>「{c.quote}」</p>
+              <p className="text-micro text-muted truncate" title={c.quote}>「{c.quote}」</p>
             )}
           </div>
         </label>
@@ -667,10 +668,10 @@ export function WatchlistImportDialog({
     >
       <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
         <div>
-          <h2 id="watchlist-import-title" className="text-sm font-semibold text-foreground">
+          <h2 id="watchlist-import-title" className={TYPE.section}>
             批量导入自选
           </h2>
-          <p className="text-[11px] text-muted mt-0.5">
+          <p className="text-xs text-muted mt-0.5">
             截图 / CSV / TXT / 代码均支持，也可粘整篇文章让 AI 认票并按文中小分队归类；
             一律按证券主数据匹配，已在自选的只并入分组不重复添加
           </p>
@@ -687,7 +688,7 @@ export function WatchlistImportDialog({
 
       <div className="px-4 py-3 overflow-y-auto flex-1 space-y-3">
         {busy && progressLabel && (
-          <p className="text-[11px] text-muted">{progressLabel}</p>
+          <p className="text-xs text-muted">{progressLabel}</p>
         )}
 
         <div className="space-y-2">
@@ -718,14 +719,14 @@ export function WatchlistImportDialog({
                 className="w-full resize-y rounded-btn border border-border bg-surface px-3 py-2 text-xs text-foreground placeholder:text-muted focus:border-accent/50 focus:outline-none"
               />
               <div className="flex items-center justify-between gap-2">
-                <span className="text-[11px] text-muted min-w-0">
+                <span className="text-xs text-muted min-w-0">
                   代码用「解析代码」，整篇文章用「AI 认股票」
                 </span>
                 <div className="flex items-center gap-1.5 shrink-0">
                   <button
                     type="button"
                     onClick={() => { setPasteOpen(false); setCodesText('') }}
-                    className="h-7 px-2 rounded-btn text-[11px] text-secondary hover:bg-elevated"
+                    className="h-7 px-2 rounded-btn text-xs text-secondary hover:bg-elevated"
                   >
                     收起
                   </button>
@@ -785,12 +786,12 @@ export function WatchlistImportDialog({
                 <button
                   type="button"
                   onClick={toggleAll}
-                  className="text-[11px] text-accent hover:underline shrink-0"
+                  className="text-xs text-accent hover:underline shrink-0"
                 >
                   {allSelected ? '取消全选' : '全选可添加'}
                 </button>
               ) : matchedCount > 0 ? (
-                <span className="text-[11px] text-muted shrink-0">所选目标分组已包含这些标的，无需导入</span>
+                <span className="text-xs text-muted shrink-0">所选目标分组已包含这些标的，无需导入</span>
               ) : null}
             </div>
 
@@ -798,7 +799,7 @@ export function WatchlistImportDialog({
               <button
                 type="button"
                 onClick={() => setShowSkipped(v => !v)}
-                className="flex items-center gap-1 text-[11px] text-muted hover:text-secondary"
+                className="flex items-center gap-1 text-xs text-muted hover:text-secondary"
               >
                 <span className="transition-transform" style={{ transform: showSkipped ? 'rotate(90deg)' : undefined }}>▸</span>
                 已略过 {skippedCount} 个（已在自选/所选分组，或主数据未匹配）
@@ -820,8 +821,8 @@ export function WatchlistImportDialog({
         {sectionMode ? (
           <div className="space-y-1.5">
             <div className="flex items-baseline gap-2">
-              <span className="text-[11px] text-secondary">文章里分好的小分队</span>
-              <span className="text-[10px] text-muted">
+              <span className="text-xs text-secondary">文章里分好的小分队</span>
+              <span className="text-micro text-muted">
                 各自导入到下面选定的分组;一只票同时属于两队就同时进两个分组
               </span>
             </div>
@@ -832,20 +833,20 @@ export function WatchlistImportDialog({
                 return (
                   <div key={name} className="flex items-center gap-2">
                     <span
-                      className={`min-w-0 flex-1 truncate text-[11px] ${
+                      className={`min-w-0 flex-1 truncate text-xs ${
                         target === SECTION_SKIP ? 'text-muted/50 line-through' : 'text-foreground'
                       }`}
                       title={name}
                     >
                       {name}
-                      <span className="ml-1 text-[10px] text-muted tabular-nums">{count} 只</span>
+                      <span className="ml-1 text-micro text-muted tabular-nums">{count} 只</span>
                     </span>
-                    <span className="shrink-0 text-[10px] text-muted">→</span>
+                    <span className="shrink-0 text-micro text-muted">→</span>
                     <select
                       value={target}
                       onChange={e => setSectionMap(prev => ({ ...prev, [name]: e.target.value }))}
                       aria-label={`小分队「${name}」导入到`}
-                      className="h-6 w-36 shrink-0 rounded-btn border border-border bg-base px-1.5 text-[11px] text-foreground focus:border-accent/50 focus:outline-none"
+                      className="h-6 w-36 shrink-0 rounded-btn border border-border bg-base px-1.5 text-xs text-foreground focus:border-accent/50 focus:outline-none"
                     >
                       <option value={SECTION_NEW}>新建「{name}」</option>
                       {groups.map(g => <option key={g.id} value={g.id}>并入 {g.name}</option>)}
@@ -859,13 +860,13 @@ export function WatchlistImportDialog({
         ) : (
         <div className="space-y-1.5">
           <div className="flex items-start gap-2">
-            <span className="text-[11px] text-secondary pt-1.5 shrink-0">导入到分组</span>
+            <span className="text-xs text-secondary pt-1.5 shrink-0">导入到分组</span>
             <div className="flex flex-wrap items-center gap-1.5 min-w-0">
               <button
                 type="button"
                 onClick={() => changeTargetGroups([])}
                 aria-pressed={targetGroupIds.length === 0}
-                className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[11px] transition-colors ${
+                className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs transition-colors ${
                   targetGroupIds.length === 0
                     ? 'border-accent/40 bg-accent/10 text-accent'
                     : 'border-border bg-elevated text-secondary hover:text-foreground'
@@ -888,7 +889,7 @@ export function WatchlistImportDialog({
                         : [...targetGroupIds, g.id],
                     )}
                     aria-pressed={active}
-                    className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[11px] transition-colors ${
+                    className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs transition-colors ${
                       active
                         ? `${c.border} ${c.background} ${c.text}`
                         : 'border-border bg-elevated text-secondary hover:bg-elevated/80 hover:text-foreground'
@@ -904,7 +905,7 @@ export function WatchlistImportDialog({
                 <button
                   type="button"
                   onClick={() => setNewGroupOpen(true)}
-                  className="inline-flex items-center gap-1 rounded-full border border-dashed border-border bg-elevated/40 px-2 py-1 text-[11px] text-accent hover:bg-elevated/70"
+                  className="inline-flex items-center gap-1 rounded-full border border-dashed border-border bg-elevated/40 px-2 py-1 text-xs text-accent hover:bg-elevated/70"
                   title="新建分组接收这批导入"
                 >
                   <Plus className="h-3 w-3" />
@@ -941,7 +942,7 @@ export function WatchlistImportDialog({
                 </button>
               </div>
               <div className="flex items-center gap-2 pl-1">
-                <span className="text-[11px] text-secondary shrink-0">颜色</span>
+                <span className="text-xs text-secondary shrink-0">颜色</span>
                 <div className="flex flex-wrap items-center gap-1.5">
                   {WATCHLIST_GROUP_COLORS.map(option => {
                     const active = option.id === newGroupColor

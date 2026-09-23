@@ -7,6 +7,7 @@
  */
 import { cloneElement, isValidElement, useRef, type ReactElement, type ReactNode } from 'react'
 import { cn } from '@/lib/cn'
+import { TH_ROW } from '@/components/ui'
 import { useVirtualizer, type VirtualItem } from '@tanstack/react-virtual'
 import type { ColumnConfig } from '@/lib/list-columns'
 import { UNSORTABLE_KEYS } from '@/lib/stock-table'
@@ -64,9 +65,11 @@ export interface StockDataTableProps {
 
 function alignThClass(align: ColumnConfig['align']): string {
   // 表头一律不换行: 窄列(如收起的图表列)中标签/排序箭头折行会把整行表头顶高
-  if (align === 'right') return 'px-3 py-2.5 font-medium text-right whitespace-nowrap'
-  if (align === 'center') return 'px-3 py-2.5 font-medium text-center whitespace-nowrap'
-  return 'px-3 py-2.5 font-medium whitespace-nowrap'
+  // [R452] 表头是标签那一级(11px 灰、不加粗), 与全站表格同一套 —— 原来 15px 中粗,
+  // 比表格内容还显眼, 层级是反的
+  if (align === 'right') return 'px-3 py-2.5 font-normal text-right whitespace-nowrap'
+  if (align === 'center') return 'px-3 py-2.5 font-normal text-center whitespace-nowrap'
+  return 'px-3 py-2.5 font-normal whitespace-nowrap'
 }
 
 export function StockDataTable({
@@ -116,7 +119,7 @@ export function StockDataTable({
   }
 
   const theadClass = headerSticky
-    ? 'sticky top-0 z-10 bg-surface after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-border'
+    ? 'sticky top-0 z-10 bg-elevated after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-border'
     : 'bg-elevated'
 
   const renderRow = (r: any, virtualRow?: VirtualItem) => (
@@ -155,7 +158,8 @@ export function StockDataTable({
     <div ref={containerRef} className={className}>
       <table className="w-full text-sm" style={{ minWidth: computedMinWidth }}>
         <thead className={theadClass}>
-          <tr className="text-left text-secondary">
+          {/* [R452] 整页主列表(自选、选股)内容保持 15px, 表头落到标签级 —— 见 docs/ui-hierarchy.md */}
+          <tr className={cn(TH_ROW, 'text-left')}>
             {visibleColumns.map((col, i) => {
               const sortable = isColSortable(col)
               const isSorted = sort?.key === col.id
@@ -170,13 +174,13 @@ export function StockDataTable({
                     // 表头那一格要同时钉住上边和左边, 否则往右滑时表头第一格会跑掉,
                     // 而表体第一格还钉着 —— 两者错位比都不钉更让人分神。
                     // 底色跟表头走(`bg-surface`), 不是行的底色。
-                    pinFirstColumn && i === 0 && 'sticky left-0 z-20 bg-surface lg:static lg:bg-transparent',
+                    pinFirstColumn && i === 0 && 'sticky left-0 z-20 bg-elevated lg:static lg:bg-transparent',
                   )}
                   onClick={sortable ? () => onSortToggle!(col.id) : undefined}
                 >
                   {contentOverride !== undefined ? contentOverride : col.label}
                   {sortable && (
-                    <span className="inline-block ml-1 text-[10px] opacity-30 group-hover:opacity-60 transition-opacity">
+                    <span className="inline-block ml-1 text-micro opacity-30 group-hover:opacity-60 transition-opacity">
                       {isSorted ? (dir === 'asc' ? '↑' : '↓') : '↕'}
                     </span>
                   )}
@@ -184,7 +188,7 @@ export function StockDataTable({
               )
             })}
             {extraHeader && (
-              <th className="px-3 py-2.5 font-medium text-right">{extraHeader}</th>
+              <th className="px-3 py-2.5 font-normal text-right">{extraHeader}</th>
             )}
           </tr>
         </thead>

@@ -27,6 +27,8 @@
   (亮色黑底白字、暗色白底黑字), 全站只有这一种选中态。
 - **卡片**: `<Card>`。实边框、实底、6px 圆角、无投影。
 - **表格**: `table.ts`。表头 11px 灰字浅灰底条, 内容 13px, 行间一道细线。
+  **整页主列表**(自选、选股那张 `StockDataTable`)内容保持 15px —— 那是整页的主体, 本来就够大;
+  表头照样落到 11px 灰字(R452 之前是 15px 中粗, 比内容还显眼)。
 
 ## 迁移规则(写死的字号按**角色**落档, 不是按数字一刀切)
 
@@ -51,7 +53,7 @@
 - [x] 个股弹窗新块(R429~R448 已是这套; R449 修正分区 / 卡片标题的级别)
 - [x] 外壳: 侧栏 / 导航(`Layout`)、`PageHeader`、`PageShell`
 - [x] 自选决策台(`StockAnalysis` + `WatchlistDecisionBoard` + `decision-board/*`)
-- [ ] 自选(`Watchlist`)
+- [x] 自选(`Watchlist`)
 - [ ] 大盘(`Dashboard`)
 - [ ] 监控(`Monitor` + `monitor/RuleEditor`)
 - [ ] 模拟盘 / 批次(`FlipPaper` / `Lots`)

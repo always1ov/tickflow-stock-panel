@@ -24,6 +24,7 @@ import { QK } from '@/lib/queryKeys'
 import type { ColumnConfig, ColumnGroup, ExtColumnDisplayConfig, CandleColumnConfig, IntradayColumnConfig } from '@/lib/list-columns'
 import { resolveCandleConfig, resolveIntradayConfig } from '@/lib/list-columns'
 import { useDialogBackdrop } from '@/lib/useDialogBackdrop'
+import { TYPE } from '@/components/ui'
 
 interface ListColumnCustomizerProps {
   columns: ColumnConfig[]
@@ -115,7 +116,7 @@ function SortableActiveCol({ col, onRemove, onConfig, configOpen, extTableLabel,
         {showStandaloneToggle && (
           <button
             onClick={() => onToggleStandalone?.(col.id)}
-            className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] transition-colors shrink-0 ${
+            className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded text-micro transition-colors shrink-0 ${
               col.standalone
                 ? 'text-accent bg-accent/10'
                 : 'text-muted hover:text-secondary opacity-0 group-hover:opacity-100'
@@ -419,7 +420,7 @@ export function ListColumnCustomizer({
                       const next = hidden ? cur.filter(x => x !== i) : [...cur, i]
                       updateExtDisplay(col.id, { hiddenIndices: next.length ? next : undefined })
                     }}
-                    className={`w-6 h-6 rounded text-[10px] font-medium transition-colors ${
+                    className={`w-6 h-6 rounded text-micro font-medium transition-colors ${
                       hidden ? 'bg-elevated text-muted line-through' : 'bg-accent/15 text-accent'
                     }`}
                   >
@@ -454,7 +455,7 @@ export function ListColumnCustomizer({
         {/* 数字格式化配置: 千分位 + 单位换算 + 小数位(仅 number 类型字段) */}
         {col.source.type === 'ext' && isNumericFieldType(col.source.fieldType) && (
           <>
-            <div className="border-t border-border/40 pt-2 mt-1 text-[10px] text-muted">数字格式</div>
+            <div className="border-t border-border/40 pt-2 mt-1 text-micro text-muted">数字格式</div>
             <label className="flex items-center gap-2 text-xs">
               <span className="text-secondary w-16 shrink-0">千分位</span>
               <button
@@ -469,7 +470,7 @@ export function ListColumnCustomizer({
                   col.extDisplay?.thousandSeparator ? 'translate-x-[14px]' : 'translate-x-0.5'
                 }`} />
               </button>
-              <span className="text-[10px] text-muted">如 1,234,567</span>
+              <span className="text-micro text-muted">如 1,234,567</span>
             </label>
             <label className="flex items-center gap-2 text-xs">
               <span className="text-secondary w-16 shrink-0">单位换算</span>
@@ -493,14 +494,14 @@ export function ListColumnCustomizer({
                   onChange={e => updateExtDisplay(col.id, { unitDecimals: Math.max(0, Math.min(6, Number(e.target.value) || 0)) })}
                   className="w-16 h-7 rounded bg-elevated border border-border text-foreground text-xs px-2 text-center focus:outline-none focus:border-accent/50"
                 />
-                <span className="text-[10px] text-muted">换算后保留几位</span>
+                <span className="text-micro text-muted">换算后保留几位</span>
               </label>
             )}
           </>
         )}
         {col.extDisplay && (
           <div className="flex justify-end pt-1">
-            <button onClick={() => resetExtDisplay(col.id)} className="text-[10px] text-muted hover:text-foreground transition-colors">
+            <button onClick={() => resetExtDisplay(col.id)} className="text-micro text-muted hover:text-foreground transition-colors">
               恢复默认
             </button>
           </div>
@@ -546,7 +547,7 @@ export function ListColumnCustomizer({
                       const next = hidden ? cur.filter(x => x !== i) : [...cur, i]
                       updateExtDisplay(col.id, { hiddenIndices: next.length ? next : undefined })
                     }}
-                    className={`w-6 h-6 rounded text-[10px] font-medium transition-colors ${
+                    className={`w-6 h-6 rounded text-micro font-medium transition-colors ${
                       hidden ? 'bg-elevated text-muted line-through' : 'bg-accent/15 text-accent'
                     }`}
                   >
@@ -578,7 +579,7 @@ export function ListColumnCustomizer({
         </label>
         {col.extDisplay && (
           <div className="flex justify-end pt-1">
-            <button onClick={() => resetExtDisplay(col.id)} className="text-[10px] text-muted hover:text-foreground transition-colors">
+            <button onClick={() => resetExtDisplay(col.id)} className="text-micro text-muted hover:text-foreground transition-colors">
               恢复默认
             </button>
           </div>
@@ -628,12 +629,12 @@ export function ListColumnCustomizer({
           {numInput('enabledHeight', '开启高度')}
           {numInput('disabledWidth', '收起宽度')}
           {numInput('disabledHeight', '收起高度')}
-          <div className="text-[10px] text-muted leading-relaxed pt-0.5">
+          <div className="text-micro text-muted leading-relaxed pt-0.5">
             宽度 40–300 / 高度 32–200 / 天数 1–60，越界自动钳制到边界
           </div>
           {col.candleConfig && (
             <div className="flex justify-end pt-1">
-              <button onClick={() => resetCandleConfig(col.id)} className="text-[10px] text-muted hover:text-foreground transition-colors">
+              <button onClick={() => resetCandleConfig(col.id)} className="text-micro text-muted hover:text-foreground transition-colors">
                 恢复默认
               </button>
             </div>
@@ -678,12 +679,12 @@ export function ListColumnCustomizer({
         <div className="pl-10 pr-3 py-2 space-y-2 border-l-2 border-accent/20 ml-[18px]">
           {numInput('width', '宽度')}
           {numInput('height', '高度')}
-          <div className="text-[10px] text-muted leading-relaxed pt-0.5">
+          <div className="text-micro text-muted leading-relaxed pt-0.5">
             宽度 60–300 / 高度 32–200，越界自动钳制到边界
           </div>
           {col.intradayConfig && (
             <div className="flex justify-end pt-1">
-              <button onClick={() => resetIntradayConfig(col.id)} className="text-[10px] text-muted hover:text-foreground transition-colors">
+              <button onClick={() => resetIntradayConfig(col.id)} className="text-micro text-muted hover:text-foreground transition-colors">
                 恢复默认
               </button>
             </div>
@@ -715,7 +716,7 @@ export function ListColumnCustomizer({
       {showStandaloneToggle && col.visible && (
         <button
           onClick={() => toggleStandalone(col.id)}
-          className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] transition-colors shrink-0 ${
+          className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded text-micro transition-colors shrink-0 ${
             col.standalone
               ? 'text-accent bg-accent/10'
               : 'text-muted hover:text-secondary'
@@ -740,7 +741,7 @@ export function ListColumnCustomizer({
       >
         {renderCheckbox(checked)}
         <span className={`flex-1 text-xs truncate ${checked ? 'text-foreground' : 'text-muted'}`}>{field.label || field.name}</span>
-        <span className="text-[10px] text-muted shrink-0">{field.type}</span>
+        <span className="text-micro text-muted shrink-0">{field.type}</span>
       </button>
     )
   }
@@ -761,7 +762,7 @@ export function ListColumnCustomizer({
             className="relative w-[360px] max-w-[90vw] h-full bg-base border-l border-border shadow-2xl flex flex-col"
           >
             <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-              <h3 className="text-sm font-medium text-foreground">{title}</h3>
+              <h3 className={TYPE.section}>{title}</h3>
               <button onClick={onClose} className="p-1 rounded hover:bg-elevated text-muted hover:text-foreground transition-colors">
                 <X className="h-4 w-4" />
               </button>
@@ -785,8 +786,8 @@ export function ListColumnCustomizer({
                 <div>
                   <div className="flex items-center gap-1.5 px-1 py-1.5">
                     <Eye className="h-3 w-3 text-accent/70" />
-                    <span className="text-[10px] font-semibold text-accent/80 uppercase tracking-wider">已启用</span>
-                    <span className="text-[10px] text-muted">{activeCols.length} 列 · 拖拽排序</span>
+                    <span className="text-micro font-semibold text-accent/80 uppercase tracking-wider">已启用</span>
+                    <span className="text-micro text-muted">{activeCols.length} 列 · 拖拽排序</span>
                   </div>
                   <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                     <SortableContext items={activeCols.map(c => c.id)} strategy={verticalListSortingStrategy}>
@@ -816,7 +817,7 @@ export function ListColumnCustomizer({
               <div>
                 <div className="flex items-center gap-1.5 px-1 py-1.5">
                   <Plus className="h-3 w-3 text-muted" />
-                  <span className="text-[10px] font-semibold text-muted uppercase tracking-wider">{builtinSectionLabel}</span>
+                  <span className="text-micro font-semibold text-muted uppercase tracking-wider">{builtinSectionLabel}</span>
                 </div>
 
                 {filteredGroups.map(group => {
@@ -836,9 +837,9 @@ export function ListColumnCustomizer({
                         className="flex items-center gap-1.5 w-full px-1 py-1.5 rounded hover:bg-elevated/30 text-left transition-colors"
                       >
                         {isExpanded ? <ChevronDown className="h-3 w-3 text-muted" /> : <ChevronRight className="h-3 w-3 text-muted" />}
-                        {group.icon && <span className="text-[11px]">{group.icon}</span>}
-                        <span className="text-[11px] font-medium text-secondary">{group.label}</span>
-                        <span className="text-[10px] text-muted ml-auto">{visCount}/{groupCols.length}</span>
+                        {group.icon && <span className="text-xs">{group.icon}</span>}
+                        <span className="text-xs font-medium text-secondary">{group.label}</span>
+                        <span className="text-micro text-muted ml-auto">{visCount}/{groupCols.length}</span>
                       </button>
                       <AnimatePresence>
                         {isExpanded && (
@@ -862,7 +863,7 @@ export function ListColumnCustomizer({
                 <div className="pt-1 border-t border-border mt-1">
                   <div className="flex items-center gap-1.5 px-1 py-1.5">
                     <Database className="h-3 w-3 text-accent/70" />
-                    <span className="text-[10px] font-semibold text-accent/80 uppercase tracking-wider">扩展数据列</span>
+                    <span className="text-micro font-semibold text-accent/80 uppercase tracking-wider">扩展数据列</span>
                   </div>
                   <div className="space-y-0.5">
                     {extTables.map(table => {
@@ -882,10 +883,10 @@ export function ListColumnCustomizer({
                           >
                             {isExpanded ? <ChevronDown className="h-3 w-3 text-muted" /> : <ChevronRight className="h-3 w-3 text-muted" />}
                             <Database className="h-3 w-3 text-accent shrink-0" />
-                            <span className="text-[11px] font-medium text-secondary flex-1">{table.label}</span>
-                            <span className="text-[10px] text-muted">{table.mode === 'snapshot' ? '快照' : '时序'}</span>
+                            <span className="text-xs font-medium text-secondary flex-1">{table.label}</span>
+                            <span className="text-micro text-muted">{table.mode === 'snapshot' ? '快照' : '时序'}</span>
                             {activeCount > 0 && (
-                              <span className="text-[10px] text-accent font-medium">{activeCount}</span>
+                              <span className="text-micro text-accent font-medium">{activeCount}</span>
                             )}
                           </button>
                           <AnimatePresence>
