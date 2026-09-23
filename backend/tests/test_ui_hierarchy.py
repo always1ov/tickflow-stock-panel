@@ -80,6 +80,11 @@ MIGRATED: list[str] = [
     "pages/Signals.tsx",
     "components/signals/CustomSignalDialog.tsx",
     "components/signals/SignalTriggerActions.tsx",
+    "pages/ConceptAnalysis.tsx",
+    "pages/IndustryAnalysis.tsx",
+    "components/ExtDimensionAnalysis.tsx",
+    "components/SectorRotationCard.tsx",
+    "components/SectionIntro.tsx",
 ]
 
 

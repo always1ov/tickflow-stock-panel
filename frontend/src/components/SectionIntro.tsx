@@ -32,7 +32,7 @@ export function SectionIntro({ eyebrow, title, children, right, icon, className 
     <section className={cn('rounded-card border border-border bg-surface p-6 lg:p-7', className)}>
       <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
         <div className="max-w-3xl">
-          <div className="flex items-center gap-2 text-[10.5px] font-semibold uppercase tracking-wider text-accent">
+          <div className="flex items-center gap-2 text-micro font-semibold uppercase tracking-wider text-accent">
             {icon}
             {eyebrow}
           </div>

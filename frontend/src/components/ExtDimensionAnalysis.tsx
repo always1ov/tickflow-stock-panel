@@ -108,7 +108,7 @@ function StatCard({ label, value, hint, icon: Icon }: {
         <Icon className="h-4 w-4 text-secondary" />
       </div>
       <div className="mt-3 text-2xl font-semibold tracking-tight text-foreground">{value}</div>
-      <div className="mt-1 text-[11px] text-muted">{hint}</div>
+      <div className="mt-1 text-xs text-muted">{hint}</div>
     </div>
   )
 }
@@ -287,7 +287,7 @@ export function ExtDimensionAnalysis({
       <div className="px-8 py-6 space-y-6 max-w-7xl">
         <section className={`relative overflow-hidden rounded-2xl border border-border bg-surface p-6 ${accentClass}`}>
           <div className="relative z-10 max-w-3xl">
-            <div className="inline-flex items-center gap-2 rounded-btn border border-white/10 bg-white/[0.04] px-3 py-1 text-[11px] text-secondary">
+            <div className="inline-flex items-center gap-2 rounded-btn border border-white/10 bg-white/[0.04] px-3 py-1 text-xs text-secondary">
               <Layers3 className="h-3.5 w-3.5" />
               扩展数据驱动 · 菜单可配置 · 列动态渲染
             </div>
@@ -332,9 +332,9 @@ export function ExtDimensionAnalysis({
                   <div className="px-4 py-3 border-b border-border flex items-center justify-between gap-3">
                     <div>
                       <h3 className="text-sm font-medium text-foreground">分组榜单</h3>
-                      <p className="mt-0.5 text-[11px] text-muted">按覆盖标的数量排序</p>
+                      <p className="mt-0.5 text-xs text-muted">按覆盖标的数量排序</p>
                     </div>
-                    <span className="text-[10px] text-muted">Top {Math.min(filteredGroups.length, 100)}</span>
+                    <span className="text-micro text-muted">Top {Math.min(filteredGroups.length, 100)}</span>
                   </div>
                   <div className="p-3 border-b border-border/60">
                     <div className="relative">
@@ -359,7 +359,7 @@ export function ExtDimensionAnalysis({
                           className={`w-full rounded-lg px-3 py-2 text-left transition-colors ${active ? 'bg-accent/10 border border-accent/25' : 'border border-transparent hover:bg-elevated/60'}`}
                         >
                           <div className="flex items-center gap-2">
-                            <span className="w-5 text-[10px] font-mono text-muted">#{i + 1}</span>
+                            <span className="w-5 text-micro font-mono text-muted">#{i + 1}</span>
                             <span className="flex-1 truncate text-xs font-medium text-foreground">{group.key}</span>
                             <span className="font-mono text-xs text-secondary">{group.count}</span>
                           </div>
@@ -369,7 +369,7 @@ export function ExtDimensionAnalysis({
                               style={{ width: `${Math.max(6, (group.count / (filteredGroups[0]?.count || 1)) * 100)}%` }}
                             />
                           </div>
-                          <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-muted">
+                          <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-micro text-muted">
                             {groupColumns.filter(c => !['__dimension', '__count'].includes(c.field)).slice(0, 3).map(col => (
                               <span key={col.field}>{col.label || col.field}: {formatValue(group.metrics[col.field], col)}</span>
                             ))}
@@ -386,11 +386,11 @@ export function ExtDimensionAnalysis({
                   <div>
                     <div className="flex items-center gap-2">
                       <h3 className="text-base font-semibold text-foreground">{menu?.template === 'table' || menu?.template === 'ranking' ? '明细列表' : currentGroup?.key ?? `选择${activeKindLabel}`}</h3>
-                      <span className="rounded-btn bg-accent/10 px-2 py-0.5 text-[10px] text-accent">{tableRows.length} 条</span>
+                      <span className="rounded-btn bg-accent/10 px-2 py-0.5 text-micro text-accent">{tableRows.length} 条</span>
                     </div>
                     <p className="mt-1 text-xs text-muted">列来自菜单 detail_columns：{displayColumns.map(f => f.label || f.field).join(' / ') || '暂无字段'}</p>
                   </div>
-                  <div className="hidden sm:flex items-center gap-2 text-[11px] text-muted">
+                  <div className="hidden sm:flex items-center gap-2 text-xs text-muted">
                     <CalendarDays className="h-3.5 w-3.5" />
                     {rowsQuery.data?.date ?? '当前快照'}
                   </div>
@@ -398,7 +398,7 @@ export function ExtDimensionAnalysis({
 
                 <div className="overflow-auto">
                   <table className="min-w-full text-left text-xs">
-                    <thead className="bg-elevated/50 text-[11px] text-muted">
+                    <thead className="bg-elevated/50 text-xs text-muted">
                       <tr>
                         {displayColumns.map(col => (
                           <th key={col.field} className="whitespace-nowrap px-4 py-2 font-medium" style={col.width ? { width: col.width } : undefined}>{col.label || col.field}</th>
@@ -424,7 +424,7 @@ export function ExtDimensionAnalysis({
                 </div>
 
                 {tableRows.length > 300 && (
-                  <div className="border-t border-border px-4 py-2 text-center text-[11px] text-muted">仅展示前 300 条明细，共 {tableRows.length} 条</div>
+                  <div className="border-t border-border px-4 py-2 text-center text-xs text-muted">仅展示前 300 条明细，共 {tableRows.length} 条</div>
                 )}
               </section>
             </div>

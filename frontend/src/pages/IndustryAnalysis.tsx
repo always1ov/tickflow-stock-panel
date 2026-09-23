@@ -563,12 +563,12 @@ function HeroMetric({ icon: Icon, label, value, hint, tone }: {
   }[tone]
   return (
     <div className="rounded-xl border border-border bg-surface px-3 py-2">
-      <div className="flex items-center justify-between text-[11px] text-muted">
+      <div className="flex items-center justify-between text-micro text-muted">
         <span>{label}</span>
         <span className={cn('rounded-md p-1', toneClass)}><Icon className="h-3.5 w-3.5" /></span>
       </div>
-      <div className={cn('mt-1 truncate text-sm font-semibold', valueClass)}>{value}</div>
-      <div className="mt-0.5 truncate text-[11px] text-muted">{hint}</div>
+      <div className={cn('mt-1 truncate text-xl font-semibold tabular-nums', valueClass)}>{value}</div>
+      <div className="mt-0.5 truncate text-micro text-muted">{hint}</div>
     </div>
   )
 }
@@ -627,7 +627,7 @@ function PulseList({
           {mode === 'up' ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
           {title}
         </div>
-        <span className="rounded-btn bg-elevated/60 px-2 py-0.5 text-[10px] text-muted">Top 10</span>
+        <span className="rounded-btn bg-elevated/60 px-2 py-0.5 text-micro text-muted">Top 10</span>
       </div>
       <div className="space-y-1">
         {items.map((item, idx) => {
@@ -649,16 +649,16 @@ function PulseList({
               <div className="grid gap-2 md:grid-cols-[minmax(0,0.9fr)_minmax(16rem,1.1fr)] md:items-center">
                 <div className="min-w-0">
                   <div className="flex min-w-0 items-center gap-2">
-                    <span className={cn('flex h-5 w-5 shrink-0 items-center justify-center rounded-md font-mono text-[10px]', idx < 3 ? cn(toneBg, toneText) : 'bg-elevated/70 text-muted')}>{idx + 1}</span>
+                    <span className={cn('flex h-5 w-5 shrink-0 items-center justify-center rounded-md font-mono text-micro', idx < 3 ? cn(toneBg, toneText) : 'bg-elevated/70 text-muted')}>{idx + 1}</span>
                     <div className="min-w-0 flex-1">
                       <div className="flex min-w-0 items-center gap-2">
                         <span className="truncate text-xs font-medium text-foreground">{item.key}</span>
-                        <span className="shrink-0 text-[10px] text-muted">
+                        <span className="shrink-0 text-micro text-muted">
                           <span className="text-bull">{item.upCount}</span>涨
                           <span className="mx-0.5 text-muted/40">/</span>
                           <span className="text-bear">{item.downCount}</span>跌
                         </span>
-                        <span className={cn('ml-auto shrink-0 font-mono text-[10px] tabular-nums', priceColorClass(item.avgPct))}>{item.avgPct != null ? fmtPct(item.avgPct) : '—'}</span>
+                        <span className={cn('ml-auto shrink-0 font-mono text-micro tabular-nums', priceColorClass(item.avgPct))}>{item.avgPct != null ? fmtPct(item.avgPct) : '—'}</span>
                       </div>
                     </div>
                   </div>
@@ -674,13 +674,13 @@ function PulseList({
                   {Array.from({ length: 3 }).map((_, i) => {
                     const stock = leaders[i]
                     return stock ? (
-                      <span key={stock.symbol} title={stock.name || stock.symbol} onClick={e => { e.stopPropagation(); onStockClick(stock.symbol, stock.name || undefined, toNavItems(sortedStocks.slice(0, MAX_RENDERED_STOCKS))) }} className={cn('flex min-w-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] cursor-pointer hover:brightness-125', i === 0 ? 'bg-amber-300/10 text-foreground' : 'bg-elevated/60 text-secondary', stock.symbol === activeSymbol && 'ring-1 ring-accent/60')}>
+                      <span key={stock.symbol} title={stock.name || stock.symbol} onClick={e => { e.stopPropagation(); onStockClick(stock.symbol, stock.name || undefined, toNavItems(sortedStocks.slice(0, MAX_RENDERED_STOCKS))) }} className={cn('flex min-w-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-micro cursor-pointer hover:brightness-125', i === 0 ? 'bg-amber-300/10 text-foreground' : 'bg-elevated/60 text-secondary', stock.symbol === activeSymbol && 'ring-1 ring-accent/60')}>
                         <span className="flex min-w-0 items-center gap-1">
                           <span className="min-w-0 truncate font-medium">{stock.name || stock.symbol}</span>
                         </span>
                         <span className={cn('shrink-0 font-mono', priceColorClass(stock.change_pct))}>{stock.change_pct != null ? fmtPct(stock.change_pct) : '—'}</span>
                       </span>
-                    ) : <span key={i} className="rounded-md bg-elevated/30 px-1.5 py-0.5 text-[10px] text-muted/40">—</span>
+                    ) : <span key={i} className="rounded-md bg-elevated/30 px-1.5 py-0.5 text-micro text-muted/40">—</span>
                   })}
                 </div>
               </div>
@@ -716,13 +716,13 @@ function IndustryRail({
       <div className="px-1 pb-2.5">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-semibold text-foreground">行业矩阵</h3>
-          <span className="text-[10px] text-muted">Top {stats.length}</span>
+          <span className="text-micro text-muted">Top {stats.length}</span>
         </div>
         <div className="mt-2 relative">
           <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted" />
           <input value={search} onChange={e => onSearch(e.target.value)} placeholder="搜索行业" className="h-8 w-full rounded-lg border border-border bg-base pl-8 pr-3 text-xs text-foreground outline-none focus:border-accent/50" />
         </div>
-        <div className="mt-2 grid grid-cols-5 overflow-hidden rounded-lg border border-border text-[10px]">
+        <div className="mt-2 grid grid-cols-5 overflow-hidden rounded-lg border border-border text-micro">
           {([
             ['heat', '强度'], ['avgPct', '涨幅'], ['leader', '龙头'], ['amount', '成交'], ['down', '跌幅'],
           ] as [SortMode, string][]).map(([key, label]) => (
@@ -739,7 +739,7 @@ function IndustryRail({
                 <span className="min-w-0 flex-1 truncate text-xs font-medium text-foreground">{item.key}</span>
                 <span className={cn('font-mono text-xs', priceColorClass(item.avgPct))}>{item.avgPct != null ? fmtPct(item.avgPct) : '—'}</span>
               </div>
-              <div className="mt-1 flex items-center gap-2 text-[10px] text-muted">
+              <div className="mt-1 flex items-center gap-2 text-micro text-muted">
                 <span>{item.count}只</span>
                 <span className="text-bull">{item.upCount}涨</span>
                 <span className="text-bear">{item.downCount}跌</span>
@@ -767,7 +767,7 @@ function IndustryFocus({ stat, onStockClick, activeSymbol }: { stat: IndustrySta
           <div className="min-w-0">
             <div className="flex items-center gap-3">
               <h3 className="truncate text-xl font-semibold text-foreground">{stat.key}</h3>
-              <span className="rounded-btn bg-amber-500/10 px-2 py-0.5 text-[10px] text-amber-400">强度 {stat.heatScore.toFixed(0)}</span>
+              <span className="rounded-btn bg-amber-500/10 px-2 py-0.5 text-micro text-amber-400">强度 {stat.heatScore.toFixed(0)}</span>
             </div>
             <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
               <span>{stat.count} 只成分</span>
@@ -794,7 +794,7 @@ function IndustryFocus({ stat, onStockClick, activeSymbol }: { stat: IndustrySta
 
       <div className="min-h-0 flex-1 overflow-auto">
         <table className="min-w-full text-left text-xs">
-          <thead className="bg-elevated/60 text-[11px] text-muted">
+          <thead className="bg-elevated/60 text-xs text-muted">
             <tr>
               <th className="px-4 py-2 font-medium">排名</th>
               <th className="px-4 py-2 font-medium">股票</th>
@@ -812,7 +812,7 @@ function IndustryFocus({ stat, onStockClick, activeSymbol }: { stat: IndustrySta
                 <td className="px-4 py-2 font-mono text-muted">{idx + 1}</td>
                 <td className="px-4 py-2">
                   <div className="font-medium text-foreground">{s.name || '—'}</div>
-                  <div className="font-mono text-[10px] text-muted">{s.symbol}</div>
+                  <div className="font-mono text-micro text-muted">{s.symbol}</div>
                 </td>
                 <td className={cn('px-4 py-2 font-mono tabular-nums', priceColorClass(s.change_pct))}>{s.change_pct != null ? fmtPct(s.change_pct) : '—'}</td>
                 <td className="px-4 py-2 font-mono text-foreground">{s.turnover_rate != null ? `${s.turnover_rate.toFixed(2)}%` : '—'}</td>
@@ -830,13 +830,13 @@ function IndustryFocus({ stat, onStockClick, activeSymbol }: { stat: IndustrySta
           </tbody>
         </table>
       </div>
-      {stat.stocks.length > MAX_RENDERED_STOCKS && <div className="shrink-0 border-t border-border px-4 py-2 text-center text-[11px] text-muted">仅展示龙头分前 {MAX_RENDERED_STOCKS} 只，共 {stat.stocks.length} 只</div>}
+      {stat.stocks.length > MAX_RENDERED_STOCKS && <div className="shrink-0 border-t border-border px-4 py-2 text-center text-xs text-muted">仅展示龙头分前 {MAX_RENDERED_STOCKS} 只，共 {stat.stocks.length} 只</div>}
     </section>
   )
 }
 
 function MiniStat({ label, value, cls }: { label: string; value: string; cls: string }) {
-  return <div className="rounded-lg border border-border/60 bg-base/35 px-2 py-1.5"><div className="text-[10px] text-muted">{label}</div><div className={cn('mt-0.5 truncate text-sm font-semibold', cls)}>{value}</div></div>
+  return <div className="rounded-lg border border-border/60 bg-base/35 px-2 py-1.5"><div className="text-micro text-muted">{label}</div><div className={cn('mt-0.5 truncate text-sm font-semibold', cls)}>{value}</div></div>
 }
 
 function LeaderStage({ stocks, onStockClick, activeSymbol }: { stocks: EnrichedStock[]; onStockClick: (symbol: string, name?: string) => void; activeSymbol: string | null }) {
@@ -851,11 +851,11 @@ function LeaderStage({ stocks, onStockClick, activeSymbol }: { stocks: EnrichedS
         {stocks.map((stock, idx) => (
           <div key={stock.symbol} onClick={() => onStockClick(stock.symbol, stock.name || undefined)} className={cn('rounded-lg border p-3 cursor-pointer hover:brightness-110 transition-ui', idx === 0 ? 'border-amber-400/25 bg-amber-400/[0.06]' : 'border-border/60 bg-base/35', stock.symbol === activeSymbol && 'ring-1 ring-accent/60')}>
             <div className="flex items-center justify-between gap-2">
-              <span className={cn('text-[10px] font-medium', idx === 0 ? 'text-amber-300' : 'text-muted')}>{idx === 0 ? '主龙头' : `辅龙 ${idx}`}</span>
-              <span className="font-mono text-[11px] text-amber-300">{stock.leaderScore.toFixed(0)}</span>
+              <span className={cn('text-micro font-medium', idx === 0 ? 'text-amber-300' : 'text-muted')}>{idx === 0 ? '主龙头' : `辅龙 ${idx}`}</span>
+              <span className="font-mono text-xs text-amber-300">{stock.leaderScore.toFixed(0)}</span>
             </div>
             <div className="mt-2 truncate text-sm font-medium text-foreground">{stock.name || stock.symbol}</div>
-            <div className="mt-0.5 flex items-center justify-between text-[11px]">
+            <div className="mt-0.5 flex items-center justify-between text-xs">
               <span className="font-mono text-muted">{stock.symbol}</span>
               <span className={cn('font-mono', priceColorClass(stock.change_pct))}>{stock.change_pct != null ? fmtPct(stock.change_pct) : '—'}</span>
             </div>
@@ -873,7 +873,7 @@ function ScoreExplain({ stock }: { stock?: EnrichedStock }) {
     <div className="rounded-xl border border-border/60 bg-surface p-3">
       <div className="mb-2 flex items-center justify-between">
         <span className="text-xs font-medium text-foreground">主龙头评分拆解</span>
-        <span className="text-[11px] text-muted">涨幅 / 换手 / 成交 / 市值 / 量比 / 连板</span>
+        <span className="text-xs text-muted">涨幅 / 换手 / 成交 / 市值 / 量比 / 连板</span>
       </div>
       <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
         <Part label="动能" value={parts.momentum} cls="bg-red-400" />
@@ -888,5 +888,5 @@ function ScoreExplain({ stock }: { stock?: EnrichedStock }) {
 }
 
 function Part({ label, value, cls }: { label: string; value: number; cls: string }) {
-  return <div className="rounded-lg bg-base/35 px-2 py-1.5"><div className="mb-1 flex justify-between text-[10px] text-muted"><span>{label}</span><span>{Math.round(value * 100)}</span></div><div className="h-1 rounded-full bg-elevated"><div className={cn('h-full rounded-full', cls)} style={{ width: `${Math.max(3, value * 100)}%` }} /></div></div>
+  return <div className="rounded-lg bg-base/35 px-2 py-1.5"><div className="mb-1 flex justify-between text-micro text-muted"><span>{label}</span><span>{Math.round(value * 100)}</span></div><div className="h-1 rounded-full bg-elevated"><div className={cn('h-full rounded-full', cls)} style={{ width: `${Math.max(3, value * 100)}%` }} /></div></div>
 }

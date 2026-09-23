@@ -67,7 +67,7 @@
 - [x] 连板梯队(`LimitUpLadder`)
 - [x] 复盘(`Review`)
 - [x] 信号(`Signals` + `signals/*`)
-- [ ] 概念 / 行业分析(`ConceptAnalysis` / `IndustryAnalysis`)
+- [x] 概念 / 行业分析(`ConceptAnalysis` / `IndustryAnalysis`)
 - [ ] 财务 / 数据 / 因子 / 回测(`Financials` / `Data` / `factors/*` / `backtest/*`)
 - [ ] 设置(`Settings` + `settings/*`)
 - [ ] 其余共用组件与弹窗

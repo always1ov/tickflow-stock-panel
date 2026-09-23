@@ -21,6 +21,7 @@ import { useChartTheme } from '@/lib/theme'
 import { cn } from '@/lib/cn'
 import { toast } from '@/components/Toast'
 import { CORE_INDEXES } from '@/components/Layout'
+import { TYPE, buttonClass } from '@/components/ui'
 
 const FLOW_LS_PREFIX = 'sector_rotation_flow_'
 const INDEX_LS_PREFIX = 'sector_rotation_index_'
@@ -698,34 +699,34 @@ export function SectorRotationCard({ kind }: { kind: 'concept' | 'industry' }) {
       <div className="mb-2 flex flex-wrap items-center gap-2">
         <span className="h-3 w-0.5 rounded-full bg-gradient-to-b from-amber-400 to-amber-400/30" />
         <Activity className="h-3.5 w-3.5 text-amber-500" />
-        <h2 className="text-xs font-semibold text-foreground">{dimLabel}切换 · 盘中轮动</h2>
+        <h2 className={TYPE.card}>{dimLabel}切换 · 盘中轮动</h2>
         {data?.status === 'ok' && data.date && (
           phase === 'live' ? (
-            <span className="inline-flex items-center gap-1 rounded bg-emerald-400/10 px-1.5 py-0.5 text-[9px] font-medium text-emerald-400">
+            <span className="inline-flex items-center gap-1 rounded bg-emerald-400/10 px-1.5 py-0.5 text-micro font-medium text-emerald-400">
               <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />盘中
             </span>
           ) : (
-            <span className="rounded bg-elevated px-1.5 py-0.5 text-[9px] text-muted">回放 · {data.date}</span>
+            <span className="rounded bg-elevated px-1.5 py-0.5 text-micro text-muted">回放 · {data.date}</span>
           )
         )}
-        <span className="text-[10px] text-muted">
+        <span className="text-micro text-muted">
           {data?.status === 'ok' && latest ? `${data.date} ${data.as_of} · 切换强度 ${latest.rotation.toFixed(2)} · 领涨 ${latest.leader}` : '全量分钟聚合'}
         </span>
         <div className="ml-auto flex flex-wrap items-center gap-1.5">
-          <span className="text-[9px] text-muted">显示</span>
+          <span className="text-micro text-muted">显示</span>
           <select
             aria-label="显示模式"
-            className="h-6 rounded border border-border bg-surface px-1 text-[10px] text-secondary outline-none focus:border-accent"
+            className="h-7 rounded-btn border border-border bg-surface px-1.5 text-xs text-foreground outline-none focus:border-accent"
             value={displayMode}
             onChange={event => onDisplayModeChange(event.target.value as 'trend' | 'heatmap')}
           >
             <option value="trend">走势线</option>
             <option value="heatmap">热力图</option>
           </select>
-          <span className="text-[9px] text-muted">板块</span>
+          <span className="text-micro text-muted">板块</span>
           <select
             aria-label="板块来源"
-            className="h-6 rounded border border-border bg-surface px-1 text-[10px] text-secondary outline-none focus:border-accent"
+            className="h-7 rounded-btn border border-border bg-surface px-1.5 text-xs text-foreground outline-none focus:border-accent"
             value={rowsMode}
             onChange={event => onRowsModeChange(event.target.value as SectorSource)}
           >
@@ -742,7 +743,7 @@ export function SectorRotationCard({ kind }: { kind: 'concept' | 'industry' }) {
             <>
               <select
                 aria-label="活跃榜行数"
-                className="h-6 rounded border border-border bg-surface px-1 text-[10px] text-secondary outline-none focus:border-accent"
+                className="h-7 rounded-btn border border-border bg-surface px-1.5 text-xs text-foreground outline-none focus:border-accent"
                 value={autoRows}
                 onChange={event => onAutoRowsChange(Number(event.target.value))}
               >
@@ -753,7 +754,7 @@ export function SectorRotationCard({ kind }: { kind: 'concept' | 'industry' }) {
                 onClick={() => setExcludeEditorOpen(v => !v)}
                 aria-label="编辑自动活跃榜排除名单"
                 className={cn(
-                  'rounded border px-1.5 py-0.5 text-[10px]',
+                  'h-7 rounded-btn border px-2 text-xs',
                   excludeEditorOpen ? 'border-accent text-accent' : 'border-border text-secondary hover:text-accent',
                 )}
               >
@@ -761,19 +762,19 @@ export function SectorRotationCard({ kind }: { kind: 'concept' | 'industry' }) {
               </button>
             </>
           )}
-          <span className="text-[9px] text-muted">指数</span>
+          <span className="text-micro text-muted">指数</span>
           <select
             aria-label="指数叠加"
-            className="h-6 max-w-24 truncate rounded border border-border bg-surface px-1 text-[10px] text-secondary outline-none focus:border-accent"
+            className="h-7 max-w-24 truncate rounded-btn border border-border bg-surface px-1.5 text-xs text-foreground outline-none focus:border-accent"
             value={indexSymbol}
             onChange={event => onIndexChange(event.target.value)}
           >
             {CORE_INDEXES.map(item => <option key={item.symbol} value={item.symbol}>{item.name}</option>)}
           </select>
-          <span className="text-[9px] text-muted">资金流</span>
+          <span className="text-micro text-muted">资金流</span>
           <select
             aria-label="资金流扩展列"
-            className="h-6 max-w-52 truncate rounded border border-border bg-surface px-1 text-[10px] text-secondary outline-none focus:border-accent"
+            className="h-7 max-w-52 truncate rounded-btn border border-border bg-surface px-1.5 text-xs text-foreground outline-none focus:border-accent"
             value={flow}
             onChange={event => onFlowChange(event.target.value)}
           >
@@ -784,7 +785,7 @@ export function SectorRotationCard({ kind }: { kind: 'concept' | 'industry' }) {
           </select>
           <select
             aria-label="分钟桶粒度"
-            className="h-6 rounded border border-border bg-surface px-1 text-[10px] text-secondary outline-none focus:border-accent"
+            className="h-7 rounded-btn border border-border bg-surface px-1.5 text-xs text-foreground outline-none focus:border-accent"
             value={bucket}
             onChange={event => setBucket(Number(event.target.value))}
           >
@@ -809,7 +810,7 @@ export function SectorRotationCard({ kind }: { kind: 'concept' | 'industry' }) {
           {rowsMode !== 'custom' && excludeEditorOpen && (
             <div className="mb-2 rounded-lg border border-border/60 bg-elevated/30 p-2">
               <div className="flex flex-wrap items-center gap-1.5">
-                <span className="text-[9px] text-muted">
+                <span className="text-micro text-muted">
                   自动活跃榜排除板块 {effectiveExclude.length}/{MAX_EXCLUDE_SECTORS}
                   {data?.max_auto_members != null && ` · 成员数>${data.max_auto_members} 自动排除`}
                 </span>
@@ -817,20 +818,20 @@ export function SectorRotationCard({ kind }: { kind: 'concept' | 'industry' }) {
                   type="button"
                   onClick={() => persistExclude(null)}
                   disabled={excludeNames === null}
-                  className="ml-auto rounded border border-border px-1.5 py-0.5 text-[10px] text-secondary hover:text-accent disabled:cursor-not-allowed disabled:opacity-50"
+                  className={buttonClass({ size: 'xs' }, 'ml-auto')}
                 >
                   恢复默认
                 </button>
               </div>
               <div className="mt-1.5 flex flex-wrap gap-1">
                 {effectiveExclude.map(name => (
-                  <span key={name} className="inline-flex items-center gap-1 rounded bg-accent/10 px-1.5 py-0.5 text-[10px] text-accent">
+                  <span key={name} className="inline-flex items-center gap-1 rounded bg-accent/10 px-1.5 py-0.5 text-micro text-accent">
                     {name}
                     <button type="button" onClick={() => removeExclude(name)} className="cursor-pointer hover:text-danger" aria-label={`移除 ${name}`}>×</button>
                   </span>
                 ))}
                 {effectiveExclude.length === 0 && (
-                  <span className="text-[9px] text-muted/70">名称过滤已清空 — 仅按成员数上限过滤</span>
+                  <span className="text-micro text-muted/70">名称过滤已清空 — 仅按成员数上限过滤</span>
                 )}
               </div>
               <div className="mt-1.5 flex items-center gap-1.5">
@@ -839,17 +840,17 @@ export function SectorRotationCard({ kind }: { kind: 'concept' | 'industry' }) {
                   onChange={event => setExcludeInput(event.target.value)}
                   onKeyDown={event => { if (event.key === 'Enter') addExclude() }}
                   placeholder="添加要排除的板块名称 (名称包含即排除)"
-                  className="h-6 flex-1 rounded border border-border bg-surface px-2 text-[10px] text-foreground outline-none focus:border-accent"
+                  className="h-7 flex-1 rounded-btn border border-border bg-surface px-2 text-xs text-foreground outline-none focus:border-accent"
                 />
                 <button
                   type="button"
                   onClick={addExclude}
-                  className="rounded border border-border px-1.5 py-0.5 text-[10px] text-secondary hover:text-accent"
+                  className="rounded border border-border px-1.5 py-0.5 text-micro text-secondary hover:text-accent"
                 >
                   添加
                 </button>
               </div>
-              <div className="px-1 pt-1 text-[9px] text-muted/70">
+              <div className="px-1 pt-1 text-micro text-muted/70">
                 仅影响自动活跃榜的选取 — 自定义监控不受影响; 过滤后不足展示行数时回退为不过滤
               </div>
             </div>
@@ -857,18 +858,18 @@ export function SectorRotationCard({ kind }: { kind: 'concept' | 'industry' }) {
           {rowsMode === 'custom' && (
             <div className="mb-2 rounded-lg border border-border/60 bg-elevated/30 p-2">
               <div className="flex flex-wrap items-center gap-1.5">
-                <span className="text-[9px] text-muted">监控板块 {customNames.length}/{MAX_CUSTOM_SECTORS}</span>
+                <span className="text-micro text-muted">监控板块 {customNames.length}/{MAX_CUSTOM_SECTORS}</span>
                 {customNames.map(name => (
-                  <span key={name} className="inline-flex items-center gap-1 rounded bg-accent/10 px-1.5 py-0.5 text-[10px] text-accent">
+                  <span key={name} className="inline-flex items-center gap-1 rounded bg-accent/10 px-1.5 py-0.5 text-micro text-accent">
                     {name}
                     <button type="button" onClick={() => toggleCustom(name)} className="cursor-pointer hover:text-danger" aria-label={`移除 ${name}`}>×</button>
                   </span>
                 ))}
-                {customNames.length === 0 && <span className="text-[9px] text-muted/70">未选择板块 — 暂按活跃榜展示</span>}
+                {customNames.length === 0 && <span className="text-micro text-muted/70">未选择板块 — 暂按活跃榜展示</span>}
                 <button
                   type="button"
                   onClick={() => setPickerOpen(v => !v)}
-                  className="ml-auto rounded border border-border px-1.5 py-0.5 text-[10px] text-secondary hover:text-accent"
+                  className="ml-auto rounded border border-border px-1.5 py-0.5 text-micro text-secondary hover:text-accent"
                 >
                   {pickerOpen ? '收起' : '＋添加板块'}
                 </button>
@@ -879,7 +880,7 @@ export function SectorRotationCard({ kind }: { kind: 'concept' | 'industry' }) {
                     value={pickerSearch}
                     onChange={event => setPickerSearch(event.target.value)}
                     placeholder="搜索板块名"
-                    className="mb-1 h-6 w-full rounded border border-border bg-surface px-2 text-[10px] text-foreground outline-none focus:border-accent"
+                    className="mb-1 h-6 w-full rounded border border-border bg-surface px-2 text-micro text-foreground outline-none focus:border-accent"
                   />
                   <div className="max-h-44 overflow-y-auto rounded border border-border/40">
                     {(data.universe ?? [])
@@ -892,7 +893,7 @@ export function SectorRotationCard({ kind }: { kind: 'concept' | 'industry' }) {
                             type="button"
                             onClick={() => toggleCustom(item.name)}
                             className={cn(
-                              'flex w-full items-center justify-between gap-2 px-2 py-1 text-left text-[10px] hover:bg-elevated/50',
+                              'flex w-full items-center justify-between gap-2 px-2 py-1 text-left text-micro hover:bg-elevated/50',
                               selected && 'bg-accent/5 text-accent',
                             )}
                           >
@@ -903,9 +904,9 @@ export function SectorRotationCard({ kind }: { kind: 'concept' | 'industry' }) {
                           </button>
                         )
                       })}
-                    {!(data.universe ?? []).length && <div className="p-2 text-center text-[10px] text-muted">板块清单不可用</div>}
+                    {!(data.universe ?? []).length && <div className="p-2 text-center text-micro text-muted">板块清单不可用</div>}
                   </div>
-                  <div className="px-1 pt-1 text-[9px] text-muted/70">右列为 活跃度 (近 30 分钟成交额合计) · 现涨幅</div>
+                  <div className="px-1 pt-1 text-micro text-muted/70">右列为 活跃度 (近 30 分钟成交额合计) · 现涨幅</div>
                 </div>
               )}
             </div>
@@ -916,7 +917,7 @@ export function SectorRotationCard({ kind }: { kind: 'concept' | 'industry' }) {
               // key 强制模式切换时销毁重建容器: 两个分支同为 <div> 时 React 会原地
               // 复用节点换挂 ref, 造成两个 echarts 实例交叉挤占同一个 dom
               <div key="heatmap" className="rounded-lg border border-border/60 bg-elevated/30 p-1.5">
-                <div className="px-1 pb-1 text-[9px] text-muted">
+                <div className="px-1 pb-1 text-micro text-muted">
                   热度板块 × 分钟轮动热力图 — 行按{rowsMode === 'custom' ? '自定义清单' : `${SOURCE_LABELS[rowsMode]}维度`}排序, 色为该桶板块涨幅 (红涨绿跌, 平淡近透明), 悬停与下方榜单联动
                 </div>
                 <div ref={heat.ref} style={{ height: heatHeight }} className="w-full" />
@@ -925,7 +926,7 @@ export function SectorRotationCard({ kind }: { kind: 'concept' | 'industry' }) {
           ) : (
             displayNames.length > 0 && (
               <div key="trend" className="rounded-lg border border-border/60 bg-elevated/30 p-1.5">
-                <div className="px-1 pb-1 text-[9px] text-muted">
+                <div className="px-1 pb-1 text-micro text-muted">
                   展示板块涨幅走势 (桶内均值, 右轴 %) — 线上穿 0% 轴为切入, 下穿为退潮; 悬停列表或线条即聚焦: 其余线压暗、目标线加粗并浮出名称, 图例可单看某条线
                 </div>
                 <div ref={trend.ref} style={{ height: Math.max(260, displayNames.length * 8 + 240) }} className="w-full" />
@@ -944,7 +945,7 @@ export function SectorRotationCard({ kind }: { kind: 'concept' | 'industry' }) {
             const downNames = events.filter(event => event.dir === 'down').slice(0, 8)
             return (
               <div className="mt-2 rounded-lg border border-border/60 bg-elevated/30 p-1.5">
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[10px]">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-micro">
                   <span className="font-medium text-foreground">涨跌切换 (0轴穿越)</span>
                   <span className="text-muted">可见窗口累计</span>
                   <span className="text-bull">↑ 转强 {upTotal}</span>
@@ -952,9 +953,9 @@ export function SectorRotationCard({ kind }: { kind: 'concept' | 'industry' }) {
                   {latest && (latest.cross_up || latest.cross_down) ? (
                     <span className="text-muted">最新桶 ↑{latest.cross_up ?? 0} / ↓{latest.cross_down ?? 0}</span>
                   ) : null}
-                  <span className="ml-auto text-[9px] text-muted">悬停名称可在上图 / 榜单定位</span>
+                  <span className="ml-auto text-micro text-muted">悬停名称可在上图 / 榜单定位</span>
                 </div>
-                <div className="mt-1 flex flex-wrap items-center gap-1 text-[10px]">
+                <div className="mt-1 flex flex-wrap items-center gap-1 text-micro">
                   <span className="w-12 shrink-0 text-bull">↑ 转强</span>
                   {upNames.map(event => (
                     <button
@@ -964,12 +965,12 @@ export function SectorRotationCard({ kind }: { kind: 'concept' | 'industry' }) {
                       onMouseLeave={() => setHoverName(null)}
                       className="rounded bg-base/60 px-1.5 py-0.5 text-bull hover:bg-elevated/60"
                     >
-                      {event.name} <span className="font-mono text-[9px] opacity-60">{event.time}</span>
+                      {event.name} <span className="font-mono text-micro opacity-60">{event.time}</span>
                     </button>
                   ))}
                   {!upNames.length && <span className="text-muted/70">无</span>}
                 </div>
-                <div className="mt-1 flex flex-wrap items-center gap-1 text-[10px]">
+                <div className="mt-1 flex flex-wrap items-center gap-1 text-micro">
                   <span className="w-12 shrink-0 text-bear">↓ 转弱</span>
                   {downNames.map(event => (
                     <button
@@ -979,7 +980,7 @@ export function SectorRotationCard({ kind }: { kind: 'concept' | 'industry' }) {
                       onMouseLeave={() => setHoverName(null)}
                       className="rounded bg-base/60 px-1.5 py-0.5 text-bear hover:bg-elevated/60"
                     >
-                      {event.name} <span className="font-mono text-[9px] opacity-60">{event.time}</span>
+                      {event.name} <span className="font-mono text-micro opacity-60">{event.time}</span>
                     </button>
                   ))}
                   {!downNames.length && <span className="text-muted/70">无</span>}
@@ -989,13 +990,13 @@ export function SectorRotationCard({ kind }: { kind: 'concept' | 'industry' }) {
           })()}
           <div className="mt-2 grid grid-cols-1 gap-2 lg:grid-cols-[1.2fr_1fr]">
             <div className="rounded-lg border border-border/60 bg-elevated/30 p-1.5">
-              <div className="px-1 pb-1 text-[9px] text-muted">
+              <div className="px-1 pb-1 text-micro text-muted">
                 切换强度 (1h 领涨梯队换血率) · 琥珀字=窗口内最强 2 次切换 / 灰字=最弱 2 次切换的新领涨{dimLabel} · 蓝线={indexLine ? indexLine.label : '指数'}(右轴) · 灰虚线=全市场(右轴) · 与展示图指针联动
               </div>
               <div ref={chart.ref} className="h-32 w-full" />
             </div>
             <div className="overflow-hidden rounded-lg border border-border/60">
-              <div className="grid grid-cols-[minmax(0,1.4fr)_64px_64px_58px_minmax(72px,1fr)] border-b border-border bg-base/50 px-2 py-1.5 text-[9px] font-medium text-muted">
+              <div className="grid grid-cols-[minmax(0,1.4fr)_64px_64px_58px_minmax(72px,1fr)] border-b border-border bg-base/50 px-2 py-1.5 text-micro font-medium text-muted">
                 <span>{dimLabel}</span><span className="text-right">现涨幅</span><span className="text-right">1h前</span><span className="text-right">排名变化</span><span className="text-right">{data.flow_available ? '资金流 / 综合分' : '综合分'}</span>
               </div>
               <div className="max-h-40 overflow-y-auto">
@@ -1005,7 +1006,7 @@ export function SectorRotationCard({ kind }: { kind: 'concept' | 'industry' }) {
                     onMouseEnter={() => setHoverName(sector.name)}
                     onMouseLeave={() => setHoverName(null)}
                     className={cn(
-                      'grid grid-cols-[minmax(0,1.4fr)_64px_64px_58px_minmax(72px,1fr)] items-center border-b border-border/40 px-2 py-1.5 text-[10px] last:border-b-0 hover:bg-elevated/40',
+                      'grid grid-cols-[minmax(0,1.4fr)_64px_64px_58px_minmax(72px,1fr)] items-center border-b border-border/40 px-2 py-1.5 text-micro last:border-b-0 hover:bg-elevated/40',
                       hoverName === sector.name && 'bg-accent/10',
                     )}
                   >
@@ -1031,11 +1032,11 @@ export function SectorRotationCard({ kind }: { kind: 'concept' | 'industry' }) {
                     </span>
                   </div>
                 ))}
-                {!data.sectors.length && <div className="p-3 text-center text-[10px] text-muted">暂无板块数据</div>}
+                {!data.sectors.length && <div className="p-3 text-center text-micro text-muted">暂无板块数据</div>}
               </div>
             </div>
           </div>
-          <div className="mt-1.5 flex items-center gap-1.5 text-[9px] text-muted">
+          <div className="mt-1.5 flex items-center gap-1.5 text-micro text-muted">
             <Database className="h-3 w-3" />
             {`${data.member_count} 个${dimLabel} · ${data.bucket_minutes}分钟桶 · 基准 ${data.basis === 'prev_close' ? '昨收' : data.basis === 'first_close' ? '今开' : '混合'}`}
             {data.flow_available ? ` · 资金流 ${data.flow_field}` : ' · 未启用资金流'}
