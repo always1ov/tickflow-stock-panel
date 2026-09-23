@@ -29,9 +29,7 @@ def test_R433_读数各自取自原来的产地():
     assert "useStockTrend(symbol)" in st, "六态没走图上方那条六态条同一个查询"
     assert "useStockReview(symbol, days)" in st, "通道那几样没走复盘同一个查询"
     assert "POS_FILL[b.pos]" in st and "b?.pos_cn" in st, "三档位置的颜色 / 名字没用原来那份"
-    assert "VERDICT_CLS[now.tone]" in st
-    # 通道这一层唯一能照着做的一句(R269: 别的都能收, 它不行)
-    assert "该盯什么: " in st and "{ph?.watch && <div" in st, "「该盯什么」没按条件渲染出来"
+    assert "const ph = d?.channel?.phase ?? null" in st and "{ph?.cn ?? '—'}" in st, "通道阶段没用复盘接口那份"
     # 距离用后端给的带符号的数, 不在前端另算一遍
     assert "t.flip_down_distance_pct" in st and "t.flip_up_distance_pct" in st
 
@@ -72,3 +70,17 @@ def test_R438_现状里没有这一格历来():
     # 六态成了第一格, 前面不该再有分隔竖线
     trend = st[st.index("<Cell label={<>趋势状态 · 六态"):]
     assert "md:border-l" not in trend[:trend.index("\n")]
+
+
+def test_R445_现状块删掉打码的部分_没有分隔竖线_四块等分():
+    """[R445] 用户在截图上打码: 通道那一格的档位徽标、三字组合码、「该盯什么」那一句,
+    连同分隔竖线, 「删除掉我打码的部分和间隔符合, 然后排版好显示」。"""
+    st = code_of(ST)
+    for gone in ("VERDICT_CLS", "三档都在中部", "geo?.combo", "该盯什么", "ph?.watch", "border-l"):
+        assert gone not in st, f"「{gone}」是用户打码删掉的"
+    # 那一格只剩阶段, 标题跟着改名 —— 「通道档位」底下放阶段就是一个名字两个意思
+    assert '<Cell label="通道阶段">' in st and "通道档位" not in st
+    # 四块同一个结构(小标题 + 读数), 等分一行, 窄屏两块一行
+    assert "grid grid-cols-1 items-start" in st and "sm:grid-cols-2 lg:grid-cols-4" in st
+    for label in ('<Cell label="三档位置">', "<FlipCell label=\"跌破转弱\"", "<FlipCell label=\"站上转强\""):
+        assert label in st
