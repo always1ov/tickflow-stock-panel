@@ -65,11 +65,11 @@ export function ScoreCell({ o, rank, total }: { o: TodayOpportunity; rank: numbe
           ? '⚠ 有因子没读到,那一份权重是靠剩下的顶上来的 —— 总分偏乐观,同分时优先选没带 * 的'
           : '三个维度的因子都齐全')}
     >
-      <span className="font-mono text-[12px] font-semibold leading-none text-foreground">
+      <span className="font-mono text-xs font-semibold leading-none text-foreground">
         {rank}
-        <span className="text-[9px] font-normal text-muted">/{total}</span>
+        <span className="text-micro font-normal text-muted">/{total}</span>
       </span>
-      <span className="font-mono text-[9px] leading-none text-muted">
+      <span className="font-mono text-micro leading-none text-muted">
         {o.score}
         {o.partial && (
           <span className="text-warning" title="有因子没读到, 总分偏乐观">*</span>

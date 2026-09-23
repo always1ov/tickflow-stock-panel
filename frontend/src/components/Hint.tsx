@@ -90,7 +90,7 @@ export function Hint({ title, className }: {
           style={style ?? { left: GAP, top: GAP, visibility: 'hidden' }}
           onClick={(e) => e.stopPropagation()}
           className={cn(
-            'fixed z-[70] w-max max-w-[min(22rem,calc(100vw-1rem))] cursor-auto select-text whitespace-pre-line rounded-btn border border-border bg-surface px-2.5 py-2 text-left text-[11px] font-normal leading-relaxed text-secondary shadow-lg animate-pop-in',
+            'fixed z-[70] w-max max-w-[min(22rem,calc(100vw-1rem))] cursor-auto select-text whitespace-pre-line rounded-btn border border-border bg-surface px-2.5 py-2 text-left text-xs font-normal leading-relaxed text-secondary shadow-lg animate-pop-in',
             above ? 'origin-bottom' : 'origin-top',
           )}
         >

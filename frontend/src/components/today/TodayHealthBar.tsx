@@ -14,7 +14,7 @@ export function TodayHealthBar({ h }: { h: TodayHealth }) {
   const stale = (h.stale_days ?? 0) >= 1
   if (h.ok && !stale) return null
   return (
-    <div className={`rounded-lg border px-3 py-2 text-[11px] leading-relaxed ${
+    <div className={`rounded-lg border px-3 py-2 text-xs leading-relaxed ${
       h.blocks.length || stale
         ? 'border-warning/40 bg-warning/[0.07] text-warning'
         : 'border-border bg-elevated/30 text-muted'

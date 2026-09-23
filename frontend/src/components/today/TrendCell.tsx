@@ -61,24 +61,24 @@ export function TrendCell({ o }: { o: TodayOpportunity }) {
         <span>{o.text}</span>
         {o.trend_state_cn && (
           <span title="六态趋势状态 —— 门槛要求必须在多头侧(上涨趋势/自然回升/次级回升)"
-                className="whitespace-nowrap rounded bg-border/40 px-1 py-0.5 text-[9px] text-muted">
+                className="whitespace-nowrap rounded bg-border/40 px-1 py-0.5 text-micro text-muted">
             {o.trend_state_cn}
           </span>
         )}
         {o.fresh_from === 'near_breakout' && (
           <span title="这只是靠「逼近触发价」进来的:突破还没发生,跑道最长但也最未经确认"
-                className="whitespace-nowrap rounded bg-sky-400/15 px-1 py-0.5 text-[9px] text-sky-300">
+                className="whitespace-nowrap rounded bg-sky-400/15 px-1 py-0.5 text-micro text-sky-300">
             尚未突破
           </span>
         )}
         {o.intraday && (
           <span title="这个信号由盘中实时价触发,收盘可能收回去 —— 只记录观察,收盘确认后再动手"
-                className="rounded bg-amber-400/15 px-1 py-0.5 text-[9px] text-amber-300">
+                className="rounded bg-amber-400/15 px-1 py-0.5 text-micro text-amber-300">
             盘中·待收盘确认
           </span>
         )}
       </div>
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px]">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-micro">
         {p && (
           <span className={p.tone}
                 title={`量化波动通道·短期 位置 ${Math.round(o.channel_pct! * 100)}%`

@@ -74,14 +74,15 @@ export const SELECTED = 'border border-foreground bg-foreground font-medium text
 // [R449] 定高, 与个股弹窗同一套: 默认一档 32px 高、13px 字(弹窗的 PILL)。
 // 同一排按钮高度一致, 不再随字号、边框各自长高。
 const SIZE: Record<ButtonSize, string> = {
-  xs: 'h-7 gap-g2 px-2 text-micro',
+  // 小号只是矮一点(28px), 字仍是正文级 13px —— 按钮一律正文级, 不落到标签级
+  xs: 'h-7 gap-g2 px-2 text-xs',
   sm: 'h-8 gap-g3 px-3 text-xs',
   md: 'h-9 gap-g4 px-4 text-sm',
 }
 
 /** 方形图标钮: 四边等距, 不然图标不在正中。 */
 const ICON_SIZE: Record<ButtonSize, string> = {
-  xs: 'h-7 w-7 text-micro',
+  xs: 'h-7 w-7 text-xs',
   sm: 'h-8 w-8 text-xs',
   md: 'h-9 w-9 text-sm',
 }

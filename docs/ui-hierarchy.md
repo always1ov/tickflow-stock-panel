@@ -23,7 +23,7 @@
 
 ## 样式
 
-- **按钮**: `<Button>` / `buttonClass()`。默认 32px 高、13px 字、描边实底; 选中是黑白反相
+- **按钮**: `<Button>` / `buttonClass()`。默认 32px 高、13px 字、描边实底(小号 28px 高, 字仍是 13px —— 按钮一律正文级); 选中是黑白反相
   (亮色黑底白字、暗色白底黑字), 全站只有这一种选中态。
 - **卡片**: `<Card>`。实边框、实底、6px 圆角、无投影。
 - **表格**: `table.ts`。表头 11px 灰字浅灰底条, 内容 13px, 行间一道细线。
@@ -42,6 +42,7 @@
 | 与正文同字号的卡片标题 | 放大正文之后标题和正文一样大, 层级就塌了 | `TYPE.card`(15) |
 | 手写按钮 class 串 | | `buttonClass()` |
 | 各写各的选中色 | | `selected` |
+| `text-micro`(R400 那一轮已经落到 11px 的) | 正文、控件、表格内容、说明段落 | `text-xs`(13) —— **不能只看写死的字号**, R400 迁过的页面(模拟盘等)正文挤在 11px, 要按角色逐处看 |
 
 每迁完一个文件, 把它加进 `backend/tests/test_ui_hierarchy.py` 的 `MIGRATED`: 那里面的文件
 **一处写死字号都不许再有**。`test_design_spec.py` 的棘轮跟着往下调。
@@ -56,7 +57,7 @@
 - [x] 自选(`Watchlist`)
 - [x] 大盘(`Dashboard`)
 - [x] 监控(`Monitor` + `monitor/RuleEditor`)
-- [ ] 模拟盘 / 批次(`FlipPaper` / `Lots`)
+- [x] 模拟盘 / 批次(`FlipPaper` / `Lots`)
 - [ ] 选股(`Screener` + `screener/*`)
 - [ ] 市场环境(`Regime` + `regime/*`)
 - [ ] 指数(`Indices`)

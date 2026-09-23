@@ -48,6 +48,13 @@ MIGRATED: list[str] = [
     "components/monitor/FocusBar.tsx",
     "components/monitor/RuleEditor.tsx",
     "components/screener/SignalPicker.tsx",
+    "pages/FlipPaper.tsx",
+    "pages/Lots.tsx",
+    "components/today/ScoreCell.tsx",
+    "components/today/TodayHealthBar.tsx",
+    "components/today/TrendCell.tsx",
+    "components/Hint.tsx",
+    "components/DateShortcuts.tsx",
 ]
 
 

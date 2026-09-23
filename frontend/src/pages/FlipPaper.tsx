@@ -649,7 +649,7 @@ function TodaySignals({ rows, conviction }: {
                 type="button"
                 onClick={toggleMine}
                 aria-expanded={mineOpen}
-                className="flex w-full items-center gap-1.5 border-t border-border/40 bg-elevated/20 px-4 py-2 text-micro text-secondary transition-colors hover:bg-elevated/40 cursor-pointer"
+                className="flex w-full items-center gap-1.5 border-t border-border/40 bg-elevated/20 px-4 py-2 text-xs text-secondary transition-colors hover:bg-elevated/40 cursor-pointer"
               >
                 <ChevronDown className={cn('h-3 w-3 shrink-0 text-muted transition-transform duration-expand ease-smooth',
                   mineOpen && 'rotate-180')} />
@@ -675,7 +675,7 @@ function TodaySignals({ rows, conviction }: {
                 type="button"
                 onClick={toggleWatch}
                 aria-expanded={watchOpen}
-                className="flex w-full items-center gap-1.5 border-t border-border/40 px-4 py-2 text-micro text-muted transition-colors hover:bg-elevated/40 hover:text-foreground cursor-pointer"
+                className="flex w-full items-center gap-1.5 border-t border-border/40 px-4 py-2 text-xs text-muted transition-colors hover:bg-elevated/40 hover:text-foreground cursor-pointer"
               >
                 <ChevronDown className={cn('h-3 w-3 transition-transform duration-expand ease-smooth',
                   watchOpen && 'rotate-180')} />
@@ -866,7 +866,7 @@ function SignalRow({ r, c, shape, onOpen, onReview }: {
         ) : actionable && shape.rank ? (
           /* [R384] `shape.rank` 为假 = 整屏一个名次都没有, 那一列已经收成 0 宽,
              再写字会溢出到隔壁格。这句话改在区块标题上说一次。 */
-          <span className="text-center text-[9px] leading-tight text-muted/60"
+          <span className="text-center text-micro leading-tight text-muted/60"
                 title="没过打分那三道硬门槛, 所以没有名次 —— 但它转折了, 该动手还是要动手">
             没进
             <br />候选池
@@ -894,11 +894,11 @@ function SignalRow({ r, c, shape, onOpen, onReview }: {
              [R338] 手上拿着的换个标记: 同样没有动作, 但"我拿着它"与"我在看它"
              是两件事, 一眼要能分开。 */
           r.held ? (
-            <span className="inline-flex items-center gap-1 text-micro text-secondary">
+            <span className="inline-flex items-center gap-1 text-xs text-secondary">
               <Wallet className="h-3 w-3" />持有
             </span>
           ) : (
-            <span className="inline-flex items-center gap-1 text-micro text-muted">
+            <span className="inline-flex items-center gap-1 text-xs text-muted">
               <Eye className="h-3 w-3" />盯着
             </span>
           )
@@ -922,7 +922,7 @@ function SignalRow({ r, c, shape, onOpen, onReview }: {
             **动作那一格因此退回不可点**, 一个像素没动。 */}
         <button type="button" onClick={() => onReview(r.symbol, r.name)}
                 title={`看 ${r.name} 的逐日复盘 —— 这个状态是怎么走到今天的`}
-                className="col-span-2 min-w-0 cursor-pointer truncate text-left text-micro text-secondary transition-colors hover:text-accent sm:col-span-1">
+                className="col-span-2 min-w-0 cursor-pointer truncate text-left text-xs text-secondary transition-colors hover:text-accent sm:col-span-1">
           {r.stage === 'flipped' && <>已转折 · 现在是{r.state_cn}</>}
           {r.stage === 'crossing' && (
             <>按现价会转折 —— <b className="text-warning">收盘还站在这边才算数</b></>
@@ -940,12 +940,12 @@ function SignalRow({ r, c, shape, onOpen, onReview }: {
 
         {/* [R356] 走势并进同一行的第五列 —— 原来它是第二行, 害得行高随内容变。
             没进候选池的票这一格是空的, 但**格子照样占住**, 行高不受影响。 */}
-        <span className="col-span-3 min-w-0 text-micro sm:col-span-1">
+        <span className="col-span-3 min-w-0 text-xs sm:col-span-1">
           {c && <TrendCell o={c} />}
         </span>
 
         {/* [R350] 不再 `ml-auto` —— 它是网格的最后一列, 位置由栅格决定 */}
-        <span className="col-span-3 whitespace-nowrap text-left text-micro tabular-nums text-muted sm:col-span-1 sm:text-right">
+        <span className="col-span-3 whitespace-nowrap text-left text-xs tabular-nums text-muted sm:col-span-1 sm:text-right">
           {r.flip_price != null && <>
             触发 {r.flip_price.toFixed(2)}
             {r.ref_price != null && <> · 现 {r.ref_price.toFixed(2)}</>}
@@ -1028,7 +1028,7 @@ function NumberField({ label, value, onChange, min, max, step, width = 'w-20', s
           if (e.key === 'Escape') { setDraft(null); e.currentTarget.blur() }
         }}
         title={`${min} ~ ${max}${suffix ?? ''} —— 超出会被钳到边界; 回车或点别处生效`}
-        className={cn(width, 'rounded-btn border border-border bg-base px-1.5 py-0.5 text-right text-micro text-foreground outline-none focus:border-accent/50')}
+        className={cn(width, 'rounded-btn border border-border bg-base px-1.5 py-0.5 text-right text-xs text-foreground outline-none focus:border-accent/50')}
       />
       {suffix && <span className="text-micro">{suffix}</span>}
     </label>
@@ -1074,7 +1074,7 @@ function ParamBar({ capital, maxPositions, years, onCapital, onMaxPositions, onY
   onYears: (v: number) => void
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-1.5 text-micro">
+    <div className="flex flex-wrap items-center gap-1.5 text-xs">
       {/* [R353] 三个都改成可输入。上下界与后端逐个对齐:
           本金 > 0(给 1 万下限, 再低连一手都买不起);
           最多持有 1~50(`flip_portfolio.MAX_POSITIONS_CAP`);
@@ -1142,7 +1142,7 @@ function MonthStrip({ months }: { months: FlipPaperData['monthly'] }) {
                                style={{ height: `${Math.max(2, (-m.ret / peak) * 100)}%` }} />}
                 </div>
               </div>
-              <span className={cn('text-[9px] tabular-nums text-muted', m.partial && 'opacity-60')}>
+              <span className={cn('text-micro tabular-nums text-muted', m.partial && 'opacity-60')}>
                 {/* 一月与跨年的那个月印出年份, 其余只印月 —— 一排 12 格里
                     「2026-01」占的宽是「03」的三倍, 而年份一年只需要说一次 */}
                 {m.month.endsWith('-01') ? m.month.replace('-', '/') : m.month.slice(5)}
@@ -1233,7 +1233,7 @@ function Summary({ d }: { d: FlipPaperData }) {
             type="button"
             onClick={toggleNav}
             aria-expanded={navOpen}
-            className="flex w-full items-center gap-1.5 px-3 py-2 text-micro text-muted transition-colors hover:bg-elevated/40 hover:text-foreground cursor-pointer"
+            className="flex w-full items-center gap-1.5 px-3 py-2 text-xs text-muted transition-colors hover:bg-elevated/40 hover:text-foreground cursor-pointer"
           >
             <ChevronDown className={cn('h-3 w-3 transition-transform duration-expand ease-smooth',
               navOpen && 'rotate-180')} />
@@ -1263,7 +1263,8 @@ function Stat({ label, value, sub, tone, hint }: {
         {label}
         {hint && <Hint title={hint} />}
       </div>
-      <div className={cn('mt-0.5 text-lg font-semibold tabular-nums',
+      {/* [R455] 读数级 21px */}
+      <div className={cn('mt-0.5 text-xl font-semibold tabular-nums',
         tone === 'bull' && 'text-bull', tone === 'bear' && 'text-bear',
         tone === 'warn' && 'text-warning')}>
         {value}
@@ -1392,7 +1393,7 @@ function Orders({ orders }: { orders: FlipOrder[] }) {
         note={`${orders.length} 笔 · 最近的在前`}
         right={rows.length > 30 && (
           <button onClick={() => setAll((v) => !v)}
-                  className="text-micro text-muted hover:text-foreground cursor-pointer">
+                  className="text-xs text-muted hover:text-foreground cursor-pointer">
             {all ? '只看最近 30 笔' : `展开全部 ${rows.length} 笔`}
           </button>
         )}
@@ -1415,7 +1416,7 @@ function Orders({ orders }: { orders: FlipOrder[] }) {
             <tbody>
               {shown.map((o, i) => (
                 <tr key={`${o.date}-${o.symbol}-${i}`} className="border-t border-border/30">
-                  <td className="px-4 py-1.5 font-mono text-micro text-muted">
+                  <td className="px-4 py-1.5 font-mono text-xs text-muted">
                     {o.date}
                     {o.delayed && (
                       <span className="ml-1 text-warning"
@@ -1434,7 +1435,7 @@ function Orders({ orders }: { orders: FlipOrder[] }) {
                       {o.act === 'buy' ? '买入' : '清仓'}
                     </span>
                   </td>
-                  <td className="px-2 py-1.5 text-micro text-secondary">
+                  <td className="px-2 py-1.5 text-xs text-secondary">
                     {o.reason}
                     {o.state_cn && <span className="ml-1 text-muted">({o.state_cn})</span>}
                   </td>
@@ -1476,7 +1477,7 @@ function Skipped({ d }: { d: FlipPaperData }) {
 
           原因那几句长短不一(「封板挂不进去」 vs 「一直封到反向转折, 这张单作废」),
           所以次数靠右对齐、标签占剩下的宽 —— 标签自己换行, 次数永远在同一条竖线上。 */}
-      <div className="px-4 py-2.5 text-micro">
+      <div className="px-4 py-2.5 text-xs">
         <div className="grid gap-x-8 gap-y-1.5 sm:grid-cols-2">
           {Object.entries(byReason).map(([r, n]) => (
             <div key={r} className="flex items-baseline justify-between gap-3">
@@ -1520,7 +1521,7 @@ function Rules({ r, d }: { r: FlipRules; d?: FlipPaperData }) {
           免得它一个人把整行的行高撑成两倍。
 
           底下三段告诫是成段的话, 不是清单 —— 它们走自己的两列, 且保持顺序。 */}
-      <div className="px-4 py-3 text-micro leading-relaxed">
+      <div className="px-4 py-3 text-xs leading-relaxed">
         <div className="grid gap-x-8 gap-y-2 md:grid-cols-2 2xl:grid-cols-3">
           <Rule k="信号" v={r.signal} />
           <Rule k="成交" v={r.execute} />
