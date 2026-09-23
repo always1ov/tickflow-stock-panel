@@ -63,7 +63,7 @@
 - [x] 选股(`Screener` + `screener/*`)
 - [x] 市场环境(`Regime` + `regime/*`)
 - [x] 指数(`Indices`)
-- [ ] 异动(`AbnormalMoves`)
+- [x] 异动(`AbnormalMoves`)
 - [ ] 连板梯队(`LimitUpLadder`)
 - [ ] 复盘(`Review`)
 - [ ] 信号(`Signals` + `signals/*`)

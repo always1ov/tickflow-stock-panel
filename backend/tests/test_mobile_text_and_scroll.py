@@ -66,11 +66,11 @@ def test_R402_异动监控的分段控件不许被挤扁():
     body = src[i:i + 900]
     # **分开查外壳和按钮** —— 只查"这一段里有没有 shrink-0"是条死断言:
     # 按钮自己也带 shrink-0, 把外壳那个拿掉照样绿(变异测试当场证过)。
-    shell = re.search(r'className="(inline-flex[^"]*h-7[^"]*)"', body)
-    assert shell, "找不到分段控件的外壳"
-    assert "shrink-0" in shell.group(1), \
-        f"分段控件整组会被旁边的搜索框挤扁: {shell.group(1)}"
-    btn = re.search(r"className=\{`([^`]*px-2\.5[^`]*)`", body)
+    # [R458] 换成了全站分段切换: 外壳是 `SEG`(自带 shrink-0), 按钮是 `cn(SEG_ITEM, …)`
+    assert "<div className={SEG}>" in body, "找不到分段控件的外壳"
+    seg = dict(re.findall(r"export const (SEG\w*) = '([^']*)'", code_of("components/ui/segmented.ts")))
+    assert "shrink-0" in seg["SEG"], f"分段控件整组会被旁边的搜索框挤扁: {seg['SEG']}"
+    btn = re.search(r"cn\(SEG_ITEM,([^)]*)\)", body)
     assert btn, "找不到分段控件的按钮"
     assert "whitespace-nowrap" in btn.group(1), \
         f"分段控件里的字会断: {btn.group(1)}"

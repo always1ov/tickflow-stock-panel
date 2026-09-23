@@ -17,6 +17,8 @@ import { fmtPrice, fmtPct, priceColorClass } from '@/lib/format'
 import { boardTag } from '@/components/stock-table/primitives'
 import { PageHeader } from '@/components/PageHeader'
 import { StockPreviewDialog } from '@/components/StockPreviewDialog'
+import { cn } from '@/lib/cn'
+import { SEG, SEG_ITEM, SEG_OFF, SEG_ON, buttonClass } from '@/components/ui'
 
 /**
  * 异动监控 — 全时段异动中心, 按交易时间线分三个 tab:
@@ -96,10 +98,10 @@ export function AbnormalMoves() {
           right={
             <Link
               to="/monitor"
-              className="inline-flex h-7 shrink-0 items-center gap-1 whitespace-nowrap rounded border border-border bg-base px-2 text-[11px] text-secondary transition-colors hover:text-foreground"
+              className={buttonClass({}, 'shrink-0 gap-1')}
               title="在监控中心创建「异动监控」规则: 后台持续评估, 触发时统一走触发记录/站内通知/外部渠道推送, 无需保持本页打开"
             >
-              <Settings2 className="h-3 w-3" />
+              <Settings2 className="h-3.5 w-3.5" />
               告警规则
             </Link>
           }
@@ -108,7 +110,8 @@ export function AbnormalMoves() {
 
       {/* tab 条: 交易时间线 竞价(盘前) → 盘中 → 偏移(多日) */}
       <div className="flex shrink-0 flex-wrap items-center gap-3 px-5 pt-3">
-        <div className="inline-flex items-center gap-0.5 rounded-btn border border-border/50 bg-base/70 p-0.5">
+        {/* [R458] 页签是全站分段切换(docs/ui-hierarchy.md) */}
+        <div className={SEG}>
           {TAB_META.map(t => {
             const Icon = t.icon
             const active = tab === t.key
@@ -118,11 +121,7 @@ export function AbnormalMoves() {
                 type="button"
                 aria-pressed={active}
                 onClick={() => setTab(t.key)}
-                className={`inline-flex items-center gap-1.5 rounded-btn px-3.5 py-1.5 text-xs transition-ui ${
-                  active
-                    ? 'bg-accent/15 font-medium text-accent shadow-sm'
-                    : 'text-secondary hover:text-foreground'
-                }`}
+                className={cn(SEG_ITEM, 'gap-1.5 px-3', active ? SEG_ON : SEG_OFF)}
               >
                 <Icon className="h-3.5 w-3.5" />
                 {t.label}
@@ -130,7 +129,7 @@ export function AbnormalMoves() {
             )
           })}
         </div>
-        <span className="text-[10px] text-muted">{TAB_META.find(t => t.key === tab)?.desc}</span>
+        <span className="text-micro text-muted">{TAB_META.find(t => t.key === tab)?.desc}</span>
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col px-5 pb-4 pt-3">
@@ -203,7 +202,7 @@ function AuctionView({ onOpenStock }: {
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 overflow-y-auto">
       <BenchmarkCard q={q} onOpenStock={onOpenStock} />
 
-      <p className="px-1 text-[10px] leading-relaxed text-muted/70">
+      <p className="px-1 text-micro leading-relaxed text-muted/70">
         风向标为同花顺盘前竞价筛选名单 (每日约 5~6 只)。60 日回测: 名单当日开盘买入均值 +0.54%
         (超额 +0.44%), 但高开 ≥5% 子集当日 -1.97% — 追高是陷阱, 次日无显著优势, 仅作当日观察。
       </p>
@@ -245,8 +244,8 @@ function BenchmarkCard({ q, onOpenStock }: {
         <span className="grid h-8 w-8 shrink-0 place-items-center rounded bg-elevated/60">
           <Compass className="h-4 w-4 text-muted/50" />
         </span>
-        <span className="text-[11px] text-muted">盘前风向标暂不可用{d?.message ? ` (${d.message.slice(0, 40)})` : ''}</span>
-        <button onClick={() => q.refetch()} className="ml-auto text-[10px] text-accent hover:underline">重试</button>
+        <span className="text-xs text-muted">盘前风向标暂不可用{d?.message ? ` (${d.message.slice(0, 40)})` : ''}</span>
+        <button onClick={() => q.refetch()} className="ml-auto text-micro text-accent hover:underline">重试</button>
       </div>
     )
   }
@@ -265,34 +264,34 @@ function BenchmarkCard({ q, onOpenStock }: {
         </span>
         <span className="leading-tight">
           <span className="flex items-center gap-2">
-            <span className="text-[13px] font-semibold text-foreground">盘前风向标</span>
+            <span className="text-xs font-semibold text-foreground">盘前风向标</span>
             {isFallback && (
               <span
-                className="rounded border border-warning/30 bg-warning/10 px-1.5 py-px text-[9px] leading-tight text-warning"
+                className="rounded border border-warning/30 bg-warning/10 px-1.5 py-px text-micro leading-tight text-warning"
                 title="目标日名单不可用, 已自动显示上一期"
               >
                 显示上一期
               </span>
             )}
           </span>
-          <span className="mt-0.5 block text-[10px] text-muted">
+          <span className="mt-0.5 block text-micro text-muted">
             {d.trade_date} · {items.length} 只 · 同花顺竞价筛选
             {avgOc != null && (
               <> · 当日开盘买均值 <span className={priceColorClass(avgOc)}>{fmtPct(avgOc)}</span></>
             )}
           </span>
         </span>
-        <span className="ml-auto text-right text-[9px] leading-tight text-muted/70">
+        <span className="ml-auto text-right text-micro leading-tight text-muted/70">
           次日无优势<br />仅当日观察
         </span>
       </div>
 
       {/* 名单 */}
       {items.length === 0 ? (
-        <p className="border-t border-border/60 px-4 py-3 text-center text-[11px] text-muted">本期无名单数据</p>
+        <p className="border-t border-border/60 px-4 py-3 text-center text-xs text-muted">本期无名单数据</p>
       ) : (
         <div>
-          <div className="flex items-center gap-2 border-t border-border/60 bg-elevated/50 px-4 py-1.5 text-[9px] font-medium uppercase tracking-wider text-muted/70">
+          <div className="flex items-center gap-2 border-t border-border/60 bg-elevated/50 px-4 py-1.5 text-micro font-medium uppercase tracking-wider text-muted/70">
             <span className="w-14 shrink-0">竞价</span>
             <span className="min-w-0 flex-1">股票</span>
             <span className="w-16 shrink-0 text-right">当日</span>
@@ -306,7 +305,7 @@ function BenchmarkCard({ q, onOpenStock }: {
                 key={i.thscode}
                 type="button"
                 onClick={() => onOpenStock(i.thscode, i.name ?? undefined, navItems)}
-                className="flex w-full items-center gap-2 border-t border-border/30 px-4 py-2 text-left text-[11px] transition-colors hover:bg-accent/[0.05]"
+                className="flex w-full items-center gap-2 border-t border-border/30 px-4 py-2 text-left text-xs transition-colors hover:bg-accent/[0.05]"
                 title={`查看 ${i.name ?? i.thscode} 详情 · 竞价 ${gap ?? '—'}%`}
               >
                 <span className={('w-14 shrink-0 font-mono tabular-nums ' + priceColorClass(gap)).trim()}>
@@ -314,22 +313,22 @@ function BenchmarkCard({ q, onOpenStock }: {
                 </span>
                 <span className="flex min-w-0 flex-1 items-center gap-1.5">
                   <span className="truncate text-foreground">{i.name ?? i.thscode}</span>
-                  <span className="shrink-0 font-mono text-[9px] text-muted">{i.ticker ?? i.thscode}</span>
+                  <span className="shrink-0 font-mono text-micro text-muted">{i.ticker ?? i.thscode}</span>
                   {(() => { const b = boardTag(i.thscode); return b && (
-                    <span className={`shrink-0 inline-flex items-center rounded border px-1 text-[8px] font-bold leading-tight ${b.color}`}>
+                    <span className={`shrink-0 inline-flex items-center rounded border px-1 text-micro font-bold leading-tight ${b.color}`}>
                       {b.label}
                     </span>
                   ) })()}
                   {chase && (
                     <span
-                      className="shrink-0 rounded border border-danger/30 bg-danger/10 px-1 text-[8px] font-medium leading-tight text-danger"
+                      className="shrink-0 rounded border border-danger/30 bg-danger/10 px-1 text-micro font-medium leading-tight text-danger"
                       title="60日回测: 高开≥5%子集当日开盘买入平均 -1.97% (次日 +1.79%) — 追高陷阱"
                     >
                       追高风险
                     </span>
                   )}
                   {(i.tags ?? []).slice(0, 2).map(t => (
-                    <span key={t} className="max-w-24 truncate rounded-btn bg-base/70 px-1.5 py-px text-[9px] text-muted" title={t}>
+                    <span key={t} className="max-w-24 truncate rounded-btn bg-base/70 px-1.5 py-px text-micro text-muted" title={t}>
                       {t}
                     </span>
                   ))}
@@ -408,7 +407,7 @@ function IntradayView({ onPreview }: {
             cls={SIGNAL_META[k].cls}
           />
         ))}
-        <span className="ml-1 text-[10px] text-muted">
+        <span className="ml-1 text-micro text-muted">
           数据截至 {data?.cache_date ?? '—'}
           {q.isFetching && ' · 更新中…'}
         </span>
@@ -424,13 +423,13 @@ function IntradayView({ onPreview }: {
           <button
             type="button"
             onClick={() => q.refetch()}
-            className="inline-flex h-7 shrink-0 items-center gap-1 whitespace-nowrap rounded border border-border bg-base px-2 text-[11px] text-secondary transition-colors hover:text-foreground"
+            className={buttonClass({}, 'shrink-0 gap-1')}
             title="立即刷新"
           >
-            <RefreshCw className={`h-3 w-3 ${q.isFetching ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`h-3.5 w-3.5 ${q.isFetching ? 'animate-spin' : ''}`} />
             刷新
           </button>
-          <label className="flex shrink-0 items-center gap-1.5 whitespace-nowrap text-[11px] text-secondary" title="过滤 ST/*ST 风险警示股票">
+          <label className="flex shrink-0 items-center gap-1.5 whitespace-nowrap text-xs text-secondary" title="过滤 ST/*ST 风险警示股票">
             <input type="checkbox" checked={excludeSt} onChange={e => setExcludeSt(e.target.checked)} className="h-3 w-3 accent-accent" />
             过滤ST
           </label>
@@ -440,7 +439,7 @@ function IntradayView({ onPreview }: {
               value={query}
               onChange={e => setQuery(e.target.value)}
               placeholder="搜索代码/名称"
-              className="h-7 w-40 rounded border border-border bg-base pl-7 pr-2 text-[11px] text-foreground"
+              className="h-7 w-40 rounded border border-border bg-base pl-7 pr-2 text-xs text-foreground"
             />
           </div>
         </div>
@@ -449,8 +448,8 @@ function IntradayView({ onPreview }: {
       {/* 主表 */}
       <div className="min-h-0 flex-1 overflow-auto rounded-card border border-border bg-surface">
         <table className="w-full min-w-[900px] text-xs">
-          <thead className="sticky top-0 z-10 bg-surface">
-            <tr className="border-b border-border text-[10px] uppercase tracking-wider text-muted">
+          <thead className="sticky top-0 z-10 bg-elevated">
+            <tr className="border-b border-border text-micro text-muted">
               <th className="w-10 px-2 py-2 text-right">#</th>
               <th className="px-2 py-2 text-left">代码 / 名称</th>
               <th className="px-2 py-2 text-right">现价</th>
@@ -490,11 +489,8 @@ function SigChip({ active, onClick, label, count, cls }: {
       type="button"
       aria-pressed={active}
       onClick={onClick}
-      className={`inline-flex items-center gap-1 rounded-btn border px-2.5 py-1 text-[11px] transition-colors ${
-        active
-          ? (cls ?? 'border-accent/40 bg-accent/12 text-accent')
-          : 'border-border bg-elevated text-secondary hover:text-foreground'
-      }`}
+      // [R458] 全站按钮的尺寸; 自带颜色的信号(涨停红 / 跌停绿 …)选中时仍亮它的颜色, 其余选中反相
+      className={buttonClass({ selected: active && !cls }, cn('gap-1', active && cls))}
     >
       <span className="font-mono text-xs font-semibold tabular-nums">{count}</span>
       {label}
@@ -511,7 +507,7 @@ function IntradayRowView({ row, rank, onPreview }: {
   const clu = row.consecutive_limit_ups ?? 0
   return (
     <tr className="group border-b border-border/40 transition-colors last:border-0 hover:bg-elevated/50">
-      <td className="px-2 py-1.5 text-right font-mono text-[10px] text-muted/70">{rank}</td>
+      <td className="px-2 py-1.5 text-right font-mono text-micro text-muted/70">{rank}</td>
       <td className="px-2 py-1.5">
         <button
           type="button"
@@ -522,12 +518,12 @@ function IntradayRowView({ row, rank, onPreview }: {
           <span className="shrink-0 font-mono text-xs text-foreground transition-colors duration-hover group-hover:text-accent">{row.symbol}</span>
           <span className="min-w-0 max-w-40 truncate text-xs text-secondary transition-colors duration-hover group-hover:text-foreground">{row.name ?? '—'}</span>
           {board && (
-            <span className={`shrink-0 rounded border px-1 text-[9px] font-bold leading-tight ${board.color}`}>
+            <span className={`shrink-0 rounded border px-1 text-micro font-bold leading-tight ${board.color}`}>
               {board.label}
             </span>
           )}
           {clu > 1 && (
-            <span className="shrink-0 rounded border border-amber-500/30 bg-amber-500/10 px-1 text-[9px] font-bold leading-tight text-amber-500" title={`连续 ${clu} 日涨停`}>
+            <span className="shrink-0 rounded border border-amber-500/30 bg-amber-500/10 px-1 text-micro font-bold leading-tight text-amber-500" title={`连续 ${clu} 日涨停`}>
               {clu}连板
             </span>
           )}
@@ -540,7 +536,7 @@ function IntradayRowView({ row, rank, onPreview }: {
       <td className="px-2 py-1.5">
         <div className="flex flex-wrap items-center gap-1">
           {row.signals.map(s => (
-            <span key={s} className={`rounded border px-1 text-[9px] font-medium leading-tight ${SIGNAL_META[s].cls}`}>
+            <span key={s} className={`rounded border px-1 text-micro font-medium leading-tight ${SIGNAL_META[s].cls}`}>
               {SIGNAL_META[s].label}
             </span>
           ))}
@@ -659,7 +655,7 @@ function DeviationView({ onPreview }: {
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             {ruleChips()}
           </div>
-          <p className="mt-2.5 border-t border-border/60 pt-2 text-[10px] leading-relaxed text-muted">
+          <p className="mt-2.5 border-t border-border/60 pt-2 text-micro leading-relaxed text-muted">
             口径说明: 偏离值 = 个股 N 日累计涨跌幅 − 对应指数同期涨跌幅 (沪主板: 上证A指/上证指数,
             科创板: 科创50, 深主板: 深证A指/深证成指, 创业板: 创业板综指, 北: 北证50)。
             阈值为交易所异常波动披露标准的近似值, 仅供风险提示,
@@ -682,7 +678,7 @@ function DeviationView({ onPreview }: {
               对应指数同期), 找出接近触发「异常波动 / 严重异常波动」的标的。
               计算量较大, 默认关闭; 每次计算的结果会保留, 关闭后仍可查看 (不再实时更新)。
             </p>
-            <p className="mx-auto mt-2 max-w-lg text-[11px] leading-relaxed text-muted/80">
+            <p className="mx-auto mt-2 max-w-lg text-xs leading-relaxed text-muted/80">
               需要告警推送时, 在<Link to="/monitor?new=abnormal" className="text-accent hover:underline">监控中心</Link>
               新建「异动监控」规则 —— 后台持续评估, 触发时统一走触发记录 / 站内通知 / 外部渠道推送,
               与本页开关互不影响。
@@ -703,15 +699,15 @@ function DeviationView({ onPreview }: {
           {stale && (
             <div className="flex shrink-0 flex-wrap items-center gap-2 rounded-card border border-warning/25 bg-warning/5 px-3 py-2">
               <History className="h-3.5 w-3.5 shrink-0 text-warning" />
-              <span className="text-[11px] font-medium text-warning">已暂停计算 · 展示上次结果</span>
-              <span className="text-[11px] text-secondary">
+              <span className="text-xs font-medium text-warning">已暂停计算 · 展示上次结果</span>
+              <span className="text-xs text-secondary">
                 上次计算 {fmtCalcTime(lastResult.asof)} · 数据截至 {lastResult.cache_date ?? '—'}
                 {lastResult.includes_today ? ' (含今日收盘)' : ''}
               </span>
               <button
                 type="button"
                 onClick={() => toggleEnabled(true)}
-                className="ml-auto inline-flex h-7 shrink-0 items-center gap-1 whitespace-nowrap rounded border border-accent/40 bg-accent/10 px-2.5 text-[11px] font-medium text-accent transition-colors hover:bg-accent/15"
+                className={buttonClass({ variant: 'primary' }, 'ml-auto shrink-0 gap-1')}
               >
                 <Power className="h-3 w-3" />
                 开启实时计算
@@ -725,7 +721,7 @@ function DeviationView({ onPreview }: {
             <StatusChip label="异动边缘" count={counts?.edge} tone="warning" />
             <StatusChip label="观察" count={counts?.watch} tone="muted" />
             {enabled && (
-              <span className="text-[10px] text-muted">
+              <span className="text-micro text-muted">
                 数据截至 {data?.cache_date ?? '—'}
                 {data?.includes_today ? ' (含今日收盘)' : ' · 已叠加今日实时涨跌'}
                 {data ? ` · 基准指数今日 ${(data.bench_rt_pct * 100).toFixed(2)}%` : ''}
@@ -738,11 +734,7 @@ function DeviationView({ onPreview }: {
                 aria-label="查看异动规则口径"
                 title="交易所异动规则口径 (阈值 / 偏离值计算方式)"
                 onClick={() => setRulesOpen(v => !v)}
-                className={`inline-flex h-7 w-7 items-center justify-center rounded border transition-colors ${
-                  rulesOpen
-                    ? 'border-accent/40 bg-accent/10 text-accent'
-                    : 'border-border bg-base text-secondary hover:text-foreground'
-                }`}
+                className={buttonClass({ icon: true, selected: rulesOpen })}
               >
                 <HelpCircle className="h-3.5 w-3.5" />
               </button>
@@ -750,7 +742,7 @@ function DeviationView({ onPreview }: {
                 <button
                   type="button"
                   onClick={() => overview.refetch()}
-                  className="inline-flex h-7 shrink-0 items-center gap-1 whitespace-nowrap rounded border border-border bg-base px-2 text-[11px] text-secondary transition-colors hover:text-foreground"
+                  className={buttonClass({}, 'shrink-0 gap-1')}
                   title="立即刷新"
                 >
                   <RefreshCw className={`h-3 w-3 ${updating ? 'animate-spin' : ''}`} />
@@ -764,11 +756,7 @@ function DeviationView({ onPreview }: {
                 aria-checked={enabled}
                 aria-label="启用异动监控计算"
                 onClick={() => toggleEnabled(!enabled)}
-                className={`inline-flex h-7 items-center gap-2 rounded border px-2.5 text-[11px] font-medium transition-colors ${
-                  enabled
-                    ? 'border-accent/40 bg-accent/12 text-accent'
-                    : 'border-border bg-base text-secondary hover:text-foreground'
-                }`}
+                className={buttonClass({ selected: enabled }, 'gap-2')}
               >
                 <Power className="h-3 w-3" />
                 {enabled ? '监控中 · 每60秒计算' : '开启监控'}
@@ -802,7 +790,7 @@ function DeviationView({ onPreview }: {
                 ...BOARDS.map(b => ({ value: b, label: b })),
               ]}
             />
-            <label className="flex items-center gap-1.5 text-[11px] text-secondary" title="只看自选列表中的标的">
+            <label className="flex items-center gap-1.5 text-xs text-secondary" title="只看自选列表中的标的">
               <input
                 type="checkbox"
                 checked={watchlistOnly}
@@ -811,7 +799,7 @@ function DeviationView({ onPreview }: {
               />
               只看自选
             </label>
-            <label className="flex shrink-0 items-center gap-1.5 whitespace-nowrap text-[11px] text-secondary" title="过滤 ST/*ST 风险警示股票">
+            <label className="flex shrink-0 items-center gap-1.5 whitespace-nowrap text-xs text-secondary" title="过滤 ST/*ST 风险警示股票">
               <input
                 type="checkbox"
                 checked={excludeSt}
@@ -820,7 +808,7 @@ function DeviationView({ onPreview }: {
               />
               过滤ST
             </label>
-            <label className="flex items-center gap-1.5 text-[11px] text-secondary" title="接近度下限 (|偏离|/阈值)">
+            <label className="flex items-center gap-1.5 text-xs text-secondary" title="接近度下限 (|偏离|/阈值)">
               接近度 ≥ {(minCloseness * 100).toFixed(0)}%
               <input
                 type="range"
@@ -838,7 +826,7 @@ function DeviationView({ onPreview }: {
                 value={query}
                 onChange={e => setQuery(e.target.value)}
                 placeholder="搜索代码/名称"
-                className="h-7 w-40 rounded border border-border bg-base pl-7 pr-2 text-[11px] text-foreground"
+                className="h-7 w-40 rounded border border-border bg-base pl-7 pr-2 text-xs text-foreground"
               />
             </div>
           </div>
@@ -846,8 +834,8 @@ function DeviationView({ onPreview }: {
           {/* 主表: 剩余空间内滚动 (页面本身不滚动) */}
           <div className="min-h-0 flex-1 overflow-auto rounded-card border border-border bg-surface">
             <table className="w-full min-w-[860px] text-xs">
-              <thead className="sticky top-0 z-10 bg-surface">
-                <tr className="border-b border-border text-[10px] uppercase tracking-wider text-muted">
+              <thead className="sticky top-0 z-10 bg-elevated">
+                <tr className="border-b border-border text-micro text-muted">
                   <th className="w-10 px-2 py-2 text-right">#</th>
                   <th className="px-2 py-2 text-left">代码 / 名称</th>
                   <th className="px-2 py-2 text-right">现价</th>
@@ -909,11 +897,11 @@ function DeviationView({ onPreview }: {
       }).join(' / ')
       return (
         <div key={i} className="rounded border border-border bg-base px-2.5 py-2">
-          <div className="text-[11px] font-medium text-foreground">
+          <div className="text-xs font-medium text-foreground">
             {rule.board}
             {rule.st && <span className="ml-1 text-danger">ST</span>}
           </div>
-          <div className="mt-0.5 font-mono text-[10px] text-muted">{thr}</div>
+          <div className="mt-0.5 font-mono text-micro text-muted">{thr}</div>
         </div>
       )
     })
@@ -952,7 +940,7 @@ function AbnormalRowView({ row, rank, onPreview }: {
   const meta = STATUS_META[row.status]
   return (
     <tr className="group border-b border-border/40 transition-colors last:border-0 hover:bg-elevated/50">
-      <td className="px-2 py-1.5 text-right font-mono text-[10px] text-muted/70">{rank}</td>
+      <td className="px-2 py-1.5 text-right font-mono text-micro text-muted/70">{rank}</td>
       <td className="px-2 py-1.5">
         {/* 仅代码/名称可点击打开详情 (与自选列表一致), 其余单元格不可点 */}
         <button
@@ -964,12 +952,12 @@ function AbnormalRowView({ row, rank, onPreview }: {
           <span className="shrink-0 font-mono text-xs text-foreground group-hover:text-accent transition-colors duration-hover">{row.symbol}</span>
           <span className="min-w-0 max-w-40 truncate text-xs text-secondary group-hover:text-foreground transition-colors duration-hover">{row.name ?? '—'}</span>
           {board && (
-            <span className={`shrink-0 rounded px-1 text-[9px] font-bold leading-tight border ${board.color}`}>
+            <span className={`shrink-0 rounded px-1 text-micro font-bold leading-tight border ${board.color}`}>
               {board.label}
             </span>
           )}
           {row.st && (
-            <span className="shrink-0 rounded border border-danger/30 bg-danger/10 px-1 text-[9px] font-bold text-danger">
+            <span className="shrink-0 rounded border border-danger/30 bg-danger/10 px-1 text-micro font-bold text-danger">
               ST
             </span>
           )}
@@ -993,7 +981,7 @@ function AbnormalRowView({ row, rank, onPreview }: {
                 title={`阈值 ${sign}${fmtThreshold(info.threshold)} · 接近度 ${(info.closeness * 100).toFixed(0)}%${isDominant ? ' · 本行接近度来源' : ''}`}
               >
                 {fmtPct(info.value)}
-                <span className="ml-1 text-[9px] text-muted/60">/{sign}{fmtThreshold(info.threshold)}</span>
+                <span className="ml-1 text-micro text-muted/60">/{sign}{fmtThreshold(info.threshold)}</span>
               </span>
             ) : (
               <span className="text-muted/40">—</span>
@@ -1015,13 +1003,13 @@ function AbnormalRowView({ row, rank, onPreview }: {
               style={{ width: `${Math.min(100, (dominant?.closeness ?? 0) * 100)}%` }}
             />
           </div>
-          <span className="font-mono text-[10px] tabular-nums text-secondary">
+          <span className="font-mono text-micro tabular-nums text-secondary">
             {((dominant?.closeness ?? 0) * 100).toFixed(0)}%
           </span>
         </div>
       </td>
       <td className="px-2 py-1.5 text-center">
-        <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${meta.cls}`}>{meta.label}</span>
+        <span className={`rounded px-1.5 py-0.5 text-micro font-medium ${meta.cls}`}>{meta.label}</span>
       </td>
     </tr>
   )
@@ -1035,7 +1023,7 @@ function StatusChip({ label, count, tone }: { label: string; count?: number; ton
         ? 'border-warning/30 bg-warning/8 text-warning'
         : 'border-border bg-elevated text-secondary'
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-btn border px-2.5 py-1 text-[11px] ${toneCls}`}>
+    <span className={`inline-flex items-center gap-1.5 rounded-btn border px-2.5 py-1 text-xs ${toneCls}`}>
       <span className="font-mono text-sm font-semibold tabular-nums">{count ?? '—'}</span>
       {label}
     </span>
@@ -1053,16 +1041,14 @@ function SegmentedControl<T extends string>({ value, onChange, options }: {
     // 实测 375px 下「全板块」这个按钮 `scrollHeight 53 > clientHeight 26`,
     // 也就是三行字塞在一个一行高的盒子里。与 R401 的市场环境页是同一族。
     // 两层一起改: 整组不许被压(`shrink-0`), 组里每个字不许断(`whitespace-nowrap`)。
-    <div className="inline-flex h-7 shrink-0 overflow-hidden rounded border border-border bg-base">
+    <div className={SEG}>
       {options.map(o => (
         <button
           key={o.value}
           type="button"
           aria-pressed={value === o.value}
           onClick={() => onChange(o.value)}
-          className={`shrink-0 whitespace-nowrap px-2.5 text-[11px] transition-colors ${
-            value === o.value ? 'bg-accent/10 text-accent' : 'text-muted hover:text-foreground'
-          }`}
+          className={cn(SEG_ITEM, 'shrink-0 whitespace-nowrap', value === o.value ? SEG_ON : SEG_OFF)}
         >
           {o.label}
         </button>

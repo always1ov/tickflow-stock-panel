@@ -71,6 +71,7 @@ MIGRATED: list[str] = [
     "components/regime/SeesawPanel.tsx",
     "pages/Indices.tsx",
     "components/EChartsIntraday.tsx",
+    "pages/AbnormalMoves.tsx",
 ]
 
 
