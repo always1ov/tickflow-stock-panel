@@ -1,5 +1,5 @@
 import { useEffect, useRef, useMemo, useState } from 'react'
-import { chartTheme, FIB2_ROLE_TARGET, QUANT_MACD_COLORS, fib2RoleColor, getTheme, levelColors, useLevelColors, useTheme } from '@/lib/theme'
+import { chartTheme, FIB2_ROLE_TARGET, LEVEL_CURVE_COLOR, QUANT_MACD_COLORS, fib2RoleColor, getTheme, levelColors, useLevelColors, useTheme } from '@/lib/theme'
 import * as echarts from 'echarts'
 import type { ECharts, EChartsOption } from 'echarts'
 import type { Fib2Grain, Fib2Overlay, KlineRow, LevelSeries, QuantMacdResult } from '@/lib/api'
@@ -116,6 +116,8 @@ export const LEVEL_GROUPS: { key: LevelType; label: string }[] = [
 // 颜色**: 开关上的小圆点是一种色、图上的线是另一种, 而且那三个 hex 谁也没管,
 // 与别的组撞不撞没人知道(实测 ATR上轨 #F87171 离 K 线涨红只有 ΔE 6)。
 // 上/下轨靠位置就分得开, 中轨靠实线(`dashed: false`)分得开, 不需要再换色。
+// [R443] 用户要回作者原来的颜色 —— 布林中轨、ATR上轨那两个作者色回来了, 放在
+// `lib/theme.ts` 的 `LEVEL_CURVE_COLOR`(仍是配色的唯一产地), 这张表照旧不带颜色。
 const CURVE_DEFS: { alignedKey: string; group: LevelType; endLabel: string; dashed?: boolean }[] = [
   { alignedKey: 'boll_upper',     group: 'boll',      endLabel: '布林上轨', dashed: true },
   { alignedKey: 'boll_lower',     group: 'boll',      endLabel: '布林下轨', dashed: true },
@@ -577,8 +579,9 @@ export function AnalysisKChart({
       }
       // 曲线 key 用 group(同组上下轨联动),hover 命中时高亮
       const hit = hoveredKey === def.group
-      // [R409] 曲线用所属组的颜色 —— 开关上的小圆点与图上的线必须是同一个色
-      const curveColor = LC[def.group]
+      // [R409] 曲线用所属组的颜色 —— 开关上的小圆点与图上的线必须是同一个色。
+      // [R443] 作者单独配过色的两条(布林中轨、ATR上轨)照作者的
+      const curveColor = LEVEL_CURVE_COLOR[def.alignedKey] ?? LC[def.group]
       const opacity = dimming ? (hit ? 1 : 0.12) : 0.9
       const width = hit ? 1.8 : 1
       series.push({

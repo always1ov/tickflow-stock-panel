@@ -1,4 +1,10 @@
-"""[fork R409] 关键价位的配色 —— 一个指标一个颜色, 两套主题各一份, 而且不许浅。
+"""[fork R409 → R443] 关键价位的配色。
+
+[R443] 用户: 「关键指标的颜色还是用作者原来的颜色, 然后自定的你再帮我选深色的」——
+作者的 11 组回到上游原色(缺口位除外: 原色是粉, 全站禁粉); R409 / R424 那套「全体两两
+分得开、一律不浅」只对自定的那几种还管着(见 `test_R443_*`)。下面是 R409 当时的说明。
+
+[fork R409] 关键价位的配色 —— 一个指标一个颜色, 两套主题各一份, 而且不许浅。
 
 用户原话:「关键价位的所有指标的各个指标的颜色都要不一样, 因为重叠的时候容易混淆
 是视觉, 而且不能搞浅色, 也要符合自身含义」。
@@ -43,20 +49,26 @@ CANDLE = {
     "dark": ("#C74040", "#2D9B65", "#FE595F", "#03935B"),
 }
 
-# 门槛。取值的由来:
-#   · ΔE 8 —— 改之前最近的一对是 0.0(完全相同), 5 对在 8.5 以下。8 是"再往下就是
-#     已经出过事的那一档"。
-#   · 离涨跌色 ΔE 10 —— 改之前 ATR 通道是 5。
-#   · 对比度 亮 3.0 / 暗 5.0 —— 改之前亮色最低 1.35。WCAG 对非文字图形的线是 3.0,
-#     暗色底上本来就容易拉开, 所以门槛给高一档。
-#: [R424] 两两最小 ΔE, 按主题分。原来一律 8; 用户: 「不能很接近」。
-#: 亮色做不到 12 是白底的物理限制(黄 / 金一压深就成了橄榄土色), 见 theme.ts ⑥。
-MIN_PAIR_DE = {"dark": 12.0, "light": 11.0}
-#: 量化通道三档是同一个指标的三个周期, 刻意同族, 三档之间只要求分得出
-KELTNER = {"keltner_s", "keltner_m", "keltner_l"}
-MIN_FAMILY_DE = 9.5
+# [R443] 门槛。作者的 11 组回到作者原色之后, R409 / R424 那套「全体两两分得开、
+# 一律不浅」对作者的颜色不再成立(作者原样就有撞色、偏浅、ATR 像阳线), 只管**自定的**:
+#   · 彼此 ΔE ≥ 10; 离作者的颜色 ≥ 9.5; 离 K 线涨跌色 ≥ 10(被读成涨跌是最要命的一种);
+#   · 深: 亮色明度 ≤ 0.50、暗色 ≤ 0.65; 对页底对比 亮 ≥ 4.5、暗 ≥ 3.0(再深就看不见)。
+MIN_CUSTOM_PAIR_DE = 10.0
+MIN_CUSTOM_AUTHOR_DE = 9.5
 MIN_CANDLE_DE = 10.0
-MIN_CONTRAST = {"light": 3.0, "dark": 5.0}
+MAX_CUSTOM_L = {"light": 0.50, "dark": 0.65}
+MIN_CUSTOM_CONTRAST = {"light": 4.5, "dark": 3.0}
+
+#: 作者的原色, 逐字取自上游 `upstream/main` 的 `AnalysisKChart.tsx`(LEVEL_GROUPS 与
+#: CURVE_DEFS 的 color 列)。**缺口位不在里面**: 作者原色 #EC4899 是粉, 全站禁粉。
+AUTHOR = {
+    "sr": "#F97316", "pivot": "#8B5CF6", "extreme": "#EAB308", "boll": "#F97316",
+    "keltner_s": "#06B6D4", "keltner_m": "#22D3EE", "keltner_l": "#67E8F9",
+    "atr_stop": "#EF4444", "fib": "#F59E0B", "round": "#71717A",
+}
+AUTHOR_CURVES = {"boll_mid": "#FB923C", "atr_tp": "#F87171"}
+#: 自定的组(另两种二型线在 `_customs` 里补上)
+CUSTOM = {"gap", "livermore", "fib2"}
 
 
 # ── 色彩换算(无依赖, 直接写在这儿)──────────────────────────
@@ -169,79 +181,6 @@ def test_R409_每个价位组都有配色_不多不少():
         f"开关组与配色表对不上: 只在开关里 {sorted(keys - pal)}, 只在配色表里 {sorted(pal - keys)}")
 
 
-def test_R409_任意两个指标色都分得开_两套主题各算一遍():
-    """用户: 「重叠的时候容易混淆是视觉」。
-
-    **改之前压力支撑与布林带是同一个值** —— 这条断言最直接要挡的就是那个。
-    """
-    bad: list[str] = []
-    for theme in ("light", "dark"):
-        cols = _all_colors(theme)
-        names = sorted(cols)
-        for i, a in enumerate(names):
-            for b in names[i + 1:]:
-                d = delta_e(cols[a], cols[b])
-                floor = MIN_FAMILY_DE if {a, b} <= KELTNER else MIN_PAIR_DE[theme]
-                if d < floor:
-                    bad.append(f"[{theme}] {a} × {b} 只差 ΔE {d:.1f}(下限 {floor}; {cols[a]} / {cols[b]})")
-    assert not bad, "有指标色撞在一起:\n  " + "\n  ".join(bad)
-
-
-def test_R409_没有一个指标色像K线的涨红或跌绿():
-    """**最要命的一种混淆**: 一条指标线长得像一根蜡烛, 看的人不会怀疑, 只会读错。
-
-    改之前 ATR 波动通道 #EF4444 离涨红只有 ΔE 5~6。红绿两段色相整个让开是本仓库的
-    既定口径(R405 写过), 这里把它变成可断言的。
-    """
-    bad: list[str] = []
-    for theme in ("light", "dark"):
-        for name, hex_ in _all_colors(theme).items():
-            for candle in CANDLE[theme]:
-                d = delta_e(hex_, candle)
-                if d < MIN_CANDLE_DE:
-                    bad.append(f"[{theme}] {name} {hex_} 离 K 线色 {candle} 只有 ΔE {d:.1f}")
-    assert not bad, "指标色离涨跌色太近:\n  " + "\n  ".join(bad)
-
-
-def test_R409_没有一个色是浅到看不见的():
-    """用户: 「不能搞浅色」。
-
-    **这是那句话的机器形式。** 改之前亮色主题下通道长期 #67E8F9 对白底只有 1.35:1,
-    通道中期 1.69、前高前低 1.79、一型 2.01 —— 四个组实际上是画了跟没画一样。
-    一个 hex 同时要在近白底和近黑底上站住, 就只能挤在很窄的一段明度里, 那正是"浅"
-    的来源; 所以现在按主题分了两套值, 这条断言两套都查。
-    """
-    bad: list[str] = []
-    for theme in ("light", "dark"):
-        for name, hex_ in _all_colors(theme).items():
-            c = contrast(hex_, BG[theme])
-            if c < MIN_CONTRAST[theme]:
-                bad.append(f"[{theme}] {name} {hex_} 对页底 {BG[theme]} 只有 {c:.2f}:1"
-                           f"(下限 {MIN_CONTRAST[theme]})")
-    assert not bad, "有颜色浅到看不见:\n  " + "\n  ".join(bad)
-
-
-def test_R409_量化通道三档留在同族但明度分得开():
-    """三档是**同一个指标的三个周期**, 换成三个色相就读不出"同一家"了。
-
-    但也不能像以前那样靠"一档比一档浅"来区分 —— 那正是长期档 1.35:1 的由来。
-    所以: 色相相近(同族), 明度单调且每两档之间拉开够多。
-    """
-    for theme in ("light", "dark"):
-        pal = _palette()
-        s, m, l = (pal[f"keltner_{x}"][theme] for x in ("s", "m", "l"))
-        hues = []
-        for hex_ in (s, m, l):
-            _L, a, b = oklab(hex_)
-            hues.append(math.degrees(math.atan2(b, a)) % 360)
-        spread = max(hues) - min(hues)
-        assert spread < 25, f"[{theme}] 三档通道色相散开了 {spread:.1f}° —— 读不出是同一个指标"
-        ls = [oklab(x)[0] for x in (s, m, l)]
-        assert ls[0] > ls[1] > ls[2], f"[{theme}] 三档明度不单调: {ls}"
-        assert min(ls[0] - ls[1], ls[1] - ls[2]) > 0.05, \
-            f"[{theme}] 相邻两档明度差太小, 分不出来: {ls}"
-
-
 def test_R409_曲线不再自带颜色_一律跟所属组():
     """改之前 CURVE_DEFS 里另写了三个 hex(布林中轨 / ATR上轨 / 二型均线), 于是
     **同一个开关底下冒出了组色之外的颜色** —— 开关上的小圆点一种色、图上的线另一种,
@@ -341,42 +280,55 @@ def test_R409_价位线的透明度有下限():
     assert min(normals) >= 0.85, f"常态不透明度掉回去了: {normals}"
 
 
-#: [R424] 中性色 —— 不按色度要求(它们本来就不带颜色)
-NEUTRAL = {"extreme", "round", "livermore"}
+def _customs(theme: str) -> dict[str, str]:
+    """一套主题下自定的全部颜色: 三个组色 + 二型另外两种线。"""
+    out = {k: v[theme] for k, v in _palette().items() if k in CUSTOM}
+    roles = _fib2_roles()
+    out["fib2_目标"] = roles[dinapoli.C_TARGET][theme]
+    out["fib2_失效位"] = roles[dinapoli.C_INVALID][theme]
+    return out
 
 
-def test_R424_没有浅色_暗色一律饱和_亮色一律深():
-    """用户: 「关键价位指标的颜色不能用浅色的, 要用深色」。
+def test_R443_作者的指标就是作者原来的颜色():
+    """[R443] 用户: 「关键指标的颜色还是用作者原来的颜色, 然后自定的你再帮我选深色的」。
+    作者就是一个值, 两套主题都用它; 作者单独配过色的两条曲线也照回。"""
+    pal = _palette()
+    assert set(pal) == set(AUTHOR) | CUSTOM, "配色表的组 = 作者的 + 自定的, 不多不少"
+    for k, hex_ in AUTHOR.items():
+        assert pal[k] == {"light": hex_, "dark": hex_}, f"{k} 不是作者原来的 {hex_}: {pal[k]}"
+    src = read_src(THEME_TS)
+    blk = src[src.index("export const LEVEL_CURVE_COLOR"):]
+    blk = blk[:blk.index("\n}")]
+    assert dict(re.findall(r"(\w+): '(#[0-9A-Fa-f]{6})'", blk)) == AUTHOR_CURVES
+    chart = code_lines(read_src(CHART_TSX))
+    assert "const curveColor = LEVEL_CURVE_COLOR[def.alignedKey] ?? LC[def.group]" in chart
 
-    「浅」在两套主题上是两回事, 分开钉:
 
-    - **暗色**: 黑底上要看得见就不可能"暗", 这里的「浅」是**粉彩** —— 明度高、色度低
-      (R409 那套的浅桃 #FCB177 色度 0.11 也算勉强, 浅靛 #7F96FA 那种才是典型)。
-      所以彩色一律色度 ≥ 0.10, 且明度 ≤ 0.87(再亮就发白)。
-    - **亮色**: 白底上的「浅」就是明度高。一律明度 ≤ 0.65。
-
-    中性色(前高前低 / 整数关口 / 六态关键点)不看色度 —— 它们本来就不带颜色。
-    """
+def test_R443_自定的是深色_不粉_分得开():
     bad: list[str] = []
     for theme in ("light", "dark"):
-        for name, hex_ in _all_colors(theme).items():
+        cust = _customs(theme)
+        others = list(AUTHOR.values()) + list(AUTHOR_CURVES.values())
+        for name, hex_ in cust.items():
             L, a, b = oklab(hex_)
-            C = math.hypot(a, b)
-            if theme == "light" and L > 0.65:
-                bad.append(f"[light] {name} {hex_} 明度 {L:.2f} > 0.65, 浅了")
-            if theme == "dark" and name not in NEUTRAL:
-                if C < 0.10:
-                    bad.append(f"[dark] {name} {hex_} 色度 {C:.3f} < 0.10, 是粉彩")
-                if L > 0.87:
-                    bad.append(f"[dark] {name} {hex_} 明度 {L:.2f} > 0.87, 发白")
-    assert not bad, "有浅色:\n  " + "\n  ".join(bad)
-
-
-def test_R424_中性色按明度分开_三档():
-    """三个中性组靠明度占三档, 这是冷暖两侧排得开的前提 —— 哪天有人把其中一个挪近,
-    上面的两两 ΔE 会报, 但这里把"为什么是三档"钉成可读的样子。"""
-    for theme in ("light", "dark"):
-        pal = _palette()
-        Ls = {k: oklab(pal[k][theme])[0] for k in NEUTRAL}
-        order = sorted(Ls, key=Ls.get, reverse=(theme == "dark"))
-        assert order == ["livermore", "extreme", "round"], f"[{theme}] 中性三档的强弱次序乱了: {Ls}"
+            hue = math.degrees(math.atan2(b, a)) % 360
+            if (hue >= 315 or hue <= 12) and math.hypot(a, b) > 0.03:
+                bad.append(f"[{theme}] {name} {hex_} 落在粉 / 洋红一带(色相 {hue:.0f}°)")
+            if L > MAX_CUSTOM_L[theme]:
+                bad.append(f"[{theme}] {name} {hex_} 明度 {L:.2f} > {MAX_CUSTOM_L[theme]}, 不够深")
+            c = contrast(hex_, BG[theme])
+            if c < MIN_CUSTOM_CONTRAST[theme]:
+                bad.append(f"[{theme}] {name} {hex_} 对页底只有 {c:.2f}:1, 深到看不见了")
+            d = min(delta_e(hex_, x) for x in others)
+            if d < MIN_CUSTOM_AUTHOR_DE:
+                bad.append(f"[{theme}] {name} {hex_} 离作者的颜色只有 ΔE {d:.1f}")
+            d = min(delta_e(hex_, x) for x in CANDLE[theme])
+            if d < MIN_CANDLE_DE:
+                bad.append(f"[{theme}] {name} {hex_} 离 K 线涨跌色只有 ΔE {d:.1f}")
+        names = sorted(cust)
+        for i, x in enumerate(names):
+            for y in names[i + 1:]:
+                d = delta_e(cust[x], cust[y])
+                if d < MIN_CUSTOM_PAIR_DE:
+                    bad.append(f"[{theme}] {x} × {y} 只差 ΔE {d:.1f}")
+    assert not bad, "自定的颜色不合格:\n  " + "\n  ".join(bad)
