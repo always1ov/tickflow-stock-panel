@@ -51,8 +51,9 @@ def test_R429_切到另一只票天数复位():
 def test_R429_AI入口与占位按钮():
     hero = code_of(HERO)
     assert "onClick={() => onAiAnalyze(symbol, name)} disabled={aiBusy}" in hero
-    for what in ("导出复盘", "使用说明"):
-        assert f"todo('{what}')" in hero, f"「{what}」占位按钮不见了"
+    assert "todo('导出复盘')" in hero, "「导出复盘」占位按钮不见了"
+    # [R447] 用户: 「删掉导出复盘后面的使用说明按钮, 不需要了」
+    assert "使用说明" not in hero, "「使用说明」按钮又回来了"
 
 
 def test_R429_星星方框不叠冲突的内边距():
