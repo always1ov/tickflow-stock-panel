@@ -26,6 +26,7 @@ import { toast } from '@/components/Toast'
 import { Modal } from '@/components/Modal'
 import { cn } from '@/lib/cn'
 import { PageShell } from '@/components/PageShell'
+import { SEG, SEG_ITEM, SEG_OFF, SEG_ON, TYPE, buttonClass } from '@/components/ui'
 
 const STATE_ORDER: RegimeState[] = ['strong', 'lean_strong', 'range', 'lean_weak', 'weak']
 
@@ -141,16 +142,16 @@ function SectionTitle({ icon: Icon, title, hint }: { icon: typeof Activity; titl
   // 整块挪到下一行去, 不去挤标题。
   return (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-      <span className="h-3 w-0.5 shrink-0 rounded-full bg-gradient-to-b from-accent to-accent/30" />
-      <Icon className="h-3.5 w-3.5 shrink-0 text-accent" />
-      <h2 className="shrink-0 whitespace-nowrap text-xs font-semibold text-foreground">{title}</h2>
-      {hint != null && <span className="ml-auto min-w-0 text-[10px] text-muted font-mono">{hint}</span>}
+      <Icon className="h-4 w-4 shrink-0 text-accent" />
+      {/* [R457] 卡片标题 L3(15px), 装饰小竖条撤了 —— 与大盘同一套 */}
+      <h2 className={cn('shrink-0 whitespace-nowrap', TYPE.card)}>{title}</h2>
+      {hint != null && <span className="ml-auto min-w-0 text-micro text-muted font-mono">{hint}</span>}
     </div>
   )
 }
 
 // ── 卡片容器样式 (Dashboard 同款) ─────────────────────────
-const cardCls = 'rounded-card border border-border bg-surface/80 shadow-[0_1px_2px_oklch(var(--border)/0.4)] backdrop-blur-sm transition-shadow hover:shadow-[0_2px_8px_oklch(var(--border)/0.5)]'
+const cardCls = 'rounded-card border border-border bg-surface'   // [R457] 实边框实底, 与全站卡片同一套
 
 // ── 主组件 ────────────────────────────────────────────────
 export function Regime() {
@@ -721,29 +722,19 @@ export function Regime() {
           //  位置合法 —— R395 在同一个坑里栽过一次, 这次一次写对。)
           <div className="flex flex-wrap items-center gap-2">
             {/* 时间范围按钮组 */}
-            <div className="flex shrink-0 items-center rounded-btn border border-border bg-base/60 p-0.5">
+            <div className={SEG}>
               {(['1y', '2y', 'all'] as const).map(k => (
                 <button
                   key={k}
                   onClick={() => setRange(k)}
-                  className={cn(
-                    'h-6 shrink-0 whitespace-nowrap rounded-[5px] px-2.5 text-xs font-medium transition-colors',
-                    isPresetKey(range, k)
-                      ? 'bg-accent text-white shadow-sm'
-                      : 'text-secondary hover:text-foreground',
-                  )}
+                  className={cn(SEG_ITEM, 'shrink-0 whitespace-nowrap', isPresetKey(range, k) ? SEG_ON : SEG_OFF)}
                 >
                   {RANGE_LABEL[k]}
                 </button>
               ))}
               <button
                 onClick={() => setCustomOpen(true)}
-                className={cn(
-                  'inline-flex items-center gap-1 h-6 shrink-0 whitespace-nowrap rounded-[5px] px-2.5 text-xs font-medium transition-colors',
-                  typeof range === 'object'
-                    ? 'bg-accent text-white shadow-sm'
-                    : 'text-secondary hover:text-foreground',
-                )}
+                className={cn(SEG_ITEM, 'shrink-0 whitespace-nowrap', typeof range === 'object' ? SEG_ON : SEG_OFF)}
               >
                 {typeof range === 'object' && <Pencil className="h-3 w-3 shrink-0" />}
                 {customLabel}
@@ -751,7 +742,7 @@ export function Regime() {
             </div>
             {/* 重算 */}
             <button onClick={handleRecompute} disabled={recomputing}
-              className="inline-flex shrink-0 items-center gap-1.5 h-7 whitespace-nowrap px-3 rounded-btn border border-border bg-base text-xs text-secondary hover:text-accent disabled:opacity-50">
+              className={buttonClass({}, 'shrink-0 gap-1.5')}>
               {recomputing ? <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5 shrink-0" />}
               {recomputing ? '重算中…' : '重算'}
             </button>
@@ -766,17 +757,16 @@ export function Regime() {
           说明是同一个 flex 行里的兄弟, 它一长, 药丸组就被挤(默认 `shrink:1`)。
           三处一起改才成立 —— 行可换行 / 药丸组不许被压 / 药丸里的字不许断。 */}
       <div className="flex flex-wrap items-center gap-2">
-        <div className="flex shrink-0 items-center rounded-btn border border-border bg-base/60 p-0.5">
+        <div className={SEG}>
           {([['regime', '市场环境', Activity], ['phase', '情绪周期', Flame]] as const).map(([k, label, Icon]) => (
             <button key={k} onClick={() => setView(k)}
-              className={cn('inline-flex items-center gap-1.5 h-7 shrink-0 whitespace-nowrap rounded-[5px] px-3 text-xs font-medium transition-colors',
-                view === k ? 'bg-accent text-white shadow-sm' : 'text-secondary hover:text-foreground')}>
+              className={cn(SEG_ITEM, 'gap-1.5 shrink-0 whitespace-nowrap', view === k ? SEG_ON : SEG_OFF)}>
               <Icon className="h-3.5 w-3.5 shrink-0" />
               {label}
             </button>
           ))}
         </div>
-        <span className="min-w-0 text-[10px] text-muted">两组内容同页切换 · 共用时间范围</span>
+        <span className="min-w-0 text-micro text-muted">两组内容同页切换 · 共用时间范围</span>
       </div>
 
       {/* ══ 情绪周期 tab: 阶段概览 + 时间轴 + 阶段×主线 + 主线排行 ══ */}
@@ -787,18 +777,18 @@ export function Regime() {
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
           {/* 当前阶段 — 付费档实时时显示盘中临时阶段, 否则显示最近定稿 */}
           <div className={cn(cardCls, 'p-3')}>
-            <div className="flex items-center gap-1.5 text-[10px] text-muted">
+            <div className="flex items-center gap-1.5 text-micro text-muted">
               <Flame className="h-3 w-3" /> 当前阶段 · {live ? `${live.as_of}` : latest.date}
               {live ? (
                 <span
-                  className="rounded border border-amber-400/30 bg-amber-400/10 px-1 py-px text-[9px] text-amber-300"
+                  className="rounded border border-amber-400/30 bg-amber-400/10 px-1 py-px text-micro text-amber-300"
                   title={`盘中口径(每分钟刷新), 收盘定稿为准\n首板 ${live.metrics?.first_board ?? '—'} · 2板+ ${live.metrics?.ge2_count ?? '—'} · 高度 ${live.metrics?.max_consecutive ?? '—'}板 · 封板率 ${live.metrics?.seal_rate != null ? (live.metrics.seal_rate * 100).toFixed(0) + '%' : '—'} · 晋级率 ${live.metrics?.promo_rate != null ? (live.metrics.promo_rate * 100).toFixed(0) + '%' : '—'}`}
                 >
                   盘中
                 </span>
               ) : lastUnsettled ? (
                 <span
-                  className="rounded border border-border/60 bg-elevated/40 px-1 py-px text-[9px] text-muted"
+                  className="rounded border border-border/60 bg-elevated/40 px-1 py-px text-micro text-muted"
                   title="今日日线尚未落盘, 显示最近定稿阶段; 盘后数据出齐自动更新(盘中实时阶段需 Starter+ 全市场行情)"
                 >
                   定稿口径
@@ -829,18 +819,18 @@ export function Regime() {
             {(() => {
               const p = (live?.phase as MarketPhase) ?? phaseStreak?.phase
               return p && MARKET_PHASE_GUIDE[p] ? (
-                <div className="mt-0.5 text-[9px] text-muted/90 truncate" title={MARKET_PHASE_GUIDE[p].meaning}>
+                <div className="mt-0.5 text-micro text-muted/90 truncate" title={MARKET_PHASE_GUIDE[p].meaning}>
                   {MARKET_PHASE_GUIDE[p].action}
                 </div>
               ) : null
             })()}
             <div className="mt-1.5 flex flex-wrap gap-1">
               {latestMainlines.length > 0 ? latestMainlines.map(m => (
-                <span key={m.member} className="rounded px-1.5 py-px text-[9px] font-medium"
+                <span key={m.member} className="rounded px-1.5 py-px text-micro font-medium"
                   style={{ color: '#f59e0b', backgroundColor: '#f59e0b18' }} title={`涨停${m.limit_up_count}家 · 最高${m.max_boards}板 · 梯队${m.rungs_filled}档`}>
                   {m.member}
                 </span>
-              )) : <span className="text-[9px] text-muted">暂无主线数据</span>}
+              )) : <span className="text-micro text-muted">暂无主线数据</span>}
             </div>
           </div>
           {([
@@ -856,11 +846,11 @@ export function Regime() {
             const p = pctRank(k.field)
             return (
               <div key={k.label} className={cn(cardCls, 'p-3')}>
-                <div className="flex items-center gap-1.5 text-[10px] text-muted">
+                <div className="flex items-center gap-1.5 text-micro text-muted">
                   <Activity className="h-3 w-3" /> {k.label}
                   {p != null && (
                     <span
-                      className="ml-auto font-mono text-[9px] text-muted/70"
+                      className="ml-auto font-mono text-micro text-muted/70"
                       title={`当前值在所选时间窗口内的历史分位 (p${p})`}
                     >
                       p{p}
@@ -870,7 +860,7 @@ export function Regime() {
                 <div className="mt-1.5 text-2xl font-bold" style={{ color: k.color }}>
                   {k.val}<span className="ml-0.5 text-xs font-normal text-muted">{k.unit}</span>
                 </div>
-                {k.sub && <div className="mt-1 text-[9px] text-muted">{k.sub}</div>}
+                {k.sub && <div className="mt-1 text-micro text-muted">{k.sub}</div>}
               </div>
             )
           })}
@@ -886,7 +876,7 @@ export function Regime() {
         <div className={cn(cardCls, 'p-3')}>
           <SectionTitle icon={Flame} title="阶段规律"
             hint="当前阶段在窗口内的历史统计 · 去向=每段之后进入的阶段" />
-          <div className="mt-2 flex flex-wrap items-center gap-x-6 gap-y-2 text-[11px]">
+          <div className="mt-2 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs">
             <span className="text-secondary">
               <span style={{ color: MARKET_PHASE_COLORS[phaseStreak.phase], fontWeight: 600 }}>
                 {MARKET_PHASE_LABELS[phaseStreak.phase]}
@@ -896,7 +886,7 @@ export function Regime() {
               <span className="text-muted"> · 历史 {phaseStats.count} 段, 平均 {phaseStats.avgDays} 天, 最长 {phaseStats.maxDays} 天</span>
             </span>
             {phaseStreak.streak > phaseStats.avgDays && (
-              <span className="rounded bg-warning/10 px-1.5 py-px text-[10px] font-medium text-warning"
+              <span className="rounded bg-warning/10 px-1.5 py-px text-micro font-medium text-warning"
                 title="持续天数已超过窗口内该阶段的平均时长">
                 已超历史平均
               </span>
@@ -927,13 +917,13 @@ export function Regime() {
             <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-md border border-accent/25 bg-accent/5 px-2.5 py-1.5">
               <span className="flex items-center gap-1.5">
                 <span className="font-mono text-xs font-semibold text-foreground">{selRow.date}</span>
-                <span className="rounded px-1.5 py-px text-[10px] font-semibold"
+                <span className="rounded px-1.5 py-px text-micro font-semibold"
                   style={{ color: MARKET_PHASE_COLORS[selRow.phase as MarketPhase], backgroundColor: MARKET_PHASE_COLORS[selRow.phase as MarketPhase] + '20' }}>
                   {MARKET_PHASE_LABELS[selRow.phase as MarketPhase]}
                 </span>
-                {selStreak != null && <span className="text-[10px] text-muted">第 {selStreak} 天</span>}
+                {selStreak != null && <span className="text-micro text-muted">第 {selStreak} 天</span>}
               </span>
-              <span className="flex flex-wrap items-center gap-x-2.5 gap-y-1 font-mono text-[10px] text-secondary">
+              <span className="flex flex-wrap items-center gap-x-2.5 gap-y-1 font-mono text-micro text-secondary">
                 <span>高度 <b className="text-danger">{selRow.max_consecutive}板</b></span>
                 <span>涨停 <b className="text-foreground">{selRow.limit_up ?? '—'}</b>
                   <span className="text-muted"> = 首板{selRow.first_board ?? '—'} + 2板+{selRow.ge2_count ?? '—'}</span></span>
@@ -942,15 +932,15 @@ export function Regime() {
               </span>
               <span className="flex flex-wrap items-center gap-1">
                 {selMainlines.length > 0 ? selMainlines.map(m => (
-                  <span key={m.member} className="rounded px-1.5 py-px text-[9px] font-medium"
+                  <span key={m.member} className="rounded px-1.5 py-px text-micro font-medium"
                     style={{ color: '#f59e0b', backgroundColor: '#f59e0b18' }}
                     title={`涨停${m.limit_up_count}家 · 最高${m.max_boards}板 · 梯队${m.rungs_filled}档`}>
                     {m.member}
                   </span>
-                )) : <span className="text-[9px] text-muted">当日无主线数据</span>}
+                )) : <span className="text-micro text-muted">当日无主线数据</span>}
               </span>
               <button onClick={() => setSelDate(null)}
-                className="ml-auto flex items-center gap-1 rounded px-1.5 py-px text-[10px] text-muted hover:bg-elevated hover:text-foreground">
+                className="ml-auto flex items-center gap-1 rounded px-1.5 py-px text-micro text-muted hover:bg-elevated hover:text-foreground">
                 <X className="h-3 w-3" /> 回到今日
               </button>
             </div>
@@ -963,7 +953,7 @@ export function Regime() {
                 style={{ backgroundColor: MARKET_PHASE_COLORS[r.phase as MarketPhase] }} />
             ))}
           </div>
-          <div className="mt-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-[10px] text-muted">
+          <div className="mt-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-micro text-muted">
             {MARKET_PHASE_ORDER.map(p => (
               <span key={p} className="flex items-center gap-1">
                 <span className="inline-block h-2.5 w-2.5 rounded" style={{ backgroundColor: MARKET_PHASE_COLORS[p] }} />
@@ -983,9 +973,9 @@ export function Regime() {
               border-separate 是 sticky 前提 — Chromium 在 border-collapse:collapse
               (preflight 默认) 下表格元素 sticky 失效; spacing-0 保持视觉不变。 */}
           <div className="mt-2 max-h-[420px] overflow-auto">
-            <table className="w-full min-w-[760px] border-separate border-spacing-0 text-left text-[11px]">
+            <table className="w-full min-w-[760px] border-separate border-spacing-0 text-left text-xs">
               <thead>
-                <tr className="text-[10px] text-muted">
+                <tr className="text-micro text-muted">
                   <th className="sticky top-0 z-10 border-b border-border bg-surface py-1.5 pr-3 font-medium">阶段</th>
                   <th className="sticky top-0 z-10 border-b border-border bg-surface py-1.5 pr-3 font-medium">区间</th>
                   <th className="sticky top-0 z-10 border-b border-border bg-surface py-1.5 pr-3 font-medium text-right">天数</th>
@@ -1000,12 +990,12 @@ export function Regime() {
                 {[...segments].reverse().map((seg, i) => (
                   <tr key={`${seg.start}-${seg.phase}-${i}`}>
                     <td className="border-b border-border/50 py-1.5 pr-3">
-                      <span className="rounded px-1.5 py-px text-[10px] font-semibold"
+                      <span className="rounded px-1.5 py-px text-micro font-semibold"
                         style={{ color: MARKET_PHASE_COLORS[seg.phase], backgroundColor: MARKET_PHASE_COLORS[seg.phase] + '20' }}>
                         {seg.label}
                       </span>
                     </td>
-                    <td className="border-b border-border/50 py-1.5 pr-3 font-mono text-[10px] text-secondary">
+                    <td className="border-b border-border/50 py-1.5 pr-3 font-mono text-micro text-secondary">
                       {seg.start.slice(5)} ~ {seg.end.slice(5)}
                     </td>
                     <td className="border-b border-border/50 py-1.5 pr-3 text-right font-mono">{seg.days}</td>
@@ -1020,12 +1010,12 @@ export function Regime() {
                     <td className="border-b border-border/50 py-1.5">
                       <div className="flex flex-wrap gap-1">
                         {seg.top_mainlines.length > 0 ? seg.top_mainlines.map(m => (
-                          <span key={m.member} className="rounded px-1.5 py-px text-[9px]"
+                          <span key={m.member} className="rounded px-1.5 py-px text-micro"
                             style={{ color: '#f59e0b', backgroundColor: '#f59e0b18' }}
                             title={`top5 ${m.top5_days} 天 · 最高 ${m.max_boards} 板 · 龙头 ${m.leader_symbol}`}>
                             {m.member}<span className="ml-1 font-mono opacity-70">{m.top5_days}d</span>
                           </span>
-                        )) : <span className="text-[9px] text-muted">—</span>}
+                        )) : <span className="text-micro text-muted">—</span>}
                       </div>
                     </td>
                   </tr>
@@ -1043,10 +1033,10 @@ export function Regime() {
         <SectionTitle icon={Layers} title="主线排行"
           hint={
             <span className="flex items-center gap-2">
-              <span className="hidden sm:inline text-[9px] text-muted">{mainline.data?.membership_note}</span>
+              <span className="hidden sm:inline text-micro text-muted">{mainline.data?.membership_note}</span>
               <button
                 onClick={() => setFilterOpen(v => !v)}
-                className={cn('inline-flex items-center gap-1 rounded-btn border px-2 py-0.5 text-[10px] transition-colors',
+                className={cn('inline-flex items-center gap-1 rounded-btn border px-2 py-0.5 text-micro transition-colors',
                   filterOpen ? 'border-accent/50 text-accent' : 'border-border bg-base text-secondary hover:text-accent')}
               >
                 <Filter className="h-3 w-3" /> 过滤
@@ -1057,16 +1047,15 @@ export function Regime() {
         {/* [R401] 第三处同样的药丸组 —— 旁边那句说明比前两处还长。
             守卫扫出来的, 我自己按截图改的时候漏了这一个。 */}
         <div className="mt-2 flex flex-wrap items-center gap-2">
-          <div className="flex shrink-0 items-center rounded-btn border border-border bg-base/60 p-0.5">
+          <div className={SEG}>
             {([['concept', '概念'], ['industry', '行业']] as const).map(([k, label]) => (
               <button key={k} onClick={() => setMainlineKind(k)}
-                className={cn('h-6 shrink-0 whitespace-nowrap rounded-[5px] px-2.5 text-xs font-medium transition-colors',
-                  mainlineKind === k ? 'bg-accent text-white shadow-sm' : 'text-secondary hover:text-foreground')}>
+                className={cn(SEG_ITEM, 'shrink-0 whitespace-nowrap', mainlineKind === k ? SEG_ON : SEG_OFF)}>
                 {label}
               </button>
             ))}
           </div>
-          <span className="min-w-0 text-[10px] text-muted">窗口内 top1 天数排序 · 点击「过滤」配置宽基概念屏蔽</span>
+          <span className="min-w-0 text-micro text-muted">窗口内 top1 天数排序 · 点击「过滤」配置宽基概念屏蔽</span>
         </div>
         {filterOpen && (
           <MainlineFilterPanel
@@ -1078,9 +1067,9 @@ export function Regime() {
           />
         )}
         <div className="mt-2 overflow-x-auto">
-          <table className="w-full min-w-[560px] text-left text-[11px]">
+          <table className="w-full min-w-[560px] text-left text-xs">
             <thead>
-              <tr className="border-b border-border text-[10px] text-muted">
+              <tr className="border-b border-border text-micro text-muted">
                 <th className="py-1.5 pr-3 font-medium">#</th>
                 <th className="py-1.5 pr-3 font-medium">主线</th>
                 <th className="py-1.5 pr-3 font-medium text-right">top1 天数</th>
@@ -1099,7 +1088,7 @@ export function Regime() {
                 </tr>
               ))}
               {(mainline.data?.leaders ?? []).length === 0 && (
-                <tr><td colSpan={5} className="py-4 text-center text-[10px] text-muted">
+                <tr><td colSpan={5} className="py-4 text-center text-micro text-muted">
                   {mainline.isLoading ? '加载中…' : '暂无主线数据 — 点击「重算」回填, 或检查过滤设置'}
                 </td></tr>
               )}
@@ -1118,7 +1107,7 @@ export function Regime() {
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {/* 状态卡(保留) */}
           <div className={cn(cardCls, 'p-3')}>
-            <div className="flex items-center gap-1.5 text-[10px] text-muted">
+            <div className="flex items-center gap-1.5 text-micro text-muted">
               <Gauge className="h-3 w-3" /> 最新状态 · {latest.date}
             </div>
             <div className="mt-1.5 flex items-baseline gap-2">
@@ -1135,7 +1124,7 @@ export function Regime() {
 
           {/* 当前势头(新) */}
           <div className={cn(cardCls, 'p-3')}>
-            <div className="flex items-center gap-1.5 text-[10px] text-muted">
+            <div className="flex items-center gap-1.5 text-micro text-muted">
               {(() => {
                 const TrendIcon = (momentum?.slope ?? 0) > 0.5 ? TrendingUp : (momentum?.slope ?? 0) < -0.5 ? TrendingDown : Minus
                 return <TrendIcon className={`h-3 w-3 ${(momentum?.slope ?? 0) > 0.5 ? 'text-bull' : (momentum?.slope ?? 0) < -0.5 ? 'text-bear' : 'text-muted'}`} />
@@ -1146,7 +1135,7 @@ export function Regime() {
                 <div className="mt-1.5 text-sm font-semibold text-foreground">
                   连续 <span style={{ color: REGIME_STATE_COLORS[momentum.state] }}>{momentum.streak}</span> 天{REGIME_STATE_LABELS[momentum.state]}
                 </div>
-                <div className="mt-1 text-[10px] text-muted">
+                <div className="mt-1 text-micro text-muted">
                   5日{(momentum.slope > 0 ? '改善' : momentum.slope < 0 ? '恶化' : '持平')}
                   {momentum.lastWeakGap > 0 && ` · 上次弱势 ${momentum.lastWeakGap} 天前`}
                 </div>
@@ -1156,7 +1145,7 @@ export function Regime() {
 
           {/* 4 子维度迷你条(新) */}
           <div className={cn(cardCls, 'p-3')}>
-            <div className="flex items-center gap-1.5 text-[10px] text-muted">
+            <div className="flex items-center gap-1.5 text-micro text-muted">
               <Activity className="h-3 w-3" /> 四维拆解 · {latest.date}
             </div>
             <div className="mt-2 space-y-1">
@@ -1167,12 +1156,12 @@ export function Regime() {
                 { label: '趋势', val: latest.trend_score, color: '#3b82f6' },
               ] as const).map(d => (
                 <div key={d.label} className="flex items-center gap-1.5">
-                  <span className="w-6 shrink-0 text-[9px] text-muted">{d.label}</span>
+                  <span className="w-6 shrink-0 text-micro text-muted">{d.label}</span>
                   <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-base">
                     <div className="h-full rounded-full transition-ui"
                       style={{ width: `${d.val ?? 0}%`, backgroundColor: d.color }} />
                   </div>
-                  <span className="w-5 shrink-0 text-right text-[9px] font-mono text-muted">{d.val ?? '—'}</span>
+                  <span className="w-5 shrink-0 text-right text-micro font-mono text-muted">{d.val ?? '—'}</span>
                 </div>
               ))}
             </div>
@@ -1180,13 +1169,13 @@ export function Regime() {
 
           {/* 状态转换频率(新) */}
           <div className={cn(cardCls, 'p-3')}>
-            <div className="flex items-center gap-1.5 text-[10px] text-muted">
+            <div className="flex items-center gap-1.5 text-micro text-muted">
               <Repeat className="h-3 w-3" /> 状态转换 · 近 {days} 天
             </div>
             <div className="mt-1.5 text-lg font-semibold text-foreground">
               {transitions.count} <span className="text-xs font-normal text-muted">次切换</span>
             </div>
-            <div className="mt-1 text-[10px] text-muted">
+            <div className="mt-1 text-micro text-muted">
               节奏：<span className="text-accent">{transitions.label}</span>
               <span className="ml-1">({(transitions.rate * 100).toFixed(0)}%/天)</span>
             </div>
@@ -1210,7 +1199,7 @@ export function Regime() {
                 style={{ backgroundColor: REGIME_STATE_COLORS[r.state] }} />
             ))}
           </div>
-          <div className="mt-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-[10px] text-muted">
+          <div className="mt-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-micro text-muted">
             {STATE_ORDER.map(s => (
               <span key={s} className="flex items-center gap-1">
                 <span className="inline-block h-2.5 w-2.5 rounded"
@@ -1242,7 +1231,7 @@ export function Regime() {
             hint={
               <button
                 onClick={() => setCalendarExpanded(v => !v)}
-                className="inline-flex items-center gap-1 rounded-btn border border-border bg-base px-2 py-0.5 text-[10px] text-secondary hover:text-accent hover:border-accent/40 transition-colors"
+                className="inline-flex items-center gap-1 rounded-btn border border-border bg-base px-2 py-0.5 text-micro text-secondary hover:text-accent hover:border-accent/40 transition-colors"
                 title={calendarExpanded ? '切换为单行紧凑' : '切换为月份展开'}
               >
                 {calendarExpanded ? <><Rows3 className="h-3 w-3" />单行</> : <><LayoutGrid className="h-3 w-3" />展开</>}
@@ -1259,15 +1248,15 @@ export function Regime() {
                 return (
                   <div key={`${mo.year}-${mo.month}`} className="shrink-0">
                     <div className="mb-1 flex items-center gap-1.5">
-                      <span className="text-[10px] font-medium text-secondary">{mo.label}</span>
+                      <span className="text-micro font-medium text-secondary">{mo.label}</span>
                       {avgScore > 0 && (
-                        <span className="rounded px-1 py-px text-[9px] font-semibold"
+                        <span className="rounded px-1 py-px text-micro font-semibold"
                           style={{ color: scoreToColor(avgScore), backgroundColor: scoreToColor(avgScore) + '20' }}>
                           {avgScore}
                         </span>
                       )}
                     </div>
-                    <div className="mb-0.5 grid grid-cols-7 gap-[2px] text-[8px] text-muted">
+                    <div className="mb-0.5 grid grid-cols-7 gap-[2px] text-micro text-muted">
                       {['一', '二', '三', '四', '五', '六', '日'].map(d => (
                         <div key={d} className="text-center">{d}</div>
                       ))}
@@ -1299,15 +1288,15 @@ export function Regime() {
                 return (
                   <div key={`${mo.year}-${mo.month}`} className="shrink-0">
                     <div className="mb-1 flex items-center gap-1.5">
-                      <span className="text-[10px] font-medium text-secondary">{mo.label}</span>
+                      <span className="text-micro font-medium text-secondary">{mo.label}</span>
                       {avgScore > 0 && (
-                        <span className="rounded px-1 py-px text-[9px] font-semibold"
+                        <span className="rounded px-1 py-px text-micro font-semibold"
                           style={{ color: scoreToColor(avgScore), backgroundColor: scoreToColor(avgScore) + '20' }}>
                           {avgScore}
                         </span>
                       )}
                     </div>
-                    <div className="mb-0.5 grid grid-cols-7 gap-[2px] text-[8px] text-muted">
+                    <div className="mb-0.5 grid grid-cols-7 gap-[2px] text-micro text-muted">
                       {['一', '二', '三', '四', '五', '六', '日'].map(d => (
                         <div key={d} className="text-center">{d}</div>
                       ))}
@@ -1398,19 +1387,19 @@ function MainlineFilterPanel({ filter, onDone }: {
     <div className="mt-2 rounded-btn border border-border bg-base/40 p-2.5">
       <div className="flex flex-wrap items-end gap-3">
         <label className="flex flex-col gap-1">
-          <span className="text-[10px] text-muted">成员数上限(过滤宽基标签)</span>
+          <span className="text-micro text-muted">成员数上限(过滤宽基标签)</span>
           <input type="number" min={50} max={5000} value={maxMembers}
             onChange={e => setMaxMembers(e.target.value)}
             className="h-7 w-24 rounded-input border border-border bg-base px-2 text-xs text-foreground outline-none focus:border-accent" />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-[10px] text-muted">成员数下限</span>
+          <span className="text-micro text-muted">成员数下限</span>
           <input type="number" min={1} max={200} value={minMembers}
             onChange={e => setMinMembers(e.target.value)}
             className="h-7 w-20 rounded-input border border-border bg-base px-2 text-xs text-foreground outline-none focus:border-accent" />
         </label>
         <div className="flex min-w-[220px] flex-1 flex-col gap-1">
-          <span className="text-[10px] text-muted">按名称屏蔽(回车添加)</span>
+          <span className="text-micro text-muted">按名称屏蔽(回车添加)</span>
           <div className="flex items-center gap-1.5">
             <input value={input} onChange={e => setInput(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addTag() } }}
@@ -1420,7 +1409,7 @@ function MainlineFilterPanel({ filter, onDone }: {
           {blacklist.length > 0 && (
             <div className="mt-1 flex flex-wrap gap-1">
               {blacklist.map(b => (
-                <span key={b} className="inline-flex items-center gap-1 rounded bg-accent/10 px-1.5 py-px text-[10px] text-accent">
+                <span key={b} className="inline-flex items-center gap-1 rounded bg-accent/10 px-1.5 py-px text-micro text-accent">
                   {b}
                   <button onClick={() => setBlacklist(blacklist.filter(x => x !== b))} className="hover:text-foreground">
                     <X className="h-2.5 w-2.5" />
@@ -1452,12 +1441,12 @@ function MainlineFilterPanel({ filter, onDone }: {
             excludeSt ? 'translate-x-[17px]' : 'translate-x-0.5',
           )} />
         </button>
-        <span className="text-[11px] text-secondary">
+        <span className="text-xs text-secondary">
           统计剔除 ST 股
-          <span className="ml-1.5 text-[9px] text-muted">主线 + 情绪周期统一口径; 切换后自动全量重算(约 1-2 分钟)</span>
+          <span className="ml-1.5 text-micro text-muted">主线 + 情绪周期统一口径; 切换后自动全量重算(约 1-2 分钟)</span>
         </span>
       </div>
-      <div className="mt-1.5 text-[9px] text-muted">
+      <div className="mt-1.5 text-micro text-muted">
         说明: 成分股数超过上限的概念(如 融资融券~7700家/沪深股通~3300家)视为宽基/风格标签, 不参与主线排名;
         风险警示股(名称含 ST)不参与涨停梯队统计 — 主板 5% 便宜板时代曾系统性霸榜, 且 ST 是状态桶而非题材。修改后自动重算全部历史(秒级~分钟级)。
       </div>
@@ -1489,7 +1478,7 @@ function CustomDaysModal({ current, onClose, onApply }: {
       <div className="space-y-3">
         <div>
           <div className="text-xs font-medium text-foreground">自定义天数</div>
-          <div className="mt-0.5 text-[10px] text-muted">范围 1 ~ 1000 个交易日</div>
+          <div className="mt-0.5 text-micro text-muted">范围 1 ~ 1000 个交易日</div>
         </div>
         <input
           ref={inputRef}
@@ -1505,7 +1494,7 @@ function CustomDaysModal({ current, onClose, onApply }: {
         <div className="flex flex-wrap gap-1.5">
           {[60, 90, 180, 365].map(d => (
             <button key={d} onClick={() => setVal(String(d))}
-              className="h-6 rounded-btn border border-border bg-base px-2 text-[11px] text-secondary hover:text-accent hover:border-accent/40 transition-colors">
+              className="h-6 rounded-btn border border-border bg-base px-2 text-xs text-secondary hover:text-accent hover:border-accent/40 transition-colors">
               {d}天
             </button>
           ))}

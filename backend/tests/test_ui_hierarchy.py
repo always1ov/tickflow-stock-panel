@@ -67,6 +67,8 @@ MIGRATED: list[str] = [
     "components/screener/StrategyPoolDialog.tsx",
     "components/screener/StrategySettingsDialog.tsx",
     "components/screener/StrategyStoreDialog.tsx",
+    "pages/Regime.tsx",
+    "components/regime/SeesawPanel.tsx",
 ]
 
 

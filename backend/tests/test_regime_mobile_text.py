@@ -31,13 +31,13 @@ SHELL = "components/PageShell.tsx"
 
 
 def _pill_groups(src: str) -> list[str]:
-    """定高药丸组 —— 抓 `h-6`/`h-7` 且带 `rounded-[5px]` 的那几个按钮的 class 串。
+    """定高药丸 —— [R457] 换成了全站的分段切换(`components/ui/segmented.ts`),
+    每一个药丸是 `cn(SEG_ITEM, …)`; 这里抓出每一处的参数串。"""
+    return [m.group(0) for m in re.finditer(r"cn\(SEG_ITEM,[^)]*\)", src)]
 
-    锚在**定高 + 小圆角**这两个属性上, 不锚某一段具体文案: 这一页的药丸文字
-    改过不止一次, 而"定高盒子装不下换行的字"跟文字是什么无关。
-    """
-    return [m.group(0) for m in re.finditer(r"'inline-flex[^']*rounded-\[5px\][^']*'"
-                                            r"|'h-[67][^']*rounded-\[5px\][^']*'", src)]
+
+def _seg() -> dict[str, str]:
+    return dict(re.findall(r"export const (SEG\w*) = '([^']*)'", code_of("components/ui/segmented.ts")))
 
 
 def test_R401_定高药丸里的字不许断():
@@ -45,6 +45,7 @@ def test_R401_定高药丸里的字不许断():
     src = code_of(REGIME)
     groups = _pill_groups(src)
     assert len(groups) >= 3, f"没找到那几个定高药丸(找到 {len(groups)} 个), 选择器该更新了"
+    assert re.search(r"\bh-7\b", _seg()["SEG_ITEM"]), "分段切换的药丸不再定高了 —— 这条守卫的前提变了"
     for cls in groups:
         assert "whitespace-nowrap" in cls, (
             f"定高药丸没写 whitespace-nowrap, 窄屏上字会换行并溢出盒子:\n  {cls}")
@@ -54,17 +55,13 @@ def test_R401_药丸组不许被旁边的说明挤扁():
     """药丸自己不换行还不够: 外面那层若允许被压缩, 压到比内容还窄时字照样换行。
 
     钉的是"这两层一起成立" —— 药丸组 `shrink-0`, 且它所在的行允许换行
-    (放不下就整组换到下一行去, 而不是把自己压扁)。
+    (放不下就整组换到下一行去, 而不是把自己压扁)。[R457] 药丸组是全站的 `SEG`。
     """
     src = code_of(REGIME)
-    # 药丸组: 带 rounded-btn + bg-base/60 + p-0.5 的那两个容器
-    groups = re.findall(r'"flex[^"]*rounded-btn border border-border bg-base/60 p-0\.5"', src)
-    assert len(groups) >= 2, f"没找到药丸组容器(找到 {len(groups)} 个)"
-    for g in groups:
-        assert "shrink-0" in g, f"药丸组会被旁边的说明挤扁: {g}"
-    # 两个药丸组的父行都要允许换行
-    for g in groups:
-        i = src.index(g)
+    assert "shrink-0" in _seg()["SEG"], "分段切换的外框会被旁边的说明挤扁"
+    spots = [m.start() for m in re.finditer(r"<div className=\{SEG\}>", src)]
+    assert len(spots) >= 2, f"没找到药丸组容器(找到 {len(spots)} 个)"
+    for i in spots:
         head = src[max(0, i - 400):i]
         assert "flex-wrap" in head, (
             f"药丸组所在的行不许换行, 放不下时只能把药丸压扁:\n  …{head[-160:]}")
@@ -75,7 +72,8 @@ def test_R401_区块标题不许被右边的说明腰斩():
     src = code_of(REGIME)
     i = src.index("function SectionTitle")
     body = src[i:i + 1200]
-    h2 = re.search(r"<h2 className=\"([^\"]*)\"", body)
+    # [R457] 标题字号走 TYPE.card, 不换行 / 不被压窄那两个类写在 cn() 的前一个参数里
+    h2 = re.search(r"<h2 className=\{cn\('([^']*)', TYPE\.card\)\}", body)
     assert h2, "SectionTitle 里找不到标题元素"
     assert "whitespace-nowrap" in h2.group(1), f"区块标题会被腰斩: {h2.group(1)}"
     assert "shrink-0" in h2.group(1), f"区块标题会被右边的说明压窄: {h2.group(1)}"

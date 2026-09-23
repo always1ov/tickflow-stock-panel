@@ -61,7 +61,7 @@
 - [x] 监控(`Monitor` + `monitor/RuleEditor`)
 - [x] 模拟盘 / 批次(`FlipPaper` / `Lots`)
 - [x] 选股(`Screener` + `screener/*`)
-- [ ] 市场环境(`Regime` + `regime/*`)
+- [x] 市场环境(`Regime` + `regime/*`)
 - [ ] 指数(`Indices`)
 - [ ] 异动(`AbnormalMoves`)
 - [ ] 连板梯队(`LimitUpLadder`)

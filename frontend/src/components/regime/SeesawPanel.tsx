@@ -32,26 +32,26 @@ function PairCard({ p, verdict, note }: { p: SeesawPair; verdict?: string; note?
         <Repeat className="h-3 w-3 text-muted" />
         <span style={{ color: COLOR_B }}>{p.b}</span>
       </span>
-      <span className="shrink-0 rounded border border-border px-1.5 py-px font-mono text-[10px] text-secondary"
+      <span className="shrink-0 rounded border border-border px-1.5 py-px font-mono text-micro text-secondary"
         title="跷跷板分: 反向程度 + 来回轮数 + 双方活跃度">
         {p.score} 分
       </span>
-      <span className="shrink-0 rounded border border-border/60 px-1.5 py-px font-mono text-[10px] text-muted"
+      <span className="shrink-0 rounded border border-border/60 px-1.5 py-px font-mono text-micro text-muted"
         title="窗口内领先方换手次数 —— 来回才算跷跷板, 一次性此消彼长不算">
         {p.flips} 轮
       </span>
       {verdict && (
-        <span className={cn('shrink-0 rounded px-1.5 py-px text-[10px]',
+        <span className={cn('shrink-0 rounded px-1.5 py-px text-micro',
           verdict === '成立'
             ? 'border border-emerald-400/40 bg-emerald-400/10 text-emerald-400'
             : 'border border-amber-400/40 bg-amber-400/10 text-amber-400')}>
           AI {verdict}
         </span>
       )}
-      <span className="min-w-0 flex-1 truncate text-[10px] text-secondary" title={fullTip}>
+      <span className="min-w-0 flex-1 truncate text-micro text-secondary" title={fullTip}>
         {p.hint}{note && <span className="text-accent/80"> · AI: {note}</span>}
       </span>
-      <span className="ml-auto shrink-0 rounded px-1.5 py-px text-[10px]"
+      <span className="ml-auto shrink-0 rounded px-1.5 py-px text-micro"
         style={{ color: leaderIsA ? COLOR_A : COLOR_B, backgroundColor: (leaderIsA ? COLOR_A : COLOR_B) + '18' }}>
         {p.leader}占优 · {p.lead_days} 天
       </span>
@@ -99,12 +99,12 @@ export function SeesawPanel({ kind, embedded = false }: { kind: 'concept' | 'ind
             <h2 className="shrink-0 text-xs font-semibold text-foreground">板块跷跷板</h2>
           </>
         )}
-        <span className={cn('text-[9px] text-muted', embedded ? '' : 'hidden sm:inline')}>
+        <span className={cn('text-micro text-muted', embedded ? '' : 'hidden sm:inline')}>
           {embedded ? `近 ${q.data?.window ?? 0} 个交易日 · 每天收盘后识别一次即可` : `一边熄火往往就是另一边点火 · 近 ${q.data?.window ?? 0} 个交易日`}
         </span>
         <button
           onClick={() => setShowHistory(v => !v)}
-          className={cn('ml-auto inline-flex shrink-0 whitespace-nowrap items-center gap-1 rounded-btn border px-2 py-0.5 text-[10px] transition-colors',
+          className={cn('ml-auto inline-flex shrink-0 whitespace-nowrap items-center gap-1 rounded-btn border px-2 py-0.5 text-micro transition-colors',
             showHistory ? 'border-accent/50 text-accent' : 'border-border bg-base text-secondary hover:text-accent')}
           title="最近 30 天的识别留档 —— 看这对板块来回切了几轮、上一轮哪天换的手"
         >
@@ -113,7 +113,7 @@ export function SeesawPanel({ kind, embedded = false }: { kind: 'concept' | 'ind
         <button
           onClick={() => detect.mutate()}
           disabled={detect.isPending}
-          className="inline-flex shrink-0 whitespace-nowrap items-center gap-1 rounded-btn border border-accent/40 bg-accent/10 px-2 py-0.5 text-[10px] text-accent transition-colors hover:bg-accent/20 disabled:opacity-60"
+          className="inline-flex shrink-0 whitespace-nowrap items-center gap-1 rounded-btn border border-accent/40 bg-accent/10 px-2 py-0.5 text-micro text-accent transition-colors hover:bg-accent/20 disabled:opacity-60"
           title="让 AI 看真实日度强度序列, 甄别哪几对是真跷跷板、当下轮到谁(会调用 AI)"
         >
           {detect.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
@@ -123,9 +123,9 @@ export function SeesawPanel({ kind, embedded = false }: { kind: 'concept' | 'ind
 
       {/* AI 结论(最近一次) */}
       {latest?.ai?.summary && (
-        <p className="mt-2 rounded-lg border border-accent/25 bg-accent/[0.06] px-2.5 py-2 text-[11px] leading-relaxed text-secondary">
+        <p className="mt-2 rounded-lg border border-accent/25 bg-accent/[0.06] px-2.5 py-2 text-xs leading-relaxed text-secondary">
           <span className="mr-1 font-semibold text-accent">【AI 定性】</span>{latest.ai.summary}
-          <span className="ml-1.5 font-mono text-[9px] text-muted">
+          <span className="ml-1.5 font-mono text-micro text-muted">
             {latest.as_of ?? ''}{latest.as_of !== q.data?.as_of ? ' · 非最新交易日, 建议重新识别' : ''}
           </span>
         </p>
@@ -134,12 +134,12 @@ export function SeesawPanel({ kind, embedded = false }: { kind: 'concept' | 'ind
       {/* 规则候选 */}
       <div className="mt-2 space-y-1.5">
         {pairs.length > 0 && (
-          <p className="text-[10px] font-semibold text-foreground/80">
+          <p className="text-micro font-semibold text-foreground/80">
             【配对明细】<span className="font-normal text-muted">按跷跷板分排序 · 悬停行内提示看节奏全文</span>
           </p>
         )}
         {pairs.length === 0 ? (
-          <p className="py-4 text-center text-[10px] text-muted">
+          <p className="py-4 text-center text-micro text-muted">
             {q.isLoading ? '加载中…' : (q.data?.error ?? '近期没有明显的跷跷板 —— 板块各走各的, 或主线数据不足')}
           </p>
         ) : pairs.map(p => (
@@ -153,7 +153,7 @@ export function SeesawPanel({ kind, embedded = false }: { kind: 'concept' | 'ind
       {showHistory && (
         <div className="mt-2 border-t border-border/60 pt-2">
           {history.length === 0 ? (
-            <p className="py-3 text-center text-[10px] text-muted">还没有留档 —— 点一次「AI 一键识别」就会开始按天记录</p>
+            <p className="py-3 text-center text-micro text-muted">还没有留档 —— 点一次「AI 一键识别」就会开始按天记录</p>
           ) : (
             <div className="max-h-[300px] space-y-1 overflow-auto">
               {history.map((h: SeesawEntry) => {
@@ -165,20 +165,20 @@ export function SeesawPanel({ kind, embedded = false }: { kind: 'concept' | 'ind
                     <button onClick={() => setOpenDay(open ? null : key)}
                       className="flex w-full items-center gap-2 px-2 py-1.5 text-left">
                       <ChevronDown className={cn('h-3 w-3 shrink-0 text-muted transition-transform', !open && '-rotate-90')} />
-                      <span className="font-mono text-[10px] text-secondary">{h.as_of ?? '—'}</span>
-                      <span className="truncate text-[10px] text-foreground">
+                      <span className="font-mono text-micro text-secondary">{h.as_of ?? '—'}</span>
+                      <span className="truncate text-micro text-foreground">
                         {top ? `${top.a} ↔ ${top.b}` : '无候选'}
                       </span>
-                      {top && <span className="shrink-0 font-mono text-[9px] text-muted">当下 {top.leader}</span>}
-                      <span className="ml-auto shrink-0 text-[9px] text-muted">
+                      {top && <span className="shrink-0 font-mono text-micro text-muted">当下 {top.leader}</span>}
+                      <span className="ml-auto shrink-0 text-micro text-muted">
                         {h.pairs?.length ?? 0} 对{h.ai?.picks?.length ? ` · AI 认 ${h.ai.picks.length}` : ''}
                       </span>
                     </button>
                     {open && (
                       <div className="space-y-1 border-t border-border/40 px-2 py-1.5">
-                        {h.ai?.summary && <p className="text-[10px] leading-relaxed text-secondary">{h.ai.summary}</p>}
+                        {h.ai?.summary && <p className="text-micro leading-relaxed text-secondary">{h.ai.summary}</p>}
                         {(h.pairs ?? []).map(p => (
-                          <div key={p.pair} className="flex flex-wrap items-center gap-x-2 text-[10px]">
+                          <div key={p.pair} className="flex flex-wrap items-center gap-x-2 text-micro">
                             <span style={{ color: COLOR_A }}>{p.a}</span>
                             <span className="text-muted">↔</span>
                             <span style={{ color: COLOR_B }}>{p.b}</span>
