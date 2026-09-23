@@ -63,6 +63,28 @@ MAX_REACTIONS = 5         # 往回最多取几个反应点
 TOL_ATR = 0.5             # 聚类容差 = 几倍 ATR
 STOP_BUFFER_ATR = 0.1     # 失效位在参照价位下方再让几倍 ATR
 
+# ── [R473] 聚焦点改取「最近这一波上涨的最高点」──────────────────
+# 用户拿别人的通达信图(中际旭创)对比: 「斐波那契Ⅱ型出来的结果不对…你要完美复刻还原,
+# 他的才是准确有效的」。拿不到对方源码, 按图反推 —— 图上每个数都能逐位对上同一套公式:
+#     930.30 = 974.99 − 0.382 × (974.99 − 858.00)      F3 = 38.2%
+#     921.95 = 974.99 − 0.382 × (974.99 − 836.13)
+#     889.17 = 974.99 − 0.618 × (974.99 − 836.13)      F5 = 61.8%
+# **公式与我们一样, 差在聚焦点**: 对方锚在最近这波的最高点 974.99(截图当天前一根,
+# 还没等摆点确认), 我们锚在几个月前那段「连续 8 根站上短期均线」的上攻上 —— 最近这波
+# 没凑够 8 根, 不算推进, 于是一直画着那组早已作废的线(图上自己都写着「已跌破这组作废」)。
+#
+# 新口径: 往回看 FOCUS_LOOKBACK 根里的最低点, 它之后的最高点就是聚焦点, 两者之间是这一波
+# 上涨。幅度仍要 ≥ THRUST_MIN_ATR × ATR(磨盘不算一波)。最低点就是最后一根 = 还在跌,
+# 不画 —— 下跌里到回撤线不是机会(AGENTS.md 第 10 条)。
+FOCUS_LOOKBACK = 60       # 约一个季度; 这是反推出来的口径里唯一一个人为定的数
+# 这一波至少要有几倍 ATR 才算(过滤磨盘)。原推进段用 3 倍; 对方图上中际旭创这一波
+# 974.99 − 827.74 ≈ 147, 而它的 ATR 在四五十 —— 3 倍正好卡在边上, 会整组不画。
+UPSWING_MIN_ATR = 2.0
+# 反应点去重: 只合并**几乎同价**的低点(平台 / 一字板那种同一条线数几遍)。原来用聚类容差
+# (0.5×ATR)当去重间距, 高价股 ATR 四五十, 858.00 / 863.52 / 870.17 这种相隔五六块的
+# 不同低点会被并成一个 —— 对方图上它们各有一条 F3(930.30 / 932.41 / 934.95)。
+REACT_DEDUP_PCT = 0.003
+
 # ── 粗细三档 ─────────────────────────────────────────────────
 # 原书对「什么算一个有意义的回调」**没有硬公式**(规格第 1 节自陈), 这四个数是
 # 规格作者替它补的。既然是人为补定的, 就不该藏在配置里当"待优化参数" ——
@@ -240,6 +262,38 @@ def _emit(out, s, e, highs, lows, atr, min_len, min_atr) -> None:
 # 聚焦点与反应点
 # ================================================================
 
+def latest_upswing(
+    highs: list[float], lows: list[float], atr: list[float | None],
+    *, lookback: int = FOCUS_LOOKBACK, min_atr: float = UPSWING_MIN_ATR,
+) -> tuple[int, int] | None:
+    """[R473] 最近这一波上涨 `[s, e]`: s = 近 `lookback` 根的最低点(同价取最近那根),
+    e = 它之后的最高点(同价取最早那根, 与 `focus_of` 一致)。
+
+    **不等右侧摆点确认** —— 对方图上的聚焦点就是截图前一根的高点。聚焦点是
+    「这波到目前为止最高到了哪」, 创了新高它就跟着上移, 这正是帝纳波利的用法。
+
+    还在跌(最低点就是最后一根)、或者这波幅度不到 `min_atr` 倍 ATR, 返回 None。
+    """
+    n = min(len(highs), len(lows))
+    if n < 2:
+        return None
+    start = max(0, n - lookback)
+    lo = min(lows[start:n])
+    s = max(i for i in range(start, n) if lows[i] == lo)
+    if s >= n - 1:
+        return None
+    hi = max(highs[s:n])
+    e = s + highs[s:n].index(hi)
+    if e <= s:
+        return None
+    a = atr[e] if e < len(atr) else None
+    if a is None or not math.isfinite(a) or a <= 0:
+        return None
+    if hi - lo < min_atr * a:
+        return None
+    return s, e
+
+
 def focus_of(highs: list[float], seg: tuple[int, int]) -> tuple[float, int]:
     """推进段里的最高点 —— 所有回撤都从它往下量。"""
     s, e = seg
@@ -406,18 +460,18 @@ def _compute(df: pl.DataFrame, pivot_k: int = PIVOT_K) -> Fib2:
            if "atr_14" in df.columns else [None] * len(closes))
 
     dma = displaced_sma(closes, DMA_LEN, DMA_SHIFT)
-    segs = thrust_segments(closes, dma, highs, lows, atr)
-    if not segs:
+    # [R473] 不再取「最近一段连续 8 根站上短期均线」的推进段, 改取最近这一波上涨
+    seg = latest_upswing(highs, lows, atr)
+    if seg is None:
         return Fib2(dma3=dma)
 
-    seg = segs[-1]                                  # 最近一波推进
     focus, focus_bar = focus_of(highs, seg)
 
     # 容差先算出来 —— 反应点去重和点位聚类用的是同一把尺子, 本来就该一致
     last_atr = next((a for a in reversed(atr) if a and math.isfinite(a) and a > 0), None)
     tol = TOL_ATR * last_atr if last_atr else focus * 0.005
 
-    reacts = reactions_before(lows, focus_bar, k=pivot_k, min_gap=tol)
+    reacts = reactions_before(lows, focus_bar, k=pivot_k, min_gap=focus * REACT_DEDUP_PCT)
     if not reacts:
         return Fib2(dma3=dma, thrust=seg, focus=focus, focus_bar=focus_bar)
 
