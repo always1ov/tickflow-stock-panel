@@ -59,13 +59,13 @@ export function SignalPicker({ signals, onChange, kind, options }: Props) {
   const active = isEntry
     ? 'border-accent/50 bg-accent/10 text-accent'
     : 'border-warning/50 bg-warning/10 text-warning'
-  const idle = variant === 'dialog'
-    ? 'border-border bg-base text-muted hover:border-accent/40'
-    : 'border-border bg-base text-muted hover:border-accent/40'
+  // [R454] 未选中的样子与全站描边按钮一致; 选中仍按进场蓝 / 出场橙(那两种颜色有含义)
+  const idle = 'border-border bg-surface text-foreground hover:bg-elevated'
 
+  // [R454] 可点的控件按正文级 13px; 弹窗里那一档矮一点(28px), 其余与全站按钮同高(32px)
   const btnCls = variant === 'dialog'
-    ? 'rounded px-1.5 py-0.5 text-[10px] font-medium border transition-colors cursor-pointer'
-    : 'rounded-btn border px-2.5 py-1.5 text-[11px] transition-colors cursor-pointer'
+    ? 'inline-flex h-7 items-center rounded-btn border px-2 text-xs transition-colors cursor-pointer'
+    : 'inline-flex h-8 items-center rounded-btn border px-3 text-xs transition-colors cursor-pointer'
   const builtinOptions = builtinSignals ?? SIGNAL_OPTIONS.map(key => ({ key, label: cnSignal(key) }))
 
   return (

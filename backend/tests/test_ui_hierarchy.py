@@ -44,6 +44,10 @@ MIGRATED: list[str] = [
     "components/data/ActiveJobCard.tsx",
     "components/AdjFactorSyncGate.tsx",
     "components/DatePicker.tsx",
+    "pages/Monitor.tsx",
+    "components/monitor/FocusBar.tsx",
+    "components/monitor/RuleEditor.tsx",
+    "components/screener/SignalPicker.tsx",
 ]
 
 

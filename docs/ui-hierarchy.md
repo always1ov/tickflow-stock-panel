@@ -55,7 +55,7 @@
 - [x] 自选决策台(`StockAnalysis` + `WatchlistDecisionBoard` + `decision-board/*`)
 - [x] 自选(`Watchlist`)
 - [x] 大盘(`Dashboard`)
-- [ ] 监控(`Monitor` + `monitor/RuleEditor`)
+- [x] 监控(`Monitor` + `monitor/RuleEditor`)
 - [ ] 模拟盘 / 批次(`FlipPaper` / `Lots`)
 - [ ] 选股(`Screener` + `screener/*`)
 - [ ] 市场环境(`Regime` + `regime/*`)

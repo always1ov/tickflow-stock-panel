@@ -10,6 +10,7 @@ import { resolveWatchlistGroupColor } from '@/lib/watchlist-group-colors'
 import { SignalPicker } from '@/components/screener/SignalPicker'
 import { MONITOR_INTRADAY_SIGNAL_OPTIONS, SIGNAL_OPTIONS, cnSignal } from '@/lib/signals'
 import { usePreferences, useQuoteStatus } from '@/lib/useSharedQueries'
+import { TYPE } from '@/components/ui'
 
 interface Props {
   /** 编辑现有规则;null=新建 */
@@ -45,7 +46,7 @@ const SECTOR_KIND_OPTIONS: Array<{ key: SectorKind; label: string; icon: typeof 
 const STRATEGY_SOURCE_META = {
   builtin: { label: '内置', className: 'border-accent/25 bg-accent/10 text-accent' },
   custom: { label: '自定义', className: 'border-emerald-400/25 bg-emerald-400/10 text-emerald-400' },
-  ai: { label: 'AI', className: 'border-amber-400/25 bg-amber-400/10 text-amber-400' },
+  ai: { label: 'AI', className: 'border-warning/25 bg-warning/10 text-warning' },
   composite: { label: '叠加', className: 'border-teal-500/25 bg-teal-500/10 text-teal-400' },
 } as const
 
@@ -471,7 +472,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
     return (
       <div className="rounded-card border border-border bg-surface p-5 space-y-4">
         <div className="flex items-center justify-between gap-3">
-          <h3 className="text-sm font-medium text-foreground">{editing ? '编辑监控' : '加入监控'}</h3>
+          <h3 className={TYPE.section}>{editing ? '编辑监控' : '加入监控'}</h3>
           <button onClick={onClose} className="rounded p-1 text-muted hover:bg-elevated hover:text-foreground cursor-pointer">
             <X className="h-4 w-4" />
           </button>
@@ -480,13 +481,13 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
         {draft.symbols.length > 0 && (
           <div className="flex flex-wrap gap-1">
             {draft.symbols.map(s => (
-              <span key={s} className="rounded bg-elevated px-1.5 py-0.5 text-[10px] text-secondary font-mono">{s}</span>
+              <span key={s} className="rounded bg-elevated px-1.5 py-0.5 text-micro text-secondary font-mono">{s}</span>
             ))}
           </div>
         )}
 
         <div>
-          <div className="mb-1.5 text-[11px] text-muted">选择触发信号 (任一命中即报警)</div>
+          <div className="mb-1.5 text-xs text-muted">选择触发信号 (任一命中即报警)</div>
           <SignalPicker
             signals={selectedSignals}
             onChange={onSignalPickerChange}
@@ -499,7 +500,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
             }}
           />
           {hasIntradaySignal && (
-            <div className={`mt-2 text-[10px] ${intradaySupport?.available === false ? 'text-danger' : 'text-muted'}`}>
+            <div className={`mt-2 text-micro ${intradaySupport?.available === false ? 'text-danger' : 'text-muted'}`}>
               {intradaySupport?.available === false
                 ? intradaySupport.reason
                 : `按已完成的一分钟判断,当前最多监听 ${intradaySupport?.max_symbols ?? 0} 只标的。`}
@@ -510,8 +511,8 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
         {/* 价位条件 (阈值) — 与信号共存, 可选添加 */}
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] text-muted">价位条件 (可选)</span>
-            <button onClick={() => addCond('threshold')} className="inline-flex items-center gap-1 text-[11px] text-accent hover:text-accent/80 cursor-pointer">
+            <span className="text-xs text-muted">价位条件 (可选)</span>
+            <button onClick={() => addCond('threshold')} className="inline-flex items-center gap-1 text-xs text-accent hover:text-accent/80 cursor-pointer">
               <Plus className="h-3 w-3" />添加价位
             </button>
           </div>
@@ -521,14 +522,14 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
                 const realIdx = draft.conditions.indexOf(c)
                 return (
                   <div key={i} className="flex items-center gap-1.5">
-                    <span className="text-[10px] text-muted/60 w-6 text-right shrink-0">{i === 0 && selectedSignals.length === 0 ? '当' : draft.logic === 'and' ? '且' : '或'}</span>
-                    <select value={c.field} onChange={e => updateCond(realIdx, { field: e.target.value })} className="flex-1 h-7 px-1.5 rounded bg-base border border-border text-[11px] text-foreground focus:outline-none focus:border-accent/50">
+                    <span className="text-micro text-muted/60 w-6 text-right shrink-0">{i === 0 && selectedSignals.length === 0 ? '当' : draft.logic === 'and' ? '且' : '或'}</span>
+                    <select value={c.field} onChange={e => updateCond(realIdx, { field: e.target.value })} className="flex-1 h-7 px-1.5 rounded bg-base border border-border text-xs text-foreground focus:outline-none focus:border-accent/50">
                       {thresholdFields.map(f => <option key={f.key} value={f.key}>{f.label}</option>)}
                     </select>
-                    <select value={c.op} onChange={e => updateCond(realIdx, { op: e.target.value })} className="w-12 h-7 px-1 rounded bg-base border border-border text-[11px] font-mono text-foreground text-center focus:outline-none focus:border-accent/50">
+                    <select value={c.op} onChange={e => updateCond(realIdx, { op: e.target.value })} className="w-12 h-7 px-1 rounded bg-base border border-border text-xs font-mono text-foreground text-center focus:outline-none focus:border-accent/50">
                       {operators.map(op => <option key={op} value={op}>{op}</option>)}
                     </select>
-                    <input type="number" value={c.value ?? 0} onChange={e => updateCond(realIdx, { value: parseFloat(e.target.value) })} step="any" className="w-24 h-7 px-1.5 rounded bg-base border border-border text-[11px] font-mono text-foreground text-center focus:outline-none focus:border-accent/50" />
+                    <input type="number" value={c.value ?? 0} onChange={e => updateCond(realIdx, { value: parseFloat(e.target.value) })} step="any" className="w-24 h-7 px-1.5 rounded bg-base border border-border text-xs font-mono text-foreground text-center focus:outline-none focus:border-accent/50" />
                     <button onClick={() => removeCond(realIdx)} className="p-1 rounded text-muted hover:text-danger hover:bg-danger/10 cursor-pointer">
                       <X className="h-3.5 w-3.5" />
                     </button>
@@ -540,7 +541,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
         </div>
 
         <label className="space-y-1.5">
-          <span className="text-[11px] text-muted">备注 (可选)</span>
+          <span className="text-xs text-muted">备注 (可选)</span>
           <input value={draft.message} onChange={e => setDraft(d => ({ ...d, message: e.target.value }))} placeholder="给这条监控加个备注" className="h-9 w-full rounded-btn border border-border bg-base px-3 text-xs text-foreground" />
         </label>
 
@@ -561,8 +562,8 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
     <div className="rounded-card border border-border bg-surface p-5 space-y-4">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h3 className="text-sm font-medium text-foreground">{editing ? '编辑监控规则' : '新建监控规则'}</h3>
-          <p className="mt-1 text-[11px] text-muted">规则标识自动生成,描述为可选。</p>
+          <h3 className={TYPE.section}>{editing ? '编辑监控规则' : '新建监控规则'}</h3>
+          <p className="mt-1 text-xs text-muted">规则标识自动生成,描述为可选。</p>
         </div>
         <button onClick={onClose} className="rounded p-1 text-muted hover:bg-elevated hover:text-foreground cursor-pointer">
           <X className="h-4 w-4" />
@@ -572,7 +573,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
       {/* 资产类型: 股票 / ETF / 指数 (个股极简模式不显示; 板块/异动仅个股) */}
       {!simple && draft.type !== 'sector' && draft.type !== 'abnormal' && draft.type !== 'volume_delta' && (
         <div className="space-y-1.5">
-          <span className="text-[11px] text-muted">资产类型</span>
+          <span className="text-xs text-muted">资产类型</span>
           <div className="inline-flex h-9 rounded-btn border border-border overflow-hidden">
             {(['stock', 'etf', 'index'] as const).map(t => (
               <button
@@ -607,7 +608,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
 
       {/* 监控类型 */}
       <div className="space-y-1.5">
-        <span className="text-[11px] text-muted">监控类型</span>
+        <span className="text-xs text-muted">监控类型</span>
         <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
           {visibleTypes.map(t => {
             const Icon = TYPE_ICONS[t.key as keyof typeof TYPE_ICONS] ?? Activity
@@ -664,14 +665,14 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
       </div>
 
       <label className="space-y-1.5">
-        <span className="text-[11px] text-muted">描述 (可选)</span>
+        <span className="text-xs text-muted">描述 (可选)</span>
         <input value={draft.name} onChange={e => setDraft(d => ({ ...d, name: e.target.value }))} placeholder="留空用默认名称" className="h-9 w-full rounded-btn border border-border bg-base px-3 text-xs text-foreground" />
       </label>
 
       {draft.type === 'sector' && (
         <div className="space-y-4 border-t border-border/60 pt-4">
           <div className="space-y-1.5">
-            <span className="text-[11px] text-muted">板块分类</span>
+            <span className="text-xs text-muted">板块分类</span>
             <div className="grid grid-cols-3 gap-1.5">
               {SECTOR_KIND_OPTIONS.map(option => {
                 const Icon = option.icon
@@ -696,7 +697,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
 
           {sectorKind === 'industry' && (
             <div className="space-y-1.5">
-              <span className="text-[11px] text-muted">行业层级</span>
+              <span className="text-xs text-muted">行业层级</span>
               <div className="inline-flex h-8 overflow-hidden rounded-btn border border-border bg-base">
                 {([1, 2, 3] as const).map(level => (
                   <button
@@ -707,7 +708,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
                       setIndustryLevel(level)
                       setDraft(d => ({ ...d, sector_targets: [] }))
                     }}
-                    className={`px-3 text-[11px] transition-colors cursor-pointer ${
+                    className={`px-3 text-xs transition-colors cursor-pointer ${
                       industryLevel === level ? 'bg-accent/10 text-accent' : 'text-muted hover:text-foreground'
                     }`}
                   >
@@ -720,13 +721,13 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
 
           <div className="space-y-2">
             <div className="flex items-center justify-between gap-3">
-              <span className="text-[11px] text-muted">监控对象</span>
-              <span className="text-[10px] font-mono text-muted">{draft.sector_targets?.length ?? 0}/20</span>
+              <span className="text-xs text-muted">监控对象</span>
+              <span className="text-micro font-mono text-muted">{draft.sector_targets?.length ?? 0}/20</span>
             </div>
             {(draft.sector_targets?.length ?? 0) > 0 && (
               <div className="flex flex-wrap gap-1">
                 {draft.sector_targets?.map(target => (
-                  <span key={target.key} className="inline-flex items-center gap-1 rounded bg-accent/8 px-1.5 py-1 text-[10px] text-accent">
+                  <span key={target.key} className="inline-flex items-center gap-1 rounded bg-accent/8 px-1.5 py-1 text-micro text-accent">
                     {target.name}
                     <button type="button" onClick={() => toggleSectorTarget(target)} title="移除" className="text-accent/60 hover:text-danger cursor-pointer">
                       <X className="h-2.5 w-2.5" />
@@ -771,9 +772,9 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
                           : 'cursor-pointer border-border bg-base text-secondary hover:border-accent/25 hover:text-foreground'
                     }`}
                   >
-                    <span className="min-w-0 flex-1 truncate text-[11px]">{targetLabel}</span>
-                    {target.symbol && <span className="shrink-0 font-mono text-[9px] opacity-60">{target.symbol}</span>}
-                    {target.kind !== 'index' && <span className="shrink-0 font-mono text-[9px] opacity-60">{target.member_count}</span>}
+                    <span className="min-w-0 flex-1 truncate text-xs">{targetLabel}</span>
+                    {target.symbol && <span className="shrink-0 font-mono text-micro opacity-60">{target.symbol}</span>}
+                    {target.kind !== 'index' && <span className="shrink-0 font-mono text-micro opacity-60">{target.member_count}</span>}
                     <span className={`grid h-4 w-4 shrink-0 place-items-center rounded-full border ${selected ? 'border-accent bg-accent text-white' : 'border-border text-transparent'}`}>
                       <Check className="h-2.5 w-2.5" />
                     </span>
@@ -785,7 +786,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
 
           <div className="grid gap-3 border-t border-border/60 pt-4 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <span className="text-[11px] text-muted">触发方式</span>
+              <span className="text-xs text-muted">触发方式</span>
               <div className="grid h-9 grid-cols-2 overflow-hidden rounded-btn border border-border bg-base">
                 {([
                   ['change_pct', '涨跌幅到达'],
@@ -796,7 +797,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
                     type="button"
                     aria-pressed={(draft.sector_trigger ?? 'change_pct') === key}
                     onClick={() => setDraft(d => ({ ...d, sector_trigger: key }))}
-                    className={`text-[11px] font-medium transition-colors cursor-pointer ${
+                    className={`text-xs font-medium transition-colors cursor-pointer ${
                       (draft.sector_trigger ?? 'change_pct') === key ? 'bg-accent/10 text-accent' : 'text-muted hover:text-foreground'
                     }`}
                   >
@@ -806,7 +807,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
               </div>
             </div>
             <div className="space-y-1.5">
-              <span className="text-[11px] text-muted">方向</span>
+              <span className="text-xs text-muted">方向</span>
               <div className="grid h-9 grid-cols-2 overflow-hidden rounded-btn border border-border bg-base">
                 {([
                   ['up', draft.sector_trigger === 'momentum' ? '快速上涨' : '上涨'],
@@ -817,7 +818,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
                     type="button"
                     aria-pressed={draft.direction === key}
                     onClick={() => setDraft(d => ({ ...d, direction: key }))}
-                    className={`text-[11px] font-medium transition-colors cursor-pointer ${
+                    className={`text-xs font-medium transition-colors cursor-pointer ${
                       draft.direction === key ? 'bg-accent/10 text-accent' : 'text-muted hover:text-foreground'
                     }`}
                   >
@@ -828,7 +829,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
             </div>
             {draft.sector_trigger === 'momentum' && (
               <label className="space-y-1.5">
-                <span className="text-[11px] text-muted">统计窗口</span>
+                <span className="text-xs text-muted">统计窗口</span>
                 <select
                   value={draft.window_minutes ?? 5}
                   onChange={event => setDraft(d => ({ ...d, window_minutes: Number(event.target.value) as MonitorRule['window_minutes'] }))}
@@ -839,7 +840,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
               </label>
             )}
             <label className="space-y-1.5">
-              <span className="text-[11px] text-muted">{draft.sector_trigger === 'momentum' ? '窗口变化阈值' : '板块涨跌幅阈值'}</span>
+              <span className="text-xs text-muted">{draft.sector_trigger === 'momentum' ? '窗口变化阈值' : '板块涨跌幅阈值'}</span>
               <span className="relative block">
                 <input
                   type="number"
@@ -855,7 +856,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
             </label>
           </div>
           {sectorKind !== 'index' && (
-            <div className="flex flex-wrap gap-1.5 text-[9px] text-muted">
+            <div className="flex flex-wrap gap-1.5 text-micro text-muted">
               <span className="rounded bg-elevated px-1.5 py-0.5">等权平均</span>
               <span className="rounded bg-elevated px-1.5 py-0.5">行情覆盖 ≥ 80%</span>
               <span className="rounded bg-elevated px-1.5 py-0.5">有效成分 ≥ 5</span>
@@ -868,7 +869,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
         <div className="space-y-4 border-t border-border/60 pt-4">
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="space-y-1.5">
-              <span className="text-[11px] text-muted">接近度阈值</span>
+              <span className="text-xs text-muted">接近度阈值</span>
               <span className="relative block">
                 <input
                   type="number"
@@ -881,12 +882,12 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
                 />
                 <span className="absolute right-3 top-2.5 text-xs text-muted">%</span>
               </span>
-              <span className="block text-[10px] text-muted/70">
+              <span className="block text-micro text-muted/70">
                 接近度 = |偏离值| ÷ 交易所阈值。70=边缘预警, 100=已触发
               </span>
             </label>
             <div className="space-y-1.5">
-              <span className="text-[11px] text-muted">方向</span>
+              <span className="text-xs text-muted">方向</span>
               <div className="grid h-9 grid-cols-3 overflow-hidden rounded-btn border border-border bg-base">
                 {([
                   ['both', '全部'],
@@ -898,7 +899,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
                     type="button"
                     aria-pressed={(draft.direction ?? 'both') === key}
                     onClick={() => setDraft(d => ({ ...d, direction: key }))}
-                    className={`text-[11px] font-medium transition-colors cursor-pointer ${
+                    className={`text-xs font-medium transition-colors cursor-pointer ${
                       (draft.direction ?? 'both') === key ? 'bg-accent/10 text-accent' : 'text-muted hover:text-foreground'
                     }`}
                   >
@@ -909,7 +910,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
             </div>
           </div>
           <div className="space-y-1.5">
-            <span className="text-[11px] text-muted">关注窗口</span>
+            <span className="text-xs text-muted">关注窗口</span>
             <div className="grid h-9 grid-cols-4 overflow-hidden rounded-btn border border-border bg-base">
               {([
                 ['any', '全部'],
@@ -922,7 +923,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
                   type="button"
                   aria-pressed={(draft.abnormal_window ?? 'any') === key}
                   onClick={() => setDraft(d => ({ ...d, abnormal_window: key }))}
-                  className={`text-[11px] font-medium transition-colors cursor-pointer ${
+                  className={`text-xs font-medium transition-colors cursor-pointer ${
                     (draft.abnormal_window ?? 'any') === key ? 'bg-accent/10 text-accent' : 'text-muted hover:text-foreground'
                   }`}
                 >
@@ -931,7 +932,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
               ))}
             </div>
           </div>
-          <div className="rounded-btn bg-base px-3 py-2 text-[10px] leading-relaxed text-muted">
+          <div className="rounded-btn bg-base px-3 py-2 text-micro leading-relaxed text-muted">
             按交易所异动规则口径 (3日±20%/30%… 10日+100%、30日+200% 等按板块) 计算
             个股涨跌幅偏离值的接近度, 上穿阈值时告警; 冷却期内同一标的不重复提醒。
           </div>
@@ -941,13 +942,13 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
       {draft.type === 'volume_delta' && (
         <div className="space-y-4 border-t border-border/60 pt-4">
           {!volumeDeltaAvailable && (
-            <div className="rounded-btn border border-warning/30 bg-warning/10 px-3 py-2 text-[10px] leading-relaxed text-warning">
+            <div className="rounded-btn border border-warning/30 bg-warning/10 px-3 py-2 text-micro leading-relaxed text-warning">
               当前行情模式不是全市场轮询，规则可以保存，但在切换到全市场实时行情前不会触发。
             </div>
           )}
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <span className="text-[11px] text-muted">阈值口径</span>
+              <span className="text-xs text-muted">阈值口径</span>
               <div className="grid h-9 grid-cols-2 overflow-hidden rounded-btn border border-border bg-base">
                 {([['volume', '按手数'], ['amount', '按金额']] as const).map(([key, label]) => (
                   <button
@@ -955,7 +956,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
                     type="button"
                     aria-pressed={(draft.metric ?? 'volume') === key}
                     onClick={() => setDraft(d => ({ ...d, metric: key }))}
-                    className={`text-[11px] font-medium transition-colors cursor-pointer ${
+                    className={`text-xs font-medium transition-colors cursor-pointer ${
                       (draft.metric ?? 'volume') === key ? 'bg-accent/10 text-accent' : 'text-muted hover:text-foreground'
                     }`}
                   >
@@ -965,7 +966,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
               </div>
             </div>
             <label className="space-y-1.5">
-              <span className="text-[11px] text-muted">
+              <span className="text-xs text-muted">
                 单轮放量阈值{draft.metric === 'amount' ? ' (万元)' : ' (手)'}
               </span>
               <input
@@ -983,50 +984,50 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
                 })}
                 className="h-9 w-full rounded-btn border border-border bg-base px-3 text-xs font-mono text-foreground"
               />
-              <span className="block text-[10px] text-muted/70">
+              <span className="block text-micro text-muted/70">
                 相邻两次全市场轮询（当前约 {Math.round(quoteInterval)} 秒）的增量达到阈值时提醒。
               </span>
             </label>
           </div>
 
           <div className="space-y-2">
-            <span className="text-[11px] text-muted">基础过滤（留空表示不过滤）</span>
+            <span className="text-xs text-muted">基础过滤（留空表示不过滤）</span>
             <div className="grid gap-2 sm:grid-cols-3">
               <label className="space-y-1">
-                <span className="text-[10px] text-muted/70">股价区间（元）</span>
+                <span className="text-micro text-muted/70">股价区间（元）</span>
                 <div className="flex items-center gap-1">
                   <input type="number" min="0" step="0.5" placeholder="下限" value={draft.basic_filter?.price_min ?? ''}
                     onChange={event => setDraft(d => ({ ...d, basic_filter: { ...d.basic_filter, price_min: event.target.value === '' ? null : Number(event.target.value) } }))}
                     className="h-8 w-full rounded border border-border bg-base px-2 text-xs font-mono text-foreground" />
-                  <span className="text-[10px] text-muted">—</span>
+                  <span className="text-micro text-muted">—</span>
                   <input type="number" min="0" step="0.5" placeholder="上限" value={draft.basic_filter?.price_max ?? ''}
                     onChange={event => setDraft(d => ({ ...d, basic_filter: { ...d.basic_filter, price_max: event.target.value === '' ? null : Number(event.target.value) } }))}
                     className="h-8 w-full rounded border border-border bg-base px-2 text-xs font-mono text-foreground" />
                 </div>
               </label>
               <label className="space-y-1">
-                <span className="text-[10px] text-muted/70">总市值下限（亿元）</span>
+                <span className="text-micro text-muted/70">总市值下限（亿元）</span>
                 <input type="number" min="0" step="1" placeholder="不限"
                   value={draft.basic_filter?.market_cap_min != null ? draft.basic_filter.market_cap_min / 1e8 : ''}
                   onChange={event => setDraft(d => ({ ...d, basic_filter: { ...d.basic_filter, market_cap_min: event.target.value === '' ? null : Number(event.target.value) * 1e8 } }))}
                   className="h-8 w-full rounded border border-border bg-base px-2 text-xs font-mono text-foreground" />
               </label>
               <label className="space-y-1">
-                <span className="text-[10px] text-muted/70">当日成交额下限（万元）</span>
+                <span className="text-micro text-muted/70">当日成交额下限（万元）</span>
                 <input type="number" min="0" step="100" placeholder="不限"
                   value={draft.basic_filter?.amount_min != null ? draft.basic_filter.amount_min / 1e4 : ''}
                   onChange={event => setDraft(d => ({ ...d, basic_filter: { ...d.basic_filter, amount_min: event.target.value === '' ? null : Number(event.target.value) * 1e4 } }))}
                   className="h-8 w-full rounded border border-border bg-base px-2 text-xs font-mono text-foreground" />
               </label>
               <label className="space-y-1">
-                <span className="text-[10px] text-muted/70">流通市值下限（亿元）</span>
+                <span className="text-micro text-muted/70">流通市值下限（亿元）</span>
                 <input type="number" min="0" step="1" placeholder="不限"
                   value={draft.basic_filter?.float_cap_min != null ? draft.basic_filter.float_cap_min / 1e8 : ''}
                   onChange={event => setDraft(d => ({ ...d, basic_filter: { ...d.basic_filter, float_cap_min: event.target.value === '' ? null : Number(event.target.value) * 1e8 } }))}
                   className="h-8 w-full rounded border border-border bg-base px-2 text-xs font-mono text-foreground" />
               </label>
               <label className="space-y-1">
-                <span className="text-[10px] text-muted/70">流通市值上限（亿元）</span>
+                <span className="text-micro text-muted/70">流通市值上限（亿元）</span>
                 <input type="number" min="0" step="1" placeholder="不限"
                   value={draft.basic_filter?.float_cap_max != null ? draft.basic_filter.float_cap_max / 1e8 : ''}
                   onChange={event => setDraft(d => ({ ...d, basic_filter: { ...d.basic_filter, float_cap_max: event.target.value === '' ? null : Number(event.target.value) * 1e8 } }))}
@@ -1036,12 +1037,12 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
                 <input type="checkbox" checked={draft.basic_filter?.exclude_st ?? true}
                   onChange={event => setDraft(d => ({ ...d, basic_filter: { ...d.basic_filter, exclude_st: event.target.checked } }))}
                   className="h-3.5 w-3.5 accent-[oklch(var(--accent))]" />
-                <span className="text-[11px] text-secondary">剔除 ST / 风险警示</span>
+                <span className="text-xs text-secondary">剔除 ST / 风险警示</span>
               </label>
             </div>
           </div>
 
-          <div className="rounded-btn bg-base px-3 py-2 text-[10px] leading-relaxed text-muted">
+          <div className="rounded-btn bg-base px-3 py-2 text-micro leading-relaxed text-muted">
             仅比较连续竞价时段内的相邻完整快照；跨日、开盘首轮、午休恢复首轮和字段缺失均不触发。
             同一标的受冷却期保护，单轮命中超过 5 只时合并通知。
           </div>
@@ -1050,9 +1051,9 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
 
       {/* 作用范围 */}
       {draft.type !== 'sector' && draft.type !== 'volume_delta' && <div className="space-y-2">
-        <span className="text-[11px] text-muted">作用范围</span>
+        <span className="text-xs text-muted">作用范围</span>
         <div className="flex items-start gap-1.5">
-          <select value={draft.scope} onChange={e => setDraft(d => ({ ...d, scope: e.target.value as MonitorRule['scope'] }))} className="h-7 w-32 shrink-0 rounded border border-border bg-base px-2 text-[11px] text-foreground">
+          <select value={draft.scope} onChange={e => setDraft(d => ({ ...d, scope: e.target.value as MonitorRule['scope'] }))} className="h-7 w-32 shrink-0 rounded border border-border bg-base px-2 text-xs text-foreground">
             {visibleScopes.map(s => <option key={s.key} value={s.key} disabled={hasIntradaySignal && s.key !== 'symbols'}>{s.label}</option>)}
           </select>
           {draft.scope === 'symbols' && (
@@ -1064,7 +1065,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
                     type="button"
                     onClick={() => setWatchMenuOpen(v => !v)}
                     title="从自选 / 自选分组导入当前成员 (一次性拷贝, 后续增删自选不影响本规则); 需要动态跟随分组请把作用范围切到「自选分组」"
-                    className={`inline-flex h-7 shrink-0 items-center gap-1 rounded border px-2 text-[11px] transition-colors cursor-pointer ${
+                    className={`inline-flex h-7 shrink-0 items-center gap-1 rounded border px-2 text-xs transition-colors cursor-pointer ${
                       watchMenuOpen
                         ? 'border-accent/40 bg-accent/10 text-accent'
                         : 'border-border bg-base text-secondary hover:border-accent/30 hover:text-foreground'
@@ -1075,19 +1076,19 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
                   {watchMenuOpen && (
                     <div className="absolute z-10 mt-1 max-h-56 w-44 overflow-y-auto rounded border border-border bg-surface py-1 shadow-lg">
                       {watchlistQ.isLoading ? (
-                        <div className="px-2.5 py-2 text-[11px] text-muted">正在加载自选...</div>
+                        <div className="px-2.5 py-2 text-xs text-muted">正在加载自选...</div>
                       ) : watchImportOptions.length === 0 ? (
-                        <div className="px-2.5 py-2 text-[11px] text-muted">自选列表为空</div>
+                        <div className="px-2.5 py-2 text-xs text-muted">自选列表为空</div>
                       ) : watchImportOptions.map(option => (
                         <button
                           key={option.key}
                           type="button"
                           onClick={() => importSymbols(option.symbols)}
-                          className="flex w-full items-center gap-1.5 px-2.5 py-1.5 text-left text-[11px] text-secondary transition-colors hover:bg-elevated hover:text-foreground cursor-pointer"
+                          className="flex w-full items-center gap-1.5 px-2.5 py-1.5 text-left text-xs text-secondary transition-colors hover:bg-elevated hover:text-foreground cursor-pointer"
                         >
                           <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${option.dot}`} />
                           <span className="min-w-0 flex-1 truncate">{option.name}</span>
-                          <span className="shrink-0 font-mono text-[9px] tabular-nums text-muted">{option.symbols.length}</span>
+                          <span className="shrink-0 font-mono text-micro tabular-nums text-muted">{option.symbols.length}</span>
                         </button>
                       ))}
                     </div>
@@ -1098,15 +1099,15 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
                     value={symbolQuery}
                     onChange={e => setSymbolQuery(e.target.value)}
                     placeholder="搜索代码或名称添加标的..."
-                    className="h-7 w-full rounded border border-border bg-base pl-6 pr-2 text-[11px] text-foreground focus:outline-none focus:border-accent/50"
+                    className="h-7 w-full rounded border border-border bg-base pl-6 pr-2 text-xs text-foreground focus:outline-none focus:border-accent/50"
                   />
                   <Search className="absolute left-1.5 top-1.5 h-3.5 w-3.5 text-muted" />
                   {symbolSearch.data && symbolSearch.data.results.length > 0 && (
                     <div className="absolute z-10 mt-1 max-h-48 w-full overflow-auto rounded border border-border bg-surface shadow-lg">
                       {symbolSearch.data.results.map(r => (
-                        <button key={r.symbol} onClick={() => addSymbol(r.symbol)} className="block w-full px-2 py-1 text-left text-[11px] hover:bg-elevated cursor-pointer">
+                        <button key={r.symbol} onClick={() => addSymbol(r.symbol)} className="block w-full px-2 py-1 text-left text-xs hover:bg-elevated cursor-pointer">
                           <span className="font-mono text-foreground/80">{r.symbol}</span>
-                          {(() => { const b = boardTag(r.symbol); return b && <span className={`ml-1 inline-flex items-center justify-center rounded px-0.5 text-[9px] font-bold leading-tight border ${b.color}`}>{b.label}</span> })()}
+                          {(() => { const b = boardTag(r.symbol); return b && <span className={`ml-1 inline-flex items-center justify-center rounded px-0.5 text-micro font-bold leading-tight border ${b.color}`}>{b.label}</span> })()}
                           <span className="ml-1 text-muted">{r.name}</span>
                         </button>
                       ))}
@@ -1120,7 +1121,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
                   type="button"
                   onClick={() => setSymbolsExpanded(true)}
                   title="展开管理标的列表"
-                  className="inline-flex items-center gap-1 rounded border border-accent/30 bg-accent/10 px-2 py-0.5 text-[10px] text-accent transition-colors hover:bg-accent/20 cursor-pointer"
+                  className="inline-flex items-center gap-1 rounded border border-accent/30 bg-accent/10 px-2 py-0.5 text-micro text-accent transition-colors hover:bg-accent/20 cursor-pointer"
                 >
                   已加入 <span className="font-mono font-semibold tabular-nums">{draft.symbols.length}</span> 只
                   <ChevronDown className="h-3 w-3" />
@@ -1129,12 +1130,12 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
               {draft.symbols.length > 0 && symbolsExpanded && (
                 <>
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] text-muted">已加入 <span className="font-mono tabular-nums text-secondary">{draft.symbols.length}</span> 只</span>
+                    <span className="text-micro text-muted">已加入 <span className="font-mono tabular-nums text-secondary">{draft.symbols.length}</span> 只</span>
                     <span className="flex items-center gap-2">
                       <button
                         type="button"
                         onClick={() => setDraft(d => ({ ...d, symbols: [] }))}
-                        className="inline-flex items-center gap-0.5 text-[10px] text-muted transition-colors hover:text-warning cursor-pointer"
+                        className="inline-flex items-center gap-0.5 text-micro text-muted transition-colors hover:text-warning cursor-pointer"
                         title="移除全部标的"
                       >
                         <Eraser className="h-3 w-3" />清空
@@ -1142,7 +1143,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
                       <button
                         type="button"
                         onClick={() => setSymbolsExpanded(false)}
-                        className="inline-flex items-center gap-0.5 text-[10px] text-muted transition-colors hover:text-foreground cursor-pointer"
+                        className="inline-flex items-center gap-0.5 text-micro text-muted transition-colors hover:text-foreground cursor-pointer"
                       >
                         收起<ChevronUp className="h-3 w-3" />
                       </button>
@@ -1153,10 +1154,10 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
                       const b = boardTag(sym)
                       const name = nameBySymbol[sym]
                       return (
-                        <span key={sym} className="inline-flex items-center gap-1 rounded border border-border bg-elevated px-1.5 py-0.5 text-[10px] text-secondary">
+                        <span key={sym} className="inline-flex items-center gap-1 rounded border border-border bg-elevated px-1.5 py-0.5 text-micro text-secondary">
                           <span className="max-w-24 truncate text-foreground/90" title={name ? `${name} ${sym}` : sym}>{name ?? sym}</span>
-                          {b && <span className={`inline-flex items-center justify-center rounded px-0.5 text-[9px] font-bold leading-tight border ${b.color}`}>{b.label}</span>}
-                          <span className="font-mono text-[9px] tabular-nums text-muted">{sym}</span>
+                          {b && <span className={`inline-flex items-center justify-center rounded px-0.5 text-micro font-bold leading-tight border ${b.color}`}>{b.label}</span>}
+                          <span className="font-mono text-micro tabular-nums text-muted">{sym}</span>
                           <button
                             onClick={() => setDraft(d => ({ ...d, symbols: d.symbols.filter(s => s !== sym) }))}
                             className="text-muted transition-colors hover:text-danger cursor-pointer"
@@ -1179,7 +1180,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
                   type="button"
                   onClick={() => setGroupMenuOpen(v => !v)}
                   title="选择要监控的自选分组 (动态绑定, 分组内增删标的自动生效)"
-                  className={`inline-flex h-7 max-w-full items-center gap-1.5 rounded border px-2 text-[11px] transition-colors cursor-pointer ${
+                  className={`inline-flex h-7 max-w-full items-center gap-1.5 rounded border px-2 text-xs transition-colors cursor-pointer ${
                     groupMenuOpen
                       ? 'border-accent/40 bg-accent/10 text-accent'
                       : 'border-border bg-base text-secondary hover:border-accent/30 hover:text-foreground'
@@ -1189,7 +1190,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
                     <>
                       <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${resolveWatchlistGroupColor(selectedGroup.color).dot}`} />
                       <span className="max-w-32 truncate">{selectedGroup.name}</span>
-                      <span className="shrink-0 font-mono text-[9px] tabular-nums text-muted">{groupCounts[selectedGroup.id] ?? 0}只</span>
+                      <span className="shrink-0 font-mono text-micro tabular-nums text-muted">{groupCounts[selectedGroup.id] ?? 0}只</span>
                     </>
                   ) : (
                     <span className="text-muted">{watchGroupsQ.isLoading ? '加载分组中...' : '选择自选分组...'}</span>
@@ -1199,9 +1200,9 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
                 {groupMenuOpen && (
                   <div className="absolute z-10 mt-1 max-h-56 w-56 overflow-y-auto rounded border border-border bg-surface py-1 shadow-lg">
                     {watchGroupsQ.isLoading ? (
-                      <div className="px-2.5 py-2 text-[11px] text-muted">正在加载分组...</div>
+                      <div className="px-2.5 py-2 text-xs text-muted">正在加载分组...</div>
                     ) : groupList.length === 0 ? (
-                      <div className="px-2.5 py-2 text-[11px] text-muted">
+                      <div className="px-2.5 py-2 text-xs text-muted">
                         还没有自选分组,<Link to="/watchlist" className="text-accent hover:text-accent/80">去自选页创建 →</Link>
                       </div>
                     ) : groupList.map(g => (
@@ -1212,11 +1213,11 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
                           setDraft(d => ({ ...d, group_id: g.id }))
                           setGroupMenuOpen(false)
                         }}
-                        className="flex w-full items-center gap-1.5 px-2.5 py-1.5 text-left text-[11px] text-secondary transition-colors hover:bg-elevated hover:text-foreground cursor-pointer"
+                        className="flex w-full items-center gap-1.5 px-2.5 py-1.5 text-left text-xs text-secondary transition-colors hover:bg-elevated hover:text-foreground cursor-pointer"
                       >
                         <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${resolveWatchlistGroupColor(g.color).dot}`} />
                         <span className="min-w-0 flex-1 truncate">{g.name}</span>
-                        <span className="shrink-0 font-mono text-[9px] tabular-nums text-muted">{groupCounts[g.id] ?? 0}</span>
+                        <span className="shrink-0 font-mono text-micro tabular-nums text-muted">{groupCounts[g.id] ?? 0}</span>
                         {draft.group_id === g.id && <Check className="h-3 w-3 shrink-0 text-accent" />}
                       </button>
                     ))}
@@ -1231,30 +1232,30 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
                       {selectedGroupSymbols.map(sym => {
                         const b = boardTag(sym)
                         return (
-                          <span key={sym} className="inline-flex items-center gap-1 rounded border border-border bg-elevated px-1.5 py-0.5 text-[10px] text-secondary">
+                          <span key={sym} className="inline-flex items-center gap-1 rounded border border-border bg-elevated px-1.5 py-0.5 text-micro text-secondary">
                             <span className="max-w-24 truncate text-foreground/90" title={groupNameBySymbol[sym] ? `${groupNameBySymbol[sym]} ${sym}` : sym}>
                               {groupNameBySymbol[sym] ?? sym}
                             </span>
-                            {b && <span className={`inline-flex items-center justify-center rounded px-0.5 text-[9px] font-bold leading-tight border ${b.color}`}>{b.label}</span>}
-                            <span className="font-mono text-[9px] tabular-nums text-muted">{sym}</span>
+                            {b && <span className={`inline-flex items-center justify-center rounded px-0.5 text-micro font-bold leading-tight border ${b.color}`}>{b.label}</span>}
+                            <span className="font-mono text-micro tabular-nums text-muted">{sym}</span>
                           </span>
                         )
                       })}
                     </div>
                   ) : (
-                    <div className="rounded border border-dashed border-border px-2 py-1.5 text-[10px] text-muted">
+                    <div className="rounded border border-dashed border-border px-2 py-1.5 text-micro text-muted">
                       该分组当前没有标的, 后续在分组内添加自选会自动纳入监控
                     </div>
                   )}
-                  <div className="text-[10px] text-muted/70">
+                  <div className="text-micro text-muted/70">
                     动态绑定: 分组内增删标的自动同步监控范围, 无需修改本规则
                   </div>
                 </div>
               )}
             </div>
           )}
-          {draft.scope === 'all' && <span className="text-[11px] text-muted">对全市场所有标的生效</span>}
-          {draft.scope === 'sector' && <span className="text-[11px] text-muted/60">板块精确过滤(开发中,当前等同全市场)</span>}
+          {draft.scope === 'all' && <span className="text-xs text-muted">对全市场所有标的生效</span>}
+          {draft.scope === 'sector' && <span className="text-xs text-muted/60">板块精确过滤(开发中,当前等同全市场)</span>}
         </div>
       </div>}
 
@@ -1262,15 +1263,15 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
       {draft.type !== 'strategy' && draft.type !== 'sector' && draft.type !== 'abnormal' && draft.type !== 'volume_delta' && (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] text-muted">触发条件</span>
+            <span className="text-xs text-muted">触发条件</span>
             <div className="flex items-center gap-2">
-              <select value={draft.logic} onChange={e => setDraft(d => ({ ...d, logic: e.target.value as MonitorRule['logic'] }))} className="h-7 rounded border border-border bg-base px-1.5 text-[11px] text-foreground">
+              <select value={draft.logic} onChange={e => setDraft(d => ({ ...d, logic: e.target.value as MonitorRule['logic'] }))} className="h-7 rounded border border-border bg-base px-1.5 text-xs text-foreground">
                 {(options.data?.logics ?? []).map(l => <option key={l.key} value={l.key}>{l.label}</option>)}
               </select>
-              <button onClick={() => addCond('truth')} className="inline-flex items-center gap-1 text-[11px] text-accent hover:text-accent/80 cursor-pointer">
+              <button onClick={() => addCond('truth')} className="inline-flex items-center gap-1 text-xs text-accent hover:text-accent/80 cursor-pointer">
                 <Plus className="h-3 w-3" />信号条件
               </button>
-              <button onClick={() => addCond('threshold')} className="inline-flex items-center gap-1 text-[11px] text-accent hover:text-accent/80 cursor-pointer">
+              <button onClick={() => addCond('threshold')} className="inline-flex items-center gap-1 text-xs text-accent hover:text-accent/80 cursor-pointer">
                 <Plus className="h-3 w-3" />阈值条件
               </button>
             </div>
@@ -1278,7 +1279,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
 
           {selectedSignals.length > 0 || (options.data?.builtin_signals ?? []).length > 0 ? (
             <div>
-              <div className="mb-1.5 text-[10px] text-muted/70">信号条件 (点选)</div>
+              <div className="mb-1.5 text-micro text-muted/70">信号条件 (点选)</div>
               <SignalPicker
                 signals={selectedSignals}
                 onChange={onSignalPickerChange}
@@ -1291,7 +1292,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
                 }}
               />
               {hasIntradaySignal && (
-                <div className={`mt-2 text-[10px] ${intradaySupport?.available === false ? 'text-danger' : 'text-muted'}`}>
+                <div className={`mt-2 text-micro ${intradaySupport?.available === false ? 'text-danger' : 'text-muted'}`}>
                   {intradaySupport?.available === false
                     ? intradaySupport.reason
                     : `分时穿越按已完成的一分钟判断,仅支持指定标的,当前最多监听 ${intradaySupport?.max_symbols ?? 0} 只。`}
@@ -1306,14 +1307,14 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
                 const realIdx = draft.conditions.indexOf(c)
                 return (
                   <div key={i} className="flex items-center gap-1.5">
-                    <span className="text-[10px] text-muted/60 w-6 text-right shrink-0">{i === 0 && selectedSignals.length === 0 ? '当' : draft.logic === 'and' ? '且' : '或'}</span>
-                    <select value={c.field} onChange={e => updateCond(realIdx, { field: e.target.value })} className="w-32 h-7 px-1.5 rounded bg-base border border-border text-[11px] text-foreground focus:outline-none focus:border-accent/50">
+                    <span className="text-micro text-muted/60 w-6 text-right shrink-0">{i === 0 && selectedSignals.length === 0 ? '当' : draft.logic === 'and' ? '且' : '或'}</span>
+                    <select value={c.field} onChange={e => updateCond(realIdx, { field: e.target.value })} className="w-32 h-7 px-1.5 rounded bg-base border border-border text-xs text-foreground focus:outline-none focus:border-accent/50">
                       {thresholdFields.map(f => <option key={f.key} value={f.key}>{f.label}</option>)}
                     </select>
-                    <select value={c.op} onChange={e => updateCond(realIdx, { op: e.target.value })} className="w-12 h-7 px-1 rounded bg-base border border-border text-[11px] font-mono text-foreground text-center focus:outline-none focus:border-accent/50">
+                    <select value={c.op} onChange={e => updateCond(realIdx, { op: e.target.value })} className="w-12 h-7 px-1 rounded bg-base border border-border text-xs font-mono text-foreground text-center focus:outline-none focus:border-accent/50">
                       {operators.map(op => <option key={op} value={op}>{op}</option>)}
                     </select>
-                    <input type="number" value={c.value ?? 0} onChange={e => updateCond(realIdx, { value: parseFloat(e.target.value) })} step="any" className="w-24 h-7 px-1.5 rounded bg-base border border-border text-[11px] font-mono text-foreground text-center focus:outline-none focus:border-accent/50" />
+                    <input type="number" value={c.value ?? 0} onChange={e => updateCond(realIdx, { value: parseFloat(e.target.value) })} step="any" className="w-24 h-7 px-1.5 rounded bg-base border border-border text-xs font-mono text-foreground text-center focus:outline-none focus:border-accent/50" />
                     <button onClick={() => removeCond(realIdx)} className="p-1 rounded text-muted hover:text-danger hover:bg-danger/10 cursor-pointer">
                       <X className="h-3 w-3" />
                     </button>
@@ -1324,7 +1325,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
           )}
 
           {draft.conditions.length === 0 && (
-            <div className="rounded border border-dashed border-border px-3 py-4 text-center text-[11px] text-muted">
+            <div className="rounded border border-dashed border-border px-3 py-4 text-center text-xs text-muted">
               点击上方「信号条件」或「阈值条件」添加触发规则
             </div>
           )}
@@ -1336,7 +1337,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
         <div className="space-y-3">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
             <label className="min-w-0 flex-1 space-y-1.5">
-              <span className="text-[11px] text-muted">搜索策略</span>
+              <span className="text-xs text-muted">搜索策略</span>
               <span className="relative block">
                 <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted" />
                 <input
@@ -1354,14 +1355,14 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
                   type="button"
                   aria-pressed={strategyCategory === category.key}
                   onClick={() => setStrategyCategory(category.key)}
-                  className={`flex h-7 min-w-0 items-center justify-center gap-1 rounded px-1 text-[10px] font-medium transition-colors cursor-pointer ${
+                  className={`flex h-7 min-w-0 items-center justify-center gap-1 rounded px-1 text-micro font-medium transition-colors cursor-pointer ${
                     strategyCategory === category.key
                       ? 'bg-elevated text-foreground'
                       : 'text-muted hover:text-secondary'
                   }`}
                 >
                   <span className="truncate">{category.label}</span>
-                  <span className="font-mono text-[9px] opacity-70">{category.count}</span>
+                  <span className="font-mono text-micro opacity-70">{category.count}</span>
                 </button>
               ))}
             </div>
@@ -1392,10 +1393,10 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
                 >
                   <span className="min-w-0 flex-1">
                     <span className="flex min-w-0 items-center gap-1.5">
-                      <span className={`shrink-0 rounded border px-1 py-px text-[9px] font-medium ${sourceMeta.className}`}>{sourceMeta.label}</span>
+                      <span className={`shrink-0 rounded border px-1 py-px text-micro font-medium ${sourceMeta.className}`}>{sourceMeta.label}</span>
                       <span className="truncate text-xs font-medium text-foreground">{strategy.name}</span>
                     </span>
-                    <span className="mt-1 block truncate text-[10px] text-muted" title={summary}>{summary}</span>
+                    <span className="mt-1 block truncate text-micro text-muted" title={summary}>{summary}</span>
                   </span>
                   <span className={`mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded-full border ${
                     active ? 'border-accent bg-accent text-white' : 'border-border text-transparent'
@@ -1409,14 +1410,14 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
 
           <div className="border-t border-border/60 pt-3">
             <div
-              className="mb-2 text-[11px] text-muted"
+              className="mb-2 text-xs text-muted"
               title="评分范围仅过滤选股结果与买入信号，卖出信号不受限制"
             >
               评分范围
             </div>
             <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
               <label className="space-y-1.5">
-                <span className="text-[10px] text-muted">最低分（含）</span>
+                <span className="text-micro text-muted">最低分（含）</span>
                 <input
                   type="number"
                   min={0}
@@ -1433,7 +1434,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
               </label>
               <span className="mt-5 text-xs text-muted">至</span>
               <label className="space-y-1.5">
-                <span className="text-[10px] text-muted">最高分（含）</span>
+                <span className="text-micro text-muted">最高分（含）</span>
                 <input
                   type="number"
                   min={0}
@@ -1453,13 +1454,13 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
 
           <div className="border-t border-border/60 pt-3">
             <div className="mb-2 flex items-center justify-between gap-3">
-              <span className="text-[11px] text-muted">通知事件</span>
-              <span className="text-[9px] text-muted">至少选择一项</span>
+              <span className="text-xs text-muted">通知事件</span>
+              <span className="text-micro text-muted">至少选择一项</span>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               {(['signal', 'pool'] as const).map(group => (
                 <div key={group} className="rounded-btn border border-border bg-base p-2.5">
-                  <div className="mb-2 text-[10px] font-medium text-secondary">
+                  <div className="mb-2 text-micro font-medium text-secondary">
                     {group === 'signal' ? '交易信号' : '选股结果'}
                   </div>
                   <div className="space-y-2">
@@ -1471,7 +1472,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
                           onChange={() => toggleStrategyEvent(option.key)}
                           className="h-3.5 w-3.5 accent-accent cursor-pointer"
                         />
-                        <span className="text-[11px] text-foreground">{option.label}</span>
+                        <span className="text-xs text-foreground">{option.label}</span>
                       </label>
                     ))}
                   </div>
@@ -1479,7 +1480,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
               ))}
             </div>
             {(draft.notify_events ?? LEGACY_STRATEGY_NOTIFY_EVENTS).length === 0 && (
-              <div className="mt-2 text-[10px] text-danger">至少选择一个通知事件</div>
+              <div className="mt-2 text-micro text-danger">至少选择一个通知事件</div>
             )}
           </div>
         </div>
@@ -1488,17 +1489,17 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
       {/* 通知设置 */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
         <label className="space-y-1.5">
-          <span className="text-[11px] text-muted">冷却期(秒)</span>
+          <span className="text-xs text-muted">冷却期(秒)</span>
           <input type="number" value={draft.cooldown_seconds} onChange={e => setDraft(d => ({ ...d, cooldown_seconds: parseInt(e.target.value) || 0 }))} min={0} className="h-9 w-full rounded-btn border border-border bg-base px-3 text-xs text-foreground" />
         </label>
         <label className="space-y-1.5">
-          <span className="text-[11px] text-muted">严重级别</span>
+          <span className="text-xs text-muted">严重级别</span>
           <select value={draft.severity} onChange={e => setDraft(d => ({ ...d, severity: e.target.value as MonitorRule['severity'] }))} className="h-9 w-full rounded-btn border border-border bg-base px-3 text-xs text-foreground">
             {(options.data?.severities ?? []).map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
           </select>
         </label>
         <label className="space-y-1.5 md:col-span-1">
-          <span className="text-[11px] text-muted">自定义提示(可选)</span>
+          <span className="text-xs text-muted">自定义提示(可选)</span>
           <input value={draft.message} onChange={e => setDraft(d => ({ ...d, message: e.target.value }))} placeholder="留空用默认文案" className="h-9 w-full rounded-btn border border-border bg-base px-3 text-xs text-foreground" />
         </label>
       </div>
@@ -1506,8 +1507,8 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
       {/* 外部推送 */}
       <div className="rounded-btn border border-border/40 bg-base/40 p-3 space-y-2">
         <div className="flex items-center gap-1.5">
-          <span className="text-[11px] font-medium text-foreground">外部推送</span>
-          <span className="text-[9px] text-muted">触发时推送告警到外部</span>
+          <span className="text-xs font-medium text-foreground">外部推送</span>
+          <span className="text-micro text-muted">触发时推送告警到外部</span>
         </div>
 
         {/* 渠道列表 */}
@@ -1520,10 +1521,10 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
               onChange={() => toggleChannel('feishu')}
               className="h-3 w-3 accent-accent cursor-pointer"
             />
-            <span className="text-[11px] text-foreground">飞书</span>
-            <span className="text-[9px] text-muted">群推送 Webhook</span>
+            <span className="text-xs text-foreground">飞书</span>
+            <span className="text-micro text-muted">群推送 Webhook</span>
             {(draft.webhook_channels ?? []).includes('feishu') && (
-              <span className={`ml-auto text-[9px] ${feishuConfigured ? 'text-emerald-500' : 'text-warning'}`}>
+              <span className={`ml-auto text-micro ${feishuConfigured ? 'text-emerald-500' : 'text-warning'}`}>
                 {feishuConfigured ? '已配置' : '未配置'}
               </span>
             )}
@@ -1536,10 +1537,10 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
               onChange={() => toggleChannel('custom')}
               className="h-3 w-3 accent-accent cursor-pointer"
             />
-            <span className="text-[11px] text-foreground">第三方系统</span>
-            <span className="text-[9px] text-muted">JSON Webhook</span>
+            <span className="text-xs text-foreground">第三方系统</span>
+            <span className="text-micro text-muted">JSON Webhook</span>
             {(draft.webhook_channels ?? []).includes('custom') && (
-              <span className={`ml-auto text-[9px] ${customConfigured ? 'text-emerald-500' : 'text-warning'}`}>
+              <span className={`ml-auto text-micro ${customConfigured ? 'text-emerald-500' : 'text-warning'}`}>
                 {customConfigured ? '已配置' : '未配置'}
               </span>
             )}
@@ -1552,10 +1553,10 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
               onChange={() => toggleChannel('email')}
               className="h-3 w-3 accent-accent cursor-pointer"
             />
-            <span className="text-[11px] text-foreground">邮件</span>
-            <span className="text-[9px] text-muted">SMTP</span>
+            <span className="text-xs text-foreground">邮件</span>
+            <span className="text-micro text-muted">SMTP</span>
             {(draft.webhook_channels ?? []).includes('email') && (
-              <span className={`ml-auto text-[9px] ${emailConfigured ? 'text-emerald-500' : 'text-warning'}`}>
+              <span className={`ml-auto text-micro ${emailConfigured ? 'text-emerald-500' : 'text-warning'}`}>
                 {emailConfigured ? '已配置' : '未配置'}
               </span>
             )}
@@ -1569,10 +1570,10 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
               onChange={() => toggleChannel('wecom')}
               className="h-3 w-3 accent-accent cursor-pointer"
             />
-            <span className="text-[11px] text-foreground">企业微信</span>
-            <span className="text-[9px] text-muted">群推送 Webhook</span>
+            <span className="text-xs text-foreground">企业微信</span>
+            <span className="text-micro text-muted">群推送 Webhook</span>
             {(draft.webhook_channels ?? []).includes('wecom') && (
-              <span className={`ml-auto text-[9px] ${wecomConfigured ? 'text-emerald-500' : 'text-warning'}`}>
+              <span className={`ml-auto text-micro ${wecomConfigured ? 'text-emerald-500' : 'text-warning'}`}>
                 {wecomConfigured ? '已配置' : '未配置'}
               </span>
             )}
@@ -1586,10 +1587,10 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
               onChange={() => toggleChannel('dingtalk')}
               className="h-3 w-3 accent-accent cursor-pointer"
             />
-            <span className="text-[11px] text-foreground">钉钉</span>
-            <span className="text-[9px] text-muted">群机器人 · 关键词</span>
+            <span className="text-xs text-foreground">钉钉</span>
+            <span className="text-micro text-muted">群机器人 · 关键词</span>
             {(draft.webhook_channels ?? []).includes('dingtalk') && (
-              <span className={`ml-auto text-[9px] ${dingtalkConfigured ? 'text-emerald-500' : 'text-warning'}`}>
+              <span className={`ml-auto text-micro ${dingtalkConfigured ? 'text-emerald-500' : 'text-warning'}`}>
                 {dingtalkConfigured ? '已配置' : '未配置'}
               </span>
             )}
@@ -1608,7 +1609,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
           if (selected.includes('email') && !emailConfigured) unconfigured.push('邮件')
           if (unconfigured.length === 0) return null
           return (
-            <p className="text-[10px] leading-relaxed text-warning/80">
+            <p className="text-micro leading-relaxed text-warning/80">
               {unconfigured.join('、')}尚未配置,
               <Link to="/settings?tab=monitoring&highlight=webhooks" className="text-accent hover:text-accent/80">前往设置页配置 →</Link>
             </p>
@@ -1624,7 +1625,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
           if (selected.includes('email') && emailConfigured) ready.push('邮件')
           if (ready.length === 0) return null
           return (
-            <p className="text-[10px] leading-relaxed text-muted">
+            <p className="text-micro leading-relaxed text-muted">
               命中本规则时,告警将推送到已配置的{ready.join(' + ')}。
             </p>
           )

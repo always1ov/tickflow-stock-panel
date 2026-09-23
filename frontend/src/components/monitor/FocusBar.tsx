@@ -55,10 +55,10 @@ export function FocusBar() {
     const pinned = it.override === 'pin'
     const muted = it.override === 'mute'
     return (
-      <div className="flex items-center gap-2 rounded-md px-2 py-1 text-[11px] hover:bg-elevated/40">
-        <span className={cn('shrink-0 rounded border px-1 py-px text-[9px]', TIER_STYLE[it.effective])}>{labels[it.effective]}</span>
+      <div className="flex items-center gap-2 rounded-md px-2 py-1 text-xs hover:bg-elevated/40">
+        <span className={cn('shrink-0 rounded border px-1 py-px text-micro', TIER_STYLE[it.effective])}>{labels[it.effective]}</span>
         <span className="font-medium text-foreground">{it.name}</span>
-        <span className="font-mono text-[9px] text-muted">{it.symbol}</span>
+        <span className="font-mono text-micro text-muted">{it.symbol}</span>
         <span className="min-w-0 flex-1 truncate text-muted" title={it.reason}>{it.reason}</span>
         <button
           onClick={() => overrideMut.mutate({ symbol: it.symbol, mode: pinned ? null : 'pin' })}
@@ -84,16 +84,16 @@ export function FocusBar() {
             <ChevronDown className={cn('h-3 w-3 text-muted transition-transform', open && 'rotate-180')} />
           </button>
           {(['held', 'plan', 'band', 'watch'] as FocusTier[]).map(t => (
-            <span key={t} className={cn('rounded border px-1.5 py-px text-[10px]', TIER_STYLE[t])}>
+            <span key={t} className={cn('rounded border px-1.5 py-px text-micro', TIER_STYLE[t])}>
               {labels[t]} {v.counts[t]}
             </span>
           ))}
           {!v.fresh && (
-            <span className="inline-flex items-center gap-1 text-[10px] text-warning" title="总览快照超过 7 天没构建, 名单失效期间推送门放行">
+            <span className="inline-flex items-center gap-1 text-micro text-warning" title="总览快照超过 7 天没构建, 名单失效期间推送门放行">
               <AlertTriangle className="h-3 w-3" />名单已过期, 放行中
             </span>
           )}
-          <label className="ml-auto inline-flex cursor-pointer items-center gap-2 text-[11px] text-secondary"
+          <label className="ml-auto inline-flex cursor-pointer items-center gap-2 text-xs text-secondary"
                  title={'开(默认): 全市场/自选分组/板块这类广域规则, 只对「持有 + 计划中 + 钉住」弹窗、响铃、推外部渠道、计徽标; 焦点外的只写进触发记录(灰显)。\n单独给某只票设的规则(点位提醒等)不受影响, 永远推。\n关: 所有告警照常打扰。'}>
             <span>只认焦点名单</span>
             <button
@@ -108,12 +108,12 @@ export function FocusBar() {
         </div>
         {open && (
           <div className="border-t border-border/40 px-2 py-2">
-            <div className="px-2 pb-1 text-[10px] text-muted">
+            <div className="px-2 pb-1 text-micro text-muted">
               名单来自总览快照(持有 + 值得关注), 每次构建自动刷新
               {v.as_of ? ` · 数据日 ${v.as_of}` : ''}。钉住/静音是你的例外, 长期有效。
             </div>
             {held.length + plan.length + band.length === 0 && (
-              <div className="px-2 py-2 text-[11px] text-muted">还没有持有 / 计划中 / 贴轨的票 —— 日线管道跑一次、或打开一次模拟盘, 名单就会生成。</div>
+              <div className="px-2 py-2 text-xs text-muted">还没有持有 / 计划中 / 贴轨的票 —— 日线管道跑一次、或打开一次模拟盘, 名单就会生成。</div>
             )}
             <div className="grid gap-x-4 md:grid-cols-2 xl:grid-cols-3">
               <div>{held.map(it => <Row key={it.symbol} it={it} />)}</div>
@@ -121,7 +121,7 @@ export function FocusBar() {
               {/* [R161] 短期贴/破上下轨: 高抛低吸候选, 用户常盯的那一档 */}
               <div>{band.map(it => <Row key={it.symbol} it={it} />)}</div>
             </div>
-            <button onClick={() => setShowWatch(s => !s)} className="mt-1 px-2 text-[10px] text-muted hover:text-foreground">
+            <button onClick={() => setShowWatch(s => !s)} className="mt-1 px-2 text-micro text-muted hover:text-foreground">
               {showWatch ? '收起' : '展开'} {labels.watch} {watch.length} 只(不推外部渠道, 想推就钉住它)
             </button>
             {showWatch && (
