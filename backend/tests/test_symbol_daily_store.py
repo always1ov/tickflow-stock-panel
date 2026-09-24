@@ -44,7 +44,7 @@ def _write_day(root: Path, d: date, syms=SYMS, bump: float = 0.0, src="kline_dai
         "symbol": syms, "date": [d] * n,
         "open": base, "high": [x + 0.3 for x in base], "low": [x - 0.3 for x in base], "close": base,
         "volume": [1e6 + i for i in range(n)], "amount": [1e7] * n,
-        "raw_close": base, "raw_high": base, "raw_low": base, "turnover_rate": [1.0, None, float("nan")][:n],
+        "raw_close": base, "raw_high": base, "raw_low": base, "turnover_rate": [[1.0, None, float("nan")][i % 3] for i in range(n)],
         "consecutive_limit_ups": [0] * n, "consecutive_limit_downs": [0] * n, "quote_ts": [0] * n,
     }).cast(ENRICHED_STORAGE_SCHEMA)
     p = root / src / f"date={d}"
@@ -227,7 +227,7 @@ def test_R492_旧版6列副本_自动按新格式重建(store):
     (base / "600000.SH.json").write_text(json.dumps(
         {"v": 1, "cutoff": days[-11].isoformat(), "n": 30, "cols": OHLCV, "built": time.time()}))
     assert _same(root, cols=None)
-    assert json.loads((base / "600000.SH.json").read_text())["v"] == sds.FORMAT_VERSION
+    assert json.loads((base / "600000.SH.json").read_text())["format"] == sds.FORMAT_VERSION
 
 
 def test_R492_副本列对不上_即使说明是新的也重建(store):
@@ -397,14 +397,164 @@ def test_R492_三种资产目录同时在_各读各的_不串(tmp_path, monkeypa
         assert want.height > 0 and got1.equals(want) and got2.equals(want), fn
 
 
-def test_R492_空副本的列对不上_也重建而不是回回退原路(store, monkeypatch):
-    """这只票截止日前没有数(新股) → 副本是空表, 首尾抽查无从抽; 列不对只能靠列检查发现。"""
+def test_R493_截止日前没有这只票_不留空副本_历史补进来立刻看得到(store):
+    """审查发现: 空副本无从抽查, 历史补进已有日文件后分区数不变, 原来会连着 7 天只给最近几根。"""
+    root, days = store
+    assert _same(root, "600009.SH")
+    assert not (root / sds.CACHE_DIRNAME / "stock" / "600009.SH.parquet").exists()
+    for d in days:
+        _write_day(root, d, syms=[*SYMS, "600009.SH"])
+    assert _same(root, "600009.SH")
+    assert _via(root, "600009.SH").height == len(days)
+
+
+def test_R493_往已有日文件里补这只票更早的历史_立刻看得到(store):
+    """首尾两根、分区数都没变 —— 只有「第一根的前一天现在有这只票了」看得出来。"""
+    root, days = store
+    for d in days[15:]:
+        _write_day(root, d, syms=[*SYMS, "600009.SH"])
+    _via(root, "600009.SH")
+    for d in days[5:15]:
+        _write_day(root, d, syms=[*SYMS, "600009.SH"])
+    assert _same(root, "600009.SH")
+
+
+def test_R493_停牌后那段补进来_截止日有了这只票_立刻看得到(store):
+    root, days = store
+    for d in days[:20]:
+        _write_day(root, d, syms=[*SYMS, "600009.SH"])
+    _via(root, "600009.SH")                                # 副本最后一根早于截止日
+    for d in days[20:]:
+        _write_day(root, d, syms=[*SYMS, "600009.SH"])
+    assert _same(root, "600009.SH")
+
+
+def test_R493_抽查那天分区里有重复行_不会次次重建(store, monkeypatch):
+    root, days = store
+    p = root / "kline_daily_enriched" / f"date={days[0]}" / "part.parquet"
+    df = pl.read_parquet(p)
+    pl.concat([df, df.filter(pl.col("symbol") == "600000.SH")]).write_parquet(p)
+    _via(root)
+    n = [0]
+    real = sds._write_atomic
+    monkeypatch.setattr(sds, "_write_atomic", lambda *a, **k: (n.__setitem__(0, n[0] + 1), real(*a, **k)))
+    for _ in range(3):
+        assert _same(root)
+    assert n[0] == 0, "重复行原路也照样返回, 副本与它一致就该认"
+
+
+@pytest.mark.parametrize("asset,src", [("stock", "kline_daily_enriched"), ("etf", "kline_etf_enriched")])
+def test_R493_管道正在发布_不建也不用副本(tmp_path, monkeypatch, asset, src):
+    for d in _days(30):
+        _write_day(tmp_path, d, src=src)
+    _via(tmp_path, asset=asset)
+    seen = []
+    monkeypatch.setattr(sds, "enriched_publication_incomplete",
+                        lambda _d, a="stock": seen.append(a) or True)
+    assert _via(tmp_path, asset=asset) is None
+    assert seen == [asset], "股票和 ETF 各看各的发布标记"
+
+
+def test_R493_空副本即使说明是新的也不认_历史补进来照样看得到(store):
+    """空副本现在不会建出来; 但磁盘上万一有一份(旧版本、手工拷来的), 也不能被当成「没变」。"""
+    root, days = store
+    base = root / sds.CACHE_DIRNAME / "stock"
+    base.mkdir(parents=True)
+    sds._empty().write_parquet(base / "600009.SH.parquet")
+    (base / "600009.SH.json").write_text(json.dumps(
+        {"format": sds.FORMAT_VERSION, "cutoff": days[-11].isoformat(), "partitions": 30,
+         "built": time.time()}))
+    for d in days:
+        _write_day(root, d, syms=[*SYMS, "600009.SH"])
+    assert _same(root, "600009.SH")
+
+
+def test_R493_抽查那天的全部行都对照_不只第一行(store):
+    root, days = store
+    p = root / "kline_daily_enriched" / f"date={days[0]}" / "part.parquet"
+    df = pl.read_parquet(p)
+    dup = df.filter(pl.col("symbol") == "600000.SH")
+    pl.concat([df, dup]).write_parquet(p)
+    _via(root)
+    pl.concat([df, dup.with_columns(pl.col("close") + 1)]).write_parquet(p)   # 只改了第二行
+    assert _same(root)
+
+
+def test_R493_建的途中管道开始发布_这份不存(store, monkeypatch):
     root, _ = store
-    _via(root, "999999.SH")
-    pq = root / sds.CACHE_DIRNAME / "stock" / "999999.SH.parquet"
-    pl.DataFrame(schema={c: ENRICHED_STORAGE_SCHEMA[c] for c in OHLCV}).write_parquet(pq)
-    assert _via(root, "999999.SH") is not None, "空副本列不对要当场重建, 不能次次抛错退回原路"
-    assert pl.read_parquet(pq).schema == pl.Schema(ENRICHED_STORAGE_SCHEMA)
+    calls = [0]
+
+    def flag(*_a, **_k):
+        calls[0] += 1
+        return calls[0] > 1                                # 进门时没在发布, 建完再看已经在发布
+    monkeypatch.setattr(sds, "enriched_publication_incomplete", flag)
+    assert _via(root) is not None
+    assert not (root / sds.CACHE_DIRNAME / "stock" / "600000.SH.parquet").exists()
+
+
+def test_R493_重复的列名_退回原路而不是把异常抛出仓库(store):
+    root, _ = store
+    assert _via(root, cols=["close", "close"]) is None
+    assert _orig(root, "stock", "600000.SH", date(1990, 1, 1), END, ["close", "close"]).is_empty()
+
+
+def test_R493_管道作废_点名的票和整类(store):
+    root, _ = store
+    for s in SYMS:
+        _via(root, s)
+    base = root / sds.CACHE_DIRNAME / "stock"
+    outside = root / sds.CACHE_DIRNAME / "x.parquet"
+    outside.write_text("不许被删")
+    sds.invalidate(root, "stock", ["600000.SH", "../x", None])
+    assert outside.exists(), "代码要拼进路径, 不像代码的一律不碰"
+    assert sorted(p.stem for p in base.glob("*.parquet")) == ["000002.SZ", "600001.SH"]
+    assert not (base / "600000.SH.json").exists()
+    sds.invalidate(root, "stock")
+    assert not list(base.glob("*.parquet")) and not list(base.glob("*.json"))
+    sds.invalidate(root, "etf")                            # 没建过也不报错
+    assert _same(root)
+
+
+def test_R493_淘汰按最近用过_常看的不被挤掉(tmp_path, monkeypatch):
+    syms = ["600000.SH", "600001.SH", "600002.SH", "600003.SH"]
+    for d in _days(30):
+        _write_day(tmp_path, d, syms=syms)
+    monkeypatch.setattr(sds, "MAX_COPIES", 3)
+    base = tmp_path / sds.CACHE_DIRNAME / "stock"
+    for s in syms[:3]:
+        _via(tmp_path, s)
+        time.sleep(0.02)
+    _via(tmp_path, "600000.SH")                            # 最早建的, 但刚用过
+    time.sleep(0.02)
+    _via(tmp_path, "600003.SH")                            # 第 4 份 → 删到 2 份
+    assert sorted(p.stem for p in base.glob("*.parquet")) == ["600000.SH", "600003.SH"]
+
+
+def test_R493_崩溃留下的临时文件和孤儿说明_建副本时顺手清掉(store):
+    root, _ = store
+    base = root / sds.CACHE_DIRNAME / "stock"
+    base.mkdir(parents=True)
+    old_tmp, new_tmp = base / ".x.parquet.abc.tmp", base / ".y.parquet.def.tmp"
+    orphan = base / "600777.SH.json"
+    for f in (old_tmp, new_tmp, orphan):
+        f.write_text("x")
+    t = time.time() - sds.ORPHAN_SECONDS - 10
+    import os
+    os.utime(old_tmp, (t, t))
+    _via(root)
+    assert not old_tmp.exists() and not orphan.exists()
+    assert new_tmp.exists(), "刚建的临时文件可能正被别的进程写, 不能删"
+
+
+def test_R493_管道与清空数据都接上了副本(tmp_path):
+    """这两处在作者文件里, 同步上游时最容易被整段覆盖掉 —— 钉住它们还在。"""
+    src = Path(__file__).resolve().parents[1] / "app"
+    pipe = (src / "jobs" / "daily_pipeline.py").read_text(encoding="utf-8")
+    assert 'symbol_daily_store.invalidate(repo.store.data_dir, "stock")' in pipe
+    assert 'symbol_daily_store.invalidate(repo.store.data_dir, "stock", list(affected_symbols))' in pipe
+    assert 'symbol_daily_store.invalidate(repo.store.data_dir, "etf", list(affected_etfs))' in pipe
+    data = (src / "api" / "data.py").read_text(encoding="utf-8")
+    assert data.count('".symbol_daily_cache"') == 2, "清空要删它, 占用统计要算它"
 
 
 def test_R492_截止日之后只读区间里的日文件(store, monkeypatch):

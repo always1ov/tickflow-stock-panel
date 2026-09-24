@@ -550,6 +550,12 @@ def run_now(
         logger.info("compute_enriched: skip (no new daily, no adj_factor changes)")
     _refresh_single_view(repo, "kline_enriched")
     _invalidate("enriched")
+    # [R493 · fork] 个股日K副本: 这一轮按除权重算过的票当场作废(精确到票), 全量重建整类作废
+    from app.services import symbol_daily_store
+    if not enriched_exists or backward_extension:
+        symbol_daily_store.invalidate(repo.store.data_dir, "stock")
+    elif affected_symbols:
+        symbol_daily_store.invalidate(repo.store.data_dir, "stock", list(affected_symbols))
 
     # Step 2.1: 数据充足性可见化 (#303) — 空库首跑/仅当日实时覆写 1 天的库,
     # 均线/动量/量比等指标暖机不足, 管道各 stage 都"成功"但选股会静默全 0。
@@ -561,6 +567,7 @@ def run_now(
     index_count = 0
     etf_count = 0
     etf_adj_symbols = 0
+    affected_etfs: list[str] = []
     pull_index = _prefs.get_pipeline_pull_index()
     pull_etf = _prefs.get_pipeline_pull_etf()
 
@@ -669,6 +676,10 @@ def run_now(
                 emit("sync_index", 88, f"ETF 日K完成,{written_etf_daily} 行")
                 _invalidate("etf_instruments")
                 _invalidate("etf_daily")
+                # [R493 · fork] 除权因子变了的 ETF, 日K写完后副本当场作废
+                if affected_etfs:
+                    from app.services import symbol_daily_store
+                    symbol_daily_store.invalidate(repo.store.data_dir, "etf", list(affected_etfs))
 
             repo.refresh_index_views()
             emit(

@@ -34,20 +34,37 @@
 盘后管道只要有一只票除权, 就会把**所有**日文件重写一遍 —— 按修改时间判断, 副本每天都会作废,
 等于没做。所以这里抽查内容:
 
+  0. **盘后管道重算过的票当场作废**(R493): 除权因子变了的那几只, 管道重算完就删它们的副本;
+     全量重建则整类作废。这是「这只票自己的复权价变了就重建」的正面兑现, 下面几条是兜底;
   1. **截止日之前的分区数变了**(补历史、补缺口、修复删掉了某一天) → 重建;
-  2. **抽查两根**: 副本的第一根和最后一根, 各自现读那一天的分区对照整行。复权价一变
-     (除权因子进来, 前复权改前面、后复权改后面), 首尾至少有一根对不上 → 重建;
-  3. **最多用 7 天**, 到期重建一次, 兜住上面两条都抽不到的中间某天被改。
+  2. **抽查首尾**: 副本第一根与最后一根那两天, 现读分区里这只票的**全部行**对照
+     (复权价一变, 前复权改前面、后复权改后面, 首尾至少一头对不上);
+  3. **抽查两头外侧**(R493): 第一根的前一个交易日、以及截止日(若副本最后一根早于它),
+     分区里这只票必须**没有行** —— 往已有日文件里补了这只票更早的历史、或补了停牌后
+     那段, 分区数不变、首尾也没变, 只有这里看得出来;
+  4. **最多用 7 天**, 到期重建一次, 兜住以上都抽不到的中间某段被改。
+
+截止日前一根都没有的票(还没同步历史的、刚上市十来天的、查错代码的)**不留空副本** ——
+空副本无从抽查, 历史补进来之后会被当成「没变」。这类票每次照原来扫分区。
+
+管道正在发布(发布标记未就绪)时不建也不用副本, 照原来扫分区 —— 免得把一半新一半旧的
+状态存下来。
 
 分区目录里出现看不懂的东西(不是 `date=YYYY-MM-DD` 的子目录、散落的 parquet) → 不用副本:
 原来的 `**/*.parquet` 会把它们也读进来, 这里不去猜它们该怎么对齐。
 
 副本坏了、读不了、写不了, 一律退回原来的直接扫分区 —— 它只是加速, 不是数据源。
-这是 `data_dir` 下的派生缓存, 整个目录删掉也没关系, 下次取时自动重建。每种资产最多留
-`MAX_COPIES` 份, 超出删最早建的 —— 自定义策略逐只扫全市场也撑不爆硬盘。
+这是 `data_dir` 下的派生缓存, 整个目录删掉也没关系, 下次取时自动重建; 「清空本地数据」
+会一并删掉它。每种资产最多留 `MAX_COPIES` 份, 超出删**最久没用**的(读到一次就刷新一次
+修改时间) —— 自定义策略逐只扫全市场也撑不爆硬盘, 也挤不掉天天在看的那几只。
+
+「与原路逐位相同」依赖一个写入端保证的前提: 分区目录名就是行里的 `date`(仓库
+`_write_daily_partition` 按 `date` 列 partition_by 落盘, 没有别的写法)。最近几天按目录名
+挑文件, 若有人手工把某天的行塞进别的日期目录, 这里与原路会差那几行。
 """
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import os
@@ -60,6 +77,7 @@ from pathlib import Path
 
 import polars as pl
 
+from app.enriched_generation import enriched_publication_incomplete
 from app.parquet import ENRICHED_STORAGE_SCHEMA, scan_enriched_parquet
 from app.polars_guard import guarded_collect
 
@@ -69,9 +87,12 @@ CACHE_DIRNAME = ".symbol_daily_cache"
 TAIL_DAYS = 10
 MAX_AGE_SECONDS = 7 * 86400
 MAX_COPIES = 800
-FORMAT_VERSION = 2
+ORPHAN_SECONDS = 3600
+FORMAT_VERSION = 3
 STORE_COLS = list(ENRICHED_STORAGE_SCHEMA)
 
+# 与仓库 `_enriched_glob` 等三处同名; 这三个目录名在整个后端(管道、视图、清空数据)都写死,
+# 改名本身就是一次全局迁移, 这里不另起一层间接
 _SOURCE_DIRS = {
     "stock": "kline_daily_enriched",
     "index": "kline_index_enriched",
@@ -81,6 +102,8 @@ _SOURCE_DIRS = {
 _SAFE_SYMBOL = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,31}")
 _locks_guard = threading.Lock()
 _locks: dict[tuple[str, str, str], threading.Lock] = {}
+# 仓库里只有股票和 ETF 走发布标记(`EnrichedPublication`); 指数没有, 不查
+_PUBLISHED = {"stock", "etf"}
 
 
 def _partitions(src: Path) -> list[tuple[date, Path]] | None:
@@ -142,9 +165,17 @@ def _write_atomic(df: pl.DataFrame, meta: dict, pq: Path, js: Path) -> None:
 
 
 def _trim(base: Path) -> None:
-    """超过 MAX_COPIES 份就删最早建的, 删到九成(免得每建一份都要删一份)。"""
+    """超过 MAX_COPIES 份就删最久没用的(修改时间 = 最后一次读到), 删到九成(免得每建一份
+    都要删一份)。顺手清掉崩溃留下的临时文件和没有数据文件的说明。"""
     try:
-        copies = [p for p in base.glob("*.parquet")]
+        now = time.time()
+        for p in base.glob(".*.tmp"):
+            if now - p.stat().st_mtime > ORPHAN_SECONDS:
+                p.unlink(missing_ok=True)
+        for js in base.glob("*.json"):
+            if not js.with_suffix(".parquet").exists():
+                js.unlink(missing_ok=True)
+        copies = list(base.glob("*.parquet"))
         if len(copies) <= MAX_COPIES:
             return
         copies.sort(key=lambda p: p.stat().st_mtime)
@@ -155,19 +186,43 @@ def _trim(base: Path) -> None:
         logger.debug("个股日K副本清理跳过: %s", e)
 
 
-def _anchor_ok(copy: pl.DataFrame, parts: dict[date, Path], symbol: str) -> bool:
-    """副本首尾两根, 各自现读那一天的分区, 整行逐个相等才算没被改过。"""
-    if copy.is_empty():
-        return True
-    for i in {0, copy.height - 1}:
-        row = copy[i]
-        pdir = parts.get(row["date"][0])
+def invalidate(data_dir: Path, asset_type: str, symbols: list[str] | None = None) -> None:
+    """[R493] 盘后管道重算过的票: 删它们的副本。symbols=None → 这一类整个作废(全量重建)。
+
+    只删不建, 下次有人取时再建; 删失败只记日志 —— 抽查照样兜得住。
+    """
+    base = Path(data_dir) / CACHE_DIRNAME / asset_type
+    if not base.exists():
+        return
+    try:
+        if symbols is None:
+            targets = list(base.glob("*.parquet"))
+        else:
+            targets = [base / f"{s}.parquet" for s in symbols
+                       if isinstance(s, str) and _SAFE_SYMBOL.fullmatch(s)]
+        for pq in targets:
+            pq.unlink(missing_ok=True)
+            pq.with_suffix(".json").unlink(missing_ok=True)
+    except OSError as e:
+        logger.warning("个股日K副本作废失败 %s: %s", asset_type, e)
+
+
+def _anchor_ok(saved: pl.DataFrame, head: list[tuple[date, Path]], symbol: str) -> bool:
+    """抽查: 首尾两天分区里这只票的全部行与副本相同; 两头外侧那两天分区里没有这只票。"""
+    if saved.is_empty():
+        return False                   # 空副本无从抽查, 不认(建的时候也不会留)
+    by_date = dict(head)
+    dates = [d for d, _ in head]
+    first, last = saved["date"][0], saved["date"][-1]
+    for d in {first, last}:
+        pdir = by_date.get(d)
         if pdir is None:
             return False
-        live = _scan(_files([pdir]), symbol)
-        if live.height != 1 or not live.equals(row):
+        if not _scan(_files([pdir]), symbol).equals(saved.filter(pl.col("date") == d)):
             return False
-    return True
+    i = dates.index(first) if first in by_date else 0
+    outside = ([dates[i - 1]] if i > 0 else []) + ([dates[-1]] if dates[-1] > last else [])
+    return all(_scan(_files([by_date[d]]), symbol).is_empty() for d in outside)
 
 
 def scan_symbol(data_dir: Path, asset_type: str, symbol: str, start: date, end: date,
@@ -180,18 +235,20 @@ def scan_symbol(data_dir: Path, asset_type: str, symbol: str, start: date, end: 
     src_name = _SOURCE_DIRS.get(asset_type)
     if src_name is None or not isinstance(symbol, str) or not _SAFE_SYMBOL.fullmatch(symbol):
         return None
+    if _publishing(Path(data_dir), asset_type):
+        return None                    # 管道正在发布: 照原来扫, 不把半新半旧存下来
     parts = _partitions(Path(data_dir) / src_name)
     if not parts:
         return None
     try:
         df = _history(Path(data_dir), asset_type, symbol, start, end, parts)
+        df = df.filter((pl.col("date") >= start) & (pl.col("date") <= end))
+        if columns:
+            df = df.select([c for c in columns if c in STORE_COLS])
+        return df
     except Exception as e:  # noqa: BLE001 —— 副本只是加速, 出任何错都退回原路
         logger.warning("个股日K副本不可用, 退回扫分区 %s %s: %s", asset_type, symbol, e)
         return None
-    df = df.filter((pl.col("date") >= start) & (pl.col("date") <= end))
-    if columns:
-        df = df.select([c for c in columns if c in STORE_COLS])
-    return df
 
 
 def _history(data_dir: Path, asset_type: str, symbol: str, start: date, end: date,
@@ -207,25 +264,40 @@ def _history(data_dir: Path, asset_type: str, symbol: str, start: date, end: dat
     key = (str(data_dir), asset_type, symbol)
     with _locks_guard:
         lock = _locks.setdefault(key, threading.Lock())
-    with lock:                         # 同一只票同时来两个请求, 只建一次
+    # 单票锁: 只挡同一只票的并发请求(single-flight, 第二个等第一个建完直接读, 否则它也得
+    # 把全部日文件扫一遍); 别的票不受影响。CONTRIBUTING §6.2 防的是全局锁里扫盘拖住所有人
+    with lock:
         loaded = _load_valid(pq, js, parts, symbol)
         if loaded is None:
             cutoff = parts[-TAIL_DAYS - 1][0]          # 截止日: 倒数第 TAIL_DAYS+1 个分区
             head = [p for d, p in parts if d <= cutoff]
-            copy = _scan(_files(head), symbol)
-            meta = {"v": FORMAT_VERSION, "cutoff": cutoff.isoformat(), "n": len(head),
-                    "built": time.time()}
+            saved = _scan(_files(head), symbol)
+            meta = {"format": FORMAT_VERSION, "cutoff": cutoff.isoformat(),
+                    "partitions": len(head), "built": time.time()}
             try:
-                _write_atomic(copy, meta, pq, js)
-                _trim(base)
+                if saved.is_empty():
+                    # 截止日前没有这只票: 不留空副本(见模块说明), 旧的也删掉
+                    pq.unlink(missing_ok=True)
+                    js.unlink(missing_ok=True)
+                elif _publishing(data_dir, asset_type):
+                    pass                                # 建的途中管道开始发布: 这份不存
+                else:
+                    _write_atomic(saved, meta, pq, js)
+                    _trim(base)
             except OSError as e:       # 写不了(只读盘、满了)不影响这一次的结果
                 logger.warning("个股日K副本写入失败 %s: %s", pq, e)
         else:
-            copy, cutoff = loaded
+            saved, cutoff = loaded
+            with contextlib.suppress(OSError):
+                os.utime(pq)                            # 记一次「最近用过」, 淘汰按它排
 
     # 截止日之后的全部现读: 建副本那天的最近 10 天 + 之后每天新进来的(最多 7 天)
     tail = _scan(_files([p for d, p in in_range if d > cutoff]), symbol)
-    return pl.concat([copy, tail])     # 严格拼接: 类型对不上就抛错 → 退回原路
+    return pl.concat([saved, tail])    # 严格拼接: 类型对不上就抛错 → 退回原路
+
+
+def _publishing(data_dir: Path, asset_type: str) -> bool:
+    return asset_type in _PUBLISHED and enriched_publication_incomplete(data_dir, asset_type)
 
 
 def _load_valid(pq: Path, js: Path, parts: list[tuple[date, Path]],
@@ -243,18 +315,17 @@ def _load_valid(pq: Path, js: Path, parts: list[tuple[date, Path]],
         return None
     head = [(d, p) for d, p in parts if d <= cutoff]
     if (
-        meta.get("v") != FORMAT_VERSION
-        or meta.get("n") != len(head)               # 截止日之前补了历史 / 补了缺口 / 删了某天
+        meta.get("format") != FORMAT_VERSION
+        or meta.get("partitions") != len(head)      # 截止日之前补了历史 / 补了缺口 / 删了某天
         or not isinstance(meta.get("built"), (int, float))
         or time.time() - meta["built"] > MAX_AGE_SECONDS
     ):
         return None
     try:
-        copy = pl.read_parquet(pq)
+        saved = pl.read_parquet(pq)
     except Exception:  # noqa: BLE001
         return None
-    if copy.schema != pl.Schema(ENRICHED_STORAGE_SCHEMA):
+    # 列、类型不对也在这里被拦: 抽查拿现读的整行比, 列一不同就不相等
+    if not head or not _anchor_ok(saved, head, symbol):
         return None
-    if not _anchor_ok(copy, dict(head), symbol):
-        return None
-    return copy, cutoff
+    return saved, cutoff

@@ -507,7 +507,8 @@ def _compute_storage(data_dir: Path) -> dict:
         stats[f"{key}_size_mb"] = sz
 
     # total: 再加上其他零散目录 (financials 有下方专属明细统计, 不在此列)
-    other_dirs = ["pools", "backtest_results", "screener_results", "ai_cache"]
+    other_dirs = ["pools", "backtest_results", "screener_results", "ai_cache",
+                  ".symbol_daily_cache"]  # [R493 · fork] 个股日K副本也算进总占用
     for name in other_dirs:
         d = data_dir / name
         if d.exists():
@@ -639,6 +640,7 @@ def clear_data(request: Request):
         "kline_etf_daily", "kline_etf_enriched", "kline_etf_minute", "kline_minute",
         "adj_factor", "adj_factor_etf", "instruments", "instruments_index", "instruments_etf", "pools", "financials",
         "backtest_results", "screener_results", "ai_cache",
+        ".symbol_daily_cache",  # [R493 · fork] 个股日K副本: 源数据都清了, 副本不能留
     ):
         d = data_dir / sub
         if not d.exists():
