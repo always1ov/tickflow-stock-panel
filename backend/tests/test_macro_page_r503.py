@@ -19,12 +19,13 @@ def test_R503_没有页签了_两组都常驻():
     assert "两组内容同页切换" not in src
 
 
-def test_R503_市场环境在前_情绪周期在后_各有组标题():
+def test_R503_市场环境有组标题():
+    """[R506] 情绪周期整组撤掉之后, 原来「市场环境在前、情绪周期在后」那条顺序没有对象了,
+    只剩市场环境这一组; 它的组标题留着(以后再有第二组, 读的人仍然分得清)。"""
     src = code_of(REGIME)
-    i_reg = src.index('<GroupTitle id="macro-regime" icon={Activity} title="市场环境"')
-    i_ph = src.index('<GroupTitle id="macro-phase" icon={Flame} title="情绪周期"')
-    assert i_reg < i_ph, "顺序反了: 市场环境(原默认页签)在前"
-    assert 'aria-labelledby="macro-regime"' in src and 'aria-labelledby="macro-phase"' in src
+    assert '<GroupTitle id="macro-regime" icon={Activity} title="市场环境"' in src
+    assert 'aria-labelledby="macro-regime"' in src
+    assert "macro-phase" not in src, "情绪周期那一组又回来了(R506 撤的)"
 
 
 def test_R503_组标题比卡片标题高一级_标题不许断():
@@ -36,10 +37,9 @@ def test_R503_组标题比卡片标题高一级_标题不许断():
 
 
 def test_R503_仍共用一组时间范围():
-    """时间范围只有一组(页头), 两组的查询都吃同一个 histRange / days。"""
+    """时间范围只有一组(页头), 查询都吃同一个 histRange / days。"""
     src = code_of(REGIME)
     assert len(re.findall(r"useState<RangePreset>", src)) == 1
-    assert "api.regimePhases(histRange.start, histRange.end)" in src
     assert "api.regimeHistory(histRange.start, histRange.end, histRange.limit)" in src
 
 

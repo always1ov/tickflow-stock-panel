@@ -1,6 +1,8 @@
 /**
- * 宏观分析页(原「市场环境」页, 路由仍是 /regime) — 每日环境状态时序趋势 + 状态分布 + 情绪周期。
- * [R503] 两组内容上下同时铺开(原来页签切换), 共用页头的时间范围。
+ * 宏观分析页(原「市场环境」页, 路由仍是 /regime) — 市场环境: 「现在」一张卡 + 环境综合分趋势。
+ * [R503] 市场环境与情绪周期两组上下同时铺开(原来页签切换), 共用页头的时间范围。
+ * [R505] 市场环境精简成两块。[R506] 情绪周期整组撤掉(后端照算, 页面不再显示), 「当前主线」
+ * 从转折页页头搬进「现在」卡。
  *
  * 数据来源: 后端 regime_builder 批算的时序表(每日离散状态 + 多维指标)。
  * 不复刻 Dashboard 的当日总览(那是单日快照), 聚焦历史趋势与状态分布。
@@ -8,17 +10,16 @@
  * 时间范围: 1年(250交易日) / 2年(500) / 自定义(1~1000天) / 全部(走日期范围)。
  * 美化对齐 Dashboard 设计语言: 半透明 surface 卡片 + 渐变竖条标题 + 语义色。
  */
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import * as echarts from 'echarts'
 import {
   Activity, RefreshCw, Loader2, Gauge, TrendingUp, TrendingDown, Minus,
-  Pencil, Flame, Layers, Filter, X,
+  Pencil, Filter, X, Layers,
 } from 'lucide-react'
 import {
-  api, type RegimeRow, type RegimeState, type MarketPhase,
+  api, type RegimeRow, type RegimeState, type MainlineFilter,
   REGIME_STATE_LABELS, REGIME_STATE_COLORS,
-  MARKET_PHASE_LABELS, MARKET_PHASE_COLORS, MARKET_PHASE_ORDER,
 } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { useChartTheme } from '@/lib/theme'
@@ -30,23 +31,12 @@ import { PageShell } from '@/components/PageShell'
 import { SEG, SEG_ITEM, SEG_OFF, SEG_ON, TYPE, buttonClass } from '@/components/ui'
 
 
-/** 阶段含义与应对提示 — meaning 与后端 market_phase.py 判定规则对齐, 供当前阶段卡展示 */
-const MARKET_PHASE_GUIDE: Record<MarketPhase, { meaning: string; action: string }> = {
-  ice:     { meaning: '高度/宽度/首板同时贴地, 亏钱效应极致', action: '观望 · 跟踪率先异动股' },
-  ignite:  { meaning: '低位放量扩张, 晋级率回升', action: '试仓主线 · 快进快出' },
-  rally:   { meaning: '高度+宽度+晋级率共振', action: '持股 · 顺势而为' },
-  climax:  { meaning: '情绪极端宣泄, 批量二板+', action: '逐步兑现 · 不追高' },
-  ebb:     { meaning: '自高位回落, 晋级率坍塌', action: '防守 · 不接力' },
-  repair:  { meaning: '多空拉锯, 无明确方向', action: '轻仓试错 · 控回撤' },
-}
-
 /**
- * [R401] 两张图的图例项。**单独列出来是为了让守卫数得着** ——
+ * [R401] 趋势图的图例项。**单独列出来是为了让守卫数得着** ——
  * 写在 option 里的话, 哪天有人加第七条曲线, 图例又会在手机上折成两行、
  * 又一次画进绘图区, 而那件事在桌面上看不出来。
  * `test_regime_legend_fits.py` 按最窄那档宽度算过, 加项会当场红。
  */
-export const PHASE_LEGEND = ['首板', '2板+', '高度', '晋级率', '封板率']
 export const TREND_LEGEND = ['综合分', '涨停数', '赚钱', '投机', '抗跌', '趋势']
 
 // ── 时间范围 ──────────────────────────────────────────────
@@ -161,8 +151,6 @@ const cardCls = 'rounded-card border border-border bg-surface'   // [R457] 实�
 export function Regime() {
   const qc = useQueryClient()
   const [range, setRange] = useState<RangePreset>('1y')
-  // [R503] 市场环境(状态/趋势/日历) 与 情绪周期(阶段/主线) 两组同时铺开, 不再页签切换;
-  // 两组仍共用时间范围与重算入口。
   const [customOpen, setCustomOpen] = useState(false)
   const ct = useChartTheme()
 
@@ -182,27 +170,20 @@ export function Regime() {
     queryFn: () => api.regimeHistory(histRange.start, histRange.end, histRange.limit),
     staleTime: 5 * 60 * 1000,
   })
-  // 情绪周期阶段段 + 主线排行(与 history 同一时间范围)
-  const phases = useQuery({
-    queryKey: QK.regimePhases(histRange.start, histRange.end),
-    queryFn: () => api.regimePhases(histRange.start, histRange.end),
-    staleTime: 5 * 60 * 1000,
-  })
-  const [mainlineKind, setMainlineKind] = useState<'concept' | 'industry'>('concept')
-  const [filterOpen, setFilterOpen] = useState(false)
-  // 时间轴点击选中的交易日 (当日快照联动); null = 未选。窗口切换后失效。
-  const [selDate, setSelDate] = useState<string | null>(null)
-  useEffect(() => { setSelDate(null) }, [histRange.start, histRange.end])
-  const mainline = useQuery({
-    queryKey: QK.regimeMainline(mainlineKind, histRange.start, histRange.end),
-    queryFn: () => api.regimeMainline(histRange.start, histRange.end, 10, mainlineKind),
-    staleTime: 5 * 60 * 1000,
-  })
   const [recomputing, setRecomputing] = useState(false)
+  // [R506] 当前主线 —— 原在转折页页头。与今日总览同一个后端函数出(停更判定只在那一处),
+  // 不随页头的时间范围变: 它说的就是「今天」。
+  const mainlineNow = useQuery({
+    queryKey: QK.todayMainline,
+    queryFn: () => api.todayMainline(),
+    staleTime: 5 * 60 * 1000,
+  })
+  const [filterOpen, setFilterOpen] = useState(false)
+  const ml = mainlineNow.data?.mainline ?? null
 
   const rows: RegimeRow[] = history.data?.rows ?? []
   // [fork 增强] 当日数据未落盘时, 末行是重算产生的"空数据行"(0板0家) ——
-  // 若拿它判阶段会凭空得出"退潮"。当前阶段卡改用最近一个"数据齐"的定稿日。
+  // 拿它当「最新状态」会凭空多出一天弱势。「现在」卡用最近一个"数据齐"的定稿日。
   const lastRaw = rows.length > 0 ? rows[rows.length - 1] : null
   const lastUnsettled = !!(lastRaw
     && (lastRaw.max_consecutive ?? 0) === 0
@@ -211,89 +192,6 @@ export function Regime() {
     && (lastRaw.limit_up ?? 0) === 0)
   const settledRows = lastUnsettled ? rows.slice(0, -1) : rows
   const latest = settledRows.length > 0 ? settledRows[settledRows.length - 1] : null
-  const hasPhaseData = settledRows.length > 0 && settledRows.some(r => r.phase != null)
-  const segments = phases.data?.segments ?? []
-
-  // [fork 增强] 盘中实时阶段(付费全市场档才 available; 免费档静默不可用)
-  const phaseLive = useQuery({
-    queryKey: QK.regimePhaseLive,
-    queryFn: () => api.regimePhaseLive(),
-    refetchInterval: 60_000,
-    staleTime: 55_000,
-  })
-  const live = phaseLive.data?.available && phaseLive.data.phase ? phaseLive.data : null
-
-  // 当前阶段持续天数(末尾连续同阶段) + 当前主线(最新交易日 top3)
-  const phaseStreak = useMemo(() => {
-    if (!hasPhaseData) return null
-    const lastPhase = settledRows[settledRows.length - 1].phase
-    let streak = 1
-    for (let i = settledRows.length - 2; i >= 0; i--) {
-      if (settledRows[i].phase === lastPhase) streak++
-      else break
-    }
-    return { phase: lastPhase as MarketPhase, streak }
-  }, [settledRows, hasPhaseData])
-  const latestMainlines = useMemo(() => {
-    const mlRows = mainline.data?.rows ?? []
-    if (mlRows.length === 0) return []
-    const lastDate = mlRows[mlRows.length - 1].date
-    return mlRows.filter(r => r.date === lastDate && r.rank <= 3)
-  }, [mainline.data])
-
-  // ── 时间轴点击选中日: 当日行 + 当日主线 top3 (主查询窗口内可回看任意一天) ──
-  const selRow = useMemo(
-    () => (selDate ? rows.find(r => r.date === selDate) ?? null : null),
-    [rows, selDate],
-  )
-  const selMainlines = useMemo(() => {
-    if (!selDate) return []
-    return (mainline.data?.rows ?? []).filter(r => r.date === selDate && r.rank <= 3)
-  }, [mainline.data, selDate])
-  // 选中日处于其阶段段的第几天 (自段首数起, 与"当前阶段第 N 天"同口径)
-  const selStreak = useMemo(() => {
-    if (!selRow?.phase) return null
-    let streak = 1
-    for (let i = rows.findIndex(r => r.date === selRow.date); i > 0; i--) {
-      if (rows[i - 1].phase === selRow.phase) streak++
-      else break
-    }
-    return streak
-  }, [rows, selRow])
-
-  // ── 指标历史分位: 最新值在当前窗口内的位置 (≤ 它的天数占比), 给指标卡参照系 ──
-  const pctRank = useCallback((field: keyof RegimeRow): number | null => {
-    if (!latest) return null
-    const latestV = latest[field] as number | null
-    if (latestV == null) return null
-    const vals = rows.map(r => r[field] as number | null).filter((v): v is number => v != null)
-    if (vals.length < 20) return null   // 样本太少分位无意义
-    const below = vals.filter(v => v <= latestV).length
-    return Math.round((100 * below) / vals.length)
-  }, [rows, latest])
-
-  // ── 阶段规律: 当前阶段的历史段统计 + 下一阶段转移分布 (窗口内 segments) ──
-  const phaseStats = useMemo(() => {
-    if (!phaseStreak || segments.length === 0) return null
-    const cur = phaseStreak.phase
-    const segs = segments.filter(s => s.phase === cur)
-    if (segs.length === 0) return null
-    const avgDays = Math.round(segs.reduce((a, s) => a + s.days, 0) / segs.length)
-    const maxDays = Math.max(...segs.map(s => s.days))
-    // 转移分布: 每个历史同阶段段的后继段 (segments 按开始日期升序, 最后一段无后继不计)
-    const nexts = new Map<MarketPhase, number>()
-    segments.forEach((s, i) => {
-      if (s.phase !== cur) return
-      const nx = segments[i + 1]
-      if (!nx) return
-      nexts.set(nx.phase as MarketPhase, (nexts.get(nx.phase as MarketPhase) ?? 0) + 1)
-    })
-    const total = [...nexts.values()].reduce((a, b) => a + b, 0)
-    const transitions = [...nexts.entries()]
-      .sort((a, b) => b[1] - a[1])
-      .map(([phase, count]) => ({ phase, count, pct: total > 0 ? Math.round((100 * count) / total) : 0 }))
-    return { count: segs.length, avgDays, maxDays, transitions }
-  }, [phaseStreak, segments])
 
   // ── 当前势头: 末尾连续同态天数 + score 5日斜率(改善/恶化) + 上次弱势距今 ──
   const momentum = useMemo(() => {
@@ -323,164 +221,6 @@ export function Regime() {
 
 
 
-
-  // 阶段时间轴: 高度折线 + 2板以上宽度柱 + 晋级率曲线, 背景色带=情绪周期阶段
-  const phaseOption = useMemo<echarts.EChartsOption | null>(() => {
-    if (rows.length === 0 || !hasPhaseData) return null
-    const dates = rows.map(r => r.date)
-    const heights = rows.map(r => r.max_consecutive)
-    const firstBoard = rows.map(r => r.first_board ?? null)
-    const ge2 = rows.map(r => r.ge2_count ?? null)
-    const promo = rows.map(r => (r.promo_rate != null ? Math.round(r.promo_rate * 100) : null))
-    const seal = rows.map(r => (r.seal_rate != null ? Math.round(r.seal_rate * 100) : null))
-    // 阶段色带: 连续同阶段为一带; ≥6 天的宽带标阶段名(窄带不标避免糊作一团)
-    const phaseBands: any[] = []
-    let bandStartIdx = 0
-    let prevPhase = rows[0]?.phase
-    rows.forEach((r, i) => {
-      if (r.phase !== prevPhase || i === rows.length - 1) {
-        const endIdx = i === rows.length - 1 ? i : i - 1
-        if (prevPhase && MARKET_PHASE_COLORS[prevPhase as MarketPhase]) {
-          const color = MARKET_PHASE_COLORS[prevPhase as MarketPhase]
-          const bandDays = endIdx - bandStartIdx + 1
-          phaseBands.push([
-            {
-              xAxis: rows[bandStartIdx].date,
-              itemStyle: { color, opacity: 0.10 },
-              label: {
-                show: bandDays >= 6,
-                formatter: MARKET_PHASE_LABELS[prevPhase as MarketPhase],
-                position: 'insideTopLeft', distance: 6,
-                color, fontSize: 9, fontWeight: 600,
-              },
-            },
-            { xAxis: rows[endIdx].date },
-          ])
-        }
-        bandStartIdx = i
-        prevPhase = r.phase
-      }
-    })
-    // 阶段切换点: 当日 phase ≠ 前日 → 在高度线上标一枚新阶段颜色的小三角
-    const switchPoints: any[] = []
-    for (let i = 1; i < rows.length; i++) {
-      if (rows[i].phase && rows[i].phase !== rows[i - 1].phase) {
-        switchPoints.push({
-          coord: [rows[i].date, heights[i]],
-          itemStyle: { color: MARKET_PHASE_COLORS[rows[i].phase as MarketPhase] },
-          label: { show: false },
-        })
-      }
-    }
-    return {
-      backgroundColor: 'transparent',
-      tooltip: {
-        trigger: 'axis', backgroundColor: ct.tooltipBg, borderColor: ct.tooltipBorder,
-        textStyle: { color: ct.tooltipText },
-        axisPointer: { type: 'line', snap: true, lineStyle: { color: ct.grid } },
-        formatter: (params: any) => {
-          const p0 = Array.isArray(params) ? params[0] : params
-          const i = dates.indexOf(p0.axisValue)
-          const r = rows[i]
-          if (!r) return ''
-          const phase = r.phase ? MARKET_PHASE_LABELS[r.phase] : '—'
-          // 该日处于阶段段的第几天 (与"当前阶段第 N 天"同口径)
-          let dayN = 1
-          for (let j = i; j > 0; j--) {
-            if (rows[j - 1].phase === r.phase) dayN++
-            else break
-          }
-          const pct = (v: number | null | undefined) =>
-            v != null ? (v * 100).toFixed(1) + '%' : '—'
-          return [
-            `<b>${r.date}</b> · ${phase} 第${dayN}天`,
-            `高度 ${r.max_consecutive}板 · 完整度 ${r.ladder_completeness != null ? (r.ladder_completeness * 100).toFixed(0) + '%' : '—'}`,
-            `涨停 ${r.limit_up ?? '—'}家 = 首板 ${r.first_board ?? '—'} + 2板+ ${r.ge2_count ?? '—'}`,
-            `晋级率 ${pct(r.promo_rate)} · 封板率 ${pct(r.seal_rate)}`,
-          ].join('<br/>')
-        },
-      },
-      // [R401] 紧凑图例: 默认的 25px 图标 + 10px 项间距是为桌面定的, 手机上
-      // 会把项挤到第二行, 而 `grid.top` 只给一行 —— 第二行就画进绘图区里,
-      // 和轴名、刻度叠成一团。取值与占几行的算法见 `lib/echartsLegend.ts`。
-      legend: {
-        data: PHASE_LEGEND,
-        selected: { 封板率: false },
-        textStyle: { color: ct.text, fontSize: COMPACT_LEGEND.fontSize }, top: 0,
-        itemWidth: COMPACT_LEGEND.itemWidth,
-        itemHeight: COMPACT_LEGEND.itemHeight,
-        itemGap: COMPACT_LEGEND.itemGap,
-      },
-      grid: { left: 44, right: 44, top: LEGEND_GRID_TOP, bottom: 44 },
-      xAxis: {
-        type: 'category', data: dates, boundaryGap: false,
-        axisLabel: { color: ct.text, fontSize: 10, formatter: (v: string) => v.slice(5) },
-        axisLine: { lineStyle: { color: ct.grid } },
-      },
-      yAxis: [
-        { type: 'value', name: '板/家', position: 'left', axisLabel: { color: ct.text, fontSize: 10 }, splitLine: { show: false }, nameTextStyle: { color: ct.text } },
-        { type: 'value', name: '比率%', min: 0, max: 100, position: 'right', axisLabel: { color: ct.text, fontSize: 10 }, splitLine: { lineStyle: { color: ct.grid } }, nameTextStyle: { color: ct.text } },
-      ],
-      dataZoom: [
-        { type: 'inside', start: Math.max(0, 100 - (60 / days) * 100) },
-        { type: 'slider', bottom: 6, height: 14, borderColor: ct.border, fillerColor: ct.zoomFill, textStyle: { color: ct.text } },
-      ],
-      series: [
-        // 首板/2板+ 堆叠柱: 两段之和 = 当日涨停总数 (首板宽度=底部, 2板+=顶段),
-        // 总高看涨停宽度、顶段看连板厚度; 高度线在其上穿行
-        { name: '首板', type: 'bar', stack: 'lu', data: firstBoard, yAxisIndex: 0,
-          barMaxWidth: 5, itemStyle: { color: '#f97316', opacity: 0.35 }, z: 1 },
-        { name: '2板+', type: 'bar', stack: 'lu', data: ge2, yAxisIndex: 0,
-          barMaxWidth: 5, itemStyle: { color: '#f59e0b', opacity: 0.65 }, z: 1 },
-        { name: '高度', type: 'line', data: heights, smooth: true, symbol: 'none', yAxisIndex: 0,
-          lineStyle: { width: 1.6, color: '#ef4444' }, z: 3,
-          markArea: { silent: true, data: phaseBands },
-          // 定位竖线: 今日(淡白) + 选中日(蓝虚线, 点击图表日期出现)
-          markLine: {
-            silent: true, symbol: 'none',
-            data: [
-              {
-                xAxis: dates[dates.length - 1],
-                lineStyle: { color: ct.text, opacity: 0.35, width: 1 },
-                label: { show: true, position: 'end', formatter: '今日', color: ct.text, fontSize: 9 },
-              },
-              ...(selDate && selDate !== dates[dates.length - 1]
-                ? [{
-                    xAxis: selDate,
-                    lineStyle: { color: '#3b82f6', type: 'dashed' as const, width: 1.2, opacity: 0.9 },
-                    label: { show: true, position: 'end' as const, formatter: selDate.slice(5), color: '#3b82f6', fontSize: 9 },
-                  } as const]
-                : []),
-            ],
-          },
-          // 阶段切换点: 小三角=当日切换, 颜色=新阶段
-          markPoint: {
-            silent: true, symbol: 'triangle', symbolSize: 7,
-            data: switchPoints,
-          } },
-        { name: '晋级率', type: 'line', data: promo, smooth: true, symbol: 'none', yAxisIndex: 1,
-          lineStyle: { width: 1.2, color: '#3b82f6', type: 'dotted' }, z: 2 },
-        { name: '封板率', type: 'line', data: seal, smooth: true, symbol: 'none', yAxisIndex: 1,
-          lineStyle: { width: 1.2, color: '#10b981', type: 'dashed' }, z: 2 },
-      ],
-    }
-  }, [rows, days, ct, hasPhaseData, selDate])
-  const [phaseChartInst, setPhaseChartInst] = useState<echarts.ECharts | null>(null)
-  const phaseChartRef = useEChart(phaseOption, [phaseOption], setPhaseChartInst)
-  // 点击图表任意位置 → 选中最近的交易日 (zrender 级监听, 命中区为整个网格,
-  // 不依赖细线/窄柱的精确点击); 点击图例/dataZoom 不在网格内, 自动忽略
-  useEffect(() => {
-    if (!phaseChartInst || !phaseOption) return
-    const zr = phaseChartInst.getZr()
-    const onClick = (e: { offsetX: number; offsetY: number }) => {
-      if (!phaseChartInst.containPixel('grid', [e.offsetX, e.offsetY])) return
-      const dates = rows.map(r => r.date)
-      const idx = Math.round(phaseChartInst.convertFromPixel({ seriesIndex: 0 }, [e.offsetX, e.offsetY])[0])
-      if (Number.isFinite(idx) && idx >= 0 && idx < dates.length) setSelDate(dates[idx])
-    }
-    zr.on('click', onClick)
-    return () => { zr.off('click', onClick) }
-  }, [phaseChartInst, phaseOption, rows])
 
   // 趋势图: 综合分主线 + 4 子维度曲线(可切换) + 状态背景色带 + 涨停数柱状
   const trendOption = useMemo<echarts.EChartsOption | null>(() => {
@@ -599,6 +339,7 @@ export function Regime() {
         qc.invalidateQueries({ queryKey: ['regime-latest'] }),
         qc.invalidateQueries({ queryKey: ['regime-phases'] }),
         qc.invalidateQueries({ queryKey: ['regime-mainline'] }),
+        qc.invalidateQueries({ queryKey: QK.todayMainline }),
         qc.invalidateQueries({ queryKey: QK.regimeCoverage }),
       ])
     } catch (e) {
@@ -620,7 +361,7 @@ export function Regime() {
       // [R503] 菜单「市场环境」改名「宏观分析」—— 页名跟菜单走; 「市场环境」仍是下面第一组的名字
       title="宏观分析"
       titleExtra={<Activity className="h-4 w-4 text-accent" />}
-      subtitle="市场环境 · 情绪周期 · 共用时间范围"
+      subtitle="市场环境 · 当前主线 · 综合分趋势"
       right={(
           // [R401] 与下面视图药丸同一个毛病、同一个修法: 定高药丸 + 允许被压扁
           // = 字换行之后画到药丸外面。这一组在窄屏上还会和重算按钮争宽度。
@@ -655,19 +396,19 @@ export function Regime() {
           </div>
       )}
     >
-      {/* [R503] 两组内容原来是同页切换(页签: 市场环境 / 情绪周期), 用户: 「两组内容不再搞同页切换,
-          都放在同一个页面一次性同时展示, 但仍共用时间范围」—— 上下铺开, 市场环境在前(原来的默认页签),
-          情绪周期在后; 页头那组时间范围同时管两组。 */}
+      {/* [R503] 两组内容原来是同页切换(页签: 市场环境 / 情绪周期), 后来上下同时铺开、共用时间范围。
+          [R506] 情绪周期整组撤掉 —— 它全部由涨停梯队算出, 衡量的是打板情绪; 用户试用一段时间
+          判定对趋势持仓没用, 且与综合分的「投机」维是同一批数。后端照算(对话里 AI 助手的 get_regime 工具还读阶段), 页面不再显示。 */}
       {/* ══ 市场环境: 「现在」一张卡 + 环境综合分趋势 ══ */}
       <section className="space-y-4" aria-labelledby="macro-regime">
       <GroupTitle id="macro-regime" icon={Activity} title="市场环境" hint="每日环境状态 · 赚钱效应 · 趋势分析" />
 
-      {/* ── [R505] 「现在」一张卡: 最新状态 + 当前势头 + 四维拆解 ──
+      {/* ── [R505] 「现在」一张卡: 最新状态 + 当前势头 + 四维拆解 ([R506] + 当前主线) ──
           原来是四张卡 + 状态时间轴 + 状态分布饼图 + 日历热力图。后三块与趋势图的
           背景色带是同一份「每天哪一档」画了四遍; 「状态转换次数」是纯统计, 不指向任何动作。
           留下的三样都是**解读**: 现在在哪一档、在变好还是变坏、是哪一维在拉。 */}
       {latest ? (
-        <div className={cn(cardCls, 'grid gap-3 p-3 sm:grid-cols-[auto_auto_1fr] sm:items-center sm:gap-0 sm:divide-x sm:divide-border')}>
+        <div className={cn(cardCls, 'grid gap-3 p-3 sm:grid-cols-[auto_auto_auto_1fr] sm:items-center sm:gap-0 sm:divide-x sm:divide-border')}>
           <div className="sm:pr-5">
             <div className="flex items-center gap-1.5 text-micro text-muted">
               <Gauge className="h-3 w-3" /> 最新状态 · {latest.date}
@@ -700,6 +441,38 @@ export function Regime() {
             ) : <div className="mt-1 text-sm text-muted">—</div>}
           </div>
 
+          {/* [R506] 当前主线 —— 从转折页页头搬来, 色与停更规矩原样带过来:
+              主线用琥珀(看盘软件里「领涨/焦点」的通行色, 不占红绿, R421 起替代品红);
+              **停更要变灰并改标题** —— 几天前的主线长得跟今天的一模一样, 比不显示更糟。 */}
+          <div className="min-w-0 sm:px-5">
+            <div className="flex items-center gap-1.5 text-micro text-muted">
+              <Layers className="h-3 w-3" /> {ml?.stale ? '当前主线(停更)' : '当前主线'}
+              <button
+                type="button"
+                onClick={() => setFilterOpen(v => !v)}
+                aria-expanded={filterOpen}
+                title="主线口径: 宽基概念屏蔽 / 统计剔除 ST"
+                className={cn('ml-1 inline-flex items-center gap-0.5 rounded-btn border px-1.5 py-px text-micro transition-colors',
+                  filterOpen ? 'border-accent/50 text-accent' : 'border-border bg-base text-secondary hover:text-accent')}
+              >
+                <Filter className="h-2.5 w-2.5" /> 口径
+              </button>
+            </div>
+            {ml ? (
+              <>
+                <div className={cn('mt-1 truncate text-sm font-semibold', ml.stale ? 'text-muted' : 'text-amber-300')}
+                  title={ml.stale
+                    ? `主线数据停在 ${ml.date},已经 ${ml.age_days} 天没更新 —— 只作展示`
+                    : `按 ${ml.date} 的涨停梯队聚合`}>
+                  {ml.rows[0].member}
+                </div>
+                <div className="mt-0.5 truncate text-micro text-muted">
+                  {ml.rows.length > 1 ? `其后 ${ml.rows.slice(1, 3).map(r => r.member).join(' · ')}` : ml.date}
+                </div>
+              </>
+            ) : <div className="mt-1 text-sm text-muted">{mainlineNow.isLoading ? '…' : '暂无主线数据'}</div>}
+          </div>
+
           <div className="min-w-0 sm:pl-5">
             <div className="flex items-center gap-1.5 text-micro text-muted">
               <Activity className="h-3 w-3" /> 四维拆解 · 是哪一维在拉高或拖低
@@ -728,6 +501,15 @@ export function Regime() {
           {history.isLoading ? '加载中…' : '暂无环境数据，请先运行盘后管道或点击「重算」'}
         </div>
       )}
+      {filterOpen && (
+        <MainlineFilterPanel
+          filter={mainlineNow.data?.filter ?? undefined}
+          onDone={async () => {
+            await qc.invalidateQueries({ queryKey: QK.todayMainline })
+            await qc.invalidateQueries({ queryKey: ['regime-history'] })
+          }}
+        />
+      )}
 
       {/* ── 趋势图: 这一组的主体, 独占整行(原来右边三分之一给了状态分布饼图) ── */}
       <div className={cn(cardCls, 'p-3')}>
@@ -737,337 +519,6 @@ export function Regime() {
       </div>
 
       </section>{/* /市场环境 */}
-
-      {/* ══ 情绪周期: 阶段概览 + 时间轴 + 阶段×主线 + 主线排行 ══ */}
-      <section className="space-y-4 pt-4" aria-labelledby="macro-phase">   {/* 与上一组隔开一段, 一眼分出是两组 */}
-      <GroupTitle id="macro-phase" icon={Flame} title="情绪周期" hint="涨停情绪 · 市场阶段 · 主线脉络" />
-
-      {/* ── 市场阶段概览 (情绪周期 + 梯队指标 + 当前主线) ── */}
-      {hasPhaseData && latest ? (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-          {/* 当前阶段 — 付费档实时时显示盘中临时阶段, 否则显示最近定稿 */}
-          <div className={cn(cardCls, 'p-3')}>
-            <div className="flex items-center gap-1.5 text-micro text-muted">
-              <Flame className="h-3 w-3" /> 当前阶段 · {live ? `${live.as_of}` : latest.date}
-              {live ? (
-                <span
-                  className="rounded border border-amber-400/30 bg-amber-400/10 px-1 py-px text-micro text-amber-300"
-                  title={`盘中口径(每分钟刷新), 收盘定稿为准\n首板 ${live.metrics?.first_board ?? '—'} · 2板+ ${live.metrics?.ge2_count ?? '—'} · 高度 ${live.metrics?.max_consecutive ?? '—'}板 · 封板率 ${live.metrics?.seal_rate != null ? (live.metrics.seal_rate * 100).toFixed(0) + '%' : '—'} · 晋级率 ${live.metrics?.promo_rate != null ? (live.metrics.promo_rate * 100).toFixed(0) + '%' : '—'}`}
-                >
-                  盘中
-                </span>
-              ) : lastUnsettled ? (
-                <span
-                  className="rounded border border-border/60 bg-elevated/40 px-1 py-px text-micro text-muted"
-                  title="今日日线尚未落盘, 显示最近定稿阶段; 盘后数据出齐自动更新(盘中实时阶段需 Starter+ 全市场行情)"
-                >
-                  定稿口径
-                </span>
-              ) : null}
-            </div>
-            <div className="mt-1.5 flex items-baseline gap-2">
-              <span
-                className="text-2xl font-bold cursor-help"
-                style={{ color: MARKET_PHASE_COLORS[(live?.phase as MarketPhase) ?? phaseStreak?.phase ?? 'repair'] ?? MARKET_PHASE_COLORS.repair }}
-                title={(() => {
-                  const p = (live?.phase as MarketPhase) ?? phaseStreak?.phase
-                  return p && MARKET_PHASE_GUIDE[p] ? `${MARKET_PHASE_GUIDE[p].meaning}\n应对: ${MARKET_PHASE_GUIDE[p].action}` : undefined
-                })()}
-              >
-                {live
-                  ? (MARKET_PHASE_LABELS[live.phase as MarketPhase] ?? live.phase_label ?? live.phase)
-                  : MARKET_PHASE_LABELS[phaseStreak?.phase ?? 'repair']}
-              </span>
-              {live ? (
-                <span className="text-xs text-muted">
-                  {phaseStreak && live.phase === phaseStreak.phase ? `第 ${phaseStreak.streak + 1} 天(盘中)` : '盘中·收盘定稿为准'}
-                </span>
-              ) : (
-                phaseStreak && <span className="text-xs text-muted">第 {phaseStreak.streak} 天</span>
-              )}
-            </div>
-            {(() => {
-              const p = (live?.phase as MarketPhase) ?? phaseStreak?.phase
-              return p && MARKET_PHASE_GUIDE[p] ? (
-                <div className="mt-0.5 text-micro text-muted/90 truncate" title={MARKET_PHASE_GUIDE[p].meaning}>
-                  {MARKET_PHASE_GUIDE[p].action}
-                </div>
-              ) : null
-            })()}
-            <div className="mt-1.5 flex flex-wrap gap-1">
-              {latestMainlines.length > 0 ? latestMainlines.map(m => (
-                <span key={m.member} className="rounded px-1.5 py-px text-micro font-medium"
-                  style={{ color: '#f59e0b', backgroundColor: '#f59e0b18' }} title={`涨停${m.limit_up_count}家 · 最高${m.max_boards}板 · 梯队${m.rungs_filled}档`}>
-                  {m.member}
-                </span>
-              )) : <span className="text-micro text-muted">暂无主线数据</span>}
-            </div>
-          </div>
-          {([
-            { label: '市场高度', val: latest.max_consecutive, unit: '板', color: '#ef4444', field: 'max_consecutive' as const },
-            { label: '首板宽度', val: latest.first_board, unit: '家', color: '#f97316', field: 'first_board' as const },
-            { label: '2板+宽度', val: latest.ge2_count, unit: '家', color: '#f59e0b', field: 'ge2_count' as const },
-            { label: '晋级率', val: latest.promo_rate != null ? `${(latest.promo_rate * 100).toFixed(0)}%` : '—',
-              unit: '', color: '#3b82f6', field: 'promo_rate' as const,
-              sub: latest.promo_pool != null ? `池 ${latest.promo_pool} 家` : undefined },
-            { label: '梯队完整度', val: latest.ladder_completeness != null ? `${(latest.ladder_completeness * 100).toFixed(0)}%` : '—',
-              unit: '', color: '#a855f7', field: 'ladder_completeness' as const, sub: '2板→最高板不断档' },
-          ] as { label: string; val: React.ReactNode; unit: string; color: string; field: keyof RegimeRow; sub?: string }[]).map(k => {
-            const p = pctRank(k.field)
-            return (
-              <div key={k.label} className={cn(cardCls, 'p-3')}>
-                <div className="flex items-center gap-1.5 text-micro text-muted">
-                  <Activity className="h-3 w-3" /> {k.label}
-                  {p != null && (
-                    <span
-                      className="ml-auto font-mono text-micro text-muted/70"
-                      title={`当前值在所选时间窗口内的历史分位 (p${p})`}
-                    >
-                      p{p}
-                    </span>
-                  )}
-                </div>
-                <div className="mt-1.5 text-2xl font-bold" style={{ color: k.color }}>
-                  {k.val}<span className="ml-0.5 text-xs font-normal text-muted">{k.unit}</span>
-                </div>
-                {k.sub && <div className="mt-1 text-micro text-muted">{k.sub}</div>}
-              </div>
-            )
-          })}
-        </div>
-      ) : (
-        <div className="rounded-card border border-dashed border-border p-4 text-center text-xs text-muted">
-          市场阶段(情绪周期)数据尚未生成 — 点击右上角「重算」即可回填全部历史阶段与主线
-        </div>
-      )}
-
-      {/* ── 阶段规律: 当前阶段的历史统计 + 下阶段转移分布 (窗口内 segments 提炼) ── */}
-      {phaseStats && phaseStreak && (
-        <div className={cn(cardCls, 'p-3')}>
-          <SectionTitle icon={Flame} title="阶段规律"
-            hint="当前阶段在窗口内的历史统计 · 去向=每段之后进入的阶段" />
-          <div className="mt-2 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs">
-            <span className="text-secondary">
-              <span style={{ color: MARKET_PHASE_COLORS[phaseStreak.phase], fontWeight: 600 }}>
-                {MARKET_PHASE_LABELS[phaseStreak.phase]}
-              </span>
-              <span className="text-muted"> 已持续 </span>
-              <span className="font-mono text-foreground">{phaseStreak.streak}</span> 天
-              <span className="text-muted"> · 历史 {phaseStats.count} 段, 平均 {phaseStats.avgDays} 天, 最长 {phaseStats.maxDays} 天</span>
-            </span>
-            {phaseStreak.streak > phaseStats.avgDays && (
-              <span className="rounded bg-warning/10 px-1.5 py-px text-micro font-medium text-warning"
-                title="持续天数已超过窗口内该阶段的平均时长">
-                已超历史平均
-              </span>
-            )}
-            {phaseStats.transitions.length > 0 && (
-              <span className="flex flex-wrap items-center gap-1.5 text-muted">
-                历史去向:
-                {phaseStats.transitions.map(t => (
-                  <span key={t.phase} className="rounded px-1.5 py-px font-medium"
-                    style={{ color: MARKET_PHASE_COLORS[t.phase], backgroundColor: MARKET_PHASE_COLORS[t.phase] + '18' }}
-                    title={`${phaseStats.count} 段中 ${t.count} 段之后进入`}>
-                    {MARKET_PHASE_LABELS[t.phase]} {t.pct}%
-                  </span>
-                ))}
-              </span>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* ── 情绪周期时间轴 (阶段色带 + 高度/宽度/晋级率 + 点击回看) ── */}
-      {hasPhaseData && rows.length > 0 && (
-        <div className={cn(cardCls, 'p-3')}>
-          <SectionTitle icon={Flame} title="情绪周期时间轴"
-            hint="堆叠柱=涨停(首板+2板+) · 高度(红) · 晋级率(蓝) · ▲切换 · 点击日期回看当日" />
-          {/* 当日快照: 点击图表日期出现 — 阶段/梯队指标/当日主线 top3 一屏回看 */}
-          {selRow && (
-            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-md border border-accent/25 bg-accent/5 px-2.5 py-1.5">
-              <span className="flex items-center gap-1.5">
-                <span className="font-mono text-xs font-semibold text-foreground">{selRow.date}</span>
-                <span className="rounded px-1.5 py-px text-micro font-semibold"
-                  style={{ color: MARKET_PHASE_COLORS[selRow.phase as MarketPhase], backgroundColor: MARKET_PHASE_COLORS[selRow.phase as MarketPhase] + '20' }}>
-                  {MARKET_PHASE_LABELS[selRow.phase as MarketPhase]}
-                </span>
-                {selStreak != null && <span className="text-micro text-muted">第 {selStreak} 天</span>}
-              </span>
-              <span className="flex flex-wrap items-center gap-x-2.5 gap-y-1 font-mono text-micro text-secondary">
-                <span>高度 <b className="text-danger">{selRow.max_consecutive}板</b></span>
-                <span>涨停 <b className="text-foreground">{selRow.limit_up ?? '—'}</b>
-                  <span className="text-muted"> = 首板{selRow.first_board ?? '—'} + 2板+{selRow.ge2_count ?? '—'}</span></span>
-                <span>晋级 <b className="text-[#3b82f6]">{selRow.promo_rate != null ? (selRow.promo_rate * 100).toFixed(0) + '%' : '—'}</b></span>
-                <span>封板 <b className="text-[#10b981]">{selRow.seal_rate != null ? (selRow.seal_rate * 100).toFixed(0) + '%' : '—'}</b></span>
-              </span>
-              <span className="flex flex-wrap items-center gap-1">
-                {selMainlines.length > 0 ? selMainlines.map(m => (
-                  <span key={m.member} className="rounded px-1.5 py-px text-micro font-medium"
-                    style={{ color: '#f59e0b', backgroundColor: '#f59e0b18' }}
-                    title={`涨停${m.limit_up_count}家 · 最高${m.max_boards}板 · 梯队${m.rungs_filled}档`}>
-                    {m.member}
-                  </span>
-                )) : <span className="text-micro text-muted">当日无主线数据</span>}
-              </span>
-              <button onClick={() => setSelDate(null)}
-                className="ml-auto flex items-center gap-1 rounded px-1.5 py-px text-micro text-muted hover:bg-elevated hover:text-foreground">
-                <X className="h-3 w-3" /> 回到今日
-              </button>
-            </div>
-          )}
-          <div ref={phaseChartRef} className="mt-2 h-[280px]" />
-          <div className="mt-1.5 flex h-6 w-full overflow-hidden rounded-md">
-            {rows.map(r => (
-              <div key={r.date} title={`${r.date} ${MARKET_PHASE_LABELS[r.phase as MarketPhase]}`}
-                className="flex-1 min-w-[2px] transition-opacity hover:opacity-80"
-                style={{ backgroundColor: MARKET_PHASE_COLORS[r.phase as MarketPhase] }} />
-            ))}
-          </div>
-          <div className="mt-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-micro text-muted">
-            {MARKET_PHASE_ORDER.map(p => (
-              <span key={p} className="flex items-center gap-1">
-                <span className="inline-block h-2.5 w-2.5 rounded" style={{ backgroundColor: MARKET_PHASE_COLORS[p] }} />
-                {MARKET_PHASE_LABELS[p]}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ── 阶段 × 主线 (什么阶段走什么主升) ── */}
-      {segments.length > 0 && (
-        <div className={cn(cardCls, 'p-3')}>
-          <SectionTitle icon={Layers} title="阶段 × 主线"
-            hint={`${segments.length} 段 · 主线按段内 top5 天数排序`} />
-          {/* 最大高度内滚动: 段数多时不再拉长页面; 表头吸顶保证滚动时列名可见。
-              border-separate 是 sticky 前提 — Chromium 在 border-collapse:collapse
-              (preflight 默认) 下表格元素 sticky 失效; spacing-0 保持视觉不变。 */}
-          <div className="mt-2 max-h-[420px] overflow-auto">
-            <table className="w-full min-w-[760px] border-separate border-spacing-0 text-left text-xs">
-              <thead>
-                <tr className="text-micro text-muted">
-                  <th className="sticky top-0 z-10 border-b border-border bg-surface py-1.5 pr-3 font-medium">阶段</th>
-                  <th className="sticky top-0 z-10 border-b border-border bg-surface py-1.5 pr-3 font-medium">区间</th>
-                  <th className="sticky top-0 z-10 border-b border-border bg-surface py-1.5 pr-3 font-medium text-right">天数</th>
-                  <th className="sticky top-0 z-10 border-b border-border bg-surface py-1.5 pr-3 font-medium text-right">高度</th>
-                  <th className="sticky top-0 z-10 border-b border-border bg-surface py-1.5 pr-3 font-medium text-right">2板+</th>
-                  <th className="sticky top-0 z-10 border-b border-border bg-surface py-1.5 pr-3 font-medium text-right">晋级率</th>
-                  <th className="sticky top-0 z-10 border-b border-border bg-surface py-1.5 pr-3 font-medium text-right">封板率</th>
-                  <th className="sticky top-0 z-10 border-b border-border bg-surface py-1.5 font-medium">主导主线</th>
-                </tr>
-              </thead>
-              <tbody>
-                {[...segments].reverse().map((seg, i) => (
-                  <tr key={`${seg.start}-${seg.phase}-${i}`}>
-                    <td className="border-b border-border/50 py-1.5 pr-3">
-                      <span className="rounded px-1.5 py-px text-micro font-semibold"
-                        style={{ color: MARKET_PHASE_COLORS[seg.phase], backgroundColor: MARKET_PHASE_COLORS[seg.phase] + '20' }}>
-                        {seg.label}
-                      </span>
-                    </td>
-                    <td className="border-b border-border/50 py-1.5 pr-3 font-mono text-micro text-secondary">
-                      {seg.start.slice(5)} ~ {seg.end.slice(5)}
-                    </td>
-                    <td className="border-b border-border/50 py-1.5 pr-3 text-right font-mono">{seg.days}</td>
-                    <td className="border-b border-border/50 py-1.5 pr-3 text-right font-mono">{seg.avg_height}</td>
-                    <td className="border-b border-border/50 py-1.5 pr-3 text-right font-mono">{seg.avg_ge2}</td>
-                    <td className="border-b border-border/50 py-1.5 pr-3 text-right font-mono">
-                      {seg.avg_promo != null ? `${(seg.avg_promo * 100).toFixed(0)}%` : '—'}
-                    </td>
-                    <td className="border-b border-border/50 py-1.5 pr-3 text-right font-mono">
-                      {seg.avg_seal_rate != null ? `${(seg.avg_seal_rate * 100).toFixed(0)}%` : '—'}
-                    </td>
-                    <td className="border-b border-border/50 py-1.5">
-                      <div className="flex flex-wrap gap-1">
-                        {seg.top_mainlines.length > 0 ? seg.top_mainlines.map(m => (
-                          <span key={m.member} className="rounded px-1.5 py-px text-micro"
-                            style={{ color: '#f59e0b', backgroundColor: '#f59e0b18' }}
-                            title={`top5 ${m.top5_days} 天 · 最高 ${m.max_boards} 板 · 龙头 ${m.leader_symbol}`}>
-                            {m.member}<span className="ml-1 font-mono opacity-70">{m.top5_days}d</span>
-                          </span>
-                        )) : <span className="text-micro text-muted">—</span>}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* [R108] 板块跷跷板已收编到「复盘」页弹窗(全站唯一入口) */}
-
-      {/* ── 主线排行 (窗口内持续性 + 过滤设置) ── */}
-      <div className={cn(cardCls, 'p-3')}>
-        <SectionTitle icon={Layers} title="主线排行"
-          hint={
-            <span className="flex items-center gap-2">
-              <span className="hidden sm:inline text-micro text-muted">{mainline.data?.membership_note}</span>
-              <button
-                onClick={() => setFilterOpen(v => !v)}
-                className={cn('inline-flex items-center gap-1 rounded-btn border px-2 py-0.5 text-micro transition-colors',
-                  filterOpen ? 'border-accent/50 text-accent' : 'border-border bg-base text-secondary hover:text-accent')}
-              >
-                <Filter className="h-3 w-3" /> 过滤
-              </button>
-            </span>
-          }
-        />
-        {/* [R401] 第三处同样的药丸组 —— 旁边那句说明比前两处还长。
-            守卫扫出来的, 我自己按截图改的时候漏了这一个。 */}
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <div className={SEG}>
-            {([['concept', '概念'], ['industry', '行业']] as const).map(([k, label]) => (
-              <button key={k} onClick={() => setMainlineKind(k)}
-                className={cn(SEG_ITEM, 'shrink-0 whitespace-nowrap', mainlineKind === k ? SEG_ON : SEG_OFF)}>
-                {label}
-              </button>
-            ))}
-          </div>
-          <span className="min-w-0 text-micro text-muted">窗口内 top1 天数排序 · 点击「过滤」配置宽基概念屏蔽</span>
-        </div>
-        {filterOpen && (
-          <MainlineFilterPanel
-            filter={mainline.data?.filter}
-            onDone={async () => {
-              await qc.invalidateQueries({ queryKey: ['regime-mainline'] })
-              await qc.invalidateQueries({ queryKey: ['regime-phases'] })
-            }}
-          />
-        )}
-        <div className="mt-2 overflow-x-auto">
-          <table className="w-full min-w-[560px] text-left text-xs">
-            <thead>
-              <tr className="border-b border-border text-micro text-muted">
-                <th className="py-1.5 pr-3 font-medium">#</th>
-                <th className="py-1.5 pr-3 font-medium">主线</th>
-                <th className="py-1.5 pr-3 font-medium text-right">top1 天数</th>
-                <th className="py-1.5 pr-3 font-medium text-right">日均分</th>
-                <th className="py-1.5 pr-3 font-medium text-right">最高板</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(mainline.data?.leaders ?? []).map((l, i) => (
-                <tr key={l.member} className="border-b border-border/50 last:border-0">
-                  <td className="py-1.5 pr-3 font-mono text-muted">{i + 1}</td>
-                  <td className="py-1.5 pr-3 font-medium text-foreground">{l.member}</td>
-                  <td className="py-1.5 pr-3 text-right font-mono">{l.top1_days}</td>
-                  <td className="py-1.5 pr-3 text-right font-mono">{l.avg_score}</td>
-                  <td className="py-1.5 pr-3 text-right font-mono">{l.max_boards} 板</td>
-                </tr>
-              ))}
-              {(mainline.data?.leaders ?? []).length === 0 && (
-                <tr><td colSpan={5} className="py-4 text-center text-micro text-muted">
-                  {mainline.isLoading ? '加载中…' : '暂无主线数据 — 点击「重算」回填, 或检查过滤设置'}
-                </td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      </section>{/* /情绪周期 */}
 
       {/* ── 自定义天数弹窗 ── */}
       {customOpen && (
@@ -1084,9 +535,9 @@ export function Regime() {
 // ── 主线过滤设置面板 ──────────────────────────────────────
 // 宽基/风格标签(融资融券/沪深股通等数千成分)会霸占主线榜首。默认按成员数
 // 上限过滤; 用户可调阈值并按名称屏蔽特定概念, 保存后自动重算主线。
-// ST 剔除开关联动情绪周期口径 — 切换时额外触发 regime 全量重算。
+// ST 剔除开关联动市场环境与主线的统计口径 — 切换时额外触发 regime 全量重算。
 function MainlineFilterPanel({ filter, onDone }: {
-  filter: { min_members: number; max_members: number; blacklist: string[]; exclude_st?: boolean } | undefined
+  filter: MainlineFilter | undefined
   onDone: () => Promise<void>
 }) {
   const [minMembers, setMinMembers] = useState(String(filter?.min_members ?? 4))
@@ -1113,9 +564,9 @@ function MainlineFilterPanel({ filter, onDone }: {
       })
       const stChanged = excludeSt !== (filter?.exclude_st ?? true)
       if (stChanged) {
-        // 口径切换影响情绪周期驱动指标, 需全量重算 regime+主线(较重, 需等待)
+        // 口径切换影响市场环境的统计(涨停/连板剔除 ST), 需全量重算 regime+主线(较重, 需等待)
         await api.regimeRecompute()
-        toast('过滤已保存, 主线与情绪周期已全量重算', 'success')
+        toast('过滤已保存, 主线与市场环境已全量重算', 'success')
       } else {
         await api.regimeMainlineRecompute()
         toast('过滤已保存, 主线已重算', 'success')
@@ -1129,7 +580,7 @@ function MainlineFilterPanel({ filter, onDone }: {
   }
 
   return (
-    <div className="mt-2 rounded-btn border border-border bg-base/40 p-2.5">
+    <div className="rounded-card border border-border bg-surface p-3">
       <div className="flex flex-wrap items-end gap-3">
         <label className="flex flex-col gap-1">
           <span className="text-micro text-muted">成员数上限(过滤宽基标签)</span>
@@ -1188,7 +639,7 @@ function MainlineFilterPanel({ filter, onDone }: {
         </button>
         <span className="text-xs text-secondary">
           统计剔除 ST 股
-          <span className="ml-1.5 text-micro text-muted">主线 + 情绪周期统一口径; 切换后自动全量重算(约 1-2 分钟)</span>
+          <span className="ml-1.5 text-micro text-muted">主线 + 市场环境统一口径; 切换后自动全量重算(约 1-2 分钟)</span>
         </span>
       </div>
       <div className="mt-1.5 text-micro text-muted">

@@ -1455,6 +1455,33 @@ class PrefsModel(BaseModel):
     boards: list[str] | None = Field(default=None, max_length=12)
 
 
+@router.get("/mainline")
+def get_mainline(request: Request):
+    """[R506] 当前主线 —— 宏观分析页「现在」卡用。
+
+    与今日总览 `meso.mainline` 是**同一个函数**出的(`today_mainline.latest_mainlines`),
+    停更判定(超过 MAX_AGE_DAYS 标 stale)只有这一处; 单开一个口子只是为了不让宏观分析页
+    为了一行主线去拉整份今日总览(那份要算几百只票的六态)。
+    主线跑批没跑过时 mainline 为 null。
+    """
+    from app.services import today_mainline
+    from app.services.market_mainline import MEMBERSHIP_NOTE, load_mainline_history
+
+    try:
+        hist = load_mainline_history(request.app.state.repo.store.data_dir, kind="concept")
+        ml = today_mainline.latest_mainlines(hist)
+    except Exception as e:  # noqa: BLE001 —— 取不到只是少一行, 不报 500
+        logger.debug("today mainline endpoint skipped: %s", e)
+        ml = None
+    try:
+        from app.services import preferences
+        filter_cfg = preferences.get_mainline_filter_config()
+    except Exception:  # noqa: BLE001
+        filter_cfg = None
+    # filter: 主线口径(宽基屏蔽 / ST 剔除), 宏观分析页那个「口径」面板要读当前值
+    return {"mainline": ml, "membership_note": MEMBERSHIP_NOTE, "filter": filter_cfg}
+
+
 @router.get("/prefs")
 def get_prefs():
     """读取当前筛选门槛, 外加**因子目录**(界面画勾选框要用)。

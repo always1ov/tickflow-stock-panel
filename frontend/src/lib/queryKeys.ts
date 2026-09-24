@@ -161,6 +161,7 @@ export const QK = {
   // 研究工作流 / AI 自动挖掘
   // 盘中阶段
   regimePhaseLive:      ['regime-phase-live'] as const,
+  todayMainline:        ['today-mainline'] as const,   // [R506] 宏观分析页「当前主线」
   // 自选决策台(持仓/出场线/AI 信号)
   watchlistPositions:   ['watchlist-positions'] as const,
   watchlistExitLines:   ['watchlist-exit-lines'] as const,

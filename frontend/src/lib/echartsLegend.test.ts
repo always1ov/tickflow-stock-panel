@@ -8,10 +8,10 @@
  */
 import { describe, it, expect } from 'vitest'
 import { legendItemWidth, legendRows, COMPACT_LEGEND } from './echartsLegend'
-import { PHASE_LEGEND, TREND_LEGEND } from '@/pages/Regime'
+import { TREND_LEGEND } from '@/pages/Regime'
 
 /**
- * 375px 手机上这两张图的可用宽度:
+ * 375px 手机上这张图的可用宽度:
  *   375 − 页面左右留白 12×2(PageShell 的 `px-3`) − 卡片内边距 12×2(`p-3`) = 327
  * 这是**最窄的一档** —— 比 375 更窄的手机基本不存在, 再宽只会更宽松。
  */
@@ -22,9 +22,7 @@ describe('图例在最窄的手机上也排得下一行', () => {
     expect(legendRows(TREND_LEGEND, NARROW_CHART_WIDTH, COMPACT_LEGEND)).toBe(1)
   })
 
-  it('情绪周期时间轴(五项)', () => {
-    expect(legendRows(PHASE_LEGEND, NARROW_CHART_WIDTH, COMPACT_LEGEND)).toBe(1)
-  })
+  // [R506] 「情绪周期时间轴(五项)」那条随图一起撤了 —— 情绪周期整组不再显示。
 
   it('还剩一项的余量; 第八项就折行 —— 这条是留给下一个加曲线的人的', () => {
     // **边界是量出来的**: 同样 327px, 真浏览器里跑 ECharts 的结果是

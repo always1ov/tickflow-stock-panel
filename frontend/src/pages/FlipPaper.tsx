@@ -223,23 +223,14 @@ export function FlipPaper() {
   const hasBody = !!d && !d.reason
 
   const w = ov?.weather
-  // [R346] 主线要有颜色 —— 上一版我给了个 `text-secondary`, 那是灰阶不是颜色。
-  // [R421] 原来沿用今日总览的品红(`text-fuchsia-300`), 按「全站禁止粉色」换成琥珀:
-  // 主线是"当前最强的那条", 琥珀/金是看盘软件里"领涨/焦点"的通行色, 且不占红绿。
-  // amber-300 是按主题取值的令牌(tailwind.config.ts), 亮色下自动压深, 一个类就够。
-  //
-  // **停更要变灰**: 原卡片对 `stale` 是换成 `text-muted` 并把标题改成
-  // 「主线(数据已停更)」。丢掉这一层的话, 一份几天前的主线会**长得跟今天的一模一样**
-  // —— 那比不显示更糟。
-  const ml = ov?.meso?.mainline
-  const mainline = ml?.rows?.[0]?.member ?? null
-  const mlStale = !!ml?.stale
+  // [R506] 页头的「主线」搬去了宏观分析页的「现在」卡(用户: 「转折页面的那个显示主线我想搬回这里」)。
+  // 色与停更规矩(琥珀 / 停更变灰改标题)跟着搬过去了, 见 pages/Regime.tsx。
   return (
     <div className="flex h-full flex-col">
       <PageHeader
         title="转折模拟盘"
         // [R343] 市场状态并进页头 —— 定基调的东西不该自己占一张卡。
-        // 姿态是结论, 给它徽章的位置; 多空比与主线是依据, 跟在副标题里。
+        // 姿态是结论, 给它徽章的位置; 多空比是依据, 跟在副标题里。
         titleExtra={w && (
           <span className={cn('shrink-0 rounded px-1.5 py-0.5 text-micro font-medium',
             POSTURE_TONE[w.posture] ?? POSTURE_TONE.观察)}
@@ -261,16 +252,6 @@ export function FlipPaper() {
               <span className="mx-1">·</span>
               转多 <span className="text-bull">{w.new_bull}</span>
               {' '}转空 <span className="text-bear">{w.new_bear}</span>
-              {mainline && <>
-                <span className="mx-1">·</span>
-                {mlStale ? '主线(停更)' : '主线'}{' '}
-                <span className={mlStale ? 'text-muted' : 'text-amber-300'}
-                      title={mlStale
-                        ? `主线数据停在 ${ml?.date},已经 ${ml?.age_days} 天没更新 —— 只作展示`
-                        : `按 ${ml?.date} 的涨停梯队聚合`}>
-                  {mainline}
-                </span>
-              </>}
               <span className="mx-1">·</span>
               {rhythmHint('derived')}
             </>

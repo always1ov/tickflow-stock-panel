@@ -4406,6 +4406,9 @@ export const api = {
     if (end) params.set('end', end)
     return request<MainlineResult>(`/api/regime/mainline?${params.toString()}`)
   },
+  // [R506] 当前主线(宏观分析页「现在」卡)。与今日总览 meso.mainline 同一个后端函数出
+  todayMainline: () =>
+    request<{ mainline: TodayMeso['mainline']; membership_note: string; filter: MainlineFilter | null }>('/api/today/mainline'),
   regimeMainlineRecompute: () =>
     request<{ ok: boolean; rows: number }>('/api/regime/mainline/recompute', { method: 'POST' }),
   mainlineFilterUpdate: (payload: { min_members?: number; max_members?: number; blacklist?: string[]; exclude_st?: boolean }) =>

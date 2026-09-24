@@ -746,13 +746,11 @@ def run_now(
                 invalidate_regime_cache()
                 logger.info("compute_regime: %d days", regime_days)
             emit("compute_regime", 92, f"市场环境 {regime_days} 天")
-            # 阶段切换推送监控通知 (软失败, 不影响管道): 末两日阶段不同 = 今日发生切换。
-            # 切入退潮/冰点为风险信号, 用 warn 级别; 其余 info。
-            if regime_days:
-                try:
-                    _push_phase_change_alert(repo.store.data_dir)
-                except Exception as e:
-                    logger.warning("phase change alert failed (soft): %s", e)
+            # [R506 · fork] 作者在这里推「情绪周期阶段切换」通知(切入退潮/冰点按 warn 级)。
+            # 撤了: 情绪周期看的是涨停梯队, 衡量打板情绪, 用户试用一段时间后判定对趋势持仓
+            # 没用, 页面上那一组也撤了。留着推送等于每隔几天拿打板节奏提醒一次「该动了」——
+            # 「主升→退潮」读起来像卖出理由, 正是 AGENTS 第 10 条「趋势没坏就不给卖出理由」的反面。
+            # 阶段本身照算(regime 重算里 refresh_phase_labels 不动), 只是不再推。
         except Exception as e:  # noqa: BLE001
             logger.warning("compute_regime failed (soft): %s", e)
             stage_errors.append(f"compute_regime: {e}")
@@ -905,33 +903,6 @@ def _refresh_instruments_view(repo: KlineRepository) -> None:
         )
     except Exception as e:  # noqa: BLE001
         logger.warning("refresh instruments view failed: %s", e)
-
-
-def _push_phase_change_alert(data_dir) -> None:
-    """情绪周期阶段切换 → 推送监控通知(SSE toast + 监控中心)。
-
-    阶段切换(如 退潮→冰点)是重要的市场信号, 原先只有打开市场环境页才能看到。
-    复用 quote_service.push_alerts 广播通道; 未发生切换静默返回。
-    """
-    from app.services.market_phase import PHASE_LABELS
-    from app.services.regime_builder import latest_phase_transition
-
-    tr = latest_phase_transition(data_dir)
-    if not tr:
-        return
-    prev, cur, d = tr
-    msg = f"情绪周期阶段切换: {PHASE_LABELS.get(prev, prev)} → {PHASE_LABELS.get(cur, cur)} ({d})"
-    severity = "warn" if cur in ("ebb", "ice") else "info"
-    app_state = _get_app_state()
-    qs = getattr(app_state, "quote_service", None) if app_state else None
-    if qs:
-        qs.push_alerts([{
-            "source": "market",
-            "type": "phase_change",
-            "message": msg,
-            "severity": severity,
-        }])
-    logger.info("phase change alert: %s (severity=%s)", msg, severity)
 
 
 def _run_tracked(fn, job_label: str) -> bool:

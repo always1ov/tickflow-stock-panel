@@ -44,7 +44,8 @@ def test_R401_定高药丸里的字不许断():
     """定高盒子里的字一旦换行就会画到盒子外面 —— 所以定高就必须配不换行。"""
     src = code_of(REGIME)
     groups = _pill_groups(src)
-    assert len(groups) >= 3, f"没找到那几个定高药丸(找到 {len(groups)} 个), 选择器该更新了"
+    # [R503/R506] 视图页签与主线排行的「概念/行业」两组撤了, 只剩时间范围那一组(预设 + 自定义两处)
+    assert len(groups) >= 2, f"没找到时间范围那两处定高药丸(找到 {len(groups)} 个), 选择器该更新了"
     assert re.search(r"\bh-7\b", _seg()["SEG_ITEM"]), "分段切换的药丸不再定高了 —— 这条守卫的前提变了"
     for cls in groups:
         assert "whitespace-nowrap" in cls, (
@@ -60,7 +61,7 @@ def test_R401_药丸组不许被旁边的说明挤扁():
     src = code_of(REGIME)
     assert "shrink-0" in _seg()["SEG"], "分段切换的外框会被旁边的说明挤扁"
     spots = [m.start() for m in re.finditer(r"<div className=\{SEG\}>", src)]
-    assert len(spots) >= 2, f"没找到药丸组容器(找到 {len(spots)} 个)"
+    assert len(spots) >= 1, f"没找到药丸组容器(找到 {len(spots)} 个)"   # [R506] 只剩时间范围那一组
     for i in spots:
         head = src[max(0, i - 400):i]
         assert "flex-wrap" in head, (

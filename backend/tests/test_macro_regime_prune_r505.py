@@ -17,7 +17,8 @@ REGIME = "pages/Regime.tsx"
 def _regime_group() -> str:
     src = code_of(REGIME)
     a = src.index('aria-labelledby="macro-regime"')
-    return src[a:src.index('aria-labelledby="macro-phase"')]
+    # [R506] 情绪周期撤了, 市场环境这一组一直到它的 </section>
+    return src[a:src.index("</section>", a)]
 
 
 def test_R505_撤掉的四块不再出现():
@@ -46,10 +47,3 @@ def test_R505_趋势图还在_独占整行_本身没动():
     src = code_of(REGIME)
     assert "const trendRef = useEChart(trendOption, [trendOption])" in src
     assert "api.regimeHistory(histRange.start, histRange.end, histRange.limit)" in src
-
-
-def test_R505_情绪周期那一组没被波及():
-    src = code_of(REGIME)
-    assert '<GroupTitle id="macro-phase" icon={Flame} title="情绪周期"' in src
-    assert "api.regimePhases(histRange.start, histRange.end)" in src
-    assert 'title="情绪周期时间轴"' in src
