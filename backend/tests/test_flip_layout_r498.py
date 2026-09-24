@@ -46,28 +46,35 @@ def test_R498_首屏给信号_筛选条后面紧跟着信号():
         assert x not in between, f"筛选条与信号之间插进了 {x}"
 
 
-def test_R498_手机上持仓是卡片_宽屏照旧是表格():
+def test_R500_持仓是小卡片_电脑手机同一套():
+    """用户: 「用小卡片显示」「或者小长方条, 你决定哪个好」—— 持仓用小卡片:
+    几只到十来只, 每只最要紧的是浮盈那一个数, 卡片把它放大。"""
     h = _fn("Holdings")
-    assert '<div className="divide-y divide-border/30 sm:hidden">' in h, "手机上没有卡片"
-    assert '<div className="hidden overflow-x-auto sm:block">' in h, "表格没在手机上收起 —— 会向右截断"
-    cards = h[h.index("sm:hidden"):h.index("hidden overflow-x-auto sm:block")]
-    # 同一份数据、同一套字段 —— 卡片上一个都不能少
+    assert "<table" not in h, "持仓还是表格"
+    assert "sm:hidden" not in h, "还留着手机与宽屏两套 —— 小卡片是同一套"
+    assert '<div className="grid gap-2 p-3 sm:grid-cols-2 2xl:grid-cols-3">' in h
+    # 同一份数据、同一套字段 —— 一个都不能少
     for field in ("pct(p.pnl_pct)", "holdingDays.get(p.symbol)", "p.shares.toLocaleString()",
                   "p.cost?.toFixed(2)", "p.last.toFixed(2)", "money(p.market_value)"):
-        assert field in cards, f"手机卡片丢了一个字段: {field}"
-    assert "onOpen(p.symbol)" in cards, "手机卡片点了不能打开这只票"
+        assert field in h, f"卡片丢了一个字段: {field}"
+    assert "onOpen(p.symbol)" in h, "点卡片不能打开这只票"
+    assert "rounded-btn" in h and "rounded " not in h, "卡片圆角走规范 token, 不写裸圆角"
+    assert "transition-all" not in h
 
 
-def test_R498_手机上流水是卡片_默认10笔_宽屏照旧30笔():
+def test_R500_流水是小长方条_按时间一条一行_宽屏两栏列优先():
+    """几十笔按时间读 —— 一笔一条, 从上往下就是时间线; 两栏用 columns(列优先), 不用 grid(行优先会打乱先后)。"""
     o = _fn("Orders")
-    assert "rows.slice(0, 30)" in o and "rows.slice(0, 10)" in o
-    cards = o[o.index('<div className="divide-y divide-border/30 sm:hidden">'):o.index("hidden overflow-x-auto sm:block")]
-    assert "shownPhone.map" in cards, "手机卡片没用那 10 笔"
-    for field in ("o.date", "o.delayed", "o.reason", "o.state_cn", "o.price.toFixed(2)", "money(o.amount)"):
-        assert field in cards, f"手机卡片丢了一个字段: {field}"
-    # 两个「展开全部」各管各的屏宽: 手机按 10 笔判断, 宽屏按 30 笔
+    assert "<table" not in o, "流水还是表格"
+    assert "xl:columns-2" in o and "break-inside-avoid" in o, "宽屏没排成两栏 / 一条会被拆到两栏"
+    assert "grid-cols" not in o, "两栏用了 grid —— 行优先会把时间顺序打乱"
+    for field in ("o.date", "o.delayed", "o.signal_date", "o.reason", "o.state_cn", "o.price.toFixed(2)",
+                  "money(o.amount)", "<OrderActBadge act={o.act}"):
+        assert field in o, f"条子丢了一个字段: {field}"
+    # 默认条数仍按屏宽: 手机 10、宽屏 30 —— 只渲染一份, 第 11 笔起在窄屏收起
+    assert "rows.slice(0, 30)" in o and "!all && i >= 10 ? 'hidden sm:flex' : 'flex'" in o
     assert "rows.length > 30 &&" in o and "rows.length > 10 &&" in o
-    assert "cursor-pointer sm:inline" in o and "cursor-pointer sm:hidden" in o, "两个展开按钮没按屏宽分开"
+    assert "shownPhone" not in o, "又回到两套 DOM 了"
 
 
 def test_R498_规则默认收起_记住展开状态_收起时不挂载():

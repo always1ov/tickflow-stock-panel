@@ -1311,14 +1311,15 @@ function Holdings({ d, onOpen }: { d: FlipPaperData; onOpen: (s: string) => void
           当前空仓 —— 自选里没有一只处在多头侧。<b className="text-secondary">空仓也是一种仓位</b>。
         </div>
       ) : (
-        <>
-        {/* [R498] 手机上改成每只两行的卡片。表格有七列、最窄 640px, 在 390 宽的屏上
-            向右截断 —— 成本、现价、浮盈都在被截掉的那一半里, 而浮盈正是最该看见的。
-            **同一份数据、同一套字段**, 只是换了摆法; 宽屏照旧是表格。 */}
-        <div className="divide-y divide-border/30 sm:hidden">
+        /* [R500] 小卡片, 电脑与手机同一套。用户: 「用小卡片显示」「或者小长方条, 你决定哪个好」。
+           持仓只有几只到十来只, 每只最要紧的是**一个数**(浮盈) —— 卡片把它放大到右上角,
+           其余五个数(持有天数 / 股数 / 成本 → 现价 / 市值)收在下面两行, 扫一眼就知道
+           哪只在赚哪只在亏。原来的表格要横着读七列才读到浮盈, 手机上还被截在屏幕外面。
+           字段一个没少, 点卡片仍然打开这只票。 */
+        <div className="grid gap-2 p-3 sm:grid-cols-2 2xl:grid-cols-3">
           {d.positions.map((p) => (
             <button key={p.symbol} type="button" onClick={() => onOpen(p.symbol)}
-                    className="block w-full px-4 py-2.5 text-left text-xs cursor-pointer">
+                    className="rounded-btn border border-border/40 bg-base/30 px-3 py-2 text-left text-xs transition-colors hover:border-border hover:bg-elevated/40 cursor-pointer">
               <div className="flex items-baseline justify-between gap-2">
                 <span className="min-w-0 truncate"><SymbolCell symbol={p.symbol} name={p.name} /></span>
                 <span className={cn('shrink-0 text-sm font-semibold tabular-nums',
@@ -1326,57 +1327,19 @@ function Holdings({ d, onOpen }: { d: FlipPaperData; onOpen: (s: string) => void
                   {pct(p.pnl_pct)}
                 </span>
               </div>
-              <div className="mt-0.5 flex flex-wrap gap-x-2 text-micro tabular-nums text-muted">
-                <span>{holdingDays.has(p.symbol) ? `持有 ${holdingDays.get(p.symbol)} 天` : '持有 —'}</span>
+              <div className="mt-1 flex flex-wrap gap-x-2 text-micro tabular-nums text-muted">
+                <span title="买入当天算第 1 个交易日，统计至模拟盘最后一天；清仓后重置">
+                  {holdingDays.has(p.symbol) ? `持有 ${holdingDays.get(p.symbol)} 天` : '持有 —'}
+                </span>
                 <span>{p.shares.toLocaleString()} 股</span>
-                <span>成本 {p.cost?.toFixed(2) ?? '—'} → 现 {p.last.toFixed(2)}</span>
+              </div>
+              <div className="mt-0.5 flex flex-wrap justify-between gap-x-2 text-micro tabular-nums text-muted">
+                <span>成本 {p.cost?.toFixed(2) ?? '—'} → 现 <span className="text-secondary">{p.last.toFixed(2)}</span></span>
                 <span>市值 {money(p.market_value)}</span>
               </div>
             </button>
           ))}
         </div>
-        <div className="hidden overflow-x-auto sm:block">
-          <table className="w-full min-w-[640px] text-xs">
-            <thead className="text-micro text-muted">
-              <tr className="text-left">
-                <th className="px-4 py-1.5 font-normal">标的</th>
-                <th className="w-24 whitespace-nowrap px-2 py-1.5 text-right font-normal"
-                    title="买入当天算第 1 个交易日，统计至模拟盘最后一天；清仓后重置">
-                  持有天数
-                </th>
-                <th className="px-2 py-1.5 text-right font-normal">股数</th>
-                <th className="px-2 py-1.5 text-right font-normal">成本</th>
-                <th className="px-2 py-1.5 text-right font-normal">现价</th>
-                <th className="px-2 py-1.5 text-right font-normal">市值</th>
-                <th className="px-2 py-1.5 text-right font-normal">浮盈</th>
-              </tr>
-            </thead>
-            <tbody>
-              {d.positions.map((p) => (
-                <tr key={p.symbol} className="border-t border-border/30 hover:bg-elevated/40">
-                  <td className="px-4 py-1.5">
-                    <button onClick={() => onOpen(p.symbol)}
-                            className="text-left hover:text-accent cursor-pointer">
-                      <SymbolCell symbol={p.symbol} name={p.name} />
-                    </button>
-                  </td>
-                  <td className="whitespace-nowrap px-2 py-1.5 text-right tabular-nums text-secondary">
-                    {holdingDays.has(p.symbol) ? `${holdingDays.get(p.symbol)} 天` : '—'}
-                  </td>
-                  <td className="px-2 py-1.5 text-right tabular-nums">{p.shares.toLocaleString()}</td>
-                  <td className="px-2 py-1.5 text-right tabular-nums">{p.cost?.toFixed(2) ?? '—'}</td>
-                  <td className="px-2 py-1.5 text-right tabular-nums">{p.last.toFixed(2)}</td>
-                  <td className="px-2 py-1.5 text-right tabular-nums">{money(p.market_value)}</td>
-                  <td className={cn('px-2 py-1.5 text-right tabular-nums font-medium',
-                    (p.pnl ?? 0) >= 0 ? 'text-bull' : 'text-bear')}>
-                    {pct(p.pnl_pct)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        </>
       )}
     </section>
   )
@@ -1397,9 +1360,9 @@ function Orders({ orders }: { orders: FlipOrder[] }) {
   const [all, setAll] = useState(false)
   // 最近的排前面 —— 流水要回答"最近做了什么"
   const rows = useMemo(() => [...orders].reverse(), [orders])
+  // [R498] 默认条数按屏宽: 手机 10 笔(一笔两行, 30 笔就是三屏多), 宽屏 30 笔。
+  // [R500] 条子只渲染一份, 第 11~30 笔在窄屏上用 `hidden sm:flex` 收起, 不再两套 DOM
   const shown = all ? rows : rows.slice(0, 30)
-  // [R498] 手机上默认只给最近 10 笔 —— 两行一笔的卡片, 30 笔就是三屏多
-  const shownPhone = all ? rows : rows.slice(0, 10)
   return (
     <section className="overflow-hidden rounded-card border border-border/60 bg-surface/40">
       <SectionHead
@@ -1423,69 +1386,42 @@ function Orders({ orders }: { orders: FlipOrder[] }) {
       {rows.length === 0 ? (
         <div className="px-4 py-5 text-xs text-muted">这段时间一次转折都没有, 所以一笔都没做。</div>
       ) : (
-        <>
-        {/* [R498] 手机上一笔两行: 日期·标的·动作 / 因为·成交价·金额。表格在 390 宽上
-            只露出日期、标的、动作三列, 成交价与金额整列看不到。 */}
-        <div className="divide-y divide-border/30 sm:hidden">
-          {shownPhone.map((o, i) => (
-            <div key={`${o.date}-${o.symbol}-${i}`} className="px-4 py-2 text-xs">
-              <div className="flex items-center gap-2">
-                <span className="shrink-0 font-mono text-micro text-muted">
-                  {o.date}
-                  {o.delayed && <span className="ml-0.5 text-warning">·延</span>}
-                </span>
-                <span className="min-w-0 flex-1 truncate"><SymbolCell symbol={o.symbol} name={o.name} /></span>
-                <OrderActBadge act={o.act} className="shrink-0" />
-              </div>
-              <div className="mt-0.5 flex justify-between gap-2 text-micro text-muted">
-                <span className="min-w-0 truncate">{o.reason}{o.state_cn && `(${o.state_cn})`}</span>
-                <span className="shrink-0 tabular-nums">{o.price.toFixed(2)} · {money(o.amount)}</span>
-              </div>
+        /* [R500] 小长方条。流水是按时间读的几十笔, 卡片网格会把先后打乱 —— 一笔一条、
+           从上往下就是时间线。宽屏排两栏(列优先: 左栏读完接右栏, 顺序不乱); 手机上一条
+           折成两行: 日期 · 动作 · 标的 · 成交价/金额, 下面一行是「因为」。字段一个没少。 */
+        <div className="px-3 py-2 xl:columns-2 xl:gap-x-6">
+          {shown.map((o, i) => (
+            <div key={`${o.date}-${o.symbol}-${i}`}
+                 className={cn('break-inside-avoid flex-wrap items-center gap-x-2 gap-y-0.5 border-b border-border/30 py-1.5 text-xs',
+                   // 同一个元素上只给一个 display 类 —— `flex` 与 `hidden` 同时在时谁赢看样式表次序
+                   !all && i >= 10 ? 'hidden sm:flex' : 'flex')}>
+              {/* 手机一条两行、宽屏一行 —— 靠 order 换位, DOM 只有一份(宽屏按 DOM 顺序排):
+                    手机  动作 · 标的 ……… 成交价
+                          日期 · 因为 ……… 金额
+                    宽屏  日期 · 动作 · 标的 · 因为 ……… 成交价 金额 */}
+              <span className="order-5 shrink-0 font-mono text-micro text-muted sm:order-none sm:w-[5.75rem]">
+                {o.date}
+                {o.delayed && (
+                  <span className="ml-0.5 text-warning"
+                        title={`信号在 ${o.signal_date}, 那几天封板挂不进去, 顺延到这天才成交`}>
+                    ·延
+                  </span>
+                )}
+              </span>
+              <OrderActBadge act={o.act} className="order-1 shrink-0 sm:order-none" />
+              {/* 宽屏定宽 12.5rem: 四个字的名称 + 代码刚好放下, 各条的「因为」那一列因此对齐;
+                  11rem 时代码被截成「60052…」 */}
+              <span className="order-2 min-w-0 flex-1 truncate sm:order-none sm:w-[12.5rem] sm:flex-none"><SymbolCell symbol={o.symbol} name={o.name} /></span>
+              <span className="order-6 min-w-0 flex-1 truncate text-micro text-muted sm:order-none">
+                {o.reason}{o.state_cn && `(${o.state_cn})`}
+              </span>
+              <span className="order-3 ml-auto shrink-0 tabular-nums sm:order-none">{o.price.toFixed(2)}</span>
+              {/* 手机上的换行点 —— 前三样一行, 后三样一行 */}
+              <span aria-hidden className="order-4 h-0 basis-full sm:hidden" />
+              <span className="order-7 shrink-0 tabular-nums text-muted sm:order-none">{money(o.amount)}</span>
             </div>
           ))}
         </div>
-        <div className="hidden overflow-x-auto sm:block">
-          <table className="w-full min-w-[640px] text-xs">
-            <thead className="text-micro text-muted">
-              <tr className="text-left">
-                <th className="px-4 py-1.5 font-normal">日期</th>
-                <th className="px-2 py-1.5 font-normal">标的</th>
-                <th className="px-2 py-1.5 font-normal">动作</th>
-                <th className="px-2 py-1.5 font-normal">因为</th>
-                <th className="px-2 py-1.5 text-right font-normal">成交价</th>
-                <th className="px-2 py-1.5 text-right font-normal">金额</th>
-              </tr>
-            </thead>
-            <tbody>
-              {shown.map((o, i) => (
-                <tr key={`${o.date}-${o.symbol}-${i}`} className="border-t border-border/30">
-                  <td className="px-4 py-1.5 font-mono text-xs text-muted">
-                    {o.date}
-                    {o.delayed && (
-                      <span className="ml-1 text-warning"
-                            title={`信号在 ${o.signal_date}, 那几天封板挂不进去, 顺延到这天才成交`}>
-                        ·延
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-2 py-1.5">
-                    <SymbolCell symbol={o.symbol} name={o.name} />
-                  </td>
-                  <td className="px-2 py-1.5">
-                    <OrderActBadge act={o.act} />
-                  </td>
-                  <td className="px-2 py-1.5 text-xs text-secondary">
-                    {o.reason}
-                    {o.state_cn && <span className="ml-1 text-muted">({o.state_cn})</span>}
-                  </td>
-                  <td className="px-2 py-1.5 text-right tabular-nums">{o.price.toFixed(2)}</td>
-                  <td className="px-2 py-1.5 text-right tabular-nums text-muted">{money(o.amount)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        </>
       )}
     </section>
   )
