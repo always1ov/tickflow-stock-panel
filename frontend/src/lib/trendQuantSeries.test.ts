@@ -48,4 +48,10 @@ describe('[R486] 趋势量化副图', () => {
     expect(color('tao')).toBe(C.yellow)
     expect(color('jiandi')).toBe(C.lightRed)
   })
+
+  it('[R487] 对着通达信截图校准的三种默认色: 平均线紫(替洋红)、吸筹线绿、升顶下白', () => {
+    expect(C.avg).toBe('#B84DFF')
+    expect(C.xichou).toBe('#00FF00')
+    expect(C.text).toBe('#FFFFFF')
+  })
 })
