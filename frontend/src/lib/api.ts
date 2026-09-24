@@ -1885,51 +1885,6 @@ export interface MainlineResult {
   filter: MainlineFilter
 }
 
-// ===== [fork 增强] R28 板块跷跷板 =====
-export interface SeesawPair {
-  pair: string
-  a: string
-  b: string
-  score: number
-  corr: number
-  flips: number
-  active_a: number
-  active_b: number
-  recent_a: number
-  recent_b: number
-  leader: string
-  lead_days: number
-  hint: string
-  series_a?: number[]
-  series_b?: number[]
-}
-export interface SeesawAi {
-  summary: string
-  picks: { pair: string; verdict: string; leader: string; note: string }[]
-}
-export interface SeesawEntry {
-  as_of: string | null
-  kind: string
-  pairs: SeesawPair[]
-  ai: SeesawAi | null
-  created_at: string
-  source: string
-}
-export interface SeesawResult {
-  as_of?: string | null
-  kind?: string
-  window?: number
-  dates?: string[]
-  pairs: SeesawPair[]
-  ai?: SeesawAi
-  latest?: SeesawEntry | null
-  history?: SeesawEntry[]
-  error?: string
-  created_at?: string
-  source?: string
-}
-
-
 // ===== [fork 增强] R31 AI 自动挖掘 =====
 /** AI 每轮的判断。satisfied=true 时循环收工, 由人工决定要不要发布。 */
 export interface AutopilotPlan {
@@ -2060,8 +2015,6 @@ export interface AiReviewReport {
   summary?: string
   emotion_score?: number | null
   emotion_label?: string
-  /** 生成时用的复盘模式(today/continuity/week); 旧存档无此字段 */
-  mode?: 'today' | 'continuity' | 'week'
   created_at: string
 }
 
@@ -4455,12 +4408,6 @@ export const api = {
   },
   regimeMainlineRecompute: () =>
     request<{ ok: boolean; rows: number }>('/api/regime/mainline/recompute', { method: 'POST' }),
-  // [fork 增强] R28 板块跷跷板: GET 走规则(免费, 每次开页都算), POST 才调 AI 甄别并留档
-  regimeSeesaw: (kind: 'concept' | 'industry' = 'concept') =>
-    request<SeesawResult>(`/api/regime/seesaw?kind=${kind}`),
-  regimeSeesawDetect: (kind: 'concept' | 'industry' = 'concept') =>
-    request<SeesawResult>(`/api/regime/seesaw/detect?kind=${kind}`,
-      { method: 'POST', timeoutMs: AI_REQUEST_TIMEOUT_MS }),
   mainlineFilterUpdate: (payload: { min_members?: number; max_members?: number; blacklist?: string[]; exclude_st?: boolean }) =>
     request<MainlineFilter>('/api/settings/preferences/mainline-filter', {
       method: 'PUT',
@@ -4767,20 +4714,6 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
-
-  // [R50] 「AI 打板复盘」(原「AI 战法」, 已从连板梯队页搬到复盘页):
-  // 梯队快照 → 龙头/二进三/反包候选分组(带置信度);
-  // messages 传对话可追问; reportId 传历史报告 id 可对旧报告续问(复用其存档快照)
-  ladderAiReview: (payload: { date: string; stats: Record<string, unknown>; tiers: unknown[] }, messages: { role: 'user' | 'assistant'; content: string }[] = [], reportId?: string) =>
-    request<{ text: string; report_id: string | null }>('/api/screener/ladder-ai', {
-      method: 'POST',
-      timeoutMs: AI_REQUEST_TIMEOUT_MS,
-      body: JSON.stringify({ ...payload, messages, report_id: reportId ?? '' }),
-    }),
-  ladderAiReports: () =>
-    request<{ reports: { id: string; date: string; created_at: string; text: string }[] }>('/api/screener/ladder-ai/reports'),
-  ladderAiDeleteReport: (id: string) =>
-    request<{ ok: boolean }>(`/api/screener/ladder-ai/reports/${id}`, { method: 'DELETE' }),
 
   pipelineRun: () => request<{ job_id: string; reused: boolean }>(
     '/api/pipeline/run', { method: 'POST' },
@@ -5325,7 +5258,6 @@ export const api = {
   reviewReportSave: (r: {
     as_of: string; focus?: string; content: string
     summary?: string; emotion_score?: number | null; emotion_label?: string
-    mode?: 'today' | 'continuity' | 'week'
     push?: boolean
   }) =>
     request<{ ok: boolean; report: AiReviewReport }>('/api/market-recap/reports', {
@@ -5341,7 +5273,7 @@ export const api = {
    */
   // [合上游 48ddc68b] 事件类型联合加上 `'ping'`(空闲心跳保活)。
   // **fork 那个 `mode` 参数原样保留** —— 一个是入参一个是出参, 两件事不冲突。
-  async *reviewStream(asOf?: string, focus?: string, mode: 'today' | 'continuity' | 'week' = 'today'): AsyncGenerator<{
+  async *reviewStream(asOf?: string, focus?: string): AsyncGenerator<{
     type: 'meta' | 'delta' | 'error' | 'done' | 'ping'
     as_of?: string
     emotion_score?: number
@@ -5353,7 +5285,7 @@ export const api = {
     const res = await fetch('/api/market-recap/analyze', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ as_of: asOf ?? null, focus: focus ?? '', mode }),
+      body: JSON.stringify({ as_of: asOf ?? null, focus: focus ?? '' }),
     })
     if (!res.ok) {
       let detail = ''

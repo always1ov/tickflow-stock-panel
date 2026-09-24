@@ -45,10 +45,9 @@ AI_METHODS = {
     # [R435] `generateStockSignal` 删了(AI 信号整套停用) —— 名单跟着它一起去掉。
     # [R352] `todayAi` 删了(用户不要 AI 导读了) —— 名单跟着它一起去掉。
     # 立论不变: **会真出一段文本的接口才放宽超时**, 这一条只是少了一个对象。
-    "ladderAiReview": "连板梯队 AI 复盘",
+    # [R504] `ladderAiReview` / `regimeSeesawDetect` 删了(AI 打板复盘连同跷跷板整套撤掉)。
     "watchlistImportText": "粘整篇文章 → AI 认票并按小分队归类",
     "customSignalsAiGenerate": "自定义信号 AI 生成",
-    "regimeSeesawDetect": "跷跷板 AI 甄别",
     "usageNoteDigest": "消息面单条凝练",
     "usageNotesSummaryBuild": "消息面「一大段总的」",
     "todayScoreLedgerDigest": "台账 AI 提炼",
@@ -57,7 +56,6 @@ AI_METHODS = {
 # **故意**留在默认 30s 的。它们要么压根不调模型, 要么快失败才是对的。
 NOT_AI_METHODS = {
     "strategyAiStatus": "读配置状态",
-    "ladderAiReports": "读历史报告",
     # [R352] `todayAiTrackRecord` 删了 —— 它从 R351 起就没人调(只服务于
     # 已随今日总览删掉的优选面板)。
     "usageNotesSummaryGet": "读已存的那一段, 不重新生成",

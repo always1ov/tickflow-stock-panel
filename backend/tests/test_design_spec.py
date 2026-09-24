@@ -43,10 +43,10 @@ TW = SRC.parent / "tailwind.config.ts"
 #: 迁成 `rounded-btn` 时这个数**一动不动**, 棘轮看不见它存在的意义所在的那种迁移。
 #: 详见 `_counts()`。另外「任意字号」2282 → 2280 是这一轮真迁的(两个档位选择器)。
 RATCHET = {
-    "裸圆角": 749,         # 真·裸圆角: rounded / -sm/-md/-lg/-xl/-2xl, 不含语义 token
+    "裸圆角": 732,         # 真·裸圆角: rounded / -sm/-md/-lg/-xl/-2xl, 不含语义 token
     "任意字号": 42,      # text-[Npx]
-    "硬编码色": 753,      # text-/bg-/border- + Tailwind 调色板
-    "任意容器宽": 42,      # max-w-[Npx]
+    "硬编码色": 729,      # text-/bg-/border- + Tailwind 调色板
+    "任意容器宽": 41,      # max-w-[Npx]
 }
 
 #: [R400] 基础件所在目录。新写界面从这里取, 不再手写 class 串。

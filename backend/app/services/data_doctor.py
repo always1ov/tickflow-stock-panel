@@ -131,7 +131,10 @@ STORES: tuple[Store, ...] = (
     Store("user_data/today_prefs.json", "总览门槛偏好", shape=SHAPE_OBJECT),
     Store("user_data/today_ai.json", "今日 AI 导读", shape=SHAPE_OPAQUE, kind=KIND_DERIVED),
     Store("user_data/market_mode.json", "大盘红绿灯", shape=SHAPE_OPAQUE, kind=KIND_DERIVED),
-    Store("user_data/seesaw_history.json", "板块跷跷板", shape=SHAPE_OPAQUE, kind=KIND_DERIVED),
+    # [R504] 跷跷板与 AI 打板复盘两个功能撤了, **存档文件没删**(用户定的: 删代码, 留存档)。
+    # 登记留着, 体检才不会把它们当成来路不明的孤儿; note 说清楚现在没有功能在读写它们。
+    Store("user_data/seesaw_history.json", "板块跷跷板", shape=SHAPE_OPAQUE, kind=KIND_DERIVED,
+          note="功能已撤(R504), 只剩历史存档 —— 没有地方再读写它, 不需要可以删"),
     Store("user_data/livermore.json", "利弗莫尔趋势", shape=SHAPE_OPAQUE, kind=KIND_DERIVED),
     Store("user_data/pattern_digest.json", "形态提炼", shape=SHAPE_OPAQUE, kind=KIND_DERIVED),
     Store("user_data/focus_overrides.json", "关注清单覆盖", shape=SHAPE_OPAQUE),
@@ -165,7 +168,8 @@ STORES: tuple[Store, ...] = (
     Store("user_data/ai_market_recaps.json", "AI 复盘归档", kind=KIND_DERIVED,
           shape=SHAPE_RECORD_LIST, required=("id",)),
     Store("user_data/ladder_ai_reports.json", "连板梯队 AI 复盘", kind=KIND_DERIVED,
-          shape=SHAPE_RECORD_LIST, required=("id",)),
+          shape=SHAPE_RECORD_LIST, required=("id",),
+          note="功能已撤(R504), 只剩历史存档 —— 没有地方再读写它, 不需要可以删"),
     Store("user_data/strategy_cache.json", "策略结果缓存", kind=KIND_DERIVED,
           note="纯缓存, 最容易长得很大 —— 删掉会自动重算"),
     Store("user_data/strategy_run_timings.json", "策略耗时统计", kind=KIND_DERIVED),

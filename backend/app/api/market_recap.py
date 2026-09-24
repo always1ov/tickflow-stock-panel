@@ -32,7 +32,6 @@ class AnalyzeRequest(BaseModel):
     """AI 大盘复盘请求。"""
     as_of: str | None = None  # 可选:复盘日期(YYYY-MM-DD),缺省取最新有数据日
     focus: str = ""           # 可选:用户追加的复盘关注点
-    mode: str = "today"       # 复盘模式: today=当日 / continuity=连读昨日 / week=近7交易日
 
 
 @router.get("/dragon-tiger")
@@ -102,14 +101,8 @@ async def analyze_market(request: Request, req: AnalyzeRequest):
             raise HTTPException(400, f"as_of 格式应为 YYYY-MM-DD,收到: {req.as_of}")
 
     async def stream_gen():
-        # [合上游 48ddc68b] 作者给这一路加了空闲心跳保活(等 LLM 首包期间流上
-        # 零字节可达几分钟, 反向代理会按空闲超时切断)。**fork 那个 `mode` 参数
-        # 原样保留** —— 作者包的是"这个流", 传什么参数是另一回事, 两件事不冲突。
         async for chunk in with_heartbeat(
-            recap_market_stream(
-                repo, quote_service, depth_service, as_of, req.focus,
-                mode=req.mode if req.mode in ("today", "continuity", "week") else "today",
-            ),
+            recap_market_stream(repo, quote_service, depth_service, as_of, req.focus),
         ):
             yield chunk + "\n"
 
@@ -132,7 +125,6 @@ class SaveReportRequest(BaseModel):
     summary: str = ""
     emotion_score: int | None = None
     emotion_label: str = ""
-    mode: str = "today"       # 生成时用的复盘模式(today/continuity/week), 供历史列表区分显示
     push: bool = False  # 是否显式外发推送(manual 模式下需显式传 true)
 
 
@@ -152,7 +144,6 @@ def save_report(request: Request, req: SaveReportRequest):
         "summary": req.summary,
         "emotion_score": req.emotion_score,
         "emotion_label": req.emotion_label,
-        "mode": req.mode if req.mode in ("today", "continuity", "week") else "today",
     })
     # 推送门控: manual 模式需显式 push=True; auto 模式保持归档即推。
     # 内部 try/except 静默降级, 不影响归档返回值。

@@ -12,7 +12,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   BookOpenCheck, RefreshCw, Sparkles, Trash2, History, ChevronRight, AlertTriangle,
-  Database, Wand2, Copy, Download, Clock, X, Check, Trophy, ChevronDown, ChevronUp, Repeat,
+  Database, Wand2, Copy, Download, Clock, X, Check, Trophy, ChevronDown, ChevronUp,
 } from 'lucide-react'
 
 import { api, type OverviewMarket, type AiReviewReport, type DragonTigerStockItem } from '@/lib/api'
@@ -23,8 +23,6 @@ import { StockPreviewDialog } from '@/components/StockPreviewDialog'
 import { boardTag } from '@/components/stock-table/primitives'
 import { fmtBigNum } from '@/lib/format'
 import { PageHeader } from '@/components/PageHeader'
-import { RpsRotationDialog } from '@/components/RpsRotationDialog'
-import { LadderAiReview } from '@/components/LadderAiReview'
 import { MarkdownRenderer } from '@/components/financials/MarkdownRenderer'
 import { toast } from '@/components/Toast'
 import { usePreferences } from '@/lib/useSharedQueries'
@@ -33,7 +31,7 @@ import {
   startReviewGeneration, resetReview, isReviewGenerating,
   type ReviewPhase,
 } from '@/lib/reviewStore'
-import { SEG, SEG_ITEM, SEG_OFF, SEG_ON, TYPE, buttonClass } from '@/components/ui'
+import { TYPE, buttonClass } from '@/components/ui'
 
 // ================================================================
 // 涨跌幅格式化(注意单位差异)
@@ -77,8 +75,6 @@ export function Review() {
   // 复盘日期:当前固定取最新交易日(后续如需日期选择可改回 useState)
   const asOf: string | undefined = undefined
   const [focus, setFocus] = useState('')
-  // 复盘模式: 当日 / 连读昨日(对照上一份复盘) / 近7交易日纵览
-  const [recapMode, setRecapMode] = useState<'today' | 'continuity' | 'week'>('today')
   // 生成状态走全局 store:切走页面流不中断,回来可恢复
   const { phase, content, error, meta } = useReviewState()
   const [viewing, setViewing] = useState<AiReviewReport | null>(null)  // 查看历史报告
@@ -109,8 +105,6 @@ export function Review() {
 
   // ===== 定时复盘 =====
   const [showSchedule, setShowSchedule] = useState(false)
-  // [R105] 板块 RPS 轮动弹窗(统一入口)
-  const [showRps, setShowRps] = useState(false)
   const prefs = usePreferences()
   const reviewSched = prefs.data?.review_schedule ?? { enabled: false, hour: 15, minute: 10 }
   const feishuConfigured = !!(prefs.data?.feishu_webhook_url)
@@ -196,11 +190,10 @@ export function Review() {
         summary: doneMeta?.summary,
         emotion_score: doneMeta?.emotion_score ?? null,
         emotion_label: doneMeta?.emotion_label ?? '',
-        mode: recapMode,
       })
       qc.invalidateQueries({ queryKey: QK.reviewReports })
     } catch { /* 静默 */ }
-  }, [focus, asOf, marketQuery.data, qc, recapMode])
+  }, [focus, asOf, marketQuery.data, qc])
 
   // 主流程:生成复盘(委托给全局 store,流在后台独立运行)
   const generate = useCallback(() => {
@@ -209,8 +202,8 @@ export function Review() {
     resetReview()
     startReviewGeneration(asOf, focus, (full, doneMeta) => {
       onGenerationDone(full, doneMeta).catch(() => { /* 静默 */ })
-    }, recapMode)
-  }, [asOf, focus, onGenerationDone, recapMode])
+    })
+  }, [asOf, focus, onGenerationDone])
 
   // 复制全文到剪贴板(viewing 优先,与主区域显示一致)
   const copyContent = useCallback(async () => {
@@ -261,17 +254,12 @@ export function Review() {
         titleExtra={<Sparkles className="h-4 w-4 text-accent" />}
         subtitle={`${displayDate}${data?.emotion ? ` · 情绪 ${data.emotion.label}` : ''}`}
         right={
+          // [R504] 页头回到作者那一排(刷新 / 定时 / 生成复盘)。撤掉的三样都是 fork 加的:
+          // AI 打板复盘(连同藏在它里面的板块跷跷板)、「当日/连读昨日/近7日」三种复盘模式、
+          // 板块 RPS 轮动入口(已放回作者原来的行业/概念分析页)。用户要整改这一页, 先回到干净的底子。
+          // **整改这一页之前先读 .scratch/review-page-rework/issues/01-ladder-ai-and-friends.md,
+          // 把撤掉的几样逐项问用户要不要回来** —— 这是用户交代的提醒。
           <div className="flex flex-wrap items-center gap-1">
-            {/* [R105] 板块 RPS 轮动 —— 从行业/概念分析页收编到复盘的统一入口,
-                弹窗内可切行业/概念维度并标明数据出处 */}
-            <button
-              onClick={() => setShowRps(true)}
-              // [R461] 页头这一排一律全站按钮(docs/ui-hierarchy.md)
-              className={buttonClass({}, 'gap-1')}
-              title="板块涨幅 RPS 轮动矩阵(数据来自行业/概念分析页) —— 复盘时观察板块强弱轮动"
-            >
-              <Repeat className="h-3 w-3" />板块RPS轮动
-            </button>
             <button
               onClick={() => { marketQuery.refetch() }}
               disabled={marketQuery.isFetching}
@@ -287,19 +275,6 @@ export function Review() {
             >
               <Clock className="h-3 w-3" />定时
             </button>
-            {/* 复盘模式: 当日 / 连读昨日(对照上一份) / 近7交易日纵览 */}
-            <div className={SEG}>
-              {([['today', '当日'], ['continuity', '连读昨日'], ['week', '近7日']] as const).map(([k, label]) => (
-                <button key={k} onClick={() => setRecapMode(k)}
-                  title={k === 'continuity' ? '先回顾上一份复盘的观察要点是否兑现, 再结合今日复盘' : k === 'week' ? '以近7个交易日为主时间轴: 情绪演变/主线切换/量能趋势' : '按当日盘面直接复盘(原模式)'}
-                  className={cn(SEG_ITEM, recapMode === k ? SEG_ON : SEG_OFF)}>
-                  {label}
-                </button>
-              ))}
-            </div>
-            {/* [R50] 打板那条线。大盘复盘看指数与情绪, 这份看梯队与打板 ——
-                两份并排才是一次完整的盘后复盘。原在连板梯队页, 名为「AI 战法」 */}
-            <LadderAiReview date={data?.as_of ?? undefined} />
             <button
               onClick={generate}
               disabled={isGenerating}
@@ -400,9 +375,6 @@ export function Review() {
           )}
         </div>
       </div>
-
-      {/* [R105] 板块 RPS 轮动弹窗 —— 全站唯一入口, 弹窗内可切行业/概念 */}
-      {showRps && <RpsRotationDialog onClose={() => setShowRps(false)} kind="industry" allowKindSwitch />}
 
 
       {/* ===== 定时复盘设置弹窗 ===== */}
@@ -858,7 +830,7 @@ function ReportPanel({
           {isGenerating ? <RefreshCw className="h-3.5 w-3.5 animate-spin text-accent" /> : <BookOpenCheck className="h-3.5 w-3.5 text-accent" />}
           <span className="text-xs font-medium text-foreground">
             {showViewingTag
-              ? `历史复盘 · ${viewing!.as_of}${viewing!.mode && MODE_LABEL[viewing!.mode] ? ` · ${MODE_LABEL[viewing!.mode]}` : ''}`
+              ? `历史复盘 · ${viewing!.as_of}`
               : isGenerating ? 'AI 正在复盘…' : '复盘报告'}
           </span>
         </div>
@@ -905,9 +877,6 @@ function ReportPanel({
 // ================================================================
 // 历史面板
 // ================================================================
-
-/** 复盘模式的显示标签(与顶部模式选择器一致); 旧存档无 mode 字段则不显示 */
-const MODE_LABEL: Record<string, string> = { today: '当日', continuity: '连读昨日', week: '近7日' }
 
 function HistoryPanel({
   reports, loading, viewingId, generating, onView, onBackToGenerating, onDelete,
@@ -978,11 +947,6 @@ function HistoryPanel({
                     <div className="flex items-center gap-1.5">
                       <span className="truncate text-xs font-medium text-foreground">{r.emotion_label ?? '—'}</span>
                       <span className="font-mono text-micro text-secondary">{r.as_of}</span>
-                      {r.mode && MODE_LABEL[r.mode] && (
-                        <span className="shrink-0 rounded border border-accent/30 bg-accent/10 px-1 py-px text-micro text-accent">
-                          {MODE_LABEL[r.mode]}
-                        </span>
-                      )}
                     </div>
                     <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
                       {r.summary

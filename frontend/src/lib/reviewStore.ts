@@ -76,7 +76,6 @@ export async function startReviewGeneration(
   asOf: string | undefined,
   focus: string,
   onDone?: (fullContent: string, meta: ReviewMeta | null) => void,
-  mode: 'today' | 'continuity' | 'week' = 'today',
 ): Promise<void> {
   // 已在生成中,不重复启动
   if (isReviewGenerating()) return
@@ -91,7 +90,7 @@ export async function startReviewGeneration(
   let doneMeta: ReviewMeta | null = null
 
   try {
-    for await (const evt of api.reviewStream(asOf, focus, mode)) {
+    for await (const evt of api.reviewStream(asOf, focus)) {
       if (abortCtrl.signal.aborted) break
       if (evt.type === 'meta') {
         doneMeta = evt

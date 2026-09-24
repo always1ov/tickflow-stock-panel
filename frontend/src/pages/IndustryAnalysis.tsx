@@ -6,6 +6,7 @@ import {
   Crown,
   Layers3,
   RefreshCw,
+  Repeat,
   Search,
   Settings2,
   TrendingDown,
@@ -23,6 +24,8 @@ import { fmtBigNum, fmtPct, priceColorClass } from '@/lib/format'
 import { cn } from '@/lib/cn'
 import { resolveDimension, type DimensionGroup, type StockRow } from '@/lib/analysis-adapter'
 import { SectorRotationCard } from '@/components/SectorRotationCard'
+import { RpsRotationDialog } from '@/components/RpsRotationDialog'
+import { buttonClass } from '@/components/ui'
 
 const KEYWORDS = ['industry', '行业', 'sector', '申万', '中信']
 const CANDIDATE_FIELDS = ['industry', '行业', 'sector', '申万', '中信', '行业名称', 'industry_name', 'sector_name']
@@ -271,6 +274,7 @@ function groupByIndustryLevel(groups: DimensionGroup[], level: IndustryLevel): D
 export function IndustryAnalysis() {
   const [fieldConfig, setFieldConfig] = useState<AnalysisFieldConfig>(loadConfig)
   const [showConfig, setShowConfig] = useState(false)
+  const [showRps, setShowRps] = useState(false)
   const [search, setSearch] = useState('')
   const [selectedKey, setSelectedKey] = useState<string | null>(null)
   const [sortMode, setSortMode] = useState<SortMode>('heat')
@@ -419,7 +423,16 @@ export function IndustryAnalysis() {
         subtitle={`${industryLevelLabel} · ${marketQuery.data?.as_of ?? rowsQuery.data?.date ?? '最新'} · ${stats.length} 个行业 · ${totalSymbols} 只标的`}
         right={
           <div className="flex flex-wrap items-center gap-1">
-            {/* [R105] RPS 轮动入口移到「复盘」页(全站唯一入口, 弹窗内可切行业/概念) */}
+            {/* RPS 轮动: 打开行业涨幅轮动矩阵对话框。
+                [R504] R105 曾把它收编到复盘页做统一入口; 复盘页回到作者的样子后, 放回作者原来这里。
+                配色走全站按钮(作者原来是琥珀色高亮, 全站迁移后不写死调色板色) */}
+            <button
+              onClick={() => setShowRps(true)}
+              className={buttonClass({}, 'gap-1')}
+              title="行业涨幅轮动矩阵"
+            >
+              <Repeat className="h-3.5 w-3.5" />涨幅RPS轮动分析
+            </button>
             <button
               onClick={() => { rowsQuery.refetch(); marketQuery.refetch() }}
               disabled={rowsQuery.isFetching || marketQuery.isFetching}
@@ -508,6 +521,7 @@ export function IndustryAnalysis() {
           onNavigate={(sym, n) => { setPreviewSymbol(sym); setPreviewName(n ?? '') }}
         />
       )}
+      {showRps && <RpsRotationDialog onClose={() => setShowRps(false)} kind="industry" />}
     </>
   )
 }

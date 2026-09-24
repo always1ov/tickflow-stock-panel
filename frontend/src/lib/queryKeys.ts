@@ -159,11 +159,8 @@ export const QK = {
   tickflowKeys:         ['tickflow-keys'] as const,
   realtimeKeysPerRound: ['realtime-keys-per-round'] as const,
   // 研究工作流 / AI 自动挖掘
-  // 板块跷跷板 / 盘中阶段
-  regimeSeesaw:         (kind: string) => ['regime-seesaw', kind] as const,
+  // 盘中阶段
   regimePhaseLive:      ['regime-phase-live'] as const,
-  // 连板梯队 AI 打板复盘
-  ladderAiReports:      ['ladder-ai-reports'] as const,
   // 自选决策台(持仓/出场线/AI 信号)
   watchlistPositions:   ['watchlist-positions'] as const,
   watchlistExitLines:   ['watchlist-exit-lines'] as const,
