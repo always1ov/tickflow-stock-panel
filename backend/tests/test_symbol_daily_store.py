@@ -452,7 +452,32 @@ def test_R493_管道正在发布_不建也不用副本(tmp_path, monkeypatch, as
     monkeypatch.setattr(sds, "enriched_publication_incomplete",
                         lambda _d, a="stock": seen.append(a) or True)
     assert _via(tmp_path, asset=asset) is None
-    assert seen == [asset], "股票和 ETF 各看各的发布标记"
+    assert set(seen) == {asset}, "股票和 ETF 各看各的发布标记"
+
+
+def test_R494_盘中实时落盘撞上发布标记_等几毫秒照常用副本(store, monkeypatch):
+    """实时每轮只在换文件那几毫秒处于发布中 —— 不该为此退回扫全部日文件。"""
+    root, _ = store
+    _via(root)
+    left = [3]                                             # 前 3 次看是「发布中」, 随后就绪
+
+    def flag(*_a, **_k):
+        left[0] -= 1
+        return left[0] >= 0
+    monkeypatch.setattr(sds, "enriched_publication_incomplete", flag)
+    c = _Counter(monkeypatch)
+    got = _via(root)
+    assert got is not None and got.equals(_orig(root, "stock", "600000.SH", date(1990, 1, 1), END, OHLCV))
+    assert c.files == sds.TAIL_DAYS + 2, "走的是副本(最近 10 天 + 抽查首尾两天; 这只票天天有, 两头外侧不用查)"
+
+
+def test_R494_管道整轮发布_等满也不就绪_退回原路且不久等(store, monkeypatch):
+    root, _ = store
+    _via(root)
+    monkeypatch.setattr(sds, "enriched_publication_incomplete", lambda *_a, **_k: True)
+    t = time.monotonic()
+    assert _via(root) is None
+    assert time.monotonic() - t < sds.PUBLISH_WAIT_SECONDS + 0.15
 
 
 def test_R493_空副本即使说明是新的也不认_历史补进来照样看得到(store):

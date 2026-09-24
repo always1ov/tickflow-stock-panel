@@ -48,7 +48,16 @@
 空副本无从抽查, 历史补进来之后会被当成「没变」。这类票每次照原来扫分区。
 
 管道正在发布(发布标记未就绪)时不建也不用副本, 照原来扫分区 —— 免得把一半新一半旧的
-状态存下来。
+状态存下来。盘中实时落盘也走同一个发布标记, 但只占换文件那几毫秒: 撞上了先等一小会儿
+(最多 0.2 秒), 就绪了照常用副本, 见 `_publishing`。
+
+## 盘中(R494 梳理)
+
+  · 实时只写「今天」分区, 它永远在现读的那十来天里, 副本本身不受盘中影响;
+  · 今天那根的数: 磁盘上是最近一轮实时落盘的值; 股票再由仓库用最新行情缓存覆盖
+    (`get_daily` 快路径, 与原来同一段代码); 两张副图与 K 线接口还会叠
+    `_maybe_inject_live_candle` 的实时蜡烛 —— 三层都与原来一样, 副本没有插手;
+  · 盘中建副本照常: 截止日取倒数第 11 个分区, 今天那个分区自然落在截止日之后。
 
 分区目录里出现看不懂的东西(不是 `date=YYYY-MM-DD` 的子目录、散落的 parquet) → 不用副本:
 原来的 `**/*.parquet` 会把它们也读进来, 这里不去猜它们该怎么对齐。
@@ -88,6 +97,7 @@ TAIL_DAYS = 10
 MAX_AGE_SECONDS = 7 * 86400
 MAX_COPIES = 800
 ORPHAN_SECONDS = 3600
+PUBLISH_WAIT_SECONDS = 0.2
 FORMAT_VERSION = 3
 STORE_COLS = list(ENRICHED_STORAGE_SCHEMA)
 
@@ -102,8 +112,6 @@ _SOURCE_DIRS = {
 _SAFE_SYMBOL = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,31}")
 _locks_guard = threading.Lock()
 _locks: dict[tuple[str, str, str], threading.Lock] = {}
-# 仓库里只有股票和 ETF 走发布标记(`EnrichedPublication`); 指数没有, 不查
-_PUBLISHED = {"stock", "etf"}
 
 
 def _partitions(src: Path) -> list[tuple[date, Path]] | None:
@@ -297,7 +305,19 @@ def _history(data_dir: Path, asset_type: str, symbol: str, start: date, end: dat
 
 
 def _publishing(data_dir: Path, asset_type: str) -> bool:
-    return asset_type in _PUBLISHED and enriched_publication_incomplete(data_dir, asset_type)
+    """发布标记未就绪 = 有人正在改分区。先等一小会儿再下结论(R494):
+
+    盘中实时每轮(默认 6 秒, 最快 1 秒)覆写「今天」分区, 标记只在换文件那几毫秒处于发布中;
+    盘后管道重算历史是**整轮一次发布**, 一挂就是几分钟。等 PUBLISH_WAIT_SECONDS 还没就绪
+    的才当作管道在跑 —— 实时落盘撞上了就等它几毫秒, 不必为此退回扫全部日文件。
+    指数没有发布标记(仓库只给股票和 ETF 发), 标记文件不存在即视为就绪。
+    """
+    deadline = time.monotonic() + PUBLISH_WAIT_SECONDS
+    while enriched_publication_incomplete(data_dir, asset_type):
+        if time.monotonic() >= deadline:
+            return True
+        time.sleep(0.01)
+    return False
 
 
 def _load_valid(pq: Path, js: Path, parts: list[tuple[date, Path]],
