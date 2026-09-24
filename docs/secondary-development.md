@@ -20,7 +20,7 @@
 - 扩展数据与声明式分析页面：适合不需要自定义 React 交互的页面。
 - 前端源码扩展注册：`frontend/src/custom/<namespace>/extension.tsx`，支持静态页面、导航和已开放插槽。
 - 后端源码扩展注册：`backend/app/custom/<module>.py`，支持 FastAPI 路由、启动钩子和通知格式化器。
-- 当前前端插槽：`layout.navigation.extra`、`stock-preview.footer`、`watchlist.toolbar`。
+- 当前前端插槽：`layout.navigation.extra`、`stock-preview.footer`、`watchlist.toolbar`、`minds.chat`。
 - 当前后端继承点：`NotificationFormatter`。
 - 因子平台与策略线的既有桥接（已实现，二开时直接复用、勿重复实现）：因子库一键生成单因子排名策略（`GenerateFactorStrategyDialog` → `custom_factor_*`）；策略触发器引用因子条件信号（`AddFactorSignalDialog`，`csg_f_*`）；自定义信号 AI 提示词含因子分组（`custom_signals_ai.py`）；策略回测因子归因（`strategy.py` 的 `factor_attribution`，覆盖 `meta.scoring` 非空的策略）。
 
@@ -118,6 +118,7 @@ export default extension
 layout.navigation.extra
 stock-preview.footer
 watchlist.toolbar
+minds.chat
 ```
 
 各插槽 context 契约（均要求 `apiVersion: 1`，定义见 `frontend/src/extensions/types.ts` 的 `FrontendSlotContextMap`）：
@@ -125,6 +126,7 @@ watchlist.toolbar
 - `layout.navigation.extra`：`{ collapsed, pathname }`，侧边栏导航底部。
 - `stock-preview.footer`：`{ symbol, name, view }`，个股详情对话框底部（日K/分时图表下方）；`view` 为 `'daily' | 'intraday'`。适合个股附加面板：龙虎榜、资金流、外部研究链接等。
 - `watchlist.toolbar`：`{ symbols, viewMode, selectedGroup, refresh }`，自选页工具栏末尾；`symbols` 为当前筛选视图中的标的，`refresh` 在扩展修改数据后调用以刷新自选增强数据。适合批量操作入口：自定义分析、导出、组合计算等。
+- `minds.chat`：`{}`（无上下文），Minds 页「对话」一栏的正文区，高度占满该栏；未注册时该栏显示未安装提示。当前由 AI 助手扩展（`custom/assistant`）注册，用于把对话从悬浮抽屉搬进 Minds（fork R502）。
 
 新增插槽前必须有真实用例，并同时定义 context 类型、异常隔离和测试；不能只在类型表中预留名字。
 

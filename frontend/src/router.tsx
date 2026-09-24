@@ -42,8 +42,8 @@ const Regime = lazy(() => import('./pages/Regime').then(m => ({ default: m.Regim
 const AbnormalMoves = lazy(() => import('./pages/AbnormalMoves').then(m => ({ default: m.AbnormalMoves })))
 const Dev = lazy(() => import('./pages/Dev').then(m => ({ default: m.Dev })))
 const ExternalPage = lazy(() => import('./pages/ExternalPage').then(m => ({ default: m.ExternalPage })))
-// [fork 增强] R93 使用观察笔记
-const UsageNotes = lazy(() => import('./pages/UsageNotes').then(m => ({ default: m.UsageNotes })))
+// [fork 增强] R93 使用观察笔记 → [R502] 并进 Minds 的「笔记」一栏
+const Minds = lazy(() => import('./pages/Minds').then(m => ({ default: m.Minds })))
 
 const CORE_ROUTE_PATHS = new Set([
   '/',
@@ -76,7 +76,8 @@ const CORE_ROUTE_PATHS = new Set([
   '/settings',
   '/dev',
   '/external-page',
-  '/usage-notes',
+  '/usage-notes',     // [R502] 旧地址, 重定向到 /minds?tab=notes
+  '/minds',
   '/settings/keys',
   '/settings/ai',
   '/settings/queries',
@@ -186,7 +187,9 @@ export function createAppRouter() {
       { path: 'regime', element: <Regime /> },
       { path: 'abnormal', element: <AbnormalMoves /> },
       { path: 'external-page', element: <ExternalPage /> },
-      { path: 'usage-notes', element: <UsageNotes /> },
+      { path: 'minds', element: <Minds /> },
+      // [R502] 「消息面」改名 Minds, 原页成了「笔记」一栏 —— 书签与旧链接照旧能进
+      { path: 'usage-notes', element: <Navigate to="/minds?tab=notes" replace /> },
       { path: 'branding', element: <Branding /> },
       { path: 'settings', element: <Settings /> },
       // 隐藏路由：开发者工具（不暴露在菜单，仅供调试）

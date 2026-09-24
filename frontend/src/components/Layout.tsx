@@ -48,7 +48,7 @@ import {
   RadioTower,
   CheckCircle2,
   BookOpenCheck,
-  NotebookPen,
+  Brain,           // [R502] Minds
   ChevronRight,
   ChevronDown,
   Sun,
@@ -112,8 +112,9 @@ const nav = [
   { to: '/lots',       label: '模拟盘', icon: Repeat },   // [R327] 转折模拟盘 —— 纯规则, 图标从 Bot 换掉: 这里已经没有 AI
   { to: '/signals',    label: '信号库',   icon: Zap },
   { to: '/review',      label: '复盘',   icon: BookOpenCheck },
-  // [fork 增强] R93 使用观察笔记
-  { to: '/usage-notes', label: '消息面', icon: NotebookPen },   // [R180] 原「我的使用观察」
+  // [fork 增强] R93 使用观察笔记 → [R180] 消息面 → [R502] Minds(笔记 / 洞见 / 交易计划 / 对话)。
+  // 原位改名: 排在哪、藏没藏, 后端读偏好时把旧路径换成新路径(preferences.NAV_RENAMED)。
+  { to: '/minds', label: 'Minds', icon: Brain },
   { to: '/indices', label: '指数', icon: BarChart3 },
   { to: '/data',       label: '数据',   icon: Database },
 ] as const

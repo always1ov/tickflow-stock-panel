@@ -23,6 +23,11 @@ export interface FrontendSlotContextMap {
     /** 刷新自选增强数据 (扩展修改数据后调用) */
     refresh: () => void
   }
+  /**
+   * [R502] Minds 页「对话」一栏的正文区(占满该栏)。没有扩展注册时那一栏显示未安装提示。
+   * 真实用例: AI 助手扩展从悬浮抽屉搬进这里 —— 核心页面不 import 扩展目录, 删扩展仍是整体卸载。
+   */
+  'minds.chat': Record<string, never>
 }
 
 export type FrontendSlotName = keyof FrontendSlotContextMap

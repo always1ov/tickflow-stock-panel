@@ -28,6 +28,10 @@
  *
  * **注入只到 AI 层。** 把握分/出场线/六态/通道位置这些规则层的东西一个字都不吃
  * 这段总结 —— 它们必须保持可复现。这条边界在后端有测试钉着。
+ *
+ * [R502] 菜单「消息面」改名 Minds, 这一页成了 Minds 的「笔记」一栏(pages/Minds.tsx),
+ * 所以只导出正文 `NotesPanel`, 页头与滚动区归 Minds。内容、接口、注入口径一个字没动;
+ * 旧地址 /usage-notes 重定向到 /minds?tab=notes。
  */
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -38,7 +42,6 @@ import {
 import { api, type NewsDeskSummary, type UsageNote } from '@/lib/api'
 import { toast } from '@/components/Toast'
 import { QK } from '@/lib/queryKeys'
-import { PageHeader } from '@/components/PageHeader'
 import { EmptyState } from '@/components/EmptyState'
 import { CollapsibleText } from '@/components/CollapsibleText'
 import { storage } from '@/lib/storage'
@@ -339,7 +342,7 @@ function NoteCard({ note, onDigest, digesting }: {
   )
 }
 
-export function UsageNotes() {
+export function NotesPanel() {
   const qc = useQueryClient()
   const notesQuery = useQuery({ queryKey: QK.usageNotes, queryFn: api.usageNotesList })
   const [draft, setDraft] = useState('')
@@ -431,12 +434,10 @@ export function UsageNotes() {
   }, [notes, filter, search])
 
   return (
-    <div className="flex h-full flex-col">
-      <PageHeader title="消息面" subtitle="记录 → AI 凝练 → 综合成一段总的 → 每次 AI 决策都带上它" />
-      <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4 pt-3 lg:px-4">
-        {/* [R129] 原来 mx-auto max-w-5xl(1024px) 居中: 这是一面卡片墙, 宽屏下
+        /* [R129] 原来 mx-auto max-w-5xl(1024px) 居中: 这是一面卡片墙, 宽屏下
             两侧空一大片而卡片仍挤成两列。改为贴左 + 放宽到 1600px, 配合下方
-            网格在宽屏加到三列 —— 观察条目多的时候一屏能多看一行。 */}
+            网格在宽屏加到三列 —— 观察条目多的时候一屏能多看一行。
+           [R502] 页头与滚动区交给 Minds 页, 这里只剩正文。 */
         <div className="w-full max-w-[1600px] space-y-3">
           {/* [R181] 到期埋伏提醒 —— 排在总览之前, 因为它是这一页唯一需要你"现在动手"的东西 */}
           {due.length > 0 && (
@@ -622,7 +623,5 @@ export function UsageNotes() {
             </div>
           )}
         </div>
-      </div>
-    </div>
   )
 }

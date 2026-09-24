@@ -1,14 +1,16 @@
 /**
- * AI 助手面板 — 非模态, 从页面最右缘滑入(right: 0), 默认 720px 宽,
- * 左缘拖拽可调宽并持久化到 localStorage。
+ * AI 助手面板 — 嵌在 Minds 页「对话」一栏里(经 `minds.chat` 插槽), 占满那一栏。
  *
- * 非模态是核心体验决策: 用户边看行情边问, 页面主体不遮挡、不解锁滚动。
- * 拖拽调宽沿用仓库 60fps 手法: 拖动期间直接改 DOM style.width, 松手才
- * 提交 React state + 持久化。视觉全部走设计令牌; 动画用全站统一缓动。
+ * [R502 · fork] 原来是从页面最右缘滑入的非模态抽屉(默认 720px, 左缘拖拽调宽)。
+ * 用户: 「系统里面悬浮的那个 ai 助手改造复刻成 minds 的功能, 也做成一个菜单选项在左侧」,
+ * 定的是「悬浮按钮去掉, 对话成为 Minds 的第四栏, 原样搬过去」。所以:
+ *   · 去掉 portal / 滑入动画 / 拖拽调宽 / 关闭按钮 —— 它现在是页面的一栏, 不是浮层;
+ *   · 会话、消息、发送、历史(本地最近 20 个)一个字没动, 仍走 ../store;
+ *   · 文件名不改, 方便同步上游时对齐作者的改动。
+ * 原来钳制抽屉宽度的 clampWidth(R397)随抽屉一起没了 —— 一栏的宽度由页面版式决定。
  */
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   ArrowDown,
@@ -19,7 +21,6 @@ import {
   Sparkles,
   Square,
   Trash2,
-  X,
 } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import {
@@ -29,7 +30,6 @@ import {
   type QuickSuggest,
 } from '../client'
 import {
-  closeAssistant,
   deleteSession,
   newSession,
   retryLast,
@@ -43,79 +43,14 @@ import { buttonClass } from '@/components/ui'
 
 const EASE_SMOOTH: [number, number, number, number] = [0.16, 1, 0.3, 1]
 
-const WIDTH_STORAGE_KEY = 'assistant.width.v1'
-const DEFAULT_WIDTH = 720
-export const MIN_WIDTH = 480
+type PanelMessages = ReturnType<typeof useAssistantStore>['sessions'][number]['messages']
 
-function loadWidth(): number {
-  try {
-    const raw = localStorage.getItem(WIDTH_STORAGE_KEY)
-    const value = raw ? Number.parseInt(raw, 10) : Number.NaN
-    return Number.isFinite(value) && value >= MIN_WIDTH ? value : DEFAULT_WIDTH
-  } catch {
-    return DEFAULT_WIDTH
-  }
-}
-
-function saveWidth(width: number) {
-  try {
-    localStorage.setItem(WIDTH_STORAGE_KEY, String(Math.round(width)))
-  } catch { /* 存储不可用时仅内存态 */ }
-}
-
-export function clampWidth(width: number): number {
-  const vw = window.innerWidth
-  // [R397] **收口的那一下必须是视口, 不是那个写死的下限。**
-  //
-  // 原来是 `Math.min(Math.max(width, MIN_WIDTH), Math.max(MIN_WIDTH, vw - 64))` ——
-  // 里外两个 `Math.max` 都在保证"无论如何至少 480px", 于是 390px 的手机上算出来
-  // 仍是 480: **抽屉比屏幕还宽 90px**。右缘贴齐之后左边整块被切出视口, 标题只剩
-  // 半个、每条快捷建议的首字都没了(用户截图)。而调用它的那个 resize 监听, 注释
-  // 写着「保证面板不越出视口」—— **注释承诺的事, 代码做不到**。
-  //
-  // 修法只加最后那个 `vw`: 不变式是"永不超过视口", 别的都在它之内。
-  // **窄屏铺满整屏是这条不变式的结果, 不需要单写一支** —— 我第一版写了个
-  // `if (vw <= MIN_WIDTH) return vw` 的早返回, 变异测试当场证明它与这里的 `vw`
-  // 完全重复(拿掉任意一个, 四条断言照样全绿)。两道看起来像两层防线, 其实只有
-  // 一层, 那比一层更坏。
-  const maxWidth = Math.max(MIN_WIDTH, vw - 64)
-  return Math.min(Math.max(width, MIN_WIDTH), maxWidth, vw)
-}
-
-export function AssistantDrawer() {
-  const { open, sending, sessions, activeId } = useAssistantStore()
+export function AssistantPanel() {
+  const { sending, sessions, activeId } = useAssistantStore()
   const active = sessions.find(s => s.id === activeId) ?? null
-  const messages = active?.messages ?? []
-
-  return createPortal(
-    <AnimatePresence>
-      {open && (
-        <DrawerPanel key="assistant-drawer" sending={sending} messages={messages} />
-      )}
-    </AnimatePresence>,
-    document.body,
-  )
-}
-
-type DrawerMessages = ReturnType<typeof useAssistantStore>['sessions'][number]['messages']
-
-function DrawerPanel({
-  sending,
-  messages,
-}: {
-  sending: boolean
-  messages: DrawerMessages
-}) {
-  const { sessions, activeId } = useAssistantStore()
+  const messages: PanelMessages = active?.messages ?? []
   const [status, setStatus] = useState<AssistantStatus | null>(null)
   const [suggests, setSuggests] = useState<QuickSuggest[]>([])
-  const [width, setWidth] = useState(() => clampWidth(loadWidth()))
-  const [viewportWidth, setViewportWidth] = useState(() => window.innerWidth)
-  // 铺满整屏时没有"调宽"可言 —— 把手是 `touch-none` 的, 留在整页抽屉的左边缘
-  // 会把那一条竖带上的触摸滚动也吃掉。
-  const canResize = viewportWidth > MIN_WIDTH
-  const panelRef = useRef<HTMLElement>(null)
-  const draggingRef = useRef(false)
 
   useEffect(() => {
     let cancelled = false
@@ -124,75 +59,19 @@ function DrawerPanel({
     return () => { cancelled = true }
   }, [])
 
-  // 窗口缩放后重新夹取宽度, 保证面板不越出视口。
-  useEffect(() => {
-    const onResize = () => {
-      setViewportWidth(window.innerWidth)
-      setWidth(prev => clampWidth(prev))
-    }
-    window.addEventListener('resize', onResize)
-    return () => window.removeEventListener('resize', onResize)
-  }, [])
-
-  // 拖拽期间直接改 DOM(60fps), 松手才提交 state + 持久化。
-  const onHandlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
-    event.preventDefault()
-    event.currentTarget.setPointerCapture(event.pointerId)
-    draggingRef.current = true
-  }
-  const onHandlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (!draggingRef.current) return
-    const el = panelRef.current
-    if (el) el.style.width = `${clampWidth(window.innerWidth - event.clientX)}px`
-  }
-  const onHandlePointerEnd = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (!draggingRef.current) return
-    draggingRef.current = false
-    const finalWidth = clampWidth(window.innerWidth - event.clientX)
-    setWidth(finalWidth)
-    saveWidth(finalWidth)
-  }
-
   return (
-    <motion.aside
-      ref={panelRef}
-      initial={{ x: 32, opacity: 0 }}
-      animate={{ x: 0, opacity: 1 }}
-      exit={{ x: 32, opacity: 0 }}
-      transition={{ duration: 0.26, ease: EASE_SMOOTH }}
-      style={{ right: 0, width }}
-      className={cn(
-        'fixed inset-y-0 z-[60] flex min-w-0 flex-col border-l border-border',
-        'bg-surface shadow-2xl',
-      )}
-      role="complementary"
+    <section
+      className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-card border border-border bg-surface"
       aria-label="AI 助手"
     >
-      <DrawerHeader status={status} sessions={sessions} activeId={activeId} sending={sending} />
+      <PanelHeader status={status} sessions={sessions} activeId={activeId} sending={sending} />
       <MessageList messages={messages} sending={sending} status={status} suggests={suggests} />
       <InputArea sending={sending} blocked={status ? !status.supports_tools : false} />
-
-      {/* 左缘拖拽调宽 —— 窄屏铺满时不渲染, 见 canResize */}
-      {canResize && (
-      <div
-        role="separator"
-        aria-orientation="vertical"
-        aria-label="调整宽度"
-        onPointerDown={onHandlePointerDown}
-        onPointerMove={onHandlePointerMove}
-        onPointerUp={onHandlePointerEnd}
-        onLostPointerCapture={onHandlePointerEnd}
-        className="group/handle absolute inset-y-0 left-0 z-10 w-1.5 cursor-col-resize touch-none"
-        title="拖拽调整宽度"
-      >
-        <span className="absolute left-1/2 top-1/2 h-10 w-[3px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent/50 opacity-0 transition-opacity duration-150 ease-smooth group-hover/handle:opacity-100" />
-      </div>
-      )}
-    </motion.aside>
+    </section>
   )
 }
 
-function DrawerHeader({
+function PanelHeader({
   status,
   sessions,
   activeId,
@@ -226,9 +105,6 @@ function DrawerHeader({
         </div>
         <IconButton title="新对话" onClick={() => { newSession(); setMenuOpen(false) }} disabled={sending}>
           <Plus className="h-4 w-4" />
-        </IconButton>
-        <IconButton title="关闭 (Esc)" onClick={closeAssistant}>
-          <X className="h-4 w-4" />
         </IconButton>
       </div>
     </div>
@@ -313,7 +189,7 @@ function MessageList({
   status,
   suggests,
 }: {
-  messages: DrawerMessages
+  messages: PanelMessages
   sending: boolean
   status: AssistantStatus | null
   suggests: QuickSuggest[]
@@ -427,7 +303,7 @@ function EmptyState({ status, suggests }: { status: AssistantStatus | null; sugg
             key={suggest.id}
             type="button"
             onClick={() => sendMessage(suggest.prompt)}
-            className="cursor-pointer rounded-card border border-border bg-base/60 px-3 py-2.5 text-left text-xs text-secondary transition-all duration-150 ease-smooth hover:border-accent/40 hover:bg-elevated hover:text-foreground"
+            className="cursor-pointer rounded-card border border-border bg-base/60 px-3 py-2.5 text-left text-xs text-secondary transition-colors duration-150 ease-smooth hover:border-accent/40 hover:bg-elevated hover:text-foreground"
           >
             {suggest.label}
           </button>
@@ -440,6 +316,14 @@ function EmptyState({ status, suggests }: { status: AssistantStatus | null; sugg
 function InputArea({ sending, blocked }: { sending: boolean; blocked: boolean }) {
   const [text, setText] = useState('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  // [R502] 进到这一栏(含 Ctrl+K 跳过来)就能直接打字 —— 只在有鼠标的设备上:
+  // 手机上一聚焦就弹键盘, 把半屏消息顶没了。依赖 location.key: 已经在这一栏时
+  // 再按 Ctrl+K 会替换一次历史记录, key 变了就再聚焦一次。
+  const { key: locationKey } = useLocation()
+  useEffect(() => {
+    if (window.matchMedia?.('(pointer: fine)').matches) textareaRef.current?.focus()
+  }, [locationKey])
 
   const canSend = !sending && !blocked && text.trim().length > 0
 
@@ -466,7 +350,7 @@ function InputArea({ sending, blocked }: { sending: boolean; blocked: boolean })
 
   return (
     <div className="shrink-0 border-t border-border bg-surface px-4 pb-3 pt-2.5">
-      <div className="flex items-end gap-2 rounded-card border border-border bg-base focus-within:border-accent/50">
+      <div className="flex items-end gap-2 rounded-card border border-border bg-base transition-colors duration-150 ease-smooth focus-within:border-accent/70">
         <textarea
           ref={textareaRef}
           value={text}
@@ -475,7 +359,8 @@ function InputArea({ sending, blocked }: { sending: boolean; blocked: boolean })
           placeholder={blocked ? '请先在设置页配置 AI' : '提问, Enter 发送 / Shift+Enter 换行'}
           onChange={e => { setText(e.target.value); autoGrow() }}
           onKeyDown={onKeyDown}
-          className="max-h-36 min-h-[38px] flex-1 resize-none bg-transparent px-3 py-2 text-sm text-foreground outline-none placeholder:text-muted disabled:cursor-not-allowed"
+          // [R502] 焦点由外框 focus-within 标出; 自动聚焦时全局焦点环再画一圈就成了框中框
+          className="focus-ring-custom max-h-36 min-h-[38px] flex-1 resize-none bg-transparent px-3 py-2 text-sm text-foreground outline-none placeholder:text-muted disabled:cursor-not-allowed"
         />
         {sending ? (
           <button
@@ -501,7 +386,8 @@ function InputArea({ sending, blocked }: { sending: boolean; blocked: boolean })
         )}
       </div>
       <div className="mt-1.5 px-1 text-micro text-muted">
-        ⌘K / Ctrl+K 呼出 · 左缘可拖拽调宽 · 回答基于本地数据, 不构成投资建议
+        {/* 手机上没有键盘快捷键可言, 那半句只在宽屏出 */}
+        <span className="hidden sm:inline">⌘K / Ctrl+K 从任何页面跳到这里 · </span>回答基于本地数据, 不构成投资建议
       </div>
     </div>
   )

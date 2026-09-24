@@ -1,6 +1,8 @@
 /**
  * AI 助手前端状态 — 会话/消息/发送编排, useSyncExternalStore 单例 store。
  *
+ * [R502] 抽屉搬进 Minds「对话」一栏后没有开/关可言, open 状态与三个开关动作随之删掉。
+ *
  * 后端无状态, 会话历史仅存 localStorage(最近 20 个会话); 每轮请求把可见的
  * user/assistant 消息回传, 由后端负责截断。工具往返(footprint)只用于本地
  * 展示, 不进入请求历史。
@@ -43,7 +45,6 @@ export interface AssistantSession {
 interface AssistantState {
   sessions: AssistantSession[]
   activeId: string
-  open: boolean
   sending: boolean
 }
 
@@ -55,7 +56,6 @@ const MAX_INPUT_CHARS = 4000
 let state: AssistantState = {
   sessions: [],
   activeId: '',
-  open: false,
   sending: false,
 }
 
@@ -257,20 +257,6 @@ export function retryLast() {
 
 export function stopSending() {
   abortController?.abort()
-}
-
-export function openAssistant() {
-  setState({ open: true }, false)
-  ensureSession()
-}
-
-export function closeAssistant() {
-  setState({ open: false }, false)
-}
-
-export function toggleAssistant() {
-  if (state.open) closeAssistant()
-  else openAssistant()
 }
 
 export function newSession() {

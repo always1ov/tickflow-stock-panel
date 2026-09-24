@@ -1,21 +1,23 @@
 /**
  * AI 助手宿主 — 挂载于 layout.navigation.extra 插槽(全站常驻渲染点),
- * 但不在侧栏菜单里渲染任何入口。聚合三件套:
- * ① 可拖动悬浮球(位置持久化); ② 左上角 AI 配置徽标右侧的打开入口
- * (DOM 锚定); ③ 从页面右缘滑入的非模态面板。
- * 另负责全局快捷键 ⌘K/Ctrl+K 与 Esc、按当前路由上报页面上下文。
+ * 但不在侧栏菜单里渲染任何入口。负责全局快捷键 ⌘K/Ctrl+K、按当前路由上报页面上下文。
+ *
+ * [R502 · fork] 悬浮球、AI 配置徽标旁的小入口、右缘滑入的抽屉三件套都去掉了 ——
+ * 对话搬进 Minds 页的「对话」一栏(见 extension.tsx 的 minds.chat 插槽), 入口就是
+ * 左侧菜单的 Minds。⌘K/Ctrl+K 从「开关抽屉」改成「跳到那一栏」; Esc 没有要关的东西了。
  */
 import { useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import type { FrontendSlotContextMap } from '@/extensions/types'
-import { closeAssistant, setPageContext, toggleAssistant, useAssistantStore } from './store'
-import { AssistantFloatingButton } from './ui/AssistantFloatingButton'
-import { AiConfigEntry } from './ui/AiConfigEntry'
-import { AssistantDrawer } from './ui/AssistantDrawer'
+import { setPageContext } from './store'
 
 // 插槽注册表把组件 props 定为所有插槽上下文的联合类型(保守契约);
 // 本组件只在 layout.navigation.extra 渲染, 在此收窄到该插槽的上下文。
 type NavigationContext = FrontendSlotContextMap['layout.navigation.extra']
 type AnySlotContext = FrontendSlotContextMap[keyof FrontendSlotContextMap]
+
+/** Minds 页「对话」一栏的地址 —— 快捷键跳过去的地方。 */
+export const CHAT_PATH = '/minds?tab=chat'
 
 // 与核心侧栏导航文案保持一致的轻量映射(仅用于上下文提示, 展示不走这里)。
 const PAGE_LABELS: Record<string, string> = {
@@ -42,7 +44,7 @@ const PAGE_LABELS: Record<string, string> = {
 
 export function AssistantLauncher(props: AnySlotContext) {
   const { pathname } = props as NavigationContext
-  const { open } = useAssistantStore()
+  const navigate = useNavigate()
 
   useEffect(() => {
     setPageContext({ page: PAGE_LABELS[pathname] ?? '' })
@@ -52,20 +54,14 @@ export function AssistantLauncher(props: AnySlotContext) {
     const onKeyDown = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault()
-        toggleAssistant()
-        return
+        // 已在 Minds 里就替换当前记录, 不在历史里堆一串同一个地址;
+        // 换了记录 location.key 就变, 输入框据此重新聚焦(见 AssistantDrawer 的 InputArea)。
+        navigate(CHAT_PATH, { replace: pathname === '/minds' })
       }
-      if (event.key === 'Escape' && open) closeAssistant()
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [open])
+  }, [navigate, pathname])
 
-  return (
-    <>
-      <AssistantFloatingButton />
-      <AiConfigEntry />
-      <AssistantDrawer />
-    </>
-  )
+  return null
 }

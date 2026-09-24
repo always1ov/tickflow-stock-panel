@@ -1233,9 +1233,30 @@ def get_realtime_monitor_config() -> dict:
     }
 
 
+# [R502 · fork] 菜单项改了路径的, 读偏好时换成新路径 —— 原位改名, 用户排好的位置、
+# 藏掉的状态都跟过去。只在读的时候换, 不回写文件: 下次用户在设置里保存时自然落成新路径。
+# 不换的话, 旧路径在 nav_order 里对不上任何一项被跳过, 新路径被当成「新条目」插回默认位置 ——
+# 位置丢了还不报错; 藏掉的会重新冒出来。
+NAV_RENAMED: dict[str, str] = {
+    "/usage-notes": "/minds",   # 消息面 → Minds
+}
+
+
+def _renamed_nav_ids(ids: list) -> list[str]:
+    """把旧路径换成新路径并去重(新旧两个都在时只留先出现的那个位置)。"""
+    out: list[str] = []
+    for i in ids:
+        if not isinstance(i, str):
+            continue
+        i = NAV_RENAMED.get(i, i)
+        if i not in out:
+            out.append(i)
+    return out
+
+
 def get_nav_order() -> list[str]:
     """返回左侧菜单的自定义排序（内置页面 path + 扩展分析菜单 id）。"""
-    return load().get("nav_order", [])
+    return _renamed_nav_ids(load().get("nav_order", []))
 
 
 def set_nav_order(order: list[str]) -> list[str]:
@@ -1246,7 +1267,7 @@ def set_nav_order(order: list[str]) -> list[str]:
 
 def get_nav_hidden() -> list[str]:
     """返回左侧菜单中隐藏的项 id 列表。"""
-    return load().get("nav_hidden", [])
+    return _renamed_nav_ids(load().get("nav_hidden", []))
 
 
 def set_nav_hidden(hidden: list[str]) -> list[str]:
