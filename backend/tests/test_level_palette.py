@@ -38,7 +38,8 @@ THEME_TS = "lib/theme.ts"
 CHART_TSX = "components/stock-analysis/AnalysisKChart.tsx"
 
 # 页底色(index.css 的 --base), 两套主题各一个。价位线画在它上面。
-BG = {"light": "#F6F7FB", "dark": "#0A0A0B"}
+# [R501] 亮色页底 #F6F7FB → #FFFFFF(用户给的参考图); 比原来更亮, 深色线的对比只升不降
+BG = {"light": "#FFFFFF", "dark": "#0A0A0B"}
 
 # K 线的涨跌色。**价位线必须离这两个够远** —— 一条指标线长得像一根蜡烛是最坏的
 # 一种混淆: 看的人不会怀疑, 只会读错。

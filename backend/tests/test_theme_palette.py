@@ -57,9 +57,14 @@ CSS = SRC / "index.css"
 #     明度差 + 1px 边框」—— 这话在暗色成立, 在亮色不成立(边框 1.12、抬升 1.10,
 #     阴影一撤就什么都不剩)。**暗色那边一个字没动**: 那是 R163「还是用回以前
 #     作者的黑」定过案的, 由 test_R382_作者的黑一个字没动 钉着。
+# [R501] 背景这一层照用户给的参考截图换成中性白灰: 页底 #F6F7FB → #FFFFFF,
+#     侧栏 #FFFFFF → #FAFAFA, 次级面去掉蓝调(明度不动, 见下面那条 R501 守卫)。
+#     用户原话: 「参考这个图片的风格, 日间主题就用这种颜色背景色」。只换背景, 边框/文字/
+#     主题色/指标色一个没动。
 CHROME = {
-    "base": "#F6F7FB",
-    "sidebar": "#FFFFFF",
+    "base": "#FFFFFF",
+    "sidebar": "#FAFAFA",
+    "elevated": "#E2E2E2",
     "border": "#D1D4DD",
     "border-input": "#C2C7D6",
     "fg-primary": "#222738",
@@ -513,6 +518,23 @@ def test_R382_暗色的强调色不再借别处的值():
     # 选中底要坐在卡面之上、又远低于文字
     assert _token(blk, "surface")[0] < _token(blk, "accent-soft")[0] < _token(blk, "accent")[0], \
         "选中底的明度没夹在卡面与强调色之间"
+
+
+def test_R501_日间背景是中性白灰_侧栏比页底略灰_次级面明度没被调浅():
+    """用户: 「参考这个图片的风格, 日间主题就用这种颜色背景色」。
+
+    · 三档背景都是中性灰(彩度 0) —— 参考图的灰没有蓝调;
+    · 侧栏比页底略灰: 页底纯白之后, 白侧栏会与页面糊成一片;
+    · 次级面(hover/次级面板)的明度仍是 R408 为了看得见压到的 0.91 —— 这次只去色, 不调浅。
+    """
+    blk = _light_block()
+    for name in ("base", "sidebar", "elevated"):
+        assert _token(blk, name)[1] == 0, f"--{name} 还带着色调"
+    assert _token(blk, "base")[0] == 1, "页底不是纯白"
+    assert _token(blk, "sidebar")[0] < _token(blk, "base")[0], "侧栏没比页底灰 —— 两块白会糊在一起"
+    assert abs(_token(blk, "elevated")[0] - 0.91) < 0.0005, "次级面的明度被调浅了(R408 用户嫌淡)"
+    # 边框不跟着参考图换淡: 页底与卡片都白之后, 卡片只剩边框在分界
+    assert CHROME["border"] == "#D1D4DD"
 
 
 def test_R382_作者的黑一个字没动():

@@ -148,7 +148,7 @@ const LIGHT: ChartTheme = {
   tooltipBg: 'rgba(255,255,255,0.97)',  // --surface
   tooltipBorder: 'rgba(34,39,56,0.10)',
   tooltipText: '#222738', // --fg-primary
-  infoBarBg: 'rgba(246,247,251,0.85)',  // --base       页面底
+  infoBarBg: 'rgba(255,255,255,0.85)',  // --base       页面底(R501 起纯白)
   zoomFill: 'rgba(34,39,56,0.06)',
   fillSubtle: 'rgba(34,39,56,0.04)',
 }
