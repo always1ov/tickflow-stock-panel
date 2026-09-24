@@ -385,6 +385,9 @@ class KlineRepository:
         # symbol 集合 memo (随对应 instruments 缓存失效): 供每请求资产分流用
         self._index_symbol_set_cache: set[str] | None = None
         self._etf_symbol_set_cache: set[str] | None = None
+        # [R497 · fork] 原来只在维表刷新成功或 clear_cache 时才有这个属性: 新装还没同步维表、
+        # 或维表刷新抛错时, 第一次查名字就 AttributeError, 今日总览整页 500
+        self._name_map_cache: dict[str, str] | None = None
         self._index_enriched_cache: pl.DataFrame | None = None
         self._index_enriched_cache_date: date | None = None
 
