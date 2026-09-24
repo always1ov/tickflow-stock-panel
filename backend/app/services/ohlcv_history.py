@@ -19,6 +19,9 @@
 2. **同一只票只扫一次**: 放进内存, 直到库里的最新交易日变了或过了 10 分钟才重扫;
 3. **两张副图共用、同一时刻只让一个请求去扫**(single-flight): 另一个等它扫完直接拿。
 
+[R491] 内存里没有时, 先读按个股另存的日 K 副本(`symbol_daily_store`, 一个文件 + 最近
+十来个日文件), 读不到才照原来扫全部日文件 —— 每只票**第一次**打开也快了。
+
 盘中实时那一根**不进缓存**: 调用方拿到缓存后照旧自己叠 `_maybe_inject_live_candle`,
 所以盘中看到的最右一根永远是最新的。缓存里存的是一份拷贝, 调用方改不坏它。
 """
@@ -31,6 +34,8 @@ from datetime import date
 from typing import Any
 
 import polars as pl
+
+from app.services import symbol_daily_store
 
 COLS = ["date", "open", "high", "low", "close", "volume"]
 # 早于 A 股开市 = 「库里有多少取多少」(趋势量化的「吸筹」要从上市第一根算起)
@@ -52,6 +57,31 @@ def _data_version(repo, asset_type: str) -> Any:
         return None
 
 
+def _from_symbol_copy(repo, asset_type: str, symbol: str, end: date) -> pl.DataFrame | None:
+    """[R491] 先读按个股另存的副本(一个文件 + 最近十来个日文件), 读不到返回 None 走原路。
+
+    盘中最新那一根的覆盖**照抄** `KlineRepository.get_daily` 列下推快路径的那几行:
+    用仓库最新缓存里这只票的那一行替换同一天的行。指数不覆盖、ETF 不覆盖 —— 与
+    `get_index_daily` / `get_etf_daily` 快路径一致。结果与 `get_daily_asset(..., COLS)` 逐位相同。
+    """
+    data_dir = getattr(getattr(repo, "store", None), "data_dir", None)
+    if data_dir is None:                           # 测试替身之类没有磁盘的仓库
+        return None
+    df = symbol_daily_store.read(data_dir, asset_type, symbol, end, COLS)
+    if df is None or df.is_empty() or not all(c in df.columns for c in COLS):
+        return None                                # 空的交给原路(ETF 还有旧版存在指数目录的兜底)
+    if asset_type == "stock":
+        cached, cache_date = repo.get_enriched_latest()
+        if cached is not None and not cached.is_empty() and cache_date:
+            if HISTORY_START <= cache_date <= end:
+                cached_part = repo._filter_cached(cached, symbol, COLS)
+                if not cached_part.is_empty():
+                    df = df.filter(pl.col("date") != cache_date)
+                    common_cols = [c for c in df.columns if c in cached_part.columns]
+                    df = pl.concat([df.select(common_cols), cached_part.select(common_cols)])
+    return df
+
+
 def get_history(repo, asset_type: str, symbol: str, end: date) -> pl.DataFrame:
     """这只票从上市到 `end` 的日 K(6 列, 按日期升序)。命中缓存时不碰磁盘。"""
     key = (id(repo), asset_type, symbol, end)
@@ -68,7 +98,9 @@ def get_history(repo, asset_type: str, symbol: str, end: date) -> pl.DataFrame:
             hit = _cache.get(key)
             if hit and hit[0] == version and time.monotonic() - hit[1] < TTL_SECONDS:
                 return hit[2].clone()
-        df = repo.get_daily_asset(asset_type, symbol, HISTORY_START, end, COLS)
+        df = _from_symbol_copy(repo, asset_type, symbol, end)
+        if df is None:
+            df = repo.get_daily_asset(asset_type, symbol, HISTORY_START, end, COLS)
         if not df.is_empty() and "date" in df.columns:
             df = df.sort("date")
         with _lock:
