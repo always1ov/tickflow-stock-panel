@@ -1,0 +1,5 @@
+# R507 — 隐藏与撤下的功能登记簿
+
+| # | 改动 | 涉及文件 | 冲突风险 | 单独回退 |
+|---|---|---|---|---|
+| R507 | 用户:「要登记好哪些功能等于隐藏了以后说不定用得上」。新建 docs/hidden-features.md, 分三类: 一、隐藏(后端还在算或接口还在, 页面没入口, 只补前端就能找回) —— 情绪周期(阶段照算, /api/regime/phases 与 /phase/live, AI 助手 get_regime 还读)、主线排行与阶段 × 主线(/api/regime/mainline)、状态分布等四块(/api/regime/states 与 history)、转折页「有信号但没做成」(接口照旧返回 skipped / missing / pending)、今日总览没人显示的几块(/api/today 仍算 actions / holdings / meso 成交额分位与涨跌家数 / position_hint / portfolio)、AI 导读 · 优选(/api/today/ai 与 /ai/track-record 仍能用)、批次登记页 /lots-registry、开发者工具 /dev; 二、撤下(代码删了, 写明磁盘存档与找回用的提交号) —— AI 打板复盘、板块跷跷板、复盘三模式、阶段切换推送、AI 个股信号(用户说过以后用斐波那契二型重做)、关键价位持仓止盈线、全球指数、今日总览页、AI 操盘手、「怎么办」列、决策台词汇表、策略体检、因子 / 回测页的 fork 增强; 三、收起(闲置功能分组、RPS 轮动入口、Minds 对话、设置里隐藏的菜单)。每条写清是什么、为什么撤、还剩什么、怎么找回、出自哪一轮; 所有路径与提交号逐一用 git cat-file 核对过。只收功能级撤除, 版面微调不收。AGENTS.md 加硬约束第 16 条: 撤下或隐藏功能要在同一个提交里登记。守卫: 新增 test_hidden_features_registry.py —— 「一、隐藏」17 个锚点(接口路由 / 返回字段 / 路由表)必须还在、7 份存档必须仍在数据体检名单里、登记簿里的提交号必须都找得到(浅克隆才跳过)、AGENTS.md 必须指向登记簿; 变异测试确认改错一个提交号、删掉一个接口都会红 | docs/hidden-features.md(新增); AGENTS.md; backend/tests/test_hidden_features_registry.py(新增) | 无(只加文档与测试) | 可以: git revert 本提交 |
