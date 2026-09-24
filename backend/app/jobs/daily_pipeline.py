@@ -802,6 +802,13 @@ def run_now(
     except Exception:
         logger.exception("pipeline score-ledger snapshot failed (not fatal)")
 
+    # [R495 · fork] 持仓与自选的个股日K副本在后台建好, 明天打开就快。立刻返回, 不影响管道结果
+    try:
+        from app.services import symbol_daily_store
+        symbol_daily_store.start_warmup(repo)
+    except Exception:
+        logger.exception("symbol daily warmup failed to start (not fatal)")
+
     result = {
         "universe_size": len(universe),
         "daily_days": new_daily_days,

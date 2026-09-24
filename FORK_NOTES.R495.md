@@ -1,0 +1,5 @@
+# R495 — 盘后预热持仓与自选的个股日K副本
+
+| # | 改动 | 涉及文件 | 冲突风险 | 单独回退 |
+|---|---|---|---|---|
+| R495 | 用户:「做第1条盘后预热」。副本原来是谁先打开谁建, 每只票第一次打开(以及除权作废、用满 7 天之后的下一次)要多等一次全扫。盘后管道跑完(把握分台账快照之后、返回之前)调用 symbol_daily_store.start_warmup: 起一个后台守护线程立刻返回, 不影响管道结果与耗时; 名单是持仓(effective_positions 里标了持有的)在前、自选在后, 去重保序, 任一处读失败只少那一部分; 挨个调同一个 scan_symbol 建副本(建出来的与打开时建的是同一份, 已有效的只抽查不重建), 读分区走 polars_guard 的 background 车道(用 contextvars 只对预热这条线程生效, 页面请求照旧 interactive), 两只之间歇 0.05 秒; 管道又开始发布(scan_symbol 等满仍在发布而让位)就整轮停下; 最多预热副本池上限的一半(400 只), 不把池里别的票挤光; 同一时刻只跑一轮。模拟库(1000 交易日 × 5000 只)实测: 预热 100 只约 56 秒; 弹窗 5 个请求串行合计, 没预热的票第一次打开中位约 730 ms, 预热过的约 310 ms; 预热进行中打开弹窗中位约 430 ms(CPU 争用, 只发生在盘后这一分钟左右)。294 项对照与改前逐字一致。新增 9 条用例, 变异 12 个全红(删掉的一处「认不出资产类型就跳过」与 scan_symbol 自己的让位重复, 变异下无用例能区分) | backend/app/services/symbol_daily_store.py; backend/app/jobs/daily_pipeline.py; backend/tests/test_symbol_daily_store.py | 低(daily_pipeline.py 末尾加一段 try 包住的调用; 上游改这里时按 test_R495_管道末尾接上了预热 补回) | 可以: git revert 本提交; 或只删 daily_pipeline.py 那一段, 副本回到打开时才建 |

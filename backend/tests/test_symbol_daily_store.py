@@ -588,3 +588,123 @@ def test_R492_截止日之后只读区间里的日文件(store, monkeypatch):
     c = _Counter(monkeypatch)
     _via(root, end=days[-5])
     assert c.files == (sds.TAIL_DAYS - 4) + 2, "区间外的最近几天不该打开"
+
+
+# ── [R495] 盘后预热 ─────────────────────────────────────────────
+def _resolve(s):
+    return "stock"
+
+
+def test_R495_预热把给定的票挨个建好_之后打开直接读副本(store, monkeypatch):
+    root, _ = store
+    res = sds.warm(root, SYMS, _resolve, END)
+    assert res == {"done": 3, "skipped": 0, "reason": "完成"}
+    for s in SYMS:
+        assert (root / sds.CACHE_DIRNAME / "stock" / f"{s}.parquet").exists()
+    c = _Counter(monkeypatch)
+    assert _same(root)
+    assert c.files <= 2 * (sds.TAIL_DAYS + 4), "打开时走的是副本, 不是全扫"
+
+
+def test_R495_已有效的不重建(store, monkeypatch):
+    root, _ = store
+    sds.warm(root, SYMS, _resolve, END)
+    n = [0]
+    real = sds._write_atomic
+    monkeypatch.setattr(sds, "_write_atomic", lambda *a, **k: (n.__setitem__(0, n[0] + 1), real(*a, **k)))
+    sds.warm(root, SYMS, _resolve, END)
+    assert n[0] == 0
+
+
+def test_R495_预热走后台车道_页面请求照旧走前台(store, monkeypatch):
+    root, _ = store
+    seen = []
+    real = sds.guarded_collect
+    monkeypatch.setattr(sds, "guarded_collect", lambda lf, priority="interactive": (seen.append(priority), real(lf))[1])
+    sds.warm(root, ["600000.SH"], _resolve, END)
+    assert seen and set(seen) == {"background"}
+    seen.clear()
+    _via(root, "600001.SH")
+    assert seen and set(seen) == {"interactive"}, "预热结束后车道要还原"
+
+
+def test_R495_管道开始发布就整轮停下(store, monkeypatch):
+    root, _ = store
+    monkeypatch.setattr(sds, "enriched_publication_incomplete", lambda *_a, **_k: True)
+    calls = []
+    real = sds.scan_symbol
+    monkeypatch.setattr(sds, "scan_symbol", lambda *a, **k: (calls.append(a[2]), real(*a, **k))[1])
+    res = sds.warm(root, SYMS, _resolve, END)
+    assert res["done"] == 0 and res["reason"] == "管道正在发布, 让位"
+    assert calls == [SYMS[0]], "第一只就发现在发布, 后面的不再去碰"
+    assert not (root / sds.CACHE_DIRNAME).exists()
+
+
+def test_R495_不认识的票跳过_不影响后面的(store):
+    root, _ = store
+
+    def resolve(s):
+        if s == "BAD":
+            raise ValueError("x")
+        return "futures" if s == "IF2409" else "stock"
+    res = sds.warm(root, ["BAD", "IF2409", "../x", "600000.SH"], resolve, END)
+    assert res == {"done": 1, "skipped": 3, "reason": "完成"}
+
+
+def test_R495_最多预热副本池的一半_还能收到停止(store, monkeypatch):
+    root, _ = store
+    monkeypatch.setattr(sds, "MAX_COPIES", 4)
+    assert sds.warm(root, SYMS, _resolve, END)["done"] == 2
+    stop = threading.Event()
+    stop.set()
+    assert sds.warm(root, SYMS, _resolve, END, stop)["reason"] == "收到停止"
+
+
+def test_R495_预热名单_持仓在前_自选在后_去重(monkeypatch):
+    from app.services import effective_positions
+    from app.tickflow import pools
+    monkeypatch.setattr(effective_positions, "load_all",
+                        lambda: {"600003.SH": {"held": True}, "600001.SH": {"held": False},
+                                 "600002.SH": {"held": True}})
+    monkeypatch.setattr(pools, "get_pool", lambda _p: ["600001.SH", " 600002.sh ", "600009.SH", None])
+    assert sds._warm_targets() == ["600002.SH", "600003.SH", "600001.SH", "600009.SH"]
+    monkeypatch.setattr(pools, "get_pool", lambda _p: (_ for _ in ()).throw(RuntimeError("x")))
+    assert sds._warm_targets() == ["600002.SH", "600003.SH"], "自选读失败只少自选那部分"
+
+
+def test_R495_后台起一轮就返回_同一时刻只跑一轮_守护线程(store, monkeypatch):
+    root, _ = store
+    gate = threading.Event()
+    started = []
+
+    def slow_warm(*a, **k):
+        started.append(threading.current_thread())
+        gate.wait(5)
+        return {"done": 0, "skipped": 0, "reason": "完成"}
+    monkeypatch.setattr(sds, "warm", slow_warm)
+    monkeypatch.setattr(sds, "_warm_targets", lambda: SYMS)
+
+    class _R:
+        store = type("S", (), {"data_dir": root})()
+
+        @staticmethod
+        def resolve_asset_type(_s):
+            return "stock"
+    t = time.monotonic()
+    assert sds.start_warmup(_R()) is True
+    assert time.monotonic() - t < 0.5, "不能卡住管道"
+    for _ in range(100):
+        if started:
+            break
+        time.sleep(0.01)
+    assert started and started[0].daemon, "守护线程, 不拦进程退出"
+    assert sds.start_warmup(_R()) is False, "上一轮没跑完不再起"
+    gate.set()
+    started[0].join(2)
+    assert sds.start_warmup(_R()) is True
+    gate.set()
+
+
+def test_R495_管道末尾接上了预热():
+    src = (Path(__file__).resolve().parents[1] / "app" / "jobs" / "daily_pipeline.py").read_text(encoding="utf-8")
+    assert "symbol_daily_store.start_warmup(repo)" in src

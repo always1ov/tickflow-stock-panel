@@ -63,6 +63,7 @@
 原来的 `**/*.parquet` 会把它们也读进来, 这里不去猜它们该怎么对齐。
 
 副本坏了、读不了、写不了, 一律退回原来的直接扫分区 —— 它只是加速, 不是数据源。
+盘后管道跑完会在后台把持仓与自选的副本提前建好(R495, 见文件末尾 `start_warmup`)。
 这是 `data_dir` 下的派生缓存, 整个目录删掉也没关系, 下次取时自动重建; 「清空本地数据」
 会一并删掉它。每种资产最多留 `MAX_COPIES` 份, 超出删**最久没用**的(读到一次就刷新一次
 修改时间) —— 自定义策略逐只扫全市场也撑不爆硬盘, 也挤不掉天天在看的那几只。
@@ -74,6 +75,7 @@
 from __future__ import annotations
 
 import contextlib
+import contextvars
 import json
 import logging
 import os
@@ -149,12 +151,17 @@ def _empty() -> pl.DataFrame:
     return pl.DataFrame(schema=ENRICHED_STORAGE_SCHEMA)
 
 
+# 盘后预热在后台车道读(R495), 页面请求照旧走 interactive —— 预热不许挤占看盘
+_priority: contextvars.ContextVar[str] = contextvars.ContextVar("symbol_daily_priority", default="interactive")
+
+
 def _scan(files: list[str], symbol: str) -> pl.DataFrame:
     """与仓库 `_scan_*_symbol` 同一个读法(同 schema、同类型放宽), 只是文件由这里点名。"""
     if not files:
         return _empty()
     lf = scan_enriched_parquet(files, cast_options=pl.ScanCastOptions(integer_cast="allow-float"))
-    return guarded_collect(lf.filter(pl.col("symbol") == symbol).sort("date"))
+    return guarded_collect(lf.filter(pl.col("symbol") == symbol).sort("date"),
+                           priority=_priority.get())  # type: ignore[arg-type]
 
 
 def _write_atomic(df: pl.DataFrame, meta: dict, pq: Path, js: Path) -> None:
@@ -349,3 +356,92 @@ def _load_valid(pq: Path, js: Path, parts: list[tuple[date, Path]],
     if not head or not _anchor_ok(saved, head, symbol):
         return None
     return saved, cutoff
+
+
+# ── [R495] 盘后预热: 持仓与自选的副本提前建好, 打开就快 ────────────────────────
+#
+# 用户: 「做第1条盘后预热」。副本本来是「谁先打开谁建」, 每只票第一次打开要多等一次全扫
+# (模拟库 ~0.5 秒); 除权作废的、用满 7 天到期的, 也是下一次打开时才重建。盘后管道跑完
+# 顺手在后台把持仓和自选挨个建好, 第二天打开就是读副本。
+#
+#   · 建出来的与打开时建的是同一份(同一个 scan_symbol), 预热只是把时间挪到盘后;
+#   · 后台车道读(polars_guard 的 background), 页面请求优先;
+#   · 一次只建一只, 两只之间歇一下; 管道又开始发布(scan_symbol 等满仍在发布而让位)
+#     就整轮停下, 不和管道抢;
+#   · 最多预热 MAX_COPIES 的一半, 不把副本池里别的票全挤出去;
+#   · 同一时刻只跑一轮; 后台守护线程, 不拦进程退出。
+
+WARM_PAUSE_SECONDS = 0.05
+_warm_lock = threading.Lock()
+
+
+def warm(data_dir: Path, symbols: list[str], resolve_asset_type, end: date,
+         stop: threading.Event | None = None) -> dict:
+    """按给定顺序挨个把副本建好(已有效的只抽查不重建)。返回 {建好/跳过/停下的原因}。"""
+    done, skipped = 0, 0
+    reason = "完成"
+    token = _priority.set("background")
+    try:
+        for sym in symbols[: MAX_COPIES // 2]:
+            if stop is not None and stop.is_set():
+                reason = "收到停止"
+                break
+            try:
+                asset = resolve_asset_type(sym)
+            except Exception:  # noqa: BLE001
+                asset = None
+            got = scan_symbol(data_dir, asset, sym, date(1990, 1, 1), end, ["date"])
+            if got is None:
+                if _publishing(Path(data_dir), asset):
+                    reason = "管道正在发布, 让位"
+                    break
+                skipped += 1                       # 认不出资产类型 / 代码不像代码 / 库里没这类数据
+            else:
+                done += 1
+            time.sleep(WARM_PAUSE_SECONDS)
+    finally:
+        _priority.reset(token)
+    return {"done": done, "skipped": skipped, "reason": reason}
+
+
+def _warm_targets() -> list[str]:
+    """持仓在前, 自选在后, 去重保序。任何一处读失败都只少那一部分, 不抛。"""
+    out: list[str] = []
+    try:
+        from app.services import effective_positions
+        out += sorted(s for s, p in effective_positions.load_all().items() if p.get("held"))
+    except Exception as e:  # noqa: BLE001
+        logger.warning("预热取持仓失败: %s", e)
+    try:
+        from app.tickflow.pools import get_pool
+        out += list(get_pool("watchlist"))
+    except Exception as e:  # noqa: BLE001
+        logger.warning("预热取自选失败: %s", e)
+    targets: list[str] = []
+    for x in out:
+        sym = x.strip().upper() if isinstance(x, str) else ""
+        if sym and sym not in targets:
+            targets.append(sym)
+    return targets
+
+
+def start_warmup(repo, end: date | None = None) -> bool:
+    """盘后管道跑完调用: 后台起一轮预热, 立刻返回。已有一轮在跑就不再起(返回 False)。"""
+    if not _warm_lock.acquire(blocking=False):
+        return False
+    from app.market_time import cn_today
+
+    def run() -> None:
+        try:
+            t0 = time.monotonic()
+            targets = _warm_targets()
+            res = warm(repo.store.data_dir, targets, repo.resolve_asset_type, end or cn_today())
+            logger.info("个股日K副本盘后预热: %d 只建好/有效, %d 只跳过, 共 %d 只, %.1f 秒, %s",
+                        res["done"], res["skipped"], len(targets), time.monotonic() - t0, res["reason"])
+        except Exception:  # noqa: BLE001 —— 预热失败只是明天第一次打开慢一点
+            logger.exception("个股日K副本盘后预热失败")
+        finally:
+            _warm_lock.release()
+
+    threading.Thread(target=run, name="symbol-daily-warmup", daemon=True).start()
+    return True
