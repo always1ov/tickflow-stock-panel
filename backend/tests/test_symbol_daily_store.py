@@ -1,11 +1,16 @@
-"""[fork R491] 按个股另存的日 K 副本 —— 钉住「快」靠的那几件事, 以及「快了但结果没变」。
+"""[fork R491 / R492] 按个股另存的日 K 副本 —— 钉住「快」靠的那几件事, 以及「快了但结果没变」。
 
-用户: 「按个股另存一份日K副本, 做吧」。每只票第一次打开要把一千来个日文件逐个打开,
-副本把它变成一个文件 + 最近十来个日文件。风险全在「副本过期了还在用」, 所以大半用例
-是在各种改库的方式下, 断言拿到的还是库里此刻的数。
+用户: 「按个股另存一份日K副本, 做吧」; R492 接进仓库的单票读取, 用户确认「做」, 且只关心
+「作者的内置指标、我的评分系统、六态有没有被改变」。所以这里的主线断言只有一句:
+**同样的 (代码, 起, 止, 列) 进去, 走副本与走原来的扫分区, 出来的表逐位相同** ——
+指标、把握分、六态都是拿到这张表之后才算的。
+
+风险全在「副本过期了还在用」, 所以大半用例是在各种改库的方式下断言拿到的还是库里此刻的数。
 """
 from __future__ import annotations
 
+import json
+import shutil
 import threading
 import time
 from datetime import date, timedelta
@@ -19,6 +24,8 @@ from app.services import ohlcv_history as oh
 from app.services import symbol_daily_store as sds
 
 SYMS = ["600000.SH", "600001.SH", "000002.SZ"]
+END = date(2026, 9, 24)
+OHLCV = ["date", "open", "high", "low", "close", "volume"]
 
 
 def _days(n: int, last: date = date(2026, 9, 23)) -> list[date]:
@@ -37,7 +44,7 @@ def _write_day(root: Path, d: date, syms=SYMS, bump: float = 0.0, src="kline_dai
         "symbol": syms, "date": [d] * n,
         "open": base, "high": [x + 0.3 for x in base], "low": [x - 0.3 for x in base], "close": base,
         "volume": [1e6 + i for i in range(n)], "amount": [1e7] * n,
-        "raw_close": base, "raw_high": base, "raw_low": base, "turnover_rate": [1.0] * n,
+        "raw_close": base, "raw_high": base, "raw_low": base, "turnover_rate": [1.0, None, float("nan")][:n],
         "consecutive_limit_ups": [0] * n, "consecutive_limit_downs": [0] * n, "quote_ts": [0] * n,
     }).cast(ENRICHED_STORAGE_SCHEMA)
     p = root / src / f"date={d}"
@@ -53,10 +60,32 @@ def store(tmp_path):
     return tmp_path, days
 
 
-def _direct(root: Path, sym: str, end: date, src="kline_daily_enriched") -> pl.DataFrame:
-    """原路: 扫全部日文件。"""
-    files = sorted(str(p) for p in (root / src).glob("date=*/*.parquet"))
-    return sds._scan(files, sym, oh.COLS).filter(pl.col("date") <= end)
+def _repo(root: Path):
+    from app.tickflow.repository import DataStore, KlineRepository
+    return KlineRepository(DataStore(data_dir=root))
+
+
+_ORIG = {"stock": "_scan_daily_symbol", "index": "_scan_index_daily_symbol", "etf": "_scan_etf_daily_symbol"}
+
+
+def _orig(root: Path, asset: str, sym: str, start: date, end: date, cols=None) -> pl.DataFrame:
+    """原路: 仓库自己那套扫全部日文件(把副本关掉)。"""
+    real = sds.scan_symbol
+    sds.scan_symbol = lambda *_a, **_k: None
+    try:
+        return getattr(_repo(root), _ORIG[asset])(sym, start, end, cols)
+    finally:
+        sds.scan_symbol = real
+
+
+def _via(root, sym="600000.SH", start=date(1990, 1, 1), end=END, cols=OHLCV, asset="stock"):
+    return sds.scan_symbol(root, asset, sym, start, end, cols)
+
+
+def _same(root, sym="600000.SH", start=date(1990, 1, 1), end=END, cols=OHLCV, asset="stock") -> bool:
+    got = _via(root, sym, start, end, cols, asset)
+    want = _orig(root, asset, sym, start, end, cols)
+    return got is not None and got.schema == want.schema and got.equals(want)
 
 
 class _Counter:
@@ -66,115 +95,147 @@ class _Counter:
         self.files = 0
         real = sds._scan
 
-        def scan(files, symbol, cols):
+        def scan(files, symbol):
             self.files += len(files)
-            return real(files, symbol, cols)
+            return real(files, symbol)
         monkeypatch.setattr(sds, "_scan", scan)
 
 
-END = date(2026, 9, 24)
+# ── 主线: 与原来扫分区逐位相同 ─────────────────────────────────────
+_RANGES = [
+    (date(1990, 1, 1), END), (date(2026, 8, 1), END), (date(2026, 9, 1), date(2026, 9, 10)),
+    (date(2026, 9, 16), END),                      # 只在最近 10 天以内: 不碰副本
+    (END, END + timedelta(days=5)),                # 区间里一个分区都没有
+    (date(2000, 1, 1), date(2001, 1, 1)),          # 早于库里第一天
+]
+_COLSETS = [None, OHLCV, ["date", "close"], ["close", "date", "turnover_rate"],
+            ["date", "ma20", "close"], ["date", "change_pct"]]
+
+
+@pytest.mark.parametrize("start,end", _RANGES)
+@pytest.mark.parametrize("cols", _COLSETS)
+def test_R492_同样的输入_副本与原路逐位相同_行列列序类型(store, start, end, cols):
+    root, _ = store
+    for s in [*SYMS, "999999.SH"]:
+        assert _same(root, s, start, end, cols), (s, start, end, cols)       # 第一次: 建副本
+        assert _same(root, s, start, end, cols), (s, start, end, cols)       # 以后: 读副本
 
 
 def test_R491_第一次建副本_以后只开副本加最近十来个日文件(store, monkeypatch):
     root, days = store
     c = _Counter(monkeypatch)
-    a = sds.read(root, "stock", "600000.SH", END, oh.COLS)
+    _via(root)
     assert c.files == len(days), "第一次: 截止日前的建副本 + 最近 10 天现读, 合起来正好全部"
     assert (root / sds.CACHE_DIRNAME / "stock" / "600000.SH.parquet").exists()
     c.files = 0
-    b = sds.read(root, "stock", "600000.SH", END, oh.COLS)
+    _via(root)
     assert c.files == sds.TAIL_DAYS + 2, "以后: 最近 10 天 + 抽查首尾两天"
-    assert a.equals(b) and a.equals(_direct(root, "600000.SH", END))
 
 
-def test_R491_与直接扫分区逐位一致_每只票(store):
-    root, _ = store
-    for s in SYMS:
-        sds.read(root, "stock", s, END, oh.COLS)            # 建
-        assert sds.read(root, "stock", s, END, oh.COLS).equals(_direct(root, s, END)), s
+def test_R492_只要最近十天以内_不碰副本(store, monkeypatch):
+    root, days = store
+    c = _Counter(monkeypatch)
+    _via(root, start=days[-5])
+    assert c.files == 5
+    assert not (root / sds.CACHE_DIRNAME).exists()
 
 
 def test_R491_新进一天_截止日不挪_新的一天照样读到(store, monkeypatch):
-    root, days = store
-    sds.read(root, "stock", "600000.SH", END, oh.COLS)
-    meta0 = (root / sds.CACHE_DIRNAME / "stock" / "600000.SH.json").read_text()
+    root, _ = store
+    _via(root)
+    js = root / sds.CACHE_DIRNAME / "stock" / "600000.SH.json"
+    meta0 = js.read_text()
     new_day = date(2026, 9, 24)
     _write_day(root, new_day)
     c = _Counter(monkeypatch)
-    got = sds.read(root, "stock", "600000.SH", date(2026, 9, 25), oh.COLS)
-    assert (root / sds.CACHE_DIRNAME / "stock" / "600000.SH.json").read_text() == meta0, \
-        "每进一天截止日就挪 = 副本天天作废, 等于没做"
+    got = _via(root, end=date(2026, 9, 25))
+    assert js.read_text() == meta0, "每进一天截止日就挪 = 副本天天作废, 等于没做"
     assert c.files == sds.TAIL_DAYS + 1 + 2
     assert got["date"][-1] == new_day
-    assert got.equals(_direct(root, "600000.SH", date(2026, 9, 25)))
+    assert _same(root, end=date(2026, 9, 25))
 
 
 def test_R491_除权后全部日文件重写_复权价变了就重建(store):
     """管道遇到除权会把这只票的全部日期重算重写 —— 副本必须跟上, 不能拿旧价。"""
     root, days = store
-    sds.read(root, "stock", "600000.SH", END, oh.COLS)
+    _via(root)
     for d in days:
         _write_day(root, d, bump=-1.5)                     # 前复权: 以前的价整体下移
-    got = sds.read(root, "stock", "600000.SH", END, oh.COLS)
-    assert got.equals(_direct(root, "600000.SH", END))
+    assert _same(root)
 
 
 @pytest.mark.parametrize("which", ["first", "last"])
 def test_R491_抽查首尾_任一根对不上就重建(store, which):
     """前复权改前面(首根对不上), 后复权改后面(截止日那根对不上), 两头都得抽。"""
     root, days = store
-    sds.read(root, "stock", "600000.SH", END, oh.COLS)
+    _via(root)
     cutoff = days[-sds.TAIL_DAYS - 1]
     _write_day(root, days[0] if which == "first" else cutoff, bump=0.07)
-    assert sds.read(root, "stock", "600000.SH", END, oh.COLS).equals(_direct(root, "600000.SH", END))
+    assert _same(root)
+
+
+def test_R492_抽查的是整行_只改了成交额也重建(store):
+    root, days = store
+    _via(root, cols=None)
+    p = root / "kline_daily_enriched" / f"date={days[0]}" / "part.parquet"
+    pl.read_parquet(p).with_columns(pl.col("amount") * 2).write_parquet(p)
+    assert _same(root, cols=None)
 
 
 def test_R491_补历史_补缺口_删一天_分区数一变就重建(store):
     root, days = store
-    sds.read(root, "stock", "600000.SH", END, oh.COLS)
+    _via(root)
     _write_day(root, days[0] - timedelta(days=7))           # 往前补历史
-    assert sds.read(root, "stock", "600000.SH", END, oh.COLS).equals(_direct(root, "600000.SH", END))
-    import shutil
+    assert _same(root)
     shutil.rmtree(root / "kline_daily_enriched" / f"date={days[5]}")   # 中间删掉一天
-    assert sds.read(root, "stock", "600000.SH", END, oh.COLS).equals(_direct(root, "600000.SH", END))
+    assert _same(root)
 
 
 def test_R491_中间某天被改_抽查抽不到_最多7天后重建(store, monkeypatch):
     root, days = store
-    sds.read(root, "stock", "600000.SH", END, oh.COLS)
+    _via(root)
     _write_day(root, days[10], bump=0.5)
-    stale = sds.read(root, "stock", "600000.SH", END, oh.COLS)
-    assert not stale.equals(_direct(root, "600000.SH", END)), "这正是抽查的盲区, 只靠到期兜底"
+    assert not _same(root), "这正是抽查的盲区, 只靠到期兜底"
     t = time.time()
     monkeypatch.setattr(sds.time, "time", lambda: t + sds.MAX_AGE_SECONDS + 1)
-    assert sds.read(root, "stock", "600000.SH", END, oh.COLS).equals(_direct(root, "600000.SH", END))
+    assert _same(root)
 
 
 def test_R491_最近几天的分区被删_副本不受影响_结果照样对(store):
-    import shutil
     root, days = store
-    sds.read(root, "stock", "600000.SH", END, oh.COLS)
+    _via(root)
     for d in days[-3:]:
         shutil.rmtree(root / "kline_daily_enriched" / f"date={d}")
-    assert sds.read(root, "stock", "600000.SH", END, oh.COLS).equals(_direct(root, "600000.SH", END))
+    assert _same(root)
 
 
 def test_R491_副本坏了_照样拿到对的数(store):
     root, _ = store
-    sds.read(root, "stock", "600000.SH", END, oh.COLS)
+    _via(root)
     (root / sds.CACHE_DIRNAME / "stock" / "600000.SH.parquet").write_bytes(b"garbage")
-    assert sds.read(root, "stock", "600000.SH", END, oh.COLS).equals(_direct(root, "600000.SH", END))
+    assert _same(root)
     (root / sds.CACHE_DIRNAME / "stock" / "600000.SH.json").write_text("{not json")
-    assert sds.read(root, "stock", "600000.SH", END, oh.COLS).equals(_direct(root, "600000.SH", END))
+    assert _same(root)
 
 
-def test_R491_读副本时出了意外_返回None交给原路(store, monkeypatch):
+def test_R492_旧版6列副本_自动按新格式重建(store):
+    """R491 的副本只有 6 列; 升级后第一次读就重建成全部列, 不会拿 6 列去冒充。"""
+    root, days = store
+    base = root / sds.CACHE_DIRNAME / "stock"
+    base.mkdir(parents=True)
+    _orig(root, "stock", "600000.SH", date(1990, 1, 1), days[-11], OHLCV).write_parquet(base / "600000.SH.parquet")
+    (base / "600000.SH.json").write_text(json.dumps(
+        {"v": 1, "cutoff": days[-11].isoformat(), "n": 30, "cols": OHLCV, "built": time.time()}))
+    assert _same(root, cols=None)
+    assert json.loads((base / "600000.SH.json").read_text())["v"] == sds.FORMAT_VERSION
+
+
+def test_R492_副本列对不上_即使说明是新的也重建(store):
     root, _ = store
-
-    def boom(*_a, **_k):
-        raise RuntimeError("polars 出错")
-    monkeypatch.setattr(sds, "_scan", boom)
-    assert sds.read(root, "stock", "600000.SH", END, oh.COLS) is None
+    _via(root)
+    pq = root / sds.CACHE_DIRNAME / "stock" / "600000.SH.parquet"
+    pl.read_parquet(pq).drop("amount").write_parquet(pq)
+    assert _same(root, cols=None)
 
 
 def test_R491_写不了盘_这一次照样拿到对的数(store, monkeypatch):
@@ -183,31 +244,56 @@ def test_R491_写不了盘_这一次照样拿到对的数(store, monkeypatch):
     def boom(*_a, **_k):
         raise OSError("read-only")
     monkeypatch.setattr(sds, "_write_atomic", boom)
-    assert sds.read(root, "stock", "600000.SH", END, oh.COLS).equals(_direct(root, "600000.SH", END))
+    assert _same(root)
+
+
+def test_R491_读副本时出了意外_返回None交给原路(store, monkeypatch):
+    root, _ = store
+
+    def boom(*_a, **_k):
+        raise RuntimeError("polars 出错")
+    monkeypatch.setattr(sds, "_scan", boom)
+    assert _via(root) is None
 
 
 def test_R491_分区不够多不建副本(tmp_path):
     for d in _days(sds.TAIL_DAYS):
         _write_day(tmp_path, d)
-    got = sds.read(tmp_path, "stock", "600000.SH", END, oh.COLS)
-    assert got.equals(_direct(tmp_path, "600000.SH", END))
+    assert _same(tmp_path)
     assert not (tmp_path / sds.CACHE_DIRNAME).exists()
 
 
 def test_R491_帮不上忙就返回None_调用方走原路(store):
-    root, _ = store
-    assert sds.read(root, "futures", "600000.SH", END, oh.COLS) is None
     from tests.test_path_identifier_guards import TRAVERSAL_IDS
-    for bad in [*TRAVERSAL_IDS, "600000.SH\n", "600000.SH/../x"]:
-        assert sds.read(root, "stock", bad, END, oh.COLS) is None, repr(bad)
-    assert sds.read(root, "index", "000001.SH", END, oh.COLS) is None   # 没有指数分区目录
+    root, _ = store
+    assert _via(root, asset="futures") is None
+    assert _via(root, "000001.SH", asset="index") is None             # 没有指数分区目录
+    for bad in [*TRAVERSAL_IDS, "600000.SH\n", "600000.SH/../x", None]:
+        assert _via(root, bad) is None, repr(bad)
 
 
-def test_R491_早于截止日的end_只给到end(store):
-    root, days = store
-    sds.read(root, "stock", "600000.SH", END, oh.COLS)
-    e = days[5]
-    assert sds.read(root, "stock", "600000.SH", e, oh.COLS).equals(_direct(root, "600000.SH", e))
+@pytest.mark.parametrize("stray", ["dir", "file"])
+def test_R492_分区目录里有看不懂的东西_不用副本(store, stray):
+    """原来的 `**/*.parquet` 会把散落的文件也读进来 —— 副本不去猜怎么对齐, 直接让位。"""
+    root, _ = store
+    src = root / "kline_daily_enriched"
+    if stray == "dir":
+        (src / "backup").mkdir()
+    else:
+        pl.DataFrame({"x": [1]}).write_parquet(src / "stray.parquet")
+    assert _via(root) is None
+
+
+def test_R492_副本最多留MAX_COPIES份_超出删最早建的(store, monkeypatch):
+    root, _ = store
+    monkeypatch.setattr(sds, "MAX_COPIES", 2)
+    for s in SYMS:
+        _via(root, s)
+        time.sleep(0.01)
+    left = sorted(p.stem for p in (root / sds.CACHE_DIRNAME / "stock").glob("*.parquet"))
+    assert len(left) <= 2 and "000002.SZ" in left, left
+    assert len(list((root / sds.CACHE_DIRNAME / "stock").glob("*.json"))) == len(left)
+    assert all(_same(root, s) for s in SYMS)
 
 
 def test_R491_同时来四个请求_只建一次(store, monkeypatch):
@@ -221,8 +307,7 @@ def test_R491_同时来四个请求_只建一次(store, monkeypatch):
         return real(*a, **k)
     monkeypatch.setattr(sds, "_write_atomic", slow)
     out: list = []
-    ts = [threading.Thread(target=lambda: out.append(sds.read(root, "stock", "600000.SH", END, oh.COLS)))
-          for _ in range(4)]
+    ts = [threading.Thread(target=lambda: out.append(_via(root))) for _ in range(4)]
     for t in ts:
         t.start()
     for t in ts:
@@ -234,38 +319,97 @@ def test_R491_同时来四个请求_只建一次(store, monkeypatch):
 def test_R491_指数与ETF各读各的目录(tmp_path, asset, src):
     for d in _days(30):
         _write_day(tmp_path, d, syms=["510300.SH"], src=src)
-    sds.read(tmp_path, asset, "510300.SH", END, oh.COLS)
-    got = sds.read(tmp_path, asset, "510300.SH", END, oh.COLS)
-    assert got.equals(_direct(tmp_path, "510300.SH", END, src=src))
+    for cols in (None, OHLCV):
+        assert _same(tmp_path, "510300.SH", cols=cols, asset=asset)
+        assert _same(tmp_path, "510300.SH", cols=cols, asset=asset)
     assert (tmp_path / sds.CACHE_DIRNAME / asset / "510300.SH.parquet").exists()
 
 
-# ── 接进 ohlcv_history 之后: 与仓库原路逐位一致, 包括盘中最新那一根的覆盖 ──────────
-def _repo(root: Path):
-    from app.tickflow.repository import DataStore, KlineRepository
-    return KlineRepository(DataStore(data_dir=root))
+# ── 接进仓库之后: 仓库对外的读法与原来逐位一致(含最新一根的覆盖、全套指标重算) ──────
+def _both(root, monkeypatch, call):
+    """同一个调用, 走副本一次(建)、再一次(读), 与把副本关掉的原路比。"""
+    repo = _repo(root)
+    got1, got2 = call(repo), call(repo)
+    monkeypatch.setattr(sds, "scan_symbol", lambda *_a, **_k: None)
+    want = call(_repo(root))
+    monkeypatch.undo()
+    return got1, got2, want
 
 
-def test_R491_接进历史缓存_与仓库原路逐位一致_含最新一根的覆盖(store, monkeypatch):
+def test_R492_仓库get_daily_列下推快路径_含最新一根覆盖(store, monkeypatch):
     root, days = store
-    repo = _repo(root)
     last = days[-1]
-    latest = _direct(root, "600000.SH", last).filter(pl.col("date") == last).with_columns(
-        pl.lit("600000.SH").alias("symbol"), pl.lit(99.9).alias("close"))
-    monkeypatch.setattr(repo, "get_enriched_latest", lambda: (latest, last))
-    want = repo.get_daily_asset("stock", "600000.SH", oh.HISTORY_START, END, oh.COLS).sort("date")
+    latest = _orig(root, "stock", "600000.SH", last, last).with_columns(pl.lit(99.9).alias("close"))
+
+    def call(repo):
+        repo.get_enriched_latest = lambda: (latest, last)
+        return repo.get_daily("600000.SH", date(1990, 1, 1), END, OHLCV)
+    got1, got2, want = _both(root, monkeypatch, call)
     assert want.filter(pl.col("date") == last)["close"][0] == 99.9, "原路本身要带覆盖, 这条用例才有意义"
-    for _ in range(2):                                       # 建副本一次, 读副本一次
-        oh.clear()
-        got = oh.get_history(repo, "stock", "600000.SH", END)
-        assert got.equals(want)
+    assert got1.equals(want) and got2.equals(want)
 
 
-def test_R491_副本里没有这只票_交给仓库原路(store, monkeypatch):
+def test_R492_仓库get_daily_不指定列_全套指标照原样重算(store, monkeypatch):
     root, _ = store
-    repo = _repo(root)
-    calls = []
-    real = repo.get_daily_asset
-    monkeypatch.setattr(repo, "get_daily_asset", lambda *a, **k: calls.append(a) or real(*a, **k))
-    oh.get_history(repo, "stock", "999999.SH", END)
-    assert calls, "空结果要交给原路 (ETF 还有旧版存在指数目录里的兜底)"
+
+    def call(repo):
+        repo.get_enriched_latest = lambda: (pl.DataFrame(), None)
+        return repo.get_daily("600000.SH", date(2026, 7, 1), END)
+    got1, got2, want = _both(root, monkeypatch, call)
+    assert "ma20" in want.columns and want.height > 0
+    assert got1.equals(want) and got2.equals(want)
+
+
+@pytest.mark.parametrize("asset,src", [("index", "kline_index_enriched"), ("etf", "kline_etf_enriched")])
+def test_R492_仓库指数与ETF读法(tmp_path, monkeypatch, asset, src):
+    for d in _days(40):
+        _write_day(tmp_path, d, syms=["510300.SH"], src=src)
+    fn = "get_index_daily" if asset == "index" else "get_etf_daily"
+    for cols in (None, ["date", "close"]):
+        got1, got2, want = _both(tmp_path, monkeypatch,
+                                 lambda r, c=cols: getattr(r, fn)("510300.SH", date(2026, 6, 1), END, c))
+        assert want.height > 0 and got1.equals(want) and got2.equals(want), cols
+
+
+def test_R492_历史缓存走仓库_与原路逐位一致(store, monkeypatch):
+    """两张副图(R490 的内存缓存)不再自己抄一份覆盖逻辑, 直接用仓库 —— 结果不变。"""
+    root, days = store
+    last = days[-1]
+    latest = _orig(root, "stock", "600000.SH", last, last).with_columns(pl.lit(88.8).alias("close"))
+
+    def call(repo):
+        repo.get_enriched_latest = lambda: (latest, last)
+        oh.clear()
+        return oh.get_history(repo, "stock", "600000.SH", END)
+    got1, got2, want = _both(root, monkeypatch, call)
+    assert want["close"][-1] == 88.8
+    assert got1.equals(want) and got2.equals(want)
+
+
+def test_R492_三种资产目录同时在_各读各的_不串(tmp_path, monkeypatch):
+    """同一个代码在股票、指数、ETF 三个目录里各有一份不同的数 —— 仓库的三个读法各拿各的。"""
+    for i, src in enumerate(("kline_daily_enriched", "kline_index_enriched", "kline_etf_enriched")):
+        for d in _days(30):
+            _write_day(tmp_path, d, syms=["510300.SH"], bump=i * 100.0, src=src)
+    for fn in ("_scan_daily_symbol", "_scan_index_daily_symbol", "_scan_etf_daily_symbol"):
+        got1, got2, want = _both(tmp_path, monkeypatch,
+                                 lambda r, f=fn: getattr(r, f)("510300.SH", date(1990, 1, 1), END, None))
+        assert want.height > 0 and got1.equals(want) and got2.equals(want), fn
+
+
+def test_R492_空副本的列对不上_也重建而不是回回退原路(store, monkeypatch):
+    """这只票截止日前没有数(新股) → 副本是空表, 首尾抽查无从抽; 列不对只能靠列检查发现。"""
+    root, _ = store
+    _via(root, "999999.SH")
+    pq = root / sds.CACHE_DIRNAME / "stock" / "999999.SH.parquet"
+    pl.DataFrame(schema={c: ENRICHED_STORAGE_SCHEMA[c] for c in OHLCV}).write_parquet(pq)
+    assert _via(root, "999999.SH") is not None, "空副本列不对要当场重建, 不能次次抛错退回原路"
+    assert pl.read_parquet(pq).schema == pl.Schema(ENRICHED_STORAGE_SCHEMA)
+
+
+def test_R492_截止日之后只读区间里的日文件(store, monkeypatch):
+    root, days = store
+    _via(root)
+    c = _Counter(monkeypatch)
+    _via(root, end=days[-5])
+    assert c.files == (sds.TAIL_DAYS - 4) + 2, "区间外的最近几天不该打开"

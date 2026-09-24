@@ -34,6 +34,7 @@ from app.enriched_generation import (
 from app.market_time import cn_today
 from app.parquet import scan_enriched_parquet
 from app.polars_guard import guarded_collect
+from app.services import symbol_daily_store  # [R492 · fork] 单票日K副本
 from app.services.minute_adjust import apply_minute_adjustment, minute_basis_is_raw
 
 logger = logging.getLogger(__name__)
@@ -1870,6 +1871,11 @@ class KlineRepository:
         return df.sort(["symbol", "date"])
 
     def _scan_daily_symbol(self, symbol: str, start: date, end: date, columns: list[str] | None) -> pl.DataFrame:
+        # [R492 · fork] 先读按个股另存的副本(一个文件 + 最近十来个日文件), 结果与下面逐位相同;
+        # 帮不上忙(返回 None)才照原来扫全部日文件。见 services/symbol_daily_store.py
+        copied = symbol_daily_store.scan_symbol(self.store.data_dir, "stock", symbol, start, end, columns)
+        if copied is not None:
+            return copied
         try:
             lf = scan_enriched_parquet(self._enriched_glob,
                                  cast_options=pl.ScanCastOptions(integer_cast="allow-float")).filter(
@@ -1904,6 +1910,11 @@ class KlineRepository:
             return pl.DataFrame()
 
     def _scan_index_daily_symbol(self, symbol: str, start: date, end: date, columns: list[str] | None) -> pl.DataFrame:
+        # [R492 · fork] 先读按个股另存的副本(一个文件 + 最近十来个日文件), 结果与下面逐位相同;
+        # 帮不上忙(返回 None)才照原来扫全部日文件。见 services/symbol_daily_store.py
+        copied = symbol_daily_store.scan_symbol(self.store.data_dir, "index", symbol, start, end, columns)
+        if copied is not None:
+            return copied
         try:
             lf = scan_enriched_parquet(self._index_enriched_glob,
                                  cast_options=pl.ScanCastOptions(integer_cast="allow-float")).filter(
@@ -1921,6 +1932,11 @@ class KlineRepository:
             return pl.DataFrame()
 
     def _scan_etf_daily_symbol(self, symbol: str, start: date, end: date, columns: list[str] | None) -> pl.DataFrame:
+        # [R492 · fork] 先读按个股另存的副本(一个文件 + 最近十来个日文件), 结果与下面逐位相同;
+        # 帮不上忙(返回 None)才照原来扫全部日文件。见 services/symbol_daily_store.py
+        copied = symbol_daily_store.scan_symbol(self.store.data_dir, "etf", symbol, start, end, columns)
+        if copied is not None:
+            return copied
         try:
             lf = scan_enriched_parquet(self._etf_enriched_glob,
                                  cast_options=pl.ScanCastOptions(integer_cast="allow-float")).filter(
