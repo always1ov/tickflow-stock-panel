@@ -28,6 +28,12 @@ export interface TrendQuantData {
   xichou: (number | null)[]
   xichou_bar: (number | null)[]
   marks: Record<TrendMarkKey, (number | null)[]>
+  /**
+   * [R488] 庄现: 出现的那一根为 1, 其余 null。**另一个冻结的独立指标**(后端
+   * `indicators/zhuang_xian.py`), 只是借这张副图显示狗头 —— 画法在 `lib/zhuangXianSeries.ts`,
+   * 这个文件不画它。可选: 旧缓存里没有。
+   */
+  zhuang?: (number | null)[]
 }
 
 export type TrendMarkKey = 'jidi' | 'sheng' | 'ding' | 'xia' | 'jiancang' | 'tao' | 'jiandi' | 'juedi'

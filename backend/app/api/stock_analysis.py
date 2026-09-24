@@ -551,8 +551,8 @@ def quant_macd(
                               end - timedelta(days=_QMACD_WARMUP_DAYS), end)
     if df.is_empty() or not {"date", "close"}.issubset(df.columns):
         return {"symbol": symbol, "dates": [], "diff": [], "dea": [],
-                "yellow": [], "gold_icon": [], "dead_icon": [], "zhuang": []}
-    cols = [c for c in ("date", "close", "volume", "high", "low") if c in df.columns]
+                "yellow": [], "gold_icon": [], "dead_icon": []}
+    cols = [c for c in ("date", "close", "volume") if c in df.columns]
     rows = df.select(cols).to_dicts()
     try:
         rows = _maybe_inject_live_candle(request, symbol, rows, asset_type)
@@ -576,13 +576,6 @@ def quant_macd(
     res = qm.compute([float(r["close"]) for r in rows],
                      [float(r["volume"]) if finite(r.get("volume")) else None for r in rows])
 
-    # [R485] 庄现: 另一个独立的冻结模块算, **不经过 qm** —— 用户: 「就算我以后微调量化macd
-    # 也不动这些了」。高 / 低缺失或不是数的那一根按无效处理(不出信号), 不编值。
-    from app.indicators import zhuang_xian as zx
-    zhuang = zx.compute([float(r["high"]) if finite(r.get("high")) else None for r in rows],
-                        [float(r["low"]) if finite(r.get("low")) else None for r in rows],
-                        [float(r["close"]) for r in rows])
-
     def tail(xs: list) -> list:
         # 6 位小数 —— 比通达信显示的 3 位还多, 只为少传点字节, 不改变任何一根。
         # 非有限值兜底成 None: 算法里不该再产出它, 但一个 NaN 就能让整个响应 500。
@@ -594,8 +587,6 @@ def quant_macd(
         "diff": tail(res.diff), "dea": tail(res.dea),
         "yellow": tail(res.yellow),
         "gold_icon": tail(res.gold_icon), "dead_icon": tail(res.dead_icon),
-        # 出庄现的那一根为 1, 其余 null —— 与别的几样同一个「null = 这一根不画」的约定
-        "zhuang": [1 if z else None for z in zhuang[-bars:]],
     }
 
 
@@ -623,7 +614,7 @@ def trend_quant(
     from app.market_time import cn_today
 
     empty = {"symbol": symbol, "dates": [], "wave": [], "wave_prev": [], "avg": [],
-             "stick_up": [], "xichou": [], "xichou_bar": [],
+             "stick_up": [], "xichou": [], "xichou_bar": [], "zhuang": [],
              "marks": {k: [] for k in ("jidi", "sheng", "ding", "xia", "jiancang",
                                        "tao", "jiandi", "juedi")}}
     repo = request.app.state.repo
@@ -651,6 +642,11 @@ def trend_quant(
     if not rows:
         return empty
     res = tq.compute(col("open"), col("high"), col("low"), col("close"), col("volume"))
+    # [R485 → R488] 庄现狗头: 原来借量化MACD 的接口与副图, 用户:「把狗头剥离量化macd,
+    # 放到趋势量化里面去」。仍是独立冻结的模块单独算, **不经过 tq** —— 趋势量化以后怎么调,
+    # 庄现都不跟着变。高 / 低缺失的那一根按无效处理(不出信号)。
+    from app.indicators import zhuang_xian as zx
+    zhuang = zx.compute(col("high"), col("low"), col("close"))
 
     def tail(xs: list) -> list:
         return [round(x, 6) if finite(x) else None for x in xs[-bars:]]
@@ -665,6 +661,8 @@ def trend_quant(
         "wave": tail(res.wave), "wave_prev": tail(wave_prev), "avg": tail(res.avg),
         "stick_up": tail(res.stick_up),
         "xichou": tail(res.xichou), "xichou_bar": flags(res.xichou_bar),
+        # 出庄现的那一根为 1, 其余 null
+        "zhuang": flags(zhuang),
         "marks": {k: flags(getattr(res, k)) for k in ("jidi", "sheng", "ding", "xia",
                                                       "jiancang", "tao", "jiandi", "juedi")},
     }

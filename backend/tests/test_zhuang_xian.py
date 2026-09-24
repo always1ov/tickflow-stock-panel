@@ -1,6 +1,7 @@
 """[fork R485] 庄现 —— 钉住「逐行复刻」和「冻结、与量化MACD 互不相干」两件事。
 
 用户: 「移植到量化macd里面, 当作辅助指标不在动了, 就算我以后微调量化macd也不动这些了」。
+[R488] 又: 「把狗头剥离量化macd, 放到趋势量化里面去」—— 画在趋势量化上, 数据由 /trend-quant 带。
 
 最容易坏的三种方式, 屏幕上都看不出来(狗头照样一个个冒出来):
 
@@ -118,11 +119,21 @@ def test_R485_后端模块不引用量化MACD():
         f"庄现又依赖量化MACD 了 —— 以后调量化MACD 它会跟着变: {sorted(mods)}"
 
 
-def test_R485_前端画法不引用量化MACD_也不读它的数值():
+def test_R485_前端画法不引用任何一张副图_也不读它们的数值():
+    """[R488] 狗头挪到了趋势量化, 同样不许读趋势量化的数值 —— 位置只看哪一天。"""
     code = code_lines(read_src("lib/zhuangXianSeries.ts"))
-    assert "quantMacdSeries" not in code
-    for w in (".diff", ".dea", "gold_icon", "dead_icon", "yellow"):
-        assert w not in code, f"狗头的画法读了量化MACD 的「{w}」—— 位置会跟着量化MACD 变"
+    assert "quantMacdSeries" not in code and "trendQuantSeries" not in code
+    for w in (".diff", ".dea", "gold_icon", "dead_icon", "yellow",
+              ".avg", ".wave", "xichou", "marks"):
+        assert w not in code, f"狗头的画法读了副图的「{w}」—— 位置会跟着那张副图变"
+
+
+def test_R488_狗头画在趋势量化_不在量化MACD():
+    """用户: 「把狗头剥离量化macd, 放到趋势量化里面去」。"""
+    chart = code_lines(read_src("components/stock-analysis/AnalysisKChart.tsx"))
+    assert "zhuangXianIndexes(dates, trendQuant)" in chart
+    assert "zhuangXianSeries(zhuang, { xAxisIndex: 2, yAxisIndex: 2 })" in chart
+    assert "zhuangXianIndexes(dates, quantMacd)" not in chart
 
 
 def test_R485_界面上不用粉色():
@@ -158,7 +169,8 @@ def _daily(n: int = 600) -> pl.DataFrame:
                          "volume": [1e6] * n})
 
 
-URL = "/api/stock-analysis/quant-macd?symbol=000001.SZ"
+# [R488] 庄现改由趋势量化的接口带过来; 量化MACD 的接口回到 R485 之前, 不再有这个字段
+URL = "/api/stock-analysis/trend-quant?symbol=000001.SZ"
 
 
 def test_R485_端点带上庄现_与模块逐根一致(monkeypatch):
@@ -170,16 +182,29 @@ def test_R485_端点带上庄现_与模块逐根一致(monkeypatch):
     assert any(v == 1 for v in d["zhuang"])
 
 
-def test_R485_量化MACD的算法怎么变_庄现都不跟着变(monkeypatch):
-    """用户那句话的字面意思: 把量化MACD 的计算整个换成胡乱的结果, 庄现必须一根不差。"""
+def test_R485_趋势量化和量化MACD的算法怎么变_庄现都不跟着变(monkeypatch):
+    """用户那句话的字面意思: 把所在副图的计算整个换成胡乱的结果, 庄现必须一根不差。"""
     from app.indicators import quant_macd as qm
+    from app.indicators import trend_quant as tq
     before = _client(monkeypatch, _daily()).get(URL).json()["zhuang"]
-    junk = qm.QuantMacd(diff=[], dea=[], yellow=[], gold_icon=[], dead_icon=[])
-    monkeypatch.setattr(qm, "compute", lambda close, vol: qm.QuantMacd(
-        diff=[123.0] * len(close), dea=[-1.0] * len(close), yellow=[None] * len(close),
-        gold_icon=[None] * len(close), dead_icon=[None] * len(close)) if close else junk)
+
+    def junk_tq(o, h, lo, c, v):
+        n = len(c)
+        return tq.TrendQuant(wave=[9.0] * n, avg=[9.0] * n, stick_up=[None] * n,
+                             jidi=[True] * n, sheng=[True] * n, ding=[True] * n, xia=[True] * n,
+                             jiancang=[True] * n, tao=[True] * n, jiandi=[True] * n,
+                             juedi=[True] * n, xichou=[None] * n, xichou_bar=[False] * n)
+
+    monkeypatch.setattr(tq, "compute", junk_tq)
+    monkeypatch.setattr(qm, "compute", lambda close, vol: None)
     after = _client(monkeypatch, _daily()).get(URL).json()["zhuang"]
     assert after == before
+
+
+def test_R488_量化MACD的接口不再带庄现(monkeypatch):
+    d = _client(monkeypatch, _daily()).get(
+        "/api/stock-analysis/quant-macd?symbol=000001.SZ").json()
+    assert "zhuang" not in d
 
 
 def test_R485_日K里没有高低价也不抛异常_只是不出庄现(monkeypatch):

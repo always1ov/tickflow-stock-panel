@@ -1287,11 +1287,6 @@ export interface QuantMacdResult {
   gold_icon: (number | null)[]
   /** 死叉图标高度 = DEA*1.1 */
   dead_icon: (number | null)[]
-  /**
-   * [R485] 庄现: 出现的那一根为 1, 其余 null。**另一个冻结的独立指标**(后端
-   * `indicators/zhuang_xian.py`), 只是借量化MACD 这张副图显示。可选: 旧缓存里没有。
-   */
-  zhuang?: (number | null)[]
 }
 
 /** [R486] 趋势量化: 画得出来的几样(字段含义见 `lib/trendQuantSeries.ts`)。 */

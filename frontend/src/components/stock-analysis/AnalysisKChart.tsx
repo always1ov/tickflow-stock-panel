@@ -657,14 +657,16 @@ export function AnalysisKChart({
       }
     }
 
-    // [R485] 庄现狗头 —— 借量化MACD 这张副图显示, 但算法与画法都是独立冻结的
-    // (`lib/zhuangXianSeries.ts`)。放在最后 push: 与「未来」区同理, 不参与悬停联动的下标。
-    const zhuang = zhuangXianIndexes(dates, quantMacd)
-    if (zhuang.length) series.push(zhuangXianSeries(zhuang, { xAxisIndex: 1, yAxisIndex: 1 }))
+    // [R485 → R488] 庄现狗头 —— 原来借量化MACD 的副图, 用户: 「把狗头剥离量化macd, 放到
+    // 趋势量化里面去」。算法与画法仍是独立冻结的(`lib/zhuangXianSeries.ts`)。放在最后 push:
+    // 不参与悬停联动的下标。
+    const zhuang = zhuangXianIndexes(dates, trendQuant)
 
     // [R486] 趋势量化副图(第三张 grid, 画在主图与量化MACD 之间)。同样放在最后 push,
     // 不参与悬停联动的下标。算法 `indicators/trend_quant.py`, 画法 `lib/trendQuantSeries.ts`。
     series.push(...trendQuantSeries(alignTrendQuant(dates, trendQuant), { xAxisIndex: 2, yAxisIndex: 2 }))
+    // 狗头压在趋势量化的最上面(后画的盖在上面)
+    if (zhuang.length) series.push(zhuangXianSeries(zhuang, { xAxisIndex: 2, yAxisIndex: 2 }))
 
     return {
       animation: false,
