@@ -4,6 +4,7 @@ import * as echarts from 'echarts'
 import type { ECharts, EChartsOption } from 'echarts'
 import type { Fib2Grain, Fib2Overlay, KlineRow, LevelSeries, QuantMacdResult } from '@/lib/api'
 import { alignQuantMacd, quantMacdSeries } from '@/lib/quantMacdSeries'
+import { zhuangXianIndexes, zhuangXianSeries } from '@/lib/zhuangXianSeries'
 import { levelsChartLayout, PAD_BOTTOM, SLIDER_H } from '@/lib/levelsChartLayout'
 import { futureSlotRenderer } from '@/lib/futureZone'
 import { fib2Status } from '@/lib/fib2Status'
@@ -648,6 +649,11 @@ export function AnalysisKChart({
         })
       }
     }
+
+    // [R485] 庄现狗头 —— 借量化MACD 这张副图显示, 但算法与画法都是独立冻结的
+    // (`lib/zhuangXianSeries.ts`)。放在最后 push: 与「未来」区同理, 不参与悬停联动的下标。
+    const zhuang = zhuangXianIndexes(dates, quantMacd)
+    if (zhuang.length) series.push(zhuangXianSeries(zhuang, { xAxisIndex: 1, yAxisIndex: 1 }))
 
     return {
       animation: false,
