@@ -544,11 +544,16 @@ def quant_macd(
     from app.indicators import quant_macd as qm
     from app.market_time import cn_today   # 北京口径 —— R414 刚栽过 date.today() 的坑
 
+    from app.services import ohlcv_history
+
     repo = request.app.state.repo
     end = cn_today()
     asset_type = repo.resolve_asset_type(symbol)
-    df = repo.get_daily_asset(asset_type, symbol,
-                              end - timedelta(days=_QMACD_WARMUP_DAYS), end)
+    # [R490] 与趋势量化共用一份单票历史缓存(只读 6 列、同一只票只扫一次), 再切出预热窗口 ——
+    # 切出来的行与原来按区间直接取的一模一样。
+    df = ohlcv_history.get_history(repo, asset_type, symbol, end)
+    if not df.is_empty() and "date" in df.columns:
+        df = df.filter(pl.col("date") >= end - timedelta(days=_QMACD_WARMUP_DAYS))
     if df.is_empty() or not {"date", "close"}.issubset(df.columns):
         return {"symbol": symbol, "dates": [], "diff": [], "dea": [],
                 "yellow": [], "gold_icon": [], "dead_icon": []}
@@ -592,6 +597,7 @@ def quant_macd(
 
 # [R486] 趋势量化要从上市第一根算起: 「吸筹」的柱高 = VAR17 ÷ HHV(VAR17,0)(第一根到今天的
 # 最高值)。取一个早于 A 股开市的起点, 等于「库里有多少就取多少」。其余信号只要最近几百根。
+# [R490] 实际取数改由 `services/ohlcv_history`(起点同为 1990-01-01), 这里留着给守卫对照。
 _TQ_HISTORY_START = date(1990, 1, 1)
 
 
@@ -617,9 +623,12 @@ def trend_quant(
              "stick_up": [], "xichou": [], "xichou_bar": [], "zhuang": [],
              "marks": {k: [] for k in ("jidi", "sheng", "ding", "xia", "jiancang",
                                        "tao", "jiandi", "juedi")}}
+    from app.services import ohlcv_history
+
     repo = request.app.state.repo
     asset_type = repo.resolve_asset_type(symbol)
-    df = repo.get_daily_asset(asset_type, symbol, _TQ_HISTORY_START, cn_today())
+    # [R490] 全部历史走单票缓存: 同一只票只扫一次磁盘, 与量化MACD 共用
+    df = ohlcv_history.get_history(repo, asset_type, symbol, cn_today())
     if df.is_empty() or not {"date", "close"}.issubset(df.columns):
         return empty
     cols = [c for c in ("date", "open", "high", "low", "close", "volume") if c in df.columns]
