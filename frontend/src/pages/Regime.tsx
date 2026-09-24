@@ -13,7 +13,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import * as echarts from 'echarts'
 import {
   Activity, RefreshCw, Loader2, Gauge, TrendingUp, TrendingDown, Minus,
-  Pencil, CalendarDays, Repeat, Rows3, LayoutGrid, Flame, Layers, Filter, X,
+  Pencil, Flame, Layers, Filter, X,
 } from 'lucide-react'
 import {
   api, type RegimeRow, type RegimeState, type MarketPhase,
@@ -29,7 +29,6 @@ import { cn } from '@/lib/cn'
 import { PageShell } from '@/components/PageShell'
 import { SEG, SEG_ITEM, SEG_OFF, SEG_ON, TYPE, buttonClass } from '@/components/ui'
 
-const STATE_ORDER: RegimeState[] = ['strong', 'lean_strong', 'range', 'lean_weak', 'weak']
 
 /** 阶段含义与应对提示 — meaning 与后端 market_phase.py 判定规则对齐, 供当前阶段卡展示 */
 const MARKET_PHASE_GUIDE: Record<MarketPhase, { meaning: string; action: string }> = {
@@ -39,15 +38,6 @@ const MARKET_PHASE_GUIDE: Record<MarketPhase, { meaning: string; action: string 
   climax:  { meaning: '情绪极端宣泄, 批量二板+', action: '逐步兑现 · 不追高' },
   ebb:     { meaning: '自高位回落, 晋级率坍塌', action: '防守 · 不接力' },
   repair:  { meaning: '多空拉锯, 无明确方向', action: '轻仓试错 · 控回撤' },
-}
-
-/** 综合分 → 对应状态色(与 classify_state 阈值一致: 70/55/45/30) */
-function scoreToColor(score: number): string {
-  if (score >= 70) return REGIME_STATE_COLORS.strong
-  if (score >= 55) return REGIME_STATE_COLORS.lean_strong
-  if (score >= 45) return REGIME_STATE_COLORS.range
-  if (score >= 30) return REGIME_STATE_COLORS.lean_weak
-  return REGIME_STATE_COLORS.weak
 }
 
 /**
@@ -82,7 +72,7 @@ function resolveHistoryRange(
   return { limit: Math.max(1, Math.min(1000, preset.custom)) }
 }
 
-/** history/states 共用的"天数"语义: 用于 states 接口 + 标题展示。 */
+/** 时间范围折成的"天数": 趋势图默认视窗与标题展示用。 */
 function resolveDays(
   preset: RangePreset,
   coverage: { rows: number } | undefined,
@@ -174,8 +164,6 @@ export function Regime() {
   // [R503] 市场环境(状态/趋势/日历) 与 情绪周期(阶段/主线) 两组同时铺开, 不再页签切换;
   // 两组仍共用时间范围与重算入口。
   const [customOpen, setCustomOpen] = useState(false)
-  // 日历热力图显示模式: false=单行(月份网格横向排列+滚动条, 默认), true=展开(换行完整网格)
-  const [calendarExpanded, setCalendarExpanded] = useState(false)
   const ct = useChartTheme()
 
   // coverage: "全部"模式 + 标题展示依赖
@@ -192,11 +180,6 @@ export function Regime() {
   const history = useQuery({
     queryKey: ['regime-history', range] as const,
     queryFn: () => api.regimeHistory(histRange.start, histRange.end, histRange.limit),
-    staleTime: 5 * 60 * 1000,
-  })
-  const states = useQuery({
-    queryKey: QK.regimeStates(days),
-    queryFn: () => api.regimeStates(days),
     staleTime: 5 * 60 * 1000,
   })
   // 情绪周期阶段段 + 主线排行(与 history 同一时间范围)
@@ -338,18 +321,6 @@ export function Regime() {
     return { streak, state: lastState, slope, lastWeakGap }
   }, [rows])
 
-  // ── 状态转换频率: 近 N 天相邻 state 变化次数 ──
-  const transitions = useMemo(() => {
-    if (rows.length < 2) return { count: 0, rate: 0, label: '数据不足' }
-    let count = 0
-    for (let i = 1; i < rows.length; i++) {
-      if (rows[i].state !== rows[i - 1].state) count++
-    }
-    // 频率 = 转换次数 / 天数; <0.2 稳定, 0.2-0.4 中等, >0.4 频繁
-    const rate = count / (rows.length - 1)
-    const label = rate < 0.2 ? '稳定' : rate < 0.4 ? '中等切换' : '频繁切换'
-    return { count, rate, label }
-  }, [rows])
 
 
 
@@ -607,85 +578,7 @@ export function Regime() {
   }, [rows, days, ct])
   const trendRef = useEChart(trendOption, [trendOption])
 
-  // 状态分布饼图
-  const pieOption = useMemo<echarts.EChartsOption | null>(() => {
-    const dist = states.data?.distribution ?? []
-    if (dist.length === 0) return null
-    return {
-      backgroundColor: 'transparent',
-      tooltip: { trigger: 'item', backgroundColor: ct.tooltipBg, borderColor: ct.tooltipBorder, textStyle: { color: ct.tooltipText } },
-      series: [{
-        type: 'pie', radius: ['42%', '65%'], center: ['50%', '52%'],
-        // 标签外置 + 引导虚线, 避免 5 个状态标签互相重叠(原 label 紧贴扇区会挤在一起)。
-        label: {
-          position: 'outside',
-          color: ct.text, fontSize: 10,
-          formatter: '{b}  {d}%',
-        },
-        labelLine: {
-          show: true,
-          length: 8,        // 第一段(扇区到拐点)
-          length2: 10,      // 第二段(拐点到标签)
-          lineStyle: { color: ct.border, type: 'dashed', width: 1 },
-        },
-        // labelLayout 自动调整标签位置防重叠: 相邻标签过近时自动错开
-        labelLayout: { hideOverlap: false },
-        data: STATE_ORDER
-          .map(s => dist.find(d => d.state === s))
-          .filter((x): x is NonNullable<typeof x> => !!x)
-          .map(d => ({
-            name: d.label, value: d.count,
-            itemStyle: { color: REGIME_STATE_COLORS[d.state] },
-          })),
-      }],
-    }
-  }, [states.data, ct])
-  const pieRef = useEChart(pieOption, [pieOption])
 
-  // 日历热力图数据: 按月分组(纯 CSS 渲染, 不依赖 echarts calendar 的跨年怪异行为)。
-  // 结构: [{ year, month, label, weeks: [[cell|gap]×7]×N }]
-  // 每个 cell = { date, score, state } 或 null(该位置无交易日, 如月初前的空位)
-  const calendarMonths = useMemo(() => {
-    if (rows.length === 0) return []
-    const byMonth = new Map<string, RegimeRow[]>()
-    for (const r of rows) {
-      const ym = r.date.slice(0, 7) // YYYY-MM
-      if (!byMonth.has(ym)) byMonth.set(ym, [])
-      byMonth.get(ym)!.push(r)
-    }
-    const MONTH_LABELS = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月']
-    return [...byMonth.entries()].sort().map(([ym, monthRows]) => {
-      const [y, m] = ym.split('-')
-      const year = Number(y), month = Number(m)
-      // 按自然日铺格子: 只有该日为交易日且有数据才填 RegimeRow, 其余日子填 null。
-      // 这样每个格子都对其正确的周几列, 不会因月内数据不连续而把交易日错位到周末列。
-      const dateToRow = new Map<string, RegimeRow>()
-      for (const r of monthRows) dateToRow.set(r.date, r)
-      // 月首的星期偏移(周一=0..周日=6), 与表头 ['一'..'日'] 列顺序一致
-      const firstDow = new Date(year, month - 1, 1).getDay()
-      const leadOffset = firstDow === 0 ? 6 : firstDow - 1
-      const cells: (RegimeRow | null)[] = Array(leadOffset).fill(null)
-      const dayCount = new Date(year, month, 0).getDate()
-      for (let day = 1; day <= dayCount; day++) {
-        const ds = `${y}-${m.padStart(2, '0')}-${String(day).padStart(2, '0')}`
-        cells.push(dateToRow.has(ds) ? dateToRow.get(ds)! : null)
-      }
-      // 补齐到 7 的倍数(完整周)
-      while (cells.length % 7 !== 0) cells.push(null)
-      // 切成每周一组
-      const weeks: (RegimeRow | null)[][] = []
-      for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7))
-      return { year, month, label: `${y}年${MONTH_LABELS[month - 1]}`, weeks }
-    })
-  }, [rows])
-
-  // 日历热力图横向滚动容器: 单行模式下默认滚到最右侧(显示最新月份)
-  const calendarScrollRef = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    if (!calendarExpanded && calendarScrollRef.current) {
-      calendarScrollRef.current.scrollLeft = calendarScrollRef.current.scrollWidth
-    }
-  }, [calendarExpanded, calendarMonths])
 
   const handleRecompute = async () => {
     setRecomputing(true)
@@ -703,7 +596,6 @@ export function Regime() {
       }
       await Promise.all([
         qc.invalidateQueries({ queryKey: ['regime-history'] }),
-        qc.invalidateQueries({ queryKey: ['regime-states'] }),
         qc.invalidateQueries({ queryKey: ['regime-latest'] }),
         qc.invalidateQueries({ queryKey: ['regime-phases'] }),
         qc.invalidateQueries({ queryKey: ['regime-mainline'] }),
@@ -766,32 +658,29 @@ export function Regime() {
       {/* [R503] 两组内容原来是同页切换(页签: 市场环境 / 情绪周期), 用户: 「两组内容不再搞同页切换,
           都放在同一个页面一次性同时展示, 但仍共用时间范围」—— 上下铺开, 市场环境在前(原来的默认页签),
           情绪周期在后; 页头那组时间范围同时管两组。 */}
-      {/* ══ 市场环境: 最新日概览 + 状态时间轴 + 趋势/分布 + 日历热力图 ══ */}
+      {/* ══ 市场环境: 「现在」一张卡 + 环境综合分趋势 ══ */}
       <section className="space-y-4" aria-labelledby="macro-regime">
       <GroupTitle id="macro-regime" icon={Activity} title="市场环境" hint="每日环境状态 · 赚钱效应 · 趋势分析" />
 
-      {/* ── 最新日概览 (4 个指标卡, 去掉与看板重复的涨停/涨跌/成交额) ── */}
+      {/* ── [R505] 「现在」一张卡: 最新状态 + 当前势头 + 四维拆解 ──
+          原来是四张卡 + 状态时间轴 + 状态分布饼图 + 日历热力图。后三块与趋势图的
+          背景色带是同一份「每天哪一档」画了四遍; 「状态转换次数」是纯统计, 不指向任何动作。
+          留下的三样都是**解读**: 现在在哪一档、在变好还是变坏、是哪一维在拉。 */}
       {latest ? (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {/* 状态卡(保留) */}
-          <div className={cn(cardCls, 'p-3')}>
+        <div className={cn(cardCls, 'grid gap-3 p-3 sm:grid-cols-[auto_auto_1fr] sm:items-center sm:gap-0 sm:divide-x sm:divide-border')}>
+          <div className="sm:pr-5">
             <div className="flex items-center gap-1.5 text-micro text-muted">
               <Gauge className="h-3 w-3" /> 最新状态 · {latest.date}
             </div>
-            <div className="mt-1.5 flex items-baseline gap-2">
+            <div className="mt-1 flex items-baseline gap-2">
               <span className="text-2xl font-bold" style={{ color: REGIME_STATE_COLORS[latest.state] }}>
                 {REGIME_STATE_LABELS[latest.state]}
               </span>
               <span className="text-sm text-muted">{latest.score} 分</span>
             </div>
-            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-base">
-              <div className="h-full rounded-full transition-ui"
-                style={{ width: `${Math.max(2, Math.min(100, latest.score))}%`, backgroundColor: REGIME_STATE_COLORS[latest.state] }} />
-            </div>
           </div>
 
-          {/* 当前势头(新) */}
-          <div className={cn(cardCls, 'p-3')}>
+          <div className="sm:px-5">
             <div className="flex items-center gap-1.5 text-micro text-muted">
               {(() => {
                 const TrendIcon = (momentum?.slope ?? 0) > 0.5 ? TrendingUp : (momentum?.slope ?? 0) < -0.5 ? TrendingDown : Minus
@@ -800,23 +689,22 @@ export function Regime() {
             </div>
             {momentum ? (
               <>
-                <div className="mt-1.5 text-sm font-semibold text-foreground">
+                <div className="mt-1 text-sm font-semibold text-foreground">
                   连续 <span style={{ color: REGIME_STATE_COLORS[momentum.state] }}>{momentum.streak}</span> 天{REGIME_STATE_LABELS[momentum.state]}
                 </div>
-                <div className="mt-1 text-micro text-muted">
+                <div className="mt-0.5 text-micro text-muted">
                   5日{(momentum.slope > 0 ? '改善' : momentum.slope < 0 ? '恶化' : '持平')}
                   {momentum.lastWeakGap > 0 && ` · 上次弱势 ${momentum.lastWeakGap} 天前`}
                 </div>
               </>
-            ) : <div className="mt-1.5 text-sm text-muted">—</div>}
+            ) : <div className="mt-1 text-sm text-muted">—</div>}
           </div>
 
-          {/* 4 子维度迷你条(新) */}
-          <div className={cn(cardCls, 'p-3')}>
+          <div className="min-w-0 sm:pl-5">
             <div className="flex items-center gap-1.5 text-micro text-muted">
-              <Activity className="h-3 w-3" /> 四维拆解 · {latest.date}
+              <Activity className="h-3 w-3" /> 四维拆解 · 是哪一维在拉高或拖低
             </div>
-            <div className="mt-2 space-y-1">
+            <div className="mt-1.5 grid grid-cols-2 gap-x-4 gap-y-1 lg:grid-cols-4">
               {([
                 { label: '赚钱', val: latest.profit_score, color: '#f59e0b' },
                 { label: '投机', val: latest.speculation_score, color: '#a855f7' },
@@ -826,26 +714,12 @@ export function Regime() {
                 <div key={d.label} className="flex items-center gap-1.5">
                   <span className="w-6 shrink-0 text-micro text-muted">{d.label}</span>
                   <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-base">
-                    <div className="h-full rounded-full transition-ui"
+                    <div className="h-full rounded-full"
                       style={{ width: `${d.val ?? 0}%`, backgroundColor: d.color }} />
                   </div>
-                  <span className="w-5 shrink-0 text-right text-micro font-mono text-muted">{d.val ?? '—'}</span>
+                  <span className="w-5 shrink-0 text-right text-micro font-mono text-muted">{d.val != null ? Math.round(d.val) : '—'}</span>
                 </div>
               ))}
-            </div>
-          </div>
-
-          {/* 状态转换频率(新) */}
-          <div className={cn(cardCls, 'p-3')}>
-            <div className="flex items-center gap-1.5 text-micro text-muted">
-              <Repeat className="h-3 w-3" /> 状态转换 · 近 {days} 天
-            </div>
-            <div className="mt-1.5 text-lg font-semibold text-foreground">
-              {transitions.count} <span className="text-xs font-normal text-muted">次切换</span>
-            </div>
-            <div className="mt-1 text-micro text-muted">
-              节奏：<span className="text-accent">{transitions.label}</span>
-              <span className="ml-1">({(transitions.rate * 100).toFixed(0)}%/天)</span>
             </div>
           </div>
         </div>
@@ -855,140 +729,12 @@ export function Regime() {
         </div>
       )}
 
-      {/* ── 状态色带时间轴 ── */}
-      {rows.length > 0 && (
-        <div className={cn(cardCls, 'p-3')}>
-          <SectionTitle icon={Activity} title="状态时间轴"
-            hint={`${rows[0]?.date} → ${rows[rows.length - 1]?.date} · ${rows.length} 天`} />
-          <div className="mt-2.5 flex h-7 w-full overflow-hidden rounded-md">
-            {rows.map(r => (
-              <div key={r.date} title={`${r.date} ${REGIME_STATE_LABELS[r.state]}(${r.score})`}
-                className="flex-1 min-w-[2px] transition-opacity hover:opacity-80"
-                style={{ backgroundColor: REGIME_STATE_COLORS[r.state] }} />
-            ))}
-          </div>
-          <div className="mt-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-micro text-muted">
-            {STATE_ORDER.map(s => (
-              <span key={s} className="flex items-center gap-1">
-                <span className="inline-block h-2.5 w-2.5 rounded"
-                  style={{ backgroundColor: REGIME_STATE_COLORS[s] }} />
-                {REGIME_STATE_LABELS[s]}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ── 趋势图 + 分布图 ── */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className={cn(cardCls, 'p-3 lg:col-span-2')}>
-          <SectionTitle icon={Activity} title="环境综合分趋势"
-            hint="综合分(粗) · 赚钱/投机/抗跌/趋势(细, 可点图例切换) · 背景色=状态" />
-          <div ref={trendRef} className="mt-2 h-[320px]" />
-        </div>
-        <div className={cn(cardCls, 'p-3')}>
-          <SectionTitle icon={Gauge} title="状态分布" hint={`近 ${days} 天`} />
-          <div ref={pieRef} className="mt-2 h-[320px]" />
-        </div>
+      {/* ── 趋势图: 这一组的主体, 独占整行(原来右边三分之一给了状态分布饼图) ── */}
+      <div className={cn(cardCls, 'p-3')}>
+        <SectionTitle icon={Activity} title="环境综合分趋势"
+          hint="综合分(粗) · 赚钱/投机/抗跌/趋势(细, 可点图例切换) · 背景色=状态" />
+        <div ref={trendRef} className="mt-2 h-[340px]" />
       </div>
-
-      {/* ── 日历热力图(每日综合分按状态色, 支持单行/展开切换) ── */}
-      {calendarMonths.length > 0 && (
-        <div className={cn(cardCls, 'p-3')}>
-          <SectionTitle icon={CalendarDays} title="日历热力图"
-            hint={
-              <button
-                onClick={() => setCalendarExpanded(v => !v)}
-                className="inline-flex items-center gap-1 rounded-btn border border-border bg-base px-2 py-0.5 text-micro text-secondary hover:text-accent hover:border-accent/40 transition-colors"
-                title={calendarExpanded ? '切换为单行紧凑' : '切换为月份展开'}
-              >
-                {calendarExpanded ? <><Rows3 className="h-3 w-3" />单行</> : <><LayoutGrid className="h-3 w-3" />展开</>}
-              </button>
-            }
-          />
-          {calendarExpanded ? (
-            /* 展开模式: 按月分块的完整日历网格, 自动换行 */
-            <div className="mt-3 flex flex-wrap gap-x-5 gap-y-3">
-              {calendarMonths.map(mo => {
-                const monthRows = mo.weeks.flat().filter((c): c is RegimeRow => !!c)
-                const avgScore = monthRows.length > 0
-                  ? Math.round(monthRows.reduce((s, r) => s + r.score, 0) / monthRows.length) : 0
-                return (
-                  <div key={`${mo.year}-${mo.month}`} className="shrink-0">
-                    <div className="mb-1 flex items-center gap-1.5">
-                      <span className="text-micro font-medium text-secondary">{mo.label}</span>
-                      {avgScore > 0 && (
-                        <span className="rounded px-1 py-px text-micro font-semibold"
-                          style={{ color: scoreToColor(avgScore), backgroundColor: scoreToColor(avgScore) + '20' }}>
-                          {avgScore}
-                        </span>
-                      )}
-                    </div>
-                    <div className="mb-0.5 grid grid-cols-7 gap-[2px] text-micro text-muted">
-                      {['一', '二', '三', '四', '五', '六', '日'].map(d => (
-                        <div key={d} className="text-center">{d}</div>
-                      ))}
-                    </div>
-                    <div className="grid grid-cols-7 gap-[2px]">
-                      {mo.weeks.flat().map((cell, i) => (
-                        cell ? (
-                          <div key={i}
-                            title={`${cell.date} ${REGIME_STATE_LABELS[cell.state]}(${cell.score})`}
-                            className="h-[14px] w-[14px] rounded-[2px] transition-transform hover:scale-125 hover:z-10 cursor-default"
-                            style={{ backgroundColor: REGIME_STATE_COLORS[cell.state] }}
-                          />
-                        ) : (
-                          <div key={i} className="h-[14px] w-[14px]" />
-                        )
-                      ))}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          ) : (
-            /* 单行模式(默认): 月份网格横向一行+滚动条, 默认滚到最新, 每月份带月均分 */
-            <div ref={calendarScrollRef} className="mt-3 flex gap-x-5 overflow-x-auto pb-2">
-              {calendarMonths.map(mo => {
-                const monthRows = mo.weeks.flat().filter((c): c is RegimeRow => !!c)
-                const avgScore = monthRows.length > 0
-                  ? Math.round(monthRows.reduce((s, r) => s + r.score, 0) / monthRows.length) : 0
-                return (
-                  <div key={`${mo.year}-${mo.month}`} className="shrink-0">
-                    <div className="mb-1 flex items-center gap-1.5">
-                      <span className="text-micro font-medium text-secondary">{mo.label}</span>
-                      {avgScore > 0 && (
-                        <span className="rounded px-1 py-px text-micro font-semibold"
-                          style={{ color: scoreToColor(avgScore), backgroundColor: scoreToColor(avgScore) + '20' }}>
-                          {avgScore}
-                        </span>
-                      )}
-                    </div>
-                    <div className="mb-0.5 grid grid-cols-7 gap-[2px] text-micro text-muted">
-                      {['一', '二', '三', '四', '五', '六', '日'].map(d => (
-                        <div key={d} className="text-center">{d}</div>
-                      ))}
-                    </div>
-                    <div className="grid grid-cols-7 gap-[2px]">
-                      {mo.weeks.flat().map((cell, i) => (
-                        cell ? (
-                          <div key={i}
-                            title={`${cell.date} ${REGIME_STATE_LABELS[cell.state]}(${cell.score})`}
-                            className="h-[14px] w-[14px] rounded-[2px] transition-transform hover:scale-125 hover:z-10 cursor-default"
-                            style={{ backgroundColor: REGIME_STATE_COLORS[cell.state] }}
-                          />
-                        ) : (
-                          <div key={i} className="h-[14px] w-[14px]" />
-                        )
-                      ))}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </div>
-      )}
 
       </section>{/* /市场环境 */}
 
