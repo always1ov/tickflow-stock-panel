@@ -1,10 +1,11 @@
 import { useEffect, useRef, useMemo, useState } from 'react'
-import { chartTheme, FIB2_ROLE_TARGET, LEVEL_CURVE_COLOR, QUANT_MACD_COLORS, fib2RoleColor, getTheme, levelColors, useLevelColors, useTheme } from '@/lib/theme'
+import { chartTheme, FIB2_ROLE_TARGET, LEVEL_CURVE_COLOR, QUANT_MACD_COLORS, TREND_QUANT_COLORS, fib2RoleColor, getTheme, levelColors, useLevelColors, useTheme } from '@/lib/theme'
 import * as echarts from 'echarts'
 import type { ECharts, EChartsOption } from 'echarts'
 import type { Fib2Grain, Fib2Overlay, KlineRow, LevelSeries, QuantMacdResult } from '@/lib/api'
 import { alignQuantMacd, quantMacdSeries } from '@/lib/quantMacdSeries'
 import { zhuangXianIndexes, zhuangXianSeries } from '@/lib/zhuangXianSeries'
+import { alignTrendQuant, trendQuantSeries, type TrendQuantData } from '@/lib/trendQuantSeries'
 import { levelsChartLayout, PAD_BOTTOM, SLIDER_H } from '@/lib/levelsChartLayout'
 import { futureSlotRenderer } from '@/lib/futureZone'
 import { fib2Status } from '@/lib/fib2Status'
@@ -188,6 +189,10 @@ interface Props {
   quantMacd?: QuantMacdResult
   /** [R426] 副图取数失败 —— 在副图里明说, 不让一块空白冒充"没有信号" */
   quantMacdError?: boolean
+  /** [R486] 副图「趋势量化」(量化MACD 上方)的逐根数值; 没到就先空着 */
+  trendQuant?: TrendQuantData
+  /** [R486] 趋势量化取数失败 —— 同样在副图里明说 */
+  trendQuantError?: boolean
   /** 预留:点击某根 K 线 */
   onDateClick?: (date: string) => void
   /**
@@ -246,6 +251,8 @@ export function AnalysisKChart({
   symbol,
   quantMacd,
   quantMacdError = false,
+  trendQuant,
+  trendQuantError = false,
   onDateClick,
   height = 460,
   className,
@@ -393,7 +400,7 @@ export function AnalysisKChart({
     // 成交量之间, 成交量柱从底部往上长, 顶上那条被刻度压住看不出来; 换成量化MACD
     // 以后 0 轴与叉点图标都贴近副图顶部, 出图就被日期字压住了。
     // [R419] 数值统一由 `levelsChartLayout` 出: 主图与 R415 之前一样高, 副图另加。
-    const { mainH, subH, subTop } = layout
+    const { mainH, subH, subTop, trendH, trendTop } = layout
     const sliderBottom = PAD_BOTTOM
 
     // 预留:markPoint(新闻标记)
@@ -655,6 +662,10 @@ export function AnalysisKChart({
     const zhuang = zhuangXianIndexes(dates, quantMacd)
     if (zhuang.length) series.push(zhuangXianSeries(zhuang, { xAxisIndex: 1, yAxisIndex: 1 }))
 
+    // [R486] 趋势量化副图(第三张 grid, 画在主图与量化MACD 之间)。同样放在最后 push,
+    // 不参与悬停联动的下标。算法 `indicators/trend_quant.py`, 画法 `lib/trendQuantSeries.ts`。
+    series.push(...trendQuantSeries(alignTrendQuant(dates, trendQuant), { xAxisIndex: 2, yAxisIndex: 2 }))
+
     return {
       animation: false,
       backgroundColor: 'transparent',
@@ -667,6 +678,9 @@ export function AnalysisKChart({
         // [R434 加, R436 撤] 外面那圈红框撤了。用户: 「量化macd别搞红框框出来」
         { left: 56, right: 144, top: subTop, height: subH,
           show: !isDark, backgroundColor: QUANT_MACD_COLORS.paneBg, borderWidth: 0 },
+        // [R486] 趋势量化: 下标是 2, 位置在主图与量化MACD 之间。亮色主题下同样铺通达信的黑底
+        { left: 56, right: 144, top: trendTop, height: trendH,
+          show: !isDark, backgroundColor: TREND_QUANT_COLORS.paneBg, borderWidth: 0 },
       ],
       xAxis: [
         {
@@ -684,6 +698,12 @@ export function AnalysisKChart({
           // 0 轴横线 —— 原文没画这条线, 不能多画。
           axisLine: { show: false }, axisTick: { show: false },
         },
+        // [R486] 趋势量化的类目轴: 不写日期(日期只在最底下写一次), 不画轴线
+        {
+          type: 'category', gridIndex: 2, data: dates, boundaryGap: true,
+          axisLabel: { show: false }, axisLine: { show: false }, axisTick: { show: false },
+          splitLine: { show: false },
+        },
       ],
       yAxis: [
         { scale: true, splitLine: { lineStyle: { color: CT().grid } },
@@ -700,10 +720,13 @@ export function AnalysisKChart({
           // 0 下、有没有金叉死叉、出没出黄柱, 一个数都不用读。0 轴也不必标: 每根
           // 柱都从 0 长出来, 柱根就是 0。
           axisLabel: { show: false }, axisTick: { show: false } },
+        // [R486] 趋势量化: 纵轴按画出来的东西自动定范围(通达信也是), 不写刻度, 不画横线
+        { scale: true, gridIndex: 2, splitNumber: 2, splitLine: { show: false },
+          axisLabel: { show: false }, axisTick: { show: false } },
       ],
       dataZoom: [
-        { type: 'inside', xAxisIndex: [0, 1], startValue: zoomStart, endValue: dates.length - 1 },
-        { type: 'slider', xAxisIndex: [0, 1], bottom: sliderBottom, height: SLIDER_H, startValue: zoomStart, endValue: dates.length - 1,
+        { type: 'inside', xAxisIndex: [0, 1, 2], startValue: zoomStart, endValue: dates.length - 1 },
+        { type: 'slider', xAxisIndex: [0, 1, 2], bottom: sliderBottom, height: SLIDER_H, startValue: zoomStart, endValue: dates.length - 1,
           borderColor: 'transparent', fillerColor: CT().zoomFill,
           handleStyle: { color: '#52525B' }, textStyle: { color: CT().text, fontSize: 10 } },
       ],
@@ -718,6 +741,12 @@ export function AnalysisKChart({
         type: 'text', left: 60, top: subTop + 2, silent: true,
         // 亮色主题下它落在黑底上, 用浅灰才看得见
         style: { text: '量化MACD', fill: isDark ? CT().text : '#B4B4B4', fontSize: 9 },
+      }, ...(trendQuantError ? [{
+        type: 'text' as const, left: 'center', top: trendTop + trendH / 2 - 6, silent: true,
+        style: { text: '趋势量化 取数失败, 稍后点右上角刷新重试', fill: CT().text, fontSize: 11 },
+      }] : []), {
+        type: 'text', left: 60, top: trendTop + 2, silent: true,
+        style: { text: '趋势量化', fill: isDark ? CT().text : '#B4B4B4', fontSize: 9 },
       }],
       series,
     }
@@ -748,7 +777,7 @@ export function AnalysisKChart({
     chartInstRef.current.resize()
     chartInstRef.current.setOption(buildOption(), true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rows, levels, series, seriesDates, activeTypes, pivotRank, markers, ranges, fib2, fib2Grain, effLevels, fib2Zone, height, theme, hoveredKey, quantMacd, quantMacdError])
+  }, [rows, levels, series, seriesDates, activeTypes, pivotRank, markers, ranges, fib2, fib2Grain, effLevels, fib2Zone, height, theme, hoveredKey, quantMacd, quantMacdError, trendQuant, trendQuantError])
 
   // resize
   useEffect(() => {

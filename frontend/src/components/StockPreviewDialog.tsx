@@ -255,6 +255,8 @@ export function StockPreviewDialog({ symbol, name, onClose, enableLevelsView = t
       // [R472] 关键价位图的量化MACD 副图是单独一个查询, 原来漏了 —— 它取数失败时
       // 图上叫人「点右上角刷新重试」, 点了却不会重取。
       qc.invalidateQueries({ queryKey: QK.stockQuantMacd(symbol) })
+      // [R486] 趋势量化同理, 一起重取
+      qc.invalidateQueries({ queryKey: QK.stockTrendQuant(symbol) })
     }
   }
 

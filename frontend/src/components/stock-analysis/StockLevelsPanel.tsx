@@ -60,6 +60,14 @@ export function StockLevelsPanel({ symbol, height = 480, bare = false, controls,
     staleTime: 15_000,
   })
 
+  // [R486] 量化MACD 上方的「趋势量化」。同样独立一支: 它要从上市第一根算起
+  const tquantQ = useQuery({
+    queryKey: QK.stockTrendQuant(symbol),
+    queryFn: () => api.stockTrendQuant(symbol),
+    enabled: !!symbol,
+    staleTime: 15_000,
+  })
+
   const trendQ = useStockTrend(symbol)
   const qc = useQueryClient()
   const klineUpdatedAt = kline.dataUpdatedAt
@@ -72,6 +80,7 @@ export function StockLevelsPanel({ symbol, height = 480, bare = false, controls,
     qc.invalidateQueries({ queryKey: QK.stockLevels(symbol) })
     // [R415] 副图跟主图同一根实时蜡烛走, 不然盘中两张图差一根
     qc.invalidateQueries({ queryKey: QK.stockQuantMacd(symbol) })
+    qc.invalidateQueries({ queryKey: QK.stockTrendQuant(symbol) })
   }, [klineUpdatedAt, symbol, qc])
 
   const liveRefresh = kline.data?.live_refresh
@@ -131,6 +140,9 @@ export function StockLevelsPanel({ symbol, height = 480, bare = false, controls,
         quantMacd={qmacdQ.data}
         // [R426] 取数失败要说出来 —— 原来失败时副图只剩标题, 看着像"这只票没有信号"
         quantMacdError={qmacdQ.isError}
+        // [R486] 量化MACD 上方的第二张副图
+        trendQuant={tquantQ.data}
+        trendQuantError={tquantQ.isError}
         controls={controls}
         visibleBars={visibleBars}
         height={height}

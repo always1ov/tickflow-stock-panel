@@ -13,6 +13,11 @@
  * (减去原来成交量那一套 156px), 所以主图与换成交量之前一模一样。
  *
  *   [16 顶部] [主图] [14 间距] [副图] [26 日期刻度] [22 缩放条] [8 底部]
+ *
+ * [R486] 主图与量化MACD 之间再插一张「趋势量化」, 与量化MACD 同高。用户: 「在量化macd
+ * 上方加个副图」。主图高度仍一像素不动, 多出来的照旧让整张图变长、弹窗往下滚:
+ *
+ *   [16] [主图] [14] [趋势量化] [14] [量化MACD] [26 日期刻度] [22 缩放条] [8]
  */
 export const PAD_TOP = 16
 export const GAP_MAIN_SUB = 14      // 主图 ↔ 副图(两边纵轴刻度不上下相撞)
@@ -36,6 +41,10 @@ export function subPaneHeight(mainH: number): number {
 
 export interface LevelsChartLayout {
   mainH: number
+  /** [R486] 趋势量化副图(主图正下方) */
+  trendH: number
+  trendTop: number
+  /** 量化MACD 副图(最下面那张) */
   subH: number
   subTop: number
   /** 整张图(画布)的高度 —— 比调用方给的 `height` 高, 多出来的靠弹窗滚动 */
@@ -45,7 +54,9 @@ export interface LevelsChartLayout {
 export function levelsChartLayout(height: number): LevelsChartLayout {
   const mainH = height - LEGACY_NON_MAIN
   const subH = subPaneHeight(mainH)
-  const subTop = PAD_TOP + mainH + GAP_MAIN_SUB
+  const trendH = subH
+  const trendTop = PAD_TOP + mainH + GAP_MAIN_SUB
+  const subTop = trendTop + trendH + GAP_MAIN_SUB
   const total = subTop + subH + GAP_SUB_SLIDER + SLIDER_H + PAD_BOTTOM
-  return { mainH, subH, subTop, total }
+  return { mainH, trendH, trendTop, subH, subTop, total }
 }
