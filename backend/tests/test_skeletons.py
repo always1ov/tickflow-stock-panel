@@ -73,8 +73,10 @@ def test_R351_骨架的形状跟着版面走():
     # (R358 用户: 「我是想合并到筛选的卡片里面」), 所以在整页里找, 不是只在
     # `{d && !d.reason}` 那一段里找 —— 那一段现在没有它了。
     assert "<Summary d={d} />" in code, "骨架画了那一排统计, 页面上却没有 Summary"
-    # [R359] 插槽里现在是「参数条 + 成绩」两样(用户: 「参数框也并进来」)
-    assert "extra={cardBody}" in code, "成绩没接到筛选卡上"
+    # [R498] 成绩单独成卡了, 骨架就画在那张卡里 —— 它画的正是那六格与净值折叠条,
+    # 画在别处(比如页面顶上)就是在一个不会出现成绩的位置许诺成绩
+    card = code[code.index("const results = ("):code.index("const hasBody")]
+    assert "{q.isLoading && <LoadingSkeleton />}" in card, "骨架没跟着成绩走"
 
 
 def test_R324_决策台加载中画骨架行_不印自选为空():

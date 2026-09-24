@@ -61,6 +61,8 @@ export const storage = {
   flipMineOpen:         kv<boolean>('flip-mine-open'),
   /** [R358] 净值走势图折起来没有 —— 默认收起 */
   flipNavOpen:          kv<boolean>('flip-nav-open'),
+  // [R498] 「这套规则」默认收起 —— 查口径时才打开, 打开过就记住
+  flipRulesOpen:        kv<boolean>('flip-rules-open'),
   flipCapital:          kv<number>('flip-capital'),
   flipMaxPositions:     kv<number>('flip-max-positions'),
   flipYears:            kv<number>('flip-years'),

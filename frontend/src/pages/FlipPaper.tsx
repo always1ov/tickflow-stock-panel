@@ -24,7 +24,7 @@
  * 本金 / 同时持有上限 / 回溯年数都进 queryKey。这套后端是纯函数, 同样的参数必然
  * 同样的结果, 所以缓存可以放心留着。
  */
-import { useMemo, useState } from 'react'
+import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { ChevronDown, Eye, RefreshCw, TrendingDown, TrendingUp, Wallet } from 'lucide-react'
@@ -195,29 +195,41 @@ export function FlipPaper() {
   const refreshing = q.isFetching || today.isFetching
   const refreshAll = () => { void q.refetch(); void today.refetch() }
 
-  // [R358] 成绩那一块并进筛选卡 —— 先在这里算好, 两条渲染路径共用同一个
-  // (筛选条在 / 不在)。跑不动时 `reason` 那条横幅另有位置, 这里给 null。
+  // [R358] 成绩那一块 —— 先在这里算好。跑不动时 `reason` 那条横幅另有位置, 这里给 null。
   const summary = d && !d.reason ? <Summary d={d} /> : null
 
   /**
-   * [R359] 卡里那一块 = **参数条 + 成绩**。用户: 「这两个部分整合到一个卡片放在
-   * 顶部」, 追问后明确「参数框也并进来, 标题行留在外面」。
+   * [R498] 成绩**单独成一张卡**, 不再挂在筛选卡的插槽上。
    *
-   * **参数条必须排在成绩正上方**: 本金 / 最多持有 / 回溯**就是算出下面那些数字
-   * 的那三个输入**。它原来在页头最右边, 与它决定的东西隔着大半个屏幕。
+   * 用户: 「先这样保守的改, 每个页面里面的东西重新排版。不动数据, 只考虑怎么改表达」,
+   * 看过三种排法的效果图后选了「一个页面来搞定」(A · 今天优先)。
    *
-   * **而且参数条不跟着 `summary` 一起消失**: `summary` 在跑不动时是 null, 可
-   * 那正是最需要这三个框的时候 —— 回溯填过头、本金填成 0, 修的办法就是改它们。
-   * 把参数条塞进 `Summary` 里, 出错时它会跟着一起不见, 于是**没有任何办法把
-   * 页面救回来**, 只能清 localStorage。所以两者在这里并列, 不是嵌套。
+   * R358/R359 把成绩与参数并进了页面顶上那张筛选卡(当时用户点的名), 代价是**首屏
+   * 被「筛选 + 参数 + 逐月 + 六格」占掉一半**, 「今天该挂什么单」要从页面中段才开始
+   * —— 而用户说过这一页最常看的是转折。现在首屏让给信号, 成绩挪到持仓旁边。
+   *
+   * R359 立的两条**性质一条没丢**, 只是换了位置:
+   *   · 参数条紧贴在它算出来的数字上方(同一张卡, 排在 Summary 前面);
+   *   · 参数条不跟着成绩一起消失 —— 这张卡**无条件渲染**, 跑不动时 summary 为 null,
+   *     参数条照样在, 回溯填过头还能改回来。
+   * R358 那条也还在: 打分那一层(`ov`)挂了, 这张卡不受影响 —— 它根本不挂在 `ov` 下面。
    */
-  const cardBody = (
-    <div className="space-y-3">
-      <ParamBar capital={capital} maxPositions={maxPositions} years={years}
-                onCapital={putCapital} onMaxPositions={putMaxPositions} onYears={putYears} />
-      {summary}
-    </div>
+  const results = (
+    <section className="overflow-hidden rounded-card border border-border/60 bg-surface/40">
+      <SectionHead title="这套打法的成绩" note="只按六态转折买卖 · 非真实资金" />
+      <div className="space-y-3 px-4 py-3">
+        <ParamBar capital={capital} maxPositions={maxPositions} years={years}
+                  onCapital={putCapital} onMaxPositions={putMaxPositions} onYears={putYears} />
+        {summary}
+        {/* 骨架跟着成绩走: 它画的就是这张卡里那六格 + 净值折叠条 */}
+        {q.isLoading && <LoadingSkeleton />}
+      </div>
+    </section>
   )
+
+  // [R498] 有没有正文(信号 / 持仓 / 流水) —— 跑不动(`reason`)或还没到时只剩成绩卡
+  const hasBody = !!d && !d.reason
+  const hasSkipped = !!d && (d.skipped.length > 0 || d.missing.length > 0)   // 与 Skipped 自己的判据同一条
 
   const w = ov?.weather
   // [R346] 主线要有颜色 —— 上一版我给了个 `text-secondary`, 那是灰阶不是颜色。
@@ -298,24 +310,11 @@ export function FlipPaper() {
             「门槛的东西非常重要, 体检和筛选功能也要能保留」。
             **它只作用于打分那一层**: 板块过滤改的是哪些票拿得到名次, 门槛改的是
             谁进候选池 —— 也就是只影响本页信号的**先后与标注**, 不影响谁在名单上
-            (名单只由六态选, R344), 更不影响谁能出手。守卫钉着这条。 */}
-        {/* [R358] 成绩与净值图**并进筛选那张卡**。用户: 「净值走势图和这两行收益
-            都融合到页面开头的第一个卡片里面」→「我是想合并到筛选的卡片里面」。
+            (名单只由六态选, R344), 更不影响谁能出手。守卫钉着这条。
+            [R498] 成绩不再挂在它的插槽上(见上面 `results` 那段), 它现在紧挨着
+            它唯一影响的东西 —— 下面的信号。 */}
+        {ov && <TodayControls d={ov} refetch={() => today.refetch()} isFetching={today.isFetching} />}
 
-            **`ov` 拿不到时要有退路。** 筛选条吃的是今日总览那份数据(打分那一层),
-            而成绩吃的是模拟盘自己那份 —— 两份是各自独立的请求。挂在 `ov &&` 里
-            的话, **打分那一层一挂, 整段成绩跟着一起消失**, 而它明明算出来了。
-            那种消失不报错、也看不出是哪儿出的问题。 */}
-        {ov
-          ? <TodayControls d={ov} refetch={() => today.refetch()}
-                           isFetching={today.isFetching} extra={cardBody} />
-          : (
-            <div className="rounded-card border border-border/60 bg-surface/40 px-4 py-3">
-              {cardBody}
-            </div>
-          )}
-
-        {q.isLoading && <LoadingSkeleton />}
         {q.isError && (
           <div className="rounded-card border border-danger/40 bg-danger/10 px-4 py-3 text-xs text-danger">
             跑不动:{(q.error as Error)?.message}
@@ -328,52 +327,28 @@ export function FlipPaper() {
           </div>
         )}
 
-        {d && !d.reason && (
-          <>
-            <TodaySignals rows={d.today ?? []} conviction={conv} />
-            {/* [R358] 成绩与净值图搬到筛选那张卡里了 —— 见上面那段 */}
-            {/* [R381] 「现在拿着」与「成交流水」并排 —— 两张都是 `min-w-[640px]`
-                的窄表, 单列铺在 1600px 上时右边一半是空的, 而它们又都是"回头看"
-                的东西, 本来就该放在一屏里对照着看(拿着的这几只, 是哪天买进来的)。
+        {d && !d.reason && <TodaySignals rows={d.today ?? []} conviction={conv} />}
 
-                **断点是算出来的**: 内容区 ≈ 视口 − 侧栏 224 − 左右留白 32,
-                两列 640 + 12 的间隙要 1292 → 视口 ≥ 1548, 取 1560。
-                侧栏收起时会更宽松, 那只会更好看。**万一还是窄了也不会坏** ——
-                两张表自己带 `overflow-x-auto`, 最坏是卡片内部出现横向滚动条,
-                不是版面塌掉。
-                `items-start`: 两张表行数天生不对等(拿着几只 / 流水几十笔),
-                拉成等高会让短的那张下面挂一大片空白。
+        {/* [R498] 「现在拿着」与成绩并排: 一个说「手上是什么」, 一个说「这么做下来怎么样」,
+            都是转折之后回头看的东西。持仓表有七列, 分到略宽的那一侧(1.25 : 1)。
+            跑不动时没有持仓, 成绩那张卡(带参数条)独占整行 —— 它必须在, 见 `results`。 */}
+        <div className={cn('grid gap-3', hasBody && 'xl:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)] xl:items-start')}>
+          {hasBody && d && <Holdings d={d} onOpen={(s) => navigate(`/stock-analysis?symbol=${s}`)} />}
+          {results}
+        </div>
 
-                **第一版只是把两张表并排, 截图一看左边空了七百多像素** ——
-                「拿着 6 只」对「流水 30 笔」, 右边排到底左边早就完了。所以把
-                「有信号但没做成」也收进左列, 右列让流水竖跨两行。
-
-                **第二版又推翻了一次。** 先试的是「按 `col-start`/`row-start` 摆位,
-                DOM 顺序不动」—— 想法是让手机上的阅读顺序一个字不变。结果右列那块
-                `row-span-2` 把第一行撑高了, 左列两块中间裂开一道四百像素的缝:
-                跨行元素比它跨的两行都高时, 多出来的高度要分摊回那两行, 而分摊
-                不听我的。**摆位摆不出来就别硬摆** —— 改成左列一个容器装两块,
-                右列装流水, 高度各自算, 那道缝自然没有了。
-
-                代价是单列时顺序变成 拿着 → 没做成 → 流水(原来流水在中间)。
-                **这个代价是划算的**: 「没做成」是一句话的小结, 「流水」是几十行
-                的长表, 短的放前面本来就更好读; 而真正有顺序讲究的是「规则排在
-                最后」那一条, 它没动。 */}
-            <div className="grid gap-3 min-[1560px]:grid-cols-2 min-[1560px]:items-start">
-              <div className="min-w-0 space-y-3">
-                <Holdings d={d} onOpen={(s) => navigate(`/stock-analysis?symbol=${s}`)} />
-                <Skipped d={d} />
-              </div>
-              <div className="min-w-0">
-                <Orders orders={d.orders} />
-              </div>
-            </div>
-          </>
+        {/* [R381 → R498] 流水与「有信号但没做成」并排。R381 是「拿着 + 没做成」对流水;
+            拿着挪到成绩旁边之后, 这一行只剩流水这张长表, 「没做成」那句小结正好放它右边。
+            **没有「没做成」时流水独占整行** —— 空着右边一栏等于白留一条缝。 */}
+        {hasBody && d && (
+          <div className={cn('grid gap-3', hasSkipped && 'xl:grid-cols-[minmax(0,1fr)_minmax(0,24rem)] xl:items-start')}>
+            <div className="min-w-0"><Orders orders={d.orders} /></div>
+            <Skipped d={d} />
+          </div>
         )}
 
-
-        {/* 规则排在最后 —— 查证用的, 不该天天占首屏 */}
-        {rules.data && <Rules r={rules.data} d={d} />}
+        {/* 规则排在最后 —— 查证用的, 不该天天占首屏。[R498] 而且默认收起 */}
+        {rules.data && <RulesFold r={rules.data} d={d} />}
       </div>
     </div>
   )
@@ -654,8 +629,10 @@ function TodaySignals({ rows, conviction }: {
                 <ChevronDown className={cn('h-3 w-3 shrink-0 text-muted transition-transform duration-expand ease-smooth',
                   mineOpen && 'rotate-180')} />
                 <Wallet className="h-3 w-3" />
-                手上这些 · 跌破离场线才清仓
-                <span className="ml-auto flex items-center gap-2 text-muted">
+                {/* [R498] 手机上这一行放不下, 右边那两个数被挤成竖排。后半句在窄屏收掉 ——
+                    「跌破离场线才清仓」是说明, 右边那两个数才是这一行要说的 */}
+                手上这些<span className="hidden sm:inline"> · 跌破离场线才清仓</span>
+                <span className="ml-auto flex items-center gap-2 whitespace-nowrap text-muted">
                   {/* 收起来也要看得见的那两个数 —— 卖出这一侧全靠它们 */}
                   {mineNear > 0 && (
                     <span className="text-warning">{mineNear} 只贴近离场线</span>
@@ -1108,6 +1085,17 @@ function ParamBar({ capital, maxPositions, years, onCapital, onMaxPositions, onY
 }
 
 function MonthStrip({ months }: { months: FlipPaperData['monthly'] }) {
+  /**
+   * [R498] **放不下时先露出最近的月份。** 成绩卡挪到持仓旁边后只有半幅宽, 13 个月
+   * 排不下, 横向滚动 —— 而滚动条默认停在最左, 被藏起来的恰好是**最近那几个月**,
+   * 这一排排在最前的理由(R357「最近哪个月在亏」)正好落空。所以一挂上就滚到最右,
+   * 往左拖看更早的。瞬时定位, 不做滚动动画(数据不加装饰性动效)。
+   */
+  const scrollRef = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    const el = scrollRef.current
+    if (el) el.scrollLeft = el.scrollWidth
+  }, [months])
   if (!months.length) return null
   // 最大月度波动 —— 柱高按它归一, 于是**柱子之间可比**。拿固定刻度的话,
   // 一个 ±2% 的年份会所有柱子都贴着底, 什么也看不出来。
@@ -1121,7 +1109,7 @@ function MonthStrip({ months }: { months: FlipPaperData['monthly'] }) {
         <Hint title={'**每个月单独算, 月与月之间不重叠** —— 这个月的收益 =\n月末净值 / 上月末净值 - 1(第一个月的基准是本金)。\n\n基准取**上月最后一天**而不是本月第一天: 收益要算这一段期间的变化,\n拿本月第一个交易日当基准会把那一天自己的涨跌吃掉。\n\n**打叉的是残月**: 回测窗口从月中切进来(第一个月),\n或者这个月还没走完(最后一个月)—— 它们不该拿去和整月比。'} />
         <span className="ml-1 opacity-70">{months.length} 个月 · 柱高按最大月度波动归一</span>
       </div>
-      <div className="flex items-end gap-1 overflow-x-auto">
+      <div ref={scrollRef} className="flex items-end gap-1 overflow-x-auto">
         {months.map((m) => {
           const up = m.ret >= 0
           return (
@@ -1193,7 +1181,10 @@ function Summary({ d }: { d: FlipPaperData }) {
 
           窄屏仍然换行: 2 格 → 3 格 → 6 格。`divide-y` 只在换行的档位上要,
           六格一行时关掉, 否则会在唯一那一行下面画一条多余的线。 */}
-      <section className="grid grid-cols-2 divide-x divide-y divide-border/30 overflow-hidden rounded-card border border-border/40 bg-base/30 sm:grid-cols-3 lg:grid-cols-6 lg:divide-y-0">
+      {/* [R498] 成绩卡挪到持仓旁边之后, xl(≥1280)起只有半幅宽。实测: 半幅里一行六格
+          一格只剩一百二十来像素, 21px 的「2026-09-23」被截成两行(1440 与 1920 都是)。
+          所以半幅时 2 列、1800 起 3 列; 只有成绩卡占满整行时(xl 以下)才一行六格。 */}
+      <section className="grid grid-cols-2 divide-x divide-y divide-border/30 overflow-hidden rounded-card border border-border/40 bg-base/30 sm:grid-cols-3 lg:grid-cols-6 lg:divide-y-0 xl:grid-cols-2 xl:divide-y min-[1800px]:grid-cols-3">
         <Stat label="现在拿着" value={`${d.positions.length} 只`}
               sub={`仓位 ${d.nav.length ? pct((d.nav[d.nav.length - 1].market_value / d.nav[d.nav.length - 1].nav), 0) : '—'} · 现金 ${money(d.nav.at(-1)?.cash)}`}
               hint={'这是**当下**的仓位, 与上面那条逐月一样看的是现在;\n同一行右边那四格才是整个回溯窗口的成绩。'} />
@@ -1335,7 +1326,31 @@ function Holdings({ d, onOpen }: { d: FlipPaperData; onOpen: (s: string) => void
           当前空仓 —— 自选里没有一只处在多头侧。<b className="text-secondary">空仓也是一种仓位</b>。
         </div>
       ) : (
-        <div className="overflow-x-auto">
+        <>
+        {/* [R498] 手机上改成每只两行的卡片。表格有七列、最窄 640px, 在 390 宽的屏上
+            向右截断 —— 成本、现价、浮盈都在被截掉的那一半里, 而浮盈正是最该看见的。
+            **同一份数据、同一套字段**, 只是换了摆法; 宽屏照旧是表格。 */}
+        <div className="divide-y divide-border/30 sm:hidden">
+          {d.positions.map((p) => (
+            <button key={p.symbol} type="button" onClick={() => onOpen(p.symbol)}
+                    className="block w-full px-4 py-2.5 text-left text-xs cursor-pointer">
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="min-w-0 truncate"><SymbolCell symbol={p.symbol} name={p.name} /></span>
+                <span className={cn('shrink-0 text-sm font-semibold tabular-nums',
+                  (p.pnl ?? 0) >= 0 ? 'text-bull' : 'text-bear')}>
+                  {pct(p.pnl_pct)}
+                </span>
+              </div>
+              <div className="mt-0.5 flex flex-wrap gap-x-2 text-micro tabular-nums text-muted">
+                <span>{holdingDays.has(p.symbol) ? `持有 ${holdingDays.get(p.symbol)} 天` : '持有 —'}</span>
+                <span>{p.shares.toLocaleString()} 股</span>
+                <span>成本 {p.cost?.toFixed(2) ?? '—'} → 现 {p.last.toFixed(2)}</span>
+                <span>市值 {money(p.market_value)}</span>
+              </div>
+            </button>
+          ))}
+        </div>
+        <div className="hidden overflow-x-auto sm:block">
           <table className="w-full min-w-[640px] text-xs">
             <thead className="text-micro text-muted">
               <tr className="text-left">
@@ -1376,8 +1391,20 @@ function Holdings({ d, onOpen }: { d: FlipPaperData; onOpen: (s: string) => void
             </tbody>
           </table>
         </div>
+        </>
       )}
     </section>
+  )
+}
+
+/** [R498] 流水里的「买入 / 清仓」徽标 —— 宽屏表格与手机卡片共用这一处(同一个读数只许有一个产地) */
+function OrderActBadge({ act, className }: { act: FlipOrder['act']; className?: string }) {
+  return (
+    <span className={cn('inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-micro font-medium',
+      act === 'buy' ? 'bg-bull/15 text-bull' : 'bg-bear/15 text-bear', className)}>
+      {act === 'buy' ? <TrendingUp className="h-2.5 w-2.5" /> : <TrendingDown className="h-2.5 w-2.5" />}
+      {act === 'buy' ? '买入' : '清仓'}
+    </span>
   )
 }
 
@@ -1386,22 +1413,53 @@ function Orders({ orders }: { orders: FlipOrder[] }) {
   // 最近的排前面 —— 流水要回答"最近做了什么"
   const rows = useMemo(() => [...orders].reverse(), [orders])
   const shown = all ? rows : rows.slice(0, 30)
+  // [R498] 手机上默认只给最近 10 笔 —— 两行一笔的卡片, 30 笔就是三屏多
+  const shownPhone = all ? rows : rows.slice(0, 10)
   return (
     <section className="overflow-hidden rounded-card border border-border/60 bg-surface/40">
       <SectionHead
         title="成交流水"
         note={`${orders.length} 笔 · 最近的在前`}
-        right={rows.length > 30 && (
-          <button onClick={() => setAll((v) => !v)}
-                  className="text-xs text-muted hover:text-foreground cursor-pointer">
-            {all ? '只看最近 30 笔' : `展开全部 ${rows.length} 笔`}
-          </button>
-        )}
+        right={<>
+          {rows.length > 30 && (
+            <button onClick={() => setAll((v) => !v)}
+                    className="hidden text-xs text-muted hover:text-foreground cursor-pointer sm:inline">
+              {all ? '只看最近 30 笔' : `展开全部 ${rows.length} 笔`}
+            </button>
+          )}
+          {rows.length > 10 && (
+            <button onClick={() => setAll((v) => !v)}
+                    className="text-xs text-muted hover:text-foreground cursor-pointer sm:hidden">
+              {all ? '只看最近 10 笔' : `展开全部 ${rows.length} 笔`}
+            </button>
+          )}
+        </>}
       />
       {rows.length === 0 ? (
         <div className="px-4 py-5 text-xs text-muted">这段时间一次转折都没有, 所以一笔都没做。</div>
       ) : (
-        <div className="overflow-x-auto">
+        <>
+        {/* [R498] 手机上一笔两行: 日期·标的·动作 / 因为·成交价·金额。表格在 390 宽上
+            只露出日期、标的、动作三列, 成交价与金额整列看不到。 */}
+        <div className="divide-y divide-border/30 sm:hidden">
+          {shownPhone.map((o, i) => (
+            <div key={`${o.date}-${o.symbol}-${i}`} className="px-4 py-2 text-xs">
+              <div className="flex items-center gap-2">
+                <span className="shrink-0 font-mono text-micro text-muted">
+                  {o.date}
+                  {o.delayed && <span className="ml-0.5 text-warning">·延</span>}
+                </span>
+                <span className="min-w-0 flex-1 truncate"><SymbolCell symbol={o.symbol} name={o.name} /></span>
+                <OrderActBadge act={o.act} className="shrink-0" />
+              </div>
+              <div className="mt-0.5 flex justify-between gap-2 text-micro text-muted">
+                <span className="min-w-0 truncate">{o.reason}{o.state_cn && `(${o.state_cn})`}</span>
+                <span className="shrink-0 tabular-nums">{o.price.toFixed(2)} · {money(o.amount)}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="hidden overflow-x-auto sm:block">
           <table className="w-full min-w-[640px] text-xs">
             <thead className="text-micro text-muted">
               <tr className="text-left">
@@ -1429,11 +1487,7 @@ function Orders({ orders }: { orders: FlipOrder[] }) {
                     <SymbolCell symbol={o.symbol} name={o.name} />
                   </td>
                   <td className="px-2 py-1.5">
-                    <span className={cn('inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-micro font-medium',
-                      o.act === 'buy' ? 'bg-bull/15 text-bull' : 'bg-bear/15 text-bear')}>
-                      {o.act === 'buy' ? <TrendingUp className="h-2.5 w-2.5" /> : <TrendingDown className="h-2.5 w-2.5" />}
-                      {o.act === 'buy' ? '买入' : '清仓'}
-                    </span>
+                    <OrderActBadge act={o.act} />
                   </td>
                   <td className="px-2 py-1.5 text-xs text-secondary">
                     {o.reason}
@@ -1446,6 +1500,7 @@ function Orders({ orders }: { orders: FlipOrder[] }) {
             </tbody>
           </table>
         </div>
+        </>
       )}
     </section>
   )
@@ -1507,10 +1562,34 @@ function Skipped({ d }: { d: FlipPaperData }) {
   )
 }
 
-function Rules({ r, d }: { r: FlipRules; d?: FlipPaperData }) {
+/**
+ * [R498] 「这套规则」默认收起。它是查口径用的清单, 一个月看不了一次, 却一直占着
+ * 页面最底下那一整块。折叠条的样子与「只是盯着」「净值走势」同一套(旋转的
+ * ChevronDown + 右边一句摘要), 展开状态记住。
+ *
+ * **连内容一起不渲染**, 与净值图同一个做法 —— 这里没有图表那个坑, 只是没必要让一块
+ * 看不见的东西挂着。
+ */
+function RulesFold({ r, d }: { r: FlipRules; d?: FlipPaperData }) {
+  const [open, setOpen] = useState(() => storage.flipRulesOpen.get(false))
+  const toggle = () => setOpen((v) => { storage.flipRulesOpen.set(!v); return !v })
   return (
     <section className="overflow-hidden rounded-card border border-border/60 bg-surface/40">
-      <SectionHead title="这套规则" note="口径 —— 与后端同一份, 不是这里另写的" />
+      <button type="button" onClick={toggle} aria-expanded={open}
+              className="flex w-full items-center gap-1.5 px-4 py-2.5 text-xs text-muted transition-colors hover:bg-elevated/40 hover:text-foreground cursor-pointer">
+        <ChevronDown className={cn('h-3 w-3 transition-transform duration-expand ease-smooth', open && 'rotate-180')} />
+        <span className="text-sm font-medium text-foreground">这套规则</span>
+        <span className="ml-auto opacity-70">口径 —— 与后端同一份 · {open ? '收起' : '展开'}</span>
+      </button>
+      {open && <div className="border-t border-border/40"><Rules r={r} d={d} /></div>}
+    </section>
+  )
+}
+
+/** [R498] 只剩正文 —— 卡壳与标题归 RulesFold 的折叠条, 不然是卡中卡 */
+function Rules({ r, d }: { r: FlipRules; d?: FlipPaperData }) {
+  return (
+    <>
       {/* [R381] 这一段是全页最浪费的一块: 七条「标签 + 一行值」竖着排在 1600px 上,
           每行右边空掉三分之二, 还把下面的东西挤出首屏。改成两列 / 宽屏三列。
           **口径一个字没改**, 七条还是那七条, 次序也没动 —— 这是查证用的清单,
@@ -1539,7 +1618,7 @@ function Rules({ r, d }: { r: FlipRules; d?: FlipPaperData }) {
           <p className="xl:col-span-2">{r.why_no_state}</p>
         </div>
       </div>
-    </section>
+    </>
   )
 }
 
@@ -1556,8 +1635,10 @@ function SectionHead({ title, note, right, hint }: {
   title: string; note?: string; right?: React.ReactNode; hint?: string
 }) {
   return (
-    <div className="flex items-center gap-2 border-b border-border/40 px-4 py-2.5">
-      <span className="text-sm font-medium text-foreground">{title}</span>
+    /* [R498] 手机上「今天该挂什么单」被后面那串说明挤成两行。标题不许换行,
+       放不下时让说明整段落到下一行 —— 标题是这一块的名字, 说明才是可以让位的那个。 */
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 border-b border-border/40 px-4 py-2.5">
+      <span className="shrink-0 whitespace-nowrap text-sm font-medium text-foreground">{title}</span>
       {hint && <Hint title={hint} />}
       {note && <span className="text-micro text-muted">{note}</span>}
       {right && <span className="ml-auto">{right}</span>}
@@ -1571,7 +1652,7 @@ function LoadingSkeleton() {
       {/* [R362] 六格 —— **跟着 `Summary` 那一排走**。少画两格就是先许诺一个版面
           再食言(与下面净值图那块同一条纪律)。栅格断点也要逐个对上, 否则骨架
           在窄屏上换行的位置与真东西不一样, 数据到位时版面会跳一下。 */}
-      <div className="grid grid-cols-2 divide-x divide-y divide-border/30 overflow-hidden rounded-card border border-border/60 bg-surface/40 sm:grid-cols-3 lg:grid-cols-6 lg:divide-y-0">
+      <div className="grid grid-cols-2 divide-x divide-y divide-border/30 overflow-hidden rounded-card border border-border/60 bg-surface/40 sm:grid-cols-3 lg:grid-cols-6 lg:divide-y-0 xl:grid-cols-2 xl:divide-y min-[1800px]:grid-cols-3">
         {Array.from({ length: 6 }, (_, i) => (
           <div key={i} className="space-y-1.5 px-4 py-2.5">
             <Skeleton w="w-12" h="h-2.5" />

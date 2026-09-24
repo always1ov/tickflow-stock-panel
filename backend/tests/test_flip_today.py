@@ -209,11 +209,14 @@ def test_R329_今日信号排在主列第一块():
     剩下这一半仍然成立而且仍然要钉: 今日信号是**主列的第一块**, 持仓 / 成交 /
     没做成 / 规则都排在它后面。成绩并进了页头那张控制卡, 不占主列的位置。
     """
+    # [R498] **被 R358 缩掉的那一半又回来了。** 用户选了「今天优先」: 成绩从页头那张
+    # 筛选卡里搬下来, 排到信号后面。所以这里重新钉住原来那句 —— 今天要动手的东西
+    # 排在回测结论(`{results}`)前面。
     from tests.frontend_source import code_of
     code = code_of("pages/FlipPaper.tsx")
-    body = code[code.index("{d && !d.reason && ("):]
+    body = code[code.index('return (\n    <div className="flex h-full flex-col">'):]
     i_today = body.index("<TodaySignals")
-    for later in ("<Holdings", "<Orders", "<Skipped"):
+    for later in ("<Holdings", "{results}", "<Orders", "<Skipped"):
         assert i_today < body.index(later), f"今日信号被 {later} 挤到后面去了"
 
 

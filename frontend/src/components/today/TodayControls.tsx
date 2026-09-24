@@ -99,8 +99,9 @@ export function TodayControls({ d, refetch, isFetching, extra }: {
       <Card padding="none">
       <div className="flex flex-wrap items-center gap-g4 px-s2 py-s1">
         {/* [R40] 板块筛选。过滤在后端做 —— 前端筛的话会漏掉被 max_show 截掉的票,
-            看到的"主板机会"是残缺的而你不会知道 */}
-        <div className="flex items-center gap-g2">
+            看到的"主板机会"是残缺的而你不会知道
+            [R498] 加 flex-wrap: 六个按钮一排在手机 390 宽上放不下, 「北交所」被挤出屏幕右边 */}
+        <div className="flex flex-wrap items-center gap-g2">
           <Button
             size="xs"
             selected={boardFilter.length === 0}

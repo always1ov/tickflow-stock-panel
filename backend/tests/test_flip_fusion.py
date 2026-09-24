@@ -122,10 +122,17 @@ def test_R343_模拟盘原有六块的顺序没被动过():
     # 是一句话的小结, 「流水」是几十行的长表, 短的放前面本来就更好读。
     #
     # 真正有讲究的那一条**没动**: 「规则排在最后」—— 它是查证用的, 不该天天占首屏。
-    order = ["<TodaySignals", "<Holdings", "<Skipped", "<Orders", "<Rules"]
-    idx = [body.index(t) for t in order]
+    # [R498] **又排了一次, 是用户选的。** 「先这样保守的改, 每个页面里面的东西重新
+    # 排版」, 看过三种排法的效果图后选了「一个页面来搞定」(今天优先):
+    #     信号 → [持仓 | 成绩(参数 + 六格 + 逐月 + 净值)] → [流水 | 没做成] → 规则(收起)
+    # 成绩从筛选卡的插槽上搬下来, 成了主列里的一块(`{results}`); 「没做成」挪到
+    # 流水右边。**「规则排在最后」那一条仍然没动。**
+    # 只在 JSX 里数 —— `results` 那张卡的定义在前面, 那里的 `<ParamBar` 不算版面顺序
+    jsx = body[body.index("return (\n    <div className=\"flex h-full flex-col\">"):]
+    order = ["<TodaySignals", "<Holdings", "{results}", "<Orders", "<Skipped", "<RulesFold"]
+    idx = [jsx.index(t) for t in order]
     assert idx == sorted(idx), f"版面顺序被动过: {order}"
-    assert body.index("<Rules") == max(idx), "「规则排在最后」这一条被动了"
+    assert jsx.index("<RulesFold") == max(idx), "「规则排在最后」这一条被动了"
     assert "<NavChart" not in body, "净值图该在 Summary 的折叠区里, 不在主列"
 
 
@@ -595,8 +602,13 @@ def test_R358_成绩挂在筛选卡的插槽上_不是搬进那个组件():
     # 组件本身仍然对模拟盘一无所知
     for leak in ("FlipPaper", "monthly", "nav", "total_ret", "max_drawdown"):
         assert leak not in ctrl, f"模拟盘的数据结构漏进了这个共用组件: {leak}"
+    # [R498] 模拟盘**不再用这个插槽** —— 成绩单独成卡了(用户选的「今天优先」)。
+    # 插槽本身留着(它是共用组件的通用能力, 不该因为一个页面不用了就拆), 上面那几条
+    # 「组件对模拟盘一无所知」照旧钉着。这里改钉: 模拟盘调它时不传 extra。
     code = code_of(FLIP)
-    assert "extra={cardBody}" in code, "模拟盘没把那一块接到插槽上"
+    call = code[code.index("<TodayControls d={ov}"):]
+    call = call[:call.index("/>")]
+    assert "extra=" not in call, "成绩又挂回筛选卡的插槽上了 —— R498 用户选了让首屏给信号"
 
 
 def test_R358_插槽与筛选条在同一张卡里():
@@ -684,14 +696,17 @@ def test_R358_打分那层挂了_成绩不跟着消失():
     筛选条吃的是今日总览那份(打分那一层), 成绩吃的是模拟盘自己那份。把成绩挂在
     `ov && ...` 里的话, 打分那一层一挂, **整段成绩跟着一起消失** —— 而它明明
     算出来了。那种消失不报错, 也看不出是哪儿出的问题。
+
+    [R498] 成绩单独成卡之后, 这条性质换了个钉法: 成绩卡 `{results}` 在主列里
+    **无条件渲染**, 它所在的那一层不看 `ov`, 也不看 `d`(跑不动时参数条仍得在)。
     """
     code = code_of(FLIP)
-    blk = code[code.index("{ov\n"):code.index("{q.isLoading &&")]
-    assert blk.strip()
-    assert "{cardBody}" in blk, "ov 拿不到时这一块没有退路, 会整块消失"
-    # [R359] 退路里装的必须是**同一个** `cardBody` —— 另写一份等于两套版面,
-    # 改了一边忘了另一边只有在打分那层挂掉时才看得见, 那时没人在看。
-    assert blk.count("cardBody") == 2, "两条渲染路径没共用同一块内容"
+    jsx = code[code.index('return (\n    <div className="flex h-full flex-col">'):]
+    line = jsx[:jsx.index("{results}")]
+    line = line[line.rindex("\n", 0, line.rindex("<div className={cn('grid gap-3'")):]
+    assert "ov" not in line.replace("overflow", ""), "成绩卡挂到了打分那一层下面 —— 打分一挂它就没了"
+    assert "{results}" in jsx and jsx.count("{results}") == 1, "成绩卡没渲染, 或渲染了两份"
+    assert "hasBody && d && <Holdings" in jsx, "持仓该跟着正文走, 成绩卡不该"
 
 
 # ── [R359] 参数条也并进那张卡 ───────────────────────────────────────────
@@ -722,7 +737,8 @@ def test_R359_参数条不在页头了_在卡里():
 def test_R359_参数条紧挨着它算出来的东西():
     """本金 / 最多持有 / 回溯**就是算出下面那些数字的那三个输入**。"""
     code = code_of(FLIP)
-    body = code[code.index("const cardBody = ("):code.index("const w = ov?.weather")]
+    # [R498] 成绩单独成卡(`results`), 参数条跟着进了这张卡, 仍排在成绩正上方
+    body = code[code.index("const results = ("):code.index("const hasBody")]
     assert body.strip()
     assert body.index("<ParamBar") < body.index("{summary}"), "参数条没排在成绩上方"
 
@@ -735,9 +751,11 @@ def test_R359_参数条不跟着成绩一起消失():
     一起不见, 于是**没有任何办法把页面救回来**, 只能去清 localStorage。
     """
     code = code_of(FLIP)
-    body = code[code.index("const cardBody = ("):code.index("const w = ov?.weather")]
+    body = code[code.index("const results = ("):code.index("const hasBody")]
     assert body.strip()
-    assert "<ParamBar" in body, "参数条不在 cardBody 这一层"
+    assert "<ParamBar" in body, "参数条不在成绩卡这一层"
+    # [R498] 而且它**不在 `{summary}` 的条件里**: summary 为 null 时参数条照样渲染
+    assert "summary &&" not in body and "summary ?" not in body, "参数条被包进了成绩的条件里"
     sm = code[code.index("function Summary({ d }"):code.index("function Stat({ label")]
     assert sm.strip()
     assert "<ParamBar" not in sm, "参数条嵌进了 Summary —— 跑不动时会跟着一起消失"
@@ -1256,21 +1274,22 @@ def test_R381_六态那句话能显示完整():
 def test_R381_现在拿着与成交流水在宽屏并排():
     """两张都是 `min-w-[640px]` 的窄表, 各占一整行时右边一半是空的。
 
-    断点 1560 是算出来的: 内容区 ≈ 视口 − 侧栏 224 − 留白 32, 两列 640 + 12
-    的间隙要 1292 → 视口 ≥ 1548。**窄了也不会坏** —— 两张表自带
-    `overflow-x-auto`, 最坏是卡片内部出现横向滚动条。
+    [R498] 用户选了「今天优先」之后并排的对象换了: 持仓与成绩并排(一个说手上是什么,
+    一个说这么做下来怎么样), 流水与「没做成」并排。立论没变 —— **宽屏上别让一张
+    窄表独占一整行**。两处并排都只在有第二块时才开两列, 否则一张独占整行。
     """
     from tests.frontend_source import code_of
     code = code_of("pages/FlipPaper.tsx")
     i = code.index("<TodaySignals")
-    blk = code[i:code.index("<Rules", i)]
+    blk = code[i:code.index("<RulesFold", i)]
     assert blk.strip()
-    assert "min-[1560px]:grid-cols-2" in blk, "并排那层栅格没了"
-    # 左列装两块(拿着 + 没做成), 右列装流水 —— 左列只装一块的话会空掉一大截
-    left = blk[blk.index('className="min-w-0 space-y-3"'):]
-    left = left[:left.index("</div>")]
-    assert "<Holdings" in left and "<Skipped" in left, "左列没把「没做成」收进来"
-    assert "<Orders" not in left, "流水跑到左列去了"
+    top = blk[blk.index("<div className={cn('grid gap-3', hasBody"):]
+    top = top[:top.index("</div>")]
+    assert "xl:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]" in top, "持仓与成绩没并排"
+    assert "<Holdings" in top and "{results}" in top
+    low = blk[blk.index("<div className={cn('grid gap-3', hasSkipped"):]
+    assert "xl:grid-cols-[minmax(0,1fr)_minmax(0,24rem)]" in low[:200], "流水与没做成没并排"
+    assert low.index("<Orders") < low.index("<Skipped"), "流水在左、没做成在右"
 
 
 def test_R381_规则与没做成都改成多列():
