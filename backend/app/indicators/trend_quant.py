@@ -30,6 +30,9 @@
 2. **无效值传播**: `MA` 不足 N 根无效、`REF` 开头无效; 比较 / 运算碰到无效, 结果无效,
    条件不成立。
 3. **除以 0 当无效**, 不除出无穷大(高低价相等、分母那几根全是 0 时)。
+   **乘除的先后照原文写的顺序**(R489): 原文 `A/B*100` 就先除后乘, `DMP*100/TR1` 就先乘后除。
+   数学上一样, 浮点上差最后一位 —— 而「会员<昨天」「平均线>=昨天」这类比较恰好碰上相等
+   (比如会员顶到 100)时, 差的这一位就决定了出不出字。
 4. **「吸筹」要从上市第一根算起**: `CDXS:=HHV(VAR17,0)` 是「第一根到今天的最高值」,
    柱子高度 = VAR17 ÷ 它。调用方取全部历史再算; 历史不全时只影响吸筹的高低, 不影响
    它出现在哪天, 其他信号只要最近几百根。
@@ -137,6 +140,10 @@ def _div(a: Num, b: Num) -> Num:
     return None if a is None or b is None or b == 0 else a / b
 
 
+def _mul(a: Num, k: float) -> Num:
+    return None if a is None else a * k
+
+
 def _div_col(a: list[Num], b: list[Num]) -> list[Num]:
     return [_div(x, y) for x, y in zip(a, b)]
 
@@ -170,7 +177,7 @@ def compute(o: list[Num], h: list[Num], l: list[Num], c: list[Num], v: list[Num]
     n = len(c)
     # 最小值 / 最大值 / 波动线 / 平均线
     lo10, hi25 = LLV(l, 10), HHV(h, 25)
-    wave = EMA(_op(lambda cc, a, b: _div((cc - a) * 4, b - a), c, lo10, hi25), 4)
+    wave = EMA(_op(lambda cc, a, b: _mul(_div(cc - a, b - a), 4), c, lo10, hi25), 4)
     avg = EMA(wave, 3)
     avg1 = REF(avg, 1)
     info = [None if a is None or b is None else (1 if a >= b else 0) for a, b in zip(avg, avg1)]
@@ -204,7 +211,7 @@ def compute(o: list[Num], h: list[Num], l: list[Num], c: list[Num], v: list[Num]
     lc = REF(c, 1)
     up_move = _op(lambda x, y: max(x - y, 0.0), c, lc)
     abs_move = _op(lambda x, y: abs(x - y), c, lc)
-    rsi5 = _op(lambda a, b: _div(a * 100, b), SMA(up_move, 5, 1), SMA(abs_move, 5, 1))
+    rsi5 = _op(lambda a, b: _mul(_div(a, b), 100), SMA(up_move, 5, 1), SMA(abs_move, 5, 1))
     h1, l1 = REF(h, 1), REF(l, 1)
     tr = _op(lambda hh, ll, cc: max(max(hh - ll, abs(hh - cc)), abs(ll - cc)), h, l, lc)
     tr1 = SUM(tr, 10)
@@ -214,7 +221,7 @@ def compute(o: list[Num], h: list[Num], l: list[Num], c: list[Num], v: list[Num]
     dmm = SUM(_op(lambda a, b: b if b > 0 and b > a else 0.0, hd, ld), 10)
     pdi = _div_col(_op(lambda a: a * 100, dmp), tr1)
     mdi = _div_col(_op(lambda a: a * 100, dmm), tr1)
-    adx = MA(_op(lambda m, p: _div(abs(m - p) * 100, m + p), mdi, pdi), 5)
+    adx = MA(_op(lambda m, p: _mul(_div(abs(m - p), m + p), 100), mdi, pdi), 5)
     av = _op(lambda a, b: a + b, rsi5, adx)
     hh10, ll10 = HHV(h, 10), LLV(l, 10)
     wr10 = _op(lambda a, cc, b: _div(100 * (a - cc), a - b), hh10, c, ll10)
@@ -228,7 +235,7 @@ def compute(o: list[Num], h: list[Num], l: list[Num], c: list[Num], v: list[Num]
 
     # 逃
     c2 = REF(c, 2)
-    member = _op(lambda a, b: _div(a * 100, b),
+    member = _op(lambda a, b: _mul(_div(a, b), 100),
                  SMA(_op(lambda x, y: max(x - y, 0.0), c, c2), 7, 1),
                  SMA(_op(lambda x, y: abs(x - y), c, c2), 7, 1))
     m1 = REF(member, 1)
@@ -247,7 +254,7 @@ def compute(o: list[Num], h: list[Num], l: list[Num], c: list[Num], v: list[Num]
 
     # 主力吸货 / 吸筹
     var11 = REF(l, 1)
-    var12 = _op(lambda a, b: _div(a * 100, b),
+    var12 = _op(lambda a, b: _mul(_div(a, b), 100),
                 SMA(_op(lambda x, y: abs(x - y), l, var11), 3, 1),
                 SMA(_op(lambda x, y: max(x - y, 0.0), l, var11), 3, 1))
     var13 = EMA(_op(lambda cc, x: x * 10 if cc * 1.2 else x / 10, c, var12), 3)

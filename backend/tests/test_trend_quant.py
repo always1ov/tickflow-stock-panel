@@ -225,3 +225,18 @@ def test_R486_端点取全部历史(monkeypatch):
 def test_R486_空数据不抛异常(monkeypatch):
     d = _client(monkeypatch, pl.DataFrame()).get(URL).json()
     assert d["dates"] == [] and d["marks"]["sheng"] == []
+
+
+def test_R489_乘除先后照原文书写的顺序():
+    """原文 `A/B*100` 先除后乘、`DMP*100/TR1` 先乘后除。数学上一样, 浮点上差最后一位 ——
+    恰好相等的比较(收盘价与两天前相同时「会员」今天等于昨天)就靠这一位定出不出字。
+    照通达信的写法算, 舍入才和它一致。"""
+    src = open(tq.__file__, encoding="utf-8").read()
+    for want in ("_mul(_div(cc - a, b - a), 4)",            # (C-最小值)/(最大值-最小值)*4
+                 "_mul(_div(a, b), 100), SMA(up_move",        # RSI5: SMA/SMA*100
+                 "_mul(_div(abs(m - p), m + p), 100)",        # ABS(MDI-PDI)/(MDI+PDI)*100
+                 "member = _op(lambda a, b: _mul(_div(a, b), 100)",
+                 "var12 = _op(lambda a, b: _mul(_div(a, b), 100)",
+                 "_div_col(_op(lambda a: a * 100, dmp), tr1)",  # DMP*100/TR1
+                 "_div(100 * (a - cc), a - b)"):              # 100*(HHV-C)/(HHV-LLV)
+        assert want in src, f"乘除顺序与原文不一致: 缺 {want}"
