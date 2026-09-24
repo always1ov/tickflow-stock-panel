@@ -575,9 +575,10 @@ def test_R493_管道与清空数据都接上了副本(tmp_path):
     """这两处在作者文件里, 同步上游时最容易被整段覆盖掉 —— 钉住它们还在。"""
     src = Path(__file__).resolve().parents[1] / "app"
     pipe = (src / "jobs" / "daily_pipeline.py").read_text(encoding="utf-8")
-    assert 'symbol_daily_store.invalidate(repo.store.data_dir, "stock")' in pipe
-    assert 'symbol_daily_store.invalidate(repo.store.data_dir, "stock", list(affected_symbols))' in pipe
-    assert 'symbol_daily_store.invalidate(repo.store.data_dir, "etf", list(affected_etfs))' in pipe
+    # R496 起改由登记表统一通知(derived_caches.enriched_rewritten), 那边另有调用点守卫
+    assert 'derived_caches.enriched_rewritten(repo.store.data_dir, "stock")' in pipe
+    assert 'derived_caches.enriched_rewritten(repo.store.data_dir, "stock", affected_symbols)' in pipe
+    assert 'derived_caches.enriched_rewritten(repo.store.data_dir, "etf", affected_etfs)' in pipe
     data = (src / "api" / "data.py").read_text(encoding="utf-8")
     assert data.count('".symbol_daily_cache"') == 2, "清空要删它, 占用统计要算它"
 

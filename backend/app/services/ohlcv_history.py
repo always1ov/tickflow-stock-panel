@@ -84,6 +84,18 @@ def get_history(repo, asset_type: str, symbol: str, end: date) -> pl.DataFrame:
         return df.clone()
 
 
+def invalidate(asset_type: str, symbols=None) -> None:
+    """[R496] 日K历史被改写(除权重算等): 点名的票作废; symbols=None → 这一类整个作废。
+
+    由 `derived_caches.enriched_rewritten` 调用。原来只靠「最新交易日变了 / 10 分钟」,
+    除权重算而没有新交易日时, 两张副图会用旧复权价最多 10 分钟。
+    """
+    wanted = None if symbols is None else set(symbols)
+    with _lock:
+        for key in [k for k in _cache if k[1] == asset_type and (wanted is None or k[2] in wanted)]:
+            del _cache[key]
+
+
 def clear() -> None:
     """测试用: 各用例换一个假仓库, 不能读到上一个用例缓存的数据。"""
     with _lock:

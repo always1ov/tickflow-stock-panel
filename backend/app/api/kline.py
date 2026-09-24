@@ -1718,6 +1718,9 @@ async def rebuild_enriched(request: Request):
                     _long_task_executor, run_with_capacity, job_id,
                     lambda: run_pipeline(on_batch_done=_batch_progress),
                 )
+                # [R496 · fork] 全量重算 = 日K历史原地改写: 登记过的衍生缓存统一作废
+                from app.services import derived_caches
+                derived_caches.enriched_rewritten(repo.store.data_dir, "stock")
 
                 enriched_dir = repo.store.data_dir / "kline_daily_enriched"
                 enriched_days = len(list(enriched_dir.glob("date=*"))) if enriched_dir.exists() else 0

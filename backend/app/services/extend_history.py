@@ -197,6 +197,9 @@ def run_extend_history(
 
     from app.indicators.pipeline import run_pipeline
     written_enriched = run_pipeline()
+    # [R496 · fork] 全量重建 = 日K历史原地改写: 登记过的衍生缓存统一作废
+    from app.services import derived_caches
+    derived_caches.enriched_rewritten(repo.store.data_dir, "stock")
 
     enriched_dir = repo.store.data_dir / "kline_daily_enriched"
     enriched_days = len(list(enriched_dir.glob("date=*"))) if enriched_dir.exists() else 0
