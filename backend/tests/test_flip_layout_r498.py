@@ -122,15 +122,20 @@ def test_R498_成绩卡半幅时2列_1800起3列_整行时才6格():
 
 
 def test_R498_没有第二块时不开两列():
-    """跑不动时没有持仓、没有「没做成」时 —— 空着的那一栏等于白留一条缝。"""
+    """跑不动时没有持仓 —— 空着的那一栏等于白留一条缝。"""
     jsx = _jsx()
     assert "cn('grid gap-3', hasBody && 'xl:grid-cols-" in jsx
-    assert "cn('grid gap-3', hasSkipped && 'xl:grid-cols-" in jsx
+
+
+def test_R499_有信号但没做成不再放出来():
+    """用户: 「有信号没做成的就不要放出来了」。**只撤页面上那一块, 后端照旧算** ——
+    skipped / missing / pending 三个字段还在接口里(模拟盘的成交顺延靠它们), 只是这一页不画。"""
     code = code_of(FLIP)
-    # 与 Skipped 自己的判据是同一条 —— 两处各写一份的话会一边说有一边不渲染
-    assert "d.skipped.length > 0 || d.missing.length > 0" in code
-    sk = _fn("Skipped")
-    assert "if (!d.skipped.length && !d.missing.length) return null" in sk
+    assert "有信号但没做成" not in code, "那一块又放出来了"
+    assert "function Skipped(" not in code and "<Skipped" not in code
+    assert "WHY_CN" not in code and "hasSkipped" not in code, "撤干净 —— 留着没人用的翻译表会骗人"
+    api = code_of("lib/api.ts")
+    assert "skipped: FlipSkipped[]" in api, "接口字段不该跟着删 —— 只是页面不显示"
 
 
 def test_R498_逐月放不下时先露出最近的月份():

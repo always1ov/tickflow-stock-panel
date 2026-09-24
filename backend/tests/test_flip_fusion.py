@@ -129,7 +129,8 @@ def test_R343_模拟盘原有六块的顺序没被动过():
     # 流水右边。**「规则排在最后」那一条仍然没动。**
     # 只在 JSX 里数 —— `results` 那张卡的定义在前面, 那里的 `<ParamBar` 不算版面顺序
     jsx = body[body.index("return (\n    <div className=\"flex h-full flex-col\">"):]
-    order = ["<TodaySignals", "<Holdings", "{results}", "<Orders", "<Skipped", "<RulesFold"]
+    # [R499] 「有信号但没做成」整块撤掉了(用户: 「有信号没做成的就不要放出来了」)
+    order = ["<TodaySignals", "<Holdings", "{results}", "<Orders", "<RulesFold"]
     idx = [jsx.index(t) for t in order]
     assert idx == sorted(idx), f"版面顺序被动过: {order}"
     assert jsx.index("<RulesFold") == max(idx), "「规则排在最后」这一条被动了"
@@ -1287,12 +1288,12 @@ def test_R381_现在拿着与成交流水在宽屏并排():
     top = top[:top.index("</div>")]
     assert "xl:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]" in top, "持仓与成绩没并排"
     assert "<Holdings" in top and "{results}" in top
-    low = blk[blk.index("<div className={cn('grid gap-3', hasSkipped"):]
-    assert "xl:grid-cols-[minmax(0,1fr)_minmax(0,24rem)]" in low[:200], "流水与没做成没并排"
-    assert low.index("<Orders") < low.index("<Skipped"), "流水在左、没做成在右"
+    # [R499] 「没做成」撤掉之后流水独占整行 —— 它本来就是全页最长的一张表, 不存在
+    # 「窄表独占一行右边空一半」的问题(它的列会铺开)
+    assert "{hasBody && d && <Orders orders={d.orders} />}" in blk, "流水该独占一整行"
 
 
-def test_R381_规则与没做成都改成多列():
+def test_R381_规则改成多列():
     """七条「标签 + 一行值」竖着排在 1600px 上, 每行右边空掉三分之二,
     还把下面的东西挤出首屏。**口径一个字没改, 只是换了排法。**"""
     from tests.frontend_source import code_of
@@ -1310,13 +1311,7 @@ def test_R381_规则与没做成都改成多列():
     # 「成本」那条最长, 多列时独占一整行
     assert "md:col-span-2 2xl:col-span-3" in rules, "「成本」没独占整行, 会把行高撑成两倍"
 
-    skipped = code[code.index("function Skipped("):]
-    skipped = skipped[:skipped.index("\nfunction ")]
-    assert skipped.strip()
-    # **列数只到 2**: 这一块活在半幅左列里, 而 sm:/xl: 量的是视口不是它自己的宽度
-    assert "sm:grid-cols-2" in skipped, "没做成那几条没排成两列"
-    assert "grid-cols-3" not in skipped and "grid-cols-4" not in skipped, \
-        "列数又往上加了 —— 它在半幅列里, 视口断点在这儿是假的"
+    # [R499] 「没做成」那一块整个撤了, 它那一半守卫随之退场(见 test_flip_layout_r498 的 R499 那条)
 
 
 # ── [R383] 没内容的列不该占宽 ────────────────────────────────────────────

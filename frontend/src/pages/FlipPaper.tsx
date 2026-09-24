@@ -13,7 +13,7 @@
  *   ② 曲线    净值走势
  *   ③ 现在    还拿着哪几只(这是"接下来要盯的")
  *   ④ 流水    每一笔为什么买、为什么卖
- *   ⑤ 没做成  封板没买进 / 仓位满了 / 钱不够 —— **空栏必须自己解释**
+ *   ⑤ 没做成  [R499 撤] 用户: 「有信号没做成的就不要放出来了」—— 页面不再显示, 后端数据照旧
  *   ⑥ 规则    口径, 从后端取, 不在这里誊抄
  *
  * 结论在最前, 规则在最后: 规则是查证用的, 不该天天占着首屏(R190 那条教训 ——
@@ -82,14 +82,6 @@ function clampYears(v: unknown): number {
   const n = Number(v)
   if (!Number.isFinite(n)) return YEARS_DEFAULT
   return Math.min(YEARS_MAX, Math.max(YEARS_MIN, n))
-}
-
-/** 没做成的原因 —— 逐条翻译。**空栏必须自己解释**: 读的人分不清"没有"和"算不出来" */
-const WHY_CN: Record<string, string> = {
-  sealed: '封板挂不进去',
-  no_slot: '仓位已满',
-  no_cash: '现金不够一手',
-  voided: '一直封到反向转折, 这张单作废',
 }
 
 const REASON_CN: Record<string, string> = {
@@ -229,7 +221,6 @@ export function FlipPaper() {
 
   // [R498] 有没有正文(信号 / 持仓 / 流水) —— 跑不动(`reason`)或还没到时只剩成绩卡
   const hasBody = !!d && !d.reason
-  const hasSkipped = !!d && (d.skipped.length > 0 || d.missing.length > 0)   // 与 Skipped 自己的判据同一条
 
   const w = ov?.weather
   // [R346] 主线要有颜色 —— 上一版我给了个 `text-secondary`, 那是灰阶不是颜色。
@@ -337,15 +328,9 @@ export function FlipPaper() {
           {results}
         </div>
 
-        {/* [R381 → R498] 流水与「有信号但没做成」并排。R381 是「拿着 + 没做成」对流水;
-            拿着挪到成绩旁边之后, 这一行只剩流水这张长表, 「没做成」那句小结正好放它右边。
-            **没有「没做成」时流水独占整行** —— 空着右边一栏等于白留一条缝。 */}
-        {hasBody && d && (
-          <div className={cn('grid gap-3', hasSkipped && 'xl:grid-cols-[minmax(0,1fr)_minmax(0,24rem)] xl:items-start')}>
-            <div className="min-w-0"><Orders orders={d.orders} /></div>
-            <Skipped d={d} />
-          </div>
-        )}
+        {/* [R499] 「有信号但没做成」撤掉了(用户: 「有信号没做成的就不要放出来了」),
+            流水独占整行。后端照旧算 skipped / missing / pending, 只是这一页不再显示。 */}
+        {hasBody && d && <Orders orders={d.orders} />}
 
         {/* 规则排在最后 —— 查证用的, 不该天天占首屏。[R498] 而且默认收起 */}
         {rules.data && <RulesFold r={rules.data} d={d} />}
@@ -1506,70 +1491,6 @@ function Orders({ orders }: { orders: FlipOrder[] }) {
   )
 }
 
-function Skipped({ d }: { d: FlipPaperData }) {
-  if (!d.skipped.length && !d.missing.length) return null
-  const byReason = d.skipped.reduce<Record<string, number>>((acc, s) => {
-    acc[s.reason] = (acc[s.reason] ?? 0) + 1
-    return acc
-  }, {})
-  return (
-    <section className="overflow-hidden rounded-card border border-border/60 bg-surface/40">
-      <SectionHead
-        title="有信号但没做成"
-        note={`${d.skipped.length} 次`}
-        hint={'这一栏存在的理由: **不说出来的话, 曲线会显得比实际更"顺"**。\n有信号却没动手的次数, 与做成的那些同样是这套打法的一部分。'}
-      />
-      {/* [R381] 「原因 + N 次」每行只有十几个字, 单列排下来右边整片是空的。
-          改成两列 —— 每一行的内容一个字没动。
-          下面两条(取不到日线 / 还在等成交)的值是一串股票名, 会很长,
-          所以**它们不进多列**, 各自独占一整行。
-
-          **列数只到 2, 不跟着视口往上加。** 这一块从 R381 起活在宽屏的**半幅
-          左列**里, 而 `sm:`/`xl:` 这些断点量的是**视口**不是它自己的宽度 ——
-          第一版写到 `2xl:grid-cols-4`, 1600px 上实际只有 650px 可用, 四列挤得
-          「6 次」两个字都拆行了。容器查询能量准, 但为这一块引一套新机制不值,
-          两列在半幅和全幅下都站得住。
-
-          原因那几句长短不一(「封板挂不进去」 vs 「一直封到反向转折, 这张单作废」),
-          所以次数靠右对齐、标签占剩下的宽 —— 标签自己换行, 次数永远在同一条竖线上。 */}
-      <div className="px-4 py-2.5 text-xs">
-        <div className="grid gap-x-8 gap-y-1.5 sm:grid-cols-2">
-          {Object.entries(byReason).map(([r, n]) => (
-            <div key={r} className="flex items-baseline justify-between gap-3">
-              <span className="min-w-0 text-secondary">{WHY_CN[r] ?? r}</span>
-              <span className="shrink-0 tabular-nums text-muted">{n} 次</span>
-            </div>
-          ))}
-        </div>
-        {d.missing.length > 0 && (
-          <div className="flex items-start gap-2 pt-2">
-            <span className="min-w-[9rem] shrink-0 text-warning">取不到日线</span>
-            <span className="text-muted">
-              {d.missing.join('、')} —— 这几只没进这次模拟, 不是它们没信号
-            </span>
-          </div>
-        )}
-        {d.pending.length > 0 && (
-          <div className="flex items-start gap-2 pt-2">
-            <span className="min-w-[9rem] shrink-0 text-secondary">还在等成交</span>
-            <span className="text-muted">
-              {d.pending.map((p) => `${p.name}(${p.act === 'buy' ? '买' : '卖'})`).join('、')}
-            </span>
-          </div>
-        )}
-      </div>
-    </section>
-  )
-}
-
-/**
- * [R498] 「这套规则」默认收起。它是查口径用的清单, 一个月看不了一次, 却一直占着
- * 页面最底下那一整块。折叠条的样子与「只是盯着」「净值走势」同一套(旋转的
- * ChevronDown + 右边一句摘要), 展开状态记住。
- *
- * **连内容一起不渲染**, 与净值图同一个做法 —— 这里没有图表那个坑, 只是没必要让一块
- * 看不见的东西挂着。
- */
 function RulesFold({ r, d }: { r: FlipRules; d?: FlipPaperData }) {
   const [open, setOpen] = useState(() => storage.flipRulesOpen.get(false))
   const toggle = () => setOpen((v) => { storage.flipRulesOpen.set(!v); return !v })
