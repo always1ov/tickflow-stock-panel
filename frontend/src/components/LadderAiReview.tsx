@@ -191,7 +191,7 @@ function LadderAiDialog({ payload, loadingLadder, onClose }: {
             <p className="text-xs text-muted truncate">
               {tab === 'ladder'
                 ? '打开即查看存档 · 生成需手动点击 · 带置信度 —— 高风险, 仅为复盘参考'
-                : '来自「市场环境」页主线强度数据 · 识别资金在两个板块间来回切换 —— 一边熄火往往是另一边点火'}
+                : '来自「宏观分析」页主线强度数据 · 识别资金在两个板块间来回切换 —— 一边熄火往往是另一边点火'}
             </p>
           </div>
           <div className="flex items-center rounded-btn border border-border bg-base/60 p-0.5">

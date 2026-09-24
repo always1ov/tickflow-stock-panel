@@ -77,7 +77,7 @@ const BUILTIN_PAGES: NavEntry[] = [
   { id: '/minds', label: 'Minds', type: 'builtin', visible: true },   // [R502] 原「消息面」, 原位改名
   { id: '/financials', label: '财务分析', type: 'builtin', visible: true },
   { id: '/monitor', label: '监控中心', type: 'builtin', visible: true },
-  { id: '/regime', label: '市场环境', type: 'builtin', visible: true },
+  { id: '/regime', label: '宏观分析', type: 'builtin', visible: true },   // [R503] 原「市场环境」
   { id: '/abnormal', label: '异动监控', type: 'builtin', visible: true },
   { id: '/lots', label: '模拟盘', type: 'builtin', visible: true },   // [R183] 整页 AI 模拟盘
   { id: '/signals', label: '信号库', type: 'builtin', visible: true },

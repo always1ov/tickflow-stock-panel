@@ -245,7 +245,7 @@ def regime_phase_live(request: Request):
     hist = regime_builder.load_regime_history(_data_dir(request))
     required = {"date", "max_consecutive", "first_board", "ge2_count", "promo_rate", "seal_rate"}
     if hist.is_empty() or not required.issubset(hist.columns):
-        return {"available": False, "reason": "阶段历史不足(先在市场环境页重算一次)"}
+        return {"available": False, "reason": "阶段历史不足(先在宏观分析页重算一次)"}
     base = hist.sort("date").filter(pl.col("date") < today)
     if base.is_empty():
         return {"available": False, "reason": "阶段历史不足"}

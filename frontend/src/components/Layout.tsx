@@ -105,7 +105,7 @@ const nav = [
   { to: '/industry-analysis', label: '行业分析', icon: Landmark },
   { to: '/financials', label: '财务分析', icon: FileText },
   { to: '/monitor', label: '监控中心', icon: RadioTower },
-  { to: '/regime', label: '市场环境', icon: Gauge },
+  { to: '/regime', label: '宏观分析', icon: Gauge },   // [R503] 原「市场环境」; 路由不变, 存过的菜单偏好不受影响
   { to: '/abnormal', label: '异动监控', icon: Siren },
   // [R170] 上游这里叫「持仓提醒」; 在 fork 这边它是双 tab 外壳(我的批次 + AI 操盘手),
   // 所以叫「仓位中心」。旧路径 /paper-trading 仍可用(router 里重定向)。
