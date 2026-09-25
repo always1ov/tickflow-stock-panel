@@ -45,7 +45,7 @@ TW = SRC.parent / "tailwind.config.ts"
 RATCHET = {
     "裸圆角": 700,         # 真·裸圆角: rounded / -sm/-md/-lg/-xl/-2xl, 不含语义 token
     "任意字号": 42,      # text-[Npx]
-    "硬编码色": 726,      # text-/bg-/border- + Tailwind 调色板
+    "硬编码色": 675,      # text-/bg-/border- + Tailwind 调色板 ([R514] 紫族撤掉 -51)
     "任意容器宽": 41,      # max-w-[Npx]
 }
 

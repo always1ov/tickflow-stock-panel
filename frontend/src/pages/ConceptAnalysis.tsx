@@ -825,7 +825,7 @@ function ScoreExplain({ stock }: { stock?: EnrichedStock }) {
         <Part label="换手" value={parts.turnover} cls="bg-orange-400" />
         <Part label="成交" value={parts.amount} cls="bg-blue-400" />
         <Part label="市值" value={parts.cap} cls="bg-cyan-400" />
-        <Part label="量比" value={parts.volume} cls="bg-purple-400" />
+        <Part label="量比" value={parts.volume} cls="bg-lime-400" />
         <Part label="连板" value={parts.boards} cls="bg-amber-300" />
       </div>
     </div>

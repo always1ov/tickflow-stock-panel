@@ -102,12 +102,12 @@ export function TrendStateBar({ symbol, trend }: { symbol: string; trend: TrendD
       <span className="text-xs text-warning/90">{trend.action}</span>
       <button
         onClick={() => setShowBacktest(true)}
-        className="ml-auto inline-flex items-center gap-1 rounded-btn border border-violet-400/30 bg-violet-400/10 px-2 py-0.5 text-micro text-violet-300 hover:bg-violet-400/20 transition-colors cursor-pointer"
+        className="ml-auto inline-flex items-center gap-1 rounded-btn border border-accent/30 bg-accent/10 px-2 py-0.5 text-micro text-accent hover:bg-accent/20 transition-colors cursor-pointer"
         title="按阈值网格回测近 180 个交易日,选择该票的合适回撤/回升阈值"
       >
         <FlaskConical className="h-3 w-3" />
         回测调参 {(trend.threshold * 100).toFixed(0)}%
-        {trend.threshold_source === 'override' && <span className="text-violet-300/60">(已定制)</span>}
+        {trend.threshold_source === 'override' && <span className="text-accent/60">(已定制)</span>}
       </button>
       {showBacktest && (
         <TrendBacktestDialog symbol={symbol} onClose={() => setShowBacktest(false)} />
@@ -225,12 +225,12 @@ function TrendBacktestDialog({ symbol, onClose }: { symbol: string; onClose: () 
                       const isRule = Math.abs(r.threshold - result.rule_suggestion.threshold) < 0.001 && !result.rule_suggestion.sample_insufficient
                       const isAi = result.ai && Math.abs(r.threshold - result.ai.threshold) < 0.001
                       return (
-                        <tr key={r.threshold} className={`border-t border-border/40 text-right ${isCurrent ? 'bg-accent/10' : isAi ? 'bg-violet-400/10' : ''}`}>
+                        <tr key={r.threshold} className={`border-t border-border/40 text-right ${isCurrent ? 'bg-accent/10' : isAi ? 'bg-elevated/70' : ''}`}>
                           <td className="px-2 py-1 text-left">
                             {pct(r.threshold, 0)}
                             {isCurrent && <span className="ml-1 text-micro text-accent">当前</span>}
                             {isRule && <span className="ml-1 text-micro text-sky-300">规则荐</span>}
-                            {isAi && <span className="ml-1 text-micro text-violet-300">AI荐</span>}
+                            {isAi && <span className="ml-1 text-micro text-accent">AI荐</span>}
                           </td>
                           <td className="px-2 py-1">{r.flips}</td>
                           <td className="px-2 py-1">{r.bull_segs}</td>
@@ -279,19 +279,19 @@ function TrendBacktestDialog({ symbol, onClose }: { symbol: string; onClose: () 
                   </div>
                   <p className="text-micro leading-relaxed text-muted">{result.rule_suggestion.reason}</p>
                 </div>
-                <div className="rounded-btn border border-violet-400/20 bg-violet-400/[0.06] px-3.5 py-3">
+                <div className="rounded-btn border border-accent/20 bg-accent/[0.04] px-3.5 py-3">
                   {result.ai ? (
                     <>
                       <div className="mb-1 flex items-center justify-between">
-                        <span className="inline-flex items-center gap-1 text-xs font-medium text-violet-300">
+                        <span className="inline-flex items-center gap-1 text-xs font-medium text-accent">
                           <Sparkles className="h-3 w-3" />
                           AI 推荐 · {pct(result.ai.threshold, 0)}
-                          <span className="text-micro text-violet-300/70">置信 {result.ai.confidence}%</span>
+                          <span className="text-micro text-accent/70">置信 {result.ai.confidence}%</span>
                         </span>
                         <button
                           onClick={() => apply.mutate({ threshold: result.ai!.threshold, source: 'ai' })}
                           disabled={apply.isPending}
-                          className="rounded-btn border border-violet-400/40 px-2 py-0.5 text-micro text-violet-300 hover:bg-violet-400/10 disabled:opacity-40"
+                          className="rounded-btn border border-accent/40 px-2 py-0.5 text-micro text-accent hover:bg-accent/10 disabled:opacity-40"
                         >
                           应用
                         </button>
@@ -300,7 +300,7 @@ function TrendBacktestDialog({ symbol, onClose }: { symbol: string; onClose: () 
                     </>
                   ) : (
                     <p className="text-micro leading-relaxed text-muted">
-                      <Sparkles className="mr-1 inline h-3 w-3 text-violet-300/60" />
+                      <Sparkles className="mr-1 inline h-3 w-3 text-accent/60" />
                       {result.ai_error ?? 'AI 未参与本次回测'}
                     </p>
                   )}

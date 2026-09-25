@@ -91,7 +91,7 @@ const _SOURCE_BADGE: Record<string, string> = {
   strategy: 'bg-amber-400/10 text-amber-400',
   signal: 'bg-accent/10 text-accent',
   price: 'bg-emerald-400/10 text-emerald-400',
-  market: 'bg-purple-500/10 text-purple-400',
+  market: 'bg-sky-500/10 text-sky-400',
   sector: 'bg-cyan-500/10 text-cyan-700 dark:text-cyan-300',
 }
 const _SOURCE_LABEL: Record<string, string> = {

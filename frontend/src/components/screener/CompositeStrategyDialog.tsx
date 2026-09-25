@@ -22,7 +22,7 @@ interface ChildItem {
 const SRC_MAP: Record<string, string> = { builtin: '内置', custom: '自定义', ai: 'AI' }
 const BADGE_CLS: Record<string, string> = {
   builtin: 'bg-accent/10 text-accent border-accent/20',
-  ai: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
+  ai: 'bg-sky-500/10 text-sky-400 border-sky-500/20',
   custom: 'bg-amber-400/10 text-amber-400 border-amber-400/30',
 }
 

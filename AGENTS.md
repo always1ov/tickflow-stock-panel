@@ -189,14 +189,20 @@ Keltner 三档、注记·不计分、焦点名单、收盘口径 vs 盘中口径
     而那是判断，不是可断言的事实。硬编一道闸只会变成走过场的形式，
     反而稀释了另外那几条真能拦住东西的守卫。
 
-15. **全站禁止粉色 / 洋红 / 玫红(少女系风格)。**
-    用户原话「整个系统禁止少女系风格，比如粉色，投资是一件很严肃的事情」。
+15. **全站禁止粉色 / 洋红 / 玫红(少女系风格)，也禁止紫色 —— 图表里的线与画图除外。**
+    用户原话「整个系统禁止少女系风格，比如粉色，投资是一件很严肃的事情」；
+    「不要紫色，除了图表里面的划线画图」(R514)。
 
-    - 不用 Tailwind 的 `pink` / `fuchsia` / `rose` 三族；不写落在 OKLCH 色相
+    - 粉: 不用 Tailwind 的 `pink` / `fuchsia` / `rose` 三族；不写落在 OKLCH 色相
       315°~12° 的颜色(hex / rgb / hsl / OKLCH 令牌都算)。
-    - 守卫 [`backend/tests/test_no_pink.py`](backend/tests/test_no_pink.py) 扫整个前端代码
-      与后端发出的颜色字符串；确需保留的值(比如退役的查表键)进它的 `ALLOWED` 并写清理由。
-    - 红(涨)不受影响，它在 22°~29.5°。紫没有被点名，没问过不扩大到紫。
+      守卫 [`backend/tests/test_no_pink.py`](backend/tests/test_no_pink.py)，确需保留的值
+      (比如退役的查表键)进它的 `ALLOWED` 并写清理由。**粉没有图表例外。**
+    - 紫: 不用 Tailwind 的 `indigo` / `purple` / `violet` 三族(调色板里已删)；不写落在
+      OKLCH 色相 270°~315° 的颜色。**唯一例外是图表里的线与画图**(K 线副图的指标线、
+      关键价位的画线、净值曲线、走势线调色板这类), 逐个文件登记在
+      [`backend/tests/test_no_purple.py`](backend/tests/test_no_purple.py) 的 `CHART_ALLOWED`
+      并写清是哪条线；界面上的徽标、按钮、边框、图标、文字一律不许。
+    - 红(涨)不受影响，它在 22°~29.5°；蓝在 265° 以下，也不受影响。
 
 16. **撤下或隐藏一个功能，同一个提交里登记进 [`docs/hidden-features.md`](docs/hidden-features.md)。**
     用户原话「要登记好哪些功能等于隐藏了以后说不定用得上」。

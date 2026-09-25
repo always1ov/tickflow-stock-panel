@@ -90,7 +90,7 @@ const SOURCE_BADGE: Record<string, { label: string; cls: string }> = {
   strategy:  { label: '策略',   cls: 'bg-amber-400/15 text-amber-400' },
   signal:    { label: '信号',   cls: 'bg-accent/15 text-accent' },
   price:     { label: '价格',   cls: 'bg-emerald-400/15 text-emerald-400' },
-  market:    { label: '异动',   cls: 'bg-purple-500/15 text-purple-400' },
+  market:    { label: '异动',   cls: 'bg-sky-500/15 text-sky-400' },
   sector:    { label: '板块',   cls: 'bg-cyan-500/15 text-cyan-700 dark:text-cyan-300' },
   abnormal:  { label: '异动边缘', cls: 'bg-orange-500/15 text-orange-500 dark:text-orange-400' },
   pool_entry: { label: '进入', cls: 'bg-danger/15 text-danger' },

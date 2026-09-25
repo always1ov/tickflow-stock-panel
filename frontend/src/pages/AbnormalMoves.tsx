@@ -71,7 +71,7 @@ const SIGNAL_META: Record<IntradaySignalKey, { label: string; cls: string }> = {
   limit_down: { label: '跌停', cls: 'text-bear bg-bear/10 border-bear/25' },
   new_high: { label: '60日新高', cls: 'text-amber-400 bg-amber-400/10 border-amber-400/25' },
   new_low: { label: '60日新低', cls: 'text-sky-400 bg-sky-400/10 border-sky-400/25' },
-  volume_surge: { label: '放量', cls: 'text-violet-400 bg-violet-400/10 border-violet-400/25' },
+  volume_surge: { label: '放量', cls: 'text-lime-400 bg-lime-400/10 border-lime-400/25' },
 }
 
 export function AbnormalMoves() {

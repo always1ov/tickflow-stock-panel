@@ -288,7 +288,7 @@ export function Regime() {
         { name: '赚钱', type: 'line', data: profit, smooth: true, symbol: 'none', yAxisIndex: 1,
           lineStyle: { ...subLineStyle, color: '#f59e0b' }, z: 2 },
         { name: '投机', type: 'line', data: speculation, smooth: true, symbol: 'none', yAxisIndex: 1,
-          lineStyle: { ...subLineStyle, color: '#a855f7' }, z: 2 },
+          lineStyle: { ...subLineStyle, color: '#06b6d4' }, z: 2 },
         { name: '抗跌', type: 'line', data: resilience, smooth: true, symbol: 'none', yAxisIndex: 1,
           lineStyle: { ...subLineStyle, color: '#10b981' }, z: 2 },
         { name: '趋势', type: 'line', data: trend, smooth: true, symbol: 'none', yAxisIndex: 1,
@@ -485,7 +485,7 @@ export function Regime() {
             <div className="mt-1.5 max-w-xs space-y-1">
               {([
                 { label: '赚钱', val: latest.profit_score, color: '#f59e0b' },
-                { label: '投机', val: latest.speculation_score, color: '#a855f7' },
+                { label: '投机', val: latest.speculation_score, color: '#06b6d4' },
                 { label: '抗跌', val: latest.resilience_score, color: '#10b981' },
                 { label: '趋势', val: latest.trend_score, color: '#3b82f6' },
               ] as const).map(d => (

@@ -78,8 +78,7 @@ import { ExtensionSlot } from '@/extensions/ExtensionSlot'
 import { getFrontendExtensionNavigation } from '@/extensions/registry'
 import { BROWSE_GROUP, BROWSE_GROUP_ID, browseMembersOf, splitBrowseGroup } from '@/lib/navGroups'
 
-// 品牌色 — 只用于 logo / brand 区域,不影响功能语义色
-const BRAND = '#8B5CF6'
+// [R514] 品牌色原来是紫 #8B5CF6。用户: 「不要紫色, 除了图表里面的划线画图」—— logo 跟着 R509 的黑白主题走前景色。
 
 // 核心四只指数 — 与后端 index_const.py 单一权威对齐 (前端展示层固定清单)
 export const CORE_INDEXES = [
@@ -473,8 +472,8 @@ function AIConfigBadge({ configured, model }: { configured?: boolean; model?: st
         title={managed.length > 0 ? '点击快速切换首选 AI 档位' : `AI 配置 — ${descText}`}
         className="group relative flex w-full items-center gap-2 overflow-hidden rounded-md py-1.5 pl-2.5 pr-2 text-left transition-colors duration-hover hover:bg-elevated/70"
       >
-        <span className="pointer-events-none absolute inset-y-1.5 left-0 w-[2px] rounded-full bg-purple-400/50 transition-colors group-hover:bg-purple-400" />
-        <Sparkles className="h-3.5 w-3.5 shrink-0 text-muted group-hover:text-purple-400 transition-colors" />
+        <span className="pointer-events-none absolute inset-y-1.5 left-0 w-[2px] rounded-full bg-border transition-colors group-hover:bg-accent" />
+        <Sparkles className="h-3.5 w-3.5 shrink-0 text-muted group-hover:text-accent transition-colors" />
         {isConfigured ? (
           <>
             <span className="truncate text-xs font-medium text-secondary group-hover:text-foreground transition-colors">
@@ -1003,13 +1002,11 @@ export function Layout() {
           <div className={cn('flex', railMode ? 'flex-col items-center gap-2' : 'items-center gap-2')}>
             <Logo
               size={railMode ? 24 : 26}
-              className="shrink-0"
-              style={{ color: BRAND }}
+              className="shrink-0 text-foreground"
             />
             {!railMode && (
               <div
                 className="text-sm font-semibold tracking-[0.06em] text-foreground whitespace-nowrap"
-                style={{ textShadow: `0 0 10px ${BRAND}44` }}
               >
                 牛来
               </div>

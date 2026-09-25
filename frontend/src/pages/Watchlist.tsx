@@ -77,7 +77,8 @@ function turnoverColor(rate: number | null | undefined): string {
   if (rate < 10)  return 'text-[#d4a800]'
   if (rate < 20)  return 'text-[#f97316]'
   if (rate < 35)  return 'text-[#d94a3d]'
-  return 'text-[#8b5cf6]'   // [R421] 极高换手: 原洋红按「禁止粉色」换成紫(热度色阶里比红再高一档)
+  // [R421] 极高换手原是洋红, 按「禁止粉色」换成紫; [R514] 紫也不要了 —— 与上一档同一个红, 加粗表示更高一档
+  return 'text-[#d94a3d] font-bold'
 }
 
 // ===== 动态列渲染 =====

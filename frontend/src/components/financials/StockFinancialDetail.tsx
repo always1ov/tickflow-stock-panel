@@ -189,7 +189,7 @@ export function StockFinancialDetail({ symbol, name }: Props) {
           <button
             onClick={handleAiClick}
             disabled={checking}
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-btn text-xs font-medium border border-purple-400/30 bg-purple-400/10 text-purple-300 hover:bg-purple-400/20 hover:border-purple-400/40 transition-ui shrink-0 disabled:opacity-50"
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-btn text-xs font-medium border border-accent/30 bg-accent/10 text-accent hover:bg-accent/20 hover:border-accent/40 transition-ui shrink-0 disabled:opacity-50"
             title="AI 财务分析"
           >
             {checking ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
@@ -295,15 +295,15 @@ export function StockFinancialDetail({ symbol, name }: Props) {
               className="relative w-[90vw] max-w-[400px] rounded-card border border-border bg-base shadow-2xl p-6"
             >
               <div className="flex items-start gap-3">
-                <div className="shrink-0 h-10 w-10 rounded-full bg-purple-400/12 flex items-center justify-center">
-                  <AlertTriangle className="h-5 w-5 text-purple-300" />
+                <div className="shrink-0 h-10 w-10 rounded-full bg-accent/10 flex items-center justify-center">
+                  <AlertTriangle className="h-5 w-5 text-accent" />
                 </div>
                 <div className="min-w-0 flex-1">
                   <h3 className={cn('mb-1.5', TYPE.section)}>该个股已有分析报告</h3>
                   <p className="text-xs text-secondary leading-relaxed">
                     <span className="font-medium text-foreground">{name}</span>
                     <span className="font-mono text-muted"> {symbol}</span> 在
-                    <span className="text-purple-300 font-medium"> {fmtReportTime(confirmReport.created_at)} </span>
+                    <span className="text-accent font-medium"> {fmtReportTime(confirmReport.created_at)} </span>
                     已生成过 AI 财务分析报告。
                   </p>
                   <p className="mt-2 text-xs text-muted">

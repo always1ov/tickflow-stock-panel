@@ -52,11 +52,11 @@ const VARIANTS: Variant[] = [
     id: 'helix',
     name: '牛来',
     tagline: 'QUANT · TERMINAL',
-    hint: 'DNA 螺旋 — 紫色强调,等宽字体,赛博朋克经典意象',
+    hint: 'DNA 螺旋 — 金色强调,等宽字体,赛博朋克经典意象',
     icon: GitFork,
-    iconAccent: 'text-[#8B5CF6]',
+    iconAccent: 'text-[#F59E0B]',   // [R514] 原紫 #8B5CF6, 「不要紫色」
     nameClass: 'font-mono font-bold text-base tracking-[0.08em]',
-    glow: '#8B5CF6',
+    glow: '#F59E0B',
   },
   {
     id: 'aurora',

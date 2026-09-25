@@ -61,7 +61,7 @@ const TONE_STYLE: Record<string, string> = {
 const URGENCY_STYLE: Record<Urgency['level'], string> = {
   triggered: 'background:#fdecec;color:#c0392b;font-weight:600',
   near: 'background:#fdf0e3;color:#c78326',
-  flip: 'background:#f3ecfd;color:#7b4fc0',
+  flip: 'background:#fef3c7;color:#92400e',  // [R514] 原紫 #7b4fc0, 「不要紫色」
   band: 'background:#e6f4fb;color:#1c6ea4',
   idle: 'color:#b6bcc7',
 }

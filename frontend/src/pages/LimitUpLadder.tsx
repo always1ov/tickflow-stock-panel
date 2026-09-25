@@ -48,7 +48,7 @@ function fmtSealAmount(v: number): string {
 function boardTag(symbol: string): { label: string; cls: string } | null {
   if (/^(300|301)/.test(symbol)) return { label: '创', cls: 'text-[#f97316] bg-[#f97316]/12 border-[#f97316]/25' }
   if (/^688/.test(symbol))       return { label: '科', cls: 'text-cyan-400 bg-cyan-400/12 border-cyan-400/25' }
-  if (/\.BJ$/.test(symbol))      return { label: '北', cls: 'text-purple-400 bg-purple-400/12 border-purple-400/25' }
+  if (/\.BJ$/.test(symbol))      return { label: '北', cls: 'text-amber-400 bg-amber-400/12 border-amber-400/25' }
   return null
 }
 
@@ -85,18 +85,18 @@ const STATUS_STYLE: Record<string, { bg: string; bar: string; nameCls: string; c
   },
   broken: {
     bg: 'opacity-75',
-    bar: 'border-l border-purple-400/30',
+    bar: 'border-l border-orange-400/30',
     nameCls: 'text-foreground/70 text-xs',
     codeCls: 'text-muted/60',
-    badge: 'text-purple-400',
+    badge: 'text-orange-400',
     badgeText: d => d === 'down' ? '撬' : '炸',
   },
   recovery: {
     bg: 'opacity-75',
-    bar: 'border-l border-purple-400/30',
+    bar: 'border-l border-cyan-400/30',
     nameCls: 'text-foreground/70 text-xs',
     codeCls: 'text-muted/60',
-    badge: 'text-purple-400',
+    badge: 'text-cyan-400',
     badgeText: '撬',
   },
   failed: {
@@ -724,7 +724,7 @@ function OverviewBar({ tiers, dateValue, onDateChange, filterKeys, bf, direction
           )
         })}
         {showBroken && totalBroken > 0 && (
-          <span className="text-purple-400 font-medium">{brokenLabel} {totalBroken}</span>
+          <span className="text-orange-400 font-medium">{brokenLabel} {totalBroken}</span>
         )}
         {showFailed && totalFailed > 0 && (
           <span className="text-yellow-500 font-medium">{failedLabel} {totalFailed}</span>
@@ -963,7 +963,7 @@ function TierGroup({ tier, defaultOpen, extFields, filterKeys, bf, onStockClick,
         <span className={`text-sm font-bold tabular-nums ${tierTextCls(tier.boards)}`}>{tierLabel(tier.boards, direction)}<span className="text-muted/40 mx-1">·</span>{luCount}</span>
         {(showBroken && brCount > 0) || (showFailed && faCount > 0) ? (
           <span className="text-xs text-muted/60">
-            {showBroken && brCount > 0 && <span className="text-purple-400">{brCount}{brokenBadge}</span>}
+            {showBroken && brCount > 0 && <span className="text-orange-400">{brCount}{brokenBadge}</span>}
             {showBroken && brCount > 0 && showFailed && faCount > 0 && <span className="text-muted/40"> · </span>}
             {showFailed && faCount > 0 && <span className="text-muted/80">{faCount}{failedBadge}</span>}
           </span>
@@ -1264,7 +1264,7 @@ function BrokenFailedSection({ bf, onChange }: {
     <div className="space-y-3">
       {/* 炸板 */}
       <div className="space-y-2">
-        <span className="text-micro font-semibold text-purple-400 uppercase tracking-wider">炸板</span>
+        <span className="text-micro font-semibold text-orange-400 uppercase tracking-wider">炸板</span>
         <Toggle label="显示炸板股票" checked={bf.brokenShow ?? true} onChange={v => update({ brokenShow: v })} />
         <Toggle label="计入炸板数量" checked={bf.brokenCount ?? true} onChange={v => update({ brokenCount: v })} />
         <NumInput label="最低板数（含）" value={bf.brokenMinBoards ?? 0} onChange={v => update({ brokenMinBoards: v ?? 0 })} min={0} max={50} placeholder="0=不限" />

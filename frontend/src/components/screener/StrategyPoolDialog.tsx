@@ -14,7 +14,7 @@ interface Props {
 const SOURCE_CLS: Record<string, string> = {
   builtin: 'bg-accent/10 text-accent border-accent/20',
   custom: 'bg-amber-400/10 text-amber-400 border-amber-400/30',
-  ai: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
+  ai: 'bg-sky-500/10 text-sky-400 border-sky-500/20',
   // 叠加策略归入「自定义」分组展示, 徽标与 StrategyCard 一致用 teal 区分
   composite: 'bg-teal-500/10 text-teal-400 border-teal-500/30',
   invalid: 'bg-danger/10 text-danger border-danger/20',
@@ -288,7 +288,7 @@ export function StrategyPoolDialog({ pool, onConfirm, onClose }: Props) {
                         {drafts.map(s => (
                           <div
                             key={s.id}
-                            className="flex items-center gap-2 px-2.5 py-1.5 rounded-btn border border-purple-500/15 bg-purple-500/5"
+                            className="flex items-center gap-2 px-2.5 py-1.5 rounded-btn border border-sky-500/15 bg-sky-500/5"
                           >
                             <span className="flex-1 min-w-0">
                               <span className="text-xs text-foreground block truncate">
@@ -299,7 +299,7 @@ export function StrategyPoolDialog({ pool, onConfirm, onClose }: Props) {
                             <button
                               onClick={() => handlePublish(s.id)}
                               disabled={publishingId === s.id}
-                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-btn text-micro text-purple-400 border border-purple-500/25 bg-purple-500/10 hover:bg-purple-500/20 disabled:opacity-50 transition-colors cursor-pointer shrink-0"
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-btn text-micro text-sky-400 border border-sky-500/25 bg-sky-500/10 hover:bg-sky-500/20 disabled:opacity-50 transition-colors cursor-pointer shrink-0"
                             >
                               {publishingId === s.id && <Loader2 className="h-3 w-3 animate-spin" />}
                               发布

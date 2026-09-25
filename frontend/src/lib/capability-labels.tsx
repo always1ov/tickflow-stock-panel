@@ -118,7 +118,7 @@ const TIER_STYLE: Record<string, TierStyle> = {
   //      (starter)、`#c084fc`(pro) 落在白卡片上对比只有 2 点几, 是看不清的。
   //      换色本来就要把它们压下来。
   //
-  // 档位之间仍然分得开 —— 靠色相(灰 / 蓝 / 紫 / 琥珀), 不靠渐变。
+  // 档位之间仍然分得开 —— 靠色相(灰 / 蓝 / 墨绿 / 琥珀), 不靠渐变。
   none: {
     desc: '未配置 Key · 仅历史日K',
     tagBg: { background: 'rgba(102,112,133,0.10)' },
@@ -131,19 +131,20 @@ const TIER_STYLE: Record<string, TierStyle> = {
     dotStyle: { background: '#667085' },
     labelTextStyle: { color: '#475467' },
   },
-  // [R379] 这一档的蓝跟着主题色一起换成靛蓝 —— 它代表的是"强调", 不是涨跌,
-  // 留在旧的 #2563EB 会和全站主题色差出一个色相, 两种蓝并排出现。
+  // [R379] 这一档的蓝跟着主题色一起换成靛蓝; [R514] 靛蓝落在紫区(色相 273°), 用户: 「不要紫色」,
+  // 而 R509 起主题色是黑白, 当初「跟主题色同一个色相」的理由也没了 —— 回到蓝。
   starter: {
     desc: '除权因子 · 全市场实时',
-    tagBg: { background: 'rgba(79,93,232,0.10)' },
-    dotStyle: { background: '#4F5DE8' },
-    labelTextStyle: { color: '#3E49CE' },
+    tagBg: { background: 'rgba(37,99,235,0.10)' },
+    dotStyle: { background: '#2563EB' },
+    labelTextStyle: { color: '#1D4ED8' },
   },
+  // [R514] 原来是紫 #6D28D9 → 墨绿。档位之间仍靠色相分开: 灰 / 蓝 / 墨绿 / 琥珀。
   pro: {
     desc: '分钟K · 盘口',
-    tagBg: { background: 'rgba(109,40,217,0.10)' },
-    dotStyle: { background: '#6D28D9' },
-    labelTextStyle: { color: '#6D28D9' },
+    tagBg: { background: 'rgba(15,118,110,0.10)' },
+    dotStyle: { background: '#0F766E' },
+    labelTextStyle: { color: '#0F766E' },
   },
   expert: {
     desc: 'WebSocket · 财务数据',

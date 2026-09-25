@@ -434,7 +434,7 @@ export function StrategySettingsDialog({ strategyId, onClose, onSaved, onAiModif
                   const SRC_CLS: Record<string, string> = {
                     builtin: 'border-accent/25 bg-accent/10 text-accent',
                     custom: 'border-amber-400/25 bg-amber-400/10 text-amber-400',
-                    ai: 'border-purple-500/25 bg-purple-500/10 text-purple-400',
+                    ai: 'border-sky-500/25 bg-sky-500/10 text-sky-400',
                   }
                   const selectedIds = new Set(compositeChildren.map(c => c.id))
                   const candidates = allStrategies.filter(s => !selectedIds.has(s.id))
