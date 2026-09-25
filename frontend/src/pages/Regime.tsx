@@ -451,11 +451,11 @@ export function Regime() {
                 type="button"
                 onClick={() => setFilterOpen(v => !v)}
                 aria-expanded={filterOpen}
-                title="主线口径: 宽基概念屏蔽 / 统计剔除 ST"
+                title="主线过滤: 宽基概念屏蔽 / 统计剔除 ST"
                 className={cn('ml-1 inline-flex items-center gap-0.5 rounded-btn border px-1.5 py-px text-micro transition-colors',
                   filterOpen ? 'border-accent/50 text-accent' : 'border-border bg-base text-secondary hover:text-accent')}
               >
-                <Filter className="h-2.5 w-2.5" /> 口径
+                <Filter className="h-2.5 w-2.5" /> 过滤
               </button>
             </div>
             {ml ? (
@@ -477,16 +477,20 @@ export function Regime() {
             <div className="flex items-center gap-1.5 text-micro text-muted">
               <Activity className="h-3 w-3" /> 四维拆解 · 是哪一维在拉高或拖低
             </div>
-            <div className="mt-1.5 grid grid-cols-2 gap-x-4 gap-y-1 lg:grid-cols-4">
+            {/* [R510] 四条不再撑满整行: 原来 grid 四等分 + 条子 flex-1, 在 2000px 宽的屏上一条被拉到
+                三百多像素, 数字离标签半屏远, 读不成一行。条子定宽 96px, 四条按内容排, 放不下再换行。
+                轨道底色用 --elevated —— 原来是 --base, R501 之后页底是纯白, 轨道在白卡上看不见,
+                于是 0 分那一维什么都没画, 像坏了。 */}
+            <div className="mt-1.5 flex flex-wrap gap-x-5 gap-y-1">
               {([
                 { label: '赚钱', val: latest.profit_score, color: '#f59e0b' },
                 { label: '投机', val: latest.speculation_score, color: '#a855f7' },
                 { label: '抗跌', val: latest.resilience_score, color: '#10b981' },
                 { label: '趋势', val: latest.trend_score, color: '#3b82f6' },
               ] as const).map(d => (
-                <div key={d.label} className="flex items-center gap-1.5">
+                <div key={d.label} className="flex items-center gap-1.5" title={`${d.label} ${d.val != null ? Math.round(d.val) : '—'} / 100`}>
                   <span className="w-6 shrink-0 text-micro text-muted">{d.label}</span>
-                  <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-base">
+                  <div className="h-1.5 w-24 shrink-0 overflow-hidden rounded-full bg-elevated">
                     <div className="h-full rounded-full"
                       style={{ width: `${d.val ?? 0}%`, backgroundColor: d.color }} />
                   </div>
