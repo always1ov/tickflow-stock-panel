@@ -61,6 +61,8 @@ CSS = SRC / "index.css"
 #     侧栏 #FFFFFF → #FAFAFA, 次级面去掉蓝调(明度不动, 见下面那条 R501 守卫)。
 #     用户原话: 「参考这个图片的风格, 日间主题就用这种颜色背景色」。只换背景, 边框/文字/
 #     主题色/指标色一个没动。
+# [R509] 主题色去蓝: 用户指着侧栏选中项「别搞蓝色主题, 就只用黑白」。四个 accent 令牌换成
+#     中性黑灰(#222222 / 悬停 #3D3D3D / 选中底 #EDEDED); 文字三级、边框、背景、指标色都没动。
 CHROME = {
     "base": "#FFFFFF",
     "sidebar": "#FAFAFA",
@@ -70,10 +72,10 @@ CHROME = {
     "fg-primary": "#222738",
     "fg-secondary": "#4B5569",
     "fg-muted": "#5A6377",
-    "accent": "#4F5DE8",
-    "accent-text": "#4F5DE8",
-    "accent-hover": "#3E49CE",
-    "accent-soft": "#EFF1FD",
+    "accent": "#222222",
+    "accent-text": "#222222",
+    "accent-hover": "#3D3D3D",
+    "accent-soft": "#EDEDED",
 }
 # **这三个不许动。** 值来自 R368, 与 WavMint 那份包无关。
 MARKET = {
@@ -397,7 +399,11 @@ def test_R379_主题色不许落进涨跌的色相带():
     没有任何东西会报错。留 40° 的隔离带。
     """
     blk = _light_block()
-    h_accent = _token(blk, "accent")[2]
+    _, c_accent, h_accent = _token(blk, "accent")
+    # [R509] 主题色改成中性黑灰(彩度 0): 没有色相可言, 灰不可能被看成涨或跌 —— 这条守卫
+    # 钉的是「以后换成偏红偏绿」, 中性色直接放行。哪天又换回有彩度的, 下面照旧生效。
+    if c_accent < 0.01:
+        return
     for name in ("bull", "bear"):
         h = _token(blk, name)[2]
         d = min(abs(h_accent - h), 360 - abs(h_accent - h))
@@ -492,8 +498,13 @@ def test_R379_看盘页的密度一个像素没动():
 def test_R382_两套主题是同一个品牌色():
     """亮色靛蓝、暗色蓝 = 两个品牌色。明度可以按底色各调各的(暗底上要更亮),
     但**色相必须一致** —— 色相才是「这是什么颜色」。"""
-    h_light = _token(_light_block(), "accent")[2]
-    h_dark = _token(_dark_block(), "accent")[2]
+    _, c_light, h_light = _token(_light_block(), "accent")
+    _, c_dark, h_dark = _token(_dark_block(), "accent")
+    # [R509] 两边都是中性(彩度 0)也算同一个品牌色 —— 「黑白」就是这个品牌的颜色;
+    # 一边中性一边有彩度才是两个品牌色。
+    if c_light < 0.01 and c_dark < 0.01:
+        return
+    assert c_light >= 0.01 and c_dark >= 0.01, "一套主题中性、一套有彩度 —— 两套主题成了两个品牌色"
     assert abs(h_light - h_dark) < 1.0, \
         f"亮色主题色色相 {h_light:.2f}, 暗色 {h_dark:.2f} —— 两套主题成了两个品牌色"
 
@@ -554,8 +565,10 @@ def test_R382_暗色的指标色也没被带着漂():
     for name, want_h in (("bull", 22.00), ("bear", 158.00), ("warning", 70.00)):
         assert abs(_token(blk, name)[2] - want_h) < 0.01, f"--{name} 的色相被改了"
     assert _token(blk, "danger") == _token(blk, "bull"), "--danger 不再等于 --bull"
-    # 主题色离涨跌足够远 —— 与亮色那条同样的隔离带
-    h_accent = _token(blk, "accent")[2]
+    # 主题色离涨跌足够远 —— 与亮色那条同样的隔离带。[R509] 中性(彩度 0)没有色相, 直接放行
+    _, c_accent, h_accent = _token(blk, "accent")
+    if c_accent < 0.01:
+        return
     for name in ("bull", "bear"):
         h = _token(blk, name)[2]
         d = min(abs(h_accent - h), 360 - abs(h_accent - h))
