@@ -125,7 +125,7 @@ minds.chat
 
 - `layout.navigation.extra`：`{ collapsed, pathname }`，侧边栏导航底部。
 - `stock-preview.footer`：`{ symbol, name, view }`，个股详情对话框底部（日K/分时图表下方）；`view` 为 `'daily' | 'intraday'`。适合个股附加面板：龙虎榜、资金流、外部研究链接等。
-- `watchlist.toolbar`：`{ symbols, viewMode, selectedGroup, refresh }`，自选页工具栏末尾；`symbols` 为当前筛选视图中的标的，`refresh` 在扩展修改数据后调用以刷新自选增强数据。适合批量操作入口：自定义分析、导出、组合计算等。
+- `watchlist.toolbar`：`{ symbols, viewMode, selectedGroup, refresh }`，自选页工具栏末尾；`viewMode` 为 `'grid'`（按小分队，默认）或 `'table'`（`'card'` 已撤，类型里保留只为兼容）；`symbols` 为当前筛选视图中的标的，`refresh` 在扩展修改数据后调用以刷新自选增强数据。适合批量操作入口：自定义分析、导出、组合计算等。
 - `minds.chat`：`{}`（无上下文），Minds 页「对话」一栏的正文区，高度占满该栏；未注册时该栏显示未安装提示。当前由 AI 助手扩展（`custom/assistant`）注册，用于把对话从悬浮抽屉搬进 Minds（fork R502）。
 
 新增插槽前必须有真实用例，并同时定义 context 类型、异常隔离和测试；不能只在类型表中预留名字。

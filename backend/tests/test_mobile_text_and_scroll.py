@@ -80,15 +80,20 @@ def test_R402_异动监控的分段控件不许被挤扁():
 
 
 def test_R402_自选分组栏有高度上限且自己能滚():
-    """没有上限 = 要么把表格挤成一条缝, 要么整栏超出视口而**什么都滚不动**。"""
+    """没有上限 = 要么把表格挤成一条缝, 要么整栏超出视口而**什么都滚不动**。
+
+    [R508] 这一栏改成两档: 折起时限高三行、多出来的裁掉, **但裁掉的那部分有「全部 N 组」按钮
+    能展开**; 展开后仍是 R402 那套 —— 34vh 上限 + 自己滚。类名成了模板串, 两档一起钉。
+    """
     src = code_of("components/WatchlistGroups.tsx")
-    m = re.search(r'role="tablist"(.{0,600}?)className="([^"]*)"', src, re.S)
+    m = re.search(r'role="tablist"(.{0,900}?)className=\{`([^`]*)`\}', src, re.S)
     assert m, "找不到分组栏的 tablist"
     cls = m.group(2)
-    assert re.search(r"max-h-\[\d+(vh|px)\]", cls), \
-        f"分组栏没有高度上限, 分组一多会把表格挤没:\n  {cls}"
-    assert "overflow-y-auto" in cls, \
-        f"分组栏有上限却不能滚 —— 那是把「看不到下面」从挤没变成裁掉:\n  {cls}"
+    assert re.search(r"max-h-\[\d+vh\] overflow-y-auto", cls), \
+        f"展开那一档没有上限或不能滚 —— 那是把「看不到下面」从挤没变成裁掉:\n  {cls}"
+    assert re.search(r"max-h-\[[\d.]+rem\] overflow-hidden", cls), \
+        f"折起那一档没有限高:\n  {cls}"
+    assert "`全部 ${groups.length} 组`" in src, "折起裁掉的那部分没有展开的路 —— 那就真是裁掉了"
 
 
 def test_R402_分组拖拽的自动滚动跟着改成纵向():

@@ -21,6 +21,11 @@ import {
 export type { ColumnConfig, ColumnGroup, ColumnSource, ExtColumnDisplayConfig, CandleColumnConfig }
 
 // ===== 内置列注册表（与当前硬编码一一对应） =====
+// [R508] 默认可见列 5 个: 代码/名称 · 现价 · 涨跌幅 · 加入以来 · 加入日期。
+// 换手 / 量比 / RSI14 / 60D 动量 / 连板 / 信号 从默认里撤下(仍在「列」里可勾回) —— 那是短线筛选的
+// 指标, 自选页管的是池子; 判断(六态 / 转折 / 档位)在个股分析的决策台上, 那里也能按分组看。
+// 「加入以来」是趋势跟踪者最想知道的那个数: 进池子之后走对了没有。
+// 只改默认: 用户存过列配置的, mergeColumns 会保留他自己的显隐。
 
 export const BUILTIN_COLUMNS: ColumnConfig[] = [
   // 固定列
@@ -37,11 +42,11 @@ export const BUILTIN_COLUMNS: ColumnConfig[] = [
   { id: 'builtin:limit_up_price', source: { type: 'builtin', key: 'limit_up_price' }, label: '涨停价', visible: false, align: 'center' },
   { id: 'builtin:limit_down_price', source: { type: 'builtin', key: 'limit_down_price' }, label: '跌停价', visible: false, align: 'center' },
   // 成交
-  { id: 'builtin:turnover', source: { type: 'builtin', key: 'turnover' }, label: '换手率', visible: true, align: 'center' },
+  { id: 'builtin:turnover', source: { type: 'builtin', key: 'turnover' }, label: '换手率', visible: false, align: 'center' },
   { id: 'builtin:volume', source: { type: 'builtin', key: 'volume' }, label: '成交量', visible: false, align: 'center' },
   { id: 'builtin:amount', source: { type: 'builtin', key: 'amount' }, label: '成交额', visible: false, align: 'center' },
   { id: 'builtin:float_val', source: { type: 'builtin', key: 'float_val' }, label: '流通值', visible: false, align: 'center' },
-  { id: 'builtin:vol_ratio', source: { type: 'builtin', key: 'vol_ratio' }, label: '量比', visible: true, align: 'center' },
+  { id: 'builtin:vol_ratio', source: { type: 'builtin', key: 'vol_ratio' }, label: '量比', visible: false, align: 'center' },
   { id: 'builtin:annual_vol', source: { type: 'builtin', key: 'annual_vol' }, label: '年化波动', visible: false, align: 'center' },
   // 均线
   { id: 'builtin:ma5', source: { type: 'builtin', key: 'ma5' }, label: 'MA5', visible: false, align: 'center' },
@@ -53,7 +58,7 @@ export const BUILTIN_COLUMNS: ColumnConfig[] = [
   { id: 'builtin:low_60d', source: { type: 'builtin', key: 'low_60d' }, label: '60日低', visible: false, align: 'center' },
   // 技术指标
   { id: 'builtin:rsi6', source: { type: 'builtin', key: 'rsi6' }, label: 'RSI6', visible: false, align: 'center' },
-  { id: 'builtin:rsi14', source: { type: 'builtin', key: 'rsi14' }, label: 'RSI14', visible: true, align: 'center' },
+  { id: 'builtin:rsi14', source: { type: 'builtin', key: 'rsi14' }, label: 'RSI14', visible: false, align: 'center' },
   { id: 'builtin:rsi24', source: { type: 'builtin', key: 'rsi24' }, label: 'RSI24', visible: false, align: 'center' },
   { id: 'builtin:macd_dif', source: { type: 'builtin', key: 'macd_dif' }, label: 'MACD-DIF', visible: false, align: 'center' },
   { id: 'builtin:macd_dea', source: { type: 'builtin', key: 'macd_dea' }, label: 'MACD-DEA', visible: false, align: 'center' },
@@ -71,12 +76,12 @@ export const BUILTIN_COLUMNS: ColumnConfig[] = [
   { id: 'builtin:momentum_10d', source: { type: 'builtin', key: 'momentum_10d' }, label: '10D 动量', visible: false, align: 'center' },
   { id: 'builtin:momentum_20d', source: { type: 'builtin', key: 'momentum_20d' }, label: '20D 动量', visible: false, align: 'center' },
   { id: 'builtin:momentum_30d', source: { type: 'builtin', key: 'momentum_30d' }, label: '30D 动量', visible: false, align: 'center' },
-  { id: 'builtin:momentum_60d', source: { type: 'builtin', key: 'momentum' }, label: '60D 动量', visible: true, align: 'center' },
+  { id: 'builtin:momentum_60d', source: { type: 'builtin', key: 'momentum' }, label: '60D 动量', visible: false, align: 'center' },
   // 连板
-  { id: 'builtin:limit_ups', source: { type: 'builtin', key: 'limit_ups' }, label: '连板', visible: true, align: 'center' },
+  { id: 'builtin:limit_ups', source: { type: 'builtin', key: 'limit_ups' }, label: '连板', visible: false, align: 'center' },
   { id: 'builtin:limit_downs', source: { type: 'builtin', key: 'limit_downs' }, label: '连跌', visible: false, align: 'center' },
   // 信号 & 图表
-  { id: 'builtin:signals', source: { type: 'builtin', key: 'signals' }, label: '信号', visible: true, align: 'center' },
+  { id: 'builtin:signals', source: { type: 'builtin', key: 'signals' }, label: '信号', visible: false, align: 'center' },
   { id: 'builtin:candle', source: { type: 'builtin', key: 'candle' }, label: '日k', visible: false, align: 'center' },
   { id: 'builtin:intraday', source: { type: 'builtin', key: 'intraday' }, label: '分时', visible: false, align: 'center' },
   // 财务指标 (需财务数据能力 financial, 列默认隐藏)
@@ -91,8 +96,8 @@ export const BUILTIN_COLUMNS: ColumnConfig[] = [
   { id: 'builtin:net_income_yoy', source: { type: 'builtin', key: 'net_income_yoy' }, label: '净利增速', visible: false, align: 'center' },
   { id: 'builtin:debt_ratio', source: { type: 'builtin', key: 'debt_ratio' }, label: '负债率', visible: false, align: 'center' },
   // 自选加入信息 (后端读时计算, 不落盘; 默认隐藏)
-  { id: 'builtin:added_at', source: { type: 'builtin', key: 'added_at' }, label: '加入日期', visible: false, align: 'center' },
-  { id: 'builtin:pct_since_added', source: { type: 'builtin', key: 'pct_since_added' }, label: '加入以来', visible: false, align: 'center' },
+  { id: 'builtin:added_at', source: { type: 'builtin', key: 'added_at' }, label: '加入日期', visible: true, align: 'center' },
+  { id: 'builtin:pct_since_added', source: { type: 'builtin', key: 'pct_since_added' }, label: '加入以来', visible: true, align: 'center' },
 ]
 
 export const COLUMN_GROUPS: ColumnGroup[] = [

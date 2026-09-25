@@ -18,7 +18,8 @@ export interface FrontendSlotContextMap {
   'watchlist.toolbar': {
     /** 当前筛选/排序后视图中的标的 */
     symbols: string[]
-    viewMode: 'table' | 'card'
+    /** [R508] 自选页现在是 grid(按小分队) | table(一张表); card 已撤, 留在联合类型里只为不破坏已有扩展的类型 */
+    viewMode: 'table' | 'card' | 'grid'
     selectedGroup: string
     /** 刷新自选增强数据 (扩展修改数据后调用) */
     refresh: () => void

@@ -107,7 +107,7 @@ export const storage = {
   /** 策略结果列表列配置 */
   screenerResultColumns: kv<unknown[]>('screener_result_columns'),
 
-  /** 自选列表视图模式 table | card (分组卡片为临时模式, 不持久化) */
+  /** 自选列表视图模式 grid(按小分队, 默认) | table(一张表)。[R508] 原来的 card 值按 grid 处理 */
   watchlistView:        kv<string>('watchlist_view'),
 
   /** 自选列表日K蜡烛图显示状态 */
@@ -135,8 +135,8 @@ export const storage = {
   /** 自选列表排除 ST 标的 (默认不排除) */
   watchlistExcludeST:    kv<boolean>('watchlist_excludeST'),
 
-  /** 自选分组统计条配置 (metric: 统计指标, sort: 排序方式, card*: 分组卡片显示项) */
-  watchlistGroupStats: kv<{ metric: string; sort: string; cardTopN?: number; cardColorBar?: boolean; cardRank?: boolean }>('watchlist_groupStats'),
+  /** [R508] 自选「按小分队」网格里块的顺序: order 分组顺序 / pct 今日涨跌 */
+  watchlistGridSort:    kv<string>('watchlist_gridSort'),
 
   /** 异动监控: 主开关 (默认关, 开启后才轮询计算; 告警走监控中心规则) */
   abnormalEnabled:      kv<boolean>('abnormal_enabled'),

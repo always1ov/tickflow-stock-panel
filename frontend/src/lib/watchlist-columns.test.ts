@@ -57,16 +57,19 @@ describe('watchlist columns: 新增内置列向后兼容', () => {
   })
 })
 
-// 自选加入信息列 (加入日期 / 加入后涨跌幅): 数据来自 /enriched 的读时计算字段,
-// 同样遵循「新增列默认隐藏」契约。列 key 必须与后端返回的字段名逐字一致。
+// 自选加入信息列 (加入日期 / 加入后涨跌幅): 数据来自 /enriched 的读时计算字段。
+// 列 key 必须与后端返回的字段名逐字一致。
+// [R508] 这两列改为**默认可见**(用户定的默认 5 列之二: 「加入以来」是进池子之后走对了没有),
+// 是「新增列默认隐藏」契约里有意的例外 —— 换手 / 量比 / RSI14 / 60D 动量 / 连板 / 信号
+// 同一轮从默认里撤下, 见下一组断言。
 describe('watchlist columns: 自选加入信息列', () => {
   const ADDED_KEYS = ['added_at', 'pct_since_added']
 
-  it('两列已注册且默认隐藏, 并归入「自选」分组', () => {
+  it('两列已注册且默认可见, 并归入「自选」分组', () => {
     for (const key of ADDED_KEYS) {
       const col = BUILTIN_COLUMNS.find(c => c.source.type === 'builtin' && c.source.key === key)
       expect(col, `内置列 ${key} 应存在`).toBeTruthy()
-      expect(col!.visible).toBe(false)
+      expect(col!.visible).toBe(true)
     }
     // 必须进 COLUMN_GROUPS, 否则列存在于表格配置但在自定义列面板里不可见
     const group = COLUMN_GROUPS.find(g => g.id === 'added')
@@ -76,7 +79,7 @@ describe('watchlist columns: 自选加入信息列', () => {
     }
   })
 
-  it('老用户配置 (不含新列 id) 合并后自动补齐两列且默认隐藏', () => {
+  it('老用户配置 (不含新列 id) 合并后自动补齐两列(按 R508 的默认: 可见)', () => {
     const saved = BUILTIN_COLUMNS
       .filter(c => ['builtin:symbol', 'builtin:price', 'builtin:pct'].includes(c.id))
       .map(c => ({ ...c }))
@@ -87,11 +90,26 @@ describe('watchlist columns: 自选加入信息列', () => {
     for (const key of ADDED_KEYS) {
       const col = byId.get(`builtin:${key}`)
       expect(col, `合并后应包含新列 builtin:${key}`).toBeTruthy()
-      expect(col!.visible).toBe(false)
+      expect(col!.visible).toBe(true)
     }
     // 用户已有列的显隐与顺序不受影响, 新列追加在末尾
     expect(byId.get('builtin:price')!.visible).toBe(true)
     expect(merged[0].id).toBe('builtin:symbol')
     expect(merged.map(c => c.id).slice(-2)).toEqual(['builtin:added_at', 'builtin:pct_since_added'])
+  })
+})
+
+// [R508] 默认可见列就是这 5 个, 一个不多。短线筛选那六列从默认里撤下, 但仍注册着(「列」里能勾回)。
+describe('watchlist columns: R508 默认 5 列', () => {
+  it('默认可见列 = 代码/名称 · 现价 · 涨跌幅 · 加入以来 · 加入日期', () => {
+    const visible = BUILTIN_COLUMNS.filter(c => c.visible).map(c => c.source.type === 'builtin' ? c.source.key : c.id)
+    expect(visible).toEqual(['symbol', 'price', 'pct', 'added_at', 'pct_since_added'])
+  })
+  it('撤下的六列仍然注册着', () => {
+    for (const key of ['turnover', 'vol_ratio', 'rsi14', 'momentum', 'limit_ups', 'signals']) {
+      const col = BUILTIN_COLUMNS.find(c => c.source.type === 'builtin' && c.source.key === key)
+      expect(col, `内置列 ${key} 应仍注册`).toBeTruthy()
+      expect(col!.visible).toBe(false)
+    }
   })
 })

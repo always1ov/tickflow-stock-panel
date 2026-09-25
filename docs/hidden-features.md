@@ -52,6 +52,7 @@
 | **「怎么办」列**（五套判定收敛成一句话） | 用户看过影响清单后决定删 | 无 | `git show 547769f1^` | R310 |
 | **决策台词汇表**（角上那个感叹号） | 用户：「删除掉感叹号」 | 无 | `git show 8b7925c9^:frontend/src/components/stock-analysis/decision-board/GlossaryDialog.tsx` | R259 |
 | **策略页「策略体检」** | 用户：「策略体检删除掉，我不要了」 | 无 | `git show 627ea827^` | R176 |
+| **自选页的三种视图**：卡片视图（大字价格 + 换手/量比/RSI）、分组卡片（每组前 N 名，可配指标/排序/条数）、分组统计条（各组涨跌横条图） | 同一份涨跌幅的三种画法；默认视图换成「按小分队」网格后重复 | 无（`watchlist_groupStats` 那条本地偏好不再读） | `git show 8d8ba655:frontend/src/components/WatchlistGroupCards.tsx`（R508 之前最后一个提交；另两个：`WatchlistGroupStatsBar.tsx`、`GroupStatsSettings.tsx`；卡片视图的 `StockCard` 在同一提交的 `pages/Watchlist.tsx` 里）。整轮回退：`git log --grep R508` 找到那个提交再 `git revert` | R508 |
 | **因子页、回测页上 fork 加的东西**（因子 AI 解读 / AI 填表、研究工作流等） | 用户：两页「完全恢复成作者的样子」，作者的一切保留 | 无 | `git show 22333335^` | R174 |
 
 ---

@@ -64,6 +64,23 @@ export function WatchlistGroupBar({
   const [dropIndex, setDropIndex] = useState<number | null>(null)
   const reorderable = !!onReorder && groups.length > 1
   const tablistRef = useRef<HTMLDivElement>(null)
+  // [R508] 分组多时默认只露几行, 其余折起来 —— 32 个小分队原来在手机上占掉半屏
+  // (34vh 上限内自己滚), 表格只剩「代码 + 现价」。现在电脑露三行、手机露两行,
+  // 折起来的那部分用一个「还有 N 组」按钮展开; 展开与否不记住, 每次进来都是折的。
+  const [expanded, setExpanded] = useState(false)
+  const [overflowing, setOverflowing] = useState(false)
+  useEffect(() => {
+    const el = tablistRef.current
+    if (!el) return
+    const check = () => setOverflowing(el.scrollHeight > el.clientHeight + 1)
+    check()
+    // 观察的是每一个药丸而不只是容器: 容器高度被 max-h 钉死、宽度不变, 网页字体加载完
+    // 药丸变宽从三行溢成四行时, 容器自己不会触发 ResizeObserver —— 实测就漏过这一次
+    const ro = new ResizeObserver(check)
+    ro.observe(el)
+    for (const child of Array.from(el.children)) ro.observe(child)
+    return () => ro.disconnect()
+  }, [groups.length, expanded])
 
   const clearDrag = () => { setDragIndex(null); setDropIndex(null) }
 
@@ -102,7 +119,9 @@ export function WatchlistGroupBar({
     <>
       {/* [fork 增强] 分组多了自动换行, 不再横向滚动: 分组一多时横滚要左右拖才能
           看全, 且被遮住的分组容易被忘掉。右侧操作按钮固定在首行不随行数漂移。 */}
-      <div className="flex min-h-10 items-start border-b border-border bg-surface/40 px-5">
+      {/* [R508] 手机上药丸区独占整行(展开按钮 / 管理按钮先排在上一行右侧), 否则右边两个按钮
+          把药丸区挤到 230px, 一行只放得下一个药丸; sm 起回到一行两栏 */}
+      <div className="flex min-h-10 flex-wrap items-start border-b border-border bg-surface/40 px-5">
         <div
           ref={tablistRef}
           role="tablist"
@@ -128,7 +147,10 @@ export function WatchlistGroupBar({
             **右侧那个操作按钮不在这一层**(它是兄弟节点), 所以滚的只是药丸,
             按钮仍然钉在首行, 与上面那条 fork 增强的约定一致。
           */
-          className="flex min-w-0 flex-1 flex-wrap items-stretch gap-1 py-0.5 max-h-[34vh] overflow-y-auto"
+          className={`order-2 flex min-w-0 basis-full flex-wrap items-stretch gap-1 py-0.5 sm:order-1 sm:basis-0 sm:flex-1 ${
+            // [R508] 折起时限高三行(每行 = 药丸 28 + 上下 my-0.5 4 + 行间 gap 4 → 3 行 108px), 展开后仍守 34vh 上限自己滚
+            expanded ? 'max-h-[34vh] overflow-y-auto' : 'max-h-[6.75rem] overflow-hidden'
+          }`}
         >
           {tabs.map((tab, tabIndex) => {
             const active = selected === tab.id
@@ -162,7 +184,9 @@ export function WatchlistGroupBar({
                 title={draggable ? `${tab.name} — 可拖拽调整分组顺序` : undefined}
                 // [R452] 与全站按钮同高(32px); 「全部 / 未分组」选中是全站那套反相,
                 // 彩色分组选中仍亮它自己的颜色(颜色是分组的身份)
-                className={`relative my-1 inline-flex h-8 shrink-0 items-center gap-1.5 rounded-btn border px-3 text-xs transition-colors ${
+                // [R508] 药丸压矮一档(28px)并一律带边框 —— 原来未选中的没边框、靠留白分隔,
+                // 32 个排下来一片散点; 有边框之后一行能多放两个, 而且看得出每个是一个按钮
+                className={`relative my-0.5 inline-flex h-7 shrink-0 items-center gap-1.5 rounded-btn border px-2.5 text-xs transition-colors ${
                   draggable ? 'no-press cursor-grab active:cursor-grabbing' : ''
                 } ${
                   dragging ? 'opacity-40' : ''
@@ -172,8 +196,8 @@ export function WatchlistGroupBar({
                       ? `${color.text} ${color.border} ${color.background}`
                       : SELECTED
                     : color
-                      ? `border-transparent ${color.text} hover:bg-elevated`
-                      : 'border-transparent text-secondary hover:bg-elevated hover:text-foreground'
+                      ? `border-border ${color.text} hover:bg-elevated`
+                      : 'border-border text-secondary hover:bg-elevated hover:text-foreground'
                 }`}
               >
                 {draggable && dragIndex != null && dropIndex === groupIndex && (
@@ -203,10 +227,22 @@ export function WatchlistGroupBar({
             )
           })}
         </div>
+        {(overflowing || expanded) && (
+          <button
+            type="button"
+            onClick={() => setExpanded(v => !v)}
+            aria-expanded={expanded}
+            className="order-1 ml-auto inline-flex h-10 shrink-0 items-center gap-0.5 whitespace-nowrap text-micro text-muted hover:text-accent sm:order-2 sm:ml-1"
+            title={expanded ? '收起分组' : '展开全部分组'}
+          >
+            {expanded ? '收起' : `全部 ${groups.length} 组`}
+            <ChevronDown className={`h-3 w-3 transition-transform duration-expand ease-smooth ${expanded ? 'rotate-180' : ''}`} />
+          </button>
+        )}
         <button
           type="button"
           onClick={() => setManagerOpen(true)}
-          className="ml-2 inline-flex h-10 w-8 shrink-0 items-center justify-center text-muted hover:text-accent"
+          className="order-1 ml-2 inline-flex h-10 w-8 shrink-0 items-center justify-center text-muted hover:text-accent sm:order-2"
           title="管理自选分组"
           aria-label="管理自选分组"
         >
@@ -217,7 +253,7 @@ export function WatchlistGroupBar({
           <button
             type="button"
             onClick={() => setConfirmClear(true)}
-            className="inline-flex h-10 w-8 shrink-0 items-center justify-center text-muted hover:text-warning"
+            className="order-1 inline-flex h-10 w-8 shrink-0 items-center justify-center text-muted hover:text-warning sm:order-2"
             title="清空当前分组"
             aria-label="清空当前分组"
           >
