@@ -178,24 +178,18 @@ def test_R329_持仓取自模拟盘自己的账_不是真钱持仓():
 
 
 def test_R329_界面上后两档不渲染动作位():
-    """**不是灰掉, 是根本不渲染** —— 灰掉的徽标仍在暗示这里本来有个动作。"""
-    blk = _signal_row()
-    assert "const actionable = r.stage === 'flipped' && !!r.act" in blk, \
+    """**不是灰掉, 是根本不渲染** —— 灰掉的徽标仍在暗示这里本来有个动作。
+    [R513] 动作徽标只长在要动手的卡片上; 持仓方块与盯着那行连动作词的字面量都没有。"""
+    assert "const isActionable = (r: FlipTodaySignal) => r.stage === 'flipped' && !!r.act" in _page(), \
         "能不能动手只由这一条决定"
-    assert "actionable ? (" in blk
-    # 动作徽标(买入/清仓)必须在 actionable 那一支里。
-    #
-    # **钉的是徽标那个三元, 不是"清仓"这两个字。** [R338] 之后另一支里有一句
-    # 「离清仓线还有 N%」—— 那是在说距离, 不是一个可点的动作; 拿裸字符串去扫
-    # 会把它误判成"动作词漏进来了", 于是逼着把话说得不像人话。区分办法是**带
-    # 引号的字面量**: 徽标里的 `'清仓'` 是 JS 字符串, 正文里的清仓是 JSX 文本。
-    badge = "r.act === 'buy' ? '买入' : '清仓'"
-    head = blk[:blk.index(") : (")]
-    assert badge in head, "动作徽标必须长在 actionable 这一支里"
-    tail = blk[blk.index(") : ("):]
-    assert badge not in tail, "另一支里不许出现动作徽标"
-    assert "'买入'" not in tail and "'清仓'" not in tail, \
-        "另一支里不许出现动作词的字面量(正文里说距离可以, 渲染成动作不行)"
+    card = _fn("ActionCard")
+    head = card[card.index("{buy || sell ? ("):card.index(") : (", card.index("{buy || sell ? ("))]
+    assert "buy ? '买入' : '清仓'" in head, "动作徽标必须长在能动手那一支里"
+    tail = card[card.index(") : (", card.index("{buy || sell ? (")):]
+    assert "'买入'" not in tail and "'清仓'" not in tail, "盘中越线那一支里出现了动作词"
+    for comp in ("HoldingTile", "WatchGroup", "StateLine", "PriceLine"):
+        blk = _fn(comp)
+        assert "'买入'" not in blk and "'清仓'" not in blk, f"{comp} 里出现了动作词的字面量"
 
 
 def test_R329_今日信号排在主列第一块():
@@ -235,15 +229,21 @@ def _flip_src() -> str:
 
 
 def _signal_row() -> str:
-    """`SignalRow` 的函数体。
-
-    **不按 `"\\n}"` 截。** 剥注释后, 跨行的 `{/* … */}` 收尾会留下一个裸 `}`,
-    于是函数在中间被截断, 后半段的断言全部落空**却照样是绿的** —— 这个仓库里
-    「断言被自己的注释喂饱」已经是第六次, 这次换了个马甲: 注释不是喂饱断言,
-    是把断言要看的那段**整个切掉了**。改成截到下一个顶层 `function`。
-    """
+    """[R513] 行级组件的源码。原来是一个 `SignalRow`; R513 起三段各一种长相 ——
+    要动手的卡片 / 持仓方块 / 盯着的密排行, 加上三者共用的标的按钮、六态那句、价格那行。
+    截到下一个顶层 `function`(不按 `\n}` 截: 剥注释后跨行注释的收尾会留下裸 `}`)。"""
     code = _page()
-    blk = code[code.index("function SignalRow"):]
+    out = []
+    for name in ("ActionCard", "HoldingTile", "WatchGroup", "SymbolButton", "StateLine", "PriceLine"):
+        blk = code[code.index(f"function {name}("):]
+        nxt = blk.find("\nfunction ", 1)
+        out.append(blk if nxt < 0 else blk[:nxt])
+    return "\n".join(out)
+
+
+def _fn(name: str) -> str:
+    code = _page()
+    blk = code[code.index(f"function {name}("):]
     nxt = blk.find("\nfunction ", 1)
     return blk if nxt < 0 else blk[:nxt]
 
@@ -251,30 +251,27 @@ def _signal_row() -> str:
 def _today_block() -> str:
     code = _page()
     blk = code[code.index("function TodaySignals"):]
-    return blk[:blk.index("function SignalRow")]
+    return blk[:blk.index("function ZoneHead")]
 
 
 def test_R331_要动手的永远不进折叠区():
-    """**折叠是为了让信号更显眼, 把信号自己折起来就本末倒置了。**"""
+    """**折叠是为了让信号更显眼, 把信号自己折起来就本末倒置了。**
+
+    [R513] 整栏不折叠了(用户: 「不要折叠了」)。这条的立论更强地成立: 要动手的排在最前,
+    持仓其次, 盯着最后; 三段的分界仍然只由 `isLive` 一个判据说了算。"""
     blk = _today_block()
-    # [R338] 判据收成了一个 isLive, 常驻/折叠都建立在它之上 —— 论点没变,
-    # 反而更强: 以前是正反各写一遍, 现在正反同源, 想漂都漂不了。
     pred = next(l for l in blk.splitlines() if "const isLive =" in l)
-    assert "r.stage === 'flipped' && !!r.act" in pred, "要动手的必须进常驻区"
-    assert "const rest = rows.filter((r) => !isLive(r))" in blk, \
-        "折叠那一侧必须是常驻区的补集 —— 两套各写一份判据必然漂"
-    # 常驻区渲染在折叠开关**之前**, 且不受 watchOpen 控制
-    # [R342] 常驻区渲染的是排过序的 `ordered`(只重排不增删), 锚跟着走
-    # [R383] 每一行外面多包了一层格子 div(两列时要在它身上画分隔线),
-    # 所以 map 的形状从 `(r) => <SignalRow` 变成 `(r, i) => (`。**锚跟着走,
-    # 立论没变**: 常驻区仍然渲染在折叠开关之前。
-    # [R385] 三段都改走 `renderRows` —— 组内再按「进没进候选池」拆两半。
-    # **立论没变**: 常驻区仍然渲染在折叠开关之前。
-    i_live = blk.index("renderRows(ordered)")
-    i_toggle = blk.index("onClick={toggleWatch}")
-    assert i_live < i_toggle
-    head = blk[:i_toggle]
-    assert "watchOpen &&" not in head, "常驻区不许被折叠状态控制"
+    assert "r.stage === 'flipped' && !!r.act" in pred, "要动手的必须进第一段"
+    assert "const rest = rows.filter((r) => !isLive(r))" in blk, "后两段必须是第一段的补集"
+    i_live = blk.index("ordered.map((r) => (")
+    i_mine = blk.index("mineSorted.map((r) => (")
+    i_watch = blk.index("<WatchGroup")
+    assert i_live < i_mine < i_watch, "三段次序乱了 —— 要动手的得在最前"
+    for fold in ("watchOpen", "mineOpen", "toggleWatch", "toggleMine", "aria-expanded", "max-h-64"):
+        assert fold not in blk, f"又长出了折叠: {fold}"
+    from tests.frontend_source import code_of
+    storage = code_of("lib/storage.ts")
+    assert "flipTodayWatchOpen" not in storage and "flipMineOpen" not in storage, "只为折叠服务的偏好还在"
 
 
 def test_R331_盘中越线也常驻_它今天就可能成交():
@@ -284,28 +281,24 @@ def test_R331_盘中越线也常驻_它今天就可能成交():
         "盘中越线收盘还站着就成交 —— 今天就要盯, 不该被折起来")
 
 
-def test_R331_折叠状态记在本地_刷新后还在():
-    blk = _today_block()
-    assert "storage.flipTodayWatchOpen.get(false)" in blk, "默认收起"
-    assert "storage.flipTodayWatchOpen.set(!v)" in blk, "改了要落盘, 否则刷新就忘"
+# [R513] `test_R331_折叠状态记在本地_刷新后还在` 退役 —— 折叠没了, 记住折叠状态的偏好一起删了; 「不许再长出折叠」并进了上面那条
 
 
-def test_R331_展开区限高自己滚():
-    """盯着的票可能几十只 —— 让它把整页顶长等于没折叠。"""
-    blk = _today_block()
-    open_blk = blk[blk.index("{watchOpen && ("):]
-    assert "max-h-64" in open_blk and "overflow-y-auto" in open_blk
+# [R513] `test_R331_展开区限高自己滚` 退役 —— 盯着那一段不再折进一个限高的滚动区, 改成一只一行、多列密排; 见 test_flip_signals_r513.py
 
 
 def test_R331_没有要动手的时候明说_不是留一片空白():
     blk = _today_block()
-    assert "{ordered.length === 0 && (" in blk
+    assert "{ordered.length > 0 ? (" in blk
     assert "管住手" in blk, "空着不说话, 读的人分不清是没有还是没算出来"
 
 
 def test_R331_折叠按钮报出条数():
+    """[R513] 没有折叠按钮了, 但「每一段有几只」仍然要写在段标题上 —— 不写的话看不出这一段有多长。"""
     blk = _today_block()
-    assert "{idle.length} 只" in blk, "不写条数的话, 用户不知道展开会看到什么"
+    for head in ('<ZoneHead title="要动手" count={actCount}', '<ZoneHead title="持仓" count={mine.length}',
+                 '<ZoneHead title="盯着" count={idle.length}'):
+        assert head in blk, f"段标题没报条数: {head}"
 
 
 # ── [R332 → R357] 注重当下: 从滚动窗口改成逐月 ──────────────────────────
@@ -635,44 +628,24 @@ def test_R338_每行都带held_否则前端分不开():
 
 
 def test_R355_手上这段可折叠_但折叠条自己就是摘要():
-    """[R338 → R355] 用户: 「这部分也想能折叠展开」。
-
-    **R338 我为这一段写过「不许折叠」**, 理由是: 买入天天长出来, 卖出只在真触发
-    那天冒一次, 折起来就等于又回到只剩买入。用户当面推翻 —— 那条理由没有错,
-    但它不该替用户决定版面。
-
-    所以守卫**不是删掉而是换了个钉法**: 折叠可以, 但**折叠条必须把卖出侧的读数
-    带上**(拿着几只 / 其中几只贴到离场线)。收起来之后那一行仍然在说「你手上有
-    10 只, 2 只快到线了」—— **那才是 R338 真正要保的东西, 而不是"不许折"**。
-
-    顺带记一笔: R338 那条守卫写的是 `assert "watchOpen" not in seg`, 钉的是
-    **某一个变量名**而不是"不可折叠"这条性质 —— 我这次用 `mineOpen` 接上折叠,
-    它**照样是绿的**。钉名字不钉性质, 又一次。
-    """
+    """[R355 → R513] R355 允许持仓这段折叠, 条件是折叠条自己把卖出侧的读数带上。
+    R513 不折叠了, 那两个读数照样挂在段标题上: 拿着几只、几只贴近离场线 —— 那才是 R338 要保的东西。"""
     blk = _today_block()
     seg = blk[blk.index("{mine.length > 0 && ("):blk.index("{idle.length > 0 && (")]
-    assert "onClick={toggleMine}" in seg, "没有折叠开关"
-    assert "{mineOpen && (" in seg, "展开区没受开关控制"
-    # **折叠条上必须有这两个数** —— 收起来之后卖出侧全靠它们
-    assert "{mine.length} 只" in seg, "折叠条上没说拿着几只"
-    assert "{mineNear} 只贴近离场线" in seg, "折叠条上没说几只快到线了 —— 收起来卖出侧就消失了"
-    assert "renderRows(mineSorted)" in seg   # [R385] 改走统一的分组渲染
+    assert "count={mine.length}" in seg, "段标题上没说拿着几只"
+    assert "{mineNear} 只贴近离场线" in seg, "段标题上没说几只快到线了"
+    assert "mineSorted.map((r) => (" in seg and "<HoldingTile" in seg
 
 
-def test_R355_默认展开_且状态记住():
-    """它是卖出那一侧唯一天天有位置的东西, 默认收起等于把 R338 做的事撤回去。"""
-    blk = _today_block()
-    assert "storage.flipMineOpen.get(true)" in blk, "默认要展开"
-    assert "storage.flipMineOpen.set(!v)" in blk, "改了要落盘, 否则刷新就忘"
+# [R513] `test_R355_默认展开_且状态记住` 退役 —— 不折叠了, 没有「默认展开」可言; 「不许再长出折叠」见 test_R331_要动手的永远不进折叠区
 
 
 def test_R355_贴近离场线的判据只有一处():
-    """条上说 2 只、展开却只有 1 行标黄 —— 两处各写一份必然这样。"""
+    """段标题上说 2 只、方块却只有 1 块标黄 —— 两处各写一份必然这样。"""
     blk = _today_block()
     line = next(l for l in blk.splitlines() if "const mineNear" in l)
-    assert "<= NEAR_EXIT" in line, "折叠条上那个计数没走 NEAR_EXIT 那条判据"
-    row = _signal_row()
-    assert "<= NEAR_EXIT" in row, "行上那一档也得是同一条"
+    assert "<= NEAR_EXIT" in line, "段标题上那个计数没走 NEAR_EXIT 那条判据"
+    assert "dist <= NEAR_EXIT" in _fn("HoldingTile"), "方块上那一档也得是同一条"
 
 
 def test_R338_三段分流只由一个判据说了算():
@@ -685,10 +658,11 @@ def test_R338_三段分流只由一个判据说了算():
 
 
 def test_R338_持有与盯着在界面上分得开():
-    """"我拿着它"与"我在看它"是两件事, 一眼要能分开。"""
-    blk = _signal_row()
-    assert "r.held ? (" in blk and "持有" in blk
-    assert "离清仓线还有" in blk, "拿着的票问的是什么时候卖, 不是什么时候买"
+    """「我拿着它」与「我在看它」是两件事, 一眼要能分开。[R513] 两段各是各的长相。"""
+    blk = _today_block()
+    assert "<HoldingTile" in blk and "<WatchGroup" in blk
+    assert "离清仓线" in _fn("HoldingTile"), "拿着的票问的是什么时候卖, 不是什么时候买"
+    assert "离清仓线" not in _fn("WatchGroup")
 
 
 # ── [R339] 卖出要醒目 ───────────────────────────────────────────────────
@@ -699,34 +673,32 @@ def test_R338_持有与盯着在界面上分得开():
 
 
 def test_R339_买和卖不许共用一个底色():
-    """一行里最先被看见的是底色, 不是徽标上那两个字。"""
-    blk = _signal_row()
-    assert "bg-accent/[0.06]" not in blk, "买卖共用一个底色 = 扫一眼分不出今天是买是卖"
-    assert "buy && 'border-l-bull bg-bull/[0.07]'" in blk
-    assert "sell && 'border-l-bear bg-bear/[0.10]'" in blk
+    """一张卡里最先被看见的是底色, 不是徽标上那两个字。"""
+    card = _fn("ActionCard")
+    assert "bg-accent/[0.06]" not in card, "买卖共用一个底色 = 扫一眼分不出今天是买是卖"
+    assert "buy && 'border-bull/30 border-l-bull bg-bull/[0.07]'" in card
+    assert "sell && 'border-bear/30 border-l-bear bg-bear/[0.10]'" in card
     # 方向是从 act 来的, 不许另立一套
-    assert "const sell = actionable && r.act === 'sell'" in blk
-    assert "const buy = actionable && r.act === 'buy'" in blk
+    assert "const buy = isActionable(r) && r.act === 'buy'" in card
+    assert "const sell = isActionable(r) && r.act === 'sell'" in card
 
 
 def test_R339_贴着清仓线的持仓也上色():
     """卖出这一侧该醒目的不只是「今天要卖」, 还有「明后天很可能要卖」。"""
-    blk = _signal_row()
     assert "const NEAR_EXIT = 0.02" in _page()
-    assert "Math.abs(r.gap_pct) <= NEAR_EXIT" in blk
-    assert "nearExit && 'border-l-warning bg-warning/[0.07]'" in blk
-    # 只有**拿着的**才吃这一档 —— 不相干的票离它的买入线近, 与"要卖"无关
-    assert "r.held && r.gap_pct != null" in blk
+    tile = _fn("HoldingTile")
+    assert "const near = dist != null && dist <= NEAR_EXIT" in tile
+    assert "near ? 'border-warning/40 bg-warning/[0.06]'" in tile
+    # 只有**拿着的**才吃这一档 —— 方块只画持仓那一段
+    blk = _today_block()
+    assert blk.count("<HoldingTile") == 1 and "mineSorted.map((r) => (" in blk
 
 
 def test_R339_上色不是出手理由():
     """**铁律。** 上了色照样不许长出动作徽标 —— 颜色是提醒, 不是信号。"""
-    blk = _signal_row()
-    # nearExit 必须建立在「不是 actionable」之上; 它一旦能独立成立就是新出手口径
-    assert "const nearExit = !actionable && r.held" in blk
-    badge = "r.act === 'buy' ? '买入' : '清仓'"
-    tail = blk[blk.index(") : ("):]
-    assert badge not in tail, "上色那一支里不许出现动作徽标"
+    tile = _fn("HoldingTile")
+    assert "isActionable" not in tile and "r.act" not in tile, "持仓方块里出现了出手判据"
+    assert "'买入'" not in tile and "'清仓'" not in tile
 
 
 def test_R339_样本量不够时胜率自己说出来():
@@ -765,13 +737,15 @@ def test_R342_排序只重排不增删():
 
 
 def test_R342_分不参与能不能动手():
-    """**铁律。** 把握分只碰顺序, 不许碰 `isLive` 那个判据。"""
+    """**铁律。** 把握分只碰顺序, 不许碰 `isLive` 那个判据, 也不许碰盯着那段的分组。"""
     blk = _today_block()
     pred = next(l for l in blk.splitlines() if "const isLive =" in l)
     for word in ("conviction", "rank", "score", "把握"):
         assert word not in pred, f"出手判据里混进了打分: {word}"
-    # [R344] 打分现在对四档都生效了, 这条界线因此更要紧: 它只管档内先后, 不管分档
-    assert "const mine = rest.filter((r) => r.held)" in blk, "分档判据被动过"
+    assert "const mine = rest.filter((r) => r.held)" in blk, "分段判据被动过"
+    for name in ("const toBull", "const toBear"):
+        line = next(l for l in blk.splitlines() if name in l)
+        assert "r.side" in line and "conviction" not in line and "score" not in line, f"{name} 的分组混进了打分"
 
 
 def test_R342_slice先拷一份_不就地改props():
@@ -785,30 +759,29 @@ def test_R342_排序依据摆在界面上_不做暗箱():
     """顺序是谁排的不说, 读的人不知道该不该照着做。"""
     blk = _today_block()
     assert "'按把握分排序'" in blk, "页头没说这个顺序是按什么排的"
-    row = _signal_row()
-    # [R345] 行上那个徽标换成了整格移植过来的 `ScoreCell`(名次 + 分 + 三条维度条)
-    assert "<ScoreCell o={c} rank={c.rank}" in row, "行上要看得见名次 —— 排序依据不做暗箱"
+    assert "<ScoreCell o={c} rank={c.rank}" in _fn("ActionCard"), "卡片上要看得见名次 —— 排序依据不做暗箱"
+    for comp in ("HoldingTile", "WatchGroup"):
+        assert "c.rank" in _fn(comp), f"{comp} 上看不见名次"
     assert "它**不是动作**" in _flip_src(), "必须写明分不是出手依据"
 
 
 def test_R342_没进候选池的票照样在名单里():
     """转折了就是转折了 —— 打分够不够是另一个问题, 不该让它从名单上消失。"""
-    row = _signal_row()
-    assert "候选池" in row
-    assert "该动手还是要动手" in row, "得说清它为什么没名次, 以及这不影响动手"
+    card = _fn("ActionCard")
+    assert "候选池" in card
+    assert "该动手还是要动手" in card, "得说清它为什么没名次, 以及这不影响动手"
 
 
 def test_R342_把握分那一格不是动作():
-    """名次徽标长在动作徽标旁边, **不许变成第二个可点的动作**。"""
-    row = _signal_row()
-    # [R350] 版面改成网格后, 原来那个右界(状态文字那个 span 的 className)变了。
-    # 改用**这个三元自己的收尾**当右界 —— 它跟着这一格走, 不跟旁边的样式走。
-    a = row.index("{c?.rank != null ? (")
-    seg = row[a:row.index(") : <span />}", a)]
+    """名次那一格长在动作徽标旁边, **不许变成第二个可点的动作**。"""
+    card = _fn("ActionCard")
+    a = card.index("{c?.rank != null && (")
+    seg = card[a:card.index('<div className="min-w-0 flex-1 space-y-1">', a)]
     for word in ("'买入'", "'清仓'", "onClick"):
         assert word not in seg, f"名次那一格出现了动作: {word}"
-    # [R345] 移植过来的那一格本身也不许带动作
     from tests.frontend_source import code_of
     cell = code_of("components/today/ScoreCell.tsx")
     for word in ("'买入'", "'清仓'", "onClick"):
         assert word not in cell, f"ScoreCell 里出现了动作: {word}"
+
+

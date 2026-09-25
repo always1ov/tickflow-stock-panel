@@ -110,13 +110,13 @@ def test_R498_区块标题不被说明挤成两行():
 
 
 def test_R498_手上这些那一行在手机上不再挤成竖排():
-    # [R512] 「手上这些」改名「持仓」, 与分栏同名
+    """R498: 手机上那一行右边的两个数被挤成竖排。
+    [R512] 「手上这些」改名「持仓」。[R513] 折叠条没了, 换成段标题 `ZoneHead`:
+    标题、只数、说明、右边的读数都在一个能换行的 flex 里, 放不下时整段落到下一行, 不会被挤成竖排。"""
     code = code_of(FLIP)
-    bar = code[code.index("持仓<span"):]
-    bar = bar[:bar.index("</button>")]
-    assert '<span className="hidden sm:inline"> · 跌破离场线才清仓</span>' in bar, \
-        "后半句在窄屏没收掉 —— 右边那两个数会被挤成竖排"
-    assert "whitespace-nowrap" in bar, "右边那两个数会被拆行"
+    zh = _fn("ZoneHead")
+    assert "flex flex-wrap items-baseline" in zh, "段标题不能换行 —— 窄屏上右边的读数会被挤成竖排"
+    assert '<ZoneHead title="持仓" count={mine.length} note="跌破离场线才清仓"' in code
     assert "手上这些" not in code, "旧名还在渲染"
 
 

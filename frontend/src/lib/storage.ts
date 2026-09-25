@@ -47,18 +47,11 @@ export const storage = {
   strategyPoolMinute:   kv<string[]>('strategy-pool-1m'),
   /** [R95] prune 自动清理的备份 — 被移除的 ID 留底, 页面提供一键恢复 */
   strategyPoolPruneBackup: kv<{ at: string; removed: string[] } | null>('strategy-pool-prune-backup'),
-  /**
-   * [R331] 今日信号里「只是盯着」那一段展开着没有。默认 **false(收起)** ——
-   * 那一段是"今天大概率不用动"的票, 数量随自选规模走, 摊开会把真要动手的淹掉。
-   *
-   * [R327] R192 那个 `paperTrader`(当前看哪个操作员)跟着 AI 操盘手一起没了。
-   */
-  flipTodayWatchOpen:   kv<boolean>('flip-today-watch-open'),
+  // [R327] R192 那个 `paperTrader`(当前看哪个操作员)跟着 AI 操盘手一起没了。
+  // [R513] 原来这里还有 flipTodayWatchOpen(「只是盯着」折没折, R331)与 flipMineOpen
+  // (「手上这些」折没折, R355) —— 今日信号改成三段一次摊开、不再折叠, 两条一起删。
   // [R353] 模拟盘那三个参数。用户: 「这里我要能配置而不是选择或者默认」——
   // 既然能自己填, 就得记住; 每次打开都退回默认值等于没配过。
-  // [R355] 「手上这些」的展开状态。**默认展开** —— 见 FlipPaper 里那段说明:
-  // 它是卖出那一侧唯一天天有位置的东西, 默认收起等于把 R338 做的事撤回去。
-  flipMineOpen:         kv<boolean>('flip-mine-open'),
   /** [R358] 净值走势图折起来没有 —— 默认收起 */
   flipNavOpen:          kv<boolean>('flip-nav-open'),
   // [R512] 原来这里是 flipRulesOpen(「这套规则」折没折) —— 规则有了自己的一栏, 不再折叠, 删了

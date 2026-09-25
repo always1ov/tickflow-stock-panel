@@ -31,8 +31,21 @@ def _flip() -> str:
 
 
 def _signal_row() -> str:
-    blk = _flip()
-    blk = blk[blk.index("function SignalRow"):]
+    """[R513] 行级组件的源码。原来是一个 `SignalRow`; R513 起三段各一种长相 ——
+    要动手的卡片 / 持仓方块 / 盯着的密排行, 加上三者共用的标的按钮、六态那句、价格那行。
+    截到下一个顶层 `function`(不按 `\n}` 截: 剥注释后跨行注释的收尾会留下裸 `}`)。"""
+    code = code_of(FLIP)
+    out = []
+    for name in ("ActionCard", "HoldingTile", "WatchGroup", "SymbolButton", "StateLine", "PriceLine"):
+        blk = code[code.index(f"function {name}("):]
+        nxt = blk.find("\nfunction ", 1)
+        out.append(blk if nxt < 0 else blk[:nxt])
+    return "\n".join(out)
+
+
+def _fn(name: str) -> str:
+    code = code_of(FLIP)
+    blk = code[code.index(f"function {name}("):]
     nxt = blk.find("\nfunction ", 1)
     return blk if nxt < 0 else blk[:nxt]
 
@@ -61,17 +74,19 @@ def test_R344_名单只由六态选_前端不合成任何一行():
 
 
 def test_R344_四档内部都按打分重排():
-    """打分是**第二段**, 对六态选出来的**每一档**都生效 —— 不是只管其中一档。"""
+    """打分是**第二段**, 对六态选出来的**每一段**都生效 —— 不是只管其中一段。
+    [R513] 盯着那一段按转多 / 转空再分两组, 两组各自照样走 byRank。"""
     code = _flip()
     i = code.index("const rank = (r: FlipTodaySignal)")
     blk = code[i:code.index("return (", i)]
     assert blk.strip(), "切出来是空的, 下面的断言就全是摆设"
     assert "const byRank = (rs: FlipTodaySignal[]) => rs.slice().sort((a, b) => rank(a) - rank(b))" in blk, \
-        "排序得是一处实现 —— 四档各写一遍必然漂"
+        "排序得是一处实现 —— 各段各写一遍必然漂"
     for tier in ("const ordered = byRank(live)",
                  "const mineSorted = byRank(mine)",
-                 "const idleSorted = byRank(idle)"):
-        assert tier in blk, f"这一档没参与二次排序: {tier}"
+                 "const toBull = byRank(idle.filter(",
+                 "const toBear = byRank(idle.filter("):
+        assert tier in blk, f"这一段没参与二次排序: {tier}"
 
 
 def test_R344_打分不参与分档():
@@ -245,9 +260,8 @@ def test_R345_三条维度条跟着一起搬():
 
 
 def test_R345_模拟盘行上用的就是那一格():
-    row = code_of(FLIP)
-    row = row[row.index("function SignalRow"):]
-    assert "<ScoreCell o={c} rank={c.rank} total={c.rank_total ?? 0} />" in row
+    # [R513] 名次那一格整格(带三条维度条)留在要动手的卡片上
+    assert "<ScoreCell o={c} rank={c.rank} total={c.rank_total ?? 0} />" in _fn("ActionCard")
 
 
 def test_R345_打分那份数据整条存着_不再只留几个字段():
@@ -352,23 +366,7 @@ def test_R349_三样读数都在():
     assert "'放量刚好'" in cell and "'刚站上生命线'" in cell
 
 
-def test_R356_走势并进同一行_自成一列():
-    """[R349 → R356] 用户: 「后面还有不少空间, 利用起来一行显示完整」。
-
-    **R349 我把它放成第二行**, 理由是「六态那句说要不要动手, 走势说凭什么是这一只,
-    挤在同一行读的人得先分清哪句是哪套」。那条理由没有错, 但**分列同样能分清** ——
-    而分行的代价是行高随内容变(见下一条), 那个代价更大。
-
-    所以现在它是**网格的第五列**: 与六态那句各占一格, 界线由栅格划, 不由换行划。
-    """
-    row = _row()
-    assert "<TrendCell o={c} />" in row
-    # 它在网格里, 不再是网格之外的第二行
-    grid = row[row.index("<div className={cn("):]
-    assert "<TrendCell o={c} />" in grid, "走势跑到网格外面去了 —— 那就又是第二行"
-    assert "pl-[22.25rem]" not in row, "还留着第二行那套缩进"
-    # 六态那句仍然在它自己的格子里, 排在走势之前
-    assert row.index("已转折 · 现在是") < row.index("<TrendCell"), "顺序变了"
+# [R513] `test_R356_走势并进同一行_自成一列` 退役 —— 信号行那套定宽网格(ROW_GRID / RowShape / SignalRow)随 R513 整个删了: 用户「今日页面这个页面重做, 改的好看点, 不要折叠了」, 三段各换一种长相(卡片 / 方块 / 密排行), 不再是一张对齐的长表。新版面的守卫在 test_flip_signals_r513.py
 
 
 def test_R356_走势那一格自己也是一行():
@@ -384,74 +382,13 @@ def test_R356_走势那一格自己也是一行():
     assert "flex flex-wrap items-center" in body, "没有横排"
 
 
-def test_R356_行高定死_不随有没有走势变():
-    """**用户的第二件事**: 「每行个股行高要一样」。(R383 起是"整屏统一决定撑不撑")
-
-    名次那一格本身有三行高(名次 / 分 / 三条维度条), 而没进候选池的票只有两行字
-    —— 不定死的话, **行高就跟着"这只票有没有进候选池"变**, 一屏扫下去参差不齐。
-    """
-    row = _row()
-    grid_cls = _grid_class(row)
-    # [R366] **带上 `sm:` 前缀断言。** 手机上折成了卡片式, 行高本来就随内容 ——
-    # 那儿定死反而会在只有两行字时留一截空。裸写 `"min-h-[3.5rem]"` 的话,
-    # `sm:min-h-[3.5rem]` 也含着它, 断言分不出这两件事(锚是别人的子串, 又一次)。
-    # [R383] **这一条现在是有条件的, 守卫跟着说清楚。**
-    #
-    # 立论没变 —— 「行与行一样高」。但撑行高的理由只在**真有名次**时存在:
-    # 名次那一格三行高, 所以要把没名次的行也垫到同样高度。整屏一个名次都没有时
-    # (用户实机就是这样: 32 行全是「没进候选池」), 每行只有两行字, 再垫到
-    # 3.5rem 就是每行白送 26px —— 32 行八百多像素的滚动, 垫的是"和谁一样高"?
-    #
-    # 所以判据是: **撑不撑由整屏统一决定(`shape.rank`), 不是每行各自算。**
-    # 后者才会真的出现"行高跟着这只票有没有进候选池变", 那正是 R356 要挡的。
-    assert "shape.rank && 'sm:min-h-[3.5rem]'" in grid_cls, \
-        "行高要么没了, 要么改成每行各自算 —— 后者正是 R356 挡的那件事"
-    # **`items-center` 必须钉在网格那个 div 自己身上。** 只查 `"items-center" in row`
-    # 是不够的 —— 动作徽标那几个 span 用的是 `inline-flex items-center`, 断言会被
-    # 它们喂饱, 于是把网格上的这个类删掉守卫照样是绿的(变异电池当场抓到)。
-    # 「锚太宽 = 没有锚」, 本会话第七次。
-    assert "sm:items-center" in grid_cls, "内容没垂直居中, 定了高也会看着歪"
+# [R513] `test_R356_行高定死_不随有没有走势变` 退役 —— 信号行那套定宽网格(ROW_GRID / RowShape / SignalRow)随 R513 整个删了: 用户「今日页面这个页面重做, 改的好看点, 不要折叠了」, 三段各换一种长相(卡片 / 方块 / 密排行), 不再是一张对齐的长表。新版面的守卫在 test_flip_signals_r513.py
 
 
-def test_R356_把右边那片空地用上():
-    """[R350 → R356] R350 我加了 `max-w-[72rem]` 防止一行横贯两米;
-    用户看了实机说「后面还有不少空间, 利用起来」—— 那道限宽因此撤掉,
-    多出来的宽度给了走势那一列。"""
-    row = _row()
-    assert "max-w-[72rem]" not in row, "还限着宽, 右边那片空地没用上"
-    # 六列。[R360] 名次挪到了最前(用户: 「这列内容统一放到股票名称前面」):
-    #   名次 / 标的 / 动作 / 六态 / 走势 / 触发价
-    # [R381] 六态那一列的上限 9rem → 16rem。**立论一个字没变**(把空地用上),
-    # 只是发现还有一处没用上: 9rem 装不下「按现价会转折 —— 收盘还站在这边才算数」,
-    # 左边在截字、右边那格空着六百像素。细节与变异见 test_R381_六态那句话能显示完整。
-    # [R383] 这一串搬进了 `ROW_GRID`, 所以从 `_grid_class` 里查。它现在是
-    # **走势有内容**时的那一套; 整屏没走势时另有一套把那一格收成 0。
-    assert "sm:grid-cols-[3.5rem_minmax(9rem,11rem)_4.5rem_minmax(7rem,16rem)_minmax(0,1fr)_auto]" \
-        in _grid_class(row), "宽屏那套列宽变了 —— 定宽网格是行与行对齐的前提"
+# [R513] `test_R356_把右边那片空地用上` 退役 —— 信号行那套定宽网格(ROW_GRID / RowShape / SignalRow)随 R513 整个删了: 用户「今日页面这个页面重做, 改的好看点, 不要折叠了」, 三段各换一种长相(卡片 / 方块 / 密排行), 不再是一张对齐的长表。新版面的守卫在 test_flip_signals_r513.py
 
 
-def test_R356_没进候选池时走势格空着但占位():
-    """格子不占位的话, 后面的触发价列会整体错开一格。
-
-    **锚必须是代码, 不能是注释** —— `code_of()` 会把注释整片剥掉(这是它的本职:
-    注释里写什么都不算数)。拿注释文字当切片锚, 切出来的要么报 `substring not
-    found`, 要么是个空串而让下面的断言恒真。本会话已经在这上面栽过两次。
-    """
-    row = _row()
-    # 空着时**格子还在**: 条件挂在 `{c && …}` 上, 而不是整个 <span> 上
-    assert '{c && <TrendCell o={c} />}' in row, "走势那一格不由 c 决定渲不渲染"
-    # 条件挂在 `{c && …}` 上, **不是整个 <span> 上** —— 套在外面就不占位了。
-    i = row.index("{c && <TrendCell o={c} />}")
-    before = row[:i]
-    assert before.rstrip().endswith(">"), "走势那一格的 <span> 没包住它 —— 空着时不占位"
-    # [R400] 原来这一行锚的是 `text-[11px]` —— 而那个字号只是**当时**的写法,
-    # 3.2 把它换成规范档位 `text-micro` 时这条就红了, 可它要钉的"占位"一点没变。
-    # 钉性质: 包住它的那个 <span> 占满走势那三列, 且不许被内容撑开。
-    span_open = row[:i].rstrip()
-    assert span_open.endswith(">"), "走势那一格的 <span> 没包住它 —— 空着时不占位"
-    tag = span_open[span_open.rindex("<span"):]
-    assert "col-span-3" in tag, f"走势那一格不再占满三列, 后面的列会整体错开: {tag}"
-    assert "min-w-0" in tag, f"走势那一格会被内容撑开, 定宽网格就不成立了: {tag}"
+# [R513] `test_R356_没进候选池时走势格空着但占位` 退役 —— 信号行那套定宽网格(ROW_GRID / RowShape / SignalRow)随 R513 整个删了: 用户「今日页面这个页面重做, 改的好看点, 不要折叠了」, 三段各换一种长相(卡片 / 方块 / 密排行), 不再是一张对齐的长表。新版面的守卫在 test_flip_signals_r513.py
 
 
 def test_R349_走势那一格不是动作():
@@ -512,40 +449,10 @@ def _grid_class(row: str) -> str:
     return cls + "\n" + table
 
 
-def test_R350_信号行是定宽网格_不是flex():
-    """列宽固定, 行与行天然对齐, 一列能扫到底。
-
-    (R350 的起因: 原来是 flex + 触发价上一个 `ml-auto`, 宽屏上价格被甩到最右、
-    中间空一条, 而各行按自己内容宽度排, 列也对不齐。**这一条立论没变**,
-    只是列数从五变六 —— 见 `test_R356_把右边那片空地用上`。)
-    """
-    row = _row()
-    assert "ml-auto" not in row, "ml-auto 会把最后一列甩到屏幕最右, 中间空一条"
-    # [R366] **两处**: 窄屏那张卡片栅格 + `sm:` 起那张六列。立论没变(仍然是
-    # 定宽网格而不是 flex), 只是同一个 div 上挂了两套。**不许再多**: 第三套
-    # 意味着又有一个宽度区间是谁也没看过的。
-    # [R383] 宽屏那套挪进了 `ROW_GRID`, 所以从「行 + 那张表」一起数。
-    # 窄屏 1 套 + 宽屏 2 套(走势有/无), 共 3 套。**不许再多**: 第四套意味着
-    # 又有一个宽度区间是谁也没看过的。
-    # [R384] 名次那一列也能收成 0 了, 于是 `ROW_GRID` 变成 2×2 = 4 套
-    # (名次有/无 × 走势有/无), 每套自带窄屏与宽屏两段。**不许再多**: 第五套
-    # 意味着又有一个组合是谁也没看过的。
-    cls = _grid_class(row)
-    assert cls.count("sm:grid-cols-[") == 4, f"宽屏栅格不是四套: {cls.count('sm:grid-cols-[')}"
-    assert cls.count("grid-cols-[") == 8, "窄屏那四段没跟着配齐(每套都要有窄屏+宽屏)"
+# [R513] `test_R350_信号行是定宽网格_不是flex` 退役 —— 信号行那套定宽网格(ROW_GRID / RowShape / SignalRow)随 R513 整个删了: 用户「今日页面这个页面重做, 改的好看点, 不要折叠了」, 三段各换一种长相(卡片 / 方块 / 密排行), 不再是一张对齐的长表。新版面的守卫在 test_flip_signals_r513.py
 
 
-def test_R350_名次那一格空着也占位():
-    """有名次的行和没名次的行, 后面所有列都得对齐。"""
-    row = _row()
-    assert ") : <span />}" in row, "没名次时要留一个空占位, 不能整格不渲染"
-
-
-# [R350 → **R356 退役**] `test_R350_走势行缩进对齐到状态文字那一列` 钉的是
-# 走势作为**第二行**时的缩进量。R356 把它并进同一行自成一列, **那个缩进不存在了**
-# —— 它没有可守的对象了, 而不是被绕过去。对齐现在由栅格保证, 见
-# `test_R356_把右边那片空地用上` 里那条列宽断言。
-
+# [R513] `test_R350_名次那一格空着也占位` 退役 —— 信号行那套定宽网格(ROW_GRID / RowShape / SignalRow)随 R513 整个删了: 用户「今日页面这个页面重做, 改的好看点, 不要折叠了」, 三段各换一种长相(卡片 / 方块 / 密排行), 不再是一张对齐的长表。新版面的守卫在 test_flip_signals_r513.py
 
 
 # ── [R352] AI 导读删掉, 连同它那个已经没有展示面的定时开关 ──────────────
@@ -785,41 +692,10 @@ def test_R359_说清楚筛选不进回测():
 
 
 def test_R360_名次是整行第一格_排在标的前面():
-    """它回答的是「凭什么是这一只」—— **那个问题得在读到代码之前就摆在眼前**。
-
-    原来它夹在动作与六态中间: 眼睛先认票、再看要不要动手, 最后才补上理由。
-    现在名次先到, 一列扫下去就是一份从强到弱的名单。
-    """
-    row = _row()
-    i_rank = row.index("{c?.rank != null ? (")
-    i_sym = row.index("<SymbolCell symbol={r.symbol}")
-    i_act = row.index("r.act === 'buy' ? '买入' : '清仓'")
-    assert i_rank < i_sym < i_act, "名次 / 标的 / 动作 三者的次序不对"
-    # 列宽也得跟着挪 —— 只换 JSX 不换栅格, 名次会去占标的那 9~11rem,
-    # 而标的被挤进 3.5rem 里截成一两个字。**两处必须同时改**。
-    # [R366] 两套栅格的第一列**都**得是名次那 3.5rem —— 只改一套的话, 另一个
-    # 宽度区间里名次会去占标的的位置, 而那个区间没人看过。
-    cols = [c for c in _grid_class(row).split() if "grid-cols-[" in c]
-    assert len(cols) == 8, f"栅格不是四套(每套窄屏+宽屏两段): {cols}"
-    # [R384] 第一列**要么是名次那 3.5rem, 要么是 0**(整屏一个名次都没有时它收掉)。
-    # **立论没变**: 名次仍然是第一格, 挪 JSX 就必须挪栅格。加的是那个 0 ——
-    # 而 `0` 恰恰只有"名次在第一列"才讲得通: 它收掉的就是名次那一列。
-    for c in cols:
-        body = c[c.index("grid-cols-["):]
-        assert body.startswith("grid-cols-[3.5rem_") or body.startswith("grid-cols-[0_"), \
-            f"第一列既不是名次那 3.5rem 也不是收掉的 0 —— JSX 挪了栅格没挪: {c}"
-    # 四套里必须**两种都有** —— 只剩 3.5rem 说明收不掉了, 只剩 0 说明名次没位置了
-    assert any("[3.5rem_" in c for c in cols) and any("[0_" in c for c in cols), \
-        "名次那一列要么永远占着要么永远没有 —— 两种都得在"
-
-
-def test_R360_名次空着时照样占住第一格():
-    """[R350 立论照搬] 空着不占位的话, 后面**所有**列整体左移一格 ——
-    而它现在是第一格, 错开的就不只是它后面几列, 是整行。"""
-    row = _row()
-    assert ") : <span />}" in row, "没名次时要留一个空占位"
-    # 空占位必须仍在第一格 —— 即在 SymbolCell 之前
-    assert row.index(") : <span />}") < row.index("<SymbolCell symbol={r.symbol}")
+    """用户: 「这列内容统一放到股票名称前面」—— 它回答「凭什么是这一只」, 得在认票之前摆在眼前。
+    [R513] 卡片上仍是名次在左、标的在右。"""
+    card = _fn("ActionCard")
+    assert card.index("<ScoreCell") < card.index("<SymbolButton"), "名次挪到标的后面去了"
 
 
 # ── [R362] 六格并成一行 ─────────────────────────────────────────────────
@@ -917,26 +793,23 @@ def test_R363_关键价位弹窗是一处实现_两页共用():
 
 
 def test_R364_两个可点的格子_各开各的表():
-    """[R363 → R364] 用户: 「还是别点买入了, 点「已转折 · 现在是自然回升」这样更合理」。
-
-    **两列点开的不是同一张表**, 这正是决策台 R51 立下的规矩:
+    """[R363 → R364] 两列点开的不是同一张表(决策台 R51 的规矩):
 
         标的那格   这只票现在贵不贵、关键价位在哪  → 关键价位(日 K)
-        六态那句   这个状态是怎么走到今天的        → 逐日复盘(趋势页)
+        六态那句   这个状态是怎么走到今天的        → 逐日复盘
 
-    R363 我把复盘那个入口挂在了**动作**那一格上, 还为此写了一整段"别让它看起来
-    像下单按钮"的辩解。用户直接把它挪开了 —— **要辩解才站得住的设计, 多半本来
-    就不该那么放**。挪到六态那句上反而更对得上内容。
-    """
-    row = _signal_row()
-    assert row.count("onClick={() => onOpen(r.symbol, r.name)}") == 1, "标的那格的入口不止一个"
-    assert row.count("onClick={() => onReview(r.symbol, r.name)}") == 1, "复盘入口不止一个"
-    i_sym = row.index("<SymbolCell symbol={r.symbol}")
-    i_state = row.index("已转折 · 现在是")
-    i_open = row.index("onClick={() => onOpen(r.symbol, r.name)}")
-    i_review = row.index("onClick={() => onReview(r.symbol, r.name)}")
-    assert i_open < i_sym, "关键价位那个入口没包住标的那一格"
-    assert i_sym < i_review < i_state, "复盘那个入口没包住六态那一句"
+    [R513] 三段共用 `SymbolButton`(→ 关键价位)与 `StateLine`(→ 复盘); 持仓方块的距离条、
+    盯着那行的「差 N%」说的也是状态离转折多远, 所以同样开复盘。"""
+    sym = _fn("SymbolButton")
+    assert sym.count("onClick={() => onOpen(r.symbol, r.name)}") == 1 and "onReview" not in sym
+    assert sym.index("onClick={() => onOpen") < sym.index("<SymbolCell symbol={r.symbol}"), "关键价位入口没包住标的"
+    st = _fn("StateLine")
+    assert st.count("onClick={() => onReview(r.symbol, r.name)}") == 1 and "onOpen" not in st
+    assert st.index("onClick={() => onReview") < st.index("已转折 · 现在是"), "复盘入口没包住六态那一句"
+    for comp in ("ActionCard", "HoldingTile", "WatchGroup"):
+        blk = _fn(comp)
+        assert "<SymbolButton r={r} onOpen={onOpen}" in blk, f"{comp} 的标的没走共用那一格"
+        assert "onOpen(r.symbol" not in blk.replace("<SymbolButton", ""), f"{comp} 另开了一个关键价位入口"
 
 
 def test_R364_两个入口开的不是同一个弹窗():
@@ -953,13 +826,11 @@ def test_R364_两个入口开的不是同一个弹窗():
 
 
 def test_R363_弹窗挂在这一层_不是每行一个():
-    """三档几十上百行, 每行各挂一个就是几十上百个常驻的 AnimatePresence 与
-    Esc 监听 —— 而同一时刻只可能开着一个。"""
+    """三段上百行, 每行各挂一个就是上百个常驻的 AnimatePresence 与 Esc 监听 —— 而同一时刻只可能开着一个。"""
     code = code_of(FLIP)
     assert code.count("<LevelsDialog") == 1, "弹窗挂了不止一处"
-    row = _signal_row()
-    assert "<LevelsDialog" not in row, "弹窗挂进了每一行"
-    seg = code[code.index("function TodaySignals"):]
+    assert "<LevelsDialog" not in _signal_row(), "弹窗挂进了每一行"
+    seg = code[code.index("function TodaySignals"):code.index("function ZoneHead")]
     assert "<LevelsDialog" in seg, "弹窗没挂在 TodaySignals 这一层"
 
 
@@ -971,25 +842,11 @@ def test_R363_点开是弹窗_不是跳走():
 
 
 def test_R364_动作那一格根本不可点():
-    """[R363 → R364] **这条守卫变强了, 不是被放松。**
-
-    R363 钉的是「动作那一格可以点, 但不许长得像个下单按钮」—— 要靠一句 title
-    和"不加按钮外观"撑着。用户看过实机后直接把入口挪走了, 于是现在钉的是最强的
-    那一版: **它根本不可点**。
-
-    理由没变, 只是更彻底: 这一格里印着「买入」两个字, 任何可点的迹象都在暗示
-    "点它就下单" —— 而这一页从来不下单, 也永远不会。
-
-    (R329 那条铁律本身另有守卫: 能不能出手只由 `actionable` 决定。这一条钉的是
-    **别让它连"像个动作"都不许**。)
-    """
-    row = _signal_row()
-    i_act = row.index("{actionable ? (")
-    # 边界取**六态那一格的 `<button` 起始**, 不是那句话本身 —— 那句话在按钮
-    # 里面, 拿它当界会把六态自己的 `<button ... cursor-pointer>` 一起圈进来,
-    # 于是这条守卫会指着隔壁那一格喊"动作又能点了"。(第一版就是这么红的。)
-    i_next = row.index('<button type="button" onClick={() => onReview')
-    seg = row[i_act:i_next]
+    """这一格里印着「买入」两个字, 任何可点的迹象都在暗示「点它就下单」—— 而这一页从来不下单。
+    [R513] 动作徽标在卡片右上角, 仍然是个 span。"""
+    card = _fn("ActionCard")
+    i_act = card.index("{buy || sell ? (")
+    seg = card[i_act:card.index("<StateLine", i_act)]
     assert seg.strip() and "'买入'" in seg, "切出来的不是动作那一格"
     for clickable in ("<button", "onClick", "cursor-pointer", "role=\"button\""):
         assert clickable not in seg, f"动作那一格又变得能点了: {clickable}"
@@ -1154,25 +1011,7 @@ def test_R366_开发时不注册SW():
     assert "navigator.serviceWorker.register('/sw.js')" in code
 
 
-def test_R366_信号行窄屏折成卡片_而不是另写一份():
-    """六列那条最窄也要 ≈444px, 而手机竖屏是 390px —— 横向必然撑破。
-
-    **没有另写一份手机版的行**: 六个格子、次序、内容全都没动, 只是窄屏换一张
-    三列的栅格, 靠 row-span / col-span 让它们自己落成一张卡。另写一份的代价是
-    两套版面各自演化, 哪天只改了一边, 手机上看到的与电脑上不是同一件事,
-    而两边都不报错。
-    """
-    row = _signal_row()
-    cls = _grid_class(row)
-    assert "grid-cols-[3.5rem_minmax(0,1fr)_auto]" in cls, "窄屏那套栅格没了"
-    assert "sm:grid-cols-[" in cls, "宽屏那套栅格没了"
-    # 名次竖跨两行, 六态横跨两列, 走势/触发价各占一整行 —— 这几样缺一样卡就散了
-    assert "row-span-2 sm:row-span-1" in row, "名次没竖跨 —— 右边两行会挤掉它"
-    assert "col-span-2 min-w-0 cursor-pointer" in row, "六态没横跨标的+动作那两列"
-    assert row.count("col-span-3") == 2, "走势与触发价没各占一整行"
-    # **只有一个 SignalRow** —— 没有手机版分身
-    code = code_of(FLIP)
-    assert code.count("function SignalRow") == 1, "又写了一份手机版的信号行"
+# [R513] `test_R366_信号行窄屏折成卡片_而不是另写一份` 退役 —— 信号行那套定宽网格(ROW_GRID / RowShape / SignalRow)随 R513 整个删了: 用户「今日页面这个页面重做, 改的好看点, 不要折叠了」, 三段各换一种长相(卡片 / 方块 / 密排行), 不再是一张对齐的长表。新版面的守卫在 test_flip_signals_r513.py
 
 
 def test_R366_窄屏断点走共用那一个_不另立一套():
@@ -1263,18 +1102,7 @@ def test_R366_根目录那几个文件按原样发_不落进SPA兜底():
 #   ③ 「这套规则」七条竖着排, 「有信号但没做成」也是一条一行
 
 
-def test_R381_六态那句话能显示完整():
-    """9rem = 144px 装不下「按现价会转折 —— 收盘还站在这边才算数」, 盘中越线
-    那几行一直被截成「…收盘还...」 —— 而截掉的正是这一档唯一要说的话。
-
-    **仍然是定宽列, 不是 `1fr`**: 行与行要对齐, 这是 R350 定的。
-    """
-    from tests.frontend_source import code_of
-    code = code_of("pages/FlipPaper.tsx")
-    assert "sm:grid-cols-[3.5rem_minmax(9rem,11rem)_4.5rem_minmax(7rem,16rem)_minmax(0,1fr)_auto]" in code, \
-        "六态那一列的宽度被改回去了(或整条栅格被动过)"
-    # 窄屏那条一个字没动 —— R366 的卡片式布局靠它
-    assert "grid-cols-[3.5rem_minmax(0,1fr)_auto]" in code, "窄屏栅格被动了"
+# [R513] `test_R381_六态那句话能显示完整` 退役 —— 信号行那套定宽网格(ROW_GRID / RowShape / SignalRow)随 R513 整个删了: 用户「今日页面这个页面重做, 改的好看点, 不要折叠了」, 三段各换一种长相(卡片 / 方块 / 密排行), 不再是一张对齐的长表。新版面的守卫在 test_flip_signals_r513.py
 
 
 def test_R381_R512_宽屏上不让窄块独占半屏_分栏后各占整行():
@@ -1338,89 +1166,16 @@ def _signals() -> str:
     return out
 
 
-def test_R385_分界线是每一行进没进候选池():
-    """**R383/R384 的判据("整屏一行都没有才收")被实机打脸。**
-
-    用户那一屏 32 行里 3 行有名次与走势、29 行两样都没有 —— 于是 3 行把 29 行
-    全拖住: 29 行陪着撑 56px 的行高、陪着空出 `1fr` 那一整列走势。
-    **混着才是常态**, "整屏"那个判据几乎永远不成立。
-
-    而这两类行本来就该分开: `conv` 只收 `rank != null` 的, 走势也只在有 `c` 时
-    渲染 —— **名次与走势永远同进同出**。这条守卫先把那个前提钉住, 再钉分组。
-    """
-    code = code_of(FLIP)
-    # 前提: conv 只收有名次的 —— 这是"两样同进同出"的来源
-    i = code.index("const conv = useMemo(")
-    blk = code[i:code.index("}, [ov])", i)]
-    assert "if (o.rank == null) continue" in blk, \
-        "conv 收了没名次的条目 —— 那么「名次与走势同进同出」就不成立了, 分组的前提没了"
-    row = _row()
-    assert "{c && <TrendCell o={c} />}" in row, "走势不再由 c 决定 —— 同上"
-
-    sig = _signals()
-    assert "const FULL: RowShape = { rank: true, trend: true }" in sig, "进了候选池那一组的形状没了"
-    assert "const PLAIN: RowShape = { rank: false, trend: false }" in sig, "没进那一组的形状没了"
-    # 分组判据就是 conviction.has, 不掺别的
-    i = sig.index("const renderRows = (list: FlipTodaySignal[]) => {")
-    blk = sig[i:sig.index("\n  }", i)]
-    assert blk.strip()
-    assert "list.filter((r) => conviction.has(r.symbol))" in blk, "上半组不是「进了候选池」"
-    assert "list.filter((r) => !conviction.has(r.symbol))" in blk, "下半组不是「没进候选池」"
-    assert "shape={FULL}" in blk and "shape={PLAIN}" in blk, "两组没各用各的形状"
-    # 没进的那一组不传 c —— 传了就会去渲染走势, 而它那一列已经收成 0
-    assert re.search(r"<SignalRow r=\{r\} shape=\{PLAIN\}", blk), \
-        "没进候选池那一组还在传 c —— 走势那一列已经收成 0, 渲染出来会溢出"
+# [R513] `test_R385_分界线是每一行进没进候选池` 退役 —— 信号行那套定宽网格(ROW_GRID / RowShape / SignalRow)随 R513 整个删了: 用户「今日页面这个页面重做, 改的好看点, 不要折叠了」, 三段各换一种长相(卡片 / 方块 / 密排行), 不再是一张对齐的长表。新版面的守卫在 test_flip_signals_r513.py
 
 
-def test_R385_三段都走同一个分组函数():
-    """三段各写一遍的话, 「要动手」分了组而「只是盯着」没分, 同一张卡里两种版面。"""
-    sig = _signals()
-    for seg in ("renderRows(ordered)", "renderRows(mineSorted)", "renderRows(idleSorted)"):
-        assert seg in sig, f"少了 {seg}"
-    assert sig.count("<SignalRow") == 2, \
-        "SignalRow 不是只在 renderRows 里渲染了两处(进/没进各一处) —— 有人又在别处单独渲染"
+# [R513] `test_R385_三段都走同一个分组函数` 退役 —— 信号行那套定宽网格(ROW_GRID / RowShape / SignalRow)随 R513 整个删了: 用户「今日页面这个页面重做, 改的好看点, 不要折叠了」, 三段各换一种长相(卡片 / 方块 / 密排行), 不再是一张对齐的长表。新版面的守卫在 test_flip_signals_r513.py
 
 
-def test_R385_没进候选池那组排三列():
-    """行只剩 标的/动作/六态 ≈560px, 宽屏上排三列; 1180 起先排两列。"""
-    sig = _signals()
-    assert "min-[1180px]:grid min-[1180px]:grid-cols-2" in sig, "两列那一档没了"
-    assert "min-[1560px]:grid-cols-3" in sig, "三列那一档没了"
-    # 竖缝: 两列时左列画, 三列时前两列画、最右不画
-    assert "i % 2 === 0 && 'min-[1180px]:border-r" in sig, "两列的竖缝没了"
-    assert "(i + 1) % 3 === 0 && 'min-[1560px]:border-r-0'" in sig, "三列时最右一列还在画竖缝"
+# [R513] `test_R385_没进候选池那组排三列` 退役 —— 信号行那套定宽网格(ROW_GRID / RowShape / SignalRow)随 R513 整个删了: 用户「今日页面这个页面重做, 改的好看点, 不要折叠了」, 三段各换一种长相(卡片 / 方块 / 密排行), 不再是一张对齐的长表。新版面的守卫在 test_flip_signals_r513.py
 
 
-def test_R384_名次那列在没进候选池那一组里收成0():
-    """同一句话说 32 遍不是信息是噪音 —— 它该在区块标题上说一次。
-
-    (名字里原来写的是"整屏没名次" —— [R385] 判据改成按行分组之后那个说法不成立了,
-    现在是"没进候选池那一组"。**四套模板本身一个字没动**, 变的是谁来挑。)
-
-    **收成 0 而不是不渲染那一格**: 窄屏那套卡片版面(R366)靠 `row-span-2` /
-    `col-span-3` 把六个格子折成一张卡, 抽掉一格整套跨行跨列全要重算。
-    """
-    code = code_of(FLIP)
-    i = code.index("const ROW_GRID = {")
-    table = code[i:code.index("} as const", i)]
-    assert table.strip()
-    # **逐条切出来查, 不是在整张表里找一次。**
-    # 第一版写成 `for key in (...)` 里两次断言同一个字符串 —— 与 key 无关,
-    # 于是只改回其中一条照样绿(变异 M1 当场抓到)。「锚太宽 = 没有锚」。
-    entries = dict(re.findall(r"'([a-z ]*)': '([^']+)'", table))
-    assert set(entries) == {"rank trend", "rank", "trend", ""}, f"四套键对不上: {sorted(entries)}"
-    for key in ("trend", ""):          # 没名次的那两套
-        v = entries[key]
-        assert "grid-cols-[0_minmax(0,1fr)_auto]" in v, f"{key!r} 那套窄屏没收掉名次列"
-        assert "sm:grid-cols-[0_minmax(9rem,11rem)_" in v, f"{key!r} 那套宽屏没收掉名次列"
-    for key in ("rank trend", "rank"):  # 有名次的那两套要占住 3.5rem
-        v = entries[key]
-        assert "grid-cols-[3.5rem_minmax(0,1fr)_auto]" in v, f"{key!r} 那套窄屏把名次列收掉了"
-        assert "sm:grid-cols-[3.5rem_minmax(9rem,11rem)_" in v, f"{key!r} 那套宽屏把名次列收掉了"
-    row = _row()
-    # 0 宽的格子里不许再写字 —— 会溢出到隔壁
-    assert "actionable && shape.rank ? (" in row, \
-        "整屏没名次时还在往 0 宽的格子里写「没进候选池」"
+# [R513] `test_R384_名次那列在没进候选池那一组里收成0` 退役 —— 信号行那套定宽网格(ROW_GRID / RowShape / SignalRow)随 R513 整个删了: 用户「今日页面这个页面重做, 改的好看点, 不要折叠了」, 三段各换一种长相(卡片 / 方块 / 密排行), 不再是一张对齐的长表。新版面的守卫在 test_flip_signals_r513.py
 
 
 def test_R384_那句话改在标题上说一次():
@@ -1436,24 +1191,10 @@ def test_R384_那句话改在标题上说一次():
         "那个数不是从全部行算的"
 
 
-def test_R384_行留白跟着名次走():
-    """名次那一格是三行高, 留白撑着才不挤; 没名次时行只有两行字,
-    `py-2.5`(上下各 10px)在 40px 的栅格上占掉三分之一。"""
-    row = _row()
-    assert "shape.rank ? 'py-2.5' : 'py-1.5'" in row, "行留白没跟着 shape 走"
+# [R513] `test_R384_行留白跟着名次走` 退役 —— 信号行那套定宽网格(ROW_GRID / RowShape / SignalRow)随 R513 整个删了: 用户「今日页面这个页面重做, 改的好看点, 不要折叠了」, 三段各换一种长相(卡片 / 方块 / 密排行), 不再是一张对齐的长表。新版面的守卫在 test_flip_signals_r513.py
 
 
-def test_R384_网格类只有一个产地():
-    """div 上写死一个、模板再给一个, 同一个元素上就有两个 `grid-cols-` ——
-    **而 CSS 里谁赢取决于样式表里谁排后面, 不是 class 串里谁排后面**。
-    那种冲突不报错, 只表现为「某些情况下列宽莫名其妙」。(这条是数 grid-cols
-    条数时当场抓到的, 不是想出来的。)"""
-    row = _row()
-    m = re.search(r"<div className=\{cn\(\s*\n?\s*'grid ", row)
-    assert m
-    head = row[m.start():row.index(")}>", m.start())]
-    assert "grid-cols-[" not in head, "网格那个 div 上又写死了列宽"
-    assert "gridOf(shape)" in head, "没去 ROW_GRID 挑模板"
+# [R513] `test_R384_网格类只有一个产地` 退役 —— 信号行那套定宽网格(ROW_GRID / RowShape / SignalRow)随 R513 整个删了: 用户「今日页面这个页面重做, 改的好看点, 不要折叠了」, 三段各换一种长相(卡片 / 方块 / 密排行), 不再是一张对齐的长表。新版面的守卫在 test_flip_signals_r513.py
 
 
 # ── [R386] 列数要把触发价算进去 ──────────────────────────────────────────
@@ -1474,42 +1215,12 @@ def test_R384_网格类只有一个产地():
 # R386 里: 拦 `/api/flip-paper` 喂一档有触发价的持仓行, 在 7 个宽度上逐行量。
 
 
-def test_R386_列数把触发价算进去了():
-    """没触发价 ≈560px → 1180 起两列、1560 起三列;
-    有触发价 ≈740px → 1560 起两列, **三列直接放弃**(要 ≥2560 的视口)。"""
-    sig = _signals()
-    i = sig.index("const plainCols = (hasPrice: boolean) =>")
-    blk = sig[i:sig.index("const plainCell", i)]
-    assert blk.strip()
-    assert "hasPrice" in blk, "列数没看触发价"
-    # 有触发价那一支: 只到两列, 且断点是 1560(不是 1180)
-    assert "'min-[1560px]:grid min-[1560px]:grid-cols-2'" in blk, \
-        "有触发价时不是「1560 起两列」"
-    hi = blk[blk.index("?"):blk.index(":", blk.index("?"))]
-    assert "grid-cols-3" not in hi, "有触发价还排三列 —— 那正是撑破格子的那一版"
-    # 没触发价那一支照旧三列 —— 不能因为修这个 bug 把另一支也降级
-    lo = blk[blk.index(":", blk.index("?")):]
-    assert "min-[1560px]:grid-cols-3" in lo, "没触发价那一支的三列被顺手砍了"
+# [R513] `test_R386_列数把触发价算进去了` 退役 —— 信号行那套定宽网格(ROW_GRID / RowShape / SignalRow)随 R513 整个删了: 用户「今日页面这个页面重做, 改的好看点, 不要折叠了」, 三段各换一种长相(卡片 / 方块 / 密排行), 不再是一张对齐的长表。新版面的守卫在 test_flip_signals_r513.py
 
 
-def test_R386_触发价按这一组算_不是整屏():
-    """「要动手」那档没有触发价(转折已成), 「手上这些」那档每行都有 ——
-    两档因此列数不同。按整屏算的话, 一档有触发价就把另一档也拖成两列。"""
-    sig = _signals()
-    i = sig.index("const renderRows = (list: FlipTodaySignal[]) => {")
-    blk = sig[i:sig.index("\n  }", i)]
-    assert "const plainHasPrice = plain.some((r) => r.flip_price != null)" in blk, \
-        "触发价不是从这一组的行里算的"
-    assert "plainCols(plainHasPrice)" in blk and "plainCell(i, plainHasPrice)" in blk, \
-        "算出来的 plainHasPrice 没真的用上"
+# [R513] `test_R386_触发价按这一组算_不是整屏` 退役 —— 信号行那套定宽网格(ROW_GRID / RowShape / SignalRow)随 R513 整个删了: 用户「今日页面这个页面重做, 改的好看点, 不要折叠了」, 三段各换一种长相(卡片 / 方块 / 密排行), 不再是一张对齐的长表。新版面的守卫在 test_flip_signals_r513.py
 
 
-def test_R386_触发价那一格仍然不换行():
-    """`whitespace-nowrap` 是它宽度需求的来源 —— 去掉它「触发 45.85 · 现 46.23」
-    会在窄格里折行, 行高就跟着这一格变, 而 R356 定的是「每行个股行高要一样」。
-    所以它不许换行, 该让**列数**去适应它, 不是反过来。"""
-    row = _row()
-    i = row.index("触发 {r.flip_price.toFixed(2)}")
-    head = row[:i]
-    j = head.rindex("<span className=")
-    assert "whitespace-nowrap" in head[j:], "触发价那一格可以换行了 —— 行高会跟着它变"
+# [R513] `test_R386_触发价那一格仍然不换行` 退役 —— 信号行那套定宽网格(ROW_GRID / RowShape / SignalRow)随 R513 整个删了: 用户「今日页面这个页面重做, 改的好看点, 不要折叠了」, 三段各换一种长相(卡片 / 方块 / 密排行), 不再是一张对齐的长表。新版面的守卫在 test_flip_signals_r513.py
+
+

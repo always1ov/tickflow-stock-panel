@@ -3102,6 +3102,7 @@ export interface FlipTodaySignal {
   act: 'buy' | 'sell' | null
   /** [R338] 模拟盘现在拿着它吗 —— 版面据此把「手上这些」单独常驻一段 */
   held: boolean
+  /** 转折之前那一侧: 后端 `flip_trades.BULL / BEAR` 的原值「多头」/「空头」(中文, 不是 bull / bear) */
   side: string
   state_cn: string | null
   /** 触发价 —— 开盘前就定死的那条线 */

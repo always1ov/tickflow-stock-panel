@@ -27,7 +27,7 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { BookOpen, ChevronDown, Eye, LineChart, ReceiptText, RefreshCw, TrendingDown, TrendingUp, Wallet, Zap } from 'lucide-react'
+import { BookOpen, ChevronDown, LineChart, ReceiptText, RefreshCw, TrendingDown, TrendingUp, Wallet, Zap } from 'lucide-react'
 import { api, type FlipOrder, type FlipPaper as FlipPaperData, type FlipRules,
   type FlipTodaySignal, type TodayOpportunity } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
@@ -437,164 +437,44 @@ function TodaySignals({ rows, conviction }: {
    */
   const [review, setReview] = useState<{ symbol: string; name: string } | null>(null)
   const openReview = (symbol: string, name: string) => setReview({ symbol, name })
-  // [R331] 用户: 「今天该挂什么单显得太多了, 需要折叠展开的功能」。
+  // [R513] **不折叠了, 三段一次摊开。** 用户: 「今日页面这个页面重做, 改的好看点, 不要折叠了, 你自己设计」。
   //
-  // **折叠边界落在「今天是否可能成交」上**, 不是随便砍前 N 条:
+  // R331/R355 那两个折叠(「持仓」可收、「只是盯着」默认收)是给**长条表格**加的: 一行一只、
+  // 行高 40~56px, 盯着那一段上百行摊开就是四五屏, 真要动手的那一两行被淹掉。
+  // 现在不靠折叠压长度, 靠**每一段换一种长相**, 长相跟着这一段要回答的问题走:
   //
-  //   常驻  已转折要动手  —— 今天真要挂的单
-  //   常驻  盘中越线      —— 收盘还站在这边就成交, 今天就要盯
-  //   常驻  手上这些      —— [R338] 拿着的票, 离场线天天要看见
-  //   收起  只是盯着      —— 还差几个点, 今天大概率不用动
+  //     要动手   卡片, 字最大、色最重 —— 今天真要挂的单, 一两笔, 该占地方
+  //     持仓     小方块 + 一根离清仓线的距离条 —— 这一段只问「离卖还有多远」
+  //     盯着     一只一行的密排, 多列 —— 上百只, 只报差几个点, 色最淡
   //
-  // 「盯着」那一段的条数随自选规模走(5% 以内就进名单), 自选上百只时它会把真要
-  // 动手的那两三行淹掉 —— 而那两三行正是这个区块存在的全部理由。
+  // 盯着那一段按**转了会不会变成动作**再分两组(见下面 `toBull`), 这是本轮唯一一处新的
+  // 表达 —— 数据还是那份, 分组判据只看后端给的 `side`, 一分打分都不参与。
   //
-  // **要动手的永远不进折叠区**, 这一条有守卫钉着: 折叠是为了让信号更显眼,
-  // 把信号自己折起来就本末倒置了。
-  const [watchOpen, setWatchOpen] = useState(() => storage.flipTodayWatchOpen.get(false))
-  const toggleWatch = () => {
-    setWatchOpen((v) => {
-      storage.flipTodayWatchOpen.set(!v)
-      return !v
-    })
-  }
-  // [R355] 用户: 「这部分也想能折叠展开」。
-  //
-  // **R338 我为这一段写过「不许折叠」的守卫**, 理由是: 买入天天长出来, 卖出只在
-  // 真触发那天冒一次, 折起来就等于又回到只剩买入。用户当面推翻它 —— 那条理由
-  // 没有错, 但它不该替用户决定版面。
-  //
-  // 守卫因此**不是删掉而是换了个钉法**: 折叠可以, 但**折叠条本身必须把卖出侧的
-  // 读数带上**(拿着几只 / 其中几只已经贴到离场线)。收起来之后那一行仍然在说
-  // 「你手上有 10 只, 2 只快到线了」—— 那才是 R338 真正要保的东西, 而不是"不许折"。
-  // 默认**展开**: 它是卖出那一侧唯一天天有位置的东西。
-  const [mineOpen, setMineOpen] = useState(() => storage.flipMineOpen.get(true))
-  const toggleMine = () => {
-    setMineOpen((v) => {
-      storage.flipMineOpen.set(!v)
-      return !v
-    })
-  }
-
-  // **一个判据, 三段分流。** 常驻/折叠的边界只由 `isLive` 这一个函数说了算 ——
-  // 以前是把同一段条件正着写一遍、反着再写一遍, 改一边漏一边就会出现"两边都收
-  // 它"或"两边都不收它"的票, 而且不报错。
+  // **边界仍然只由 `isLive` 一个函数说了算**, 打分只在每一段内部排先后(R344 那两条没动)。
   const isLive = (r: FlipTodaySignal) => (r.stage === 'flipped' && !!r.act) || r.stage === 'crossing'
   const live = rows.filter(isLive)
   const rest = rows.filter((r) => !isLive(r))
-  const mine = rest.filter((r) => r.held)   // [R338] 手上拿着的, 常驻
-  const idle = rest.filter((r) => !r.held)  // 其余, 折叠
+  const mine = rest.filter((r) => r.held)   // [R338] 手上拿着的
+  const idle = rest.filter((r) => !r.held)  // 其余, 只是盯着
   const actCount = live.filter(isActionable).length
 
-  // [R344] **两段式: 六态负责「选」, 打分负责「排」。**
-  //
-  // 用户: 「打分系统针对六态选出来的进行二次排序」。
-  //
-  // R343 我把这条理解成了「六态排不动了才轮到打分」—— 方向反了。正确的分工是
-  // 两段, 不是二选一:
-  //
-  //     第一段  六态选出今天有话说的那些票, 并把它们分进四档(能不能成交)
-  //     第二段  打分在**每一档内部**重排先后
-  //
-  // 四档的**边界仍然只由六态定**(能不能动手 / 今天会不会成交 / 拿没拿着) ——
-  // 打分一分都不参与那个判定, `isLive` 那一行有守卫钉着。打分只管进了同一档之后
-  // 谁排前面。
-  //
-  // 没进候选池的(拿不到名次)一律排到本档末尾, 但**仍在名单里** —— 它被六态选中
-  // 了就是选中了, 打分够不够是另一个问题。
-  //
-  // **只重排, 不增删。** `slice()` 先拷一份 —— 直接 sort 会就地改上面那个 filter
-  // 的产物, 而 React 的 props 数组不该被下游改。
+  // [R344] 打分只在每一段内部重排; 没名次的排本段末尾但仍在名单里。只重排不增删(先 slice)。
   const rank = (r: FlipTodaySignal) => conviction.get(r.symbol)?.rank ?? Number.MAX_SAFE_INTEGER
   const byRank = (rs: FlipTodaySignal[]) => rs.slice().sort((a, b) => rank(a) - rank(b))
   const ordered = byRank(live)
   const mineSorted = byRank(mine)
-  const idleSorted = byRank(idle)
   const scored = live.filter((r) => conviction.has(r.symbol)).length
   const unscored = rows.length - rows.filter((r) => conviction.has(r.symbol)).length
-  // [R355] 折叠条上那个「N 只贴近离场线」。**判据与行上那一档是同一条**
-  // (`NEAR_EXIT`)—— 两处各写一份的话, 会出现"条上说 2 只、展开却只有 1 行标黄"。
+  // [R355] 「N 只贴近离场线」—— 判据与方块上那一档是同一条(`NEAR_EXIT`)
   const mineNear = mine.filter((r) => r.gap_pct != null && Math.abs(r.gap_pct) <= NEAR_EXIT).length
-
-  // ── [R385] 分界线是**每一行进没进候选池**, 不是"整屏有没有" ──────────
-  //
-  // R383/R384 的判据是「整屏一行都没有才收」。实机打脸: 用户那一屏 32 行里
-  // **3 行有名次与走势, 29 行两样都没有** —— 于是 3 行把 29 行全拖住了,
-  // 29 行陪着撑 56px 的行高、陪着空出 `1fr` 那一整列走势。**混着才是常态**,
-  // "整屏"那个判据几乎永远不成立。
-  //
-  // 而这两类行本来就该分开: `conv` 只收 `rank != null` 的, 走势也只在有 `c` 时
-  // 渲染 —— **名次与走势永远同进同出**。所以一行要么两样都有(进了候选池),
-  // 要么两样都没有。按这条线拆成两组:
-  //
-  //     进了候选池  六列全开、单列铺满、行高撑住 —— 它们有东西要说
-  //     没进候选池  只剩 标的/动作/六态, 三列紧凑 —— 它们说的是同一句话
-  //
-  // **组内仍然行行对齐**(R350 那条立论要的就是这个), 变的是"两组各自多宽"。
-  // 次序也没动: `byRank` 本来就把没名次的排在本档末尾, 拆开正好是原来的顺序。
-  const FULL: RowShape = { rank: true, trend: true }
-  const PLAIN: RowShape = { rank: false, trend: false }
-  /** 没进候选池那一组: 行只剩 ≈560px, 宽屏上排三列。 */
-  // [R386] **列数要把触发价那一列算进去。**
-  //
-  // R385 我按「标的 176 + 动作 72 + 六态 256 + 间距」≈560px 定的三列 —— 漏了
-  // **触发价**: 它是 `auto` + `whitespace-nowrap`, 有值时要 ~175px, 一行实际
-  // 要 ~740px。而「手上这些」那一档每行都有触发价, 塞进 539px 的格子就**溢出
-  // 压到右边一列的字上**(用户截图里「现 46.23深科技」那种叠字)。
-  //
-  // 教训与 R385 同一条: `shape.trend` 为假**并不意味着触发价也没有** ——
-  // 名次与走势同进同出, 触发价是**第三个独立的东西**。
-  //
-  //     没触发价  0+176+72+112~256+间距 ≈ 560   → 1180 起两列, 1560 起三列
-  //     有触发价  再加 ~175                ≈ 740 → 1560 起两列, 三列放弃
-  //                                                (三列要 ≥2560 的视口, 不现实)
-  const plainCols = (hasPrice: boolean) => hasPrice
-    ? 'min-[1560px]:grid min-[1560px]:grid-cols-2'
-    : 'min-[1180px]:grid min-[1180px]:grid-cols-2 min-[1560px]:grid-cols-3'
-  const plainCell = (i: number, hasPrice: boolean) => cn(
-    'min-w-0 border-b border-border/30',
-    hasPrice
-      // 只有两列: 左边那列画竖缝
-      ? i % 2 === 0 && 'min-[1560px]:border-r min-[1560px]:border-border/30'
-      // 两列时左边画竖缝; 三列时前两列画, 最右不画
-      : cn(i % 2 === 0 && 'min-[1180px]:border-r min-[1180px]:border-border/30',
-           i % 2 === 1 && 'min-[1560px]:border-r min-[1560px]:border-border/30',
-           (i + 1) % 3 === 0 && 'min-[1560px]:border-r-0'),
-  )
-  /** 一段(某一档)里的行 —— 进了候选池的在上、没进的在下, 各用各的版面。 */
-  const renderRows = (list: FlipTodaySignal[]) => {
-    const scored = list.filter((r) => conviction.has(r.symbol))
-    const plain = list.filter((r) => !conviction.has(r.symbol))
-    const plainHasPrice = plain.some((r) => r.flip_price != null)
-    return (
-      <>
-        {scored.length > 0 && (
-          <div className="divide-y divide-border/30">
-            {scored.map((r) => (
-              <SignalRow key={r.symbol} r={r} c={conviction.get(r.symbol)} shape={FULL}
-                         onOpen={openLevels} onReview={openReview} />
-            ))}
-          </div>
-        )}
-        {plain.length > 0 && (
-          /* 触发价按**这一组**算, 不是整屏 —— 「要动手」那档没有触发价(转折已成,
-             不再有待触发的线), 「手上这些」那档每行都有。两档因此列数不同,
-             而组内仍然行行对齐。 */
-          <div className={cn('divide-border/30', plainCols(plainHasPrice))}>
-            {plain.map((r, i) => (
-              <div key={r.symbol} className={plainCell(i, plainHasPrice)}>
-                <SignalRow r={r} shape={PLAIN} onOpen={openLevels} onReview={openReview} />
-              </div>
-            ))}
-          </div>
-        )}
-      </>
-    )
-  }
-  // 走势那一列整屏都空时, 一行 620px 就排完了 —— 而宽屏上有 1600+。
-  // 这种时候把行**排成两列**: 32 行的滚动直接砍一半。
-  // 走势有内容时行本来就要吃满宽度, 保持单列。
-  // 断点与 R381 那处并排用同一个(内容区 ≈ 视口 − 侧栏 224 − 留白 32)。
+  // [R513] 盯着的按「转了会不会变成动作」分两组。没拿着的票:
+  //   空头侧盯的是站上触发价转多 —— 转了就是买入, 是明天可能要动手的那一组;
+  //   多头侧盯的是跌破转空 —— 没拿着, 转了也没有动作(`flip_today.evaluate` 里 act=None)。
+  // 后一组照样全列出来(用户要的是不折叠), 只是排在后面、色更淡。
+  // `side` 是后端 `flip_trades.BULL / BEAR` 的原值, 是中文「多头 / 空头」, 不是 bull / bear ——
+  // 写成英文的话一只都分不进离转多, 而且不报错(原型阶段拿英文假数据就这么过了一次)。
+  const toBull = byRank(idle.filter((r) => r.side === '空头'))
+  const toBear = byRank(idle.filter((r) => r.side !== '空头'))
 
   return (
     <>
@@ -603,99 +483,251 @@ function TodaySignals({ rows, conviction }: {
         title="今日信号"
         note={[
           actCount ? `${actCount} 笔要动手` : '今天没有要动手的',
-          // [R342] 说明白这个顺序是谁排的 —— 不说的话读的人不知道该不该照着做
           actCount && scored ? '按把握分排序' : null,
-          // [R384 → R385] 没进候选池的行**不再各自印一遍**那句话(32 行 32 遍),
-          // 改在这儿报个数。判据从「整屏都没有」换成「有几行没有」——
-          // 混着才是常态, 前者几乎永远不成立。
           unscored ? `${unscored} 只没进候选池` : null,
           mine.length ? `持仓 ${mine.length} 只` : null,
         ].filter(Boolean).join(' · ')}
-        hint={'**只有真转折才出手。**\n\n已转折 = 最新那根已落盘的日 K 让状态翻了面, 这才是动作。\n盘中越线 = 按此刻现价当收盘算会翻面 —— **不是出手理由**, 盘中价会变回去,\n14:30 跌破、14:58 拉回来的那天根本没有转折。\n\n触发价是作者的六态每天给的 flip_up / flip_down, 开盘前就定死,\n所以尾盘盯着它挂单是做得到的。\n\n「持仓」这一段列的是模拟盘手上的票与各自的离场线 —— 常驻不折叠,\n买入天天有、卖出只在触发那天冒一次, 中间这段空白正是它补的。\n\n最下面「只是盯着」默认收起 —— 它随自选规模走, 摊开会把真要动手的淹掉。'}
+        hint={'**只有真转折才出手。**\n\n已转折 = 最新那根已落盘的日 K 让状态翻了面, 这才是动作。\n盘中越线 = 按此刻现价当收盘算会翻面 —— **不是出手理由**, 盘中价会变回去,\n14:30 跌破、14:58 拉回来的那天根本没有转折。\n\n触发价是作者的六态每天给的 flip_up / flip_down, 开盘前就定死,\n所以尾盘盯着它挂单是做得到的。\n\n「持仓」这一段列的是模拟盘手上的票与各自的离场线 —— 那根条越短, 离清仓越近。\n\n「盯着」按转了会不会变成动作分两组: 离转多的转了就是买点;\n离转空的没拿着, 转了也不用动。'}
       />
 
       {rows.length === 0 ? (
-        <div className="px-4 py-5 text-xs text-muted">
+        <div className="px-4 py-6 text-xs text-muted">
           自选里没有一只处在转折边上 —— <b className="text-secondary">今天不用动</b>。
         </div>
       ) : (
-        <>
-          {ordered.length > 0 && (
-            <div>{renderRows(ordered)}</div>
-          )}
-          {ordered.length === 0 && (
-            <div className="px-4 py-3 text-xs text-muted">
-              今天没有要动手的 —— <b className="text-secondary">管住手</b>。
+        <div className="divide-y divide-border/40">
+          {/* ① 要动手 —— 已转折(买入 / 清仓)与盘中越线 */}
+          <div className="px-4 py-3">
+            <ZoneHead title="要动手" count={actCount} note="已转折才出手 · 盘中越线要等收盘" />
+            {ordered.length > 0 ? (
+              <div className="mt-2 grid gap-2 lg:grid-cols-2 2xl:grid-cols-3">
+                {ordered.map((r) => (
+                  <ActionCard key={r.symbol} r={r} c={conviction.get(r.symbol)} onOpen={openLevels} onReview={openReview} />
+                ))}
+              </div>
+            ) : (
+              <div className="mt-2 rounded-btn border border-dashed border-border px-3 py-3 text-xs text-muted">
+                今天没有要动手的 —— <b className="text-secondary">管住手</b>。
+              </div>
+            )}
+          </div>
+
+          {/* ② 持仓 —— 离清仓线还有多远 */}
+          {mine.length > 0 && (
+            <div className="px-4 py-3">
+              <ZoneHead title="持仓" count={mine.length} note="跌破离场线才清仓"
+                        right={mineNear > 0 ? <span className="text-warning">{mineNear} 只贴近离场线</span> : undefined} />
+              <div className="mt-2 grid grid-cols-2 gap-2 lg:grid-cols-3 2xl:grid-cols-5">
+                {mineSorted.map((r) => (
+                  <HoldingTile key={r.symbol} r={r} c={conviction.get(r.symbol)} onOpen={openLevels} onReview={openReview} />
+                ))}
+              </div>
             </div>
           )}
 
-          {/* [R338 → R355] 手上这些 —— 可折叠, 但**折叠条自己就是摘要**。
-              买入天天长出来, 卖出只在真触发那天冒一次; 中间那段空白就是这里补的。
-              所以收起来之后, 这一行仍然要说清「拿着几只、几只快到线了」——
-              否则就是把 R338 做的事整个撤回去。
-              不带动作徽标: 没转折就不出手, 这一段只回答「离场线在哪、还有多远」。 */}
-          {mine.length > 0 && (
-            <>
-              <button
-                type="button"
-                onClick={toggleMine}
-                aria-expanded={mineOpen}
-                className="flex w-full items-center gap-1.5 border-t border-border/40 bg-elevated/20 px-4 py-2 text-xs text-secondary transition-colors hover:bg-elevated/40 cursor-pointer"
-              >
-                <ChevronDown className={cn('h-3 w-3 shrink-0 text-muted transition-transform duration-expand ease-smooth',
-                  mineOpen && 'rotate-180')} />
-                <Wallet className="h-3 w-3" />
-                {/* [R498] 手机上这一行放不下, 右边那两个数被挤成竖排。后半句在窄屏收掉 ——
-                    「跌破离场线才清仓」是说明, 右边那两个数才是这一行要说的 */}
-                持仓<span className="hidden sm:inline"> · 跌破离场线才清仓</span>
-                <span className="ml-auto flex items-center gap-2 whitespace-nowrap text-muted">
-                  {/* 收起来也要看得见的那两个数 —— 卖出这一侧全靠它们 */}
-                  {mineNear > 0 && (
-                    <span className="text-warning">{mineNear} 只贴近离场线</span>
-                  )}
-                  <span className="opacity-70">{mine.length} 只</span>
-                </span>
-              </button>
-              {mineOpen && (
-                <div>{renderRows(mineSorted)}</div>
-              )}
-            </>
-          )}
-
+          {/* ③ 盯着 —— 上百只, 一只一行密排 */}
           {idle.length > 0 && (
-            <>
-              <button
-                type="button"
-                onClick={toggleWatch}
-                aria-expanded={watchOpen}
-                className="flex w-full items-center gap-1.5 border-t border-border/40 px-4 py-2 text-xs text-muted transition-colors hover:bg-elevated/40 hover:text-foreground cursor-pointer"
-              >
-                <ChevronDown className={cn('h-3 w-3 transition-transform duration-expand ease-smooth',
-                  watchOpen && 'rotate-180')} />
-                {watchOpen ? '收起' : '展开'}「只是盯着」的 {idle.length} 只
-                <span className="ml-auto opacity-70">今天大概率不用动</span>
-              </button>
-              {watchOpen && (
-                /* 限高 + 自己滚: 盯着的票可能几十只, 让它把整页顶长等于没折叠 */
-                <div className="max-h-64 overflow-y-auto">{renderRows(idleSorted)}</div>
+            <div className="px-4 py-3">
+              <ZoneHead title="盯着" count={idle.length} note="今天大概率不用动 · 只报还差几个点" />
+              {toBull.length > 0 && (
+                <WatchGroup title="离转多" note="转了就是买点" tone="bull" rows={toBull}
+                            conviction={conviction} onOpen={openLevels} onReview={openReview} />
               )}
-            </>
+              {toBear.length > 0 && (
+                <WatchGroup title="离转空" note="没拿着, 转了也不用动" tone="muted" rows={toBear}
+                            conviction={conviction} onOpen={openLevels} onReview={openReview} />
+              )}
+            </div>
           )}
-        </>
+        </div>
       )}
     </section>
-    {/* [R363] 与个股分析页**同一个组件** —— 那边点标的弹的就是它(R28)。
-        一页只挂这一个: 同一时刻只可能开着一个弹窗。 */}
+    {/* [R363] 与个股分析页**同一个组件**。一页只挂这一个: 同一时刻只可能开着一个弹窗。 */}
     <LevelsDialog symbol={levels?.symbol ?? null} name={levels?.name ?? ''}
                   onClose={() => setLevels(null)} />
-    {/* [R364] 逐日复盘 —— 与决策台「走势/位置」点开的**是同一个弹窗**。
-        落在复盘: 动作那一格问的是「这个买入怎么来的」, 答案是那张逐日表上的转折与买卖,
-        不是三档结论。[R427] 复盘并进了个股弹窗(用户: 「两个弹窗融合成一个」), 这里跟着换。
-        [R479] 旧复盘页随旧顶栏删了, 打开时直接定位到新「复盘」块(逐日复盘就是原来那张表)。 */}
+    {/* [R364 → R427 → R479] 逐日复盘 —— 个股弹窗的复盘页 */}
     <StockPreviewDialog symbol={review?.symbol ?? null} name={review?.name}
                         initialView="review"
                         onClose={() => setReview(null)} />
     </>
+  )
+}
+
+/** [R513] 每一段的小标题: 名字 · 只数 · 一句说明, 右边可挂一个读数。 */
+function ZoneHead({ title, count, note, right }: {
+  title: string; count: number; note: string; right?: React.ReactNode
+}) {
+  return (
+    <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-xs">
+      <span className="font-medium text-foreground">{title}</span>
+      <span className="tabular-nums text-muted">{count}</span>
+      <span className="text-micro text-muted/80">{note}</span>
+      {right && <span className="ml-auto text-micro">{right}</span>}
+    </div>
+  )
+}
+
+type OpenFn = (symbol: string, name: string) => void
+
+/** 六态那一句 —— 可点, 弹逐日复盘(R364: 点状态看这个状态是怎么走到今天的) */
+function StateLine({ r, onReview, className }: { r: FlipTodaySignal; onReview: OpenFn; className?: string }) {
+  return (
+    <button type="button" onClick={() => onReview(r.symbol, r.name)}
+            title={`看 ${r.name} 的逐日复盘 —— 这个状态是怎么走到今天的`}
+            className={cn('min-w-0 cursor-pointer truncate text-left transition-colors hover:text-accent', className)}>
+      {r.stage === 'flipped' && <>已转折 · 现在是{r.state_cn}</>}
+      {r.stage === 'crossing' && <>按现价会转折 —— <b className="text-warning">收盘还站在这边才算数</b></>}
+    </button>
+  )
+}
+
+/** 标的 —— 可点, 弹关键价位(R363) */
+function SymbolButton({ r, onOpen, className }: { r: FlipTodaySignal; onOpen: OpenFn; className?: string }) {
+  return (
+    <button type="button" onClick={() => onOpen(r.symbol, r.name)}
+            title={`看 ${r.name} 的日 K 与关键价位`}
+            className={cn('min-w-0 cursor-pointer truncate text-left transition-colors hover:text-accent', className)}>
+      <SymbolCell symbol={r.symbol} name={r.name} />
+    </button>
+  )
+}
+
+function PriceLine({ r }: { r: FlipTodaySignal }) {
+  if (r.flip_price == null) return null
+  return (
+    <span className="whitespace-nowrap tabular-nums">
+      触发 {r.flip_price.toFixed(2)}
+      {r.ref_price != null && <> · 现 {r.ref_price.toFixed(2)}</>}
+      {!r.live && <span className="ml-1 text-warning/70">昨收口径</span>}
+    </span>
+  )
+}
+
+/**
+ * [R513] 要动手那一段的一张卡。字最大、色最重 —— 今天真要挂的单。
+ *
+ * 名次那一格(ScoreCell, 带三条维度条)与走势那一格(TrendCell)原样留着: 前者回答「先做哪个」,
+ * 后者回答「凭什么是这一只」。名次它**不是动作**: 拿不到名次的票照样在这一段, 只排在末尾。买入红底红条、清仓绿底绿条(红涨绿跌), 盘中越线只给琥珀色左条、
+ * **不给动作徽标** —— 越线不是出手理由, 连徽标的位置都不留。
+ */
+function ActionCard({ r, c, onOpen, onReview }: { r: FlipTodaySignal; c?: TodayOpportunity; onOpen: OpenFn; onReview: OpenFn }) {
+  const buy = isActionable(r) && r.act === 'buy'
+  const sell = isActionable(r) && r.act === 'sell'
+  return (
+    <div className={cn('flex gap-3 rounded-btn border border-l-2 px-3 py-2.5',
+      buy && 'border-bull/30 border-l-bull bg-bull/[0.07]',
+      sell && 'border-bear/30 border-l-bear bg-bear/[0.10]',
+      !buy && !sell && 'border-warning/30 border-l-warning bg-warning/[0.05]')}>
+      {c?.rank != null && (
+        <div className="shrink-0"><ScoreCell o={c} rank={c.rank} total={c.rank_total ?? 0} /></div>
+      )}
+      <div className="min-w-0 flex-1 space-y-1">
+        <div className="flex items-center gap-2">
+          <SymbolButton r={r} onOpen={onOpen} className="text-sm font-medium text-foreground" />
+          {buy || sell ? (
+            <span className={cn('ml-auto inline-flex shrink-0 items-center gap-1 rounded px-2 py-0.5 text-xs font-semibold',
+              buy ? 'bg-bull/15 text-bull' : 'bg-bear/15 text-bear')}>
+              {buy ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
+              {buy ? '买入' : '清仓'}
+            </span>
+          ) : (
+            <span className="ml-auto shrink-0 text-micro text-warning">盘中越线</span>
+          )}
+        </div>
+        <StateLine r={r} onReview={onReview} className="block w-full text-xs text-secondary" />
+        {c && <div className="text-xs"><TrendCell o={c} /></div>}
+        <div className="flex flex-wrap gap-x-3 text-micro text-muted">
+          <PriceLine r={r} />
+          {!c && <span title="没过打分那三道硬门槛, 所以没有名次 —— 但它转折了, 该动手还是要动手">没进候选池</span>}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/** [R513] 距离条满格对应多远 —— 超过它就画满。只影响条的长短, 不影响判定。 */
+const EXIT_GAUGE_FULL = 0.10
+
+/**
+ * [R513] 持仓那一段的一个方块。这一段只问一件事: **离清仓线还有多远。**
+ *
+ * 那个距离画成一根条: 条越短越贴近清仓线, 满格是 10% 以上(`EXIT_GAUGE_FULL`)。
+ * 贴近(`NEAR_EXIT` 以内)时条与数字变琥珀色 —— 与原来整行标黄是同一个判据。
+ * **不带动作徽标**: 没转折就不出手, 上色不是出手理由。
+ */
+function HoldingTile({ r, c, onOpen, onReview }: { r: FlipTodaySignal; c?: TodayOpportunity; onOpen: OpenFn; onReview: OpenFn }) {
+  const dist = r.gap_pct != null ? Math.abs(r.gap_pct) : null
+  const near = dist != null && dist <= NEAR_EXIT
+  const fill = dist != null ? Math.min(1, dist / EXIT_GAUGE_FULL) : 0
+  return (
+    <div className={cn('rounded-btn border px-3 py-2',
+      near ? 'border-warning/40 bg-warning/[0.06]' : 'border-border/50 bg-base/30')}>
+      <div className="flex items-baseline gap-2">
+        <SymbolButton r={r} onOpen={onOpen} className="text-xs text-foreground" />
+        {c?.rank != null && (
+          <span className="ml-auto shrink-0 text-micro tabular-nums text-muted" title="把握分名次">第 {c.rank} 名</span>
+        )}
+      </div>
+      <button type="button" onClick={() => onReview(r.symbol, r.name)}
+              title={`离清仓线还有多远 —— 条越短越近, 满格是 ${EXIT_GAUGE_FULL * 100}% 以上。点开看 ${r.name} 的逐日复盘`}
+              className="mt-1.5 flex w-full cursor-pointer items-center gap-2 text-left">
+        <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-elevated">
+          <span className={cn('block h-full rounded-full', near ? 'bg-warning' : 'bg-secondary/50')}
+                style={{ width: `${Math.max(fill * 100, 3)}%` }} />
+        </span>
+        <span className={cn('shrink-0 text-xs font-semibold tabular-nums', near ? 'text-warning' : 'text-secondary')}>
+          {dist != null ? `${(dist * 100).toFixed(1)}%` : '—'}
+        </span>
+      </button>
+      {/* 手机上一行两个方块, 每块不到 180px, 「离清仓线」与价格挤不下 —— 那几个字收掉(段标题已经说了) */}
+      <div className="mt-1 flex justify-end gap-2 text-micro text-muted sm:justify-between">
+        <span className="hidden shrink-0 sm:inline">离清仓线</span>
+        <span className="min-w-0 truncate"><PriceLine r={r} /></span>
+      </div>
+      {c && <div className="mt-1 text-micro"><TrendCell o={c} /></div>}
+    </div>
+  )
+}
+
+/**
+ * [R513] 盯着那一段的一组 —— 一只一行, 多列密排。
+ *
+ * 上百只票要一次摊开又不淹掉上面两段, 靠的是**行矮、色淡、只说一个数**:
+ * 名称 · 还差几个点 · 触发价。名次只在进了候选池时挂一个小号数字。
+ * 多列用 CSS columns(列优先): 读完左栏接右栏, 次序与打分排的一致。
+ */
+function WatchGroup({ title, note, tone, rows, conviction, onOpen, onReview }: {
+  title: string; note: string; tone: 'bull' | 'muted'
+  rows: FlipTodaySignal[]; conviction: Map<string, TodayOpportunity>
+  onOpen: OpenFn; onReview: OpenFn
+}) {
+  return (
+    <div className="mt-3">
+      <div className="mb-1 flex items-baseline gap-2 text-micro">
+        <span className={cn('font-medium', tone === 'bull' ? 'text-bull' : 'text-secondary')}>{title}</span>
+        <span className="tabular-nums text-muted">{rows.length}</span>
+        <span className="text-muted/80">{note}</span>
+      </div>
+      <div className="sm:columns-2 sm:gap-x-6 lg:columns-3 2xl:columns-4 min-[1800px]:columns-5">
+        {rows.map((r) => {
+          const c = conviction.get(r.symbol)
+          return (
+            <div key={r.symbol} className="flex h-7 break-inside-avoid items-center gap-2 border-b border-border/30 text-xs">
+              <SymbolButton r={r} onOpen={onOpen}
+                            className={cn('flex-1', tone === 'bull' ? 'text-foreground' : 'text-secondary')} />
+              {c?.rank != null && <span className="shrink-0 text-micro tabular-nums text-muted" title="把握分名次">#{c.rank}</span>}
+              <button type="button" onClick={() => onReview(r.symbol, r.name)}
+                      title={`还差多少到触发价 ${r.flip_price?.toFixed(2) ?? '—'} —— 点开看 ${r.name} 的逐日复盘`}
+                      className={cn('w-[4.5rem] shrink-0 cursor-pointer text-right tabular-nums transition-colors hover:text-accent',
+                        tone === 'bull' ? 'text-secondary' : 'text-muted')}>
+                差 {r.gap_pct != null ? `${(Math.abs(r.gap_pct) * 100).toFixed(1)}%` : '—'}
+              </button>
+              <span className="w-12 shrink-0 text-right text-micro tabular-nums text-muted">{r.flip_price?.toFixed(2) ?? '—'}</span>
+            </div>
+          )
+        })}
+      </div>
+    </div>
   )
 }
 
@@ -704,254 +736,6 @@ const isActionable = (r: FlipTodaySignal) => r.stage === 'flipped' && !!r.act
 
 /** [R339] 离清仓线多近才算"贴着了"。**只用来上色, 不产生任何动作。** */
 const NEAR_EXIT = 0.02
-
-/**
- * [R383] 宽屏那套栅格 —— **按「这一屏到底有没有那些内容」选**, 不是写死一套。
- *
- * R356 定下定宽网格时的立论是「行与行天然对齐, 一列扫到底」—— 那条立论没错,
- * 但它要的是**行与行之间**对齐, 不是某一列必须占住某个绝对宽度。实机量出来的
- * 后果是: 一整屏 32 行全是「没进候选池」时, 走势那一格**独占 1068px 而且是空的**
- * (行宽 1688, 63% 在那儿闲着), 触发价那格也是空的 —— 而左边的内容 620px 就排完了。
- *
- * 所以: 整屏都没有的那一列, 宽度给 0。**同一屏里所有行用同一套模板**, 行与行
- * 照旧对齐 —— 变的是"这一屏需要几列", 不是"每行各自算各自的"。
- */
-const ROW_GRID = {
-  /** 有名次 + 有走势 —— R356 那版原样 */
-  'rank trend': 'grid-cols-[3.5rem_minmax(0,1fr)_auto] sm:grid-cols-[3.5rem_minmax(9rem,11rem)_4.5rem_minmax(7rem,16rem)_minmax(0,1fr)_auto]',
-  /** 有名次, 整屏没走势 */
-  'rank': 'grid-cols-[3.5rem_minmax(0,1fr)_auto] sm:grid-cols-[3.5rem_minmax(9rem,11rem)_4.5rem_minmax(7rem,16rem)_0_auto]',
-  /**
-   * [R384] **整屏一个名次都没有 —— 名次那一列收成 0。**
-   *
-   * 它本来是 3.5rem, 而整屏没名次时每一行都在那儿写同一句「没进候选池」——
-   * 32 行 32 遍。同一句话说 32 遍不是信息, 是噪音; 它该在区块标题上说一次
-   * (见 `SectionHead` 的 note)。
-   *
-   * **收成 0 而不是不渲染那一格**: 窄屏那套卡片版面(R366)靠 `row-span-2` /
-   * `col-span-3` 把六个格子折成一张卡, 抽掉一格整套跨行跨列全要重算。
-   * 给 0 宽度则一个 `col-span` 都不用动 —— 代价只有 `gap-x-3` 那 12px。
-   */
-  'trend': 'grid-cols-[0_minmax(0,1fr)_auto] sm:grid-cols-[0_minmax(9rem,11rem)_4.5rem_minmax(7rem,16rem)_minmax(0,1fr)_auto]',
-  '': 'grid-cols-[0_minmax(0,1fr)_auto] sm:grid-cols-[0_minmax(9rem,11rem)_4.5rem_minmax(7rem,16rem)_0_auto]',
-} as const
-
-/** 挑一套 —— 键就是「这一屏有什么」, 与 `RowShape` 一一对应。 */
-const gridOf = (shape: RowShape) =>
-  ROW_GRID[[shape.rank && 'rank', shape.trend && 'trend'].filter(Boolean).join(' ') as keyof typeof ROW_GRID]
-
-/** 这一屏的行里, 哪几格真有东西 —— 决定用哪套栅格、要不要撑行高、能不能排两列。 */
-export interface RowShape {
-  /** 有没有任何一行拿得到名次(名次那一格是三行高的, 它决定要不要撑行高) */
-  rank: boolean
-  /** 有没有任何一行有走势读数 */
-  trend: boolean
-}
-
-function SignalRow({ r, c, shape, onOpen, onReview }: {
-  r: FlipTodaySignal; c?: TodayOpportunity
-  /** [R383] 这一屏的形状 —— 同一屏所有行共用一份, 所以行与行仍然对齐 */
-  shape: RowShape
-  /** [R363] 点标的那一格 —— 弹关键价位(日 K + 压力支撑), 不跳页 */
-  onOpen: (symbol: string, name: string) => void
-  /** [R364] 点动作那一格 —— 弹逐日复盘。**与上面不是同一张表**, 见那一格的注释 */
-  onReview: (symbol: string, name: string) => void
-}) {
-  const actionable = r.stage === 'flipped' && !!r.act
-  // [R349 → R356] 「走势」那一格整格移植过来(用户: 「这一列也要有」)。
-  //
-  // 它与六态那句回答的不是同一个问题:
-  //
-  //     六态那句   今天要不要动手(已转折 / 盘中越线 / 还差多少)
-  //     走势那格   凭什么是这一只(位置贵不贵 / 有没有量 / 离关键点多远)
-  //
-  // **R349 我据此把它放成第二行**, 怕两套判据的措辞并排读的人分不清哪句是哪套。
-  // 那个顾虑本身没错, 但**分列同样能分清** —— 而分行要付的代价是行高随内容变
-  // (有走势的行两行高, 没走势的一行高), 一屏扫下去参差不齐。代价更大。
-  //
-  // R356 起它是网格的**第五列**: 界线由栅格划, 不由换行划。
-  // 只在这只票**进了候选池**时才有读数 —— 但**格子照样占住**, 见下面那段。
-  // [R339] 用户: 「卖出也要上色, 这样看起来醒目」。
-  //
-  // 在这之前**买卖两种要动手的行共用同一个灰蓝底** `bg-accent/[0.06]` —— 徽标
-  // 虽然分了红绿, 但一行里最先被看见的是整条底色, 而底色对买和卖说的是同一句话。
-  // 现在底色跟着方向走, 并在左边加一道 2px 的色条: 扫一眼就知道今天是要买还是要卖,
-  // 不用先去读徽标上那两个字。
-  //
-  // **另加一档"贴着清仓线"**: 手上的票离离场线 2% 以内时同样上琥珀色 —— 卖出这一侧
-  // 真正该醒目的不只是"今天要卖", 还有"明后天很可能要卖"。这一档**不带动作徽标**,
-  // 上色不是出手理由(铁律没动, 守卫钉着)。
-  const sell = actionable && r.act === 'sell'
-  const buy = actionable && r.act === 'buy'
-  const nearExit = !actionable && r.held && r.gap_pct != null
-    && Math.abs(r.gap_pct) <= NEAR_EXIT
-  return (
-    <div className={cn('border-l-2 px-4',
-      // [R384] 整屏没名次时行只有两行字, `py-2.5`(上下各 10px)在 40px 的栅格上
-      // 占掉三分之一。有名次时那一格是三行高, 留白撑着才不挤 —— 所以跟着 shape 走,
-      // 与行高那一条同一个判据。
-      shape.rank ? 'py-2.5' : 'py-1.5',
-      buy && 'border-l-bull bg-bull/[0.07]',
-      sell && 'border-l-bear bg-bear/[0.10]',
-      nearExit && 'border-l-warning bg-warning/[0.07]',
-      !actionable && !nearExit && 'border-l-transparent')}>
-      {/* [R350 → R356] **定宽网格**: 每一列宽度固定, 行与行天然对齐, 一列扫到底。
-          (R350 的起因: 原来是 `flex` + 触发价上一个 `ml-auto`, 宽屏上价格被甩到
-          最右、中间空一条, 而各行按自己内容宽度排, 列也对不齐。)
-
-          [R356] 用户: 「后面还有不少空间, 利用起来一行显示完整, 每行个股行高要一样」。
-          **两处跟着改**:
-          ① 去掉 `max-w-[72rem]` 并把走势并进同一行 —— 右边那片空地正好装它;
-          ② 行高由 `min-h-[3.5rem]` 定死。名次那一格本身有三行高(名次/分/三条),
-             而没进候选池的票只有两行字 —— **不定死的话, 行高就跟着"这只票有没有
-             进候选池"变**, 一屏扫下去参差不齐。这正是用户说的第二件事。 */}
-      {/* [R366] **同一串格子, 两套栅格。** 用户: 「手机端我只需要模拟盘页面和
-          模拟盘里面的那两个弹窗」。
-
-          六列那条最窄也要 3.5+9+4.5+7 rem 加五道间距 ≈ **444px**, 而手机竖屏
-          是 390px —— 横向必然撑破。
-
-          **没有另写一份手机版的行。** 六个格子、次序、内容全都没动, 只是窄屏
-          换一张三列的栅格, 靠 `row-span` / `col-span` 让它们自己落成一张卡:
-
-              [名次] 中际旭创 300308.SZ  [买入]
-              [    ] 已转折 · 现在是自然回升
-              走势词 …
-              触发 82.50 · 现 83.10
-
-          另写一份的代价是**两套版面各自演化**, 哪天只改了一边, 手机上看到的与
-          电脑上不是同一件事, 而两边都不报错 —— 这仓库从 R212 起一直在躲这个坑。
-
-          `min-h` 与 `items-center` 只在宽屏生效: 卡片式那版行高本来就随内容,
-          定死反而会在只有两行字时留一截空。
-
-          [R381] **六态那一列的上限 9rem → 16rem。** 用户: 「合理利用显示空间」。
-          9rem = 144px 装不下「按现价会转折 —— 收盘还站在这边才算数」, 于是盘中
-          越线那几行**一直被截成「…收盘还...」** —— 而截断的那半句正是这一档唯一
-          要说的话(收盘站不住就不算数)。更别扭的是: 它右边那格(走势)在没进候选池
-          的行上是**空的**, 宽屏上白白空着六百来像素, 左边却在截字。
-          16rem = 256px 刚好装下那句话(20 个字 × 11px)。**仍然是定宽列不是 `1fr`**,
-          行与行照旧对齐; `truncate` 也留着 —— 窄屏上它还得兜底。 */}
-      <div className={cn(
-        // [R384] **窄屏那套栅格也挪进 `ROW_GRID` 了**(名次那列在窄屏同样要能收成 0)。
-        // 写死在这儿 + 模板再给一个, 同一个元素上就有两个 `grid-cols-`, 而 CSS 里
-        // 谁赢取决于**样式表里谁排后面**, 不是 class 串里谁排后面 —— 那种冲突不报错,
-        // 只表现为「某些情况下列宽莫名其妙」。守卫数 grid-cols 的条数时当场抓到的。
-        'grid gap-x-3 gap-y-1 text-xs sm:items-center sm:gap-y-0',
-        gridOf(shape),
-        // [R383] 行高只在**真有名次**时撑 —— 名次那一格是三行高(名次/分/三条维度),
-        // 撑行高是为了让"有名次"和"没名次"的行一样高。整屏都没名次时, 每行只有
-        // 两行字, 再撑 3.5rem 就是每行白送 26px: 32 行就是 800 多像素的滚动。
-        shape.rank && 'sm:min-h-[3.5rem]',
-      )}>
-        {/* [R345] 「名次」那一格整格移植自今日总览 —— 用户: 「这一列要移植」。
-            **不是只搬个数字**: 名次下面那三条维度条(红=趋势 45% / 蓝=量能 30% /
-            黄=位置 25%)才是它能被读懂的原因 —— 离开那三条颜色, 上面那个名次
-            就只是个号码, 说不出"为什么是这个名次"。
-            它**不是动作**: 拿不到名次的票照样在名单里, 只是排在本档末尾。
-            [R350] 这一格无论有没有都占住那 3.5rem —— 空着也要占位, 否则有名次的
-            行和没名次的行后面所有列全都错开。
-            [R360] **挪到标的前面, 成了整行的第一格**(用户: 「这列内容统一放到
-            股票名称前面」)。它原来夹在动作与六态之间, 而它回答的是「凭什么是
-            这一只」—— 那个问题得在读到代码之前就摆在眼前, 排在后面等于先认票
-            再补理由。 */}
-        {/* 窄屏竖跨两行 —— 右边那两行(标的+动作 / 六态)共用它这一格 */}
-        <div className="row-span-2 sm:row-span-1">
-        {c?.rank != null ? (
-          <ScoreCell o={c} rank={c.rank} total={c.rank_total ?? 0} />
-        ) : actionable && shape.rank ? (
-          /* [R384] `shape.rank` 为假 = 整屏一个名次都没有, 那一列已经收成 0 宽,
-             再写字会溢出到隔壁格。这句话改在区块标题上说一次。 */
-          <span className="text-center text-micro leading-tight text-muted/60"
-                title="没过打分那三道硬门槛, 所以没有名次 —— 但它转折了, 该动手还是要动手">
-            没进
-            <br />候选池
-          </span>
-        ) : <span />}
-        </div>
-
-        {/* [R363] 标的可点 —— 弹关键价位(日 K + 压力支撑 + 六态趋势条),
-            与个股分析页点标的弹出来的**是同一个组件**(R28 那一个, 已摘成共用)。
-            不跳页: 跳走之后回来, 折叠状态、滚动位置、这一屏的上下文全没了。 */}
-        <button type="button" onClick={() => onOpen(r.symbol, r.name)}
-                title={`看 ${r.name} 的日 K 与关键价位`}
-                className="cursor-pointer truncate text-left transition-colors hover:text-accent">
-          <SymbolCell symbol={r.symbol} name={r.name} />
-        </button>
-
-        {actionable ? (
-          <span className={cn('inline-flex items-center justify-center gap-1 rounded px-1.5 py-0.5 text-micro font-medium',
-            r.act === 'buy' ? 'bg-bull/15 text-bull' : 'bg-bear/15 text-bear')}>
-            {r.act === 'buy' ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-            {r.act === 'buy' ? '买入' : '清仓'}
-          </span>
-        ) : (
-          /* 后两档**不渲染动作位** —— 灰掉的徽标仍在暗示这里本来有个动作。
-             [R338] 手上拿着的换个标记: 同样没有动作, 但"我拿着它"与"我在看它"
-             是两件事, 一眼要能分开。 */
-          r.held ? (
-            <span className="inline-flex items-center gap-1 text-xs text-secondary">
-              <Wallet className="h-3 w-3" />持有
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-1 text-xs text-muted">
-              <Eye className="h-3 w-3" />盯着
-            </span>
-          )
-        )}
-
-        {/* [R364] **六态那句可点, 弹逐日复盘。**
-            用户: 「还是别点买入了, 点「已转折 · 现在是自然回升」这样更合理」。
-
-            R363 我把这个入口挂在了动作那一格上, 并为此写了一整段"别让它看起来
-            像下单按钮"的辩解 —— 用户直接把它挪开了。**要辩解才站得住的设计,
-            多半本来就不该那么放**: 一个印着「买入」两个字的格子, 无论加多少
-            title 都在暗示点它会下单。
-
-            挪到这里反而**更对得上内容**: 这一格印的就是「已转折 · 现在是自然
-            回升」, 而复盘弹窗那张逐日表正是把每一天的六态与转折排开 —— 点一句
-            状态, 看这个状态是怎么走到今天的。这也正是决策台 R51 的规矩:
-
-                标的那格   这只票现在贵不贵、关键价位在哪  → 关键价位(日 K)
-                六态那句   这个状态是怎么走到今天的        → 逐日复盘(趋势页)
-
-            **动作那一格因此退回不可点**, 一个像素没动。 */}
-        <button type="button" onClick={() => onReview(r.symbol, r.name)}
-                title={`看 ${r.name} 的逐日复盘 —— 这个状态是怎么走到今天的`}
-                className="col-span-2 min-w-0 cursor-pointer truncate text-left text-xs text-secondary transition-colors hover:text-accent sm:col-span-1">
-          {r.stage === 'flipped' && <>已转折 · 现在是{r.state_cn}</>}
-          {r.stage === 'crossing' && (
-            <>按现价会转折 —— <b className="text-warning">收盘还站在这边才算数</b></>
-          )}
-          {/* [R338] 拿着的票问的是"什么时候卖", 不是"什么时候买" —— 同一个距离,
-              说法要对上它在你这儿的身份 */}
-          {r.stage === 'watch' && r.gap_pct != null && (
-            r.held
-              ? <b className={cn(nearExit && 'text-warning')}>
-                  离清仓线还有 {(Math.abs(r.gap_pct) * 100).toFixed(1)}%
-                </b>
-              : <>还差 {(Math.abs(r.gap_pct) * 100).toFixed(1)}% 到触发价</>
-          )}
-        </button>
-
-        {/* [R356] 走势并进同一行的第五列 —— 原来它是第二行, 害得行高随内容变。
-            没进候选池的票这一格是空的, 但**格子照样占住**, 行高不受影响。 */}
-        <span className="col-span-3 min-w-0 text-xs sm:col-span-1">
-          {c && <TrendCell o={c} />}
-        </span>
-
-        {/* [R350] 不再 `ml-auto` —— 它是网格的最后一列, 位置由栅格决定 */}
-        <span className="col-span-3 whitespace-nowrap text-left text-xs tabular-nums text-muted sm:col-span-1 sm:text-right">
-          {r.flip_price != null && <>
-            触发 {r.flip_price.toFixed(2)}
-            {r.ref_price != null && <> · 现 {r.ref_price.toFixed(2)}</>}
-            {!r.live && <span className="ml-1 text-warning/70">昨收口径</span>}
-          </>}
-        </span>
-      </div>
-    </div>
-  )
-}
 
 /**
  * [R353] 可输入的参数格。用户: 「这里我要能配置而不是选择或者默认」。
@@ -1238,8 +1022,8 @@ function Summary({ d }: { d: FlipPaperData }) {
           折叠条上带着这条曲线自己的读数(起止那一段), 上面那排数字它不重复。 */}
       {!!d.nav.length && (
         <section className="overflow-hidden rounded-card border border-border/40 bg-base/30">
-          {/* 折叠条的样子与 R355「只是盯着」那条**同一套**: 旋转的 ChevronDown +
-              「收起/展开」+ 右边一句摘要。同一页上两种折叠长两个样, 读的人要认两次。 */}
+          {/* 折叠条: 旋转的 ChevronDown +「收起/展开」+ 右边一句摘要。原来与 R355「只是盯着」那条
+              同一套; [R513] 今日信号不再折叠, 这是模拟盘上仅剩的一处折叠(用户点名要默认收起的净值图)。 */}
           <button
             type="button"
             onClick={toggleNav}
