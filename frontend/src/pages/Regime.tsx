@@ -477,11 +477,12 @@ export function Regime() {
             <div className="flex items-center gap-1.5 text-micro text-muted">
               <Activity className="h-3 w-3" /> 四维拆解 · 是哪一维在拉高或拖低
             </div>
-            {/* [R510] 四条不再撑满整行: 原来 grid 四等分 + 条子 flex-1, 在 2000px 宽的屏上一条被拉到
-                三百多像素, 数字离标签半屏远, 读不成一行。条子定宽 96px, 四条按内容排, 放不下再换行。
-                轨道底色用 --elevated —— 原来是 --base, R501 之后页底是纯白, 轨道在白卡上看不见,
-                于是 0 分那一维什么都没画, 像坏了。 */}
-            <div className="mt-1.5 flex flex-wrap gap-x-5 gap-y-1">
+            {/* [R511] 用户:「四个维度用回之前四行的样子」—— 回到 R505 之前那张小卡的排法: 一维一行,
+                四行上下叠, 条子撑满。R505 并卡后这一栏是 1fr, 宽屏上会很宽, 所以整组封顶 max-w-xs
+                (320px), 条长与原来四张并排小卡里的那一张相当。
+                [R510] 轨道底色用 --elevated —— 原来是 --base, R501 之后页底是纯白, 轨道在白卡上
+                看不见, 于是 0 分那一维什么都没画, 像坏了。 */}
+            <div className="mt-1.5 max-w-xs space-y-1">
               {([
                 { label: '赚钱', val: latest.profit_score, color: '#f59e0b' },
                 { label: '投机', val: latest.speculation_score, color: '#a855f7' },
@@ -490,7 +491,7 @@ export function Regime() {
               ] as const).map(d => (
                 <div key={d.label} className="flex items-center gap-1.5" title={`${d.label} ${d.val != null ? Math.round(d.val) : '—'} / 100`}>
                   <span className="w-6 shrink-0 text-micro text-muted">{d.label}</span>
-                  <div className="h-1.5 w-24 shrink-0 overflow-hidden rounded-full bg-elevated">
+                  <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-elevated">
                     <div className="h-full rounded-full"
                       style={{ width: `${d.val ?? 0}%`, backgroundColor: d.color }} />
                   </div>

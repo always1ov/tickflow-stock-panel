@@ -49,13 +49,15 @@ def test_R505_趋势图还在_独占整行_本身没动():
     assert "api.regimeHistory(histRange.start, histRange.end, histRange.limit)" in src
 
 
-def test_R510_四维拆解的条子定宽_轨道在白底上看得见():
-    """用户截图(2000px 宽): 四条被拉到半屏长, 数字离标签半屏远; 0 分那一维什么都没画, 像坏了。
-    根因两个: 条子 flex-1 跟着四等分的格子撑; 轨道底色是 --base, R501 之后页底纯白, 轨道隐形。"""
+def test_R510_R511_四维拆解四行上下叠_封顶宽度_轨道在白底上看得见():
+    """R510 用户截图(2000px 宽): 四条被拉到半屏长, 0 分那一维什么都没画, 像坏了。
+    根因两个: 条子 flex-1 跟着四等分的格子撑; 轨道底色是 --base, R501 之后页底纯白, 轨道隐形。
+    R511 用户:「四个维度用回之前四行的样子」—— 一维一行上下叠, 整组封顶 320px 免得宽屏又拉长。"""
     g = _regime_group()
     i = g.index("四维拆解")
     seg = g[i:i + 1800]
-    assert "w-24 shrink-0 overflow-hidden rounded-full bg-elevated" in seg, "条子又撑满 / 轨道又隐形了"
-    assert "flex flex-wrap gap-x-5" in seg and "lg:grid-cols-4" not in seg, "四条又被四等分撑开了"
+    assert "mt-1.5 max-w-xs space-y-1" in seg, "四维不是上下四行了 / 宽度没封顶, 宽屏上条子会被拉到半屏"
+    assert "h-1.5 flex-1 overflow-hidden rounded-full bg-elevated" in seg, "轨道又隐形了"
+    assert "lg:grid-cols-4" not in seg and "flex-wrap" not in seg, "四条又排成一横排了"
     # 用户: 「口径改成过滤」
     assert "<Filter className=\"h-2.5 w-2.5\" /> 过滤" in g and "/> 口径" not in g
