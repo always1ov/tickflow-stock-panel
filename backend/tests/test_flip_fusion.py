@@ -36,18 +36,18 @@ def _signal_row() -> str:
     截到下一个顶层 `function`(不按 `\n}` 截: 剥注释后跨行注释的收尾会留下裸 `}`)。"""
     code = code_of(FLIP)
     out = []
-    for name in ("ActionCard", "HoldingTile", "WatchGroup", "SymbolButton", "StateLine", "PriceLine"):
+    for name in ("ActionCard", "HoldingTile", "SymbolButton", "StateLine", "PriceLine"):   # [R516] WatchGroup 随「盯着」撤了
         blk = code[code.index(f"function {name}("):]
-        nxt = blk.find("\nfunction ", 1)
-        out.append(blk if nxt < 0 else blk[:nxt])
+        ends = [e for e in (blk.find("\nfunction ", 1), blk.find("\nconst ", 1), blk.find("\n/**", 1)) if e > 0]
+        out.append(blk[:min(ends)] if ends else blk)   # 截到下一个顶层声明(函数 / 常量 / 文档注释)
     return "\n".join(out)
 
 
 def _fn(name: str) -> str:
     code = code_of(FLIP)
     blk = code[code.index(f"function {name}("):]
-    nxt = blk.find("\nfunction ", 1)
-    return blk if nxt < 0 else blk[:nxt]
+    ends = [e for e in (blk.find("\nfunction ", 1), blk.find("\nconst ", 1), blk.find("\n/**", 1)) if e > 0]
+    return blk[:min(ends)] if ends else blk   # 截到下一个顶层声明(函数 / 常量 / 文档注释)
 
 
 # ── 底线: 六态选, 打分排 ────────────────────────────────────────────────
@@ -83,8 +83,7 @@ def test_R344_四档内部都按打分重排():
     assert "const byRank = (rs: FlipTodaySignal[]) => rs.slice().sort((a, b) => rank(a) - rank(b))" in blk, \
         "排序得是一处实现 —— 各段各写一遍必然漂"
     for tier in ("const ordered = byRank(live)",
-                 "const mineSorted = byRank(mine)",
-                 "const nearBuy = byRank(toBull.filter("):   # [R515] 盯着只列快转多的那几只
+                 "const mineSorted = byRank(mine)"):   # [R516] 盯着那一段撤了, 只剩两段
         assert tier in blk, f"这一段没参与二次排序: {tier}"
 
 
@@ -94,10 +93,8 @@ def test_R344_打分不参与分档():
     pred = next(l for l in code.splitlines() if "const isLive =" in l)
     for word in ("conviction", "rank", "score", "把握"):
         assert word not in pred, f"分档判据里混进了打分: {word}"
-    # 「手上这些」与「只是盯着」的边界是 held, 也不许沾打分
-    for line in ("const mine = rest.filter((r) => r.held)",
-                 "const idle = rest.filter((r) => !r.held)"):
-        assert line in code, f"分档判据被动过: {line}"
+    # 「持仓」那一段的边界是 held, 也不许沾打分。[R516] 没拿着的那一侧(原「盯着」)不画了, 只剩这一条
+    assert "const mine = rest.filter((r) => r.held)" in code, "分档判据被动过"
 
 
 def test_R344_只重排不增删():
@@ -793,7 +790,7 @@ def test_R364_两个可点的格子_各开各的表():
     st = _fn("StateLine")
     assert st.count("onClick={() => onReview(r.symbol, r.name)}") == 1 and "onOpen" not in st
     assert st.index("onClick={() => onReview") < st.index("已转折 · 现在是"), "复盘入口没包住六态那一句"
-    for comp in ("ActionCard", "HoldingTile", "WatchGroup"):
+    for comp in ("ActionCard", "HoldingTile"):   # [R516] WatchGroup 随「盯着」撤了
         blk = _fn(comp)
         assert "<SymbolButton r={r} onOpen={onOpen}" in blk, f"{comp} 的标的没走共用那一格"
         assert "onOpen(r.symbol" not in blk.replace("<SymbolButton", ""), f"{comp} 另开了一个关键价位入口"

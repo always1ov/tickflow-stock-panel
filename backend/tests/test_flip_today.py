@@ -187,7 +187,7 @@ def test_R329_界面上后两档不渲染动作位():
     assert "buy ? '买入' : '清仓'" in head, "动作徽标必须长在能动手那一支里"
     tail = card[card.index(") : (", card.index("{buy || sell ? (")):]
     assert "'买入'" not in tail and "'清仓'" not in tail, "盘中越线那一支里出现了动作词"
-    for comp in ("HoldingTile", "WatchGroup", "StateLine", "PriceLine"):
+    for comp in ("HoldingTile", "StateLine", "PriceLine"):
         blk = _fn(comp)
         assert "'买入'" not in blk and "'清仓'" not in blk, f"{comp} 里出现了动作词的字面量"
 
@@ -234,18 +234,18 @@ def _signal_row() -> str:
     截到下一个顶层 `function`(不按 `\n}` 截: 剥注释后跨行注释的收尾会留下裸 `}`)。"""
     code = _page()
     out = []
-    for name in ("ActionCard", "HoldingTile", "WatchGroup", "SymbolButton", "StateLine", "PriceLine"):
+    for name in ("ActionCard", "HoldingTile", "SymbolButton", "StateLine", "PriceLine"):   # [R516] WatchGroup 随「盯着」撤了
         blk = code[code.index(f"function {name}("):]
-        nxt = blk.find("\nfunction ", 1)
-        out.append(blk if nxt < 0 else blk[:nxt])
+        ends = [e for e in (blk.find("\nfunction ", 1), blk.find("\nconst ", 1), blk.find("\n/**", 1)) if e > 0]
+        out.append(blk[:min(ends)] if ends else blk)   # 截到下一个顶层声明(函数 / 常量 / 文档注释)
     return "\n".join(out)
 
 
 def _fn(name: str) -> str:
     code = _page()
     blk = code[code.index(f"function {name}("):]
-    nxt = blk.find("\nfunction ", 1)
-    return blk if nxt < 0 else blk[:nxt]
+    ends = [e for e in (blk.find("\nfunction ", 1), blk.find("\nconst ", 1), blk.find("\n/**", 1)) if e > 0]
+    return blk[:min(ends)] if ends else blk   # 截到下一个顶层声明(函数 / 常量 / 文档注释)
 
 
 def _today_block() -> str:
@@ -265,8 +265,7 @@ def test_R331_要动手的永远不进折叠区():
     assert "const rest = rows.filter((r) => !isLive(r))" in blk, "后两段必须是第一段的补集"
     i_live = blk.index("ordered.map((r) => (")
     i_mine = blk.index("mineSorted.map((r) => (")
-    i_watch = blk.index("<WatchGroup")
-    assert i_live < i_mine < i_watch, "三段次序乱了 —— 要动手的得在最前"
+    assert i_live < i_mine, "次序乱了 —— 要动手的得在最前"   # [R516] 「盯着」撤了, 只剩两段
     for fold in ("watchOpen", "mineOpen", "toggleWatch", "toggleMine", "aria-expanded", "max-h-64"):
         assert fold not in blk, f"又长出了折叠: {fold}"
     from tests.frontend_source import code_of
@@ -296,8 +295,7 @@ def test_R331_没有要动手的时候明说_不是留一片空白():
 def test_R331_折叠按钮报出条数():
     """[R513] 没有折叠按钮了, 但「每一段有几只」仍然要写在段标题上 —— 不写的话看不出这一段有多长。"""
     blk = _today_block()
-    for head in ('<ZoneHead title="要动手" count={actCount}', '<ZoneHead title="持仓" count={mine.length}',
-                 '<ZoneHead title="盯着" count={nearBuy.length}'):   # [R515] 报的是列出来的那几只
+    for head in ('<ZoneHead title="要动手" count={actCount}', '<ZoneHead title="持仓" count={mine.length}'):
         assert head in blk, f"段标题没报条数: {head}"
 
 
@@ -628,10 +626,10 @@ def test_R338_每行都带held_否则前端分不开():
 
 
 def test_R355_手上这段可折叠_但折叠条自己就是摘要():
-    """[R355 → R513] R355 允许持仓这段折叠, 条件是折叠条自己把卖出侧的读数带上。
-    R513 不折叠了, 那两个读数照样挂在段标题上: 拿着几只、几只贴近离场线 —— 那才是 R338 要保的东西。"""
+    """[R355 → R513] 持仓这段不折叠, 卖出侧的两个读数挂在段标题上: 拿着几只、几只贴近离场线。"""
     blk = _today_block()
-    seg = blk[blk.index("{mine.length > 0 && ("):blk.index("{idle.length > 0 && (")]
+    seg = blk[blk.index("{mine.length > 0 && ("):]
+    seg = seg[:seg.index("</section>")]
     assert "count={mine.length}" in seg, "段标题上没说拿着几只"
     assert "{mineNear} 只贴近离场线" in seg, "段标题上没说几只快到线了"
     assert "mineSorted.map((r) => (" in seg and "<HoldingTile" in seg
@@ -658,11 +656,10 @@ def test_R338_三段分流只由一个判据说了算():
 
 
 def test_R338_持有与盯着在界面上分得开():
-    """「我拿着它」与「我在看它」是两件事, 一眼要能分开。[R513] 两段各是各的长相。"""
+    """「我拿着它」与「我在看它」是两件事。[R516] 后者不画了(「不要盯着」), 拿着的仍然天天有位置。"""
     blk = _today_block()
-    assert "<HoldingTile" in blk and "<WatchGroup" in blk
+    assert "<HoldingTile" in blk and "<WatchGroup" not in blk
     assert "离清仓线" in _fn("HoldingTile"), "拿着的票问的是什么时候卖, 不是什么时候买"
-    assert "离清仓线" not in _fn("WatchGroup")
 
 
 # ── [R339] 卖出要醒目 ───────────────────────────────────────────────────
@@ -743,13 +740,6 @@ def test_R342_分不参与能不能动手():
     for word in ("conviction", "rank", "score", "把握"):
         assert word not in pred, f"出手判据里混进了打分: {word}"
     assert "const mine = rest.filter((r) => r.held)" in blk, "分段判据被动过"
-    # [R515] 盯着那段只挑快转多的几只: 挑的判据只看 side 与离触发价的距离, 打分只在挑出来之后排先后
-    for name in ("const toBull", "const nearBuy"):
-        line = next(l for l in blk.splitlines() if name in l)
-        pick = line.replace("byRank(", "", 1)
-        assert "conviction" not in pick and "score" not in pick and "rank" not in pick, f"{name} 的挑选混进了打分"
-    assert "r.side === '空头'" in next(l for l in blk.splitlines() if "const toBull" in l)
-    assert "Math.abs(r.gap_pct) <= NEAR_BUY" in next(l for l in blk.splitlines() if "const nearBuy" in l)
 
 
 def test_R342_slice先拷一份_不就地改props():
@@ -764,8 +754,7 @@ def test_R342_排序依据摆在界面上_不做暗箱():
     blk = _today_block()
     assert "'按把握分排序'" in blk, "页头没说这个顺序是按什么排的"
     assert "<ScoreCell o={c} rank={c.rank}" in _fn("ActionCard"), "卡片上要看得见名次 —— 排序依据不做暗箱"
-    for comp in ("HoldingTile", "WatchGroup"):
-        assert "c.rank" in _fn(comp), f"{comp} 上看不见名次"
+    assert "c.rank" in _fn("HoldingTile"), "持仓方块上看不见名次"
     assert "它**不是动作**" in _flip_src(), "必须写明分不是出手依据"
 
 

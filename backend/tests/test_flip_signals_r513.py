@@ -20,8 +20,8 @@ FLIP = "pages/FlipPaper.tsx"
 def _fn(name: str) -> str:
     code = code_of(FLIP)
     blk = code[code.index(f"function {name}("):]
-    nxt = blk.find("\nfunction ", 1)
-    return blk if nxt < 0 else blk[:nxt]
+    ends = [e for e in (blk.find("\nfunction ", 1), blk.find("\nconst ", 1), blk.find("\n/**", 1)) if e > 0]
+    return blk[:min(ends)] if ends else blk   # 截到下一个顶层声明(函数 / 常量 / 文档注释)
 
 
 def _today() -> str:
@@ -29,47 +29,35 @@ def _today() -> str:
     return code[code.index("function TodaySignals"):code.index("function ZoneHead")]
 
 
-def test_R513_三段各用各的组件_次序是要动手_持仓_盯着():
+def test_R513_各段各用各的组件_次序是要动手_持仓():
     blk = _today()
-    order = ['<ZoneHead title="要动手"', "<ActionCard", '<ZoneHead title="持仓"', "<HoldingTile",
-             '<ZoneHead title="盯着"', "<WatchGroup"]
+    order = ['<ZoneHead title="要动手"', "<ActionCard", '<ZoneHead title="持仓"', "<HoldingTile"]
     idx = [blk.index(t) for t in order]
-    assert idx == sorted(idx), f"三段次序乱了: {order}"
+    assert idx == sorted(idx), f"次序乱了: {order}"
     assert "SignalRow" not in code_of(FLIP) and "ROW_GRID" not in code_of(FLIP), "旧的定宽网格还留着"
 
 
-def test_R513_R515_盯着只列快转多的那几只_判据只看side与距离():
-    """[R513] 盯着按转了会不会变成动作分两组(只看后端的 `side`)。
-    [R515] 用户: 「模拟盘的只需要展示最重要的, 像"盯着"这部分, 这么多没有精力看」——
-    只列离转多、且离触发价 `NEAR_BUY`(= NEAR_EXIT, 2%)以内的; 其余只报个数, 不列、不给展开。
-    打分一分不参与挑选, 只在挑出来的几只里排先后。"""
+def test_R516_盯着整段撤掉_没拿着又没转的票一行都不画():
+    """用户: 「不要盯着」(R513 全列九十几行 → R515 只列快转多几只 → 整段撤掉)。
+    交易只在收盘转折那一刻发生, 还没转的票转了那天会出现在「要动手」里。
+    钉的是**性质**, 不是某个变量名: 渲染出去的只有要动手(isLive)与持仓(held)两段 ——
+    没拿着、也没到转折的那一侧, 在 JSX 里没有任何一处 map 它。"""
     blk = _today()
-    assert "const toBull = idle.filter((r) => r.side === '空头')" in blk
-    assert "const nearBuy = byRank(toBull.filter((r) => r.gap_pct != null && Math.abs(r.gap_pct) <= NEAR_BUY))" in blk
-    assert "const NEAR_BUY = NEAR_EXIT" in code_of(FLIP), "「贴近」另立了一个数 —— 与离场线那一档该是同一个口径"
-    assert "<WatchGroup rows={nearBuy}" in blk and blk.count("<WatchGroup") == 1, "盯着那一段又把别的票列出来了"
-    assert "只离转空(没拿着, 转了也不用动)" in blk and "只离转多还差" in blk, "不列的那些连个数都没报"
-    for fold in ("展开", "aria-expanded"):
-        assert fold not in blk, f"不列的那些给了展开 —— 用户要的是不看: {fold}"
+    code = code_of(FLIP)
+    assert "function WatchGroup(" not in code and "<WatchGroup" not in code, "盯着那一组的组件又回来了"
+    assert '<ZoneHead title="盯着"' not in blk, "「盯着」那一段又回来了"
+    assert "!r.held" not in blk, "又挑出了没拿着的那一侧 —— 挑出来就是要画的"
+    jsx = blk[blk.index("return ("):]
+    maps = [m for m in ("ordered.map(", "mineSorted.map(") if m in jsx]
+    assert maps == ["ordered.map(", "mineSorted.map("] and jsx.count(".map(") == 2, \
+        "信号栏里多了一处 map —— 除了要动手与持仓, 别的票不该画出来"
+    assert "还没转的票不列" in code, "提示里没说还没转的票去哪儿了"
 
 
-def test_R513_两组的说法与后端的出手判据对得上():
-    """「转了就是买点」「转了也不用动」这两句是对后端 `evaluate` 的转述 —— 后端改了, 这两句就成了假话。
-    所以直接跑判据: 没拿着的票, 空头侧(DT)转成多头 → 买入; 多头侧(UT)转成空头 → 没有动作。"""
-    from app.services import flip_today as ft
-    from tests.test_flip_today import _steps
-    # 盯着时 side 是转折**之前**那一侧 —— 离转多的那组 side=bear, 转了之后:
-    up = ft.evaluate(_steps(["DT", "UT"]), held=False, last_close=10.0)
-    assert up is not None and up["act"] == ft.ACT_BUY, "没拿着的票转多不再是买入 —— 「转了就是买点」成了假话"
-    # 离转空的那组 side=bull, 没拿着, 转了之后:
-    down = ft.evaluate(_steps(["UT", "DT"]), held=False, last_close=10.0)
-    assert down is not None and down["act"] is None, "没拿着的票转空有了动作 —— 「转了也不用动」成了假话"
-    # 盯着那一侧的 side 确实是转折之前的那一侧(前端靠它分组)
-    watch_bear = ft.evaluate(_steps(["DT", "DT"], flip_up=10.2), held=False, last_close=10.0)
-    # 前端拿 `r.side === '空头'` 分组 —— 这个字面量必须就是后端发出来的那个值
-    from app.services.flip_trades import BEAR
-    assert watch_bear is not None and watch_bear["side"] == BEAR == "空头" and watch_bear["stage"] == ft.STAGE_WATCH
-    assert f"r.side === '{BEAR}'" in _today(), "前端分组用的字面量与后端发出的 side 对不上"
+# [R516] `test_R513_R515_盯着只列快转多的那几只_判据只看side与距离` 退役 —— 用户: 「不要盯着」—— 今日信号里「盯着」那一段整个撤掉(还没转的票转了那天会出现在「要动手」里); 「还没转、没拿着的票一行都不画」的钉法在 test_flip_signals_r513.py 的 test_R516_盯着整段撤掉
+
+
+# [R516] `test_R513_两组的说法与后端的出手判据对得上` 退役 —— 用户: 「不要盯着」—— 今日信号里「盯着」那一段整个撤掉(还没转的票转了那天会出现在「要动手」里); 「还没转、没拿着的票一行都不画」的钉法在 test_flip_signals_r513.py 的 test_R516_盯着整段撤掉
 
 
 def test_R513_持仓方块的距离条_只画不判():
@@ -84,12 +72,7 @@ def test_R513_持仓方块的距离条_只画不判():
         assert banned not in tile, f"距离条上出现了动效: {banned}"
 
 
-def test_R513_盯着那一段是列优先的密排():
-    """上百只一次摊开又不淹掉上面两段: 行矮(h-7)、多列; 多列用 CSS columns(列优先), 次序与打分排的一致。"""
-    wg = _fn("WatchGroup")
-    assert "sm:columns-2" in wg and "lg:columns-3" in wg and "2xl:columns-4" in wg and "min-[1800px]:columns-5" in wg
-    assert "break-inside-avoid" in wg and "grid-cols" not in wg, "用了 grid —— 行优先会把次序打乱"
-    assert "flex h-7" in wg
+# [R516] `test_R513_盯着那一段是列优先的密排` 退役 —— 用户: 「不要盯着」—— 今日信号里「盯着」那一段整个撤掉(还没转的票转了那天会出现在「要动手」里); 「还没转、没拿着的票一行都不画」的钉法在 test_flip_signals_r513.py 的 test_R516_盯着整段撤掉
 
 
 def test_R513_手机上持仓一排两块_方块里的说明让位给价格():
@@ -101,7 +84,7 @@ def test_R513_手机上持仓一排两块_方块里的说明让位给价格():
 
 def test_R513_三段都不加装饰性动效():
     """AGENTS.md 硬规则第 7 条: 功能性数据不做「跳动」「流动」。只许颜色过渡(hover)。"""
-    for comp in ("ActionCard", "HoldingTile", "WatchGroup", "ZoneHead", "SymbolButton", "StateLine"):
+    for comp in ("ActionCard", "HoldingTile", "ZoneHead", "SymbolButton", "StateLine"):   # [R516] WatchGroup 撤了
         src = _fn(comp)
         for banned in ("animate-", "motion", "transition-all", "translate", "hover:scale", "transition-transform"):
             assert banned not in src, f"{comp} 里出现了 {banned}"

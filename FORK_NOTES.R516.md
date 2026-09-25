@@ -1,0 +1,5 @@
+# R516 — 模拟盘今日信号: 「盯着」整段撤掉
+
+| # | 改动 | 涉及文件 | 冲突风险 | 单独回退 |
+|---|---|---|---|---|
+| R516 | 用户:「不要盯着」。R513 把盯着全列(离转多 / 离转空两组, 九十几行), R515 收成只列离转多 2% 以内的几只, 用户看过后要求整段撤掉。今日信号只剩两段: 要动手(已转折 + 盘中越线)与持仓(离清仓线多远)。理由写进代码与提示: 交易只在收盘转折那一刻发生, 还没转的票转了那天会出现在「要动手」里, 提前盯着不产生任何动作。删掉 WatchGroup 组件、idle / toBull / nearBuy 那几行与 NEAR_BUY 常量; 信号栏提示最后一段改成「还没转的票不列」。后端照旧全算全发, docs/hidden-features.md 那一条改成整段隐藏(写了两个旧版面的提交号: 260c2ee1 全列、258c07a0 只列快转多), STILL_THERE 锚点跟着改名。守卫: test_flip_signals_r513 新增 test_R516_盯着整段撤掉(钉性质: 信号栏里只有要动手与持仓两处 map, 不挑没拿着的那一侧), 三条盯着专用守卫退役留言; test_flip_fusion / test_flip_today 改钉两段; test_theme_palette 的密度守卫改钉流水那一条; 三个测试文件里切函数体的 helper 改成截到下一个顶层声明(持仓方块成了最后一个函数后, 原来的切法会把后面的常量一起切进来) | frontend/src/pages/FlipPaper.tsx; docs/hidden-features.md; backend/tests/test_hidden_features_registry.py; backend/tests/test_flip_signals_r513.py; backend/tests/test_flip_fusion.py; backend/tests/test_flip_today.py; backend/tests/test_theme_palette.py | 低: FlipPaper.tsx 是 fork 页面 | 可以: git revert 本提交(回到 R515 只列快转多) |
