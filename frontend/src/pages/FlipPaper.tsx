@@ -27,12 +27,13 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { ChevronDown, Eye, RefreshCw, TrendingDown, TrendingUp, Wallet } from 'lucide-react'
+import { BookOpen, ChevronDown, Eye, LineChart, ReceiptText, RefreshCw, TrendingDown, TrendingUp, Wallet, Zap } from 'lucide-react'
 import { api, type FlipOrder, type FlipPaper as FlipPaperData, type FlipRules,
   type FlipTodaySignal, type TodayOpportunity } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { getFlipHoldingDays } from '@/lib/flipHoldingDays'
 import { PageHeader } from '@/components/PageHeader'
+import { PageTabs, usePageTab, type PageTabDef } from '@/components/PageTabs'
 import { Hint } from '@/components/Hint'
 import { Button } from '@/components/ui'
 import { Skeleton } from '@/components/data/Skeleton'
@@ -117,7 +118,22 @@ function SymbolCell({ symbol, name }: { symbol: string; name: string }) {
   )
 }
 
+/**
+ * [R512] 分栏。用户指着 Minds 的分栏说「模拟盘的内容分类整理成图片这样的表达方式」。
+ * 原来一页从上往下摞五块(信号 / 持仓 + 成绩 / 流水 / 规则), 现在一块一栏。
+ * 默认落在「今日信号」—— 这一页最常看的是转折(R498 的「今天优先」那条没变)。
+ */
+export type FlipTab = 'signals' | 'holdings' | 'results' | 'orders' | 'rules'
+export const FLIP_TABS: Record<FlipTab, PageTabDef> = {
+  signals: { title: '今日信号', icon: Zap },
+  holdings: { title: '持仓', icon: Wallet },
+  results: { title: '成绩', icon: LineChart },
+  orders: { title: '流水', icon: ReceiptText },
+  rules: { title: '规则', icon: BookOpen },
+}
+
 export function FlipPaper() {
+  const [tab, setTab] = usePageTab(FLIP_TABS, 'signals')
   const navigate = useNavigate()
   // [R353] 三个参数可自己填, 并且**记住** —— 每次打开都退回默认值等于没配过。
   const [capital, setCapital] = useState(() => storage.flipCapital.get(1_000_000))
@@ -208,7 +224,7 @@ export function FlipPaper() {
    */
   const results = (
     <section className="overflow-hidden rounded-card border border-border/60 bg-surface/40">
-      <SectionHead title="这套打法的成绩" note="只按六态转折买卖 · 非真实资金" />
+      <SectionHead title="成绩" note="只按六态转折买卖 · 非真实资金" />
       <div className="space-y-3 px-4 py-3">
         <ParamBar capital={capital} maxPositions={maxPositions} years={years}
                   onCapital={putCapital} onMaxPositions={putMaxPositions} onYears={putYears} />
@@ -221,6 +237,16 @@ export function FlipPaper() {
 
   // [R498] 有没有正文(信号 / 持仓 / 流水) —— 跑不动(`reason`)或还没到时只剩成绩卡
   const hasBody = !!d && !d.reason
+
+  // [R512] 栏名后面的数: 要动手几笔 / 拿着几只 / 做过几笔。
+  // 要动手是 0 时不画 —— 「没事」是常态, 天天挂个 0 等于天天提醒你去看一眼。
+  // 判据与信号栏里「N 笔要动手」是同一条(`isActionable`), 不另写一遍。
+  const actCount = hasBody && d ? d.today.filter(isActionable).length : 0
+  const tabCounts: Partial<Record<FlipTab, number | null>> = {
+    signals: actCount > 0 ? actCount : null,
+    holdings: hasBody && d ? d.positions.length : null,
+    orders: hasBody && d ? d.orders.length : null,
+  }
 
   const w = ov?.weather
   // [R506] 页头的「主线」搬去了宏观分析页的「现在」卡(用户: 「转折页面的那个显示主线我想搬回这里」)。
@@ -261,16 +287,24 @@ export function FlipPaper() {
         // 回答的是「我现在就要刷」。两件事挨着放。
         // (标签之间不能用 `{/* */}`, 那是子节点的写法 —— 这里要用 `//`,
         //  与上面 titleExtra / subtitle 那两段注释同一个写法。)
+        // [R512] 分栏与刷新并排在页头右侧 —— 放不下时整组落到下一行(与 Minds 同一个做法)
+        className="shrink-0 flex-wrap gap-x-4 gap-y-2"
         right={
-          <Button
-            size="xs"
-            onClick={refreshAll}
-            disabled={refreshing}
-            title="立刻重取一次(模拟盘 + 打分两份一起) —— 自动刷新的节奏不受影响"
-          >
-            <RefreshCw className={cn('h-3 w-3', refreshing && 'animate-spin')} />
-            {refreshing ? '刷新中' : '刷新'}
-          </Button>
+          <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2">
+            {/* 分栏条让位, 刷新不换行: 窄屏上分栏条自己横向滚动, 不把刷新挤到下一行 */}
+            <div className="min-w-0 flex-1 basis-0">
+              <PageTabs tabs={FLIP_TABS} active={tab} onChange={setTab} counts={tabCounts} label="模拟盘分栏" />
+            </div>
+            <Button
+              size="xs"
+              onClick={refreshAll}
+              disabled={refreshing}
+              title="立刻重取一次(模拟盘 + 打分两份一起) —— 自动刷新的节奏不受影响"
+            >
+              <RefreshCw className={cn('h-3 w-3', refreshing && 'animate-spin')} />
+              <span className="hidden sm:inline">{refreshing ? '刷新中' : '刷新'}</span>
+            </Button>
+          </div>
         }
       />
 
@@ -285,8 +319,6 @@ export function FlipPaper() {
             (名单只由六态选, R344), 更不影响谁能出手。守卫钉着这条。
             [R498] 成绩不再挂在它的插槽上(见上面 `results` 那段), 它现在紧挨着
             它唯一影响的东西 —— 下面的信号。 */}
-        {ov && <TodayControls d={ov} refetch={() => today.refetch()} isFetching={today.isFetching} />}
-
         {q.isError && (
           <div className="rounded-card border border-danger/40 bg-danger/10 px-4 py-3 text-xs text-danger">
             跑不动:{(q.error as Error)?.message}
@@ -299,22 +331,40 @@ export function FlipPaper() {
           </div>
         )}
 
-        {d && !d.reason && <TodaySignals rows={d.today ?? []} conviction={conv} />}
+        {/* [R512] 一栏一块。自检条与上面两条报错横幅在所有栏之上 —— 它们说的是「你正在看的数字靠不靠得住」,
+            哪一栏都要先看见。 */}
+        {tab === 'signals' && (
+          <>
+            {/* [R347] 门槛 / 体检 / 板块筛选 —— 与今日总览共用那一份实现。用户:
+                「门槛的东西非常重要, 体检和筛选功能也要能保留」。
+                **它只作用于打分那一层**: 板块过滤改的是哪些票拿得到名次, 门槛改的是
+                谁进候选池 —— 也就是只影响本页信号的**先后与标注**, 不影响谁在名单上
+                (名单只由六态选, R344), 更不影响谁能出手。守卫钉着这条。
+                [R512] 所以它跟着信号进「今日信号」这一栏 —— 它唯一影响的就是这一栏。 */}
+            {ov && <TodayControls d={ov} refetch={() => today.refetch()} isFetching={today.isFetching} />}
+            {hasBody && d && <TodaySignals rows={d.today ?? []} conviction={conv} />}
+          </>
+        )}
 
-        {/* [R498] 「现在拿着」与成绩并排: 一个说「手上是什么」, 一个说「这么做下来怎么样」,
-            都是转折之后回头看的东西。持仓表有七列, 分到略宽的那一侧(1.25 : 1)。
-            跑不动时没有持仓, 成绩那张卡(带参数条)独占整行 —— 它必须在, 见 `results`。 */}
-        <div className={cn('grid gap-3', hasBody && 'xl:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)] xl:items-start')}>
-          {hasBody && d && <Holdings d={d} onOpen={(s) => navigate(`/stock-analysis?symbol=${s}`)} />}
-          {results}
-        </div>
+        {tab === 'holdings' && hasBody && d && (
+          <Holdings d={d} onOpen={(s) => navigate(`/stock-analysis?symbol=${s}`)} />
+        )}
 
-        {/* [R499] 「有信号但没做成」撤掉了(用户: 「有信号没做成的就不要放出来了」),
-            流水独占整行。后端照旧算 skipped / missing / pending, 只是这一页不再显示。 */}
-        {hasBody && d && <Orders orders={d.orders} />}
+        {/* 成绩这一栏**无条件渲染** —— 跑不动时 summary 为 null, 参数条照样在,
+            回溯填过头还能改回来(R359 那条)。 */}
+        {tab === 'results' && results}
 
-        {/* 规则排在最后 —— 查证用的, 不该天天占首屏。[R498] 而且默认收起 */}
-        {rules.data && <RulesFold r={rules.data} d={d} />}
+        {/* [R499] 「有信号但没做成」撤掉了(用户: 「有信号没做成的就不要放出来了」)。
+            后端照旧算 skipped / missing / pending, 只是这一页不再显示。 */}
+        {tab === 'orders' && hasBody && d && <Orders orders={d.orders} />}
+
+        {/* [R512] 规则有了自己的一栏, 不再折叠 —— 折叠是因为它原来排在长页面的最底下 */}
+        {tab === 'rules' && rules.data && (
+          <section className="overflow-hidden rounded-card border border-border/60 bg-surface/40">
+            <SectionHead title="规则" note="口径 —— 与后端同一份" />
+            <Rules r={rules.data} d={d} />
+          </section>
+        )}
       </div>
     </div>
   )
@@ -434,7 +484,7 @@ function TodaySignals({ rows, conviction }: {
   const rest = rows.filter((r) => !isLive(r))
   const mine = rest.filter((r) => r.held)   // [R338] 手上拿着的, 常驻
   const idle = rest.filter((r) => !r.held)  // 其余, 折叠
-  const actCount = live.filter((r) => r.stage === 'flipped' && r.act).length
+  const actCount = live.filter(isActionable).length
 
   // [R344] **两段式: 六态负责「选」, 打分负责「排」。**
   //
@@ -550,7 +600,7 @@ function TodaySignals({ rows, conviction }: {
     <>
     <section className="overflow-hidden rounded-card border border-border/60 bg-surface/40">
       <SectionHead
-        title="今天该挂什么单"
+        title="今日信号"
         note={[
           actCount ? `${actCount} 笔要动手` : '今天没有要动手的',
           // [R342] 说明白这个顺序是谁排的 —— 不说的话读的人不知道该不该照着做
@@ -559,9 +609,9 @@ function TodaySignals({ rows, conviction }: {
           // 改在这儿报个数。判据从「整屏都没有」换成「有几行没有」——
           // 混着才是常态, 前者几乎永远不成立。
           unscored ? `${unscored} 只没进候选池` : null,
-          mine.length ? `手上 ${mine.length} 只` : null,
+          mine.length ? `持仓 ${mine.length} 只` : null,
         ].filter(Boolean).join(' · ')}
-        hint={'**只有真转折才出手。**\n\n已转折 = 最新那根已落盘的日 K 让状态翻了面, 这才是动作。\n盘中越线 = 按此刻现价当收盘算会翻面 —— **不是出手理由**, 盘中价会变回去,\n14:30 跌破、14:58 拉回来的那天根本没有转折。\n\n触发价是作者的六态每天给的 flip_up / flip_down, 开盘前就定死,\n所以尾盘盯着它挂单是做得到的。\n\n「手上这些」是模拟盘现在拿着的票与各自的离场线 —— 常驻不折叠,\n买入天天有、卖出只在触发那天冒一次, 中间这段空白正是它补的。\n\n最下面「只是盯着」默认收起 —— 它随自选规模走, 摊开会把真要动手的淹掉。'}
+        hint={'**只有真转折才出手。**\n\n已转折 = 最新那根已落盘的日 K 让状态翻了面, 这才是动作。\n盘中越线 = 按此刻现价当收盘算会翻面 —— **不是出手理由**, 盘中价会变回去,\n14:30 跌破、14:58 拉回来的那天根本没有转折。\n\n触发价是作者的六态每天给的 flip_up / flip_down, 开盘前就定死,\n所以尾盘盯着它挂单是做得到的。\n\n「持仓」这一段列的是模拟盘手上的票与各自的离场线 —— 常驻不折叠,\n买入天天有、卖出只在触发那天冒一次, 中间这段空白正是它补的。\n\n最下面「只是盯着」默认收起 —— 它随自选规模走, 摊开会把真要动手的淹掉。'}
       />
 
       {rows.length === 0 ? (
@@ -597,7 +647,7 @@ function TodaySignals({ rows, conviction }: {
                 <Wallet className="h-3 w-3" />
                 {/* [R498] 手机上这一行放不下, 右边那两个数被挤成竖排。后半句在窄屏收掉 ——
                     「跌破离场线才清仓」是说明, 右边那两个数才是这一行要说的 */}
-                手上这些<span className="hidden sm:inline"> · 跌破离场线才清仓</span>
+                持仓<span className="hidden sm:inline"> · 跌破离场线才清仓</span>
                 <span className="ml-auto flex items-center gap-2 whitespace-nowrap text-muted">
                   {/* 收起来也要看得见的那两个数 —— 卖出这一侧全靠它们 */}
                   {mineNear > 0 && (
@@ -648,6 +698,9 @@ function TodaySignals({ rows, conviction }: {
     </>
   )
 }
+
+/** [R512] 「要动手」的判据 —— 信号栏的「N 笔要动手」与分栏上的数同出这一处。 */
+const isActionable = (r: FlipTodaySignal) => r.stage === 'flipped' && !!r.act
 
 /** [R339] 离清仓线多近才算"贴着了"。**只用来上色, 不产生任何动作。** */
 const NEAR_EXIT = 0.02
@@ -1044,7 +1097,8 @@ function ParamBar({ capital, maxPositions, years, onCapital, onMaxPositions, onY
           **它不是可有可无**(R359 特意加的), 所以不是删: 宽屏照旧, 窄屏挪进
           「回溯」那个框的 title 里, 长按仍看得到。 */}
       <span className="ml-auto hidden text-muted/70 sm:inline">
-        上面那排板块与门槛只改打分的标注, 不进这条曲线
+        {/* [R512] 板块与门槛挪进「今日信号」栏了, 「上面那排」不再是真话 */}
+        「今日信号」栏里的板块与门槛只改打分的标注, 不进这条曲线
       </span>
     </div>
   )
@@ -1150,8 +1204,8 @@ function Summary({ d }: { d: FlipPaperData }) {
       {/* [R498] 成绩卡挪到持仓旁边之后, xl(≥1280)起只有半幅宽。实测: 半幅里一行六格
           一格只剩一百二十来像素, 21px 的「2026-09-23」被截成两行(1440 与 1920 都是)。
           所以半幅时 2 列、1800 起 3 列; 只有成绩卡占满整行时(xl 以下)才一行六格。 */}
-      <section className="grid grid-cols-2 divide-x divide-y divide-border/30 overflow-hidden rounded-card border border-border/40 bg-base/30 sm:grid-cols-3 lg:grid-cols-6 lg:divide-y-0 xl:grid-cols-2 xl:divide-y min-[1800px]:grid-cols-3">
-        <Stat label="现在拿着" value={`${d.positions.length} 只`}
+      <section className="grid grid-cols-2 divide-x divide-y divide-border/30 overflow-hidden rounded-card border border-border/40 bg-base/30 sm:grid-cols-3 lg:grid-cols-6 lg:divide-y-0">
+        <Stat label="持仓" value={`${d.positions.length} 只`}
               sub={`仓位 ${d.nav.length ? pct((d.nav[d.nav.length - 1].market_value / d.nav[d.nav.length - 1].nav), 0) : '—'} · 现金 ${money(d.nav.at(-1)?.cash)}`}
               hint={'这是**当下**的仓位, 与上面那条逐月一样看的是现在;\n同一行右边那四格才是整个回溯窗口的成绩。'} />
         <Stat label="最后一天" value={d.as_of ?? '—'}
@@ -1283,7 +1337,7 @@ function Holdings({ d, onOpen }: { d: FlipPaperData; onOpen: (s: string) => void
   return (
     <section className="overflow-hidden rounded-card border border-border/60 bg-surface/40">
       <SectionHead
-        title="现在拿着"
+        title="持仓"
         note={`${d.positions.length} 只 · 现金 ${money(d.nav.at(-1)?.cash)}`}
         hint={'这几只就是接下来要盯的 —— 它们各自下一次转空时, 这套规则会清掉。'}
       />
@@ -1347,7 +1401,7 @@ function Orders({ orders }: { orders: FlipOrder[] }) {
   return (
     <section className="overflow-hidden rounded-card border border-border/60 bg-surface/40">
       <SectionHead
-        title="成交流水"
+        title="流水"
         note={`${orders.length} 笔 · 最近的在前`}
         right={<>
           {rows.length > 30 && (
@@ -1408,23 +1462,7 @@ function Orders({ orders }: { orders: FlipOrder[] }) {
   )
 }
 
-function RulesFold({ r, d }: { r: FlipRules; d?: FlipPaperData }) {
-  const [open, setOpen] = useState(() => storage.flipRulesOpen.get(false))
-  const toggle = () => setOpen((v) => { storage.flipRulesOpen.set(!v); return !v })
-  return (
-    <section className="overflow-hidden rounded-card border border-border/60 bg-surface/40">
-      <button type="button" onClick={toggle} aria-expanded={open}
-              className="flex w-full items-center gap-1.5 px-4 py-2.5 text-xs text-muted transition-colors hover:bg-elevated/40 hover:text-foreground cursor-pointer">
-        <ChevronDown className={cn('h-3 w-3 transition-transform duration-expand ease-smooth', open && 'rotate-180')} />
-        <span className="text-sm font-medium text-foreground">这套规则</span>
-        <span className="ml-auto opacity-70">口径 —— 与后端同一份 · {open ? '收起' : '展开'}</span>
-      </button>
-      {open && <div className="border-t border-border/40"><Rules r={r} d={d} /></div>}
-    </section>
-  )
-}
-
-/** [R498] 只剩正文 —— 卡壳与标题归 RulesFold 的折叠条, 不然是卡中卡 */
+/** [R498] 只剩正文 —— 卡壳与标题归外面那张卡。[R512] 规则有了自己的一栏, 原来那个折叠壳(RulesFold)删了 */
 function Rules({ r, d }: { r: FlipRules; d?: FlipPaperData }) {
   return (
     <>
@@ -1490,7 +1528,7 @@ function LoadingSkeleton() {
       {/* [R362] 六格 —— **跟着 `Summary` 那一排走**。少画两格就是先许诺一个版面
           再食言(与下面净值图那块同一条纪律)。栅格断点也要逐个对上, 否则骨架
           在窄屏上换行的位置与真东西不一样, 数据到位时版面会跳一下。 */}
-      <div className="grid grid-cols-2 divide-x divide-y divide-border/30 overflow-hidden rounded-card border border-border/60 bg-surface/40 sm:grid-cols-3 lg:grid-cols-6 lg:divide-y-0 xl:grid-cols-2 xl:divide-y min-[1800px]:grid-cols-3">
+      <div className="grid grid-cols-2 divide-x divide-y divide-border/30 overflow-hidden rounded-card border border-border/60 bg-surface/40 sm:grid-cols-3 lg:grid-cols-6 lg:divide-y-0">
         {Array.from({ length: 6 }, (_, i) => (
           <div key={i} className="space-y-1.5 px-4 py-2.5">
             <Skeleton w="w-12" h="h-2.5" />

@@ -61,8 +61,7 @@ export const storage = {
   flipMineOpen:         kv<boolean>('flip-mine-open'),
   /** [R358] 净值走势图折起来没有 —— 默认收起 */
   flipNavOpen:          kv<boolean>('flip-nav-open'),
-  // [R498] 「这套规则」默认收起 —— 查口径时才打开, 打开过就记住
-  flipRulesOpen:        kv<boolean>('flip-rules-open'),
+  // [R512] 原来这里是 flipRulesOpen(「这套规则」折没折) —— 规则有了自己的一栏, 不再折叠, 删了
   flipCapital:          kv<number>('flip-capital'),
   flipMaxPositions:     kv<number>('flip-max-positions'),
   flipYears:            kv<number>('flip-years'),

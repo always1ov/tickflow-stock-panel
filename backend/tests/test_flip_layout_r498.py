@@ -10,6 +10,8 @@
   · 手机上持仓表、流水表向右截断(浮盈、成交价、金额整列看不到) → 手机改成两行卡片;
   · 手机上「今天该挂什么单」被说明挤成两行、「手上这些」那一行右边的数被挤成竖排;
   · 「这套规则」一个月看不了一次, 一直占着页面底部 → 默认收起。
+[R512] 之后改成分栏(用户: 「模拟盘的内容分类整理成图片这样的表达方式」): 规则有了自己一栏、
+不再折叠; 成绩独占一栏, 六格回到一行。对应的几条在本文件里改了钉法, 注释写着 R512。
 版面顺序、成绩卡不挂在打分那一层下面、参数条不跟着成绩消失这几条, 在
 test_flip_fusion.py 的 R343 / R358 / R359 / R381 那几条里(随本次一起改了钉法)。
 """
@@ -35,15 +37,19 @@ def _jsx() -> str:
 
 
 def test_R498_首屏给信号_筛选条后面紧跟着信号():
-    """筛选条(板块/门槛/体检)只影响信号的先后与标注 —— 它该贴着信号, 不该隔着一张成绩卡。"""
+    """筛选条(板块/门槛/体检)只影响信号的先后与标注 —— 它该贴着信号, 不该隔着一张成绩卡。
+
+    [R512] 分栏之后: 筛选条与信号同在「今日信号」一栏, 默认打开的就是这一栏。
+    """
     jsx = _jsx()
-    i_ctrl = jsx.index("<TodayControls d={ov}")
-    i_sig = jsx.index("<TodaySignals")
-    i_res = jsx.index("{results}")
-    assert i_ctrl < i_sig < i_res, "首屏又被成绩占了 —— 信号要紧跟在筛选条后面"
-    between = jsx[i_ctrl:i_sig]
-    for x in ("<Summary", "<ParamBar", "<MonthStrip", "{results}"):
+    blk = jsx[jsx.index("{tab === 'signals' && ("):jsx.index("{tab === 'holdings'")]
+    i_ctrl = blk.index("<TodayControls d={ov}")
+    i_sig = blk.index("<TodaySignals")
+    assert i_ctrl < i_sig, "信号要紧跟在筛选条后面"
+    between = blk[i_ctrl:i_sig]
+    for x in ("<Summary", "<ParamBar", "<MonthStrip", "results"):
         assert x not in between, f"筛选条与信号之间插进了 {x}"
+    assert "usePageTab(FLIP_TABS, 'signals')" in code_of(FLIP), "默认打开的不是今日信号"
 
 
 def test_R500_持仓是小卡片_电脑手机同一套():
@@ -77,21 +83,16 @@ def test_R500_流水是小长方条_按时间一条一行_宽屏两栏列优先(
     assert "shownPhone" not in o, "又回到两套 DOM 了"
 
 
-def test_R498_规则默认收起_记住展开状态_收起时不挂载():
-    f = _fn("RulesFold")
-    assert "storage.flipRulesOpen.get(false)" in f, "默认不是收起"
-    assert "storage.flipRulesOpen.set(!v)" in f, "展开状态没记住"
-    assert "{open && <div" in f and "<Rules r={r} d={d} />" in f, "收起时还挂着正文"
-    assert "flipRulesOpen:" in code_of("lib/storage.ts")
-
-
-def test_R498_规则折叠条与页上另外几条折叠长一个样():
-    """同一页上几种折叠长几个样, 读的人要认几次。"""
-    f = _fn("RulesFold")
-    assert "open && 'rotate-180'" in f, "没沿用旋转的 ChevronDown"
-    assert "duration-expand ease-smooth" in f, "旋转动效与另外几条不一致"
-    assert "aria-expanded={open}" in f
-    assert "transition-all" not in f, "只许过渡具体属性"
+def test_R512_规则有自己一栏_不再折叠():
+    """R498 把规则默认收起, 理由是它压在长页面底下、一个月看不了一次。
+    [R512] 分栏之后它有了自己一栏, 不点那一栏就不占地方, 折叠壳和记住展开状态的那条偏好一起删了。"""
+    code = code_of(FLIP)
+    assert "function RulesFold(" not in code and "<RulesFold" not in code, "折叠壳还在"
+    assert "flipRulesOpen" not in code_of("lib/storage.ts"), "只为折叠壳服务的偏好还在"
+    jsx = _jsx()
+    blk = jsx[jsx.index("{tab === 'rules' && rules.data && ("):]
+    blk = blk[:blk.index("</section>")]
+    assert '<SectionHead title="规则"' in blk and "<Rules r={rules.data} d={d} />" in blk
 
 
 def test_R498_规则正文不带卡壳_不是卡中卡():
@@ -109,29 +110,28 @@ def test_R498_区块标题不被说明挤成两行():
 
 
 def test_R498_手上这些那一行在手机上不再挤成竖排():
+    # [R512] 「手上这些」改名「持仓」, 与分栏同名
     code = code_of(FLIP)
-    bar = code[code.index("手上这些<span"):]
+    bar = code[code.index("持仓<span"):]
     bar = bar[:bar.index("</button>")]
     assert '<span className="hidden sm:inline"> · 跌破离场线才清仓</span>' in bar, \
         "后半句在窄屏没收掉 —— 右边那两个数会被挤成竖排"
     assert "whitespace-nowrap" in bar, "右边那两个数会被拆行"
+    assert "手上这些" not in code, "旧名还在渲染"
 
 
-def test_R498_成绩卡半幅时2列_1800起3列_整行时才6格():
-    """xl 起成绩卡只有半幅宽。实测半幅里一行六格一格只剩一百二十来像素,
-    21px 的「2026-09-23」被截成两行 —— 1440 与 1920 都是。"""
+def test_R512_成绩独占一栏_六格回到一行():
+    """R498 时成绩卡只有半幅宽, 六格一行会把「2026-09-23」截成两行, 所以半幅排 2~3 列。
+    [R512] 成绩独占一栏、整行宽, 那几档半幅断点删掉, 六格从 lg 起回到一行。
+    骨架跟着同一套断点走(不然数据到位时版面跳一下)。"""
     code = code_of(FLIP)
-    row = code[code.index('<section className="grid grid-cols-2 divide-x'):]
-    row = row[:row.index(">")]
-    for cls in ("lg:grid-cols-6", "xl:grid-cols-2", "xl:divide-y", "min-[1800px]:grid-cols-3"):
-        assert cls in row, f"少了这一档: {cls}"
-    assert "min-[1800px]:grid-cols-6" not in row, "半幅里一行六格会把日期截成两行"
-
-
-def test_R498_没有第二块时不开两列():
-    """跑不动时没有持仓 —— 空着的那一栏等于白留一条缝。"""
-    jsx = _jsx()
-    assert "cn('grid gap-3', hasBody && 'xl:grid-cols-" in jsx
+    cls = "grid grid-cols-2 divide-x divide-y divide-border/30 overflow-hidden rounded-card border"
+    rows = [code[i:code.index('">', i)] for i in range(len(code)) if code.startswith(cls, i)]
+    assert len(rows) == 2, "六格与它的骨架该各有一排"
+    for row in rows:
+        assert "sm:grid-cols-3 lg:grid-cols-6 lg:divide-y-0" in row, row
+        for gone in ("xl:grid-cols-2", "xl:divide-y", "min-[1800px]"):
+            assert gone not in row, f"半幅那一档还在: {gone}"
 
 
 def test_R499_有信号但没做成不再放出来():

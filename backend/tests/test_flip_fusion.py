@@ -130,10 +130,15 @@ def test_R343_模拟盘原有六块的顺序没被动过():
     # 只在 JSX 里数 —— `results` 那张卡的定义在前面, 那里的 `<ParamBar` 不算版面顺序
     jsx = body[body.index("return (\n    <div className=\"flex h-full flex-col\">"):]
     # [R499] 「有信号但没做成」整块撤掉了(用户: 「有信号没做成的就不要放出来了」)
-    order = ["<TodaySignals", "<Holdings", "{results}", "<Orders", "<RulesFold"]
+    # [R512] **一页摞五块改成五栏**(用户指着 Minds 的分栏: 「模拟盘的内容分类整理成图片这样的
+    # 表达方式」)。顺序的意思没变, 只是从「从上往下」变成「从左往右」: 分栏条的次序与 JSX 里
+    # 各栏出现的次序都得是 信号 → 持仓 → 成绩 → 流水 → 规则, 规则仍在最后。
+    order = ["tab === 'signals'", "tab === 'holdings'", "tab === 'results'", "tab === 'orders'", "tab === 'rules'"]
     idx = [jsx.index(t) for t in order]
     assert idx == sorted(idx), f"版面顺序被动过: {order}"
-    assert jsx.index("<RulesFold") == max(idx), "「规则排在最后」这一条被动了"
+    assert jsx.index("tab === 'rules'") == max(idx), "「规则排在最后」这一条被动了"
+    tabs = re.findall(r"^  (\w+): \{ title: '", code[code.index("FLIP_TABS"):code.index("export function FlipPaper")], re.M)
+    assert tabs == ["signals", "holdings", "results", "orders", "rules"], f"分栏条次序被动过: {tabs}"
     assert "<NavChart" not in body, "净值图该在 Summary 的折叠区里, 不在主列"
 
 
@@ -699,13 +704,12 @@ def test_R358_打分那层挂了_成绩不跟着消失():
     [R498] 成绩单独成卡之后, 这条性质换了个钉法: 成绩卡 `{results}` 在主列里
     **无条件渲染**, 它所在的那一层不看 `ov`, 也不看 `d`(跑不动时参数条仍得在)。
     """
+    # [R512] 分栏之后成绩独占一栏: 那一栏只看 `tab`, 不看 `ov` 也不看 `hasBody` / `d`。
     code = code_of(FLIP)
     jsx = code[code.index('return (\n    <div className="flex h-full flex-col">'):]
-    line = jsx[:jsx.index("{results}")]
-    line = line[line.rindex("\n", 0, line.rindex("<div className={cn('grid gap-3'")):]
-    assert "ov" not in line.replace("overflow", ""), "成绩卡挂到了打分那一层下面 —— 打分一挂它就没了"
-    assert "{results}" in jsx and jsx.count("{results}") == 1, "成绩卡没渲染, 或渲染了两份"
-    assert "hasBody && d && <Holdings" in jsx, "持仓该跟着正文走, 成绩卡不该"
+    assert "{tab === 'results' && results}" in jsx, "成绩那一栏挂上了别的条件 —— 打分一挂或跑不动时它就没了"
+    assert "{results}" not in jsx and jsx.count(" results}") == 1, "成绩卡没渲染, 或渲染了两份"
+    assert "{tab === 'holdings' && hasBody && d && (" in jsx, "持仓该跟着正文走, 成绩卡不该"
 
 
 # ── [R359] 参数条也并进那张卡 ───────────────────────────────────────────
@@ -724,7 +728,9 @@ def test_R359_参数条不在页头了_在卡里():
     # 而这条守卫要护的是「那三个输入框不在页头」**。R365 往右槽放了个手动刷新
     # 按钮(用户点的名), 守卫因此红了, 而它红得没有道理: 一个刷新按钮不是参数框。
     # 锚太宽的另一个方向 —— 禁得比该禁的多。改钉真正的性质: 右槽里不许有输入。
-    for inp in ("<input", "NumberField", "onChange="):
+    # [R512] 页头右槽多了分栏条, 它有 `onChange={setTab}` —— 切栏不是参数输入, 所以
+    # 「onChange=」这个锚改钉参数自己的回调名。
+    for inp in ("<input", "NumberField", "onCapital", "onMaxPositions", "onYears"):
         assert inp not in head, f"页头右槽里出现了输入: {inp}"
     # 标题那一行**留在页头**, 这是用户点的名(「标题行留在外面」)。
     # 锚带上行首的换行与缩进: 光写 `titleExtra={w && (` 的话, 改名成
@@ -833,7 +839,8 @@ def test_R362_六格一行_不是两排():
     """原来是两排: 上排两格说「当下」各占半屏 —— 一个「10 只」霸着 1000px。"""
     import re
     row = _stat_row()
-    for label in ("现在拿着", "最后一天", "总收益", "最大回撤", "完整买卖", "胜率"):
+    # [R512] 「现在拿着」改名「持仓」—— 与分栏上那一栏同名(一个东西一个名字)
+    for label in ("持仓", "最后一天", "总收益", "最大回撤", "完整买卖", "胜率"):
         assert label in row, f"这一格掉出这一排了: {label}"
     assert len(re.findall(r"<Stat[\s>]", row)) == 6, "不是六格"
     # **整页只剩这一个统计排** —— 留着旧的那一排等于没并
@@ -848,7 +855,7 @@ def test_R362_当下那两格仍排在整段四格之前():
     **那条次序还在, 只是不再靠换行表达** —— 六格一行, 左两格当下、右四格整段。
     """
     row = _stat_row()
-    assert row.index('label="现在拿着"') < row.index('label="总收益"'), "次序反了"
+    assert row.index('label="持仓"') < row.index('label="总收益"'), "次序反了"
     assert row.index('label="最后一天"') < row.index('label="总收益"')
 
 
@@ -1270,25 +1277,21 @@ def test_R381_六态那句话能显示完整():
     assert "grid-cols-[3.5rem_minmax(0,1fr)_auto]" in code, "窄屏栅格被动了"
 
 
-def test_R381_现在拿着与成交流水在宽屏并排():
-    """两张都是 `min-w-[640px]` 的窄表, 各占一整行时右边一半是空的。
+def test_R381_R512_宽屏上不让窄块独占半屏_分栏后各占整行():
+    """R381 的立论: **宽屏上别让一张窄表独占一整行、右边空一半** —— 当时的解法是并排。
 
-    [R498] 用户选了「今天优先」之后并排的对象换了: 持仓与成绩并排(一个说手上是什么,
-    一个说这么做下来怎么样), 流水与「没做成」并排。立论没变 —— **宽屏上别让一张
-    窄表独占一整行**。两处并排都只在有第二块时才开两列, 否则一张独占整行。
+    [R498] 并排的对象换成持仓 | 成绩。[R512] 分栏之后每一栏只有一块, 并排没有对象了,
+    立论换个方向落地: 成绩独占整行时, 六格回到一行(不再按半幅排成 2~3 列),
+    持仓卡片与流水两栏照旧铺满宽屏。
     """
     from tests.frontend_source import code_of
     code = code_of("pages/FlipPaper.tsx")
-    i = code.index("<TodaySignals")
-    blk = code[i:code.index("<RulesFold", i)]
-    assert blk.strip()
-    top = blk[blk.index("<div className={cn('grid gap-3', hasBody"):]
-    top = top[:top.index("</div>")]
-    assert "xl:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]" in top, "持仓与成绩没并排"
-    assert "<Holdings" in top and "{results}" in top
-    # [R499] 「没做成」撤掉之后流水独占整行 —— 它本来就是全页最长的一张表, 不存在
-    # 「窄表独占一行右边空一半」的问题(它的列会铺开)
-    assert "{hasBody && d && <Orders orders={d.orders} />}" in blk, "流水该独占一整行"
+    jsx = code[code.index('return (\n    <div className="flex h-full flex-col">'):]
+    assert "xl:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]" not in jsx, "分栏之后还留着并排的两列 —— 一栏里只有一块"
+    assert "{tab === 'orders' && hasBody && d && <Orders orders={d.orders} />}" in jsx, "流水该独占一栏"
+    row = code[code.index('<section className="grid grid-cols-2 divide-x'):]
+    row = row[:row.index(">")]
+    assert "lg:grid-cols-6" in row and "xl:grid-cols-2" not in row, "成绩独占整行了, 六格还按半幅排"
 
 
 def test_R381_规则改成多列():

@@ -13,9 +13,9 @@
  *
  * 分栏跟因子页同一个做法: 页头右侧一组分段按钮, 当前栏写在 `?tab=` 里(可收藏、刷新不丢)。
  * 切栏是瞬时的, 不加过渡 —— 这是高频操作。
+ * [R512] 分栏条抽成 `components/PageTabs.tsx`, 模拟盘也用它 —— 两页一份实现。
  */
 import { useQuery } from '@tanstack/react-query'
-import { useSearchParams } from 'react-router-dom'
 import { ClipboardList, Lightbulb, MessagesSquare, NotebookPen } from 'lucide-react'
 import { PageHeader } from '@/components/PageHeader'
 import { EmptyState } from '@/components/EmptyState'
@@ -23,37 +23,24 @@ import { ExtensionSlot } from '@/extensions/ExtensionSlot'
 import { getFrontendSlotRegistrations } from '@/extensions/registry'
 import { api } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
-import { cn } from '@/lib/cn'
-import { SEG, SEG_ITEM, SEG_OFF, SEG_ON } from '@/components/ui'
+import { PageTabs, usePageTab, type PageTabDef } from '@/components/PageTabs'
 import { NotesPanel } from './UsageNotes'
 
 export type MindsTab = 'notes' | 'insights' | 'plans' | 'chat'
 
-export const MINDS_TABS: Record<MindsTab, { title: string; icon: typeof NotebookPen }> = {
+export const MINDS_TABS: Record<MindsTab, PageTabDef> = {
   notes: { title: '笔记', icon: NotebookPen },
   insights: { title: '洞见', icon: Lightbulb },
   plans: { title: '交易计划', icon: ClipboardList },
   chat: { title: '对话', icon: MessagesSquare },
 }
 
-function isMindsTab(v: string | null): v is MindsTab {
-  return v != null && Object.prototype.hasOwnProperty.call(MINDS_TABS, v)
-}
-
 export function Minds() {
-  const [searchParams, setSearchParams] = useSearchParams()
-  const requested = searchParams.get('tab')
-  const activeTab: MindsTab = isMindsTab(requested) ? requested : 'notes'
+  const [activeTab, changeTab] = usePageTab(MINDS_TABS, 'notes')
 
   // 笔记条数挂在分栏上 —— 与笔记栏同一个查询键, 不多发请求
   const notesQ = useQuery({ queryKey: QK.usageNotes, queryFn: api.usageNotesList })
   const counts: Partial<Record<MindsTab, number>> = { notes: notesQ.data?.items.length }
-
-  const changeTab = (tab: MindsTab) => {
-    const next = new URLSearchParams(searchParams)
-    next.set('tab', tab)
-    setSearchParams(next, { replace: true })
-  }
 
   return (
     <div className="flex h-full flex-col">
@@ -61,31 +48,7 @@ export function Minds() {
         title="Minds"
         subtitle={<span className="hidden md:inline">记下来 → 提炼成洞见 → 整理成交易计划 · 有问题随时在「对话」里问</span>}
         className="shrink-0 flex-wrap gap-x-4 gap-y-2"
-        right={(
-          <nav className="min-w-0 max-w-full overflow-x-auto" aria-label="Minds 分栏">
-            <div className={cn(SEG, 'min-w-max')}>
-              {(Object.keys(MINDS_TABS) as MindsTab[]).map(tab => {
-                const { title, icon: Icon } = MINDS_TABS[tab]
-                const active = activeTab === tab
-                return (
-                  <button
-                    key={tab}
-                    type="button"
-                    onClick={() => changeTab(tab)}
-                    aria-current={active ? 'page' : undefined}
-                    className={cn(SEG_ITEM, 'sm:gap-1.5', active ? SEG_ON : SEG_OFF)}
-                  >
-                    <Icon className="hidden h-3.5 w-3.5 sm:block" />
-                    {title}
-                    {counts[tab] != null && (
-                      <span className="text-micro tabular-nums opacity-70">{counts[tab]}</span>
-                    )}
-                  </button>
-                )
-              })}
-            </div>
-          </nav>
-        )}
+        right={<PageTabs tabs={MINDS_TABS} active={activeTab} onChange={changeTab} counts={counts} label="Minds 分栏" />}
       />
 
       {activeTab === 'chat' ? (

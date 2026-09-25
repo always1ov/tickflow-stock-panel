@@ -215,9 +215,12 @@ def test_R329_今日信号排在主列第一块():
     from tests.frontend_source import code_of
     code = code_of("pages/FlipPaper.tsx")
     body = code[code.index('return (\n    <div className="flex h-full flex-col">'):]
+    # [R512] 分栏之后「第一块」= 第一栏且是默认栏
     i_today = body.index("<TodaySignals")
-    for later in ("<Holdings", "{results}", "<Orders"):   # [R499] 没做成那块撤了
+    for later in ("<Holdings", "results}", "<Orders"):   # [R499] 没做成那块撤了
         assert i_today < body.index(later), f"今日信号被 {later} 挤到后面去了"
+    assert "usePageTab(FLIP_TABS, 'signals')" in code, "默认打开的不是今日信号"
+    assert "  signals: { title: '今日信号'" in code
 
 
 # ── [R331] 折叠 ────────────────────────────────────────────────────────

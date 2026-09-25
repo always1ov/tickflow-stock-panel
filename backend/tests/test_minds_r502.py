@@ -113,8 +113,11 @@ def test_R502_四栏的名字与顺序():
     m = code_of(MINDS)
     tabs = re.findall(r"^\s+(\w+): \{ title: '([^']+)'", m, re.M)
     assert tabs == [("notes", "笔记"), ("insights", "洞见"), ("plans", "交易计划"), ("chat", "对话")]
-    assert "searchParams.get('tab')" in m and "setSearchParams(next, { replace: true })" in m
-    assert ": 'notes'" in m, "没带 ?tab= 时该落在笔记"
+    # [R512] 分栏条抽成 components/PageTabs.tsx(模拟盘也用), ?tab= 的读写在那里
+    tabs_src = code_of("components/PageTabs.tsx")
+    assert "searchParams.get('tab')" in tabs_src and "setSearchParams(next, { replace: true })" in tabs_src
+    assert "usePageTab(MINDS_TABS, 'notes')" in m, "没带 ?tab= 时该落在笔记"
+    assert "<PageTabs tabs={MINDS_TABS}" in m
 
 
 def test_R502_核心页面不import扩展目录_对话走插槽():
