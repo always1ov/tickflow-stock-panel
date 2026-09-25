@@ -84,8 +84,7 @@ def test_R344_四档内部都按打分重排():
         "排序得是一处实现 —— 各段各写一遍必然漂"
     for tier in ("const ordered = byRank(live)",
                  "const mineSorted = byRank(mine)",
-                 "const toBull = byRank(idle.filter(",
-                 "const toBear = byRank(idle.filter("):
+                 "const nearBuy = byRank(toBull.filter("):   # [R515] 盯着只列快转多的那几只
         assert tier in blk, f"这一段没参与二次排序: {tier}"
 
 
@@ -711,50 +710,38 @@ def _stat_row() -> str:
     return row
 
 
-def test_R362_六格一行_不是两排():
-    """原来是两排: 上排两格说「当下」各占半屏 —— 一个「10 只」霸着 1000px。"""
+def test_R515_成绩只剩整段四格():
+    """[R362] 六格并成一行 → [R515] 「持仓」「最后一天」两格撤掉(用户: 「模拟盘的只需要展示最重要的」):
+    持仓与持仓那一栏重复, 日期挪进成绩卡的说明。剩下四格全是整段回溯的成绩。"""
     import re
     row = _stat_row()
-    # [R512] 「现在拿着」改名「持仓」—— 与分栏上那一栏同名(一个东西一个名字)
-    for label in ("持仓", "最后一天", "总收益", "最大回撤", "完整买卖", "胜率"):
-        assert label in row, f"这一格掉出这一排了: {label}"
-    assert len(re.findall(r"<Stat[\s>]", row)) == 6, "不是六格"
-    # **整页只剩这一个统计排** —— 留着旧的那一排等于没并
+    for label in ("总收益", "最大回撤", "完整买卖", "胜率"):
+        assert f'label="{label}"' in row, f"这一格掉出这一排了: {label}"
+    for gone in ('label="持仓"', 'label="最后一天"'):
+        assert gone not in row, f"撤掉的那一格又回来了: {gone}"
+    assert len(re.findall(r"<Stat[\s>]", row)) == 4, "不是四格"
     code = code_of(FLIP)
-    assert code.count('<section className="grid grid-cols-2 divide-x') == 1, \
-        "还有第二排统计 —— 那就不是「一行显示」"
+    assert code.count('<section className="grid grid-cols-2 divide-x') == 1, "还有第二排统计"
+    assert "` · 截至 ${d.as_of}`" in code, "「最后一天」撤了, 但日期没挪进成绩卡的说明 —— 那条信息就这么没了"
 
 
-def test_R362_当下那两格仍排在整段四格之前():
-    """[R332 立论照搬] 用户每天打开先问「最近怎么样」。
-
-    **那条次序还在, 只是不再靠换行表达** —— 六格一行, 左两格当下、右四格整段。
-    """
-    row = _stat_row()
-    assert row.index('label="持仓"') < row.index('label="总收益"'), "次序反了"
-    assert row.index('label="最后一天"') < row.index('label="总收益"')
+# [R515] `test_R362_当下那两格仍排在整段四格之前` 退役 —— 用户: 「模拟盘的只需要展示最重要的」, 确认了精简方案 —— 成绩里「持仓」与「最后一天」两格撤掉(前者和持仓那一栏重复, 日期挪进成绩卡的说明「截至 …」), 六格变四格; 新的钉法在 test_R515_成绩只剩整段四格
 
 
 def test_R362_窄屏照样换行():
-    """六格横排在手机上一格只剩六十来像素, 数字会被压断。"""
+    """四格横排在手机上一格只剩八十来像素, 数字会被压断 —— 窄屏两格一行。"""
     row = _stat_row()
-    for cls in ("grid-cols-2", "sm:grid-cols-3", "lg:grid-cols-6"):
+    for cls in ("grid-cols-2", "lg:grid-cols-4"):
         assert cls in row, f"少了这一档断点: {cls}"
-    # 换行的档位要有横线, 六格一行时**要关掉** —— 否则会在唯一那一行下面
-    # 多画一条线
-    assert "divide-y divide-border/30" in row and "lg:divide-y-0" in row, \
-        "divide-y 没按断点收掉"
+    assert "divide-y divide-border/30" in row and "lg:divide-y-0" in row, "divide-y 没按断点收掉"
 
 
 def test_R362_并成一行之后提示语没说假话():
-    """「下面那一排才是整段成绩」那句话在并成一行之后是假的 —— 下面没有那一排了。
-
-    **提示语跟着版面走**: 一句指错方向的说明比没有说明更坏, 它会让人去找一个
-    不存在的东西, 而且不会有任何东西报错。
-    """
+    """提示语跟着版面走: 一句指错方向的说明比没有说明更坏。
+    [R515] 「同一行右边那四格」那句长在撤掉的「持仓」格上, 一起没了; 剩下的格子里不许再有指向别处的话。"""
     row = _stat_row()
-    assert "下面那一排" not in row, "提示语还在指一个不存在的下一排"
-    assert "同一行右边那四格" in row, "没告诉读的人整段成绩现在在哪儿"
+    for stale in ("下面那一排", "同一行右边"):
+        assert stale not in row, f"提示语还在指一个不存在的地方: {stale}"
 
 
 # ── [R363] 标的与动作两格可点, 弹关键价位 ───────────────────────────────
@@ -858,15 +845,15 @@ def test_R364_动作那一格根本不可点():
 
 
 def test_R365_有手动刷新_而且自动那一档没被动过():
-    """**「除了自动定时」** —— 手动是补一条路, 不是替掉节奏。"""
+    """**「除了自动定时」** —— 手动是补一条路, 不是替掉节奏。
+    [R515] 节奏那半句从副标题挪进刷新按钮的提示(用户: 「模拟盘的只需要展示最重要的」),
+    天气拿没拿到都一样 —— 只剩一处, 而且就长在那个按钮上。"""
     code = code_of(FLIP)
     assert "const refreshAll = () =>" in code, "没有手动刷新"
     assert "refetchInterval: refreshEvery('derived')" in code, "自动那一档被动了"
-    # **两个分支各有一句**: 天气拿到了走 JSX 那支, 没拿到走后面那句模板串。
-    # 只断言"出现过"的话, 删掉其中一支照样绿 —— 另一支把断言喂饱了(变异电池
-    # 当场打绿)。而删掉的那一支正是**常态那一支**。
-    assert code.count("rhythmHint('derived')") == 2, \
-        "副标题那句节奏说明少了一支 —— 天气拿到/拿不到, 两种情形都得说"
+    assert code.count("rhythmHint('derived')") == 1, "节奏说明该只剩刷新按钮上那一处"
+    btn = code[code.index("onClick={refreshAll}") - 200:code.index("onClick={refreshAll}") + 400]
+    assert "rhythmHint('derived')" in btn, "节奏说明不在刷新按钮的提示里"
 
 
 def test_R365_两个查询一起重取_不是只刷半页():
@@ -1119,7 +1106,7 @@ def test_R381_R512_宽屏上不让窄块独占半屏_分栏后各占整行():
     assert "{tab === 'orders' && hasBody && d && <Orders orders={d.orders} />}" in jsx, "流水该独占一栏"
     row = code[code.index('<section className="grid grid-cols-2 divide-x'):]
     row = row[:row.index(">")]
-    assert "lg:grid-cols-6" in row and "xl:grid-cols-2" not in row, "成绩独占整行了, 六格还按半幅排"
+    assert "lg:grid-cols-4" in row and "xl:grid-cols-2" not in row, "成绩独占整行了, 格子还按半幅排"
 
 
 def test_R381_规则改成多列():
@@ -1178,17 +1165,7 @@ def _signals() -> str:
 # [R513] `test_R384_名次那列在没进候选池那一组里收成0` 退役 —— 信号行那套定宽网格(ROW_GRID / RowShape / SignalRow)随 R513 整个删了: 用户「今日页面这个页面重做, 改的好看点, 不要折叠了」, 三段各换一种长相(卡片 / 方块 / 密排行), 不再是一张对齐的长表。新版面的守卫在 test_flip_signals_r513.py
 
 
-def test_R384_那句话改在标题上说一次():
-    """从行里撤掉的东西必须在别处说出来, 否则就是悄悄少了一条信息。
-
-    [R385] 判据从「整屏都没有」换成「有几行没有」—— 混着才是常态, 前者几乎
-    永远不成立。所以标题上**报个数**, 而不是一句"都没进"。
-    """
-    sig = _signals()
-    assert "unscored ? `${unscored} 只没进候选池` : null" in sig, \
-        "「没进候选池」从行里撤了, 但标题上没补上 —— 那条信息就这么没了"
-    assert "const unscored = rows.length - rows.filter((r) => conviction.has(r.symbol)).length" in sig, \
-        "那个数不是从全部行算的"
+# [R515] `test_R384_那句话改在标题上说一次` 退役 —— 用户: 「模拟盘的只需要展示最重要的」—— 「N 只没进候选池」不影响谁能动手, 从信号栏说明里撤了; 没名次的要动手卡片上仍写着「没进候选池」(test_R342_没进候选池的票照样在名单里)
 
 
 # [R513] `test_R384_行留白跟着名次走` 退役 —— 信号行那套定宽网格(ROW_GRID / RowShape / SignalRow)随 R513 整个删了: 用户「今日页面这个页面重做, 改的好看点, 不要折叠了」, 三段各换一种长相(卡片 / 方块 / 密排行), 不再是一张对齐的长表。新版面的守卫在 test_flip_signals_r513.py

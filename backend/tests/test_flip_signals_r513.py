@@ -38,14 +38,19 @@ def test_R513_三段各用各的组件_次序是要动手_持仓_盯着():
     assert "SignalRow" not in code_of(FLIP) and "ROW_GRID" not in code_of(FLIP), "旧的定宽网格还留着"
 
 
-def test_R513_盯着按转了会不会变成动作分两组_判据只看side():
-    """没拿着的票: 空头侧站上触发价转多 → 转了就是买入; 多头侧跌破转空 → 没拿着, 转了也没有动作。
-    分组只看后端给的 `side`, 打分一分不参与; 两组都全列出来, 不折叠。"""
+def test_R513_R515_盯着只列快转多的那几只_判据只看side与距离():
+    """[R513] 盯着按转了会不会变成动作分两组(只看后端的 `side`)。
+    [R515] 用户: 「模拟盘的只需要展示最重要的, 像"盯着"这部分, 这么多没有精力看」——
+    只列离转多、且离触发价 `NEAR_BUY`(= NEAR_EXIT, 2%)以内的; 其余只报个数, 不列、不给展开。
+    打分一分不参与挑选, 只在挑出来的几只里排先后。"""
     blk = _today()
-    assert "const toBull = byRank(idle.filter((r) => r.side === '空头'))" in blk
-    assert "const toBear = byRank(idle.filter((r) => r.side !== '空头'))" in blk, "两组必须互为补集"
-    assert blk.index('title="离转多" note="转了就是买点"') < blk.index('title="离转空" note="没拿着, 转了也不用动"'), \
-        "能变成买点的那组该排在前面"
+    assert "const toBull = idle.filter((r) => r.side === '空头')" in blk
+    assert "const nearBuy = byRank(toBull.filter((r) => r.gap_pct != null && Math.abs(r.gap_pct) <= NEAR_BUY))" in blk
+    assert "const NEAR_BUY = NEAR_EXIT" in code_of(FLIP), "「贴近」另立了一个数 —— 与离场线那一档该是同一个口径"
+    assert "<WatchGroup rows={nearBuy}" in blk and blk.count("<WatchGroup") == 1, "盯着那一段又把别的票列出来了"
+    assert "只离转空(没拿着, 转了也不用动)" in blk and "只离转多还差" in blk, "不列的那些连个数都没报"
+    for fold in ("展开", "aria-expanded"):
+        assert fold not in blk, f"不列的那些给了展开 —— 用户要的是不看: {fold}"
 
 
 def test_R513_两组的说法与后端的出手判据对得上():

@@ -32,6 +32,7 @@
 | **今日总览没人显示的几块**：需要行动（`actions`）、持仓体检（`holdings`）、中观快照（`meso`：两市成交额分位、全市场涨跌家数）、仓位上限提示（`position_hint`）、组合（`portfolio`） | 今日总览页 R351 删了，内容逐块并进转折页；这几块没有并进去（R340 撤了需要行动与持仓体检；R506 把主线搬去了宏观分析） | `GET /api/today` 每次仍算并返回这几个字段 | 旧页面：`git show 4fdce3fe^:frontend/src/pages/Today.tsx`。其中**成交额分位和涨跌家数**跟宏观分析最相关，要接就接到「现在」卡 | R340 / R351 / R506 |
 | **AI 导读 · 优选**（盘前导读正文 + 从候选里精选 1~3 只） | 用户：「这部分和 ai 导读都不用了」 | 接口 `POST /api/today/ai`（生成）、`GET /api/today/ai/track-record`（优选战绩）仍能用；存档 `user_data/today_ai.json`、`user_data/ai_pick_ledger.json` | 前端按钮与定时开关：`git show 8b224af3^`（`lib/api.ts` 的 `todayAi`、设置里的定时导读） | R352 |
 | **批次登记页**（作者的真钱批次：成本 / 数量 / 止盈止损 / 到期提醒） | 模拟盘换成转折模拟盘后不在菜单里 | 路由 `/lots-registry` 能直接打开，代码一行没动；数据 `user_data/lots/` | 地址栏输入 `/lots-registry`，或在侧栏菜单里加回一行 | R327 |
+| **模拟盘「盯着」里不列出的票**(离转多还差 2% 以上的、离转空的) | 用户: 「模拟盘的只需要展示最重要的, 像"盯着"这部分, 这么多没有精力看」。交易只在收盘转折那一刻发生, 页面只列明天收盘站上就是买点的那几只(离转多 2% 以内) | 接口 `GET /api/flip-paper` 的 `today` 照旧全发(`flip_today.evaluate` 的 watch 档, 没拿着的 5% 以内都报); 页面上只报一行个数 | 全列两组(离转多 / 离转空)的版面: `git show 260c2ee1:frontend/src/pages/FlipPaper.tsx`, 看 `WatchGroup` 那两处 | R515 |
 | **开发者工具** | 调试用，从来不进菜单 | 路由 `/dev` | 地址栏输入 `/dev` | 作者原有 |
 
 ---

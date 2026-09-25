@@ -297,7 +297,7 @@ def test_R331_折叠按钮报出条数():
     """[R513] 没有折叠按钮了, 但「每一段有几只」仍然要写在段标题上 —— 不写的话看不出这一段有多长。"""
     blk = _today_block()
     for head in ('<ZoneHead title="要动手" count={actCount}', '<ZoneHead title="持仓" count={mine.length}',
-                 '<ZoneHead title="盯着" count={idle.length}'):
+                 '<ZoneHead title="盯着" count={nearBuy.length}'):   # [R515] 报的是列出来的那几只
         assert head in blk, f"段标题没报条数: {head}"
 
 
@@ -743,9 +743,13 @@ def test_R342_分不参与能不能动手():
     for word in ("conviction", "rank", "score", "把握"):
         assert word not in pred, f"出手判据里混进了打分: {word}"
     assert "const mine = rest.filter((r) => r.held)" in blk, "分段判据被动过"
-    for name in ("const toBull", "const toBear"):
+    # [R515] 盯着那段只挑快转多的几只: 挑的判据只看 side 与离触发价的距离, 打分只在挑出来之后排先后
+    for name in ("const toBull", "const nearBuy"):
         line = next(l for l in blk.splitlines() if name in l)
-        assert "r.side" in line and "conviction" not in line and "score" not in line, f"{name} 的分组混进了打分"
+        pick = line.replace("byRank(", "", 1)
+        assert "conviction" not in pick and "score" not in pick and "rank" not in pick, f"{name} 的挑选混进了打分"
+    assert "r.side === '空头'" in next(l for l in blk.splitlines() if "const toBull" in l)
+    assert "Math.abs(r.gap_pct) <= NEAR_BUY" in next(l for l in blk.splitlines() if "const nearBuy" in l)
 
 
 def test_R342_slice先拷一份_不就地改props():

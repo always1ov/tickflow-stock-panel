@@ -224,7 +224,7 @@ export function FlipPaper() {
    */
   const results = (
     <section className="overflow-hidden rounded-card border border-border/60 bg-surface/40">
-      <SectionHead title="成绩" note="只按六态转折买卖 · 非真实资金" />
+      <SectionHead title="成绩" note={`只按六态转折买卖 · 非真实资金${d?.as_of ? ` · 截至 ${d.as_of}` : ''}`} />
       <div className="space-y-3 px-4 py-3">
         <ParamBar capital={capital} maxPositions={maxPositions} years={years}
                   onCapital={putCapital} onMaxPositions={putMaxPositions} onYears={putYears} />
@@ -278,11 +278,10 @@ export function FlipPaper() {
               <span className="mx-1">·</span>
               转多 <span className="text-bull">{w.new_bull}</span>
               {' '}转空 <span className="text-bear">{w.new_bear}</span>
-              <span className="mx-1">·</span>
-              {rhythmHint('derived')}
             </>
           )
-          : `非真实资金 · 只按六态转折买卖 · ${rhythmHint('derived')}`}
+          : '非真实资金 · 只按六态转折买卖'}
+        // [R515] 刷新节奏那半句从副标题挪进刷新按钮的提示 —— 天天看的一行里, 它是最不要紧的那几个字
         // [R365] 手动刷新 —— 副标题那句说的是「它自己什么时候刷」, 这个按钮
         // 回答的是「我现在就要刷」。两件事挨着放。
         // (标签之间不能用 `{/* */}`, 那是子节点的写法 —— 这里要用 `//`,
@@ -299,7 +298,7 @@ export function FlipPaper() {
               size="xs"
               onClick={refreshAll}
               disabled={refreshing}
-              title="立刻重取一次(模拟盘 + 打分两份一起) —— 自动刷新的节奏不受影响"
+              title={`立刻重取一次(模拟盘 + 打分两份一起)。平时${rhythmHint('derived')}, 这个按钮不影响那个节奏`}
             >
               <RefreshCw className={cn('h-3 w-3', refreshing && 'animate-spin')} />
               <span className="hidden sm:inline">{refreshing ? '刷新中' : '刷新'}</span>
@@ -464,17 +463,25 @@ function TodaySignals({ rows, conviction }: {
   const ordered = byRank(live)
   const mineSorted = byRank(mine)
   const scored = live.filter((r) => conviction.has(r.symbol)).length
-  const unscored = rows.length - rows.filter((r) => conviction.has(r.symbol)).length
   // [R355] 「N 只贴近离场线」—— 判据与方块上那一档是同一条(`NEAR_EXIT`)
   const mineNear = mine.filter((r) => r.gap_pct != null && Math.abs(r.gap_pct) <= NEAR_EXIT).length
   // [R513] 盯着的按「转了会不会变成动作」分两组。没拿着的票:
   //   空头侧盯的是站上触发价转多 —— 转了就是买入, 是明天可能要动手的那一组;
   //   多头侧盯的是跌破转空 —— 没拿着, 转了也没有动作(`flip_today.evaluate` 里 act=None)。
-  // 后一组照样全列出来(用户要的是不折叠), 只是排在后面、色更淡。
   // `side` 是后端 `flip_trades.BULL / BEAR` 的原值, 是中文「多头 / 空头」, 不是 bull / bear ——
   // 写成英文的话一只都分不进离转多, 而且不报错(原型阶段拿英文假数据就这么过了一次)。
-  const toBull = byRank(idle.filter((r) => r.side === '空头'))
-  const toBear = byRank(idle.filter((r) => r.side !== '空头'))
+  //
+  // [R515] **只列最要紧的那几只。** 用户: 「模拟盘的只需要展示最重要的, 像"盯着"这部分, 这么多
+  // 没有精力看」。R513 把九十几只全摊开(离转多 + 离转空两组), 这一段反而成了全页最长的。
+  // 交易只在收盘转折那一刻发生, 所以盯着里真正有用的只有**明天收盘站上就是买点**的那几只:
+  // 离转多、且离触发价 `NEAR_BUY` 以内。其余只报个数、不列出, 也不给展开 ——
+  //   离转多但还差 2% 以上: 一天走不到, 明天大概率不用动;
+  //   离转空: 没拿着, 转了也没有动作。
+  // 后端照旧全算全发(登记在 docs/hidden-features.md), 只是这一页不画。
+  const toBull = idle.filter((r) => r.side === '空头')
+  const nearBuy = byRank(toBull.filter((r) => r.gap_pct != null && Math.abs(r.gap_pct) <= NEAR_BUY))
+  const farBull = toBull.length - nearBuy.length
+  const toBear = idle.length - toBull.length
 
   return (
     <>
@@ -484,8 +491,8 @@ function TodaySignals({ rows, conviction }: {
         note={[
           actCount ? `${actCount} 笔要动手` : '今天没有要动手的',
           actCount && scored ? '按把握分排序' : null,
-          unscored ? `${unscored} 只没进候选池` : null,
-          mine.length ? `持仓 ${mine.length} 只` : null,
+          // [R515] 「N 只没进候选池」「持仓 N 只」撤掉: 前者不影响谁能动手, 后者与分栏上的数、
+          // 下面持仓那一段的标题重复 —— 这一行只说今天要不要动手
         ].filter(Boolean).join(' · ')}
         hint={'**只有真转折才出手。**\n\n已转折 = 最新那根已落盘的日 K 让状态翻了面, 这才是动作。\n盘中越线 = 按此刻现价当收盘算会翻面 —— **不是出手理由**, 盘中价会变回去,\n14:30 跌破、14:58 拉回来的那天根本没有转折。\n\n触发价是作者的六态每天给的 flip_up / flip_down, 开盘前就定死,\n所以尾盘盯着它挂单是做得到的。\n\n「持仓」这一段列的是模拟盘手上的票与各自的离场线 —— 那根条越短, 离清仓越近。\n\n「盯着」按转了会不会变成动作分两组: 离转多的转了就是买点;\n离转空的没拿着, 转了也不用动。'}
       />
@@ -525,17 +532,24 @@ function TodaySignals({ rows, conviction }: {
             </div>
           )}
 
-          {/* ③ 盯着 —— 上百只, 一只一行密排 */}
+          {/* ③ 盯着 —— [R515] 只列明天收盘站上就是买点的那几只, 其余只报个数 */}
           {idle.length > 0 && (
             <div className="px-4 py-3">
-              <ZoneHead title="盯着" count={idle.length} note="今天大概率不用动 · 只报还差几个点" />
-              {toBull.length > 0 && (
-                <WatchGroup title="离转多" note="转了就是买点" tone="bull" rows={toBull}
-                            conviction={conviction} onOpen={openLevels} onReview={openReview} />
+              <ZoneHead title="盯着" count={nearBuy.length}
+                        note={`只列离转多 ${NEAR_BUY * 100}% 以内的 · 收盘站上就是买点`} />
+              {nearBuy.length > 0 ? (
+                <WatchGroup rows={nearBuy} conviction={conviction} onOpen={openLevels} onReview={openReview} />
+              ) : (
+                <div className="mt-2 text-xs text-muted">
+                  没有一只离转多在 {NEAR_BUY * 100}% 以内 —— <b className="text-secondary">明天大概率不用动</b>。
+                </div>
               )}
-              {toBear.length > 0 && (
-                <WatchGroup title="离转空" note="没拿着, 转了也不用动" tone="muted" rows={toBear}
-                            conviction={conviction} onOpen={openLevels} onReview={openReview} />
+              {(farBull > 0 || toBear > 0) && (
+                <div className="mt-2 text-micro text-muted/80">
+                  另有{farBull > 0 && ` ${farBull} 只离转多还差 ${NEAR_BUY * 100}% 以上`}
+                  {farBull > 0 && toBear > 0 && '、'}
+                  {toBear > 0 && ` ${toBear} 只离转空(没拿着, 转了也不用动)`}, 不列出。
+                </div>
               )}
             </div>
           )}
@@ -684,7 +698,7 @@ function HoldingTile({ r, c, onOpen, onReview }: { r: FlipTodaySignal; c?: Today
         <span className="hidden shrink-0 sm:inline">离清仓线</span>
         <span className="min-w-0 truncate"><PriceLine r={r} /></span>
       </div>
-      {c && <div className="mt-1 text-micro"><TrendCell o={c} /></div>}
+      {/* [R515] 走势那一格撤掉: 这一段只问离清仓线多远, 走势词是买的时候看的(要动手的卡片上还在) */}
     </div>
   )
 }
@@ -696,30 +710,22 @@ function HoldingTile({ r, c, onOpen, onReview }: { r: FlipTodaySignal; c?: Today
  * 名称 · 还差几个点 · 触发价。名次只在进了候选池时挂一个小号数字。
  * 多列用 CSS columns(列优先): 读完左栏接右栏, 次序与打分排的一致。
  */
-function WatchGroup({ title, note, tone, rows, conviction, onOpen, onReview }: {
-  title: string; note: string; tone: 'bull' | 'muted'
+function WatchGroup({ rows, conviction, onOpen, onReview }: {
   rows: FlipTodaySignal[]; conviction: Map<string, TodayOpportunity>
   onOpen: OpenFn; onReview: OpenFn
 }) {
   return (
-    <div className="mt-3">
-      <div className="mb-1 flex items-baseline gap-2 text-micro">
-        <span className={cn('font-medium', tone === 'bull' ? 'text-bull' : 'text-secondary')}>{title}</span>
-        <span className="tabular-nums text-muted">{rows.length}</span>
-        <span className="text-muted/80">{note}</span>
-      </div>
+    <div className="mt-2">
       <div className="sm:columns-2 sm:gap-x-6 lg:columns-3 2xl:columns-4 min-[1800px]:columns-5">
         {rows.map((r) => {
           const c = conviction.get(r.symbol)
           return (
             <div key={r.symbol} className="flex h-7 break-inside-avoid items-center gap-2 border-b border-border/30 text-xs">
-              <SymbolButton r={r} onOpen={onOpen}
-                            className={cn('flex-1', tone === 'bull' ? 'text-foreground' : 'text-secondary')} />
+              <SymbolButton r={r} onOpen={onOpen} className="flex-1 text-foreground" />
               {c?.rank != null && <span className="shrink-0 text-micro tabular-nums text-muted" title="把握分名次">#{c.rank}</span>}
               <button type="button" onClick={() => onReview(r.symbol, r.name)}
                       title={`还差多少到触发价 ${r.flip_price?.toFixed(2) ?? '—'} —— 点开看 ${r.name} 的逐日复盘`}
-                      className={cn('w-[4.5rem] shrink-0 cursor-pointer text-right tabular-nums transition-colors hover:text-accent',
-                        tone === 'bull' ? 'text-secondary' : 'text-muted')}>
+                      className="w-[4.5rem] shrink-0 cursor-pointer text-right tabular-nums text-secondary transition-colors hover:text-accent">
                 差 {r.gap_pct != null ? `${(Math.abs(r.gap_pct) * 100).toFixed(1)}%` : '—'}
               </button>
               <span className="w-12 shrink-0 text-right text-micro tabular-nums text-muted">{r.flip_price?.toFixed(2) ?? '—'}</span>
@@ -736,6 +742,8 @@ const isActionable = (r: FlipTodaySignal) => r.stage === 'flipped' && !!r.act
 
 /** [R339] 离清仓线多近才算"贴着了"。**只用来上色, 不产生任何动作。** */
 const NEAR_EXIT = 0.02
+/** [R515] 离转多还差多少才算「明天收盘可能站上」—— 与「贴近离场线」同一个口径, 不另立一个数。 */
+const NEAR_BUY = NEAR_EXIT
 
 /**
  * [R353] 可输入的参数格。用户: 「这里我要能配置而不是选择或者默认」。
@@ -880,10 +888,7 @@ function ParamBar({ capital, maxPositions, years, onCapital, onMaxPositions, onY
       {/* [R366] 窄屏藏掉这句 —— 手机上一行只放得下那三个框, 这句会换行占掉一整行。
           **它不是可有可无**(R359 特意加的), 所以不是删: 宽屏照旧, 窄屏挪进
           「回溯」那个框的 title 里, 长按仍看得到。 */}
-      <span className="ml-auto hidden text-muted/70 sm:inline">
-        {/* [R512] 板块与门槛挪进「今日信号」栏了, 「上面那排」不再是真话 */}
-        「今日信号」栏里的板块与门槛只改打分的标注, 不进这条曲线
-      </span>
+      {/* [R515] 「板块与门槛只改打分的标注, 不进这条曲线」那句撤下, 只留在「回溯」那个框的提示里 */}
     </div>
   )
 }
@@ -988,13 +993,9 @@ function Summary({ d }: { d: FlipPaperData }) {
       {/* [R498] 成绩卡挪到持仓旁边之后, xl(≥1280)起只有半幅宽。实测: 半幅里一行六格
           一格只剩一百二十来像素, 21px 的「2026-09-23」被截成两行(1440 与 1920 都是)。
           所以半幅时 2 列、1800 起 3 列; 只有成绩卡占满整行时(xl 以下)才一行六格。 */}
-      <section className="grid grid-cols-2 divide-x divide-y divide-border/30 overflow-hidden rounded-card border border-border/40 bg-base/30 sm:grid-cols-3 lg:grid-cols-6 lg:divide-y-0">
-        <Stat label="持仓" value={`${d.positions.length} 只`}
-              sub={`仓位 ${d.nav.length ? pct((d.nav[d.nav.length - 1].market_value / d.nav[d.nav.length - 1].nav), 0) : '—'} · 现金 ${money(d.nav.at(-1)?.cash)}`}
-              hint={'这是**当下**的仓位, 与上面那条逐月一样看的是现在;\n同一行右边那四格才是整个回溯窗口的成绩。'} />
-        <Stat label="最后一天" value={d.as_of ?? '—'}
-              sub={`回溯 ${d.nav[0]?.date ?? '—'} 起`}
-              hint={'日 K 要等收盘后落盘 —— 所以这里通常是上一个交易日,\n今天的要等 20:00 之后才会进来。'} />
+      <section className="grid grid-cols-2 divide-x divide-y divide-border/30 overflow-hidden rounded-card border border-border/40 bg-base/30 lg:grid-cols-4 lg:divide-y-0">
+        {/* [R515] 「持仓 N 只」与「最后一天」两格撤掉: 前者与持仓那一栏重复, 后者挪进这张卡的说明
+            (「截至 …」)。剩下四格都是整段回溯的成绩。 */}
         <Stat label="总收益" value={pct(s.total_ret)} tone={s.total_ret >= 0 ? 'bull' : 'bear'}
               sub={`本金 ${money(d.capital)} · ${s.days} 个交易日`} />
         <Stat label="最大回撤" value={pct(s.max_drawdown)} tone="bear"
@@ -1312,8 +1313,8 @@ function LoadingSkeleton() {
       {/* [R362] 六格 —— **跟着 `Summary` 那一排走**。少画两格就是先许诺一个版面
           再食言(与下面净值图那块同一条纪律)。栅格断点也要逐个对上, 否则骨架
           在窄屏上换行的位置与真东西不一样, 数据到位时版面会跳一下。 */}
-      <div className="grid grid-cols-2 divide-x divide-y divide-border/30 overflow-hidden rounded-card border border-border/60 bg-surface/40 sm:grid-cols-3 lg:grid-cols-6 lg:divide-y-0">
-        {Array.from({ length: 6 }, (_, i) => (
+      <div className="grid grid-cols-2 divide-x divide-y divide-border/30 overflow-hidden rounded-card border border-border/60 bg-surface/40 lg:grid-cols-4 lg:divide-y-0">
+        {Array.from({ length: 4 }, (_, i) => (
           <div key={i} className="space-y-1.5 px-4 py-2.5">
             <Skeleton w="w-12" h="h-2.5" />
             <Skeleton w="w-16" h="h-5" />

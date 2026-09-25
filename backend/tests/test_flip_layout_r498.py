@@ -121,17 +121,17 @@ def test_R498_手上这些那一行在手机上不再挤成竖排():
 
 
 def test_R512_成绩独占一栏_六格回到一行():
-    """R498 时成绩卡只有半幅宽, 六格一行会把「2026-09-23」截成两行, 所以半幅排 2~3 列。
-    [R512] 成绩独占一栏、整行宽, 那几档半幅断点删掉, 六格从 lg 起回到一行。
-    骨架跟着同一套断点走(不然数据到位时版面跳一下)。"""
+    """R498 时成绩卡只有半幅宽, 所以半幅排 2~3 列。[R512] 成绩独占一栏, 半幅断点删掉。
+    [R515] 撤掉「持仓」「最后一天」两格后剩四格, lg 起一行四格。骨架跟着同一套断点走。"""
     code = code_of(FLIP)
     cls = "grid grid-cols-2 divide-x divide-y divide-border/30 overflow-hidden rounded-card border"
     rows = [code[i:code.index('">', i)] for i in range(len(code)) if code.startswith(cls, i)]
-    assert len(rows) == 2, "六格与它的骨架该各有一排"
+    assert len(rows) == 2, "四格与它的骨架该各有一排"
     for row in rows:
-        assert "sm:grid-cols-3 lg:grid-cols-6 lg:divide-y-0" in row, row
-        for gone in ("xl:grid-cols-2", "xl:divide-y", "min-[1800px]"):
-            assert gone not in row, f"半幅那一档还在: {gone}"
+        assert "lg:grid-cols-4 lg:divide-y-0" in row, row
+        for gone in ("xl:grid-cols-2", "xl:divide-y", "min-[1800px]", "lg:grid-cols-6"):
+            assert gone not in row, f"旧的那一档还在: {gone}"
+    assert "Array.from({ length: 4 }" in code, "骨架画的格数与真东西对不上"
 
 
 def test_R499_有信号但没做成不再放出来():
