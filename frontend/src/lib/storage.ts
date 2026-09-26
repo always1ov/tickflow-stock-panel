@@ -139,7 +139,7 @@ export const storage = {
   abnormalLastResult:   kv<unknown>('abnormal_last_result'),
 
   /** Screener 卡片尺寸 */
-  screenerCardSize:     kv<string>('screener-card-size'),
+  // [R522] 原来这里是 screenerCardSize(策略卡片四档尺寸) —— 卡片统一成一颗芯片, 删了
 
   /** 连板梯队板块筛选 */
   limitLadderBoard:     kv<string[]>('limit-ladder-board-filter'),

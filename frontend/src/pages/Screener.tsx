@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
-import { ScanSearch, Clock, TrendingUp, Star, Filter, Layers, Network, Sparkles, RefreshCw, Settings2, Store, RotateCcw, X, SlidersHorizontal } from 'lucide-react'
+import { ScanSearch, TrendingUp, Star, Filter, Layers, Network, Sparkles, RefreshCw, Settings2, Store, RotateCcw, X, SlidersHorizontal } from 'lucide-react'
 import { api, genRuleId, type ScreenerStrategy, type ScreenerResult } from '@/lib/api'
 import { fetchMinuteBatchIncremental } from '@/lib/minuteBatchIncremental'
 import { DEFAULT_STRATEGY_NOTIFY_EVENTS } from '@/lib/strategyMonitorEvents'
@@ -17,7 +17,7 @@ import { StockPreviewDialog } from '@/components/StockPreviewDialog'
 import { type NavItem } from '@/lib/listNav'
 import { WatchlistAddMenu } from '@/components/WatchlistAddMenu'
 import { useStrategyPool } from '@/lib/useStrategyPool'
-import { StrategyCard, CardSize, loadCardSize, cardWrapCls } from '@/components/screener/StrategyCard'
+import { StrategyCard, CARD_WRAP_CLS } from '@/components/screener/StrategyCard'
 import { ScreenerTable } from '@/components/screener/ScreenerTable'
 import { ScreenerFilter as ScreenerFilterType, defaultFilter, filterActive, countActiveFilters, applyFilter, FilterPanel } from '@/components/screener/ScreenerFilter'
 import { StrategySettingsDialog } from '@/components/screener/StrategySettingsDialog'
@@ -47,7 +47,9 @@ export function Screener() {
   const [assetType, setAssetType] = useState<'stock' | 'etf'>('stock')
   // 周期显示筛选: 全部 / 日线 / 分钟 — 只过滤卡片显示, 不影响池和执行;
   // 执行按每个策略自己声明的 timeframes 路由 (日线走盘后缓存, 分钟走本地分钟K分区)
-  const [tfFilter, setTfFilter] = useState<'all' | '1d' | '1m'>('all')
+  // [R522] 周期筛选(全部 / 日线 / 分钟)的开关撤了 —— 策略芯片一行就排完, 没什么可筛的;
+  // 这个值仍是 run_all 分日线 / 分钟两路的钥匙, 固定在「全部」, 两路都跑
+  const [tfFilter] = useState<'all' | '1d' | '1m'>('all')
   const [activeStrategy, setActiveStrategy] = useState<string | null>(null)
   const [result, setResult] = useState<ScreenerResult | null>(null)
   const [asOf, setAsOf] = useState<string>('')
@@ -71,7 +73,6 @@ export function Screener() {
   const [pruneBackup, setPruneBackup] = useState(() => storage.strategyPoolPruneBackup.get(null))
   // [R101] 池空时按盘后缓存找回的横幅(本次会话内可忽略)
   const [recoverDismissed, setRecoverDismissed] = useState(false)
-  const [cardSize, setCardSize] = useState<CardSize>(loadCardSize)
   // 日k蜡烛图显示开关（仅当 candle 列可见时才有意义；持久化）
   const [dailyKChartVisible, setDailyKChartVisible] = useState<boolean>(() => storage.screenerCandle.get(true))
   const toggleDailyKChart = useCallback(() => {
@@ -815,9 +816,10 @@ export function Screener() {
 
   return (
     <>
+      {/* [R522] 副标题「基于本地 enriched 表 · 毫秒级 SQL」去掉 —— 那是实现细节不是给看盘的人的。
+          工具条从两行 11 个控件收成一行: 周期筛选与卡片尺寸两组开关撤了, 重载 / 叠加 / 创建 / 默认参数只留图标。 */}
       <PageHeader
         title="策略"
-        subtitle="基于本地 enriched 表 · 毫秒级 SQL"
         right={
           <div className="flex flex-wrap items-center gap-2">
             {/* 资产类型切换: 股票 / ETF (分钟策略 asset_types 仅股票, ETF 列表自然不含) */}
@@ -833,22 +835,6 @@ export function Screener() {
                 </button>
               ))}
             </div>
-            {/* 周期筛选: 全部 / 日线 / 分钟 — 只过滤卡片显示, 不影响池与执行路由 */}
-            <div className={SEG}>
-              {(['all', '1d', '1m'] as const).map(tf => (
-                <button
-                  key={tf}
-                  onClick={() => {
-                    if (tfFilter === tf) return
-                    setTfFilter(tf)
-                    setActiveStrategy(null); setResult(null); setShowAll(false)
-                  }}
-                  className={cn(SEG_ITEM, tfFilter === tf ? SEG_ON : SEG_OFF)}
-                >
-                  {tf === 'all' ? '全部' : tf === '1d' ? '日线' : '分钟'}
-                </button>
-              ))}
-            </div>
             {/* 重新运行策略：重载策略文件并重跑全部策略，更新命中个股 */}
             <button
               onClick={() => reloadStrategies.mutate()}
@@ -857,7 +843,7 @@ export function Screener() {
               className={buttonClass({}, 'disabled:cursor-wait')}
             >
               <RefreshCw className={`h-3.5 w-3.5 ${reloadStrategies.isPending ? 'animate-spin' : ''}`} />
-              重载
+              <span className="sr-only">重载</span>
             </button>
             {asOf && (
               <DatePicker
@@ -875,18 +861,6 @@ export function Screener() {
             >
               <Network className="h-3.5 w-3.5" />
             </button>
-            {/* 卡片尺寸切换 */}
-            <div className={SEG}>
-              {(['hidden', 'mini', 'normal', 'large'] as const).map(sz => (
-                <button
-                  key={sz}
-                  onClick={() => { setCardSize(sz); storage.screenerCardSize.set(sz) }}
-                  className={cn(SEG_ITEM, cardSize === sz ? SEG_ON : SEG_OFF)}
-                >
-                  {sz === 'hidden' ? '隐藏' : sz === 'mini' ? '紧凑' : sz === 'normal' ? '标准' : '详细'}
-                </button>
-              ))}
-            </div>
             {/* 策略池按钮 */}
             <button
               onClick={() => setShowPoolDialog(true)}
@@ -901,18 +875,20 @@ export function Screener() {
             {/* 创建叠加策略 */}
             <button
               onClick={() => setShowComposite(true)}
-              className={buttonClass()}
+              title="叠加策略 —— 把几个策略的选股取交集 / 并集"
+              className={buttonClass({ icon: true })}
             >
               <Layers className="h-3.5 w-3.5" />
-              叠加策略
+              <span className="sr-only">叠加策略</span>
             </button>
             {/* 创建策略 */}
             <button
               onClick={() => { setBuilderMode('create'); setShowBuilder(true) }}
-              className={buttonClass()}
+              title="创建策略 · AI"
+              className={buttonClass({ icon: true })}
             >
               <Sparkles className="h-3.5 w-3.5" />
-              创建策略 · AI
+              <span className="sr-only">创建策略 · AI</span>
             </button>
             {/* 获取策略（占位，敬请期待）— 暂时隐藏 */}
             {SHOW_STRATEGY_STORE && (
@@ -942,8 +918,7 @@ export function Screener() {
 
       {/* [R60] 统一页面留白。宽度不限 —— 筛选器是宽表, 限宽只会逼出横向滚动条 */}
       <div className="px-3 pb-4 pt-3 lg:px-4 space-y-3">
-        {/* 策略卡片 */}
-        {cardSize !== 'hidden' && (
+        {/* 策略芯片 —— [R522] 一颗一个策略, 一行排完 */}
         <section>
           {strategies.isLoading && <div className="text-sm text-muted">加载中…</div>}
           {/* [R101] 池空但盘后缓存里有跑批记录: 缓存的键=上次跑批时池里的策略
@@ -1003,7 +978,7 @@ export function Screener() {
                 : '当前周期筛选下无策略，切换周期筛选或编辑策略池'}
             </div>
           )}
-          <div className={cardWrapCls(cardSize)}>
+          <div className={CARD_WRAP_CLS}>
             {displayPool.map(id => {
               const s = strategyMap.get(id)
               if (!s) return null
@@ -1023,7 +998,6 @@ export function Screener() {
                   loading={runAll.isPending}
                   computing={pendingRunIds.has(id) || selfRunning || minuteRunning}
                   awaitRun={hitCounts[id] == null && isMinute && !selfRunning && !minuteRunning}
-                  cardSize={cardSize}
                   onRun={() => handleRun(s)}
                   disabled={run.isPending && activeStrategy === s.id}
                   onSettings={() => setSettingsStrategyId(s.id)}
@@ -1035,7 +1009,6 @@ export function Screener() {
             })}
           </div>
         </section>
-        )}
 
         {/* 结果 */}
         <section>
@@ -1053,8 +1026,9 @@ export function Screener() {
               transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
               className="space-y-3"
             >
-              <div className="flex items-center justify-between">
-                <h2 className={cn('flex items-center gap-2', TYPE.card)}>
+              {/* [R522] 手机上标题与右边三个按钮抢一行, 标题被挤成竖排 —— 放不下时按钮整组落到下一行 */}
+              <div className="flex flex-wrap items-center justify-between gap-y-2">
+                <h2 className={cn('flex items-center gap-2 whitespace-nowrap', TYPE.card)}>
                   {!showAll && activeStrategy && (
                     <span className="text-secondary">{strategyIdToName[activeStrategy] ?? ''}</span>
                   )}
@@ -1063,17 +1037,12 @@ export function Screener() {
                   {filterActive(filter) && displayRows.length !== (showAll ? allRows.length : result!.total) && (
                     <span className="text-muted text-xs">/ {showAll ? allRows.length : result!.total}</span>
                   )}
-                  <span className="text-xs text-muted font-normal">
-                    · {displayPool.length} 策略
-                    {!showAll && displayPool.length > 0 && (
-                      <> · 共 {displayPool.reduce((sum, id) => sum + (hitCounts[id] ?? 0), 0)} 只</>
-                    )}
-                  </span>
+                  {/* [R522] 「· N 策略 · 共 M 只」撤了: 每颗芯片上都写着自己的命中数, 这里再加总一遍是第二份同样的话 */}
                   {(runAll.isPending || run.isPending || singleCachedQuery.isFetching || fullCachedQuery.isFetching) && (
                     <span className="text-xs text-muted animate-pulse">更新中…</span>
                   )}
                 </h2>
-                <div className="flex items-center gap-3">
+                <div className="flex shrink-0 items-center gap-3">
                   {(showAll ? allRows.length > 0 : !!result?.rows.length) && (
                     <div className="inline-flex items-stretch h-7 rounded-btn border border-border bg-surface overflow-hidden">
                       <button
@@ -1138,12 +1107,7 @@ export function Screener() {
                   >
                     <Settings2 className="h-3 w-3" />
                   </button>
-                  {!showAll && result && result.elapsed_ms > 0 && (
-                    <div className="flex items-center gap-2 text-xs text-muted">
-                      <Clock className="h-3 w-3" />
-                      <span className="num">{result.elapsed_ms.toFixed(1)} ms</span>
-                    </div>
-                  )}
+                  {/* [R522] 「29.7 ms」那个耗时撤了 —— 实现细节, 不是看盘要的读数 */}
                   {/* 分时截断提示: 超数据源批量上限时在工具栏内联显示, 可关闭 */}
                   {intradayTruncated && !intradayCapDismissed && (
                     <span className="inline-flex items-center gap-1 text-xs text-warning/90">

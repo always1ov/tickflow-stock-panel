@@ -10,7 +10,7 @@ import { StrategyCard } from './StrategyCard'
 const noop = () => {}
 const base = {
   name: '分钟突破', description: '', source: 'custom' as const,
-  active: false, loading: false, cardSize: 'normal' as const,
+  active: false, loading: false,
   onRun: noop, disabled: false, onSettings: noop,
   timeframeBadge: '分钟',
 }
@@ -55,12 +55,6 @@ it('hint yields to the real count once available', () => {
 
   expect(container.textContent).not.toContain('待计算')
   expect(container.textContent).toContain('7')
-})
-
-it('mini size also renders the hint', () => {
-  render({ awaitRun: true, cardSize: 'mini' })
-
-  expect(container.textContent).toContain('待算')
 })
 
 it('onRun fires when the card is clicked', () => {

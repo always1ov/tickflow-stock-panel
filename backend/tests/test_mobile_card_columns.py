@@ -30,8 +30,9 @@ def _code() -> str:
 def _root_class() -> str:
     """卡片根元素那一串 className。"""
     code = _code()
-    m = re.search(r"className=\{`\$\{cs\.card\}([^`]*)`\}", code)
-    assert m, "卡片根元素的 className 形状变了 —— 这条守卫的锚要跟着改"
+    # [R522] 四档卡片统一成一颗芯片, 根元素的 className 不再拼 `cs.card`; 锚改成芯片根元素那一串
+    m = re.search(r"className=\{`inline-flex h-7([^`]*)`\}", code)
+    assert m, "芯片根元素的 className 形状变了 —— 这条守卫的锚要跟着改"
     return m.group(1)
 
 
