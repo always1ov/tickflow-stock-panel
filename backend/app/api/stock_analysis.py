@@ -334,12 +334,12 @@ def get_trend(request: Request, symbol: str = Query(...)):
 
 
 @router.get("/trends")
-def get_trends(request: Request, symbols: str = Query(..., description="逗号分隔,最多 200 只")):
+def get_trends(request: Request, symbols: str = Query(..., description="逗号分隔,最多 300 只")):
     """批量六态趋势(决策台「趋势」列)。返回 {trends: {SYMBOL: {...}}}。
 
     [R16] 实时行情开着时, 当天实时价作为临时收盘参与判定(盘中口径)。
     """
-    syms = [s for s in symbols.split(",") if s.strip()][:200]
+    syms = [s for s in symbols.split(",") if s.strip()][:300]   # [R530] 与 keltner / urgency 同一个上限 —— 原来 200, 用户 202 只自选, 多的两只六态被静默截掉
     if not syms:
         raise HTTPException(400, "symbols 不能为空")
     from app.services import livermore_service

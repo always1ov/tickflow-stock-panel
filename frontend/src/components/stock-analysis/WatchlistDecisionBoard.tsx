@@ -1,10 +1,8 @@
-import { useState, useMemo, useEffect, useRef } from 'react'
+import { Fragment, useState, useMemo, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Star, ArrowUp, ArrowDown, RefreshCw, Download, ChevronDown, Folder, Inbox, List, FlaskConical } from 'lucide-react'
-import { api, type ChannelEvent, type ChannelPhase, type EffectivePosition, type ExitLine, type KeltnerBands, type TrendInfo, type Urgency } from '@/lib/api'
+import { Star, ArrowUp, ArrowDown, RefreshCw, Download, FlaskConical } from 'lucide-react'
+import { api, type ChannelEvent, type ChannelPhase, type EffectivePosition, type ExitLine, type FocusTier, type KeltnerBands, type TrendInfo, type Urgency } from '@/lib/api'
 // [R276] 分组下拉直接复用「加入自选」那个菜单 —— 定位/键盘/点外面关闭/配色全都现成
-import { WatchlistGroupMenu } from '@/components/WatchlistAddMenu'
-import { resolveWatchlistGroupColor } from '@/lib/watchlist-group-colors'
 import { QK } from '@/lib/queryKeys'
 import { cn } from '@/lib/cn'
 import { toast } from '@/components/Toast'
@@ -147,9 +145,6 @@ const BOARD_COLS = [
 const TREND_RANK: Record<string, number> = { UT: 0, NR: 1, SR: 2, SREA: 3, NREA: 4, DT: 5 }
 
 // [R276] 分组筛选的两个哨兵。用字符串而不是 null —— 见 storage.boardGroupFilter 的说明。
-const G_ALL = 'all'
-const G_UNGROUPED = 'ungrouped'
-
 /** 自选决策台 —— 个股分析页的整页主体: 一行一只自选, 点标的即弹出关键价位分析,
  *  并可标记仓位/成本、纵观对比浮盈。[R28] 起不再折叠(整页就它一个, 没有要让位的东西)。 */
 export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, locateNonce }: {
@@ -162,7 +157,6 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, loc
   onPreview?: (symbol: string, name: string, view?: PreviewView) => void
 }) {
   const qc = useQueryClient()
-  const [heldOnly, setHeldOnly] = useState(false)
   // [R157] 定位当前个股: 行引用 + 闪烁高亮 + "行还没渲染出来"时的待定位
   const rowRefs = useRef<Record<string, HTMLTableRowElement | null>>({})
   const pendingLocate = useRef<{ symbol: string; explicit: boolean } | null>(null)
@@ -195,38 +189,10 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, loc
   // [R228] 27 种组合速查的独立弹窗状态在这里删掉了。用户: 「这两个弹窗也整合到
   // 一起, 外部入口就变成一个按钮了」。它已经是复盘弹窗的第三个页签, 而且 geo/runs
   // 改由复盘接口的 `channel` 给 —— 决策台不必再把行数据透传进弹窗。
-  // 「只看要动的」—— 自选一多, 默认列 80 行本身就是噪音
-  // [R521] **默认开着, 并且记住。** 用户把这个决定交给我(「等我的事件, 你帮我选择最优解拍板」):
-  // 这一页叫决策台, 回答的是「今天该动谁」; 一百多只里天天真该看的就那几只, 先列全部
-  // 是让人先过一遍噪音再找信号 —— 与模拟盘「没事是常态」同一条取舍。想扫全部的点一下
-  // 关掉, 关了就一直关着(存 localStorage), 不会每次打开都替人做一遍决定。
-  // 定位(搜索 / 从别页跳来)到一只被它挡住的票时, 下面那段仍会自动把它关掉并提示。
-  const [actionableOnly, setActionableOnlyState] = useState(() => storage.boardActionableOnly.get(true))
-  const setActionableOnly = (next: boolean | ((v: boolean) => boolean)) =>
-    setActionableOnlyState((v) => {
-      const n = typeof next === 'function' ? next(v) : next
-      storage.boardActionableOnly.set(n)
-      return n
-    })
-  // [R330] 「只看转折」—— 用户: 「再加个按钮只看趋势转折」。
-  //
-  // **它与「只看要动的」不是一回事, 所以是第三个开关而不是并进去**: 后者是四档
-  // 触发的并集(出场线破了/逼近、离翻转价 2% 以内、今日刚翻转、短期通道到轨),
-  // 转折只是其中一档。想「今天只看真翻面的那几只」时, 另外三档就是噪音 ——
-  // 而这正是整套模拟盘唯一认的那个信号(R327/R329: 只有真转折才出手)。
-  const [flippedOnly, setFlippedOnly] = useState(false)
-  // [R276] 「只看某个分组」。用户: 「这里还要加个选择按钮, 能下拉菜单只看哪个分组」。
-  //
-  // 记进 localStorage: 分组是长期的编队(军工/稳定币/…), 你昨天在看哪一队, 今天
-  // 多半还想接着看 —— 每次刷新都退回「全部」等于这个功能只对当次会话有用。
-  // **但记住一个筛选就必须管它过期**: 那个分组被删掉之后, 界面会永远是空的而不说
-  // 为什么。下面 groupsQ 到位后的那个 useEffect 就是干这个的。
-  const [groupFilter, setGroupFilterRaw] = useState<string>(
-    () => storage.boardGroupFilter.get(G_ALL) || G_ALL)
-  const setGroupFilter = (g: string) => {
-    setGroupFilterRaw(g)
-    storage.boardGroupFilter.set(g)
-  }
+  // [R530] 「只看要动的 / 只看转折 / 只看持有 / 只看哪个分组」四个筛选一起撤了(R178 / R330 / R276 / R521)。
+  // 用户: 「个股分析页面只显示那些我需要看的, 不然一大堆。自选页面里面才是一大堆, 当做个收藏夹」。
+  // 这一页不再是"全量自选 + 筛选", 而是三段固定的名单: 今天要动的 / 持有·无事 / 计划中·贴轨,
+  // 其余的票在这一页根本不出现 —— 要看随便哪只, 页头搜索直接开弹窗。分组是仓库(自选页)的事。
   /**
    * [R251] 每个排序目标**第一次点击**该往哪边排。
    *
@@ -294,36 +260,14 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, loc
   // 会让 rows 的 useMemo 依赖每帧都变, 记忆化等于没做。
   const positions = useMemo(() => positionsQ.data?.positions ?? {}, [positionsQ.data])
 
-  // [R276] 分组归属与分组名录。
-  //
-  // **enriched 那个接口不带 group_ids** —— 它只出行情, 分组归属在自选列表里。
-  // 两份都走各自已有的 QK, 与自选页/侧栏/监控共用同一份 React Query 缓存, 不多一次请求。
-  const wlQ = useQuery({
-    queryKey: QK.watchlist,
-    queryFn: () => api.watchlistList(),
-    staleTime: 60_000,
-  })
-  const groupsQ = useQuery({
-    queryKey: QK.watchlistGroups,
-    queryFn: () => api.watchlistGroups(),
-    staleTime: 60_000,
-  })
-  const groups = useMemo(() => groupsQ.data?.groups ?? [], [groupsQ.data])
-  /** symbol → 所属分组 id 列表(空数组 = 未分组) */
-  const groupOf = useMemo(() => {
-    const m = new Map<string, string[]>()
-    for (const e of wlQ.data?.symbols ?? []) m.set(e.symbol, e.group_ids ?? [])
+  // [R530] 焦点名单(持有 / 计划中 / 贴轨 / 观察, 含钉住·静音之后的有效档) —— 第三段「计划中 · 贴轨」从它来。
+  // 与监控中心的焦点名单栏同一个查询键, 不多发请求; 口径由后端 focus_list 定, 这里只分档。
+  const focusQ = useQuery({ queryKey: QK.focus, queryFn: api.focusList, staleTime: 30_000 })
+  const focusTier = useMemo(() => {
+    const m = new Map<string, FocusTier>()
+    for (const it of focusQ.data?.items ?? []) m.set(it.symbol, it.effective)
     return m
-  }, [wlQ.data])
-  // **归属还没到之前一律不筛。** 空 Map 会让每一只都看着像「未分组」—— 选了某个
-  // 分组的人在加载那一瞬间会看到一张空表, 而那不是真的。宁可多显示, 见下面「只看
-  // 要动的」同样的取舍。
-  const groupsReady = !!wlQ.data
-  const inGroup = useMemo(() => (sym: string) => {
-    if (groupFilter === G_ALL || !groupsReady) return true
-    const ids = groupOf.get(sym) ?? []
-    return groupFilter === G_UNGROUPED ? ids.length === 0 : ids.includes(groupFilter)
-  }, [groupFilter, groupOf, groupsReady])
+  }, [focusQ.data])
 
   // [fork 增强] 六态趋势列 —— 批量一次拉取,零 AI 成本,基于日线收盘价
   const trendSyms = useMemo(
@@ -407,9 +351,8 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, loc
     },
   })
 
-  // [R276] `scoped` = 过完「只看要动的」「只看持有」但**还没过分组**的那一批。
-  // 分组下拉里那些数字要从它算 —— 见下面 groupCounts 的说明。
-  const scoped = useMemo(() => {
+  // 全部自选的行(带上趋势 / 通道 / 急迫度 / 仓位); 分段在下面 `sections` 里做
+  const rows = useMemo(() => {
     const src = enriched.data?.rows ?? []
     return src
       .map((r: any) => {
@@ -434,59 +377,10 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, loc
           lotCount: pos?.lot_count ?? 0,
         }
       })
-      .filter((r) => (heldOnly ? r.held : true))
-      // [R178] 「要动的」= 前四档(已触发/逼近/刚转折/到轨), 无事档不算。
-      // 判定还没回来时不过滤 —— 宁可多显示, 不能让表在加载中看起来是空的。
-      .filter((r) => (actionableOnly ? (r.urg ? r.urg.level !== 'idle' : true) : true))
-      // [R330] 「只看转折」。判据取 `trend.flipped` —— 复盘逐日表、今日信号、
-      // 模拟盘认的是同一个字段(R286 起), **不在这里另立一套"算不算转折"**。
-      // 趋势还没回来时不过滤, 与上面那条同理: 加载中的表不该看起来是空的。
-      .filter((r) => (flippedOnly ? (r.trend ? !!r.trend.flipped : true) : true))
     // [R276] phases/plays 补进依赖表 —— 它们在上面的 map 里被读, 原来漏了。
-    // 实际不会串数据(四份都来自同一个 urgencyQ, 一起变), 但漏一个依赖是下一次
-    // 拆查询时才会爆的雷, 现在补上不花钱。
-  }, [enriched.data, positions, heldOnly, actionableOnly, flippedOnly, trends, exitLines,
-      keltner, urgency, events, phases])
+  }, [enriched.data, positions, trends, exitLines, keltner, urgency, events, phases])
 
-  const rows = useMemo(() => scoped.filter((r) => inGroup(r.symbol)), [scoped, inGroup])
-
-  /**
-   * [R276] 下拉里每一项后面那个数字 = **选它之后你能看到几行**, 不是"这个组里有几只"。
-   *
-   * 两者在开着「只看要动的」时能差很远。显示"组里有 8 只"而点进去是 0 行, 就又变成
-   * 这个项目一直在治的那种毛病: 界面说的和界面做的不是一回事, 而人只会以为它坏了。
-   * 菜单标题里把口径写出来, 免得反过来被当成"这个组只剩 3 只票了"。
-   *
-   * 一只票同时属于两个分组时**两边各计一次** —— 与 lib/watchlistGroupStats.ts 同口径。
-   */
-  const groupCounts = useMemo(() => {
-    const c: Record<string, number> = { ungrouped: 0 }
-    for (const g of groups) c[g.id] = 0
-    for (const r of scoped) {
-      const ids = groupsReady ? (groupOf.get(r.symbol) ?? []) : []
-      if (!ids.length) c.ungrouped += 1
-      else for (const id of ids) c[id] = (c[id] ?? 0) + 1
-    }
-    return c
-  }, [scoped, groupOf, groups, groupsReady])
-
-  /**
-   * [R276] **记住的那个分组被删掉之后, 要有人说一声。**
-   *
-   * 不管的话: 自选页删掉「稳定币」这一组 → 决策台下次打开永远是空表, 而底下写的是
-   * 「自选为空」。那句话是假的, 而且指向完全错误的方向(去自选页添加标的)。
-   * 名录到位之后核对一次, 对不上就退回「全部分组」并明说。
-   */
-  useEffect(() => {
-    if (groupFilter === G_ALL || groupFilter === G_UNGROUPED) return
-    if (!groupsQ.data) return          // 还没加载完 —— 这时候判"不存在"是冤枉它
-    if (groups.some((g) => g.id === groupFilter)) return
-    setGroupFilter(G_ALL)
-    toast('原先筛选的那个分组已经不在了 —— 已切回「全部分组」', 'error')
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [groupsQ.data, groupFilter])
-
-  const sortedRows = useMemo(() => {
+  const sortRows = useMemo(() => (list: typeof rows) => {
     const val = (r: (typeof rows)[number]): string | number | null => {
       switch (sort.key) {
         // [R178] 档位为主、同档内离触发多近为辅。合成一个可比的数:
@@ -503,7 +397,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, loc
         case 'trend': return r.trend ? -(TREND_RANK[r.trend.state] ?? 9) : null
       }
     }
-    const arr = [...rows]
+    const arr = [...list]
     arr.sort((a, b) => {
       const av = val(a), bv = val(b)
       if (av == null && bv == null) return 0
@@ -513,7 +407,35 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, loc
       return sort.dir === 'asc' ? c : -c
     })
     return arr
-  }, [rows, sort])
+  }, [sort])
+
+  /**
+   * [R530] 三段固定名单 —— 这一页只放今天要看的:
+   *   ① 今天要动的: 急迫度前四档(已触发 / 逼近 / 刚转折 / 到轨), 持有与否都算
+   *   ② 持有 · 无事: 拿着但今天没事的
+   *   ③ 计划中 · 贴轨: 焦点名单里过推送门的那两档(含钉住), 还没拿、今天也没事的
+   * 一只票只出现一次, 按①②③的先后归段。观察档、无事的票不在这一页出现。
+   *
+   * **急迫度没回来时①不放行全部。** 原来「只看要动的」在判定缺失时一律放行 —— 接口一超时,
+   * 202 只全体变成"要动的"(用户手机截图就是这样)。现在缺就明说缺, 不拿全量冒充。
+   */
+  const urgencyReady = !!urgencyQ.data
+  const sections = useMemo(() => {
+    const act = urgencyReady ? rows.filter((r) => r.urg && r.urg.level !== 'idle') : []
+    const inAct = new Set(act.map((r) => r.symbol))
+    const held = rows.filter((r) => r.held && !inAct.has(r.symbol))
+    const focus = rows.filter((r) => {
+      if (r.held || inAct.has(r.symbol)) return false
+      const t = focusTier.get(r.symbol)
+      return t === 'plan' || t === 'band'
+    })
+    return [
+      { key: 'act', title: '今天要动的', rows: sortRows(act) },
+      { key: 'held', title: '持有 · 无事', rows: sortRows(held) },
+      { key: 'focus', title: '计划中 · 贴轨', rows: sortRows(focus) },
+    ] as const
+  }, [rows, urgencyReady, focusTier, sortRows])
+  const sortedRows = useMemo(() => sections.flatMap((sec) => sec.rows), [sections])
 
   // [R435] 「全自选持有数」(heldCount)原来只用来决定「AI 分析持有」那个按钮出不出现,
   // 按钮随 AI 信号撤了, 它也跟着撤。
@@ -522,18 +444,9 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, loc
   // 原来它是全自选的持有数, 和左边的「N 只」(已经被筛过)不是同一批票 ——
   // 开着筛选时那一行读作「12 只 · 持有 8」, 而这 12 只里可能一只持仓都没有。
   // 加了分组筛选之后这个错位会天天撞见, 所以一并纠正: 一行里的两个数出自同一批。
-  const heldInView = useMemo(() => rows.filter((r) => r.held).length, [rows])
-  // 「要动的」有几只 —— 显示在开关上, 用户不点也能一眼知道今天有没有事
-  const actionCount = useMemo(
-    () => Object.values(urgency).filter((u) => u.level !== 'idle').length, [urgency])
-  // [R330] 今天转折的有几只 —— 与上面那个同一条理由: 不点也能一眼知道今天有没有事
-  const flipCount = useMemo(
-    () => Object.values(trends).filter((t: any) => t?.flipped).length, [trends])
+  const heldInView = useMemo(() => sortedRows.filter((r) => r.held).length, [sortedRows])
   // [R276] 自选一共几只(不受任何筛选影响) —— 空表提示和导出页脚要拿它当分母
   const totalRows = enriched.data?.rows?.length ?? 0
-  const curGroup = groups.find((g) => g.id === groupFilter)
-  const groupLabel = groupFilter === G_ALL ? '全部分组'
-    : groupFilter === G_UNGROUPED ? '未分组' : (curGroup?.name ?? '分组')
 
   // ===== [R157] 定位当前个股 =====
   // 用户: 「加个定位当前个股的功能, 任何适合被选中的都要能当前页面显示, 我不想每次
@@ -567,29 +480,9 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, loc
       if (explicit) toast(`${sym} 不在自选里, 决策台没有它这一行`, 'error')
       return
     }
-    // [R276] 在自选里、却没有这一行 —— 那就是被筛选挡住了。**挡路的可能不止一个**,
-    // 所以逐个查、逐个撤, 而不是只撤第一个(只撤一个的话行还是不出现, 看起来就是
-    // "点了定位没反应")。原来这里只认「只看持有」, 漏了「只看要动的」——
-    // 加分组筛选之后这个洞会更常撞到, 一并补齐。
-    const byHeld = heldOnly && !positions[sym]?.held
-    const byAction = actionableOnly && urgency[sym]?.level === 'idle'
-    // [R330] 新开关必须同步补进这里 —— R276 立这段时就是因为「漏了一个筛选」
-    // 会表现成"点了定位没反应", 而且不会有任何东西报错。
-    const byFlip = flippedOnly && !trends[sym]?.flipped
-    const byGroup = !inGroup(sym)
-    const blockers = [
-      byHeld && '只看持有',
-      byAction && '只看要动的',
-      byFlip && '只看转折',
-      byGroup && `只看「${groupLabel}」`,
-    ].filter(Boolean) as string[]
-    if (!blockers.length) return
-    pendingLocate.current = { symbol: sym, explicit: true }
-    if (byHeld) setHeldOnly(false)
-    if (byAction) setActionableOnly(false)
-    if (byFlip) setFlippedOnly(false)
-    if (byGroup) setGroupFilter(G_ALL)
-    toast(`这只票被${blockers.join(' / ')}挡住了 —— 已撤掉并定位`, 'success')
+    // [R530] 在自选里、却不在这一页 —— 它今天不在要看的名单里(不持有、没事、也不在计划中 / 贴轨)。
+    // 不再有筛选可撤; 要看它, 页头搜索直接开弹窗。定位按钮按下去时说一声, 别静默。
+    if (explicit) toast(`${sym} 今天不在这一页的名单里(不持有、没事、也不在计划中 / 贴轨)—— 用搜索打开它`, 'error')
   }
   // 行渲染出来之后补做待定位(数据首次到达 / 切换筛选 / 排序变化)
   useEffect(() => {
@@ -649,71 +542,13 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, loc
               同一页两个名字读的人得先确认是不是一回事。只数留着。 */}
           {/* [R276] 两个数出自同一批票(当前这张表)。筛掉了多少写在后面, 免得
               「12 只」被读成"我的自选只剩 12 只了"。 */}
+          {/* [R530] 「N 只」是这一页三段加起来的数; 「自选共 M」一直写着 —— 这一页本来就只放自选的一小部分 */}
           <span className="text-xs text-muted">
-            {rows.length} 只 · 持有 {heldInView}
-            {rows.length < totalRows && (
-              <span className="opacity-60"> · 自选共 {totalRows}</span>
-            )}
+            {sortedRows.length} 只 · 持有 {heldInView}
+            <span className="opacity-60"> · 自选共 {totalRows}</span>
           </span>
           {/* [R198] 角上的感叹号 —— 点开只讲这些词怎么读, 不讲怎么算出来的 */}
         </span>
-        {/* [R395] 这三个开关是 `py-0.5`, 算上边框实高 21px —— 手指点不准。
-            用仓库已有的 `.tap-target`(见 index.css): 它用一个 ::before 把**可点
-            范围**撑到 28px, **视觉尺寸一个像素不变** —— 这一页的密度是刻意的,
-            不能为了好点就把控件撑大。 */}
-        <button
-          onClick={() => setActionableOnly((v) => !v)}
-          title={'只留下有触发的那几只: 出场线已破/逼近、离趋势翻转价 2% 以内、今日刚翻转、'
-            + '短期通道到轨。判定是纯规则的(与焦点名单同一套到轨口径), AI 不参与。\n'
-            + '自选一多, 默认列出全部本身就是噪音 —— 绝大多数票今天确实不需要你看。'}
-          className={buttonClass({ selected: actionableOnly }, 'shrink-0')}
-        >
-          只看要动的{actionCount > 0 && <span className="opacity-70">·{actionCount}</span>}
-        </button>
-        <button
-          onClick={() => setFlippedOnly((v) => !v)}
-          title={'只留下**今天六态翻面**的那几只 —— 昨天还不是这个状态。\n'
-            + '判据是 `trend.flipped`, 与复盘逐日表的「转折」、模拟盘认的信号同一个字段。\n\n'
-            + '与「只看要动的」的区别: 那个是四档触发的并集(出场线、逼近翻转价、'
-            + '今日转折、通道到轨), 转折只是其中一档。\n'
-            + '想按转折做的时候, 另外三档就是噪音 —— 而转折正是模拟盘唯一认的信号。'}
-          className={buttonClass({ selected: flippedOnly }, 'shrink-0')}
-        >
-          只看转折{flipCount > 0 && <span className="opacity-70">·{flipCount}</span>}
-        </button>
-        <button
-          onClick={() => setHeldOnly((v) => !v)}
-          className={buttonClass({ selected: heldOnly }, 'shrink-0')}
-        >
-          只看持有
-        </button>
-        {/* [R276] 只看某个分组。选中时按分组自己的颜色亮起 —— 与自选页的分组条同一套配色,
-            扫一眼就知道现在挂着的是哪一队, 而不用去读文字。 */}
-        <WatchlistGroupMenu
-          includeAll
-          align="left"
-          menuLabel="只看哪个分组(数字=当前筛选下能看到几只)"
-          counts={groupCounts}
-          total={scoped.length}
-          preferredGroupId={groupFilter === G_ALL ? undefined
-            : groupFilter === G_UNGROUPED ? null : groupFilter}
-          onSelect={(g) => setGroupFilter(g === 'all' ? G_ALL : g ?? G_UNGROUPED)}
-          title={'只看某一个分组的票。分组在自选页维护 —— 一只票可以同时属于多个分组, '
-            + '那它在每个分组里都会出现。\n'
-            + '这个选择会记住, 下次打开还是它; 分组万一被删掉会自动退回「全部分组」并提示。'}
-          ariaLabel="按分组筛选"
-          // 选中某个分组时仍按分组自己的颜色亮 —— 那个颜色是分组的身份, 不是装饰
-          triggerClassName={buttonClass({ selected: groupFilter !== G_ALL && !curGroup }, cn('gap-1',
-            groupFilter !== G_ALL && curGroup && cn('border', resolveWatchlistGroupColor(curGroup.color).border,
-              resolveWatchlistGroupColor(curGroup.color).background, resolveWatchlistGroupColor(curGroup.color).text)))}
-        >
-          {groupFilter === G_ALL ? <List className="h-3.5 w-3.5" />
-            : groupFilter === G_UNGROUPED ? <Inbox className="h-3.5 w-3.5" />
-              : <Folder className="h-3.5 w-3.5" />}
-          <span className="max-w-[7rem] truncate">{groupLabel}</span>
-          <ChevronDown className="h-3.5 w-3.5 opacity-70" />
-        </WatchlistGroupMenu>
-        <span className="mx-0.5 h-4 w-px shrink-0 bg-border/60" aria-hidden />
         <button
           onClick={refreshAll}
           disabled={refreshing}
@@ -734,9 +569,9 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, loc
             「撤销上一次批量」这回事。所以跑完先摆结果, 勾了才写。 */}
         <button
           onClick={() => setBacktestAllOpen(true)}
-          disabled={!rows.length}
-          title={rows.length
-            ? `对当前列表所见的 ${rows.length} 只各按 3%~15% 阈值网格跑一遍六态状态机。\n`
+          disabled={!sortedRows.length}
+          title={sortedRows.length
+            ? `对当前列表所见的 ${sortedRows.length} 只各按 3%~15% 阈值网格跑一遍六态状态机。\n`
               + '纯计算,不调用 AI、不计费。\n\n'
               + '跑完先摆结果(现在多赚 → 改后多赚),勾选之后才写入 ——\n'
               + '阈值一改,这只票的六态整条历史都会跟着重算。'
@@ -835,21 +670,27 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, loc
                   没有缓存)时出现; 后台重取时上一份行还在, 不盖。 */}
               {enriched.isLoading ? (
                 <BoardSkeletonRows cols={BOARD_COLS.length} />
-              ) : rows.length === 0 ? (
-                /* [R276] **原来这里一律写「自选为空」, 而那多半是假的。**
-                   开着任一筛选把行数筛成 0 时, 这句话既说错了原因、又把人指向完全
-                   错误的动作(去自选页添加标的)。现在分两种情况说, 并点名是谁挡的。 */
+              ) : totalRows === 0 ? (
                 <tr className="max-sm:block"><td colSpan={BOARD_COLS.length} className="px-4 py-6 text-center text-muted max-sm:block">
-                  {totalRows === 0
-                    ? '自选为空 —— 去自选页添加标的'
-                    : `自选有 ${totalRows} 只, 但当前筛选(${
-                      [actionableOnly && '只看要动的', heldOnly && '只看持有',
-                        flippedOnly && '只看转折',
-                        groupFilter !== G_ALL && `只看「${groupLabel}」`]
-                        .filter(Boolean).join(' + ') || '无'
-                    })之后一只不剩`}
+                  自选为空 —— 去自选页添加标的
                 </td></tr>
-              ) : sortedRows.map((r) => {
+              ) : sections.map((sec) => (sec.rows.length === 0 && sec.key !== 'act') ? null : (
+                <Fragment key={sec.key}>
+                  {/* [R530] 段头: 一行小字, 与监控中心的日期分组条同一个形状 */}
+                  <tr className="max-sm:block">
+                    <td colSpan={BOARD_COLS.length} className="px-3 pb-1 pt-3 text-micro font-medium text-muted max-sm:block">
+                      {sec.title} <span className="font-mono tabular-nums">{sec.rows.length}</span>
+                    </td>
+                  </tr>
+                  {sec.rows.length === 0 && (
+                    /* 只有「今天要动的」会空着还画出来 —— 「今天没事」本身就是信息; 判定没回来时明说, 不拿全量冒充 */
+                    <tr className="max-sm:block"><td colSpan={BOARD_COLS.length} className="px-3 py-3 text-xs text-muted max-sm:block">
+                      {urgencyQ.isError ? '急迫度没算出来 —— 点右上角刷新再试'
+                        : !urgencyReady ? '急迫度还在算…'
+                          : '今天没有要动的'}
+                    </td></tr>
+                  )}
+                  {sec.rows.map((r) => {
                 const active = r.symbol === currentSymbol
                 // [R169] 只有手填的成本才回写。r.cost 可能是批次派生值, 回写它等于
                 // 把派生固化成手填, 之后改批次就不跟着动了。
@@ -965,6 +806,8 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, loc
                   </tr>
                 )
               })}
+                </Fragment>
+              ))}
             </tbody>
           </table>
       </div>

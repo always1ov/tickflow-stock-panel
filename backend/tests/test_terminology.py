@@ -324,7 +324,7 @@ def test_R279_两侧都真的接在检查里(rendered):
     确认两侧都真的被查了。
     """
     be_only = "再争论「通道档位」没有意义"        # 只在 keltner_geometry.py 里
-    fe_only = "只看要动的"                        # 只在决策台 tsx 里
+    fe_only = "今天没有要动的"                    # 只在决策台 tsx 里([R530] 原来是「只看要动的」, 那个开关撤了)
     for word, side in ((be_only, "后端"), (fe_only, "前端")):
         hits = find_hits((word,), rendered)
         assert hits, f"{side}这一侧没接进检查 —— 找不到已知存在的「{word}」"

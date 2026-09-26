@@ -84,7 +84,7 @@ def test_R324_决策台加载中画骨架行_不印自选为空():
     # [R526] tbody 在手机上要变块, 标签带了 className —— 不再按 `<tbody>` 整字匹配
     tbody = code[code.index("<tbody"):code.index("</tbody>")]
     i_load = tbody.index("enriched.isLoading ? (")
-    i_empty = tbody.index("rows.length === 0 ? (")
+    i_empty = tbody.index("totalRows === 0 ? (")   # [R530] 空表只剩「自选为空」一种, 判的是自选总数
     assert i_load < i_empty, "加载判定必须排在「为空」判定前面 —— 否则加载中照样印「自选为空」"
     blk = tbody[i_load:i_empty]
     assert "<BoardSkeletonRows cols={BOARD_COLS.length} />" in blk, "列数跟着 BOARD_COLS 走, 不写死"

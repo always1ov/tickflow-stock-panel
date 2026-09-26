@@ -343,7 +343,8 @@ def test_R254_点不到的排序键全删掉():
                  "'spread'", "'verdict'", "'exit'", "'confidence'", "'play'"):
         assert dead not in keys, f"排序键 {dead} 点不到却还留着"
     # 比较器里也不该还有它们的分支
-    cmp_ = body[body.index("const sortedRows"):]
+    # [R530] 比较器搬进了 `sortRows`(三段各排各的), `sortedRows` 只是三段拼起来
+    cmp_ = body[body.index("const sortRows"):]
     cmp_ = cmp_[:cmp_.index("const arr = ")]
     for dead in ("case 'close'", "case 'ks'", "case 'verdict'", "case 'held'",
                  "case 'cost'", "case 'report'", "case 'spread'",
