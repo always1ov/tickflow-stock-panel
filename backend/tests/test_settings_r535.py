@@ -26,7 +26,9 @@ def test_R535_卡头只有一个产地():
 
 def test_R535_宽度只在外壳定一处():
     shell = code_of("pages/Settings.tsx")
-    assert '<div className="w-full max-w-5xl">' in shell
+    # [R536] 用户「每个子页面都要铺满内容区域」: 外壳不设上限, 八栏一起铺满
+    assert '<div className="w-full">' in shell
+    assert not re.search(r'<main[^>]*>\s*<div className="w-full max-w-', shell), "设置外壳又加回了宽度上限, 宽屏右边会空一块"
     for f in CARD_USERS + ["DataSources.tsx", "Notifications.tsx", "Timeout.tsx"]:
         code = code_of(S + f)
         # 面板最外层不许再自带上限(弹窗里的 max-w-[380px] 那种不算)
