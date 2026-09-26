@@ -8,12 +8,12 @@ import { FactorEditor } from './factors/FactorEditor'
 import { FactorLibrary } from './factors/FactorLibrary'
 import { MiningWorkbench } from './backtest/MiningWorkbench'
 import { ResearchCandidatesDialog } from './backtest/ResearchCandidatesDialog'
-import { SEG, SEG_ITEM, SEG_ON, SEG_OFF, buttonClass } from '@/components/ui'
-import { cn } from '@/lib/cn'
+import { buttonClass } from '@/components/ui'
+import { PageTabs, type PageTabDef } from '@/components/PageTabs'
 
 type Tab = 'inspect' | 'library' | 'editor' | 'composite' | 'mining'
 
-const TABS: Record<Tab, { title: string; icon: typeof Sigma }> = {
+const TABS: Record<Tab, PageTabDef> = {
   inspect: { title: '检验', icon: Sigma },
   library: { title: '因子库', icon: LibrarySquare },
   editor: { title: '编辑器', icon: PenLine },
@@ -59,27 +59,10 @@ export function Factors() {
               <span>候选方案</span>
             </button>
             <span className="h-5 w-px shrink-0 bg-border" aria-hidden="true" />
-            <nav className="min-w-0 flex-1 overflow-x-auto lg:flex-none" aria-label="因子视图">
-              <div className={cn(SEG, 'min-w-max')}>
-                {(Object.keys(TABS) as Tab[]).map(tab => {
-                  const mode = TABS[tab]
-                  const Icon = mode.icon
-                  const active = activeTab === tab
-                  return (
-                    <button
-                      key={tab}
-                      type="button"
-                      onClick={() => changeTab(tab)}
-                      aria-current={active ? 'page' : undefined}
-                      className={cn(SEG_ITEM, 'sm:gap-1.5', active ? SEG_ON : SEG_OFF)}
-                    >
-                      <Icon className="hidden h-3.5 w-3.5 sm:block" />
-                      {mode.title}
-                    </button>
-                  )
-                })}
-              </div>
-            </nav>
+            {/* [R537] 分栏条原来是手抄的一份(与 PageTabs 逐字相同), 换成共用件 —— 长相不变, 产地一个 */}
+            <div className="min-w-0 flex-1 lg:flex-none">
+              <PageTabs tabs={TABS} active={activeTab} onChange={changeTab} label="因子视图" />
+            </div>
           </div>
         )}
       />

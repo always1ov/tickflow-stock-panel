@@ -308,7 +308,8 @@ export function FactorEditor({ editId = '' }: { editId?: string }) {
               算子（{OPERATOR_COUNT} 个 · 时序 / 截面 / 工具）
               <span className="font-normal text-muted">· 点击签名插入</span>
             </summary>
-            <div className="mt-1.5 grid grid-cols-1 gap-2 sm:grid-cols-2" role="group" aria-label="插入算子">
+            {/* [R537] 原来两组并排, 每组只剩 ~250px, 说明挤到 100px 宽一律折成两行; 改成一组一整行, 说明不折 */}
+            <div className="mt-1.5 grid grid-cols-1 gap-2" role="group" aria-label="插入算子">
               {OPERATOR_GROUPS.map(group => (
                 <div key={group.label} className="rounded-btn border border-border/50 bg-base/30 px-2 py-1.5">
                   <div className="mb-1 font-medium text-secondary">{group.label} <span className="font-normal text-muted">({group.ops.length})</span></div>
@@ -322,7 +323,7 @@ export function FactorEditor({ editId = '' }: { editId?: string }) {
                         className="flex w-full cursor-pointer items-baseline gap-2 rounded px-1 py-px text-left leading-4 transition-colors hover:bg-accent/10"
                       >
                         <code className="w-36 shrink-0 truncate font-mono text-accent">{op.sig}</code>
-                        <span className="text-muted">{op.desc}</span>
+                        <span className="truncate text-muted">{op.desc}</span>
                       </button>
                     ))}
                   </div>

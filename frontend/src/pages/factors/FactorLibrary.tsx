@@ -85,8 +85,10 @@ export function FactorLibrary({ onInspect, onEdit }: { onInspect: (factorId: str
           <div className="p-6 text-center text-xs text-muted">无匹配因子</div>
         )}
         {!lib.isLoading && filtered.length > 0 && (
-          <table className="w-full min-w-[760px] text-xs">
-            <thead className={cn(THEAD, 'z-20 text-left', TH_ROW)}>
+          <table className="w-full text-xs max-sm:block sm:min-w-[760px]">
+            {/* [R537] 手机上不横滑(用户: 「手机版现在不搞左右滑动」): 一行一块 —— 名字·id·去检验 / 分组·类型·公式;
+              预热、适用两列手机上不显示(详情抽屉里都有)。桌面照旧是表格, 名字与 id 并成一行, 行高减半。 */}
+            <thead className={cn(THEAD, 'z-20 text-left max-sm:hidden', TH_ROW)}>
               <tr>
                 <th className="px-3 py-2 font-normal">因子</th>
                 <th className="px-3 py-2 font-normal">分组</th>
@@ -97,32 +99,34 @@ export function FactorLibrary({ onInspect, onEdit }: { onInspect: (factorId: str
                 <th className="w-24 px-3 py-2 text-right font-normal">操作</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="max-sm:block">
               {filtered.map(item => (
                 <tr
                   key={item.id}
                   onClick={() => setDetail(item)}
-                  className="cursor-pointer border-t border-border/70 transition-colors hover:bg-elevated/40"
+                  className="cursor-pointer border-t border-border/70 transition-colors hover:bg-elevated/40 max-sm:flex max-sm:flex-wrap max-sm:items-center max-sm:gap-x-2 max-sm:px-2 max-sm:py-2"
                 >
-                  <td className="px-3 py-2.5">
-                    <div className="font-medium text-foreground">{item.label}</div>
-                    <div className="mt-0.5 font-mono text-micro text-muted">{item.id}</div>
+                  <td className="px-3 py-2 max-sm:w-[calc(100%-6rem)] max-sm:p-0">
+                    <div className="flex min-w-0 items-baseline gap-2">
+                      <span className="shrink-0 font-medium text-foreground">{item.label}</span>
+                      <span className="truncate font-mono text-micro text-muted">{item.id}</span>
+                    </div>
                   </td>
-                  <td className="px-3 py-2.5 text-secondary">{item.group}</td>
-                  <td className="px-3 py-2.5">
+                  <td className="px-3 py-2 text-secondary max-sm:order-3 max-sm:p-0">{item.group}</td>
+                  <td className="whitespace-nowrap px-3 py-2 max-sm:order-4 max-sm:p-0">
                     <span className={`inline-flex rounded-btn px-1.5 py-0.5 text-micro font-medium ${KIND_META[item.kind].cls}`}>
                       {KIND_META[item.kind].label}
                     </span>
                     {item.pit && <span className="ml-1 text-micro text-warning" title="点时数据: 仅使用公告日不晚于当日的财务数据">点时</span>}
                   </td>
-                  <td className="max-w-[22rem] px-3 py-2.5">
+                  <td className="max-w-[22rem] px-3 py-2 max-sm:order-5 max-sm:min-w-0 max-sm:flex-1 max-sm:p-0">
                     <span className="block truncate text-secondary" title={item.formula}>{item.formula}</span>
                   </td>
-                  <td className="px-3 py-2.5 font-mono text-secondary">{item.warmup_bars > 1 ? `${item.warmup_bars}日` : '—'}</td>
-                  <td className="px-3 py-2.5 text-muted">
+                  <td className="px-3 py-2 font-mono text-secondary max-sm:hidden">{item.warmup_bars > 1 ? `${item.warmup_bars}日` : '—'}</td>
+                  <td className="px-3 py-2 text-muted max-sm:hidden">
                     {item.asset_types.includes('stock') && item.asset_types.includes('etf') ? '股票/ETF' : item.asset_types.join('/')}
                   </td>
-                  <td className="px-3 py-2.5 text-right">
+                  <td className="px-3 py-2 text-right max-sm:order-2 max-sm:ml-auto max-sm:p-0">
                     <button
                       type="button"
                       onClick={event => { event.stopPropagation(); onInspect(item.id) }}
