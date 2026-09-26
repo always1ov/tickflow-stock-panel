@@ -69,9 +69,10 @@ CHROME = {
     "elevated": "#E2E2E2",
     "border": "#D1D4DD",
     "border-input": "#C2C7D6",
-    "fg-primary": "#222738",
-    "fg-secondary": "#4B5569",
-    "fg-muted": "#5A6377",
+    # [R531] 文字两档、去蓝(用户看过 Aipha AI 的黑白搭配后说「改」): 次要并进正文; 辅助只去色, 明度仍是 R408 的 0.50
+    "fg-primary": "#0A0A0A",
+    "fg-secondary": "#0A0A0A",
+    "fg-muted": "#636363",
     "accent": "#222222",
     "accent-text": "#222222",
     "accent-hover": "#3D3D3D",
