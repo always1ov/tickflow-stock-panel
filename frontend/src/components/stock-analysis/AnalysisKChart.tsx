@@ -84,7 +84,7 @@ export const LEVEL_GROUPS: { key: LevelType; label: string }[] = [
   { key: 'sr',       label: '压力支撑' },
   { key: 'pivot',    label: '枢轴点' },
   { key: 'extreme',  label: '前高前低' },
-  { key: 'boll',     label: '布林(26日)' },      // [R528] 26 日 ±2σ 曲线, 后端 indicators/bollinger.py 现场算(不是 enriched 的 20 日列)
+  { key: 'boll',     label: '26日布林' },        // [R528/R529] 26 日 ±2σ 曲线, 后端 indicators/bollinger.py 现场算(不是 enriched 的 20 日列)
   { key: 'keltner_s',label: '量化通道短期' },     // MA20±2ATR 曲线
   { key: 'keltner_m',label: '量化通道中期' },     // MA60±2.5ATR 曲线
   { key: 'keltner_l',label: '量化通道长期' },     // MA120±3ATR 曲线
@@ -121,9 +121,9 @@ export const LEVEL_GROUPS: { key: LevelType; label: string }[] = [
 // [R443] 用户要回作者原来的颜色 —— 布林中轨、ATR上轨那两个作者色回来了, 放在
 // `lib/theme.ts` 的 `LEVEL_CURVE_COLOR`(仍是配色的唯一产地), 这张表照旧不带颜色。
 const CURVE_DEFS: { alignedKey: string; group: LevelType; endLabel: string; dashed?: boolean }[] = [
-  { alignedKey: 'boll_upper',     group: 'boll',      endLabel: '布林上轨(26日)', dashed: true },
-  { alignedKey: 'boll_lower',     group: 'boll',      endLabel: '布林下轨(26日)', dashed: true },
-  { alignedKey: 'boll_mid',       group: 'boll',      endLabel: '布林中轨(26日)', dashed: false },
+  { alignedKey: 'boll_upper',     group: 'boll',      endLabel: '26日布林上轨', dashed: true },
+  { alignedKey: 'boll_lower',     group: 'boll',      endLabel: '26日布林下轨', dashed: true },
+  { alignedKey: 'boll_mid',       group: 'boll',      endLabel: '26日布林中轨', dashed: false },
   { alignedKey: 'keltner_s_upper',group: 'keltner_s', endLabel: '短期上沿', dashed: true },
   { alignedKey: 'keltner_s_lower',group: 'keltner_s', endLabel: '短期下沿', dashed: true },
   { alignedKey: 'keltner_m_upper',group: 'keltner_m', endLabel: '中期上沿', dashed: true },

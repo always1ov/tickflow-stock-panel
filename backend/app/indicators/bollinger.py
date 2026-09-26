@@ -11,8 +11,8 @@
   · 关键价位图(个股分析弹窗)的布林上/中/下轨曲线与价位列表 —— `api/stock_analysis.py`、`indicators/levels.py`
   · 日K图(个股 / 指数)主图叠加的 BOLL —— `api/kline.py` 给每行附 `boll26_*`
 
-两处都从这里取, 参数只写在这里。界面上带周期叫「布林(26日)」, 与 20 日那组
-(自选 / 策略结果表的「布林上轨(20日)」列)分得开 —— 同一个词两个数是这仓库反复在治的病。
+两处都从这里取, 参数只写在这里。界面上叫「26日布林」(用户定的写法, R529), 与 20 日那组
+(自选 / 策略结果表的「20日布林上轨」列)分得开 —— 同一个词两个数是这仓库反复在治的病。
 """
 from __future__ import annotations
 
@@ -25,10 +25,10 @@ BOLL_CHART_WINDOW = 26
 BOLL_CHART_K = 2.0
 
 #: 界面上的名字(单一产地; 前端 CURVE_DEFS / LEVEL_GROUPS 与这里对齐, 由 test_boll26_chart 钉着)
-BOLL_CHART_LABEL = f"布林({BOLL_CHART_WINDOW}日)"
-BOLL_CHART_UPPER = f"布林上轨({BOLL_CHART_WINDOW}日)"
-BOLL_CHART_MID = f"布林中轨({BOLL_CHART_WINDOW}日)"
-BOLL_CHART_LOWER = f"布林下轨({BOLL_CHART_WINDOW}日)"
+BOLL_CHART_LABEL = f"{BOLL_CHART_WINDOW}日布林"
+BOLL_CHART_UPPER = f"{BOLL_CHART_WINDOW}日布林上轨"
+BOLL_CHART_MID = f"{BOLL_CHART_WINDOW}日布林中轨"
+BOLL_CHART_LOWER = f"{BOLL_CHART_WINDOW}日布林下轨"
 
 
 def bollinger_series(close: pl.Series, window: int = BOLL_CHART_WINDOW, k: float = BOLL_CHART_K) -> dict[str, pl.Series]:

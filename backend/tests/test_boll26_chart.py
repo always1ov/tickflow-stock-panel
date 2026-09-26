@@ -23,8 +23,8 @@ def _closes(n: int = 60) -> list[float]:
 def test_R528_参数只写在一处_26日_2倍():
     assert B.BOLL_CHART_WINDOW == 26
     assert B.BOLL_CHART_K == 2.0
-    assert B.BOLL_CHART_LABEL == "布林(26日)"
-    assert (B.BOLL_CHART_UPPER, B.BOLL_CHART_MID, B.BOLL_CHART_LOWER) == ("布林上轨(26日)", "布林中轨(26日)", "布林下轨(26日)")
+    assert B.BOLL_CHART_LABEL == "26日布林"
+    assert (B.BOLL_CHART_UPPER, B.BOLL_CHART_MID, B.BOLL_CHART_LOWER) == ("26日布林上轨", "26日布林中轨", "26日布林下轨")
 
 
 def test_R528_序列与逐行两条路算出同一个数():
@@ -74,20 +74,21 @@ def test_R528_三个消费点都从同一处取():
 
 
 def test_R528_前端画的是26日_名字带周期_20日那组也带周期():
+    """[R529] 用户定的写法: 「26日布林」, 周期在前; 20 日那组同一个形状「20日布林上轨」。"""
     ak = code_of("components/stock-analysis/AnalysisKChart.tsx")
-    assert "label: '布林(26日)'" in ak
-    for lbl in ("布林上轨(26日)", "布林中轨(26日)", "布林下轨(26日)"):
+    assert "label: '26日布林'" in ak
+    for lbl in ("26日布林上轨", "26日布林中轨", "26日布林下轨"):
         assert f"endLabel: '{lbl}'" in ak
     for rel in ("components/StockDailyKChart.tsx", "pages/Indices.tsx"):
         code = code_of(rel)
         assert "r.boll26_upper" in code and "r.boll26_mid" in code and "r.boll26_lower" in code, f"{rel} 还在读 20 日列"
     ec = code_of("components/EChartsCandlestick.tsx")
-    assert "label: 'BOLL(26)'" in ec
-    assert "bollLine('boll_mid', '#14B8A6', 'BOLL中')" in ec, "中轨不再是 MA20, 得自己画"
+    assert "label: '26日布林'" in ec
+    assert "bollLine('boll_mid', '#14B8A6', '26日布林中轨')" in ec, "中轨不再是 MA20, 得自己画"
     assert "Number(d.ma20).toFixed(2)}/${Number(d.boll_lower)" not in ec, "悬停里的中轨还在印 MA20"
     # 20 日那组(表格列 / 条件字段)名字带 (20日), 与图表的 26 日分得开
     for rel in ("lib/watchlist-columns.ts", "lib/screener-columns.ts", "lib/signals.ts",
                 "pages/backtest/StrategyBacktest.tsx", "components/screener/StrategySettingsDialog.tsx"):
         code = code_of(rel)
-        assert "'布林上轨(20日)'" in code and "'布林下轨(20日)'" in code, f"{rel}: 20 日那组没带周期"
+        assert "'20日布林上轨'" in code and "'20日布林下轨'" in code, f"{rel}: 20 日那组没带周期"
         assert "'布林上轨'" not in code, f"{rel}: 还有不带周期的「布林上轨」"

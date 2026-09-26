@@ -50,7 +50,7 @@ LEVEL_TYPES = {
     "sr": "压力支撑",        # 成交密集区(价量:Volume Profile POC + 高成交密集区)
     "pivot": "枢轴点",        # 经典 Pivot P/R/S
     "extreme": "前高前低",    # 60/250 日极值 + 近期 swing 高低点
-    "boll": BOLL_CHART_LABEL,  # [R528] 布林(26日) ± 2σ, 标准差波动带(参考性,非真实支撑压力); 周期与名字见 indicators/bollinger.py
+    "boll": BOLL_CHART_LABEL,  # [R528] 26日布林 ± 2σ, 标准差波动带(参考性,非真实支撑压力); 周期与名字见 indicators/bollinger.py
     "keltner_s": "Keltner短期",  # MA20 ± 2×ATR
     "keltner_m": "Keltner中期",  # MA60 ± 2.5×ATR
     "keltner_l": "Keltner长期",  # MA120 ± 3×ATR(牛熊趋势边界)
@@ -346,7 +346,7 @@ def _keltner_band(
 
 
 def _boll_channel(df: pl.DataFrame) -> list[dict]:
-    """布林(26日)上/中/下轨。
+    """26日布林上/中/下轨。
 
     基于标准差的波动带,反映价格相对均线的统计偏离;非真实支撑压力,
     仅作波动边界参考。[R528] 原来直接取预计算列 boll_upper/boll_lower(20 日, 作者策略在用的那两列),

@@ -69,7 +69,7 @@ def _build_series(df: pl.DataFrame) -> dict:
     close = df["close"]
     has_atr = "atr_14" in df.columns
 
-    # 布林(26日): 上/中/下轨现场算 —— [R528] 图表这条不再读 enriched 的 20 日列, 产地在 indicators/bollinger.py
+    # 26日布林: 上/中/下轨现场算 —— [R528] 图表这条不再读 enriched 的 20 日列, 产地在 indicators/bollinger.py
     boll = bollinger_series(close)
     out["boll"] = {
         "upper": _to_float_list(boll["upper"]),
