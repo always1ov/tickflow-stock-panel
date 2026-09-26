@@ -238,7 +238,7 @@ export const LEVEL_PALETTE: Record<string, { light: string; dark: string }> = {
   sr:        { light: '#F97316', dark: '#F97316' },  // 橙(成交密集区,价量驱动)
   pivot:     { light: '#8B5CF6', dark: '#8B5CF6' },  // 紫
   extreme:   { light: '#EAB308', dark: '#EAB308' },  // 黄
-  boll:      { light: '#F97316', dark: '#F97316' },  // 橙(MA20±2σ 曲线)
+  boll:      { light: '#F97316', dark: '#F97316' },  // 橙(布林 26 日 ±2σ 曲线, R528)
   keltner_s: { light: '#06B6D4', dark: '#06B6D4' },  // 青(MA20±2ATR 曲线)
   keltner_m: { light: '#22D3EE', dark: '#22D3EE' },  // 浅青(MA60±2.5ATR 曲线)
   keltner_l: { light: '#67E8F9', dark: '#67E8F9' },  // 更浅青(MA120±3ATR 曲线)

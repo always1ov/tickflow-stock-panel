@@ -20,6 +20,7 @@ from typing import Any
 
 import polars as pl
 
+from app.indicators.bollinger import BOLL_CHART_LABEL, BOLL_CHART_LOWER, BOLL_CHART_MID, BOLL_CHART_UPPER, bollinger_series
 from app.indicators.keltner import BANDS as KELTNER_BANDS
 
 logger = logging.getLogger(__name__)
@@ -49,7 +50,7 @@ LEVEL_TYPES = {
     "sr": "压力支撑",        # 成交密集区(价量:Volume Profile POC + 高成交密集区)
     "pivot": "枢轴点",        # 经典 Pivot P/R/S
     "extreme": "前高前低",    # 60/250 日极值 + 近期 swing 高低点
-    "boll": "布林带",         # MA20 ± 2σ,标准差波动带(参考性,非真实支撑压力)
+    "boll": BOLL_CHART_LABEL,  # [R528] 布林(26日) ± 2σ, 标准差波动带(参考性,非真实支撑压力); 周期与名字见 indicators/bollinger.py
     "keltner_s": "Keltner短期",  # MA20 ± 2×ATR
     "keltner_m": "Keltner中期",  # MA60 ± 2.5×ATR
     "keltner_l": "Keltner长期",  # MA120 ± 3×ATR(牛熊趋势边界)
@@ -345,35 +346,32 @@ def _keltner_band(
 
 
 def _boll_channel(df: pl.DataFrame) -> list[dict]:
-    """布林带上下轨(MA20 ± 2σ)。
+    """布林(26日)上/中/下轨。
 
     基于标准差的波动带,反映价格相对均线的统计偏离;非真实支撑压力,
-    仅作波动边界参考。数据直接取预计算列 boll_upper/boll_lower。
+    仅作波动边界参考。[R528] 原来直接取预计算列 boll_upper/boll_lower(20 日, 作者策略在用的那两列),
+    现在按 `indicators/bollinger.py` 的图表参数现场算 —— 周期与名字都只在那儿定。
     """
-    if df.is_empty() or "boll_upper" not in df.columns or "boll_lower" not in df.columns:
+    if df.is_empty() or "close" not in df.columns:
         return []
-    last = df.tail(1)
-    close = float(last["close"][0]) if "close" in df.columns else 0
+    close = float(df["close"][-1]) if _ok(df["close"][-1]) else 0
     if not close:
         return []
-    bu = last["boll_upper"][0]
-    bl = last["boll_lower"][0]
+    boll = bollinger_series(df["close"])
+    bu, bm, bl = boll["upper"][-1], boll["mid"][-1], boll["lower"][-1]
     if not _ok(bu) or not _ok(bl):
         return []
     bu, bl = float(bu), float(bl)
     out = [
-        {"value": round(bu, 2), "label": "布林上轨",
+        {"value": round(bu, 2), "label": BOLL_CHART_UPPER,
          "type": "boll", "side": _side(bu, close), "strength": "medium"},
-        {"value": round(bl, 2), "label": "布林下轨",
+        {"value": round(bl, 2), "label": BOLL_CHART_LOWER,
          "type": "boll", "side": _side(bl, close), "strength": "medium"},
     ]
-    # 布林中轨 = MA20(多空平衡线,价格在其上下分强弱);数据层已预计算 ma20
-    if "ma20" in df.columns:
-        mid = last["ma20"][0]
-        if _ok(mid):
-            mid = float(mid)
-            out.append({"value": round(mid, 2), "label": "布林中轨",
-                        "type": "boll", "side": _side(mid, close), "strength": "medium"})
+    if _ok(bm):
+        mid = float(bm)
+        out.append({"value": round(mid, 2), "label": BOLL_CHART_MID,
+                    "type": "boll", "side": _side(mid, close), "strength": "medium"})
     return out
 
 

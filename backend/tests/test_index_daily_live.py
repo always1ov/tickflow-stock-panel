@@ -83,6 +83,9 @@ def test_index_daily_injects_live_candle(monkeypatch) -> None:
     from app.api import kline as kline_api
 
     monkeypatch.setattr(kline_api, "cn_today", lambda: TODAY)
+    # [R528] 接口现在会把请求窗口之外的行裁掉(为图表的 26 日布林多读了 60 天历史), 窗口右端是 indices 自己的
+    # cn_today —— 不钉的话 2026-03 的替身行会被当成窗口外裁没
+    monkeypatch.setattr(indices, "cn_today", lambda: TODAY)
     repo = _IndexRepo()
     result = indices.get_index_daily(
         _index_request(repo), symbol="000001.SH", days=5, start_date=None, end_date=None,
@@ -108,6 +111,7 @@ def test_index_daily_skips_live_candle_when_cache_unusable(monkeypatch, latest) 
     from app.api import kline as kline_api
 
     monkeypatch.setattr(kline_api, "cn_today", lambda: TODAY)
+    monkeypatch.setattr(indices, "cn_today", lambda: TODAY)   # [R528] 同上: 窗口裁剪看 indices 的今天
     repo = _IndexRepo(latest=latest)
     result = indices.get_index_daily(
         _index_request(repo), symbol="000001.SH", days=5, start_date=None, end_date=None,

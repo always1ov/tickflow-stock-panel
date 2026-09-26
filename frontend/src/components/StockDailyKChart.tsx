@@ -76,8 +76,10 @@ export function toOHLC(rows: KlineRow[]): OHLC[] {
       kdj_k: r.kdj_k != null ? Number(r.kdj_k) : null,
       kdj_d: r.kdj_d != null ? Number(r.kdj_d) : null,
       kdj_j: r.kdj_j != null ? Number(r.kdj_j) : null,
-      boll_upper: r.boll_upper != null ? Number(r.boll_upper) : null,
-      boll_lower: r.boll_lower != null ? Number(r.boll_lower) : null,
+      // [R528] 图表画的是 26 日布林(接口现场算的 boll26_*), 不是 enriched 那组 20 日列
+      boll_upper: r.boll26_upper != null ? Number(r.boll26_upper) : null,
+      boll_mid: r.boll26_mid != null ? Number(r.boll26_mid) : null,
+      boll_lower: r.boll26_lower != null ? Number(r.boll26_lower) : null,
     }))
 }
 

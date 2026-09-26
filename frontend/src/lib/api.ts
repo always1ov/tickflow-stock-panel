@@ -1384,6 +1384,10 @@ export interface PriceLimitInfo {
 export interface KlineRow {
   symbol?: string
   date: string
+  /** [R528] 图表的布林(26日), 日K接口现场算; enriched 的 boll_upper/boll_lower 仍是 20 日(策略在用) */
+  boll26_upper?: number | null
+  boll26_mid?: number | null
+  boll26_lower?: number | null
   open: number
   high: number
   low: number

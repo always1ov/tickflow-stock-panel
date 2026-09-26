@@ -185,7 +185,7 @@ const FIELD_LABELS: Record<string, string> = {
   ma5: 'MA5', ma10: 'MA10', ma20: 'MA20', ma30: 'MA30', ma60: 'MA60',
   ema5: 'EMA5', ema10: 'EMA10', ema20: 'EMA20',
   macd_dif: 'MACD-DIF', macd_dea: 'MACD-DEA', macd_hist: 'MACD柱',
-  boll_upper: '布林上轨', boll_lower: '布林下轨',
+  boll_upper: '布林上轨(20日)', boll_lower: '布林下轨(20日)',   // [R528] 图表画的是 26 日那组, 这里是 enriched 的 20 日列
   kdj_k: 'KDJ-K', kdj_d: 'KDJ-D', kdj_j: 'KDJ-J',
   rsi_6: 'RSI6', rsi_14: 'RSI14', rsi_24: 'RSI24',
   vol_ratio_5d: '5日量比', vol_ratio_20d: '20日量比',

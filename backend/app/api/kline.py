@@ -13,6 +13,7 @@ from zoneinfo import ZoneInfo
 from fastapi import APIRouter, HTTPException, Query, Request, Response
 
 from app.db_safe import is_valid_ext_ident
+from app.indicators.bollinger import attach_bollinger
 from app.indicators.pipeline import compute_enriched
 from app.market_time import cn_now, cn_today, in_continuous_session
 from app.price_limits import is_no_limit_day, is_risk_warning_name, parse_listing_date, price_limit_pct
@@ -436,7 +437,8 @@ def get_daily(
     stock_name = stock_info.get("name")
 
     # 从 enriched 表读取 (已含前复权 OHLCV + 技术指标 + 信号); ETF/指数走独立存储
-    df = repo.get_daily_asset(asset_type, symbol, start, end)
+    # [R528] 多读 60 个自然日: 图表的布林(26日)现场算, 窗口前面 25 根要有历史垫着, 算完再按 start 裁掉
+    df = repo.get_daily_asset(asset_type, symbol, start - timedelta(days=60), end)
 
     if df.is_empty():
         try:
@@ -459,9 +461,11 @@ def get_daily(
         except Exception as e:  # noqa: BLE001
             logger.debug("单股除权因子拉取失败 %s: %s", symbol, e)
         enriched = compute_enriched(raw, factors=factors)
-        rows = enriched.tail(days).to_dicts()
+        rows = enriched.to_dicts()
         # 即使 live 模式也尝试追加实时蜡烛
         rows = _maybe_inject_live_candle(request, symbol, rows, asset_type)
+        attach_bollinger(rows)   # [R528] 图表的布林(26日), 今天那根按注入后的收盘算
+        rows = rows[-days:]
         resp = {"symbol": symbol, "name": stock_name, "stock_info": stock_info, "rows": rows, "source": "live"}
         # [同步作者 v0.2.4] 作者给详情响应加了 gzip 包装(a8bb7a2 压缩详情响应),
         # fork 这边给响应挂着 `live_refresh` 标记。两者不冲突 —— **先挂标记再包装**,
@@ -478,6 +482,10 @@ def get_daily(
 
     # 追加/覆盖今日实时蜡烛
     rows = _maybe_inject_live_candle(request, symbol, rows, asset_type)
+    # [R528] 图表的布林(26日): 在多读的那段历史上算完, 再裁回请求的窗口
+    attach_bollinger(rows)
+    start_iso = start.isoformat()
+    rows = [r for r in rows if str(r.get("date"))[:10] >= start_iso]
 
     resp = {"symbol": symbol, "name": stock_name, "stock_info": stock_info, "rows": rows, "source": "enriched"}
     # [同步作者 v0.2.4] 同上: 先挂 fork 的 live_refresh 标记, 再走作者的 gzip 包装

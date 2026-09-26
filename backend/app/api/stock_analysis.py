@@ -21,6 +21,7 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
+from app.indicators.bollinger import bollinger_series
 from app.indicators.levels import compute_levels, summarize_levels
 from app.services import stock_reports
 from app.services.ndjson_heartbeat import with_heartbeat
@@ -68,13 +69,13 @@ def _build_series(df: pl.DataFrame) -> dict:
     close = df["close"]
     has_atr = "atr_14" in df.columns
 
-    # 布林带(上/下/中轨;中轨 = MA20,数据层已预计算)
-    if "boll_upper" in df.columns and "boll_lower" in df.columns:
-        out["boll"] = {
-            "upper": _to_float_list(df["boll_upper"]),
-            "lower": _to_float_list(df["boll_lower"]),
-            "mid": _to_float_list(df["ma20"]) if "ma20" in df.columns else None,
-        }
+    # 布林(26日): 上/中/下轨现场算 —— [R528] 图表这条不再读 enriched 的 20 日列, 产地在 indicators/bollinger.py
+    boll = bollinger_series(close)
+    out["boll"] = {
+        "upper": _to_float_list(boll["upper"]),
+        "lower": _to_float_list(boll["lower"]),
+        "mid": _to_float_list(boll["mid"]),
+    }
 
     # Keltner 通道三档(需要 ATR)
     if has_atr:

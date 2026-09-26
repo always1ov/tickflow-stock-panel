@@ -26,7 +26,7 @@ Object.assign(FIELD_LABEL, {
   rsi_14: 'RSI14', rsi_6: 'RSI6', rsi_24: 'RSI24',
   vol_ratio_5d: '量比', vol_ratio_20d: '20日量比',
   macd_dif: 'MACD-DIF', macd_dea: 'MACD-DEA', macd_hist: 'MACD柱',
-  boll_upper: '布林上轨', boll_lower: '布林下轨',
+  boll_upper: '布林上轨(20日)', boll_lower: '布林下轨(20日)',   // [R528] 图表画的是 26 日那组, 这里是 enriched 的 20 日列
   ma20_bias: 'MA20乖离率',
 })
 

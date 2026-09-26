@@ -52,10 +52,15 @@ def get_index_daily(
     start = date.fromisoformat(start_date) if start_date else end - timedelta(days=days)
     info = _index_info(repo, symbol)
 
-    df = repo.get_index_daily(symbol, start, end)
+    # [R528] 多读 60 个自然日给图表的布林(26日)垫窗口, 算完按 start 裁回(与 kline.get_daily 同一套做法)
+    df = repo.get_index_daily(symbol, start - timedelta(days=60), end)
     if not df.is_empty():
         from app.api.kline import _maybe_inject_live_candle
+        from app.indicators.bollinger import attach_bollinger
         rows = _maybe_inject_live_candle(request, symbol, df.to_dicts(), "index")
+        attach_bollinger(rows)
+        start_iso = start.isoformat()
+        rows = [r for r in rows if str(r.get("date"))[:10] >= start_iso]
         return {"symbol": symbol, "name": info.get("name"), "index_info": info, "rows": rows, "source": "index_enriched"}
 
     capset = request.app.state.capabilities
@@ -70,7 +75,11 @@ def get_index_daily(
         return {"symbol": symbol, "name": info.get("name"), "index_info": info, "rows": [], "source": "none"}
 
     enriched = compute_enriched(raw, factors=None, instruments=None)
-    rows = enriched.filter((pl.col("date") >= start) & (pl.col("date") <= end)).to_dicts()
+    from app.indicators.bollinger import attach_bollinger
+    rows = enriched.filter(pl.col("date") <= end).to_dicts()
+    attach_bollinger(rows)   # [R528] 先在整段上算, 再裁到请求窗口
+    start_iso = start.isoformat()
+    rows = [r for r in rows if str(r.get("date"))[:10] >= start_iso]
     return {"symbol": symbol, "name": info.get("name"), "index_info": info, "rows": rows, "source": "live"}
 
 
