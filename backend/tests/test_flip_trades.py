@@ -1349,7 +1349,8 @@ def test_R291_两种状态用同一个盒子():
     blk = code[code.index("export function TrendSegment"):]
     i = blk.index("今天转折")
     box = blk[i - 700:i]
-    assert "inline-flex whitespace-nowrap rounded border px-1.5 py-px" in box, (
+    # [R520] 决策台改成单行后这个盒子加了 shrink-0(在 flex 行里不许被压扁), 盒子本身没变
+    assert "inline-flex shrink-0 whitespace-nowrap rounded border px-1.5 py-px" in box, (
         "两种状态没共用同一个盒子 —— 转折那行会比别的行高一截"
     )
     assert "border-transparent" in box, "平常那天的边框没设成透明"

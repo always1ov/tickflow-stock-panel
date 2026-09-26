@@ -18,8 +18,9 @@ export function BoardSkeletonRows({ rows = 6, cols = CELL_W.length }: { rows?: n
       {Array.from({ length: rows }, (_, r) => (
         <tr key={r} className="border-t border-border/30" aria-hidden="true">
           {Array.from({ length: cols }, (_, c) => (
-            <td key={c} className="px-3 py-3">
-              <Skeleton w={CELL_W[c] ?? 'w-12'} h="h-3" className="mx-auto" />
+            <td key={c} className="px-3 py-2.5">
+              {/* [R520] 表改单行左对齐, 骨架跟着(数据到位时版面不跳) */}
+              <Skeleton w={CELL_W[c] ?? 'w-12'} h="h-3" />
             </td>
           ))}
         </tr>

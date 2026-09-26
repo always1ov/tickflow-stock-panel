@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Star, Wallet, ArrowUp, ArrowDown, RefreshCw, Download, ChevronDown, Folder, Inbox, List, FlaskConical } from 'lucide-react'
+import { Star, ArrowUp, ArrowDown, RefreshCw, Download, ChevronDown, Folder, Inbox, List, FlaskConical } from 'lucide-react'
 import { api, type ChannelEvent, type ChannelPhase, type EffectivePosition, type ExitLine, type KeltnerBands, type TrendInfo, type Urgency } from '@/lib/api'
 // [R276] 分组下拉直接复用「加入自选」那个菜单 —— 定位/键盘/点外面关闭/配色全都现成
 import { WatchlistGroupMenu } from '@/components/WatchlistAddMenu'
@@ -22,7 +22,7 @@ import { LotsLink } from '@/components/stock-analysis/decision-board/LotsLink'
 import { Hint } from '@/components/Hint'   // [R323] 表头说明点得开
 import { refreshEvery } from '@/lib/refreshRhythm'   // [R333] 刷新节奏一处定义
 import { BoardSkeletonRows } from '@/components/stock-analysis/decision-board/BoardSkeletonRows'   // [R324] 首次加载骨架行
-import { TH_ROW, THEAD, TYPE, buttonClass } from '@/components/ui'   // [R451] 全站层级与样式
+import { TH_ROW, THEAD, buttonClass } from '@/components/ui'   // [R451] 全站层级与样式
 // [R169] 合并视图(手填 ⊕ 上游批次登记), 字段说明见 api.ts 的 EffectivePosition
 type Position = EffectivePosition
 // [R254] 排序目标从 18 个砍到 10 个 —— **每列只留一个**。
@@ -104,7 +104,8 @@ const BOARD_COLS = [
   // 六态与通道阶段答的是同一个问题(往哪走), 只是方法不同 —— 放一格里,
   // 它们什么时候一致、什么时候打架, 上下一对就看见了。
   // [R425] 「走势」20% + 「位置」14% 并成一列, 宽度原数相加 —— 总和仍是 100。
-  { label: '走势/位置', w: '48%' },
+  // [R520] 单行之后持仓那一格要横着放「持有 + 成本框 + 出场线」, 从这里拿 4% 给它: 48/18 → 44/22。
+  { label: '走势/位置', w: '44%' },
   // [R277 加, R297 删] 「进度」那一列并进「结论」了。用户: 「个股分析页面的
   // 进度列和结论列看看怎么合并和显示哪些内容」。
   // [R212] 「贵不贵」(位置) + 「怎么办」(动作) 合成一列, 竖排, 摆在 AI 之前。
@@ -125,7 +126,7 @@ const BOARD_COLS = [
   // 在整张表上零个渲染点, 那条线只从「怎么办」的 `price` 露过面。所以它搬进
   // 「持仓」列 —— 出场线本来就是**关于我这笔仓位**的事, 归「我的账」比归
   // 「凭什么」更准。
-  { label: '持仓', w: '18%' },
+  { label: '持仓', w: '22%' },
   // [R284 → R435] 「AI 分析」整列并进「AI 信号」列(R284), R435 连「AI 信号」列一起撤了 ——
   // 用户: 「清除了ai信号这部分, 后续我打算用斐波那契二型重做这部分」。那一列头一行的
   // 三个入口(报告胶囊 / ✨AI 四维分析 / 🔔点位提醒)按用户选的一起去掉: AI 四维分析在
@@ -633,8 +634,8 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, loc
       <div className="flex flex-wrap items-center gap-x-2 gap-y-2 px-4 py-3">
         {/* 决策台就是整页主体, 没有要让位的东西 —— 不再提供折叠 */}
         <span className="flex shrink-0 items-center gap-2">
-          <Wallet className="h-4 w-4 text-accent" />
-          <span className={TYPE.card}>自选决策台</span>
+          {/* [R520] 「自选决策台」那个标题撤了 —— 这张表就是整页, 页头已经写着「个股分析」,
+              同一页两个名字读的人得先确认是不是一回事。只数留着。 */}
           {/* [R276] 两个数出自同一批票(当前这张表)。筛掉了多少写在后面, 免得
               「12 只」被读成"我的自选只剩 12 只了"。 */}
           <span className="text-xs text-muted">
@@ -709,7 +710,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, loc
           className={buttonClass({}, 'ml-auto')}
         >
           <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} />
-          刷新
+          <span className="sr-only">刷新</span>
         </button>
         {/* [R312] 「全量回测」。用户: 「在刷新后面加个一键回测所有个股」。
 
@@ -732,21 +733,20 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, loc
           className={buttonClass()}
         >
           <FlaskConical className="h-3.5 w-3.5" />
-          全量回测
+          <span className="sr-only">全量回测</span>
         </button>
         <button
           onClick={() => setExportOpen(true)}
           disabled={!exportRows.length}
           title={exportRows.length
-            ? `导出当前列表所见的 ${exportRows.length} 只为自包含 HTML(可存档/打印/转发)。\n`
+            ? `导出当前列表所见的 ${exportRows.length} 只、${exportCols.length} 列为自包含 HTML(可存档/打印/转发)。\n`
               + `点开可以选导哪些列 —— 原「六态汇总」就是其中一个预设。\n`
               + `导出的读法与屏幕一致(通道列写「贴上轨」而不是 0.87)。`
             : '当前列表是空的'}
           className={buttonClass()}
         >
           <Download className="h-3.5 w-3.5" />
-          导出
-          {exportRows.length > 0 && <span className="opacity-70">{exportRows.length}·{exportCols.length}列</span>}
+          <span className="sr-only">导出</span>
         </button>
         {/* [R435] 「AI 分析持有 / AI 分析全部」两个批量按钮随 AI 信号撤了 */}
       </div>
@@ -777,8 +777,8 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, loc
                     看得完, 滑过去之后满屏读数不知道是哪一只票。`z-30` 要压过 thead
                     自己的 `z-20`, 否则表头第一格会被同一层的其余表头盖住。
                     宽屏 `lg:static` 之后与改动前逐像素相同。 */}
-                <th className="sticky left-0 z-30 bg-elevated whitespace-nowrap px-3 py-2.5 font-normal text-center lg:static lg:bg-transparent"><button onClick={() => cycleSort('name')} className={thBtn} title={HEAD_TIPS.name}>标的{caret('name')}</button><Hint title={HEAD_TIPS.name} className="ml-0.5" /></th>
-                <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center">
+                <th className="sticky left-0 z-30 bg-elevated whitespace-nowrap px-3 py-2 font-normal text-left lg:static lg:bg-transparent"><button onClick={() => cycleSort('name')} className={thBtn} title={HEAD_TIPS.name}>标的{caret('name')}</button><Hint title={HEAD_TIPS.name} className="ml-0.5" /></th>
+                <th className="whitespace-nowrap px-2 py-2 font-normal text-right">
                   <button onClick={() => cycleSort('changePct')}
                           className={`${thBtn} whitespace-nowrap`}
                           title={HEAD_TIPS.changePct}>
@@ -791,7 +791,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, loc
                 {/* [R42] Keltner 三档: 一眼看出这只票贴着哪条轨。收盘口径, 与个股分析图表同一组公式 */}
                 {/* [R198] 三档合一。排序键仍是三个 —— 点表头在 短→中→长 之间轮换,
                     再点同一个翻方向。合并的是显示不是能力。 */}
-                <th className="whitespace-nowrap px-1.5 py-2.5 font-normal text-center">
+                <th className="whitespace-nowrap px-2 py-2 font-normal text-left">
                   {/* [R211] 排序标记压成同一行的一个小字。原来那个彩色徽标会换行,
                       表头看着就断成两截 —— 用户: 「量化通道我不喜欢这样搞, 不美观」。
                       [R250] 表头**只印列名** —— 排序目标是内部分层, 不该印在表头上。
@@ -808,7 +808,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, loc
                 </th>
                 {/* [R284] 账目三列并一列。表头也只剩一个, 排序目标取「浮盈」——
                     「拿没拿」由「只看持有」那个按钮回答, 成本价排序没有决策含义。 */}
-                <th className="whitespace-nowrap px-2 py-2.5 font-normal text-center">
+                <th className="whitespace-nowrap px-2 py-2 font-normal text-left">
                   <button onClick={() => cycleSort('pnl')} className={thBtn}
                           title={HEAD_TIPS.pnl}>
                     持仓{caret('pnl')}
@@ -869,10 +869,11 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, loc
                         当前)是半透明的, 同一个元素上叠不起两个底色, 所以窄屏上这一格
                         只有页面底色。当前行的身份标记没丢 —— 左边那道靛蓝边还在, 而且
                         它本来就是比淡色底更强的那个信号。 */}
-                    <td className={`${TD_BASE} sticky left-0 z-[1] bg-base px-3 text-center border-l-2 lg:static lg:bg-transparent ${active ? 'border-l-accent' : 'border-l-transparent'}`}>
+                    <td className={`${TD_BASE} sticky left-0 z-[1] bg-base px-3 border-l-2 lg:static lg:bg-transparent ${active ? 'border-l-accent' : 'border-l-transparent'}`}>
+                      {/* [R520] 单行、左对齐 —— 原来名字与代码竖着居中在一个 36px 高的按钮里, 是全表行高 80px 的根源之一 */}
                       <button onClick={() => (onPreview ?? onSelect)(r.symbol, r.name)}
-                              className="mx-auto flex min-h-[2.25rem] flex-col items-center justify-center gap-0.5 text-center cursor-pointer group">
-                        <span className="flex items-center gap-1.5">
+                              className="flex max-w-full items-center text-left cursor-pointer group">
+                        <span className="flex min-w-0 items-center gap-1.5">
                           {active && <Star className="h-2.5 w-2.5 shrink-0 text-accent" />}
                           <span className="max-w-[140px] truncate font-medium text-foreground transition-colors group-hover:text-accent">{r.name}</span>
                           <span className={`${NUM} text-micro text-muted`}>{r.symbol}</span>
@@ -880,7 +881,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, loc
                       </button>
                     </td>
                     {/* [R212] 现价与涨跌并成一格 —— 两个数天生一起读 */}
-                    <td className={`${TD_BASE} ${NUM} whitespace-nowrap px-2`}>
+                    <td className={`${TD_BASE} ${NUM} whitespace-nowrap px-2 text-right`}>
                       <span className="text-foreground">{r.close != null ? r.close.toFixed(2) : '—'}</span>
                       <span className={`ml-1.5 text-xs ${up ? 'text-bull' : down ? 'text-bear' : 'text-muted'}`}>
                         {r.changePct != null ? `${r.changePct > 0 ? '+' : ''}${(r.changePct * 100).toFixed(2)}%` : '—'}
@@ -900,11 +901,17 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, loc
                         空仓(158/166 行)时这一格只有一个按钮; 持有时才长出成本输入。
                         [R169] 写回时一律用 manualCost 而不是 r.cost —— r.cost 可能是批次
                         派生出来的, 直接回写会把"批次算的"固化成"我填的"。派生值必须保持派生。 */}
-                    <td className={`${TD_BASE} whitespace-nowrap px-2 text-center`}>
-                      <div className="inline-flex flex-col items-center gap-1">
+                    <td className={`${TD_BASE} whitespace-nowrap px-2`}>
+                      {/* [R520] 单行。**空仓不再是一颗带边框的按钮**: 120 行里 110 行印着「空仓」, 一列按钮全在说
+                          「这只我没拿」—— 没事是常态, 常态不该长得像个动作。改成一个压暗的文字入口, 点它仍切成持有;
+                          持有那几行才亮起来, 一列扫下去只看得见拿着的。 */}
+                      <div className="flex items-center gap-1.5">
                         <button
                           onClick={() => setPos.mutate({ symbol: r.symbol, held: !r.held, cost: manualCost, weight: r.weight })}
-                          className={buttonClass({ size: 'xs', selected: r.held })}
+                          title={r.held ? '点一下改成空仓' : '空仓 —— 点一下改成持有'}
+                          className={r.held
+                            ? buttonClass({ size: 'xs', selected: true })
+                            : 'rounded-btn px-1.5 py-0.5 text-micro text-muted/50 transition-colors duration-hover hover:bg-elevated hover:text-secondary'}
                         >
                           {r.held ? '持有' : '空仓'}
                         </button>
@@ -921,7 +928,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, loc
                                 const v = e.target.value === '' ? null : Number(e.target.value)
                                 if (v !== manualCost) setPos.mutate({ symbol: r.symbol, held: true, cost: v, weight: r.weight })
                               }}
-                              className={`w-16 h-7 px-1.5 rounded-btn bg-base border text-xs ${NUM} text-right text-foreground focus:outline-none focus:border-accent/50 ${
+                              className={`w-16 h-6 px-1.5 rounded-btn bg-base border text-xs ${NUM} text-right text-foreground focus:outline-none focus:border-accent/50 ${
                                 r.costSource === 'lots' ? 'border-accent/35 placeholder:text-accent/70' : 'border-border'
                               }`}
                             />

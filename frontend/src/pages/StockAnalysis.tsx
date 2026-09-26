@@ -113,25 +113,15 @@ export function StockAnalysis() {
       {/* [R104] 页头重排: 名称按钮与"上次查看"胶囊已被整合弹窗取代(列表点标的即弹),
           撤销这两个入口; AI 个股分析/点位提醒 上移到页头右侧, 搜索行只留搜索框
           和一个非交互的"当前个股"小标签(标明 AI 分析/点位提醒作用在谁身上)。 */}
+      {/* [R520] 用户: 「个股分析页面也需要整改」。副标题(功能清单)去掉; 搜索框与「当前个股」
+          从自己那一行并进页头右侧 —— 与自选页同一个做法, 首屏少一行 50px。 */}
       <PageHeader
         title="个股分析"
-        subtitle="日 K · 关键价位 · AI 四维分析(技术 / 基本面 / 财务 / 消息面)"
-      />
-
-      {/* [R60] 统一页面留白 */}
-      <div className="w-full px-3 pb-4 pt-3 lg:px-4 space-y-3">
-        {/* 搜索 + 当前个股标签(纯展示, 点开弹窗走下方列表的标的名称) */}
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-          <div className="w-72 shrink-0">
-            {/* [R157b] 搜索选中 = 明确的"带我去它那一行": 滚到正中并高亮, 不只是"进视野" */}
-            <StockFinancialSearch
-              onSelect={(s, n) => { onSelect(s, n); setLocateNonce((k) => k + 1) }}
-              assetTypes="stock,index"
-            />
-          </div>
+        className="shrink-0 flex-wrap gap-x-4 gap-y-2"
+        right={
+        <div className="flex min-w-0 max-w-full flex-wrap items-center gap-x-3 gap-y-2">
           {symbol && (
             <span className="inline-flex shrink-0 items-center gap-1.5 text-xs text-muted">
-              当前
               <span className="font-medium text-secondary">{name || symbol}</span>
               <span className="font-mono text-micro">{symbol}</span>
               {/* [R157] 定位: 把这只票在决策台里的那一行滚到正中并闪一下。
@@ -155,8 +145,19 @@ export function StockAnalysis() {
               </button>
             </span>
           )}
+          <div className="w-64 shrink-0">
+            {/* [R157b] 搜索选中 = 明确的"带我去它那一行": 滚到正中并高亮, 不只是"进视野" */}
+            <StockFinancialSearch
+              onSelect={(s, n) => { onSelect(s, n); setLocateNonce((k) => k + 1) }}
+              assetTypes="stock,index"
+            />
+          </div>
         </div>
+        }
+      />
 
+      {/* [R60] 统一页面留白 */}
+      <div className="w-full px-3 pb-4 pt-3 lg:px-4">
         {/* 主体:自选决策台铺满整页 —— 点标的弹出关键价位分析([R28]) */}
         {/* [R103] 点标的名称 = 选中该股 + 弹整合版个股弹窗(与全站其他列表一致) */}
         <WatchlistDecisionBoard

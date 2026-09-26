@@ -30,7 +30,8 @@ import { POS_TEXT } from '@/lib/reviewTimeline'
 // [R283] `py-2` → `py-2.5`, 并把多行格子的 `leading-snug` 换成 `leading-snug`。
 // 用户: 「页面整体看起来有点压抑」。**压抑有一半来自行高不是字号** —— 字号整档
 // 调大之后行距不跟着松, 反而比原来更挤。
-export const TD_BASE = 'align-middle py-2.5 text-center'
+// [R520] py-2.5 → py-1.5, 去掉 text-center: 全表单行左对齐(数字列各自 text-right)
+export const TD_BASE = 'align-middle py-1.5'
 
 /**
  * 数字列的统一写法。`tabular-nums` 是**列对齐的关键**: 没有它, 比例字形下
@@ -308,7 +309,7 @@ export function TrendSegment({ trend, geo, runs, ph, kc, close, trendCls }: {
     // 那一个按钮里, 这里只交出左半边的两行(fragment, 由外壳的 2×2 网格排位,
     // 左右同一行共用行高, 两条基线才齐)。悬停仍各半一份: 左半讲方向的依据。
     <>
-        <span title={tip} className="flex flex-wrap items-center justify-center gap-1">
+        <span title={tip} className="flex shrink-0 items-center gap-1">
           {trend ? (
             <span className={`inline-flex whitespace-nowrap rounded border px-1.5 py-0.5 text-xs ${trendCls ?? ''}`}>
               {/* [R290] 天数从徽标上**搬到了第二行**, 换成「转折后第 N 天」——
@@ -356,7 +357,7 @@ export function TrendSegment({ trend, geo, runs, ph, kc, close, trendCls }: {
                R284「别人看了会看不懂」、R285「加多两个字表述清楚」)。
             琥珀色与复盘逐日表那个「转折」标记同色, 两个页面同一件事同一个颜色。 */}
         {trend ? (
-          <span className={`inline-flex whitespace-nowrap rounded border px-1.5 py-px text-xs ${
+          <span className={`inline-flex shrink-0 whitespace-nowrap rounded border px-1.5 py-px text-xs ${
             trend.flipped
               ? 'border-amber-400/45 bg-amber-400/10 font-medium text-amber-300'
               : 'border-transparent text-muted'}`}
@@ -465,7 +466,9 @@ export function PositionSegment({ kc, geo, ev, runs, energy, ph, stateRun, close
     <>
         {/* 第一行: 位置名。**扫 166 行时只看这一行的颜色** ——
             红 = 在上轨那一侧, 蓝 = 在下轨那一侧, 灰 = 通道内。 */}
-        <span title={tip} className={`text-xs ${s ? POS_TEXT[s.pos] ?? 'text-muted' : 'text-muted/30'}`}>
+        {/* [R520] 一行四段里位置名前面隔一道细缝 —— 左边两段说方向, 右边两段说位置 */}
+        <span aria-hidden className="h-3 w-px shrink-0 bg-border" />
+        <span title={tip} className={`shrink-0 text-xs ${s ? POS_TEXT[s.pos] ?? 'text-muted' : 'text-muted/30'}`}>
           {s ? s.pos_cn : '—'}
         </span>
         {/* 第二行: 离那条轨还有多远, **价格口径**。
@@ -521,10 +524,12 @@ export function TrendPositionCell({ trend, trendCls, geo, runs, ph, kc, close, e
   onOpen: () => void
 }) {
   return (
-    <td className={`${TD_BASE} whitespace-nowrap px-1.5`}>
+    <td className={`${TD_BASE} whitespace-nowrap px-2`}>
       {/* 整格**一个** button; 内部两半都是 span —— button 里套 button 是非法 HTML */}
+      {/* [R520] 2×2 网格改成**一行四段**: 六态徽标 · 转折后第几天 · 位置名 · 离轨距离。
+          两行是全表行高 80px 的另一半根源; 一行放得下(1440 宽这一格有 500px, 四段加起来不到 300)。 */}
       <button type="button" onClick={onOpen}
-              className="mx-auto grid w-full cursor-pointer grid-flow-col grid-rows-2 items-center justify-center justify-items-center gap-x-3 gap-y-0.5 rounded-btn px-1 py-0.5 leading-snug transition-colors duration-hover hover:bg-elevated/40">
+              className="flex w-full cursor-pointer items-center gap-x-2 rounded-btn px-1 py-0.5 text-left leading-snug transition-colors duration-hover hover:bg-elevated/40">
         <TrendSegment trend={trend} trendCls={trendCls} geo={geo} runs={runs} ph={ph} kc={kc} close={close} />
         <PositionSegment kc={kc} geo={geo} ev={ev} runs={runs} energy={energy} ph={ph}
                          stateRun={stateRun} close={close} />
