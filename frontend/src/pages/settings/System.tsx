@@ -27,6 +27,133 @@ export function SettingsSystemPanel() {
   const screenerAutoRun = prefs?.screener_auto_run ?? true
   const [extTpl, setExtTpl] = useState(() => loadStockExternalTemplate())
   const [clearing, setClearing] = useState(false)
+  const save = useCallback(async (cfg: Record<string, unknown>) => {
+    setSaving(true)
+    try {
+      await api.updateRealtimeMonitorConfig(cfg)
+      qc.invalidateQueries({ queryKey: QK.preferences })
+    } finally {
+      setSaving(false)
+    }
+  }, [qc])
+
+  // 刷新前端缓存: 清除 react-query 缓存 + 强制重载 (绕过浏览器缓存)
+  // 不动 localStorage (用户列配置/策略池等偏好保留), 也不影响后端的本地股票数据
+  const handleClearCache = useCallback(() => {
+    setClearing(true)
+    qc.clear()
+    // 加时间戳参数强制浏览器重新下载所有静态资源
+    setTimeout(() => {
+      window.location.href = window.location.pathname + '?_t=' + Date.now()
+    }, 300)
+  }, [qc])
+
+  return (
+    <>
+      {/* [R533] 这里原来又印了一遍「系统设置 · 全局行为开关」大标题 —— 分栏条上已经写着「系统」, 同一页两个标题 */}
+
+      <section className="rounded-card border border-border bg-surface p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <Settings2 className="h-4 w-4 text-accent" />
+          <h3 className={TYPE.card}>策略页</h3>
+        </div>
+
+        <ToggleRow
+          label="进入策略页自动运行策略"
+          desc="开启后进入策略页自动跑所有策略获取命中数; 关闭则需手动点击"
+          checked={screenerAutoRun}
+          disabled={saving}
+          onChange={(v) => save({ screener_auto_run: v })}
+        />
+      </section>
+
+      {/* [R534] 「通知弹窗」「语音播报」两张卡搬去了「通知」栏(AlertPopupSettings, 本文件导出) */}
+
+      <section className="rounded-card border border-border bg-surface p-5 mt-6">
+        <div className="flex items-center gap-2 mb-4">
+          <ExternalLink className="h-4 w-4 text-accent" />
+          <h3 className={TYPE.card}>个股详情外链</h3>
+        </div>
+
+        <div className="flex items-center justify-between gap-4 py-2">
+          <div className="min-w-0">
+            <div className="text-sm text-foreground">详情页 URL 模板</div>
+            <div className="text-xs text-muted truncate">{"支持 {code} {market} {symbol} · 留空关闭外链"}</div>
+          </div>
+          <input
+            value={extTpl}
+            onChange={(e) => {
+              setExtTpl(e.target.value)
+              saveStockExternalTemplate(e.target.value)
+            }}
+            placeholder="https://..."
+            spellCheck={false}
+            className="w-[26rem] max-w-[60%] h-8 px-2.5 rounded-btn border border-border bg-base text-xs font-mono text-foreground focus:border-accent/50 focus:outline-none"
+          />
+        </div>
+      </section>
+
+      <section className="rounded-card border border-border bg-surface p-5 mt-6">
+        <div className="flex items-center gap-2 mb-4">
+          <Trash2 className="h-4 w-4 text-accent" />
+          <h3 className={TYPE.card}>缓存</h3>
+        </div>
+
+        <div className="flex items-center justify-between gap-4 py-2">
+          <div className="min-w-0">
+            <div className="text-sm text-foreground">刷新前端缓存</div>
+            <div className="text-xs text-muted truncate">
+              清除页面缓存并强制重新加载 (不影响个人配置和本地股票数据)
+            </div>
+          </div>
+          <button
+            onClick={handleClearCache}
+            disabled={clearing}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-btn text-xs
+                       bg-elevated text-secondary hover:text-foreground transition-colors
+                       disabled:opacity-50 shrink-0"
+          >
+            {clearing ? (
+              <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <RefreshCw className="h-3.5 w-3.5" />
+            )}
+            {clearing ? '清理中…' : '清理并刷新'}
+          </button>
+        </div>
+      </section>
+
+      <DataDoctorSection />
+
+      <section className="rounded-card border border-border bg-surface p-5 mt-6">
+        <div className="flex items-center gap-2 mb-4">
+          <Info className="h-4 w-4 text-accent" />
+          <h3 className={TYPE.card}>关于</h3>
+        </div>
+
+        <div className="flex items-center justify-between gap-4 py-2">
+          <div className="min-w-0">
+            <div className="text-sm text-foreground">版本</div>
+            <div className="text-xs text-muted truncate">当前安装的应用版本</div>
+          </div>
+          <span className="font-mono text-xs text-secondary shrink-0">
+            {versionData?.version ?? '—'}
+          </span>
+        </div>
+
+      </section>
+    </>
+  )
+}
+
+
+
+// ===== [R534] 通知弹窗 + 语音播报 —— 搬到「通知」栏 =====
+//
+// 用户: 「通知设置合到一栏」。两张卡原样搬出, 只读写浏览器本地偏好(alert_toast_* / alert_sound* /
+// voice_broadcast_*), 与后端无关。唯一的改动: 弹窗开关原来挂着 `disabled={saving}` —— 那是「策略页」那个开关
+// 落库时的忙碌态, 跟弹窗无关, 搬出来就没有了。
+export function AlertPopupSettings() {
   const [toastEnabled, setToastEnabled] = useState(() => {
     try { return localStorage.getItem('alert_toast_enabled') !== '0' } catch { return true }
   })
@@ -78,47 +205,10 @@ export function SettingsSystemPanel() {
     }
   }, [voiceConfigured])
 
-  const save = useCallback(async (cfg: Record<string, unknown>) => {
-    setSaving(true)
-    try {
-      await api.updateRealtimeMonitorConfig(cfg)
-      qc.invalidateQueries({ queryKey: QK.preferences })
-    } finally {
-      setSaving(false)
-    }
-  }, [qc])
-
-  // 刷新前端缓存: 清除 react-query 缓存 + 强制重载 (绕过浏览器缓存)
-  // 不动 localStorage (用户列配置/策略池等偏好保留), 也不影响后端的本地股票数据
-  const handleClearCache = useCallback(() => {
-    setClearing(true)
-    qc.clear()
-    // 加时间戳参数强制浏览器重新下载所有静态资源
-    setTimeout(() => {
-      window.location.href = window.location.pathname + '?_t=' + Date.now()
-    }, 300)
-  }, [qc])
 
   return (
-    <>
-      {/* [R533] 这里原来又印了一遍「系统设置 · 全局行为开关」大标题 —— 分栏条上已经写着「系统」, 同一页两个标题 */}
-
+    <div className="space-y-6">
       <section className="rounded-card border border-border bg-surface p-5">
-        <div className="flex items-center gap-2 mb-4">
-          <Settings2 className="h-4 w-4 text-accent" />
-          <h3 className={TYPE.card}>策略页</h3>
-        </div>
-
-        <ToggleRow
-          label="进入策略页自动运行策略"
-          desc="开启后进入策略页自动跑所有策略获取命中数; 关闭则需手动点击"
-          checked={screenerAutoRun}
-          disabled={saving}
-          onChange={(v) => save({ screener_auto_run: v })}
-        />
-      </section>
-
-      <section className="rounded-card border border-border bg-surface p-5 mt-6">
         <div className="flex items-center gap-2 mb-4">
           <Bell className="h-4 w-4 text-accent" />
           <h3 className={TYPE.card}>通知弹窗</h3>
@@ -128,7 +218,6 @@ export function SettingsSystemPanel() {
           label="开启监控通知弹窗"
           desc="收到监控告警时在右下角弹出通知卡片"
           checked={toastEnabled}
-          disabled={saving}
           onChange={(v) => {
             localStorage.setItem('alert_toast_enabled', v ? '1' : '0')
             setToastEnabled(v)
@@ -288,83 +377,9 @@ export function SettingsSystemPanel() {
         </div>
       </section>
 
-      <section className="rounded-card border border-border bg-surface p-5 mt-6">
-        <div className="flex items-center gap-2 mb-4">
-          <ExternalLink className="h-4 w-4 text-accent" />
-          <h3 className={TYPE.card}>个股详情外链</h3>
-        </div>
-
-        <div className="flex items-center justify-between gap-4 py-2">
-          <div className="min-w-0">
-            <div className="text-sm text-foreground">详情页 URL 模板</div>
-            <div className="text-xs text-muted truncate">{"支持 {code} {market} {symbol} · 留空关闭外链"}</div>
-          </div>
-          <input
-            value={extTpl}
-            onChange={(e) => {
-              setExtTpl(e.target.value)
-              saveStockExternalTemplate(e.target.value)
-            }}
-            placeholder="https://..."
-            spellCheck={false}
-            className="w-[26rem] max-w-[60%] h-8 px-2.5 rounded-btn border border-border bg-base text-xs font-mono text-foreground focus:border-accent/50 focus:outline-none"
-          />
-        </div>
-      </section>
-
-      <section className="rounded-card border border-border bg-surface p-5 mt-6">
-        <div className="flex items-center gap-2 mb-4">
-          <Trash2 className="h-4 w-4 text-accent" />
-          <h3 className={TYPE.card}>缓存</h3>
-        </div>
-
-        <div className="flex items-center justify-between gap-4 py-2">
-          <div className="min-w-0">
-            <div className="text-sm text-foreground">刷新前端缓存</div>
-            <div className="text-xs text-muted truncate">
-              清除页面缓存并强制重新加载 (不影响个人配置和本地股票数据)
-            </div>
-          </div>
-          <button
-            onClick={handleClearCache}
-            disabled={clearing}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-btn text-xs
-                       bg-elevated text-secondary hover:text-foreground transition-colors
-                       disabled:opacity-50 shrink-0"
-          >
-            {clearing ? (
-              <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <RefreshCw className="h-3.5 w-3.5" />
-            )}
-            {clearing ? '清理中…' : '清理并刷新'}
-          </button>
-        </div>
-      </section>
-
-      <DataDoctorSection />
-
-      <section className="rounded-card border border-border bg-surface p-5 mt-6">
-        <div className="flex items-center gap-2 mb-4">
-          <Info className="h-4 w-4 text-accent" />
-          <h3 className={TYPE.card}>关于</h3>
-        </div>
-
-        <div className="flex items-center justify-between gap-4 py-2">
-          <div className="min-w-0">
-            <div className="text-sm text-foreground">版本</div>
-            <div className="text-xs text-muted truncate">当前安装的应用版本</div>
-          </div>
-          <span className="font-mono text-xs text-secondary shrink-0">
-            {versionData?.version ?? '—'}
-          </span>
-        </div>
-
-      </section>
-    </>
+    </div>
   )
 }
-
 
 // ===== [R271] 数据体检 =====
 

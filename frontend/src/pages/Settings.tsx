@@ -12,7 +12,8 @@
  *   · 页头副标题「管理账户、数据刷新策略和高级功能配置」撤掉 —— 这里没有账户。
  * 七个面板的内容一个没动。
  */
-import { BarChart3, Clock3, Database, Radio, Settings2, SlidersHorizontal, Sparkles } from 'lucide-react'
+import { useEffect } from 'react'
+import { BarChart3, Bell, Clock3, Database, Radio, Settings2, SlidersHorizontal, Sparkles } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import { SettingsAIPanel } from './settings/AI'
 import { SettingsMonitoringPanel } from './settings/Monitoring'
@@ -21,17 +22,20 @@ import { SettingsMenuSettingsPanel } from './settings/MenuSettings'
 import { SettingsTimeoutPanel } from './settings/Timeout'
 import { SettingsSystemPanel } from './settings/System'
 import { SettingsDataSourcesPanel } from './settings/DataSources'
+import { SettingsNotificationsPanel } from './settings/Notifications'
 import { PageHeader } from '@/components/PageHeader'
 import { PageTabs, usePageTab, type PageTabDef } from '@/components/PageTabs'
 
 import type { ComponentType } from 'react'
 
-export type SettingsTab = 'data-sources' | 'monitoring' | 'ai' | 'menus' | 'ext-pages' | 'timeout' | 'system'
+export type SettingsTab = 'data-sources' | 'monitoring' | 'notifications' | 'ai' | 'menus' | 'ext-pages' | 'timeout' | 'system'
 
 /** 栏的顺序就是这张表的顺序 */
 export const SETTINGS_TABS: Record<SettingsTab, PageTabDef> = {
   'data-sources': { title: '数据源', icon: Database },
   monitoring: { title: '实时监控', icon: Radio },
+  // [R534] 推送通知(原在实时监控) + 通知弹窗 / 语音播报(原在系统) 合成一栏
+  notifications: { title: '通知', icon: Bell },
   ai: { title: 'AI', icon: Sparkles },
   menus: { title: '菜单', icon: SlidersHorizontal },
   'ext-pages': { title: '扩展页面', icon: BarChart3 },
@@ -42,6 +46,7 @@ export const SETTINGS_TABS: Record<SettingsTab, PageTabDef> = {
 const PANELS: Record<SettingsTab, ComponentType<{ highlight?: string }>> = {
   'data-sources': SettingsDataSourcesPanel,
   monitoring: SettingsMonitoringPanel,
+  notifications: SettingsNotificationsPanel,
   ai: SettingsAIPanel,
   menus: SettingsMenuSettingsPanel,
   'ext-pages': SettingsExtPagesPanel,
@@ -51,8 +56,16 @@ const PANELS: Record<SettingsTab, ComponentType<{ highlight?: string }>> = {
 
 export function Settings() {
   const [activeTab, changeTab] = usePageTab(SETTINGS_TABS, 'data-sources')
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const highlight = searchParams.get('highlight') ?? ''
+  // [R534] 推送通知搬到了「通知」栏: 老书签 / 老链接 `?tab=monitoring&highlight=webhooks` 转过去, 定位照旧
+  useEffect(() => {
+    if (searchParams.get('tab') === 'monitoring' && highlight === 'webhooks') {
+      const next = new URLSearchParams(searchParams)
+      next.set('tab', 'notifications')
+      setSearchParams(next, { replace: true })
+    }
+  }, [searchParams, highlight, setSearchParams])
   const Panel = PANELS[activeTab]
 
   return (

@@ -1611,7 +1611,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
           return (
             <p className="text-micro leading-relaxed text-warning/80">
               {unconfigured.join('、')}尚未配置,
-              <Link to="/settings?tab=monitoring&highlight=webhooks" className="text-accent hover:text-accent/80">前往设置页配置 →</Link>
+              <Link to="/settings?tab=notifications&highlight=webhooks" className="text-accent hover:text-accent/80">前往设置页配置 →</Link>
             </p>
           )
         })()}

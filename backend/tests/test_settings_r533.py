@@ -19,7 +19,7 @@ def test_R533_走共用分栏条_不再有竖向菜单():
 
 def test_R533_栏名与顺序():
     code = code_of(PAGE)
-    order = ["'data-sources': { title: '数据源'", "monitoring: { title: '实时监控'", "ai: { title: 'AI'",
+    order = ["'data-sources': { title: '数据源'", "monitoring: { title: '实时监控'", "notifications: { title: '通知'", "ai: { title: 'AI'",
              "menus: { title: '菜单'", "'ext-pages': { title: '扩展页面'", "timeout: { title: '网络'",
              "system: { title: '系统'"]
     idx = [code.index(o) for o in order]
@@ -42,3 +42,36 @@ def test_R533_切栏瞬时_副标题与重复标题撤掉():
     assert "管理账户" not in code, "副标题说的「账户」这里根本没有"
     system = code_of("pages/settings/System.tsx")
     assert 'title="系统设置"' not in system, "系统栏里又印了一遍大标题"
+
+
+# ── [R534] 通知设置合到一栏 ──────────────────────────────────────
+
+def test_R534_通知一栏装着三张卡():
+    """用户: 「通知设置合到一栏」。推送通知(原在实时监控) + 通知弹窗 / 语音播报(原在系统)。"""
+    panel = code_of("pages/settings/Notifications.tsx")
+    assert "<PushChannelsCard highlight={highlight} />" in panel
+    assert "<AlertPopupSettings />" in panel
+    assert "notifications: SettingsNotificationsPanel" in code_of(PAGE)
+
+
+def test_R534_原处不再各放一份():
+    mon = code_of("pages/settings/Monitoring.tsx")
+    sysp = code_of("pages/settings/System.tsx")
+    # 推送卡只在导出的组件里出现一次, 实时监控面板本身不再渲染它
+    assert mon.count('title="推送通知"') == 1 and "export function PushChannelsCard" in mon
+    i = mon.index("export function SettingsMonitoringPanel"); j = mon.index("export function PushChannelsCard")
+    assert "webhookDefaultChannels" not in mon[i:j], "实时监控面板里还留着推送渠道的状态"
+    # 数卡片标题, 不数字面 —— 「监控告警语音播报」这个开关标签里也有这四个字
+    assert sysp.count(">通知弹窗</h3>") == 1 and sysp.count(">语音播报</h3>") == 1 and "export function AlertPopupSettings" in sysp
+    i = sysp.index("export function SettingsSystemPanel"); j = sysp.index("export function AlertPopupSettings")
+    assert "alert_toast_enabled" not in sysp[i:j], "系统面板里还留着弹窗的状态"
+
+
+def test_R534_老链接转到通知栏_站内链接已改():
+    page = code_of(PAGE)
+    assert "searchParams.get('tab') === 'monitoring' && highlight === 'webhooks'" in page
+    assert "next.set('tab', 'notifications')" in page
+    for rel in ("components/monitor/RuleEditor.tsx", "pages/Review.tsx"):
+        code = code_of(rel)
+        assert "/settings?tab=notifications&highlight=webhooks" in code
+        assert "/settings?tab=monitoring&highlight=webhooks" not in code

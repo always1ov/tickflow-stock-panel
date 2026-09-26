@@ -83,8 +83,6 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
   // 修复轮的 intraday.batch 与其同档, 见后端 minute_refresh 服务
   const hasFullMinuteCap = !!caps?.capabilities?.['intraday.universe']
   const rs = refreshStatus.data
-  // 新建监控规则时默认勾选的推送渠道 (全局默认值数组, 单条规则可独立修改)
-  const webhookDefaultChannels = prefs?.webhook_default_channels ?? []
   const isRunning = quoteStatus?.running ?? false
   const isTrading = quoteStatus?.is_trading_hours ?? false
   // 管道/数据修正运行期间实时行情被临时暂停 — 此时禁止开启
@@ -93,91 +91,6 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
   const minInterval = intervalData?.min_interval ?? 6
   const maxInterval = intervalData?.max_interval ?? 60
   const [intervalDraft, setIntervalDraft] = useState(interval)
-  // [安全审查 run-1] 这几项后端已改成「掩码串 + *_set 布尔」返回 —— 它们不是
-  // 「地址」而是凭据 (企微的 ?key=、钉钉的 ?access_token=、飞书的 /hook/<uuid>
-  // 末段, 以及两个签名密钥本身)。前端照 **本页既有的写法** 改成只写不读:
-  // 草稿从空开始、placeholder 用同一句「已保存；留空保持不变」、清除走独立按钮。
-  // 直接把掩码串塞进输入框是不行的 —— 用户改中间几个字符, 提交上去仍带掩码点,
-  // 后端会判成「没改」而静默忽略, 那比看不见更糟。
-  const feishuWebhookUrl = prefs?.feishu_webhook_url ?? ''
-  const feishuWebhookUrlSet = prefs?.feishu_webhook_url_set ?? !!feishuWebhookUrl
-  const feishuWebhookSecret = prefs?.feishu_webhook_secret ?? ''
-  const feishuWebhookSecretSet = prefs?.feishu_webhook_secret_set ?? !!feishuWebhookSecret
-  const [feishuDraft, setFeishuDraft] = useState('')
-  const [feishuSecretDraft, setFeishuSecretDraft] = useState('')
-  const [feishuError, setFeishuError] = useState('')
-  // 企业微信 webhook
-  const wecomWebhookUrl = prefs?.wecom_webhook_url ?? ''
-  const wecomWebhookUrlSet = prefs?.wecom_webhook_url_set ?? !!wecomWebhookUrl
-  const [wecomDraft, setWecomDraft] = useState('')
-  const [wecomError, setWecomError] = useState('')
-  // 钉钉 webhook (仅关键词模式: 地址 + 关键词)
-  const dingtalkWebhookUrl = prefs?.dingtalk_webhook_url ?? ''
-  const dingtalkWebhookUrlSet = prefs?.dingtalk_webhook_url_set ?? !!dingtalkWebhookUrl
-  const dingtalkKeyword = prefs?.dingtalk_keyword ?? ''
-  const [dingtalkDraft, setDingtalkDraft] = useState('')
-  const [dingtalkKeywordDraft, setDingtalkKeywordDraft] = useState(dingtalkKeyword)
-  const [dingtalkError, setDingtalkError] = useState('')
-  // 通用第三方 JSON webhook
-  const customWebhookUrl = prefs?.custom_webhook_url ?? ''
-  const customWebhookSecretSet = prefs?.custom_webhook_secret_set ?? false
-  const [customDraft, setCustomDraft] = useState(customWebhookUrl)
-  const [customSecretDraft, setCustomSecretDraft] = useState('')
-  const [customError, setCustomError] = useState('')
-  // SMTP 邮件通道
-  const emailSmtpConfig = prefs?.email_smtp_config ?? EMPTY_EMAIL_SMTP
-  const emailSmtpPasswordSet = prefs?.email_smtp_password_set ?? false
-  const emailConfigured = !!(
-    emailSmtpConfig.host
-    && emailSmtpConfig.from_address
-    && emailSmtpConfig.to_addresses.length
-    && (!emailSmtpConfig.username || emailSmtpPasswordSet)
-  )
-  const [emailDraft, setEmailDraft] = useState<EmailSmtpConfig>(emailSmtpConfig)
-  const [emailPasswordDraft, setEmailPasswordDraft] = useState('')
-  const [emailError, setEmailError] = useState('')
-  // 企业微信智能机器人 (BotID + Secret, 长连接通道)
-  const wecomBotId = prefs?.wecom_bot_id ?? ''
-  const wecomBotSecret = prefs?.wecom_bot_secret ?? ''
-  const wecomBotSecretSet = prefs?.wecom_bot_secret_set ?? !!wecomBotSecret
-  const wecomBotEnabled = prefs?.wecom_bot_enabled ?? false
-  const [botIdDraft, setBotIdDraft] = useState(wecomBotId)
-  const [botSecretDraft, setBotSecretDraft] = useState('')
-  const [botError, setBotError] = useState('')
-  const [botStatus, setBotStatus] = useState<{connected: boolean; last_error: string} | null>(null)
-  // 飞书渠道配置区展开态 (推送通知卡片内)
-  const [channelOpen, setChannelOpen] = useState(false)
-  // 企业微信渠道配置区展开态
-  const [wecomOpen, setWecomOpen] = useState(false)
-  // 钉钉渠道配置区展开态
-  const [dingtalkOpen, setDingtalkOpen] = useState(false)
-  const [customOpen, setCustomOpen] = useState(false)
-  const [emailOpen, setEmailOpen] = useState(false)
-  // 智能机器人配置区展开态
-  const [botOpen, setBotOpen] = useState(false)
-  useEffect(() => {
-    setFeishuDraft('')
-    setFeishuSecretDraft('')
-  }, [feishuWebhookUrlSet, feishuWebhookSecretSet])
-  useEffect(() => {
-    setWecomDraft('')
-  }, [wecomWebhookUrlSet])
-  useEffect(() => {
-    setDingtalkDraft('')
-    setDingtalkKeywordDraft(dingtalkKeyword)
-  }, [dingtalkWebhookUrlSet, dingtalkKeyword])
-  useEffect(() => {
-    setCustomDraft(customWebhookUrl)
-    setCustomSecretDraft('')
-  }, [customWebhookUrl, customWebhookSecretSet])
-  useEffect(() => {
-    setEmailDraft(emailSmtpConfig)
-    setEmailPasswordDraft('')
-  }, [emailSmtpConfig, emailSmtpPasswordSet])
-  useEffect(() => {
-    setBotIdDraft(wecomBotId)
-    setBotSecretDraft('')
-  }, [wecomBotId, wecomBotSecretSet])
 
   const save = useCallback(async (cfg: Record<string, unknown>) => {
     try {
@@ -199,198 +112,6 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
     qc.invalidateQueries({ queryKey: QK.preferences })
   }, [qc])
 
-  // 勾选/取消勾选某个默认推送渠道。
-  const toggleDefaultChannel = useCallback(async (ch: string, enabled: boolean) => {
-    const cur = prefs?.webhook_default_channels ?? []
-    const next = enabled ? [...cur, ch] : cur.filter(c => c !== ch)
-    await api.updateWebhookDefaultChannels(next)
-    qc.invalidateQueries({ queryKey: QK.preferences })
-  }, [qc, prefs])
-
-  const saveFeishuWebhook = useMutation({
-    mutationFn: ({ url, secret }: { url: string; secret: string }) => api.updateFeishuWebhook(url, secret),
-    onSuccess: () => {
-      setFeishuError('')
-      toast('飞书 Webhook 已保存', 'success')
-      qc.invalidateQueries({ queryKey: QK.preferences })
-    },
-    onError: (err: any) => setFeishuError(String(err?.message ?? '保存失败')),
-  })
-  const FEISHU_PREFIX = 'https://open.feishu.cn/open-apis/bot/v2/hook/'
-  const submitFeishu = useCallback(() => {
-    const url = feishuDraft.trim()
-    const secret = feishuSecretDraft.trim()
-    if (url && !url.startsWith(FEISHU_PREFIX)) {
-      setFeishuError('地址需以 ' + FEISHU_PREFIX + ' 开头')
-      return
-    }
-    // 空 = 没动这一项: 回传掩码串, 后端识别为「保持原值」。清除走下面的按钮。
-    saveFeishuWebhook.mutate({
-      url: url || (feishuWebhookUrlSet ? feishuWebhookUrl : ''),
-      secret: secret || (feishuWebhookSecretSet ? feishuWebhookSecret : ''),
-    })
-  }, [feishuDraft, feishuSecretDraft, feishuWebhookUrl, feishuWebhookUrlSet,
-      feishuWebhookSecret, feishuWebhookSecretSet, saveFeishuWebhook])
-  const clearFeishu = useCallback(() => {
-    setFeishuDraft('')
-    setFeishuSecretDraft('')
-    saveFeishuWebhook.mutate({ url: '', secret: '' })
-  }, [saveFeishuWebhook])
-
-  const saveWecomWebhook = useMutation({
-    mutationFn: (url: string) => api.updateWecomWebhook(url),
-    onSuccess: () => {
-      setWecomError('')
-      toast('企业微信 Webhook 已保存', 'success')
-      qc.invalidateQueries({ queryKey: QK.preferences })
-    },
-    onError: (err: any) => setWecomError(String(err?.message ?? '保存失败')),
-  })
-  const WECOM_PREFIX = 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send'
-  const submitWecom = useCallback(() => {
-    const url = wecomDraft.trim()
-    // 允许完整 URL 或纯 key (36位UUID样式)
-    if (url && !url.startsWith(WECOM_PREFIX) && url.length < 20) {
-      setWecomError('请输入完整 Webhook 地址或纯 key (至少 20 位)')
-      return
-    }
-    saveWecomWebhook.mutate(url || (wecomWebhookUrlSet ? wecomWebhookUrl : ''))
-  }, [wecomDraft, wecomWebhookUrl, wecomWebhookUrlSet, saveWecomWebhook])
-  const clearWecom = useCallback(() => {
-    setWecomDraft('')
-    saveWecomWebhook.mutate('')
-  }, [saveWecomWebhook])
-
-  const saveDingtalkWebhook = useMutation({
-    mutationFn: ({ url, keyword }: { url: string; keyword: string }) => api.updateDingtalkWebhook(url, keyword),
-    onSuccess: () => {
-      setDingtalkError('')
-      toast('钉钉 Webhook 已保存', 'success')
-      qc.invalidateQueries({ queryKey: QK.preferences })
-    },
-    onError: (err: any) => setDingtalkError(String(err?.message ?? '保存失败')),
-  })
-  const DINGTALK_PREFIX = 'https://oapi.dingtalk.com/robot/send'
-  const submitDingtalk = useCallback(() => {
-    const url = dingtalkDraft.trim()
-    const keyword = dingtalkKeywordDraft.trim()
-    // 允许完整 URL 或纯 access_token (至少 20 位)
-    if (url && !url.startsWith(DINGTALK_PREFIX) && url.length < 20) {
-      setDingtalkError('请输入完整 Webhook 地址或纯 access_token (至少 20 位)')
-      return
-    }
-    const effective = url || (dingtalkWebhookUrlSet ? dingtalkWebhookUrl : '')
-    if (effective && !keyword) {
-      setDingtalkError('关键词模式下请填写机器人的自定义关键词, 否则钉钉会拒收消息')
-      return
-    }
-    saveDingtalkWebhook.mutate({ url: effective, keyword })
-  }, [dingtalkDraft, dingtalkKeywordDraft, dingtalkWebhookUrl, dingtalkWebhookUrlSet,
-      saveDingtalkWebhook])
-  const clearDingtalk = useCallback(() => {
-    setDingtalkDraft('')
-    saveDingtalkWebhook.mutate({ url: '', keyword: dingtalkKeywordDraft.trim() })
-  }, [dingtalkKeywordDraft, saveDingtalkWebhook])
-
-  // 发送测试消息 (用已保存的配置验证 Webhook 是否通)
-  const testDingtalk = useMutation({
-    mutationFn: () => api.sendTestWebhook('dingtalk'),
-    onSuccess: (d) => toast(d.detail, d.ok ? 'success' : 'error'),
-    onError: (err: any) => toast(String(err?.message ?? '测试失败'), 'error'),
-  })
-  const testFeishu = useMutation({
-    mutationFn: () => api.sendTestWebhook('feishu'),
-  })
-  const testWecom = useMutation({
-    mutationFn: () => api.sendTestWebhook('wecom'),
-  })
-
-  const saveCustomWebhook = useMutation({
-    mutationFn: ({ url, secret }: { url: string; secret?: string }) => api.updateCustomWebhook(url, secret),
-    onSuccess: () => {
-      setCustomError('')
-      setCustomSecretDraft('')
-      toast('第三方 Webhook 已保存', 'success')
-      qc.invalidateQueries({ queryKey: QK.preferences })
-    },
-    onError: (err: any) => setCustomError(String(err?.message ?? '保存失败')),
-  })
-  const submitCustom = useCallback(() => {
-    const url = customDraft.trim()
-    if (url && !/^https?:\/\//i.test(url)) {
-      setCustomError('请输入完整的 HTTP(S) URL')
-      return
-    }
-    saveCustomWebhook.mutate({
-      url,
-      ...(customSecretDraft ? { secret: customSecretDraft } : {}),
-    })
-  }, [customDraft, customSecretDraft, saveCustomWebhook])
-  const testCustom = useMutation({
-    mutationFn: () => api.sendTestWebhook('custom'),
-  })
-
-  const saveEmailSmtp = useMutation({
-    mutationFn: ({ config, password }: { config: EmailSmtpConfig; password?: string }) =>
-      api.updateEmailSmtp(config, password),
-    onSuccess: () => {
-      setEmailError('')
-      setEmailPasswordDraft('')
-      toast('邮件推送配置已保存', 'success')
-      qc.invalidateQueries({ queryKey: QK.preferences })
-    },
-    onError: (err: any) => setEmailError(String(err?.message ?? '保存失败')),
-  })
-  const submitEmail = useCallback(() => {
-    saveEmailSmtp.mutate({
-      config: {
-        ...emailDraft,
-        host: emailDraft.host.trim(),
-        username: emailDraft.username.trim(),
-        from_address: emailDraft.from_address.trim(),
-        to_addresses: emailDraft.to_addresses.map(item => item.trim()).filter(Boolean),
-      },
-      ...(emailPasswordDraft ? { password: emailPasswordDraft } : {}),
-    })
-  }, [emailDraft, emailPasswordDraft, saveEmailSmtp])
-  const testEmail = useMutation({
-    mutationFn: () => api.sendTestWebhook('email'),
-  })
-
-  // 智能机器人 (BotID + Secret) 保存 → 后端立即重建连接
-  const saveWecomBot = useMutation({
-    mutationFn: ({ botId, secret }: { botId: string; secret: string }) =>
-      api.updateWecomBot(botId, secret, true),
-    onSuccess: (data) => {
-      setBotError('')
-      toast('智能机器人凭证已保存, 正在连接…', 'success')
-      setBotStatus({
-        connected: data.wecom_bot_status?.connected ?? false,
-        last_error: data.wecom_bot_status?.last_error ?? '',
-      })
-      qc.invalidateQueries({ queryKey: QK.preferences })
-    },
-    onError: (err: any) => setBotError(String(err?.message ?? '保存失败')),
-  })
-  const submitBot = useCallback(() => {
-    // 空 = 没动 Secret: 回传掩码串, 后端识别为「保持原值」
-    saveWecomBot.mutate({
-      botId: botIdDraft.trim(),
-      secret: botSecretDraft.trim() || (wecomBotSecretSet ? wecomBotSecret : ''),
-    })
-  }, [botIdDraft, botSecretDraft, wecomBotSecret, wecomBotSecretSet, saveWecomBot])
-
-  // 智能机器人长连接开关(不改动凭证): 开启→连接, 关闭→断开
-  const toggleBotConnection = useMutation({
-    mutationFn: (enabled: boolean) => api.toggleWecomBot(enabled),
-    onSuccess: (data) => {
-      setBotStatus({
-        connected: data.wecom_bot_status?.connected ?? false,
-        last_error: data.wecom_bot_status?.last_error ?? '',
-      })
-      qc.invalidateQueries({ queryKey: QK.preferences })
-    },
-  })
 
   const runFix = useMutation({
     mutationFn: () => api.runLimitLadderFix(),
@@ -657,6 +378,304 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
           )}
         </Card>
 
+      </div>
+    </div>
+    </HighlightContext.Provider>
+  )
+}
+
+
+// ===== [R534] 推送通知 —— 搬到「通知」栏 =====
+//
+// 用户: 「通知设置合到一栏」。这张卡原来是「实时监控」面板的一部分, 状态 / 保存 / 测试全是它自己的,
+// 原样整块搬出来成一个组件, 一个字段、一个校验、一个按钮都没改。仍住在本文件, 复用本文件的 Card / ToggleRow /
+// TestSendButton / TestResult 与 HighlightContext(`highlight=webhooks` 定位照旧)。
+export function PushChannelsCard({ highlight }: { highlight?: string } = {}) {
+  const qc = useQueryClient()
+  const { data: prefs } = usePreferences()
+  // 新建监控规则时默认勾选的推送渠道 (全局默认值数组, 单条规则可独立修改)
+  const webhookDefaultChannels = prefs?.webhook_default_channels ?? []
+  // [安全审查 run-1] 这几项后端已改成「掩码串 + *_set 布尔」返回 —— 它们不是
+  // 「地址」而是凭据 (企微的 ?key=、钉钉的 ?access_token=、飞书的 /hook/<uuid>
+  // 末段, 以及两个签名密钥本身)。前端照 **本页既有的写法** 改成只写不读:
+  // 草稿从空开始、placeholder 用同一句「已保存；留空保持不变」、清除走独立按钮。
+  // 直接把掩码串塞进输入框是不行的 —— 用户改中间几个字符, 提交上去仍带掩码点,
+  // 后端会判成「没改」而静默忽略, 那比看不见更糟。
+  const feishuWebhookUrl = prefs?.feishu_webhook_url ?? ''
+  const feishuWebhookUrlSet = prefs?.feishu_webhook_url_set ?? !!feishuWebhookUrl
+  const feishuWebhookSecret = prefs?.feishu_webhook_secret ?? ''
+  const feishuWebhookSecretSet = prefs?.feishu_webhook_secret_set ?? !!feishuWebhookSecret
+  const [feishuDraft, setFeishuDraft] = useState('')
+  const [feishuSecretDraft, setFeishuSecretDraft] = useState('')
+  const [feishuError, setFeishuError] = useState('')
+  // 企业微信 webhook
+  const wecomWebhookUrl = prefs?.wecom_webhook_url ?? ''
+  const wecomWebhookUrlSet = prefs?.wecom_webhook_url_set ?? !!wecomWebhookUrl
+  const [wecomDraft, setWecomDraft] = useState('')
+  const [wecomError, setWecomError] = useState('')
+  // 钉钉 webhook (仅关键词模式: 地址 + 关键词)
+  const dingtalkWebhookUrl = prefs?.dingtalk_webhook_url ?? ''
+  const dingtalkWebhookUrlSet = prefs?.dingtalk_webhook_url_set ?? !!dingtalkWebhookUrl
+  const dingtalkKeyword = prefs?.dingtalk_keyword ?? ''
+  const [dingtalkDraft, setDingtalkDraft] = useState('')
+  const [dingtalkKeywordDraft, setDingtalkKeywordDraft] = useState(dingtalkKeyword)
+  const [dingtalkError, setDingtalkError] = useState('')
+  // 通用第三方 JSON webhook
+  const customWebhookUrl = prefs?.custom_webhook_url ?? ''
+  const customWebhookSecretSet = prefs?.custom_webhook_secret_set ?? false
+  const [customDraft, setCustomDraft] = useState(customWebhookUrl)
+  const [customSecretDraft, setCustomSecretDraft] = useState('')
+  const [customError, setCustomError] = useState('')
+  // SMTP 邮件通道
+  const emailSmtpConfig = prefs?.email_smtp_config ?? EMPTY_EMAIL_SMTP
+  const emailSmtpPasswordSet = prefs?.email_smtp_password_set ?? false
+  const emailConfigured = !!(
+    emailSmtpConfig.host
+    && emailSmtpConfig.from_address
+    && emailSmtpConfig.to_addresses.length
+    && (!emailSmtpConfig.username || emailSmtpPasswordSet)
+  )
+  const [emailDraft, setEmailDraft] = useState<EmailSmtpConfig>(emailSmtpConfig)
+  const [emailPasswordDraft, setEmailPasswordDraft] = useState('')
+  const [emailError, setEmailError] = useState('')
+  // 企业微信智能机器人 (BotID + Secret, 长连接通道)
+  const wecomBotId = prefs?.wecom_bot_id ?? ''
+  const wecomBotSecret = prefs?.wecom_bot_secret ?? ''
+  const wecomBotSecretSet = prefs?.wecom_bot_secret_set ?? !!wecomBotSecret
+  const wecomBotEnabled = prefs?.wecom_bot_enabled ?? false
+  const [botIdDraft, setBotIdDraft] = useState(wecomBotId)
+  const [botSecretDraft, setBotSecretDraft] = useState('')
+  const [botError, setBotError] = useState('')
+  const [botStatus, setBotStatus] = useState<{connected: boolean; last_error: string} | null>(null)
+  // 飞书渠道配置区展开态 (推送通知卡片内)
+  const [channelOpen, setChannelOpen] = useState(false)
+  // 企业微信渠道配置区展开态
+  const [wecomOpen, setWecomOpen] = useState(false)
+  // 钉钉渠道配置区展开态
+  const [dingtalkOpen, setDingtalkOpen] = useState(false)
+  const [customOpen, setCustomOpen] = useState(false)
+  const [emailOpen, setEmailOpen] = useState(false)
+  // 智能机器人配置区展开态
+  const [botOpen, setBotOpen] = useState(false)
+  useEffect(() => {
+    setFeishuDraft('')
+    setFeishuSecretDraft('')
+  }, [feishuWebhookUrlSet, feishuWebhookSecretSet])
+  useEffect(() => {
+    setWecomDraft('')
+  }, [wecomWebhookUrlSet])
+  useEffect(() => {
+    setDingtalkDraft('')
+    setDingtalkKeywordDraft(dingtalkKeyword)
+  }, [dingtalkWebhookUrlSet, dingtalkKeyword])
+  useEffect(() => {
+    setCustomDraft(customWebhookUrl)
+    setCustomSecretDraft('')
+  }, [customWebhookUrl, customWebhookSecretSet])
+  useEffect(() => {
+    setEmailDraft(emailSmtpConfig)
+    setEmailPasswordDraft('')
+  }, [emailSmtpConfig, emailSmtpPasswordSet])
+  useEffect(() => {
+    setBotIdDraft(wecomBotId)
+    setBotSecretDraft('')
+  }, [wecomBotId, wecomBotSecretSet])
+
+  // 勾选/取消勾选某个默认推送渠道。
+  const toggleDefaultChannel = useCallback(async (ch: string, enabled: boolean) => {
+    const cur = prefs?.webhook_default_channels ?? []
+    const next = enabled ? [...cur, ch] : cur.filter(c => c !== ch)
+    await api.updateWebhookDefaultChannels(next)
+    qc.invalidateQueries({ queryKey: QK.preferences })
+  }, [qc, prefs])
+
+  const saveFeishuWebhook = useMutation({
+    mutationFn: ({ url, secret }: { url: string; secret: string }) => api.updateFeishuWebhook(url, secret),
+    onSuccess: () => {
+      setFeishuError('')
+      toast('飞书 Webhook 已保存', 'success')
+      qc.invalidateQueries({ queryKey: QK.preferences })
+    },
+    onError: (err: any) => setFeishuError(String(err?.message ?? '保存失败')),
+  })
+  const FEISHU_PREFIX = 'https://open.feishu.cn/open-apis/bot/v2/hook/'
+  const submitFeishu = useCallback(() => {
+    const url = feishuDraft.trim()
+    const secret = feishuSecretDraft.trim()
+    if (url && !url.startsWith(FEISHU_PREFIX)) {
+      setFeishuError('地址需以 ' + FEISHU_PREFIX + ' 开头')
+      return
+    }
+    // 空 = 没动这一项: 回传掩码串, 后端识别为「保持原值」。清除走下面的按钮。
+    saveFeishuWebhook.mutate({
+      url: url || (feishuWebhookUrlSet ? feishuWebhookUrl : ''),
+      secret: secret || (feishuWebhookSecretSet ? feishuWebhookSecret : ''),
+    })
+  }, [feishuDraft, feishuSecretDraft, feishuWebhookUrl, feishuWebhookUrlSet,
+      feishuWebhookSecret, feishuWebhookSecretSet, saveFeishuWebhook])
+  const clearFeishu = useCallback(() => {
+    setFeishuDraft('')
+    setFeishuSecretDraft('')
+    saveFeishuWebhook.mutate({ url: '', secret: '' })
+  }, [saveFeishuWebhook])
+
+  const saveWecomWebhook = useMutation({
+    mutationFn: (url: string) => api.updateWecomWebhook(url),
+    onSuccess: () => {
+      setWecomError('')
+      toast('企业微信 Webhook 已保存', 'success')
+      qc.invalidateQueries({ queryKey: QK.preferences })
+    },
+    onError: (err: any) => setWecomError(String(err?.message ?? '保存失败')),
+  })
+  const WECOM_PREFIX = 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send'
+  const submitWecom = useCallback(() => {
+    const url = wecomDraft.trim()
+    // 允许完整 URL 或纯 key (36位UUID样式)
+    if (url && !url.startsWith(WECOM_PREFIX) && url.length < 20) {
+      setWecomError('请输入完整 Webhook 地址或纯 key (至少 20 位)')
+      return
+    }
+    saveWecomWebhook.mutate(url || (wecomWebhookUrlSet ? wecomWebhookUrl : ''))
+  }, [wecomDraft, wecomWebhookUrl, wecomWebhookUrlSet, saveWecomWebhook])
+  const clearWecom = useCallback(() => {
+    setWecomDraft('')
+    saveWecomWebhook.mutate('')
+  }, [saveWecomWebhook])
+
+  const saveDingtalkWebhook = useMutation({
+    mutationFn: ({ url, keyword }: { url: string; keyword: string }) => api.updateDingtalkWebhook(url, keyword),
+    onSuccess: () => {
+      setDingtalkError('')
+      toast('钉钉 Webhook 已保存', 'success')
+      qc.invalidateQueries({ queryKey: QK.preferences })
+    },
+    onError: (err: any) => setDingtalkError(String(err?.message ?? '保存失败')),
+  })
+  const DINGTALK_PREFIX = 'https://oapi.dingtalk.com/robot/send'
+  const submitDingtalk = useCallback(() => {
+    const url = dingtalkDraft.trim()
+    const keyword = dingtalkKeywordDraft.trim()
+    // 允许完整 URL 或纯 access_token (至少 20 位)
+    if (url && !url.startsWith(DINGTALK_PREFIX) && url.length < 20) {
+      setDingtalkError('请输入完整 Webhook 地址或纯 access_token (至少 20 位)')
+      return
+    }
+    const effective = url || (dingtalkWebhookUrlSet ? dingtalkWebhookUrl : '')
+    if (effective && !keyword) {
+      setDingtalkError('关键词模式下请填写机器人的自定义关键词, 否则钉钉会拒收消息')
+      return
+    }
+    saveDingtalkWebhook.mutate({ url: effective, keyword })
+  }, [dingtalkDraft, dingtalkKeywordDraft, dingtalkWebhookUrl, dingtalkWebhookUrlSet,
+      saveDingtalkWebhook])
+  const clearDingtalk = useCallback(() => {
+    setDingtalkDraft('')
+    saveDingtalkWebhook.mutate({ url: '', keyword: dingtalkKeywordDraft.trim() })
+  }, [dingtalkKeywordDraft, saveDingtalkWebhook])
+
+  // 发送测试消息 (用已保存的配置验证 Webhook 是否通)
+  const testDingtalk = useMutation({
+    mutationFn: () => api.sendTestWebhook('dingtalk'),
+    onSuccess: (d) => toast(d.detail, d.ok ? 'success' : 'error'),
+    onError: (err: any) => toast(String(err?.message ?? '测试失败'), 'error'),
+  })
+  const testFeishu = useMutation({
+    mutationFn: () => api.sendTestWebhook('feishu'),
+  })
+  const testWecom = useMutation({
+    mutationFn: () => api.sendTestWebhook('wecom'),
+  })
+
+  const saveCustomWebhook = useMutation({
+    mutationFn: ({ url, secret }: { url: string; secret?: string }) => api.updateCustomWebhook(url, secret),
+    onSuccess: () => {
+      setCustomError('')
+      setCustomSecretDraft('')
+      toast('第三方 Webhook 已保存', 'success')
+      qc.invalidateQueries({ queryKey: QK.preferences })
+    },
+    onError: (err: any) => setCustomError(String(err?.message ?? '保存失败')),
+  })
+  const submitCustom = useCallback(() => {
+    const url = customDraft.trim()
+    if (url && !/^https?:\/\//i.test(url)) {
+      setCustomError('请输入完整的 HTTP(S) URL')
+      return
+    }
+    saveCustomWebhook.mutate({
+      url,
+      ...(customSecretDraft ? { secret: customSecretDraft } : {}),
+    })
+  }, [customDraft, customSecretDraft, saveCustomWebhook])
+  const testCustom = useMutation({
+    mutationFn: () => api.sendTestWebhook('custom'),
+  })
+
+  const saveEmailSmtp = useMutation({
+    mutationFn: ({ config, password }: { config: EmailSmtpConfig; password?: string }) =>
+      api.updateEmailSmtp(config, password),
+    onSuccess: () => {
+      setEmailError('')
+      setEmailPasswordDraft('')
+      toast('邮件推送配置已保存', 'success')
+      qc.invalidateQueries({ queryKey: QK.preferences })
+    },
+    onError: (err: any) => setEmailError(String(err?.message ?? '保存失败')),
+  })
+  const submitEmail = useCallback(() => {
+    saveEmailSmtp.mutate({
+      config: {
+        ...emailDraft,
+        host: emailDraft.host.trim(),
+        username: emailDraft.username.trim(),
+        from_address: emailDraft.from_address.trim(),
+        to_addresses: emailDraft.to_addresses.map(item => item.trim()).filter(Boolean),
+      },
+      ...(emailPasswordDraft ? { password: emailPasswordDraft } : {}),
+    })
+  }, [emailDraft, emailPasswordDraft, saveEmailSmtp])
+  const testEmail = useMutation({
+    mutationFn: () => api.sendTestWebhook('email'),
+  })
+
+  // 智能机器人 (BotID + Secret) 保存 → 后端立即重建连接
+  const saveWecomBot = useMutation({
+    mutationFn: ({ botId, secret }: { botId: string; secret: string }) =>
+      api.updateWecomBot(botId, secret, true),
+    onSuccess: (data) => {
+      setBotError('')
+      toast('智能机器人凭证已保存, 正在连接…', 'success')
+      setBotStatus({
+        connected: data.wecom_bot_status?.connected ?? false,
+        last_error: data.wecom_bot_status?.last_error ?? '',
+      })
+      qc.invalidateQueries({ queryKey: QK.preferences })
+    },
+    onError: (err: any) => setBotError(String(err?.message ?? '保存失败')),
+  })
+  const submitBot = useCallback(() => {
+    // 空 = 没动 Secret: 回传掩码串, 后端识别为「保持原值」
+    saveWecomBot.mutate({
+      botId: botIdDraft.trim(),
+      secret: botSecretDraft.trim() || (wecomBotSecretSet ? wecomBotSecret : ''),
+    })
+  }, [botIdDraft, botSecretDraft, wecomBotSecret, wecomBotSecretSet, saveWecomBot])
+
+  // 智能机器人长连接开关(不改动凭证): 开启→连接, 关闭→断开
+  const toggleBotConnection = useMutation({
+    mutationFn: (enabled: boolean) => api.toggleWecomBot(enabled),
+    onSuccess: (data) => {
+      setBotStatus({
+        connected: data.wecom_bot_status?.connected ?? false,
+        last_error: data.wecom_bot_status?.last_error ?? '',
+      })
+      qc.invalidateQueries({ queryKey: QK.preferences })
+    },
+  })
+
+  return (
+    <HighlightContext.Provider value={highlight ?? ''}>
         {/* 推送通知 — 监控告警的外部推送渠道 (全局配置)。
             飞书 / 企业微信 / 第三方 Webhook / 邮件。
             每个渠道合并成一行: 勾选=新建规则默认推送, 点行展开地址配置。 */}
@@ -1190,8 +1209,6 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
 
           </div>
         </Card>
-      </div>
-    </div>
     </HighlightContext.Provider>
   )
 }

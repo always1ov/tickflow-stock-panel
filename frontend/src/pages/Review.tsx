@@ -593,7 +593,7 @@ export function Review() {
                   {reviewPushMode === 'auto'
                     ? '定时与手动生成的复盘归档后都会自动推送完整报告。'
                     : '复盘仅归档保存，不自动外发。'}
-                  复用「设置 → 实时监控」的渠道配置。
+                  复用「设置 → 通知」的渠道配置。
                   {(
                     (reviewPushChannels.includes('feishu') && !feishuConfigured)
                     || (reviewPushChannels.includes('wecom') && !wecomConfigured)
@@ -601,7 +601,7 @@ export function Review() {
                     || (reviewPushChannels.includes('custom') && !customConfigured)
                     || (reviewPushChannels.includes('email') && !emailConfigured)
                   ) && (
-                    <Link to="/settings?tab=monitoring&highlight=webhooks" className="ml-1 text-accent hover:underline" onClick={() => setShowSchedule(false)}>
+                    <Link to="/settings?tab=notifications&highlight=webhooks" className="ml-1 text-accent hover:underline" onClick={() => setShowSchedule(false)}>
                       前往配置 →
                     </Link>
                   )}
