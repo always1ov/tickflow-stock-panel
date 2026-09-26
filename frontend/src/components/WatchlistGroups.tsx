@@ -147,7 +147,9 @@ export function WatchlistGroupBar({
             **右侧那个操作按钮不在这一层**(它是兄弟节点), 所以滚的只是药丸,
             按钮仍然钉在首行, 与上面那条 fork 增强的约定一致。
           */
-          className={`order-2 flex min-w-0 basis-full flex-wrap items-stretch gap-1 py-0.5 sm:order-1 sm:basis-0 sm:flex-1 ${
+          // [R517] 用户: 「分组药丸条长度能做到一直保持一致吗」—— 从按内容撑开的 flex-wrap 换成等宽网格:
+          // 每列最窄 9rem、平分剩下的宽度, 于是每颗药丸一样长、列与列上下对齐; 名字太长截断(悬停看全名)。
+          className={`order-2 grid min-w-0 basis-full grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] items-stretch gap-1 py-0.5 sm:order-1 sm:basis-0 sm:flex-1 ${
             // [R508] 折起时限高三行(每行 = 药丸 28 + 上下 my-0.5 4 + 行间 gap 4 → 3 行 108px), 展开后仍守 34vh 上限自己滚
             expanded ? 'max-h-[34vh] overflow-y-auto' : 'max-h-[6.75rem] overflow-hidden'
           }`}
@@ -181,12 +183,12 @@ export function WatchlistGroupBar({
                 onDrop={draggable ? e => { e.preventDefault(); handleDrop() } : undefined}
                 onDragEnd={draggable ? clearDrag : undefined}
                 onClick={() => onSelect(tab.id)}
-                title={draggable ? `${tab.name} — 可拖拽调整分组顺序` : undefined}
+                title={draggable ? `${tab.name} — 可拖拽调整分组顺序` : tab.name}
                 // [R452] 与全站按钮同高(32px); 「全部 / 未分组」选中是全站那套反相,
                 // 彩色分组选中仍亮它自己的颜色(颜色是分组的身份)
                 // [R508] 药丸压矮一档(28px)并一律带边框 —— 原来未选中的没边框、靠留白分隔,
                 // 32 个排下来一片散点; 有边框之后一行能多放两个, 而且看得出每个是一个按钮
-                className={`relative my-0.5 inline-flex h-7 shrink-0 items-center gap-1.5 rounded-btn border px-2.5 text-xs transition-colors ${
+                className={`relative my-0.5 flex h-7 min-w-0 items-center gap-1.5 rounded-btn border px-2.5 text-xs transition-colors ${
                   draggable ? 'no-press cursor-grab active:cursor-grabbing' : ''
                 } ${
                   dragging ? 'opacity-40' : ''
@@ -207,8 +209,8 @@ export function WatchlistGroupBar({
                   <span className="absolute -right-0.5 top-1 bottom-1 w-0.5 rounded-full bg-accent" />
                 )}
                 {color && <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${color.dot}`} />}
-                <span>{tab.name}</span>
-                <span className={`font-mono text-micro tabular-nums ${active && !color ? 'opacity-70' : 'text-muted'}`}>
+                <span className="min-w-0 truncate">{tab.name}</span>
+                <span className={`shrink-0 font-mono text-micro tabular-nums ${active && !color ? 'opacity-70' : 'text-muted'}`}>
                   {tab.count}
                 </span>
                 {pcts && (() => {
@@ -216,7 +218,7 @@ export function WatchlistGroupBar({
                   if (!info || info.pct == null || info.sampled === 0) return null
                   return (
                     <span
-                      className={`font-mono text-micro tabular-nums ${groupPctColor(info.pct)}`}
+                      className={`ml-auto shrink-0 font-mono text-micro tabular-nums ${groupPctColor(info.pct)}`}
                       title={groupPctTitle(info)}
                     >
                       {fmtPct(info.pct)}

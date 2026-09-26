@@ -56,8 +56,11 @@ def test_R508_网格吃的是同一份行_零额外请求():
 
 def test_R508_网格每只一行_块内按涨跌_未分组垫底():
     grid = code_of(GRID)
-    for cell in ("fmtPrice(price)", "fmtPct(pct)", "r.pct_since_added", "r.symbol.slice(0, 6)"):
+    # [R517] 代码不再跟在名字后面(一行只留名称 + 三个数), 挪进行的悬停提示
+    for cell in ("fmtPrice(price)", "fmtPct(pct)", "r.pct_since_added"):
         assert cell in grid, f"一行少了 {cell}"
+    assert "r.symbol.slice(0, 6)" not in grid, "代码又印回行里了"
+    assert "title={`${name || r.symbol} ${r.symbol}`}" in grid, "代码从行里撤了, 悬停里也得有"
     assert "const bySymbolPct = (a: any, b: any) => (rowPct(b) ?? -Infinity) - (rowPct(a) ?? -Infinity)" in grid
     assert "name: '未分组'" in grid and "return loose ? [...ranked, loose] : ranked" in grid, "未分组该垫底"
     assert "grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4" in grid
@@ -81,11 +84,14 @@ def test_R508_分组条折起_药丸压矮带边框():
     assert "max-h-[6.75rem] overflow-hidden" in bar and "'max-h-[34vh] overflow-y-auto'" in bar, "折起 / 展开两档没了"
     assert "el.scrollHeight > el.clientHeight + 1" in bar, "没量溢出就画不出「全部 N 组」按钮"
     assert "`全部 ${groups.length} 组`" in bar
-    assert "inline-flex h-7 shrink-0 items-center gap-1.5 rounded-btn border px-2.5" in bar, "药丸没压到 28px"
+    # [R517] 药丸等长: 容器是等宽网格, 药丸不再 inline-flex/shrink-0 按内容撑
+    assert "grid min-w-0 basis-full grid-cols-[repeat(auto-fill,minmax(9rem,1fr))]" in bar, "药丸条不是等宽网格了 —— 每颗长短不一"
+    assert "flex h-7 min-w-0 items-center gap-1.5 rounded-btn border px-2.5" in bar, "药丸没压到 28px / 又按内容撑宽"
+    assert '<span className="min-w-0 truncate">{tab.name}</span>' in bar, "名字太长时不截断, 等宽就守不住"
     assert "? `border-border ${color.text} hover:bg-elevated`" in bar, "未选中的彩色药丸又没边框了"
     assert "'border-border text-secondary hover:bg-elevated hover:text-foreground'" in bar, "未选中的全部 / 未分组又没边框了"
     # 手机上药丸区独占整行
-    assert "order-2 flex min-w-0 basis-full flex-wrap" in bar and "sm:order-1 sm:basis-0 sm:flex-1" in bar
+    assert "order-2 grid min-w-0 basis-full" in bar and "sm:order-1 sm:basis-0 sm:flex-1" in bar
 
 
 def test_R508_默认列就是那5个():

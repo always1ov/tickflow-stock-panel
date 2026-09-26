@@ -110,12 +110,13 @@ export function WatchlistGroupGrid({ groups, entries, rows, selected, sort, onPr
                 return (
                   <tr
                     key={r.symbol}
+                    title={`${name || r.symbol} ${r.symbol}`}
                     onClick={() => onPreview(r.symbol, name)}
                     className="cursor-pointer border-t border-border/50 transition-colors duration-hover ease-smooth hover:bg-elevated/50"
                   >
                     <td className="max-w-0 truncate py-[3px] pl-2 pr-1 text-foreground">
+                      {/* [R517] 代码不再跟在名字后面 —— 一行只留名称与三个数; 代码在悬停提示里, 点开弹窗也有 */}
                       {name || r.symbol}
-                      <span className="ml-1 font-mono text-micro text-muted/70">{r.symbol.slice(0, 6)}</span>
                     </td>
                     <td className={cn('w-[22%] py-[3px] px-1 text-right font-mono tabular-nums', priceColorClass(pct))}>{fmtPrice(price)}</td>
                     <td className={cn('w-[20%] py-[3px] px-1 text-right font-mono tabular-nums', priceColorClass(pct))}>{pct != null ? fmtPct(pct) : '—'}</td>

@@ -1031,8 +1031,11 @@ export function Watchlist() {
             {/* 计数胶囊: 显示数/总数, mono 字体突出数字 */}
             <span className="inline-flex items-baseline gap-0.5 px-2 py-0.5 rounded-md bg-elevated/70 text-xs">
               <span className="font-mono font-semibold text-secondary tabular-nums">{sortedRows.length}</span>
-              <span className="text-muted/50">/</span>
-              <span className="font-mono text-muted tabular-nums">{rowsInSelectedGroup.length}</span>
+              {/* [R517] 没筛掉任何一只时「120/120」两个数说的是同一件事 —— 只在真有筛掉的时候才写分母 */}
+              {sortedRows.length !== rowsInSelectedGroup.length && <>
+                <span className="text-muted/50">/</span>
+                <span className="font-mono text-muted tabular-nums">{rowsInSelectedGroup.length}</span>
+              </>}
               <span className="text-muted/60 ml-0.5">只</span>
             </span>
             {/* 数据未就绪提示: 自选了但 enriched 缓存未覆盖 (新股/冷门/新用户未同步), 指标全为 null */}
@@ -1059,8 +1062,10 @@ export function Watchlist() {
         }
         right={
           <div className="flex flex-wrap items-center gap-2">
-            {/* 筛选 / 重置 / 搜索 */}
-            <button
+            {/* 筛选 / 重置 / 搜索
+                [R517] 「按小分队」是看的, 「一张表」是管的 —— 筛选、导入、自定义列、清空只在一张表里出现。
+                筛选条件在两个视图里照样生效; 有生效的筛选时, 重置按钮在两边都露着(页头也挂着「已过滤 N」)。 */}
+            {viewMode === 'table' && <button
               onClick={() => setFilterOpen(v => !v)}
               className={`inline-flex items-center justify-center h-8 w-8 rounded-btn transition-colors duration-hover ease-smooth ${
                 filterOpen || hasActiveFilters
@@ -1070,7 +1075,7 @@ export function Watchlist() {
               title={`筛选${activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}`}
             >
               <Filter className="h-4 w-4" />
-            </button>
+            </button>}
             {hasActiveFilters && (
               <button
                 onClick={resetAllFilters}
@@ -1091,14 +1096,14 @@ export function Watchlist() {
               addPending={addMutation.isPending}
               memberPending={addGroupMember.isPending || removeGroupMember.isPending}
             />
-            <button
+            {viewMode === 'table' && <button
               onClick={() => setImportOpen(true)}
               className="inline-flex items-center justify-center h-8 w-8 rounded-btn bg-elevated hover:bg-elevated/80 text-secondary hover:text-foreground transition-colors duration-hover ease-smooth"
               title="批量导入自选（截图 / CSV / 粘贴代码）"
               aria-label="批量导入自选"
             >
               <FileUp className="h-4 w-4" />
-            </button>
+            </button>}
             <div className="w-px h-5 bg-border" />
             {/* [R508] 视图: 按小分队(默认) / 一张表。原来这里是三个开关(卡片视图 / 分组卡片 /
                 分组统计条), 都是同一份涨跌幅的另一种画法, 整组撤了 */}
@@ -1110,15 +1115,26 @@ export function Watchlist() {
                 </button>
               ))}
             </div>
+            {/* [R517] 小分队顺序从网格上方那一行挪到这里 —— 原来它单独占一行, 后面还拖着一句操作说明 */}
+            {viewMode === 'grid' && (
+              <div className={SEG} role="group" aria-label="小分队顺序" title="小分队的先后; 块内总是按今日涨跌">
+                {([['order', '分组顺序'], ['pct', '今日涨跌']] as const).map(([k, label]) => (
+                  <button key={k} type="button" onClick={() => changeGridSort(k)} aria-pressed={gridSort === k}
+                    className={cn(SEG_ITEM, 'shrink-0 whitespace-nowrap', gridSort === k ? SEG_ON : SEG_OFF)}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
             <div className="w-px h-5 bg-border" />
             {/* 自定义列 / 刷新 */}
-            <button
+            {viewMode === 'table' && <button
               onClick={() => setCustomizerOpen(true)}
               className="inline-flex items-center justify-center h-8 w-8 rounded-btn bg-elevated hover:bg-elevated/80 text-secondary hover:text-foreground transition-colors duration-hover ease-smooth"
               title="自定义列"
             >
               <Settings2 className="h-4 w-4" />
-            </button>
+            </button>}
             <button
               onClick={() => enriched.refetch()}
               disabled={enriched.isFetching}
@@ -1127,7 +1143,7 @@ export function Watchlist() {
             >
               <RefreshCw className={`h-4 w-4 ${enriched.isFetching ? 'animate-spin' : ''}`} />
             </button>
-            {allSymbols.length > 0 && (
+            {viewMode === 'table' && allSymbols.length > 0 && (
               <>
                 <div className="w-px h-5 bg-border" />
                 <button
@@ -1153,7 +1169,21 @@ export function Watchlist() {
         }
       />
 
-      <WatchlistGroupBar
+      {/* [R517] 分组药丸只在「一张表」里: 网格里每一块的块头就是组名 + 只数 + 组内涨跌, 与药丸是同一份信息,
+          32 组的药丸占了三行。网格里点块头进某一组后, 只给一条返回全部的细条。 */}
+      {viewMode === 'grid' && selectedGroup !== 'all' && (
+        <div className="flex items-center gap-2 border-b border-border px-5 py-1.5 text-xs">
+          <button type="button" onClick={() => handleGroupSelect('all')}
+                  className="rounded-btn px-1.5 py-0.5 text-secondary transition-colors duration-hover ease-smooth hover:bg-elevated hover:text-foreground">
+            ← 全部 {allSymbols.length}
+          </button>
+          <span className="text-muted">·</span>
+          <span className="font-medium text-foreground">
+            {selectedGroup === 'ungrouped' ? '未分组' : groups.find(g => g.id === selectedGroup)?.name ?? ''}
+          </span>
+        </div>
+      )}
+      {viewMode === 'table' && <WatchlistGroupBar
         groups={groups}
         counts={groupCounts}
         selected={selectedGroup}
@@ -1165,10 +1195,10 @@ export function Watchlist() {
         onDelete={groupId => deleteGroup.mutateAsync(groupId).then(() => undefined)}
         onClearGroup={groupId => clearGroup.mutateAsync(groupId).then(() => undefined)}
         onReorder={orderedIds => reorderGroup.mutateAsync(orderedIds).then(() => undefined)}
-      />
+      />}
 
       {/* 筛选栏 */}
-      {filterOpen && (
+      {filterOpen && viewMode === 'table' && (
         <div className="px-5 py-2 border-b border-border bg-surface/50 max-h-[184px] overflow-y-auto">
           {/* 板块筛选 */}
           <div className="mb-2">
@@ -1280,19 +1310,6 @@ export function Watchlist() {
             />
           ) : viewMode === 'grid' ? (
             <div className="space-y-2">
-              {/* 块的顺序: 分组顺序(你拖出来的) / 今日涨跌(强的小分队浮到最上) */}
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-micro text-muted">小分队顺序</span>
-                <div className={SEG} role="group" aria-label="小分队顺序">
-                  {([['order', '分组顺序'], ['pct', '今日涨跌']] as const).map(([k, label]) => (
-                    <button key={k} type="button" onClick={() => changeGridSort(k)} aria-pressed={gridSort === k}
-                      className={cn(SEG_ITEM, 'shrink-0 whitespace-nowrap', gridSort === k ? SEG_ON : SEG_OFF)}>
-                      {label}
-                    </button>
-                  ))}
-                </div>
-                <span className="hidden text-micro text-muted md:inline">块内按今日涨跌 · 点一行看图 · 点组名只看那一组 · 增删改分组到「一张表」</span>
-              </div>
               <WatchlistGroupGrid
                 groups={groups}
                 entries={listEntries}
