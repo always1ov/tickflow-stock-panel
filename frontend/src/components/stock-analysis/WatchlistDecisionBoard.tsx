@@ -196,7 +196,18 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, loc
   // 一起, 外部入口就变成一个按钮了」。它已经是复盘弹窗的第三个页签, 而且 geo/runs
   // 改由复盘接口的 `channel` 给 —— 决策台不必再把行数据透传进弹窗。
   // 「只看要动的」—— 自选一多, 默认列 80 行本身就是噪音
-  const [actionableOnly, setActionableOnly] = useState(false)
+  // [R521] **默认开着, 并且记住。** 用户把这个决定交给我(「等我的事件, 你帮我选择最优解拍板」):
+  // 这一页叫决策台, 回答的是「今天该动谁」; 一百多只里天天真该看的就那几只, 先列全部
+  // 是让人先过一遍噪音再找信号 —— 与模拟盘「没事是常态」同一条取舍。想扫全部的点一下
+  // 关掉, 关了就一直关着(存 localStorage), 不会每次打开都替人做一遍决定。
+  // 定位(搜索 / 从别页跳来)到一只被它挡住的票时, 下面那段仍会自动把它关掉并提示。
+  const [actionableOnly, setActionableOnlyState] = useState(() => storage.boardActionableOnly.get(true))
+  const setActionableOnly = (next: boolean | ((v: boolean) => boolean)) =>
+    setActionableOnlyState((v) => {
+      const n = typeof next === 'function' ? next(v) : next
+      storage.boardActionableOnly.set(n)
+      return n
+    })
   // [R330] 「只看转折」—— 用户: 「再加个按钮只看趋势转折」。
   //
   // **它与「只看要动的」不是一回事, 所以是第三个开关而不是并进去**: 后者是四档

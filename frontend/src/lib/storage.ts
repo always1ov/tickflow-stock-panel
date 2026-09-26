@@ -77,6 +77,8 @@ export const storage = {
    * 它的话就和"没存过"撞在一起了 —— localStorage 分不出这两件事。
    */
   boardGroupFilter:     kv<string>('board-group-filter'),
+  /** [R521] 决策台「只看要动的」开没开 —— 默认开(没事是常态), 点过就记住 */
+  boardActionableOnly:  kv<boolean>('board-actionable-only'),
 
   /** [R100] 个股弹窗最近查看(全局, 弹窗内随意切换用) */
   recentStocks:         kv<{ symbol: string; name: string }[]>('recent-stocks'),
