@@ -1618,7 +1618,9 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
     .filter(item => item.value > 0)
 
   return (
-    <div className="h-full min-h-0 overflow-hidden rounded-card border border-border bg-surface/80 grid grid-cols-1 xl:grid-cols-[18rem_minmax(0,1fr)]">
+    // [R538] 左栏 18rem 时, 回测区间两个日期各只剩 ~118px, 「2026-06-26」折成两行, 建仓口径「次日开盘（推荐）」被截断;
+    // 放到 21rem, 两者都不折不截。右侧结果区照样吃满剩下的宽度。
+    <div className="h-full min-h-0 overflow-hidden rounded-card border border-border bg-surface/80 grid grid-cols-1 xl:grid-cols-[21rem_minmax(0,1fr)]">
       {/* 配置面板 */}
       <section className="space-y-3 border-b xl:border-b-0 xl:border-r border-border bg-base/25 px-3 py-3 xl:overflow-y-auto">
         <div>

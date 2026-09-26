@@ -6,12 +6,12 @@ import { ResearchCandidatesDialog } from './backtest/ResearchCandidatesDialog'
 import { RobustnessValidation } from './backtest/RobustnessValidation'
 import { StrategyBacktest } from './backtest/StrategyBacktest'
 import { type ResearchCandidate } from '@/lib/api'
-import { SEG, SEG_ITEM, SEG_ON, SEG_OFF, buttonClass } from '@/components/ui'
-import { cn } from '@/lib/cn'
+import { buttonClass } from '@/components/ui'
+import { PageTabs, type PageTabDef } from '@/components/PageTabs'
 
 type Tab = 'strategy' | 'robustness'
 
-const MODES: Record<Tab, { title: string; subtitle: string; icon: typeof FlaskConical }> = {
+const MODES: Record<Tab, PageTabDef & { subtitle: string }> = {
   strategy: {
     title: '策略',
     subtitle: '现有策略评估与候选沉淀',
@@ -85,27 +85,10 @@ export function Backtest() {
               <span>候选方案</span>
             </button>
             <span className="h-5 w-px shrink-0 bg-border" aria-hidden="true" />
-            <nav className="min-w-0 flex-1 overflow-x-auto lg:flex-none" aria-label="回测视图">
-              <div className={cn(SEG, 'min-w-max')}>
-                {(Object.keys(MODES) as Tab[]).map(tab => {
-                  const mode = MODES[tab]
-                  const Icon = mode.icon
-                  const active = activeTab === tab
-                  return (
-                    <button
-                      key={tab}
-                      type="button"
-                      onClick={() => changeTab(tab)}
-                      aria-current={active ? 'page' : undefined}
-                      className={cn(SEG_ITEM, 'sm:gap-1.5', active ? SEG_ON : SEG_OFF)}
-                    >
-                      <Icon className="hidden h-3.5 w-3.5 sm:block" />
-                      {mode.title}
-                    </button>
-                  )
-                })}
-              </div>
-            </nav>
+            {/* [R538] 分栏条原来是手抄的一份(与 PageTabs 逐字相同), 换成共用件 —— 长相不变, 产地一个 */}
+            <div className="min-w-0 flex-1 lg:flex-none">
+              <PageTabs tabs={MODES} active={activeTab} onChange={changeTab} label="回测视图" />
+            </div>
           </div>
         )}
       />
