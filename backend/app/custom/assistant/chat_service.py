@@ -96,7 +96,7 @@ def _guard_input_budget(messages: list[dict[str, Any]]) -> None:
     if estimated + reserve > window:
         raise ValueError(
             f"输入过长: 估算输入约 {estimated} tokens, 加上输出预算 {reserve} tokens, "
-            f"超过上下文窗口 {window}。请缩短输入, 或在 AI 设置中调大『上下文窗口』。"
+            f"超过上下文窗口 {window}。请缩短输入, 或在「设置 → AI」里调大『上下文窗口』。"
         )
 
 

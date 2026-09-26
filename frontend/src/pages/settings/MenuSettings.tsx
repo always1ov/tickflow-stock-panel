@@ -488,7 +488,7 @@ export function SettingsMenuSettingsPanel() {
   return (
     <div className="max-w-5xl space-y-6">
       {/* [R379] 这一块的手搓版收进 `SectionIntro` —— 与扩展页面那一处合成一个产地 */}
-      <SectionIntro eyebrow="菜单设置" title="调整左侧菜单顺序">
+      <SectionIntro eyebrow="菜单" title="调整左侧菜单顺序">
         拖动左侧手柄调整菜单排列顺序，点击眼睛图标控制菜单在侧边栏中的显示或隐藏。
         「{BROWSE_GROUP.label}」是一个分组，拖它整块一起挪；缩进的那几行是它的成员。
         <strong className="font-medium text-foreground">任何一行都能拖进或拖出这个分组</strong>

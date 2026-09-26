@@ -1,12 +1,19 @@
 /**
- * 统一设置页面 — Tab 切换外壳。
+ * 统一设置页面 — 分栏外壳。
  *
- * 通过 URL query param ?tab=xxx 同步 Tab 状态。
+ * 通过 URL query param ?tab=xxx 同步当前栏(键名一个没改, 老书签与各处「去设置」的深链照旧)。
+ *
+ * [R533] 用户: 「设置页面也要整改」。原来是页面里再套一列 144px 的竖向菜单(带「收起菜单」按钮, 手机上收成一列图标),
+ * 与 Minds / 模拟盘 / 监控中心那套页头分栏是两种长相。现在同一份 `PageTabs`:
+ *   · 分栏条在页头右侧, 手机上横向滚动, 不再占一整列;
+ *   · 栏名去掉重复的「设置」二字(AI 设置 → AI、网络设置 → 网络、菜单设置 → 菜单、系统设置 → 系统);
+ *   · 「菜单」挪到「扩展页面」旁边 —— 扩展页面建出来的就是一条菜单;
+ *   · 切栏瞬时, 不再淡入上移(高频操作不加动效, AGENTS.md 动效硬规则第 4 条);
+ *   · 页头副标题「管理账户、数据刷新策略和高级功能配置」撤掉 —— 这里没有账户。
+ * 七个面板的内容一个没动。
  */
-import { useState } from 'react'
+import { BarChart3, Clock3, Database, Radio, Settings2, SlidersHorizontal, Sparkles } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
-import { motion } from 'framer-motion'
-import { BarChart3, Database, Radio, SlidersHorizontal, Sparkles, Settings2, PanelLeftClose, PanelLeftOpen, Clock3 } from 'lucide-react'
 import { SettingsAIPanel } from './settings/AI'
 import { SettingsMonitoringPanel } from './settings/Monitoring'
 import { SettingsExtPagesPanel } from './settings/ExtPages'
@@ -15,135 +22,54 @@ import { SettingsTimeoutPanel } from './settings/Timeout'
 import { SettingsSystemPanel } from './settings/System'
 import { SettingsDataSourcesPanel } from './settings/DataSources'
 import { PageHeader } from '@/components/PageHeader'
-import { cn } from '@/lib/cn'
+import { PageTabs, usePageTab, type PageTabDef } from '@/components/PageTabs'
 
 import type { ComponentType } from 'react'
 
-// ===== Tab 定义 =====
+export type SettingsTab = 'data-sources' | 'monitoring' | 'ai' | 'menus' | 'ext-pages' | 'timeout' | 'system'
 
-type TabDef = {
-  key: string
-  label: string
-  icon: ComponentType<{ className?: string }>
-  panel: ComponentType<{ highlight?: string }>
-  badge?: string
+/** 栏的顺序就是这张表的顺序 */
+export const SETTINGS_TABS: Record<SettingsTab, PageTabDef> = {
+  'data-sources': { title: '数据源', icon: Database },
+  monitoring: { title: '实时监控', icon: Radio },
+  ai: { title: 'AI', icon: Sparkles },
+  menus: { title: '菜单', icon: SlidersHorizontal },
+  'ext-pages': { title: '扩展页面', icon: BarChart3 },
+  timeout: { title: '网络', icon: Clock3 },
+  system: { title: '系统', icon: Settings2 },
 }
 
-const TABS: readonly TabDef[] = [
-  { key: 'data-sources', label: '数据源',     icon: Database,  panel: SettingsDataSourcesPanel },
-  { key: 'ai',         label: 'AI 设置',    icon: Sparkles,  panel: SettingsAIPanel },
-  { key: 'monitoring', label: '实时监控',   icon: Radio,     panel: SettingsMonitoringPanel },
-  { key: 'ext-pages',  label: '扩展页面',   icon: BarChart3, panel: SettingsExtPagesPanel },
-  { key: 'timeout',    label: '网络设置',   icon: Clock3,    panel: SettingsTimeoutPanel },
-  { key: 'menus',      label: '菜单设置',   icon: SlidersHorizontal, panel: SettingsMenuSettingsPanel },
-  { key: 'system',     label: '系统设置',   icon: Settings2, panel: SettingsSystemPanel },
-]
-
-type TabKey = (typeof TABS)[number]['key']
+const PANELS: Record<SettingsTab, ComponentType<{ highlight?: string }>> = {
+  'data-sources': SettingsDataSourcesPanel,
+  monitoring: SettingsMonitoringPanel,
+  ai: SettingsAIPanel,
+  menus: SettingsMenuSettingsPanel,
+  'ext-pages': SettingsExtPagesPanel,
+  timeout: SettingsTimeoutPanel,
+  system: SettingsSystemPanel,
+}
 
 export function Settings() {
-  const [searchParams, setSearchParams] = useSearchParams()
-  const tabParam = searchParams.get('tab') as TabKey | null
-  const activeTab = TABS.find((t) => t.key === tabParam) ?? TABS[0]
+  const [activeTab, changeTab] = usePageTab(SETTINGS_TABS, 'data-sources')
+  const [searchParams] = useSearchParams()
   const highlight = searchParams.get('highlight') ?? ''
-
-  // 设置菜单收起状态 — 持久化到 localStorage
-  // [R374] 窄屏(<768px)首次访问默认收起 nav, 否则左 144px + gap 80px = 224px
-  // 直接顶掉右栏, 内容区只剩 151px 几乎不可读。用户已存的偏好不覆盖。
-  const [collapsed, setCollapsed] = useState(() => {
-    try {
-      const stored = localStorage.getItem('tf-settings-nav-collapsed')
-      if (stored !== null) return stored === '1'
-      return !window.matchMedia('(min-width: 768px)').matches
-    } catch { return false }
-  })
-  const toggleCollapsed = () => {
-    setCollapsed(prev => {
-      const next = !prev
-      try { localStorage.setItem('tf-settings-nav-collapsed', next ? '1' : '0') } catch {}
-      return next
-    })
-  }
+  const Panel = PANELS[activeTab]
 
   return (
-    <>
+    <div className="flex h-full flex-col">
       <PageHeader
         title="设置"
-        subtitle="管理账户、数据刷新策略和高级功能配置。"
+        className="shrink-0 flex-wrap gap-x-4 gap-y-2"
+        right={<PageTabs tabs={SETTINGS_TABS} active={activeTab} onChange={changeTab} label="设置分栏" />}
       />
-
-      {/* [R60] 统一版式: 设置以表单与说明文字为主, 取「读」档
-          [R115] 重排: 原来整块 mx-auto max-w-[1100px] 居中 + tab 列表垂直居中
-          (justify-center min-h-[60vh]), 宽屏下导航浮在屏幕正中、两侧各留一大片
-          空白, 内容区反被挤窄。改为**贴左贴顶**: 导航紧跟应用侧栏、从顶部开始,
-          内容区吃掉剩余宽度(上限 1500px 防超宽屏行长失控, 左对齐不居中)。 */}
-      {/* [R379 第二层] 设置区是**外围页** —— 这里没有一屏几百个数字要塞, 密度
-          不是它的目标, 所以留白给到 WavMint 那一档(手册 §1.3: 手机页边距 18px,
-          卡片间距 20~24px)。**只动这一个容器**, 七个面板一起受益, 不用逐个去改。
-          看盘那些页一个像素没碰。 */}
-      <div className="px-4 pb-8 pt-5 lg:px-6">
-        <div className="w-full">
-        <div className="flex gap-5 items-start">
-          {/* ===== 竖向 Tab 侧栏 ===== */}
-          <nav className={cn('shrink-0 transition-ui duration-expand ease-smooth', collapsed ? 'w-10' : 'w-36')}>
-            <div className="flex flex-col gap-0.5 sticky top-3">
-              {/* 收起/展开 按钮 */}
-              <button
-                onClick={toggleCollapsed}
-                className={cn(
-                  'flex items-center gap-2 rounded-btn text-muted hover:text-foreground hover:bg-elevated/60 transition-colors duration-hover ease-smooth mb-1',
-                  collapsed ? 'justify-center px-0 py-2' : 'px-3 py-2 text-xs',
-                )}
-                title={collapsed ? '展开菜单' : '收起菜单'}
-              >
-                {collapsed
-                  ? <PanelLeftOpen className="h-3.5 w-3.5 shrink-0" />
-                  : <PanelLeftClose className="h-3.5 w-3.5 shrink-0" />
-                }
-                {!collapsed && <span>收起菜单</span>}
-              </button>
-
-              {/* Tab 按钮列表 — 收起时只显示图标 */}
-              {TABS.map(({ key, label, icon: Icon, badge }) => (
-                <button
-                  key={key}
-                  onClick={() => setSearchParams({ tab: key }, { replace: true })}
-                  title={collapsed ? label : undefined}
-                  className={cn(
-                    'relative flex items-center rounded-btn text-sm transition-colors duration-hover ease-smooth',
-                    collapsed ? 'justify-center px-0 py-2' : 'items-center gap-2 px-3 py-2 text-left',
-                    activeTab.key === key
-                      ? 'bg-accent-soft text-accent font-medium'
-                      : 'text-secondary hover:text-foreground hover:bg-elevated/60',
-                  )}
-                >
-                  <Icon className="h-3.5 w-3.5 shrink-0" />
-                  {!collapsed && <span>{label}</span>}
-                  {!collapsed && badge && (
-                    <span className="ml-auto inline-flex items-center rounded-btn border border-warning/30 bg-warning/10 px-1.5 py-0.5 text-micro font-medium text-warning shrink-0">
-                      {badge}
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
-          </nav>
-
-          {/* ===== Tab 内容 ===== */}
-          <motion.div
-            key={activeTab.key}
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.15 }}
-            className="min-w-0 flex-1 max-w-[1500px]"
-          >
-            {activeTab.key === 'monitoring'
-            ? <SettingsMonitoringPanel highlight={highlight} />
-            : <activeTab.panel highlight={highlight} />}
-          </motion.div>
+      {/* [R60] 统一版式: 设置以表单与说明文字为主, 取「读」档。
+          [R379 第二层] 设置区是**外围页**, 留白给到 WavMint 那一档(手机页边距 18px, 卡片间距 20~24px);
+          **只动这一个容器**, 七个面板一起受益。[R533] 竖向菜单撤了, 内容区直接吃满, 上限 1500px 防超宽屏行长失控。 */}
+      <main className="min-h-0 flex-1 overflow-y-auto px-4 pb-8 pt-5 lg:px-6">
+        <div className="w-full max-w-[1500px]">
+          <Panel highlight={highlight} />
         </div>
-        </div>
-      </div>
-    </>
+      </main>
+    </div>
   )
 }

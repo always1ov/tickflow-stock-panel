@@ -274,7 +274,7 @@ def _check_input_budget(messages: Sequence[Message], *, max_tokens: int | None) 
     if est + output_reserve > context_window:
         raise ValueError(
             f"输入过长: 估算输入约 {est} tokens, 加上输出预算 {max_tokens} tokens, "
-            f"超过上下文窗口 {context_window}。请缩短输入, 或在 AI 设置中调大『上下文窗口』。"
+            f"超过上下文窗口 {context_window}。请缩短输入, 或在「设置 → AI」里调大『上下文窗口』。"
         )
 
 

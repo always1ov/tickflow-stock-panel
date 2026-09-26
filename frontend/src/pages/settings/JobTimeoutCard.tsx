@@ -1,6 +1,6 @@
 /**
  * 网络设置面板内容 — 任务停滞超时配置 + 分时批量传输压缩开关。
- * 菜单/Tab 名为「网络设置」(Settings.tsx), 卡片内超时区块标题保持「超时设置」。
+ * 分栏名为「网络」(Settings.tsx, [R533] 原「网络设置」), 卡片内超时区块标题保持「超时设置」。
  */
 import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'

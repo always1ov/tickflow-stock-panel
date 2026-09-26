@@ -513,7 +513,7 @@ function AIConfigBadge({ configured, model }: { configured?: boolean; model?: st
             首选档位 · 用不了时自动顺位试下一档
           </div>
           {managed.length === 0 ? (
-            <div className="px-2 py-2 text-micro text-muted">还没有档位 —— 去 AI 设置里添加</div>
+            <div className="px-2 py-2 text-micro text-muted">还没有档位 —— 去「设置 → AI」里添加</div>
           ) : managed.map((p, i) => {
             const label = p.label?.trim() || p.model
             const isPrimary = primary?.id === p.id

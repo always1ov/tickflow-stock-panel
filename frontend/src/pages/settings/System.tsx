@@ -10,7 +10,6 @@ import { Settings2, Trash2, RefreshCw, Bell, Volume2, Info, ExternalLink, Stetho
 import { usePreferences, useVersion } from '@/lib/useSharedQueries'
 import { api, type DataDoctorReport } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
-import { PageHeader } from '@/components/PageHeader'
 import { refreshAlertToastConfig } from '@/components/AlertToast'
 import { SOUND_OPTIONS, previewSound } from '@/lib/notificationSound'
 import {
@@ -102,10 +101,7 @@ export function SettingsSystemPanel() {
 
   return (
     <>
-      <PageHeader
-        title="系统设置"
-        subtitle="全局行为开关"
-      />
+      {/* [R533] 这里原来又印了一遍「系统设置 · 全局行为开关」大标题 —— 分栏条上已经写着「系统」, 同一页两个标题 */}
 
       <section className="rounded-card border border-border bg-surface p-5">
         <div className="flex items-center gap-2 mb-4">
