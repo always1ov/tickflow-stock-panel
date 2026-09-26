@@ -66,17 +66,18 @@ CSS = SRC / "index.css"
 CHROME = {
     "base": "#FFFFFF",
     "sidebar": "#FAFAFA",
-    "elevated": "#E2E2E2",
-    "border": "#D1D4DD",
-    "border-input": "#C2C7D6",
+    # [R532] 照 Aipha AI 原值(用户: 「尽可能参考那个网页」): 悬停 / 边框 / 输入框边框
+    "elevated": "#F3F4F6",
+    "border": "#E5E7EB",
+    "border-input": "#E5E7EB",
     # [R531] 文字两档、去蓝(用户看过 Aipha AI 的黑白搭配后说「改」): 次要并进正文; 辅助只去色, 明度仍是 R408 的 0.50
-    "fg-primary": "#0A0A0A",
-    "fg-secondary": "#0A0A0A",
-    "fg-muted": "#636363",
+    "fg-primary": "#030712",
+    "fg-secondary": "#030712",
+    "fg-muted": "#6B7280",
     "accent": "#222222",
     "accent-text": "#222222",
     "accent-hover": "#3D3D3D",
-    "accent-soft": "#EDEDED",
+    "accent-soft": "#F3F3F3",
 }
 # **这三个不许动。** 值来自 R368, 与 WavMint 那份包无关。
 MARKET = {
@@ -535,31 +536,31 @@ def test_R382_暗色的强调色不再借别处的值():
         "选中底的明度没夹在卡面与强调色之间"
 
 
-def test_R501_日间背景是中性白灰_侧栏比页底略灰_次级面明度没被调浅():
-    """用户: 「参考这个图片的风格, 日间主题就用这种颜色背景色」。
-
-    · 三档背景都是中性灰(彩度 0) —— 参考图的灰没有蓝调;
-    · 侧栏比页底略灰: 页底纯白之后, 白侧栏会与页面糊成一片;
-    · 次级面(hover/次级面板)的明度仍是 R408 为了看得见压到的 0.91 —— 这次只去色, 不调浅。
+def test_R501_日间背景_页底纯白_侧栏比页底略灰_次级面照参考页():
+    """[R501] 用户: 「参考这个图片的风格, 日间主题就用这种颜色背景色」—— 页底纯白、侧栏略灰。
+    [R532] 次级面与边框照 Aipha AI 原值(用户: 「尽可能参考那个网页」): 悬停 #F3F4F6、边框 #E5E7EB。
+    原来这里钉着「次级面明度仍是 R408 的 0.91、边框 #D1D4DD」—— 那是 R408 用户嫌淡压深的, 这次用户明确改口。
     """
     blk = _light_block()
-    for name in ("base", "sidebar", "elevated"):
+    for name in ("base", "sidebar"):
         assert _token(blk, name)[1] == 0, f"--{name} 还带着色调"
     assert _token(blk, "base")[0] == 1, "页底不是纯白"
     assert _token(blk, "sidebar")[0] < _token(blk, "base")[0], "侧栏没比页底灰 —— 两块白会糊在一起"
-    assert abs(_token(blk, "elevated")[0] - 0.91) < 0.0005, "次级面的明度被调浅了(R408 用户嫌淡)"
-    # 边框不跟着参考图换淡: 页底与卡片都白之后, 卡片只剩边框在分界
-    assert CHROME["border"] == "#D1D4DD"
+    assert CHROME["elevated"] == "#F3F4F6" and CHROME["border"] == "#E5E7EB"
 
 
-def test_R382_作者的黑一个字没动():
-    """R163 记着用户原话「还是用回以前作者的黑吧」—— 那是定过案的。
-    这一轮换的是强调色, **底子不许跟着动**。"""
+def test_R532_暗色照参考页_页面与卡片同一个底():
+    """R163 曾记着用户原话「还是用回以前作者的黑吧」(#0a0a0b / #18181b / #242429 / #3e3e42)。
+    [R532] 用户看过 Aipha AI 的黑白搭配后说「改」「尽可能参考那个网页」—— 暗色照它的原值:
+    页面与卡片同一个底 #030712, 分区全靠边框; 边框与悬停同一档 #1F2937。"""
     blk = _dark_block()
-    for name, want in (("base", 0.1452), ("surface", 0.2103),
-                       ("elevated", 0.262), ("border", 0.365)):
-        got = _token(blk, name)[0]
-        assert abs(got - want) < 0.0005, f"--{name} 的明度动了: {got} != {want}"
+    assert _oklch_to_hex(*_token(blk, "base")) == "#030712"
+    assert _token(blk, "surface") == _token(blk, "base"), "卡片又比页面亮一层了 —— 参考页是同一个底"
+    assert _oklch_to_hex(*_token(blk, "elevated")) == "#1F2937"
+    assert _token(blk, "border") == _token(blk, "elevated"), "边框与悬停不是同一档"
+    assert _oklch_to_hex(*_token(blk, "fg-primary")) == "#F9FAFB"
+    assert _token(blk, "fg-secondary") == _token(blk, "fg-primary"), "文字又分出第三档了"
+    assert _oklch_to_hex(*_token(blk, "fg-muted")) == "#9CA3AF"
 
 
 def test_R382_暗色的指标色也没被带着漂():
