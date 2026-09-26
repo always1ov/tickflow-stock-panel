@@ -1,0 +1,5 @@
+# R523 — 全站手机端体检: 看板顶部网格手机两列, 数据页体积列不折行, Minds 条数缺了不白屏
+
+| # | 改动 | 涉及文件 | 冲突风险 | 单独回退 |
+|---|---|---|---|---|
+| R523 | 用户:「这是我手机版看到的。所有页面都要自适应手机端」(截图是策略页竖排的「全市场-跌破生命线」、五行工具条、「71 ms」—— 那是 R522 之前的构建, R522 已把那一页收成两行、标题不再竖排、毫秒数撤掉)。这轮拿 Playwright 在 390×844 下把 31 个路由全过了一遍, 量三件事: 横向溢出、越出视口的元素、被挤成竖排的文字(≥3 个汉字、宽 ≤ 2.2 倍字号、高 ≥ 2.6 倍字号)。结论: 全部路由无横向溢出(只有本来就该横滚的数据表)、无竖排文字; 剩下三处硬伤本轮修掉: ① 市场看板顶部两排网格写死 `grid-cols-4` / `grid-cols-6`, 390px 下标签竖排、数值截断 → 手机两列(`grid-cols-2 sm:grid-cols-4` / `grid-cols-2 sm:grid-cols-3 lg:grid-cols-6`), KPI 读数手机 18px(sm 起回到 R453 的 21px, 「2100/200/2900」13 个等宽字 21px 塞不进半屏); ② 数据页存储那一栏「1234.5 MB」在 w-16 里把 MB 折到下一行 → w-20 + 不折行(两处); ③ Minds 分栏上的笔记条数 `items.length` 在接口回空对象时整页白屏(体检时撞见的真 bug) → `items?.length`, 条数缺就缺。宽屏一个像素没动。守卫: 新增 test_mobile_r523(钉这三处的类名与写法) | frontend/src/pages/Dashboard.tsx; frontend/src/pages/Data.tsx; frontend/src/pages/Minds.tsx; backend/tests/test_mobile_r523.py(新) | 低: Dashboard.tsx / Data.tsx 有上游底子, 但改的是三行类名, 冲突时按「手机两列 / w-20 不折行」重放即可 | 可以: git revert 本提交 |

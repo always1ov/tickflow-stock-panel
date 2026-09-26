@@ -40,7 +40,8 @@ export function Minds() {
 
   // 笔记条数挂在分栏上 —— 与笔记栏同一个查询键, 不多发请求
   const notesQ = useQuery({ queryKey: QK.usageNotes, queryFn: api.usageNotesList })
-  const counts: Partial<Record<MindsTab, number>> = { notes: notesQ.data?.items.length }
+  // [R523] `items?.` —— 接口回了个空对象时整页白屏(手机体检时撞见的), 条数缺就缺, 不该拖垮整页
+  const counts: Partial<Record<MindsTab, number>> = { notes: notesQ.data?.items?.length }
 
   return (
     <div className="flex h-full flex-col">

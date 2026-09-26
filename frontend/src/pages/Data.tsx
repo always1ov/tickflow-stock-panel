@@ -926,7 +926,7 @@ export function Data() {
                   <span className="text-muted">{item.label}</span>
                   <div className="flex items-center gap-3">
                     <span className="font-mono text-secondary">{item.files ?? 0} 文件</span>
-                    <span className="font-mono text-muted w-16 text-right">{(item.size ?? 0).toFixed(1)} MB</span>
+                    <span className="font-mono text-muted w-20 whitespace-nowrap text-right">{(item.size ?? 0).toFixed(1)} MB</span>
                   </div>
                 </div>
               ))}
@@ -936,7 +936,7 @@ export function Data() {
                   <span className="text-muted">扩展数据</span>
                   <div className="flex items-center gap-3">
                     <span className="font-mono text-secondary">{s?.storage.ext_data_files ?? extConfigs.data.items.length} 文件</span>
-                    <span className="font-mono text-muted w-16 text-right">
+                    <span className="font-mono text-muted w-20 whitespace-nowrap text-right">
                       {s?.storage.ext_data_size_mb != null ? `${s.storage.ext_data_size_mb.toFixed(1)} MB` : '—'}
                     </span>
                   </div>

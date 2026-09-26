@@ -238,8 +238,8 @@ function KpiCell({ label, value, sub, tone = 'neutral' }: { label: ReactNode; va
   return (
     <div className="min-w-0 overflow-hidden rounded-lg border border-border bg-surface/80 px-2 py-1 shadow-[0_1px_2px_oklch(var(--border)/0.4)] backdrop-blur-sm transition-ui hover:border-accent/30 hover:shadow-[0_2px_8px_oklch(var(--accent)/0.15)]">
       <div className="flex items-center gap-1 text-xs text-muted">{label}</div>
-      {/* [R453] 读数级 21px */}
-      <div className={`mt-1 truncate font-mono text-xl font-semibold leading-none tabular-nums ${isPlain ? color : 'text-foreground'}`}>{value}</div>
+      {/* [R453] 读数级 21px; [R523] 手机两列时 18px —— 「2100/200/2900」13 个字 21px 塞不进半屏, 尾巴被截 */}
+      <div className={`mt-1 truncate font-mono text-lg font-semibold leading-none tabular-nums sm:text-xl ${isPlain ? color : 'text-foreground'}`}>{value}</div>
       {sub && <div className="mt-1 truncate text-micro text-muted">{sub}</div>}
     </div>
   )
@@ -841,11 +841,12 @@ export function Dashboard() {
         </div>
       )}
 
-      <div className="mb-1.5 grid grid-cols-4 gap-1">
+      {/* [R523] 手机两列 —— 四格指数、六格 KPI 硬塞 390px 时标签竖排、数值截断 */}
+      <div className="mb-1.5 grid grid-cols-2 gap-1 sm:grid-cols-4">
         {data.indices.map(item => <IndexTicker key={item.symbol} item={item} />)}
       </div>
 
-      <div className="mb-1.5 grid grid-cols-6 gap-1">
+      <div className="mb-1.5 grid grid-cols-2 gap-1 sm:grid-cols-3 lg:grid-cols-6">
         <KpiCell label="个股涨 / 平 / 跌" value={<><span className="text-bull">{data.breadth.up}</span><span className="text-muted">/</span><span className="text-muted">{data.breadth.flat}</span><span className="text-muted">/</span><span className="text-bear">{data.breadth.down}</span></>} sub={`上涨率 ${data.breadth.up_pct.toFixed(1)}%`} />
         <KpiCell label="强势 / 弱势" value={<><span className="text-bull">{strongUp}</span><span className="text-muted">/</span><span className="text-bear">{strongDown}</span></>} sub="涨跌 ≥3%" />
         <KpiCell label={<span className="inline-flex items-center gap-1">涨停 / 跌停<SealedBadge degraded={isSealedDegrade} hasDepth={hasDepth} isHistorical={false} sealedReady={sealedReady} sealedCountsUp={{ real: data.limit.limit_up, fake: data.limit.fake_up ?? 0, pending: 0 }} sealedCountsDown={{ real: data.limit.limit_down, fake: data.limit.fake_down ?? 0, pending: 0 }} rawUp={data.limit.limit_up + (data.limit.fake_up ?? 0)} rawDown={data.limit.limit_down + (data.limit.fake_down ?? 0)} invalidateKeys={['overview-market', 'limit-ladder']} /></span>} value={<><span className="text-bull">{data.limit.limit_up}</span><span className="text-muted">/</span><span className="text-bear">{data.limit.limit_down}</span></>} sub={`封板率 ${(data.limit.seal_rate ?? 0).toFixed(0)}%`} />
