@@ -12,8 +12,8 @@ import { AlertPopupSettings } from './System'
 
 export function SettingsNotificationsPanel({ highlight }: { highlight?: string } = {}) {
   return (
-    <div className="grid max-w-5xl grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-      <div className="space-y-6">
+    <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+      <div className="space-y-5">
         <PushChannelsCard highlight={highlight} />
       </div>
       <AlertPopupSettings />

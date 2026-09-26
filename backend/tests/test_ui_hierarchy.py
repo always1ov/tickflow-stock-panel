@@ -80,7 +80,7 @@ MIGRATED: list[str] = [
     "pages/IndustryAnalysis.tsx",
     "components/ExtDimensionAnalysis.tsx",
     "components/SectorRotationCard.tsx",
-    "components/SectionIntro.tsx",
+    "pages/settings/SettingsCard.tsx",
     "pages/Financials.tsx",
     "components/financials/AiAnalysisDialog.tsx",
     "components/financials/AiReportBubble.tsx",

@@ -450,21 +450,25 @@ def test_R379_开篇块只有一个产地():
     后者还是照深色底调的)。两份的下场是必然的: 谁也不会记得同时改两处,
     于是同一个位置在两页长得不一样, **而且不报错**。
 
-    所以这条钉两头: 组件在, 且**没有人再手搓第二份**。
+    [R535] 用户「设置里面的每个子页面也要整改」, 看过方案图后「确认」: 设置区八栏收成
+    同一种卡头(`pages/settings/SettingsCard.tsx`), 大号开篇块 `SectionIntro` 只剩的两处
+    (菜单、扩展页面)也换过去, 组件随之退役。**「只有一个产地」这条纪律不变, 换的是产地**:
+    钉住 SettingsCard 在、SectionIntro 没回来、没人再手搓那串 eyebrow。
     """
     from tests.frontend_source import SRC, code_of
-    intro = code_of("components/SectionIntro.tsx")
-    for anchor in ("export function SectionIntro", "eyebrow", "text-2xl font-semibold"):
-        assert anchor in intro, f"SectionIntro 少了 {anchor}"
+    card = code_of("pages/settings/SettingsCard.tsx")
+    for anchor in ("export function SettingsCard", "export function SettingRow", "TYPE.card"):
+        assert anchor in card, f"SettingsCard 少了 {anchor}"
+    assert not (SRC / "components/SectionIntro.tsx").exists(), "SectionIntro 又回来了 —— 设置区的卡头走 SettingsCard"
 
     # 手搓的特征: 那串 eyebrow 的字号/字重/字距组合
     hand_rolled = "text-[10.5px] font-semibold uppercase tracking-wider"
     offenders = [
         f.relative_to(SRC).as_posix()
         for f in sorted(SRC.rglob("*.tsx"))
-        if f.name != "SectionIntro.tsx" and hand_rolled in code_of(f.relative_to(SRC).as_posix())
+        if hand_rolled in code_of(f.relative_to(SRC).as_posix())
     ]
-    assert not offenders, "又有人手搓开篇块了, 收进 SectionIntro:\n  " + "\n  ".join(offenders)
+    assert not offenders, "又有人手搓开篇块了:\n  " + "\n  ".join(offenders)
 
 
 def test_R379_看盘页的密度一个像素没动():

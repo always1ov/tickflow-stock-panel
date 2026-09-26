@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ExternalLink, Globe2, Pencil, Plus, Save, ShieldCheck, Sparkles, Trash2, X } from 'lucide-react'
+import { BarChart3, ExternalLink, Globe2, Pencil, Plus, Save, ShieldCheck, Sparkles, Trash2, X } from 'lucide-react'
 import {
   api,
   type AnalysisColumn, type AnalysisMenu, type ExtDataConfig, type ExtDataField,
@@ -9,7 +9,7 @@ import {
 } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { Skeleton } from '@/components/data/Skeleton'
-import { SectionIntro } from '@/components/SectionIntro'
+import { SettingsCard } from './SettingsCard'
 import { ExternalViewRender } from '@/components/ExternalViewRender'   // [R117] 试运行预览
 import { TYPE, buttonClass } from '@/components/ui'
 
@@ -110,10 +110,15 @@ function ExternalWebsiteSettings() {
         [R379] 这一块的手搓版收进 `SectionIntro` —— 连带修掉那个 `text-cyan-400/80`
         的标签色: 它是照深色底调的, 白卡片上偏淡, 而且与另一页的 `text-accent` 不是
         同一个颜色(同一个位置两种写法, 谁也不会记得同时改两处)。 */}
-    <SectionIntro
-      eyebrow="外部网页"
-      icon={<Globe2 className="h-3.5 w-3.5" />}
-      title="把一个外部网页变成菜单里的一页"
+    {/* [R535] 原来是两张卡: 一块大号开篇(小标签 + 24px 大标题 + 一段话), 下面一张表单卡。说的是同一件事,
+        收成设置区统一卡头的一张卡; 大标题那句话并进说明第一句。 */}
+    <SettingsCard
+      icon={Globe2}
+      title="外部网页"
+      desc={<>
+        把一个外部网页变成菜单里的一页。两种做法二选一：直接内嵌整站，或者由后端抓回原文、交给面板里配置的 AI 整理成统一表格再显示。
+        无论哪种，牛来都不会把 TickFlow 数据、API Key 或登录凭据转发给对方。
+      </>}
       right={(
         <button
           type="button"
@@ -125,10 +130,6 @@ function ExternalWebsiteSettings() {
         </button>
       )}
     >
-      两种做法二选一：直接内嵌整站，或者由后端抓回原文、交给面板里配置的 AI 整理成统一表格再显示。
-      无论哪种，牛来都不会把 TickFlow 数据、API Key 或登录凭据转发给对方。
-    </SectionIntro>
-    <section className="mt-5 rounded-card border border-border bg-surface p-6 lg:p-7">
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         {([
           { key: 'fetch' as const, icon: Sparkles, title: '抓取 + AI 整理', desc: '后端取回原文，AI 按固定结构整理成 KPI 卡 + 表格。对方禁 iframe、是 SPA 都不影响；每次解析会调一次 AI（同一份原文有缓存）。' },
@@ -231,7 +232,7 @@ function ExternalWebsiteSettings() {
           </button>
         </div>
       </div>
-    </section>
+    </SettingsCard>
     </>
   )
 }
@@ -334,12 +335,12 @@ export function SettingsExtPagesPanel() {
   })
 
   return (
-    <div className="max-w-6xl space-y-6">
+    <div className="space-y-5">
       <ExternalWebsiteSettings />
-      {/* [R379] 这是第三处手搓 —— 守卫一开就把它抓出来了(我自己只记得两处)。 */}
-      <SectionIntro
-        eyebrow="扩展页面"
-        title="把扩展数据配置成左侧分析菜单"
+      <SettingsCard
+        icon={BarChart3}
+        title="扩展页面"
+        desc="把扩展数据配置成左侧分析菜单：选择扩展数据源、分析模板、分组字段和列表列后，系统会生成一个可访问的动态分析页面。"
         right={(
           <button
             onClick={() => { resetForm(); setShowForm(true) }}
@@ -350,11 +351,9 @@ export function SettingsExtPagesPanel() {
           </button>
         )}
       >
-        选择扩展数据源、分析模板、分组字段和列表列后，系统会生成一个可访问的动态分析页面。
-      </SectionIntro>
 
       {showForm && (
-        <section className="rounded-card border border-border bg-surface p-5 space-y-4">
+        <section className="mb-4 rounded-card border border-border bg-base/60 p-5 space-y-4">
           <div className="flex items-center justify-between gap-3">
             <div>
               <h3 className={TYPE.card}>{editingMenu ? '编辑扩展页面' : '新建扩展页面'}</h3>
@@ -452,7 +451,7 @@ export function SettingsExtPagesPanel() {
         </section>
       )}
 
-      <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {menuItems.map(menu => (
           <div key={menu.id} className="rounded-card border border-border bg-surface p-4">
             <div className="flex items-start justify-between gap-3">
@@ -496,9 +495,10 @@ export function SettingsExtPagesPanel() {
             </div>
           ))}
         {!menus.isLoading && menuItems.length === 0 && (
-          <div className="rounded-card border border-border bg-surface px-5 py-10 text-center text-sm text-muted md:col-span-2 xl:col-span-3">暂无扩展页面，点击右上角新建。</div>
+          <div className="rounded-card border border-dashed border-border px-5 py-8 text-center text-sm text-muted md:col-span-2">暂无扩展页面，点击右上角新建。</div>
         )}
-      </section>
+      </div>
+      </SettingsCard>
     </div>
   )
 }

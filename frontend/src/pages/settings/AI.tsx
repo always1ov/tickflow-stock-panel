@@ -1,14 +1,14 @@
-import { useState, useEffect, useRef, createContext, useContext } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Save, Loader2, Check, Wifi, WifiOff, Eye, EyeOff, Shield,
-  Shuffle, Plug, Settings2, Trash2,
+  Shuffle, Settings2, Trash2,
 } from 'lucide-react'
 import { useSettings } from '@/lib/useSharedQueries'
 import { api, type SettingsState } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { AiProfiles } from '@/pages/settings/AiProfiles'
-import { useCardFlash, cardFlashCls } from '@/lib/useCardFlash'
+import { SettingsCard, SettingsHighlight } from './SettingsCard'
 import { buttonClass, TYPE } from '@/components/ui'
 import { cn } from '@/lib/cn'
 
@@ -316,28 +316,49 @@ export function SettingsAIPanel({ highlight }: { highlight?: string } = {}) {
     </div>
   )
 
+  const connected = profilesManaged ? enabledProfiles.length > 0 : configured
+  const saveButtons = (
+    <>
+      {configured && !profilesManaged && (
+        <button onClick={() => setConfirmClear(true)} disabled={clear.isPending} className={buttonClass({ size: 'sm', variant: 'danger' }, 'gap-1.5')} title="Clear AI provider configuration">
+          <Trash2 className="h-3.5 w-3.5" />
+          清空
+        </button>
+      )}
+      <button onClick={() => save.mutate()} disabled={save.isPending || !canSave} className={buttonClass({ size: 'sm', variant: 'primary' }, 'gap-1.5')}>
+        {save.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : saved ? <Check className="h-3.5 w-3.5" /> : <Save className="h-3.5 w-3.5" />}
+        {save.isPending ? '保存中...' : saved ? '已保存' : '保存配置'}
+      </button>
+    </>
+  )
+
   return (
-    <HighlightContext.Provider value={highlight ?? ''}>
-    <div className="space-y-5 max-w-2xl">
+    <SettingsHighlight.Provider value={highlight ?? ''}>
+    <div className="space-y-5">
       {/* [R56] 多档兜底放最上 —— 这是"AI 能不能一直用得上"的那一层。
           [R94] 配过档位表后它就是全系统 AI 的唯一配置入口: 下面那张卡收起
           接口/模型/Key, 只剩全局参数。没配过档位的老用户看到的仍是单档配置
           (它会被合成为兜底链的唯一一档), 行为不变。 */}
       <AiProfiles />
-      <Card icon={Plug} title="连接状态" anchor="ai-connection" right={
-        (profilesManaged ? enabledProfiles.length > 0 : configured) && (
-          <button onClick={handleTest} disabled={testing}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-btn bg-elevated hover:bg-elevated/80 text-xs text-secondary transition-colors duration-hover ease-smooth disabled:opacity-50">
-            {testing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Wifi className="h-3 w-3" />}
-            {testing ? '测试中' : '测试'}
-          </button>
-        )
-      }>
-        <div className="flex items-center gap-3">
-          <div className={`w-9 h-9 rounded-btn flex items-center justify-center shrink-0 ${(profilesManaged ? enabledProfiles.length > 0 : configured) ? 'bg-bear/10 text-bear' : 'bg-warning/10 text-warning'}`}>
-            {(profilesManaged ? enabledProfiles.length > 0 : configured) ? <Wifi className="h-4.5 w-4.5" /> : <WifiOff className="h-4.5 w-4.5" />}
-          </div>
-          <div className="min-w-0">
+
+      {/* [R62] 「快速预设」整块去掉 —— 用户明确不要这种挑选:
+          那种清单只在你正好用清单里那几家时省事, 否则先得挑一个再把三个字段
+          全改掉, 比直接填还多两步; 而且它会过期(模型名换代、中转站换域名),
+          过期的预设比没有预设更误事。一律按 OpenAI 兼容接口走, 地址/密钥/模型
+          三样自己填。
+          [R535] 原来是三块: 「连接状态」卡 + 配置卡 + 页底一条橙色提示与通栏「保存配置」。
+          连接状态收成卡里第一行, 保存挪到卡头右侧 —— 与上面「AI 档位」卡的保存同一个位置;
+          橙色提示降成卡底一行灰字(它是一句说明, 不是要你处理的事)。 */}
+      <SettingsCard
+        icon={Settings2}
+        title={configTitle}
+        anchor="ai-connection"
+        desc={profilesManaged ? undefined : isCodexProvider ? '本机 codex exec' : 'Chat Completions 接口'}
+        right={saveButtons}
+      >
+        <div className="mb-4 flex items-center gap-3 rounded-btn bg-elevated/50 px-3 py-2.5">
+          {connected ? <Wifi className="h-4 w-4 shrink-0 text-bear" /> : <WifiOff className="h-4 w-4 shrink-0 text-warning" />}
+          <div className="min-w-0 flex-1">
             <div className="text-sm font-medium text-foreground">
               {profilesManaged
                 ? (enabledProfiles.length > 0 ? 'AI 已连接 · 档位统一管理' : 'AI 档位全部停用')
@@ -355,30 +376,19 @@ export function SettingsAIPanel({ highlight }: { highlight?: string } = {}) {
                 : (isCodexProvider ? '使用本机 codex exec, 此处无需填写 API Key。' : '配置 API Key 后即可使用 AI 功能。')}
             </div>
           </div>
+          {connected && (
+            <button onClick={handleTest} disabled={testing} className={buttonClass({ size: 'xs' }, 'gap-1.5')}>
+              {testing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Wifi className="h-3 w-3" />}
+              {testing ? '测试中' : '测试'}
+            </button>
+          )}
         </div>
         {testResult && (
-          <div className={`mt-3 rounded-btn border px-3 py-2 text-xs flex items-center gap-2 ${testResult.ok ? 'border-bear/20 bg-bear/[0.04] text-bear' : 'border-danger/20 bg-danger/[0.04] text-danger'}`}>
+          <div className={`mb-4 rounded-btn border px-3 py-2 text-xs flex items-center gap-2 ${testResult.ok ? 'border-bear/20 bg-bear/[0.04] text-bear' : 'border-danger/20 bg-danger/[0.04] text-danger'}`}>
             <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${testResult.ok ? 'bg-bear' : 'bg-danger'}`} />
             {testResult.msg}
           </div>
         )}
-      </Card>
-
-      {/* [R62] 「快速预设」整块去掉 —— 用户明确不要这种挑选:
-          那种清单只在你正好用清单里那几家时省事, 否则先得挑一个再把三个字段
-          全改掉, 比直接填还多两步; 而且它会过期(模型名换代、中转站换域名),
-          过期的预设比没有预设更误事。一律按 OpenAI 兼容接口走, 地址/密钥/模型
-          三样自己填。 */}
-      <Card
-        icon={Settings2}
-        title={configTitle}
-        right={profilesManaged ? undefined : (
-          <span className="inline-flex items-center gap-1.5 text-micro text-muted/60" title={isCodexProvider ? 'Use local Codex CLI via codex exec' : 'Use OpenAI-compatible Chat Completions API'}>
-            <span className="rounded-btn border border-border/40 bg-base/50 px-1.5 py-px font-mono">{isCodexProvider ? 'codex exec' : 'Chat Completions'}</span>
-            {isCodexProvider ? 'CLI' : '接口'}
-          </span>
-        )}
-      >
         <div className="space-y-4">
           {profilesManaged ? (
             <>
@@ -471,29 +481,13 @@ export function SettingsAIPanel({ highlight }: { highlight?: string } = {}) {
             </div>
           </div>
         </div>
-      </Card>
-
-      <div className="rounded-card border border-warning/20 bg-warning/[0.04] px-4 py-3 flex items-start gap-3">
-        <Shield className="h-4 w-4 text-warning/70 mt-0.5 shrink-0" />
-        <div className="text-xs text-warning/70 leading-relaxed">
+        <p className="mt-4 flex items-start gap-1.5 border-t border-border/60 pt-3 text-xs leading-5 text-muted">
+          <Shield className="mt-0.5 h-3.5 w-3.5 shrink-0" />
           {isCodexProvider
             ? 'Codex CLI 模式会复用本机已登录的 Codex 账户, 个股、财务、复盘等分析上下文会发送给 OpenAI/Codex。保存即表示确认仅在本机或可信内网使用。'
             : 'API Key 仅保存在本机项目文件中, 不会上传到任何服务器。请妥善保管。'}
-        </div>
-      </div>
-
-      <div className="flex gap-2">
-        <button onClick={() => save.mutate()} disabled={save.isPending || !canSave} className={buttonClass({ variant: 'primary' }, 'flex-1 justify-center gap-2')}>
-          {save.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : saved ? <Check className="h-4 w-4" /> : <Save className="h-4 w-4" />}
-          {save.isPending ? '保存中...' : saved ? '已保存' : '保存配置'}
-        </button>
-        {configured && !profilesManaged && (
-          <button onClick={() => setConfirmClear(true)} disabled={clear.isPending} className="h-10 px-4 rounded-btn bg-elevated text-secondary hover:text-danger text-sm flex items-center justify-center gap-1.5 hover:bg-elevated/80 disabled:opacity-50 transition-ui shrink-0" title="Clear AI provider configuration">
-            <Trash2 className="h-4 w-4" />
-            清空
-          </button>
-        )}
-      </div>
+        </p>
+      </SettingsCard>
 
       {confirmClear && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -515,46 +509,13 @@ export function SettingsAIPanel({ highlight }: { highlight?: string } = {}) {
         </div>
       )}
     </div>
-    </HighlightContext.Provider>
+    </SettingsHighlight.Provider>
   )
 }
 
 // ===== 通用卡片(与 Keys 页风格统一) =====
 
 // 卡片定位锚点: highlight=<anchor> 时滚动到视口中央并闪烁 (见 useCardFlash)
-const HighlightContext = createContext('')
-
-interface CardProps {
-  icon: React.ComponentType<{ className?: string }>
-  title: string
-  right?: React.ReactNode
-  children: React.ReactNode
-  anchor?: string
-}
-
-function Card({ icon: Icon, title, right, children, anchor }: CardProps) {
-  const highlight = useContext(HighlightContext)
-  const { ref, flash } = useCardFlash(anchor ? highlight : undefined, anchor ?? '')
-  const inner = (
-    <section className="rounded-card border border-border bg-surface p-5">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2.5">
-          <Icon className="h-4 w-4 text-secondary" />
-          <h2 className={TYPE.card}>{title}</h2>
-        </div>
-        {right}
-      </div>
-      {children}
-    </section>
-  )
-  if (!anchor) return inner
-  return (
-    <div ref={ref} id={anchor} className={cardFlashCls(flash)}>
-      {inner}
-    </div>
-  )
-}
-
 // ===== 表单字段(统一 label + 输入框样式) =====
 
 function Field({ label, hint, inline, children }: {

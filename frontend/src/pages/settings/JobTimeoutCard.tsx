@@ -1,15 +1,17 @@
 /**
  * 网络设置面板内容 — 任务停滞超时配置 + 分时批量传输压缩开关。
  * 分栏名为「网络」(Settings.tsx, [R533] 原「网络设置」), 卡片内超时区块标题保持「超时设置」。
+ * [R535] 拆成两张卡: 「超时设置」(带保存) 与「数据传输压缩」(点了即生效)。
  */
 import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Clock3 } from 'lucide-react'
+import { Clock3, Gauge } from 'lucide-react'
 import { api, type Preferences } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { usePreferences } from '@/lib/useSharedQueries'
 import { toast } from '@/components/Toast'
-import { buttonClass, TYPE } from '@/components/ui'
+import { buttonClass } from '@/components/ui'
+import { SettingsCard, SettingRow } from './SettingsCard'
 
 type TimeoutUnit = 'second' | 'minute' | 'hour'
 
@@ -110,17 +112,14 @@ export function JobTimeoutCard() {
   })
 
   return (
-    <section className="rounded-card border border-border bg-surface p-5">
-      <div className="flex items-start justify-between gap-4 mb-4">
-        <div className="flex items-start gap-2.5">
-          <Clock3 className="h-4 w-4 text-secondary mt-0.5" />
-          <div>
-            <h2 className={TYPE.card}>超时设置</h2>
-            <p className="text-xs text-muted mt-1 leading-relaxed">
-              后台任务超过对应时间<b>没有任何进度</b>才判定卡死并自动终止；只要任务仍在推进（如慢带宽下的冷启动全市场拉取），无论总时长多久都不会被中断。保存时自动换算为秒，修改后对新建任务生效。
-            </p>
-          </div>
-        </div>
+    <>
+    {/* [R535] 原来一张「超时设置」卡里还装着数据传输压缩 —— 卡头的「保存」只管超时, 压缩是点了立即生效,
+        两件事挤在一张卡里, 看不出那个保存管到哪。拆成两张, 字段、行为一个没动。 */}
+    <SettingsCard
+      icon={Clock3}
+      title="超时设置"
+      desc={<>后台任务超过对应时间<b className="text-secondary">没有任何进度</b>才判定卡死并自动终止；只要任务仍在推进（如慢带宽下的冷启动全市场拉取），无论总时长多久都不会被中断。保存时自动换算为秒，修改后对新建任务生效。</>}
+      right={(
         <button
           onClick={() => saveJobTimeouts.mutate()}
           disabled={!timeoutValuesValid || !timeoutValuesChanged || saveJobTimeouts.isPending}
@@ -128,8 +127,8 @@ export function JobTimeoutCard() {
         >
           {saveJobTimeouts.isPending ? '保存中...' : '保存'}
         </button>
-      </div>
-
+      )}
+    >
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <label className="rounded-btn border border-border/60 bg-elevated/20 px-3.5 py-3">
           <span className="block text-xs font-medium text-foreground mb-1">普通任务停滞超时</span>
@@ -196,45 +195,37 @@ export function JobTimeoutCard() {
         </label>
       </div>
 
-      <div className="mt-3 pt-3 border-t border-border space-y-3">
-        <div className="flex items-center justify-between gap-4">
-          <div className="min-w-0">
-            <span className="block text-xs font-medium text-foreground">数据传输压缩</span>
-            <span className="block text-micro text-muted mt-0.5 leading-relaxed">
-              大数据接口（分时、日K）启用 gzip 压缩，响应可缩至约 1/8，公网访问明显更快；本机或内网可关闭以节省服务端 CPU。任一子项开启时总开关为开，点击总开关一键全开/全关，子项可单独微调，立即生效。
-            </span>
-          </div>
-          <button
-            onClick={() => toggleAllCompress.mutate(!compressAnyOn)}
-            disabled={toggleAllCompress.isPending}
-            className={`shrink-0 relative h-5 w-9 rounded-full transition-colors disabled:opacity-40 ${
-              compressAnyOn ? 'bg-accent' : 'bg-elevated'
-            }`}
-            title={compressAnyOn ? '全部关闭' : '全部开启'}
-          >
-            <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-ui ${
-              compressAnyOn ? 'left-[1.125rem]' : 'left-0.5'
-            }`} />
-          </button>
-        </div>
-        <div className="ml-1 space-y-2 border-l-2 border-border/60 pl-3">
-          <CompressToggleRow
-            label="分时数据压缩"
-            desc="分时批量接口（自选/策略分时图，千只标的 MB 级响应）"
-            enabled={minuteBatchCompress}
-            pending={toggleCompress.isPending}
-            onToggle={() => toggleCompress.mutate(!minuteBatchCompress)}
-          />
-          <CompressToggleRow
-            label="日K数据压缩"
-            desc="日K批量接口（自选/策略日K列，千只标的 MB 级响应）"
-            enabled={dailyBatchCompress}
-            pending={toggleDailyCompress.isPending}
-            onToggle={() => toggleDailyCompress.mutate(!dailyBatchCompress)}
-          />
-        </div>
-      </div>
-    </section>
+    </SettingsCard>
+
+    <SettingsCard
+      icon={Gauge}
+      title="数据传输压缩"
+      desc="大数据接口（分时、日K）启用 gzip 压缩，响应可缩至约 1/8，公网访问明显更快；本机或内网可关闭以节省服务端 CPU。任一子项开启时总开关为开，点击总开关一键全开/全关，子项可单独微调，立即生效。"
+      right={(
+        <Switch
+          on={compressAnyOn}
+          disabled={toggleAllCompress.isPending}
+          onClick={() => toggleAllCompress.mutate(!compressAnyOn)}
+          title={compressAnyOn ? '全部关闭' : '全部开启'}
+        />
+      )}
+    >
+      <CompressToggleRow
+        label="分时数据压缩"
+        desc="分时批量接口（自选/策略分时图，千只标的 MB 级响应）"
+        enabled={minuteBatchCompress}
+        pending={toggleCompress.isPending}
+        onToggle={() => toggleCompress.mutate(!minuteBatchCompress)}
+      />
+      <CompressToggleRow
+        label="日K数据压缩"
+        desc="日K批量接口（自选/策略日K列，千只标的 MB 级响应）"
+        enabled={dailyBatchCompress}
+        pending={toggleDailyCompress.isPending}
+        onToggle={() => toggleDailyCompress.mutate(!dailyBatchCompress)}
+      />
+    </SettingsCard>
+    </>
   )
 }
 
@@ -246,23 +237,23 @@ function CompressToggleRow({ label, desc, enabled, pending, onToggle }: {
   onToggle: () => void
 }) {
   return (
-    <div className="flex items-center justify-between gap-4">
-      <div className="min-w-0">
-        <span className="block text-xs font-medium text-secondary">{label}</span>
-        <span className="block text-micro text-muted/80 mt-0.5 leading-relaxed">{desc}</span>
-      </div>
-      <button
-        onClick={onToggle}
-        disabled={pending}
-        className={`shrink-0 relative h-4 w-7 rounded-full transition-colors disabled:opacity-40 ${
-          enabled ? 'bg-accent' : 'bg-elevated'
-        }`}
-        title={enabled ? '点击关闭' : '点击开启'}
-      >
-        <span className={`absolute top-0.5 h-3 w-3 rounded-full bg-white shadow transition-ui ${
-          enabled ? 'left-[0.875rem]' : 'left-0.5'
-        }`} />
-      </button>
-    </div>
+    <SettingRow label={label} desc={desc}>
+      <Switch on={enabled} disabled={pending} onClick={onToggle} title={enabled ? '点击关闭' : '点击开启'} />
+    </SettingRow>
+  )
+}
+
+/** [R535] 两个尺寸的开关并成一个, 与设置区其它开关同尺寸; 滑块改走 transform(原来过渡的是 `left`, 每帧重排) */
+function Switch({ on, disabled, onClick, title }: { on: boolean; disabled?: boolean; onClick: () => void; title?: string }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      aria-pressed={on}
+      className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors duration-expand disabled:opacity-40 ${on ? 'bg-accent' : 'bg-elevated'}`}
+    >
+      <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white shadow-sm transition-transform duration-expand ${on ? 'translate-x-[18px]' : 'translate-x-[3px]'}`} />
+    </button>
   )
 }

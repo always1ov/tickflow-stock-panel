@@ -62,7 +62,8 @@ def test_R534_原处不再各放一份():
     i = mon.index("export function SettingsMonitoringPanel"); j = mon.index("export function PushChannelsCard")
     assert "webhookDefaultChannels" not in mon[i:j], "实时监控面板里还留着推送渠道的状态"
     # 数卡片标题, 不数字面 —— 「监控告警语音播报」这个开关标签里也有这四个字
-    assert sysp.count(">通知弹窗</h3>") == 1 and sysp.count(">语音播报</h3>") == 1 and "export function AlertPopupSettings" in sysp
+    # [R535] 卡头换成 SettingsCard, 标题从 <h3> 字面挪进 title 属性
+    assert sysp.count('title="通知弹窗"') == 1 and sysp.count('title="语音播报"') == 1 and "export function AlertPopupSettings" in sysp
     i = sysp.index("export function SettingsSystemPanel"); j = sysp.index("export function AlertPopupSettings")
     assert "alert_toast_enabled" not in sysp[i:j], "系统面板里还留着弹窗的状态"
 

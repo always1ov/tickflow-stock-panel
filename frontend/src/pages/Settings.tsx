@@ -77,9 +77,11 @@ export function Settings() {
       />
       {/* [R60] 统一版式: 设置以表单与说明文字为主, 取「读」档。
           [R379 第二层] 设置区是**外围页**, 留白给到 WavMint 那一档(手机页边距 18px, 卡片间距 20~24px);
-          **只动这一个容器**, 七个面板一起受益。[R533] 竖向菜单撤了, 内容区直接吃满, 上限 1500px 防超宽屏行长失控。 */}
+          **只动这一个容器**, 七个面板一起受益。[R533] 竖向菜单撤了, 内容区直接吃满, 上限 1500px 防超宽屏行长失控。
+          [R535] 八栏统一 1024px(max-w-5xl): 原来各面板自带上限 —— AI 672、通知/数据源/菜单 1024、网络/系统/扩展页面
+          一路铺到 1500 —— 切栏时左右边界来回跳。宽度只在这一处定, 面板里不再各写各的。 */}
       <main className="min-h-0 flex-1 overflow-y-auto px-4 pb-8 pt-5 lg:px-6">
-        <div className="w-full max-w-[1500px]">
+        <div className="w-full max-w-5xl">
           <Panel highlight={highlight} />
         </div>
       </main>

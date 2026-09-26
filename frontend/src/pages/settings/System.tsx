@@ -6,7 +6,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import { toast } from '@/components/Toast'
 import { useQueryClient } from '@tanstack/react-query'
-import { Settings2, Trash2, RefreshCw, Bell, Volume2, Info, ExternalLink, Stethoscope, Loader2, Wrench } from 'lucide-react'
+import { Settings2, RefreshCw, Bell, Volume2, Stethoscope, Loader2, Wrench } from 'lucide-react'
 import { usePreferences, useVersion } from '@/lib/useSharedQueries'
 import { api, type DataDoctorReport } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
@@ -16,7 +16,8 @@ import {
   listZhVoices, previewVoice, activateVoice, getCurrentVoiceURI,
 } from '@/lib/voiceBroadcast'
 import { loadStockExternalTemplate, saveStockExternalTemplate } from '@/lib/stock-external-link'
-import { TYPE, buttonClass } from '@/components/ui'
+import { buttonClass } from '@/components/ui'
+import { SettingsCard, SettingRow } from './SettingsCard'
 
 export function SettingsSystemPanel() {
   const qc = useQueryClient()
@@ -49,15 +50,13 @@ export function SettingsSystemPanel() {
   }, [qc])
 
   return (
-    <>
+    <div className="space-y-5">
       {/* [R533] 这里原来又印了一遍「系统设置 · 全局行为开关」大标题 —— 分栏条上已经写着「系统」, 同一页两个标题 */}
-
-      <section className="rounded-card border border-border bg-surface p-5">
-        <div className="flex items-center gap-2 mb-4">
-          <Settings2 className="h-4 w-4 text-accent" />
-          <h3 className={TYPE.card}>策略页</h3>
-        </div>
-
+      {/* [R534] 「通知弹窗」「语音播报」两张卡搬去了「通知」栏(AlertPopupSettings, 本文件导出) */}
+      {/* [R535] 原来是五张各装一行的卡(策略页 / 个股详情外链 / 缓存 / 数据体检 / 关于), 一屏看过去五个标题
+          比五行内容还显眼。按「偏好」与「维护」收成两张: 常规里是改了就生效的偏好与版本号,
+          维护里是点一下才干活的两件事。每一行的文字、控件、行为都没改。 */}
+      <SettingsCard icon={Settings2} title="常规">
         <ToggleRow
           label="进入策略页自动运行策略"
           desc="开启后进入策略页自动跑所有策略获取命中数; 关闭则需手动点击"
@@ -65,21 +64,7 @@ export function SettingsSystemPanel() {
           disabled={saving}
           onChange={(v) => save({ screener_auto_run: v })}
         />
-      </section>
-
-      {/* [R534] 「通知弹窗」「语音播报」两张卡搬去了「通知」栏(AlertPopupSettings, 本文件导出) */}
-
-      <section className="rounded-card border border-border bg-surface p-5 mt-6">
-        <div className="flex items-center gap-2 mb-4">
-          <ExternalLink className="h-4 w-4 text-accent" />
-          <h3 className={TYPE.card}>个股详情外链</h3>
-        </div>
-
-        <div className="flex items-center justify-between gap-4 py-2">
-          <div className="min-w-0">
-            <div className="text-sm text-foreground">详情页 URL 模板</div>
-            <div className="text-xs text-muted truncate">{"支持 {code} {market} {symbol} · 留空关闭外链"}</div>
-          </div>
+        <SettingRow label="个股详情外链" desc={"详情页 URL 模板 · 支持 {code} {market} {symbol} · 留空关闭外链"}>
           <input
             value={extTpl}
             onChange={(e) => {
@@ -88,61 +73,30 @@ export function SettingsSystemPanel() {
             }}
             placeholder="https://..."
             spellCheck={false}
-            className="w-[26rem] max-w-[60%] h-8 px-2.5 rounded-btn border border-border bg-base text-xs font-mono text-foreground focus:border-accent/50 focus:outline-none"
+            className="w-[26rem] max-w-[55%] h-8 px-2.5 rounded-btn border border-border bg-base text-xs font-mono text-foreground focus:border-accent/50 focus:outline-none"
           />
-        </div>
-      </section>
-
-      <section className="rounded-card border border-border bg-surface p-5 mt-6">
-        <div className="flex items-center gap-2 mb-4">
-          <Trash2 className="h-4 w-4 text-accent" />
-          <h3 className={TYPE.card}>缓存</h3>
-        </div>
-
-        <div className="flex items-center justify-between gap-4 py-2">
-          <div className="min-w-0">
-            <div className="text-sm text-foreground">刷新前端缓存</div>
-            <div className="text-xs text-muted truncate">
-              清除页面缓存并强制重新加载 (不影响个人配置和本地股票数据)
-            </div>
-          </div>
-          <button
-            onClick={handleClearCache}
-            disabled={clearing}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-btn text-xs
-                       bg-elevated text-secondary hover:text-foreground transition-colors
-                       disabled:opacity-50 shrink-0"
-          >
-            {clearing ? (
-              <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <RefreshCw className="h-3.5 w-3.5" />
-            )}
-            {clearing ? '清理中…' : '清理并刷新'}
-          </button>
-        </div>
-      </section>
-
-      <DataDoctorSection />
-
-      <section className="rounded-card border border-border bg-surface p-5 mt-6">
-        <div className="flex items-center gap-2 mb-4">
-          <Info className="h-4 w-4 text-accent" />
-          <h3 className={TYPE.card}>关于</h3>
-        </div>
-
-        <div className="flex items-center justify-between gap-4 py-2">
-          <div className="min-w-0">
-            <div className="text-sm text-foreground">版本</div>
-            <div className="text-xs text-muted truncate">当前安装的应用版本</div>
-          </div>
+        </SettingRow>
+        <SettingRow label="版本" desc="当前安装的应用版本">
           <span className="font-mono text-xs text-secondary shrink-0">
             {versionData?.version ?? '—'}
           </span>
-        </div>
+        </SettingRow>
+      </SettingsCard>
 
-      </section>
-    </>
+      <SettingsCard icon={Wrench} title="维护">
+        <SettingRow label="刷新前端缓存" desc="清除页面缓存并强制重新加载 (不影响个人配置和本地股票数据)">
+          <button
+            onClick={handleClearCache}
+            disabled={clearing}
+            className={buttonClass({ size: 'sm', variant: 'secondary' }, 'shrink-0 gap-1.5')}
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${clearing ? 'animate-spin' : ''}`} />
+            {clearing ? '清理中…' : '清理并刷新'}
+          </button>
+        </SettingRow>
+        <DataDoctorSection />
+      </SettingsCard>
+    </div>
   )
 }
 
@@ -207,12 +161,8 @@ export function AlertPopupSettings() {
 
 
   return (
-    <div className="space-y-6">
-      <section className="rounded-card border border-border bg-surface p-5">
-        <div className="flex items-center gap-2 mb-4">
-          <Bell className="h-4 w-4 text-accent" />
-          <h3 className={TYPE.card}>通知弹窗</h3>
-        </div>
+    <div className="space-y-5">
+      <SettingsCard icon={Bell} title="通知弹窗">
 
         <ToggleRow
           label="开启监控通知弹窗"
@@ -288,13 +238,9 @@ export function AlertPopupSettings() {
             </button>
           </div>
         </div>
-      </section>
+      </SettingsCard>
 
-      <section className="rounded-card border border-border bg-surface p-5 mt-6">
-        <div className="flex items-center gap-2 mb-4">
-          <Volume2 className="h-4 w-4 text-accent" />
-          <h3 className={TYPE.card}>语音播报</h3>
-        </div>
+      <SettingsCard icon={Volume2} title="语音播报">
 
         <ToggleRow
           label="监控告警语音播报"
@@ -375,7 +321,7 @@ export function AlertPopupSettings() {
             <span className="text-xs text-muted w-8 text-right">{voiceRate.toFixed(1)}</span>
           </div>
         </div>
-      </section>
+      </SettingsCard>
 
     </div>
   )
@@ -431,25 +377,21 @@ function DataDoctorSection() {
     .sort((a, b) => b.bytes - a.bytes)
 
   return (
-    <section className="rounded-card border border-border bg-surface p-5 mt-6">
-      <div className="flex items-center gap-2 mb-1">
-        <Stethoscope className="h-4 w-4 text-accent" />
-        <h3 className={TYPE.card}>数据体检</h3>
-        <button
-          onClick={() => void run()}
-          disabled={busy}
-          className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-btn text-xs
-                     bg-elevated text-secondary hover:text-foreground transition-colors disabled:opacity-50"
-        >
-          {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-          {busy ? '体检中…' : '开始体检'}
-        </button>
-      </div>
-      <p className="text-xs leading-relaxed text-muted">
+    <div className="border-t border-border/60 pt-3 mt-2">
+      <SettingRow label="数据体检" desc={<>
         系统一直在改,盘上的老数据是早先的版本写的 —— 后加的字段老记录不会有。
         这类缺失<b className="text-secondary">不会报错</b>,只会被当成「你没设过」静默处理。
         体检只读不改;补齐前会先备份,并且<b className="text-secondary">一条记录都不删</b>。
-      </p>
+      </>}>
+        <button
+          onClick={() => void run()}
+          disabled={busy}
+          className={buttonClass({ size: 'sm', variant: 'secondary' }, 'shrink-0 gap-1.5')}
+        >
+          {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Stethoscope className="h-3.5 w-3.5" />}
+          {busy ? '体检中…' : '开始体检'}
+        </button>
+      </SettingRow>
 
       {report && (
         <div className="mt-3 space-y-3">
@@ -540,7 +482,7 @@ function DataDoctorSection() {
           )}
         </div>
       )}
-    </section>
+    </div>
   )
 }
 

@@ -715,7 +715,7 @@ export function SettingsDataSourcesPanel({ highlight }: { highlight?: string } =
   const pluginMap = new Map(pluginList.map(p => [p.name, p]))
 
   return (
-    <div className="space-y-5 max-w-5xl">
+    <div className="space-y-5">
       {/* ===== 上区: 能力路由 (能力为主视图, 点标签切换提供方) ===== */}
       <CapabilityRoutingSection />
 
@@ -743,9 +743,11 @@ export function SettingsDataSourcesPanel({ highlight }: { highlight?: string } =
           </button>
         </div>
 
-        {/* 插件化说明 (置顶黄色提示条): 接入自有行情 → 把文档交给 AI */}
-        <div className="mb-4 flex items-start gap-2 rounded-btn border border-warning/40 bg-warning/10 px-3 py-2.5">
-          <Puzzle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warning" />
+        {/* 插件化说明: 接入自有行情 → 把文档交给 AI。
+            [R535] 原是置顶的黄色提示条 —— 黄色在设置区是「要你处理」(未配置 / 未解锁 / 能力不可用),
+            这一条是说明, 不是待办; 降成一行灰字, 位置不动。 */}
+        <div className="mb-4 flex items-start gap-2 text-xs">
+          <Puzzle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted" />
           <div className="text-xs leading-relaxed text-muted">
             <span className="text-secondary">数据源已插件化</span>
             ,接入自有行情?把文档发给 AI 即可自动接入:

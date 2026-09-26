@@ -22,13 +22,13 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import {
   Eye, EyeOff, ExternalLink, GripVertical, Settings, Bell, Layers3,
-  CornerDownRight, CornerLeftUp,
+  CornerDownRight, CornerLeftUp, SlidersHorizontal,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { api } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { usePreferences } from '@/lib/useSharedQueries'
-import { SectionIntro } from '@/components/SectionIntro'
+import { SettingsCard } from './SettingsCard'
 import {
   BROWSE_GROUP,
   BROWSE_GROUP_ID,
@@ -89,7 +89,9 @@ const BUILTIN_PAGES: NavEntry[] = [
 // ── Sortable row ──
 
 /** 表格列宽 —— 表头与每一行共用同一串, 分两处写迟早对不齐。 */
-const GRID_COLS = 'grid-cols-[2.5rem_1fr_4.5rem_3rem_3rem_3rem_3rem]'
+// [R535] 手机上原来也是这 7 列: 固定宽度加起来 19rem, 390 宽的屏幕上菜单名那一列只剩一个字宽 ——
+// 名字整个被挤没了, 只看得见一排「内置」和图标。手机上藏掉「类型」列、收窄图标列, 名字保底。
+const GRID_COLS = 'grid-cols-[1.75rem_minmax(0,1fr)_2.25rem_2.25rem_2.25rem_2.25rem] sm:grid-cols-[2.5rem_minmax(0,1fr)_4.5rem_3rem_3rem_3rem_3rem]'
 
 /**
  * [R378] 空组的投放区 id。
@@ -160,8 +162,8 @@ function SortableItem({ entry, hidden, onToggleHidden, badgeEnabled, onToggleBad
     <div
       ref={setNodeRef}
       style={style}
-      className={`grid ${GRID_COLS} items-center border-b border-border/70 py-3 pr-4 last:border-b-0 ${
-        indent ? 'pl-10 bg-elevated/25' : 'pl-4'
+      className={`grid ${GRID_COLS} items-center border-b border-border/70 py-2.5 pr-2 sm:pr-4 last:border-b-0 ${
+        indent ? 'pl-6 sm:pl-10 bg-elevated/25' : 'pl-3 sm:pl-4'
       } ${isDragging ? 'bg-elevated rounded-btn shadow-lg' : ''} ${hidden ? 'opacity-50' : ''}`}
     >
       <div
@@ -179,14 +181,18 @@ function SortableItem({ entry, hidden, onToggleHidden, badgeEnabled, onToggleBad
         {hidden && (
           <span className="rounded bg-elevated px-1.5 py-0.5 text-micro text-muted shrink-0">已隐藏</span>
         )}
-        <span className={`truncate text-xs text-muted ${note ? '' : 'font-mono'}`}>{note ?? entry.id}</span>
+        <span className={`truncate text-xs text-muted max-sm:hidden ${note ? '' : 'font-mono'}`}>{note ?? entry.id}</span>
       </div>
-      <div>
-        <span className={`inline-flex items-center rounded-btn px-2 py-0.5 text-xs ${
-          entry.type === 'analysis' ? 'bg-accent/10 text-accent' : 'bg-elevated text-muted'
-        }`}>
-          {entry.type === 'builtin' ? '内置' : entry.type === 'group' ? '分组' : '扩展'}
-        </span>
+      {/* [R535] 「内置」不再逐行印: 十几行里除了分组全是它, 一整列同一个词不携带信息。
+          只给与众不同的那几行标出来(分组 / 扩展)。 */}
+      <div className="max-sm:hidden">
+        {entry.type !== 'builtin' && (
+          <span className={`inline-flex items-center rounded-btn px-2 py-0.5 text-xs ${
+            entry.type === 'analysis' ? 'bg-accent/10 text-accent' : 'bg-elevated text-muted'
+          }`}>
+            {entry.type === 'group' ? '分组' : '扩展'}
+          </span>
+        )}
       </div>
       <div className="flex justify-center">
         <button
@@ -486,20 +492,24 @@ export function SettingsMenuSettingsPanel() {
   }
 
   return (
-    <div className="max-w-5xl space-y-6">
-      {/* [R379] 这一块的手搓版收进 `SectionIntro` —— 与扩展页面那一处合成一个产地 */}
-      <SectionIntro eyebrow="菜单" title="调整左侧菜单顺序">
-        拖动左侧手柄调整菜单排列顺序，点击眼睛图标控制菜单在侧边栏中的显示或隐藏。
-        「{BROWSE_GROUP.label}」是一个分组，拖它整块一起挪；缩进的那几行是它的成员。
-        <strong className="font-medium text-foreground">任何一行都能拖进或拖出这个分组</strong>
-        ，也可以点那一行的「闲置」按钮一键收进去 / 放出来。
-      </SectionIntro>
-
-      <section className="rounded-card border border-border bg-surface overflow-hidden">
-        <div className={`grid ${GRID_COLS} items-center border-b border-border px-4 py-2 text-xs text-muted`}>
+    <div className="space-y-5">
+      {/* [R535] 原来是一块单独的大号开篇(小标签 + 24px 大标题 + 一段话)压在表格上面, 与其余六栏的卡片像两个系统。
+          收成设置区统一的卡头, 说明挪到标题下, 表格就在同一张卡里。 */}
+      <SettingsCard
+        icon={SlidersHorizontal}
+        title="调整左侧菜单顺序"
+        desc={<>
+          拖动左侧手柄调整菜单排列顺序，点击眼睛图标控制菜单在侧边栏中的显示或隐藏。
+          「{BROWSE_GROUP.label}」是一个分组，拖它整块一起挪；缩进的那几行是它的成员。
+          <strong className="font-medium text-secondary">任何一行都能拖进或拖出这个分组</strong>
+          ，也可以点那一行的「闲置」按钮一键收进去 / 放出来。
+        </>}
+        bodyClassName="p-0 pt-3"
+      >
+        <div className={`grid ${GRID_COLS} items-center border-y border-border px-3 py-2 text-xs text-muted sm:px-4`}>
           <div />
           <div>菜单</div>
-          <div>类型</div>
+          <div className="max-sm:hidden">类型</div>
           <div className="text-center">显示</div>
           <div className="text-center">闲置</div>
           <div className="text-center">设置</div>
@@ -558,7 +568,7 @@ export function SettingsMenuSettingsPanel() {
         {menus.isLoading && (
           <div className="px-5 py-10 text-center text-sm text-muted">正在加载菜单...</div>
         )}
-      </section>
+      </SettingsCard>
     </div>
   )
 }

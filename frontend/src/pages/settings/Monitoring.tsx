@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, createContext, useContext } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useQueryClient, useMutation, useQuery } from '@tanstack/react-query'
 import {
   Activity,
@@ -17,14 +17,13 @@ import {
 import { useUpdateQuoteInterval, useToggleRealtimeQuotes } from '@/lib/useSharedMutations'
 import { api, type EmailSmtpConfig } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
-import { useCardFlash, cardFlashCls } from '@/lib/useCardFlash'
+import { SettingsCard, SettingsHighlight } from './SettingsCard'
 import { toast } from '@/components/Toast'
 import { DepthConfigContent } from '@/components/data/DepthConfigCard'
-import { TYPE, buttonClass } from '@/components/ui'
+import { buttonClass } from '@/components/ui'
 
 // 卡片定位锚点: highlight=<anchor> 时该卡片滚动到视口中央并闪烁高亮。
 // 其他页面用 /settings?tab=monitoring&highlight=<anchor> 精确引导用户到某张卡片。
-const HighlightContext = createContext('')
 
 // 页面 → 显示名
 const PAGE_LABELS: Record<string, string> = {
@@ -164,12 +163,12 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
   }, [minuteRefreshIntervalDraft, minuteRefreshInterval, save])
 
   return (
-    <HighlightContext.Provider value={highlight ?? ''}>
-    <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-6 max-w-5xl">
+    <SettingsHighlight.Provider value={highlight ?? ''}>
+    <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-5">
       {/* ========== 左列 ========== */}
-      <div className="space-y-6">
+      <div className="space-y-5">
         {/* 行情状态 — 开关 + 间隔 */}
-        <Card icon={Activity} title="行情轮询" anchor="quotes">
+        <SettingsCard icon={Activity} title="行情轮询" anchor="quotes">
           <ToggleRow
             label="实时行情"
             desc={
@@ -219,9 +218,9 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
               </span>
             </div>
           </div>
-        </Card>
+        </SettingsCard>
 
-        <Card icon={Wifi} title="页面实时刷新">
+        <SettingsCard icon={Wifi} title="页面实时刷新">
           <p className="text-xs text-secondary mb-4">
             选择哪些页面跟随 SSE 实时刷新数据。关闭的页面不会被推送，
             但行情轮询和策略监控不受影响。
@@ -237,10 +236,10 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
               />
             ))}
           </div>
-        </Card>
+        </SettingsCard>
 
         {/* 自选列表分时图实时刷新 (默认关闭, 开启后盘中按设定间隔轮询刷新分时数据) */}
-        <Card icon={Activity} title="分时图刷新" anchor="intraday-refresh">
+        <SettingsCard icon={Activity} title="分时图刷新" anchor="intraday-refresh">
           <ToggleRow
             label="自选/策略分时图实时刷新"
             desc={`开启后自选与策略列表的分时图盘中每 ${intradayInterval} 秒自动刷新（依赖分钟K批量数据 + 实时行情运行）。关闭时仅打开页面时拉取一次, 可点表头刷新按钮手动更新。`}
@@ -274,7 +273,7 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
               </span>
             </div>
           </div>
-        </Card>
+        </SettingsCard>
 
         {/* [R120] A 股指数选择与「固定显示」随上游 3c6ed99 下线 —— 作者把展示层
             收敛为固定核心四只(services/index_const.py 单一权威), 不再给配置。
@@ -283,9 +282,9 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
       </div>
 
       {/* ========== 右列 ========== */}
-      <div className="space-y-6">
+      <div className="space-y-5">
         {/* 全量分钟: 盘中全市场分钟落盘, 按能力路由 (TickFlow Expert 或声明 full_minute 的插件/自定义源) */}
-        <Card icon={Zap} title="全量分钟" anchor="minute-refresh">
+        <SettingsCard icon={Zap} title="全量分钟" anchor="minute-refresh">
           <ToggleRow
             label="全量分钟落盘"
             desc={
@@ -333,10 +332,10 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
               </div>
             )}
           </div>
-        </Card>
+        </SettingsCard>
 
         {/* 连板梯队降级修正 */}
-        <Card
+        <SettingsCard
           icon={Flame}
           title="连板梯队降级修正"
           anchor="depth-fix"
@@ -376,11 +375,11 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
           ) : (
             <DepthConfigContent disabled />
           )}
-        </Card>
+        </SettingsCard>
 
       </div>
     </div>
-    </HighlightContext.Provider>
+    </SettingsHighlight.Provider>
   )
 }
 
@@ -389,7 +388,7 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
 //
 // 用户: 「通知设置合到一栏」。这张卡原来是「实时监控」面板的一部分, 状态 / 保存 / 测试全是它自己的,
 // 原样整块搬出来成一个组件, 一个字段、一个校验、一个按钮都没改。仍住在本文件, 复用本文件的 Card / ToggleRow /
-// TestSendButton / TestResult 与 HighlightContext(`highlight=webhooks` 定位照旧)。
+// TestSendButton / TestResult 与 SettingsHighlight(`highlight=webhooks` 定位照旧)。
 export function PushChannelsCard({ highlight }: { highlight?: string } = {}) {
   const qc = useQueryClient()
   const { data: prefs } = usePreferences()
@@ -675,11 +674,11 @@ export function PushChannelsCard({ highlight }: { highlight?: string } = {}) {
   })
 
   return (
-    <HighlightContext.Provider value={highlight ?? ''}>
+    <SettingsHighlight.Provider value={highlight ?? ''}>
         {/* 推送通知 — 监控告警的外部推送渠道 (全局配置)。
             飞书 / 企业微信 / 第三方 Webhook / 邮件。
             每个渠道合并成一行: 勾选=新建规则默认推送, 点行展开地址配置。 */}
-        <Card icon={Webhook} title="推送通知" anchor="webhooks">
+        <SettingsCard icon={Webhook} title="推送通知" anchor="webhooks">
           <p className="text-xs text-secondary mb-3">
             监控规则命中后,可把告警推送到外部。勾选渠道作为<b className="text-foreground/80">新建规则的默认推送</b>,
             单条规则仍可在编辑页独立修改。
@@ -1208,8 +1207,8 @@ export function PushChannelsCard({ highlight }: { highlight?: string } = {}) {
             </div>
 
           </div>
-        </Card>
-    </HighlightContext.Provider>
+        </SettingsCard>
+    </SettingsHighlight.Provider>
   )
 }
 
@@ -1300,40 +1299,3 @@ function ToggleRow({
 }
 
 
-// ===== 通用卡片 =====
-
-interface CardProps {
-  icon: React.ComponentType<{ className?: string }>
-  title: string
-  badge?: string
-  right?: React.ReactNode
-  children: React.ReactNode
-}
-
-function Card({ icon: Icon, title, badge, right, children, anchor }: CardProps & { anchor?: string }) {
-  const highlight = useContext(HighlightContext)
-  const { ref, flash } = useCardFlash(anchor ? highlight : undefined, anchor ?? '')
-  const inner = (
-    <section className="rounded-card border border-border bg-surface p-5">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2.5">
-          <Icon className="h-4 w-4 text-secondary" />
-          <h2 className={TYPE.card}>{title}</h2>
-          {badge && (
-            <span className="px-1.5 py-0.5 text-micro font-mono rounded bg-elevated text-muted">
-              {badge}
-            </span>
-          )}
-        </div>
-        {right}
-      </div>
-      {children}
-    </section>
-  )
-  if (!anchor) return inner
-  return (
-    <div ref={ref} id={anchor} className={cardFlashCls(flash)}>
-      {inner}
-    </div>
-  )
-}
