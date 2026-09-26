@@ -19,8 +19,12 @@ def test_R526_四格在手机上的落位():
     assert "px-3 border-l-2 max-sm:order-1 max-sm:min-w-0 max-sm:grow max-sm:basis-40 max-sm:py-0 max-sm:pr-0 max-sm:pl-2" in board
     # 第一行右半: 现价 涨跌
     assert "text-right max-sm:order-2 max-sm:px-0 max-sm:py-0" in board
-    # 持仓跟在价的后面(放不下自己换行)
-    assert "whitespace-nowrap px-2 max-sm:order-3 max-sm:px-0 max-sm:py-0" in board
+    # 持仓: 格子本身在手机上 display:contents, 持有 / 空仓那颗按钮跟在价的后面, 批次 / 出场线落到最后一行
+    # ([R527] 成本输入框撤掉后, 持有与空仓同一颗 xs 按钮的几何, 两种行里它落在同一个位置)
+    assert "whitespace-nowrap px-2 max-sm:contents" in board
+    assert "buttonClass({ size: 'xs', selected: true }, 'max-sm:order-3')" in board
+    assert "buttonClass({ size: 'xs', variant: 'ghost' }, 'text-muted/50 hover:text-secondary max-sm:order-3')" in board
+    assert "sm:contents max-sm:order-5 max-sm:flex max-sm:basis-full" in board
     # 走势 / 位置最后, 独占一整行, 四段按段换行
     assert "whitespace-nowrap px-2 max-sm:order-4 max-sm:basis-full max-sm:px-0 max-sm:py-0" in cells
     assert "max-sm:flex-wrap max-sm:gap-y-1 max-sm:px-0" in cells

@@ -909,39 +909,27 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, loc
                         空仓(158/166 行)时这一格只有一个按钮; 持有时才长出成本输入。
                         [R169] 写回时一律用 manualCost 而不是 r.cost —— r.cost 可能是批次
                         派生出来的, 直接回写会把"批次算的"固化成"我填的"。派生值必须保持派生。 */}
-                    <td className={`${TD_BASE} whitespace-nowrap px-2 max-sm:order-3 max-sm:px-0 max-sm:py-0`}>
+                    <td className={`${TD_BASE} whitespace-nowrap px-2 max-sm:contents`}>
                       {/* [R520] 单行。**空仓不再是一颗带边框的按钮**: 120 行里 110 行印着「空仓」, 一列按钮全在说
                           「这只我没拿」—— 没事是常态, 常态不该长得像个动作。改成一个压暗的文字入口, 点它仍切成持有;
                           持有那几行才亮起来, 一列扫下去只看得见拿着的。 */}
-                      <div className="flex items-center gap-1.5">
+                      {/* [R527] 成本输入框撤掉(用户: 「不需要成本这一列」)。成本改由「持仓提醒」页的批次提供; 已经手填过的
+                          成本还在 positions 里, 切换持有 / 空仓时原样带着(cost: manualCost), 出场线照旧按它算。
+                          持有 / 空仓用同一颗 xs 按钮的几何, 只差亮不亮 —— 用户: 「持仓和空仓应该是在同一个位置」。
+                          手机上这一格与这层壳都 display:contents: 按钮排在价格后面(order-3), 批次链接 / 出场线落到最后一行(order-5)。 */}
+                      <div className="flex items-center gap-1.5 max-sm:contents">
                         <button
                           onClick={() => setPos.mutate({ symbol: r.symbol, held: !r.held, cost: manualCost, weight: r.weight })}
                           title={r.held ? '点一下改成空仓' : '空仓 —— 点一下改成持有'}
                           className={r.held
-                            ? buttonClass({ size: 'xs', selected: true })
-                            : 'rounded-btn px-1.5 py-0.5 text-micro text-muted/50 transition-colors duration-hover hover:bg-elevated hover:text-secondary'}
+                            ? buttonClass({ size: 'xs', selected: true }, 'max-sm:order-3')
+                            : buttonClass({ size: 'xs', variant: 'ghost' }, 'text-muted/50 hover:text-secondary max-sm:order-3')}
                         >
                           {r.held ? '持有' : '空仓'}
                         </button>
+                        <span className="sm:contents max-sm:order-5 max-sm:flex max-sm:basis-full max-sm:items-center max-sm:gap-1.5 max-sm:empty:hidden">
                         {r.held ? (
-                          <span className="inline-flex items-center gap-1">
-                            <input
-                              type="number"
-                              defaultValue={manualCost ?? ''}
-                              placeholder={r.costSource === 'lots' && r.lotCost != null ? `批 ${r.lotCost.toFixed(2)}` : '成本'}
-                              title={r.costSource === 'lots' && r.lotCost != null
-                                ? `成本来自「持仓提醒」页的 ${r.lotCount} 笔批次(数量加权均价 ${r.lotCost.toFixed(2)})。这里留空即跟随批次; 填了数字则以填的为准。`
-                                : '买入成本(手填) —— 出场线按它算'}
-                              onBlur={(e) => {
-                                const v = e.target.value === '' ? null : Number(e.target.value)
-                                if (v !== manualCost) setPos.mutate({ symbol: r.symbol, held: true, cost: v, weight: r.weight })
-                              }}
-                              className={`w-16 h-6 px-1.5 rounded-btn bg-base border text-xs ${NUM} text-right text-foreground focus:outline-none focus:border-accent/50 ${
-                                r.costSource === 'lots' ? 'border-accent/35 placeholder:text-accent/70' : 'border-border'
-                              }`}
-                            />
-                            <LotsLink symbol={r.symbol} lotCount={r.lotCount} driftPct={r.costDriftPct} lotCost={r.lotCost} />
-                          </span>
+                          <LotsLink symbol={r.symbol} lotCount={r.lotCount} driftPct={r.costDriftPct} lotCost={r.lotCost} />
                         ) : (
                           // 空仓但批次还挂着 —— 多半是卖出后忘了删批次, 那两条监控规则还在跑
                           r.lotCount > 0
@@ -971,6 +959,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, loc
                             <span className={`ml-1 ${NUM}`}>{r.exit.line.toFixed(2)}</span>
                           </span>
                         )}
+                        </span>
                       </div>
                     </td>
                   </tr>

@@ -29,8 +29,10 @@ def test_R520_空仓不是按钮_持有才亮():
     board = code_of(BOARD)
     i = board.index("{r.held ? '持有' : '空仓'}")
     seg = board[i - 600:i]
-    assert "? buttonClass({ size: 'xs', selected: true })" in seg, "持有那一档不亮了"
-    assert "text-muted/50" in seg and "buttonClass({ size: 'xs', selected: r.held })" not in seg, \
+    # [R527] 持有 / 空仓改成同一颗 xs 按钮的几何(用户: 「持仓和空仓应该是在同一个位置」), 空仓走 ghost:
+    # 没边框、压暗(text-muted/50) —— 「空仓不是一颗带边框的按钮」这条立论没变, 变的只是等高等宽
+    assert "? buttonClass({ size: 'xs', selected: true }" in seg, "持有那一档不亮了"
+    assert "variant: 'ghost' }, 'text-muted/50" in seg and "buttonClass({ size: 'xs', selected: r.held })" not in seg, \
         "空仓又成了一颗带边框的按钮 —— 120 行里 110 行都在说「没拿」"
 
 

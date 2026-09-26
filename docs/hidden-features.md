@@ -33,6 +33,7 @@
 | **AI 导读 · 优选**（盘前导读正文 + 从候选里精选 1~3 只） | 用户：「这部分和 ai 导读都不用了」 | 接口 `POST /api/today/ai`（生成）、`GET /api/today/ai/track-record`（优选战绩）仍能用；存档 `user_data/today_ai.json`、`user_data/ai_pick_ledger.json` | 前端按钮与定时开关：`git show 8b224af3^`（`lib/api.ts` 的 `todayAi`、设置里的定时导读） | R352 |
 | **批次登记页**（作者的真钱批次：成本 / 数量 / 止盈止损 / 到期提醒） | 模拟盘换成转折模拟盘后不在菜单里 | 路由 `/lots-registry` 能直接打开，代码一行没动；数据 `user_data/lots/` | 地址栏输入 `/lots-registry`，或在侧栏菜单里加回一行 | R327 |
 | **模拟盘信号栏的「盯着」一段**(没拿着、离触发价 5% 以内还没转的票; 分离转多 / 离转空) | R515 先收成只列离转多 2% 以内的几只(用户: 「模拟盘的只需要展示最重要的, 像"盯着"这部分, 这么多没有精力看」), 再整段撤掉(「不要盯着」)。交易只在收盘转折那一刻发生, 还没转的票转了那天会出现在「要动手」里 | 接口 `GET /api/flip-paper` 的 `today` 照旧全发(`flip_today.evaluate` 的 watch 档) | 全列两组的版面: `git show 260c2ee1:frontend/src/pages/FlipPaper.tsx`, 看 `WatchGroup`; 只列快转多的版面: `git show 258c07a0:frontend/src/pages/FlipPaper.tsx` | R515 / R516 |
+| **决策台「持仓」格的手填成本输入框**(持有那几行旁边那个「成本」框, 出场线按它算) | 用户:「不需要成本这一列」。成本改由「持仓提醒」页的批次提供(数量加权均价) | 后端 `PUT /api/watchlist/positions/{symbol}` 仍收 `cost`; 已经手填过的成本还在 `user_data/positions.json` 里, 出场线照旧按它算, 决策台切换持有 / 空仓时原样带着 | `git show 5a19c723:frontend/src/components/stock-analysis/WatchlistDecisionBoard.tsx`, 搜 `type="number"` | R527 |
 | **开发者工具** | 调试用，从来不进菜单 | 路由 `/dev` | 地址栏输入 `/dev` | 作者原有 |
 
 ---

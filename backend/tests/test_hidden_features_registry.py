@@ -37,6 +37,8 @@ STILL_THERE = [
     ("批次登记页", "frontend/src/router.tsx", "{ path: 'lots-registry', element: <Lots /> }"),
     ("开发者工具", "frontend/src/router.tsx", "{ path: 'dev', element: <Dev /> }"),
     ("信号栏的「盯着」一段", "backend/app/services/flip_today.py", '"stage": STAGE_WATCH,'),
+    ("手填成本输入框", "backend/app/api/watchlist.py", "cost: float | None = None"),
+    ("手填成本输入框", "backend/app/api/watchlist.py", "positions.set_position(symbol, req.held, req.cost, req.weight)"),
 ]
 
 # 登记簿说「留在磁盘上」的存档 —— 必须仍在数据体检的名单里
