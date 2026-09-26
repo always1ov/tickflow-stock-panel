@@ -765,7 +765,10 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, loc
 
       {/* [R28] 关键价位改弹窗后, 页面里已没有 K 线图要让位 —— 表格直接吃满剩余视口高度 */}
       <div className="overflow-auto border-t border-border/60 max-h-[calc(100vh-210px)]">
-          <table className="w-full text-xs">
+          {/* [R526] 手机(< sm)不再横滑: 表退化成一行一块 —— table / tbody 变块, thead 藏起, tr 变 flex-wrap,
+              四格按 名字·价 / 持仓 / 走势·位置 折成两三行(见各 td 的 max-sm:)。用户: 「手机版现在不搞左右滑动,
+              能否像监控中心那样, 每一行就能显示完整」。R395 的「首列钉住 + 横滑」在这张表上就此撤掉。 */}
+          <table className="w-full text-xs max-sm:block">
             {/* [R194] 列宽表驱动(宽度与分配原则见 BOARD_COLS)。R178 加「该动」列时**只加了 <th> 没加 <col>**,
                 15 对 16, 从那天起每个宽度都串了一位(R193 才发现); R184/R189 改列数
                 时又要手动同步 colSpan。改成从 BOARD_COLS 渲染之后, colgroup 与
@@ -782,13 +785,11 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, loc
                 滚动时表头被行内容穿透。背景也从 95% 半透明改成实心 —— 表头底下本来
                 就是要划走的行, 让它透出来没有任何好处。 */}
             {/* [R451] 表头是标签那一级(11px 灰, 浅灰底条), 与全站表格同一套 */}
-            <thead className={cn(THEAD, 'z-20')}>
+            <thead className={cn(THEAD, 'z-20 max-sm:hidden')}>
               <tr className={cn(TH_ROW, 'text-left')}>
-                {/* [R395] 窄屏把「标的」钉在左边缘 —— 手机上这张表要往右滑 160px 才
-                    看得完, 滑过去之后满屏读数不知道是哪一只票。`z-30` 要压过 thead
-                    自己的 `z-20`, 否则表头第一格会被同一层的其余表头盖住。
-                    宽屏 `lg:static` 之后与改动前逐像素相同。 */}
-                <th className="sticky left-0 z-30 bg-elevated whitespace-nowrap px-3 py-2 font-normal text-left lg:static lg:bg-transparent"><button onClick={() => cycleSort('name')} className={thBtn} title={HEAD_TIPS.name}>标的{caret('name')}</button><Hint title={HEAD_TIPS.name} className="ml-0.5" /></th>
+                {/* [R395] 窄屏曾把「标的」钉在左边缘(sticky left-0 + lg:static), 让横滑时认得出是哪只票;
+                    [R526] 手机不再横滑, 钉住随之撤掉, 表头在手机上整个藏起。 */}
+                <th className="whitespace-nowrap px-3 py-2 font-normal text-left"><button onClick={() => cycleSort('name')} className={thBtn} title={HEAD_TIPS.name}>标的{caret('name')}</button><Hint title={HEAD_TIPS.name} className="ml-0.5" /></th>
                 <th className="whitespace-nowrap px-2 py-2 font-normal text-right">
                   <button onClick={() => cycleSort('changePct')}
                           className={`${thBtn} whitespace-nowrap`}
@@ -828,7 +829,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, loc
                 </th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="max-sm:block">
               {/* [R324] 自选列表还没回来时先画骨架行 —— 原来这段时间印的是「自选为空」,
                   加载中的表看起来像空表, 把人指去了错误的地方。只在 isLoading(本地
                   没有缓存)时出现; 后台重取时上一份行还在, 不盖。 */}
@@ -838,7 +839,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, loc
                 /* [R276] **原来这里一律写「自选为空」, 而那多半是假的。**
                    开着任一筛选把行数筛成 0 时, 这句话既说错了原因、又把人指向完全
                    错误的动作(去自选页添加标的)。现在分两种情况说, 并点名是谁挡的。 */
-                <tr><td colSpan={BOARD_COLS.length} className="px-4 py-6 text-center text-muted">
+                <tr className="max-sm:block"><td colSpan={BOARD_COLS.length} className="px-4 py-6 text-center text-muted max-sm:block">
                   {totalRows === 0
                     ? '自选为空 —— 去自选页添加标的'
                     : `自选有 ${totalRows} 只, 但当前筛选(${
@@ -861,7 +862,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, loc
                   <tr
                     key={r.symbol}
                     ref={(el) => { rowRefs.current[r.symbol] = el }}
-                    className={`scroll-mt-10 border-t border-border/30 transition-colors duration-500 hover:bg-elevated/40 ${
+                    className={`scroll-mt-10 border-t border-border/30 transition-colors duration-500 hover:bg-elevated/40 max-sm:flex max-sm:flex-wrap max-sm:items-center max-sm:gap-x-3 max-sm:gap-y-1 max-sm:px-3 max-sm:py-2 ${
                       flashing ? 'bg-accent/25' : active ? 'bg-accent/[0.10]' : ''}`}
                   >
                     {/* 点标的即切换分析(免搜索) */}
@@ -874,13 +875,9 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, loc
                         一份。R198 当初把它挪进标的格是为了省一列, 现在收敛层顶上了,
                         它就成了纯重复。
                         判定本身一个字没动 —— 排序键、「只看要动的」筛选照旧走它。 */}
-                    {/* [R395] 与表头那一格成对: 钉住的格子必须**不透明**, 否则
-                        从它底下滑过去的读数会透上来。
-                        **知情取舍**: 行的高亮(`bg-accent/25` 闪烁 / `bg-accent/[0.10]`
-                        当前)是半透明的, 同一个元素上叠不起两个底色, 所以窄屏上这一格
-                        只有页面底色。当前行的身份标记没丢 —— 左边那道靛蓝边还在, 而且
-                        它本来就是比淡色底更强的那个信号。 */}
-                    <td className={`${TD_BASE} sticky left-0 z-[1] bg-base px-3 border-l-2 lg:static lg:bg-transparent ${active ? 'border-l-accent' : 'border-l-transparent'}`}>
+                    {/* [R395] 这一格曾在窄屏钉住(sticky left-0 + 不透明底), [R526] 随横滑一起撤掉;
+                        手机上它是第一行的左半(名字 · 代码), 撑满剩下的宽度, 价格在右边。 */}
+                    <td className={`${TD_BASE} px-3 border-l-2 max-sm:order-1 max-sm:min-w-0 max-sm:grow max-sm:basis-40 max-sm:py-0 max-sm:pr-0 max-sm:pl-2 ${active ? 'border-l-accent' : 'border-l-transparent'}`}>
                       {/* [R520] 单行、左对齐 —— 原来名字与代码竖着居中在一个 36px 高的按钮里, 是全表行高 80px 的根源之一 */}
                       <button onClick={() => (onPreview ?? onSelect)(r.symbol, r.name)}
                               className="flex max-w-full items-center text-left cursor-pointer group">
@@ -892,7 +889,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, loc
                       </button>
                     </td>
                     {/* [R212] 现价与涨跌并成一格 —— 两个数天生一起读 */}
-                    <td className={`${TD_BASE} ${NUM} whitespace-nowrap px-2 text-right`}>
+                    <td className={`${TD_BASE} ${NUM} whitespace-nowrap px-2 text-right max-sm:order-2 max-sm:px-0 max-sm:py-0`}>
                       <span className="text-foreground">{r.close != null ? r.close.toFixed(2) : '—'}</span>
                       <span className={`ml-1.5 text-xs ${up ? 'text-bull' : down ? 'text-bear' : 'text-muted'}`}>
                         {r.changePct != null ? `${r.changePct > 0 ? '+' : ''}${(r.changePct * 100).toFixed(2)}%` : '—'}
@@ -912,7 +909,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, loc
                         空仓(158/166 行)时这一格只有一个按钮; 持有时才长出成本输入。
                         [R169] 写回时一律用 manualCost 而不是 r.cost —— r.cost 可能是批次
                         派生出来的, 直接回写会把"批次算的"固化成"我填的"。派生值必须保持派生。 */}
-                    <td className={`${TD_BASE} whitespace-nowrap px-2`}>
+                    <td className={`${TD_BASE} whitespace-nowrap px-2 max-sm:order-3 max-sm:px-0 max-sm:py-0`}>
                       {/* [R520] 单行。**空仓不再是一颗带边框的按钮**: 120 行里 110 行印着「空仓」, 一列按钮全在说
                           「这只我没拿」—— 没事是常态, 常态不该长得像个动作。改成一个压暗的文字入口, 点它仍切成持有;
                           持有那几行才亮起来, 一列扫下去只看得见拿着的。 */}

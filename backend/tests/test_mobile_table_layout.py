@@ -19,12 +19,15 @@ import pytest
 
 from tests.frontend_source import SRC, code_of
 
-#: 这一轮开了钉住的三张表。**不扫全前端** —— 别处可能有正当的 `sticky left-0`
+#: 这一轮开了钉住的表。**不扫全前端** —— 别处可能有正当的 `sticky left-0`
 #: (比如始终钉住的侧栏), 那不归这条管。
+#: [R526] 决策台那张从这里撤了: 用户「手机版现在不搞左右滑动, 能否像监控中心那样,
+#: 每一行就能显示完整」—— 它在手机上改成一行一块, 不横滑也就无所谓钉。
 PINNED = (
     "components/stock-table/StockDataTable.tsx",   # 自选 / 策略两张表的共用骨架
-    "components/stock-analysis/WatchlistDecisionBoard.tsx",  # 决策台自己那张
 )
+
+BOARD = "components/stock-analysis/WatchlistDecisionBoard.tsx"
 
 
 def _code(rel: str) -> str:
@@ -69,14 +72,16 @@ def test_R395_只在窄屏钉住_宽屏要还原():
     assert not bad, "这些钉住没有在宽屏还原(缺 lg:static):\n  " + "\n  ".join(bad)
 
 
-def test_R395_表头和表体要么都钉要么都不钉():
-    """只钉一头最难受: 往右滑时表头第一格跑了、表体第一格还在(或反过来),
-    两者错位比都不钉更让人分神。决策台那张表是手写 th/td, 最容易漏一头。"""
-    code = _code("components/stock-analysis/WatchlistDecisionBoard.tsx")
-    th = re.search(r"<th[^>]*sticky left-0", code)
-    td = re.search(r"<td[^>]*sticky left-0", code)
-    assert th and td, (
-        f"决策台只钉了一头(表头={bool(th)} 表体={bool(td)}) —— 滑动时两者会错位")
+def test_R526_决策台手机上不横滑_不钉():
+    """[R395] 原来钉的是「表头和表体要么都钉要么都不钉」。[R526] 决策台在手机上整张表
+    折成一行一块(table / tbody 变块, thead 藏起, tr 变 flex-wrap), 没有横向滚动, 钉住也
+    就一并撤了 —— 留一处 `sticky left-0` 都是残余。"""
+    code = _code(BOARD)
+    assert "sticky left-0" not in code, "决策台里还有钉住的格子 —— 手机上已经不横滑了"
+    assert 'className="w-full text-xs max-sm:block"' in code, "表在手机上没变块"
+    assert "'z-20 max-sm:hidden'" in code, "表头在手机上没藏起"
+    assert '<tbody className="max-sm:block">' in code
+    assert "max-sm:flex max-sm:flex-wrap max-sm:items-center" in code, "行在手机上没变 flex-wrap"
 
 
 def test_R395_共用骨架把钉住做成开关而不是写死():

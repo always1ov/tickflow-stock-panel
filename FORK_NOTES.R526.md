@@ -1,0 +1,5 @@
+# R526 — 决策台手机上不横滑: 一行一块, 名字·价 / 持仓 / 走势·位置
+
+| # | 改动 | 涉及文件 | 冲突风险 | 单独回退 |
+|---|---|---|---|---|
+| R526 | 用户拿手机截图(个股分析的决策台要往右滑才看得全):「手机版现在不搞左右滑动, 能否像监控中心那样, 每一行就能显示完整」。R395 给这张表定的是「首列钉住 + 横滑」, 这一轮改口: 手机(< sm)上整张表折成一行一块 —— table / tbody 变块, thead 藏起(排序是桌面的事), tr 变 flex-wrap, 四格按 CSS order 落位: 第一行 名字·代码(撑满)+ 现价 涨跌 + 持仓(空仓两个字放得下就跟在同一行, 持有带成本输入放不下就自己换行), 最后一行 走势·位置 独占, 四段按段换行。首列的 sticky left-0 / 不透明底 / lg:static 一并撤掉(不横滑就无所谓钉), 当前行的高亮回到整行。全部改动挂在 `max-sm:` 下, 宽屏(≥ 640)一个类名没动。骨架行同步。守卫: 新增 test_board_mobile_stack_r526; test_mobile_table_layout 的 PINNED 去掉决策台, 「都钉」那条改成「不钉」。**自选一张表与策略结果表仍是 R395 的横滑 + 钉首列** —— 它们十几列可配置, 手机上要改得另出方案 | frontend/src/components/stock-analysis/WatchlistDecisionBoard.tsx; frontend/src/components/stock-analysis/decision-board/cells.tsx; frontend/src/components/stock-analysis/decision-board/BoardSkeletonRows.tsx; backend/tests/test_board_mobile_stack_r526.py(新); backend/tests/test_mobile_table_layout.py; backend/tests/test_skeletons.py | 低: 决策台是 fork 自己的 | 可以: git revert 本提交 |

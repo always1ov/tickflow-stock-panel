@@ -524,12 +524,13 @@ export function TrendPositionCell({ trend, trendCls, geo, runs, ph, kc, close, e
   onOpen: () => void
 }) {
   return (
-    <td className={`${TD_BASE} whitespace-nowrap px-2`}>
+    // [R526] 手机上这一格是行里的最后一行, 独占一整行; 四段放不下就按段换行
+    <td className={`${TD_BASE} whitespace-nowrap px-2 max-sm:order-4 max-sm:basis-full max-sm:px-0 max-sm:py-0`}>
       {/* 整格**一个** button; 内部两半都是 span —— button 里套 button 是非法 HTML */}
       {/* [R520] 2×2 网格改成**一行四段**: 六态徽标 · 转折后第几天 · 位置名 · 离轨距离。
           两行是全表行高 80px 的另一半根源; 一行放得下(1440 宽这一格有 500px, 四段加起来不到 300)。 */}
       <button type="button" onClick={onOpen}
-              className="flex w-full cursor-pointer items-center gap-x-2 rounded-btn px-1 py-0.5 text-left leading-snug transition-colors duration-hover hover:bg-elevated/40">
+              className="flex w-full cursor-pointer items-center gap-x-2 rounded-btn px-1 py-0.5 text-left leading-snug transition-colors duration-hover hover:bg-elevated/40 max-sm:flex-wrap max-sm:gap-y-1 max-sm:px-0">
         <TrendSegment trend={trend} trendCls={trendCls} geo={geo} runs={runs} ph={ph} kc={kc} close={close} />
         <PositionSegment kc={kc} geo={geo} ev={ev} runs={runs} energy={energy} ph={ph}
                          stateRun={stateRun} close={close} />

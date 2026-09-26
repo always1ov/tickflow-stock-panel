@@ -16,7 +16,7 @@ export function BoardSkeletonRows({ rows = 6, cols = CELL_W.length }: { rows?: n
   return (
     <>
       {Array.from({ length: rows }, (_, r) => (
-        <tr key={r} className="border-t border-border/30" aria-hidden="true">
+        <tr key={r} className="border-t border-border/30 max-sm:flex max-sm:items-center max-sm:gap-x-3 max-sm:px-3" aria-hidden="true">
           {Array.from({ length: cols }, (_, c) => (
             <td key={c} className="px-3 py-2.5">
               {/* [R520] 表改单行左对齐, 骨架跟着(数据到位时版面不跳) */}

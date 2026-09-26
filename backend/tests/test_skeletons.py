@@ -81,7 +81,8 @@ def test_R351_骨架的形状跟着版面走():
 
 def test_R324_决策台加载中画骨架行_不印自选为空():
     code = code_of(BOARD)
-    tbody = code[code.index("<tbody>"):code.index("</tbody>")]
+    # [R526] tbody 在手机上要变块, 标签带了 className —— 不再按 `<tbody>` 整字匹配
+    tbody = code[code.index("<tbody"):code.index("</tbody>")]
     i_load = tbody.index("enriched.isLoading ? (")
     i_empty = tbody.index("rows.length === 0 ? (")
     assert i_load < i_empty, "加载判定必须排在「为空」判定前面 —— 否则加载中照样印「自选为空」"
