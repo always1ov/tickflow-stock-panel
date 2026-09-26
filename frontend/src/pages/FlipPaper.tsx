@@ -125,7 +125,7 @@ function SymbolCell({ symbol, name }: { symbol: string; name: string }) {
  */
 export type FlipTab = 'signals' | 'holdings' | 'results' | 'orders' | 'rules'
 export const FLIP_TABS: Record<FlipTab, PageTabDef> = {
-  signals: { title: '今日信号', icon: Zap },
+  signals: { title: '信号', icon: Zap },   // [R518] 用户: 「今日信号改成信号」
   holdings: { title: '持仓', icon: Wallet },
   results: { title: '成绩', icon: LineChart },
   orders: { title: '流水', icon: ReceiptText },
@@ -471,7 +471,7 @@ function TodaySignals({ rows, conviction }: {
     <>
     <section className="overflow-hidden rounded-card border border-border/60 bg-surface/40">
       <SectionHead
-        title="今日信号"
+        title="信号"
         note={[
           actCount ? `${actCount} 笔要动手` : '今天没有要动手的',
           actCount && scored ? '按把握分排序' : null,

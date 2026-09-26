@@ -36,7 +36,7 @@ STILL_THERE = [
     ("AI 导读 · 优选", "backend/app/api/today.py", '@router.get("/ai/track-record")'),
     ("批次登记页", "frontend/src/router.tsx", "{ path: 'lots-registry', element: <Lots /> }"),
     ("开发者工具", "frontend/src/router.tsx", "{ path: 'dev', element: <Dev /> }"),
-    ("今日信号的「盯着」一段", "backend/app/services/flip_today.py", '"stage": STAGE_WATCH,'),
+    ("信号栏的「盯着」一段", "backend/app/services/flip_today.py", '"stage": STAGE_WATCH,'),
 ]
 
 # 登记簿说「留在磁盘上」的存档 —— 必须仍在数据体检的名单里

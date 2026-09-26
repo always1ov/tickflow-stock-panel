@@ -214,7 +214,7 @@ def test_R329_今日信号排在主列第一块():
     for later in ("<Holdings", "results}", "<Orders"):   # [R499] 没做成那块撤了
         assert i_today < body.index(later), f"今日信号被 {later} 挤到后面去了"
     assert "usePageTab(FLIP_TABS, 'signals')" in code, "默认打开的不是今日信号"
-    assert "  signals: { title: '今日信号'" in code
+    assert "  signals: { title: '信号'" in code   # [R518] 「今日信号改成信号」
 
 
 # ── [R331] 折叠 ────────────────────────────────────────────────────────

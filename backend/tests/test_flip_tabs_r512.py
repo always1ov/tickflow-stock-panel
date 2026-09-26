@@ -37,7 +37,8 @@ def test_R512_切栏是瞬时的_不加动效():
 
 def test_R512_五栏的名字与默认栏():
     code = code_of(FLIP)
-    for key, title in (("signals", "今日信号"), ("holdings", "持仓"), ("results", "成绩"),
+    # [R518] 「今日信号改成信号」
+    for key, title in (("signals", "信号"), ("holdings", "持仓"), ("results", "成绩"),
                        ("orders", "流水"), ("rules", "规则")):
         assert f"  {key}: {{ title: '{title}'" in code, f"{key} 那一栏名字不对"
     assert "usePageTab(FLIP_TABS, 'signals')" in code
@@ -45,7 +46,7 @@ def test_R512_五栏的名字与默认栏():
 
 def test_R512_栏里卡片标题与栏同名():
     code = code_of(FLIP)
-    for title in ('title="今日信号"', 'title="持仓"', '<SectionHead title="成绩"', 'title="流水"', '<SectionHead title="规则"'):
+    for title in ('title="信号"', 'title="持仓"', '<SectionHead title="成绩"', 'title="流水"', '<SectionHead title="规则"'):
         assert title in code, f"卡片标题没跟栏名统一: {title}"
 
 
