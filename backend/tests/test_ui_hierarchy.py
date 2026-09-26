@@ -43,7 +43,7 @@ MIGRATED: list[str] = [
     "components/AdjFactorSyncGate.tsx",
     "components/DatePicker.tsx",
     "pages/Monitor.tsx",
-    "components/monitor/FocusBar.tsx",
+    "components/monitor/FocusPanel.tsx",
     "components/monitor/RuleEditor.tsx",
     "components/screener/SignalPicker.tsx",
     "pages/FlipPaper.tsx",

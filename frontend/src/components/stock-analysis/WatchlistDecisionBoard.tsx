@@ -664,7 +664,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, loc
         <button
           onClick={() => setActionableOnly((v) => !v)}
           title={'只留下有触发的那几只: 出场线已破/逼近、离趋势翻转价 2% 以内、今日刚翻转、'
-            + '短期通道到轨。判定是纯规则的(与推送焦点名单同一套到轨口径), AI 不参与。\n'
+            + '短期通道到轨。判定是纯规则的(与焦点名单同一套到轨口径), AI 不参与。\n'
             + '自选一多, 默认列出全部本身就是噪音 —— 绝大多数票今天确实不需要你看。'}
           className={buttonClass({ selected: actionableOnly }, 'shrink-0')}
         >
