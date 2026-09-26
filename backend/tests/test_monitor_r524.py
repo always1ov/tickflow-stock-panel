@@ -83,3 +83,26 @@ def test_R524_焦点名单成栏_名字统一():
     assert "mode: pinned ? null : 'pin'" in code
     assert "mode: muted ? null : 'mute'" in code
     assert "setShowWatch" in code
+
+
+# ── [R525] 用户拿手机截图指出的三处 ──────────────────────────────
+
+def test_R525_徽标剥掉类型前缀与代码():
+    """「持仓出场 · 000657.SZ · 生命线(20日线) 60.30」三段: 第一段是类型, 代码那段跟左边「谁」重复, 徽标只留最后一段。"""
+    code = code_of(MONITOR)
+    assert "const parts = (ev.rule_name ?? '').split(' · ')" in code
+    assert "const rest = parts.slice(1).filter(p => p && p !== ev.symbol)" in code
+
+
+def test_R525_行业与概念同一个词只印一次():
+    code = code_of(MONITOR)
+    assert "Array.from(new Set(getExtTags(ev, fields.industry)))" in code
+    assert ".filter(t => !industryTags.includes(t))" in code
+
+
+def test_R525_日期分组条不粘住_手机第二行价与详情同流():
+    code = code_of(MONITOR)
+    assert "sticky top-0" not in code, "粘住的分组条在手机上压在行文字上"
+    # 手机上「价 涨跌 · 规则 · 命中 · 行业/概念」一层壳, 宽屏 display:contents 消失
+    assert "pl-[3.25rem] text-xs sm:contents" in code
+    assert 'className="contents sm:flex sm:min-w-0 sm:basis-0 sm:grow' in code

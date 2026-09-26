@@ -120,8 +120,9 @@ function AlertExtTags({ ev, fields, onTagClick }: {
   fields: { concept: MonitorExtFieldItem | null; industry: MonitorExtFieldItem | null }
   onTagClick: (kind: DimensionKind, value: string, sourceField?: string) => void
 }) {
-  const conceptTags = getExtTags(ev, fields.concept)
-  const industryTags = getExtTags(ev, fields.industry)
+  const industryTags = Array.from(new Set(getExtTags(ev, fields.industry)))
+  // [R525] 行业与概念指到同一个字段(或同一个词两边都有)时只印一次 —— 原来彩块分蓝橙还分得出, 改灰字后重复就成了看着像 bug
+  const conceptTags = Array.from(new Set(getExtTags(ev, fields.concept))).filter(t => !industryTags.includes(t))
   if (conceptTags.length === 0 && industryTags.length === 0) return null
   const tagCls = 'rounded px-0.5 text-micro leading-tight text-muted transition-colors hover:bg-elevated hover:text-foreground cursor-pointer'
   return (
@@ -564,11 +565,12 @@ function AlertRow({ ev, dayHeader, isNew, customNames, monitorExtFields, confirm
   const board = ev.symbol ? boardTag(ev.symbol) : null
   const badgeLabel = (() => {
     // 优先用规则名 (如 "策略监控 · 空中加油" → "空中加油"); 退回到 type 标签
-    const rn = ev.rule_name ?? ''
-    const dotIdx = rn.indexOf(' · ')
-    const label = dotIdx >= 0 ? rn.slice(dotIdx + 3) : rn
-    // 单票规则的名字就是那只票的代码("价格提醒 · 300059.SZ"), 跟左边「谁」重复 —— 退回类型名
-    return label && label !== ev.symbol ? label : (TYPE_LABEL[ev.source] ?? ev.source)
+    // [R525] 规则名可能是三段("持仓出场 · 000657.SZ · 生命线(20日线) 60.30"): 第一段是类型, 代码那段跟左边「谁」重复,
+    // 都剥掉; 什么都不剩("价格提醒 · 300059.SZ")就退回类型名
+    const parts = (ev.rule_name ?? '').split(' · ')
+    const rest = parts.slice(1).filter(p => p && p !== ev.symbol)
+    if (rest.length > 0) return rest.join(' · ')
+    return parts[0] && parts.length === 1 && parts[0] !== ev.symbol ? parts[0] : (TYPE_LABEL[ev.source] ?? ev.source)
   })()
   const eventMeta = ev.source === 'strategy' ? strategyEventMeta(ev.type) : null
   const hasSignals = !!ev.signals && ev.signals.length > 0
@@ -577,7 +579,8 @@ function AlertRow({ ev, dayHeader, isNew, customNames, monitorExtFields, confirm
   return (
     <>
       {dayHeader && (
-        <li className="sticky top-0 z-[1] bg-base/95 px-1 pb-1 pt-3 text-micro font-medium text-muted backdrop-blur first:pt-0">{dayHeader}</li>
+        // [R525] 不粘住: 粘住的分组条在手机上压在行文字上(外层滚动容器不是这一层), 分组条本来就每段可见, 不需要粘
+        <li className="px-1 pb-1 pt-3 text-micro font-medium text-muted first:pt-0">{dayHeader}</li>
       )}
       <motion.li
         initial={isNew ? { opacity: 0, transform: 'translateY(-4px)' } : false}
@@ -622,14 +625,6 @@ function AlertRow({ ev, dayHeader, isNew, customNames, monitorExtFields, confirm
           ) : null}
         </div>
 
-        {/* 价 · 涨跌 */}
-        {(ev.price != null || ev.change_pct != null) && (
-          <span className={cn('flex shrink-0 items-center gap-1.5 font-mono text-xs tabular-nums sm:w-28', pctCls)}>
-            {ev.price != null && <span>{fmtPrice(ev.price)}</span>}
-            {ev.change_pct != null && <span className="font-medium">{fmtPct(ev.change_pct)}</span>}
-          </span>
-        )}
-
         {/* 删除: 手机上一直淡淡地在, 宽屏悬停才出现 */}
         <span className="ml-auto flex shrink-0 items-center sm:order-last">
           {confirming ? (
@@ -652,8 +647,18 @@ function AlertRow({ ev, dayHeader, isNew, customNames, monitorExtFields, confirm
           )}
         </span>
 
+        {/* [R525] 手机上第二行: 价 涨跌 · 规则 · 命中 · 行业/概念 一起从「谁」的下面流过去(名字不再被价格挤掉);
+            宽屏这层壳 display:contents 消失, 价与详情各归各的列 */}
+        <div className="order-last flex min-w-0 basis-full flex-wrap items-center gap-x-2 gap-y-1 pl-[3.25rem] text-xs sm:contents">
+          {(ev.price != null || ev.change_pct != null) && (
+            <span className={cn('flex shrink-0 items-center gap-1.5 font-mono text-xs tabular-nums sm:w-28', pctCls)}>
+              {ev.price != null && <span>{fmtPrice(ev.price)}</span>}
+              {ev.change_pct != null && <span className="font-medium">{fmtPct(ev.change_pct)}</span>}
+            </span>
+          )}
+
         {/* 规则 · 命中了什么 · 行业/概念 */}
-        <div className="order-last flex min-w-0 basis-full flex-wrap items-center gap-x-2 gap-y-1 pl-[3.25rem] text-xs sm:order-none sm:basis-0 sm:grow sm:pl-0">
+        <div className="contents sm:flex sm:min-w-0 sm:basis-0 sm:grow sm:flex-wrap sm:items-center sm:gap-x-2 sm:gap-y-1 sm:text-xs">
           <span
             className={cn('shrink-0 rounded border px-1.5 py-px text-micro font-medium', SOURCE_BADGE_STYLE[ev.source] ?? 'bg-elevated text-muted border-border')}
             title={ruleConditionsText(ev, customNames)}
@@ -688,6 +693,7 @@ function AlertRow({ ev, dayHeader, isNew, customNames, monitorExtFields, confirm
             <span className="min-w-0 truncate">{renderMessage(ev.source, ev.message)}</span>
           )}
           <AlertExtTags ev={ev} fields={monitorExtFields} onTagClick={onTag} />
+        </div>
         </div>
       </motion.li>
     </>
