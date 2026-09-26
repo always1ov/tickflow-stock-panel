@@ -667,7 +667,11 @@ export function WatchlistGroupPicker({ groups, groupIds, symbol, disabled, onTog
         type="button"
         disabled={disabled}
         onClick={event => { event.stopPropagation(); if (open) setOpen(false); else openMenu() }}
-        className={`relative inline-flex h-5 items-center justify-center gap-0.5 rounded border border-transparent px-1 transition-colors ${
+        // [R519] **定宽 32px, 内容居中。** 用户: 「一张表, 显示全部个股或者未分组的个股, 我滚动个股, 会发现不对齐」。
+        // 原来宽度跟着内容走: 未分组是 14px 的文件夹图标, 一个组是 8px 的圆点, 叠点再宽一截, 超过三个还挂「+N」——
+        // 这组按钮靠右对齐, 于是它的左边缘(连带名字能占的宽度)每行不一样, 实测落在三个位置, 最多差 24px。
+        // 32px 装得下最宽的那种(三个叠点 + 「+N」)。
+        className={`relative inline-flex h-5 w-8 shrink-0 items-center justify-center gap-0.5 rounded border border-transparent transition-colors ${
           memberGroups.length > 0
             ? 'hover:border-accent/30'
             : 'text-muted hover:border-accent/30 hover:text-accent'
