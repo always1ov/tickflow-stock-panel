@@ -185,7 +185,7 @@ export function StockFinancialDetail({ symbol, name }: Props) {
           <span className="text-lg font-semibold text-foreground">{name}</span>
           <span className="text-xs font-mono text-muted">{symbol}</span>
         </div>
-        <div className="flex items-center gap-2 ml-auto">
+        <div className="flex flex-wrap items-center gap-2 ml-auto">
           <button
             onClick={handleAiClick}
             disabled={checking}
@@ -198,9 +198,9 @@ export function StockFinancialDetail({ symbol, name }: Props) {
           {latestPeriod && (
             <div className="flex items-center gap-1.5 text-xs text-secondary">
               <CalendarDays className="h-3.5 w-3.5" />
-              <span>报告期 <span className="font-mono">{latestPeriod}</span></span>
+              <span className="whitespace-nowrap">报告期 <span className="font-mono">{latestPeriod}</span></span>
               {latestAnnounce && (
-                <span className="text-muted">· 披露 {fmtDate(latestAnnounce)}</span>
+                <span className="whitespace-nowrap text-muted">· 披露 {fmtDate(latestAnnounce)}</span>
               )}
             </div>
           )}
@@ -216,7 +216,7 @@ export function StockFinancialDetail({ symbol, name }: Props) {
             <button
               key={t.key}
               onClick={() => setTab(t.key)}
-              className={`inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium border-b-2 -mb-px transition-colors ${
+              className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap px-3 py-2 text-xs font-medium border-b-2 -mb-px transition-colors ${
                 isActive
                   ? 'border-accent text-accent'
                   : 'border-transparent text-muted hover:text-secondary'
@@ -245,35 +245,68 @@ export function StockFinancialDetail({ symbol, name }: Props) {
             暂无{TABS.find(t => t.key === tab)?.label}数据 — 可点击顶部「全部同步」拉取
           </div>
         ) : (
-          <div className="space-y-5">
-            {/* 多期时为每期渲染一组;单期时只有一组 */}
-            {rows.map((row, ri) => (
-              <div key={row.period_end ?? ri}>
-                {rows.length > 1 && (
+          rows.length === 1 ? (
+            // 单期: 三列网格, 一屏看完
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-0">
+              {fieldDefs.map((def: any) => (
+                <div
+                  key={def.key}
+                  className="flex items-baseline justify-between gap-3 py-2 border-b border-border/40"
+                >
+                  <span className="text-xs text-secondary shrink-0">{def.label}</span>
+                  <span className="text-sm font-mono tabular-nums text-foreground text-right">
+                    {formatValue(rows[0][def.key], def.fmt)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            // [R539] 多期: 原来每一期各画一整块三列网格, 8 期叠成一长串, 要比同一个指标的变化得上下翻着找。
+            // 改成财报的读法 —— 一张表, 行是指标、列是报告期(最新在左), 横着一眼看完。数一个没变。
+            // 手机上照旧一期一块(不横滑, 用户: 「手机版现在不搞左右滑动」)。
+            <>
+            <div className="space-y-5 sm:hidden">
+              {rows.map((row, ri) => (
+                <div key={row.period_end ?? ri}>
                   <div className="text-xs text-muted mb-2 flex items-center gap-1.5">
                     <CalendarDays className="h-3 w-3" />
                     报告期 <span className="font-mono text-secondary">{row.period_end}</span>
                   </div>
-                )}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-0">
-                  {fieldDefs.map((def: any) => {
-                    const val = row[def.key]
-                    return (
-                      <div
-                        key={def.key}
-                        className="flex items-baseline justify-between gap-3 py-2 border-b border-border/40"
-                      >
-                        <span className="text-xs text-secondary shrink-0">{def.label}</span>
-                        <span className="text-sm font-mono tabular-nums text-foreground text-right">
-                          {formatValue(val, def.fmt)}
-                        </span>
-                      </div>
-                    )
-                  })}
+                  {fieldDefs.map((def: any) => (
+                    <div key={def.key} className="flex items-baseline justify-between gap-3 py-2 border-b border-border/40">
+                      <span className="text-xs text-secondary shrink-0">{def.label}</span>
+                      <span className="text-sm font-mono tabular-nums text-foreground text-right">{formatValue(row[def.key], def.fmt)}</span>
+                    </div>
+                  ))}
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+            <div className="-mx-4 overflow-x-auto max-sm:hidden">
+              <table className="w-full min-w-max text-xs">
+                <thead>
+                  <tr className="border-b border-border text-muted">
+                    <th className="sticky left-0 bg-surface px-4 py-2 text-left font-normal">报告期</th>
+                    {rows.map((row, ri) => (
+                      <th key={row.period_end ?? ri} className="px-3 py-2 text-right font-mono font-normal">{row.period_end}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {fieldDefs.map((def: any) => (
+                    <tr key={def.key} className="border-b border-border/40">
+                      <td className="sticky left-0 bg-surface px-4 py-1.5 text-secondary whitespace-nowrap">{def.label}</td>
+                      {rows.map((row, ri) => (
+                        <td key={row.period_end ?? ri} className="px-3 py-1.5 text-right font-mono tabular-nums text-foreground">
+                          {formatValue(row[def.key], def.fmt)}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            </>
+          )
         )}
       </div>
 
