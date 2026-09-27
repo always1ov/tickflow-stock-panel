@@ -1464,19 +1464,24 @@ def test_release_of_extracts_from_presigned_url():
 
 
 def test_test_dataset_daily_preview(monkeypatch):
-    bars = {"000001.SZ": [_bar(date(2026, 8, 27), 11.05), _bar(date(2026, 8, 28), 11.65)]}
+    # 试拉取的是「最近 30 天」(相对真实的今天), 夹具日期也得跟着今天走 ——
+    # 原来写死 2026-08-27/28, 过了 09-26 那一根就掉出窗口, 测试到点自己变红
+    d1, d2 = date.today() - timedelta(days=3), date.today() - timedelta(days=2)
+    bars = {"000001.SZ": [_bar(d1, 11.05), _bar(d2, 11.65)]}
     provider = _hist_provider(monkeypatch, _FakeHistClient(bars))
     out = provider.test_dataset("daily", ["000001.SZ"])
     assert out["provider"] == "fuyao" and out["dataset"] == "daily"
     assert out["rows"] == 2
-    assert out["preview"][0]["date"] == "2026-08-27"  # date → ISO 字符串
+    assert out["preview"][0]["date"] == d1.isoformat()  # date → ISO 字符串
 
 
 def test_test_dataset_adj_factor_preview(monkeypatch):
-    events = [("600519.SH", date(2026, 6, 12), 0.68, 0.0, 0.0, 0.0)]
-    bars = {"600519.SH": [_bar(date(2026, 6, 11), 32.8), _bar(date(2026, 6, 12), 32.0)]}
+    # 同上: 试拉的是最近 365 天, 夹具日期相对今天取, 不然一年后到点变红
+    ex = date.today() - timedelta(days=100)
+    events = [("600519.SH", ex, 0.68, 0.0, 0.0, 0.0)]
+    bars = {"600519.SH": [_bar(ex - timedelta(days=1), 32.8), _bar(ex, 32.0)]}
     provider = _adj_provider(monkeypatch, events, bars)
     out = provider.test_dataset("adj_factor", ["600519.SH"])
     assert out["rows"] == 1
-    assert out["preview"][0]["trade_date"] == "2026-06-12"
+    assert out["preview"][0]["trade_date"] == ex.isoformat()
     assert out["preview"][0]["ex_factor"] == pytest.approx(32.8 / 32.12)
