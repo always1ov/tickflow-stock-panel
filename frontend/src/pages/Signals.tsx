@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Lock, Plus, Settings2, Trash2, Zap } from 'lucide-react'
+import { Lock, Plus, Settings2, SlidersHorizontal, Trash2, Zap } from 'lucide-react'
 import { api, type CustomSignal } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { BUILTIN_SIGNAL_DEFINITIONS, type SignalKind } from '@/lib/signals'
@@ -9,7 +9,8 @@ import { CustomSignalDialog } from '@/components/signals/CustomSignalDialog'
 import { Skeleton } from '@/components/data/Skeleton'
 import { PageHeader } from '@/components/PageHeader'
 import { AnchorWrap } from '@/lib/useCardFlash'
-import { SEG, SEG_ITEM, SEG_OFF, SEG_ON, TYPE, buttonClass } from '@/components/ui'
+import { TYPE, buttonClass } from '@/components/ui'
+import { PageTabs, usePageTab, type PageTabDef } from '@/components/PageTabs'
 import { cn } from '@/lib/cn'
 
 type SignalSection = 'builtin' | 'custom'
@@ -22,36 +23,83 @@ const KIND_CLASS: Record<SignalKind, string> = {
 }
 
 /** 信号库独立页: 内置只读信号 + 自定义条件信号 (csg_*), 策略/回测/监控统一取用。 */
+// [R542] 分栏挪进页头(与因子 / 回测 / 异动监控同一份 PageTabs), 当前栏记在 `?tab=`;
+// 原来在正文里、是组件状态, 一刷新就回到「自定义信号」。
+const SECTIONS: Record<SignalSection, PageTabDef> = {
+  custom: { title: '自定义信号', icon: SlidersHorizontal },
+  builtin: { title: '内置信号', icon: Lock },
+}
+
 export function Signals() {
   const [searchParams] = useSearchParams()
   const highlight = searchParams.get('highlight') ?? ''
+  const [activeSection, setActiveSection] = usePageTab(SECTIONS, 'custom')
+  const list = useQuery({ queryKey: QK.customSignals, queryFn: api.customSignalsList })
+  const [showForm, setShowForm] = useState(false)
+  const [editing, setEditing] = useState<CustomSignal | null>(null)
+
+  const openNew = () => {
+    setEditing(null)
+    setActiveSection('custom')
+    setShowForm(true)
+  }
 
   return (
     <div className="flex flex-col h-full">
-      <PageHeader title="信号库" subtitle="内置预计算信号与自定义条件信号, 供策略 / 回测 / 监控统一使用" />
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-        <div className="mx-auto max-w-6xl">
-          <SignalsBody highlight={highlight} />
-        </div>
+      <PageHeader
+        title="信号库"
+        subtitle={<span className="hidden md:inline">内置预计算信号与自定义条件信号, 供策略 / 回测 / 监控统一使用</span>}
+        className="flex-wrap gap-x-4 gap-y-2"
+        right={(
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <PageTabs
+              tabs={SECTIONS}
+              active={activeSection}
+              onChange={setActiveSection}
+              counts={{ custom: list.data?.signals.length ?? null, builtin: BUILTIN_SIGNAL_DEFINITIONS.length }}
+              label="信号分栏"
+            />
+            <button onClick={openNew} className={buttonClass({}, 'shrink-0 gap-1.5')}>
+              <Plus className="h-3.5 w-3.5" />
+              新建信号
+            </button>
+          </div>
+        )}
+      />
+      {/* [R542] 内容区不设宽度上限(原 max-w-6xl), 与设置页「铺满」一致 */}
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 lg:px-5">
+        <SignalsBody
+          highlight={highlight}
+          activeSection={activeSection}
+          setActiveSection={setActiveSection}
+          showForm={showForm}
+          setShowForm={setShowForm}
+          editing={editing}
+          setEditing={setEditing}
+        />
       </div>
     </div>
   )
 }
 
-function SignalsBody({ highlight }: { highlight: string }) {
+function SignalsBody({ highlight, activeSection, setActiveSection, showForm, setShowForm, editing, setEditing }: {
+  highlight: string
+  activeSection: SignalSection
+  setActiveSection: (s: SignalSection) => void
+  showForm: boolean
+  setShowForm: (v: boolean) => void
+  editing: CustomSignal | null
+  setEditing: (s: CustomSignal | null) => void
+}) {
   const qc = useQueryClient()
   const list = useQuery({ queryKey: QK.customSignals, queryFn: api.customSignalsList })
   const options = useQuery({ queryKey: QK.customSignalsOptions, queryFn: api.customSignalsOptions })
 
-  const [activeSection, setActiveSection] = useState<SignalSection>('custom')
-  const [showForm, setShowForm] = useState(false)
-  const [editing, setEditing] = useState<CustomSignal | null>(null)
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null)
   const resetDeleteTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const fields = options.data?.fields ?? []
   const signals = list.data?.signals ?? []
-  const enabledCustomSignals = signals.filter(sig => sig.enabled).length
 
   useEffect(() => () => {
     if (resetDeleteTimer.current) clearTimeout(resetDeleteTimer.current)
@@ -63,12 +111,6 @@ function SignalsBody({ highlight }: { highlight: string }) {
     setConfirmingDeleteId(null)
   }
 
-  const openNew = () => {
-    setEditing(null)
-    clearDeleteConfirm()
-    setActiveSection('custom')
-    setShowForm(true)
-  }
   const openEdit = (sig: CustomSignal) => {
     setEditing(sig)
     clearDeleteConfirm()
@@ -103,53 +145,15 @@ function SignalsBody({ highlight }: { highlight: string }) {
     resetDeleteTimer.current = setTimeout(() => setConfirmingDeleteId(null), 3000)
   }
 
-  const tabs = [
-    { key: 'custom' as const, label: '自定义信号', count: signals.length, hint: `${enabledCustomSignals} 个已启用` },
-    { key: 'builtin' as const, label: '内置信号', count: BUILTIN_SIGNAL_DEFINITIONS.length, hint: '系统预计算，只读' },
-  ]
-
   return (
     <div className="space-y-4">
-      {/* 紧凑工具条: 分段切换 + 新建 */}
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        {/* [R462] 全站分段切换(docs/ui-hierarchy.md); 选中从琥珀实底换成反相 */}
-        <div className={SEG}>
-          {tabs.map(tab => {
-            const active = activeSection === tab.key
-            return (
-              <button
-                key={tab.key}
-                type="button"
-                onClick={() => setActiveSection(tab.key)}
-                aria-current={active ? 'page' : undefined}
-                className={cn(SEG_ITEM, 'gap-1.5', active ? SEG_ON : SEG_OFF)}
-              >
-                {tab.label}
-                <span className={`rounded px-1 py-px text-micro font-mono ${active ? 'bg-surface/20' : 'bg-elevated text-muted'}`}>
-                  {tab.count}
-                </span>
-              </button>
-            )
-          })}
-        </div>
-        <div className="flex items-center gap-3">
-          <span className="text-xs text-muted">自定义信号保存为 <span className="font-mono text-secondary">csg_*</span> 列，条件字段可用行情指标与全部注册因子</span>
-          <button
-            onClick={openNew}
-            className={buttonClass({}, 'shrink-0 gap-1.5')}
-          >
-            <Plus className="h-3.5 w-3.5" />
-            新建信号
-          </button>
-        </div>
-      </div>
-
       {activeSection === 'custom' && (
         <AnchorWrap highlight={highlight} anchor="signals">
-        <section className="rounded-card border border-border bg-surface p-4">
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+        <section>
+          {/* [R542] 原来外面还套一层白框(卡片套卡片), 手机上两层内边距把条件挤得折行; 去掉外框, 卡片直接排 */}
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
             {signals.map(sig => (
-              <div key={sig.id} className="rounded-card border border-border bg-base p-4">
+              <div key={sig.id} className="rounded-card border border-border bg-surface p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
@@ -162,7 +166,7 @@ function SignalsBody({ highlight }: { highlight: string }) {
                     <p className="mt-1 truncate font-mono text-xs text-muted">csg_{sig.id}</p>
                   </div>
                   <div className="flex shrink-0 items-center gap-1">
-                    <button onClick={() => toggleEnabled(sig)} title={sig.enabled ? '停用' : '启用'} className={`cursor-pointer rounded p-1 ${sig.enabled ? 'text-emerald-400 hover:bg-emerald-400/10' : 'text-muted hover:bg-elevated'}`}>
+                    <button onClick={() => toggleEnabled(sig)} title={sig.enabled ? '停用' : '启用'} className={`cursor-pointer rounded p-1 ${sig.enabled ? 'text-bear hover:bg-bear/10' : 'text-muted hover:bg-elevated'}`}>
                       <Zap className="h-3.5 w-3.5" />
                     </button>
                     <button onClick={() => openEdit(sig)} className="cursor-pointer rounded p-1 text-muted hover:bg-accent/10 hover:text-accent" title="编辑">
@@ -191,7 +195,7 @@ function SignalsBody({ highlight }: { highlight: string }) {
                 </div>
                 <div className="mt-3 space-y-1">
                   {sig.conditions.map((c, i) => (
-                    <div key={i} className="flex items-center gap-1.5 text-xs text-secondary">
+                    <div key={i} className="flex flex-wrap items-baseline gap-x-1.5 text-xs text-secondary">
                       <span className="w-6 text-right text-muted/50">{i === 0 ? '当' : '且'}</span>
                       <span className="font-mono text-foreground/80">{fieldWithDays(c.left, c.leftDays, fields)}</span>
                       <span className="font-mono text-muted">{c.op}</span>
@@ -207,31 +211,34 @@ function SignalsBody({ highlight }: { highlight: string }) {
             ))}
             {list.isLoading &&
               Array.from({ length: 2 }).map((_, i) => (
-                <div key={`sk-${i}`} className="space-y-3 rounded-card border border-border bg-base p-4">
+                <div key={`sk-${i}`} className="space-y-3 rounded-card border border-border bg-surface p-4">
                   <Skeleton w="w-1/2" h="h-4" />
                   <Skeleton w="w-1/3" h="h-3" />
                   <Skeleton h="h-4" />
                 </div>
               ))}
             {!list.isLoading && signals.length === 0 && (
-              <div className="rounded-card border border-dashed border-border px-5 py-10 text-center text-sm text-muted md:col-span-2">
+              <div className="rounded-card border border-dashed border-border px-5 py-10 text-center text-sm text-muted md:col-span-2 xl:col-span-3">
                 暂无自定义信号。可用「字段 + 运算符 + 值」组合条件创建，或从检验页因子行一键生成；也可让 AI 按描述生成。
               </div>
             )}
           </div>
+          <p className="mt-3 text-micro text-muted">
+            自定义信号保存为 <span className="font-mono text-secondary">csg_*</span> 列，条件字段可用行情指标与全部注册因子
+          </p>
         </section>
         </AnchorWrap>
       )}
 
       {activeSection === 'builtin' && (
-        <section className="rounded-card border border-border bg-surface p-4">
+        <section>
           <div className="mb-3 flex items-center gap-2 text-xs text-muted">
             <Lock className="h-3.5 w-3.5" />
             系统在 enriched 数据中预计算，策略选择器直接展示，只读。
           </div>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
             {BUILTIN_SIGNAL_DEFINITIONS.map(sig => (
-              <div key={sig.id} className="rounded-card border border-border bg-base p-4">
+              <div key={sig.id} className="rounded-card border border-border bg-surface p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
