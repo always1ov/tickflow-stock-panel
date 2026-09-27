@@ -8,10 +8,13 @@ import { createAppRouter } from './router'
 import { api } from './lib/api'
 import { QK } from './lib/queryKeys'
 import { installWaapiHandoff } from './lib/waapiHandoff'
+import { installTitleTooltip } from './lib/titleTooltip'
 import './index.css'
 
 // [R550] framer-motion 原生动画跑完 → 撤掉之间会漏一帧起始值, 弹窗开关时闪一下。见 lib/waapiHandoff.ts
 installWaapiHandoff()
+// [R553] 全站 `title` 悬停提示换成本系统画的一层(原生的要停一秒多、样式不是本系统的)。见 lib/titleTooltip.ts
+installTitleTooltip()
 
 // 全局认证拦截: 任何 query/mutation 收到 401 (未登录/会话过期) → 跳登录页。
 // api.ts 的 request() 已对 401 静默 (不弹 toast), 这里统一负责跳转。
