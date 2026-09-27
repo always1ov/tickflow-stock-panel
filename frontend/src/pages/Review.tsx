@@ -250,8 +250,8 @@ export function Review() {
   return (
     <>
       <PageHeader
-        title="AI 复盘"
-        titleExtra={<Sparkles className="h-4 w-4 text-accent" />}
+        // [R543] 页头原叫「AI 复盘」+ 闪光图标, 菜单里叫「复盘」—— 同一页两个名字(AGENTS.md 第 12 条), 随菜单
+        title="复盘"
         subtitle={`${displayDate}${data?.emotion ? ` · 情绪 ${data.emotion.label}` : ''}`}
         right={
           // [R504] 页头回到作者那一排(刷新 / 定时 / 生成复盘)。撤掉的三样都是 fork 加的:
@@ -259,6 +259,7 @@ export function Review() {
           // 板块 RPS 轮动入口(已放回作者原来的行业/概念分析页)。用户要整改这一页, 先回到干净的底子。
           // **整改这一页之前先读 .scratch/review-page-rework/issues/01-ladder-ai-and-friends.md,
           // 把撤掉的几样逐项问用户要不要回来** —— 这是用户交代的提醒。
+          // [R543] 已问过(2026-09-27): 用户无偏好, 按其授权代为拍板 —— 四样都不接回, 结论记在那份待办里。
           <div className="flex flex-wrap items-center gap-1">
             <button
               onClick={() => { marketQuery.refetch() }}
@@ -297,7 +298,8 @@ export function Review() {
           上限放到 1600px —— 行长由正文自己的 max-w 控(见下方 prose), 不该让
           整页陪着一起窄。 */}
       <div className="min-h-full px-3 pb-4 pt-3 lg:px-4">
-        <div className="w-full max-w-[1600px] space-y-3">
+        {/* [R543] 1600px 上限撤掉, 与其它页「铺满」一致; 正文行长照旧由 prose 的 75ch 控 */}
+        <div className="w-full space-y-3">
 
           {marketQuery.isLoading && !data ? (
             <div className="flex h-40 items-center justify-center">
@@ -349,7 +351,8 @@ export function Review() {
               </div>
 
               {/* ===== 报告 + 历史 双栏(报告为主体)===== */}
-              <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_18rem]">
+              {/* [R543] 历史栏 18rem → 21rem: 四个指数涨跌原来要折成两行(「科 -0.31%」掉到第二行) */}
+              <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_21rem]">
                 <ReportPanel
                   phase={phase}
                   content={displayContent}
@@ -409,7 +412,7 @@ export function Review() {
 
               <p className="mb-4 text-xs leading-relaxed text-muted">
                 开启后,每个交易日到点自动生成大盘复盘报告并归档,静默执行。
-                下次打开本页即可在历史列表看到新报告;也可选推送到飞书。
+                下次打开本页即可在历史列表看到新报告;也可推送到下方渠道。
               </p>
 
               {/* 开关(只改本地草稿, 不提交) */}
@@ -472,7 +475,7 @@ export function Review() {
                     </span>
                     <span className="text-xs text-foreground">飞书</span>
                     <span className="text-micro text-muted">群推送 Webhook</span>
-                    <span className={cn('ml-auto text-micro', feishuConfigured ? 'text-emerald-500' : 'text-warning')}>
+                    <span className={cn('ml-auto text-micro', feishuConfigured ? 'text-bear' : 'text-warning')}>
                       {feishuConfigured ? '已配置' : '未配置'}
                     </span>
                   </button>
@@ -493,7 +496,7 @@ export function Review() {
                     </span>
                     <span className="text-xs text-foreground">企业微信</span>
                     <span className="text-micro text-muted">群推送 Webhook</span>
-                    <span className={cn('ml-auto text-micro', wecomConfigured ? 'text-emerald-500' : 'text-warning')}>
+                    <span className={cn('ml-auto text-micro', wecomConfigured ? 'text-bear' : 'text-warning')}>
                       {wecomConfigured ? '已配置' : '未配置'}
                     </span>
                   </button>
@@ -514,7 +517,7 @@ export function Review() {
                     </span>
                     <span className="text-xs text-foreground">钉钉</span>
                     <span className="text-micro text-muted">群机器人 · 关键词</span>
-                    <span className={cn('ml-auto text-micro', dingtalkConfigured ? 'text-emerald-500' : 'text-warning')}>
+                    <span className={cn('ml-auto text-micro', dingtalkConfigured ? 'text-bear' : 'text-warning')}>
                       {dingtalkConfigured ? '已配置' : '未配置'}
                     </span>
                   </button>
@@ -534,7 +537,7 @@ export function Review() {
                     </span>
                     <span className="text-xs text-foreground">第三方系统</span>
                     <span className="text-micro text-muted">JSON Webhook</span>
-                    <span className={cn('ml-auto text-micro', customConfigured ? 'text-emerald-500' : 'text-warning')}>
+                    <span className={cn('ml-auto text-micro', customConfigured ? 'text-bear' : 'text-warning')}>
                       {customConfigured ? '已配置' : '未配置'}
                     </span>
                   </button>
@@ -554,7 +557,7 @@ export function Review() {
                     </span>
                     <span className="text-xs text-foreground">邮件</span>
                     <span className="text-micro text-muted">SMTP</span>
-                    <span className={cn('ml-auto text-micro', emailConfigured ? 'text-emerald-500' : 'text-warning')}>
+                    <span className={cn('ml-auto text-micro', emailConfigured ? 'text-bear' : 'text-warning')}>
                       {emailConfigured ? '已配置' : '未配置'}
                     </span>
                   </button>
@@ -787,23 +790,11 @@ function ReportPanel({
             结构化输出可直接指导次日仓位与节奏。
           </p>
         </div>
-        {/* 报告七节预览 —— 空状态也有内容感,暗示报告结构 */}
-        <div className="mt-2 grid w-full max-w-md grid-cols-2 gap-2 sm:grid-cols-4">
-          {[
-            { icon: '🎯', label: '一句话定调' },
-            { icon: '📊', label: '盘面总览' },
-            { icon: '🔥', label: '板块主线' },
-            { icon: '💰', label: '资金情绪' },
-            { icon: '📰', label: '消息催化' },
-            { icon: '🎯', label: '明日计划' },
-            { icon: '⚠️', label: '风险提示' },
-          ].map((s) => (
-            <div key={s.label} className="flex flex-col items-center gap-1 rounded-btn bg-elevated/40 px-2 py-2">
-              <span className="text-base">{s.icon}</span>
-              <span className="text-micro text-secondary">{s.label}</span>
-            </div>
-          ))}
-        </div>
+        {/* 报告七节预览 —— 空状态也有内容感, 暗示报告结构。
+            [R543] 原是七个 emoji 方块(🎯📊🔥💰📰🎯⚠️, 其中两个一模一样), 收成一行字: 结构还在, 花哨没了 */}
+        <p className="mt-1 max-w-xl text-center text-xs leading-6 text-secondary">
+          报告包含: 一句话定调 · 盘面总览 · 板块主线 · 资金情绪 · 消息催化 · 明日计划 · 风险提示
+        </p>
         <div className="mt-2 flex items-center gap-1.5 text-xs text-muted">
           <Sparkles className="h-3 w-3 text-accent" />
           点击右上角「生成复盘」开始
@@ -825,7 +816,7 @@ function ReportPanel({
       animate={{ opacity: 1 }}
       className="overflow-hidden rounded-card border border-border bg-surface/80"
     >
-      <div className="flex items-center justify-between border-b border-border bg-gradient-to-r from-accent/5 to-transparent px-4 py-2.5">
+      <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
         <div className="flex items-center gap-1.5">
           {isGenerating ? <RefreshCw className="h-3.5 w-3.5 animate-spin text-accent" /> : <BookOpenCheck className="h-3.5 w-3.5 text-accent" />}
           <span className="text-xs font-medium text-foreground">
@@ -892,7 +883,7 @@ function HistoryPanel({
   const empty = !generating && reports.length === 0
   return (
     <div className="overflow-hidden rounded-card border border-border bg-surface/80">
-      <div className="flex items-center gap-1.5 border-b border-border bg-gradient-to-r from-accent/5 to-transparent px-3 py-2.5">
+      <div className="flex items-center gap-1.5 border-b border-border px-3 py-2.5">
         <History className="h-3.5 w-3.5 text-accent" />
         <span className="text-xs font-medium text-foreground">历史复盘</span>
         <span className="font-mono text-micro text-muted">({reports.length})</span>
@@ -948,7 +939,7 @@ function HistoryPanel({
                       <span className="truncate text-xs font-medium text-foreground">{r.emotion_label ?? '—'}</span>
                       <span className="font-mono text-micro text-secondary">{r.as_of}</span>
                     </div>
-                    <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+                    <div className="mt-0.5 flex items-center gap-x-1 overflow-hidden whitespace-nowrap">
                       {r.summary
                         ? (() => {
                             const pcts = parseIndexPcts(shortenIndexNames(r.summary).split('|')[0])
@@ -1005,10 +996,9 @@ function _dtSorted(items: DragonTigerStockItem[], key: 'net_value' | 'org_net_va
 }
 
 /** 排名序号色: 前三用暖色系奖牌感, 其余弱化 */
+// [R543] 前三原是金 / 银 / 铜三色奖牌(琥珀 / 锌灰 / 橙, 写死的调色板), 收成一种强调: 前三反相, 其余弱化
 function _rankCls(idx: number): string {
-  if (idx === 0) return 'bg-amber-500/20 text-amber-400'
-  if (idx === 1) return 'bg-zinc-400/15 text-zinc-300'
-  if (idx === 2) return 'bg-orange-700/20 text-orange-400/90'
+  if (idx < 3) return 'bg-foreground text-surface'
   return 'bg-elevated text-muted/70'
 }
 
