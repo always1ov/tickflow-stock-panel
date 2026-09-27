@@ -68,7 +68,8 @@ const STATUS_CYCLE: NoteStatus[] = ['', 'pending', 'verified', 'rejected']
 const STATUS_META: Record<NoteStatus, { label: string; cls: string; dot: string }> = {
   '':         { label: '随手记', cls: 'border-border text-muted',                          dot: 'bg-muted/50' },
   pending:    { label: '待验证', cls: 'border-warning/30 bg-warning/10 text-warning',      dot: 'bg-warning' },
-  verified:   { label: '已验证', cls: 'border-emerald-400/30 bg-emerald-400/10 text-emerald-400', dot: 'bg-emerald-400' },
+  // [R544] 已验证原是写死的 emerald, 换成设置区「已配置 / 可用」同一个令牌
+  verified:   { label: '已验证', cls: 'border-bear/30 bg-bear/10 text-bear', dot: 'bg-bear' },
   rejected:   { label: '不成立', cls: 'border-danger/30 bg-danger/10 text-danger',         dot: 'bg-danger' },
 }
 
@@ -87,7 +88,8 @@ const HORIZON_META: Record<Horizon, { label: string; cls: string; hint: string }
     hint: '时效 —— 政策/突发/公告。几天内影响判断, 过后就不再进决策。点击切换',
   },
   thesis: {
-    label: '埋伏', cls: 'border-amber-400/40 bg-amber-400/10 text-amber-400',
+    // [R544] 写死的 amber 换成同色系的 warning 令牌(暖色这层意思不变)
+    label: '埋伏', cls: 'border-warning/40 bg-warning/10 text-warning',
     hint: '埋伏 —— 业绩/基本面逻辑, 不会立刻兑现。不按天数淘汰, 一直留在总览里影响'
       + '「要不要有耐心继续持有」; 到兑现检查点会提醒你回来给结论。点击切换',
   },
@@ -519,13 +521,15 @@ export function NotesPanel() {
           </section>
 
           {/* 新增区: 单行起步, 聚焦时长高 */}
+          {/* [R544] 手机上输入框原来被「传图/文件」「添加」两个按钮挤到 ~150px, 占位字折成两行;
+              手机上输入框占整行, 两个按钮换到下一行靠右 */}
           <div className="rounded-card border border-border bg-surface p-3">
-            <div className="flex items-start gap-2">
+            <div className="flex flex-wrap items-start gap-2 sm:flex-nowrap">
               <textarea
                 // [R266] rows 默认是 2, min-h 只管下限 —— 空着时按意图该是一行,
                 // 实际却白占了一行高。写死 rows=1, 聚焦或有草稿时再靠 min-h 长高。
                 rows={1}
-                className={cn(TA_CLS, draft ? 'min-h-[72px]' : 'min-h-[38px] focus:min-h-[72px]')}
+                className={cn(TA_CLS, 'max-sm:basis-full', draft ? 'min-h-[72px]' : 'min-h-[38px] focus:min-h-[72px]')}
                 placeholder="记一条观察… (Ctrl+Enter 保存)"
                 value={draft}
                 onChange={e => setDraft(e.target.value)}
@@ -544,7 +548,7 @@ export function NotesPanel() {
                 title={'传图片(png/jpg/webp…)或文本文件(txt/md/csv/json)。也可以直接在左边输入框里 Ctrl+V 粘贴截图。\n'
                   + '传完自动让 AI 凝练一次。\n'
                   + '注意: 图片凝练成功后原件会被删除, 只保留要点(文字会保留原文)。'}
-                className="inline-flex h-[38px] shrink-0 cursor-pointer items-center gap-1 rounded-btn border border-border bg-base px-2.5 text-xs text-muted transition-colors hover:text-foreground"
+                className="inline-flex h-[38px] shrink-0 cursor-pointer items-center gap-1 rounded-btn border border-border bg-base px-2.5 text-xs text-muted transition-colors hover:text-foreground max-sm:ml-auto"
               >
                 {upload.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Paperclip className="h-3.5 w-3.5" />}
                 传图/文件
