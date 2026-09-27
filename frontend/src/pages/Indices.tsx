@@ -8,8 +8,8 @@ import { useCapabilities } from '@/lib/useSharedQueries'
 import { EChartsCandlestick, type OHLC } from '@/components/EChartsCandlestick'
 import { EChartsIntraday } from '@/components/EChartsIntraday'
 import { PageShell } from '@/components/PageShell'
-import { TYPE } from '@/components/ui'
-import { cn } from '@/lib/cn'
+import { buttonClass } from '@/components/ui'
+import { useMediaQuery } from '@/lib/useMediaQuery'
 
 function defaultRange() {
   const now = new Date()
@@ -78,6 +78,9 @@ export function Indices() {
   // 分时数据依赖分钟K批量数据 (kline.minute.batch)
   const caps = useCapabilities()
   const hasMinuteCap = !!caps.data?.capabilities?.['kline.minute.batch']
+  // [R545] 手机上日K与分时上下叠, 各自全宽; 叠起来后矮一点, 两张图一屏半看完
+  const isNarrow = useMediaQuery('(max-width: 767px)')
+  const chartH = isNarrow ? 420 : 620
 
   // 指数标的固定核心四只 (产品契约, 不再提供全指数搜索/浏览)
   const topRows: IndexInstrument[] = PINNED_INDEXES.map(p => ({
@@ -162,7 +165,7 @@ export function Indices() {
       <button
         key={item.symbol}
         onClick={() => selectIndex(item.symbol)}
-        className={`w-full rounded-btn px-2 py-2 text-left transition-colors ${active ? 'bg-accent/15 text-foreground' : 'hover:bg-elevated text-secondary'}`}
+        className={`w-full rounded-card border px-3 py-2 text-left transition-colors ${active ? 'border-foreground bg-surface text-foreground' : 'border-border bg-surface text-secondary hover:bg-elevated'}`}
       >
         <div className="flex items-center justify-between gap-2">
           <span className="truncate text-xs font-medium">{item.name || item.symbol}</span>
@@ -180,14 +183,15 @@ export function Indices() {
     // [R60] 原来手搓了一个 h1 + p-4 的壳, 标题字号和留白都和别的页对不上
     <PageShell
       title="指数"
-      subtitle="独立 kline_index_* parquet，不进入股票选股和策略链路"
+      // [R545] 原副标题「独立 kline_index_* parquet，不进入股票选股和策略链路」是写给开发者看的
+      subtitle="上证 · 深证 · 创业板 · 科创 四只核心指数的日K与分时"
       width="full"
       right={(
         <div className="flex items-center gap-2">
           <button
             onClick={() => syncDaily.mutate()}
             disabled={syncDaily.isPending}
-            className="inline-flex items-center gap-1.5 rounded-btn bg-accent px-3 py-1.5 text-xs font-medium text-base hover:bg-accent/90 disabled:opacity-50"
+            className={buttonClass({ variant: 'primary' }, 'gap-1.5')}
           >
             {syncDaily.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
             同步指数日K
@@ -195,16 +199,13 @@ export function Indices() {
         </div>
       )}
     >
-      {/* [R374] 窄屏堆叠: 原 grid-cols-[15rem_1fr] 固定 240px 左栏,
-          手机 375px 直接吃掉 65% 屏宽。默认 grid-cols-1 让左 sidebar
-          折到顶部堆叠, lg 才回两栏。 */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[15rem_1fr]">
-        <aside className="rounded-card border border-border bg-surface p-3">
-          <div className={cn('mb-2 px-1', TYPE.card)}>核心指数</div>
-          <div className="space-y-1">
-            {topRows.map(renderIndexItem)}
-          </div>
-        </aside>
+      {/* [R374] 窄屏堆叠: 原 grid-cols-[15rem_1fr] 固定 240px 左栏, 手机上堆到顶部。
+          [R545] 四只指数用一整列 240px 竖着排, 下面大半截是空的, 图表只剩剩下的宽度 ——
+          改成顶上一排四格(名称 / 代码 / 点位 / 涨跌一样不少), 图表吃满整宽。 */}
+      <div className="space-y-4">
+        <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+          {topRows.map(renderIndexItem)}
+        </div>
 
         <main className="min-w-0 rounded-card border border-border bg-surface p-3">
           <div className="mb-3 flex items-center justify-between gap-3">
@@ -224,9 +225,8 @@ export function Indices() {
                 {selectedSymbol && <span className="font-mono text-xs text-foreground">{fmtNum(selectedQuoteValue)}</span>}
                 {selectedSymbol && <span className={`font-mono text-xs ${Number(selectedQuotePct ?? 0) >= 0 ? 'text-bull' : 'text-bear'}`}>{fmtPct(selectedQuotePct)}</span>}
               </div>
-              <div className="mt-1 text-xs text-muted">
-                实时缓存 {quotes.data?.count ?? 0} 只指数 · 日K来源 {daily.data?.source ?? '--'}
-              </div>
+              {/* [R545] 原「实时缓存 N 只指数 · 日K来源 x」—— 缓存条数是给开发者看的, 只留来源 */}
+              <div className="mt-1 text-xs text-muted">日K来源 {daily.data?.source ?? '--'}</div>
             </div>
             {/* [R374] date inputs 窄屏换行: 两个 input + "至" 标签在窄屏挤,
                 shrink-0 会顶破主区。加 flex-wrap 后窄屏自动第二行。 */}
@@ -255,11 +255,11 @@ export function Indices() {
             </div>
           )}
           {chartRows.length > 0 && (
-            <div className="flex items-start gap-3">
+            <div className="flex flex-col gap-3 md:flex-row md:items-start">
               <div className="min-w-0 flex-1">
                 <EChartsCandlestick
                   data={chartRows}
-                  height={620}
+                  height={chartH}
                   showMA={true}
                   showInfoBar={true}
                   showMarkers={false}
@@ -273,7 +273,7 @@ export function Indices() {
                   activeIndicators={['vol', 'macd']}
                 />
               </div>
-              <div className="min-w-0 flex-1 border-l border-border pl-3" style={{ height: 620 }}>
+              <div className="min-w-0 flex-1 border-border max-md:border-t max-md:pt-3 md:border-l md:pl-3" style={{ height: chartH }}>
                 {!hasMinuteCap ? (
                   <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
                     <Lock className="h-5 w-5 text-muted" />
@@ -292,7 +292,7 @@ export function Indices() {
                       <EChartsIntraday
                         key={`${selectedSymbol}:${selectedDate}`}
                         data={minuteRows}
-                        height={620}
+                        height={chartH}
                         prevClose={prevClose}
                         date={selectedDate ?? undefined}
                         showLimitLines={false}
