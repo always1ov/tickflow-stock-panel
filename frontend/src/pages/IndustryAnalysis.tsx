@@ -450,7 +450,8 @@ export function IndustryAnalysis() {
 
       {/* [R60] 统一版式: 留白 px-3/lg:px-4、区块间距 12px, 与全站一致 */}
       <div className="min-h-full px-3 pb-4 pt-3 lg:px-4">
-        <div className="mx-auto w-full max-w-[1440px] space-y-3">
+        {/* [R547] 撤掉 1440px 居中上限, 与其它页一样贴左铺满(用户: 页面要铺满内容区) */}
+        <div className="w-full space-y-3">
           {/* [R326 同步上游] v0.2.4 新增的盘中板块轮动卡。上游随它一起把
               这一页的留白改成了 px-6 py-5 / space-y-5 —— **版式那半不取**:
               R60 把全站统一到了 px-3/lg:px-4 + space-y-3, 只改这两页会让它们
