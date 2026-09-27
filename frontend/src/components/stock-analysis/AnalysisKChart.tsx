@@ -6,7 +6,7 @@ import type { Fib2Grain, Fib2Overlay, KlineRow, LevelSeries, QuantMacdResult } f
 import { alignQuantMacd, quantMacdSeries } from '@/lib/quantMacdSeries'
 import { zhuangXianIndexes, zhuangXianSeries } from '@/lib/zhuangXianSeries'
 import {
-  alignTrendQuant, trendQuantLegendGraphic, trendQuantSeries, TREND_QUANT_HELP, TQ_Y_MAX, TQ_Y_MIN,
+  alignTrendQuant, trendQuantLegendGraphic, trendQuantSeries, TREND_QUANT_HELP, tqYRange,
   type TrendQuantData,
 } from '@/lib/trendQuantSeries'
 
@@ -671,7 +671,7 @@ export function AnalysisKChart({
 
     // [R486] 趋势量化副图(第三张 grid, 画在主图与量化MACD 之间)。同样放在最后 push,
     // 不参与悬停联动的下标。算法 `indicators/trend_quant.py`, 画法 `lib/trendQuantSeries.ts`。
-    series.push(...trendQuantSeries(alignTrendQuant(dates, trendQuant), { xAxisIndex: 2, yAxisIndex: 2 }, trendH))
+    series.push(...trendQuantSeries(alignTrendQuant(dates, trendQuant), { xAxisIndex: 2, yAxisIndex: 2 }))
     // 狗头压在趋势量化的最上面(后画的盖在上面)
     if (zhuang.length) series.push(zhuangXianSeries(zhuang, { xAxisIndex: 2, yAxisIndex: 2 }))
 
@@ -731,10 +731,9 @@ export function AnalysisKChart({
           axisLabel: { show: false }, axisTick: { show: false } },
         // [R486] 趋势量化: 纵轴按画出来的东西自动定范围(通达信也是), 不写刻度, 不画横线
         { scale: true, gridIndex: 2, splitNumber: 2, splitLine: { show: false },
-          // [R558] 固定上下界, 给字和狗头留余量: 波动线恒在 0~4(收盘不会跑出近期高低点),
-          // 上面多留 0.35 给走到顶的「顶」字, 下面多留到 −0.45 —— 狗头贴着副图底边画(庄现冻结,
-          // 不改它), 原来底边就是 0.5 那条黄线附近, 狗头压在线和「建仓」上
-          min: TQ_Y_MIN, max: TQ_Y_MAX,
+          // [R558] 固定上下界(原来按画出来的东西自动定, 顶和底都贴边)。[R559] 两头各留出一条字道
+          // 与狗头的位置, 见 `tqYRange`
+          ...tqYRange(trendH),
           axisLabel: { show: false }, axisTick: { show: false } },
       ],
       dataZoom: [

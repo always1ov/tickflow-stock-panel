@@ -16,12 +16,16 @@ def test_R558_名字与图例在副图顶上的标题带里():
     assert "trendTop - SUB_HEADER + 3" in chart and "subTop - SUB_HEADER + 3" in chart, "副图名字又写回图里了"
 
 
-def test_R558_趋势量化纵轴留余量_字压在白柱之上():
+def test_R559_字画在图顶图底两条字道里_不压线不互叠():
+    """用户对 R558: 「字还是重叠」。R558 的纵轴留余量 + 字压白柱 + 叠字让一行, 字仍写在
+    原文的高度上(那正是线与柱子所在处), 所以换成字道。"""
     tq = code_of("lib/trendQuantSeries.ts")
-    assert "TQ_Y_MIN = -0.45" in tq and "TQ_Y_MAX = 4.35" in tq
-    assert "min: TQ_Y_MIN, max: TQ_Y_MAX" in code_of("components/stock-analysis/AnalysisKChart.tsx")
-    assert "z: 8 + k * 0.01" in tq, "字又被吸筹白柱盖住了"
-    assert "textBorderWidth" in tq
+    assert "export function laneLayout(" in tq and "export function tqYRange(" in tq
+    assert "lane: 'top'" in tq and "lane: 'bottom'" in tq
+    # 字不再按原文高度画在图里
+    assert "type: 'scatter', ...axis, name: m.text" not in tq, "字又写回图里了"
+    assert "...tqYRange(trendH)" in code_of("components/stock-analysis/AnalysisKChart.tsx")
+    assert "subH + TREND_LANES_EXTRA" in code_of("lib/levelsChartLayout.ts"), "字道占了地方, 副图没跟着加高"
 
 
 def test_R558_庄现画法没动():

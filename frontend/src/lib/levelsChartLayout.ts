@@ -31,6 +31,11 @@ export const GAP_MAIN_SUB = 14      // 主图 ↔ 副图(两边纵轴刻度不�
  * 的左上角, 碰上走到顶的柱子与「顶」字就叠在一起。
  */
 export const SUB_HEADER = 18
+/**
+ * [R559] 趋势量化比量化MACD 高这么多: 它的八种字挪进了图顶 / 图底两条字道(`trendQuantSeries.ts`
+ * 的 `laneLayout`), 字道连同狗头占掉约 90px, 不加高的话中间的图就被挤扁了。
+ */
+export const TREND_LANES_EXTRA = 50
 export const GAP_SUB_SLIDER = 26    // 副图 ↔ 缩放条: 日期刻度在这一段里
 export const SLIDER_H = 22
 export const PAD_BOTTOM = 8
@@ -66,7 +71,7 @@ export interface LevelsChartLayout {
 export function levelsChartLayout(height: number): LevelsChartLayout {
   const mainH = height - LEGACY_NON_MAIN
   const subH = subPaneHeight(mainH)
-  const trendH = subH
+  const trendH = subH + TREND_LANES_EXTRA
   const trendTop = PAD_TOP + mainH + GAP_MAIN_SUB + SUB_HEADER
   const subTop = trendTop + trendH + GAP_MAIN_SUB + SUB_HEADER
   const total = subTop + subH + GAP_SUB_SLIDER + SLIDER_H + PAD_BOTTOM

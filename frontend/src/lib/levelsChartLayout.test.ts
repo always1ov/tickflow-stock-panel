@@ -23,10 +23,10 @@ describe('关键价位图版面', () => {
     }
   })
 
-  it('[R486] 趋势量化与量化MACD 同高, 主图不因它变矮', () => {
+  it('[R486] 趋势量化比量化MACD 高出两条字道(R559), 主图不因它变矮', () => {
     for (const h of [320, 520, 720]) {
       const L = levelsChartLayout(h)
-      expect(L.trendH).toBe(L.subH)
+      expect(L.trendH).toBe(L.subH + 50)
       expect(L.mainH).toBe(legacyMain(h))
     }
   })

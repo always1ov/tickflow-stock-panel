@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { TREND_QUANT_COLORS as C } from './theme'
 import {
-  alignTrendQuant, markOffsets, TQ_Y_MAX, TQ_Y_MIN, TREND_MARKS, TREND_QUANT_HELP, TREND_QUANT_LEGEND,
+  alignTrendQuant, laneLayout, tqYRange, TQ_LANES_H, TREND_MARKS, TREND_QUANT_HELP, TREND_QUANT_LEGEND,
   trendQuantLegendGraphic, trendQuantSeries,
   type TrendQuantData,
 } from './trendQuantSeries'
@@ -26,8 +26,9 @@ describe('[R486] 趋势量化副图', () => {
 
   it('画的先后照原文: 超买、超卖、平均线、红绿短柱、八种字、吸筹白柱、吸筹线', () => {
     const s = trendQuantSeries(alignTrendQuant(Q.dates, Q), { xAxisIndex: 2, yAxisIndex: 2 })
+    // [R559] 八种字合成一个「标注」系列画在字道里
     expect(s.map(x => x.name)).toEqual([
-      '超买', '超卖', '平均线', '波动', ...TREND_MARKS.map(m => m.text), '吸筹柱', '吸筹',
+      '超买', '超卖', '平均线', '波动', '标注', '吸筹柱', '吸筹',
     ])
     expect((s[0] as { data: number[] }).data).toEqual([3.2, 3.2, 3.2])
     expect((s[1] as { data: number[] }).data).toEqual([0.5, 0.5, 0.5])
@@ -38,10 +39,12 @@ describe('[R486] 趋势量化副图', () => {
     expect((s[3] as { data: number[][] }).data).toEqual([[1, 1, 2, 1], [2, 2, 1.5, 0]])
   })
 
-  it('「升」写在当天平均线的高度; 吸筹白柱从 0.53 画起', () => {
+  it('「升」对准它那一天、写在底下的字道; 吸筹白柱从 0.53 画起', () => {
     const s = trendQuantSeries(alignTrendQuant(Q.dates, Q), { xAxisIndex: 2, yAxisIndex: 2 })
-    const sheng = s.find(x => x.name === '升') as { data: unknown[] }
-    expect(sheng.data).toEqual(['-', [1, 1.6], '-'])
+    const a = alignTrendQuant(Q.dates, Q)
+    expect(laneLayout(a.marks, [10, 20, 30])).toEqual([
+      { m: TREND_MARKS.find(m => m.key === 'sheng'), x: 20, row: 0 },
+    ])
     const whites = s.find(x => x.name === '吸筹柱') as { data: number[][] }
     expect(whites.data).toEqual([[0, 0.53, 0.6, 0], [1, 0.53, 1.2, 0]])
   })
@@ -87,25 +90,29 @@ describe('[R486] 趋势量化副图', () => {
     expect(TREND_QUANT_HELP.split('\n\n')).toHaveLength(3)
   })
 
-  it('[R558] 叠在一起的字后一个让开一行; 不挨着的不动', () => {
-    const a = alignTrendQuant(Q.dates, Q)
-    // 第 2 根同时出「建仓」(0.75)与「见底」(1): 175px 高的副图里相距 9px, 算叠
-    a.marks.jiancang[1] = true
-    a.marks.jiandi[1] = true
-    const off = markOffsets(a, 175)
-    expect(off.size).toBe(1)
-    expect(off.get('jiandi:1')).toBeLessThan(0)     // 往上让
-    // 字压在白柱之上 + 黑描边
-    const s = trendQuantSeries(a, { xAxisIndex: 2, yAxisIndex: 2 }, 175)
-    const jiandi = s.find(x => x.name === '见底') as { z: number; label: { textBorderWidth: number }; data: unknown[] }
-    const white = s.find(x => x.name === '吸筹柱') as { z: number }
-    expect(jiandi.z).toBeGreaterThan(white.z)
-    expect(jiandi.label.textBorderWidth).toBeGreaterThan(0)
-    expect(jiandi.data[1]).toMatchObject({ value: [1, 1], label: { offset: [0, off.get('jiandi:1')] } })
+  it('[R559] 字道: 挨得太近的换到第二行, 离得开的留在第一行; 卖出一侧在上, 买入一侧在下', () => {
+    const none = () => [false, false, false, false]
+    const marks = Object.fromEntries(TREND_MARKS.map(m => [m.key, none()])) as Record<string, boolean[]>
+    marks.ding[0] = true; marks.tao[0] = true       // 同一天: 顶 + 逃
+    marks.ding[3] = true                            // 离得远的一个
+    marks.jiancang[0] = true                        // 买入一侧
+    const out = laneLayout(marks as never, [100, 110, 120, 200])
+    const at = (k: string, x: number) => out.find(o => o.m.key === k && o.x === x)!
+    expect(at('ding', 100).m.lane).toBe('top')
+    expect(at('ding', 100).row).toBe(0)
+    expect(at('tao', 100).row).toBe(1)           // 与「顶」同一处, 换行
+    expect(at('ding', 200).row).toBe(0)          // 离得开, 回第一行
+    expect(at('jiancang', 100).m.lane).toBe('bottom')
+    expect(at('jiancang', 100).row).toBe(0)      // 另一条字道, 不和「顶」抢
+    // 看不见的那几根不排
+    expect(laneLayout(marks as never, [null, null, null, 200]).map(o => o.x)).toEqual([200])
   })
 
-  it('[R558] 纵轴上下界把波动线 0~4 全装下, 且上下各留余量', () => {
-    expect(TQ_Y_MIN).toBeLessThan(0)
-    expect(TQ_Y_MAX).toBeGreaterThan(4)
+  it('[R559] 纵轴两头留出字道: 0~4 全装下, 副图越矮留得越多(换算成数值)', () => {
+    const r175 = tqYRange(175 + 50), r220 = tqYRange(220 + 50)
+    expect(r175.min).toBeLessThan(0)
+    expect(r175.max).toBeGreaterThan(4)
+    expect(r175.max - 4).toBeGreaterThan(r220.max - 4)
+    expect(TQ_LANES_H).toBeGreaterThan(0)
   })
 })

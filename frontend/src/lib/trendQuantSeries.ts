@@ -38,16 +38,20 @@ export interface TrendQuantData {
 
 export type TrendMarkKey = 'jidi' | 'sheng' | 'ding' | 'xia' | 'jiancang' | 'tao' | 'jiandi' | 'juedi'
 
-/** 八种字: 写什么、写在多高、什么颜色。`at: 'avg'` = 写在当天平均线的高度。 */
-export const TREND_MARKS: { key: TrendMarkKey; text: string; at: number | 'avg'; color: string }[] = [
-  { key: 'jidi', text: '极底', at: 1.75, color: C.red },
-  { key: 'sheng', text: '升', at: 'avg', color: C.text },
-  { key: 'ding', text: '顶', at: 'avg', color: C.text },
-  { key: 'xia', text: '下', at: 'avg', color: C.text },
-  { key: 'jiancang', text: '建仓', at: 0.75, color: C.red },
-  { key: 'tao', text: '逃', at: 3.1, color: C.yellow },
-  { key: 'jiandi', text: '见底', at: 1, color: C.lightRed },
-  { key: 'juedi', text: '绝底', at: 1, color: C.red },
+/**
+ * 八种字: 写什么、原文写在多高、什么颜色, 以及 [R559] 写进哪条字道。
+ * `at` 是原文 DRAWTEXT 的高度(`'avg'` = 当天平均线处), R559 起**不再照它画**, 只留作出处;
+ * `lane` 是现在的位置: 卖出一侧(顶 / 逃 / 下)在图顶上的字道, 买入一侧在图底下的字道。
+ */
+export const TREND_MARKS: { key: TrendMarkKey; text: string; at: number | 'avg'; color: string; lane: 'top' | 'bottom' }[] = [
+  { key: 'jidi', text: '极底', at: 1.75, color: C.red, lane: 'bottom' },
+  { key: 'sheng', text: '升', at: 'avg', color: C.text, lane: 'bottom' },
+  { key: 'ding', text: '顶', at: 'avg', color: C.text, lane: 'top' },
+  { key: 'xia', text: '下', at: 'avg', color: C.text, lane: 'top' },
+  { key: 'jiancang', text: '建仓', at: 0.75, color: C.red, lane: 'bottom' },
+  { key: 'tao', text: '逃', at: 3.1, color: C.yellow, lane: 'top' },
+  { key: 'jiandi', text: '见底', at: 1, color: C.lightRed, lane: 'bottom' },
+  { key: 'juedi', text: '绝底', at: 1, color: C.red, lane: 'bottom' },
 ]
 
 /**
@@ -158,47 +162,64 @@ function stickRenderer(ratio: number, colorOf: (v: number) => string) {
 const NONE = '-'
 
 /**
- * [R558] 纵轴固定上下界(原来按画出来的东西自动定, 顶和底都贴边)。
- * 波动线恒在 0~4 —— 收盘不会跑出近 10 日最低 / 近 25 日最高 —— 上面多留一点给走到顶的「顶」字,
- * 下面留到 −0.45: 狗头贴着副图底边画(庄现冻结, 不动它), 原来底边就在 0.5 那条黄线附近,
- * 狗头压在线和「建仓」上。
+ * [R559] 字道。用户对 R558 的截图: 「字还是重叠」。
+ *
+ * R558 只让字与字互相避让, 字本身仍写在原文的高度上(平均线处、0.75、1、3.1 ……), 那些高度正是
+ * 线和柱子所在的地方 —— 「顶」压着紫线, 「建仓」压着绿线和柱子, 同一天连出两个字就竖着贴在一起。
+ * 所以把字从图里挪出去: 图顶上一条字道放卖出一侧(顶 / 逃 / 下), 图底下一条放买入一侧(升 / 建仓 /
+ * 见底 / 绝底 / 极底), 每个字**水平对准它那一天**; 字道各两行, 画的时候按真实像素宽度排, 挤不下
+ * 才换到第二行。出不出字、在哪一天, 一概不变; 变的只是竖直位置。
+ *
+ * 狗头贴副图底边画(庄现冻结, 不动它), 底下的字道在狗头上面。
  */
-export const TQ_Y_MIN = -0.45
-export const TQ_Y_MAX = 4.35
+const LANE_FONT = 11
+const LANE_ROW_H = 14
+const LANE_ROWS = 2
+const LANE_TOP_PAD = 3
+const LANE_BOTTOM_PAD = 22          // 给狗头(18px + 2px 底隙)留的
+const LANE_HALO = { stroke: '#000000', lineWidth: 3 }
 
-/** [R558] 八种字: 11px, 带一圈与副图同色的描边, 压在柱子上也读得出来 */
-const MARK_FONT = 11
-const MARK_HALO = { textBorderColor: '#000000', textBorderWidth: 3 }
-/** 两个字相距不到这么多 px 且落在相邻两三根里, 就算叠在一起 */
-const MARK_CLEAR_PX = 12
-const MARK_NEAR_BARS = 2
+/** 两条字道一共占掉的高度(px) —— 副图因此加高这么多, 图本身不被挤小 */
+export const TQ_LANES_H = LANE_TOP_PAD + LANE_ROWS * LANE_ROW_H + LANE_BOTTOM_PAD + LANE_ROWS * LANE_ROW_H
 
 /**
- * [R558] 字的避让: 同一处(相邻两三根、纵向不到一行字高)出了两个字, 后一个往上让一行,
- * 顶上放不下就往下让。只挪字的位置, 出不出字、写在哪一根一概不变。
- * 返回每个字相对原位置的纵向偏移(px, 负数 = 往上)。
+ * 纵轴上下界: 波动线恒在 0~4(收盘不会跑出近 10 日最低 / 近 25 日最高), 把字道那几十像素换算成
+ * 数值加到两头。副图高不同(个股预览 / 最大化 / 窄屏), 换算出来的上下界也不同。
  */
-export function markOffsets(a: TrendQuantAligned, paneH: number): Map<string, number> {
-  const pxPerUnit = paneH / (TQ_Y_MAX - TQ_Y_MIN)
-  const toPx = (v: number) => (v - TQ_Y_MIN) * pxPerUnit          // 离底边多高
-  const placed: { i: number; px: number }[] = []
-  const out = new Map<string, number>()
-  const n = a.avg.length
-  for (let i = 0; i < n; i++) {
+export function tqYRange(paneH: number): { min: number; max: number } {
+  const topPx = LANE_TOP_PAD + LANE_ROWS * LANE_ROW_H + 4
+  const bottomPx = LANE_BOTTOM_PAD + LANE_ROWS * LANE_ROW_H + 4
+  const perUnit = Math.max(1, paneH - topPx - bottomPx) / 4
+  return { min: -bottomPx / perUnit, max: 4 + topPx / perUnit }
+}
+
+/** 字宽(px): 11px 字号, 汉字 11px, 外加描边 */
+const laneTextW = (t: string) => [...t].length * LANE_FONT + 4
+
+/**
+ * 把可见范围里的字排进两条字道: 从左到右, 每个字放进第一行放得下的地方(和前一个字不相碰),
+ * 两行都放不下才压在第二行上。`xs[i]` 是第 i 根的像素横坐标, 看不见的给 null。
+ * 返回 [字, 横坐标, 第几行] —— 纯函数, 单测用。
+ */
+export function laneLayout(
+  marks: Record<TrendMarkKey, boolean[]>, xs: (number | null)[],
+): { m: (typeof TREND_MARKS)[number]; x: number; row: number }[] {
+  const out: { m: (typeof TREND_MARKS)[number]; x: number; row: number }[] = []
+  const right: Record<'top' | 'bottom', number[]> = {
+    top: Array(LANE_ROWS).fill(-Infinity), bottom: Array(LANE_ROWS).fill(-Infinity),
+  }
+  for (let i = 0; i < xs.length; i++) {
+    const x = xs[i]
+    if (x == null) continue
     for (const m of TREND_MARKS) {
-      if (!a.marks[m.key][i]) continue
-      const y = m.at === 'avg' ? a.avg[i] : m.at
-      if (y == null) continue
-      const base = toPx(y)
-      const clash = (px: number) => placed.some(p => Math.abs(p.i - i) <= MARK_NEAR_BARS && Math.abs(p.px - px) < MARK_CLEAR_PX)
-      let off = 0
-      while (clash(base + off) && base + off + MARK_CLEAR_PX < paneH - MARK_FONT / 2) off += MARK_CLEAR_PX
-      if (clash(base + off)) {
-        off = 0
-        while (clash(base + off) && base + off - MARK_CLEAR_PX > MARK_FONT / 2) off -= MARK_CLEAR_PX
-      }
-      placed.push({ i, px: base + off })
-      if (off) out.set(`${m.key}:${i}`, -off)
+      if (!marks[m.key][i]) continue
+      const w = laneTextW(m.text)
+      const left = x - w / 2
+      const rows = right[m.lane]
+      let row = rows.findIndex(r => r <= left)
+      if (row < 0) row = rows.indexOf(Math.min(...rows))
+      rows[row] = left + w
+      out.push({ m, x, row })
     }
   }
   return out
@@ -208,10 +229,7 @@ export function markOffsets(a: TrendQuantAligned, paneH: number): Map<string, nu
 export function trendQuantSeries(
   a: TrendQuantAligned,
   axis: { xAxisIndex: number; yAxisIndex: number },
-  /** [R558] 副图高(px), 给字的避让换算用; 不传就不避让 */
-  paneH?: number,
 ): Record<string, unknown>[] {
-  const offsets = paneH ? markOffsets(a, paneH) : new Map<string, number>()
   const n = a.avg.length
   const line = { type: 'line', ...axis, animation: false, silent: true, symbol: 'none' }
   const hline = (v: number) => Array.from({ length: n }, () => v)
@@ -232,22 +250,37 @@ export function trendQuantSeries(
     const x = a.xichou[i]
     if (b === 1 && x != null) whites.push([i, 0.53, x, 0])
   })
-  // [R558] 字压在吸筹白柱之上(z 8 > 白柱 6): 原文的先后是白柱盖字, 可白柱在这里有间距的 1/3 宽,
-  // 「建仓」「绝底」整个被盖住看不见 —— 用户: 「有些东西看不清楚了」
-  const texts: Record<string, unknown>[] = TREND_MARKS.map((m, k) => ({
-    type: 'scatter', ...axis, name: m.text, animation: false, silent: true, z: 8 + k * 0.01,
-    symbolSize: 0,
-    data: a.marks[m.key].map((on, i) => {
-      if (!on) return NONE
-      const y = m.at === 'avg' ? a.avg[i] : m.at
-      if (y == null) return NONE
-      const off = offsets.get(`${m.key}:${i}`)
-      return off ? { value: [i, y], label: { offset: [0, off] } } : [i, y]
-    }),
-    // 通达信的 DRAWTEXT: 字从那一根往右写, 纵向居中在那个数值上
-    label: { show: true, position: 'right', distance: -2, formatter: m.text,
-             color: m.color, fontSize: MARK_FONT, ...MARK_HALO },
-  }))
+  // [R559] 八种字画在两条字道里(见 `laneLayout`)。一个自定义系列、只在第一根可见的 K 线上画一整组 ——
+  // 要拿到所有字的真实像素位置才排得开, 逐根画的话每根只知道自己。
+  const texts: Record<string, unknown>[] = [{
+    type: 'custom', ...axis, name: '标注', z: 8, animation: false, silent: true, clip: true,
+    encode: { x: 0 },
+    data: a.avg.map((_, i) => [i]),
+    renderItem: (
+      params: { dataIndexInside: number; coordSys: { x: number; y: number; width: number; height: number } },
+      api: Api,
+    ) => {
+      if (params.dataIndexInside !== 0) return null
+      const { x: cx, y: cy, width: cw, height: ch } = params.coordSys
+      const xs = a.avg.map((_, i) => {
+        const x = api.coord([i, 0])[0]
+        return x >= cx - 1 && x <= cx + cw + 1 ? x : null
+      })
+      return {
+        type: 'group',
+        children: laneLayout(a.marks, xs).map(({ m, x, row }) => ({
+          type: 'text',
+          style: {
+            text: m.text, x,
+            y: m.lane === 'top'
+              ? cy + LANE_TOP_PAD + row * LANE_ROW_H
+              : cy + ch - LANE_BOTTOM_PAD - (row + 1) * LANE_ROW_H,
+            fill: m.color, fontSize: LANE_FONT, align: 'center', verticalAlign: 'top', ...LANE_HALO,
+          },
+        })),
+      }
+    },
+  }]
 
   return [
     // [R556] 两条黄线的名字写在右端(用户: 「超买超卖想在黄线右端注明」), 落在图右侧的留白带里。
