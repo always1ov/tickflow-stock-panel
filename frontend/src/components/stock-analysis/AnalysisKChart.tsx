@@ -5,7 +5,13 @@ import type { ECharts, EChartsOption } from 'echarts'
 import type { Fib2Grain, Fib2Overlay, KlineRow, LevelSeries, QuantMacdResult } from '@/lib/api'
 import { alignQuantMacd, quantMacdSeries } from '@/lib/quantMacdSeries'
 import { zhuangXianIndexes, zhuangXianSeries } from '@/lib/zhuangXianSeries'
-import { alignTrendQuant, trendQuantSeries, type TrendQuantData } from '@/lib/trendQuantSeries'
+import {
+  alignTrendQuant, trendQuantLegendGraphic, trendQuantSeries, TREND_QUANT_HELP, type TrendQuantData,
+} from '@/lib/trendQuantSeries'
+
+// [R555] 趋势量化图例: 从「趋势量化」四个字右边开始(60 + 4 字 × 9px + 间距)
+const TQ_LEGEND_LEFT = 108
+const TQ_LEGEND_W = trendQuantLegendGraphic(TQ_LEGEND_LEFT, 0, '').width
 import { levelsChartLayout, PAD_BOTTOM, SLIDER_H } from '@/lib/levelsChartLayout'
 import { futureSlotRenderer } from '@/lib/futureZone'
 import { fib2Status } from '@/lib/fib2Status'
@@ -749,7 +755,9 @@ export function AnalysisKChart({
       }] : []), {
         type: 'text', left: 60, top: trendTop + 2, silent: true,
         style: { text: '趋势量化', fill: isDark ? CT().text : '#B4B4B4', fontSize: 9 },
-      }],
+      },
+      // [R555] 三种线的图例(说明在悬停里, 见下面画布上那块透明热区)
+      ...trendQuantLegendGraphic(TQ_LEGEND_LEFT, trendTop + 1, isDark ? CT().text : '#B4B4B4').graphic],
       series,
     }
   }
@@ -947,7 +955,18 @@ export function AnalysisKChart({
       )}
       {/* 图表:右侧预留带(grid.right 预留)显示价位标签文字,不压蜡烛 */}
       {/* [R419] 画布高 = 主图(原高) + 副图, 比 `height` 高; 弹窗内容区本身可滚动 */}
-      <div ref={chartRef} style={{ width: '100%', height: layout.total }} />
+      <div className="relative">
+        <div ref={chartRef} style={{ width: '100%', height: layout.total }} />
+        {/* [R555] 趋势量化图例的悬停热区: 画布里的字接不到悬停, 用一块透明的 HTML 盖在图例上,
+            说明走全站悬停提示(R553)。说明文字与图例同一个产地(`TREND_QUANT_HELP`) */}
+        {trendQuant && !trendQuantError && (
+          <span
+            className="absolute cursor-help"
+            style={{ left: 56, top: layout.trendTop, height: 16, width: TQ_LEGEND_LEFT - 56 + TQ_LEGEND_W }}
+            title={TREND_QUANT_HELP}
+          />
+        )}
+      </div>
 
       {/* 价位统计面板:把当前开启的点位按"压力 / 支撑"结构化列出 */}
       {effLevels && (

@@ -50,6 +50,59 @@ export const TREND_MARKS: { key: TrendMarkKey; text: string; at: number | 'avg';
   { key: 'juedi', text: '绝底', at: 1, color: C.red },
 ]
 
+/**
+ * [R555] 副图左上角的图例 + 悬停说明 —— 三种线各代表什么。**只此一个产地**。
+ *
+ * 用户: 「我好像发现有绿线和紫线, 都代表什么含义。我想加点注释」。原文里这三样都没有注释,
+ * 其中绿线最容易看错: 平时它贴在 0.53, 紧挨着 0.5 那条黄线, 看着像一条平的绿线。
+ * 说明只讲**这条线是怎么来的、怎么读**, 不添判定 —— 公式是作者的, 冻结。
+ */
+export const TREND_QUANT_LEGEND: { name: string; color: string; desc: string }[] = [
+  {
+    name: '平均线', color: C.avg,
+    desc: '红绿短柱(波动线)的 3 日均线。波动线 = 收盘价落在「近 10 日最低 ~ 近 25 日最高」'
+      + '之间的哪个位置, 折成 0~4 再平滑: 越靠上越接近近期高点。平均线向上时短柱画红, 向下画绿。',
+  },
+  {
+    name: '吸筹', color: C.xichou,
+    desc: '平时贴在 0.53 不动(紧挨下面那条黄线, 所以看着像一条平的绿线)。'
+      + '只有最低价打到近 38 日新低的那几天才拱起来, 下面配白色细柱, 之后几天慢慢落回; '
+      + '拱多高看最近最低价跌得有多急(原公式叫「主力吸货」), 高低是和这只票上市以来最高的那一次比。',
+  },
+  {
+    name: '超买 3.2 / 超卖 0.5', color: C.yellow,
+    desc: '两条固定参考线。波动线靠近 3.2 = 收盘在近期区间的高位, 靠近 0.5 = 在近期区间的低位。',
+  },
+]
+
+/** 悬停说明的全文(三段) */
+export const TREND_QUANT_HELP = TREND_QUANT_LEGEND.map(l => `${l.name}: ${l.desc}`).join('\n\n')
+
+/** 图例一行的宽度估算: 9px 字号下汉字按 9px、其余按 5px */
+const textW = (t: string) => [...t].reduce((w, ch) => w + (/[\u4e00-\u9fff]/.test(ch) ? 9 : 5), 0)
+const SWATCH = 12
+const ITEM_GAP = 12
+
+/**
+ * 图例: 每项 = 一小段该色的线 + 灰字名称, 画在「趋势量化」四个字右边。
+ * 名称用中性色 —— 紫只许用在图里的线上(AGENTS.md 硬约束第 15 条), 所以色只落在那段线上。
+ */
+export function trendQuantLegendGraphic(left: number, top: number, textColor: string): {
+  graphic: Record<string, unknown>[]
+  width: number
+} {
+  const graphic: Record<string, unknown>[] = []
+  let x = left
+  for (const l of TREND_QUANT_LEGEND) {
+    graphic.push({ type: 'line', x, y: top + 6, silent: true,
+                   shape: { x1: 0, y1: 0, x2: SWATCH, y2: 0 }, style: { stroke: l.color, lineWidth: 2 } })
+    graphic.push({ type: 'text', left: x + SWATCH + 4, top: top + 1, silent: true,
+                   style: { text: l.name, fill: textColor, fontSize: 9 } })
+    x += SWATCH + 4 + textW(l.name) + ITEM_GAP
+  }
+  return { graphic, width: x - left - ITEM_GAP }
+}
+
 /** 原文两种柱宽: 2(红绿短柱)与 1(吸筹白柱)。按量化MACD 实测的「宽度 2 = 间距 66%」折算。 */
 export const TQ_STICK2 = 0.66
 export const TQ_STICK1 = 0.33

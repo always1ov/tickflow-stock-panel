@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { TREND_QUANT_COLORS as C } from './theme'
-import { alignTrendQuant, TREND_MARKS, trendQuantSeries, type TrendQuantData } from './trendQuantSeries'
+import {
+  alignTrendQuant, TREND_MARKS, TREND_QUANT_HELP, TREND_QUANT_LEGEND, trendQuantLegendGraphic, trendQuantSeries,
+  type TrendQuantData,
+} from './trendQuantSeries'
 
 const marks = (on: (number | null)[]) => Object.fromEntries(
   TREND_MARKS.map(m => [m.key, m.key === 'sheng' ? on : on.map(() => null)]),
@@ -53,5 +56,25 @@ describe('[R486] 趋势量化副图', () => {
     expect(C.avg).toBe('#B84DFF')
     expect(C.xichou).toBe('#00FF00')
     expect(C.text).toBe('#FFFFFF')
+  })
+
+  it('[R555] 图例的色与图上那几条线同色 —— 看图例找得到线', () => {
+    const s = trendQuantSeries(alignTrendQuant(Q.dates, Q), { xAxisIndex: 2, yAxisIndex: 2 })
+    const lineColor = (name: string) =>
+      (s.find(x => x.name === name) as { lineStyle: { color: string } }).lineStyle.color
+    const legend = Object.fromEntries(TREND_QUANT_LEGEND.map(l => [l.name, l.color]))
+    expect(legend['平均线']).toBe(lineColor('平均线'))
+    expect(legend['吸筹']).toBe(lineColor('吸筹'))
+    expect(legend['超买 3.2 / 超卖 0.5']).toBe(lineColor('超买'))
+    expect(legend['超买 3.2 / 超卖 0.5']).toBe(lineColor('超卖'))
+  })
+
+  it('[R555] 图例名字用中性色, 色只落在那段线上; 悬停说明三段齐全', () => {
+    const { graphic, width } = trendQuantLegendGraphic(108, 0, '#999')
+    const texts = graphic.filter(g => g.type === 'text') as { style: { text: string; fill: string } }[]
+    expect(texts.map(t => t.style.text)).toEqual(TREND_QUANT_LEGEND.map(l => l.name))
+    expect(texts.every(t => t.style.fill === '#999')).toBe(true)
+    expect(width).toBeGreaterThan(0)
+    expect(TREND_QUANT_HELP.split('\n\n')).toHaveLength(3)
   })
 })
