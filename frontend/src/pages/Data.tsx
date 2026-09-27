@@ -610,9 +610,6 @@ export function Data() {
         subtitle="本地数据画像 · 同步状态 · 历史记录"
         right={
           <div className="flex flex-wrap items-center gap-2">
-            {!hasData && !isLoading && (
-              <span className="text-xs text-accent animate-pulse">首次使用请点击右侧按钮同步数据</span>
-            )}
             <button
               onClick={() => adjGate.guard(() => startSync.mutate())}
               disabled={isStarting}
@@ -702,7 +699,16 @@ export function Data() {
       {/* [R60] 统一版式: 留白与全站一致, 宽度取「读」档 —— 这页以设置项和
           说明文字为主, 一行太长眼睛回不到行首 */}
       <div className="px-3 pb-4 pt-3 lg:px-4">
-        <div className="mx-auto w-full max-w-[1100px] space-y-3">
+        {/* [R546] 撤掉 1100px 居中上限, 与其它页一样贴左铺满(用户: 页面要铺满内容区) */}
+        <div className="w-full space-y-3">
+        {/* [R546] 「首次使用请点击右侧按钮同步数据」原来挤在页头按钮条里、还一直闪(animate-pulse), 把按钮条顶成两行;
+            手机上按钮根本不在「右侧」。挪到正文第一行, 不闪 */}
+        {!hasData && !isLoading && (
+          <div className="flex items-center gap-2 rounded-card border border-border bg-elevated/40 px-3 py-2 text-xs text-secondary">
+            <Play className="h-3.5 w-3.5 shrink-0 text-muted" />
+            还没有本地数据 —— 点页头「立即同步」开始第一次同步
+          </div>
+        )}
         {/* 数据持久化警告 —— 容器内数据目录未挂卷, 重建容器(拉新镜像)会丢全部数据 */}
         {s?.data_dir_persistent === false && (
           <div className="flex items-start gap-2 rounded-card border border-danger/40 bg-danger/10 px-3 py-2.5 text-xs">
