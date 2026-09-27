@@ -24,7 +24,9 @@ def test_R555_说明只有一个产地():
 def test_R556_黄线名字写在右端_图例行不重复():
     """用户: 「超买超卖想在黄线右端注明」。"""
     series = code_of("lib/trendQuantSeries.ts")
-    assert "hlineLabel('超买 3.2')" in series and "hlineLabel('超卖 0.5')" in series
+    # [R557] 用户: 「超买超卖不需要显示数值了」—— 只写名字
+    assert "hlineLabel('超买')" in series and "hlineLabel('超卖')" in series
+    assert "hlineLabel('超买 3.2')" not in series, "右端标签又带回了数值"
     # 亮色主题下右侧留白是白底, 纯黄字看不见, 要垫副图同色的底
     assert "backgroundColor: C.paneBg" in series
     assert "labelledOnLine: true" in series and "!l.labelledOnLine" in series

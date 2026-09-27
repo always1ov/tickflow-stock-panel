@@ -70,7 +70,7 @@ export const TREND_QUANT_LEGEND: { name: string; color: string; desc: string; la
       + '拱多高看最近最低价跌得有多急(原公式叫「主力吸货」), 高低是和这只票上市以来最高的那一次比。',
   },
   {
-    name: '超买 3.2 / 超卖 0.5', color: C.yellow, labelledOnLine: true,
+    name: '超买 / 超卖', color: C.yellow, labelledOnLine: true,
     desc: '两条固定参考线。波动线靠近 3.2 = 收盘在近期区间的高位, 靠近 0.5 = 在近期区间的低位。',
   },
 ]
@@ -196,11 +196,12 @@ export function trendQuantSeries(
   }))
 
   return [
-    // [R556] 两条黄线的名字写在右端(用户: 「超买超卖想在黄线右端注明」), 落在图右侧的留白带里
+    // [R556] 两条黄线的名字写在右端(用户: 「超买超卖想在黄线右端注明」), 落在图右侧的留白带里。
+    // [R557] 只写名字不写数值(用户: 「超买超卖不需要显示数值了」); 3.2 / 0.5 在悬停说明里
     { ...line, name: '超买', z: 2, lineStyle: { color: C.yellow, width: 1 }, data: hline(3.2),
-      endLabel: hlineLabel('超买 3.2') },
+      endLabel: hlineLabel('超买') },
     { ...line, name: '超卖', z: 2, lineStyle: { color: C.yellow, width: 1 }, data: hline(0.5),
-      endLabel: hlineLabel('超卖 0.5') },
+      endLabel: hlineLabel('超卖') },
     { ...line, name: '平均线', z: 3, lineStyle: { color: C.avg, width: 1 },
       data: a.avg.map(v => v ?? NONE) },
     {

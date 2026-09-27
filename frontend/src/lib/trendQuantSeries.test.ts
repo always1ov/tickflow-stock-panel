@@ -65,15 +65,15 @@ describe('[R486] 趋势量化副图', () => {
     const legend = Object.fromEntries(TREND_QUANT_LEGEND.map(l => [l.name, l.color]))
     expect(legend['平均线']).toBe(lineColor('平均线'))
     expect(legend['吸筹']).toBe(lineColor('吸筹'))
-    expect(legend['超买 3.2 / 超卖 0.5']).toBe(lineColor('超买'))
-    expect(legend['超买 3.2 / 超卖 0.5']).toBe(lineColor('超卖'))
+    expect(legend['超买 / 超卖']).toBe(lineColor('超买'))
+    expect(legend['超买 / 超卖']).toBe(lineColor('超卖'))
   })
 
-  it('[R556] 超买 / 超卖两条黄线在右端注明名字与数值', () => {
+  it('[R556 → R557] 超买 / 超卖两条黄线在右端注明名字, 不带数值', () => {
     const s = trendQuantSeries(alignTrendQuant(Q.dates, Q), { xAxisIndex: 2, yAxisIndex: 2 })
     const end = (name: string) => (s.find(x => x.name === name) as { endLabel: { show: boolean; formatter: string } }).endLabel
-    expect(end('超买')).toMatchObject({ show: true, formatter: '超买 3.2' })
-    expect(end('超卖')).toMatchObject({ show: true, formatter: '超卖 0.5' })
+    expect(end('超买')).toMatchObject({ show: true, formatter: '超买' })
+    expect(end('超卖')).toMatchObject({ show: true, formatter: '超卖' })
   })
 
   it('[R555] 图例名字用中性色, 色只落在那段线上; 悬停说明三段齐全', () => {
