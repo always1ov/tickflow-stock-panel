@@ -382,7 +382,9 @@ export function StockPreviewDialog({ symbol, name, onClose, enableLevelsView = t
                     />
                     </div>
                   ) : (
-                    <StockLevelsPanel symbol={symbol} bare height={520}
+                    // [R551] 不要图上方的六态条: 与上面「现状」卡是同一份六态(用户圈出「重复了」),
+                    // 它独有的回测调参入口、转折信号已挪进现状卡
+                    <StockLevelsPanel symbol={symbol} bare height={520} trendBar={false}
                                       controls={levelCtl} visibleBars={reviewDays} />
                   )}
                 </ChartLevelsSection>

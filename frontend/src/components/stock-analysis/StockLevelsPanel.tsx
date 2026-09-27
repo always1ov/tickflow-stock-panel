@@ -16,6 +16,8 @@ interface StockLevelsPanelProps {
   controls?: LevelControls
   /** [R430] 默认显示最近多少根 K 线 */
   visibleBars?: number
+  /** [R551] 图上方那条六态条。个股弹窗传 false —— 同一份六态已在上面的「现状」卡里 */
+  trendBar?: boolean
 }
 
 /**
@@ -46,7 +48,7 @@ export function useStockLevels(symbol: string) {
  * 个股分析页与通用个股详情共用的关键价位主体。
  * 查询键、单票实时刷新与六态失效顺序保持一致，避免两个入口形成不同口径。
  */
-export function StockLevelsPanel({ symbol, height = 480, bare = false, controls, visibleBars }: StockLevelsPanelProps) {
+export function StockLevelsPanel({ symbol, height = 480, bare = false, controls, visibleBars, trendBar = true }: StockLevelsPanelProps) {
   const kline = useAnalysisKline(symbol)
 
   const levelsQ = useStockLevels(symbol)
@@ -123,7 +125,7 @@ export function StockLevelsPanel({ symbol, height = 480, bare = false, controls,
 
   const body = (
     <div className={bare ? 'space-y-2' : 'space-y-2 p-3'}>
-      <TrendStateBar symbol={symbol} trend={trendQ.data} />
+      {trendBar && <TrendStateBar symbol={symbol} trend={trendQ.data} />}
       <AnalysisKChart
         rows={rows}
         levels={levels}

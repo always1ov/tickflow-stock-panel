@@ -35,9 +35,46 @@ export function trendBadgeCls(state: LivermoreState): string {
   return STATE_BADGE[state] ?? 'border-border text-muted'
 }
 
-export function TrendStateBar({ symbol, trend }: { symbol: string; trend: TrendDetail | undefined }) {
-  const [showBacktest, setShowBacktest] = useState(false)
+/** 当天出了转折信号(转多 / 转空 / 回升 / 回撤)时的小徽标 —— 六态条与个股弹窗「现状」卡共用这一份 */
+export function TrendSignalBadge({ trend }: { trend: TrendDetail }) {
+  if (!trend.signal) return null
+  return (
+    <span
+      className={`inline-flex rounded-btn border px-2 py-0.5 text-micro ${SIGNAL_BADGE[trend.signal] ?? ''}`}
+      title={trend.signal_desc ?? undefined}
+    >
+      {trend.signal}
+    </span>
+  )
+}
 
+/** 两条翻转价背后的参考数(本轮高低收盘、上下关键点、阈值、价格口径), 悬停可见 —— 只此一个产地 */
+export function trendPivotTitle(trend: TrendDetail): string {
+  return `本轮最高收盘 ${trend.leg_high?.toFixed(2) ?? '—'} · 本轮最低收盘 ${trend.leg_low?.toFixed(2) ?? '—'}\n上关键点 ${trend.up_pivot?.toFixed(2) ?? '—'} · 下关键点 ${trend.dn_pivot?.toFixed(2) ?? '—'}\n阈值 ${(trend.threshold * 100).toFixed(0)}%${trend.price_basis === 'closing' ? `\n价位按已收盘日线算(不含盘中实时价), 截至 ${trend.closing_as_of ?? '—'}` : ''}`
+}
+
+/** 「回测调参 N%」按钮 + 它打开的弹窗 —— 六态条与个股弹窗「现状」卡共用这一份 */
+export function TrendBacktestButton({ symbol, trend, className }: { symbol: string; trend: TrendDetail; className?: string }) {
+  const [showBacktest, setShowBacktest] = useState(false)
+  return (
+    <>
+      <button
+        onClick={() => setShowBacktest(true)}
+        className={`inline-flex items-center gap-1 rounded-btn border border-accent/30 bg-accent/10 px-2 py-0.5 text-micro text-accent hover:bg-accent/20 transition-colors cursor-pointer ${className ?? ''}`}
+        title="按阈值网格回测近 180 个交易日,选择该票的合适回撤/回升阈值"
+      >
+        <FlaskConical className="h-3 w-3" />
+        回测调参 {(trend.threshold * 100).toFixed(0)}%
+        {trend.threshold_source === 'override' && <span className="text-accent/60">(已定制)</span>}
+      </button>
+      {showBacktest && (
+        <TrendBacktestDialog symbol={symbol} onClose={() => setShowBacktest(false)} />
+      )}
+    </>
+  )
+}
+
+export function TrendStateBar({ symbol, trend }: { symbol: string; trend: TrendDetail | undefined }) {
   if (!trend) return null
   if (trend.error) {
     return (
@@ -71,20 +108,13 @@ export function TrendStateBar({ symbol, trend }: { symbol: string; trend: TrendD
         <span className="text-muted"> · 自 {trend.since}</span>
         {trend.entered_from_cn && <span className="text-muted"> · 由「{trend.entered_from_cn}」转入</span>}
       </span>
-      {trend.signal && (
-        <span
-          className={`inline-flex rounded-btn border px-2 py-0.5 text-micro ${SIGNAL_BADGE[trend.signal] ?? ''}`}
-          title={trend.signal_desc ?? undefined}
-        >
-          {trend.signal}
-        </span>
-      )}
+      <TrendSignalBadge trend={trend} />
       {/* [R29] 主打「跌破转弱 / 站上转强」两条翻转触发价 —— 趋势途中上关键点就是
           本轮最高收盘价(创新高当天等于当日收盘), 当触发价看没有参考价值。
           关键点降级为悬停可见的参考信息。 */}
       <span
         className="text-xs font-mono text-muted"
-        title={`本轮最高收盘 ${trend.leg_high?.toFixed(2) ?? '—'} · 本轮最低收盘 ${trend.leg_low?.toFixed(2) ?? '—'}\n上关键点 ${trend.up_pivot?.toFixed(2) ?? '—'} · 下关键点 ${trend.dn_pivot?.toFixed(2) ?? '—'}\n阈值 ${(trend.threshold * 100).toFixed(0)}%${trend.price_basis === 'closing' ? `\n价位按已收盘日线算(不含盘中实时价), 截至 ${trend.closing_as_of ?? '—'}` : ''}`}
+        title={trendPivotTitle(trend)}
       >
         {trend.flip_down != null && (
           <>跌破 <span className="text-bear/90">{trend.flip_down.toFixed(2)}</span> 转弱</>
@@ -100,18 +130,7 @@ export function TrendStateBar({ symbol, trend }: { symbol: string; trend: TrendD
         )}
       </span>
       <span className="text-xs text-warning/90">{trend.action}</span>
-      <button
-        onClick={() => setShowBacktest(true)}
-        className="ml-auto inline-flex items-center gap-1 rounded-btn border border-accent/30 bg-accent/10 px-2 py-0.5 text-micro text-accent hover:bg-accent/20 transition-colors cursor-pointer"
-        title="按阈值网格回测近 180 个交易日,选择该票的合适回撤/回升阈值"
-      >
-        <FlaskConical className="h-3 w-3" />
-        回测调参 {(trend.threshold * 100).toFixed(0)}%
-        {trend.threshold_source === 'override' && <span className="text-accent/60">(已定制)</span>}
-      </button>
-      {showBacktest && (
-        <TrendBacktestDialog symbol={symbol} onClose={() => setShowBacktest(false)} />
-      )}
+      <TrendBacktestButton symbol={symbol} trend={trend} className="ml-auto" />
     </div>
   )
 }

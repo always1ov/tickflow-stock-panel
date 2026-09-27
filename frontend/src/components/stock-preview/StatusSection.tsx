@@ -5,7 +5,9 @@
  * **一整套新的买卖判定**, 用户选的是「先做现状, 规则写成草案给你审」—— 所以这里只有
  * 现成的读数, 一个新判定都没有:
  *
- *   趋势状态      六态, 与图上方那条六态条同一个查询(`useStockTrend`)
+ *   趋势状态      六态(`useStockTrend`)。[R551] 图上方原来还有一条六态条, 与这一格逐字重复
+ *                 (用户圈出「重复了」), 已撤; 它独有的回测调参入口、转折信号搬到这一格,
+ *                 操作建议与关键点参考数放进状态名的悬停
  *   跌破转弱 / 站上转强   同上, 距离是后端给的带符号的数
  *   通道阶段      上升中 / 下跌中 / 横盘中 …(`channel.phase.cn`)
  *   三档位置      短 / 中 / 长期各在自己通道的上轨 / 中轨 / 下轨哪一格, 色与时间轴
@@ -21,13 +23,13 @@
  * 顶上一行小标题, 下面读数, 顶端对齐; 窄屏两块一行。[R448] 三档位置那一块不要小标题。
  *
  * 六态走的是六态接口(开实时行情时是盘中口径, 会标出来), 通道那几样走复盘接口
- * (收盘口径)。两者分别与图上方的六态条、下面的复盘表是同一份数, 不另算。
+ * (收盘口径)。两者分别与六态条(独立的关键价位弹窗里还有)、下面的复盘表是同一份数, 不另算。
  */
 import type { ReactNode } from 'react'
 import type { StockReview } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import { BAND_CN, POS_FILL } from '@/lib/reviewTimeline'
-import { useStockTrend } from '@/components/stock-analysis/TrendStateBar'
+import { TrendBacktestButton, TrendSignalBadge, trendPivotTitle, useStockTrend } from '@/components/stock-analysis/TrendStateBar'
 import { pct, useStockReview } from '@/components/stock-analysis/StockReviewDialog'
 import { SectionTitle } from '@/components/ui'
 
@@ -69,13 +71,18 @@ function TrendCell({ symbol }: { symbol: string }) {
     <>
       <Cell label={<>趋势状态 · 六态{t.intraday && <span className="ml-1.5 text-warning" title="实时价参与了六态判定, 收盘价可能改变结论 —— 定稿以收盘为准">盘中口径</span>}</>}>
         <div className="flex items-baseline gap-2">
-          <span className={cn('text-xl font-semibold', bull ? 'text-bull' : 'text-bear')}>{t.state_cn}</span>
+          {/* [R551] 悬停: 操作建议 + 两条翻转价背后的参考数 —— 原来印在图上方六态条里, 那条已撤 */}
+          <span className={cn('text-xl font-semibold', bull ? 'text-bull' : 'text-bear')}
+                title={`${t.action}\n\n${trendPivotTitle(t)}`}>{t.state_cn}</span>
           {/* [R249] 「已 N 天」—— 与决策台徽标、六态条同一个说法 */}
           <span className="text-sm text-secondary">已 <span className="font-mono">{t.duration}</span> 天</span>
+          <TrendSignalBadge trend={t} />
         </div>
         <div className="mt-0.5 text-micro text-muted">
           自 {t.since}{t.entered_from_cn && <> 由「{t.entered_from_cn}」转入</>}
         </div>
+        {/* [R551] 回测调参的入口从图上方的六态条搬来(那条与这一格重复, 已撤) */}
+        <TrendBacktestButton symbol={symbol} trend={t} className="mt-2" />
       </Cell>
       <div className="flex flex-wrap gap-x-8 gap-y-5">
         {t.flip_down != null && (
