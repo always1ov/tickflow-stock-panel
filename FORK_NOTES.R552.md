@@ -1,0 +1,5 @@
+# R552 — 个股弹窗开合动效: 动效评审四条
+
+| # | 改动 | 涉及文件 | 冲突风险 | 单独回退 |
+|---|---|---|---|---|
+| R552 | 用户对 R550/R551 跑 `/review-animations`, 结论 Block, 用户「修」。① 面板位移原来用 framer 的 `scale` / `y` 简写, 逐帧日志里交给浏览器原生动画的只有 opacity, 位移在主线程逐帧算, 打开那 200ms 正赶上 K 线图、复盘表挂载 → 改成完整 transform 字符串(`translateY(12px) scale(0.95)` → `translateY(0px) scale(1)`, 终态 `transitionEnd` 收回 `none`, 免得成为 fixed 子元素的包含块), 修后日志里 transform 也走原生动画; ② 面板退场沿用入场的 200ms → 退场单独 150ms(关掉是系统应答, 该利落); ③ 遮罩只写了时长、吃 framer 默认的软曲线, 与面板不同步 → 两者同用 `[0.23, 1, 0.32, 1]`(--ease-out-strong); ④ R550 让退场真的跑起来之后, 外层 `fixed inset-0 z-50` 在退场那 150ms 里还拦点击(关掉一只马上点下一只, 第一下被吞) → 外层改 motion.div, `exit={{ pointerEvents: 'none' }}`。减少动态效果: framer 的 reducedMotion 只认 x / y / scale 键、不认 transform 字符串(评审里说「照样生效」是错的, 查源码 positionalKeys 才发现), 改用 `useReducedMotion()` 自己判断, 开了就只剩透明度。验证: 逐帧回路深浅两色 open dips=0 / close rebounds=0、退场 50ms 时点屏幕中央落在页面上(修前 BLOCKED)、静止后 transform=none、减少动态效果下 transform 全程 none | frontend/src/components/StockPreviewDialog.tsx; backend/tests/test_preview_motion_r552.py | 低: 只动个股弹窗外壳的动效参数 | 可以: git revert 本提交 |

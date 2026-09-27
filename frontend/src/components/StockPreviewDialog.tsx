@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import { api } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { cn } from '@/lib/cn'
@@ -61,6 +61,20 @@ interface PriceAlertDraft {
 }
 const INTRADAY_DAY_OPTIONS = [1, 5, 10, 20] as const
 
+// [R552] 弹窗开合的动效参数(动效评审 R550/R551 四条):
+//   · 遮罩与面板同一条有力的 ease-out(--ease-out-strong), 原来遮罩吃 framer 默认的软曲线, 两者不同步;
+//   · 面板位移写完整 transform 字符串, 不用 `scale` / `y` 简写 —— 简写在主线程逐帧算,
+//     打开那 200ms 正是 K 线图、复盘表挂载最忙的时候, 会掉帧; 字符串交给浏览器原生动画跑;
+//   · 退场比入场快(150 vs 200ms): 点开是用户主动的, 关掉是系统应答, 该利落;
+//   · 减少动态效果: framer 的 reducedMotion 只认 x / y / scale 这类键, 不认 `transform` 字符串,
+//     所以这里自己判断, 开了就只剩透明度。
+const EASE_OUT_STRONG = [0.23, 1, 0.32, 1] as const
+const PANEL_MOTION = {
+  from: 'translateY(12px) scale(0.95)',
+  to: 'translateY(0px) scale(1)',
+  exit: 'translateY(8px) scale(0.97)',
+} as const
+
 function loadIntradayDays(): number {
   const saved = storage.stockPreviewIntradayDays.get(DEFAULT_INTRADAY_DAYS)
   return INTRADAY_DAY_OPTIONS.includes(saved as typeof INTRADAY_DAY_OPTIONS[number])
@@ -86,6 +100,7 @@ export function StockPreviewDialog({ symbol, name, onClose, enableLevelsView = t
   const [priceAlertDraft, setPriceAlertDraft] = useState<PriceAlertDraft | null>(null)
   const qc = useQueryClient()
   const backdrop = useDialogBackdrop(onClose)
+  const reduceMotion = useReducedMotion()
 
   const watchlist = useQuery({
     queryKey: QK.watchlist,
@@ -279,23 +294,27 @@ export function StockPreviewDialog({ symbol, name, onClose, enableLevelsView = t
   return (
     <AnimatePresence>
       {symbol && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
+        // [R552] 退场期间不接点击: 弹窗常挂之后退场真的会跑, 已经淡出的遮罩还会拦住 150ms 的点击,
+        // 关掉一只马上点下一只, 第一下被吞掉
+        <motion.div className="fixed inset-0 z-50 flex items-center justify-center"
+                    exit={{ pointerEvents: 'none' }}>
           {/* 遮罩 */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}
+            transition={{ duration: 0.15, ease: EASE_OUT_STRONG }}
             className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             {...backdrop}
           />
 
-          {/* 弹窗主体 */}
+          {/* 弹窗主体 —— 终态 transform 收回 none: 非 none 的 transform 会成为 fixed 子元素的包含块(见 Modal.tsx) */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 12 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.97, y: 8 }}
-            transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+            initial={{ opacity: 0, transform: reduceMotion ? 'none' : PANEL_MOTION.from }}
+            animate={{ opacity: 1, transform: reduceMotion ? 'none' : PANEL_MOTION.to, transitionEnd: { transform: 'none' } }}
+            exit={{ opacity: 0, transform: reduceMotion ? 'none' : PANEL_MOTION.exit,
+                    transition: { duration: 0.15, ease: EASE_OUT_STRONG } }}
+            transition={{ duration: 0.2, ease: EASE_OUT_STRONG }}
             className={cn(
               'relative rounded-card border border-border bg-base shadow-2xl overflow-hidden flex flex-col w-[92vw] max-w-[1200px] max-h-[95vh]',
             )}
@@ -443,7 +462,7 @@ export function StockPreviewDialog({ symbol, name, onClose, enableLevelsView = t
             {/* 首↔尾循环弱提示 */}
             <NavWrapToast message={nav.wrapMsg} />
           </motion.div>
-        </div>
+        </motion.div>
       )}
       {symbol && priceAlertDraft && (
         <PriceAlertDialog
