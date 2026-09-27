@@ -19,3 +19,12 @@ def test_R555_说明只有一个产地():
     assert "export const TREND_QUANT_LEGEND" in series
     # 图表里不另写一份说明文字
     assert "吸筹:" not in code_of("components/stock-analysis/AnalysisKChart.tsx")
+
+
+def test_R556_黄线名字写在右端_图例行不重复():
+    """用户: 「超买超卖想在黄线右端注明」。"""
+    series = code_of("lib/trendQuantSeries.ts")
+    assert "hlineLabel('超买 3.2')" in series and "hlineLabel('超卖 0.5')" in series
+    # 亮色主题下右侧留白是白底, 纯黄字看不见, 要垫副图同色的底
+    assert "backgroundColor: C.paneBg" in series
+    assert "labelledOnLine: true" in series and "!l.labelledOnLine" in series

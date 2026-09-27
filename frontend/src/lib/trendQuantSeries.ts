@@ -57,7 +57,7 @@ export const TREND_MARKS: { key: TrendMarkKey; text: string; at: number | 'avg';
  * 其中绿线最容易看错: 平时它贴在 0.53, 紧挨着 0.5 那条黄线, 看着像一条平的绿线。
  * 说明只讲**这条线是怎么来的、怎么读**, 不添判定 —— 公式是作者的, 冻结。
  */
-export const TREND_QUANT_LEGEND: { name: string; color: string; desc: string }[] = [
+export const TREND_QUANT_LEGEND: { name: string; color: string; desc: string; labelledOnLine?: true }[] = [
   {
     name: '平均线', color: C.avg,
     desc: '红绿短柱(波动线)的 3 日均线。波动线 = 收盘价落在「近 10 日最低 ~ 近 25 日最高」'
@@ -70,7 +70,7 @@ export const TREND_QUANT_LEGEND: { name: string; color: string; desc: string }[]
       + '拱多高看最近最低价跌得有多急(原公式叫「主力吸货」), 高低是和这只票上市以来最高的那一次比。',
   },
   {
-    name: '超买 3.2 / 超卖 0.5', color: C.yellow,
+    name: '超买 3.2 / 超卖 0.5', color: C.yellow, labelledOnLine: true,
     desc: '两条固定参考线。波动线靠近 3.2 = 收盘在近期区间的高位, 靠近 0.5 = 在近期区间的低位。',
   },
 ]
@@ -93,7 +93,8 @@ export function trendQuantLegendGraphic(left: number, top: number, textColor: st
 } {
   const graphic: Record<string, unknown>[] = []
   let x = left
-  for (const l of TREND_QUANT_LEGEND) {
+  // [R556] 黄线的名字已写在线的右端, 图例这行不再重复印它(悬停说明里仍有那一段)
+  for (const l of TREND_QUANT_LEGEND.filter(l => !l.labelledOnLine)) {
     graphic.push({ type: 'line', x, y: top + 6, silent: true,
                    shape: { x1: 0, y1: 0, x2: SWATCH, y2: 0 }, style: { stroke: l.color, lineWidth: 2 } })
     graphic.push({ type: 'text', left: x + SWATCH + 4, top: top + 1, silent: true,
@@ -164,6 +165,12 @@ export function trendQuantSeries(
   const n = a.avg.length
   const line = { type: 'line', ...axis, animation: false, silent: true, symbol: 'none' }
   const hline = (v: number) => Array.from({ length: n }, () => v)
+  // 标签落在副图右侧的留白带里 —— 亮色主题下那里是白底, 纯黄字看不见; 垫一块与副图同色的黑底,
+  // 两个主题下都是「黑底黄字」, 像是副图的延伸
+  const hlineLabel = (text: string) => ({
+    show: true, formatter: text, color: C.yellow, fontSize: 10, distance: 6,
+    backgroundColor: C.paneBg, padding: [2, 4], borderRadius: 2,
+  })
 
   const sticks: [number, number, number, number][] = []
   a.stick_up.forEach((u, i) => {
@@ -189,8 +196,11 @@ export function trendQuantSeries(
   }))
 
   return [
-    { ...line, name: '超买', z: 2, lineStyle: { color: C.yellow, width: 1 }, data: hline(3.2) },
-    { ...line, name: '超卖', z: 2, lineStyle: { color: C.yellow, width: 1 }, data: hline(0.5) },
+    // [R556] 两条黄线的名字写在右端(用户: 「超买超卖想在黄线右端注明」), 落在图右侧的留白带里
+    { ...line, name: '超买', z: 2, lineStyle: { color: C.yellow, width: 1 }, data: hline(3.2),
+      endLabel: hlineLabel('超买 3.2') },
+    { ...line, name: '超卖', z: 2, lineStyle: { color: C.yellow, width: 1 }, data: hline(0.5),
+      endLabel: hlineLabel('超卖 0.5') },
     { ...line, name: '平均线', z: 3, lineStyle: { color: C.avg, width: 1 },
       data: a.avg.map(v => v ?? NONE) },
     {

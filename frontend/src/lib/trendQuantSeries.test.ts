@@ -69,10 +69,18 @@ describe('[R486] 趋势量化副图', () => {
     expect(legend['超买 3.2 / 超卖 0.5']).toBe(lineColor('超卖'))
   })
 
+  it('[R556] 超买 / 超卖两条黄线在右端注明名字与数值', () => {
+    const s = trendQuantSeries(alignTrendQuant(Q.dates, Q), { xAxisIndex: 2, yAxisIndex: 2 })
+    const end = (name: string) => (s.find(x => x.name === name) as { endLabel: { show: boolean; formatter: string } }).endLabel
+    expect(end('超买')).toMatchObject({ show: true, formatter: '超买 3.2' })
+    expect(end('超卖')).toMatchObject({ show: true, formatter: '超卖 0.5' })
+  })
+
   it('[R555] 图例名字用中性色, 色只落在那段线上; 悬停说明三段齐全', () => {
     const { graphic, width } = trendQuantLegendGraphic(108, 0, '#999')
     const texts = graphic.filter(g => g.type === 'text') as { style: { text: string; fill: string } }[]
-    expect(texts.map(t => t.style.text)).toEqual(TREND_QUANT_LEGEND.map(l => l.name))
+    // [R556] 黄线的名字写在线右端, 图例行不再重复
+    expect(texts.map(t => t.style.text)).toEqual(['平均线', '吸筹'])
     expect(texts.every(t => t.style.fill === '#999')).toBe(true)
     expect(width).toBeGreaterThan(0)
     expect(TREND_QUANT_HELP.split('\n\n')).toHaveLength(3)
