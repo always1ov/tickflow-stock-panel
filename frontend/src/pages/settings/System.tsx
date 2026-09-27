@@ -18,6 +18,7 @@ import {
 import { loadStockExternalTemplate, saveStockExternalTemplate } from '@/lib/stock-external-link'
 import { buttonClass } from '@/components/ui'
 import { SettingsCard, SettingRow } from './SettingsCard'
+import { Switch } from '@/components/ui/Switch'
 
 export function SettingsSystemPanel() {
   const qc = useQueryClient()
@@ -508,19 +509,7 @@ function ToggleRow({
         <div className="text-sm text-foreground">{label}</div>
         <div className="text-xs text-muted truncate">{desc}</div>
       </div>
-      <button
-        onClick={() => onChange(!checked)}
-        disabled={disabled}
-        className={`relative inline-flex h-5 w-9 items-center rounded-full shrink-0 transition-colors duration-expand disabled:opacity-50 ${
-          checked ? 'bg-accent' : 'bg-elevated'
-        }`}
-      >
-        <span
-          className={`inline-block h-3.5 w-3.5 rounded-full bg-white shadow-sm transition-transform duration-expand ${
-            checked ? 'translate-x-[18px]' : 'translate-x-[3px]'
-          }`}
-        />
-      </button>
+      <Switch checked={checked} disabled={disabled} onChange={onChange} label={label} />
     </div>
   )
 }

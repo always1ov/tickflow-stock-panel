@@ -10,6 +10,7 @@ import { QK } from '@/lib/queryKeys'
 import { AiProfiles } from '@/pages/settings/AiProfiles'
 import { SettingsCard, SettingsHighlight } from './SettingsCard'
 import { buttonClass, TYPE } from '@/components/ui'
+import { Switch } from '@/components/ui/Switch'
 import { cn } from '@/lib/cn'
 
 // 统一的输入框样式(与项目其他设置页一致)
@@ -302,7 +303,7 @@ export function SettingsAIPanel({ highlight }: { highlight?: string } = {}) {
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <Field label="自定义 User-Agent" inline>
-          <Toggle checked={customUa} onChange={() => setCustomUa(v => !v)} />
+          <Switch checked={customUa} onChange={() => setCustomUa(v => !v)} label="自定义 User-Agent" />
         </Field>
       </div>
       {customUa && (
@@ -544,17 +545,3 @@ function Field({ label, hint, inline, children }: {
   )
 }
 
-// ===== 开关 =====
-
-function Toggle({ checked, onChange }: { checked: boolean; onChange: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onChange}
-      className={`tap-target relative inline-flex h-5 w-9 items-center rounded-full shrink-0 transition-colors duration-expand ${checked ? 'bg-accent' : 'bg-elevated'}`}
-      aria-pressed={checked}
-    >
-      <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white shadow-sm transition-transform duration-expand ${checked ? 'translate-x-[18px]' : 'translate-x-[3px]'}`} />
-    </button>
-  )
-}

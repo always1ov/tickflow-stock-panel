@@ -5,6 +5,7 @@ import { KeyRound, Play, Plus, Save, Trash2, X, Zap, Check, ChevronDown } from '
 import { api, type CustomSourceConfig, type DatasetConfig } from '@/lib/api'
 import { toast } from '@/components/Toast'
 import { buttonClass, TYPE } from '@/components/ui'
+import { Switch } from '@/components/ui/Switch'
 
 // 暗色适配的标准输入框样式 (与 AI 页统一, bg-base 在暗色下为深色, 不会白底白字)
 const INPUT_CLS =
@@ -709,15 +710,7 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
   )
 }
 
+// [R548] 小号开关走 components/ui/Switch(size="sm"); 这层薄壳只为保留调用处拿事件做 stopPropagation 的写法
 function Toggle({ checked, onChange }: { checked: boolean; onChange: (e?: React.MouseEvent) => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onChange}
-      className={`tap-target relative inline-flex h-4 w-7 items-center rounded-full transition-colors ${checked ? 'bg-accent' : 'bg-elevated'}`}
-      aria-pressed={checked}
-    >
-      <span className={`inline-block h-3 w-3 rounded-full bg-white shadow-sm transition-transform ${checked ? 'translate-x-[14px]' : 'translate-x-[2px]'}`} />
-    </button>
-  )
+  return <Switch size="sm" checked={checked} onChange={(_, e) => onChange(e)} />
 }

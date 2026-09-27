@@ -1,0 +1,5 @@
+# R548 — 动效评审四条落地: 开关收成一个产地、滑块用有力曲线、删除确认不闪
+
+| # | 改动 | 涉及文件 | 冲突风险 | 单独回退 |
+|---|---|---|---|---|
+| R548 | 用户跑了 `/review-animations` 评审 R535–R547 的动效, 结论「通过」附四条打磨项, 用户「解决」。① 新增 `components/ui/Switch`(md / sm 两档, role=switch + aria-checked): 滑块 `transition-transform duration-expand ease-in-out-strong`(200ms, cubic-bezier(0.77,0,0.175,1); 原来吃 Tailwind 默认曲线, 滑得发飘), 轨道 `transition-colors duration-hover` + `ease`(150ms, 只变色); ② 设置区与复盘定时的开关原来各手写一份(JobTimeoutCard / AI / System / Monitoring / DataSourceEditor / Review), 手感一致纯属巧合 → 全部改走这一个组件; 复盘那份关着时轨道用 bg-border、滑块偏 4px, 顺带对齐; ③ 信号库删除确认按钮的无限 `animate-pulse` 去掉(3 秒自动复原的状态不需要装饰性循环动效)。减少动态效果: index.css 全局兜底已把 transform 移出过渡, 滑块瞬时到位。**还没收的**: 站内其余十几处手写开关(看板 / 自选 / 策略弹窗 / 连板梯队 / 宏观 / 异动 / 分钟同步等), 本轮没动, 以后碰到哪页顺手迁; R535 那条守卫(滑块只动 transform)跟着改为查共用 Switch | frontend/src/components/ui/Switch.tsx(新); frontend/src/components/ui/index.ts; frontend/src/pages/settings/{JobTimeoutCard,AI,System,Monitoring,DataSourceEditor}.tsx; frontend/src/pages/Review.tsx; frontend/src/pages/Signals.tsx; backend/tests/test_switch_r548.py(新); backend/tests/test_settings_r535.py | 低: 开关外观与行为不变, 只换产地与曲线 | 可以: git revert 本提交 |

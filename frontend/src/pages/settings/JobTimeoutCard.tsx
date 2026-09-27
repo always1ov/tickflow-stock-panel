@@ -11,6 +11,8 @@ import { QK } from '@/lib/queryKeys'
 import { usePreferences } from '@/lib/useSharedQueries'
 import { toast } from '@/components/Toast'
 import { buttonClass } from '@/components/ui'
+// [R548] 开关收成 components/ui/Switch 一个产地
+import { Switch } from '@/components/ui/Switch'
 import { SettingsCard, SettingRow } from './SettingsCard'
 
 type TimeoutUnit = 'second' | 'minute' | 'hour'
@@ -203,9 +205,9 @@ export function JobTimeoutCard() {
       desc="大数据接口（分时、日K）启用 gzip 压缩，响应可缩至约 1/8，公网访问明显更快；本机或内网可关闭以节省服务端 CPU。任一子项开启时总开关为开，点击总开关一键全开/全关，子项可单独微调，立即生效。"
       right={(
         <Switch
-          on={compressAnyOn}
+          checked={compressAnyOn}
           disabled={toggleAllCompress.isPending}
-          onClick={() => toggleAllCompress.mutate(!compressAnyOn)}
+          onChange={next => toggleAllCompress.mutate(next)}
           title={compressAnyOn ? '全部关闭' : '全部开启'}
         />
       )}
@@ -238,22 +240,7 @@ function CompressToggleRow({ label, desc, enabled, pending, onToggle }: {
 }) {
   return (
     <SettingRow label={label} desc={desc}>
-      <Switch on={enabled} disabled={pending} onClick={onToggle} title={enabled ? '点击关闭' : '点击开启'} />
+      <Switch checked={enabled} disabled={pending} onChange={() => onToggle()} title={enabled ? '点击关闭' : '点击开启'} />
     </SettingRow>
-  )
-}
-
-/** [R535] 两个尺寸的开关并成一个, 与设置区其它开关同尺寸; 滑块改走 transform(原来过渡的是 `left`, 每帧重排) */
-function Switch({ on, disabled, onClick, title }: { on: boolean; disabled?: boolean; onClick: () => void; title?: string }) {
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      title={title}
-      aria-pressed={on}
-      className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors duration-expand disabled:opacity-40 ${on ? 'bg-accent' : 'bg-elevated'}`}
-    >
-      <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white shadow-sm transition-transform duration-expand ${on ? 'translate-x-[18px]' : 'translate-x-[3px]'}`} />
-    </button>
   )
 }

@@ -177,7 +177,7 @@ function SignalsBody({ highlight, activeSection, setActiveSection, showForm, set
                         onClick={() => handleDeleteClick(sig)}
                         disabled={del.isPending}
                         title="再次点击确认删除"
-                        className="inline-flex animate-pulse cursor-pointer items-center gap-1 rounded-md border border-danger/30 bg-danger/15 px-1.5 py-0.5 text-micro font-medium text-danger disabled:opacity-50"
+                        className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-danger/30 bg-danger/15 px-1.5 py-0.5 text-micro font-medium text-danger disabled:opacity-50"
                       >
                         <Trash2 className="h-2.5 w-2.5" />确认
                       </button>

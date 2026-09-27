@@ -57,8 +57,10 @@ def test_R535_系统收成常规与维护两张():
 def test_R535_网络拆成两张_开关只动transform():
     code = code_of(S + "JobTimeoutCard.tsx")
     assert 'title="超时设置"' in code and 'title="数据传输压缩"' in code
-    # 原来滑块过渡的是 left(每帧重排), AGENTS.md 动效硬规则第 1 条
-    assert "left-[" not in code and "translate-x-" in code
+    # 原来滑块过渡的是 left(每帧重排), AGENTS.md 动效硬规则第 1 条。
+    # [R548] 开关收进 components/ui/Switch, 这里只查不再手写 left, 且用的是共用开关(transform 在那边钉着)
+    assert "left-[" not in code and "<Switch" in code
+    assert "transition-transform" in code_of("components/ui/Switch.tsx")
 
 
 def test_R535_菜单_内置不逐行印_手机上名字保底():

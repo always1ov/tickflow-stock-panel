@@ -32,6 +32,7 @@ import {
   type ReviewPhase,
 } from '@/lib/reviewStore'
 import { TYPE, buttonClass } from '@/components/ui'
+import { Switch } from '@/components/ui/Switch'
 
 // ================================================================
 // 涨跌幅格式化(注意单位差异)
@@ -418,18 +419,8 @@ export function Review() {
               {/* 开关(只改本地草稿, 不提交) */}
               <label className="flex items-center justify-between rounded-btn bg-elevated/40 px-3 py-2.5">
                 <span className="text-xs text-foreground">启用定时复盘</span>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={draft.enabled}
-                  onClick={() => setDraft(d => ({ ...d, enabled: !d.enabled }))}
-                  className={cn(
-                    'relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors',
-                    draft.enabled ? 'bg-accent' : 'bg-border',
-                  )}
-                >
-                  <span className={cn('inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform', draft.enabled ? 'translate-x-[18px]' : 'translate-x-1')} />
-                </button>
+                {/* [R548] 走共用 Switch(原来手写一份, 关着时轨道用 bg-border、滑块偏 4px, 与设置区的开关长得不一样) */}
+                <Switch checked={draft.enabled} onChange={next => setDraft(d => ({ ...d, enabled: next }))} />
               </label>
 
               {/* 时间设置(仅开启时可编辑, 本地草稿) */}
