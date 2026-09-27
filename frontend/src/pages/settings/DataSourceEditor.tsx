@@ -262,25 +262,29 @@ export function DataSourceEditor({
               <div className="text-micro uppercase tracking-widest text-muted">数据集</div>
               {DATASETS.map(key => {
                 const enabled = !!config.datasets[key]
+                // [R549] 开关原来嵌在这一行的 <button> 里: 按钮套按钮不合法, 而且按下开关时祖先也进 :active,
+                // 整行跟着缩到 0.97(瞬间跳变)。改成一行两个并排的控件 —— 行按钮切数据集, 开关管启用。
                 return (
-                  <button
+                  <div
                     key={key}
-                    onClick={() => setActiveTab(key)}
-                    className={`w-full flex items-center gap-2 px-2.5 py-2 rounded-btn text-sm transition-colors ${
+                    className={`flex items-center gap-2 rounded-btn pr-2.5 transition-colors ${
                       activeTab === key ? 'bg-elevated text-foreground' : 'text-secondary hover:bg-elevated/50'
                     }`}
                   >
-                    <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${enabled ? 'bg-accent' : 'bg-muted/30'}`} />
-                    <span className="flex-1 text-left">{DATASET_LABEL[key]}</span>
-                    {enabled
-                      ? <span className="text-micro text-accent">已配置</span>
-                      : <span className="text-micro text-muted/50">回退 TF</span>
-                    }
-                    <Toggle
-                      checked={enabled}
-                      onChange={(e) => { e?.stopPropagation(); setDatasetEnabled(key, !enabled) }}
-                    />
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab(key)}
+                      className="flex min-w-0 flex-1 items-center gap-2 py-2 pl-2.5 text-sm"
+                    >
+                      <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${enabled ? 'bg-accent' : 'bg-muted/30'}`} />
+                      <span className="flex-1 text-left">{DATASET_LABEL[key]}</span>
+                      {enabled
+                        ? <span className="text-micro text-accent">已配置</span>
+                        : <span className="text-micro text-muted/50">回退 TF</span>
+                      }
+                    </button>
+                    <Switch size="sm" checked={enabled} onChange={next => setDatasetEnabled(key, next)} label={`启用${DATASET_LABEL[key]}`} />
+                  </div>
                 )
               })}
             </div>
@@ -365,7 +369,7 @@ function DatasetDetail({
           <h3 className={TYPE.card}>{DATASET_LABEL[datasetKey]}</h3>
           <span className="text-micro text-muted/50 font-mono">{datasetKey}</span>
         </div>
-        <Toggle checked={enabled} onChange={() => onToggle(!enabled)} />
+        <Switch size="sm" checked={enabled} onChange={next => onToggle(next)} label={`启用${DATASET_LABEL[datasetKey]}`} />
       </div>
 
       <AnimatePresence mode="wait">
@@ -710,7 +714,3 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
   )
 }
 
-// [R548] 小号开关走 components/ui/Switch(size="sm"); 这层薄壳只为保留调用处拿事件做 stopPropagation 的写法
-function Toggle({ checked, onChange }: { checked: boolean; onChange: (e?: React.MouseEvent) => void }) {
-  return <Switch size="sm" checked={checked} onChange={(_, e) => onChange(e)} />
-}

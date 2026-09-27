@@ -25,7 +25,8 @@ def test_R548_开关动效取值():
     sw = code_of(SWITCH)
     # 滑块: 屏上位移 → 有力的 ease-in-out, 200ms; 轨道: 只变色 → ease, 150ms
     assert "transition-transform duration-expand ease-in-out-strong" in sw
-    assert "transition-colors duration-hover [transition-timing-function:ease]" in sw
+    # [R549] 轨道同时过渡颜色(150ms ease)与按压缩放(160ms 有力 ease-out), 取值见 test_R549_按压缩放有过渡
+    assert "background-color_150ms_ease" in sw
     assert 'role="switch"' in sw and "aria-checked={checked}" in sw
     # 只动 transform 与颜色
     for bad in ("left-[", "transition-all", "transition-ui"):
@@ -41,3 +42,17 @@ def test_R548_设置区不再手写开关(path):
 
 def test_R548_删除确认不闪():
     assert "animate-pulse" not in code_of("pages/Signals.tsx")
+
+
+def test_R549_按压缩放有过渡():
+    # 全站 :active → scale(0.97); 轨道原来只过渡颜色, 缩放瞬间跳变
+    sw = code_of(SWITCH)
+    assert "[transition:background-color_150ms_ease,transform_160ms_var(--ease-out-strong)]" in sw
+
+
+def test_R549_开关不嵌在按钮里():
+    # 数据源编辑器的数据集行: 开关原来嵌在整行 <button> 里, 按下开关整行跟着缩
+    code = code_of("pages/settings/DataSourceEditor.tsx")
+    assert "function Toggle" not in code
+    row = code[code.index("onClick={() => setActiveTab(key)}"):]
+    assert row.index("</button>") < row.index("<Switch"), "开关又塞回行按钮里了"
