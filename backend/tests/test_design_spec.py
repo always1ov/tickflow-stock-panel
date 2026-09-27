@@ -45,7 +45,7 @@ TW = SRC.parent / "tailwind.config.ts"
 RATCHET = {
     "裸圆角": 665,         # 真·裸圆角: rounded / -sm/-md/-lg/-xl/-2xl, 不含语义 token ([R524] 监控中心卡片改行 -22)
     "任意字号": 42,      # text-[Npx]
-    "硬编码色": 657,      # text-/bg-/border- + Tailwind 调色板 ([R514] 紫族撤掉 -51; [R522] 策略卡四档并一 -9; [R524] 监控中心 -8) [R539] 财务同步卡 emerald -1
+    "硬编码色": 635,      # text-/bg-/border- + Tailwind 调色板 ([R514] 紫族撤掉 -51; [R522] 策略卡四档并一 -9; [R524] 监控中心 -8) [R539] 财务同步卡 emerald -1; [R541] 异动信号七色收三色 -22
     "任意容器宽": 35,      # max-w-[Npx] ([R524] 焦点条那一处 -1; [R535] 设置外壳的 1500px 上限 -1); [R539] 财务页 1440px 上限 -1
 }
 

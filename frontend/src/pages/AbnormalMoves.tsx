@@ -16,6 +16,7 @@ import { toNavItems, type NavItem } from '@/lib/listNav'
 import { fmtPrice, fmtPct, priceColorClass } from '@/lib/format'
 import { boardTag } from '@/components/stock-table/primitives'
 import { PageHeader } from '@/components/PageHeader'
+import { PageTabs, usePageTab, type PageTabDef } from '@/components/PageTabs'
 import { StockPreviewDialog } from '@/components/StockPreviewDialog'
 import { cn } from '@/lib/cn'
 import { SEG, SEG_ITEM, SEG_OFF, SEG_ON, buttonClass } from '@/components/ui'
@@ -55,27 +56,32 @@ const REFRESH_MS = 60_000
 
 type AbnormalTab = 'auction' | 'intraday' | 'deviation'
 
-const TAB_META: Array<{ key: AbnormalTab; label: string; icon: typeof Compass; desc: string }> = [
-  { key: 'auction', label: '竞价异动', icon: Compass, desc: '盘前 9:15-9:25 · 同花顺风向标 + 竞价扫描' },
-  { key: 'intraday', label: '盘中异动', icon: Activity, desc: '当日量价信号 · 涨停/炸板/翘板/新高新低/放量' },
-  { key: 'deviation', label: '偏移异动', icon: Ruler, desc: '多日累计偏离值 · 交易所异动规则接近度' },
-]
+// [R541] 分栏挪进页头(与因子 / 回测 / 模拟盘同一份 PageTabs), 当前栏记在 `?tab=` —— 刷新不丢、可收藏;
+// 原来是 useState, 一刷新就回到「盘中」。栏的说明挪作页头副标题(原副标题只是把三个栏名念一遍)。
+const TABS: Record<AbnormalTab, PageTabDef & { desc: string }> = {
+  auction: { title: '竞价异动', icon: Compass, desc: '盘前 9:15-9:25 · 同花顺风向标 + 竞价扫描' },
+  intraday: { title: '盘中异动', icon: Activity, desc: '当日量价信号 · 涨停/炸板/翘板/新高新低/放量' },
+  deviation: { title: '偏移异动', icon: Ruler, desc: '多日累计偏离值 · 交易所异动规则接近度' },
+}
 
 // ---- 盘中信号元数据 (标签 + 配色, 与后端 _INTRADAY_SIGNALS 优先级同序) ----
 const SIGNAL_KEYS: IntradaySignalKey[] = ['limit_up', 'broken', 'recovery', 'limit_down', 'new_high', 'new_low', 'volume_surge']
 
+// [R541] 原来七种信号七种颜色(红 / 橙 / 青 / 绿 / 琥珀 / 天蓝 / 黄绿), 一列标签像调色板。收成三种意思:
+// 涨停红、跌停绿(红涨绿跌), 炸板琥珀(板没封住 —— 要留意), 其余四种只是「发生了」, 一律中性灰。
+const SIGNAL_NEUTRAL = 'text-secondary bg-elevated border-border'
 const SIGNAL_META: Record<IntradaySignalKey, { label: string; cls: string }> = {
   limit_up: { label: '涨停', cls: 'text-bull bg-bull/10 border-bull/25' },
-  broken: { label: '炸板', cls: 'text-orange-400 bg-orange-400/10 border-orange-400/25' },
-  recovery: { label: '翘板', cls: 'text-cyan-400 bg-cyan-400/10 border-cyan-400/25' },
+  broken: { label: '炸板', cls: 'text-warning bg-warning/10 border-warning/25' },
+  recovery: { label: '翘板', cls: SIGNAL_NEUTRAL },
   limit_down: { label: '跌停', cls: 'text-bear bg-bear/10 border-bear/25' },
-  new_high: { label: '60日新高', cls: 'text-amber-400 bg-amber-400/10 border-amber-400/25' },
-  new_low: { label: '60日新低', cls: 'text-sky-400 bg-sky-400/10 border-sky-400/25' },
-  volume_surge: { label: '放量', cls: 'text-lime-400 bg-lime-400/10 border-lime-400/25' },
+  new_high: { label: '60日新高', cls: SIGNAL_NEUTRAL },
+  new_low: { label: '60日新低', cls: SIGNAL_NEUTRAL },
+  volume_surge: { label: '放量', cls: SIGNAL_NEUTRAL },
 }
 
 export function AbnormalMoves() {
-  const [tab, setTab] = useState<AbnormalTab>('intraday')
+  const [tab, setTab] = usePageTab(TABS, 'intraday')
   // navList: 弹窗切股的候选列表, 打开详情时由来源 tab 一并给出
   const [preview, setPreview] = useState<{ symbol: string; name: string; navList: NavItem[] } | null>(null)
 
@@ -94,8 +100,11 @@ export function AbnormalMoves() {
       <div className="shrink-0">
         <PageHeader
           title="异动监控"
-          subtitle="竞价 · 盘中 · 偏移 · 全时段异动中心"
+          subtitle={<span className="hidden md:inline">{TABS[tab].desc}</span>}
+          className="flex-wrap gap-x-4 gap-y-2"
           right={
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <PageTabs tabs={TABS} active={tab} onChange={setTab} label="异动视图" />
             <Link
               to="/monitor"
               className={buttonClass({}, 'shrink-0 gap-1')}
@@ -104,32 +113,9 @@ export function AbnormalMoves() {
               <Settings2 className="h-3.5 w-3.5" />
               告警规则
             </Link>
+            </div>
           }
         />
-      </div>
-
-      {/* tab 条: 交易时间线 竞价(盘前) → 盘中 → 偏移(多日) */}
-      <div className="flex shrink-0 flex-wrap items-center gap-3 px-5 pt-3">
-        {/* [R458] 页签是全站分段切换(docs/ui-hierarchy.md) */}
-        <div className={SEG}>
-          {TAB_META.map(t => {
-            const Icon = t.icon
-            const active = tab === t.key
-            return (
-              <button
-                key={t.key}
-                type="button"
-                aria-pressed={active}
-                onClick={() => setTab(t.key)}
-                className={cn(SEG_ITEM, 'gap-1.5 px-3', active ? SEG_ON : SEG_OFF)}
-              >
-                <Icon className="h-3.5 w-3.5" />
-                {t.label}
-              </button>
-            )
-          })}
-        </div>
-        <span className="text-micro text-muted">{TAB_META.find(t => t.key === tab)?.desc}</span>
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col px-5 pb-4 pt-3">
@@ -178,7 +164,7 @@ function AuctionView({ onOpenStock }: {
     return (
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
         <div className="m-auto rounded-card border border-border bg-surface p-8 text-center">
-          <span className="mx-auto grid h-10 w-10 place-items-center rounded-full bg-cyan-500/10 text-cyan-500 ring-1 ring-cyan-500/20">
+          <span className="mx-auto grid h-10 w-10 place-items-center rounded-full bg-elevated text-secondary ring-1 ring-border">
             <Compass className="h-5 w-5" />
           </span>
           <div className="mt-3 text-sm font-medium text-foreground">竞价数据源未配置</div>
@@ -199,7 +185,7 @@ function AuctionView({ onOpenStock }: {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 overflow-y-auto">
+    <div className="flex w-full flex-col gap-4 overflow-y-auto">
       <BenchmarkCard q={q} onOpenStock={onOpenStock} />
 
       <p className="px-1 text-micro leading-relaxed text-muted/70">
@@ -259,7 +245,7 @@ function BenchmarkCard({ q, onOpenStock }: {
     <div className="rounded-card border border-border bg-surface/80">
       {/* 头部 */}
       <div className="flex items-center gap-3 px-4 py-3">
-        <span className="grid h-8 w-8 shrink-0 place-items-center rounded bg-cyan-500/15 text-cyan-500 ring-1 ring-cyan-500/20">
+        <span className="grid h-8 w-8 shrink-0 place-items-center rounded bg-elevated text-secondary ring-1 ring-border">
           <Compass className="h-4 w-4" />
         </span>
         <span className="leading-tight">
@@ -447,8 +433,10 @@ function IntradayView({ onPreview }: {
 
       {/* 主表 */}
       <div className="min-h-0 flex-1 overflow-auto rounded-card border border-border bg-surface">
-        <table className="w-full min-w-[900px] text-xs">
-          <thead className="sticky top-0 z-10 bg-elevated">
+        {/* [R541] 手机上不横滑(原来 900px 宽表, 手机上只看得见代码和名字): 一行一块 ——
+            名字 · 今日 / 信号 · 现价 · 量比 · 振幅 · 换手 */}
+        <table className="w-full text-xs max-sm:block sm:min-w-[900px]">
+          <thead className="sticky top-0 z-10 bg-elevated max-sm:hidden">
             <tr className="border-b border-border text-micro text-muted">
               <th className="w-10 px-2 py-2 text-right">#</th>
               <th className="px-2 py-2 text-left">代码 / 名称</th>
@@ -460,7 +448,7 @@ function IntradayView({ onPreview }: {
               <th className="px-2 py-2 text-right">换手</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="max-sm:block">
             {q.isLoading ? (
               <tr><td colSpan={8} className="px-3 py-10 text-center text-muted">正在加载盘中信号…</td></tr>
             ) : rows.length === 0 ? (
@@ -506,9 +494,9 @@ function IntradayRowView({ row, rank, onPreview }: {
   const board = boardTag(row.symbol)
   const clu = row.consecutive_limit_ups ?? 0
   return (
-    <tr className="group border-b border-border/40 transition-colors last:border-0 hover:bg-elevated/50">
-      <td className="px-2 py-1.5 text-right font-mono text-micro text-muted/70">{rank}</td>
-      <td className="px-2 py-1.5">
+    <tr className="group border-b border-border/40 transition-colors last:border-0 hover:bg-elevated/50 max-sm:flex max-sm:flex-wrap max-sm:items-center max-sm:gap-x-2 max-sm:gap-y-1 max-sm:px-2 max-sm:py-2">
+      <td className="px-2 py-1.5 text-right font-mono text-micro text-muted/70 max-sm:hidden">{rank}</td>
+      <td className="px-2 py-1.5 max-sm:min-w-0 max-sm:flex-1 max-sm:p-0">
         <button
           type="button"
           onClick={onPreview}
@@ -523,17 +511,17 @@ function IntradayRowView({ row, rank, onPreview }: {
             </span>
           )}
           {clu > 1 && (
-            <span className="shrink-0 rounded border border-amber-500/30 bg-amber-500/10 px-1 text-micro font-bold leading-tight text-amber-500" title={`连续 ${clu} 日涨停`}>
+            <span className="shrink-0 rounded border border-warning/30 bg-warning/10 px-1 text-micro font-bold leading-tight text-warning" title={`连续 ${clu} 日涨停`}>
               {clu}连板
             </span>
           )}
         </button>
       </td>
-      <td className="px-2 py-1.5 text-right font-mono text-xs text-secondary">{fmtPrice(row.close)}</td>
-      <td className={`px-2 py-1.5 text-right font-mono text-xs font-medium ${priceColorClass(row.change_pct)}`}>
+      <td className="px-2 py-1.5 text-right font-mono text-xs text-secondary max-sm:order-4 max-sm:p-0">{fmtPrice(row.close)}</td>
+      <td className={`px-2 py-1.5 text-right font-mono text-xs font-medium max-sm:order-2 max-sm:p-0 ${priceColorClass(row.change_pct)}`}>
         {fmtPct(row.change_pct)}
       </td>
-      <td className="px-2 py-1.5">
+      <td className="px-2 py-1.5 max-sm:order-3 max-sm:basis-full max-sm:p-0">
         <div className="flex flex-wrap items-center gap-1">
           {row.signals.map(s => (
             <span key={s} className={`rounded border px-1 text-micro font-medium leading-tight ${SIGNAL_META[s].cls}`}>
@@ -542,14 +530,14 @@ function IntradayRowView({ row, rank, onPreview }: {
           ))}
         </div>
       </td>
-      <td className="px-2 py-1.5 text-right font-mono text-xs tabular-nums text-secondary">
-        {row.vol_ratio_5d != null ? row.vol_ratio_5d.toFixed(2) : '—'}
+      <td className="px-2 py-1.5 text-right font-mono text-xs tabular-nums text-secondary max-sm:order-5 max-sm:p-0 max-sm:text-micro max-sm:text-muted">
+        <span className="sm:hidden">量比 </span>{row.vol_ratio_5d != null ? row.vol_ratio_5d.toFixed(2) : '—'}
       </td>
-      <td className="px-2 py-1.5 text-right font-mono text-xs tabular-nums text-secondary">
-        {row.amplitude != null ? fmtPct(row.amplitude, 2) : '—'}
+      <td className="px-2 py-1.5 text-right font-mono text-xs tabular-nums text-secondary max-sm:order-6 max-sm:p-0 max-sm:text-micro max-sm:text-muted">
+        <span className="sm:hidden">振幅 </span>{row.amplitude != null ? fmtPct(row.amplitude, 2) : '—'}
       </td>
-      <td className="px-2 py-1.5 text-right font-mono text-xs tabular-nums text-secondary">
-        {row.turnover_rate != null ? `${Number(row.turnover_rate).toFixed(2)}%` : '—'}
+      <td className="px-2 py-1.5 text-right font-mono text-xs tabular-nums text-secondary max-sm:order-7 max-sm:p-0 max-sm:text-micro max-sm:text-muted">
+        <span className="sm:hidden">换手 </span>{row.turnover_rate != null ? `${Number(row.turnover_rate).toFixed(2)}%` : '—'}
       </td>
     </tr>
   )
