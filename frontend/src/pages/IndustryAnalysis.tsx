@@ -513,15 +513,14 @@ export function IndustryAnalysis() {
         {showConfig && <AnalysisConfigDialog currentConfig={fieldConfig} onSave={handleSaveConfig} onClose={() => setShowConfig(false)} showHierarchyLevel />}
       </AnimatePresence>
 
-      {previewSymbol && (
-        <StockPreviewDialog
-          symbol={previewSymbol}
-          name={previewName}
-          onClose={() => { setPreviewSymbol(null); setPreviewName(''); setPreviewNavList([]) }}
-          navList={previewNavList}
-          onNavigate={(sym, n) => { setPreviewSymbol(sym); setPreviewName(n ?? '') }}
-        />
-      )}
+      {/* [R550] 常挂着、靠 symbol 为空收起, 退场动画才跑得起来(见 AbnormalMoves 同一处) */}
+      <StockPreviewDialog
+        symbol={previewSymbol}
+        name={previewName}
+        onClose={() => { setPreviewSymbol(null); setPreviewName(''); setPreviewNavList([]) }}
+        navList={previewNavList}
+        onNavigate={(sym, n) => { setPreviewSymbol(sym); setPreviewName(n ?? '') }}
+      />
       {showRps && <RpsRotationDialog onClose={() => setShowRps(false)} kind="industry" />}
     </>
   )

@@ -128,15 +128,15 @@ export function AbnormalMoves() {
         )}
       </div>
 
-      {preview && (
-        <StockPreviewDialog
-          symbol={preview.symbol}
-          name={preview.name}
-          navList={preview.navList}
-          onNavigate={handleNavigate}
-          onClose={() => setPreview(null)}
-        />
-      )}
+      {/* [R550] 常挂着、靠 symbol 为空收起 —— 外面包一层 `preview &&` 的话一关就连根卸掉,
+          弹窗里 AnimatePresence 的退场动画没机会跑, 遮罩「啪」地消失, 看着像闪了一下。 */}
+      <StockPreviewDialog
+        symbol={preview?.symbol ?? null}
+        name={preview?.name}
+        navList={preview?.navList}
+        onNavigate={handleNavigate}
+        onClose={() => setPreview(null)}
+      />
     </div>
   )
 }

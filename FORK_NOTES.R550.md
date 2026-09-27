@@ -1,0 +1,5 @@
+# R550 — 弹窗点开 / 关闭时一闪: 补上 framer-motion 原生动画交接漏的那一帧, 个股弹窗不再被连根卸掉
+
+| # | 改动 | 涉及文件 | 冲突风险 | 单独回退 |
+|---|---|---|---|---|
+| R550 | 用户「弹窗点开和关闭会有一闪而过的闪屏的感觉」。逐帧采样(每个 rAF 读 computed opacity + getAnimations)定位两处成因: ① framer-motion 11 把 opacity / transform 交给原生 WAAPI 跑, 跑完时先 `motionValue.set(终值)`(排队到下一帧才写行内样式)再立刻 `cancel()`, 中间元素回落到行内的起始值被画出一帧 —— 入场遮罩 0.77→0→1、面板 1→0→1(整块黑一下), 退场淡到 0 后又亮回 1 一帧; 全站四十来处 AnimatePresence 弹窗 / 浮层都走这条路 → 新增 `lib/waapiHandoff.ts`, 入口装一次: 撤掉**已跑完**的原生动画前先 `commitStyles()` 把终值写进行内(WAAPI 的标准做法), 中途打断不碰, 目标脱离渲染树时吞掉异常; 没升级 framer-motion(大版本依赖, 另议)。② 异动 / 行业 / 概念三页用 `x && <StockPreviewDialog/>` 挂个股弹窗, 一关就连根卸掉, 弹窗里 AnimatePresence 的退场动画不跑, 遮罩「啪」地消失 → 改为常挂、靠 symbol 为空收起(与其余九处调用方一致)。验证: 逐帧回路修前 open dips=2 / close rebounds=2(RED), 修后 0 / 0、退场有 2–3 帧渐隐(GREEN, 深浅两色各跑) | frontend/src/lib/waapiHandoff.ts; frontend/src/lib/waapiHandoff.test.ts; frontend/src/main.tsx; frontend/src/pages/AbnormalMoves.tsx; frontend/src/pages/IndustryAnalysis.tsx; frontend/src/pages/ConceptAnalysis.tsx; backend/tests/test_dialog_flash_r550.py | 低: 入口多一行安装, 三处调用方写法 | 可以: git revert 本提交 |
