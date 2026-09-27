@@ -6,13 +6,14 @@ import type { Fib2Grain, Fib2Overlay, KlineRow, LevelSeries, QuantMacdResult } f
 import { alignQuantMacd, quantMacdSeries } from '@/lib/quantMacdSeries'
 import { zhuangXianIndexes, zhuangXianSeries } from '@/lib/zhuangXianSeries'
 import {
-  alignTrendQuant, trendQuantLegendGraphic, trendQuantSeries, TREND_QUANT_HELP, type TrendQuantData,
+  alignTrendQuant, trendQuantLegendGraphic, trendQuantSeries, TREND_QUANT_HELP, TQ_Y_MAX, TQ_Y_MIN,
+  type TrendQuantData,
 } from '@/lib/trendQuantSeries'
 
-// [R555] 趋势量化图例: 从「趋势量化」四个字右边开始(60 + 4 字 × 9px + 间距)
-const TQ_LEGEND_LEFT = 108
+// [R555] 趋势量化图例: 从「趋势量化」四个字右边开始。[R558] 名字 11px: 56 + 4 字 × 11px + 间距
+const TQ_LEGEND_LEFT = 116
 const TQ_LEGEND_W = trendQuantLegendGraphic(TQ_LEGEND_LEFT, 0, '').width
-import { levelsChartLayout, PAD_BOTTOM, SLIDER_H } from '@/lib/levelsChartLayout'
+import { levelsChartLayout, PAD_BOTTOM, SLIDER_H, SUB_HEADER } from '@/lib/levelsChartLayout'
 import { futureSlotRenderer } from '@/lib/futureZone'
 import { fib2Status } from '@/lib/fib2Status'
 import { Fib2GrainDialog } from './Fib2GrainDialog'
@@ -670,7 +671,7 @@ export function AnalysisKChart({
 
     // [R486] 趋势量化副图(第三张 grid, 画在主图与量化MACD 之间)。同样放在最后 push,
     // 不参与悬停联动的下标。算法 `indicators/trend_quant.py`, 画法 `lib/trendQuantSeries.ts`。
-    series.push(...trendQuantSeries(alignTrendQuant(dates, trendQuant), { xAxisIndex: 2, yAxisIndex: 2 }))
+    series.push(...trendQuantSeries(alignTrendQuant(dates, trendQuant), { xAxisIndex: 2, yAxisIndex: 2 }, trendH))
     // 狗头压在趋势量化的最上面(后画的盖在上面)
     if (zhuang.length) series.push(zhuangXianSeries(zhuang, { xAxisIndex: 2, yAxisIndex: 2 }))
 
@@ -730,6 +731,10 @@ export function AnalysisKChart({
           axisLabel: { show: false }, axisTick: { show: false } },
         // [R486] 趋势量化: 纵轴按画出来的东西自动定范围(通达信也是), 不写刻度, 不画横线
         { scale: true, gridIndex: 2, splitNumber: 2, splitLine: { show: false },
+          // [R558] 固定上下界, 给字和狗头留余量: 波动线恒在 0~4(收盘不会跑出近期高低点),
+          // 上面多留 0.35 给走到顶的「顶」字, 下面多留到 −0.45 —— 狗头贴着副图底边画(庄现冻结,
+          // 不改它), 原来底边就是 0.5 那条黄线附近, 狗头压在线和「建仓」上
+          min: TQ_Y_MIN, max: TQ_Y_MAX,
           axisLabel: { show: false }, axisTick: { show: false } },
       ],
       dataZoom: [
@@ -746,18 +751,18 @@ export function AnalysisKChart({
         type: 'text' as const, left: 'center', top: subTop + subH / 2 - 6, silent: true,
         style: { text: '量化MACD 取数失败, 稍后点右上角刷新重试', fill: CT().text, fontSize: 11 },
       }] : []), {
-        type: 'text', left: 60, top: subTop + 2, silent: true,
-        // 亮色主题下它落在黑底上, 用浅灰才看得见
-        style: { text: '量化MACD', fill: isDark ? CT().text : '#B4B4B4', fontSize: 9 },
+        // [R558] 名字写在副图顶上的标题带里(不再压在图里); 标题带在副图黑底之外, 两个主题都用正文灰
+        type: 'text', left: 56, top: subTop - SUB_HEADER + 3, silent: true,
+        style: { text: '量化MACD', fill: CT().text, fontSize: 11 },
       }, ...(trendQuantError ? [{
         type: 'text' as const, left: 'center', top: trendTop + trendH / 2 - 6, silent: true,
         style: { text: '趋势量化 取数失败, 稍后点右上角刷新重试', fill: CT().text, fontSize: 11 },
       }] : []), {
-        type: 'text', left: 60, top: trendTop + 2, silent: true,
-        style: { text: '趋势量化', fill: isDark ? CT().text : '#B4B4B4', fontSize: 9 },
+        type: 'text', left: 56, top: trendTop - SUB_HEADER + 3, silent: true,
+        style: { text: '趋势量化', fill: CT().text, fontSize: 11 },
       },
-      // [R555] 三种线的图例(说明在悬停里, 见下面画布上那块透明热区)
-      ...trendQuantLegendGraphic(TQ_LEGEND_LEFT, trendTop + 1, isDark ? CT().text : '#B4B4B4').graphic],
+      // [R555] 三种线的图例(说明在悬停里, 见下面画布上那块透明热区)。[R558] 挪进标题带
+      ...trendQuantLegendGraphic(TQ_LEGEND_LEFT, trendTop - SUB_HEADER + 3, CT().text).graphic],
       series,
     }
   }
@@ -962,7 +967,7 @@ export function AnalysisKChart({
         {trendQuant && !trendQuantError && (
           <span
             className="absolute cursor-help"
-            style={{ left: 56, top: layout.trendTop, height: 16, width: TQ_LEGEND_LEFT - 56 + TQ_LEGEND_W }}
+            style={{ left: 56, top: layout.trendTop - SUB_HEADER, height: SUB_HEADER, width: TQ_LEGEND_LEFT - 56 + TQ_LEGEND_W }}
             title={TREND_QUANT_HELP}
           />
         )}

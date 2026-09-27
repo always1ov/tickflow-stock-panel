@@ -78,8 +78,8 @@ export const TREND_QUANT_LEGEND: { name: string; color: string; desc: string; la
 /** 悬停说明的全文(三段) */
 export const TREND_QUANT_HELP = TREND_QUANT_LEGEND.map(l => `${l.name}: ${l.desc}`).join('\n\n')
 
-/** 图例一行的宽度估算: 9px 字号下汉字按 9px、其余按 5px */
-const textW = (t: string) => [...t].reduce((w, ch) => w + (/[\u4e00-\u9fff]/.test(ch) ? 9 : 5), 0)
+/** 图例一行的宽度估算: [R558] 10px 字号下汉字按 10px、其余按 6px */
+const textW = (t: string) => [...t].reduce((w, ch) => w + (/[\u4e00-\u9fff]/.test(ch) ? 10 : 6), 0)
 const SWATCH = 12
 const ITEM_GAP = 12
 
@@ -98,7 +98,7 @@ export function trendQuantLegendGraphic(left: number, top: number, textColor: st
     graphic.push({ type: 'line', x, y: top + 6, silent: true,
                    shape: { x1: 0, y1: 0, x2: SWATCH, y2: 0 }, style: { stroke: l.color, lineWidth: 2 } })
     graphic.push({ type: 'text', left: x + SWATCH + 4, top: top + 1, silent: true,
-                   style: { text: l.name, fill: textColor, fontSize: 9 } })
+                   style: { text: l.name, fill: textColor, fontSize: 10 } })
     x += SWATCH + 4 + textW(l.name) + ITEM_GAP
   }
   return { graphic, width: x - left - ITEM_GAP }
@@ -157,11 +157,61 @@ function stickRenderer(ratio: number, colorOf: (v: number) => string) {
 
 const NONE = '-'
 
+/**
+ * [R558] 纵轴固定上下界(原来按画出来的东西自动定, 顶和底都贴边)。
+ * 波动线恒在 0~4 —— 收盘不会跑出近 10 日最低 / 近 25 日最高 —— 上面多留一点给走到顶的「顶」字,
+ * 下面留到 −0.45: 狗头贴着副图底边画(庄现冻结, 不动它), 原来底边就在 0.5 那条黄线附近,
+ * 狗头压在线和「建仓」上。
+ */
+export const TQ_Y_MIN = -0.45
+export const TQ_Y_MAX = 4.35
+
+/** [R558] 八种字: 11px, 带一圈与副图同色的描边, 压在柱子上也读得出来 */
+const MARK_FONT = 11
+const MARK_HALO = { textBorderColor: '#000000', textBorderWidth: 3 }
+/** 两个字相距不到这么多 px 且落在相邻两三根里, 就算叠在一起 */
+const MARK_CLEAR_PX = 12
+const MARK_NEAR_BARS = 2
+
+/**
+ * [R558] 字的避让: 同一处(相邻两三根、纵向不到一行字高)出了两个字, 后一个往上让一行,
+ * 顶上放不下就往下让。只挪字的位置, 出不出字、写在哪一根一概不变。
+ * 返回每个字相对原位置的纵向偏移(px, 负数 = 往上)。
+ */
+export function markOffsets(a: TrendQuantAligned, paneH: number): Map<string, number> {
+  const pxPerUnit = paneH / (TQ_Y_MAX - TQ_Y_MIN)
+  const toPx = (v: number) => (v - TQ_Y_MIN) * pxPerUnit          // 离底边多高
+  const placed: { i: number; px: number }[] = []
+  const out = new Map<string, number>()
+  const n = a.avg.length
+  for (let i = 0; i < n; i++) {
+    for (const m of TREND_MARKS) {
+      if (!a.marks[m.key][i]) continue
+      const y = m.at === 'avg' ? a.avg[i] : m.at
+      if (y == null) continue
+      const base = toPx(y)
+      const clash = (px: number) => placed.some(p => Math.abs(p.i - i) <= MARK_NEAR_BARS && Math.abs(p.px - px) < MARK_CLEAR_PX)
+      let off = 0
+      while (clash(base + off) && base + off + MARK_CLEAR_PX < paneH - MARK_FONT / 2) off += MARK_CLEAR_PX
+      if (clash(base + off)) {
+        off = 0
+        while (clash(base + off) && base + off - MARK_CLEAR_PX > MARK_FONT / 2) off -= MARK_CLEAR_PX
+      }
+      placed.push({ i, px: base + off })
+      if (off) out.set(`${m.key}:${i}`, -off)
+    }
+  }
+  return out
+}
+
 /** 返回这张副图的全部系列, 顺序即原文画的先后。 */
 export function trendQuantSeries(
   a: TrendQuantAligned,
   axis: { xAxisIndex: number; yAxisIndex: number },
+  /** [R558] 副图高(px), 给字的避让换算用; 不传就不避让 */
+  paneH?: number,
 ): Record<string, unknown>[] {
+  const offsets = paneH ? markOffsets(a, paneH) : new Map<string, number>()
   const n = a.avg.length
   const line = { type: 'line', ...axis, animation: false, silent: true, symbol: 'none' }
   const hline = (v: number) => Array.from({ length: n }, () => v)
@@ -182,17 +232,21 @@ export function trendQuantSeries(
     const x = a.xichou[i]
     if (b === 1 && x != null) whites.push([i, 0.53, x, 0])
   })
+  // [R558] 字压在吸筹白柱之上(z 8 > 白柱 6): 原文的先后是白柱盖字, 可白柱在这里有间距的 1/3 宽,
+  // 「建仓」「绝底」整个被盖住看不见 —— 用户: 「有些东西看不清楚了」
   const texts: Record<string, unknown>[] = TREND_MARKS.map((m, k) => ({
-    type: 'scatter', ...axis, name: m.text, animation: false, silent: true, z: 5 + k * 0.01,
+    type: 'scatter', ...axis, name: m.text, animation: false, silent: true, z: 8 + k * 0.01,
     symbolSize: 0,
     data: a.marks[m.key].map((on, i) => {
       if (!on) return NONE
       const y = m.at === 'avg' ? a.avg[i] : m.at
-      return y == null ? NONE : [i, y]
+      if (y == null) return NONE
+      const off = offsets.get(`${m.key}:${i}`)
+      return off ? { value: [i, y], label: { offset: [0, off] } } : [i, y]
     }),
     // 通达信的 DRAWTEXT: 字从那一根往右写, 纵向居中在那个数值上
     label: { show: true, position: 'right', distance: -2, formatter: m.text,
-             color: m.color, fontSize: 12 },
+             color: m.color, fontSize: MARK_FONT, ...MARK_HALO },
   }))
 
   return [

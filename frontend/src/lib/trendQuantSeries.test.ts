@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { TREND_QUANT_COLORS as C } from './theme'
 import {
-  alignTrendQuant, TREND_MARKS, TREND_QUANT_HELP, TREND_QUANT_LEGEND, trendQuantLegendGraphic, trendQuantSeries,
+  alignTrendQuant, markOffsets, TQ_Y_MAX, TQ_Y_MIN, TREND_MARKS, TREND_QUANT_HELP, TREND_QUANT_LEGEND,
+  trendQuantLegendGraphic, trendQuantSeries,
   type TrendQuantData,
 } from './trendQuantSeries'
 
@@ -84,5 +85,27 @@ describe('[R486] 趋势量化副图', () => {
     expect(texts.every(t => t.style.fill === '#999')).toBe(true)
     expect(width).toBeGreaterThan(0)
     expect(TREND_QUANT_HELP.split('\n\n')).toHaveLength(3)
+  })
+
+  it('[R558] 叠在一起的字后一个让开一行; 不挨着的不动', () => {
+    const a = alignTrendQuant(Q.dates, Q)
+    // 第 2 根同时出「建仓」(0.75)与「见底」(1): 175px 高的副图里相距 9px, 算叠
+    a.marks.jiancang[1] = true
+    a.marks.jiandi[1] = true
+    const off = markOffsets(a, 175)
+    expect(off.size).toBe(1)
+    expect(off.get('jiandi:1')).toBeLessThan(0)     // 往上让
+    // 字压在白柱之上 + 黑描边
+    const s = trendQuantSeries(a, { xAxisIndex: 2, yAxisIndex: 2 }, 175)
+    const jiandi = s.find(x => x.name === '见底') as { z: number; label: { textBorderWidth: number }; data: unknown[] }
+    const white = s.find(x => x.name === '吸筹柱') as { z: number }
+    expect(jiandi.z).toBeGreaterThan(white.z)
+    expect(jiandi.label.textBorderWidth).toBeGreaterThan(0)
+    expect(jiandi.data[1]).toMatchObject({ value: [1, 1], label: { offset: [0, off.get('jiandi:1')] } })
+  })
+
+  it('[R558] 纵轴上下界把波动线 0~4 全装下, 且上下各留余量', () => {
+    expect(TQ_Y_MIN).toBeLessThan(0)
+    expect(TQ_Y_MAX).toBeGreaterThan(4)
   })
 })

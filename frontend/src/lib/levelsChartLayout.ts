@@ -18,9 +18,19 @@
  * 上方加个副图」。主图高度仍一像素不动, 多出来的照旧让整张图变长、弹窗往下滚:
  *
  *   [16] [主图] [14] [趋势量化] [14] [量化MACD] [26 日期刻度] [22 缩放条] [8]
+ *
+ * [R558] 两张副图各加一条 18px 标题带(名字 + 图例), 副图本身也加高:
+ *
+ *   [16] [主图] [14] [18 标题] [趋势量化] [14] [18 标题] [量化MACD] [26] [22] [8]
  */
 export const PAD_TOP = 16
 export const GAP_MAIN_SUB = 14      // 主图 ↔ 副图(两边纵轴刻度不上下相撞)
+/**
+ * [R558] 每张副图顶上的标题带: 名字与图例写在这里, 不再压在图里。
+ * 用户: 「感觉空间有点挤, 有些东西看不清楚了」—— 原来「趋势量化」连同图例写在副图里面
+ * 的左上角, 碰上走到顶的柱子与「顶」字就叠在一起。
+ */
+export const SUB_HEADER = 18
 export const GAP_SUB_SLIDER = 26    // 副图 ↔ 缩放条: 日期刻度在这一段里
 export const SLIDER_H = 22
 export const PAD_BOTTOM = 8
@@ -36,7 +46,9 @@ export const LEGACY_NON_MAIN = 156
  * R418 的 90~130 高(图标不再深插进柱子), 又始终比主图矮一大截。
  */
 export function subPaneHeight(mainH: number): number {
-  return Math.round(Math.min(200, Math.max(130, mainH * 0.4)))
+  // [R558] 40% / 130~200 → 48% / 160~220。两张副图里有字、有图标、有狗头, 146px(个股预览)
+  // 装不下: 字互相叠、狗头贴着底边压在线上。仍比主图矮一大截(R422「副图调得太高了」那条线)。
+  return Math.round(Math.min(220, Math.max(160, mainH * 0.48)))
 }
 
 export interface LevelsChartLayout {
@@ -55,8 +67,8 @@ export function levelsChartLayout(height: number): LevelsChartLayout {
   const mainH = height - LEGACY_NON_MAIN
   const subH = subPaneHeight(mainH)
   const trendH = subH
-  const trendTop = PAD_TOP + mainH + GAP_MAIN_SUB
-  const subTop = trendTop + trendH + GAP_MAIN_SUB
+  const trendTop = PAD_TOP + mainH + GAP_MAIN_SUB + SUB_HEADER
+  const subTop = trendTop + trendH + GAP_MAIN_SUB + SUB_HEADER
   const total = subTop + subH + GAP_SUB_SLIDER + SLIDER_H + PAD_BOTTOM
   return { mainH, trendH, trendTop, subH, subTop, total }
 }
