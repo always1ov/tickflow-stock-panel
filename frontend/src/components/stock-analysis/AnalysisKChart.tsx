@@ -3,7 +3,7 @@ import { chartTheme, FIB2_ROLE_TARGET, LEVEL_CURVE_COLOR, QUANT_MACD_COLORS, TRE
 import * as echarts from 'echarts'
 import type { ECharts, EChartsOption } from 'echarts'
 import type { Fib2Grain, Fib2Overlay, KlineRow, LevelSeries, QuantMacdResult } from '@/lib/api'
-import { alignQuantMacd, quantMacdSeries } from '@/lib/quantMacdSeries'
+import { alignQuantMacd, QUANT_MACD_HELP, quantMacdLegendGraphic, quantMacdSeries } from '@/lib/quantMacdSeries'
 import { zhuangXianIndexes, zhuangXianSeries } from '@/lib/zhuangXianSeries'
 import {
   alignTrendQuant, trendQuantLegendGraphic, trendQuantSeries, TREND_QUANT_HELP, tqYRange,
@@ -13,6 +13,9 @@ import {
 // [R555] 趋势量化图例: 从「趋势量化」四个字右边开始。[R558] 名字 11px: 56 + 4 字 × 11px + 间距
 const TQ_LEGEND_LEFT = 116
 const TQ_LEGEND_W = trendQuantLegendGraphic(TQ_LEGEND_LEFT, 0, '').width
+// [R560] 量化MACD 图例: 从「量化MACD」右边开始(56 + 两个汉字 22 + MACD 约 30 + 间距)
+const QM_LEGEND_LEFT = 120
+const QM_LEGEND_W = quantMacdLegendGraphic(QM_LEGEND_LEFT, 0, '').width
 import { levelsChartLayout, PAD_BOTTOM, SLIDER_H, SUB_HEADER } from '@/lib/levelsChartLayout'
 import { futureSlotRenderer } from '@/lib/futureZone'
 import { fib2Status } from '@/lib/fib2Status'
@@ -753,7 +756,10 @@ export function AnalysisKChart({
         // [R558] 名字写在副图顶上的标题带里(不再压在图里); 标题带在副图黑底之外, 两个主题都用正文灰
         type: 'text', left: 56, top: subTop - SUB_HEADER + 3, silent: true,
         style: { text: '量化MACD', fill: CT().text, fontSize: 11 },
-      }, ...(trendQuantError ? [{
+      },
+      // [R560] 量化MACD 的图例(说明在悬停里, 见画布上那块透明热区)
+      ...(quantMacdError ? [] : quantMacdLegendGraphic(QM_LEGEND_LEFT, subTop - SUB_HEADER + 3, CT().text).graphic),
+      ...(trendQuantError ? [{
         type: 'text' as const, left: 'center', top: trendTop + trendH / 2 - 6, silent: true,
         style: { text: '趋势量化 取数失败, 稍后点右上角刷新重试', fill: CT().text, fontSize: 11 },
       }] : []), {
@@ -963,6 +969,13 @@ export function AnalysisKChart({
         <div ref={chartRef} style={{ width: '100%', height: layout.total }} />
         {/* [R555] 趋势量化图例的悬停热区: 画布里的字接不到悬停, 用一块透明的 HTML 盖在图例上,
             说明走全站悬停提示(R553)。说明文字与图例同一个产地(`TREND_QUANT_HELP`) */}
+        {quantMacd && !quantMacdError && (
+          <span
+            className="absolute cursor-help"
+            style={{ left: 56, top: layout.subTop - SUB_HEADER, height: SUB_HEADER, width: QM_LEGEND_LEFT - 56 + QM_LEGEND_W }}
+            title={QUANT_MACD_HELP}
+          />
+        )}
         {trendQuant && !trendQuantError && (
           <span
             className="absolute cursor-help"

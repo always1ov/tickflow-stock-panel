@@ -32,6 +32,7 @@
  * 同一份 —— 用户: 「颜色和柱子类型都得一样」。
  *
  * **只画原文画的, 不多一样也不少一样**: 没有悬停提示, 原文没有的一律不加。
+ * [R560] 图**外面**的标题带里加了图例与悬停说明(用户要的), 图里仍然只画原文画的。
  */
 import { QUANT_MACD_COLORS } from '@/lib/theme'
 
@@ -112,6 +113,88 @@ export function renderDiffRect(
     shape: { x: a[0] - w / 2, y: Math.min(a[1], b[1]), width: w, height: Math.abs(a[1] - b[1]) },
     style: { fill: hi >= 0 ? QUANT_MACD_COLORS.red : QUANT_MACD_COLORS.green },
   }
+}
+
+/**
+ * [R560] 标题带里的图例 + 悬停说明 —— 五样东西各代表什么。**只此一个产地**。
+ *
+ * 用户: 「量化macd也加标注」(趋势量化 R555 已有)。只讲每样东西是怎么来的、怎么读,
+ * 不添判定; 公式(`indicators/quant_macd.py`)与画法一个字节没动。图例画在副图**外面**的
+ * 标题带里, 所以不违背上面那条「图里只画原文画的」。
+ */
+export const QUANT_MACD_LEGEND: { key: 'diff' | 'dea' | 'yellow' | 'gold' | 'dead'; name: string; desc: string }[] = [
+  {
+    key: 'diff', name: 'DIFF',
+    desc: '实心柱, 从 0 画到 DIFF(12 日与 26 日指数均线之差, 与标准 MACD 的 DIFF 同一个算法); '
+      + '0 上红、0 下绿。它被 DEA 的点线框盖住, 只露出比 DEA 长的那一截: '
+      + '露出实心 = DIFF 走在 DEA 前面, 动能在加速; 只剩空框 = 动能在减弱。柱尖就是 DIFF 的值。',
+  },
+  {
+    key: 'dea', name: 'DEA',
+    desc: '点线空心框, 从 0 画到 DEA(DIFF 的 9 日指数均线); 0 上深红、0 下绿。比 DIFF 慢半拍。',
+  },
+  {
+    key: 'yellow', name: '共振',
+    desc: '黄柱: 能量潮(按涨跌累计的成交量)的短线强度在增加, 同时 3 日均价在上升 —— 量和价同一天转好。'
+      + '从 0 画到 DEA 的 1/4, 只看出没出现, 长短没有含义。',
+  },
+  {
+    key: 'gold', name: '金叉',
+    desc: '红色向上箭头: DIFF 上穿 DEA 的那一根, 箭头顶端对准 DEA。',
+  },
+  {
+    key: 'dead', name: '死叉',
+    desc: '绿色向下箭头: DIFF 下穿 DEA 的那一根, 画在 DEA 的 1.1 倍处。',
+  },
+]
+
+/** 悬停说明全文(五段) */
+export const QUANT_MACD_HELP = QUANT_MACD_LEGEND.map(l => `${l.name}: ${l.desc}`).join('\n\n')
+
+const LEGEND_FONT = 10
+const legendTextW = (t: string) => [...t].reduce((w, ch) => w + (/[\u4e00-\u9fff]/.test(ch) ? 10 : 6.5), 0)
+const SW = 10          // 色块边长
+const LEGEND_GAP = 12
+
+/**
+ * 图例: 每项 = 一个照图里画法缩小的色块(实心红绿 / 点线框 / 黄块 / 上下箭头) + 灰字名称。
+ */
+export function quantMacdLegendGraphic(left: number, top: number, textColor: string): {
+  graphic: Record<string, unknown>[]
+  width: number
+} {
+  const C = QUANT_MACD_COLORS
+  const g: Record<string, unknown>[] = []
+  const y = top + 1
+  // graphic 组件没有 path 类型: 从图里那两个箭头的路径取顶点, 缩到色块大小画成多边形 —— 形状与图里同一份
+  const k = SW / ICON_H
+  const arrow = (path: string, color: string, x: number) => ({
+    type: 'polygon', silent: true,
+    shape: { points: [...path.matchAll(/(-?[\d.]+),(-?[\d.]+)/g)].map(m => [x + +m[1] * k, y + +m[2] * k]) },
+    style: { fill: color },
+  })
+  let x = left
+  for (const l of QUANT_MACD_LEGEND) {
+    let sw = SW
+    if (l.key === 'diff') {
+      g.push({ type: 'rect', silent: true, shape: { x, y, width: SW / 2, height: SW }, style: { fill: C.red } })
+      g.push({ type: 'rect', silent: true, shape: { x: x + SW / 2, y, width: SW / 2, height: SW }, style: { fill: C.green } })
+    } else if (l.key === 'dea') {
+      g.push({ type: 'rect', silent: true, shape: { x: x + 0.5, y: y + 0.5, width: SW - 1, height: SW - 1 },
+               style: { fill: 'none', stroke: C.darkRed, lineWidth: 1, lineDash: HOLLOW_DASH } })
+    } else if (l.key === 'yellow') {
+      // 细灰边: 亮色主题下标题带是白底, 纯黄色块单独放在白底上几乎看不见
+      g.push({ type: 'rect', silent: true, shape: { x: x + 0.5, y: y + 0.5, width: SW - 1, height: SW - 1 },
+               style: { fill: C.yellow, stroke: 'rgba(128,128,128,0.6)', lineWidth: 1 } })
+    } else {
+      sw = ICON_W * SW / ICON_H
+      g.push(arrow(l.key === 'gold' ? ICON_UP : ICON_DOWN, l.key === 'gold' ? C.red : C.icon2, x))
+    }
+    g.push({ type: 'text', left: x + sw + 4, top: top, silent: true,
+             style: { text: l.name, fill: textColor, fontSize: LEGEND_FONT } })
+    x += sw + 4 + legendTextW(l.name) + LEGEND_GAP
+  }
+  return { graphic: g, width: x - left - LEGEND_GAP }
 }
 
 /**

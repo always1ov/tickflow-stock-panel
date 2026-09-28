@@ -8,7 +8,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   alignQuantMacd, diffExposed, HOLLOW_DASH, ICON_DOWN, ICON_H, ICON_UP, quantMacdSeries, renderDiffRect,
-  STICK_RATIO, STICK_WIDTH,
+  STICK_RATIO, STICK_WIDTH, QUANT_MACD_HELP, QUANT_MACD_LEGEND, quantMacdLegendGraphic,
 } from './quantMacdSeries'
 import { QUANT_MACD_COLORS } from './theme'
 
@@ -175,5 +175,19 @@ describe('量化MACD: 按日期对到图上的 x 轴', () => {
   it('数据还没到: 整张副图留白, 长度仍与 x 轴一致', () => {
     const a = alignQuantMacd(['2026-09-01', '2026-09-02'], undefined)
     for (const v of Object.values(a)) expect(v).toEqual([null, null])
+  })
+
+  it('[R560] 图例五项, 名字与图里的系列同名; 悬停说明五段; 箭头色块取自图里同一份路径', () => {
+    const names = quantMacdSeries(alignQuantMacd([], undefined), { xAxisIndex: 1, yAxisIndex: 1 }).map(x => x.name)
+    expect(QUANT_MACD_LEGEND.map(l => l.name)).toEqual(['DIFF', 'DEA', '共振', '金叉', '死叉'])
+    for (const l of QUANT_MACD_LEGEND) expect(names).toContain(l.name)
+    expect(QUANT_MACD_HELP.split('\n\n')).toHaveLength(5)
+    const { graphic, width } = quantMacdLegendGraphic(120, 0, '#999')
+    const polys = graphic.filter(g => g.type === 'polygon') as { shape: { points: number[][] } }[]
+    expect(polys).toHaveLength(2)
+    expect(polys.every(p => p.shape.points.length === 7)).toBe(true)
+    const texts = graphic.filter(g => g.type === 'text') as { style: { fill: string } }[]
+    expect(texts.every(t => t.style.fill === '#999')).toBe(true)
+    expect(width).toBeGreaterThan(0)
   })
 })
