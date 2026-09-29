@@ -79,8 +79,9 @@ const BUILTIN_PAGES: NavEntry[] = [
   { id: '/monitor', label: '监控中心', type: 'builtin', visible: true },
   { id: '/regime', label: '宏观分析', type: 'builtin', visible: true },   // [R503] 原「市场环境」
   { id: '/abnormal', label: '异动监控', type: 'builtin', visible: true },
-  { id: '/lots', label: '模拟盘', type: 'builtin', visible: true },   // [R183] 整页 AI 模拟盘
-  // [R561 同步上游] 上游 v0.3.2 的虚拟账户(模拟撮合)。上游叫「模拟盘」, 与上一行撞名, 本 fork 叫「虚拟账户」
+  // [R564] `/lots`「模拟盘」这一行删了: 转折模拟盘并进虚拟账户(跟六态转折)。存过的 nav_order 里带着
+  // `/lots` 没关系 —— 合并时 `entryMap.get(id)` 取不到就跳过(与上面 /paper-trading 同一条)。
+  // [R561 同步上游] 上游 v0.3.2 的虚拟账户(模拟撮合)。上游叫「模拟盘」, 本 fork 叫「虚拟账户」
   { id: '/paper', label: '虚拟账户', type: 'builtin', visible: true },
   { id: '/signals', label: '信号库', type: 'builtin', visible: true },
   { id: '/review', label: '复盘', type: 'builtin', visible: true },
@@ -95,7 +96,7 @@ const BUILTIN_PAGES: NavEntry[] = [
 type ArchKind = 'core' | 'ext'
 const ARCH_CLASS: Record<string, { kind: ArchKind; reason: string }> = {
   '/':               { kind: 'core', reason: '总览页 — 聚合核心数据的多维视图' },
-  // [R561] 本 fork 的看板在 /dashboard(R64 把根路径让给了模拟盘)
+  // [R561] 本 fork 的看板在 /dashboard(R64 把根路径让了出去; R564 起根路径落在虚拟账户)
   '/dashboard':      { kind: 'core', reason: '总览页 — 聚合核心数据的多维视图' },
   '/watchlist':      { kind: 'core', reason: '订阅锚点 — 监控/提醒/看板的数据范围基准' },
   '/screener':       { kind: 'core', reason: '策略引擎 — 选股/评分/信号定义' },
@@ -111,9 +112,8 @@ const ARCH_CLASS: Record<string, { kind: ArchKind; reason: string }> = {
   '/financials':     { kind: 'ext', reason: '财务分析视图 — 消费核心数据, 可由扩展页面替换' },
   '/monitor':        { kind: 'ext', reason: '监控消费页 (规则引擎与推送管道属核心), 页面可替换' },
   '/abnormal':       { kind: 'ext', reason: '异动监控视图 — 消费核心数据, 可由扩展页面替换' },
-  // [R561] 本 fork 的 /lots 是转折模拟盘(R327), 不是上游的持仓提醒
-  '/lots':           { kind: 'core', reason: '转折模拟盘 — 六态规则的出手判定, 本 fork 的中枢' },
-  '/paper':          { kind: 'ext', reason: '虚拟账户 — 官方插件化拆分候选 (V3)' },
+  // [R564] 转折模拟盘(/lots)并进虚拟账户: 六态规则的出手判定现在在这里记实账, 归属跟着改成核心
+  '/paper':          { kind: 'core', reason: '虚拟账户 — 跟六态转折的实账, 六态规则的出手判定在这里, 本 fork 的中枢' },
   '/minds':          { kind: 'ext', reason: 'Minds — 笔记 / 洞见 / 交易计划 / 对话, 消费核心数据' },
   '/signals':        { kind: 'ext', reason: '信号库视图 — 消费核心数据, 可由扩展页面替换' },
   '/review':         { kind: 'ext', reason: '大盘复盘视图 — 消费核心数据, 可由扩展页面替换' },

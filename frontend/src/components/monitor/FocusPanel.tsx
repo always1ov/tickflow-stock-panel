@@ -107,7 +107,7 @@ export function FocusPanel() {
         </label>
       </div>
       {gated === 0 && (
-        <div className="mb-3 text-xs text-muted">还没有持有 / 计划中 / 贴轨的票 —— 日线管道跑一次、或打开一次模拟盘, 名单就会生成。</div>
+        <div className="mb-3 text-xs text-muted">还没有持有 / 计划中 / 贴轨的票 —— 日线管道跑一次, 名单就会生成。</div>
       )}
       <div className="grid gap-x-6 gap-y-4 md:grid-cols-2 xl:grid-cols-4">
         {TIERS.map(t => {

@@ -13,7 +13,7 @@ from tests.frontend_source import code_of
 
 RHYTHM = "lib/refreshRhythm.ts"
 BOARD = "components/stock-analysis/WatchlistDecisionBoard.tsx"
-PAPER = "pages/FlipPaper.tsx"
+PAPER = "components/paper/FlipFollowCard.tsx"   # [R564] 模拟盘并进虚拟账户的「跟六态转折」信号块
 
 
 def _table() -> dict[str, tuple[str, str]]:
@@ -74,7 +74,7 @@ def test_R333_不打开后台轮询():
 def test_R333_模拟盘自己刷_不等手动():
     code = code_of(PAPER)
     assert "refetchInterval: refreshEvery('derived')" in code, "主查询没接节奏"
-    assert "refetchInterval: refreshEvery('static')" in code, "规则口径不该轮询"
+    # [R564] 规则说明并进了同一个接口(/api/paper/flip), 不再单独一条 static 查询
     assert "rhythmHint('derived')" in code, (
         "页头要写出它在自己刷 —— 否则用户会以为数字卡住了")
 

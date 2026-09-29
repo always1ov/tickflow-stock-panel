@@ -165,10 +165,6 @@ export const QK = {
   // R121 AI 优选历史命中率(纯事后统计)
   // R133 规则层把握分体检(完整候选池的分层胜率/因子归因)
   todayScoreLedger:     ['today-score-ledger'] as const,
-  // [R327] 转折模拟盘 —— 参数进键: 本金/上限/年数一改就是另一条曲线
-  flipPaper:            (capital: number, maxPositions: number, years: number) =>
-                          ['flip-paper', capital, maxPositions, years] as const,
-  flipPaperRules:       ['flip-paper-rules'] as const,
   // 多 AI 档位 / 数据源 key
   aiProfiles:           ['ai-profiles'] as const,
   tickflowKeys:         ['tickflow-keys'] as const,

@@ -168,13 +168,13 @@ def test_R274_名录每一项都真的接在代码里(key):
 # ================================================================
 
 def _page() -> str:
-    """[R351] 今日总览删了 —— 这个 helper 指向模拟盘。
+    """[R351] 今日总览删了 —— 这个 helper 指向模拟盘 → [R564] 模拟盘并进虚拟账户的信号块。
 
     它现在是自检条、市场状态与那份 `/api/today` 数据唯一的落脚页, 下面那几条
     守卫要守的东西一样没变, 只是换了一个文件去找。
     """
     from tests.frontend_source import code_of
-    return code_of("pages/FlipPaper.tsx")
+    return code_of("components/paper/FlipFollowCard.tsx")
 
 
 def _bar() -> str:
@@ -194,7 +194,7 @@ def test_R274_自检条被挂在页面上():
     assert "export function TodayHealthBar" in _bar()
     # [R351] 今日总览删了, 自检条现在只挂在模拟盘上 —— 但「组件存在 ≠ 被挂上去」
     # 这条立论不变, 只是要守的页面从两个变成一个。
-    for page in ("pages/FlipPaper.tsx",):
+    for page in ("components/paper/FlipFollowCard.tsx",):   # [R564] 随模拟盘搬进虚拟账户
         code = code_of(page)
         assert "<TodayHealthBar h=" in code, f"{page} 没把自检条挂上去"
         assert "from '@/components/today/TodayHealthBar'" in code

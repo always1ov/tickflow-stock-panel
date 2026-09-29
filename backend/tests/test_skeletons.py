@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from tests.frontend_source import code_of
 
-FLIP = "pages/FlipPaper.tsx"   # [R351] 今日总览删了, 骨架那条立论落到模拟盘
+FLIP = "components/paper/FlipFollowCard.tsx"   # [R351] 今日总览删了, 骨架落到模拟盘 → [R564] 跟着搬进虚拟账户的信号块
 BOARD = "components/stock-analysis/WatchlistDecisionBoard.tsx"
 BOARD_SK = "components/stock-analysis/decision-board/BoardSkeletonRows.tsx"
 
@@ -23,61 +23,33 @@ def test_R324_模拟盘首次加载画骨架_不再转圈():
     要守的东西一个字没变, 换的只是去哪个文件里找。
     """
     code = code_of(FLIP)
-    assert "{q.isLoading && <LoadingSkeleton />}" in code
+    assert "{q.isLoading ? (\n          <FlipSkeleton />" in code
     assert 'role="status"' in code, "骨架要报给读屏器"
 
 
 def test_R351_骨架的形状跟着版面走():
     """**骨架与版面必须同步改。** 画出一个填不进东西的形状比直接转圈更糟 ——
-    它先许诺了一个版面, 然后食言。(R340 那条同名守卫钉的是今日总览的两块,
-    那一页没了; 立论搬到模拟盘, 对象换成那一排统计格。)
+    它先许诺了一个版面, 然后食言。
 
-    [R358] 净值图改成**默认收起**之后, 那块曲线骨架自己成了食言的那一个 ——
-    画一块 240px 的灰块, 数据到了那儿却是一条折叠条。所以这条守卫现在**反过来
-    钉它不在**。
+    [R564] 模拟盘那一排统计格随页面删了; 首页落到虚拟账户, 立论跟着搬到「跟六态转折」
+    信号块: 骨架的两段栅格(明早开盘的卡片、持仓的方块)断点逐个与真东西对上。
     """
     import re
 
     code = code_of(FLIP)
-    sk = code[code.index("function LoadingSkeleton"):]
+    sk = code[code.index("function FlipSkeleton"):]
+    sk = sk[:sk.index("\n}\n")]
+    card = code[code.index("export function FlipFollowCard"):code.index("function FlipSkeleton")]
 
-    # [R362] **格数与断点都不写死, 从真东西上量。**
-    #
-    # 原来写的是 `"sm:grid-cols-4" in sk and "Array.from({ length: 4 }" in sk`
-    # —— 两个 4 各自写死。把那一排从四格改成六格时, 守卫红在"骨架没跟上",
-    # 而**它红得含糊**: 它说的是"不等于 4", 不是"与那一排对不上"。改完之后
-    # 又得回来把两个 4 手改成 6, 下一次还得再来一遍。
-    #
-    # 现在直接比: 骨架的 grid-cols-* 断点 == 那一排的; 骨架画几格 == 那一排
-    # 有几个 `<Stat`。这样它**不可能漂**, 而且红的时候说的就是真正的毛病。
-    def _cols(block: str) -> list[str]:
-        return sorted(set(re.findall(r"(?:[a-z]+:)?grid-cols-\S+", block)))
+    def grids(block: str) -> list[str]:
+        return re.findall(r'className="(?:mt-2 )?(grid [^"]*grid-cols[^"]*)"', block)
 
-    row = code[code.index("<section className=\"grid grid-cols-2 divide-x"):]
-    row = row[:row.index("</section>")]
-    assert row.strip() and "<Stat label=" in row, "没切到统计那一排"
-
-    assert _cols(sk) == _cols(row), (
-        f"骨架的栅格与统计那一排对不上 —— 窄屏换行的位置不一样, "
-        f"数据到位时版面会跳一下\n骨架 {_cols(sk)}\n那一排 {_cols(row)}")
-    # `<Stat ` 数不对: 胜率那一格写的是 `<Stat` + 换行(属性太多换了行), 拿
-    # 带空格的串去数会**少数一格**, 而少数出来的那个数**照样是个数**, 断言
-    # 不会报"数不出来", 只会安静地按 5 去比。第一版就栽在这儿。
-    n = len(re.findall(r"<Stat[\s>]", row))
-    assert n >= 4, f"只数出 {n} 格, 多半是数法不对而不是真少了"
-    assert f"Array.from({{ length: {n} }}" in sk, \
-        f"那一排有 {n} 格, 骨架没画这么多 —— 先许诺一个版面再食言"
-    assert "h-[240px]" not in sk, \
-        "净值图已经默认收起了, 骨架还在画一块曲线大小的灰块 —— 先许诺再食言"
-    # 骨架画的东西页面上得真有。**`Summary` 现在挂在筛选卡的插槽上**
-    # (R358 用户: 「我是想合并到筛选的卡片里面」), 所以在整页里找, 不是只在
-    # `{d && !d.reason}` 那一段里找 —— 那一段现在没有它了。
-    assert "<Summary d={d} />" in code, "骨架画了那一排统计, 页面上却没有 Summary"
-    # [R498] 成绩单独成卡了, 骨架就画在那张卡里 —— 它画的正是那六格与净值折叠条,
-    # 画在别处(比如页面顶上)就是在一个不会出现成绩的位置许诺成绩
-    card = code[code.index("const results = ("):code.index("const hasBody")]
-    assert "{q.isLoading && <LoadingSkeleton />}" in card, "骨架没跟着成绩走"
-
+    want = [g.replace("mt-2 ", "") for g in grids(card)]
+    got = grids(sk)
+    # 明早开盘那段的卡片栅格、持仓那段的方块栅格, 骨架里都得有一份一模一样的
+    for g in ("grid gap-2 lg:grid-cols-2 2xl:grid-cols-3", "grid grid-cols-2 gap-2 lg:grid-cols-3 2xl:grid-cols-5"):
+        assert g in want, f"版面里没有这一段栅格了: {g}"
+        assert g in got, f"骨架没跟上版面: 缺 {g}"
 
 def test_R324_决策台加载中画骨架行_不印自选为空():
     code = code_of(BOARD)
@@ -94,7 +66,7 @@ def test_R324_决策台加载中画骨架行_不印自选为空():
 def test_R324_骨架只认_isLoading_不认_isFetching():
     # [R351] 今日总览那一项换成模拟盘 —— 立论不变: 后台重取时上一份数据还在,
     # 盖骨架等于把已经能看的东西藏起来。
-    for rel, needle in ((FLIP, "q.isLoading && <LoadingSkeleton"), (BOARD, "enriched.isLoading ? (")):
+    for rel, needle in ((FLIP, "q.isLoading ? ("), (BOARD, "enriched.isLoading ? (")):
         code = code_of(rel)
         assert needle in code
         assert needle.replace("isLoading", "isFetching") not in code, \

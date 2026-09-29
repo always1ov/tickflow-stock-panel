@@ -34,7 +34,7 @@ const PAGE_LABELS: Record<string, string> = {
   '/monitor': '监控中心',
   '/regime': '宏观分析',
   '/abnormal': '异动监控',
-  '/lots': '持仓提醒',
+  '/paper': '虚拟账户',   // [R564] 转折模拟盘(/lots)并进虚拟账户; 上游这里的 /lots「持仓提醒」本 fork 没有
   '/signals': '信号库',
   '/review': '复盘',
   '/indices': '指数',

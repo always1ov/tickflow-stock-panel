@@ -482,16 +482,15 @@ def test_R379_看盘页的密度一个像素没动():
     # 自选表格的行: 紧凑档位还在
     table = code_of("components/stock-table/primitives.tsx")
     assert "text-xs" in table or "text-[11px]" in table, "自选表格的紧凑字号没了"
-    # 模拟盘信号行: R356 定下的行高与栅格没被放开
-    flip = code_of("pages/FlipPaper.tsx")
+    # [R564] 模拟盘随页面删了, 它的「流水」那张表也没了; 虚拟账户的流水是作者的表(紧凑 text-xs 行)。
+    flip = code_of("pages/Paper.tsx")
     # [R383] 行高改成由整屏统一决定撑不撑(整屏没名次就不撑 —— 那时每行只有两行字,
     # 垫高是白送滚动)。**这不是"放开密度"而是相反**: 该紧的时候更紧了。
     # 所以这里钉的从"写死 3.5rem"换成"那一档还在, 且由 shape 统一决定"。
     # [R513] 信号行那套定宽网格随今日信号重做删了; [R516] 盯着那一段的密排行也撤了(「不要盯着」)。
     # 密度这条立论照旧钉在模拟盘最长的那张表上 —— 流水: 一笔一条、12px 字、上下各 6px, 宽屏两栏。
-    assert "break-inside-avoid flex-wrap items-center gap-x-2 gap-y-0.5 border-b border-border/30 py-1.5 text-xs" in flip, \
-        "模拟盘流水那一条被放大了"
-    assert "xl:columns-2" in flip, "宽屏上流水的栏数被减了"
+    assert "flex items-center gap-2 rounded-btn px-2 py-1.5 font-mono text-xs hover:bg-elevated/50" in flip, \
+        "虚拟账户成交台账那一条被放大了"
 
 
 # ── [R382] 换皮肤别漏掉暗色 ──────────────────────────────────────────────

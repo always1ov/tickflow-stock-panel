@@ -66,7 +66,8 @@ def test_R370_那条空壳AI操盘手确实删了():
     assert "AI 操盘手" not in blk, "R327 之后这套东西已经不存在了"
     # **但路由那条要留着** —— router 里写着「书签、菜单设置里存的旧路径不能断」
     router = code_of("router.tsx")
-    assert "{ path: 'paper-trading', element: <Navigate to=\"/lots\" replace /> }" in router, \
+    # [R564] 转折模拟盘(/lots)并进虚拟账户, 旧入口跟着指到 /paper
+    assert "{ path: 'paper-trading', element: <Navigate to=\"/paper\" replace /> }" in router, \
         "重定向路由被一起删了 —— 老书签会断"
 
 

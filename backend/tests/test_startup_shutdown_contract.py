@@ -74,8 +74,7 @@ _EXPECTED_ROUTERS = (
     "backtest.router",
     "factors.router",
     "mining.router",
-    # [R327] R59 的 AI 操盘手换成了转折模拟盘, 路由跟着换名
-    "flip_paper.router",
+    # [R327] R59 的 AI 操盘手换成了转折模拟盘(flip_paper) → [R564] 并进虚拟账户后删了
     "intraday.router",
     "indices.router",
     "overview.router",

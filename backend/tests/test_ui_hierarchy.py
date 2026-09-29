@@ -46,7 +46,10 @@ MIGRATED: list[str] = [
     "components/monitor/FocusPanel.tsx",
     "components/monitor/RuleEditor.tsx",
     "components/screener/SignalPicker.tsx",
-    "pages/FlipPaper.tsx",
+    # [R564] pages/FlipPaper.tsx 删了; 它的信号栏搬进虚拟账户这三个文件
+    "components/paper/FlipFollowCard.tsx",
+    "components/paper/FlipSetup.tsx",
+    "components/paper/MonthStrip.tsx",
     "pages/Lots.tsx",
     "components/today/ScoreCell.tsx",
     "components/today/TodayHealthBar.tsx",

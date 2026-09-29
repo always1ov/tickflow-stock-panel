@@ -29,7 +29,6 @@ from app.api import (
     events,
     factors,
     financials,
-    flip_paper,  # [fork 增强] R327 转折模拟盘
     focus,  # [fork 增强] R159 推送焦点名单
     indices,
     intraday,
@@ -750,7 +749,7 @@ def _register_routers(app: FastAPI) -> None:
     app.include_router(backtest.router)
     app.include_router(factors.router)
     app.include_router(mining.router)
-    app.include_router(flip_paper.router)  # [fork 增强] R327 转折模拟盘
+    # [R327 → R564] 转折模拟盘(flip_paper)并进虚拟账户的「跟六态转折」后删了, 数据走 paper_flip(末尾注册)
     app.include_router(intraday.router)
     app.include_router(indices.router)
     app.include_router(overview.router)

@@ -25,8 +25,10 @@ STILL_THERE = [
     ("主线排行", "backend/app/api/regime.py", '@router.get("/mainline")'),
     ("主线排行", "backend/app/api/regime.py", '@router.post("/mainline/recompute")'),
     ("状态分布饼图", "backend/app/api/regime.py", '@router.get("/states")'),
-    ("有信号但没做成", "backend/app/services/flip_portfolio.py", "skipped: list[dict] = []"),
-    ("有信号但没做成", "frontend/src/lib/api.ts", "skipped: FlipSkipped[]"),
+    # [R564] 转折模拟盘并进虚拟账户: 「没做成」的记录改由跟六态转折照记、接口照发
+    ("有信号但没做成", "backend/app/services/flip_follow_run.py", 'state["log"].append(x)'),
+    ("有信号但没做成", "backend/app/services/flip_follow_run.py", 'out["log"] = ['),
+    ("有信号但没做成", "frontend/src/lib/api.ts", "log: PaperFlipLog[]"),
     ("今日总览没人显示的几块", "backend/app/api/today.py", '"actions": actions,'),
     ("今日总览没人显示的几块", "backend/app/api/today.py", '"holdings": holdings,'),
     ("今日总览没人显示的几块", "backend/app/api/today.py", '"meso": meso,'),

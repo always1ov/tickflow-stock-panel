@@ -62,7 +62,6 @@ import {
   IconMonitor,
   IconRegime,
   IconAlert,
-  IconLots,
   IconPaper,
   IconSignals,
   IconReview,
@@ -99,7 +98,7 @@ type CoreIndex = (typeof CORE_INDEXES)[number]
 
 const nav = [
   // [R561 同步上游] 图标换成上游 v0.3.2 的品牌图标族(BrandIcons, 描边跟随文字色, 不带紫); 上游那套里没有的
-  // 两项(「浏览」分组、Minds)仍用 lucide。/lots 是本 fork 的转折模拟盘, 用上游「仓位箱 + mini K 线」那枚
+  // 两项(「浏览」分组、Minds)仍用 lucide。[R564] /lots(转折模拟盘)并进虚拟账户后撤掉了这一行
   { to: '/watchlist',  label: '自选',   icon: IconWatchlist },
   { to: '/screener',   label: '策略',   icon: IconStrategy },
   { to: '/factors',    label: '因子', icon: IconFactors },
@@ -115,10 +114,8 @@ const nav = [
   { to: '/monitor', label: '监控中心', icon: IconMonitor },
   { to: '/regime', label: '宏观分析', icon: IconRegime },   // [R503] 原「市场环境」; 路由不变, 存过的菜单偏好不受影响
   { to: '/abnormal', label: '异动监控', icon: IconAlert },
-  // [R170] 上游这里叫「持仓提醒」; 在 fork 这边它是双 tab 外壳(我的批次 + AI 操盘手),
-  // 所以叫「仓位中心」。旧路径 /paper-trading 仍可用(router 里重定向)。
-  { to: '/lots',       label: '模拟盘', icon: IconLots },   // [R327] 转折模拟盘 —— 纯规则
-  // [R561 同步上游] 上游 v0.3.2 的虚拟账户(模拟撮合)。上游菜单叫「模拟盘」, 与上一行撞名, 本 fork 叫「虚拟账户」
+  // [R561 同步上游] 上游 v0.3.2 的虚拟账户(模拟撮合)。上游菜单叫「模拟盘」, 本 fork 叫「虚拟账户」。
+  // [R564] 本 fork 的转折模拟盘(/lots)并进了它(跟六态转折), 那一行撤了
   { to: '/paper',      label: '虚拟账户', icon: IconPaper },
   { to: '/signals',    label: '信号库',   icon: IconSignals },
   { to: '/review',      label: '复盘',   icon: IconReview },

@@ -23,12 +23,10 @@ const Factors = lazy(() => import('./pages/Factors').then(m => ({ default: m.Fac
 const Financials = lazy(() => import('./pages/Financials').then(m => ({ default: m.Financials })))
 const Data = lazy(() => import('./pages/Data').then(m => ({ default: m.Data })))
 const Monitor = lazy(() => import('./pages/Monitor').then(m => ({ default: m.Monitor })))
-// [R170] 仓位中心: 「我的批次」(真钱) 与「AI 操盘手」(模拟盘) 的双 tab 外壳
-// [R327] AI 操盘手换成转折模拟盘 —— 纯规则, 没有 AI
-const FlipPaper = lazy(() => import('./pages/FlipPaper').then(m => ({ default: m.FlipPaper })))
+// [R564] 转折模拟盘(R327)删了 —— 它的规则并进虚拟账户的「跟六态转折」(R562/R563)。/lots 留成重定向
 const Lots = lazy(() => import('./pages/Lots').then(m => ({ default: m.Lots })))   // [R183] 上游批次登记, 保留路由
-// [R561 同步上游] 上游 v0.3.2 的虚拟账户(模拟撮合)。上游界面也叫「模拟盘」, 与本 fork 的转折模拟盘(/lots)撞名 ——
-// 在本 fork 里一律叫「虚拟账户」(上游设计文档自己的正式名), 路由沿用上游的 /paper
+// [R561 同步上游] 上游 v0.3.2 的虚拟账户(模拟撮合)。上游界面叫「模拟盘」, 在本 fork 里一律叫「虚拟账户」
+// (上游设计文档自己的正式名), 路由沿用上游的 /paper。[R564] 它现在也是首页
 const Paper = lazy(() => import('./pages/Paper').then(m => ({ default: m.Paper })))
 const Dashboard = lazy(() => import('./pages/Dashboard').then(m => ({ default: m.Dashboard })))
 const AnalysisDetail = lazy(() => import('./pages/AnalysisDetail').then(m => ({ default: m.AnalysisDetail })))
@@ -155,12 +153,13 @@ export function createAppRouter() {
       //
       // [R351] 那个决策汇聚层从今日总览换成了模拟盘: 今日总览的内容已经
       // 逐块融进模拟盘(R341~R350), 这一页删掉了。
-      { index: true, element: <Navigate to="/lots" replace /> },
+      // [R564] 模拟盘并进虚拟账户(跟六态转折), 首页跟着落到 /paper
+      { index: true, element: <Navigate to="/paper" replace /> },
       { path: 'dashboard', element: <Dashboard /> },
       { path: 'overview', element: <Navigate to="/dashboard" replace /> },
       // [R351] 今日总览删了, 但**路由保留成重定向** —— 书签、菜单设置里存的
       // 旧路径不能断(R170 对 /paper-trading 立的同一条规矩)。
-      { path: 'today', element: <Navigate to="/lots" replace /> },
+      { path: 'today', element: <Navigate to="/paper" replace /> },
       { path: 'analysis', element: <Navigate to="/settings?tab=ext-pages" replace /> },
       { path: 'analysis/:menuId', element: <AnalysisDetail /> },
       { path: 'concept-analysis', element: <ConceptAnalysis /> },
@@ -174,13 +173,13 @@ export function createAppRouter() {
       // 上游把挖掘并进了因子页; 这条重定向让老书签(带 run/candidate 参数)仍然可用
       { path: 'mining', element: <MiningRedirect /> },
       // [R170] AI 操盘手并入仓位中心。路由保留并重定向: 书签、菜单设置里存的旧路径不能断。
-      { path: 'paper-trading', element: <Navigate to="/lots" replace /> },   // [R327] 旧入口照旧指过来
+      { path: 'paper-trading', element: <Navigate to="/paper" replace /> },   // [R327 → R564] 旧入口照旧指过来
       { path: 'financials', element: <Financials /> },
       { path: 'data', element: <Data /> },
       { path: 'monitor', element: <Monitor /> },
-      // [R327] /lots 现在是**转折模拟盘**。路由保留不改名: 书签、菜单设置里
-      // 存的都是这个路径, 改名等于把用户存的入口作废。
-      { path: 'lots', element: <FlipPaper /> },
+      // [R327] /lots 曾是**转折模拟盘**; [R564] 那一页并进虚拟账户后删了, 路由留成重定向 ——
+      // 书签、菜单设置里存的都是这个路径, 断掉等于把用户存的入口作废。
+      { path: 'lots', element: <Navigate to="/paper" replace /> },
       // 上游的批次登记页保留一条自己的路由 —— 代码一行没动, 只是不在导航里。
       // 哪天想用回真钱批次登记, 它原封不动还在。
       { path: 'lots-registry', element: <Lots /> },

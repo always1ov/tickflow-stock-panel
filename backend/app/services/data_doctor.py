@@ -13,7 +13,7 @@
 
 ## 三类, 处置办法完全相反
 
-    用户数据    自选/分组、持仓标记、模拟盘账本、消息面、把握分台账、偏好
+    用户数据    自选/分组、持仓标记、AI 操盘手旧账本、消息面、把握分台账、偏好
                 **不可重算** —— 缺字段只能按默认值补齐, 少一条就是真丢了
     派生数据    行情分区、enriched 快照、AI 报告、回测结果
                 **可重算** —— 坏了删掉重跑就行, 补它反而是在给假数据续命
@@ -110,8 +110,10 @@ STORES: tuple[Store, ...] = (
     Store("user_data/positions.json", "持仓标记", shape=SHAPE_RECORD_MAP,
           fields={"held": False, "cost": None, "weight": None, "updated_at": ""},
           note="weight(仓位比例)是后加的 —— 缺了会被当成「没填仓位」, 组合层面的提示全部失效"),
-    Store("user_data/paper_traders.json", "模拟盘账本", shape=SHAPE_OPAQUE,
-          note="账本读取自带老数据迁移(单本平铺 → books)。结构深, 不做字段级补齐"),
+    # [R564] 标签原叫「模拟盘账本」—— 那是 R59「AI 操盘手」的旧账本(R327 已撤), 与虚拟账户无关;
+    # 模拟盘这个名字随转折模拟盘并进虚拟账户退役, 标签照实写
+    Store("user_data/paper_traders.json", "AI 操盘手旧账本", shape=SHAPE_OPAQUE,
+          note="功能已撤(R327)。账本读取自带老数据迁移(单本平铺 → books)。结构深, 不做字段级补齐"),
     Store("user_data/usage_notes.json", "消息面记录", shape=SHAPE_RECORD_LIST,
           required=("id",),
           fields={"status": "", "horizon": "news", "pinned": False,

@@ -59,7 +59,7 @@
 - [x] 自选(`Watchlist`)
 - [x] 大盘(`Dashboard`)
 - [x] 监控(`Monitor` + `monitor/RuleEditor`)
-- [x] 模拟盘 / 批次(`FlipPaper` / `Lots`)
+- [x] 虚拟账户·跟六态转折 / 批次(`components/paper/*` / `Lots`) —— R564 起替代转折模拟盘(`FlipPaper`, 已删)
 - [x] 选股(`Screener` + `screener/*`)
 - [x] 市场环境(`Regime` + `regime/*`)
 - [x] 指数(`Indices`)

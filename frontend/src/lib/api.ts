@@ -3247,73 +3247,6 @@ export interface TickflowKeyRow {
 }
 
 /**
- * [fork 增强 R327] 转折模拟盘 —— 一个组合, 只按六态转折买卖。
- *
- * 替掉 R59 那套「AI 操盘手」。**没有状态**: 每次请求当场从日线重算, 不落盘、
- * 不定时。规则文案从 `/api/flip-paper/rules` 取, 前端不誊抄 —— 誊一份的话口径
- * 一改那份誊抄就开始说假话, 而且不会有任何东西报错。
- */
-export interface FlipNavPoint {
-  date: string
-  nav: number
-  cash: number
-  market_value: number
-  positions: number
-  ret: number
-}
-
-export interface FlipOrder {
-  date: string
-  symbol: string
-  name: string
-  act: 'buy' | 'sell'
-  shares: number
-  price: number
-  amount: number
-  fee: number
-  state_cn: string | null
-  reason: string
-  /** 信号日 —— 封板顺延时与成交日不同 */
-  signal_date: string
-  delayed: boolean
-}
-
-export interface FlipPosition {
-  symbol: string
-  name: string
-  shares: number
-  cost: number | null
-  last: number
-  market_value: number
-  pnl: number
-  pnl_pct: number | null
-}
-
-export interface FlipStats {
-  days: number
-  orders: number
-  buys: number
-  sells: number
-  /** 一次完整买卖才算一轮 —— 还拿着的不算 */
-  round_trips: number
-  win: number
-  /** null = 一轮都没兑现, 算不出来(不是 0) */
-  win_rate: number | null
-  total_ret: number
-  max_drawdown: number
-  best: number | null
-  worst: number | null
-}
-
-/** 没能按信号动手的那些 —— 原因码在界面上逐条翻译, 空栏必须自己解释 */
-export interface FlipSkipped {
-  date: string
-  symbol: string
-  name: string
-  reason: 'sealed' | 'no_slot' | 'no_cash' | 'voided'
-}
-
-/**
  * [R329] 今日信号。**只有 stage === 'flipped' 时 act 才有值** —— 盘中越线与
  * 接近都不是出手理由(用户唯一的要求: 一定要根据转折才能出手)。
  */
@@ -3324,7 +3257,7 @@ export interface FlipTodaySignal {
   stage: 'flipped' | 'crossing' | 'watch'
   /** 只在 stage === 'flipped' 时非空 */
   act: 'buy' | 'sell' | null
-  /** [R338] 模拟盘现在拿着它吗 —— 版面据此把「手上这些」单独常驻一段 */
+  /** [R338] 账户现在拿着它吗(R564 起是虚拟账户里的真实持仓) —— 版面据此把「持仓」单独列一段 */
   held: boolean
   /** 转折之前那一侧: 后端 `flip_trades.BULL / BEAR` 的原值「多头」/「空头」(中文, 不是 bull / bear) */
   side: string
@@ -3336,59 +3269,6 @@ export interface FlipTodaySignal {
   gap_pct: number | null
   /** 参考价是不是盘中实时价 */
   live: boolean
-}
-
-export interface FlipPaper {
-  /** [R329] 今天该挂什么单 */
-  today: FlipTodaySignal[]
-  nav: FlipNavPoint[]
-  orders: FlipOrder[]
-  positions: FlipPosition[]
-  stats: FlipStats
-  /** [R357] 逐月收益 —— 自然月, 月与月之间不重叠 */
-  monthly: FlipMonth[]
-  skipped: FlipSkipped[]
-  pending: { symbol: string; name: string; act: string; since: string }[]
-  as_of: string | null
-  /** 一天都跑不了时的原因; 跑得了就是 null */
-  reason: string | null
-  symbols: string[]
-  /** 自选里但取不到日线的那些 —— 不静默丢掉 */
-  missing: string[]
-  capital: number
-  max_positions: number
-}
-
-/**
- * [R357] 一个自然月的成绩。用户: 「最好是每个月的收益单独计算」。
- *
- * 替掉 R332 那两个**滚动窗口**(近一月 / 近三月)—— 那两格重叠, 近三月把近一月
- * 整个包在里面, 读的人没法从这两个数还原出中间那两个月各自怎么样。
- */
-export interface FlipMonth {
-  /** `YYYY-MM` */
-  month: string
-  /** 这个月**自己**的收益: 月末净值 / 上月末净值 - 1(首月基准是本金) */
-  ret: number
-  /** 月末净值 */
-  nav: number
-  /** 这个月有几个交易日 */
-  days: number
-  /** 首尾两个月是残月 —— 回测窗口从月中切进来 / 这个月还没走完 */
-  partial: boolean
-}
-
-export interface FlipRules {
-  signal: string
-  execute: string
-  direction: string[]
-  sizing: string
-  universe: string
-  short: string
-  costs: { commission: number; stamp_tax: number; slippage_bps: number; lot: number }
-  caveat: string
-  vs_flip_trades: string
-  why_no_state: string
 }
 
 export interface AiProfile {
@@ -3860,20 +3740,6 @@ export const api = {
     request<{ ok: boolean; onboarding_completed: boolean }>(
       '/api/settings/onboarding/complete', { method: 'POST' },
     ),
-
-  // ===== [R59] AI 操盘手 =====
-  /** [R327] 转折模拟盘。无参就用默认本金/上限/回溯年数 */
-  flipPaper: (q?: { capital?: number; maxPositions?: number; years?: number }) => {
-    const p = new URLSearchParams()
-    if (q?.capital != null) p.set('capital', String(q.capital))
-    if (q?.maxPositions != null) p.set('max_positions', String(q.maxPositions))
-    if (q?.years != null) p.set('years', String(q.years))
-    const qs = p.toString()
-    return request<FlipPaper>(`/api/flip-paper${qs ? `?${qs}` : ''}`)
-  },
-
-  /** 规则说明从后端出 —— 前端不誊抄一份 */
-  flipPaperRules: () => request<FlipRules>('/api/flip-paper/rules'),
 
   /** [R56] 多 AI 档位: 列表顺序即优先级, 前面的先用, 用不了顺位往下 */
   aiProfiles: () =>

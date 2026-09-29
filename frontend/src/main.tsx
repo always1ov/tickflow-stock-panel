@@ -68,15 +68,15 @@ const _path = window.location.pathname
 if (_path !== '/login') {
   void queryClient.prefetchQuery({ queryKey: QK.settings, queryFn: api.settings })
 }
-// [R351] 首屏预热跟着首页走: 今日总览删了, 落地页现在是模拟盘。
-// `/api/today` 那份数据**仍然要预热** —— 模拟盘拿它做把握分排序与页头的市场状态。
-if (_path === '/' || _path === '/lots' || _path === '/today') {
+// [R351] 首屏预热跟着首页走: 今日总览删了, 落地页是模拟盘 → [R564] 模拟盘并进虚拟账户, 落地页是 /paper。
+// `/api/today` 那份数据**仍然要预热** —— 虚拟账户的「跟六态转折」信号块拿它做把握分排序、门槛与自检条。
+if (_path === '/' || _path === '/paper' || _path === '/lots' || _path === '/today') {
   void queryClient.prefetchQuery({
     queryKey: QK.todayOverview,
     queryFn: () => api.todayOverview(),
     staleTime: 60_000,
   })
-  import('./pages/FlipPaper').catch(() => { /* 真正需要时 lazy() 会再试, 这里只是预热 */ })
+  import('./pages/Paper').catch(() => { /* 真正需要时 lazy() 会再试, 这里只是预热 */ })
 }
 
 async function bootstrap() {

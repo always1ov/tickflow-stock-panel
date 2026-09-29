@@ -39,8 +39,9 @@ def test_R506_当前主线进了现在卡_色与停更规矩一起搬过来():
 
 
 def test_R506_转折页页头不再有主线():
-    flip = code_of("pages/FlipPaper.tsx")
-    head = flip[flip.index("<PageHeader"):flip.index('<div className="min-h-0 flex-1')]
+    # [R564] 转折页并进虚拟账户, 页头那几样(天气 / 刷新)挂到了「跟六态转折」信号块的标题行上
+    flip = code_of("components/paper/FlipFollowCard.tsx")
+    head = flip[flip.index("<span className=\"text-sm font-medium\">信号</span>"):flip.index("{q.isLoading ? (")]
     assert "主线" not in head and "mlStale" not in flip
 
 

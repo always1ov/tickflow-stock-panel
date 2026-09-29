@@ -17,17 +17,29 @@
  * 用户在 R499 说过「有信号没做成的就不要放出来了」。
  *
  * 数据: `/api/paper/flip`(一趟给齐); 把握分取今日总览那份打分, 只排序不参与判定(R342)。
+ *
+ * [R564] 模拟盘页删掉时, 那一页上的**数据自检条**(R343)与**门槛 / 体检 / 板块筛选**(R347)
+ * 一起搬到这里 —— 用户在 R347 说过「门槛的东西非常重要, 体检和筛选功能也要能保留」。
+ * 仍是同一个组件(今日总览那份实现), 只换了挂的地方; 它们只作用于打分那一层,
+ * 只影响「明早开盘」里买入的先后与名次标注, 不影响谁在名单上、更不影响挂不挂单。
+ * 页头那三样也一起搬过来, 挂在「信号」标题行上: 大盘天气(姿态 + 多空只数, R343)、
+ * 手动刷新(R365「除了自动定时我还要手动按钮」)、自动刷新节奏(R333, 盘中 5 分钟 / 盘后 1 小时)。
  * 不加任何动效: 这是看盘数据(AGENTS 动效硬规则第 7 条)。
  */
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { TrendingDown, TrendingUp } from 'lucide-react'
+import { RefreshCw, TrendingDown, TrendingUp } from 'lucide-react'
 import { api, type FlipTodaySignal, type PaperFlipPanel, type TodayOpportunity } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { cn } from '@/lib/cn'
 import { useTodayOverview } from '@/lib/useSharedQueries'
+import { refreshEvery, rhythmHint } from '@/lib/refreshRhythm'
+import { Button } from '@/components/ui'
+import { Skeleton } from '@/components/data/Skeleton'
 import { Hint } from '@/components/Hint'
 import { ScoreCell } from '@/components/today/ScoreCell'
+import { TodayControls } from '@/components/today/TodayControls'
+import { TodayHealthBar } from '@/components/today/TodayHealthBar'
 import { TrendCell } from '@/components/today/TrendCell'
 import { LevelsDialog } from '@/components/stock-analysis/LevelsDialog'
 import { StockPreviewDialog } from '@/components/StockPreviewDialog'
@@ -39,6 +51,14 @@ const EXIT_GAUGE_FULL = 0.10
 /** 后端 flip_trades.BEAR 的原值 */
 const BEAR = '空头'
 
+/** [R343] 姿态四档的配色 —— 与今日总览那张卡同一套语义, 不另立一份说法(随模拟盘页头搬来) */
+const POSTURE_TONE: Record<string, string> = {
+  进攻: 'bg-bull/15 text-bull',
+  谨慎: 'bg-warning/15 text-warning',
+  防守: 'bg-bear/15 text-bear',
+  观察: 'bg-muted/15 text-muted',
+}
+
 type OpenFn = (symbol: string, name: string) => void
 type Order = PaperFlipPanel['orders'][number]
 
@@ -48,6 +68,7 @@ export function useFlipPanel(acc: string, enabled: boolean) {
     queryFn: () => api.paperFlip(acc),
     enabled,
     staleTime: 60_000,
+    refetchInterval: refreshEvery('derived'),   // [R333] 自己刷, 不等手动
   })
 }
 
@@ -73,9 +94,17 @@ export function FlipFollowCard({ acc, holdingDays }: { acc: string; holdingDays:
   const crossing = (d?.signals ?? []).filter((r) => r.stage === 'crossing')
   const held = (d?.signals ?? []).filter((r) => r.held).sort((a, b) => rank(a.symbol) - rank(b.symbol))
   const near = held.filter((r) => r.gap_pct != null && Math.abs(r.gap_pct) <= NEAR_EXIT).length
+  const w = today.data?.weather
+  // [R365] 两份一起重取 —— 只刷一份的话按钮说「刷新」实际只刷了半块; 在飞就禁用
+  const refreshing = q.isFetching || today.isFetching
+  const refreshAll = () => { void q.refetch(); void today.refetch() }
 
   return (
-    <>
+    <div className="space-y-3">
+      {/* [R343] 自检条: 一切正常时一个像素都不占; 它要说的是「你正在看的数字是几天前的」 */}
+      {!!today.data?.health && <TodayHealthBar h={today.data.health} />}
+      {/* [R347] 门槛 / 体检 / 板块筛选 —— 紧挨着它唯一影响的东西(下面的信号) */}
+      {today.data && <TodayControls d={today.data} refetch={() => today.refetch()} isFetching={today.isFetching} />}
       <section className="overflow-hidden rounded-card border border-border bg-surface">
         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 border-b border-border/60 px-4 py-2.5">
           <span className="text-sm font-medium">信号</span>
@@ -83,11 +112,25 @@ export function FlipFollowCard({ acc, holdingDays }: { acc: string; holdingDays:
             跟六态转折{d?.rule ? ` · 同时最多 ${d.rule.max_positions} 只` : ''} · 收盘确认转折, 次日开盘成交
           </span>
           <Hint title={'**只有收盘确认的转折才出手。**\n\n转折当晚, 盘后管道自动挂**次日开盘单** —— 不用你动手。\n盘中越线 = 按此刻现价当收盘算会翻面, **不是出手理由**:\n收盘还在线外, 今晚才会挂单。\n\n「持仓」那一段: 条越短, 离清仓线越近。'} />
-          {d?.as_of && <span className="ml-auto text-micro tabular-nums text-muted">数据截至 {d.as_of}</span>}
+          <div className="ml-auto flex items-center gap-2 text-micro tabular-nums text-muted">
+            {w && (
+              <span className="flex items-center gap-1.5" title={w.posture_reason || undefined}>
+                <span className={cn('rounded-btn px-1.5 py-0.5 font-medium', POSTURE_TONE[w.posture] ?? POSTURE_TONE.观察)}>{w.posture}</span>
+                多 <span className="text-bull">{w.bull}</span>/空 <span className="text-bear">{w.bear}</span>
+                <span className="hidden sm:inline">· 转多 <span className="text-bull">{w.new_bull}</span> 转空 <span className="text-bear">{w.new_bear}</span></span>
+              </span>
+            )}
+            {d?.as_of && <span className="hidden sm:inline">截至 {d.as_of}</span>}
+            <Button size="xs" onClick={refreshAll} disabled={refreshing}
+                    title={`立刻重取一次(信号 + 打分两份一起)。平时${rhythmHint('derived')}, 这个按钮不影响那个节奏`}>
+              <RefreshCw className={cn('h-3 w-3', refreshing && 'animate-spin')} />
+              <span className="hidden sm:inline">{refreshing ? '刷新中' : '刷新'}</span>
+            </Button>
+          </div>
         </div>
 
         {q.isLoading ? (
-          <div className="px-4 py-6 text-xs text-muted">加载中…</div>
+          <FlipSkeleton />
         ) : q.isError ? (
           <div className="px-4 py-6 text-xs text-danger">{String((q.error as Error).message)}</div>
         ) : (
@@ -139,7 +182,32 @@ export function FlipFollowCard({ acc, holdingDays }: { acc: string; holdingDays:
       <LevelsDialog symbol={levels?.symbol ?? null} name={levels?.name ?? ''} onClose={() => setLevels(null)} />
       <StockPreviewDialog symbol={review?.symbol ?? null} name={review?.name} initialView="review"
                           onClose={() => setReview(null)} />
-    </>
+    </div>
+  )
+}
+
+/**
+ * [R324 → R564] 首次加载画版面的形状, 不画转圈 —— 首页落在虚拟账户之后, 这条立论跟着搬过来。
+ * 形状跟着真东西走: 「明早开盘」那段的卡片栅格 + 「持仓」那段的方块栅格, 断点逐个对上
+ * (骨架换行的位置与真东西不一样, 数据到位时版面会跳)。只在 `isLoading` 时出现 ——
+ * 后台重取时上一份数据还在, 盖骨架等于把能看的东西藏起来。
+ */
+function FlipSkeleton() {
+  return (
+    <div role="status" aria-label="正在算" className="divide-y divide-border/40">
+      <div className="space-y-2 px-4 py-3">
+        <Skeleton w="w-40" h="h-3" />
+        <div className="grid gap-2 lg:grid-cols-2 2xl:grid-cols-3">
+          {Array.from({ length: 2 }, (_, i) => <Skeleton key={i} h="h-16" rounded="rounded-btn" />)}
+        </div>
+      </div>
+      <div className="space-y-2 px-4 py-3">
+        <Skeleton w="w-32" h="h-3" />
+        <div className="grid grid-cols-2 gap-2 lg:grid-cols-3 2xl:grid-cols-5">
+          {Array.from({ length: 3 }, (_, i) => <Skeleton key={i} h="h-14" rounded="rounded-btn" />)}
+        </div>
+      </div>
+    </div>
   )
 }
 
