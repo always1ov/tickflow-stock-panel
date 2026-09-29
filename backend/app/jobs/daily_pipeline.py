@@ -809,6 +809,21 @@ def run_now(
         logger.warning("paper_settle failed (soft): %s", e)
         stage_errors.append(f"paper_settle: {e}")
 
+    # Step 2.9 [fork R562]: 跟六态转折 —— 按今天收盘确认的转折, 给带这条规则的虚拟账户
+    # 挂**次日开盘单**。必须在结算之后: 要用今天定版的净值算「净值 ÷ N」, 要看今天
+    # 开盘单成交了没有。只下单不撮合(撮合是明天这一步的事); 软失败不阻断主管道。
+    flip_follow_summary: list[dict] = []
+    try:
+        from app.services import flip_follow_run
+        flip_follow_summary = flip_follow_run.follow_all(repo, today.isoformat())
+        if flip_follow_summary:
+            logger.info("flip_follow: %s", [
+                {k: (len(v) if isinstance(v, list) else v) for k, v in s.items()}
+                for s in flip_follow_summary])
+    except Exception as e:  # noqa: BLE001
+        logger.warning("flip_follow failed (soft): %s", e)
+        stage_errors.append(f"flip_follow: {e}")
+
     # Step 3: 刷新视图
     emit("refresh_views", 95, "刷新 DuckDB 视图…")
     _refresh_views(repo)
@@ -852,6 +867,7 @@ def run_now(
         "regime_days": regime_days,
         "mainline_rows": mainline_rows,
         "paper_settle": paper_summary,
+        "flip_follow": flip_follow_summary,
         "lagging_symbols": len(lagging_symbols),
         "enriched_total_days": enriched_total_days,
         "integrity_repair_from": repair_start.isoformat() if repair_start else None,

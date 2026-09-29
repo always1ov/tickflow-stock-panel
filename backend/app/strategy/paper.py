@@ -35,6 +35,7 @@ import uuid
 from datetime import date as _date
 from datetime import datetime
 from datetime import time as _time
+from datetime import timedelta
 from pathlib import Path
 
 import polars as pl
@@ -399,7 +400,10 @@ def create_order(
                 return None, f"无 {symbol} 持仓, 不能卖出"
             # 可卖数量按当前交易日现算 (与 _fill_order / overview 同口径): 物化文件里的
             # available_qty 是上次重建时的 T+1 口径, 跨日后不会更新, 次日仍会是 0
-            available = _available_of(pos, cn_today().isoformat())
+            # [fork R562] 次日开盘单在下一交易日才成交: 今天买进的那批到时已可卖。按今天算
+            # 会把「今天开盘买、今晚挂明早卖」误拒 (撮合时 _fill_order 仍按成交日再校验)。
+            as_of = cn_today() + timedelta(days=1) if order_type == "next_open" else cn_today()
+            available = _available_of(pos, as_of.isoformat())
             if qty > available:
                 return None, f"可卖数量不足 (T+1): 可卖 {available}, 请求数量 {qty}"
             # 超卖防护: pending 卖出单占用可卖额度 — 同 symbol 的 pending 卖出合计

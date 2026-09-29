@@ -22,6 +22,7 @@ from datetime import datetime
 from pathlib import Path
 
 from app.market_time import cn_now
+from app.services import flip_follow  # [fork R562] 「跟六态转折」规则
 from app.services.fs_utils import atomic_write_text
 from app.strategy import paper
 
@@ -44,6 +45,9 @@ def _new_id() -> str:
 
 def validate_rule(rule: dict) -> None:
     """校验规则字段, 非法抛 ValueError (中文信息)。"""
+    if rule.get("match_kind") == flip_follow.KIND:  # [fork R562] 字段形状不同, 走自己的校验
+        flip_follow.validate_rule(rule)
+        return
     if (rule.get("name") or "").strip() == "":
         raise ValueError("规则名称不能为空")
     if rule.get("match_kind") not in ("strategy", "rule"):
@@ -67,6 +71,8 @@ def validate_rule(rule: dict) -> None:
 
 
 def normalize_rule(rule: dict) -> dict:
+    if rule.get("match_kind") == flip_follow.KIND:  # [fork R562]
+        return flip_follow.normalize_rule({**rule, "created_at": rule.get("created_at") or _now_iso()})
     d = dict(rule)
     d["name"] = (d.get("name") or "").strip()
     d["match_id"] = (d.get("match_id") or "").strip()
@@ -101,6 +107,11 @@ def save_auto_rule(data_dir: Path, rule: dict, account_id: str = paper.DEFAULT_A
 def create_auto_rule(data_dir: Path, rule: dict, account_id: str = paper.DEFAULT_ACCOUNT_ID) -> dict:
     rule = normalize_rule({**rule, "id": _new_id()})
     validate_rule(rule)
+    # [fork R562] 一个账户只许一条「跟六态转折」: 两条会各按「净值 ÷ N」下单, 仓位翻倍
+    if rule["match_kind"] == flip_follow.KIND and any(
+        r["match_kind"] == flip_follow.KIND for r in load_auto_rules(data_dir, account_id)
+    ):
+        raise ValueError("每个账户只能有一条「跟六态转折」规则")
     return save_auto_rule(data_dir, rule, account_id)
 
 
@@ -122,6 +133,8 @@ def set_enabled(data_dir: Path, rule_id: str, enabled: bool, account_id: str = p
 
 
 def _matches(rule: dict, ev: dict) -> bool:
+    if rule["match_kind"] == flip_follow.KIND:  # [fork R562] 盘后管道驱动, 不接盘中监控事件
+        return False
     if rule["match_kind"] == "strategy":
         return ev.get("source") == "strategy" and ev.get("strategy_id") == rule["match_id"]
     return ev.get("rule_id") == rule["match_id"]

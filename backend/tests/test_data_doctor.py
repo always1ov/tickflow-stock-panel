@@ -45,6 +45,8 @@ NOT_USER_DATA = {
     "account.json": "虚拟账户(data/paper/accounts/<id>/)",
     "fills.jsonl": "虚拟账户成交台账(同上)",
     "daily.jsonl": "虚拟账户每日净值(同上 nav/)",
+    # [R562] 跟六态转折的在途信号与没能动手的记录, 与上面同在 accounts/<id>/ 下; 钱不记在这里
+    "flip_follow.json": "虚拟账户·跟六态转折状态(同上)",
 }
 
 

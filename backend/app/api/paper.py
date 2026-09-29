@@ -282,11 +282,14 @@ def update_settings(request: Request, body: SettingsModel, account: str = Query(
 # ===== 自动跟单规则 (V2) =====
 class AutoRuleModel(BaseModel):
     name: str
-    match_kind: str                 # strategy / rule
-    match_id: str
+    match_kind: str                 # strategy / rule / flip ([fork R562] 跟六态转折)
+    # [fork R562] match_id / size_value 改为可缺省: 「跟六态转折」用不到它们。作者那两种
+    # 规则缺了照样拒 —— 校验在域模块 paper_auto.validate_rule, 只是状态码从 422 变成 400。
+    match_id: str = ""
     side: str = "buy"
     size_mode: str = "fixed_amount" # fixed_amount / pct_equity
-    size_value: float
+    size_value: float | None = None
+    max_positions: int | None = None  # [fork R562] 跟六态转折: 同时最多持有几只
     order_type: str = "next_open"
     cooldown_days: int = 5
     enabled: bool = True
@@ -302,7 +305,7 @@ def list_auto_rules(request: Request, account: str = Query(paper.DEFAULT_ACCOUNT
 def create_auto_rule(request: Request, body: AutoRuleModel, account: str = Query(paper.DEFAULT_ACCOUNT_ID)):
     from app.strategy import paper_auto
     try:
-        rule = paper_auto.create_auto_rule(_data_dir(request), body.model_dump(), _acc(request, account))
+        rule = paper_auto.create_auto_rule(_data_dir(request), body.model_dump(exclude_none=True), _acc(request, account))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     return {"rule": rule}
