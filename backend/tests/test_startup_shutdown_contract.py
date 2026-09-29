@@ -107,6 +107,8 @@ _EXPECTED_ROUTERS = (
     # 同步上游时它当场报出「新增: ['sector_rotation.router']」, 确认是作者有意
     # 新增的功能之后才登记进来。
     "sector_rotation.router",
+    # [R562] 虚拟账户「跟六态转折」那一块的数据(/api/paper/flip, 与作者的 /api/paper/* 不重叠)
+    "paper_flip.router",
 )
 
 

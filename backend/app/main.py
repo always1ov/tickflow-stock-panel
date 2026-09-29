@@ -40,6 +40,7 @@ from app.api import (
     monitor_rules,
     overview,
     paper,
+    paper_flip,  # [fork 增强] R562 虚拟账户·跟六态转折
     pipeline,
     regime,
     rps,
@@ -778,6 +779,7 @@ def _register_routers(app: FastAPI) -> None:
     # [R326 同步上游] v0.2.4 新增: 盘中板块轮动监控。上游那版是**裸调用**,
     # 这里跟着 R318 的规矩进函数体 —— 路由注册只此一处, 不再有第二个注册点。
     app.include_router(sector_rotation.router)
+    app.include_router(paper_flip.router)  # [fork 增强] R562 虚拟账户·跟六态转折
 
 
 _register_routers(app)

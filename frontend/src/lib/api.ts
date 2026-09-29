@@ -2489,6 +2489,67 @@ export interface PaperAutoRule {
   created_at: string
 }
 
+/**
+ * [fork R562] 「跟六态转折」规则 —— 作者自动跟单里的一种, 但字段形状不同: 一条同时管买卖,
+ * 仓位是「净值 ÷ 同时持有上限」, 固定次日开盘单。口径见后端 services/flip_follow。
+ */
+export interface PaperFlipRule {
+  id: string
+  name: string
+  match_kind: 'flip'
+  match_id: string
+  max_positions: number
+  order_type: 'next_open'
+  enabled: boolean
+  created_at: string
+}
+
+/** [fork R562] 规则说明 —— 后端一处出(flip_follow.RULES), 前端不誊抄 */
+export interface PaperFlipRules {
+  signal: string
+  execute: string
+  direction: string[]
+  sizing: string
+  order: string
+  sealed: string
+  universe: string
+  crossing: string
+}
+
+/** [fork R562] 没能动手的一条记录 */
+export interface PaperFlipLog {
+  date: string
+  symbol: string
+  name: string
+  act: 'buy' | 'sell'
+  since: string
+  /** no_slot 仓位满 / no_cash 钱不够一手 / voided 方向反了作废 / failed 作者撮合拒了 */
+  reason: 'no_slot' | 'no_cash' | 'voided' | 'failed'
+  detail?: string
+}
+
+/** [fork R562] 虚拟账户页上「跟六态转折」那一块 */
+export interface PaperFlipPanel {
+  rule: PaperFlipRule | null
+  rules: PaperFlipRules
+  /** 这条规则还在途的单(今晚挂的, 明早开盘成交) */
+  orders: Array<{
+    id: string
+    symbol: string
+    name: string
+    side: 'buy' | 'sell'
+    qty: number
+    /** 信号日(收盘确认转折那天) */
+    since: string | null
+    created_at: string | null
+    postponed: number
+  }>
+  /** 手上每只票离清仓线多远 + 此刻按现价会转折的票 */
+  signals: FlipTodaySignal[]
+  log: PaperFlipLog[]
+  as_of: string | null
+}
+
 export interface PaperFill {
   seq: number
   ts: string
@@ -5762,7 +5823,23 @@ export const api = {
     request<{ account: PaperAccount }>(accUrl('/api/paper/freeze?frozen=' + frozen, account), { method: 'POST' }),
 
   paperAutoRules: (account?: string) =>
-    request<{ rules: PaperAutoRule[] }>(accUrl('/api/paper/auto_rules', account)),
+    request<{ rules: Array<PaperAutoRule | PaperFlipRule> }>(accUrl('/api/paper/auto_rules', account)),
+
+  /** [fork R562] 新建「跟六态转折」规则(走作者同一个接口, match_kind = flip) */
+  paperFlipRuleCreate: (body: { name: string; max_positions: number }, account?: string) =>
+    request<{ rule: PaperFlipRule }>(accUrl('/api/paper/auto_rules', account), {
+      method: 'POST',
+      body: JSON.stringify({ ...body, match_kind: 'flip', enabled: true }),
+    }),
+
+  /** [fork R562] 虚拟账户页上「跟六态转折」那一块 */
+  paperFlip: (account?: string) =>
+    request<PaperFlipPanel>(accUrl('/api/paper/flip', account)),
+
+  /** [fork R562] 新建转折账户 / 规则的默认值(费率只在后端一处) */
+  paperFlipDefaults: () =>
+    request<{ fees: { commission_pct: number; stamp_tax_pct: number; slippage_bps: number }; max_positions: number; cap: number }>(
+      '/api/paper/flip/defaults'),
 
   paperAutoRuleCreate: (body: Omit<PaperAutoRule, 'id' | 'created_at'>, account?: string) =>
     request<{ rule: PaperAutoRule }>(accUrl('/api/paper/auto_rules', account), {

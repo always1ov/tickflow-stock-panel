@@ -16,6 +16,12 @@ import { fmtPct, priceColorClass } from '@/lib/format'
 import { boardTag } from '@/components/stock-table/primitives'
 import { PageHeader } from '@/components/PageHeader'
 import { Modal } from '@/components/Modal'
+// [fork R562] 跟六态转折(转折模拟盘并入虚拟账户) —— 逻辑都在这几个 fork 文件里, 本页只留挂载点
+import { FlipFollowCard, FlipRulesCard } from '@/components/paper/FlipFollowCard'
+import { FLIP_RULE_NAME, FlipRuleRow, FlipSetupToggle, MaxField, useFlipDefaults, validMaxPos } from '@/components/paper/FlipSetup'
+import { MonthStrip } from '@/components/paper/MonthStrip'
+import { monthlyReturns } from '@/lib/paperMonthly'
+import { paperHoldingDays } from '@/lib/paperHoldingDays'
 
 const ACC_STORAGE_KEY = 'paper.account'
 
@@ -174,19 +180,25 @@ function SetupCard({ accId, onDone, onCancel }: { accId: string; onDone: (create
   const [stampQian, setStampQian] = useState(defaults.stampQian)
   const [slippageBps, setSlippageBps] = useState(defaults.slippageBps)
   const [name, setName] = useState('')
+  // [fork R562] 跟六态转折账户: 开户后顺手建那条规则; 费率换成转折账户那一套(不记成下次的默认)
+  const [flip, setFlip] = useState(false)
+  const [flipMax, setFlipMax] = useState('10')
   const m = useMutation({
-    mutationFn: () =>
-      api.paperCreateAccount({
+    mutationFn: async () => {
+      const r = await api.paperCreateAccount({
         initial_cash: Number(cash),
         account_id: accId,
         name: name.trim() || undefined,
         commission_pct: Number(commissionWan) / 10000,   // 万 X → pct
         stamp_tax_pct: Number(stampQian) / 1000,         // 千 X → pct
         slippage_bps: Number(slippageBps),
-      }),
+      })
+      if (flip) await api.paperFlipRuleCreate({ name: FLIP_RULE_NAME, max_positions: Number(flipMax) }, r.account.id)
+      return r
+    },
     onSuccess: r => {
       // 记住本次取值, 作为下次新建账户的默认
-      try {
+      if (!flip) try {
         localStorage.setItem(NEW_ACCOUNT_DEFAULTS_KEY, JSON.stringify({
           cash, commissionWan, stampQian, slippageBps,
         }))
@@ -196,6 +208,7 @@ function SetupCard({ accId, onDone, onCancel }: { accId: string; onDone: (create
   })
   const valid = Number(cash) > 0
     && Number(commissionWan) >= 0 && Number(stampQian) >= 0 && Number(slippageBps) >= 0
+    && (!flip || validMaxPos(flipMax))
   return (
     <div className="mx-auto mt-16 max-w-md rounded-card border border-border bg-surface p-6">
       <div className="flex items-center gap-2">
@@ -221,6 +234,16 @@ function SetupCard({ accId, onDone, onCancel }: { accId: string; onDone: (create
         className="mt-1 w-full rounded-btn border border-border bg-base px-3 py-2 font-mono text-sm outline-none focus:border-accent/50"
         placeholder="1000000"
       />
+      <FlipSetupToggle
+        on={flip}
+        maxPos={flipMax}
+        onMaxPos={setFlipMax}
+        onToggle={(on, fees) => {
+          setFlip(on)
+          const f = on ? fees : defaults
+          if (f) { setCommissionWan(f.commissionWan); setStampQian(f.stampQian); setSlippageBps(f.slippageBps) }
+        }}
+      />
       <div className="mt-3 grid grid-cols-3 gap-2">
         <div>
           <label className="block text-micro text-muted">佣金 (万)</label>
@@ -242,7 +265,7 @@ function SetupCard({ accId, onDone, onCancel }: { accId: string; onDone: (create
         <button
           onClick={() => valid && m.mutate()}
           disabled={!valid || m.isPending}
-          className="flex-1 rounded-btn bg-accent py-2 text-sm font-medium text-white transition-opacity hover:bg-accent/90 disabled:opacity-50"
+          className="flex-1 rounded-btn bg-accent py-2 text-sm font-medium text-on-accent transition-opacity hover:bg-accent/90 disabled:opacity-50"
         >
           {m.isPending ? '创建中…' : '创建账户'}
         </button>
@@ -436,7 +459,7 @@ function OrderForm({ acc, onDone }: { acc: string; onDone: () => void }) {
               key={s}
               onClick={() => setSide(s)}
               className={cn(
-                'flex-1 rounded-btn border py-1.5 text-xs font-medium transition-all duration-150 ease-smooth',
+                'flex-1 rounded-btn border py-1.5 text-xs font-medium transition-colors duration-150 ease-smooth',
                 side === s
                   ? s === 'buy'
                     ? 'border-bull/50 bg-bull/10 text-bull'
@@ -492,7 +515,7 @@ function OrderForm({ acc, onDone }: { acc: string; onDone: () => void }) {
           onClick={() => canSubmit && m.mutate()}
           disabled={!canSubmit || m.isPending}
           className={cn(
-            'w-full rounded-btn py-2 text-sm font-medium text-white transition-all duration-150 ease-smooth disabled:opacity-40 disabled:cursor-not-allowed',
+            'w-full rounded-btn py-2 text-sm font-medium text-white transition-colors duration-150 ease-smooth disabled:opacity-40 disabled:cursor-not-allowed',
             side === 'buy' ? 'bg-bull hover:bg-bull/85' : 'bg-bear hover:bg-bear/85',
           )}
         >
@@ -663,7 +686,7 @@ function FeeSettingsModal({ accId, fees, queue, onSaved, onClose }: {
           <button
             onClick={() => m.mutate()}
             disabled={!valid || m.isPending}
-            className="flex-1 rounded-btn bg-accent py-2 text-sm font-medium text-white transition-opacity hover:bg-accent/90 disabled:opacity-50"
+            className="flex-1 rounded-btn bg-accent py-2 text-sm font-medium text-on-accent transition-opacity hover:bg-accent/90 disabled:opacity-50"
           >
             {m.isPending ? '保存中…' : '保存'}
           </button>
@@ -872,7 +895,9 @@ function AutoRulesPanel({ acc }: { acc: string }) {
         <div className="py-8 text-center text-xs text-muted">暂无规则 — 新建一条, 让策略信号自动进入虚拟账户</div>
       ) : (
         <div className="mt-2 space-y-1">
-          {rules.map(r => (
+          {rules.map(r => r.match_kind === 'flip' ? (
+            <FlipRuleRow key={r.id} r={r} onToggle={() => toggleM.mutate({ id: r.id, enabled: !r.enabled })} onDelete={() => deleteM.mutate(r.id)} />
+          ) : (
             <div key={r.id} className="flex items-center gap-2 rounded-btn px-2 py-1.5 text-xs transition-colors hover:bg-elevated/40">
               <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full', r.enabled ? 'bg-bear' : 'bg-muted')} />
               <span className="w-28 shrink-0 truncate font-medium">{r.name}</span>
@@ -903,7 +928,9 @@ function AutoRulesPanel({ acc }: { acc: string }) {
 
 function AutoRuleForm({ acc, onDone, onCancel }: { acc: string; onDone: () => void; onCancel: () => void }) {
   const [name, setName] = useState('')
-  const [matchKind, setMatchKind] = useState<'strategy' | 'rule'>('strategy')
+  const [matchKind, setMatchKind] = useState<'strategy' | 'rule' | 'flip'>('strategy')
+  const [flipMax, setFlipMax] = useState('10')   // [fork R562] 跟六态转折: 同时持有上限
+  const flipCap = useFlipDefaults().data?.cap ?? 50
   const [matchId, setMatchId] = useState('')
   const [side, setSide] = useState<'buy' | 'sell'>('buy')
   const [sizeMode, setSizeMode] = useState<'fixed_amount' | 'pct_equity'>('fixed_amount')
@@ -913,8 +940,9 @@ function AutoRuleForm({ acc, onDone, onCancel }: { acc: string; onDone: () => vo
   const [msg, setMsg] = useState<string | null>(null)
 
   const m = useMutation({
-    mutationFn: () =>
-      api.paperAutoRuleCreate({
+    mutationFn: (): Promise<unknown> => matchKind === 'flip'
+      ? api.paperFlipRuleCreate({ name: name.trim(), max_positions: Number(flipMax) }, acc)
+      : api.paperAutoRuleCreate({
         name: name.trim(),
         match_kind: matchKind,
         match_id: matchId.trim(),
@@ -929,7 +957,9 @@ function AutoRuleForm({ acc, onDone, onCancel }: { acc: string; onDone: () => vo
     onError: e => setMsg(String((e as Error).message)),
   })
 
-  const valid = name.trim() && matchId.trim() && Number(sizeValue) > 0
+  const valid = matchKind === 'flip'
+    ? name.trim() && validMaxPos(flipMax, flipCap)
+    : name.trim() && matchId.trim() && Number(sizeValue) > 0
 
   // ID 联想: 跟策略 → 策略引擎列表; 跟监控规则 → 监控规则列表。本地按中文名/ID 过滤。
   const strategiesQ = useQuery({
@@ -973,18 +1003,28 @@ function AutoRuleForm({ acc, onDone, onCancel }: { acc: string; onDone: () => vo
           <input value={name} onChange={e => setName(e.target.value)} placeholder="如: 跟单前高突破"
             className="mt-1 w-full rounded-btn border border-border bg-base px-3 py-1.5 text-sm outline-none focus:border-accent/50" />
         </div>
-        <div>
+        {/* [fork R562] 三个选项, 窄栏里要占满一行才排得下 */}
+        <div className="md:col-span-2">
           <label className="text-micro text-muted">跟什么</label>
           <div className="mt-1 flex gap-1.5">
-            {(['strategy', 'rule'] as const).map(k => (
-              <button key={k} onClick={() => { setMatchKind(k); setMatchId('') }}
+            {(['strategy', 'rule', 'flip'] as const).map(k => (
+              <button key={k} onClick={() => { setMatchKind(k); setMatchId(''); if (k === 'flip' && !name.trim()) setName(FLIP_RULE_NAME) }}
                 className={cn('flex-1 rounded-btn border py-1 text-micro transition-colors',
                   matchKind === k ? 'border-accent/40 bg-accent/10 text-accent' : 'border-border text-muted hover:text-secondary')}>
-                {k === 'strategy' ? '跟策略' : '跟监控规则'}
+                {k === 'strategy' ? '跟策略' : k === 'rule' ? '跟监控规则' : FLIP_RULE_NAME}
               </button>
             ))}
           </div>
         </div>
+        {matchKind === 'flip' ? (
+          <div className="md:col-span-2">
+            <label className="text-micro text-muted">同时最多持有 (只)</label>
+            <div className="mt-1 flex items-center gap-2 text-micro text-muted">
+              <MaxField value={flipMax} onChange={setFlipMax} cap={flipCap} />
+              转多买、转空清仓, 次日开盘成交; 每笔 = 净值 ÷ 这个数。一个账户只能有一条
+            </div>
+          </div>
+        ) : (<>
         <div className="md:col-span-2">
           <label className="text-micro text-muted">{matchKind === 'strategy' ? '策略 (输入中文名 / ID 联想, 留空聚焦看全部)' : '监控规则 (输入名称 / ID 联想)'}</label>
           <SuggestInput
@@ -1040,10 +1080,11 @@ function AutoRuleForm({ acc, onDone, onCancel }: { acc: string; onDone: () => vo
           <input type="number" value={cooldown} onChange={e => setCooldown(e.target.value)}
             className="mt-1 w-full rounded-btn border border-border bg-base px-3 py-1.5 font-mono text-sm outline-none focus:border-accent/50" />
         </div>
+        </>)}
       </div>
       <div className="mt-3 flex gap-2">
         <button onClick={() => valid && m.mutate()} disabled={!valid || m.isPending}
-          className="flex-1 rounded-btn bg-accent py-2 text-sm font-medium text-white transition-opacity disabled:opacity-40">
+          className="flex-1 rounded-btn bg-accent py-2 text-sm font-medium text-on-accent transition-opacity disabled:opacity-40">
           {m.isPending ? '创建中…' : '创建规则'}
         </button>
         <button onClick={onCancel} className="rounded-btn border border-border px-4 py-2 text-sm text-secondary transition-colors hover:text-foreground">取消</button>
@@ -1073,6 +1114,8 @@ export function Paper() {
   const tradesQ = useQuery({ queryKey: QK.paperTrades(accId), queryFn: () => api.paperTrades(accId) })
   const navQ = useQuery({ queryKey: QK.paperNav(accId), queryFn: () => api.paperNav(accId) })
   const statsQ = useQuery({ queryKey: QK.paperStats(accId), queryFn: () => api.paperStats(accId) })
+  // [fork R562] 账户上有没有「跟六态转折」规则 —— 与右列规则面板共用同一份缓存
+  const autoRulesQ = useQuery({ queryKey: QK.paperAutoRules(accId), queryFn: () => api.paperAutoRules(accId) })
 
   // 'paper' 前缀兜底失效: 覆盖全部账户的全部查询 (订单变动可能影响净值/统计)
   const invalidateAll = () => qc.invalidateQueries({ queryKey: QK.paperAll })
@@ -1150,6 +1193,10 @@ export function Paper() {
   const nav = navQ.data?.nav ?? []
   const stats = statsQ.data
   const pnlPct = ov.initial_cash && ov.initial_cash > 0 ? ((ov.total_pnl ?? 0) / ov.initial_cash) * 100 : 0
+  // [fork R562] 跟六态转折 / 逐月收益 / 持有天数(后两样所有账户都有)
+  const flipRule = (autoRulesQ.data?.rules ?? []).find(r => r.match_kind === 'flip')
+  const months = monthlyReturns(nav, ov.initial_cash ?? 0)
+  const holdingDays = paperHoldingDays(allFills, nav.map(n => n.date))
 
   /** 导出全部成交台账 CSV (带 BOM, Excel 可直接打开); 口径与页面「成交台账」一致 */
   const exportTradesCsv = () => {
@@ -1185,6 +1232,12 @@ export function Paper() {
         titleExtra={
           <>
             {ov.status === 'frozen' && <span className="rounded-full bg-warning/15 px-2 py-0.5 text-micro text-warning">已冻结</span>}
+            {flipRule && (
+              <span className={cn('rounded-full px-2 py-0.5 text-micro', flipRule.enabled ? 'bg-accent/15 text-accent' : 'bg-elevated text-muted')}
+                title={`只按收盘确认的六态转折自动买卖, 次日开盘成交; 同时最多 ${flipRule.max_positions} 只${flipRule.enabled ? '' : ' (规则已停用)'}`}>
+                {FLIP_RULE_NAME}{flipRule.enabled ? '' : ' · 已停用'}
+              </span>
+            )}
             {ov.queue_limit_orders && (
               <span className="rounded-full bg-accent/15 px-2 py-0.5 text-micro text-accent" title="触及涨跌停不直接拒单, 转次日开盘重试 (最多顺延 3 日)">
                 涨跌停排队
@@ -1256,9 +1309,11 @@ export function Paper() {
         <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[1fr_320px]">
           {/* 左列: 净值 + 持仓 + 流水 */}
           <div className="min-w-0 space-y-4">
+            {flipRule && <FlipFollowCard acc={accId} holdingDays={holdingDays} />}
             <div className="rounded-card border border-border bg-surface p-4">
               <div className="text-sm font-medium">净值曲线 <span className="ml-1 text-micro text-muted">按交易日收盘定版</span></div>
               {nav.length > 0 ? <NavChart nav={nav} /> : <div className="py-10 text-center text-xs text-muted">暂无定版净值 — 交易日盘后管道自动结算</div>}
+              {months.length > 0 && <div className="mt-3 border-t border-border/50 pt-3"><MonthStrip months={months} /></div>}
             </div>
 
             <div className="rounded-card border border-border bg-surface p-4">
@@ -1272,6 +1327,7 @@ export function Paper() {
                       <th className="py-1.5 font-normal">代码</th>
                       <th className="py-1.5 text-right font-normal">数量</th>
                       <th className="py-1.5 text-right font-normal">可卖(T+1)</th>
+                      <th className="py-1.5 text-right font-normal" title="这一轮建仓那天算第 1 个交易日, 清仓后重置; 按盘后定版的净值日历数">持有</th>
                       <th className="py-1.5 text-right font-normal">成本</th>
                       <th className="py-1.5 text-right font-normal">现价</th>
                       <th className="py-1.5 text-right font-normal">市值</th>
@@ -1284,6 +1340,7 @@ export function Paper() {
                         <td className="py-1.5 font-sans">{h.symbol}</td>
                         <td className="py-1.5 text-right">{h.qty}</td>
                         <td className="py-1.5 text-right text-muted">{h.available_qty}</td>
+                        <td className="py-1.5 text-right text-muted">{holdingDays.has(h.symbol) ? `${holdingDays.get(h.symbol)} 天` : '—'}</td>
                         <td className="py-1.5 text-right">{fmtMoney(h.avg_cost, 3)}</td>
                         <td className="py-1.5 text-right">{fmtMoney(h.last_price, 3)}</td>
                         <td className="py-1.5 text-right">{fmtMoney(h.market_value, 0)}</td>
@@ -1393,7 +1450,8 @@ export function Paper() {
 
           {/* 右列: 下单 + 自动跟单 + 策略对比 */}
           <div className="space-y-4">
-            <OrderForm acc={accId} onDone={invalidateAll} />
+            {/* [fork R562] 跟六态转折的账户不接手动单 —— 成绩就是规则本身的成绩 */}
+            {flipRule ? <FlipRulesCard acc={accId} /> : <OrderForm acc={accId} onDone={invalidateAll} />}
             <AutoRulesPanel acc={accId} />
             <CandidateCompareCard paper={{
               total_return_pct: nav.length >= 2 && nav[0].nav > 0 ? (nav[nav.length - 1].nav / nav[0].nav - 1) * 100 : null,
@@ -1424,9 +1482,10 @@ export function Paper() {
                   )}
                   aria-label="涨跌停排队次日重试开关"
                 >
+                  {/* [fork R562] 原来是全属性过渡、动 left(每帧重排), 改成只动 transform —— 动效硬规则第 1 条 */}
                   <span className={cn(
-                    'absolute top-0.5 h-3 w-3 rounded-full bg-white shadow transition-all',
-                    ov.queue_limit_orders ? 'left-[18px]' : 'left-0.5',
+                    'absolute left-0.5 top-0.5 h-3 w-3 rounded-full bg-white shadow transition-transform duration-150 ease-out',
+                    ov.queue_limit_orders ? 'translate-x-4' : 'translate-x-0',
                   )} />
                 </button>
               </div>

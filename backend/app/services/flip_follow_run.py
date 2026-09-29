@@ -223,3 +223,78 @@ def follow_all(repo, day: str) -> list[dict]:
         if res is not None:
             out.append(res)
     return out
+
+
+def panel(repo, account_id: str = paper.DEFAULT_ACCOUNT_ID) -> dict:
+    """虚拟账户页上「跟六态转折」那一块要的全部东西, 一趟给齐。
+
+    orders   这条规则还在途的单(今晚挂的, 明早开盘成交), 带信号日
+    signals  手上每只票离清仓线多远, 以及此刻按现价会转折的票(盘中越线)。
+             判定是 flip_today.evaluate —— 与转折模拟盘同一个函数, 持仓换成账户里真实的
+    log      最近没能动手的(仓位满 / 钱不够 / 作废 / 被拒), 新的在前
+    """
+    from app.indicators.livermore import compute
+    from app.services import flip_today, livermore_service, watchlist
+    from app.services.flip_trades import BEAR
+    from app.services.live_quotes import watchlist_live_map
+
+    data_dir = repo.store.data_dir
+    rule = flip_rule(data_dir, account_id)
+    out: dict = {"rule": rule, "rules": ff.RULES, "orders": [], "signals": [], "log": [], "as_of": None}
+    if rule is None:
+        return out
+
+    state = load_state(data_dir, account_id)
+    since_of = {it.get("order_id"): it.get("since") for it in state["intents"].values() if it.get("order_id")}
+    source = f"auto:{rule['id']}"
+    orders = [o for o in paper.load_orders(data_dir, account_id)
+              if o.get("source") == source and o.get("status") == "pending"]
+    held = {s for s, p in paper.load_positions(data_dir, account_id).items() if int(p.get("qty") or 0) > 0}
+    try:
+        pool = set(watchlist.symbol_set())
+    except Exception as e:  # noqa: BLE001
+        logger.warning("flip follow panel: 读自选失败: %s", e)
+        pool = set()
+    pool |= held
+    syms = sorted(pool | {o["symbol"] for o in orders} | {x["symbol"] for x in state["log"][-30:]})
+    try:
+        names = repo.get_name_map(syms)
+    except Exception:  # noqa: BLE001
+        names = {}
+    name = lambda s: str(names.get(s) or s)  # noqa: E731
+
+    try:
+        live = watchlist_live_map(repo)
+    except Exception:  # noqa: BLE001
+        live = {}
+    windows = livermore_service._windows_for_symbols(repo, sorted(pool))
+    as_of = None
+    for sym, (closes, dates) in windows.items():
+        if not closes:
+            continue
+        as_of = max(as_of or dates[-1], dates[-1])
+        try:
+            threshold, _src = livermore_service.get_effective_threshold(sym)
+            steps = compute(closes, dates, threshold)["steps"]
+        except Exception as e:  # noqa: BLE001
+            logger.debug("flip follow panel %s failed: %s", sym, e)
+            continue
+        is_held = sym in held
+        sig = flip_today.evaluate(steps, held=is_held, last_close=closes[-1],
+                                  live_close=(live.get(sym) or {}).get("close"))
+        if sig is None:
+            continue
+        # 没拿着的只列「按现价会转多」的: 「还没到」那一档不列(R516「不要盯着」),
+        # 没拿着的票转空对这个账户没有动作; 已转折的当晚就挂了单, 在 orders 里
+        if not is_held and not (sig["stage"] == flip_today.STAGE_CROSSING and sig["side"] == BEAR):
+            continue
+        out["signals"].append({"symbol": sym, "name": name(sym), "held": is_held, **sig})
+
+    out["orders"] = [{
+        "id": o["id"], "symbol": o["symbol"], "name": name(o["symbol"]), "side": o["side"],
+        "qty": o["qty"], "since": since_of.get(o["id"]), "created_at": o.get("created_at"),
+        "postponed": o.get("postponed", 0),
+    } for o in sorted(orders, key=lambda o: (o["side"] != "sell", o["symbol"]))]
+    out["log"] = [{**x, "name": name(x["symbol"])} for x in reversed(state["log"][-30:])]
+    out["as_of"] = as_of
+    return out

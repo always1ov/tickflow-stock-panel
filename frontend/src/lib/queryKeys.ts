@@ -129,6 +129,8 @@ export const QK = {
   paperStats:           (acc: string) => ['paper', 'stats', acc] as const,
   paperCompare:         ['paper', 'compare'] as const,
   paperAutoRules:       (acc: string) => ['paper', 'auto-rules', acc] as const,
+  paperFlip:            (acc: string) => ['paper', 'flip', acc] as const,   // [fork R562] 跟六态转折
+  paperFlipDefaults:    ['paper', 'flip-defaults'] as const,
   alerts:               (source?: string) => ['alerts', source ?? ''] as const,
 
   // AI 大盘复盘

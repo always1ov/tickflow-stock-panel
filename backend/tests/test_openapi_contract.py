@@ -52,6 +52,9 @@ EXPECTED_OPEN_ENDPOINTS: set[str] = {
     "GET /api/paper/auto_rules",
     "POST /api/paper/auto_rules/{rule_id}/enabled",
     "GET /api/paper/compare",
+    # [R562] 虚拟账户「跟六态转折」: 页面那一块的数据 + 新建时的默认值(费率只在后端一处)
+    "GET /api/paper/flip",
+    "GET /api/paper/flip/defaults",
     "POST /api/paper/freeze",
     "GET /api/paper/nav",
     "POST /api/paper/orders",

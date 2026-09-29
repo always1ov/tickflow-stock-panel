@@ -212,3 +212,56 @@ def test_取数_最后一天暴跌_认出转空_收盘价取不复权(tmp_path, 
     rows = run.load_rows(repo, tmp_path, [SYM], days[-1].isoformat())
     assert rows[SYM]["side"] == BEAR and rows[SYM]["flipped"] is True
     assert rows[SYM]["close"] == pytest.approx(closes[-1])
+
+
+def test_面板_持仓都列_没拿着的只列盘中越线_在途单带信号日(acc, monkeypatch):
+    from types import SimpleNamespace
+
+    from app.services import flip_today, livermore_service, watchlist
+    from app.services import live_quotes
+
+    other = "000001.SZ"
+    _write_daily(acc, [(D0, 10.0, 10.0), (D1, 10.0, 10.0), (D2, 10.5, 10.6)])
+    run.follow_day(acc, D1.isoformat(), rows=_flip(BULL, 10.0))
+    _evening(monkeypatch, D2)
+    paper.settle_day(acc, D2.isoformat())                       # SYM 买进, 拿着
+    run.follow_day(acc, D2.isoformat(), rows={"300750.SZ": {"side": BULL, "flipped": True, "close": 20.0}})
+
+    monkeypatch.setattr(watchlist, "symbol_set", lambda: {SYM, other, other2, "300750.SZ"})
+    monkeypatch.setattr(live_quotes, "watchlist_live_map", lambda repo: {})
+    monkeypatch.setattr(livermore_service, "get_effective_threshold", lambda s: (0.06, "t"))
+    monkeypatch.setattr(livermore_service, "_windows_for_symbols",
+                        lambda repo, syms: {s: ([10.0, 10.5], [D1.isoformat(), D2.isoformat()]) for s in syms})
+    other2 = "600036.SH"      # 没拿着、盘中越线但在多头侧(会转空) —— 对这个账户没有动作, 不列
+    stages = {SYM: flip_today.STAGE_WATCH, other: flip_today.STAGE_WATCH,
+              "300750.SZ": flip_today.STAGE_CROSSING, other2: flip_today.STAGE_CROSSING}
+    sides = {"300750.SZ": BEAR}
+    calls = iter([])
+
+    def fake_eval(steps, *, held, last_close, live_close=None):
+        sym = next(calls)
+        return {"stage": stages[sym], "act": None, "side": sides.get(sym, BULL), "state_cn": "上涨趋势",
+                "flip_price": 9.5, "ref_price": 10.5, "gap_pct": -0.05, "live": False}
+
+    monkeypatch.setattr(flip_today, "evaluate", fake_eval)
+    monkeypatch.setattr("app.indicators.livermore.compute", lambda c, d, t: {"steps": [{}]})
+    calls = iter(sorted({SYM, other, other2, "300750.SZ"}))
+    repo = SimpleNamespace(store=SimpleNamespace(data_dir=acc), get_name_map=lambda syms: {SYM: "贵州茅台"})
+
+    p = run.panel(repo)
+    by = {s["symbol"]: s for s in p["signals"]}
+    assert set(by) == {SYM, "300750.SZ"}, "没拿着且还没到的、没拿着却会转空的都不列"
+    assert by[SYM]["held"] is True and by[SYM]["name"] == "贵州茅台"
+    assert by["300750.SZ"]["stage"] == flip_today.STAGE_CROSSING
+    [o] = p["orders"]
+    assert (o["symbol"], o["side"], o["since"]) == ("300750.SZ", "buy", D2.isoformat())
+    assert p["rules"] is ff.RULES and p["rule"]["max_positions"] == 2
+
+
+def test_面板_没有转折规则只给空壳(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    _evening(monkeypatch, D1)
+    paper.create_account(tmp_path, 100_000)
+    p = run.panel(SimpleNamespace(store=SimpleNamespace(data_dir=tmp_path)))
+    assert p["rule"] is None and p["signals"] == [] and p["orders"] == []
