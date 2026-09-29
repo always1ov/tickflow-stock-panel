@@ -351,10 +351,15 @@ def test_R367_没有不存在的_api_health():
     #
     # 判据是**有没有落进 SPA 兜底**: 兜底给的是 index.html, 里面必然有
     # `id="root"`。落进兜底 = 这条路径没有后端路由。
+    # [R561 同步上游] 上游 v0.3.2 的 SSE 事件流 `/api/events` 进了白名单, 但它在**端点里**校验
+    # query 里的一次性票据(EventSource 带不了 Authorization 头) —— 不带票据就该是 401。
+    # 401 同样证明它是一条真实的后端路由(兜底页给的是 200 + index.html), 这里认它。
+    SELF_AUTH = {"/api/events"}
     with TestClient(main_mod.app) as c:
         for path in main_mod._AUTH_WHITELIST_EXACT:
             r = c.get(path)
-            assert r.status_code == 200, f"白名单路径拿不到: {path} → {r.status_code}"
+            ok = (200, 401) if path in SELF_AUTH else (200,)
+            assert r.status_code in ok, f"白名单路径拿不到: {path} → {r.status_code}"
             assert b'id="root"' not in r.content, \
                 f"{path} 落进了 SPA 兜底 —— 它根本不是一条后端路由"
         # 探活那条真的能探活

@@ -79,6 +79,8 @@ _EXPECTED_ROUTERS = (
     "intraday.router",
     "indices.router",
     "overview.router",
+    # [R561 同步上游] 上游 v0.3.2 的虚拟账户(模拟撮合)
+    "paper.router",
     "today.router",
     "usage_notes.router",
     "focus.router",
@@ -98,6 +100,8 @@ _EXPECTED_ROUTERS = (
     "monitor_rules.router",
     "lots.router",
     "alerts.router",
+    # [R561 同步上游] 上游 v0.3.2 的 SSE 事件流
+    "events.router",
     "rps.router",
     # [R326] 上游 v0.2.4 新增: 盘中板块轮动监控。**这条守卫正是这么用的** ——
     # 同步上游时它当场报出「新增: ['sector_rotation.router']」, 确认是作者有意

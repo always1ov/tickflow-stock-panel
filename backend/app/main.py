@@ -26,6 +26,7 @@ from app.api import (
     data,
     ext_data,
     external_page,  # [fork 增强] R117 外部网页抓取模式(独立模块)
+    events,
     factors,
     financials,
     flip_paper,  # [fork 增强] R327 转折模拟盘
@@ -38,6 +39,7 @@ from app.api import (
     mining,
     monitor_rules,
     overview,
+    paper,
     pipeline,
     regime,
     rps,
@@ -661,7 +663,19 @@ _AUTH_WHITELIST_PREFIX = ("/api/auth/",)
 # 白名单里多一条不存在的路径**不会报任何错**, 它只是永远不会被命中 —— 而它会
 # 骗人: 排查线上问题时照着这里去开 `/api/health`, 拿到的是 SPA 兜底的 index.html,
 # 于是把"端点不存在"误读成"路由没配上", 往完全错的方向查。这次就是这么栽的。
-_AUTH_WHITELIST_EXACT = ("/health", "/openapi.json", "/docs", "/redoc")
+# [R561 同步上游] 上游这里加回了 "/api/health" —— 仍然没有这个端点(全仓只有白名单里这一处),
+# 照 R367 不收; "/api/openapi.json"(Tier A 契约视图)与 "/api/events"(SSE, 凭一次性票据)是上游新开的, 收下。
+_AUTH_WHITELIST_EXACT = (
+    "/health",
+    "/openapi.json",
+    "/api/openapi.json",
+    "/docs",
+    "/redoc",
+    # SSE 事件流: EventSource 带不了 Authorization 头, 凭证即 query 里的
+    # 一次性票据, 端点内校验 (api/events.py); POST /api/events/ticket 不在
+    # 白名单, 仍走网关 Bearer 通道
+    "/api/events",
+)
 
 
 @app.middleware("http")
@@ -673,9 +687,29 @@ async def auth_middleware(request: Request, call_next):
     # [fork 增强] R82: AUTH_DISABLED=1 → 免登录全放行(公网也放)。风险自负, 启动日志有大字警告。
     if settings.auth_disabled:
         return await call_next(request)
+    # CORS 预检不带凭据, 直接放行 (CORSMiddleware 在外层应答)
+    if request.method == "OPTIONS":
+        return await call_next(request)
     # 白名单放行(设密码/登录/探活本身不拦)
     if path.startswith(_AUTH_WHITELIST_PREFIX) or path in _AUTH_WHITELIST_EXACT:
         return await call_next(request)
+
+    # ── API Token 通道 (外部调用方; 与密码会话并行, 见 open-platform-plan §4) ──
+    authz = request.headers.get("authorization", "")
+    if authz.startswith("Bearer "):
+        from app.services import api_gateway
+        verdict = api_gateway.evaluate(
+            settings.data_dir, request.method, path, authz[len("Bearer "):].strip(),
+        )
+        if verdict["status"] is not None:
+            return JSONResponse(
+                status_code=verdict["status"], content={"detail": verdict["detail"]},
+                headers=verdict["headers"],
+            )
+        response = await call_next(request)
+        for k, v in verdict["headers"].items():
+            response.headers[k] = v
+        return response
 
     from app.services import auth as auth_service
 
@@ -719,6 +753,7 @@ def _register_routers(app: FastAPI) -> None:
     app.include_router(intraday.router)
     app.include_router(indices.router)
     app.include_router(overview.router)
+    app.include_router(paper.router)  # [R561 同步上游] 上游 v0.3.2 虚拟账户(模拟撮合)
     app.include_router(today.router)  # [fork 增强] 今日总览
     app.include_router(usage_notes.router)  # [fork 增强] R93 使用观察笔记
     app.include_router(focus.router)  # [fork 增强] R159 推送焦点名单
@@ -738,6 +773,7 @@ def _register_routers(app: FastAPI) -> None:
     app.include_router(monitor_rules.router)
     app.include_router(lots.router)
     app.include_router(alerts.router)
+    app.include_router(events.router)  # [R561 同步上游] 上游 v0.3.2 SSE 事件流
     app.include_router(rps.router)
     # [R326 同步上游] v0.2.4 新增: 盘中板块轮动监控。上游那版是**裸调用**,
     # 这里跟着 R318 的规矩进函数体 —— 路由注册只此一处, 不再有第二个注册点。
@@ -750,6 +786,32 @@ _register_routers(app)
 extension_registry, extension_load_errors = configure_backend_extensions(app)
 app.state.extension_registry = extension_registry
 app.state.extension_load_errors = extension_load_errors
+
+
+@app.get("/api/openapi.json", include_in_schema=False)
+async def openapi_contract_view(tier: str = "a"):
+    """Tier A 契约视图: 只保留对外开放 (Token 可达) 的端点 = 稳定承诺面。
+
+    开放清单的权威来源是 api_gateway 的规则表 — 规则表即契约, 单源维护。
+    二开方以此生成客户端; 未出现在此视图的端点属内部实现, 随时变化。
+    """
+    spec = app.openapi()
+    if tier == "a":
+        from app.services import api_gateway
+
+        kept_paths: dict = {}
+        for path, ops in spec.get("paths", {}).items():
+            kept_ops = {}
+            for method, op in ops.items():
+                if method in ("get", "post", "put", "delete", "patch") and api_gateway.required_scope(
+                    method.upper(), path,
+                ):
+                    kept_ops[method] = op
+            if kept_ops:
+                kept_paths[path] = kept_ops
+        spec["paths"] = kept_paths
+        spec["x-tier"] = "a"
+    return JSONResponse(spec)
 
 
 # 能力门控异常 → 403(而非默认 500)

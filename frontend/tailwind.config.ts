@@ -24,6 +24,8 @@ export default {
       },
       colors: {
         // §6.0.1 色板 — CSS variables 见 src/index.css
+        // [上游 9b639c8f] 注意: base 与字号 token 撞名, text-base 会同时生成字号与 color 规则(文字变背景色)。
+        // 字号 16px 写 text-[16px] leading-6; 强调实底上的文字用 text-on-accent(见下)。不要再写 text-base。
         base:      'oklch(var(--base) / <alpha-value>)',
         surface:   'oklch(var(--surface) / <alpha-value>)',
         // [R368] 侧栏单独一档: 比白面板略灰、比页面底略白, 三层有分界

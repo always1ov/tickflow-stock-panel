@@ -13,9 +13,10 @@
  * 七个面板的内容一个没动。
  */
 import { useEffect } from 'react'
-import { BarChart3, Bell, Clock3, Database, Radio, Settings2, SlidersHorizontal, Sparkles } from 'lucide-react'
+import { BarChart3, Bell, Clock3, Database, KeyRound, Radio, Settings2, SlidersHorizontal, Sparkles } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import { SettingsAIPanel } from './settings/AI'
+import { SettingsApiTokensPanel } from './settings/ApiTokens'
 import { SettingsMonitoringPanel } from './settings/Monitoring'
 import { SettingsExtPagesPanel } from './settings/ExtPages'
 import { SettingsMenuSettingsPanel } from './settings/MenuSettings'
@@ -28,7 +29,7 @@ import { PageTabs, usePageTab, type PageTabDef } from '@/components/PageTabs'
 
 import type { ComponentType } from 'react'
 
-export type SettingsTab = 'data-sources' | 'monitoring' | 'notifications' | 'ai' | 'menus' | 'ext-pages' | 'timeout' | 'system'
+export type SettingsTab = 'data-sources' | 'monitoring' | 'notifications' | 'ai' | 'menus' | 'ext-pages' | 'timeout' | 'api-tokens' | 'system'
 
 /** 栏的顺序就是这张表的顺序 */
 export const SETTINGS_TABS: Record<SettingsTab, PageTabDef> = {
@@ -40,6 +41,8 @@ export const SETTINGS_TABS: Record<SettingsTab, PageTabDef> = {
   menus: { title: '菜单', icon: SlidersHorizontal },
   'ext-pages': { title: '扩展页面', icon: BarChart3 },
   timeout: { title: '网络', icon: Clock3 },
+  // [R561 同步上游] 上游 v0.3.2 的 API Token 管理(对外开放接口的钥匙)。上游叫「开放接口」, 照用
+  'api-tokens': { title: '开放接口', icon: KeyRound },
   system: { title: '系统', icon: Settings2 },
 }
 
@@ -51,6 +54,7 @@ const PANELS: Record<SettingsTab, ComponentType<{ highlight?: string }>> = {
   menus: SettingsMenuSettingsPanel,
   'ext-pages': SettingsExtPagesPanel,
   timeout: SettingsTimeoutPanel,
+  'api-tokens': SettingsApiTokensPanel,
   system: SettingsSystemPanel,
 }
 

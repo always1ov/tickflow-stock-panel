@@ -775,7 +775,7 @@ function ReportPanel({
           <Sparkles className="absolute -right-1 -top-1 h-5 w-5 text-accent" />
         </div>
         <div className="text-center">
-          <div className="text-base font-semibold text-foreground">AI 大盘复盘</div>
+          <div className="text-title font-semibold text-foreground">AI 大盘复盘</div>
           <p className="mx-auto mt-2 max-w-sm text-xs leading-relaxed text-secondary">
             一键生成今日盘后复盘报告 —— 从一句话定调到明日交易计划,
             结构化输出可直接指导次日仓位与节奏。

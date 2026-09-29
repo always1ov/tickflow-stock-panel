@@ -46,6 +46,6 @@ def test_R503_仍共用一组时间范围():
 def test_R503_页名与菜单同名_宏观分析():
     src = code_of(REGIME)
     assert 'title="宏观分析"' in src
-    assert "{ to: '/regime', label: '宏观分析', icon: Gauge }" in code_of("components/Layout.tsx")
+    assert "{ to: '/regime', label: '宏观分析', icon: IconRegime }" in code_of("components/Layout.tsx")
     assert "{ id: '/regime', label: '宏观分析', type: 'builtin', visible: true }" in code_of("pages/settings/MenuSettings.tsx")
     assert "'/regime': '宏观分析'," in code_of("custom/assistant/AssistantLauncher.tsx")

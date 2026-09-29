@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, Suspense, lazy } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, Suspense, lazy, type ReactNode } from 'react'
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
@@ -24,30 +24,15 @@ import {
 } from '@/lib/useSharedMutations'
 import { QK } from '@/lib/queryKeys'
 import {
-  Siren,
-  Star,
-  ScanSearch,
-  History,
-  Sigma,
-  FileText,
   Settings,
   DatabaseZap,
-  Database,
   Loader2,
-  LayoutDashboard,
   Tags,
-  TrendingUp,
-  Flame,
   BarChart3,
-  Gauge,
   Sparkles,
-  Repeat,
   Layers3,
-  Zap,
-  Landmark,
-  RadioTower,
+  Gauge,           // [R561] 只剩 NavItem 的类型在用(上游把菜单图标换成了 BrandIcons)
   CheckCircle2,
-  BookOpenCheck,
   Brain,           // [R502] Minds
   ChevronRight,
   ChevronDown,
@@ -63,6 +48,28 @@ import {
   CalendarClock,   // [R127] 实时行情自动开关
   HelpCircle,      // [R323] 名词说明的全局入口
 } from 'lucide-react'
+import {
+  IconDashboard,
+  IconWatchlist,
+  IconStrategy,
+  IconFactors,
+  IconBacktest,
+  IconStockFocus,
+  IconLadder,
+  IconConcept,
+  IconIndustry,
+  IconFinancials,
+  IconMonitor,
+  IconRegime,
+  IconAlert,
+  IconLots,
+  IconPaper,
+  IconSignals,
+  IconReview,
+  IconIndices,
+  IconData,
+  type BrandIconProps,
+} from './BrandIcons'
 import { Logo } from './Logo'
 import { api, type CapabilityMatrix, type IndexQuote } from '@/lib/api'
 import { cn } from '@/lib/cn'
@@ -91,31 +98,35 @@ export const CORE_INDEXES = [
 type CoreIndex = (typeof CORE_INDEXES)[number]
 
 const nav = [
-  { to: '/watchlist',  label: '自选',   icon: Star },
-  { to: '/screener',   label: '策略',   icon: ScanSearch },
-  { to: '/factors',    label: '因子', icon: Sigma },
-  { to: '/backtest',   label: '回测', icon: History },
-  { to: '/stock-analysis',    label: '个股分析', icon: TrendingUp },
+  // [R561 同步上游] 图标换成上游 v0.3.2 的品牌图标族(BrandIcons, 描边跟随文字色, 不带紫); 上游那套里没有的
+  // 两项(「浏览」分组、Minds)仍用 lucide。/lots 是本 fork 的转折模拟盘, 用上游「仓位箱 + mini K 线」那枚
+  { to: '/watchlist',  label: '自选',   icon: IconWatchlist },
+  { to: '/screener',   label: '策略',   icon: IconStrategy },
+  { to: '/factors',    label: '因子', icon: IconFactors },
+  { to: '/backtest',   label: '回测', icon: IconBacktest },
+  { to: '/stock-analysis',    label: '个股分析', icon: IconStockFocus },
   // [R67] 分组本身也是菜单里的一行 —— 排序时它整块走, 后面的成员是它的子项
   { to: BROWSE_GROUP_ID,    label: BROWSE_GROUP.label, icon: Layers3 },
-  { to: '/dashboard',       label: '看板',     icon: LayoutDashboard },
-  { to: '/limit-ladder', label: '连板梯队', icon: Flame },
-  { to: '/concept-analysis', label: '概念分析', icon: Layers3 },
-  { to: '/industry-analysis', label: '行业分析', icon: Landmark },
-  { to: '/financials', label: '财务分析', icon: FileText },
-  { to: '/monitor', label: '监控中心', icon: RadioTower },
-  { to: '/regime', label: '宏观分析', icon: Gauge },   // [R503] 原「市场环境」; 路由不变, 存过的菜单偏好不受影响
-  { to: '/abnormal', label: '异动监控', icon: Siren },
+  { to: '/dashboard',       label: '看板',     icon: IconDashboard },
+  { to: '/limit-ladder', label: '连板梯队', icon: IconLadder },
+  { to: '/concept-analysis', label: '概念分析', icon: IconConcept },
+  { to: '/industry-analysis', label: '行业分析', icon: IconIndustry },
+  { to: '/financials', label: '财务分析', icon: IconFinancials },
+  { to: '/monitor', label: '监控中心', icon: IconMonitor },
+  { to: '/regime', label: '宏观分析', icon: IconRegime },   // [R503] 原「市场环境」; 路由不变, 存过的菜单偏好不受影响
+  { to: '/abnormal', label: '异动监控', icon: IconAlert },
   // [R170] 上游这里叫「持仓提醒」; 在 fork 这边它是双 tab 外壳(我的批次 + AI 操盘手),
   // 所以叫「仓位中心」。旧路径 /paper-trading 仍可用(router 里重定向)。
-  { to: '/lots',       label: '模拟盘', icon: Repeat },   // [R327] 转折模拟盘 —— 纯规则, 图标从 Bot 换掉: 这里已经没有 AI
-  { to: '/signals',    label: '信号库',   icon: Zap },
-  { to: '/review',      label: '复盘',   icon: BookOpenCheck },
+  { to: '/lots',       label: '模拟盘', icon: IconLots },   // [R327] 转折模拟盘 —— 纯规则
+  // [R561 同步上游] 上游 v0.3.2 的虚拟账户(模拟撮合)。上游菜单叫「模拟盘」, 与上一行撞名, 本 fork 叫「虚拟账户」
+  { to: '/paper',      label: '虚拟账户', icon: IconPaper },
+  { to: '/signals',    label: '信号库',   icon: IconSignals },
+  { to: '/review',      label: '复盘',   icon: IconReview },
   // [fork 增强] R93 使用观察笔记 → [R180] 消息面 → [R502] Minds(笔记 / 洞见 / 交易计划 / 对话)。
   // 原位改名: 排在哪、藏没藏, 后端读偏好时把旧路径换成新路径(preferences.NAV_RENAMED)。
   { to: '/minds', label: 'Minds', icon: Brain },
-  { to: '/indices', label: '指数', icon: BarChart3 },
-  { to: '/data',       label: '数据',   icon: Database },
+  { to: '/indices', label: '指数', icon: IconIndices },
+  { to: '/data',       label: '数据',   icon: IconData },
 ] as const
 
 /**
@@ -549,7 +560,8 @@ function AIConfigBadge({ configured, model }: { configured?: boolean; model?: st
   )
 }
 
-type NavItem = { to: string; label: string; icon: typeof Gauge; badge?: string }
+// [R561] 上游品牌图标(BrandIcons)与 lucide 两种都收: 签名兼容(className / size)
+type NavItem = { to: string; label: string; icon: typeof Gauge | ((props: BrandIconProps) => ReactNode); badge?: string }
 
 /** 普通菜单项 —— 顶层和「闲置功能」组里用的是同一个, 免得两处样式各走各的。 */
 function PlainNavLink({ item, collapsed, indent, dataSyncing, dataSyncJustDone }: {
@@ -614,6 +626,9 @@ export function Layout() {
   const { data: settingsState } = useSettings()
   const { data: matrix } = useCapabilityMatrix()
   const { data: versionData } = useVersion()
+  // [R561 同步上游] 上游 v0.3.2 在这里启动时静默查一次 GitHub Releases, 给左下角版本号挂 NEW 徽标 —— 本 fork 不接:
+  // 它比的是上游作者的发布版本, 本 fork 走 Docker 镜像自动部署, 上游发版 ≠ 这里能更新, 徽标只会误导。
+  // lib/updateCheck.ts(写着上游仓库地址, R268 不许)一并删了, 找回方法登记在 docs/hidden-features.md「二、撤下」。
   const { data: prefs } = usePreferences()
   // 数据源列表 (用于实时行情状态显示当前数据源名称)
   const { data: dataSources } = useQuery({

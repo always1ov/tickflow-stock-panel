@@ -1464,9 +1464,10 @@ def test_release_of_extracts_from_presigned_url():
 
 
 def test_test_dataset_daily_preview(monkeypatch):
-    # 试拉取的是「最近 30 天」(相对真实的今天), 夹具日期也得跟着今天走 ——
-    # 原来写死 2026-08-27/28, 过了 09-26 那一根就掉出窗口, 测试到点自己变红
-    d1, d2 = date.today() - timedelta(days=3), date.today() - timedelta(days=2)
+    # 实现窗口为 now-30天..now, 数据日期必须相对今天生成; 硬编码日期会随时间
+    # 滑出窗口 (2026-09-27 起原硬编码 8/27 的版本必然失败)。
+    d1 = date.today() - timedelta(days=2)
+    d2 = date.today() - timedelta(days=1)
     bars = {"000001.SZ": [_bar(d1, 11.05), _bar(d2, 11.65)]}
     provider = _hist_provider(monkeypatch, _FakeHistClient(bars))
     out = provider.test_dataset("daily", ["000001.SZ"])

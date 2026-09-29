@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, type ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Save, Loader2, Check, Wifi, WifiOff, Eye, EyeOff, Shield,
-  Shuffle, Settings2, Trash2,
+  Shuffle, Settings2, Trash2, ChevronDown,
 } from 'lucide-react'
 import { useSettings } from '@/lib/useSharedQueries'
 import { api, type SettingsState } from '@/lib/api'
@@ -21,6 +21,12 @@ const INPUT_CLS =
 const toPositiveInt = (v: string) => {
   const n = parseInt(v, 10)
   return Number.isInteger(n) && n > 0 ? n : undefined
+}
+
+// 允许 0 (0=关闭): 轮次检查点等"0 有语义"的数值输入
+const toIntAllowZero = (v: string) => {
+  const n = parseInt(v, 10)
+  return Number.isInteger(n) && n >= 0 ? n : undefined
 }
 
 const CODEX_PROVIDER = 'codex_cli'
@@ -54,17 +60,17 @@ const codexModelLabel = (model?: string, effort?: string) => {
   return effortLabel ? `${modelLabel} · ${effortLabel}` : modelLabel
 }
 
-type AiPreset = { label: string; provider?: string; url: string; model: string; codexCommand?: string; website: string; websiteLabel: string; description: string; custom?: boolean }
+type AiPreset = { label: string; provider?: string; url: string; model: string; codexCommand?: string; website: string; websiteLabel: string; description: ReactNode; custom?: boolean; sponsor?: boolean }
 
 const PRESETS: AiPreset[] = [
   { label: '自定义', url: '', model: '', website: '', websiteLabel: '', description: '不自动填充任何配置，完全手动填写 API 地址、模型和密钥。', custom: true },
+  { label: 'RunningHub', url: 'https://llm.runninghub.ai/v1', model: 'openai/gpt-6-astra-saver', website: 'https://www.runninghub.ai/zh-cn/call-api/llm/models?source=github&inviteCode=edt5wh7c', websiteLabel: 'www.runninghub.ai · 赞助', sponsor: true, description: <>本项目赞助商 · OpenAI 兼容中转，单一接口直连 400+ 主流大模型，<span className="font-medium text-warning">Claude、ChatGPT、Gemini</span> 等国际模型直连稳定不掉线，<span className="font-medium text-warning">最高优惠 80%</span>，<span className="font-medium text-warning">邀请链接注册赠送 1000 RH 积分</span>。通过下方链接注册即为项目提供赞助支持。</> },
   { label: 'OpenAI', provider: OPENAI_PROVIDER, url: 'https://api.openai.com/v1', model: DEFAULT_OPENAI_MODEL, website: 'https://platform.openai.com/', websiteLabel: 'platform.openai.com', description: 'OpenAI 官方接口，可单独配置模型支持的推理强度。' },
   { label: 'DeepSeek', url: 'https://api.deepseek.com', model: 'deepseek-v4-pro', website: 'https://www.deepseek.com/', websiteLabel: 'deepseek.com', description: 'DeepSeek 官方 OpenAI 兼容接口。' },
   { label: '通义千问', url: 'https://dashscope.aliyuncs.com/compatible-mode/v1', model: 'qwen-3.6plus', website: 'https://tongyi.aliyun.com/', websiteLabel: 'tongyi.aliyun.com', description: '阿里云 DashScope 兼容模式接口。' },
   { label: '智谱 GLM', url: 'https://open.bigmodel.cn/api/paas/v4', model: 'glm-5.2', website: 'https://open.bigmodel.cn/', websiteLabel: 'open.bigmodel.cn', description: '智谱 AI 官方 OpenAI 兼容接口。' },
   { label: 'Kimi', url: 'https://api.moonshot.cn/v1', model: 'kimi-k2.7-code', website: 'https://platform.moonshot.cn/', websiteLabel: 'platform.moonshot.cn', description: '月之暗面 Moonshot 官方 OpenAI 兼容接口，支持超长上下文。' },
   { label: 'Codex CLI', provider: CODEX_PROVIDER, url: '', model: DEFAULT_CODEX_MODEL, codexCommand: CODEX_COMMAND, website: 'https://developers.openai.com/codex/noninteractive', websiteLabel: 'codex exec', description: '调用本机 Codex CLI 的 codex exec, 适合已登录 ChatGPT/Codex 的本地环境。' },
-  { label: '炸鸡中转站', url: 'https://api.zhaji.dev/v1', model: 'gpt-5.5', website: 'https://api.zhaji.dev', websiteLabel: 'api.zhaji.dev', description: 'OpenAI 兼容中转服务，适合直接使用国际模型。' },
 ]
 
 const findPreset = (provider: string, baseUrl: string, codexCommand: string) => PRESETS.find(p => {
@@ -90,9 +96,17 @@ export function SettingsAIPanel({ highlight }: { highlight?: string } = {}) {
   const [userAgent, setUserAgent] = useState('')
   const [maxOutputTokens, setMaxOutputTokens] = useState('')
   const [contextWindow, setContextWindow] = useState('')
+  const [roundCheckpoint, setRoundCheckpoint] = useState('')
   const [showKey, setShowKey] = useState(false)
   const [saved, setSaved] = useState(false)
   const [confirmClear, setConfirmClear] = useState(false)
+  // 赞助商预设的模型列表下拉（/models 接口 + 关键词过滤）
+  const [modelsOpen, setModelsOpen] = useState(false)
+  const [modelsLoading, setModelsLoading] = useState(false)
+  const [modelsError, setModelsError] = useState('')
+  const [modelOptions, setModelOptions] = useState<string[]>([])
+  const [modelFilter, setModelFilter] = useState('')
+  const modelBoxRef = useRef<HTMLDivElement | null>(null)
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<{ ok: boolean; msg: string } | null>(null)
   const [selectedPresetLabel, setSelectedPresetLabel] = useState(PRESETS[0].label)
@@ -174,8 +188,9 @@ export function SettingsAIPanel({ highlight }: { highlight?: string } = {}) {
     const ua = s.ai_user_agent ?? ''
     setCustomUa(!!ua)
     setUserAgent(ua)
-    setMaxOutputTokens(String(s?.ai_max_output_tokens ?? 8192))
-    setContextWindow(String(s?.ai_context_window ?? 64000))
+    setMaxOutputTokens(String(s?.ai_max_output_tokens ?? 16384))
+    setContextWindow(String(s?.ai_context_window ?? 128000))
+    setRoundCheckpoint(String(s?.ai_round_checkpoint ?? 100))
   }, [s])
 
   const payload = () => ({
@@ -189,6 +204,7 @@ export function SettingsAIPanel({ highlight }: { highlight?: string } = {}) {
     user_agent: customUa ? userAgent : '',
     max_output_tokens: toPositiveInt(maxOutputTokens),
     context_window: toPositiveInt(contextWindow),
+    round_checkpoint: toIntAllowZero(roundCheckpoint),
   })
 
   const save = useMutation({
@@ -209,6 +225,7 @@ export function SettingsAIPanel({ highlight }: { highlight?: string } = {}) {
         ai_configured: result.ai_configured ?? (isCodexProvider ? true : (apiKey ? true : prev.ai_configured)),
         ai_max_output_tokens: result.ai_max_output_tokens ?? toPositiveInt(maxOutputTokens),
         ai_context_window: result.ai_context_window ?? toPositiveInt(contextWindow),
+        ai_round_checkpoint: result.ai_round_checkpoint ?? toIntAllowZero(roundCheckpoint),
         ...(apiKey ? {
           has_ai_key: true,
           ai_api_key_masked: `${apiKey.slice(0, 4)}......${apiKey.slice(-4)}`,
@@ -236,8 +253,9 @@ export function SettingsAIPanel({ highlight }: { highlight?: string } = {}) {
         custom: { baseUrl: '', model: '' },
         openai: { baseUrl: 'https://api.openai.com/v1', model: DEFAULT_OPENAI_MODEL },
       }
-      setMaxOutputTokens('8192')
-      setContextWindow('64000')
+      setMaxOutputTokens('16384')
+      setContextWindow('128000')
+      setRoundCheckpoint('100')
       setTestResult(null)
       qc.setQueryData<SettingsState>(QK.settings, prev => prev ? {
         ...prev,
@@ -249,8 +267,8 @@ export function SettingsAIPanel({ highlight }: { highlight?: string } = {}) {
         ai_codex_model: '',
         ai_codex_command: CODEX_COMMAND,
         ai_codex_reasoning_effort: '',
-        ai_max_output_tokens: 8192,
-        ai_context_window: 64000,
+        ai_max_output_tokens: 16384,
+        ai_context_window: 128000,
         has_ai_key: false,
         ai_configured: false,
         ai_api_key_masked: '',
@@ -282,6 +300,38 @@ export function SettingsAIPanel({ highlight }: { highlight?: string } = {}) {
     if (selectedPreset.custom) directDrafts.current.custom.model = value
     if (isOpenAIProvider) directDrafts.current.openai.model = value
   }
+
+  // 赞助商预设: 经后端代理拉取 /models 全量模型列表供下拉选择
+  // (浏览器直连会被 RunningHub 网关按 Origin 过滤, 只返回国产模型)
+  const fetchModelOptions = async () => {
+    setModelsLoading(true)
+    setModelsError('')
+    setModelFilter('')
+    setModelsOpen(true)
+    try {
+      const data = await api.sponsorModels()
+      setModelOptions(data.models)
+    } catch (error) {
+      setModelOptions([])
+      setModelsError(error instanceof Error ? error.message : '获取模型列表失败')
+    } finally {
+      setModelsLoading(false)
+    }
+  }
+
+  const filteredModelOptions = modelFilter.trim()
+    ? modelOptions.filter(id => id.toLowerCase().includes(modelFilter.trim().toLowerCase()))
+    : modelOptions
+
+  // 下拉打开时点击外部关闭
+  useEffect(() => {
+    if (!modelsOpen) return
+    const onDocMouseDown = (e: MouseEvent) => {
+      if (modelBoxRef.current && !modelBoxRef.current.contains(e.target as Node)) setModelsOpen(false)
+    }
+    document.addEventListener('mousedown', onDocMouseDown)
+    return () => document.removeEventListener('mousedown', onDocMouseDown)
+  }, [modelsOpen])
 
   const handleTest = async () => {
     setTesting(true)
@@ -430,10 +480,43 @@ export function SettingsAIPanel({ highlight }: { highlight?: string } = {}) {
             <>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <Field label="API 地址">
-                  <input type="text" value={baseUrl} onChange={e => handleBaseUrlChange(e.target.value)} placeholder="https://api.zhaji.dev/v1" className={INPUT_CLS} />
+                  <input type="text" value={baseUrl} onChange={e => handleBaseUrlChange(e.target.value)} placeholder="https://llm.runninghub.ai/v1" className={INPUT_CLS} />
                 </Field>
                 <Field label="模型">
-                  <input type="text" value={model} onChange={e => handleModelChange(e.target.value)} placeholder="gpt-5.6-sol" className={INPUT_CLS} />
+                  <div ref={modelBoxRef} className="relative">
+                    <input type="text" value={model} onChange={e => handleModelChange(e.target.value)} placeholder="gpt-5.6-sol" className={`${INPUT_CLS} ${selectedPreset?.sponsor ? 'pr-9' : ''}`} />
+                    {selectedPreset?.sponsor && (
+                      <button type="button" onClick={fetchModelOptions} aria-label="获取模型列表"
+                        className="absolute right-1.5 top-1/2 flex h-6 w-7 -translate-y-1/2 items-center justify-center rounded-md border border-border/40 bg-base text-muted transition-colors hover:border-accent/40 hover:text-accent">
+                        {modelsLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                      </button>
+                    )}
+                    {selectedPreset?.sponsor && modelsOpen && (
+                      <div className="absolute z-20 mt-1 w-full rounded-lg border border-border/40 bg-base shadow-lg">
+                        <div className="border-b border-border/30 p-2">
+                          <input type="text" value={modelFilter} onChange={e => setModelFilter(e.target.value)}
+                            placeholder="搜索模型..." autoFocus
+                            className="h-7 w-full rounded-md bg-base px-2 text-xs ring-1 ring-border/30 focus:outline-none focus:ring-accent/40" />
+                        </div>
+                        <div className="max-h-56 overflow-y-auto py-1">
+                          {modelsLoading ? (
+                            <div className="flex items-center justify-center gap-1.5 py-6 text-xs text-muted">
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />加载中...
+                            </div>
+                          ) : modelsError ? (
+                            <div className="px-3 py-4 text-center text-xs text-muted">获取失败: {modelsError}</div>
+                          ) : filteredModelOptions.length === 0 ? (
+                            <div className="px-3 py-4 text-center text-xs text-muted">{modelOptions.length ? '无匹配模型' : '未获取到模型'}</div>
+                          ) : filteredModelOptions.map(id => (
+                            <button key={id} type="button" onClick={() => { handleModelChange(id); setModelsOpen(false) }}
+                              className={`block w-full truncate px-3 py-1.5 text-left font-mono text-xs transition-colors hover:bg-accent/10 ${model === id ? 'text-accent' : 'text-secondary'}`}>
+                              {id}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </Field>
               </div>
 
@@ -473,11 +556,14 @@ export function SettingsAIPanel({ highlight }: { highlight?: string } = {}) {
 
           <div className="border-t border-border/20 pt-4">
             <div className="grid grid-cols-2 gap-4">
-              <Field label="输出上限 max_tokens" hint="所有 AI 任务的输出 token 上限, 任务请求会被钳制到此值; 默认 8192">
-                <input type="number" min={1} value={maxOutputTokens} onChange={e => setMaxOutputTokens(e.target.value)} placeholder="8192" className={INPUT_CLS} />
+              <Field label="输出上限 max_tokens" hint="所有 AI 任务的输出 token 上限, 任务请求会被钳制到此值; 默认 16384">
+                <input type="number" min={1} value={maxOutputTokens} onChange={e => setMaxOutputTokens(e.target.value)} placeholder="16384" className={INPUT_CLS} />
               </Field>
-              <Field label="上下文窗口 (输入上限)" hint="输入估算超出此窗口时会报错并提示调大; 默认 64000">
-                <input type="number" min={1} value={contextWindow} onChange={e => setContextWindow(e.target.value)} placeholder="64000" className={INPUT_CLS} />
+              <Field label="上下文窗口 (输入上限)" hint="输入估算超出此窗口时会报错并提示调大; 默认 128000">
+                <input type="number" min={1} value={contextWindow} onChange={e => setContextWindow(e.target.value)} placeholder="128000" className={INPUT_CLS} />
+              </Field>
+              <Field label="助手工具轮数检查点" hint="AI 助手连续 N 轮工具调用未完成时询问是否继续; 0 = 不检查(无限轮); 最小 5, 默认 100">
+                <input type="number" min={0} value={roundCheckpoint} onChange={e => setRoundCheckpoint(e.target.value)} placeholder="100" className={INPUT_CLS} />
               </Field>
             </div>
           </div>

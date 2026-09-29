@@ -14,13 +14,19 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   ArrowDown,
+  Bot,
+  Database,
+  FlaskConical,
   History,
   Plus,
+  Puzzle,
   SendHorizontal,
   Settings2,
   Sparkles,
   Square,
+  Star,
   Trash2,
+  TrendingUp,
 } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import {
@@ -87,16 +93,16 @@ function PanelHeader({
   return (
     <div className="relative flex h-14 shrink-0 items-center gap-2 border-b border-border px-4">
       <Sparkles className="h-4 w-4 shrink-0 text-accent" />
-      <span className="text-sm font-semibold text-foreground">AI 助手</span>
+      <span className="shrink-0 text-sm font-semibold text-foreground">AI 助手</span>
       {status?.model && (
         <span
-          className="max-w-36 truncate rounded-btn bg-elevated px-1.5 py-0.5 font-mono text-micro text-muted"
-          title={`供应商: ${status.provider}`}
+          className="min-w-0 truncate rounded-btn bg-elevated px-1.5 py-0.5 font-mono text-micro text-muted"
+          title={`模型: ${status.model}\n供应商: ${status.provider ?? '-'}`}
         >
           {status.model}
         </span>
       )}
-      <div className="ml-auto flex items-center gap-0.5">
+      <div className="ml-auto flex shrink-0 items-center gap-0.5">
         <div className="relative">
           <IconButton title="历史会话" onClick={() => setMenuOpen(v => !v)} disabled={sending}>
             <History className="h-4 w-4" />
@@ -247,6 +253,14 @@ function MessageList({
   )
 }
 
+/** 空会话建议分组的图标 (后端 suggests 的 group 字段驱动, 未匹配时兜底)。 */
+const SUGGEST_GROUP_ICONS: Record<string, typeof TrendingUp> = {
+  行情与大盘: TrendingUp,
+  我的与个股: Star,
+  策略与信号: FlaskConical,
+  数据与扩展: Database,
+}
+
 function EmptyState({ status, suggests }: { status: AssistantStatus | null; suggests: QuickSuggest[] }) {
   const navigate = useNavigate()
 
@@ -291,23 +305,63 @@ function EmptyState({ status, suggests }: { status: AssistantStatus | null; sugg
   }
 
   if (!suggests.length) {
-    return <p className="pt-8 text-center text-xs text-muted">问我任何关于策略、因子、回测或数据能力的问题。</p>
+    return (
+      <p className="pt-8 text-center text-xs text-muted">
+        问我任何关于行情、个股、策略、扩展数据或数据能力的问题。
+      </p>
+    )
+  }
+
+  // 按后端 group 字段分区, 保持原始顺序; 未分组的建议归入「更多」。
+  const groups = new Map<string, QuickSuggest[]>()
+  for (const suggest of suggests) {
+    const key = suggest.group || '更多'
+    groups.set(key, [...(groups.get(key) ?? []), suggest])
   }
 
   return (
-    <div className="space-y-3 pt-6">
-      <p className="text-center text-xs text-muted">试试这些:</p>
-      <div className="grid grid-cols-1 gap-2">
-        {suggests.map(suggest => (
-          <button
-            key={suggest.id}
-            type="button"
-            onClick={() => sendMessage(suggest.prompt)}
-            className="cursor-pointer rounded-card border border-border bg-base/60 px-3 py-2.5 text-left text-xs text-secondary transition-colors duration-150 ease-smooth hover:border-accent/40 hover:bg-elevated hover:text-foreground"
-          >
-            {suggest.label}
-          </button>
-        ))}
+    <div className="space-y-4 pb-2 pt-2">
+      <div className="rounded-card border border-border bg-elevated/40 px-4 py-4 text-center">
+        <div className="mx-auto flex h-9 w-9 items-center justify-center rounded-full bg-accent/15 text-accent">
+          <Bot className="h-4.5 w-4.5" />
+        </div>
+        <p className="mt-2 text-sm font-medium text-foreground">有什么可以帮你？</p>
+        <p className="mt-1 text-xs text-muted">基于本地真实数据回答 · 每次取数都可展开核对</p>
+      </div>
+
+      {[...groups.entries()].map(([group, items]) => {
+        const GroupIcon = SUGGEST_GROUP_ICONS[group] ?? Sparkles
+        return (
+          <div key={group} className="space-y-2">
+            <div className="flex items-center gap-1.5 px-0.5 text-micro font-medium text-muted">
+              <GroupIcon className="h-3.5 w-3.5" />
+              {group}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {items.map(suggest => (
+                <button
+                  key={suggest.id}
+                  type="button"
+                  onClick={() => sendMessage(suggest.prompt)}
+                  className="max-w-full shrink-0 cursor-pointer rounded-card border border-border bg-base/60 px-3 py-2 text-left text-xs text-secondary transition-colors duration-150 ease-smooth hover:border-accent/40 hover:bg-elevated hover:text-foreground"
+                >
+                  {suggest.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )
+      })}
+
+      <div className="rounded-card border border-dashed border-border bg-base/40 px-3.5 py-3 text-xs">
+        <div className="flex items-center gap-1.5 font-medium text-foreground">
+          <Puzzle className="h-3.5 w-3.5 text-accent" />
+          扩展内容同样可以问
+        </div>
+        <p className="mt-1 leading-relaxed text-secondary">
+          扩展数据表、自定义策略与信号等扩展内容都能问答互动, 比如「我的扩展数据表里有什么」「看看最新一张的数据」。
+          AI 助手本身也是一个 custom 扩展模块。
+        </p>
       </div>
     </div>
   )

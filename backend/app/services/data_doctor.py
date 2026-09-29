@@ -120,6 +120,10 @@ STORES: tuple[Store, ...] = (
     Store("user_data/news_desk_summary.json", "消息面总览", shape=SHAPE_OBJECT,
           fields={"text": "", "as_of": "", "item_count": 0}),
     Store("user_data/score_ledger.json", "把握分台账", shape=SHAPE_OPAQUE),
+    # [R561 同步上游] 上游 v0.3.2 开放接口的 Token 表: 只存 SHA-256 哈希(明文只在创建那一刻给一次),
+    # 不可重算 —— 丢了就得重新发 Token、改所有调用方的配置
+    Store("user_data/api_tokens.json", "开放接口 Token", shape=SHAPE_OPAQUE,
+          note="上游 v0.3.2 新增; 结构由 services/api_tokens.py 管, 不做字段级补齐"),
     # [R435] AI 信号已停用, 不再写这个文件; 旧数据留在盘上(回退时要用), 体检照旧认得它
     Store("user_data/signals.json", "AI 个股信号(已停用)", shape=SHAPE_OPAQUE),
     Store("user_data/ai_pick_ledger.json", "AI 优选台账", shape=SHAPE_OPAQUE),

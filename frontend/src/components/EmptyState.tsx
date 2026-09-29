@@ -16,7 +16,7 @@ export function EmptyState({ icon: Icon = Construction, title, hint }: Props) {
     <div className="h-full grid place-items-center px-8 py-16 animate-rise-in">
       <div className="text-center max-w-md">
         <Icon className="mx-auto h-10 w-10 text-muted" strokeWidth={1.5} />
-        <h2 className="mt-4 text-base font-medium text-foreground">{title}</h2>
+        <h2 className="mt-4 text-title font-medium text-foreground">{title}</h2>
         {hint && <p className="mt-2 text-sm text-secondary leading-relaxed">{hint}</p>}
       </div>
     </div>

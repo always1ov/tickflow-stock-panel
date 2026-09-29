@@ -113,7 +113,7 @@ export function ActiveJobCard({ job }: { job: PipelineJob }) {
               {cancelling ? '停止中…' : '取消'}
             </button>
             <div className="font-mono text-2xl font-bold tracking-tight">
-              {job.progress}<span className="text-base text-muted">%</span>
+              {job.progress}<span className="text-title text-muted">%</span>
             </div>
           </div>
         )}

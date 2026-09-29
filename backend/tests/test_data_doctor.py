@@ -40,6 +40,11 @@ NOT_USER_DATA = {
     "manifest.json": "任务/挖掘 job_store",
     "summary.json": "回测结果目录",
     "events.jsonl": "任务事件流",
+    # [R561 同步上游] 上游 v0.3.2 的虚拟账户: 按账户分目录存在 data/paper/accounts/<id>/, 不在 user_data/ 下,
+    # 体检的孤儿扫描(find_orphans)本来就不看那里。成交台账 fills.jsonl 是账务唯一事实源, 由 strategy/paper.py 自己管
+    "account.json": "虚拟账户(data/paper/accounts/<id>/)",
+    "fills.jsonl": "虚拟账户成交台账(同上)",
+    "daily.jsonl": "虚拟账户每日净值(同上 nav/)",
 }
 
 

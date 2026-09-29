@@ -99,6 +99,7 @@ const SOURCE_BADGE: Record<string, { label: string; cls: string }> = {
   sell_signal: { label: '卖出', cls: 'bg-bear/15 text-bear' },
   new_entry: { label: '进入', cls: 'bg-danger/15 text-danger' },
   dropped:   { label: '移出', cls: 'bg-bear/15 text-bear' },
+  paper:     { label: '虚拟账户', cls: 'bg-accent/15 text-accent' },  // [R561] 上游用 sky 色板, 换成语义色
 }
 
 // ===== 容器 — 挂在 Layout =====
