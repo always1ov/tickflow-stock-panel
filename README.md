@@ -623,6 +623,7 @@ PORT=3018                      # 服务端口
 | [docs/mining.md](./docs/mining.md)                                                                 | 因子与策略挖掘口径、防泄漏、任务隔离和发布边界                       |
 | [docs/market-phase.md](./docs/market-phase.md)                                                     | 市场情绪周期 6 阶段与概念/行业主线识别的口径与设计                   |
 | [docs/plugin-development.md](./docs/plugin-development.md)                                         | 数据源插件开发规范(以 fuyao 为参考实现)                  |
+| [外部数据源插件安装](./docs/external-data-source-packages.md) | ZIP 安装、Key 配置、版本维护和开发模板 |
 | [docs/secondary-development.md](./docs/secondary-development.md)                                   | 代码二次开发、前端插槽、后端策略接口与 AI 开发模板                   |
 | [docs/page-sdk.md](./docs/page-sdk.md)                                                             | 页面插件开发指南:产物契约、能力桥 ctx、打包与上传、安全边界           |
 | [backend/app/strategy/prompts/strategy-guide.md](./backend/app/strategy/prompts/strategy-guide.md) | 策略开发完整规范(AI 生成与手写)                                      |
