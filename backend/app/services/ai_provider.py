@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import os
 import re
 import shutil
@@ -24,6 +25,7 @@ OPENAI_COMPAT_PROVIDER = "openai_compat"
 OPENAI_PROVIDER = "openai"
 CODEX_CLI_PROVIDER = "codex_cli"
 CODEX_DEFAULT_COMMAND = "codex"
+CODEX_MIN_TIMEOUT_SECONDS = 600.0
 CODEX_SUPPORTED_REASONING_EFFORTS = {"none", "minimal", "low", "medium", "high", "xhigh"}
 OPENAI_DEFAULT_REASONING_EFFORT = "high"
 # OpenAI 系两种请求协议: chat.completions (兼容面最广) 与 Responses (官方新协议)。
@@ -72,6 +74,8 @@ _CODEX_ENV_ALLOWLIST = (
 )
 
 Message = dict[str, str]
+
+logger = logging.getLogger(__name__)
 
 _ANSI_RE = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]")
 
@@ -339,7 +343,7 @@ async def generate_ai_text(
     max_tokens = _resolve_max_tokens(max_tokens)
     _check_input_budget(messages, max_tokens=max_tokens)
     if is_codex_cli_provider():
-        return await _run_codex_cli(messages, max_tokens=max_tokens, timeout=max(timeout, 600.0))
+        return await _run_codex_cli(messages, max_tokens=max_tokens, timeout=max(timeout, CODEX_MIN_TIMEOUT_SECONDS))
     if is_responses_protocol():
         from app.services import ai_responses
 
@@ -485,7 +489,7 @@ async def stream_ai_text(
     max_tokens = _resolve_max_tokens(max_tokens)
     _check_input_budget(messages, max_tokens=max_tokens)
     if is_codex_cli_provider():
-        yield await _run_codex_cli(messages, max_tokens=max_tokens, timeout=max(timeout, 600.0))
+        yield await _run_codex_cli(messages, max_tokens=max_tokens, timeout=max(timeout, CODEX_MIN_TIMEOUT_SECONDS))
         return
 
     if is_responses_protocol():
@@ -945,8 +949,12 @@ def _compact_error_text(text: str) -> str:
     return text[:500]
 
 
+# 词边界约束: 裸 "401" 会把输出正文里任意含 401 的数字串 (如模型回复文本)
+# 误判成鉴权失败, 附出不相关的 codex login 指引; 词边界只排除数字粘连,
+# 真实鉴权报错 ("401 Unauthorized"/"status 401") 不受影响。
 _CODEX_AUTH_FAILURE_RE = re.compile(
-    r"401|unauthorized|not logged in|missing bearer|login required", re.IGNORECASE
+    r"\b401\b|\bunauthorized\b|\bnot logged in\b|\bmissing bearer\b|\blogin required\b",
+    re.IGNORECASE,
 )
 
 
@@ -975,6 +983,7 @@ async def _run_codex_cli(
     max_tokens: int | None,
     timeout: float,
     model_override: str | None = None,
+    output_schema: dict | None = None,
 ) -> str:
     prompt = _codex_prompt(messages, max_tokens=max_tokens)
     _sweep_stale_codex_run_dirs()
@@ -1003,6 +1012,10 @@ async def _run_codex_cli(
             "--output-last-message",
             str(output_path),
         ]
+        if output_schema is not None:
+            schema_path = run_path / "output-schema.json"
+            schema_path.write_text(json.dumps(output_schema, ensure_ascii=False), encoding="utf-8")
+            args.extend(["--output-schema", str(schema_path)])
         model = (current_ai_model() if model_override is None else model_override).strip()
         if model:
             args.extend(["--model", model])
@@ -1049,6 +1062,7 @@ def _run_codex_process(
     env: dict[str, str],
     timeout: float,
 ) -> tuple[int, bytes, bytes]:
+    started = time.monotonic()
     try:
         proc = subprocess.run(
             list(args),
@@ -1059,7 +1073,22 @@ def _run_codex_process(
             check=False,
         )
     except subprocess.TimeoutExpired as exc:
-        raise RuntimeError("Codex CLI 调用超时, 请稍后重试或检查本机 Codex 登录状态") from exc
+        stderr = _clean_process_text(exc.stderr or b"")
+        logger.warning(
+            "Codex CLI timed out: elapsed_s=%.1f timeout_s=%g prompt_chars=%d "
+            "structured=%s retry_indicated=%s auth_failure_indicated=%s",
+            time.monotonic() - started, timeout, len(prompt), "--output-schema" in args,
+            any(hint in stderr.lower() for hint in ("reconnecting", "retrying", "stream disconnected")),
+            bool(_CODEX_AUTH_FAILURE_RE.search(stderr)),
+        )
+        raise RuntimeError(
+            f"Codex CLI 调用超时({timeout:g} 秒), 本轮生成已终止。"
+            "可重试, 或在 AI 设置中降低 Codex 推理强度。"
+        ) from exc
+    logger.info(
+        "Codex CLI completed: elapsed_s=%.1f timeout_s=%g prompt_chars=%d structured=%s returncode=%d",
+        time.monotonic() - started, timeout, len(prompt), "--output-schema" in args, proc.returncode,
+    )
     return proc.returncode, proc.stdout, proc.stderr
 
 
@@ -1262,7 +1291,9 @@ def _resolve_macos_codex_command() -> str | None:
             continue
     for candidate in candidates:
         try:
-            if candidate.is_file():
+            # 与 shutil.which 同口径校验可执行位: 只查 is_file 会解析到同名
+            # 不可执行文件, 运行时报错不直观
+            if candidate.is_file() and os.access(candidate, os.X_OK):
                 return str(candidate)
         except OSError:
             continue
