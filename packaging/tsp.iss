@@ -5,8 +5,8 @@
 ;       单个 Setup.exe 安装程序 (双击→安装向导→快捷方式→可卸载)。
 ;
 ; 构建 (本地):
-;   1. 先跑 PyInstaller: cd backend && uv run pyinstaller ../packaging/tickflow.spec
-;   2. 再跑 Inno Setup:   ISCC.exe packaging\tickflow.iss
+;   1. 先跑 PyInstaller: cd backend && uv run pyinstaller ../packaging/tsp.spec
+;   2. 再跑 Inno Setup:   ISCC.exe packaging\tsp.iss
 ;   3. 产物: packaging\Output\TSP-Setup-x.x.x.exe
 ;
 ; 设计决策:
@@ -18,7 +18,7 @@
 ;   - 卸载入口 (控制面板可见)
 ; ===========================================================================
 
-#define MyAppName          "TSP 股票面板"
+#define MyAppName          "TSP"
 #define MyAppNameEN       "Tick Stock Panel"
 #define MyAppExeName      "TSP.exe"
 #define MyAppPublisher    "TSP"
@@ -93,13 +93,17 @@ Name: "{group}\卸载 {#MyAppName}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
 [Run]
-; 刷新 Windows 图标缓存: 覆盖安装时 exe 路径不变 (D:\TSP\TSP.exe), 资源管理器
-; 会一直显示缓存里的旧图标 (首个版本为透明底)。ie4uinit -show 强制重建缓存,
-; 装完快捷方式立即显示当前 exe 内嵌图标, 无需用户重启资源管理器。
-Filename: "{sys}\ie4uinit.exe"; Parameters: "-show"; Flags: runhidden
+; 安装完成后启动应用
+; shellexec: 部分机器对 exe 路径存有「以管理员身份运行」兼容标志/策略要求提权,
+; CreateProcess 无法弹 UAC 会直接报错误码 740; ShellExecute 遇提权正常弹 UAC,
+; asInvoker 场景行为不变。
+Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#MyAppName}}"; Flags: nowait postinstall skipifsilent shellexec
 
 ; 安装完成后启动应用
-Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#MyAppName}}"; Flags: nowait postinstall skipifsilent
+; shellexec: 部分机器对 exe 路径存有「以管理员身份运行」兼容标志/策略要求提权,
+; CreateProcess 无法弹 UAC 会直接报错误码 740; ShellExecute 遇提权正常弹 UAC,
+; asInvoker 场景行为不变。
+Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#MyAppName}}"; Flags: nowait postinstall skipifsilent shellexec
 
 [UninstallRun]
 ; 卸载前先关闭正在运行的应用 (否则 exe 被占用删不掉)
@@ -152,6 +156,27 @@ begin
     DefaultDir := ExpandConstant('{localappdata}\Programs\TSP');
     WizardForm.DirEdit.Text := DefaultDir;
   end;
+end;
+
+// ── 安装完成后: 通知外壳刷新图标缓存 ─────────────────────────────
+// 覆盖安装时 exe 路径不变 (如 D:\TSP\TSP.exe), 资源管理器会一直显示缓存的旧图标
+// (首个版本为透明底)。用 SHCNE_ASSOCCHANGED 强制外壳重建图标缓存, 装完快捷方式
+// 立即显示当前 exe 内嵌图标, 无需用户重启资源管理器。
+// 此前用 ie4uinit -show 实现同一目的, 但 ie4uinit.exe 是 IE 组件, 在移除 IE 的
+// 系统 (Win11 24H2+ 等) 上不存在 —— 执行会报错, 只能加 Check 跳过, 结果那些
+// 机器永远刷不掉旧图标。SHChangeNotify 是 ie4uinit -show 底层调用的同一外壳 API,
+// 所有 Windows 都有, 无外部依赖。
+const
+  SHCNE_ASSOCCHANGED = $08000000;
+  SHCNF_IDLIST = $0000;
+
+procedure SHChangeNotify(wEventId, uFlags, dwItem1, dwItem2: Longint);
+  external 'SHChangeNotify@shell32.dll stdcall';
+
+procedure CurStepChanged(CurStep: TSetupStep);
+begin
+  if CurStep = ssPostInstall then
+    SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, 0, 0);
 end;
 
 // ── 卸载时询问是否删除用户数据 ─────────────────────────────────

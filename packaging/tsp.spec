@@ -10,7 +10,7 @@
 
 构建 (在项目根目录):
   cd frontend && pnpm build                     # 先构建前端到 frontend/dist
-  pyinstaller packaging/tickflow.spec           # 产物在 dist/TSP/
+  pyinstaller packaging/tsp.spec                # 产物在 dist/TSP/
 """
 import sys
 from importlib.util import find_spec
@@ -79,6 +79,11 @@ hiddenimports += [
 # ── pywebview 平台后端 (动态导入, PyInstaller 默认抓不到) ────────────
 hiddenimports += collect_submodules("webview")
 hiddenimports += collect_submodules("webview.platforms")
+# pywebview 运行时依赖链 (webview/__init__ 顶层 import proxy_tools, Windows 端
+# 还要 bottle/clr_loader/pythonnet)。显式声明为金丝雀: 构建环境缺这些包时
+# PyInstaller 直接报错, 而不是静默产出启动即崩的包 (曾因 venv 缺 proxy_tools
+# 发布过启动崩溃版本)。
+hiddenimports += ["proxy_tools", "bottle", "clr_loader", "pythonnet"]
 
 # ── 系统通知后端 (winotify/plyer 按平台动态导入) ─────────────────────
 if sys.platform == "win32":
@@ -127,6 +132,9 @@ for pkg in (
 datas += [(FRONTEND_DIST, "static")]
 # tiers.yaml → 包根 (config.py frozen 模式读 _MEIPASS/tiers.yaml)
 datas += [(TIERS_YAML, ".")]
+# frontend/package.json → 包根 (app/__init__.py frozen 模式读 _MEIPASS/package.json,
+# __version__ 与安装包 AppVersion / 页面显示同源, 版本号只改 package.json 一处)
+datas += [(str(ROOT / "frontend" / "package.json"), ".")]
 # 内置策略 → app/strategy/builtin/ (importlib 动态加载, 不能进 PYZ)
 datas += [(BUILTIN_STRATEGIES, "app/strategy/builtin")]
 
@@ -220,7 +228,7 @@ if _IS_MACOS:
         version=APP_VERSION,   # → CFBundleShortVersionString / CFBundleVersion
         info_plist={
             "CFBundleName": "Tick Stock Panel",
-            "CFBundleDisplayName": "TSP 股票面板",
+            "CFBundleDisplayName": "TSP",
             "CFBundleVersion": APP_VERSION,
             "NSHighResolutionCapable": True,
             "LSMinimumSystemVersion": "10.13",
