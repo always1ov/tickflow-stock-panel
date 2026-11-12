@@ -103,7 +103,7 @@ Keltner 三档、注记·不计分、焦点名单、收盘口径 vs 盘中口径
 6. **数据源只用 TickFlow。** 唯一例外是境外指数（已定案，独立模块，见 `CONTEXT.md`）。
 7. **同步上游的原则**：以作者为尊，fork 增强一个不丢，AI 分析系统（`api/today.py`、
    `opportunity_score.py`、`score_ledger.py`、`today_annotations.py`、`action_timing.py`、
-   `focus_list.py`、`pages/Today.tsx` 等）不动。合完把"合并相对 fork HEAD 删掉的行"
+   `focus_list.py`、`components/today/` 等）不动。合完把"合并相对 fork HEAD 删掉的行"
    全部过一遍，确认没有一行 fork 内容被抹掉，并前移 `FORK_NOTES.md` 顶部的上游基线锚点。
 8. **验证看真实退出码。** `pnpm build | grep ...` 这类管道会吞掉退出码，
    踩过一次（构建其实没过却提交了）。要么单独 `echo $?`，要么写文件后再 grep。
@@ -214,6 +214,63 @@ Keltner 三档、注记·不计分、焦点名单、收盘口径 vs 盘中口径
     - 数据文件留在磁盘上 → 必须仍登记在数据体检 `data_doctor.STORES` 里，`note` 写明「功能已撤」。
     - 只收**功能级**的撤除；改一行文案、挪一个按钮不算。
     - 用户问「以前那个 XX 还能用吗」，先查这份登记簿，再查 `FORK_NOTES`。
+
+17. **评分选股系统与个股图表、价位指标 —— 三条禁区，动手前先确认。**
+    用户原话「绝对禁止修改、调整或重构现有的评分选股系统的任何核心逻辑、计算规则和
+    数据结构」「不得改动任何个股页面中的图表组件配置，不得调整价位相关的指标参数、
+    阈值和显示规则」。
+
+    这三条与第 3 条（作者策略只读）、第 13 条（打分冻结）是同一个量级的
+    **「根本不许动」**，不是「问一声就能动」。第 14 条那五类例外**不覆盖本条**。
+
+    - **禁区一 · 评分选股系统**：评分/选股的**核心逻辑、计算规则、数据结构**
+      一律不许改 —— 权重、曲线、门槛、因子真名与参数、判定口径、数据形状。
+      这条比第 13 条更宽：第 13 条冻结的是 `opportunity_score.py` 这套打分系统，
+      本条连**选股引擎、因子注册表、策略配置、数据结构**一起圈进去。
+      已有守卫：[`test_scoring_frozen.py`](backend/tests/test_scoring_frozen.py)、
+      [`test_screener_builtin_params.py`](backend/tests/test_screener_builtin_params.py)、
+      [`test_terminology.py`](backend/tests/test_terminology.py)。
+    - **禁区二 · 个股页面图表组件配置**：个股页的图表组件**配置**
+      （[`EChartsCandlestick.tsx`](frontend/src/components/EChartsCandlestick.tsx)、
+      `EChartsIntraday.tsx`、`EChartsMultiDayIntraday.tsx`、
+      [`AnalysisKChart.tsx`](frontend/src/components/stock-analysis/AnalysisKChart.tsx)、
+      `StockAnalysisDialog.tsx`、`lib/kline.ts`）不许改。
+      「改样式不算改动」这条规矩在这里不适用 —— 第 13 条 R437 说的是"每个模块是否
+      代码都几乎和以前一模一样"，**尤其图形部分**，指的是不要顺手重画；
+      本条禁的是**配置本身**：数据源、序列组装、坐标轴、缩放、标注层、事件绑定。
+    - **禁区三 · 价位相关指标参数、阈值、显示规则**：
+      [`indicators/levels.py`](backend/app/indicators/levels.py)（生命线 / 止盈线 /
+      出场三阶段 ATR 线）、`indicators/keltner.py`、`indicators/keltner_geometry.py`
+      的**参数、阈值、显示规则**一律不许改。
+      已有守卫：[`test_keltner.py`](backend/tests/test_keltner.py)、
+      `test_keltner_geometry.py`、`test_keltner_stance.py`、`test_keltner_verdict.py`、
+      `test_keltner_reversion.py`、`test_chart_levels_section.py`、
+      `test_exit_level_removed_only_from_chart.py`、
+      [`test_theme_palette.py`](backend/tests/test_theme_palette.py)（指标色 `MARKET` 段冻结）。
+
+    **提交前自证**（输出必须为空，非空即触碰禁区）：
+
+    ```bash
+    git diff --stat HEAD -- \
+      backend/app/strategy/ backend/app/factors/ backend/app/indicators/ \
+      backend/app/api/screener.py backend/app/api/strategy.py backend/app/api/signals.py \
+      backend/app/api/today.py backend/app/backtest/ \
+      backend/app/services/opportunity_score.py backend/app/services/score_ledger.py \
+      backend/app/services/livermore_service.py backend/app/services/action_timing.py \
+      backend/app/services/market_mode.py backend/app/services/position_exit.py \
+      frontend/src/pages/StockAnalysis.tsx \
+      "frontend/src/components/ECharts*" frontend/src/components/stock-analysis/ \
+      frontend/src/components/today/ frontend/src/lib/kline.ts
+    ```
+
+    **同步上游时这几处是必争之地**，逐条处理，不许整批照搬：
+    - 上游 `e077fc27`（`refactor/de-builtin-strategies-signals`）**删掉了 25 个
+      builtin 策略**并改成「用户数据 + `builtin/__init__.py` 垫片」。**不接受这一部分**
+      —— 第 3 条的 builtin 是精心设计验证过的资产。
+    - 上游改 `strategy/scoring.py`、`api/screener.py`、`factors/registry.py` 时，
+      **凡触及权重 / 门槛 / 曲线 / 已有因子参数的一律丢弃**；只允许新增不触碰既有。
+    - 上游的图表引擎统一（`AnalysisKChart` 大改 + 新增 `components/charts/`）
+      **暂不合并**，等用户逐项过。
 
 ---
 
