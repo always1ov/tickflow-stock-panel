@@ -495,7 +495,7 @@ Windows 启动器的可用参数:
 ```
 
 - **停止请用 Ctrl-C**,不要点窗口右上角的 X —— 只有 Ctrl-C 会走到清理逻辑,结束整棵进程树。
-- 子进程输出重定向到 `data/logs/{backend,frontend}.{out,err}.log`,启动器本身只做有界 tail,内存占用恒定。排查问题优先看这几个文件,后端的 `data/backend.log` 仍会单独轮转。
+- 子进程输出重定向到 `data/logs/{backend,frontend}.{out,err}.log`,启动器本身只做有界 tail,内存占用恒定。排查问题优先看这几个文件,后端自身的 `data/logs/backend.log` 会单独按大小轮转 (10MB×3)。
 - 启动前会检测同端口是否已有本项目后端:有则直接拒绝启动并打印 PID,避免多开叠加内存(每个实例常驻 1GB 以上)。换端口调试的实例不会被误杀。
 
 ### 方式 E:桌面客户端(Windows / macOS)
@@ -551,7 +551,7 @@ POLARS_MAX_THREADS=2        # 主要收益项: 用约 40% 的构建耗时换 500
     Select-Object ProcessId, ParentProcessId, CommandLine
   ```
 
-- **确认预热规模**:`data/backend.log` 中的 `enriched 历史缓存: N rows` 表示本次预热实际载入的行数,N 越大占用越高。历史数据较少时(例如首次只同步了几十天)内存会明显低于上表。
+- **确认预热规模**:`data/logs/backend.log` 中的 `enriched 历史缓存: N rows` 表示本次预热实际载入的行数,N 越大占用越高。历史数据较少时(例如首次只同步了几十天)内存会明显低于上表。
 
 ### 跑起来后的第一次使用
 
@@ -659,6 +659,8 @@ PORT=3018                      # 服务端口
 > **分发与二次开发须知**:依据 MIT 协议,分发本软件或其任何部分(包括 fork 后发布、修改再发布、封装为自有产品或服务)时,必须完整保留原始版权声明与许可文本。未经版权所有者书面许可,移除、遮蔽或篡改版权署名、许可声明,或在再分发时隐匿本项目来源,均构成协议违约与著作权侵权,版权所有者保留依法追究责任的权利。
 >
 > 协议全文与第三方组件许可清单亦可见应用内「设置 → 关于 → 开源许可」。
+
+**贡献**:提交 PR 前请阅读 [CONTRIBUTING.md](./CONTRIBUTING.md);所有提交须用 `git commit -s` 签署 DCO(贡献来源声明),并同意其中第 14 节的贡献再许可条款。
 
 本项目依赖 [TickFlow](https://tickflow.org/auth/register?ref=V3KDKGXPEA) 提供数据服务,使用前请遵守其服务条款
 
