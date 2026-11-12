@@ -4,6 +4,7 @@
 // Prod:同源(FastAPI 托管前端 dist)
 
 import { toast } from '@/components/Toast'
+import type { NavLayout } from './navLayout'
 
 const BASE = ''
 
@@ -999,6 +1000,7 @@ export interface StrategyCodeSaveResult {
 export interface AiIterateRound {
   round: number
   stats: Record<string, number> | null
+  backtest_error?: string | null
   change_summary: string
 }
 
@@ -2522,6 +2524,8 @@ export interface Preferences {
   webhook_default_channels?: string[]
   nav_order: string[]
   nav_hidden: string[]
+  nav_layout?: NavLayout | null
+  ui_prefs?: Record<string, string | number | boolean>
   /** 看板自定义布局; null/缺省 = 未自定义(前端内置默认布局) */
   dashboard_layout: { v: number; items: Array<{ i: string; t: string; x: number; y: number; w: number; h: number; p?: Record<string, string> }> } | null
   screener_auto_run: boolean
@@ -2851,15 +2855,28 @@ export const api = {
     request<{ ok: boolean }>('/api/settings/ai', { method: 'DELETE' }),
 
   /** 草稿连通性测试 — 只验证当前表单值, 不保存任何配置 */
-  testAiSettings: (
+  testAiSettings: async (
     ai: { provider?: string; base_url?: string; api_key?: string; model?: string; protocol?: string },
     opts?: { timeoutMs?: number },
-  ) =>
-    request<{ ok: boolean; model?: string; response?: string; error?: string; error_type?: string }>('/api/settings/ai/test', {
-      method: 'POST',
-      body: JSON.stringify(ai),
-      ...(opts?.timeoutMs != null ? { timeoutMs: opts.timeoutMs } : {}),
-    }),
+  ) => {
+    const invalidResponse = 'AI 连接测试未收到有效的后端响应。请确认前后端版本一致，重启 TSP 后刷新页面，并检查代理是否将 /api 请求转发到 TSP 后端。'
+    try {
+      const result = await request<{ ok: boolean; model?: string; response?: string; error?: string; error_type?: string }>('/api/settings/ai/test', {
+        method: 'POST',
+        body: JSON.stringify(ai),
+        quiet: true,
+        ...(opts?.timeoutMs != null ? { timeoutMs: opts.timeoutMs } : {}),
+      })
+      if (typeof result?.ok !== 'boolean') throw new ApiError(invalidResponse, 502)
+      return result
+    } catch (error) {
+      if (error instanceof ApiError && (error.status === 404 || error.status === 405)) {
+        throw new ApiError(`AI 连接测试接口不可用（HTTP ${error.status}）。请确认前后端版本一致，完整升级并重启 TSP 后刷新页面。使用代理时，请确认 POST /api/settings/ai/test 转发到 TSP 后端。`, error.status)
+      }
+      if (error instanceof SyntaxError) throw new ApiError(invalidResponse, 502)
+      throw error
+    }
+  },
 
   upgradeGuardStatus: () => request<UpgradeGuardStatus>('/api/upgrade-guard/status'),
   upgradeGuardScan: () => request<UpgradeGuardStatus>('/api/upgrade-guard/scan', { method: 'POST' }),
@@ -3283,6 +3300,10 @@ export const api = {
     request<{ nav_order: string[] }>('/api/settings/preferences/nav-order', {
       method: 'PUT',
       body: JSON.stringify({ nav_order }),
+    }),
+  saveNavLayout: (nav_layout: NavLayout | null, nav_hidden: string[]) =>
+    request<{ nav_layout: NavLayout | null; nav_order: string[]; nav_hidden: string[] }>('/api/settings/preferences/nav-layout', {
+      method: 'PUT', body: JSON.stringify({ nav_layout, nav_hidden }),
     }),
   saveNavHidden: (nav_hidden: string[]) =>
     request<{ nav_hidden: string[] }>('/api/settings/preferences/nav-hidden', {
@@ -4357,6 +4378,8 @@ export const api = {
     url: string; method?: string; headers?: Record<string, string>; body?: string;
     response_path?: string; field_map?: Record<string, string>;
     schedule_minutes?: number; enabled?: boolean;
+    /** 间隔秒数 (10~2592000): 配置后优先于 schedule_minutes; null=沿用分钟值 */
+    schedule_seconds?: number | null;
     schedule_time?: string | null;
     schedule_period?: 'daily' | 'weekly' | 'monthly' | null;
     schedule_day?: number | null;
@@ -5379,6 +5402,8 @@ export interface PullConfig {
   response_path: string
   field_map?: Record<string, string>
   schedule_minutes: number
+  /** 间隔秒数 (10~2592000): 配置后优先于 schedule_minutes 生效; null/缺省=分钟制 */
+  schedule_seconds?: number | null
   enabled: boolean
   /** 每日固定拉取时刻 "HH:MM" (北京时间): 配置后忽略间隔, 每天该时刻拉一次; null=间隔制 */
   schedule_time?: string | null
