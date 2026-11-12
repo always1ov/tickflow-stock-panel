@@ -18,7 +18,7 @@ on:
       version:
         description: '版本号 (如 v0.1.33, 用作 Release tag 和标题; 必须与 frontend/package.json 的 version 一致, 否则流水线直接失败)'
         required: true
-        default: 'v0.3.3'
+        default: 'v0.3.9'
       platforms:
         description: '要构建的平台 (逗号分隔: windows,macos,linux)'
         required: true
@@ -150,6 +150,9 @@ jobs:
         # Inno/DMG/tar 一起分发, 运行时由 upgrade_guard 读取。
         # uv run --no-project: 跨平台用 uv 管的 Python; 版本号唯一权威 =
         # frontend/package.json (与 app/__init__._load_version 同源)。
+        # shell: bash —— Windows runner 默认是 pwsh, 不认识 FOO=$(...) 语法;
+        # 三平台 runner 均自带 bash, 显式指定即可统一。
+        shell: bash
         run: |
           APP_VER=$(node -p "require('./frontend/package.json').version")
           uv run --no-project python scripts/generate_manifest.py --root backend/dist/TSP/_internal --output backend/dist/TSP/_internal/app/upgrade_manifest.json --version "$APP_VER"
