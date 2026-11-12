@@ -20,6 +20,7 @@ export const MINUTE_DATA_QUERY_PREFIXES = new Set([
 ])
 
 export const QK = {
+  dataVersions: ['data-versions'] as const,
   extensionPackages: ['extension-packages'] as const,
   // 全局 / 共享 (Layout 预取)
   capabilities:   ['capabilities'] as const,
@@ -38,6 +39,7 @@ export const QK = {
   // Watchlist
   watchlist:            ['watchlist'] as const,
   watchlistGroups:      ['watchlist-groups'] as const,
+  watchlistPrepare:     (symbols: string[]) => ['watchlist-prepare', symbols] as const,
   watchlistQuotes:      ['watchlist-quotes'] as const,
   watchlistEnriched:    (ext?: string) => ['watchlist-enriched', ext ?? ''] as const,
   // 异动边缘总览 (开启监控时才查询, 参数为 min_closeness/limit)
@@ -65,7 +67,8 @@ export const QK = {
   screenerCachedResult: (strategyId: string, asOf?: string, ext?: string) => ['screener-cached', 'strategy', strategyId, asOf ?? '', ext ?? ''] as const,
   screenerCached:       (asOf?: string, ext?: string) => ['screener-cached', 'all', asOf ?? '', ext ?? ''] as const,
   screenerKlineBatch:   (symbols: string) => ['screener-kline-batch', symbols] as const,
-  /** 日内多盘扩展列迷你图序列 (集合竞价等): 列集 + 日期 + 标的集 */
+  /** 扩展列迷你图: 列集 (含显示周期和天数) + 日期 + 标的集。 */
+  extSeriesAll:        ['ext-series'] as const,
   extSeries:           (colsKey: string, date?: string | null, symbolsKey?: string) => ['ext-series', colsKey, date ?? '', symbolsKey ?? ''] as const,
   marketSnapshot:       ['market-snapshot'] as const,
   limitLadder:          (asOf?: string) => ['limit-ladder', asOf] as const,
