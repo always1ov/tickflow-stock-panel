@@ -6,19 +6,23 @@ import json
 import logging
 import math
 from datetime import date, timedelta
-from pathlib import Path
-from zoneinfo import ZoneInfo
 from functools import lru_cache
+from pathlib import Path
 from typing import Optional
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, HTTPException, Query, Request, Response
 
+from app.db_safe import is_valid_ext_ident
 from app.indicators.pipeline import compute_enriched, compute_enriched_single
 from app.market_time import cn_now, cn_today, in_continuous_session
-from app.price_limits import is_no_limit_day, is_risk_warning_name, parse_listing_date, price_limit_pct
-from app.db_safe import is_valid_ext_ident
-from app.services import kline_sync, trading_day
-from app.services import minute_adjust
+from app.price_limits import (
+    is_no_limit_day,
+    is_risk_warning_name,
+    parse_listing_date,
+    price_limit_pct,
+)
+from app.services import kline_sync, minute_adjust, trading_day
 
 logger = logging.getLogger(__name__)
 
@@ -97,7 +101,7 @@ def _name_pinyin_keys(name: str) -> tuple[str, ...]:
     非汉字字符原样保留: '万科A' -> ('WKA',)。
     股票名总量有限且不变, lru_cache 命中后单次查询 ≈ dict 查找, 全市场遍历 < 1ms。
     """
-    from pypinyin import pinyin, Style
+    from pypinyin import Style, pinyin
     if not name:
         return ()
     keys = [""]
@@ -630,8 +634,9 @@ def get_daily_batch(request: Request, body: dict):
     days = max(5, min(60, days))
 
     repo = request.app.state.repo
-    import polars as pl
     from datetime import timedelta
+
+    import polars as pl
 
     # 窗口右端必须是北京今天: QuoteService 当日 flush 的分区日期是北京交易日。
     # 美西主机整个 A 股交易时段、UTC 主机北京 00:00-08:00, date.today() 比北京早一天,
@@ -693,7 +698,9 @@ def get_minute_batch(request: Request, body: dict):
     - 需 Pro+ 权限 (kline.minute.batch)
     """
     from datetime import datetime
+
     import polars as pl
+
     from app.tickflow.capabilities import Cap
 
     symbols: list[str] = body.get("symbols", [])
@@ -1228,8 +1235,14 @@ async def trigger_minute_sync(repo, capset, *, override_days=None, extend_flag=N
     """触发分钟K同步/向前扩展后台任务(HTTP 端点与 AI 助手共用同一条触发路径)。"""
     import asyncio
 
-    from app.services.pipeline_jobs import JobCancelledError, job_store, release_run_slot, run_with_capacity, try_acquire_run_slot
     from app.api.data import invalidate_storage_cache
+    from app.services.pipeline_jobs import (
+        JobCancelledError,
+        job_store,
+        release_run_slot,
+        run_with_capacity,
+        try_acquire_run_slot,
+    )
     from app.services.preferences import get_minute_sync_days
     from app.tickflow.capabilities import Cap
     from app.tickflow.pools import get_pool
@@ -1252,19 +1265,19 @@ async def trigger_minute_sync(repo, capset, *, override_days=None, extend_flag=N
 
         try:
             progress("sync_minute", 5, "解析标的池…")
-            universe = sorted(set(get_pool("watchlist")) | set(get_pool("CN_Equity_A")))
-            # 补充 instruments 全量标的，覆盖北交所、新股等
+            # 标的池 = instruments 维表 + 自选 (单一来源, 不拉 CN_Equity_A/SW1 池)
+            universe: set[str] = set(get_pool("watchlist"))
             inst_path = repo.store.data_dir / "instruments" / "instruments.parquet"
             if inst_path.exists():
                 try:
                     import polars as pl
                     inst = pl.read_parquet(inst_path, columns=["symbol"])
-                    universe = sorted(set(universe) | set(inst["symbol"].to_list()))
+                    universe.update(inst["symbol"].to_list())
                 except Exception:  # noqa: BLE001
                     pass
             # 剔除指数 symbol: 指数分钟K无本地存储, 落库会污染 kline_minute
             index_set = repo.get_index_symbol_set()
-            universe = [s for s in universe if s not in index_set]
+            universe = sorted({s for s in universe if s not in index_set})
             progress("sync_minute", 10, f"标的池 {len(universe)} 只")
 
             days = override_days if override_days else get_minute_sync_days()
@@ -1445,9 +1458,15 @@ async def extend_history(request: Request):
         if not capset.has(Cap.KLINE_DAILY_BATCH):
             raise HTTPException(status_code=403, detail="需要 Pro+ 权限 (batch K-line)")
 
-        from app.services.extend_history import run_extend_history
-        from app.services.pipeline_jobs import JobCancelledError, job_store, release_run_slot, run_with_capacity, try_acquire_run_slot
         from app.api.data import invalidate_storage_cache
+        from app.services.extend_history import run_extend_history
+        from app.services.pipeline_jobs import (
+            JobCancelledError,
+            job_store,
+            release_run_slot,
+            run_with_capacity,
+            try_acquire_run_slot,
+        )
 
         job_id, is_new = job_store.create()
         if not is_new:
@@ -1526,9 +1545,15 @@ async def repair_daily(request: Request):
         if not capset.has(Cap.KLINE_DAILY_BATCH):
             raise HTTPException(status_code=403, detail="需要 Pro+ 权限 (batch K-line)")
 
-        from app.services.repair_daily import run_repair_daily
-        from app.services.pipeline_jobs import JobCancelledError, job_store, release_run_slot, run_with_capacity, try_acquire_run_slot
         from app.api.data import invalidate_storage_cache
+        from app.services.pipeline_jobs import (
+            JobCancelledError,
+            job_store,
+            release_run_slot,
+            run_with_capacity,
+            try_acquire_run_slot,
+        )
+        from app.services.repair_daily import run_repair_daily
 
         job_id, is_new = job_store.create()
         if not is_new:
@@ -1589,8 +1614,14 @@ async def rebuild_enriched(request: Request):
     try:
         repo = request.app.state.repo
 
-        from app.services.pipeline_jobs import JobCancelledError, job_store, release_run_slot, run_with_capacity, try_acquire_run_slot
         from app.api.data import invalidate_storage_cache
+        from app.services.pipeline_jobs import (
+            JobCancelledError,
+            job_store,
+            release_run_slot,
+            run_with_capacity,
+            try_acquire_run_slot,
+        )
 
         job_id, is_new = job_store.create()
         if not is_new:
@@ -1664,4 +1695,5 @@ async def rebuild_enriched(request: Request):
 
 # 长时间任务专用线程池（隔离于 FastAPI 默认线程池，防止阻塞请求处理）
 import concurrent.futures as _cf
+
 _long_task_executor = _cf.ThreadPoolExecutor(max_workers=2, thread_name_prefix="long-task")
