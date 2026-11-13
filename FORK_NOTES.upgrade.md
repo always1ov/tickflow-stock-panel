@@ -16,6 +16,8 @@
 
 | R573 | v0.3.11 | 2026-11-13 | sync/upstream-v0.3.11-tree | 0 | 0 | 零冲突。上游改动集中在 `indicators/pipeline.py` 全量重建的日期覆盖校验：新增 `daily_dates`（日K现存分区），孤儿分区（enriched 有而日K已无）改为告警放行且保留原地，`missing_dates` 只在 `existing_dates & daily_dates` 上校验 —— 修「发布中断 → 强制全量重建」与孤儿分区互相锁死、同步永久失败。fork 无自有改动，整份取上游；其余为版本号与发布脚本 | 后端 5526 通过 / 12 项失败=已裁决豁免的 UI 字号守卫（`test_ui_hierarchy` 8 + `test_design_spec` 4），`test_scoring_frozen` 通过；前端 build 4.36s、vitest 345 通过；`VERSION` 与 `package.json` 均 0.3.11 | `git reset --hard fork-pre-v0.3.11` |
 
+| R574 | v0.3.12 | 2026-11-13 | sync/upstream-v0.3.12-tree | 2（C0 2） | 0 | 两处冲突均为「同一位置各自新增」：①`api/settings.py` 尾部 fork 的 `data-doctor` 扫描/补齐接口 (R271) 与上游「复盘系统提示词」GET/PUT 接口并存；②`services/preferences.py` fork 的今日总览 AI 定时 (R435 后仅剩 `today_ai_schedule`) 与上游 `market_recap_system_prompt` 读写函数并存。其余整份取上游：`index_sync.py` 自定义指数日线同步大改、`market_recap.py` 支持自定义提示词、`api.ts` 补对应接口、`custom/review/extension.tsx` 新增复盘提示词编辑入口。该扩展页写死 `text-[10/11px]` 改为 `text-micro`，UI 守卫维持 12 项豁免 | 后端 5543 通过 / 12 项失败=已裁决豁免的 UI 字号守卫，`test_scoring_frozen` 通过；前端 build 4.72s、vitest 345 通过；`VERSION` 与 `package.json` 均 0.3.12 | `git reset --hard fork-pre-v0.3.12` |
+
 ## 待办登记
 
 - `test_design_spec`（写死字号 42→49）、`test_ui_hierarchy`（`Data.tsx` 的 `text-[10px]`）：用户裁决升级期豁免，升级完成后统一恢复。
