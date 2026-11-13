@@ -19,6 +19,7 @@ import { fmtPrice, fmtPct, fmtBigNum, priceColorClass, formatExtNumber, fmtAsset
 import { cn } from '@/lib/cn'
 import { computeGroupPcts, loadGroupStatsConfig, type GroupStatsConfigPatch } from '@/lib/watchlistGroupStats'
 import { PageHeader } from '@/components/PageHeader'
+import { SEG, SEG_ITEM, SEG_OFF, SEG_ON } from '@/components/ui'
 import { EmptyState } from '@/components/EmptyState'
 import { StockPreviewDialog } from '@/components/StockPreviewDialog'
 import { QuoteFreshnessBadge } from '@/components/QuoteFreshnessBadge'
@@ -793,13 +794,11 @@ export function Watchlist() {
   // 计算 ext 列参数
   const extColumnsParam = useMemo(() => buildExtColumnsParam(columns, extSchema.data?.items), [columns, extSchema.data])
 
-  const toggleView = useCallback(() => {
+  // [R605] 视图分段: 表格 / 卡片 写盘, 分组卡片是临时模式不写盘
+  const selectView = useCallback((mode: 'table' | 'card') => {
     setGroupCardsOpen(false)
-    setViewMode(v => {
-      const next = v === 'table' ? 'card' : 'table'
-      storage.watchlistView.set(next)
-      return next
-    })
+    setViewMode(mode)
+    storage.watchlistView.set(mode)
   }, [])
   // 分组卡片: 整页临时展示, 开关不触碰个股视图设置
   const toggleGroupView = useCallback(() => {
@@ -1474,28 +1473,7 @@ export function Watchlist() {
         }
         right={
           <div className="flex flex-wrap items-center gap-2">
-            {/* 筛选 / 重置 / 搜索 */}
-            <button
-              onClick={() => setFilterOpen(v => !v)}
-              className={`inline-flex items-center justify-center h-8 w-8 rounded-btn transition-colors duration-150 ease-smooth ${
-                filterOpen || hasActiveFilters
-                  ? 'bg-accent/15 text-accent hover:bg-accent/25'
-                  : 'bg-elevated text-secondary hover:bg-elevated/80'
-              }`}
-              title={`筛选${activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}`}
-            >
-              <Filter className="h-4 w-4" />
-            </button>
-            {hasActiveFilters && (
-              <button
-                onClick={resetAllFilters}
-                className="inline-flex items-center justify-center h-8 w-8 rounded-btn bg-elevated text-secondary hover:bg-danger/10 hover:text-danger transition-colors duration-150 ease-smooth"
-                title="重置全部筛选"
-                aria-label="重置全部筛选"
-              >
-                <RotateCcw className="h-4 w-4" />
-              </button>
-            )}
+            {/* 搜索 */}
             <StockSearchBox
               onPreview={(sym, name) => { setPreviewSymbol(sym); setPreviewName(name) }}
               existingBySymbol={groupBySymbol}
@@ -1513,43 +1491,6 @@ export function Watchlist() {
               aria-label="批量导入自选"
             >
               <FileUp className="h-4 w-4" />
-            </button>
-            <div className="w-px h-5 bg-border" />
-            {/* 视图 */}
-            <button
-              onClick={toggleView}
-              className="inline-flex items-center justify-center h-8 w-8 rounded-btn bg-elevated hover:bg-elevated/80 text-secondary hover:text-foreground transition-colors duration-150 ease-smooth"
-              title={viewMode === 'table' ? '卡片视图' : '列表视图'}
-            >
-              {viewMode === 'table' ? <LayoutGrid className="h-4 w-4" /> : <List className="h-4 w-4" />}
-            </button>
-            {/* 分组卡片视图 */}
-            <button
-              onClick={toggleGroupView}
-              aria-pressed={groupCardsOpen}
-              className={`inline-flex items-center justify-center h-8 w-8 rounded-btn transition-colors duration-150 ease-smooth ${
-                groupCardsOpen
-                  ? 'bg-accent/15 text-accent hover:bg-accent/25'
-                  : 'bg-elevated text-secondary hover:bg-elevated/80 hover:text-foreground'
-              }`}
-              title={groupCardsOpen ? '退出分组卡片' : '分组卡片视图'}
-              aria-label={groupCardsOpen ? '退出分组卡片' : '分组卡片视图'}
-            >
-              <Rows3 className="h-4 w-4" />
-            </button>
-            {/* 分组统计条 */}
-            <button
-              onClick={toggleGroupStats}
-              aria-pressed={groupStatsOpen}
-              className={`inline-flex items-center justify-center h-8 w-8 rounded-btn transition-colors duration-150 ease-smooth ${
-                groupStatsOpen
-                  ? 'bg-accent/15 text-accent hover:bg-accent/25'
-                  : 'bg-elevated text-secondary hover:bg-elevated/80 hover:text-foreground'
-              }`}
-              title={groupStatsOpen ? '收起分组统计' : '分组统计'}
-              aria-label={groupStatsOpen ? '收起分组统计' : '分组统计'}
-            >
-              <BarChart3 className="h-4 w-4" />
             </button>
             <div className="w-px h-5 bg-border" />
             {/* 自定义列 / 刷新 */}
@@ -1594,32 +1535,66 @@ export function Watchlist() {
         }
       />
 
-      {groupStatsOpen && (
-        <WatchlistGroupStatsBar
-          groups={groups}
-          counts={groupCounts}
-          pcts={groupPcts}
-          selected={selectedGroup}
-          onSelect={handleGroupSelect}
-          config={groupStatsConfig}
-          onConfigChange={updateGroupStatsConfig}
-        />
-      )}
-
-      <WatchlistGroupBar
-        entries={listEntries}
-        groups={groups}
-        counts={groupCounts}
-        selected={selectedGroup}
-        total={allSymbols.length}
-        pcts={groupPcts}
-        onSelect={handleGroupSelect}
-        onCreate={(name, color) => createGroup.mutateAsync({ name, color }).then(() => undefined)}
-        onRename={(groupId, name, color) => renameGroup.mutateAsync({ groupId, name, color }).then(() => undefined)}
-        onDelete={groupId => deleteGroup.mutateAsync(groupId).then(() => undefined)}
-        onClearGroup={groupId => clearGroup.mutateAsync(groupId).then(() => undefined)}
-        onReorder={orderedIds => reorderGroup.mutateAsync(orderedIds).then(() => undefined)}
-      />
+      {/* [R605] 工具条: 「怎么看」与「怎么筛」独立成一行, 页头只留搜索与数据动作 */}
+      <div className="flex flex-wrap items-center gap-2 px-5 py-2 border-b border-border/60 bg-surface/40">
+        <div className={SEG} role="group" aria-label="视图切换">
+          <button
+            onClick={() => selectView('table')}
+            aria-pressed={!groupCardsOpen && viewMode === 'table'}
+            className={cn(SEG_ITEM, !groupCardsOpen && viewMode === 'table' ? SEG_ON : SEG_OFF)}
+          >
+            <List className="h-3.5 w-3.5" />表格
+          </button>
+          <button
+            onClick={() => selectView('card')}
+            aria-pressed={!groupCardsOpen && viewMode === 'card'}
+            className={cn(SEG_ITEM, !groupCardsOpen && viewMode === 'card' ? SEG_ON : SEG_OFF)}
+          >
+            <LayoutGrid className="h-3.5 w-3.5" />卡片
+          </button>
+          <button
+            onClick={toggleGroupView}
+            aria-pressed={groupCardsOpen}
+            className={cn(SEG_ITEM, groupCardsOpen ? SEG_ON : SEG_OFF)}
+          >
+            <Rows3 className="h-3.5 w-3.5" />分组卡片
+          </button>
+        </div>
+        <button
+          onClick={toggleGroupStats}
+          aria-pressed={groupStatsOpen}
+          className={`inline-flex h-8 items-center gap-1 rounded-btn border px-2.5 text-micro transition-colors duration-150 ease-smooth ${
+            groupStatsOpen
+              ? 'border-accent/30 bg-accent/15 text-accent'
+              : 'border-border bg-elevated text-secondary hover:text-foreground'
+          }`}
+        >
+          <BarChart3 className="h-3.5 w-3.5" />分组统计
+        </button>
+        <div className="flex-1" />
+        <button
+          onClick={() => setFilterOpen(v => !v)}
+          aria-expanded={filterOpen}
+          className={`inline-flex h-8 items-center gap-1 rounded-btn border px-2.5 text-micro transition-colors duration-150 ease-smooth ${
+            filterOpen || hasActiveFilters
+              ? 'border-accent/30 bg-accent/15 text-accent'
+              : 'border-border bg-elevated text-secondary hover:text-foreground'
+          }`}
+        >
+          <Filter className="h-3.5 w-3.5" />筛选
+          {activeFilterCount > 0 && <span className="font-mono">{activeFilterCount}</span>}
+        </button>
+        {hasActiveFilters && (
+          <button
+            onClick={resetAllFilters}
+            className="inline-flex items-center justify-center h-8 w-8 rounded-btn bg-elevated text-secondary hover:bg-danger/10 hover:text-danger transition-colors duration-150 ease-smooth"
+            title="重置全部筛选"
+            aria-label="重置全部筛选"
+          >
+            <RotateCcw className="h-4 w-4" />
+          </button>
+        )}
+      </div>
 
       {/* 筛选栏 */}
       {filterOpen && (
@@ -1710,6 +1685,33 @@ export function Watchlist() {
         </div>
       )}
 
+
+      <WatchlistGroupBar
+        entries={listEntries}
+        groups={groups}
+        counts={groupCounts}
+        selected={selectedGroup}
+        total={allSymbols.length}
+        pcts={groupPcts}
+        onSelect={handleGroupSelect}
+        onCreate={(name, color) => createGroup.mutateAsync({ name, color }).then(() => undefined)}
+        onRename={(groupId, name, color) => renameGroup.mutateAsync({ groupId, name, color }).then(() => undefined)}
+        onDelete={groupId => deleteGroup.mutateAsync(groupId).then(() => undefined)}
+        onClearGroup={groupId => clearGroup.mutateAsync(groupId).then(() => undefined)}
+        onReorder={orderedIds => reorderGroup.mutateAsync(orderedIds).then(() => undefined)}
+      />
+
+      {groupStatsOpen && (
+        <WatchlistGroupStatsBar
+          groups={groups}
+          counts={groupCounts}
+          pcts={groupPcts}
+          selected={selectedGroup}
+          onSelect={handleGroupSelect}
+          config={groupStatsConfig}
+          onConfigChange={updateGroupStatsConfig}
+        />
+      )}
       {/* 可滚动列表区 — 占满剩余高度，内部独立滚动，表头 sticky 固定 */}
       <div className="flex-1 min-h-0 overflow-y-auto">
         <div className="px-5 py-3">
