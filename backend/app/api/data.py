@@ -646,6 +646,8 @@ def status(request: Request) -> dict:
         "last_instruments_run": _last_finished("instruments"),
         "last_pipeline_run":    _last_finished("pipeline"),
         "checked_at": datetime.now(UTC).isoformat(timespec="seconds").replace("+00:00", "Z"),
+        # 同步/修复期间同样可能返回 null 统计, 不可把它当成无本地数据。
+        "stats_pending": busy,
         # 指标缓存就绪标志 (启动时 enriched 异步预热, 完成前为 false)
         "indicators_ready": getattr(request.app.state, "indicators_ready", True),
         # 数据目录持久化自检 (启动时检测; false = 容器内未挂卷, 重建容器丢全部数据)

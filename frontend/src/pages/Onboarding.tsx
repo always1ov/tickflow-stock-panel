@@ -348,7 +348,10 @@ function DataSourceStep({ onNext, onBack }: { onNext: () => void; onBack: () => 
       realtime_data_provider: 'fuyao',
       adj_factor_provider: 'fuyao',
     }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: QK.preferences }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: QK.preferences })
+      qc.invalidateQueries({ queryKey: QK.quoteStatus })
+    },
   })
 
   // 常驻展开的两个 Key 表单元数据 (卡片只读, Key 是向导里唯一可操作项)

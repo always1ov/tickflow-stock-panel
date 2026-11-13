@@ -337,10 +337,24 @@ export function SettingsAIPanel({ highlight }: { highlight?: string } = {}) {
     setTesting(true)
     setTestResult(null)
     try {
-      // 档位接管时测试的是档位链本身, 不该顺手把旧单档配置写回去
-      if (canSave && !profilesManaged) await api.saveAiSettings(payload())
-      const r = await api.strategyAiTest()
-      setTestResult({ ok: r.ok, msg: r.ok ? `连通成功 · ${r.model ?? provider}` : (r.error ?? '未知错误') })
+      // 只探测当前表单值, 绝不保存 — 测试失败不能把坏配置写进已保存配置。
+      // [R583 同步上游 v0.3.21] 档位接管时仍测档位链本身 (fork 的档位特性不变)。
+      const r = profilesManaged
+        ? await api.strategyAiTest()
+        : await api.testAiSettings(
+          {
+            provider,
+            ...(isCodexProvider ? {} : { base_url: baseUrl.trim() }),
+            model: (isCodexProvider ? codexModel : model).trim(),
+            ...(apiKey.trim() ? { api_key: apiKey.trim() } : {}),
+          },
+          // codex 探测是真实最小 exec (CLI 启动+一次生成), 默认 30s 会掐断
+          isCodexProvider ? { timeoutMs: 90_000 } : undefined,
+        )
+      setTestResult({
+        ok: r.ok,
+        msg: r.ok ? `连通成功 · ${r.model ?? provider}` : (r.error ?? '未知错误'),
+      })
     } catch (e: any) {
       setTestResult({ ok: false, msg: String(e?.message ?? '测试失败') })
     } finally {
