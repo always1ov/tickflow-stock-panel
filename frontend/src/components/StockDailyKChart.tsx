@@ -126,7 +126,7 @@ function ChartPill({
       aria-pressed={active}
       onClick={onClick}
       title={title}
-      className={`px-2 py-0.5 rounded text-micro font-mono cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
+      className={`px-2 py-0.5 rounded-btn text-micro font-mono cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
         active ? activeClass : 'bg-elevated text-secondary hover:text-foreground'
       }`}
     >
@@ -254,7 +254,7 @@ export function StockDailyKChart({
                 value={volumeCompare.days}
                 disabled={!volumeCompare.enabled}
                 onChange={event => updateVolumeCompare({ days: Number(event.target.value) })}
-                className="h-5 rounded border border-border bg-base px-1 text-micro text-secondary outline-none disabled:opacity-40"
+                className="h-5 rounded-btn border border-border bg-base px-1 text-micro text-secondary outline-none disabled:opacity-40"
               >
                 {Array.from({ length: 20 }, (_, index) => index + 1).map(days => (
                   <option key={days} value={days}>前{days}日均量</option>
@@ -278,7 +278,7 @@ export function StockDailyKChart({
                   value={markerStyle}
                   disabled={!showMarkers}
                   onChange={event => updateMarkerStyle(event.target.value as DailyMarkerStyle)}
-                  className="h-5 w-[74px] rounded border border-border bg-base px-1 text-micro text-secondary outline-none focus-visible:ring-2 focus-visible:ring-accent/60 disabled:opacity-40"
+                  className="h-5 w-[74px] rounded-btn border border-border bg-base px-1 text-micro text-secondary outline-none focus-visible:ring-2 focus-visible:ring-accent/60 disabled:opacity-40"
                 >
                   <option value="label">文字</option>
                   <option value="candle">颜色</option>

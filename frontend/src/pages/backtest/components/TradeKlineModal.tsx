@@ -168,14 +168,14 @@ export function TradeKlineModal({ trade, assetType, navItems, currentKey, onNavi
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.97, y: 8 }}
             transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-            className="relative flex max-h-[94dvh] w-[96vw] max-w-[1600px] flex-col overflow-hidden rounded-card border border-border bg-base shadow-2xl"
+            className="relative flex max-h-[94dvh] w-[96vw] max-w-wide flex-col overflow-hidden rounded-card border border-border bg-base shadow-2xl"
           >
             <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3 border-b border-border px-4 py-3 sm:px-5">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                   <span className={cn('font-mono', TYPE.section)}>{trade.symbol}</span>
                   <span className="truncate text-sm text-foreground">{trade.name || '交易回放'}</span>
-                  <span className="rounded border border-accent/30 bg-accent/10 px-1.5 py-0.5 text-micro text-accent">交易回放</span>
+                  <span className="rounded-btn border border-accent/30 bg-accent/10 px-1.5 py-0.5 text-micro text-accent">交易回放</span>
 
                   {/* 切交易: 上一笔 / n·N / 下一笔 */}
                   <NavPager nav={nav} prevLabel="上一笔" nextLabel="下一笔" />
@@ -183,13 +183,13 @@ export function TradeKlineModal({ trade, assetType, navItems, currentKey, onNavi
                 <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-micro text-muted">
                   <button type="button" aria-label="查看买入日" title="查看买入日分时"
                     onClick={() => selectDate(entryDay)}
-                    className="rounded px-1 py-0.5 text-bull transition-colors hover:bg-bull/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60">
+                    className="rounded-btn px-1 py-0.5 text-bull transition-colors hover:bg-bull/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60">
                     {String(trade.entry_date).replace('T', ' ').slice(0, 16)} 买入
                   </button>
                   <span aria-hidden="true">→</span>
                   <button type="button" aria-label="查看卖出日" title="查看卖出日分时"
                     onClick={() => selectDate(exitDay)}
-                    className="rounded px-1 py-0.5 text-bear transition-colors hover:bg-bear/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60">
+                    className="rounded-btn px-1 py-0.5 text-bear transition-colors hover:bg-bear/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60">
                     {String(trade.exit_date).replace('T', ' ').slice(0, 16)} 卖出
                   </button>
                   <span>· 持仓 {trade.duration ?? '—'} 天</span>

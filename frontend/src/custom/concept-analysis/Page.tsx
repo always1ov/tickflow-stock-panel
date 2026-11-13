@@ -437,7 +437,7 @@ export function ConceptAnalysis() {
               <ConceptFocus stat={selected} activeSymbol={previewSymbol} onStockClick={handleStockClick} />
             </div>
           ) : rowsQuery.isLoading ? (
-            <div className="rounded-2xl border border-border bg-surface px-6 py-16 text-center text-sm text-muted">正在计算概念强度...</div>
+            <div className="rounded-dialog border border-border bg-surface px-6 py-16 text-center text-sm text-muted">正在计算概念强度...</div>
           ) : needsConceptFetch ? (
             <PresetFetchState
               title="未获取概念数据"
@@ -510,20 +510,20 @@ function HeroMetric({ icon: Icon, label, value, hint, tone }: {
   const toneClass = {
     up: 'text-bull bg-bull/10',
     down: 'text-bear bg-bear/10',
-    gold: 'text-amber-300 bg-amber-400/10',
+    gold: 'text-warning bg-warning/10',
     blue: 'text-blue-300 bg-blue-400/10',
   }[tone]
   const valueClass = {
     up: 'text-bull',
     down: 'text-bear',
-    gold: 'text-amber-300',
+    gold: 'text-warning',
     blue: 'text-foreground',
   }[tone]
   return (
-    <div className="rounded-xl border border-border bg-surface px-3 py-2">
+    <div className="rounded-dialog border border-border bg-surface px-3 py-2">
       <div className="flex items-center justify-between text-micro text-muted">
         <span>{label}</span>
-        <span className={cn('rounded-md p-1', toneClass)}><Icon className="h-3.5 w-3.5" /></span>
+        <span className={cn('rounded-btn p-1', toneClass)}><Icon className="h-3.5 w-3.5" /></span>
       </div>
       <div className={cn('mt-1 truncate text-xl font-semibold tabular-nums', valueClass)}>{value}</div>
       <div className="mt-0.5 truncate text-micro text-muted">{hint}</div>
@@ -577,7 +577,7 @@ function PulseList({
   const toneHover = mode === 'up' ? 'hover:border-bull/35' : 'hover:border-bear/35'
 
   return (
-    <div className={cn('rounded-xl border bg-base/35 p-2', toneBorder)}>
+    <div className={cn('rounded-dialog border bg-base/35 p-2', toneBorder)}>
       <div className="mb-1.5 flex items-center justify-between px-1">
         <div className={cn('flex items-center gap-1.5 text-xs font-medium', toneText)}>
           {mode === 'up' ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
@@ -598,14 +598,14 @@ function PulseList({
               key={item.key}
               onClick={() => onSelect(item.key)}
               className={cn(
-                'block w-full rounded-lg border border-transparent bg-surface/45 px-2 py-1.5 text-left transition-colors',
+                'block w-full rounded-card border border-transparent bg-surface/45 px-2 py-1.5 text-left transition-colors',
                 active ? cn('bg-blue-400/[0.08]', toneBorder) : cn('hover:bg-elevated/35', toneHover),
               )}
             >
               <div className="grid gap-2 md:grid-cols-[minmax(0,0.9fr)_minmax(16rem,1.1fr)] md:items-center">
                 <div className="min-w-0">
                   <div className="flex min-w-0 items-center gap-2">
-                    <span className={cn('flex h-5 w-5 shrink-0 items-center justify-center rounded-md font-mono text-micro', idx < 3 ? cn(toneBg, toneText) : 'bg-elevated/70 text-muted')}>{idx + 1}</span>
+                    <span className={cn('flex h-5 w-5 shrink-0 items-center justify-center rounded-btn font-mono text-micro', idx < 3 ? cn(toneBg, toneText) : 'bg-elevated/70 text-muted')}>{idx + 1}</span>
                     <div className="min-w-0 flex-1">
                       <div className="flex min-w-0 items-center gap-2">
                         <span className="truncate text-xs font-medium text-foreground">{item.key}</span>
@@ -630,13 +630,13 @@ function PulseList({
                   {Array.from({ length: 3 }).map((_, i) => {
                     const stock = leaders[i]
                     return stock ? (
-                      <span key={stock.symbol} title={stock.name || stock.symbol} onClick={e => { e.stopPropagation(); onStockClick(stock.symbol, stock.name || undefined, toNavItems(sortedStocks.slice(0, MAX_RENDERED_STOCKS))) }} className={cn('flex min-w-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-micro cursor-pointer hover:brightness-125', i === 0 ? 'bg-amber-300/10 text-foreground' : 'bg-elevated/60 text-secondary', stock.symbol === activeSymbol && 'ring-1 ring-accent/60')}>
+                      <span key={stock.symbol} title={stock.name || stock.symbol} onClick={e => { e.stopPropagation(); onStockClick(stock.symbol, stock.name || undefined, toNavItems(sortedStocks.slice(0, MAX_RENDERED_STOCKS))) }} className={cn('flex min-w-0 items-center gap-1 rounded-btn px-1.5 py-0.5 text-micro cursor-pointer hover:brightness-125', i === 0 ? 'bg-warning/10 text-foreground' : 'bg-elevated/60 text-secondary', stock.symbol === activeSymbol && 'ring-1 ring-accent/60')}>
                         <span className="flex min-w-0 items-center gap-1">
                           <span className="min-w-0 truncate font-medium">{stock.name || stock.symbol}</span>
                         </span>
                         <span className={cn('shrink-0 font-mono', priceColorClass(stock.change_pct))}>{stock.change_pct != null ? fmtPct(stock.change_pct) : '—'}</span>
                       </span>
-                    ) : <span key={i} className="rounded-md bg-elevated/30 px-1.5 py-0.5 text-micro text-muted/40">—</span>
+                    ) : <span key={i} className="rounded-btn bg-elevated/30 px-1.5 py-0.5 text-micro text-muted/40">—</span>
                   })}
                 </div>
               </div>
@@ -666,7 +666,7 @@ function ConceptRail({
   onSelect: (v: string) => void
 }) {
   return (
-    <section className="rounded-2xl border border-border bg-surface p-2.5">
+    <section className="rounded-dialog border border-border bg-surface p-2.5">
       <div className="px-1 pb-2.5">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-semibold text-foreground">概念矩阵</h3>
@@ -674,9 +674,9 @@ function ConceptRail({
         </div>
         <div className="mt-2 relative">
           <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted" />
-          <input value={search} onChange={e => onSearch(e.target.value)} placeholder="搜索概念" className="h-8 w-full rounded-lg border border-border bg-base pl-8 pr-3 text-xs text-foreground outline-none focus:border-accent/50" />
+          <input value={search} onChange={e => onSearch(e.target.value)} placeholder="搜索概念" className="h-8 w-full rounded-card border border-border bg-base pl-8 pr-3 text-xs text-foreground outline-none focus:border-accent/50" />
         </div>
-        <div className="mt-2 grid grid-cols-5 overflow-hidden rounded-lg border border-border text-micro">
+        <div className="mt-2 grid grid-cols-5 overflow-hidden rounded-card border border-border text-micro">
           {([
             ['heat', '强度'], ['avgPct', '涨幅'], ['leader', '龙头'], ['amount', '成交'], ['down', '跌幅'],
           ] as [SortMode, string][]).map(([key, label]) => (
@@ -684,7 +684,7 @@ function ConceptRail({
           ))}
         </div>
       </div>
-      <div className="max-h-[620px] overflow-auto rounded-lg border border-border/50">
+      <div className="max-h-[620px] overflow-auto rounded-card border border-border/50">
         {stats.map(item => {
           const active = selectedKey === item.key
           return (
@@ -713,7 +713,7 @@ function ConceptFocus({ stat, onStockClick, activeSymbol }: { stat: ConceptStat 
   const topLeaders = stocks.slice(0, 3)
   const focusNav: NavItem[] = toNavItems(stocks)
   return (
-    <section className="flex max-h-[720px] flex-col overflow-hidden rounded-2xl border border-border bg-surface">
+    <section className="flex max-h-[720px] flex-col overflow-hidden rounded-dialog border border-border bg-surface">
       <div className="shrink-0 border-b border-border px-5 py-4">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0">
@@ -773,8 +773,8 @@ function ConceptFocus({ stat, onStockClick, activeSymbol }: { stat: ConceptStat 
                 <td className="px-4 py-2 font-mono text-foreground">{s.vol_ratio_5d != null ? s.vol_ratio_5d.toFixed(2) : '—'}</td>
                 <td className="px-4 py-2">
                   <div className="flex items-center gap-2">
-                    <span className="w-9 font-mono text-amber-300">{s.leaderScore.toFixed(0)}</span>
-                    <div className="h-1.5 w-16 rounded-full bg-elevated"><div className="h-full rounded-full bg-amber-300" style={{ width: `${Math.max(4, s.leaderScore)}%` }} /></div>
+                    <span className="w-9 font-mono text-warning">{s.leaderScore.toFixed(0)}</span>
+                    <div className="h-1.5 w-16 rounded-full bg-elevated"><div className="h-full rounded-full bg-warning" style={{ width: `${Math.max(4, s.leaderScore)}%` }} /></div>
                   </div>
                 </td>
               </tr>
@@ -788,23 +788,23 @@ function ConceptFocus({ stat, onStockClick, activeSymbol }: { stat: ConceptStat 
 }
 
 function MiniStat({ label, value, cls }: { label: string; value: string; cls: string }) {
-  return <div className="rounded-lg border border-border/60 bg-base/35 px-2 py-1.5"><div className="text-micro text-muted">{label}</div><div className={cn('mt-0.5 truncate text-sm font-semibold', cls)}>{value}</div></div>
+  return <div className="rounded-card border border-border/60 bg-base/35 px-2 py-1.5"><div className="text-micro text-muted">{label}</div><div className={cn('mt-0.5 truncate text-sm font-semibold', cls)}>{value}</div></div>
 }
 
 function LeaderStage({ stocks, onStockClick, activeSymbol }: { stocks: EnrichedStock[]; onStockClick: (symbol: string, name?: string) => void; activeSymbol: string | null }) {
-  if (!stocks.length) return <div className="rounded-xl border border-border/60 bg-surface p-4 text-sm text-muted">暂无龙头候选</div>
+  if (!stocks.length) return <div className="rounded-dialog border border-border/60 bg-surface p-4 text-sm text-muted">暂无龙头候选</div>
   return (
-    <div className="rounded-xl border border-border/60 bg-surface p-3">
-      <div className="mb-2 flex items-center gap-2 text-xs font-medium text-amber-300">
+    <div className="rounded-dialog border border-border/60 bg-surface p-3">
+      <div className="mb-2 flex items-center gap-2 text-xs font-medium text-warning">
         <Crown className="h-3.5 w-3.5" />
         本概念三龙头
       </div>
       <div className="grid gap-2 md:grid-cols-3">
         {stocks.map((stock, idx) => (
-          <div key={stock.symbol} onClick={() => onStockClick(stock.symbol, stock.name || undefined)} className={cn('rounded-lg border p-3 cursor-pointer hover:brightness-110 transition-ui', idx === 0 ? 'border-amber-400/25 bg-amber-400/[0.06]' : 'border-border/60 bg-base/35', stock.symbol === activeSymbol && 'ring-1 ring-accent/60')}>
+          <div key={stock.symbol} onClick={() => onStockClick(stock.symbol, stock.name || undefined)} className={cn('rounded-card border p-3 cursor-pointer hover:brightness-110 transition-ui', idx === 0 ? 'border-warning/25 bg-warning/[0.06]' : 'border-border/60 bg-base/35', stock.symbol === activeSymbol && 'ring-1 ring-accent/60')}>
             <div className="flex items-center justify-between gap-2">
-              <span className={cn('text-micro font-medium', idx === 0 ? 'text-amber-300' : 'text-muted')}>{idx === 0 ? '主龙头' : `辅龙 ${idx}`}</span>
-              <span className="font-mono text-xs text-amber-300">{stock.leaderScore.toFixed(0)}</span>
+              <span className={cn('text-micro font-medium', idx === 0 ? 'text-warning' : 'text-muted')}>{idx === 0 ? '主龙头' : `辅龙 ${idx}`}</span>
+              <span className="font-mono text-xs text-warning">{stock.leaderScore.toFixed(0)}</span>
             </div>
             <div className="mt-2 truncate text-sm font-medium text-foreground">{stock.name || stock.symbol}</div>
             <div className="mt-0.5 flex items-center justify-between text-xs">
@@ -819,26 +819,26 @@ function LeaderStage({ stocks, onStockClick, activeSymbol }: { stocks: EnrichedS
 }
 
 function ScoreExplain({ stock }: { stock?: EnrichedStock }) {
-  if (!stock) return <div className="rounded-xl border border-border/60 bg-surface p-4 text-sm text-muted">暂无评分拆解</div>
+  if (!stock) return <div className="rounded-dialog border border-border/60 bg-surface p-4 text-sm text-muted">暂无评分拆解</div>
   const parts = stock.leaderParts
   return (
-    <div className="rounded-xl border border-border/60 bg-surface p-3">
+    <div className="rounded-dialog border border-border/60 bg-surface p-3">
       <div className="mb-2 flex items-center justify-between">
         <span className="text-xs font-medium text-foreground">主龙头评分拆解</span>
         <span className="text-xs text-muted">涨幅 / 换手 / 成交 / 市值 / 量比 / 连板</span>
       </div>
       <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
         <Part label="动能" value={parts.momentum} cls="bg-red-400" />
-        <Part label="换手" value={parts.turnover} cls="bg-orange-400" />
+        <Part label="换手" value={parts.turnover} cls="bg-warning" />
         <Part label="成交" value={parts.amount} cls="bg-blue-400" />
         <Part label="市值" value={parts.cap} cls="bg-cyan-400" />
         <Part label="量比" value={parts.volume} cls="bg-lime-400" />
-        <Part label="连板" value={parts.boards} cls="bg-amber-300" />
+        <Part label="连板" value={parts.boards} cls="bg-warning" />
       </div>
     </div>
   )
 }
 
 function Part({ label, value, cls }: { label: string; value: number; cls: string }) {
-  return <div className="rounded-lg bg-base/35 px-2 py-1.5"><div className="mb-1 flex justify-between text-micro text-muted"><span>{label}</span><span>{Math.round(value * 100)}</span></div><div className="h-1 rounded-full bg-elevated"><div className={cn('h-full rounded-full', cls)} style={{ width: `${Math.max(3, value * 100)}%` }} /></div></div>
+  return <div className="rounded-card bg-base/35 px-2 py-1.5"><div className="mb-1 flex justify-between text-micro text-muted"><span>{label}</span><span>{Math.round(value * 100)}</span></div><div className="h-1 rounded-full bg-elevated"><div className={cn('h-full rounded-full', cls)} style={{ width: `${Math.max(3, value * 100)}%` }} /></div></div>
 }

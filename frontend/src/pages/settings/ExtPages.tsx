@@ -190,7 +190,7 @@ function ExternalWebsiteSettings() {
           <div className="text-xs text-muted">
             抓通了：HTTP {rawPeek.status} · {rawPeek.content_type || '未知类型'} · {rawPeek.bytes} 字节 · 清洗后 {rawPeek.source_chars} 字
           </div>
-          <pre className="mt-2 max-h-56 overflow-auto whitespace-pre-wrap break-all rounded bg-elevated/40 p-2 text-micro leading-5 text-secondary">{rawPeek.preview.slice(0, 2000)}</pre>
+          <pre className="mt-2 max-h-56 overflow-auto whitespace-pre-wrap break-all rounded-btn bg-elevated/40 p-2 text-micro leading-5 text-secondary">{rawPeek.preview.slice(0, 2000)}</pre>
         </div>
       )}
 
@@ -393,7 +393,7 @@ export function SettingsExtPagesPanel() {
               <h3 className="text-sm font-medium text-foreground">{editingMenu ? '编辑扩展页面' : '新建扩展页面'}</h3>
               <p className="mt-1 text-micro text-muted">菜单标识保存后不可在此处直接修改，如需更换标识请新建页面。</p>
             </div>
-            <button onClick={() => { setShowForm(false); setError('') }} className="rounded p-1 text-muted hover:bg-elevated hover:text-foreground">
+            <button onClick={() => { setShowForm(false); setError('') }} className="rounded-btn p-1 text-muted hover:bg-elevated hover:text-foreground">
               <X className="h-4 w-4" />
             </button>
           </div>
@@ -507,17 +507,17 @@ export function SettingsExtPagesPanel() {
               <div>
                 <div className="flex items-center gap-2">
                   <h3 className="text-sm font-medium text-foreground">{menu.label}</h3>
-                  {menu.builtin && <span className="rounded bg-accent/10 px-1.5 py-0.5 text-micro text-accent">默认</span>}
-                  {!menu.visible && <span className="rounded bg-muted/10 px-1.5 py-0.5 text-micro text-muted">已隐藏</span>}
+                  {menu.builtin && <span className="rounded-btn bg-accent/10 px-1.5 py-0.5 text-micro text-accent">默认</span>}
+                  {!menu.visible && <span className="rounded-btn bg-muted/10 px-1.5 py-0.5 text-micro text-muted">已隐藏</span>}
                 </div>
                 <p className="mt-1 text-micro text-muted font-mono">{menu.id}</p>
               </div>
               <div className="flex items-center gap-1">
-                <button onClick={() => editMenu(menu)} className="p-1 rounded text-muted hover:text-accent hover:bg-accent/10" title="编辑">
+                <button onClick={() => editMenu(menu)} className="p-1 rounded-btn text-muted hover:text-accent hover:bg-accent/10" title="编辑">
                   <Pencil className="h-3.5 w-3.5" />
                 </button>
                 {!menu.builtin && (
-                  <button onClick={() => del.mutate(menu.id)} disabled={del.isPending} className="p-1 rounded text-muted hover:text-danger hover:bg-danger/10" title="删除">
+                  <button onClick={() => del.mutate(menu.id)} disabled={del.isPending} className="p-1 rounded-btn text-muted hover:text-danger hover:bg-danger/10" title="删除">
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
                 )}
@@ -546,7 +546,7 @@ export function SettingsExtPagesPanel() {
             <div key={`sk-${i}`} className="rounded-card border border-border bg-surface p-4 space-y-3">
               <Skeleton w="w-1/2" h="h-4" />
               <Skeleton w="w-1/3" h="h-3" />
-              <Skeleton h="h-8" rounded="rounded-btn" />
+              <Skeleton h="h-8" rounded-btn="rounded-btn" />
             </div>
           ))}
         {!menus.isLoading && menuItems.length === 0 && (

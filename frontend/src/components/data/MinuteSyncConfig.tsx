@@ -176,7 +176,7 @@ export function MinuteSyncConfig({ hasCap, onJobStart, onClose }: { hasCap: bool
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/60 pt-4">
         <div className="flex items-center gap-1.5">
           <span className="text-xs text-foreground font-medium">分段大小</span>
-          <span className="text-micro text-muted px-1 py-px rounded bg-warning/8 text-warning/80">内存优化</span>
+          <span className="text-micro text-muted px-1 py-px rounded-btn bg-warning/8 text-warning/80">内存优化</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="flex items-center">

@@ -31,7 +31,7 @@ export function ExtConfigExportButton({ id, label }: { id: string; label: string
   }
   return <button type="button" onClick={exportConfig} disabled={busy}
     aria-label={`导出${label}配置`} title="导出单表配置（不含 Key 和数据）"
-    className="inline-flex h-7 shrink-0 items-center gap-1 rounded-lg px-2.5 text-[10px] text-muted transition-colors hover:bg-elevated hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-50">
+    className="inline-flex h-7 shrink-0 items-center gap-1 rounded-card px-2.5 text-micro text-muted transition-colors hover:bg-elevated hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-50">
     {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />}
     {busy ? '导出中…' : '导出配置'}
   </button>
@@ -89,7 +89,7 @@ export function ExtConfigImportDialog({ onClose }: { onClose: () => void }) {
         <p className="mt-1 text-xs leading-5 text-secondary">一次导入一张表的配置，API Key 由接收方自行填写。</p>
       </div>
       <button type="button" aria-label="关闭" onClick={close} disabled={!!busy}
-        className="shrink-0 rounded-md p-1 text-secondary hover:bg-elevated focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-50"><X className="h-4 w-4" /></button>
+        className="shrink-0 rounded-btn p-1 text-secondary hover:bg-elevated focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-50"><X className="h-4 w-4" /></button>
     </div>
     <div className="space-y-4 overflow-y-auto px-5 py-4">
       {done ? <div role="status" className="space-y-3 text-sm leading-6 text-secondary">
@@ -117,7 +117,7 @@ export function ExtConfigImportDialog({ onClose }: { onClose: () => void }) {
           </label>
           <p id="ext-config-id-hint" className="text-xs leading-5 text-secondary">{preview.conflict ? '已有同名配置，已建议新标识。' : ''}仅限英文字母、数字和下划线；不会覆盖现有配置。</p>
           <p className="text-xs leading-5 text-secondary">{preview.requires_key ? '导入后需填写自己的 API Key。' : '此配置未声明 API Key 鉴权。'}{preview.has_pull ? '定时拉取先保持关闭。' : ''}</p>
-          {preview.warnings.length > 0 && <ul className="space-y-1 text-xs leading-5 text-amber-800 dark:text-amber-300">{preview.warnings.map(note => <li key={note}>{note}</li>)}</ul>}
+          {preview.warnings.length > 0 && <ul className="space-y-1 text-xs leading-5 text-warning dark:text-warning">{preview.warnings.map(note => <li key={note}>{note}</li>)}</ul>}
         </div>}
         {error && <p role="alert" className="break-words text-sm leading-5 text-danger">{error}</p>}
       </>}

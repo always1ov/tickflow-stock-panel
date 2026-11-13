@@ -35,8 +35,8 @@ export type ShellWidth = 'full' | 'wide' | 'read'
 
 const WIDTH: Record<ShellWidth, string> = {
   full: 'max-w-none',
-  wide: 'max-w-[1440px]',
-  read: 'max-w-[1100px]',
+  wide: 'max-w-wide',
+  read: 'max-w-read',
 }
 
 /** 页面留白: 小屏窄一点(手机上每一个像素都是内容), 大屏给到 20px。

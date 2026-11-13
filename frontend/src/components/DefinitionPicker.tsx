@@ -51,7 +51,7 @@ function SmokeResultView({ r }: { r: DefinitionSmokeResult }) {
     <div className="mt-1.5 space-y-0.5">
       {r.issues.map((i, idx) => (
         <div key={idx} className="text-micro text-danger">
-          <span className="rounded bg-danger/10 px-1 py-px font-mono text-micro">{i.code}</span> {i.message}
+          <span className="rounded-btn bg-danger/10 px-1 py-px font-mono text-micro">{i.code}</span> {i.message}
         </div>
       ))}
     </div>
@@ -180,7 +180,7 @@ export function DefinitionPicker({ kinds = ['signal', 'factor'], onSelect, selec
                       <span className="rounded-full bg-warning/10 px-1.5 py-px text-micro text-warning">已停用</span>
                     )}
                     {it.archived && (
-                      <span className="rounded-full bg-muted/15 px-1.5 py-px text-[10px] text-muted" title="已归档 (仍在参与计算), 可在对应库的档案库恢复">已归档</span>
+                      <span className="rounded-full bg-muted/15 px-1.5 py-px text-micro text-muted" title="已归档 (仍在参与计算), 可在对应库的档案库恢复">已归档</span>
                     )}
                     {it.kind === 'factor' && it.status && it.status !== 'active' && (
                       <span className="rounded-full bg-elevated px-1.5 py-px text-micro text-muted">{it.status}</span>

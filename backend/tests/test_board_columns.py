@@ -939,8 +939,8 @@ def test_R261_徽标与第二行仍各自按含义上色():
     # [R291] 转折那天点亮成一枚芯片(边框+底色+琥珀字), 平常是同尺寸的透明框 ——
     # 同一个盒子只换颜色, 所以行高一格都不跳。守的规矩没变: 这一行的颜色
     # 必须说这一行自己的意思(今天是不是转折)。
-    assert "border-amber-400/45 bg-amber-400/10 font-medium text-amber-300" in cells, (
-        "转折那天没点亮 —— 那一行该是琥珀芯片, 与复盘逐日表那个标记同色"
+    assert "border-warning/45 bg-warning/10 font-medium text-warning" in cells, (
+        "转折那天没点亮 —— 那一行该是琥珀芯片(warning 令牌), 与复盘逐日表那个标记同色"
     )
     assert "'border-transparent text-muted'" in cells, (
         "平常那天的透明框没了 —— 没有它, 转折行会比别的行高一截"
@@ -978,8 +978,8 @@ def test_R286_转折的词与复盘那边一致():
     assert "转折" in review, "场景没搭对: 复盘那边的「转折」不见了"
     for banned in ("刚翻转", "拐点", "变盘", "反转日"):
         assert banned not in blk, f"走势列用了「{banned}」而复盘用「转折」—— 同一件事两个词"
-    assert "amber" in blk[blk.index("转折") - 400:blk.index("转折")], (
-        "转折标记没用琥珀色 —— 复盘那边用的是 amber, 两处该同色"
+    assert "warning" in blk[blk.index("转折") - 400:blk.index("转折")], (
+        "转折标记没用琥珀色 —— 复盘那边用的是 warning 令牌, 两处该同色"
     )
 
 

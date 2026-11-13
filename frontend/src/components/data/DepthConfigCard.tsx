@@ -59,7 +59,7 @@ export function DepthConfigContent({ disabled }: { disabled?: boolean }) {
     )
   }
 
-  const inputCls = `w-16 h-7 bg-elevated border border-border rounded text-xs text-center px-1 focus:outline-none focus:border-accent/50 ${disabled ? 'opacity-40 cursor-not-allowed' : ''}`
+  const inputCls = `w-16 h-7 bg-elevated border border-border rounded-btn text-xs text-center px-1 focus:outline-none focus:border-accent/50 ${disabled ? 'opacity-40 cursor-not-allowed' : ''}`
 
   return (
     <div className="space-y-3">
@@ -116,7 +116,7 @@ export function DepthConfigContent({ disabled }: { disabled?: boolean }) {
               if (h * 60 + m > 18 * 60) { h = 18; m = 0 }
               saveFinalize.mutate({ hour: h, minute: m })
             }}
-            className={`w-12 h-7 bg-elevated border border-border rounded text-xs text-center px-1 focus:outline-none focus:border-accent/50 ${disabled ? 'opacity-40 cursor-not-allowed' : ''}`}
+            className={`w-12 h-7 bg-elevated border border-border rounded-btn text-xs text-center px-1 focus:outline-none focus:border-accent/50 ${disabled ? 'opacity-40 cursor-not-allowed' : ''}`}
           />
           <span className="text-xs text-muted">:</span>
           <input
@@ -138,7 +138,7 @@ export function DepthConfigContent({ disabled }: { disabled?: boolean }) {
               if (h * 60 + m > 18 * 60) { h = 18; m = 0 }
               saveFinalize.mutate({ hour: h, minute: m })
             }}
-            className={`w-12 h-7 bg-elevated border border-border rounded text-xs text-center px-1 focus:outline-none focus:border-accent/50 ${disabled ? 'opacity-40 cursor-not-allowed' : ''}`}
+            className={`w-12 h-7 bg-elevated border border-border rounded-btn text-xs text-center px-1 focus:outline-none focus:border-accent/50 ${disabled ? 'opacity-40 cursor-not-allowed' : ''}`}
           />
         </div>
       </div>

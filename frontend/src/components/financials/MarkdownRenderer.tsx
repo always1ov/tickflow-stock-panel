@@ -44,7 +44,7 @@ function renderInline(text: string, keyBase: string): ReactNode[] {
     } else if (m[3]) {
       // 行内代码
       nodes.push(
-        <code key={`${keyBase}-c-${i}`} className="px-1 py-0.5 rounded bg-elevated text-[0.85em] font-mono text-accent">
+        <code key={`${keyBase}-c-${i}`} className="px-1 py-0.5 rounded-btn bg-elevated text-[0.85em] font-mono text-accent">
           {m[4]}
         </code>,
       )
@@ -59,7 +59,7 @@ function renderInline(text: string, keyBase: string): ReactNode[] {
       // 涨跌停: 徽章式底色, 对齐信号标签样式
       const up = m[6] === '涨停'
       nodes.push(
-        <span key={`${keyBase}-l-${i}`} className={`rounded px-1 font-medium ${up ? 'bg-bull/10 text-bull' : 'bg-bear/10 text-bear'}`}>
+        <span key={`${keyBase}-l-${i}`} className={`rounded-btn px-1 font-medium ${up ? 'bg-bull/10 text-bull' : 'bg-bear/10 text-bear'}`}>
           {m[6]}
         </span>,
       )
@@ -168,7 +168,7 @@ export function MarkdownRenderer({ content, compact = false }: { content: string
         i++
       }
       blocks.push(
-        <blockquote key={key++} className="my-4 pl-3 border-l-2 border-amber-400/40 bg-amber-400/[0.04] py-1.5 pr-2 rounded-r text-xs text-secondary">
+        <blockquote key={key++} className="my-4 pl-3 border-l-2 border-warning/40 bg-warning/[0.04] py-1.5 pr-2 rounded-r text-xs text-secondary">
           {renderInline(quoteLines.join(' '), `q-${key}`)}
         </blockquote>,
       )

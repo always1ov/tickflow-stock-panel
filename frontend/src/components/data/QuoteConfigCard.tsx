@@ -84,7 +84,7 @@ export function QuoteConfigCard({ enabled, running, isTrading, lastFetchMs, inte
               <span className="text-muted">轮询间隔</span>
               <button
                 onClick={() => onShowIntervalEdit()}
-                className={`p-0.5 rounded hover:bg-elevated transition-colors ${showIntervalEdit ? 'text-accent' : 'text-secondary'}`}
+                className={`p-0.5 rounded-btn hover:bg-elevated transition-colors ${showIntervalEdit ? 'text-accent' : 'text-secondary'}`}
                 title="设置轮询间隔"
               >
                 <Settings className="h-3 w-3" />

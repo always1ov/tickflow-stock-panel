@@ -87,12 +87,12 @@ const SEVERITY_BAR: Record<string, string> = {
   info: 'bg-accent', warn: 'bg-warning', critical: 'bg-danger',
 }
 const SOURCE_BADGE: Record<string, { label: string; cls: string }> = {
-  strategy:  { label: '策略',   cls: 'bg-amber-400/15 text-amber-400' },
+  strategy:  { label: '策略',   cls: 'bg-warning/15 text-warning' },
   signal:    { label: '信号',   cls: 'bg-accent/15 text-accent' },
   price:     { label: '价格',   cls: 'bg-emerald-400/15 text-emerald-400' },
   market:    { label: '异动',   cls: 'bg-sky-500/15 text-sky-400' },
   sector:    { label: '板块',   cls: 'bg-cyan-500/15 text-cyan-700 dark:text-cyan-300' },
-  abnormal:  { label: '异动边缘', cls: 'bg-orange-500/15 text-orange-500 dark:text-orange-400' },
+  abnormal:  { label: '异动边缘', cls: 'bg-warning/15 text-warning dark:text-warning' },
   pool_entry: { label: '进入', cls: 'bg-danger/15 text-danger' },
   pool_exit:   { label: '移出', cls: 'bg-bear/15 text-bear' },
   buy_signal: { label: '买入', cls: 'bg-danger/15 text-danger' },
@@ -169,7 +169,7 @@ export function AlertToastContainer() {
 
               {/* 顶行: 分类标签 + 代码/名称 + 涨跌幅 + 关闭 */}
               <div className="flex items-center gap-2">
-                <span className={cn('shrink-0 rounded px-1 py-px text-micro font-medium', badge.cls)}>
+                <span className={cn('shrink-0 rounded-btn px-1 py-px text-micro font-medium', badge.cls)}>
                   {badge.label}
                 </span>
                 {ev.symbol && <span className="font-mono text-xs font-medium text-foreground shrink-0">{ev.symbol}</span>}
@@ -180,7 +180,7 @@ export function AlertToastContainer() {
                     {fmtPct(pct)}
                   </span>
                 )}
-                <button aria-label="关闭通知" onClick={(e) => { e.stopPropagation(); dismiss(item.id) }} className="shrink-0 p-0.5 rounded text-muted/50 hover:text-foreground hover:bg-elevated transition-colors cursor-pointer">
+                <button aria-label="关闭通知" onClick={(e) => { e.stopPropagation(); dismiss(item.id) }} className="shrink-0 p-0.5 rounded-btn text-muted/50 hover:text-foreground hover:bg-elevated transition-colors cursor-pointer">
                   <X className="h-3 w-3" />
                 </button>
               </div>
@@ -209,7 +209,7 @@ export function AlertToastContainer() {
                   {ev.signals && ev.signals.length > 0 && (
                     <div className="mt-1 flex flex-wrap gap-1 pl-0.5">
                       {ev.signals.map(signal => (
-                        <span key={signal} className="rounded bg-accent/8 px-1 py-px text-micro text-accent/80">{cnSignal(signal, customNames)}</span>
+                        <span key={signal} className="rounded-btn bg-accent/8 px-1 py-px text-micro text-accent/80">{cnSignal(signal, customNames)}</span>
                       ))}
                     </div>
                   )}
@@ -236,14 +236,14 @@ export function AlertToastContainer() {
                   const hi = item.hiddenIndices
                   if (hi?.length) parts = parts.filter((_, i) => !hi.includes(i))
                   for (const t of parts) {
-                    tags.push({ text: t, cls: isIndustry ? 'bg-sky-500/10 text-sky-400' : 'bg-orange-500/10 text-orange-400' })
+                    tags.push({ text: t, cls: isIndustry ? 'bg-sky-500/10 text-sky-400' : 'bg-warning/10 text-warning' })
                   }
                 }
                 if (!tags.length) return null
                 return (
                   <div className="mt-1 flex flex-wrap items-center gap-1 pl-0.5">
                     {tags.map((t, i) => (
-                      <span key={i} className={cn('rounded px-1 py-px text-micro leading-tight', t.cls)}>{t.text}</span>
+                      <span key={i} className={cn('rounded-btn px-1 py-px text-micro leading-tight', t.cls)}>{t.text}</span>
                     ))}
                   </div>
                 )

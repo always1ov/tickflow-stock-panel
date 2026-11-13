@@ -234,3 +234,14 @@ def test_R449_迁完的文件不许再写死字号(rel):
     src = code_of(rel)
     hits = re.findall(r"text-\[[\d.]+px\]", src)
     assert not hits, f"{rel} 迁完了却还有写死的字号: {hits}"
+
+
+def test_R599_全部界面文件都不许写死字号():
+    """[R599] 上游 v0.3.21→37 同步收尾后, src 下已经没有 `text-[Npx]`。
+    字号守卫从「迁完的 MIGRATED 文件」恢复成扫全部 tsx —— 新文件也一视同仁。"""
+    from tests.test_design_spec import _strip_comments
+    hits = []
+    for path in sorted((SRC).rglob("*.tsx")):
+        if re.search(r"text-\[[\d.]+px\]", _strip_comments(path.read_text(encoding="utf-8"))):
+            hits.append(str(path.relative_to(SRC)))
+    assert not hits, f"这些文件还在写死字号: {hits[:10]}"

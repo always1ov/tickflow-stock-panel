@@ -616,12 +616,12 @@ export function WatchlistImportDialog({
             disabled={!state.eligible}
             checked={checked}
             onChange={() => sym && toggle(sym)}
-            className="rounded border-border"
+            className="rounded-btn border-border"
           />
           <div className="flex-1 min-w-0">
             <div className="flex items-baseline gap-2">
               {/* [R267] 原文里加粗的是作者标出的重点票 —— 这个信号在文章里明摆着, 丢了可惜 */}
-              {c.starred && <span className="shrink-0 text-xs text-amber-400" title="原文里加粗标注">★</span>}
+              {c.starred && <span className="shrink-0 text-xs text-warning" title="原文里加粗标注">★</span>}
               <span className="font-medium text-foreground truncate">
                 {c.name || c.mention || (c.matched && sym ? sym : '未匹配')}
               </span>
@@ -640,7 +640,7 @@ export function WatchlistImportDialog({
                     <span
                       key={g}
                       title={skip ? `小分队「${g}」已设为不导入` : `来自小分队「${g}」`}
-                      className={`rounded px-1 py-px text-micro ${
+                      className={`rounded-btn px-1 py-px text-micro ${
                         skip ? 'bg-elevated/40 text-muted/50 line-through' : 'bg-accent/10 text-accent/80'
                       }`}
                     >

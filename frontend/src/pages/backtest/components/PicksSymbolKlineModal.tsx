@@ -116,7 +116,7 @@ export function PicksSymbolKlineModal({ symbol, result, periodStart, periodEnd, 
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.97, y: 8 }}
             transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-            className="relative flex max-h-[94vh] w-[92vw] max-w-[1120px] flex-col overflow-hidden rounded-card border border-border bg-base shadow-2xl"
+            className="relative flex max-h-[94vh] w-[92vw] max-w-read flex-col overflow-hidden rounded-card border border-border bg-base shadow-2xl"
           >
             <div className="border-b border-border px-5 py-3">
               <div className="flex items-start justify-between gap-4">
@@ -125,11 +125,11 @@ export function PicksSymbolKlineModal({ symbol, result, periodStart, periodEnd, 
                     <span className={cn('font-mono', TYPE.section)}>{symbol}</span>
                     {name && <span className="truncate text-sm text-foreground">{name}</span>}
                     {tag && (
-                      <span className="rounded border border-accent/30 bg-accent/10 px-1.5 py-0.5 text-micro text-accent">
+                      <span className="rounded-btn border border-accent/30 bg-accent/10 px-1.5 py-0.5 text-micro text-accent">
                         {tag}
                       </span>
                     )}
-                    <span className="rounded border border-accent/30 bg-accent/10 px-1.5 py-0.5 text-micro text-accent">标的回放</span>
+                    <span className="rounded-btn border border-accent/30 bg-accent/10 px-1.5 py-0.5 text-micro text-accent">标的回放</span>
 
                     {/* 切标的: 上一只 / n·N / 下一只 */}
                     <NavPager nav={nav} prevLabel="上一只" nextLabel="下一只" />

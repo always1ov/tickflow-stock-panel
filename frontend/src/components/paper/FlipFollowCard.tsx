@@ -198,13 +198,13 @@ function FlipSkeleton() {
       <div className="space-y-2 px-4 py-3">
         <Skeleton w="w-40" h="h-3" />
         <div className="grid gap-2 lg:grid-cols-2 2xl:grid-cols-3">
-          {Array.from({ length: 2 }, (_, i) => <Skeleton key={i} h="h-16" rounded="rounded-btn" />)}
+          {Array.from({ length: 2 }, (_, i) => <Skeleton key={i} h="h-16" rounded-btn="rounded-btn" />)}
         </div>
       </div>
       <div className="space-y-2 px-4 py-3">
         <Skeleton w="w-32" h="h-3" />
         <div className="grid grid-cols-2 gap-2 lg:grid-cols-3 2xl:grid-cols-5">
-          {Array.from({ length: 3 }, (_, i) => <Skeleton key={i} h="h-14" rounded="rounded-btn" />)}
+          {Array.from({ length: 3 }, (_, i) => <Skeleton key={i} h="h-14" rounded-btn="rounded-btn" />)}
         </div>
       </div>
     </div>

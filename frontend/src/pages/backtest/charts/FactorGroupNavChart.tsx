@@ -123,7 +123,7 @@ export function FactorGroupNavChart({ result }: Props) {
         ))}
         {result.long_short_nav?.length > 0 && (
           <span className="flex items-center gap-1 text-micro text-secondary">
-            <span className="w-2 h-0.5 rounded bg-yellow-400" style={{ borderTop: '2px dashed #fbbf24' }} />
+            <span className="w-2 h-0.5 rounded-btn bg-warning" style={{ borderTop: '2px dashed #fbbf24' }} />
             多空
           </span>
         )}

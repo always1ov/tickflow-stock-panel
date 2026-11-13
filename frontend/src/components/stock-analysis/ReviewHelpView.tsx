@@ -44,7 +44,7 @@ import { TYPE } from '@/components/ui'
 const TONE_CLS: Record<string, string> = {
   sell: 'border-red-400/40 bg-red-400/10 text-red-400',
   buy: 'border-sky-400/40 bg-sky-400/10 text-sky-300',
-  hold: 'border-amber-400/40 bg-amber-400/10 text-amber-400',
+  hold: 'border-warning/40 bg-warning/10 text-warning',
   avoid: 'border-border bg-base text-muted',
   watch: 'border-border bg-elevated/60 text-secondary',
 }
@@ -97,7 +97,7 @@ export function ReviewHelpView() {
               {q.data.trend.map((t) => (
                 <Term
                   key={t.code}
-                  badge={<span className={cn('inline-flex whitespace-nowrap rounded border px-1.5 py-0.5 text-micro',
+                  badge={<span className={cn('inline-flex whitespace-nowrap rounded-btn border px-1.5 py-0.5 text-micro',
                                              trendBadgeCls(t.code as Parameters<typeof trendBadgeCls>[0]))}>{t.title}</span>}
                   side={t.side}
                   meaning={t.meaning}
@@ -113,7 +113,7 @@ export function ReviewHelpView() {
               {q.data.verdict.map((v) => (
                 <Term
                   key={v.code}
-                  badge={<span className={cn('inline-flex whitespace-nowrap rounded border px-1.5 py-0.5 text-micro',
+                  badge={<span className={cn('inline-flex whitespace-nowrap rounded-btn border px-1.5 py-0.5 text-micro',
                                              TONE_CLS[v.tone] ?? TONE_CLS.avoid)}>{v.title}</span>}
                   meaning={v.meaning}
                   action={v.action}

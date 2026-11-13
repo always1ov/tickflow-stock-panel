@@ -119,7 +119,7 @@ export function CustomSignalDialog({ open, signal, defaultKind = 'exit', onClose
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 10 }}
             transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
-            className="w-full max-w-3xl max-h-[88vh] bg-surface/95 backdrop-blur-xl border border-border/50 rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+            className="w-full max-w-3xl max-h-[88vh] bg-surface/95 backdrop-blur-xl border border-border/50 rounded-dialog shadow-2xl flex flex-col overflow-hidden"
             onClick={e => e.stopPropagation()}
           >
             <div className="flex items-center justify-between gap-3 border-b border-border/50 px-5 py-4">
@@ -127,7 +127,7 @@ export function CustomSignalDialog({ open, signal, defaultKind = 'exit', onClose
                 <h3 className="text-sm font-semibold text-foreground">{editing ? '编辑自定义信号' : '新建自定义信号'}</h3>
                 <p className="mt-1 text-micro text-muted">标识保存后不可修改，如需更换请新建。自定义信号保存为 csg_* 列。</p>
               </div>
-              <button onClick={onClose} className="rounded-lg p-1.5 text-muted transition-colors hover:bg-elevated hover:text-foreground">
+              <button onClick={onClose} className="rounded-card p-1.5 text-muted transition-colors hover:bg-elevated hover:text-foreground">
                 <X className="h-4 w-4" />
               </button>
             </div>
@@ -166,22 +166,22 @@ export function CustomSignalDialog({ open, signal, defaultKind = 'exit', onClose
                   headerExtra={
                     <button
                       onClick={() => setAiOpen(o => !o)}
-                      className={`inline-flex items-center gap-1 text-micro cursor-pointer transition-colors ${aiOpen ? 'text-amber-400' : 'text-amber-400/80 hover:text-amber-400'}`}
+                      className={`inline-flex items-center gap-1 text-micro cursor-pointer transition-colors ${aiOpen ? 'text-warning' : 'text-warning/80 hover:text-warning'}`}
                     >
                       <Sparkles className="h-3 w-3" />AI 生成条件
                     </button>
                   }
                 />
                 {aiOpen && (
-                  <div className="rounded-card border border-amber-400/30 bg-amber-400/5 p-3 space-y-2">
+                  <div className="rounded-card border border-warning/30 bg-warning/5 p-3 space-y-2">
                     <div className="flex items-center gap-2">
-                      <Sparkles className="h-3.5 w-3.5 text-amber-400 shrink-0" />
-                      <span className="text-micro text-amber-300">描述信号思路，AI 将生成条件组合</span>
+                      <Sparkles className="h-3.5 w-3.5 text-warning shrink-0" />
+                      <span className="text-micro text-warning">描述信号思路，AI 将生成条件组合</span>
                     </div>
                     {aiConfigured === false ? (
-                      <div className="text-xs text-amber-400/80">
+                      <div className="text-xs text-warning/80">
                         AI 未配置，无法生成信号。{' '}
-                        <a href={`${import.meta.env.BASE_URL}settings?tab=ai`} className="underline hover:text-amber-300">去设置页配置 API Key</a>
+                        <a href={`${import.meta.env.BASE_URL}settings?tab=ai`} className="underline hover:text-warning">去设置页配置 API Key</a>
                       </div>
                     ) : (
                       <>
@@ -190,14 +190,14 @@ export function CustomSignalDialog({ open, signal, defaultKind = 'exit', onClose
                           onChange={e => setAiDesc(e.target.value)}
                           placeholder="例如：收盘价回踩20日均线，且量比≥2 放量"
                           rows={2}
-                          className="w-full rounded-btn border border-border bg-base px-3 py-2 text-xs text-foreground focus:outline-none focus:border-amber-400/50 resize-none"
+                          className="w-full rounded-btn border border-border bg-base px-3 py-2 text-xs text-foreground focus:outline-none focus:border-warning/50 resize-none"
                         />
                         {aiError && <div className="text-xs text-danger">{aiError}</div>}
                         <div className="flex justify-end">
                           <button
                             onClick={generateByAI}
                             disabled={aiLoading}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-btn bg-amber-500/90 text-white text-xs font-medium disabled:opacity-50 cursor-pointer"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-btn bg-warning/90 text-white text-xs font-medium disabled:opacity-50 cursor-pointer"
                           >
                             {aiLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
                             {aiLoading ? '生成中…' : '生成条件'}
@@ -217,7 +217,7 @@ export function CustomSignalDialog({ open, signal, defaultKind = 'exit', onClose
 
             <div className="flex justify-end gap-2 border-t border-border/50 px-5 py-4">
               <button onClick={onClose} className="px-4 py-1.5 rounded-btn bg-elevated text-secondary text-xs">取消</button>
-              <button onClick={() => save.mutate()} disabled={save.isPending} className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-btn bg-amber-500/90 text-white text-xs font-medium disabled:opacity-50">
+              <button onClick={() => save.mutate()} disabled={save.isPending} className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-btn bg-warning/90 text-white text-xs font-medium disabled:opacity-50">
                 <Save className="h-3.5 w-3.5" />保存
               </button>
             </div>

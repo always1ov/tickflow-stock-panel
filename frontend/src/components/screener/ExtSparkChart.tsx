@@ -23,7 +23,7 @@ export function ExtSparkChart({ points, kind, width = 110, height = 36 }: {
   const max = values.length ? Math.max(...values) : 0
   // 全等值 (含单点/全空): 数值无变化可画, 回退文本
   if (values.length < 2 || min === max) {
-    return <span className="text-[10px] text-muted tabular-nums">{values.length >= 1 ? values[0] : '—'}</span>
+    return <span className="text-micro text-muted tabular-nums">{values.length >= 1 ? values[0] : '—'}</span>
   }
   // 柱体表达绝对幅度; 只按 min/max 缩放会压扁较小正值, 并把全负序列的零轴移出图外。
   const domainMin = kind === 'bar' ? Math.min(0, min) : min

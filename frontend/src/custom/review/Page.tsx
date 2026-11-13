@@ -338,7 +338,7 @@ export function ReviewPage() {
           ) : !data || !data.as_of ? (
             <div className="flex flex-col items-center justify-center gap-4 rounded-card border border-border bg-surface/80 px-6 py-16">
               <div className="relative">
-                <div className="grid h-14 w-14 place-items-center rounded-2xl bg-accent-soft border border-accent/30">
+                <div className="grid h-14 w-14 place-items-center rounded-dialog bg-accent-soft border border-accent/30">
                   <Database className="h-6 w-6 text-accent" strokeWidth={1.8} />
                 </div>
               </div>
@@ -432,7 +432,7 @@ export function ReviewPage() {
                 </div>
                 <button
                   onClick={() => setShowSchedule(false)}
-                  className="rounded p-1 text-muted transition-colors hover:bg-elevated hover:text-foreground"
+                  className="rounded-btn p-1 text-muted transition-colors hover:bg-elevated hover:text-foreground"
                 >
                   <X className="h-4 w-4" />
                 </button>
@@ -488,7 +488,7 @@ export function ReviewPage() {
                         : 'border-border/60 bg-base/40 hover:bg-base/60',
                     )}
                   >
-                    <span className={cn('flex h-3 w-3 shrink-0 items-center justify-center rounded border', reviewPushChannels.includes('feishu') ? 'border-accent bg-accent text-white' : 'border-border')}>
+                    <span className={cn('flex h-3 w-3 shrink-0 items-center justify-center rounded-btn border', reviewPushChannels.includes('feishu') ? 'border-accent bg-accent text-white' : 'border-border')}>
                       {reviewPushChannels.includes('feishu') && <Check className="h-2.5 w-2.5" />}
                     </span>
                     <span className="text-xs text-foreground">飞书</span>
@@ -509,7 +509,7 @@ export function ReviewPage() {
                         : 'border-border/60 bg-base/40 hover:bg-base/60',
                     )}
                   >
-                    <span className={cn('flex h-3 w-3 shrink-0 items-center justify-center rounded border', reviewPushChannels.includes('wecom') ? 'border-accent bg-accent text-white' : 'border-border')}>
+                    <span className={cn('flex h-3 w-3 shrink-0 items-center justify-center rounded-btn border', reviewPushChannels.includes('wecom') ? 'border-accent bg-accent text-white' : 'border-border')}>
                       {reviewPushChannels.includes('wecom') && <Check className="h-2.5 w-2.5" />}
                     </span>
                     <span className="text-xs text-foreground">企业微信</span>
@@ -530,7 +530,7 @@ export function ReviewPage() {
                         : 'border-border/60 bg-base/40 hover:bg-base/60',
                     )}
                   >
-                    <span className={cn('flex h-3 w-3 shrink-0 items-center justify-center rounded border', reviewPushChannels.includes('dingtalk') ? 'border-accent bg-accent text-white' : 'border-border')}>
+                    <span className={cn('flex h-3 w-3 shrink-0 items-center justify-center rounded-btn border', reviewPushChannels.includes('dingtalk') ? 'border-accent bg-accent text-white' : 'border-border')}>
                       {reviewPushChannels.includes('dingtalk') && <Check className="h-2.5 w-2.5" />}
                     </span>
                     <span className="text-xs text-foreground">钉钉</span>
@@ -550,7 +550,7 @@ export function ReviewPage() {
                         : 'border-border/60 bg-base/40 hover:bg-base/60',
                     )}
                   >
-                    <span className={cn('flex h-3 w-3 shrink-0 items-center justify-center rounded border', reviewPushChannels.includes('custom') ? 'border-accent bg-accent text-white' : 'border-border')}>
+                    <span className={cn('flex h-3 w-3 shrink-0 items-center justify-center rounded-btn border', reviewPushChannels.includes('custom') ? 'border-accent bg-accent text-white' : 'border-border')}>
                       {reviewPushChannels.includes('custom') && <Check className="h-2.5 w-2.5" />}
                     </span>
                     <span className="text-xs text-foreground">第三方系统</span>
@@ -570,7 +570,7 @@ export function ReviewPage() {
                         : 'border-border/60 bg-base/40 hover:bg-base/60',
                     )}
                   >
-                    <span className={cn('flex h-3 w-3 shrink-0 items-center justify-center rounded border', reviewPushChannels.includes('email') ? 'border-accent bg-accent text-white' : 'border-border')}>
+                    <span className={cn('flex h-3 w-3 shrink-0 items-center justify-center rounded-btn border', reviewPushChannels.includes('email') ? 'border-accent bg-accent text-white' : 'border-border')}>
                       {reviewPushChannels.includes('email') && <Check className="h-2.5 w-2.5" />}
                     </span>
                     <span className="text-xs text-foreground">邮件</span>
@@ -773,7 +773,7 @@ function MarketSummaryBar({ data }: { data: OverviewMarket }) {
       {/* 情绪分(带色徽章)—— 复盘的核心定调 */}
       <div className="flex items-center gap-2">
         <span
-          className="grid h-8 w-8 shrink-0 place-items-center rounded font-mono text-xs font-bold tabular-nums"
+          className="grid h-8 w-8 shrink-0 place-items-center rounded-btn font-mono text-xs font-bold tabular-nums"
           style={{ color: emoColor, backgroundColor: `${emoColor}1a` }}
         >
           {score ?? '—'}
@@ -862,7 +862,7 @@ function ReportPanel({
     return (
       <div className="flex min-h-[28rem] flex-col items-center justify-center gap-5 rounded-card border border-border bg-surface/80 px-6 py-16">
         <div className="relative">
-          <div className="grid h-20 w-20 place-items-center rounded-2xl bg-accent-soft border border-accent/30">
+          <div className="grid h-20 w-20 place-items-center rounded-dialog bg-accent-soft border border-accent/30">
             <BookOpenCheck className="h-9 w-9 text-accent" strokeWidth={1.8} />
           </div>
           <Sparkles className="absolute -right-1 -top-1 h-5 w-5 text-accent" />
@@ -939,7 +939,7 @@ function ReportPanel({
           <div className="prose prose-invert max-w-[75ch]">
             <MarkdownRenderer content={content} />
             {showCursor && (
-              <span className="ml-0.5 inline-block h-4 w-1.5 animate-pulse rounded-sm bg-accent align-middle" />
+              <span className="ml-0.5 inline-block h-4 w-1.5 animate-pulse rounded-btn bg-accent align-middle" />
             )}
           </div>
         )}
@@ -987,12 +987,12 @@ function HistoryPanel({
             {generating && (
               <div
                 className={cn(
-                  'flex items-center gap-2 rounded px-2 py-2 cursor-pointer transition-colors',
+                  'flex items-center gap-2 rounded-btn px-2 py-2 cursor-pointer transition-colors',
                   viewingId === null ? 'bg-accent/10 ring-1 ring-accent/20' : 'hover:bg-elevated/60',
                 )}
                 onClick={onBackToGenerating}
               >
-                <div className="grid h-8 w-8 shrink-0 place-items-center rounded bg-accent/15">
+                <div className="grid h-8 w-8 shrink-0 place-items-center rounded-btn bg-accent/15">
                   <RefreshCw className="h-3.5 w-3.5 animate-spin text-accent" />
                 </div>
                 <div className="min-w-0 flex-1">
@@ -1007,13 +1007,13 @@ function HistoryPanel({
                 <div
                   key={r.id}
                   className={cn(
-                    'group flex items-center gap-2 rounded px-2 py-2 cursor-pointer transition-colors',
+                    'group flex items-center gap-2 rounded-btn px-2 py-2 cursor-pointer transition-colors',
                     viewingId === r.id ? 'bg-accent/10 ring-1 ring-accent/20' : 'hover:bg-elevated/60',
                   )}
                   onClick={() => onView(r)}
                 >
                   <div
-                    className="grid h-8 w-8 shrink-0 place-items-center rounded font-mono text-micro font-bold tabular-nums"
+                    className="grid h-8 w-8 shrink-0 place-items-center rounded-btn font-mono text-micro font-bold tabular-nums"
                     style={{ color, backgroundColor: `${color}1a` }}
                   >
                     {r.emotion_score ?? '—'}
@@ -1120,7 +1120,7 @@ function _DtPill({ item, idx, value, onOpenStock }: {
         {label}
       </span>
       {(() => { const b = boardTag(code); return b && (
-        <span className={`inline-flex items-center rounded border px-1 text-micro font-bold leading-tight ${b.color}`}>
+        <span className={`inline-flex items-center rounded-btn border px-1 text-micro font-bold leading-tight ${b.color}`}>
           {b.label}
         </span>
       ) })()}
@@ -1232,7 +1232,7 @@ function DtStockTable({ items, tab, onOpenStock }: {
             className="flex w-full items-center gap-2 border-t border-border/30 px-2.5 py-2 text-left text-xs transition-colors hover:bg-accent/[0.05]"
             title={`查看 ${label} 详情`}
           >
-            <span className={cn('w-5 shrink-0 text-center font-mono text-micro tabular-nums', idx < 3 ? 'text-amber-400/90' : 'text-muted/50')}>
+            <span className={cn('w-5 shrink-0 text-center font-mono text-micro tabular-nums', idx < 3 ? 'text-warning/90' : 'text-muted/50')}>
               {idx + 1}
             </span>
             <span className={cn('w-14 shrink-0 font-mono tabular-nums', priceColorClass(i.change ?? null))}>
@@ -1242,16 +1242,16 @@ function DtStockTable({ items, tab, onOpenStock }: {
               <span className="text-foreground">{label}</span>
               <span className="ml-1.5 font-mono text-micro text-muted">{i.ticker ?? code}</span>
               {(() => { const b = boardTag(code); return b && (
-                <span className={`ml-1 inline-flex items-center rounded border px-1 text-micro font-bold leading-tight ${b.color}`}>
+                <span className={`ml-1 inline-flex items-center rounded-btn border px-1 text-micro font-bold leading-tight ${b.color}`}>
                   {b.label}
                 </span>
               ) })()}
               {i.hot_rank != null && i.hot_rank > 0 && i.hot_rank <= 99 && (
                 <span
                   className={cn(
-                    'ml-1.5 inline-flex items-center rounded px-1 text-micro font-medium leading-tight',
+                    'ml-1.5 inline-flex items-center rounded-btn px-1 text-micro font-medium leading-tight',
                     i.hot_rank <= 10
-                      ? 'border border-amber-500/30 bg-amber-500/10 text-amber-500'
+                      ? 'border border-warning/30 bg-warning/10 text-warning'
                       : 'border border-border bg-elevated/50 text-muted/80',
                   )}
                   title={`同花顺人气第 ${i.hot_rank} 名`}
@@ -1286,7 +1286,7 @@ function DtStockTable({ items, tab, onOpenStock }: {
             <span className="w-20 shrink-0 text-right font-mono tabular-nums text-muted">{fmtVolume(i.sell_value ?? null)}</span>
             <span className="w-11 shrink-0 text-right">
               <span className={cn(
-                'inline-flex rounded px-1 text-micro leading-tight',
+                'inline-flex rounded-btn px-1 text-micro leading-tight',
                 i.range_days === 3
                   ? 'border border-sky-500/25 bg-sky-500/10 text-sky-400/90'
                   : 'border border-border/60 bg-elevated/50 text-muted/80',
@@ -1338,7 +1338,7 @@ function _DtSeatList({ seats, onOpenStock }: {
                 >
                   <span>{_dtLabel(r)}</span>
                   {(() => { const b = boardTag(code); return b && (
-                    <span className={`inline-flex items-center self-center rounded border px-1 text-micro font-bold leading-tight ${b.color}`}>
+                    <span className={`inline-flex items-center self-center rounded-btn border px-1 text-micro font-bold leading-tight ${b.color}`}>
                       {b.label}
                     </span>
                   ) })()}
@@ -1375,7 +1375,7 @@ export function DragonTigerCard({ date, onOpenStock }: {
   if (q.isLoading) {
     return (
       <div className="flex items-center gap-3 rounded-card border border-border bg-surface/80 px-4 py-3">
-        <span className="grid h-8 w-8 shrink-0 animate-pulse place-items-center rounded bg-elevated">
+        <span className="grid h-8 w-8 shrink-0 animate-pulse place-items-center rounded-btn bg-elevated">
           <Trophy className="h-4 w-4 text-muted/50" />
         </span>
         <div className="flex items-center gap-2">
@@ -1391,7 +1391,7 @@ export function DragonTigerCard({ date, onOpenStock }: {
   if (d?.state === 'source_unavailable') {
     return (
       <div className="flex items-center gap-3 rounded-card border border-dashed border-border bg-surface/50 px-4 py-3">
-        <span className="grid h-8 w-8 shrink-0 place-items-center rounded bg-elevated/60">
+        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-btn bg-elevated/60">
           <Trophy className="h-4 w-4 text-muted/50" />
         </span>
         <span className="text-xs text-muted">龙虎榜需要 fuyao 数据源 (同花顺特色数据)</span>
@@ -1406,7 +1406,7 @@ export function DragonTigerCard({ date, onOpenStock }: {
   if (!d || d.state === 'no_data') {
     return (
       <div className="flex items-center gap-3 rounded-card border border-border bg-surface/50 px-4 py-3">
-        <span className="grid h-8 w-8 shrink-0 place-items-center rounded bg-elevated/60">
+        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-btn bg-elevated/60">
           <Trophy className="h-4 w-4 text-muted/50" />
         </span>
         <span className="text-xs text-muted">龙虎榜暂不可用{d?.message ? ` (${d.message.slice(0, 40)})` : ''}</span>
@@ -1432,7 +1432,7 @@ export function DragonTigerCard({ date, onOpenStock }: {
         onClick={() => setExpanded(v => !v)}
         className="group flex w-full items-center gap-3 px-4 py-3 text-left"
       >
-        <span className="grid h-8 w-8 shrink-0 place-items-center rounded bg-amber-500/15 text-amber-500 ring-1 ring-amber-500/20">
+        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-btn bg-warning/15 text-warning ring-1 ring-warning/20">
           <Trophy className={cn('h-4 w-4 transition-transform group-hover:scale-110', expanded && 'scale-110')} />
         </span>
         <span className="leading-tight">
@@ -1440,7 +1440,7 @@ export function DragonTigerCard({ date, onOpenStock }: {
             <span className="text-xs font-semibold text-foreground">龙虎榜</span>
             {isFallback && (
               <span
-                className="rounded border border-warning/30 bg-warning/10 px-1.5 py-px text-micro leading-tight text-warning"
+                className="rounded-btn border border-warning/30 bg-warning/10 px-1.5 py-px text-micro leading-tight text-warning"
                 title="当日榜单未发布(约17:00后), 已自动显示上一期"
               >
                 当日未发布 · 显示上一期

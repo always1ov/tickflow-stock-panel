@@ -1166,11 +1166,11 @@ export function Screener() {
               {pool.length === 0 && (
                 <div className="mt-2 flex flex-wrap items-center justify-center gap-x-1.5 gap-y-1 text-micro leading-relaxed text-muted/80">
                   <span>自己写策略看</span>
-                  <code className="rounded bg-elevated/70 px-1 py-px font-mono text-micro text-secondary">docs/strategy.md</code>
+                  <code className="rounded-btn bg-elevated/70 px-1 py-px font-mono text-micro text-secondary">docs/strategy.md</code>
                   <span>（三种扩展方式：自定义信号 / AI 生成 / 手写代码）</span>
                   <span className="text-border" aria-hidden="true">·</span>
                   <span>用 AI 迭代已有策略看</span>
-                  <code className="rounded bg-elevated/70 px-1 py-px font-mono text-micro text-secondary">docs/strategy-iteration.md</code>
+                  <code className="rounded-btn bg-elevated/70 px-1 py-px font-mono text-micro text-secondary">docs/strategy-iteration.md</code>
                 </div>
               )}
             </div>
@@ -1415,7 +1415,7 @@ export function Screener() {
 
           {!showAll && !result && !viewLoading && (
             <div className="flex flex-col items-center justify-center py-16 gap-4">
-              <div className="w-16 h-16 rounded-2xl bg-accent/5 border border-border flex items-center justify-center">
+              <div className="w-16 h-16 rounded-dialog bg-accent/5 border border-border flex items-center justify-center">
                 <ScanSearch className="h-7 w-7 text-accent/40" />
               </div>
               <div className="flex flex-col items-center gap-1.5">

@@ -48,7 +48,7 @@ function CapBadge({ hasCap, isLocal, missingCapName, capInfo, localSuffix, custo
   // 走自定义数据源时, 显示数据源名 (能力来源对所有数据源统一表达)
   if (customProvider) {
     return (
-      <span className="text-micro text-accent/80 bg-accent/8 rounded px-1.5 py-px font-medium">
+      <span className="text-micro text-accent/80 bg-accent/8 rounded-btn px-1.5 py-px font-medium">
         {customProvider}
       </span>
     )
@@ -56,7 +56,7 @@ function CapBadge({ hasCap, isLocal, missingCapName, capInfo, localSuffix, custo
 
   if (isLocal) {
     return (
-      <span className="text-micro text-secondary bg-elevated rounded px-1.5 py-px font-medium">
+      <span className="text-micro text-secondary bg-elevated rounded-btn px-1.5 py-px font-medium">
         本地计算{localSuffix ? ` · ${localSuffix}` : ''}
       </span>
     )
@@ -66,7 +66,7 @@ function CapBadge({ hasCap, isLocal, missingCapName, capInfo, localSuffix, custo
     const parts = ['可用', `${capInfo.rpm}/min`]
     if (capInfo.batch != null && capInfo.batch > 1) parts.push(`${capInfo.batch}股/批`)
     return (
-      <span className="text-micro text-accent/80 bg-accent/8 rounded px-1.5 py-px font-mono font-medium">
+      <span className="text-micro text-accent/80 bg-accent/8 rounded-btn px-1.5 py-px font-mono font-medium">
         {parts.join(' · ')}
       </span>
     )
@@ -79,7 +79,7 @@ function CapBadge({ hasCap, isLocal, missingCapName, capInfo, localSuffix, custo
 
   if (hasCap) {
     return (
-      <span className="text-micro text-accent/80 bg-accent/8 rounded px-1.5 py-px font-medium">
+      <span className="text-micro text-accent/80 bg-accent/8 rounded-btn px-1.5 py-px font-medium">
         可用
       </span>
     )
@@ -146,7 +146,7 @@ export function StatCard({
       return (
         <button
           onClick={(e) => { e.stopPropagation(); onShowFields() }}
-          className="inline-flex align-middle ml-1 p-0.5 rounded hover:bg-elevated transition-colors text-secondary hover:text-accent"
+          className="inline-flex align-middle ml-1 p-0.5 rounded-btn hover:bg-elevated transition-colors text-secondary hover:text-accent"
           title="查看字段说明"
         >
           <Table2 className="h-3 w-3" />
@@ -161,7 +161,7 @@ export function StatCard({
     <button
       key={tab.table}
       onClick={(e) => { e.stopPropagation(); onShowFields?.(tab.table) }}
-      className="inline-flex align-middle -mt-px p-0.5 rounded hover:bg-elevated transition-colors text-secondary hover:text-accent"
+      className="inline-flex align-middle -mt-px p-0.5 rounded-btn hover:bg-elevated transition-colors text-secondary hover:text-accent"
       title={`查看${tab.label}字段说明`}
     >
       <Table2 className="h-3 w-3" />
@@ -226,14 +226,14 @@ export function StatCard({
           {active && <Loader2 className="h-3.5 w-3.5 text-accent animate-spin" />}
           {done && !active && !skipped && <CheckCircle2 className="h-3.5 w-3.5 text-bear" />}
           {skipped && !active && (
-            <span className="text-micro text-muted bg-elevated rounded px-1.5 py-px font-medium">
+            <span className="text-micro text-muted bg-elevated rounded-btn px-1.5 py-px font-medium">
               本次跳过
             </span>
           )}
           {onPull && (
             <button
               onClick={(e) => { e.stopPropagation(); onPull() }}
-              className="rounded p-0.5 text-secondary transition-colors hover:bg-elevated hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+              className="rounded-btn p-0.5 text-secondary transition-colors hover:bg-elevated hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
               title={pullTitle ?? '手动拉取'}
               aria-label={pullTitle ?? '手动拉取'}
             >
@@ -243,7 +243,7 @@ export function StatCard({
           {onSettings && (
             <button
               onClick={(e) => { e.stopPropagation(); onSettings() }}
-              className={`p-0.5 rounded hover:bg-elevated transition-colors ${
+              className={`p-0.5 rounded-btn hover:bg-elevated transition-colors ${
                 settingsOpen ? 'text-accent' : 'text-secondary'
               }`}
               title="设置"

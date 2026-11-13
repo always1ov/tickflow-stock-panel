@@ -384,7 +384,7 @@ export function CreateExtDialog({ onClose }: { onClose: () => void }) {
           <button
             onClick={onClose}
             aria-label="关闭"
-            className="p-1.5 rounded-lg text-secondary hover:text-foreground hover:bg-elevated focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-colors shrink-0"
+            className="p-1.5 rounded-card text-secondary hover:text-foreground hover:bg-elevated focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-colors shrink-0"
           >
             <X className="h-4 w-4" />
           </button>
@@ -405,7 +405,7 @@ export function CreateExtDialog({ onClose }: { onClose: () => void }) {
                   <button
                     key={key}
                     onClick={() => selectSource(key)}
-                    className={`inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 ${
+                    className={`inline-flex items-center justify-center gap-1.5 rounded-card px-3 py-2 text-xs font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 ${
                       active
                         ? 'bg-surface text-foreground shadow-sm'
                         : 'text-muted hover:text-secondary hover:bg-elevated/60'
@@ -435,7 +435,7 @@ export function CreateExtDialog({ onClose }: { onClose: () => void }) {
                         : 'border-border bg-elevated/30 hover:bg-elevated/60 hover:border-border'
                     }`}
                   >
-                    <div className={`mt-0.5 p-1.5 rounded-lg transition-colors ${
+                    <div className={`mt-0.5 p-1.5 rounded-card transition-colors ${
                       active ? 'bg-warning/15 text-warning' : 'bg-elevated text-muted'
                     }`}>
                       {m === 'snapshot' ? <Tag className="h-4 w-4" /> : <Clock className="h-4 w-4" />}
@@ -460,7 +460,7 @@ export function CreateExtDialog({ onClose }: { onClose: () => void }) {
             </div>
 
             {/* 市场级: 行=全市场一条, 无标的列 (择时状态/情绪指数类) */}
-            <label className="mt-2.5 flex cursor-pointer items-center gap-2.5 rounded-lg border border-border/50 bg-elevated/30 px-3 py-2 hover:bg-elevated/50 transition-colors">
+            <label className="mt-2.5 flex cursor-pointer items-center gap-2.5 rounded-card border border-border/50 bg-elevated/30 px-3 py-2 hover:bg-elevated/50 transition-colors">
               <input
                 type="checkbox"
                 checked={marketLevel}
@@ -534,7 +534,7 @@ export function CreateExtDialog({ onClose }: { onClose: () => void }) {
                 <select
                   value={method}
                   onChange={(e) => setMethod(e.target.value as 'GET' | 'POST')}
-                  className="h-9 shrink-0 rounded-lg border border-border bg-base px-2.5 text-xs font-mono text-foreground focus:outline-none focus:ring-1 focus:ring-accent/25 focus:border-accent/50"
+                  className="h-9 shrink-0 rounded-card border border-border bg-base px-2.5 text-xs font-mono text-foreground focus:outline-none focus:ring-1 focus:ring-accent/25 focus:border-accent/50"
                 >
                   <option value="GET">GET</option>
                   <option value="POST">POST</option>
@@ -543,12 +543,12 @@ export function CreateExtDialog({ onClose }: { onClose: () => void }) {
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
                   placeholder="https://api.example.com/data"
-                  className="h-9 flex-1 min-w-0 rounded-lg border border-border bg-base px-3 text-xs font-mono text-foreground placeholder:text-muted/40 focus:outline-none focus:ring-1 focus:ring-accent/25 focus:border-accent/50 transition-shadow"
+                  className="h-9 flex-1 min-w-0 rounded-card border border-border bg-base px-3 text-xs font-mono text-foreground placeholder:text-muted/40 focus:outline-none focus:ring-1 focus:ring-accent/25 focus:border-accent/50 transition-shadow"
                 />
                 <button
                   onClick={handleDetectUrl}
                   disabled={detecting || !url.trim()}
-                  className="h-9 inline-flex items-center gap-1.5 rounded-lg bg-accent px-3.5 text-xs font-medium text-on-accent hover:bg-accent/90 active:translate-y-px disabled:opacity-40 disabled:pointer-events-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-all"
+                  className="h-9 inline-flex items-center gap-1.5 rounded-card bg-accent px-3.5 text-xs font-medium text-on-accent hover:bg-accent/90 active:translate-y-px disabled:opacity-40 disabled:pointer-events-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-all"
                 >
                   {detecting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
                   测试识别
@@ -575,9 +575,9 @@ export function CreateExtDialog({ onClose }: { onClose: () => void }) {
                   />
                 </div>
               </div>
-              <div className="rounded-lg border border-border/50 bg-base/40 p-2.5 space-y-2">
+              <div className="rounded-card border border-border/50 bg-base/40 p-2.5 space-y-2">
                 <div className="text-micro text-muted">调度方式</div>
-                <div className="grid grid-cols-2 gap-1 rounded-lg bg-elevated/50 p-1 border border-border/40">
+                <div className="grid grid-cols-2 gap-1 rounded-card bg-elevated/50 p-1 border border-border/40">
                   <button
                     onClick={() => { setScheduleMode('interval'); setScheduleTime('') }}
                     className={`h-8 rounded-card text-micro font-medium transition-all ${
@@ -618,7 +618,7 @@ export function CreateExtDialog({ onClose }: { onClose: () => void }) {
                           setScheduleUnit(unit)
                         }}
                         title={`间隔单位: 秒 (${MIN_PULL_INTERVAL_SECONDS}~${MAX_PULL_INTERVAL_SECONDS}) / 分钟 (1~)`}
-                        className="h-8 shrink-0 rounded-lg border border-border bg-base px-1.5 text-micro text-foreground cursor-pointer focus:outline-none focus:ring-1 focus:ring-accent/25"
+                        className="h-8 shrink-0 rounded-card border border-border bg-base px-1.5 text-micro text-foreground cursor-pointer focus:outline-none focus:ring-1 focus:ring-accent/25"
                       >
                         <option value="minutes">分钟</option>
                         <option value="seconds">秒</option>
@@ -634,7 +634,7 @@ export function CreateExtDialog({ onClose }: { onClose: () => void }) {
                       <select
                         value={schedulePeriod}
                         onChange={(e) => setSchedulePeriod(e.target.value as 'daily' | 'weekly' | 'monthly')}
-                        className="h-8 rounded-lg border border-border bg-base px-2 text-micro text-foreground cursor-pointer focus:outline-none focus:ring-1 focus:ring-accent/25"
+                        className="h-8 rounded-card border border-border bg-base px-2 text-micro text-foreground cursor-pointer focus:outline-none focus:ring-1 focus:ring-accent/25"
                       >
                         <option value="daily">每日</option>
                         <option value="weekly">每周</option>
@@ -645,7 +645,7 @@ export function CreateExtDialog({ onClose }: { onClose: () => void }) {
                         onChange={(e) => setScheduleDay(Number(e.target.value))}
                         disabled={schedulePeriod === 'daily'}
                         title={schedulePeriod === 'weekly' ? '每周几拉取' : '每月几号拉取 (短月无该日则该月跳过)'}
-                        className="h-8 rounded-lg border border-border bg-base px-2 text-micro text-foreground cursor-pointer focus:outline-none focus:ring-1 focus:ring-accent/25 disabled:opacity-40"
+                        className="h-8 rounded-card border border-border bg-base px-2 text-micro text-foreground cursor-pointer focus:outline-none focus:ring-1 focus:ring-accent/25 disabled:opacity-40"
                       >
                         {(schedulePeriod === 'weekly' ? WEEKDAY_OPTS : MONTHDAY_OPTS).map(([v, t]) => (
                           <option key={v} value={String(v)}>{t}</option>
@@ -663,7 +663,7 @@ export function CreateExtDialog({ onClose }: { onClose: () => void }) {
                           <button
                             type="button"
                             onClick={() => setScheduleTime('')}
-                            className="h-8 shrink-0 px-2.5 rounded-lg border border-border bg-base text-micro text-muted hover:text-foreground hover:bg-elevated focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-colors"
+                            className="h-8 shrink-0 px-2.5 rounded-card border border-border bg-base text-micro text-muted hover:text-foreground hover:bg-elevated focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-colors"
                           >
                             清除
                           </button>
@@ -693,7 +693,7 @@ export function CreateExtDialog({ onClose }: { onClose: () => void }) {
                     onChange={(e) => setHeaderStr(e.target.value)}
                     rows={2}
                     placeholder='{"Authorization":"Bearer xxx"}'
-                    className="w-full rounded-lg border border-border bg-base px-2.5 py-1.5 text-micro font-mono text-foreground placeholder:text-muted/40 resize-none focus:outline-none focus:ring-1 focus:ring-accent/25 focus:border-accent/50 transition-shadow"
+                    className="w-full rounded-card border border-border bg-base px-2.5 py-1.5 text-micro font-mono text-foreground placeholder:text-muted/40 resize-none focus:outline-none focus:ring-1 focus:ring-accent/25 focus:border-accent/50 transition-shadow"
                   />
                 </div>
                 <div>
@@ -703,7 +703,7 @@ export function CreateExtDialog({ onClose }: { onClose: () => void }) {
                     onChange={(e) => setFieldMapStr(e.target.value)}
                     rows={2}
                     placeholder='{"code":"symbol","val":"score"}'
-                    className="w-full rounded-lg border border-border bg-base px-2.5 py-1.5 text-micro font-mono text-foreground placeholder:text-muted/40 resize-none focus:outline-none focus:ring-1 focus:ring-accent/25 focus:border-accent/50 transition-shadow"
+                    className="w-full rounded-card border border-border bg-base px-2.5 py-1.5 text-micro font-mono text-foreground placeholder:text-muted/40 resize-none focus:outline-none focus:ring-1 focus:ring-accent/25 focus:border-accent/50 transition-shadow"
                   />
                 </div>
               </div>
@@ -715,12 +715,12 @@ export function CreateExtDialog({ onClose }: { onClose: () => void }) {
                     onChange={(e) => setBody(e.target.value)}
                     rows={3}
                     placeholder='{"page":1}'
-                    className="w-full rounded-lg border border-border bg-base px-2.5 py-1.5 text-micro font-mono text-foreground placeholder:text-muted/40 resize-none focus:outline-none focus:ring-1 focus:ring-accent/25 focus:border-accent/50 transition-shadow"
+                    className="w-full rounded-card border border-border bg-base px-2.5 py-1.5 text-micro font-mono text-foreground placeholder:text-muted/40 resize-none focus:outline-none focus:ring-1 focus:ring-accent/25 focus:border-accent/50 transition-shadow"
                   />
                 </div>
               )}
               {urlPreview && (
-                <div className="rounded-lg border border-border/50 bg-base/60 p-3 space-y-2">
+                <div className="rounded-card border border-border/50 bg-base/60 p-3 space-y-2">
                   <div className="flex items-center justify-between text-micro">
                     <span className="text-secondary tabular-nums">
                       识别到 <span className="text-foreground font-medium">{urlPreview.total_rows}</span> 行 · 路径{' '}
@@ -796,7 +796,7 @@ export function CreateExtDialog({ onClose }: { onClose: () => void }) {
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
                 exit={{ opacity: 0, height: 0 }}
-                className="mb-2 rounded-lg border border-warning/30 bg-warning/[0.06] px-3 py-2.5 space-y-2"
+                className="mb-2 rounded-card border border-warning/30 bg-warning/[0.06] px-3 py-2.5 space-y-2"
               >
                 <div className="text-micro text-warning font-medium">
                   未自动识别到唯一标的代码，请选择哪一列作为标的代码
@@ -862,7 +862,7 @@ export function CreateExtDialog({ onClose }: { onClose: () => void }) {
                 <span className="text-micro text-muted">手动添加字段后即可创建空表结构</span>
                 <button
                   onClick={addField}
-                  className="inline-flex items-center gap-1 rounded-lg bg-accent px-3.5 py-1.5 text-xs font-medium text-on-accent hover:bg-accent/90 active:translate-y-px focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-all"
+                  className="inline-flex items-center gap-1 rounded-card bg-accent px-3.5 py-1.5 text-xs font-medium text-on-accent hover:bg-accent/90 active:translate-y-px focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-all"
                 >
                   <Plus className="h-3.5 w-3.5" />
                   添加字段
@@ -876,7 +876,7 @@ export function CreateExtDialog({ onClose }: { onClose: () => void }) {
                 ].map(row => (
                   <div
                     key={row.key}
-                    className={`flex items-center gap-2.5 px-3 py-2 rounded-lg border ${
+                    className={`flex items-center gap-2.5 px-3 py-2 rounded-card border ${
                       row.mapped ? 'border-border/40 bg-elevated/20' : 'border-danger/30 bg-danger/[0.04]'
                     }`}
                   >
@@ -899,18 +899,18 @@ export function CreateExtDialog({ onClose }: { onClose: () => void }) {
                         value={f.label}
                         onChange={(e) => updateField(idx, 'label', e.target.value)}
                         placeholder="显示名"
-                        className="w-24 h-8 px-2.5 rounded-lg border border-border bg-base text-micro text-foreground placeholder:text-muted/40 focus:outline-none focus:ring-1 focus:ring-accent/25 focus:border-accent/50 transition-shadow"
+                        className="w-24 h-8 px-2.5 rounded-card border border-border bg-base text-micro text-foreground placeholder:text-muted/40 focus:outline-none focus:ring-1 focus:ring-accent/25 focus:border-accent/50 transition-shadow"
                       />
                       <input
                         value={f.name}
                         onChange={(e) => updateField(idx, 'name', e.target.value)}
                         placeholder="字段名（英文）"
-                        className="flex-1 h-8 px-2.5 rounded-lg border border-border bg-base text-micro font-mono text-foreground placeholder:text-muted/40 focus:outline-none focus:ring-1 focus:ring-accent/25 focus:border-accent/50 transition-shadow"
+                        className="flex-1 h-8 px-2.5 rounded-card border border-border bg-base text-micro font-mono text-foreground placeholder:text-muted/40 focus:outline-none focus:ring-1 focus:ring-accent/25 focus:border-accent/50 transition-shadow"
                       />
                       <select
                         value={f.dtype}
                         onChange={(e) => updateField(idx, 'dtype', e.target.value)}
-                        className="h-8 px-2 rounded-lg border border-border bg-base text-micro text-foreground focus:outline-none focus:ring-1 focus:ring-accent/25 focus:border-accent/50"
+                        className="h-8 px-2 rounded-card border border-border bg-base text-micro text-foreground focus:outline-none focus:ring-1 focus:ring-accent/25 focus:border-accent/50"
                       >
                         <option value="string">文本</option>
                         <option value="int">整数</option>
@@ -951,7 +951,7 @@ export function CreateExtDialog({ onClose }: { onClose: () => void }) {
               ] as const).map(opt => (
                 <label
                   key={opt.label}
-                  className={`flex items-start gap-2.5 px-2 py-1.5 -mx-2 rounded-lg transition-colors ${opt.disabled ? 'opacity-40 pointer-events-none' : 'hover:bg-elevated/50 cursor-pointer'}`}
+                  className={`flex items-start gap-2.5 px-2 py-1.5 -mx-2 rounded-card transition-colors ${opt.disabled ? 'opacity-40 pointer-events-none' : 'hover:bg-elevated/50 cursor-pointer'}`}
                 >
                   <input
                     type="checkbox"
@@ -970,7 +970,7 @@ export function CreateExtDialog({ onClose }: { onClose: () => void }) {
 
           {error && (
 
-            <div role="alert" className="flex items-start gap-2 text-micro text-danger bg-danger/5 border border-danger/20 rounded-lg px-3 py-2.5">
+            <div role="alert" className="flex items-start gap-2 text-micro text-danger bg-danger/5 border border-danger/20 rounded-card px-3 py-2.5">
               <AlertCircle className="h-3.5 w-3.5 mt-px shrink-0" />
               <span className="leading-relaxed">{error}</span>
             </div>
@@ -988,14 +988,14 @@ export function CreateExtDialog({ onClose }: { onClose: () => void }) {
           <div className="flex items-center gap-2 shrink-0">
             <button
               onClick={onClose}
-              className="px-4 py-2 rounded-lg bg-elevated text-secondary text-xs hover:bg-elevated/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-colors"
+              className="px-4 py-2 rounded-card bg-elevated text-secondary text-xs hover:bg-elevated/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-colors"
             >
               取消
             </button>
             <button
               onClick={() => create.mutate()}
               disabled={!valid || create.isPending}
-              className="px-5 py-2 inline-flex items-center gap-1.5 rounded-lg bg-accent text-on-accent text-xs font-medium hover:bg-accent/90 active:translate-y-px disabled:opacity-40 disabled:pointer-events-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-all shadow-sm shadow-accent/20"
+              className="px-5 py-2 inline-flex items-center gap-1.5 rounded-card bg-accent text-on-accent text-xs font-medium hover:bg-accent/90 active:translate-y-px disabled:opacity-40 disabled:pointer-events-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-all shadow-sm shadow-accent/20"
             >
               {create.isPending
                 ? <><Loader2 className="h-3.5 w-3.5 animate-spin" />创建中…</>

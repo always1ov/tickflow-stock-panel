@@ -79,14 +79,14 @@ function renderExtInline(
   return (
     <span className="inline-flex flex-wrap items-center gap-0.5">
       {shown.map((tag, i) => (
-        <span key={i} className="inline-block px-1 rounded text-micro leading-tight text-yellow-500 bg-yellow-500/10">
+        <span key={i} className="inline-block px-1 rounded-btn text-micro leading-tight text-warning bg-warning/10">
           {tag}
         </span>
       ))}
       {!showAll && overflow > 0 && (
         <button
           onClick={onToggle}
-          className="inline-block px-1 rounded text-micro leading-tight text-accent bg-accent/10 hover:bg-accent/20 transition-colors"
+          className="inline-block px-1 rounded-btn text-micro leading-tight text-accent bg-accent/10 hover:bg-accent/20 transition-colors"
         >
           +{overflow}
         </button>
@@ -94,7 +94,7 @@ function renderExtInline(
       {showAll && maxTags > 0 && tags.length > maxTags && (
         <button
           onClick={onToggle}
-          className="inline-block px-1 rounded text-micro leading-tight text-muted hover:text-foreground transition-colors"
+          className="inline-block px-1 rounded-btn text-micro leading-tight text-muted hover:text-foreground transition-colors"
         >
           收起
         </button>

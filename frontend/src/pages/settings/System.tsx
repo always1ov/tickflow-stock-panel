@@ -813,7 +813,7 @@ function UpgradeGuardCard() {
             <span className="text-micro text-muted">清单 {st?.manifest_version ?? '—'} · 当前 {st?.current_version}</span>
             <button onClick={scan} disabled={busy === 'scan' || !!st?.scanning}
               title="重新扫描程序目录, 刷新常备备份 (修改程序文件后可手动执行)"
-              className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs text-secondary transition-colors hover:bg-elevated hover:text-foreground disabled:opacity-50">
+              className="inline-flex items-center gap-1.5 rounded-card px-2.5 py-1 text-xs text-secondary transition-colors hover:bg-elevated hover:text-foreground disabled:opacity-50">
               <RefreshCw className={`h-3 w-3 ${busy === 'scan' || st?.scanning ? 'animate-spin' : ''}`} />
               {busy === 'scan' || st?.scanning ? '扫描中' : '重新扫描'}
             </button>
@@ -829,7 +829,7 @@ function UpgradeGuardCard() {
             <span className="text-micro text-muted">（上次扫描 {st?.last_scan?.replace('T', ' ').slice(0, 19) ?? '—'}）</span>
           </button>
           {listOpen && (
-            <div className="mt-2 max-h-48 overflow-y-auto rounded-lg border border-border/60 bg-base/40 p-2 font-mono text-micro leading-5">
+            <div className="mt-2 max-h-48 overflow-y-auto rounded-card border border-border/60 bg-base/40 p-2 font-mono text-micro leading-5">
               {st?.modified?.map(f => <div key={f} className="truncate text-warning">✎ {f}</div>)}
               {st?.added?.map(f => <div key={f} className="truncate text-bear">＋ {f}</div>)}
               {(st?.modified?.length ?? 0) + (st?.added?.length ?? 0) === 0 && (
@@ -841,7 +841,7 @@ function UpgradeGuardCard() {
       )}
 
       {report && (
-        <div className="mt-3 rounded-lg border border-warning/25 bg-warning/[0.05] p-3">
+        <div className="mt-3 rounded-card border border-warning/25 bg-warning/[0.05] p-3">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 text-xs">
               <div className="font-medium text-foreground">
@@ -857,18 +857,18 @@ function UpgradeGuardCard() {
             <div className="flex shrink-0 gap-2">
               {restorableFiles.length > 0 && (
                 <button onClick={() => restoreAll(report.id, restorableFiles)} disabled={!!busy}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-2.5 py-1 text-micro text-white hover:bg-accent/90 disabled:opacity-50">
+                  className="inline-flex items-center gap-1.5 rounded-card bg-accent px-2.5 py-1 text-micro text-white hover:bg-accent/90 disabled:opacity-50">
                   <RotateCcw className="h-3 w-3" />
                   恢复可恢复项 ({restorableFiles.length})
                 </button>
               )}
               <button onClick={dismiss} disabled={busy === 'dismiss'}
-                className="rounded-lg px-2.5 py-1 text-micro text-secondary hover:bg-elevated hover:text-foreground disabled:opacity-50">
+                className="rounded-card px-2.5 py-1 text-micro text-secondary hover:bg-elevated hover:text-foreground disabled:opacity-50">
                 知道了
               </button>
             </div>
           </div>
-          <div className="mt-2 max-h-56 overflow-y-auto rounded-md border border-border/40 bg-base/40 p-2">
+          <div className="mt-2 max-h-56 overflow-y-auto rounded-btn border border-border/40 bg-base/40 p-2">
             {reportFiles.map(f => (
               <div key={f.relpath} className="flex items-center justify-between gap-2 py-0.5">
                 <span className="min-w-0 truncate font-mono text-micro text-secondary" title={f.relpath}>{f.relpath}</span>
@@ -878,7 +878,7 @@ function UpgradeGuardCard() {
                   </span>
                   {(f.category === 'restorable' || f.category === 'added_lost') && (
                     <button onClick={() => restore(report.id, f.relpath)} disabled={busy === f.relpath}
-                      className="rounded px-1.5 py-0.5 text-micro text-accent hover:bg-accent/10 disabled:opacity-50">
+                      className="rounded-btn px-1.5 py-0.5 text-micro text-accent hover:bg-accent/10 disabled:opacity-50">
                       {busy === f.relpath ? '恢复中' : '恢复'}
                     </button>
                   )}

@@ -99,7 +99,7 @@ export function EditExtDialog({ config, onClose }: { config: ExtDataConfig; onCl
               <h3 className="text-sm leading-6 font-semibold text-foreground">编辑扩展数据</h3>
               <div className="flex items-center gap-1.5 mt-0.5">
                 <span className="text-micro font-mono text-muted">{config.id}</span>
-                <span className={`inline-flex px-1.5 py-px rounded text-micro border ${
+                <span className={`inline-flex px-1.5 py-px rounded-btn text-micro border ${
                   config.mode === 'snapshot'
                     ? 'bg-blue-500/10 border-blue-500/25 text-blue-400'
                     : 'bg-warning/10 border-warning/25 text-warning'
@@ -112,7 +112,7 @@ export function EditExtDialog({ config, onClose }: { config: ExtDataConfig; onCl
           <button
             onClick={onClose}
             aria-label="关闭"
-            className="p-1.5 rounded-lg text-secondary hover:text-foreground hover:bg-elevated focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-colors shrink-0"
+            className="p-1.5 rounded-card text-secondary hover:text-foreground hover:bg-elevated focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-colors shrink-0"
           >
             <X className="h-4 w-4" />
           </button>
@@ -178,7 +178,7 @@ export function EditExtDialog({ config, onClose }: { config: ExtDataConfig; onCl
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
                 exit={{ opacity: 0, height: 0 }}
-                className="mb-2 rounded-lg border border-warning/30 bg-warning/[0.06] px-3 py-2.5 space-y-2"
+                className="mb-2 rounded-card border border-warning/30 bg-warning/[0.06] px-3 py-2.5 space-y-2"
               >
                 <div className="text-micro text-warning font-medium">未找到 symbol 列，请选择哪一列作为标的代码</div>
                 <div className="flex flex-wrap gap-1.5">
@@ -211,7 +211,7 @@ export function EditExtDialog({ config, onClose }: { config: ExtDataConfig; onCl
                       onChange={(e) => updateField(i, 'label', e.target.value)}
                       placeholder="显示名"
                       disabled={isBuiltin}
-                      className={`w-24 h-8 px-2.5 rounded-lg border text-micro placeholder:text-muted/40 focus:outline-none focus:ring-1 focus:ring-accent/25 focus:border-accent/50 transition-shadow ${
+                      className={`w-24 h-8 px-2.5 rounded-card border text-micro placeholder:text-muted/40 focus:outline-none focus:ring-1 focus:ring-accent/25 focus:border-accent/50 transition-shadow ${
                         isBuiltin
                           ? 'bg-elevated/50 border-border/60 text-muted cursor-not-allowed'
                           : 'bg-base border-border text-foreground'
@@ -223,7 +223,7 @@ export function EditExtDialog({ config, onClose }: { config: ExtDataConfig; onCl
                         onChange={(e) => updateField(i, 'name', e.target.value)}
                         placeholder="字段名（英文）"
                         disabled={isBuiltin}
-                        className={`w-full h-8 px-2.5 rounded-lg border text-micro font-mono placeholder:text-muted/40 focus:outline-none focus:ring-1 focus:ring-accent/25 focus:border-accent/50 transition-shadow ${
+                        className={`w-full h-8 px-2.5 rounded-card border text-micro font-mono placeholder:text-muted/40 focus:outline-none focus:ring-1 focus:ring-accent/25 focus:border-accent/50 transition-shadow ${
                           isBuiltin
                             ? 'bg-elevated/50 border-border/60 text-muted cursor-not-allowed pr-7'
                             : 'bg-base border-border text-foreground pr-2.5'
@@ -237,7 +237,7 @@ export function EditExtDialog({ config, onClose }: { config: ExtDataConfig; onCl
                       value={f.dtype}
                       onChange={(e) => updateField(i, 'dtype', e.target.value)}
                       disabled={isBuiltin}
-                      className={`h-8 px-2 rounded-lg border border-border text-micro focus:outline-none focus:ring-1 focus:ring-accent/25 focus:border-accent/50 ${
+                      className={`h-8 px-2 rounded-card border border-border text-micro focus:outline-none focus:ring-1 focus:ring-accent/25 focus:border-accent/50 ${
                         isBuiltin ? 'bg-elevated/50 text-muted cursor-not-allowed' : 'bg-base text-foreground'
                       }`}
                     >
@@ -264,7 +264,7 @@ export function EditExtDialog({ config, onClose }: { config: ExtDataConfig; onCl
           </section>
 
           {error && (
-            <div className="flex items-start gap-2 text-micro text-danger bg-danger/5 border border-danger/20 rounded-lg px-3 py-2.5">
+            <div className="flex items-start gap-2 text-micro text-danger bg-danger/5 border border-danger/20 rounded-card px-3 py-2.5">
               <AlertCircle className="h-3.5 w-3.5 mt-px shrink-0" />
               <span className="leading-relaxed">{error}</span>
             </div>
@@ -274,14 +274,14 @@ export function EditExtDialog({ config, onClose }: { config: ExtDataConfig; onCl
         <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-border/50 bg-elevated/30">
           <button
             onClick={onClose}
-            className="px-4 py-2 rounded-lg bg-elevated text-secondary text-xs hover:bg-elevated/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-colors"
+            className="px-4 py-2 rounded-card bg-elevated text-secondary text-xs hover:bg-elevated/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-colors"
           >
             取消
           </button>
           <button
             onClick={() => update.mutate()}
             disabled={!valid || update.isPending}
-            className="px-5 py-2 inline-flex items-center gap-1.5 rounded-lg bg-accent text-on-accent text-xs font-medium hover:bg-accent/90 active:translate-y-px disabled:opacity-40 disabled:pointer-events-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-all shadow-sm shadow-accent/20"
+            className="px-5 py-2 inline-flex items-center gap-1.5 rounded-card bg-accent text-on-accent text-xs font-medium hover:bg-accent/90 active:translate-y-px disabled:opacity-40 disabled:pointer-events-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-all shadow-sm shadow-accent/20"
           >
             {update.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
             {update.isPending ? '保存中…' : '保存'}

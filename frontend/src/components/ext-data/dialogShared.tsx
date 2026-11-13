@@ -8,7 +8,7 @@ export function SectionHead({ num, title, children }: {
 }) {
   return (
     <div className="flex items-center gap-2.5 mb-2.5">
-      <span className="font-mono text-[10px] text-amber-500/80 tabular-nums">{num}</span>
+      <span className="font-mono text-micro text-warning/80 tabular-nums">{num}</span>
       <span className="text-xs font-semibold text-foreground shrink-0">{title}</span>
       <div className="flex-1 h-px bg-border/60" />
       {children}
@@ -16,8 +16,8 @@ export function SectionHead({ num, title, children }: {
   )
 }
 
-export const INPUT_CLS = 'w-full h-9 px-3 rounded-lg bg-base border border-border text-xs text-foreground placeholder:text-muted/40 focus:outline-none focus:ring-1 focus:ring-accent/30 focus:border-accent/50 transition-shadow'
-export const INPUT_SM_CLS = 'w-full h-8 px-2.5 rounded-lg border border-border bg-base text-[11px] text-foreground placeholder:text-muted/40 focus:outline-none focus:ring-1 focus:ring-accent/25 focus:border-accent/50 transition-shadow'
+export const INPUT_CLS = 'w-full h-9 px-3 rounded-card bg-base border border-border text-xs text-foreground placeholder:text-muted/40 focus:outline-none focus:ring-1 focus:ring-accent/30 focus:border-accent/50 transition-shadow'
+export const INPUT_SM_CLS = 'w-full h-8 px-2.5 rounded-card border border-border bg-base text-micro text-foreground placeholder:text-muted/40 focus:outline-none focus:ring-1 focus:ring-accent/25 focus:border-accent/50 transition-shadow'
 
 export const MIN_PULL_INTERVAL_SECONDS = 10
 export const MAX_PULL_INTERVAL_SECONDS = 2_592_000

@@ -80,7 +80,7 @@ export function RegimeConfigCard() {
           type="button"
           onClick={() => updateEnabled.mutate(!on)}
           disabled={updateEnabled.isPending}
-          className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors ${
+          className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-btn border transition-colors ${
             on ? 'bg-accent border-accent' : 'bg-base border-border'
           }`}
           role="checkbox"

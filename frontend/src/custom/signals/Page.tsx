@@ -117,9 +117,9 @@ function SignalsBody({ highlight }: { highlight: string }) {
       {/* 紧凑工具条: 统计 + 视图切换 + 新建 */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
-          <div className="inline-flex h-7 items-center gap-1.5 rounded-btn border border-border bg-surface/80 px-2.5 text-[11px] font-medium text-secondary sm:text-xs">
+          <div className="inline-flex h-7 items-center gap-1.5 rounded-btn border border-border bg-surface/80 px-2.5 text-micro font-medium text-secondary sm:text-xs">
             条件信号
-            <span className="rounded bg-elevated px-1 py-px font-mono text-[10px] text-muted">{signals.length}</span>
+            <span className="rounded-btn bg-elevated px-1 py-px font-mono text-micro text-muted">{signals.length}</span>
             <span className="text-muted">· {enabledCustomSignals} 个已启用</span>
           </div>
           <div className="inline-flex h-7 items-center rounded-btn border border-border p-0.5" role="tablist" aria-label="信号库视图">
@@ -130,7 +130,7 @@ function SignalsBody({ highlight }: { highlight: string }) {
                 role="tab"
                 aria-selected={view === id}
                 onClick={() => setView(id)}
-                className={`rounded px-2 py-0.5 text-[11px] transition-colors ${view === id ? 'bg-accent/10 font-medium text-accent' : 'text-secondary hover:text-foreground'}`}
+                className={`rounded-btn px-2 py-0.5 text-micro transition-colors ${view === id ? 'bg-accent/10 font-medium text-accent' : 'text-secondary hover:text-foreground'}`}
               >
                 {label}
               </button>
@@ -138,10 +138,10 @@ function SignalsBody({ highlight }: { highlight: string }) {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <span className="text-[11px] text-muted">信号保存为 <span className="font-mono text-secondary">csg_*</span> 列，条件字段可用行情指标、涨跌停判定价与全部注册因子</span>
+          <span className="text-micro text-muted">信号保存为 <span className="font-mono text-secondary">csg_*</span> 列，条件字段可用行情指标、涨跌停判定价与全部注册因子</span>
           <button
             onClick={openNew}
-            className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-btn border border-amber-400/30 bg-amber-400/5 px-3 text-xs font-medium text-amber-400 transition-colors hover:bg-amber-400/10"
+            className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-btn border border-warning/30 bg-warning/5 px-3 text-xs font-medium text-warning transition-colors hover:bg-warning/10"
           >
             <Plus className="h-3.5 w-3.5" />
             新建信号
@@ -158,15 +158,15 @@ function SignalsBody({ highlight }: { highlight: string }) {
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <h3 className="truncate text-sm font-medium text-foreground">{sig.name}</h3>
-                      <span className={`rounded px-1.5 py-0.5 text-[10px] ${KIND_CLASS[sig.kind]}`}>
+                      <span className={`rounded-btn px-1.5 py-0.5 text-micro ${KIND_CLASS[sig.kind]}`}>
                         {KIND_LABEL[sig.kind]}
                       </span>
-                      {!sig.enabled && <span className="rounded bg-muted/10 px-1.5 py-0.5 text-[10px] text-muted">已停用</span>}
-                      {sig.archived && <span className="rounded bg-muted/15 px-1.5 py-0.5 text-[10px] text-muted">已归档</span>}
+                      {!sig.enabled && <span className="rounded-btn bg-muted/10 px-1.5 py-0.5 text-micro text-muted">已停用</span>}
+                      {sig.archived && <span className="rounded-btn bg-muted/15 px-1.5 py-0.5 text-micro text-muted">已归档</span>}
                     </div>
-                    <p className="mt-1 truncate font-mono text-[11px] text-muted">{sig.column ?? `csg_${sig.id}`}</p>
+                    <p className="mt-1 truncate font-mono text-micro text-muted">{sig.column ?? `csg_${sig.id}`}</p>
                     {sig.archived && sig.archived_at && (
-                      <p className="mt-1 text-[10px] text-muted/80">归档于 {sig.archived_at.slice(0, 16).replace('T', ' ')}</p>
+                      <p className="mt-1 text-micro text-muted/80">归档于 {sig.archived_at.slice(0, 16).replace('T', ' ')}</p>
                     )}
                   </div>
                   <div className="flex shrink-0 items-center gap-1">
@@ -175,7 +175,7 @@ function SignalsBody({ highlight }: { highlight: string }) {
                         onClick={() => setArchived.mutate({ id: sig.id, archived: false })}
                         disabled={setArchived.isPending}
                         title="恢复到信号库 (归档可逆, 不影响计算)"
-                        className="inline-flex cursor-pointer items-center gap-1 rounded border border-accent/30 px-1.5 py-0.5 text-micro text-accent hover:bg-accent/10 disabled:opacity-50"
+                        className="inline-flex cursor-pointer items-center gap-1 rounded-btn border border-accent/30 px-1.5 py-0.5 text-micro text-accent hover:bg-accent/10 disabled:opacity-50"
                       >
                         <ArchiveRestore className="h-3 w-3" />恢复
                       </button>
@@ -184,15 +184,15 @@ function SignalsBody({ highlight }: { highlight: string }) {
                         onClick={() => setArchived.mutate({ id: sig.id, archived: true })}
                         disabled={setArchived.isPending}
                         title="归档到档案库 (可恢复, 不删除信号)"
-                        className="cursor-pointer rounded p-1 text-muted hover:bg-warning/10 hover:text-warning disabled:opacity-50"
+                        className="cursor-pointer rounded-btn p-1 text-muted hover:bg-warning/10 hover:text-warning disabled:opacity-50"
                       >
                         <Archive className="h-3.5 w-3.5" />
                       </button>
                     )}
-                    <button onClick={() => toggleEnabled(sig)} title={sig.enabled ? '停用' : '启用'} className={`cursor-pointer rounded p-1 ${sig.enabled ? 'text-bear hover:bg-bear/10' : 'text-muted hover:bg-elevated'}`}>
+                    <button onClick={() => toggleEnabled(sig)} title={sig.enabled ? '停用' : '启用'} className={`cursor-pointer rounded-btn p-1 ${sig.enabled ? 'text-bear hover:bg-bear/10' : 'text-muted hover:bg-elevated'}`}>
                       <Zap className="h-3.5 w-3.5" />
                     </button>
-                    <button onClick={() => openEdit(sig)} className="cursor-pointer rounded p-1 text-muted hover:bg-accent/10 hover:text-accent" title="编辑">
+                    <button onClick={() => openEdit(sig)} className="cursor-pointer rounded-btn p-1 text-muted hover:bg-accent/10 hover:text-accent" title="编辑">
                       <Settings2 className="h-3.5 w-3.5" />
                     </button>
                     {confirmingDeleteId === sig.id ? (
@@ -200,7 +200,7 @@ function SignalsBody({ highlight }: { highlight: string }) {
                         onClick={() => handleDeleteClick(sig)}
                         disabled={del.isPending}
                         title="再次点击确认删除"
-                        className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-danger/30 bg-danger/15 px-1.5 py-0.5 text-[10px] font-medium text-danger disabled:opacity-50"
+                        className="inline-flex cursor-pointer items-center gap-1 rounded-btn border border-danger/30 bg-danger/15 px-1.5 py-0.5 text-micro font-medium text-danger disabled:opacity-50"
                       >
                         <Trash2 className="h-2.5 w-2.5" />确认
                       </button>
@@ -208,7 +208,7 @@ function SignalsBody({ highlight }: { highlight: string }) {
                       <button
                         onClick={() => handleDeleteClick(sig)}
                         disabled={del.isPending}
-                        className="cursor-pointer rounded p-1 text-muted hover:bg-danger/10 hover:text-danger disabled:opacity-50"
+                        className="cursor-pointer rounded-btn p-1 text-muted hover:bg-danger/10 hover:text-danger disabled:opacity-50"
                         title="删除"
                       >
                         <Trash2 className="h-3.5 w-3.5" />

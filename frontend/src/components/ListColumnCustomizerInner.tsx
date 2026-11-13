@@ -193,7 +193,7 @@ function SortableActiveCol({ col, onRemove, onConfig, configOpen, extTableLabel,
           opacity: isDragging ? 0.5 : 1,
           zIndex: isDragging ? 10 : undefined,
         }}
-        className={`flex items-center gap-2 px-2 py-1.5 rounded-lg group border ${
+        className={`flex items-center gap-2 px-2 py-1.5 rounded-card group border ${
           isDragging ? 'bg-elevated shadow-lg border-transparent'
             : configOpen ? 'bg-accent/8 border-accent/30'
               : 'border-transparent hover:bg-elevated/50'
@@ -217,7 +217,7 @@ function SortableActiveCol({ col, onRemove, onConfig, configOpen, extTableLabel,
         {showStandaloneToggle && (
           <button
             onClick={() => onToggleStandalone?.(col.id)}
-            className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded text-micro transition-colors shrink-0 ${
+            className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-btn text-micro transition-colors shrink-0 ${
               col.standalone
                 ? 'text-accent bg-accent/10'
                 : 'text-muted hover:text-secondary opacity-0 group-hover:opacity-100'
@@ -230,7 +230,7 @@ function SortableActiveCol({ col, onRemove, onConfig, configOpen, extTableLabel,
         {hasConfig && (
           <button
             onClick={() => onConfig(configOpen ? null : col.id)}
-            className={`shrink-0 p-1 rounded transition-colors ${configOpen ? 'text-accent bg-accent/10' : 'text-muted hover:text-accent hover:bg-elevated'}`}
+            className={`shrink-0 p-1 rounded-btn transition-colors ${configOpen ? 'text-accent bg-accent/10' : 'text-muted hover:text-accent hover:bg-elevated'}`}
             title={configOpen ? '收起配置' : '配置'}
           >
             <Settings2 className="h-3.5 w-3.5" />
@@ -238,7 +238,7 @@ function SortableActiveCol({ col, onRemove, onConfig, configOpen, extTableLabel,
         )}
         <button
           onClick={() => onRemove(col.id)}
-          className="shrink-0 p-1 rounded text-muted hover:text-danger hover:bg-elevated transition-colors"
+          className="shrink-0 p-1 rounded-btn text-muted hover:text-danger hover:bg-elevated transition-colors"
           title="移出列表"
         >
           <X className="h-3.5 w-3.5" />
@@ -549,7 +549,7 @@ function extGranularityOf(
           <select
             value={col.extDisplay?.displayMode ?? 'tag'}
             onChange={e => updateExtDisplay(col.id, { displayMode: e.target.value as 'tag' | 'text' })}
-            className="flex-1 h-7 rounded bg-elevated border border-border text-foreground text-xs px-2 focus:outline-none focus:border-accent/50"
+            className="flex-1 h-7 rounded-btn bg-elevated border border-border text-foreground text-xs px-2 focus:outline-none focus:border-accent/50"
           >
             <option value="tag">标签</option>
             <option value="text">纯文本</option>
@@ -563,7 +563,7 @@ function extGranularityOf(
               value={col.extDisplay?.separator ?? ''}
               onChange={e => updateExtDisplay(col.id, { separator: e.target.value })}
               placeholder="默认：、,，;；-"
-              className="flex-1 h-7 rounded bg-elevated border border-border text-foreground text-xs px-2 placeholder:text-muted focus:outline-none focus:border-accent/50"
+              className="flex-1 h-7 rounded-btn bg-elevated border border-border text-foreground text-xs px-2 placeholder:text-muted focus:outline-none focus:border-accent/50"
             />
           </label>
         )}
@@ -574,7 +574,7 @@ function extGranularityOf(
             value={col.extDisplay?.maxWidth ?? ''}
             onChange={e => updateExtDisplay(col.id, { maxWidth: e.target.value })}
             placeholder="如 200px"
-            className="flex-1 h-7 rounded bg-elevated border border-border text-foreground text-xs px-2 placeholder:text-muted focus:outline-none focus:border-accent/50"
+            className="flex-1 h-7 rounded-btn bg-elevated border border-border text-foreground text-xs px-2 placeholder:text-muted focus:outline-none focus:border-accent/50"
           />
         </label>
         {(col.extDisplay?.displayMode ?? 'tag') === 'tag' && (
@@ -588,7 +588,7 @@ function extGranularityOf(
                 updateExtDisplay(col.id, { maxTags: v, ...(v ? {} : { hiddenIndices: undefined }) })
               }}
               placeholder="0=全部"
-              className="flex-1 h-7 rounded bg-elevated border border-border text-foreground text-xs px-2 placeholder:text-muted focus:outline-none focus:border-accent/50"
+              className="flex-1 h-7 rounded-btn bg-elevated border border-border text-foreground text-xs px-2 placeholder:text-muted focus:outline-none focus:border-accent/50"
             />
           </label>
         )}
@@ -606,7 +606,7 @@ function extGranularityOf(
                       const next = hidden ? cur.filter(x => x !== i) : [...cur, i]
                       updateExtDisplay(col.id, { hiddenIndices: next.length ? next : undefined })
                     }}
-                    className={`w-6 h-6 rounded text-micro font-medium transition-colors ${
+                    className={`w-6 h-6 rounded-btn text-micro font-medium transition-colors ${
                       hidden ? 'bg-elevated text-muted line-through' : 'bg-accent/15 text-accent'
                     }`}
                   >
@@ -620,7 +620,7 @@ function extGranularityOf(
         {(col.extDisplay?.displayMode ?? 'tag') === 'tag' && (
           <label className="flex items-center gap-2 text-xs">
             <span className="text-secondary w-16 shrink-0">排列方向</span>
-            <div className="flex rounded overflow-hidden border border-border">
+            <div className="flex rounded-btn overflow-hidden border border-border">
               <button
                 onClick={() => updateExtDisplay(col.id, { tagLayout: 'horizontal' })}
                 className={`px-3 py-1 text-xs transition-colors ${
@@ -648,14 +648,14 @@ function extGranularityOf(
                 onChange={e => updateExtDisplay(col.id, {
                   seriesGranularity: e.target.value === 'auto' ? undefined : e.target.value as 'daily' | 'intraday',
                 })}
-                className="flex-1 min-w-0 h-7 rounded bg-elevated border border-border text-foreground text-xs px-2 focus:outline-none focus:border-accent/50"
+                className="flex-1 min-w-0 h-7 rounded-btn bg-elevated border border-border text-foreground text-xs px-2 focus:outline-none focus:border-accent/50"
               >
                 <option value="auto">跟随数据表（当前按{defaultGranularity === 'daily' ? '日' : '日内'}）</option>
                 <option value="daily">按日（近 N 日，每天一值）</option>
                 <option value="intraday" disabled={!table?.time_field}>按日内（当天全部盘次）</option>
               </select>
             </label>
-            <p className="text-[10px] text-muted leading-relaxed">
+            <p className="text-micro text-muted leading-relaxed">
               仅影响本列展示，原始多盘记录保留。{!table?.time_field && '按日内展示需先在扩展数据拉取设置中配置时间字段。'}
             </p>
           </div>
@@ -669,7 +669,7 @@ function extGranularityOf(
               <select
                 value={col.extDisplay?.snapshotRender ?? 'text'}
                 onChange={e => updateExtDisplay(col.id, { snapshotRender: e.target.value as 'text' | 'bar' | 'line' })}
-                className="flex-1 h-7 rounded bg-elevated border border-border text-foreground text-xs px-2 focus:outline-none focus:border-accent/50"
+                className="flex-1 h-7 rounded-btn bg-elevated border border-border text-foreground text-xs px-2 focus:outline-none focus:border-accent/50"
               >
                 <option value="line">折线图 (分时式)</option>
                 <option value="bar">柱状图 (逐盘幅度)</option>
@@ -684,7 +684,7 @@ function extGranularityOf(
                   value={(col.extDisplay?.snapshotAt ?? '').slice(0, 5)}
                   onChange={e => updateExtDisplay(col.id, { snapshotAt: e.target.value ? `${e.target.value}:00` : undefined })}
                   title="取该时刻或之前最近一盘的值; 留空=末盘定型值"
-                  className="flex-1 h-7 rounded bg-elevated border border-border text-foreground text-xs px-2 focus:outline-none focus:border-accent/50"
+                  className="flex-1 h-7 rounded-btn bg-elevated border border-border text-foreground text-xs px-2 focus:outline-none focus:border-accent/50"
                 />
                 <span className="text-micro text-muted shrink-0">留空=末盘</span>
               </label>
@@ -696,7 +696,7 @@ function extGranularityOf(
                     value={col.extDisplay?.chartWidth ?? 150}
                     min={60} max={300} step={10}
                     onCommit={v => updateExtDisplay(col.id, { chartWidth: v })}
-                    className="w-16 h-7 rounded bg-elevated border border-border text-foreground text-xs px-2 text-center focus:outline-none focus:border-accent/50"
+                    className="w-16 h-7 rounded-btn bg-elevated border border-border text-foreground text-xs px-2 text-center focus:outline-none focus:border-accent/50"
                   />
                 </label>
                 <label className="flex items-center gap-1">
@@ -705,7 +705,7 @@ function extGranularityOf(
                     value={col.extDisplay?.chartHeight ?? 80}
                     min={24} max={160} step={4}
                     onCommit={v => updateExtDisplay(col.id, { chartHeight: v })}
-                    className="w-16 h-7 rounded bg-elevated border border-border text-foreground text-xs px-2 text-center focus:outline-none focus:border-accent/50"
+                    className="w-16 h-7 rounded-btn bg-elevated border border-border text-foreground text-xs px-2 text-center focus:outline-none focus:border-accent/50"
                   />
                 </label>
                 <span className="text-micro text-muted">px · 当天全序列</span>
@@ -721,7 +721,7 @@ function extGranularityOf(
               <select
                 value={col.extDisplay?.snapshotRender ?? 'text'}
                 onChange={e => updateExtDisplay(col.id, { snapshotRender: e.target.value as 'text' | 'bar' | 'line' })}
-                className="flex-1 h-7 rounded bg-elevated border border-border text-foreground text-xs px-2 focus:outline-none focus:border-accent/50"
+                className="flex-1 h-7 rounded-btn bg-elevated border border-border text-foreground text-xs px-2 focus:outline-none focus:border-accent/50"
               >
                 <option value="bar">柱状图 (近N日每日值)</option>
                 <option value="line">折线图 (近N日)</option>
@@ -736,7 +736,7 @@ function extGranularityOf(
                     value={col.extDisplay?.chartDays ?? 10}
                     min={3} max={60} step={1}
                     onCommit={v => updateExtDisplay(col.id, { chartDays: v })}
-                    className="w-16 h-7 rounded bg-elevated border border-border text-foreground text-xs px-2 text-center focus:outline-none focus:border-accent/50"
+                    className="w-16 h-7 rounded-btn bg-elevated border border-border text-foreground text-xs px-2 text-center focus:outline-none focus:border-accent/50"
                   />
                 </label>
                 <label className="flex items-center gap-1">
@@ -745,7 +745,7 @@ function extGranularityOf(
                     value={col.extDisplay?.chartWidth ?? 150}
                     min={60} max={300} step={10}
                     onCommit={v => updateExtDisplay(col.id, { chartWidth: v })}
-                    className="w-16 h-7 rounded bg-elevated border border-border text-foreground text-xs px-2 text-center focus:outline-none focus:border-accent/50"
+                    className="w-16 h-7 rounded-btn bg-elevated border border-border text-foreground text-xs px-2 text-center focus:outline-none focus:border-accent/50"
                   />
                 </label>
                 <label className="flex items-center gap-1">
@@ -754,7 +754,7 @@ function extGranularityOf(
                     value={col.extDisplay?.chartHeight ?? 80}
                     min={24} max={160} step={4}
                     onCommit={v => updateExtDisplay(col.id, { chartHeight: v })}
-                    className="w-16 h-7 rounded bg-elevated border border-border text-foreground text-xs px-2 text-center focus:outline-none focus:border-accent/50"
+                    className="w-16 h-7 rounded-btn bg-elevated border border-border text-foreground text-xs px-2 text-center focus:outline-none focus:border-accent/50"
                   />
                 </label>
                 <span className="text-micro text-muted">px · 近N日全序列</span>
@@ -787,7 +787,7 @@ function extGranularityOf(
               <select
                 value={col.extDisplay?.unitConvert ?? 'none'}
                 onChange={e => updateExtDisplay(col.id, { unitConvert: e.target.value as 'none' | 'wan' | 'yi' | 'auto' })}
-                className="flex-1 h-7 rounded bg-elevated border border-border text-foreground text-xs px-2 focus:outline-none focus:border-accent/50"
+                className="flex-1 h-7 rounded-btn bg-elevated border border-border text-foreground text-xs px-2 focus:outline-none focus:border-accent/50"
               >
                 <option value="none">不换算</option>
                 <option value="wan">万 (÷1万)</option>
@@ -802,7 +802,7 @@ function extGranularityOf(
                   type="number" min={0} max={6} step={1}
                   value={col.extDisplay?.unitDecimals ?? 2}
                   onChange={e => updateExtDisplay(col.id, { unitDecimals: Math.max(0, Math.min(6, Number(e.target.value) || 0)) })}
-                  className="w-16 h-7 rounded bg-elevated border border-border text-foreground text-xs px-2 text-center focus:outline-none focus:border-accent/50"
+                  className="w-16 h-7 rounded-btn bg-elevated border border-border text-foreground text-xs px-2 text-center focus:outline-none focus:border-accent/50"
                 />
                 <span className="text-micro text-muted">换算后保留几位</span>
               </label>
@@ -841,7 +841,7 @@ function extGranularityOf(
               updateExtDisplay(col.id, { maxTags: v, ...(v ? {} : { hiddenIndices: undefined }) })
             }}
             placeholder="0=全部"
-            className="flex-1 h-7 rounded bg-elevated border border-border text-foreground text-xs placeholder:text-muted focus:outline-none focus:border-accent/50"
+            className="flex-1 h-7 rounded-btn bg-elevated border border-border text-foreground text-xs placeholder:text-muted focus:outline-none focus:border-accent/50"
           />
         </label>
         {(col.extDisplay?.maxTags ?? 0) > 0 && (
@@ -858,7 +858,7 @@ function extGranularityOf(
                       const next = hidden ? cur.filter(x => x !== i) : [...cur, i]
                       updateExtDisplay(col.id, { hiddenIndices: next.length ? next : undefined })
                     }}
-                    className={`w-6 h-6 rounded text-micro font-medium transition-colors ${
+                    className={`w-6 h-6 rounded-btn text-micro font-medium transition-colors ${
                       hidden ? 'bg-elevated text-muted line-through' : 'bg-accent/15 text-accent'
                     }`}
                   >
@@ -871,7 +871,7 @@ function extGranularityOf(
         )}
         <label className="flex items-center gap-2 text-xs">
           <span className="text-secondary w-16 shrink-0">排列方向</span>
-          <div className="flex rounded overflow-hidden border border-border">
+          <div className="flex rounded-btn overflow-hidden border border-border">
             <button
               onClick={() => updateExtDisplay(col.id, { tagLayout: 'horizontal' })}
               className={`px-3 py-1 text-xs transition-colors ${
@@ -948,7 +948,7 @@ function extGranularityOf(
                 value={unifiedHeight}
                 min={LINK_HEIGHT_BOUNDS.min} max={LINK_HEIGHT_BOUNDS.max}
                 onCommit={v => updateChartLink({ height: v })}
-                className="flex-1 h-7 rounded bg-elevated border border-border text-foreground text-xs px-2 focus:outline-none focus:border-accent/50 tabular-nums"
+                className="flex-1 h-7 rounded-btn bg-elevated border border-border text-foreground text-xs px-2 focus:outline-none focus:border-accent/50 tabular-nums"
               />
             </label>
             <div className="text-micro text-muted leading-relaxed">
@@ -1004,7 +1004,7 @@ function extGranularityOf(
               const merged = resolveCandleConfig({ ...col.candleConfig, [field]: raw === '' ? undefined : Number(raw) }, link)
               updateCandleConfig(col.id, { [field]: merged[field] } as Partial<CandleColumnConfig>)
             }}
-            className={`flex-1 h-7 rounded bg-elevated border border-border text-foreground text-xs px-2 focus:outline-none focus:border-accent/50 tabular-nums${locked ? ' opacity-60' : ''}`}
+            className={`flex-1 h-7 rounded-btn bg-elevated border border-border text-foreground text-xs px-2 focus:outline-none focus:border-accent/50 tabular-nums${locked ? ' opacity-60' : ''}`}
           />
         </label>
       )
@@ -1046,7 +1046,7 @@ function extGranularityOf(
           {/* 效果预览: 固定样例 K, 宽高与量带即时反映 (阈值与列表同源: 带宽 ≥3px 即画) */}
           <div className="border-t border-border/40 pt-2 mt-1">
             <div className="text-micro text-muted mb-1.5">效果预览（示例日K，配置改动即时反映）</div>
-            <div className="rounded bg-base border border-border/60 flex items-center justify-center overflow-hidden">
+            <div className="rounded-btn bg-base border border-border/60 flex items-center justify-center overflow-hidden">
               <MiniCandlestick
                 rows={PREVIEW_KLINES}
                 width={Math.min(cfg.enabledWidth, 260)}
@@ -1097,7 +1097,7 @@ function extGranularityOf(
               const merged = resolveIntradayConfig({ ...col.intradayConfig, [field]: raw === '' ? undefined : Number(raw) }, link)
               updateIntradayConfig(col.id, { [field]: merged[field] } as Partial<IntradayColumnConfig>)
             }}
-            className={`flex-1 h-7 rounded bg-elevated border border-border text-foreground text-xs px-2 focus:outline-none focus:border-accent/50 tabular-nums${locked ? ' opacity-60' : ''}`}
+            className={`flex-1 h-7 rounded-btn bg-elevated border border-border text-foreground text-xs px-2 focus:outline-none focus:border-accent/50 tabular-nums${locked ? ' opacity-60' : ''}`}
           />
         </label>
       )
@@ -1126,7 +1126,7 @@ function extGranularityOf(
         <select
           value={auction?.[key] ?? ''}
           onChange={e => updateAuction({ [key]: e.target.value || undefined })}
-          className="flex-1 h-7 rounded bg-elevated border border-border text-foreground text-xs px-2 focus:outline-none focus:border-accent/50"
+          className="flex-1 h-7 rounded-btn bg-elevated border border-border text-foreground text-xs px-2 focus:outline-none focus:border-accent/50"
         >
           <option value="">{hint ?? '不显示'}</option>
           {numericFields.map(f => (
@@ -1229,7 +1229,7 @@ function extGranularityOf(
                     if (next === auction?.configId) return
                     updateAuction({ configId: next, priceField: undefined, matchField: undefined, unmatchedField: undefined })
                   }}
-                  className="flex-1 h-7 rounded bg-elevated border border-border text-foreground text-xs px-2 focus:outline-none focus:border-accent/50"
+                  className="flex-1 h-7 rounded-btn bg-elevated border border-border text-foreground text-xs px-2 focus:outline-none focus:border-accent/50"
                 >
                   <option value="">选择时序扩展表</option>
                   {multiTables.map(t => (
@@ -1238,7 +1238,7 @@ function extGranularityOf(
                 </select>
               </label>
               {multiTables.length === 0 && (
-                <div className="text-micro text-amber-500 leading-relaxed">
+                <div className="text-micro text-warning leading-relaxed">
                   暂无可用的日内多盘扩展表 — 需先在「数据 → 扩展数据」创建时序表并配置时间列（如集合竞价）。
                 </div>
               )}
@@ -1250,7 +1250,7 @@ function extGranularityOf(
                   {/* 栏宽三档 (R3): 只改窄栏占宽, 分桶数随宽度自适应 */}
                   <div className="flex items-center gap-2 text-xs">
                     <span className="text-secondary w-16 shrink-0">栏宽</span>
-                    <div className="flex rounded overflow-hidden border border-border">
+                    <div className="flex rounded-btn overflow-hidden border border-border">
                       {([['narrow', '窄'], ['standard', '标准'], ['wide', '宽']] as [AuctionBarWidth, string][]).map(([v, text], i) => (
                         <button
                           key={v}
@@ -1277,7 +1277,7 @@ function extGranularityOf(
                             key={c.key}
                             type="button"
                             onClick={() => addExtColumn(auction!.configId!, c.field, c.label, c.type)}
-                            className={`px-2 py-1 rounded border text-micro transition-colors cursor-pointer ${
+                            className={`px-2 py-1 rounded-btn border text-micro transition-colors cursor-pointer ${
                               c.added
                                 ? 'bg-accent/15 border-accent/40 text-accent'
                                 : 'bg-elevated border-border text-secondary hover:text-foreground'
@@ -1301,7 +1301,7 @@ function extGranularityOf(
           {/* 效果预览 (R4): 固定样例数据渲染真组件, 配置改动即时反映 (所见即所得) */}
           <div className="border-t border-border/40 pt-2 mt-1">
             <div className="text-micro text-muted mb-1.5">效果预览（示例数据，配置改动即时反映）</div>
-            <div className="rounded bg-base border border-border/60 flex items-center justify-center overflow-hidden">
+            <div className="rounded-btn bg-base border border-border/60 flex items-center justify-center overflow-hidden">
               <MiniIntraday
                 rows={PREVIEW_ROWS}
                 prevClose={10}
@@ -1327,7 +1327,7 @@ function extGranularityOf(
   }
 
   const renderCheckbox = (checked: boolean) => (
-    <span className={`shrink-0 w-4 h-4 rounded flex items-center justify-center transition-colors ${
+    <span className={`shrink-0 w-4 h-4 rounded-btn flex items-center justify-center transition-colors ${
       checked ? 'bg-accent text-white' : 'border border-border text-transparent group-hover:border-muted'
     }`}>
       <svg viewBox="0 0 16 16" className="w-2.5 h-2.5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -1339,7 +1339,7 @@ function extGranularityOf(
   const renderBuiltinRow = (col: ColumnConfig) => (
     <div
       key={col.id}
-      className="flex items-center gap-2 w-full px-2 py-1.5 rounded hover:bg-elevated/50 text-left group transition-colors"
+      className="flex items-center gap-2 w-full px-2 py-1.5 rounded-btn hover:bg-elevated/50 text-left group transition-colors"
     >
       <button onClick={() => toggleVisible(col.id)} className="flex items-center gap-2 flex-1 min-w-0">
         {renderCheckbox(col.visible)}
@@ -1348,7 +1348,7 @@ function extGranularityOf(
       {showStandaloneToggle && col.visible && (
         <button
           onClick={() => toggleStandalone(col.id)}
-          className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded text-micro transition-colors shrink-0 ${
+          className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-btn text-micro transition-colors shrink-0 ${
             col.standalone
               ? 'text-accent bg-accent/10'
               : 'text-muted hover:text-secondary'
@@ -1369,7 +1369,7 @@ function extGranularityOf(
       <button
         key={field.name}
         onClick={() => addExtColumn(configId, field.name, field.label, field.type)}
-        className="flex items-center gap-2 w-full px-2 py-1.5 rounded hover:bg-elevated/50 text-left group transition-colors"
+        className="flex items-center gap-2 w-full px-2 py-1.5 rounded-btn hover:bg-elevated/50 text-left group transition-colors"
       >
         {renderCheckbox(checked)}
         <span className={`flex-1 text-xs truncate ${checked ? 'text-foreground' : 'text-muted'}`}>{field.label || field.name}</span>
@@ -1403,7 +1403,7 @@ function extGranularityOf(
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
                   placeholder="搜索列名 / 扩展字段…"
-                  className="w-full h-8 pl-8 pr-3 rounded-lg bg-elevated border border-border text-xs text-foreground placeholder:text-muted focus:outline-none focus:border-accent/50 transition-colors"
+                  className="w-full h-8 pl-8 pr-3 rounded-card bg-elevated border border-border text-xs text-foreground placeholder:text-muted focus:outline-none focus:border-accent/50 transition-colors"
                 />
               </div>
               <span className="hidden sm:inline ml-auto text-micro text-muted tabular-nums shrink-0">已选 {activeCols.length} 列</span>
@@ -1416,7 +1416,7 @@ function extGranularityOf(
                   {baselineSavedAt && Date.now() - baselineSavedAt < 2000 ? '✓ 已保存' : '保存为默认方案'}
                 </button>
               )}
-              <button onClick={onClose} aria-label="关闭列设置" className="p-1 rounded hover:bg-elevated text-muted hover:text-foreground transition-colors shrink-0">
+              <button onClick={onClose} aria-label="关闭列设置" className="p-1 rounded-btn hover:bg-elevated text-muted hover:text-foreground transition-colors shrink-0">
                 <X className="h-4 w-4" />
               </button>
             </div>
@@ -1452,7 +1452,7 @@ function extGranularityOf(
                     <div key={group.id}>
                       <button
                         onClick={() => toggleGroup(group.id)}
-                        className="flex items-center gap-1.5 w-full px-1 py-1.5 rounded hover:bg-elevated/30 text-left transition-colors"
+                        className="flex items-center gap-1.5 w-full px-1 py-1.5 rounded-btn hover:bg-elevated/30 text-left transition-colors"
                       >
                         {isExpanded ? <ChevronDown className="h-3 w-3 text-muted" /> : <ChevronRight className="h-3 w-3 text-muted" />}
                         {group.icon && <span className="text-micro">{group.icon}</span>}
@@ -1497,12 +1497,12 @@ function extGranularityOf(
                         <div key={table.id}>
                           <button
                             onClick={() => toggleTableExpand(table.id)}
-                            className="flex items-center gap-1.5 w-full px-1 py-1.5 rounded hover:bg-elevated/30 text-left transition-colors"
+                            className="flex items-center gap-1.5 w-full px-1 py-1.5 rounded-btn hover:bg-elevated/30 text-left transition-colors"
                           >
                             {isExpanded ? <ChevronDown className="h-3 w-3 text-muted" /> : <ChevronRight className="h-3 w-3 text-muted" />}
                             <Database className="h-3 w-3 text-accent shrink-0" />
                             <span className="text-micro font-medium text-secondary flex-1 truncate">{table.label}</span>
-                            <span className="text-micro text-muted px-1.5 py-0.5 rounded bg-elevated shrink-0">
+                            <span className="text-micro text-muted px-1.5 py-0.5 rounded-btn bg-elevated shrink-0">
                               {table.mode === 'snapshot' ? '快照' : '时序'}
                             </span>
                             <span className="text-micro text-muted tabular-nums w-8 text-right shrink-0">

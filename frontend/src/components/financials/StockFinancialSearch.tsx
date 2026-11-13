@@ -122,11 +122,11 @@ export function StockFinancialSearch({ onSelect, assetTypes }: Props) {
                   {(() => {
                     const b = boardTag(r.symbol)
                     return b && (
-                      <span className={`shrink-0 px-1 py-0.5 rounded text-micro leading-none border ${b.color}`}>{b.label}</span>
+                      <span className={`shrink-0 px-1 py-0.5 rounded-btn text-micro leading-none border ${b.color}`}>{b.label}</span>
                     )
                   })()}
                   {r.asset_type === 'index' && (
-                    <span className="shrink-0 px-1 py-0.5 rounded text-micro leading-none bg-sky-500/10 text-sky-400">指数</span>
+                    <span className="shrink-0 px-1 py-0.5 rounded-btn text-micro leading-none bg-sky-500/10 text-sky-400">指数</span>
                   )}
                   {r.code && <span className="text-micro text-muted font-mono shrink-0">{r.code}</span>}
                 </button>

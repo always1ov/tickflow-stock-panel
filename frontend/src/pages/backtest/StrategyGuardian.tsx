@@ -9,7 +9,7 @@ import { INPUT_CLS, PRIMARY_OBJECTIVES, StrategySelect } from './components/para
 const STATUS_META: Record<GuardianProfile['status'], { label: string; cls: string }> = {
   pending: { label: '未复验', cls: 'bg-elevated text-secondary' },
   healthy: { label: '健康', cls: 'bg-emerald-500/15 text-emerald-400' },
-  watch: { label: '观察', cls: 'bg-amber-500/15 text-amber-400' },
+  watch: { label: '观察', cls: 'bg-warning/15 text-warning' },
   retired: { label: '已退役', cls: 'bg-red-500/15 text-red-400' },
 }
 
@@ -29,7 +29,7 @@ function fmtNum(v: number | null | undefined, digits = 2): string {
 function StatusBadge({ status }: { status: GuardianProfile['status'] }) {
   const meta = STATUS_META[status]
   return (
-    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${meta.cls}`}>
+    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-micro font-medium ${meta.cls}`}>
       {status === 'healthy' && <ShieldCheck className="mr-0.5 h-3 w-3" />}
       {meta.label}
     </span>
@@ -64,7 +64,7 @@ function ConfigCard({ config }: { config: GuardianConfig }) {
         </label>
       </div>
       <div className="mt-2 flex flex-wrap items-end gap-2">
-        <label className="text-[11px] text-secondary">
+        <label className="text-micro text-secondary">
           观察阈值
           <input
             type="number" step="0.05" min="0.05" max="0.9"
@@ -74,7 +74,7 @@ function ConfigCard({ config }: { config: GuardianConfig }) {
             className={`${INPUT_CLS} mt-0.5 w-24`}
           />
         </label>
-        <label className="text-[11px] text-secondary">
+        <label className="text-micro text-secondary">
           退役阈值
           <input
             type="number" step="0.05" min="0.1" max="1"
@@ -84,7 +84,7 @@ function ConfigCard({ config }: { config: GuardianConfig }) {
             className={`${INPUT_CLS} mt-0.5 w-24`}
           />
         </label>
-        <label className="text-[11px] text-secondary">
+        <label className="text-micro text-secondary">
           验证段数上限 K
           <input
             type="number" step="1" min="2" max="4"
@@ -94,7 +94,7 @@ function ConfigCard({ config }: { config: GuardianConfig }) {
             className={`${INPUT_CLS} mt-0.5 w-20`}
           />
         </label>
-        <label className="text-[11px] text-secondary">
+        <label className="text-micro text-secondary">
           挖掘策略名额上限
           <input
             type="number" step="1" min="0" max="50"
@@ -104,9 +104,9 @@ function ConfigCard({ config }: { config: GuardianConfig }) {
             className={`${INPUT_CLS} mt-0.5 w-24`}
           />
         </label>
-        <div className="text-[10px] text-secondary">基线后退化为百分比; 段回测失败只降级到观察, 不会直接退役</div>
+        <div className="text-micro text-secondary">基线后退化为百分比; 段回测失败只降级到观察, 不会直接退役</div>
       </div>
-      {error && <div className="mt-2 text-[11px] text-red-400">{error}</div>}
+      {error && <div className="mt-2 text-micro text-red-400">{error}</div>}
     </div>
   )
 }
@@ -141,10 +141,10 @@ function AdoptCard({ onChanged }: { onChanged: () => void }) {
           <ShieldCheck className="h-3.5 w-3.5" /> 入护并复验
         </button>
       </div>
-      <div className="mt-1.5 text-[10px] text-secondary">
+      <div className="mt-1.5 text-micro text-secondary">
         手动入护用入护日前 252 个交易日的尾随表现作参考基线 (非样本外), 判定只针对此后新数据; 挖掘发布的策略自动入护 (门槛基线, 天然 OOS)。
       </div>
-      {error && <div className="mt-2 text-[11px] text-red-400">{error}</div>}
+      {error && <div className="mt-2 text-micro text-red-400">{error}</div>}
     </div>
   )
 }
@@ -158,14 +158,14 @@ function LabReportCard({ report }: { report: LabReport | undefined }) {
     <div className="rounded-card border border-border bg-surface p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="text-xs font-medium">实验室战报</div>
-        <div className="flex flex-wrap gap-2 text-[11px] text-secondary">
+        <div className="flex flex-wrap gap-2 text-micro text-secondary">
           <span>守护 {report.guardian.profiles} 个
             {report.guardian.by_status.healthy ? ` · 健康 ${report.guardian.by_status.healthy}` : ''}
             {report.guardian.by_status.watch ? ` · 观察 ${report.guardian.by_status.watch}` : ''}
             {report.guardian.by_status.retired ? ` · 退役 ${report.guardian.by_status.retired}` : ''}
           </span>
           {report.guardian.alerts > 0 && (
-            <span className="inline-flex items-center gap-0.5 text-amber-400">
+            <span className="inline-flex items-center gap-0.5 text-warning">
               <BellRing className="h-3 w-3" /> {report.guardian.alerts} 个连续观察告警
             </span>
           )}
@@ -175,7 +175,7 @@ function LabReportCard({ report }: { report: LabReport | undefined }) {
           </span>
         </div>
       </div>
-      <div className="mt-1.5 text-[11px] text-secondary">
+      <div className="mt-1.5 text-micro text-secondary">
         {mining
           ? `最近挖掘 ${mining.status} · ${mining.algorithm_version ?? '—'} · 候选 ${mining.candidate_count ?? '—'} 个 · 有效折 ${mining.valid_fold_count ?? '—'}`
           : '还没有挖掘运行'}
@@ -210,13 +210,13 @@ function CombinationsCard({
         <button
           onClick={onScan}
           disabled={busy}
-          className="inline-flex items-center gap-1 rounded-btn border border-border px-2 py-1 text-[11px] text-secondary hover:bg-elevated hover:text-foreground disabled:opacity-40"
+          className="inline-flex items-center gap-1 rounded-btn border border-border px-2 py-1 text-micro text-secondary hover:bg-elevated hover:text-foreground disabled:opacity-40"
         >
           <RefreshCw className="h-3 w-3" /> 扫描相关性
         </button>
       </div>
       {combinations.length === 0 ? (
-        <div className="mt-2 text-[11px] text-secondary">
+        <div className="mt-2 text-micro text-secondary">
           暂无建议 — 扫描会计算健康守护冠军间近 126 个交易日的日收益相关性, 相关性 ≤0.7 的对才会出现在这里。
         </div>
       ) : (
@@ -224,7 +224,7 @@ function CombinationsCard({
           {combinations.map(item => {
             const key = `${item.a}+${item.b}`
             return (
-              <div key={key} className="flex items-center justify-between gap-2 rounded-input bg-elevated/40 px-2 py-1.5 text-[11px]">
+              <div key={key} className="flex items-center justify-between gap-2 rounded-input bg-elevated/40 px-2 py-1.5 text-micro">
                 <span className="min-w-0 truncate">
                   {item.a} <span className="text-secondary">×</span> {item.b}
                   <span className="ml-2 text-secondary">相关性 {item.corr.toFixed(2)} · {item.common_days} 日</span>
@@ -240,7 +240,7 @@ function CombinationsCard({
                     }
                   }}
                   disabled={busy || creating === key}
-                  className="shrink-0 rounded-btn bg-accent px-2 py-1 text-[11px] font-medium text-white hover:opacity-90 disabled:opacity-40"
+                  className="shrink-0 rounded-btn bg-accent px-2 py-1 text-micro font-medium text-white hover:opacity-90 disabled:opacity-40"
                 >
                   {creating === key ? '生成中…' : '生成组合'}
                 </button>
@@ -383,13 +383,13 @@ export function StrategyGuardian() {
                   <tr key={p.strategy_id} className="border-b border-border/40 align-top hover:bg-elevated/50">
                     <td className="px-3 py-2">
                       <div className="font-medium">{p.name ?? p.strategy_id}</div>
-                      <div className="text-[10px] text-secondary">{p.strategy_id}</div>
+                      <div className="text-micro text-secondary">{p.strategy_id}</div>
                     </td>
                     <td className="px-2 py-2">
                       <div className="flex flex-col items-start gap-1">
                         <StatusBadge status={p.status} />
                         {p.alert && (
-                          <span className="inline-flex items-center gap-0.5 text-[10px] text-amber-400">
+                          <span className="inline-flex items-center gap-0.5 text-micro text-warning">
                             <BellRing className="h-3 w-3" /> 连续 {p.consecutive_watch} 次观察
                           </span>
                         )}
@@ -397,18 +397,18 @@ export function StrategyGuardian() {
                     </td>
                     <td className="px-2 py-2 text-secondary">
                       <div>{BASELINE_KIND_LABEL[p.baseline.kind ?? ''] ?? '—'}</div>
-                      <div className="text-[10px]">
+                      <div className="text-micro">
                         {p.baseline.objective ?? '—'} {fmtNum(p.baseline.score)} · {p.baseline.n_trades ?? '—'} 笔 · 截至 {p.baseline.data_as_of ?? '—'}
                       </div>
                     </td>
                     <td className="px-2 py-2 text-secondary">
                       <div>{last?.checked_at ? new Date(last.checked_at).toLocaleString('zh-CN', { hour12: false }) : '—'}</div>
-                      <div className="max-w-56 truncate text-[10px]" title={lastText}>{lastText}</div>
+                      <div className="max-w-56 truncate text-micro" title={lastText}>{lastText}</div>
                     </td>
                     <td className="px-2 py-2 text-right font-medium" style={{ color: last?.degradation_pct != null && last.degradation_pct > 0 ? '#f87171' : undefined }}>
                       {fmtDegradation(last?.degradation_pct)}
                     </td>
-                    <td className="max-w-64 px-2 py-2 text-[10px] text-secondary">
+                    <td className="max-w-64 px-2 py-2 text-micro text-secondary">
                       {(last?.reasons?.length ? last.reasons : [p.status_reason]).filter(Boolean).join('; ') || '—'}
                     </td>
                     <td className="px-2 py-2">

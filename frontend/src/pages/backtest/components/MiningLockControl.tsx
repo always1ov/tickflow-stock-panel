@@ -56,7 +56,7 @@ export function MiningLockControl() {
           <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${busy || lockQuery.isPending ? 'animate-spin text-muted' : data?.mine && !error ? 'text-success' : 'text-warning'}`} />
           <div className="min-w-0">
             <div className="font-medium text-foreground">{title}</div>
-            <div className="mt-0.5 break-words text-[11px] leading-4 text-secondary">
+            <div className="mt-0.5 break-words text-micro leading-4 text-secondary">
               {error ? error.message : data?.mine ? '当前后端已取得挖掘权限。'
                 : blocked ? <>
                   {holder ? `占用进程 ${holder.pid}${holder.role === 'worker' ? ' · 挖掘工作进程' : holder.role === 'app' ? ' · 后端实例' : ''}。` : ''}

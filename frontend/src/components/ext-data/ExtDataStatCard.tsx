@@ -113,7 +113,7 @@ export function ExtDataStatCard({ config, onDelete, deleting, onEdit }: {
             {config.label}
           </h3>
           <div className="flex items-center gap-1.5 mt-1.5">
-            <span className={`whitespace-nowrap text-micro leading-none font-medium px-1.5 py-1 rounded-md ${
+            <span className={`whitespace-nowrap text-micro leading-none font-medium px-1.5 py-1 rounded-btn ${
               config.mode === 'snapshot'
                 ? 'bg-blue-500/10 text-blue-400'
                 : 'bg-warning/10 text-warning'
@@ -122,7 +122,7 @@ export function ExtDataStatCard({ config, onDelete, deleting, onEdit }: {
             </span>
             {config.mode === 'timeseries' && config.pull?.time_field && (
               <span
-                className="whitespace-nowrap text-micro leading-none font-medium px-1.5 py-1 rounded-md bg-accent-soft text-accent"
+                className="whitespace-nowrap text-micro leading-none font-medium px-1.5 py-1 rounded-btn bg-accent-soft text-accent"
                 title={`日内多盘 · 时间列 ${config.pull.time_field}`}
               >
                 多盘
@@ -133,7 +133,7 @@ export function ExtDataStatCard({ config, onDelete, deleting, onEdit }: {
         <button
           onClick={() => setSettingsOpen(v => !v)}
           aria-label={`${config.label}设置`}
-          className="shrink-0 p-1.5 rounded-md hover:bg-elevated/70 transition-colors text-muted hover:text-secondary"
+          className="shrink-0 p-1.5 rounded-btn hover:bg-elevated/70 transition-colors text-muted hover:text-secondary"
         >
           <Settings className="h-3.5 w-3.5" />
         </button>
@@ -162,7 +162,7 @@ export function ExtDataStatCard({ config, onDelete, deleting, onEdit }: {
               .map((f) => (
                 <span
                   key={f.name}
-                  className="text-micro leading-none py-1 px-1.5 rounded-md bg-elevated/70 border border-border/40 text-secondary"
+                  className="text-micro leading-none py-1 px-1.5 rounded-btn bg-elevated/70 border border-border/40 text-secondary"
                   title={f.name}
                 >
                   {f.label || f.name}
@@ -223,8 +223,8 @@ export function ExtDataStatCard({ config, onDelete, deleting, onEdit }: {
           <SettingsModal title={config.label} onClose={() => setSettingsOpen(false)} width="max-w-xl">
             <div className="space-y-4">
               {/* 信息条: 一眼看清这张表是什么 */}
-              <div className="flex items-center gap-2 flex-wrap rounded-lg border border-border/50 bg-elevated/30 px-3 py-2 text-micro">
-                <span className={`px-1.5 py-px rounded font-medium border ${
+              <div className="flex items-center gap-2 flex-wrap rounded-card border border-border/50 bg-elevated/30 px-3 py-2 text-micro">
+                <span className={`px-1.5 py-px rounded-btn font-medium border ${
                   config.mode === 'snapshot'
                     ? 'bg-blue-500/10 text-blue-400 border-blue-500/20'
                     : 'bg-warning/10 text-warning border-warning/20'
@@ -244,7 +244,7 @@ export function ExtDataStatCard({ config, onDelete, deleting, onEdit }: {
                 <div className="grid grid-cols-3 gap-1 rounded-card bg-elevated/50 p-1 border border-border/40">
                   <button
                     onClick={() => setIngestTab('pull')}
-                    className={`inline-flex items-center justify-center gap-1.5 h-9 rounded-lg text-xs font-medium transition-all ${
+                    className={`inline-flex items-center justify-center gap-1.5 h-9 rounded-card text-xs font-medium transition-all ${
                       ingestTab === 'pull' ? 'bg-surface text-foreground shadow-sm' : 'text-muted hover:text-secondary hover:bg-elevated/40'
                     }`}
                   >
@@ -252,7 +252,7 @@ export function ExtDataStatCard({ config, onDelete, deleting, onEdit }: {
                   </button>
                   <button
                     onClick={() => setIngestTab('api')}
-                    className={`inline-flex items-center justify-center gap-1.5 h-9 rounded-lg text-xs font-medium transition-all ${
+                    className={`inline-flex items-center justify-center gap-1.5 h-9 rounded-card text-xs font-medium transition-all ${
                       ingestTab === 'api' ? 'bg-surface text-foreground shadow-sm' : 'text-muted hover:text-secondary hover:bg-elevated/40'
                     }`}
                   >
@@ -260,7 +260,7 @@ export function ExtDataStatCard({ config, onDelete, deleting, onEdit }: {
                   </button>
                   <button
                     onClick={() => setIngestTab('file')}
-                    className={`inline-flex items-center justify-center gap-1.5 h-9 rounded-lg text-xs font-medium transition-all ${
+                    className={`inline-flex items-center justify-center gap-1.5 h-9 rounded-card text-xs font-medium transition-all ${
                       ingestTab === 'file' ? 'bg-surface text-foreground shadow-sm' : 'text-muted hover:text-secondary hover:bg-elevated/40'
                     }`}
                   >
@@ -316,7 +316,7 @@ export function ExtDataStatCard({ config, onDelete, deleting, onEdit }: {
               )}
 
               {uploadResult && (
-                <div className="text-micro text-green-400 bg-green-500/10 border border-green-500/25 rounded-lg px-3 py-2.5 text-center flex items-center justify-center gap-1.5 font-medium">
+                <div className="text-micro text-green-400 bg-green-500/10 border border-green-500/25 rounded-card px-3 py-2.5 text-center flex items-center justify-center gap-1.5 font-medium">
                   <CheckCircle2 className="h-3.5 w-3.5" />上传成功 · {uploadResult.rows} 行 · {uploadResult.date}
                 </div>
               )}
@@ -328,7 +328,7 @@ export function ExtDataStatCard({ config, onDelete, deleting, onEdit }: {
                     <button
                       onClick={() => { setSettingsOpen(false); onEdit() }}
                       title="编辑名称、描述与字段定义"
-                      className="inline-flex items-center gap-1 h-7 px-2.5 rounded-lg text-micro text-muted hover:text-foreground hover:bg-elevated focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-colors"
+                      className="inline-flex items-center gap-1 h-7 px-2.5 rounded-card text-micro text-muted hover:text-foreground hover:bg-elevated focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-colors"
                     >
                       <Pencil className="h-3 w-3" />
                       编辑配置
@@ -344,7 +344,7 @@ export function ExtDataStatCard({ config, onDelete, deleting, onEdit }: {
                       })
                     }}
                     title="历史数据 symbol 列缺交易所后缀时批量补全 (600000 → 600000.SH)"
-                    className="inline-flex items-center gap-1 h-7 px-2.5 rounded-lg text-micro text-muted hover:text-foreground hover:bg-elevated focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-colors"
+                    className="inline-flex items-center gap-1 h-7 px-2.5 rounded-card text-micro text-muted hover:text-foreground hover:bg-elevated focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-colors"
                   >
                     <Tag className="h-3 w-3" />
                     修复代码格式
@@ -352,7 +352,7 @@ export function ExtDataStatCard({ config, onDelete, deleting, onEdit }: {
                 </div>
                 <button
                   onClick={() => setShowDelete(true)}
-                  className="inline-flex items-center gap-1 h-7 px-2.5 rounded-lg text-micro text-danger/60 hover:text-danger hover:bg-danger/[0.06] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-danger/40 transition-colors"
+                  className="inline-flex items-center gap-1 h-7 px-2.5 rounded-card text-micro text-danger/60 hover:text-danger hover:bg-danger/[0.06] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-danger/40 transition-colors"
                 >
                   <Trash2 className="h-3 w-3" />
                   删除

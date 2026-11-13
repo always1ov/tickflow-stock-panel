@@ -180,7 +180,7 @@ function DimensionMembersDialogContent({ target, onClose, onStockClick }: Omit<P
   }, [search, sortMode])
 
   const accent = target.kind === 'concept'
-    ? { icon: Tags, badge: '概念', iconCls: 'text-orange-700 dark:text-orange-300', badgeCls: 'bg-orange-500/10 text-orange-700 dark:text-orange-300' }
+    ? { icon: Tags, badge: '概念', iconCls: 'text-warning dark:text-warning', badgeCls: 'bg-warning/10 text-warning dark:text-warning' }
     : { icon: Building2, badge: '行业', iconCls: 'text-sky-700 dark:text-sky-300', badgeCls: 'bg-sky-500/10 text-sky-700 dark:text-sky-300' }
   const AccentIcon = accent.icon
   const titleId = 'dimension-members-title'
@@ -193,13 +193,13 @@ function DimensionMembersDialogContent({ target, onClose, onStockClick }: Omit<P
       panelClassName="flex h-[86vh] max-h-[760px] w-[94vw] max-w-4xl flex-col overflow-hidden rounded-card border border-border bg-base shadow-2xl"
     >
       <div className="flex shrink-0 items-center gap-3 border-b border-border px-4 py-3">
-        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-elevated ${accent.iconCls}`}>
+        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-btn bg-elevated ${accent.iconCls}`}>
           <AccentIcon className="h-4 w-4" />
         </div>
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <h2 id={titleId} className={cn('truncate', TYPE.section)}>{target.value}</h2>
-            <span className={`shrink-0 rounded px-1.5 py-0.5 text-micro font-medium ${accent.badgeCls}`}>{accent.badge}</span>
+            <span className={`shrink-0 rounded-btn px-1.5 py-0.5 text-micro font-medium ${accent.badgeCls}`}>{accent.badge}</span>
           </div>
           <div className="mt-0.5 flex items-center gap-2 text-micro text-muted">
             <span>{membersQuery.data?.label ?? source?.configId ?? '扩展数据'}</span>
@@ -211,7 +211,7 @@ function DimensionMembersDialogContent({ target, onClose, onStockClick }: Omit<P
             <Users className="h-3.5 w-3.5 text-muted" />
             {membersQuery.isLoading ? '—' : total}
           </span>
-          <button onClick={onClose} className="inline-flex h-7 w-7 items-center justify-center rounded text-muted hover:bg-elevated hover:text-foreground" title="关闭">
+          <button onClick={onClose} className="inline-flex h-7 w-7 items-center justify-center rounded-btn text-muted hover:bg-elevated hover:text-foreground" title="关闭">
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -291,7 +291,7 @@ function DimensionMembersDialogContent({ target, onClose, onStockClick }: Omit<P
                       <span className="min-w-0">
                         <span className="flex min-w-0 items-center gap-1.5">
                           <span className="min-w-0 truncate font-medium text-foreground">{row.name || row.symbol}</span>
-                          {board && <span className={`inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded border text-micro font-bold ${board.color}`}>{board.label}</span>}
+                          {board && <span className={`inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-btn border text-micro font-bold ${board.color}`}>{board.label}</span>}
                         </span>
                         <span className="block font-mono text-micro text-muted">{row.symbol}</span>
                       </span>
@@ -366,13 +366,13 @@ function DimensionIntradaySection({ configId, field, value, date, kind }: {
         <Activity className="h-3 w-3 text-muted" />
         <span className="text-micro font-medium text-muted">分时走势 · 等权</span>
         {data?.member_count != null && data.members_with_minute != null && (
-          <span className="rounded bg-elevated px-1 py-px font-mono text-micro text-muted" title="有当日分钟数据的成分股数">
+          <span className="rounded-btn bg-elevated px-1 py-px font-mono text-micro text-muted" title="有当日分钟数据的成分股数">
             {data.members_with_minute}/{data.member_count}只
           </span>
         )}
         {data?.basis && data.basis !== 'prev_close' && (
           <span
-            className="rounded bg-warning/10 px-1 py-px text-micro text-warning"
+            className="rounded-btn bg-warning/10 px-1 py-px text-micro text-warning"
             title="前一交易日收盘缺失, 部分标的以当日首根分钟价为基准, 曲线起点约为 0"
           >
             基准:当日首价
@@ -400,13 +400,13 @@ function DimensionIntradaySection({ configId, field, value, date, kind }: {
       </div>
 
       {query.isLoading ? (
-        <div className="mx-4 mb-2 mt-1.5 h-[132px] animate-pulse rounded-md bg-elevated/50" />
+        <div className="mx-4 mb-2 mt-1.5 h-[132px] animate-pulse rounded-btn bg-elevated/50" />
       ) : query.isError ? (
-        <div className="mx-4 mb-2 mt-1 grid h-[72px] place-items-center rounded-md border border-dashed border-border px-4 text-center text-xs text-muted">
+        <div className="mx-4 mb-2 mt-1 grid h-[72px] place-items-center rounded-btn border border-dashed border-border px-4 text-center text-xs text-muted">
           分时加载失败:{String((query.error as Error).message)}
         </div>
       ) : data?.status === 'no_data' ? (
-        <div className="mx-4 mb-2 mt-1 flex h-[96px] flex-col items-center justify-center gap-1 rounded-md border border-dashed border-border">
+        <div className="mx-4 mb-2 mt-1 flex h-[96px] flex-col items-center justify-center gap-1 rounded-btn border border-dashed border-border">
           <Database className="h-4 w-4 text-muted" />
           <p className="text-xs text-muted">分钟数据未落盘, 暂无分时走势</p>
           <p className="text-micro text-muted/70">需 TickFlow Pro+ 盘后分钟同步 / Expert 盘中增量, 或自定义分钟源</p>

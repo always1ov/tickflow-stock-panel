@@ -155,19 +155,19 @@ function renderExtValue(
           key={i}
           type="button"
           onClick={event => { event.stopPropagation(); onTagClick(tag) }}
-          className="inline-block px-1.5 py-px rounded text-micro font-medium leading-tight text-warning bg-warning/10 hover:brightness-95"
+          className="inline-block px-1.5 py-px rounded-btn text-micro font-medium leading-tight text-warning bg-warning/10 hover:brightness-95"
         >
           {tag}
         </button>
       ) : (
-        <span key={i} className="inline-block px-1.5 py-px rounded text-micro font-medium leading-tight text-warning bg-warning/10">
+        <span key={i} className="inline-block px-1.5 py-px rounded-btn text-micro font-medium leading-tight text-warning bg-warning/10">
           {tag}
         </span>
       ))}
       {!showAll && hiddenCount > 0 && (
         <button
           onClick={onToggle}
-          className="inline-block px-1.5 py-px rounded text-micro font-medium leading-tight text-accent bg-accent/10 hover:bg-accent/20 transition-colors"
+          className="inline-block px-1.5 py-px rounded-btn text-micro font-medium leading-tight text-accent bg-accent/10 hover:bg-accent/20 transition-colors"
         >
           +{hiddenCount}
         </button>
@@ -175,7 +175,7 @@ function renderExtValue(
       {showAll && maxTags > 0 && tags.length > maxTags && (
         <button
           onClick={onToggle}
-          className="inline-block px-1.5 py-px rounded text-micro font-medium leading-tight text-muted hover:text-foreground transition-colors"
+          className="inline-block px-1.5 py-px rounded-btn text-micro font-medium leading-tight text-muted hover:text-foreground transition-colors"
         >
           收起
         </button>
@@ -370,15 +370,15 @@ function StockSearchBox({
                     <span className="flex min-w-0 flex-1 items-center gap-1">
                       <span className="truncate text-secondary">{r.name}</span>
                       {r.asset_type === 'etf' && (
-                        <span className="shrink-0 px-1 py-0.5 rounded text-micro leading-none bg-accent/10 text-accent">ETF</span>
+                        <span className="shrink-0 px-1 py-0.5 rounded-btn text-micro leading-none bg-accent/10 text-accent">ETF</span>
                       )}
                       {r.asset_type === 'index' && (
-                        <span className="shrink-0 px-1 py-0.5 rounded text-micro leading-none bg-sky-500/10 text-sky-400">指数</span>
+                        <span className="shrink-0 px-1 py-0.5 rounded-btn text-micro leading-none bg-sky-500/10 text-sky-400">指数</span>
                       )}
                       {(() => {
                         const b = boardTag(r.symbol)
                         return b && (
-                          <span className={`shrink-0 px-1 py-0.5 rounded text-micro leading-none border ${b.color}`}>{b.label}</span>
+                          <span className={`shrink-0 px-1 py-0.5 rounded-btn text-micro leading-none border ${b.color}`}>{b.label}</span>
                         )
                       })()}
                     </span>
@@ -410,7 +410,7 @@ function StockSearchBox({
                         type="button"
                         onClick={event => { event.stopPropagation(); onAdd(r.symbol, preferredGroupId ?? null) }}
                         disabled={addPending}
-                        className="shrink-0 rounded p-1 text-muted transition-colors hover:bg-accent/10 hover:text-accent disabled:opacity-50 cursor-pointer"
+                        className="shrink-0 rounded-btn p-1 text-muted transition-colors hover:bg-accent/10 hover:text-accent disabled:opacity-50 cursor-pointer"
                         title={
                           preferredGroupId
                             ? `加入自选 · 当前分组「${groups.find(g => g.id === preferredGroupId)?.name ?? ''}」`
@@ -424,7 +424,7 @@ function StockSearchBox({
                         onSelect={groupId => onAdd(r.symbol, groupId)}
                         preferredGroupId={preferredGroupId}
                         disabled={addPending}
-                        triggerClassName="shrink-0 rounded p-1 text-muted transition-colors hover:bg-accent/10 hover:text-accent disabled:opacity-50"
+                        triggerClassName="shrink-0 rounded-btn p-1 text-muted transition-colors hover:bg-accent/10 hover:text-accent disabled:opacity-50"
                         title="展开分组, 选择要加入的自选分组"
                       >
                         <FolderPlus className="h-3.5 w-3.5" />
@@ -1116,7 +1116,7 @@ export function Watchlist() {
         titleExtra={
           <span className="inline-flex items-center gap-1.5">
             {/* 计数胶囊: 显示数/总数, mono 字体突出数字 */}
-            <span className="inline-flex items-baseline gap-0.5 px-2 py-0.5 rounded-md bg-elevated/70 text-xs">
+            <span className="inline-flex items-baseline gap-0.5 px-2 py-0.5 rounded-btn bg-elevated/70 text-xs">
               <span className="font-mono font-semibold text-secondary tabular-nums">{sortedRows.length}</span>
               {/* [R517] 没筛掉任何一只时「120/120」两个数说的是同一件事 —— 只在真有筛掉的时候才写分母 */}
               {sortedRows.length !== rowsInSelectedGroup.length && <>
@@ -1131,7 +1131,7 @@ export function Watchlist() {
                 type="button"
                 disabled={preparation.isFetching}
                 onClick={() => { void preparation.refetch() }}
-                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-micro font-medium bg-muted/15 text-muted border border-border/50 whitespace-nowrap disabled:cursor-wait"
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-btn text-micro font-medium bg-muted/15 text-muted border border-border/50 whitespace-nowrap disabled:cursor-wait"
                 title={preparation.isFetching ? '正在按需补齐自选日K，已有数据仍可查看' :
                   `${preparation.data?.filter(r => r.status !== 'ready').map(r => `${r.symbol}：${r.message}`).join('\n') || '日K暂未就绪，请检查数据源配置'}\n点击重试补齐`}
               >
@@ -1142,7 +1142,7 @@ export function Watchlist() {
             {/* 过滤提示: 仅在有筛选隐藏时出现, 柔和橙色融入整体 */}
             {hiddenCount > 0 && (
               <span
-                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-micro font-medium bg-warning/12 text-warning/90 border border-warning/25 whitespace-nowrap"
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-btn text-micro font-medium bg-warning/12 text-warning/90 border border-warning/25 whitespace-nowrap"
                 title={`当前有 ${hiddenCount} 只被筛选条件隐藏,清除筛选可查看全部`}
               >
                 <Filter className="h-2.5 w-2.5" />
@@ -1302,7 +1302,7 @@ export function Watchlist() {
                   <button
                     key={board}
                     onClick={() => toggleBoard(board)}
-                    className={`px-2 py-0.5 rounded text-xs transition-colors ${
+                    className={`px-2 py-0.5 rounded-btn text-xs transition-colors ${
                       active
                         ? 'bg-accent/15 text-accent'
                         : 'bg-elevated text-secondary hover:text-foreground hover:bg-elevated/80'
@@ -1320,7 +1320,7 @@ export function Watchlist() {
             <div className="flex flex-wrap gap-1">
               <button
                 onClick={toggleExcludeST}
-                className={`px-2 py-0.5 rounded text-xs transition-colors ${
+                className={`px-2 py-0.5 rounded-btn text-xs transition-colors ${
                   excludeST
                     ? 'bg-accent/15 text-accent'
                     : 'bg-elevated text-secondary hover:text-foreground hover:bg-elevated/80'
@@ -1431,7 +1431,7 @@ export function Watchlist() {
                       <button
                         type="button"
                         onClick={(event) => { event.stopPropagation(); toggleDailyKChart() }}
-                        className={`inline-flex items-center justify-center w-5 h-5 rounded transition-colors ${
+                        className={`inline-flex items-center justify-center w-5 h-5 rounded-btn transition-colors ${
                           dailyKChartVisible
                             ? 'text-accent bg-accent/10 hover:bg-accent/20'
                             : 'text-muted hover:text-foreground hover:bg-elevated'
@@ -1452,7 +1452,7 @@ export function Watchlist() {
                       <button
                         type="button"
                         onClick={(event) => { event.stopPropagation(); toggleIntradayChart() }}
-                        className={`inline-flex items-center justify-center w-5 h-5 rounded transition-colors ${
+                        className={`inline-flex items-center justify-center w-5 h-5 rounded-btn transition-colors ${
                           intradayChartVisible
                             ? 'text-accent bg-accent/10 hover:bg-accent/20'
                             : 'text-muted hover:text-foreground hover:bg-elevated'
@@ -1468,7 +1468,7 @@ export function Watchlist() {
                           type="button"
                           onClick={(event) => { event.stopPropagation(); minuteBatch.refetch() }}
                           disabled={minuteBatch.isFetching}
-                          className="inline-flex items-center justify-center w-5 h-5 rounded text-muted hover:text-accent hover:bg-accent/10 transition-colors disabled:opacity-40"
+                          className="inline-flex items-center justify-center w-5 h-5 rounded-btn text-muted hover:text-accent hover:bg-accent/10 transition-colors disabled:opacity-40"
                           title="刷新分时数据"
                           aria-label="刷新分时数据"
                         >
@@ -1484,7 +1484,7 @@ export function Watchlist() {
                         <button
                           type="button"
                           onClick={(event) => { event.stopPropagation(); toggleIntradayYMode() }}
-                          className={`inline-flex items-center justify-center h-5 px-1 rounded text-micro whitespace-nowrap transition-colors ${
+                          className={`inline-flex items-center justify-center h-5 px-1 rounded-btn text-micro whitespace-nowrap transition-colors ${
                             intradayYMode === 'limit'
                               ? 'text-accent bg-accent/10 hover:bg-accent/20'
                               : 'text-muted hover:text-foreground hover:bg-elevated'
@@ -1529,7 +1529,7 @@ export function Watchlist() {
                             </span>
                           )}
                           {board ? (
-                            <span className={`shrink-0 inline-flex items-center justify-center w-[18px] h-[18px] rounded text-micro font-bold leading-none border ${board.color}`}>
+                            <span className={`shrink-0 inline-flex items-center justify-center w-[18px] h-[18px] rounded-btn text-micro font-bold leading-none border ${board.color}`}>
                               {board.label}
                             </span>
                           ) : null}
@@ -1542,7 +1542,7 @@ export function Watchlist() {
                             <div className="flex items-center gap-1">
                               <button
                                 onClick={() => { remove.mutate(r.symbol); setConfirmRemove(null) }}
-                                className="px-1.5 py-0.5 rounded text-micro text-danger bg-danger/10 hover:bg-danger/20 transition-colors"
+                                className="px-1.5 py-0.5 rounded-btn text-micro text-danger bg-danger/10 hover:bg-danger/20 transition-colors"
                               >
                                 确认
                               </button>
@@ -1619,7 +1619,7 @@ export function Watchlist() {
                       {signals.length > 0 && (
                         <div className="flex flex-wrap gap-0.5">
                           {signals.slice(0, 3).map((s) => (
-                            <span key={s.label} className={`inline-block px-1.5 py-px rounded text-micro font-medium leading-tight ${signalCls(s.type)}`}>
+                            <span key={s.label} className={`inline-block px-1.5 py-px rounded-btn text-micro font-medium leading-tight ${signalCls(s.type)}`}>
                               {s.label}
                             </span>
                           ))}

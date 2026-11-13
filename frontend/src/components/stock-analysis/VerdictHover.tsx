@@ -20,14 +20,14 @@ import { type KeltnerVerdict } from '@/lib/api'
 const TONE_ACCENT: Record<KeltnerVerdict['tone'], string> = {
   sell: 'text-red-400',
   buy: 'text-sky-300',
-  hold: 'text-amber-400',
+  hold: 'text-warning',
   avoid: 'text-muted',
   watch: 'text-secondary',
 }
 const TONE_BAR: Record<KeltnerVerdict['tone'], string> = {
   sell: 'bg-red-400',
   buy: 'bg-sky-400',
-  hold: 'bg-amber-400',
+  hold: 'bg-warning',
   avoid: 'bg-border',
   watch: 'bg-secondary/60',
 }
@@ -115,7 +115,7 @@ export function VerdictHover({ v, note, children }: {
               </div>
 
               {/* 怎么做 —— 这一行是用户真正要的那句, 排在最上面且最显眼 */}
-              <div className="mt-2 rounded border border-border/60 bg-elevated/40 px-2 py-1.5">
+              <div className="mt-2 rounded-btn border border-border/60 bg-elevated/40 px-2 py-1.5">
                 <div className="text-micro text-muted">怎么做</div>
                 <div className="mt-0.5 text-xs leading-snug text-foreground">{v.action}</div>
               </div>
@@ -129,7 +129,7 @@ export function VerdictHover({ v, note, children }: {
                 <span className="shrink-0 text-micro text-muted">依据</span>
                 <span className="text-micro leading-snug text-secondary">{v.bands_text}</span>
                 <span
-                  className="ml-auto shrink-0 rounded border border-border/60 px-1 text-micro text-muted"
+                  className="ml-auto shrink-0 rounded-btn border border-border/60 px-1 text-micro text-muted"
                   title="有几档通道指向同一边"
                 >
                   {v.bands_aligned} 档共振

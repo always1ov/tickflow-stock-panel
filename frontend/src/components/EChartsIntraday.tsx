@@ -502,7 +502,7 @@ export function EChartsIntraday({
     <div className="w-full">
       {/* 按钮行: 切换式按钮组, 居右 */}
       {showLimitLines && assetType !== 'index' && <div className="flex items-center justify-end px-1 pb-0.5">
-        <div className="inline-flex items-center rounded bg-elevated overflow-hidden">
+        <div className="inline-flex items-center rounded-btn bg-elevated overflow-hidden">
           <button
             onClick={() => setYMode('adaptive')}
             className={`px-2.5 py-0.5 text-xs font-mono cursor-pointer transition-colors ${

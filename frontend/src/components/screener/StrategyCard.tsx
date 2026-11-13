@@ -8,7 +8,7 @@ import { motion } from 'framer-motion'
 const SRC_MAP: Record<string, string> = { custom: '自定义', ai: 'AI', composite: '叠加' }
 const BADGE_CLS_MAP: Record<string, string> = {
   ai: 'bg-sky-500/10 text-sky-400 border-sky-500/30',
-  custom: 'bg-amber-400/10 text-amber-400 border-amber-400/30',
+  custom: 'bg-warning/10 text-warning border-warning/30',
   composite: 'bg-teal-500/10 text-teal-400 border-teal-500/30',
 }
 
@@ -74,10 +74,10 @@ export function StrategyCard({
       <button onClick={onRun} disabled={disabled}
         className="flex min-w-0 items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-wait">
         {srcLabel && (
-          <span className={`shrink-0 rounded border px-1 py-px text-micro font-medium leading-tight ${badgeCls}`}>{srcLabel}</span>
+          <span className={`shrink-0 rounded-btn border px-1 py-px text-micro font-medium leading-tight ${badgeCls}`}>{srcLabel}</span>
         )}
         {timeframeBadge && (
-          <span className="shrink-0 rounded border border-sky-500/30 bg-sky-500/10 px-1 py-px text-micro font-medium leading-tight text-sky-400">{timeframeBadge}</span>
+          <span className="shrink-0 rounded-btn border border-sky-500/30 bg-sky-500/10 px-1 py-px text-micro font-medium leading-tight text-sky-400">{timeframeBadge}</span>
         )}
         <span className="truncate text-xs font-medium text-foreground">{name}</span>
         {count != null && !loading && (
@@ -92,17 +92,17 @@ export function StrategyCard({
         {hasExpired && (
           <span className="shrink-0 font-mono text-micro text-muted" title={`今日曾命中、现已失效 ${expiredCount} 只`}>{'-' + expiredCount}</span>
         )}
-        {loading && <span className="h-3 w-5 shrink-0 animate-pulse rounded bg-elevated" />}
+        {loading && <span className="h-3 w-5 shrink-0 animate-pulse rounded-btn bg-elevated" />}
       </button>
       {onToggleMonitor && (
         <button onClick={(e) => { e.stopPropagation(); onToggleMonitor() }}
-          className="relative shrink-0 rounded p-0.5 transition-colors hover:bg-elevated cursor-pointer" title={monitored ? '取消策略监控' : '开启策略监控'}>
+          className="relative shrink-0 rounded-btn p-0.5 transition-colors hover:bg-elevated cursor-pointer" title={monitored ? '取消策略监控' : '开启策略监控'}>
           <RadioTower className={`h-3 w-3 transition-colors ${monitored ? 'text-accent' : 'text-muted hover:text-accent'}`} />
-          {monitored && <span className="absolute inset-0 rounded animate-ping bg-accent/20" />}
+          {monitored && <span className="absolute inset-0 rounded-btn animate-ping bg-accent/20" />}
         </button>
       )}
       <button onClick={(e) => { e.stopPropagation(); onSettings() }}
-        className="shrink-0 rounded p-0.5 transition-colors hover:bg-elevated cursor-pointer" title="策略设置">
+        className="shrink-0 rounded-btn p-0.5 transition-colors hover:bg-elevated cursor-pointer" title="策略设置">
         <Settings2 className="h-3 w-3 text-muted transition-colors hover:text-accent" />
       </button>
     </motion.div>

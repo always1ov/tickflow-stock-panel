@@ -86,7 +86,7 @@ function TierReqChip({ tier, currentLabel }: { tier: string; currentLabel?: stri
       title={unmet
         ? `TickFlow 该能力需 ${text} — 当前档位 ${currentLabel}`
         : `TickFlow 该能力需 ${text}`}
-      className={`inline-flex h-[15px] shrink-0 items-center gap-1 rounded px-1.5 text-micro font-bold font-mono leading-none ${unmet ? 'ring-1 ring-warning/60' : ''}`}
+      className={`inline-flex h-[15px] shrink-0 items-center gap-1 rounded-btn px-1.5 text-micro font-bold font-mono leading-none ${unmet ? 'ring-1 ring-warning/60' : ''}`}
       style={t.tagBg}
     >
       <span className="h-1 w-1 rounded-full shrink-0" style={t.dotStyle} />
@@ -100,7 +100,7 @@ function AllTiersBadge({ size = 'text-micro' }: { size?: string }) {
   const t = tierStyle('expert')
   return (
     <span
-      className="inline-flex shrink-0 items-center rounded px-1.5 py-0.5 font-medium leading-none"
+      className="inline-flex shrink-0 items-center rounded-btn px-1.5 py-0.5 font-medium leading-none"
       style={t.tagBg}
       title="无 Key 到 Expert 各订阅档位均有可用能力 — 日K全档位可用, 除权/分钟/财务等高级能力按订阅档位解锁"
     >
@@ -555,7 +555,7 @@ function CapabilityChips({ caps, servingSet, isTickFlow }: {
           <span
             key={cap.id}
             title={title}
-            className={`inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-micro leading-none ${cls}`}
+            className={`inline-flex items-center gap-0.5 rounded-btn px-1.5 py-0.5 text-micro leading-none ${cls}`}
           >
             {servingNow
               ? <Check className="h-2.5 w-2.5" />
@@ -737,9 +737,9 @@ export function SettingsDataSourcesPanel({ highlight }: { highlight?: string } =
           <div className="text-xs leading-relaxed text-muted">
             <span className="text-secondary">数据源已插件化</span>
             ,接入自有行情?把文档发给 AI 即可自动接入:
-            <span className="mx-0.5 rounded bg-elevated/70 px-1 py-px font-mono text-micro text-secondary">docs/custom-data-source.md</span>
+            <span className="mx-0.5 rounded-btn bg-elevated/70 px-1 py-px font-mono text-micro text-secondary">docs/custom-data-source.md</span>
             (自有 HTTP 接口) ·
-            <span className="mx-0.5 rounded bg-elevated/70 px-1 py-px font-mono text-micro text-secondary">docs/plugin-development.md</span>
+            <span className="mx-0.5 rounded-btn bg-elevated/70 px-1 py-px font-mono text-micro text-secondary">docs/plugin-development.md</span>
             (插件开发)
           </div>
         </div>
@@ -800,7 +800,7 @@ export function SettingsDataSourcesPanel({ highlight }: { highlight?: string } =
                     <TierTag label={matrix.data.tickflow_tier} />
                   )}
                   {!customNames.has(item.name) && (
-                    <span className="shrink-0 rounded bg-warning/15 px-1 py-0.5 text-micro font-medium leading-none text-warning">第三方</span>
+                    <span className="shrink-0 rounded-btn bg-warning/15 px-1 py-0.5 text-micro font-medium leading-none text-warning">第三方</span>
                   )}
                 </div>
 
@@ -831,7 +831,7 @@ export function SettingsDataSourcesPanel({ highlight }: { highlight?: string } =
                           <button
                             onClick={(e) => { e.stopPropagation(); installMut.mutate(item.name) }}
                             disabled={installMut.isPending}
-                            className="rounded px-1.5 py-0.5 text-micro font-medium bg-accent/10 text-accent hover:bg-accent/20 transition-colors disabled:opacity-50"
+                            className="rounded-btn px-1.5 py-0.5 text-micro font-medium bg-accent/10 text-accent hover:bg-accent/20 transition-colors disabled:opacity-50"
                           >
                             安装
                           </button>
@@ -842,7 +842,7 @@ export function SettingsDataSourcesPanel({ highlight }: { highlight?: string } =
                         <button
                           onClick={(e) => { e.stopPropagation(); switchProvider.mutate(item.name) }}
                           disabled={switchProvider.isPending}
-                          className="rounded px-1.5 py-0.5 text-micro font-medium bg-accent/10 text-accent hover:bg-accent/20 transition-colors disabled:opacity-50"
+                          className="rounded-btn px-1.5 py-0.5 text-micro font-medium bg-accent/10 text-accent hover:bg-accent/20 transition-colors disabled:opacity-50"
                         >
                           套用
                         </button>
@@ -1011,9 +1011,9 @@ function PluginDetail({ plugin, isActive, matrixCaps, servingSet, refresh }: {
           <div className="flex items-center gap-2 mb-1 flex-wrap">
             <h3 className="text-title font-semibold text-foreground">{plugin.display_name}</h3>
             <span className="text-micro text-muted/50 uppercase tracking-wider">插件 · {plugin.runtime}</span>
-            <span className="rounded bg-warning/15 px-1 py-0.5 text-micro font-medium leading-none text-warning">第三方</span>
+            <span className="rounded-btn bg-warning/15 px-1 py-0.5 text-micro font-medium leading-none text-warning">第三方</span>
             {isActive && (
-              <span className="inline-flex items-center gap-1 text-micro text-accent bg-accent/10 px-2 py-1 rounded">
+              <span className="inline-flex items-center gap-1 text-micro text-accent bg-accent/10 px-2 py-1 rounded-btn">
                 <Check className="h-2.5 w-2.5" /> 服务中
               </span>
             )}
@@ -1108,7 +1108,7 @@ function TickFlowDetail({ active, matrix }: { active: boolean; matrix?: Capabili
         onClick={() => redetect.mutate()}
         disabled={redetect.isPending}
         title="根据 API Key 重新检测订阅档位"
-        className="inline-flex h-5 w-5 items-center justify-center rounded text-muted/60 hover:text-foreground hover:bg-elevated/70 transition-colors duration-hover"
+        className="inline-flex h-5 w-5 items-center justify-center rounded-btn text-muted/60 hover:text-foreground hover:bg-elevated/70 transition-colors duration-hover"
       >
         <RefreshCw className={`h-3 w-3 ${redetect.isPending ? 'animate-spin' : ''}`} />
       </button>
@@ -1116,7 +1116,7 @@ function TickFlowDetail({ active, matrix }: { active: boolean; matrix?: Capabili
           外层 top-full + pt-1.5: 间隙用内边距做, hover 区与图标无缝衔接 (mt 间隙会断 hover 链);
           不设 pointer-events-none, 否则鼠标移不进浮层、列表无法滚动。 */}
       <div className="relative group/caps shrink-0" aria-label="可用功能">
-        <span className="flex h-5 w-5 items-center justify-center rounded text-muted/60 transition-colors group-hover/caps:text-foreground">
+        <span className="flex h-5 w-5 items-center justify-center rounded-btn text-muted/60 transition-colors group-hover/caps:text-foreground">
           <ListChecks className="h-3 w-3" />
         </span>
         <div className="invisible absolute right-0 top-full z-20 pt-1.5 opacity-0 transition-ui duration-hover group-hover/caps:visible group-hover/caps:opacity-100">
@@ -1162,10 +1162,10 @@ function TickFlowDetail({ active, matrix }: { active: boolean; matrix?: Capabili
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <h2 className="text-title font-semibold text-foreground">TickFlow</h2>
-            <span className="rounded bg-warning/15 px-1.5 py-0.5 text-micro font-medium text-warning">第三方</span>
+            <span className="rounded-btn bg-warning/15 px-1.5 py-0.5 text-micro font-medium text-warning">第三方</span>
             <AllTiersBadge />
             {active && (
-              <span className="inline-flex items-center gap-1 text-micro text-accent bg-accent/10 px-2 py-1 rounded">
+              <span className="inline-flex items-center gap-1 text-micro text-accent bg-accent/10 px-2 py-1 rounded-btn">
                 <Check className="h-2.5 w-2.5" /> 服务中
               </span>
             )}

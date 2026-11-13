@@ -111,7 +111,7 @@ export function AnalysisConfigDialog({
             <select
               value={draft.configId ?? ''}
               onChange={e => setDraft(d => ({ ...d, configId: e.target.value || undefined, dimensionField: undefined }))}
-              className="w-full h-8 bg-elevated border border-border rounded text-xs text-foreground px-2 focus:outline-none focus:border-accent/50"
+              className="w-full h-8 bg-elevated border border-border rounded-btn text-xs text-foreground px-2 focus:outline-none focus:border-accent/50"
             >
               <option value="">自动选择</option>
               {configs.map(c => (
@@ -127,7 +127,7 @@ export function AnalysisConfigDialog({
               <select
                 value={draft.dimensionField ?? ''}
                 onChange={e => setDraft(d => ({ ...d, dimensionField: e.target.value || undefined }))}
-                className="w-full h-8 bg-elevated border border-border rounded text-xs text-foreground px-2 focus:outline-none focus:border-accent/50"
+                className="w-full h-8 bg-elevated border border-border rounded-btn text-xs text-foreground px-2 focus:outline-none focus:border-accent/50"
               >
                 <option value="">自动探测</option>
                 {nonMetaFields.map(f => (
@@ -143,7 +143,7 @@ export function AnalysisConfigDialog({
               <select
                 value={draft.hierarchyLevel ?? 2}
                 onChange={e => setDraft(d => ({ ...d, hierarchyLevel: Number(e.target.value) as 1 | 2 | 3 }))}
-                className="w-full h-8 bg-elevated border border-border rounded text-xs text-foreground px-2 focus:outline-none focus:border-accent/50"
+                className="w-full h-8 bg-elevated border border-border rounded-btn text-xs text-foreground px-2 focus:outline-none focus:border-accent/50"
               >
                 <option value={1}>一级行业</option>
                 <option value={2}>二级行业（默认）</option>
@@ -162,7 +162,7 @@ export function AnalysisConfigDialog({
           <button onClick={onClose} className="px-3 py-1.5 text-xs text-secondary hover:text-foreground">取消</button>
           <button
             onClick={() => { onSave(draft); onClose() }}
-            className="px-3 py-1.5 text-xs bg-accent/15 text-accent rounded hover:bg-accent/25"
+            className="px-3 py-1.5 text-xs bg-accent/15 text-accent rounded-btn hover:bg-accent/25"
           >
             保存
           </button>
@@ -276,7 +276,7 @@ export function DimensionHeatmap({
             <button
               key={g.key}
               onClick={() => onSelect(active ? null : g.key)}
-              className="px-2.5 py-1.5 rounded-sm text-xs whitespace-nowrap cursor-pointer hover:brightness-125 transition-ui"
+              className="px-2.5 py-1.5 rounded-btn text-xs whitespace-nowrap cursor-pointer hover:brightness-125 transition-ui"
               style={{
                 fontSize: `${10 + size * 2}px`,
                 color: active ? '#fff' : `rgba(${r},${gr},${b},${0.6 + upRatio * 0.4})`,
@@ -502,7 +502,7 @@ export function PresetFetchState({
         </button>
         {errMsg && (
           needKey ? (
-            <div className="mt-3 rounded-lg border border-warning/30 bg-warning/[0.06] px-3 py-2.5 text-left">
+            <div className="mt-3 rounded-card border border-warning/30 bg-warning/[0.06] px-3 py-2.5 text-left">
               <p className="flex items-start gap-1.5 text-xs text-warning">
                 <AlertCircle className="mt-px h-3.5 w-3.5 shrink-0" />
                 <span>

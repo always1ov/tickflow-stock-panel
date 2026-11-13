@@ -119,7 +119,7 @@ function CategoryCheck({ label, desc, checked, onChange, sensitive }: {
         type="checkbox"
         checked={checked}
         onChange={onChange}
-        className="mt-0.5 rounded border-border"
+        className="mt-0.5 rounded-btn border-border"
       />
       <div className="min-w-0">
         <div className="flex items-center gap-1 text-xs text-foreground">
@@ -388,7 +388,7 @@ export function SettingsBackupPanel({ mode = 'all' }: { mode?: 'all' | 'export' 
                         type="checkbox"
                         checked={importSel.has(c.key)}
                         onChange={() => setImportSel((s) => toggleSet(s, c.key))}
-                        className="rounded border-border"
+                        className="rounded-btn border-border"
                         aria-label={`导入 ${c.label}`}
                       />
                     </td>
@@ -514,7 +514,7 @@ export function SettingsBackupPanel({ mode = 'all' }: { mode?: 'all' | 'export' 
                       </div>
                       {!sm.ok && sm.issues.map((i, idx) => (
                         <div key={idx} className="mt-0.5 pl-4.5 text-micro text-danger">
-                          <span className="rounded bg-danger/10 px-1 py-px font-mono text-micro">{i.code}</span> {i.message}
+                          <span className="rounded-btn bg-danger/10 px-1 py-px font-mono text-micro">{i.code}</span> {i.message}
                         </div>
                       ))}
                     </div>

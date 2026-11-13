@@ -70,7 +70,7 @@ export type ReviewTab = 'trend' | 'verdict' | 'combo'
 export const VERDICT_CLS: Record<KeltnerVerdict['tone'], string> = {
   sell: 'border-red-400/40 bg-red-400/10 text-red-400',
   buy: 'border-sky-400/40 bg-sky-400/10 text-sky-300',
-  hold: 'border-amber-400/40 bg-amber-400/10 text-amber-400',
+  hold: 'border-warning/40 bg-warning/10 text-warning',
   avoid: 'border-border bg-base text-muted',
   watch: 'border-border bg-elevated/60 text-secondary',
 }
@@ -103,7 +103,7 @@ export function LimitTag({ r }: { r: ReviewRow }) {
   if (r.limit_up) {
     return (
       <span
-        className="ml-1 inline-flex whitespace-nowrap rounded border border-red-400/50 bg-red-400/15 px-1 text-[9px] text-red-300"
+        className="ml-1 inline-flex whitespace-nowrap rounded-btn border border-red-400/50 bg-red-400/15 px-1 text-micro text-red-300"
         title={`涨停${r.limit_streak > 1 ? ` · 第 ${r.limit_streak} 个板` : ''}`}
       >
         {r.limit_streak > 1 ? `${r.limit_streak}板` : '涨停'}
@@ -111,12 +111,12 @@ export function LimitTag({ r }: { r: ReviewRow }) {
     )
   }
   if (r.limit_down) {
-    return <span className="ml-1 inline-flex rounded border border-emerald-400/50 bg-emerald-400/15 px-1 text-[9px] text-emerald-300">跌停</span>
+    return <span className="ml-1 inline-flex rounded-btn border border-emerald-400/50 bg-emerald-400/15 px-1 text-micro text-emerald-300">跌停</span>
   }
   if (r.broken_limit_up) {
     return (
       <span
-        className="ml-1 inline-flex whitespace-nowrap rounded border border-amber-400/40 bg-amber-400/10 px-1 text-[9px] text-amber-300"
+        className="ml-1 inline-flex whitespace-nowrap rounded-btn border border-warning/40 bg-warning/10 px-1 text-micro text-warning"
         title="炸板 —— 盘中最高触及涨停但收盘没封住"
       >
         炸板
@@ -212,7 +212,7 @@ export function StockReviewPanel({ symbol, tab: initialTab, days: daysProp, onDa
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 pb-2.5 sm:flex-nowrap sm:gap-3">
         <div className="flex min-w-0 items-baseline gap-2.5">
           <CalendarRange className="h-4 w-4 self-center shrink-0 text-sky-400" />
-          <span className="truncate text-[10px] text-muted">
+          <span className="truncate text-micro text-muted">
             {d && !d.error ? (
               <>
                 {d.start} ~ {d.end} · {d.days} 个交易日
@@ -231,7 +231,7 @@ export function StockReviewPanel({ symbol, tab: initialTab, days: daysProp, onDa
               <button
                 key={k}
                 onClick={() => setTab(k)}
-                className={`px-2.5 py-1 text-[10px] transition-colors cursor-pointer ${
+                className={`px-2.5 py-1 text-micro transition-colors cursor-pointer ${
                   tab === k ? 'bg-sky-400/15 text-sky-300' : 'text-muted hover:text-foreground'}`}
               >
                 {label}
@@ -243,7 +243,7 @@ export function StockReviewPanel({ symbol, tab: initialTab, days: daysProp, onDa
               <button
                 key={n}
                 onClick={() => setDays(n)}
-                className={`px-2 py-1 text-[10px] transition-colors cursor-pointer ${
+                className={`px-2 py-1 text-micro transition-colors cursor-pointer ${
                   days === n ? 'bg-sky-400/15 text-sky-300' : 'text-muted hover:text-foreground'}`}
               >
                 {n}日
@@ -306,13 +306,13 @@ function TrendView({ d, rows, onlyMarked, onToggleMarked }: {
 
         {d.now && (
           <HeadRow label="现在">
-            <span className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-[10px]">
+            <span className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-micro">
               <b className={cn('font-medium', bull ? 'text-red-400' : 'text-emerald-400')}>
                 {d.now.state_cn} 第 {d.now.day} 天
               </b>
               {/* [R313] 同上 —— 注记, 不是状态 */}
               {d.now.sub_state_cn && (
-                <span className="text-[10px] text-muted/60" title={SUB_STATE_TIP}>
+                <span className="text-micro text-muted/60" title={SUB_STATE_TIP}>
                   ({d.now.sub_state_cn})
                 </span>
               )}
@@ -336,12 +336,12 @@ function TrendView({ d, rows, onlyMarked, onToggleMarked }: {
         {/* [R292] 涨跌停计数与状态色带搬进这张卡 —— 用户点名要这两样。
             **只留计数, 不留那四张大卡片**: 同样三个数, 一行小字说得完。 */}
         <HeadRow label={`这 ${d.days} 天`}>
-          <div className="text-[10px] text-muted">
+          <div className="text-micro text-muted">
             {limits > 0 ? (
               <span className="flex flex-wrap gap-x-3">
                 <span className="text-red-400/90">涨停 {st.limit_ups}</span>
                 {st.max_streak > 1 && <span>最高 {st.max_streak} 连板</span>}
-                <span className="text-amber-400/90" title="盘中最高触及涨停但收盘没封住">炸板 {st.broken_limit_ups}</span>
+                <span className="text-warning/90" title="盘中最高触及涨停但收盘没封住">炸板 {st.broken_limit_ups}</span>
                 <span className="text-emerald-400/90">跌停 {st.limit_downs}</span>
               </span>
             ) : <span>没有涨跌停</span>}
@@ -360,7 +360,7 @@ function TrendView({ d, rows, onlyMarked, onToggleMarked }: {
         <button
           onClick={onToggleMarked}
           title="只留下有涨跌停、或趋势翻转的那些天 —— 其余日子状态没变, 复盘时没有信息"
-          className={`rounded-btn border px-2 py-1 text-[10px] transition-colors cursor-pointer ${
+          className={`rounded-btn border px-2 py-1 text-micro transition-colors cursor-pointer ${
             onlyMarked ? 'border-sky-400/40 bg-sky-400/15 text-sky-300' : 'border-border/60 text-muted hover:text-foreground'}`}
         >
           只看有事的日子
@@ -371,7 +371,7 @@ function TrendView({ d, rows, onlyMarked, onToggleMarked }: {
       <div className="mt-2 min-h-0 flex-1 overflow-auto border-t border-border/60">
         <table className="w-full text-xs">
           <thead className="sticky top-0 z-10 bg-surface">
-            <tr className="border-b border-border/60 text-[10px] text-muted">
+            <tr className="border-b border-border/60 text-micro text-muted">
               <th className="whitespace-nowrap px-3 py-2 text-left font-normal">日期</th>
               <th className="whitespace-nowrap px-2 py-2 text-right font-normal">收盘</th>
               <th className="whitespace-nowrap px-2 py-2 text-right font-normal">涨跌</th>
@@ -395,9 +395,9 @@ function TrendView({ d, rows, onlyMarked, onToggleMarked }: {
             {rows.map((r) => (
               <tr
                 key={r.date}
-                className={`border-b border-border/30 hover:bg-elevated/30 ${r.trend?.flipped ? 'bg-amber-400/[0.05]' : ''}`}
+                className={`border-b border-border/30 hover:bg-elevated/30 ${r.trend?.flipped ? 'bg-warning/[0.05]' : ''}`}
               >
-                <td className="whitespace-nowrap px-3 py-1.5 font-mono text-[10px] text-secondary">{r.date}</td>
+                <td className="whitespace-nowrap px-3 py-1.5 font-mono text-micro text-secondary">{r.date}</td>
                 <td className="whitespace-nowrap px-2 py-1.5 text-right font-mono tabular-nums text-foreground">{r.close.toFixed(2)}</td>
                 <td className={`whitespace-nowrap px-2 py-1.5 text-right font-mono tabular-nums ${chgCls(r.change_pct)}`}>
                   {pct(r.change_pct, 2)}
@@ -407,7 +407,7 @@ function TrendView({ d, rows, onlyMarked, onToggleMarked }: {
                   {r.trend ? (
                     <>
                       <span
-                        className={`inline-flex whitespace-nowrap rounded border px-1.5 py-0.5 text-[10px] ${trendBadgeCls(r.trend.state)}`}
+                        className={`inline-flex whitespace-nowrap rounded-btn border px-1.5 py-0.5 text-micro ${trendBadgeCls(r.trend.state)}`}
                         title={`${r.trend.state_cn}(${r.trend.state_en})`}
                       >
                         {r.trend.state_cn} 第 {r.trend.day} 天
@@ -417,17 +417,17 @@ function TrendView({ d, rows, onlyMarked, onToggleMarked }: {
                           换徽标的词、也不换徽标的色(色编的是多空, 而细分档
                           不改多空), 只在后面缀一个更暗的小字。 */}
                       {r.trend.sub_state_cn && (
-                        <span className="ml-1 text-[9px] text-muted/60" title={SUB_STATE_TIP}>
+                        <span className="ml-1 text-micro text-muted/60" title={SUB_STATE_TIP}>
                           ({r.trend.sub_state_cn})
                         </span>
                       )}
                       {r.trend.flipped && (
-                        <span className="ml-1.5 text-[9px] text-amber-400" title="这天六态状态发生了翻转">
+                        <span className="ml-1.5 text-micro text-warning" title="这天六态状态发生了翻转">
                           ← 转折
                         </span>
                       )}
                     </>
-                  ) : <span className="text-[10px] text-muted/40">—</span>}
+                  ) : <span className="text-micro text-muted/40">—</span>}
                 </td>
                 <FlipTradeCells leg={legs.get(r.date)} />
                 {/* [R296] 恢复。**排在成交三格之后** —— 这一页的主线是六态与
@@ -435,22 +435,22 @@ function TrendView({ d, rows, onlyMarked, onToggleMarked }: {
                 <td className="whitespace-nowrap px-2 py-1.5 text-center">
                   {r.verdict ? (
                     <VerdictHover v={r.verdict} note="收盘口径">
-                      <span className={`inline-flex cursor-help whitespace-nowrap rounded border px-1 py-0.5 text-[10px] ${VERDICT_CLS[r.verdict.tone]}`}>
+                      <span className={`inline-flex cursor-help whitespace-nowrap rounded-btn border px-1 py-0.5 text-micro ${VERDICT_CLS[r.verdict.tone]}`}>
                         {r.verdict.title}
                       </span>
                     </VerdictHover>
-                  ) : <span className="text-[10px] text-muted/40">—</span>}
+                  ) : <span className="text-micro text-muted/40">—</span>}
                 </td>
               </tr>
             ))}
             {rows.length === 0 && (
-              <tr><td colSpan={8} className="px-3 py-10 text-center text-[11px] text-muted">这段时间里没有涨跌停, 状态也没翻转过</td></tr>
+              <tr><td colSpan={8} className="px-3 py-10 text-center text-micro text-muted">这段时间里没有涨跌停, 状态也没翻转过</td></tr>
             )}
           </tbody>
         </table>
       </div>
 
-      <div className="border-t border-border/60 px-4 py-2 text-[10px] leading-relaxed text-muted">
+      <div className="border-t border-border/60 px-4 py-2 text-micro leading-relaxed text-muted">
         收盘口径, 与决策台「趋势」列同一个状态机、同一个阈值(含你自己调过的那个)。
         {/* [R258] 「这个价贵不贵」是 R200 那轮清行话时的旧页签名, R223 已经改回
             「通道档位」—— 那句脚注一直指着一个**不存在的页签**。
@@ -466,13 +466,13 @@ function TrendView({ d, rows, onlyMarked, onToggleMarked }: {
 /** [R293] 阶段的纯文字色。整块卡的边框+底色那套已随 VerdictHeader 一起撤了 */
 const PHASE_TEXT_CLS: Record<string, string> = {
   coiling: 'text-secondary', launching: 'text-red-300', advancing: 'text-red-300',
-  stalling: 'text-amber-300', overextended: 'text-amber-300',
+  stalling: 'text-warning', overextended: 'text-warning',
   declining: 'text-emerald-300', unclear: 'text-muted',
 }
 
 /** [R293] 语气的纯文字色与大白话名 —— 与 `VERDICT_CLS` 同一套语义, 不同用法 */
 const VERDICT_TEXT_CLS: Record<string, string> = {
-  buy: 'text-sky-300', hold: 'text-amber-400', sell: 'text-red-400',
+  buy: 'text-sky-300', hold: 'text-warning', sell: 'text-red-400',
   avoid: 'text-muted', watch: 'text-secondary',
 }
 const TONE_CN: Record<string, string> = {
@@ -497,12 +497,12 @@ export function EvidencePanel({ ch, edge }: {
     >
         <div className="space-y-2">
           {!!phase?.why && (
-            <p className="text-[10px] leading-relaxed text-secondary">
+            <p className="text-micro leading-relaxed text-secondary">
               <span className="text-muted">阶段判定:</span> {phase.why}
             </p>
           )}
           {!!edge && (
-            <p className="text-[10px] leading-relaxed text-secondary">
+            <p className="text-micro leading-relaxed text-secondary">
               <span className="text-muted">通道档位:</span> {edge.text}
             </p>
           )}
@@ -512,11 +512,11 @@ export function EvidencePanel({ ch, edge }: {
                 <div key={r.label}
                      className={cn('flex items-start gap-2 px-3 py-1.5',
                        i % 2 ? 'bg-elevated/20' : 'bg-elevated/35')}>
-                  <span className="w-14 shrink-0 text-[10px] text-muted">{r.label}</span>
-                  <span className="w-20 shrink-0 font-mono text-[11px] tabular-nums text-foreground/90">
+                  <span className="w-14 shrink-0 text-micro text-muted">{r.label}</span>
+                  <span className="w-20 shrink-0 font-mono text-micro tabular-nums text-foreground/90">
                     {r.value}
                   </span>
-                  <span className="min-w-0 flex-1 text-[10px] leading-relaxed text-secondary">
+                  <span className="min-w-0 flex-1 text-micro leading-relaxed text-secondary">
                     {r.why}
                   </span>
                 </div>
@@ -574,7 +574,7 @@ function VerdictView({ d, segments }: {
 
         {!!ph && (
           <HeadRow label="现在">
-            <div className="text-[10px]">
+            <div className="text-micro">
               <span className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
                 {/* [R302] **今天那一档结论补回来了, 而且排在最前面。**
                     用户: 「都围绕位置展开」。
@@ -589,7 +589,7 @@ function VerdictView({ d, segments }: {
                     结论第一、它的坐标第二、背景往后 —— 这就是"围绕位置展开"。 */}
                 {!!now && (
                   <VerdictHover v={now} note="今天这一档。收盘口径。">
-                    <b className={`inline-flex cursor-help whitespace-nowrap rounded border px-1.5 py-0.5 font-medium ${VERDICT_CLS[now.tone]}`}>
+                    <b className={`inline-flex cursor-help whitespace-nowrap rounded-btn border px-1.5 py-0.5 font-medium ${VERDICT_CLS[now.tone]}`}>
                       {now.title}
                       {!!now.days && (
                         <span className="ml-1 opacity-70"
@@ -655,7 +655,7 @@ function VerdictView({ d, segments }: {
         )}
 
         <HeadRow label={`这 ${d.days} 天`}>
-          <div className="flex flex-wrap gap-x-3 text-[10px] text-muted">
+          <div className="flex flex-wrap gap-x-3 text-micro text-muted">
             <span>{segments.length} 段档位</span>
             {(['buy', 'hold', 'watch', 'sell', 'avoid'] as const)
               .filter((t) => byTone[t])
@@ -696,7 +696,7 @@ function VerdictView({ d, segments }: {
         <button
           onClick={() => setOnlyMarked((v) => !v)}
           title="只留下档位换过的那些天 —— 其余日子档位没变, 复盘时没有信息"
-          className={`rounded-btn border px-2 py-1 text-[10px] transition-colors cursor-pointer ${
+          className={`rounded-btn border px-2 py-1 text-micro transition-colors cursor-pointer ${
             onlyMarked ? 'border-sky-400/40 bg-sky-400/15 text-sky-300' : 'border-border/60 text-muted hover:text-foreground'}`}
         >
           只看换档的日子
@@ -714,7 +714,7 @@ function VerdictView({ d, segments }: {
       <div className="mt-2 min-h-0 flex-1 overflow-auto border-t border-border/60">
         <table className="w-full text-xs">
           <thead className="sticky top-0 z-10 bg-surface">
-            <tr className="border-b border-border/60 text-[10px] text-muted">
+            <tr className="border-b border-border/60 text-micro text-muted">
               <th className="whitespace-nowrap px-3 py-2 text-left font-normal">日期</th>
               <th className="whitespace-nowrap px-2 py-2 text-right font-normal">收盘</th>
               <th className="whitespace-nowrap px-2 py-2 text-right font-normal">涨跌</th>
@@ -731,9 +731,9 @@ function VerdictView({ d, segments }: {
             {rows.map((r) => (
               <tr
                 key={r.date}
-                className={`border-b border-border/30 hover:bg-elevated/30 ${r.verdict_flipped ? 'bg-amber-400/[0.05]' : ''}`}
+                className={`border-b border-border/30 hover:bg-elevated/30 ${r.verdict_flipped ? 'bg-warning/[0.05]' : ''}`}
               >
-                <td className="whitespace-nowrap px-3 py-1.5 font-mono text-[10px] text-secondary">{r.date}</td>
+                <td className="whitespace-nowrap px-3 py-1.5 font-mono text-micro text-secondary">{r.date}</td>
                 <td className="whitespace-nowrap px-2 py-1.5 text-right font-mono tabular-nums text-foreground">{r.close.toFixed(2)}</td>
                 <td className={`whitespace-nowrap px-2 py-1.5 text-right font-mono tabular-nums ${chgCls(r.change_pct)}`}>
                   {pct(r.change_pct, 2)}
@@ -742,13 +742,13 @@ function VerdictView({ d, segments }: {
                 <td className="whitespace-nowrap px-3 py-1.5">
                   {r.verdict ? (
                     <VerdictHover v={r.verdict} note="收盘口径">
-                      <span className={`inline-flex cursor-help whitespace-nowrap rounded border px-1.5 py-0.5 text-[10px] ${VERDICT_CLS[r.verdict.tone]}`}>
+                      <span className={`inline-flex cursor-help whitespace-nowrap rounded-btn border px-1.5 py-0.5 text-micro ${VERDICT_CLS[r.verdict.tone]}`}>
                         {r.verdict.title}
                       </span>
                     </VerdictHover>
-                  ) : <span className="text-[10px] text-muted/40">三档都在中部</span>}
+                  ) : <span className="text-micro text-muted/40">三档都在中部</span>}
                   {r.verdict_flipped && (
-                    <span className="ml-1.5 text-[9px] text-amber-400" title="这天通道档位换了一档">
+                    <span className="ml-1.5 text-micro text-warning" title="这天通道档位换了一档">
                       ← 换档
                     </span>
                   )}
@@ -757,13 +757,13 @@ function VerdictView({ d, segments }: {
               </tr>
             ))}
             {rows.length === 0 && (
-              <tr><td colSpan={7} className="px-3 py-10 text-center text-[11px] text-muted">这段时间里档位一次都没换过</td></tr>
+              <tr><td colSpan={7} className="px-3 py-10 text-center text-micro text-muted">这段时间里档位一次都没换过</td></tr>
             )}
           </tbody>
         </table>
       </div>
 
-      <div className="border-t border-border/60 px-4 py-2 text-[10px] leading-relaxed text-muted">
+      <div className="border-t border-border/60 px-4 py-2 text-micro leading-relaxed text-muted">
         「通道档位」列悬停看完整卡片 —— 与决策台「档位」列是同一张。一律按收盘算, 用的是同一套通道。
         历史是按<b className="text-secondary">当前</b>复权价重新算的 —— 期间除过权的话,
         同一天今天算出来的通道会和当时屏幕上略有出入, 复盘看的是形态与节奏。

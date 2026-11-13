@@ -203,7 +203,7 @@ export function StockAnalysisDialog({ task, mode, minimized }: Props) {
               <div className="relative">
                 <MarkdownRenderer content={content} />
                 {phase === 'streaming' && (
-                  <span className="inline-block w-1.5 h-3.5 bg-sky-400 ml-0.5 align-middle animate-pulse rounded-sm" />
+                  <span className="inline-block w-1.5 h-3.5 bg-sky-400 ml-0.5 align-middle animate-pulse rounded-btn" />
                 )}
               </div>
             )}

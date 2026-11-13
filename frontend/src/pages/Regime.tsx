@@ -464,7 +464,7 @@ export function Regime() {
             </div>
             {ml ? (
               <>
-                <div className={cn('mt-1 truncate text-sm font-semibold', ml.stale ? 'text-muted' : 'text-amber-300')}
+                <div className={cn('mt-1 truncate text-sm font-semibold', ml.stale ? 'text-muted' : 'text-warning')}
                   title={ml.stale
                     ? `主线数据停在 ${ml.date},已经 ${ml.age_days} 天没更新 —— 只作展示`
                     : `按 ${ml.date} 的涨停梯队聚合`}>
@@ -614,7 +614,7 @@ function MainlineFilterPanel({ filter, onDone }: {
           {blacklist.length > 0 && (
             <div className="mt-1 flex flex-wrap gap-1">
               {blacklist.map(b => (
-                <span key={b} className="inline-flex items-center gap-1 rounded bg-accent/10 px-1.5 py-px text-micro text-accent">
+                <span key={b} className="inline-flex items-center gap-1 rounded-btn bg-accent/10 px-1.5 py-px text-micro text-accent">
                   {b}
                   <button onClick={() => setBlacklist(blacklist.filter(x => x !== b))} className="hover:text-foreground">
                     <X className="h-2.5 w-2.5" />

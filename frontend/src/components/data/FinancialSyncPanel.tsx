@@ -101,14 +101,14 @@ export function FinancialSyncPanel() {
       <div className="rounded-card border border-dashed border-border bg-base/30 px-4 py-6 text-center">
         <Table2 className="mx-auto h-6 w-6 text-muted" />
         <div className="mt-2 text-xs text-secondary">当前数据源不提供财务数据</div>
-        <div className="mt-1 text-[11px] text-muted">在 设置 → 数据源 配置提供财务数据的数据源后可用</div>
+        <div className="mt-1 text-micro text-muted">在 设置 → 数据源 配置提供财务数据的数据源后可用</div>
       </div>
     )
   }
 
   return (
     <div className="space-y-3">
-      <div className="text-[11px] leading-relaxed text-muted">
+      <div className="text-micro leading-relaxed text-muted">
         5 张表同属「财务数据」这一个能力 (同一数据源 / 同一门禁), 可整体同步或单独更新某一张。
         财务不在盘后管道内, 需在此手动拉取。
       </div>
@@ -138,7 +138,7 @@ export function FinancialSyncPanel() {
 
               <span className="w-20 shrink-0 text-xs text-foreground">{TABLE_LABELS[key]}</span>
 
-              <span className="min-w-0 flex-1 truncate text-[11px] text-muted">
+              <span className="min-w-0 flex-1 truncate text-micro text-muted">
                 {hasData ? (
                   <>
                     <span className="font-mono tabular-nums text-secondary">{fmtBigNum(rows)}</span> 行
@@ -150,7 +150,7 @@ export function FinancialSyncPanel() {
                 )}
               </span>
 
-              <span className="hidden shrink-0 items-center gap-1 text-[10px] text-muted/80 sm:flex">
+              <span className="hidden shrink-0 items-center gap-1 text-micro text-muted/80 sm:flex">
                 <Clock className="h-2.5 w-2.5" />
                 {lsTime
                   ? new Date(lsTime).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
@@ -175,7 +175,7 @@ export function FinancialSyncPanel() {
 
       <div className="flex items-center gap-2">
         {syncing && (
-          <span className="flex min-w-0 items-center gap-1.5 text-[11px] text-accent/80">
+          <span className="flex min-w-0 items-center gap-1.5 text-micro text-accent/80">
             <Loader2 className="h-3 w-3 shrink-0 animate-spin" />
             <span className="truncate">
               {isFullSync

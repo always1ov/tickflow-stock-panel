@@ -29,7 +29,7 @@ export function SettingsModal({ title, onClose, children, width = 'max-w-md', co
       >
         <div className="flex items-center justify-between px-5 py-3 border-b border-border shrink-0">
           <h3 className={TYPE.section}>{title}</h3>
-          <button onClick={onClose} aria-label="关闭" className="p-0.5 rounded hover:bg-elevated text-secondary">
+          <button onClick={onClose} aria-label="关闭" className="p-0.5 rounded-btn hover:bg-elevated text-secondary">
             <X className="h-4 w-4" />
           </button>
         </div>

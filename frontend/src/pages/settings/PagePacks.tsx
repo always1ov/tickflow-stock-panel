@@ -120,8 +120,8 @@ export function SettingsPagePacksPanel() {
 
   return (
     <div className="space-y-4">
-      <section className="rounded-2xl border border-border bg-surface p-6">
-        <div className="text-[11px] uppercase tracking-[0.2em] text-accent/80">页面插件</div>
+      <section className="rounded-dialog border border-border bg-surface p-6">
+        <div className="text-micro uppercase tracking-[0.2em] text-accent/80">页面插件</div>
         <h2 className="mt-2 text-2xl font-semibold tracking-tight text-foreground">上传打包页面产物, 免重建挂载</h2>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-secondary">
           用 <span className="font-mono text-xs text-accent">frontend/page-pack-template</span> 打包页面
@@ -163,7 +163,7 @@ export function SettingsPagePacksPanel() {
       </section>
 
       <section className="rounded-card border border-border bg-surface p-5">
-        <div className="text-[11px] uppercase tracking-[0.2em] text-accent/80">导入源码</div>
+        <div className="text-micro uppercase tracking-[0.2em] text-accent/80">导入源码</div>
         <h3 className="mt-2 text-lg font-semibold tracking-tight text-foreground">.tsx 源码一键导入, 自动编译挂载</h3>
         <p className="mt-2 max-w-3xl text-xs leading-5 text-secondary">
           上传源码扩展文件 (.tsx) 或从本项目 <span className="font-mono text-accent">frontend/src/custom/</span> 直接选择,
@@ -191,7 +191,7 @@ export function SettingsPagePacksPanel() {
           </button>
           {(sourceNs.data?.length ?? 0) > 0 && (
             <>
-              <span className="ml-2 text-[11px] text-muted">或从本项目导入:</span>
+              <span className="ml-2 text-micro text-muted">或从本项目导入:</span>
               <select
                 value={importNs}
                 onChange={e => setImportNs(e.target.value)}
@@ -227,7 +227,7 @@ export function SettingsPagePacksPanel() {
       )}
 
       <section className="rounded-card border border-border bg-surface overflow-hidden">
-        <div className="grid grid-cols-[1fr_8rem_6rem_5rem_4rem] items-center border-b border-border px-4 py-2 text-[11px] text-muted">
+        <div className="grid grid-cols-[1fr_8rem_6rem_5rem_4rem] items-center border-b border-border px-4 py-2 text-micro text-muted">
           <div>页面 / ID</div><div>路径</div><div>大小 / 时间</div><div className="text-center">启用</div><div className="text-center">操作</div>
         </div>
         {packs.length === 0 && (
@@ -243,11 +243,11 @@ export function SettingsPagePacksPanel() {
                 {p.error ? <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-danger" /> : p.enabled ? <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-500" /> : <Package className="h-3.5 w-3.5 shrink-0 text-muted" />}
                 <span className="truncate">{p.label || '(未验证)'}</span>
               </div>
-              <div className="mt-0.5 truncate font-mono text-[11px] text-muted">{p.id}</div>
-              {p.error && <div className="mt-1 text-[11px] leading-4 text-danger">{p.error}</div>}
+              <div className="mt-0.5 truncate font-mono text-micro text-muted">{p.id}</div>
+              {p.error && <div className="mt-1 text-micro leading-4 text-danger">{p.error}</div>}
             </div>
-            <div className="truncate font-mono text-[11px] text-muted">{p.path || '—'}</div>
-            <div className="text-[11px] leading-4 text-muted">
+            <div className="truncate font-mono text-micro text-muted">{p.path || '—'}</div>
+            <div className="text-micro leading-4 text-muted">
               <div>{fmtSize(p.size)}</div>
               <div>{fmtTime(p.uploaded_at)}</div>
             </div>
@@ -273,7 +273,7 @@ export function SettingsPagePacksPanel() {
               <button
                 type="button"
                 onClick={() => { if (confirm(`删除页面插件 "${p.label || p.id}"?`)) deleteMut.mutate(p.id) }}
-                className="rounded p-1.5 text-muted hover:bg-danger/10 hover:text-danger transition-colors"
+                className="rounded-btn p-1.5 text-muted hover:bg-danger/10 hover:text-danger transition-colors"
                 title="删除"
               >
                 <Trash2 className="h-3.5 w-3.5" />

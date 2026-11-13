@@ -117,11 +117,11 @@ export function EmotionScoreConfigDialog({ onClose }: { onClose: () => void }) {
           <Sigma className="h-4 w-4 shrink-0 text-accent" />
           <h3 className="text-sm font-medium text-foreground">情绪评分 · 计算方式</h3>
           {payload?.customized && (
-            <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-medium leading-none text-accent">
+            <span className="rounded-full bg-accent/15 px-2 py-0.5 text-micro font-medium leading-none text-accent">
               已自定义
             </span>
           )}
-          <button onClick={onClose} className="ml-auto rounded p-0.5 text-secondary transition-colors hover:bg-elevated hover:text-foreground" aria-label="关闭">
+          <button onClick={onClose} className="ml-auto rounded-btn p-0.5 text-secondary transition-colors hover:bg-elevated hover:text-foreground" aria-label="关闭">
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -135,8 +135,8 @@ export function EmotionScoreConfigDialog({ onClose }: { onClose: () => void }) {
         ) : (
           <div className="flex-1 overflow-y-auto px-5 py-4">
             {/* 公式说明 */}
-            <div className="rounded-lg border border-border/60 bg-elevated/30 px-3.5 py-2.5">
-              <div className="flex items-start gap-2 text-[11px] leading-relaxed text-secondary">
+            <div className="rounded-card border border-border/60 bg-elevated/30 px-3.5 py-2.5">
+              <div className="flex items-start gap-2 text-micro leading-relaxed text-secondary">
                 <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent/70" />
                 <div>
                   每个维度先由若干指标按 <span className="text-foreground">区间线性归一化</span> 到
@@ -144,7 +144,7 @@ export function EmotionScoreConfigDialog({ onClose }: { onClose: () => void }) {
                   各维度再按 <span className="text-foreground">维度权重</span> 加权平均得到总分。
                   <div className="mt-1 text-muted">
                     子项权重会在维度内自动归一化（权重和不必等于 1）；标记
-                    <span className="mx-0.5 rounded bg-elevated/70 px-1 py-px font-mono text-[10px]">逆向</span>
+                    <span className="mx-0.5 rounded-btn bg-elevated/70 px-1 py-px font-mono text-micro">逆向</span>
                     的维度表示「越强得分越低」（如抗跌：下跌越多，得分越少）。
                   </div>
                 </div>
@@ -157,24 +157,24 @@ export function EmotionScoreConfigDialog({ onClose }: { onClose: () => void }) {
                 const dim = draft.dimensions[dimKey]
                 if (!dim) return null
                 return (
-                  <div key={dimKey} className="rounded-lg border border-border/60 bg-base/30">
+                  <div key={dimKey} className="rounded-card border border-border/60 bg-base/30">
                     <div className="flex items-center gap-2 border-b border-border/40 px-3 py-2">
                       <span className="text-xs font-medium text-foreground">{dim.label}</span>
                       {dim.invert && (
-                        <span className="rounded bg-warning/15 px-1.5 py-px text-[9px] font-medium leading-none text-warning">逆向</span>
+                        <span className="rounded-btn bg-warning/15 px-1.5 py-px text-micro font-medium leading-none text-warning">逆向</span>
                       )}
                       <span className="ml-auto flex items-center gap-1.5">
-                        <span className="text-[10px] text-muted">维度权重</span>
+                        <span className="text-micro text-muted">维度权重</span>
                         <input
                           type="number" min={0} max={10} step={0.1}
                           value={dim.weight}
                           onChange={e => setDimWeight(dimKey, Number(e.target.value))}
-                          className="h-6 w-16 rounded border border-border bg-base px-1.5 text-right font-mono text-[11px] text-foreground focus:outline-none focus:ring-1 focus:ring-accent/50"
+                          className="h-6 w-16 rounded-btn border border-border bg-base px-1.5 text-right font-mono text-micro text-foreground focus:outline-none focus:ring-1 focus:ring-accent/50"
                         />
                       </span>
                     </div>
                     <div className="px-3 py-2">
-                      <div className="grid grid-cols-[1fr_54px_64px_64px] items-center gap-2 pb-1 text-[10px] text-muted">
+                      <div className="grid grid-cols-[1fr_54px_64px_64px] items-center gap-2 pb-1 text-micro text-muted">
                         <span>指标</span>
                         <span className="text-right">权重</span>
                         <span className="text-right">归一化下限</span>
@@ -182,9 +182,9 @@ export function EmotionScoreConfigDialog({ onClose }: { onClose: () => void }) {
                       </div>
                       {dim.terms.map(term => (
                         <div key={term.key} className="grid grid-cols-[1fr_54px_64px_64px] items-center gap-2 py-0.5">
-                          <span className="truncate text-[11px] text-secondary" title={`${term.label}${term.unit ? ` (${term.unit})` : ''}`}>
+                          <span className="truncate text-micro text-secondary" title={`${term.label}${term.unit ? ` (${term.unit})` : ''}`}>
                             {term.label}
-                            {term.unit && <span className="ml-1 text-[10px] text-muted/70">{term.unit}</span>}
+                            {term.unit && <span className="ml-1 text-micro text-muted/70">{term.unit}</span>}
                           </span>
                           {(['weight', 'low', 'high'] as const).map(field => (
                             <input
@@ -192,7 +192,7 @@ export function EmotionScoreConfigDialog({ onClose }: { onClose: () => void }) {
                               type="number" step={field === 'weight' ? 0.05 : 'any'}
                               value={term[field]}
                               onChange={e => setTerm(dimKey, term.key, field, Number(e.target.value))}
-                              className="h-6 w-full rounded border border-border bg-base px-1.5 text-right font-mono text-[11px] text-foreground focus:outline-none focus:ring-1 focus:ring-accent/50"
+                              className="h-6 w-full rounded-btn border border-border bg-base px-1.5 text-right font-mono text-micro text-foreground focus:outline-none focus:ring-1 focus:ring-accent/50"
                             />
                           ))}
                         </div>
@@ -204,21 +204,21 @@ export function EmotionScoreConfigDialog({ onClose }: { onClose: () => void }) {
             </div>
 
             {/* 档位阈值 */}
-            <div className="mt-4 rounded-lg border border-border/60 bg-base/30 px-3 py-2.5">
+            <div className="mt-4 rounded-card border border-border/60 bg-base/30 px-3 py-2.5">
               <div className="text-xs font-medium text-foreground">档位阈值</div>
-              <p className="mt-1 text-[11px] leading-relaxed text-muted">
+              <p className="mt-1 text-micro leading-relaxed text-muted">
                 总分达到阈值即归入该档位（自上而下匹配第一个满足项，最低档为
                 <span className="mx-0.5 text-secondary">{labels.find(l => l.key === 'fallback')?.name ?? '冰点'}</span>）。
               </p>
               <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
                 {labels.filter(l => l.key !== 'fallback').map(l => (
                   <div key={l.key} className="flex items-center gap-2">
-                    <span className="w-8 shrink-0 text-[11px] text-secondary">{l.name}</span>
+                    <span className="w-8 shrink-0 text-micro text-secondary">{l.name}</span>
                     <input
                       type="number" min={0} max={100} step={1}
                       value={draft.thresholds[l.key] ?? 0}
                       onChange={e => setThreshold(l.key, Number(e.target.value))}
-                      className="h-6 w-full rounded border border-border bg-base px-1.5 text-right font-mono text-[11px] text-foreground focus:outline-none focus:ring-1 focus:ring-accent/50"
+                      className="h-6 w-full rounded-btn border border-border bg-base px-1.5 text-right font-mono text-micro text-foreground focus:outline-none focus:ring-1 focus:ring-accent/50"
                     />
                   </div>
                 ))}
@@ -226,7 +226,7 @@ export function EmotionScoreConfigDialog({ onClose }: { onClose: () => void }) {
             </div>
 
             {error && (
-              <div className="mt-3 rounded-lg bg-danger/5 px-3 py-2 text-[11px] text-danger">{error}</div>
+              <div className="mt-3 rounded-card bg-danger/5 px-3 py-2 text-micro text-danger">{error}</div>
             )}
           </div>
         )}

@@ -50,27 +50,27 @@ export function StateTimeline({ hint, bands, legend, className }: Props) {
   if (!total) return null
   const multi = bands.length > 1
   return (
-    <div className={cn('mx-4 mt-2 rounded-lg border border-border/50 bg-elevated/20 px-3 py-2', className)}>
+    <div className={cn('mx-4 mt-2 rounded-card border border-border/50 bg-elevated/20 px-3 py-2', className)}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <span className="text-[10px] text-muted">状态时间轴</span>
+        <span className="text-micro text-muted">状态时间轴</span>
         {/* 图例和标题挤在同一行 —— 单独占一行的话, 三个页签就一共多花 48px */}
         <span className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5">
           {legend.map(l => (
-            <span key={l.label} className="inline-flex items-center gap-1 text-[9px] text-muted">
-              <i className={cn('inline-block h-2 w-2 rounded-sm', l.cls)} />
+            <span key={l.label} className="inline-flex items-center gap-1 text-micro text-muted">
+              <i className={cn('inline-block h-2 w-2 rounded-btn', l.cls)} />
               {l.label}
             </span>
           ))}
         </span>
-        {!!hint && <span className="ml-auto shrink-0 font-mono text-[9px] text-muted/70">{hint}</span>}
+        {!!hint && <span className="ml-auto shrink-0 font-mono text-micro text-muted/70">{hint}</span>}
       </div>
       <div className="mt-1.5 space-y-1">
         {bands.map((b, i) => (
           <div key={b.label ?? i} className="flex items-center gap-2">
             {multi && (
-              <span className="w-6 shrink-0 text-right text-[9px] text-muted">{b.label}</span>
+              <span className="w-6 shrink-0 text-right text-micro text-muted">{b.label}</span>
             )}
-            <div className={cn('flex min-w-0 flex-1 overflow-hidden rounded',
+            <div className={cn('flex min-w-0 flex-1 overflow-hidden rounded-btn',
               multi ? 'h-2.5' : 'h-5')}>
               {b.cells.map(c => (
                 <div

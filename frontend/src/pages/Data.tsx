@@ -738,7 +738,7 @@ export function Data() {
             <span className="text-danger leading-relaxed">
               <span className="font-semibold">数据目录未挂载持久化卷!</span>
               当前数据写在容器内部({s?.data_dir_path}),拉新镜像重建容器时会<span className="font-semibold">丢失全部数据</span>。
-              请在 docker-compose 的 volumes 中挂载该路径(如 <code className="font-mono bg-danger/15 rounded px-1">./data:{s?.data_dir_path}</code>)后重建容器。
+              请在 docker-compose 的 volumes 中挂载该路径(如 <code className="font-mono bg-danger/15 rounded-btn px-1">./data:{s?.data_dir_path}</code>)后重建容器。
             </span>
           </div>
         )}
@@ -841,7 +841,7 @@ export function Data() {
                     </span>
                     <button
                       onClick={() => setShowInstScheduleEdit(v => !v)}
-                      className={`p-0.5 rounded hover:bg-elevated transition-colors ${showInstScheduleEdit ? 'text-accent' : 'text-secondary'}`}
+                      className={`p-0.5 rounded-btn hover:bg-elevated transition-colors ${showInstScheduleEdit ? 'text-accent' : 'text-secondary'}`}
                     >
                       <Clock className="h-3 w-3" />
                     </button>
@@ -888,7 +888,7 @@ export function Data() {
                     </span>
                     <button
                       onClick={() => setShowScheduleEdit(v => !v)}
-                      className={`p-0.5 rounded hover:bg-elevated transition-colors ${showScheduleEdit ? 'text-accent' : 'text-secondary'}`}
+                      className={`p-0.5 rounded-btn hover:bg-elevated transition-colors ${showScheduleEdit ? 'text-accent' : 'text-secondary'}`}
                     >
                       <Clock className="h-3 w-3" />
                     </button>
@@ -1020,7 +1020,7 @@ export function Data() {
                 {Array.from({ length: 3 }).map((_, i) => (
                   <div key={i} className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <Skeleton w="w-4" h="h-4" rounded="rounded-full" />
+                      <Skeleton w="w-4" h="h-4" rounded-btn="rounded-full" />
                       <div className="space-y-1.5">
                         <Skeleton w="w-20" />
                         <Skeleton w="w-28" h="h-3" />

@@ -98,7 +98,7 @@ export function EndpointTestDialog({ hasKey, tierLabel, currentEndpoint, onClose
             </div>
             <div className="flex items-center gap-3">
               {isFree && (
-                <span className="text-micro px-2 py-0.5 rounded bg-warning/10 text-warning/80">Free 模式</span>
+                <span className="text-micro px-2 py-0.5 rounded-btn bg-warning/10 text-warning/80">Free 模式</span>
               )}
               <button
                 onClick={testAll}
@@ -109,7 +109,7 @@ export function EndpointTestDialog({ hasKey, tierLabel, currentEndpoint, onClose
                 {anyTesting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Play className="h-3 w-3" />}
                 全部测速
               </button>
-              <button onClick={onClose} className="p-1 rounded text-secondary hover:text-foreground transition-colors">
+              <button onClick={onClose} className="p-1 rounded-btn text-secondary hover:text-foreground transition-colors">
                 <X className="h-4 w-4" />
               </button>
             </div>
@@ -189,13 +189,13 @@ function EpRow({ ep, result, testing, isCurrent, isFree, canUsePremium, switchin
           <div className="flex items-center gap-1.5 flex-wrap min-w-0">
             <span className="text-xs font-medium text-foreground">{ep.label}</span>
             {isPremium && (
-              <span className="inline-flex items-center gap-0.5 text-micro px-1.5 py-px rounded-sm bg-warning/15 text-warning font-medium" title={ep.description ?? '需专线加速权限'}>
+              <span className="inline-flex items-center gap-0.5 text-micro px-1.5 py-px rounded-btn bg-warning/15 text-warning font-medium" title={ep.description ?? '需专线加速权限'}>
                 <Crown className="h-2.5 w-2.5" />
                 专线
               </span>
             )}
             {isCurrent && (
-              <span className="text-micro px-1.5 py-px rounded-sm bg-accent/15 text-accent font-medium">使用中</span>
+              <span className="text-micro px-1.5 py-px rounded-btn bg-accent/15 text-accent font-medium">使用中</span>
             )}
           </div>
           {/* 中位延迟 —— 测试中/前/后都占位,避免高度跳动 */}
@@ -203,7 +203,7 @@ function EpRow({ ep, result, testing, isCurrent, isFree, canUsePremium, switchin
             {isFree ? (
               // Free 模式:普通付费端点需 Starter+,premium 端点需 Expert+
               <span
-                className={`text-micro px-1.5 py-0.5 rounded-sm font-medium font-sans ${
+                className={`text-micro px-1.5 py-0.5 rounded-btn font-medium font-sans ${
                   isPremium
                     ? 'bg-warning/15 text-warning'
                     : 'bg-muted/10 text-muted/70'

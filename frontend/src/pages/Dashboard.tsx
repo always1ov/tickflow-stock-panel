@@ -337,7 +337,7 @@ export function Dashboard() {
       {/* 自选实时模式提示: 大盘看板为盘后数据, 仅自选实时。避免用户误读为全市场实时。 */}
       {quoteMode === 'watchlist' && (
         <div className="mb-1.5 flex items-start gap-2 rounded-card border border-warning/30 bg-warning/10 px-3 py-1.5 text-xs leading-relaxed">
-          <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
+          <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warning" />
           <div className="min-w-0 flex-1 text-secondary">
             当前为「自选实时」模式,看板展示的大盘数据为<strong className="text-foreground">盘后快照</strong>(最新有数据日),并非盘中实时;
             仅自选({data.quote_status?.watchlist_symbol_count ?? 0} 只)支持实时监控。
@@ -385,7 +385,7 @@ function FetchDataCard({
   return (
     <div className="mb-3 rounded-card border border-border bg-surface/85 p-3.5">
       <div className="flex items-start gap-3">
-        <div className="rounded-lg bg-accent/10 p-2 shrink-0">
+        <div className="rounded-card bg-accent/10 p-2 shrink-0">
           <Database className="h-4 w-4 text-accent" />
         </div>
         <div className="min-w-0 flex-1">
@@ -478,7 +478,7 @@ function WelcomeFetchModal({
           initial={{ scale: 0.85, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-          className="mx-auto w-fit rounded-2xl bg-accent/10 p-3.5"
+          className="mx-auto w-fit rounded-dialog bg-accent/10 p-3.5"
         >
           <Sparkles className="h-7 w-7 text-accent" />
         </motion.div>
@@ -514,7 +514,7 @@ function WelcomeFetchModal({
           </button>
           <button
             onClick={onStart}
-            className="inline-flex items-center gap-2 px-5 h-9 rounded-xl bg-accent text-white text-sm font-semibold shadow-lg shadow-accent/20 hover:bg-accent/90 transition-ui"
+            className="inline-flex items-center gap-2 px-5 h-9 rounded-dialog bg-accent text-white text-sm font-semibold shadow-lg shadow-accent/20 hover:bg-accent/90 transition-ui"
           >
             <Play className="h-4 w-4" />开始获取
           </button>

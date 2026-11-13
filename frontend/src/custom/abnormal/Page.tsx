@@ -210,7 +210,7 @@ function BenchmarkCard({ q, onOpenStock }: {
   if (q.isLoading) {
     return (
       <div className="flex items-center gap-3 rounded-card border border-border bg-surface/80 px-4 py-3">
-        <span className="grid h-8 w-8 shrink-0 animate-pulse place-items-center rounded bg-elevated">
+        <span className="grid h-8 w-8 shrink-0 animate-pulse place-items-center rounded-btn bg-elevated">
           <Compass className="h-4 w-4 text-muted/50" />
         </span>
         <div className="flex items-center gap-2">
@@ -227,7 +227,7 @@ function BenchmarkCard({ q, onOpenStock }: {
   if (!d || d.state === 'no_data') {
     return (
       <div className="flex items-center gap-3 rounded-card border border-border bg-surface/50 px-4 py-3">
-        <span className="grid h-8 w-8 shrink-0 place-items-center rounded bg-elevated/60">
+        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-btn bg-elevated/60">
           <Compass className="h-4 w-4 text-muted/50" />
         </span>
         <span className="text-xs text-muted">盘前风向标暂不可用{d?.message ? ` (${d.message.slice(0, 40)})` : ''}</span>
@@ -245,7 +245,7 @@ function BenchmarkCard({ q, onOpenStock }: {
     <div className="rounded-card border border-border bg-surface/80">
       {/* 头部 */}
       <div className="flex items-center gap-3 px-4 py-3">
-        <span className="grid h-8 w-8 shrink-0 place-items-center rounded bg-elevated text-secondary ring-1 ring-border">
+        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-btn bg-elevated text-secondary ring-1 ring-border">
           <Compass className="h-4 w-4" />
         </span>
         <span className="leading-tight">
@@ -253,7 +253,7 @@ function BenchmarkCard({ q, onOpenStock }: {
             <span className="text-xs font-semibold text-foreground">盘前风向标</span>
             {isFallback && (
               <span
-                className="rounded border border-warning/30 bg-warning/10 px-1.5 py-px text-micro leading-tight text-warning"
+                className="rounded-btn border border-warning/30 bg-warning/10 px-1.5 py-px text-micro leading-tight text-warning"
                 title="目标日名单不可用, 已自动显示上一期"
               >
                 显示上一期
@@ -301,13 +301,13 @@ function BenchmarkCard({ q, onOpenStock }: {
                   <span className="truncate text-foreground">{i.name ?? i.thscode}</span>
                   <span className="shrink-0 font-mono text-micro text-muted">{i.ticker ?? i.thscode}</span>
                   {(() => { const b = boardTag(i.thscode); return b && (
-                    <span className={`shrink-0 inline-flex items-center rounded border px-1 text-micro font-bold leading-tight ${b.color}`}>
+                    <span className={`shrink-0 inline-flex items-center rounded-btn border px-1 text-micro font-bold leading-tight ${b.color}`}>
                       {b.label}
                     </span>
                   ) })()}
                   {chase && (
                     <span
-                      className="shrink-0 rounded border border-danger/30 bg-danger/10 px-1 text-micro font-medium leading-tight text-danger"
+                      className="shrink-0 rounded-btn border border-danger/30 bg-danger/10 px-1 text-micro font-medium leading-tight text-danger"
                       title="60日回测: 高开≥5%子集当日开盘买入平均 -1.97% (次日 +1.79%) — 追高陷阱"
                     >
                       追高风险
@@ -506,12 +506,12 @@ function IntradayRowView({ row, rank, onPreview }: {
           <span className="shrink-0 font-mono text-xs text-foreground transition-colors duration-hover group-hover:text-accent">{row.symbol}</span>
           <span className="min-w-0 max-w-40 truncate text-xs text-secondary transition-colors duration-hover group-hover:text-foreground">{row.name ?? '—'}</span>
           {board && (
-            <span className={`shrink-0 rounded border px-1 text-micro font-bold leading-tight ${board.color}`}>
+            <span className={`shrink-0 rounded-btn border px-1 text-micro font-bold leading-tight ${board.color}`}>
               {board.label}
             </span>
           )}
           {clu > 1 && (
-            <span className="shrink-0 rounded border border-warning/30 bg-warning/10 px-1 text-micro font-bold leading-tight text-warning" title={`连续 ${clu} 日涨停`}>
+            <span className="shrink-0 rounded-btn border border-warning/30 bg-warning/10 px-1 text-micro font-bold leading-tight text-warning" title={`连续 ${clu} 日涨停`}>
               {clu}连板
             </span>
           )}
@@ -524,7 +524,7 @@ function IntradayRowView({ row, rank, onPreview }: {
       <td className="px-2 py-1.5 max-sm:order-3 max-sm:basis-full max-sm:p-0">
         <div className="flex flex-wrap items-center gap-1">
           {row.signals.map(s => (
-            <span key={s} className={`rounded border px-1 text-micro font-medium leading-tight ${SIGNAL_META[s].cls}`}>
+            <span key={s} className={`rounded-btn border px-1 text-micro font-medium leading-tight ${SIGNAL_META[s].cls}`}>
               {SIGNAL_META[s].label}
             </span>
           ))}
@@ -884,7 +884,7 @@ function DeviationView({ onPreview }: {
         return `${w.replace('d', '日')}${s}`
       }).join(' / ')
       return (
-        <div key={i} className="rounded border border-border bg-base px-2.5 py-2">
+        <div key={i} className="rounded-btn border border-border bg-base px-2.5 py-2">
           <div className="text-xs font-medium text-foreground">
             {rule.board}
             {rule.st && <span className="ml-1 text-danger">ST</span>}
@@ -940,12 +940,12 @@ function AbnormalRowView({ row, rank, onPreview }: {
           <span className="shrink-0 font-mono text-xs text-foreground group-hover:text-accent transition-colors duration-hover">{row.symbol}</span>
           <span className="min-w-0 max-w-40 truncate text-xs text-secondary group-hover:text-foreground transition-colors duration-hover">{row.name ?? '—'}</span>
           {board && (
-            <span className={`shrink-0 rounded px-1 text-micro font-bold leading-tight border ${board.color}`}>
+            <span className={`shrink-0 rounded-btn px-1 text-micro font-bold leading-tight border ${board.color}`}>
               {board.label}
             </span>
           )}
           {row.st && (
-            <span className="shrink-0 rounded border border-danger/30 bg-danger/10 px-1 text-micro font-bold text-danger">
+            <span className="shrink-0 rounded-btn border border-danger/30 bg-danger/10 px-1 text-micro font-bold text-danger">
               ST
             </span>
           )}
@@ -997,7 +997,7 @@ function AbnormalRowView({ row, rank, onPreview }: {
         </div>
       </td>
       <td className="px-2 py-1.5 text-center">
-        <span className={`rounded px-1.5 py-0.5 text-micro font-medium ${meta.cls}`}>{meta.label}</span>
+        <span className={`rounded-btn px-1.5 py-0.5 text-micro font-medium ${meta.cls}`}>{meta.label}</span>
       </td>
     </tr>
   )

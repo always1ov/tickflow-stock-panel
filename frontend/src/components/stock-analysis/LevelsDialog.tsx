@@ -56,7 +56,7 @@ export function LevelsDialog({ symbol, name, onClose }: { symbol: string | null;
               'relative rounded-card border border-border bg-base shadow-2xl overflow-hidden flex flex-col transition-ui duration-expand ease-smooth',
               // [fork R366] 手机上 92vw 会在两侧各留一条 4% 的黑边, 而屏幕本来就窄
               // —— 窄屏改成铺满并去掉圆角外的留白, 宽屏照旧。
-              maximized ? 'w-screen h-screen max-w-none max-h-none' : 'w-full max-w-[1100px] max-h-[95vh] sm:w-[92vw]',
+              maximized ? 'w-screen h-screen max-w-none max-h-none' : 'w-full max-w-read max-h-[95vh] sm:w-[92vw]',
             )}
           >
             {/* 顶栏: 与个股日 K 弹窗同款 —— 代码 + 名称在左, 行情摘要与操作在右 */}
@@ -71,14 +71,14 @@ export function LevelsDialog({ symbol, name, onClose }: { symbol: string | null;
                 <button
                   onClick={() => setMaximized(v => !v)}
                   title={maximized ? '缩小' : '放大'}
-                  className="rounded-md p-1 text-muted transition-colors hover:bg-elevated hover:text-foreground"
+                  className="rounded-btn p-1 text-muted transition-colors hover:bg-elevated hover:text-foreground"
                 >
                   {maximized ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
                 </button>
                 <button
                   onClick={onClose}
                   title="关闭(Esc)"
-                  className="rounded-md p-1 text-muted transition-colors hover:bg-elevated hover:text-foreground"
+                  className="rounded-btn p-1 text-muted transition-colors hover:bg-elevated hover:text-foreground"
                 >
                   <X className="h-4 w-4" />
                 </button>

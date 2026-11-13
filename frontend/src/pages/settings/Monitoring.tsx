@@ -346,7 +346,7 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
             <button
               onClick={() => runFix.mutate()}
               disabled={runFix.isPending}
-              className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs
+              className="inline-flex items-center gap-1 px-2 py-1 rounded-btn text-xs
                          bg-accent/15 text-accent hover:bg-accent/25 transition-colors
                          disabled:opacity-50 disabled:cursor-not-allowed"
             >
@@ -705,7 +705,7 @@ export function PushChannelsCard({ highlight }: { highlight?: string } = {}) {
                 <span className="text-xs font-medium text-foreground">飞书</span>
                 <span className="text-micro text-muted">群推送 Webhook</span>
                 {webhookDefaultChannels.includes('feishu') && (
-                  <span className="rounded bg-accent/15 px-1 py-px text-micro text-accent">默认</span>
+                  <span className="rounded-btn bg-accent/15 px-1 py-px text-micro text-accent">默认</span>
                 )}
                 <span className={`ml-auto text-micro ${feishuWebhookUrl ? 'text-bear' : 'text-warning'}`}>
                   {feishuWebhookUrl ? '已配置' : '未配置'}
@@ -802,7 +802,7 @@ export function PushChannelsCard({ highlight }: { highlight?: string } = {}) {
                 <span className="text-xs font-medium text-foreground">企业微信</span>
                 <span className="text-micro text-muted">群推送 Webhook</span>
                 {webhookDefaultChannels.includes('wecom') && (
-                  <span className="rounded bg-accent/15 px-1 py-px text-micro text-accent">默认</span>
+                  <span className="rounded-btn bg-accent/15 px-1 py-px text-micro text-accent">默认</span>
                 )}
                 <span className={`ml-auto text-micro ${wecomWebhookUrl ? 'text-bear' : 'text-warning'}`}>
                   {wecomWebhookUrl ? '已配置' : '未配置'}
@@ -887,7 +887,7 @@ export function PushChannelsCard({ highlight }: { highlight?: string } = {}) {
                 <span className="text-xs font-medium text-foreground">钉钉</span>
                 <span className="text-micro text-muted">群机器人 · 关键词</span>
                 {webhookDefaultChannels.includes('dingtalk') && (
-                  <span className="rounded bg-accent/15 px-1 py-px text-micro text-accent">默认</span>
+                  <span className="rounded-btn bg-accent/15 px-1 py-px text-micro text-accent">默认</span>
                 )}
                 <span className={`ml-auto text-micro ${dingtalkWebhookUrl ? 'text-bear' : 'text-warning'}`}>
                   {dingtalkWebhookUrl ? '已配置' : '未配置'}
@@ -988,7 +988,7 @@ export function PushChannelsCard({ highlight }: { highlight?: string } = {}) {
                 <span className="text-xs font-medium text-foreground">第三方系统</span>
                 <span className="text-micro text-muted">JSON Webhook</span>
                 {webhookDefaultChannels.includes('custom') && (
-                  <span className="rounded bg-accent/15 px-1 py-px text-micro text-accent">默认</span>
+                  <span className="rounded-btn bg-accent/15 px-1 py-px text-micro text-accent">默认</span>
                 )}
                 <span className={`ml-auto text-micro ${customWebhookUrl ? 'text-bear' : 'text-warning'}`}>
                   {customWebhookUrl ? '已配置' : '未配置'}
@@ -1057,7 +1057,7 @@ export function PushChannelsCard({ highlight }: { highlight?: string } = {}) {
                 <span className="text-xs font-medium text-foreground">邮件</span>
                 <span className="text-micro text-muted">SMTP</span>
                 {webhookDefaultChannels.includes('email') && (
-                  <span className="rounded bg-accent/15 px-1 py-px text-micro text-accent">默认</span>
+                  <span className="rounded-btn bg-accent/15 px-1 py-px text-micro text-accent">默认</span>
                 )}
                 <span className={`ml-auto text-micro ${emailConfigured ? 'text-bear' : 'text-warning'}`}>
                   {emailConfigured ? '已配置' : '未配置'}

@@ -33,7 +33,7 @@ export function AdjFactorSyncConfig({ hasCap, providerDisplay, onJobStart }: {
       <div className="flex items-center justify-between">
         <span className="text-xs text-foreground font-medium">生效数据源</span>
         <div className="flex items-center gap-2">
-          <span className="text-[11px] text-secondary font-mono">{providerDisplay ?? 'TickFlow'}</span>
+          <span className="text-micro text-secondary font-mono">{providerDisplay ?? 'TickFlow'}</span>
           {!hasCap && <MissingCapChip capKey="adj_factor" />}
         </div>
       </div>
@@ -42,8 +42,8 @@ export function AdjFactorSyncConfig({ hasCap, providerDisplay, onJobStart }: {
       <div className="pt-3 border-t border-border space-y-2">
         <div className="flex items-center gap-1.5">
           <Download className="h-3 w-3 text-secondary" />
-          <span className="text-[11px] text-secondary font-medium">手动同步</span>
-          <span className="text-[10px] text-muted">与盘后管道共用任务槽</span>
+          <span className="text-micro text-secondary font-medium">手动同步</span>
+          <span className="text-micro text-muted">与盘后管道共用任务槽</span>
         </div>
         <button
           onClick={handleSync}
@@ -56,7 +56,7 @@ export function AdjFactorSyncConfig({ hasCap, providerDisplay, onJobStart }: {
             <><Download className="h-3.5 w-3.5" /><span>全历史同步除权因子</span></>
           )}
         </button>
-        <div className="flex items-start gap-1.5 text-[10px] text-muted leading-relaxed">
+        <div className="flex items-start gap-1.5 text-micro text-muted leading-relaxed">
           <Info className="h-3 w-3 shrink-0 mt-px" />
           <span>
             拉取除权事件(等比因子 + 分红/送转/配股明细),窗口按需钳到本地日K起点 —
@@ -65,7 +65,7 @@ export function AdjFactorSyncConfig({ hasCap, providerDisplay, onJobStart }: {
           </span>
         </div>
         {providerDisplay == null && (
-          <div className="text-[10px] text-muted leading-relaxed">
+          <div className="text-micro text-muted leading-relaxed">
             当前路由 TickFlow:只返回等比因子,无事件明细。需要明细时,在
             设置 → 数据源 将「除权因子」切换到提供明细的数据源后重跑。
           </div>

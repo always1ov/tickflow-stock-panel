@@ -694,7 +694,7 @@ function LevelOverview({
       <div
         onMouseEnter={() => onHover(key)}
         onMouseLeave={() => onHover(null)}
-        className={`flex items-center gap-2 py-0.5 px-1.5 -mx-1.5 rounded transition-ui cursor-default ${
+        className={`flex items-center gap-2 py-0.5 px-1.5 -mx-1.5 rounded-btn transition-ui cursor-default ${
           hit ? 'bg-elevated/60' : ''
         }`}
         style={dim ? { opacity: 0.35 } : undefined}

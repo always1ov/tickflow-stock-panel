@@ -12,7 +12,7 @@ export function QuoteFreshnessBadge({ freshness, compact = false }: { freshness?
   const title = `${current.message}${current.data_date ? `；数据日期 ${current.data_date}` : ''}`
   return (
     <span title={title} aria-label={title}
-      className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-[11px] leading-5 ${warning ? 'text-warning' : 'text-muted'}`}>
+      className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-micro leading-5 ${warning ? 'text-warning' : 'text-muted'}`}>
       <Clock className="h-3 w-3" aria-hidden="true" />
       {quoteFreshnessLabel(current)}
     </span>

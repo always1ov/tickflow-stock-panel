@@ -221,24 +221,24 @@ export function StrategyNavChart({ result }: Props) {
     <div>
       <div className="flex flex-wrap items-center gap-4 px-4 pb-2">
         <span className="flex items-center gap-1.5 text-micro text-secondary">
-          <span className="w-3 h-0.5 rounded bg-[#3b82f6]" />
+          <span className="w-3 h-0.5 rounded-btn bg-[#3b82f6]" />
           策略净值
         </span>
         <span className="flex items-center gap-1.5 text-micro text-secondary">
-          <span className="w-3 h-0.5 rounded bg-[#f04438]" />
+          <span className="w-3 h-0.5 rounded-btn bg-[#f04438]" />
           回撤
         </span>
         {hasPosition && (
           <button type="button" onClick={() => toggleLegend('仓位')} title="点击显示/隐藏"
             className={`flex items-center gap-1.5 text-micro text-secondary cursor-pointer transition-opacity ${showPosition ? 'opacity-100' : 'opacity-40'}`}>
-            <span className="h-2.5 w-3 rounded-sm bg-amber-500/15" />
+            <span className="h-2.5 w-3 rounded-btn bg-warning/15" />
             仓位
           </button>
         )}
         {hasBenchmark && (
           <button type="button" onClick={() => toggleLegend('同期上证指数')} title="点击显示/隐藏"
             className={`flex items-center gap-1.5 text-micro text-secondary cursor-pointer transition-opacity ${showBenchmark ? 'opacity-100' : 'opacity-40'}`}>
-            <span className="w-3 h-0.5 rounded border-t border-dashed border-[#64748b]" />
+            <span className="w-3 h-0.5 rounded-btn border-t border-dashed border-[#64748b]" />
             同期上证指数
           </button>
         )}

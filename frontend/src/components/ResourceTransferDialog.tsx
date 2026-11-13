@@ -137,7 +137,7 @@ export function ResourceTransferDialog({ kind, initialMode = 'import', exportOnl
   return createPortal(
     <Modal ariaLabel={`${KIND_LABEL[kind]}导入与导出`} onClose={() => { if (!busy) onClose() }} closeOnBackdrop={!busy}
       overlayClassName="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm"
-      panelClassName="flex h-[min(680px,90dvh)] w-[94vw] max-w-[1040px] flex-col overflow-hidden rounded-card border border-border bg-surface shadow-2xl">
+      panelClassName="flex h-[min(680px,90dvh)] w-[94vw] max-w-read flex-col overflow-hidden rounded-card border border-border bg-surface shadow-2xl">
       <header className="flex shrink-0 items-center justify-between gap-3 border-b border-border px-4 py-3 sm:px-5">
         <div className="min-w-0">
           <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground"><PackageOpen className="h-4 w-4 text-accent" />{KIND_LABEL[kind]}导入与导出</h2>

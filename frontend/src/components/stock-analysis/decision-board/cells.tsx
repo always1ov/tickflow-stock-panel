@@ -311,7 +311,7 @@ export function TrendSegment({ trend, geo, runs, ph, kc, close, trendCls }: {
     <>
         <span title={tip} className="flex shrink-0 items-center gap-1">
           {trend ? (
-            <span className={`inline-flex whitespace-nowrap rounded border px-1.5 py-0.5 text-xs ${trendCls ?? ''}`}>
+            <span className={`inline-flex whitespace-nowrap rounded-btn border px-1.5 py-0.5 text-xs ${trendCls ?? ''}`}>
               {/* [R290] 天数从徽标上**搬到了第二行**, 换成「转折后第 N 天」——
                   用户: 「这类词统一改成出现转折后的第几天」。
                   徽标上不再留一份: 同一个数印两遍, 读的人得先确认是不是一回事
@@ -357,9 +357,9 @@ export function TrendSegment({ trend, geo, runs, ph, kc, close, trendCls }: {
                R284「别人看了会看不懂」、R285「加多两个字表述清楚」)。
             琥珀色与复盘逐日表那个「转折」标记同色, 两个页面同一件事同一个颜色。 */}
         {trend ? (
-          <span className={`inline-flex shrink-0 whitespace-nowrap rounded border px-1.5 py-px text-xs ${
+          <span className={`inline-flex shrink-0 whitespace-nowrap rounded-btn border px-1.5 py-px text-xs ${
             trend.flipped
-              ? 'border-amber-400/45 bg-amber-400/10 font-medium text-amber-300'
+              ? 'border-warning/45 bg-warning/10 font-medium text-warning'
               : 'border-transparent text-muted'}`}
                 title={trend.flipped
                   ? '今天六态状态发生了翻转 —— 昨天还不是这个状态'

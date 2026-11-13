@@ -38,7 +38,7 @@ export function StrategyStoreDialog({ open, onClose }: Props) {
                 <Store className="h-4 w-4 text-accent" />
                 获取策略
               </span>
-              <button onClick={onClose} className="p-1 rounded hover:bg-elevated transition-colors cursor-pointer">
+              <button onClick={onClose} className="p-1 rounded-btn hover:bg-elevated transition-colors cursor-pointer">
                 <X className="h-4 w-4 text-muted" />
               </button>
             </div>
@@ -46,9 +46,9 @@ export function StrategyStoreDialog({ open, onClose }: Props) {
             {/* 建设中占位内容 */}
             <div className="flex-1 flex flex-col items-center justify-center px-6 py-14 text-center">
               <div className="relative mb-5">
-                <div className="absolute inset-0 blur-2xl bg-amber-400/20 rounded-full" />
-                <div className="relative h-16 w-16 rounded-2xl bg-amber-400/10 border border-amber-400/30 flex items-center justify-center">
-                  <Hammer className="h-8 w-8 text-amber-400" />
+                <div className="absolute inset-0 blur-2xl bg-warning/20 rounded-full" />
+                <div className="relative h-16 w-16 rounded-dialog bg-warning/10 border border-warning/30 flex items-center justify-center">
+                  <Hammer className="h-8 w-8 text-warning" />
                 </div>
               </div>
 

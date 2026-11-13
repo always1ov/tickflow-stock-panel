@@ -1073,7 +1073,7 @@ def test_R292_头部三行共用一条左栏():
     from tests.frontend_source import code_of
     row = code_of("components/stock-analysis/ReviewHeadRow.tsx")
     assert "w-[4.5rem] shrink-0" in row, "标签栏没有固定宽度 —— 三行对不齐"
-    assert "divide-y divide-border/40 rounded-lg border border-border/60" in row, (
+    assert "divide-y divide-border/40 rounded-card border border-border/60" in row, (
         "共用的外框没了"
     )
 
@@ -1350,7 +1350,7 @@ def test_R291_两种状态用同一个盒子():
     i = blk.index("今天转折")
     box = blk[i - 700:i]
     # [R520] 决策台改成单行后这个盒子加了 shrink-0(在 flex 行里不许被压扁), 盒子本身没变
-    assert "inline-flex shrink-0 whitespace-nowrap rounded border px-1.5 py-px" in box, (
+    assert "inline-flex shrink-0 whitespace-nowrap rounded-btn border px-1.5 py-px" in box, (
         "两种状态没共用同一个盒子 —— 转折那行会比别的行高一截"
     )
     assert "border-transparent" in box, "平常那天的边框没设成透明"
@@ -1737,7 +1737,7 @@ def test_R295_换档标记读后端不自己比():
     # 变异测试当场就漏了(本轮同一个坑的第 N 次)。
     assert "{r.verdict_flipped && (" in verdict, "换档标记没有按标记渲染"
     assert "← 换档" in verdict, "换档那天没有标记"
-    assert "${r.verdict_flipped ? 'bg-amber-400/[0.05]' : ''}" in verdict, (
+    assert "${r.verdict_flipped ? 'bg-warning/[0.05]' : ''}" in verdict, (
         "换档那一行没有底色 —— 一张 120 行的表, 靠底色才扫得出来"
     )
     for derived in ("verdict?.code !==", "verdict.code !==", "prevCode"):

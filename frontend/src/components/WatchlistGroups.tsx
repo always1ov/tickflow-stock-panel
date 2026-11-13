@@ -542,7 +542,7 @@ function GroupManagerDialog({
                   type="button"
                   disabled={pending}
                   onClick={() => void run(async () => { await onDelete(group.id); setDeletingId(null) })}
-                  className="rounded px-2 py-1 text-xs text-danger bg-danger/10 hover:bg-danger/20 disabled:opacity-50"
+                  className="rounded-btn px-2 py-1 text-xs text-danger bg-danger/10 hover:bg-danger/20 disabled:opacity-50"
                 >
                   确认
                 </button>
@@ -677,7 +677,7 @@ export function WatchlistGroupPicker({ groups, groupIds, symbol, disabled, onTog
         // 原来宽度跟着内容走: 未分组是 14px 的文件夹图标, 一个组是 8px 的圆点, 叠点再宽一截, 超过三个还挂「+N」——
         // 这组按钮靠右对齐, 于是它的左边缘(连带名字能占的宽度)每行不一样, 实测落在三个位置, 最多差 24px。
         // 32px 装得下最宽的那种(三个叠点 + 「+N」)。
-        className={`relative inline-flex h-5 w-8 shrink-0 items-center justify-center gap-0.5 rounded border border-transparent transition-colors ${
+        className={`relative inline-flex h-5 w-8 shrink-0 items-center justify-center gap-0.5 rounded-btn border border-transparent transition-colors ${
           memberGroups.length > 0
             ? 'hover:border-accent/30'
             : 'text-muted hover:border-accent/30 hover:text-accent'
@@ -734,11 +734,11 @@ export function WatchlistGroupPicker({ groups, groupIds, symbol, disabled, onTog
                 role="menuitemcheckbox"
                 aria-checked={member}
                 onClick={() => onToggleMember(symbol, group.id, !member)}
-                className={`flex w-full items-center gap-2 rounded px-2 py-1 text-left text-xs transition-colors hover:bg-elevated ${
+                className={`flex w-full items-center gap-2 rounded-btn px-2 py-1 text-left text-xs transition-colors hover:bg-elevated ${
                   member ? color.text : 'text-secondary'
                 }`}
               >
-                <span className={`inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-sm border ${
+                <span className={`inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-btn border ${
                   member ? `${color.border} ${color.background}` : 'border-border'
                 }`}>
                   {member && <Check className="h-2.5 w-2.5" />}

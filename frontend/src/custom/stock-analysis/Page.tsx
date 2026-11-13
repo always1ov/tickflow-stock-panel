@@ -129,7 +129,7 @@ export function StockAnalysis() {
               <button
                 onClick={() => setLocateNonce((n) => n + 1)}
                 title={`在决策台里定位 ${name || symbol} 那一行`}
-                className="rounded p-1 text-accent/80 hover:bg-accent/10 hover:text-accent transition-colors"
+                className="rounded-btn p-1 text-accent/80 hover:bg-accent/10 hover:text-accent transition-colors"
               >
                 <LocateFixed className="h-3.5 w-3.5" />
               </button>
@@ -139,7 +139,7 @@ export function StockAnalysis() {
               <button
                 onClick={() => openPriceAlert()}
                 title={`为 ${name || symbol} 设置价格点位提醒`}
-                className="rounded p-1 text-sky-300/70 hover:bg-sky-400/10 hover:text-sky-300 transition-colors"
+                className="rounded-btn p-1 text-sky-300/70 hover:bg-sky-400/10 hover:text-sky-300 transition-colors"
               >
                 <Bell className="h-3.5 w-3.5" />
               </button>
@@ -236,7 +236,7 @@ function ConfirmModal({ report, onView, onRedo, onClose }: {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
       <div
-        className="w-full max-w-sm bg-surface border border-border rounded-2xl p-5 shadow-2xl"
+        className="w-full max-w-sm bg-surface border border-border rounded-dialog p-5 shadow-2xl"
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center gap-2 mb-2">
@@ -250,11 +250,11 @@ function ConfirmModal({ report, onView, onRedo, onClose }: {
         <p className="text-xs text-muted mb-4">可直接查看历史,或重新生成一份新报告。</p>
         <div className="flex gap-2">
           <button onClick={onView}
-            className="flex-1 h-8 rounded-lg bg-elevated border border-border text-xs text-secondary hover:text-foreground transition-colors">
+            className="flex-1 h-8 rounded-card bg-elevated border border-border text-xs text-secondary hover:text-foreground transition-colors">
             查看历史
           </button>
           <button onClick={onRedo}
-            className="flex-1 h-8 rounded-lg bg-accent-soft border border-sky-400/30 text-xs text-sky-300 hover:from-sky-500/30 transition-ui">
+            className="flex-1 h-8 rounded-card bg-accent-soft border border-sky-400/30 text-xs text-sky-300 hover:from-sky-500/30 transition-ui">
             重新分析
           </button>
         </div>

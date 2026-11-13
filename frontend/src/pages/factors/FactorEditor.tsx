@@ -321,7 +321,7 @@ export function FactorEditor({ editId = '' }: { editId?: string }) {
                         type="button"
                         title={`点击插入 ${op.sig} — ${op.desc}`}
                         onClick={() => insertSnippet(`${op.name}(`)}
-                        className="flex w-full cursor-pointer items-baseline gap-2 rounded px-1 py-px text-left leading-4 transition-colors hover:bg-accent/10"
+                        className="flex w-full cursor-pointer items-baseline gap-2 rounded-btn px-1 py-px text-left leading-4 transition-colors hover:bg-accent/10"
                       >
                         <code className="w-36 shrink-0 truncate font-mono text-accent">{op.sig}</code>
                         <span className="truncate text-muted">{op.desc}</span>

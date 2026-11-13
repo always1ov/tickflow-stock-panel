@@ -43,7 +43,7 @@ export function SettingsCard({ icon: Icon, title, badge, desc, right, children, 
             <Icon className="h-4 w-4 shrink-0 text-secondary" />
             <h2 className={TYPE.card}>{title}</h2>
             {badge && (
-              <span className="rounded bg-elevated px-1.5 py-0.5 text-micro text-muted">{badge}</span>
+              <span className="rounded-btn bg-elevated px-1.5 py-0.5 text-micro text-muted">{badge}</span>
             )}
           </div>
           {desc && <p className="mt-1 pl-6 text-xs leading-5 text-muted">{desc}</p>}

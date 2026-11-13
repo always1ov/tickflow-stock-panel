@@ -18,7 +18,7 @@ import { NUM_CELL_CLASS } from '@/lib/stock-table'
 export function boardTag(symbol: string): { label: string; color: string } | null {
   if (/^(300|301)/.test(symbol)) return { label: '创', color: 'text-[#f97316] bg-[#f97316]/12 border-[#f97316]/25' }
   if (/^688/.test(symbol))       return { label: '科', color: 'text-cyan-400 bg-cyan-400/12 border-cyan-400/25' }
-  if (/\.BJ$/.test(symbol))      return { label: '北', color: 'text-amber-400 bg-amber-400/12 border-amber-400/25' }
+  if (/\.BJ$/.test(symbol))      return { label: '北', color: 'text-warning bg-warning/12 border-warning/25' }
   return null
 }
 
@@ -134,7 +134,7 @@ export function renderBuiltinDataCell(r: any, col: ColumnConfig, assetType: stri
       return (
         <td key={col.id} className="px-3 py-2 text-center">
           {r.consecutive_limit_ups > 0 ? (
-            <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1 rounded bg-danger/15 text-danger text-xs font-bold tabular-nums">
+            <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1 rounded-btn bg-danger/15 text-danger text-xs font-bold tabular-nums">
               {r.consecutive_limit_ups}
             </span>
           ) : (
@@ -146,7 +146,7 @@ export function renderBuiltinDataCell(r: any, col: ColumnConfig, assetType: stri
       return (
         <td key={col.id} className="px-3 py-2 text-center">
           {r.consecutive_limit_downs > 0 ? (
-            <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1 rounded bg-bear/15 text-bear text-xs font-bold tabular-nums">
+            <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1 rounded-btn bg-bear/15 text-bear text-xs font-bold tabular-nums">
               {r.consecutive_limit_downs}
             </span>
           ) : (

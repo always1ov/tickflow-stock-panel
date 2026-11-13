@@ -121,13 +121,13 @@ export function TickflowKeys() {
             {/* 验活结论。没验过就什么都不显示 —— 显示一个灰点会被当成"已验且没问题" */}
             {h && (h.alive
               ? (
-                <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded border border-bear/40 bg-bear/10 px-1.5 py-0.5 text-micro text-bear">
+                <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-btn border border-bear/40 bg-bear/10 px-1.5 py-0.5 text-micro text-bear">
                   <CheckCircle2 className="h-3 w-3" />可用
                 </span>
               )
               : (
                 <span title={h.error || '接口调用失败'}
-                  className="inline-flex shrink-0 cursor-help items-center gap-1 whitespace-nowrap rounded border border-danger/40 bg-danger/10 px-1.5 py-0.5 text-micro text-danger">
+                  className="inline-flex shrink-0 cursor-help items-center gap-1 whitespace-nowrap rounded-btn border border-danger/40 bg-danger/10 px-1.5 py-0.5 text-micro text-danger">
                   <AlertCircle className="h-3 w-3" />失效
                 </span>
               ))}

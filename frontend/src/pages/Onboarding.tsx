@@ -412,11 +412,11 @@ function DataSourceStep({ onNext, onBack }: { onNext: () => void; onBack: () => 
                     {item.display_name.replace(/（.*?）|\(.*?\)/g, '').trim() || item.display_name}
                   </span>
                   {item.kind === 'builtin' ? (
-                    <span className="shrink-0 rounded bg-accent/15 px-1 py-0.5 text-micro font-medium leading-none text-accent">内置</span>
+                    <span className="shrink-0 rounded-btn bg-accent/15 px-1 py-0.5 text-micro font-medium leading-none text-accent">内置</span>
                   ) : item.kind === 'custom' ? (
                     <span className="text-micro text-muted/50 tracking-wider shrink-0">自有</span>
                   ) : (
-                    <span className="shrink-0 rounded bg-warning/15 px-1 py-0.5 text-micro font-medium leading-none text-warning">第三方</span>
+                    <span className="shrink-0 rounded-btn bg-warning/15 px-1 py-0.5 text-micro font-medium leading-none text-warning">第三方</span>
                   )}
                 </div>
                 <div className="mt-1.5 flex items-center gap-1 pl-0.5">
@@ -426,7 +426,7 @@ function DataSourceStep({ onNext, onBack }: { onNext: () => void; onBack: () => 
                     <span className="text-micro text-warning">需配置 API Key,见下方表单</span>
                   ) : item.datasets.length > 0 ? (
                     item.datasets.slice(0, 4).map(ds => (
-                      <span key={ds} className="rounded bg-elevated/60 px-1 py-0.5 text-micro text-muted">
+                      <span key={ds} className="rounded-btn bg-elevated/60 px-1 py-0.5 text-micro text-muted">
                         {DATASET_LABELS[ds] ?? ds}
                       </span>
                     ))
@@ -451,7 +451,7 @@ function DataSourceStep({ onNext, onBack }: { onNext: () => void; onBack: () => 
             <div className="flex items-center gap-2">
               <KeyRound className="h-3.5 w-3.5 text-accent/80" />
               <span className="text-xs font-medium text-foreground">配置 {f.display} API Key</span>
-              <span className="rounded bg-elevated/70 px-1 py-px font-mono text-micro text-muted">{f.env}</span>
+              <span className="rounded-btn bg-elevated/70 px-1 py-px font-mono text-micro text-muted">{f.env}</span>
               {f.configured ? (
                 <span className="ml-auto inline-flex items-center gap-1 text-micro text-bull">
                   <CheckCircle2 className="h-3 w-3" />
@@ -519,11 +519,11 @@ function DataSourceStep({ onNext, onBack }: { onNext: () => void; onBack: () => 
         <div className="text-xs leading-relaxed text-muted">
           <span className="text-secondary">数据源已插件化</span>
           ,接入自有行情或切换数据源请前往
-          <span className="mx-0.5 rounded bg-elevated/70 px-1 py-px font-mono text-micro text-secondary">设置 → 数据源</span>
+          <span className="mx-0.5 rounded-btn bg-elevated/70 px-1 py-px font-mono text-micro text-secondary">设置 → 数据源</span>
           ,方法详见
-          <span className="mx-0.5 rounded bg-elevated/70 px-1 py-px font-mono text-micro text-secondary">docs/custom-data-source.md</span>
+          <span className="mx-0.5 rounded-btn bg-elevated/70 px-1 py-px font-mono text-micro text-secondary">docs/custom-data-source.md</span>
           与
-          <span className="mx-0.5 rounded bg-elevated/70 px-1 py-px font-mono text-micro text-secondary">docs/plugin-development.md</span>
+          <span className="mx-0.5 rounded-btn bg-elevated/70 px-1 py-px font-mono text-micro text-secondary">docs/plugin-development.md</span>
           。
         </div>
       </div>

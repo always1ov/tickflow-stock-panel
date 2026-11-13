@@ -162,7 +162,7 @@ export function FilterPanel({ value, onChange, onClose, onReset }: {
             <button
               onClick={onReset}
               title="清空全部筛选"
-              className="inline-flex items-center gap-1 px-1.5 h-6 rounded text-xs
+              className="inline-flex items-center gap-1 px-1.5 h-6 rounded-btn text-xs
                 text-muted hover:text-danger hover:bg-danger/10 transition-colors"
             >
               <RotateCcw className="h-3 w-3" />
@@ -172,7 +172,7 @@ export function FilterPanel({ value, onChange, onClose, onReset }: {
           <button
             onClick={onClose}
             title="收起筛选"
-            className="p-1 rounded text-secondary hover:text-foreground hover:bg-elevated transition-colors"
+            className="p-1 rounded-btn text-secondary hover:text-foreground hover:bg-elevated transition-colors"
           >
             <X className="h-3.5 w-3.5" />
           </button>
@@ -188,7 +188,7 @@ export function FilterPanel({ value, onChange, onClose, onReset }: {
             <button
               key={board}
               onClick={() => toggleBoard(board)}
-              className={`px-2 py-0.5 rounded text-xs transition-colors ${
+              className={`px-2 py-0.5 rounded-btn text-xs transition-colors ${
                 active
                   ? 'bg-accent/15 text-accent'
                   : 'bg-elevated text-secondary hover:text-foreground hover:bg-elevated/80'
@@ -201,7 +201,7 @@ export function FilterPanel({ value, onChange, onClose, onReset }: {
         <span className="w-px h-4 bg-border mx-1" />
         <button
           onClick={() => onChange({ ...value, excludeST: !value.excludeST })}
-          className={`px-2 py-0.5 rounded text-xs transition-colors ${
+          className={`px-2 py-0.5 rounded-btn text-xs transition-colors ${
             value.excludeST
               ? 'bg-accent/15 text-accent'
               : 'bg-elevated text-secondary hover:text-foreground hover:bg-elevated/80'
@@ -212,7 +212,7 @@ export function FilterPanel({ value, onChange, onClose, onReset }: {
         <button
           onClick={() => onChange({ ...value, watchlistOnly: !value.watchlistOnly })}
           title="只保留在「自选」里的标的"
-          className={`px-2 py-0.5 rounded text-xs transition-colors ${
+          className={`px-2 py-0.5 rounded-btn text-xs transition-colors ${
             value.watchlistOnly
               ? 'bg-accent/15 text-accent'
               : 'bg-elevated text-secondary hover:text-foreground hover:bg-elevated/80'

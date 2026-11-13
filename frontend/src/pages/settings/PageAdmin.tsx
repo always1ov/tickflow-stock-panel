@@ -37,7 +37,7 @@ export function SettingsPageAdminPanel() {
             type="button"
             onClick={() => switchSection(s.key)}
             className={cn(
-              'rounded-lg border px-3 py-1.5 text-sm transition-colors',
+              'rounded-card border px-3 py-1.5 text-sm transition-colors',
               section === s.key
                 ? 'border-accent/40 bg-accent/10 text-accent'
                 : 'border-border text-secondary hover:bg-elevated/60',
@@ -46,7 +46,7 @@ export function SettingsPageAdminPanel() {
             {s.label}
           </button>
         ))}
-        <Link to="/settings?tab=import" className="ml-auto rounded-lg border border-border px-3 py-1.5 text-sm text-secondary hover:bg-elevated">导入或管理页面插件</Link>
+        <Link to="/settings?tab=import" className="ml-auto rounded-card border border-border px-3 py-1.5 text-sm text-secondary hover:bg-elevated">导入或管理页面插件</Link>
       </div>
 
       {section === 'menus' && <SettingsMenuSettingsPanel />}

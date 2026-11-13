@@ -285,7 +285,7 @@ export function ExtDimensionAnalysis({
       />
 
       <div className="px-8 py-6 space-y-6 max-w-7xl">
-        <section className={`relative overflow-hidden rounded-2xl border border-border bg-surface p-6 ${accentClass}`}>
+        <section className={`relative overflow-hidden rounded-dialog border border-border bg-surface p-6 ${accentClass}`}>
           <div className="relative z-10 max-w-3xl">
             <div className="inline-flex items-center gap-2 rounded-btn border border-white/10 bg-white/[0.04] px-3 py-1 text-xs text-secondary">
               <Layers3 className="h-3.5 w-3.5" />
@@ -356,7 +356,7 @@ export function ExtDimensionAnalysis({
                         <button
                           key={group.key}
                           onClick={() => setSelectedGroup(group.key)}
-                          className={`w-full rounded-lg px-3 py-2 text-left transition-colors ${active ? 'bg-accent/10 border border-accent/25' : 'border border-transparent hover:bg-elevated/60'}`}
+                          className={`w-full rounded-card px-3 py-2 text-left transition-colors ${active ? 'bg-accent/10 border border-accent/25' : 'border border-transparent hover:bg-elevated/60'}`}
                         >
                           <div className="flex items-center gap-2">
                             <span className="w-5 text-micro font-mono text-muted">#{i + 1}</span>

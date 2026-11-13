@@ -513,16 +513,16 @@ export function SettingsAIPanel({ highlight }: { highlight?: string } = {}) {
                     <input type="text" value={model} onChange={e => handleModelChange(e.target.value)} placeholder="gpt-5.6-sol" className={`${INPUT_CLS} ${selectedPreset?.sponsor ? 'pr-9' : ''}`} />
                     {selectedPreset?.sponsor && (
                       <button type="button" onClick={fetchModelOptions} aria-label="获取模型列表"
-                        className="absolute right-1.5 top-1/2 flex h-6 w-7 -translate-y-1/2 items-center justify-center rounded-md border border-border/40 bg-base text-muted transition-colors hover:border-accent/40 hover:text-accent">
+                        className="absolute right-1.5 top-1/2 flex h-6 w-7 -translate-y-1/2 items-center justify-center rounded-btn border border-border/40 bg-base text-muted transition-colors hover:border-accent/40 hover:text-accent">
                         {modelsLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ChevronDown className="h-3.5 w-3.5" />}
                       </button>
                     )}
                     {selectedPreset?.sponsor && modelsOpen && (
-                      <div className="absolute z-20 mt-1 w-full rounded-lg border border-border/40 bg-base shadow-lg">
+                      <div className="absolute z-20 mt-1 w-full rounded-card border border-border/40 bg-base shadow-lg">
                         <div className="border-b border-border/30 p-2">
                           <input type="text" value={modelFilter} onChange={e => setModelFilter(e.target.value)}
                             placeholder="搜索模型..." autoFocus
-                            className="h-7 w-full rounded-md bg-base px-2 text-xs ring-1 ring-border/30 focus:outline-none focus:ring-accent/40" />
+                            className="h-7 w-full rounded-btn bg-base px-2 text-xs ring-1 ring-border/30 focus:outline-none focus:ring-accent/40" />
                         </div>
                         <div className="max-h-56 overflow-y-auto py-1">
                           {modelsLoading ? (

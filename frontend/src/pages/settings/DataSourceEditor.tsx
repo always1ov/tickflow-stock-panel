@@ -304,7 +304,7 @@ export function DataSourceEditor({
         </div>
         <div className="flex items-center gap-2">
           {!isNew && isActive && (
-            <span className="inline-flex items-center gap-1 text-micro text-accent bg-accent/10 px-2 py-1 rounded">
+            <span className="inline-flex items-center gap-1 text-micro text-accent bg-accent/10 px-2 py-1 rounded-btn">
               <Check className="h-2.5 w-2.5" /> 使用中
             </span>
           )}

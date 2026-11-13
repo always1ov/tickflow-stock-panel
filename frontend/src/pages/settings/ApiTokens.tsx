@@ -97,7 +97,7 @@ export function SettingsApiTokensPanel() {
                     <span className="text-xs text-foreground">
                       {s.label}
                       <span className="ml-1.5 font-mono text-micro text-accent/80">{s.key}</span>
-                      {s.default && <span className="ml-1 rounded bg-accent/10 px-1 text-micro text-accent">默认</span>}
+                      {s.default && <span className="ml-1 rounded-btn bg-accent/10 px-1 text-micro text-accent">默认</span>}
                     </span>
                     <span className="block text-micro text-muted">{s.desc}</span>
                   </span>
@@ -155,7 +155,7 @@ export function SettingsApiTokensPanel() {
                     </div>
                     <div className="mt-0.5 flex flex-wrap items-center gap-1">
                       {t.scopes.map(s => (
-                        <span key={s} className="rounded bg-accent/10 px-1.5 py-px font-mono text-micro text-accent">{s}</span>
+                        <span key={s} className="rounded-btn bg-accent/10 px-1.5 py-px font-mono text-micro text-accent">{s}</span>
                       ))}
                       <span className="ml-1 text-micro text-muted">
                         创建 {t.created_at?.slice(0, 16).replace('T', ' ')}

@@ -62,7 +62,7 @@ export function ReportHistoryPanel() {
               onClick={() => openHistoryReport(r.id)}
             >
               {/* 图标 */}
-              <div className={`flex h-8 w-8 items-center justify-center rounded-lg shrink-0 ${
+              <div className={`flex h-8 w-8 items-center justify-center rounded-card shrink-0 ${
                 isGenerating
                   ? 'bg-accent/10 text-accent'
                   : 'bg-elevated text-secondary group-hover:text-accent'
@@ -78,7 +78,7 @@ export function ReportHistoryPanel() {
                   <span className="text-xs font-medium text-foreground truncate">{r.name || r.symbol}</span>
                   <span className="text-micro font-mono text-muted shrink-0">{r.symbol}</span>
                   {r.focus && (
-                    <span className="hidden sm:inline-block px-1.5 py-px rounded bg-accent/10 text-accent text-micro shrink-0">
+                    <span className="hidden sm:inline-block px-1.5 py-px rounded-btn bg-accent/10 text-accent text-micro shrink-0">
                       {r.focus}
                     </span>
                   )}
@@ -98,7 +98,7 @@ export function ReportHistoryPanel() {
               {/* 删除按钮 */}
               <button
                 onClick={e => { e.stopPropagation(); deleteReport(r.id) }}
-                className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-danger/10 text-muted hover:text-danger transition-ui shrink-0"
+                className="opacity-0 group-hover:opacity-100 p-1.5 rounded-card hover:bg-danger/10 text-muted hover:text-danger transition-ui shrink-0"
                 title="删除"
               >
                 <Trash2 className="h-3.5 w-3.5" />

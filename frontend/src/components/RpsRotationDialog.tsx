@@ -213,7 +213,7 @@ export function RpsRotationDialog({ onClose, kind = 'concept' }: Props) {
       onClose={onClose}
       labelledBy="rps-rotation-title"
       overlayClassName="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-      panelClassName="w-[92vw] max-w-[1100px] h-[88vh] bg-surface border border-border rounded-card shadow-xl flex flex-col"
+      panelClassName="w-[92vw] max-w-read h-[88vh] bg-surface border border-border rounded-card shadow-xl flex flex-col"
     >
           {/* 标题栏 */}
           <div className="flex items-center justify-between px-4 py-2.5 border-b border-border shrink-0">
@@ -241,7 +241,7 @@ export function RpsRotationDialog({ onClose, kind = 'concept' }: Props) {
                 </div>
               )}
             </div>
-            <button aria-label="关闭" onClick={onClose} className="p-1 rounded hover:bg-elevated transition-colors cursor-pointer">
+            <button aria-label="关闭" onClick={onClose} className="p-1 rounded-btn hover:bg-elevated transition-colors cursor-pointer">
               <X className="h-4 w-4 text-muted" />
             </button>
           </div>

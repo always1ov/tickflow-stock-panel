@@ -28,7 +28,7 @@ export function LotsLink({ symbol, lotCount, driftPct, lotCost, stale = false }:
 
   const drift = driftPct != null && Math.abs(driftPct) >= DRIFT_ALERT_PCT ? driftPct : null
   const tone = stale
-    ? 'border-amber-400/40 text-amber-400'
+    ? 'border-warning/40 text-warning'
     : drift
       ? 'border-warning/45 text-warning'
       : 'border-border text-muted hover:text-secondary'
@@ -46,7 +46,7 @@ export function LotsLink({ symbol, lotCount, driftPct, lotCost, stale = false }:
       to={`/lots-registry?symbol=${encodeURIComponent(symbol)}`}
       title={title}
       aria-label={title}
-      className={`tap-target inline-flex h-6 shrink-0 items-center gap-0.5 rounded border bg-base px-1 text-xs font-mono transition-colors ${tone}`}
+      className={`tap-target inline-flex h-6 shrink-0 items-center gap-0.5 rounded-btn border bg-base px-1 text-xs font-mono transition-colors ${tone}`}
     >
       <Layers className="h-2.5 w-2.5" />
       {lotCount}

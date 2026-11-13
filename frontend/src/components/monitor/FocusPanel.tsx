@@ -51,7 +51,7 @@ export function FocusPanel() {
   if (!v) {
     return (
       <div className="space-y-2">
-        {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} h="h-8" rounded="rounded-card" />)}
+        {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} h="h-8" rounded-btn="rounded-card" />)}
       </div>
     )
   }
@@ -70,12 +70,12 @@ export function FocusPanel() {
         <button
           onClick={() => overrideMut.mutate({ symbol: it.symbol, mode: pinned ? null : 'pin' })}
           title={pinned ? '取消钉住' : '钉住: 无论分档, 永远推送'}
-          className={cn('rounded p-1 transition-colors cursor-pointer', pinned ? 'text-accent' : 'text-muted/50 hover:text-accent')}
+          className={cn('rounded-btn p-1 transition-colors cursor-pointer', pinned ? 'text-accent' : 'text-muted/50 hover:text-accent')}
         ><Pin className="h-3 w-3" /></button>
         <button
           onClick={() => overrideMut.mutate({ symbol: it.symbol, mode: muted ? null : 'mute' })}
           title={muted ? '取消静音' : '静音: 无论分档, 广域规则不推(单独设的点位提醒仍推)'}
-          className={cn('rounded p-1 transition-colors cursor-pointer', muted ? 'text-warning' : 'text-muted/50 hover:text-warning')}
+          className={cn('rounded-btn p-1 transition-colors cursor-pointer', muted ? 'text-warning' : 'text-muted/50 hover:text-warning')}
         ><BellOff className="h-3 w-3" /></button>
       </li>
     )
@@ -116,7 +116,7 @@ export function FocusPanel() {
           return (
             <section key={t} className="min-w-0">
               <div className="flex items-center gap-2 border-b border-border pb-1">
-                <span className={cn('rounded border px-1.5 py-px text-micro', TIER_STYLE[t])}>{labels[t]}</span>
+                <span className={cn('rounded-btn border px-1.5 py-px text-micro', TIER_STYLE[t])}>{labels[t]}</span>
                 <span className="font-mono text-micro tabular-nums text-muted">{v.counts[t]}</span>
                 {t === 'watch' && (
                   <button onClick={() => setShowWatch(s => !s)} className="ml-auto text-micro text-muted transition-colors hover:text-foreground cursor-pointer">

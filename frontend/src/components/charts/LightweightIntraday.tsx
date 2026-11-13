@@ -104,21 +104,21 @@ export function LightweightIntraday({ symbol, assetType, data, sessions: supplie
   return <div className="w-full min-w-0" data-testid="lightweight-intraday">
     <div className={`flex min-h-10 flex-wrap items-center justify-between gap-2 border-b border-border/50 bg-elevated/20 px-3 py-1.5 xl:h-10 xl:flex-nowrap xl:py-0 ${showLimitLines ? 'pr-10' : ''}`}>
       <span className="shrink-0 text-xs font-semibold text-foreground">{supplied && sessions.length > 1 ? '多日分时' : '分时走势'}
-        <span className="ml-2 font-mono text-[10px] text-muted">{supplied ? `${sessions.length} 个交易日` : date}</span>
+        <span className="ml-2 font-mono text-micro text-muted">{supplied ? `${sessions.length} 个交易日` : date}</span>
       </span>
-      {sessions.length === 1 && scale && !reference && <span className="text-[10px] text-muted">昨收缺失 · 仅价格轴</span>}
-      {showLimitLines && assetType === 'index' && <span className="text-[10px] text-muted" title={scale?.centered ? '以昨收为中轴，按最大涨跌幅对称适配' : '按分时最高、最低点自动适配'}>自适应</span>}
-      {showLimitLines && assetType !== 'index' && <div className="inline-flex rounded border border-border/70 p-0.5" role="group" aria-label="分时纵轴范围">
+      {sessions.length === 1 && scale && !reference && <span className="text-micro text-muted">昨收缺失 · 仅价格轴</span>}
+      {showLimitLines && assetType === 'index' && <span className="text-micro text-muted" title={scale?.centered ? '以昨收为中轴，按最大涨跌幅对称适配' : '按分时最高、最低点自动适配'}>自适应</span>}
+      {showLimitLines && assetType !== 'index' && <div className="inline-flex rounded-btn border border-border/70 p-0.5" role="group" aria-label="分时纵轴范围">
         {(['adaptive', 'limit'] as const).map(option => <button key={option} type="button" aria-pressed={mode === option}
           disabled={option === 'limit' && !limits} title={option === 'adaptive'
             ? scale?.centered ? '以昨收为中轴，按最大涨跌幅对称适配' : '按分时最高、最低点自动适配'
             : !limits ? '当日无有效涨跌停价格' : undefined}
-          onClick={() => setYMode(option)} className={`rounded px-2 py-0.5 text-[10px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 disabled:cursor-not-allowed disabled:opacity-40 ${mode === option ? 'bg-accent/15 text-accent' : 'text-muted hover:text-foreground'}`}>
+          onClick={() => setYMode(option)} className={`rounded-btn px-2 py-0.5 text-micro transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 disabled:cursor-not-allowed disabled:opacity-40 ${mode === option ? 'bg-accent/15 text-accent' : 'text-muted hover:text-foreground'}`}>
           {option === 'adaptive' ? '自适应' : '涨跌停'}
         </button>)}
       </div>}
     </div>
-    <div className="min-h-16 border-b border-border/50 px-3 py-2 font-mono text-[11px] tabular-nums xl:h-16">
+    <div className="min-h-16 border-b border-border/50 px-3 py-2 font-mono text-micro tabular-nums xl:h-16">
       <div className="flex min-h-5 flex-wrap items-center gap-x-3 gap-y-1">
         <span className="font-medium text-foreground">{sourceTimes
           ? `${point?.date} ${sourceTimes.join(' / ')}`
@@ -126,7 +126,7 @@ export function LightweightIntraday({ symbol, assetType, data, sessions: supplie
         <span className="text-muted">{sourceTimes ? '午间衔接' : hovered || supplied ? '分钟' : daily ? '日K（前复权）' : '分时汇总'}</span>
         {([['开', ohlc?.open], ['高', ohlc?.high], ['低', ohlc?.low], ['收', ohlc?.close]] as const).map(([label, value]) => <span key={label} className="text-muted">{label} <span className="text-secondary">{fmt(value)}</span></span>)}
       </div>
-      <div className="mt-1 flex min-h-4 flex-wrap items-center gap-x-4 gap-y-1 text-[10px]">
+      <div className="mt-1 flex min-h-4 flex-wrap items-center gap-x-4 gap-y-1 text-micro">
         <span className="text-muted">分时价 <span style={{ color: change == null || change === 0 ? C.flat : change > 0 ? C.up : C.down }}>{fmt(shown?.close)}{change != null && ` ${fmtPct(change)}`}</span></span>
         {showAvgLine && assetType !== 'index' && <span style={{ color: C.average }}>均价 {fmt(point?.average)}</span>}
         <span className="text-muted">量 <span className="text-secondary">{fmtBigNum(shown?.volume)}</span></span>

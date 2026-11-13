@@ -118,7 +118,7 @@ function renderTagList(
       {!showAll && hiddenCount > 0 && (
         <button
           onClick={onToggle}
-          className="inline-block px-1.5 py-px rounded text-micro font-medium leading-tight text-accent bg-accent/10 hover:bg-accent/20 transition-colors"
+          className="inline-block px-1.5 py-px rounded-btn text-micro font-medium leading-tight text-accent bg-accent/10 hover:bg-accent/20 transition-colors"
         >
           +{hiddenCount}
         </button>
@@ -126,7 +126,7 @@ function renderTagList(
       {showAll && maxTags > 0 && tags.length > maxTags && (
         <button
           onClick={onToggle}
-          className="inline-block px-1.5 py-px rounded text-micro font-medium leading-tight text-muted hover:text-foreground transition-colors"
+          className="inline-block px-1.5 py-px rounded-btn text-micro font-medium leading-tight text-muted hover:text-foreground transition-colors"
         >
           收起
         </button>
@@ -135,8 +135,8 @@ function renderTagList(
   )
 }
 
-const EXT_TAG_CLS = 'inline-block px-1.5 py-px rounded text-micro font-medium leading-tight text-yellow-500 bg-yellow-500/10'
-const STRATEGY_TAG_CLS = 'inline-block px-1.5 py-px rounded text-micro font-medium leading-tight bg-amber-500/10 text-amber-600 border border-amber-500/20'
+const EXT_TAG_CLS = 'inline-block px-1.5 py-px rounded-btn text-micro font-medium leading-tight text-warning bg-warning/10'
+const STRATEGY_TAG_CLS = 'inline-block px-1.5 py-px rounded-btn text-micro font-medium leading-tight bg-warning/10 text-warning border border-warning/20'
 
 function renderExtValue(
   val: any,
@@ -284,7 +284,7 @@ export function ScreenerTable({
                 className={`flex items-center gap-2 text-left ${isExpired ? 'cursor-default' : ''}`}
               >
                 {board ? (
-                  <span className={`shrink-0 inline-flex items-center justify-center w-[18px] h-[18px] rounded text-micro font-bold leading-none border ${board.color}`}>
+                  <span className={`shrink-0 inline-flex items-center justify-center w-[18px] h-[18px] rounded-btn text-micro font-bold leading-none border ${board.color}`}>
                     {board.label}
                   </span>
                 ) : (
@@ -300,7 +300,7 @@ export function ScreenerTable({
                 )}
               </button>
               {isExpired ? (
-                <span className="shrink-0 inline-flex items-center px-1.5 py-px rounded text-micro font-medium leading-tight bg-red-500/10 text-red-400/60 border border-red-500/15">
+                <span className="shrink-0 inline-flex items-center px-1.5 py-px rounded-btn text-micro font-medium leading-tight bg-red-500/10 text-red-400/60 border border-red-500/15">
                   失效
                 </span>
               ) : (
@@ -350,7 +350,7 @@ export function ScreenerTable({
         return (
           <td key={col.id} className={numCls}>
             {r.score != null ? (
-              <span className={r.score >= 70 ? 'text-accent font-medium' : r.score >= 50 ? 'text-amber-400' : 'text-secondary'}>
+              <span className={r.score >= 70 ? 'text-accent font-medium' : r.score >= 50 ? 'text-warning' : 'text-secondary'}>
                 {Number(r.score).toFixed(1)}
               </span>
             ) : (
@@ -366,7 +366,7 @@ export function ScreenerTable({
             {signals.length > 0 ? (
               <div className="flex flex-wrap gap-0.5">
                 {signals.slice(0, 3).map((s) => (
-                  <span key={s.label} className={`inline-block px-1.5 py-px rounded text-micro font-medium leading-tight ${signalCls(s.type)}`}>
+                  <span key={s.label} className={`inline-block px-1.5 py-px rounded-btn text-micro font-medium leading-tight ${signalCls(s.type)}`}>
                     {s.label}
                   </span>
                 ))}
@@ -465,7 +465,7 @@ export function ScreenerTable({
               <button
                 type="button"
                 onClick={(event) => { event.stopPropagation(); onToggleDailyKChart() }}
-                className={`inline-flex items-center justify-center w-5 h-5 rounded transition-colors ${
+                className={`inline-flex items-center justify-center w-5 h-5 rounded-btn transition-colors ${
                   dailyKChartVisible
                     ? 'text-accent bg-accent/10 hover:bg-accent/20'
                     : 'text-muted hover:text-foreground hover:bg-elevated'
@@ -486,7 +486,7 @@ export function ScreenerTable({
               <button
                 type="button"
                 onClick={(event) => { event.stopPropagation(); onToggleIntradayChart() }}
-                className={`inline-flex items-center justify-center w-5 h-5 rounded transition-colors ${
+                className={`inline-flex items-center justify-center w-5 h-5 rounded-btn transition-colors ${
                   intradayChartVisible
                     ? 'text-accent bg-accent/10 hover:bg-accent/20'
                     : 'text-muted hover:text-foreground hover:bg-elevated'
@@ -502,7 +502,7 @@ export function ScreenerTable({
                   type="button"
                   onClick={(event) => { event.stopPropagation(); onRefreshIntraday() }}
                   disabled={intradayRefreshing}
-                  className="inline-flex items-center justify-center w-5 h-5 rounded text-muted hover:text-accent hover:bg-accent/10 transition-colors disabled:opacity-40"
+                  className="inline-flex items-center justify-center w-5 h-5 rounded-btn text-muted hover:text-accent hover:bg-accent/10 transition-colors disabled:opacity-40"
                   title="刷新分时数据"
                   aria-label="刷新分时数据"
                 >
@@ -518,7 +518,7 @@ export function ScreenerTable({
                 <button
                   type="button"
                   onClick={(event) => { event.stopPropagation(); onToggleIntradayYMode() }}
-                  className={`inline-flex items-center justify-center h-5 px-1 rounded text-micro whitespace-nowrap transition-colors ${
+                  className={`inline-flex items-center justify-center h-5 px-1 rounded-btn text-micro whitespace-nowrap transition-colors ${
                     intradayYMode === 'limit'
                       ? 'text-accent bg-accent/10 hover:bg-accent/20'
                       : 'text-muted hover:text-foreground hover:bg-elevated'
@@ -540,7 +540,7 @@ export function ScreenerTable({
               <button
                 type="button"
                 onClick={(event) => { event.stopPropagation(); handleToggleStrategyTags() }}
-                className={`inline-flex items-center justify-center w-5 h-5 rounded transition-colors ${
+                className={`inline-flex items-center justify-center w-5 h-5 rounded-btn transition-colors ${
                   strategyTagsExpanded
                     ? 'text-accent bg-accent/10 hover:bg-accent/20'
                     : 'text-muted hover:text-foreground hover:bg-elevated'

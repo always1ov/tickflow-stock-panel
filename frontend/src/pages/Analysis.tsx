@@ -144,8 +144,8 @@ export function Analysis() {
       />
 
       <div className="px-8 py-6 max-w-6xl space-y-6">
-        <section className="rounded-2xl border border-border bg-surface p-6">
-          <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[11px] text-secondary">
+        <section className="rounded-dialog border border-border bg-surface p-6">
+          <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-micro text-secondary">
             <BarChart3 className="h-3.5 w-3.5" />
             扩展数据 → 分析菜单 → 动态页面
           </div>
@@ -159,15 +159,15 @@ export function Analysis() {
           <section className="rounded-card border border-border bg-surface p-5 space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <label className="space-y-1.5">
-                <span className="text-[11px] text-muted">菜单标识</span>
+                <span className="text-micro text-muted">菜单标识</span>
                 <input value={id} onChange={e => setId(e.target.value.replace(/[^a-zA-Z0-9_]/g, ''))} placeholder="如 concept_hot" className="h-9 w-full rounded-btn border border-border bg-base px-3 text-xs text-foreground" />
               </label>
               <label className="space-y-1.5">
-                <span className="text-[11px] text-muted">菜单名称</span>
+                <span className="text-micro text-muted">菜单名称</span>
                 <input value={label} onChange={e => setLabel(e.target.value)} placeholder="如 概念热度" className="h-9 w-full rounded-btn border border-border bg-base px-3 text-xs text-foreground" />
               </label>
               <label className="space-y-1.5">
-                <span className="text-[11px] text-muted">扩展数据源</span>
+                <span className="text-micro text-muted">扩展数据源</span>
                 <select
                   value={dataSource || activeConfig?.id || ''}
                   onChange={e => {
@@ -185,7 +185,7 @@ export function Analysis() {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <label className="space-y-1.5">
-                <span className="text-[11px] text-muted">模板</span>
+                <span className="text-micro text-muted">模板</span>
                 <select value={template} onChange={e => setTemplate(e.target.value as any)} className="h-9 w-full rounded-btn border border-border bg-base px-3 text-xs text-foreground">
                   <option value="dimension_rank">维度热度榜</option>
                   <option value="ranking">指标排名榜</option>
@@ -193,14 +193,14 @@ export function Analysis() {
                 </select>
               </label>
               <label className="space-y-1.5">
-                <span className="text-[11px] text-muted">分组字段</span>
+                <span className="text-micro text-muted">分组字段</span>
                 <select value={dimensionField} onChange={e => setDimensionField(e.target.value)} disabled={template !== 'dimension_rank'} className="h-9 w-full rounded-btn border border-border bg-base px-3 text-xs text-foreground disabled:opacity-50">
                   <option value="">请选择</option>
                   {fields.map(f => <option key={f.name} value={f.name}>{f.label || f.name}</option>)}
                 </select>
               </label>
               <label className="space-y-1.5">
-                <span className="text-[11px] text-muted">排名字段</span>
+                <span className="text-micro text-muted">排名字段</span>
                 <select value={rankField} onChange={e => setRankField(e.target.value)} disabled={template !== 'ranking'} className="h-9 w-full rounded-btn border border-border bg-base px-3 text-xs text-foreground disabled:opacity-50">
                   <option value="">请选择</option>
                   {numericFields.map(f => <option key={f.name} value={f.name}>{f.label || f.name}</option>)}
@@ -209,7 +209,7 @@ export function Analysis() {
             </div>
 
             <div>
-              <div className="text-[11px] text-muted mb-2">列表列配置</div>
+              <div className="text-micro text-muted mb-2">列表列配置</div>
               <div className="flex flex-wrap gap-2">
                 {fields.filter(f => !['symbol', 'code'].includes(f.name)).map(f => {
                   const active = selectedColumns.includes(f.name)
@@ -217,7 +217,7 @@ export function Analysis() {
                     <button
                       key={f.name}
                       onClick={() => setSelectedColumns(cols => active ? cols.filter(c => c !== f.name) : [...cols, f.name])}
-                      className={`rounded-full border px-3 py-1 text-[11px] transition-colors ${active ? 'border-accent/40 bg-accent/10 text-accent' : 'border-border bg-elevated/40 text-secondary hover:bg-elevated'}`}
+                      className={`rounded-full border px-3 py-1 text-micro transition-colors ${active ? 'border-accent/40 bg-accent/10 text-accent' : 'border-border bg-elevated/40 text-secondary hover:bg-elevated'}`}
                     >
                       {f.label || f.name}
                     </button>
@@ -243,13 +243,13 @@ export function Analysis() {
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <h3 className="text-sm font-medium text-foreground">{menu.label}</h3>
-                  <p className="mt-1 text-[11px] text-muted font-mono">{menu.id}</p>
+                  <p className="mt-1 text-micro text-muted font-mono">{menu.id}</p>
                 </div>
                 <div className="flex items-center gap-1">
                   <button
                     onClick={() => moveMenu(idx, -1)}
                     disabled={idx === 0 || reorder.isPending}
-                    className="p-1 rounded text-muted hover:text-accent hover:bg-accent/10 disabled:opacity-30"
+                    className="p-1 rounded-btn text-muted hover:text-accent hover:bg-accent/10 disabled:opacity-30"
                     title="上移"
                   >
                     <ChevronUp className="h-3.5 w-3.5" />
@@ -257,21 +257,21 @@ export function Analysis() {
                   <button
                     onClick={() => moveMenu(idx, 1)}
                     disabled={idx === menuItems.length - 1 || reorder.isPending}
-                    className="p-1 rounded text-muted hover:text-accent hover:bg-accent/10 disabled:opacity-30"
+                    className="p-1 rounded-btn text-muted hover:text-accent hover:bg-accent/10 disabled:opacity-30"
                     title="下移"
                   >
                     <ChevronDown className="h-3.5 w-3.5" />
                   </button>
                   {menu.builtin ? (
-                    <span className="rounded bg-accent/10 px-1.5 py-0.5 text-[10px] text-accent">默认</span>
+                    <span className="rounded-btn bg-accent/10 px-1.5 py-0.5 text-micro text-accent">默认</span>
                   ) : (
-                    <button onClick={() => del.mutate(menu.id)} disabled={del.isPending} className="p-1 rounded text-muted hover:text-danger hover:bg-danger/10">
+                    <button onClick={() => del.mutate(menu.id)} disabled={del.isPending} className="p-1 rounded-btn text-muted hover:text-danger hover:bg-danger/10">
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   )}
                 </div>
               </div>
-              <div className="mt-3 space-y-1 text-[11px] text-secondary">
+              <div className="mt-3 space-y-1 text-micro text-secondary">
                 <div>数据源：<span className="font-mono text-muted">{menu.data_source}</span></div>
                 <div>模板：{menu.template}</div>
                 {menu.dimension_field && <div>分组字段：{menu.dimension_field}</div>}
@@ -287,7 +287,7 @@ export function Analysis() {
               <div key={`sk-${i}`} className="rounded-card border border-border bg-surface p-4 space-y-3">
                 <Skeleton w="w-1/2" h="h-4" />
                 <Skeleton w="w-1/3" h="h-3" />
-                <Skeleton h="h-8" rounded="rounded-btn" />
+                <Skeleton h="h-8" rounded-btn="rounded-btn" />
               </div>
             ))}
           {!menus.isLoading && menuItems.length === 0 && (

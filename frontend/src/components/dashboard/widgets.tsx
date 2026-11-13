@@ -66,9 +66,9 @@ export function BreadthBar({ data }: { data: OverviewMarket['breadth'] }) {
         <div className="bg-bull/85" style={{ width: `${upW}%` }} />
       </div>
       <div className="grid grid-cols-3 gap-1.5 text-xs">
-        <div className="rounded bg-bear/8 px-2 py-1 text-bear">跌 <span className="font-mono">{data.down}</span></div>
-        <div className="rounded bg-elevated/70 px-2 py-1 text-muted">平 <span className="font-mono">{data.flat}</span></div>
-        <div className="rounded bg-bull/8 px-2 py-1 text-bull">涨 <span className="font-mono">{data.up}</span></div>
+        <div className="rounded-btn bg-bear/8 px-2 py-1 text-bear">跌 <span className="font-mono">{data.down}</span></div>
+        <div className="rounded-btn bg-elevated/70 px-2 py-1 text-muted">平 <span className="font-mono">{data.flat}</span></div>
+        <div className="rounded-btn bg-bull/8 px-2 py-1 text-bull">涨 <span className="font-mono">{data.up}</span></div>
       </div>
     </div>
   )
@@ -169,16 +169,16 @@ export function LadderMini({ limit }: { limit: OverviewMarket['limit'] }) {
   const tiers = limit.tiers.filter(t => t.boards >= 2).slice(0, 6)
   return (
     <div className="space-y-1.5">
-      <div className="flex items-center justify-between rounded bg-elevated/55 px-2 py-1.5 text-xs">
+      <div className="flex items-center justify-between rounded-btn bg-elevated/55 px-2 py-1.5 text-xs">
         <span className="text-muted">封板率</span>
         <span className="font-mono text-accent">{(limit.seal_rate ?? 0).toFixed(0)}%</span>
       </div>
-      {tiers.length === 0 && <div className="rounded border border-dashed border-border py-5 text-center text-xs text-muted">暂无 2 板以上</div>}
+      {tiers.length === 0 && <div className="rounded-btn border border-dashed border-border py-5 text-center text-xs text-muted">暂无 2 板以上</div>}
       {tiers.map(t => {
         const stocks = t.stocks ?? []
         const showStocks = stocks.length > 0 && stocks.length <= 3
         return (
-          <div key={t.boards} className="rounded bg-elevated/35 px-2 py-1.5">
+          <div key={t.boards} className="rounded-btn bg-elevated/35 px-2 py-1.5">
             <div className="grid grid-cols-[42px_1fr_auto] items-center gap-2">
               <span className={`font-mono text-sm font-bold ${t.boards >= 5 ? 'text-bull' : t.boards >= 3 ? 'text-accent' : 'text-secondary'}`}>{t.boards}板</span>
               <div className="h-1.5 overflow-hidden rounded-full bg-base">
@@ -228,7 +228,7 @@ export function StockList({ title, rows, mode, onStockClick, activeSymbol }: {
                 {(() => {
                   const board = boardTag(r.symbol)
                   return board ? (
-                    <span className={`shrink-0 inline-flex items-center justify-center h-3 px-1 rounded text-micro font-bold leading-none border ${board.color}`}>
+                    <span className={`shrink-0 inline-flex items-center justify-center h-3 px-1 rounded-btn text-micro font-bold leading-none border ${board.color}`}>
                       {board.label}
                     </span>
                   ) : null
@@ -315,7 +315,7 @@ export function RankColumn({ title, rows, tone, onStockClick, onDimensionClick, 
               {r.leader?.symbol && (() => {
                 const board = boardTag(r.leader!.symbol!)
                 return board ? (
-                  <span className={`shrink-0 inline-flex items-center justify-center h-3 px-1 rounded text-micro font-bold leading-none border ${board.color}`}>
+                  <span className={`shrink-0 inline-flex items-center justify-center h-3 px-1 rounded-btn text-micro font-bold leading-none border ${board.color}`}>
                     {board.label}
                   </span>
                 ) : null
@@ -326,7 +326,7 @@ export function RankColumn({ title, rows, tone, onStockClick, onDimensionClick, 
         </div>
         )
       })}
-      {rows.length === 0 && <div className="rounded border border-dashed border-border py-4 text-center text-xs text-muted">暂无数据</div>}
+      {rows.length === 0 && <div className="rounded-btn border border-dashed border-border py-4 text-center text-xs text-muted">暂无数据</div>}
     </div>
   )
 }
@@ -364,7 +364,7 @@ export function HotRankCard({ title, rank, configUrl, onStockClick, onDimensionC
 
 // ===== 监控中心小组件 — 前 10 条触发记录 =====
 const _SOURCE_BADGE: Record<string, string> = {
-  strategy: 'bg-amber-400/10 text-amber-400',
+  strategy: 'bg-warning/10 text-warning',
   signal: 'bg-accent/10 text-accent',
   price: 'bg-emerald-400/10 text-emerald-400',
   market: 'bg-sky-500/10 text-sky-400',
@@ -422,13 +422,13 @@ export function MonitorWidget({ onStockClick, activeSymbol }: {
                 <button
                   onClick={() => isSector ? navigate('/monitor') : ev.symbol && onStockClick(ev, alertNav)}
                   title={isSector ? '在监控中心查看板块告警' : ev.symbol ? `查看 ${ev.symbol} 日K` : undefined}
-                  className={`inline-flex items-center gap-1 min-w-0 shrink-0 rounded hover:bg-elevated/60 transition-colors -mx-0.5 px-0.5 ${isSector || ev.symbol ? 'cursor-pointer' : 'cursor-default'}`}
+                  className={`inline-flex items-center gap-1 min-w-0 shrink-0 rounded-btn hover:bg-elevated/60 transition-colors -mx-0.5 px-0.5 ${isSector || ev.symbol ? 'cursor-pointer' : 'cursor-default'}`}
                 >
                   <span className="font-mono text-micro font-medium text-foreground/80 hover:text-accent">{ev.symbol?.replace(/\.(SH|SZ|BJ)$/, '')}</span>
                   {ev.symbol && (() => {
                     const board = boardTag(ev.symbol)
                     return board && (
-                      <span className={`inline-flex items-center justify-center h-3 w-3 rounded text-micro font-bold leading-none border ${board.color}`}>
+                      <span className={`inline-flex items-center justify-center h-3 w-3 rounded-btn text-micro font-bold leading-none border ${board.color}`}>
                         {board.label}
                       </span>
                     )
@@ -454,7 +454,7 @@ export function MonitorWidget({ onStockClick, activeSymbol }: {
                         {eventMeta.action}
                       </span>
                       {sname
-                        ? <span className="truncate text-micro font-medium text-amber-400">「{sname}」</span>
+                        ? <span className="truncate text-micro font-medium text-warning">「{sname}」</span>
                         : ev.message && <span className="truncate text-micro text-muted">{ev.message}</span>}
                       <span className="flex-1" />
                       <span className="text-micro text-muted/50 shrink-0 font-mono">
@@ -473,7 +473,7 @@ export function MonitorWidget({ onStockClick, activeSymbol }: {
                   {ev.signals && ev.signals.length > 0 && (
                     <div className="mt-1 flex flex-wrap gap-1">
                       {ev.signals.map(signal => (
-                        <span key={signal} className="rounded bg-accent/8 px-1 py-px text-micro text-accent/80">{cnSignal(signal, customNames)}</span>
+                        <span key={signal} className="rounded-btn bg-accent/8 px-1 py-px text-micro text-accent/80">{cnSignal(signal, customNames)}</span>
                       ))}
                     </div>
                   )}
@@ -481,7 +481,7 @@ export function MonitorWidget({ onStockClick, activeSymbol }: {
               ) : (
                 <>
                   <div className="mt-0.5 flex items-center gap-1.5">
-                    <span className={cn('shrink-0 rounded px-1 py-px text-micro font-medium', _SOURCE_BADGE[ev.source] ?? 'bg-elevated text-muted')}>
+                    <span className={cn('shrink-0 rounded-btn px-1 py-px text-micro font-medium', _SOURCE_BADGE[ev.source] ?? 'bg-elevated text-muted')}>
                       {_SOURCE_LABEL[ev.source] ?? ev.source}
                     </span>
                     {ev.message && (
@@ -494,7 +494,7 @@ export function MonitorWidget({ onStockClick, activeSymbol }: {
                   {ev.signals && ev.signals.length > 0 && (
                     <div className="mt-1 flex flex-wrap gap-1">
                       {ev.signals.map((s, j) => (
-                        <span key={j} className="rounded bg-accent/8 px-1 py-px text-micro text-accent/80">{cnSignal(s, customNames)}</span>
+                        <span key={j} className="rounded-btn bg-accent/8 px-1 py-px text-micro text-accent/80">{cnSignal(s, customNames)}</span>
                       ))}
                     </div>
                   )}

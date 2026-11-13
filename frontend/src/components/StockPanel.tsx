@@ -229,7 +229,7 @@ export function StockPanel({
 
       {infoBarOnly ? null : (
       <div className={renderer === 'lightweight'
-        ? `grid min-w-0 grid-cols-1 items-start overflow-hidden rounded-lg border border-border/70 ${showIntraday && selectedDate && !intradayDismissed ? 'xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]' : ''}`
+        ? `grid min-w-0 grid-cols-1 items-start overflow-hidden rounded-card border border-border/70 ${showIntraday && selectedDate && !intradayDismissed ? 'xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]' : ''}`
         : 'flex gap-3 items-start'}>
         <StockDailyKChart
           symbol={symbol}
@@ -254,7 +254,7 @@ export function StockPanel({
           <div className={renderer === 'lightweight' ? 'relative min-w-0 border-t border-border/60 xl:border-l xl:border-t-0' : 'relative flex-1 min-w-0 border-l border-border pl-3'}>
             <button
               onClick={() => onIntradayClose ? onIntradayClose() : setIntradayDismissed(true)}
-              className={renderer === 'lightweight' ? 'absolute right-2 top-2 z-10 flex h-6 w-6 items-center justify-center rounded text-muted transition-colors hover:bg-elevated hover:text-foreground' : 'absolute -left-1.5 -top-1.5 z-10 flex h-5 w-5 items-center justify-center rounded-full border border-border bg-surface text-muted shadow-sm transition-colors hover:text-foreground hover:bg-elevated'}
+              className={renderer === 'lightweight' ? 'absolute right-2 top-2 z-10 flex h-6 w-6 items-center justify-center rounded-btn text-muted transition-colors hover:bg-elevated hover:text-foreground' : 'absolute -left-1.5 -top-1.5 z-10 flex h-5 w-5 items-center justify-center rounded-full border border-border bg-surface text-muted shadow-sm transition-colors hover:text-foreground hover:bg-elevated'}
               title="收起分时图"
               aria-label="收起分时图"
             >

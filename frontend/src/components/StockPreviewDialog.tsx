@@ -316,7 +316,7 @@ export function StockPreviewDialog({ symbol, name, onClose, enableLevelsView = t
                     transition: { duration: 0.15, ease: EASE_OUT_STRONG } }}
             transition={{ duration: 0.2, ease: EASE_OUT_STRONG }}
             className={cn(
-              'relative rounded-card border border-border bg-base shadow-2xl overflow-hidden flex flex-col w-[92vw] max-w-[1200px] max-h-[95vh]',
+              'relative rounded-card border border-border bg-base shadow-2xl overflow-hidden flex flex-col w-[92vw] max-w-read max-h-[95vh]',
             )}
           >
             {/* [R429] 新头部(用户给的排版图)。[R479] 旧顶栏已删(用户框出整块:「我是想删除掉框出来的这部分」),

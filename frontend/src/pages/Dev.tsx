@@ -66,7 +66,7 @@ function MinuteProbePanel() {
       <div>
         <h2 className="text-sm font-semibold text-foreground">分钟K数据探测</h2>
         <p className="mt-1 text-xs text-muted">
-          逐日调用 <code className="px-1 rounded bg-elevated text-secondary">/api/kline/minute</code> 接口，
+          逐日调用 <code className="px-1 rounded-btn bg-elevated text-secondary">/api/kline/minute</code> 接口，
           检测每只股票最近若干天的分钟K数据是否齐全。本地无数据时会自动走 TickFlow 实时拉取。
         </p>
       </div>
@@ -144,7 +144,7 @@ function MinuteProbePanel() {
                   <td className="px-4 py-2 text-foreground">{r.date}</td>
                   <td className="px-4 py-2 text-right tabular-nums text-foreground">{r.rows}</td>
                   <td className="px-4 py-2 text-secondary">
-                    <span className="rounded bg-elevated px-1.5 py-0.5 text-xs">{r.source}</span>
+                    <span className="rounded-btn bg-elevated px-1.5 py-0.5 text-xs">{r.source}</span>
                   </td>
                   <td className="px-4 py-2 text-center">
                     {r.ok ? (
@@ -371,7 +371,7 @@ function LadderTestPanel() {
             }
           }}
           disabled={triggerMut.isPending}
-          className="flex items-center gap-1.5 rounded-btn border border-amber-400/40 bg-amber-400/10 px-4 py-1.5 text-sm font-medium text-amber-400 hover:bg-amber-400/20 disabled:opacity-50 cursor-pointer"
+          className="flex items-center gap-1.5 rounded-btn border border-warning/40 bg-warning/10 px-4 py-1.5 text-sm font-medium text-warning hover:bg-warning/20 disabled:opacity-50 cursor-pointer"
         >
           {triggerMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bell className="h-4 w-4" />}
           真实触发预警
@@ -383,9 +383,9 @@ function LadderTestPanel() {
         )}
       </div>
 
-      <div className="rounded-btn border border-amber-400/30 bg-amber-400/5 p-3 text-xs text-muted">
-        <span className="font-medium text-amber-400">模拟触发</span>:纯条件判断,不落盘不推送。
-        <span className="font-medium text-amber-400 ml-2">真实触发</span>:走完整链路(落盘 alerts.jsonl + 推送飞书 + SSE 通知),会在监控中心和飞书看到预警。
+      <div className="rounded-btn border border-warning/30 bg-warning/5 p-3 text-xs text-muted">
+        <span className="font-medium text-warning">模拟触发</span>:纯条件判断,不落盘不推送。
+        <span className="font-medium text-warning ml-2">真实触发</span>:走完整链路(落盘 alerts.jsonl + 推送飞书 + SSE 通知),会在监控中心和飞书看到预警。
       </div>
 
       {pushMsg && (
@@ -407,7 +407,7 @@ function LadderTestPanel() {
               <div className="flex items-center gap-2 mb-1">
                 <span className="font-medium text-foreground">{ev.symbol}</span>
                 {ev.name && <span className="text-secondary">{ev.name}</span>}
-                <span className="ml-auto rounded bg-emerald-400/15 px-1.5 py-0.5 text-xs text-emerald-400">{ev.type}</span>
+                <span className="ml-auto rounded-btn bg-emerald-400/15 px-1.5 py-0.5 text-xs text-emerald-400">{ev.type}</span>
               </div>
               <div className="text-xs text-secondary">{ev.message}</div>
               <div className="mt-1 text-xs text-muted tabular-nums">
@@ -458,7 +458,7 @@ export function Dev() {
             <button
               onClick={() => setTab('seed')}
               className={cn(
-                'inline-flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer',
+                'inline-flex items-center gap-1.5 rounded-btn px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer',
                 tab === 'seed' ? 'bg-surface text-foreground shadow-sm' : 'text-muted hover:text-secondary',
               )}
             >
@@ -467,7 +467,7 @@ export function Dev() {
             <button
               onClick={() => setTab('ladder')}
               className={cn(
-                'inline-flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer',
+                'inline-flex items-center gap-1.5 rounded-btn px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer',
                 tab === 'ladder' ? 'bg-surface text-foreground shadow-sm' : 'text-muted hover:text-secondary',
               )}
             >
@@ -476,7 +476,7 @@ export function Dev() {
             <button
               onClick={() => setTab('minute')}
               className={cn(
-                'inline-flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer',
+                'inline-flex items-center gap-1.5 rounded-btn px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer',
                 tab === 'minute' ? 'bg-surface text-foreground shadow-sm' : 'text-muted hover:text-secondary',
               )}
             >

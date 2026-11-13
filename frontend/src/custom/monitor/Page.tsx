@@ -67,7 +67,7 @@ const SOURCE_BADGE_STYLE: Record<string, string> = {
   price:    'bg-emerald-400/10 text-emerald-400 border-emerald-400/20',
   market:   'bg-sky-500/10 text-sky-400 border-sky-500/20',
   sector:   'bg-cyan-500/10 text-cyan-700 border-cyan-500/20 dark:text-cyan-300',
-  abnormal: 'bg-orange-500/10 text-orange-500 border-orange-500/20 dark:text-orange-400',
+  abnormal: 'bg-warning/10 text-warning border-warning/20 dark:text-warning',
   volume_delta: 'bg-teal-500/10 text-teal-500 border-teal-500/20 dark:text-teal-300',
   date:     'bg-secondary/10 text-secondary border-border',
 }
@@ -124,7 +124,7 @@ function AlertExtTags({ ev, fields, onTagClick }: {
   // [R525] 行业与概念指到同一个字段(或同一个词两边都有)时只印一次 —— 原来彩块分蓝橙还分得出, 改灰字后重复就成了看着像 bug
   const conceptTags = Array.from(new Set(getExtTags(ev, fields.concept))).filter(t => !industryTags.includes(t))
   if (conceptTags.length === 0 && industryTags.length === 0) return null
-  const tagCls = 'rounded px-0.5 text-micro leading-tight text-muted transition-colors hover:bg-elevated hover:text-foreground cursor-pointer'
+  const tagCls = 'rounded-btn px-0.5 text-micro leading-tight text-muted transition-colors hover:bg-elevated hover:text-foreground cursor-pointer'
   return (
     <span className="inline-flex flex-wrap items-center gap-x-1 gap-y-0.5">
       {industryTags.map((t, i) => (
@@ -246,7 +246,7 @@ export function Monitor() {
       />
       {realtimeUnavailable && (
         <div className="px-3 pb-1 lg:px-4">
-          <div className="mx-auto flex max-w-[1440px] items-center gap-2.5 rounded-xl border border-warning/30 bg-warning/[0.06] px-4 py-2.5">
+          <div className="mx-auto flex max-w-wide items-center gap-2.5 rounded-dialog border border-warning/30 bg-warning/[0.06] px-4 py-2.5">
             <AlertTriangle className="h-4 w-4 shrink-0 text-warning" />
             <span className="text-xs leading-relaxed text-secondary">
               实时行情当前不可用 — 监控与预警收不到最新价。可接入提供实时行情的数据源。
@@ -261,7 +261,7 @@ export function Monitor() {
         </div>
       )}
       <main className="min-h-0 flex-1 overflow-y-auto px-3 pb-4 pt-3 lg:px-4">
-        <div className="mx-auto w-full max-w-[1440px]">
+        <div className="mx-auto w-full max-w-wide">
           {activeTab === 'alerts' && (
             <AlertsTab
               alertsQuery={alertsQuery}
@@ -471,7 +471,7 @@ function AlertsList({ alertsQuery, loading, confirmClear, setConfirmClear, total
       {loading ? (
         <div className="space-y-2">
           {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} h="h-8" rounded="rounded-card" />
+            <Skeleton key={i} h="h-8" rounded-btn="rounded-card" />
           ))}
         </div>
       ) : events.length === 0 ? (
@@ -601,7 +601,7 @@ function AlertRow({ ev, dayHeader, isNew, customNames, monitorExtFields, confirm
           {ev.source === 'sector' ? (
             <button
               onClick={onSector}
-              className="inline-flex min-w-0 items-center gap-1.5 rounded px-1 -mx-1 text-xs font-medium text-foreground transition-colors hover:bg-elevated/50 hover:text-accent cursor-pointer"
+              className="inline-flex min-w-0 items-center gap-1.5 rounded-btn px-1 -mx-1 text-xs font-medium text-foreground transition-colors hover:bg-elevated/50 hover:text-accent cursor-pointer"
               title={ev.sector_kind === 'index' ? '打开指数详情' : '查看成分股'}
             >
               <Tags className="h-3.5 w-3.5 shrink-0 text-cyan-600 dark:text-cyan-300" />
@@ -611,12 +611,12 @@ function AlertRow({ ev, dayHeader, isNew, customNames, monitorExtFields, confirm
           ) : ev.symbol ? (
             <button
               onClick={onPreview}
-              className="inline-flex min-w-0 items-center gap-1.5 rounded px-1 -mx-1 transition-colors hover:bg-elevated/50 cursor-pointer"
+              className="inline-flex min-w-0 items-center gap-1.5 rounded-btn px-1 -mx-1 transition-colors hover:bg-elevated/50 cursor-pointer"
               title="点击查看日K"
             >
               <span className="font-mono text-xs font-medium text-foreground hover:text-accent">{ev.symbol}</span>
               {board && (
-                <span className={`inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border text-micro font-bold leading-none ${board.color}`}>
+                <span className={`inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-btn border text-micro font-bold leading-none ${board.color}`}>
                   {board.label}
                 </span>
               )}
@@ -631,7 +631,7 @@ function AlertRow({ ev, dayHeader, isNew, customNames, monitorExtFields, confirm
             <button
               onClick={onDelete}
               title="再次点击确认删除"
-              className="inline-flex items-center gap-1 rounded-md border border-danger/30 bg-danger/15 px-1.5 py-0.5 text-micro font-medium text-danger cursor-pointer"
+              className="inline-flex items-center gap-1 rounded-btn border border-danger/30 bg-danger/15 px-1.5 py-0.5 text-micro font-medium text-danger cursor-pointer"
             >
               <Trash2 className="h-2.5 w-2.5" />确认
             </button>
@@ -640,7 +640,7 @@ function AlertRow({ ev, dayHeader, isNew, customNames, monitorExtFields, confirm
               onClick={onDelete}
               disabled={deleting}
               title="删除"
-              className="rounded p-1 text-muted opacity-60 transition-colors hover:bg-danger/10 hover:text-danger focus-visible:opacity-100 sm:opacity-0 sm:group-hover:opacity-100 cursor-pointer"
+              className="rounded-btn p-1 text-muted opacity-60 transition-colors hover:bg-danger/10 hover:text-danger focus-visible:opacity-100 sm:opacity-0 sm:group-hover:opacity-100 cursor-pointer"
             >
               <Trash2 className="h-3 w-3" />
             </button>
@@ -660,7 +660,7 @@ function AlertRow({ ev, dayHeader, isNew, customNames, monitorExtFields, confirm
         {/* 规则 · 命中了什么 · 行业/概念 */}
         <div className="contents sm:flex sm:min-w-0 sm:basis-0 sm:grow sm:flex-wrap sm:items-center sm:gap-x-2 sm:gap-y-1 sm:text-xs">
           <span
-            className={cn('shrink-0 rounded border px-1.5 py-px text-micro font-medium', SOURCE_BADGE_STYLE[ev.source] ?? 'bg-elevated text-muted border-border')}
+            className={cn('shrink-0 rounded-btn border px-1.5 py-px text-micro font-medium', SOURCE_BADGE_STYLE[ev.source] ?? 'bg-elevated text-muted border-border')}
             title={ruleConditionsText(ev, customNames)}
           >
             {badgeLabel}
@@ -672,7 +672,7 @@ function AlertRow({ ev, dayHeader, isNew, customNames, monitorExtFields, confirm
             <>
               {!eventMeta && <span className="text-muted">命中</span>}
               {ev.signals!.map((s, j) => (
-                <span key={j} className="rounded bg-accent/10 px-1.5 py-px text-micro font-medium text-accent">{cnSignal(s, customNames)}</span>
+                <span key={j} className="rounded-btn bg-accent/10 px-1.5 py-px text-micro font-medium text-accent">{cnSignal(s, customNames)}</span>
               ))}
             </>
           ) : hasConds ? (
@@ -835,14 +835,14 @@ function RulesList({ rulesQuery, onEdit }: {
     }
   }
 
-  const pill = 'rounded bg-elevated px-1.5 py-px text-micro text-secondary'
+  const pill = 'rounded-btn bg-elevated px-1.5 py-px text-micro text-secondary'
 
   return (
     <div>
       {rulesQuery.isLoading ? (
         <div className="space-y-2">
           {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} h="h-8" rounded="rounded-card" />
+            <Skeleton key={i} h="h-8" rounded-btn="rounded-card" />
           ))}
         </div>
       ) : rules.length === 0 ? (
@@ -870,7 +870,7 @@ function RulesList({ rulesQuery, onEdit }: {
               >
                 {/* 类型 */}
                 <span className="flex w-[4.5rem] shrink-0 items-center gap-1">
-                  <span className={cn('rounded px-1.5 py-px text-micro font-semibold', SOURCE_BADGE_STYLE[r.type] ?? 'bg-elevated text-muted')}>
+                  <span className={cn('rounded-btn px-1.5 py-px text-micro font-semibold', SOURCE_BADGE_STYLE[r.type] ?? 'bg-elevated text-muted')}>
                     {TYPE_LABEL[r.type]}
                   </span>
                 </span>
@@ -878,10 +878,10 @@ function RulesList({ rulesQuery, onEdit }: {
                 {/* 对象: 策略名 / 个股 / 分组 / 规则名 */}
                 <div className="flex min-w-0 grow basis-0 items-center gap-1.5 sm:w-60 sm:grow-0 sm:basis-auto">
                   {r.lot_id && (
-                    <span className="shrink-0 rounded bg-emerald-400/10 px-1.5 py-px text-micro font-semibold text-emerald-500" title="由「持仓提醒」页托管, 请在持仓提醒页修改或删除">批次</span>
+                    <span className="shrink-0 rounded-btn bg-emerald-400/10 px-1.5 py-px text-micro font-semibold text-emerald-500" title="由「持仓提醒」页托管, 请在持仓提醒页修改或删除">批次</span>
                   )}
                   {r.asset_type === 'index' && (
-                    <span className="shrink-0 rounded bg-sky-500/10 px-1.5 py-px text-micro font-semibold text-sky-400">指数</span>
+                    <span className="shrink-0 rounded-btn bg-sky-500/10 px-1.5 py-px text-micro font-semibold text-sky-400">指数</span>
                   )}
                   {/* 策略类型始终显示策略名；其他个股类型才显示可点击的代码+名称。 */}
                   {r.type === 'strategy' ? (
@@ -891,7 +891,7 @@ function RulesList({ rulesQuery, onEdit }: {
                   ) : r.scope === 'symbols' && r.symbols.length > 0 ? (
                     <button
                       onClick={() => setPreviewSymbol(r.symbols[0])}
-                      className="inline-flex min-w-0 items-center gap-1 rounded px-0.5 transition-colors hover:bg-elevated/50 cursor-pointer"
+                      className="inline-flex min-w-0 items-center gap-1 rounded-btn px-0.5 transition-colors hover:bg-elevated/50 cursor-pointer"
                       title={`查看 ${r.symbols[0]} 日K`}
                     >
                       <span className="font-mono text-xs font-medium text-foreground hover:text-accent">{r.symbols[0]}</span>
@@ -906,7 +906,7 @@ function RulesList({ rulesQuery, onEdit }: {
                       return (
                         <Link
                           to={`/watchlist?group=${r.group_id}`}
-                          className="inline-flex min-w-0 items-center gap-1.5 rounded px-0.5 transition-colors hover:bg-elevated/50 cursor-pointer"
+                          className="inline-flex min-w-0 items-center gap-1.5 rounded-btn px-0.5 transition-colors hover:bg-elevated/50 cursor-pointer"
                           title={`「${meta.name}」分组 · 当前 ${meta.count} 只 · 点击查看分组`}
                         >
                           <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${resolveWatchlistGroupColor(meta.color).dot}`} />
@@ -925,7 +925,7 @@ function RulesList({ rulesQuery, onEdit }: {
                 <div className="ml-auto flex shrink-0 items-center gap-0.5 sm:order-last">
                   {r.lot_id ? (
                     <span
-                      className="inline-flex items-center rounded-md border border-border/60 bg-elevated/60 px-1.5 py-0.5 text-micro text-secondary"
+                      className="inline-flex items-center rounded-btn border border-border/60 bg-elevated/60 px-1.5 py-0.5 text-micro text-secondary"
                       title="由「持仓提醒」页生成的规则, 该页托管; 启停/修改/删除请到持仓提醒页"
                     >
                       批次托管
@@ -936,7 +936,7 @@ function RulesList({ rulesQuery, onEdit }: {
                         onClick={() => toggleEnabled(r)}
                         title={r.enabled ? '停用' : '启用'}
                         className={cn(
-                          'rounded-md p-1 transition-colors cursor-pointer',
+                          'rounded-btn p-1 transition-colors cursor-pointer',
                           r.enabled ? 'text-accent hover:bg-accent/10' : 'text-muted hover:bg-elevated hover:text-accent',
                         )}
                       >
@@ -944,7 +944,7 @@ function RulesList({ rulesQuery, onEdit }: {
                       </button>
                       <button
                         onClick={() => onEdit(r)}
-                        className="rounded-md p-1 text-secondary transition-colors hover:bg-accent/10 hover:text-accent cursor-pointer"
+                        className="rounded-btn p-1 text-secondary transition-colors hover:bg-accent/10 hover:text-accent cursor-pointer"
                         title="编辑"
                       >
                         <Settings2 className="h-3.5 w-3.5" />
@@ -953,7 +953,7 @@ function RulesList({ rulesQuery, onEdit }: {
                         <button
                           onClick={() => handleClickDelete(r.id)}
                           title="再次点击确认删除"
-                          className="inline-flex items-center gap-1 rounded-md border border-danger/30 bg-danger/15 px-1.5 py-0.5 text-micro font-medium text-danger cursor-pointer"
+                          className="inline-flex items-center gap-1 rounded-btn border border-danger/30 bg-danger/15 px-1.5 py-0.5 text-micro font-medium text-danger cursor-pointer"
                         >
                           <Trash2 className="h-2.5 w-2.5" />确认
                         </button>
@@ -961,7 +961,7 @@ function RulesList({ rulesQuery, onEdit }: {
                         <button
                           onClick={() => handleClickDelete(r.id)}
                           disabled={del.isPending}
-                          className="rounded-md p-1 text-secondary transition-colors hover:bg-danger/10 hover:text-danger cursor-pointer"
+                          className="rounded-btn p-1 text-secondary transition-colors hover:bg-danger/10 hover:text-danger cursor-pointer"
                           title="删除"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
@@ -982,7 +982,7 @@ function RulesList({ rulesQuery, onEdit }: {
                   {r.type === 'sector' ? (
                     <>
                       {(r.sector_targets ?? []).slice(0, 3).map(target => (
-                        <span key={target.key} className="max-w-28 truncate rounded bg-cyan-500/8 px-1.5 py-px text-micro text-cyan-700 dark:text-cyan-300">
+                        <span key={target.key} className="max-w-28 truncate rounded-btn bg-cyan-500/8 px-1.5 py-px text-micro text-cyan-700 dark:text-cyan-300">
                           {target.name}
                         </span>
                       ))}
@@ -996,7 +996,7 @@ function RulesList({ rulesQuery, onEdit }: {
                     </>
                   ) : r.type === 'abnormal' ? (
                     <>
-                      <span className="rounded bg-orange-500/8 px-1.5 py-px text-micro text-orange-500 dark:text-orange-400">
+                      <span className="rounded-btn bg-warning/8 px-1.5 py-px text-micro text-warning dark:text-warning">
                         接近度 ≥ {r.threshold_pct ?? 70}%
                       </span>
                       <span className={pill}>
@@ -1014,7 +1014,7 @@ function RulesList({ rulesQuery, onEdit }: {
                     </span>
                   ) : r.type === 'volume_delta' ? (
                     <>
-                      <span className="rounded bg-teal-500/10 px-1.5 py-px font-mono text-micro text-teal-500 dark:text-teal-300">
+                      <span className="rounded-btn bg-teal-500/10 px-1.5 py-px font-mono text-micro text-teal-500 dark:text-teal-300">
                         {r.metric === 'amount'
                           ? `单轮增量 ≥ ${Math.round((r.threshold_amount ?? 1e6) / 1e4).toLocaleString()} 万元`
                           : `单轮增量 ≥ ${(r.threshold_volume ?? 9000).toLocaleString()} 手`}
@@ -1027,7 +1027,7 @@ function RulesList({ rulesQuery, onEdit }: {
                   ) : r.type === 'strategy' && r.strategy_id ? (
                     <>
                       {(r.score_min != null || r.score_max != null) && (
-                        <span className="rounded bg-warning/10 px-1.5 py-px font-mono text-micro text-warning">
+                        <span className="rounded-btn bg-warning/10 px-1.5 py-px font-mono text-micro text-warning">
                           评分 {r.score_min ?? 0}–{r.score_max ?? 100}
                         </span>
                       )}
@@ -1155,7 +1155,7 @@ function BatchChannelsDialog({ open, rulesCount, prefs, onClose }: {
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.96 }}
             transition={{ duration: 0.15 }}
-            className="w-full max-w-sm rounded-2xl border border-border bg-surface p-5 shadow-2xl"
+            className="w-full max-w-sm rounded-dialog border border-border bg-surface p-5 shadow-2xl"
             onClick={e => e.stopPropagation()}
           >
             <h3 className={TYPE.section}>批量设置推送渠道</h3>
@@ -1232,7 +1232,7 @@ function ConfirmDialog({ open, title, message, confirmText, danger, pending, onC
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.96 }}
             transition={{ duration: 0.15 }}
-            className="w-full max-w-sm rounded-2xl border border-border bg-surface p-5 shadow-2xl"
+            className="w-full max-w-sm rounded-dialog border border-border bg-surface p-5 shadow-2xl"
             onClick={e => e.stopPropagation()}
           >
             <h3 className={TYPE.section}>{title}</h3>
@@ -1302,7 +1302,7 @@ function MonitorExtConfigDialog({ open, fields, onClose }: {
           <motion.div
             initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.96 }}
             transition={{ duration: 0.15 }}
-            className="w-full max-w-md rounded-2xl border border-border bg-surface p-5 shadow-2xl max-h-[85vh] overflow-y-auto"
+            className="w-full max-w-md rounded-dialog border border-border bg-surface p-5 shadow-2xl max-h-[85vh] overflow-y-auto"
             onClick={e => e.stopPropagation()}
           >
             <div className="flex items-center gap-2 mb-4">
@@ -1357,7 +1357,7 @@ function ExtFieldSection({ label, value, onChange, groups, loading }: {
           value={field}
           onChange={e => pickField(e.target.value || null)}
           disabled={loading}
-          className="flex-1 min-w-0 h-8 bg-elevated border border-border rounded text-xs text-foreground px-2 focus:outline-none focus:border-accent/50"
+          className="flex-1 min-w-0 h-8 bg-elevated border border-border rounded-btn text-xs text-foreground px-2 focus:outline-none focus:border-accent/50"
         >
           <option value="">不显示</option>
           {groups.map(g => (
@@ -1367,7 +1367,7 @@ function ExtFieldSection({ label, value, onChange, groups, loading }: {
           ))}
         </select>
         {field && (
-          <button onClick={() => onChange(null)} title="清除" className="shrink-0 p-1 rounded text-muted hover:text-danger transition-colors cursor-pointer">
+          <button onClick={() => onChange(null)} title="清除" className="shrink-0 p-1 rounded-btn text-muted hover:text-danger transition-colors cursor-pointer">
             <Trash2 className="h-3.5 w-3.5" />
           </button>
         )}
@@ -1380,7 +1380,7 @@ function ExtFieldSection({ label, value, onChange, groups, loading }: {
             value={maxTags || ''}
             onChange={e => setMaxTags(e.target.value ? Number(e.target.value) : 0)}
             placeholder="不限"
-            className="w-14 h-6 bg-elevated border border-border rounded text-xs text-foreground px-1.5 focus:outline-none focus:border-accent/50"
+            className="w-14 h-6 bg-elevated border border-border rounded-btn text-xs text-foreground px-1.5 focus:outline-none focus:border-accent/50"
           />
           <span className="text-micro text-muted/60">留空=全部</span>
         </div>
@@ -1393,7 +1393,7 @@ function ExtFieldSection({ label, value, onChange, groups, loading }: {
               <button
                 key={i}
                 onClick={() => toggleHidden(i)}
-                className={`w-5 h-5 rounded text-micro font-medium transition-colors cursor-pointer ${
+                className={`w-5 h-5 rounded-btn text-micro font-medium transition-colors cursor-pointer ${
                   hidden.includes(i) ? 'bg-elevated text-muted line-through' : 'bg-accent/15 text-accent'
                 }`}
               >{i + 1}</button>

@@ -183,7 +183,7 @@ export function TodayControls({ d, refetch, isFetching, extra }: {
                 : '不过滤'}
             </span>
             {!d.hist_pct_ready && (
-              <span className="text-micro text-amber-300/80"
+              <span className="text-micro text-warning/80"
                     title="分位要跟历史比才算得出来。台账攒够约一个月的记录(400 条)之后这个门槛自动开始起作用 —— 在那之前它谁也不挡, 而不是偷偷把页面挡空。">
                 台账还没攒够,暂不起作用
               </span>

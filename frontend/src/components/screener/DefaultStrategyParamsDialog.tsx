@@ -103,7 +103,7 @@ export function DefaultStrategyParamsDialog({ show, onClose }: Props) {
       onClose={onClose}
       labelledBy="default-strategy-params-title"
       overlayClassName="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
-      panelClassName="w-[460px] max-w-[92vw] max-h-[86vh] bg-surface/95 backdrop-blur-xl border border-border/50 rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+      panelClassName="w-[460px] max-w-[92vw] max-h-[86vh] bg-surface/95 backdrop-blur-xl border border-border/50 rounded-dialog shadow-2xl flex flex-col overflow-hidden"
     >
       {/* 标题 */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border/50">
@@ -111,7 +111,7 @@ export function DefaultStrategyParamsDialog({ show, onClose }: Props) {
           <SlidersHorizontal className="h-4 w-4 text-accent" />
           <span id="default-strategy-params-title" className={TYPE.section}>默认基础参数</span>
         </div>
-        <button onClick={onClose} className="p-1 rounded hover:bg-elevated text-muted hover:text-foreground transition-colors cursor-pointer" title="关闭">
+        <button onClick={onClose} className="p-1 rounded-btn hover:bg-elevated text-muted hover:text-foreground transition-colors cursor-pointer" title="关闭">
           <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18M6 6l12 12" /></svg>
         </button>
       </div>
@@ -133,7 +133,7 @@ export function DefaultStrategyParamsDialog({ show, onClose }: Props) {
                 const active = bf.boards.includes(b)
                 return (
                   <button key={b} onClick={() => { const next = active ? bf.boards.filter(x => x !== b) : [...bf.boards, b]; set('boards', next.length === 0 ? [...ALL_BOARDS] : next) }}
-                    className={`px-1.5 py-0.5 rounded text-micro font-medium border transition-colors cursor-pointer ${active ? `${color.select.border} ${color.select.bgLight} ${color.select.text}` : `border-border bg-base text-muted ${color.select.borderHover}`}`}>{b}</button>
+                    className={`px-1.5 py-0.5 rounded-btn text-micro font-medium border transition-colors cursor-pointer ${active ? `${color.select.border} ${color.select.bgLight} ${color.select.text}` : `border-border bg-base text-muted ${color.select.borderHover}`}`}>{b}</button>
                 )
               })}
             </div>
@@ -141,7 +141,7 @@ export function DefaultStrategyParamsDialog({ show, onClose }: Props) {
           <div className="flex items-center gap-1.5">
             <span className="text-xs text-secondary w-16 shrink-0 text-right">ST</span>
             <button onClick={() => set('exclude_st', !bf.exclude_st)}
-              className={`px-1.5 py-0.5 rounded text-micro font-medium border transition-colors cursor-pointer ${bf.exclude_st ? 'border-danger/40 bg-danger/10 text-danger' : 'border-border bg-base text-muted hover:border-danger/30'}`}>{bf.exclude_st ? '排除' : '包含'}</button>
+              className={`px-1.5 py-0.5 rounded-btn text-micro font-medium border transition-colors cursor-pointer ${bf.exclude_st ? 'border-danger/40 bg-danger/10 text-danger' : 'border-border bg-base text-muted hover:border-danger/30'}`}>{bf.exclude_st ? '排除' : '包含'}</button>
           </div>
         </div>
       </div>
@@ -152,7 +152,7 @@ export function DefaultStrategyParamsDialog({ show, onClose }: Props) {
           <button onClick={() => setApplyPhase('confirm')} disabled={!strategyCount}
             title="把当前参数写入全部股票策略的基础参数（不影响各策略已调的其他配置）"
             className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-btn text-xs font-medium
-              border border-amber-500/40 bg-amber-500/10 text-amber-500 hover:bg-amber-500/20
+              border border-warning/40 bg-warning/10 text-warning hover:bg-warning/20
               transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
             <Zap className="h-3 w-3" />
             一键应用到全部策略{strategyCount ? `（${strategyCount} 个）` : ''}
@@ -161,17 +161,17 @@ export function DefaultStrategyParamsDialog({ show, onClose }: Props) {
         {applyPhase === 'confirm' && (
           <div className="flex items-center gap-2">
             <span className="flex-1 text-xs text-muted leading-tight">
-              将覆盖全部 <span className="text-amber-500 font-medium">{strategyCount}</span> 个策略的基础参数（只动基础过滤，不碰各策略的参数/评分），重跑后生效。
+              将覆盖全部 <span className="text-warning font-medium">{strategyCount}</span> 个策略的基础参数（只动基础过滤，不碰各策略的参数/评分），重跑后生效。
             </span>
             <button onClick={() => setApplyPhase('idle')}
               className="px-2.5 py-1.5 rounded-btn text-xs text-secondary border border-border hover:text-foreground transition-colors cursor-pointer shrink-0">取消</button>
             <button onClick={applyToAll}
-              className="px-3 py-1.5 rounded-btn text-xs font-medium text-white bg-amber-500 hover:bg-amber-500/90 transition-colors cursor-pointer shrink-0">确认覆盖</button>
+              className="px-3 py-1.5 rounded-btn text-xs font-medium text-white bg-warning hover:bg-warning/90 transition-colors cursor-pointer shrink-0">确认覆盖</button>
           </div>
         )}
         {applyPhase === 'applying' && (
           <div className="flex items-center justify-center gap-2 px-3 py-1.5 rounded-btn text-xs text-muted border border-border/50 bg-elevated/50">
-            <span className="h-3 w-3 rounded-full border-2 border-amber-500/30 border-t-amber-500 animate-spin" />
+            <span className="h-3 w-3 rounded-full border-2 border-warning/30 border-t-amber-500 animate-spin" />
             应用中 {applyProgress.done}/{applyProgress.total}
             {applyProgress.failed > 0 && <span className="text-danger">（{applyProgress.failed} 失败）</span>}
           </div>

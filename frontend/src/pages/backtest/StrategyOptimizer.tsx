@@ -34,14 +34,14 @@ const ONE_YEAR_AGO = new Date(Date.now() - 365 * 864e5).toISOString().slice(0, 1
 /** 诊断徽章的中文标签 (与后端 robust_optimizer 的 label 一一对应)。 */
 const CONVERGENCE_LABEL: Record<string, { text: string; cls: string }> = {
   unanimous: { text: '各段冠军一致', cls: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-400' },
-  majority: { text: '冠军多数收敛', cls: 'border-amber-500/40 bg-amber-500/10 text-amber-400' },
+  majority: { text: '冠军多数收敛', cls: 'border-warning/40 bg-warning/10 text-warning' },
   scattered: { text: '冠军散落 · 参数不稳', cls: 'border-red-500/40 bg-red-500/10 text-red-400' },
   no_data: { text: '无有效段', cls: 'border-border bg-elevated text-secondary' },
 }
 
 const PLATEAU_LABEL: Record<string, { text: string; cls: string }> = {
   plateau: { text: '参数高原 · 选择不敏感', cls: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-400' },
-  slope: { text: '缓坡', cls: 'border-amber-500/40 bg-amber-500/10 text-amber-400' },
+  slope: { text: '缓坡', cls: 'border-warning/40 bg-warning/10 text-warning' },
   peak: { text: '孤峰 · 过拟合警报', cls: 'border-red-500/40 bg-red-500/10 text-red-400' },
   isolated: { text: '邻居无效', cls: 'border-border bg-elevated text-secondary' },
 }
@@ -190,7 +190,7 @@ export function StrategyOptimizer() {
               ))}
             </div>
             {previewWarnings.map(w => (
-              <div key={w} className="mt-1 text-micro text-amber-400">{w}</div>
+              <div key={w} className="mt-1 text-micro text-warning">{w}</div>
             ))}
           </div>
         )}
@@ -263,11 +263,11 @@ export function StrategyOptimizer() {
                 <div className="mt-2 grid grid-cols-2 gap-2 text-micro text-secondary sm:grid-cols-4">
                   <span>中位 {num(bestRow.median)}</span>
                   <span>最差段 {num(bestRow.worst)}</span>
-                  <span className={bestRow.spread != null && bestRow.spread > 5 ? 'text-amber-400' : ''}>段间离散 {num(bestRow.spread)}</span>
+                  <span className={bestRow.spread != null && bestRow.spread > 5 ? 'text-warning' : ''}>段间离散 {num(bestRow.spread)}</span>
                   <span>合计交易 {bestRow.trades_total ?? '—'}</span>
                 </div>
                 {bestRow.is_full?.objective_raw != null && (
-                  <div className={`mt-2 text-micro ${bestRow.degradation != null && bestRow.degradation > 0 ? 'text-amber-400' : 'text-secondary'}`}>
+                  <div className={`mt-2 text-micro ${bestRow.degradation != null && bestRow.degradation > 0 ? 'text-warning' : 'text-secondary'}`}>
                     全窗样本内 {num(bestRow.is_full.objective_raw)} → 稳健分 {num(result.best_score)}
                     {bestRow.degradation != null && ` · 乐观偏差 ${num(bestRow.degradation)}${bestRow.degradation_pct != null ? ` (${fmtPct(bestRow.degradation_pct)})` : ''}`}
                   </div>
@@ -378,7 +378,7 @@ function ResultRow({ row, k }: { row: RobustResultRow; k: number }) {
       <td className="px-2 py-1.5 text-secondary">{row.rank}</td>
       <td className="px-2 py-1.5">
         <span className="text-foreground">{Object.entries(row.params).map(([kk, v]) => `${kk}=${v}`).join(', ')}</span>
-        {dq && <span className="ml-2 text-amber-400" title={row.disqualify_reason ?? ''}>除名: {row.disqualify_reason}</span>}
+        {dq && <span className="ml-2 text-warning" title={row.disqualify_reason ?? ''}>除名: {row.disqualify_reason}</span>}
       </td>
       <td className="px-2 py-1.5 text-right font-medium">{num(row.score)}</td>
       <td className="px-2 py-1.5 text-right">{num(row.median)}</td>
@@ -390,7 +390,7 @@ function ResultRow({ row, k }: { row: RobustResultRow; k: number }) {
         </td>
       ))}
       <td className="px-2 py-1.5 text-right">{row.is_full?.objective_raw != null ? num(row.is_full.objective_raw) : '—'}</td>
-      <td className={`px-2 py-1.5 text-right ${row.degradation != null && row.degradation > 0 ? 'text-amber-400' : ''}`}>
+      <td className={`px-2 py-1.5 text-right ${row.degradation != null && row.degradation > 0 ? 'text-warning' : ''}`}>
         {row.degradation_pct != null ? fmtPct(row.degradation_pct) : '—'}
       </td>
       <td className="px-2 py-1.5 text-right">{row.trades_total ?? '—'}</td>

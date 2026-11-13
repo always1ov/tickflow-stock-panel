@@ -16,7 +16,7 @@ const KIND_META: Record<FactorLibraryItem['kind'], { label: string; cls: string 
   base: { label: '基础', cls: 'bg-elevated text-secondary' },
   virtual: { label: '虚拟', cls: 'bg-accent/10 text-accent' },
   composite: { label: '复合', cls: 'bg-bull/10 text-bull' },
-  custom: { label: '自定义', cls: 'bg-amber-400/10 text-amber-500' },
+  custom: { label: '自定义', cls: 'bg-warning/10 text-warning' },
 }
 
 /** 生命周期状态 (仅自定义/复合因子有): 表格状态列、筛选与详情弹窗共用。
@@ -121,7 +121,7 @@ export function FactorLibrary({ onInspect, onEdit }: { onInspect: (factorId: str
         <div className="flex shrink-0 items-center rounded-btn border border-border p-0.5" role="tablist" aria-label="因子库视图">
           {([['library', '因子库'], ['archive', `档案库 ${archivedCount}`]] as const).map(([id, label]) => (
             <button key={id} type="button" role="tab" aria-selected={view === id} onClick={() => setView(id)}
-              className={`rounded px-2 py-1 text-micro transition-colors ${view === id ? 'bg-accent/10 font-medium text-accent' : 'text-secondary hover:text-foreground'}`}>
+              className={`rounded-btn px-2 py-1 text-micro transition-colors ${view === id ? 'bg-accent/10 font-medium text-accent' : 'text-secondary hover:text-foreground'}`}>
               {label}
             </button>
           ))}

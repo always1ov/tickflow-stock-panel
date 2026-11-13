@@ -36,7 +36,7 @@ export function ExtUrlEmbed({ label, url }: { label: string; url: string }) {
         <span className="flex min-w-0 items-center gap-1.5 text-sm font-medium text-foreground">
           <Link2 className="h-3.5 w-3.5 shrink-0 text-accent" />
           <span className="truncate" title={label}>{label}</span>
-          {host && <span className="shrink-0 truncate font-mono text-[10px] text-muted">{host}</span>}
+          {host && <span className="shrink-0 truncate font-mono text-micro text-muted">{host}</span>}
         </span>
         <a
           href={safeUrl}
@@ -56,7 +56,7 @@ export function ExtUrlEmbed({ label, url }: { label: string; url: string }) {
         loading="lazy"
         className="min-h-0 w-full flex-1 border-0 bg-white"
       />
-      <div className="shrink-0 px-3 py-1 text-[10px] text-muted/60">
+      <div className="shrink-0 px-3 py-1 text-micro text-muted/60">
         若长时间空白, 该站点可能禁止被嵌入 (X-Frame-Options), 请用右上角新窗口打开
       </div>
     </section>

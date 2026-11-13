@@ -37,7 +37,7 @@ export function SignalTriggerActions({ kind, signals, onChange, buttonClassName,
         type="button"
         onClick={() => setFactorOpen(true)}
         title="从因子快速创建条件（阈值给建议值）"
-        className={`${btnCls} hover:border-amber-400/40 hover:text-amber-400`}
+        className={`${btnCls} hover:border-warning/40 hover:text-warning`}
       >
         <Zap className={iconCls} />
       </button>
@@ -53,7 +53,7 @@ export function SignalTriggerActions({ kind, signals, onChange, buttonClassName,
         type="button"
         onClick={() => navigate('/signals?highlight=signals')}
         title="去信号库"
-        className={`${btnCls} hover:border-amber-400/40 hover:text-amber-400`}
+        className={`${btnCls} hover:border-warning/40 hover:text-warning`}
       >
         <Settings2 className={iconCls} />
       </button>

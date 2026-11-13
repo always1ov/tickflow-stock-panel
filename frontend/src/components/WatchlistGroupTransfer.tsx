@@ -74,7 +74,7 @@ function TransferDialog({ source, groups, entries, onClose }: Props & { onClose:
     panelClassName="flex max-h-[90dvh] w-[92vw] max-w-md flex-col overflow-y-auto rounded-card border border-border bg-surface shadow-xl">
     <header className="flex items-start justify-between gap-2 border-b border-border px-4 py-3">
       <div className="min-w-0">
-        <h2 className="text-[16px] font-semibold text-foreground">批量分组</h2>
+        <h2 className="text-title font-semibold text-foreground">批量分组</h2>
         <p className="mt-1 break-words text-xs text-secondary">从「{sourceName}」选择标的</p>
       </div>
       <button type="button" aria-label="关闭" disabled={pending} onClick={onClose}

@@ -205,7 +205,7 @@ export function FlipTradeCells({ leg }: { leg?: Leg }) {
 export function LegAct({ leg }: { leg: Leg }) {
   return (
     <>
-      <span className={cn('inline-flex rounded border px-1 py-px text-micro', ACT_CLS[leg.act])}>
+      <span className={cn('inline-flex rounded-btn border px-1 py-px text-micro', ACT_CLS[leg.act])}>
         {leg.act}
       </span>
       {leg.delayed > 0 && (

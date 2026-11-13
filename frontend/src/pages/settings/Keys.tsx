@@ -38,7 +38,7 @@ function SectionHeading({ icon: Icon, title, badge, right }: {
         <Icon className="h-3.5 w-3.5 text-secondary shrink-0" />
         <h3 className={TYPE.card}>{title}</h3>
         {badge && (
-          <span className="px-1.5 py-0.5 text-micro font-mono rounded bg-elevated text-muted shrink-0">{badge}</span>
+          <span className="px-1.5 py-0.5 text-micro font-mono rounded-btn bg-elevated text-muted shrink-0">{badge}</span>
         )}
       </div>
       {right}

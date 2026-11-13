@@ -25,7 +25,7 @@ export class ExtensionBoundary extends Component<Props, State> {
     if (!this.state.failed) return this.props.children
     if (this.props.compact) return null
     return (
-      <div className="rounded border border-danger/30 bg-danger/5 px-3 py-2 text-xs text-danger">
+      <div className="rounded-btn border border-danger/30 bg-danger/5 px-3 py-2 text-xs text-danger">
         扩展 {this.props.extensionId} 暂时不可用
       </div>
     )

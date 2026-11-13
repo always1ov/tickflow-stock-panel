@@ -240,7 +240,7 @@ export function ScoreLedgerDialog({ onClose }: { onClose: () => void }) {
                 而 `TodayHealthBar` 在一切正常时**整条不渲染**, 它只会说"没记"。
             指路的话最容易写成假话: 写之前先确认那条路现在还在不在。 */}
         {d && d.recorded_days === 0 && (
-          <div className="rounded border border-border/60 bg-base/40 px-3 py-6 text-center text-xs text-muted">
+          <div className="rounded-btn border border-border/60 bg-base/40 px-3 py-6 text-center text-xs text-muted">
             {d.legacy_days
               ? <>台账里有 {d.legacy_days} 天, 但<span className="text-foreground">全是换打分口径之前</span>记的 ——
                   两套分数刻度不同, 混在一起算胜率没有意义, 所以一张表都排不出来。
@@ -284,7 +284,7 @@ export function ScoreLedgerDialog({ onClose }: { onClose: () => void }) {
                 <span className="ml-1.5 font-normal text-muted">分数有没有信息量, 主要看这张</span>
               </h3>
               <div className={cn(
-                'mb-1.5 rounded border px-2.5 py-1.5 text-xs',
+                'mb-1.5 rounded-btn border px-2.5 py-1.5 text-xs',
                 d.monotonic.ok === true && 'border-bull/30 bg-bull/10 text-bull',
                 d.monotonic.ok === false && 'border-danger/30 bg-danger/10 text-danger',
                 d.monotonic.ok === null && 'border-border/60 bg-base/40 text-muted',
@@ -348,7 +348,7 @@ export function ScoreLedgerDialog({ onClose }: { onClose: () => void }) {
 
             {/* ⑤ [R175] 回头看 —— 不参与打分的那批标签, 到底灵不灵 */}
             {!!d.labels?.length && (
-              <section className="rounded border border-border/60 bg-base/40 p-2.5">
+              <section className="rounded-btn border border-border/60 bg-base/40 p-2.5">
                 <h3 className={cn('mb-1', TYPE.card)}>
                   回头看 · 这些结论最近还灵吗
                   <span className="ml-1.5 font-normal text-muted">
@@ -404,7 +404,7 @@ export function ScoreLedgerDialog({ onClose }: { onClose: () => void }) {
             )}
 
             {!!d.legacy_days && (
-              <p className="rounded border border-warning/30 bg-warning/10 px-2.5 py-1.5 text-micro text-warning">
+              <p className="rounded-btn border border-warning/30 bg-warning/10 px-2.5 py-1.5 text-micro text-warning">
                 另有 {d.legacy_days} 天是<b className="font-medium">换打分口径之前</b>记的,未计入上面任何一张表 ——
                 两套分数刻度不同,混在一起算胜率没有意义。它们仍在导出的 CSV 里
                 (scoring_version 列区分)。

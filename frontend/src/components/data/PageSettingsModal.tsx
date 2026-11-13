@@ -237,7 +237,7 @@ function SortableCardRow({
       <button
         type="button"
         onClick={onToggle}
-        className={`tap-target flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors ${
+        className={`tap-target flex h-4 w-4 shrink-0 items-center justify-center rounded-btn border transition-colors ${
           on ? 'bg-accent border-accent' : 'bg-base border-border'
         }`}
         role="checkbox"

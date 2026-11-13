@@ -19,7 +19,7 @@ import { INVALIDATE_KEYS, SettingsBackupPanel } from './Backup'
 const BUTTON = 'inline-flex min-h-11 items-center justify-center gap-1.5 rounded-btn border border-border bg-surface px-3 py-2 text-xs font-medium text-secondary transition-colors hover:bg-elevated hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45 sm:min-h-9'
 const PRIMARY = cn(BUTTON, 'border-blue-600 bg-blue-600 text-on-accent hover:bg-blue-700 hover:text-on-accent')
 // 16px 用 text-[16px]: 主题色有 base, text-base 会生成 color 规则让文字变成背景色 (见 tailwind.config.ts)
-const INPUT = 'min-h-11 w-full min-w-0 rounded-input border border-border bg-base px-3 py-2 text-[16px] leading-6 text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent sm:min-h-9 sm:text-sm'
+const INPUT = 'min-h-11 w-full min-w-0 rounded-input border border-border bg-base px-3 py-2 text-title leading-6 text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent sm:min-h-9 sm:text-sm'
 const KIND = { strategy: '策略', factor: '因子', signal: '信号', settings: '调参', code: '辅助模块' }
 const TYPE = { resources: '策略与定义资源', backup: '配置备份', source: '数据源插件', extension: '后端扩展', page: '页面插件', project: '项目源码页面' }
 type Review = ImportCenterPreview | { kind: 'project'; preview: { namespace: string } }
@@ -32,7 +32,7 @@ function Notice({ children, warning = false }: { children: ReactNode; warning?: 
 }
 
 function Status({ children }: { children: string }) {
-  return <span className={cn('inline-flex max-w-full rounded px-2 py-1 text-micro leading-5',
+  return <span className={cn('inline-flex max-w-full rounded-btn px-2 py-1 text-micro leading-5',
     /失败|损坏/.test(children) ? 'bg-danger/10 text-danger' : /待|重启/.test(children) ? 'bg-warning/10 text-warning' : /已启用|已就绪/.test(children) ? 'bg-success/10 text-success' : 'bg-elevated text-secondary')}>{children}</span>
 }
 
@@ -361,7 +361,7 @@ function InstalledView({ packages, sources, pages, selected, select, install, re
     {!!error && <div role="alert" className="text-sm text-danger">扩展清单读取失败，已保留可用列表。请点击刷新重试。</div>}
     {loading && <p role="status" className="flex gap-2 text-sm text-secondary"><Loader2 className="h-4 w-4 animate-spin" />正在读取扩展…</p>}
     {!!runtimeErrors.length && <details className="rounded-btn border border-warning/25 bg-warning/5 px-4 py-3 text-xs leading-6 text-secondary">
-      <summary className="cursor-pointer font-medium text-amber-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent dark:text-amber-300">{runtimeErrors.length} 个页面加载失败</summary>
+      <summary className="cursor-pointer font-medium text-warning focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent dark:text-warning">{runtimeErrors.length} 个页面加载失败</summary>
       <div className="mt-2 space-y-2">
         {runtimeErrors.map((entry, i) => <p key={i} className="break-words">{entry.source}：{entry.error}</p>)}
         <p>选择对应页面查看详情，可停用或更新以解决冲突。</p>

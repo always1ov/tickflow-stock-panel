@@ -161,7 +161,7 @@ function SidebarIndexQuotes({ rows, items, cnLive }: {
           <NavLink
             key={item.symbol}
             to={`/indices?symbol=${encodeURIComponent(item.symbol)}`}
-            className={cn('block rounded bg-elevated/60 px-2 py-1.5 transition-colors hover:bg-elevated',
+            className={cn('block rounded-btn bg-elevated/60 px-2 py-1.5 transition-colors hover:bg-elevated',
               !cnLive && 'opacity-70')}
             title={`${item.name} ${item.symbol} — ${
               cnLive ? '交易中, 实时刷新' : '非实时(休市或实时行情未开), 显示最后收盘/缓存值'
@@ -252,7 +252,7 @@ function DataSourceHealthBadge({ matrix }: { matrix: CapabilityMatrix | undefine
         onFocus={openPop}
         onBlur={closePop}
         onKeyDown={e => { if (e.key === 'Escape') setPopPos(null) }}
-        className="group relative flex items-center gap-2 overflow-hidden rounded-md py-1.5 pl-2.5 pr-2 transition-colors duration-hover hover:bg-elevated/70"
+        className="group relative flex items-center gap-2 overflow-hidden rounded-btn py-1.5 pl-2.5 pr-2 transition-colors duration-hover hover:bg-elevated/70"
       >
         <span className="pointer-events-none absolute inset-y-1.5 left-0 w-[2px] rounded-full bg-accent/50 transition-colors group-hover:bg-accent" />
         <DatabaseZap className="h-3.5 w-3.5 shrink-0 text-muted group-hover:text-accent transition-colors" />
@@ -284,7 +284,7 @@ function DataSourceHealthBadge({ matrix }: { matrix: CapabilityMatrix | undefine
             initial={{ opacity: 0, x: -6 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
-            className="w-64 rounded-md border border-border bg-surface py-2.5 pl-3 pr-3.5 shadow-2xl shadow-black/40"
+            className="w-64 rounded-btn border border-border bg-surface py-2.5 pl-3 pr-3.5 shadow-2xl shadow-black/40"
           >
             <div className="mb-2 flex items-center justify-between">
               <span className="flex items-center gap-1.5 text-xs font-medium text-foreground">
@@ -415,7 +415,7 @@ function AIConfigBadge({ configured, model }: { configured?: boolean; model?: st
         ref={btnRef}
         onClick={e => { e.stopPropagation(); toggleMenu() }}
         title={managed.length > 0 ? '点击快速切换首选 AI 档位' : `AI 配置 — ${descText}`}
-        className="group relative flex w-full items-center gap-2 overflow-hidden rounded-md py-1.5 pl-2.5 pr-2 text-left transition-colors duration-hover hover:bg-elevated/70"
+        className="group relative flex w-full items-center gap-2 overflow-hidden rounded-btn py-1.5 pl-2.5 pr-2 text-left transition-colors duration-hover hover:bg-elevated/70"
       >
         <span className="pointer-events-none absolute inset-y-1.5 left-0 w-[2px] rounded-full bg-border transition-colors group-hover:bg-accent" />
         <Sparkles className="h-3.5 w-3.5 shrink-0 text-muted group-hover:text-accent transition-colors" />
@@ -468,7 +468,7 @@ function AIConfigBadge({ configured, model }: { configured?: boolean; model?: st
                 onClick={() => !isPrimary && switchTo.mutate(p.id)}
                 disabled={switchTo.isPending}
                 className={cn(
-                  'flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs transition-colors disabled:opacity-60',
+                  'flex w-full items-center gap-2 rounded-btn px-2 py-1.5 text-left text-xs transition-colors disabled:opacity-60',
                   isPrimary ? 'bg-accent/10 text-accent' : 'text-secondary hover:bg-elevated hover:text-foreground',
                 )}
               >
@@ -483,7 +483,7 @@ function AIConfigBadge({ configured, model }: { configured?: boolean; model?: st
             <NavLink
               to="/settings?tab=ai"
               onClick={() => setMenuPos(null)}
-              className="block rounded px-2 py-1.5 text-micro text-muted transition-colors hover:bg-elevated hover:text-foreground"
+              className="block rounded-btn px-2 py-1.5 text-micro text-muted transition-colors hover:bg-elevated hover:text-foreground"
             >
               管理档位(增删 / 改 Key / 排序) →
             </NavLink>
@@ -1165,7 +1165,7 @@ export function Layout() {
             <div>
               <div className="flex items-center justify-between">
                 <span className="text-xs text-secondary truncate">实时行情</span>
-                <span className="text-micro text-muted/80 bg-elevated px-1.5 py-0.5 rounded">
+                <span className="text-micro text-muted/80 bg-elevated px-1.5 py-0.5 rounded-btn">
                   不可用
                 </span>
               </div>
@@ -1380,7 +1380,7 @@ export function Layout() {
       {/* 开启实时行情 + 排队中的挖掘任务 → 冲突确认 */}
       {miningQueuedWarning != null && (
         <div {...miningWarnBackdrop} className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4">
-          <div onClick={e => e.stopPropagation()} className="w-full max-w-sm rounded-2xl border border-border bg-surface p-5 shadow-2xl">
+          <div onClick={e => e.stopPropagation()} className="w-full max-w-sm rounded-dialog border border-border bg-surface p-5 shadow-2xl">
             <div className="text-sm font-semibold text-foreground">
               有挖掘任务正在排队
             </div>

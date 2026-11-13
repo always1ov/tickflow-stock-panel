@@ -90,7 +90,7 @@ export function Branding() {
 
       {/* [R60] 统一版式 */}
       <div className="px-3 pb-4 pt-3 lg:px-4">
-        <div className="mx-auto w-full max-w-[1100px]">
+        <div className="mx-auto w-full max-w-read">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           {VARIANTS.map((v) => (
             <Sample key={v.id} v={v} />

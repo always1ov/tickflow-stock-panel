@@ -29,7 +29,7 @@ export function GlossaryDialog({ onClose }: { onClose: () => void }) {
           type="button"
           aria-label="关闭"
           onClick={onClose}
-          className="ml-auto rounded p-1 text-muted transition-colors hover:bg-elevated hover:text-foreground cursor-pointer"
+          className="ml-auto rounded-btn p-1 text-muted transition-colors hover:bg-elevated hover:text-foreground cursor-pointer"
         >
           <X className="h-4 w-4" />
         </button>

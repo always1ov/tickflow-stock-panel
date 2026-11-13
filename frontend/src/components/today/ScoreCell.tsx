@@ -23,7 +23,7 @@ export const DIM_META = [
   { key: 'volume', cn: '量能确认', cls: 'bg-sky-400',
     what: '有没有人跟 —— 权重 30%',
     hint: '量比(主导,区间最优,峰在 1.3~2.5) / 换手率' },
-  { key: 'position', cn: '位置成本', cls: 'bg-amber-400',
+  { key: 'position', cn: '位置成本', cls: 'bg-warning',
     what: '买在什么位置 —— 权重 25%',
     hint: '通道位置(甜区 50%~65%,越接近 100% 越是追高)' },
 ] as const

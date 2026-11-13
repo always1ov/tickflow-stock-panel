@@ -199,7 +199,7 @@ export function ResearchCandidatesDialog({ onClose, onLoadStrategy }: {
             <div className="grid grid-cols-1 gap-3 px-4 py-3 md:grid-cols-[minmax(0,1fr)_8rem_7rem] md:items-center">
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className={`shrink-0 rounded border px-1.5 py-0.5 text-micro font-medium ${item.kind === 'factor'
+                  <span className={`shrink-0 rounded-btn border px-1.5 py-0.5 text-micro font-medium ${item.kind === 'factor'
                     ? 'border-cyan-400/30 bg-cyan-400/10 text-cyan-400'
                     : 'border-warning/30 bg-warning/10 text-warning'
                   }`}>

@@ -153,7 +153,7 @@ export function LightweightDaily({ data, assetType, symbol = '', height = 480, a
   const turnover = stockInfo?.float_shares && current?.volume != null ? current.volume * 100 / stockInfo.float_shares : null
 
   return <div className="min-w-0" data-testid="lightweight-daily">
-    {showInfoBar && <div className="min-h-16 border-b border-border/50 px-3 py-2 text-[11px] font-mono tabular-nums xl:h-16">
+    {showInfoBar && <div className="min-h-16 border-b border-border/50 px-3 py-2 text-micro font-mono tabular-nums xl:h-16">
       <div className="flex min-h-5 flex-wrap items-center gap-x-3 gap-y-1">
         <span className="font-medium text-foreground">{current?.date ?? '—'}</span>
         {currentEvent && <span style={{ color: eventTextColor(currentEvent, current, theme) }} title="阴阳按收盘价与开盘价判断，影线保留原来的涨跌色">
@@ -166,7 +166,7 @@ export function LightweightDaily({ data, assetType, symbol = '', height = 480, a
         {change != null && <span style={{ color: change >= 0 ? C.up : C.down }}>{fmtPct(change)}</span>}
         {turnover != null && <span className="text-muted">换手 {fmtPct(turnover)}</span>}
       </div>
-      <div className="mt-1 flex min-h-4 flex-wrap gap-x-4 gap-y-1 text-[10px]">
+      <div className="mt-1 flex min-h-4 flex-wrap gap-x-4 gap-y-1 text-micro">
         {showMA && maFields.map(([field, token]) => <span key={field} style={{ color: color(token) }}>{field.toUpperCase()} {price(current?.[field], precision)}</span>)}
         {activeIndicators.includes('boll') && <span className="inline-flex flex-wrap gap-x-3" aria-label="BOLL 读数">
           <span className="text-muted">BOLL</span>

@@ -55,7 +55,7 @@ export function InstallDialog({ onClose, onInstalled }: { onClose: () => void; o
   return <Modal onClose={() => { if (!busy) onClose() }} labelledBy="source-package-title" closeOnBackdrop={!busy}
     panelClassName="w-[94vw] max-w-xl max-h-[85vh] overflow-y-auto text-foreground bg-surface border border-border rounded-card shadow-xl p-5 space-y-4">
     <div className="flex items-center justify-between gap-3">
-      <h2 id="source-package-title" className="text-[16px] leading-6 font-semibold text-foreground">安装数据源插件</h2>
+      <h2 id="source-package-title" className="text-title leading-6 font-semibold text-foreground">安装数据源插件</h2>
       <button className={button} aria-label="关闭" disabled={busy} onClick={onClose}><X size={16} /></button>
     </div>
     <p className="text-sm text-secondary">安装后会在数据源列表中显示卡片。配置 API Key 后，再选择需要启用的能力。</p>
@@ -123,7 +123,7 @@ export function PackageActions({ plugin, refresh }: FrontendSlotContextMap['sett
     {references.length > 0 && <p className="text-secondary">当前分配的能力：<span className="text-foreground">{references.map(cap => cap.label).join('、')}</span></p>}
     {plugin.enabled === false && <p className="text-secondary">插件已停用，启用后可继续配置并选择数据能力。</p>}
     {plugin.update_error && <p className="text-danger">{plugin.update_error}</p>}
-    {plugin.pending_version && <p className="text-amber-800 dark:text-amber-300">版本 {plugin.pending_version} 已暂存，重启后生效。</p>}
+    {plugin.pending_version && <p className="text-warning dark:text-warning">版本 {plugin.pending_version} 已暂存，重启后生效。</p>}
     <div className="flex flex-wrap items-center gap-2">
       {plugin.available && <button disabled={busy} className={cn(button, 'border-accent/25 text-blue-700 dark:text-blue-400')} onClick={() => setRouting(true)}>选择启用能力</button>}
       <button disabled={busy} className={button} onClick={() => void run(plugin.enabled === false ? 'enable' : 'disable')}>{plugin.enabled === false ? '启用插件' : '停用插件'}</button>
@@ -151,7 +151,7 @@ export function PackageActions({ plugin, refresh }: FrontendSlotContextMap['sett
                 <dd className="flex shrink-0 items-center gap-2 text-secondary"><ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />{[...cap.candidates, ...cap.pending].find(candidate => candidate.name === cap.default)?.display || (cap.default === 'tickflow' ? 'TickFlow' : cap.default)}</dd>
               </div>)}
             </dl>
-            {missingDefault && <p className="text-xs leading-6 text-amber-800 dark:text-amber-300">部分默认来源当前不可用，相应能力将暂停取数。可在数据源设置中配置或选择其他来源。</p>}
+            {missingDefault && <p className="text-xs leading-6 text-warning dark:text-warning">部分默认来源当前不可用，相应能力将暂停取数。可在数据源设置中配置或选择其他来源。</p>}
           </div> : <p className="text-xs text-secondary">此插件未分配给任何数据能力，可直接卸载。</p>)}
         </> : <p className="text-sm leading-6 text-secondary">重启后切换到上一版本，已保存的 Key 和能力路由保留。</p>}
         {error && <p role="alert" className="break-words text-xs text-danger">{error}</p>}
@@ -192,11 +192,11 @@ function RoutingDialog({ plugin, onClose, onSaved }: { plugin: FrontendSlotConte
   }
   return <Modal onClose={() => { if (!busy) onClose() }} ariaLabel="选择启用能力" closeOnBackdrop={!busy}>
     <div className="p-5 space-y-4 text-foreground max-h-[80vh] overflow-y-auto">
-      <h3 className="text-[16px] leading-6 font-semibold text-foreground">选择启用能力</h3>
+      <h3 className="text-title leading-6 font-semibold text-foreground">选择启用能力</h3>
       <p className="text-xs text-secondary">仅修改勾选项，其他能力保留原数据源。试拉可能消耗供应商额度。</p>
       {matrix.isLoading && <p>正在读取能力…</p>}
       {matrix.error && <p role="alert">能力列表读取失败，请关闭后重试。</p>}
-      {caps.map(cap => <div key={cap.id} className="rounded border border-border p-3 space-y-2 text-xs">
+      {caps.map(cap => <div key={cap.id} className="rounded-btn border border-border p-3 space-y-2 text-xs">
         <label className="flex items-center gap-2"><input type="checkbox" disabled={busy} checked={selected.includes(cap.id)} onChange={e => setSelected(prev => e.target.checked ? [...prev, cap.id] : prev.filter(id => id !== cap.id))} />
           {cap.label}：{cap.current_display} → {plugin.display_name}</label>
         {plugin.can_test ? <button className={button} disabled={busy} onClick={() => void test(cap.id)}>试拉{cap.label}</button> : <p className="text-muted">此插件未提供能力试拉；Key 验证不代表接口权限已确认。</p>}

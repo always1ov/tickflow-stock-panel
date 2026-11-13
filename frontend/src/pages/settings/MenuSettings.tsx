@@ -33,13 +33,13 @@ function SortableMenuRow({ node, entry, parentId, groups, hidden, busy, focusNew
       parentId && 'pl-9 sm:pl-10', isDragging && 'z-10 bg-elevated shadow-lg', isOver && 'bg-accent/10', hidden && 'opacity-60')}
     data-nav-id={node.id}>
     <button type="button" {...attributes} {...listeners} disabled={home || busy} aria-label={`拖动${label}`}
-      className="touch-none rounded p-1 text-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-accent/50 disabled:opacity-30">
+      className="touch-none rounded-btn p-1 text-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-accent/50 disabled:opacity-30">
       {home ? <LockKeyhole className="h-4 w-4" /> : <GripVertical className="h-4 w-4" />}
     </button>
     <Icon className="h-4 w-4 shrink-0 text-muted" />
     <div className="min-w-0 flex-1 basis-28">
       {node.type === 'group' ? <input aria-label={`分类名称：${label}`} maxLength={32} value={node.label} disabled={busy} autoFocus={focusNew}
-        onChange={e => onRename(node.id, e.target.value)} className="h-8 w-full rounded border border-transparent bg-transparent px-0 text-sm font-medium text-foreground hover:border-border focus:border-accent focus:outline-none" />
+        onChange={e => onRename(node.id, e.target.value)} className="h-8 w-full rounded-btn border border-transparent bg-transparent px-0 text-sm font-medium text-foreground hover:border-border focus:border-accent focus:outline-none" />
         : <div className="truncate text-sm font-medium text-foreground">{label}{home && <span className="ml-2 text-xs font-normal text-muted">固定置顶</span>}</div>}
       <div className="truncate text-micro text-muted">
         {node.type === 'group' ? `${node.children.length} 个菜单 · 拖到分类名称上可移入` : !entry ? '页面暂不可用，归属已保留'
@@ -53,16 +53,16 @@ function SortableMenuRow({ node, entry, parentId, groups, hidden, busy, focusNew
     </select>}
     <div className="flex items-center gap-1">
       {node.type === 'group' ? <button type="button" disabled={busy} onClick={() => onDissolve(node.id)} aria-label={`解散${label}`}
-        title="解散分类，子菜单移回顶层" className="rounded p-2 text-muted hover:bg-elevated hover:text-foreground disabled:opacity-40"><FolderMinus className="h-4 w-4" /></button>
+        title="解散分类，子菜单移回顶层" className="rounded-btn p-2 text-muted hover:bg-elevated hover:text-foreground disabled:opacity-40"><FolderMinus className="h-4 w-4" /></button>
         : <>
           <button type="button" disabled={home || busy} onClick={() => onHide(node.id)} aria-label={`${hidden ? '显示' : '隐藏'}${label}`}
-            className="rounded p-2 text-muted hover:bg-elevated hover:text-accent disabled:opacity-30">{hidden ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button>
+            className="rounded-btn p-2 text-muted hover:bg-elevated hover:text-accent disabled:opacity-30">{hidden ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button>
           {entry && <Link to={entry.type === 'analysis' ? '/settings?tab=pages&section=ext-pages' : entry.to}
-            aria-label={`打开${label}`} className="rounded p-2 text-muted hover:bg-elevated hover:text-accent"><ExternalLink className="h-4 w-4" /></Link>}
+            aria-label={`打开${label}`} className="rounded-btn p-2 text-muted hover:bg-elevated hover:text-accent"><ExternalLink className="h-4 w-4" /></Link>}
           {node.id === '/monitor' && <button type="button" aria-label={badgeEnabled ? '关闭监控数字提示' : '开启监控数字提示'} onClick={onToggleBadge}
-            className="rounded p-2 text-muted hover:bg-elevated hover:text-accent"><Bell className="h-4 w-4" /></button>}
+            className="rounded-btn p-2 text-muted hover:bg-elevated hover:text-accent"><Bell className="h-4 w-4" /></button>}
           {entry?.extensionId && <button type="button" disabled={busy} onClick={() => onRemove(entry)} aria-label={`删除源码扩展页${label}`}
-            className="rounded p-2 text-muted hover:bg-danger/10 hover:text-danger disabled:opacity-30"><Trash2 className="h-4 w-4" /></button>}
+            className="rounded-btn p-2 text-muted hover:bg-danger/10 hover:text-danger disabled:opacity-30"><Trash2 className="h-4 w-4" /></button>}
         </>}
     </div>
   </div>

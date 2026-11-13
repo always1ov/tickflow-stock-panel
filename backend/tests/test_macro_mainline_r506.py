@@ -31,7 +31,7 @@ def test_R506_当前主线进了现在卡_色与停更规矩一起搬过来():
     card = card[:card.index("</section>")]
     assert "api.todayMainline()" in src, "当前主线要和今日总览同一个后端函数出, 不在前端另算"
     assert "{ml?.stale ? '当前主线(停更)' : '当前主线'}" in card, "停更没在标题上说出来"
-    assert "ml.stale ? 'text-muted' : 'text-amber-300'" in card, "主线没上琥珀 / 停更没降级成灰"
+    assert "ml.stale ? 'text-muted' : 'text-warning'" in card, "主线没上琥珀(warning) / 停更没降级成灰"
     assert "{ml.rows[0].member}" in card
     # 口径面板(宽基屏蔽 / 剔除 ST)原来挂在主线排行上, 排行撤了它得有新入口, 否则就配不了了
     assert "setFilterOpen(v => !v)" in card and "<MainlineFilterPanel" in card

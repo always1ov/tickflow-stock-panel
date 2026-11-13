@@ -285,7 +285,7 @@ export function StockPreviewDialogContent({ symbol, name, onClose, triggerInfo, 
             transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
             className={cn(
               'relative rounded-dialog border border-border bg-surface shadow-2xl shadow-black/50 overflow-hidden flex flex-col transition-all duration-200 ease-smooth',
-              maximized ? 'w-screen h-screen max-w-none max-h-none' : 'w-[96vw] max-w-[1360px] max-h-[95vh] sm:w-[94vw]',
+              maximized ? 'w-screen h-screen max-w-none max-h-none' : 'w-[96vw] max-w-wide max-h-[95vh] sm:w-[94vw]',
             )}
             role="dialog"
             aria-modal="true"
@@ -298,12 +298,12 @@ export function StockPreviewDialogContent({ symbol, name, onClose, triggerInfo, 
                 {(() => {
                   const board = symbol ? boardTag(symbol) : null
                   return board ? (
-                    <span className={`inline-flex items-center justify-center w-[18px] h-[18px] rounded text-[9px] font-bold leading-none border ${board.color}`}>
+                    <span className={`inline-flex items-center justify-center w-[18px] h-[18px] rounded-btn text-micro font-bold leading-none border ${board.color}`}>
                       {board.label}
                     </span>
                   ) : null
                 })()}
-                <span className="shrink-0 font-mono text-[15px] font-semibold tracking-tight text-foreground">{symbol}</span>
+                <span className="shrink-0 font-mono text-title font-semibold tracking-tight text-foreground">{symbol}</span>
                 {name && <span className="truncate text-xs text-secondary">{name}</span>}
 
                 {/* 切股导航: 上一只 / n·N / 下一只 */}
@@ -312,7 +312,7 @@ export function StockPreviewDialogContent({ symbol, name, onClose, triggerInfo, 
 
               {/* 视图/区间控件: 原第二行并入顶行, 紧邻操作按钮 (原「自选于」标注位置) */}
               <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-2.5">
-                <div role="tablist" aria-label="图表视图" className="inline-flex max-w-full flex-wrap items-center rounded border border-border/60 bg-base/60 p-0.5">
+                <div role="tablist" aria-label="图表视图" className="inline-flex max-w-full flex-wrap items-center rounded-btn border border-border/60 bg-base/60 p-0.5">
                   {tabs.map(({ key, label, icon: Icon }) => (
                     <button
                       key={key}
@@ -322,7 +322,7 @@ export function StockPreviewDialogContent({ symbol, name, onClose, triggerInfo, 
                       aria-selected={view === key}
                       aria-controls={panelId}
                       onClick={() => setView(key)}
-                      className={`inline-flex h-6 max-w-full items-center gap-1 rounded px-2.5 text-[11px] transition-colors ${
+                      className={`inline-flex h-6 max-w-full items-center gap-1 rounded-btn px-2.5 text-micro transition-colors ${
                         view === key ? 'bg-accent/20 text-accent font-medium' : 'text-muted hover:text-secondary hover:bg-elevated/60'
                       }`}
                     >
@@ -335,7 +335,7 @@ export function StockPreviewDialogContent({ symbol, name, onClose, triggerInfo, 
                 {/* 区间选择 — 随视图切换 */}
                 {view === 'daily' ? (
                   <div className="flex max-w-full flex-wrap items-center gap-2">
-                    <div className="inline-flex shrink-0 items-center rounded border border-border/60 bg-base/60 p-0.5">
+                    <div className="inline-flex shrink-0 items-center rounded-btn border border-border/60 bg-base/60 p-0.5">
                     {PRESETS.map(p => {
                       const expected = klineDateRange(p.months, today).start
                       const isActive = dateRange.start === expected
@@ -346,7 +346,7 @@ export function StockPreviewDialogContent({ symbol, name, onClose, triggerInfo, 
                             setRollingMonths(p.months)
                             setDateRange(klineDateRange(p.months, today))
                           }}
-                          className={`h-6 shrink-0 whitespace-nowrap rounded px-2.5 text-[11px] transition-colors cursor-pointer
+                          className={`h-6 shrink-0 whitespace-nowrap rounded-btn px-2.5 text-micro transition-colors cursor-pointer
                             ${isActive
                               ? 'bg-accent/20 text-accent font-medium'
                               : 'text-muted hover:text-secondary hover:bg-elevated/60'
@@ -363,7 +363,7 @@ export function StockPreviewDialogContent({ symbol, name, onClose, triggerInfo, 
                       onChange={(v) => { setRollingMonths(null); setDateRange(prev => ({ ...prev, start: v })) }}
                       max={dateRange.end}
                     />
-                    <span className="text-muted/70 text-[10px]">~</span>
+                    <span className="text-muted/70 text-micro">~</span>
                     <DatePicker
                       value={dateRange.end}
                       onChange={(v) => { setRollingMonths(null); setDateRange(prev => ({ ...prev, end: v })) }}
@@ -373,14 +373,14 @@ export function StockPreviewDialogContent({ symbol, name, onClose, triggerInfo, 
                   </div>
                 ) : view === 'intraday' && (
                   <div className="inline-flex items-center gap-2">
-                    <div className="inline-flex shrink-0 items-center rounded border border-border/60 bg-base/60 p-0.5" aria-label="分时周期">
+                    <div className="inline-flex shrink-0 items-center rounded-btn border border-border/60 bg-base/60 p-0.5" aria-label="分时周期">
                       {dayOptions.map(days => (
                         <button
                           key={days}
                           type="button"
                           aria-pressed={effectiveIntradayDays === days}
                           onClick={() => selectIntradayDays(days)}
-                          className={`h-6 rounded px-2.5 text-[11px] transition-colors ${
+                          className={`h-6 rounded-btn px-2.5 text-micro transition-colors ${
                             effectiveIntradayDays === days
                               ? 'bg-accent/20 text-accent font-medium'
                               : 'text-muted hover:text-secondary hover:bg-elevated/60'
@@ -420,7 +420,7 @@ export function StockPreviewDialogContent({ symbol, name, onClose, triggerInfo, 
                 {/* 加监控 */}
                 <button
                   onClick={() => setShowMonitorEditor(true)}
-                  className="p-1.5 rounded-btn text-amber-400 hover:bg-amber-400/10 transition-colors cursor-pointer"
+                  className="p-1.5 rounded-btn text-warning hover:bg-warning/10 transition-colors cursor-pointer"
                   title="加监控"
                 >
                   <RadioTower className="h-4 w-4" />
@@ -460,12 +460,12 @@ export function StockPreviewDialogContent({ symbol, name, onClose, triggerInfo, 
 
             {/* 触发信息条 (来自监控触发记录) */}
             {triggerInfo && (
-              <div className="flex items-center gap-4 border-b border-amber-400/20 bg-amber-400/[0.06] px-5 py-2 shrink-0">
+              <div className="flex items-center gap-4 border-b border-warning/20 bg-warning/[0.06] px-5 py-2 shrink-0">
                 {/* 左: 触发标记 + 时间 */}
                 <div className="flex items-center gap-2 shrink-0">
-                  <span className="text-[10px] font-semibold text-amber-400">⚡ 触发</span>
+                  <span className="text-micro font-semibold text-warning">⚡ 触发</span>
                   {triggerInfo.ts && (
-                    <span className="text-[11px] text-secondary font-mono">
+                    <span className="text-micro text-secondary font-mono">
                       {new Date(triggerInfo.ts).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
                     </span>
                   )}
@@ -474,10 +474,10 @@ export function StockPreviewDialogContent({ symbol, name, onClose, triggerInfo, 
                 {/* 中: 价格 + 涨跌幅 */}
                 <div className="flex items-center gap-2 shrink-0">
                   {triggerInfo.price != null && (
-                    <span className="text-[11px] font-mono text-foreground/80">{fmtAssetPrice(triggerInfo.price, assetType)}</span>
+                    <span className="text-micro font-mono text-foreground/80">{fmtAssetPrice(triggerInfo.price, assetType)}</span>
                   )}
                   {triggerInfo.changePct != null && (
-                    <span className={`text-[11px] font-mono font-medium ${triggerInfo.changePct >= 0 ? 'text-danger' : 'text-bear'}`}>
+                    <span className={`text-micro font-mono font-medium ${triggerInfo.changePct >= 0 ? 'text-danger' : 'text-bear'}`}>
                       {triggerInfo.changePct >= 0 ? '+' : ''}{(triggerInfo.changePct * 100).toFixed(2)}%
                     </span>
                   )}
@@ -486,12 +486,12 @@ export function StockPreviewDialogContent({ symbol, name, onClose, triggerInfo, 
                 {/* 右: 消息 + 信号标签 */}
                 <div className="flex items-center gap-2 flex-wrap min-w-0">
                   {triggerInfo.message && (
-                    <span className="text-[11px] text-foreground/70 truncate">{triggerInfo.message}</span>
+                    <span className="text-micro text-foreground/70 truncate">{triggerInfo.message}</span>
                   )}
                   {triggerInfo.signals && triggerInfo.signals.length > 0 && (
                     <div className="flex items-center gap-1 flex-wrap">
                       {triggerInfo.signals.map((s, j) => (
-                        <span key={j} className="rounded bg-accent/10 px-1.5 py-0.5 text-[9px] text-accent/80">{cnSignal(s, customNames)}</span>
+                        <span key={j} className="rounded-btn bg-accent/10 px-1.5 py-0.5 text-micro text-accent/80">{cnSignal(s, customNames)}</span>
                       ))}
                     </div>
                   )}
@@ -506,8 +506,8 @@ export function StockPreviewDialogContent({ symbol, name, onClose, triggerInfo, 
                 <div className={`flex flex-wrap items-center gap-x-3 gap-y-1 px-5 py-2 shrink-0 ${meta.bar}`}>
                   <span className="flex shrink-0 items-center gap-1.5">
                     <Activity className={`h-3.5 w-3.5 ${meta.icon}`} />
-                    <span className={`text-[11px] font-bold ${meta.icon}`}>异动</span>
-                    <span className={`rounded px-1.5 py-0.5 text-[10px] ${meta.cls}`}>
+                    <span className={`text-micro font-bold ${meta.icon}`}>异动</span>
+                    <span className={`rounded-btn px-1.5 py-0.5 text-micro ${meta.cls}`}>
                       {meta.label}
                     </span>
                   </span>
@@ -519,7 +519,7 @@ export function StockPreviewDialogContent({ symbol, name, onClose, triggerInfo, 
                         <span
                           key={w}
                           title={`近${parseInt(w, 10)}日累计偏离(含实时) / 交易所规则阈值 · 接近度=|偏离|/阈值`}
-                          className={`shrink-0 rounded border px-1.5 py-0.5 font-mono text-[11px] ${
+                          className={`shrink-0 rounded-btn border px-1.5 py-0.5 font-mono text-micro ${
                             dominant
                               ? 'border-border bg-elevated font-semibold text-foreground'
                               : 'border-border/60 bg-base/40 text-secondary'
@@ -533,7 +533,7 @@ export function StockPreviewDialogContent({ symbol, name, onClose, triggerInfo, 
                       )
                     })}
                   <span
-                    className="ml-auto shrink-0 font-mono text-[10px] text-muted"
+                    className="ml-auto shrink-0 font-mono text-micro text-muted"
                     title="异动引擎上次计算时间"
                   >
                     计算于 {fmtAbnormalCalcTime(abnormal.data?.asof ?? 0)}

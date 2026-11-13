@@ -66,13 +66,13 @@ export function ConditionEditor({ conditions, onChange, options, max = 8, title,
     <div className="space-y-2">
       {title !== '' && (
         <div className="flex items-center justify-between gap-2">
-          <span className="text-[11px] text-muted">{title ?? '条件（多条件为「且」关系）'}</span>
+          <span className="text-micro text-muted">{title ?? '条件（多条件为「且」关系）'}</span>
           <div className="flex items-center gap-2 shrink-0">
             {headerExtra}
             <button
               onClick={addCond}
               disabled={conditions.length >= max}
-              className="inline-flex items-center gap-1 text-[11px] text-accent hover:text-accent/80 cursor-pointer disabled:opacity-40"
+              className="inline-flex items-center gap-1 text-micro text-accent hover:text-accent/80 cursor-pointer disabled:opacity-40"
             >
               <Plus className="h-3 w-3" />添加条件
             </button>
@@ -81,21 +81,21 @@ export function ConditionEditor({ conditions, onChange, options, max = 8, title,
       )}
       <div className="space-y-2 rounded-card border border-border/70 bg-base/50 p-3">
         {conditions.length === 0 && (
-          <div className="text-[11px] text-muted/70 py-1.5">无条件 — 不叠加过滤</div>
+          <div className="text-micro text-muted/70 py-1.5">无条件 — 不叠加过滤</div>
         )}
         {conditions.map((c, i) => {
           const isStr = stringFields.includes(c.left)
           const condOps = isStr ? stringOperators : operators
           return (
             <div key={i} className="flex flex-wrap items-center gap-1.5">
-              <span className="text-[10px] text-muted/60 w-5 text-right shrink-0">{i === 0 ? '当' : '且'}</span>
+              <span className="text-micro text-muted/60 w-5 text-right shrink-0">{i === 0 ? '当' : '且'}</span>
 
               {/* 左操作数: 前N日 + 字段(弹出选择) */}
               {!hideDays && <DaysInput value={c.leftDays ?? 0} max={maxDays} onChange={v => updateCond(i, { leftDays: v })} />}
               <FieldPicker value={c.left} fields={fields} groups={groups} onChange={v => changeLeft(i, v)} />
 
               {/* 运算符: 字符串字段为 包含/等于/不等于 */}
-              <select value={c.op} onChange={e => updateCond(i, { op: e.target.value })} className="w-11 h-7 px-0.5 rounded bg-base border border-border text-[11px] font-mono text-foreground text-center focus:outline-none focus:border-accent/50">
+              <select value={c.op} onChange={e => updateCond(i, { op: e.target.value })} className="w-11 h-7 px-0.5 rounded-btn bg-base border border-border text-micro font-mono text-foreground text-center focus:outline-none focus:border-accent/50">
                 {condOps.map(op => <option key={op} value={op}>{OP_LABELS[op] ?? op}</option>)}
               </select>
 
@@ -103,7 +103,7 @@ export function ConditionEditor({ conditions, onChange, options, max = 8, title,
               {isStr ? (
                 <input type="text" value={c.right} onChange={e => updateCond(i, { right: e.target.value })}
                   placeholder="概念/行业名, 如 AI" maxLength={64}
-                  className="flex-1 min-w-0 h-7 px-1.5 rounded bg-base border border-border text-[11px] text-foreground focus:outline-none focus:border-accent/50" />
+                  className="flex-1 min-w-0 h-7 px-1.5 rounded-btn bg-base border border-border text-micro text-foreground focus:outline-none focus:border-accent/50" />
               ) : (
                 <RightValueInput cond={c} fields={fields} groups={groups} maxDays={maxDays} hideDays={hideDays}
                   onChangeRight={v => updateCond(i, { right: v })}
@@ -111,7 +111,7 @@ export function ConditionEditor({ conditions, onChange, options, max = 8, title,
               )}
 
               {(conditions.length > 1 || allowEmpty) && (
-                <button onClick={() => removeCond(i)} aria-label="删除条件" className="p-1 rounded text-muted hover:text-danger hover:bg-danger/10 cursor-pointer">
+                <button onClick={() => removeCond(i)} aria-label="删除条件" className="p-1 rounded-btn text-muted hover:text-danger hover:bg-danger/10 cursor-pointer">
                   <X className="h-3 w-3" />
                 </button>
               )}
@@ -155,7 +155,7 @@ function FieldPicker({ value, fields, groups, onChange }: {
       <button
         type="button"
         onClick={() => { setQuery(''); setOpen(true) }}
-        className="min-w-[80px] max-w-[180px] h-7 px-1.5 rounded bg-base border border-border text-[11px] text-foreground text-left hover:border-accent/40 transition-colors cursor-pointer truncate"
+        className="min-w-[80px] max-w-[180px] h-7 px-1.5 rounded-btn bg-base border border-border text-micro text-foreground text-left hover:border-accent/40 transition-colors cursor-pointer truncate"
       >
         {selectedLabel}
       </button>
@@ -174,14 +174,14 @@ function FieldPicker({ value, fields, groups, onChange }: {
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95, y: 10 }}
                 transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
-                className="w-full max-w-sm bg-surface border border-border/50 rounded-2xl shadow-2xl flex flex-col overflow-hidden max-h-[70vh]"
+                className="w-full max-w-sm bg-surface border border-border/50 rounded-dialog shadow-2xl flex flex-col overflow-hidden max-h-[70vh]"
                 onClick={e => e.stopPropagation()}
               >
                 {/* 标题 + 搜索 */}
                 <div className="p-3 border-b border-border/50 space-y-2.5">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-medium text-foreground">选择字段</span>
-                    <button onClick={() => setOpen(false)} className="rounded p-1 text-muted hover:bg-elevated hover:text-foreground transition-colors">
+                    <button onClick={() => setOpen(false)} className="rounded-btn p-1 text-muted hover:bg-elevated hover:text-foreground transition-colors">
                       <X className="h-3.5 w-3.5" />
                     </button>
                   </div>
@@ -202,12 +202,12 @@ function FieldPicker({ value, fields, groups, onChange }: {
                   {filteredGroups ? (
                     filteredGroups.length > 0 ? filteredGroups.map(g => (
                       <div key={g.key} className="mb-1">
-                        <div className="px-2 py-1 text-[10px] text-muted/60 font-medium">{g.label}</div>
+                        <div className="px-2 py-1 text-micro text-muted/60 font-medium">{g.label}</div>
                         {g.fields.map(f => (
                           <button
                             key={f.key}
                             onClick={() => { onChange(f.key); setOpen(false) }}
-                            className={`w-full text-left px-2.5 py-1.5 rounded text-xs transition-colors ${
+                            className={`w-full text-left px-2.5 py-1.5 rounded-btn text-xs transition-colors ${
                               f.key === value ? 'bg-accent/10 text-accent' : 'text-foreground/80 hover:bg-elevated'
                             }`}
                           >
@@ -223,7 +223,7 @@ function FieldPicker({ value, fields, groups, onChange }: {
                       <button
                         key={f.key}
                         onClick={() => { onChange(f.key); setOpen(false) }}
-                        className={`w-full text-left px-2.5 py-1.5 rounded text-xs transition-colors ${
+                        className={`w-full text-left px-2.5 py-1.5 rounded-btn text-xs transition-colors ${
                           f.key === value ? 'bg-accent/10 text-accent' : 'text-foreground/80 hover:bg-elevated'
                         }`}
                       >
@@ -251,15 +251,15 @@ function DaysInput({ value, max, onChange }: { value: number; max: number; onCha
         type="button"
         onClick={() => onChange(1)}
         title="点击切换为「前N日」(取 N 个交易日前的值)"
-        className="h-7 px-2 rounded bg-base border border-border text-[11px] text-muted hover:text-accent hover:border-accent/50 transition-colors shrink-0 cursor-pointer"
+        className="h-7 px-2 rounded-btn bg-base border border-border text-micro text-muted hover:text-accent hover:border-accent/50 transition-colors shrink-0 cursor-pointer"
       >
         最新
       </button>
     )
   }
   return (
-    <div className="flex items-center h-7 rounded bg-base border border-border focus-within:border-accent/50 transition-colors shrink-0">
-      <span className="pl-1.5 text-[11px] text-muted select-none">前</span>
+    <div className="flex items-center h-7 rounded-btn bg-base border border-border focus-within:border-accent/50 transition-colors shrink-0">
+      <span className="pl-1.5 text-micro text-muted select-none">前</span>
       <input
         type="number"
         min={1}
@@ -272,13 +272,13 @@ function DaysInput({ value, max, onChange }: { value: number; max: number; onCha
           onChange(n)
         }}
         title={`前 ${value} 个交易日的值`}
-        className="w-7 h-full px-0 text-[11px] font-mono text-foreground text-center bg-transparent focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
+        className="w-7 h-full px-0 text-micro font-mono text-foreground text-center bg-transparent focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
       />
       <button
         type="button"
         onClick={() => onChange(0)}
         title="切回「最新」"
-        className="pr-1.5 pl-0.5 text-[11px] text-muted hover:text-accent transition-colors cursor-pointer"
+        className="pr-1.5 pl-0.5 text-micro text-muted hover:text-accent transition-colors cursor-pointer"
       >
         日
       </button>
@@ -310,7 +310,7 @@ function RightValueInput({ cond, fields, groups, maxDays, hideDays, onChangeRigh
         <>
           {!hideDays && <DaysInput value={cond.rightDays ?? 0} max={maxDays} onChange={onChangeDays} />}
           <FieldPicker value={fieldValue} fields={fields} groups={groups} onChange={v => onChangeRight(`field:${v}`)} />
-          <button onClick={() => onChangeRight('0')} title="切换为数字" className="p-0.5 rounded text-muted hover:text-accent cursor-pointer shrink-0">
+          <button onClick={() => onChangeRight('0')} title="切换为数字" className="p-0.5 rounded-btn text-muted hover:text-accent cursor-pointer shrink-0">
             <ArrowRight className="h-3 w-3 rotate-90" />
           </button>
         </>
@@ -319,8 +319,8 @@ function RightValueInput({ cond, fields, groups, maxDays, hideDays, onChangeRigh
           {/* 常量无前N日概念, 占位保持与字段模式对齐 */}
           {!hideDays && <div className="shrink-0" style={{ width: 44 }} />}
           <input type="number" value={numValue} onChange={e => onChangeRight(e.target.value)} step="any"
-            className="flex-1 min-w-0 h-7 px-1.5 rounded bg-base border border-border text-[11px] font-mono text-foreground text-center focus:outline-none focus:border-accent/50" />
-          <button onClick={() => onChangeRight('field:close')} title="切换为字段" className="p-0.5 rounded text-muted hover:text-accent cursor-pointer shrink-0">
+            className="flex-1 min-w-0 h-7 px-1.5 rounded-btn bg-base border border-border text-micro font-mono text-foreground text-center focus:outline-none focus:border-accent/50" />
+          <button onClick={() => onChangeRight('field:close')} title="切换为字段" className="p-0.5 rounded-btn text-muted hover:text-accent cursor-pointer shrink-0">
             <ArrowRight className="h-3 w-3 -rotate-90" />
           </button>
         </>

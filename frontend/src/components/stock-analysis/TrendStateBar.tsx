@@ -95,7 +95,7 @@ export function TrendStateBar({ symbol, trend }: { symbol: string; trend: TrendD
       </span>
       {trend.intraday && (
         <span
-          className="inline-flex rounded border border-warning/30 bg-warning/10 px-1.5 py-0.5 text-micro text-warning"
+          className="inline-flex rounded-btn border border-warning/30 bg-warning/10 px-1.5 py-0.5 text-micro text-warning"
           title="实时价参与了六态判定,收盘价可能改变结论 —— 定稿以收盘为准"
         >
           盘中口径
@@ -262,7 +262,7 @@ function TrendBacktestDialog({ symbol, onClose }: { symbol: string; onClose: () 
                             <button
                               onClick={() => apply.mutate({ threshold: r.threshold, source: 'manual' })}
                               disabled={apply.isPending || isCurrent}
-                              className="rounded border border-border px-1.5 py-0.5 text-micro text-muted hover:text-foreground hover:border-accent/50 disabled:opacity-30"
+                              className="rounded-btn border border-border px-1.5 py-0.5 text-micro text-muted hover:text-foreground hover:border-accent/50 disabled:opacity-30"
                             >
                               用
                             </button>

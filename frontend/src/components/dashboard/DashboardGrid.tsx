@@ -142,7 +142,7 @@ export function DashboardGrid({ ctx, items, onItemsChange, editing }: DashboardG
                     <button
                       type="button"
                       onClick={() => removeItem(it.i)}
-                      className="dash-widget-remove flex h-4 w-4 shrink-0 items-center justify-center rounded text-muted hover:bg-danger/15 hover:text-danger"
+                      className="dash-widget-remove flex h-4 w-4 shrink-0 items-center justify-center rounded-btn text-muted hover:bg-danger/15 hover:text-danger"
                       title="移除组件"
                     >
                       <X className="h-3 w-3" />

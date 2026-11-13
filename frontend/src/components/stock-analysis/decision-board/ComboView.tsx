@@ -36,7 +36,7 @@ import { ReviewDisclosure } from '@/components/stock-analysis/ReviewDisclosure'
 const TONE_CLS: Record<string, string> = {
   sell: 'text-red-400',
   buy: 'text-sky-300',
-  hold: 'text-amber-400',
+  hold: 'text-warning',
   avoid: 'text-muted',
   watch: 'text-secondary',
 }
@@ -56,7 +56,7 @@ function Dots({ rarity }: { rarity?: string }) {
     <span className="inline-flex gap-[2px]" title={`这一格${rarity ?? ''}`}>
       {[0, 1, 2].map(i => (
         <i key={i} className={cn('h-[3px] w-[3px] rounded-full',
-          i < n ? 'bg-amber-300/70' : 'bg-border')} />
+          i < n ? 'bg-warning/70' : 'bg-border')} />
       ))}
     </span>
   )

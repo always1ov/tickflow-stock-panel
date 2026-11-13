@@ -14,14 +14,14 @@ import type { ReactNode } from 'react'
 export function HeadRow({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex gap-3 px-3 py-2">
-      <span className="w-[4.5rem] shrink-0 pt-px text-[10px] text-muted">{label}</span>
+      <span className="w-[4.5rem] shrink-0 pt-px text-micro text-muted">{label}</span>
       <div className="min-w-0 flex-1">{children}</div>
     </div>
   )
 }
 
 /** 两张卡共用的外框: 一条细分割线隔开每一行 */
-export const HEAD_CARD = 'mx-4 mt-3 divide-y divide-border/40 rounded-lg border border-border/60'
+export const HEAD_CARD = 'mx-4 mt-3 divide-y divide-border/40 rounded-card border border-border/60'
 
 /**
  * [R301] 一行里的**子条目**: 「该盯什么」「这一格历来」这类"小标签 + 一句话"。
@@ -36,8 +36,8 @@ export const HEAD_CARD = 'mx-4 mt-3 divide-y divide-border/40 rounded-lg border 
 export function SubRow({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="mt-1 flex gap-2">
-      <span className="w-[3.75rem] shrink-0 text-[10px] text-muted/70">{label}</span>
-      <div className="min-w-0 flex-1 text-[10px] leading-relaxed">{children}</div>
+      <span className="w-[3.75rem] shrink-0 text-micro text-muted/70">{label}</span>
+      <div className="min-w-0 flex-1 text-micro leading-relaxed">{children}</div>
     </div>
   )
 }

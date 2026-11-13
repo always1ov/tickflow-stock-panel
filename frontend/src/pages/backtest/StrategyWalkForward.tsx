@@ -210,7 +210,7 @@ export function StrategyWalkForward() {
               ))}
             </div>
             {(foldPreview.data.warnings ?? []).map(w => (
-              <div key={w} className="mt-1 text-micro text-amber-400">{w}</div>
+              <div key={w} className="mt-1 text-micro text-warning">{w}</div>
             ))}
           </div>
         )}
@@ -323,7 +323,7 @@ export function StrategyWalkForward() {
                   {result.skipped.map((s, i) => (
                     <div key={i} className="flex justify-between gap-2 text-micro text-muted">
                       <span>#{s.index + 1} 测试 {s.test_start}~{s.test_end}</span>
-                      <span className="text-amber-400/80">{s.reason}</span>
+                      <span className="text-warning/80">{s.reason}</span>
                     </div>
                   ))}
                 </div>
@@ -405,7 +405,7 @@ function ParamDrift({ folds }: { folds: { index: number; best_params: Record<str
             <div key={k} className="flex items-center gap-2 text-micro">
               <span className="w-32 shrink-0 truncate text-muted" title={k}>{k}</span>
               <span className="min-w-0 flex-1 truncate text-foreground">{seq.join(' → ')}</span>
-              <span className={`shrink-0 rounded-full border px-1.5 py-0.5 text-micro ${stable ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-400' : 'border-amber-500/40 bg-amber-500/10 text-amber-400'}`}>
+              <span className={`shrink-0 rounded-full border px-1.5 py-0.5 text-micro ${stable ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-400' : 'border-warning/40 bg-warning/10 text-warning'}`}>
                 {stable ? '稳定' : '漂移'}
               </span>
             </div>

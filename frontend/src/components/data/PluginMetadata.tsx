@@ -19,7 +19,7 @@ export function PluginMetadata({ plugin }: { plugin: PluginDataSourceItem }) {
     </ul>}
     {!!links.length && <div className="flex flex-wrap gap-x-5 gap-y-2">
       {links.map(({ url, label }, i) => <a key={i} href={url} target="_blank" rel="noopener noreferrer"
-        className="inline-flex min-h-9 max-w-full items-center gap-1.5 rounded-sm text-xs text-accent underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">
+        className="inline-flex min-h-9 max-w-full items-center gap-1.5 rounded-btn text-xs text-accent underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">
         <span className="min-w-0 break-words">{label}</span>
         <ExternalLink className="h-3 w-3 shrink-0" aria-hidden="true" />
       </a>)}

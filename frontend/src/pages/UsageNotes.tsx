@@ -230,7 +230,7 @@ function NoteCard({ note, onDigest, digesting }: {
               )}
               {showRaw && (
                 /* 原文可能很长(整份研报的文字) —— 给个上限自己滚, 不让它把卡片顶穿 */
-                <p className="mt-1 max-h-48 overflow-y-auto whitespace-pre-wrap rounded border border-border/40 bg-base/50 px-2 py-1.5 text-xs leading-relaxed text-muted">
+                <p className="mt-1 max-h-48 overflow-y-auto whitespace-pre-wrap rounded-btn border border-border/40 bg-base/50 px-2 py-1.5 text-xs leading-relaxed text-muted">
                   {note.content || <span className="italic opacity-70">(只有附件, 没有正文)</span>}
                 </p>
               )}
@@ -273,7 +273,7 @@ function NoteCard({ note, onDigest, digesting }: {
               disabled={update.isPending}
               title={HORIZON_META[(note.horizon ?? 'news') as Horizon].hint}
               className={cn(
-                'rounded border px-1.5 py-0.5 text-micro transition-colors cursor-pointer',
+                'rounded-btn border px-1.5 py-0.5 text-micro transition-colors cursor-pointer',
                 HORIZON_META[(note.horizon ?? 'news') as Horizon].cls,
               )}
             >
@@ -300,7 +300,7 @@ function NoteCard({ note, onDigest, digesting }: {
                 title={note.digest
                   ? '重新凝练(改过正文之后可以重来)'
                   : '让 AI 把这条凝练成要点。图片会直接读图。'}
-                className="rounded p-1 text-muted/60 transition-colors hover:bg-elevated hover:text-foreground disabled:opacity-40"
+                className="rounded-btn p-1 text-muted/60 transition-colors hover:bg-elevated hover:text-foreground disabled:opacity-40"
               >
                 {digesting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
               </button>
@@ -308,7 +308,7 @@ function NoteCard({ note, onDigest, digesting }: {
                 onClick={() => update.mutate({ pinned: !note.pinned })}
                 disabled={update.isPending}
                 className={cn(
-                  'rounded p-1 transition-colors',
+                  'rounded-btn p-1 transition-colors',
                   note.pinned ? 'text-accent hover:bg-accent/10' : 'text-muted/60 hover:bg-elevated hover:text-foreground',
                 )}
                 title={note.pinned ? '取消置顶' : '置顶'}
@@ -317,7 +317,7 @@ function NoteCard({ note, onDigest, digesting }: {
               </button>
               <button
                 onClick={() => { setDraft(note.content); setEditing(true); setConfirmDelete(false) }}
-                className="rounded p-1 text-muted/60 hover:bg-elevated hover:text-foreground transition-colors"
+                className="rounded-btn p-1 text-muted/60 hover:bg-elevated hover:text-foreground transition-colors"
                 title="编辑"
               >
                 <Pencil className="h-3.5 w-3.5" />
@@ -327,7 +327,7 @@ function NoteCard({ note, onDigest, digesting }: {
                 onBlur={() => setConfirmDelete(false)}
                 disabled={remove.isPending}
                 className={cn(
-                  'rounded p-1 transition-colors',
+                  'rounded-btn p-1 transition-colors',
                   confirmDelete
                     ? 'bg-danger/15 text-danger hover:bg-danger/25'
                     : 'text-muted/60 hover:bg-elevated hover:text-danger',
@@ -440,7 +440,7 @@ export function NotesPanel() {
             两侧空一大片而卡片仍挤成两列。改为贴左 + 放宽到 1600px, 配合下方
             网格在宽屏加到三列 —— 观察条目多的时候一屏能多看一行。
            [R502] 页头与滚动区交给 Minds 页, 这里只剩正文。 */
-        <div className="w-full max-w-[1600px] space-y-3">
+        <div className="w-full max-w-wide space-y-3">
           {/* [R181] 到期埋伏提醒 —— 排在总览之前, 因为它是这一页唯一需要你"现在动手"的东西 */}
           {due.length > 0 && (
             <div className="rounded-card border border-warning/30 bg-warning/[0.07] px-3 py-2">

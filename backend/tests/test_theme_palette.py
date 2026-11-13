@@ -481,7 +481,7 @@ def test_R379_看盘页的密度一个像素没动():
     from tests.frontend_source import code_of
     # 自选表格的行: 紧凑档位还在
     table = code_of("components/stock-table/primitives.tsx")
-    assert "text-xs" in table or "text-[11px]" in table, "自选表格的紧凑字号没了"
+    assert "text-xs" in table or "text-micro" in table, "自选表格的紧凑字号没了"
     # [R564] 模拟盘随页面删了, 它的「流水」那张表也没了; 虚拟账户的流水是作者的表(紧凑 text-xs 行)。
     flip = code_of("custom/paper/Page.tsx")
     # [R383] 行高改成由整屏统一决定撑不撑(整屏没名次就不撑 —— 那时每行只有两行字,

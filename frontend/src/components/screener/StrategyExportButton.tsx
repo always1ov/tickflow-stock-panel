@@ -21,7 +21,7 @@ export function StrategyExportButton({ strategyId, disabled = false, disabledHin
   return <button type="button" aria-label="导出策略包" disabled={disabled || busy}
     title={disabled && disabledHint ? disabledHint : '导出 ZIP 策略包，包含相关因子、信号与已保存调参'}
     onClick={event => { event.stopPropagation(); void download() }}
-    className={cn('inline-flex shrink-0 items-center justify-center rounded p-0.5 text-muted transition-colors hover:bg-elevated hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40', className)}>
+    className={cn('inline-flex shrink-0 items-center justify-center rounded-btn p-0.5 text-muted transition-colors hover:bg-elevated hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40', className)}>
     {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />}
   </button>
 }

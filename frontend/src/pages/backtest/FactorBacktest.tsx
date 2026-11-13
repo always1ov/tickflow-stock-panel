@@ -64,7 +64,7 @@ function LoadingPanel({ symbolsText }: { symbolsText: string }) {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {['读取因子', '计算 IC', '分层回测', '汇总指标'].map(item => (
           <div key={item} className="rounded-btn border border-border bg-surface p-3">
-            <div className="h-2 w-10 rounded bg-accent/30 animate-pulse" />
+            <div className="h-2 w-10 rounded-btn bg-accent/30 animate-pulse" />
             <div className="mt-3 text-xs text-secondary">{item}</div>
           </div>
         ))}

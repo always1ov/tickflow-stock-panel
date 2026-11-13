@@ -26,7 +26,7 @@ const SRC_MAP: Record<string, string> = { custom: '自定义', ai: 'AI' }
 const BADGE_CLS: Record<string, string> = {
   builtin: 'bg-accent/10 text-accent border-accent/20',
   ai: 'bg-sky-500/10 text-sky-400 border-sky-500/20',
-  custom: 'bg-amber-400/10 text-amber-400 border-amber-400/30',
+  custom: 'bg-warning/10 text-warning border-warning/30',
 }
 
 export function CompositeStrategyDialog({ open, onClose, onSavedId, editStrategyId }: Props) {
@@ -267,11 +267,11 @@ export function CompositeStrategyDialog({ open, onClose, onSavedId, editStrategy
                   </label>
                   <span className="text-micro text-muted flex items-center gap-1.5">
                     权重
-                    <span className={`font-mono ${children.length > 0 && totalPct !== 100 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                    <span className={`font-mono ${children.length > 0 && totalPct !== 100 ? 'text-warning' : 'text-emerald-400'}`}>
                       {totalPct}%
                     </span>
                     {children.length > 0 && totalPct !== 100 && (
-                      <span className="text-amber-400/60">(保存时自动按比例归一)</span>
+                      <span className="text-warning/60">(保存时自动按比例归一)</span>
                     )}
                   </span>
                 </div>
@@ -295,7 +295,7 @@ export function CompositeStrategyDialog({ open, onClose, onSavedId, editStrategy
                           <Settings2 className="h-3 w-3 shrink-0 text-muted/50" />
                         </button>
                         {s?.source && (
-                          <span className={`rounded border px-1 text-micro ${BADGE_CLS[s.source] ?? ''}`}>
+                          <span className={`rounded-btn border px-1 text-micro ${BADGE_CLS[s.source] ?? ''}`}>
                             {SRC_MAP[s.source] ?? s.source}
                           </span>
                         )}
@@ -344,12 +344,12 @@ export function CompositeStrategyDialog({ open, onClose, onSavedId, editStrategy
                     <button
                       key={s.id}
                       onClick={() => addChild(s)}
-                      className="flex w-full items-center gap-1.5 rounded px-2 py-1 text-left text-xs text-foreground hover:bg-accent/10"
+                      className="flex w-full items-center gap-1.5 rounded-btn px-2 py-1 text-left text-xs text-foreground hover:bg-accent/10"
                     >
                       <Plus className="h-3 w-3 shrink-0 text-teal-400" />
                       <span className="flex-1 truncate">{s.name}</span>
                       {s.source && (
-                        <span className={`rounded border px-1 text-micro ${BADGE_CLS[s.source] ?? ''}`}>
+                        <span className={`rounded-btn border px-1 text-micro ${BADGE_CLS[s.source] ?? ''}`}>
                           {SRC_MAP[s.source] ?? s.source}
                         </span>
                       )}

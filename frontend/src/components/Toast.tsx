@@ -91,7 +91,7 @@ function ToastCard({ t }: { t: ToastItem }) {
       role={t.kind === 'error' ? 'alert' : undefined}
       onClick={() => dismiss(t.id)}
       className={cn(
-        'pointer-events-auto relative flex w-[300px] cursor-pointer items-start gap-2 overflow-hidden rounded-xl border border-border/60 bg-surface/95 py-2 pl-3 pr-2 text-xs shadow-lg backdrop-blur-md',
+        'pointer-events-auto relative flex w-[300px] cursor-pointer items-start gap-2 overflow-hidden rounded-dialog border border-border/60 bg-surface/95 py-2 pl-3 pr-2 text-xs shadow-lg backdrop-blur-md',
         'transition-[opacity,transform] ease-out-strong',
         shown ? 'duration-expand translate-y-0 opacity-100' : 'duration-hover translate-y-1.5 opacity-0',
       )}
@@ -104,7 +104,7 @@ function ToastCard({ t }: { t: ToastItem }) {
           type="button"
           aria-label="关闭提示"
           onClick={(e) => { e.stopPropagation(); dismiss(t.id) }}
-          className="shrink-0 rounded p-0.5 text-muted/50 transition-colors hover:bg-elevated hover:text-foreground cursor-pointer"
+          className="shrink-0 rounded-btn p-0.5 text-muted/50 transition-colors hover:bg-elevated hover:text-foreground cursor-pointer"
         >
           <X className="h-3 w-3" />
         </button>
