@@ -9,7 +9,6 @@ import {
   Check,
   CheckCircle2,
   Database,
-  ExternalLink,
   Eye,
   EyeOff,
   FileWarning,
@@ -44,6 +43,7 @@ import { AnchorWrap } from '@/lib/useCardFlash'
 import { CAP_LABELS, TIER_RANK, tierRank, tierStyle, TierTag } from '@/lib/capability-labels'
 import { DEFAULT_ROUTING, buildProviderRouting } from '@/lib/provider-routing'
 import { toast } from '@/components/Toast'
+import { PluginMetadata } from '@/components/data/PluginMetadata'
 import { DataSourceEditor } from './DataSourceEditor'
 import { TickFlowKeySection, TierHelpPopover, useInvalidateTierRelated } from './Keys'
 import { buttonClass, TYPE } from '@/components/ui'
@@ -419,35 +419,18 @@ export function PluginKeyConfig({ plugin }: { plugin: PluginDataSourceItem }) {
 
   return (
     <div>
-      <div className="flex items-center gap-2 mb-2">
+      <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1">
         <KeyRound className="h-3.5 w-3.5 text-secondary" />
         <h3 className={TYPE.card}>API Key</h3>
-        <span className="text-micro text-muted/50 uppercase tracking-wider">{plugin.api_key_env}</span>
+        <span className="break-all font-mono text-micro text-muted/50 uppercase tracking-wider">{plugin.api_key_env}</span>
       </div>
 
-      {/* 申请说明 + 官网链接 (对齐 TickFlow Key 区话术) */}
       <p className="text-xs text-secondary leading-relaxed mb-4">
-        {plugin.homepage ? (
-          <>
-            在{' '}
-            <a
-              href={plugin.homepage}
-              target="_blank"
-              rel="noreferrer"
-              className="text-accent hover:underline inline-flex items-baseline gap-0.5"
-            >
-              {plugin.display_name} 官网
-              <ExternalLink className="h-3 w-3 self-center" />
-            </a>
-            {' '}申请获取。
-          </>
-        ) : (
-          <>向该数据源官方申请 API Key。</>
-        )}
+        向该数据源官方申请 API Key。
         Key 保存在本地，验证和取数时发送给该数据源用于认证。环境变量可作为后备配置。
       </p>
 
-      {/* 积分计费警示框 + Key/积分管理入口 (manifest billing/billing_note/key_manage_url 声明) */}
+      {/* 积分计费警示框 (manifest billing/billing_note 声明) */}
       {plugin.billing === 'points' && (
         <div className="mb-3 flex items-start gap-2 rounded-btn border border-warning/35 bg-warning/[0.07] px-3 py-2.5">
           <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warning" />
@@ -458,18 +441,6 @@ export function PluginKeyConfig({ plugin }: { plugin: PluginDataSourceItem }) {
           </div>
         </div>
       )}
-      {plugin.key_manage_url && (
-        <a
-          href={plugin.key_manage_url}
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex items-center gap-1 text-xs text-accent hover:underline mb-4"
-        >
-          管理 Key / 查看账户用量
-          <ExternalLink className="h-3 w-3" />
-        </a>
-      )}
-
       {/* 当前状态 */}
       <div className="flex items-center justify-between mb-4">
         <div className="min-w-0">
@@ -514,6 +485,7 @@ export function PluginKeyConfig({ plugin }: { plugin: PluginDataSourceItem }) {
       >
         <div className="relative">
           <input
+            aria-label={`${plugin.display_name} API Key`}
             type={revealing ? 'text' : 'password'}
             placeholder={plugin.available ? '粘贴新 Key 替换当前' : `粘贴 ${plugin.display_name} API Key`}
             value={keyInput}
@@ -1046,7 +1018,8 @@ function PluginDetail({ plugin, isActive, matrixCaps, servingSet, refresh }: {
               </span>
             )}
           </div>
-          {plugin.description && <p className="text-xs text-secondary leading-relaxed">{plugin.description}</p>}
+          {/* [R590 同步上游 v0.3.28] 清单正文/链接抽成共用 PluginMetadata */}
+          <PluginMetadata plugin={plugin} />
           <div className="mt-2">
             <CapabilityChips
               caps={matrixCaps.filter(c => declared.has(c.id))}
