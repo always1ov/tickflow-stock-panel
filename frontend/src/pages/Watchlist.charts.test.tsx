@@ -156,8 +156,7 @@ it('keeps one stock across sorting, refreshes and group cards when an older back
   }))
   await settle()
   expect(host.querySelectorAll('tbody tr')).toHaveLength(2)
-  // [R598] fork 按 R508 只保留表格视图（禁卡片视图），上游这条用例的卡片分支不适用；
-  // 去重诉求改在表格上验证：同一标的多条后端重复只渲染一行。
-  expect(host.querySelector('button[aria-label="分组卡片视图"]')).toBeNull()
+  // [R603] 自选页按上游恢复(分组卡片 / 卡片视图都回来了); 去重诉求仍在表格上验证:
+  // 同一标的多条后端重复只渲染一行。
   expect([...host.querySelectorAll('tbody tr')].filter(el => el.textContent?.includes(target))).toHaveLength(1)
 })
