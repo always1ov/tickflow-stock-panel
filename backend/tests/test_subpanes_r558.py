@@ -29,9 +29,3 @@ def test_R559_字画在图顶图底两条字道里_不压线不互叠():
     assert "paneReadouts={[[], trendReadouts, quantReadouts]}" in code_of("components/stock-analysis/AnalysisKChart.tsx"), \
         "字没走副图读数列"
     assert "subH + TREND_LANES_EXTRA" in code_of("lib/levelsChartLayout.ts"), "字道占了地方, 副图没跟着加高"
-
-
-def test_R558_庄现画法没动():
-    # 狗头的位置只看「哪一天」、贴副图底边 —— 冻结(R485), 这次只动了副图纵轴
-    z = code_of("lib/zhuangXianSeries.ts")
-    assert "y + height - DOGE_SIZE - BOTTOM_GAP" in z

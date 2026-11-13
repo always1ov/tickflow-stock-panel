@@ -33,7 +33,7 @@ export const GAP_MAIN_SUB = 14      // 主图 ↔ 副图(两边纵轴刻度不�
 export const SUB_HEADER = 18
 /**
  * [R559] 趋势量化比量化MACD 高这么多: 它的八种字挪进了图顶 / 图底两条字道(`trendQuantSeries.ts`
- * 的 `laneLayout`), 字道连同狗头占掉约 90px, 不加高的话中间的图就被挤扁了。
+ * 的 `laneLayout`), 两条字道占掉约 90px, 不加高的话中间的图就被挤扁了。
  */
 export const TREND_LANES_EXTRA = 50
 export const GAP_SUB_SLIDER = 26    // 副图 ↔ 缩放条: 日期刻度在这一段里
@@ -51,8 +51,8 @@ export const LEGACY_NON_MAIN = 156
  * R418 的 90~130 高(图标不再深插进柱子), 又始终比主图矮一大截。
  */
 export function subPaneHeight(mainH: number): number {
-  // [R558] 40% / 130~200 → 48% / 160~220。两张副图里有字、有图标、有狗头, 146px(个股预览)
-  // 装不下: 字互相叠、狗头贴着底边压在线上。仍比主图矮一大截(R422「副图调得太高了」那条线)。
+  // [R558] 40% / 130~200 → 48% / 160~220。两张副图里有字、有图标, 146px(个股预览)
+  // 装不下: 字互相叠。仍比主图矮一大截(R422「副图调得太高了」那条线)。
   return Math.round(Math.min(220, Math.max(160, mainH * 0.48)))
 }
 

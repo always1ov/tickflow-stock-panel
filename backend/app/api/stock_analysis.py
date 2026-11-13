@@ -612,7 +612,7 @@ def trend_quant(
     """[R486] 用户的「趋势量化」副图 —— 通达信公式逐行复刻, 放在量化MACD 上方。
 
     与量化MACD 同一个取数方式(带盘中实时那一根), 但**独立计算**
-    (`indicators/trend_quant.py`, 不 import 量化MACD / 庄现)。只出位置与标记,
+    (`indicators/trend_quant.py`, 不 import 量化MACD)。只出位置与标记,
     不进把握分、不推送、不碰六态。
     """
     if not symbol:
@@ -622,7 +622,7 @@ def trend_quant(
     from app.market_time import cn_today
 
     empty = {"symbol": symbol, "dates": [], "wave": [], "wave_prev": [], "avg": [],
-             "stick_up": [], "xichou": [], "xichou_bar": [], "zhuang": [],
+             "stick_up": [], "xichou": [], "xichou_bar": [],
              "marks": {k: [] for k in ("jidi", "sheng", "ding", "xia", "jiancang",
                                        "tao", "jiandi", "juedi")}}
     from app.services import ohlcv_history
@@ -653,11 +653,6 @@ def trend_quant(
     if not rows:
         return empty
     res = tq.compute(col("open"), col("high"), col("low"), col("close"), col("volume"))
-    # [R485 → R488] 庄现狗头: 原来借量化MACD 的接口与副图, 用户:「把狗头剥离量化macd,
-    # 放到趋势量化里面去」。仍是独立冻结的模块单独算, **不经过 tq** —— 趋势量化以后怎么调,
-    # 庄现都不跟着变。高 / 低缺失的那一根按无效处理(不出信号)。
-    from app.indicators import zhuang_xian as zx
-    zhuang = zx.compute(col("high"), col("low"), col("close"))
 
     def tail(xs: list) -> list:
         return [round(x, 6) if finite(x) else None for x in xs[-bars:]]
@@ -672,8 +667,6 @@ def trend_quant(
         "wave": tail(res.wave), "wave_prev": tail(wave_prev), "avg": tail(res.avg),
         "stick_up": tail(res.stick_up),
         "xichou": tail(res.xichou), "xichou_bar": flags(res.xichou_bar),
-        # 出庄现的那一根为 1, 其余 null
-        "zhuang": flags(zhuang),
         "marks": {k: flags(getattr(res, k)) for k in ("jidi", "sheng", "ding", "xia",
                                                       "jiancang", "tao", "jiandi", "juedi")},
     }

@@ -27,8 +27,6 @@ interface Props {
   volumeLabels?: AnnotationData['labels']
   paneTitles?: string[]
   paneReadouts?: AnnotationData['readouts'][]
-  /** 序列标记: key = 序列 id(副图标记用, 狗头等) */
-  seriesMarkers?: Record<string, SeriesMarker<Time>[]>
   linkedPrice?: number | null
   onHover?: (time: string | null) => void
   /** 十字线价格与像素比例(仅主价格 pane)，供价位命中判断使用 */
@@ -57,7 +55,6 @@ export function FinancialPlot(props: Props) {
   const propsRef = useRef(props); propsRef.current = props
   const scopeRef = useRef<string | null>(null)
   const markerRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null)
-  const paneMarkerRef = useRef(new Map<string, { api: ISeriesApi<SeriesType>; plugin: ISeriesMarkersPluginApi<Time> }>())
   const annotationRef = useRef(new ChartAnnotations())
   const attachedMain = useRef<ISeriesApi<SeriesType> | null>(null)
   const leftAnnotation = useRef(new ChartAnnotations())
@@ -205,8 +202,6 @@ export function FinancialPlot(props: Props) {
     const view = reset || props.intraday ? null : chart.timeScale().getVisibleLogicalRange()
     if (reset || paneChanged) {
       markerRef.current?.detach(); markerRef.current = null
-      for (const item of paneMarkerRef.current.values()) item.plugin.detach()
-      paneMarkerRef.current.clear()
       for (const { api } of [...seriesRef.current.values()].reverse()) chart.removeSeries(api)
       seriesRef.current.clear()
       paneAnnotations.current.clear()
@@ -314,21 +309,7 @@ export function FinancialPlot(props: Props) {
     paneAnnotations.current.forEach((item, pane) => item.annotation.update({ dates: [],
       labels: item.volume ? props.volumeLabels : undefined, title: props.paneTitles?.[pane], readouts: props.paneReadouts?.[pane], textColor: ct.text }))
     markerRef.current?.setMarkers(markersForView(props.markers, compactRef.current))
-    // 副图标记(狗头等): 挂在指定序列上
-    if (props.seriesMarkers) {
-      for (const [seriesId, markers] of Object.entries(props.seriesMarkers)) {
-        const api = seriesRef.current.get(seriesId)?.api
-        if (!api) continue
-        const current = paneMarkerRef.current.get(seriesId)
-        if (!current || current.api !== api) {
-          current?.plugin.detach()
-          paneMarkerRef.current.set(seriesId, { api, plugin: createSeriesMarkers(api, markersForView(markers, compactRef.current)) })
-        } else {
-          current.plugin.setMarkers(markersForView(markers, compactRef.current))
-        }
-      }
-    }
-  }, [props.annotations, props.markers, props.seriesMarkers, props.volumeLabels, props.paneTitles, props.paneReadouts, props.linkedPrice, props.series, props.pricePrecision, ct])
+  }, [props.annotations, props.markers, props.volumeLabels, props.paneTitles, props.paneReadouts, props.linkedPrice, props.series, props.pricePrecision, ct])
 
   return <div ref={host} role="group" aria-label={props.intraday ? '分时价格与成交量图' : '日 K 与技术指标图'} data-chart-engine="lightweight" className="w-full min-w-0" style={{ height: props.height }} />
 }

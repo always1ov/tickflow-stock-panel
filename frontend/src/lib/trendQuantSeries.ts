@@ -28,12 +28,6 @@ export interface TrendQuantData {
   xichou: (number | null)[]
   xichou_bar: (number | null)[]
   marks: Record<TrendMarkKey, (number | null)[]>
-  /**
-   * [R488] 庄现: 出现的那一根为 1, 其余 null。**另一个冻结的独立指标**(后端
-   * `indicators/zhuang_xian.py`), 只是借这张副图显示狗头 —— 画法在 `lib/zhuangXianSeries.ts`,
-   * 这个文件不画它。可选: 旧缓存里没有。
-   */
-  zhuang?: (number | null)[]
 }
 
 export type TrendMarkKey = 'jidi' | 'sheng' | 'ding' | 'xia' | 'jiancang' | 'tao' | 'jiandi' | 'juedi'
@@ -170,13 +164,13 @@ const NONE = '-'
  * 见底 / 绝底 / 极底), 每个字**水平对准它那一天**; 字道各两行, 画的时候按真实像素宽度排, 挤不下
  * 才换到第二行。出不出字、在哪一天, 一概不变; 变的只是竖直位置。
  *
- * 狗头贴副图底边画(庄现冻结, 不动它), 底下的字道在狗头上面。
+ * 字道贴着副图底边画。
  */
 const LANE_FONT = 11
 const LANE_ROW_H = 14
 const LANE_ROWS = 2
 const LANE_TOP_PAD = 3
-const LANE_BOTTOM_PAD = 22          // 给狗头(18px + 2px 底隙)留的
+const LANE_BOTTOM_PAD = 22          // 字道与副图底边之间的留白
 const LANE_HALO = { stroke: '#000000', lineWidth: 3 }
 
 /** 两条字道一共占掉的高度(px) —— 副图因此加高这么多, 图本身不被挤小 */

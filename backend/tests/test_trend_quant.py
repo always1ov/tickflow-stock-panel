@@ -2,7 +2,7 @@
 
 用户: 「在量化macd上方加个副图, 先还原做出来再说, 名称就叫趋势量化」。
 
-做法与量化MACD、庄现相同: 另用 pandas 的常规翻译把原文写一遍(不看被测模块),
+做法与量化MACD 相同: 另用 pandas 的常规翻译把原文写一遍(不看被测模块),
 过了预热期两者必须逐根一致 —— 两种独立写法对上, 才算复刻对了。
 """
 from __future__ import annotations
@@ -167,7 +167,7 @@ def test_R486_不引用别的指标模块():
     mods = {a.name for n in ast.walk(tree) if isinstance(n, ast.Import) for a in n.names}
     mods |= {f"{n.module}.{a.name}" for n in ast.walk(tree)
              if isinstance(n, ast.ImportFrom) for a in n.names}
-    assert not any(x in m for m in mods for x in ("quant_macd", "zhuang_xian")), sorted(mods)
+    assert not any(x in m for m in mods for x in ("quant_macd",)), sorted(mods)
 
 
 def test_R486_缺值不抛异常():

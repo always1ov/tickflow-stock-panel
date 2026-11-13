@@ -8,7 +8,6 @@ import {
 } from '@/lib/theme'
 import { alignQuantMacd, QUANT_MACD_HELP, QUANT_MACD_LEGEND } from '@/lib/quantMacdSeries'
 import { alignTrendQuant, TREND_QUANT_HELP, TREND_QUANT_LEGEND, type TrendQuantData } from '@/lib/trendQuantSeries'
-import { zhuangXianIndexes } from '@/lib/zhuangXianSeries'
 import type { Fib2Grain, Fib2Overlay, KlineRow, LevelSeries, QuantMacdResult } from '@/lib/api'
 import type { PlotData, PlotSeries } from '@/lib/lightweight-model'
 import { fib2Status } from '@/lib/fib2Status'
@@ -37,7 +36,7 @@ import {
  *
  * 与旧 ECharts 版的差异(均为渲染能力取舍):
  *   - 量化MACD 的金叉 / 死叉箭头图标省略(lightweight 无对应图元);
- *   - 趋势量化的「升 / 顶 / 下」等文字标记、狗头图标省略(副图没有 custom 系列),
+ *   - 趋势量化的「升 / 顶 / 下」等文字标记省略(副图没有 custom 系列),
  *     竖直 / 水平位置改由阅读图例与线本身判断;
  *   - 趋势量化的红绿短柱、吸筹白柱用 Histogram 近似(以东财口径从 0 起画,
  *     原图是从昨值画到今值)。
@@ -353,17 +352,6 @@ export function AnalysisKChart({
     }
   }, [model, future, activeTypes, fib2, fib2Zone, LC.fib2, ct.text, theme])
 
-  // [R488] 狗头(庄现)只画在趋势量化的主线上, 不跨到量化MACD。
-  const chartDates = useMemo(() => (future ? [...model.dates, ...future.labels] : model.dates), [model.dates, future])
-  const zhuanMarkers = useMemo(() => zhuangXianIndexes(chartDates, trendQuant).map(index => ({
-    time: chartDates[index],
-    position: 'belowBar' as const,
-    shape: 'circle' as const,
-    text: '庄',
-    color: TREND_QUANT_COLORS.avg,
-    size: 1,
-  })), [chartDates, trendQuant])
-
   const scope = `${symbol ?? ''}:${model.rows[0]?.date ?? ''}:${model.rows.length}:${visibleBars}:${future?.dates.length ?? 0}`
 
   // 切股 / 区间变化后清掉上一份数据的悬浮高亮
@@ -529,7 +517,6 @@ export function AnalysisKChart({
         annotations={annotations}
         paneTitles={['', trendTitle, quantTitle]}
         paneReadouts={[[], trendReadouts, quantReadouts]}
-        seriesMarkers={zhuanMarkers.length ? { 'tq:wave': zhuanMarkers } : undefined}
         onSelect={date => onDateClick?.(date)}
         onCrosshairMove={point => {
           if (!point) { setHoveredKey(null); return }
