@@ -45,7 +45,7 @@ def test_legitimate_strategy_code_still_passes():
 ])
 def test_aliasing_a_forbidden_builtin_is_rejected(payload):
     """危险内建连「被取到」都不允许, 不只是「被调用」。"""
-    with pytest.raises(ValueError, match="禁止引用内建"):
+    with pytest.raises(ValueError, match="禁止引用"):
         G._validate_safety(payload)
 
 
@@ -55,16 +55,20 @@ def test_aliasing_a_forbidden_builtin_is_rejected(payload):
     "from app.backtest.matrix import json\n",
     "from app.backtest.matrix import hashlib, uuid\n",
     "from app.strategy.market_data import threading\n",
-    "from app.indicators.keltner import time\n",
+    "from app.indicators.keltner import math\n",
 ])
 def test_reexported_modules_cannot_be_pulled_through_an_allowlisted_module(payload):
-    """白名单模块不许当作它本要排除的模块的再导出口。"""
-    with pytest.raises(ValueError, match="本身是模块"):
+    """白名单模块不许当作它本要排除的模块的再导出口。
+
+    v0.3.8: 上游合入 GH #475 收紧后文案改为「禁止导入 …」; keltner 已不再 import time,
+    改用它实际再导出的 math 验证同一语义。
+    """
+    with pytest.raises(ValueError, match="禁止导入"):
         G._validate_safety(payload)
 
 
 def test_star_import_is_rejected_with_its_own_reason():
-    with pytest.raises(ValueError, match="星号导入"):
+    with pytest.raises(ValueError, match="通配导入"):
         G._validate_safety("from polars import *\n")
 
 

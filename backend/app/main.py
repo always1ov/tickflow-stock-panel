@@ -56,6 +56,7 @@ from app.api import (
 )
 from app.api import auth as auth_api
 from app.api import settings as settings_api
+from app.api import upgrade_guard as upgrade_guard_api
 from app.api.routes import router as core_router
 from app.config import settings
 from app.enriched_generation import EnrichedGenerationUnavailableError
@@ -386,6 +387,16 @@ def _init_strategy_engine(app: FastAPI, store: DataStore, repo: KlineRepository)
 
     screener_svc = ScreenerService(repo=repo)
     etf_screener_svc = ScreenerService(repo=repo, asset_type="etf")
+    # 去内置化补全(仅升级用户): 原内置策略按 ID 补回 custom (一次性,
+    # 已自行迁移的不覆盖; 新装无旧版使用痕迹, 跳过保持策略库为空)。
+    # 必须在 StrategyEngine 创建前完成, 否则首载拿不到刚补回的文件。
+    _seeded_strategies = 0
+    try:
+        from app.strategy.strategy_seeds import seed_missing_builtins
+
+        _seeded_strategies = seed_missing_builtins(store.data_dir)
+    except Exception as e:  # noqa: BLE001
+        logger.warning("strategy seeding failed (ignored): %s", e)
     strategy_engine = StrategyEngine(
         strategy_dirs=_strategy_search_dirs(store),
         override_loader=lambda sid: strategy_config.load_override(store.data_dir, sid),
@@ -401,6 +412,9 @@ def _init_strategy_engine(app: FastAPI, store: DataStore, repo: KlineRepository)
         if _seeded_signals:
             legacy_migration["seeded_signals"] = _seeded_signals
             logger.info("legacy migrate: seeded %d default signals", _seeded_signals)
+        if _seeded_strategies:
+            legacy_migration["seeded_strategies"] = _seeded_strategies
+            logger.info("legacy migrate: seeded %d builtin strategies", _seeded_strategies)
         archived = archive_unloadable_strategies(strategy_engine.load_errors())
         if archived:
             strategy_engine.reload()
@@ -620,6 +634,13 @@ async def _application_lifespan(app: FastAPI):
     # ── 阶段 4:独立后台服务(互不依赖,可任意顺序)────────────────
     # 这些服务只依赖 store / repo / capset,彼此之间没有先后关系;
     # 单独调换其中任意两行的顺序都不会改变行为。
+    # 二次开发升级保护: 后台常备备份用户修改的程序文件 (无清单时自动停用)
+    from app.services.upgrade_guard import UpgradeGuard
+
+    upgrade_guard = UpgradeGuard(store.data_dir)
+    app.state.upgrade_guard = upgrade_guard
+    upgrade_guard.start_background_scan()
+
     _init_quote_service(app, repo)
     depth_service = _init_depth_service(app, repo)
     _start_scheduler(app, repo, capset)
@@ -810,6 +831,7 @@ def _register_routers(app: FastAPI) -> None:
     app.include_router(stock_analysis.router)
     app.include_router(market_recap.router)
     app.include_router(settings_api.router)
+    app.include_router(upgrade_guard_api.router)  # [v0.3.8 同步上游] 二次开发升级保护
     app.include_router(strategy.router)
     app.include_router(signals.router)
     app.include_router(monitor_rules.router)

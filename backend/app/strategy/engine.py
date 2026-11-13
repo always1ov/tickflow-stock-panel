@@ -400,18 +400,15 @@ class StrategyEngine:
                         "types",
                         "typing",
                     }),
-                    extra_allowed_calls=frozenset({"vars"}),
                 )
         except ValueError:
             raise
-        except Exception:  # noqa: BLE001
-            # 文件读不到/语法错等: 不阻断, 让下方 exec_module 抛原样错误。
-            # [安全审查 run-1] 但**不能静默**: 这一句的下一步就是 exec_module,
-            # 所以「复校验没跑成」和「复校验通过了」在日志里必须能分开看。
-            logger.warning(
-                "strategy pre-exec re-validation could not run for %s; "
-                "proceeding to import (see traceback)", path, exc_info=True,
-            )
+        except SyntaxError as e:
+            raise ValueError(f"策略语法错误: 第 {e.lineno} 行, {e.msg}") from e
+        except (OSError, UnicodeDecodeError) as e:
+            # fail-closed: 文件读不到/读不懂时不得放行到 exec_module,
+            # 否则异常输入即可让校验静默跳过 (GH #475 同类逃逸)。
+            raise ValueError(f"策略安全校验失败: {e}") from e
 
         spec = importlib.util.spec_from_file_location(path.stem, path)
         if spec is None or spec.loader is None:

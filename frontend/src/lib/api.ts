@@ -2128,6 +2128,16 @@ export function paramOptionValue(o: StrategyParamOption): string | number {
 /** 取选项的显示文案 (渲染为 <option> 子节点, 必须是字符串以免 React 直接渲染对象报错)。 */
 export function paramOptionLabel(o: StrategyParamOption): string {
   return o != null && typeof o === 'object' ? o.label : String(o)
+
+}
+
+/** 参数级联显隐条件 (UI 元数据, 后端原样透传)。三种形态可递归组合:
+ *  { param, in } — values[param] ∈ in;  { all: [...] } — 全部成立;  { any: [...] } — 任一成立 */
+export interface ParamVisibleIf {
+  param?: string
+  in?: (string | number | boolean)[]
+  all?: ParamVisibleIf[]
+  any?: ParamVisibleIf[]
 }
 
 export interface StrategyParamDef {
@@ -2140,6 +2150,12 @@ export interface StrategyParamDef {
   step?: number
   // 兼容两种形态: string[] 或 [{label, value}]（后者是 AI 策略生成器的约定格式）
   options?: StrategyParamOption[]
+  /** UI 元数据: 分组节标题 (相同组名的相邻参数归并) */
+  group?: string
+  /** UI 元数据: 级联显隐 — 条件成立时显示 (见 ParamVisibleIf) */
+  visible_if?: ParamVisibleIf
+  /** UI 元数据: select 各选项被选中时批量应用的参数值 (如标的池预设 → 开关+默认值) */
+  option_applies?: Record<string, Record<string, string | number | boolean>>
 }
 
 export interface CompositeChildInfo {
@@ -3799,7 +3815,7 @@ export interface SectorRotationUniverseItem {
   excluded?: boolean
 }
 
-/** 页面包元数据 — data/ext_pages/{id}/page.json, 后端源 app/services/ext_pages.py */
+/** 页面插件元数据 — data/ext_pages/{id}/page.json, 后端源 app/services/ext_pages.py */
 export interface RuntimePagePack {
   id: string
   enabled: boolean
@@ -3809,6 +3825,42 @@ export interface RuntimePagePack {
   sha256: string
   uploaded_at: number
   error: string
+}
+
+// ===== 升级保护 (二次开发) =====
+/** 报告文件分类: restorable=新版没动可恢复 / conflict=双方都改需手工合并 /
+ *  match=内容已一致 / added_lost=用户新建文件新版没有 */
+export type UpgradeGuardCategory = 'restorable' | 'conflict' | 'match' | 'added_lost'
+
+export interface UpgradeGuardReportFile {
+  relpath: string
+  category: UpgradeGuardCategory
+  current_exists: boolean
+}
+
+export interface UpgradeGuardReport {
+  id: string
+  from_version: string
+  to_version: string
+  created_at: string
+  counts: Record<UpgradeGuardCategory, number>
+  files: UpgradeGuardReportFile[]
+  dir: string
+}
+
+export interface UpgradeGuardStatus {
+  enabled: boolean
+  reason?: string
+  scanning?: boolean
+  program_root?: string
+  manifest_version?: string | null
+  current_version?: string
+  last_scan?: string
+  modified?: string[]
+  added?: string[]
+  backup_dir?: string
+  reports_dir?: string
+  pending_report?: UpgradeGuardReport | null
 }
 
 // ===== API surface =====
@@ -3891,6 +3943,15 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(ai),
     }),
+
+  upgradeGuardStatus: () => request<UpgradeGuardStatus>('/api/upgrade-guard/status'),
+  upgradeGuardScan: () => request<UpgradeGuardStatus>('/api/upgrade-guard/scan', { method: 'POST' }),
+  upgradeGuardRestore: (reportId: string, relpath: string) =>
+    request<{ ok: boolean; restored: string }>('/api/upgrade-guard/restore', {
+      method: 'POST',
+      body: JSON.stringify({ report_id: reportId, relpath }),
+    }),
+  upgradeGuardDismiss: () => request<{ ok: boolean }>('/api/upgrade-guard/dismiss-report', { method: 'POST' }),
 
   /** 赞助商(RunningHub)模型列表(后端代理, 规避其网关按 Origin 过滤) */
   sponsorModels: () =>
@@ -4585,7 +4646,7 @@ export const api = {
     const data = await request<{
       strategies: StrategyDetail[]
       load_errors?: StrategyLoadError[]
-      legacy_migration?: { seeded_signals?: number; archived_files?: string[] }
+      legacy_migration?: { seeded_signals?: number; seeded_strategies?: number; archived_files?: string[] }
     }>(
       `/api/strategies?${assetType ? `asset_type=${assetType}&` : ''}${timeframe !== 'all' ? `timeframe=${timeframe}` : ''}`,
     )
@@ -5087,7 +5148,7 @@ export const api = {
   analysisMenus: () =>
     request<{ items: AnalysisMenu[] }>('/api/analysis-menus'),
 
-  // ===== 页面包 (运行时扩展页面, 见 docs/page-sdk.md) =====
+  // ===== 页面插件 (运行时扩展页面, 见 docs/page-sdk.md) =====
   extPagesList: () =>
     request<RuntimePagePack[]>('/api/ext-pages'),
 

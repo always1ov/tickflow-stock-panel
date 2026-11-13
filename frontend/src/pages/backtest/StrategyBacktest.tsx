@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef, type ReactNode } from 'react'
+import { useState, useMemo, useEffect, useRef, useCallback, memo, type ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Play, FlaskConical, Clock, Loader2, Square, Search, Plus, X, SlidersHorizontal, BarChart3, Gauge, Zap, ListPlus, HelpCircle, ChevronRight, AlertTriangle, Layers, BookmarkPlus, Download, Filter, Star, TrendingUp, CalendarRange } from 'lucide-react'
@@ -16,6 +16,7 @@ import {
   REGIME_STATE_COLORS,
 } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
+import { groupParams, visibleParams } from '@/lib/strategyParams'
 import { storage } from '@/lib/storage'
 import { fmtPct, fmtPrice, priceColorClass } from '@/lib/format'
 import { boardTag } from '@/lib/board'
@@ -721,10 +722,13 @@ function ConfigSection({ title, hint, actions, children }: { title: string; hint
 }
 
 
-function StrategyParamInput({ param, value, onChange }: {
+// memo: 单参数修改只重渲本行 (父组件需传稳定回调, 否则 memo 失效)
+const StrategyParamInput = memo(function StrategyParamInput({ param, value, onChange, onApplyValues }: {
   param: StrategyParamDef
   value: any
-  onChange: (value: any) => void
+  onChange: (pid: string, value: any) => void
+  /** select 带 option_applies 时, 选中某选项需批量应用一组参数值 (如标的池预设) */
+  onApplyValues?: (values: Record<string, any>) => void
 }) {
   if (param.type === 'bool') {
     const checked = value === true || value === 'true' || value === 'True' || value === true
@@ -733,7 +737,7 @@ function StrategyParamInput({ param, value, onChange }: {
         <span className="mb-1 block text-xs text-secondary">{param.label}</span>
         <button
           type="button"
-          onClick={() => onChange(!checked)}
+          onClick={() => onChange(param.id, !checked)}
           className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 cursor-pointer ${
             checked ? 'bg-accent' : 'bg-elevated'
           }`}
@@ -750,18 +754,38 @@ function StrategyParamInput({ param, value, onChange }: {
     return (
       <label className="block">
         <span className="mb-1 block text-xs text-secondary">{param.label}</span>
-        <select value={value ?? param.default} onChange={e => onChange(e.target.value)} className={INPUT_CLS}>
-          {/* [R174] 这两页已整体还原成作者那份, 只有这一行没能原样保留 ——
-              而且它不是 fork 功能, 是被数据形状逼出来的: 你的内置策略
-              (strategy/builtin/keltner_reversion.py 等)给的 options 是
-              {value,label} 对象而不是字符串, 按作者原样直接渲染会出
-              [object Object]。那个文件是只读红线, 所以这里用 api.ts 的
-              两个取值助手兜一下。 */}
+        <select
+          value={value ?? param.default}
+          onChange={e => {
+            const v = e.target.value
+            const applies = param.option_applies?.[v]
+            if (applies && onApplyValues) {
+              onApplyValues({ [param.id]: v, ...applies })
+              // 预设会覆盖其他参数的当前值, 显式提示避免静默改动
+              toast(`已应用预设「${v}」，覆盖 ${Object.keys(applies).length} 个参数`, 'success')
+            } else onChange(param.id, v)
+          }}
+          className={INPUT_CLS}
+        >
+          {/* [R174] fork 的 options 可能是 {value,label} 对象 (AI/自定义策略), 统一走取值助手, 避免 [object Object] */}
           {(param.options ?? []).map(opt => {
             const v = paramOptionValue(opt)
             return <option key={String(v)} value={v}>{paramOptionLabel(opt)}</option>
           })}
         </select>
+      </label>
+    )
+  }
+  if (param.type === 'string') {
+    return (
+      <label className="block">
+        <span className="mb-1 block text-xs text-secondary">{param.label}</span>
+        <input
+          type="text"
+          value={value ?? param.default ?? ''}
+          onChange={e => onChange(param.id, e.target.value)}
+          className={INPUT_CLS}
+        />
       </label>
     )
   }
@@ -773,12 +797,12 @@ function StrategyParamInput({ param, value, onChange }: {
         min={param.min}
         max={param.max}
         step={param.step ?? (param.type === 'int' ? 1 : 0.01)}
-        onChange={n => onChange(n == null ? '' : (param.type === 'int' ? Math.round(n) : n))}
+        onChange={n => onChange(param.id, n == null ? '' : (param.type === 'int' ? Math.round(n) : n))}
         className={INPUT_CLS}
       />
     </label>
   )
-}
+})
 
 function StockPoolPicker({ value, onChange, assetType = 'stock' }: { value: string; onChange: (value: string) => void; assetType?: 'stock' | 'etf' }) {
   const symbols = useMemo(() => value.split(',').map(s => s.trim()).filter(Boolean), [value])
@@ -998,6 +1022,8 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
   const [quickRanges, setQuickRanges] = useState(loadQuickRanges)
   const [settingsTab, setSettingsTab] = useState<AdvancedSettingsTab>('conditions')
   const [strategyParams, setStrategyParams] = useState<Record<string, any>>(saved?.params ?? {})
+  // 稳定回调: 配合 memo(StrategyParamInput), 单参数修改只重渲对应行
+  const handleStrategyParamChange = useCallback((pid: string, v: any) => setStrategyParams(prev => ({ ...prev, [pid]: v })), [])
   const [overrides, setOverrides] = useState<Record<string, any>>(saved?.overrides ?? {})
   // result 不从 localStorage 恢复:它是运行产物(净值/交易),大且易过时,
   // 跨会话/拉新代码后自动渲染一个可能对应已失效策略的旧结果会造成困惑
@@ -2766,7 +2792,7 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             onClick={() => setSettingsOpen(false)}
-            className="fixed inset-0 z-50 bg-black/45 backdrop-blur-[1px]"
+            className="fixed inset-0 z-50 bg-black/45"
           />
           <motion.aside
             initial={{ x: 32, opacity: 0 }}
@@ -2898,14 +2924,25 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
                   actions={detail.params.length > 0 ? <span className="text-[10px] text-muted">{detail.params.length} 项</span> : undefined}
                 >
                   {detail.params.length > 0 ? (
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      {detail.params.map(param => (
-                        <StrategyParamInput
-                          key={param.id}
-                          param={param}
-                          value={strategyParams[param.id]}
-                          onChange={value => setStrategyParams(prev => ({ ...prev, [param.id]: value }))}
-                        />
+                    <div className="space-y-4">
+                      {groupParams(visibleParams(detail.params, strategyParams)).map((g, gi) => (
+                        <div key={g.name ?? `ug${gi}`}>
+                          {g.name && (
+                            <div className="mb-2 border-b border-border/40 pb-1 text-[11px] font-medium text-muted">{g.name}</div>
+                          )}
+                          {/* 命名组横排（如「入池开关 + 止盈 + 锁定」同组一行）；无名组回退网格 */}
+                          <div className={g.name ? 'flex flex-wrap items-end gap-x-4 gap-y-3' : 'grid grid-cols-1 gap-3 sm:grid-cols-2'}>
+                            {g.items.map(param => (
+                              <StrategyParamInput
+                                key={param.id}
+                                param={param}
+                                value={strategyParams[param.id]}
+                                onChange={handleStrategyParamChange}
+                                onApplyValues={values => setStrategyParams(prev => ({ ...prev, ...values }))}
+                              />
+                            ))}
+                          </div>
+                        </div>
                       ))}
                     </div>
                   ) : (

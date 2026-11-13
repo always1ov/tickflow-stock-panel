@@ -41,6 +41,7 @@ from pathlib import Path
 import polars as pl
 
 from app.market_time import CN_TZ, cn_now, cn_today
+from app.parquet import scan_daily_parquet
 from app.services.fs_utils import atomic_write_text
 
 logger = logging.getLogger(__name__)
@@ -423,23 +424,18 @@ def create_order(
             if est_price > 0 and qty * est_price * (1 + acc["slippage_bps"] / 10000) + buy_fee(qty, est_price, acc["commission_pct"]) > acc_cash:
                 return None, f"可用资金不足 (需约 {qty * est_price:.0f}, 可用 {acc_cash:.0f})"
         else:
-            pos = load_positions(data_dir, account_id).get(symbol)
-            if pos is None or pos["qty"] <= 0:
+            held = sell_capacity(data_dir, symbol, account_id)
+            if held is None:
                 return None, f"无 {symbol} 持仓, 不能卖出"
-            # 可卖数量按当前交易日现算 (与 _fill_order / overview 同口径): 物化文件里的
-            # available_qty 是上次重建时的 T+1 口径, 跨日后不会更新, 次日仍会是 0
+            available, pending_sell = held
             # [fork R562] 次日开盘单在下一交易日才成交: 今天买进的那批到时已可卖。按今天算
             # 会把「今天开盘买、今晚挂明早卖」误拒 (撮合时 _fill_order 仍按成交日再校验)。
-            as_of = cn_today() + timedelta(days=1) if order_type == "next_open" else cn_today()
-            available = _available_of(pos, as_of.isoformat())
+            if order_type == "next_open":
+                _pos = load_positions(data_dir, account_id).get(symbol)
+                if _pos is not None:
+                    available = _available_of(_pos, (cn_today() + timedelta(days=1)).isoformat())
             if qty > available:
                 return None, f"可卖数量不足 (T+1): 可卖 {available}, 请求数量 {qty}"
-            # 超卖防护: pending 卖出单占用可卖额度 — 同 symbol 的 pending 卖出合计
-            # 不得超过可卖数量, 否则多张单各自通过校验、成交时逐张扣减会超额
-            pending_sell = sum(
-                int(o["qty"]) for o in load_orders(data_dir, account_id)
-                if o["status"] == "pending" and o["side"] == "sell" and o["symbol"] == symbol
-            )
             if pending_sell + qty > available:
                 return None, (
                     f"可卖数量不足 (T+1): 可卖 {available}, "
@@ -585,6 +581,26 @@ def replay_positions(
                 pos["avg_cost"] = 0.0
         pos["available_qty"] = _available_of(pos)
     return positions, round(cash, 2)
+
+
+def sell_capacity(
+    data_dir: Path, symbol: str, account_id: str = DEFAULT_ACCOUNT_ID,
+) -> tuple[int, int] | None:
+    """(T+1 可卖数量, 同 symbol 已挂 pending 卖出合计); 无持仓返回 None。
+
+    可卖数量按当前交易日现算 (与 _fill_order / overview 同口径): 物化文件里的
+    available_qty 是上次重建时的 T+1 口径, 跨日后不会更新, 次日仍会是 0。
+    pending 卖出单占用可卖额度, 否则多张单各自通过校验、成交时逐张扣减会超额。
+    """
+    pos = load_positions(data_dir, account_id).get(symbol)
+    if pos is None or pos["qty"] <= 0:
+        return None
+    available = _available_of(pos, cn_today().isoformat())
+    pending_sell = sum(
+        int(o["qty"]) for o in load_orders(data_dir, account_id)
+        if o["status"] == "pending" and o["side"] == "sell" and o["symbol"] == symbol
+    )
+    return available, pending_sell
 
 
 def _available_of(pos: dict, today: str | None = None) -> int:
@@ -840,7 +856,7 @@ def read_daily_bar(data_dir: Path, symbol: str, asset_type: str, day: str) -> di
         return None
     try:
         df = (
-            pl.scan_parquet((base / "**" / "*.parquet").as_posix())
+            scan_daily_parquet((base / "**" / "*.parquet").as_posix())
             .filter((pl.col("symbol") == symbol) & (pl.col("date") == _date.fromisoformat(day)))
             .select(["open", "close"])
             .collect()
@@ -860,7 +876,7 @@ def _prev_close(data_dir: Path, symbol: str, asset_type: str, day: str) -> float
         return None
     try:
         df = (
-            pl.scan_parquet((base / "**" / "*.parquet").as_posix())
+            scan_daily_parquet((base / "**" / "*.parquet").as_posix())
             .filter((pl.col("symbol") == symbol) & (pl.col("date") < _date.fromisoformat(day)))
             .sort("date")
             .select(pl.col("close").last())
@@ -881,7 +897,7 @@ def _index_close(data_dir: Path, day: str) -> float | None:
         return None
     try:
         df = (
-            pl.scan_parquet((base / "**" / "*.parquet").as_posix())
+            scan_daily_parquet((base / "**" / "*.parquet").as_posix())
             .filter((pl.col("symbol") == "000300.SH") & (pl.col("date") == _date.fromisoformat(day)))
             .select("close")
             .collect()
