@@ -67,10 +67,9 @@ def test_R535_菜单_内置不逐行印_手机上名字保底():
     code = code_of(S + "MenuSettings.tsx")
     assert "'内置'" not in code, "「内置」又逐行印回来了"
     assert "entry.type !== 'builtin'" in code
-    cols = re.search(r"const GRID_COLS = '([^']+)'", code).group(1)
-    phone = cols.split(" sm:")[0]
-    assert "minmax(0,1fr)" in phone and phone.count("_") == 5, "手机上的列数/名字列不对(应 6 列, 名字列保底)"
-    assert 'className="max-sm:hidden">类型</div>' in code
+    # [R598] 上游把菜单页改成分类管理器，不再有固定列宽的表格；名字列仍要留保底宽度
+    assert "min-w-0 flex-1 basis-28" in code and "truncate" in code, "手机上的名字列没留保底"
+    assert "SettingsCard" in code, "菜单页要跟其余分栏共用卡头"
 
 
 def test_R535_外部网页一张卡_扩展页面一张卡():

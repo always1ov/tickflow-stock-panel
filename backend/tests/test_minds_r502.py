@@ -88,23 +88,26 @@ def _paths(src: str, key: str) -> list[str]:
 
 
 def test_R502_侧栏原位改名():
-    nav = code_of("components/Layout.tsx")
-    i0 = nav.index("const nav = [")
-    nav = nav[i0:nav.index("] as const", i0)]
-    paths = _paths(nav, "to")
-    assert "/usage-notes" not in paths, "侧栏还挂着旧路径"
-    i = paths.index("/minds")
-    assert paths[i - 1] == "/review" and paths[i + 1] == "/indices", "Minds 没在消息面原来的位置"
-    assert "{ to: '/minds', label: 'Minds', icon: Brain }" in nav
+    nav = code_of("lib/navigation.ts")
+    i0 = nav.index("CORE_NAVIGATION")
+    nav = nav[i0:nav.index("].map", i0)]
+    ids = re.findall(r"\{ id: '([^']+)'", nav)
+    assert "/usage-notes" not in ids, "侧栏还挂着旧路径"
+    i = ids.index("/minds")
+    assert ids[i - 1] == "/review" and ids[i + 1] == "/indices", "Minds 没在消息面原来的位置"
+    assert "{ id: '/minds', label: 'Minds', icon: Brain }" in nav
 
 
 def test_R502_菜单设置的默认顺序与侧栏同一处改名():
+    # [R598] 上游 v0.3.36 起设置页不再自带一份默认名单, 与侧栏共用 navigation.ts
     ms = code_of("pages/settings/MenuSettings.tsx")
-    ids = _paths(ms, "id")
+    assert "getNavigationEntries(" in ms, "设置页没走统一菜单来源"
+    nav = code_of("lib/navigation.ts")
+    i0 = nav.index("CORE_NAVIGATION")
+    ids = re.findall(r"\{ id: '([^']+)'", nav[i0:nav.index("].map", i0)])
     assert "/usage-notes" not in ids
     i = ids.index("/minds")
-    assert ids[i + 1] == "/financials", "默认顺序里 Minds 挪了位置"
-    assert "{ id: '/minds', label: 'Minds', type: 'builtin', visible: true }" in ms
+    assert ids[i - 1] == "/review" and ids[i + 1] == "/indices", "默认顺序里 Minds 挪了位置"
 
 
 # ── Minds 页 ──────────────────────────────────────────────────────

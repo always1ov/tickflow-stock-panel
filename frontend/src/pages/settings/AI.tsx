@@ -384,6 +384,11 @@ export function SettingsAIPanel({ highlight }: { highlight?: string } = {}) {
   const connected = profilesManaged ? enabledProfiles.length > 0 : configured
   const saveButtons = (
     <>
+      {/* [R598 同步上游 v0.3.36] 保存位旁边补一个「测试连接」，与卡内「测试」同一个探测逻辑 */}
+      <button onClick={handleTest} disabled={testing} className={buttonClass({ size: 'sm' }, 'gap-1.5')} title="测试当前表单的连接, 不保存配置">
+        {testing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wifi className="h-3.5 w-3.5" />}
+        {testing ? '测试中' : '测试连接'}
+      </button>
       {configured && !profilesManaged && (
         <button onClick={() => setConfirmClear(true)} disabled={clear.isPending} className={buttonClass({ size: 'sm', variant: 'danger' }, 'gap-1.5')} title="Clear AI provider configuration">
           <Trash2 className="h-3.5 w-3.5" />
@@ -449,10 +454,17 @@ export function SettingsAIPanel({ highlight }: { highlight?: string } = {}) {
           )}
         </div>
         {testResult && (
-          <div className={`mb-4 rounded-btn border px-3 py-2 text-xs flex items-center gap-2 ${testResult.ok ? 'border-bear/20 bg-bear/[0.04] text-bear' : 'border-danger/20 bg-danger/[0.04] text-danger'}`}>
-            <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${testResult.ok ? 'bg-bear' : 'bg-danger'}`} />
-            {testResult.msg}
-          </div>
+          // [R598 同步上游 v0.3.36] 失败详情单独用 role=alert，完整多行路由错误不再被截成一行
+          <>
+            <div role="status" title="测试只验证当前表单, 不会保存配置; 通过后请点「保存配置」生效"
+              className={`mb-4 inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-micro ${testResult.ok ? 'border-bear/25 bg-bear/[0.06] text-bear' : 'border-danger/25 bg-danger/[0.06] text-danger'}`}>
+              <span className={`h-1 w-1 shrink-0 rounded-full ${testResult.ok ? 'bg-bear' : 'bg-danger'}`} />
+              {testResult.ok ? testResult.msg : '测试失败'}
+            </div>
+            {!testResult.ok && (
+              <div role="alert" className="mb-4 whitespace-pre-wrap rounded-btn bg-danger/10 px-3 py-2 text-sm leading-6 text-danger [overflow-wrap:anywhere]">{testResult.msg}</div>
+            )}
+          </>
         )}
         <div className="space-y-4">
           {profilesManaged ? (
