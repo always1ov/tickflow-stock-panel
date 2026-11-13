@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { BarChart3, Brain, Globe2, Settings, Tags } from 'lucide-react'
+import { BarChart3, Brain, Globe2, Tags } from 'lucide-react'
 import {
   IconWatchlist, IconStrategy, IconFactors, IconBacktest, IconStockFocus,
   IconLadder, IconConcept, IconIndustry, IconFinancials, IconMonitor,
@@ -45,7 +45,6 @@ export const CORE_NAVIGATION: NavigationEntry[] = [
   { id: '/minds', label: 'Minds', icon: Brain },
   { id: '/indices', label: '指数', icon: IconIndices },
   { id: '/data', label: '数据', icon: IconData },
-  { id: '/settings', label: '设置', icon: Settings },
 ].map(x => ({ ...x, to: x.id, type: 'builtin' as const, visible: true, arch: 'core' as const }))
 
 /** [R117] 外部网页固定契约 —— 启用时作为一个扩展域页面进菜单。 */
