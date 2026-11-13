@@ -15,7 +15,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 
 from app import __version__
 from app.api import (
@@ -73,11 +73,13 @@ from app.extensions.loader import (
     current_extension_context,
     start_backend_extensions,
 )
+from app.frontend_static import FrontendStaticFiles, frontend_file_response
 from app.jobs import daily_pipeline
 from app.services.daily_health import DailyIntegrityError
 from app.services.matrix_prewarm_owner import MatrixCachePrewarmOwner
 from app.services.mining_process_lock import MiningProcessLock, MiningProcessLockError
 from app.services.quote_service import QuoteService
+from app.startup_diagnostics import startup_phase
 from app.tickflow import client as tf_client
 from app.tickflow.capabilities import CapabilityDenied
 from app.tickflow.policy import detect_capabilities
@@ -153,25 +155,26 @@ def _bootstrap_auth() -> None:
     公网部署免 SSH 端口转发; 已设过密码则不覆盖 (改密码走 UI)。
     """
     try:
-        from app.services import auth as auth_service
-
-        auth_service.bootstrap_from_env()
+        # [R591 同步上游 v0.3.29] 启动阶段计时, 慢阶段落到启动诊断日志
+        with startup_phase(logger, "auth bootstrap"):
+            from app.services import auth as auth_service
+            auth_service.bootstrap_from_env()
     except Exception as e:  # noqa: BLE001
         logger.warning("auth bootstrap failed: %s", e)
 
 
 def _load_custom_factors(store: DataStore) -> None:
     """载入自定义/复合因子注册表 (P3); 单个失败只跳过该因子 (fail-隔离)。"""
-    from app.factors.store import load_into_registry
+    with startup_phase(logger, "custom factor module import"):
+        from app.factors.store import load_into_registry
 
     try:
-        loaded_factors = load_into_registry(store.data_dir)
+        with startup_phase(logger, "custom factor registration"):
+            loaded_factors = load_into_registry(store.data_dir)
         if loaded_factors:
             logger.info("custom factors loaded: %s", len(loaded_factors))
     except Exception as exc:  # noqa: BLE001
         logger.warning("custom factors load failed: %s", exc)
-
-
 def _init_mining_manager(app: FastAPI, store: DataStore):
     """恢复被中断的挖掘任务, 并把管理器挂到 app.state。
 
@@ -179,24 +182,28 @@ def _init_mining_manager(app: FastAPI, store: DataStore):
     线程 + spawn 子进程 + 持久 run store, 独立 namespace 存 run 记录; 与挖掘共用
     heavy 槽 (避免双份全市场矩阵)。
     """
-    from app.services.mining_jobs import MiningRunStore
-    from app.services.mining_manager import MiningJobManager
+    with startup_phase(logger, "mining manager initialization"):
+        from app.services.mining_jobs import MiningRunStore
+        from app.services.mining_manager import MiningJobManager
 
-    mining_manager = MiningJobManager(store.data_dir)
+        mining_manager = MiningJobManager(store.data_dir)
     # [R589 同步上游 v0.3.27] A degraded instance must never rewrite another
     # owner's live run manifests.
-    recovered_mining_runs = (
-        mining_manager.recover_interrupted() if app.state.mining_lock_acquired else 0
-    )
+    with startup_phase(logger, "mining run recovery"):
+        recovered_mining_runs = (
+            mining_manager.recover_interrupted() if app.state.mining_lock_acquired else 0
+        )
     app.state.mining_manager = mining_manager
     if recovered_mining_runs:
         logger.warning("recovered %d interrupted mining runs", recovered_mining_runs)
-    guardian_manager = MiningJobManager(
-        store.data_dir,
-        kind="guardian",
-        store=MiningRunStore(store.data_dir, namespace="guardian"),
-    )
-    recovered_guardian_runs = guardian_manager.recover_interrupted()
+    with startup_phase(logger, "guardian manager initialization"):
+        guardian_manager = MiningJobManager(
+            store.data_dir,
+            kind="guardian",
+            store=MiningRunStore(store.data_dir, namespace="guardian"),
+        )
+    with startup_phase(logger, "guardian run recovery"):
+        recovered_guardian_runs = guardian_manager.recover_interrupted()
     app.state.guardian_manager = guardian_manager
     if recovered_guardian_runs:
         logger.warning(
@@ -210,7 +217,8 @@ def _prime_matrix_generation(repo: KlineRepository) -> None:
     if not settings.backtest_matrix_disk_cache_enabled:
         return
     try:
-        repo.get_matrix_data_generation("stock")
+        with startup_phase(logger, "enriched generation initialization"):
+            repo.get_matrix_data_generation("stock")
     except EnrichedGenerationUnavailableError as exc:
         logger.warning("enriched generation requires a full rebuild: %s", exc)
 
@@ -1045,12 +1053,20 @@ def _register_static_routes(target: FastAPI, static_dir: Path) -> None:
     根级静态文件 (favicon.svg / donate-wechat.jpg 等) 必须原样返回 —— 此前所有
     未匹配路径都回退 index.html, 浏览器把 HTML 当图标解析失败。
     """
+    # 旧客户端可能缓存了 text/plain 的 JS/CSS。使用版本化资源地址，连带
+    # 相对路径动态 import 的分块一起绕过旧缓存；保留 /assets 兼容旧链接。
+    asset_base = f"/_static/{__version__}/assets"
     if (static_dir / "assets").exists():
         # [fork R153] 带 hash 的产物: 一年 immutable 缓存 + 构建期预压缩直出。
         # 见 app/static_assets.py。API 路径不受影响。
         from app.static_assets import HashedAssets
 
         target.mount("/assets", HashedAssets(directory=static_dir / "assets"), name="assets")
+        # [R591 同步上游 v0.3.29] 版本化地址 + 固定 MIME (frontend_static.py,
+        # Windows 注册表把 .js 关联成 text/plain 时仍按 JS 执行) —— 旧客户端
+        # 缓存过错误的 Content-Type 时, /_static/<版本>/assets 可以绕过去。
+        versioned = FrontendStaticFiles(directory=static_dir / "assets")
+        target.mount(asset_base, versioned, name="versioned-assets")
 
     # [fork R366] dist **根目录**下那几个真文件要按原样发出去, 不能落进下面的
     # SPA 兜底。
@@ -1082,7 +1098,10 @@ def _register_static_routes(target: FastAPI, static_dir: Path) -> None:
         # **sw.js 不许被缓存住**: 它自己就是更新机制, 缓存住等于把旧逻辑钉死。
         cache = ("no-cache" if target.name == "sw.js"
                  else "public, max-age=3600")
-        return FileResponse(target, headers={"Cache-Control": cache})
+        # [R591 同步上游 v0.3.29] 根文件也走固定 MIME
+        resp = frontend_file_response(target)
+        resp.headers["Cache-Control"] = cache
+        return resp
 
     @target.get("/{full_path:path}", include_in_schema=False)
     def spa_fallback(full_path: str):
@@ -1096,8 +1115,11 @@ def _register_static_routes(target: FastAPI, static_dir: Path) -> None:
             return hit
         index = static_dir / "index.html"
         if index.exists():
-            return FileResponse(
-                index,
+            markup = index.read_text(encoding="utf-8")
+            for quote in ('"', "'"):
+                markup = markup.replace(f"{quote}/assets/", f"{quote}{asset_base}/")
+            return HTMLResponse(
+                markup,
                 headers={"Cache-Control": "no-store, must-revalidate"},
             )
         return {"error": "frontend not built"}

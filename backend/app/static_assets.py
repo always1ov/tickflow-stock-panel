@@ -24,6 +24,8 @@ from starlette.responses import FileResponse, Response
 from starlette.staticfiles import NotModifiedResponse, StaticFiles
 from starlette.types import Scope
 
+from app.frontend_static import frontend_media_type
+
 IMMUTABLE = "public, max-age=31536000, immutable"
 # 优先级顺序: br 更小, 客户端两者都接受时先给 br
 _ENCODINGS: tuple[tuple[str, str], ...] = (("br", ".br"), ("gzip", ".gz"))
@@ -62,8 +64,14 @@ class HashedAssets(StaticFiles):
     ) -> Response:
         request_headers = Headers(scope=scope)
         accepted = accepted_encodings(request_headers.get("accept-encoding", ""))
-        # Content-Type 一律按**原文件名**判, 发的是 .br/.gz 时也得是 text/javascript
-        media_type = mimetypes.guess_type(str(full_path))[0] or "application/octet-stream"
+        # Content-Type 一律按**原文件名**判, 发的是 .br/.gz 时也得是 text/javascript。
+        # [R591 同步上游 v0.3.29] 先查前端固定 MIME 表 —— Windows 注册表把 .js 关联成
+        # text/plain 时, mimetypes.guess_type 会跟着错。
+        media_type = (
+            frontend_media_type(full_path)
+            or mimetypes.guess_type(str(full_path))[0]
+            or "application/octet-stream"
+        )
         headers = {"Cache-Control": IMMUTABLE, "Vary": "Accept-Encoding"}
 
         path: PathLike | str = full_path
