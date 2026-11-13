@@ -1,11 +1,11 @@
 import { useRef, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
-import { X, Loader2, Upload } from 'lucide-react'
+import { X, Loader2, Upload, Database, Plus, AlertCircle, Lock } from 'lucide-react'
 import { api, type ExtDataConfig, type ExtDataField } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { useDialogBackdrop } from '@/lib/useDialogBackdrop'
-import { TYPE, buttonClass } from '@/components/ui'
+import { SectionHead, INPUT_CLS } from './dialogShared'
 
 export function EditExtDialog({ config, onClose }: { config: ExtDataConfig; onClose: () => void }) {
   const qc = useQueryClient()
@@ -90,56 +90,64 @@ export function EditExtDialog({ config, onClose }: { config: ExtDataConfig; onCl
         transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
         className="relative rounded-card border border-border bg-surface shadow-2xl mx-4 w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden"
       >
-        <div className="flex items-center justify-between px-5 py-3 border-b border-border">
-          <h3 className={TYPE.section}>编辑扩展数据</h3>
-          <button onClick={onClose} className={buttonClass({ variant: 'ghost', icon: true })}>
+        <div className="px-6 pt-5 pb-4 flex items-start justify-between gap-4">
+          <div className="flex items-start gap-3 min-w-0">
+            <div className="mt-0.5 p-2 rounded-card bg-warning/10 text-warning border border-warning/20 shrink-0">
+              <Database className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <h3 className="text-sm leading-6 font-semibold text-foreground">编辑扩展数据</h3>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <span className="text-micro font-mono text-muted">{config.id}</span>
+                <span className={`inline-flex px-1.5 py-px rounded text-micro border ${
+                  config.mode === 'snapshot'
+                    ? 'bg-blue-500/10 border-blue-500/25 text-blue-400'
+                    : 'bg-warning/10 border-warning/25 text-warning'
+                }`}>
+                  {config.mode === 'snapshot' ? '快照型' : '时序型'}
+                </span>
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            aria-label="关闭"
+            className="p-1.5 rounded-lg text-secondary hover:text-foreground hover:bg-elevated focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-colors shrink-0"
+          >
             <X className="h-4 w-4" />
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
-          <div className="grid grid-cols-[1fr_1fr] gap-3">
-            <div>
-              <label className="text-micro text-muted mb-1 block">标识符</label>
-              <div className="h-8 px-3 rounded-btn bg-elevated/50 border border-border text-xs text-muted font-mono flex items-center">
-                {config.id}
+        <div className="flex-1 overflow-y-auto px-6 pb-6 space-y-6">
+          {/* 01 基本信息 */}
+          <section>
+            <SectionHead num="01" title="基本信息" />
+            <div className="space-y-3">
+              <div>
+                <div className="text-micro font-medium text-secondary mb-1.5">显示名称</div>
+                <input
+                  value={label}
+                  onChange={(e) => setLabel(e.target.value)}
+                  placeholder={config.label}
+                  className={INPUT_CLS}
+                />
+              </div>
+              <div>
+                <div className="text-micro font-medium text-secondary mb-1.5">描述 <span className="text-muted font-normal">可选</span></div>
+                <input
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="一句话说明数据用途，展示在表卡片上"
+                  className={INPUT_CLS}
+                />
               </div>
             </div>
-            <div>
-              <label className="text-micro text-muted mb-1 block">数据类型</label>
-              <div className={`h-8 px-3 rounded-btn border text-xs flex items-center ${
-                config.mode === 'snapshot'
-                  ? 'bg-blue-500/10 border-blue-500/30 text-blue-400'
-                  : 'bg-amber-500/10 border-amber-500/30 text-amber-400'
-              }`}>
-                {config.mode === 'snapshot' ? '快照型' : '时序型'}
-              </div>
-            </div>
-          </div>
+          </section>
 
-          <div>
-            <label className="text-micro text-muted mb-1 block">显示名称</label>
-            <input
-              value={label}
-              onChange={(e) => setLabel(e.target.value)}
-              className="w-full h-8 px-3 rounded-btn bg-base border border-border text-xs text-foreground placeholder:text-muted/40 focus:outline-none focus:border-accent/50"
-            />
-          </div>
-
-          <div>
-            <label className="text-micro text-muted mb-1 block">描述</label>
-            <input
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="可选，简要说明数据的用途"
-              className="w-full h-8 px-3 rounded-btn bg-base border border-border text-xs text-foreground placeholder:text-muted/40 focus:outline-none focus:border-accent/50"
-            />
-          </div>
-
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <div className={TYPE.card}>字段定义</div>
-              <div className="flex items-center gap-2">
+          {/* 02 字段定义 */}
+          <section>
+            <SectionHead num="02" title="字段定义">
+              <div className="flex items-center gap-1.5">
                 <input
                   ref={detectFileRef}
                   type="file"
@@ -150,69 +158,87 @@ export function EditExtDialog({ config, onClose }: { config: ExtDataConfig; onCl
                 <button
                   onClick={() => detectFileRef.current?.click()}
                   disabled={detecting}
-                  className={buttonClass({ size: 'xs' }, 'gap-1')}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-card text-micro text-muted hover:text-accent hover:bg-accent/[0.06] disabled:opacity-40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-colors"
                 >
                   {detecting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
                   从文件导入
                 </button>
-                <button onClick={addField} className={buttonClass({ size: 'xs' })}>+ 添加字段</button>
+                <button
+                  onClick={addField}
+                  className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-card text-micro text-muted hover:text-accent hover:bg-accent/[0.06] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-colors"
+                >
+                  <Plus className="h-3 w-3" />
+                  添加字段
+                </button>
               </div>
-            </div>
+            </SectionHead>
+
             {symbolMapping && (
-              <div className="mb-2 rounded-card border border-warning/30 bg-warning/[0.06] px-3 py-2 space-y-1.5">
-                <div className="text-xs text-warning">未找到 symbol 列，请选择哪一列作为标的代码：</div>
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="mb-2 rounded-lg border border-warning/30 bg-warning/[0.06] px-3 py-2.5 space-y-2"
+              >
+                <div className="text-micro text-warning font-medium">未找到 symbol 列，请选择哪一列作为标的代码</div>
                 <div className="flex flex-wrap gap-1.5">
                   {symbolMapping.candidates.map(col => (
                     <button
                       key={col}
                       onClick={() => handleSymbolMap(col)}
-                      className={buttonClass({ size: 'xs' }, 'font-mono')}
+                      className="px-2.5 py-1 rounded-card bg-accent/10 text-accent text-micro font-medium hover:bg-accent/20 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-colors"
                     >
                       {col}
                     </button>
                   ))}
                   <button
                     onClick={() => setSymbolMapping(null)}
-                    className={buttonClass({ size: 'xs', variant: 'ghost' })}
+                    className="px-2.5 py-1 rounded-card bg-elevated text-muted text-micro hover:text-secondary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-colors"
                   >
                     取消
                   </button>
                 </div>
-              </div>
+              </motion.div>
             )}
-            <div className="space-y-2">
+
+            <div className="space-y-1">
               {fields.map((f, i) => {
                 const isBuiltin = f.name === 'symbol' || f.name === 'name'
                 return (
-                  <div key={i} className="flex items-center gap-2">
+                  <div key={i} className="flex items-center gap-2 group">
                     <input
                       value={f.label}
                       onChange={(e) => updateField(i, 'label', e.target.value)}
                       placeholder="显示名"
                       disabled={isBuiltin}
-                      className={`w-20 h-7 px-2 rounded-btn border text-xs text-foreground placeholder:text-muted/40 focus:outline-none focus:border-accent/50 ${
+                      className={`w-24 h-8 px-2.5 rounded-lg border text-micro placeholder:text-muted/40 focus:outline-none focus:ring-1 focus:ring-accent/25 focus:border-accent/50 transition-shadow ${
                         isBuiltin
-                          ? 'bg-elevated/50 border-border text-muted cursor-not-allowed'
-                          : 'bg-base border-border'
+                          ? 'bg-elevated/50 border-border/60 text-muted cursor-not-allowed'
+                          : 'bg-base border-border text-foreground'
                       }`}
                     />
-                    <input
-                      value={f.name}
-                      onChange={(e) => updateField(i, 'name', e.target.value)}
-                      placeholder="字段名 (英文)"
-                      disabled={isBuiltin}
-                      className={`flex-1 h-7 px-2 rounded-btn border text-xs font-mono placeholder:text-muted/40 focus:outline-none focus:border-accent/50 ${
-                        isBuiltin
-                          ? 'bg-elevated/50 border-border text-muted cursor-not-allowed'
-                          : 'bg-base border-border'
-                      }`}
-                    />
+                    <div className="relative flex-1 min-w-0">
+                      <input
+                        value={f.name}
+                        onChange={(e) => updateField(i, 'name', e.target.value)}
+                        placeholder="字段名（英文）"
+                        disabled={isBuiltin}
+                        className={`w-full h-8 px-2.5 rounded-lg border text-micro font-mono placeholder:text-muted/40 focus:outline-none focus:ring-1 focus:ring-accent/25 focus:border-accent/50 transition-shadow ${
+                          isBuiltin
+                            ? 'bg-elevated/50 border-border/60 text-muted cursor-not-allowed pr-7'
+                            : 'bg-base border-border text-foreground pr-2.5'
+                        }`}
+                      />
+                      {isBuiltin && (
+                        <Lock className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted/40 pointer-events-none" />
+                      )}
+                    </div>
                     <select
                       value={f.dtype}
                       onChange={(e) => updateField(i, 'dtype', e.target.value)}
                       disabled={isBuiltin}
-                      className={`h-7 px-2 rounded-btn border border-border text-xs text-foreground ${
-                        isBuiltin ? 'bg-elevated/50 text-muted cursor-not-allowed' : 'bg-base'
+                      className={`h-8 px-2 rounded-lg border border-border text-micro focus:outline-none focus:ring-1 focus:ring-accent/25 focus:border-accent/50 ${
+                        isBuiltin ? 'bg-elevated/50 text-muted cursor-not-allowed' : 'bg-base text-foreground'
                       }`}
                     >
                       <option value="string">文本</option>
@@ -220,32 +246,44 @@ export function EditExtDialog({ config, onClose }: { config: ExtDataConfig; onCl
                       <option value="float">小数</option>
                       <option value="bool">布尔</option>
                     </select>
-                    {!isBuiltin && fields.length > 3 && (
-                      <button onClick={() => removeField(i)} className="p-1 text-muted hover:text-danger">
+                    {!isBuiltin && fields.length > 3 ? (
+                      <button
+                        onClick={() => removeField(i)}
+                        aria-label="删除字段"
+                        className="p-1.5 rounded-card text-muted/40 hover:text-danger hover:bg-danger/10 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-danger/40 transition-all"
+                      >
                         <X className="h-3 w-3" />
                       </button>
+                    ) : (
+                      <div className="w-[30px] shrink-0" />
                     )}
-                    {isBuiltin && <div className="w-[18px]" />}
                   </div>
                 )
               })}
             </div>
-          </div>
+          </section>
 
           {error && (
-            <div className="text-xs text-danger bg-danger/5 rounded-btn px-3 py-1.5">{error}</div>
+            <div className="flex items-start gap-2 text-micro text-danger bg-danger/5 border border-danger/20 rounded-lg px-3 py-2.5">
+              <AlertCircle className="h-3.5 w-3.5 mt-px shrink-0" />
+              <span className="leading-relaxed">{error}</span>
+            </div>
           )}
         </div>
 
-        <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-border">
-          <button onClick={onClose} className={buttonClass()}>
+        <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-border/50 bg-elevated/30">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 rounded-lg bg-elevated text-secondary text-xs hover:bg-elevated/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-colors"
+          >
             取消
           </button>
           <button
             onClick={() => update.mutate()}
             disabled={!valid || update.isPending}
-            className={buttonClass({ variant: 'primary' })}
+            className="px-5 py-2 inline-flex items-center gap-1.5 rounded-lg bg-accent text-on-accent text-xs font-medium hover:bg-accent/90 active:translate-y-px disabled:opacity-40 disabled:pointer-events-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-all shadow-sm shadow-accent/20"
           >
+            {update.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
             {update.isPending ? '保存中…' : '保存'}
           </button>
         </div>

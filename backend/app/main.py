@@ -137,6 +137,18 @@ def _log_startup_banner() -> None:
             + "=" * 72
         )
 
+    # 同步路由线程池容量: Starlette 默认 40, 本地多标签页/自动刷新与长计算
+    # 路由并存时容易排队。调大只影响空闲线程上限 (按需创建), 无常驻代价。
+    try:
+        import anyio.to_thread
+
+        anyio.to_thread.current_default_thread_limiter().total_tokens = (
+            settings.api_sync_thread_pool
+        )
+        logger.info("sync route thread pool: %d", settings.api_sync_thread_pool)
+    except Exception as e:  # noqa: BLE001
+        logger.warning("thread pool resize failed (ignored): %s", e)
+
 
 def _bootstrap_auth() -> None:
     """首次启动: 若配置了 AUTH_PASSWORD 环境变量且未设过密码, 用它初始化。
