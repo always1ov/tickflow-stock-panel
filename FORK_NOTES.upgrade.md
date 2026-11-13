@@ -14,6 +14,8 @@
 
 | R572 | v0.3.10 | 2026-11-13 | sync/upstream-v0.3.10-tree | 7（C0 7） | 0 | ①静态路由取上游重构（抽成 `_register_static_routes(app, static_dir)`，上游新增 `test_spa_static_routes` 直接 import 该函数），函数体内保留 fork 的 `HashedAssets`(R153) 与「dist 根目录真文件直出 + sw.js no-cache」(R366)；②`main.py` 并入上游 enriched 发布标记启动自愈 (`recover_stale_publications`)，fork 的 `_init_wecom_bot` 拆分保留；③`ext_pull.py` 保留 fork 的鉴权/URL 密钥擦除收口，并入上游 401/403 可执行提示；④`MiniIntraday` 取上游竞价叠加/量带/涨跌停纵轴大改，保留 fork「`useId` 必须早于空数据早退」的 hook 数修复，并删掉被上游「盘前竞价单独渲染」取代的旧早退分支；⑤`ScreenerTable`/`Watchlist` 接上游新增 `yMode`/`limitRate`/`auction`/`volume`/`auctionWidth` 参数，写死字号回退 `text-micro`；⑥`Screener.tsx` 同时保留 fork 的 `columnsReady` 门禁与 `placeholderData`，并入上游交易时段 6s / 收盘 60s 轮询；⑦`ListColumnCustomizer` 分时数值输入字段限定 `width｜height`（上游新增 `volume`/`auction` 后 `keyof` 不再全是 number） | 后端 5523 通过 / 12 项失败=已裁决豁免的 UI 字号守卫（`test_ui_hierarchy` 8 + `test_design_spec` 4），`test_scoring_frozen` 通过；前端 build 4.51s、vitest 345 通过；`VERSION` 与 `package.json` 均 0.3.10 | `git reset --hard fork-pre-v0.3.10` |
 
+| R573 | v0.3.11 | 2026-11-13 | sync/upstream-v0.3.11-tree | 0 | 0 | 零冲突。上游改动集中在 `indicators/pipeline.py` 全量重建的日期覆盖校验：新增 `daily_dates`（日K现存分区），孤儿分区（enriched 有而日K已无）改为告警放行且保留原地，`missing_dates` 只在 `existing_dates & daily_dates` 上校验 —— 修「发布中断 → 强制全量重建」与孤儿分区互相锁死、同步永久失败。fork 无自有改动，整份取上游；其余为版本号与发布脚本 | 后端 5526 通过 / 12 项失败=已裁决豁免的 UI 字号守卫（`test_ui_hierarchy` 8 + `test_design_spec` 4），`test_scoring_frozen` 通过；前端 build 4.36s、vitest 345 通过；`VERSION` 与 `package.json` 均 0.3.11 | `git reset --hard fork-pre-v0.3.11` |
+
 ## 待办登记
 
 - `test_design_spec`（写死字号 42→49）、`test_ui_hierarchy`（`Data.tsx` 的 `text-[10px]`）：用户裁决升级期豁免，升级完成后统一恢复。
