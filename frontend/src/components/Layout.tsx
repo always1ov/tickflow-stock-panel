@@ -31,6 +31,7 @@ import { getPageScale } from '@/lib/pageZoom'
 import { setKlineBatchLimits } from '@/lib/klineBatchLimits'
 import { seedHiddenForNewUser } from '@/lib/navOrder'
 import { navPageIds, resolveNavLayout, visibleNavLayout, type NavGroup } from '@/lib/navLayout'
+import { BROWSE_GROUP_ID } from '@/lib/navGroups'
 import { getNavigationEntries, type NavigationEntry } from '@/lib/navigation'
 import { NavFolder } from './navigation/NavFolder'
 import {
@@ -567,7 +568,10 @@ export function Layout() {
     location.pathname === page.id || (page.id !== '/' && location.pathname.startsWith(`${page.id}/`))))?.id
   useEffect(() => {
     setRailGroupId(null)
-    if (activeGroupId) setGroupOpen(previous => ({ ...previous, [activeGroupId]: true }))
+    // [R609] 闲置功能默认折叠: 即使当前页面在组内也不自动展开, 保持侧栏初始干净
+    if (activeGroupId && activeGroupId !== BROWSE_GROUP_ID) {
+      setGroupOpen(previous => ({ ...previous, [activeGroupId]: true }))
+    }
   }, [location.pathname, location.search, activeGroupId])
   const savedGroupOpen = prefs?.ui_prefs?.nav_groups
   useEffect(() => {
@@ -581,7 +585,8 @@ export function Layout() {
       }
     } catch { /* 非法展开偏好不影响页面入口 */ }
   }, [savedGroupOpen])
-  const isGroupOpen = (group: NavGroup) => groupOpen[group.id] ?? group.id === activeGroupId
+  const isGroupOpen = (group: NavGroup) =>
+    groupOpen[group.id] ?? (group.id === activeGroupId && group.id !== BROWSE_GROUP_ID)
   const toggleGroup = (group: NavGroup) => {
     groupEdited.current = true
     const next = { ...groupOpen, [group.id]: !isGroupOpen(group) }
