@@ -8,7 +8,7 @@ import re
 
 from tests.frontend_source import code_of
 
-PAGE = "pages/AbnormalMoves.tsx"
+PAGE = "custom/abnormal/extension.tsx"
 
 
 def test_R541_分栏走共用件_记在地址上():

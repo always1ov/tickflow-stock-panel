@@ -62,7 +62,7 @@ def test_界面上撤干净了():
 
 
 def test_页面不再给决策台传那两个入口():
-    page = code_of("pages/StockAnalysis.tsx")
+    page = code_of("custom/stock-analysis/extension.tsx")
     call = page[page.index("<WatchlistDecisionBoard"):]
     call = call[:call.index("/>")]
     assert "onAnalyze=" not in call and "onPriceAlert=" not in call

@@ -36,7 +36,8 @@ STILL_THERE = [
     ("今日总览没人显示的几块", "backend/app/api/today.py", '"portfolio": portfolio,'),
     ("AI 导读 · 优选", "backend/app/api/today.py", '@router.post("/ai")'),
     ("AI 导读 · 优选", "backend/app/api/today.py", '@router.get("/ai/track-record")'),
-    ("批次登记页", "frontend/src/router.tsx", "{ path: 'lots-registry', element: <Lots /> }"),
+    # [R568 同步上游 v0.3.6] 作者把批次登记页改成扩展页 /lots(侧栏「持仓提醒」)
+    ("批次登记页", "frontend/src/custom/lots/extension.tsx", "id: 'official.lots'"),
     ("开发者工具", "frontend/src/router.tsx", "{ path: 'dev', element: <Dev /> }"),
     ("信号栏的「盯着」一段", "backend/app/services/flip_today.py", '"stage": STAGE_WATCH,'),
     ("手填成本输入框", "backend/app/api/watchlist.py", "cost: float | None = None"),

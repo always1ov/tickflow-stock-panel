@@ -10,7 +10,7 @@ import pytest
 from app.services.screener import ScreenerService
 from app.strategy.engine import StrategyDataContext, StrategyEngine
 
-BUILTIN_DIR = Path(__file__).resolve().parents[1] / "app" / "strategy" / "builtin"
+BUILTIN_DIR = Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "strategies"
 
 
 class _FakeRepo:
@@ -50,8 +50,9 @@ def test_all_builtin_strategies_use_matrix_backend_only():
     assert engine.load_errors() == []
     strategies = [engine.get(meta["id"]) for meta in engine.list_strategies()]
     matrix_strategies = [s for s in strategies if s.execution_backend == "matrix_native"]
-    # 叉版额外保留 factor_rank_research(matrix), 比作者仓多 1
-    assert len(matrix_strategies) == 26
+    # [R568 同步上游 v0.3.6] 策略全面去内置化: 作者仓 25 个矩阵策略。
+    # 叉版的 factor_rank_research 走 app/strategy/research 直接导入, 不在此目录。
+    assert len(matrix_strategies) == 25
     assert all(s.matrix_strategy is not None for s in matrix_strategies)
     assert all(s.filter_fn is None for s in matrix_strategies)
     assert all(s.filter_history_fn is None for s in matrix_strategies)

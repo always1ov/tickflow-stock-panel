@@ -8,18 +8,22 @@ import math
 from datetime import date, timedelta
 from functools import lru_cache
 from pathlib import Path
+from typing import Optional
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, HTTPException, Query, Request, Response
 
 from app.db_safe import is_valid_ext_ident
 from app.indicators.bollinger import attach_bollinger
-from app.indicators.pipeline import compute_enriched
+from app.indicators.pipeline import compute_enriched, compute_enriched_single
 from app.market_time import cn_now, cn_today, in_continuous_session
-from app.price_limits import is_no_limit_day, is_risk_warning_name, parse_listing_date, price_limit_pct
-from app.db_safe import is_valid_ext_ident
-from app.services import kline_sync, trading_day
-from app.services import minute_adjust
+from app.price_limits import (
+    is_no_limit_day,
+    is_risk_warning_name,
+    parse_listing_date,
+    price_limit_pct,
+)
+from app.services import kline_sync, minute_adjust, trading_day
 
 logger = logging.getLogger(__name__)
 
@@ -711,8 +715,9 @@ def get_daily_batch(request: Request, body: dict):
     days = max(5, min(60, days))
 
     repo = request.app.state.repo
-    import polars as pl
     from datetime import timedelta
+
+    import polars as pl
 
     # 窗口右端必须是北京今天: QuoteService 当日 flush 的分区日期是北京交易日。
     # 美西主机整个 A 股交易时段、UTC 主机北京 00:00-08:00, date.today() 比北京早一天,
@@ -1342,19 +1347,19 @@ async def trigger_minute_sync(repo, capset, *, override_days=None, extend_flag=N
 
         try:
             progress("sync_minute", 5, "解析标的池…")
-            universe = sorted(set(get_pool("watchlist")) | set(get_pool("CN_Equity_A")))
-            # 补充 instruments 全量标的，覆盖北交所、新股等
+            # 标的池 = instruments 维表 + 自选 (单一来源, 不拉 CN_Equity_A/SW1 池)
+            universe: set[str] = set(get_pool("watchlist"))
             inst_path = repo.store.data_dir / "instruments" / "instruments.parquet"
             if inst_path.exists():
                 try:
                     import polars as pl
                     inst = pl.read_parquet(inst_path, columns=["symbol"])
-                    universe = sorted(set(universe) | set(inst["symbol"].to_list()))
+                    universe.update(inst["symbol"].to_list())
                 except Exception:  # noqa: BLE001
                     pass
             # 剔除指数 symbol: 指数分钟K无本地存储, 落库会污染 kline_minute
             index_set = repo.get_index_symbol_set()
-            universe = [s for s in universe if s not in index_set]
+            universe = sorted({s for s in universe if s not in index_set})
             progress("sync_minute", 10, f"标的池 {len(universe)} 只")
 
             days = override_days if override_days else get_minute_sync_days()

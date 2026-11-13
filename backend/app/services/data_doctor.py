@@ -179,6 +179,11 @@ STORES: tuple[Store, ...] = (
     Store("user_data/strategy_cache.json", "策略结果缓存", kind=KIND_DERIVED,
           note="纯缓存, 最容易长得很大 —— 删掉会自动重算"),
     Store("user_data/strategy_run_timings.json", "策略耗时统计", kind=KIND_DERIVED),
+    # [R568 同步上游 v0.3.6] 作者新增的两份 user_data 存储
+    Store("user_data/assistant_sessions.json", "AI 助手会话历史", shape=SHAPE_OPAQUE,
+          note="上游 v0.3.6 新增; 结构由 custom/assistant/sessions.py 管(≤20 会话 × 200 条), 不做字段级补齐"),
+    Store("user_data/task_registry.json", "任务注册表", shape=SHAPE_OPAQUE, kind=KIND_DERIVED,
+          note="上游 v0.3.6 新增; 回测/挖掘等任务的运行状态登记, 可重算"),
 )
 
 #: 内容一个字节都不读的存储 —— 里面是口令散列与明文 Key。

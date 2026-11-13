@@ -42,6 +42,9 @@ _NO_LIFECYCLE: dict[str, str] = {
     "extension_load_errors": "二次开发扩展的加载错误列表, 纯数据",
     "extension_registry": "扩展注册表, 无后台线程",
     "indicators_ready": "布尔标志, 标记 enriched 缓存是否预热完成",
+    # [R568 同步上游 v0.3.6] 迁移/种子结果均为纯数据, 只在启动时写一次
+    "legacy_migration": "旧数据迁移结果 dict, 纯数据无生命周期",
+    "seeded_signals": "默认信号种子写入条数 int, 纯数据无生命周期",
     # 被调用方驱动的引擎: 无常驻线程/连接, 因此无需 stop
     "monitor_engine": "MonitorRuleEngine — 规则内存态, 由请求/刷新驱动, 无常驻任务",
     "sector_monitor_service": "SectorMonitorService — 无 stop() 方法, 计算型服务",
@@ -90,6 +93,9 @@ _EXPECTED_ROUTERS = (
     "pipeline.router",
     "data.router",
     "ext_data.router",
+    # [R568 同步上游 v0.3.6] 作者新增: 扩展页面与任务注册表
+    "ext_pages.router",
+    "task_registry.router",
     "financials.router",
     "stock_analysis.router",
     "market_recap.router",

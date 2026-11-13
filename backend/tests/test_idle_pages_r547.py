@@ -10,6 +10,6 @@ import pytest
 from tests.frontend_source import code_of
 
 
-@pytest.mark.parametrize("page", ["pages/ConceptAnalysis.tsx", "pages/IndustryAnalysis.tsx"])
+@pytest.mark.parametrize("page", ["custom/concept-analysis/extension.tsx", "custom/industry-analysis/extension.tsx"])
 def test_R547_概念行业分析铺满(page):
     assert "mx-auto w-full max-w-[1440px]" not in code_of(page)

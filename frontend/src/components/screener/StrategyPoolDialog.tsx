@@ -12,7 +12,6 @@ interface Props {
 }
 
 const SOURCE_CLS: Record<string, string> = {
-  builtin: 'bg-accent/10 text-accent border-accent/20',
   custom: 'bg-amber-400/10 text-amber-400 border-amber-400/30',
   ai: 'bg-sky-500/10 text-sky-400 border-sky-500/20',
   // 叠加策略归入「自定义」分组展示, 徽标与 StrategyCard 一致用 teal 区分
@@ -21,7 +20,6 @@ const SOURCE_CLS: Record<string, string> = {
 }
 
 const SOURCE_LABEL: Record<string, string> = {
-  builtin: '内置',
   custom: '自定义',
   ai: 'AI',
   composite: '叠加',
@@ -30,13 +28,13 @@ const SOURCE_LABEL: Record<string, string> = {
 
 const TF_BADGE_CLS = 'text-micro px-1 py-px rounded border leading-tight shrink-0 border-sky-500/30 bg-sky-500/10 text-sky-400'
 
-type SourceTab = 'all' | 'builtin' | 'custom' | 'ai'
+type SourceTab = 'all' | 'custom' | 'ai' | 'composite'
 
 const TABS: { id: SourceTab; label: string }[] = [
   { id: 'all', label: '全部' },
-  { id: 'builtin', label: '内置' },
   { id: 'custom', label: '自定义' },
   { id: 'ai', label: 'AI' },
+  { id: 'composite', label: '叠加' },
 ]
 
 function parseMetaId(code: string): string {
@@ -96,18 +94,17 @@ export function StrategyPoolDialog({ pool, onConfirm, onClose }: Props) {
     [allStrategies, draftPool]
   )
 
-  // research_only 草稿(AI 来源)单独列出, 供「发布」操作; 不进待选列表
+  // research_only 草稿(AI 来源)单独列出, 供「发布」操作; 不进待选列表。
+  // 发布闸(/{id}/publish)仅接受 source=ai, 非 AI 的 research 项(如内置研究模板
+  // factor_rank_research)混入会渲染出必然失败的「发布」按钮, 故此处排除。
   const drafts = useMemo(
-    () => allStrategies.filter(s => s.research_only),
+    () => allStrategies.filter(s => s.research_only && s.source === 'ai'),
     [allStrategies]
   )
 
-  // 按 Tab 分组过滤待选; 叠加策略(composite)并入「自定义」分组
+  // 按 Tab 分组过滤待选; 叠加策略(composite)独立分组, 不再并入「自定义」
   const filteredAvailable = useMemo(() => {
     if (activeTab === 'all') return available
-    if (activeTab === 'custom') {
-      return available.filter(s => s.source === 'custom' || s.source === 'composite')
-    }
     return available.filter(s => s.source === activeTab)
   }, [available, activeTab])
 
@@ -249,9 +246,7 @@ export function StrategyPoolDialog({ pool, onConfirm, onClose }: Props) {
                   {TABS.map(tab => {
                     const count = tab.id === 'all'
                       ? available.length
-                      : tab.id === 'custom'
-                        ? available.filter(s => s.source === 'custom' || s.source === 'composite').length
-                        : available.filter(s => s.source === tab.id).length
+                      : available.filter(s => s.source === tab.id).length
                     return (
                       <button
                         key={tab.id}

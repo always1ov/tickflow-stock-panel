@@ -12,7 +12,7 @@ from pathlib import Path
 
 FE = Path(__file__).resolve().parents[2] / "frontend" / "src"
 CARD = (FE / "components" / "paper" / "FlipFollowCard.tsx").read_text(encoding="utf-8")
-PAPER = (FE / "pages" / "Paper.tsx").read_text(encoding="utf-8")
+PAPER = (FE / "custom" / "paper" / "extension.tsx").read_text(encoding="utf-8")
 
 
 def _fn(src: str, name: str) -> str:

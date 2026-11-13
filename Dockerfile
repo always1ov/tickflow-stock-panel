@@ -9,6 +9,7 @@
 # 版本号以实际能 pull 到的为准。
 ARG USE_CN_MIRROR=1
 ARG INCLUDE_STOCKSDK=0
+ARG USE_CN_MIRROR=1
 ARG NPM_REGISTRY=https://registry.npmmirror.com
 ARG PYPI_INDEX=https://pypi.tuna.tsinghua.edu.cn/simple
 # 备用 PyPI 源:主源同步延迟/故障时自动兜底(阿里云与清华互为补充)
@@ -92,8 +93,6 @@ WORKDIR /app
 
 # Node.js 运行时: 仅在启用 stock-sdk 插件时安装(供 node bridge.mjs 使用)。
 # Codex CLI 从官方 npm 包提取原生二进制，不依赖运行时 Node.js。
-# bookworm 自带 nodejs 18.19, 满足插件 engines>=18; --no-install-recommends 精简,
-# 自带 libnode/libc-ares 等全部动态依赖, 无需手动补库。
 # 国内构建换 apt 阿里云镜像 (bookworm deb822 格式)。官方 python slim 镜像的
 # sources 指向 deb.debian.org, 部分国内网络下 apt 极慢(实测阿里云 ECS 拉官方源
 # 单阶段可达 8 分钟以上); USE_CN_MIRROR 与 npm/pypi 的换源开关注一脉相承。

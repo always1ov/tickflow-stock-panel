@@ -49,6 +49,9 @@ NOT_USER_DATA = {
     "flip_follow.json": "虚拟账户·跟六态转折状态(同上)",
     # [R566 同步上游 v0.3.4] 版本号唯一权威改成 frontend/package.json, app/__init__.py 运行时读它
     "package.json": "前端版本号唯一权威(运行时读取, 非用户数据)",
+    # [R568 同步上游 v0.3.6] 扩展页面包内文件(data/ext_pages/<id>/page.json)与 tdxquant 探测临时文件
+    "page.json": "扩展页面包清单(data/ext_pages/<id>/page.json)",
+    "progress.json": "tdxquant 探测临时文件(插件 tmp 目录)",
 }
 
 

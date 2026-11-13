@@ -12,7 +12,17 @@
           if (localStorage.getItem('tf-theme') === 'dark') {
             document.documentElement.classList.add('dark')
           }
-        } catch (e) { /* 读不到就用默认的亮色 */ }
+        } catch (e) {
+          document.documentElement.classList.add('dark')
+        }
+        try {
+          var raw = localStorage.getItem('tf-page-zoom')
+          var z = raw == null ? 0.9 : JSON.parse(raw)
+          if (typeof z !== 'number' || z < 0.8 || z > 1.5) z = 0.9
+          document.documentElement.style.zoom = String(z)
+        } catch (e) {
+          document.documentElement.style.zoom = '0.9'
+        }
       })()
     </script>
     <!-- [fork R366] **这里故意没有 `viewport-fit=cover`。**

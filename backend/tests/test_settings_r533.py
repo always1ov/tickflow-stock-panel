@@ -72,7 +72,7 @@ def test_R534_老链接转到通知栏_站内链接已改():
     page = code_of(PAGE)
     assert "searchParams.get('tab') === 'monitoring' && highlight === 'webhooks'" in page
     assert "next.set('tab', 'notifications')" in page
-    for rel in ("components/monitor/RuleEditor.tsx", "pages/Review.tsx"):
+    for rel in ("components/monitor/RuleEditor.tsx", "custom/review/extension.tsx"):
         code = code_of(rel)
         assert "/settings?tab=notifications&highlight=webhooks" in code
         assert "/settings?tab=monitoring&highlight=webhooks" not in code

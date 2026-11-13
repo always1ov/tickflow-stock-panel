@@ -31,6 +31,10 @@ CODEX_CLI_PROVIDER = "codex_cli"
 CODEX_DEFAULT_COMMAND = "codex"
 CODEX_SUPPORTED_REASONING_EFFORTS = {"none", "minimal", "low", "medium", "high", "xhigh"}
 OPENAI_DEFAULT_REASONING_EFFORT = "high"
+# OpenAI 系两种请求协议: chat.completions (兼容面最广) 与 Responses (官方新协议)。
+CHAT_COMPLETIONS_PROTOCOL = "chat_completions"
+RESPONSES_PROTOCOL = "responses"
+_SUPPORTED_PROTOCOLS = {CHAT_COMPLETIONS_PROTOCOL, RESPONSES_PROTOCOL}
 
 _CODEX_ENV_ALLOWLIST = (
     "PATH",
@@ -161,6 +165,24 @@ def current_ai_provider() -> str:
     return (_profile_value("provider")
             or secrets_store.get_ai_config("ai_provider", settings.ai_provider)
             or OPENAI_COMPAT_PROVIDER)
+
+
+def current_ai_protocol() -> str:
+    """当前 OpenAI 系请求协议: chat_completions (默认) | responses。
+
+    仅对 openai/openai_compat 两种 provider 有意义; Codex CLI 走本地子进程,
+    恒为 chat_completions。非法存储值一律回退默认, 不抛错。
+    """
+    if is_codex_cli_provider():
+        return CHAT_COMPLETIONS_PROTOCOL
+    value = str(
+        secrets_store.get_ai_config("ai_protocol", settings.ai_protocol) or ""
+    ).strip().lower()
+    return value if value in _SUPPORTED_PROTOCOLS else CHAT_COMPLETIONS_PROTOCOL
+
+
+def is_responses_protocol() -> bool:
+    return current_ai_protocol() == RESPONSES_PROTOCOL
 
 
 def current_openai_model() -> str:
@@ -462,7 +484,6 @@ async def generate_ai_text(
     # 换哪一档都超, 不该把它算成"这一档用不了"去触发兜底
     max_tokens = _resolve_max_tokens(max_tokens)
     _check_input_budget(messages, max_tokens=max_tokens)
-
     profiles = _profiles_for_call()
     if not profiles:
         raise RuntimeError("AI API Key 未配置, 请在设置页配置")
@@ -474,6 +495,16 @@ async def generate_ai_text(
             if is_codex_cli_provider():
                 text = await _run_codex_cli(
                     messages, max_tokens=max_tokens, timeout=max(timeout, 600.0))
+            elif is_responses_protocol():
+                # 上游 v0.3.6: OpenAI Responses 新协议走独立实现
+                from app.services import ai_responses
+
+                text = await ai_responses.run_text(
+                    messages,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    timeout=timeout,
+                )
             else:
                 text = await _run_openai_once(
                     messages, temperature=temperature, max_tokens=max_tokens, timeout=timeout)
@@ -495,6 +526,23 @@ async def generate_ai_text(
         finally:
             _ACTIVE_PROFILE.reset(token)
     raise _all_failed(errors)
+
+
+def _assistant_tool_call(tc) -> dict:
+    """SDK 返回的 tool_call 转成回传用的 dict; Gemini 3 的 extra_content
+    (thought_signature) 需原样带回, 否则下一轮被上游 400 拒绝。"""
+    item = {
+        "id": tc.id,
+        "type": getattr(tc, "type", "function"),
+        "function": {
+            "name": tc.function.name,
+            "arguments": tc.function.arguments,
+        },
+    }
+    extra = getattr(tc, "extra_content", None)
+    if extra:
+        item["extra_content"] = extra
+    return item
 
 
 async def generate_ai_text_with_tools(
@@ -527,13 +575,24 @@ async def generate_ai_text_with_tools(
 
     for _ in range(max_rounds):
         _check_input_budget(req_messages, max_tokens=max_tokens)
-        message = await _run_openai_message_once(
-            req_messages,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            timeout=timeout,
-            tools=tool_schemas,
-        )
+        if is_responses_protocol():
+            from app.services import ai_responses
+
+            message = await ai_responses.run_message_once(
+                req_messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                timeout=timeout,
+                tools=tool_schemas,
+            )
+        else:
+            message = await _run_openai_message_once(
+                req_messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                timeout=timeout,
+                tools=tool_schemas,
+            )
         if message is None:
             return req_messages
 
@@ -545,17 +604,7 @@ async def generate_ai_text_with_tools(
 
         assistant = {
             "role": "assistant",
-            "tool_calls": [
-                {
-                    "id": tc.id,
-                    "type": getattr(tc, "type", "function"),
-                    "function": {
-                        "name": tc.function.name,
-                        "arguments": tc.function.arguments,
-                    },
-                }
-                for tc in tool_calls
-            ],
+            "tool_calls": [_assistant_tool_call(tc) for tc in tool_calls],
         }
         if message.content:
             assistant["content"] = message.content
@@ -635,6 +684,26 @@ async def stream_ai_text(
                 started = True
                 _mark_served(prof)
                 yield stripper.feed(text) + stripper.flush()
+                return
+            if is_responses_protocol():
+                # 上游 v0.3.6: Responses 新协议流式
+                from app.services import ai_responses
+
+                async for chunk in ai_responses.stream_text(
+                    messages,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    timeout=timeout,
+                ):
+                    if not started:
+                        _mark_served(prof)
+                    started = True
+                    out = stripper.feed(chunk)
+                    if out:
+                        yield out
+                tail = stripper.flush()
+                if tail:
+                    yield tail
                 return
             async for chunk in _stream_openai(
                 messages, temperature=temperature, max_tokens=max_tokens, timeout=timeout,
@@ -863,6 +932,57 @@ def _openai_client(api_key: str, timeout: float):
         max_retries=2,
         default_headers={"User-Agent": user_agent},
     )
+
+
+async def probe_ai_config(
+    *,
+    provider: str,
+    api_key: str,
+    base_url: str,
+    model: str,
+    protocol: str = "",
+    timeout: float = 20.0,
+) -> str:
+    """草稿配置一次性连通性探测 — 不读写任何配置状态。
+
+    「测试」必须与「保存」解耦: 旧实现先保存草稿再测试, 测试失败时坏配置
+    已经落盘并被状态栏展示为已连接。本函数用表单值直接建临时客户端发一条
+    最小消息, 成功与否都不触碰 secrets。
+
+    与正式调用共用 base URL 规范化与协议分支 (chat.completions / responses);
+    不传输出上限/温度等可选参数, 规避 max_tokens 与 max_completion_tokens 等
+    模型差异。返回模型可见文本 (推理模型可能为空串 — 200 即证明鉴权/端点/
+    模型可用); 传输层异常原样抛出, 由调用方格式化后回报。
+    """
+    if provider == CODEX_CLI_PROVIDER:
+        if not codex_cli_available():
+            raise RuntimeError("Codex CLI 不可用: 未找到可运行的 codex 命令")
+        return ""
+    if not api_key:
+        raise RuntimeError("未配置 API Key")
+    if not base_url:
+        raise ValueError("请先填写 API 地址")
+    if not model:
+        raise ValueError("请先填写模型名称")
+
+    from openai import AsyncOpenAI
+
+    user_agent = secrets_store.get_ai_config("ai_user_agent", "") or settings.ai_user_agent
+    client = AsyncOpenAI(
+        api_key=api_key,
+        base_url=normalize_openai_base_url(base_url),
+        timeout=timeout,
+        max_retries=0,
+        default_headers={"User-Agent": user_agent},
+    )
+    prompt = [{"role": "user", "content": "Reply exactly: OK"}]
+    if protocol == RESPONSES_PROTOCOL:
+        resp = await client.responses.create(model=model, input=prompt)
+        return str(getattr(resp, "output_text", "") or "")
+    resp = await client.chat.completions.create(model=model, messages=prompt)
+    if not getattr(resp, "choices", None):
+        return ""
+    return str(resp.choices[0].message.content or "")
 
 
 # 不同模型可能拒绝 temperature 或 reasoning_effort。这里不靠模型名猜测,

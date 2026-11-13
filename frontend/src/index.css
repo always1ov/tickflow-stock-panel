@@ -660,3 +660,22 @@ body {
     transform: none !important;
   }
 }
+.animate-breath {
+  animation: breath-glow 2.8s ease-in-out infinite;
+}
+
+/* 呼吸灯(同步按钮): 透明度起伏 + 主色光晕同步强弱 (数据页「立即同步」无数据态) */
+@keyframes breath-sync {
+  0%, 100% {
+    opacity: 1;
+    box-shadow: 0 0 10px 1px hsl(var(--accent) / 0.45);
+  }
+  50% {
+    opacity: 0.65;
+    box-shadow: 0 0 2px 0 hsl(var(--accent) / 0.12);
+  }
+}
+.animate-breath-sync {
+  animation: breath-sync 2.8s ease-in-out infinite;
+}
+

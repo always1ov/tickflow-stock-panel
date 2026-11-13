@@ -20,27 +20,16 @@ const Watchlist = lazy(() => import('./pages/Watchlist').then(m => ({ default: m
 const Screener = lazy(() => import('./pages/Screener').then(m => ({ default: m.Screener })))
 const Backtest = lazy(() => import('./pages/Backtest').then(m => ({ default: m.Backtest })))
 const Factors = lazy(() => import('./pages/Factors').then(m => ({ default: m.Factors })))
-const Financials = lazy(() => import('./pages/Financials').then(m => ({ default: m.Financials })))
 const Data = lazy(() => import('./pages/Data').then(m => ({ default: m.Data })))
-const Monitor = lazy(() => import('./pages/Monitor').then(m => ({ default: m.Monitor })))
-// [R564] 转折模拟盘(R327)删了 —— 它的规则并进虚拟账户的「跟六态转折」(R562/R563)。/lots 留成重定向
-const Lots = lazy(() => import('./pages/Lots').then(m => ({ default: m.Lots })))   // [R183] 上游批次登记, 保留路由
-// [R561 同步上游] 上游 v0.3.2 的虚拟账户(模拟撮合)。上游界面叫「模拟盘」, 在本 fork 里一律叫「虚拟账户」
-// (上游设计文档自己的正式名), 路由沿用上游的 /paper。[R564] 它现在也是首页
-const Paper = lazy(() => import('./pages/Paper').then(m => ({ default: m.Paper })))
+// [R568 同步上游 v0.3.6] Monitor / Lots / Paper / Signals / Review / LimitUpLadder /
+// AbnormalMoves / Financials / ConceptAnalysis / IndustryAnalysis / StockAnalysis 等页面
+// 已按上游「扩展包」架构迁到 frontend/src/custom/<id>/extension.tsx, 由扩展路由接管。
 const Dashboard = lazy(() => import('./pages/Dashboard').then(m => ({ default: m.Dashboard })))
 const AnalysisDetail = lazy(() => import('./pages/AnalysisDetail').then(m => ({ default: m.AnalysisDetail })))
-const ConceptAnalysis = lazy(() => import('./pages/ConceptAnalysis').then(m => ({ default: m.ConceptAnalysis })))
-const IndustryAnalysis = lazy(() => import('./pages/IndustryAnalysis').then(m => ({ default: m.IndustryAnalysis })))
-const StockAnalysis = lazy(() => import('./pages/StockAnalysis').then(m => ({ default: m.StockAnalysis })))
-const Signals = lazy(() => import('./pages/Signals').then(m => ({ default: m.Signals })))
-const Review = lazy(() => import('./pages/Review').then(m => ({ default: m.Review })))
-const LimitUpLadder = lazy(() => import('./pages/LimitUpLadder').then(m => ({ default: m.LimitUpLadder })))
 const Indices = lazy(() => import('./pages/Indices').then(m => ({ default: m.Indices })))
 const Branding = lazy(() => import('./pages/Branding').then(m => ({ default: m.Branding })))
 const Settings = lazy(() => import('./pages/Settings').then(m => ({ default: m.Settings })))
 const Regime = lazy(() => import('./pages/Regime').then(m => ({ default: m.Regime })))
-const AbnormalMoves = lazy(() => import('./pages/AbnormalMoves').then(m => ({ default: m.AbnormalMoves })))
 const Dev = lazy(() => import('./pages/Dev').then(m => ({ default: m.Dev })))
 const ExternalPage = lazy(() => import('./pages/ExternalPage').then(m => ({ default: m.ExternalPage })))
 // [fork 增强] R93 使用观察笔记 → [R502] 并进 Minds 的「笔记」一栏
@@ -55,10 +44,6 @@ const CORE_ROUTE_PATHS = new Set([
   '/today',
   '/analysis',
   '/analysis/:menuId',
-  '/concept-analysis',
-  '/industry-analysis',
-  '/stock-analysis',
-  '/review',
   '/watchlist',
   '/screener',
   '/backtest',
@@ -66,13 +51,11 @@ const CORE_ROUTE_PATHS = new Set([
   '/mining',
   '/paper-trading',
   '/lots',            // [R170] 上游加 /lots 路由时漏了这一条; 它现在托管仓位中心
-  '/financials',
+  '/external-page',
+  '/minds',
   '/data',
-  '/monitor',
-  '/limit-ladder',
   '/indices',
   '/regime',
-  '/abnormal',
   '/branding',
   '/settings',
   '/dev',
@@ -162,10 +145,6 @@ export function createAppRouter() {
       { path: 'today', element: <Navigate to="/paper" replace /> },
       { path: 'analysis', element: <Navigate to="/settings?tab=ext-pages" replace /> },
       { path: 'analysis/:menuId', element: <AnalysisDetail /> },
-      { path: 'concept-analysis', element: <ConceptAnalysis /> },
-      { path: 'industry-analysis', element: <IndustryAnalysis /> },
-      { path: 'stock-analysis', element: <StockAnalysis /> },
-      { path: 'review', element: <Review /> },
       { path: 'watchlist', element: <Watchlist /> },
       { path: 'screener', element: <Screener /> },
       { path: 'backtest', element: <Backtest /> },
@@ -174,21 +153,12 @@ export function createAppRouter() {
       { path: 'mining', element: <MiningRedirect /> },
       // [R170] AI 操盘手并入仓位中心。路由保留并重定向: 书签、菜单设置里存的旧路径不能断。
       { path: 'paper-trading', element: <Navigate to="/paper" replace /> },   // [R327 → R564] 旧入口照旧指过来
-      { path: 'financials', element: <Financials /> },
       { path: 'data', element: <Data /> },
-      { path: 'monitor', element: <Monitor /> },
       // [R327] /lots 曾是**转折模拟盘**; [R564] 那一页并进虚拟账户后删了, 路由留成重定向 ——
       // 书签、菜单设置里存的都是这个路径, 断掉等于把用户存的入口作废。
       { path: 'lots', element: <Navigate to="/paper" replace /> },
-      // 上游的批次登记页保留一条自己的路由 —— 代码一行没动, 只是不在导航里。
-      // 哪天想用回真钱批次登记, 它原封不动还在。
-      { path: 'lots-registry', element: <Lots /> },
-      { path: 'paper', element: <Paper /> },
-      { path: 'signals', element: <Signals /> },
-      { path: 'limit-ladder', element: <LimitUpLadder /> },
       { path: 'indices', element: <Indices /> },
       { path: 'regime', element: <Regime /> },
-      { path: 'abnormal', element: <AbnormalMoves /> },
       { path: 'external-page', element: <ExternalPage /> },
       { path: 'minds', element: <Minds /> },
       // [R502] 「消息面」改名 Minds, 原页成了「笔记」一栏 —— 书签与旧链接照旧能进

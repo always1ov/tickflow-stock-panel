@@ -413,7 +413,7 @@ def test_loader_probe_plugin_key_dispatch(monkeypatch):
     assert loader.probe_plugin_key("fuyao", "bad") == (False, "bad")
 
 
-def test_loader_probe_plugin_key_unsupported_plugin():
+def test_loader_probe_plugin_key_unsupported_plugin(monkeypatch):
     from app.data_providers.custom import loader
 
     # stock-sdk 未声明 api_key_env → 不支持界面配 Key

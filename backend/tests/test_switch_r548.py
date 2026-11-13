@@ -17,7 +17,7 @@ MIGRATED = [
     "pages/settings/System.tsx",
     "pages/settings/Monitoring.tsx",
     "pages/settings/DataSourceEditor.tsx",
-    "pages/Review.tsx",
+    "custom/review/extension.tsx",
 ]
 
 
@@ -41,7 +41,7 @@ def test_R548_设置区不再手写开关(path):
 
 
 def test_R548_删除确认不闪():
-    assert "animate-pulse" not in code_of("pages/Signals.tsx")
+    assert "animate-pulse" not in code_of("custom/signals/extension.tsx")
 
 
 def test_R549_按压缩放有过渡():

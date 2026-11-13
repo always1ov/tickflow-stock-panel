@@ -295,12 +295,44 @@ export function Screener() {
     prune(allStrategyIds)
   }, [allStrategyIds, prune, strategies.isError, strategies.isSuccess, strategies.data])
 
-  // 策略文件加载失败时提示用户(避免"策略静默消失"被误判为正常)
+  // 去内置化一次性迁移提示: 后端启动时自动种入默认信号/归档失效策略,
+  // 摘要只在首次见到时提示一次 (localStorage 记录迁移指纹)。
+  const legacyMigration = strategies.data?.legacy_migration
+  useEffect(() => {
+    if (!legacyMigration) return
+    const fingerprint = JSON.stringify(legacyMigration)
+    const key = 'tsp-legacy-migration-v1'
+    try {
+      if (localStorage.getItem(key) === fingerprint) return
+      localStorage.setItem(key, fingerprint)
+    } catch { /* 隐私模式等存储不可用: 退化为每次提示 */ }
+    const parts: string[] = []
+    if (legacyMigration.seeded_signals) {
+      parts.push(`已将 ${legacyMigration.seeded_signals} 个原内置信号转为自定义信号(可在信号库编辑)`)
+    }
+    if (legacyMigration.archived_files?.length) {
+      parts.push(`已归档 ${legacyMigration.archived_files.length} 个无法加载的旧策略文件(位于 data/strategies/*/_archive_unloadable/)`)
+    }
+    if (parts.length) toast(`旧版数据自动迁移完成：${parts.join('；')}`, 'success')
+  }, [legacyMigration])
+
+  // 策略文件加载失败时提示用户(避免"策略静默消失"被误判为正常)。
+  // 多个失败聚合为一条, 避免旧数据目录升级后 (内置模块移除/叠加断链) 刷屏。
   const loadErrors = strategies.data?.load_errors ?? []
   useEffect(() => {
-    for (const e of loadErrors) {
-      toast(`策略「${e.file}」加载失败：${e.error}`, 'error')
+    if (loadErrors.length === 0) return
+    if (loadErrors.length === 1) {
+      toast(`策略「${loadErrors[0].file}」加载失败：${loadErrors[0].error}`, 'error')
+      return
     }
+    const files = loadErrors.slice(0, 3)
+      .map(e => String(e.file).split('/').pop())
+      .join('、')
+    toast(
+      `${loadErrors.length} 个策略文件加载失败（${files}${loadErrors.length > 3 ? ' 等' : ''}）。` +
+      '常见原因：文件引用了已移除的内置模块、或叠加策略的子策略不存在 —— 请在 data/strategies/ 下更新或删除这些文件',
+      'error',
+    )
   }, [loadErrors])
 
   // 批量/单策略计算完成后先发布摘要，再刷新明细查询。摘要是明细查询的
@@ -741,7 +773,6 @@ export function Screener() {
       ))
     || (filter.watchlistOnly && watchlistQuery.isPending)
 
-
   // 单只股票加入/移出自选
   const toggleWatchlist = useMutation({
     mutationFn: ({
@@ -823,7 +854,13 @@ export function Screener() {
       <PageHeader
         title="策略"
         right={
-          <div className="flex flex-wrap items-center gap-2">
+          /* 工具栏 10 组控件总宽会超过标题栏 (窄屏实测溢出 148px)。
+             不能靠 overflow-x-auto + 隐藏滚动条 —— 那样右侧按钮被静默裁掉,
+             用户既看不到也滚不到 (「创建策略 · AI」曾整块消失)。
+             改用 flex-wrap: 空间不足时折到第二行, 全部控件始终可达。
+             间距取 1.5 (6px): 1440px 宽下总占位 939+54=993px, 刚好单行放下;
+             8px 间距则是 1011px, 会在 1440 只剩一个按钮孤零零折行。 */
+          <div className="flex flex-wrap items-center justify-end gap-1.5">
             {/* 资产类型切换: 股票 / ETF (分钟策略 asset_types 仅股票, ETF 列表自然不含) */}
             {/* [R456] 分段切换 / 按钮一律全站那一套(docs/ui-hierarchy.md) */}
             <div className={SEG}>
@@ -973,11 +1010,26 @@ export function Screener() {
               </div>
             </div>
           )}
-          {!strategies.isLoading && displayPool.length === 0 && (
-            <div className="text-sm text-muted py-4 text-center border border-dashed border-border rounded-btn">
-              {pool.length === 0
-                ? '策略池为空，点击右上角「策略池」按钮添加策略'
-                : '当前周期筛选下无策略，切换周期筛选或编辑策略池'}
+          {!strategies.isLoading && !strategies.isError && displayPool.length === 0 && (
+            <div className="py-4 text-center border border-dashed border-border rounded-btn">
+              <div className="text-sm text-muted">
+                {pool.length === 0
+                  ? '策略池为空，点击右上角「策略池」按钮添加策略'
+                  : '当前周期筛选下无策略，切换周期筛选或编辑策略池'}
+              </div>
+              {/* 池空时补文档入口: 用户此刻最需要的是「怎么造一个策略」, 而文档路径
+                  在界面上不可发现 —— 补上下文提到的三份指南, 与其它页引用 docs 同款
+                  (等宽文本而非链接: 这些是仓库内文件, 浏览器里点不开)。 */}
+              {pool.length === 0 && (
+                <div className="mt-2 flex flex-wrap items-center justify-center gap-x-1.5 gap-y-1 text-[11px] leading-relaxed text-muted/80">
+                  <span>自己写策略看</span>
+                  <code className="rounded bg-elevated/70 px-1 py-px font-mono text-[10px] text-secondary">docs/strategy.md</code>
+                  <span>（三种扩展方式：自定义信号 / AI 生成 / 手写代码）</span>
+                  <span className="text-border" aria-hidden="true">·</span>
+                  <span>用 AI 迭代已有策略看</span>
+                  <code className="rounded bg-elevated/70 px-1 py-px font-mono text-[10px] text-secondary">docs/strategy-iteration.md</code>
+                </div>
+              )}
             </div>
           )}
           <div className={CARD_WRAP_CLS}>
@@ -1207,6 +1259,18 @@ export function Screener() {
               <div className="flex flex-col items-center gap-1.5">
                 <span className="text-sm text-secondary">点击策略卡片查看选股结果</span>
                 <span className="text-xs text-muted">若提示 enriched 表无数据，请先运行盘后管道</span>
+                {/* 池空时没有卡片可点, 原文案「点击策略卡片」会指向不存在的操作 */}
+                {pool.length === 0 ? (
+                  <>
+                    <span className="text-sm text-secondary">还没有策略，先添加或创建一个</span>
+                    <span className="text-[11px] text-muted">用右上角「创建策略 · AI」生成，或按上方文档手写</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-sm text-secondary">点击策略卡片查看策略结果</span>
+                    <span className="text-[11px] text-muted">若提示 enriched 表无数据，请先运行盘后管道</span>
+                  </>
+                )}
               </div>
             </div>
           )}

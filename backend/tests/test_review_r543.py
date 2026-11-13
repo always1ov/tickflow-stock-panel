@@ -9,7 +9,7 @@ import re
 
 from tests.frontend_source import code_of
 
-PAGE = "pages/Review.tsx"
+PAGE = "custom/review/extension.tsx"
 
 
 def test_R543_页头与菜单同名():

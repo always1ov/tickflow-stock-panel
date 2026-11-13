@@ -49,6 +49,7 @@ import { ScheduleEditor } from '@/components/data/ScheduleEditor'
 import { ExtendHistoryPanel } from '@/components/data/ExtendHistoryPanel'
 import { RepairDailyPanel } from '@/components/data/RepairDailyPanel'
 import { EnrichedRebuildPanel } from '@/components/data/EnrichedRebuildPanel'
+import { FinancialSyncPanel } from '@/components/data/FinancialSyncPanel'
 import { MinuteSyncConfig } from '@/components/data/MinuteSyncConfig'
 import { AdjFactorSyncConfig } from '@/components/data/AdjFactorSyncConfig'
 import { RegimeConfigCard } from '@/components/data/RegimeConfigCard'
@@ -70,6 +71,8 @@ export function Data() {
 
   const caps = useCapabilities()
   const settings = useSettings()
+  // 测试端点仅探测 TickFlow 通道 — 未配置 TickFlow Key 时隐藏入口
+  const hasTickflowKey = settings.data?.has_tickflow_key ?? settings.data?.mode === 'api_key'
 
   const status = useDataStatus({
     refetchInterval: (query) => {
@@ -132,7 +135,7 @@ export function Data() {
   const clearData = useMutation({
     mutationFn: api.dataClear,
     onSuccess: () => {
-      // 清库删除全部 parquet + alerts, 各页 (看板/自选/选股/指数/财务/个股/连板/监控) 缓存
+      // 清库删除全部 parquet + alerts, 各页 (看板/自选/策略/指数/财务/个股/连板/监控) 缓存
       // 数据均已失效, 故广域失效所有 query 令其重取 —— 数据已清空, 全量刷新是正确行为而非误伤。
       qc.invalidateQueries()
       setShowClearConfirm(false)
@@ -577,8 +580,11 @@ export function Data() {
             capLimits={mergedCaps}
             customProvider={routeProviderDisplay(matrix.data, 'financial')}
             subLabel={`历史股本 · ${historicalShareRows.toLocaleString()} 条`}
+            // 财务不在盘后管道内, 顶部「立即同步」不含它 —— 给出独立的拉取入口
+            onPull={() => setOpenSettings(v => v === 'financial-sync' ? null : 'financial-sync')}
+            pullTitle="手动拉取财务数据"
             onSettings={hasData ? () => setOpenSettings(v => v === 'financials' ? null : 'financials') : undefined}
-            settingsOpen={openSettings === 'financials'}
+            settingsOpen={openSettings === 'financials' || openSettings === 'financial-sync'}
           />
         )
       }
@@ -660,6 +666,7 @@ export function Data() {
                 <Plus className="h-3.5 w-3.5" />
                 扩展数据
               </button>
+              {hasTickflowKey && (
               <button
                 onClick={() => setShowEndpointTest(true)}
                 className={buttonClass({}, 'gap-1.5')}
@@ -667,6 +674,7 @@ export function Data() {
                 <Wifi className="h-3.5 w-3.5" />
                 测试端点
               </button>
+              )}
               <button
                 onClick={() => setOpenSettings('page-settings')}
                 className={buttonClass({}, 'gap-1.5')}
@@ -1098,6 +1106,11 @@ export function Data() {
               historicalShareRows={s?.financials?.tables?.shares?.rows ?? 0}
               onStart={(jobId) => { setActiveJobId(jobId); setOpenSettings(null) }}
             />
+          </SettingsModal>
+        )}
+        {openSettings === 'financial-sync' && (
+          <SettingsModal title="财务数据 · 手动拉取" onClose={() => setOpenSettings(null)} width="max-w-lg">
+            <FinancialSyncPanel />
           </SettingsModal>
         )}
       </AnimatePresence>

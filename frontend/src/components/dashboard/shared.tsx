@@ -5,7 +5,7 @@
  * 行为不变; A 股语义色约定: 红涨(text-bull)绿跌(text-bear)。
  */
 import type { ReactNode } from 'react'
-import { Activity } from 'lucide-react'
+import { Activity, Settings2 } from 'lucide-react'
 import { TYPE } from '@/components/ui'
 
 export function n(v: number | null | undefined) {
@@ -59,7 +59,14 @@ export function compactCount(v: number | null | undefined) {
   return x.toFixed(0)
 }
 
-export function SectionTitle({ icon: Icon, title, hint }: { icon: typeof Activity; title: string; hint?: ReactNode }) {
+export function SectionTitle({ icon: Icon, title, hint, onConfig, configTitle }: {
+  icon: typeof Activity
+  title: string
+  hint?: ReactNode
+  /** 传入即在标题行右侧加配置齿轮 (如情绪雷达的评分口径编辑) */
+  onConfig?: () => void
+  configTitle?: string
+}) {
   return (
     <div className="mb-2 flex items-center justify-between gap-2">
       <div className="flex items-center gap-1.5">
@@ -67,7 +74,20 @@ export function SectionTitle({ icon: Icon, title, hint }: { icon: typeof Activit
         {/* [R453] 卡片标题是 L3(15px) —— 原来 13px, 与卡片里的内容一样大 */}
         <h2 className={TYPE.card}>{title}</h2>
       </div>
-      {hint && <span className="font-mono text-micro text-muted">{hint}</span>}
+      <div className="flex shrink-0 items-center gap-1.5">
+        {hint && <span className="font-mono text-[10px] text-muted">{hint}</span>}
+        {onConfig && (
+          <button
+            type="button"
+            onClick={onConfig}
+            title={configTitle ?? '配置计算方式'}
+            aria-label={configTitle ?? '配置计算方式'}
+            className="rounded p-0.5 text-muted transition-colors hover:bg-elevated hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+          >
+            <Settings2 className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
     </div>
   )
 }

@@ -1,14 +1,31 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { RouterProvider } from 'react-router-dom'
-import { QueryClient, QueryClientProvider, QueryCache } from '@tanstack/react-query'
+import { QueryClient, QueryCache } from '@tanstack/react-query'
 import { MotionConfig } from 'framer-motion'
 import { initializeFrontendExtensions } from './extensions/bootstrap'
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client'
 import { createAppRouter } from './router'
+import { installTspExtBridge, loadRuntimePageExtensions } from './extensions/runtime'
 import { api } from './lib/api'
 import { QK } from './lib/queryKeys'
+import { cn } from './lib/cn'
+import * as format from './lib/format'
+import { createAppPersister, shouldPersistQuery, PERSIST_BUSTER } from './lib/queryPersist'
 import { installWaapiHandoff } from './lib/waapiHandoff'
 import { installTitleTooltip } from './lib/titleTooltip'
+// 字体自托管 (@fontsource): 替代 rsms.me / Google Fonts 渲染阻塞外链,
+// 内网/离线部署不再白屏等字体。权重覆盖 tailwind 全部用量 (300-900)。
+import '@fontsource/inter/300.css'
+import '@fontsource/inter/400.css'
+import '@fontsource/inter/500.css'
+import '@fontsource/inter/600.css'
+import '@fontsource/inter/700.css'
+import '@fontsource/inter/900.css'
+import '@fontsource/jetbrains-mono/400.css'
+import '@fontsource/jetbrains-mono/500.css'
+import '@fontsource/jetbrains-mono/600.css'
+import '@fontsource/jetbrains-mono/700.css'
 import './index.css'
 
 // [R550] framer-motion 原生动画跑完 → 撤掉之间会漏一帧起始值, 弹窗开关时闪一下。见 lib/waapiHandoff.ts
@@ -76,11 +93,15 @@ if (_path === '/' || _path === '/paper' || _path === '/lots' || _path === '/toda
     queryFn: () => api.todayOverview(),
     staleTime: 60_000,
   })
-  import('./pages/Paper').catch(() => { /* 真正需要时 lazy() 会再试, 这里只是预热 */ })
+  // [R568] 页面已迁入扩展包, 首屏 chunk 预热交给扩展运行时按需加载
 }
 
 async function bootstrap() {
   await initializeFrontendExtensions()
+  // 页面包能力桥: 运行时页面包经 shim 读取宿主 api/QK/cn/format
+  installTspExtBridge({ api, QK, cn, format })
+  // 运行时页面包: 必须在 router 模块求值(finalize + 建路由表)之前挂载
+  await loadRuntimePageExtensions()
   const router = createAppRouter()
   ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>
@@ -93,9 +114,18 @@ async function bootstrap() {
           放在 main.tsx 不额外增加首屏体积: framer-motion 本来就在入口 chunk 里
           (router.tsx 同步 import 了 Layout, Layout 里有 motion), 见 R153。 */}
       <MotionConfig reducedMotion="user">
-        <QueryClientProvider client={queryClient}>
+        <PersistQueryClientProvider
+          client={queryClient}
+          persistOptions={{
+            persister: createAppPersister(),
+            buster: PERSIST_BUSTER,
+            // 恢复超过 1 天的缓存直接丢弃 (慢变族一天内必然后台刷新过)
+            maxAge: 24 * 60 * 60 * 1000,
+            dehydrateOptions: { shouldDehydrateQuery: shouldPersistQuery },
+          }}
+        >
           <RouterProvider router={router} />
-        </QueryClientProvider>
+        </PersistQueryClientProvider>
       </MotionConfig>
     </React.StrictMode>,
   )

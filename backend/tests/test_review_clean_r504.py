@@ -18,7 +18,7 @@ REMINDER = ROOT / ".scratch" / "review-page-rework" / "issues" / "01-ladder-ai-a
 
 
 def test_R504_复盘页页头只剩作者那一排():
-    r = code_of("pages/Review.tsx")
+    r = code_of("custom/review/extension.tsx")
     for gone in ("LadderAiReview", "RpsRotationDialog", "recapMode", "MODE_LABEL", "连读昨日", "板块RPS轮动"):
         assert gone not in r, f"复盘页还留着 {gone}"
     for kept in ("刷新", "定时", "生成复盘"):
@@ -60,7 +60,7 @@ def test_R504_存档没删_体检仍认得它们():
 
 
 def test_R504_RPS入口回到行业概念两页_弹窗不再自带维度切换():
-    for page, kind in (("pages/IndustryAnalysis.tsx", ' kind="industry"'), ("pages/ConceptAnalysis.tsx", "")):
+    for page, kind in (("custom/industry-analysis/extension.tsx", ' kind="industry"'), ("custom/concept-analysis/extension.tsx", "")):
         src = code_of(page)
         assert "onClick={() => setShowRps(true)}" in src and "涨幅RPS轮动分析" in src, f"{page} 没有 RPS 入口"
         assert f"<RpsRotationDialog onClose={{() => setShowRps(false)}}{kind} />" in src
@@ -74,5 +74,5 @@ def test_R504_整改时的提醒留下了():
     for item in ("AI 打板复盘", "板块跷跷板", "复盘三模式", "RPS 轮动", "ladder_ai_reports.json", "seesaw_history.json"):
         assert item in text
     # 动复盘页的人一打开文件就能看见这条提醒(它写在注释里, 所以读原文, 不走剥注释的 code_of)
-    raw = (SRC / "pages" / "Review.tsx").read_text(encoding="utf-8")
+    raw = (SRC / "custom" / "review" / "extension.tsx").read_text(encoding="utf-8")
     assert ".scratch/review-page-rework/issues/01-ladder-ai-and-friends.md" in raw

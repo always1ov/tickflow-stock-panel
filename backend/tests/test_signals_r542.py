@@ -6,12 +6,16 @@ from __future__ import annotations
 
 from tests.frontend_source import code_of
 
-PAGE = "pages/Signals.tsx"
+PAGE = "custom/signals/extension.tsx"
 
 
-def test_R542_分栏走共用件_记在地址上():
+def test_R542_单一视图_不再需要分栏():
+    # [R568 同步上游 v0.3.6] 信号全面去内置化: 「内置信号」清单已不存在
+    # (BUILTIN_SIGNAL_DEFINITIONS 已删), 所以 R542 的 custom/builtin 分栏
+    # 天然失去意义, 上游把页面改成单视图 PageHeader + 卡片网格。
+    # 这里改守「仍是页头 + 没有旧的内联分段控件」, 不再要求 PageTabs。
     page = code_of(PAGE)
-    assert "<PageTabs" in page and "usePageTab(SECTIONS, 'custom')" in page
+    assert "<PageHeader" in page
     assert "useState<SignalSection>" not in page
     assert "SEG_ITEM" not in page
 

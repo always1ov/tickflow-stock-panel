@@ -10,7 +10,7 @@ from tests.frontend_source import code_of
 
 BOARD = "components/stock-analysis/WatchlistDecisionBoard.tsx"
 CELLS = "components/stock-analysis/decision-board/cells.tsx"
-PAGE = "pages/StockAnalysis.tsx"
+PAGE = "custom/stock-analysis/extension.tsx"
 
 
 def test_R520_行是单行():

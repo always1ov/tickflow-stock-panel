@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useRef, type ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Play, FlaskConical, Clock, Loader2, Square, Search, Plus, X, SlidersHorizontal, BarChart3, Gauge, Zap, ListPlus, HelpCircle, ChevronRight, AlertTriangle, Layers, BookmarkPlus, Download } from 'lucide-react'
+import { Play, FlaskConical, Clock, Loader2, Square, Search, Plus, X, SlidersHorizontal, BarChart3, Gauge, Zap, ListPlus, HelpCircle, ChevronRight, AlertTriangle, Layers, BookmarkPlus, Download, Filter, Star, TrendingUp, CalendarRange } from 'lucide-react'
 import {
   paramOptionValue, paramOptionLabel,
   api,
@@ -11,6 +11,7 @@ import {
   type StrategyDetail,
   type StrategyParamDef,
   type ScoringDirection,
+  type CustomSignalCondition,
   REGIME_STATE_LABELS,
   REGIME_STATE_COLORS,
 } from '@/lib/api'
@@ -35,6 +36,7 @@ import { ReturnDistributionChart } from './charts/ReturnDistributionChart'
 import { TradeKlineModal, type TradeNavSource } from './components/TradeKlineModal'
 import { PicksSymbolKlineModal } from './components/PicksSymbolKlineModal'
 import { SignalTriggerActions } from '@/components/signals/SignalTriggerActions'
+import { ConditionEditor } from '@/components/signals/ConditionEditor'
 import { WatchlistGroupMenu } from '@/components/WatchlistAddMenu'
 import { ScoringEditor } from '@/components/ScoringEditor'
 import { strategyResultCandidate } from './researchCandidates'
@@ -164,7 +166,7 @@ function FillRuleHint() {
   )
 }
 
-const SRC_MAP: Record<string, string> = { builtin: '内置', custom: '自定义', ai: 'AI', composite: '叠加' }
+const SRC_MAP: Record<string, string> = { custom: '自定义', ai: 'AI', composite: '叠加' }
 const TRADE_PAGE_SIZE_OPTIONS = [10, 20, 30, 50, 100]
 const BADGE_CLS_MAP: Record<string, string> = {
   builtin: 'bg-secondary/10 text-muted border-border',
@@ -195,23 +197,22 @@ const BASIC_FILTER_RANGES = [
   { minKey: 'amount_min', maxKey: 'amount_max', label: '成交额', unit: '亿', scale: 1e8, step: '0.5' },
   { minKey: 'turnover_min', maxKey: 'turnover_max', label: '换手率', unit: '%', step: '0.5' },
 ]
-type AdvancedSettingsTab = 'params' | 'filter' | 'entry' | 'exit' | 'scoring' | 'risk' | 'range'
-type StrategyGroup = 'all' | 'custom' | 'ai' | 'builtin' | 'composite'
+// 高级设置分区 — 与策略设置弹窗 (StrategySettingsDialog) 同一信息架构:
+// 策略条件(基础过滤+参数+叠加) / 策略权重 / 风控触发(风控+买卖触发) / 回测范围。
+// 回测抽屉编辑的是本次回测的 overrides, 策略弹窗编辑的是策略定义; 字段与口径两边一致。
+type AdvancedSettingsTab = 'conditions' | 'scoring' | 'trading' | 'range'
+type StrategyGroup = 'all' | 'custom' | 'ai' | 'composite'
 const STRATEGY_GROUPS: { id: StrategyGroup; label: string }[] = [
   { id: 'all', label: '全部' },
   { id: 'custom', label: '自定义' },
   { id: 'ai', label: 'AI' },
   { id: 'composite', label: '叠加' },
-  { id: 'builtin', label: '内置' },
 ]
-const ADVANCED_TABS: { id: AdvancedSettingsTab; label: string }[] = [
-  { id: 'params', label: '策略参数' },
-  { id: 'filter', label: '基础过滤' },
-  { id: 'entry', label: '入场触发器' },
-  { id: 'exit', label: '出场触发器' },
-  { id: 'scoring', label: '评分权重' },
-  { id: 'risk', label: '风控' },
-  { id: 'range', label: '回测范围' },
+const ADVANCED_TABS: { id: AdvancedSettingsTab; label: string; icon: typeof Filter }[] = [
+  { id: 'conditions', label: '策略条件', icon: Filter },
+  { id: 'scoring', label: '策略权重', icon: Star },
+  { id: 'trading', label: '风控触发', icon: TrendingUp },
+  { id: 'range', label: '回测范围', icon: CalendarRange },
 ]
 const toSignalId = (sig: string) => (sig.startsWith('signal_') || sig.startsWith('csg_')) ? sig : `signal_${sig}`
 
@@ -322,6 +323,9 @@ const normalizeStrategyOverrides = (detail: StrategyDetail, values?: Record<stri
     delete next.entry_signals
     delete next.exit_signals
   }
+  // 叠加条件: 旧 localStorage 草稿没有该键时回填策略当前配置,
+  // 保证策略页改了叠加条件后回测至少按新配置跑 (签名变化会整体重载草稿)。
+  if (next.overlay_filter === undefined) next.overlay_filter = detail.overlay_filter ?? []
   return next
 }
 const buildDefaultOverrides = (detail: StrategyDetail) => normalizeStrategyOverrides(detail, {
@@ -331,6 +335,7 @@ const buildDefaultOverrides = (detail: StrategyDetail) => normalizeStrategyOverr
   scoring: { ...detail.scoring },
   scoring_directions: { ...(detail.scoring_directions ?? {}) },
   scoring_replace: true,
+  overlay_filter: detail.overlay_filter ?? [],
   stop_loss: detail.stop_loss,
   take_profit: detail.take_profit,
   trailing_stop: detail.trailing_stop,
@@ -350,6 +355,7 @@ const strategyBacktestConfigSignature = (detail: StrategyDetail) => JSON.stringi
   scoring_directions: detail.scoring_directions,
   entry_signals: detail.entry_signals,
   exit_signals: detail.exit_signals,
+  overlay_filter: detail.overlay_filter ?? [],
   stop_loss: detail.stop_loss,
   take_profit: detail.take_profit,
   trailing_stop: detail.trailing_stop,
@@ -990,7 +996,7 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
   }
   const [rangeSettingsOpen, setRangeSettingsOpen] = useState(false)
   const [quickRanges, setQuickRanges] = useState(loadQuickRanges)
-  const [settingsTab, setSettingsTab] = useState<AdvancedSettingsTab>('params')
+  const [settingsTab, setSettingsTab] = useState<AdvancedSettingsTab>('conditions')
   const [strategyParams, setStrategyParams] = useState<Record<string, any>>(saved?.params ?? {})
   const [overrides, setOverrides] = useState<Record<string, any>>(saved?.overrides ?? {})
   // result 不从 localStorage 恢复:它是运行产物(净值/交易),大且易过时,
@@ -1456,7 +1462,7 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
     return names
   }, [result?.trades])
 
-  // 选股分析弹窗的切标的候选 (与表格同序, 保证计数与「上一只/下一只」一致)
+  // 策略分析弹窗的切标的候选 (与表格同序, 保证计数与「上一只/下一只」一致)
   const picksNavItems = useMemo(
     () => toNavItems(result?.per_symbol_stats ?? []),
     [result?.per_symbol_stats],
@@ -1489,14 +1495,30 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
   const matrixStrategy = detail?.execution_backend === 'matrix_native'
   const compositeStrategy = detail?.source === 'composite'
   const visibleAdvancedTabs = useMemo(
-    () => matrixStrategy
-      ? ADVANCED_TABS.filter(tab => tab.id !== 'entry' && tab.id !== 'exit')
-      : compositeStrategy
-        // composite 的 entry/exit/scoring 由子策略决定, composite 层只调合并参数(params Tab)
-        ? ADVANCED_TABS.filter(tab => tab.id !== 'entry' && tab.id !== 'exit' && tab.id !== 'scoring')
-        : ADVANCED_TABS,
-    [matrixStrategy, compositeStrategy],
+    () => compositeStrategy
+      // composite 的触发器/评分由子策略决定, 只调合并参数与风控
+      ? ADVANCED_TABS.filter(tab => tab.id !== 'scoring')
+      : ADVANCED_TABS,
+    [compositeStrategy],
   )
+  // 叠加条件 (与策略设置同源): composite/分钟策略不支持; matrix 只支持数值字段
+  const overlaySupported = !!detail && !['composite', 'minute_filter'].includes(detail.execution_backend)
+  const overlayIsMatrix = detail?.execution_backend === 'matrix_native'
+  const overlayOptions = useQuery({
+    queryKey: QK.customSignalsOptions,
+    queryFn: api.customSignalsOptions,
+    enabled: settingsOpen && overlaySupported,
+  })
+  const overlayStringFields = overlayIsMatrix ? [] : (overlayOptions.data?.stringFields ?? [])
+  const overlayFields = overlayIsMatrix
+    ? (overlayOptions.data?.fields ?? []).filter(f => !(overlayOptions.data?.stringFields ?? []).includes(f.key))
+    : (overlayOptions.data?.fields ?? [])
+  const overlayGroups = overlayIsMatrix
+    ? (overlayOptions.data?.groups ?? [])
+        .map(g => ({ ...g, fields: g.fields.filter(f => !(overlayOptions.data?.stringFields ?? []).includes(f.key)) }))
+        .filter(g => g.fields.length > 0)
+    : overlayOptions.data?.groups
+  const overlayConditions = (overrides.overlay_filter ?? []) as CustomSignalCondition[]
   const basicFilter = (overrides.basic_filter ?? {}) as Record<string, any>
   const entrySignals = (overrides.entry_signals ?? []) as string[]
   const exitSignals = (overrides.exit_signals ?? []) as string[]
@@ -1535,12 +1557,6 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
   const trailingTakeProfitDrawdownPct = overrides.trailing_take_profit_drawdown == null ? '' : String(round4(Math.abs(Number(overrides.trailing_take_profit_drawdown)) * 100))
   const maxHoldDaysValue = overrides.max_hold_days == null ? '' : String(overrides.max_hold_days)
   const targetPositionPct = Number(maxPositions) > 0 ? Number(maxExposure) / Number(maxPositions) : 0
-
-  useEffect(() => {
-    if (matrixStrategy && (settingsTab === 'entry' || settingsTab === 'exit')) {
-      setSettingsTab('params')
-    }
-  }, [matrixStrategy, settingsTab])
 
   const updateOverride = (key: string, value: any) => {
     setOverrides(prev => ({ ...prev, [key]: value }))
@@ -1712,7 +1728,7 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
                 {st.timeframes?.includes('1m') && (
                   <span className="ml-1 text-micro px-1 py-px rounded border border-sky-500/30 bg-sky-500/10 text-sky-400">分钟</span>
                 )}
-                {st.source && st.source !== 'builtin' && (
+                {st.source && (
                   <span className={`ml-1 text-micro px-1 py-px rounded border ${BADGE_CLS_MAP[st.source] ?? ''}`}>
                     {SRC_MAP[st.source] ?? ''}
                   </span>
@@ -2402,7 +2418,7 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
               </div>
             )}
 
-            {/* Tab: 按日期 / 交易明细 / 选股分析 / 因子归因 */}
+            {/* Tab: 按日期 / 交易明细 / 策略分析 / 因子归因 */}
             {(result.trades.length > 0 || result.per_symbol_stats.length > 0 || (result.factor_attribution?.factors.length ?? 0) > 0) && (
               <div className="rounded-card border border-border overflow-hidden">
                 <div className="flex items-center gap-1 border-b border-border px-4 pt-2">
@@ -2424,7 +2440,7 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
                           : t === 'trades'
                           ? `交易明细 (${sortedTrades.length})`
                           : t === 'picks'
-                          ? `选股分析 (${result.per_symbol_stats.length})`
+                          ? `策略分析 (${result.per_symbol_stats.length})`
                           : `因子归因 (${attributionCount})`}
                       </button>
                     )
@@ -2733,6 +2749,13 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
             </div>
           </motion.div>
         )}
+
+        {/* 免责声明: 常驻于结果区底部 */}
+        <div className="rounded-card border border-border/60 bg-base/40 px-3 py-2 text-center text-[10px] leading-4 text-muted">
+          回测基于历史数据与当前参数设定模拟,受成交假设与市场环境影响,过往结果不代表未来收益;
+          行情数据来自第三方数据源,其准确性、完整性与及时性不作保证,可能存在缺失、延迟或错误;
+          仅供参考,不构成投资建议,请独立决策并自担风险。
+        </div>
       </section>
 
       {settingsOpen && detail && (
@@ -2795,49 +2818,7 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
                 {matrixStrategy && <div className="text-accent">当前为 Matrix 策略，进出场信号由策略公式生成，不能用列信号覆盖。</div>}
               </div>
 
-              {settingsTab === 'range' && (
-                <ConfigSection title="回测范围">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted">资产类型</span>
-                    <div className={SEG}>
-                      {(['stock', 'etf'] as const).map(t => (
-                        <button
-                          key={t}
-                          type="button"
-                          onClick={() => { setAssetType(t); setSelectedStrategy(null); setSymbols('') }}
-                          className={cn(SEG_ITEM, 'px-3', assetType === t ? SEG_ON : SEG_OFF)}
-                        >
-                          {t === 'stock' ? '股票' : 'ETF'}
-                        </button>
-                      ))}
-                    </div>
-                    <span className="text-xs text-muted/70">ETF 仅技术类策略,读 ETF enriched</span>
-                  </div>
-                  <StockPoolPicker value={symbols} onChange={setSymbols} assetType={assetType} />
-                  <div className="text-xs leading-5 text-muted">默认全市场回测，由基础过滤、策略条件和买卖触发器筛选；需要单票调试或自选池回测时再限定股票池。</div>
-                </ConfigSection>
-              )}
-
-              {settingsTab === 'params' && (
-                <ConfigSection title="策略参数" hint="自动限制 min/max">
-                  {detail.params.length > 0 ? (
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      {detail.params.map(param => (
-                        <StrategyParamInput
-                          key={param.id}
-                          param={param}
-                          value={strategyParams[param.id]}
-                          onChange={value => setStrategyParams(prev => ({ ...prev, [param.id]: value }))}
-                        />
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-xs text-muted">当前策略没有可调参数。</div>
-                  )}
-                </ConfigSection>
-              )}
-
-              {settingsTab === 'filter' && (
+              <div className={settingsTab === 'conditions' ? 'space-y-3' : 'hidden'}>
                 <ConfigSection title="基础过滤" hint="用于候选池">
                   <label className="flex items-center gap-2 text-xs text-secondary">
                     <input
@@ -2910,37 +2891,53 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
                     })}
                   </div>
                 </ConfigSection>
-              )}
 
-              {settingsTab === 'entry' && (
                 <ConfigSection
-                  title="入场触发器"
-                  hint="任一入场点满足即可进入候选"
-                  actions={<SignalTriggerActions kind="entry" signals={entrySignals} onChange={next => updateOverride('entry_signals', next)} />}
+                  title="策略参数"
+                  hint="自动限制 min/max"
+                  actions={detail.params.length > 0 ? <span className="text-[10px] text-muted">{detail.params.length} 项</span> : undefined}
                 >
-                  <SignalPicker
-                    signals={entrySignals}
-                    onChange={next => updateOverride('entry_signals', next)}
-                    kind="entry"
-                  />
+                  {detail.params.length > 0 ? (
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      {detail.params.map(param => (
+                        <StrategyParamInput
+                          key={param.id}
+                          param={param}
+                          value={strategyParams[param.id]}
+                          onChange={value => setStrategyParams(prev => ({ ...prev, [param.id]: value }))}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-xs text-muted">当前策略没有可调参数。</div>
+                  )}
                 </ConfigSection>
-              )}
 
-              {settingsTab === 'exit' && (
-                <ConfigSection
-                  title="出场触发器"
-                  hint="任一出场点满足即触发出场"
-                  actions={<SignalTriggerActions kind="exit" signals={exitSignals} onChange={next => updateOverride('exit_signals', next)} />}
-                >
-                  <SignalPicker
-                    signals={exitSignals}
-                    onChange={next => updateOverride('exit_signals', next)}
-                    kind="exit"
-                  />
+                <ConfigSection title="叠加条件" hint="硬过滤，只影响入场">
+                  {overlaySupported ? (
+                    <div className="space-y-2">
+                      <ConditionEditor
+                        conditions={overlayConditions}
+                        onChange={next => updateOverride('overlay_filter', next)}
+                        options={{ fields: overlayFields, groups: overlayGroups, stringFields: overlayStringFields }}
+                        title="叠加过滤（多条件为「且」关系，硬过滤）"
+                        allowEmpty
+                      />
+                      <div className="text-[11px] leading-5 text-muted/70">
+                        默认继承策略设置里保存的叠加条件；字段可点「最新」切换为「前N日」（上限 60 日）。ETF 回测通常无扩展数据字段，请谨慎使用。
+                        {overlayIsMatrix && ' matrix 策略不支持字符串字段条件。'}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-xs text-muted">
+                      当前策略类型不支持叠加条件（composite 请对子策略单独配置，分钟策略不支持）。
+                    </div>
+                  )}
                 </ConfigSection>
-              )}
+              </div>
 
-              {settingsTab === 'scoring' && (
+              {/* 策略权重 */}
+              <div className={settingsTab === 'scoring' ? 'space-y-3' : 'hidden'}>
                 <ConfigSection title="评分方案" hint="选择因子、方向与权重，保存时自动归一化">
                   <ScoringEditor
                     key={detail.id}
@@ -2982,10 +2979,20 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
                     <div className="mt-2 text-micro leading-4 text-muted">例如最小值 71 表示只把评分 ≥ 71 的股票放入下一交易日买入预选池。</div>
                   </div>
                 </ConfigSection>
-              )}
+              </div>
 
-              {settingsTab === 'risk' && (
-                <ConfigSection title="风控">
+              {/* 风控触发: 成交口径说明 + 风控与持仓纪律 + 买卖触发器 */}
+              <div className={settingsTab === 'trading' ? 'space-y-3' : 'hidden'}>
+                <div className="rounded-btn border border-accent/25 bg-accent/5 px-3 py-2.5 text-[11px] leading-5 text-secondary">
+                  <div className="font-medium text-foreground">触发 / 成交 / 仓位关系</div>
+                  <div className="mt-1">触发器决定什么时候产生买卖信号；评分只在多个买点同时出现时排序。</div>
+                  <div>成交口径可分别设置建仓/清仓：默认建仓次日开盘（避免未来函数）、清仓当日收盘（持仓中可盘中/收盘卖）。</div>
+                  <div>退出优先级：止损/移动止损 &gt; 卖点信号 &gt; 到期平仓；到期只作兜底，不抢占卖点或风控。</div>
+                  <div>最大持仓数控制同时持股数量，最大总仓位控制资金投入比例；剩余现金不等于可新增持仓名额。</div>
+                  {matrixStrategy && <div className="text-accent">当前为 Matrix 策略，进出场信号由策略公式生成，不能用列信号覆盖。</div>}
+                </div>
+
+                <ConfigSection title="风控与持仓纪律">
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <label className="block">
                       <span className="mb-1 block text-xs text-secondary">止损(%)</span>
@@ -3051,7 +3058,61 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
                     </label>
                   </div>
                 </ConfigSection>
-              )}
+
+                {/* matrix/composite 的触发器由策略公式/子策略决定, 不可覆盖 */}
+                {!matrixStrategy && !compositeStrategy && (
+                  <>
+                    <ConfigSection
+                      title="入场触发器"
+                      hint="任一入场点满足即可进入候选"
+                      actions={<SignalTriggerActions kind="entry" signals={entrySignals} onChange={next => updateOverride('entry_signals', next)} />}
+                    >
+                      <SignalPicker
+                        signals={entrySignals}
+                        onChange={next => updateOverride('entry_signals', next)}
+                        kind="entry"
+                      />
+                    </ConfigSection>
+
+                    <ConfigSection
+                      title="出场触发器"
+                      hint="任一出场点满足即触发出场"
+                      actions={<SignalTriggerActions kind="exit" signals={exitSignals} onChange={next => updateOverride('exit_signals', next)} />}
+                    >
+                      <SignalPicker
+                        signals={exitSignals}
+                        onChange={next => updateOverride('exit_signals', next)}
+                        kind="exit"
+                      />
+                    </ConfigSection>
+                  </>
+                )}
+              </div>
+
+              {/* 回测范围: 资产类型与股票池为回测专属概念 */}
+              <div className={settingsTab === 'range' ? 'space-y-3' : 'hidden'}>
+                <ConfigSection title="回测范围">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] text-muted">资产类型</span>
+                    <div className="inline-flex h-8 rounded-btn border border-border overflow-hidden">
+                      {(['stock', 'etf'] as const).map(t => (
+                        <button
+                          key={t}
+                          type="button"
+                          onClick={() => { setAssetType(t); setSelectedStrategy(null); setSymbols('') }}
+                          className={`h-full px-3 text-xs font-medium transition-colors cursor-pointer
+                            ${assetType === t ? 'bg-accent/10 text-accent' : 'text-muted hover:text-foreground'}`}
+                        >
+                          {t === 'stock' ? '股票' : 'ETF'}
+                        </button>
+                      ))}
+                    </div>
+                    <span className="text-[11px] text-muted/70">ETF 仅技术类策略,读 ETF enriched</span>
+                  </div>
+                  <StockPoolPicker value={symbols} onChange={setSymbols} assetType={assetType} />
+                  <div className="text-[11px] leading-5 text-muted">需要单票调试或自选池回测时再限定股票池；默认由基础过滤、策略条件与买卖触发器在全市场筛选。</div>
+                </ConfigSection>
+              </div>
             </div>
 
             <div className="flex items-center justify-end gap-2 border-t border-border px-4 py-3">
