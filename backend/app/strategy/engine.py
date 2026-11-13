@@ -283,6 +283,7 @@ class StrategyEngine:
         override_loader: Callable[[str], dict] | None = None,
     ):
         self._strategies: dict[str, StrategyDef] = {}
+        self.definition_revision = 0
         self._load_errors: list[dict] = []  # 加载失败的策略 [{file, error}]
         self._strategy_dirs = strategy_dirs or []
         self._realtime_matrices: dict[str, _RealtimeMatrixEntry] = {}
@@ -649,6 +650,7 @@ class StrategyEngine:
         with self._realtime_matrix_lock:
             self._realtime_matrices.clear()
             self._shared_matrix_cache.clear()
+            self.definition_revision += 1
 
     # ================================================================
     # 查询
@@ -687,6 +689,7 @@ class StrategyEngine:
         strategies = dict(self._strategies)
         strategies.pop(strategy_id)
         self._strategies = strategies
+        self.definition_revision += 1
         with self._realtime_matrix_lock:
             self._realtime_matrices.clear()
             self._shared_matrix_cache.clear()
