@@ -20,21 +20,22 @@ export const navPageIds = (node: NavNode) => node.type === 'group' ? node.childr
  * 用户一拖一动就写进自己的布局, 这里不再参与。
  */
 /**
- * [R606] 高频页直接平铺在最外层, 不折叠 —— 个股分析、市场环境这类每天都要点的,
- * 藏进文件夹等于多点一次, 不划算。
+ * [R608] 高频页直接平铺, 顺序按「开盘先看什么 → 再做什么」:
+ * 自选(第一入口) → 策略(选股) → 个股分析 → 市场环境 → 连板梯队 → 异动监控 → 复盘 → 数据(配置)
  */
 const DEFAULT_NAV_FLAT: readonly string[] = [
-  '/watchlist', '/screener', '/stock-analysis', '/regime', '/dashboard', '/indices',
+  '/watchlist', '/screener', '/stock-analysis', '/regime', '/limit-ladder', '/abnormal', '/review', '/data',
 ]
 
 /**
- * [R606] 只保留 3 个折叠区: 题材研究 / 回测复盘 / 闲置功能。
- * 组数越多, 每次找页面越要先展开, 反而比平铺更费事。
+ * [R608] 其余全部收进闲置: 看板/指数(总览) → 概念/行业/财务(研究) → 信号库/回测/因子(验证) → 监控中心/Minds
  */
 const DEFAULT_NAV_GROUPS: readonly { id: string; label: string; ids: readonly string[] }[] = [
-  { id: 'group:research', label: '题材研究', ids: ['/limit-ladder', '/concept-analysis', '/industry-analysis', '/financials', '/abnormal', '/signals'] },
-  { id: 'group:review', label: '回测复盘', ids: ['/backtest', '/factors', '/review'] },
-  { id: BROWSE_GROUP_ID, label: BROWSE_GROUP.label, ids: ['/data', '/monitor', '/minds'] },
+  {
+    id: BROWSE_GROUP_ID,
+    label: BROWSE_GROUP.label,
+    ids: ['/dashboard', '/indices', '/concept-analysis', '/industry-analysis', '/financials', '/signals', '/backtest', '/factors', '/monitor', '/minds'],
+  },
 ]
 
 /** 保留离线插件引用，运行时显隐另行过滤；新页面补在顶层。 */
