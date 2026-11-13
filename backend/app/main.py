@@ -47,6 +47,7 @@ from app.api import (
     paper,
     paper_flip,  # [fork 增强] R562 虚拟账户·跟六态转折
     pipeline,
+    position_policies,
     regime,
     rps,
     screener,
@@ -555,6 +556,15 @@ def _init_monitor_engine(app: FastAPI, store: DataStore, repo: KlineRepository, 
         logger.info("monitor engine loaded: %d rules", monitor_engine.rule_count)
     except Exception as e:  # noqa: BLE001
         logger.warning("monitor engine load failed: %s", e)
+    # 模拟盘「绑定即评估」: 把账户绑定但无监控规则的策略注入评估循环
+    # (set_rules 全量覆盖, 必须在其后注入; 失败不阻断启动)。
+    try:
+        from app.strategy import paper_watch
+
+        synced = paper_watch.sync(store.data_dir, monitor_engine, strategy_engine)
+        logger.info("paper watch synced at startup: %d strategies", len(synced["watching"]))
+    except Exception as e:  # noqa: BLE001
+        logger.warning("paper watch sync failed (ignored): %s", e)
     app.state.monitor_engine = monitor_engine
     app.state.sector_monitor_service = sector_monitor_service
 
@@ -882,6 +892,7 @@ def _register_routers(app: FastAPI) -> None:
     app.include_router(regime.router)
     app.include_router(analysis.router)
     app.include_router(pipeline.router)
+    app.include_router(position_policies.router)  # [R581 同步上游 v0.3.19] 持仓策略
     app.include_router(data.router)
     app.include_router(ext_data.router)
     app.include_router(ext_pages.router)

@@ -152,11 +152,11 @@ it('shows unsaved-change hint on edit and clears it when reverted', async () => 
   setNumberInput(stopInput, '9')
   expect(container.textContent).toContain('有未保存的改动')
   const navBtn = [...container.querySelectorAll('nav button')].find(b => b.textContent?.includes('风控触发'))!
-  expect(navBtn.querySelector('.bg-amber-400')).toBeTruthy()
+  expect(navBtn.querySelector('.bg-warning')).toBeTruthy()
 
   setNumberInput(stopInput, '8')
   expect(container.textContent).not.toContain('有未保存的改动')
-  expect(navBtn.querySelector('.bg-amber-400')).toBeFalsy()
+  expect(navBtn.querySelector('.bg-warning')).toBeFalsy()
 })
 
 it('trading page exposes full risk fields and save carries them', async () => {

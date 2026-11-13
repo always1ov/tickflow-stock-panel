@@ -173,7 +173,7 @@ const TRADE_PAGE_SIZE_OPTIONS = [10, 20, 30, 50, 100]
 const BADGE_CLS_MAP: Record<string, string> = {
   builtin: 'bg-secondary/10 text-muted border-border',
   ai: 'bg-sky-500/10 text-sky-400 border-sky-500/30',
-  custom: 'bg-amber-400/10 text-amber-400 border-amber-400/30',
+  custom: 'bg-warning/10 text-warning border-warning/30',
   composite: 'bg-teal-500/10 text-teal-400 border-teal-500/30',
 }
 const FIELD_LABEL: Record<string, string> = {}
@@ -400,10 +400,10 @@ function ExitReasonBadge({ reason, signalId, signalNames }: { reason: string; si
   const config: Record<string, { label: string; cls: string }> = {
     signal: { label: '信号', cls: 'bg-accent/10 text-accent border-accent/30' },
     stop_loss: { label: '止损', cls: 'bg-red-500/10 text-red-400 border-red-500/30' },
-    take_profit: { label: '止盈', cls: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' },
+    take_profit: { label: '止盈', cls: 'bg-accent/10 text-emerald-400 border-accent/30' },
     trailing_stop: { label: '移损', cls: 'bg-orange-500/10 text-orange-400 border-orange-500/30' },
-    trailing_take_profit: { label: '回撤止盈', cls: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' },
-    max_hold: { label: '超期', cls: 'bg-amber-400/10 text-amber-400 border-amber-400/30' },
+    trailing_take_profit: { label: '回撤止盈', cls: 'bg-accent/10 text-emerald-400 border-accent/30' },
+    max_hold: { label: '超期', cls: 'bg-warning/10 text-warning border-warning/30' },
     pending_exit: { label: '待卖', cls: 'bg-orange-400/10 text-orange-400 border-orange-400/30' },
     end: { label: '期末', cls: 'bg-secondary/10 text-secondary border-border' },
   }
@@ -924,7 +924,7 @@ function StockPoolPicker({ value, onChange, assetType = 'stock' }: { value: stri
         {/* 操作按钮 — 紧贴输入框右侧 */}
         <div className="flex shrink-0 items-center gap-1.5">
           {/* 当前范围 — 有范围显示个数, 无范围显示全市场 */}
-          <span className={`whitespace-nowrap text-xs font-medium ${symbols.length === 0 ? 'text-amber-400' : 'text-accent'}`}>
+          <span className={`whitespace-nowrap text-xs font-medium ${symbols.length === 0 ? 'text-warning' : 'text-accent'}`}>
             {symbols.length === 0 ? '全市场' : `共 ${symbols.length} 只`}
           </span>
           <WatchlistGroupMenu
@@ -1001,7 +1001,15 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
   const [maxPositions, setMaxPositions] = useState(saved?.maxPositions ?? '10')
   const [maxExposure, setMaxExposure] = useState(saved?.maxExposure ?? '100')
   const [initialCapital, setInitialCapital] = useState(saved?.initialCapital ?? '1000000')
-  const [positionSizing, setPositionSizing] = useState<'equal' | 'score_weight'>(saved?.positionSizing ?? 'equal')
+  const [positionSizing, setPositionSizing] = useState<'equal' | 'score_weight' | 'policy'>(saved?.positionSizing ?? 'equal')
+  const [positionPolicyId, setPositionPolicyId] = useState<string>(saved?.positionPolicyId ?? '')
+  const [positionPolicyParams, setPositionPolicyParams] = useState<Record<string, number | boolean | string>>(saved?.positionPolicyParams ?? {})
+  const positionPoliciesQ = useQuery({
+    queryKey: QK.positionPolicies,
+    queryFn: api.positionPolicyList,
+    staleTime: 60_000,
+    enabled: positionSizing === 'policy',
+  })
   const [simMode, setSimMode] = useState<'position' | 'full'>(saved?.mode ?? 'position')
   const [holdingDays, setHoldingDays] = useState(saved?.holdingDays ?? '5')
   const [highGranularity, setHighGranularity] = useState(saved?.minuteFill ?? false)
@@ -1052,8 +1060,12 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
     if (cfg.max_positions != null) setMaxPositions(String(cfg.max_positions))
     if (cfg.max_exposure_pct != null) setMaxExposure(String(Math.round(Number(cfg.max_exposure_pct) * 100)))
     if (cfg.initial_capital != null) setInitialCapital(String(cfg.initial_capital))
-    if (cfg.position_sizing === 'equal' || cfg.position_sizing === 'score_weight') {
+    if (cfg.position_sizing === 'equal' || cfg.position_sizing === 'score_weight' || cfg.position_sizing === 'policy') {
       setPositionSizing(cfg.position_sizing)
+      setPositionPolicyId(typeof cfg.position_policy === 'string' ? cfg.position_policy : '')
+      if (cfg.position_policy_params && typeof cfg.position_policy_params === 'object') {
+        setPositionPolicyParams(cfg.position_policy_params as Record<string, number | boolean | string>)
+      }
     }
     if (cfg.mode === 'position' || cfg.mode === 'full') setSimMode(cfg.mode)
     if (cfg.holding_days != null) setHoldingDays(String(cfg.holding_days))
@@ -1221,6 +1233,8 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
         maxExposure,
         initialCapital,
         positionSizing,
+        positionPolicyId,
+        positionPolicyParams,
         mode: simMode,
         holdingDays,
         minuteFill: isMinuteStrategy ? false : highGranularity,
@@ -1257,6 +1271,9 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
       max_exposure_pct: Number(maxExposure) / 100,
       initial_capital: Number(initialCapital),
       position_sizing: positionSizing,
+      ...(positionSizing === 'policy' && positionPolicyId
+        ? { position_policy: positionPolicyId, position_policy_params: positionPolicyParams }
+        : {}),
       params: strategyParams,
       overrides: requestOverrides,
       mode: simMode,
@@ -1708,7 +1725,7 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
                 }
                 className={`group relative inline-flex h-3.5 w-6 items-center rounded-full shrink-0 transition-colors duration-200 ${
                   !hasMinuteBatch ? 'bg-elevated opacity-50 cursor-not-allowed'
-                  : highGranularity ? 'bg-amber-500 cursor-pointer'
+                  : highGranularity ? 'bg-warning cursor-pointer'
                   : 'bg-elevated cursor-pointer'
                 }`}
               >
@@ -2008,7 +2025,47 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
             <select value={positionSizing} onChange={e => setPositionSizing(e.target.value as any)} className={INPUT_CLS}>
               <option value="equal">等权买入</option>
               <option value="score_weight">评分加权</option>
+              <option value="policy">自定义策略</option>
             </select>
+            {positionSizing === 'policy' && (
+              <div className="mt-2 space-y-2 rounded-card border border-border bg-surface p-2.5">
+                <select
+                  value={positionPolicyId}
+                  onChange={e => setPositionPolicyId(e.target.value)}
+                  className={INPUT_CLS}
+                >
+                  <option value="">选择仓位策略…</option>
+                  {(positionPoliciesQ.data?.policies ?? []).map(p => (
+                    <option key={p.id} value={p.id}>{p.label}</option>
+                  ))}
+                </select>
+                {(positionPoliciesQ.data?.policies ?? [])
+                  .find(p => p.id === positionPolicyId)
+                  ?.params.map(pd => (
+                    <label key={pd.id} className="flex items-center justify-between gap-2 text-xs text-secondary">
+                      <span className="truncate">{pd.label || pd.id}</span>
+                      {pd.type === 'bool' ? (
+                        <input
+                          type="checkbox"
+                          checked={Boolean(positionPolicyParams[pd.id] ?? pd.default)}
+                          onChange={e => setPositionPolicyParams(prev => ({ ...prev, [pd.id]: e.target.checked }))}
+                        />
+                      ) : (
+                        <input
+                          type="number"
+                          value={Number(positionPolicyParams[pd.id] ?? pd.default ?? 0)}
+                          step={pd.step ?? 'any'}
+                          onChange={e => setPositionPolicyParams(prev => ({ ...prev, [pd.id]: Number(e.target.value) }))}
+                          className={`${INPUT_CLS} w-24`}
+                        />
+                      )}
+                    </label>
+                  ))}
+                <div className="text-micro text-muted">
+                  在 设置 → 定义 → 仓位策略 创建与管理; 建仓时按当日候选与历史表现动态分配资金。
+                </div>
+              </div>
+            )}
           </div>
           <div>
             <label className="text-xs font-medium text-secondary block mb-1.5">最大持仓数</label>
@@ -2152,7 +2209,7 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
               return (
                 <button key={s} onClick={() => setRegimeStates(prev => active ? prev.filter(x => x !== s) : [...prev, s])}
                   className={`inline-flex items-center gap-1 px-2 py-0.5 rounded border text-xs transition-colors cursor-pointer ${
-                    active ? 'border-transparent text-white' : 'border-border text-muted hover:text-secondary'
+                    active ? 'border-transparent text-on-accent' : 'border-border text-muted hover:text-secondary'
                   }`}
                   style={active ? { backgroundColor: REGIME_STATE_COLORS[s] } : undefined}>
                   <span className="inline-block h-2 w-2 rounded-sm" style={{ backgroundColor: active ? '#fff' : REGIME_STATE_COLORS[s] }} />
@@ -2462,7 +2519,7 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
             )}
 
             {executionSummary.length > 0 && (
-              <div className="rounded-card border border-amber-400/25 bg-amber-400/5 px-3 py-2 text-xs leading-5 text-secondary">
+              <div className="rounded-card border border-warning/25 bg-warning/5 px-3 py-2 text-xs leading-5 text-secondary">
                 <span className="font-medium text-warning">成交约束：</span>
                 {executionSummary.map((item, index) => (
                   <span key={item.key} className="ml-2">
@@ -2661,7 +2718,7 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
                             </td>
                             <td className="px-4 py-2.5 text-right num text-secondary">
                               <div>{t.duration} 天</div>
-                              {!!t.blocked_exit_days && <div className="mt-0.5 text-xs text-amber-400">阻塞 {t.blocked_exit_days} 天</div>}
+                              {!!t.blocked_exit_days && <div className="mt-0.5 text-xs text-warning">阻塞 {t.blocked_exit_days} 天</div>}
                             </td>
                             <td className="px-4 py-2.5"><ExitReasonBadge reason={t.exit_reason} signalId={t.exit_signal_id} signalNames={signalNames} /></td>
                           </tr>

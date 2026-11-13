@@ -93,10 +93,10 @@ type Snapshot = ReturnType<typeof buildSnapshot>
 const PAGE_ANIM = 'animate-in fade-in-0 slide-in-from-bottom-1 duration-150'
 
 // ===== 策略参数/基础参数通用字段行 =====
-const FIELD_LABEL_CLS = 'w-[88px] shrink-0 text-right text-[11px] leading-4 text-secondary'
+const FIELD_LABEL_CLS = 'w-[88px] shrink-0 text-right text-micro leading-4 text-secondary'
 // 参数标签通常更长 (如「近60日最少涨停次数」), 单独放宽避免括号内折行
 // 参数标签通常更长 (如「近60日最少涨停次数」), 单独放宽; keep-all 让断行只发生在空格处, 避免拆断括号
-const PARAM_LABEL_CLS = 'w-[116px] shrink-0 text-right text-[11px] leading-4 text-secondary break-keep [overflow-wrap:anywhere]'
+const PARAM_LABEL_CLS = 'w-[116px] shrink-0 text-right text-micro leading-4 text-secondary break-keep [overflow-wrap:anywhere]'
 const FIELD_INPUT_CLS = 'h-7 rounded-[6px] border border-border bg-base text-xs font-mono text-foreground focus:outline-none focus:border-accent/50'
 
 // ===== 区间字段（最小 ~ 最大） =====
@@ -120,7 +120,7 @@ export function RangeField({ label, minVal, maxVal, onMinChange, onMaxChange, un
         step={step}
         className={`${FIELD_INPUT_CLS} w-[84px] px-2 text-center`}
       />
-      <span className="text-[10px] text-muted">~</span>
+      <span className="text-micro text-muted">~</span>
       <input
         type="number"
         value={maxVal ?? ''}
@@ -129,7 +129,7 @@ export function RangeField({ label, minVal, maxVal, onMinChange, onMaxChange, un
         step={step}
         className={`${FIELD_INPUT_CLS} w-[84px] px-2 text-center`}
       />
-      {unit && <span className="w-4 shrink-0 text-[10px] text-muted">{unit}</span>}
+      {unit && <span className="w-4 shrink-0 text-micro text-muted">{unit}</span>}
     </div>
   )
 }
@@ -162,7 +162,7 @@ function RiskPctField({ label, value, onChange, min, max, step = 0.5, unit = '%'
         onChange={e => onChange(e.target.value === '' ? null : Math.abs(Number(e.target.value)) / 100)}
         className={`${FIELD_INPUT_CLS} w-[76px] px-2 text-center`}
       />
-      <span className="text-[10px] text-muted">{unit}</span>
+      <span className="text-micro text-muted">{unit}</span>
     </div>
   )
 }
@@ -193,7 +193,7 @@ const ParamField = memo(function ParamField({ def, value, onChange, onApplyValue
             checked ? 'translate-x-[14px]' : 'translate-x-0.5'
           }`} />
         </button>
-        <span className="text-[10px] text-muted/60">{checked ? '开' : '关'}</span>
+        <span className="text-micro text-muted/60">{checked ? '开' : '关'}</span>
       </div>
     )
   }
@@ -247,7 +247,7 @@ const ParamField = memo(function ParamField({ def, value, onChange, onApplyValue
         className={`${FIELD_INPUT_CLS} w-24 px-2 text-center`}
       />
       {def.min != null && def.max != null && (
-        <span className="whitespace-nowrap text-[10px] text-muted/60">{def.min}~{def.max}</span>
+        <span className="whitespace-nowrap text-micro text-muted/60">{def.min}~{def.max}</span>
       )}
     </div>
   )
@@ -524,18 +524,15 @@ export function StrategySettingsDialog({ strategyId, onClose, onSaved, onAiModif
     } finally { setDeleting(false) }
   }
 
-  const handleDownload = async () => {
-    if (!strategyId || !detail || (detail.source !== 'ai' && detail.source !== 'custom')) return
-    const src = await api.strategyGetSource(strategyId)
-    const blob = new Blob([src.code], { type: 'text/x-python;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
+  const handleDownload = () => {
+    // 策略包导出: 策略 .py + 引用的信号/因子定义 + 用户调参, 换机/分享不丢依赖
+    if (!strategyId) return
     const a = document.createElement('a')
-    a.href = url
-    a.download = `${strategyId}.py`
+    a.href = api.strategyBundleExportUrl(strategyId)
+    a.download = `tsp-strategy-${strategyId}.zip`
     document.body.appendChild(a)
     a.click()
     a.remove()
-    URL.revokeObjectURL(url)
   }
 
   // ===== 左侧导航分区 =====
@@ -546,7 +543,7 @@ export function StrategySettingsDialog({ strategyId, onClose, onSaved, onAiModif
       ? [{ id: 'children' as const, label: '子策略与权重', icon: Layers, accent: 'text-teal-400' }]
       : [
           { id: 'screen' as const, label: '策略条件', icon: Filter, accent: 'text-sky-400' },
-          { id: 'scoring' as const, label: '策略权重', icon: Star, accent: 'text-amber-400' },
+          { id: 'scoring' as const, label: '策略权重', icon: Star, accent: 'text-warning' },
           { id: 'trading' as const, label: '风控触发', icon: TrendingUp, accent: 'text-emerald-400' },
         ]
   }, [detail, isComposite])
@@ -580,19 +577,19 @@ export function StrategySettingsDialog({ strategyId, onClose, onSaved, onAiModif
             <div className="flex items-center gap-2.5">
               <Settings2 className="h-4 w-4 text-accent" />
               <span id="strategy-settings-title" className="text-sm font-semibold text-foreground">{detail?.name ?? strategyId}</span>
-              {detail && <span className="text-[10px] px-1.5 py-0.5 rounded bg-elevated text-muted">{{ custom: '自定义', ai: 'AI', composite: '叠加' }[detail.source] ?? detail.source}</span>}
-              <span className="text-[10px] text-muted/40 font-mono">{strategyId}</span>
+              {detail && <span className="text-micro px-1.5 py-0.5 rounded bg-elevated text-muted">{{ custom: '自定义', ai: 'AI', composite: '叠加' }[detail.source] ?? detail.source}</span>}
+              <span className="text-micro text-muted/40 font-mono">{strategyId}</span>
             </div>
             <div className="flex items-center gap-2">
-              {detail && (detail.source === 'ai' || detail.source === 'custom') && (
+              {detail && (
                 <button
-                  aria-label="下载策略"
-                  title="下载策略"
+                  aria-label="导出策略包"
+                  title="导出策略包 (.zip, 含引用的信号/因子定义与调参)"
                   onClick={handleDownload}
                   className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-lg border border-border/60 bg-surface text-xs text-secondary hover:text-accent hover:border-accent/30 transition-colors cursor-pointer"
                 >
                   <Download className="h-3.5 w-3.5" />
-                  下载策略
+                  导出策略包
                 </button>
               )}
               <button aria-label="关闭" onClick={onClose} className="p-1.5 rounded-lg hover:bg-elevated transition-colors cursor-pointer"><X className="h-4 w-4 text-muted" /></button>
@@ -606,20 +603,20 @@ export function StrategySettingsDialog({ strategyId, onClose, onSaved, onAiModif
               {/* 名称 + 描述 + 显示上限 */}
               <div className="flex items-center gap-4 border-b border-border/40 px-5 py-2.5">
                 <div className="flex min-w-0 flex-[3] items-center gap-2">
-                  <span className="shrink-0 text-[10px] uppercase tracking-wider text-muted/50">名称</span>
+                  <span className="shrink-0 text-micro uppercase tracking-wider text-muted/50">名称</span>
                   <input type="text" value={strategyName} onChange={e => setStrategyName(e.target.value)}
                     className="h-8 min-w-0 flex-1 rounded-lg bg-base border-0 ring-1 ring-border/30 px-3 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-accent/30 transition-shadow" />
                 </div>
                 <div className="flex min-w-0 flex-[4] items-center gap-2">
-                  <span className="shrink-0 text-[10px] uppercase tracking-wider text-muted/50">描述</span>
+                  <span className="shrink-0 text-micro uppercase tracking-wider text-muted/50">描述</span>
                   <input type="text" value={strategyDesc} onChange={e => setStrategyDesc(e.target.value)}
                     className="h-8 min-w-0 flex-1 rounded-lg bg-base border-0 ring-1 ring-border/30 px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent/30 transition-shadow" />
                 </div>
                 <div className="flex shrink-0 items-center gap-1.5">
-                  <span className="text-[10px] text-muted/50">显示上限</span>
+                  <span className="text-micro text-muted/50">显示上限</span>
                   <input type="number" value={displayLimit ?? ''} onChange={e => setDisplayLimit(e.target.value ? Number(e.target.value) : null)} step={1} min={10} max={200} placeholder="不限"
                     className="h-8 w-16 rounded-lg bg-base border border-border/40 px-1.5 text-xs font-mono text-foreground text-center focus:outline-none focus:border-accent/50" />
-                  <span className="text-[10px] text-muted/50">只</span>
+                  <span className="text-micro text-muted/50">只</span>
                 </div>
               </div>
 
@@ -645,19 +642,19 @@ export function StrategySettingsDialog({ strategyId, onClose, onSaved, onAiModif
                       >
                         <Icon className={`h-3.5 w-3.5 shrink-0 ${activePage ? 'text-accent' : p.accent}`} />
                         <span className="min-w-0 flex-1 truncate text-xs font-medium">{p.label}</span>
-                        {badge != null && <span className="shrink-0 font-mono text-[10px] text-muted/70">{badge}</span>}
-                        {pageDirty && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400" title="有未保存的改动" />}
+                        {badge != null && <span className="shrink-0 font-mono text-micro text-muted/70">{badge}</span>}
+                        {pageDirty && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-warning" title="有未保存的改动" />}
                       </button>
                     )
                   })}
                   {/* 底部: 策略元信息 */}
                   <div className="mt-auto space-y-1 border-t border-border/20 px-1 pt-3" hidden={pages.length === 0}>
-                    <div className="flex items-center justify-between text-[10px] text-muted/50">
+                    <div className="flex items-center justify-between text-micro text-muted/50">
                       <span>执行后端</span>
                       <span className="font-mono text-muted/70">{BACKEND_LABEL[detail.execution_backend] ?? detail.execution_backend}</span>
                     </div>
                     {detail.timeframes.length > 0 && (
-                      <div className="flex items-center justify-between text-[10px] text-muted/50">
+                      <div className="flex items-center justify-between text-micro text-muted/50">
                         <span>周期</span>
                         <span className="text-muted/70">{detail.timeframes.map(t => TF_LABEL[t] ?? t).join(' / ')}</span>
                       </div>
@@ -669,7 +666,7 @@ export function StrategySettingsDialog({ strategyId, onClose, onSaved, onAiModif
                   {/* 策略条件: 基础参数 / 策略参数 / 叠加条件 */}
                   <div className={page === 'screen' ? PAGE_ANIM : 'hidden'}>
                     <div className="space-y-3">
-                      <p className="text-[11px] leading-5 text-muted/70">决定哪些股票进入候选：基础过滤 → 策略参数 → 叠加条件，逐层收紧。</p>
+                      <p className="text-micro leading-5 text-muted/70">决定哪些股票进入候选：基础过滤 → 策略参数 → 叠加条件，逐层收紧。</p>
                       <div className="grid grid-cols-2 items-start gap-3">
                         <Card
                           icon={SlidersHorizontal}
@@ -677,7 +674,7 @@ export function StrategySettingsDialog({ strategyId, onClose, onSaved, onAiModif
                           accent="text-sky-400"
                           dim={!basicFilterEnabled}
                           extra={<>
-                            <span className="text-[10px] text-muted/60">{basicFilterEnabled ? '已启用' : '已关闭'}</span>
+                            <span className="text-micro text-muted/60">{basicFilterEnabled ? '已启用' : '已关闭'}</span>
                             <button
                               type="button"
                               onClick={() => setBasicFilterEnabled(v => !v)}
@@ -702,7 +699,7 @@ export function StrategySettingsDialog({ strategyId, onClose, onSaved, onAiModif
                                   const active = boards.includes(b)
                                   return (
                                     <button key={b} onClick={() => { const cur: string[] = basicFilter.boards ?? ALL_BOARDS; const next = active ? cur.filter(x => x !== b) : [...cur, b]; setBF('boards', next.length === 0 ? ALL_BOARDS : next) }}
-                                      className={`px-2 py-1 rounded-md text-[11px] font-medium border transition-colors cursor-pointer ${active ? `${color.select.border} ${color.select.bgLight} ${color.select.text}` : `border-border bg-base text-muted ${color.select.borderHover}`}`}>{b}</button>
+                                      className={`px-2 py-1 rounded-md text-micro font-medium border transition-colors cursor-pointer ${active ? `${color.select.border} ${color.select.bgLight} ${color.select.text}` : `border-border bg-base text-muted ${color.select.borderHover}`}`}>{b}</button>
                                   )
                                 })}
                               </div>
@@ -710,7 +707,7 @@ export function StrategySettingsDialog({ strategyId, onClose, onSaved, onAiModif
                             <div className="flex items-center gap-2">
                               <span className={FIELD_LABEL_CLS}>ST</span>
                               <button onClick={() => setBF('exclude_st', !basicFilter.exclude_st)}
-                                className={`px-2 py-1 rounded-md text-[11px] font-medium border transition-colors cursor-pointer ${basicFilter.exclude_st ? 'border-danger/40 bg-danger/10 text-danger' : 'border-border bg-base text-muted hover:border-danger/30'}`}>{basicFilter.exclude_st ? '排除' : '包含'}</button>
+                                className={`px-2 py-1 rounded-md text-micro font-medium border transition-colors cursor-pointer ${basicFilter.exclude_st ? 'border-danger/40 bg-danger/10 text-danger' : 'border-border bg-base text-muted hover:border-danger/30'}`}>{basicFilter.exclude_st ? '排除' : '包含'}</button>
                             </div>
                           </div>
                         </Card>
@@ -719,14 +716,14 @@ export function StrategySettingsDialog({ strategyId, onClose, onSaved, onAiModif
                           icon={Settings2}
                           title="策略参数"
                           accent="text-muted"
-                          extra={detail.params.length > 0 ? <span className="text-[10px] text-muted/60">{detail.params.length} 项</span> : undefined}
+                          extra={detail.params.length > 0 ? <span className="text-micro text-muted/60">{detail.params.length} 项</span> : undefined}
                         >
                           {detail.params.length > 0 ? (
                             <div className="space-y-2.5">
                               {groupParams(visibleParams(detail.params, params)).map((g, gi) => (
                                 <div key={g.name ?? `ug${gi}`}>
                                   {g.name && (
-                                    <div className="mb-1 border-b border-border/20 pb-0.5 text-[10px] font-medium text-muted/70">{g.name}</div>
+                                    <div className="mb-1 border-b border-border/20 pb-0.5 text-micro font-medium text-muted/70">{g.name}</div>
                                   )}
                                   <div className="space-y-1.5">
                                     {g.items.map(p => <ParamField key={p.id} def={p} value={params[p.id]} onChange={handleParamChange} onApplyValues={values => setParams(prev => ({ ...prev, ...values }))} />)}
@@ -746,7 +743,7 @@ export function StrategySettingsDialog({ strategyId, onClose, onSaved, onAiModif
                         title="叠加条件"
                         accent="text-sky-400"
                         extra={overlaySupported(detail) && overlayFilter.length > 0
-                          ? <span className="text-[10px] text-muted/60">{overlayFilter.length} 条</span>
+                          ? <span className="text-micro text-muted/60">{overlayFilter.length} 条</span>
                           : undefined}
                       >
                         {overlaySupported(detail) ? (
@@ -758,7 +755,7 @@ export function StrategySettingsDialog({ strategyId, onClose, onSaved, onAiModif
                               title="叠加过滤（多条件为「且」关系，硬过滤）"
                               allowEmpty
                             />
-                            <div className="text-[11px] leading-5 text-muted/70">
+                            <div className="text-micro leading-5 text-muted/70">
                               叠加条件直接过滤策略候选，策略 / 回测 / 监控一致生效；只影响新入场，不触发已持仓卖出；字段可点「最新」切换为「前N日」（按交易日回看，上限 60 日，与信号库同口径）；字段数据缺失的日期不入选（如扩展数据未回补的交易日）。
                               {isMatrixBackend && ' matrix 策略不支持字符串字段条件。'}
                             </div>
@@ -775,12 +772,12 @@ export function StrategySettingsDialog({ strategyId, onClose, onSaved, onAiModif
                   {/* 策略权重 */}
                   <div className={page === 'scoring' ? PAGE_ANIM : 'hidden'}>
                     <div className="space-y-3">
-                      <p className="text-[11px] leading-5 text-muted/70">对通过筛选的候选按因子加权打分排序；评分不改变是否入选，只决定排序先后。权重保存时自动归一。</p>
+                      <p className="text-micro leading-5 text-muted/70">对通过筛选的候选按因子加权打分排序；评分不改变是否入选，只决定排序先后。权重保存时自动归一。</p>
                       <Card
                         icon={Star}
                         title="策略权重"
-                        accent="text-amber-400"
-                        extra={scoreCount > 0 ? <span className="text-[10px] text-muted/60">{scoreCount} 个因子</span> : undefined}
+                        accent="text-warning"
+                        extra={scoreCount > 0 ? <span className="text-micro text-muted/60">{scoreCount} 个因子</span> : undefined}
                       >
                         <ScoringEditor
                           key={detail.id}
@@ -799,7 +796,7 @@ export function StrategySettingsDialog({ strategyId, onClose, onSaved, onAiModif
                   {/* 风控触发 */}
                   <div className={page === 'trading' ? PAGE_ANIM : 'hidden'}>
                     <div className="space-y-3">
-                      <p className="text-[11px] leading-5 text-muted/70">控制买卖时点：出入场触发器对回测与监控生效（任一命中即触发）；策略扫描不消费触发器，仍按策略自身规则。风控与持仓纪律作为策略默认值保存，回测 / 优化 / 走查打开时自动继承。</p>
+                      <p className="text-micro leading-5 text-muted/70">控制买卖时点：出入场触发器对回测与监控生效（任一命中即触发）；策略扫描不消费触发器，仍按策略自身规则。风控与持仓纪律作为策略默认值保存，回测 / 优化 / 走查打开时自动继承。</p>
                       <Card icon={TrendingUp} title="风控与持仓纪律" accent="text-emerald-400">
                         <div className="space-y-2">
                           <div className="grid grid-cols-2 gap-x-6 gap-y-2">
@@ -821,10 +818,10 @@ export function StrategySettingsDialog({ strategyId, onClose, onSaved, onAiModif
                               <span className={FIELD_LABEL_CLS}>最长持仓</span>
                               <input type="number" value={maxHoldDays ?? ''} onChange={e => setMaxHoldDays(e.target.value === '' ? null : Number(e.target.value))} step={1} min={1}
                                 className={`${FIELD_INPUT_CLS} w-[76px] px-2 text-center`} />
-                              <span className="text-[10px] text-muted">天{maxHoldDays == null && '（不限）'}</span>
+                              <span className="text-micro text-muted">天{maxHoldDays == null && '（不限）'}</span>
                             </div>
                           </div>
-                          <div className="text-[10px] leading-4 text-muted/70">回撤止盈：涨幅达到「启动」后启用，从高点回撤「回撤」个百分点即卖出；留空 = 不启用对应纪律。</div>
+                          <div className="text-micro leading-4 text-muted/70">回撤止盈：涨幅达到「启动」后启用，从高点回撤「回撤」个百分点即卖出；留空 = 不启用对应纪律。</div>
                         </div>
                       </Card>
 
@@ -837,7 +834,7 @@ export function StrategySettingsDialog({ strategyId, onClose, onSaved, onAiModif
                         >
                           <div className="space-y-2">
                             <SignalPicker signals={entrySignals} onChange={setEntrySignals} kind="entry" options={{ variant: 'dialog' }} />
-                            <div className="text-[10px] leading-4 text-muted/70">任一入场点满足即进入候选。</div>
+                            <div className="text-micro leading-4 text-muted/70">任一入场点满足即进入候选。</div>
                           </div>
                         </Card>
 
@@ -849,7 +846,7 @@ export function StrategySettingsDialog({ strategyId, onClose, onSaved, onAiModif
                         >
                           <div className="space-y-2">
                             <SignalPicker signals={exitSignals} onChange={setExitSignals} kind="exit" options={{ variant: 'dialog' }} />
-                            <div className="text-[10px] leading-4 text-muted/70">任一出场点满足即触发出场。</div>
+                            <div className="text-micro leading-4 text-muted/70">任一出场点满足即触发出场。</div>
                           </div>
                         </Card>
                       </div>
@@ -861,29 +858,29 @@ export function StrategySettingsDialog({ strategyId, onClose, onSaved, onAiModif
                     {isComposite && (() => {
                       const SRC_LABEL: Record<string, string> = { custom: '自定义', ai: 'AI' }
                       const SRC_CLS: Record<string, string> = {
-                        custom: 'border-amber-400/25 bg-amber-400/10 text-amber-400',
+                        custom: 'border-warning/25 bg-warning/10 text-warning',
                         ai: 'border-sky-500/25 bg-sky-500/10 text-sky-400',
                       }
                       const selectedIds = new Set(compositeChildren.map(c => c.id))
                       const candidates = allStrategies.filter(s => !selectedIds.has(s.id))
                       return (
                       <div className="space-y-3">
-                        <p className="text-[11px] leading-5 text-muted/70">叠加策略按权重融合子策略的结果；点击子策略名可单独编辑其配置。</p>
+                        <p className="text-micro leading-5 text-muted/70">叠加策略按权重融合子策略的结果；点击子策略名可单独编辑其配置。</p>
                         <div className="rounded-xl border border-teal-500/20 bg-teal-500/[0.03] overflow-hidden">
                           <div className="flex items-center gap-2 border-b border-teal-500/15 bg-teal-500/[0.06] px-4 py-2.5">
                             <Layers className="h-3.5 w-3.5 text-teal-400" />
                             <span className="text-xs font-medium text-foreground/80">子策略与权重</span>
                             <div className="ml-auto flex items-center gap-2">
-                              <span className="text-[10px] text-muted flex items-center gap-1.5">
+                              <span className="text-micro text-muted flex items-center gap-1.5">
                                 共 {compositeChildren.length} 个 · 权重
-                                <span className={`font-mono ${compositeChildren.length > 0 && compositeTotal !== 100 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                                <span className={`font-mono ${compositeChildren.length > 0 && compositeTotal !== 100 ? 'text-warning' : 'text-emerald-400'}`}>
                                   {compositeTotal}%
                                 </span>
                                 {compositeChildren.length > 0 && compositeTotal !== 100 && (
-                                  <span className="text-amber-400/60">(保存时自动按比例归一)</span>
+                                  <span className="text-warning/60">(保存时自动按比例归一)</span>
                                 )}
                               </span>
-                              <button onClick={() => setShowAddChild(v => !v)} className="inline-flex items-center gap-1 h-6 px-2 rounded-lg border border-teal-500/30 bg-teal-500/10 text-[11px] text-teal-400 hover:bg-teal-500/20 cursor-pointer">
+                              <button onClick={() => setShowAddChild(v => !v)} className="inline-flex items-center gap-1 h-6 px-2 rounded-lg border border-teal-500/30 bg-teal-500/10 text-micro text-teal-400 hover:bg-teal-500/20 cursor-pointer">
                                 <Plus className="h-3 w-3" />添加
                               </button>
                             </div>
@@ -893,13 +890,13 @@ export function StrategySettingsDialog({ strategyId, onClose, onSaved, onAiModif
                             {showAddChild && (
                               <div className="rounded-lg border border-border bg-base/60 p-2 space-y-1 max-h-56 overflow-y-auto">
                                 {candidates.length === 0 ? (
-                                  <div className="text-[11px] text-muted py-2 text-center">无可添加的策略</div>
+                                  <div className="text-micro text-muted py-2 text-center">无可添加的策略</div>
                                 ) : candidates.map(s => (
                                   <button key={s.id} onClick={() => addCompositeChild(s)} className="flex w-full items-center gap-1.5 rounded px-2 py-1 text-left hover:bg-teal-500/10 cursor-pointer">
                                     <Plus className="h-3 w-3 shrink-0 text-teal-400" />
                                     <span className="flex-1 truncate text-xs text-foreground">{s.name}</span>
                                     {s.source && (
-                                      <span className={`rounded border px-1 text-[8px] ${SRC_CLS[s.source] ?? ''}`}>{SRC_LABEL[s.source] ?? s.source}</span>
+                                      <span className={`rounded border px-1 text-micro ${SRC_CLS[s.source] ?? ''}`}>{SRC_LABEL[s.source] ?? s.source}</span>
                                     )}
                                   </button>
                                 ))}
@@ -911,7 +908,7 @@ export function StrategySettingsDialog({ strategyId, onClose, onSaved, onAiModif
                               <div className="space-y-1.5">
                                 {compositeChildren.map((c, i) => (
                                   <div key={c.id} className="flex items-center gap-3 rounded-lg bg-base/60 px-3 py-2">
-                                    <span className="w-5 shrink-0 font-mono text-[10px] text-muted/50">{i + 1}</span>
+                                    <span className="w-5 shrink-0 font-mono text-micro text-muted/50">{i + 1}</span>
                                     <div className="min-w-0 flex-1">
                                       <div className="flex items-center gap-1.5">
                                         <button
@@ -923,10 +920,10 @@ export function StrategySettingsDialog({ strategyId, onClose, onSaved, onAiModif
                                           {c.name || c.id}
                                         </button>
                                         {c.source && (
-                                          <span className={`shrink-0 rounded border px-1 text-[8px] ${SRC_CLS[c.source] ?? ''}`}>{SRC_LABEL[c.source] ?? c.source}</span>
+                                          <span className={`shrink-0 rounded border px-1 text-micro ${SRC_CLS[c.source] ?? ''}`}>{SRC_LABEL[c.source] ?? c.source}</span>
                                         )}
                                       </div>
-                                      <div className="font-mono text-[10px] text-muted/50">{c.id}</div>
+                                      <div className="font-mono text-micro text-muted/50">{c.id}</div>
                                     </div>
                                     <div className="flex shrink-0 items-center gap-2">
                                       <input
@@ -939,7 +936,7 @@ export function StrategySettingsDialog({ strategyId, onClose, onSaved, onAiModif
                                         className="h-1 w-36 cursor-pointer accent-teal-400"
                                         aria-label={`${c.name || c.id}权重`}
                                       />
-                                      <span className="w-9 text-right font-mono text-[10px] text-muted">{Math.round(c.weight)}%</span>
+                                      <span className="w-9 text-right font-mono text-micro text-muted">{Math.round(c.weight)}%</span>
                                       <button onClick={() => removeCompositeChild(c.id)} className="p-1 text-danger/50 hover:text-danger cursor-pointer" aria-label={`移除${c.name || c.id}`}>
                                         <Trash2 className="h-3 w-3" />
                                       </button>
@@ -948,7 +945,7 @@ export function StrategySettingsDialog({ strategyId, onClose, onSaved, onAiModif
                                 ))}
                               </div>
                             )}
-                            <div className="border-t border-border/30 pt-2 text-[10px] text-muted/60">
+                            <div className="border-t border-border/30 pt-2 text-micro text-muted/60">
                               提示: 权重按相对比例生效, 保存时自动归一; 修改后点底部「保存设置」生效。
                             </div>
                           </div>
@@ -973,23 +970,23 @@ export function StrategySettingsDialog({ strategyId, onClose, onSaved, onAiModif
               </button>
               {(detail?.source === 'ai' || detail?.source === 'custom' || detail?.source === 'composite') && (
                 <button onClick={() => { setDeleteError(''); setShowDeleteConfirm(true) }}
-                  className="text-[10px] text-danger hover:text-danger/80 transition-colors">删除策略</button>
+                  className="text-micro text-danger hover:text-danger/80 transition-colors">删除策略</button>
               )}
             </div>
             <div className="flex items-center gap-2">
               {dirtyAny && (
-                <span className="mr-1 inline-flex items-center gap-1.5 text-[11px] text-amber-400/90" title="改动需点击「保存设置」后生效">
-                  <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />有未保存的改动
+                <span className="mr-1 inline-flex items-center gap-1.5 text-micro text-warning/90" title="改动需点击「保存设置」后生效">
+                  <span className="h-1.5 w-1.5 rounded-full bg-warning" />有未保存的改动
                 </span>
               )}
               {onAiModify && (detail?.source === 'ai' || detail?.source === 'custom') && (
                 <button onClick={onAiModify}
-                  className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-amber-400/30 bg-amber-400/8 text-amber-400 text-xs font-medium hover:bg-amber-400/15 transition-colors cursor-pointer">
+                  className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-warning/30 bg-warning/8 text-warning text-xs font-medium hover:bg-warning/15 transition-colors cursor-pointer">
                   <Sparkles className="h-3.5 w-3.5" />AI 修改
                 </button>
               )}
               <button onClick={handleSave} disabled={saving}
-                className="inline-flex items-center gap-1.5 h-8 px-4 rounded-lg bg-accent text-white text-xs font-semibold hover:bg-accent/90 transition-colors cursor-pointer disabled:opacity-50">
+                className="inline-flex items-center gap-1.5 h-8 px-4 rounded-lg bg-accent text-on-accent text-xs font-semibold hover:bg-accent/90 transition-colors cursor-pointer disabled:opacity-50">
                 <Save className="h-3.5 w-3.5" />{saving ? '保存中…' : '保存设置'}
               </button>
             </div>
@@ -1018,11 +1015,11 @@ export function StrategySettingsDialog({ strategyId, onClose, onSaved, onAiModif
                 <div className="text-sm font-semibold text-foreground">删除策略</div>
                 <div className="text-xs text-muted mt-1">确定要删除「{detail?.name ?? strategyId}」吗？</div>
               </div>
-              <div className="text-[11px] text-danger/70 bg-danger/[0.04] rounded-lg px-3 py-2 border border-danger/10">
+              <div className="text-micro text-danger/70 bg-danger/[0.04] rounded-lg px-3 py-2 border border-danger/10">
                 删除后无法恢复，策略文件、配置和关联数据将被永久清除。
               </div>
               {deleteError && (
-                <div className="text-[11px] text-danger bg-danger/10 rounded-lg px-3 py-2 border border-danger/20">
+                <div className="text-micro text-danger bg-danger/10 rounded-lg px-3 py-2 border border-danger/20">
                   {deleteError}
                 </div>
               )}
@@ -1030,7 +1027,7 @@ export function StrategySettingsDialog({ strategyId, onClose, onSaved, onAiModif
                 <button onClick={() => setShowDeleteConfirm(false)}
                   className="flex-1 h-8 rounded-lg border border-border text-xs text-secondary hover:text-foreground">取消</button>
                 <button onClick={handleDelete} disabled={deleting}
-                  className="flex-1 h-8 rounded-lg bg-danger text-white text-xs font-medium hover:bg-danger/90 disabled:opacity-50">
+                  className="flex-1 h-8 rounded-lg bg-danger text-on-accent text-xs font-medium hover:bg-danger/90 disabled:opacity-50">
                   {deleting ? '删除中...' : '确认删除'}
                 </button>
               </div>

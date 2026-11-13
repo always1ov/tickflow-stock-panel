@@ -102,6 +102,8 @@ _EXPECTED_ROUTERS = (
     "regime.router",
     "analysis.router",
     "pipeline.router",
+    # [R581 同步上游 v0.3.19] 持仓策略 (/api/position-policies/*)
+    "position_policies.router",
     "data.router",
     "ext_data.router",
     # [R568 同步上游 v0.3.6] 作者新增: 扩展页面与任务注册表

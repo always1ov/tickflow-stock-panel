@@ -1409,8 +1409,14 @@ def update_realtime_quotes(req: RealtimeQuotesPrefs, request: Request) -> dict:
                 issues = []
             earliest = data_integrity.earliest_issue_day(issues)
             if issues and data_integrity.within_auto_repair_window(earliest):
+                symbols = sorted({
+                    s
+                    for i in issues
+                    if i.table == "kline_daily" and i.kind == "snapshot"
+                    for s in i.symbols
+                }) or None
                 job_id, is_new = data_integrity.launch_integrity_repair(
-                    request.app.state, earliest, "realtime_gate",
+                    request.app.state, earliest, "realtime_gate", symbols=symbols,
                 )
                 if job_id is not None:
                     # 返回“已接受、等待修复”的结构化状态，而不是只抛 409。
@@ -1430,6 +1436,18 @@ def update_realtime_quotes(req: RealtimeQuotesPrefs, request: Request) -> dict:
                         "repair_reused": not is_new,
                         "repair_detail": detail,
                     }
+                # [R581 同步上游 v0.3.19] 上次自动修复失败的退避窗口: 窗口内不再
+                # 重复起任务, 直接告知剩余时间与手动入口。
+                backoff = data_integrity.repair_backoff_remaining_s(
+                    repo.store.data_dir, earliest,
+                )
+                if backoff > 0:
+                    raise HTTPException(status_code=409, detail=(
+                        f"检测到{data_integrity.describe_issues(issues)}；"
+                        f"上次自动修复未成功（多为数据源拉取失败），"
+                        f"{int(backoff // 60) + 1} 分钟后将自动重试，"
+                        "也可到 数据→修正数据 手动执行"
+                    ))
     if req.realtime_quotes_enabled and qs and qs.is_paused():
         # 完整性检查必须先于 paused 门禁：启动自检可能已经启动修复并暂停行情，
         # 此时前端应接续该任务，而不是被普通同步的 409 提前截断。若没有可接续
