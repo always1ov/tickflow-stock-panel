@@ -64,4 +64,14 @@ describe('nav layout', () => {
     expect(dissolveNavGroup(layout, 'group:research').items.map(x => x.id))
       .toEqual(['/paper', '/analysis/auction', '/company/offline', '/watchlist', '/screener'])
   })
+  it('ships a grouped default layout for users who never reordered the menu', () => {
+    const all = ['/paper', '/watchlist', '/screener', '/dashboard', '/indices',
+      '/stock-analysis', '/limit-ladder', '/concept-analysis', '/industry-analysis', '/financials',
+      '/regime', '/abnormal', '/signals', '/backtest', '/factors', '/review',
+      '/data', '/monitor', '/minds'].map(id => ({ id, visible: true }))
+    const result = resolveNavLayout(null, all)
+    expect(result.items[0]).toEqual({ type: 'page', id: '/paper' })
+    expect(result.items.slice(1).map(x => x.type === 'group' ? x.label : x.id))
+      .toEqual(['日常盯盘', '个股研究', '环境与信号', '验证与复盘', '闲置功能'])
+  })
 })

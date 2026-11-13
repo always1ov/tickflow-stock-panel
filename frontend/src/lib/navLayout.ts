@@ -13,6 +13,20 @@ export const HOME_NAV_ID = '/paper'
 export const canonicalNavId = (id: string) => id.startsWith('/') ? id : `/analysis/${id}`
 export const navPageIds = (node: NavNode) => node.type === 'group' ? node.children.map(x => x.id) : [node.id]
 
+/**
+ * [R604] 默认分组 —— 只对「从未调整过菜单」的人生效(没有 nav_layout, 也没有旧的 nav_order)。
+ *
+ * 逻辑按使用频率与工作流排: 盘中反复看的排最前, 研究类居中, 低频的收进「闲置功能」。
+ * 用户一拖一动就写进自己的布局, 这里不再参与。
+ */
+const DEFAULT_NAV_GROUPS: readonly { id: string; label: string; ids: readonly string[] }[] = [
+  { id: 'group:daily', label: '日常盯盘', ids: ['/watchlist', '/screener', '/dashboard', '/indices'] },
+  { id: 'group:research', label: '个股研究', ids: ['/stock-analysis', '/limit-ladder', '/concept-analysis', '/industry-analysis', '/financials'] },
+  { id: 'group:signal', label: '环境与信号', ids: ['/regime', '/abnormal', '/signals'] },
+  { id: 'group:review', label: '验证与复盘', ids: ['/backtest', '/factors', '/review'] },
+  { id: BROWSE_GROUP_ID, label: BROWSE_GROUP.label, ids: ['/data', '/monitor', '/minds'] },
+]
+
 /** 保留离线插件引用，运行时显隐另行过滤；新页面补在顶层。 */
 export function resolveNavLayout(
   layout: NavLayout | null | undefined, entries: readonly { id: string }[], legacyOrder: readonly string[] = [],
@@ -34,6 +48,17 @@ export function resolveNavLayout(
         seen.add(node.id)
         items.push({ ...node })
       }
+    }
+  } else if (!legacyOrder.length) {
+    // [R604] 从未调整过菜单: 直接给出按用途分好的默认分组, 不再平铺 19 项。
+    for (const spec of DEFAULT_NAV_GROUPS) {
+      const children: NavPage[] = []
+      for (const id of spec.ids) {
+        if (seen.has(id) || !entries.some(x => x.id === id)) continue
+        seen.add(id)
+        children.push({ type: 'page', id })
+      }
+      if (children.length) items.push({ type: 'group', id: spec.id, label: spec.label, children })
     }
   } else {
     // [R598] 旧配置是扁平 nav_order，其中「闲置功能」用一对首尾哨兵编码成员。
