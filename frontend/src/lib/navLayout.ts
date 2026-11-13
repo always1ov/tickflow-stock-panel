@@ -19,11 +19,21 @@ export const navPageIds = (node: NavNode) => node.type === 'group' ? node.childr
  * 逻辑按使用频率与工作流排: 盘中反复看的排最前, 研究类居中, 低频的收进「闲置功能」。
  * 用户一拖一动就写进自己的布局, 这里不再参与。
  */
+/**
+ * [R606] 高频页直接平铺在最外层, 不折叠 —— 个股分析、市场环境这类每天都要点的,
+ * 藏进文件夹等于多点一次, 不划算。
+ */
+const DEFAULT_NAV_FLAT: readonly string[] = [
+  '/watchlist', '/screener', '/stock-analysis', '/regime', '/dashboard', '/indices',
+]
+
+/**
+ * [R606] 只保留 3 个折叠区: 题材研究 / 回测复盘 / 闲置功能。
+ * 组数越多, 每次找页面越要先展开, 反而比平铺更费事。
+ */
 const DEFAULT_NAV_GROUPS: readonly { id: string; label: string; ids: readonly string[] }[] = [
-  { id: 'group:daily', label: '日常盯盘', ids: ['/watchlist', '/screener', '/dashboard', '/indices'] },
-  { id: 'group:research', label: '个股研究', ids: ['/stock-analysis', '/limit-ladder', '/concept-analysis', '/industry-analysis', '/financials'] },
-  { id: 'group:signal', label: '环境与信号', ids: ['/regime', '/abnormal', '/signals'] },
-  { id: 'group:review', label: '验证与复盘', ids: ['/backtest', '/factors', '/review'] },
+  { id: 'group:research', label: '题材研究', ids: ['/limit-ladder', '/concept-analysis', '/industry-analysis', '/financials', '/abnormal', '/signals'] },
+  { id: 'group:review', label: '回测复盘', ids: ['/backtest', '/factors', '/review'] },
   { id: BROWSE_GROUP_ID, label: BROWSE_GROUP.label, ids: ['/data', '/monitor', '/minds'] },
 ]
 
@@ -50,7 +60,12 @@ export function resolveNavLayout(
       }
     }
   } else if (!legacyOrder.length) {
-    // [R604] 从未调整过菜单: 直接给出按用途分好的默认分组, 不再平铺 19 项。
+    // [R604][R606] 从未调整过菜单: 高频页平铺, 其余收进 3 个折叠区。
+    for (const id of DEFAULT_NAV_FLAT) {
+      if (seen.has(id) || !entries.some(x => x.id === id)) continue
+      seen.add(id)
+      items.push({ type: 'page', id })
+    }
     for (const spec of DEFAULT_NAV_GROUPS) {
       const children: NavPage[] = []
       for (const id of spec.ids) {
