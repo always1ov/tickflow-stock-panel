@@ -2461,6 +2461,43 @@ export interface PaperCompareRow {
   realized_pnl: number
   max_drawdown: number | null
   nav: Array<{ date: string; nav: number }>
+  /** 对比展示字段 (后端增量, 旧响应可缺) */
+  holdings_count?: number
+  created_at?: string | null
+  last_nav_date?: string | null
+  /** 最近两个定版净值的涨跌 (百分数值, 1.5 = +1.5%) */
+  day_change_pct?: number | null
+  auto_rules?: Array<{ name: string; match_kind: string; match_id: string; side: 'buy' | 'sell'; enabled: boolean }>
+  auto_enabled?: number
+  /** 盘中实时估算 (后端增量, 当日快照就绪才有): live_* 为快照价口径 */
+  live_total?: number | null
+  live_pnl_pct?: number | null
+  estimating?: boolean
+}
+
+/** FIFO 配对回合 (GET /api/paper/rounds): 开仓成本含买入费, 平仓净额扣卖出费 */
+export interface PaperRound {
+  symbol: string
+  open_date: string
+  close_date: string
+  qty: number
+  pnl: number
+  pnl_pct: number
+  holding_days: number
+}
+
+/** 对比批量创建的单个来源 (POST /api/paper/arena/batch_create) */
+export interface PaperArenaSource {
+  name?: string
+  match_kind: 'strategy' | 'rule'
+  match_id: string
+  side?: 'buy' | 'sell' | 'auto'
+  size_mode?: 'fixed_amount' | 'pct_equity'
+  size_value?: number
+  order_type?: 'market' | 'next_open' | 'close'
+  cooldown_days?: number
+  /** 最大同时持仓标的数 (0 = 不限); 对齐回测 max_positions 口径 */
+  max_positions?: number
 }
 
 export interface PaperHolding {
@@ -2522,11 +2559,14 @@ export interface PaperAutoRule {
   name: string
   match_kind: 'strategy' | 'rule'
   match_id: string
-  side: 'buy' | 'sell'
+  /** auto = 跟随策略信号方向 (入场/进池买入, 出场/移出全平); 仅 match_kind=strategy 支持 */
+  side: 'buy' | 'sell' | 'auto'
   size_mode: 'fixed_amount' | 'pct_equity'
   size_value: number
   order_type: 'market' | 'next_open' | 'close'
   cooldown_days: number
+  /** 最大同时持仓标的数 (仅约束买入开新仓, 0 = 不限); 对齐回测 max_positions 口径 */
+  max_positions?: number
   enabled: boolean
   created_at: string
 }
@@ -5777,6 +5817,21 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
+  /** 对比批量创建: 同本金/同费率一次开 N 个账户, 各绑一条规则 (服务端生成 arena_ 前缀 id) */
+  paperArenaCreate: (body: {
+    initial_cash: number
+    sources: PaperArenaSource[]
+    name_prefix?: string
+    commission_pct?: number
+    stamp_tax_pct?: number
+    slippage_bps?: number
+    queue_limit_orders?: boolean
+  }) =>
+    request<{ created: Array<{ account: string; name: string; rule_id: string }> }>('/api/paper/arena/batch_create', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
   paperOrderCreate: (body: { symbol: string; side: 'buy' | 'sell'; qty?: number; amount?: number; order_type: 'market' | 'next_open' | 'close'; ref_price?: number }, account?: string) =>
     request<{ order: PaperOrder }>(accUrl('/api/paper/orders', account), {
       method: 'POST',
@@ -5803,11 +5858,18 @@ export const api = {
   paperStats: (account?: string) =>
     request<{ rounds: number; win_rate: number; profit_loss_ratio: number | null; avg_holding_days: number; realized_pnl: number; max_drawdown: number | null }>(accUrl('/api/paper/stats', account)),
 
+  paperRounds: (account?: string) =>
+    request<{ rounds: PaperRound[] }>(accUrl('/api/paper/rounds', account)),
+
   paperCompare: () =>
     request<{ accounts: PaperCompareRow[] }>('/api/paper/compare'),
 
   paperFreeze: (frozen: boolean, account?: string) =>
     request<{ account: PaperAccount }>(accUrl('/api/paper/freeze?frozen=' + frozen, account), { method: 'POST' }),
+
+  /** 删除账户及其全部数据 (不可恢复); 有持仓/待成交订单时后端拒绝, force=true 强删 */
+  paperDeleteAccount: (force: boolean, account?: string) =>
+    request<{ ok: boolean; deleted: string; holdings?: number; pending_orders?: number }>(accUrl(`/api/paper/account?force=${force}`, account), { method: 'DELETE' }),
 
   paperAutoRules: (account?: string) =>
     request<{ rules: Array<PaperAutoRule | PaperFlipRule> }>(accUrl('/api/paper/auto_rules', account)),

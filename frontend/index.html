@@ -15,14 +15,6 @@
         } catch (e) {
           document.documentElement.classList.add('dark')
         }
-        try {
-          var raw = localStorage.getItem('tf-page-zoom')
-          var z = raw == null ? 0.9 : JSON.parse(raw)
-          if (typeof z !== 'number' || z < 0.8 || z > 1.5) z = 0.9
-          document.documentElement.style.zoom = String(z)
-        } catch (e) {
-          document.documentElement.style.zoom = '0.9'
-        }
       })()
     </script>
     <!-- [fork R366] **这里故意没有 `viewport-fit=cover`。**
@@ -55,6 +47,26 @@
   </head>
   <body class="bg-base text-foreground">
     <div id="root"></div>
+    <script>
+      // 预渲染缩放脚本: #root transform scale (方案详见 src/lib/pageZoom.ts —
+      // 不用 CSS zoom, zoom≠1 会让 ECharts 鼠标命中偏移)。
+      // 放在 #root 之后、main.tsx (module 延迟执行) 之前: 首帧绘制前生效, 无尺寸跳变。
+      (function () {
+        var z = 1
+        try {
+          var raw = localStorage.getItem('tf-page-zoom')
+          var v = raw == null ? 1 : JSON.parse(raw)
+          if (typeof v === 'number' && v >= 0.8 && v <= 1.5) z = v
+        } catch (e) { /* 解析失败保底不缩放 */ }
+        if (z !== 1) {
+          var root = document.getElementById('root')
+          root.style.transformOrigin = '0 0'
+          root.style.transform = 'scale(' + z + ')'
+          root.style.width = (100 / z) + '%'
+          root.style.height = (100 / z) + '%'
+        }
+      })()
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

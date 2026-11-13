@@ -38,6 +38,9 @@ export interface DefaultStrategyBasicFilter {
 }
 
 export const storage = {
+  /** 页面整体缩放 (设置→系统→界面缩放): 0.8–1.5, 默认 1 (见 lib/pageZoom.ts) */
+  pageZoom:             kv<number>('tf-page-zoom'),
+
   /** 查询轮询 / SSE 配置 */
   queryConfig:          kv<unknown>('tf-stocks-query-config'),
 

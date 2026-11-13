@@ -46,6 +46,7 @@ EXPECTED_OPEN_ENDPOINTS: set[str] = {
     "GET /api/overview/market",
     "GET /api/paper/account",
     "POST /api/paper/account",
+    "DELETE /api/paper/account",
     "GET /api/paper/accounts",
     # [R568 同步上游 v0.3.6] 对比批量创建 (V3)
     "POST /api/paper/arena/batch_create",
@@ -65,6 +66,7 @@ EXPECTED_OPEN_ENDPOINTS: set[str] = {
     "GET /api/paper/overview",
     "GET /api/paper/positions",
     "POST /api/paper/rebuild",
+    "GET /api/paper/rounds",
     "POST /api/paper/settings",
     "GET /api/paper/stats",
     "GET /api/paper/trades",

@@ -465,6 +465,11 @@ textarea {
   border-color: oklch(var(--border-input));
 }
 
+/* 页面缩放 (设置→系统→界面缩放) 用 #root transform: scale 实现 (见 lib/pageZoom.ts):
+ * #root 宽高按 1/z 百分比补偿, 根链路必须是 % 高度链 (vh 不参与换算) —
+ * 主布局与加载占位用 h-full/min-h-full 而非 h-screen。 */
+html, body, #root { height: 100%; }
+
 body {
   background: oklch(var(--base));
   color: oklch(var(--fg-primary));
@@ -484,6 +489,12 @@ body {
   -moz-osx-font-smoothing: auto;
   -webkit-text-size-adjust: 100%;
   text-rendering: optimizeLegibility;
+}
+
+/* 联想下拉 (SuggestInput portal) 进入动画: 2px 上浮 + 淡入, 120ms 快进快出 */
+@keyframes sg-drop-in {
+  from { opacity: 0; transform: translateY(-2px) scale(0.995); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 /* FluxDown 式桌面应用排版：默认规则放进 base 层，确保页面已有的 text-*、

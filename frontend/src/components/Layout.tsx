@@ -23,6 +23,7 @@ import {
   useToggleRealtimeQuotes,
 } from '@/lib/useSharedMutations'
 import { QK } from '@/lib/queryKeys'
+import { getPageScale } from '@/lib/pageZoom'
 import {
   Settings,
   DatabaseZap,
@@ -288,10 +289,14 @@ function DataSourceHealthBadge({ matrix }: { matrix: CapabilityMatrix | undefine
   const openPop = () => {
     window.clearTimeout(closeTimer.current)
     const rect = linkRef.current?.getBoundingClientRect()
-    if (rect) setPopPos({ left: rect.right, top: rect.top + rect.height / 2 })
+    // rect 是视觉坐标, fixed 定位值是 #root 布局坐标 (缩放层), 需 ÷ scale 换算。
+    if (rect) {
+      const z = getPageScale()
+      setPopPos({ left: rect.right / z, top: (rect.top + rect.height / 2) / z })
+    }
   }
   const closePop = () => {
-    closeTimer.current = window.setTimeout(() => setPopPos(null), 80)
+    window.setTimeout(() => setPopPos(null), 80)
   }
   useEffect(() => () => window.clearTimeout(closeTimer.current), [])
   useLayoutEffect(() => {
@@ -299,7 +304,7 @@ function DataSourceHealthBadge({ matrix }: { matrix: CapabilityMatrix | undefine
     const h = popRef.current.offsetHeight
     const margin = 8
     const minCenter = margin + h / 2
-    const maxCenter = window.innerHeight - margin - h / 2
+    const maxCenter = window.innerHeight / getPageScale() - margin - h / 2
     const clamped = Math.min(maxCenter, Math.max(minCenter, popPos.top))
     if (clamped !== popPos.top) setPopPos({ ...popPos, top: clamped })
   }, [popPos])
@@ -956,7 +961,7 @@ export function Layout() {
 
   return (
     <div
-      className="h-screen grid bg-base text-foreground overflow-hidden transition-[grid-template-columns] duration-200 ease-smooth"
+      className="h-full grid bg-base text-foreground overflow-hidden transition-[grid-template-columns] duration-200 ease-smooth"
       style={{ gridTemplateColumns: isDesktop && !overlayPreview ? (navState === 'expanded' ? '14rem 1fr' : navState === 'rail' ? '3.5rem 1fr' : '0 1fr') : '1fr' }}
     >
       {/* 移动端抽屉遮罩 */}
