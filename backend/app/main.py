@@ -183,10 +183,14 @@ def _init_mining_manager(app: FastAPI, store: DataStore):
     from app.services.mining_manager import MiningJobManager
 
     mining_manager = MiningJobManager(store.data_dir)
-    recovered = mining_manager.recover_interrupted()
+    # [R589 同步上游 v0.3.27] A degraded instance must never rewrite another
+    # owner's live run manifests.
+    recovered_mining_runs = (
+        mining_manager.recover_interrupted() if app.state.mining_lock_acquired else 0
+    )
     app.state.mining_manager = mining_manager
-    if recovered:
-        logger.warning("recovered %d interrupted mining runs", recovered)
+    if recovered_mining_runs:
+        logger.warning("recovered %d interrupted mining runs", recovered_mining_runs)
     guardian_manager = MiningJobManager(
         store.data_dir,
         kind="guardian",
