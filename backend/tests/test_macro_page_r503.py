@@ -1,7 +1,8 @@
-"""[fork R503] 宏观分析页: 市场环境与情绪周期两组同时铺开, 共用时间范围; 菜单改名。
+"""[fork R503] 市场环境页(路由 /regime): 两组内容同页铺开, 共用时间范围。
 
 用户: 「市场环境和情绪周期两组内容不再搞同页切换, 都放在同一个页面一次性同时展示,
 但仍共用时间范围。左边菜单市场环境改成宏观分析」。
+[R601] 以上游为准, 菜单与页名都叫回「市场环境」。
 """
 from __future__ import annotations
 
@@ -43,9 +44,9 @@ def test_R503_仍共用一组时间范围():
     assert "api.regimeHistory(histRange.start, histRange.end, histRange.limit)" in src
 
 
-def test_R503_页名与菜单同名_宏观分析():
+def test_R503_页名与菜单同名_市场环境():
     src = code_of(REGIME)
-    assert 'title="宏观分析"' in src
-    assert "{ id: '/regime', label: '宏观分析', icon: IconRegime }" in code_of("lib/navigation.ts")
+    assert 'title="市场环境"' in src
+    assert "{ id: '/regime', label: '市场环境', icon: IconRegime }" in code_of("lib/navigation.ts")
     assert "getNavigationEntries(" in code_of("pages/settings/MenuSettings.tsx")
-    assert "'/regime': '宏观分析'," in code_of("custom/assistant/AssistantLauncher.tsx")
+    assert "'/regime': '市场环境'," in code_of("custom/assistant/AssistantLauncher.tsx")

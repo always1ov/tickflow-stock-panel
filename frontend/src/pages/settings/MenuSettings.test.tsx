@@ -60,8 +60,8 @@ async function moveWatchlist(group: string) {
 
 it('pins home and atomically saves a new group, child move, and visibility', async () => {
   await mount()
-  expect(host.querySelector<HTMLButtonElement>('button[aria-label="拖动虚拟账户"]')?.disabled).toBe(true)
-  expect(host.querySelector('select[aria-label="移动虚拟账户到"]')).toBeNull()
+  expect(host.querySelector<HTMLButtonElement>('button[aria-label="拖动模拟盘"]')?.disabled).toBe(true)
+  expect(host.querySelector('select[aria-label="移动模拟盘到"]')).toBeNull()
   const group = await createGroup(); await moveWatchlist(group)
   await act(async () => host.querySelector<HTMLButtonElement>('button[aria-label="隐藏数据"]')!.click())
   await click('保存布局')

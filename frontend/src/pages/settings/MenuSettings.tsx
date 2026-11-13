@@ -177,7 +177,7 @@ export function SettingsMenuSettingsPanel() {
     <SettingsCard
       icon={ListTree}
       title="组织左侧菜单"
-      desc="把常用页面归入分类，缩短侧栏。虚拟账户固定置顶，设置固定在侧栏底部；其他菜单可拖动或选择归属，自选保留原有分组。"
+      desc="把常用页面归入分类，缩短侧栏。模拟盘固定置顶，设置固定在侧栏底部；其他菜单可拖动或选择归属，自选保留原有分组。"
       right={<Link to="/settings?tab=pages&section=ext-pages" className="rounded-btn border border-border px-3 py-2 text-xs text-secondary hover:bg-elevated">管理扩展页面</Link>}
     >
     <div className="mb-3 flex flex-wrap items-center gap-2">

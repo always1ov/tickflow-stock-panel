@@ -43,7 +43,7 @@ export function ErrorCard({ error, onRetry, homeLink }: {
   error: unknown
   /** 给了就画「重试」—— 只有边界那一层能原地重试; 路由那层没有可回退的树 */
   onRetry?: () => void
-  /** 给了就画「回到虚拟账户」—— 只在没有壳的整页错误上要 */
+  /** 给了就画「回到模拟盘」—— 只在没有壳的整页错误上要 */
   homeLink?: boolean
 }) {
   const stale = isStaleChunkError(error)
@@ -90,7 +90,7 @@ export function ErrorCard({ error, onRetry, homeLink }: {
                 to="/paper"
                 className="inline-flex items-center rounded-btn border border-border px-2.5 py-1 text-xs text-secondary hover:bg-elevated hover:text-foreground transition-colors"
               >
-                回到虚拟账户
+                回到模拟盘
               </Link>
             )}
           </div>
@@ -152,7 +152,7 @@ export function RouteErrorPage() {
               to="/paper"
               className="inline-flex items-center rounded-btn border border-accent/40 bg-accent/10 px-2.5 py-1 text-xs text-accent hover:bg-accent/20 transition-colors"
             >
-              回到虚拟账户
+              回到模拟盘
             </Link>
           </div>
         </div>

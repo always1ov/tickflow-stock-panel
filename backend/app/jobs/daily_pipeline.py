@@ -808,7 +808,7 @@ def run_now(
     # 「市场环境」等可选开关控制, 恒运行 (开销可忽略); 软失败不阻断主管道。
     paper_summary: dict = {}
     try:
-        emit("paper_settle", 94, "虚拟账户结算…")
+        emit("paper_settle", 94, "模拟盘结算…")
         from app.strategy import paper as paper_trading
         # 逐账户结算 (账户间订单/台账隔离), 汇总合并供日志与结果展示
         totals = {"filled": 0, "expired": 0, "corp_actions": 0, "nav": None, "accounts": []}
@@ -836,7 +836,7 @@ def run_now(
                     alert_store.append_many(repo.store.data_dir, settle_events)
             except Exception as e:
                 logger.warning("模拟盘结算成交留痕失败: %s", e)
-        emit("paper_settle", 94, "虚拟账户结算完成")
+        emit("paper_settle", 94, "模拟盘结算完成")
     except Exception as e:
         logger.warning("paper_settle failed (soft): %s", e)
         stage_errors.append(f"paper_settle: {e}")

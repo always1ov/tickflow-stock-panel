@@ -13,7 +13,7 @@ const SCOPES: { key: string; label: string; desc: string; default: boolean }[] =
   { key: 'write:ext', label: '扩展数据写入', desc: '向已配置的扩展表程序化写入行数据 (会进入策略/回测数据面, 谨慎授予)', default: false },
   { key: 'read:analysis', label: '分析结果读取', desc: '策略清单与结果 / 回测报告 / 市场环境 / 告警', default: false },
   { key: 'run:backtest', label: '触发回测', desc: '提交回测 / 选股 / 因子检验任务 (受并发约束)', default: false },
-  { key: 'paper:trade', label: '虚拟账户交易', desc: '虚拟账户读取与下单/撤单 (写操作, 最高敏感)', default: false },
+  { key: 'paper:trade', label: '模拟盘交易', desc: '模拟盘读取与下单/撤单 (写操作, 最高敏感)', default: false },
 ]
 
 export function SettingsApiTokensPanel() {

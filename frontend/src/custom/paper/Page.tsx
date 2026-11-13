@@ -1599,8 +1599,8 @@ function CompareView({ onCreateSingle }: { onCreateSingle: () => void }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <PageHeader
-        // [R561] 上游叫「模拟盘」, 与本 fork 的转折模拟盘(/lots)撞名 —— 界面名用上游设计文档里的正式名「虚拟账户」
-        title="虚拟账户"
+        // [R601] 页名跟上游扩展的 label「模拟盘」; 账户实体仍叫「虚拟账户」(上游同款措辞)。
+        title="模拟盘"
         subtitle="多账户并行对比 — 同本金 · 同费率 · 点表头排序, 点行展开完整账户操作"
         right={
           <div className="flex flex-wrap items-center gap-2">

@@ -31,14 +31,15 @@ export const CORE_NAVIGATION: NavigationEntry[] = [
   { id: '/stock-analysis', label: '个股分析', icon: IconStockFocus },
   { id: '/dashboard', label: '看板', icon: IconDashboard },
   { id: '/limit-ladder', label: '连板梯队', icon: IconLadder },
-  { id: '/concept-analysis', label: '概念分析', icon: IconConcept },
-  { id: '/industry-analysis', label: '行业分析', icon: IconIndustry },
-  { id: '/financials', label: '财务分析', icon: IconFinancials },
+  { id: '/concept-analysis', label: '概念板块', icon: IconConcept },
+  { id: '/industry-analysis', label: '行业板块', icon: IconIndustry },
+  { id: '/financials', label: '财务概况', icon: IconFinancials },
   { id: '/monitor', label: '监控中心', icon: IconMonitor },
-  { id: '/regime', label: '宏观分析', icon: IconRegime },   // [R503] 原「市场环境」; 路由不变
+  // [R601] 跟上游叫法：上游 /regime 页与菜单都叫「市场环境」(R503 曾改「宏观分析」, 现收回)。
+  { id: '/regime', label: '市场环境', icon: IconRegime },
   { id: '/abnormal', label: '异动监控', icon: IconAlert },
-  // [R561] 上游 v0.3.2 的虚拟账户。上游菜单叫「模拟盘」, 本 fork 叫「虚拟账户」
-  { id: '/paper', label: '虚拟账户', icon: IconPaper },
+  // [R601] 菜单名跟上游扩展的 label「模拟盘」; 账户实体仍叫「虚拟账户」(与上游一致)。
+  { id: '/paper', label: '模拟盘', icon: IconPaper },
   { id: '/signals', label: '信号库', icon: IconSignals },
   { id: '/review', label: '复盘', icon: IconReview },
   // [fork 增强] R93 使用观察笔记 → [R180] 消息面 → [R502] Minds

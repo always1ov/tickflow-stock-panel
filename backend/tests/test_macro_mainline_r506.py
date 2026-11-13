@@ -22,7 +22,7 @@ def test_R506_情绪周期整组不再显示():
     src = code_of(REGIME)
     for gone in ("macro-phase", "情绪周期时间轴", "阶段规律", "阶段 × 主线", "主线排行",
                  "api.regimePhases", "api.regimePhaseLive", "api.regimeMainline(", "MARKET_PHASE", "PHASE_LEGEND"):
-        assert gone not in src, f"宏观分析页还留着情绪周期的 {gone}"
+        assert gone not in src, f"市场环境页还留着情绪周期的 {gone}"
 
 
 def test_R506_当前主线进了现在卡_色与停更规矩一起搬过来():

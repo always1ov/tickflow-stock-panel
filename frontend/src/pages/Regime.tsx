@@ -362,8 +362,8 @@ export function Regime() {
     // [R60] 这一页原来手搓了一个渐变条头部 + 自己的 1440px 限宽, 和别的页
     // 在标题字号、边界、留白上都对不上。头部交给 PageShell, 页内不再自成一套。
     <PageShell
-      // [R503] 菜单「市场环境」改名「宏观分析」—— 页名跟菜单走; 「市场环境」仍是下面第一组的名字
-      title="宏观分析"
+      // [R601] 页名跟上游叫法「市场环境」(R503 曾改名「宏观分析」, 现收回); 「市场环境」仍是下面第一组的名字
+      title="市场环境"
       titleExtra={<Activity className="h-4 w-4 text-accent" />}
       subtitle="市场环境 · 当前主线 · 综合分趋势"
       right={(

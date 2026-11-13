@@ -28,13 +28,13 @@ const PAGE_LABELS: Record<string, string> = {
   '/backtest': '回测',
   '/stock-analysis': '个股分析',
   '/limit-ladder': '连板梯队',
-  '/concept-analysis': '概念分析',
-  '/industry-analysis': '行业分析',
-  '/financials': '财务分析',
+  '/concept-analysis': '概念板块',
+  '/industry-analysis': '行业板块',
+  '/financials': '财务概况',
   '/monitor': '监控中心',
-  '/regime': '宏观分析',
+  '/regime': '市场环境',   // [R601] 跟上游
   '/abnormal': '异动监控',
-  '/paper': '虚拟账户',   // [R564] 转折模拟盘(/lots)并进虚拟账户; 上游这里的 /lots「持仓提醒」本 fork 没有
+  '/paper': '模拟盘',   // [R601] 跟上游扩展的 label; 账户实体仍叫「虚拟账户」
   '/signals': '信号库',
   '/review': '复盘',
   '/indices': '指数',
