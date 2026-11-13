@@ -27,10 +27,14 @@ def test_R523_KPI读数手机降一号():
 
 
 def test_R523_数据页存储体积列不折行():
-    """「1234.5 MB」在 w-16 里会把 MB 折到下一行, 一列数字参差不齐。"""
+    """「1234.5 MB」折到下一行会让一列数字参差不齐。
+
+    [R585 同步上游 v0.3.23] 上游把扩展数据那列改回 w-16 —— 真正防折行的是
+    fork 补的 `whitespace-nowrap`, 所以这里只守 nowrap, 不再钉死列宽。
+    """
     code = code_of("pages/Data.tsx")
-    assert code.count("font-mono text-muted w-20 whitespace-nowrap text-right") == 2
-    assert "font-mono text-muted w-16 text-right" not in code
+    assert code.count("whitespace-nowrap text-right") == 2
+    assert not re.search(r"w-\d+(?:\.\d+)? text-right", code), "体积列又丢了 whitespace-nowrap"
 
 
 def test_R523_Minds笔记条数缺了不拖垮整页():

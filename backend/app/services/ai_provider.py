@@ -1524,7 +1524,9 @@ def _resolve_macos_codex_command() -> str | None:
             continue
     for candidate in candidates:
         try:
-            if candidate.is_file():
+            # [R585 同步上游 v0.3.23] 与 shutil.which 同口径: 无执行位的同名文件
+            # 不是可用 CLI, 否则解析成功后运行才报错。
+            if candidate.is_file() and os.access(candidate, os.X_OK):
                 return str(candidate)
         except OSError:
             continue

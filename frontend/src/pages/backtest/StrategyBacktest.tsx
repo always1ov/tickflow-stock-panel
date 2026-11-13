@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useRef, useCallback, memo, type ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Play, FlaskConical, Clock, Loader2, Square, Search, Plus, X, SlidersHorizontal, BarChart3, Gauge, Zap, ListPlus, HelpCircle, ChevronRight, AlertTriangle, Layers, BookmarkPlus, Download, Filter, Star, TrendingUp, CalendarRange } from 'lucide-react'
+import { Play, FlaskConical, Clock, Loader2, Square, Search, Plus, X, SlidersHorizontal, BarChart3, Gauge, Zap, ListPlus, HelpCircle, ChevronRight, AlertTriangle, Layers, BookmarkPlus, Download, Filter, Star, TrendingUp, CalendarRange, RefreshCw } from 'lucide-react'
 import {
   paramOptionValue, paramOptionLabel,
   api,
@@ -1155,7 +1155,10 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
     ? dataStatus.data?.etf_enriched
     : dataStatus.data?.enriched
   const earliestDate = backtestDataStatus?.earliest_date ?? null
-  const backtestDataUnavailable = dataStatus.isSuccess && !earliestDate
+  // 预热/同步/修复期间统计为 null 是未知态 (stats_pending 契约, 同 Dashboard.isDataStatusPending),
+  // 不得误判成"缺数据"禁用回测 — 等真实统计就绪再判
+  const statsPending = dataStatus.data?.stats_pending === true || dataStatus.data?.indicators_ready === false
+  const backtestDataUnavailable = dataStatus.isSuccess && !statsPending && !earliestDate
   const backtestDataLabel = assetType === 'etf' ? 'ETF 指标数据' : '股票指标数据'
 
   const resetConfigFromDetail = (detail: StrategyDetail) => {
@@ -1250,7 +1253,7 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
     }
   }, [backtestTask])
 
-  const handleRun = () => {
+  const handleRun = (force = false) => {
     if (!selectedStrategy || backtestDataUnavailable) return
     const requestOverrides = detail
       ? normalizeStrategyOverrides(detail, overrides)
@@ -1285,6 +1288,7 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
             ...(regimeMinScore !== '' ? { min_score: Number(regimeMinScore) } : {}),
           }
         : null,
+      force,
     })
   }
 
@@ -1304,7 +1308,9 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
     mutationFn: () => api.regimeRecompute(regimeGapStart ?? undefined, end || undefined),
     onSuccess: data => {
       toast(`环境数据补算完成 (新增 ${data.computed} 天)，自动重新回测`, 'success')
-      handleRun()
+      // 数据已变, 必须 force: 已失败任务的 error 同样被 5 分钟任务缓存保留,
+      // 不带 force 会命中同参数旧 job 直接重放补算前的报错
+      handleRun(true)
     },
     onError: e => toast(`环境数据补算失败 · ${String((e as Error)?.message || e)}`, 'error'),
   })
@@ -2122,14 +2128,27 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
             停止回测
           </button>
         ) : (
-          <button
-            onClick={handleRun}
-            disabled={!selectedStrategy || strategyDetail.isLoading || backtestDataUnavailable}
-            className={buttonClass({ variant: 'primary', size: 'md' }, 'w-full gap-2')}
-          >
-            <Play className="h-3.5 w-3.5 fill-current" />
-            运行回测
-          </button>
+          // [R585 同步上游 v0.3.23] 采纳「强制重跑」双按钮, 主按钮沿用 fork
+          // buttonClass (上游渐变+发光违反 R368)
+          <div className="flex gap-2">
+            <button
+              onClick={() => handleRun()}
+              disabled={!selectedStrategy || strategyDetail.isLoading || backtestDataUnavailable}
+              className={buttonClass({ variant: 'primary', size: 'md' }, 'min-w-0 flex-1 gap-2')}
+            >
+              <Play className="h-3.5 w-3.5 fill-current" />
+              运行回测
+            </button>
+            <button
+              onClick={() => handleRun(true)}
+              disabled={!selectedStrategy || strategyDetail.isLoading || backtestDataUnavailable}
+              title="忽略同参数结果缓存 (保留 5 分钟), 强制重新计算"
+              className={buttonClass({ variant: 'secondary', size: 'md' }, 'shrink-0 gap-1.5')}
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+              强制重跑
+            </button>
+          </div>
         )}
       </section>
 
