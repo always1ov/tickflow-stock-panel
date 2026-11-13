@@ -63,6 +63,9 @@ NOT_USER_DATA = {
     # 放在 data/daily_integrity/ 下, 不在 user_data/ 里
     "daily_integrity_state.json": "每日数据完整性状态(data/daily_integrity/)",
     "integrity_report.json": "每日数据完整性报告(data/daily_integrity/)",
+    # [R595 同步上游 v0.3.33] 桌面版旧数据恢复的完成标记, 由 data_dir_upgrade 自管,
+    # 存在 data/upgrade_backups/data-dir-v1/<token>/ 下, 不在 user_data 里
+    "completed.json": "桌面版旧数据恢复完成标记(data/upgrade_backups/data-dir-v1/<token>/)",
 }
 
 
