@@ -5,7 +5,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Trash2, RefreshCw, Star, X, Search, Settings2, Plus, Check, Filter, Eye, EyeOff, Minus, ChevronsUp, Clock, RotateCcw, FileUp, FolderOpen, FolderMinus, FolderPlus } from 'lucide-react'
 import { api, type KlineRow, type MinuteKlineRow, type WatchlistGroup, type WatchlistGroupColor } from '@/lib/api'
 import { ExtSparkChart } from '@/components/screener/ExtSparkChart'
-import { fetchMinuteBatchIncremental } from '@/lib/minuteBatchIncremental'
+import { fetchMinuteBatchIncremental, MINUTE_SEED_MAX } from '@/lib/minuteBatchIncremental'
+import { fetchDailyBatchChunked } from '@/lib/klineBatchChunked'
 import { extendMinuteTail } from '@/lib/minuteTailExtend'
 import { reuseUnchangedSeries, EMPTY_ROWS } from '@/lib/series-identity'
 import { QK } from '@/lib/queryKeys'
@@ -643,26 +644,29 @@ export function Watchlist() {
     enabled: (list.data?.symbols.length ?? 0) > 0,
   })
 
-  const symbols = enriched.data?.rows?.map((r: any) => r.symbol) ?? []
-  const symbolsKey = symbols.join(',')
-
   // 指数无本地分钟K数据, 分时批量请求剔除指数 symbol (省请求, 避免逐只 404)
-  const minuteSymbols = useMemo(
-    () => symbols.filter((s: string) => (enriched.data?.rows ?? []).find((r: any) => r.symbol === s)?.asset_type !== 'index'),
-    [symbols, enriched.data],
-  )
-  const minuteSymbolsKey = minuteSymbols.join(',')
+  const enrichedRows = enriched.data?.rows
+  const { symbols, minuteSymbols } = useMemo(() => {
+    const rows = enrichedRows ?? []
+    return {
+      symbols: rows.map((r: any) => r.symbol),
+      minuteSymbols: rows.filter((r: any) => r.asset_type !== 'index').map((r: any) => r.symbol),
+    }
+  }, [enrichedRows])
 
   // 实时行情状态 (提前到此处: 分时轮询判断需要 realtimeRunning)
   const quoteStatus = useQuoteStatus()
   const realtimeRunning = quoteStatus.data?.running ?? false
 
-  // 批量日k数据 (天数由列配置决定; 分组卡片视图不展示蜡烛, 挂起请求)
+  // 批量日k数据 (天数由列配置决定)。symbols 不进 key, 按 300/块分块拉取
+  // (后端单次上限 400): 增删自选不再整批重拉, 缓存单份常驻; 天数变化才换 key。
+  // [R508] 卡片视图已撤, 表格是唯一视图。
   const klineBatch = useQuery({
-    queryKey: QK.watchlistKlineBatch(`${symbolsKey}|${candleDays}`),
-    queryFn: () => api.klineDailyBatch(symbols, candleDays),
+    queryKey: QK.watchlistKlineBatch(candleDays),
+    queryFn: () => fetchDailyBatchChunked(symbols, candleDays),
     enabled: dailyKVisible && symbols.length > 0 && viewMode === 'table',
     staleTime: 5 * 60_000,  // 5 分钟内不重请求
+    placeholderData: (prev: any) => prev,
   })
 
   // 当日蜡烛实时修补: 历史 K 线按 staleTime 周期拉取 (见 queryKeys 注释), 最后一根
@@ -708,17 +712,22 @@ export function Watchlist() {
   const intradayRefreshEnabled = prefsData?.minute_intraday_refresh ?? false
   const intradayRefreshInterval = prefsData?.minute_intraday_refresh_interval ?? 6
   // 视口感知: 虚拟器渲染中的 symbol 集合 (可见 + overscan 缓冲), 由下方虚拟器
-  // 区域的 effect 写入; null = 未就绪/非虚拟化视图, 沿用全列表。首轮全量播种
-  // 缓存 (queryFn 在挂载时先于 ref 填充执行), 之后各轮只拉视口集合。
+  // 区域的 effect 写入; null = 未就绪/非虚拟化视图。大列表 (千只自选) 全量播种
+  // 会造成 40 万级分钟对象常驻 — 视口集合就绪后各轮只拉视口, 缓存按 LRU 淘汰
+  // 视口外序列 (见 lib/minuteBatchIncremental.ts)。
   const minuteRequestSymbolsRef = useRef<string[] | null>(null)
   const minuteBatch = useQuery({
-    queryKey: QK.minuteBatch(minuteSymbolsKey),
+    queryKey: QK.minuteBatch(),
     // 增量轮询 (prefer_local): 读缓存以最后一根为 since 只拉新增, 本地合并为
     // 完整序列; 全量分钟健康时服务端零补拉, 不健康时也只增量。
-    // 请求集合 = 视口内 symbol (缓存按 symbol upsert, 视口外保留旧序列)
+    // 请求集合 = 视口内 symbol (缓存按 symbol upsert, 视口外保留旧序列);
+    // 视口未就绪时: 小列表全量, 大列表先拉头部播种 (effect 填充视口后防抖补拉)
     queryFn: () => {
-      const reqSymbols = minuteRequestSymbolsRef.current ?? minuteSymbols
-      return fetchMinuteBatchIncremental(qc, QK.minuteBatch(minuteSymbolsKey), reqSymbols, true)
+      let reqSymbols = minuteRequestSymbolsRef.current ?? minuteSymbols
+      if (minuteRequestSymbolsRef.current == null && reqSymbols.length > MINUTE_SEED_MAX) {
+        reqSymbols = reqSymbols.slice(0, MINUTE_SEED_MAX)
+      }
+      return fetchMinuteBatchIncremental(qc, reqSymbols, true)
     },
     enabled: intradayVisible && minuteSymbols.length > 0 && viewMode === 'table',
     staleTime: 10_000,
@@ -766,6 +775,7 @@ export function Watchlist() {
       qc.invalidateQueries({ queryKey: QK.watchlist })
       qc.invalidateQueries({ queryKey: ['watchlist-enriched'] })
       qc.invalidateQueries({ queryKey: ['kline-batch'] })
+      qc.invalidateQueries({ queryKey: ['minute-batch'] })
     },
   })
 
@@ -776,6 +786,13 @@ export function Watchlist() {
       qc.setQueryData(['watchlist-enriched', extColumnsParam], (old: any) => {
         if (!old?.rows) return old
         return { ...old, rows: old.rows.filter((r: any) => r.symbol !== sym) }
+      })
+      // 分钟缓存单 key 按 symbol 合并 — 同步摘除, 不等 LRU 自然淘汰
+      qc.setQueryData(QK.minuteBatch(), (old: any) => {
+        if (!old?.data || !(sym in old.data)) return old
+        const next = { ...old.data }
+        delete next[sym]
+        return { ...old, data: next }
       })
       // 2. 清除 list 缓存，触发后台 refetch
       qc.invalidateQueries({ queryKey: QK.watchlist })

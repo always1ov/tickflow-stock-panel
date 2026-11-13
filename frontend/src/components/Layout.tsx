@@ -714,7 +714,9 @@ export function Layout() {
     staleTime: 60_000,
   })
   const { data: navEnriched } = useQuery({
-    queryKey: QK.watchlistEnriched(undefined),
+    // 无参 → key 归一为 ['watchlist-enriched', ''], 与自选页 (无 ext 列时) 共享缓存,
+    // 消除侧栏与自选页各拉一份整表的双份内存
+    queryKey: QK.watchlistEnriched(),
     queryFn: () => api.watchlistEnriched(),
     // [R154] 这条在服务端是全自选的指标批量, 与 /api/today 抢的是同一批 CPU ——
     // 侧栏分组涨跌幅晚 1.5s 出来, 换主内容早到
