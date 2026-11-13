@@ -71,7 +71,7 @@ export function Financials() {
   if (!hasFinancial) {
     return (
       <>
-        <PageHeader title="财务分析" subtitle="利润表 / 资负表 / 现金流 / 关键指标 / 股本 / AI分析" />
+        <PageHeader title="财务概况" subtitle="利润表 / 资负表 / 现金流 / 关键指标 / 股本 / AI分析" />
         <div className="px-8 py-10">
           {/* [R539] 原来是橙色卡里再套一个「关于数据源」小框, 两段话说的是同一件事(当前源没有 / 需付费, 换一个源),
               合成一段; 「数据源」只有一处, 一个按钮 */}
@@ -157,7 +157,7 @@ export function Financials() {
   return (
     <>
       <PageHeader
-        title="财务分析"
+        title="财务概况"
         subtitle="利润表 / 资负表 / 现金流 / 关键指标 / 股本 / AI分析"
         right={
           <div className="flex flex-wrap items-center gap-2">
@@ -320,7 +320,7 @@ const extension: FrontendExtension = {
     { id: 'financials', path: '/financials', component: Financials },
   ],
   navigation: [
-    { id: 'financials', routeId: 'financials', label: '财务分析', icon: IconFinancials },
+    { id: 'financials', routeId: 'financials', label: '财务概况', icon: IconFinancials },
   ],
 }
 

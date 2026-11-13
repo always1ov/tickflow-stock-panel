@@ -111,15 +111,20 @@ function pushUiPrefs(updates: Record<string, unknown>): void {
   }, 300)
 }
 
-let _hydrated = false
+let _hydratePromise: Promise<void> | undefined
 
 /**
  * 启动时从后端回填 localStorage (本地已有的键不回写, 反向把本地值上推)。
  * 失败静默 — 读不到后端时继续用本地缓存, 行为与改造前一致。
+ * 幂等且共享同一 Promise: main.tsx 与后进加载的模块 (如 AI 助手 store) 无论
+ * 谁先调用、调用几次, 拿到的都是同一次回填, await 到的都是"已完成"状态。
  */
-export async function hydrateUiPrefs(): Promise<void> {
-  if (_hydrated) return
-  _hydrated = true
+export function hydrateUiPrefs(): Promise<void> {
+  if (!_hydratePromise) _hydratePromise = _doHydrate()
+  return _hydratePromise
+}
+
+async function _doHydrate(): Promise<void> {
   try {
     const res = await fetch('/api/settings/preferences', {
       headers: { Accept: 'application/json' },

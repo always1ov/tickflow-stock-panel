@@ -113,7 +113,7 @@ const ARCH_CLASS: Record<string, { kind: ArchKind; reason: string }> = {
   '/limit-ladder':   { kind: 'ext', reason: '连板梯队视图 — 消费核心数据, 可由扩展页面替换' },
   '/concept-analysis': { kind: 'ext', reason: '概念分析视图 — 消费核心数据, 可由扩展页面替换' },
   '/industry-analysis': { kind: 'ext', reason: '行业分析视图 — 消费核心数据, 可由扩展页面替换' },
-  '/financials':     { kind: 'ext', reason: '财务分析视图 — 消费核心数据, 可由扩展页面替换' },
+  '/financials':     { kind: 'ext', reason: '财务概况视图 — 消费核心数据, 可由扩展页面替换' },
   '/monitor':        { kind: 'ext', reason: '监控消费页 (规则引擎与推送管道属核心), 页面可替换' },
   '/abnormal':       { kind: 'ext', reason: '异动监控视图 — 消费核心数据, 可由扩展页面替换' },
   // [R564] 转折模拟盘(/lots)并进虚拟账户: 六态规则的出手判定现在在这里记实账, 归属跟着改成核心
