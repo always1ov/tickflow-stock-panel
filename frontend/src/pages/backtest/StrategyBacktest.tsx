@@ -1659,6 +1659,32 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
     .map(([key, label]) => ({ key, label, value: Number(executionStats[key] ?? 0) }))
     .filter(item => item.value > 0)
 
+  // 策略选择区高度: 底部手柄上下拖动调整 (80–480px), 记忆到 localStorage
+  const [strategyListMaxH, setStrategyListMaxH] = useState(() => {
+    try {
+      const v = parseInt(localStorage.getItem('bt_strategy_list_maxh') || '', 10)
+      return v >= 80 && v <= 480 ? v : 128
+    } catch { return 128 }
+  })
+  useEffect(() => {
+    try { localStorage.setItem('bt_strategy_list_maxh', String(strategyListMaxH)) } catch { /* 私有模式等 */ }
+  }, [strategyListMaxH])
+  const listResize = useRef<{ startY: number; startH: number } | null>(null)
+  const onListResizeStart = (e: React.PointerEvent<HTMLDivElement>) => {
+    listResize.current = { startY: e.clientY, startH: strategyListMaxH }
+    e.currentTarget.setPointerCapture(e.pointerId)
+  }
+  const onListResizeMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const st = listResize.current
+    if (!st) return
+    setStrategyListMaxH(Math.min(480, Math.max(80, st.startH + (e.clientY - st.startY))))
+  }
+  const onListResizeEnd = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!listResize.current) return
+    listResize.current = null
+    e.currentTarget.releasePointerCapture(e.pointerId)
+  }
+
   return (
     // [R538] 左栏 18rem 时, 回测区间两个日期各只剩 ~118px, 「2026-06-26」折成两行, 建仓口径「次日开盘（推荐）」被截断;
     // 放到 21rem, 两者都不折不截。右侧结果区照样吃满剩下的宽度。
@@ -1737,7 +1763,7 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
                 </button>
               ))}
             </div>
-            <div className="flex max-h-[128px] flex-wrap gap-1 overflow-y-auto p-1">
+            <div className="flex flex-wrap gap-1 overflow-y-auto p-1" style={{ maxHeight: strategyListMaxH }}>
             {strategies.isLoading && (
               <span className="text-xs text-muted px-2 py-1">加载中…</span>
             )}
@@ -1761,6 +1787,24 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
                 )}
               </button>
             ))}
+            </div>
+            {/* 底部拖拽手柄: 上下拉动调整策略列表高度 */}
+            <div
+              role="separator"
+              aria-orientation="horizontal"
+              aria-label="拖动调整策略列表高度"
+              tabIndex={0}
+              onPointerDown={onListResizeStart}
+              onPointerMove={onListResizeMove}
+              onPointerUp={onListResizeEnd}
+              onPointerCancel={onListResizeEnd}
+              onKeyDown={e => {
+                if (e.key === 'ArrowDown') setStrategyListMaxH(h => Math.min(480, h + 16))
+                else if (e.key === 'ArrowUp') setStrategyListMaxH(h => Math.max(80, h - 16))
+              }}
+              className="group flex h-2 shrink-0 cursor-ns-resize items-center justify-center border-t border-border/50 bg-base/40 transition-colors hover:bg-accent/10 focus:outline-none focus-visible:bg-accent/15"
+            >
+              <span className="h-0.5 w-8 rounded-full bg-border transition-colors group-hover:bg-accent/60" />
             </div>
           </div>
         </div>
@@ -2777,7 +2821,7 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
         )}
 
         {/* 免责声明: 常驻于结果区底部 */}
-        <div className="rounded-card border border-border/60 bg-base/40 px-3 py-2 text-center text-[10px] leading-4 text-muted">
+        <div className="rounded-card border border-border/60 bg-base/40 px-3 py-2 text-center text-micro leading-4 text-muted">
           回测基于历史数据与当前参数设定模拟,受成交假设与市场环境影响,过往结果不代表未来收益;
           行情数据来自第三方数据源,其准确性、完整性与及时性不作保证,可能存在缺失、延迟或错误;
           仅供参考,不构成投资建议,请独立决策并自担风险。
@@ -2921,14 +2965,14 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
                 <ConfigSection
                   title="策略参数"
                   hint="自动限制 min/max"
-                  actions={detail.params.length > 0 ? <span className="text-[10px] text-muted">{detail.params.length} 项</span> : undefined}
+                  actions={detail.params.length > 0 ? <span className="text-micro text-muted">{detail.params.length} 项</span> : undefined}
                 >
                   {detail.params.length > 0 ? (
                     <div className="space-y-4">
                       {groupParams(visibleParams(detail.params, strategyParams)).map((g, gi) => (
                         <div key={g.name ?? `ug${gi}`}>
                           {g.name && (
-                            <div className="mb-2 border-b border-border/40 pb-1 text-[11px] font-medium text-muted">{g.name}</div>
+                            <div className="mb-2 border-b border-border/40 pb-1 text-micro font-medium text-muted">{g.name}</div>
                           )}
                           {/* 命名组横排（如「入池开关 + 止盈 + 锁定」同组一行）；无名组回退网格 */}
                           <div className={g.name ? 'flex flex-wrap items-end gap-x-4 gap-y-3' : 'grid grid-cols-1 gap-3 sm:grid-cols-2'}>
@@ -2960,7 +3004,7 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
                         title="叠加过滤（多条件为「且」关系，硬过滤）"
                         allowEmpty
                       />
-                      <div className="text-[11px] leading-5 text-muted/70">
+                      <div className="text-micro leading-5 text-muted/70">
                         默认继承策略设置里保存的叠加条件；字段可点「最新」切换为「前N日」（上限 60 日）。ETF 回测通常无扩展数据字段，请谨慎使用。
                         {overlayIsMatrix && ' matrix 策略不支持字符串字段条件。'}
                       </div>
@@ -3020,7 +3064,7 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
 
               {/* 风控触发: 成交口径说明 + 风控与持仓纪律 + 买卖触发器 */}
               <div className={settingsTab === 'trading' ? 'space-y-3' : 'hidden'}>
-                <div className="rounded-btn border border-accent/25 bg-accent/5 px-3 py-2.5 text-[11px] leading-5 text-secondary">
+                <div className="rounded-btn border border-accent/25 bg-accent/5 px-3 py-2.5 text-micro leading-5 text-secondary">
                   <div className="font-medium text-foreground">触发 / 成交 / 仓位关系</div>
                   <div className="mt-1">触发器决定什么时候产生买卖信号；评分只在多个买点同时出现时排序。</div>
                   <div>成交口径可分别设置建仓/清仓：默认建仓次日开盘（避免未来函数）、清仓当日收盘（持仓中可盘中/收盘卖）。</div>
@@ -3130,7 +3174,7 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
               <div className={settingsTab === 'range' ? 'space-y-3' : 'hidden'}>
                 <ConfigSection title="回测范围">
                   <div className="flex items-center gap-2">
-                    <span className="text-[11px] text-muted">资产类型</span>
+                    <span className="text-micro text-muted">资产类型</span>
                     <div className="inline-flex h-8 rounded-btn border border-border overflow-hidden">
                       {(['stock', 'etf'] as const).map(t => (
                         <button
@@ -3144,10 +3188,10 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
                         </button>
                       ))}
                     </div>
-                    <span className="text-[11px] text-muted/70">ETF 仅技术类策略,读 ETF enriched</span>
+                    <span className="text-micro text-muted/70">ETF 仅技术类策略,读 ETF enriched</span>
                   </div>
                   <StockPoolPicker value={symbols} onChange={setSymbols} assetType={assetType} />
-                  <div className="text-[11px] leading-5 text-muted">需要单票调试或自选池回测时再限定股票池；默认由基础过滤、策略条件与买卖触发器在全市场筛选。</div>
+                  <div className="text-micro leading-5 text-muted">需要单票调试或自选池回测时再限定股票池；默认由基础过滤、策略条件与买卖触发器在全市场筛选。</div>
                 </ConfigSection>
               </div>
             </div>

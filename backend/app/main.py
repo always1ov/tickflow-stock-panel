@@ -31,9 +31,11 @@ from app.api import (
     factors,
     financials,
     focus,  # [fork 增强] R159 推送焦点名单
+    guardian,  # [R578 同步上游 v0.3.16] 策略守护
     indices,
     intraday,
     kline,
+    lab,  # [R578 同步上游 v0.3.16] 研究台
     lots,
     market_recap,
     mining,
@@ -165,7 +167,13 @@ def _load_custom_factors(store: DataStore) -> None:
 
 
 def _init_mining_manager(app: FastAPI, store: DataStore):
-    """恢复被中断的挖掘任务, 并把管理器挂到 app.state。"""
+    """恢复被中断的挖掘任务, 并把管理器挂到 app.state。
+
+    [R578 同步上游 v0.3.16] 同处创建策略守护(guardian)的任务编排: 复用挖掘的
+    线程 + spawn 子进程 + 持久 run store, 独立 namespace 存 run 记录; 与挖掘共用
+    heavy 槽 (避免双份全市场矩阵)。
+    """
+    from app.services.mining_jobs import MiningRunStore
     from app.services.mining_manager import MiningJobManager
 
     mining_manager = MiningJobManager(store.data_dir)
@@ -173,6 +181,17 @@ def _init_mining_manager(app: FastAPI, store: DataStore):
     app.state.mining_manager = mining_manager
     if recovered:
         logger.warning("recovered %d interrupted mining runs", recovered)
+    guardian_manager = MiningJobManager(
+        store.data_dir,
+        kind="guardian",
+        store=MiningRunStore(store.data_dir, namespace="guardian"),
+    )
+    recovered_guardian_runs = guardian_manager.recover_interrupted()
+    app.state.guardian_manager = guardian_manager
+    if recovered_guardian_runs:
+        logger.warning(
+            "recovered %d interrupted guardian runs", recovered_guardian_runs
+        )
     return mining_manager
 
 
@@ -576,6 +595,10 @@ async def _shutdown_services(app: FastAPI, repo: KlineRepository, matrix_prewarm
     mining_manager = getattr(app.state, "mining_manager", None)
     if mining_manager:
         mining_manager.shutdown()
+    # [R578 同步上游 v0.3.16] 策略守护与挖掘共用 heavy 槽, 同样要停。
+    guardian_manager = getattr(app.state, "guardian_manager", None)
+    if guardian_manager:
+        guardian_manager.shutdown()
     if app.state.scheduler:
         app.state.scheduler.shutdown(wait=False)
 
@@ -832,6 +855,8 @@ def _register_routers(app: FastAPI) -> None:
     app.include_router(backtest.router)
     app.include_router(factors.router)
     app.include_router(mining.router)
+    app.include_router(guardian.router)  # [R578 同步上游 v0.3.16] 策略守护
+    app.include_router(lab.router)  # [R578 同步上游 v0.3.16] 研究台
     # [R327 → R564] 转折模拟盘(flip_paper)并进虚拟账户的「跟六态转折」后删了, 数据走 paper_flip(末尾注册)
     app.include_router(intraday.router)
     app.include_router(indices.router)

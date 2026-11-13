@@ -1154,19 +1154,21 @@ def _maybe_schedule_official_retry() -> None:
 
 
 def _scheduled_pipeline_task(pipeline_fn) -> None:
-    """Run weekly mining only after the tracked daily pipeline has fully succeeded."""
+    """Run the scheduled lab cycle (weekly mining + daily guardian) after pipeline success."""
     ok = _run_tracked(pipeline_fn, "daily_pipeline")
     # 管道成功与否都做确认检查: 失败轮同样该有下一次机会
     _maybe_schedule_official_retry()
     if not ok:
         return
     try:
-        from app.services.mining_schedule import run_weekly_mining
+        from app.services.lab_schedule import run_scheduled_lab
 
-        result = run_weekly_mining(_get_app_state())
-        logger.info("scheduled mining result: %s", result)
+        result = run_scheduled_lab(_get_app_state())
+        logger.info("scheduled lab result: %s", result)
     except Exception:
-        logger.exception("scheduled mining enqueue failed; daily pipeline remains succeeded")
+        logger.exception(
+            "scheduled lab enqueue failed; daily pipeline remains succeeded"
+        )
 
 
 # ================================================================

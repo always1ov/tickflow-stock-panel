@@ -79,6 +79,9 @@ _EXPECTED_ROUTERS = (
     "backtest.router",
     "factors.router",
     "mining.router",
+    # [R578 同步上游 v0.3.16] 策略守护 (/api/guardian/*) 与研究台 (/api/lab/*)
+    "guardian.router",
+    "lab.router",
     # [R327] R59 的 AI 操盘手换成了转折模拟盘(flip_paper) → [R564] 并进虚拟账户后删了
     "intraday.router",
     "indices.router",

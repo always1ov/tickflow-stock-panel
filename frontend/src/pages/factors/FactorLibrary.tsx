@@ -18,20 +18,38 @@ const KIND_META: Record<FactorLibraryItem['kind'], { label: string; cls: string 
   custom: { label: '自定义', cls: 'bg-amber-400/10 text-amber-500' },
 }
 
+/** 生命周期状态 (仅自定义/复合因子有): 表格状态列、筛选与详情弹窗共用。
+ *
+ * [R578 同步上游 v0.3.16] 上游给因子库加了生命周期筛选; 本 fork 保持手机不横滑的
+ * 表格形态(R537), 只把状态并进「类型」列与筛选条。
+ */
+const STATUS_META: Record<string, { label: string; cls: string }> = {
+  active: { label: '激活', cls: 'bg-bull/10 text-bull' },
+  watch: { label: '观察', cls: 'bg-warning/10 text-warning' },
+  draft: { label: '草稿', cls: 'bg-base text-muted' },
+  retired: { label: '退役', cls: 'bg-danger/10 text-danger/80' },
+}
+const BUILTIN_STATUS = { label: '内置', cls: 'bg-elevated/60 text-muted' }
+const statusOf = (item: FactorLibraryItem) =>
+  (item.status && STATUS_META[item.status]) || BUILTIN_STATUS
+
 export function FactorLibrary({ onInspect, onEdit }: { onInspect: (factorId: string) => void; onEdit?: (factorId: string) => void }) {
   const [query, setQuery] = useState('')
   const [kind, setKind] = useState('all')
   const [group, setGroup] = useState('all')
+  const [status, setStatus] = useState('all')
   const [detail, setDetail] = useState<FactorLibraryItem | null>(null)
 
   const lib = useQuery({
     queryKey: QK.factorLibrary('all'),
     queryFn: () => api.factorLibrary(),
+    // 注册表近乎静态 (只在保存/删除自定义因子时变化, 届时主动 invalidate), 切 tab 不再闪 loading
+    staleTime: 60_000,
   })
   const factors = lib.data?.factors ?? []
 
   const groups = useMemo(
-    () => Array.from(new Set(factors.map(item => item.group))),
+    () => Array.from(new Set(factors.map(item => item.group))).sort((a, b) => a.localeCompare(b, 'zh')),
     [factors],
   )
 
@@ -40,10 +58,17 @@ export function FactorLibrary({ onInspect, onEdit }: { onInspect: (factorId: str
     return factors.filter(item => {
       if (kind !== 'all' && item.kind !== kind) return false
       if (group !== 'all' && item.group !== group) return false
+      if (status !== 'all') {
+        if (status === 'builtin') {
+          if (item.status != null) return false
+        } else if (item.status !== status) {
+          return false
+        }
+      }
       if (keyword && !`${item.id} ${item.label} ${item.formula}`.toLowerCase().includes(keyword)) return false
       return true
     })
-  }, [factors, query, kind, group])
+  }, [factors, query, kind, group, status])
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-card border border-border bg-surface">
@@ -68,6 +93,14 @@ export function FactorLibrary({ onInspect, onEdit }: { onInspect: (factorId: str
         <select value={group} onChange={event => setGroup(event.target.value)} className={`${INPUT_CLS} w-28`} aria-label="因子分组">
           <option value="all">全部分组</option>
           {groups.map(name => <option key={name} value={name}>{name}</option>)}
+        </select>
+        <select value={status} onChange={event => setStatus(event.target.value)} className={`${INPUT_CLS} w-24`} aria-label="生命周期状态">
+          <option value="all">全部状态</option>
+          <option value="builtin">内置</option>
+          <option value="active">激活</option>
+          <option value="watch">观察</option>
+          <option value="draft">草稿</option>
+          <option value="retired">退役</option>
         </select>
         <span className="ml-auto text-micro text-muted">{lib.isLoading ? '加载中…' : `${filtered.length} / ${factors.length} 个因子`}</span>
       </div>
@@ -118,6 +151,11 @@ export function FactorLibrary({ onInspect, onEdit }: { onInspect: (factorId: str
                       {KIND_META[item.kind].label}
                     </span>
                     {item.pit && <span className="ml-1 text-micro text-warning" title="点时数据: 仅使用公告日不晚于当日的财务数据">点时</span>}
+                    {item.status != null && (
+                      <span className={`ml-1 inline-flex rounded-btn px-1.5 py-0.5 text-micro font-medium ${statusOf(item).cls}`}>
+                        {statusOf(item).label}
+                      </span>
+                    )}
                   </td>
                   <td className="max-w-[22rem] px-3 py-2 max-sm:order-5 max-sm:min-w-0 max-sm:flex-1 max-sm:p-0">
                     <span className="block truncate text-secondary" title={item.formula}>{item.formula}</span>

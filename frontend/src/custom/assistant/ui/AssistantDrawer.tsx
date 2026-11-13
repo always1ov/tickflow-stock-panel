@@ -22,13 +22,18 @@ import {
   Puzzle,
   SendHorizontal,
   Settings2,
+  SlidersHorizontal,
   Sparkles,
   Square,
   Star,
   Trash2,
   TrendingUp,
 } from 'lucide-react'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { cn } from '@/lib/cn'
+import { api } from '@/lib/api'
+import { QK } from '@/lib/queryKeys'
+import { usePreferences } from '@/lib/useSharedQueries'
 import {
   fetchAssistantStatus,
   fetchAssistantSuggests,
@@ -89,6 +94,7 @@ function PanelHeader({
   sending: boolean
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   return (
     <div className="relative flex h-14 shrink-0 items-center gap-2 border-b border-border px-4">
@@ -104,17 +110,101 @@ function PanelHeader({
       )}
       <div className="ml-auto flex shrink-0 items-center gap-0.5">
         <div className="relative">
-          <IconButton title="历史会话" onClick={() => setMenuOpen(v => !v)} disabled={sending}>
+          {/* [R578 同步上游 v0.3.16] 上游抽屉的「助手设置」菜单, 本 fork 只保留动作工具免确认一项 */}
+          <IconButton
+            title="助手设置"
+            onClick={() => { setSettingsOpen(v => !v); setMenuOpen(false) }}
+            disabled={sending}
+          >
+            <SlidersHorizontal className="h-4 w-4" />
+          </IconButton>
+          {settingsOpen && <AssistantSettingsMenu onDone={() => setSettingsOpen(false)} />}
+        </div>
+        <div className="relative">
+          <IconButton
+            title="历史会话"
+            onClick={() => { setMenuOpen(v => !v); setSettingsOpen(false) }}
+            disabled={sending}
+          >
             <History className="h-4 w-4" />
           </IconButton>
           {menuOpen && <SessionMenu sessions={sessions} activeId={activeId} onDone={() => setMenuOpen(false)} />}
         </div>
-        <IconButton title="新对话" onClick={() => { newSession(); setMenuOpen(false) }} disabled={sending}>
+        <IconButton title="新对话" onClick={() => { newSession(); setMenuOpen(false); setSettingsOpen(false) }} disabled={sending}>
           <Plus className="h-4 w-4" />
         </IconButton>
       </div>
     </div>
   )
+}
+
+/** 助手设置: 动作工具免确认开关(偏好存后端 preferences, 与设置页同源)。
+ *
+ * [R578 同步上游 v0.3.16] 上游把「毛玻璃遮罩 + 动作工具免确认」两个开关放进了
+ * 抽屉的「助手设置」菜单。本 fork 的助手是 Minds 的一栏(R502), 没有遮罩可言,
+ * 只保留免确认: 打开后 create_signal_strategy / create_strategy / run_backtest /
+ * add_to_watchlist / sync_data 不再逐次弹确认卡, 直接执行。
+ */
+function AssistantSettingsMenu({ onDone }: { onDone: () => void }) {
+  const prefs = usePreferences()
+  const qc = useQueryClient()
+  const enabled = prefs.data?.assistant_auto_approve_actions ?? false
+  const save = useMutation({
+    mutationFn: (next: boolean) => api.updateAssistantAutoApprove(next),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: QK.preferences }) },
+  })
+
+  return (
+    <>
+      <div className="fixed inset-0 z-[61]" onClick={onDone} />
+      <div className="absolute right-0 top-full z-[62] mt-1 w-72 rounded-card border border-border bg-surface p-3 shadow-xl">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <div className="text-xs font-medium text-foreground">动作工具免确认</div>
+            <div className="mt-1 text-micro leading-relaxed text-secondary">
+              打开后创建信号/策略、回测、加自选、数据补全不再逐次弹确认卡, 直接执行。
+            </div>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={enabled}
+            aria-label="动作工具免确认"
+            disabled={save.isPending}
+            onClick={() => save.mutate(!enabled)}
+            className={cn(
+              'relative mt-0.5 inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200 disabled:opacity-50',
+              enabled ? 'bg-accent' : 'bg-border',
+            )}
+          >
+            <span
+              className={cn(
+                'inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm transition-transform duration-200',
+                enabled ? 'translate-x-[18px]' : 'translate-x-0.5',
+              )}
+            />
+          </button>
+        </div>
+        {enabled && (
+          <div className="mt-2 rounded-btn bg-warning/10 px-2 py-1.5 text-micro leading-relaxed text-warning">
+            已开启: 助手会不经确认直接写入。轮次检查点仍然有效 (防止单轮无限调用)。
+          </div>
+        )}
+      </div>
+    </>
+  )
+}
+
+/** 会话时间: 今天/昨天 + HH:MM, 年内 MM-DD HH:MM, 跨年带年份 (上游 v0.3.16) */
+function formatSessionTime(ts: number): string {
+  const d = new Date(ts)
+  const now = new Date()
+  const hm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+  if (d.toDateString() === now.toDateString()) return `今天 ${hm}`
+  const yesterday = new Date(now.getTime() - 86_400_000)
+  if (d.toDateString() === yesterday.toDateString()) return `昨天 ${hm}`
+  const md = `${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  return d.getFullYear() === now.getFullYear() ? `${md} ${hm}` : `${d.getFullYear()}-${md}`
 }
 
 function SessionMenu({
@@ -143,11 +233,14 @@ function SessionMenu({
           >
             <button
               type="button"
-              className="min-w-0 flex-1 cursor-pointer truncate text-left"
+              className="min-w-0 flex-1 cursor-pointer text-left"
               onClick={() => { selectSession(session.id); onDone() }}
               title={session.title}
             >
-              {session.title || '新对话'}
+              <span className="block truncate">{session.title || '新对话'}</span>
+              <span className="block text-micro leading-tight text-muted">
+                {formatSessionTime(session.createdAt)}
+              </span>
             </button>
             <button
               type="button"

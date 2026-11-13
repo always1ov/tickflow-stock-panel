@@ -56,6 +56,9 @@ NOT_USER_DATA = {
     "state.json": "升级保护扫描状态(data/upgrade_guard/state.json)",
     "report.json": "升级保护对比报告(data/upgrade_guard/reports/<id>/report.json)",
     "upgrade_manifest.json": "构建期生成的程序文件 sha256 清单(app/upgrade_manifest.json)",
+    # [R578 同步上游 v0.3.16] 策略守护的组合建议写在 user_data/strategy_guardian/ 下,
+    # 目录本身已在 STORES 登记, 文件名单独列出免得体检守卫以为是漏登记
+    "combinations.json": "策略守护组合建议(user_data/strategy_guardian/, 目录已登记)",
 }
 
 

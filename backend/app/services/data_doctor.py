@@ -184,6 +184,10 @@ STORES: tuple[Store, ...] = (
           note="上游 v0.3.6 新增; 结构由 custom/assistant/sessions.py 管(≤20 会话 × 200 条), 不做字段级补齐"),
     Store("user_data/task_registry.json", "任务注册表", shape=SHAPE_OPAQUE, kind=KIND_DERIVED,
           note="上游 v0.3.6 新增; 回测/挖掘等任务的运行状态登记, 可重算"),
+    # [R578 同步上游 v0.3.16] 策略守护: 每策略一份档案在 strategy_guardian/<id>.json,
+    # 组合建议写在 strategy_guardian/combinations.json
+    Store("user_data/strategy_guardian", "策略守护档案", fmt=FMT_DIR,
+          note="上游 v0.3.16 新增; 档案与组合建议由 guardian_store.py 管, 删掉只会丢复验历史"),
 )
 
 #: 内容一个字节都不读的存储 —— 里面是口令散列与明文 Key。

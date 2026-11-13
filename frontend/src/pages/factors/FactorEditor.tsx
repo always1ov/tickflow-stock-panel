@@ -350,8 +350,8 @@ export function FactorEditor({ editId = '' }: { editId?: string }) {
                         onClick={() => insertSnippet(col.id)}
                         className={CHIP_CLS}
                       >
-                        <span className="font-mono text-accent">{col.id}</span>
-                        <span className="ml-1 font-sans text-muted">{col.label}</span>
+                        <span className="font-sans text-secondary">{col.label}</span>
+                        <span className="ml-1 font-mono text-muted/70">{col.id}</span>
                       </button>
                     ))}
                   </div>
@@ -506,7 +506,7 @@ export function FactorEditor({ editId = '' }: { editId?: string }) {
                   </div>
                 </div>
                 <div className="text-micro leading-relaxed text-muted">
-                  试算仅为快照预览 (无成本/分层), 完整检验请到「检验」页运行。样本内表现不代表未来。
+                  试算仅为快照预览 (无成本/分层), 完整检验请到「发现」页运行。样本内表现不代表未来。
                 </div>
 
                 {/* 注册/更新区: 试算有非空输出才可保存 (服务端同样 fail-closed 校验) */}
@@ -562,7 +562,7 @@ export function FactorEditor({ editId = '' }: { editId?: string }) {
                       {savedId && !save.isPending && (
                         <button
                           type="button"
-                          onClick={() => navigate(`/factors?tab=inspect&focus=${savedId}`)}
+                          onClick={() => navigate(`/factors?tab=discover&focus=${savedId}`)}
                           className={buttonClass({}, 'shrink-0 gap-1.5 whitespace-nowrap')}
                         >
                           去检验 {savedId}
@@ -572,7 +572,7 @@ export function FactorEditor({ editId = '' }: { editId?: string }) {
                     <div className="mt-1 text-micro text-muted">
                       {editing
                         ? '公式变化会保存为新版本并回草稿态 (需重新检验后激活); 仅改名称/分组保留当前状态。'
-                        : '保存后状态为 draft；到「检验」页跑完整检验确认有效后，在因子库中激活。'}
+                        : '保存后状态为 draft；到「发现」页跑完整检验确认有效后，在因子库中激活。'}
                     </div>
                     {savedId && savedVersion != null && (
                       <div className="mt-1 text-micro text-bull">已保存: {savedId} v{savedVersion}</div>

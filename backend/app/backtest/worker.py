@@ -101,13 +101,13 @@ def _decode_backtest_config(payload: dict[str, Any]):
     return StrategyBacktestConfig(**values)
 
 
-def _decode_optimize_config(payload: dict[str, Any]):
-    from app.backtest.optimizer import OptimizeConfig
+def _decode_robust_config(payload: dict[str, Any]):
+    from app.backtest.robust_optimizer import RobustOptimizeConfig
 
     values = dict(payload)
     values["start"] = date.fromisoformat(values["start"])
     values["end"] = date.fromisoformat(values["end"])
-    return OptimizeConfig(**values)
+    return RobustOptimizeConfig(**values)
 
 
 def _decode_walkforward_config(payload: dict[str, Any]):
@@ -126,25 +126,20 @@ def encode_backtest_config(config) -> dict[str, Any]:
     return payload
 
 
-def encode_optimize_config(config) -> dict[str, Any]:
-    payload = asdict(config)
-    payload["start"] = config.start.isoformat()
-    payload["end"] = config.end.isoformat()
-    return payload
-
-
 def make_worker_task(kind: str, data_dir: Path, config) -> dict[str, Any]:
     if kind == "backtest":
         encoded = encode_backtest_config(config)
-    elif kind == "optimize":
-        encoded = encode_optimize_config(config)
-    elif kind == "walkforward":
+    elif kind in ("walkforward", "robust_optimize"):
         encoded = asdict(config)
         encoded["start"] = config.start.isoformat()
         encoded["end"] = config.end.isoformat()
     elif kind == "mining":
         if not isinstance(config, dict):
             raise TypeError("mining worker config must be a dict")
+        encoded = dict(config)
+    elif kind == "guardian":
+        if not isinstance(config, dict):
+            raise TypeError("guardian worker config must be a dict")
         encoded = dict(config)
     else:
         raise ValueError(f"unsupported worker task kind: {kind}")
@@ -197,6 +192,11 @@ def _worker_entry(task: dict[str, Any], event_queue, cancel_event) -> None:
         from app.factors.store import load_into_registry
 
         load_into_registry(data_dir)
+        # 扩展数据因子 (ext_) 与 uf_/cf_ 同理只在主进程注册; 不同步时挖掘
+        # 请求携带的 ext 因子会因注册表缺失被拒 (unknown mining factors)。
+        from app.factors.ext_factors import ensure_synced
+
+        ensure_synced(data_dir)
         strategy_engine = StrategyEngine(
             strategy_dirs=_strategy_dirs(data_dir),
             override_loader=lambda sid: strategy_config.load_override(data_dir, sid),
@@ -210,15 +210,12 @@ def _worker_entry(task: dict[str, Any], event_queue, cancel_event) -> None:
         if kind == "backtest":
             config = _decode_backtest_config(task["config"])
             result = asdict(service.run(config, _progress, cancel_event))
-        elif kind == "optimize":
-            config = _decode_optimize_config(task["config"])
-            optimizer = StrategyOptimizer(service, strategy_engine)
-            result = optimizer.optimize(
-                config,
-                _progress,
-                cancel_event,
-                rss_sampler=sampler,
-            )
+        elif kind == "robust_optimize":
+            from app.backtest.robust_optimizer import RobustOptimizeService
+
+            config = _decode_robust_config(task["config"])
+            robust = RobustOptimizeService(service, strategy_engine)
+            result = robust.robust_optimize(config, _progress, cancel_event)
         elif kind == "walkforward":
             from app.backtest.walkforward import WalkForwardService
 
@@ -237,6 +234,18 @@ def _worker_entry(task: dict[str, Any], event_queue, cancel_event) -> None:
                 progress_cb=_progress,
                 cancel_check=cancel_event,
                 rss_sampler=sampler,
+            )
+        elif kind == "guardian":
+            from app.backtest.guardian_runtime import run_guardian_runtime
+
+            payload = dict(task["config"])
+            result = run_guardian_runtime(
+                {**payload.get("request", {}), "run_id": payload.get("run_id")},
+                data_dir=data_dir,
+                service=service,
+                strategy_engine=strategy_engine,
+                progress_cb=_progress,
+                cancel_check=cancel_event,
             )
         else:
             raise ValueError(f"unsupported worker task kind: {kind}")
