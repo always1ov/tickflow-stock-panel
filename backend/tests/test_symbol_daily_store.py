@@ -342,7 +342,7 @@ def test_R492_仓库get_daily_列下推快路径_含最新一根覆盖(store, mo
     latest = _orig(root, "stock", "600000.SH", last, last).with_columns(pl.lit(99.9).alias("close"))
 
     def call(repo):
-        repo.get_enriched_latest = lambda: (latest, last)
+        repo.get_enriched_latest = lambda *_a, **_k: (latest, last)
         return repo.get_daily("600000.SH", date(1990, 1, 1), END, OHLCV)
     got1, got2, want = _both(root, monkeypatch, call)
     assert want.filter(pl.col("date") == last)["close"][0] == 99.9, "原路本身要带覆盖, 这条用例才有意义"
@@ -353,7 +353,7 @@ def test_R492_仓库get_daily_不指定列_全套指标照原样重算(store, mo
     root, _ = store
 
     def call(repo):
-        repo.get_enriched_latest = lambda: (pl.DataFrame(), None)
+        repo.get_enriched_latest = lambda *_a, **_k: (pl.DataFrame(), None)
         return repo.get_daily("600000.SH", date(2026, 7, 1), END)
     got1, got2, want = _both(root, monkeypatch, call)
     assert "ma20" in want.columns and want.height > 0
@@ -378,7 +378,7 @@ def test_R492_历史缓存走仓库_与原路逐位一致(store, monkeypatch):
     latest = _orig(root, "stock", "600000.SH", last, last).with_columns(pl.lit(88.8).alias("close"))
 
     def call(repo):
-        repo.get_enriched_latest = lambda: (latest, last)
+        repo.get_enriched_latest = lambda *_a, **_k: (latest, last)
         oh.clear()
         return oh.get_history(repo, "stock", "600000.SH", END)
     got1, got2, want = _both(root, monkeypatch, call)

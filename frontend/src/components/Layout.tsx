@@ -10,6 +10,7 @@ const GlossaryDialog = lazy(() => import('@/components/GlossaryDialog'))
 import { AlertToastContainer } from '@/components/AlertToast'
 import { AiAnalysisHost } from '@/components/financials/AiAnalysisHost'
 import { AiReportBubble } from '@/components/financials/AiReportBubble'
+import { DailyDataHealthNotice } from '@/components/data/DailyDataHealthNotice'
 import { StockAnalysisHost } from '@/components/stock-analysis/StockAnalysisHost'
 import { StockAnalysisBubble } from '@/components/stock-analysis/StockAnalysisBubble'
 import {
@@ -188,7 +189,7 @@ function MonitorBadge({ active }: { active: boolean }) {
   })()
   if (active || unread <= 0 || !badgeEnabled) return null
   return (
-    <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-micro font-bold text-white animate-pulse">
+    <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-micro font-bold text-on-accent animate-pulse">
       {unread > 99 ? '99+' : unread}
     </span>
   )
@@ -1426,6 +1427,8 @@ export function Layout() {
             与服务连接已断开 · 正在重连
           </div>
         )}
+        {/* [R586 同步上游 v0.3.24] 每日数据健康提示 */}
+        <DailyDataHealthNotice />
         {/* [R321] 边界在 Suspense **外面**: lazy chunk 拿不到时错是从 Suspense 里抛
             出来的, 边界在里面就接不住。按路径复位 —— 换页即重来。 */}
         <PageErrorBoundary resetKey={location.pathname}>
@@ -1465,7 +1468,7 @@ export function Layout() {
             </p>
             <div className="mt-4 flex justify-end gap-2">
               <button type="button" onClick={() => setMiningQueuedWarning(null)} className="h-8 rounded-btn border border-border px-3 text-xs text-secondary hover:bg-elevated">取消</button>
-              <button type="button" onClick={() => { setMiningQueuedWarning(null); void doEnableRealtime() }} className="h-8 rounded-btn bg-accent px-3 text-xs font-semibold text-white hover:opacity-90">仍要开启</button>
+              <button type="button" onClick={() => { setMiningQueuedWarning(null); void doEnableRealtime() }} className="h-8 rounded-btn bg-accent px-3 text-xs font-semibold text-on-accent hover:opacity-90">仍要开启</button>
             </div>
           </div>
         </div>

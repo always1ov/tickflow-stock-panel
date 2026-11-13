@@ -72,6 +72,7 @@ from app.extensions.loader import (
     start_backend_extensions,
 )
 from app.jobs import daily_pipeline
+from app.services.daily_health import DailyIntegrityError
 from app.services.matrix_prewarm_owner import MatrixCachePrewarmOwner
 from app.services.mining_process_lock import MiningProcessLock, MiningProcessLockError
 from app.services.quote_service import QuoteService
@@ -628,6 +629,11 @@ async def _shutdown_services(app: FastAPI, repo: KlineRepository, matrix_prewarm
         if service:
             getattr(service, method)()
 
+    # [R586 同步上游 v0.3.24] webhook/系统通知投递线程池: 放弃排队投递并关闭,
+    # 避免通知静默丢失在 daemon 线程里。
+    from app.services.quote_service import shutdown_delivery_executors
+
+    shutdown_delivery_executors()
     logger.info("shutdown")
 
 
@@ -720,6 +726,43 @@ async def _application_lifespan(app: FastAPI):
         yield
     finally:
         await _shutdown_services(app, repo, matrix_prewarm_owner)
+        repo._on_refresh_done = None  # noqa: SLF001
+        wd = getattr(app.state, "watchdog", None)
+        if wd:
+            await wd.stop()
+        if not matrix_prewarm_owner.shutdown(timeout=5.0):
+            logger.warning("matrix cache prewarm did not stop within 5 seconds")
+        mmanager = getattr(app.state, "mining_manager", None)
+        if mmanager:
+            mmanager.shutdown()
+        gmanager = getattr(app.state, "guardian_manager", None)
+        if gmanager:
+            gmanager.shutdown()
+        if app.state.scheduler:
+            app.state.scheduler.shutdown(wait=False)
+        ps = getattr(app.state, "pull_scheduler", None)
+        if ps:
+            ps.stop()
+        fsc = getattr(app.state, "financial_scheduler", None)
+        if fsc:
+            fsc.stop()
+        qs = getattr(app.state, "quote_service", None)
+        if qs:
+            qs.stop()
+        dsvc = getattr(app.state, "depth_service", None)
+        if dsvc:
+            dsvc.stop_polling()
+        wbot = getattr(app.state, "wecom_bot_service", None)
+        if wbot:
+            wbot.stop()
+        mrs = getattr(app.state, "minute_refresh", None)
+        if mrs:
+            mrs.stop()
+        # webhook/系统通知投递线程池: 放弃排队投递并关闭, 避免通知静默丢失在 daemon 线程里
+        from app.services.quote_service import shutdown_delivery_executors
+
+        shutdown_delivery_executors()
+        logger.info("shutdown")
 
 
 @asynccontextmanager
@@ -971,11 +1014,9 @@ async def capability_denied_handler(request: Request, exc: CapabilityDenied) -> 
     )
 
 
-# [R327] R68 那个「操盘手账本读不出来 → 503 而且不写」的 handler 删掉了。
-# 它守的是一条具体的路: 账本读失败时若按空账本继续跑, 下一次保存会把其他
-# 操作员覆盖掉。**转折模拟盘不落盘**(每次请求当场重算), 没有账本, 也就没有
-# 这条路 —— 留着一个引用已删模块的 handler 只会让 import 炸掉。
-
+@app.exception_handler(DailyIntegrityError)
+async def daily_integrity_error_handler(request: Request, exc: DailyIntegrityError) -> JSONResponse:
+    return JSONResponse(status_code=409, content={"detail": str(exc), "code": "daily_integrity"})
 
 # 生产期静态文件(前端 dist)
 def _register_static_routes(target: FastAPI, static_dir: Path) -> None:

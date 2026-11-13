@@ -1081,6 +1081,18 @@ function _dtSorted(items: DragonTigerStockItem[], key: 'net_value' | 'org_net_va
   return asc ? s.reverse() : s
 }
 
+/** 榜单标的代码: 后端已归一非空, 此处兜底旧缓存/异常数据源的 null thscode。 */
+function _dtCode(i: DragonTigerStockItem): string {
+  const code = i.thscode
+  if (typeof code === 'string' && code.trim()) return code
+  return i.ticker ?? ''
+}
+
+/** 榜单标的展示名: 名称优先, 无名称时退代码/ticker。 */
+function _dtLabel(i: DragonTigerStockItem): string {
+  return i.name ?? (_dtCode(i) || '—')
+}
+
 /** 排名序号色: 前三用暖色系奖牌感, 其余弱化 */
 // [R543] 前三原是金 / 银 / 铜三色奖牌(琥珀 / 锌灰 / 橙, 写死的调色板), 收成一种强调: 前三反相, 其余弱化
 function _rankCls(idx: number): string {
@@ -1094,20 +1106,22 @@ function _DtPill({ item, idx, value, onOpenStock }: {
   value: number | null | undefined
   onOpenStock: (s: string) => void
 }) {
+  const code = _dtCode(item)
+  const label = _dtLabel(item)
   return (
     <button
       type="button"
-      onClick={() => onOpenStock(item.thscode)}
+      onClick={() => code && onOpenStock(code)}
       className="group inline-flex items-center gap-1.5 rounded-btn border border-border/60 bg-elevated/40 py-0.5 pl-0.5 pr-2.5 transition-ui hover:border-accent/40 hover:bg-elevated/70"
-      title={`查看 ${item.name ?? item.thscode} · 净买 ${fmtVolume(value ?? null)}`}
+      title={`查看 ${label} · 净买 ${fmtVolume(value ?? null)}`}
     >
       <span className={cn('grid h-[18px] w-[18px] min-w-[18px] place-items-center rounded-full font-mono text-micro font-bold leading-none', _rankCls(idx))}>
         {idx + 1}
       </span>
       <span className="text-xs text-foreground/90 transition-colors group-hover:text-accent">
-        {item.name ?? item.thscode}
+        {label}
       </span>
-      {(() => { const b = boardTag(item.thscode); return b && (
+      {(() => { const b = boardTag(code); return b && (
         <span className={`inline-flex items-center rounded border px-1 text-micro font-bold leading-tight ${b.color}`}>
           {b.label}
         </span>
@@ -1137,7 +1151,7 @@ function _DtSummaryRow({ label, items, pick, onOpenStock }: {
         )}
       </span>
       {items.map((i, idx) => (
-        <_DtPill key={`${i.thscode}-${idx}`} item={i} idx={idx} value={pick(i)} onOpenStock={onOpenStock} />
+        <_DtPill key={`${_dtCode(i)}-${idx}`} item={i} idx={idx} value={pick(i)} onOpenStock={onOpenStock} />
       ))}
     </div>
   )
@@ -1210,13 +1224,15 @@ function DtStockTable({ items, tab, onOpenStock }: {
       {sorted.map((i, idx) => {
         const barPct = Math.max(2, Math.min(100, (Math.abs(i.net_value ?? 0) / maxAbs) * 100))
         const positive = (i.net_value ?? 0) >= 0
+        const code = _dtCode(i)
+        const label = _dtLabel(i)
         return (
           <button
-            key={`${i.thscode}-${i.range_days ?? 1}`}
+            key={`${code}-${i.range_days ?? 1}`}
             type="button"
-            onClick={() => onOpenStock(i.thscode)}
+            onClick={() => code && onOpenStock(code)}
             className="flex w-full items-center gap-2 border-t border-border/30 px-2.5 py-2 text-left text-xs transition-colors hover:bg-accent/[0.05]"
-            title={`查看 ${i.name ?? i.thscode} 详情`}
+            title={`查看 ${label} 详情`}
           >
             <span className={cn('w-5 shrink-0 text-center font-mono text-micro tabular-nums', idx < 3 ? 'text-amber-400/90' : 'text-muted/50')}>
               {idx + 1}
@@ -1225,9 +1241,9 @@ function DtStockTable({ items, tab, onOpenStock }: {
               {fmtPct(i.change ?? null, 1)}
             </span>
             <span className="min-w-0 flex-1">
-              <span className="text-foreground">{i.name ?? '—'}</span>
-              <span className="ml-1.5 font-mono text-micro text-muted">{i.ticker ?? i.thscode}</span>
-              {(() => { const b = boardTag(i.thscode); return b && (
+              <span className="text-foreground">{label}</span>
+              <span className="ml-1.5 font-mono text-micro text-muted">{i.ticker ?? code}</span>
+              {(() => { const b = boardTag(code); return b && (
                 <span className={`ml-1 inline-flex items-center rounded border px-1 text-micro font-bold leading-tight ${b.color}`}>
                   {b.label}
                 </span>
@@ -1312,16 +1328,18 @@ function _DtSeatList({ seats, onOpenStock }: {
               </span>
             </div>
             <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5">
-              {(s.rows ?? []).map(r => (
+              {(s.rows ?? []).map((r, ri) => {
+                const code = _dtCode(r)
+                return (
                 <button
-                  key={`${s.name}-${r.thscode}`}
+                  key={`${s.name}-${code}-${ri}`}
                   type="button"
-                  onClick={() => onOpenStock(r.thscode)}
+                  onClick={() => code && onOpenStock(code)}
                   className="inline-flex items-baseline gap-1.5 rounded-btn border border-border/60 bg-surface/60 px-2 py-0.5 text-micro transition-ui hover:border-accent/40 hover:text-accent"
-                  title={`查看 ${r.name ?? r.thscode} 详情`}
+                  title={`查看 ${_dtLabel(r)} 详情`}
                 >
-                  <span>{r.name ?? r.thscode}</span>
-                  {(() => { const b = boardTag(r.thscode); return b && (
+                  <span>{_dtLabel(r)}</span>
+                  {(() => { const b = boardTag(code); return b && (
                     <span className={`inline-flex items-center self-center rounded border px-1 text-micro font-bold leading-tight ${b.color}`}>
                       {b.label}
                     </span>
@@ -1330,7 +1348,8 @@ function _DtSeatList({ seats, onOpenStock }: {
                     {fmtVolume(r.hot_money_item_net_value ?? r.net_value ?? null)}
                   </span>
                 </button>
-              ))}
+                )
+              })}
             </div>
           </div>
         </div>
@@ -1341,7 +1360,7 @@ function _DtSeatList({ seats, onOpenStock }: {
 
 /** 追高风险阈值: 60日回测高开≥5%子集当日开盘买 -1.97% (温和高开才是名单 alpha 来源) */
 
-function DragonTigerCard({ date, onOpenStock }: {
+export function DragonTigerCard({ date, onOpenStock }: {
   date?: string
   onOpenStock: (symbol: string) => void
 }) {

@@ -9,6 +9,7 @@ import { useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { BookmarkCheck, FlaskConical, LibrarySquare, Search } from 'lucide-react'
 import { PageHeader } from '@/components/PageHeader'
+import { ResourceTransferButton } from '@/components/ResourceTransferDialog'
 import { FactorDiscovery } from './backtest/FactorDiscovery'
 import { FactorComposite } from './factors/FactorComposite'
 import { FactorEditor } from './factors/FactorEditor'
@@ -85,7 +86,7 @@ export function Factors() {
         subtitle={<span className="hidden md:inline">{TABS[activeTab].subtitle}</span>}
         className="shrink-0 flex-wrap gap-x-4 gap-y-2 bg-base/95 px-3 lg:flex-nowrap lg:px-5"
         right={(
-          <div className="flex w-full min-w-0 items-center gap-1.5 sm:gap-2 lg:w-auto">
+          <div className="flex w-full min-w-0 flex-wrap items-center gap-1.5 sm:gap-2 lg:w-auto lg:flex-nowrap">
             <button
               type="button"
               onClick={() => setCandidatesOpen(true)}
@@ -101,6 +102,8 @@ export function Factors() {
             <div className="min-w-0 flex-1 lg:flex-none">
               <PageTabs tabs={TABS} active={activeTab} onChange={changeTab} label="因子视图" />
             </div>
+            {/* [R586 同步上游 v0.3.24] 因子包导入/导出 */}
+            <ResourceTransferButton kind="factor" className="h-8 w-8 shrink-0" />
           </div>
         )}
       />

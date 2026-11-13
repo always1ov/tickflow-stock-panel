@@ -10,6 +10,7 @@ import type { TrendQuantData } from '@/lib/trendQuantSeries'   // [R486] 趋势�
 const BASE = ''
 
 type RequestOptions = RequestInit & {
+  responseType?: 'json' | 'blob'
   /** 为 true 时不弹错误 toast（由调用方自行汇总提示，如多图串行队列） */
   quiet?: boolean
   /** 请求超时毫秒数; null 关闭。默认 30s — 后端依赖 polars, 偶发挂起时无超时
@@ -78,7 +79,7 @@ const AI_REQUEST_TIMEOUT_MS = 300_000
 const extPullTimeoutMs = (timeoutSeconds?: number) => (timeoutSeconds ?? 30) * 1000 + 10_000
 
 async function request<T>(path: string, init?: RequestOptions): Promise<T> {
-  const { quiet, timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS, ...fetchInit } = init ?? {}
+  const { quiet, responseType = 'json', timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS, ...fetchInit } = init ?? {}
   const isFormData = fetchInit.body instanceof FormData
   const headers: Record<string, string> = {}
   if (!isFormData) headers['Content-Type'] = 'application/json'
@@ -125,7 +126,7 @@ async function request<T>(path: string, init?: RequestOptions): Promise<T> {
     if (res.status !== 401 && !quiet) toast(msg, 'error')
     throw new ApiError(msg, res.status)
   }
-  return res.json() as Promise<T>
+  return (responseType === 'blob' ? res.blob() : res.json()) as Promise<T>
 }
 
 // ===== Capabilities =====
@@ -2074,7 +2075,8 @@ export interface AiReviewReport {
 
 // ===== 龙虎榜 (fuyao 专有, 复盘页) =====
 export interface DragonTigerStockItem {
-  thscode: string
+  /** 后端已归一 (缺失时由 ticker 推导); 旧缓存/异常数据源可能为 null, 消费方需兜底 */
+  thscode: string | null
   ticker?: string | null
   name?: string | null
   change?: number | null      // 当日涨跌幅 (小数制)
@@ -3051,6 +3053,8 @@ export interface MiningLockStatus {
     host?: string
     schema_version?: number
   } | null
+  /** 持有者线索来源: 锁文件内容 / 旧格式锁经操作系统扫描反查 */
+  holder_source?: 'file' | 'os-scan' | null
   holder_alive: boolean
   pid_consistent: boolean
   active_runs: number
@@ -3715,6 +3719,38 @@ export interface DefinitionsCatalogItem {
   warmup_bars?: number | null
   /** 目录不因单个坏定义失败 — 坏条目携带错误原因 (隔离要求) */
   error?: string
+}
+
+export type ResourceKind = 'strategy' | 'signal' | 'factor'
+export interface ResourceRef { kind: ResourceKind; id: string }
+export interface TransferResource extends ResourceRef { label: string; description?: string; source?: string; draft?: boolean }
+export interface ResourceTransferEntry {
+  key: string
+  kind: ResourceKind | 'settings' | 'code'
+  id: string
+  label: string
+  path: string
+  dependencies: string[]
+  local_dependencies: string[]
+  issues: string[]
+  action: 'create' | 'reuse' | 'conflict'
+  draft?: boolean
+  comparison?: { local: string; incoming: string; truncated: boolean } | null
+  referenced_by?: string[]
+}
+export interface ResourceTransferPreview {
+  roots: string[]
+  entries: ResourceTransferEntry[]
+  counts: Record<string, number>
+  revision: string
+}
+export interface ResourceTransferResult {
+  imported: number
+  reused: number
+  counts: Record<ResourceKind, number>
+  resources: string[]
+  changed: string[]
+  drafts?: string[]
 }
 
 /** 导入冒烟结果 (POST /api/definitions/smoke) */
@@ -5469,6 +5505,19 @@ export const api = {
     ),
 
   dataStatus: () => request<DataStatus>('/api/data/status'),
+  dataIntegrity: () => request<{
+    report: IntegrityReport | null
+    blocking_assets?: IntegrityAsset[]
+    data_revisions?: DailyDataRevisions
+  }>('/api/data/integrity'),
+  scanDataIntegrity: (lookbackDays: number, assetTypes: IntegrityAsset[]) =>
+    request<{ job_id: string }>('/api/data/integrity/scan', {
+      method: 'POST', body: JSON.stringify({ lookback_days: lookbackDays, asset_types: assetTypes }),
+    }),
+  repairDataIntegrity: (reportId: string) =>
+    request<{ job_id: string }>('/api/data/integrity/repair', {
+      method: 'POST', body: JSON.stringify({ report_id: reportId }),
+    }),
   dataClear: () => request<{ deleted_files: number }>('/api/data/clear', { method: 'POST' }),
   refreshCache: () => request<{ ok: boolean }>('/api/data/refresh-cache', { method: 'POST' }),
   enrichedSchema: (table: string) => request<EnrichedField[]>(`/api/data/schema/${table}`),
@@ -5634,6 +5683,28 @@ export const api = {
   },
 
   // ── 统一定义目录 / 导入冒烟 (P4) ──
+  resourcesList: () => request<{ items: TransferResource[] }>('/api/definitions/resources'),
+  resourcesExportPreview: (resources: ResourceRef[], signal?: AbortSignal) =>
+    request<ResourceTransferPreview>('/api/definitions/resources/export/preview', {
+      method: 'POST', body: JSON.stringify({ resources }), signal, quiet: true,
+    }),
+  resourcesExport: (resources: ResourceRef[], revision?: string) =>
+    request<Blob>('/api/definitions/resources/export', {
+      method: 'POST', body: JSON.stringify({ resources, revision }), responseType: 'blob', quiet: true,
+    }),
+  resourcesInspect: (files: File[]) => {
+    const body = new FormData()
+    files.forEach(file => body.append('files', file))
+    return request<ResourceTransferPreview>('/api/definitions/resources/inspect', { method: 'POST', body, quiet: true })
+  },
+  resourcesApply: (files: File[], selected: string[], overwrite: string[], revision: string) => {
+    const body = new FormData()
+    files.forEach(file => body.append('files', file))
+    body.append('selected', JSON.stringify(selected))
+    body.append('overwrite', JSON.stringify(overwrite))
+    body.append('revision', revision)
+    return request<ResourceTransferResult>('/api/definitions/resources/apply', { method: 'POST', body, quiet: true })
+  },
 
   definitionsList: () =>
     request<{ items: DefinitionsCatalogItem[] }>('/api/definitions'),
@@ -6718,6 +6789,7 @@ export interface PipelineJob {
   finished_at: string | null
   duration_s: number | null
   result: {
+    integrity_report?: IntegrityReport
     universe_size?: number
     today_daily_rows?: number
     today_daily_incomplete?: boolean
@@ -6737,6 +6809,37 @@ export interface PipelineJob {
 export type PipelineJobSummary = Omit<PipelineJob, 'log'>
 
 // ===== Data status =====
+export type IntegrityAsset = 'stock' | 'etf' | 'index'
+export type DailyDataRevisions = Partial<Record<IntegrityAsset, string>>
+
+export interface IntegrityReport {
+  version: 1
+  id: string
+  checked_at: string
+  start_date: string
+  end_date: string
+  lookback_days: number
+  asset_types: IntegrityAsset[]
+  status: 'clean' | 'issues' | 'uncertain' | 'empty'
+  repairable_count: number
+  uncertain_count: number
+  no_data_assets: IntegrityAsset[]
+  backup_dir?: string
+  repair_error?: string
+  data_revisions?: DailyDataRevisions
+  issues: {
+    asset_type: IntegrityAsset
+    asset_label: string
+    date: string
+    kind: string
+    kind_label: string
+    reason: string
+    repairable: boolean
+    symbols: string[]
+    symbol_count: number
+  }[]
+}
+
 interface TableStats {
   rows: number
   earliest_date: string | null

@@ -59,6 +59,10 @@ NOT_USER_DATA = {
     # [R578 同步上游 v0.3.16] 策略守护的组合建议写在 user_data/strategy_guardian/ 下,
     # 目录本身已在 STORES 登记, 文件名单独列出免得体检守卫以为是漏登记
     "combinations.json": "策略守护组合建议(user_data/strategy_guardian/, 目录已登记)",
+    # [R586 同步上游 v0.3.24] 每日数据完整性: 状态与最近一次报告由 daily_health 自管,
+    # 放在 data/daily_integrity/ 下, 不在 user_data/ 里
+    "daily_integrity_state.json": "每日数据完整性状态(data/daily_integrity/)",
+    "integrity_report.json": "每日数据完整性报告(data/daily_integrity/)",
 }
 
 
