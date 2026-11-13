@@ -3011,6 +3011,26 @@ export interface MiningAvailability {
   suggested_start: string | null
 }
 
+/** 挖掘锁诊断 (撞锁降级模式的持有者线索 + 强制释放判定)。 */
+export interface MiningLockStatus {
+  held: boolean
+  mine: boolean
+  holder: {
+    pid: number
+    started_at?: string
+    role?: string
+    host?: string
+    schema_version?: number
+  } | null
+  holder_alive: boolean
+  pid_consistent: boolean
+  active_runs: number
+  store_idle_seconds: number | null
+  stale_after_seconds: number
+  force_releasable: boolean
+  reason: string | null
+}
+
 export interface MiningRequestV1 {
   factor_names: string[]
   strategy_ids?: string[]
@@ -5127,6 +5147,15 @@ export const api = {
     request<{ count: number; total_keys: number }>(
       '/api/settings/preferences/realtime-keys-per-round',
       { method: 'PUT', body: JSON.stringify({ count }) }),
+
+  miningLockStatus: () =>
+    request<MiningLockStatus>('/api/backtest/mining/lock', { quiet: true }),
+
+  miningForceReleaseLock: () =>
+    request<{ released: boolean; terminated_pid: number; reacquired: boolean }>(
+      '/api/backtest/mining/lock/force-release', { method: 'POST' },
+    ),
+
   miningRuns: () =>
     request<{ items: MiningRun[] }>('/api/backtest/mining/runs'),
 

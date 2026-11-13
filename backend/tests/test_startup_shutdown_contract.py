@@ -52,6 +52,10 @@ _NO_LIFECYCLE: dict[str, str] = {
     "sector_monitor_service": "SectorMonitorService — 无 stop() 方法, 计算型服务",
     "strategy_engine": "StrategyEngine — 无 stop() 方法, 由请求驱动",
     "strategy_monitor": "策略监控配置对象, 纯内存态",
+    # [R579 同步上游 v0.3.17] 挖掘进程锁改为降级启动: 锁对象与持有标志都挂到
+    # app.state 供挖掘页查询, 释放动作仍在 lifespan 的 finally 里(不在停机表)。
+    "mining_process_lock": "挖掘进程锁 — 由 lifespan finally 释放, 不走 _shutdown_services",
+    "mining_lock_acquired": "布尔标志 (启动时是否拿到挖掘锁), 纯数据无生命周期",
 }
 
 # ── 常驻后台服务(必须停机)─────────────────────────────────────────
