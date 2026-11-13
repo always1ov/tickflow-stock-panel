@@ -118,6 +118,8 @@ _EXPECTED_ROUTERS = (
     "sector_rotation.router",
     # [R562] 虚拟账户「跟六态转折」那一块的数据(/api/paper/flip, 与作者的 /api/paper/* 不重叠)
     "paper_flip.router",
+    # [R575 同步上游 v0.3.13] 页面管理 (/api/pages/*): 扩展页面源码模板/导入导出
+    "pages_admin.router",
 )
 
 

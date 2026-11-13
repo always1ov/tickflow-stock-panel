@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { BarChart3, ExternalLink, Globe2, Pencil, Plus, Save, ShieldCheck, Sparkles, Trash2, X } from 'lucide-react'
+import { ExternalLink, Globe2, Layers3, Pencil, Plus, Save, ShieldCheck, Sparkles, Trash2, X } from 'lucide-react'
 import {
   api,
   type AnalysisColumn, type AnalysisMenu, type ExtDataConfig, type ExtDataField,
@@ -9,9 +9,10 @@ import {
 } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { Skeleton } from '@/components/data/Skeleton'
+import { sanitizeExtUrl } from '@/components/dashboard/layout'
 import { SettingsCard } from './SettingsCard'
 import { ExternalViewRender } from '@/components/ExternalViewRender'   // [R117] 试运行预览
-import { TYPE, buttonClass } from '@/components/ui'
+import { buttonClass } from '@/components/ui'
 
 function dtypeToColumnType(dtype: string): AnalysisColumn['type'] {
   return dtype === 'int' || dtype === 'float' ? 'number' : 'string'
@@ -249,7 +250,8 @@ export function SettingsExtPagesPanel() {
   const [id, setId] = useState('')
   const [label, setLabel] = useState('')
   const [dataSource, setDataSource] = useState('')
-  const [template, setTemplate] = useState<'dimension_rank' | 'ranking' | 'table'>('dimension_rank')
+  const [template, setTemplate] = useState<'dimension_rank' | 'ranking' | 'table' | 'url'>('dimension_rank')
+  const [embedUrl, setEmbedUrl] = useState('')
   const [dimensionField, setDimensionField] = useState('')
   const [rankField, setRankField] = useState('')
   const [selectedColumns, setSelectedColumns] = useState<string[]>([])
@@ -266,6 +268,7 @@ export function SettingsExtPagesPanel() {
     setLabel('')
     setDataSource(cfg?.id ?? '')
     setTemplate('dimension_rank')
+    setEmbedUrl('')
     setDimensionField(firstMatchingField(cfg, ['概念', 'industry', '行业', 'sector']))
     setRankField('')
     setSelectedColumns(cfg?.fields.filter(f => !['symbol', 'code'].includes(f.name)).slice(0, 6).map(f => f.name) ?? [])
@@ -279,6 +282,7 @@ export function SettingsExtPagesPanel() {
     setLabel(menu.label)
     setDataSource(menu.data_source)
     setTemplate(menu.template)
+    setEmbedUrl(menu.url ?? '')
     setDimensionField(menu.dimension_field ?? firstMatchingField(cfg, ['概念', 'industry', '行业', 'sector']))
     setRankField(menu.rank_field ?? '')
     setSelectedColumns(menu.detail_columns.map(c => c.field))
@@ -288,10 +292,31 @@ export function SettingsExtPagesPanel() {
 
   const save = useMutation({
     mutationFn: () => {
-      const cfg = activeConfig
-      if (!cfg) throw new Error('请选择扩展数据源')
       if (!id.trim()) throw new Error('请输入菜单标识')
       if (!label.trim()) throw new Error('请输入菜单名称')
+
+      // url 嵌入型: 不绑数据源, 只需消毒后的地址 (与渲染端 ExtUrlEmbed 同一 sanitize)
+      if (template === 'url') {
+        const safe = sanitizeExtUrl(embedUrl)
+        if (!safe) throw new Error('嵌入地址无效: 仅支持 http(s)、长度 ≤500, 且不能嵌入本站自身')
+        return api.analysisMenuSave(id.trim(), {
+          label: label.trim(),
+          icon: 'link',
+          data_source: '',
+          template: 'url',
+          url: safe,
+          dimension_field: null,
+          rank_field: null,
+          group_columns: [],
+          detail_columns: [],
+          default_sort: null,
+          visible: editingMenu?.visible ?? true,
+          order: editingMenu?.order ?? menuItems.length + 100,
+        })
+      }
+
+      const cfg = activeConfig
+      if (!cfg) throw new Error('请选择扩展数据源')
       if (template === 'dimension_rank' && !dimensionField) throw new Error('请选择分组字段')
       if (template === 'ranking' && !rankField) throw new Error('请选择排名字段')
 
@@ -335,12 +360,13 @@ export function SettingsExtPagesPanel() {
   })
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <ExternalWebsiteSettings />
+      {/* [R535] 设置区统一卡头: 大号开篇并入说明 */}
       <SettingsCard
-        icon={BarChart3}
+        icon={Layers3}
         title="扩展页面"
-        desc="把扩展数据配置成左侧分析菜单：选择扩展数据源、分析模板、分组字段和列表列后，系统会生成一个可访问的动态分析页面。"
+        desc="把扩展数据配置成左侧分析菜单：选数据源、模板、分组字段和列表列后，系统生成一个可访问的动态分析页。也可直接填网址创建 URL 嵌入页；要导入 .tsx 源码页面请到「页面插件」区块的「导入源码」。"
         right={(
           <button
             onClick={() => { resetForm(); setShowForm(true) }}
@@ -351,13 +377,12 @@ export function SettingsExtPagesPanel() {
           </button>
         )}
       >
-
       {showForm && (
-        <section className="mb-4 rounded-card border border-border bg-base/60 p-5 space-y-4">
+        <div className="mt-5 rounded-card border border-border bg-base p-5 space-y-4">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <h3 className={TYPE.card}>{editingMenu ? '编辑扩展页面' : '新建扩展页面'}</h3>
-              <p className="mt-1 text-xs text-muted">菜单标识保存后不可在此处直接修改，如需更换标识请新建页面。</p>
+              <h3 className="text-sm font-medium text-foreground">{editingMenu ? '编辑扩展页面' : '新建扩展页面'}</h3>
+              <p className="mt-1 text-micro text-muted">菜单标识保存后不可在此处直接修改，如需更换标识请新建页面。</p>
             </div>
             <button onClick={() => { setShowForm(false); setError('') }} className="rounded p-1 text-muted hover:bg-elevated hover:text-foreground">
               <X className="h-4 w-4" />
@@ -366,7 +391,7 @@ export function SettingsExtPagesPanel() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <label className="space-y-1.5">
-              <span className="text-xs text-muted">菜单标识</span>
+              <span className="text-micro text-muted">菜单标识</span>
               <input
                 value={id}
                 disabled={!!editingMenu}
@@ -376,45 +401,59 @@ export function SettingsExtPagesPanel() {
               />
             </label>
             <label className="space-y-1.5">
-              <span className="text-xs text-muted">菜单名称</span>
+              <span className="text-micro text-muted">菜单名称</span>
               <input value={label} onChange={e => setLabel(e.target.value)} placeholder="如 概念热度" className="h-9 w-full rounded-btn border border-border bg-base px-3 text-xs text-foreground" />
             </label>
-            <label className="space-y-1.5">
-              <span className="text-xs text-muted">扩展数据源</span>
-              <select
-                value={dataSource || activeConfig?.id || ''}
-                onChange={e => {
-                  const cfg = configs.find(c => c.id === e.target.value)
-                  setDataSource(e.target.value)
-                  setDimensionField(firstMatchingField(cfg, ['概念', 'industry', '行业', 'sector']))
-                  setRankField('')
-                  setSelectedColumns(cfg?.fields.filter(f => !['symbol', 'code'].includes(f.name)).slice(0, 6).map(f => f.name) ?? [])
-                }}
-                className="h-9 w-full rounded-btn border border-border bg-base px-3 text-xs text-foreground"
-              >
-                {configs.map(cfg => <option key={cfg.id} value={cfg.id}>{cfg.label}</option>)}
-              </select>
-            </label>
+            {template === 'url' ? (
+              <label className="space-y-1.5">
+                <span className="text-micro text-muted">嵌入地址</span>
+                <input
+                  value={embedUrl}
+                  onChange={e => setEmbedUrl(e.target.value)}
+                  placeholder="https://example.com/page"
+                  className="h-9 w-full rounded-btn border border-border bg-base px-3 text-xs text-foreground"
+                />
+                <span className="block text-micro text-muted/70">仅 http(s)、≤500 字符，不支持嵌入本站；部分站点可拒绝被嵌入</span>
+              </label>
+            ) : (
+              <label className="space-y-1.5">
+                <span className="text-micro text-muted">扩展数据源</span>
+                <select
+                  value={dataSource || activeConfig?.id || ''}
+                  onChange={e => {
+                    const cfg = configs.find(c => c.id === e.target.value)
+                    setDataSource(e.target.value)
+                    setDimensionField(firstMatchingField(cfg, ['概念', 'industry', '行业', 'sector']))
+                    setRankField('')
+                    setSelectedColumns(cfg?.fields.filter(f => !['symbol', 'code'].includes(f.name)).slice(0, 6).map(f => f.name) ?? [])
+                  }}
+                  className="h-9 w-full rounded-btn border border-border bg-base px-3 text-xs text-foreground"
+                >
+                  {configs.map(cfg => <option key={cfg.id} value={cfg.id}>{cfg.label}</option>)}
+                </select>
+              </label>
+            )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <label className="space-y-1.5">
-              <span className="text-xs text-muted">模板</span>
+              <span className="text-micro text-muted">模板</span>
               <select value={template} onChange={e => setTemplate(e.target.value as any)} className="h-9 w-full rounded-btn border border-border bg-base px-3 text-xs text-foreground">
                 <option value="dimension_rank">维度热度榜</option>
                 <option value="ranking">指标排名榜</option>
                 <option value="table">明细表</option>
+                <option value="url">URL 嵌入</option>
               </select>
             </label>
             <label className="space-y-1.5">
-              <span className="text-xs text-muted">分组字段</span>
+              <span className="text-micro text-muted">分组字段</span>
               <select value={dimensionField} onChange={e => setDimensionField(e.target.value)} disabled={template !== 'dimension_rank'} className="h-9 w-full rounded-btn border border-border bg-base px-3 text-xs text-foreground disabled:opacity-50">
                 <option value="">请选择</option>
                 {fields.map(f => <option key={f.name} value={f.name}>{f.label || f.name}</option>)}
               </select>
             </label>
             <label className="space-y-1.5">
-              <span className="text-xs text-muted">排名字段</span>
+              <span className="text-micro text-muted">排名字段</span>
               <select value={rankField} onChange={e => setRankField(e.target.value)} disabled={template !== 'ranking'} className="h-9 w-full rounded-btn border border-border bg-base px-3 text-xs text-foreground disabled:opacity-50">
                 <option value="">请选择</option>
                 {numericFields.map(f => <option key={f.name} value={f.name}>{f.label || f.name}</option>)}
@@ -422,46 +461,47 @@ export function SettingsExtPagesPanel() {
             </label>
           </div>
 
-          <div>
-            <div className="text-xs text-muted mb-2">列表列配置</div>
-            <div className="flex flex-wrap gap-2">
-              {fields.filter(f => !['symbol', 'code'].includes(f.name)).map(f => {
-                const active = selectedColumns.includes(f.name)
-                return (
-                  <button
-                    key={f.name}
-                    onClick={() => setSelectedColumns(cols => active ? cols.filter(c => c !== f.name) : [...cols, f.name])}
-                    className={buttonClass({ size: 'xs', selected: active })}
-                  >
-                    {f.label || f.name}
-                  </button>
-                )
-              })}
+          {template !== 'url' && (
+            <div>
+              <div className="text-micro text-muted mb-2">列表列配置</div>
+              <div className="flex flex-wrap gap-2">
+                {fields.filter(f => !['symbol', 'code'].includes(f.name)).map(f => {
+                  const active = selectedColumns.includes(f.name)
+                  return (
+                    <button
+                      key={f.name}
+                      onClick={() => setSelectedColumns(cols => active ? cols.filter(c => c !== f.name) : [...cols, f.name])}
+                      className={`rounded-full border px-3 py-1 text-micro transition-colors ${active ? 'border-accent/40 bg-accent/10 text-accent' : 'border-border bg-elevated/40 text-secondary hover:bg-elevated'}`}
+                    >
+                      {f.label || f.name}
+                    </button>
+                  )
+                })}
+              </div>
             </div>
-          </div>
+          )}
 
           {error && <div className="rounded-btn border border-danger/30 bg-danger/5 px-3 py-2 text-xs text-danger">{error}</div>}
 
           <div className="flex justify-end gap-2">
             <button onClick={() => { setShowForm(false); setError('') }} className="px-4 py-1.5 rounded-btn bg-elevated text-secondary text-xs">取消</button>
-            <button onClick={() => save.mutate()} disabled={save.isPending} className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-btn bg-accent/90 text-white text-xs font-medium disabled:opacity-50">
+            <button onClick={() => save.mutate()} disabled={save.isPending} className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-btn bg-accent/90 text-on-accent text-xs font-medium disabled:opacity-50">
               <Save className="h-3.5 w-3.5" />保存
             </button>
           </div>
-        </section>
+        </div>
       )}
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="mt-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         {menuItems.map(menu => (
           <div key={menu.id} className="rounded-card border border-border bg-surface p-4">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="flex items-center gap-2">
-                  <h3 className={TYPE.card}>{menu.label}</h3>
+                  <h3 className="text-sm font-medium text-foreground">{menu.label}</h3>
                   {menu.builtin && <span className="rounded bg-accent/10 px-1.5 py-0.5 text-micro text-accent">默认</span>}
                   {!menu.visible && <span className="rounded bg-muted/10 px-1.5 py-0.5 text-micro text-muted">已隐藏</span>}
                 </div>
-                <p className="mt-1 text-xs text-muted font-mono">{menu.id}</p>
+                <p className="mt-1 text-micro text-muted font-mono">{menu.id}</p>
               </div>
               <div className="flex items-center gap-1">
                 <button onClick={() => editMenu(menu)} className="p-1 rounded text-muted hover:text-accent hover:bg-accent/10" title="编辑">
@@ -474,11 +514,17 @@ export function SettingsExtPagesPanel() {
                 )}
               </div>
             </div>
-            <div className="mt-3 space-y-1 text-xs text-secondary">
-              <div>数据源：<span className="font-mono text-muted">{menu.data_source}</span></div>
+            <div className="mt-3 space-y-1 text-micro text-secondary">
+              {menu.template === 'url' ? (
+                <div className="break-all">地址：<span className="font-mono text-muted">{menu.url}</span></div>
+              ) : (
+                <>
+                  <div>数据源：<span className="font-mono text-muted">{menu.data_source}</span></div>
+                  {menu.dimension_field && <div>分组字段：{menu.dimension_field}</div>}
+                  <div>列表列：{menu.detail_columns.length} 个</div>
+                </>
+              )}
               <div>模板：{menu.template}</div>
-              {menu.dimension_field && <div>分组字段：{menu.dimension_field}</div>}
-              <div>列表列：{menu.detail_columns.length} 个</div>
             </div>
             <Link to={`/analysis/${menu.id}`} className="mt-4 inline-flex w-full items-center justify-center gap-1.5 rounded-btn border border-border bg-elevated px-3 py-1.5 text-xs text-foreground hover:bg-border/30 transition-colors">
               <ExternalLink className="h-3.5 w-3.5" />
@@ -495,7 +541,7 @@ export function SettingsExtPagesPanel() {
             </div>
           ))}
         {!menus.isLoading && menuItems.length === 0 && (
-          <div className="rounded-card border border-dashed border-border px-5 py-8 text-center text-sm text-muted md:col-span-2">暂无扩展页面，点击右上角新建。</div>
+          <div className="rounded-card border border-border bg-surface px-5 py-10 text-center text-sm text-muted md:col-span-2 xl:col-span-3">暂无扩展页面，点击右上角新建。</div>
         )}
       </div>
       </SettingsCard>

@@ -39,6 +39,7 @@ from app.api import (
     mining,
     monitor_rules,
     overview,
+    pages_admin,
     paper,
     paper_flip,  # [fork 增强] R562 虚拟账户·跟六态转折
     pipeline,
@@ -870,6 +871,7 @@ def _register_routers(app: FastAPI) -> None:
     # 这里跟着 R318 的规矩进函数体 —— 路由注册只此一处, 不再有第二个注册点。
     app.include_router(sector_rotation.router)
     app.include_router(paper_flip.router)  # [fork 增强] R562 虚拟账户·跟六态转折
+    app.include_router(pages_admin.router)  # [R575 同步上游 v0.3.13] 页面管理
 
 
 _register_routers(app)

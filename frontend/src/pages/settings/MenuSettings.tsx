@@ -21,7 +21,7 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import {
-  Eye, EyeOff, ExternalLink, GripVertical, Settings, Bell, Layers3,
+  Eye, EyeOff, ExternalLink, GripVertical, Settings, Bell, Layers3, Trash2,
   CornerDownRight, CornerLeftUp, SlidersHorizontal,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
@@ -42,6 +42,8 @@ interface NavEntry {
   label: string
   type: 'builtin' | 'analysis' | 'group'
   visible: boolean
+  /** 源码扩展命名空间 (frontend/src/custom/<ns>/), 仅 type=extension 有值; 物理删除的凭据 */
+  extensionId?: string
 }
 
 // 与 Layout 侧边栏默认顺序保持一致 (nav_order 未保存时的默认展示顺序)
@@ -159,7 +161,7 @@ function EmptyMemberDropZone({ active }: { active: boolean }) {
   )
 }
 
-function SortableItem({ entry, hidden, onToggleHidden, badgeEnabled, onToggleBadge, indent, note, onToggleGroup }: {
+function SortableItem({ entry, hidden, onToggleHidden, badgeEnabled, onToggleBadge, indent, note, onToggleGroup, onRemove }: {
   entry: NavEntry
   hidden: boolean
   onToggleHidden: (id: string) => void
@@ -177,6 +179,8 @@ function SortableItem({ entry, hidden, onToggleHidden, badgeEnabled, onToggleBad
    * (它不能钻进自己肚子里), 所以这个 prop 是可选的。
    */
   onToggleGroup?: (id: string) => void
+  /** 删除源码扩展页 (物理删除 frontend/src/custom/<extensionId>/, 先备份) */
+  onRemove?: (entry: NavEntry) => void
 }) {
   const {
     attributes,
@@ -289,6 +293,16 @@ function SortableItem({ entry, hidden, onToggleHidden, badgeEnabled, onToggleBad
           >
             <Settings className="h-3.5 w-3.5" />
           </Link>
+        )}
+        {onRemove && entry.extensionId && (
+          <button
+            type="button"
+            onClick={() => onRemove(entry)}
+            className="rounded p-1 text-muted hover:bg-danger/10 hover:text-danger transition-colors"
+            title={`删除源码扩展页 (物理删除 frontend/src/custom/${entry.extensionId}/, 自动备份)`}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
         )}
       </div>
       {/* 第 6 列: 徽标开关 (仅监控中心) */}
@@ -428,6 +442,7 @@ export function SettingsMenuSettingsPanel() {
     mutationFn: (hidden: string[]) => api.saveNavHidden(hidden),
     onSuccess: () => qc.invalidateQueries({ queryKey: QK.preferences }),
   })
+
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
