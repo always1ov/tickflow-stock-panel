@@ -10,11 +10,12 @@ from functools import lru_cache
 from typing import Optional
 from zoneinfo import ZoneInfo
 
+import anyio
 from fastapi import APIRouter, HTTPException, Query, Request, Response
 
 from app.db_safe import is_valid_ext_ident
 from app.indicators.bollinger import attach_bollinger
-from app.indicators.pipeline import compute_enriched, compute_enriched_single
+from app.indicators.pipeline import compute_enriched_single
 from app.market_time import cn_now, cn_today, in_continuous_session
 from app.price_limits import (
     is_no_limit_day,
@@ -525,35 +526,38 @@ def get_daily(
     df = repo.get_daily_asset(asset_type, symbol, start - timedelta(days=60), end)
 
     if df.is_empty():
+        from app.services import daily_bootstrap
+        from app.tickflow.capabilities import CapabilitySet
+
+        capset = getattr(request.app.state, "capabilities", None) or CapabilitySet()
         try:
-            raw = kline_sync.sync_daily_batch([symbol], count=days + 30)
+            qs = getattr(request.app.state, "quote_service", None)
+            enriched = daily_bootstrap.ensure_history(
+                repo, capset, symbol, asset_type, start, end,
+                on_updated=qs.notify_data_updated if qs else None,
+            )
         except Exception as e:
-            raise HTTPException(status_code=502, detail=f"TickFlow fetch failed: {e}") from e
-        if raw.is_empty():
+            from app.services.heavy_job_limiter import HeavyJobLimitTimeoutError
+            from app.services.shared_work import WorkBusyError
+
+            if isinstance(e, (WorkBusyError, HeavyJobLimitTimeoutError)):
+                raise HTTPException(503, "日K补齐繁忙，请稍后重试", headers={"Retry-After": "2"}) from e
+            raise HTTPException(status_code=502, detail="日K数据源获取失败，请检查数据源配置或稍后重试") from e
+        if enriched.is_empty():
             return _gzip_payload(
                 request,
-                {"symbol": symbol, "name": stock_name, "stock_info": stock_info, "rows": []},
+                {"symbol": symbol, "asset_type": asset_type, "name": stock_name, "stock_info": stock_info, "rows": []},
                 pref_key="daily_batch_compress",
             )
-        # 拉除权因子做前复权 (Starter+ 有权限), 否则空 df → compute_enriched 退回未复权
-        factors = pl.DataFrame()
-        capset = getattr(request.app.state, "capabilities", None)
-        try:
-            from app.tickflow.capabilities import Cap
-            if capset and capset.has(Cap.ADJ_FACTOR):
-                factors = kline_sync.fetch_adj_factor_single(symbol)
-        except Exception as e:  # noqa: BLE001
-            logger.debug("单股除权因子拉取失败 %s: %s", symbol, e)
-        enriched = compute_enriched(raw, factors=factors)
-        rows = enriched.to_dicts()
+        rows = enriched.filter(
+            (pl.col("symbol") == symbol) & pl.col("date").is_between(start, end),
+        ).sort("date").to_dicts()
         # 即使 live 模式也尝试追加实时蜡烛
-        rows = _maybe_inject_live_candle(request, symbol, rows, asset_type)
+        if end >= cn_today():
+            rows = _maybe_inject_live_candle(request, symbol, rows, asset_type)
         attach_bollinger(rows)   # [R528] 图表的布林(26日), 今天那根按注入后的收盘算
-        rows = rows[-days:]
-        resp = {"symbol": symbol, "name": stock_name, "stock_info": stock_info, "rows": rows, "source": "live"}
-        # [同步作者 v0.2.4] 作者给详情响应加了 gzip 包装(a8bb7a2 压缩详情响应),
-        # fork 这边给响应挂着 `live_refresh` 标记。两者不冲突 —— **先挂标记再包装**,
-        # 顺序反了标记就被压进去看不见了。
+        resp = {"symbol": symbol, "asset_type": asset_type, "name": stock_name, "stock_info": stock_info, "rows": rows, "source": "live"}
+        # [同步作者 v0.2.4] 先挂 fork 的 live_refresh 标记, 再走作者的 gzip 包装
         if live_refresh:
             resp["live_refresh"] = live_refresh
         return _gzip_payload(
@@ -565,14 +569,16 @@ def get_daily(
     rows = df.to_dicts()
 
     # 追加/覆盖今日实时蜡烛
-    rows = _maybe_inject_live_candle(request, symbol, rows, asset_type)
+    # 即使 live 模式也尝试追加实时蜡烛
+    if end >= cn_today():
+        rows = _maybe_inject_live_candle(request, symbol, rows, asset_type)
     # [R528] 图表的布林(26日): 在多读的那段历史上算完, 再裁回请求的窗口
     attach_bollinger(rows)
     start_iso = start.isoformat()
     rows = [r for r in rows if str(r.get("date"))[:10] >= start_iso]
 
-    resp = {"symbol": symbol, "name": stock_name, "stock_info": stock_info, "rows": rows, "source": "enriched"}
-    # [同步作者 v0.2.4] 同上: 先挂 fork 的 live_refresh 标记, 再走作者的 gzip 包装
+    resp = {"symbol": symbol, "asset_type": asset_type, "name": stock_name, "stock_info": stock_info, "rows": rows, "source": "enriched"}
+    # [同步作者 v0.2.4] 先挂 fork 的 live_refresh 标记, 再走作者的 gzip 包装
     if live_refresh:
         resp["live_refresh"] = live_refresh
     return _gzip_payload(
@@ -737,6 +743,11 @@ def _latest_live_candle(
                 "atr_14", "vol_ratio_5d"):
         if key in q and q[key] is not None:
             live_row[key] = q[key]
+    # 当前价变化时同步替换异动判定字段；缺失/无涨跌停时显式清空，不能残留旧标记。
+    for key in ("raw_low", "raw_close", "limit_down_price", "signal_limit_down",
+                "signal_limit_down_recovery", "signal_limit_up", "signal_broken_limit_up",
+                "consecutive_limit_ups"):
+        live_row[key] = q.get(key)
     return live_row
 
 
@@ -771,6 +782,7 @@ def get_daily_latest(
     row = _latest_live_candle(request, symbol, asset_type, refresh_asset=False)
     return {
         "symbol": symbol,
+        "asset_type": asset_type,
         "row": row,
         "source": "live" if row is not None else "none",
     }
@@ -1056,8 +1068,10 @@ def get_minute_batch(request: Request, body: dict):
         raw_basis = minute_adjust.minute_basis_is_raw(repo.store.data_dir)
         from app.services.minute_shared_pull import pull
 
+        qs = getattr(request.app.state, "quote_service", None)
         df_live = pull(repo, sym_list, asset_type=asset, start=start, end=session_end,
-                       batch_size=lim.batch, rpm=lim.rpm, raw_basis=raw_basis)
+                       batch_size=lim.batch, rpm=lim.rpm, raw_basis=raw_basis,
+                       on_updated=qs.notify_data_updated if qs else None)
         if df_live.is_empty():
             return
         if raw_basis:
@@ -1584,8 +1598,6 @@ async def sync_minute_single(request: Request, body: dict):
     body: { "symbol": "000001.SZ" }
     用于个股分时图"获取数据"按钮: 本地无数据时单独拉取并持久化。
     """
-    import asyncio
-
     from app.services.preferences import get_minute_sync_days
 
     symbol = body.get("symbol", "").strip()
@@ -1604,23 +1616,24 @@ async def sync_minute_single(request: Request, body: dict):
 
     # 指数分钟K无本地存储, 落库会污染股票分钟表 kline_minute;
     # 指数分钟数据走 /api/index/minute 实时读取, 此端点显式拒绝。
-    if repo.resolve_asset_type(symbol) == "index":
+    asset_type = repo.resolve_asset_type(symbol)
+    if asset_type == "index":
         raise HTTPException(status_code=400, detail="指数分钟K不支持落库同步 (指数分钟数据走 /api/index/minute 实时读取)")
 
     if not _minute_allowed(capset):
         raise HTTPException(status_code=403, detail="需要 Pro+ 权限")
 
     days = requested_days if requested_days is not None else get_minute_sync_days()
-    loop = asyncio.get_event_loop()
+    from app.services.minute_shared_pull import sync_history
 
-    def _run():
-        return kline_sync.sync_and_persist_minute([symbol], repo, capset, days=days, force_full_days=True)
-
-    written = await loop.run_in_executor(_long_task_executor, _run)
+    qs = getattr(request.app.state, "quote_service", None)
+    written = await anyio.to_thread.run_sync(lambda: sync_history(
+        repo, capset, symbol, asset_type, days, on_updated=qs.notify_data_updated if qs else None,
+    ))
 
     # 刷新视图
     from app.jobs.daily_pipeline import _refresh_single_view
-    _refresh_single_view(repo, "kline_minute")
+    _refresh_single_view(repo, "kline_etf_minute" if asset_type == "etf" else "kline_minute")
 
     return {"status": "ok", "symbol": symbol, "rows": written}
 

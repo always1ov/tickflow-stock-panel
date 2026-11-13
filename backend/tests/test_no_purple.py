@@ -41,6 +41,12 @@ CHART_ALLOWED: dict[str, tuple[set[str], str]] = {
         {"#8B5CF6"}, "K 线副图的 VOL10 / DEA / RSI24 / KDJ-J / MA60 线, 与它们图例上的同色小字"),
     "frontend/src/components/StockDailyKChart.tsx": (
         {"#8B5CF6"}, "日 K 上「炸」板的标记"),
+    # [R593 同步上游 v0.3.31] 轻量图表渲染器的紫全部是线/标记, 与 ECharts 版同一套色
+    "frontend/src/components/charts/LightweightDaily.tsx": (
+        {"#8B5CF6", "#7C3AED", "#A78BFA"},
+        "轻量日K的 DEA / RSI24 / KDJ-J / MA60 线, 与「炸板」标记及其图例小字"),
+    "frontend/src/lib/lightweight-model.ts": (
+        {"#8B5CF6"}, "轻量日K的 MA60 线色 (与 ECharts 版同色)"),
     "frontend/src/components/SectorRotationCard.tsx": (
         {"#a78bfa", "#818cf8", "#9575cd"}, "板块走势线的 20 色调色板(列表里的小圆点跟线同色)"),
     "frontend/src/pages/backtest/charts/FactorGroupNavChart.tsx": (
