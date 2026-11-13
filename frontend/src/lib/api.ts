@@ -3329,6 +3329,56 @@ export interface StrategyBacktestTrade {
   exit_signal_id?: string | null
 }
 
+export interface BacktestEvidenceCheck {
+  kind: string
+  cutoff: string
+  status: 'completed' | 'error'
+  differences: number
+  compared_values: number
+  error?: string
+  examples: {
+    date: string; symbol: string; field: string; cutoff: string
+    baseline: number | string | boolean | null
+    recomputed: number | string | boolean | null
+  }[]
+}
+
+export interface BacktestEvidence {
+  schema_version: number
+  run_id: string
+  created_at: string
+  runtime: { application: string; python: string; polars: string; numpy: string; code_sha256: string }
+  config: Record<string, unknown>
+  config_sha256: string
+  strategy: { id: string; backend: string; sha256: string; changed_during_run: boolean }
+  data: {
+    sha256: string
+    origin: string
+    asset_type: string
+    daily_price_basis: string
+    datasets: Record<string, {
+      sha256: string; fields: Record<string, string>; rows: number; symbols: number | null
+      start: string | null; end: string | null
+    }>
+  }
+  reproducibility_sha256: string
+  lookahead: {
+    status: 'passed' | 'failed' | 'partial' | 'error' | 'insufficient' | 'cancelled'
+    sampled: boolean
+    differences: number
+    checks: BacktestEvidenceCheck[]
+    reports: { scope: string; status: string; checks: BacktestEvidenceCheck[]; differences: number }[]
+  }
+  persistence: { status: 'saved' | 'error'; error?: string }
+  execution_timing?: {
+    status: 'passed' | 'failed' | 'insufficient'
+    compared_values: number
+    differences: number
+    examples: { symbol: string; side: string; signal_date: string; fill_date: string }[]
+  }
+  limitations: string[]
+}
+
 export interface StrategyBacktestResult {
   run_id: string
   config: Record<string, any>
@@ -3372,6 +3422,7 @@ export interface StrategyBacktestResult {
   }
   elapsed_ms: number
   error: string | null
+  evidence?: BacktestEvidence | null
 }
 
 // ===== Settings =====
@@ -3533,7 +3584,42 @@ export interface SourcePackagePreview {
   digest: string
   errors: string[]
   installed_version: string | null
+  pending_version?: string | null
+  revision?: string
 }
+
+export interface ExtensionPackagePreview {
+  manifest: { id: string; display_name?: string; version: string; author?: string; description?: string; backend: string; frontend?: string }
+  digest: string
+  revision: string
+  errors: string[]
+  files: string[]
+  installed_version: string | null
+  pending_version?: string | null
+}
+
+export interface ManagedExtensionPackage {
+  id: string
+  name: string
+  version?: string | null
+  pending_version?: string | null
+  previous_version?: string | null
+  runtime_version?: string | null
+  enabled: boolean
+  frontend?: boolean
+  status: string
+  error: string
+  pending_remove?: boolean
+  failed_version?: string | null
+  revision?: string
+}
+
+export type ImportCenterPreview =
+  | { kind: 'resources'; preview: ResourceTransferPreview }
+  | { kind: 'backup'; preview: ConfigBackupInspect }
+  | { kind: 'source'; preview: SourcePackagePreview }
+  | { kind: 'extension'; preview: ExtensionPackagePreview }
+  | { kind: 'page'; preview: { filename: string; size: number; digest: string; source: boolean; suggested_id: string } }
 
 export interface PluginDataSourceItem {
   can_test?: boolean
@@ -4030,6 +4116,8 @@ export interface RuntimePagePack {
   sha256: string
   uploaded_at: number
   error: string
+  managed_by?: string
+  version?: string
 }
 
 // ===== 升级保护 (二次开发) =====
@@ -4313,15 +4401,44 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ url: opts?.url ?? null, hint: null, force: opts?.force ?? true }),
     }),
+  importCenterInspect: (files: File[]) => {
+    const body = new FormData()
+    files.forEach(file => body.append('files', file))
+    return request<ImportCenterPreview>('/api/import-center/inspect', { method: 'POST', body, quiet: true, timeoutMs: 120_000 })
+  },
+  extensionPackages: () => request<ManagedExtensionPackage[]>('/api/extension-packages'),
+  installExtensionPackage: (file: File, digest: string, revision: string) => {
+    const body = new FormData()
+    body.append('file', file); body.append('digest', digest); body.append('revision', revision); body.append('trusted', 'true')
+    return request<{ id: string; message: string }>('/api/extension-packages/install', { method: 'POST', body, quiet: true })
+  },
+  extensionPackageFrontend: (file: File, digest: string) => {
+    const body = new FormData()
+    body.append('file', file); body.append('digest', digest); body.append('trusted', 'true')
+    return request<Blob>('/api/extension-packages/frontend', { method: 'POST', body, responseType: 'blob', quiet: true })
+  },
+  manageExtensionPackage: (id: string, action: string, revision?: string) =>
+    request<{ id: string; message: string }>('/api/extension-packages/' + encodeURIComponent(id) + '/manage', {
+      method: 'POST', body: JSON.stringify({ action, revision }), quiet: true,
+    }),
+  importCenterInstallPage: (file: File, id: string, digest: string, overwrite: boolean) => {
+    const body = new FormData()
+    body.append('file', file); body.append('id', id); body.append('digest', digest)
+    body.append('trusted', 'true'); body.append('overwrite', String(overwrite))
+    return request<RuntimePagePack>('/api/import-center/page', { method: 'POST', body, quiet: true, timeoutMs: COMPUTE_REQUEST_TIMEOUT_MS })
+  },
+  importCenterProjectPage: (namespace: string, id: string, overwrite: boolean) =>
+    request<RuntimePagePack>('/api/import-center/project', { method: 'POST', body: JSON.stringify({ namespace, id, overwrite, trusted: true }), quiet: true, timeoutMs: COMPUTE_REQUEST_TIMEOUT_MS }),
   inspectSourcePackage: (file: File) => {
     const body = new FormData()
     body.append('file', file)
     return request<SourcePackagePreview>('/api/custom/source-packages/inspect', { method: 'POST', body, quiet: true })
   },
-  installSourcePackage: (file: File, digest: string) => {
+  installSourcePackage: (file: File, digest: string, revision?: string) => {
     const body = new FormData()
     body.append('file', file)
     body.append('digest', digest)
+    if (revision) body.append('revision', revision)
     return request<{ name: string; message: string }>('/api/custom/source-packages/install', { method: 'POST', body, quiet: true, timeoutMs: 120_000 })
   },
   manageSourcePackage: (name: string, action: string) =>
@@ -5448,6 +5565,9 @@ export const api = {
     request<{ ok: boolean }>(`/api/backtest/candidates/${encodeURIComponent(id)}`, {
       method: 'DELETE',
     }),
+
+  strategyBacktestEvidence: (runId: string) =>
+    request<BacktestEvidence>(`/api/backtest/strategy/runs/${encodeURIComponent(runId)}/evidence`),
 
   strategyBacktestRun: (payload: {
     strategy_id: string

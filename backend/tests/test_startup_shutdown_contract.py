@@ -120,6 +120,8 @@ _EXPECTED_ROUTERS = (
     "monitor_rules.router",
     # [R580 同步上游 v0.3.18] 配置备份 (/api/config-backup/*)
     "config_backup.router",
+    # [R588 同步上游 v0.3.26] 导入中心 (/api/import-center/*)
+    "import_center.router",
     "lots.router",
     "alerts.router",
     # [R561 同步上游] 上游 v0.3.2 的 SSE 事件流

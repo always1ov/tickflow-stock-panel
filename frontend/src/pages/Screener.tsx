@@ -1109,13 +1109,13 @@ export function Screener() {
                   在界面上不可发现 —— 补上下文提到的三份指南, 与其它页引用 docs 同款
                   (等宽文本而非链接: 这些是仓库内文件, 浏览器里点不开)。 */}
               {pool.length === 0 && (
-                <div className="mt-2 flex flex-wrap items-center justify-center gap-x-1.5 gap-y-1 text-[11px] leading-relaxed text-muted/80">
+                <div className="mt-2 flex flex-wrap items-center justify-center gap-x-1.5 gap-y-1 text-micro leading-relaxed text-muted/80">
                   <span>自己写策略看</span>
-                  <code className="rounded bg-elevated/70 px-1 py-px font-mono text-[10px] text-secondary">docs/strategy.md</code>
+                  <code className="rounded bg-elevated/70 px-1 py-px font-mono text-micro text-secondary">docs/strategy.md</code>
                   <span>（三种扩展方式：自定义信号 / AI 生成 / 手写代码）</span>
                   <span className="text-border" aria-hidden="true">·</span>
                   <span>用 AI 迭代已有策略看</span>
-                  <code className="rounded bg-elevated/70 px-1 py-px font-mono text-[10px] text-secondary">docs/strategy-iteration.md</code>
+                  <code className="rounded bg-elevated/70 px-1 py-px font-mono text-micro text-secondary">docs/strategy-iteration.md</code>
                 </div>
               )}
             </div>
@@ -1356,12 +1356,12 @@ export function Screener() {
                 {pool.length === 0 ? (
                   <>
                     <span className="text-sm text-secondary">还没有策略，先添加或创建一个</span>
-                    <span className="text-[11px] text-muted">用右上角「创建策略 · AI」生成，或按上方文档手写</span>
+                    <span className="text-micro text-muted">用右上角「创建策略 · AI」生成，或按上方文档手写</span>
                   </>
                 ) : (
                   <>
                     <span className="text-sm text-secondary">点击策略卡片查看策略结果</span>
-                    <span className="text-[11px] text-muted">若提示 enriched 表无数据，请先运行盘后管道</span>
+                    <span className="text-micro text-muted">若提示 enriched 表无数据，请先运行盘后管道</span>
                   </>
                 )}
               </div>

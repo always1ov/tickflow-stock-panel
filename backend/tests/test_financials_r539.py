@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from tests.frontend_source import code_of
 
-PAGE = "custom/financials/extension.tsx"
+PAGE = "custom/financials/Page.tsx"
 DETAIL = "components/financials/StockFinancialDetail.tsx"
 
 

@@ -523,7 +523,7 @@ export function PresetFetchState({
             </p>
           )
         )}
-        <p className="mt-5 text-[11px] leading-relaxed text-muted">
+        <p className="mt-5 text-micro leading-relaxed text-muted">
           这张表的完整拉取配方 (URL / 鉴权 / 两级请求) 可在
           <Link to="/data" className="mx-0.5 text-accent hover:underline">数据</Link>
           页展开本表 → <span className="text-secondary">拉取</span> 查看, 供接入自有源参考。

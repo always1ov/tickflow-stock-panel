@@ -4,7 +4,7 @@
 """
 from tests.frontend_source import code_of
 
-PAGE = "custom/stock-analysis/extension.tsx"
+PAGE = "custom/stock-analysis/Page.tsx"
 DLG = "components/StockPreviewDialog.tsx"
 
 

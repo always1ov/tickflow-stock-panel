@@ -654,7 +654,9 @@ def _needed_references_limit_prices(needed: set[str]) -> bool:
             return True
     return False
 
-def compute_signals(df: pl.DataFrame, needed: set[str] | None = None) -> pl.DataFrame:
+def compute_signals(
+    df: pl.DataFrame, needed: set[str] | None = None, *, attach_extensions: bool = True,
+) -> pl.DataFrame:
     """注入自定义信号布尔列 (含迁移自内置的 signal_* 定义)。
 
     输入必须包含 compute_indicators() 产出的指标列。
@@ -667,7 +669,8 @@ def compute_signals(df: pl.DataFrame, needed: set[str] | None = None) -> pl.Data
     # 都按列存在性解析。历史多日帧仅注入时序模式 —— 快照代表"最新值",
     # 历史回看注入会引入未来数据 (CONTRIBUTING §5.3)。
     from app.factors import ext_factors
-    df = ext_factors.attach_ext_columns(df, include_snapshot=False)
+    if attach_extensions:
+        df = ext_factors.attach_ext_columns(df, include_snapshot=False)
     # 条件引用的注册表因子列先复用评分物化管线补算 (虚拟/自定义/复合均可)。
     from app.strategy import custom_signals
     exprs = _get_custom_signal_exprs()
@@ -1406,18 +1409,13 @@ _BATCH_TARGET_ROWS = 150_000          # 小内存单批目标行数 (宽表 ~60-
 _BATCH_MIN_SYMBOLS = 50
 _MERGE_DATE_CHUNKS = 15               # 最终合并按日期切 15 块流式执行
 
-_ram_bytes_cache: int | None | bool = False  # False = 未探测
-
 
 def _total_ram_bytes() -> int | None:
-    global _ram_bytes_cache
-    if _ram_bytes_cache is False:
-        try:
-            import psutil
-            _ram_bytes_cache = psutil.virtual_memory().total
-        except Exception:
-            _ram_bytes_cache = None
-    return _ram_bytes_cache  # type: ignore[return-value]
+    try:
+        from app.services.memory_budget import memory_budget
+        return memory_budget().total_bytes
+    except Exception:
+        return None
 
 
 def _adaptive_sym_batch(default_batch: int, rows_per_symbol: int) -> int:

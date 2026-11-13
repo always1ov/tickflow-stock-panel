@@ -9,6 +9,8 @@ import numpy as np
 import polars as pl
 
 MAIN_BOARD_ST_LIMIT_CHANGE_DATE = date(2026, 7, 6)
+# 创业板注册制改革首日: 此前创业板与主板同为 ±10% (风险警示股 ±5%), 当日起 ±20%。
+GEM_20PCT_LIMIT_START_DATE = date(2020, 8, 24)
 
 MAIN_BOARD_LIMIT = 0.10
 LEGACY_MAIN_BOARD_ST_LIMIT = 0.05
@@ -32,18 +34,21 @@ BOARD_OTHER = "其他"
 #  展示顺序: 两个主板在前(体量最大), 20cm 的两个次之, 北交所最后
 BOARDS = (BOARD_SH_MAIN, BOARD_SZ_MAIN, BOARD_GROWTH, BOARD_STAR, BOARD_BEIJING, BOARD_OTHER)
 
+# [R588 同步上游 v0.3.26] 创业板前缀补 302(新注册制段), 与 board_of 保持一致。
+_GEM_PREFIXES = ("300", "301", "302")
+
 
 def board_of(symbol: str) -> str:
     """代码 → 板块中文名。
 
     判定顺序要紧: 先看后缀 .BJ, 再看数字前缀, 最后才回落到交易所主板 ——
-    300/301/688/689 同时也带 .SZ/.SH 后缀, 反过来判会把它们全算进主板。
+    300/301/302/688/689 同时也带 .SZ/.SH 后缀, 反过来判会把它们全算进主板。
     002(原中小板)2021 年已并入深市主板, 这里不再单列。
     """
     s = str(symbol or "").upper()
     if s.endswith(".BJ"):
         return BOARD_BEIJING
-    if s.startswith(("300", "301")):
+    if s.startswith(_GEM_PREFIXES):
         return BOARD_GROWTH
     if s.startswith(("688", "689")):
         return BOARD_STAR
@@ -57,9 +62,13 @@ def board_of(symbol: str) -> str:
 def board_limit_pct(symbol: str) -> float:
     if symbol.endswith(".BJ"):
         return BEIJING_BOARD_LIMIT
-    if symbol.startswith(("300", "301", "302", "688", "689")):
+    if symbol.startswith((*_GEM_PREFIXES, "688", "689")):
         return GROWTH_BOARD_LIMIT
     return MAIN_BOARD_LIMIT
+
+
+def _is_gem(symbol: str) -> bool:
+    return not symbol.endswith(".BJ") and symbol.startswith(_GEM_PREFIXES)
 
 
 def price_limit_pct(
@@ -69,6 +78,8 @@ def price_limit_pct(
     is_risk_warning: bool = False,
 ) -> float:
     base = board_limit_pct(symbol)
+    if _is_gem(symbol) and trade_date < GEM_20PCT_LIMIT_START_DATE:
+        base = MAIN_BOARD_LIMIT
     if (
         base == MAIN_BOARD_LIMIT
         and is_risk_warning
@@ -173,9 +184,13 @@ def polars_price_limit_pct(
     )
     is_star = symbol.str.starts_with("688") | symbol.str.starts_with("689")
     is_beijing = symbol.str.ends_with(".BJ")
-    is_non_main = is_growth | is_star | is_beijing
+    gem_pre_registration = (
+        is_growth & ~is_beijing & (trade_date < pl.lit(GEM_20PCT_LIMIT_START_DATE))
+    )
+    is_non_main = (is_growth | is_star | is_beijing) & ~gem_pre_registration
     base = (
-        pl.when(is_growth | is_star).then(GROWTH_BOARD_LIMIT)
+        pl.when(gem_pre_registration).then(MAIN_BOARD_LIMIT)
+        .when(is_growth | is_star).then(GROWTH_BOARD_LIMIT)
         .when(is_beijing).then(BEIJING_BOARD_LIMIT)
         .otherwise(MAIN_BOARD_LIMIT)
     )
@@ -221,6 +236,35 @@ def numpy_limit_pct_vectors(
     return legacy, current
 
 
+def numpy_gem_pre_registration_vector(
+    symbols: Sequence[str],
+    legacy: np.ndarray,
+    names: Sequence[str],
+) -> np.ndarray:
+    """Limits before GEM_20PCT_LIMIT_START_DATE: ChiNext falls back to the main-board rule."""
+    result = legacy.copy()
+    for asset_id, (symbol, name) in enumerate(zip(symbols, names, strict=True)):
+        if _is_gem(str(symbol)):
+            result[asset_id] = (
+                LEGACY_MAIN_BOARD_ST_LIMIT if is_risk_warning_name(name) else MAIN_BOARD_LIMIT
+            )
+    return result
+
+
+def numpy_limit_pct_for_date(
+    trade_date: date,
+    pre_gem: np.ndarray,
+    legacy: np.ndarray,
+    current: np.ndarray,
+) -> np.ndarray:
+    """Pick the per-asset limit vector that applies on ``trade_date``."""
+    if trade_date < GEM_20PCT_LIMIT_START_DATE:
+        return pre_gem
+    if trade_date < MAIN_BOARD_ST_LIMIT_CHANGE_DATE:
+        return legacy
+    return current
+
+
 def numpy_price_limit_matrix(
     trading_dates: Sequence[date],
     symbols: Sequence[str],
@@ -255,6 +299,14 @@ def write_numpy_price_limit_matrix(
     )
     if legacy_rows.any():
         target[legacy_rows] = legacy.astype(np.float32, copy=False)
+    pre_gem_rows = np.fromiter(
+        (value < GEM_20PCT_LIMIT_START_DATE for value in trading_dates),
+        dtype=bool,
+        count=len(trading_dates),
+    )
+    if pre_gem_rows.any():
+        pre_gem = numpy_gem_pre_registration_vector(symbols, legacy, names)
+        target[pre_gem_rows] = pre_gem.astype(np.float32, copy=False)
     if valid is not None:
         target[~valid] = np.nan
     return target

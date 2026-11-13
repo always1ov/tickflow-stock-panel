@@ -125,7 +125,7 @@ export function CustomSignalDialog({ open, signal, defaultKind = 'exit', onClose
             <div className="flex items-center justify-between gap-3 border-b border-border/50 px-5 py-4">
               <div>
                 <h3 className="text-sm font-semibold text-foreground">{editing ? '编辑自定义信号' : '新建自定义信号'}</h3>
-                <p className="mt-1 text-[11px] text-muted">标识保存后不可修改，如需更换请新建。自定义信号保存为 csg_* 列。</p>
+                <p className="mt-1 text-micro text-muted">标识保存后不可修改，如需更换请新建。自定义信号保存为 csg_* 列。</p>
               </div>
               <button onClick={onClose} className="rounded-lg p-1.5 text-muted transition-colors hover:bg-elevated hover:text-foreground">
                 <X className="h-4 w-4" />
@@ -135,7 +135,7 @@ export function CustomSignalDialog({ open, signal, defaultKind = 'exit', onClose
             <div className="flex-1 overflow-y-auto px-5 py-5 space-y-5">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <label className="space-y-1.5">
-                  <span className="text-[11px] text-muted">信号标识</span>
+                  <span className="text-micro text-muted">信号标识</span>
                   <input
                     value={draft.id}
                     disabled={editing}
@@ -145,11 +145,11 @@ export function CustomSignalDialog({ open, signal, defaultKind = 'exit', onClose
                   />
                 </label>
                 <label className="space-y-1.5">
-                  <span className="text-[11px] text-muted">信号名称</span>
+                  <span className="text-micro text-muted">信号名称</span>
                   <input value={draft.name} onChange={e => setDraft(d => ({ ...d, name: e.target.value }))} placeholder="如 跌至MA5" className="h-9 w-full rounded-btn border border-border bg-base px-3 text-xs text-foreground" />
                 </label>
                 <label className="space-y-1.5">
-                  <span className="text-[11px] text-muted">类型</span>
+                  <span className="text-micro text-muted">类型</span>
                   <select value={draft.kind} onChange={e => setDraft(d => ({ ...d, kind: e.target.value as CustomSignal['kind'] }))} className="h-9 w-full rounded-btn border border-border bg-base px-3 text-xs text-foreground">
                     <option value="entry">入场</option>
                     <option value="exit">出场</option>
@@ -166,7 +166,7 @@ export function CustomSignalDialog({ open, signal, defaultKind = 'exit', onClose
                   headerExtra={
                     <button
                       onClick={() => setAiOpen(o => !o)}
-                      className={`inline-flex items-center gap-1 text-[11px] cursor-pointer transition-colors ${aiOpen ? 'text-amber-400' : 'text-amber-400/80 hover:text-amber-400'}`}
+                      className={`inline-flex items-center gap-1 text-micro cursor-pointer transition-colors ${aiOpen ? 'text-amber-400' : 'text-amber-400/80 hover:text-amber-400'}`}
                     >
                       <Sparkles className="h-3 w-3" />AI 生成条件
                     </button>
@@ -176,7 +176,7 @@ export function CustomSignalDialog({ open, signal, defaultKind = 'exit', onClose
                   <div className="rounded-card border border-amber-400/30 bg-amber-400/5 p-3 space-y-2">
                     <div className="flex items-center gap-2">
                       <Sparkles className="h-3.5 w-3.5 text-amber-400 shrink-0" />
-                      <span className="text-[11px] text-amber-300">描述信号思路，AI 将生成条件组合</span>
+                      <span className="text-micro text-amber-300">描述信号思路，AI 将生成条件组合</span>
                     </div>
                     {aiConfigured === false ? (
                       <div className="text-xs text-amber-400/80">
@@ -207,7 +207,7 @@ export function CustomSignalDialog({ open, signal, defaultKind = 'exit', onClose
                     )}
                   </div>
                 )}
-                <p className="text-[10px] text-muted/60 px-1">
+                <p className="text-micro text-muted/60 px-1">
                   每个操作数左侧的 <span className="text-foreground/70">最新</span> 按钮可点击切换为「前N日」(取 N 个交易日前的值)。例:收盘价(最新) &gt; 收盘价(前1日) = 上涨。带偏移的条件仅盘后/回测生效, 盘中实时跳过。
                 </p>
               </div>

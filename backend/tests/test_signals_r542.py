@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from tests.frontend_source import code_of
 
-PAGE = "custom/signals/extension.tsx"
+PAGE = "custom/signals/Page.tsx"
 
 
 def test_R542_单一视图_不再需要分栏():

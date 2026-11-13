@@ -34,6 +34,7 @@ from app.api import (
     financials,
     focus,  # [fork 增强] R159 推送焦点名单
     guardian,  # [R578 同步上游 v0.3.16] 策略守护
+    import_center,  # [R588 同步上游 v0.3.26] 导入中心
     indices,
     intraday,
     kline,
@@ -692,6 +693,14 @@ async def _application_lifespan(app: FastAPI):
     # ── 阶段 4:独立后台服务(互不依赖,可任意顺序)────────────────
     # 这些服务只依赖 store / repo / capset,彼此之间没有先后关系;
     # 单独调换其中任意两行的顺序都不会改变行为。
+    # [R588 同步上游 v0.3.26] 发布完整冻结快照后再启动行情与监控线程,
+    # 避免首批事件使用未完成的注册表。
+    from app.extensions.packages import start_managed_extensions
+
+    start_managed_extensions(
+        app, current_extension_context(data_dir=store.data_dir, repository=repo),
+    )
+
     # 二次开发升级保护: 后台常备备份用户修改的程序文件 (无清单时自动停用)
     from app.services.upgrade_guard import UpgradeGuard
 
@@ -950,6 +959,7 @@ def _register_routers(app: FastAPI) -> None:
     app.include_router(signals.router)
     app.include_router(monitor_rules.router)
     app.include_router(config_backup.router)  # [R580 同步上游 v0.3.18] 配置备份
+    app.include_router(import_center.router)  # [R588 同步上游 v0.3.26] 导入中心
     app.include_router(lots.router)
     app.include_router(alerts.router)
     app.include_router(events.router)  # [R561 同步上游] 上游 v0.3.2 SSE 事件流

@@ -32,7 +32,7 @@ from tests.frontend_source import code_of
 
 #: (文件, 说明) —— 这一轮改到的那几处定高药丸/工具条
 FIXED_HEIGHT_PILLS = [
-    ("custom/abnormal/extension.tsx", "异动监控的板块分段控件与工具条"),
+    ("custom/abnormal/Page.tsx", "异动监控的板块分段控件与工具条"),
     ("pages/settings/TickflowKeys.tsx", "TickFlow key 那一排工具按钮"),
 ]
 
@@ -61,7 +61,7 @@ def test_R402_异动监控的分段控件不许被挤扁():
 
     钉三层一起成立: 整组 `shrink-0` / 每个按钮不换行 / 外面那行允许换行。
     """
-    src = code_of("custom/abnormal/extension.tsx")
+    src = code_of("custom/abnormal/Page.tsx")
     i = src.index("function SegmentedControl")
     body = src[i:i + 900]
     # **分开查外壳和按钮** —— 只查"这一段里有没有 shrink-0"是条死断言:
@@ -134,5 +134,5 @@ def test_R402_连板梯队仍然走公共页头():
 
     这条钉的是"别哪天把它改成手搓的", 那样就会和看板页一样掉队。
     """
-    src = code_of("custom/limit-ladder/extension.tsx")
+    src = code_of("custom/limit-ladder/Page.tsx")
     assert src.count("<PageHeader") >= 2, "连板梯队不再走公共页头了"

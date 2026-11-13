@@ -10,7 +10,7 @@ import re
 
 from tests.frontend_source import code_of
 
-MONITOR = "custom/monitor/extension.tsx"
+MONITOR = "custom/monitor/Page.tsx"
 FOCUS = "components/monitor/FocusPanel.tsx"
 
 

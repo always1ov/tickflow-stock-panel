@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import logging
 import os
@@ -211,6 +212,33 @@ def current_ai_model() -> str:
     return current_openai_model()
 
 
+def current_reasoning_context_key() -> str:
+    """Bind saved reasoning to its provider, protocol, endpoint and model."""
+    identity = [current_ai_provider(), current_ai_protocol(), current_ai_model(),
+                normalize_openai_base_url(secrets_store.get_ai_config("ai_base_url", settings.ai_base_url))]
+    return hashlib.sha256(json.dumps(identity).encode()).hexdigest()
+
+
+def prepare_tool_messages(messages: Sequence[dict], *, model: str, base_url: str) -> list[dict]:
+    """Keep vendor metadata private and tolerate old DeepSeek text-only history."""
+    prepared = []
+    context_key = None
+    deepseek = urlsplit(base_url).hostname == "api.deepseek.com" or model.lower().rsplit("/", 1)[-1].startswith("deepseek")
+    for source in messages:
+        message = dict(source)
+        origin = message.pop("reasoning_context", None)
+        if origin is not None:
+            context_key = context_key or current_reasoning_context_key()
+            if origin != context_key:
+                message.pop("reasoning_content", None)
+        if deepseek and message.get("role") == "assistant" and message.get("reasoning_content") is None:
+            # Older sessions never saved reasoning; the required field can only
+            # be empty for those messages. Never replace a recorded empty string.
+            message["reasoning_content"] = ""
+        prepared.append(message)
+    return prepared
+
+
 def current_openai_reasoning_effort() -> str:
     prof = _ACTIVE_PROFILE.get()
     if prof is not None:
@@ -283,6 +311,8 @@ def _estimate_input_tokens(messages: Sequence[Message]) -> int:
     total = 0
     for m in messages:
         text, images = _content_text(m.get("content"))
+        # [R588 同步上游 v0.3.26] 思考内容也占输入 token, 一并计入估算。
+        text += str(m.get("reasoning_content") or "")
         cjk = sum(1 for ch in text if "一" <= ch <= "鿿")
         total += cjk + (len(text) - cjk) // 4 + 1
         total += images * _IMAGE_TOKEN_ESTIMATE
@@ -604,7 +634,11 @@ async def generate_ai_text_with_tools(
         tool_calls = getattr(message, "tool_calls", None) or []
         if not tool_calls:
             # 模型不再请求工具, 产出最终文本, 结束循环。
-            req_messages.append({"role": "assistant", "content": message.content or ""})
+            assistant = {"role": "assistant", "content": message.content or ""}
+            reasoning = getattr(message, "reasoning_content", None)
+            if reasoning is not None:
+                assistant["reasoning_content"] = reasoning
+            req_messages.append(assistant)
             return req_messages
 
         assistant = {
@@ -613,6 +647,10 @@ async def generate_ai_text_with_tools(
         }
         if message.content:
             assistant["content"] = message.content
+        # DeepSeek 思考模式要求工具轮的 reasoning_content 原样回传, 否则下一轮 400。
+        reasoning = getattr(message, "reasoning_content", None)
+        if reasoning is not None:
+            assistant["reasoning_content"] = reasoning
         req_messages.append(assistant)
 
         for tc in tool_calls:
@@ -790,7 +828,12 @@ async def _run_openai_message_once(
 
     client = _openai_client(ai_key, timeout)
     model = current_ai_model()
-    req_messages = list(messages)
+    req_messages = (
+        prepare_tool_messages(
+            messages, model=model,
+            base_url=secrets_store.get_ai_config("ai_base_url", settings.ai_base_url),
+        ) if tools else list(messages)
+    )
     kwargs = _openai_kwargs(temperature=temperature, max_tokens=max_tokens, tools=tools)
     transient_left = 2  # 瞬时错误(429/5xx/连接超时)自动重试: 2s → 5s 退避
     while True:

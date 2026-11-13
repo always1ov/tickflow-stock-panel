@@ -13,11 +13,11 @@
  * 七个面板的内容一个没动。
  */
 import { useEffect } from 'react'
-import { BarChart3, Bell, Clock3, Database, HardDriveDownload, KeyRound, Library, Package, Radio, Settings2, SlidersHorizontal, Sparkles } from 'lucide-react'
+import { BarChart3, Bell, Clock3, Database, KeyRound, Library, Package, PackageOpen, Radio, Settings2, SlidersHorizontal, Sparkles } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import { SettingsAIPanel } from './settings/AI'
 import { SettingsApiTokensPanel } from './settings/ApiTokens'
-import { SettingsBackupPanel } from './settings/Backup'
+import { SettingsImportCenterPanel } from './settings/ImportCenter'
 import { SettingsDefinitionsPanel } from './settings/Definitions'
 import { SettingsMonitoringPanel } from './settings/Monitoring'
 import { SettingsExtPagesPanel } from './settings/ExtPages'
@@ -32,7 +32,7 @@ import { PageTabs, usePageTab, type PageTabDef } from '@/components/PageTabs'
 
 import type { ComponentType } from 'react'
 
-export type SettingsTab = 'data-sources' | 'monitoring' | 'notifications' | 'ai' | 'menus' | 'ext-pages' | 'page-packs' | 'timeout' | 'api-tokens' | 'definitions' | 'backup' | 'system'
+export type SettingsTab = 'data-sources' | 'monitoring' | 'notifications' | 'ai' | 'menus' | 'ext-pages' | 'page-packs' | 'timeout' | 'api-tokens' | 'definitions' | 'import' | 'system'
 
 /** 栏的顺序就是这张表的顺序 */
 export const SETTINGS_TABS: Record<SettingsTab, PageTabDef> = {
@@ -50,7 +50,9 @@ export const SETTINGS_TABS: Record<SettingsTab, PageTabDef> = {
   'api-tokens': { title: '开放接口', icon: KeyRound },
   // [R580 同步上游 v0.3.18] 定义目录(信号/因子统一目录与导入冒烟) + 配置备份
   definitions: { title: '定义目录', icon: Library },
-  backup: { title: '配置备份', icon: HardDriveDownload },
+  // [R588 同步上游 v0.3.26] 上游把「配置备份」升级为「导入与备份」统一导入中心
+  // (策略/因子/信号/页面插件/外部扩展包 + 备份还原)。fork 保留横向栏, 只换这一格。
+  import: { title: '导入与备份', icon: PackageOpen },
   system: { title: '系统', icon: Settings2 },
 }
 
@@ -65,7 +67,7 @@ const PANELS: Record<SettingsTab, ComponentType<{ highlight?: string }>> = {
   timeout: SettingsTimeoutPanel,
   'api-tokens': SettingsApiTokensPanel,
   definitions: SettingsDefinitionsPanel,
-  backup: SettingsBackupPanel,
+  import: SettingsImportCenterPanel,
   system: SettingsSystemPanel,
 }
 

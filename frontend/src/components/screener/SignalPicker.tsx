@@ -67,8 +67,8 @@ export function SignalPicker({ signals, onChange, kind, options }: Props) {
     : 'border-border bg-base text-muted hover:border-accent/40'
 
   const btnCls = variant === 'dialog'
-    ? 'rounded px-1.5 py-0.5 text-[10px] font-medium border transition-colors cursor-pointer'
-    : 'rounded-btn border px-2.5 py-1.5 text-[11px] transition-colors cursor-pointer'
+    ? 'rounded px-1.5 py-0.5 text-micro font-medium border transition-colors cursor-pointer'
+    : 'rounded-btn border px-2.5 py-1.5 text-micro transition-colors cursor-pointer'
 
   return (
     <div className="flex flex-wrap gap-1.5">
