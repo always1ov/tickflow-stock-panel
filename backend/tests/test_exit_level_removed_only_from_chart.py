@@ -32,7 +32,7 @@ BACKEND = Path(__file__).resolve().parent.parent / "app"
 
 def test_R403_图上不再有持仓止盈这一组():
     assert "exit" not in LEVEL_TYPES, "后端还在向图上输出「持仓止盈」这一组"
-    src = code_of("components/stock-analysis/AnalysisKChart.tsx")
+    src = code_of("components/stock-analysis/AnalysisKChart.tsx") + code_of("components/stock-analysis/analysis-chart-model.ts")
     groups = re.search(r"LEVEL_GROUPS:[^=]*=\s*\[(.*?)\n\]", src, re.S)
     assert groups, "找不到前端的价位组注册表"
     assert "key: 'exit'" not in groups.group(1), "前端还留着「持仓止盈」的开关"
@@ -47,7 +47,7 @@ def test_R403_六态那一组原样留着():
     api = (BACKEND / "api" / "stock_analysis.py").read_text(encoding="utf-8")
     for label in ("六态跌破转弱", "六态站上转强", "六态上关键点", "六态下关键点"):
         assert label in api, f"六态注入少了一条: {label}"
-    src = code_of("components/stock-analysis/AnalysisKChart.tsx")
+    src = code_of("components/stock-analysis/AnalysisKChart.tsx") + code_of("components/stock-analysis/analysis-chart-model.ts")
     assert "key: 'livermore'" in src, "前端的六态开关没了"
 
 

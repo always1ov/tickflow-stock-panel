@@ -75,7 +75,7 @@ def test_R528_三个消费点都从同一处取():
 
 def test_R528_前端画的是26日_名字带周期_20日那组也带周期():
     """[R529] 用户定的写法: 「26日布林」, 周期在前; 20 日那组同一个形状「20日布林上轨」。"""
-    ak = code_of("components/stock-analysis/AnalysisKChart.tsx")
+    ak = code_of("components/stock-analysis/AnalysisKChart.tsx") + code_of("components/stock-analysis/analysis-chart-model.ts")
     assert "label: '26日布林'" in ak
     for lbl in ("26日布林上轨", "26日布林中轨", "26日布林下轨"):
         assert f"endLabel: '{lbl}'" in ak

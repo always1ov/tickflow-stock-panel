@@ -131,8 +131,8 @@ def test_R485_前端画法不引用任何一张副图_也不读它们的数值()
 def test_R488_狗头画在趋势量化_不在量化MACD():
     """用户: 「把狗头剥离量化macd, 放到趋势量化里面去」。"""
     chart = code_lines(read_src("components/stock-analysis/AnalysisKChart.tsx"))
-    assert "zhuangXianIndexes(dates, trendQuant)" in chart
-    assert "zhuangXianSeries(zhuang, { xAxisIndex: 2, yAxisIndex: 2 })" in chart
+    assert "zhuangXianIndexes(chartDates, trendQuant)" in chart
+    assert "seriesMarkers={zhuanMarkers.length ? { 'tq:wave': zhuanMarkers } : undefined}" in chart
     assert "zhuangXianIndexes(dates, quantMacd)" not in chart
 
 

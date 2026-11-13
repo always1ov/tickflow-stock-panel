@@ -53,10 +53,9 @@ def test_R439_量化MACD副图不画红线():
     chart = code_of(CHART)
     for w in ("QMACD_GRID", "quantMacdGrid", "qmacdGridRef", "gridLine", "markLine: { data: g."):
         assert w not in chart, f"「{w}」—— 副图横线又回来了"
-    assert "show: !isDark, backgroundColor: QUANT_MACD_COLORS.paneBg, borderWidth: 0" in chart, "外框回来了"
-    sub = chart[chart.index("{ scale: false, gridIndex: 1, splitNumber: 2,"):]
-    sub = sub[:sub.index("axisLabel")]
-    assert "splitLine: { show: false }" in sub, "副图背景横线又画出来了"
+    # [R596] lightweight 的 pane 本身没有外框/背景横线; 只要没人把 paneBg/splitLine 加回来即可
+    assert "paneBg" not in chart, "副图又铺底色外框了"
+    assert "splitLine" not in chart, "副图背景横线又画出来了"
     qm = code_of(QM)
     for w in ("QMACD_GRID", "quantMacdGrid", "QMACD_ROWS", "quantMacdRange"):
         assert w not in qm

@@ -61,7 +61,7 @@ def test_R432_没有右侧列表了_开关回到图上方():
     i = chart.index("{levels && controls && (")
     assert "<LevelToolbar groups={LEVEL_GROUPS} controls={controls}" in chart[i:i + 200]
     # 位置: 就在老那排小开关的地方, 在图(chartRef)之前
-    assert i < chart.index("{levels && !controls && (") < chart.index("<div ref={chartRef}")
+    assert i < chart.index("{levels && !controls && (") < chart.index("<FinancialPlot")
 
 
 def test_R432_保留方形按钮_点开的反相_色点换另一套主题():
@@ -87,15 +87,17 @@ def test_R430_图跟着头部天数走():
     assert "dateRange={heroRange}" in daily and "visibleBars={reviewDays}" in daily, (
         "日 K 没跟头部天数走(带分时小图时它默认只露 40 根)")
     chart = code_of(CHART)
-    assert "startValue: zoomStart" in chart, "起点要按第几根给 —— 按百分比取整 60 日会露出 62 根"
+    # [R596] lightweight 版把「露几根」交给 FinancialPlot 的 visibleBars(按根数, 不是百分比)
+    assert "visibleBars={visibleBars" in chart, "起点要按第几根给 —— 按百分比取整 60 日会露出 62 根"
     assert "Math.round((1 - showBars" not in chart
 
 
 def test_R430_每类的数与小开关文案只有一个产地():
     chart, bar, ctl = code_of(CHART), code_of(BAR), code_of(CTL)
     for src, name in ((chart, "老那排小开关"), (bar, "方形按钮那排")):
-        assert "levelGroupStat(g.key, g.label, effLevels, fib2Raw, pivotRank)" in src, f"{name}没用共用的计数"
-        for c in ("PIVOT_RANK_TITLES[r]", "FIB2_GRAINS.map", "title={FIB2_TARGETS_TITLE}",
+        assert re.search(r"levelGroupStat\((?:g|group)\.key, (?:g|group)\.label, effLevels, fib2Raw, pivotRank\)", src), \
+            f"{name}没用共用的计数"
+        for c in ("PIVOT_RANK_TITLES[", "FIB2_GRAINS.map", "title={FIB2_TARGETS_TITLE}",
                   "title={FIB2_BACKTEST_TITLE}"):
             assert c in src, f"{name}没用共用的文案 {c}"
     for text in ("画了 ${count} 条", "P + R1/S1", "三点推算", "线画得准不准"):

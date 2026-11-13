@@ -5,8 +5,9 @@ import { Activity, Loader2, Lock, RefreshCw } from 'lucide-react'
 import { api, type IndexInstrument, type KlineRow, type MinuteKlineRow } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { useCapabilities } from '@/lib/useSharedQueries'
-import { EChartsCandlestick, type OHLC } from '@/components/EChartsCandlestick'
-import { EChartsIntraday } from '@/components/EChartsIntraday'
+import type { OHLC } from '@/lib/chart-types'
+import { LightweightDaily } from '@/components/charts/LightweightDaily'
+import { LightweightIntraday } from '@/components/charts/LightweightIntraday'
 import { PageShell } from '@/components/PageShell'
 import { buttonClass } from '@/components/ui'
 import { useMediaQuery } from '@/lib/useMediaQuery'
@@ -257,12 +258,11 @@ export function Indices() {
           {chartRows.length > 0 && (
             <div className="flex flex-col gap-3 md:flex-row md:items-start">
               <div className="min-w-0 flex-1">
-                <EChartsCandlestick
+                <LightweightDaily
                   data={chartRows}
                   height={chartH}
                   showMA={true}
                   showInfoBar={true}
-                  showMarkers={false}
                   symbol={selectedSymbol}
                   linkedPrice={linkedPrice}
                   onDateClick={(date) => {
@@ -289,8 +289,9 @@ export function Indices() {
                       </div>
                     )}
                     {minuteRows.length > 0 && (
-                      <EChartsIntraday
+                      <LightweightIntraday
                         key={`${selectedSymbol}:${selectedDate}`}
+                        symbol={selectedSymbol}
                         assetType="index"
                         data={minuteRows}
                         height={chartH}

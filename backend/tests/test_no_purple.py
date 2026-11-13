@@ -55,6 +55,11 @@ CHART_ALLOWED: dict[str, tuple[set[str], str]] = {
         {"#8B5CF6", "#3730A3", "#4F46E5", "#6A0DAD", "#724EA0", "#322097", "#7B07CE", "#B84DFF"},
         "关键价位图上的画线: 枢轴点、缺口、斐波那契二型回踩位(R472 用户点名「深紫」)及其退役角色键、"
         "分时均价线"),
+    # [R596 同步上游 v0.3.34] 个股分析图的价位线默认色(实际渲染由 levelColors(theme) 按主题覆盖),
+    # 紫仍只出现在图表画线上, 不进任何 UI 元素。
+    "frontend/src/components/stock-analysis/analysis-chart-model.ts": (
+        {"#8B5CF6", "#6A0DAD", "#3730A3"},
+        "枢轴点 / 缺口位 / 斐波那契二型的价位线默认色, 组件渲染时按主题换成 LEVEL_PALETTE"),
 }
 
 #: 后端按角色发给图表的颜色(它发什么前端就画什么)

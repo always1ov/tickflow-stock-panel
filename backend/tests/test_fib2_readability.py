@@ -155,15 +155,14 @@ def test_R413_未来区只在二型开着的时候才存在():
     动共用坐标轴**, 而二型可能根本没开。
     """
     code = code_lines(read_src(CHART))
-    m = re.search(r"const futureVals = ([^\n]+)", code)
+    m = re.search(r"const futureVals = useMemo\(", code)
     assert m, "未来区那个开关读不出来"
-    assert "activeTypes.has('fib2')" in m[1], \
-        f"未来区没有跟着二型开关走: {m[1]}"
+    assert "activeTypes.has('fib2')" in code[m.start():m.start() + 220], \
+        f"未来区没有跟着二型开关走: {code[m.start():m.start() + 220]}"
     # 空的时候必须原样返回基础数组, 不许重建(重建 = 每次渲染都换新引用)
-    i = code.index("const futureVals")
-    blk = code[i:i + 900]
-    assert "if (!futureVals.length)" in blk, "没有「没有未来值就原样返回」那条早返回"
-    assert "dates: baseDates" in blk, "早返回时没有把原来的 dates 原样交回去"
+    i = code.index("const future = useMemo")
+    blk = code[i:i + 400]
+    assert "if (!futureVals.length" in blk, "没有「没有未来值就原样返回」那条早返回"
 
 
 def test_R413_现价贴签在右边单独占一列_不靠图层压():
@@ -173,23 +172,15 @@ def test_R413_现价贴签在右边单独占一列_不靠图层压():
     这条钉的是"让开的距离明显大于价位标签的距离", 而不是某个具体像素。
     """
     code = code_lines(read_src(CHART))
-    i = code.index("const nowLine")
-    blk = code[i:i + 800]
-    m = re.search(r"position: 'end' as const, distance: (\d+)", blk)
-    assert m, "现价贴签的位置读不出来"
-    now_d = int(m[1])
-    # 价位线/曲线的 endLabel 用的距离
-    others = [int(x) for x in re.findall(r"distance: (\d+),\n\s*\}", code)]
-    others += [int(x) for x in re.findall(r"padding: \[2, 5\], borderRadius: 2,\n\s*distance: (\d+)", code)]
-    assert now_d >= 40, f"现价贴签只让了 {now_d}px, 会和价位标签挤在一起"
-    for d in others:
-        assert now_d > d + 20, f"现价贴签({now_d})没比价位标签({d})让开足够"
+    assert "label: `现价 ${lastClose.toFixed(2)}`" in code, "现价贴签不见了"
+    # lightweight 的价位标签统一画在右侧留白带里, 现价和价位线结构上就不重叠
+    assert "rightOffsetPixels={ANALYSIS_LABEL_BAND_PX}" in code, "右侧留白带没了, 现价贴签会和价位标签挤在一起"
 
 
 def test_R413_密集带标签带上下沿价格():
     """一块没有数字的色带挂不了单 —— 而它是这一组里唯一真会拿来挂单的东西。"""
     code = code_lines(read_src(CHART))
-    i = code.index("name: `回踩密集带")
-    line = code[i:i + 160]
-    assert "z.low.toFixed(2)" in line and "z.high.toFixed(2)" in line, \
-        f"密集带标签没带上下沿价格: {line}"
+    i = code.index("回踩密集带下沿")
+    assert "zone.low.toFixed(2)" in code[i:i + 80], "密集带下沿标签没带价格"
+    i = code.index("回踩密集带上沿")
+    assert "zone.high.toFixed(2)" in code[i:i + 80], "密集带上沿标签没带价格"

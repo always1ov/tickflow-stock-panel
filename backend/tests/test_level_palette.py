@@ -36,6 +36,8 @@ from tests.frontend_source import code_lines, read_src
 
 THEME_TS = "lib/theme.ts"
 CHART_TSX = "components/stock-analysis/AnalysisKChart.tsx"
+# [R596 上游 v0.3.34] 价位组 / 曲线 / 强弱透明度的单一产地从画布组件搬到了数据模型。
+MODEL_TS = "components/stock-analysis/analysis-chart-model.ts"
 
 # 页底色(index.css 的 --base), 两套主题各一个。价位线画在它上面。
 # [R501] 亮色页底 #F6F7FB → #FFFFFF(用户给的参考图); 比原来更亮, 深色线的对比只升不降
@@ -155,7 +157,7 @@ def _fib2_roles() -> dict[str, dict[str, str]]:
 
 def _group_keys() -> list[str]:
     """`LEVEL_GROUPS` 里的 key, 按出现顺序。"""
-    src = read_src(CHART_TSX)
+    src = read_src(MODEL_TS)
     i = src.index("export const LEVEL_GROUPS")
     blk = code_lines(src[i:src.index("\n]", i)])
     keys = re.findall(r"key:\s*'(\w+)'", blk)
@@ -187,7 +189,7 @@ def test_R409_曲线不再自带颜色_一律跟所属组():
     **同一个开关底下冒出了组色之外的颜色** —— 开关上的小圆点一种色、图上的线另一种,
     而且那三个 hex 与别的组撞不撞谁也没管(ATR上轨 #F87171 离涨红只有 ΔE 6)。
     """
-    src = read_src(CHART_TSX)
+    src = read_src(MODEL_TS)
     i = src.index("const CURVE_DEFS")
     blk = code_lines(src[i:src.index("\n]", i)])
     found = re.findall(r"#[0-9A-Fa-f]{6}", blk)
@@ -197,7 +199,7 @@ def test_R409_曲线不再自带颜色_一律跟所属组():
 
 def test_R409_开关组也不自带颜色():
     """同上, 换成 LEVEL_GROUPS 那一侧。两处都堵住, 配色才真的只有一个产地。"""
-    src = read_src(CHART_TSX)
+    src = read_src(MODEL_TS)
     i = src.index("export const LEVEL_GROUPS")
     blk = code_lines(src[i:src.index("\n]", i)])
     found = re.findall(r"#[0-9A-Fa-f]{6}", blk)
@@ -266,7 +268,7 @@ def test_R409_价位线的透明度有下限():
     改之前: 常态 `opacity: 0.7`, 再乘 strengthColor 的 0.55(弱) → 实际 0.39。
     色值再深, 叠完也是浅的。这条把两层的下限都钉住。
     """
-    src = read_src(CHART_TSX)
+    src = read_src(MODEL_TS)
     code = code_lines(src)
     # strengthColor 的两档
     m = re.search(r"if \(strength === 'weak'\) return base \+ '([0-9A-Fa-f]{2})'", code)
@@ -275,12 +277,12 @@ def test_R409_价位线的透明度有下限():
     m = re.search(r"if \(strength === 'medium'\) return base \+ '([0-9A-Fa-f]{2})'", code)
     assert m, "strengthColor 的 medium 那一档读不出来"
     assert int(m[1], 16) >= 0xD9, f"中间那一档透明度 0x{m[1]} 比以前还低"
-    # 画线时的常态 opacity(价位线与曲线各一处), 淡化态 0.12 是 hover 聚焦用的, 不算
-    # [R484] 价位线那处多了一个「二型 ? 1 :」—— 二型常态实色, 其余照旧; 两个数都得过下限。
-    pat = r"dimming \? \(hit \? 1 : 0\.12\) : (?:p\.type === 'fib2' \? ([\d.]+) : )?([\d.]+)"
-    normals = [float(g) for m in re.findall(pat, code) for g in m if g]
-    assert len(normals) == 3, f"常态 opacity 应是价位线两个数(二型 / 其余)+ 曲线一个, 读到 {normals}"
-    assert min(normals) >= 0.85, f"常态不透明度掉回去了: {normals}"
+    # [R596] 搬到 lightweight 后 opacity 只保留两个常量: 常态 0.9 / hover 淡化 0.12;
+    # 二型常态实色(1)不受 0.9 影响。
+    m = re.search(r"export const LEVEL_LINE_OPACITY = ([\d.]+)", code)
+    assert m, "价位线常态 opacity 读不出来"
+    assert float(m[1]) >= 0.85, f"常态不透明度掉回去了: {m[1]}"
+    assert "line.type === 'fib2' ? 1 : LEVEL_LINE_OPACITY" in code, "二型线又跟常态一起被淡化了"
 
 
 def _customs(theme: str) -> dict[str, str]:
@@ -303,8 +305,10 @@ def test_R443_作者的指标就是作者原来的颜色():
     blk = src[src.index("export const LEVEL_CURVE_COLOR"):]
     blk = blk[:blk.index("\n}")]
     assert dict(re.findall(r"(\w+): '(#[0-9A-Fa-f]{6})'", blk)) == AUTHOR_CURVES
-    chart = code_lines(read_src(CHART_TSX))
-    assert "const curveColor = LEVEL_CURVE_COLOR[def.alignedKey] ?? LC[def.group]" in chart
+    chart = code_lines(read_src(MODEL_TS))
+    assert "const baseColor = curveColorOf(def.alignedKey, def.group, input.colors)" in chart
+    assert "colors?.[alignedKey] ?? colors?.[group] ?? DEFAULT_CURVE_COLORS[alignedKey] ?? DEFAULT_GROUP_COLORS[group]" in chart, \
+        "曲线的取色顺序变了: 作者专属色 → 组色 → 兜底"
 
 
 def test_R443_自定的是深色_不粉_分得开():
@@ -363,8 +367,8 @@ def test_R484_斐波那契二型的线够深_不再叠透明度():
     retired = src[src.index("const FIB2_ROLE_RETIRED"):]
     retired = retired[:retired.index("\n}")]
     assert "'#7B07CE': FIB2_ROLE_RETRACE" in retired, "R472~R483 的回撤位没进退役表"
-    code = code_lines(read_src(CHART_TSX))
-    assert "color: p.type === 'fib2' ? base : strengthColor(p.strength, base)" in code, \
+    code = code_lines(read_src(MODEL_TS))
+    assert "point.type === 'fib2' ? base : strengthColor(point.strength, base)" in code, \
         "二型的线又按强弱淡化了"
-    assert "const opacity = dimming ? (hit ? 1 : 0.12) : p.type === 'fib2' ? 1 : 0.9" in code, \
+    assert "line.type === 'fib2' ? 1 : LEVEL_LINE_OPACITY" in code, \
         "二型的线常态不是实色了"

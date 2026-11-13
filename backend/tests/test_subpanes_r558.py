@@ -13,7 +13,9 @@ def test_R558_名字与图例在副图顶上的标题带里():
     assert "SUB_HEADER = 18" in layout
     assert "GAP_MAIN_SUB + SUB_HEADER" in layout
     chart = code_of("components/stock-analysis/AnalysisKChart.tsx")
-    assert "trendTop - SUB_HEADER + 3" in chart and "subTop - SUB_HEADER + 3" in chart, "副图名字又写回图里了"
+    # [R596] lightweight 版把副图名字/读数列交给 FinancialPlot 的 pane 标题带, 不再画进图里
+    assert "paneTitles={['', trendTitle, quantTitle]}" in chart, "副图名字又写回图里了"
+    assert "trendQuantLegendGraphic()" in chart and "quantMacdLegendGraphic()" in chart, "标题带里没有图例"
 
 
 def test_R559_字画在图顶图底两条字道里_不压线不互叠():
@@ -24,7 +26,8 @@ def test_R559_字画在图顶图底两条字道里_不压线不互叠():
     assert "lane: 'top'" in tq and "lane: 'bottom'" in tq
     # 字不再按原文高度画在图里
     assert "type: 'scatter', ...axis, name: m.text" not in tq, "字又写回图里了"
-    assert "...tqYRange(trendH)" in code_of("components/stock-analysis/AnalysisKChart.tsx")
+    assert "paneReadouts={[[], trendReadouts, quantReadouts]}" in code_of("components/stock-analysis/AnalysisKChart.tsx"), \
+        "字没走副图读数列"
     assert "subH + TREND_LANES_EXTRA" in code_of("lib/levelsChartLayout.ts"), "字道占了地方, 副图没跟着加高"
 
 
