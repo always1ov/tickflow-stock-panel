@@ -647,7 +647,7 @@ export function ListColumnCustomizer({
   const renderIntradayConfig = (col: ColumnConfig) => {
     const cfg = resolveIntradayConfig(col.intradayConfig)
     const numInput = (
-      field: keyof IntradayColumnConfig,
+      field: 'width' | 'height',
       label: string,
     ) => (
       <label key={field} className="flex items-center gap-2 text-xs">

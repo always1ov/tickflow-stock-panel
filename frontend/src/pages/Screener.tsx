@@ -19,6 +19,7 @@ import { WatchlistAddMenu } from '@/components/WatchlistAddMenu'
 import { useStrategyPool } from '@/lib/useStrategyPool'
 import { StrategyCard, CARD_WRAP_CLS } from '@/components/screener/StrategyCard'
 import { ScreenerTable } from '@/components/screener/ScreenerTable'
+import type { MiniIntradayYMode } from '@/components/stock-table/MiniIntraday'
 import { ScreenerFilter as ScreenerFilterType, defaultFilter, filterActive, countActiveFilters, applyFilter, FilterPanel } from '@/components/screener/ScreenerFilter'
 import { StrategySettingsDialog } from '@/components/screener/StrategySettingsDialog'
 import { DefaultStrategyParamsDialog } from '@/components/screener/DefaultStrategyParamsDialog'
@@ -29,6 +30,7 @@ import { CompositeStrategyDialog } from '@/components/screener/CompositeStrategy
 import { ListColumnCustomizer } from '@/components/ListColumnCustomizer'
 import { useTableSort } from '@/components/stock-table/useTableSort'
 import { resolveCandleConfig } from '@/lib/list-columns'
+import { useAuctionConfig, useAuctionSeries } from '@/lib/intraday-auction'
 import {
   SCREENER_BUILTIN_COLUMNS,
   SCREENER_COLUMN_GROUPS,
@@ -88,6 +90,16 @@ export function Screener() {
     setIntradayChartVisible(v => {
       const next = !v
       storage.screenerIntraday.set(next)
+      return next
+    })
+  }, [])
+  // 分时纵轴模式: adaptive=实际价格区间, limit=按涨跌停带 (持久化)
+  const [intradayYMode, setIntradayYMode] = useState<MiniIntradayYMode>(() =>
+    storage.screenerIntradayYMode.get('adaptive') === 'limit' ? 'limit' : 'adaptive')
+  const toggleIntradayYMode = useCallback(() => {
+    setIntradayYMode(v => {
+      const next: MiniIntradayYMode = v === 'adaptive' ? 'limit' : 'adaptive'
+      storage.screenerIntradayYMode.set(next)
       return next
     })
   }, [])
@@ -192,6 +204,12 @@ export function Screener() {
   // 卡片首屏只读取轻量摘要；明细在点击策略或“全部”时按需加载。
   // 摘要只覆盖日线缓存; 分钟策略命中数来自手动单跑。
   // run_all 渐进式返回后后台仍在算 → 轮询摘要, 算完的策略逐个点亮。
+  //
+  // 后端会用当前实时行情覆盖结果里的价格类字段 (close/change_pct 等), 所以
+  // 交易时段内需要定期重取, 否则列表一直停在首次加载那一刻的涨跌幅, 与详情
+  // 弹窗的实时价对不上。摘要没有价格字段, 仍只在 run_all 未完成时轮询。
+  const quoteStatus = useQuoteStatus()
+  const inTradingSession = quoteStatus.data?.is_trading_hours !== false
   const summaryQuery = useQuery({
     queryKey: QK.screenerCachedSummary,
     queryFn: api.screenerCachedSummary,
@@ -204,6 +222,8 @@ export function Screener() {
     queryFn: () => api.screenerCached(extColumnsParam || undefined),
     enabled: columnsReady && assetType === 'stock' && tfFilter !== '1m' && showAll,
     placeholderData: previousData => previousData,
+    // 交易时段跟随行情轮询; 收盘后价格不再变, 降为 60s 仅兜底数据修正
+    refetchInterval: inTradingSession ? 6_000 : 60_000,
   })
 
   const singleCachedQuery = useQuery({
@@ -218,6 +238,8 @@ export function Screener() {
     // 列配置或实时快照变化时保留上一份完整明细，直到新请求整体返回。
     // 避免表格先只画基础列、随后才补扩展列，造成“显示部分结果”的错觉。
     placeholderData: previousData => previousData,
+    // 与 fullCachedQuery 同口径: 列表与详情共享同一份实时覆盖后的价格
+    refetchInterval: inTradingSession ? 6_000 : 60_000,
   })
 
   const dataStatus = useDataStatus({ staleTime: 0 })
@@ -639,7 +661,6 @@ export function Screener() {
   //  - 刷新: minute_intraday_refresh 偏好开启时按用户设定间隔轮询; 否则仅首次加载,
   //    用户可点表头刷新按钮手动更新
   const minuteBatchCap = caps.data?.capabilities?.['kline.minute.batch']?.batch ?? 100
-  const quoteStatus = useQuoteStatus()
   const realtimeRunning = quoteStatus.data?.running ?? false
   const intradayRefreshEnabled = prefs?.minute_intraday_refresh ?? false
   const intradayRefreshInterval = prefs?.minute_intraday_refresh_interval ?? 6
@@ -702,6 +723,11 @@ export function Screener() {
     placeholderData: prev => prev,
   })
   const extSeriesData = extChartColumns.length ? (extSeriesQuery.data ?? {}) : {}
+
+  // 分时列集合竞价叠加: 左侧窄栏价格/匹配量/未匹配量 (按 asOf 取同日分区)
+  const auctionCfg = useAuctionConfig(columns)
+  const auctionSymbols = useMemo(() => displayRows.map((r: any) => r.symbol as string), [displayRows])
+  const auctionData = useAuctionSeries(auctionCfg, auctionSymbols, asOf)
 
   // asOf 确定后 + 策略列表就绪 + 策略池非空 → 自动跑一次 (受系统设置开关控制)
   // 缓存命中时秒加载; 未命中时, 仅当 screener_auto_run 开启才自动触发 runAll
@@ -1272,11 +1298,15 @@ export function Screener() {
                     intradayAutoRefresh={intradayRefreshEnabled && realtimeRunning}
                     onRefreshIntraday={() => minuteBatch.refetch()}
                     intradayRefreshing={minuteBatch.isFetching}
+                    intradayYMode={intradayYMode}
+                    onToggleIntradayYMode={toggleIntradayYMode}
+                    assetType={assetType}
                     strategyTagsExpanded={strategyTagsExpanded}
                     onToggleStrategyTags={toggleStrategyTags}
                     sort={sort}
                     onSortToggle={toggle}
                     extSeriesData={extSeriesData}
+                    auctionData={auctionData}
                   />
                 </>
               )}

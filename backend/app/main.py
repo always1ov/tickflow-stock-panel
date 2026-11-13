@@ -317,6 +317,21 @@ def _schedule_boot_integrity_check(app: FastAPI) -> None:
     except Exception as e:  # noqa: BLE001
         logger.warning("integrity boot check scheduling failed: %s", e)
 
+    # 启动自愈: 上次进程异常退出可能残留 enriched 发布标记 (state=publishing),
+    # 会让所有读写持续报"数据正在发布", 且停止实时行情后没有写入方来接管。
+    # 本进程刚启动、不可能持有活跃发布, 因此可直接判定残留并在锁内恢复。
+    try:
+        from app.enriched_generation import recover_stale_publications
+
+        recovered_publications = recover_stale_publications(store.data_dir)
+        if recovered_publications:
+            logger.warning(
+                "已恢复上次中断的 enriched 发布标记: %s",
+                ", ".join(recovered_publications),
+            )
+    except Exception as e:  # noqa: BLE001
+        logger.warning("enriched 发布标记自愈失败 (不影响启动): %s", e)
+
 
 def _init_wecom_bot(app: FastAPI) -> None:
     """企业微信智能机器人长连接(可选通道, 失败不阻断启动)。"""
@@ -918,14 +933,18 @@ async def capability_denied_handler(request: Request, exc: CapabilityDenied) -> 
 
 
 # 生产期静态文件(前端 dist)
-_static = Path(settings.static_dir)
-if _static.exists():
-    if (_static / "assets").exists():
+def _register_static_routes(target: FastAPI, static_dir: Path) -> None:
+    """挂载前端构建产物: /assets 走静态服务, 根级文件直出, 其余回退 SPA。
+
+    根级静态文件 (favicon.svg / donate-wechat.jpg 等) 必须原样返回 —— 此前所有
+    未匹配路径都回退 index.html, 浏览器把 HTML 当图标解析失败。
+    """
+    if (static_dir / "assets").exists():
         # [fork R153] 带 hash 的产物: 一年 immutable 缓存 + 构建期预压缩直出。
         # 见 app/static_assets.py。API 路径不受影响。
         from app.static_assets import HashedAssets
 
-        app.mount("/assets", HashedAssets(directory=_static / "assets"), name="assets")
+        target.mount("/assets", HashedAssets(directory=static_dir / "assets"), name="assets")
 
     # [fork R366] dist **根目录**下那几个真文件要按原样发出去, 不能落进下面的
     # SPA 兜底。
@@ -940,7 +959,7 @@ if _static.exists():
     #
     # 而这一串**一个错都不会报到眼前**: 页面照常打开, 只是装不成 app。
     # (favicon 其实早就在吃这个亏, 只是浏览器悄悄退回默认图标, 没人注意。)
-    _root_static = _static.resolve()
+    _root_static = static_dir.resolve()
 
     def _serve_root_file(rel: str) -> FileResponse | None:
         """dist 根目录下的真文件 —— 没有就返回 None, 交给 SPA 兜底。"""
@@ -959,7 +978,7 @@ if _static.exists():
                  else "public, max-age=3600")
         return FileResponse(target, headers={"Cache-Control": cache})
 
-    @app.get("/{full_path:path}", include_in_schema=False)
+    @target.get("/{full_path:path}", include_in_schema=False)
     def spa_fallback(full_path: str):
         """dist 根目录下的真文件按原样发; 其余回退到 index.html — React Router 接管。
 
@@ -969,10 +988,15 @@ if _static.exists():
         hit = _serve_root_file(full_path)
         if hit is not None:
             return hit
-        index = _static / "index.html"
+        index = static_dir / "index.html"
         if index.exists():
             return FileResponse(
                 index,
                 headers={"Cache-Control": "no-store, must-revalidate"},
             )
         return {"error": "frontend not built"}
+
+
+_static = Path(settings.static_dir)
+if _static.exists():
+    _register_static_routes(app, _static)
