@@ -546,7 +546,8 @@ def get_daily(
         if enriched.is_empty():
             return _gzip_payload(
                 request,
-                {"symbol": symbol, "asset_type": asset_type, "name": stock_name, "stock_info": stock_info, "rows": []},
+                {"symbol": symbol, "asset_type": asset_type, "name": stock_name, "stock_info": stock_info, "rows": [],
+                 "quote_freshness": _daily_freshness(request, [], end)},
                 pref_key="daily_batch_compress",
             )
         rows = enriched.filter(
@@ -557,6 +558,8 @@ def get_daily(
             rows = _maybe_inject_live_candle(request, symbol, rows, asset_type)
         attach_bollinger(rows)   # [R528] 图表的布林(26日), 今天那根按注入后的收盘算
         resp = {"symbol": symbol, "asset_type": asset_type, "name": stock_name, "stock_info": stock_info, "rows": rows, "source": "live"}
+        # [R594 同步上游 v0.3.32] 行情口径提示
+        resp["quote_freshness"] = _daily_freshness(request, rows, end)
         # [同步作者 v0.2.4] 先挂 fork 的 live_refresh 标记, 再走作者的 gzip 包装
         if live_refresh:
             resp["live_refresh"] = live_refresh
@@ -578,6 +581,8 @@ def get_daily(
     rows = [r for r in rows if str(r.get("date"))[:10] >= start_iso]
 
     resp = {"symbol": symbol, "asset_type": asset_type, "name": stock_name, "stock_info": stock_info, "rows": rows, "source": "enriched"}
+    # [R594 同步上游 v0.3.32] 行情口径提示
+    resp["quote_freshness"] = _daily_freshness(request, rows, end)
     # [同步作者 v0.2.4] 先挂 fork 的 live_refresh 标记, 再走作者的 gzip 包装
     if live_refresh:
         resp["live_refresh"] = live_refresh
@@ -586,6 +591,12 @@ def get_daily(
         _attach_ext(resp, repo, symbol, ext_columns),
         pref_key="daily_batch_compress",
     )
+
+
+def _daily_freshness(request: Request, rows: list[dict], end: date) -> dict:
+    from app.services.quote_freshness import QuoteFreshness
+
+    return QuoteFreshness.for_request(request).describe(rows[-1] if rows else None, historical=end < cn_today())
 
 
 def _attach_ext(resp: dict, repo, symbol: str, ext_columns: str | None) -> dict:
@@ -735,6 +746,8 @@ def _latest_live_candle(
         "change_pct": q.get("change_pct"),
         "is_live": True,
     }
+    if q.get("quote_ts") is not None:
+        live_row["quote_ts"] = q["quote_ts"]
     for key in ("ma5", "ma10", "ma20", "ma30", "ma60",
                 "macd_dif", "macd_dea", "macd_hist",
                 "kdj_k", "kdj_d", "kdj_j",
@@ -780,11 +793,14 @@ def get_daily_latest(
     repo = request.app.state.repo
     asset_type = repo.resolve_asset_type(symbol)
     row = _latest_live_candle(request, symbol, asset_type, refresh_asset=False)
+    from app.services.quote_freshness import QuoteFreshness
+
     return {
         "symbol": symbol,
         "asset_type": asset_type,
         "row": row,
         "source": "live" if row is not None else "none",
+        **({"quote_freshness": QuoteFreshness.for_request(request).describe(row)} if row else {}),
     }
 
 

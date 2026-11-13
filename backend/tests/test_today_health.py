@@ -409,7 +409,9 @@ def test_R319_市场时钟只有一处产地():
     assert not stale, f"这些已经不再自己换时区了, 把它们从 KNOWN_DEBT 里删掉: {sorted(stale)}"
 
     # 纯格式化器也得一个个过目 —— 新冒出来的必须先确认它真的只格式化传进来的时间戳
-    PURE_FORMATTERS = {"lib/format.ts"}
+    # [R594 同步上游 v0.3.32] quote-freshness 只把调用方给的时间戳按北京时间渲染
+    # (与 lib/format.ts 同类), 自己取"现在"的话会落进上面的 clocks。
+    PURE_FORMATTERS = {"lib/format.ts", "lib/quote-freshness.ts"}
     assert formatters == PURE_FORMATTERS, \
         f"换时区的纯格式化器名单对不上: 多了 {sorted(formatters - PURE_FORMATTERS)}, 少了 {sorted(PURE_FORMATTERS - formatters)}"
 

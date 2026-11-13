@@ -1432,6 +1432,15 @@ export interface KlineRow {
   [key: string]: any
 }
 
+export interface QuoteFreshness {
+  state: 'live' | 'delayed' | 'stale' | 'historical' | 'unknown' | 'missing' | 'paused' | 'disabled'
+  message: string
+  data_date: string | null
+  quote_ts: number | null
+  checked_at: number
+  max_age_ms: number
+}
+
 export interface KlineDailyResponse {
   symbol: string
   asset_type?: 'stock' | 'etf' | 'index'
@@ -1439,6 +1448,7 @@ export interface KlineDailyResponse {
   stock_info?: { name?: string; total_shares?: number; float_shares?: number; ext?: Record<string, unknown> }
   rows: KlineRow[]
   source?: string
+  quote_freshness?: QuoteFreshness | null
 }
 
 export interface KlineDailyLatestResponse {
@@ -1446,6 +1456,7 @@ export interface KlineDailyLatestResponse {
   asset_type?: 'stock' | 'etf' | 'index'
   row: KlineRow | null
   source: 'live' | 'none'
+  quote_freshness?: QuoteFreshness | null
 }
 
 // ===== Watchlist =====
@@ -4688,6 +4699,14 @@ export const api = {
       { method: 'PUT', body: JSON.stringify({ interval }) },
     ),
   intradayRefresh: () => request<{ status: string }>('/api/intraday/refresh', { method: 'POST' }),
+  subscribeQuotes: (clientId: string, symbols: string[]) =>
+    request<{ lease_seconds: number }>(`/api/intraday/subscriptions/${encodeURIComponent(clientId)}`, {
+      method: 'PUT', body: JSON.stringify({ symbols }), quiet: true, timeoutMs: 10_000,
+    }),
+  unsubscribeQuotes: (clientId: string) =>
+    request<{ status: string }>(`/api/intraday/subscriptions/${encodeURIComponent(clientId)}`, {
+      method: 'DELETE', quiet: true, keepalive: true, timeoutMs: 10_000,
+    }),
   indexQuotes: (symbols?: string[]) =>
     // [R119] source: realtime=来自行情轮询缓存(会跳) / index_daily=回退到日线收盘(静止)
     request<{ rows: IndexQuote[]; count: number; source?: 'realtime' | 'index_daily' }>(

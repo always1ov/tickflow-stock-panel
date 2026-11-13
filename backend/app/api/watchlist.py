@@ -11,7 +11,7 @@ import polars as pl
 from fastapi import APIRouter, File, HTTPException, Query, Request, UploadFile
 from pydantic import BaseModel, Field
 
-from app.db_safe import is_valid_ext_ident, quote_ident
+from app.db_safe import quote_ident
 from app.market_time import CN_TZ, cn_today
 from app.price_limits import (
     polars_is_risk_warning_name,
@@ -443,7 +443,7 @@ def clear_all():
 
 # 自选页需要的列
 _WATCHLIST_COLS = [
-    "symbol", "date", "close", "open", "high", "low", "prev_close", "volume",
+    "symbol", "date", "close", "open", "high", "low", "prev_close", "volume", "quote_ts",
     "change_pct", "change_amount", "amount",
     "turnover_rate",
     "amplitude", "annual_vol_20d",
@@ -574,7 +574,11 @@ def watchlist_enriched(
     df_e, cache_date = repo.get_enriched_latest()
     # 自选实时档: 全市场快照是盘后, 把自选实时叠加层覆盖上去, 让自选那几只显示实时值。
     # 非该档 (全市场实时/盘后) 叠加层为空, 原样返回。
-    df_e = repo.overlay_watchlist_live(df_e, "stock")
+    # [R594 同步上游 v0.3.32] 上游测试的 repo 桩只实现 enriched 读者 (口径提示改由
+    # quote_freshness 表达); 叠加层是 fork 的实时档增强, 用 getattr 保持兼容。
+    overlay = getattr(repo, "overlay_watchlist_live", None)
+    if callable(overlay):
+        df_e = overlay(df_e, "stock")
 
     # 以自选列表为主表 LEFT JOIN enriched, 保证自选的每一只都返回一行;
     # 不在 enriched 缓存里的标的 (新股/冷门股/新用户未同步) 指标为 null, 前端渲染为 "—".
@@ -801,36 +805,28 @@ def watchlist_enriched(
     df = df.sort("_sort_order").drop("_sort_order")
 
     rows = df.to_dicts()
+    from app.services.quote_freshness import QuoteFreshness
+
+    freshness = QuoteFreshness.for_request(request)
+    for row in rows:
+        row["quote_freshness"] = freshness.describe(row)
     elapsed = (time.perf_counter() - t0) * 1000
     return {"rows": rows, "as_of": str(as_of) if as_of else None,
             "elapsed_ms": elapsed, "dates": quote_dates}
 
 
 def _parse_ext_columns(ext_columns: str) -> list[tuple[str, str, str | None]]:
-    """解析 'config_id1.field1@09:20,config_id2.field2' 为 [(config_id, field_name, at), ...]。
+    """解析并去重扩展列；同一输出列存在歧义时返回 400。
 
-    "@HH:MM[:SS]" 为日内多盘表的选盘时刻 (该时刻或之前最近一盘), 与 screener 同口径。
+    [R594 同步上游 v0.3.32] 上游 `parse_ext_columns` 已支持 `@HH:MM[:SS]`
+    选盘时刻, fork 之前的内联副本撤掉, 与 screener 共用一份实现。
     """
-    from app.services.ext_data import norm_ext_snapshot_at
+    from app.services.ext_data import parse_ext_columns
 
-    result = []
-    for part in ext_columns.split(","):
-        part = part.strip()
-        if "." not in part:
-            continue
-        config_id, field_name = part.split(".", 1)
-        at: str | None = None
-        if "@" in field_name:
-            field_name, at_raw = field_name.rsplit("@", 1)
-            try:
-                at = norm_ext_snapshot_at(at_raw)
-            except ValueError:
-                continue
-        config_id = config_id.strip()
-        field_name = field_name.strip()
-        if config_id and field_name and is_valid_ext_ident(config_id) and "\x00" not in field_name:
-            result.append((config_id, field_name, at))
-    return result
+    try:
+        return parse_ext_columns(ext_columns)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
 
 
 # ================================================================

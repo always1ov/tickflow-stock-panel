@@ -19,6 +19,7 @@ import { computeGroupPcts } from '@/lib/watchlistGroupStats'
 import { PageHeader } from '@/components/PageHeader'
 import { EmptyState } from '@/components/EmptyState'
 import { StockPreviewDialog } from '@/components/StockPreviewDialog'
+import { QuoteFreshnessBadge } from '@/components/QuoteFreshnessBadge'
 import { toNavItems, type NavItem } from '@/lib/listNav'
 import {
   DimensionMembersDialog,
@@ -1555,6 +1556,7 @@ export function Watchlist() {
                           ) : null}
                           {monitoredSymbols.has(r.symbol) && <span className="ml-2"><RealtimeDot /></span>}
                         </button>
+                        <QuoteFreshnessBadge freshness={r.quote_freshness} compact />
                         {/* 删除入口：从分组移除 + 从自选移除(二次确认) + 移到顶部 */}
                         <div className="ml-auto pl-1 shrink-0">
                           {confirmRemove === r.symbol ? (
