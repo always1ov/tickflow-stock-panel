@@ -1,9 +1,8 @@
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useVirtualizer } from '@tanstack/react-virtual'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Trash2, RefreshCw, Star, X, Search, LayoutGrid, List, Rows3, BarChart3, Settings2, Plus, Check, Filter, Eye, EyeOff, Minus, ChevronsUp, Clock, RotateCcw, FileUp, FolderOpen, FolderMinus, FolderPlus } from 'lucide-react'
+import { Trash2, RefreshCw, Star, X, Search, List, Rows3, BarChart3, Settings2, Plus, Check, Filter, Eye, EyeOff, Minus, ChevronsUp, Clock, RotateCcw, FileUp, FolderOpen, FolderMinus, FolderPlus } from 'lucide-react'
 import { api, type KlineRow, type MinuteKlineRow, type WatchlistGroup, type WatchlistGroupColor } from '@/lib/api'
 import { ExtSparkChart } from '@/components/screener/ExtSparkChart'
 import { MINUTE_SEED_MAX } from '@/lib/minuteBatchIncremental'
@@ -44,7 +43,7 @@ import { ExtensionSlot } from '@/extensions/ExtensionSlot'
 const INTRADAY_SORTABLE_KEYS = new Set(['intraday'])
 import { ColumnCustomizer } from '@/components/ColumnCustomizer'
 import { StockDataTable } from '@/components/stock-table/StockDataTable'
-import { VIRTUAL_LIST_THRESHOLD, useParentScroll } from '@/components/virtual-list/useParentScroll'
+import { VIRTUAL_LIST_THRESHOLD } from '@/components/virtual-list/useParentScroll'
 import { useTableSort } from '@/components/stock-table/useTableSort'
 import { MiniCandlestick } from '@/components/stock-table/MiniCandlestick'
 import { MiniIntraday, type MiniIntradayYMode } from '@/components/stock-table/MiniIntraday'
@@ -465,230 +464,10 @@ function RealtimeDot({ title = '实时监控中' }: { title?: string }) {
   )
 }
 
-// ===== 卡片组件 =====
+// ===== 主页面 =====
 
-// 共享的空 K 线数组常量 — 避免每次渲染传入新的 [] 破坏 StockCard 的 memo
-const EMPTY_KLINE: KlineRow[] = []
-
-// 行合并时无分组的兜底 (共享引用, 见 rowsInSelectedGroup 的行引用缓存)
-const EMPTY_GROUP_IDS: string[] = []
-
-function cardColumnCount(viewportWidth: number): number {
-  if (viewportWidth >= 1536) return 6
-  if (viewportWidth >= 1280) return 5
-  if (viewportWidth >= 768) return 4
-  if (viewportWidth >= 640) return 3
-  return 2
-}
-
-function useCardColumnCount(): number {
-  const [count, setCount] = useState(() => cardColumnCount(window.innerWidth))
-
-  useEffect(() => {
-    const update = () => setCount(cardColumnCount(window.innerWidth))
-    window.addEventListener('resize', update)
-    return () => window.removeEventListener('resize', update)
-  }, [])
-
-  return count
-}
-
-const StockCard = React.memo(function StockCard({
-  r,
-  candleRows,
-  showCandle,
-  onPreview,
-  onConfirmRemove,
-  onCancelRemove,
-  onRequestRemove,
-  isConfirming,
-  extCols,
-  expandedCells,
-  onToggleExpand,
-  onDimensionClick,
-  isMonitored,
-  active,
-  groups,
-  onToggleMember,
-  groupChangePending,
-}: {
-  r: any
-  candleRows: KlineRow[]
-  showCandle: boolean
-  onPreview: (symbol: string, name: string) => void
-  onConfirmRemove: (symbol: string) => void
-  onCancelRemove: () => void
-  onRequestRemove: (symbol: string) => void
-  isConfirming: boolean
-  extCols: ColumnConfig[]
-  expandedCells: Set<string>
-  onToggleExpand: (key: string) => void
-  onDimensionClick: (target: DimensionMembersTarget) => void
-  isMonitored?: boolean
-  /** 正在 K 线弹窗预览中 → 高亮卡片 */
-  active?: boolean
-  groups: WatchlistGroup[]
-  onToggleMember: (symbol: string, groupId: string, member: boolean) => void
-  groupChangePending: boolean
-}) {
-  const board = boardTag(r.symbol)
-  const price = r.rt_price ?? r.close
-  const pct = r.rt_pct ?? r.change_pct
-  const name = r.rt_name ?? r.name
-  const signals = getSignals(r)
-  const isUp = (pct ?? 0) > 0
-  const isDown = (pct ?? 0) < 0
-
-  // 卡片底色: 涨=淡红, 跌=淡绿, 平=无色。只留纯色底纹 —— 用户: 整套系统不要渐变(R368)
-  const bgGlow = isUp
-    ? 'bg-bull/[0.04]'
-    : isDown
-      ? 'bg-bear/[0.04]'
-      : ''
-  // 左侧指示条颜色
-  const barColor = isUp ? 'bg-bull/70' : isDown ? 'bg-bear/70' : 'bg-muted/30'
-  // 涨跌幅标签背景
-  const pctBg = isUp ? 'bg-bull/12 text-bull' : isDown ? 'bg-bear/12 text-bear' : 'bg-elevated text-secondary'
-
-  return (
-    <div
-      className={`relative rounded-card border border-border bg-surface hover:border-border/80 transition-all duration-200 group cursor-pointer overflow-hidden ${bgGlow} ${active ? 'ring-2 ring-accent/60' : ''}`}
-      onClick={() => onPreview(r.symbol, name ?? '')}
-    >
-      {/* 左侧彩色指示条 */}
-      <div className={`absolute left-0 top-0 bottom-0 w-[3px] rounded-l-lg ${barColor}`} />
-
-      {/* 分组与删除入口 */}
-      <div className="absolute top-1.5 right-1.5 z-10">
-        {isConfirming ? (
-          <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
-            <button
-              onClick={() => onConfirmRemove(r.symbol)}
-              className="px-1.5 py-0.5 rounded-btn text-micro text-danger bg-danger/10 hover:bg-danger/20 transition-colors"
-            >
-              确认
-            </button>
-            <button onClick={() => onCancelRemove()} className="p-0.5 text-muted hover:text-foreground transition-colors">
-              <X className="h-3 w-3" />
-            </button>
-          </div>
-        ) : (
-          <div className="flex items-center gap-0.5" onClick={e => e.stopPropagation()}>
-            <WatchlistGroupPicker
-              groups={groups}
-              groupIds={r.group_ids ?? []}
-              symbol={r.symbol}
-              disabled={groupChangePending}
-              onToggleMember={onToggleMember}
-            />
-            <button
-              onClick={() => onRequestRemove(r.symbol)}
-              className="opacity-0 group-hover:opacity-100 text-muted hover:text-danger transition-all duration-150 p-0.5 rounded-btn hover:bg-elevated"
-              aria-label="移除"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* 卡片内容 */}
-      <div className="pl-4 pr-2.5 pt-2.5 pb-0">
-        {/* 第一行: 代码 + 名称 + 板块标识 */}
-        <div className="flex items-center gap-1.5 min-w-0 mb-2 pr-8">
-          <span className="shrink-0 font-mono text-foreground text-xs tracking-wide">
-            {r.symbol}
-          </span>
-          {name && (
-            <span className="text-xs text-secondary truncate">{name}</span>
-          )}
-          <QuoteFreshnessBadge freshness={r.quote_freshness} compact />
-          {board && (
-            <span className={`shrink-0 inline-flex items-center justify-center px-1 h-[16px] rounded-btn text-micro font-bold leading-none ${board.color}`}>
-              {board.label}
-            </span>
-          )}
-          {r.consecutive_limit_ups > 0 && (
-            <span className="shrink-0 inline-flex items-center justify-center px-1 h-[16px] rounded-btn bg-danger/15 text-danger text-micro font-bold tabular-nums">
-              {r.consecutive_limit_ups === 1 ? '首板' : `${r.consecutive_limit_ups}连`}
-            </span>
-          )}
-          {isMonitored && <span className="ml-auto"><RealtimeDot /></span>}
-        </div>
-
-        {/* 第二行: 大价格 + 涨跌幅胶囊 */}
-        <div className="flex items-end justify-between gap-2 mb-2">
-          <span className={`text-xl tabular-nums tracking-tighter leading-none ${priceColorClass(pct)}`}>
-            {fmtAssetPrice(price, r.asset_type)}
-          </span>
-          {pct != null && (
-            <span className={`shrink-0 inline-flex items-center px-1.5 py-[2px] rounded-btn text-micro tabular-nums ${pctBg}`}>
-              {fmtPct(pct)}
-            </span>
-          )}
-        </div>
-
-        {/* 第三行: 指标 */}
-        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-micro text-muted leading-relaxed">
-          <span title="换手率">换手<span className={`font-mono ml-0.5 ${turnoverColor(r.turnover_rate)}`}>{r.turnover_rate != null ? `${r.turnover_rate.toFixed(2)}%` : '—'}</span></span>
-          <span title="量比">量比<span className="font-mono ml-0.5">{fmtPrice(r.vol_ratio_5d)}</span></span>
-          <span title="RSI14">RSI<span className="font-mono ml-0.5">{r.rsi_14 != null ? r.rsi_14.toFixed(1) : '—'}</span></span>
-          {/* 扩展数据列展示在卡片中 */}
-          {extCols.map(col => {
-            if (col.source.type !== 'ext') return null
-            const { configId, fieldName } = col.source
-            const val = r[`${configId}__${fieldName}`]
-            if (val == null) return null
-
-            const cellKey = `${r.symbol}::${col.id}`
-            const expanded = expandedCells.has(cellKey)
-            const sourceField = `${configId}.${fieldName}`
-            const dimensionKind = dimensionKindForSourceField(sourceField)
-
-            return (
-              <span key={col.id} title={col.label}>
-                <span className="text-secondary">{col.label}</span>
-                <span className="font-mono ml-0.5">
-                  {renderExtValue(
-                    val,
-                    col,
-                    expanded,
-                    () => onToggleExpand(cellKey),
-                    true,
-                    dimensionKind ? value => onDimensionClick({ kind: dimensionKind, value, sourceField }) : undefined,
-                  )}
-                </span>
-              </span>
-            )
-          })}
-        </div>
-      </div>
-
-      {/* 信号标签区 */}
-      {signals.length > 0 && (
-        <div className="pl-4 pr-2.5 pt-1.5 pb-2 flex flex-wrap gap-1">
-          {signals.slice(0, 3).map(s => (
-            <span key={s.label} className={`inline-block px-1.5 py-[1px] rounded-btn text-micro font-medium leading-tight ${signalCls(s.type)}`}>
-              {s.label}
-            </span>
-          ))}
-          {signals.length > 3 && (
-            <span className="inline-block px-1 py-[1px] rounded-btn text-micro text-muted bg-elevated leading-tight">
-              +{signals.length - 3}
-            </span>
-          )}
-        </div>
-      )}
-
-      {/* 迷你蜡烛图 */}
-      {showCandle && candleRows.length > 0 && (
-        <div className="border-t border-border/40 px-3 py-1.5">
-          <MiniCandlestick rows={candleRows} height={32} />
-        </div>
-      )}
-    </div>
-  )
-})
+/** 空分组集合: 复用同一引用, 避免每次渲染产生新数组击穿 memo。 */
+const EMPTY_GROUP_IDS: readonly string[] = []
 
 function minuteScopeFor(rows: { symbol: string; asset_type?: string }[]): string {
   // 分时按标的缓存。单纯排序不改变取数范围，指数走独立数据入口。
@@ -699,10 +478,8 @@ function minuteScopeFor(rows: { symbol: string; asset_type?: string }[]): string
 
 export function Watchlist() {
   const qc = useQueryClient()
-  const [viewMode, setViewMode] = useState<'table' | 'card'>(() => {
-    return (storage.watchlistView.get('table') as 'table' | 'card')
-  })
-  // 分组卡片总览: 临时整页模式, 不持久化; 关闭(含刷新)后回到原视图设置
+  // [R607] 卡片视图已删除, 只剩「表格」与「分组卡片」两种。
+  // 分组卡片总览: 临时整页模式, 不持久化; 关闭(含刷新)后回到表格
   const [groupCardsOpen, setGroupCardsOpen] = useState(false)
   // 分组统计条: 顶部图形化分组涨跌概览, 会话内开关, 不影响个股视图设置
   const [groupStatsOpen, setGroupStatsOpen] = useState(false)
@@ -794,12 +571,7 @@ export function Watchlist() {
   // 计算 ext 列参数
   const extColumnsParam = useMemo(() => buildExtColumnsParam(columns, extSchema.data?.items), [columns, extSchema.data])
 
-  // [R605] 视图分段: 表格 / 卡片 写盘, 分组卡片是临时模式不写盘
-  const selectView = useCallback((mode: 'table' | 'card') => {
-    setGroupCardsOpen(false)
-    setViewMode(mode)
-    storage.watchlistView.set(mode)
-  }, [])
+
   // 分组卡片: 整页临时展示, 开关不触碰个股视图设置
   const toggleGroupView = useCallback(() => {
     setGroupCardsOpen(open => !open)
@@ -1073,11 +845,6 @@ export function Watchlist() {
   const handleCardPreview = useCallback((sym: string, name: string) => {
     setPreviewSymbol(sym); setPreviewName(name)
   }, [])
-  const handleCardConfirmRemove = useCallback((sym: string) => {
-    remove.mutate(sym); setConfirmRemove(null)
-  }, [remove])
-  const handleCardCancelRemove = useCallback(() => setConfirmRemove(null), [])
-  const handleCardRequestRemove = useCallback((sym: string) => setConfirmRemove(sym), [])
   const handleToggleMember = useCallback((symbol: string, groupId: string, member: boolean) => {
     if (member) addGroupMember.mutate({ symbol, groupId })
     else removeGroupMember.mutate({ symbol, groupId })
@@ -1344,24 +1111,7 @@ export function Watchlist() {
     [previewSymbol, sortedRows],
   )
 
-  const cardColumns = useCardColumnCount()
-  const cardGridRef = useRef<HTMLDivElement>(null)
   const virtualized = sortedRows.length > VIRTUAL_LIST_THRESHOLD
-  const virtualizeCards = viewMode === 'card' && !groupCardsOpen && virtualized
-  const cardRowCount = Math.ceil(sortedRows.length / cardColumns)
-  const { getScrollElement: getCardScrollElement, scrollMargin: cardScrollMargin } = useParentScroll(
-    cardGridRef,
-    virtualizeCards,
-  )
-  const cardRowVirtualizer = useVirtualizer({
-    count: virtualizeCards ? cardRowCount : 0,
-    getScrollElement: getCardScrollElement,
-    estimateSize: () => dailyKVisible ? 180 : 140,
-    getItemKey: index => `${cardColumns}:${(sortedRows[index * cardColumns] as any)?.symbol ?? index}`,
-    gap: 12,
-    overscan: 3,
-    scrollMargin: cardScrollMargin,
-  })
 
   const [visibleTableScope, setVisibleTableScope] = useState<string | null>(null)
   const handleTableVisibleRows = useCallback((visibleRows: any[] | null) => {
@@ -1372,13 +1122,7 @@ export function Watchlist() {
     if (!virtualized) {
       visibleMinuteScope = minuteScopeFor(sortedRows)
     } else {
-      let viewport = visibleTableScope
-      if (viewMode === 'card') {
-        const items = cardRowVirtualizer.getVirtualItems()
-        const first = items[0], last = items.at(-1)
-        viewport = first && last ? minuteScopeFor(sortedRows.slice(first.index * cardColumns, (last.index + 1) * cardColumns)) : null
-      }
-      visibleMinuteScope = viewport ?? minuteScopeFor(sortedRows.slice(0, MINUTE_SEED_MAX))
+      visibleMinuteScope = visibleTableScope ?? minuteScopeFor(sortedRows.slice(0, MINUTE_SEED_MAX))
     }
   }
   useEffect(() => {
@@ -1391,12 +1135,6 @@ export function Watchlist() {
     return () => clearTimeout(timer)
   }, [visibleMinuteScope, virtualized])
 
-  // 可见的 ext 列（卡片视图使用）
-  const visibleExtCols = useMemo(
-    () => visibleColumns.filter(c => c.source.type === 'ext'),
-    [visibleColumns]
-  )
-
   // "数据未就绪" 的个股数: 后端 LEFT JOIN 保证返回所有自选行,
   // 指标全为 null 的行属于 enriched 缓存未覆盖 (新股/冷门/新用户未同步), 非筛选导致.
   // 用 close 是否为 null/undefined 判断 "整行指标缺失" (close 是 enriched 最基础字段).
@@ -1408,29 +1146,6 @@ export function Watchlist() {
   // "被筛选条件隐藏" 的个股数: 后端返回的行数 vs 经过前端筛选后的行数.
   // 分组切换不计入筛选隐藏，只比较当前分组内的数据。
   const hiddenCount = Math.max(0, rowsInSelectedGroup.length - sortedRows.length)
-
-  const renderStockCard = (r: any) => (
-    <StockCard
-      key={r.symbol}
-      r={r}
-      candleRows={klineData[r.symbol] ?? EMPTY_KLINE}
-      showCandle={dailyKVisible}
-      onPreview={handleCardPreview}
-      onConfirmRemove={handleCardConfirmRemove}
-      onCancelRemove={handleCardCancelRemove}
-      onRequestRemove={handleCardRequestRemove}
-      isConfirming={confirmRemove === r.symbol}
-      extCols={visibleExtCols}
-      expandedCells={expandedCells}
-      onToggleExpand={handleToggleExpand}
-      onDimensionClick={setDimensionTarget}
-      isMonitored={monitoredSymbols.has(r.symbol)}
-      active={previewSymbol === r.symbol}
-      groups={groups}
-      onToggleMember={handleToggleMember}
-      groupChangePending={addGroupMember.isPending || removeGroupMember.isPending}
-    />
-  )
 
   return (
     <div className="flex flex-col h-full">
@@ -1526,7 +1241,7 @@ export function Watchlist() {
               name="watchlist.toolbar"
               context={{
                 symbols: sortedRows.map((row: any) => row.symbol),
-                viewMode,
+                viewMode: 'table',
                 selectedGroup,
                 refresh: () => enriched.refetch(),
               }}
@@ -1539,18 +1254,11 @@ export function Watchlist() {
       <div className="flex flex-wrap items-center gap-2 px-5 py-2 border-b border-border/60 bg-surface/40">
         <div className={SEG} role="group" aria-label="视图切换">
           <button
-            onClick={() => selectView('table')}
-            aria-pressed={!groupCardsOpen && viewMode === 'table'}
-            className={cn(SEG_ITEM, !groupCardsOpen && viewMode === 'table' ? SEG_ON : SEG_OFF)}
+            onClick={() => setGroupCardsOpen(false)}
+            aria-pressed={!groupCardsOpen}
+            className={cn(SEG_ITEM, !groupCardsOpen ? SEG_ON : SEG_OFF)}
           >
             <List className="h-3.5 w-3.5" />表格
-          </button>
-          <button
-            onClick={() => selectView('card')}
-            aria-pressed={!groupCardsOpen && viewMode === 'card'}
-            className={cn(SEG_ITEM, !groupCardsOpen && viewMode === 'card' ? SEG_ON : SEG_OFF)}
-          >
-            <LayoutGrid className="h-3.5 w-3.5" />卡片
           </button>
           <button
             onClick={toggleGroupView}
@@ -1745,7 +1453,7 @@ export function Watchlist() {
               config={groupStatsConfig}
               onConfigChange={updateGroupStatsConfig}
             />
-          ) : viewMode === 'table' ? (
+          ) : (
             <StockDataTable
               columns={visibleColumns}
               rows={sortedRows}
@@ -2021,32 +1729,6 @@ export function Watchlist() {
               }}
               className="rounded-card overflow-x-auto"
             />
-          ) : !virtualizeCards ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3">
-              {sortedRows.map(renderStockCard)}
-            </div>
-          ) : (
-            <div
-              ref={cardGridRef}
-              className="relative"
-              style={{ height: cardRowVirtualizer.getTotalSize() }}
-            >
-              {cardRowVirtualizer.getVirtualItems().map(virtualRow => {
-                const start = virtualRow.index * cardColumns
-                const row = sortedRows.slice(start, start + cardColumns)
-                return (
-                  <div
-                    key={virtualRow.key}
-                    ref={cardRowVirtualizer.measureElement}
-                    data-index={virtualRow.index}
-                    className="absolute left-0 top-0 w-full grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3"
-                    style={{ transform: `translateY(${virtualRow.start - cardScrollMargin}px)` }}
-                  >
-                    {row.map(renderStockCard)}
-                  </div>
-                )
-              })}
-            </div>
           )}
         </div>
       </div>

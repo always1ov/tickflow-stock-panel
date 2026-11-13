@@ -117,9 +117,6 @@ export const storage = {
   /** 自选分组统计条配置 (metric: 统计指标, sort: 排序方式, card*: 分组卡片显示项) */
   watchlistGroupStats: kv<{ metric: string; sort: string; cardTopN?: number; cardColorBar?: boolean; cardRank?: boolean }>('watchlist_groupStats'),
 
-  /** 自选列表视图模式 table | card (分组卡片为临时模式, 不持久化) */
-  watchlistView:        kv<string>('watchlist_view'),
-
   /** 自选列表日K蜡烛图显示状态 */
   watchlistCandle:      kv<boolean>('watchlist_showCandle'),
 
