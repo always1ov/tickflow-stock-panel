@@ -10,5 +10,5 @@
 
 - `test_design_spec`（写死字号 42→49）、`test_ui_hierarchy`（`Data.tsx` 的 `text-[10px]`）：用户裁决升级期豁免，升级完成后统一恢复。
 - v0.3.6 起豁免范围扩大：`test_ui_hierarchy` 9 个迁移文件（`SignalPicker`、`Screener`、`StrategySettingsDialog`、`Data`、`StrategyBacktest`、`analysis-shared`、`ext-data/ExtDataPullPanel`、`signals/extension`、`signals/CustomSignalDialog`）与 `test_design_spec` 4 条计数守卫；上游新页面直接写死字号，合并时整页取上游所致。
-- **v0.3.6 产品影响待裁决**：上游「策略全面去内置化」后 `backend/app/strategy/builtin/` 只剩 fork 自有的 `factor_rank_research`、`keltner_reversion`；作者 25 个内置策略只存在于 `backend/tests/fixtures/strategies/`（测试用）。全新安装或升级后策略列表会变空，需决定是否加 fork 一次性种子。
+- **v0.3.6 产品影响（已裁决）**：上游「策略全面去内置化」后 `backend/app/strategy/builtin/` 只剩 fork 自有的 `factor_rank_research`、`keltner_reversion`；作者 25 个内置策略只存在于 `backend/tests/fixtures/strategies/`（测试用）。用户裁决「**不种子，完全跟随上游**」——策略列表允许为空，由用户自行新建或用 AI 生成，不再加 fork 一次性种子。
 - 上游 v0.3.4 起产品名与安装包改叫 TSP；本仓保留「牛来」品牌，因此这三个打包文件每次同步都需要重放品牌字段。
