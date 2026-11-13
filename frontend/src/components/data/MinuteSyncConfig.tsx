@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useId, useRef } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Loader2, Trash2, Download, Calendar } from 'lucide-react'
+import { Loader2, Trash2, Download, Calendar, SlidersHorizontal, Activity } from 'lucide-react'
 import { api } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { MissingCapChip } from '@/lib/capability-labels'
@@ -9,7 +9,11 @@ import { cn } from '@/lib/cn'
 import { MinuteGapPanel } from '@/components/data/MinuteGapPanel'
 
 // hasCap: 分钟K能力当前是否可用 (路由矩阵判定, 生效源含插件/自定义源)
-export function MinuteSyncConfig({ hasCap, onJobStart }: { hasCap: boolean; onJobStart?: (jobId: string) => void }) {
+export function MinuteSyncConfig({ hasCap, onJobStart, onClose }: { hasCap: boolean; onJobStart?: (jobId: string) => void; onClose?: () => void }) {
+  const [tab, setTab] = useState<'sync' | 'health'>('sync')
+  const tabId = useId()
+  const syncTabRef = useRef<HTMLButtonElement>(null)
+  const healthTabRef = useRef<HTMLButtonElement>(null)
   const qc = useQueryClient()
   const prefs = useQuery({
     queryKey: QK.preferences,
@@ -78,12 +82,54 @@ export function MinuteSyncConfig({ hasCap, onJobStart }: { hasCap: boolean; onJo
   }
 
   return (
-    <div className="px-4 pb-4 pt-3 border-t border-accent/20 space-y-3">
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div
+        role="tablist"
+        aria-label="分钟数据管理"
+        className="flex shrink-0 gap-5 border-b border-border px-4 sm:px-5"
+        onKeyDown={e => {
+          if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return
+          e.preventDefault()
+          const next = e.key === 'Home' ? 'sync' : e.key === 'End' ? 'health' : tab === 'sync' ? 'health' : 'sync'
+          setTab(next)
+          ;(next === 'sync' ? syncTabRef : healthTabRef).current?.focus()
+        }}
+      >
+        {([
+          { key: 'sync', label: '同步与获取', icon: SlidersHorizontal, ref: syncTabRef },
+          { key: 'health', label: '数据体检', icon: Activity, ref: healthTabRef },
+        ] as const).map(({ key, label, icon: Icon, ref }) => (
+          <button
+            key={key}
+            ref={ref}
+            role="tab"
+            id={`${tabId}-${key}-tab`}
+            aria-controls={`${tabId}-${key}-panel`}
+            aria-selected={tab === key}
+            tabIndex={tab === key ? 0 : -1}
+            onClick={() => setTab(key)}
+            className={`inline-flex items-center gap-1.5 border-b-2 py-3 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/60 ${tab === key ? 'border-accent text-accent' : 'border-transparent text-muted hover:text-foreground'}`}
+          >
+            <Icon className="h-3.5 w-3.5" />{label}
+          </button>
+        ))}
+      </div>
+      <div
+        role="tabpanel"
+        id={`${tabId}-sync-panel`}
+        aria-labelledby={`${tabId}-sync-tab`}
+        hidden={tab !== 'sync'}
+        tabIndex={0}
+        className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain p-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/60 sm:p-5"
+      >
       {/* 区块 A: 自动同步 (盘后定时拉取的偏好设置) */}
-      <div className="space-y-2.5">
-      <div className="flex items-center justify-between">
+      <div className="space-y-4 rounded-card border border-border bg-base/30 p-3 sm:p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2.5">
           <button
+            role="switch"
+            aria-label="自动同步"
+            aria-checked={enabled}
             onClick={handleToggle}
             disabled={!hasMinuteCap}
             className={`tap-target relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-expand shrink-0 ${
@@ -104,14 +150,16 @@ export function MinuteSyncConfig({ hasCap, onJobStart }: { hasCap: boolean; onJo
           <div className="flex items-center">
             <button
               onClick={() => setDays(localDays - 1)}
+              aria-label="减少自动同步天数"
               disabled={!hasMinuteCap || !enabled || localDays <= 1}
               className="h-6 w-6 flex items-center justify-center rounded-l-btn bg-elevated border border-border text-secondary hover:bg-border/50 disabled:opacity-30 transition-colors text-xs"
             >−</button>
-            <div className={`h-6 w-8 flex items-center justify-center border-y border-border text-xs font-mono tabular-nums ${enabled ? 'text-foreground bg-base' : 'text-muted bg-elevated/50'}`}>
+            <div className={`h-6 w-8 flex items-center justify-center border-y border-border text-micro font-mono tabular-nums ${enabled ? 'text-foreground bg-base' : 'text-muted bg-elevated/50'}`}>
               {localDays}
             </div>
             <button
               onClick={() => setDays(localDays + 1)}
+              aria-label="增加自动同步天数"
               disabled={!hasMinuteCap || !enabled || localDays >= 30}
               className="h-6 w-6 flex items-center justify-center rounded-r-btn bg-elevated border border-border text-secondary hover:bg-border/50 disabled:opacity-30 transition-colors text-xs"
             >+</button>
@@ -125,7 +173,7 @@ export function MinuteSyncConfig({ hasCap, onJobStart }: { hasCap: boolean; onJo
 
       {/* 分段大小: 控制单次 SDK 请求覆盖的交易日数。每段拉完即落盘,避免全量攒内存 OOM。
           「往前获取」与「获取 1 年」共用此设置 (两者都经过 sync_and_persist_minute)。 */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/60 pt-4">
         <div className="flex items-center gap-1.5">
           <span className="text-xs text-foreground font-medium">分段大小</span>
           <span className="text-micro text-muted px-1 py-px rounded bg-warning/8 text-warning/80">内存优化</span>
@@ -134,14 +182,16 @@ export function MinuteSyncConfig({ hasCap, onJobStart }: { hasCap: boolean; onJo
           <div className="flex items-center">
             <button
               onClick={() => setSegment(localSegment - 5)}
+              aria-label="减小分段大小"
               disabled={!hasMinuteCap || localSegment <= 5}
               className="h-6 w-6 flex items-center justify-center rounded-l-btn bg-elevated border border-border text-secondary hover:bg-border/50 disabled:opacity-30 transition-colors text-xs"
             >−</button>
-            <div className="h-6 w-8 flex items-center justify-center border-y border-border text-xs font-mono tabular-nums bg-base text-foreground">
+            <div className="h-6 w-8 flex items-center justify-center border-y border-border text-micro font-mono tabular-nums bg-base text-foreground">
               {localSegment}
             </div>
             <button
               onClick={() => setSegment(localSegment + 5)}
+              aria-label="增大分段大小"
               disabled={!hasMinuteCap || localSegment >= 30}
               className="h-6 w-6 flex items-center justify-center rounded-r-btn bg-elevated border border-border text-secondary hover:bg-border/50 disabled:opacity-30 transition-colors text-xs"
             >+</button>
@@ -149,14 +199,14 @@ export function MinuteSyncConfig({ hasCap, onJobStart }: { hasCap: boolean; onJo
           <span className="text-micro text-muted">交易日/段</span>
         </div>
       </div>
-      <div className="text-micro text-muted leading-relaxed -mt-1">
-        每段拉完即写盘,避免内存堆积。越小越省内存但越慢,默认 20 平衡。
+      <div className="text-micro text-muted leading-relaxed">
+        每段拉完即写盘，避免内存堆积。分段越小越省内存，获取耗时越长；默认 20 个交易日。设置自动保存。
       </div>
       </div>
 
       {/* 区块 B: 手动获取 (一次性操作, 独立于上方自动同步开关) */}
-      <div className="pt-3 border-t border-border space-y-2">
-        <div className="flex items-center gap-1.5">
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <Download className="h-3 w-3 text-secondary" />
           <span className={TYPE.card}>手动获取</span>
           <span className="text-micro text-muted">不受自动同步开关影响</span>
@@ -190,18 +240,18 @@ export function MinuteSyncConfig({ hasCap, onJobStart }: { hasCap: boolean; onJo
           均按上方「分段大小」分段拉取、每段即落盘
         </div>
       </div>
-
-      {/* 区块 D: 缺口体检 (发现本地分区中不完整的 标的×交易日) */}
-      <div className="space-y-2 border-t border-border/40 pt-2.5">
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs font-medium text-foreground">数据体检</span>
-          <span className="rounded bg-warning/10 px-1 py-px text-micro text-warning/90">
-            找出残缺的交易日照
-          </span>
-        </div>
-        <MinuteGapPanel />
       </div>
-
+      <div
+        role="tabpanel"
+        id={`${tabId}-health-panel`}
+        aria-labelledby={`${tabId}-health-tab`}
+        hidden={tab !== 'health'}
+        tabIndex={0}
+        className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/60 sm:p-5"
+      >
+        <MinuteGapPanel hasCap={hasMinuteCap} onJobStart={onJobStart} />
+      </div>
+      <div className="flex shrink-0 items-center justify-between gap-3 border-t border-border bg-base/20 px-4 py-3 sm:px-5">
       {/* 区块 C: 清空 (危险操作, 独立分隔) */}
       <button
         onClick={() => setConfirmClear(true)}
@@ -212,6 +262,8 @@ export function MinuteSyncConfig({ hasCap, onJobStart }: { hasCap: boolean; onJo
         <Trash2 className="h-3 w-3" />
         清空分钟K数据
       </button>
+      {onClose && <button onClick={onClose} className="rounded-btn border border-border bg-elevated px-4 py-1.5 text-xs text-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60">关闭</button>}
+      </div>
 
       {/* 清空确认弹窗 */}
       {confirmClear && (
@@ -219,7 +271,7 @@ export function MinuteSyncConfig({ hasCap, onJobStart }: { hasCap: boolean; onJo
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => !clearMutation.isPending && setConfirmClear(false)} />
           <div className="relative rounded-card border border-border bg-surface shadow-2xl mx-4 px-6 py-5 max-w-sm w-full space-y-4">
             <div className={cn(TYPE.section, 'text-center')}>确认清空分钟K数据？</div>
-            <div className="text-xs text-muted text-center leading-relaxed">
+            <div className="text-micro text-muted text-center leading-relaxed">
               此操作仅删除分钟K (kline_minute) 数据, <span className="text-foreground/80">不影响</span>日K、复权因子、指标等其他数据。清空后可重新获取。
             </div>
             <div className="flex items-center justify-center gap-3">

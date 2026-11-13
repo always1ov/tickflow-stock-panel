@@ -19,6 +19,7 @@ vi.mock('@/lib/api', () => ({ api: {
   watchlistList: vi.fn(async () => ({ symbols: [] })),
   watchlistEnriched: vi.fn(async () => ({ rows: [] })),
   pipelineJobs: vi.fn(async () => ({ active_id: null, items: [] })),
+  dataIntegrity: vi.fn(async () => ({ report: null, blocking_assets: [], data_revisions: {} })),
   alertsList: vi.fn(async () => ({ total: 0 })),
   quoteStatus: vi.fn(),
   updateRealtimeQuotes: vi.fn(async (enabled: boolean) => ({
@@ -100,3 +101,28 @@ it('当前源已不可用时不复用旧可用状态开启', async () => {
   expect(api.updateRealtimeQuotes).not.toHaveBeenCalled()
   expect(toast).toHaveBeenCalledWith(expect.stringContaining('数据源'), 'error')
 })
+
+it.each(['succeeded', 'failed'] as const)('离开数据页后, 分钟补拉 %s 仍刷新体检和分钟缓存', async status => {
+  // [R587 同步上游 v0.3.25] jsdom 不保证有 rAF, fork 的 useBootTier 靠它升档;
+  // 没有的话管道轮询永远不发出。用 setTimeout 兜一个。
+  vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => setTimeout(() => cb(0), 0))
+  vi.mocked(api.pipelineJobs).mockResolvedValue({ active_id: null, jobs: [{
+    id: 'repair-job', status, stage: status === 'succeeded' ? 'done' : 'sync_minute', progress: 100,
+    stage_pct: 100, started_at: null, finished_at: null, duration_s: 1,
+    result: status === 'succeeded' ? { minute_rows: 480, universe_size: 2 } : null,
+    error: status === 'failed' ? '部分补拉失败' : null,
+  }] })
+  const keys = [QK.minuteGaps, QK.minuteBatch(), QK.klineMinute('600000.SH', '2026-10-20'), QK.klineMinuteRange('600000.SH', 10)]
+  keys.forEach(key => client.setQueryData(key, {}))
+  const unaffected = QK.indexMinute('000001.SH', '2026-10-20')
+  client.setQueryData(unaffected, {})
+  await act(async () => root.render(
+    <MemoryRouter><QueryClientProvider client={client}><Layout /></QueryClientProvider></MemoryRouter>,
+  ))
+  // [R587 同步上游 v0.3.25] fork 的管道轮询挂在 bootTier >= 2 (首帧后 1.5s, R154),
+  // 上游测试只等 20ms 拿不到任务数据 —— 等过这一档即可。
+  await act(async () => { await new Promise(r => setTimeout(r, 1700)) })
+  // 任务数据到达后, 监听任务完成的 effect 还要再跑一轮
+  await act(async () => { await new Promise(r => setTimeout(r, 100)) })
+  keys.forEach(key => expect(client.getQueryState(key)?.isInvalidated).toBe(true))
+  expect(client.getQueryState(unaffected)?.isInvalidated).toBe(false)})

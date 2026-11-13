@@ -3528,7 +3528,22 @@ export interface DataSourceItem {
 }
 
 /** 内置可选插件数据源 (plugins/ 目录, 需手动装依赖) */
+export interface SourcePackagePreview {
+  manifest: { name: string; display_name?: string; version: string; author?: string; description?: string; datasets: string[] }
+  digest: string
+  errors: string[]
+  installed_version: string | null
+}
+
 export interface PluginDataSourceItem {
+  can_test?: boolean
+  origin?: 'builtin' | 'external'
+  version?: string
+  enabled?: boolean
+  pending_version?: string | null
+  previous_version?: string | null
+  pending_remove?: boolean
+  update_error?: string | null
   name: string
   display_name: string
   datasets: string[]
@@ -3604,6 +3619,7 @@ export interface DataSourcesResponse {
 }
 
 export interface DataSourceTestResult {
+  error?: string
   provider: string
   dataset: string
   rows: number
@@ -3768,25 +3784,6 @@ export interface ConfigBackupApplyResult {
   skipped_unselected: number
   out_of_scope_files: number
   reload_hints: Record<string, boolean>
-}
-
-/** 策略包条目预览 (POST /api/strategies/bundle/inspect) */
-export interface StrategyBundleEntry {
-  path: string
-  kind: 'strategies' | 'strategy_overrides' | 'custom_signals' | 'custom_factors'
-  id: string
-  action: 'create' | 'conflict'
-  bytes: number
-}
-
-export interface StrategyBundleInspect {
-  strategy_id: string
-  label: string
-  created_at?: string
-  counts: Record<string, number>
-  warnings: string[]
-  missing_deps: string[]
-  entries: StrategyBundleEntry[]
 }
 
 export interface Preferences {
@@ -4316,6 +4313,21 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ url: opts?.url ?? null, hint: null, force: opts?.force ?? true }),
     }),
+  inspectSourcePackage: (file: File) => {
+    const body = new FormData()
+    body.append('file', file)
+    return request<SourcePackagePreview>('/api/custom/source-packages/inspect', { method: 'POST', body, quiet: true })
+  },
+  installSourcePackage: (file: File, digest: string) => {
+    const body = new FormData()
+    body.append('file', file)
+    body.append('digest', digest)
+    return request<{ name: string; message: string }>('/api/custom/source-packages/install', { method: 'POST', body, quiet: true, timeoutMs: 120_000 })
+  },
+  manageSourcePackage: (name: string, action: string) =>
+    request<{ name: string; message: string }>(`/api/custom/source-packages/${encodeURIComponent(name)}/manage`, {
+      method: 'POST', body: JSON.stringify({ action }), quiet: true,
+    }),
   dataSources: () => request<DataSourcesResponse>('/api/settings/data-sources'),
   capabilityMatrix: () => request<CapabilityMatrix>('/api/settings/capability-matrix'),
   dataSource: (name: string) => request<CustomSourceConfig>(`/api/settings/data-sources/${encodeURIComponent(name)}`),
@@ -4441,6 +4453,7 @@ export const api = {
       scanned_dates: number
       scanned_symbols: number
       complete_dates: string[]
+      inactive_symbol_days?: number
       gaps: MinuteGapRow[]
       summary_by_date: { date: string; gap_symbols: number; missing_bars: number; expected_bars: number }[]
       truncated: boolean
@@ -4869,6 +4882,11 @@ export const api = {
     request<{ status: string; symbol: string; rows: number }>('/api/kline/sync_minute_single', {
       method: 'POST',
       body: JSON.stringify({ symbol, ...(days != null ? { days } : {}) }),
+    }),
+  repairMinuteGaps: (symbols: string[]) =>
+    request<{ status: string; job_id: string }>('/api/kline/repair_minute_gaps', {
+      method: 'POST',
+      body: JSON.stringify({ symbols }),
     }),
   clearMinute: () =>
     request<{ status: string; removed: number }>('/api/kline/clear_minute', {
@@ -6653,31 +6671,6 @@ export const api = {
   /** 获取策略源文件内容 */
   strategyGetSource: (id: string) =>
     request<{ code: string; source: string }>(`/api/strategies/${id}/source`),
-
-  // 策略包 (bundle): 依赖感知的导出/导入 — 策略 .py + 引用的信号/因子定义 + 用户调参。
-  // 导出走浏览器原生下载 (同配置备份直链模式)。
-  strategyBundleExportUrl: (strategyId: string) =>
-    `/api/strategies/${encodeURIComponent(strategyId)}/bundle`,
-
-  strategyBundleInspect: (file: File) => {
-    const fd = new FormData()
-    fd.append('file', file)
-    return request<StrategyBundleInspect>('/api/strategies/bundle/inspect', {
-      method: 'POST',
-      body: fd,
-    })
-  },
-
-  strategyBundleApply: (file: File, allowOverwrite: boolean) => {
-    const fd = new FormData()
-    fd.append('file', file)
-    fd.append('allow_overwrite', allowOverwrite ? 'true' : 'false')
-    return request<ConfigBackupApplyResult>('/api/strategies/bundle/apply', {
-      method: 'POST',
-      body: fd,
-      timeoutMs: 120_000,
-    })
-  },
 
   strategyBuild: (step: number, payload: Record<string, any>) =>
     request<StrategyBuildResult>(

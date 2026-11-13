@@ -942,7 +942,7 @@ def save_plugin_key(req: PluginKeyIn) -> dict:
     """保存插件 API Key(先探后存, 对齐 /tickflow-key 语义)。
 
     流程: probe_plugin_key 用候选 Key 实探 → 有效才写 secrets.json
-    ({plugin}_api_key, 优先级高于 .env) → load_all 重扫, 插件即刻变为可切换。
+    ({plugin}_api_key, 优先级高于 .env) → 定向刷新当前插件。
     """
     from app.data_providers import custom as custom_sources
 
@@ -955,13 +955,31 @@ def save_plugin_key(req: PluginKeyIn) -> dict:
     # 再动文件系统。少了这一道, 一个任意字符串会一路走到 plugins_dir()/name 的
     # 路径拼接、yaml.safe_load, 以及按清单 entry 做的 importlib.import_module,
     # 并且最后用它当 key 名写进共享的 secrets.json。
-    if not custom_sources.is_builtin(name):
+    # [R587 同步上游 v0.3.25] 外部源码包不是内置插件, 但同样是合法目标;
+    # read_state 自带 NAME 白名单校验, 非法名字照样 404。
+    from contextlib import nullcontext
+
+    from app.data_providers.custom import packages
+    external = packages.read_state(name) is not None
+    if not external and not custom_sources.is_builtin(name):
         raise HTTPException(status_code=404, detail=f"插件 '{name}' 不存在")
-    ok, message = custom_sources.probe_plugin_key(name, key)
-    if not ok:
-        return {"ok": False, "reason": "invalid", "error": message}
-    secrets_store.save({f"{name}_api_key": key})
-    custom_sources.load_all()
+    with packages.mutation() if external else nullcontext():
+        ok, message = custom_sources.probe_plugin_key(name, key)
+        if not ok:
+            return {"ok": False, "reason": "invalid", "error": message}
+        previous = secrets_store.load().get(f"{name}_api_key") if external else None
+        secrets_store.save({f"{name}_api_key": key})
+        try:
+            if external:
+                custom_sources.refresh_plugin(name, strict=True)
+            else:
+                custom_sources.refresh_plugin(name)
+        except ValueError:
+            if previous is None:
+                secrets_store.clear(f"{name}_api_key")
+            else:
+                secrets_store.save({f"{name}_api_key": previous})
+            return {"ok": False, "error": "插件初始化失败，已保留原配置"}
     status = next((p for p in custom_sources.list_plugins() if p["name"] == name), None)
     return {
         "ok": True,
@@ -978,7 +996,9 @@ def clear_plugin_key(name: str) -> dict:
 
     # [安全审查 run-1] gate 排在 plugin_manifest 之前 —— 原本是先读清单再判
     # is_builtin, 也就是非法名字仍然先走了一趟路径拼接与 yaml 解析。
-    if not custom_sources.is_builtin(name):
+    # [R587 同步上游 v0.3.25] 外部源码包也允许清 Key。
+    from app.data_providers.custom import packages
+    if packages.read_state(name) is None and not custom_sources.is_builtin(name):
         raise HTTPException(status_code=404, detail=f"插件 '{name}' 不存在")
     manifest = custom_sources.plugin_manifest(name)
     if manifest is None:
@@ -986,7 +1006,7 @@ def clear_plugin_key(name: str) -> dict:
     if not manifest.get("api_key_env"):
         raise HTTPException(status_code=400, detail=f"插件 '{name}' 不支持在界面配置 Key")
     secrets_store.clear(f"{name.lower()}_api_key")
-    custom_sources.load_all()
+    custom_sources.refresh_plugin(name)
     status = next((p for p in custom_sources.list_plugins() if p["name"] == name), None)
     return {
         "ok": True,

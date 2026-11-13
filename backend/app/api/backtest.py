@@ -770,10 +770,10 @@ async def strategy_stream(
                             # 界面上只剩一句"结果解析失败", 跑完的结果全丢。
                             # [R586 同步上游 v0.3.24] 在 _json_safe 之后再盖
                             # daily_data_revisions 戳 (两者都要)。
-                            payload = _stamp_daily_data(
-                                _json_safe(r if isinstance(r, dict) else asdict(r)),
-                                job.daily_data_revisions,
-                            )
+                            # [R587 同步上游 v0.3.25] 先单独洗成 payload,
+                            # 上游守卫按 `payload = _json_safe(` 字面量检查。
+                            payload = _json_safe(r if isinstance(r, dict) else asdict(r))
+                            payload = _stamp_daily_data(payload, job.daily_data_revisions)
                             yield f"event: done\ndata: {json.dumps(payload, ensure_ascii=False, default=str)}\n\n"
                     return
 
