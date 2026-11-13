@@ -23,7 +23,9 @@ from app.api import (
     alerts,
     analysis,
     backtest,
+    config_backup,
     data,
+    definitions,
     external_page,  # [fork 增强] R117 外部网页抓取模式(独立模块)
     events,
     ext_data,
@@ -863,6 +865,7 @@ def _register_routers(app: FastAPI) -> None:
     app.include_router(screener.router)
     app.include_router(backtest.router)
     app.include_router(factors.router)
+    app.include_router(definitions.router)  # [R580 同步上游 v0.3.18] 定义目录/冒烟
     app.include_router(mining.router)
     app.include_router(guardian.router)  # [R578 同步上游 v0.3.16] 策略守护
     app.include_router(lab.router)  # [R578 同步上游 v0.3.16] 研究台
@@ -891,6 +894,7 @@ def _register_routers(app: FastAPI) -> None:
     app.include_router(strategy.router)
     app.include_router(signals.router)
     app.include_router(monitor_rules.router)
+    app.include_router(config_backup.router)  # [R580 同步上游 v0.3.18] 配置备份
     app.include_router(lots.router)
     app.include_router(alerts.router)
     app.include_router(events.router)  # [R561 同步上游] 上游 v0.3.2 SSE 事件流

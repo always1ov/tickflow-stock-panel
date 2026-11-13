@@ -1,20 +1,20 @@
 """自定义/复合因子存储 (P3) — data/user_data/custom_factors/*.json。
 
-镜像 custom_signals 的持久化写法; 单文件损坏只禁用该因子并告警, 不影响启动
-(对齐 CONTRIBUTING 第 4 节插件隔离要求)。生命周期状态: draft → active →
-watch → retired (P4 状态机, 存储字段就绪, 迁移逻辑见巡检设计)。
+持久化收口到统一契约 Store (app/definitions.py); 单文件损坏只禁用该因子并
+告警, 不影响启动 (对齐 CONTRIBUTING 第 4 节插件隔离要求)。生命周期状态:
+draft → active → watch → retired (P4 状态机, 存储字段就绪, 迁移逻辑见巡检设计)。
 """
 from __future__ import annotations
 
-import json
 import logging
 import re
 from datetime import datetime
 from pathlib import Path
 
+from app.definitions import DefinitionKind, JsonDefinitionStore, register_kind
 from app.factors.dsl import compile_formula
+from app.factors.py_expr import compile_python_expression
 from app.factors.registry import FactorSpec, factor_dependencies, get_factor, register_factor
-from app.services.fs_utils import atomic_write_text
 
 logger = logging.getLogger(__name__)
 
@@ -23,13 +23,12 @@ COMPOSITE_ID_PATTERN = re.compile(r"^cf_[a-z0-9_]{1,40}$")
 MAX_COMPOSITE_MEMBERS = 8
 STATUSES = frozenset({"draft", "active", "watch", "retired"})
 
-
-def _dir(data_dir: Path) -> Path:
-    directory = data_dir / "user_data" / "custom_factors"
-    directory.mkdir(parents=True, exist_ok=True)
-    return directory
+_STORE = JsonDefinitionStore("user_data/custom_factors", label="custom factor")
 
 
+# [fork 保留 R580] 因子 id 白名单与路径断言 —— fork 安全审查 run-1 的加固。
+# 上游 v0.3.18 把持久化收口到 JsonDefinitionStore 后只剩 load_all 走统一实现,
+# 这里把校验留在写/删的唯一咽喉 `_path`, 路由原始 id 不能直接拼路径。
 def validate_id(factor_id: str) -> str:
     """因子 id 白名单。**唯一的把关点就是这里** —— 见 `_path` 的说明。"""
     fid = str(factor_id)
@@ -53,7 +52,7 @@ def _path(data_dir: Path, factor_id: str) -> Path:
     「先白名单, 再 resolve, 再断言父目录」这一套; 这里补齐成同一套。
     """
     fid = validate_id(factor_id)
-    base = _dir(data_dir).resolve()
+    base = _STORE.dir(data_dir).resolve()
     target = (base / f"{fid}.json").resolve()
     if target.parent != base:
         raise ValueError(f"因子路径越界: {factor_id!r}")
@@ -62,19 +61,13 @@ def _path(data_dir: Path, factor_id: str) -> Path:
 
 def load_all(data_dir: Path) -> list[dict]:
     """读取全部自定义/复合因子定义; 损坏文件跳过。"""
-    out: list[dict] = []
-    for file in sorted(_dir(data_dir).glob("*.json")):
-        try:
-            out.append(json.loads(file.read_text(encoding="utf-8")))
-        except Exception as exc:
-            logger.warning("custom factor load failed %s: %s", file.name, exc)
-    return out
+    return _STORE.load_all(data_dir)
 
 
 def save_one(data_dir: Path, definition: dict) -> None:
-    target = _path(data_dir, str(definition["id"]))
-    target.parent.mkdir(parents=True, exist_ok=True)
-    atomic_write_text(target, json.dumps(definition, ensure_ascii=False, indent=2))
+    # [fork 保留 R580] 落盘前先过 `_path` 的 id 校验 (统一 Store 本身不校验)
+    _path(data_dir, str(definition["id"]))
+    _STORE.save_one(data_dir, definition)
 
 
 def exists_one(data_dir: Path, factor_id: str) -> bool:
@@ -87,11 +80,9 @@ def exists_one(data_dir: Path, factor_id: str) -> bool:
 
 
 def delete_one(data_dir: Path, factor_id: str) -> bool:
-    target = _path(data_dir, factor_id)
-    if target.exists():
-        target.unlink()
-        return True
-    return False
+    # [fork 保留 R580] 删除路由拿到的是原始路径参数, 同样先过 id 校验
+    _path(data_dir, factor_id)
+    return _STORE.delete_one(data_dir, factor_id)
 
 
 def _now() -> str:
@@ -118,6 +109,30 @@ def to_spec(definition: dict) -> FactorSpec:
 
     if kind == "custom":
         formula = str(definition.get("formula", ""))
+        lang = str(definition.get("lang", "dsl")).strip().lower()
+        if lang not in ("dsl", "python"):
+            raise ValueError(f"未知 lang: {lang} (可选 dsl / python)")
+        if lang == "python":
+            # T2 表达式级 Python (P3): 依赖由 ctx 构造期登记; 显式 warmup
+            # 只允许增大 (推断值是安全下限, 少算会失真)。
+            compiled = compile_python_expression(formula)
+            if not compiled.ok:
+                first = compiled.errors[0]
+                raise ValueError(f"表达式无效 [{first.code}]: {first.message}")
+            declared_warmup = int(definition.get("warmup_bars", 0) or 0)
+            return FactorSpec(
+                id=factor_id,
+                label=label,
+                group=str(definition.get("group", "自定义")),
+                formula_text=formula,
+                kind="custom",
+                lang="python",
+                version=int(definition.get("version", 1)),
+                dependencies=compiled.dependencies,
+                warmup_bars=max(declared_warmup, compiled.warmup_bars),
+                direction=str(definition.get("direction", "none")),  # type: ignore[arg-type]
+                stability="stable" if status == "active" else "experimental",
+            )
         compiled = compile_formula(formula)
         if not compiled.ok:
             first = compiled.errors[0]
@@ -224,3 +239,26 @@ def load_into_registry(data_dir: Path) -> list[str]:
             break
         pending = deferred
     return loaded
+
+
+# ── 统一定义契约注册 (P1b) ───────────────────────────────
+_FACTOR_ID_PATTERN = re.compile(r"^(uf|cf)_[a-z0-9_]{1,40}$")
+
+
+def _validate_definition(definition: dict) -> None:
+    """统一契约校验器 = to_spec (id/label/DSL/复合成员全量校验, 非法抛 ValueError)。"""
+    to_spec(definition)
+
+
+def _definition_dependencies(definition: dict) -> frozenset[str]:
+    """因子定义 → 输入列 (统一契约的依赖提取器) = DSL/复合成员编译依赖, 与 to_spec 同源。"""
+    return to_spec(definition).dependencies
+
+
+register_kind(DefinitionKind(
+    kind="factor",
+    store=_STORE,
+    id_pattern=_FACTOR_ID_PATTERN,
+    validate=_validate_definition,
+    dependencies=_definition_dependencies,
+))

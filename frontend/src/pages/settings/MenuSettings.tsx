@@ -26,6 +26,8 @@ import {
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { api } from '@/lib/api'
+// [R580 同步上游 v0.3.18] 监控徽标开关的本地偏好
+import { setUiPref } from '@/lib/uiPrefs'
 import { QK } from '@/lib/queryKeys'
 import { usePreferences } from '@/lib/useSharedQueries'
 import { SettingsCard } from './SettingsCard'
@@ -554,7 +556,7 @@ export function SettingsMenuSettingsPanel() {
     if (id !== '/monitor') return
     const next = !badgeEnabled
     setBadgeEnabled(next)
-    try { localStorage.setItem('monitor_badge_enabled', next ? '1' : '0') } catch { /* ignore */ }
+    try { setUiPref('monitor_badge_enabled', next ? '1' : '0') } catch { /* ignore */ }
   }
 
   return (

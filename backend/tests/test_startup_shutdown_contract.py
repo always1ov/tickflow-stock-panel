@@ -82,6 +82,8 @@ _EXPECTED_ROUTERS = (
     "screener.router",
     "backtest.router",
     "factors.router",
+    # [R580 同步上游 v0.3.18] 定义目录/冒烟 (/api/definitions/*)
+    "definitions.router",
     "mining.router",
     # [R578 同步上游 v0.3.16] 策略守护 (/api/guardian/*) 与研究台 (/api/lab/*)
     "guardian.router",
@@ -114,6 +116,8 @@ _EXPECTED_ROUTERS = (
     "strategy.router",
     "signals.router",
     "monitor_rules.router",
+    # [R580 同步上游 v0.3.18] 配置备份 (/api/config-backup/*)
+    "config_backup.router",
     "lots.router",
     "alerts.router",
     # [R561 同步上游] 上游 v0.3.2 的 SSE 事件流
