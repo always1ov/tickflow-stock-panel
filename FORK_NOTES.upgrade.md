@@ -22,6 +22,8 @@
 
 | R576 | v0.3.14 | 2026-11-13 | sync/upstream-v0.3.14-tree | 0 | 0 | 零冲突。上游只改 `api/kline.py` 的 `get_minute_batch`：本地已有部分K、但本轮补拉失败/为空（上游断网窗口）时，回退返回本地已落盘行并把该 symbol 记入 `truncated`（前端可据此提示），避免整只股票从分时结果里消失；`truncated` 仅在非空时写入响应，且与 `data` 键对齐。新增回归 `test_kline_minute_batch_pull_fallback.py`。fork 在该文件无自有改动，整份取上游 | 后端 5583 通过 / 12 项失败=已裁决豁免的 UI 字号守卫，`test_scoring_frozen` 通过；前端 build 4.74s、vitest 389 通过；`VERSION` 与 `package.json` 均 0.3.14 | `git reset --hard fork-pre-v0.3.14` |
 
+| R577 | v0.3.15 | 2026-11-13 | sync/upstream-v0.3.15-tree | 6 文件（冲突块 11） | 0 | ①`SectorRotationCard.tsx` 整份取上游（领涨易主圆点标注 + 热力图琥珀轨迹/中性中间色 +「更多」折叠区 + `computeLeaderReigns`/`selectReignLabels`/`topRowPerCol` 导出，上游新测试直接依赖），再重放 fork 两处定制：字号令牌（`text-[9/10/11px]`→`text-micro`）与 R421 去粉配色（`#f472b6/#e879f9/#f06292`→蓝灰/褐/浅灰）；fork 自加的 `refetchInterval: 30_000` 被上游「非连续竞价降为 5 分钟」版本取代；②`Watchlist.tsx` 保留 fork R508「撤掉卡片视图」的决定（卡片虚拟化/视口切片整块不引入），但采纳上游分块日K拉取 `fetchDailyBatchChunked`（单次 400 上限）与「symbols 不进 queryKey」，`enabled` 仍用 fork 的 `viewMode === 'table'`；③`MinuteSyncConfig.tsx` 接入上游 `MinuteGapPanel`（分钟缺口可视化+补拉），与 `TYPE/buttonClass/cn` 导入并存；④`main.tsx`/`StockDataTable.tsx` 导入取并集（fork 的 waapiHandoff/titleTooltip + 上游 uiPrefs/pageZoom；fork 的 TH_ROW + 上游 useEffect）；⑤`ExtPages.tsx` 保留 fork R535 的 `SettingsCard` 双卡，把上游新增「新建 URL 页」快捷按钮并入卡头 `right` 区（不恢复 `max-w-6xl` 与紫色渐变开篇）。纯后端新增：`minute_gaps.py`、`logfile.py`、`desktop.py` 自启、`preferences` UI 偏好、`kline`/`ext_data` 符号上限 | 后端 5627 通过 / 12 项失败=已裁决豁免的 UI 字号守卫（`test_ui_hierarchy` 8 + `test_design_spec` 4），`test_scoring_frozen` 通过；前端 build 4.55s、vitest 409 通过（新增轮动卡 20 条）；`VERSION` 与 `package.json` 均 0.3.15 | `git reset --hard fork-pre-v0.3.15` |
+
 ## 待办登记
 
 - `test_design_spec`（写死字号 42→49）、`test_ui_hierarchy`（`Data.tsx` 的 `text-[10px]`）：用户裁决升级期豁免，升级完成后统一恢复。
