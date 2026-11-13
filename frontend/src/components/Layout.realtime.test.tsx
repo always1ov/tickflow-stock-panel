@@ -124,5 +124,7 @@ it.each(['succeeded', 'failed'] as const)('离开数据页后, 分钟补拉 %s �
   await act(async () => { await new Promise(r => setTimeout(r, 1700)) })
   // 任务数据到达后, 监听任务完成的 effect 还要再跑一轮
   await act(async () => { await new Promise(r => setTimeout(r, 100)) })
-  keys.forEach(key => expect(client.getQueryState(key)?.isInvalidated).toBe(true))
-  expect(client.getQueryState(unaffected)?.isInvalidated).toBe(false)})
+  expect(client.getQueryData(QK.minuteBatch())).toBeUndefined()
+  keys.filter(key => key[0] !== 'minute-batch').forEach(key => expect(client.getQueryState(key)?.isInvalidated).toBe(true))
+  expect(client.getQueryState(unaffected)?.isInvalidated).toBe(false)
+})

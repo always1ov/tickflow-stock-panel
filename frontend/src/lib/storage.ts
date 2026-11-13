@@ -46,12 +46,18 @@ export const storage = {
   /** 查询轮询 / SSE 配置 */
   queryConfig:          kv<unknown>('tf-stocks-query-config'),
 
-  /** 策略池 (screener) — 统一池 (日线+分钟共用, 执行按各自声明周期路由) */
+  /** 策略池 (screener) — v2 起为后端存储的影子副本 (回滚保险), 池本体见 /api/strategy-pool */
   strategyPool:         kv<string[]>('strategy-pool'),
   /** 旧分钟隔离池 — 仅作一次性迁移读取源, 迁移完成后移除该 key */
   strategyPoolMinute:   kv<string[]>('strategy-pool-1m'),
   /** [R95] prune 自动清理的备份 — 被移除的 ID 留底, 页面提供一键恢复 */
   strategyPoolPruneBackup: kv<{ at: string; removed: string[] } | null>('strategy-pool-prune-backup'),
+  /** 策略池 → 后端存储的一次性上载完成标记 (旧本地池先于后端偏好同步时兜底) */
+  strategyPoolV2Migrated: kv<boolean>('tsp-strategy-pool-v2-migrated'),
+  /** 策略库弹窗·左侧策略池排序 (视图偏好: 默认 / 加入时间 / 名称) */
+  screenerPoolSort:     kv<string>('screener-pool-sort'),
+  /** 策略页卡片区·分组 tab (视图偏好: all=全部 / none=未分组 / 分组id) */
+  screenerPoolGroupTab: kv<string>('screener-pool-group-tab'),
   // [R327] R192 那个 `paperTrader`(当前看哪个操作员)跟着 AI 操盘手一起没了。
   // [R513] 原来这里还有 flipTodayWatchOpen(「只是盯着」折没折, R331)与 flipMineOpen
   // (「手上这些」折没折, R355) —— 今日信号改成三段一次摊开、不再折叠, 两条一起删。

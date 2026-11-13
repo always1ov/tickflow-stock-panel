@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { Check, ChevronDown, ChevronUp, FolderCog, FolderInput, Pencil, Plus, Trash2, X, Eraser } from 'lucide-react'
+import { WatchlistGroupTransfer } from '@/components/WatchlistGroupTransfer'
 import { Modal } from '@/components/Modal'
 import { SELECTED, TYPE, buttonClass } from '@/components/ui'
 import { cn } from '@/lib/cn'
@@ -9,7 +10,7 @@ import { api } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { usePreferences } from '@/lib/useSharedQueries'
 import { fmtPct } from '@/lib/format'
-import type { WatchlistGroup, WatchlistGroupColor } from '@/lib/api'
+import type { WatchlistEntry, WatchlistGroup, WatchlistGroupColor } from '@/lib/api'
 import {
   groupPctColor,
   groupPctTitle,
@@ -24,6 +25,7 @@ import {
 export type WatchlistGroupFilter = 'all' | 'ungrouped' | string
 
 interface GroupBarProps {
+  entries: WatchlistEntry[]
   groups: WatchlistGroup[]
   counts: Record<string, number>
   selected: WatchlistGroupFilter
@@ -40,6 +42,7 @@ interface GroupBarProps {
 }
 
 export function WatchlistGroupBar({
+  entries,
   groups,
   counts,
   selected,
@@ -241,6 +244,7 @@ export function WatchlistGroupBar({
             <ChevronDown className={`h-3 w-3 transition-transform duration-expand ease-smooth ${expanded ? 'rotate-180' : ''}`} />
           </button>
         )}
+        <WatchlistGroupTransfer key={selected} source={selected} groups={groups} entries={entries} />
         <button
           type="button"
           onClick={() => setManagerOpen(true)}
@@ -351,7 +355,7 @@ function GroupManagerDialog({
   onRename,
   onDelete,
   onReorder,
-}: Omit<GroupBarProps, 'selected' | 'total' | 'onSelect' | 'onClearGroup'> & { onClose: () => void }) {
+}: Omit<GroupBarProps, 'entries' | 'selected' | 'total' | 'onSelect' | 'onClearGroup'> & { onClose: () => void }) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [newName, setNewName] = useState('')
   const [newColor, setNewColor] = useState<WatchlistGroupColor>(DEFAULT_WATCHLIST_GROUP_COLOR)

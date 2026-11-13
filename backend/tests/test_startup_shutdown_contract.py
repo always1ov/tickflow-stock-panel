@@ -116,6 +116,8 @@ _EXPECTED_ROUTERS = (
     # [R570 同步上游 v0.3.8] 二次开发升级保护 (/api/upgrade/*): 备份/对比/还原被改过程序文件
     "upgrade_guard_api.router",
     "strategy.router",
+    # [R597 同步上游 v0.3.35] 策略池/分组/档案库 (/api/strategy-pool/*)
+    "strategy_pool.router",
     "signals.router",
     "monitor_rules.router",
     # [R580 同步上游 v0.3.18] 配置备份 (/api/config-backup/*)

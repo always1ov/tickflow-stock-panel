@@ -56,6 +56,7 @@ from app.api import (
     signals,
     stock_analysis,
     strategy,
+    strategy_pool,
     task_registry,
     today,  # [fork 增强] 今日总览
     usage_notes,  # [fork 增强] R93 使用观察笔记
@@ -168,11 +169,11 @@ def _bootstrap_auth() -> None:
 def _load_custom_factors(store: DataStore) -> None:
     """载入自定义/复合因子注册表 (P3); 单个失败只跳过该因子 (fail-隔离)。"""
     with startup_phase(logger, "custom factor module import"):
-        from app.factors.store import load_into_registry
+        from app.factors.store import load_runtime_registry
 
     try:
         with startup_phase(logger, "custom factor registration"):
-            loaded_factors = load_into_registry(store.data_dir)
+            loaded_factors = load_runtime_registry(store.data_dir)
         if loaded_factors:
             logger.info("custom factors loaded: %s", len(loaded_factors))
     except Exception as exc:  # noqa: BLE001
@@ -994,6 +995,7 @@ def _register_routers(app: FastAPI) -> None:
     app.include_router(settings_api.router)
     app.include_router(upgrade_guard_api.router)  # [v0.3.8 同步上游] 二次开发升级保护
     app.include_router(strategy.router)
+    app.include_router(strategy_pool.router)  # [R597 同步上游 v0.3.35] 策略池
     app.include_router(signals.router)
     app.include_router(monitor_rules.router)
     app.include_router(config_backup.router)  # [R580 同步上游 v0.3.18] 配置备份

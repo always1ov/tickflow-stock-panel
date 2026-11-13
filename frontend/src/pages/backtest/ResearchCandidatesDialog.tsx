@@ -8,6 +8,8 @@ import { fmtPct } from '@/lib/format'
 import { QK } from '@/lib/queryKeys'
 import { SEG, SEG_ITEM, SEG_ON, SEG_OFF, TYPE, buttonClass } from '@/components/ui'
 import { cn } from '@/lib/cn'
+import { selectableStrategies } from '@/lib/strategyLibrary'
+import { StrategyOptions } from '@/components/StrategyOptions'
 
 const STATUS_OPTIONS: { value: ResearchCandidateStatus; label: string; icon: typeof Clock3 }[] = [
   { value: 'pending', label: '待验证', icon: Clock3 },
@@ -113,7 +115,8 @@ export function ResearchCandidatesDialog({ onClose, onLoadStrategy }: {
 
   const compatibleStrategies = (item: ResearchCandidate) => {
     const assetType = typeof item.config.asset_type === 'string' ? item.config.asset_type : null
-    return (strategies.data?.strategies ?? []).filter(strategy => (
+    return selectableStrategies(strategies.data?.strategies ?? [],
+      linkDraft?.candidateId === item.id ? [linkDraft.strategyId] : []).filter(strategy => (
       strategy.execution_backend !== 'composite'
       && (!assetType || strategy.asset_types.includes(assetType))
       && strategy.timeframes.includes('1d')
@@ -272,9 +275,7 @@ export function ResearchCandidatesDialog({ onClose, onLoadStrategy }: {
                     className="h-8 w-full rounded-input border border-border bg-base px-2 text-xs text-secondary focus:border-accent focus:outline-none"
                   >
                     {options.length === 0 && <option value="">没有兼容策略</option>}
-                    {options.map(strategy => (
-                      <option key={strategy.id} value={strategy.id}>{strategy.name}</option>
-                    ))}
+                    <StrategyOptions strategies={options} selected={linkDraft ? [linkDraft.strategyId] : []} />
                   </select>
                 </label>
                 <div>

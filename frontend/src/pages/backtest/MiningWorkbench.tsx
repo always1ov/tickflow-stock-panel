@@ -40,6 +40,8 @@ import {
   useMiningTask,
 } from '@/lib/miningTask'
 import { QK } from '@/lib/queryKeys'
+import { selectableStrategies, strategyOptionLabel } from '@/lib/strategyLibrary'
+import { selectableDefinitions, definitionOptionLabel } from '@/lib/definitionOptions'
 import { usePreferences } from '@/lib/useSharedQueries'
 import { useToggleRealtimeQuotes } from '@/lib/useSharedMutations'
 import { useDialogBackdrop } from '@/lib/useDialogBackdrop'
@@ -410,7 +412,7 @@ export function MiningWorkbench() {
     if (initializedFactors.current || !factorQuery.data?.columns.length) return
     initializedFactors.current = true
     if (!draft.factorNames.length) {
-      setDraft(current => ({ ...current, factorNames: factorQuery.data!.columns.slice(0, 48).map(item => item.id) }))
+      setDraft(current => ({ ...current, factorNames: selectableDefinitions(factorQuery.data!.columns).slice(0, 48).map(item => item.id) }))
     }
   }, [factorQuery.data, draft.factorNames.length])
 
@@ -486,10 +488,12 @@ export function MiningWorkbench() {
 
   const factorGroups = useMemo(() => {
     const groups: Record<string, FactorColumn[]> = {}
-    for (const item of factorQuery.data?.columns ?? []) (groups[item.group] ??= []).push(item)
+    for (const item of selectableDefinitions(factorQuery.data?.columns ?? [], draft.factorNames)) (groups[item.group] ??= []).push(item)
     return groups
-  }, [factorQuery.data])
-  const strategies = strategyQuery.data?.strategies.filter(item => item.execution_backend === 'matrix_native') ?? []
+  }, [factorQuery.data, draft.factorNames])
+  const strategies = selectableStrategies(
+    strategyQuery.data?.strategies.filter(item => item.execution_backend === 'matrix_native') ?? [], draft.strategyIds,
+  )
 
   useEffect(() => {
     if (!strategyQuery.data) return
@@ -724,14 +728,14 @@ export function MiningWorkbench() {
           <section className="border-t border-border pt-3">
             <div className="mb-2 flex items-center justify-between">
               <span className={cn('flex items-center gap-1.5', TYPE.card)}><FlaskConical className="h-3 w-3" />因子目录</span>
-              <button type="button" className={buttonClass({ variant: 'ghost', size: 'xs' }, 'text-accent')} onClick={() => updateDraft('factorNames', draft.factorNames.length ? [] : (factorQuery.data?.columns ?? []).slice(0, 48).map(item => item.id))}>{draft.factorNames.length ? '清空' : '全选'}</button>
+              <button type="button" className={buttonClass({ variant: 'ghost', size: 'xs' }, 'text-accent')} onClick={() => updateDraft('factorNames', draft.factorNames.length ? [] : selectableDefinitions(factorQuery.data?.columns ?? []).slice(0, 48).map(item => item.id))}>{draft.factorNames.length ? '清空' : '全选'}</button>
             </div>
             <div className="max-h-64 space-y-2 overflow-y-auto pr-1">
               {Object.entries(factorGroups).map(([group, items]) => (
                 <div key={group}>
                   <div className="mb-1 text-micro font-medium text-muted">{group}</div>
                   <div className="grid grid-cols-2 gap-1">
-                    {items.map(item => <label key={item.id} className="flex min-w-0 cursor-pointer items-center gap-1.5 text-xs text-secondary"><input type="checkbox" className="h-3.5 w-3.5 accent-accent" checked={draft.factorNames.includes(item.id)} onChange={() => toggleFactor(item.id)} /><span className="truncate" title={`${item.label} · ${item.desc}`}>{item.label}</span></label>)}
+                    {items.map(item => <label key={item.id} className="flex min-w-0 cursor-pointer items-center gap-1.5 text-xs text-secondary"><input type="checkbox" className="h-3.5 w-3.5 accent-accent" checked={draft.factorNames.includes(item.id)} onChange={() => toggleFactor(item.id)} /><span className="truncate" title={`${item.label} · ${item.desc}`}>{definitionOptionLabel(item)}</span></label>)}
                   </div>
                 </div>
               ))}
@@ -743,7 +747,7 @@ export function MiningWorkbench() {
           <section className="border-t border-border pt-3">
             <div className={cn('mb-2 flex items-center justify-between', TYPE.card)}><span>已有策略对照</span><span className="font-mono text-micro text-muted">{draft.strategyIds.length}/8</span></div>
             <div className="max-h-32 space-y-1 overflow-y-auto pr-1">
-              {strategies.map(item => <label key={item.id} className="flex min-w-0 cursor-pointer items-center gap-1.5 text-xs text-secondary"><input type="checkbox" className="h-3.5 w-3.5 accent-accent" checked={draft.strategyIds.includes(item.id)} onChange={() => toggleStrategy(item.id)} /><span className="truncate" title={item.description}>{item.name}</span></label>)}
+              {strategies.map(item => <label key={item.id} className="flex min-w-0 cursor-pointer items-center gap-1.5 text-xs text-secondary"><input type="checkbox" className="h-3.5 w-3.5 accent-accent" checked={draft.strategyIds.includes(item.id)} onChange={() => toggleStrategy(item.id)} /><span className="truncate" title={item.description}>{strategyOptionLabel(item)}{item.library?.group_name ? ` · ${item.library.group_name}` : ''}</span></label>)}
               {strategyQuery.isError && <div className="text-micro text-danger">策略目录加载失败</div>}
               {!strategyQuery.isLoading && !strategyQuery.isError && !strategies.length && <div className="text-micro text-muted">无可用 matrix-native 策略</div>}
             </div>

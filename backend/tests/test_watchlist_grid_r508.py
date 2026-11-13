@@ -50,8 +50,9 @@ def test_R508_网格吃的是同一份行_零额外请求():
     grid = code_of(GRID)
     assert "useQuery" not in grid and "api." not in grid, "网格自己发了请求"
     # 表格专属的两份重请求(日K批量 / 分钟批量)在网格下不发
-    assert "enabled: dailyKVisible && symbols.length > 0 && viewMode === 'table'" in page
-    assert "enabled: intradayVisible && minuteSymbols.length > 0 && viewMode === 'table'" in page
+    # [R597 同步上游 v0.3.35] 取数收进 lib 里的两个 hook, 但 enabled 仍由 viewMode 把住
+    assert "useWatchlistDailyBatch(symbols, candleDays, dailyKVisible && viewMode === 'table')" in page
+    assert "enabled: intradayVisible && viewMode === 'table'" in page
 
 
 def test_R508_网格每只一行_块内按涨跌_未分组垫底():

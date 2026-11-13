@@ -5,6 +5,7 @@ import logging
 import time
 from collections.abc import Callable
 from datetime import UTC, date, datetime
+from typing import Literal
 
 import anyio
 import polars as pl
@@ -89,6 +90,12 @@ class GroupNameRequest(BaseModel):
 
 class GroupReorderRequest(BaseModel):
     ordered_ids: list[str]
+
+
+class GroupTransferRequest(BaseModel):
+    target_group_id: str
+    symbols: list[str] = Field(min_length=1)
+    action: Literal["move", "copy"]
 
 
 class GroupAssignRequest(BaseModel):
@@ -402,6 +409,15 @@ def assign_group(symbol: str, req: GroupAssignRequest, request: Request):
     except ValueError as e:
         raise HTTPException(400, str(e)) from e
     return {"symbols": _with_names(rows, request)}
+
+
+@router.post("/groups/{group_id}/transfer")
+def transfer_group_members(group_id: str, req: GroupTransferRequest, request: Request):
+    try:
+        rows, changed = watchlist.transfer_members(group_id, req.target_group_id, req.symbols, req.action)
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
+    return {"symbols": _with_names(rows, request), "changed": changed}
 
 
 @router.post("/groups/{group_id}/members/{symbol}")

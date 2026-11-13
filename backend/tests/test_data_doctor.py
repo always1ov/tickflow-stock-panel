@@ -52,6 +52,8 @@ NOT_USER_DATA = {
     # [R568 同步上游 v0.3.6] 扩展页面包内文件(data/ext_pages/<id>/page.json)与 tdxquant 探测临时文件
     "page.json": "扩展页面包清单(data/ext_pages/<id>/page.json)",
     "progress.json": "tdxquant 探测临时文件(插件 tmp 目录)",
+    # [R597 同步上游 v0.3.35] tdxquant 探测脚本在 tmp 目录里的结果文件(同上, 非用户数据)
+    "result.json": "tdxquant 探测临时文件(插件 tmp 目录)",
     # [R570 同步上游 v0.3.8] 二次开发升级保护: data/upgrade_guard/ 下的状态与报告, 程序自管, 非用户数据
     "state.json": "升级保护扫描状态(data/upgrade_guard/state.json)",
     "report.json": "升级保护对比报告(data/upgrade_guard/reports/<id>/report.json)",

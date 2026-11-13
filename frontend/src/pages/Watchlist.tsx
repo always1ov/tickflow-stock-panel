@@ -5,8 +5,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Trash2, RefreshCw, Star, X, Search, Settings2, Plus, Check, Filter, Eye, EyeOff, Minus, ChevronsUp, Clock, RotateCcw, FileUp, FolderOpen, FolderMinus, FolderPlus } from 'lucide-react'
 import { api, type KlineRow, type MinuteKlineRow, type WatchlistGroup, type WatchlistGroupColor } from '@/lib/api'
 import { ExtSparkChart } from '@/components/screener/ExtSparkChart'
-import { fetchMinuteBatchIncremental, MINUTE_SEED_MAX } from '@/lib/minuteBatchIncremental'
-import { fetchDailyBatchChunked } from '@/lib/klineBatchChunked'
+import { useMinuteBatchQuery } from '@/lib/useMinuteBatchQuery'
+import { useWatchlistDailyBatch } from '@/lib/useWatchlistDailyBatch'
 import { extendMinuteTail } from '@/lib/minuteTailExtend'
 import { extendDailyTail } from '@/lib/dailyTailExtend'
 import { useWatchlistPrepare } from '@/lib/useWatchlistPrepare'
@@ -648,30 +648,22 @@ export function Watchlist() {
   })
   const preparation = useWatchlistPrepare(enriched.data?.rows)
 
+  // 直接使用已保存的自选名单，图表请求无需等待 enriched 行情返回。
+  const symbols = useMemo(() => list.data?.symbols.map(entry => entry.symbol) ?? [], [list.data?.symbols])
   // 指数无本地分钟K数据, 分时批量请求剔除指数 symbol (省请求, 避免逐只 404)
-  const enrichedRows = enriched.data?.rows
-  const { symbols, minuteSymbols } = useMemo(() => {
-    const rows = enrichedRows ?? []
-    return {
-      symbols: rows.map((r: any) => r.symbol),
-      minuteSymbols: rows.filter((r: any) => r.asset_type !== 'index').map((r: any) => r.symbol),
-    }
-  }, [enrichedRows])
+  const minuteSymbols = useMemo(
+    () => (enriched.data?.rows ?? []).filter((r: any) => r.asset_type !== 'index').map((r: any) => r.symbol),
+    [enriched.data?.rows],
+  )
 
   // 实时行情状态 (提前到此处: 分时轮询判断需要 realtimeRunning)
   const quoteStatus = useQuoteStatus()
   const realtimeRunning = quoteStatus.data?.running ?? false
 
-  // 批量日k数据 (天数由列配置决定)。symbols 不进 key, 按 300/块分块拉取
-  // (后端单次上限 400): 增删自选不再整批重拉, 缓存单份常驻; 天数变化才换 key。
+  // 批量日k数据 (天数由列配置决定)。[R597 同步上游 v0.3.35] 走 useWatchlistDailyBatch:
+  // 缓存单份常驻, 只补拉新增 symbol — 快速加自选后新行蜡烛立即出现。
   // [R508] 卡片视图已撤, 表格是唯一视图。
-  const klineBatch = useQuery({
-    queryKey: QK.watchlistKlineBatch(candleDays),
-    queryFn: () => fetchDailyBatchChunked(symbols, candleDays),
-    enabled: dailyKVisible && symbols.length > 0 && viewMode === 'table',
-    staleTime: 5 * 60_000,  // 5 分钟内不重请求
-    placeholderData: (prev: any) => prev,
-  })
+  const klineBatch = useWatchlistDailyBatch(symbols, candleDays, dailyKVisible && viewMode === 'table')
 
   // 当日蜡烛实时修补: 历史 K 线按 staleTime 周期拉取 (见 queryKeys 注释), 最后一根
   // 蜡烛用每 tick 刷新的 enriched 当日 OHLC 前端覆盖/追加, 蜡烛随实时行情跳动, 零额外请求。
@@ -693,31 +685,16 @@ export function Watchlist() {
   }, [dailyKVisible, klineBatch.data, enriched.data])
 
   // 批量分时数据 (有分钟K批量能力时, 列可见才拉)
+  // [R597 同步上游 v0.3.35] 走 useMinuteBatchQuery: 内部按 scope 增量补拉,
+  // 快速加自选后新行分时图立即出现; 缓存仍按 symbol upsert (见 minuteBatchIncremental)。
   // 刷新策略: 仅当实时行情运行 且 用户在实时监控设置里开启 minute_intraday_refresh 时
   // 按用户设定的间隔轮询 (不接 SSE 高频, 避免每秒拉 TickFlow 触限流); 与 Screener / 设置卡片描述一致。
   const { data: prefsData } = usePreferences()
   const intradayRefreshEnabled = prefsData?.minute_intraday_refresh ?? false
   const intradayRefreshInterval = prefsData?.minute_intraday_refresh_interval ?? 6
-  // 视口感知: 虚拟器渲染中的 symbol 集合 (可见 + overscan 缓冲), 由下方虚拟器
-  // 区域的 effect 写入; null = 未就绪/非虚拟化视图。大列表 (千只自选) 全量播种
-  // 会造成 40 万级分钟对象常驻 — 视口集合就绪后各轮只拉视口, 缓存按 LRU 淘汰
-  // 视口外序列 (见 lib/minuteBatchIncremental.ts)。
-  const minuteRequestSymbolsRef = useRef<string[] | null>(null)
-  const minuteBatch = useQuery({
-    queryKey: QK.minuteBatch(),
-    // 增量轮询 (prefer_local): 读缓存以最后一根为 since 只拉新增, 本地合并为
-    // 完整序列; 全量分钟健康时服务端零补拉, 不健康时也只增量。
-    // 请求集合 = 视口内 symbol (缓存按 symbol upsert, 视口外保留旧序列);
-    // 视口未就绪时: 小列表全量, 大列表先拉头部播种 (effect 填充视口后防抖补拉)
-    queryFn: () => {
-      let reqSymbols = minuteRequestSymbolsRef.current ?? minuteSymbols
-      if (minuteRequestSymbolsRef.current == null && reqSymbols.length > MINUTE_SEED_MAX) {
-        reqSymbols = reqSymbols.slice(0, MINUTE_SEED_MAX)
-      }
-      return fetchMinuteBatchIncremental(qc, reqSymbols, true)
-    },
-    enabled: intradayVisible && minuteSymbols.length > 0 && viewMode === 'table',
-    staleTime: 10_000,
+  const minuteBatch = useMinuteBatchQuery(minuteSymbols, {
+    enabled: intradayVisible && viewMode === 'table',
+    preferLocal: true,
     // SSE tick 新鲜 (enriched 10s 内被行情推送刷新过) → 分时图已由下方续画本地
     // 跳动, 轮询降为 30s 兜底校准; tick 断流时回到用户设定间隔
     refetchInterval: () => {
@@ -761,8 +738,6 @@ export function Watchlist() {
       qc.setQueryData(QK.watchlist, data)
       qc.invalidateQueries({ queryKey: QK.watchlist })
       qc.invalidateQueries({ queryKey: ['watchlist-enriched'] })
-      qc.invalidateQueries({ queryKey: ['kline-batch'] })
-      qc.invalidateQueries({ queryKey: ['minute-batch'] })
     },
   })
 
@@ -1116,8 +1091,7 @@ export function Watchlist() {
     [previewSymbol, sortedRows],
   )
 
-  // [R508] 卡片视图撤了, 分时批量不再按视口切片 —— 表格与网格都按全列表请求
-  useEffect(() => { minuteRequestSymbolsRef.current = null }, [])
+  // [R508] 卡片视图撤了, 分时批量按当前分组的完整列表请求 (见上方 useMinuteBatchQuery)
 
   // "数据未就绪" 的个股数: 后端 LEFT JOIN 保证返回所有自选行,
   // 指标全为 null 的行属于 enriched 缓存未覆盖 (新股/冷门/新用户未同步), 非筛选导致.
@@ -1297,6 +1271,7 @@ export function Watchlist() {
         </div>
       )}
       {viewMode === 'table' && <WatchlistGroupBar
+        entries={list.data?.symbols ?? []}
         groups={groups}
         counts={groupCounts}
         selected={selectedGroup}

@@ -107,6 +107,11 @@ STORES: tuple[Store, ...] = (
     Store("user_data/watchlist_groups.json", "自选分组", shape=SHAPE_RECORD_LIST,
           required=("id", "name"), fields={"color": "sky"},
           note="color 是后加的; 缺了前端会拿不到配色"),
+    # [R597 同步上游 v0.3.35] 策略池/分组/档案库迁到后端存储; 旧版是 ui_prefs 里的纯 ID 数组,
+    # 服务端读盘时自带 v1 → v2 迁移(见 services/strategy_pool.py)
+    Store("user_data/strategy_pool.json", "策略池与策略库元数据", shape=SHAPE_OBJECT,
+          fields={"version": 2, "pool": [], "groups": [], "meta": {}},
+          note="version=2 才有 groups/meta; v1(entries/archived) 由服务端迁移"),
     Store("user_data/positions.json", "持仓标记", shape=SHAPE_RECORD_MAP,
           fields={"held": False, "cost": None, "weight": None, "updated_at": ""},
           note="weight(仓位比例)是后加的 —— 缺了会被当成「没填仓位」, 组合层面的提示全部失效"),
