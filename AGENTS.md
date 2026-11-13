@@ -4,6 +4,8 @@
 
 涉及代码二次开发、前端插槽、后端可替换策略、扩展注册或上游升级兼容时，还必须阅读 [`docs/secondary-development.md`](docs/secondary-development.md)。该文档区分当前已实现能力与目标扩展契约；不得根据设计示例虚构尚不存在的 API。
 
+本仓库的**必读前置文档**为 [`docs/upgrade-compatibility.md`](docs/upgrade-compatibility.md)：任何 AI 工具在修改代码、提交、升级或审查前，必须先完整阅读并遵循其中的分层隔离（Z0–Z5）、升级流程（S0–S7）、门禁（G0–G4）与红线条款；未确认遵循不得动手。
+
 同时遵守以下规则：
 
 - 先理解调用链和现有测试，再进行修改。

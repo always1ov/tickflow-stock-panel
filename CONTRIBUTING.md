@@ -6,6 +6,17 @@ This document applies to the entire repository and is shared by contributors, AI
 
 When doing secondary development, also follow [`docs/secondary-development.md`](docs/secondary-development.md). On the frontend, prefer real, existing controlled slots or registration entry points; on the backend, prefer small-grained strategy interfaces and dependency injection. When existing extension points cannot express a core behavior change, modifying the source directly is allowed, but the change must stay focused and must come with compatibility verification.
 
+## 0. Handover Prerequisite (Mandatory)
+
+Before modifying code, committing, upgrading, or reviewing, every contributor and AI agent must:
+
+1. Read [`docs/upgrade-compatibility.md`](docs/upgrade-compatibility.md) in full and confirm the Z0–Z5 layering, upgrade workflow (S0–S7), gates (G0–G4, including G2.5), and red-line rules.
+2. Confirm the change lands in an allowed layer: prefer Z1 (config/data) and Z2 (official extension points), then Z4 modules with Z3 minimal wiring; never modify Z0 non-wiring code or Z5 red-line areas.
+3. Confirm upstream features are preserved, the UI appearance rule (I-2) is respected, and no upstream file is replaced or deleted.
+4. Run the gates required by the specification and keep the evidence in the change description.
+
+A change is not reviewable until this checklist is confirmed. If an item cannot be met, record a waiver (Appendix F of the specification) and obtain the maintainer's approval before proceeding.
+
 ## 1. Core Principles
 
 ### 1.1 Understand Before Modifying
