@@ -95,9 +95,11 @@ export const ANALYSIS_LABEL_BAND_PX = 148
 
 /**
  * [R663] 右侧标签带按当前最长标签自适应 —— 固定 148px 在标签短的时候白占一大片。
- * 宽度按 10px JetBrains Mono 估: 半角 ≈ 6.2px、全角 ≈ 10px; 超长仍以 148 封顶(由图表换行)。
+ * 宽度按 10px JetBrains Mono 估: 半角 ≈ 6.2px、全角 ≈ 10px。
+ * [R664] 用户: 「改成适中的标签自适应, 最长的标签做换行」—— 上限取 104px(适中),
+ * 最长那条不再把带子撑满, 而是在空格处折成两行(名字 / 数值)。
  */
-export function labelBandWidth(labels: (string | undefined)[], min = 44, max = ANALYSIS_LABEL_BAND_PX) {
+export function labelBandWidth(labels: (string | undefined)[], min = 44, max = 104) {
   const widest = labels.reduce((width, label) => {
     if (!label) return width
     const estimate = [...label].reduce((sum, ch) => sum + (ch.charCodeAt(0) > 0x2E7F ? 10 : 6.2), 0)

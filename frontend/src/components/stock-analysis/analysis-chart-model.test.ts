@@ -3,6 +3,7 @@ import {
   ANALYSIS_LABEL_BAND_PX,
   buildAnalysisChartModel,
   hitTestAnalysis,
+  labelBandWidth,
   levelKey,
   type LevelType,
   type PriceLevel,
@@ -46,6 +47,15 @@ const series = {
   boll: { upper: [12.1, 12.2, 12.3], lower: [9.5, 9.4, 9.3], mid: [10.8, 10.8, 10.8] },
   atr: { stop_loss: [9.0, 9.1, 9.2], take_profit: [12.5, 12.6, 12.7] },
 }
+
+describe('labelBandWidth', () => {
+  it('宽度跟最长标签走, 短的收窄、长的封顶(最长的留给图表折行)', () => {
+    expect(labelBandWidth(['现价 46.09'])).toBeLessThan(80)
+    expect(labelBandWidth([])).toBe(44)
+    // 「26日布林上轨 12.30」估宽 + 16 已超上限 —— 交给 ChartAnnotations 在空格处折两行
+    expect(labelBandWidth(['26日布林上轨 12.30', '现价 46.09'])).toBe(104)
+  })
+})
 
 describe('buildAnalysisChartModel', () => {
   it('aligns channel curves to the chart rows by date and keeps missing days blank', () => {
