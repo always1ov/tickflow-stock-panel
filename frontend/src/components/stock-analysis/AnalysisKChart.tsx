@@ -175,8 +175,8 @@ function trendQuantLegendGraphic(visibleBars: number) {
 }
 
 /**
- * [R623] 两张副图的高度回到 R565 的版面(`lib/chart-layout.ts` 的 `trendSubPaneHeight`):
- * 副图 = 主图的 48%, 限 160~220; 趋势量化再 +50 给上下两条字道。
+ * [R624] 两张副图的高度(`lib/chart-layout.ts` 的 `trendSubPaneHeight`):
+ * 副图 = 主图的 40%(R422 认可的比例), 限 140~200; 趋势量化再 +50 给上下两条字道。
  * 判据挪进 `chart-layout` 是为了让「整张图要多高才装得下」的弹窗反算同源 ——
  * R616 本地一份、弹窗里再估一份(按每张副图 96), 于是「一屏」从那时起就不成立。
  */

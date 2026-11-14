@@ -19,14 +19,15 @@ export function plotPaneHeights(plotHeight: number, subPaneCount: number) {
 }
 
 /**
- * [R623] 趋势量化 / 量化MACD 两张副图的高度 —— 沿用 R565 的比例(主图的 48%, 限 160~220),
- * 趋势量化再多 50 给上下两条字道。判据只此一处: 画图的 `AnalysisKChart` 与
- * 「弹窗要给多高才装得下」的反算 `fitLevelsMainHeight` 都从这里取。
+ * [R624] 趋势量化 / 量化MACD 两张副图的高度 —— 48% 的比例会让「主次不分」, 回到 R422 用户
+ * 认可的「副图 = 主图 40%」, 下限 160→140: 1000 高的屏上, 160+50 字道让趋势图只比主图矮
+ * 一点(281 vs 209), 主图不像主图; 140 时主图 374、趋势 190、MACD 140。
+ * 判据只此一处: 画图的 `AnalysisKChart` 与「弹窗要给多高才装得下」的反算 `fitLevelsMainHeight` 都从这里取。
  */
 export const TREND_LANES_EXTRA = 50
-const TREND_SUB_PANE_RATIO = 0.48
-const TREND_SUB_PANE_MIN = 160
-const TREND_SUB_PANE_MAX = 220
+const TREND_SUB_PANE_RATIO = 0.4
+const TREND_SUB_PANE_MIN = 140
+const TREND_SUB_PANE_MAX = 200
 
 export function trendSubPaneHeight(mainHeight: number): number {
   const mainPaneH = Math.max(120, mainHeight - CHART_LAYOUT.timeAxis)

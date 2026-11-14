@@ -380,9 +380,9 @@ export function StockPreviewDialog({ symbol, name, onClose, enableLevelsView = t
             className={cn(
               'relative flex flex-col overflow-hidden rounded-card border border-border bg-base shadow-2xl',
               // [R612] 双栏要更宽: 1440 上限; 手机上整屏, 不再留一圈背景
-              // [R623] 88vh → 96dvh(min 640, 上限 1120): 关键价位要一屏装下主图 + 两张副图,
-              // 1000 高的屏只给 880 差 222, 拉满视口再让主图反算才够(用户: 「弹窗高度再高直到适应」)
-              'h-[min(1120px,96dvh)] min-h-[640px] w-[94vw] max-w-wide',
+              // [R623] 88vh → 96dvh: 关键价位要一屏装下主图 + 两张副图
+              // [R624] 再吃到 calc(100dvh - 16px): 多出的 24px 全部给主图, 让主图明显大于副图
+              'h-[min(1120px,calc(100dvh-16px))] min-h-[640px] w-[94vw] max-w-wide',
               'max-md:h-[100dvh] max-md:max-h-none max-md:min-h-0 max-md:w-screen max-md:rounded-none max-md:border-0',
             )}
           >
