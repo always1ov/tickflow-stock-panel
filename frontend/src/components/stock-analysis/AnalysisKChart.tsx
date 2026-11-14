@@ -8,10 +8,10 @@ import {
   fib2RoleColor, levelColors, useChartTheme, useLevelColors, useTheme,
 } from '@/lib/theme'
 import {
-  alignQuantMacd, diffExposed, QUANT_MACD_HELP, QUANT_MACD_LEGEND, STICK_RATIO,
+  alignQuantMacd, diffExposed, QUANT_MACD_HELP, STICK_RATIO,
 } from '@/lib/quantMacdSeries'
 import {
-  alignTrendQuant, markLabel, TREND_MARK_SHORT_HELP, TREND_MARKS, TREND_QUANT_HELP, TREND_QUANT_LEGEND,
+  alignTrendQuant, markLabel, TREND_MARKS, TREND_QUANT_HELP,
   TQ_STICK1, TQ_STICK2, tqYRange, type TrendQuantData,
 } from '@/lib/trendQuantSeries'
 import type { Fib2Grain, Fib2Overlay, KlineRow, LevelSeries, QuantMacdResult } from '@/lib/api'
@@ -128,57 +128,11 @@ interface Props {
   onHoverKey?: (key: string | null) => void
 }
 
-const QUANT_MACD_LEGEND_COLORS: Record<string, string> = {
-  diff: QUANT_MACD_COLORS.red,
-  dea: QUANT_MACD_COLORS.darkRed,
-  yellow: QUANT_MACD_COLORS.yellow,
-  gold: QUANT_MACD_COLORS.yellow,
-  dead: QUANT_MACD_COLORS.green,
-}
-
-/** [R560] 量化MACD 图例: 名字 + 色块, 悬停看全量说明。 */
-function quantMacdLegendGraphic() {
-  return (
-    <span title={QUANT_MACD_HELP} className="inline-flex flex-wrap items-center gap-x-2 gap-y-0.5">
-      {QUANT_MACD_LEGEND.map(item => (
-        <span key={item.key} title={`${item.name}: ${item.desc}`}
-              className="inline-flex items-center gap-1 text-micro text-muted-foreground">
-          <span className="h-1.5 w-2.5 rounded-[1px]" style={{ backgroundColor: QUANT_MACD_LEGEND_COLORS[item.key] }} />
-          {item.name}
-        </span>
-      ))}
-    </span>
-  )
-}
-
-/** [R555] 趋势量化图例: 线上已写名字的那几根不重复印, 悬停仍给说明。 */
-function trendQuantLegendGraphic(visibleBars: number) {
-  return (
-    <span title={TREND_QUANT_HELP} className="inline-flex flex-wrap items-center gap-x-2 gap-y-0.5">
-      {TREND_QUANT_LEGEND.filter(item => !item.labelledOnLine).map(item => (
-        <span key={item.name} title={`${item.name}: ${item.desc}`}
-              className="inline-flex items-center gap-1 text-micro text-muted-foreground">
-          <span className="h-0.5 w-2.5" style={{ backgroundColor: item.color }} />
-          {item.name}
-        </span>
-      ))}
-      {/* [R620] 八种信号的对照: 图上画什么字, 这里就写什么字（[R621] 全称 / 单字同源） */}
-      <span title={TREND_MARK_SHORT_HELP}
-            className="inline-flex items-center gap-0.5 text-micro text-muted-foreground">
-        字:
-        {TREND_MARKS.map(mark => (
-          <span key={mark.key} style={{ color: mark.color }}>{markLabel(mark, visibleBars)}</span>
-        ))}
-      </span>
-    </span>
-  )
-}
-
 /**
  * [R624] 两张副图的高度(`lib/chart-layout.ts` 的 `trendSubPaneHeight`):
- * 副图 = 主图的 40%(R422 认可的比例), 限 140~200; 趋势量化再 +50 给上下两条字道。
- * 判据挪进 `chart-layout` 是为了让「整张图要多高才装得下」的弹窗反算同源 ——
- * R616 本地一份、弹窗里再估一份(按每张副图 96), 于是「一屏」从那时起就不成立。
+ * [R626] 副图 = 主图的 28%(限 108~136), 趋势量化再 +50 给上下两条字道 ——
+ * 主图明显大于两张副图之和。判据挪进 `chart-layout` 是为了让「整张图要多高才装得下」
+ * 的弹窗反算同源 —— R616 本地一份、弹窗里再估一份(按每张副图 96), 于是「一屏」从那时起就不成立。
  */
 /** [R616] 副图顶上给 pane 标题留的带(px): R565 的标题画在图外, 现在画在图里, 顶字道从这条带下面起 */
 const PANE_HEADER_H = 18
@@ -287,8 +241,14 @@ export function AnalysisKChart({
         { text: 'DIFF', color: QUANT_MACD_COLORS.red },
         { text: 'DEA', color: QUANT_MACD_COLORS.darkRed },
         { text: '共振', color: QUANT_MACD_COLORS.yellow },
+        // [R626] 图外那行图例撤了, 金叉 / 死叉的名称搬进副图 —— 与图上的上下箭头同义
+        { text: '↑金叉', color: QUANT_MACD_COLORS.yellow },
+        { text: '↓死叉', color: QUANT_MACD_COLORS.green },
       ]
       : [{ text: '等待数据', color: ct.text }]
+
+  /** [R626] 两张副图的长说明: 图外那条图例删了, 悬停说明挂到开关键排最右的「?」上 */
+  const subPaneHelp = `${TREND_QUANT_HELP}\n\n${QUANT_MACD_HELP}`
 
   const { chartSeries, paneDecor } = useMemo(() => {
     const main: PlotSeries[] = model.series
@@ -410,7 +370,7 @@ export function AnalysisKChart({
       {/* 开关由外面持有时(个股弹窗)画方形按钮那一排, 位置与老入口相同 */}
       {levels && controls && (
         <LevelToolbar groups={LEVEL_GROUPS} controls={controls} effLevels={effLevels}
-                      fib2Raw={fib2Raw} fib2={fib2}
+                      fib2Raw={fib2Raw} fib2={fib2} help={subPaneHelp}
                       onOpenFit={symbol ? () => setFib2FitOpen(true) : undefined} />
       )}
       {levels && !controls && (
@@ -512,6 +472,15 @@ export function AnalysisKChart({
               )}
             </div>
           )}
+          {/* [R626] 副图图例说明: 图外那行图例删了, 说明收进这个「?」 */}
+          <button
+            type="button"
+            title={subPaneHelp}
+            aria-label="副图图例说明"
+            className="ml-auto inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-border/60 bg-base/40 text-micro text-muted transition-ui hover:border-border hover:text-foreground"
+          >
+            ?
+          </button>
         </div>
       )}
 
@@ -536,17 +505,9 @@ export function AnalysisKChart({
         />
       )}
 
-      {/* [R555/R560] 两个副图的图例并排放在图上方, 名字与悬停说明都在 */}
-      <div className="mb-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-micro">
-        <span className="inline-flex items-center gap-2">
-          <span className="text-muted">趋势量化</span>
-          {trendQuantLegendGraphic(visibleBars)}
-        </span>
-        <span className="inline-flex items-center gap-2">
-          <span className="text-muted">量化MACD</span>
-          {quantMacdLegendGraphic()}
-        </span>
-      </div>
+      {/* [R626] 原来这里有一行「趋势量化 / 量化MACD」的图例压在主图上方。用户: 「这些不应该放在
+          主图上面, 应该放在副图合适的位置」。名字与色样早就在各自副图顶部的读数行里
+          (`paneReadouts`), 这行只是重复; 长说明挂到开关键排最右的「?」。 */}
 
       {/* 图表:右侧留白带(rightOffsetPixels)显示价位/曲线标签,不压蜡烛 */}
       <FinancialPlot

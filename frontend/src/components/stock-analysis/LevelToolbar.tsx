@@ -28,7 +28,7 @@ const CHIP = 'h-7 whitespace-nowrap rounded-btn border px-2 text-micro transitio
 const CHIP_IDLE = 'border-border/60 bg-base/40 text-muted hover:border-border hover:text-foreground'
 const SUB = 'inline-flex shrink-0 items-center gap-1 border-l border-border/60 pl-2'
 
-export function LevelToolbar({ groups, controls, effLevels, fib2Raw, fib2, onOpenFit }: {
+export function LevelToolbar({ groups, controls, effLevels, fib2Raw, fib2, onOpenFit, help }: {
   groups: { key: LevelType; label: string }[]
   controls: LevelControls
   effLevels: Record<LevelType, PriceLevel[]> | undefined
@@ -36,6 +36,8 @@ export function LevelToolbar({ groups, controls, effLevels, fib2Raw, fib2, onOpe
   fib2?: Fib2Overlay
   /** 「回测这三档」; 不传就不显示那个按钮 */
   onOpenFit?: () => void
+  /** [R626] 两张副图的长说明 —— 图外那条图例删掉后, 说明挂到最右的「?」上 */
+  help?: string
 }) {
   const theme = useTheme()
   const { activeTypes, pivotRank, fib2Grain, fib2ShowTargets } = controls
@@ -111,6 +113,13 @@ export function LevelToolbar({ groups, controls, effLevels, fib2Raw, fib2, onOpe
               className={`${SQ} ${SQ_IDLE} ml-auto`}>
         全部清除
       </button>
+      {/* [R626] 副图图例说明 —— 原来压在主图上方那一行字, 收进这一个「?」里 */}
+      {help && (
+        <button type="button" title={help} aria-label="副图图例说明"
+                className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-border/60 bg-base/40 text-micro text-muted transition-colors duration-hover hover:border-border hover:text-foreground">
+          ?
+        </button>
+      )}
     </div>
   )
 }
