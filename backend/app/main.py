@@ -351,7 +351,7 @@ def _schedule_boot_integrity_check(app: FastAPI) -> None:
     try:
         from app.enriched_generation import recover_stale_publications
 
-        recovered_publications = recover_stale_publications(store.data_dir)
+        recovered_publications = recover_stale_publications(app.state.datastore.data_dir)
         if recovered_publications:
             logger.warning(
                 "已恢复上次中断的 enriched 发布标记: %s",

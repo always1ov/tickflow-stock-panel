@@ -10,7 +10,7 @@ import os
 import time
 from dataclasses import asdict, replace
 from datetime import date, datetime
-from typing import Any
+from typing import Any, Optional
 
 from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel
