@@ -12,10 +12,12 @@
  *   · [R478] 「加监控」从旧顶栏搬上来(用户: 「先帮我移植保留监控按钮到新的里面的合适的位置」),
  *     放在自选星标旁边 —— 两个都是**对这只票做的事**, 旧顶栏里它们也挨着。
  *
- * 两行:
+ * 一行:
  *
  *     名称 代码  现价  涨跌幅  起 ~ 止 · N 个交易日  [☆][监控]  [60日][120日][250日] [AI 四维分析] [导出复盘] [⟳]
- *     结论  (待定) ───────────────────────────────────────────────────────────────
+ *
+ * [R612] 原来下面还有一行「结论 (待定)」占位, 已删 —— 双栏改版后弹窗左边只放「现状」,
+ * 这一行占着一条分隔线却没有任何内容。
  *
  * 天数与复盘页**是同一个值**(由弹窗持有, 两处都能改): 现在用到 60/120/250 的只有复盘。
  * 「起 ~ 止 · N 个交易日」从弹窗已经在取的那份日 K 里数最后 N 根, 不为这一行另发请求 ——
@@ -25,7 +27,6 @@ import { Loader2, RadioTower, RefreshCw, Sparkles, Star } from 'lucide-react'
 import { toast } from '@/components/Toast'
 import { WatchlistAddMenu } from '@/components/WatchlistAddMenu'
 import { useAnalysisKline } from '@/components/stock-analysis/StockLevelsPanel'
-import { SectionTitle } from '@/components/ui'
 import { PILL, PILL_IDLE, PILL_ON, SQUARE } from './pill'
 
 export const HERO_DAYS = [60, 120, 250] as const
@@ -131,10 +132,6 @@ export function PreviewHero({
           </button>
         </div>
       </div>
-
-      {/* 第二行: 结论(占位)+ 一道细线把这一行拉满 */}
-      {/* [R449] 与各分区同一个形状(标题 + 副标题 + 细线), 就用同一个组件 */}
-      <SectionTitle className="mt-3" title="结论" sub="(待定)" />
     </div>
   )
 }

@@ -41,7 +41,11 @@ vi.mock('@/lib/useQuoteStream', () => ({
   useQuoteStream: () => {}, useQuoteStreamStatus: () => 'connected',
 }))
 vi.mock('@/lib/updateCheck', () => ({ useUpdateCheck: () => ({ status: 'latest' }) }))
-vi.mock('@/lib/useMediaQuery', () => ({ useIsDesktop: () => layoutMocks.desktop }))
+vi.mock('@/lib/useMediaQuery', () => ({
+  useIsDesktop: () => layoutMocks.desktop,
+  // [R612] 个股弹窗用同一个文件里的 useMediaQuery 决定要不要双栏
+  useMediaQuery: () => layoutMocks.desktop,
+}))
 vi.mock('@/extensions/registry', () => ({ getFrontendExtensionNavigation: () => [] }))
 vi.mock('@/extensions/ExtensionSlot', () => ({ ExtensionSlot: () => null }))
 vi.mock('@/components/Toast', () => ({ ToastContainer: () => null, toast: vi.fn() }))

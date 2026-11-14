@@ -33,13 +33,19 @@ import { TrendBacktestButton, TrendSignalBadge, trendPivotTitle, useStockTrend }
 import { pct, useStockReview } from '@/components/stock-analysis/StockReviewDialog'
 import { SectionTitle } from '@/components/ui'
 
-export function StatusSection({ symbol, days }: { symbol: string; days: number }) {
+export function StatusSection({ symbol, days, stacked = false }: {
+  symbol: string
+  days: number
+  /** [R612] 双栏弹窗的左栏只有 300~340px, 四格并排塞不下 —— 一列到底 */
+  stacked?: boolean
+}) {
   const review = useStockReview(symbol, days).data
   const d = review && !review.error ? review : undefined
   return (
     <section>
       <SectionTitle title="现状" sub="走到哪一步、在什么位置" />
-      <div className="mt-3 grid grid-cols-1 items-start gap-x-8 gap-y-5 rounded-card border border-border bg-surface p-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className={cn('mt-3 grid grid-cols-1 items-start gap-x-8 gap-y-5 rounded-card border border-border bg-surface p-4',
+        !stacked && 'sm:grid-cols-2 lg:grid-cols-4')}>
         <TrendCell symbol={symbol} />
         <ChannelCell d={d} />
         <BandsCell d={d} />

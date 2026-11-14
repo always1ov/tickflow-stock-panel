@@ -41,10 +41,21 @@ def test_R433_下半块那套买卖判定没有被偷偷做进来():
 
 
 def test_R434_视图切换靠右():
-    sec = code_of(SEC)
-    tool, tabs = sec.index("{toolbar}"), sec.index('role="tablist"')
+    """[R612] 切换条从「图表与价位」卡里提到右栏顶部, 仍然靠右、随视图变的那格靠左。"""
+    dlg = code_of(DLG)
+    tool, tabs = dlg.index("{chartView === 'intraday' ? ("), dlg.index('role="tablist"')
     assert tool < tabs, "视图切换没排在右边"
-    assert 'className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-btn' in sec
+    assert 'className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-btn' in dlg
+
+
+def test_R612_双栏_左栏只放现状_窄屏单列():
+    """[R612] 用户选的「双栏大弹窗」: 左「现状」/ 右图表与复盘;
+    ≥1280 才分栏, 768~1279 单列(现状在上), 手机上整屏。"""
+    dlg = code_of(DLG)
+    body = dlg[dlg.index('xl:grid-cols-[minmax(300px,340px)_minmax(0,1fr)]'):]
+    assert body.index('<StatusSection') < body.index('role="tablist"'), "现状没在左栏"
+    assert "stacked={wide}" in body, "左栏只有 300~340px, 现状没改成一列"
+    assert "max-md:w-screen" in dlg and "max-md:h-[100dvh]" in dlg, "手机上没铺满整屏"
 
 
 def test_R439_量化MACD副图不画红线():

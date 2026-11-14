@@ -29,14 +29,13 @@ def _sec(dlg: str) -> str:
 
 
 def test_R432_新块紧跟头部_旧内容整体在后面():
-    """[R479] 旧内容删了(用户框出整块:「我是想删除掉框出来的这部分」)。顺序剩 头部 → 现状 →
-    图表与价位 → 复盘; 头部以下整块一起滚。"""
+    """[R612] 双栏: 头部 → (左栏)现状 / (右栏)图表与复盘。复盘成了右栏的视图,
+    不再是图表下面的一块; 头部以下仍是同一块可滚区域。"""
     dlg = code_of(DLG)
-    hero, status = dlg.index("<PreviewHero"), dlg.index("<StatusSection")
-    sec, review = dlg.index("<ChartLevelsSection"), dlg.index("<ReviewSection")
-    assert hero < status < sec < review, "顺序应是 头部 → 现状 → 图表与价位 → 复盘"
-    scroll = dlg.index('className="min-h-0 flex-1 overflow-auto"')
-    assert hero < scroll < status
+    hero, status, sec = dlg.index("<PreviewHero"), dlg.index("<StatusSection"), dlg.index("<ChartLevelsSection")
+    assert hero < status < sec, "顺序应是 头部 → 现状 → 图表"
+    body = dlg.index('className="min-h-0 flex-1 overflow-y-auto xl:grid')
+    assert hero < body < status, "头部以下不是同一块滚动/分栏区域"
 
 
 def test_R479_旧顶栏与旧内容删干净了():
@@ -118,7 +117,22 @@ def test_R432_小开关照以前_那一类开着时接在后面():
 
 
 def test_R430_关不掉关键价位时没有这个视图():
-    assert "levelsEnabled ? TABS : TABS.filter(t => t.key !== 'levels')" in code_of(SEC)
+    """[R612] 页签提到右栏顶部, 收窄规则跟着过去。"""
+    assert "enableLevelsView ? VIEW_TABS : VIEW_TABS.filter(t => t.key !== 'levels')" in code_of(DLG)
+
+
+def test_R612_图表退化成一张卡片_不再自带页签():
+    sec = code_of(SEC)
+    for gone in ('role="tablist"', "TABS", "SectionTitle", "toolbar"):
+        assert gone not in sec, f"「{gone}」—— 图表卡又自己管页签/标题了"
+
+
+def test_R612_图高跟随右栏可用高度_下限沿用原值():
+    dlg = code_of(DLG)
+    assert "daily: 420, intraday: 480, levels: 520" in dlg, "各图的最小高度变了"
+    assert "Math.max(chartMinH, Math.min(chartAreaH - 32, CHART_MAX_HEIGHT))" in dlg, (
+        "图高没按右栏量出来的可用高度算")
+    assert "new ResizeObserver(entries => setChartAreaH(entries[0].contentRect.height))" in dlg
 
 
 def test_R437_新分时与旧分时同一套_信息栏不能漏():
@@ -132,7 +146,7 @@ def test_R437_新分时与旧分时同一套_信息栏不能漏():
                  "intradayDays={effectiveIntradayDays}", "addedDate={addedDate}"):
         assert attr in bar, f"分时信息栏少了 {attr}"
     chart = _call(new, "<StockMultiDayIntradayChart")
-    for attr in ("symbol={symbol}", "days={effectiveIntradayDays}", "height={480}",
+    for attr in ("symbol={symbol}", "days={effectiveIntradayDays}", "height={chartHeight ?? 480}",
                  "refetchIntervalMs={intradayRefetchMs}", "priceLines={monitorPriceLines}",
                  "onPriceDoubleClick={openPriceAlert}"):
         assert attr in chart, f"多日分时少了 {attr}"

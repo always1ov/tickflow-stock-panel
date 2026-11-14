@@ -12,12 +12,15 @@ OLD = "components/stock-analysis/StockReviewDialog.tsx"
 FT = "components/stock-analysis/FlipTradesPanel.tsx"
 
 
-def test_R431_复盘块排在图表与价位之后_旧内容之前_天数跟头部():
-    """[R479] 旧内容删了: 复盘块在图表与价位之后, 是弹窗里最后一块。"""
+def test_R431_复盘是右栏第4个视图_天数跟头部():
+    """[R612] 复盘从压在图表下面的第 4 块, 变成右栏顶部的第 4 个视图 ——
+    与图表是同一层的条件分支, 不再嵌套在「图表与价位」里。"""
     dlg = code_of(DLG)
-    i = dlg.index("<ReviewSection")
-    assert dlg.index("</ChartLevelsSection>") < i, "位置不对"
-    call = dlg[i:dlg.index("/>", i)]
+    assert "{ key: 'review', label: '复盘', Icon: History }" in dlg, "右栏没有复盘视图"
+    tabs = dlg.index('role="tablist"')
+    i = dlg.index("chartView === 'review' ? (", tabs)   # 工具栏那处在前, 取切换条之后那个
+    assert i < dlg.index("<ChartLevelsSection", tabs), "复盘与图表没做成同一层的分支"
+    call = dlg[i:dlg.index("/>", dlg.index("<ReviewSection", i))]
     assert "days={reviewDays}" in call, "天数没跟头部的 60 / 120 / 250 日走"
     assert "onClick={() => setView('review')}" not in dlg, "旧复盘页又回来了"
 
