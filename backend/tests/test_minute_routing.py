@@ -28,6 +28,14 @@ from app.services import kline_sync
 
 # ---------- 辅助 ----------
 
+@pytest.fixture(autouse=True)
+def _isolate_cwd(monkeypatch, tmp_path):
+    """假 repo 的 `store.data_dir` 是 MagicMock, 落到真实落盘分支时会被当成目录名,
+    在 CWD 下堆出 `MagicMock/mock.app.state.repo.store.data_dir/<id>/` —— 每跑一轮 pytest
+    就多几十个分区文件。本模块的用例一律在临时目录里跑, 假目录落在 tmp 里随用例销毁。"""
+    monkeypatch.chdir(tmp_path)
+
+
 def _mock_minute_df(symbol: str = "600519.SH") -> pl.DataFrame:
     """构造非空分钟 K df, 用于 mock provider.get_minute 返回值。"""
     return pl.DataFrame({
