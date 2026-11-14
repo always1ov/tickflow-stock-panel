@@ -10,8 +10,9 @@
 import type { ReactNode } from 'react'
 
 export function ChartLevelsSection({ children }: { children: ReactNode }) {
+  // [R635] 底部留白收到 0: 日期行贴着卡片底边(与 LEVELS_CHROME_H 的 87 同源)。
   return (
-    <div className="min-w-0 rounded-card border border-border bg-surface p-4">
+    <div className="min-w-0 rounded-card border border-border bg-surface p-4 pb-0">
       {children}
     </div>
   )

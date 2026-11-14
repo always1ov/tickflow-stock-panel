@@ -31,8 +31,29 @@ export const TREND_LANES_EXTRA = 50
  * [R633] 趋势量化与量化MACD 两张副图之间的空白间隔(px)。
  * 用户: 「两个副图之间还需要留点空间, 趋势量化不用动, 下面量化macd 往下挪挪」——
  * 间隔记在 MACD pane 顶部(标题与图一起下移), 趋势量化的高度与比例完全不变。
+ * [R637] R636 曾把这段间隔换成两行自绘日期, 用户随即改口「所有副图后面都不需要日期行」——
+ * 日期只留最底部那条真时间轴, 这里恢复成 12px 空白间隔。
  */
 export const SUB_PANE_GAP = 12
+/**
+ * [R635] 关键价位图日期轴底部空白的裁切量(px)。
+ *
+ * 轴高是库按字号算出来的(`border 1 + tick 5 + padding 3 + 字号 11 + padding 3 + 底部偏移 4 ≈ 28`),
+ * `timeScale.minimumHeight` 只能抬不能压, 把开着的一个小值传进去也不会变矮。
+ * 而日期文字垂直居中画在轴顶向下 14px 处, 文字下面白留了 11px。
+ * 用户: 「日期那一行往下移动到快接触到边界但不能和边界重叠, 和日期上面那根横线也跟着往下移调整」——
+ * 既然是轴自己多留的白, 就把轴底部这 9px 裁掉(留 2px, 不切到文字): 日期行贴到卡片底边 4px,
+ * 轴上方那根横线跟着一起下移。代价是悬停时的日期标签框(高 23px)底边少 4px —— 只切到它的下圆角,
+ * 文字仍在。
+ *
+ * 只给关键价位图用; 日K / 分时的成交量轴不动。
+ */
+export const LEVELS_AXIS_CLIP = 9
+/**
+ * [R635] 从日期轴空白(9px)与卡片底部留白(16px)腾给量化MACD 的高度(px), 数据区更高、柱更饱满。
+ * [R637] R636 曾从这里分走 14px 去画日期行, 现已撤回(见 `SUB_PANE_GAP`), 恢复 25px。
+ */
+export const MACD_PANE_EXTRA = 25
 const TREND_SUB_PANE_RATIO = 0.28
 const TREND_SUB_PANE_MIN = 108
 const TREND_SUB_PANE_MAX = 136
@@ -42,9 +63,9 @@ export function trendSubPaneHeight(mainHeight: number): number {
   return Math.round(Math.min(TREND_SUB_PANE_MAX, Math.max(TREND_SUB_PANE_MIN, mainPaneH * TREND_SUB_PANE_RATIO)))
 }
 
-/** `height` = 主图高时, 关键价位那张图连两张副图与副图间隔在内的总高(不含卡片里的按钮/图例)。 */
+/** `height` = 主图高时, 关键价位那张图连两张副图、副图间隔与 [R635] 额外让给 MACD 的高度在内的总高(不含卡片里的按钮/图例)。 */
 export function levelsChartTotalHeight(mainHeight: number): number {
-  return mainHeight + 2 * trendSubPaneHeight(mainHeight) + TREND_LANES_EXTRA + SUB_PANE_GAP
+  return mainHeight + 2 * trendSubPaneHeight(mainHeight) + TREND_LANES_EXTRA + SUB_PANE_GAP + MACD_PANE_EXTRA
 }
 
 /**

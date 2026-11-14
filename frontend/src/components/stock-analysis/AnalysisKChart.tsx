@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { AnnotationData } from '@/components/charts/ChartAnnotations'
 import { FinancialPlot } from '@/components/charts/FinancialPlot'
 import type { DecorItem, PaneDecorData } from '@/components/charts/SubPaneDecor'
-import { CHART_LAYOUT, SUB_PANE_GAP, TREND_LANES_EXTRA, trendSubPaneHeight } from '@/lib/chart-layout'
+import { CHART_LAYOUT, LEVELS_AXIS_CLIP, MACD_PANE_EXTRA, SUB_PANE_GAP, TREND_LANES_EXTRA, trendSubPaneHeight } from '@/lib/chart-layout'
 import {
   FIB2_ROLE_TARGET, LEVEL_CURVE_COLOR, QUANT_MACD_COLORS, TREND_QUANT_COLORS,
   fib2RoleColor, levelColors, useChartTheme, useLevelColors, useTheme,
@@ -215,14 +215,17 @@ export function AnalysisKChart({
 
   // 主图 + 两个副图: 主图保持 `height` 的可视高度, 副图按 R565 的比例另加两格。
   // [R633] 两张副图之间留 `SUB_PANE_GAP`: 间隔算在 MACD pane 的顶部(标题与图一起下移),
-  // 趋势量化 pane 的高度与比例不变。
+  // 趋势量化 pane 的高度与比例不变。[R637] 副图里不再画日期行, 日期只留最底部那条真时间轴。
+  // [R635] 日期轴的高度压不短(库按字号算, 只能抬不能压), 改为由外面的容器裁掉轴底那段空白,
+  // 省下的高度连同卡片底部留白一并给量化MACD。
   const mainPaneH = Math.max(120, height - CHART_LAYOUT.timeAxis)
   const subPaneH = trendSubPaneHeight(height)
   const trendPaneH = subPaneH + TREND_LANES_EXTRA
-  const plotHeight = height + trendPaneH + subPaneH + SUB_PANE_GAP
+  const macdPaneH = subPaneH + SUB_PANE_GAP + MACD_PANE_EXTRA
+  const plotHeight = height + trendPaneH + macdPaneH
   const paneHeights = useMemo(
-    () => [mainPaneH, trendPaneH, subPaneH + SUB_PANE_GAP],
-    [mainPaneH, trendPaneH, subPaneH],
+    () => [mainPaneH, trendPaneH, macdPaneH],
+    [mainPaneH, trendPaneH, macdPaneH],
   )
   const paneTopInsets = useMemo(() => [0, 0, SUB_PANE_GAP], [])
   /** [R634] 只有 MACD 这张副图要额外让出一行标题: 趋势量化的纵轴范围已含字道(tqYRange) */
@@ -518,30 +521,33 @@ export function AnalysisKChart({
           (`paneReadouts`), 这行只是重复; 长说明挂到开关键排最右的「?」。 */}
 
       {/* 图表:右侧留白带(rightOffsetPixels)显示价位/曲线标签,不压蜡烛 */}
-      <FinancialPlot
-        scope={scope}
-        series={chartSeries}
-        height={plotHeight}
-        paneHeights={paneHeights}
-        paneTopInsets={paneTopInsets}
-        paneHeaderHeights={paneHeaderHeights}
-        pricePrecision={2}
-        visibleBars={visibleBars + (future?.dates.length ?? 0)}
-        currentPrice={model.rows.at(-1)?.close}
-        rightOffsetPixels={ANALYSIS_LABEL_BAND_PX}
-        annotations={annotations}
-        paneTitles={['', trendTitle, quantTitle]}
-        paneReadouts={[[], trendReadouts, quantReadouts]}
-        paneDecor={paneDecor}
-        hidePaneAxis
-        onSelect={date => onDateClick?.(date)}
-        onCrosshairMove={point => {
-          if (!point) { setHoveredKey(null); return }
-          const index = model.dateIndex.get(point.time) ?? -1
-          const next = index < 0 ? null : hitTestAnalysis(model, point.price, point.pixelsPerPrice, index)
-          if (next !== hoveredKey) setHoveredKey(next)
-        }}
-      />
+      {/* [R635] 轴底那段空白裁掉(见 LEVELS_AXIS_CLIP): 日期行贴到卡片底边 4px, 轴上方横线跟着下移 */}
+      <div className="overflow-hidden" style={{ height: plotHeight - LEVELS_AXIS_CLIP }}>
+        <FinancialPlot
+          scope={scope}
+          series={chartSeries}
+          height={plotHeight}
+          paneHeights={paneHeights}
+          paneTopInsets={paneTopInsets}
+          paneHeaderHeights={paneHeaderHeights}
+          pricePrecision={2}
+          visibleBars={visibleBars + (future?.dates.length ?? 0)}
+          currentPrice={model.rows.at(-1)?.close}
+          rightOffsetPixels={ANALYSIS_LABEL_BAND_PX}
+          annotations={annotations}
+          paneTitles={['', trendTitle, quantTitle]}
+          paneReadouts={[[], trendReadouts, quantReadouts]}
+          paneDecor={paneDecor}
+          hidePaneAxis
+          onSelect={date => onDateClick?.(date)}
+          onCrosshairMove={point => {
+            if (!point) { setHoveredKey(null); return }
+            const index = model.dateIndex.get(point.time) ?? -1
+            const next = index < 0 ? null : hitTestAnalysis(model, point.price, point.pixelsPerPrice, index)
+            if (next !== hoveredKey) setHoveredKey(next)
+          }}
+        />
+      </div>
 
       {/* 价位统计面板:把当前开启的点位按"压力 / 支撑"结构化列出。[R615] 个股弹窗传 overview={false} 挪到左栏 */}
       {effLevels && overview && (

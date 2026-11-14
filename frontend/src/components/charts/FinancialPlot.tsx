@@ -191,7 +191,8 @@ export function FinancialPlot(props: Props) {
       chart.timeScale().unsubscribeSizeChange(resize)
       markerRef.current?.detach(); markerRef.current = null
       chart.remove(); chartRef.current = null; seriesRef.current.clear(); scopeRef.current = null
-      paneAnnotations.current.clear(); paneDecorRef.current.clear(); attachedMain.current = null; attachedLeft.current = null
+      paneAnnotations.current.clear(); paneDecorRef.current.clear()
+      attachedMain.current = null; attachedLeft.current = null
     }
   }, [])
 
