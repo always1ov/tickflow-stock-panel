@@ -419,28 +419,17 @@ export function StockPreviewDialog({ symbol, name, onClose, navList: navListSour
               />
             )}
 
-            {/* [R612] 双栏: 左「现状」/ 右图表与复盘; <1280 单列, 整块一起滚。
-                [R479] 原来挪在新块后面等删的旧顶栏、切换条、信息条和旧内容已删。 */}
-            <div className="min-h-0 flex-1 overflow-y-auto xl:grid xl:grid-cols-[minmax(300px,340px)_minmax(0,1fr)] xl:overflow-hidden">
+            {/* [R612] 多栏: 左「现状」/ 中图表与复盘 / 右「当前价·压力位·支撑位」; <1280 单列, 整块一起滚。
+                [R479] 原来挪在新块后面等删的旧顶栏、切换条、信息条和旧内容已删。
+                [R665] 用户: 「当前价这部分挪到右边, 最终弹窗里面是左中右布局」——
+                价位块从左边挪到第三栏, 从此是左中右三栏。 */}
+            <div className="min-h-0 flex-1 overflow-y-auto xl:grid xl:grid-cols-[minmax(240px,290px)_minmax(0,1fr)_minmax(260px,300px)] xl:overflow-hidden">
               {/* 左栏: 现状(只有现成读数) */}
               <div className="border-b border-border/60 px-4 py-4 sm:px-6 xl:min-h-0 xl:overflow-y-auto xl:border-b-0 xl:border-r">
                 <StatusSection symbol={symbol} days={reviewDays} stacked={wide} />
-                {/* [R615] 原来挂在量化MACD 下面的「当前价 / 压力位 / 支撑位」—— 挪到这里,
-                    哪一页都看得见; 悬停与图上的价位标签联动 */}
-                {shownLevels.effLevels && (
-                  <LevelOverview
-                    levels={shownLevels.effLevels}
-                    activeTypes={levelCtl.activeTypes}
-                    pivotRank={levelCtl.pivotRank}
-                    close={heroRows.at(-1)?.close}
-                    hoveredKey={levelHover}
-                    onHover={setLevelHover}
-                    stacked
-                  />
-                )}
               </div>
 
-              {/* 右栏: 一张图 / 复盘([R658] 只有提示文字与四个视图标签搬进头部) */}
+              {/* 中栏: 一张图 / 复盘([R658] 只有提示文字与四个视图标签搬进头部) */}
               <div className="flex min-h-0 min-w-0 flex-col px-4 py-4 sm:px-6">
                 {/* 分时天数不属于搬走的那句内容, 仍留在图上方 */}
                 {chartView === 'intraday' && (
@@ -517,6 +506,22 @@ export function StockPreviewDialog({ symbol, name, onClose, navList: navListSour
                     </ChartLevelsSection>
                   )}
                 </div>
+              </div>
+
+              {/* 右栏: 当前价 / 压力位 / 支撑位 —— [R665] 用户: 「当前价这部分挪到右边」,
+                  从此弹窗是左「现状」/ 中图 / 右「价位」三栏。 */}
+              <div className="border-t border-border/60 px-4 py-4 sm:px-6 xl:min-h-0 xl:overflow-y-auto xl:border-t-0 xl:border-l">
+                {shownLevels.effLevels && (
+                  <LevelOverview
+                    levels={shownLevels.effLevels}
+                    activeTypes={levelCtl.activeTypes}
+                    pivotRank={levelCtl.pivotRank}
+                    close={heroRows.at(-1)?.close}
+                    hoveredKey={levelHover}
+                    onHover={setLevelHover}
+                    stacked
+                  />
+                )}
               </div>
             </div>
 
