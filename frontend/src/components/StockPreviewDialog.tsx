@@ -23,7 +23,7 @@ import { buildMonitorPriceLines } from '@/lib/price-alerts'
 import { usePreferences } from '@/lib/useSharedQueries'
 import { setFocusSymbol, clearFocusSymbol } from '@/lib/useQuoteStream'
 import { useDialogBackdrop } from '@/lib/useDialogBackdrop'
-import { CHART_LAYOUT } from '@/lib/chart-layout'
+import { fitLevelsMainHeight } from '@/lib/chart-layout'
 import { useMediaQuery } from '@/lib/useMediaQuery'
 import { storage } from '@/lib/storage'
 import { navItemKey, type NavItem } from '@/lib/listNav'
@@ -241,8 +241,9 @@ export function StockPreviewDialog({ symbol, name, onClose, enableLevelsView = t
     ? chartView === 'intraday'
       ? Math.max(480, Math.min(chartAreaH - INTRADAY_CHROME_H, CHART_MAX_HEIGHT))
       : chartView === 'levels'
-        // 主图高度沿用 R614 的算法(副图另加, [R616] 起按 R565 比例, 不再等于这里的 96)
-        ? Math.max(240, Math.min(chartAreaH - LEVELS_CHROME_H - 2 * CHART_LAYOUT.subPaneSlot, CHART_MAX_HEIGHT))
+        // [R623] 主图反算: 让主图 + 趋势量化 + 量化MACD 正好填满右栏, 不再靠滚轮。
+        // 判据与 AnalysisKChart 的副图高同源(lib/chart-layout 的 fitLevelsMainHeight)。
+        ? Math.min(fitLevelsMainHeight(chartAreaH - LEVELS_CHROME_H), CHART_MAX_HEIGHT)
         : undefined
     : undefined
   // [R622] 切视图回到顶部: 右栏是滚动容器, 在关键价位滚到底再切去日K/分时,
@@ -378,8 +379,10 @@ export function StockPreviewDialog({ symbol, name, onClose, enableLevelsView = t
             transition={{ duration: 0.2, ease: EASE_OUT_STRONG }}
             className={cn(
               'relative flex flex-col overflow-hidden rounded-card border border-border bg-base shadow-2xl',
-              // [R612] 双栏要更宽: 1440 上限、88vh 高; 手机上整屏, 不再留一圈背景
-              'h-[88vh] min-h-[640px] w-[94vw] max-h-[95vh] max-w-wide',
+              // [R612] 双栏要更宽: 1440 上限; 手机上整屏, 不再留一圈背景
+              // [R623] 88vh → 96dvh(min 640, 上限 1120): 关键价位要一屏装下主图 + 两张副图,
+              // 1000 高的屏只给 880 差 222, 拉满视口再让主图反算才够(用户: 「弹窗高度再高直到适应」)
+              'h-[min(1120px,96dvh)] min-h-[640px] w-[94vw] max-w-wide',
               'max-md:h-[100dvh] max-md:max-h-none max-md:min-h-0 max-md:w-screen max-md:rounded-none max-md:border-0',
             )}
           >

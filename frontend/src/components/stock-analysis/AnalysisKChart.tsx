@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { AnnotationData } from '@/components/charts/ChartAnnotations'
 import { FinancialPlot } from '@/components/charts/FinancialPlot'
 import type { DecorItem, PaneDecorData } from '@/components/charts/SubPaneDecor'
-import { CHART_LAYOUT } from '@/lib/chart-layout'
+import { CHART_LAYOUT, TREND_LANES_EXTRA, trendSubPaneHeight } from '@/lib/chart-layout'
 import {
   FIB2_ROLE_TARGET, LEVEL_CURVE_COLOR, QUANT_MACD_COLORS, TREND_QUANT_COLORS,
   fib2RoleColor, levelColors, useChartTheme, useLevelColors, useTheme,
@@ -175,14 +175,11 @@ function trendQuantLegendGraphic(visibleBars: number) {
 }
 
 /**
- * [R616] 两张副图的高度 —— 回到 R565 的版面(`lib/levelsChartLayout.ts` 的 `subPaneHeight` /
- * `TREND_LANES_EXTRA`): 副图 = 主图的 48%, 限 160~220; 趋势量化再 +50 给上下两条字道。
- * 这里自带一份, 不反向依赖那份旧 ECharts 版面模块(它只留作历史对照)。
+ * [R623] 两张副图的高度回到 R565 的版面(`lib/chart-layout.ts` 的 `trendSubPaneHeight`):
+ * 副图 = 主图的 48%, 限 160~220; 趋势量化再 +50 给上下两条字道。
+ * 判据挪进 `chart-layout` 是为了让「整张图要多高才装得下」的弹窗反算同源 ——
+ * R616 本地一份、弹窗里再估一份(按每张副图 96), 于是「一屏」从那时起就不成立。
  */
-const SUB_PANE_RATIO = 0.48
-const SUB_PANE_MIN = 160
-const SUB_PANE_MAX = 220
-const TREND_LANES_EXTRA = 50
 /** [R616] 副图顶上给 pane 标题留的带(px): R565 的标题画在图外, 现在画在图里, 顶字道从这条带下面起 */
 const PANE_HEADER_H = 18
 
@@ -264,7 +261,7 @@ export function AnalysisKChart({
 
   // 主图 + 两个副图: 主图保持 `height` 的可视高度, 副图按 R565 的比例另加两格。
   const mainPaneH = Math.max(120, height - CHART_LAYOUT.timeAxis)
-  const subPaneH = Math.round(Math.min(SUB_PANE_MAX, Math.max(SUB_PANE_MIN, mainPaneH * SUB_PANE_RATIO)))
+  const subPaneH = trendSubPaneHeight(height)
   const trendPaneH = subPaneH + TREND_LANES_EXTRA
   const plotHeight = height + trendPaneH + subPaneH
   const paneHeights = useMemo(() => [mainPaneH, trendPaneH, subPaneH], [mainPaneH, trendPaneH, subPaneH])

@@ -17,3 +17,39 @@ export function plotPaneHeights(plotHeight: number, subPaneCount: number) {
     ...Array.from({ length: subPaneCount }, () => CHART_LAYOUT.subPaneSlot - CHART_LAYOUT.separator),
   ]
 }
+
+/**
+ * [R623] 趋势量化 / 量化MACD 两张副图的高度 —— 沿用 R565 的比例(主图的 48%, 限 160~220),
+ * 趋势量化再多 50 给上下两条字道。判据只此一处: 画图的 `AnalysisKChart` 与
+ * 「弹窗要给多高才装得下」的反算 `fitLevelsMainHeight` 都从这里取。
+ */
+export const TREND_LANES_EXTRA = 50
+const TREND_SUB_PANE_RATIO = 0.48
+const TREND_SUB_PANE_MIN = 160
+const TREND_SUB_PANE_MAX = 220
+
+export function trendSubPaneHeight(mainHeight: number): number {
+  const mainPaneH = Math.max(120, mainHeight - CHART_LAYOUT.timeAxis)
+  return Math.round(Math.min(TREND_SUB_PANE_MAX, Math.max(TREND_SUB_PANE_MIN, mainPaneH * TREND_SUB_PANE_RATIO)))
+}
+
+/** `height` = 主图高时, 关键价位那张图连两张副图在内的总高(不含卡片里的按钮/图例)。 */
+export function levelsChartTotalHeight(mainHeight: number): number {
+  return mainHeight + 2 * trendSubPaneHeight(mainHeight) + TREND_LANES_EXTRA
+}
+
+/**
+ * [R623] 在 `available` 高度里求最大的主图高, 让主图 + 两张副图一屏装下。
+ * 总高随主图单调不减, 直接二分; 副图有 160 下限, 所以空间不足时先让主图变矮。
+ */
+export function fitLevelsMainHeight(available: number): number {
+  let lo = 120
+  let hi = Math.max(120, Math.floor(available))
+  if (levelsChartTotalHeight(hi) <= available) return hi
+  while (lo < hi) {
+    const mid = Math.ceil((lo + hi) / 2)
+    if (levelsChartTotalHeight(mid) <= available) lo = mid
+    else hi = mid - 1
+  }
+  return lo
+}
