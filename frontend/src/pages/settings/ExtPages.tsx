@@ -1,18 +1,16 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ExternalLink, Globe2, Layers3, Pencil, Plus, Save, ShieldCheck, Sparkles, Trash2, X } from 'lucide-react'
+import { ExternalLink, Globe2, Layers3, Pencil, Plus, Save, Trash2, X } from 'lucide-react'
 import {
   api,
   type AnalysisColumn, type AnalysisMenu, type ExtDataConfig, type ExtDataField,
-  type ExternalPageRaw, type ExternalPageView,   // [R117]
+  type ExternalLinkItem,
 } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { Skeleton } from '@/components/data/Skeleton'
 import { sanitizeExtUrl } from '@/components/dashboard/layout'
 import { SettingsCard } from './SettingsCard'
-import { ExternalViewRender } from '@/components/ExternalViewRender'   // [R117] 试运行预览
-import { buttonClass } from '@/components/ui'
 
 function dtypeToColumnType(dtype: string): AnalysisColumn['type'] {
   return dtype === 'int' || dtype === 'float' ? 'number' : 'string'
@@ -39,49 +37,51 @@ function firstMatchingField(config: ExtDataConfig | undefined, keywords: string[
   return config.fields.find(f => !['symbol', 'code'].includes(f.name) && f.dtype === 'string')?.name ?? ''
 }
 
+const EXTERNAL_LINKS_LIMIT = 60
+
 /**
- * [R117] 外部网页设置 —— 两种形态二选一:
- *   iframe: 上游原行为, 整站塞进 iframe(对方禁 iframe 就白屏)
- *   fetch:  后端抓原文 → **面板自己的 AI** 按固定提示词整理成表格 → 固定版式
- * 用户不需要写任何代码, 想要什么用一句大白话写在「想看什么」里。
+ * [R611] 外链导航设置 —— 只维护一份链接清单。
+ * 后端不再抓页面、也不再调 AI 整理; 页面就是一个纯链接目录, 点开走新标签。
  */
-function ExternalWebsiteSettings() {
+function ExternalLinkSettings() {
   const qc = useQueryClient()
   const prefs = useQuery({ queryKey: QK.preferences, queryFn: api.preferences })
   const [enabled, setEnabled] = useState(true)
-  const [mode, setMode] = useState<'iframe' | 'fetch'>('iframe')
-  const [name, setName] = useState('利弗莫尔趋势')
-  const [url, setUrl] = useState('https://livermore-trend-dashboard-tigergu.netlify.app/')
-  const [hint, setHint] = useState('')
+  const [name, setName] = useState('外链导航')
+  const [links, setLinks] = useState<ExternalLinkItem[]>([])
   const [error, setError] = useState('')
-  const [preview, setPreview] = useState<ExternalPageView | null>(null)
-  const [rawPeek, setRawPeek] = useState<ExternalPageRaw | null>(null)
 
   useEffect(() => {
     if (!prefs.data) return
     setEnabled(prefs.data.external_page_enabled)
-    setMode(prefs.data.external_page_mode ?? 'iframe')
     setName(prefs.data.external_page_name)
-    setUrl(prefs.data.external_page_url)
-    setHint(prefs.data.external_page_ai_hint ?? '')
+    setLinks(prefs.data.external_links ?? [])
   }, [prefs.data])
 
-  const checkUrl = () => {
-    const trimmedUrl = url.trim()
-    try {
-      const parsed = new URL(trimmedUrl)
-      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') throw new Error()
-    } catch {
-      throw new Error('请输入完整的 HTTP 或 HTTPS 网站地址')
-    }
-    return trimmedUrl
+  const patch = (index: number, field: keyof ExternalLinkItem, value: string) => {
+    setLinks(rows => rows.map((row, i) => (i === index ? { ...row, [field]: value } : row)))
   }
 
   const save = useMutation({
     mutationFn: () => {
       const trimmedName = name.trim()
       if (!trimmedName) throw new Error('请输入页面名称')
-      return api.updateExternalPage({ enabled, name: trimmedName, url: checkUrl(), mode, ai_hint: hint.trim() })
+      const cleaned: ExternalLinkItem[] = []
+      links.forEach((row, index) => {
+        const url = row.url.trim()
+        if (!url) {
+          if (row.name.trim()) throw new Error(`第 ${index + 1} 条链接缺少网址`)
+          return
+        }
+        try {
+          const parsed = new URL(url)
+          if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') throw new Error()
+        } catch {
+          throw new Error(`第 ${index + 1} 条链接的网址无效，需要完整的 http(s) 地址`)
+        }
+        cleaned.push({ name: row.name.trim(), url })
+      })
+      return api.updateExternalPage({ enabled, name: trimmedName, links: cleaned })
     },
     onSuccess: () => {
       setError('')
@@ -90,151 +90,87 @@ function ExternalWebsiteSettings() {
     onError: err => setError(String((err as Error)?.message ?? err)),
   })
 
-  // 只抓原文不调 AI —— 先确认这个地址能不能抓通、抓回来是不是有用的东西
-  const peek = useMutation({
-    mutationFn: async () => api.externalPageRaw({ url: checkUrl() }),
-    onSuccess: d => { setError(''); setPreview(null); setRawPeek(d) },
-    onError: err => setError(String((err as Error)?.message ?? err)),
-  })
-
-  // 试运行 = 真调一次 AI, 结果就是页面上会看到的样子
-  const tryRun = useMutation({
-    mutationFn: async () => api.externalPageView({ url: checkUrl(), hint: hint.trim(), force: true }),
-    onSuccess: d => { setError(''); setRawPeek(null); setPreview(d) },
-    onError: err => setError(String((err as Error)?.message ?? err)),
-  })
-
   return (
-    <>
-    {/* [R378] 标题原来写的是「变成『闲置功能』里的一页」—— 那句话从来就不对:
-        外部网页是**一级菜单**, 默认不在那个分组里。
-        [R379] 这一块的手搓版收进 `SectionIntro` —— 连带修掉那个 `text-cyan-400/80`
-        的标签色: 它是照深色底调的, 白卡片上偏淡, 而且与另一页的 `text-accent` 不是
-        同一个颜色(同一个位置两种写法, 谁也不会记得同时改两处)。 */}
-    {/* [R535] 原来是两张卡: 一块大号开篇(小标签 + 24px 大标题 + 一段话), 下面一张表单卡。说的是同一件事,
-        收成设置区统一卡头的一张卡; 大标题那句话并进说明第一句。 */}
     <SettingsCard
       icon={Globe2}
-      title="外部网页"
-      desc={<>
-        把一个外部网页变成菜单里的一页。两种做法二选一：直接内嵌整站，或者由后端抓回原文、交给面板里配置的 AI 整理成统一表格再显示。
-        无论哪种，牛来都不会把 TickFlow 数据、API Key 或登录凭据转发给对方。
-      </>}
+      title="外链导航"
+      desc="把常看的站点收进来，菜单里会多出一页按卡片列出这些链接，点开在新标签打开。面板不会抓取对方页面，也不会把 TickFlow 数据、API Key 或登录凭据转发出去。"
       right={(
         <button
           type="button"
           onClick={() => setEnabled(value => !value)}
-          className={`shrink-0 inline-flex items-center gap-2 rounded-btn border px-3 py-1.5 text-xs transition-colors ${enabled ? 'border-bear/40 bg-bear/10 text-bear' : 'border-border bg-elevated text-muted'}`}
+          className={`shrink-0 inline-flex items-center gap-2 rounded-btn border px-3 py-1.5 text-xs transition-colors ${enabled ? 'border-accent/40 bg-accent/10 text-accent' : 'border-border bg-elevated text-muted'}`}
         >
-          <span className={`h-2 w-2 rounded-full ${enabled ? 'bg-bear' : 'bg-muted'}`} />
+          <span className={`h-2 w-2 rounded-full ${enabled ? 'bg-accent' : 'bg-muted'}`} />
           {enabled ? '已启用' : '已停用'}
         </button>
       )}
     >
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-        {([
-          { key: 'fetch' as const, icon: Sparkles, title: '抓取 + AI 整理', desc: '后端取回原文，AI 按固定结构整理成 KPI 卡 + 表格。对方禁 iframe、是 SPA 都不影响；每次解析会调一次 AI（同一份原文有缓存）。' },
-          { key: 'iframe' as const, icon: Globe2, title: '内嵌整站', desc: '把对方页面原样塞进 iframe。省事，但对方禁止 iframe 时会白屏，也没法只挑关键信息。' },
-        ]).map(opt => (
-          <button
-            key={opt.key}
-            type="button"
-            onClick={() => setMode(opt.key)}
-            className={`rounded-card border p-3 text-left transition-colors ${mode === opt.key ? 'border-foreground bg-surface' : 'border-border bg-surface hover:bg-elevated'}`}
-          >
-            <div className={`flex items-center gap-1.5 text-xs font-medium text-foreground`}>
-              <opt.icon className="h-3.5 w-3.5" />{opt.title}
-              {mode === opt.key && <span className="ml-auto text-micro">当前</span>}
-            </div>
-            <p className="mt-1.5 text-xs leading-5 text-muted">{opt.desc}</p>
-          </button>
-        ))}
-      </div>
-
-      <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-[minmax(12rem,0.7fr)_minmax(20rem,2fr)]">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(12rem,0.7fr)_minmax(20rem,2fr)]">
         <label className="space-y-1.5">
           <span className="text-xs text-muted">页面名称</span>
           <input value={name} maxLength={40} onChange={e => setName(e.target.value)} className="h-9 w-full rounded-btn border border-border bg-base px-3 text-xs text-foreground" />
         </label>
-        <label className="space-y-1.5">
-          <span className="text-xs text-muted">网站地址</span>
-          <input value={url} onChange={e => setUrl(e.target.value)} placeholder="https://example.com/" className="h-9 w-full rounded-btn border border-border bg-base px-3 text-xs text-foreground" />
-        </label>
+        <div className="flex items-end gap-2 text-xs text-muted">
+          <span className="pb-2">共 {links.length} / {EXTERNAL_LINKS_LIMIT} 条链接</span>
+        </div>
       </div>
 
-      {mode === 'fetch' && (
-        <div className="mt-4 space-y-2">
-          <label className="space-y-1.5 block">
-            <span className="text-xs text-muted">想从这一页看到什么（用大白话写，会拼进 AI 的提示词；留空则由 AI 自己判断）</span>
-            <textarea
-              value={hint}
-              maxLength={2000}
-              rows={3}
-              onChange={e => setHint(e.target.value)}
-              placeholder={'例如：只要涨幅榜前 20 名，列出代码、名称、涨幅、成交额；顶部给我多头家数和空头家数两个数字。'}
-              className="w-full rounded-btn border border-border bg-base px-3 py-2 text-xs leading-6 text-foreground"
-            />
-          </label>
-          <div className="rounded-btn border border-border/60 bg-base/60 px-3 py-2 text-xs leading-5 text-muted">
-            AI 会被要求只输出固定结构：<span className="text-secondary">标题 · 顶部 KPI 卡 · 若干张表（列头/对齐/单位/涨跌染色）· 备注</span>。
-            页面就按这个结构渲染，所以改提示词就能改看到的东西，不需要写代码。
-            涨跌幅这类列会自动按正负红涨绿跌。原文超过 12000 字会被截断后再送 AI。
+      <div className="mt-4 space-y-2">
+        {links.length === 0 && (
+          <div className="rounded-btn border border-dashed border-border px-3 py-6 text-center text-xs text-muted">
+            还没有链接，点下面的「添加链接」开始。
           </div>
-        </div>
-      )}
+        )}
+        {links.map((row, index) => (
+          <div key={index} className="grid grid-cols-1 gap-2 md:grid-cols-[minmax(8rem,0.8fr)_minmax(16rem,2fr)_auto]">
+            <input
+              value={row.name}
+              maxLength={40}
+              onChange={e => patch(index, 'name', e.target.value)}
+              placeholder="名称（可留空，显示网址）"
+              className="h-9 w-full rounded-btn border border-border bg-base px-3 text-xs text-foreground"
+            />
+            <input
+              value={row.url}
+              maxLength={2048}
+              onChange={e => patch(index, 'url', e.target.value)}
+              placeholder="https://example.com/"
+              className="h-9 w-full rounded-btn border border-border bg-base px-3 text-xs text-foreground"
+            />
+            <button
+              type="button"
+              onClick={() => setLinks(rows => rows.filter((_, i) => i !== index))}
+              className="inline-flex h-9 items-center justify-center gap-1.5 rounded-btn border border-border px-3 text-xs text-muted hover:border-danger/40 hover:text-danger"
+              title="删除这一条"
+            >
+              <Trash2 className="h-3.5 w-3.5" />删除
+            </button>
+          </div>
+        ))}
+      </div>
 
       {error && <div className="mt-3 rounded-btn border border-danger/30 bg-danger/5 px-3 py-2 text-xs text-danger whitespace-pre-wrap break-words">{error}</div>}
 
-      {rawPeek && (
-        <div className="mt-3 rounded-card border border-border bg-base/60 p-3">
-          <div className="text-xs text-muted">
-            抓通了：HTTP {rawPeek.status} · {rawPeek.content_type || '未知类型'} · {rawPeek.bytes} 字节 · 清洗后 {rawPeek.source_chars} 字
-          </div>
-          <pre className="mt-2 max-h-56 overflow-auto whitespace-pre-wrap break-all rounded-btn bg-elevated/40 p-2 text-micro leading-5 text-secondary">{rawPeek.preview.slice(0, 2000)}</pre>
-        </div>
-      )}
-
-      {preview && (
-        <div className="mt-3 rounded-card border border-accent/30 bg-base/60 p-3">
-          <div className="mb-2 flex flex-wrap items-center gap-x-3 text-xs text-muted">
-            <span className="text-accent">试运行结果（页面上就是这个样子）</span>
-            {preview.model && <span>档位 {preview.model}</span>}
-            <span>原文 {preview.source_chars} 字</span>
-          </div>
-          <ExternalViewRender view={preview.spec} compact />
-        </div>
-      )}
-
-      <div className="mt-4 flex flex-col gap-3 text-xs text-muted sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-1.5">
-          <ShieldCheck className="h-3.5 w-3.5" />
-          {mode === 'fetch'
-            ? '服务端代抓只允许公网地址（内网/环回一律拒绝），单页上限 2MB。'
-            : '目标网站若禁止 iframe，会显示空白，此时可使用页面内的“新窗口”按钮。'}
-        </div>
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          {mode === 'fetch' && (
-            <>
-              <button onClick={() => peek.mutate()} disabled={peek.isPending} className="inline-flex items-center gap-1.5 rounded-btn border border-border bg-elevated px-3 py-1.5 text-xs text-secondary hover:text-foreground disabled:opacity-50">
-                <ExternalLink className="h-3.5 w-3.5" />{peek.isPending ? '抓取中…' : '只抓原文看看'}
-              </button>
-              <button onClick={() => tryRun.mutate()} disabled={tryRun.isPending} className="inline-flex items-center gap-1.5 rounded-btn border border-accent/40 bg-accent/10 px-3 py-1.5 text-xs text-accent disabled:opacity-50">
-                <Sparkles className="h-3.5 w-3.5" />{tryRun.isPending ? 'AI 整理中…' : '试运行(调一次 AI)'}
-              </button>
-            </>
-          )}
-          {prefs.data?.external_page_enabled && prefs.data.external_page_url && (
-            <Link to="/external-page" className="inline-flex items-center gap-1.5 rounded-btn border border-border bg-elevated px-3 py-1.5 text-xs text-secondary hover:text-foreground">
-              <ExternalLink className="h-3.5 w-3.5" />打开页面
-            </Link>
-          )}
-          <button onClick={() => save.mutate()} disabled={save.isPending || prefs.isLoading} className={buttonClass({ variant: 'primary' }, 'gap-1.5')}>
-            <Save className="h-3.5 w-3.5" />{save.isPending ? '保存中…' : '保存设置'}
+          <button
+            type="button"
+            onClick={() => setLinks(rows => (rows.length >= EXTERNAL_LINKS_LIMIT ? rows : [...rows, { name: '', url: '' }]))}
+            disabled={links.length >= EXTERNAL_LINKS_LIMIT}
+            className="inline-flex items-center gap-1.5 rounded-btn border border-border bg-elevated px-3 py-1.5 text-xs text-secondary hover:text-foreground disabled:opacity-50"
+          >
+            <Plus className="h-3.5 w-3.5" />添加链接
           </button>
+          <Link to="/external-page" className="inline-flex items-center gap-1.5 rounded-btn border border-border bg-elevated px-3 py-1.5 text-xs text-secondary hover:text-foreground">
+            <ExternalLink className="h-3.5 w-3.5" />打开页面
+          </Link>
         </div>
+        <button onClick={() => save.mutate()} disabled={save.isPending || prefs.isLoading} className="inline-flex items-center gap-1.5 rounded-btn bg-accent/90 px-3 py-1.5 text-xs font-medium text-on-accent hover:bg-accent disabled:opacity-50">
+          <Save className="h-3.5 w-3.5" />{save.isPending ? '保存中…' : '保存设置'}
+        </button>
       </div>
     </SettingsCard>
-    </>
   )
 }
 
@@ -361,7 +297,7 @@ export function SettingsExtPagesPanel() {
 
   return (
     <div className="space-y-6">
-      <ExternalWebsiteSettings />
+      <ExternalLinkSettings />
       {/* [R535] 设置区统一卡头: 大号开篇并入说明 */}
       <SettingsCard
         icon={Layers3}

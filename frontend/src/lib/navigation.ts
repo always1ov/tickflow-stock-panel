@@ -48,8 +48,8 @@ export const CORE_NAVIGATION: NavigationEntry[] = [
   { id: '/data', label: '数据', icon: IconData },
 ].map(x => ({ ...x, to: x.id, type: 'builtin' as const, visible: true, arch: 'core' as const }))
 
-/** [R117] 外部网页固定契约 —— 启用时作为一个扩展域页面进菜单。 */
-export type ExternalPageNav = { enabled: boolean; name: string; url: string }
+/** [R611] 外链导航固定契约 —— 启用时作为一个扩展域页面进菜单。 */
+export type ExternalPageNav = { enabled: boolean; name: string }
 
 /** 宿主与管理页共用来源及 ID，分析页历史裸 ID 只在兼容读取时转换。 */
 export function getNavigationEntries(
@@ -58,10 +58,10 @@ export function getNavigationEntries(
 ): NavigationEntry[] {
   const entries: NavigationEntry[] = [
     ...CORE_NAVIGATION,
-    ...(externalPage?.enabled && externalPage.url
+    ...(externalPage?.enabled
       ? [{
           id: '/external-page', to: '/external-page',
-          label: externalPage.name || '利弗莫尔趋势', icon: Globe2,
+          label: externalPage.name || '外链导航', icon: Globe2,
           type: 'extension' as const, visible: true, arch: 'ext' as const,
         }]
       : []),

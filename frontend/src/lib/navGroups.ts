@@ -60,7 +60,7 @@ export const BROWSE_GROUP = {
    * **默认**成员 —— 仅在用户还没调整过时生效(存过的顺序里没有收尾哨兵)。
    * 调整之后归属完全由 `nav_order` 说了算, 这张表不再参与。
    *
-   * 注: 外部网页(/external-page)不在默认名单里 —— 但 R378 之后它和别的菜单
+   * 注: 外链导航(/external-page)不在默认名单里 —— 但 R378 之后它和别的菜单
    * 一样拖得进来, 那条「不入组」不再是限制, 只是默认值。
    */
   paths: ['/dashboard', '/limit-ladder', '/concept-analysis', '/industry-analysis'],

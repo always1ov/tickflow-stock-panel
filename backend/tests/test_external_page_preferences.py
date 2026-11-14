@@ -14,62 +14,70 @@ def isolated_preferences(tmp_path, monkeypatch):
     preferences._invalidate_cache()
 
 
-def test_external_page_defaults_are_backward_compatible():
+def test_external_page_defaults_to_empty_link_directory():
     assert preferences.get_external_page_config() == {
         "external_page_enabled": True,
-        "external_page_name": "利弗莫尔趋势",
-        "external_page_url": "https://livermore-trend-dashboard-tigergu.netlify.app/",
-        # [R117] 新增两字段, 默认值即上游原行为(内嵌整站, 无 AI 提示)
-        "external_page_mode": "iframe",
-        "external_page_ai_hint": "",
+        "external_page_name": "外链导航",
+        # [R611] 外部网页改成外链导航: 没有预置链接, 页面引导去设置里添加
+        "external_links": [],
     }
 
 
-def test_update_external_page_persists_configuration():
+def test_update_external_page_persists_links():
     result = settings_api.update_external_page(settings_api.ExternalPagePrefsIn(
         enabled=False,
-        name="  我的盘面  ",
-        url=" https://example.com/dashboard?view=trend ",
+        name="  我的导航  ",
+        links=[
+            {"name": " 利弗莫尔趋势 ", "url": " https://example.com/trend "},
+            {"name": "", "url": "https://example.com/tools"},
+        ],
     ))
 
     assert result == {
         "external_page_enabled": False,
-        "external_page_name": "我的盘面",
-        "external_page_url": "https://example.com/dashboard?view=trend",
-        "external_page_mode": "iframe",
-        "external_page_ai_hint": "",
+        "external_page_name": "我的导航",
+        "external_links": [
+            {"name": "利弗莫尔趋势", "url": "https://example.com/trend"},
+            # 没填名字时用地址兜底
+            {"name": "https://example.com/tools", "url": "https://example.com/tools"},
+        ],
     }
     assert preferences.get_external_page_config() == result
 
 
-def test_r117_mode_and_hint_round_trip():
-    settings_api.update_external_page(settings_api.ExternalPagePrefsIn(
-        enabled=True, name="盘面", url="https://example.com/",
-        mode="fetch", ai_hint="  只要涨幅榜前 20  ",
-    ))
+def test_links_are_deduped_and_unsafe_schemes_dropped():
+    preferences.save({"external_links": [
+        {"name": "A", "url": "https://example.com/"},
+        {"name": "重复", "url": "https://example.com/"},
+        {"name": "脚本", "url": "javascript:alert(1)"},
+        {"name": "不是对象"},
+    ]})
+    assert preferences.get_external_page_config()["external_links"] == [
+        {"name": "A", "url": "https://example.com/"},
+    ]
+
+
+def test_r611_legacy_single_url_is_migrated_once():
+    """老 preferences 里的 external_page_url 迁成第一条外链; 保存过一次后不再回读。"""
+    preferences.save({
+        "external_page_name": "利弗莫尔趋势",
+        "external_page_url": "https://old.example.com/",
+        "external_page_mode": "fetch",
+        "external_page_ai_hint": "只要涨幅榜",
+    })
     got = preferences.get_external_page_config()
-    assert got["external_page_mode"] == "fetch"
-    assert got["external_page_ai_hint"] == "只要涨幅榜前 20"
+    assert "external_page_url" not in got
+    # 站名迁进链接名, 页面本身叫「外链导航」
+    assert got["external_page_name"] == "外链导航"
+    assert got["external_links"] == [
+        {"name": "利弗莫尔趋势", "url": "https://old.example.com/"},
+    ]
 
-
-def test_r117_omitted_fields_keep_previous_values():
-    """老客户端(只发 enabled/name/url)不该把已存的模式和提示抹掉。"""
+    # 用户把这条删掉并保存 —— 老字段还在文件里, 也不许复活
     settings_api.update_external_page(settings_api.ExternalPagePrefsIn(
-        enabled=True, name="盘面", url="https://example.com/",
-        mode="fetch", ai_hint="只要涨幅榜",
+        enabled=True, name="外链导航", links=[],
     ))
-    settings_api.update_external_page(settings_api.ExternalPagePrefsIn(
-        enabled=True, name="改名了", url="https://example.com/",
-    ))
-    got = preferences.get_external_page_config()
-    assert got["external_page_name"] == "改名了"
-    assert got["external_page_mode"] == "fetch"
-    assert got["external_page_ai_hint"] == "只要涨幅榜"
-
-
-def test_r117_unknown_mode_falls_back_to_iframe():
-    preferences.save({"external_page_mode": "上一版写坏的值"})
-    assert preferences.get_external_page_config()["external_page_mode"] == "iframe"
+    assert preferences.get_external_page_config()["external_links"] == []
 
 
 @pytest.mark.parametrize("url", [
@@ -82,8 +90,8 @@ def test_update_external_page_rejects_unsafe_url(url):
     with pytest.raises(HTTPException) as exc:
         settings_api.update_external_page(settings_api.ExternalPagePrefsIn(
             enabled=True,
-            name="外部网页",
-            url=url,
+            name="外链导航",
+            links=[{"name": "站点", "url": url}],
         ))
     assert exc.value.status_code == 400
 
@@ -93,6 +101,6 @@ def test_update_external_page_rejects_blank_name():
         settings_api.update_external_page(settings_api.ExternalPagePrefsIn(
             enabled=True,
             name="   ",
-            url="https://example.com/",
+            links=[],
         ))
     assert exc.value.status_code == 400

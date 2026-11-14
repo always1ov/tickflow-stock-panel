@@ -12,7 +12,7 @@ import { SettingsExtPagesPanel } from './ExtPages'
 
 const SECTIONS = [
   { key: 'menus', label: '菜单与页面' },
-  { key: 'ext-pages', label: '扩展页面' },
+  { key: 'ext-pages', label: '扩展与外链' },
 ] as const
 
 type SectionKey = (typeof SECTIONS)[number]['key']

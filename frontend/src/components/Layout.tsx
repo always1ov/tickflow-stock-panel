@@ -549,7 +549,7 @@ export function Layout() {
   const [glossaryOpen, setGlossaryOpen] = useState(false)
 
   const allNav = getNavigationEntries(analysisMenus?.items ?? [], {
-    enabled: !!prefs?.external_page_enabled, name: prefs?.external_page_name ?? '', url: prefs?.external_page_url ?? '',
+    enabled: !!prefs?.external_page_enabled, name: prefs?.external_page_name ?? '',
   })
   const navById = new Map(allNav.map(item => [item.id, item]))
   const layout = resolveNavLayout(prefs?.nav_layout, allNav, prefs?.nav_order)

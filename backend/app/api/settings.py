@@ -794,13 +794,16 @@ class MiningSchedulePrefs(BaseModel):
     mining_budget_profile: Literal["balanced", "strict"]
 
 
+class ExternalLinkIn(BaseModel):
+    name: str = Field(default="", max_length=40)
+    url: str = Field(min_length=1, max_length=2048)
+
+
 class ExternalPagePrefsIn(BaseModel):
     enabled: bool
     name: str = Field(min_length=1, max_length=40)
-    url: str = Field(min_length=1, max_length=2048)
-    # [R117] 抓取模式相关; 都是可选 —— 不传 = 保持原值, 老客户端不受影响
-    mode: Literal["iframe", "fetch"] | None = None
-    ai_hint: str | None = Field(default=None, max_length=2000)
+    # [R611] 外链导航: 只维护链接清单, 不再有 iframe / 抓取模式
+    links: list[ExternalLinkIn] = Field(default_factory=list, max_length=60)
 
 
 @router.get("/preferences")
@@ -1258,22 +1261,25 @@ def update_nav_layout(req: NavLayoutIn) -> dict:
             "nav_hidden": preferences.get_nav_hidden()}
 
 
-# [fork] R598 扩展分析-外部网页偏好端点，上游无对应能力
+# [fork] R598 外链导航偏好端点（R611 起只保存链接清单，不再内嵌网页）
 @router.put("/preferences/external-page")
 def update_external_page(req: ExternalPagePrefsIn) -> dict:
-    """保存浏览器内嵌的外部网页, 仅允许不携带账号密码的 HTTP(S) 地址。"""
+    """保存外链导航的名称与链接清单，仅允许不携带账号密码的 HTTP(S) 地址。"""
     from app.services import preferences
 
     name = req.name.strip()
-    url = req.url.strip()
     if not name:
         raise HTTPException(status_code=400, detail="页面名称不能为空")
-    parsed = urlsplit(url)
-    if parsed.scheme.lower() not in {"http", "https"} or not parsed.netloc:
-        raise HTTPException(status_code=400, detail="仅支持完整的 HTTP 或 HTTPS 网站地址")
-    if parsed.username is not None or parsed.password is not None:
-        raise HTTPException(status_code=400, detail="网站地址中不能包含账号或密码")
-    return preferences.set_external_page_config(req.enabled, name, url, req.mode, req.ai_hint)
+    links = []
+    for item in req.links:
+        url = item.url.strip()
+        parsed = urlsplit(url)
+        if parsed.scheme.lower() not in {"http", "https"} or not parsed.netloc:
+            raise HTTPException(status_code=400, detail=f"仅支持完整的 HTTP 或 HTTPS 地址：{url}")
+        if parsed.username is not None or parsed.password is not None:
+            raise HTTPException(status_code=400, detail=f"地址中不能包含账号或密码：{url}")
+        links.append({"name": item.name.strip(), "url": url})
+    return preferences.set_external_page_config(req.enabled, name, links)
 
 
 @router.put("/preferences/nav-order")

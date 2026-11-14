@@ -42,7 +42,7 @@ export const SETTINGS_TABS: Record<SettingsTab, PageTabDef> = {
   notifications: { title: '通知', icon: Bell },
   ai: { title: 'AI', icon: Sparkles },
   menus: { title: '菜单', icon: SlidersHorizontal },
-  'ext-pages': { title: '扩展页面', icon: BarChart3 },
+  'ext-pages': { title: '扩展与外链', icon: BarChart3 },
   // [v0.3.8 同步上游] 页面插件 (page packs) 入口; 上游把「关于」也并进设置, fork 暂不引入(品牌/链接待本地化)
   'page-packs': { title: '页面插件', icon: Package },
   timeout: { title: '网络', icon: Clock3 },

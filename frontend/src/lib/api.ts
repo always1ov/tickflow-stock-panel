@@ -4,7 +4,6 @@
 // Prod:同源(FastAPI 托管前端 dist)
 
 import { toast } from '@/components/Toast'
-import type { ExtSpec } from '@/lib/externalView'   // [R117] 外部网页固定契约
 import type { TrendQuantData } from '@/lib/trendQuantSeries'   // [R486] 趋势量化的逐根数值
 import type { NavLayout } from './navLayout'
 
@@ -4043,44 +4042,16 @@ export interface Preferences {
   minute_intraday_refresh: boolean
   minute_intraday_refresh_interval: number
   monitor_ext_fields: { concept: MonitorExtFieldItem | null; industry: MonitorExtFieldItem | null }
+  /** [R611] 外链导航：菜单开关 / 页面名称 / 链接清单 */
   external_page_enabled: boolean
   external_page_name: string
-  external_page_url: string
-  /** [R117] iframe=内嵌整站; fetch=抓原文 + 面板 AI 整理 + 固定版式 */
-  external_page_mode: 'iframe' | 'fetch'
-  /** [R117] 用大白话说明想从这页看到什么, 会拼进 AI 提示词 */
-  external_page_ai_hint: string
+  external_links: ExternalLinkItem[]
 }
 
-/** [R117] 抓取模式的成品: AI 整理后、后端已归一化的固定结构 */
-export interface ExternalPageView {
-  spec: ExtSpec
+/** [R611] 外链导航的一条链接 */
+export interface ExternalLinkItem {
+  name: string
   url: string
-  hint: string
-  model: string
-  generated_at: number
-  fetched_at: number
-  source_chars: number
-  from_cache: boolean
-  /** [R146] 这份结果是哪来的:
-   *  latest = 最近一次结果(30 分钟内, **连页面都没抓**)
-   *  source = 抓了但原文一个字没变, 省掉了 AI
-   *  fresh  = 这次真抓真整理 */
-  cache_kind?: 'latest' | 'source' | 'fresh'
-  /** 距这份整理生成过了多少秒 */
-  age_seconds?: number
-}
-
-/** [R117] 只抓原文不调 AI —— 设置页确认地址通不通用 */
-export interface ExternalPageRaw {
-  ok: boolean
-  url: string
-  status: number
-  content_type: string
-  bytes: number
-  fetched_at: number
-  preview: string
-  source_chars: number
 }
 
 export interface EmailSmtpConfig {
@@ -4477,27 +4448,13 @@ export const api = {
 
   preferences: () => request<Preferences>('/api/settings/preferences'),
   updateExternalPage: (config: {
-    enabled: boolean; name: string; url: string
-    mode?: 'iframe' | 'fetch'; ai_hint?: string   // [R117] 省略 = 保持原值
+    enabled: boolean; name: string; links: ExternalLinkItem[]
   }) =>
     request<Pick<Preferences,
-      'external_page_enabled' | 'external_page_name' | 'external_page_url'
-      | 'external_page_mode' | 'external_page_ai_hint'>>(
+      'external_page_enabled' | 'external_page_name' | 'external_links'>>(
       '/api/settings/preferences/external-page',
       { method: 'PUT', body: JSON.stringify(config) },
     ),
-  /** [R117] 抓页面 + AI 整理成固定结构(原文没变时后端直接回缓存, 不重复花钱) */
-  externalPageView: (opts?: { url?: string; hint?: string; force?: boolean }) =>
-    request<ExternalPageView>('/api/external-page/view', {
-      method: 'POST',
-      body: JSON.stringify({ url: opts?.url ?? null, hint: opts?.hint ?? null, force: opts?.force ?? false }),
-    }),
-  /** [R117] 只抓原文不调 AI */
-  externalPageRaw: (opts?: { url?: string; force?: boolean }) =>
-    request<ExternalPageRaw>('/api/external-page/raw', {
-      method: 'POST',
-      body: JSON.stringify({ url: opts?.url ?? null, hint: null, force: opts?.force ?? true }),
-    }),
   importCenterInspect: (files: File[]) => {
     const body = new FormData()
     files.forEach(file => body.append('files', file))

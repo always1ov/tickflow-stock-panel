@@ -97,7 +97,7 @@ _EXPECTED_ROUTERS = (
     "today.router",
     "usage_notes.router",
     "focus.router",
-    "external_page.router",
+    # [R611] 外部网页改成「外链导航」: 抓取 / 内嵌端点随 api/external_page.py 一起删除
     "abnormal.router",
     "regime.router",
     "analysis.router",

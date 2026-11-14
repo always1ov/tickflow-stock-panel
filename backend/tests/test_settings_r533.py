@@ -20,7 +20,7 @@ def test_R533_走共用分栏条_不再有竖向菜单():
 def test_R533_栏名与顺序():
     code = code_of(PAGE)
     order = ["'data-sources': { title: '数据源'", "monitoring: { title: '实时监控'", "notifications: { title: '通知'", "ai: { title: 'AI'",
-             "menus: { title: '菜单'", "'ext-pages': { title: '扩展页面'", "timeout: { title: '网络'",
+             "menus: { title: '菜单'", "'ext-pages': { title: '扩展与外链'", "timeout: { title: '网络'",
              "system: { title: '系统'"]
     idx = [code.index(o) for o in order]
     assert idx == sorted(idx), "栏的顺序变了(菜单要挨着扩展页面)"

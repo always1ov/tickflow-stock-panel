@@ -57,7 +57,7 @@ function SortableMenuRow({ node, entry, parentId, groups, hidden, busy, focusNew
         : <>
           <button type="button" disabled={home || busy} onClick={() => onHide(node.id)} aria-label={`${hidden ? '显示' : '隐藏'}${label}`}
             className="rounded-btn p-2 text-muted hover:bg-elevated hover:text-accent disabled:opacity-30">{hidden ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button>
-          {entry && <Link to={entry.type === 'analysis' ? '/settings?tab=pages&section=ext-pages' : entry.to}
+          {entry && <Link to={entry.to}
             aria-label={`打开${label}`} className="rounded-btn p-2 text-muted hover:bg-elevated hover:text-accent"><ExternalLink className="h-4 w-4" /></Link>}
           {node.id === '/monitor' && <button type="button" aria-label={badgeEnabled ? '关闭监控数字提示' : '开启监控数字提示'} onClick={onToggleBadge}
             className="rounded-btn p-2 text-muted hover:bg-elevated hover:text-accent"><Bell className="h-4 w-4" /></button>}
@@ -79,7 +79,7 @@ export function SettingsMenuSettingsPanel() {
   const menus = useQuery({ queryKey: QK.analysisMenus, queryFn: api.analysisMenus })
   const [removedNs, setRemovedNs] = useState<Set<string>>(new Set())
   const entries = getNavigationEntries(menus.data?.items ?? [], {
-    enabled: !!prefs?.external_page_enabled, name: prefs?.external_page_name ?? '', url: prefs?.external_page_url ?? '',
+    enabled: !!prefs?.external_page_enabled, name: prefs?.external_page_name ?? '',
   }).filter(x => !x.extensionId || !removedNs.has(x.extensionId))
   const entryMap = new Map(entries.map(x => [x.id, x]))
   const [draft, setDraft] = useState<NavLayout | null>(null)

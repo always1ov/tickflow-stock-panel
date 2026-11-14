@@ -167,7 +167,6 @@ MIGRATED: list[str] = [
     "components/EndpointTestDialog.tsx",
     "components/AlertToast.tsx",
     "components/ScoringEditor.tsx",
-    "components/ExternalViewRender.tsx",
     "components/NavPager.tsx",
     "components/GlossaryDialog.tsx",
     "components/CollapsibleText.tsx",

@@ -72,10 +72,11 @@ def test_R535_菜单_内置不逐行印_手机上名字保底():
     assert "SettingsCard" in code, "菜单页要跟其余分栏共用卡头"
 
 
-def test_R535_外部网页一张卡_扩展页面一张卡():
+def test_R535_外链导航一张卡_扩展页面一张卡():
     code = code_of(S + "ExtPages.tsx")
-    assert 'title="外部网页"' in code and 'title="扩展页面"' in code
-    assert "把一个外部网页变成菜单里的一页" in code, "大标题那句话并进说明时丢了"
+    # [R611] 「外部网页」(抓取 / iframe) 改成「外链导航」(纯链接目录), 仍是一张卡
+    assert 'title="外链导航"' in code and 'title="扩展页面"' in code
+    assert "把常看的站点收进来" in code, "大标题那句话并进说明时丢了"
 
 
 def test_R535_数据源插件说明不再是黄色提示条():
