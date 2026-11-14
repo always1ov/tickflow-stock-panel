@@ -452,6 +452,21 @@ it('leaves a plain wheel to the page and zooms only with Ctrl/⌘', async () => 
   expect(view.from).toBeGreaterThan(0)
 })
 
+it('refits the viewport when the candle window switches, leaving the price axis to auto-scale', async () => {
+  const rows = Array.from({ length: 200 }, (_, index) => ({
+    time: new Date(Date.UTC(2026, 0, index + 1)).toISOString().slice(0, 10), value: 10 + index,
+  }))
+  const series: PlotSeries[] = [{ id: 'price', type: 'Line', pane: 0, data: rows }]
+  const render = (visibleBars: number) => act(async () => root.render(<FinancialPlot scope={`analysis:${visibleBars}`}
+    series={series} height={400} paneHeights={[300]} visibleBars={visibleBars} />))
+  await render(60)
+  expect(native.timeScale.setVisibleLogicalRange).toHaveBeenLastCalledWith({ from: 140, to: 199 })
+  // 主图不挂固定价格区间: 纵轴交给库按当前可见窗口的数据极值自适应
+  expect(native.chart.addSeries.mock.calls.at(-1)![1].autoscaleInfoProvider).toBeUndefined()
+  await render(250)
+  expect(native.timeScale.setVisibleLogicalRange).toHaveBeenLastCalledWith({ from: 0, to: 199 })
+})
+
 it('identifies the shared lunch slot when hovering instead of presenting the combined volume as a single minute', async () => {
   const morning = { datetime: '2026-11-05 11:30:00', open: 9, high: 11, low: 9, close: 10, volume: 10, amount: 10000 }
   const afternoon = { ...morning, datetime: '2026-11-05 13:00:00', open: 11, high: 13, low: 11, close: 12, volume: 20, amount: 24000 }
