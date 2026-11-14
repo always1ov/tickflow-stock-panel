@@ -1,13 +1,19 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { AnnotationData } from '@/components/charts/ChartAnnotations'
 import { FinancialPlot } from '@/components/charts/FinancialPlot'
-import { CHART_LAYOUT, plotPaneHeights } from '@/lib/chart-layout'
+import type { DecorItem, PaneDecorData } from '@/components/charts/SubPaneDecor'
+import { CHART_LAYOUT } from '@/lib/chart-layout'
 import {
   FIB2_ROLE_TARGET, LEVEL_CURVE_COLOR, QUANT_MACD_COLORS, TREND_QUANT_COLORS,
   fib2RoleColor, levelColors, useChartTheme, useLevelColors, useTheme,
 } from '@/lib/theme'
-import { alignQuantMacd, QUANT_MACD_HELP, QUANT_MACD_LEGEND } from '@/lib/quantMacdSeries'
-import { alignTrendQuant, TREND_QUANT_HELP, TREND_QUANT_LEGEND, type TrendQuantData } from '@/lib/trendQuantSeries'
+import {
+  alignQuantMacd, diffExposed, QUANT_MACD_HELP, QUANT_MACD_LEGEND, STICK_RATIO,
+} from '@/lib/quantMacdSeries'
+import {
+  alignTrendQuant, TREND_MARKS, TREND_QUANT_HELP, TREND_QUANT_LEGEND, TQ_STICK1, TQ_STICK2,
+  tqYRange, type TrendQuantData,
+} from '@/lib/trendQuantSeries'
 import type { Fib2Grain, Fib2Overlay, KlineRow, LevelSeries, QuantMacdResult } from '@/lib/api'
 import type { PlotData, PlotSeries } from '@/lib/lightweight-model'
 import { fib2Status } from '@/lib/fib2Status'
@@ -34,12 +40,10 @@ import {
  *   - 六态关键点(livermore)与二型(fib2)两个价位组
  *   - 枢轴档位、二型粗细档 / 上攻推算位 / 粗细档回测、形态状态行、价位统计面板
  *
- * 与旧 ECharts 版的差异(均为渲染能力取舍):
- *   - 量化MACD 的金叉 / 死叉箭头图标省略(lightweight 无对应图元);
- *   - 趋势量化的「升 / 顶 / 下」等文字标记省略(副图没有 custom 系列),
- *     竖直 / 水平位置改由阅读图例与线本身判断;
- *   - 趋势量化的红绿短柱、吸筹白柱用 Histogram 近似(以东财口径从 0 起画,
- *     原图是从昨值画到今值)。
+ * [R616] 两张副图按 R565(还是 ECharts 时)的画法补画完毕 —— 不再是"近似":
+ *   - 趋势量化的红绿短柱从**昨值连到今值**、吸筹白柱从 0.53 起, 八种字排进上下两条字道;
+ *   - 量化MACD 的 DIFF 实心柱、DEA 空心点线框、金叉 / 死叉箭头、共振黄柱全部照旧代码画。
+ *   数据仍只有一份(后端 `/trend-quant` / `/quant-macd`), 这里算的只是"怎么画"。
  */
 
 export type { ChartMarker, ChartRange, LevelType, PriceLevel }
@@ -162,6 +166,18 @@ function trendQuantLegendGraphic() {
   )
 }
 
+/**
+ * [R616] 两张副图的高度 —— 回到 R565 的版面(`lib/levelsChartLayout.ts` 的 `subPaneHeight` /
+ * `TREND_LANES_EXTRA`): 副图 = 主图的 48%, 限 160~220; 趋势量化再 +50 给上下两条字道。
+ * 这里自带一份, 不反向依赖那份旧 ECharts 版面模块(它只留作历史对照)。
+ */
+const SUB_PANE_RATIO = 0.48
+const SUB_PANE_MIN = 160
+const SUB_PANE_MAX = 220
+const TREND_LANES_EXTRA = 50
+/** [R616] 副图顶上给 pane 标题留的带(px): R565 的标题画在图外, 现在画在图里, 顶字道从这条带下面起 */
+const PANE_HEADER_H = 18
+
 export function AnalysisKChart({
   rows,
   levels,
@@ -238,9 +254,12 @@ export function AnalysisKChart({
     return { dates, labels: futureVals.map((_, index) => `未来${index + 1}`), values: futureVals }
   }, [futureVals, model.dates])
 
-  // 主图 + 两个副图: 主图保持 `height` 的可视高度, 副图另加两格。
-  const plotHeight = height + 2 * CHART_LAYOUT.subPaneSlot
-  const paneHeights = useMemo(() => plotPaneHeights(plotHeight, 2), [plotHeight])
+  // 主图 + 两个副图: 主图保持 `height` 的可视高度, 副图按 R565 的比例另加两格。
+  const mainPaneH = Math.max(120, height - CHART_LAYOUT.timeAxis)
+  const subPaneH = Math.round(Math.min(SUB_PANE_MAX, Math.max(SUB_PANE_MIN, mainPaneH * SUB_PANE_RATIO)))
+  const trendPaneH = subPaneH + TREND_LANES_EXTRA
+  const plotHeight = height + trendPaneH + subPaneH
+  const paneHeights = useMemo(() => [mainPaneH, trendPaneH, subPaneH], [mainPaneH, trendPaneH, subPaneH])
 
   // 取数失败 / 尚未到达时, 副图仍保留一块区域并写明状态。
   const trendTitle = trendQuantError ? '趋势量化 · 取数失败' : '趋势量化'
@@ -264,7 +283,7 @@ export function AnalysisKChart({
       ]
       : [{ text: '等待数据', color: ct.text }]
 
-  const chartSeries = useMemo(() => {
+  const { chartSeries, paneDecor } = useMemo(() => {
     const main: PlotSeries[] = model.series
       .filter(item => item.id !== 'volume')
       .map(item => {
@@ -283,12 +302,13 @@ export function AnalysisKChart({
         }
         return item
       })
-    return [
-      ...main,
-      ...trendPaneSeries(model.dates, trendQuant, trendQuantError),
-      ...quantPaneSeries(model.dates, quantMacd, quantMacdError),
-    ]
-  }, [model, future, trendQuant, trendQuantError, quantMacd, quantMacdError])
+    const trend = trendPaneSeries(model.dates, trendQuant, trendQuantError, trendPaneH)
+    const quant = quantPaneSeries(model.dates, quantMacd, quantMacdError)
+    return {
+      chartSeries: [...main, ...trend.series, ...quant.series],
+      paneDecor: [undefined, trend.decor, quant.decor] as (PaneDecorData | undefined)[],
+    }
+  }, [model, future, trendQuant, trendQuantError, quantMacd, quantMacdError, trendPaneH])
 
   const annotations = useMemo<AnnotationData>(() => {
     const dates = future ? [...model.dates, ...future.labels] : model.dates
@@ -534,6 +554,7 @@ export function AnalysisKChart({
         annotations={annotations}
         paneTitles={['', trendTitle, quantTitle]}
         paneReadouts={[[], trendReadouts, quantReadouts]}
+        paneDecor={paneDecor}
         onSelect={date => onDateClick?.(date)}
         onCrosshairMove={point => {
           if (!point) { setHoveredKey(null); return }
@@ -559,57 +580,110 @@ export function AnalysisKChart({
 }
 
 // ===== 副图: 趋势量化 =====
-function trendPaneSeries(dates: string[], trendQuant: TrendQuantData | undefined, error: boolean): PlotSeries[] {
-  if (error || !trendQuant || dates.length === 0) return [emptyPaneSeries('tq:empty', 1, dates)]
+function trendPaneSeries(
+  dates: string[], trendQuant: TrendQuantData | undefined, error: boolean, paneH: number,
+): { series: PlotSeries[]; decor: PaneDecorData } {
+  const empty = () => ({ series: [emptyPaneSeries('tq:empty', 1, dates)], decor: { items: [] } })
+  if (error || !trendQuant || dates.length === 0) return empty()
   const data = alignTrendQuant(dates, trendQuant)
   const C = TREND_QUANT_COLORS
-  if (!data.wave.some(value => value != null)) return [emptyPaneSeries('tq:empty', 1, dates)]
+  if (!data.wave.some(value => value != null)) return empty()
 
-  // 红绿短柱: 原图从昨值画到今值, lightweight Histogram 只能从 0 起画,
-  // 这里用「今值 - 昨值」的幅度 + stick_up 决定颜色做近似。
-  const sticks: PlotData[] = data.wave.map((wave, index) => {
+  const items: DecorItem[] = []
+  // [R616] 红绿短柱: 原文 STICKLINE(平均线>=昨天, 波动线, 昨天波动线, 2, 0) —— 从昨值连到今值。
+  data.wave.forEach((wave, index) => {
     const previous = data.wave_prev[index]
     const up = data.stick_up[index]
-    if (wave == null || previous == null || up == null) return { time: dates[index] }
-    return { time: dates[index], value: wave - previous, color: up === 1 ? C.red : C.green }
+    if (wave == null || previous == null || up == null) return
+    items.push({
+      kind: 'stick', time: dates[index], from: previous, to: wave,
+      color: up === 1 ? C.red : C.green, ratio: TQ_STICK2,
+    })
   })
-  // 吸筹白柱: 原图从 0.53 画到吸筹值, 同理从 0 起画差值。
-  const whites: PlotData[] = data.xichou.map((xichou, index) => {
-    if (data.xichou_bar[index] !== 1 || xichou == null) return { time: dates[index] }
-    return { time: dates[index], value: xichou - 0.53, color: C.white }
+  // [R559] 八种字: 卖出一侧(顶 / 逃 / 下)在图顶字道, 买入一侧在图底字道。
+  for (const mark of TREND_MARKS) {
+    data.marks[mark.key].forEach((on, index) => {
+      if (on) items.push({ kind: 'text', time: dates[index], text: mark.text, color: mark.color, lane: mark.lane })
+    })
+  }
+  // 吸筹白柱: 原文 STICKLINE(VAR17, 0.53, 吸筹, 1, 0) —— 比红绿短柱细一半。
+  data.xichou.forEach((xichou, index) => {
+    if (data.xichou_bar[index] !== 1 || xichou == null) return
+    items.push({ kind: 'stick', time: dates[index], from: 0.53, to: xichou, color: C.white, ratio: TQ_STICK1 })
   })
 
-  return [
-    emptyPaneSeries('tq:base', 1, dates),
-    { id: 'tq:ref_high', type: 'Line', pane: 1, color: C.yellow, data: dates.map(time => ({ time, value: 3.2 })) },
-    { id: 'tq:ref_low', type: 'Line', pane: 1, color: C.yellow, data: dates.map(time => ({ time, value: 0.5 })) },
-    { id: 'tq:wave', type: 'Line', pane: 1, color: C.red, lineWidth: 1, data: valuePoints(dates, data.wave) },
-    { id: 'tq:wave_prev', type: 'Line', pane: 1, color: C.green, lineWidth: 1, data: valuePoints(dates, data.wave_prev) },
-    { id: 'tq:avg', type: 'Line', pane: 1, color: C.avg, lineWidth: 1, data: valuePoints(dates, data.avg) },
-    { id: 'tq:stick', type: 'Histogram', pane: 1, color: C.red, data: sticks },
-    { id: 'tq:xichou_bar', type: 'Histogram', pane: 1, color: C.white, data: whites },
-    { id: 'tq:xichou', type: 'Line', pane: 1, color: C.xichou, lineWidth: 1, data: valuePoints(dates, data.xichou) },
-  ]
+  return {
+    series: [
+      // 透明线只负责纵轴: 原图纵轴按 tqYRange 在 0~4 两头给字道留位, 这里照同一函数取值。
+      // [R616] 它必须是这个 pane 的第一条 series —— 补画图元挂在第一条上, 而
+      // `priceToCoordinate` 在空数据 series 上返回 null(柱子/箭头会整片消失)。
+      {
+        id: 'tq:scale', type: 'Line', pane: 1, color: 'transparent', lineWidth: 1,
+        data: valuePoints(dates, data.wave), range: tqYRange(paneH, PANE_HEADER_H),
+      },
+      { id: 'tq:ref_high', type: 'Line', pane: 1, color: C.yellow, data: dates.map(time => ({ time, value: 3.2 })) },
+      { id: 'tq:ref_low', type: 'Line', pane: 1, color: C.yellow, data: dates.map(time => ({ time, value: 0.5 })) },
+      { id: 'tq:avg', type: 'Line', pane: 1, color: C.avg, lineWidth: 1, data: valuePoints(dates, data.avg) },
+      { id: 'tq:xichou', type: 'Line', pane: 1, color: C.xichou, lineWidth: 1, data: valuePoints(dates, data.xichou) },
+    ],
+    decor: { items, headerH: PANE_HEADER_H },
+  }
 }
 
 // ===== 副图: 量化MACD =====
-function quantPaneSeries(dates: string[], quantMacd: QuantMacdResult | undefined, error: boolean): PlotSeries[] {
-  if (error || !quantMacd || dates.length === 0) return [emptyPaneSeries('qm:empty', 2, dates)]
+function quantPaneSeries(
+  dates: string[], quantMacd: QuantMacdResult | undefined, error: boolean,
+): { series: PlotSeries[]; decor: PaneDecorData } {
+  const empty = () => ({ series: [emptyPaneSeries('qm:empty', 2, dates)], decor: { items: [] } })
+  if (error || !quantMacd || dates.length === 0) return empty()
   const data = alignQuantMacd(dates, quantMacd)
   const C = QUANT_MACD_COLORS
-  if (!data.diff.some(value => value != null)) return [emptyPaneSeries('qm:empty', 2, dates)]
+  if (!data.diff.some(value => value != null)) return empty()
 
-  // 涨红跌绿: 正负两段拆成两条线, 另一段用空槽断开。
-  return [
-    emptyPaneSeries('qm:base', 2, dates),
-    { id: 'qm:diff_up', type: 'Line', pane: 2, color: C.red, lineWidth: 1, data: splitBySign(dates, data.diff, true) },
-    { id: 'qm:diff_down', type: 'Line', pane: 2, color: C.green, lineWidth: 1, data: splitBySign(dates, data.diff, false) },
-    { id: 'qm:dea_up', type: 'Line', pane: 2, color: C.darkRed, lineWidth: 1, data: splitBySign(dates, data.dea, true) },
-    { id: 'qm:dea_down', type: 'Line', pane: 2, color: C.green, lineWidth: 1, data: splitBySign(dates, data.dea, false) },
-    // 黄柱 = DEA/4(共振), 从 0 起画, 只看出没出现。
-    { id: 'qm:yellow', type: 'Histogram', pane: 2, color: C.yellow, data: valuePoints(dates, data.yellow) },
-    // 金叉 / 死叉箭头图标: lightweight 无对应图元, 省略。
-  ]
+  // [R616] 顺序 = 原文语句的先后: DIFF → DEA → 金叉 → 死叉 → 共振黄柱(后画的盖在上面)。
+  const items: DecorItem[] = []
+  // DIFF 实心柱: 被 DEA 空心框盖住, 只画露出来的那一截(`diffExposed`)。
+  data.diff.forEach((diff, index) => {
+    const segment = diffExposed(diff, data.dea[index])
+    if (!segment) return
+    items.push({
+      kind: 'stick', time: dates[index], from: segment[0], to: segment[1],
+      color: diff != null && diff >= 0 ? C.red : C.green, ratio: STICK_RATIO,
+    })
+  })
+  // DEA 空心点线框。
+  data.dea.forEach((dea, index) => {
+    if (dea == null) return
+    items.push({
+      kind: 'hollow', time: dates[index], from: 0, to: dea,
+      color: dea >= 0 ? C.darkRed : C.green, ratio: STICK_RATIO,
+    })
+  })
+  data.gold_icon.forEach((value, index) => {
+    if (value != null) items.push({ kind: 'icon', time: dates[index], value, up: true, color: C.red })
+  })
+  data.dead_icon.forEach((value, index) => {
+    if (value != null) items.push({ kind: 'icon', time: dates[index], value, up: false, color: C.icon2 })
+  })
+  data.yellow.forEach((value, index) => {
+    if (value != null) {
+      items.push({ kind: 'stick', time: dates[index], from: 0, to: value, color: C.yellow, ratio: STICK_RATIO })
+    }
+  })
+
+  // 图里一条线都不画; 这些透明线只负责纵轴(死叉画在 DEA×1.1, 必须进范围)。
+  // [R616] 第一条必须是有数据的 series: 补画图元挂在第一条上, 空数据 series 的
+  // `priceToCoordinate` 返回 null, 柱子 / 箭头会整片消失。
+  return {
+    series: [
+      { id: 'qm:scale_diff', type: 'Line', pane: 2, color: 'transparent', lineWidth: 1, data: valuePoints(dates, data.diff) },
+      { id: 'qm:scale_dea', type: 'Line', pane: 2, color: 'transparent', lineWidth: 1, data: valuePoints(dates, data.dea) },
+      { id: 'qm:scale_yellow', type: 'Line', pane: 2, color: 'transparent', lineWidth: 1, data: valuePoints(dates, data.yellow) },
+      { id: 'qm:scale_gold', type: 'Line', pane: 2, color: 'transparent', lineWidth: 1, data: valuePoints(dates, data.gold_icon) },
+      { id: 'qm:scale_dead', type: 'Line', pane: 2, color: 'transparent', lineWidth: 1, data: valuePoints(dates, data.dead_icon) },
+    ],
+    decor: { items },
+  }
 }
 
 /** 一块空的副图仍保留 pane 与标题(取数失败 / 加载中时不让副图消失)。 */
@@ -620,13 +694,6 @@ function emptyPaneSeries(id: string, pane: number, dates: string[]): PlotSeries 
 function valuePoints(dates: string[], values: (number | null)[]): PlotData[] {
   return values.map((value, index) =>
     value == null || !Number.isFinite(value) ? { time: dates[index] } : { time: dates[index], value })
-}
-
-function splitBySign(dates: string[], values: (number | null)[], positive: boolean): PlotData[] {
-  return values.map((value, index) => {
-    if (value == null || !Number.isFinite(value) || (value >= 0) !== positive) return { time: dates[index] }
-    return { time: dates[index], value }
-  })
 }
 
 function normalizeDate(date: string): string {

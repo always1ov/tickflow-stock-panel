@@ -168,6 +168,39 @@ def test_R615_价位统计面板挪到左栏_图里不再画():
     assert "stacked" in chart, "窄栏要能一列到底"
 
 
+def test_R616_副图按R565画法补画_数据口径不变():
+    """[R616] 用户: 「副图的趋势量化和量化macd没有和我升级到R565之前显示的一样, 但要保持数据
+    和我升级到R565之前一样」。lightweight 版把三样画法丢了(从昨值起的短柱、八种字、金叉死叉箭头),
+    这里在 lightweight 里按旧代码补画, 并用回 R565 的副图高度比例; 数据仍只有后端那一份。"""
+    decor = code_of("components/charts/SubPaneDecor.ts")
+    for item in ("class PaneDecor", "ICON_UP", "ICON_DOWN", "HOLLOW_DASH", "'hollow'", "'text'", "'icon'"):
+        assert item in decor, f"副图补画缺了 {item}"
+
+    plot = code_of("components/charts/FinancialPlot.tsx")
+    assert "paneDecor" in plot, "图组件没提供按 pane 挂补画图元的入口"
+
+    chart = code_of(CHART)
+    # 高度回到 R565(`lib/levelsChartLayout.ts`): 主图 48%, 限 160~220; 趋势量化再 +50 字道
+    for c in ("const SUB_PANE_RATIO = 0.48", "const SUB_PANE_MIN = 160", "const SUB_PANE_MAX = 220",
+              "const TREND_LANES_EXTRA = 50", "const PANE_HEADER_H = 18"):
+        assert c in chart, f"副图高度没按 R565 的比例: 少了 {c}"
+    assert "tqYRange(paneH, PANE_HEADER_H)" in chart, "字道占的像素没同步进纵轴范围"
+
+    # 三样画法都由补画图元承担, 原生 Histogram/整条线近似必须撤掉
+    for gone in ("tq:stick", "tq:wave", "qm:yellow", "splitBySign"):
+        assert gone not in chart, f"「{gone}」—— 旧的近似画法还在"
+    assert "'stick'" in chart and "'hollow'" in chart and "'icon'" in chart and "'text'" in chart
+    assert "diffExposed" in chart, "DIFF 只露 DEA 之外那一截的旧规则没了"
+
+    # 数据一字不改: 对齐用的字段仍在
+    trend = code_of("lib/trendQuantSeries.ts")
+    quant = code_of("lib/quantMacdSeries.ts")
+    for field in ("wave_prev", "stick_up", "xichou_bar", "marks"):
+        assert field in trend, f"趋势量化的数据字段 {field} 被动了"
+    for field in ("gold_icon", "dead_icon", "yellow"):
+        assert field in quant, f"量化MACD 的数据字段 {field} 被动了"
+
+
 def test_R612fix_日K保持原高_右栏可滚_副图不能被裁():
     """[R612-fix] 用户: 「原来的趋势macd、趋势量化那些副图都没了」。
     根因是右栏 overflow-hidden，而这两张图的画布都在 height 之外再挂副图：

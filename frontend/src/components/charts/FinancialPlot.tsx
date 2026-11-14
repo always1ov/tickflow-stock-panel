@@ -7,6 +7,7 @@ import { CHART_LAYOUT } from '@/lib/chart-layout'
 import { formatAxisPercent } from '@/lib/intraday-scale'
 import { intradayTimeLabel, timeKey, type PlotSeries, type PlotData } from '@/lib/lightweight-model'
 import { axisLabelCoordinate, ChartAnnotations, type AnnotationData } from './ChartAnnotations'
+import { PaneDecor, type PaneDecorData } from './SubPaneDecor'
 import { DailyVolumeSeries } from './DailyVolumeSeries'
 
 const PRICE_MARGINS = { daily: { top: 0.08, bottom: 0.06 }, intraday: { top: 0, bottom: 0 } }
@@ -27,6 +28,8 @@ interface Props {
   volumeLabels?: AnnotationData['labels']
   paneTitles?: string[]
   paneReadouts?: AnnotationData['readouts'][]
+  /** [R616] 副图里那些原生系列画不出来的图元(按 pane 下标); 不传 = 不画 */
+  paneDecor?: (PaneDecorData | undefined)[]
   linkedPrice?: number | null
   onHover?: (time: string | null) => void
   /** 十字线价格与像素比例(仅主价格 pane)，供价位命中判断使用 */
@@ -60,6 +63,7 @@ export function FinancialPlot(props: Props) {
   const leftAnnotation = useRef(new ChartAnnotations())
   const attachedLeft = useRef<ISeriesApi<SeriesType> | null>(null)
   const paneAnnotations = useRef(new Map<number, { api: ISeriesApi<SeriesType>; annotation: ChartAnnotations; volume: boolean }>())
+  const paneDecorRef = useRef(new Map<number, { api: ISeriesApi<SeriesType>; decor: PaneDecor }>())
   const ct = useChartTheme()
   const themeRef = useRef(ct); themeRef.current = ct
   const compactRef = useRef(false)
@@ -159,7 +163,7 @@ export function FinancialPlot(props: Props) {
       chart.timeScale().unsubscribeSizeChange(resize)
       markerRef.current?.detach(); markerRef.current = null
       chart.remove(); chartRef.current = null; seriesRef.current.clear(); scopeRef.current = null
-      paneAnnotations.current.clear(); attachedMain.current = null; attachedLeft.current = null
+      paneAnnotations.current.clear(); paneDecorRef.current.clear(); attachedMain.current = null; attachedLeft.current = null
     }
   }, [])
 
@@ -205,6 +209,7 @@ export function FinancialPlot(props: Props) {
       for (const { api } of [...seriesRef.current.values()].reverse()) chart.removeSeries(api)
       seriesRef.current.clear()
       paneAnnotations.current.clear()
+      paneDecorRef.current.clear()
     }
     const wanted = new Set(props.series.map(s => s.id))
     for (const [id, item] of [...seriesRef.current].reverse()) if (!wanted.has(id)) {
@@ -276,6 +281,11 @@ export function FinancialPlot(props: Props) {
         const annotation = new ChartAnnotations(); api.attachPrimitive(annotation)
         paneAnnotations.current.set(pane, { api, annotation, volume: spec.id === 'volume' })
       }
+      // [R616] 副图补画的图元与标注挂在同一条 series 上(同一张 pane)
+      if (paneDecorRef.current.get(pane)?.api !== api) {
+        const decor = new PaneDecor(); api.attachPrimitive(decor)
+        paneDecorRef.current.set(pane, { api, decor })
+      }
     }
     props.paneHeights.forEach((value, i) => chart.panes()[i]?.setStretchFactor(value))
     if (props.intraday) chart.timeScale().fitContent()
@@ -308,8 +318,9 @@ export function FinancialPlot(props: Props) {
     leftAnnotation.current.update({ dates: [], axisTicks: props.series.find(s => s.priceScaleId === 'left')?.axisTicks, textColor: ct.text })
     paneAnnotations.current.forEach((item, pane) => item.annotation.update({ dates: [],
       labels: item.volume ? props.volumeLabels : undefined, title: props.paneTitles?.[pane], readouts: props.paneReadouts?.[pane], textColor: ct.text }))
+    paneDecorRef.current.forEach(({ decor }, pane) => decor.update(props.paneDecor?.[pane]))
     markerRef.current?.setMarkers(markersForView(props.markers, compactRef.current))
-  }, [props.annotations, props.markers, props.volumeLabels, props.paneTitles, props.paneReadouts, props.linkedPrice, props.series, props.pricePrecision, ct])
+  }, [props.annotations, props.markers, props.volumeLabels, props.paneTitles, props.paneReadouts, props.paneDecor, props.linkedPrice, props.series, props.pricePrecision, ct])
 
   return <div ref={host} role="group" aria-label={props.intraday ? '分时价格与成交量图' : '日 K 与技术指标图'} data-chart-engine="lightweight" className="w-full min-w-0" style={{ height: props.height }} />
 }

@@ -45,7 +45,16 @@ vi.mock('lightweight-charts', () => ({
   CandlestickSeries: 'Candlestick', LineSeries: 'Line', AreaSeries: 'Area', BaselineSeries: 'Baseline', HistogramSeries: 'Histogram', customSeriesDefaultOptions: {},
   ColorType: { Solid: 'solid' }, CrosshairMode: { Normal: 0 },
 }))
-vi.mock('@/lib/theme', () => ({ useTheme: () => native.appearance.theme, useChartTheme: () => ({ text: '#888', border: '#333', grid: '#222', crosshair: '#777', crosshairLabelBg: '#111' }) }))
+vi.mock('@/lib/theme', () => ({
+  useTheme: () => native.appearance.theme,
+  useChartTheme: () => ({ text: '#888', border: '#333', grid: '#222', crosshair: '#777', crosshairLabelBg: '#111' }),
+  // [R616] FinancialPlot -> SubPaneDecor -> 两张副图的画法常量会连带取主题色, 这里给一组占位值
+  TREND_QUANT_COLORS: {
+    red: '#ff3b30', green: '#00ff00', yellow: '#ffcc00', text: '#888888', lightRed: '#ff8888',
+    white: '#ffffff', avg: '#aa66ff', xichou: '#00dc00', paneBg: '#000000',
+  },
+  QUANT_MACD_COLORS: { red: '#ff3b30', green: '#00ff00', darkRed: '#aa0000', yellow: '#ffcc00', icon2: '#00dc00' },
+}))
 
 let host: HTMLDivElement, root: Root
 beforeEach(() => {

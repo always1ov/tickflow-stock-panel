@@ -166,12 +166,12 @@ const NONE = '-'
  *
  * 字道贴着副图底边画。
  */
-const LANE_FONT = 11
-const LANE_ROW_H = 14
-const LANE_ROWS = 2
-const LANE_TOP_PAD = 3
-const LANE_BOTTOM_PAD = 22          // 字道与副图底边之间的留白
-const LANE_HALO = { stroke: '#000000', lineWidth: 3 }
+export const LANE_FONT = 11
+export const LANE_ROW_H = 14
+export const LANE_ROWS = 2
+export const LANE_TOP_PAD = 3
+export const LANE_BOTTOM_PAD = 22   // 字道与副图底边之间的留白
+export const LANE_HALO = { stroke: '#000000', lineWidth: 3 }
 
 /** 两条字道一共占掉的高度(px) —— 副图因此加高这么多, 图本身不被挤小 */
 export const TQ_LANES_H = LANE_TOP_PAD + LANE_ROWS * LANE_ROW_H + LANE_BOTTOM_PAD + LANE_ROWS * LANE_ROW_H
@@ -179,9 +179,12 @@ export const TQ_LANES_H = LANE_TOP_PAD + LANE_ROWS * LANE_ROW_H + LANE_BOTTOM_PA
 /**
  * 纵轴上下界: 波动线恒在 0~4(收盘不会跑出近 10 日最低 / 近 25 日最高), 把字道那几十像素换算成
  * 数值加到两头。副图高不同(个股预览 / 最大化 / 窄屏), 换算出来的上下界也不同。
+ *
+ * [R616] `headerPx`: 副图顶上给 pane 标题留的像素。lightweight 版标题画在图里(R565 画在图外),
+ * 顶字道因此整体下移这么多 —— 纵轴范围必须同步, 否则柱子会顶进标题。
  */
-export function tqYRange(paneH: number): { min: number; max: number } {
-  const topPx = LANE_TOP_PAD + LANE_ROWS * LANE_ROW_H + 4
+export function tqYRange(paneH: number, headerPx = 0): { min: number; max: number } {
+  const topPx = headerPx + LANE_TOP_PAD + LANE_ROWS * LANE_ROW_H + 4
   const bottomPx = LANE_BOTTOM_PAD + LANE_ROWS * LANE_ROW_H + 4
   const perUnit = Math.max(1, paneH - topPx - bottomPx) / 4
   return { min: -bottomPx / perUnit, max: 4 + topPx / perUnit }

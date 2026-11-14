@@ -217,14 +217,16 @@ export function StockPreviewDialog({ symbol, name, onClose, enableLevelsView = t
   // [R612] 双栏只在 ≥1280 生效; 窄屏单列、整页滚, 图高回落到改版前写死的值。
   //
   // [R612-fix] 关键价位不再被裁: 那张图的画布 = 主图(`height`)+ 趋势量化 + 量化MACD
-  // 两张副图(各 96px, 见 CHART_LAYOUT.subPaneSlot); 改版第一版右栏 overflow-hidden,
-  // 画布比右栏高 → 两张副图被整块裁掉。
+  // 两张副图; 改版第一版右栏 overflow-hidden, 画布比右栏高 → 两张副图被整块裁掉。
   //
-  // [R614] 用户: 「按这个方案调整副图高度」—— 要一屏内同时看到两张副图, 不再往下滚。
-  // 副图高度是全局共用常量(不能只为弹窗改), 所以这里把**主图**压到「右栏 − 卡片其余部分 − 两张副图」:
-  // canvas = height + 2*96, 加上 LEVELS_CHROME_H 正好落进右栏, 主图与两张副图一屏可见。
-  // 下限 240(主图约 212): 再矮 K 线就看不清了, 触底时才由右栏滚动兜底(R613 的兜底保留)。
-  // 日K 的副图数量由图内工具栏决定、外面算不出来, 维持 420; 分时没有额外副图, 继续跟着右栏放宽。
+  // [R614] 用户: 「按这个方案调整副图高度」—— 曾把主图压到「右栏 − 卡片其余部分 − 两张副图」,
+  // 让三块一屏装下。
+  //
+  // [R616] 用户: 「副图的趋势量化和量化macd没有和我升级到R565之前显示的一样」—— 两张副图
+  // 改回 R565 的比例(主图 48%、限 160~220, 趋势量化再 +50 字道), 一屏装下因此失效:
+  // 579 高的右栏里画布会比可用空间高约 180px, 由右栏滚动兜底(R613 的兜底保留)。
+  // 这里仍按 `height` = 主图高来算, 公式与 R614 相同 —— 日K 的副图数量由图内工具栏决定、
+  // 外面算不出来, 维持 420; 分时没有额外副图, 继续跟着右栏放宽。
   const wide = useMediaQuery('(min-width: 1280px)')
   const chartAreaRef = useRef<HTMLDivElement>(null)
   const [chartAreaH, setChartAreaH] = useState(0)
@@ -239,7 +241,7 @@ export function StockPreviewDialog({ symbol, name, onClose, enableLevelsView = t
     ? chartView === 'intraday'
       ? Math.max(480, Math.min(chartAreaH - INTRADAY_CHROME_H, CHART_MAX_HEIGHT))
       : chartView === 'levels'
-        // 整张卡 = 卡片其余部分 + 主图 + 两张副图(各 96), 让它们刚好装进右栏
+        // 主图高度沿用 R614 的算法(副图另加, [R616] 起按 R565 比例, 不再等于这里的 96)
         ? Math.max(240, Math.min(chartAreaH - LEVELS_CHROME_H - 2 * CHART_LAYOUT.subPaneSlot, CHART_MAX_HEIGHT))
         : undefined
     : undefined
