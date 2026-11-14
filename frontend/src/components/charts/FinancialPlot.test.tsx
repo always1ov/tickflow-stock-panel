@@ -564,6 +564,18 @@ it('[R630] hidePaneAxis blanks the sub-pane tick labels and leaves the main pane
   expect(native.series[1].applyOptions).toHaveBeenLastCalledWith(expect.objectContaining({ priceFormat: expect.objectContaining({ type: 'price' }) }))
 })
 
+it('[R633] paneTopInsets 只在指定副图顶部留空白, 其余副图不受影响', async () => {
+  const series: PlotSeries[] = [...model,
+    { id: 'tq:scale', type: 'Line', pane: 1, data },
+    { id: 'qm:scale', type: 'Line', pane: 2, data }]
+  await act(async () => root.render(
+    <FinancialPlot scope="levels" series={series} height={400} paneHeights={[280, 120, 124]}
+      paneTopInsets={[0, 0, 12]} hidePaneAxis />))
+  // 趋势量化 pane 保持 0 边距; MACD pane 把 12px 空白折算成价格刻度上边距(12 / 124)
+  expect(native.series[1].priceScale().applyOptions).toHaveBeenLastCalledWith({ entireTextOnly: false, scaleMargins: { top: 0, bottom: 0 } })
+  expect(native.series[2].priceScale().applyOptions).toHaveBeenLastCalledWith({ entireTextOnly: false, scaleMargins: { top: 12 / 124, bottom: 0 } })
+})
+
 it('links ETF price and percentage scales, including the single-session tab, and removes stale axes on context changes', async () => {
   const row = { datetime: '2026-11-05 09:30:00', open: 0.761, high: 0.762, low: 0.76, close: 0.761, volume: 10, amount: null }
   const render = async (sessions = [{ date: '2026-11-05', prev_close: 0.76 as number | null, rows: [row] }]) => act(async () => root.render(

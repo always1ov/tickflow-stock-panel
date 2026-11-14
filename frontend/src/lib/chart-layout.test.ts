@@ -9,7 +9,8 @@ describe('[R623] 关键价位一屏装下的反算', () => {
     // 高屏封顶 136, 不让副图跟着主图一起长
     expect(trendSubPaneHeight(720)).toBe(136)
     expect(trendSubPaneHeight(500)).toBe(132)
-    expect(levelsChartTotalHeight(408)).toBe(408 + 108 * 2 + 50)
+    // [R633] 两张副图之间再留 SUB_PANE_GAP(12px)
+    expect(levelsChartTotalHeight(408)).toBe(408 + 108 * 2 + 50 + 12)
   })
 
   it('反算出来的主图高 + 两张副图不超过可用高度, 且再加 1px 就装不下', () => {
@@ -20,13 +21,13 @@ describe('[R623] 关键价位一屏装下的反算', () => {
     }
   })
 
-  it('[R626] 主图明显大于两张副图之和: 1000 / 1080 高的屏上主图 429 / 480', () => {
+  it('[R626] 主图明显大于两张副图之和: 1000 / 1080 高的屏上主图 422 / 472', () => {
     expect(fitLevelsMainHeight(-131)).toBe(120)
-    // 视口 1000: 弹窗 984, 右栏 835, 扣图外 131 → 可用 704 → 主图 429 / 趋势 162 / MACD 112
-    expect(fitLevelsMainHeight(704)).toBe(429)
-    // 视口 1080: 弹窗 1064, 右栏 915 → 可用 784 → 主图 480 / 趋势 177 / MACD 127
-    expect(fitLevelsMainHeight(784)).toBe(480)
-    // 主图占图栈(主图 + 两张副图)六成以上, 不再"主次不分"
-    expect(fitLevelsMainHeight(704) / levelsChartTotalHeight(fitLevelsMainHeight(704))).toBeGreaterThan(0.6)
+    // 视口 1000: 弹窗 984, 右栏 835, 扣图外 131 → 可用 704 → 主图 422 / 趋势 160 / MACD 110 + 间隔 12
+    expect(fitLevelsMainHeight(704)).toBe(422)
+    // 视口 1080: 弹窗 1064, 右栏 915 → 可用 784 → 主图 472 / 趋势 174 / MACD 124 + 间隔 12
+    expect(fitLevelsMainHeight(784)).toBe(472)
+    // 主图仍占图栈(主图 + 两张副图 + 间隔)近六成, 不再"主次不分"(R633 间隔让比例略降)
+    expect(fitLevelsMainHeight(704) / levelsChartTotalHeight(fitLevelsMainHeight(704))).toBeGreaterThan(0.59)
   })
 })

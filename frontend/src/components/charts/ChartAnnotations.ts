@@ -24,6 +24,8 @@ export interface AnnotationData {
   labels?: { time: Time; value: number; text: string; color?: string }[]
   textColor?: string
   title?: string
+  /** [R633] 顶部空白带(px): 标题与读数整体下移, 用于在两张副图之间留间隔 */
+  topInset?: number
   readouts?: { text: string; color?: string }[]
 }
 
@@ -105,11 +107,12 @@ export class ChartAnnotations implements ISeriesPrimitive<Time> {
         ctx.strokeStyle = this.data.gridColor ?? '#27272A'; ctx.lineWidth = 0.7
         ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(width, y); ctx.stroke()
       }
-      let headerBottom = this.data.title ? 14 : 0
-      if (this.data.title) { ctx.fillStyle = this.data.textColor ?? '#A1A1AA'; ctx.fillText(this.data.title, 8, 14) }
+      let headerBottom = (this.data.title ? 14 : 0) + (this.data.topInset ?? 0)
+      const headerY = 14 + (this.data.topInset ?? 0)
+      if (this.data.title) { ctx.fillStyle = this.data.textColor ?? '#A1A1AA'; ctx.fillText(this.data.title, 8, headerY) }
       if (this.data.readouts?.length) {
         const titleWidth = this.data.title ? ctx.measureText(this.data.title).width + 12 : 0
-        let row: { text: string; color?: string; width: number }[] = [], rowWidth = 0, y = 14
+        let row: { text: string; color?: string; width: number }[] = [], rowWidth = 0, y = headerY
         const flush = () => {
           let x = width - 8 - rowWidth
           for (const item of row) {
@@ -121,7 +124,7 @@ export class ChartAnnotations implements ISeriesPrimitive<Time> {
         }
         for (const item of this.data.readouts) {
           const itemWidth = ctx.measureText(item.text).width
-          const available = width - 16 - (y === 14 ? titleWidth : 0)
+          const available = width - 16 - (y === headerY ? titleWidth : 0)
           if (row.length && rowWidth + 12 + itemWidth > available) flush()
           rowWidth += (row.length ? 12 : 0) + itemWidth
           row.push({ ...item, width: itemWidth })

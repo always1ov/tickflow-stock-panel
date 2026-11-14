@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { AnnotationData } from '@/components/charts/ChartAnnotations'
 import { FinancialPlot } from '@/components/charts/FinancialPlot'
 import type { DecorItem, PaneDecorData } from '@/components/charts/SubPaneDecor'
-import { CHART_LAYOUT, TREND_LANES_EXTRA, trendSubPaneHeight } from '@/lib/chart-layout'
+import { CHART_LAYOUT, SUB_PANE_GAP, TREND_LANES_EXTRA, trendSubPaneHeight } from '@/lib/chart-layout'
 import {
   FIB2_ROLE_TARGET, LEVEL_CURVE_COLOR, QUANT_MACD_COLORS, TREND_QUANT_COLORS,
   fib2RoleColor, levelColors, useChartTheme, useLevelColors, useTheme,
@@ -214,11 +214,17 @@ export function AnalysisKChart({
   }, [futureVals, model.dates])
 
   // 主图 + 两个副图: 主图保持 `height` 的可视高度, 副图按 R565 的比例另加两格。
+  // [R633] 两张副图之间留 `SUB_PANE_GAP`: 间隔算在 MACD pane 的顶部(标题与图一起下移),
+  // 趋势量化 pane 的高度与比例不变。
   const mainPaneH = Math.max(120, height - CHART_LAYOUT.timeAxis)
   const subPaneH = trendSubPaneHeight(height)
   const trendPaneH = subPaneH + TREND_LANES_EXTRA
-  const plotHeight = height + trendPaneH + subPaneH
-  const paneHeights = useMemo(() => [mainPaneH, trendPaneH, subPaneH], [mainPaneH, trendPaneH, subPaneH])
+  const plotHeight = height + trendPaneH + subPaneH + SUB_PANE_GAP
+  const paneHeights = useMemo(
+    () => [mainPaneH, trendPaneH, subPaneH + SUB_PANE_GAP],
+    [mainPaneH, trendPaneH, subPaneH],
+  )
+  const paneTopInsets = useMemo(() => [0, 0, SUB_PANE_GAP], [])
 
   // 取数失败 / 尚未到达时, 副图仍保留一块区域并写明状态。
   const trendTitle = trendQuantError ? '趋势量化 · 取数失败' : '趋势量化'
@@ -515,6 +521,7 @@ export function AnalysisKChart({
         series={chartSeries}
         height={plotHeight}
         paneHeights={paneHeights}
+        paneTopInsets={paneTopInsets}
         pricePrecision={2}
         visibleBars={visibleBars + (future?.dates.length ?? 0)}
         currentPrice={model.rows.at(-1)?.close}

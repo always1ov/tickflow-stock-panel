@@ -28,6 +28,12 @@ interface Props {
   series: PlotSeries[]
   height: number
   paneHeights: number[]
+  /**
+   * [R633] 每张副图顶部的空白带(px, 按 pane 下标)。用于在两段副图之间留间隔:
+   * 该 pane 的标题/读数与走势整体下移, 数据区高度不变 —— 由 `paneHeights` 把这段
+   * 空白算进 pane 高度(见 AnalysisKChart), 这里只负责把价格刻度压到空白下方。
+   */
+  paneTopInsets?: number[]
   visibleBars?: number | 'all'
   intraday?: boolean
   markers?: SeriesMarker<Time>[]
@@ -314,13 +320,19 @@ export function FinancialPlot(props: Props) {
         updatePlotData(item.api, item.data, spec.data)
       }
       item.data = spec.data
-      if (spec.pane > 0) item.api.priceScale().applyOptions({
-        entireTextOnly: !!props.intraday,
-        // [R630] 个股分析的副图沿用原文版面: 整块高度都给走势(tqYRange 已按像素预算留好字道),
-        // 不再叠加成交量 pane 那套 28% / 8% 边距 —— 否则走势被二次压缩、字道与数据对不上。
-        scaleMargins: spec.id === 'volume' ? { top: props.intraday ? 0.22 : 0.3, bottom: 0 }
-          : props.hidePaneAxis ? { top: 0, bottom: 0 } : { top: 0.28, bottom: 0.08 },
-      })
+      if (spec.pane > 0) {
+        // [R633] 副图顶部的空白带: 只动这只 pane 的价格刻度上边距, 数据区高度不变。
+        const paneH = props.paneHeights[spec.pane] ?? 0
+        const topInset = props.paneTopInsets?.[spec.pane] ?? 0
+        const topMargin = paneH > 0 ? Math.min(0.5, topInset / paneH) : 0
+        item.api.priceScale().applyOptions({
+          entireTextOnly: !!props.intraday,
+          // [R630] 个股分析的副图沿用原文版面: 整块高度都给走势(tqYRange 已按像素预算留好字道),
+          // 不再叠加成交量 pane 那套 28% / 8% 边距 —— 否则走势被二次压缩、字道与数据对不上。
+          scaleMargins: spec.id === 'volume' ? { top: props.intraday ? 0.22 : 0.3, bottom: 0 }
+            : props.hidePaneAxis ? { top: topMargin, bottom: 0 } : { top: 0.28, bottom: 0.08 },
+        })
+      }
     }
     const primarySpec = props.series.find(s => s.pane === 0 && s.visible !== false && s.priceScaleId !== 'left')
     const primary = primarySpec && seriesRef.current.get(primarySpec.id)?.api
@@ -368,7 +380,7 @@ export function FinancialPlot(props: Props) {
     } else if (view) chart.timeScale().setVisibleLogicalRange(view)
     if (reset) props.onHover?.(null)
     scopeRef.current = props.scope
-  }, [props.scope, props.series, props.paneHeights, props.intraday, props.visibleBars, props.pricePrecision])
+  }, [props.scope, props.series, props.paneHeights, props.paneTopInsets, props.intraday, props.visibleBars, props.pricePrecision])
 
   useEffect(() => {
     const lines = [...(props.annotations?.priceLines ?? [])]
@@ -377,10 +389,11 @@ export function FinancialPlot(props: Props) {
       precision: props.pricePrecision })
     leftAnnotation.current.update({ dates: [], axisTicks: props.series.find(s => s.priceScaleId === 'left')?.axisTicks, textColor: ct.text })
     paneAnnotations.current.forEach((item, pane) => item.annotation.update({ dates: [],
-      labels: item.volume ? props.volumeLabels : undefined, title: props.paneTitles?.[pane], readouts: props.paneReadouts?.[pane], textColor: ct.text }))
+      labels: item.volume ? props.volumeLabels : undefined, title: props.paneTitles?.[pane], readouts: props.paneReadouts?.[pane],
+      topInset: props.paneTopInsets?.[pane], textColor: ct.text }))
     paneDecorRef.current.forEach(({ decor }, pane) => decor.update(props.paneDecor?.[pane]))
     markerRef.current?.setMarkers(markersForView(props.markers, compactRef.current))
-  }, [props.annotations, props.markers, props.volumeLabels, props.paneTitles, props.paneReadouts, props.paneDecor, props.linkedPrice, props.series, props.pricePrecision, ct])
+  }, [props.annotations, props.markers, props.volumeLabels, props.paneTitles, props.paneReadouts, props.paneDecor, props.paneTopInsets, props.linkedPrice, props.series, props.pricePrecision, ct])
 
   return <div ref={host} role="group" aria-label={props.intraday ? '分时价格与成交量图' : '日 K 与技术指标图'} data-chart-engine="lightweight" className="w-full min-w-0" style={{ height: props.height }} />
 }

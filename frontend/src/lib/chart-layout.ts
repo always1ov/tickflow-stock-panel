@@ -27,6 +27,12 @@ export function plotPaneHeights(plotHeight: number, subPaneCount: number) {
  * 判据只此一处: 画图的 `AnalysisKChart` 与「弹窗要给多高才装得下」的反算 `fitLevelsMainHeight` 都从这里取。
  */
 export const TREND_LANES_EXTRA = 50
+/**
+ * [R633] 趋势量化与量化MACD 两张副图之间的空白间隔(px)。
+ * 用户: 「两个副图之间还需要留点空间, 趋势量化不用动, 下面量化macd 往下挪挪」——
+ * 间隔记在 MACD pane 顶部(标题与图一起下移), 趋势量化的高度与比例完全不变。
+ */
+export const SUB_PANE_GAP = 12
 const TREND_SUB_PANE_RATIO = 0.28
 const TREND_SUB_PANE_MIN = 108
 const TREND_SUB_PANE_MAX = 136
@@ -36,9 +42,9 @@ export function trendSubPaneHeight(mainHeight: number): number {
   return Math.round(Math.min(TREND_SUB_PANE_MAX, Math.max(TREND_SUB_PANE_MIN, mainPaneH * TREND_SUB_PANE_RATIO)))
 }
 
-/** `height` = 主图高时, 关键价位那张图连两张副图在内的总高(不含卡片里的按钮/图例)。 */
+/** `height` = 主图高时, 关键价位那张图连两张副图与副图间隔在内的总高(不含卡片里的按钮/图例)。 */
 export function levelsChartTotalHeight(mainHeight: number): number {
-  return mainHeight + 2 * trendSubPaneHeight(mainHeight) + TREND_LANES_EXTRA
+  return mainHeight + 2 * trendSubPaneHeight(mainHeight) + TREND_LANES_EXTRA + SUB_PANE_GAP
 }
 
 /**
