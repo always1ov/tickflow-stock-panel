@@ -137,12 +137,14 @@ def test_R612_只有分时跟着右栏放宽():
 
 def test_R614_关键价位按右栏减两张副图定主图高_一屏装下():
     """[R614] 用户: 「按这个方案调整副图高度」。整张卡 = 固定开销(卡片内边距/边框/开关排/图例)
-    + 主图 + 2×96, 主图取右栏减掉这些, 一屏装下; 太低时下限 260, 由右栏滚动兜底。
-    [R615] 图下方的价位统计面板挪去左栏后, 固定开销里不再含它, 257 → 131。"""
+    + 主图 + 两张副图, 主图取右栏减掉这些, 一屏装下; 太低时下限 260, 由右栏滚动兜底。
+    [R615] 图下方的价位统计面板挪去左栏后, 固定开销里不再含它, 257 → 131。
+    [R623] 反算抽进 `lib/chart-layout.ts` 的 `fitLevelsMainHeight`(与画图同源)。
+    [R635] 轴底裁 9px + 卡片底留白 16px 让给 MACD: 131 → 87。"""
     dlg = code_of(DLG)
-    assert "Math.max(240, Math.min(chartAreaH - LEVELS_CHROME_H - 2 * CHART_LAYOUT.subPaneSlot, CHART_MAX_HEIGHT))" in dlg, (
+    assert "Math.min(fitLevelsMainHeight(chartAreaH - LEVELS_CHROME_H), CHART_MAX_HEIGHT)" in dlg, (
         "关键价位没按「右栏 − 固定开销 − 两张副图」定主图高")
-    assert "const LEVELS_CHROME_H = 131" in dlg, "固定开销常量没了, 装不下时无从核对"
+    assert "const LEVELS_CHROME_H = 87" in dlg, "固定开销常量没了, 装不下时无从核对"
     assert "const INTRADAY_CHROME_H = 109" in dlg, "分时也要减掉图外的天数行, 不然底部时间轴被裁"
     assert "Math.max(480, Math.min(chartAreaH - INTRADAY_CHROME_H, CHART_MAX_HEIGHT))" in dlg, (
         "分时没按「右栏 − 图外开销」定高")
@@ -180,10 +182,12 @@ def test_R616_副图按R565画法补画_数据口径不变():
     assert "paneDecor" in plot, "图组件没提供按 pane 挂补画图元的入口"
 
     chart = code_of(CHART)
-    # 高度回到 R565(`lib/levelsChartLayout.ts`): 主图 48%, 限 160~220; 趋势量化再 +50 字道
-    for c in ("const SUB_PANE_RATIO = 0.48", "const SUB_PANE_MIN = 160", "const SUB_PANE_MAX = 220",
-              "const TREND_LANES_EXTRA = 50", "const PANE_HEADER_H = 18"):
-        assert c in chart, f"副图高度没按 R565 的比例: 少了 {c}"
+    # [R623] 副图高度判据搬进 `lib/chart-layout.ts`(画图与弹窗反算同源); [R626] 48% → 28%
+    layout = code_of("lib/chart-layout.ts")
+    for c in ("const TREND_SUB_PANE_RATIO = 0.28", "const TREND_SUB_PANE_MIN = 108",
+              "const TREND_SUB_PANE_MAX = 136", "export const TREND_LANES_EXTRA = 50"):
+        assert c in layout, f"副图高度判据不对: 少了 {c}"
+    assert "const PANE_HEADER_H = 18" in chart, "pane 标题行高度没了"
     assert "tqYRange(paneH, PANE_HEADER_H)" in chart, "字道占的像素没同步进纵轴范围"
 
     # 三样画法都由补画图元承担, 原生 Histogram/整条线近似必须撤掉

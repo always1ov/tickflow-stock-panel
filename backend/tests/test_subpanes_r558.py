@@ -15,7 +15,8 @@ def test_R558_名字与图例在副图顶上的标题带里():
     chart = code_of("components/stock-analysis/AnalysisKChart.tsx")
     # [R596] lightweight 版把副图名字/读数列交给 FinancialPlot 的 pane 标题带, 不再画进图里
     assert "paneTitles={['', trendTitle, quantTitle]}" in chart, "副图名字又写回图里了"
-    assert "trendQuantLegendGraphic()" in chart and "quantMacdLegendGraphic()" in chart, "标题带里没有图例"
+    # [R626] 图例搬进副图读数行(R555/R560), 标题带里只留名字
+    assert "paneReadouts={[[], trendReadouts, quantReadouts]}" in chart, "副图读数行没走 paneReadouts"
 
 
 def test_R559_字画在图顶图底两条字道里_不压线不互叠():

@@ -10,8 +10,12 @@ from tests.frontend_source import code_of
 
 def test_R555_副图画了图例_悬停有说明():
     chart = code_of("components/stock-analysis/AnalysisKChart.tsx")
-    assert "trendQuantLegendGraphic(" in chart, "趋势量化的图例没画"
-    assert "title={TREND_QUANT_HELP}" in chart, "图例的悬停说明没接上"
+    # [R626] 图例从图外那条画布挪进趋势量化的读数行(paneReadouts), 三样仍在。
+    assert "trendReadouts" in chart, "趋势量化的读数行没了"
+    for text in ("平均线", "吸筹", "超买 3.2 / 超卖 0.5"):
+        assert f"text: '{text}'" in chart, f"趋势量化读数行少了 {text}"
+    # 悬停说明挂到开关键排最右的「?」(R626)
+    assert "TREND_QUANT_HELP" in chart, "图例的悬停说明没接上"
 
 
 def test_R555_说明只有一个产地():

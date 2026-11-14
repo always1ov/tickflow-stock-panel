@@ -10,8 +10,13 @@ from tests.frontend_source import code_of
 
 def test_R560_副图标题带里有图例_悬停有说明():
     chart = code_of("components/stock-analysis/AnalysisKChart.tsx")
-    assert "quantMacdLegendGraphic(" in chart, "量化MACD 的图例没画"
-    assert "title={QUANT_MACD_HELP}" in chart, "量化MACD 图例的悬停说明没接上"
+    # [R626] 用户: 「这些不应该放在主图上面, 应该放在副图合适的位置」——
+    # 图例从图外那条画布挪进量化MACD 的读数行(paneReadouts), 五样仍在。
+    assert "quantReadouts" in chart, "量化MACD 的读数行没了"
+    for text in ("DIFF", "DEA", "共振", "↑金叉", "↓死叉"):
+        assert f"text: '{text}'" in chart, f"量化MACD 读数行少了 {text}"
+    # 悬停说明挂到开关键排最右的「?」(R626), 仍只有一份产地
+    assert "QUANT_MACD_HELP" in chart, "量化MACD 的悬停说明没接上"
 
 
 def test_R560_说明只有一个产地_五样都讲到():
