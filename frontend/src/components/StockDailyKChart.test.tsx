@@ -25,6 +25,11 @@ let host: HTMLDivElement, root: Root
 const originalRows = fixture.rows
 beforeEach(() => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
+  // [R667] 工具栏改为 ResizeObserver 实测高度, jsdom 没有这个 API —— 空实现兜底,
+  // 回调不触发, 高度保持初始的 40px(与真实一排时一致)。
+  if (typeof globalThis.ResizeObserver === 'undefined') {
+    globalThis.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} } as unknown as typeof ResizeObserver
+  }
   localStorage.clear()
   fixture.rows = originalRows
   host = document.createElement('div'); document.body.append(host); root = createRoot(host)

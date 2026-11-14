@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { type KlineRow } from '@/lib/api'
 import { klineDailyQueryOptions, klineDateRange } from '@/lib/kline'
@@ -172,7 +172,7 @@ function ChartPill({
       aria-pressed={active}
       onClick={onClick}
       title={title}
-      className={`px-2 py-0.5 rounded-btn text-micro font-mono cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
+      className={`inline-flex shrink-0 items-center justify-center whitespace-nowrap px-2 py-0.5 rounded-btn text-micro font-mono cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
         active ? activeClass : 'bg-surface ring-1 ring-inset ring-border text-foreground hover:text-foreground'
       }`}
     >
@@ -395,6 +395,17 @@ export function StockDailyKChart({
     return analysisPanes.map((pane, index) => ({ ...pane, height: heights[index] }))
   }, [analysisPanes, maxHeight, baseChartHeight])
   const chartHeight = baseChartHeight + fittedPanes.reduce((sum, pane) => sum + pane.height, 0)
+  // [R667] 副图开关那一排现在允许换行(胶囊不再被挤成竖排), 高度不再恒为 40 ——
+  // 量一下实际高度再从画布高度里扣, 否则折成两排时卡片会多出 16px。
+  const toolbarRef = useRef<HTMLDivElement>(null)
+  const [toolbarH, setToolbarH] = useState<number>(CHART_LAYOUT.toolbar)
+  useEffect(() => {
+    const el = toolbarRef.current
+    if (!el) { setToolbarH(0); return }
+    const ro = new ResizeObserver(entries => setToolbarH(entries[0].contentRect.height))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [showIndicatorControls, rows.length, renderer])
   const Chart = renderer === 'lightweight' ? LightweightDaily : EChartsCandlestick
 
   if (!symbol) return null
@@ -402,7 +413,7 @@ export function StockDailyKChart({
   return (
     <div className={className} style={{ minHeight: chartHeight }}>
       {showIndicatorControls && rows.length > 0 && (
-        <div className={renderer === 'lightweight' ? 'flex min-h-10 flex-wrap items-center gap-1 border-b border-border/50 bg-elevated/20 px-3 py-1.5 xl:h-10 xl:flex-nowrap xl:py-0' : 'flex items-center gap-1.5 px-1 pb-0.5'}>
+        <div ref={toolbarRef} className={renderer === 'lightweight' ? 'flex min-h-10 flex-wrap items-center gap-1 border-b border-border/50 bg-elevated/20 px-3 py-1.5' : 'flex items-center gap-1.5 px-1 pb-0.5'}>
           {renderer === 'lightweight' && <span className="mr-2 shrink-0 text-xs font-semibold text-foreground">日 K</span>}
           {DAILY_SUB_CHARTS.map(ind => (
             <ChartPill
@@ -558,7 +569,7 @@ export function StockDailyKChart({
           markers={allMarkers}
           ranges={ranges}
           priceLines={priceLines}
-          height={chartHeight - (renderer === 'lightweight' ? CHART_LAYOUT.toolbar : 22)}
+          height={chartHeight - (renderer === 'lightweight' ? toolbarH : 22)}
           showMA={showMA}
           maKeys={renderer === 'lightweight' ? maKeys : undefined}
           showInfoBar={showInfoBar}
