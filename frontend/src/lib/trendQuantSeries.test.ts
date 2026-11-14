@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { TREND_QUANT_COLORS as C } from './theme'
 import {
-  alignTrendQuant, laneLayout, markLabel, packLaneTexts, tqYRange, LANE_NUDGE_MAX, LANE_ROWS, TQ_LANES_H,
+  alignTrendQuant, laneLayout, markLabel, packLaneTexts, tqPlotHeight, tqYRange,
+  LANE_NUDGE_MAX, LANE_ROWS, TQ_LANES_H,
   TREND_MARK_SHORT_HELP, TREND_MARKS, TREND_QUANT_HELP, TREND_QUANT_LEGEND, trendQuantLegendGraphic,
   trendQuantSeries, type TrendQuantData,
 } from './trendQuantSeries'
@@ -119,13 +120,13 @@ describe('[R486] 趋势量化副图', () => {
     expect(out.every(o => o.row === 0)).toBe(true)
   })
 
-  it('[R619] 同一串挤成一堆的信号排满三行; 还放不下的不画, 不压在已有的字上', () => {
+  it('[R619] 同一串挤成一堆的信号排满各行; 还放不下的不画, 不压在已有的字上', () => {
     const drafts = Array.from({ length: LANE_ROWS + 1 }, (_, i) => (
       { lane: 'bottom' as const, x: 100 + i * 2, w: 26, item: i }
     ))
     const out = packLaneTexts(drafts)
-    expect(out).toHaveLength(LANE_ROWS)          // 第 4 个跳过
-    expect(out.map(o => o.row)).toEqual([0, 1, 2])
+    expect(out).toHaveLength(LANE_ROWS)          // 多出来的那个跳过
+    expect(out.map(o => o.row)).toEqual(Array.from({ length: LANE_ROWS }, (_, i) => i))
   })
 
   it('[R620] 八种字各有单字缩写, 互不相同, 都是一个字; 全称对照写给图例', () => {
@@ -180,5 +181,15 @@ describe('[R486] 趋势量化副图', () => {
     expect(r175.max).toBeGreaterThan(4)
     expect(r175.max - 4).toBeGreaterThan(r220.max - 4)
     expect(TQ_LANES_H).toBeGreaterThan(0)
+  })
+
+  it('[R629] 字道不再吃掉走势区: 166px 副图里 0~4 分到 80px(原来只有 31)', () => {
+    // 关键价位弹窗实测的三块 pane 高度: 412 / 166 / 116, 趋势量化是 166
+    expect(tqPlotHeight(166, 18)).toBe(80)
+    expect(tqPlotHeight(166, 18) / 166).toBeGreaterThan(0.45)
+    // 走势区比两条字道加起来还高 —— 主次分明
+    expect(tqPlotHeight(166, 18)).toBeGreaterThan(TQ_LANES_H)
+    // 再矮也不能把走势区压成负数(窄屏兜底)
+    expect(tqPlotHeight(120, 18)).toBeGreaterThanOrEqual(1)
   })
 })

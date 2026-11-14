@@ -200,19 +200,33 @@ const NONE = '-'
  * 的, 不是时间序), 三行都放不下时允许往右挪几像素, 连挪都放不下就**不画**这个字 —— 宁可少一个,
  * 也不让两个叠在一起。
  *
+ * [R629] 三行 → 两行, 并把留白从 22 收到 6 —— **副图高度不再动**, 改的是副图内部的预算。
+ * 用户: 「趋势量化的里面显示的内容压得很扁……设计个方案处理趋势量化的完整显示问题」。
+ * 按 R626 的副图 166px 算, 原来的预算表是: 标题带 18 + 顶字道 3+3×14+4 + 底字道 22+3×14+4 = 135,
+ * 留给 0~4 走势的只剩 **31px**(7.75px/单位), 线和柱子自然糊成一条。
+ * 现在: 18 + (2+2×13+4) + (6+2×13+4) = 86, 走势区 **80px**(20px/单位, 2.6 倍)。
+ * 两行会不会丢信号? 不会重叠(打包算法逐行放, 放不下才跳过), 且 R621 的「全称排不下改单字重排」
+ * 兜底仍在 —— 密集窗口里偶尔少一个字, 换来整条走势可读。这两个常量与 `tqYRange` 同源, 改一处即生效。
+ *
  * 字道贴着副图底边画。
  */
 export const LANE_FONT = 11
-export const LANE_ROW_H = 14
-export const LANE_ROWS = 3
-export const LANE_TOP_PAD = 3
-export const LANE_BOTTOM_PAD = 22   // 字道与副图底边之间的留白
+export const LANE_ROW_H = 13
+export const LANE_ROWS = 2
+export const LANE_TOP_PAD = 2
+export const LANE_BOTTOM_PAD = 6   // 字道与副图底边之间的留白([R629] 22 → 6: 那段白不承载任何图元)
 export const LANE_HALO = { stroke: '#000000', lineWidth: 3 }
-/** [R619] 三行都放不下时, 最多把字往右让这么多像素(120 日窗口下约 2 根 K 线, 看不出来) */
+/** [R619] 两行都放不下时, 最多把字往右让这么多像素(120 日窗口下约 2 根 K 线, 看不出来) */
 export const LANE_NUDGE_MAX = 8
 
-/** 两条字道一共占掉的高度(px) —— 副图因此加高这么多, 图本身不被挤小 */
+/** 两条字道一共占掉的高度(px, 不含标题带) —— 副图因此加高这么多, 图本身不被挤小 */
 export const TQ_LANES_H = LANE_TOP_PAD + LANE_ROWS * LANE_ROW_H + LANE_BOTTOM_PAD + LANE_ROWS * LANE_ROW_H
+
+/** [R629] 走势区(0~4 那一段)在 `paneH` 高的副图里能分到多少像素 —— 单测钉住「不被字道吃掉」。 */
+export function tqPlotHeight(paneH: number, headerPx = 0): number {
+  return Math.max(1, paneH - headerPx - LANE_TOP_PAD - LANE_ROWS * LANE_ROW_H - 4
+    - LANE_BOTTOM_PAD - LANE_ROWS * LANE_ROW_H - 4)
+}
 
 /**
  * 纵轴上下界: 波动线恒在 0~4(收盘不会跑出近 10 日最低 / 近 25 日最高), 把字道那几十像素换算成
@@ -224,7 +238,7 @@ export const TQ_LANES_H = LANE_TOP_PAD + LANE_ROWS * LANE_ROW_H + LANE_BOTTOM_PA
 export function tqYRange(paneH: number, headerPx = 0): { min: number; max: number } {
   const topPx = headerPx + LANE_TOP_PAD + LANE_ROWS * LANE_ROW_H + 4
   const bottomPx = LANE_BOTTOM_PAD + LANE_ROWS * LANE_ROW_H + 4
-  const perUnit = Math.max(1, paneH - topPx - bottomPx) / 4
+  const perUnit = tqPlotHeight(paneH, headerPx) / 4
   return { min: -bottomPx / perUnit, max: 4 + topPx / perUnit }
 }
 
