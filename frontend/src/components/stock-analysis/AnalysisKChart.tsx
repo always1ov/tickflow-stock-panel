@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { AnnotationData } from '@/components/charts/ChartAnnotations'
 import { FinancialPlot } from '@/components/charts/FinancialPlot'
 import type { DecorItem, PaneDecorData } from '@/components/charts/SubPaneDecor'
-import { CHART_LAYOUT, TREND_LANES_EXTRA, trendSubPaneHeight } from '@/lib/chart-layout'
+import { CHART_LAYOUT, TREND_PANE_HEADER, trendPaneHeight, trendSubPaneHeight } from '@/lib/chart-layout'
 import {
   FIB2_ROLE_TARGET, LEVEL_CURVE_COLOR, QUANT_MACD_COLORS, TREND_QUANT_COLORS,
   fib2RoleColor, levelColors, useChartTheme, useLevelColors, useTheme,
@@ -134,8 +134,9 @@ interface Props {
  * 主图明显大于两张副图之和。判据挪进 `chart-layout` 是为了让「整张图要多高才装得下」
  * 的弹窗反算同源 —— R616 本地一份、弹窗里再估一份(按每张副图 96), 于是「一屏」从那时起就不成立。
  */
-/** [R616] 副图顶上给 pane 标题留的带(px): R565 的标题画在图外, 现在画在图里, 顶字道从这条带下面起 */
-const PANE_HEADER_H = 18
+/** [R616] 副图顶上给 pane 标题留的带(px): R565 的标题画在图外, 现在画在图里, 顶字道从这条带下面起。
+ *  [R627] 数值挪进 `chart-layout` 的 `TREND_PANE_HEADER` —— 副图高度反算要用同一个数。 */
+const PANE_HEADER_H = TREND_PANE_HEADER
 
 export function AnalysisKChart({
   rows,
@@ -213,10 +214,11 @@ export function AnalysisKChart({
     return { dates, labels: futureVals.map((_, index) => `未来${index + 1}`), values: futureVals }
   }, [futureVals, model.dates])
 
-  // 主图 + 两个副图: 主图保持 `height` 的可视高度, 副图按 R565 的比例另加两格。
+  // 主图 + 两个副图: 主图保持 `height` 的可视高度; 趋势量化 = 字道 135 + 走势 48~64(R627),
+  // 量化MACD 走 R626 的比例。
   const mainPaneH = Math.max(120, height - CHART_LAYOUT.timeAxis)
   const subPaneH = trendSubPaneHeight(height)
-  const trendPaneH = subPaneH + TREND_LANES_EXTRA
+  const trendPaneH = trendPaneHeight(height)
   const plotHeight = height + trendPaneH + subPaneH
   const paneHeights = useMemo(() => [mainPaneH, trendPaneH, subPaneH], [mainPaneH, trendPaneH, subPaneH])
 
