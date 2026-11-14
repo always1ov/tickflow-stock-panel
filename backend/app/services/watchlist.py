@@ -41,9 +41,8 @@ def revision() -> int:
     """自选/分组数据版本号, 每次写操作递增。"""
     return _REVISION
 _MAX_GROUP_NAME_LENGTH = 24
-# [R631] 分组代表: 每组最多 3 位(主龙头 + 辅龙), 顺序即主次; 标签最多 6 字。
+# [R632] 分组代表(统一叫「龙头」): 每组最多 3 位, 数组顺序即置顶顺序。
 _MAX_GROUP_LEADERS = 3
-_MAX_LEADER_LABEL_LENGTH = 6
 DEFAULT_GROUP_COLOR = "sky"
 GROUP_COLORS = frozenset({
     "sky",
@@ -150,25 +149,22 @@ def _write_entries(df: pl.DataFrame) -> None:
     _REVISION += 1
 
 
-def _default_leader_label(index: int) -> str:
-    return "龙头" if index == 0 else f"辅龙 {index}"
+def _normalize_leaders(raw: object) -> list[str]:
+    """把磁盘上的 leaders 归一化成 symbol 列表, 脏数据只丢该项不拖垮整个分组。
 
-
-def _normalize_leaders(raw: object) -> list[dict]:
-    """把磁盘上的 leaders 归一化成 [{symbol,label}], 脏数据只丢该项不拖垮整个分组。"""
+    R631 曾存成 [{symbol,label}], 这里兼容读取成 symbol。
+    """
     if not isinstance(raw, list):
         return []
-    leaders: list[dict] = []
+    leaders: list[str] = []
     seen: set[str] = set()
     for item in raw:
-        if not isinstance(item, dict):
-            continue
-        symbol = str(item.get("symbol") or "").strip().upper()
+        value = item.get("symbol") if isinstance(item, dict) else item
+        symbol = str(value or "").strip().upper()
         if not symbol or symbol in seen:
             continue
-        label = str(item.get("label") or "").strip()[:_MAX_LEADER_LABEL_LENGTH]
         seen.add(symbol)
-        leaders.append({"symbol": symbol, "label": label or _default_leader_label(len(leaders))})
+        leaders.append(symbol)
         if len(leaders) >= _MAX_GROUP_LEADERS:
             break
     return leaders
@@ -372,7 +368,7 @@ def _prune_leaders_best_effort(symbols: set[str], group_ids: set[str] | None = N
         if group_ids is not None and group["id"] not in group_ids:
             continue
         leaders = group.get("leaders") or []
-        kept = [item for item in leaders if item["symbol"] not in symbols]
+        kept = [item for item in leaders if item not in symbols]
         if len(kept) != len(leaders):
             group["leaders"] = kept
             changed = True
@@ -380,10 +376,10 @@ def _prune_leaders_best_effort(symbols: set[str], group_ids: set[str] | None = N
         _write_groups(groups)
 
 
-def set_leaders(group_id: str, leaders: list[dict]) -> list[dict]:
-    """设定分组代表(最多 3 位, 数组顺序即主次/置顶顺序), 只接受该分组现有成员。"""
+def set_leaders(group_id: str, leaders: list[str]) -> list[dict]:
+    """设定分组龙头(最多 3 位, 数组顺序即置顶顺序), 只接受该分组现有成员。"""
     if len(leaders) > _MAX_GROUP_LEADERS:
-        raise ValueError(f"每组最多 {_MAX_GROUP_LEADERS} 位代表")
+        raise ValueError(f"每组最多 {_MAX_GROUP_LEADERS} 位龙头")
     with _LOCK:
         groups = _read_groups()
         target = next((group for group in groups if group["id"] == group_id), None)
@@ -394,22 +390,16 @@ def set_leaders(group_id: str, leaders: list[dict]) -> list[dict]:
             for row in _read_entries().to_dicts()
             if group_id in (row.get("group_ids") or [])
         }
-        normalized: list[dict] = []
+        normalized: list[str] = []
         seen: set[str] = set()
         for item in leaders:
-            symbol = str((item or {}).get("symbol") or "").strip().upper()
+            symbol = str(item or "").strip().upper()
             if not symbol or symbol in seen:
                 continue
             if symbol not in members:
                 raise ValueError(f"{symbol} 不在该分组内")
-            label = str((item or {}).get("label") or "").strip()
-            if len(label) > _MAX_LEADER_LABEL_LENGTH:
-                raise ValueError(f"代表标签最多 {_MAX_LEADER_LABEL_LENGTH} 个字")
             seen.add(symbol)
-            normalized.append({
-                "symbol": symbol,
-                "label": label or _default_leader_label(len(normalized)),
-            })
+            normalized.append(symbol)
         target["leaders"] = normalized
         _write_groups(groups)
         return groups

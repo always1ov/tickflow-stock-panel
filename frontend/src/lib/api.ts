@@ -1484,19 +1484,12 @@ export type WatchlistGroupColor =
   | 'teal'
   | 'cyan'
 
-/** [R631] 分组代表(龙头/大哥): 每组最多 3 位, 数组顺序即主次 */
-export interface WatchlistGroupLeader {
-  symbol: string
-  /** 展示标签, 如「龙头」「中军」; 空串时后端补默认标签 */
-  label: string
-}
-
 export interface WatchlistGroup {
   id: string
   name: string
   color: WatchlistGroupColor
-  /** [R631] 分组代表, 未设置时为空数组 */
-  leaders?: WatchlistGroupLeader[]
+  /** [R631/R632] 分组龙头 symbol 列表 (≤3, 顺序即置顶顺序) */
+  leaders?: string[]
 }
 
 /** [R271] 一处存储的体检结果。 */
@@ -5135,8 +5128,8 @@ export const api = {
       `/api/watchlist/groups/${encodeURIComponent(groupId)}`,
       { method: 'PUT', body: JSON.stringify({ name, color }) },
     ),
-  // [R631] 设定分组代表: 传空数组即全部取消
-  watchlistGroupSetLeaders: (groupId: string, leaders: WatchlistGroupLeader[]) =>
+  // [R631/R632] 设定分组龙头 (symbol 列表, 顺序即置顶顺序); 传空数组即全部取消
+  watchlistGroupSetLeaders: (groupId: string, leaders: string[]) =>
     request<{ groups: WatchlistGroup[] }>(
       `/api/watchlist/groups/${encodeURIComponent(groupId)}/leaders`,
       { method: 'PUT', body: JSON.stringify({ leaders }) },

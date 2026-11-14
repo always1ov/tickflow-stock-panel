@@ -92,14 +92,9 @@ class GroupReorderRequest(BaseModel):
     ordered_ids: list[str]
 
 
-# [R631] 分组代表: 最多 3 位, 顺序即主次(头部摘要/卡片置顶都按此顺序)。
-class GroupLeaderRequest(BaseModel):
-    symbol: str
-    label: str = ""
-
-
+# [R631/R632] 分组龙头: 最多 3 位, 数组顺序即置顶顺序(标签统一叫「龙头」)。
 class GroupLeadersRequest(BaseModel):
-    leaders: list[GroupLeaderRequest] = Field(default_factory=list)
+    leaders: list[str] = Field(default_factory=list)
 
 
 class GroupTransferRequest(BaseModel):
@@ -210,12 +205,9 @@ def reorder_groups(req: GroupReorderRequest):
 
 @router.put("/groups/{group_id}/leaders")
 def set_group_leaders(group_id: str, req: GroupLeadersRequest):
-    """设定分组代表(龙头/辅龙): 传空数组即全部取消。"""
+    """设定分组龙头: 传空数组即全部取消。"""
     try:
-        groups = watchlist.set_leaders(
-            group_id,
-            [{"symbol": item.symbol, "label": item.label} for item in req.leaders],
-        )
+        groups = watchlist.set_leaders(group_id, req.leaders)
     except KeyError as e:
         raise HTTPException(404, "自选分组不存在") from e
     except ValueError as e:

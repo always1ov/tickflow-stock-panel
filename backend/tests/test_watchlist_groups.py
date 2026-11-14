@@ -336,77 +336,83 @@ def test_transfer_api_checks_whole_selection_and_virtual_groups(monkeypatch, tmp
         assert {r["symbol"]: r["group_ids"] for r in result.json()["symbols"]} == {"a": [src, dst], "b": [dst]}
 
 
-# ── 分组代表 (R631) ────────────────────────────────────────
+# ── 分组龙头 (R631; R632 简化为统一叫「龙头」) ─────────────
 
 
-def test_set_leaders_orders_labels_and_validates(monkeypatch, tmp_path):
-    """代表: ≤3 位, 顺序即主次, 默认标签龙头/辅龙, 只接受本组成员。"""
+def test_set_leaders_orders_and_validates(monkeypatch, tmp_path):
+    """龙头: ≤3 位, 数组顺序即置顶顺序, 只接受本组成员。"""
     monkeypatch.setattr(settings, "data_dir", tmp_path)
     _, group = watchlist.create_group("光模块")
     for symbol in ("300308.SZ", "300502.SZ", "300394.SZ", "600487.SH"):
         watchlist.add(symbol, group_id=group["id"])
     watchlist.add("000001.SZ")  # 组外标的
 
-    groups = watchlist.set_leaders(group["id"], [
-        {"symbol": "300308.SZ", "label": ""},
-        {"symbol": "300502.SZ", "label": "大哥"},
-        {"symbol": "300394.SZ", "label": ""},
-    ])
-    assert groups[0]["leaders"] == [
-        {"symbol": "300308.SZ", "label": "龙头"},
-        {"symbol": "300502.SZ", "label": "大哥"},
-        {"symbol": "300394.SZ", "label": "辅龙 2"},
-    ]
+    groups = watchlist.set_leaders(group["id"], ["300308.SZ", "300502.SZ", "300394.SZ"])
+    assert groups[0]["leaders"] == ["300308.SZ", "300502.SZ", "300394.SZ"]
     # 落盘可回读
     assert watchlist.list_groups()[0]["leaders"] == groups[0]["leaders"]
 
-    # 超过 3 位 / 非本组成员 / 标签超长 均拒绝, 且不破坏既有代表
+    # 超过 3 位 / 非本组成员 均拒绝, 且不破坏既有龙头
     with pytest.raises(ValueError, match="最多 3 位"):
-        watchlist.set_leaders(group["id"], [{"symbol": s} for s in ("300308.SZ", "300502.SZ", "300394.SZ", "600487.SH")])
+        watchlist.set_leaders(
+            group["id"], ["300308.SZ", "300502.SZ", "300394.SZ", "600487.SH"]
+        )
     with pytest.raises(ValueError, match="不在该分组"):
-        watchlist.set_leaders(group["id"], [{"symbol": "000001.SZ"}])
-    with pytest.raises(ValueError, match="最多 6 个字"):
-        watchlist.set_leaders(group["id"], [{"symbol": "300308.SZ", "label": "一二三四五六七"}])
+        watchlist.set_leaders(group["id"], ["000001.SZ"])
     assert watchlist.list_groups()[0]["leaders"] == groups[0]["leaders"]
 
     # 空数组 = 全部取消
     assert watchlist.set_leaders(group["id"], [])[0]["leaders"] == []
 
 
+def test_legacy_leader_objects_still_read(monkeypatch, tmp_path):
+    """R631 曾把 leaders 存成 [{symbol,label}], R632 读取时归一化成 symbol。"""
+    monkeypatch.setattr(settings, "data_dir", tmp_path)
+    path = tmp_path / "user_data" / "watchlist_groups.json"
+    path.parent.mkdir(parents=True)
+    path.write_text(
+        '[{"id":"g1","name":"光模块","color":"amber","leaders":['
+        '{"symbol":"300308.SZ","label":"龙头"},{"symbol":"300502.SZ","label":"辅龙 1"}]}]',
+        encoding="utf-8",
+    )
+
+    assert watchlist.list_groups()[0]["leaders"] == ["300308.SZ", "300502.SZ"]
+
+
 def test_leaders_are_pruned_when_members_leave(monkeypatch, tmp_path):
-    """成员移出分组/移出自选/清空分组/转移成员/删组后, 代表身份随之消失。"""
+    """成员移出分组/移出自选/清空分组/转移成员/删组后, 龙头身份随之消失。"""
     monkeypatch.setattr(settings, "data_dir", tmp_path)
     _, ga = watchlist.create_group("光模块")
     _, gb = watchlist.create_group("CPO")
     for symbol in ("300308.SZ", "300502.SZ"):
         watchlist.add(symbol, group_id=ga["id"])
-    watchlist.set_leaders(ga["id"], [{"symbol": "300308.SZ", "label": "龙头"}])
+    watchlist.set_leaders(ga["id"], ["300308.SZ"])
 
-    # 多组: 只摘出 ga, 代表消失
+    # 多组: 只摘出 ga, 龙头消失
     watchlist.add_to_group("300308.SZ", gb["id"])
     watchlist.remove_from_group("300308.SZ", ga["id"])
     assert watchlist.list_groups()[0]["leaders"] == []
     watchlist.add_to_group("300308.SZ", ga["id"])
 
     # 互斥设定到其他组
-    watchlist.set_leaders(ga["id"], [{"symbol": "300308.SZ", "label": "龙头"}])
+    watchlist.set_leaders(ga["id"], ["300308.SZ"])
     watchlist.set_group("300308.SZ", gb["id"])
     assert watchlist.list_groups()[0]["leaders"] == []
 
     # 移出自选
     watchlist.add_to_group("300308.SZ", ga["id"])
-    watchlist.set_leaders(ga["id"], [{"symbol": "300308.SZ", "label": "龙头"}])
+    watchlist.set_leaders(ga["id"], ["300308.SZ"])
     watchlist.remove("300308.SZ")
     assert watchlist.list_groups()[0]["leaders"] == []
 
     # 转移成员(move)
-    watchlist.set_leaders(ga["id"], [{"symbol": "300502.SZ", "label": "龙头"}])
+    watchlist.set_leaders(ga["id"], ["300502.SZ"])
     watchlist.transfer_members(ga["id"], gb["id"], ["300502.SZ"], "move")
     assert watchlist.list_groups()[0]["leaders"] == []
 
     # 清空分组
     watchlist.add("600487.SH", group_id=ga["id"])
-    watchlist.set_leaders(ga["id"], [{"symbol": "600487.SH", "label": "龙头"}])
+    watchlist.set_leaders(ga["id"], ["600487.SH"])
     watchlist.clear_group(ga["id"])
     assert watchlist.list_groups()[0]["leaders"] == []
 
@@ -419,9 +425,9 @@ def test_group_leaders_api_contract(monkeypatch, tmp_path):
 
     result = watchlist_api.set_group_leaders(
         group_id,
-        watchlist_api.GroupLeadersRequest(leaders=[{"symbol": "300308.SZ", "label": "龙头"}]),
+        watchlist_api.GroupLeadersRequest(leaders=["300308.SZ"]),
     )
-    assert result["groups"][0]["leaders"] == [{"symbol": "300308.SZ", "label": "龙头"}]
+    assert result["groups"][0]["leaders"] == ["300308.SZ"]
 
     with pytest.raises(HTTPException) as exc:
         watchlist_api.set_group_leaders("missing", watchlist_api.GroupLeadersRequest(leaders=[]))
@@ -430,6 +436,6 @@ def test_group_leaders_api_contract(monkeypatch, tmp_path):
     with pytest.raises(HTTPException) as exc:
         watchlist_api.set_group_leaders(
             group_id,
-            watchlist_api.GroupLeadersRequest(leaders=[{"symbol": "000001.SZ"}]),
+            watchlist_api.GroupLeadersRequest(leaders=["000001.SZ"]),
         )
     assert exc.value.status_code == 400

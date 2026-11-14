@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Trash2, RefreshCw, Star, X, Search, List, Rows3, BarChart3, Settings2, Plus, Check, Filter, Eye, EyeOff, Minus, ChevronsUp, Clock, RotateCcw, FileUp, FolderOpen, FolderMinus, FolderPlus } from 'lucide-react'
-import { api, type KlineRow, type MinuteKlineRow, type WatchlistGroup, type WatchlistGroupColor, type WatchlistGroupLeader } from '@/lib/api'
+import { api, type KlineRow, type MinuteKlineRow, type WatchlistGroup, type WatchlistGroupColor } from '@/lib/api'
 import { ExtSparkChart } from '@/components/screener/ExtSparkChart'
 import { MINUTE_SEED_MAX } from '@/lib/minuteBatchIncremental'
 import { useMinuteBatchQuery } from '@/lib/useMinuteBatchQuery'
@@ -837,9 +837,9 @@ export function Watchlist() {
     onSuccess: data => qc.setQueryData(QK.watchlist, data),
   })
 
-  // [R631] 设定分组代表(龙头/辅龙), 每组最多 3 位
+  // [R632] 设定分组龙头, 每组最多 3 位
   const setGroupLeaders = useMutation({
-    mutationFn: ({ groupId, leaders }: { groupId: string; leaders: WatchlistGroupLeader[] }) =>
+    mutationFn: ({ groupId, leaders }: { groupId: string; leaders: string[] }) =>
       api.watchlistGroupSetLeaders(groupId, leaders),
     onSuccess: data => qc.setQueryData(QK.watchlistGroups, data),
   })
@@ -862,8 +862,8 @@ export function Watchlist() {
     setSelectedGroup(group)
     setGroupCardsOpen(false)
   }, [])
-  // [R631] 分组代表设置/取消 (卡片内皇冠入口)
-  const handleSetLeaders = useCallback((groupId: string, leaders: WatchlistGroupLeader[]) => {
+  // [R632] 分组龙头设置/取消 (卡片内皇冠入口)
+  const handleSetLeaders = useCallback((groupId: string, leaders: string[]) => {
     setGroupLeaders.mutate({ groupId, leaders })
   }, [setGroupLeaders])
 
