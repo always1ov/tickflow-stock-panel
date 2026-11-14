@@ -100,6 +100,12 @@ export interface DailyChartProps {
   priceLines?: ChartPriceLine[]
   height?: number
   showMA?: boolean
+  /**
+   * [R652] 主图要画的均线(可含 'ma5' / 'ma10' / 'ma20' / 'ma60')。
+   * 不传 = 按 `showMA` 决定四条全画或不画(ECharts 渲染器与旧调用方走这条);
+   * 传了就只画列出来的那几条 —— 日K 工具栏的四个均线开关走这条。
+   */
+  maKeys?: string[]
   showInfoBar?: boolean
   showMarkers?: boolean
   markerStyle?: DailyMarkerStyle

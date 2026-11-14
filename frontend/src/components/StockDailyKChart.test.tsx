@@ -133,6 +133,20 @@ it('[R649] 趋势量化 / 量化MACD 两张副图默认不画, 点开后才追�
   expect([...host.querySelectorAll('button')].some(button => button.textContent === '趋势量化')).toBe(false)
 })
 
+it('[R652] 四条主图均线默认全开, 每条都能单独关掉再打开', async () => {
+  await render()
+  expect(props().maKeys).toEqual(['ma5', 'ma10', 'ma20', 'ma60'])
+  const pill = (label: string) => [...host.querySelectorAll('button')].find(button => button.textContent === label)!
+  await act(async () => pill('MA20').click())
+  expect(props().maKeys).toEqual(['ma5', 'ma10', 'ma60'])
+  await act(async () => pill('MA20').click())
+  expect([...props().maKeys].sort()).toEqual(['ma10', 'ma20', 'ma5', 'ma60'])
+  // ECharts 画不了单条均线: 不给这四个开关, 仍按 showMA 整组
+  await render({ renderer: 'echarts' })
+  expect(props().maKeys).toBeUndefined()
+  expect([...host.querySelectorAll('button')].some(button => button.textContent === 'MA5')).toBe(false)
+})
+
 it('[R651] 空间不够只压两张分析副图, 主图与指标副图的高度不动', async () => {
   const openPanes = async (options: any) => {
     await render(options)

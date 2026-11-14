@@ -16,6 +16,8 @@ const LightweightDaily = lazy(() => import('./charts/LightweightDaily').then(m =
 
 const SUB_INFO_H = 16
 const SUB_GAP = 4
+/** [R652] 主图上那四条默认均线 —— 工具栏逐个开关, 顺序与画线顺序一致 */
+const MA_KEYS = ['ma5', 'ma10', 'ma20', 'ma60'] as const
 const DEFAULT_VOLUME_COMPARE: VolumeCompareConfig = { enabled: true, days: 1 }
 
 function normalizeVolumeCompare(config: VolumeCompareConfig): VolumeCompareConfig {
@@ -169,6 +171,8 @@ export function StockDailyKChart({
   maxHeight,
 }: Props) {
   const [activeIndicators, setActiveIndicators] = useState<string[]>(['vol'])
+  // [R652] 四条主图均线逐条可控, 默认全开(与改版前一致)。ECharts 渲染器画不了单条, 仍按 showMA 整组。
+  const [maKeys, setMaKeys] = useState<string[]>(() => showMA ? [...MA_KEYS] : [])
   // [R649] 关键价位那两张副图并入日K, 默认关闭 —— 与改版前日K一样只留成交量。
   const [showTrendQuant, setShowTrendQuant] = useState(false)
   const [showQuantMacd, setShowQuantMacd] = useState(false)
@@ -197,6 +201,10 @@ export function StockDailyKChart({
 
   const toggleIndicator = useCallback((key: string) => {
     setActiveIndicators(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key])
+  }, [])
+
+  const toggleMA = useCallback((key: string) => {
+    setMaKeys(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key])
   }, [])
 
   const updateVolumeCompare = useCallback((patch: Partial<VolumeCompareConfig>) => {
@@ -275,6 +283,16 @@ export function StockDailyKChart({
               label={ind.label}
               activeClass="bg-accent/20 text-accent"
               onClick={() => toggleIndicator(ind.key)}
+            />
+          ))}
+          {/* [R652] 主图四条均线各自可开关 —— 与其它指标同一套胶囊, 默认全开 */}
+          {renderer === 'lightweight' && MA_KEYS.map(key => (
+            <ChartPill
+              key={key}
+              active={maKeys.includes(key)}
+              label={key.toUpperCase()}
+              activeClass="bg-accent/20 text-accent"
+              onClick={() => toggleMA(key)}
             />
           ))}
           {/* [R649] 从「关键价位」并过来的两张副图 —— 固定排在各指标副图之后 */}
@@ -375,6 +393,7 @@ export function StockDailyKChart({
           priceLines={priceLines}
           height={chartHeight - (renderer === 'lightweight' ? CHART_LAYOUT.toolbar : 22)}
           showMA={showMA}
+          maKeys={renderer === 'lightweight' ? maKeys : undefined}
           showInfoBar={showInfoBar}
           showMarkers={showMarkers}
           markerStyle={renderer === 'lightweight' ? markerStyle : undefined}

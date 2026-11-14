@@ -56,12 +56,16 @@ const eventTextColor = (event: EventMarker, row: OHLC, theme: Theme) => event.ev
 
 export function LightweightDaily({ data, assetType, symbol = '', height = 480, activeIndicators = [], showMA = true, showInfoBar = true,
   markers = [], ranges, priceLines, showMarkers = true, markerStyle = 'label', volumeCompare = { enabled: true, days: 1 }, addedDate,
-  linkedPrice, onDateClick, onPriceDoubleClick, visibleBars, stockInfo, analysisPanes = [] }: DailyChartProps) {
+  linkedPrice, onDateClick, onPriceDoubleClick, visibleBars, stockInfo, analysisPanes = [], maKeys }: DailyChartProps) {
   const rows = useMemo(() => validDailyRows(data), [data])
   const precision = pricePrecision(assetType)
   const theme = useTheme()
   const ct = useChartTheme()
   const color = (key: keyof typeof LINE_COLORS) => LINE_COLORS[key][theme]
+  // [R652] 均线逐条可控: 传了 maKeys 就只画列出来的那几条, 没传沿用 showMA 的四条全开/全关。
+  const visibleMA = useMemo(
+    () => maKeys ? maFields.filter(([key]) => maKeys.includes(key)) : showMA ? maFields : [],
+    [maKeys, showMA])
   const volumeMAs = useMemo(() => ({ 5: volMaN(rows, 5), 10: volMaN(rows, 10) }), [rows])
   const scope = `${symbol}:${rows[0]?.date ?? ''}:${ranges?.map(range => `${range.start}:${range.end}`).join(';') ?? ''}`
   const [hover, setHover] = useState<{ scope: string; time: string } | null>(null)
@@ -89,7 +93,7 @@ export function LightweightDaily({ data, assetType, symbol = '', height = 480, a
       options: Pick<PlotSeries, 'range' | 'precision' | 'priceFormat'> = {}) => {
       series.push({ id, type: 'Line', pane, data: values, color, ...options })
     }
-    if (showMA) for (const [key, token] of maFields) addLine(key, lineData(rows, key), color(token))
+    for (const [key, token] of visibleMA) addLine(key, lineData(rows, key), color(token))
     if (activeIndicators.includes('boll')) for (const [key, , token] of bollFields) addLine(`boll:${key}`, lineData(rows, key), color(token))
     selected.forEach((key, offset) => {
       const pane = offset + 1
@@ -111,7 +115,7 @@ export function LightweightDaily({ data, assetType, symbol = '', height = 480, a
       }
     })
     return series
-  }, [rows, showMA, selected, activeIndicators, events, markerStyle, showMarkers, theme, volumeMAs])
+  }, [rows, visibleMA, selected, activeIndicators, events, markerStyle, showMarkers, theme, volumeMAs])
 
   // [R649] 底部并入的分析副图(趋势量化 / 量化MACD): 排在各指标副图之后, 高度由调用方算好。
   // 与关键价位那张图同一份画法(`lib/analysisPanes.ts`), 这里只负责 pane 下标与版面。
@@ -217,7 +221,7 @@ export function LightweightDaily({ data, assetType, symbol = '', height = 480, a
         {turnover != null && <span className="text-muted">换手 {fmtPct(turnover)}</span>}
       </div>
       <div className="mt-1 flex min-h-4 flex-wrap gap-x-4 gap-y-1 text-micro">
-        {showMA && maFields.map(([field, token]) => <span key={field} style={{ color: color(token) }}>{field.toUpperCase()} {price(current?.[field], precision)}</span>)}
+        {visibleMA.map(([field, token]) => <span key={field} style={{ color: color(token) }}>{field.toUpperCase()} {price(current?.[field], precision)}</span>)}
         {activeIndicators.includes('boll') && <span className="inline-flex flex-wrap gap-x-3" aria-label="BOLL 读数">
           <span className="text-muted">BOLL</span>
           {bollFields.map(([field, label, token]) => <span key={field} style={{ color: color(token) }}>{`${label} ${price(current?.[field], precision)}`}</span>)}
