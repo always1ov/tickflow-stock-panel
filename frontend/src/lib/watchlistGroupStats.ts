@@ -91,6 +91,40 @@ export function groupPctColor(pct: number | null): string {
   return pct > 0 ? 'text-bull' : 'text-bear'
 }
 
+// ===== [R631] 分组代表(龙头/大哥) =====
+
+/** 每组最多代表数, 与后端 `_MAX_GROUP_LEADERS` 对齐 */
+export const GROUP_LEADER_MAX = 3
+
+/** 默认代表标签: 第一位「龙头」, 后续「辅龙 1」「辅龙 2」 */
+export function defaultLeaderLabel(index: number): string {
+  if (index <= 0) return '龙头'
+  return `辅龙 ${index}`
+}
+
+/**
+ * 代表置顶: 按 leaders 顺序排在组内最前, 其余成员保持原有顺序。
+ * 已不在组内的代表(数据滞后)自动忽略, 不产生空位。
+ */
+export function orderGroupRows<T extends { symbol: string }>(
+  rows: T[],
+  leaders: { symbol: string }[] | undefined,
+): T[] {
+  if (!leaders || leaders.length === 0) return rows
+  const rank = new Map<string, number>()
+  leaders.forEach((leader, i) => {
+    if (!rank.has(leader.symbol)) rank.set(leader.symbol, i)
+  })
+  const pinned: T[] = []
+  const rest: T[] = []
+  for (const row of rows) {
+    if (rank.has(row.symbol)) pinned.push(row)
+    else rest.push(row)
+  }
+  pinned.sort((a, b) => (rank.get(a.symbol) ?? 0) - (rank.get(b.symbol) ?? 0))
+  return [...pinned, ...rest]
+}
+
 // ===== 分组统计条指标契约 =====
 
 /** 分组统计指标: 等权平均 / 中位数 / 上涨占比(以50%为轴) / 组内最强 / 组内最弱 */

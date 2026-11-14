@@ -41,6 +41,9 @@ def revision() -> int:
     """自选/分组数据版本号, 每次写操作递增。"""
     return _REVISION
 _MAX_GROUP_NAME_LENGTH = 24
+# [R631] 分组代表: 每组最多 3 位(主龙头 + 辅龙), 顺序即主次; 标签最多 6 字。
+_MAX_GROUP_LEADERS = 3
+_MAX_LEADER_LABEL_LENGTH = 6
 DEFAULT_GROUP_COLOR = "sky"
 GROUP_COLORS = frozenset({
     "sky",
@@ -147,6 +150,30 @@ def _write_entries(df: pl.DataFrame) -> None:
     _REVISION += 1
 
 
+def _default_leader_label(index: int) -> str:
+    return "龙头" if index == 0 else f"辅龙 {index}"
+
+
+def _normalize_leaders(raw: object) -> list[dict]:
+    """把磁盘上的 leaders 归一化成 [{symbol,label}], 脏数据只丢该项不拖垮整个分组。"""
+    if not isinstance(raw, list):
+        return []
+    leaders: list[dict] = []
+    seen: set[str] = set()
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        symbol = str(item.get("symbol") or "").strip().upper()
+        if not symbol or symbol in seen:
+            continue
+        label = str(item.get("label") or "").strip()[:_MAX_LEADER_LABEL_LENGTH]
+        seen.add(symbol)
+        leaders.append({"symbol": symbol, "label": label or _default_leader_label(len(leaders))})
+        if len(leaders) >= _MAX_GROUP_LEADERS:
+            break
+    return leaders
+
+
 def _read_groups() -> list[dict]:
     p = _groups_path()
     if not p.exists():
@@ -166,6 +193,7 @@ def _read_groups() -> list[dict]:
             "id": str(item["id"]),
             "name": str(item["name"]),
             "color": color if color in GROUP_COLORS else DEFAULT_GROUP_COLOR,
+            "leaders": _normalize_leaders(item.get("leaders")),
         })
     return groups
 
@@ -258,6 +286,7 @@ def remove(symbol: str) -> list[dict]:
     with _LOCK:
         df = _read_entries().filter(pl.col("symbol") != symbol)
         _write_entries(df)
+        _prune_leaders_best_effort({symbol.strip().upper()})
         return df.to_dicts()
 
 
@@ -280,6 +309,7 @@ def clear() -> int:
         count = df.height
         if count > 0:
             _write_entries(_empty_entries())
+            _prune_leaders_best_effort({str(item).upper() for item in df["symbol"].to_list()})
         return count
 
 
@@ -299,6 +329,7 @@ def create_group(name: str, color: str | None = None) -> tuple[list[dict], dict]
             "id": uuid.uuid4().hex,
             "name": normalized,
             "color": normalized_color,
+            "leaders": [],
         }
         groups.append(group)
         _write_groups(groups)
@@ -320,6 +351,66 @@ def rename_group(group_id: str, name: str, color: str | None = None) -> list[dic
         target["name"] = normalized
         if color is not None:
             target["color"] = _normalize_group_color(color)
+        _write_groups(groups)
+        return groups
+
+
+def _prune_leaders_best_effort(symbols: set[str], group_ids: set[str] | None = None) -> None:
+    """标的离开分组后同步摘掉其代表身份(不指定 group_ids 则扫全部分组)。
+
+    分组配置损坏时只记日志: 移出自选、转移成员是主流程, 不能被代表功能拖垮。
+    """
+    if not symbols:
+        return
+    try:
+        groups = _read_groups()
+    except ValueError as exc:
+        logger.warning("prune group leaders skipped: %s", exc)
+        return
+    changed = False
+    for group in groups:
+        if group_ids is not None and group["id"] not in group_ids:
+            continue
+        leaders = group.get("leaders") or []
+        kept = [item for item in leaders if item["symbol"] not in symbols]
+        if len(kept) != len(leaders):
+            group["leaders"] = kept
+            changed = True
+    if changed:
+        _write_groups(groups)
+
+
+def set_leaders(group_id: str, leaders: list[dict]) -> list[dict]:
+    """设定分组代表(最多 3 位, 数组顺序即主次/置顶顺序), 只接受该分组现有成员。"""
+    if len(leaders) > _MAX_GROUP_LEADERS:
+        raise ValueError(f"每组最多 {_MAX_GROUP_LEADERS} 位代表")
+    with _LOCK:
+        groups = _read_groups()
+        target = next((group for group in groups if group["id"] == group_id), None)
+        if target is None:
+            raise KeyError(group_id)
+        members = {
+            str(row["symbol"]).upper()
+            for row in _read_entries().to_dicts()
+            if group_id in (row.get("group_ids") or [])
+        }
+        normalized: list[dict] = []
+        seen: set[str] = set()
+        for item in leaders:
+            symbol = str((item or {}).get("symbol") or "").strip().upper()
+            if not symbol or symbol in seen:
+                continue
+            if symbol not in members:
+                raise ValueError(f"{symbol} 不在该分组内")
+            label = str((item or {}).get("label") or "").strip()
+            if len(label) > _MAX_LEADER_LABEL_LENGTH:
+                raise ValueError(f"代表标签最多 {_MAX_LEADER_LABEL_LENGTH} 个字")
+            seen.add(symbol)
+            normalized.append({
+                "symbol": symbol,
+                "label": label or _default_leader_label(len(normalized)),
+            })
+        target["leaders"] = normalized
         _write_groups(groups)
         return groups
 
@@ -366,6 +457,10 @@ def set_group(symbol: str, group_id: str | None) -> list[dict]:
                 row["group_ids"] = [group_id] if group_id is not None else []
         out = pl.DataFrame(rows, schema=_ENTRY_SCHEMA)
         _write_entries(out)
+        _prune_leaders_best_effort(
+            {symbol.strip().upper()},
+            {group["id"] for group in groups if group["id"] != group_id},
+        )
         return out.to_dicts()
 
 
@@ -412,6 +507,7 @@ def transfer_members(
         if len(selected) != len(wanted):
             raise ValueError("所选标的已不在自选中，请刷新后重试")
         changed = 0
+        moved: set[str] = set()
         for row in selected:
             previous = row["group_ids"] or []
             in_source = (
@@ -427,8 +523,16 @@ def transfer_members(
             if members != previous:
                 row["group_ids"] = members
                 changed += 1
+            if (
+                action == "move"
+                and source_group_id not in {"all", "ungrouped"}
+                and source_group_id in previous
+            ):
+                moved.add(str(row["symbol"]).upper())
         if changed:
             _write_entries(pl.DataFrame(rows, schema=_ENTRY_SCHEMA))
+        if moved:
+            _prune_leaders_best_effort(moved, {source_group_id})
         return rows, changed
 
 
@@ -445,6 +549,7 @@ def remove_from_group(symbol: str, group_id: str) -> list[dict]:
                 row["group_ids"] = [g for g in (row["group_ids"] or []) if g != group_id]
         out = pl.DataFrame(rows, schema=_ENTRY_SCHEMA)
         _write_entries(out)
+        _prune_leaders_best_effort({symbol.strip().upper()}, {group_id})
         return out.to_dicts()
 
 
@@ -466,6 +571,10 @@ def clear_group(group_id: str) -> list[dict]:
             raise KeyError(group_id)
         df = _strip_group(_read_entries(), group_id)
         _write_entries(df)
+        target = next(group for group in groups if group["id"] == group_id)
+        if target.get("leaders"):
+            target["leaders"] = []
+            _write_groups(groups)
         return df.to_dicts()
 
 

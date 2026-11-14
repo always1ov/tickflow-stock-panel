@@ -33,7 +33,7 @@ def test_historical_watchlist_is_read_as_ungrouped(monkeypatch, tmp_path):
 def test_group_lifecycle_preserves_watchlist_entries(monkeypatch, tmp_path):
     monkeypatch.setattr(settings, "data_dir", tmp_path)
     groups, created = watchlist.create_group("  短线  ", "orange")
-    assert groups == [{"id": created["id"], "name": "短线", "color": "orange"}]
+    assert groups == [{"id": created["id"], "name": "短线", "color": "orange", "leaders": []}]
 
     watchlist.add("600000.SH", group_id=created["id"])
     watchlist.add("000001.SZ")
@@ -147,8 +147,8 @@ def test_historical_groups_default_to_sky(monkeypatch, tmp_path):
     )
 
     assert watchlist.list_groups() == [
-        {"id": "legacy", "name": "旧分组", "color": "sky"},
-        {"id": "invalid", "name": "未知颜色", "color": "sky"},
+        {"id": "legacy", "name": "旧分组", "color": "sky", "leaders": []},
+        {"id": "invalid", "name": "未知颜色", "color": "sky", "leaders": []},
     ]
 
 
@@ -334,3 +334,102 @@ def test_transfer_api_checks_whole_selection_and_virtual_groups(monkeypatch, tmp
         result = post("all", dst, ["a", "b"], "copy")
         assert result.status_code == 200 and result.json()["changed"] == 1
         assert {r["symbol"]: r["group_ids"] for r in result.json()["symbols"]} == {"a": [src, dst], "b": [dst]}
+
+
+# ── 分组代表 (R631) ────────────────────────────────────────
+
+
+def test_set_leaders_orders_labels_and_validates(monkeypatch, tmp_path):
+    """代表: ≤3 位, 顺序即主次, 默认标签龙头/辅龙, 只接受本组成员。"""
+    monkeypatch.setattr(settings, "data_dir", tmp_path)
+    _, group = watchlist.create_group("光模块")
+    for symbol in ("300308.SZ", "300502.SZ", "300394.SZ", "600487.SH"):
+        watchlist.add(symbol, group_id=group["id"])
+    watchlist.add("000001.SZ")  # 组外标的
+
+    groups = watchlist.set_leaders(group["id"], [
+        {"symbol": "300308.SZ", "label": ""},
+        {"symbol": "300502.SZ", "label": "大哥"},
+        {"symbol": "300394.SZ", "label": ""},
+    ])
+    assert groups[0]["leaders"] == [
+        {"symbol": "300308.SZ", "label": "龙头"},
+        {"symbol": "300502.SZ", "label": "大哥"},
+        {"symbol": "300394.SZ", "label": "辅龙 2"},
+    ]
+    # 落盘可回读
+    assert watchlist.list_groups()[0]["leaders"] == groups[0]["leaders"]
+
+    # 超过 3 位 / 非本组成员 / 标签超长 均拒绝, 且不破坏既有代表
+    with pytest.raises(ValueError, match="最多 3 位"):
+        watchlist.set_leaders(group["id"], [{"symbol": s} for s in ("300308.SZ", "300502.SZ", "300394.SZ", "600487.SH")])
+    with pytest.raises(ValueError, match="不在该分组"):
+        watchlist.set_leaders(group["id"], [{"symbol": "000001.SZ"}])
+    with pytest.raises(ValueError, match="最多 6 个字"):
+        watchlist.set_leaders(group["id"], [{"symbol": "300308.SZ", "label": "一二三四五六七"}])
+    assert watchlist.list_groups()[0]["leaders"] == groups[0]["leaders"]
+
+    # 空数组 = 全部取消
+    assert watchlist.set_leaders(group["id"], [])[0]["leaders"] == []
+
+
+def test_leaders_are_pruned_when_members_leave(monkeypatch, tmp_path):
+    """成员移出分组/移出自选/清空分组/转移成员/删组后, 代表身份随之消失。"""
+    monkeypatch.setattr(settings, "data_dir", tmp_path)
+    _, ga = watchlist.create_group("光模块")
+    _, gb = watchlist.create_group("CPO")
+    for symbol in ("300308.SZ", "300502.SZ"):
+        watchlist.add(symbol, group_id=ga["id"])
+    watchlist.set_leaders(ga["id"], [{"symbol": "300308.SZ", "label": "龙头"}])
+
+    # 多组: 只摘出 ga, 代表消失
+    watchlist.add_to_group("300308.SZ", gb["id"])
+    watchlist.remove_from_group("300308.SZ", ga["id"])
+    assert watchlist.list_groups()[0]["leaders"] == []
+    watchlist.add_to_group("300308.SZ", ga["id"])
+
+    # 互斥设定到其他组
+    watchlist.set_leaders(ga["id"], [{"symbol": "300308.SZ", "label": "龙头"}])
+    watchlist.set_group("300308.SZ", gb["id"])
+    assert watchlist.list_groups()[0]["leaders"] == []
+
+    # 移出自选
+    watchlist.add_to_group("300308.SZ", ga["id"])
+    watchlist.set_leaders(ga["id"], [{"symbol": "300308.SZ", "label": "龙头"}])
+    watchlist.remove("300308.SZ")
+    assert watchlist.list_groups()[0]["leaders"] == []
+
+    # 转移成员(move)
+    watchlist.set_leaders(ga["id"], [{"symbol": "300502.SZ", "label": "龙头"}])
+    watchlist.transfer_members(ga["id"], gb["id"], ["300502.SZ"], "move")
+    assert watchlist.list_groups()[0]["leaders"] == []
+
+    # 清空分组
+    watchlist.add("600487.SH", group_id=ga["id"])
+    watchlist.set_leaders(ga["id"], [{"symbol": "600487.SH", "label": "龙头"}])
+    watchlist.clear_group(ga["id"])
+    assert watchlist.list_groups()[0]["leaders"] == []
+
+
+def test_group_leaders_api_contract(monkeypatch, tmp_path):
+    monkeypatch.setattr(settings, "data_dir", tmp_path)
+    created = watchlist_api.create_group(watchlist_api.GroupNameRequest(name="光模块"))
+    group_id = created["group"]["id"]
+    watchlist.add("300308.SZ", group_id=group_id)
+
+    result = watchlist_api.set_group_leaders(
+        group_id,
+        watchlist_api.GroupLeadersRequest(leaders=[{"symbol": "300308.SZ", "label": "龙头"}]),
+    )
+    assert result["groups"][0]["leaders"] == [{"symbol": "300308.SZ", "label": "龙头"}]
+
+    with pytest.raises(HTTPException) as exc:
+        watchlist_api.set_group_leaders("missing", watchlist_api.GroupLeadersRequest(leaders=[]))
+    assert exc.value.status_code == 404
+
+    with pytest.raises(HTTPException) as exc:
+        watchlist_api.set_group_leaders(
+            group_id,
+            watchlist_api.GroupLeadersRequest(leaders=[{"symbol": "000001.SZ"}]),
+        )
+    assert exc.value.status_code == 400
