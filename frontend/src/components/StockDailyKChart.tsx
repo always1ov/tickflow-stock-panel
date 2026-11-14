@@ -584,7 +584,9 @@ export function StockDailyKChart({
           // [R663] 接管关键价位的版式: 价位/曲线标签画在右侧留白带里, 不压蜡烛。
           // 回测「成交K线」不画价位, 不占这条带。带子宽度跟最长标签走。
           rightOffsetPixels={renderer === 'lightweight' && showLevelToolbar ? labelBandPx : undefined}
-          labelMaxWidth={labelBandPx - 14}
+          // [R666] 折行阈值只比带子窄 6px: 带子是按最长标签算的, 阈值再往里收就会把
+          // 本来放得下的「Keltner短上 47.15」(98px) 也折了。现在只有斐波那契Ⅱ型那类才折。
+          labelMaxWidth={labelBandPx - 6}
           onCrosshairMove={renderer === 'lightweight' ? handleLevelCrosshair : undefined}
         />
         </Suspense>

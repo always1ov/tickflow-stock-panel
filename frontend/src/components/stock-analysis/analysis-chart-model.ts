@@ -98,8 +98,12 @@ export const ANALYSIS_LABEL_BAND_PX = 148
  * 宽度按 10px JetBrains Mono 估: 半角 ≈ 6.2px、全角 ≈ 10px。
  * [R664] 用户: 「改成适中的标签自适应, 最长的标签做换行」—— 上限取 104px(适中),
  * 最长那条不再把带子撑满, 而是在空格处折成两行(名字 / 数值)。
+ * [R666] 用户: 「像量化通道这么短的标签就没有换行, 像斐波那契二型的标签这么长的才需要换行」——
+ * 104 封顶 + 折行阈值再减 14 时, 「Keltner短上 47.15」实测 98px 就被折了。
+ * 上限放到 124px(日常标签实测 86~116px 全部一行放下), 折行阈值只比带子窄 6px,
+ * 于是只有「斐波那契Ⅱ型 38.2% 43.21」这类 132px 往上的才折两行。
  */
-export function labelBandWidth(labels: (string | undefined)[], min = 44, max = 104) {
+export function labelBandWidth(labels: (string | undefined)[], min = 44, max = 124) {
   const widest = labels.reduce((width, label) => {
     if (!label) return width
     const estimate = [...label].reduce((sum, ch) => sum + (ch.charCodeAt(0) > 0x2E7F ? 10 : 6.2), 0)

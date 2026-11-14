@@ -49,11 +49,15 @@ const series = {
 }
 
 describe('labelBandWidth', () => {
-  it('宽度跟最长标签走, 短的收窄、长的封顶(最长的留给图表折行)', () => {
+  it('宽度跟最长标签走, 短的收窄、长到斐波那契Ⅱ型那种才封顶(最长的留给图表折行)', () => {
     expect(labelBandWidth(['现价 46.09'])).toBeLessThan(80)
     expect(labelBandWidth([])).toBe(44)
-    // 「26日布林上轨 12.30」估宽 + 16 已超上限 —— 交给 ChartAnnotations 在空格处折两行
-    expect(labelBandWidth(['26日布林上轨 12.30', '现价 46.09'])).toBe(104)
+    // [R666] 日常标签实测 86~116px(成交密集区 / Keltner短上 / 26日布林上轨 / 成交密集区(POC)),
+    // 带子要能一行放下它们 —— 折行阈值 = 带宽 − 6
+    expect(labelBandWidth(['成交密集区(POC) 42.04', '现价 46.09'])).toBe(124)
+    expect(labelBandWidth(['Keltner短上 47.15', '现价 46.09'])).toBeGreaterThanOrEqual(110)
+    // 斐波那契Ⅱ型 132px 往上, 估宽过了上限 → 折两行
+    expect(labelBandWidth(['斐波那契Ⅱ型 38.2% 43.21'])).toBe(124)
   })
 })
 
