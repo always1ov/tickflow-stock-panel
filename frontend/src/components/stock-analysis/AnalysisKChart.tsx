@@ -24,7 +24,7 @@ import {
 } from './levelControls'
 import { LevelToolbar } from './LevelToolbar'
 import {
-  ANALYSIS_LABEL_BAND_PX, LEVEL_GROUPS, buildAnalysisChartModel, hitTestAnalysis, levelKey, strengthColor,
+  ANALYSIS_LABEL_BAND_PX, LEVEL_GROUPS, buildAnalysisChartModel, hitTestAnalysis, levelKey,
   type ChartMarker, type ChartRange, type LevelType, type PriceLevel,
 } from './analysis-chart-model'
 
@@ -47,7 +47,7 @@ import {
  */
 
 export type { ChartMarker, ChartRange, LevelType, PriceLevel }
-export { LEVEL_GROUPS, levelKey, strengthColor }
+export { LEVEL_GROUPS }
 export type { LevelControls }
 
 // ===== 价位类型(与后端 levels.py 的 LEVEL_TYPES 对齐) =====
