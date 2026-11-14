@@ -18,6 +18,11 @@ interface StockLevelsPanelProps {
   visibleBars?: number
   /** [R551] 图上方那条六态条。个股弹窗传 false —— 同一份六态已在上面的「现状」卡里 */
   trendBar?: boolean
+  /** [R615] 图下方的价位统计面板; 个股弹窗把它挪到左栏, 传 false */
+  overview?: boolean
+  /** [R615] 面板搬走后悬停高亮的联动状态由弹窗持有, 透传给图 */
+  hoveredKey?: string | null
+  onHoverKey?: (key: string | null) => void
 }
 
 /**
@@ -48,7 +53,8 @@ export function useStockLevels(symbol: string) {
  * 个股分析页与通用个股详情共用的关键价位主体。
  * 查询键、单票实时刷新与六态失效顺序保持一致，避免两个入口形成不同口径。
  */
-export function StockLevelsPanel({ symbol, height = 480, bare = false, controls, visibleBars, trendBar = true }: StockLevelsPanelProps) {
+export function StockLevelsPanel({ symbol, height = 480, bare = false, controls, visibleBars, trendBar = true,
+  overview = true, hoveredKey, onHoverKey }: StockLevelsPanelProps) {
   const kline = useAnalysisKline(symbol)
 
   const levelsQ = useStockLevels(symbol)
@@ -148,6 +154,9 @@ export function StockLevelsPanel({ symbol, height = 480, bare = false, controls,
         controls={controls}
         visibleBars={visibleBars}
         height={height}
+        overview={overview}
+        hoveredKey={hoveredKey}
+        onHoverKey={onHoverKey}
       />
     </div>
   )

@@ -111,6 +111,17 @@ interface Props {
    */
   height?: number
   className?: string
+  /**
+   * [R615] 图下方那条价位统计面板(当前价 / 压力位 / 支撑位)。个股弹窗把它挪到了左栏
+   * (传 false, 由弹窗自己画), 个股分析页保持默认画在图的下面。
+   */
+  overview?: boolean
+  /**
+   * [R615] 面板搬出图之后, 悬停高亮要跨组件联动 —— 状态由外面持有; 不传则自己持有
+   * (原来面板在组件内部, 这份 state 就够用)。
+   */
+  hoveredKey?: string | null
+  onHoverKey?: (key: string | null) => void
 }
 
 const QUANT_MACD_LEGEND_COLORS: Record<string, string> = {
@@ -171,6 +182,9 @@ export function AnalysisKChart({
   onDateClick,
   height = 460,
   className,
+  overview = true,
+  hoveredKey: hoveredKeyProp,
+  onHoverKey,
 }: Props) {
   const theme = useTheme()
   const ct = useChartTheme()
@@ -181,7 +195,10 @@ export function AnalysisKChart({
 
   const [fib2FitOpen, setFib2FitOpen] = useState(false)
   /** 双向联动高亮: hover 价位标签 ↔ hover 下方文字行。值为 levelKey, null=无高亮 */
-  const [hoveredKey, setHoveredKey] = useState<string | null>(null)
+  // [R615] 面板挪到左栏后由外面的弹窗持有, 图与面板才联动在同一份状态上。
+  const [ownHoveredKey, setOwnHoveredKey] = useState<string | null>(null)
+  const hoveredKey = hoveredKeyProp ?? ownHoveredKey
+  const setHoveredKey = onHoverKey ?? setOwnHoveredKey
 
   const { effLevels, fib2Raw, fib2Zone } = useShownLevels(levels, fib2, rows, fib2Grain, fib2ShowTargets)
   // [R411] 形态状态行读整档 `fib2Raw`(不是减线后的), 说的是形态不是"画了几条"。
@@ -358,8 +375,8 @@ export function AnalysisKChart({
   useEffect(() => { setHoveredKey(null) }, [scope])
   // 关闭价位组后, 被关掉的点位不应继续高亮
   useEffect(() => {
-    setHoveredKey(previous => previous != null && !model.hoverKeys.has(previous) ? null : previous)
-  }, [model.hoverKeys])
+    if (hoveredKey != null && !model.hoverKeys.has(hoveredKey)) setHoveredKey(null)
+  }, [model.hoverKeys, hoveredKey])
 
   return (
     <div className={className}>
@@ -522,12 +539,12 @@ export function AnalysisKChart({
           if (!point) { setHoveredKey(null); return }
           const index = model.dateIndex.get(point.time) ?? -1
           const next = index < 0 ? null : hitTestAnalysis(model, point.price, point.pixelsPerPrice, index)
-          setHoveredKey(previous => previous === next ? previous : next)
+          if (next !== hoveredKey) setHoveredKey(next)
         }}
       />
 
-      {/* 价位统计面板:把当前开启的点位按"压力 / 支撑"结构化列出 */}
-      {effLevels && (
+      {/* 价位统计面板:把当前开启的点位按"压力 / 支撑"结构化列出。[R615] 个股弹窗传 overview={false} 挪到左栏 */}
+      {effLevels && overview && (
         <LevelOverview
           levels={effLevels}
           activeTypes={activeTypes}
@@ -630,9 +647,9 @@ function nextBusinessDates(last: string, count: number): string[] {
   return out
 }
 
-// ===== 价位统计面板(图表下方,结构化文本展示) =====
-function LevelOverview({
-  levels, activeTypes, pivotRank, close, hoveredKey, onHover,
+// ===== 价位统计面板(默认在图表下方, 结构化文本展示; [R615] 弹窗里挪到左栏) =====
+export function LevelOverview({
+  levels, activeTypes, pivotRank, close, hoveredKey, onHover, stacked = false,
 }: {
   levels: Record<LevelType, PriceLevel[]>
   activeTypes: Set<LevelType>
@@ -640,6 +657,8 @@ function LevelOverview({
   close?: number
   hoveredKey: string | null
   onHover: (key: string | null) => void
+  /** [R615] 塞进 300~340px 的窄栏时一列到底 —— `sm:grid-cols-2` 按视口断点, 窄栏里会挤成两列 */
+  stacked?: boolean
 }) {
   const theme = useTheme()
   const ct = useChartTheme()
@@ -695,9 +714,9 @@ function LevelOverview({
   }
 
   return (
-    <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 rounded-card border border-border/40 bg-base/20 px-3 py-2">
+    <div className={`mt-3 grid grid-cols-1 gap-x-6 gap-y-1 rounded-card border border-border/40 bg-base/20 px-3 py-2 ${stacked ? '' : 'sm:grid-cols-2'}`}>
       {/* 当前价 */}
-      <div className="sm:col-span-2 flex items-center gap-2 pb-1 border-b border-border/30 mb-0.5">
+      <div className={`flex items-center gap-2 pb-1 border-b border-border/30 mb-0.5 ${stacked ? '' : 'sm:col-span-2'}`}>
         <span className="text-micro text-muted">当前价</span>
         <span className="text-xs font-mono font-medium text-foreground">{cur.toFixed(2)}</span>
       </div>

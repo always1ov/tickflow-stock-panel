@@ -136,17 +136,36 @@ def test_R612_只有分时跟着右栏放宽():
 
 
 def test_R614_关键价位按右栏减两张副图定主图高_一屏装下():
-    """[R614] 用户: 「按这个方案调整副图高度」。整张卡 = 固定开销(卡片内边距/边框/开关排/图例/价位统计)
-    + 主图 + 2×96, 主图取右栏减掉这些, 一屏装下; 太低时下限 260, 溢出的只是价位统计面板,
-    两张副图仍在屏内, 右栏滚动兜底。"""
+    """[R614] 用户: 「按这个方案调整副图高度」。整张卡 = 固定开销(卡片内边距/边框/开关排/图例)
+    + 主图 + 2×96, 主图取右栏减掉这些, 一屏装下; 太低时下限 260, 由右栏滚动兜底。
+    [R615] 图下方的价位统计面板挪去左栏后, 固定开销里不再含它, 257 → 131。"""
     dlg = code_of(DLG)
-    assert "Math.max(260, Math.min(chartAreaH - LEVELS_CHROME_H - 2 * CHART_LAYOUT.subPaneSlot, CHART_MAX_HEIGHT))" in dlg, (
+    assert "Math.max(240, Math.min(chartAreaH - LEVELS_CHROME_H - 2 * CHART_LAYOUT.subPaneSlot, CHART_MAX_HEIGHT))" in dlg, (
         "关键价位没按「右栏 − 固定开销 − 两张副图」定主图高")
-    assert "const LEVELS_CHROME_H = 257" in dlg, "固定开销常量没了, 装不下时无从核对"
+    assert "const LEVELS_CHROME_H = 131" in dlg, "固定开销常量没了, 装不下时无从核对"
     assert "const INTRADAY_CHROME_H = 109" in dlg, "分时也要减掉图外的天数行, 不然底部时间轴被裁"
     assert "Math.max(480, Math.min(chartAreaH - INTRADAY_CHROME_H, CHART_MAX_HEIGHT))" in dlg, (
         "分时没按「右栏 − 图外开销」定高")
     assert "height={chartHeight ?? 520}" in dlg, "窄屏/未测量时没回落到 520"
+
+
+def test_R615_价位统计面板挪到左栏_图里不再画():
+    """[R615] 用户: 「量化macd下面那部分，也就是当前价那些，可以放到左侧部分里面显示」。
+
+    面板本身仍是 `LevelOverview` 这一个产地, 只是改由弹窗画在左栏(窄栏一列到底);
+    图内传 overview={false} 不再重复画。悬停高亮跨组件, 状态提到弹窗里两边共用。"""
+    dlg = code_of(DLG)
+    assert "<LevelOverview" in dlg, "左栏里没有价位统计面板"
+    assert "overview={false}" in dlg, "图里那份没关掉, 面板会两处各画一遍"
+    assert "hoveredKey={levelHover}" in dlg and "onHoverKey={setLevelHover}" in dlg, (
+        "左栏面板与图上的价位标签没联动")
+    assert "useShownLevels(levelsQ.data?.levels, levelsQ.data?.fib2, heroRows" in dlg, (
+        "「画了哪几条」没有复用图里那份 useShownLevels, 两处会各算一套")
+
+    chart = code_of(CHART)
+    assert "export function LevelOverview(" in chart, "面板得导出来才能给左栏用"
+    assert "overview = true" in chart, "个股分析页默认仍要画在图的下面"
+    assert "stacked" in chart, "窄栏要能一列到底"
 
 
 def test_R612fix_日K保持原高_右栏可滚_副图不能被裁():

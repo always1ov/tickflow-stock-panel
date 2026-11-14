@@ -11,7 +11,8 @@ import { NavWrapToast } from '@/components/NavPager'
 import { StockMultiDayIntradayChart } from '@/components/StockMultiDayIntradayChart'
 import { RuleEditor } from '@/components/monitor/RuleEditor'
 import { PriceAlertDialog } from '@/components/stock-analysis/PriceAlertDialog'
-import { StockLevelsPanel, useAnalysisKline } from '@/components/stock-analysis/StockLevelsPanel'
+import { LevelOverview, useShownLevels } from '@/components/stock-analysis/AnalysisKChart'
+import { StockLevelsPanel, useAnalysisKline, useStockLevels } from '@/components/stock-analysis/StockLevelsPanel'
 import { useLevelControls } from '@/components/stock-analysis/levelControls'
 import { HERO_DAYS_DEFAULT, PreviewHero } from '@/components/stock-preview/PreviewHero'
 import { ChartLevelsSection } from '@/components/stock-preview/ChartLevelsSection'
@@ -69,13 +70,13 @@ const VIEW_TABS: { key: PreviewView; label: string; Icon: typeof Clock }[] = [
 /** [R612] 图高上限 */
 const CHART_MAX_HEIGHT = 720
 /**
- * [R614] 关键价位这张卡里, 图表画布以外还要占的高度 —— 1600×913 实测 257:
+ * [R615] 关键价位这张卡里, 图表画布以外还要占的高度 —— 1600×913 实测 131:
  *   · 卡片内边距 32 + 上下边框 2;
- *   · 画布上方: 开关键排 78(右栏 940px 上下宽时折成两排) + 两张副图的图例 19;
- *   · 画布下方: 价位统计面板 114 + 上间距 12。
+ *   · 画布上方: 开关键排 78(右栏 940px 上下宽时折成两排) + 两张副图的图例 19。
+ * 画布下方原来那条价位统计面板(114 + 上间距 12)已按用户要求挪到左栏, 不再占这里的账。
  * 这些都写死在图表组件里, 外面拿不到, 所以按实测写常量。图表内部版式一变就要回来重算。
  */
-const LEVELS_CHROME_H = 257
+const LEVELS_CHROME_H = 131
 /**
  * [R614] 分时那张卡里, 图以外还要占的高度 —— 1600×913 实测 109:
  * 卡片内边距 32 + 上下边框 2 + 上方天数行 63 + 间距 12。分时没有副图, 减掉它就是一屏。
@@ -123,6 +124,8 @@ export function StockPreviewDialog({ symbol, name, onClose, enableLevelsView = t
   // [R612] 复盘从压在图表下面的第 4 块, 变成右栏的第 4 个视图, 也由这一个状态管。
   const [chartView, setChartView] = useState<PreviewView>('levels')
   const levelCtl = useLevelControls()
+  /** [R615] 悬停高亮: 图的价位标签 ↔ 左栏那条价位统计, 两边同一份状态 */
+  const [levelHover, setLevelHover] = useState<string | null>(null)
   const [intradayDays, setIntradayDays] = useState<number | null>(loadIntradayDays)
   const [dateRange] = useState(getDefaultRange)
   const [showMonitorEditor, setShowMonitorEditor] = useState(false)
@@ -220,9 +223,8 @@ export function StockPreviewDialog({ symbol, name, onClose, enableLevelsView = t
   // [R614] 用户: 「按这个方案调整副图高度」—— 要一屏内同时看到两张副图, 不再往下滚。
   // 副图高度是全局共用常量(不能只为弹窗改), 所以这里把**主图**压到「右栏 − 卡片其余部分 − 两张副图」:
   // canvas = height + 2*96, 加上 LEVELS_CHROME_H 正好落进右栏, 主图与两张副图一屏可见。
-  // 下限 260(主图约 232): 再矮 K 线就看不清了; 触到下限时溢出的是画布**下方**的价位统计面板,
-  // 两张副图仍在屏内(右栏滚动作为 R613 的兜底保留)。日K 的副图数量由图内工具栏决定、
-  // 外面算不出来, 维持 420; 分时没有额外副图, 继续跟着右栏放宽。
+  // 下限 240(主图约 212): 再矮 K 线就看不清了, 触底时才由右栏滚动兜底(R613 的兜底保留)。
+  // 日K 的副图数量由图内工具栏决定、外面算不出来, 维持 420; 分时没有额外副图, 继续跟着右栏放宽。
   const wide = useMediaQuery('(min-width: 1280px)')
   const chartAreaRef = useRef<HTMLDivElement>(null)
   const [chartAreaH, setChartAreaH] = useState(0)
@@ -238,7 +240,7 @@ export function StockPreviewDialog({ symbol, name, onClose, enableLevelsView = t
       ? Math.max(480, Math.min(chartAreaH - INTRADAY_CHROME_H, CHART_MAX_HEIGHT))
       : chartView === 'levels'
         // 整张卡 = 卡片其余部分 + 主图 + 两张副图(各 96), 让它们刚好装进右栏
-        ? Math.max(260, Math.min(chartAreaH - LEVELS_CHROME_H - 2 * CHART_LAYOUT.subPaneSlot, CHART_MAX_HEIGHT))
+        ? Math.max(240, Math.min(chartAreaH - LEVELS_CHROME_H - 2 * CHART_LAYOUT.subPaneSlot, CHART_MAX_HEIGHT))
         : undefined
     : undefined
   const prevSymbolRef = useRef<string | null>(null)
@@ -328,6 +330,13 @@ export function StockPreviewDialog({ symbol, name, onClose, enableLevelsView = t
   const heroStart = heroRows.length ? String((heroRows.at(-reviewDays) ?? heroRows[0]).date).slice(0, 10) : null
   const heroRange = heroStart ? { start: heroStart, end: new Date().toISOString().slice(0, 10) } : dateRange
 
+  // [R615] 用户: 「量化macd下面那部分，也就是当前价那些，可以放到左侧部分里面显示」。
+  // 面板搬到左栏后，「画了哪几条价位」得在这里算 —— 与图内同一个 `useShownLevels`
+  // (二型的粗细档换线等都在里面), 不另算一套; 查询键与图那份相同, 不多发请求。
+  const levelsQ = useStockLevels(symbol ?? '')
+  const shownLevels = useShownLevels(levelsQ.data?.levels, levelsQ.data?.fib2, heroRows,
+    levelCtl.fib2Grain, levelCtl.fib2ShowTargets)
+
   const openPriceAlert = (targetPrice: number, currentPrice: number) => {
     setPriceAlertDraft({ id: Date.now(), targetPrice, currentPrice })
   }
@@ -387,6 +396,19 @@ export function StockPreviewDialog({ symbol, name, onClose, enableLevelsView = t
               {/* 左栏: 现状(只有现成读数) */}
               <div className="border-b border-border/60 px-4 py-4 sm:px-6 xl:min-h-0 xl:overflow-y-auto xl:border-b-0 xl:border-r">
                 <StatusSection symbol={symbol} days={reviewDays} stacked={wide} />
+                {/* [R615] 原来挂在量化MACD 下面的「当前价 / 压力位 / 支撑位」—— 挪到这里,
+                    哪一页都看得见; 悬停与图上的价位标签联动 */}
+                {shownLevels.effLevels && (
+                  <LevelOverview
+                    levels={shownLevels.effLevels}
+                    activeTypes={levelCtl.activeTypes}
+                    pivotRank={levelCtl.pivotRank}
+                    close={heroRows.at(-1)?.close}
+                    hoveredKey={levelHover}
+                    onHover={setLevelHover}
+                    stacked
+                  />
+                )}
               </div>
 
               {/* 右栏: 视图切换条 + 一张图 / 复盘 */}
@@ -473,7 +495,8 @@ export function StockPreviewDialog({ symbol, name, onClose, enableLevelsView = t
                         // [R551] 不要图上方的六态条: 与左栏「现状」是同一份六态(用户圈出「重复了」),
                         // 它独有的回测调参入口、转折信号已挪进现状卡
                         <StockLevelsPanel symbol={symbol} bare height={chartHeight ?? 520} trendBar={false}
-                                          controls={levelCtl} visibleBars={reviewDays} />
+                                          controls={levelCtl} visibleBars={reviewDays}
+                                          overview={false} hoveredKey={levelHover} onHoverKey={setLevelHover} />
                       )}
                     </ChartLevelsSection>
                   )}
