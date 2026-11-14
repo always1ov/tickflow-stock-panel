@@ -50,8 +50,6 @@ export const storage = {
   strategyPool:         kv<string[]>('strategy-pool'),
   /** 旧分钟隔离池 — 仅作一次性迁移读取源, 迁移完成后移除该 key */
   strategyPoolMinute:   kv<string[]>('strategy-pool-1m'),
-  /** [R95] prune 自动清理的备份 — 被移除的 ID 留底, 页面提供一键恢复 */
-  strategyPoolPruneBackup: kv<{ at: string; removed: string[] } | null>('strategy-pool-prune-backup'),
   /** 策略池 → 后端存储的一次性上载完成标记 (旧本地池先于后端偏好同步时兜底) */
   strategyPoolV2Migrated: kv<boolean>('tsp-strategy-pool-v2-migrated'),
   /** 策略库弹窗·左侧策略池排序 (视图偏好: 默认 / 加入时间 / 名称) */
@@ -157,8 +155,8 @@ export const storage = {
   /** 异动监控: 上次计算结果 (关闭开关后仍展示, 含 asof 计算时间戳) */
   abnormalLastResult:   kv<unknown>('abnormal_last_result'),
 
-  /** Screener 卡片尺寸 */
-  // [R522] 原来这里是 screenerCardSize(策略卡片四档尺寸) —— 卡片统一成一颗芯片, 删了
+  /** [R610] 恢复上游的策略卡四档尺寸（R522 曾删掉，功能对齐上游时还原） */
+  screenerCardSize:     kv<string>('screener-card-size'),
 
   /** 连板梯队板块筛选 */
   limitLadderBoard:     kv<string[]>('limit-ladder-board-filter'),

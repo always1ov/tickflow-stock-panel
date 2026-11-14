@@ -20,7 +20,6 @@ export interface ScreenerFilter {
   rsiMax: string
   boards: string[]       // 板块筛选: 空数组=不筛选, 否则只保留选中的板块
   excludeST: boolean     // 是否排除 ST/*ST/退市股
-  watchlistOnly: boolean // 只保留在「自选」里的标的
 }
 
 export const defaultFilter: ScreenerFilter = {
@@ -34,15 +33,13 @@ export const defaultFilter: ScreenerFilter = {
   rsiMin: '', rsiMax: '',
   boards: [],
   excludeST: false,
-  watchlistOnly: false,
 }
 
 export function filterActive(f: ScreenerFilter): boolean {
   if (f.boards.length > 0) return true
   if (f.excludeST) return true
-  if (f.watchlistOnly) return true
   return Object.entries(f).some(([k, v]) =>
-    k !== 'boards' && k !== 'excludeST' && k !== 'watchlistOnly' && v !== '' && v !== false,
+    k !== 'boards' && k !== 'excludeST' && v !== '' && v !== false,
   )
 }
 
@@ -58,16 +55,13 @@ export function countActiveFilters(f: ScreenerFilter): number {
   if (f.rsiMin || f.rsiMax) n++
   if (f.boards.length > 0) n++
   if (f.excludeST) n++
-  if (f.watchlistOnly) n++
   return n
 }
 
-export function applyFilter(rows: any[], f: ScreenerFilter, watchlistSet?: Set<string>): any[] {
+export function applyFilter(rows: any[], f: ScreenerFilter): any[] {
   if (!filterActive(f)) return rows
   const num = (v: string) => v === '' ? null : Number(v)
   return rows.filter((r) => {
-    // 只看自选: 仅保留在自选集合里的标的。集合未加载时 (undefined) 不过滤, 避免闪空。
-    if (f.watchlistOnly && watchlistSet && !watchlistSet.has(String(r.symbol))) return false
     // 板块: 用 symbol 判定板块, 必须在选中列表里
     // 全选 5 个板块 = 不过滤 (等价于 boards:[]), 避免 getBoardType 返回 null 的边缘品种被误删
     if (f.boards.length > 0 && f.boards.length < BOARDS.length) {
@@ -152,7 +146,7 @@ export function FilterPanel({ value, onChange, onClose, onReset }: {
           <Filter className="h-3.5 w-3.5 text-accent" />
           <span className="text-xs font-medium text-accent">筛选条件</span>
           {filterActive(value) && (
-            <span className="bg-accent/15 text-accent rounded-btn px-1.5 h-4 inline-flex items-center text-micro font-bold leading-none">
+            <span className="bg-accent/15 text-accent rounded-full px-1.5 h-4 inline-flex items-center text-micro font-bold leading-none">
               {countActiveFilters(value)}
             </span>
           )}
@@ -162,7 +156,7 @@ export function FilterPanel({ value, onChange, onClose, onReset }: {
             <button
               onClick={onReset}
               title="清空全部筛选"
-              className="inline-flex items-center gap-1 px-1.5 h-6 rounded-btn text-xs
+              className="inline-flex items-center gap-1 px-1.5 h-6 rounded-btn text-micro
                 text-muted hover:text-danger hover:bg-danger/10 transition-colors"
             >
               <RotateCcw className="h-3 w-3" />
@@ -181,14 +175,14 @@ export function FilterPanel({ value, onChange, onClose, onReset }: {
 
       {/* 板块 + ST 快速筛选 (按钮组) */}
       <div className="flex flex-wrap items-center gap-1.5">
-        <span className="text-xs text-secondary shrink-0 w-10">市场</span>
+        <span className="text-micro text-secondary shrink-0 w-10">市场</span>
         {BOARDS.map(board => {
           const active = value.boards.includes(board)
           return (
             <button
               key={board}
               onClick={() => toggleBoard(board)}
-              className={`px-2 py-0.5 rounded-btn text-xs transition-colors ${
+              className={`px-2 py-0.5 rounded-btn text-micro transition-colors ${
                 active
                   ? 'bg-accent/15 text-accent'
                   : 'bg-elevated text-secondary hover:text-foreground hover:bg-elevated/80'
@@ -201,24 +195,13 @@ export function FilterPanel({ value, onChange, onClose, onReset }: {
         <span className="w-px h-4 bg-border mx-1" />
         <button
           onClick={() => onChange({ ...value, excludeST: !value.excludeST })}
-          className={`px-2 py-0.5 rounded-btn text-xs transition-colors ${
+          className={`px-2 py-0.5 rounded-btn text-micro transition-colors ${
             value.excludeST
               ? 'bg-accent/15 text-accent'
               : 'bg-elevated text-secondary hover:text-foreground hover:bg-elevated/80'
           }`}
         >
           排除ST
-        </button>
-        <button
-          onClick={() => onChange({ ...value, watchlistOnly: !value.watchlistOnly })}
-          title="只保留在「自选」里的标的"
-          className={`px-2 py-0.5 rounded-btn text-xs transition-colors ${
-            value.watchlistOnly
-              ? 'bg-accent/15 text-accent'
-              : 'bg-elevated text-secondary hover:text-foreground hover:bg-elevated/80'
-          }`}
-        >
-          只看自选
         </button>
       </div>
 
@@ -227,14 +210,14 @@ export function FilterPanel({ value, onChange, onClose, onReset }: {
           const isRange = f.min !== f.max
           return (
             <div key={f.label} className="flex items-center gap-1.5">
-              <span className="text-xs text-secondary shrink-0 w-14 text-right">{f.label}</span>
+              <span className="text-micro text-secondary shrink-0 w-14 text-right">{f.label}</span>
               <input
                 type="number"
                 placeholder="最小"
                 value={value[f.min]}
                 onChange={(e) => set(f.min, e.target.value)}
                 step={f.step}
-                className="w-16 px-1.5 py-1 rounded-btn bg-base border border-border text-xs font-mono text-foreground text-center focus:outline-none focus:border-accent/50"
+                className="w-16 px-1.5 py-1 rounded-btn bg-base border border-border text-micro font-mono text-foreground text-center focus:outline-none focus:border-accent/50"
               />
               {isRange && (
                 <>
@@ -245,7 +228,7 @@ export function FilterPanel({ value, onChange, onClose, onReset }: {
                     value={value[f.max]}
                     onChange={(e) => set(f.max, e.target.value)}
                     step={f.step}
-                    className="w-16 px-1.5 py-1 rounded-btn bg-base border border-border text-xs font-mono text-foreground text-center focus:outline-none focus:border-accent/50"
+                    className="w-16 px-1.5 py-1 rounded-btn bg-base border border-border text-micro font-mono text-foreground text-center focus:outline-none focus:border-accent/50"
                   />
                 </>
               )}

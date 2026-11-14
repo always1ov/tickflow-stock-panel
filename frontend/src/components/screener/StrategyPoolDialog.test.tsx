@@ -106,7 +106,6 @@ function Harness({ ids: initialIds, meta: initialMeta, groups: initialGroups }: 
       setMeta(prev => Object.fromEntries(Object.entries(prev).map(([key, m]) => [key, m.group === id ? { ...m, group: null } : m])))
     },
     prune: vi.fn(), handleStrategyDeleted: vi.fn(),
-    restorePruned: () => 0, dismissPruneBackup: vi.fn(),
     isInPool: (id: string) => ids.includes(id),
   }
   return <StrategyPoolDialog pool={pool} onAdded={onAdded} onClose={onClose} />

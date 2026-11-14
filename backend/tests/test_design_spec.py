@@ -47,7 +47,7 @@ RATCHET = {
     # 暖色族(amber/yellow/orange)统一收进 warning。棘轮随之压到 0/0, 另两类按迁移后的真实值重设。
     "裸圆角": 0,          # rounded / -sm/-md/-lg/-xl/-2xl/-3xl 已全部换成 rounded-btn/card/dialog
     "任意字号": 0,        # text-[Npx] 已全部换成 text-micro/body/title/page/hero
-    "硬编码色": 417,      # 仍余涨跌/图表用的红绿与少量 focus 色; 暖色 298 处已并入 warning
+    "硬编码色": 408,      # 仍余涨跌/图表用的红绿与少量 focus 色; 暖色 298 处已并入 warning
     "任意容器宽": 22,      # 剩余都是 <1000px 的工具条/列宽, 1000px 以上已换 max-w-read/wide
 }
 

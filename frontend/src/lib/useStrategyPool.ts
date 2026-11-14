@@ -191,18 +191,9 @@ export function useStrategyPool() {
 
   // 清除池中失效策略 ID (与 v1 相同的守卫: 调用方保证仅在策略列表拉取成功且
   // 非空时调用)。库级 meta 记录不动 —— 档案库里失效项由用户在档案库清理。
-  //
-  // [R95] 被移除的 ID 先留底到 strategyPoolPruneBackup: prune 的判据是
-  // "后端当前列表里没有", 但"没有"未必是永久的 —— 数据目录还没迁移、策略文件
-  // 暂时加载失败, 都会让好好的策略从列表上暂时消失。没有留底的话, 一次误清
-  // 就是永久丢失, 用户只看见"策略全没了"。
   const prune = useCallback((validIds: Iterable<string>) => {
     const validSet = validIds instanceof Set ? validIds : new Set(validIds)
-    const removed = (latest.current?.pool ?? []).filter(id => !validSet.has(id))
-    if (removed.length === 0) return
-    const old = storage.strategyPoolPruneBackup.get(null)
-    const merged = [...new Set([...(old?.removed ?? []), ...removed])]
-    storage.strategyPoolPruneBackup.set({ at: new Date().toISOString(), removed: merged })
+    if (!latest.current?.pool.some(id => !validSet.has(id))) return
     void run(async () => {
       const current = qc.getQueryData<StrategyPoolSnapshot>(QK.strategyPool)!
       const next = current.pool.filter(id => validSet.has(id))
@@ -224,28 +215,6 @@ export function useStrategyPool() {
       await invalidateStrategyLibrary(qc, false)
     })
   }, [qc, settle])
-
-  // [R95] 一键恢复上次自动清理移除的 ID(去重并回池尾)。策略仍不存在时卡片
-  // 不会显示(visiblePool 过滤), 但 ID 保住了 —— 等数据迁回来它们自动重新出现。
-  const restorePruned = useCallback(() => {
-    const backup = storage.strategyPoolPruneBackup.get(null)
-    if (!backup || backup.removed.length === 0) return 0
-    const ids = backup.removed
-    storage.strategyPoolPruneBackup.remove()
-    void run(() => {
-      const current = qc.getQueryData<StrategyPoolSnapshot>(QK.strategyPool)!
-      const next = [...current.pool]
-      for (const id of ids) {
-        if (!next.includes(id)) next.push(id)
-      }
-      return api.strategyPoolSetEntries(next, false, current.revision)
-    }, '恢复清理项失败')
-    return ids.length
-  }, [qc, run])
-
-  const dismissPruneBackup = useCallback(() => {
-    storage.strategyPoolPruneBackup.remove()
-  }, [])
 
   const isInPool = useCallback((id: string) => pool.includes(id), [pool])
 
@@ -269,8 +238,6 @@ export function useStrategyPool() {
     reorderGroups,
     deleteGroup,
     prune,
-    restorePruned,
-    dismissPruneBackup,
     handleStrategyDeleted,
     isInPool,
   }
