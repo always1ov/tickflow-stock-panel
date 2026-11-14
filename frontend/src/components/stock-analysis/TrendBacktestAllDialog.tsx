@@ -192,7 +192,7 @@ export function TrendBacktestAllDialog({ symbols, onClose }: {
                             onClick={() => toggle(r.symbol)}
                             aria-label={`选择 ${r.symbol}`}
                             className={`flex h-3.5 w-3.5 items-center justify-center rounded-[3px] border transition-colors duration-hover disabled:cursor-not-allowed disabled:opacity-30 ${
-                              on ? 'border-accent bg-accent text-white' : 'border-border bg-base'}`}>
+                              on ? 'border-accent bg-accent text-on-accent' : 'border-border bg-base'}`}>
                             {on && <Check className="h-2.5 w-2.5" strokeWidth={3} />}
                           </button>
                         </td>

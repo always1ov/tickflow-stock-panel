@@ -123,7 +123,7 @@ export function Factors() {
                     onClick={() => patchParams({ mode: id, edit: null })}
                     aria-current={createMode === id ? 'true' : undefined}
                     className={`inline-flex h-7 items-center gap-1.5 rounded-[5px] px-3 text-xs font-medium transition-colors ${createMode === id
-                      ? 'bg-accent text-white shadow-sm'
+                      ? 'bg-accent text-on-accent shadow-sm'
                       : 'text-secondary hover:bg-elevated hover:text-foreground'
                     }`}
                   >

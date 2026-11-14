@@ -111,7 +111,7 @@ export function SettingsApiTokensPanel() {
               <button
                 onClick={() => name.trim() && scopes.length > 0 && createM.mutate()}
                 disabled={!name.trim() || scopes.length === 0 || createM.isPending}
-                className="rounded-btn bg-accent px-4 py-1.5 text-xs font-medium text-white transition-opacity hover:bg-accent/90 disabled:opacity-50"
+                className="rounded-btn bg-accent px-4 py-1.5 text-xs font-medium text-on-accent transition-opacity hover:bg-accent/90 disabled:opacity-50"
               >
                 {createM.isPending ? '创建中…' : '创建'}
               </button>

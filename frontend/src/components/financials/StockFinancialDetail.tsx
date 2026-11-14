@@ -359,7 +359,7 @@ export function StockFinancialDetail({ symbol, name }: Props) {
                 </button>
                 <button
                   onClick={() => { doAnalysis(); setConfirmReport(null) }}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-btn bg-accent text-white text-xs font-medium transition-ui"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-btn bg-accent text-on-accent text-xs font-medium transition-ui"
                 >
                   <Sparkles className="h-3.5 w-3.5" />
                   重新分析

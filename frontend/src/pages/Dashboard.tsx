@@ -191,7 +191,7 @@ export function Dashboard() {
       <div className="flex h-full items-center justify-center bg-base p-6">
         <div className="rounded-card border border-border bg-surface p-6 text-center">
           <div className="text-sm text-danger">看板加载失败</div>
-          <button onClick={() => overview.refetch()} className="mt-3 rounded-btn bg-accent px-3 py-1.5 text-xs font-medium text-white">重试</button>
+          <button onClick={() => overview.refetch()} className="mt-3 rounded-btn bg-accent px-3 py-1.5 text-xs font-medium text-on-accent">重试</button>
         </div>
       </div>
     )
@@ -434,7 +434,7 @@ function FetchDataCard({
               <span className="text-xs text-danger">同步失败,请重试</span>
               <button
                 onClick={onStart}
-                className="inline-flex items-center gap-1.5 px-3 h-8 rounded-btn bg-accent text-white text-xs font-medium hover:bg-accent/90 transition-colors"
+                className="inline-flex items-center gap-1.5 px-3 h-8 rounded-btn bg-accent text-on-accent text-xs font-medium hover:bg-accent/90 transition-colors"
               >
                 <Play className="h-3.5 w-3.5" />重新获取
               </button>
@@ -443,7 +443,7 @@ function FetchDataCard({
             <div className="mt-3 flex items-center gap-3">
               <button
                 onClick={onStart}
-                className="inline-flex items-center gap-1.5 px-4 h-8 rounded-btn bg-accent text-white text-xs font-medium hover:bg-accent/90 transition-colors"
+                className="inline-flex items-center gap-1.5 px-4 h-8 rounded-btn bg-accent text-on-accent text-xs font-medium hover:bg-accent/90 transition-colors"
               >
                 <Play className="h-3.5 w-3.5" />立即获取数据
               </button>
@@ -514,7 +514,7 @@ function WelcomeFetchModal({
           </button>
           <button
             onClick={onStart}
-            className="inline-flex items-center gap-2 px-5 h-9 rounded-dialog bg-accent text-white text-sm font-semibold shadow-lg shadow-accent/20 hover:bg-accent/90 transition-ui"
+            className="inline-flex items-center gap-2 px-5 h-9 rounded-dialog bg-accent text-on-accent text-sm font-semibold shadow-lg shadow-accent/20 hover:bg-accent/90 transition-ui"
           >
             <Play className="h-4 w-4" />开始获取
           </button>

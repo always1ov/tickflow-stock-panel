@@ -94,7 +94,7 @@ export function useAdjFactorSyncGate() {
               pending.run()
               setPending(null)
             }}
-            className="px-4 h-9 rounded-btn bg-accent text-white text-sm font-medium hover:bg-accent/90 transition-colors"
+            className="px-4 h-9 rounded-btn bg-accent text-on-accent text-sm font-medium hover:bg-accent/90 transition-colors"
           >
             仍然同步
           </button>

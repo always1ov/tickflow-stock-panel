@@ -745,7 +745,7 @@ export function WatchlistImportDialog({
                     disabled={busy || !codesText.trim()}
                     onClick={() => void runText()}
                     title="把整篇文章交给 AI：认出提到的个股（只有名字也认），并按文章自己分好的小分队归类"
-                    className="h-7 px-2.5 rounded-btn text-xs inline-flex items-center gap-1.5 bg-accent text-white hover:bg-accent/90 disabled:opacity-40"
+                    className="h-7 px-2.5 rounded-btn text-xs inline-flex items-center gap-1.5 bg-accent text-on-accent hover:bg-accent/90 disabled:opacity-40"
                   >
                     {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
                     AI 认股票
@@ -935,7 +935,7 @@ export function WatchlistImportDialog({
                   onClick={() => void createGroup()}
                   disabled={creatingGroup || !newGroupName.trim()}
                   title="创建分组，并作为本次导入的目标分组"
-                  className="h-8 shrink-0 px-3 rounded-btn text-xs inline-flex items-center gap-1.5 bg-accent text-white hover:bg-accent/90 disabled:opacity-40"
+                  className="h-8 shrink-0 px-3 rounded-btn text-xs inline-flex items-center gap-1.5 bg-accent text-on-accent hover:bg-accent/90 disabled:opacity-40"
                 >
                   {creatingGroup ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
                   创建
@@ -977,7 +977,7 @@ export function WatchlistImportDialog({
             type="button"
             disabled={selected.size === 0 || batchAdd.isPending || busy}
             onClick={() => void confirmAdd()}
-            className="h-8 px-3 rounded-btn text-xs inline-flex items-center gap-1.5 bg-accent text-white hover:bg-accent/90 disabled:opacity-40"
+            className="h-8 px-3 rounded-btn text-xs inline-flex items-center gap-1.5 bg-accent text-on-accent hover:bg-accent/90 disabled:opacity-40"
           >
             {batchAdd.isPending ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />

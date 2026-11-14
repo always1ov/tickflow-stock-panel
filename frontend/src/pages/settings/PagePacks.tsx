@@ -154,7 +154,7 @@ export function SettingsPagePacksPanel() {
             type="button"
             disabled={busy}
             onClick={handleUpload}
-            className="inline-flex h-9 items-center gap-1.5 rounded-btn bg-accent px-3 text-xs font-medium text-white hover:bg-accent/90 disabled:opacity-50 transition-colors"
+            className="inline-flex h-9 items-center gap-1.5 rounded-btn bg-accent px-3 text-xs font-medium text-on-accent hover:bg-accent/90 disabled:opacity-50 transition-colors"
           >
             <Upload className="h-3.5 w-3.5" />
             {busy ? '上传并校验中…' : '上传并校验'}
@@ -184,7 +184,7 @@ export function SettingsPagePacksPanel() {
             type="button"
             disabled={busyImport}
             onClick={handleImportFile}
-            className="inline-flex h-9 items-center gap-1.5 rounded-btn bg-accent px-3 text-xs font-medium text-white hover:bg-accent/90 disabled:opacity-50 transition-colors"
+            className="inline-flex h-9 items-center gap-1.5 rounded-btn bg-accent px-3 text-xs font-medium text-on-accent hover:bg-accent/90 disabled:opacity-50 transition-colors"
           >
             <Upload className="h-3.5 w-3.5" />
             {busyImport ? '编译导入中…' : '编译并导入'}

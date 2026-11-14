@@ -348,7 +348,7 @@ export function ReviewPage() {
               </div>
               <Link
                 to="/data"
-                className="inline-flex items-center gap-1.5 rounded-btn bg-accent px-4 py-2 text-xs font-medium text-white shadow-sm transition-ui hover:bg-accent/90 hover:shadow"
+                className="inline-flex items-center gap-1.5 rounded-btn bg-accent px-4 py-2 text-xs font-medium text-on-accent shadow-sm transition-ui hover:bg-accent/90 hover:shadow"
               >
                 <Database className="h-3.5 w-3.5" />前往数据页同步
                 <ChevronRight className="h-3.5 w-3.5" />
@@ -488,7 +488,7 @@ export function ReviewPage() {
                         : 'border-border/60 bg-base/40 hover:bg-base/60',
                     )}
                   >
-                    <span className={cn('flex h-3 w-3 shrink-0 items-center justify-center rounded-btn border', reviewPushChannels.includes('feishu') ? 'border-accent bg-accent text-white' : 'border-border')}>
+                    <span className={cn('flex h-3 w-3 shrink-0 items-center justify-center rounded-btn border', reviewPushChannels.includes('feishu') ? 'border-accent bg-accent text-on-accent' : 'border-border')}>
                       {reviewPushChannels.includes('feishu') && <Check className="h-2.5 w-2.5" />}
                     </span>
                     <span className="text-xs text-foreground">飞书</span>
@@ -509,7 +509,7 @@ export function ReviewPage() {
                         : 'border-border/60 bg-base/40 hover:bg-base/60',
                     )}
                   >
-                    <span className={cn('flex h-3 w-3 shrink-0 items-center justify-center rounded-btn border', reviewPushChannels.includes('wecom') ? 'border-accent bg-accent text-white' : 'border-border')}>
+                    <span className={cn('flex h-3 w-3 shrink-0 items-center justify-center rounded-btn border', reviewPushChannels.includes('wecom') ? 'border-accent bg-accent text-on-accent' : 'border-border')}>
                       {reviewPushChannels.includes('wecom') && <Check className="h-2.5 w-2.5" />}
                     </span>
                     <span className="text-xs text-foreground">企业微信</span>
@@ -530,7 +530,7 @@ export function ReviewPage() {
                         : 'border-border/60 bg-base/40 hover:bg-base/60',
                     )}
                   >
-                    <span className={cn('flex h-3 w-3 shrink-0 items-center justify-center rounded-btn border', reviewPushChannels.includes('dingtalk') ? 'border-accent bg-accent text-white' : 'border-border')}>
+                    <span className={cn('flex h-3 w-3 shrink-0 items-center justify-center rounded-btn border', reviewPushChannels.includes('dingtalk') ? 'border-accent bg-accent text-on-accent' : 'border-border')}>
                       {reviewPushChannels.includes('dingtalk') && <Check className="h-2.5 w-2.5" />}
                     </span>
                     <span className="text-xs text-foreground">钉钉</span>
@@ -550,7 +550,7 @@ export function ReviewPage() {
                         : 'border-border/60 bg-base/40 hover:bg-base/60',
                     )}
                   >
-                    <span className={cn('flex h-3 w-3 shrink-0 items-center justify-center rounded-btn border', reviewPushChannels.includes('custom') ? 'border-accent bg-accent text-white' : 'border-border')}>
+                    <span className={cn('flex h-3 w-3 shrink-0 items-center justify-center rounded-btn border', reviewPushChannels.includes('custom') ? 'border-accent bg-accent text-on-accent' : 'border-border')}>
                       {reviewPushChannels.includes('custom') && <Check className="h-2.5 w-2.5" />}
                     </span>
                     <span className="text-xs text-foreground">第三方系统</span>
@@ -570,7 +570,7 @@ export function ReviewPage() {
                         : 'border-border/60 bg-base/40 hover:bg-base/60',
                     )}
                   >
-                    <span className={cn('flex h-3 w-3 shrink-0 items-center justify-center rounded-btn border', reviewPushChannels.includes('email') ? 'border-accent bg-accent text-white' : 'border-border')}>
+                    <span className={cn('flex h-3 w-3 shrink-0 items-center justify-center rounded-btn border', reviewPushChannels.includes('email') ? 'border-accent bg-accent text-on-accent' : 'border-border')}>
                       {reviewPushChannels.includes('email') && <Check className="h-2.5 w-2.5" />}
                     </span>
                     <span className="text-xs text-foreground">邮件</span>
@@ -685,7 +685,7 @@ export function ReviewPage() {
                           type="button"
                           disabled={promptMut.isPending || promptQuery.isLoading}
                           onClick={() => promptMut.mutate(promptText)}
-                          className="rounded-btn bg-accent px-2.5 py-1 text-micro font-medium text-white transition-colors hover:bg-accent/90 disabled:opacity-50"
+                          className="rounded-btn bg-accent px-2.5 py-1 text-micro font-medium text-on-accent transition-colors hover:bg-accent/90 disabled:opacity-50"
                         >
                           {promptMut.isPending ? '保存中…' : '保存'}
                         </button>
@@ -712,7 +712,7 @@ export function ReviewPage() {
                 <button
                   onClick={() => reviewMut.mutate({ enabled: draft.enabled, hour: draft.hour, minute: draft.minute })}
                   disabled={reviewMut.isPending}
-                  className="inline-flex items-center gap-1.5 rounded-btn bg-accent px-4 py-1.5 text-xs font-medium text-white transition-colors hover:bg-accent/90 disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 rounded-btn bg-accent px-4 py-1.5 text-xs font-medium text-on-accent transition-colors hover:bg-accent/90 disabled:opacity-50"
                 >
                   {reviewMut.isPending ? '保存中…' : '保存'}
                 </button>

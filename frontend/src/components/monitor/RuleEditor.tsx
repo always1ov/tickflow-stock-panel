@@ -549,7 +549,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
 
         <div className="flex justify-end gap-2">
           <button onClick={onClose} className="px-4 py-1.5 rounded-btn bg-surface border border-border text-foreground text-xs cursor-pointer">取消</button>
-          <button onClick={() => save.mutate()} disabled={save.isPending} className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-btn bg-accent text-white text-xs font-medium disabled:opacity-50 cursor-pointer">
+          <button onClick={() => save.mutate()} disabled={save.isPending} className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-btn bg-accent text-on-accent text-xs font-medium disabled:opacity-50 cursor-pointer">
             <Save className="h-3.5 w-3.5" />加入监控
           </button>
         </div>
@@ -775,7 +775,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
                     <span className="min-w-0 flex-1 truncate text-xs">{targetLabel}</span>
                     {target.symbol && <span className="shrink-0 font-mono text-micro opacity-60">{target.symbol}</span>}
                     {target.kind !== 'index' && <span className="shrink-0 font-mono text-micro opacity-60">{target.member_count}</span>}
-                    <span className={`grid h-4 w-4 shrink-0 place-items-center rounded-full border ${selected ? 'border-accent bg-accent text-white' : 'border-border text-transparent'}`}>
+                    <span className={`grid h-4 w-4 shrink-0 place-items-center rounded-full border ${selected ? 'border-accent bg-accent text-on-accent' : 'border-border text-transparent'}`}>
                       <Check className="h-2.5 w-2.5" />
                     </span>
                   </button>
@@ -1399,7 +1399,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
                     <span className="mt-1 block truncate text-micro text-muted" title={summary}>{summary}</span>
                   </span>
                   <span className={`mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded-full border ${
-                    active ? 'border-accent bg-accent text-white' : 'border-border text-transparent'
+                    active ? 'border-accent bg-accent text-on-accent' : 'border-border text-transparent'
                   }`}>
                     <Check className="h-2.5 w-2.5" />
                   </span>
@@ -1636,7 +1636,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
 
       <div className="flex justify-end gap-2">
         <button onClick={onClose} className="px-4 py-1.5 rounded-btn bg-surface border border-border text-foreground text-xs cursor-pointer">取消</button>
-        <button onClick={() => save.mutate()} disabled={save.isPending} className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-btn bg-accent text-white text-xs font-medium disabled:opacity-50 cursor-pointer">
+        <button onClick={() => save.mutate()} disabled={save.isPending} className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-btn bg-accent text-on-accent text-xs font-medium disabled:opacity-50 cursor-pointer">
           <Save className="h-3.5 w-3.5" />保存
         </button>
       </div>

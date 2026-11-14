@@ -490,7 +490,7 @@ function GroupManagerDialog({
             type="button"
             onClick={() => void create()}
             disabled={pending}
-            className="inline-flex h-8 items-center gap-1.5 rounded-btn bg-accent px-3 text-xs text-white disabled:opacity-50"
+            className="inline-flex h-8 items-center gap-1.5 rounded-btn bg-accent px-3 text-xs text-on-accent disabled:opacity-50"
           >
             <Plus className="h-3.5 w-3.5" />
             新建

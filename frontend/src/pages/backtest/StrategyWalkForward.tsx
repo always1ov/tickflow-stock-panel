@@ -308,7 +308,7 @@ export function StrategyWalkForward() {
                 <button
                   onClick={() => onApplyLatestFold()}
                   disabled={applying}
-                  className="shrink-0 inline-flex items-center gap-1.5 rounded-btn bg-accent px-3 py-1.5 text-micro font-medium text-white hover:opacity-90 disabled:opacity-40"
+                  className="shrink-0 inline-flex items-center gap-1.5 rounded-btn bg-accent px-3 py-1.5 text-micro font-medium text-on-accent hover:opacity-90 disabled:opacity-40"
                 >
                   <CheckCircle2 className="h-3.5 w-3.5" /> {applying ? '应用中…' : '应用到策略'}
                 </button>

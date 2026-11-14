@@ -136,7 +136,7 @@ function AdoptCard({ onChanged }: { onChanged: () => void }) {
         <button
           onClick={() => adopt.mutate()}
           disabled={!strategyId || adopt.isPending}
-          className="inline-flex items-center gap-1.5 rounded-btn bg-accent px-3 py-2 text-xs font-medium text-white hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
+          className="inline-flex items-center gap-1.5 rounded-btn bg-accent px-3 py-2 text-xs font-medium text-on-accent hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <ShieldCheck className="h-3.5 w-3.5" /> 入护并复验
         </button>
@@ -240,7 +240,7 @@ function CombinationsCard({
                     }
                   }}
                   disabled={busy || creating === key}
-                  className="shrink-0 rounded-btn bg-accent px-2 py-1 text-micro font-medium text-white hover:opacity-90 disabled:opacity-40"
+                  className="shrink-0 rounded-btn bg-accent px-2 py-1 text-micro font-medium text-on-accent hover:opacity-90 disabled:opacity-40"
                 >
                   {creating === key ? '生成中…' : '生成组合'}
                 </button>
@@ -342,7 +342,7 @@ export function StrategyGuardian() {
         <button
           onClick={() => runAll.mutate()}
           disabled={runAll.isPending || !!activeRun}
-          className="inline-flex items-center gap-1.5 rounded-btn bg-accent px-3 py-1.5 text-xs font-medium text-white hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
+          className="inline-flex items-center gap-1.5 rounded-btn bg-accent px-3 py-1.5 text-xs font-medium text-on-accent hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <Play className="h-3.5 w-3.5" /> 全部复验
         </button>

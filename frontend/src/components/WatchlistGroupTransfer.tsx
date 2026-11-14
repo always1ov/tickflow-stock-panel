@@ -123,7 +123,7 @@ function TransferDialog({ source, groups, entries, onClose }: Props & { onClose:
         {pending && transfer.variables?.action === 'copy' ? '复制中…' : '复制到目标组'}
       </button>}
       {source !== 'all' && <button type="button" disabled={!canSubmit} onClick={() => target && transfer.mutate({ action: 'move', target, symbols })}
-        className="min-h-10 rounded-btn bg-accent px-4 text-sm text-white hover:bg-accent/90 disabled:opacity-50">
+        className="min-h-10 rounded-btn bg-accent px-4 text-sm text-on-accent hover:bg-accent/90 disabled:opacity-50">
         {pending && transfer.variables?.action === 'move' ? '移动中…' : '移动到目标组'}
       </button>}
     </footer>

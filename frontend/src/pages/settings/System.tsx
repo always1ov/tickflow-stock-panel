@@ -857,7 +857,7 @@ function UpgradeGuardCard() {
             <div className="flex shrink-0 gap-2">
               {restorableFiles.length > 0 && (
                 <button onClick={() => restoreAll(report.id, restorableFiles)} disabled={!!busy}
-                  className="inline-flex items-center gap-1.5 rounded-card bg-accent px-2.5 py-1 text-micro text-white hover:bg-accent/90 disabled:opacity-50">
+                  className="inline-flex items-center gap-1.5 rounded-card bg-accent px-2.5 py-1 text-micro text-on-accent hover:bg-accent/90 disabled:opacity-50">
                   <RotateCcw className="h-3 w-3" />
                   恢复可恢复项 ({restorableFiles.length})
                 </button>

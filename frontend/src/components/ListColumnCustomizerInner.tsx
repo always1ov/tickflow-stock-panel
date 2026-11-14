@@ -1328,7 +1328,7 @@ function extGranularityOf(
 
   const renderCheckbox = (checked: boolean) => (
     <span className={`shrink-0 w-4 h-4 rounded-btn flex items-center justify-center transition-colors ${
-      checked ? 'bg-accent text-white' : 'border border-border text-transparent group-hover:border-muted'
+      checked ? 'bg-accent text-on-accent' : 'border border-border text-transparent group-hover:border-muted'
     }`}>
       <svg viewBox="0 0 16 16" className="w-2.5 h-2.5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
         <path d="M3 8.5L6.5 12L13 4" />

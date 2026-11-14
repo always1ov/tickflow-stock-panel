@@ -89,7 +89,7 @@ export function MinuteGapPanel({ hasCap = true, onJobStart }: { hasCap?: boolean
               type="button"
               onClick={() => repair.mutate(repairTargets)}
               disabled={!hasCap || repairTargets.length === 0 || repair.isPending || gaps.isFetching}
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-btn bg-accent/90 px-3 py-1.5 text-micro font-medium text-white hover:bg-accent disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-btn bg-accent/90 px-3 py-1.5 text-micro font-medium text-on-accent hover:bg-accent disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
             >
               {repair.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />}
               {repair.isPending ? '正在启动…' : `一键补齐（${repairTargets.length} 条）`}

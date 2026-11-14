@@ -634,7 +634,7 @@ function MonitorMenu({ stock, direction, sealMode, monitorRule, anchorRect, hasD
             onClick={handleSave}
             disabled={saving || !threshold || !hasDepth}
             title={!hasDepth ? '五档盘口(批量)数据不可用' : ''}
-            className="flex-1 h-7 rounded-btn text-xs font-medium transition-ui cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed bg-accent text-white hover:bg-accent/90 active:scale-[0.98] disabled:active:scale-100"
+            className="flex-1 h-7 rounded-btn text-xs font-medium transition-ui cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed bg-accent text-on-accent hover:bg-accent/90 active:scale-[0.98] disabled:active:scale-100"
           >
             {saving ? '保存中…' : !hasDepth ? '五档盘口不可用' : existing ? '更新监控' : '开启监控'}
           </button>

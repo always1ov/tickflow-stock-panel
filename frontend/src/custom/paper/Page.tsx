@@ -955,7 +955,7 @@ function FeeSettingsModal({ accId, fees, queue, onSaved, onClose }: {
           <button
             onClick={() => m.mutate()}
             disabled={!valid || m.isPending}
-            className="flex-1 rounded-btn bg-accent py-2 text-sm font-medium text-white transition-opacity hover:bg-accent/90 disabled:opacity-50"
+            className="flex-1 rounded-btn bg-accent py-2 text-sm font-medium text-on-accent transition-opacity hover:bg-accent/90 disabled:opacity-50"
           >
             {m.isPending ? '保存中…' : '保存'}
           </button>
@@ -1027,7 +1027,7 @@ function BaseDefaultsModal({ onClose }: { onClose: () => void }) {
           <button
             onClick={save}
             disabled={!valid}
-            className="flex-1 rounded-btn bg-accent py-2 text-sm font-medium text-white transition-opacity hover:bg-accent/90 disabled:opacity-50"
+            className="flex-1 rounded-btn bg-accent py-2 text-sm font-medium text-on-accent transition-opacity hover:bg-accent/90 disabled:opacity-50"
           >
             {saved ? '已保存 ✓' : '保存为基础默认'}
           </button>
@@ -1440,7 +1440,7 @@ function AutoRuleForm({ acc, onDone, onCancel }: { acc: string; onDone: () => vo
       </div>
       <div className="mt-3 flex gap-2">
         <button onClick={() => valid && m.mutate()} disabled={!valid || m.isPending}
-          className="flex-1 rounded-btn bg-accent py-2 text-sm font-medium text-white transition-opacity disabled:opacity-40">
+          className="flex-1 rounded-btn bg-accent py-2 text-sm font-medium text-on-accent transition-opacity disabled:opacity-40">
           {m.isPending ? '创建中…' : '创建规则'}
         </button>
         <button onClick={onCancel} className="rounded-btn border border-border px-4 py-2 text-sm text-secondary transition-colors hover:text-foreground">取消</button>
@@ -1606,7 +1606,7 @@ function CompareView({ onCreateSingle }: { onCreateSingle: () => void }) {
           <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={() => setCreateOpen(true)}
-              className="flex items-center gap-1 rounded-btn bg-accent px-2.5 py-1 text-micro font-medium text-white transition-opacity hover:bg-accent/90"
+              className="flex items-center gap-1 rounded-btn bg-accent px-2.5 py-1 text-micro font-medium text-on-accent transition-opacity hover:bg-accent/90"
               title="同本金同费率批量创建一批账户, 各绑一条策略/监控规则跟单, 保证对比口径一致"
             >
               <Plus className="h-3 w-3" />
@@ -1657,7 +1657,7 @@ function CompareView({ onCreateSingle }: { onCreateSingle: () => void }) {
             <div className="mt-4 flex justify-center gap-2">
               <button
                 onClick={() => setCreateOpen(true)}
-                className="flex items-center gap-1 rounded-btn bg-accent px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:bg-accent/90"
+                className="flex items-center gap-1 rounded-btn bg-accent px-3 py-1.5 text-xs font-medium text-on-accent transition-opacity hover:bg-accent/90"
               >
                 <Plus className="h-3.5 w-3.5" />
                 批量创建账户
@@ -2118,7 +2118,7 @@ function BatchCreateModal({ onClose, onCreated }: { onClose: () => void; onCreat
           <button
             onClick={() => valid && m.mutate()}
             disabled={!valid || m.isPending}
-            className="flex-1 rounded-btn bg-accent py-2 text-sm font-medium text-white transition-opacity hover:bg-accent/90 disabled:opacity-40"
+            className="flex-1 rounded-btn bg-accent py-2 text-sm font-medium text-on-accent transition-opacity hover:bg-accent/90 disabled:opacity-40"
           >
             {m.isPending ? '创建中…' : `创建 ${rows.length || ''} 个账户`.replace('  ', ' ')}
           </button>

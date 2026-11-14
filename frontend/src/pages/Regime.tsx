@@ -625,7 +625,7 @@ function MainlineFilterPanel({ filter, onDone }: {
           )}
         </div>
         <button onClick={save} disabled={saving}
-          className="h-7 rounded-btn bg-accent px-3 text-xs font-medium text-white hover:bg-accent/90 disabled:opacity-50">
+          className="h-7 rounded-btn bg-accent px-3 text-xs font-medium text-on-accent hover:bg-accent/90 disabled:opacity-50">
           {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : '保存并重算'}
         </button>
       </div>
@@ -710,7 +710,7 @@ function CustomDaysModal({ current, onClose, onApply }: {
             取消
           </button>
           <button onClick={apply}
-            className="h-7 rounded-btn bg-accent px-3 text-xs font-medium text-white hover:bg-accent/90 transition-colors">
+            className="h-7 rounded-btn bg-accent px-3 text-xs font-medium text-on-accent hover:bg-accent/90 transition-colors">
             应用
           </button>
         </div>

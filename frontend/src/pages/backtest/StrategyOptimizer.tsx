@@ -275,7 +275,7 @@ export function StrategyOptimizer() {
                 <button
                   onClick={() => onApply(result.best_params!, '来源: 稳健优化冠军 (含退化/高原判据)')}
                   disabled={applying}
-                  className="mt-2.5 inline-flex items-center gap-1.5 rounded-btn bg-accent px-3 py-1.5 text-micro font-medium text-white hover:opacity-90 disabled:opacity-40"
+                  className="mt-2.5 inline-flex items-center gap-1.5 rounded-btn bg-accent px-3 py-1.5 text-micro font-medium text-on-accent hover:opacity-90 disabled:opacity-40"
                 >
                   <CheckCircle2 className="h-3.5 w-3.5" /> {applying ? '应用中…' : '应用参数到策略'}
                 </button>

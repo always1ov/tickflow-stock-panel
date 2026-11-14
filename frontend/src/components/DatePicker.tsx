@@ -227,7 +227,7 @@ export function DatePicker({
                         setShowYearPicker(false)
                       }}
                       className={`h-8 text-xs rounded-btn transition-colors duration-press
-                        ${isSelected ? 'bg-accent text-white font-bold' : ''}
+                        ${isSelected ? 'bg-accent text-on-accent font-bold' : ''}
                         ${isThisYear && !isSelected ? 'border border-accent/40' : ''}
                         ${!isSelected ? 'hover:bg-elevated cursor-pointer text-foreground' : ''}
                       `}
@@ -265,7 +265,7 @@ export function DatePicker({
                     className={`
                       h-7 w-full text-xs rounded-btn transition-colors duration-press
                       ${c.cur ? 'text-foreground' : 'text-muted/40'}
-                      ${isSelected ? 'bg-accent text-white font-bold' : ''}
+                      ${isSelected ? 'bg-accent text-on-accent font-bold' : ''}
                       ${isToday && !isSelected ? 'border border-accent/40' : ''}
                       ${!isSelected && !c.disabled ? 'hover:bg-elevated' : ''}
                       ${c.disabled ? 'opacity-20 cursor-not-allowed' : 'cursor-pointer'}

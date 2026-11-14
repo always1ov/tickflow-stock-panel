@@ -70,7 +70,7 @@ function BindingDialog({ account, binding, onClose }: { account: string; binding
     </div>
     {(preview || error) && <div className="shrink-0 space-y-2 border-t border-border bg-surface px-5 py-3">
       {error && <div role="alert" className="rounded-btn bg-danger/10 p-2 text-xs text-danger">{error}</div>}
-      {preview && <button className="w-full rounded-btn bg-accent px-3 py-2 text-xs font-medium text-white disabled:opacity-40" disabled={busy} onClick={() => bindM.mutate()}>{bindM.isPending ? '绑定中…' : '确认参数并启用跟单'}</button>}
+      {preview && <button className="w-full rounded-btn bg-accent px-3 py-2 text-xs font-medium text-on-accent disabled:opacity-40" disabled={busy} onClick={() => bindM.mutate()}>{bindM.isPending ? '绑定中…' : '确认参数并启用跟单'}</button>}
     </div>}
   </Modal>
 }
