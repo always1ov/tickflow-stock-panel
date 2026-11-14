@@ -576,6 +576,19 @@ it('[R633] paneTopInsets 只在指定副图顶部留空白, 其余副图不受�
   expect(native.series[2].priceScale().applyOptions).toHaveBeenLastCalledWith({ entireTextOnly: false, scaleMargins: { top: 12 / 124, bottom: 0 } })
 })
 
+it('[R634] 标题行的高度也折进上边距, 走势从标题下方开始', async () => {
+  const series: PlotSeries[] = [...model,
+    { id: 'tq:scale', type: 'Line', pane: 1, data },
+    { id: 'qm:scale', type: 'Line', pane: 2, data }]
+  await act(async () => root.render(
+    <FinancialPlot scope="levels" series={series} height={400} paneHeights={[280, 120, 124]}
+      paneTopInsets={[0, 0, 12]} paneHeaderHeights={[0, 0, 18]} hidePaneAxis />))
+  // MACD: 12px 空白 + 18px 标题行 = 30px, 柱子从标题下面起, 不再压字
+  expect(native.series[2].priceScale().applyOptions).toHaveBeenLastCalledWith({ entireTextOnly: false, scaleMargins: { top: 30 / 124, bottom: 0 } })
+  // 趋势量化只动空白带, 标题行传 0 时边距完全不变
+  expect(native.series[1].priceScale().applyOptions).toHaveBeenLastCalledWith({ entireTextOnly: false, scaleMargins: { top: 0, bottom: 0 } })
+})
+
 it('links ETF price and percentage scales, including the single-session tab, and removes stale axes on context changes', async () => {
   const row = { datetime: '2026-11-05 09:30:00', open: 0.761, high: 0.762, low: 0.76, close: 0.761, volume: 10, amount: null }
   const render = async (sessions = [{ date: '2026-11-05', prev_close: 0.76 as number | null, rows: [row] }]) => act(async () => root.render(

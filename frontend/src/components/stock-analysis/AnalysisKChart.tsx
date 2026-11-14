@@ -225,6 +225,8 @@ export function AnalysisKChart({
     [mainPaneH, trendPaneH, subPaneH],
   )
   const paneTopInsets = useMemo(() => [0, 0, SUB_PANE_GAP], [])
+  /** [R634] 只有 MACD 这张副图要额外让出一行标题: 趋势量化的纵轴范围已含字道(tqYRange) */
+  const paneHeaderHeights = useMemo(() => [0, 0, PANE_HEADER_H], [])
 
   // 取数失败 / 尚未到达时, 副图仍保留一块区域并写明状态。
   const trendTitle = trendQuantError ? '趋势量化 · 取数失败' : '趋势量化'
@@ -522,6 +524,7 @@ export function AnalysisKChart({
         height={plotHeight}
         paneHeights={paneHeights}
         paneTopInsets={paneTopInsets}
+        paneHeaderHeights={paneHeaderHeights}
         pricePrecision={2}
         visibleBars={visibleBars + (future?.dates.length ?? 0)}
         currentPrice={model.rows.at(-1)?.close}

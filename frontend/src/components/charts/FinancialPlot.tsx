@@ -34,6 +34,12 @@ interface Props {
    * 空白算进 pane 高度(见 AnalysisKChart), 这里只负责把价格刻度压到空白下方。
    */
   paneTopInsets?: number[]
+  /**
+   * [R634] 该 pane 顶部标题行占的高度(px, 按 pane 下标)。标题/读数画在 `paneTopInsets` 这条
+   * 空白带下面, 数据必须再让开这一行 —— R633 只挪了标题没挪数据, 标题仍然压在 MACD 柱子上。
+   * 趋势量化的纵轴范围(`tqYRange`)自己留了字道, 故传 0, 它的版面不受影响。
+   */
+  paneHeaderHeights?: number[]
   visibleBars?: number | 'all'
   intraday?: boolean
   markers?: SeriesMarker<Time>[]
@@ -321,9 +327,10 @@ export function FinancialPlot(props: Props) {
       }
       item.data = spec.data
       if (spec.pane > 0) {
-        // [R633] 副图顶部的空白带: 只动这只 pane 的价格刻度上边距, 数据区高度不变。
+        // [R633] 副图顶部的空白带 + [R634] 标题行: 都折算成这只 pane 的价格刻度上边距,
+        // 让走势从标题下方开始; 其余副图的边距不受影响。
         const paneH = props.paneHeights[spec.pane] ?? 0
-        const topInset = props.paneTopInsets?.[spec.pane] ?? 0
+        const topInset = (props.paneTopInsets?.[spec.pane] ?? 0) + (props.paneHeaderHeights?.[spec.pane] ?? 0)
         const topMargin = paneH > 0 ? Math.min(0.5, topInset / paneH) : 0
         item.api.priceScale().applyOptions({
           entireTextOnly: !!props.intraday,
@@ -380,7 +387,7 @@ export function FinancialPlot(props: Props) {
     } else if (view) chart.timeScale().setVisibleLogicalRange(view)
     if (reset) props.onHover?.(null)
     scopeRef.current = props.scope
-  }, [props.scope, props.series, props.paneHeights, props.paneTopInsets, props.intraday, props.visibleBars, props.pricePrecision])
+  }, [props.scope, props.series, props.paneHeights, props.paneTopInsets, props.paneHeaderHeights, props.intraday, props.visibleBars, props.pricePrecision])
 
   useEffect(() => {
     const lines = [...(props.annotations?.priceLines ?? [])]
