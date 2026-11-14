@@ -35,6 +35,7 @@
 | **模拟盘信号栏的「盯着」一段**(没拿着、离触发价 5% 以内还没转的票; 分离转多 / 离转空) | R515 先收成只列离转多 2% 以内的几只(用户: 「模拟盘的只需要展示最重要的, 像"盯着"这部分, 这么多没有精力看」), 再整段撤掉(「不要盯着」)。交易只在收盘转折那一刻发生, 还没转的票转了那天会出现在「要动手」里 | `flip_today.evaluate` 的 watch 档照旧算；[R564] 模拟盘并进虚拟账户后，接口 `GET /api/paper/flip` 只发持仓与「没拿着、盘中会转多」的票，没拿着又没到线的在 `flip_follow_run.panel` 里筛掉 | 全列两组的版面: `git show 260c2ee1:frontend/src/pages/FlipPaper.tsx`, 看 `WatchGroup`; 只列快转多的版面: `git show 258c07a0:frontend/src/pages/FlipPaper.tsx` | R515 / R516 |
 | **决策台「持仓」格的手填成本输入框**(持有那几行旁边那个「成本」框, 出场线按它算) | 用户:「不需要成本这一列」。成本改由「持仓提醒」页的批次提供(数量加权均价) | 后端 `PUT /api/watchlist/positions/{symbol}` 仍收 `cost`; 已经手填过的成本还在 `user_data/positions.json` 里, 出场线照旧按它算, 决策台切换持有 / 空仓时原样带着 | `git show 5a19c723:frontend/src/components/stock-analysis/WatchlistDecisionBoard.tsx`, 搜 `type="number"` | R527 |
 | **开发者工具** | 调试用，从来不进菜单 | 路由 `/dev` | 地址栏输入 `/dev` | 作者原有 |
+| **日K 副图的 MACD**（工具栏那颗 MACD 胶囊；开后在 K 线下方多一条 DIF / DEA / 柱状副图） | 用户：「日K里面的副图MACD可以删除了」。同一张图已有「量化MACD」副图（R649 并入），两套 MACD 挨着看只会互相干扰 | 数据与画法都在：`SUB_CHART_META` 里 MACD 那条、`LightweightDaily` 与 `EChartsCandlestick` 的 MACD 绘制照旧；指数页（`frontend/src/pages/Indices.tsx` 的 `activeIndicators={['vol', 'macd']}`）仍在用 | 只补前端：`frontend/src/components/StockDailyKChart.tsx` 的 `DAILY_SUB_CHARTS` 过滤器（去掉 `def.key !== 'macd'`），工具栏改回 `SUB_CHART_META.map` | R659 |
 
 ---
 

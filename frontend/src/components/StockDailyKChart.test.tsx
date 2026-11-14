@@ -153,7 +153,7 @@ it('[R657] 日K 里指标开关键与价位开关键同一尺寸(跟原来那颗
   await render()
   const byLabel = (label: string) => [...host.querySelectorAll('button')]
     .find(button => button.textContent?.trim() === label)!
-  const indicator = byLabel('MACD')
+  const indicator = byLabel('RSI')
   const level = host.querySelector('[data-testid="level-toolbar"] button')
   expect(level).not.toBeNull()
   for (const button of [indicator, level!]) {
@@ -165,6 +165,13 @@ it('[R657] 日K 里指标开关键与价位开关键同一尺寸(跟原来那颗
     expect(button.className).not.toContain('px-2.5')
     expect(button.className).not.toContain('text-xs')
   }
+})
+
+it('[R659] 日K 不再提供原 MACD 副图入口, 量化MACD 仍在', async () => {
+  await render()
+  const labels = [...host.querySelectorAll('button')].map(button => button.textContent?.trim())
+  expect(labels).not.toContain('MACD')
+  expect(labels).toContain('量化MACD')
 })
 
 it('[R651] 空间不够只压两张分析副图, 主图与指标副图的高度不动', async () => {

@@ -39,6 +39,10 @@ STILL_THERE = [
     # [R568 同步上游 v0.3.6] 作者把批次登记页改成扩展页 /lots(侧栏「持仓提醒」)
     ("批次登记页", "frontend/src/custom/lots/extension.tsx", "id: 'official.lots'"),
     ("开发者工具", "frontend/src/router.tsx", "{ path: 'dev', element: <Dev /> }"),
+    # [R659] 日K 撤掉原 MACD 副图入口, 但指标定义与画法(日K 的其他入口、指数页)都还在
+    ("日K 副图的 MACD", "frontend/src/lib/chart-indicators.ts", "{ key: 'macd', label: 'MACD', height: 72 }"),
+    ("日K 副图的 MACD", "frontend/src/components/charts/LightweightDaily.tsx", "series.push({ id: 'macd_hist'"),
+    ("日K 副图的 MACD", "frontend/src/components/EChartsCandlestick.tsx", "name: 'MACD',"),
     ("信号栏的「盯着」一段", "backend/app/services/flip_today.py", '"stage": STAGE_WATCH,'),
     ("手填成本输入框", "backend/app/api/watchlist.py", "cost: float | None = None"),
     ("手填成本输入框", "backend/app/api/watchlist.py", "positions.set_position(symbol, req.held, req.cost, req.weight)"),

@@ -5,6 +5,12 @@ import { klineDailyQueryOptions, klineDateRange } from '@/lib/kline'
 import { storage } from '@/lib/storage'
 import type { ChartMarker, ChartPriceLine, ChartRange, ChartRenderer, DailyAnalysisPane, DailyMarkerStyle, OHLC, VolumeCompareConfig } from '@/lib/chart-types'
 import { SUB_CHART_META } from '@/lib/chart-indicators'
+
+/**
+ * [R659] 用户: 「日K 里面的副图 MACD 可以删除了」。MACD 的取数与画法仍是共享的
+ * (`LightweightDaily` / `EChartsCandlestick` 都还画, 指数页也在用), 这里只撤掉日K 的入口。
+ */
+const DAILY_SUB_CHARTS = SUB_CHART_META.filter(def => def.key !== 'macd')
 import {
   CHART_LAYOUT, SUB_PANE_GAP, dailyChartHeight, fitAnalysisPaneHeights, quantPaneHeight, trendPaneHeight,
 } from '@/lib/chart-layout'
@@ -238,8 +244,9 @@ export function StockDailyKChart({
   const tquantQ = useStockTrendQuant(symbol, showTrendQuant)
   const qmacdQ = useStockQuantMacd(symbol, showQuantMacd)
 
-  // [R653] 关键价位主图那套价位指标并进日K: 取数、档位、开关状态与「关键价位」视图共用同一份
-  // (`QK.stockLevels` + `useLevelControls`), 不新增接口、不另算口径。
+  // [R653] 关键价位主图那套价位指标并进日K: 取数(`QK.stockLevels` 同一个键)、价位的收集与画法
+  // 与「关键价位」视图共用同一份, 不新增接口、不另算口径。
+  // [R659] 开关状态是**各自持有**的一份(`useLevelControls`), 切视图后会回到默认档 —— 这是现状, 不是共用。
   const theme = useTheme()
   const levelCtl = useLevelControls(DEFAULT_LEVEL_TYPES)
   const levelsQ = useStockLevels(symbol, renderer === 'lightweight')
@@ -320,7 +327,7 @@ export function StockDailyKChart({
       {showIndicatorControls && rows.length > 0 && (
         <div className={renderer === 'lightweight' ? 'flex min-h-10 flex-wrap items-center gap-1 border-b border-border/50 bg-elevated/20 px-3 py-1.5 xl:h-10 xl:flex-nowrap xl:py-0' : 'flex items-center gap-1.5 px-1 pb-0.5'}>
           {renderer === 'lightweight' && <span className="mr-2 shrink-0 text-xs font-semibold text-foreground">日 K</span>}
-          {SUB_CHART_META.map(ind => (
+          {DAILY_SUB_CHARTS.map(ind => (
             <ChartPill
               key={ind.key}
               active={activeIndicators.includes(ind.key)}
@@ -424,7 +431,8 @@ export function StockDailyKChart({
           </div>
         </div>
       )}
-      {/* [R653] 价位开关排: 与「关键价位」同一个 LevelToolbar、同一份状态, 切视图不丢 */}
+      {/* [R653] 价位开关排: 与「关键价位」同一个 LevelToolbar、同一套计数与文案;
+          开关状态各自持有(R659 核对), 切视图会回到默认档 */}
       {showIndicatorControls && renderer === 'lightweight' && rows.length > 0 && (
         <div className="flex flex-wrap items-center border-b border-border/50 bg-elevated/10 px-3 pt-1.5" data-testid="level-toolbar">
           <LevelToolbar
