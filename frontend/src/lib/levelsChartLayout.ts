@@ -33,7 +33,7 @@ export const GAP_MAIN_SUB = 14      // 主图 ↔ 副图(两边纵轴刻度不�
 export const SUB_HEADER = 18
 /**
  * [R559] 趋势量化比量化MACD 高这么多: 它的八种字挪进了图顶 / 图底两条字道(`trendQuantSeries.ts`
- * 的 `laneLayout`), 两条字道占掉约 90px, 不加高的话中间的图就被挤扁了。
+ * 的 `laneLayout`), [R619] 每条道三行、两条字道占掉约 110px, 不加高的话中间的图就被挤扁了。
  */
 export const TREND_LANES_EXTRA = 50
 export const GAP_SUB_SLIDER = 26    // 副图 ↔ 缩放条: 日期刻度在这一段里

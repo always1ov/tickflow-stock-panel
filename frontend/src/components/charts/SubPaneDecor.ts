@@ -3,14 +3,16 @@ import type {
   SeriesAttachedParameter, SeriesType, Time,
 } from 'lightweight-charts'
 import { HOLLOW_DASH, ICON_UP, ICON_DOWN, ICON_W } from '@/lib/quantMacdSeries'
-import { LANE_BOTTOM_PAD, LANE_FONT, LANE_HALO, LANE_ROWS, LANE_ROW_H, LANE_TOP_PAD } from '@/lib/trendQuantSeries'
+import {
+  LANE_BOTTOM_PAD, LANE_FONT, LANE_HALO, LANE_ROW_H, LANE_TOP_PAD, packLaneTexts, type LaneDraft,
+} from '@/lib/trendQuantSeries'
 
 /**
  * [R616] 两张副图上那些 lightweight 原生系列画不出来的图元 —— 按 R565(还是 ECharts 时)
  * 的画法补画:
  *
  *   · 趋势量化: 红绿短柱**从昨值连到今值**(原生 Histogram 只能从 0 起画)、吸筹白细柱、
- *     八种字(极底 / 升 / 顶 / 下 / 建仓 / 逃 / 见底 / 绝底)排在上下两条字道;
+ *     八种字(极底 / 升 / 顶 / 下 / 建仓 / 逃 / 见底 / 绝底)排在上下两条字道, 每条道三行;
  *   · 量化MACD: DIFF 实心柱只露 DEA 之外那一截、DEA 空心点线框、金叉 / 死叉 13×18 箭头、
  *     共振黄柱。
  *
@@ -28,7 +30,7 @@ export type DecorItem =
   | { kind: 'hollow'; time: string; from: number; to: number; color: string; ratio: number }
   /** 箭头图标: 顶端对准 value、水平居中于那根 K 线 */
   | { kind: 'icon'; time: string; value: number; up: boolean; color: string }
-  /** 字道文字: 顶 / 底各两行, 按真实像素宽度分行, 一个字的横坐标对准它那一天 */
+  /** 字道文字: 顶 / 底各三行([R619] 两行装不下密集信号), 按真实像素宽度分行, 横坐标对准它那一天 */
   | { kind: 'text'; time: string; text: string; color: string; lane: 'top' | 'bottom' }
 
 export interface PaneDecorData {
@@ -74,10 +76,9 @@ export class PaneDecor implements ISeriesPrimitive<Time> {
       const ts = chart.timeScale()
       const { width, height } = mediaSize
       const barSpacing = ts.options().barSpacing
-      // 字道分行: 每条道两行, 记已占到的右边界; 放不下才换第二行(与 R559 的 laneLayout 同一规则)
-      const right: Record<'top' | 'bottom', number[]> = {
-        top: Array(LANE_ROWS).fill(-Infinity), bottom: Array(LANE_ROWS).fill(-Infinity),
-      }
+      // [R619] 字先收起来, 等柱子和图标画完再统一排版 —— 排版要求横坐标单调,
+      // 而这些图元是按种类分批给过来的, 一边画一边排会把两行都占满后硬压在已有的字上。
+      const texts: LaneDraft<Extract<DecorItem, { kind: 'text' }>>[] = []
       ctx.save()
       ctx.beginPath(); ctx.rect(0, 0, width, height); ctx.clip()
       for (const item of this.data.items) {
@@ -108,24 +109,23 @@ export class PaneDecor implements ISeriesPrimitive<Time> {
           ctx.restore()
         } else {
           ctx.font = `${LANE_FONT}px "JetBrains Mono", monospace`
-          const textW = ctx.measureText(item.text).width + 4
-          const left = x - textW / 2
-          const rows = right[item.lane]
-          let row = rows.findIndex(itemRight => itemRight <= left)
-          if (row < 0) row = rows.indexOf(Math.min(...rows))
-          rows[row] = left + textW
-          const y = item.lane === 'top'
-            ? headerH + LANE_TOP_PAD + row * LANE_ROW_H
-            : height - LANE_BOTTOM_PAD - (row + 1) * LANE_ROW_H
-          ctx.textAlign = 'center'
-          ctx.textBaseline = 'top'
-          // 描边当底色光晕: 图里有柱子和线, 纯色小字压上去会糊
-          ctx.lineWidth = LANE_HALO.lineWidth
-          ctx.strokeStyle = LANE_HALO.stroke
-          ctx.strokeText(item.text, x, y)
-          ctx.fillStyle = item.color
-          ctx.fillText(item.text, x, y)
+          texts.push({ lane: item.lane, x, w: ctx.measureText(item.text).width + 4, item })
         }
+      }
+      // [R619] 三行字道, 按真实像素宽度从左到右排; 排不下的往右让一点, 再放不下就不画(见 packLaneTexts)
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'top'
+      ctx.font = `${LANE_FONT}px "JetBrains Mono", monospace`
+      // 描边当底色光晕: 图里有柱子和线, 纯色小字压上去会糊
+      ctx.lineWidth = LANE_HALO.lineWidth
+      ctx.strokeStyle = LANE_HALO.stroke
+      for (const { item, x, row } of packLaneTexts(texts)) {
+        const y = item.lane === 'top'
+          ? headerH + LANE_TOP_PAD + row * LANE_ROW_H
+          : height - LANE_BOTTOM_PAD - (row + 1) * LANE_ROW_H
+        ctx.strokeText(item.text, x, y)
+        ctx.fillStyle = item.color
+        ctx.fillText(item.text, x, y)
       }
       ctx.restore()
     })

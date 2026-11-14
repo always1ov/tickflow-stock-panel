@@ -161,17 +161,25 @@ const NONE = '-'
  * R558 只让字与字互相避让, 字本身仍写在原文的高度上(平均线处、0.75、1、3.1 ……), 那些高度正是
  * 线和柱子所在的地方 —— 「顶」压着紫线, 「建仓」压着绿线和柱子, 同一天连出两个字就竖着贴在一起。
  * 所以把字从图里挪出去: 图顶上一条字道放卖出一侧(顶 / 逃 / 下), 图底下一条放买入一侧(升 / 建仓 /
- * 见底 / 绝底 / 极底), 每个字**水平对准它那一天**; 字道各两行, 画的时候按真实像素宽度排, 挤不下
- * 才换到第二行。出不出字、在哪一天, 一概不变; 变的只是竖直位置。
+ * 见底 / 绝底 / 极底), 每个字**水平对准它那一天**; 字道分行, 画的时候按真实像素宽度排, 挤不下
+ * 才换下一行。出不出字、在哪一天, 一概不变; 变的只是竖直位置。
+ *
+ * [R619] 两行 → 三行, 并改掉"两行都占满就强行压进最空那行"的兜底 —— 用户: 「顶部和底部字还是会
+ * 重叠」。120 日窗口下相邻两根只隔约 4.5px, 而「建仓 / 见底 / 极底 / 绝底」有 26px 宽, 两行装不下
+ * 一串挨着的信号; 强行压进去就是在已有字上再盖一个。现在: 先按横坐标排序(调用方是按"哪种字"分批给
+ * 的, 不是时间序), 三行都放不下时允许往右挪几像素, 连挪都放不下就**不画**这个字 —— 宁可少一个,
+ * 也不让两个叠在一起。
  *
  * 字道贴着副图底边画。
  */
 export const LANE_FONT = 11
 export const LANE_ROW_H = 14
-export const LANE_ROWS = 2
+export const LANE_ROWS = 3
 export const LANE_TOP_PAD = 3
 export const LANE_BOTTOM_PAD = 22   // 字道与副图底边之间的留白
 export const LANE_HALO = { stroke: '#000000', lineWidth: 3 }
+/** [R619] 三行都放不下时, 最多把字往右让这么多像素(120 日窗口下约 2 根 K 线, 看不出来) */
+export const LANE_NUDGE_MAX = 8
 
 /** 两条字道一共占掉的高度(px) —— 副图因此加高这么多, 图本身不被挤小 */
 export const TQ_LANES_H = LANE_TOP_PAD + LANE_ROWS * LANE_ROW_H + LANE_BOTTOM_PAD + LANE_ROWS * LANE_ROW_H
@@ -193,33 +201,65 @@ export function tqYRange(paneH: number, headerPx = 0): { min: number; max: numbe
 /** 字宽(px): 11px 字号, 汉字 11px, 外加描边 */
 const laneTextW = (t: string) => [...t].length * LANE_FONT + 4
 
+/** [R619] 待排的一个字: 哪条道、横坐标对准哪一天、占多宽 */
+export interface LaneDraft<T> {
+  lane: 'top' | 'bottom'
+  x: number
+  w: number
+  item: T
+}
+
 /**
- * 把可见范围里的字排进两条字道: 从左到右, 每个字放进第一行放得下的地方(和前一个字不相碰),
- * 两行都放不下才压在第二行上。`xs[i]` 是第 i 根的像素横坐标, 看不见的给 null。
+ * [R619] 字道排版 —— 两条字道唯一的排法, ECharts 旧路径与 lightweight 现行路径都走这里。
+ *
+ * 输入可以乱序(现行代码按 mark 类型分批生成), 这里先按横坐标从左到右排。每字先找一行
+ * (上一字的右边界不越过本字左边界); 三行都放不下时, 往右让不超过 `LANE_NUDGE_MAX` 像素,
+ * 挑让得最少的那行; 还是放不下就跳过。返回的 `x` 是挪过之后的真实中心。
+ */
+export function packLaneTexts<T>(
+  drafts: LaneDraft<T>[], rows = LANE_ROWS,
+): { lane: 'top' | 'bottom'; row: number; x: number; item: T }[] {
+  const out: { lane: 'top' | 'bottom'; row: number; x: number; item: T }[] = []
+  const right: Record<'top' | 'bottom', number[]> = {
+    top: Array(rows).fill(-Infinity), bottom: Array(rows).fill(-Infinity),
+  }
+  const sorted = [...drafts].sort((a, b) => a.x - b.x)
+  for (const d of sorted) {
+    let left = d.x - d.w / 2
+    const rs = right[d.lane]
+    let row = rs.findIndex(r => r <= left)
+    if (row < 0) {
+      let bestShift = Infinity
+      for (let i = 0; i < rows; i++) {
+        const shift = rs[i] - left
+        if (shift <= LANE_NUDGE_MAX && shift < bestShift) { row = i; bestShift = shift }
+      }
+      if (row < 0) continue
+      left += bestShift
+    }
+    rs[row] = left + d.w
+    out.push({ lane: d.lane, row, x: left + d.w / 2, item: d.item })
+  }
+  return out
+}
+
+/**
+ * 把可见范围里的字排进两条字道。`xs[i]` 是第 i 根的像素横坐标, 看不见的给 null。
  * 返回 [字, 横坐标, 第几行] —— 纯函数, 单测用。
  */
 export function laneLayout(
   marks: Record<TrendMarkKey, boolean[]>, xs: (number | null)[],
 ): { m: (typeof TREND_MARKS)[number]; x: number; row: number }[] {
-  const out: { m: (typeof TREND_MARKS)[number]; x: number; row: number }[] = []
-  const right: Record<'top' | 'bottom', number[]> = {
-    top: Array(LANE_ROWS).fill(-Infinity), bottom: Array(LANE_ROWS).fill(-Infinity),
-  }
+  const drafts: LaneDraft<(typeof TREND_MARKS)[number]>[] = []
   for (let i = 0; i < xs.length; i++) {
     const x = xs[i]
     if (x == null) continue
     for (const m of TREND_MARKS) {
       if (!marks[m.key][i]) continue
-      const w = laneTextW(m.text)
-      const left = x - w / 2
-      const rows = right[m.lane]
-      let row = rows.findIndex(r => r <= left)
-      if (row < 0) row = rows.indexOf(Math.min(...rows))
-      rows[row] = left + w
-      out.push({ m, x, row })
+      drafts.push({ lane: m.lane, x, w: laneTextW(m.text), item: m })
     }
   }
-  return out
+  return packLaneTexts(drafts).map(({ item: m, x, row }) => ({ m, x, row }))
 }
 
 /** 返回这张副图的全部系列, 顺序即原文画的先后。 */

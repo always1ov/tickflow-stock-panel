@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { TREND_QUANT_COLORS as C } from './theme'
 import {
-  alignTrendQuant, laneLayout, tqYRange, TQ_LANES_H, TREND_MARKS, TREND_QUANT_HELP, TREND_QUANT_LEGEND,
-  trendQuantLegendGraphic, trendQuantSeries,
+  alignTrendQuant, laneLayout, packLaneTexts, tqYRange, LANE_NUDGE_MAX, LANE_ROWS, TQ_LANES_H,
+  TREND_MARKS, TREND_QUANT_HELP, TREND_QUANT_LEGEND, trendQuantLegendGraphic, trendQuantSeries,
   type TrendQuantData,
 } from './trendQuantSeries'
 
@@ -106,6 +106,36 @@ describe('[R486] 趋势量化副图', () => {
     expect(at('jiancang', 100).row).toBe(0)      // 另一条字道, 不和「顶」抢
     // 看不见的那几根不排
     expect(laneLayout(marks as never, [null, null, null, 200]).map(o => o.x)).toEqual([200])
+  })
+
+  it('[R619] 排版先按横坐标排 —— 图元是按"哪种字"分批给的, 不是时间序', () => {
+    const out = packLaneTexts([
+      { lane: 'top', x: 300, w: 15, item: '后到的顶' },
+      { lane: 'top', x: 100, w: 15, item: '先到的顶' },
+    ])
+    expect(out.map(o => o.x)).toEqual([100, 300])
+    expect(out.every(o => o.row === 0)).toBe(true)
+  })
+
+  it('[R619] 同一串挤成一堆的信号排满三行; 还放不下的不画, 不压在已有的字上', () => {
+    const drafts = Array.from({ length: LANE_ROWS + 1 }, (_, i) => (
+      { lane: 'bottom' as const, x: 100 + i * 2, w: 26, item: i }
+    ))
+    const out = packLaneTexts(drafts)
+    expect(out).toHaveLength(LANE_ROWS)          // 第 4 个跳过
+    expect(out.map(o => o.row)).toEqual([0, 1, 2])
+  })
+
+  it('[R619] 三行都差一点时往右让几像素, 让得不超过 LANE_NUDGE_MAX', () => {
+    const out = packLaneTexts([
+      { lane: 'top', x: 100, w: 15, item: 'a' },
+      { lane: 'top', x: 108, w: 15, item: 'b' },
+      { lane: 'top', x: 110, w: 15, item: 'c' },
+    ], 2)
+    const c = out.find(o => o.item === 'c')!
+    expect(c.row).toBe(0)
+    expect(c.x).toBeGreaterThan(110)
+    expect(c.x - 110).toBeLessThanOrEqual(LANE_NUDGE_MAX)
   })
 
   it('[R559] 纵轴两头留出字道: 0~4 全装下, 副图越矮留得越多(换算成数值)', () => {
