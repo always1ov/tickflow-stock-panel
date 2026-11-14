@@ -136,11 +136,6 @@ export interface AnalysisChartInput {
   colors?: Record<string, string>
   /** 单条价位的角色色映射(斐波那契二型用), 不传时把 `PriceLevel.color` 当最终色。 */
   roleColor?: (role: string) => string
-  /**
-   * [R661] 价位/曲线右侧标签是否带数值。默认 true(关键价位视图)。
-   * 日K 传 false —— 显示沿用日K 原来的「只有名字」, 只把功能搬过去。
-   */
-  labelWithValue?: boolean
 }
 
 export interface AnalysisChartModel {
@@ -294,8 +289,6 @@ export function buildAnalysisChartModel(input: AnalysisChartInput): AnalysisChar
   }
 
   const horizontal = collectPriceLines(input.levels, active, pivotRank, input.colors, input.roleColor)
-  // [R661] 标签带不带数值: 关键价位带, 日K 沿用原来的只有名字。
-  const labelWithValue = input.labelWithValue !== false
   const lines: NonNullable<AnnotationData['priceLines']> = []
   const hoveredLines: NonNullable<AnnotationData['priceLines']> = []
   for (const line of horizontal) {
@@ -303,7 +296,7 @@ export function buildAnalysisChartModel(input: AnalysisChartInput): AnalysisChar
     const hit = hoveredKey === key
     const entry = {
       value: line.value,
-      label: labelWithValue ? `${line.label} ${line.value.toFixed(precision)}` : line.label,
+      label: `${line.label} ${line.value.toFixed(precision)}`,
       color: line.color,
       opacity: dimming ? (hit ? 1 : LEVEL_LINE_DIM_OPACITY) : (line.type === 'fib2' ? 1 : LEVEL_LINE_OPACITY),
       width: hit ? LEVEL_LINE_HIT_WIDTH : LEVEL_LINE_WIDTH,
@@ -324,7 +317,7 @@ export function buildAnalysisChartModel(input: AnalysisChartInput): AnalysisChar
     const state = curveState(hoveredKey, def.group)
     lines.push({
       value: lastValue,
-      label: labelWithValue ? `${def.endLabel} ${lastValue.toFixed(precision)}` : def.endLabel,
+      label: `${def.endLabel} ${lastValue.toFixed(precision)}`,
       color: curveLabelColor(curveColorOf(def.alignedKey, def.group, input.colors), state),
       noLine: true,
       opacity: 1,

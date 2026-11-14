@@ -313,8 +313,6 @@ export function StockDailyKChart({
       hoveredKey,
       colors: levelPalette,
       roleColor,
-      // [R661] 标签显示沿用日K 原来的「只有名字」, 数值只在关键价位那侧出现
-      labelWithValue: false,
     })
   }, [renderer, kline.data?.rows, shown.effLevels, levelsQ.data?.series, levelsQ.data?.dates,
     levelCtl.activeTypes, levelCtl.pivotRank, hoveredKey, levelPalette, roleColor])
