@@ -4,6 +4,7 @@ import { AlertTriangle, LineChart, Loader2 } from 'lucide-react'
 import { EmptyState } from '@/components/EmptyState'
 import { api } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
+import { useStockQuantMacd, useStockTrendQuant } from '@/lib/useStockAnalysisPanes'
 import { AnalysisKChart, type LevelType, type PriceLevel } from './AnalysisKChart'
 import type { LevelControls } from './levelControls'
 import { TrendStateBar, useStockTrend } from './TrendStateBar'
@@ -59,22 +60,10 @@ export function StockLevelsPanel({ symbol, height = 480, bare = false, controls,
 
   const levelsQ = useStockLevels(symbol)
 
-  // [R415] 副图的量化MACD。独立一支请求: 它要约 1000 根历史预热 EMA,
-  // 而主图只取 250 根 —— 两者口径不同, 不能从主图那份日 K 里现算。
-  const qmacdQ = useQuery({
-    queryKey: QK.stockQuantMacd(symbol),
-    queryFn: () => api.stockQuantMacd(symbol),
-    enabled: !!symbol,
-    staleTime: 15_000,
-  })
-
-  // [R486] 量化MACD 上方的「趋势量化」。同样独立一支: 它要从上市第一根算起
-  const tquantQ = useQuery({
-    queryKey: QK.stockTrendQuant(symbol),
-    queryFn: () => api.stockTrendQuant(symbol),
-    enabled: !!symbol,
-    staleTime: 15_000,
-  })
+  // [R415] 副图的量化MACD / [R486] 上方的「趋势量化」—— 取数搬进 `useStockAnalysisPanes`,
+  // 与日K 视图共用同一份查询键与口径。
+  const qmacdQ = useStockQuantMacd(symbol)
+  const tquantQ = useStockTrendQuant(symbol)
 
   const trendQ = useStockTrend(symbol)
   const qc = useQueryClient()
