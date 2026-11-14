@@ -467,6 +467,26 @@ it('refits the viewport when the candle window switches, leaving the price axis 
   expect(native.series[0].priceScale().applyOptions).toHaveBeenCalledWith({ autoScale: true })
   await render(250)
   expect(native.timeScale.setVisibleLogicalRange).toHaveBeenLastCalledWith({ from: 0, to: 199 })
+  // 快速连点 60/250/120 时每次都由 scope 重算, 最后一次点击决定视口与纵轴
+  for (const bars of [60, 250, 120, 60, 250, 60]) await render(bars)
+  expect(native.timeScale.setVisibleLogicalRange).toHaveBeenLastCalledWith({ from: 140, to: 199 })
+  expect(native.series[0].priceScale().applyOptions).toHaveBeenLastCalledWith({ autoScale: true })
+})
+
+it('keeps a short history stable when wheel-zooming', async () => {
+  const rows = Array.from({ length: 4 }, (_, index) => ({ time: `2026-11-1${index}`, value: 10 + index }))
+  await act(async () => root.render(<FinancialPlot scope="short" series={[{ id: 'price', type: 'Line', pane: 0, data: rows }]}
+    height={400} paneHeights={[300]} visibleBars={60} />))
+  const plot = host.querySelector('[data-chart-engine]') as HTMLElement
+  native.timeScale.getVisibleLogicalRange.mockReturnValue({ from: 0, to: 3 })
+  native.timeScale.coordinateToLogical.mockReturnValue(1.5)
+  const before = native.timeScale.setVisibleLogicalRange.mock.calls.length
+  const event = new WheelEvent('wheel', { bubbles: true, cancelable: true, ctrlKey: true, deltaY: -120 })
+  plot.dispatchEvent(event)
+  expect(event.defaultPrevented).toBe(true)
+  expect(native.timeScale.setVisibleLogicalRange).toHaveBeenCalledTimes(before + 1)
+  // 不足 6 根时缩放退化为全量显示, 不能给出越界或反向区间
+  expect(native.timeScale.setVisibleLogicalRange).toHaveBeenLastCalledWith({ from: 0, to: 3 })
 })
 
 it('identifies the shared lunch slot when hovering instead of presenting the combined volume as a single minute', async () => {
