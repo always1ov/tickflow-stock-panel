@@ -11,8 +11,8 @@ import {
   alignQuantMacd, diffExposed, QUANT_MACD_HELP, QUANT_MACD_LEGEND, STICK_RATIO,
 } from '@/lib/quantMacdSeries'
 import {
-  alignTrendQuant, TREND_MARKS, TREND_QUANT_HELP, TREND_QUANT_LEGEND, TQ_STICK1, TQ_STICK2,
-  tqYRange, type TrendQuantData,
+  alignTrendQuant, TREND_MARK_SHORT_HELP, TREND_MARKS, TREND_QUANT_HELP, TREND_QUANT_LEGEND,
+  TQ_STICK1, TQ_STICK2, tqYRange, type TrendQuantData,
 } from '@/lib/trendQuantSeries'
 import type { Fib2Grain, Fib2Overlay, KlineRow, LevelSeries, QuantMacdResult } from '@/lib/api'
 import type { PlotData, PlotSeries } from '@/lib/lightweight-model'
@@ -162,6 +162,14 @@ function trendQuantLegendGraphic() {
           {item.name}
         </span>
       ))}
+      {/* [R620] 八种单字的对照: 图上写「建 / 见 / 绝 / 极」, 全称在悬停里 */}
+      <span title={TREND_MARK_SHORT_HELP}
+            className="inline-flex items-center gap-0.5 text-micro text-muted-foreground">
+        字:
+        {TREND_MARKS.map(mark => (
+          <span key={mark.key} style={{ color: mark.color }}>{mark.short}</span>
+        ))}
+      </span>
     </span>
   )
 }
@@ -271,6 +279,8 @@ export function AnalysisKChart({
         { text: '平均线', color: TREND_QUANT_COLORS.avg },
         { text: '吸筹', color: TREND_QUANT_COLORS.xichou },
         { text: '超买 3.2 / 超卖 0.5', color: TREND_QUANT_COLORS.yellow },
+        // [R620] 图上八种单字的对照就摆在副图里, 不用再往上翻总图例
+        ...TREND_MARKS.map(mark => ({ text: mark.short, color: mark.color })),
       ]
       : [{ text: '等待数据', color: ct.text }]
   const quantReadouts: AnnotationData['readouts'] = quantMacdError
@@ -601,9 +611,10 @@ function trendPaneSeries(
     })
   })
   // [R559] 八种字: 卖出一侧(顶 / 逃 / 下)在图顶字道, 买入一侧在图底字道。
+  // [R620] 图上只写单字(建 / 见 / 绝 / 极), 全称见副图图例的悬停说明 —— 两个字太宽, 密集时会让位到看不准日期。
   for (const mark of TREND_MARKS) {
     data.marks[mark.key].forEach((on, index) => {
-      if (on) items.push({ kind: 'text', time: dates[index], text: mark.text, color: mark.color, lane: mark.lane })
+      if (on) items.push({ kind: 'text', time: dates[index], text: mark.short, color: mark.color, lane: mark.lane })
     })
   }
   // 吸筹白柱: 原文 STICKLINE(VAR17, 0.53, 吸筹, 1, 0) —— 比红绿短柱细一半。

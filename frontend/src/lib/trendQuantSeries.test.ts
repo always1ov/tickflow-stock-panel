@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { TREND_QUANT_COLORS as C } from './theme'
 import {
   alignTrendQuant, laneLayout, packLaneTexts, tqYRange, LANE_NUDGE_MAX, LANE_ROWS, TQ_LANES_H,
-  TREND_MARKS, TREND_QUANT_HELP, TREND_QUANT_LEGEND, trendQuantLegendGraphic, trendQuantSeries,
-  type TrendQuantData,
+  TREND_MARK_SHORT_HELP, TREND_MARKS, TREND_QUANT_HELP, TREND_QUANT_LEGEND, trendQuantLegendGraphic,
+  trendQuantSeries, type TrendQuantData,
 } from './trendQuantSeries'
 
 const marks = (on: (number | null)[]) => Object.fromEntries(
@@ -80,14 +80,16 @@ describe('[R486] 趋势量化副图', () => {
     expect(end('超卖')).toMatchObject({ show: true, formatter: '超卖' })
   })
 
-  it('[R555] 图例名字用中性色, 色只落在那段线上; 悬停说明三段齐全', () => {
+  it('[R555] 图例名字用中性色, 色只落在那段线上; 悬停说明三段 + [R620] 单字对照', () => {
     const { graphic, width } = trendQuantLegendGraphic(108, 0, '#999')
     const texts = graphic.filter(g => g.type === 'text') as { style: { text: string; fill: string } }[]
     // [R556] 黄线的名字写在线右端, 图例行不再重复
     expect(texts.map(t => t.style.text)).toEqual(['平均线', '吸筹'])
     expect(texts.every(t => t.style.fill === '#999')).toBe(true)
     expect(width).toBeGreaterThan(0)
-    expect(TREND_QUANT_HELP.split('\n\n')).toHaveLength(3)
+    const sections = TREND_QUANT_HELP.split('\n\n')
+    expect(sections).toHaveLength(4)
+    expect(sections[3]).toContain('建=建仓')
   })
 
   it('[R559] 字道: 挨得太近的换到第二行, 离得开的留在第一行; 卖出一侧在上, 买入一侧在下', () => {
@@ -124,6 +126,27 @@ describe('[R486] 趋势量化副图', () => {
     const out = packLaneTexts(drafts)
     expect(out).toHaveLength(LANE_ROWS)          // 第 4 个跳过
     expect(out.map(o => o.row)).toEqual([0, 1, 2])
+  })
+
+  it('[R620] 八种字各有单字缩写, 互不相同, 都是一个字; 全称对照写给图例', () => {
+    const shorts = TREND_MARKS.map(m => m.short)
+    expect(new Set(shorts).size).toBe(TREND_MARKS.length)
+    expect(shorts.every(s => [...s].length === 1)).toBe(true)
+    expect(TREND_MARK_SHORT_HELP).toContain('建=建仓')
+    expect(TREND_MARK_SHORT_HELP).toContain('见=见底')
+    expect(TREND_MARK_SHORT_HELP).toContain('绝=绝底')
+    expect(TREND_MARK_SHORT_HELP).toContain('极=极底')
+  })
+
+  it('[R620] 字被让位后 anchorX 仍停在真实日期上(日期锚点画在这里)', () => {
+    const out = packLaneTexts([
+      { lane: 'top', x: 100, w: 15, item: 'a' },
+      { lane: 'top', x: 108, w: 15, item: 'b' },
+      { lane: 'top', x: 110, w: 15, item: 'c' },
+    ], 2)
+    const c = out.find(o => o.item === 'c')!
+    expect(c.x).toBeGreaterThan(110)
+    expect(c.anchorX).toBe(110)
   })
 
   it('[R619] 三行都差一点时往右让几像素, 让得不超过 LANE_NUDGE_MAX', () => {

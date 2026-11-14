@@ -4,7 +4,8 @@ import type {
 } from 'lightweight-charts'
 import { HOLLOW_DASH, ICON_UP, ICON_DOWN, ICON_W } from '@/lib/quantMacdSeries'
 import {
-  LANE_BOTTOM_PAD, LANE_FONT, LANE_HALO, LANE_ROW_H, LANE_TOP_PAD, packLaneTexts, type LaneDraft,
+  LANE_BOTTOM_PAD, LANE_FONT, LANE_HALO, LANE_ROWS, LANE_ROW_H, LANE_TOP_PAD, packLaneTexts,
+  type LaneDraft,
 } from '@/lib/trendQuantSeries'
 
 /**
@@ -112,17 +113,47 @@ export class PaneDecor implements ISeriesPrimitive<Time> {
           texts.push({ lane: item.lane, x, w: ctx.measureText(item.text).width + 4, item })
         }
       }
+      // [R620] 日期锚点: 每个信号在它那一天、贴着图的那条边上钉一个 3px 点。
+      // 字可能被让位、也可能因为太挤没写出来, 但点始终在真实日期上 —— 用户就是靠它认哪一天。
+      const topAnchorY = headerH + LANE_TOP_PAD + LANE_ROWS * LANE_ROW_H + 3
+      const bottomAnchorY = height - LANE_BOTTOM_PAD - LANE_ROWS * LANE_ROW_H - 3
+      for (const t of texts) {
+        ctx.fillStyle = t.item.color
+        ctx.globalAlpha = 0.75
+        ctx.fillRect(t.x - 1.5, (t.lane === 'top' ? topAnchorY : bottomAnchorY) - 1.5, 3, 3)
+      }
       // [R619] 三行字道, 按真实像素宽度从左到右排; 排不下的往右让一点, 再放不下就不画(见 packLaneTexts)
+      const placed = packLaneTexts(texts)
+      const laneY = (lane: 'top' | 'bottom', row: number) => (lane === 'top'
+        ? headerH + LANE_TOP_PAD + row * LANE_ROW_H
+        : height - LANE_BOTTOM_PAD - (row + 1) * LANE_ROW_H)
+      // [R620] 引线: 从字靠近图的一侧接到那天的小点。字没让位时就是一条竖直短线;
+      // 让过位时在字这一行补一小段横线, 让人能顺着线认出"这个字属于哪一天"。
+      ctx.lineWidth = 1
+      for (const { item, x, row, anchorX } of placed) {
+        const nearY = item.lane === 'top' ? laneY(item.lane, row) + LANE_ROW_H - 2 : laneY(item.lane, row) - 2
+        const anchorY = item.lane === 'top' ? topAnchorY : bottomAnchorY
+        ctx.strokeStyle = item.color
+        ctx.globalAlpha = 0.55
+        ctx.beginPath()
+        ctx.moveTo(anchorX, nearY)
+        ctx.lineTo(anchorX, anchorY)
+        if (Math.abs(x - anchorX) > 0.5) {
+          // 让过位: 同一行上再补一小段横线接到字
+          ctx.moveTo(anchorX, nearY)
+          ctx.lineTo(x, nearY)
+        }
+        ctx.stroke()
+      }
+      ctx.globalAlpha = 1
       ctx.textAlign = 'center'
       ctx.textBaseline = 'top'
       ctx.font = `${LANE_FONT}px "JetBrains Mono", monospace`
       // 描边当底色光晕: 图里有柱子和线, 纯色小字压上去会糊
       ctx.lineWidth = LANE_HALO.lineWidth
       ctx.strokeStyle = LANE_HALO.stroke
-      for (const { item, x, row } of packLaneTexts(texts)) {
-        const y = item.lane === 'top'
-          ? headerH + LANE_TOP_PAD + row * LANE_ROW_H
-          : height - LANE_BOTTOM_PAD - (row + 1) * LANE_ROW_H
+      for (const { item, x, row } of placed) {
+        const y = laneY(item.lane, row)
         ctx.strokeText(item.text, x, y)
         ctx.fillStyle = item.color
         ctx.fillText(item.text, x, y)
