@@ -34,7 +34,6 @@
  * **只画原文画的, 不多一样也不少一样**: 没有悬停提示, 原文没有的一律不加。
  * [R560] 图**外面**的标题带里加了图例与悬停说明(用户要的), 图里仍然只画原文画的。
  */
-import { QUANT_MACD_COLORS } from '@/lib/theme'
 
 export interface QuantMacdAligned {
   diff: (number | null)[]
@@ -65,7 +64,6 @@ export function alignQuantMacd(
 
 /** 柱宽占 K 线间距的比例 —— 实测: 10px / 15.1px。三种柱子同宽(原文宽度都是 2)。 */
 export const STICK_RATIO = 0.66
-export const STICK_WIDTH = `${STICK_RATIO * 100}%`
 
 /** 空心柱的边框: 1 点 1 空的点线(实测, 见 DEA 那一条的说明)。 */
 export const HOLLOW_DASH = [1, 1]
@@ -89,30 +87,6 @@ export function diffExposed(diff: number | null, dea: number | null): [number, n
   if (diff == null) return null
   if (dea == null || dea === 0 || (diff >= 0) !== (dea >= 0)) return [0, diff]
   return Math.abs(diff) > Math.abs(dea) ? [dea, diff] : null
-}
-
-const NONE = '-' // ECharts 里"这一根不画"
-
-/** DIFF 那一截的画法: 一个实心矩形, 宽度与别的柱子同一个比例。颜色按 DIFF 本身的正负。 */
-export function renderDiffRect(
-  _params: unknown,
-  api: {
-    value: (d: number) => number
-    coord: (v: [number, number]) => number[]
-    size: (v: [number, number]) => number[] | number
-  },
-) {
-  const i = api.value(0), lo = api.value(1), hi = api.value(2)
-  const a = api.coord([i, lo]), b = api.coord([i, hi])
-  const band = api.size([1, 0])
-  // [R418] 全景时一根 K 线可能不到 2px, 66% 就不到 1px, 画出来是一片糊 ——
-  // 最少给 1px, 至少每根都在
-  const w = Math.max(1, (Array.isArray(band) ? band[0] : band) * STICK_RATIO)
-  return {
-    type: 'rect',
-    shape: { x: a[0] - w / 2, y: Math.min(a[1], b[1]), width: w, height: Math.abs(a[1] - b[1]) },
-    style: { fill: hi >= 0 ? QUANT_MACD_COLORS.red : QUANT_MACD_COLORS.green },
-  }
 }
 
 /**
@@ -151,114 +125,3 @@ export const QUANT_MACD_LEGEND: { key: 'diff' | 'dea' | 'yellow' | 'gold' | 'dea
 /** 悬停说明全文(五段) */
 export const QUANT_MACD_HELP = QUANT_MACD_LEGEND.map(l => `${l.name}: ${l.desc}`).join('\n\n')
 
-const LEGEND_FONT = 10
-const legendTextW = (t: string) => [...t].reduce((w, ch) => w + (/[\u4e00-\u9fff]/.test(ch) ? 10 : 6.5), 0)
-const SW = 10          // 色块边长
-const LEGEND_GAP = 12
-
-/**
- * 图例: 每项 = 一个照图里画法缩小的色块(实心红绿 / 点线框 / 黄块 / 上下箭头) + 灰字名称。
- */
-export function quantMacdLegendGraphic(left: number, top: number, textColor: string): {
-  graphic: Record<string, unknown>[]
-  width: number
-} {
-  const C = QUANT_MACD_COLORS
-  const g: Record<string, unknown>[] = []
-  const y = top + 1
-  // graphic 组件没有 path 类型: 从图里那两个箭头的路径取顶点, 缩到色块大小画成多边形 —— 形状与图里同一份
-  const k = SW / ICON_H
-  const arrow = (path: string, color: string, x: number) => ({
-    type: 'polygon', silent: true,
-    shape: { points: [...path.matchAll(/(-?[\d.]+),(-?[\d.]+)/g)].map(m => [x + +m[1] * k, y + +m[2] * k]) },
-    style: { fill: color },
-  })
-  let x = left
-  for (const l of QUANT_MACD_LEGEND) {
-    let sw = SW
-    if (l.key === 'diff') {
-      g.push({ type: 'rect', silent: true, shape: { x, y, width: SW / 2, height: SW }, style: { fill: C.red } })
-      g.push({ type: 'rect', silent: true, shape: { x: x + SW / 2, y, width: SW / 2, height: SW }, style: { fill: C.green } })
-    } else if (l.key === 'dea') {
-      g.push({ type: 'rect', silent: true, shape: { x: x + 0.5, y: y + 0.5, width: SW - 1, height: SW - 1 },
-               style: { fill: 'none', stroke: C.darkRed, lineWidth: 1, lineDash: HOLLOW_DASH } })
-    } else if (l.key === 'yellow') {
-      // 细灰边: 亮色主题下标题带是白底, 纯黄色块单独放在白底上几乎看不见
-      g.push({ type: 'rect', silent: true, shape: { x: x + 0.5, y: y + 0.5, width: SW - 1, height: SW - 1 },
-               style: { fill: C.yellow, stroke: 'rgba(128,128,128,0.6)', lineWidth: 1 } })
-    } else {
-      sw = ICON_W * SW / ICON_H
-      g.push(arrow(l.key === 'gold' ? ICON_UP : ICON_DOWN, l.key === 'gold' ? C.red : C.icon2, x))
-    }
-    g.push({ type: 'text', left: x + sw + 4, top: top, silent: true,
-             style: { text: l.name, fill: textColor, fontSize: LEGEND_FONT } })
-    x += sw + 4 + legendTextW(l.name) + LEGEND_GAP
-  }
-  return { graphic: g, width: x - left - LEGEND_GAP }
-}
-
-/**
- * 返回五个系列, 顺序即画的先后(= 原文语句的先后)。
- * `axis` 是这张副图所在的坐标轴下标。
- */
-export function quantMacdSeries(
-  a: QuantMacdAligned,
-  axis: { xAxisIndex: number; yAxisIndex: number },
-): Record<string, unknown>[] {
-  const C = QUANT_MACD_COLORS
-  const bar = {
-    type: 'bar', ...axis, animation: false, silent: true,
-    barWidth: STICK_WIDTH,
-    barMinWidth: 1,   // [R418] 与 DIFF 那一截同一个下限
-    // 柱子叠在同一个位置 —— 原文几条 STICKLINE 画的是同一根 K 线的位置
-    barGap: '-100%',
-  }
-  const icon = {
-    type: 'scatter', ...axis, animation: false, silent: true, z: 4,
-    symbolSize: [ICON_W, ICON_H],
-    // 图标顶端对准数值: 往下挪半个图标高
-    symbolOffset: [0, ICON_H / 2],
-  }
-  const diffData: [number, number, number][] = []
-  a.diff.forEach((v, i) => {
-    const seg = diffExposed(v, a.dea[i])
-    if (seg) diffData.push([i, seg[0], seg[1]])
-  })
-  return [
-    {
-      type: 'custom', ...axis, name: 'DIFF', z: 2, animation: false, silent: true,
-      clip: true, encode: { x: 0, y: [1, 2] },
-      renderItem: renderDiffRect,
-      data: diffData,
-    },
-    {
-      ...bar, name: 'DEA', z: 3,
-      data: a.dea.map(v => v == null ? NONE : {
-        value: v,
-        // 空心: 只描边。框里面本来就没画 DIFF(见 `diffExposed`), 看到的就是底色。
-        // 边框是**点线**(1 点 1 空): 截图里空心框的两条竖边亮度按 3 像素一个周期
-        // 起伏、且两条边同相 —— 实线怎么缩放都出不来这种纵向起伏, 正是 1 点 1 空
-        // 的点线被截图缩到 2/3 之后的样子。
-        itemStyle: {
-          color: 'transparent', borderColor: v >= 0 ? C.darkRed : C.green,
-          borderWidth: 1, borderType: HOLLOW_DASH,
-        },
-      }),
-    },
-    {
-      ...icon, name: '金叉', symbol: ICON_UP,
-      itemStyle: { color: C.red },
-      data: a.gold_icon.map(v => v == null ? NONE : v),
-    },
-    {
-      ...icon, name: '死叉', symbol: ICON_DOWN,
-      itemStyle: { color: C.icon2 },
-      data: a.dead_icon.map(v => v == null ? NONE : v),
-    },
-    {
-      ...bar, name: '共振', z: 5,
-      itemStyle: { color: C.yellow },
-      data: a.yellow.map(v => v == null ? NONE : v),
-    },
-  ]
-}

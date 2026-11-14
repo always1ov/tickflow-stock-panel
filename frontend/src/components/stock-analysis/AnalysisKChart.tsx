@@ -603,6 +603,9 @@ function trendPaneSeries(
     if (data.xichou_bar[index] !== 1 || xichou == null) return
     items.push({ kind: 'stick', time: dates[index], from: 0.53, to: xichou, color: C.white, ratio: TQ_STICK1 })
   })
+  // [R638] 两条黄线的名字写在右端 —— 只写名字不带数值(R557), 与线上那条 3.2 / 0.5 对齐。
+  items.push({ kind: 'label', value: 3.2, text: '超买', color: C.yellow })
+  items.push({ kind: 'label', value: 0.5, text: '超卖', color: C.yellow })
 
   return {
     series: [

@@ -48,12 +48,20 @@ def test_R429_切到另一只票天数复位():
     assert "useState<number>(HERO_DAYS_DEFAULT)" in dlg
 
 
+def _code_only(src: str) -> str:
+    """去掉块注释 —— R622/R623 的说明在文件头复述了撤掉的按钮名, 判「渲染里有没有」不能连注释一起看。"""
+    return re.sub(r"/\*.*?\*/", "", src, flags=re.S)
+
+
 def test_R429_AI入口与占位按钮():
     hero = code_of(HERO)
     assert "onClick={() => onAiAnalyze(symbol, name)} disabled={aiBusy}" in hero
-    assert "todo('导出复盘')" in hero, "「导出复盘」占位按钮不见了"
+    code = _code_only(hero)
+    # [R623] 「导出复盘」只剩一个弹「还没定」的提示, 用户要求撤掉 —— 连 todo 兜底一起删了
+    assert "导出复盘" not in code, "「导出复盘」占位按钮又回来了"
+    assert "todo(" not in code, "撤按钮时留下的 todo 兜底又回来了"
     # [R447] 用户: 「删掉导出复盘后面的使用说明按钮, 不需要了」
-    assert "使用说明" not in hero, "「使用说明」按钮又回来了"
+    assert "使用说明" not in code, "「使用说明」按钮又回来了"
 
 
 def test_R429_星星方框不叠冲突的内边距():

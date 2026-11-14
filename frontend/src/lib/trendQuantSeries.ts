@@ -106,32 +106,6 @@ export const TREND_QUANT_LEGEND: { name: string; color: string; desc: string; la
 export const TREND_QUANT_HELP = TREND_QUANT_LEGEND.map(l => `${l.name}: ${l.desc}`).join('\n\n')
   + `\n\n信号字: ${TREND_MARK_SHORT_HELP}。60 / 120 日窗口写全称, 250 日窗口缩成单字。`
 
-/** 图例一行的宽度估算: [R558] 10px 字号下汉字按 10px、其余按 6px */
-const textW = (t: string) => [...t].reduce((w, ch) => w + (/[\u4e00-\u9fff]/.test(ch) ? 10 : 6), 0)
-const SWATCH = 12
-const ITEM_GAP = 12
-
-/**
- * 图例: 每项 = 一小段该色的线 + 灰字名称, 画在「趋势量化」四个字右边。
- * 名称用中性色 —— 紫只许用在图里的线上(AGENTS.md 硬约束第 15 条), 所以色只落在那段线上。
- */
-export function trendQuantLegendGraphic(left: number, top: number, textColor: string): {
-  graphic: Record<string, unknown>[]
-  width: number
-} {
-  const graphic: Record<string, unknown>[] = []
-  let x = left
-  // [R556] 黄线的名字已写在线的右端, 图例这行不再重复印它(悬停说明里仍有那一段)
-  for (const l of TREND_QUANT_LEGEND.filter(l => !l.labelledOnLine)) {
-    graphic.push({ type: 'line', x, y: top + 6, silent: true,
-                   shape: { x1: 0, y1: 0, x2: SWATCH, y2: 0 }, style: { stroke: l.color, lineWidth: 2 } })
-    graphic.push({ type: 'text', left: x + SWATCH + 4, top: top + 1, silent: true,
-                   style: { text: l.name, fill: textColor, fontSize: 10 } })
-    x += SWATCH + 4 + textW(l.name) + ITEM_GAP
-  }
-  return { graphic, width: x - left - ITEM_GAP }
-}
-
 /** 原文两种柱宽: 2(红绿短柱)与 1(吸筹白柱)。按量化MACD 实测的「宽度 2 = 间距 66%」折算。 */
 export const TQ_STICK2 = 0.66
 export const TQ_STICK1 = 0.33
@@ -161,29 +135,6 @@ export function alignTrendQuant(dates: string[], q: TrendQuantData | undefined):
     marks,
   }
 }
-
-type Api = {
-  value: (d: number) => number
-  coord: (v: [number, number]) => number[]
-  size: (v: [number, number]) => number[] | number
-}
-
-/** 竖着的一截柱子: 从 lo 到 hi, 宽度按 K 线间距的比例, 至少 1px。 */
-function stickRenderer(ratio: number, colorOf: (v: number) => string) {
-  return (_p: unknown, api: Api) => {
-    const i = api.value(0), lo = api.value(1), hi = api.value(2), c = api.value(3)
-    const a = api.coord([i, lo]), b = api.coord([i, hi])
-    const band = api.size([1, 0])
-    const w = Math.max(1, (Array.isArray(band) ? band[0] : band) * ratio)
-    return {
-      type: 'rect',
-      shape: { x: a[0] - w / 2, y: Math.min(a[1], b[1]), width: w, height: Math.max(1, Math.abs(a[1] - b[1])) },
-      style: { fill: colorOf(c) },
-    }
-  }
-}
-
-const NONE = '-'
 
 /**
  * [R559] 字道。用户对 R558 的截图: 「字还是重叠」。
@@ -313,88 +264,4 @@ export function laneLayout(
     }
   }
   return packLaneTexts(drafts).map(({ item: m, x, row }) => ({ m, x, row }))
-}
-
-/** 返回这张副图的全部系列, 顺序即原文画的先后。 */
-export function trendQuantSeries(
-  a: TrendQuantAligned,
-  axis: { xAxisIndex: number; yAxisIndex: number },
-): Record<string, unknown>[] {
-  const n = a.avg.length
-  const line = { type: 'line', ...axis, animation: false, silent: true, symbol: 'none' }
-  const hline = (v: number) => Array.from({ length: n }, () => v)
-  // 标签落在副图右侧的留白带里 —— 亮色主题下那里是白底, 纯黄字看不见; 垫一块与副图同色的黑底,
-  // 两个主题下都是「黑底黄字」, 像是副图的延伸
-  const hlineLabel = (text: string) => ({
-    show: true, formatter: text, color: C.yellow, fontSize: 10, distance: 6,
-    backgroundColor: C.paneBg, padding: [2, 4], borderRadius: 2,
-  })
-
-  const sticks: [number, number, number, number][] = []
-  a.stick_up.forEach((u, i) => {
-    const w = a.wave[i], p = a.wave_prev[i]
-    if (u != null && w != null && p != null) sticks.push([i, p, w, u])
-  })
-  const whites: [number, number, number, number][] = []
-  a.xichou_bar.forEach((b, i) => {
-    const x = a.xichou[i]
-    if (b === 1 && x != null) whites.push([i, 0.53, x, 0])
-  })
-  // [R559] 八种字画在两条字道里(见 `laneLayout`)。一个自定义系列、只在第一根可见的 K 线上画一整组 ——
-  // 要拿到所有字的真实像素位置才排得开, 逐根画的话每根只知道自己。
-  const texts: Record<string, unknown>[] = [{
-    type: 'custom', ...axis, name: '标注', z: 8, animation: false, silent: true, clip: true,
-    encode: { x: 0 },
-    data: a.avg.map((_, i) => [i]),
-    renderItem: (
-      params: { dataIndexInside: number; coordSys: { x: number; y: number; width: number; height: number } },
-      api: Api,
-    ) => {
-      if (params.dataIndexInside !== 0) return null
-      const { x: cx, y: cy, width: cw, height: ch } = params.coordSys
-      const xs = a.avg.map((_, i) => {
-        const x = api.coord([i, 0])[0]
-        return x >= cx - 1 && x <= cx + cw + 1 ? x : null
-      })
-      return {
-        type: 'group',
-        children: laneLayout(a.marks, xs).map(({ m, x, row }) => ({
-          type: 'text',
-          style: {
-            text: m.text, x,
-            y: m.lane === 'top'
-              ? cy + LANE_TOP_PAD + row * LANE_ROW_H
-              : cy + ch - LANE_BOTTOM_PAD - (row + 1) * LANE_ROW_H,
-            fill: m.color, fontSize: LANE_FONT, align: 'center', verticalAlign: 'top', ...LANE_HALO,
-          },
-        })),
-      }
-    },
-  }]
-
-  return [
-    // [R556] 两条黄线的名字写在右端(用户: 「超买超卖想在黄线右端注明」), 落在图右侧的留白带里。
-    // [R557] 只写名字不写数值(用户: 「超买超卖不需要显示数值了」); 3.2 / 0.5 在悬停说明里
-    { ...line, name: '超买', z: 2, lineStyle: { color: C.yellow, width: 1 }, data: hline(3.2),
-      endLabel: hlineLabel('超买') },
-    { ...line, name: '超卖', z: 2, lineStyle: { color: C.yellow, width: 1 }, data: hline(0.5),
-      endLabel: hlineLabel('超卖') },
-    { ...line, name: '平均线', z: 3, lineStyle: { color: C.avg, width: 1 },
-      data: a.avg.map(v => v ?? NONE) },
-    {
-      type: 'custom', ...axis, name: '波动', z: 4, animation: false, silent: true, clip: true,
-      encode: { x: 0, y: [1, 2] },
-      renderItem: stickRenderer(TQ_STICK2, u => (u === 1 ? C.red : C.green)),
-      data: sticks,
-    },
-    ...texts,
-    {
-      type: 'custom', ...axis, name: '吸筹柱', z: 6, animation: false, silent: true, clip: true,
-      encode: { x: 0, y: [1, 2] },
-      renderItem: stickRenderer(TQ_STICK1, () => C.white),
-      data: whites,
-    },
-    { ...line, name: '吸筹', z: 7, lineStyle: { color: C.xichou, width: 1 },
-      data: a.xichou.map(v => v ?? NONE) },
-  ]
 }

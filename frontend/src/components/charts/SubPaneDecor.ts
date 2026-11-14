@@ -33,6 +33,8 @@ export type DecorItem =
   | { kind: 'icon'; time: string; value: number; up: boolean; color: string }
   /** 字道文字: 顶 / 底各三行([R619] 两行装不下密集信号), 按真实像素宽度分行, 横坐标对准它那一天 */
   | { kind: 'text'; time: string; text: string; short?: string; color: string; lane: 'top' | 'bottom' }
+  /** [R638] 参考线右端名字(超买 / 超卖): 不跟日期走, 贴着副图右边写在该值的高度上 */
+  | { kind: 'label'; value: number; text: string; color: string }
 
 export interface PaneDecorData {
   items: DecorItem[]
@@ -80,9 +82,12 @@ export class PaneDecor implements ISeriesPrimitive<Time> {
       // [R619] 字先收起来, 等柱子和图标画完再统一排版 —— 排版要求横坐标单调,
       // 而这些图元是按种类分批给过来的, 一边画一边排会把两行都占满后硬压在已有的字上。
       const texts: (LaneDraft<Extract<DecorItem, { kind: 'text' }>> & { wShort: number })[] = []
+      // [R638] 右端名字不挂在某一天上, 没有 x 可算 —— 收起来最后画, 压在最上面
+      const labels: Extract<DecorItem, { kind: 'label' }>[] = []
       ctx.save()
       ctx.beginPath(); ctx.rect(0, 0, width, height); ctx.clip()
       for (const item of this.data.items) {
+        if (item.kind === 'label') { labels.push(item); continue }
         const x = ts.timeToCoordinate(item.time as Time)
         if (x == null || x < -24 || x > width + 24) continue
         if (item.kind === 'stick' || item.kind === 'hollow') {
@@ -171,6 +176,21 @@ export class PaneDecor implements ISeriesPrimitive<Time> {
         ctx.strokeText(item.text, x, y)
         ctx.fillStyle = item.color
         ctx.fillText(item.text, x, y)
+      }
+      // [R638] 参考线右端名字: 贴右边、纵向对准那条线的值, 同样垫一层黑描边当光晕
+      if (labels.length) {
+        ctx.textAlign = 'right'
+        ctx.textBaseline = 'middle'
+        ctx.font = `${LANE_FONT}px "JetBrains Mono", monospace`
+        ctx.lineWidth = LANE_HALO.lineWidth
+        ctx.strokeStyle = LANE_HALO.stroke
+        for (const label of labels) {
+          const y = series.priceToCoordinate(label.value)
+          if (y == null) continue
+          ctx.strokeText(label.text, width - 4, y)
+          ctx.fillStyle = label.color
+          ctx.fillText(label.text, width - 4, y)
+        }
       }
       ctx.restore()
     })
