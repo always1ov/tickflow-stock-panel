@@ -1,3 +1,6 @@
+import type { QuantMacdResult } from './api'
+import type { TrendQuantData } from './trendQuantSeries'
+
 export interface OHLC {
   date: string
   open: number
@@ -66,6 +69,29 @@ export interface VolumeCompareConfig {
   days: number
 }
 
+/**
+ * [R649] 日K 底部并入的一张分析副图(趋势量化 / 量化MACD)。
+ * 数据与画法都来自 `lib/analysisPanes.ts`; 高度由调用方算好(见 `lib/chart-layout.ts`),
+ * 图内只负责把它排到所有指标副图之后。
+ */
+export type DailyAnalysisPane =
+  | {
+    kind: 'trend'
+    height: number
+    topInset?: number
+    headerH?: number
+    data?: TrendQuantData
+    error?: boolean
+  }
+  | {
+    kind: 'quant'
+    height: number
+    topInset?: number
+    headerH?: number
+    data?: QuantMacdResult
+    error?: boolean
+  }
+
 export interface DailyChartProps {
   data: OHLC[]
   assetType?: 'stock' | 'etf' | 'index'
@@ -91,6 +117,8 @@ export interface DailyChartProps {
   volumeCompare?: VolumeCompareConfig
   /** 加入自选日 (北京时间 YYYY-MM-DD); 有值且落在当前区间内时, 主图画一条「自选」竖虚线 */
   addedDate?: string | null
+  /** [R649] 底部并入的分析副图(趋势量化 / 量化MACD), 按数组顺序排在各指标副图之后 */
+  analysisPanes?: DailyAnalysisPane[]
 }
 
 export type ChartRenderer = 'echarts' | 'lightweight'

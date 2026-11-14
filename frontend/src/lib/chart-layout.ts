@@ -63,6 +63,18 @@ export function trendSubPaneHeight(mainHeight: number): number {
   return Math.round(Math.min(TREND_SUB_PANE_MAX, Math.max(TREND_SUB_PANE_MIN, mainPaneH * TREND_SUB_PANE_RATIO)))
 }
 
+/**
+ * [R649] 日K 并入的两张分析副图高度 —— 与关键价位那张图同一套判据:
+ * 趋势量化要多给上下两条字道, 量化MACD 多给副图间隔与 R635 让出的那截。
+ */
+export function trendPaneHeight(mainHeight: number): number {
+  return trendSubPaneHeight(mainHeight) + TREND_LANES_EXTRA
+}
+
+export function quantPaneHeight(mainHeight: number): number {
+  return trendSubPaneHeight(mainHeight) + SUB_PANE_GAP + MACD_PANE_EXTRA
+}
+
 /** `height` = 主图高时, 关键价位那张图连两张副图、副图间隔与 [R635] 额外让给 MACD 的高度在内的总高(不含卡片里的按钮/图例)。 */
 export function levelsChartTotalHeight(mainHeight: number): number {
   return mainHeight + 2 * trendSubPaneHeight(mainHeight) + TREND_LANES_EXTRA + SUB_PANE_GAP + MACD_PANE_EXTRA

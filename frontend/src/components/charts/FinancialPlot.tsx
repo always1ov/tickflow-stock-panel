@@ -54,8 +54,11 @@ interface Props {
    * 个股分析的「趋势量化 / 量化MACD」按 R423 / R486 的原文约定不写刻度 —— ECharts 时代
    * 是 `axisLabel: { show: false }`, 换到 lightweight 后默认又冒了出来。
    * 日K / 分时的成交量 pane 旧图本来就带刻度, 不传即可保持。
+   *
+   * [R649] 也可以只给某几个 pane 下标 —— 日K 里指标副图(成交量/MACD...)保留刻度,
+   * 只有并入的趋势量化 / 量化MACD 按原文不写数字。
    */
-  hidePaneAxis?: boolean
+  hidePaneAxis?: boolean | readonly number[]
   linkedPrice?: number | null
   onHover?: (time: string | null) => void
   /** 十字线价格与像素比例(仅主价格 pane)，供价位命中判断使用 */
@@ -273,6 +276,9 @@ export function FinancialPlot(props: Props) {
       paneAnnotations.current.clear()
       paneDecorRef.current.clear()
     }
+    // [R649] 副图是否隐藏刻度: 布尔 = 所有副图, 数组 = 只隐藏列出的 pane
+    const hidesAxis = (pane: number) => Array.isArray(props.hidePaneAxis)
+      ? props.hidePaneAxis.includes(pane) : !!props.hidePaneAxis && pane > 0
     const wanted = new Set(props.series.map(s => s.id))
     for (const [id, item] of [...seriesRef.current].reverse()) if (!wanted.has(id)) {
       if (id === props.series[0]?.id) { markerRef.current?.detach(); markerRef.current = null }
@@ -298,7 +304,7 @@ export function FinancialPlot(props: Props) {
                 return y != null && anchors.some(anchor => Math.abs(anchor - y) < 20) ? '' : value.toFixed(propsRef.current.pricePrecision ?? 2)
               })
             },
-          } : props.hidePaneAxis && spec.pane > 0 ? {
+          } : hidesAxis(spec.pane) ? {
             // [R630] 原文副图 `axisLabel: { show: false }`: 刻度数字给空串, 轴宽仍由主图决定,
             // 图区不会被拉宽(pane 的轴宽取所有 pane 的最大值)。
             type: 'custom' as const, formatter: () => '',
@@ -338,7 +344,7 @@ export function FinancialPlot(props: Props) {
           // [R630] 个股分析的副图沿用原文版面: 整块高度都给走势(tqYRange 已按像素预算留好字道),
           // 不再叠加成交量 pane 那套 28% / 8% 边距 —— 否则走势被二次压缩、字道与数据对不上。
           scaleMargins: spec.id === 'volume' ? { top: props.intraday ? 0.22 : 0.3, bottom: 0 }
-            : props.hidePaneAxis ? { top: topMargin, bottom: 0 } : { top: 0.28, bottom: 0.08 },
+            : hidesAxis(spec.pane) ? { top: topMargin, bottom: 0 } : { top: 0.28, bottom: 0.08 },
         })
       }
     }

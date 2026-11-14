@@ -3,9 +3,11 @@ import { useQuery } from '@tanstack/react-query'
 import { type KlineRow } from '@/lib/api'
 import { klineDailyQueryOptions, klineDateRange } from '@/lib/kline'
 import { storage } from '@/lib/storage'
-import type { ChartMarker, ChartPriceLine, ChartRange, ChartRenderer, DailyMarkerStyle, OHLC, VolumeCompareConfig } from '@/lib/chart-types'
+import type { ChartMarker, ChartPriceLine, ChartRange, ChartRenderer, DailyAnalysisPane, DailyMarkerStyle, OHLC, VolumeCompareConfig } from '@/lib/chart-types'
 import { OVERLAY_INDICATORS, SUB_CHART_META } from '@/lib/chart-indicators'
-import { CHART_LAYOUT, dailyChartHeight } from '@/lib/chart-layout'
+import { CHART_LAYOUT, SUB_PANE_GAP, dailyChartHeight, quantPaneHeight, trendPaneHeight } from '@/lib/chart-layout'
+import { PANE_HEADER_H } from '@/lib/analysisPanes'
+import { useStockQuantMacd, useStockTrendQuant } from '@/lib/useStockAnalysisPanes'
 
 const EChartsCandlestick = lazy(() => import('./EChartsCandlestick').then(m => ({ default: m.EChartsCandlestick })))
 const LightweightDaily = lazy(() => import('./charts/LightweightDaily').then(m => ({ default: m.LightweightDaily })))
@@ -157,6 +159,9 @@ export function StockDailyKChart({
   addedDate,
 }: Props) {
   const [activeIndicators, setActiveIndicators] = useState<string[]>(['vol'])
+  // [R649] 关键价位那两张副图并入日K, 默认关闭 —— 与改版前日K一样只留成交量。
+  const [showTrendQuant, setShowTrendQuant] = useState(false)
+  const [showQuantMacd, setShowQuantMacd] = useState(false)
   const [showMarkers, setShowMarkers] = useState(true)
   const [markerStyle, setMarkerStyle] = useState<DailyMarkerStyle>(() => {
     const saved = storage.stockDailyMarkerStyle.get('label')
@@ -200,10 +205,32 @@ export function StockDailyKChart({
   const activeSubDefs = activeIndicators
     .map(key => SUB_CHART_META.find(s => s.key === key))
     .filter((d): d is typeof SUB_CHART_META[number] => !!d)
+
+  // [R649] 两张分析副图只在 lightweight 渲染下存在; 数据与关键价位视图同源(同一查询键)。
+  const tquantQ = useStockTrendQuant(symbol, showTrendQuant)
+  const qmacdQ = useStockQuantMacd(symbol, showQuantMacd)
+  const analysisPanes = useMemo<DailyAnalysisPane[]>(() => {
+    if (renderer !== 'lightweight') return []
+    const panes: DailyAnalysisPane[] = []
+    if (showTrendQuant) {
+      panes.push({ kind: 'trend', height: trendPaneHeight(height), data: tquantQ.data, error: tquantQ.isError })
+    }
+    if (showQuantMacd) {
+      panes.push({
+        kind: 'quant', height: quantPaneHeight(height), topInset: SUB_PANE_GAP, headerH: PANE_HEADER_H,
+        data: qmacdQ.data, error: qmacdQ.isError,
+      })
+    }
+    return panes
+  }, [renderer, showTrendQuant, showQuantMacd, height, tquantQ.data, tquantQ.isError, qmacdQ.data, qmacdQ.isError])
+  const analysisExtraH = analysisPanes.reduce((sum, pane) => sum + pane.height, 0)
+
   let subExtraH = 0
   activeSubDefs.forEach(def => { subExtraH += SUB_INFO_H + def.height })
   if (activeSubDefs.length > 0) subExtraH += activeSubDefs.length * SUB_GAP + 14
-  const chartHeight = renderer === 'lightweight' ? dailyChartHeight(height, activeSubDefs.length) : height + subExtraH
+  const chartHeight = renderer === 'lightweight'
+    ? dailyChartHeight(height, activeSubDefs.length) + analysisExtraH
+    : height + subExtraH
   const Chart = renderer === 'lightweight' ? LightweightDaily : EChartsCandlestick
 
   if (!symbol) return null
@@ -231,6 +258,23 @@ export function StockDailyKChart({
               onClick={() => toggleIndicator(ind.key)}
             />
           ))}
+          {/* [R649] 从「关键价位」并过来的两张副图 —— 固定排在各指标副图之后 */}
+          {renderer === 'lightweight' && (
+            <>
+              <ChartPill
+                active={showTrendQuant}
+                label="趋势量化"
+                activeClass="bg-accent/20 text-accent"
+                onClick={() => setShowTrendQuant(value => !value)}
+              />
+              <ChartPill
+                active={showQuantMacd}
+                label="量化MACD"
+                activeClass="bg-accent/20 text-accent"
+                onClick={() => setShowQuantMacd(value => !value)}
+              />
+            </>
+          )}
           {activeIndicators.includes('vol') && (
             <div className="ml-0.5 flex h-5 items-center gap-1.5 border-l border-border/70 pl-2">
               <span className="text-micro text-muted">量比</span>
@@ -325,6 +369,7 @@ export function StockDailyKChart({
           activeIndicators={activeIndicators}
           volumeCompare={volumeCompare}
           addedDate={showAddedMark ? addedDate : null}
+          analysisPanes={analysisPanes}
         />
         </Suspense>
       )}

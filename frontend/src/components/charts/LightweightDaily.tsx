@@ -5,9 +5,13 @@ import { SUB_CHART_META, volMaN, volumeRatioAt } from '@/lib/chart-indicators'
 import { CHART_COLORS as C, lineData, validDailyRows, type PlotSeries } from '@/lib/lightweight-model'
 import { fmtVolume, fmtPct, pricePrecision } from '@/lib/format'
 import { CHART_LAYOUT, plotPaneHeights } from '@/lib/chart-layout'
-import { useTheme, type Theme } from '@/lib/theme'
+import {
+  quantPaneReadouts, quantPaneSeries, quantPaneTitle, trendPaneReadouts, trendPaneSeries, trendPaneTitle,
+} from '@/lib/analysisPanes'
+import { useChartTheme, useTheme, type Theme } from '@/lib/theme'
 import { FinancialPlot } from './FinancialPlot'
 import type { AnnotationData } from './ChartAnnotations'
+import type { PaneDecorData } from './SubPaneDecor'
 
 const fields = {
   macd: [['macd_dif', 'DIF', 'yellow'], ['macd_dea', 'DEA', 'plum']],
@@ -52,10 +56,11 @@ const eventTextColor = (event: EventMarker, row: OHLC, theme: Theme) => event.ev
 
 export function LightweightDaily({ data, assetType, symbol = '', height = 480, activeIndicators = [], showMA = true, showInfoBar = true,
   markers = [], ranges, priceLines, showMarkers = true, markerStyle = 'label', volumeCompare = { enabled: true, days: 1 }, addedDate,
-  linkedPrice, onDateClick, onPriceDoubleClick, visibleBars, stockInfo }: DailyChartProps) {
+  linkedPrice, onDateClick, onPriceDoubleClick, visibleBars, stockInfo, analysisPanes = [] }: DailyChartProps) {
   const rows = useMemo(() => validDailyRows(data), [data])
   const precision = pricePrecision(assetType)
   const theme = useTheme()
+  const ct = useChartTheme()
   const color = (key: keyof typeof LINE_COLORS) => LINE_COLORS[key][theme]
   const volumeMAs = useMemo(() => ({ 5: volMaN(rows, 5), 10: volMaN(rows, 10) }), [rows])
   const scope = `${symbol}:${rows[0]?.date ?? ''}:${ranges?.map(range => `${range.start}:${range.end}`).join(';') ?? ''}`
@@ -107,8 +112,51 @@ export function LightweightDaily({ data, assetType, symbol = '', height = 480, a
     })
     return series
   }, [rows, showMA, selected, activeIndicators, events, markerStyle, showMarkers, theme, volumeMAs])
+
+  // [R649] 底部并入的分析副图(趋势量化 / 量化MACD): 排在各指标副图之后, 高度由调用方算好。
+  // 与关键价位那张图同一份画法(`lib/analysisPanes.ts`), 这里只负责 pane 下标与版面。
+  const analysis = useMemo(() => {
+    const base = selected.length + 1
+    const dates = rows.map(row => row.date)
+    const bars = typeof visibleBars === 'number' ? visibleBars : rows.length
+    const series: PlotSeries[] = []
+    const decor: PaneDecorData[] = []
+    const titles: string[] = []
+    const readouts: NonNullable<AnnotationData['readouts']>[] = []
+    const insets: number[] = []
+    const headers: number[] = []
+    const hidden: number[] = []
+    analysisPanes.forEach((pane, offset) => {
+      const index = base + offset
+      hidden.push(index)
+      insets.push(pane.topInset ?? 0)
+      headers.push(pane.headerH ?? 0)
+      if (pane.kind === 'trend') {
+        const result = trendPaneSeries(dates, pane.data, !!pane.error, pane.height, bars, index)
+        series.push(...result.series)
+        decor.push(result.decor)
+        titles.push(trendPaneTitle(!!pane.error))
+        readouts.push(trendPaneReadouts(bars, pane.data, !!pane.error, ct.text))
+      } else {
+        const result = quantPaneSeries(dates, pane.data, !!pane.error, index)
+        series.push(...result.series)
+        decor.push(result.decor)
+        titles.push(quantPaneTitle(!!pane.error))
+        readouts.push(quantPaneReadouts(pane.data, !!pane.error, ct.text))
+      }
+    })
+    return { series, decor, titles, readouts, insets, headers, hidden }
+  }, [analysisPanes, rows, selected.length, visibleBars, ct.text])
+  const plotSeries = useMemo(() => [...model, ...analysis.series], [model, analysis.series])
+
   const plotHeight = Math.max(260, height - (showInfoBar ? CHART_LAYOUT.readout : 0))
-  const paneHeights = useMemo(() => plotPaneHeights(plotHeight, selected.length), [plotHeight, selected.length])
+  const paneHeights = useMemo(() => {
+    const reserved = analysisPanes.reduce((sum, pane) => sum + pane.height, 0)
+    return [
+      ...plotPaneHeights(Math.max(120, plotHeight - reserved), selected.length),
+      ...analysisPanes.map(pane => pane.height),
+    ]
+  }, [plotHeight, selected.length, analysisPanes])
   const chartMarkers = useMemo<SeriesMarker<Time>[]>(() => showMarkers ? markers
     .filter(m => rows.some(r => r.date === m.date) && !(isEvent(m) && markerStyle === 'candle'))
     .sort((a, b) => a.date.localeCompare(b.date)).map(m => {
@@ -132,7 +180,9 @@ export function LightweightDaily({ data, assetType, symbol = '', height = 480, a
     const ratio = volumeRatioAt(rows, idx, volumeCompare.days)
     return ratio == null ? [] : [{ time: row.date, value: row.volume ?? 0, text: `${ratio.toFixed(1)}x` }]
   }) : [], [rows, volumeCompare.enabled, volumeCompare.days])
-  const paneTitles = useMemo(() => ['', ...selected.map(key => SUB_CHART_META.find(d => d.key === key)!.label)], [selected])
+  const paneTitles = useMemo(
+    () => ['', ...selected.map(key => SUB_CHART_META.find(d => d.key === key)!.label), ...analysis.titles],
+    [selected, analysis.titles])
   const paneReadouts = useMemo(() => [[], ...selected.map(key => {
     const result: NonNullable<AnnotationData['readouts']> = []
     if (key === 'vol') {
@@ -148,7 +198,7 @@ export function LightweightDaily({ data, assetType, symbol = '', height = 480, a
         color: current?.macd_hist == null || !Number.isFinite(current.macd_hist) ? undefined : color(current.macd_hist >= 0 ? 'up' : 'down') })
     }
     return result
-  })], [selected, current, rows, i, volumeCompare.days, volumeCompare.enabled, theme, volumeMAs])
+  }), ...analysis.readouts], [selected, current, rows, i, volumeCompare.days, volumeCompare.enabled, theme, volumeMAs, analysis.readouts])
   const change = previous?.close ? current.close / previous.close - 1 : null
   const turnover = stockInfo?.float_shares && current?.volume != null ? current.volume * 100 / stockInfo.float_shares : null
 
@@ -175,7 +225,11 @@ export function LightweightDaily({ data, assetType, symbol = '', height = 480, a
         {index >= 0 && previous && <span className="text-secondary">至今 <span style={{ color: rows.at(-1)!.close >= previous.close ? C.up : C.down }}>{fmtPct(rows.at(-1)!.close / previous.close - 1)}</span> · 周期 {rows.length - index}</span>}
       </div>
     </div>}
-    <FinancialPlot scope={scope} series={model} height={plotHeight} paneHeights={paneHeights} pricePrecision={precision}
+    <FinancialPlot scope={scope} series={plotSeries} height={plotHeight} paneHeights={paneHeights} pricePrecision={precision}
+      paneTopInsets={[0, ...selected.map(() => 0), ...analysis.insets]}
+      paneHeaderHeights={[0, ...selected.map(() => 0), ...analysis.headers]}
+      paneDecor={[undefined, ...selected.map(() => undefined), ...analysis.decor]}
+      hidePaneAxis={analysis.hidden.length ? analysis.hidden : undefined}
       markers={chartMarkers} annotations={annotations} volumeLabels={volumeLabels} paneTitles={paneTitles} paneReadouts={paneReadouts}
       linkedPrice={linkedPrice} visibleBars={visibleBars} currentPrice={rows.at(-1)?.close}
       onHover={time => setHover(time ? { scope, time } : null)} onSelect={onDateClick} onPriceDoubleClick={onPriceDoubleClick} />

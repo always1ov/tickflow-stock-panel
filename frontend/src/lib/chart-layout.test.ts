@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { fitLevelsMainHeight, levelsChartTotalHeight, trendSubPaneHeight } from './chart-layout'
+import { fitLevelsMainHeight, levelsChartTotalHeight, quantPaneHeight, trendPaneHeight, trendSubPaneHeight } from './chart-layout'
 
 describe('[R623] 关键价位一屏装下的反算', () => {
   it('[R626] 副图是主图的 28%(限 108~136), 趋势量化的字道另算', () => {
@@ -29,5 +29,16 @@ describe('[R623] 关键价位一屏装下的反算', () => {
     expect(fitLevelsMainHeight(784)).toBe(457)
     // 主图仍占图栈(主图 + 两张副图 + 间隔 + MACD 额外)过半, 不再"主次不分"
     expect(fitLevelsMainHeight(704) / levelsChartTotalHeight(fitLevelsMainHeight(704))).toBeGreaterThan(0.56)
+  })
+})
+
+describe('[R649] 日K 并入的两张副图高度与关键价位同源', () => {
+  it('趋势量化 = 副图 + 字道, 量化MACD = 副图 + 间隔 + 额外', () => {
+    const main = 420
+    const sub = trendSubPaneHeight(main)
+    expect(trendPaneHeight(main)).toBe(sub + 50)
+    expect(quantPaneHeight(main)).toBe(sub + 12 + 25)
+    // 与整张关键价位图的总高反算一致: 主图 + 两张副图
+    expect(main + trendPaneHeight(main) + quantPaneHeight(main)).toBe(levelsChartTotalHeight(main))
   })
 })

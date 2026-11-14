@@ -474,6 +474,9 @@ export function StockPreviewDialog({ symbol, name, onClose, enableLevelsView = t
                       {chartView === 'daily' ? (
                         <StockPanel
                           symbol={symbol}
+                          // [R649] 日K 统一走 lightweight: 关键价位的两张副图已并入它的底部,
+                          // 与右侧「关键价位」同一套画布(ECharts 版画不出这两张副图)
+                          renderer="lightweight"
                           height={chartHeight ?? 420}
                           showIntraday
                           dateRange={heroRange}

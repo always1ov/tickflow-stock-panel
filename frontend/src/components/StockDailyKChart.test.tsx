@@ -117,3 +117,18 @@ it('hides the style selector wherever the existing event toggle is unavailable',
   await render({ showLimitMarkers: false })
   expect(host.querySelector('[aria-label="异动显示方式"]')).toBeNull()
 })
+
+it('[R649] 趋势量化 / 量化MACD 两张副图默认不画, 点开后才追加到日K底部', async () => {
+  await render()
+  expect(props().analysisPanes).toEqual([])
+  const pill = (label: string) => [...host.querySelectorAll('button')].find(button => button.textContent === label)!
+  await act(async () => pill('趋势量化').click())
+  expect(props().analysisPanes.map((pane: any) => pane.kind)).toEqual(['trend'])
+  await act(async () => pill('量化MACD').click())
+  expect(props().analysisPanes.map((pane: any) => pane.kind)).toEqual(['trend', 'quant'])
+  expect(props().analysisPanes.every((pane: any) => pane.height > 0)).toBe(true)
+  // ECharts 渲染没有这两张副图, 工具栏也不给开关
+  await render({ renderer: 'echarts' })
+  expect(props().analysisPanes).toEqual([])
+  expect([...host.querySelectorAll('button')].some(button => button.textContent === '趋势量化')).toBe(false)
+})
