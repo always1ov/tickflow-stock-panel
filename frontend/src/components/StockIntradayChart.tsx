@@ -4,7 +4,7 @@ import { Loader2 } from 'lucide-react'
 import { api, type MinuteKlineRow } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { klineMinuteQueryOptions, minuteRefetchInterval } from '@/lib/kline'
-import type { DailySummary } from '@/lib/intraday-chart'
+import { minuteEmptyText, minuteFetchErrorText, type DailySummary } from '@/lib/intraday-chart'
 import type { ChartRenderer } from '@/lib/chart-types'
 
 const EChartsIntraday = lazy(() => import('./EChartsIntraday').then(m => ({ default: m.EChartsIntraday })))
@@ -24,6 +24,11 @@ interface Props {
   priceLines?: { value: number; label?: string; color?: string }[]
   /** 自动刷新间隔(ms)。undefined/0 = 不轮询(默认)。个股对话框盘中实时刷新时传入。 */
   refetchIntervalMs?: number
+  /**
+   * [R625] 分钟数据确认拿不到(数据源未提供 / 指数)时通知外层。
+   * 个股弹窗据此收起空的分时列, 让日K占满宽度; 详情页不传, 行为不变。
+   */
+  onSourceEmptyChange?: (empty: boolean) => void
 }
 
 export function StockIntradayChart({
@@ -39,9 +44,13 @@ export function StockIntradayChart({
   currentPrice,
   priceLines,
   refetchIntervalMs,
+  onSourceEmptyChange,
 }: Props) {
   const qc = useQueryClient()
   const [minuteDismissed, setMinuteDismissed] = useState(false)
+  // [R624] 空态里点过「获取/重新获取」的那一天: 结果只对这一天成立, 换日期就作废,
+  // 否则上一天的失败原因会被带到下一天的空态里。
+  const [attemptDate, setAttemptDate] = useState<string | null>(null)
 
   const minute = useQuery({
     // 轮询上下文 (个股详情) 传 live: 当日盘中后端直接实时拉取最新K,
@@ -72,8 +81,14 @@ export function StockIntradayChart({
 
   useEffect(() => {
     setMinuteDismissed(false)
+    setAttemptDate(null)
     onPriceHover?.(null)
   }, [date, onPriceHover])
+
+  // [R625] 「拿不到」要区分于「还没取」: 只有加载完且数据源确认没有(或指数)才算空,
+  // 「是否立即获取」那种还能取的状态不算 —— 收起来会把获取入口一起藏掉。
+  const sourceEmpty = !minute.isLoading && minuteRows.length === 0 && (isIndex || sourceIsNone)
+  useEffect(() => { onSourceEmptyChange?.(sourceEmpty) }, [sourceEmpty, onSourceEmptyChange])
 
   if (!symbol || !date) return null
 
@@ -81,42 +96,42 @@ export function StockIntradayChart({
     <div className={className} style={{ height: renderer === 'lightweight' && minuteRows.length > 0 ? undefined : height, minHeight: height, flexShrink: 0 }}>
       {minute.isLoading && <div className="text-xs text-muted py-2">分时加载中…</div>}
       {!minute.isLoading && minuteRows.length === 0 && (
-        <>
+        <div className="flex h-full flex-col items-center justify-center gap-3">
           {fetchMinute.isPending ? (
-            <div className="flex items-center justify-center h-full gap-2 text-xs text-accent">
+            <div className="flex items-center gap-2 text-xs text-accent">
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
               <span>正在获取分钟K数据…</span>
             </div>
           ) : isIndex ? (
             // 指数: 分钟K仅支持实时读取, 无落库获取入口
-            <div className="flex items-center justify-center h-full text-xs text-muted">指数暂无分钟数据</div>
+            <div className="text-xs text-muted">{minuteEmptyText('指数')}</div>
           ) : sourceIsNone ? (
             // 数据源确认无此日分钟数据 (停牌/复牌延迟等): 静态提示 + 保留重试
-            <div className="flex flex-col items-center justify-center h-full gap-3">
-              <div className="text-xs text-muted">该日暂无分钟数据（数据源未提供）</div>
+            <>
+              <div className="text-xs text-muted">{minuteEmptyText('该日', true)}</div>
               <button
-                onClick={() => fetchMinute.mutate()}
+                onClick={() => { setAttemptDate(date); fetchMinute.mutate() }}
                 className="px-4 py-1.5 rounded-btn bg-elevated text-secondary text-xs font-medium hover:bg-elevated/80 transition-colors duration-hover"
               >
                 重新获取
               </button>
-            </div>
+            </>
           ) : minuteDismissed ? (
-            <div className="flex flex-col items-center justify-center h-full gap-3">
-              <div className="text-xs text-muted">暂无分钟数据</div>
+            <>
+              <div className="text-xs text-muted">{minuteEmptyText('该日')}</div>
               <button
                 onClick={() => setMinuteDismissed(false)}
                 className="px-4 py-1.5 rounded-btn bg-accent/90 text-on-accent text-xs font-medium hover:bg-accent transition-colors duration-hover"
               >
                 获取分钟K
               </button>
-            </div>
+            </>
           ) : (
-            <div className="flex flex-col items-center justify-center h-full gap-4">
+            <>
               <div className="text-sm text-foreground">是否立即获取最近5日分钟K？</div>
               <div className="flex items-center gap-3">
                 <button
-                  onClick={() => fetchMinute.mutate()}
+                  onClick={() => { setAttemptDate(date); fetchMinute.mutate() }}
                   className="px-4 py-1.5 rounded-btn bg-accent/90 text-on-accent text-xs font-medium hover:bg-accent transition-colors duration-hover"
                 >
                   确定
@@ -128,9 +143,18 @@ export function StockIntradayChart({
                   取消
                 </button>
               </div>
-            </div>
+            </>
           )}
-        </>
+          {/* [R624] 以前点完按钮页面内没有任何反馈: 失败只弹一条全局 toast,
+              成功但数据源一根没写入则画面一点不变 —— 用户只会以为按钮坏了。 */}
+          {attemptDate === date && !fetchMinute.isPending && (
+            fetchMinute.isError
+              ? <div className="max-w-full px-4 text-center text-micro text-danger">{minuteFetchErrorText(fetchMinute.error)}</div>
+              : fetchMinute.data?.rows === 0
+                ? <div className="max-w-full px-4 text-center text-micro text-muted">已请求获取, 数据源没有该日的分钟K</div>
+                : null
+          )}
+        </div>
       )}
       {minuteRows.length > 0 && (
         <>

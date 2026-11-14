@@ -245,6 +245,12 @@ export function StockPreviewDialog({ symbol, name, onClose, enableLevelsView = t
         ? Math.max(240, Math.min(chartAreaH - LEVELS_CHROME_H - 2 * CHART_LAYOUT.subPaneSlot, CHART_MAX_HEIGHT))
         : undefined
     : undefined
+  // [R622] 切视图回到顶部: 右栏是滚动容器, 在关键价位滚到底再切去日K/分时,
+  // 新视图会停在半截 (实测残留 213px), 看起来像图表顶部被裁。换视图即归零。
+  useEffect(() => {
+    const el = chartAreaRef.current
+    if (el) el.scrollTop = 0
+  }, [chartView])
   const prevSymbolRef = useRef<string | null>(null)
   const initialViewRef = useRef(initialView)
   initialViewRef.current = initialView
@@ -471,6 +477,9 @@ export function StockPreviewDialog({ symbol, name, onClose, enableLevelsView = t
                           intradayDays={effectiveIntradayDays}
                           dailyKlineFlex="flex-[1.4]"
                           addedDate={addedDate}
+                          // [R625] 数据源确认没有该日分钟数据时收起右边空列(原来常驻一块
+                          // 空分时 + 一个拉了也没用的按钮, 日K被挤在 57% 宽里)
+                          hideEmptyIntraday
                         />
                       ) : chartView === 'intraday' ? (
                         // [R437] 与旧分时页同一套: 上面一条信息栏(只要信息栏, 不画日 K), 下面多日分时。

@@ -3,6 +3,27 @@ import { roundPriceToTick } from '@/lib/format'
 
 export type DailySummary = { date: string; open: number | null; high: number; low: number; close: number }
 
+/**
+ * [R624] 分时空态的统一说法: 「{范围}暂无分钟数据」。
+ * 单日图与多日图以前各写一套(「该日暂无分钟数据（数据源未提供）」/「本地暂无可展示的分钟数据」),
+ * 同一件事两个说法。只有后端明确回了 source=none 才补「（数据源未提供）」——
+ * 还没请求过就说「数据源没有」是在替数据源下结论。
+ */
+export function minuteEmptyText(scope: string, sourceConfirmedEmpty = false): string {
+  return `${scope}暂无分钟数据${sourceConfirmedEmpty ? '（数据源未提供）' : ''}`
+}
+
+/** [R624] 分钟K取数失败 → 给用户看的一句话; 403 是档位没这项能力, 不是网络问题。 */
+export function minuteFetchErrorText(error: unknown): string {
+  const msg = error instanceof Error ? error.message : ''
+  if (!msg) return '分钟数据获取失败, 请稍后重试'
+  if (msg.includes('403') || msg.includes('需要 Pro')) return '分钟K需要 Pro+ 数据源能力, 当前档位不提供'
+  if (msg.includes('指数')) return '指数分钟K仅支持实时读取, 无法落库获取'
+  if (/failed to fetch|network|load failed/i.test(msg)) return '分钟数据获取失败, 请检查网络或后端服务是否在运行'
+  return `分钟数据获取失败: ${msg}`
+}
+
+
 /** 仅汇总实际收到的分钟，不将缺失开盘价或成交额伪装为真实值。 */
 export function summarizeMinutes(data: MinuteKlineRow[]): MinuteKlineRow | null {
   if (!data.length) return null

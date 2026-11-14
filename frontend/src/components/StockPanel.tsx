@@ -62,6 +62,11 @@ interface Props {
   visibleBars?: number | 'all'
   /** 加入自选日 (北京时间 YYYY-MM-DD); 有值时日K主图绘制「自选」竖虚线 */
   addedDate?: string | null
+  /**
+   * [R625] 数据源确认没有该日分钟数据时, 收起那半栏空分时, 让日K占满宽度。
+   * 只给个股弹窗用; 详情页不传, 保持原来的"空着也留着"行为。
+   */
+  hideEmptyIntraday?: boolean
 }
 
 export { getDefaultRange }
@@ -96,12 +101,15 @@ export function StockPanel({
   dailyKlineFlex = 'flex-1',
   visibleBars,
   addedDate,
+  hideEmptyIntraday = false,
 }: Props) {
   const [linkedPrice, setLinkedPrice] = useState<number | null>(null)
   const [internalSelectedDate, setSelectedDate] = useState<string | null>(null)
   const selectedDate = controlledSelectedDate === undefined ? internalSelectedDate : controlledSelectedDate
   const dateSelectedByUser = useRef(false)
   const [intradayDismissed, setIntradayDismissed] = useState(false)
+  // [R625] 分时子图回报「数据源确认没有」(空列收起用); 只影响 hideEmptyIntraday 的用法
+  const [emptyIntraday, setEmptyIntraday] = useState(false)
   // 信息条指标配置提升到此层：同时供 StockInfoBar 渲染与 StockDailyKChart 请求 ext 数据
   const [fields, setFields] = useState<ColumnConfig[]>(loadInfoFields)
   const extColumns = useMemo(() => buildInfoExtColumnsParam(fields), [fields])
@@ -206,6 +214,11 @@ export function StockPanel({
   // 财务指标最新一期（metrics 按 period_end 排序，取首项）
   const financialMetrics: FinancialMetricRecord | undefined = financials.data?.data?.[0]
 
+  // [R625] 换天/换票先复位: 收起后子图就卸载了, 不复位它永远没机会知道新日期的数据回来了
+  useEffect(() => { setEmptyIntraday(false) }, [symbol, selectedDate])
+  const intradayVisible = showIntraday && !!selectedDate && !intradayDismissed
+  const collapseIntraday = hideEmptyIntraday && emptyIntraday
+
   return (
     <div className={className}>
       <StockInfoBar
@@ -229,7 +242,7 @@ export function StockPanel({
 
       {infoBarOnly ? null : (
       <div className={renderer === 'lightweight'
-        ? `grid min-w-0 grid-cols-1 items-start overflow-hidden rounded-card border border-border/70 ${showIntraday && selectedDate && !intradayDismissed ? 'xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]' : ''}`
+        ? `grid min-w-0 grid-cols-1 items-start overflow-hidden rounded-card border border-border/70 ${intradayVisible && !collapseIntraday ? 'xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]' : ''}`
         : 'flex gap-3 items-start'}>
         <StockDailyKChart
           symbol={symbol}
@@ -250,7 +263,7 @@ export function StockPanel({
           addedDate={addedDate}
         />
 
-        {showIntraday && selectedDate && !intradayDismissed && (
+        {intradayVisible && !collapseIntraday && (
           <div className={renderer === 'lightweight' ? 'relative min-w-0 border-t border-border/60 xl:border-l xl:border-t-0' : 'relative flex-1 min-w-0 border-l border-border pl-3'}>
             <button
               onClick={() => onIntradayClose ? onIntradayClose() : setIntradayDismissed(true)}
@@ -272,6 +285,7 @@ export function StockPanel({
               currentPrice={rows[rows.length - 1]?.close}
               priceLines={priceLines}
               refetchIntervalMs={refetchIntervalMs}
+              onSourceEmptyChange={hideEmptyIntraday ? setEmptyIntraday : undefined}
             />
           </div>
         )}

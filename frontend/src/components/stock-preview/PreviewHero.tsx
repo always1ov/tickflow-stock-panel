@@ -5,8 +5,9 @@
  * 我里面的文字大都是占位符」。又定了几条:
  *   · 新头部**加在最前面**, 旧顶栏原样留着, 「后面等我叫你删除旧的」;
  *   · 60 / 120 / 250 日「直接按照图片」放在头部, 另补一个「AI 四维分析」入口(图里漏了);
- *   · 「结论」那一句、「导出复盘」「使用说明」两个按钮**先占位**。
+ *   · 「结论」那一句、「导出复盘」「使用说明」两个按钮最初**先占位**。
  *     [R447] 「使用说明」撤了。用户: 「删掉导出复盘后面的使用说明按钮, 不需要了」。
+ *     [R623] 「导出复盘」也撤了 —— 它至今只弹「还没定, 先占着位置」, 是个点了没用的死按钮。
  *   · [R472] 刷新按钮挪上来。它原来只在旧顶栏里, 而旧顶栏自 R432 起排到了新块后面, 要一路
  *     滚到底才看得见 —— 量化MACD 取数失败时图上写的是「稍后点右上角刷新重试」, 右上角却没有。
  *   · [R478] 「加监控」从旧顶栏搬上来(用户: 「先帮我移植保留监控按钮到新的里面的合适的位置」),
@@ -14,7 +15,7 @@
  *
  * 一行:
  *
- *     名称 代码  现价  涨跌幅  起 ~ 止 · N 个交易日  [☆][监控]  [60日][120日][250日] [AI 四维分析] [导出复盘] [⟳]
+ *     名称 代码  现价  涨跌幅  起 ~ 止 · N 个交易日  [☆][监控]  [60日][120日][250日] [AI 四维分析] [⟳]
  *
  * [R612] 原来下面还有一行「结论 (待定)」占位, 已删 —— 双栏改版后弹窗左边只放「现状」,
  * 这一行占着一条分隔线却没有任何内容。
@@ -24,7 +25,6 @@
  * 复盘那份要"回算", 只为了头部一行字就每次开弹窗都回算一遍不划算。
  */
 import { Loader2, RadioTower, RefreshCw, Sparkles, Star } from 'lucide-react'
-import { toast } from '@/components/Toast'
 import { WatchlistAddMenu } from '@/components/WatchlistAddMenu'
 import { useAnalysisKline } from '@/components/stock-analysis/StockLevelsPanel'
 import { PILL, PILL_IDLE, PILL_ON, SQUARE } from './pill'
@@ -61,8 +61,6 @@ export function PreviewHero({
   const tone = chg == null || chg === 0 ? 'text-muted' : chg > 0 ? 'text-bull' : 'text-bear'
   const span = rows.slice(-days)
   const dateOf = (r?: { date: unknown }) => (r ? String(r.date).slice(0, 10) : '')
-
-  const todo = (what: string) => toast(`「${what}」还没定, 先占着位置`, 'info')
 
   return (
     <div className="shrink-0 border-b border-border/60 px-4 pb-3 pt-4 sm:px-6">
@@ -123,9 +121,6 @@ export function PreviewHero({
               AI 四维分析
             </button>
           )}
-          <button type="button" onClick={() => todo('导出复盘')} className={`${PILL} ${PILL_IDLE}`}>
-            导出复盘
-          </button>
           <button type="button" onClick={onRefresh} title="刷新" aria-label={`刷新 ${name || symbol} 的数据`}
                   className={`${SQUARE} text-secondary hover:text-foreground`}>
             <RefreshCw className="h-4 w-4" />
