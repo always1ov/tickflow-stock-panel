@@ -463,6 +463,8 @@ it('refits the viewport when the candle window switches, leaving the price axis 
   expect(native.timeScale.setVisibleLogicalRange).toHaveBeenLastCalledWith({ from: 140, to: 199 })
   // 主图不挂固定价格区间: 纵轴交给库按当前可见窗口的数据极值自适应
   expect(native.chart.addSeries.mock.calls.at(-1)![1].autoscaleInfoProvider).toBeUndefined()
+  // 切窗口时把价格轴交还自适应, 手拖过的固定区间不会残留到新窗口
+  expect(native.series[0].priceScale().applyOptions).toHaveBeenCalledWith({ autoScale: true })
   await render(250)
   expect(native.timeScale.setVisibleLogicalRange).toHaveBeenLastCalledWith({ from: 0, to: 199 })
 })

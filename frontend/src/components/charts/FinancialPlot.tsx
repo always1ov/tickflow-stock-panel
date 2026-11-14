@@ -345,6 +345,9 @@ export function FinancialPlot(props: Props) {
           chart.timeScale().setVisibleLogicalRange({ from: Math.max(0, count - bars), to: count - 1 })
         }
       }
+      // [R618] 切窗口是全新取景: 手拖价格轴留下的固定区间对新窗口没意义, 交还自适应,
+      // 保证 60/120/250 来回切都按当前可见数据重算纵轴。
+      seriesRef.current.forEach(item => { if (item.pane === 0) item.api.priceScale().applyOptions({ autoScale: true }) })
     } else if (view) chart.timeScale().setVisibleLogicalRange(view)
     if (reset) props.onHover?.(null)
     scopeRef.current = props.scope
