@@ -15,7 +15,11 @@
  *
  * 一行:
  *
- *     名称 代码  现价  涨跌幅  起 ~ 止 · N 个交易日  [☆][监控]  [60日][120日][250日] [AI 四维分析] [⟳]
+ *     名称 代码  现价  涨跌幅  起 ~ 止 · N 个交易日  [☆][监控]
+ *       [区间提示 / 分时天数][日K][分时][关键价位][复盘]  [60日][120日][250日] [AI 四维分析] [⟳]
+ *
+ * [R658] 用户: 「这一行『区间跟上面的天数走 日K 分时 关键价位 复盘』放到顶部的 60 日的左边」——
+ * 原来压在图上那一行整块搬进头部, 排在天数左边; 右半边放不下就整体换到第二行, 不再压图。
  *
  * [R612] 原来下面还有一行「结论 (待定)」占位, 已删 —— 双栏改版后弹窗左边只放「现状」,
  * 这一行占着一条分隔线却没有任何内容。
@@ -24,6 +28,7 @@
  * 「起 ~ 止 · N 个交易日」从弹窗已经在取的那份日 K 里数最后 N 根, 不为这一行另发请求 ——
  * 复盘那份要"回算", 只为了头部一行字就每次开弹窗都回算一遍不划算。
  */
+import type { ReactNode } from 'react'
 import { Loader2, RadioTower, RefreshCw, Sparkles, Star } from 'lucide-react'
 import { WatchlistAddMenu } from '@/components/WatchlistAddMenu'
 import { useAnalysisKline } from '@/components/stock-analysis/StockLevelsPanel'
@@ -35,7 +40,7 @@ export const HERO_DAYS_DEFAULT = 120
 
 export function PreviewHero({
   symbol, name, days, onDaysChange, inWatchlist, watchBusy, onWatchAdd, onWatchRemove,
-  onAiAnalyze, aiBusy = false, onRefresh, onAddMonitor,
+  onAiAnalyze, aiBusy = false, onRefresh, onAddMonitor, viewControls,
 }: {
   symbol: string
   name?: string
@@ -51,6 +56,8 @@ export function PreviewHero({
   onRefresh: () => void
   /** 打开「加监控」规则编辑器(编辑器挂在弹窗那一层) */
   onAddMonitor?: () => void
+  /** [R658] 视图切换那一行(区间提示 / 分时天数 + 日K / 分时 / 关键价位 / 复盘), 排在天数左边 */
+  viewControls?: ReactNode
 }) {
   // 与关键价位页同一份日 K(同一个查询键, 不多发请求)
   const kline = useAnalysisKline(symbol)
@@ -106,6 +113,8 @@ export function PreviewHero({
         </div>
 
         <div className="flex shrink-0 flex-wrap items-center gap-2">
+          {/* [R658] 用户: 把「区间跟上面的天数走 日K 分时 关键价位 复盘」那一行放到 60 日左边 */}
+          {viewControls}
           {HERO_DAYS.map(n => (
             <button key={n} type="button" onClick={() => onDaysChange(n)}
                     aria-pressed={days === n}

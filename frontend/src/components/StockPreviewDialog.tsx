@@ -359,6 +359,36 @@ export function StockPreviewDialog({ symbol, name, onClose, enableLevelsView = t
   // 「关键价位」视图可以被调用方关掉 —— 关掉时右栏只有 3 个视图
   const viewTabs = enableLevelsView ? VIEW_TABS : VIEW_TABS.filter(t => t.key !== 'levels')
 
+  /**
+   * [R658] 用户: 「这一行『区间跟上面的天数走 日K 分时 关键价位 复盘』放到顶部的 60 日的左边」,
+   * 随后又限定「仅针对…这点内容」—— 所以只搬**那行提示文字 + 四个视图标签**,
+   * 分时那排 5/10/20 日天数留在原处(它也属于那条横条, 但不是这句话点名的东西)。
+   */
+  const viewControls = (
+    <>
+      {chartView === 'levels' ? (
+        <span className="text-xs text-muted">关键价位模式: 点开哪一类, 就画到图上</span>
+      ) : chartView === 'review' ? (
+        <span className="text-xs text-muted">最近 {reviewDays} 个交易日</span>
+      ) : chartView === 'daily' ? (
+        <span className="text-xs text-muted">区间跟上面的天数走</span>
+      ) : null}
+      <div role="tablist" aria-label="图表视图"
+           className="inline-flex shrink-0 items-center gap-1 rounded-btn border border-border bg-elevated/60 p-1">
+        {viewTabs.map(({ key, label, Icon }) => (
+          <button key={key} type="button" role="tab" aria-selected={chartView === key}
+                  onClick={() => setChartView(key)}
+                  className={`inline-flex h-8 items-center gap-1.5 rounded-btn px-3 text-sm transition-colors duration-hover ${
+                    chartView === key ? 'bg-foreground font-medium text-surface' : 'text-secondary hover:text-foreground'
+                  }`}>
+            <Icon className="h-3.5 w-3.5" />
+            {label}
+          </button>
+        ))}
+      </div>
+    </>
+  )
+
   return (
     <AnimatePresence>
       {symbol && (
@@ -404,6 +434,7 @@ export function StockPreviewDialog({ symbol, name, onClose, enableLevelsView = t
                 onAiAnalyze={onAiAnalyze} aiBusy={aiBusy}
                 onRefresh={handleRefresh}
                 onAddMonitor={() => setShowMonitorEditor(true)}
+                viewControls={viewControls}
               />
             )}
 
@@ -428,41 +459,20 @@ export function StockPreviewDialog({ symbol, name, onClose, enableLevelsView = t
                 )}
               </div>
 
-              {/* 右栏: 视图切换条 + 一张图 / 复盘 */}
+              {/* 右栏: 一张图 / 复盘([R658] 只有提示文字与四个视图标签搬进头部) */}
               <div className="flex min-h-0 min-w-0 flex-col px-4 py-4 sm:px-6">
-                <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-                  {chartView === 'intraday' ? (
-                    <div className="flex flex-wrap items-center gap-2" aria-label="分时周期">
-                      {dayOptions.map(d => (
-                        <button key={d} type="button" aria-pressed={effectiveIntradayDays === d}
-                                onClick={() => selectIntradayDays(d)}
-                                className={`${PILL} ${effectiveIntradayDays === d ? PILL_ON : PILL_IDLE}`}>
-                          {d} 日
-                        </button>
-                      ))}
-                    </div>
-                  ) : chartView === 'levels' ? (
-                    <span className="text-xs text-muted">关键价位模式: 点开哪一类, 就画到图上</span>
-                  ) : chartView === 'review' ? (
-                    <span className="text-xs text-muted">最近 {reviewDays} 个交易日</span>
-                  ) : (
-                    <span className="text-xs text-muted">区间跟上面的天数走</span>
-                  )}
-                  <div role="tablist" aria-label="图表视图"
-                       className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-btn border border-border bg-elevated/60 p-1">
-                    {viewTabs.map(({ key, label, Icon }) => (
-                      <button key={key} type="button" role="tab" aria-selected={chartView === key}
-                              onClick={() => setChartView(key)}
-                              className={`inline-flex h-8 items-center gap-1.5 rounded-btn px-3 text-sm transition-colors duration-hover ${
-                                chartView === key ? 'bg-foreground font-medium text-surface' : 'text-secondary hover:text-foreground'
-                              }`}>
-                        <Icon className="h-3.5 w-3.5" />
-                        {label}
+                {/* 分时天数不属于搬走的那句内容, 仍留在图上方 */}
+                {chartView === 'intraday' && (
+                  <div className="flex flex-wrap items-center gap-2 pb-1" aria-label="分时周期">
+                    {dayOptions.map(d => (
+                      <button key={d} type="button" aria-pressed={effectiveIntradayDays === d}
+                              onClick={() => selectIntradayDays(d)}
+                              className={`${PILL} ${effectiveIntradayDays === d ? PILL_ON : PILL_IDLE}`}>
+                        {d} 日
                       </button>
                     ))}
                   </div>
-                </div>
-
+                )}
                 {/* [R612-fix] 一律可滚: 关键价位的画布比这里的可视区高(下面挂着两张副图),
                     裁掉就等于把副图删了 —— 改版前靠弹窗整页滚, 现在是右栏自己滚。 */}
                 <div ref={chartAreaRef} className="mt-3 min-h-0 flex-1 overflow-y-auto">
