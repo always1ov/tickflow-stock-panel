@@ -135,13 +135,6 @@ export interface DailyChartProps {
    * 与「关键价位」同一套 `hitTestAnalysis` —— 悬停时该线加粗、其余变淡。
    */
   onCrosshairMove?: (point: { time: string; price: number; pixelsPerPrice: number } | null) => void
-  /**
-   * [R663] 右侧留白带(px)。日K 接管「关键价位」的版式后, 价位/曲线标签画在这条带里,
-   * 不压最后一根蜡烛; 不传 = 沿用原版(蜡烛靠右)。
-   */
-  rightOffsetPixels?: number
-  /** [R663] 右侧价位标签可用宽度(px): 超出时在空格处折成两行 */
-  labelMaxWidth?: number
   /** 初始可见根数；ECharts 默认 60，新详情按窗口宽度适配；'all' 显示全部。 */
   visibleBars?: number | 'all'
   /** 已激活的子图 key 列表 (含 vol, 按点击顺序) */

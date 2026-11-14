@@ -22,8 +22,6 @@ export interface AnnotationData {
   precision?: number
   verticals?: { time: Time; label?: string; color?: string }[]
   labels?: { time: Time; value: number; text: string; color?: string }[]
-  /** [R663] 右侧标签可用宽度(px): 超出的标签在空格处折成两行, 不再被裁掉 */
-  labelMaxWidth?: number
   textColor?: string
   title?: string
   /** [R633] 顶部空白带(px): 标题与读数整体下移, 用于在两张副图之间留间隔 */
@@ -141,7 +139,7 @@ export class ChartAnnotations implements ISeriesPrimitive<Time> {
         ctx.fillRect(x1, 0, Math.max(1, x2 - x1), height)
         if (range.label) { ctx.fillStyle = this.data.textColor ?? '#A1A1AA'; ctx.fillText(range.label, Math.max(x1 + 5, 5), 15) }
       }
-      const pendingLabels: { lines: string[]; end: number; y: number; color: string; priority: number }[] = []
+      const pendingLabels: { text: string; end: number; y: number; color: string; priority: number }[] = []
       for (const line of this.data.priceLines ?? []) {
         if (this.data.dates.length && ((line.start && line.start > this.data.dates.at(-1)!) || (line.end && line.end < this.data.dates[0]))) continue
         const y = series.priceToCoordinate(line.value)
@@ -157,26 +155,16 @@ export class ChartAnnotations implements ISeriesPrimitive<Time> {
           ctx.beginPath(); ctx.moveTo(start, y); ctx.lineTo(end, y); ctx.stroke(); ctx.setLineDash([])
           ctx.globalAlpha = 1
         }
-        if (line.label) {
-          // [R663] 带子放不下的标签在最后一个空格处折行(名字 / 数值), 宁可两行也不裁掉。
-          const maxWidth = this.data.labelMaxWidth
-          const cut = maxWidth && ctx.measureText(line.label).width > maxWidth ? line.label.lastIndexOf(' ') : -1
-          const lines = cut > 0 ? [line.label.slice(0, cut), line.label.slice(cut + 1)] : [line.label]
-          pendingLabels.push({ lines, end, y: y - 5, color: line.color ?? '#3B82F6', priority: line.labelPriority ?? 0 })
-        }
+        if (line.label) pendingLabels.push({ text: line.label, end, y: y - 5, color: line.color ?? '#3B82F6', priority: line.labelPriority ?? 0 })
       }
       // 右侧标签带按优先级从上到下排布，彼此过近时只保留优先级更高的标签。
       const placedLabels: number[] = []
       pendingLabels.sort((a, b) => (b.priority - a.priority) || (a.y - b.y))
       for (const item of pendingLabels) {
-        const ys = item.lines.map((_, index) => item.y + index * 11)
-        if (ys.some(ly => placedLabels.some(placed => Math.abs(placed - ly) < 12))) continue
-        placedLabels.push(...ys)
+        if (placedLabels.some(placed => Math.abs(placed - item.y) < 12)) continue
+        placedLabels.push(item.y)
         ctx.fillStyle = item.color
-        item.lines.forEach((text, index) => {
-          const x = Math.max(5, Math.min(item.end - ctx.measureText(text).width - 5, width - 10))
-          ctx.fillText(text, x, ys[index])
-        })
+        ctx.fillText(item.text, Math.max(5, Math.min(item.end - ctx.measureText(item.text).width - 5, width - 10)), item.y)
       }
       let verticalLabelRight = -Infinity
       for (const line of this.data.verticals ?? []) {

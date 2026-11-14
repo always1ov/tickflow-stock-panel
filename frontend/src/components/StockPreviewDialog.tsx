@@ -23,7 +23,6 @@ import { buildMonitorPriceLines } from '@/lib/price-alerts'
 import { usePreferences } from '@/lib/useSharedQueries'
 import { setFocusSymbol, clearFocusSymbol } from '@/lib/useQuoteStream'
 import { useDialogBackdrop } from '@/lib/useDialogBackdrop'
-import { DAILY_CHROME_H, fitLevelsMainHeight } from '@/lib/chart-layout'
 import { useMediaQuery } from '@/lib/useMediaQuery'
 import { storage } from '@/lib/storage'
 import { navItemKey, type NavItem } from '@/lib/listNav'
@@ -66,20 +65,6 @@ const VIEW_TABS: { key: PreviewView; label: string; Icon: typeof Clock }[] = [
 
 /** [R612] 图高上限 */
 const CHART_MAX_HEIGHT = 720
-/**
- * [R615] 关键价位这张卡里, 图表画布以外还要占的高度 —— 1600×913 实测 131:
- *   · 卡片内边距 32 + 上下边框 2;
- *   · 画布上方: 开关键排 78(右栏 940px 上下宽时折成两排) + 两张副图的图例 19。
- * 画布下方原来那条价位统计面板(114 + 上间距 12)已按用户要求挪到左栏, 不再占这里的账。
- * 这些都写死在图表组件里, 外面拿不到, 所以按实测写常量。图表内部版式一变就要回来重算。
- *
- * [R626] 那 19px 的图例行删了(名字与色样挪进各自副图顶部的读数行, 长说明收进开关排最右的「?」),
- * 131 − 19 = 112。
- * [R635] 用户要「日期那一行往下移动到快接触边界」: 卡片底部留白 16→0, 再裁掉日期轴底部 9px 空白
- * (见 `LEVELS_AXIS_CLIP`), 这张卡实际只占 112 − 25 = 87 —— 省下的 25px 由 `MACD_PANE_EXTRA`
- * 记进量化MACD, 卡片总高不变, 一屏仍刚好装下。
- */
-const LEVELS_CHROME_H = 87
 /**
  * [R614] 分时那张卡里, 图以外还要占的高度 —— 1600×913 实测 109:
  * 卡片内边距 32 + 上下边框 2 + 上方天数行 63 + 间距 12。分时没有副图, 减掉它就是一屏。
@@ -243,10 +228,9 @@ export function StockPreviewDialog({ symbol, name, onClose, navList: navListSour
   const chartHeight = wide && chartAreaH > 0
     ? chartView === 'intraday'
       ? Math.max(480, Math.min(chartAreaH - INTRADAY_CHROME_H, CHART_MAX_HEIGHT))
-      // [R663] 日K 接管原「关键价位」那张图的垂直版式: 主图高度按右栏剩余空间反算
-      // (判据与关键价位同源, lib/chart-layout 的 fitLevelsMainHeight), 再换算成日K 的 `height`
-      // (主图 + 工具栏 + 读数行 + 时间轴)。主图更高, 右侧价位标签才拉得开。
-      : Math.min(fitLevelsMainHeight(chartAreaH - LEVELS_CHROME_H) + DAILY_CHROME_H, CHART_MAX_HEIGHT)
+      // [R668] 用户: 「主图显示还是恢复原来日K里面的风格吧」「要到最近一次右侧留白带之前那个版本」——
+      // R663 那套「按关键价位反算主图高度」撤掉, 日K 回到自己的默认高度与版式。
+      : undefined
     : undefined
   // [R622] 切视图回到顶部: 右栏是滚动容器, 在关键价位滚到底再切去日K/分时,
   // 新视图会停在半截 (实测残留 213px), 看起来像图表顶部被裁。换视图即归零。

@@ -3,7 +3,6 @@ import {
   ANALYSIS_LABEL_BAND_PX,
   buildAnalysisChartModel,
   hitTestAnalysis,
-  labelBandWidth,
   levelKey,
   type LevelType,
   type PriceLevel,
@@ -47,19 +46,6 @@ const series = {
   boll: { upper: [12.1, 12.2, 12.3], lower: [9.5, 9.4, 9.3], mid: [10.8, 10.8, 10.8] },
   atr: { stop_loss: [9.0, 9.1, 9.2], take_profit: [12.5, 12.6, 12.7] },
 }
-
-describe('labelBandWidth', () => {
-  it('宽度跟最长标签走, 短的收窄、长到斐波那契Ⅱ型那种才封顶(最长的留给图表折行)', () => {
-    expect(labelBandWidth(['现价 46.09'])).toBeLessThan(80)
-    expect(labelBandWidth([])).toBe(44)
-    // [R666] 日常标签实测 86~116px(成交密集区 / Keltner短上 / 26日布林上轨 / 成交密集区(POC)),
-    // 带子要能一行放下它们 —— 折行阈值 = 带宽 − 6
-    expect(labelBandWidth(['成交密集区(POC) 42.04', '现价 46.09'])).toBe(124)
-    expect(labelBandWidth(['Keltner短上 47.15', '现价 46.09'])).toBeGreaterThanOrEqual(110)
-    // 斐波那契Ⅱ型 132px 往上, 估宽过了上限 → 折两行
-    expect(labelBandWidth(['斐波那契Ⅱ型 38.2% 43.21'])).toBe(124)
-  })
-})
 
 describe('buildAnalysisChartModel', () => {
   it('aligns channel curves to the chart rows by date and keeps missing days blank', () => {
