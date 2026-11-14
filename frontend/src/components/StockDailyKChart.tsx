@@ -27,6 +27,11 @@ interface Props {
   symbol: string
   renderer?: ChartRenderer
   height?: number
+  /**
+   * [R650] 整张图(含工具栏与所有副图)最多能占多高。弹窗右栏滚动容器把可用高度传进来,
+   * 超出时整图按比例压缩, 底部日期轴始终留在可视区内 —— 不会被新增副图顶出去。
+   */
+  maxHeight?: number
   className?: string
   dateRange?: { start: string; end: string }
   markers?: ChartMarker[]
@@ -157,6 +162,7 @@ export function StockDailyKChart({
   onPriceDoubleClick,
   extColumns,
   addedDate,
+  maxHeight,
 }: Props) {
   const [activeIndicators, setActiveIndicators] = useState<string[]>(['vol'])
   // [R649] 关键价位那两张副图并入日K, 默认关闭 —— 与改版前日K一样只留成交量。
@@ -228,9 +234,12 @@ export function StockDailyKChart({
   let subExtraH = 0
   activeSubDefs.forEach(def => { subExtraH += SUB_INFO_H + def.height })
   if (activeSubDefs.length > 0) subExtraH += activeSubDefs.length * SUB_GAP + 14
-  const chartHeight = renderer === 'lightweight'
+  const naturalChartHeight = renderer === 'lightweight'
     ? dailyChartHeight(height, activeSubDefs.length) + analysisExtraH
     : height + subExtraH
+  // [R650] 有可用高度就压进去: 副图只是「按比例占位」, 整图缩短时各 pane 一起等比收缩,
+  // 底部日期轴仍贴在卡片底边, 不会因为多开两张副图被挤出可视区。
+  const chartHeight = maxHeight ? Math.min(naturalChartHeight, Math.max(360, maxHeight)) : naturalChartHeight
   const Chart = renderer === 'lightweight' ? LightweightDaily : EChartsCandlestick
 
   if (!symbol) return null

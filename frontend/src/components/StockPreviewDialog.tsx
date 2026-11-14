@@ -478,6 +478,9 @@ export function StockPreviewDialog({ symbol, name, onClose, enableLevelsView = t
                           // 与右侧「关键价位」同一套画布(ECharts 版画不出这两张副图)
                           renderer="lightweight"
                           height={chartHeight ?? 420}
+                          // [R650] 右栏可视高度: 日K 开启分析副图后整图压进这一截,
+                          // 底部日期轴不会被副图顶到折叠线以下
+                          fillHeight={chartAreaH > 0 ? chartAreaH : undefined}
                           showIntraday
                           dateRange={heroRange}
                           // 区间取到了还不够: 带分时小图时它默认只露最后 40 根

@@ -26,6 +26,11 @@ interface Props {
   /** 详情顶栏已有名称时可隐藏报价条的重复身份；独立面板默认保留。 */
   showQuoteIdentity?: boolean
   height?: number
+  /**
+   * [R650] 整块面板(报价条 + 图)最多能占多高 —— 弹窗右栏是滚动容器, 传进来后
+   * 日K 会把整张图压进可视区, 底部日期轴不会被新增副图顶到折叠线以下。
+   */
+  fillHeight?: number
   showIntraday?: boolean
   className?: string
   /** 当用户点击蜡烛选中日期时回调（用于外部自动开启分时图）。 */
@@ -102,6 +107,7 @@ export function StockPanel({
   visibleBars,
   addedDate,
   hideEmptyIntraday = false,
+  fillHeight,
 }: Props) {
   const [linkedPrice, setLinkedPrice] = useState<number | null>(null)
   const [internalSelectedDate, setSelectedDate] = useState<string | null>(null)
@@ -110,6 +116,19 @@ export function StockPanel({
   const [intradayDismissed, setIntradayDismissed] = useState(false)
   // [R625] 分时子图回报「数据源确认没有」(空列收起用); 只影响 hideEmptyIntraday 的用法
   const [emptyIntraday, setEmptyIntraday] = useState(false)
+  // [R650] 报价条实际占高(随字段/换行变化) —— 算出留给日K的那截, 免得靠猜常数
+  const infoBarRef = useRef<HTMLDivElement>(null)
+  const [infoBarH, setInfoBarH] = useState(0)
+  useEffect(() => {
+    const el = infoBarRef.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(entries => setInfoBarH(entries[0].contentRect.height))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+  const chartMaxHeight = fillHeight && infoBarH > 0
+    ? Math.max(360, Math.round(fillHeight - infoBarH - 24))
+    : undefined
   // 信息条指标配置提升到此层：同时供 StockInfoBar 渲染与 StockDailyKChart 请求 ext 数据
   const [fields, setFields] = useState<ColumnConfig[]>(loadInfoFields)
   const extColumns = useMemo(() => buildInfoExtColumnsParam(fields), [fields])
@@ -221,6 +240,7 @@ export function StockPanel({
 
   return (
     <div className={className}>
+      <div ref={infoBarRef}>
       <StockInfoBar
         freshness={kline.data?.quote_freshness}
         assetType={kline.data?.asset_type}
@@ -239,6 +259,7 @@ export function StockPanel({
         watchlistPending={watchlistPending}
         addedDate={addedDate}
       />
+      </div>
 
       {infoBarOnly ? null : (
       <div className={renderer === 'lightweight'
@@ -248,6 +269,7 @@ export function StockPanel({
           symbol={symbol}
           renderer={renderer}
           height={height}
+          maxHeight={chartMaxHeight}
           className={renderer === 'lightweight' ? 'min-w-0' : `${dailyKlineFlex} min-w-0`}
           dateRange={dateRange}
           markers={markers}

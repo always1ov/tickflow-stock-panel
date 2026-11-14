@@ -132,3 +132,12 @@ it('[R649] 趋势量化 / 量化MACD 两张副图默认不画, 点开后才追�
   expect(props().analysisPanes).toEqual([])
   expect([...host.querySelectorAll('button')].some(button => button.textContent === '趋势量化')).toBe(false)
 })
+
+it('[R650] 给了可用高度就把整张图压进去, 底部日期轴不会被副图顶出可视区', async () => {
+  await render({ maxHeight: 400 })
+  // 图表元素拿到的高度 = 压后的整图高 - 工具栏
+  expect(props().height).toBe(400 - 40)
+  // 没给可用高度时维持原自然高
+  await render()
+  expect(props().height).toBeGreaterThan(400 - 40)
+})
