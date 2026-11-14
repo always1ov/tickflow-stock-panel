@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { CandlestickChart, Clock, Crosshair, History } from 'lucide-react'
+import { CandlestickChart, Clock, History } from 'lucide-react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import { api } from '@/lib/api'
@@ -12,7 +12,7 @@ import { StockMultiDayIntradayChart } from '@/components/StockMultiDayIntradayCh
 import { RuleEditor } from '@/components/monitor/RuleEditor'
 import { PriceAlertDialog } from '@/components/stock-analysis/PriceAlertDialog'
 import { LevelOverview, useShownLevels } from '@/components/stock-analysis/AnalysisKChart'
-import { StockLevelsPanel, useAnalysisKline, useStockLevels } from '@/components/stock-analysis/StockLevelsPanel'
+import { useAnalysisKline, useStockLevels } from '@/components/stock-analysis/StockLevelsPanel'
 import { useLevelControls } from '@/components/stock-analysis/levelControls'
 import { HERO_DAYS_DEFAULT, PreviewHero } from '@/components/stock-preview/PreviewHero'
 import { ChartLevelsSection } from '@/components/stock-preview/ChartLevelsSection'
@@ -23,7 +23,7 @@ import { buildMonitorPriceLines } from '@/lib/price-alerts'
 import { usePreferences } from '@/lib/useSharedQueries'
 import { setFocusSymbol, clearFocusSymbol } from '@/lib/useQuoteStream'
 import { useDialogBackdrop } from '@/lib/useDialogBackdrop'
-import { fitLevelsMainHeight } from '@/lib/chart-layout'
+import { DAILY_CHROME_H, fitLevelsMainHeight } from '@/lib/chart-layout'
 import { useMediaQuery } from '@/lib/useMediaQuery'
 import { storage } from '@/lib/storage'
 import { navItemKey, type NavItem } from '@/lib/listNav'
@@ -35,9 +35,7 @@ interface Props {
   symbol: string | null
   name?: string
   onClose: () => void
-  /** 是否开放“关键价位”视图。[R103] 全站统一弹窗后默认开启 —— 自选/监控/异动
-      等所有入口与策略页、个股分析页看到同一套三视图(日K/分时/关键价位)。 */
-  enableLevelsView?: boolean
+  /** [R103] 全站统一弹窗后所有入口看到同一套视图(日K/分时/复盘)。 */
   /** 有序候选列表: 提供后支持左右键切股(首尾循环) */
   navList?: NavItem[]
   /** 切股回调: 收到目标 symbol/name, 由调用方更新预览状态 */
@@ -57,13 +55,12 @@ interface Props {
   aiBusy?: boolean
 }
 
-export type PreviewView = 'daily' | 'intraday' | 'levels' | 'review'
+export type PreviewView = 'daily' | 'intraday' | 'review'
 
-/** [R612] 右栏顶部的视图切换 —— 复盘从原「图表与价位」下面独立成第 4 个视图 */
+/** [R612] 右栏顶部的视图切换 —— 复盘从原「图表与价位」下面独立成一个视图 */
 const VIEW_TABS: { key: PreviewView; label: string; Icon: typeof Clock }[] = [
   { key: 'daily', label: '日 K', Icon: CandlestickChart },
   { key: 'intraday', label: '分时', Icon: Clock },
-  { key: 'levels', label: '关键价位', Icon: Crosshair },
   { key: 'review', label: '复盘', Icon: History },
 ]
 
@@ -117,7 +114,7 @@ function loadIntradayDays(): number {
     : DEFAULT_INTRADAY_DAYS
 }
 
-export function StockPreviewDialog({ symbol, name, onClose, enableLevelsView = true, navList: navListSource, onNavigate, initialView, onAiAnalyze, aiBusy = false }: Props) {
+export function StockPreviewDialog({ symbol, name, onClose, navList: navListSource, onNavigate, initialView, onAiAnalyze, aiBusy = false }: Props) {
   // [R479] 旧顶栏 + 切换条(最近查看 / 搜索)删了: 弹窗里不再有内部换股, symbol / name 就是调用方给的;
   // 方向键切股(useListNav)照旧, 由调用方 onNavigate 换票。
   // [R185] 默认落在「关键价位」而不是日K —— 这个弹窗是拿来做决策的, 图表模块
@@ -128,7 +125,7 @@ export function StockPreviewDialog({ symbol, name, onClose, enableLevelsView = t
   // [R430] 右栏的视图, 以及价位列表与图共用的开关状态。都不随切股重置 —— 与原来的关键价位页一样,
   // 方向键翻票时开着的那几类、看的那个视图都留着。
   // [R612] 复盘从压在图表下面的第 4 块, 变成右栏的第 4 个视图, 也由这一个状态管。
-  const [chartView, setChartView] = useState<PreviewView>('levels')
+  const [chartView, setChartView] = useState<PreviewView>('daily')
   const levelCtl = useLevelControls()
   /** [R615] 悬停高亮: 图的价位标签 ↔ 左栏那条价位统计, 两边同一份状态 */
   const [levelHover, setLevelHover] = useState<string | null>(null)
@@ -246,11 +243,10 @@ export function StockPreviewDialog({ symbol, name, onClose, enableLevelsView = t
   const chartHeight = wide && chartAreaH > 0
     ? chartView === 'intraday'
       ? Math.max(480, Math.min(chartAreaH - INTRADAY_CHROME_H, CHART_MAX_HEIGHT))
-      : chartView === 'levels'
-        // [R623] 主图反算: 让主图 + 趋势量化 + 量化MACD 正好填满右栏, 不再靠滚轮。
-        // 判据与 AnalysisKChart 的副图高同源(lib/chart-layout 的 fitLevelsMainHeight)。
-        ? Math.min(fitLevelsMainHeight(chartAreaH - LEVELS_CHROME_H), CHART_MAX_HEIGHT)
-        : undefined
+      // [R663] 日K 接管原「关键价位」那张图的垂直版式: 主图高度按右栏剩余空间反算
+      // (判据与关键价位同源, lib/chart-layout 的 fitLevelsMainHeight), 再换算成日K 的 `height`
+      // (主图 + 工具栏 + 读数行 + 时间轴)。主图更高, 右侧价位标签才拉得开。
+      : Math.min(fitLevelsMainHeight(chartAreaH - LEVELS_CHROME_H) + DAILY_CHROME_H, CHART_MAX_HEIGHT)
     : undefined
   // [R622] 切视图回到顶部: 右栏是滚动容器, 在关键价位滚到底再切去日K/分时,
   // 新视图会停在半截 (实测残留 213px), 看起来像图表顶部被裁。换视图即归零。
@@ -261,17 +257,12 @@ export function StockPreviewDialog({ symbol, name, onClose, enableLevelsView = t
   const prevSymbolRef = useRef<string | null>(null)
   const initialViewRef = useRef(initialView)
   initialViewRef.current = initialView
-  const enableLevelsViewRef = useRef(enableLevelsView)
-  enableLevelsViewRef.current = enableLevelsView
   useEffect(() => {
     if (prevSymbolRef.current == null && symbol != null) {
-      // [R430] 入口指定了哪一页就用哪一页; 不传落到关键价位(关掉了就落到日K)
+      // [R430] 入口指定了哪一页就用哪一页; 不传落到日K
+      // [R663] 「关键价位」视图已下线, 它的画线与开关都并进日K
       const iv = initialViewRef.current
-      setChartView(
-        iv === 'review' ? 'review'
-          : iv === 'daily' || iv === 'intraday' ? iv
-            : enableLevelsViewRef.current ? 'levels' : 'daily',
-      )
+      setChartView(iv === 'review' ? 'review' : iv === 'intraday' ? 'intraday' : 'daily')
     }
     prevSymbolRef.current = symbol
     setPriceAlertDraft(null)
@@ -315,21 +306,18 @@ export function StockPreviewDialog({ symbol, name, onClose, enableLevelsView = t
     if (!symbol) return
     if (chartView === 'daily') {
       qc.invalidateQueries({ queryKey: ['kline', symbol] })
-    } else if (chartView === 'intraday') {
-      qc.invalidateQueries({ queryKey: ['kline-minute-range', symbol] })
-      qc.invalidateQueries({ queryKey: ['kline-minute', symbol] })
-    } else if (chartView === 'review') {
-      // [R612] 复盘成了独立视图, 刷新要重取的是它自己的那份回算
-      qc.invalidateQueries({ queryKey: QK.stockReview(symbol, reviewDays) })
-    } else {
+      // [R663] 日K 现在自己画价位与两张分析副图, 刷新要连它们那份数据一起重取
       qc.invalidateQueries({ queryKey: QK.analysisKline(symbol) })
       qc.invalidateQueries({ queryKey: QK.stockLevels(symbol) })
       qc.invalidateQueries({ queryKey: QK.stockTrend(symbol) })
-      // [R472] 关键价位图的量化MACD 副图是单独一个查询, 原来漏了 —— 它取数失败时
-      // 图上叫人「点右上角刷新重试」, 点了却不会重取。
       qc.invalidateQueries({ queryKey: QK.stockQuantMacd(symbol) })
-      // [R486] 趋势量化同理, 一起重取
       qc.invalidateQueries({ queryKey: QK.stockTrendQuant(symbol) })
+    } else if (chartView === 'intraday') {
+      qc.invalidateQueries({ queryKey: ['kline-minute-range', symbol] })
+      qc.invalidateQueries({ queryKey: ['kline-minute', symbol] })
+    } else {
+      // [R612] 复盘成了独立视图, 刷新要重取的是它自己的那份回算
+      qc.invalidateQueries({ queryKey: QK.stockReview(symbol, reviewDays) })
     }
   }
 
@@ -356,26 +344,19 @@ export function StockPreviewDialog({ symbol, name, onClose, enableLevelsView = t
     setPriceAlertDraft({ id: Date.now(), targetPrice, currentPrice })
   }
 
-  // 「关键价位」视图可以被调用方关掉 —— 关掉时右栏只有 3 个视图
-  const viewTabs = enableLevelsView ? VIEW_TABS : VIEW_TABS.filter(t => t.key !== 'levels')
-
-  /**
-   * [R658] 用户: 「这一行『区间跟上面的天数走 日K 分时 关键价位 复盘』放到顶部的 60 日的左边」,
-   * 随后又限定「仅针对…这点内容」—— 所以只搬**那行提示文字 + 四个视图标签**,
-   * 分时那排 5/10/20 日天数留在原处(它也属于那条横条, 但不是这句话点名的东西)。
-   */
+  // [R658] 用户: 「这一行『区间跟上面的天数走 日K 分时 关键价位 复盘』放到顶部的 60 日的左边」,
+  // 随后又限定「仅针对…这点内容」—— 所以只搬**那行提示文字 + 视图标签**,
+  // 分时那排 5/10/20 日天数留在原处(它也属于那条横条, 但不是这句话点名的东西)。
   const viewControls = (
     <>
-      {chartView === 'levels' ? (
-        <span className="text-xs text-muted">关键价位模式: 点开哪一类, 就画到图上</span>
-      ) : chartView === 'review' ? (
+      {chartView === 'review' ? (
         <span className="text-xs text-muted">最近 {reviewDays} 个交易日</span>
       ) : chartView === 'daily' ? (
         <span className="text-xs text-muted">区间跟上面的天数走</span>
       ) : null}
       <div role="tablist" aria-label="图表视图"
            className="inline-flex shrink-0 items-center gap-1 rounded-btn border border-border bg-elevated/60 p-1">
-        {viewTabs.map(({ key, label, Icon }) => (
+        {VIEW_TABS.map(({ key, label, Icon }) => (
           <button key={key} type="button" role="tab" aria-selected={chartView === key}
                   onClick={() => setChartView(key)}
                   className={`inline-flex h-8 items-center gap-1.5 rounded-btn px-3 text-sm transition-colors duration-hover ${
@@ -511,7 +492,7 @@ export function StockPreviewDialog({ symbol, name, onClose, enableLevelsView = t
                           onLevelHoverKey={setLevelHover}
                           refreshLive
                         />
-                      ) : chartView === 'intraday' ? (
+                      ) : (
                         // [R437] 与旧分时页同一套: 上面一条信息栏(只要信息栏, 不画日 K), 下面多日分时。
                         // 区间与新日 K 同一个(同一份缓存, 不多发请求)
                         <div className="flex flex-col gap-3">
@@ -532,12 +513,6 @@ export function StockPreviewDialog({ symbol, name, onClose, enableLevelsView = t
                           onPriceDoubleClick={openPriceAlert}
                         />
                         </div>
-                      ) : (
-                        // [R551] 不要图上方的六态条: 与左栏「现状」是同一份六态(用户圈出「重复了」),
-                        // 它独有的回测调参入口、转折信号已挪进现状卡
-                        <StockLevelsPanel symbol={symbol} bare height={chartHeight ?? 520} trendBar={false}
-                                          controls={levelCtl} visibleBars={reviewDays}
-                                          overview={false} hoveredKey={levelHover} onHoverKey={setLevelHover} />
                       )}
                     </ChartLevelsSection>
                   )}

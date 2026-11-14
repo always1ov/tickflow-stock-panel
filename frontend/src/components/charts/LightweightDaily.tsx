@@ -54,7 +54,7 @@ export function LightweightDaily({ data, assetType, symbol = '', height = 480, a
   markers = [], ranges, priceLines, showMarkers = true, markerStyle = 'label', volumeCompare = { enabled: true, days: 1 }, addedDate,
   linkedPrice, onDateClick, onPriceDoubleClick, visibleBars, stockInfo, analysisPanes = [], maKeys,
   levelSeries = [], levelLines = [], levelRanges = [], levelLabels = [], levelVerticals = [],
-  levelFuture = null, onCrosshairMove }: DailyChartProps) {
+  levelFuture = null, onCrosshairMove, rightOffsetPixels, labelMaxWidth }: DailyChartProps) {
   const rows = useMemo(() => validDailyRows(data), [data])
   const precision = pricePrecision(assetType)
   const theme = useTheme()
@@ -187,8 +187,9 @@ export function LightweightDaily({ data, assetType, symbol = '', height = 480, a
       priceLines: [...(priceLines ?? []), ...levelLines],
       labels: levelLabels,
       verticals: [...verticals, ...levelVerticals],
+      labelMaxWidth,
     }
-  }, [rows, ranges, priceLines, addedDate, levelLines, levelRanges, levelLabels, levelVerticals, levelFuture])
+  }, [rows, ranges, priceLines, addedDate, levelLines, levelRanges, levelLabels, levelVerticals, levelFuture, labelMaxWidth])
   const volumeLabels = useMemo(() => volumeCompare.enabled ? rows.flatMap((row, idx) => {
     const ratio = volumeRatioAt(rows, idx, volumeCompare.days)
     return ratio == null ? [] : [{ time: row.date, value: row.volume ?? 0, text: `${ratio.toFixed(1)}x` }]
@@ -241,6 +242,7 @@ export function LightweightDaily({ data, assetType, symbol = '', height = 480, a
       hidePaneAxis={analysis.hidden.length ? analysis.hidden : undefined}
       markers={chartMarkers} annotations={annotations} volumeLabels={volumeLabels} paneTitles={paneTitles} paneReadouts={paneReadouts}
       linkedPrice={linkedPrice} visibleBars={visibleBars} currentPrice={rows.at(-1)?.close}
+      rightOffsetPixels={rightOffsetPixels}
       onCrosshairMove={onCrosshairMove}
       onHover={time => setHover(time ? { scope, time } : null)} onSelect={onDateClick} onPriceDoubleClick={onPriceDoubleClick} />
   </div>

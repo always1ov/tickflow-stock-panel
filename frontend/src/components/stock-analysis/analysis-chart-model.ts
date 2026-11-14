@@ -92,6 +92,19 @@ function curveColorOf(alignedKey: string, group: LevelType, colors?: Record<stri
 
 /** 画布右侧预留给价位/曲线标签的空白带宽度 (px) */
 export const ANALYSIS_LABEL_BAND_PX = 148
+
+/**
+ * [R663] 右侧标签带按当前最长标签自适应 —— 固定 148px 在标签短的时候白占一大片。
+ * 宽度按 10px JetBrains Mono 估: 半角 ≈ 6.2px、全角 ≈ 10px; 超长仍以 148 封顶(由图表换行)。
+ */
+export function labelBandWidth(labels: (string | undefined)[], min = 44, max = ANALYSIS_LABEL_BAND_PX) {
+  const widest = labels.reduce((width, label) => {
+    if (!label) return width
+    const estimate = [...label].reduce((sum, ch) => sum + (ch.charCodeAt(0) > 0x2E7F ? 10 : 6.2), 0)
+    return Math.max(width, estimate)
+  }, 0)
+  return Math.min(max, Math.max(min, Math.ceil(widest) + 16))
+}
 export const LEVEL_LINE_OPACITY = 0.9
 export const LEVEL_LINE_DIM_OPACITY = 0.12
 export const LEVEL_LINE_WIDTH = 1

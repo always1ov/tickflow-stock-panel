@@ -5,7 +5,6 @@ import { StockFinancialSearch } from '@/components/financials/StockFinancialSear
 import { StockPreviewDialog, type PreviewView } from '@/components/StockPreviewDialog'
 import { PriceAlertDialog } from '@/components/stock-analysis/PriceAlertDialog'
 // [fork R363] 关键价位弹窗摘成了共用组件 —— 模拟盘也点标的弹它, 不抄第二份
-import { LevelsDialog } from '@/components/stock-analysis/LevelsDialog'
 import { WatchlistDecisionBoard } from '@/components/stock-analysis/WatchlistDecisionBoard'
 import { useLastStock } from '@/lib/useLastStock'
 import { toast } from '@/components/Toast'
@@ -31,8 +30,6 @@ export function StockAnalysis() {
   // [R427] 个股弹窗打开时落在哪一页: 点名字 → 关键价位(默认), 点「走势/位置」→ 复盘
   const [previewView, setPreviewView] = useState<PreviewView | undefined>(undefined)
   const [showPriceAlerts, setShowPriceAlerts] = useState(false)
-  // [R28] 关键价位分析弹窗:点决策台里的标的即弹出,关掉后列表原样还在
-  const [showLevels, setShowLevels] = useState(false)
   // [R157] 「定位」按钮计数: 每按一次 +1, 决策台据此把当前个股那一行滚到正中
   const [locateNonce, setLocateNonce] = useState(0)
   const { last: lastStock, remember: rememberStock } = useLastStock('stock-analysis')
@@ -65,15 +62,16 @@ export function StockAnalysis() {
     setConfirmReport(null)
     setShowPriceAlerts(false)
     rememberStock(sym, nm)
-    // [R28] 选中即弹出关键价位分析 —— 页面主体已让给决策台, 不弹就等于点了没反应
-    setShowLevels(true)
+    // [R663] 「关键价位」独立弹窗已下线, 价位/曲线/开关都并进个股弹窗的日K;
+    // 选中标的仍要"点了有反应", 所以直接打开个股弹窗落在日K。
+    setPreviewView(undefined)
+    setPreviewSymbol(sym)
   }
 
   // [R106] 选中但不弹任何窗(行内 ✨/🔔 用: 只要上下文跟随, 不要弹窗打断)
   const selectQuiet = (sym: string, nm: string) => {
     setSymbol(sym)
     setName(nm)
-    setShowLevels(false)
     rememberStock(sym, nm)
   }
 
@@ -166,8 +164,6 @@ export function StockAnalysis() {
           onSelect={onSelect}
           onPreview={(s, n, v) => {
             onSelect(s, n)
-            // 整合弹窗自带关键价位视图, 不再叠一层 R28 的关键价位弹窗
-            setShowLevels(false)
             setPreviewView(v)
             setPreviewSymbol(s)
           }}
@@ -176,19 +172,10 @@ export function StockAnalysis() {
         />
       </div>
 
-      {/* [R28] 关键价位分析弹窗:日 K + 压力支撑 + 六态趋势条。
-          常驻挂载、由 symbol 是否为 null 驱动, 这样关闭时退场动画能播完 */}
-      <LevelsDialog
-        symbol={showLevels && symbol ? symbol : null}
-        name={name}
-        onClose={() => setShowLevels(false)}
-      />
-
-      {/* 个股日 K 详情对话框(点击名称/代码打开) */}
+      {/* 个股日 K 详情对话框(点击名称/代码打开) —— [R663] 价位/曲线/开关已并进日K */}
       <StockPreviewDialog
         symbol={previewSymbol}
         name={previewSymbol === symbol ? name : undefined}
-        enableLevelsView
         initialView={previewView}
         // [R428] AI 四维分析的入口挪进了弹窗顶栏; 流程(查今日报告 → 确认)仍是这一页那一套
         onAiAnalyze={(s, n) => handleAnalyze(s, n ?? s)}

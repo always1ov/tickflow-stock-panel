@@ -11,6 +11,13 @@ export function dailyChartHeight(baseHeight: number, subPaneCount: number) {
   return baseHeight + subPaneCount * CHART_LAYOUT.subPaneSlot
 }
 
+/**
+ * [R663] 日K 的 `height` 里除主图以外的固定段: 工具栏 + 读数行 + 时间轴。
+ * 主图高 = height − 这一段; 反过来, 想让主图有 M 高就传 M + 这一段。
+ * 与关键价位那张图共用同一个主图高度反算(`fitLevelsMainHeight`)时要用它换算。
+ */
+export const DAILY_CHROME_H = CHART_LAYOUT.toolbar + CHART_LAYOUT.readout + CHART_LAYOUT.timeAxis
+
 export function plotPaneHeights(plotHeight: number, subPaneCount: number) {
   return [
     Math.max(120, plotHeight - CHART_LAYOUT.timeAxis - subPaneCount * CHART_LAYOUT.subPaneSlot),

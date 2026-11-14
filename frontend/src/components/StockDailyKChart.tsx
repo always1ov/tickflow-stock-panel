@@ -24,7 +24,7 @@ import {
 } from '@/components/stock-analysis/levelControls'
 import { LevelToolbar } from '@/components/stock-analysis/LevelToolbar'
 import {
-  LEVEL_GROUPS, buildAnalysisChartModel, hitTestAnalysis,
+  LEVEL_GROUPS, buildAnalysisChartModel, hitTestAnalysis, labelBandWidth,
 } from '@/components/stock-analysis/analysis-chart-model'
 import { fib2Status } from '@/lib/fib2Status'
 import { LEVEL_CURVE_COLOR, fib2RoleColor, levelColors, useChartTheme, useTheme } from '@/lib/theme'
@@ -362,6 +362,8 @@ export function StockDailyKChart({
     ? []
     : withFib2Future(levelModel.series.filter(item => item.id.startsWith('curve:')), fib2Overlay.future),
   [renderer, levelModel, fib2Overlay.future])
+  // [R663] 右侧标签带按当前最长标签自适应: 标签短就收窄, 不白占地方。
+  const labelBandPx = useMemo(() => labelBandWidth(levelLines.map(line => line.label)), [levelLines])
   const analysisPanes = useMemo<DailyAnalysisPane[]>(() => {
     if (renderer !== 'lightweight') return []
     const panes: DailyAnalysisPane[] = []
@@ -579,6 +581,10 @@ export function StockDailyKChart({
           levelLabels={fib2Overlay.labels}
           levelVerticals={fib2Overlay.verticals}
           levelFuture={fib2Overlay.future}
+          // [R663] 接管关键价位的版式: 价位/曲线标签画在右侧留白带里, 不压蜡烛。
+          // 回测「成交K线」不画价位, 不占这条带。带子宽度跟最长标签走。
+          rightOffsetPixels={renderer === 'lightweight' && showLevelToolbar ? labelBandPx : undefined}
+          labelMaxWidth={labelBandPx - 14}
           onCrosshairMove={renderer === 'lightweight' ? handleLevelCrosshair : undefined}
         />
         </Suspense>

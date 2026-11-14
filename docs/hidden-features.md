@@ -36,6 +36,7 @@
 | **决策台「持仓」格的手填成本输入框**(持有那几行旁边那个「成本」框, 出场线按它算) | 用户:「不需要成本这一列」。成本改由「持仓提醒」页的批次提供(数量加权均价) | 后端 `PUT /api/watchlist/positions/{symbol}` 仍收 `cost`; 已经手填过的成本还在 `user_data/positions.json` 里, 出场线照旧按它算, 决策台切换持有 / 空仓时原样带着 | `git show 5a19c723:frontend/src/components/stock-analysis/WatchlistDecisionBoard.tsx`, 搜 `type="number"` | R527 |
 | **开发者工具** | 调试用，从来不进菜单 | 路由 `/dev` | 地址栏输入 `/dev` | 作者原有 |
 | **日K 副图的 MACD**（工具栏那颗 MACD 胶囊；开后在 K 线下方多一条 DIF / DEA / 柱状副图） | 用户：「日K里面的副图MACD可以删除了」。同一张图已有「量化MACD」副图（R649 并入），两套 MACD 挨着看只会互相干扰 | 数据与画法都在：`SUB_CHART_META` 里 MACD 那条、`LightweightDaily` 与 `EChartsCandlestick` 的 MACD 绘制照旧；指数页（`frontend/src/pages/Indices.tsx` 的 `activeIndicators={['vol', 'macd']}`）仍在用 | 只补前端：`frontend/src/components/StockDailyKChart.tsx` 的 `DAILY_SUB_CHARTS` 过滤器（去掉 `def.key !== 'macd'`），工具栏改回 `SUB_CHART_META.map` | R659 |
+| **「关键价位」的图表组件**（`AnalysisKChart` / `StockLevelsPanel` 的图本体、两张分析副图、六态趋势条） | 用户：「如果没问题就可以删除关键价位这部分了」（R663）。独立弹窗与个股预览弹窗里的「关键价位」视图都撤了，画线 / 开关 / 通道 / 斐波那契Ⅱ型 / 右侧标签带全并进日K，组件本身不再有入口 | 组件与画法全在（`frontend/src/components/stock-analysis/AnalysisKChart.tsx`、`StockLevelsPanel.tsx`），日K 与左栏仍在复用其中的 `useShownLevels`、`LevelOverview`、`useStockLevels`、`useAnalysisKline` 与副图常量 | 只补前端：任意卡片挂 `<StockLevelsPanel symbol={...} bare controls={useLevelControls()} />` 即可恢复整块；组件测试 `AnalysisKChart.test.tsx` 仍绿 | R663 |
 
 ---
 
@@ -64,6 +65,7 @@
 | **因子页、回测页上 fork 加的东西**（因子 AI 解读 / AI 填表、研究工作流等） | 用户：两页「完全恢复成作者的样子」，作者的一切保留 | 无 | `git show 22333335^` | R174 |
 | **外部网页的 iframe 内嵌与「抓取原文 + AI 整理」**（原菜单「利弗莫尔趋势」：整站塞 iframe，或后端抓原文交给面板 AI 整理成 KPI 卡 + 表格；设置里的「只抓原文看看」「试运行(调一次 AI)」） | 用户：「不想搞这种嵌入了」「可以做成类似外链、博客友链、导航那种形式」—— 改成纯链接目录「外链导航」，页面零外部请求 | `user_data/external_page_view.json`（旧配置）、`user_data/external_view_latest.json`（抓取结果缓存）仍留在磁盘，已在数据体检登记为退役；新的链接清单存在 `user_data/preferences.json` 的 `external_links` | `git revert cd0d6da4`；单看删除前的实现：`backend/app/api/external_page.py`、`backend/app/services/external_fetch.py`、`external_view.py`、`frontend/src/components/ExternalViewRender.tsx`、`frontend/src/lib/externalView.ts`（均 `git show <提交号>^:<路径>`） | R611 |
 | **日K 主图上原来的「BOLL」叠加**（工具栏那颗 BOLL 开关；开后在 K 线上画 26 日布林上 / 中 / 下轨，读数行跟着显示三轨） | 用户：「日k里面主图原来的boll可以删除了」。26 日布林已由「关键价位」那排开关的「26日布林」画（R653 并入日K），同一张图两个入口说同一件事 | 无（数据仍是接口的 `boll26_*`，`OHLC` 里那三个字段照给；「关键价位」的「26日布林」开关照旧能画同名三轨） | `git log --grep R656` 找到提交，`git show <该提交>^:frontend/src/components/charts/LightweightDaily.tsx`（`bollFields` 与 BOLL 读数行）、`git show <该提交>^:frontend/src/components/EChartsCandlestick.tsx`（`showBOLL` 那一段）；工具栏那颗开关在 `frontend/src/lib/chart-indicators.ts` 的 `OVERLAY_INDICATORS` | R656 |
+| **「关键价位」的独立弹窗与预览弹窗里的第 3 个视图**（`LevelsDialog`；个股弹窗右栏「日 K / 分时 / 关键价位 / 复盘」的中间那页；决策台点一行就弹的那个窗） | 用户：「如果没问题就可以删除关键价位这部分了」（R663）。日K 已接管它的价位画线、开关、通道、斐波那契Ⅱ型、两张分析副图与右侧标签带，再留两处入口是同一件事说两遍 | 无存档（数据接口 `stockLevels` / `stockTrend` / `stockTrendQuant` 照旧，日K 在用） | `git log --grep R663` 找到提交：`git show <该提交>^:frontend/src/components/stock-analysis/LevelsDialog.tsx`（整个弹窗）；预览弹窗那一页：`git show <该提交>^:frontend/src/components/StockPreviewDialog.tsx`，搜 `'levels'`；入口两处 `git show <该提交>^:frontend/src/custom/stock-analysis/Page.tsx`、`frontend/src/components/paper/FlipFollowCard.tsx` | R663 |
 
 ---
 

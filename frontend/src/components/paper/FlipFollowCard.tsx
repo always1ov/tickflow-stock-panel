@@ -41,7 +41,6 @@ import { ScoreCell } from '@/components/today/ScoreCell'
 import { TodayControls } from '@/components/today/TodayControls'
 import { TodayHealthBar } from '@/components/today/TodayHealthBar'
 import { TrendCell } from '@/components/today/TrendCell'
-import { LevelsDialog } from '@/components/stock-analysis/LevelsDialog'
 import { StockPreviewDialog } from '@/components/StockPreviewDialog'
 
 /** 离清仓线多近才算"贴着了"。**只用来上色, 不产生任何动作**(R339)。 */
@@ -81,10 +80,11 @@ export function FlipFollowCard({ acc, holdingDays }: { acc: string; holdingDays:
     for (const o of today.data?.opportunities ?? []) if (o.rank != null) m.set(o.symbol, o)
     return m
   }, [today.data])
-  const [levels, setLevels] = useState<{ symbol: string; name: string } | null>(null)
-  const [review, setReview] = useState<{ symbol: string; name: string } | null>(null)
-  const openLevels: OpenFn = (symbol, name) => setLevels({ symbol, name })
-  const openReview: OpenFn = (symbol, name) => setReview({ symbol, name })
+  // [R663] 「关键价位」独立弹窗下线: 卡片上的「价位」入口改为打开个股弹窗的日K
+  // (价位线/通道/开关都并进日K), 「复盘」仍落在复盘视图。
+  const [preview, setPreview] = useState<{ symbol: string; name: string; view: 'daily' | 'review' } | null>(null)
+  const openLevels: OpenFn = (symbol, name) => setPreview({ symbol, name, view: 'daily' })
+  const openReview: OpenFn = (symbol, name) => setPreview({ symbol, name, view: 'review' })
 
   const d = q.data
   const rank = (s: string) => conv.get(s)?.rank ?? Number.MAX_SAFE_INTEGER
@@ -179,9 +179,8 @@ export function FlipFollowCard({ acc, holdingDays }: { acc: string; holdingDays:
         )}
       </section>
       {/* 与个股分析页同一个组件; 一块只挂一个, 由 symbol 是否为 null 驱动(关闭时退场动画才播得完) */}
-      <LevelsDialog symbol={levels?.symbol ?? null} name={levels?.name ?? ''} onClose={() => setLevels(null)} />
-      <StockPreviewDialog symbol={review?.symbol ?? null} name={review?.name} initialView="review"
-                          onClose={() => setReview(null)} />
+      <StockPreviewDialog symbol={preview?.symbol ?? null} name={preview?.name} initialView={preview?.view}
+                          onClose={() => setPreview(null)} />
     </div>
   )
 }
