@@ -18,6 +18,7 @@ const native = vi.hoisted(() => {
   const series: any[] = []
   const stretch = vi.fn()
   const timeScale = { width: () => 500, applyOptions: vi.fn(), getVisibleLogicalRange: vi.fn(() => ({ from: 0, to: 10 })),
+    coordinateToLogical: vi.fn(() => 5),
     setVisibleLogicalRange: vi.fn(), fitContent: vi.fn(),
     subscribeSizeChange: vi.fn((cb: any) => { handlers.resize = cb }), unsubscribeSizeChange: vi.fn(),
     subscribeVisibleLogicalRangeChange: vi.fn((cb: any) => { handlers.zoom = cb }), unsubscribeVisibleLogicalRangeChange: vi.fn() }
@@ -60,6 +61,8 @@ let host: HTMLDivElement, root: Root
 beforeEach(() => {
   vi.clearAllMocks()
   native.series.length = 0
+  native.timeScale.getVisibleLogicalRange.mockReturnValue({ from: 0, to: 10 })
+  native.timeScale.coordinateToLogical.mockReturnValue(5)
   native.chart.addCustomSeries.mockImplementation((_view, options, pane) => native.chart.addSeries('Volume', options, pane))
   native.appearance.theme = 'dark'
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
@@ -415,10 +418,38 @@ it('keeps intraday fitted on data and size changes while daily retains zoom and 
   await render(true, [{ ...model[0], data: [data[0], { ...data[1], value: 12 }] }])
   expect(native.timeScale.fitContent).toHaveBeenCalledTimes(fits + 2)
   await render(false)
-  expect(native.chart.applyOptions).toHaveBeenCalledWith(expect.objectContaining({ handleScale: true, handleScroll: true }))
+  expect(native.chart.applyOptions).toHaveBeenCalledWith(expect.objectContaining({
+    handleScale: expect.objectContaining({ mouseWheel: false }), handleScroll: expect.objectContaining({ mouseWheel: false }),
+  }))
   const dailyFits = native.timeScale.fitContent.mock.calls.length
   await act(async () => native.handlers.resize({ width: 600, height: 28 }))
   expect(native.timeScale.fitContent).toHaveBeenCalledTimes(dailyFits)
+})
+
+it('leaves a plain wheel to the page and zooms only with Ctrl/⌘', async () => {
+  const long = Array.from({ length: 200 }, (_, index) => ({
+    time: `2026-01-${String((index % 28) + 1).padStart(2, '0')}`, value: 10 + index,
+  }))
+  await act(async () => root.render(<FinancialPlot scope="daily" series={[{ ...model[0], data: long }]} height={400}
+    paneHeights={[300]} />))
+  const plot = host.querySelector('[data-chart-engine]') as HTMLElement
+  native.timeScale.getVisibleLogicalRange.mockReturnValue({ from: 0, to: 99 })
+  native.timeScale.coordinateToLogical.mockReturnValue(50)
+  const before = native.timeScale.setVisibleLogicalRange.mock.calls.length
+  const wheel = (init: WheelEventInit) => {
+    const event = new WheelEvent('wheel', { bubbles: true, cancelable: true, ...init })
+    plot.dispatchEvent(event)
+    return event
+  }
+  // 普通滚轮 / ⌘+滚轮都不能被图吃掉, 否则副图滚不出来
+  expect(wheel({ deltaY: -120 }).defaultPrevented).toBe(false)
+  expect(wheel({ deltaY: -120, ctrlKey: true, metaKey: true }).defaultPrevented).toBe(false)
+  expect(native.timeScale.setVisibleLogicalRange).toHaveBeenCalledTimes(before)
+  expect(wheel({ deltaY: -120, ctrlKey: true }).defaultPrevented).toBe(true)
+  expect(native.timeScale.setVisibleLogicalRange).toHaveBeenCalledTimes(before + 1)
+  const view = native.timeScale.setVisibleLogicalRange.mock.calls.at(-1)![0]
+  expect(view.to - view.from).toBeLessThan(99)
+  expect(view.from).toBeGreaterThan(0)
 })
 
 it('identifies the shared lunch slot when hovering instead of presenting the combined volume as a single minute', async () => {

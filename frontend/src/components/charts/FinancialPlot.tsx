@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { createChart, CandlestickSeries, LineSeries, AreaSeries, BaselineSeries, HistogramSeries, createSeriesMarkers, ColorType, CrosshairMode,
-  type IChartApi, type ISeriesApi, type ISeriesMarkersPluginApi, type SeriesType, type Time, type SeriesMarker, type MouseEventParams } from 'lightweight-charts'
+  type HandleScaleOptions, type HandleScrollOptions, type IChartApi, type ISeriesApi, type ISeriesMarkersPluginApi, type SeriesType,
+  type Time, type SeriesMarker, type MouseEventParams } from 'lightweight-charts'
 import { useChartTheme } from '@/lib/theme'
 import { fmtBigNum } from '@/lib/format'
 import { CHART_LAYOUT } from '@/lib/chart-layout'
@@ -11,6 +12,12 @@ import { PaneDecor, type PaneDecorData } from './SubPaneDecor'
 import { DailyVolumeSeries } from './DailyVolumeSeries'
 
 const PRICE_MARGINS = { daily: { top: 0.08, bottom: 0.06 }, intraday: { top: 0, bottom: 0 } }
+// [R617] 画布下方还挂着副图, 页面必须能滚下去 —— 普通滚轮一律交给页面,
+// 缩放只认 Ctrl/⌘ + 滚轮(触控板双指捏合浏览器会带 ctrlKey)。拖图、拖轴缩放、双击复位保留。
+const DAILY_HANDLE_SCALE: HandleScaleOptions = { mouseWheel: false, pinch: true, axisPressedMouseMove: true, axisDoubleClickReset: true }
+const DAILY_HANDLE_SCROLL: HandleScrollOptions = { mouseWheel: false, pressedMouseMove: true, horzTouchDrag: true, vertTouchDrag: false }
+const WHEEL_ZOOM_SPEED = 0.002
+const WHEEL_ZOOM_MIN_BARS = 6
 const markersForView = (markers: SeriesMarker<Time>[] = [], compact: boolean) => compact
   ? markers.map(marker => marker.shape === 'arrowUp' || marker.shape === 'arrowDown' ? marker
     : { ...marker, text: '', shape: 'circle' as const, size: marker.size === 0 ? 0.5 : Math.min(marker.size ?? 0.65, 0.65) })
@@ -73,8 +80,8 @@ export function FinancialPlot(props: Props) {
     const theme = themeRef.current
     const chart = createChart(host.current, {
       autoSize: true,
-      handleScale: !propsRef.current.intraday,
-      handleScroll: !propsRef.current.intraday,
+      handleScale: propsRef.current.intraday ? false : DAILY_HANDLE_SCALE,
+      handleScroll: propsRef.current.intraday ? false : DAILY_HANDLE_SCROLL,
       layout: { background: { type: ColorType.Solid, color: 'transparent' }, textColor: theme.text,
         // 归属声明与链接统一放在设置的关于页，避免每个画布重复显示角标。
         fontFamily: 'JetBrains Mono, monospace', fontSize: 11, attributionLogo: false,
@@ -167,6 +174,39 @@ export function FinancialPlot(props: Props) {
     }
   }, [])
 
+  // [R617] 只接管“明确要缩放”的滚轮: Ctrl/⌘ + 滚轮、触控板双指捏合(浏览器带 ctrlKey)。
+  // 普通滚轮直接放行, 页面/弹窗才能滚动到画布下方的副图; ⌘ 不拦, 那是浏览器整页缩放。
+  useEffect(() => {
+    const el = host.current
+    if (!el) return
+    const onWheel = (event: WheelEvent) => {
+      if (!event.ctrlKey || event.metaKey) return
+      // 分时固定完整时段, 原本就不许缩放 —— 这里一并保持。
+      if (propsRef.current.intraday) return
+      const chart = chartRef.current
+      if (!chart) return
+      const timeScale = chart.timeScale()
+      const range = timeScale.getVisibleLogicalRange()
+      const count = Math.max(...[...seriesRef.current.values()].map(item => item.data.length), 0)
+      if (!range || range.to <= range.from || count <= 0) return
+      event.preventDefault()
+      const rect = el.getBoundingClientRect()
+      const anchor = timeScale.coordinateToLogical(event.clientX - rect.left) ?? (range.from + range.to) / 2
+      // 行模式(部分鼠标/火狐)按 16px 一行折算, 与像素滚轮同一个手感。
+      const factor = Math.exp((event.deltaMode === 1 ? event.deltaY * 16 : event.deltaY) * WHEEL_ZOOM_SPEED)
+      const span = Math.min(Math.max((range.to - range.from) * factor, WHEEL_ZOOM_MIN_BARS), Math.max(WHEEL_ZOOM_MIN_BARS, count))
+      const ratio = span / (range.to - range.from)
+      let from = anchor - (anchor - range.from) * ratio
+      let to = anchor + (range.to - anchor) * ratio
+      if (from < 0) { to -= from; from = 0 }
+      // 右缘与 fixRightEdge 一致钉在最后一根: 缩小到边缘后向左让位, 不把最后几根挤走。
+      if (to > count - 1) { from = Math.max(0, from - (to - (count - 1))); to = count - 1 }
+      timeScale.setVisibleLogicalRange({ from, to })
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+  }, [])
+
   useEffect(() => {
     const chart = chartRef.current
     if (!chart) return
@@ -179,7 +219,7 @@ export function FinancialPlot(props: Props) {
     const intraday = !!props.intraday
     // 分时固定完整时段；不能锁到最后一根实值，否则尚未到达的时段会被挤到左侧。
     chartRef.current?.applyOptions({
-      handleScale: !intraday, handleScroll: !intraday,
+      handleScale: intraday ? false : DAILY_HANDLE_SCALE, handleScroll: intraday ? false : DAILY_HANDLE_SCROLL,
       layout: { panes: { enableResize: !intraday } },
       rightPriceScale: { ...(intraday ? { autoScale: true } : {}), entireTextOnly: intraday,
         scaleMargins: intraday ? PRICE_MARGINS.intraday : PRICE_MARGINS.daily },
