@@ -127,12 +127,23 @@ def test_R612_图表退化成一张卡片_不再自带页签():
         assert gone not in sec, f"「{gone}」—— 图表卡又自己管页签/标题了"
 
 
-def test_R612_图高跟随右栏可用高度_下限沿用原值():
+def test_R612_只有分时跟着右栏放宽():
     dlg = code_of(DLG)
-    assert "daily: 420, intraday: 480, levels: 520" in dlg, "各图的最小高度变了"
-    assert "Math.max(chartMinH, Math.min(chartAreaH - 32, CHART_MAX_HEIGHT))" in dlg, (
-        "图高没按右栏量出来的可用高度算")
+    assert "Math.max(480, Math.min(chartAreaH - 32, CHART_MAX_HEIGHT))" in dlg, (
+        "分时图没按右栏量出来的可用高度放宽")
     assert "new ResizeObserver(entries => setChartAreaH(entries[0].contentRect.height))" in dlg
+
+
+def test_R612fix_日K与关键价位保持原高_右栏可滚_副图不能被裁():
+    """[R612-fix] 用户: 「原来的趋势macd、趋势量化那些副图都没了」。
+    根因是右栏 overflow-hidden + 把主图拉高: 这两张图的画布都**在 height 之外**再挂副图
+    (关键价位 +约 380px, 日K 每张指标副图 +96px), 画布比右栏高就被裁掉。
+    修法: 右栏自己滚, 两张图守住改版前的高度, 只有没有额外副图的分时跟着放宽。"""
+    dlg = code_of(DLG)
+    assert "height={chartHeight ?? 420}" in dlg, "日K 被拉高了 —— 指标副图会被推到视口外"
+    assert "height={chartHeight ?? 520}" in dlg, "关键价位被拉高了 —— 两张副图会被推到视口外"
+    assert 'className="mt-3 min-h-0 flex-1 overflow-y-auto"' in dlg, "右栏不可滚, 副图会被裁"
+    assert "chartView === 'review' && 'overflow-y-auto'" not in dlg, "复盘之外又只给一个视图开了滚动"
 
 
 def test_R437_新分时与旧分时同一套_信息栏不能漏():

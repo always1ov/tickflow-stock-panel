@@ -65,10 +65,7 @@ const VIEW_TABS: { key: PreviewView; label: string; Icon: typeof Clock }[] = [
   { key: 'review', label: '复盘', Icon: History },
 ]
 
-/** [R612] 各图的最小高度(沿用改版前写死的值); 右栏更高时放到最多 720 */
-const CHART_MIN_HEIGHT: Record<'daily' | 'intraday' | 'levels', number> = {
-  daily: 420, intraday: 480, levels: 520,
-}
+/** [R612] 日K / 分时的高度上限(关键价位不参与, 见下方 R612-fix 注释) */
 const CHART_MAX_HEIGHT = 720
 
 interface PriceAlertDraft {
@@ -201,7 +198,13 @@ export function StockPreviewDialog({ symbol, name, onClose, enableLevelsView = t
   // 原来那条「滚到底再钉住」的补丁随竖向串联布局一起删了。
   //
   // [R612] 双栏只在 ≥1280 生效; 窄屏单列、整页滚, 图高回落到改版前写死的值。
-  // 宽屏时右栏高度由弹窗高度决定, 量出来再把图放到「能放多高就多高」(下限沿用原值, 上限 720)。
+  //
+  // [R612-fix] 只有「分时」跟着右栏长高。另外两张**必须守住原来的高度**:
+  //   · 关键价位: 画布 = 主图(这里的 520)+ 趋势量化 + 量化MACD 两张副图(再 +约 380px);
+  //   · 日K: 每开一张指标副图, 画布再 +96px, 开几张由图内工具栏决定, 外面算不出来。
+  // 拉高主图只会把副图推到视口外。改版第一版还把右栏设成 overflow-hidden, 画布比
+  // 右栏高 → 副图被整块裁掉, 用户看到的就是「趋势MACD、趋势量化都没了」。
+  // 现在右栏自己可滚(与改版前「弹窗往下滚着看副图」同一个动线), 两张图保持原高。
   const wide = useMediaQuery('(min-width: 1280px)')
   const chartAreaRef = useRef<HTMLDivElement>(null)
   const [chartAreaH, setChartAreaH] = useState(0)
@@ -212,12 +215,9 @@ export function StockPreviewDialog({ symbol, name, onClose, enableLevelsView = t
     ro.observe(el)
     return () => ro.disconnect()
   }, [wide, symbol, chartView])
-  const chartMinH = chartView === 'review' ? 0 : CHART_MIN_HEIGHT[chartView]
-  const chartHeight = chartView === 'review'
-    ? undefined
-    : wide && chartAreaH > 0
-      ? Math.max(chartMinH, Math.min(chartAreaH - 32, CHART_MAX_HEIGHT))
-      : chartMinH
+  const chartHeight = chartView === 'intraday'
+    ? (wide && chartAreaH > 0 ? Math.max(480, Math.min(chartAreaH - 32, CHART_MAX_HEIGHT)) : 480)
+    : undefined
   const prevSymbolRef = useRef<string | null>(null)
   const initialViewRef = useRef(initialView)
   initialViewRef.current = initialView
@@ -401,8 +401,9 @@ export function StockPreviewDialog({ symbol, name, onClose, enableLevelsView = t
                   </div>
                 </div>
 
-                <div ref={chartAreaRef}
-                     className={cn('mt-3 min-h-0 flex-1', chartView === 'review' && 'overflow-y-auto')}>
+                {/* [R612-fix] 一律可滚: 关键价位的画布比这里的可视区高(下面挂着两张副图),
+                    裁掉就等于把副图删了 —— 改版前靠弹窗整页滚, 现在是右栏自己滚。 */}
+                <div ref={chartAreaRef} className="mt-3 min-h-0 flex-1 overflow-y-auto">
                   {chartView === 'review' ? (
                     // [R442] key 跟着票走(换票时「只看有事的日子」复位) —— 与旧复盘页一样
                     <ReviewSection key={symbol} symbol={symbol} days={reviewDays} />
