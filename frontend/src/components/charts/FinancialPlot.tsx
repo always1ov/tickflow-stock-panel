@@ -85,7 +85,9 @@ export function FinancialPlot(props: Props) {
       layout: { background: { type: ColorType.Solid, color: 'transparent' }, textColor: theme.text,
         // 归属声明与链接统一放在设置的关于页，避免每个画布重复显示角标。
         fontFamily: 'JetBrains Mono, monospace', fontSize: 11, attributionLogo: false,
-        panes: { separatorColor: theme.border, separatorHoverColor: theme.crosshair, enableResize: !propsRef.current.intraday } },
+        // [R625] 副图高度只由代码决定(paneHeights): 两个副图之间的分隔条不允许拖动,
+        // 也不再给 hover 态配色 —— 那会暗示「可拖」。
+        panes: { separatorColor: theme.border, enableResize: false } },
       grid: { vertLines: { visible: false }, horzLines: { color: theme.grid } },
       crosshair: { mode: CrosshairMode.Normal,
         vertLine: { color: theme.crosshair, labelBackgroundColor: theme.crosshairLabelBg },
@@ -220,7 +222,7 @@ export function FinancialPlot(props: Props) {
     // 分时固定完整时段；不能锁到最后一根实值，否则尚未到达的时段会被挤到左侧。
     chartRef.current?.applyOptions({
       handleScale: intraday ? false : DAILY_HANDLE_SCALE, handleScroll: intraday ? false : DAILY_HANDLE_SCROLL,
-      layout: { panes: { enableResize: !intraday } },
+      // [R625] 副图分隔条不可拖 —— 这里不再随 intraday 切换开关(切回日K 会把拖动能力带回来)。
       rightPriceScale: { ...(intraday ? { autoScale: true } : {}), entireTextOnly: intraday,
         scaleMargins: intraday ? PRICE_MARGINS.intraday : PRICE_MARGINS.daily },
       timeScale: { timeVisible: intraday, fixRightEdge: !intraday && !props.rightOffsetPixels, rightOffset: 0,

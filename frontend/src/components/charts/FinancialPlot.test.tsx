@@ -421,9 +421,19 @@ it('keeps intraday fitted on data and size changes while daily retains zoom and 
   expect(native.chart.applyOptions).toHaveBeenCalledWith(expect.objectContaining({
     handleScale: expect.objectContaining({ mouseWheel: false }), handleScroll: expect.objectContaining({ mouseWheel: false }),
   }))
+  // [R625] 副图分隔条一律不可拖: 切回日K 也不能把 resize 开关带回来
+  expect(native.chart.applyOptions.mock.calls.some(([opts]) => opts?.layout?.panes?.enableResize === true)).toBe(false)
   const dailyFits = native.timeScale.fitContent.mock.calls.length
   await act(async () => native.handlers.resize({ width: 600, height: 28 }))
   expect(native.timeScale.fitContent).toHaveBeenCalledTimes(dailyFits)
+})
+
+it('never lets the user drag the sub-pane separators apart', async () => {
+  await act(async () => root.render(<FinancialPlot scope="daily" series={model} height={400} paneHeights={[300, 100, 100]} />))
+  const options = native.createChart.mock.calls[0]?.[1] as Record<string, any>
+  expect(options.layout.panes).toMatchObject({ enableResize: false })
+  // hover 态配色会暗示「可拖」, 一并不给
+  expect(options.layout.panes).not.toHaveProperty('separatorHoverColor')
 })
 
 it('leaves a plain wheel to the page and zooms only with Ctrl/⌘', async () => {
