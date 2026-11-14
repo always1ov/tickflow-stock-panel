@@ -505,6 +505,11 @@ export function StockPreviewDialog({ symbol, name, onClose, enableLevelsView = t
                           // [R625] 数据源确认没有该日分钟数据时收起右边空列(原来常驻一块
                           // 空分时 + 一个拉了也没用的按钮, 日K被挤在 57% 宽里)
                           hideEmptyIntraday
+                          // [R660] 与「关键价位」共用同一份开关/悬停, 盘中同样现拉最新一根
+                          levelControls={levelCtl}
+                          levelHoveredKey={levelHover}
+                          onLevelHoverKey={setLevelHover}
+                          refreshLive
                         />
                       ) : chartView === 'intraday' ? (
                         // [R437] 与旧分时页同一套: 上面一条信息栏(只要信息栏, 不画日 K), 下面多日分时。

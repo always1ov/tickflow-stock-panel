@@ -1,5 +1,5 @@
-import { lazy, Suspense, useCallback, useMemo, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { type KlineRow } from '@/lib/api'
 import { klineDailyQueryOptions, klineDateRange } from '@/lib/kline'
 import { storage } from '@/lib/storage'
@@ -14,16 +14,22 @@ const DAILY_SUB_CHARTS = SUB_CHART_META.filter(def => def.key !== 'macd')
 import {
   CHART_LAYOUT, SUB_PANE_GAP, dailyChartHeight, fitAnalysisPaneHeights, quantPaneHeight, trendPaneHeight,
 } from '@/lib/chart-layout'
-import { PANE_HEADER_H } from '@/lib/analysisPanes'
+import { PANE_HEADER_H, ANALYSIS_PANE_HELP } from '@/lib/analysisPanes'
 import { useStockQuantMacd, useStockTrendQuant } from '@/lib/useStockAnalysisPanes'
 import { useShownLevels } from '@/components/stock-analysis/AnalysisKChart'
+import { Fib2GrainDialog } from '@/components/stock-analysis/Fib2GrainDialog'
 import { useStockLevels } from '@/components/stock-analysis/StockLevelsPanel'
-import { DEFAULT_LEVEL_TYPES, useLevelControls } from '@/components/stock-analysis/levelControls'
+import {
+  DEFAULT_LEVEL_TYPES, useLevelControls, type LevelControls,
+} from '@/components/stock-analysis/levelControls'
 import { LevelToolbar } from '@/components/stock-analysis/LevelToolbar'
-import { LEVEL_GROUPS } from '@/components/stock-analysis/analysis-chart-model'
+import {
+  LEVEL_GROUPS, buildAnalysisChartModel, hitTestAnalysis,
+} from '@/components/stock-analysis/analysis-chart-model'
+import { fib2Status } from '@/lib/fib2Status'
 import { LEVEL_CURVE_COLOR, fib2RoleColor, levelColors, useChartTheme, useTheme } from '@/lib/theme'
 import {
-  levelCurveSeries, levelFib2Overlay, levelLastPriceLine, levelPriceLines, withFib2Future,
+  levelFib2Overlay, levelLastPriceLine, withFib2Future,
 } from '@/lib/levelOverlays'
 
 const EChartsCandlestick = lazy(() => import('./EChartsCandlestick').then(m => ({ default: m.EChartsCandlestick })))
@@ -72,6 +78,18 @@ interface Props {
   extColumns?: string
   /** 加入自选日 (北京时间 YYYY-MM-DD); 有值时日K主图绘制「自选」竖虚线 */
   addedDate?: string | null
+  /**
+   * [R660] 价位开关状态由外面持有(个股弹窗): 与「关键价位」用同一份 `useLevelControls`,
+   * 切视图再切回来, 开着的那几类还在。不传则自己持有(详情页等其它入口不受影响)。
+   */
+  levelControls?: LevelControls
+  /** [R660] 悬停高亮状态由外面持有(个股弹窗左栏价位面板联动); 不传则自己持有 */
+  hoveredKey?: string | null
+  onHoverKey?: (key: string | null) => void
+  /** [R660] 回测「成交K线」弹窗不需要这排价位开关 */
+  showLevelToolbar?: boolean
+  /** [R660] 盘中现拉最新一根, 与关键价位视图同口径 */
+  refreshLive?: boolean
 }
 
 function isValidRow(r: any): boolean {
@@ -184,6 +202,11 @@ export function StockDailyKChart({
   extColumns,
   addedDate,
   maxHeight,
+  levelControls,
+  hoveredKey: hoveredKeyProp,
+  onHoverKey,
+  showLevelToolbar = true,
+  refreshLive = false,
 }: Props) {
   const [activeIndicators, setActiveIndicators] = useState<string[]>(['vol'])
   // [R652] 四条主图均线逐条可控。[R655] 用户要求默认只留 MA20, 其余三条默认关。
@@ -205,7 +228,20 @@ export function StockDailyKChart({
   const dateRange = externalDateRange ?? getDefaultRange()
 
   // 查询配置统一来自 klineDailyQueryOptions, 与 StockPanel 信息条/邻近预取共享同一 cache key (只发一次请求)
-  const kline = useQuery({ ...klineDailyQueryOptions(symbol, dateRange, extColumns), enabled: !!symbol })
+  // [R660] refreshLive 时缓存键多一格 'live', 且调用方(StockPanel)透传同一个值, 仍不会重复请求。
+  const klineOptions = klineDailyQueryOptions(symbol, dateRange, extColumns, { refreshLive })
+  const kline = useQuery({ ...klineOptions, enabled: !!symbol })
+  const qc = useQueryClient()
+  // [R660] 与关键价位同一套跟进: 后台现拉最新一根时, 稍后再取一次, 盘中最后一根不落后。
+  const liveRefresh = kline.data?.live_refresh
+  const klineKey = klineOptions.queryKey
+  const klineKeyId = JSON.stringify(klineKey)
+  useEffect(() => {
+    if (liveRefresh !== 'started' || !symbol) return
+    const timers = [1500, 4000].map(ms => setTimeout(
+      () => qc.invalidateQueries({ queryKey: klineKey }), ms))
+    return () => timers.forEach(clearTimeout)
+  }, [liveRefresh, kline.dataUpdatedAt, symbol, qc, klineKeyId])
 
   const rows = useMemo(() => toOHLC(kline.data?.rows ?? []), [kline.data?.rows])
   const stockInfo = kline.data?.stock_info
@@ -246,9 +282,14 @@ export function StockDailyKChart({
 
   // [R653] 关键价位主图那套价位指标并进日K: 取数(`QK.stockLevels` 同一个键)、价位的收集与画法
   // 与「关键价位」视图共用同一份, 不新增接口、不另算口径。
-  // [R659] 开关状态是**各自持有**的一份(`useLevelControls`), 切视图后会回到默认档 —— 这是现状, 不是共用。
+  // [R660] 开关与悬停状态由个股弹窗持有(与「关键价位」同一份), 切视图保持; 其它入口不传就自己持有。
   const theme = useTheme()
-  const levelCtl = useLevelControls(DEFAULT_LEVEL_TYPES)
+  const ownLevelCtl = useLevelControls(DEFAULT_LEVEL_TYPES)
+  const levelCtl = levelControls ?? ownLevelCtl
+  const [ownHoveredKey, setOwnHoveredKey] = useState<string | null>(null)
+  const hoveredKey = hoveredKeyProp ?? ownHoveredKey
+  const setHoveredKey = onHoverKey ?? setOwnHoveredKey
+  const [fib2FitOpen, setFib2FitOpen] = useState(false)
   const levelsQ = useStockLevels(symbol, renderer === 'lightweight')
   const shown = useShownLevels(levelsQ.data?.levels, levelsQ.data?.fib2, kline.data?.rows ?? [],
     levelCtl.fib2Grain, levelCtl.fib2ShowTargets)
@@ -258,6 +299,46 @@ export function StockDailyKChart({
   const levelPalette = useMemo(() => ({ ...levelColorsByTheme, ...LEVEL_CURVE_COLOR }),
     [levelColorsByTheme])
   const lastClose = rows.at(-1)?.close
+  // [R660] 价位横线/曲线直接吃「关键价位」同一个模型: 标签带数值、曲线右端带端值、
+  // 悬停时该线加粗其余淡化 —— 不再在 levelOverlays 里另拼一套。
+  const levelModel = useMemo(() => {
+    if (renderer !== 'lightweight') return null
+    return buildAnalysisChartModel({
+      rows: kline.data?.rows ?? [],
+      levels: shown.effLevels,
+      series: levelsQ.data?.series,
+      seriesDates: levelsQ.data?.dates,
+      activeTypes: levelCtl.activeTypes,
+      pivotRank: levelCtl.pivotRank,
+      hoveredKey,
+      colors: levelPalette,
+      roleColor,
+    })
+  }, [renderer, kline.data?.rows, shown.effLevels, levelsQ.data?.series, levelsQ.data?.dates,
+    levelCtl.activeTypes, levelCtl.pivotRank, hoveredKey, levelPalette, roleColor])
+  // [R411] 形态状态行读整档 `fib2Raw`(不是减线后的), 与关键价位同一份判据。
+  const fib2Line = useMemo(() => fib2Status({
+    dates: rows.map(row => row.date),
+    close: lastClose,
+    thrust: levelsQ.data?.fib2?.thrust,
+    markers: levelsQ.data?.fib2?.markers,
+    zone: shown.fib2Zone,
+    levels: shown.fib2Raw ?? [],
+  }), [rows, lastClose, levelsQ.data?.fib2, shown.fib2Zone, shown.fib2Raw])
+  // [R660] 与关键价位同一套清理: 换标的 / 关掉价位组后, 旧的高亮不残留。
+  useEffect(() => { setHoveredKey(null) }, [symbol])
+  useEffect(() => {
+    if (hoveredKey != null && levelModel && !levelModel.hoverKeys.has(hoveredKey)) setHoveredKey(null)
+  }, [levelModel, hoveredKey, setHoveredKey])
+  const handleLevelCrosshair = useCallback((point: { time: string; price: number; pixelsPerPrice: number } | null) => {
+    if (!levelModel || !point) {
+      if (hoveredKey != null) setHoveredKey(null)
+      return
+    }
+    const index = levelModel.dateIndex.get(point.time) ?? -1
+    const next = index < 0 ? null : hitTestAnalysis(levelModel, point.price, point.pixelsPerPrice, index)
+    if (next !== hoveredKey) setHoveredKey(next)
+  }, [levelModel, hoveredKey, setHoveredKey])
   // [R654] 斐波那契Ⅱ型: 上攻段底色、回踩密集带、首次回踩标记、「未来」分隔线与末尾三个空槽。
   const fib2Overlay = useMemo(() => renderer !== 'lightweight'
     ? { priceLines: [], ranges: [], labels: [], verticals: [], future: null }
@@ -273,20 +354,14 @@ export function StockDailyKChart({
     }), [renderer, levelCtl.activeTypes, levelsQ.data?.fib2, shown.fib2Zone, kline.data?.rows,
     lastClose, theme, levelColorsByTheme, ct.text])
   const levelLines = useMemo(() => renderer !== 'lightweight' ? [] : [
-    ...levelPriceLines(shown.effLevels, levelCtl.activeTypes, levelCtl.pivotRank, levelPalette, roleColor),
+    ...(levelModel?.annotations.priceLines ?? []),
     ...fib2Overlay.priceLines,
     ...levelLastPriceLine(lastClose, ct.text),
-  ], [renderer, shown.effLevels, levelCtl.activeTypes, levelCtl.pivotRank, levelPalette, roleColor,
-    fib2Overlay, lastClose, ct.text])
-  const levelSeries = useMemo(() => renderer !== 'lightweight' ? [] : withFib2Future(levelCurveSeries({
-    rows: kline.data?.rows ?? [],
-    series: levelsQ.data?.series,
-    seriesDates: levelsQ.data?.dates,
-    active: levelCtl.activeTypes,
-    colors: levelPalette,
-  }), fib2Overlay.future),
-  [renderer, kline.data?.rows, levelsQ.data?.series, levelsQ.data?.dates, levelCtl.activeTypes,
-    levelPalette, fib2Overlay.future])
+  ], [renderer, levelModel, fib2Overlay, lastClose, ct.text])
+  const levelSeries = useMemo(() => renderer !== 'lightweight' || !levelModel
+    ? []
+    : withFib2Future(levelModel.series.filter(item => item.id.startsWith('curve:')), fib2Overlay.future),
+  [renderer, levelModel, fib2Overlay.future])
   const analysisPanes = useMemo<DailyAnalysisPane[]>(() => {
     if (renderer !== 'lightweight') return []
     const panes: DailyAnalysisPane[] = []
@@ -432,18 +507,42 @@ export function StockDailyKChart({
         </div>
       )}
       {/* [R653] 价位开关排: 与「关键价位」同一个 LevelToolbar、同一套计数与文案;
-          开关状态各自持有(R659 核对), 切视图会回到默认档 */}
-      {showIndicatorControls && renderer === 'lightweight' && rows.length > 0 && (
-        <div className="flex flex-wrap items-center border-b border-border/50 bg-elevated/10 px-3 pt-1.5" data-testid="level-toolbar">
-          <LevelToolbar
-            groups={LEVEL_GROUPS}
-            controls={levelCtl}
-            effLevels={shown.effLevels}
-            fib2Raw={shown.fib2Raw}
-            fib2={levelsQ.data?.fib2}
-            compact
-          />
-        </div>
+          [R660] 开关/悬停状态由弹窗持有, 切视图保持; 回测「成交K线」弹窗不显示这排 */}
+      {showIndicatorControls && showLevelToolbar && renderer === 'lightweight' && rows.length > 0 && (
+        <>
+          <div className="flex flex-wrap items-center border-b border-border/50 bg-elevated/10 px-3 pt-1.5" data-testid="level-toolbar">
+            <LevelToolbar
+              groups={LEVEL_GROUPS}
+              controls={levelCtl}
+              effLevels={shown.effLevels}
+              fib2Raw={shown.fib2Raw}
+              fib2={levelsQ.data?.fib2}
+              help={ANALYSIS_PANE_HELP}
+              onOpenFit={symbol ? () => setFib2FitOpen(true) : undefined}
+              compact
+            />
+          </div>
+          {/* [R411] 形态走到哪一步 —— 只报事实, 一个动词都没有; 显示沿用日K 自己的极简行 */}
+          {levelCtl.activeTypes.has('fib2') && fib2Line && (
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 px-3 pb-1.5 text-micro leading-5">
+              <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: levelColorsByTheme.fib2 }} />
+              {fib2Line.map((segment, index) => (
+                <span key={segment} className={index === 0 ? 'text-secondary' : 'text-muted'}>
+                  {index > 0 && <span className="mr-2 opacity-40">·</span>}
+                  {segment}
+                </span>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+      {fib2FitOpen && symbol && (
+        <Fib2GrainDialog
+          symbol={symbol}
+          current={levelCtl.fib2Grain}
+          onPick={levelCtl.setFib2Grain}
+          onClose={() => setFib2FitOpen(false)}
+        />
       )}
       {kline.isLoading && <div className="text-sm text-muted py-4">加载中…</div>}
       {kline.isError && <div className="text-sm text-danger py-2">日K加载失败</div>}
@@ -480,6 +579,7 @@ export function StockDailyKChart({
           levelLabels={fib2Overlay.labels}
           levelVerticals={fib2Overlay.verticals}
           levelFuture={fib2Overlay.future}
+          onCrosshairMove={renderer === 'lightweight' ? handleLevelCrosshair : undefined}
         />
         </Suspense>
       )}

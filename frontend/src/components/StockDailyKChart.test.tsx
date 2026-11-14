@@ -11,7 +11,10 @@ const fixture = vi.hoisted(() => ({ rows: [
   { date: '2026-11-05', open: 10.5, high: 11, low: 10, close: 10.8, volume: 100 },
   { date: '2026-11-06', open: 10.2, high: 11.88, low: 9.72, close: 9.72, volume: 100, signal_limit_down: true, signal_broken_limit_up: true },
 ] as KlineRow[] }))
-vi.mock('@tanstack/react-query', () => ({ useQuery: () => ({ data: fixture, isLoading: false, isError: false }) }))
+vi.mock('@tanstack/react-query', () => ({
+  useQuery: () => ({ data: fixture, isLoading: false, isError: false }),
+  useQueryClient: () => ({ invalidateQueries: vi.fn() }),
+}))
 vi.mock('@/lib/kline', async importOriginal => ({
   ...await importOriginal<typeof import('@/lib/kline')>(), klineDailyQueryOptions: vi.fn(() => ({})),
 }))
@@ -172,6 +175,21 @@ it('[R659] 日K 不再提供原 MACD 副图入口, 量化MACD 仍在', async () 
   const labels = [...host.querySelectorAll('button')].map(button => button.textContent?.trim())
   expect(labels).not.toContain('MACD')
   expect(labels).toContain('量化MACD')
+})
+
+it('[R660] 价位开关状态可用外部那一份(与关键价位共用), 回测弹窗可整排关掉', async () => {
+  await render({
+    levelControls: {
+      activeTypes: new Set(['sr']), toggleType: vi.fn(), clearAll: vi.fn(), pivotRank: 1, setPivotRank: vi.fn(),
+      fib2Grain: 'coarse', setFib2Grain: vi.fn(), fib2ShowTargets: false, setFib2ShowTargets: vi.fn(),
+    } as any,
+  })
+  const byLabel = (label: string) => [...host.querySelectorAll('[data-testid="level-toolbar"] button')]
+    .find(button => button.textContent?.includes(label))!
+  expect(byLabel('压力支撑').getAttribute('aria-pressed')).toBe('true')
+  expect(byLabel('枢轴点').getAttribute('aria-pressed')).toBe('false')
+  await render({ showLevelToolbar: false })
+  expect(host.querySelector('[data-testid="level-toolbar"]')).toBeNull()
 })
 
 it('[R651] 空间不够只压两张分析副图, 主图与指标副图的高度不动', async () => {

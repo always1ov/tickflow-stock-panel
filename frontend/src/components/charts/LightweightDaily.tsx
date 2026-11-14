@@ -54,7 +54,7 @@ export function LightweightDaily({ data, assetType, symbol = '', height = 480, a
   markers = [], ranges, priceLines, showMarkers = true, markerStyle = 'label', volumeCompare = { enabled: true, days: 1 }, addedDate,
   linkedPrice, onDateClick, onPriceDoubleClick, visibleBars, stockInfo, analysisPanes = [], maKeys,
   levelSeries = [], levelLines = [], levelRanges = [], levelLabels = [], levelVerticals = [],
-  levelFuture = null }: DailyChartProps) {
+  levelFuture = null, onCrosshairMove }: DailyChartProps) {
   const rows = useMemo(() => validDailyRows(data), [data])
   const precision = pricePrecision(assetType)
   const theme = useTheme()
@@ -241,6 +241,7 @@ export function LightweightDaily({ data, assetType, symbol = '', height = 480, a
       hidePaneAxis={analysis.hidden.length ? analysis.hidden : undefined}
       markers={chartMarkers} annotations={annotations} volumeLabels={volumeLabels} paneTitles={paneTitles} paneReadouts={paneReadouts}
       linkedPrice={linkedPrice} visibleBars={visibleBars} currentPrice={rows.at(-1)?.close}
+      onCrosshairMove={onCrosshairMove}
       onHover={time => setHover(time ? { scope, time } : null)} onSelect={onDateClick} onPriceDoubleClick={onPriceDoubleClick} />
   </div>
 }

@@ -12,6 +12,7 @@ import { useCapabilities } from '@/lib/useSharedQueries'
 import { scheduleNeighborPrefetch } from '@/lib/neighborPrefetch'
 import type { ChartMarker, ChartPriceLine, ChartRange, ChartRenderer } from '@/lib/chart-types'
 import { dailyChartHeight } from '@/lib/chart-layout'
+import type { LevelControls } from '@/components/stock-analysis/levelControls'
 import {
   loadInfoFields,
   saveInfoFields,
@@ -73,6 +74,15 @@ interface Props {
    * 只给个股弹窗用; 详情页不传, 保持原来的"空着也留着"行为。
    */
   hideEmptyIntraday?: boolean
+  /** [R660] 价位开关状态由弹窗持有, 与「关键价位」共用同一份 */
+  levelControls?: LevelControls
+  /** [R660] 价位悬停高亮, 与左栏价位面板联动 */
+  levelHoveredKey?: string | null
+  onLevelHoverKey?: (key: string | null) => void
+  /** [R660] 回测「成交K线」弹窗不显示这排价位开关 */
+  showLevelToolbar?: boolean
+  /** [R660] 盘中现拉最新一根, 与关键价位视图同口径 */
+  refreshLive?: boolean
 }
 
 export { getDefaultRange }
@@ -109,6 +119,11 @@ export function StockPanel({
   addedDate,
   hideEmptyIntraday = false,
   fillHeight,
+  levelControls,
+  levelHoveredKey,
+  onLevelHoverKey,
+  showLevelToolbar,
+  refreshLive = false,
 }: Props) {
   const [linkedPrice, setLinkedPrice] = useState<number | null>(null)
   const [internalSelectedDate, setSelectedDate] = useState<string | null>(null)
@@ -159,7 +174,8 @@ export function StockPanel({
   // 日K查询由本组件持有 (与 StockDailyKChart 共享同一 cache key/配置, 只发一次请求)。
   // 信息条直接读 query data: 切股到已预取邻股时首帧即有数据, 配合 StockInfoBar 加载态占位,
   // 弹窗整体高度在切换瞬间不塌陷 (不抖动)。
-  const kline = useQuery({ ...klineDailyQueryOptions(symbol, dateRange, extColumns), enabled: !!symbol })
+  // [R660] refreshLive 同时传给信息条与日K, 两者缓存键仍一致。
+  const kline = useQuery({ ...klineDailyQueryOptions(symbol, dateRange, extColumns, { refreshLive }), enabled: !!symbol })
   const rawRows: KlineRow[] = kline.data?.rows ?? []
   // OHLC 视图用于日期选中/昨收价推导 (与图表侧同口径)
   const rows = useMemo(() => toOHLC(rawRows), [rawRows])
@@ -189,7 +205,9 @@ export function StockPanel({
       if (s === symbol) continue
       let lastDate: string | undefined
       tasks.push(async () => {
-        const res = await qc.fetchQuery({ ...klineDailyQueryOptions(s, dateRange, extColumns), staleTime: 30_000 })
+        const res = await qc.fetchQuery({
+          ...klineDailyQueryOptions(s, dateRange, extColumns, { refreshLive }), staleTime: 30_000,
+        })
         const date = res?.rows?.at(-1)?.date
         lastDate = date ? String(date).slice(0, 10) : undefined
       })
@@ -284,6 +302,11 @@ export function StockPanel({
           visibleBars={visibleBars ?? (renderer === 'lightweight' ? undefined : showIntraday ? 40 : 60)}
           extColumns={extColumns}
           addedDate={addedDate}
+          levelControls={levelControls}
+          hoveredKey={levelHoveredKey}
+          onHoverKey={onLevelHoverKey}
+          showLevelToolbar={showLevelToolbar}
+          refreshLive={refreshLive}
         />
 
         {intradayVisible && !collapseIntraday && (

@@ -1,60 +1,19 @@
 import type { AnnotationData } from '@/components/charts/ChartAnnotations'
-import {
-  buildAnalysisChartModel, collectPriceLines, type LevelType,
-} from '@/components/stock-analysis/analysis-chart-model'
+import type { LevelType } from '@/components/stock-analysis/analysis-chart-model'
 import { nextBusinessDates, normalizeDate } from '@/components/stock-analysis/AnalysisKChart'
 import type { ChartRange } from '@/lib/chart-types'
-import type { Fib2Overlay, KlineRow, LevelSeries, PriceLevel } from '@/lib/api'
+import type { Fib2Overlay, KlineRow } from '@/lib/api'
 import type { PlotSeries } from '@/lib/lightweight-model'
 
 /**
  * [R653] 关键价位那张图的主图叠加物 —— 价位横线与通道曲线。
  *
- * 日K 与关键价位**同一套画法同一个产地**：价位横线走 `collectPriceLines`，通道曲线走
- * `buildAnalysisChartModel` 里的 `curve:*` 序列。这里只做「形状转换」：
- *   · 横线转成日K 标注层认识的 `priceLines`（右侧端点带名字，走价格轴不另开标签带）；
- *   · 曲线原样透传给日K 的画布 —— 主图一条一条线，副图与蜡烛都不受影响。
+ * [R660] 横线与曲线**不再在这里另拼一套**：日K 直接消费 `buildAnalysisChartModel()` 产出的
+ * `annotations.priceLines` 与 `curve:*` 序列 —— 标签带数值、曲线端值、悬停时的高亮/淡化
+ * 与「关键价位」逐项同源。这里只剩二型那几块形状转换。
  */
 
 export type LevelLine = NonNullable<AnnotationData['priceLines']>[number]
-
-/** 价位横线：与关键价位同一份收集逻辑，只补上日K 标注层需要的透明度与避让优先级。 */
-export function levelPriceLines(
-  levels: Record<LevelType, PriceLevel[]> | undefined,
-  active: Iterable<LevelType>,
-  pivotRank: 1 | 2 | 3,
-  colors?: Record<string, string>,
-  roleColor?: (role: string) => string,
-): LevelLine[] {
-  return collectPriceLines(levels, new Set(active), pivotRank, colors, roleColor).map(line => ({
-    value: line.value,
-    label: line.label,
-    color: line.color,
-    opacity: 0.9,
-    labelPriority: 1,
-  }))
-}
-
-/** 通道/带状曲线（26日布林、Keltner 三档、ATR 上下轨、Ⅱ型均线）：只取主图那几条。 */
-export function levelCurveSeries(input: {
-  rows: KlineRow[]
-  series?: LevelSeries
-  seriesDates?: string[]
-  active: Iterable<LevelType>
-  colors?: Record<string, string>
-  roleColor?: (role: string) => string
-}): PlotSeries[] {
-  if (!input.series) return []
-  const model = buildAnalysisChartModel({
-    rows: input.rows,
-    series: input.series,
-    seriesDates: input.seriesDates,
-    activeTypes: input.active,
-    colors: input.colors,
-    roleColor: input.roleColor,
-  })
-  return model.series.filter(item => item.id.startsWith('curve:'))
-}
 
 /** 现价贴签：与关键价位那张图一样一条淡线 + 右端「现价 x.xx」，用来量还差多少到位。 */
 export function levelLastPriceLine(close: number | null | undefined, color: string): LevelLine[] {

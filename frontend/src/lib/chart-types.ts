@@ -130,6 +130,11 @@ export interface DailyChartProps {
   linkedPrice?: number | null
   onDateClick?: (date: string) => void
   onPriceDoubleClick?: (price: number, currentPrice: number) => void
+  /**
+   * [R660] 十字线价格与像素比例(仅主价格 pane)。日K 用它做价位命中判断,
+   * 与「关键价位」同一套 `hitTestAnalysis` —— 悬停时该线加粗、其余变淡。
+   */
+  onCrosshairMove?: (point: { time: string; price: number; pixelsPerPrice: number } | null) => void
   /** 初始可见根数；ECharts 默认 60，新详情按窗口宽度适配；'all' 显示全部。 */
   visibleBars?: number | 'all'
   /** 已激活的子图 key 列表 (含 vol, 按点击顺序) */

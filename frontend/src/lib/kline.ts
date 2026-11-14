@@ -17,10 +17,18 @@ export function klineDailyQueryOptions(
   symbol: string,
   dateRange: { start: string; end: string },
   extColumns?: string,
+  /**
+   * [R660] 盘中现拉最新一根(与关键价位视图的 `useAnalysisKline` 同口径)。
+   * 只有显式传 true 才换缓存键 —— 其余调用方(信息条/预取/详情页)的键一字不变。
+   */
+  opts?: { refreshLive?: boolean },
 ) {
   return {
-    queryKey: QK.kline(symbol, dateRange.start, dateRange.end, extColumns),
-    queryFn: () => api.klineDaily(symbol, undefined, dateRange, extColumns),
+    queryKey: opts?.refreshLive
+      ? [...QK.kline(symbol, dateRange.start, dateRange.end, extColumns), 'live'] as const
+      : QK.kline(symbol, dateRange.start, dateRange.end, extColumns),
+    queryFn: () => api.klineDaily(symbol, undefined, dateRange, extColumns,
+      opts?.refreshLive ? { refreshLive: true } : undefined),
     // 工厂无 TData 泛型, 参数用 any 以便 useQuery/prefetchQuery 共用
     placeholderData: (prev: any, prevQuery: any) => {
       const prevKey = prevQuery?.queryKey as readonly unknown[] | undefined

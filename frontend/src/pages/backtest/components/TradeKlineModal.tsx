@@ -238,6 +238,8 @@ export function TradeKlineModal({ trade, assetType, navItems, currentKey, onNavi
                 priceLines={priceLines}
                 showLimitMarkers={false}
                 showMarkerToggle={false}
+                // [R660] 回测「成交K线」是回放视图: 不显示关键价位那排开关
+                showLevelToolbar={false}
                 showIntraday={showIntraday}
                 selectedDate={selectedDate}
                 onSelectDate={selectDate}
