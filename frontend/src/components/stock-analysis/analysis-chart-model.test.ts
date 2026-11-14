@@ -99,6 +99,21 @@ describe('buildAnalysisChartModel', () => {
     expect(ANALYSIS_LABEL_BAND_PX).toBeGreaterThanOrEqual(120)
   })
 
+  it('[R661] 标签可只留名字(日K 原样), 关键价位仍带数值', () => {
+    const model = buildAnalysisChartModel({
+      rows,
+      levels: levels(),
+      series,
+      seriesDates: DATES,
+      activeTypes: ['sr', 'pivot', 'boll'],
+      pivotRank: 1,
+      labelWithValue: false,
+    })
+    const lines = model.annotations.priceLines!
+    expect(lines.find(line => !line.noLine)!.label).toBe('成交密集区')
+    expect(lines.find(line => line.noLine)!.label).toBe('26日布林上轨')
+  })
+
   it('dims unrelated levels and thickens the hovered one, drawing it last', () => {
     const hoveredKey = levelKey('pivot', 10.2)
     const model = buildAnalysisChartModel({
