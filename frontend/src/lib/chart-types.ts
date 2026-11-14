@@ -116,6 +116,11 @@ export interface DailyChartProps {
    */
   levelSeries?: PlotSeries[]
   levelLines?: NonNullable<AnnotationData['priceLines']>
+  /** [R654] 斐波那契Ⅱ型那几块：上攻段底色 / 首次回踩标记 / 未来分隔线 / 末尾三个空槽 */
+  levelRanges?: ChartRange[]
+  levelLabels?: NonNullable<AnnotationData['labels']>
+  levelVerticals?: NonNullable<AnnotationData['verticals']>
+  levelFuture?: { dates: string[]; labels: string[]; values: number[] } | null
   showInfoBar?: boolean
   showMarkers?: boolean
   markerStyle?: DailyMarkerStyle

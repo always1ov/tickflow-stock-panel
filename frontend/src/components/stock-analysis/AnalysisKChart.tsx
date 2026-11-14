@@ -536,12 +536,12 @@ export function AnalysisKChart({
   )
 }
 
-function normalizeDate(date: string): string {
+export function normalizeDate(date: string): string {
   return typeof date === 'string' ? date.slice(0, 10) : ''
 }
 
 /** 从最后一根往后数 `count` 个工作日(不含节假日), 给二型的「未来」空槽用。 */
-function nextBusinessDates(last: string, count: number): string[] {
+export function nextBusinessDates(last: string, count: number): string[] {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(last)) return []
   const out: string[] = []
   const date = new Date(`${last}T00:00:00Z`)

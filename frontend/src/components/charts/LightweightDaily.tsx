@@ -57,7 +57,8 @@ const eventTextColor = (event: EventMarker, row: OHLC, theme: Theme) => event.ev
 export function LightweightDaily({ data, assetType, symbol = '', height = 480, activeIndicators = [], showMA = true, showInfoBar = true,
   markers = [], ranges, priceLines, showMarkers = true, markerStyle = 'label', volumeCompare = { enabled: true, days: 1 }, addedDate,
   linkedPrice, onDateClick, onPriceDoubleClick, visibleBars, stockInfo, analysisPanes = [], maKeys,
-  levelSeries = [], levelLines = [] }: DailyChartProps) {
+  levelSeries = [], levelLines = [], levelRanges = [], levelLabels = [], levelVerticals = [],
+  levelFuture = null }: DailyChartProps) {
   const rows = useMemo(() => validDailyRows(data), [data])
   const precision = pricePrecision(assetType)
   const theme = useTheme()
@@ -152,9 +153,15 @@ export function LightweightDaily({ data, assetType, symbol = '', height = 480, a
     })
     return { series, decor, titles, readouts, insets, headers, hidden }
   }, [analysisPanes, rows, selected.length, visibleBars, ct.text])
+  // [R654] 二型的「未来」三个空槽: 蜡烛时间轴往后多三格, 末尾三个位移均线值才画得出来。
+  const plottedModel = useMemo(() => levelFuture
+    ? model.map(item => item.id === 'price'
+      ? { ...item, data: [...item.data, ...levelFuture.dates.map(time => ({ time }))] }
+      : item)
+    : model, [model, levelFuture])
   const plotSeries = useMemo(
-    () => [...model, ...analysis.series, ...levelSeries],
-    [model, analysis.series, levelSeries])
+    () => [...plottedModel, ...analysis.series, ...levelSeries],
+    [plottedModel, analysis.series, levelSeries])
 
   const plotHeight = Math.max(260, height - (showInfoBar ? CHART_LAYOUT.readout : 0))
   const paneHeights = useMemo(() => {
@@ -179,11 +186,14 @@ export function LightweightDaily({ data, assetType, symbol = '', height = 480, a
     }) : [], [markers, showMarkers, rows, markerStyle, theme])
   const annotations = useMemo(() => {
     const addedRow = addedDate ? rows.filter(r => r.date <= addedDate).at(-1) : null
-    return { dates: rows.map(r => r.date), ranges,
+    const verticals = addedRow ? [{ time: addedRow.date, label: '自选', color: '#3B82F6' }] : []
+    return { dates: [...rows.map(r => r.date), ...(levelFuture?.labels ?? [])],
+      ranges: [...(ranges ?? []), ...levelRanges],
       priceLines: [...(priceLines ?? []), ...levelLines],
-      verticals: addedRow ? [{ time: addedRow.date, label: '自选', color: '#3B82F6' }] : [],
+      labels: levelLabels,
+      verticals: [...verticals, ...levelVerticals],
     }
-  }, [rows, ranges, priceLines, addedDate, levelLines])
+  }, [rows, ranges, priceLines, addedDate, levelLines, levelRanges, levelLabels, levelVerticals, levelFuture])
   const volumeLabels = useMemo(() => volumeCompare.enabled ? rows.flatMap((row, idx) => {
     const ratio = volumeRatioAt(rows, idx, volumeCompare.days)
     return ratio == null ? [] : [{ time: row.date, value: row.volume ?? 0, text: `${ratio.toFixed(1)}x` }]

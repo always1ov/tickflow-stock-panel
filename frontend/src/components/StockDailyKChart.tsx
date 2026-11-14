@@ -15,8 +15,10 @@ import { useStockLevels } from '@/components/stock-analysis/StockLevelsPanel'
 import { DEFAULT_LEVEL_TYPES, useLevelControls } from '@/components/stock-analysis/levelControls'
 import { LevelToolbar } from '@/components/stock-analysis/LevelToolbar'
 import { LEVEL_GROUPS } from '@/components/stock-analysis/analysis-chart-model'
-import { LEVEL_CURVE_COLOR, fib2RoleColor, levelColors, useTheme } from '@/lib/theme'
-import { levelCurveSeries, levelPriceLines } from '@/lib/levelOverlays'
+import { LEVEL_CURVE_COLOR, fib2RoleColor, levelColors, useChartTheme, useTheme } from '@/lib/theme'
+import {
+  levelCurveSeries, levelFib2Overlay, levelLastPriceLine, levelPriceLines, withFib2Future,
+} from '@/lib/levelOverlays'
 
 const EChartsCandlestick = lazy(() => import('./EChartsCandlestick').then(m => ({ default: m.EChartsCandlestick })))
 const LightweightDaily = lazy(() => import('./charts/LightweightDaily').then(m => ({ default: m.LightweightDaily })))
@@ -243,20 +245,40 @@ export function StockDailyKChart({
   const shown = useShownLevels(levelsQ.data?.levels, levelsQ.data?.fib2, kline.data?.rows ?? [],
     levelCtl.fib2Grain, levelCtl.fib2ShowTargets)
   const levelColorsByTheme = levelColors(theme)
+  const ct = useChartTheme()
   const roleColor = useCallback((role: string) => fib2RoleColor(role, theme), [theme])
-  const levelLines = useMemo(() => renderer !== 'lightweight'
-    ? [] : levelPriceLines(shown.effLevels, levelCtl.activeTypes, levelCtl.pivotRank,
-      { ...levelColorsByTheme, ...LEVEL_CURVE_COLOR }, roleColor),
-  [renderer, shown.effLevels, levelCtl.activeTypes, levelCtl.pivotRank, levelColorsByTheme, roleColor])
-  const levelSeries = useMemo(() => renderer !== 'lightweight'
-    ? [] : levelCurveSeries({
-      rows: kline.data?.rows ?? [],
-      series: levelsQ.data?.series,
-      seriesDates: levelsQ.data?.dates,
+  const levelPalette = useMemo(() => ({ ...levelColorsByTheme, ...LEVEL_CURVE_COLOR }),
+    [levelColorsByTheme])
+  const lastClose = rows.at(-1)?.close
+  // [R654] 斐波那契Ⅱ型: 上攻段底色、回踩密集带、首次回踩标记、「未来」分隔线与末尾三个空槽。
+  const fib2Overlay = useMemo(() => renderer !== 'lightweight'
+    ? { priceLines: [], ranges: [], labels: [], verticals: [], future: null }
+    : levelFib2Overlay({
       active: levelCtl.activeTypes,
-      colors: { ...levelColorsByTheme, ...LEVEL_CURVE_COLOR },
-    }),
-  [renderer, kline.data?.rows, levelsQ.data?.series, levelsQ.data?.dates, levelCtl.activeTypes, levelColorsByTheme])
+      fib2: levelsQ.data?.fib2,
+      fib2Zone: shown.fib2Zone,
+      rows: kline.data?.rows ?? [],
+      lastClose,
+      theme,
+      fibColor: levelColorsByTheme.fib2,
+      textColor: ct.text,
+    }), [renderer, levelCtl.activeTypes, levelsQ.data?.fib2, shown.fib2Zone, kline.data?.rows,
+    lastClose, theme, levelColorsByTheme, ct.text])
+  const levelLines = useMemo(() => renderer !== 'lightweight' ? [] : [
+    ...levelPriceLines(shown.effLevels, levelCtl.activeTypes, levelCtl.pivotRank, levelPalette, roleColor),
+    ...fib2Overlay.priceLines,
+    ...levelLastPriceLine(lastClose, ct.text),
+  ], [renderer, shown.effLevels, levelCtl.activeTypes, levelCtl.pivotRank, levelPalette, roleColor,
+    fib2Overlay, lastClose, ct.text])
+  const levelSeries = useMemo(() => renderer !== 'lightweight' ? [] : withFib2Future(levelCurveSeries({
+    rows: kline.data?.rows ?? [],
+    series: levelsQ.data?.series,
+    seriesDates: levelsQ.data?.dates,
+    active: levelCtl.activeTypes,
+    colors: levelPalette,
+  }), fib2Overlay.future),
+  [renderer, kline.data?.rows, levelsQ.data?.series, levelsQ.data?.dates, levelCtl.activeTypes,
+    levelPalette, fib2Overlay.future])
   const analysisPanes = useMemo<DailyAnalysisPane[]>(() => {
     if (renderer !== 'lightweight') return []
     const panes: DailyAnalysisPane[] = []
@@ -452,6 +474,10 @@ export function StockDailyKChart({
           analysisPanes={fittedPanes}
           levelLines={levelLines}
           levelSeries={levelSeries}
+          levelRanges={fib2Overlay.ranges}
+          levelLabels={fib2Overlay.labels}
+          levelVerticals={fib2Overlay.verticals}
+          levelFuture={fib2Overlay.future}
         />
         </Suspense>
       )}
