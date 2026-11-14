@@ -22,6 +22,7 @@ import { buildMonitorPriceLines } from '@/lib/price-alerts'
 import { usePreferences } from '@/lib/useSharedQueries'
 import { setFocusSymbol, clearFocusSymbol } from '@/lib/useQuoteStream'
 import { useDialogBackdrop } from '@/lib/useDialogBackdrop'
+import { CHART_LAYOUT } from '@/lib/chart-layout'
 import { useMediaQuery } from '@/lib/useMediaQuery'
 import { storage } from '@/lib/storage'
 import { navItemKey, type NavItem } from '@/lib/listNav'
@@ -65,8 +66,21 @@ const VIEW_TABS: { key: PreviewView; label: string; Icon: typeof Clock }[] = [
   { key: 'review', label: '复盘', Icon: History },
 ]
 
-/** [R612] 日K / 分时的高度上限(关键价位不参与, 见下方 R612-fix 注释) */
+/** [R612] 图高上限 */
 const CHART_MAX_HEIGHT = 720
+/**
+ * [R614] 关键价位这张卡里, 图表画布以外还要占的高度 —— 1600×913 实测 257:
+ *   · 卡片内边距 32 + 上下边框 2;
+ *   · 画布上方: 开关键排 78(右栏 940px 上下宽时折成两排) + 两张副图的图例 19;
+ *   · 画布下方: 价位统计面板 114 + 上间距 12。
+ * 这些都写死在图表组件里, 外面拿不到, 所以按实测写常量。图表内部版式一变就要回来重算。
+ */
+const LEVELS_CHROME_H = 257
+/**
+ * [R614] 分时那张卡里, 图以外还要占的高度 —— 1600×913 实测 109:
+ * 卡片内边距 32 + 上下边框 2 + 上方天数行 63 + 间距 12。分时没有副图, 减掉它就是一屏。
+ */
+const INTRADAY_CHROME_H = 109
 
 interface PriceAlertDraft {
   id: number
@@ -199,12 +213,16 @@ export function StockPreviewDialog({ symbol, name, onClose, enableLevelsView = t
   //
   // [R612] 双栏只在 ≥1280 生效; 窄屏单列、整页滚, 图高回落到改版前写死的值。
   //
-  // [R612-fix] 只有「分时」跟着右栏长高。另外两张**必须守住原来的高度**:
-  //   · 关键价位: 画布 = 主图(这里的 520)+ 趋势量化 + 量化MACD 两张副图(再 +约 380px);
-  //   · 日K: 每开一张指标副图, 画布再 +96px, 开几张由图内工具栏决定, 外面算不出来。
-  // 拉高主图只会把副图推到视口外。改版第一版还把右栏设成 overflow-hidden, 画布比
-  // 右栏高 → 副图被整块裁掉, 用户看到的就是「趋势MACD、趋势量化都没了」。
-  // 现在右栏自己可滚(与改版前「弹窗往下滚着看副图」同一个动线), 两张图保持原高。
+  // [R612-fix] 关键价位不再被裁: 那张图的画布 = 主图(`height`)+ 趋势量化 + 量化MACD
+  // 两张副图(各 96px, 见 CHART_LAYOUT.subPaneSlot); 改版第一版右栏 overflow-hidden,
+  // 画布比右栏高 → 两张副图被整块裁掉。
+  //
+  // [R614] 用户: 「按这个方案调整副图高度」—— 要一屏内同时看到两张副图, 不再往下滚。
+  // 副图高度是全局共用常量(不能只为弹窗改), 所以这里把**主图**压到「右栏 − 卡片其余部分 − 两张副图」:
+  // canvas = height + 2*96, 加上 LEVELS_CHROME_H 正好落进右栏, 主图与两张副图一屏可见。
+  // 下限 260(主图约 232): 再矮 K 线就看不清了; 触到下限时溢出的是画布**下方**的价位统计面板,
+  // 两张副图仍在屏内(右栏滚动作为 R613 的兜底保留)。日K 的副图数量由图内工具栏决定、
+  // 外面算不出来, 维持 420; 分时没有额外副图, 继续跟着右栏放宽。
   const wide = useMediaQuery('(min-width: 1280px)')
   const chartAreaRef = useRef<HTMLDivElement>(null)
   const [chartAreaH, setChartAreaH] = useState(0)
@@ -215,8 +233,13 @@ export function StockPreviewDialog({ symbol, name, onClose, enableLevelsView = t
     ro.observe(el)
     return () => ro.disconnect()
   }, [wide, symbol, chartView])
-  const chartHeight = chartView === 'intraday'
-    ? (wide && chartAreaH > 0 ? Math.max(480, Math.min(chartAreaH - 32, CHART_MAX_HEIGHT)) : 480)
+  const chartHeight = wide && chartAreaH > 0
+    ? chartView === 'intraday'
+      ? Math.max(480, Math.min(chartAreaH - INTRADAY_CHROME_H, CHART_MAX_HEIGHT))
+      : chartView === 'levels'
+        // 整张卡 = 卡片其余部分 + 主图 + 两张副图(各 96), 让它们刚好装进右栏
+        ? Math.max(260, Math.min(chartAreaH - LEVELS_CHROME_H - 2 * CHART_LAYOUT.subPaneSlot, CHART_MAX_HEIGHT))
+        : undefined
     : undefined
   const prevSymbolRef = useRef<string | null>(null)
   const initialViewRef = useRef(initialView)

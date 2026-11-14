@@ -128,20 +128,35 @@ def test_R612_图表退化成一张卡片_不再自带页签():
 
 
 def test_R612_只有分时跟着右栏放宽():
+    """[R614] 分时没有副图, 但仍要减掉图外的天数行与卡片内边距, 否则底部时间轴被裁。"""
     dlg = code_of(DLG)
-    assert "Math.max(480, Math.min(chartAreaH - 32, CHART_MAX_HEIGHT))" in dlg, (
+    assert "Math.max(480, Math.min(chartAreaH - INTRADAY_CHROME_H, CHART_MAX_HEIGHT))" in dlg, (
         "分时图没按右栏量出来的可用高度放宽")
     assert "new ResizeObserver(entries => setChartAreaH(entries[0].contentRect.height))" in dlg
 
 
-def test_R612fix_日K与关键价位保持原高_右栏可滚_副图不能被裁():
+def test_R614_关键价位按右栏减两张副图定主图高_一屏装下():
+    """[R614] 用户: 「按这个方案调整副图高度」。整张卡 = 固定开销(卡片内边距/边框/开关排/图例/价位统计)
+    + 主图 + 2×96, 主图取右栏减掉这些, 一屏装下; 太低时下限 260, 溢出的只是价位统计面板,
+    两张副图仍在屏内, 右栏滚动兜底。"""
+    dlg = code_of(DLG)
+    assert "Math.max(260, Math.min(chartAreaH - LEVELS_CHROME_H - 2 * CHART_LAYOUT.subPaneSlot, CHART_MAX_HEIGHT))" in dlg, (
+        "关键价位没按「右栏 − 固定开销 − 两张副图」定主图高")
+    assert "const LEVELS_CHROME_H = 257" in dlg, "固定开销常量没了, 装不下时无从核对"
+    assert "const INTRADAY_CHROME_H = 109" in dlg, "分时也要减掉图外的天数行, 不然底部时间轴被裁"
+    assert "Math.max(480, Math.min(chartAreaH - INTRADAY_CHROME_H, CHART_MAX_HEIGHT))" in dlg, (
+        "分时没按「右栏 − 图外开销」定高")
+    assert "height={chartHeight ?? 520}" in dlg, "窄屏/未测量时没回落到 520"
+
+
+def test_R612fix_日K保持原高_右栏可滚_副图不能被裁():
     """[R612-fix] 用户: 「原来的趋势macd、趋势量化那些副图都没了」。
-    根因是右栏 overflow-hidden + 把主图拉高: 这两张图的画布都**在 height 之外**再挂副图
-    (关键价位 +约 380px, 日K 每张指标副图 +96px), 画布比右栏高就被裁掉。
-    修法: 右栏自己滚, 两张图守住改版前的高度, 只有没有额外副图的分时跟着放宽。"""
+    根因是右栏 overflow-hidden，而这两张图的画布都在 height 之外再挂副图：
+    关键价位 +2×96，日K 每张指标副图 +96，画布比右栏高就被裁。
+    修法: 右栏自己可滚(兜底); 日K 的副图数量由图内工具栏决定、外面算不出来, 维持 420。
+    [R614] 关键价位改成按右栏算出主图高，见上一条。"""
     dlg = code_of(DLG)
     assert "height={chartHeight ?? 420}" in dlg, "日K 被拉高了 —— 指标副图会被推到视口外"
-    assert "height={chartHeight ?? 520}" in dlg, "关键价位被拉高了 —— 两张副图会被推到视口外"
     assert 'className="mt-3 min-h-0 flex-1 overflow-y-auto"' in dlg, "右栏不可滚, 副图会被裁"
     assert "chartView === 'review' && 'overflow-y-auto'" not in dlg, "复盘之外又只给一个视图开了滚动"
 
