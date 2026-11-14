@@ -133,11 +133,23 @@ it('[R649] 趋势量化 / 量化MACD 两张副图默认不画, 点开后才追�
   expect([...host.querySelectorAll('button')].some(button => button.textContent === '趋势量化')).toBe(false)
 })
 
-it('[R650] 给了可用高度就把整张图压进去, 底部日期轴不会被副图顶出可视区', async () => {
-  await render({ maxHeight: 400 })
-  // 图表元素拿到的高度 = 压后的整图高 - 工具栏
-  expect(props().height).toBe(400 - 40)
-  // 没给可用高度时维持原自然高
-  await render()
-  expect(props().height).toBeGreaterThan(400 - 40)
+it('[R651] 空间不够只压两张分析副图, 主图与指标副图的高度不动', async () => {
+  const openPanes = async (options: any) => {
+    await render(options)
+    for (const label of ['趋势量化', '量化MACD']) {
+      const pill = [...host.querySelectorAll('button')].find(button => button.textContent === label)!
+      await act(async () => pill.click())
+    }
+    const panes: any[] = props().analysisPanes
+    return {
+      heights: panes.map(pane => pane.height),
+      // 去掉分析副图后剩下的那截 = 主图 + 指标副图, 必须与 maxHeight 无关
+      base: props().height - panes.reduce((sum, pane) => sum + pane.height, 0),
+    }
+  }
+  const roomy = await openPanes({ maxHeight: 2400 })
+  const tight = await openPanes({ maxHeight: 700 })
+  expect(tight.base).toBe(roomy.base)
+  expect(tight.heights.reduce((a, b) => a + b, 0)).toBeLessThan(roomy.heights.reduce((a, b) => a + b, 0))
+  expect(Math.min(...tight.heights)).toBeGreaterThanOrEqual(100)
 })

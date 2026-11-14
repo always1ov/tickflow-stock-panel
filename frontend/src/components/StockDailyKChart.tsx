@@ -5,7 +5,9 @@ import { klineDailyQueryOptions, klineDateRange } from '@/lib/kline'
 import { storage } from '@/lib/storage'
 import type { ChartMarker, ChartPriceLine, ChartRange, ChartRenderer, DailyAnalysisPane, DailyMarkerStyle, OHLC, VolumeCompareConfig } from '@/lib/chart-types'
 import { OVERLAY_INDICATORS, SUB_CHART_META } from '@/lib/chart-indicators'
-import { CHART_LAYOUT, SUB_PANE_GAP, dailyChartHeight, quantPaneHeight, trendPaneHeight } from '@/lib/chart-layout'
+import {
+  CHART_LAYOUT, SUB_PANE_GAP, dailyChartHeight, fitAnalysisPaneHeights, quantPaneHeight, trendPaneHeight,
+} from '@/lib/chart-layout'
 import { PANE_HEADER_H } from '@/lib/analysisPanes'
 import { useStockQuantMacd, useStockTrendQuant } from '@/lib/useStockAnalysisPanes'
 
@@ -28,8 +30,10 @@ interface Props {
   renderer?: ChartRenderer
   height?: number
   /**
-   * [R650] 整张图(含工具栏与所有副图)最多能占多高。弹窗右栏滚动容器把可用高度传进来,
-   * 超出时整图按比例压缩, 底部日期轴始终留在可视区内 —— 不会被新增副图顶出去。
+   * [R651] 卡里给整张图留的高度上限。**主图与指标副图的高度、位置不参与压缩** ——
+   * 只有两张分析副图(趋势量化 / 量化MACD)按剩余空间收, 收到下限 100 就不再压,
+   * 再放不下就让整张图向下溢出、由外层滚动兜底。
+   * ([R650] 曾用它等比压缩整图, 主图被压小, 已按用户「主图位置不能动」改掉。)
    */
   maxHeight?: number
   className?: string
@@ -229,17 +233,23 @@ export function StockDailyKChart({
     }
     return panes
   }, [renderer, showTrendQuant, showQuantMacd, height, tquantQ.data, tquantQ.isError, qmacdQ.data, qmacdQ.isError])
-  const analysisExtraH = analysisPanes.reduce((sum, pane) => sum + pane.height, 0)
-
+  // ECharts 渲染器(EChartsCandlestick 自己排版)的副图占位, 与 R650 前一致, 本轮不动。
   let subExtraH = 0
   activeSubDefs.forEach(def => { subExtraH += SUB_INFO_H + def.height })
   if (activeSubDefs.length > 0) subExtraH += activeSubDefs.length * SUB_GAP + 14
-  const naturalChartHeight = renderer === 'lightweight'
-    ? dailyChartHeight(height, activeSubDefs.length) + analysisExtraH
+  const baseChartHeight = renderer === 'lightweight'
+    ? dailyChartHeight(height, activeSubDefs.length)
     : height + subExtraH
-  // [R650] 有可用高度就压进去: 副图只是「按比例占位」, 整图缩短时各 pane 一起等比收缩,
-  // 底部日期轴仍贴在卡片底边, 不会因为多开两张副图被挤出可视区。
-  const chartHeight = maxHeight ? Math.min(naturalChartHeight, Math.max(360, maxHeight)) : naturalChartHeight
+
+  // [R651] 主图与指标副图的高度、位置一律不动; 两张分析副图只吃卡里剩下的空间,
+  // 不够就压它们自己(下限 100), 再不够就让整张图向下溢出滚动 —— 不拿主图去换。
+  const fittedPanes = useMemo(() => {
+    if (!analysisPanes.length || !maxHeight) return analysisPanes
+    const heights = fitAnalysisPaneHeights(
+      analysisPanes.map(pane => pane.height), Math.max(360, maxHeight) - baseChartHeight)
+    return analysisPanes.map((pane, index) => ({ ...pane, height: heights[index] }))
+  }, [analysisPanes, maxHeight, baseChartHeight])
+  const chartHeight = baseChartHeight + fittedPanes.reduce((sum, pane) => sum + pane.height, 0)
   const Chart = renderer === 'lightweight' ? LightweightDaily : EChartsCandlestick
 
   if (!symbol) return null
@@ -378,7 +388,7 @@ export function StockDailyKChart({
           activeIndicators={activeIndicators}
           volumeCompare={volumeCompare}
           addedDate={showAddedMark ? addedDate : null}
-          analysisPanes={analysisPanes}
+          analysisPanes={fittedPanes}
         />
         </Suspense>
       )}

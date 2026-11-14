@@ -478,8 +478,8 @@ export function StockPreviewDialog({ symbol, name, onClose, enableLevelsView = t
                           // 与右侧「关键价位」同一套画布(ECharts 版画不出这两张副图)
                           renderer="lightweight"
                           height={chartHeight ?? 420}
-                          // [R650] 右栏可视高度: 日K 开启分析副图后整图压进这一截,
-                          // 底部日期轴不会被副图顶到折叠线以下
+                          // [R650] 右栏可视高度: 日K 用它算两张分析副图还剩多少空间;
+                          // [R651] 主图不动, 放不下就让整图溢出、右栏滚动
                           fillHeight={chartAreaH > 0 ? chartAreaH : undefined}
                           showIntraday
                           dateRange={heroRange}

@@ -75,6 +75,22 @@ export function quantPaneHeight(mainHeight: number): number {
   return trendSubPaneHeight(mainHeight) + SUB_PANE_GAP + MACD_PANE_EXTRA
 }
 
+/** [R651] 分析副图被压缩时的下限: 再挤也要看得见字道与柱体 */
+export const MIN_ANALYSIS_PANE_H = 100
+
+/**
+ * [R651] 把「卡里剩下的空间」分给两张分析副图 —— **只压副图, 不动主图**。
+ * `natural` 是两张副图各自想要的高度, `room` 是主图与指标副图之外剩下的像素。
+ * 放得下就原样返回; 放不下就等比压缩, 每张不低于 `MIN_ANALYSIS_PANE_H`。
+ * 还不够时宁可让整张图向下溢出滚动, 也不拿主图的高度去换。
+ */
+export function fitAnalysisPaneHeights(natural: number[], room: number): number[] {
+  const total = natural.reduce((sum, value) => sum + value, 0)
+  if (total === 0 || room >= total) return natural
+  const scale = Math.max(0, room) / total
+  return natural.map(value => Math.max(MIN_ANALYSIS_PANE_H, Math.round(value * scale)))
+}
+
 /** `height` = 主图高时, 关键价位那张图连两张副图、副图间隔与 [R635] 额外让给 MACD 的高度在内的总高(不含卡片里的按钮/图例)。 */
 export function levelsChartTotalHeight(mainHeight: number): number {
   return mainHeight + 2 * trendSubPaneHeight(mainHeight) + TREND_LANES_EXTRA + SUB_PANE_GAP + MACD_PANE_EXTRA

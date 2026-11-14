@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { fitLevelsMainHeight, levelsChartTotalHeight, quantPaneHeight, trendPaneHeight, trendSubPaneHeight } from './chart-layout'
+import {
+  fitAnalysisPaneHeights, fitLevelsMainHeight, levelsChartTotalHeight, quantPaneHeight, trendPaneHeight, trendSubPaneHeight,
+} from './chart-layout'
 
 describe('[R623] 关键价位一屏装下的反算', () => {
   it('[R626] 副图是主图的 28%(限 108~136), 趋势量化的字道另算', () => {
@@ -40,5 +42,21 @@ describe('[R649] 日K 并入的两张副图高度与关键价位同源', () => {
     expect(quantPaneHeight(main)).toBe(sub + 12 + 25)
     // 与整张关键价位图的总高反算一致: 主图 + 两张副图
     expect(main + trendPaneHeight(main) + quantPaneHeight(main)).toBe(levelsChartTotalHeight(main))
+  })
+})
+
+describe('[R651] 空间不够时只压分析副图, 下限 100', () => {
+  it('放得下就原样返回', () => {
+    expect(fitAnalysisPaneHeights([168, 130], 400)).toEqual([168, 130])
+  })
+
+  it('放不下等比压缩, 且每张不低于 100', () => {
+    const fitted = fitAnalysisPaneHeights([168, 130], 200)
+    expect(fitted.every(height => height >= 100)).toBe(true)
+    expect(fitted.reduce((a, b) => a + b, 0)).toBeLessThan(298)
+  })
+
+  it('空间为负(指标副图已占满)也不低于下限, 由整图溢出滚动兜底', () => {
+    expect(fitAnalysisPaneHeights([168, 130], -56)).toEqual([100, 100])
   })
 })
