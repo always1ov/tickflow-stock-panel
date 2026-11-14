@@ -32,7 +32,7 @@ export type DecorItem =
   /** 箭头图标: 顶端对准 value、水平居中于那根 K 线 */
   | { kind: 'icon'; time: string; value: number; up: boolean; color: string }
   /** 字道文字: 顶 / 底各三行([R619] 两行装不下密集信号), 按真实像素宽度分行, 横坐标对准它那一天 */
-  | { kind: 'text'; time: string; text: string; color: string; lane: 'top' | 'bottom' }
+  | { kind: 'text'; time: string; text: string; short?: string; color: string; lane: 'top' | 'bottom' }
 
 export interface PaneDecorData {
   items: DecorItem[]
@@ -79,7 +79,7 @@ export class PaneDecor implements ISeriesPrimitive<Time> {
       const barSpacing = ts.options().barSpacing
       // [R619] 字先收起来, 等柱子和图标画完再统一排版 —— 排版要求横坐标单调,
       // 而这些图元是按种类分批给过来的, 一边画一边排会把两行都占满后硬压在已有的字上。
-      const texts: LaneDraft<Extract<DecorItem, { kind: 'text' }>>[] = []
+      const texts: (LaneDraft<Extract<DecorItem, { kind: 'text' }>> & { wShort: number })[] = []
       ctx.save()
       ctx.beginPath(); ctx.rect(0, 0, width, height); ctx.clip()
       for (const item of this.data.items) {
@@ -110,7 +110,11 @@ export class PaneDecor implements ISeriesPrimitive<Time> {
           ctx.restore()
         } else {
           ctx.font = `${LANE_FONT}px "JetBrains Mono", monospace`
-          texts.push({ lane: item.lane, x, w: ctx.measureText(item.text).width + 4, item })
+          const short = item.short ?? item.text
+          texts.push({
+            lane: item.lane, x, w: ctx.measureText(item.text).width + 4,
+            wShort: ctx.measureText(short).width + 4, item,
+          })
         }
       }
       // [R620] 日期锚点: 每个信号在它那一天、贴着图的那条边上钉一个 3px 点。
@@ -123,7 +127,17 @@ export class PaneDecor implements ISeriesPrimitive<Time> {
         ctx.fillRect(t.x - 1.5, (t.lane === 'top' ? topAnchorY : bottomAnchorY) - 1.5, 3, 3)
       }
       // [R619] 三行字道, 按真实像素宽度从左到右排; 排不下的往右让一点, 再放不下就不画(见 packLaneTexts)
-      const placed = packLaneTexts(texts)
+      // [R621] 但"不画"等于丢信号: 先按全称排一遍, 排不下的那几个改用单字再排一遍 ——
+      // 全称放得下就写全称, 挤不下才缩字, 一个信号都不会因为窗口变窄而消失。
+      const draftOf = (t: (typeof texts)[number], useShort: boolean): LaneDraft<Extract<DecorItem, { kind: 'text' }>> => ({
+        lane: t.lane, x: t.x, w: useShort ? t.wShort : t.w,
+        item: useShort ? { ...t.item, text: t.item.short ?? t.item.text } : t.item,
+      })
+      let placed = packLaneTexts(texts.map(t => draftOf(t, false)))
+      if (texts.some(t => !placed.some(p => p.item === t.item))) {
+        const kept = new Set(placed.map(p => p.item))
+        placed = packLaneTexts(texts.map(t => draftOf(t, !kept.has(t.item))))
+      }
       const laneY = (lane: 'top' | 'bottom', row: number) => (lane === 'top'
         ? headerH + LANE_TOP_PAD + row * LANE_ROW_H
         : height - LANE_BOTTOM_PAD - (row + 1) * LANE_ROW_H)

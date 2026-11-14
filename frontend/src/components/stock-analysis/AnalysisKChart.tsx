@@ -11,7 +11,7 @@ import {
   alignQuantMacd, diffExposed, QUANT_MACD_HELP, QUANT_MACD_LEGEND, STICK_RATIO,
 } from '@/lib/quantMacdSeries'
 import {
-  alignTrendQuant, TREND_MARK_SHORT_HELP, TREND_MARKS, TREND_QUANT_HELP, TREND_QUANT_LEGEND,
+  alignTrendQuant, markLabel, TREND_MARK_SHORT_HELP, TREND_MARKS, TREND_QUANT_HELP, TREND_QUANT_LEGEND,
   TQ_STICK1, TQ_STICK2, tqYRange, type TrendQuantData,
 } from '@/lib/trendQuantSeries'
 import type { Fib2Grain, Fib2Overlay, KlineRow, LevelSeries, QuantMacdResult } from '@/lib/api'
@@ -152,7 +152,7 @@ function quantMacdLegendGraphic() {
 }
 
 /** [R555] 趋势量化图例: 线上已写名字的那几根不重复印, 悬停仍给说明。 */
-function trendQuantLegendGraphic() {
+function trendQuantLegendGraphic(visibleBars: number) {
   return (
     <span title={TREND_QUANT_HELP} className="inline-flex flex-wrap items-center gap-x-2 gap-y-0.5">
       {TREND_QUANT_LEGEND.filter(item => !item.labelledOnLine).map(item => (
@@ -162,12 +162,12 @@ function trendQuantLegendGraphic() {
           {item.name}
         </span>
       ))}
-      {/* [R620] 八种单字的对照: 图上写「建 / 见 / 绝 / 极」, 全称在悬停里 */}
+      {/* [R620] 八种信号的对照: 图上画什么字, 这里就写什么字（[R621] 全称 / 单字同源） */}
       <span title={TREND_MARK_SHORT_HELP}
             className="inline-flex items-center gap-0.5 text-micro text-muted-foreground">
         字:
         {TREND_MARKS.map(mark => (
-          <span key={mark.key} style={{ color: mark.color }}>{mark.short}</span>
+          <span key={mark.key} style={{ color: mark.color }}>{markLabel(mark, visibleBars)}</span>
         ))}
       </span>
     </span>
@@ -279,8 +279,8 @@ export function AnalysisKChart({
         { text: '平均线', color: TREND_QUANT_COLORS.avg },
         { text: '吸筹', color: TREND_QUANT_COLORS.xichou },
         { text: '超买 3.2 / 超卖 0.5', color: TREND_QUANT_COLORS.yellow },
-        // [R620] 图上八种单字的对照就摆在副图里, 不用再往上翻总图例
-        ...TREND_MARKS.map(mark => ({ text: mark.short, color: mark.color })),
+        // [R620] 图上八种信号的对照就摆在副图里, 不用再往上翻总图例（[R621] 与图上同源）
+        ...TREND_MARKS.map(mark => ({ text: markLabel(mark, visibleBars), color: mark.color })),
       ]
       : [{ text: '等待数据', color: ct.text }]
   const quantReadouts: AnnotationData['readouts'] = quantMacdError
@@ -312,13 +312,13 @@ export function AnalysisKChart({
         }
         return item
       })
-    const trend = trendPaneSeries(model.dates, trendQuant, trendQuantError, trendPaneH)
+    const trend = trendPaneSeries(model.dates, trendQuant, trendQuantError, trendPaneH, visibleBars)
     const quant = quantPaneSeries(model.dates, quantMacd, quantMacdError)
     return {
       chartSeries: [...main, ...trend.series, ...quant.series],
       paneDecor: [undefined, trend.decor, quant.decor] as (PaneDecorData | undefined)[],
     }
-  }, [model, future, trendQuant, trendQuantError, quantMacd, quantMacdError, trendPaneH])
+  }, [model, future, trendQuant, trendQuantError, quantMacd, quantMacdError, trendPaneH, visibleBars])
 
   const annotations = useMemo<AnnotationData>(() => {
     const dates = future ? [...model.dates, ...future.labels] : model.dates
@@ -543,7 +543,7 @@ export function AnalysisKChart({
       <div className="mb-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-micro">
         <span className="inline-flex items-center gap-2">
           <span className="text-muted">趋势量化</span>
-          {trendQuantLegendGraphic()}
+          {trendQuantLegendGraphic(visibleBars)}
         </span>
         <span className="inline-flex items-center gap-2">
           <span className="text-muted">量化MACD</span>
@@ -592,6 +592,7 @@ export function AnalysisKChart({
 // ===== 副图: 趋势量化 =====
 function trendPaneSeries(
   dates: string[], trendQuant: TrendQuantData | undefined, error: boolean, paneH: number,
+  visibleBars: number,
 ): { series: PlotSeries[]; decor: PaneDecorData } {
   const empty = () => ({ series: [emptyPaneSeries('tq:empty', 1, dates)], decor: { items: [] } })
   if (error || !trendQuant || dates.length === 0) return empty()
@@ -611,10 +612,15 @@ function trendPaneSeries(
     })
   })
   // [R559] 八种字: 卖出一侧(顶 / 逃 / 下)在图顶字道, 买入一侧在图底字道。
-  // [R620] 图上只写单字(建 / 见 / 绝 / 极), 全称见副图图例的悬停说明 —— 两个字太宽, 密集时会让位到看不准日期。
+  // [R621] 写全称还是单字由窗口决定 —— 与图例、读数行同一个判据(`markLabel`)。
   for (const mark of TREND_MARKS) {
+    const label = markLabel(mark, visibleBars)
     data.marks[mark.key].forEach((on, index) => {
-      if (on) items.push({ kind: 'text', time: dates[index], text: mark.short, color: mark.color, lane: mark.lane })
+      if (on) {
+        items.push({
+          kind: 'text', time: dates[index], text: label, short: mark.short, color: mark.color, lane: mark.lane,
+        })
+      }
     })
   }
   // 吸筹白柱: 原文 STICKLINE(VAR17, 0.53, 吸筹, 1, 0) —— 比红绿短柱细一半。

@@ -37,9 +37,10 @@ export type TrendMarkKey = 'jidi' | 'sheng' | 'ding' | 'xia' | 'jiancang' | 'tao
  * `at` 是原文 DRAWTEXT 的高度(`'avg'` = 当天平均线处), R559 起**不再照它画**, 只留作出处;
  * `lane` 是现在的位置: 卖出一侧(顶 / 逃 / 下)在图顶上的字道, 买入一侧在图底下的字道。
  *
- * [R620] `short`: 图上只写一个字。用户: 「建仓 / 见底 / 极底 / 绝底还是让人看不清对应哪一天」——
- * 两个字有 26px 宽, 120 日窗口相邻两根才 4.5px, 密集时只能往右让位, 让完就看不准是哪天了。
- * 缩成单字后宽度 11px, 让位少得多; `text` 全称仍留给图例与悬停说明, 不丢信息。
+ * [R620] `short`: 最挤的窗口下只写一个字。用户: 「建仓 / 见底 / 极底 / 绝底还是让人看不清对应哪一天」——
+ * 两个字有 26px 宽, 密集时只能往右让位, 让完就看不准是哪天了; 一个字 11px, 让位少得多。
+ * [R621] 但全称更直观, 所以默认仍写全称, 只有 250 日这种一格 2px 的窗口才缩成单字 ——
+ * 判据与图例同源, 见 `markLabel`。
  */
 export const TREND_MARKS: {
   key: TrendMarkKey; text: string; short: string; at: number | 'avg'; color: string; lane: 'top' | 'bottom'
@@ -59,6 +60,22 @@ export const TREND_MARK_SHORT_HELP = TREND_MARKS
   .filter(m => m.short !== m.text)
   .map(m => `${m.short}=${m.text}`)
   .join(' · ') + '（顶 / 逃 / 下 / 升 就是本字）'
+
+/**
+ * [R621] 图上写全称还是单字 —— **只此一个判据**, 画字与图例同源。
+ *
+ * 用户: 「按这个方案来」—— R620 的备选: 宽窗口恢复全称(建仓 / 见底 / 极底 / 绝底 更直观),
+ * 只有最密的 250 日窗口才缩成单字。
+ *
+ * 60 / 120 日窗口一格约 4.5px 以上, 两个字 26px 还排得开(三行 + 让位兜底见 packLaneTexts);
+ * 250 日一格只 2px 出头, 两个字必然连成一片, 那时才用 `short`。
+ */
+export const TREND_MARK_FULL_BARS = 120
+
+/** 某一根 K 线窗口下, 这个信号该写什么字。 */
+export function markLabel(mark: { text: string; short: string }, visibleBars: number): string {
+  return visibleBars <= TREND_MARK_FULL_BARS ? mark.text : mark.short
+}
 
 /**
  * [R555] 副图左上角的图例 + 悬停说明 —— 三种线各代表什么。**只此一个产地**。
@@ -87,7 +104,7 @@ export const TREND_QUANT_LEGEND: { name: string; color: string; desc: string; la
 
 /** 悬停说明的全文(三段 + R620 的八种字缩写对照) */
 export const TREND_QUANT_HELP = TREND_QUANT_LEGEND.map(l => `${l.name}: ${l.desc}`).join('\n\n')
-  + `\n\n信号字: ${TREND_MARK_SHORT_HELP}`
+  + `\n\n信号字: ${TREND_MARK_SHORT_HELP}。60 / 120 日窗口写全称, 250 日窗口缩成单字。`
 
 /** 图例一行的宽度估算: [R558] 10px 字号下汉字按 10px、其余按 6px */
 const textW = (t: string) => [...t].reduce((w, ch) => w + (/[\u4e00-\u9fff]/.test(ch) ? 10 : 6), 0)

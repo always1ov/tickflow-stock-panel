@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { TREND_QUANT_COLORS as C } from './theme'
 import {
-  alignTrendQuant, laneLayout, packLaneTexts, tqYRange, LANE_NUDGE_MAX, LANE_ROWS, TQ_LANES_H,
+  alignTrendQuant, laneLayout, markLabel, packLaneTexts, tqYRange, LANE_NUDGE_MAX, LANE_ROWS, TQ_LANES_H,
   TREND_MARK_SHORT_HELP, TREND_MARKS, TREND_QUANT_HELP, TREND_QUANT_LEGEND, trendQuantLegendGraphic,
   trendQuantSeries, type TrendQuantData,
 } from './trendQuantSeries'
@@ -147,6 +147,19 @@ describe('[R486] 趋势量化副图', () => {
     const c = out.find(o => o.item === 'c')!
     expect(c.x).toBeGreaterThan(110)
     expect(c.anchorX).toBe(110)
+  })
+
+  it('[R621] 60 / 120 日写全称, 250 日才缩成单字 —— 画字、读数行、图例同一个判据', () => {
+    const mk = (k: string) => TREND_MARKS.find(m => m.key === k)!
+    expect(markLabel(mk('jiancang'), 60)).toBe('建仓')
+    expect(markLabel(mk('jiancang'), 120)).toBe('建仓')
+    expect(markLabel(mk('jiandi'), 120)).toBe('见底')
+    expect(markLabel(mk('jiancang'), 250)).toBe('建')
+    expect(markLabel(mk('jiandi'), 250)).toBe('见')
+    // 本来就是一个字的, 任何窗口都不变
+    expect(markLabel(mk('tao'), 120)).toBe('逃')
+    expect(markLabel(mk('tao'), 250)).toBe('逃')
+    expect(TREND_QUANT_HELP).toContain('250 日窗口缩成单字')
   })
 
   it('[R619] 三行都差一点时往右让几像素, 让得不超过 LANE_NUDGE_MAX', () => {
