@@ -62,6 +62,7 @@
 | **RunningHub 推广横幅**（AI 对话标题行里滚动的赞助商广告，上游 v0.3.2 新加） | 上游挂在右侧悬浮抽屉的标题行里，那个抽屉 R502 已撤、对话搬进了 Minds；持续滚动的装饰动画也不合动效硬规则。**本 fork 从没收进来**。AI 设置里 RunningHub 那个预设与它的模型下拉照收 | 无（「一周内不再显示」的时间戳只存在浏览器本地） | `git show fa195cfa:frontend/src/custom/assistant/ui/AssistantDrawer.tsx`，搜 `RhPromoBanner`；动画在同一提交的 `frontend/src/index.css`，搜 `rh-marquee` | R561 |
 | **因子页、回测页上 fork 加的东西**（因子 AI 解读 / AI 填表、研究工作流等） | 用户：两页「完全恢复成作者的样子」，作者的一切保留 | 无 | `git show 22333335^` | R174 |
 | **外部网页的 iframe 内嵌与「抓取原文 + AI 整理」**（原菜单「利弗莫尔趋势」：整站塞 iframe，或后端抓原文交给面板 AI 整理成 KPI 卡 + 表格；设置里的「只抓原文看看」「试运行(调一次 AI)」） | 用户：「不想搞这种嵌入了」「可以做成类似外链、博客友链、导航那种形式」—— 改成纯链接目录「外链导航」，页面零外部请求 | `user_data/external_page_view.json`（旧配置）、`user_data/external_view_latest.json`（抓取结果缓存）仍留在磁盘，已在数据体检登记为退役；新的链接清单存在 `user_data/preferences.json` 的 `external_links` | `git revert cd0d6da4`；单看删除前的实现：`backend/app/api/external_page.py`、`backend/app/services/external_fetch.py`、`external_view.py`、`frontend/src/components/ExternalViewRender.tsx`、`frontend/src/lib/externalView.ts`（均 `git show <提交号>^:<路径>`） | R611 |
+| **日K 主图上原来的「BOLL」叠加**（工具栏那颗 BOLL 开关；开后在 K 线上画 26 日布林上 / 中 / 下轨，读数行跟着显示三轨） | 用户：「日k里面主图原来的boll可以删除了」。26 日布林已由「关键价位」那排开关的「26日布林」画（R653 并入日K），同一张图两个入口说同一件事 | 无（数据仍是接口的 `boll26_*`，`OHLC` 里那三个字段照给；「关键价位」的「26日布林」开关照旧能画同名三轨） | `git log --grep R656` 找到提交，`git show <该提交>^:frontend/src/components/charts/LightweightDaily.tsx`（`bollFields` 与 BOLL 读数行）、`git show <该提交>^:frontend/src/components/EChartsCandlestick.tsx`（`showBOLL` 那一段）；工具栏那颗开关在 `frontend/src/lib/chart-indicators.ts` 的 `OVERLAY_INDICATORS` | R656 |
 
 ---
 

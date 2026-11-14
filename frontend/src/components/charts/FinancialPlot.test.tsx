@@ -155,14 +155,13 @@ it('centers index extrema on yesterday close, hides invalid averages and clears 
 
 it('ETF 日K价格、均线和轴刻度为三位, 切换股票后恢复两位', async () => {
   const rows = [{ date: '2026-11-05', open: 0.751, high: 0.828, low: 0.747, close: 0.827,
-    ma5: 0.801, ma10: 0.789, ma20: 0.778, ma60: 0.765, boll_upper: 0.849, boll_lower: 0.707 }]
-  await act(async () => root.render(<LightweightDaily assetType="etf" data={rows} activeIndicators={['boll']} />))
+    ma5: 0.801, ma10: 0.789, ma20: 0.778, ma60: 0.765 }]
+  await act(async () => root.render(<LightweightDaily assetType="etf" data={rows} />))
   expect(host.textContent).toContain('开 0.751')
   expect(host.textContent).toContain('收 0.827')
   expect(host.textContent).toContain('MA5 0.801')
-  expect(host.textContent).toContain('上轨 0.849')
   expect(native.chart.addSeries.mock.calls[0][1].priceFormat).toMatchObject({ precision: 3, minMove: 0.001 })
-  await act(async () => root.render(<LightweightDaily assetType="stock" data={rows} activeIndicators={['boll']} />))
+  await act(async () => root.render(<LightweightDaily assetType="stock" data={rows} />))
   expect(host.textContent).toContain('收 0.83')
   expect(native.series[0].applyOptions.mock.calls.at(-1)![0].priceFormat).toMatchObject({ precision: 2, minMove: 0.01 })
 })
@@ -239,18 +238,15 @@ it('shows every indicator readout at the hovered date, including MACD histogram 
       open: 10, high: 12, low: 9, close: 11, volume: (i + 1) * 10_000,
       macd_dif: 0.0014, macd_dea: 0, macd_hist: i === 11 ? -0.0024 : 0.0063,
       rsi_6: 56.74, rsi_14: 48.25, rsi_24: null, kdj_k: 70.35, kdj_d: 45.28, kdj_j: 120.31,
-      ma20: 10.5, boll_upper: 12.2, boll_lower: 8.8,
+      ma20: 10.5,
     }))
-    const render = async () => act(async () => root.render(<LightweightDaily symbol="A" data={rows} activeIndicators={['vol', 'macd', 'rsi', 'kdj', 'boll']} />))
+    const render = async () => act(async () => root.render(<LightweightDaily symbol="A" data={rows} activeIndicators={['vol', 'macd', 'rsi', 'kdj']} />))
     const readouts = (title: string) => [...updates.mock.calls].reverse().find(([d]) => d.title === title)![0].readouts!
     await render()
     expect(readouts('MACD').map(d => d.text)).toEqual(['DIF 0.001', 'DEA 0.000', 'MACD -0.002'])
     expect(readouts('成交量').map(d => d.text)).toEqual(['量 12.00万', 'VOL5 10.00万', 'VOL10 7.50万', '量比 1.09x'])
     expect(readouts('RSI').map(d => d.text)).toEqual(['RSI6 56.7', 'RSI14 48.3', 'RSI24 —'])
     expect(readouts('KDJ').map(d => d.text)).toEqual(['K 70.3', 'D 45.3', 'J 120.3'])
-    expect(host.textContent).toContain('上轨 12.20')
-    expect(host.textContent).toContain('中轨 10.50')
-    expect(host.textContent).toContain('下轨 8.80')
     const dif = native.chart.addSeries.mock.calls.findIndex(call => call[2] === 2 && call[0] === 'Line')
     expect(native.chart.addSeries.mock.calls[dif][1].priceFormat).toMatchObject({ precision: 3, minMove: 0.001 })
     expect(readouts('MACD')[0].color).toBe(native.chart.addSeries.mock.calls[dif][1].color)

@@ -6,8 +6,6 @@ export const SUB_CHART_META = [
   { key: 'rsi', label: 'RSI', height: 72 },
   { key: 'kdj', label: 'KDJ', height: 72 },
 ]
-export const OVERLAY_INDICATORS = [{ key: 'boll', label: 'BOLL' }]
-
 export function volMaN(data: OHLC[], n: number): (number | null)[] {
   const result: (number | null)[] = []
   for (let i = 0; i < data.length; i++) {

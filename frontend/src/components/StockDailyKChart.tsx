@@ -4,7 +4,7 @@ import { type KlineRow } from '@/lib/api'
 import { klineDailyQueryOptions, klineDateRange } from '@/lib/kline'
 import { storage } from '@/lib/storage'
 import type { ChartMarker, ChartPriceLine, ChartRange, ChartRenderer, DailyAnalysisPane, DailyMarkerStyle, OHLC, VolumeCompareConfig } from '@/lib/chart-types'
-import { OVERLAY_INDICATORS, SUB_CHART_META } from '@/lib/chart-indicators'
+import { SUB_CHART_META } from '@/lib/chart-indicators'
 import {
   CHART_LAYOUT, SUB_PANE_GAP, dailyChartHeight, fitAnalysisPaneHeights, quantPaneHeight, trendPaneHeight,
 } from '@/lib/chart-layout'
@@ -329,16 +329,8 @@ export function StockDailyKChart({
               onClick={() => toggleIndicator(ind.key)}
             />
           ))}
-          {OVERLAY_INDICATORS.map(ind => (
-            <ChartPill
-              key={ind.key}
-              active={activeIndicators.includes(ind.key)}
-              label={ind.label}
-              activeClass="bg-accent/20 text-accent"
-              onClick={() => toggleIndicator(ind.key)}
-            />
-          ))}
-          {/* [R652] 主图四条均线各自可开关 —— 与其它指标同一套胶囊, 默认全开 */}
+          {/* [R656] 原来的 BOLL 开关撤下 —— 26 日布林改由下面「关键价位」那排的「26日布林」控制 */}
+          {/* [R652] 主图四条均线各自可开关 —— 与其它指标同一套胶囊, 默认只开 MA20 */}
           {renderer === 'lightweight' && MA_KEYS.map(key => (
             <ChartPill
               key={key}

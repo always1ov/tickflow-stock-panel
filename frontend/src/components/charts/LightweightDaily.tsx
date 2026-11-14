@@ -25,14 +25,10 @@ const LINE_COLORS = {
   plum: { dark: '#8B5CF6', light: '#7C3AED' },
   gray: { dark: '#A1A1AA', light: '#71717A' },
   orange: { dark: '#F97316', light: '#C2410C' },
-  // [R593] fork R421 全系统禁粉: 布林上轨改用暖褐, 与橙/青仍可区分
-  brown: { dark: '#A1887F', light: '#8D6E63' },
-  cyan: { dark: '#22D3EE', light: '#0E7490' },
   up: { dark: C.up, light: C.up },
   down: { dark: C.down, light: '#15803D' },
 } as const
 const maFields = [['ma5', 'gray'], ['ma10', 'blue'], ['ma20', 'orange'], ['ma60', 'plum']] as const
-const bollFields = [['boll_upper', '上轨', 'brown'], ['ma20', '中轨', 'orange'], ['boll_lower', '下轨', 'cyan']] as const
 
 const price = (v: number | null | undefined, digits = 2) => v != null && Number.isFinite(v)
   ? (Number(v.toFixed(digits)) === 0 ? 0 : v).toFixed(digits) : '—'
@@ -96,7 +92,6 @@ export function LightweightDaily({ data, assetType, symbol = '', height = 480, a
       series.push({ id, type: 'Line', pane, data: values, color, ...options })
     }
     for (const [key, token] of visibleMA) addLine(key, lineData(rows, key), color(token))
-    if (activeIndicators.includes('boll')) for (const [key, , token] of bollFields) addLine(`boll:${key}`, lineData(rows, key), color(token))
     selected.forEach((key, offset) => {
       const pane = offset + 1
       if (key === 'vol') {
@@ -236,10 +231,6 @@ export function LightweightDaily({ data, assetType, symbol = '', height = 480, a
       </div>
       <div className="mt-1 flex min-h-4 flex-wrap gap-x-4 gap-y-1 text-micro">
         {visibleMA.map(([field, token]) => <span key={field} style={{ color: color(token) }}>{field.toUpperCase()} {price(current?.[field], precision)}</span>)}
-        {activeIndicators.includes('boll') && <span className="inline-flex flex-wrap gap-x-3" aria-label="BOLL 读数">
-          <span className="text-muted">BOLL</span>
-          {bollFields.map(([field, label, token]) => <span key={field} style={{ color: color(token) }}>{`${label} ${price(current?.[field], precision)}`}</span>)}
-        </span>}
         {index >= 0 && previous && <span className="text-secondary">至今 <span style={{ color: rows.at(-1)!.close >= previous.close ? C.up : C.down }}>{fmtPct(rows.at(-1)!.close / previous.close - 1)}</span> · 周期 {rows.length - index}</span>}
       </div>
     </div>}

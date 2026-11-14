@@ -222,11 +222,6 @@ export const SUB_CHARTS: SubChartDef[] = [
 /** 向后兼容的 INDICATORS 导出 (不含 vol) */
 export const INDICATORS = SUB_CHARTS.filter(s => s.key !== 'vol')
 
-/** 主图叠加指标 (画在 K 线上方, 不占副图空间) */
-export const OVERLAY_INDICATORS: { key: string; label: string }[] = [
-  { key: 'boll', label: '26日布林' },   // [R528/R529] 26 日 ±2σ, 名字是用户定的写法, 与表格里 20 日那组分开叫
-]
-
 type Props = DailyChartProps
 
 // 序列颜色 (双主题通用); 画布轴/网格/文字等主题相关色走 CT() 动态取
@@ -651,22 +646,7 @@ function buildOption(
     })
   }
 
-  // BOLL 布林带 — 需在 activeIndicators 中激活
-  const showBOLL = activeIndicators.includes('boll') && data.some(d => d.boll_upper != null || d.boll_lower != null)
-  if (showBOLL) {
-    const bollLine = (key: keyof OHLC, color: string, name: string) => ({
-      name, type: 'line',
-      data: data.map(d => (d[key] != null ? Number(d[key]) : '-')),
-      smooth: true, symbol: 'none', animation: false,
-      silent: true,
-      lineStyle: { width: 1, color, type: 'dashed' as const }, itemStyle: { color },
-    })
-    // [R421] 布林线原为洋红 #14B8A6, 按「全站禁止粉色」换成青(与 MA 的灰 / 蓝 / 橙 / 紫都分得开)
-    series.push(bollLine('boll_upper', '#14B8A6', '26日布林上轨'))
-    series.push(bollLine('boll_lower', '#14B8A6', '26日布林下轨'))
-    // [R528] 中轨是 26 日均线, 不再与 MA20 重合, 得自己画一条
-    series.push({ ...bollLine('boll_mid', '#14B8A6', '26日布林中轨'), lineStyle: { width: 1, color: '#14B8A6', type: 'solid' as const } })
-  }
+  // [R656] 原来的 BOLL 叠加已撤下 —— 26 日布林只在「关键价位」那排开关里控制。
 
   // ===== 子图区域 =====
   let curTop = topPad + candleAvail + candleBottomPad
