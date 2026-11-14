@@ -153,7 +153,7 @@ const GroupCard = React.memo(function GroupCard({
               const pct = rowPct(row)
               return (
                 <span key={symbol} className="inline-flex min-w-0 items-center gap-1">
-                  <span className="shrink-0 font-medium text-amber-400">龙头</span>
+                  <span className="shrink-0 font-medium text-warning">龙头</span>
                   <span className="min-w-0 truncate text-secondary">
                     {row?.rt_name ?? row?.name ?? symbol}
                   </span>
@@ -200,7 +200,7 @@ const GroupCard = React.memo(function GroupCard({
                       <span className="min-w-0 truncate text-xs text-secondary">{r.rt_name ?? r.name}</span>
                       {/* [R632] 龙头徽标占位优先于板块标 (卡片较窄, 两者同时出现会把名称挤没) */}
                       {isLeader ? (
-                        <span className="shrink-0 rounded-btn bg-amber-400/15 px-1 text-micro font-bold leading-[16px] text-amber-400">
+                        <span className="shrink-0 rounded-btn bg-warning/15 px-1 text-micro font-bold leading-[16px] text-warning">
                           龙头
                         </span>
                       ) : board && (
@@ -223,10 +223,10 @@ const GroupCard = React.memo(function GroupCard({
                       className={cn(
                         'mr-1 shrink-0 rounded-btn p-1 transition-colors duration-150',
                         isLeader
-                          ? 'text-amber-400 hover:bg-amber-400/10'
+                          ? 'text-warning hover:bg-warning/10'
                           : leadersFull
                             ? 'cursor-not-allowed text-muted/40 md:opacity-40'
-                            : 'text-muted/60 opacity-100 hover:bg-amber-400/10 hover:text-amber-400 focus-visible:opacity-100 md:opacity-0 md:group-hover/row:opacity-100',
+                            : 'text-muted/60 opacity-100 hover:bg-warning/10 hover:text-warning focus-visible:opacity-100 md:opacity-0 md:group-hover/row:opacity-100',
                       )}
                       title={
                         isLeader
