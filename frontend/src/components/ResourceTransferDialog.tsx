@@ -143,7 +143,7 @@ export function ResourceTransferDialog({ kind, initialMode = 'import', exportOnl
           <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground"><PackageOpen className="h-4 w-4 text-accent" />{KIND_LABEL[kind]}导入与导出</h2>
           <p className="mt-1 text-micro leading-5 text-muted">{kind === 'strategy' ? 'ZIP 包含策略、关联因子、信号和已保存调参。' : `${KIND_LABEL[kind]}以 ZIP 包分享，所需的自定义依赖会自动携带。`}</p>
         </div>
-        <button type="button" aria-label="关闭" disabled={busy} onClick={onClose} className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-btn text-muted hover:bg-elevated hover:text-foreground disabled:opacity-40"><X className="h-4 w-4" /></button>
+        <button type="button" aria-label="关闭" disabled={busy} onClick={onClose} className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-btn text-secondary hover:bg-elevated hover:text-foreground disabled:opacity-40"><X className="h-4 w-4" /></button>
       </header>
       <div className="flex shrink-0 gap-5 border-b border-border px-4 sm:px-5" role="tablist" aria-label="资源传输方式">
         {([['import', `导入${KIND_LABEL[kind]}`], ['export', '批量导出']] as const).filter(([value]) => !exportOnly || value === 'export').map(([value, label]) => (
@@ -185,7 +185,7 @@ export function ResourceTransferDialog({ kind, initialMode = 'import', exportOnl
                   <div className="flex items-center justify-between gap-2"><h3 className="text-xs font-semibold">{`${mode === 'export' ? '选择要导出的' : '选择要导入的'}${KIND_LABEL[kind]}`} </h3><span className="text-micro text-muted">已选 {selected.size} 项</span></div>
                   {mode === 'export' && <p className="text-micro leading-5 text-muted">{kind === 'strategy' ? '支持多选策略，共享因子与信号只打包一份。' : kind === 'factor' ? '仅列出自定义与复合因子，内置因子无需打包。' : '选择要分享的信号，关联因子会自动打包。'}</p>}
                   <div className="relative"><Search className="pointer-events-none absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted" /><input aria-label="搜索资源" placeholder="搜索名称或 ID" value={search} disabled={busy} onChange={event => setSearch(event.target.value)} className="h-9 w-full rounded-input border border-border bg-base pl-8 pr-3 text-xs outline-none focus:border-accent" /></div>
-                  <div className="flex items-center gap-3 text-micro"><button type="button" disabled={busy || !visible.length} onClick={() => select(visible.map(item => item.key))} className="text-accent disabled:text-muted">{allVisibleSelected ? '取消选择筛选结果' : '全选筛选结果'} ({visible.length})</button><button type="button" disabled={busy || !selected.size} onClick={() => { setSelected(new Set()); setExported(false); if (mode === 'export') setPreview(null) }} className="text-muted disabled:opacity-40">清空选择</button></div>
+                  <div className="flex items-center gap-3 text-micro"><button type="button" disabled={busy || !visible.length} onClick={() => select(visible.map(item => item.key))} className="text-accent disabled:text-muted">{allVisibleSelected ? '取消选择筛选结果' : '全选筛选结果'} ({visible.length})</button><button type="button" disabled={busy || !selected.size} onClick={() => { setSelected(new Set()); setExported(false); if (mode === 'export') setPreview(null) }} className="text-secondary disabled:opacity-40">清空选择</button></div>
                 </div>
                 <div className="max-h-[200px] overflow-y-auto border-t border-border/60 px-2 pb-2 md:min-h-0 md:max-h-none md:flex-1">
                   {mode === 'export' && catalog.isFetching && <p className="p-5 text-center text-xs text-muted">资源列表加载中…</p>}

@@ -144,15 +144,15 @@ export function AiProfiles() {
             </label>
             <div className="ml-auto flex shrink-0 items-center gap-0.5">
               <button type="button" disabled={i === 0} onClick={() => move(i, -1)}
-                title="往上 = 更优先" className="p-1 text-muted transition-colors hover:text-accent disabled:opacity-30">
+                title="往上 = 更优先" className="p-1 text-secondary transition-colors hover:text-accent disabled:opacity-30">
                 <ArrowUp className="h-3.5 w-3.5" />
               </button>
               <button type="button" disabled={i === list.length - 1} onClick={() => move(i, 1)}
-                title="往下 = 更靠后" className="p-1 text-muted transition-colors hover:text-accent disabled:opacity-30">
+                title="往下 = 更靠后" className="p-1 text-secondary transition-colors hover:text-accent disabled:opacity-30">
                 <ArrowDown className="h-3.5 w-3.5" />
               </button>
               <button type="button" onClick={() => { setRows(list.filter((_, k) => k !== i)); setDirty(true) }}
-                title="删掉这一档" className="p-1 text-muted transition-colors hover:text-danger">
+                title="删掉这一档" className="p-1 text-secondary transition-colors hover:text-danger">
                 <Trash2 className="h-3.5 w-3.5" />
               </button>
             </div>

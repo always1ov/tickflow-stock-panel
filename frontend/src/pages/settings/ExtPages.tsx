@@ -99,7 +99,7 @@ function ExternalLinkSettings() {
         <button
           type="button"
           onClick={() => setEnabled(value => !value)}
-          className={`shrink-0 inline-flex items-center gap-2 rounded-btn border px-3 py-1.5 text-xs transition-colors ${enabled ? 'border-accent/40 bg-accent/10 text-accent' : 'border-border bg-elevated text-muted'}`}
+          className={`shrink-0 inline-flex items-center gap-2 rounded-btn border px-3 py-1.5 text-xs transition-colors ${enabled ? 'border-accent/40 bg-accent/10 text-accent' : 'border-border bg-surface text-foreground'}`}
         >
           <span className={`h-2 w-2 rounded-full ${enabled ? 'bg-accent' : 'bg-muted'}`} />
           {enabled ? '已启用' : '已停用'}
@@ -141,7 +141,7 @@ function ExternalLinkSettings() {
             <button
               type="button"
               onClick={() => setLinks(rows => rows.filter((_, i) => i !== index))}
-              className="inline-flex h-9 items-center justify-center gap-1.5 rounded-btn border border-border px-3 text-xs text-muted hover:border-danger/40 hover:text-danger"
+              className="inline-flex h-9 items-center justify-center gap-1.5 rounded-btn border border-border px-3 text-xs text-secondary hover:border-danger/40 hover:text-danger"
               title="删除这一条"
             >
               <Trash2 className="h-3.5 w-3.5" />删除
@@ -158,7 +158,7 @@ function ExternalLinkSettings() {
             type="button"
             onClick={() => setLinks(rows => (rows.length >= EXTERNAL_LINKS_LIMIT ? rows : [...rows, { name: '', url: '' }]))}
             disabled={links.length >= EXTERNAL_LINKS_LIMIT}
-            className="inline-flex items-center gap-1.5 rounded-btn border border-border bg-elevated px-3 py-1.5 text-xs text-secondary hover:text-foreground disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 rounded-btn border border-border bg-surface px-3 py-1.5 text-xs text-foreground hover:text-foreground disabled:opacity-50"
           >
             <Plus className="h-3.5 w-3.5" />添加链接
           </button>
@@ -329,7 +329,7 @@ export function SettingsExtPagesPanel() {
               <h3 className="text-sm font-medium text-foreground">{editingMenu ? '编辑扩展页面' : '新建扩展页面'}</h3>
               <p className="mt-1 text-micro text-muted">菜单标识保存后不可在此处直接修改，如需更换标识请新建页面。</p>
             </div>
-            <button onClick={() => { setShowForm(false); setError('') }} className="rounded-btn p-1 text-muted hover:bg-elevated hover:text-foreground">
+            <button onClick={() => { setShowForm(false); setError('') }} className="rounded-btn p-1 text-secondary hover:bg-elevated hover:text-foreground">
               <X className="h-4 w-4" />
             </button>
           </div>
@@ -416,7 +416,7 @@ export function SettingsExtPagesPanel() {
                     <button
                       key={f.name}
                       onClick={() => setSelectedColumns(cols => active ? cols.filter(c => c !== f.name) : [...cols, f.name])}
-                      className={`rounded-full border px-3 py-1 text-micro transition-colors ${active ? 'border-accent/40 bg-accent/10 text-accent' : 'border-border bg-elevated/40 text-secondary hover:bg-elevated'}`}
+                      className={`rounded-full border px-3 py-1 text-micro transition-colors ${active ? 'border-accent/40 bg-accent/10 text-accent' : 'border-border bg-elevated/40 text-foreground hover:bg-elevated'}`}
                     >
                       {f.label || f.name}
                     </button>
@@ -429,7 +429,7 @@ export function SettingsExtPagesPanel() {
           {error && <div className="rounded-btn border border-danger/30 bg-danger/5 px-3 py-2 text-xs text-danger">{error}</div>}
 
           <div className="flex justify-end gap-2">
-            <button onClick={() => { setShowForm(false); setError('') }} className="px-4 py-1.5 rounded-btn bg-elevated text-secondary text-xs">取消</button>
+            <button onClick={() => { setShowForm(false); setError('') }} className="px-4 py-1.5 rounded-btn bg-surface border border-border text-foreground text-xs">取消</button>
             <button onClick={() => save.mutate()} disabled={save.isPending} className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-btn bg-accent/90 text-on-accent text-xs font-medium disabled:opacity-50">
               <Save className="h-3.5 w-3.5" />保存
             </button>
@@ -449,11 +449,11 @@ export function SettingsExtPagesPanel() {
                 <p className="mt-1 text-micro text-muted font-mono">{menu.id}</p>
               </div>
               <div className="flex items-center gap-1">
-                <button onClick={() => editMenu(menu)} className="p-1 rounded-btn text-muted hover:text-accent hover:bg-accent/10" title="编辑">
+                <button onClick={() => editMenu(menu)} className="p-1 rounded-btn text-secondary hover:text-accent hover:bg-accent/10" title="编辑">
                   <Pencil className="h-3.5 w-3.5" />
                 </button>
                 {!menu.builtin && (
-                  <button onClick={() => del.mutate(menu.id)} disabled={del.isPending} className="p-1 rounded-btn text-muted hover:text-danger hover:bg-danger/10" title="删除">
+                  <button onClick={() => del.mutate(menu.id)} disabled={del.isPending} className="p-1 rounded-btn text-secondary hover:text-danger hover:bg-danger/10" title="删除">
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
                 )}

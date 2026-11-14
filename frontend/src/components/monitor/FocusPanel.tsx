@@ -119,7 +119,7 @@ export function FocusPanel() {
                 <span className={cn('rounded-btn border px-1.5 py-px text-micro', TIER_STYLE[t])}>{labels[t]}</span>
                 <span className="font-mono text-micro tabular-nums text-muted">{v.counts[t]}</span>
                 {t === 'watch' && (
-                  <button onClick={() => setShowWatch(s => !s)} className="ml-auto text-micro text-muted transition-colors hover:text-foreground cursor-pointer">
+                  <button onClick={() => setShowWatch(s => !s)} className="ml-auto text-micro text-secondary transition-colors hover:text-foreground cursor-pointer">
                     {showWatch ? '收起' : '展开'}
                   </button>
                 )}

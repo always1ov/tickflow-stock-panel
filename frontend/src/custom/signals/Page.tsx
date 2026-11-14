@@ -184,15 +184,15 @@ function SignalsBody({ highlight }: { highlight: string }) {
                         onClick={() => setArchived.mutate({ id: sig.id, archived: true })}
                         disabled={setArchived.isPending}
                         title="归档到档案库 (可恢复, 不删除信号)"
-                        className="cursor-pointer rounded-btn p-1 text-muted hover:bg-warning/10 hover:text-warning disabled:opacity-50"
+                        className="cursor-pointer rounded-btn p-1 text-secondary hover:bg-warning/10 hover:text-warning disabled:opacity-50"
                       >
                         <Archive className="h-3.5 w-3.5" />
                       </button>
                     )}
-                    <button onClick={() => toggleEnabled(sig)} title={sig.enabled ? '停用' : '启用'} className={`cursor-pointer rounded-btn p-1 ${sig.enabled ? 'text-bear hover:bg-bear/10' : 'text-muted hover:bg-elevated'}`}>
+                    <button onClick={() => toggleEnabled(sig)} title={sig.enabled ? '停用' : '启用'} className={`cursor-pointer rounded-btn p-1 ${sig.enabled ? 'text-bear hover:bg-bear/10' : 'text-secondary hover:bg-elevated'}`}>
                       <Zap className="h-3.5 w-3.5" />
                     </button>
-                    <button onClick={() => openEdit(sig)} className="cursor-pointer rounded-btn p-1 text-muted hover:bg-accent/10 hover:text-accent" title="编辑">
+                    <button onClick={() => openEdit(sig)} className="cursor-pointer rounded-btn p-1 text-secondary hover:bg-accent/10 hover:text-accent" title="编辑">
                       <Settings2 className="h-3.5 w-3.5" />
                     </button>
                     {confirmingDeleteId === sig.id ? (
@@ -208,7 +208,7 @@ function SignalsBody({ highlight }: { highlight: string }) {
                       <button
                         onClick={() => handleDeleteClick(sig)}
                         disabled={del.isPending}
-                        className="cursor-pointer rounded-btn p-1 text-muted hover:bg-danger/10 hover:text-danger disabled:opacity-50"
+                        className="cursor-pointer rounded-btn p-1 text-secondary hover:bg-danger/10 hover:text-danger disabled:opacity-50"
                         title="删除"
                       >
                         <Trash2 className="h-3.5 w-3.5" />

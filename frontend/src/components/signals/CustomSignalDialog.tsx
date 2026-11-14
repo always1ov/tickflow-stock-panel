@@ -127,7 +127,7 @@ export function CustomSignalDialog({ open, signal, defaultKind = 'exit', onClose
                 <h3 className="text-sm font-semibold text-foreground">{editing ? '编辑自定义信号' : '新建自定义信号'}</h3>
                 <p className="mt-1 text-micro text-muted">标识保存后不可修改，如需更换请新建。自定义信号保存为 csg_* 列。</p>
               </div>
-              <button onClick={onClose} className="rounded-card p-1.5 text-muted transition-colors hover:bg-elevated hover:text-foreground">
+              <button onClick={onClose} className="rounded-card p-1.5 text-secondary transition-colors hover:bg-elevated hover:text-foreground">
                 <X className="h-4 w-4" />
               </button>
             </div>
@@ -216,7 +216,7 @@ export function CustomSignalDialog({ open, signal, defaultKind = 'exit', onClose
             </div>
 
             <div className="flex justify-end gap-2 border-t border-border/50 px-5 py-4">
-              <button onClick={onClose} className="px-4 py-1.5 rounded-btn bg-elevated text-secondary text-xs">取消</button>
+              <button onClick={onClose} className="px-4 py-1.5 rounded-btn bg-surface border border-border text-foreground text-xs">取消</button>
               <button onClick={() => save.mutate()} disabled={save.isPending} className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-btn bg-warning/90 text-white text-xs font-medium disabled:opacity-50">
                 <Save className="h-3.5 w-3.5" />保存
               </button>

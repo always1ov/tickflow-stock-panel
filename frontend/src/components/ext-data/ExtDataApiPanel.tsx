@@ -39,7 +39,7 @@ export function ExtDataApiPanel({ config, copied, setCopied }: {
         <div className="text-micro text-muted mb-1">接口端点</div>
         <div className="flex items-center gap-1.5 bg-elevated rounded-btn px-2.5 py-1.5">
           <code className="text-xs font-mono text-accent flex-1 select-all">{endpoint}</code>
-          <button onClick={() => handleCopy(endpoint)} className="text-muted hover:text-secondary transition-colors">
+          <button onClick={() => handleCopy(endpoint)} className="text-secondary hover:text-secondary transition-colors">
             {copied ? <Check className="h-3 w-3 text-accent" /> : <Copy className="h-3 w-3" />}
           </button>
         </div>

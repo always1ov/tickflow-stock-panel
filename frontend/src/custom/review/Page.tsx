@@ -374,7 +374,7 @@ export function ReviewPage() {
                   className="flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted/60"
                 />
                 {focus && (
-                  <button onClick={() => setFocus('')} className="text-xs text-muted transition-colors hover:text-foreground">清除</button>
+                  <button onClick={() => setFocus('')} className="text-xs text-secondary transition-colors hover:text-foreground">清除</button>
                 )}
               </div>
 
@@ -432,7 +432,7 @@ export function ReviewPage() {
                 </div>
                 <button
                   onClick={() => setShowSchedule(false)}
-                  className="rounded-btn p-1 text-muted transition-colors hover:bg-elevated hover:text-foreground"
+                  className="rounded-btn p-1 text-secondary transition-colors hover:bg-elevated hover:text-foreground"
                 >
                   <X className="h-4 w-4" />
                 </button>
@@ -591,7 +591,7 @@ export function ReviewPage() {
                       onClick={() => pushModeMut.mutate('auto')}
                       className={cn(
                         'rounded-btn px-2 py-0.5 text-micro transition-colors disabled:opacity-50',
-                        reviewPushMode === 'auto' ? 'bg-foreground font-medium text-surface' : 'text-muted hover:text-secondary',
+                        reviewPushMode === 'auto' ? 'bg-foreground font-medium text-surface' : 'text-secondary hover:text-secondary',
                       )}
                     >
                       自动
@@ -602,7 +602,7 @@ export function ReviewPage() {
                       onClick={() => pushModeMut.mutate('manual')}
                       className={cn(
                         'rounded-btn px-2 py-0.5 text-micro transition-colors disabled:opacity-50',
-                        reviewPushMode === 'manual' ? 'bg-foreground font-medium text-surface' : 'text-muted hover:text-secondary',
+                        reviewPushMode === 'manual' ? 'bg-foreground font-medium text-surface' : 'text-secondary hover:text-secondary',
                       )}
                     >
                       手动确认
@@ -705,7 +705,7 @@ export function ReviewPage() {
               <div className="mt-5 flex justify-end gap-2">
                 <button
                   onClick={() => setShowSchedule(false)}
-                  className="rounded-btn bg-elevated px-4 py-1.5 text-xs text-secondary transition-colors hover:text-foreground"
+                  className="rounded-btn bg-surface border border-border px-4 py-1.5 text-xs text-foreground transition-colors hover:text-foreground"
                 >
                   取消
                 </button>
@@ -911,10 +911,10 @@ function ReportPanel({
         </div>
         {showActions && (
           <div className="flex items-center gap-1">
-            <button onClick={onCopy} className="inline-flex items-center gap-1 rounded-btn bg-elevated px-2 py-1 text-xs text-secondary transition-colors hover:text-foreground hover:bg-elevated/70" title="复制全文">
+            <button onClick={onCopy} className="inline-flex items-center gap-1 rounded-btn bg-surface border border-border px-2 py-1 text-xs text-foreground transition-colors hover:text-foreground hover:bg-elevated/70" title="复制全文">
               <Copy className="h-3 w-3" />复制
             </button>
-            <button onClick={onDownload} className="inline-flex items-center gap-1 rounded-btn bg-elevated px-2 py-1 text-xs text-secondary transition-colors hover:text-foreground hover:bg-elevated/70" title="下载为 Markdown">
+            <button onClick={onDownload} className="inline-flex items-center gap-1 rounded-btn bg-surface border border-border px-2 py-1 text-xs text-foreground transition-colors hover:text-foreground hover:bg-elevated/70" title="下载为 Markdown">
               <Download className="h-3 w-3" />下载
             </button>
           </div>
@@ -1045,7 +1045,7 @@ function HistoryPanel({
                   </div>
                   <button
                     onClick={(e) => { e.stopPropagation(); onDelete(r.id) }}
-                    className="shrink-0 p-1 text-muted opacity-0 transition-ui hover:text-bear group-hover:opacity-100"
+                    className="shrink-0 p-1 text-secondary opacity-0 transition-ui hover:text-bear group-hover:opacity-100"
                     title="删除"
                   >
                     <Trash2 className="h-3.5 w-3.5" />

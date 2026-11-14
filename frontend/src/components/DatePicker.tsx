@@ -163,7 +163,7 @@ export function DatePicker({
         type="button"
         onClick={handleOpen}
         className={`inline-flex items-center gap-1.5 h-7 px-2.5 rounded-input border border-border
-          bg-elevated hover:border-accent/50 text-xs text-foreground num
+          bg-surface hover:border-accent/50 text-xs text-foreground num
           focus:outline-none focus:border-accent/60 transition-colors duration-hover cursor-pointer ${buttonClassName}`}
       >
         <Calendar className="h-3.5 w-3.5 text-accent" />

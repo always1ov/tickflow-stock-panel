@@ -508,7 +508,7 @@ export function EChartsIntraday({
             className={`px-2.5 py-0.5 text-xs font-mono cursor-pointer transition-colors ${
               yMode === 'adaptive'
                 ? 'bg-accent/20 text-accent'
-                : 'text-muted hover:text-secondary'
+                : 'text-secondary hover:text-secondary'
             }`}
           >
             自适应
@@ -519,7 +519,7 @@ export function EChartsIntraday({
             className={`px-2.5 py-0.5 text-xs font-mono cursor-pointer transition-colors ${
               yMode === 'limit'
                 ? 'bg-accent/20 text-accent'
-                : 'text-muted hover:text-secondary'
+                : 'text-secondary hover:text-secondary'
             }`}
           >
             涨跌停

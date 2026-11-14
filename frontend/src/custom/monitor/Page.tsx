@@ -640,7 +640,7 @@ function AlertRow({ ev, dayHeader, isNew, customNames, monitorExtFields, confirm
               onClick={onDelete}
               disabled={deleting}
               title="删除"
-              className="rounded-btn p-1 text-muted opacity-60 transition-colors hover:bg-danger/10 hover:text-danger focus-visible:opacity-100 sm:opacity-0 sm:group-hover:opacity-100 cursor-pointer"
+              className="rounded-btn p-1 text-secondary opacity-60 transition-colors hover:bg-danger/10 hover:text-danger focus-visible:opacity-100 sm:opacity-0 sm:group-hover:opacity-100 cursor-pointer"
             >
               <Trash2 className="h-3 w-3" />
             </button>
@@ -937,7 +937,7 @@ function RulesList({ rulesQuery, onEdit }: {
                         title={r.enabled ? '停用' : '启用'}
                         className={cn(
                           'rounded-btn p-1 transition-colors cursor-pointer',
-                          r.enabled ? 'text-accent hover:bg-accent/10' : 'text-muted hover:bg-elevated hover:text-accent',
+                          r.enabled ? 'text-accent hover:bg-accent/10' : 'text-secondary hover:bg-elevated hover:text-accent',
                         )}
                       >
                         <Zap className="h-3.5 w-3.5" />
@@ -1190,7 +1190,7 @@ function BatchChannelsDialog({ open, rulesCount, prefs, onClose }: {
               <p className="mt-2 text-micro text-warning">当前选择会清空所有规则的外部推送渠道(只留站内)。</p>
             )}
             <div className="mt-4 flex justify-end gap-2">
-              <button onClick={onClose} className="px-3 py-1.5 rounded-btn bg-elevated text-secondary text-xs cursor-pointer">取消</button>
+              <button onClick={onClose} className="px-3 py-1.5 rounded-btn bg-surface border border-border text-foreground text-xs cursor-pointer">取消</button>
               <button
                 onClick={() => mut.mutate()}
                 disabled={mut.isPending || !canApply}
@@ -1238,7 +1238,7 @@ function ConfirmDialog({ open, title, message, confirmText, danger, pending, onC
             <h3 className={TYPE.section}>{title}</h3>
             <p className="mt-1.5 text-xs text-muted">{message}</p>
             <div className="mt-4 flex justify-end gap-2">
-              <button onClick={onCancel} className="px-3 py-1.5 rounded-btn bg-elevated text-secondary text-xs cursor-pointer">取消</button>
+              <button onClick={onCancel} className="px-3 py-1.5 rounded-btn bg-surface border border-border text-foreground text-xs cursor-pointer">取消</button>
               <button
                 onClick={onConfirm}
                 disabled={pending}
@@ -1367,7 +1367,7 @@ function ExtFieldSection({ label, value, onChange, groups, loading }: {
           ))}
         </select>
         {field && (
-          <button onClick={() => onChange(null)} title="清除" className="shrink-0 p-1 rounded-btn text-muted hover:text-danger transition-colors cursor-pointer">
+          <button onClick={() => onChange(null)} title="清除" className="shrink-0 p-1 rounded-btn text-secondary hover:text-danger transition-colors cursor-pointer">
             <Trash2 className="h-3.5 w-3.5" />
           </button>
         )}
@@ -1394,7 +1394,7 @@ function ExtFieldSection({ label, value, onChange, groups, loading }: {
                 key={i}
                 onClick={() => toggleHidden(i)}
                 className={`w-5 h-5 rounded-btn text-micro font-medium transition-colors cursor-pointer ${
-                  hidden.includes(i) ? 'bg-elevated text-muted line-through' : 'bg-accent/15 text-accent'
+                  hidden.includes(i) ? 'bg-surface border border-border text-foreground line-through' : 'bg-accent/15 text-accent'
                 }`}
               >{i + 1}</button>
             ))}

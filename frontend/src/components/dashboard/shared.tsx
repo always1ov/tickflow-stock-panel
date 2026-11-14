@@ -82,7 +82,7 @@ export function SectionTitle({ icon: Icon, title, hint, onConfig, configTitle }:
             onClick={onConfig}
             title={configTitle ?? '配置计算方式'}
             aria-label={configTitle ?? '配置计算方式'}
-            className="rounded-btn p-0.5 text-muted transition-colors hover:bg-elevated hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+            className="rounded-btn p-0.5 text-secondary transition-colors hover:bg-elevated hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
           >
             <Settings2 className="h-3.5 w-3.5" />
           </button>

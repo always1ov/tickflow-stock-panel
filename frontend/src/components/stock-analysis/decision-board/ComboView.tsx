@@ -167,7 +167,7 @@ export function ComboGroups({ rows, here }: { rows: ComboTableRow[]; here: strin
           })}
           {(hiddenCount > 0 || showRare) && (
             <button type="button" onClick={() => setShowRare(v => !v)}
-                    className="flex items-center gap-1 text-xs text-muted hover:text-foreground">
+                    className="flex items-center gap-1 text-xs text-secondary hover:text-foreground">
               <ChevronDown className={cn('h-3 w-3 transition-transform', showRare && 'rotate-180')} />
               {showRare ? '收起几乎不出现的那几格'
                 : `还有 ${hiddenCount} 格几乎不出现(中线跑到短线与长线的另一侧, 几何上近乎不可能)`}

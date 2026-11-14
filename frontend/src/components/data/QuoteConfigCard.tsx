@@ -50,7 +50,7 @@ export function QuoteConfigCard({ enabled, running, isTrading, lastFetchMs, inte
           className={`relative inline-flex h-4 w-7 items-center rounded-full shrink-0 transition-colors duration-expand ${
             enabled
               ? 'bg-accent'
-              : 'bg-elevated'
+              : 'bg-surface border border-border'
           } ${toggling ? 'opacity-50' : 'cursor-pointer'}`}
         >
           <span className={`inline-block h-3 w-3 rounded-full bg-white shadow-sm transition-transform duration-expand ${

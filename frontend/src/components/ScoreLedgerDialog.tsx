@@ -208,7 +208,7 @@ export function ScoreLedgerDialog({ onClose }: { onClose: () => void }) {
         <button
           onClick={onClose}
           aria-label="关闭"
-          className="ml-auto rounded-btn border border-border bg-base p-1 text-muted transition-colors hover:text-foreground"
+          className="ml-auto rounded-btn border border-border bg-base p-1 text-secondary transition-colors hover:text-foreground"
         >
           <X className="h-3.5 w-3.5" />
         </button>

@@ -350,7 +350,7 @@ export function ConceptAnalysis() {
           <PageHeader
             title="概念板块"
             right={
-              <button onClick={() => setShowConfig(true)} className="p-1.5 text-muted hover:bg-surface hover:text-accent" title="配置数据源">
+              <button onClick={() => setShowConfig(true)} className="p-1.5 text-secondary hover:bg-surface hover:text-accent" title="配置数据源">
                 <Settings2 className="h-4 w-4" />
               </button>
             }
@@ -390,12 +390,12 @@ export function ConceptAnalysis() {
             <button
               onClick={() => { rowsQuery.refetch(); marketQuery.refetch() }}
               disabled={rowsQuery.isFetching || marketQuery.isFetching}
-              className="p-1.5 text-muted hover:bg-surface disabled:opacity-50"
+              className="p-1.5 text-secondary hover:bg-surface disabled:opacity-50"
               title="刷新"
             >
               <RefreshCw className={cn('h-4 w-4', (rowsQuery.isFetching || marketQuery.isFetching) && 'animate-spin')} />
             </button>
-            <button onClick={() => setShowConfig(true)} className="p-1.5 text-muted hover:bg-surface hover:text-accent" title="配置数据源">
+            <button onClick={() => setShowConfig(true)} className="p-1.5 text-secondary hover:bg-surface hover:text-accent" title="配置数据源">
               <Settings2 className="h-4 w-4" />
             </button>
           </div>
@@ -680,7 +680,7 @@ function ConceptRail({
           {([
             ['heat', '强度'], ['avgPct', '涨幅'], ['leader', '龙头'], ['amount', '成交'], ['down', '跌幅'],
           ] as [SortMode, string][]).map(([key, label]) => (
-            <button key={key} onClick={() => onSort(key)} className={cn('py-1.5 transition-colors', sortMode === key ? 'bg-accent/15 text-accent' : 'bg-base text-muted hover:text-foreground')}>{label}</button>
+            <button key={key} onClick={() => onSort(key)} className={cn('py-1.5 transition-colors', sortMode === key ? 'bg-accent/15 text-accent' : 'bg-base text-secondary hover:text-foreground')}>{label}</button>
           ))}
         </div>
       </div>

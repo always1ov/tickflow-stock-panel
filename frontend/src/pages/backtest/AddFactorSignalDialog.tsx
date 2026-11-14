@@ -181,7 +181,7 @@ export function AddFactorSignalDialog({
       </div>
 
       <div className="flex items-center justify-end gap-2 border-t border-border px-4 py-3">
-        <button type="button" onClick={onClose} className="rounded-btn bg-elevated px-3 py-1.5 text-xs text-secondary transition-colors hover:text-foreground">取消</button>
+        <button type="button" onClick={onClose} className="rounded-btn bg-surface border border-border px-3 py-1.5 text-xs text-foreground transition-colors hover:text-foreground">取消</button>
         <button
           type="button"
           onClick={() => save.mutate()}

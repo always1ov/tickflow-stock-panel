@@ -126,7 +126,7 @@ function renderTagList(
       {showAll && maxTags > 0 && tags.length > maxTags && (
         <button
           onClick={onToggle}
-          className="inline-block px-1.5 py-px rounded-btn text-micro font-medium leading-tight text-muted hover:text-foreground transition-colors"
+          className="inline-block px-1.5 py-px rounded-btn text-micro font-medium leading-tight text-secondary hover:text-foreground transition-colors"
         >
           收起
         </button>
@@ -468,7 +468,7 @@ export function ScreenerTable({
                 className={`inline-flex items-center justify-center w-5 h-5 rounded-btn transition-colors ${
                   dailyKChartVisible
                     ? 'text-accent bg-accent/10 hover:bg-accent/20'
-                    : 'text-muted hover:text-foreground hover:bg-elevated'
+                    : 'text-secondary hover:text-foreground hover:bg-elevated'
                 }`}
                 title={dailyKChartVisible ? '隐藏日k蜡烛' : '显示日k蜡烛'}
                 aria-label={dailyKChartVisible ? '隐藏日k蜡烛' : '显示日k蜡烛'}
@@ -489,7 +489,7 @@ export function ScreenerTable({
                 className={`inline-flex items-center justify-center w-5 h-5 rounded-btn transition-colors ${
                   intradayChartVisible
                     ? 'text-accent bg-accent/10 hover:bg-accent/20'
-                    : 'text-muted hover:text-foreground hover:bg-elevated'
+                    : 'text-secondary hover:text-foreground hover:bg-elevated'
                 }`}
                 title={intradayChartVisible ? '隐藏分时图' : '显示分时图'}
                 aria-label={intradayChartVisible ? '隐藏分时图' : '显示分时图'}
@@ -502,7 +502,7 @@ export function ScreenerTable({
                   type="button"
                   onClick={(event) => { event.stopPropagation(); onRefreshIntraday() }}
                   disabled={intradayRefreshing}
-                  className="inline-flex items-center justify-center w-5 h-5 rounded-btn text-muted hover:text-accent hover:bg-accent/10 transition-colors disabled:opacity-40"
+                  className="inline-flex items-center justify-center w-5 h-5 rounded-btn text-secondary hover:text-accent hover:bg-accent/10 transition-colors disabled:opacity-40"
                   title="刷新分时数据"
                   aria-label="刷新分时数据"
                 >
@@ -521,7 +521,7 @@ export function ScreenerTable({
                   className={`inline-flex items-center justify-center h-5 px-1 rounded-btn text-micro whitespace-nowrap transition-colors ${
                     intradayYMode === 'limit'
                       ? 'text-accent bg-accent/10 hover:bg-accent/20'
-                      : 'text-muted hover:text-foreground hover:bg-elevated'
+                      : 'text-secondary hover:text-foreground hover:bg-elevated'
                   }`}
                   title={intradayYMode === 'limit' ? '纵轴按涨跌停显示 (点击切回自适应)' : '纵轴自适应 (点击按涨跌停显示)'}
                   aria-label={intradayYMode === 'limit' ? '纵轴按涨跌停' : '纵轴自适应'}
@@ -543,7 +543,7 @@ export function ScreenerTable({
                 className={`inline-flex items-center justify-center w-5 h-5 rounded-btn transition-colors ${
                   strategyTagsExpanded
                     ? 'text-accent bg-accent/10 hover:bg-accent/20'
-                    : 'text-muted hover:text-foreground hover:bg-elevated'
+                    : 'text-secondary hover:text-foreground hover:bg-elevated'
                 }`}
                 title={strategyTagsExpanded ? '收起策略标签（每行仅显示前几个）' : '展开全部策略标签'}
                 aria-label={strategyTagsExpanded ? '收起策略标签' : '展开全部策略标签'}

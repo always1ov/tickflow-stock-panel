@@ -119,7 +119,7 @@ function TransferDialog({ source, groups, entries, onClose }: Props & { onClose:
     </div>
     <footer className="flex flex-wrap justify-end gap-2 border-t border-border px-4 py-3">
       {source !== 'ungrouped' && <button type="button" disabled={!canSubmit} onClick={() => target && transfer.mutate({ action: 'copy', target, symbols })}
-        className="min-h-10 rounded-btn border border-border bg-elevated px-4 text-sm text-foreground disabled:opacity-50">
+        className="min-h-10 rounded-btn border border-border bg-surface px-4 text-sm text-foreground disabled:opacity-50">
         {pending && transfer.variables?.action === 'copy' ? '复制中…' : '复制到目标组'}
       </button>}
       {source !== 'all' && <button type="button" disabled={!canSubmit} onClick={() => target && transfer.mutate({ action: 'move', target, symbols })}

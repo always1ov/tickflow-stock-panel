@@ -45,7 +45,7 @@ export function Switch({ checked, onChange, disabled, size = 'md', title, label,
         'tap-target relative inline-flex shrink-0 items-center rounded-full [transition:background-color_150ms_ease,transform_160ms_var(--ease-out-strong)]',
         'disabled:cursor-not-allowed disabled:opacity-40',
         s.track,
-        checked ? 'bg-accent' : 'bg-elevated',
+        checked ? 'bg-accent' : 'bg-surface border border-border',
         className,
       )}
     >

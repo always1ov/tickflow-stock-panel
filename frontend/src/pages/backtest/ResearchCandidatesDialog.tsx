@@ -148,7 +148,7 @@ export function ResearchCandidatesDialog({ onClose, onLoadStrategy }: {
         <button
           type="button"
           onClick={onClose}
-          className="ml-auto flex h-8 w-8 items-center justify-center rounded-btn text-muted transition-colors hover:bg-elevated hover:text-foreground"
+          className="ml-auto flex h-8 w-8 items-center justify-center rounded-btn text-secondary transition-colors hover:bg-elevated hover:text-foreground"
           title="关闭"
           aria-label="关闭候选方案"
         >
@@ -256,7 +256,7 @@ export function ResearchCandidatesDialog({ onClose, onLoadStrategy }: {
                     if (window.confirm(`确认删除候选方案“${item.name}”？`)) remove.mutate(item.id)
                   }}
                   disabled={remove.isPending}
-                  className="flex h-8 w-8 items-center justify-center rounded-btn text-muted transition-colors hover:bg-danger/10 hover:text-danger disabled:opacity-50"
+                  className="flex h-8 w-8 items-center justify-center rounded-btn text-secondary transition-colors hover:bg-danger/10 hover:text-danger disabled:opacity-50"
                   title="删除候选"
                   aria-label={`删除候选 ${item.name}`}
                 >
@@ -288,7 +288,7 @@ export function ResearchCandidatesDialog({ onClose, onLoadStrategy }: {
                         onClick={() => setLinkDraft(current => current ? { ...current, direction: value } : current)}
                         className={`flex items-center justify-center gap-1 text-xs transition-colors ${linkDraft.direction === value
                           ? 'bg-foreground font-medium text-surface'
-                          : 'text-muted hover:bg-elevated'
+                          : 'text-secondary hover:bg-elevated'
                         }`}
                         title={`偏好${label}`}
                         aria-label={`评分方向：偏好${label}`}

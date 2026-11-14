@@ -111,7 +111,7 @@ export function DefaultStrategyParamsDialog({ show, onClose }: Props) {
           <SlidersHorizontal className="h-4 w-4 text-accent" />
           <span id="default-strategy-params-title" className={TYPE.section}>默认基础参数</span>
         </div>
-        <button onClick={onClose} className="p-1 rounded-btn hover:bg-elevated text-muted hover:text-foreground transition-colors cursor-pointer" title="关闭">
+        <button onClick={onClose} className="p-1 rounded-btn hover:bg-elevated text-secondary hover:text-foreground transition-colors cursor-pointer" title="关闭">
           <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18M6 6l12 12" /></svg>
         </button>
       </div>
@@ -133,7 +133,7 @@ export function DefaultStrategyParamsDialog({ show, onClose }: Props) {
                 const active = bf.boards.includes(b)
                 return (
                   <button key={b} onClick={() => { const next = active ? bf.boards.filter(x => x !== b) : [...bf.boards, b]; set('boards', next.length === 0 ? [...ALL_BOARDS] : next) }}
-                    className={`px-1.5 py-0.5 rounded-btn text-micro font-medium border transition-colors cursor-pointer ${active ? `${color.select.border} ${color.select.bgLight} ${color.select.text}` : `border-border bg-base text-muted ${color.select.borderHover}`}`}>{b}</button>
+                    className={`px-1.5 py-0.5 rounded-btn text-micro font-medium border transition-colors cursor-pointer ${active ? `${color.select.border} ${color.select.bgLight} ${color.select.text}` : `border-border bg-base text-secondary ${color.select.borderHover}`}`}>{b}</button>
                 )
               })}
             </div>
@@ -141,7 +141,7 @@ export function DefaultStrategyParamsDialog({ show, onClose }: Props) {
           <div className="flex items-center gap-1.5">
             <span className="text-xs text-secondary w-16 shrink-0 text-right">ST</span>
             <button onClick={() => set('exclude_st', !bf.exclude_st)}
-              className={`px-1.5 py-0.5 rounded-btn text-micro font-medium border transition-colors cursor-pointer ${bf.exclude_st ? 'border-danger/40 bg-danger/10 text-danger' : 'border-border bg-base text-muted hover:border-danger/30'}`}>{bf.exclude_st ? '排除' : '包含'}</button>
+              className={`px-1.5 py-0.5 rounded-btn text-micro font-medium border transition-colors cursor-pointer ${bf.exclude_st ? 'border-danger/40 bg-danger/10 text-danger' : 'border-border bg-base text-secondary hover:border-danger/30'}`}>{bf.exclude_st ? '排除' : '包含'}</button>
           </div>
         </div>
       </div>
@@ -181,7 +181,7 @@ export function DefaultStrategyParamsDialog({ show, onClose }: Props) {
       {/* 底部按钮 */}
       <div className="flex items-center justify-between gap-2 px-4 py-3 border-t border-border/50">
         <button onClick={() => setBf({ ...BUILTIN_DEFAULT_BASIC_FILTER })}
-          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-btn text-xs text-muted border border-border hover:text-foreground hover:border-accent/40 transition-colors cursor-pointer">
+          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-btn text-xs text-secondary border border-border hover:text-foreground hover:border-accent/40 transition-colors cursor-pointer">
           <RotateCcw className="h-3 w-3" />
           恢复默认
         </button>

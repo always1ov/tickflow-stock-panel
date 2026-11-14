@@ -382,7 +382,7 @@ function SetupCard({ accId, onDone, onCancel }: { accId: string; onDone: (create
             />
           </div>
           {autoId.trim() && (
-            <button onClick={() => { setAutoId(''); setAutoName(''); setAutoSearch('') }} className="rounded-btn border border-border px-2 py-1 text-micro text-muted hover:text-danger" title="不绑定策略">清除</button>
+            <button onClick={() => { setAutoId(''); setAutoName(''); setAutoSearch('') }} className="rounded-btn border border-border px-2 py-1 text-micro text-secondary hover:text-danger" title="不绑定策略">清除</button>
           )}
         </div>
         {/* 两行栅格: 5 组控件一行放不下会被压成竖排文字并相互叠压。
@@ -412,7 +412,7 @@ function SetupCard({ accId, onDone, onCancel }: { accId: string; onDone: (create
                   onChange={e => setSizeValue(e.target.value)}
                   className="w-16 shrink-0 rounded-btn border border-border bg-base px-1.5 py-1 font-mono text-xs outline-none focus:border-accent/50" />
                 <button onClick={() => setSizeMode(m => m === 'pct_equity' ? 'fixed_amount' : 'pct_equity')}
-                  className="whitespace-nowrap rounded-btn border border-border px-1.5 py-1 text-micro text-muted hover:text-accent" title="切换仓位模式">
+                  className="whitespace-nowrap rounded-btn border border-border px-1.5 py-1 text-micro text-secondary hover:text-accent" title="切换仓位模式">
                   {sizeMode === 'pct_equity' ? '按比例' : '按金额'}
                 </button>
               </div>
@@ -733,7 +733,7 @@ function OrderForm({ acc, holdings = [], onDone }: { acc: string; holdings?: Pap
                   ? s === 'buy'
                     ? 'border-bull/50 bg-bull/10 text-bull'
                     : 'border-bear/50 bg-bear/10 text-bear'
-                  : 'border-border text-muted hover:border-border hover:bg-elevated/60 hover:text-secondary',
+                  : 'border-border text-secondary hover:border-border hover:bg-elevated/60 hover:text-secondary',
               )}
             >
               {s === 'buy' ? '买入' : '卖出'}
@@ -748,7 +748,7 @@ function OrderForm({ acc, holdings = [], onDone }: { acc: string; holdings?: Pap
                 <button
                   key={mo}
                   onClick={() => setQtyMode(mo)}
-                  className={cn('rounded-btn px-1.5 py-px transition-colors', qtyMode === mo ? 'bg-elevated text-foreground' : 'text-muted hover:text-secondary')}
+                  className={cn('rounded-btn px-1.5 py-px transition-colors', qtyMode === mo ? 'bg-surface border border-border text-foreground' : 'text-foreground hover:text-secondary')}
                 >
                   {mo === 'qty' ? '按数量' : '按金额'}
                 </button>
@@ -772,7 +772,7 @@ function OrderForm({ acc, holdings = [], onDone }: { acc: string; holdings?: Pap
                 title={t === 'market' ? '盘中按最新快照价成交; ETF 即时单自动转次日开盘' : undefined}
                 className={cn(
                   'flex-1 rounded-btn border py-1 text-micro transition-colors',
-                  orderType === t ? 'border-accent/40 bg-accent/10 text-accent' : 'border-border text-muted hover:text-secondary',
+                  orderType === t ? 'border-accent/40 bg-accent/10 text-accent' : 'border-border text-secondary hover:text-secondary',
                 )}
               >
                 {ORDER_TYPE_LABEL[t]}
@@ -1034,7 +1034,7 @@ function BaseDefaultsModal({ onClose }: { onClose: () => void }) {
           {hasBase && (
             <button
               onClick={reset}
-              className="rounded-btn border border-border px-3 text-xs text-muted transition-colors hover:border-warning/40 hover:text-warning"
+              className="rounded-btn border border-border px-3 text-xs text-secondary transition-colors hover:border-warning/40 hover:text-warning"
               title="清除自定义基础配置, 回落内置默认 (100万 / 万2.5 / 千1 / 5bps)"
             >
               恢复内置默认
@@ -1259,11 +1259,11 @@ function AutoRulesPanel({ acc }: { acc: string }) {
               <button
                 onClick={() => toggleM.mutate({ id: r.id, enabled: !r.enabled })}
                 className={cn('ml-auto shrink-0 rounded-btn px-2 py-0.5 text-micro transition-colors',
-                  r.enabled ? 'bg-bear/10 text-bear hover:bg-bear/20' : 'bg-elevated text-muted hover:text-secondary')}
+                  r.enabled ? 'bg-bear/10 text-bear hover:bg-bear/20' : 'bg-surface border border-border text-foreground hover:text-secondary')}
               >
                 {r.enabled ? '停用' : '启用'}
               </button>
-              <button onClick={() => deleteM.mutate(r.id)} className="shrink-0 rounded-btn p-0.5 text-muted hover:text-danger" title="删除规则">
+              <button onClick={() => deleteM.mutate(r.id)} className="shrink-0 rounded-btn p-0.5 text-secondary hover:text-danger" title="删除规则">
                 <X className="h-3.5 w-3.5" />
               </button>
             </div>
@@ -1359,7 +1359,7 @@ function AutoRuleForm({ acc, onDone, onCancel }: { acc: string; onDone: () => vo
             {(['strategy', 'rule', 'flip'] as const).map(k => (
               <button key={k} onClick={() => { setMatchKind(k); setMatchId(''); setSide(s => (k === 'strategy' ? 'auto' : k === 'rule' && s === 'auto' ? 'buy' : s)); if (k === 'flip' && !name.trim()) setName(FLIP_RULE_NAME) }}
                 className={cn('flex-1 rounded-btn border py-1 text-micro transition-colors',
-                  matchKind === k ? 'border-accent/40 bg-accent/10 text-accent' : 'border-border text-muted hover:text-secondary')}>
+                  matchKind === k ? 'border-accent/40 bg-accent/10 text-accent' : 'border-border text-secondary hover:text-secondary')}>
                 {k === 'strategy' ? '跟策略' : k === 'rule' ? '跟监控规则' : '跟六态转折'}
               </button>
             ))}
@@ -1393,7 +1393,7 @@ function AutoRuleForm({ acc, onDone, onCancel }: { acc: string; onDone: () => vo
               {(['buy', 'sell'] as const).map(sd => (
                 <button key={sd} onClick={() => setSide(sd)}
                   className={cn('flex-1 whitespace-nowrap rounded-btn border py-1 text-micro font-medium transition-colors',
-                    side === sd ? (sd === 'buy' ? 'border-bull/50 bg-bull/10 text-bull' : 'border-bear/50 bg-bear/10 text-bear') : 'border-border text-muted')}>
+                    side === sd ? (sd === 'buy' ? 'border-bull/50 bg-bull/10 text-bull' : 'border-bear/50 bg-bear/10 text-bear') : 'border-border text-secondary')}>
                   {sd === 'buy' ? '买入' : '卖出'}
                 </button>
               ))}
@@ -1404,9 +1404,9 @@ function AutoRuleForm({ acc, onDone, onCancel }: { acc: string; onDone: () => vo
           <label className="text-micro text-muted">仓位</label>
           <div className="mt-1 flex gap-1.5">
             <button onClick={() => setSizeMode('fixed_amount')}
-              className={cn('flex-1 rounded-btn border py-1 text-micro transition-colors', sizeMode === 'fixed_amount' ? 'border-accent/40 bg-accent/10 text-accent' : 'border-border text-muted')}>固定金额</button>
+              className={cn('flex-1 rounded-btn border py-1 text-micro transition-colors', sizeMode === 'fixed_amount' ? 'border-accent/40 bg-accent/10 text-accent' : 'border-border text-secondary')}>固定金额</button>
             <button onClick={() => setSizeMode('pct_equity')}
-              className={cn('flex-1 rounded-btn border py-1 text-micro transition-colors', sizeMode === 'pct_equity' ? 'border-accent/40 bg-accent/10 text-accent' : 'border-border text-muted')}>权益 %</button>
+              className={cn('flex-1 rounded-btn border py-1 text-micro transition-colors', sizeMode === 'pct_equity' ? 'border-accent/40 bg-accent/10 text-accent' : 'border-border text-secondary')}>权益 %</button>
           </div>
         </div>
         <div>
@@ -1420,7 +1420,7 @@ function AutoRuleForm({ acc, onDone, onCancel }: { acc: string; onDone: () => vo
             {(['next_open', 'close', 'market'] as const).map(t => (
               <button key={t} onClick={() => setOrderType(t)}
                 className={cn('flex-1 rounded-btn border py-1 text-micro transition-colors',
-                  orderType === t ? 'border-accent/40 bg-accent/10 text-accent' : 'border-border text-muted hover:text-secondary')}>
+                  orderType === t ? 'border-accent/40 bg-accent/10 text-accent' : 'border-border text-secondary hover:text-secondary')}>
                 {ORDER_TYPE_LABEL[t]}
               </button>
             ))}
@@ -1614,7 +1614,7 @@ function CompareView({ onCreateSingle }: { onCreateSingle: () => void }) {
             </button>
             <button
               onClick={onCreateSingle}
-              className="flex items-center gap-0.5 rounded-btn border border-border px-2 py-1 text-micro text-muted transition-colors hover:border-accent/40 hover:text-accent"
+              className="flex items-center gap-0.5 rounded-btn border border-border px-2 py-1 text-micro text-secondary transition-colors hover:border-accent/40 hover:text-accent"
               title="新建单个虚拟账户 (原流程)"
             >
               <Plus className="h-3 w-3" />
@@ -1622,7 +1622,7 @@ function CompareView({ onCreateSingle }: { onCreateSingle: () => void }) {
             </button>
             <button
               onClick={() => setBaseOpen(true)}
-              className="flex items-center gap-1 rounded-btn border border-border px-2 py-1 text-micro text-muted transition-colors hover:border-accent/40 hover:text-accent"
+              className="flex items-center gap-1 rounded-btn border border-border px-2 py-1 text-micro text-secondary transition-colors hover:border-accent/40 hover:text-accent"
               title="新建账户的默认初始资金与费率 (佣金/印花税/滑点), 创建时自动加载"
             >
               <SlidersHorizontal className="h-3 w-3" />
@@ -1630,7 +1630,7 @@ function CompareView({ onCreateSingle }: { onCreateSingle: () => void }) {
             </button>
             <button
               onClick={() => cmpQ.refetch()}
-              className="flex items-center gap-1 rounded-btn border border-border px-2 py-1 text-micro text-muted transition-colors hover:border-accent/40 hover:text-accent"
+              className="flex items-center gap-1 rounded-btn border border-border px-2 py-1 text-micro text-secondary transition-colors hover:border-accent/40 hover:text-accent"
             >
               <RefreshCw className={cn('h-3 w-3', cmpQ.isFetching && 'animate-spin')} />
               刷新
@@ -1804,7 +1804,7 @@ function CompareView({ onCreateSingle }: { onCreateSingle: () => void }) {
                                   disabled={freezeM.isPending}
                                   className={cn(
                                     'rounded-btn p-1 transition-colors',
-                                    r.status === 'frozen' ? 'text-warning hover:bg-warning/10' : 'text-muted hover:bg-elevated hover:text-warning',
+                                    r.status === 'frozen' ? 'text-warning hover:bg-warning/10' : 'text-secondary hover:bg-elevated hover:text-warning',
                                   )}
                                   title={r.status === 'frozen' ? '解冻账户 (恢复下单与跟单)' : '冻结账户 (拒绝新订单, 持仓只读)'}
                                 >
@@ -1812,7 +1812,7 @@ function CompareView({ onCreateSingle }: { onCreateSingle: () => void }) {
                                 </button>
                                 <button
                                   onClick={() => setDeleting(r)}
-                                  className="rounded-btn p-1 text-muted transition-colors hover:bg-danger/10 hover:text-danger"
+                                  className="rounded-btn p-1 text-secondary transition-colors hover:bg-danger/10 hover:text-danger"
                                   title="删除账户 (含全部数据, 需二次确认)"
                                 >
                                   <Trash2 className="h-3.5 w-3.5" />
@@ -1976,7 +1976,7 @@ function BatchCreateModal({ onClose, onCreated }: { onClose: () => void; onCreat
               {(['strategy', 'rule'] as const).map(k => (
                 <button key={k} onClick={() => { setQuickKind(k); setQuickId('') }}
                   className={cn('rounded-btn border px-2 py-1 text-micro transition-colors',
-                    quickKind === k ? 'border-accent/40 bg-accent/10 text-accent' : 'border-border text-muted hover:text-secondary')}>
+                    quickKind === k ? 'border-accent/40 bg-accent/10 text-accent' : 'border-border text-secondary hover:text-secondary')}>
                   {k === 'strategy' ? '策略' : '监控规则'}
                 </button>
               ))}
@@ -2028,7 +2028,7 @@ function BatchCreateModal({ onClose, onCreated }: { onClose: () => void; onCreat
                     className="min-w-0 flex-1 rounded-btn border border-border bg-base px-2 py-1 text-xs outline-none focus:border-accent/50"
                   />
                   <span className="w-44 shrink-0 truncate font-mono text-micro text-muted" title={r.matchId}>{r.matchId}</span>
-                  <button onClick={() => setRows(prev => prev.filter((_, j) => j !== i))} className="shrink-0 rounded-btn p-0.5 text-muted hover:text-danger" title="移除">
+                  <button onClick={() => setRows(prev => prev.filter((_, j) => j !== i))} className="shrink-0 rounded-btn p-0.5 text-secondary hover:text-danger" title="移除">
                     <X className="h-3.5 w-3.5" />
                   </button>
                 </div>
@@ -2058,7 +2058,7 @@ function BatchCreateModal({ onClose, onCreated }: { onClose: () => void; onCreat
                 {(['buy', 'sell'] as const).map(sd => (
                   <button key={sd} onClick={() => setSide(sd)}
                     className={cn('flex-1 whitespace-nowrap rounded-btn border py-1 text-micro font-medium transition-colors',
-                      side === sd ? (sd === 'buy' ? 'border-bull/50 bg-bull/10 text-bull' : 'border-bear/50 bg-bear/10 text-bear') : 'border-border text-muted')}>
+                      side === sd ? (sd === 'buy' ? 'border-bull/50 bg-bull/10 text-bull' : 'border-bear/50 bg-bear/10 text-bear') : 'border-border text-secondary')}>
                     {sd === 'buy' ? '买入' : '卖出'}
                   </button>
                 ))}
@@ -2069,9 +2069,9 @@ function BatchCreateModal({ onClose, onCreated }: { onClose: () => void; onCreat
             <label className={labelCls}>仓位模式 (全部来源)</label>
             <div className="mt-1 flex gap-1.5">
               <button onClick={() => setSizeMode('fixed_amount')}
-                className={cn('flex-1 rounded-btn border py-1 text-micro transition-colors', sizeMode === 'fixed_amount' ? 'border-accent/40 bg-accent/10 text-accent' : 'border-border text-muted')}>固定金额</button>
+                className={cn('flex-1 rounded-btn border py-1 text-micro transition-colors', sizeMode === 'fixed_amount' ? 'border-accent/40 bg-accent/10 text-accent' : 'border-border text-secondary')}>固定金额</button>
               <button onClick={() => setSizeMode('pct_equity')}
-                className={cn('flex-1 rounded-btn border py-1 text-micro transition-colors', sizeMode === 'pct_equity' ? 'border-accent/40 bg-accent/10 text-accent' : 'border-border text-muted')}>权益 %</button>
+                className={cn('flex-1 rounded-btn border py-1 text-micro transition-colors', sizeMode === 'pct_equity' ? 'border-accent/40 bg-accent/10 text-accent' : 'border-border text-secondary')}>权益 %</button>
             </div>
           </div>
           <div>
@@ -2084,7 +2084,7 @@ function BatchCreateModal({ onClose, onCreated }: { onClose: () => void; onCreat
               {(['next_open', 'close', 'market'] as const).map(t => (
                 <button key={t} onClick={() => setOrderType(t)}
                   className={cn('flex-1 rounded-btn border py-1 text-micro transition-colors',
-                    orderType === t ? 'border-accent/40 bg-accent/10 text-accent' : 'border-border text-muted hover:text-secondary')}>
+                    orderType === t ? 'border-accent/40 bg-accent/10 text-accent' : 'border-border text-secondary hover:text-secondary')}>
                   {ORDER_TYPE_LABEL[t]}
                 </button>
               ))}
@@ -2288,7 +2288,7 @@ function AccountPanel({ acc, name, onDeleted }: { acc: string; name?: string; on
         )}
         <button
           onClick={() => setFeeOpen(true)}
-          className="ml-auto flex items-center gap-1 rounded-btn border border-border px-2 py-0.5 text-micro text-muted transition-colors hover:border-accent/40 hover:text-accent"
+          className="ml-auto flex items-center gap-1 rounded-btn border border-border px-2 py-0.5 text-micro text-secondary transition-colors hover:border-accent/40 hover:text-accent"
           title={`佣金 ${((ov.fees?.commission_pct ?? 0) * 10000).toFixed(1)}‱ (最低5元) · 印花税 ${((ov.fees?.stamp_tax_pct ?? 0) * 1000).toFixed(1)}‰ 仅卖出 · 滑点 ${ov.fees?.slippage_bps ?? 0}bps — 点击调整`}
         >
           <Settings className="h-3 w-3" />
@@ -2296,13 +2296,13 @@ function AccountPanel({ acc, name, onDeleted }: { acc: string; name?: string; on
         </button>
         <button
           onClick={() => api.paperFreeze(ov.status !== 'frozen', acc).then(invalidateAll)}
-          className="rounded-btn border border-border px-2 py-0.5 text-micro text-muted transition-colors hover:border-warning/40 hover:text-warning"
+          className="rounded-btn border border-border px-2 py-0.5 text-micro text-secondary transition-colors hover:border-warning/40 hover:text-warning"
         >
           {ov.status === 'frozen' ? '解冻账户' : '冻结账户'}
         </button>
         <button
           onClick={() => setDeleteOpen(true)}
-          className="rounded-btn border border-border px-2 py-0.5 text-micro text-muted transition-colors hover:border-danger/40 hover:text-danger"
+          className="rounded-btn border border-border px-2 py-0.5 text-micro text-secondary transition-colors hover:border-danger/40 hover:text-danger"
           title="删除账户及其全部数据 (不可恢复)"
         >
           删除账户
@@ -2381,7 +2381,7 @@ function AccountPanel({ acc, name, onDeleted }: { acc: string; name?: string; on
                   <button
                     key={t}
                     onClick={() => setTab(t)}
-                    className={cn('flex items-center gap-1 rounded-btn px-2.5 py-1 text-xs transition-colors', tab === t ? 'bg-elevated text-foreground' : 'text-muted hover:text-secondary')}
+                    className={cn('flex items-center gap-1 rounded-btn px-2.5 py-1 text-xs transition-colors', tab === t ? 'bg-surface border border-border text-foreground' : 'text-foreground hover:text-secondary')}
                   >
                     {t === 'orders' && <><History className="h-3 w-3" />订单 {allOrders.length > 0 && <span className="text-micro text-muted">{allOrders.length}</span>}</>}
                     {t === 'trades' && <>成交台账 {allFills.length > 0 && <span className="text-micro text-muted">{allFills.length}</span>}</>}
@@ -2391,7 +2391,7 @@ function AccountPanel({ acc, name, onDeleted }: { acc: string; name?: string; on
                 {tab === 'orders' && allOrders.length > 20 && (
                   <button
                     onClick={() => setShowAllOrders(v => !v)}
-                    className="rounded-btn border border-border px-1.5 py-0.5 text-micro text-muted transition-colors hover:border-accent/30 hover:text-accent"
+                    className="rounded-btn border border-border px-1.5 py-0.5 text-micro text-secondary transition-colors hover:border-accent/30 hover:text-accent"
                   >
                     {showAllOrders ? '收起' : `显示全部 ${allOrders.length} 条`}
                   </button>
@@ -2399,7 +2399,7 @@ function AccountPanel({ acc, name, onDeleted }: { acc: string; name?: string; on
                 {tab === 'trades' && allFills.length > 30 && (
                   <button
                     onClick={() => setShowAllTrades(v => !v)}
-                    className="rounded-btn border border-border px-1.5 py-0.5 text-micro text-muted transition-colors hover:border-accent/30 hover:text-accent"
+                    className="rounded-btn border border-border px-1.5 py-0.5 text-micro text-secondary transition-colors hover:border-accent/30 hover:text-accent"
                   >
                     {showAllTrades ? '收起' : `显示全部 ${allFills.length} 条`}
                   </button>
@@ -2408,7 +2408,7 @@ function AccountPanel({ acc, name, onDeleted }: { acc: string; name?: string; on
                   <button
                     onClick={exportTradesCsv}
                     disabled={allFills.length === 0}
-                    className="ml-auto rounded-btn border border-border px-2 py-1 text-micro text-muted transition-colors hover:border-accent/30 hover:text-accent disabled:cursor-not-allowed disabled:opacity-40"
+                    className="ml-auto rounded-btn border border-border px-2 py-1 text-micro text-secondary transition-colors hover:border-accent/30 hover:text-accent disabled:cursor-not-allowed disabled:opacity-40"
                     title="导出全部成交台账 (CSV, Excel 可直接打开)"
                   >
                     导出 CSV
@@ -2456,7 +2456,7 @@ function AccountPanel({ acc, name, onDeleted }: { acc: string; name?: string; on
                         {o.status === 'filled' && o.fill_price != null ? `@ ${fmtMoney(o.fill_price, 3)}` : o.reason ?? ''}
                       </span>
                       {o.status === 'pending' && (
-                        <button onClick={() => cancelM.mutate(o.id)} className="shrink-0 rounded-btn p-0.5 text-muted hover:text-foreground" title="撤单">
+                        <button onClick={() => cancelM.mutate(o.id)} className="shrink-0 rounded-btn p-0.5 text-secondary hover:text-foreground" title="撤单">
                           <X className="h-3.5 w-3.5" />
                         </button>
                       )}

@@ -187,7 +187,7 @@ const ParamField = memo(function ParamField({ def, value, onChange, onApplyValue
           type="button"
           onClick={() => onChange(def.id, !checked)}
           className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors duration-200 cursor-pointer ${
-            checked ? 'bg-accent' : 'bg-elevated'
+            checked ? 'bg-accent' : 'bg-surface border border-border'
           }`}
           aria-pressed={checked}
         >
@@ -664,7 +664,7 @@ export function StrategySettingsDialog({ strategyId, onClose, onSaved, onAiModif
                               onClick={() => setBasicFilterEnabled(v => !v)}
                               aria-pressed={basicFilterEnabled}
                               aria-label="启用基础参数过滤"
-                              className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors duration-200 cursor-pointer ${basicFilterEnabled ? 'bg-sky-500' : 'bg-elevated'}`}
+                              className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors duration-200 cursor-pointer ${basicFilterEnabled ? 'bg-sky-500' : 'bg-surface border border-border'}`}
                             >
                               <span className={`inline-block h-3 w-3 rounded-full bg-white shadow-sm transition-transform duration-200 ${basicFilterEnabled ? 'translate-x-[14px]' : 'translate-x-0.5'}`} />
                             </button>
@@ -683,7 +683,7 @@ export function StrategySettingsDialog({ strategyId, onClose, onSaved, onAiModif
                                   const active = boards.includes(b)
                                   return (
                                     <button key={b} onClick={() => { const cur: string[] = basicFilter.boards ?? ALL_BOARDS; const next = active ? cur.filter(x => x !== b) : [...cur, b]; setBF('boards', next.length === 0 ? ALL_BOARDS : next) }}
-                                      className={`px-2 py-1 rounded-btn text-micro font-medium border transition-colors cursor-pointer ${active ? `${color.select.border} ${color.select.bgLight} ${color.select.text}` : `border-border bg-base text-muted ${color.select.borderHover}`}`}>{b}</button>
+                                      className={`px-2 py-1 rounded-btn text-micro font-medium border transition-colors cursor-pointer ${active ? `${color.select.border} ${color.select.bgLight} ${color.select.text}` : `border-border bg-base text-secondary ${color.select.borderHover}`}`}>{b}</button>
                                   )
                                 })}
                               </div>
@@ -691,7 +691,7 @@ export function StrategySettingsDialog({ strategyId, onClose, onSaved, onAiModif
                             <div className="flex items-center gap-2">
                               <span className={FIELD_LABEL_CLS}>ST</span>
                               <button onClick={() => setBF('exclude_st', !basicFilter.exclude_st)}
-                                className={`px-2 py-1 rounded-btn text-micro font-medium border transition-colors cursor-pointer ${basicFilter.exclude_st ? 'border-danger/40 bg-danger/10 text-danger' : 'border-border bg-base text-muted hover:border-danger/30'}`}>{basicFilter.exclude_st ? '排除' : '包含'}</button>
+                                className={`px-2 py-1 rounded-btn text-micro font-medium border transition-colors cursor-pointer ${basicFilter.exclude_st ? 'border-danger/40 bg-danger/10 text-danger' : 'border-border bg-base text-secondary hover:border-danger/30'}`}>{basicFilter.exclude_st ? '排除' : '包含'}</button>
                             </div>
                           </div>
                         </Card>

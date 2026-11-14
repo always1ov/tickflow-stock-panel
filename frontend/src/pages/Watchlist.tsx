@@ -177,7 +177,7 @@ function renderExtValue(
       {showAll && maxTags > 0 && tags.length > maxTags && (
         <button
           onClick={onToggle}
-          className="inline-block px-1.5 py-px rounded-btn text-micro font-medium leading-tight text-muted hover:text-foreground transition-colors"
+          className="inline-block px-1.5 py-px rounded-btn text-micro font-medium leading-tight text-secondary hover:text-foreground transition-colors"
         >
           收起
         </button>
@@ -412,7 +412,7 @@ function StockSearchBox({
                         type="button"
                         onClick={event => { event.stopPropagation(); onAdd(r.symbol, preferredGroupId ?? null) }}
                         disabled={addPending}
-                        className="shrink-0 rounded-btn p-1 text-muted transition-colors hover:bg-accent/10 hover:text-accent disabled:opacity-50 cursor-pointer"
+                        className="shrink-0 rounded-btn p-1 text-secondary transition-colors hover:bg-accent/10 hover:text-accent disabled:opacity-50 cursor-pointer"
                         title={
                           preferredGroupId
                             ? `加入自选 · 当前分组「${groups.find(g => g.id === preferredGroupId)?.name ?? ''}」`
@@ -1177,7 +1177,7 @@ export function Watchlist() {
                 type="button"
                 disabled={preparation.isFetching}
                 onClick={() => { void preparation.refetch() }}
-                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-btn text-micro font-medium bg-muted/15 text-muted border border-border/50 whitespace-nowrap disabled:cursor-wait"
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-btn text-micro font-medium bg-muted/15 text-secondary border border-border/50 whitespace-nowrap disabled:cursor-wait"
                 title={preparation.isFetching ? '正在按需补齐自选日K，已有数据仍可查看' :
                   `${preparation.data?.filter(r => r.status !== 'ready').map(r => `${r.symbol}：${r.message}`).join('\n') || '日K暂未就绪，请检查数据源配置'}\n点击重试补齐`}
               >
@@ -1212,7 +1212,7 @@ export function Watchlist() {
             />
             <button
               onClick={() => setImportOpen(true)}
-              className="inline-flex items-center justify-center h-8 w-8 rounded-btn bg-elevated hover:bg-elevated/80 text-secondary hover:text-foreground transition-colors duration-150 ease-smooth"
+              className="inline-flex items-center justify-center h-8 w-8 rounded-btn bg-surface border border-border hover:bg-elevated/80 text-foreground hover:text-foreground transition-colors duration-150 ease-smooth"
               title="批量导入自选（截图 / CSV / 粘贴代码）"
               aria-label="批量导入自选"
             >
@@ -1222,7 +1222,7 @@ export function Watchlist() {
             {/* 自定义列 / 刷新 */}
             <button
               onClick={() => setCustomizerOpen(true)}
-              className="inline-flex items-center justify-center h-8 w-8 rounded-btn bg-elevated hover:bg-elevated/80 text-secondary hover:text-foreground transition-colors duration-150 ease-smooth"
+              className="inline-flex items-center justify-center h-8 w-8 rounded-btn bg-surface border border-border hover:bg-elevated/80 text-foreground hover:text-foreground transition-colors duration-150 ease-smooth"
               title="自定义列"
             >
               <Settings2 className="h-4 w-4" />
@@ -1230,7 +1230,7 @@ export function Watchlist() {
             <button
               onClick={() => enriched.refetch()}
               disabled={enriched.isFetching}
-              className="inline-flex items-center justify-center h-8 w-8 rounded-btn bg-elevated hover:bg-elevated/80 text-secondary hover:text-foreground transition-colors duration-150 ease-smooth disabled:opacity-50"
+              className="inline-flex items-center justify-center h-8 w-8 rounded-btn bg-surface border border-border hover:bg-elevated/80 text-foreground hover:text-foreground transition-colors duration-150 ease-smooth disabled:opacity-50"
               title="刷新"
             >
               <RefreshCw className={`h-4 w-4 ${enriched.isFetching ? 'animate-spin' : ''}`} />
@@ -1285,7 +1285,7 @@ export function Watchlist() {
           className={`inline-flex h-8 items-center gap-1 rounded-btn border px-2.5 text-micro transition-colors duration-150 ease-smooth ${
             groupStatsOpen
               ? 'border-accent/30 bg-accent/15 text-accent'
-              : 'border-border bg-elevated text-secondary hover:text-foreground'
+              : 'border-border bg-surface text-foreground hover:text-foreground'
           }`}
         >
           <BarChart3 className="h-3.5 w-3.5" />分组统计
@@ -1297,7 +1297,7 @@ export function Watchlist() {
           className={`inline-flex h-8 items-center gap-1 rounded-btn border px-2.5 text-micro transition-colors duration-150 ease-smooth ${
             filterOpen || hasActiveFilters
               ? 'border-accent/30 bg-accent/15 text-accent'
-              : 'border-border bg-elevated text-secondary hover:text-foreground'
+              : 'border-border bg-surface text-foreground hover:text-foreground'
           }`}
         >
           <Filter className="h-3.5 w-3.5" />筛选
@@ -1306,7 +1306,7 @@ export function Watchlist() {
         {hasActiveFilters && (
           <button
             onClick={resetAllFilters}
-            className="inline-flex items-center justify-center h-8 w-8 rounded-btn bg-elevated text-secondary hover:bg-danger/10 hover:text-danger transition-colors duration-150 ease-smooth"
+            className="inline-flex items-center justify-center h-8 w-8 rounded-btn bg-surface border border-border text-foreground hover:bg-danger/10 hover:text-danger transition-colors duration-150 ease-smooth"
             title="重置全部筛选"
             aria-label="重置全部筛选"
           >
@@ -1331,7 +1331,7 @@ export function Watchlist() {
                     className={`px-2 py-0.5 rounded-btn text-micro transition-colors ${
                       active
                         ? 'bg-accent/15 text-accent'
-                        : 'bg-elevated text-secondary hover:text-foreground hover:bg-elevated/80'
+                        : 'bg-surface border border-border text-foreground hover:text-foreground hover:bg-elevated/80'
                     }`}
                   >
                     {board}
@@ -1349,7 +1349,7 @@ export function Watchlist() {
                 className={`px-2 py-0.5 rounded-btn text-micro transition-colors ${
                   excludeST
                     ? 'bg-accent/15 text-accent'
-                    : 'bg-elevated text-secondary hover:text-foreground hover:bg-elevated/80'
+                    : 'bg-surface border border-border text-foreground hover:text-foreground hover:bg-elevated/80'
                 }`}
                 title="勾选后隐藏简称含 ST 标记的标的 (ST/*ST/S*ST)"
               >
@@ -1489,7 +1489,7 @@ export function Watchlist() {
                         className={`inline-flex items-center justify-center w-5 h-5 rounded-btn transition-colors ${
                           dailyKChartVisible
                             ? 'text-accent bg-accent/10 hover:bg-accent/20'
-                            : 'text-muted hover:text-foreground hover:bg-elevated'
+                            : 'text-secondary hover:text-foreground hover:bg-elevated'
                         }`}
                         title={dailyKChartVisible ? '隐藏日k蜡烛' : '显示日k蜡烛'}
                         aria-label={dailyKChartVisible ? '隐藏日k蜡烛' : '显示日k蜡烛'}
@@ -1510,7 +1510,7 @@ export function Watchlist() {
                         className={`inline-flex items-center justify-center w-5 h-5 rounded-btn transition-colors ${
                           intradayChartVisible
                             ? 'text-accent bg-accent/10 hover:bg-accent/20'
-                            : 'text-muted hover:text-foreground hover:bg-elevated'
+                            : 'text-secondary hover:text-foreground hover:bg-elevated'
                         }`}
                         title={intradayChartVisible ? '隐藏分时图' : '显示分时图'}
                         aria-label={intradayChartVisible ? '隐藏分时图' : '显示分时图'}
@@ -1523,7 +1523,7 @@ export function Watchlist() {
                           type="button"
                           onClick={(event) => { event.stopPropagation(); minuteBatch.refetch() }}
                           disabled={minuteBatch.isFetching}
-                          className="inline-flex items-center justify-center w-5 h-5 rounded-btn text-muted hover:text-accent hover:bg-accent/10 transition-colors disabled:opacity-40"
+                          className="inline-flex items-center justify-center w-5 h-5 rounded-btn text-secondary hover:text-accent hover:bg-accent/10 transition-colors disabled:opacity-40"
                           title="刷新分时数据"
                           aria-label="刷新分时数据"
                         >
@@ -1542,7 +1542,7 @@ export function Watchlist() {
                           className={`inline-flex items-center justify-center h-5 px-1 rounded-btn text-micro whitespace-nowrap transition-colors ${
                             intradayYMode === 'limit'
                               ? 'text-accent bg-accent/10 hover:bg-accent/20'
-                              : 'text-muted hover:text-foreground hover:bg-elevated'
+                              : 'text-secondary hover:text-foreground hover:bg-elevated'
                           }`}
                           title={intradayYMode === 'limit' ? '纵轴按涨跌停显示 (点击切回自适应)' : '纵轴自适应 (点击按涨跌停显示)'}
                           aria-label={intradayYMode === 'limit' ? '纵轴按涨跌停' : '纵轴自适应'}
@@ -1603,7 +1603,7 @@ export function Watchlist() {
                               </button>
                               <button
                                 onClick={() => setConfirmRemove(null)}
-                                className="p-0.5 text-muted hover:text-foreground transition-colors"
+                                className="p-0.5 text-secondary hover:text-foreground transition-colors"
                               >
                                 <X className="h-3 w-3" />
                               </button>
@@ -1621,7 +1621,7 @@ export function Watchlist() {
                                 <button
                                   onClick={() => handleToggleMember(r.symbol, selectedGroup, false)}
                                   disabled={addGroupMember.isPending || removeGroupMember.isPending}
-                                  className="p-0.5 text-muted hover:text-warning transition-colors duration-150 ease-smooth disabled:opacity-50"
+                                  className="p-0.5 text-secondary hover:text-warning transition-colors duration-150 ease-smooth disabled:opacity-50"
                                   aria-label="移出当前分组"
                                   title="移出当前分组（仍保留在自选中）"
                                 >
@@ -1630,7 +1630,7 @@ export function Watchlist() {
                               )}
                               <button
                                 onClick={() => setConfirmRemove(r.symbol)}
-                                className="p-0.5 text-muted hover:text-danger transition-colors duration-150 ease-smooth"
+                                className="p-0.5 text-secondary hover:text-danger transition-colors duration-150 ease-smooth"
                                 aria-label="移除"
                                 title="从自选移除"
                               >
@@ -1639,7 +1639,7 @@ export function Watchlist() {
                               <button
                                 onClick={() => moveToTop.mutate(r.symbol)}
                                 disabled={moveToTop.isPending || allSymbols[0] === r.symbol}
-                                className="p-0.5 text-muted hover:text-accent transition-colors duration-150 ease-smooth disabled:opacity-30 disabled:hover:text-muted"
+                                className="p-0.5 text-secondary hover:text-accent transition-colors duration-150 ease-smooth disabled:opacity-30 disabled:hover:text-muted"
                                 aria-label="移到顶部"
                                 title="移到顶部"
                               >
@@ -1771,7 +1771,7 @@ export function Watchlist() {
               <div className="flex items-center justify-end gap-2">
                 <button
                   onClick={() => setConfirmClear(false)}
-                  className="px-3 py-1.5 rounded-btn bg-elevated text-secondary hover:bg-elevated/80 text-sm transition-colors"
+                  className="px-3 py-1.5 rounded-btn bg-surface border border-border text-foreground hover:bg-elevated/80 text-sm transition-colors"
                 >
                   取消
                 </button>

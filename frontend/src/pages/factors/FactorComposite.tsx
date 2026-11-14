@@ -158,7 +158,7 @@ export function FactorComposite() {
                         className="w-20 rounded-input border border-border bg-surface px-2 py-1 text-right font-mono text-xs"
                         aria-label={`${labelOf(id)} 权重`}
                       />
-                      <button type="button" onClick={() => toggleMember(id)} className="text-micro text-muted hover:text-danger">移除</button>
+                      <button type="button" onClick={() => toggleMember(id)} className="text-micro text-secondary hover:text-danger">移除</button>
                     </>
                   ) : (
                     <span className="font-mono text-xs text-secondary">{(1 / memberList.length).toFixed(3)}</span>

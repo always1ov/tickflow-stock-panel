@@ -72,10 +72,10 @@ export function FlipRuleRow({ r, onToggle, onDelete }: { r: PaperFlipRule; onTog
       </span>
       <button onClick={onToggle}
               className={cn('ml-auto shrink-0 rounded-btn px-2 py-0.5 text-micro transition-colors',
-                r.enabled ? 'bg-bear/10 text-bear hover:bg-bear/20' : 'bg-elevated text-muted hover:text-secondary')}>
+                r.enabled ? 'bg-bear/10 text-bear hover:bg-bear/20' : 'bg-surface border border-border text-foreground hover:text-secondary')}>
         {r.enabled ? '停用' : '启用'}
       </button>
-      <button onClick={onDelete} className="shrink-0 rounded-btn p-0.5 text-muted hover:text-danger" title="删除规则">
+      <button onClick={onDelete} className="shrink-0 rounded-btn p-0.5 text-secondary hover:text-danger" title="删除规则">
         <X className="h-3.5 w-3.5" />
       </button>
     </div>

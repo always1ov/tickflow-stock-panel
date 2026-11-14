@@ -228,7 +228,7 @@ function SortableCardRow({
         type="button"
         {...attributes}
         {...listeners}
-        className="no-press cursor-grab active:cursor-grabbing text-muted hover:text-foreground transition-colors shrink-0"
+        className="no-press cursor-grab active:cursor-grabbing text-secondary hover:text-foreground transition-colors shrink-0"
         title="拖动排序"
       >
         <GripVertical className="h-4 w-4" />

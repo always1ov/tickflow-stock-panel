@@ -71,14 +71,14 @@ export function LevelsDialog({ symbol, name, onClose }: { symbol: string | null;
                 <button
                   onClick={() => setMaximized(v => !v)}
                   title={maximized ? '缩小' : '放大'}
-                  className="rounded-btn p-1 text-muted transition-colors hover:bg-elevated hover:text-foreground"
+                  className="rounded-btn p-1 text-secondary transition-colors hover:bg-elevated hover:text-foreground"
                 >
                   {maximized ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
                 </button>
                 <button
                   onClick={onClose}
                   title="关闭(Esc)"
-                  className="rounded-btn p-1 text-muted transition-colors hover:bg-elevated hover:text-foreground"
+                  className="rounded-btn p-1 text-secondary transition-colors hover:bg-elevated hover:text-foreground"
                 >
                   <X className="h-4 w-4" />
                 </button>

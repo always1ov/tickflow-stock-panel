@@ -241,14 +241,14 @@ export function SettingsBackupPanel({ mode = 'all' }: { mode?: 'all' | 'export' 
             <div className="flex shrink-0 items-center gap-2 text-micro">
               <button
                 onClick={() => setExportSel(new Set(DEFAULT_EXPORT_KEYS))}
-                className="whitespace-nowrap text-muted transition-colors hover:text-accent"
+                className="whitespace-nowrap text-secondary transition-colors hover:text-accent"
               >
                 全选普通配置
               </button>
               <span className="text-border">·</span>
               <button
                 onClick={() => setExportSel(new Set())}
-                className="text-muted transition-colors hover:text-accent"
+                className="text-secondary transition-colors hover:text-accent"
               >
                清空
               </button>
@@ -335,7 +335,7 @@ export function SettingsBackupPanel({ mode = 'all' }: { mode?: 'all' | 'export' 
             <span className="min-w-0 flex-1 truncate text-xs text-foreground">{file?.name}</span>
             <button
               onClick={() => fileRef.current?.click()}
-              className="shrink-0 text-micro text-muted transition-colors hover:text-accent"
+              className="shrink-0 text-micro text-secondary transition-colors hover:text-accent"
             >
               重新选择
             </button>
@@ -422,7 +422,7 @@ export function SettingsBackupPanel({ mode = 'all' }: { mode?: 'all' | 'export' 
                   onClick={() => setAllowOverwrite((v) => !v)}
                   aria-pressed={allowOverwrite}
                   className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors duration-200 ${
-                    allowOverwrite ? 'bg-warning' : 'bg-elevated'
+                    allowOverwrite ? 'bg-warning' : 'bg-surface border border-border'
                   }`}
                 >
                   <span
@@ -562,7 +562,7 @@ export function SettingsBackupPanel({ mode = 'all' }: { mode?: 'all' | 'export' 
               <button
                 onClick={closeConfirm}
                 disabled={applyM.isPending}
-                className="rounded-btn border border-border px-3 py-1.5 text-xs text-muted transition-colors hover:text-foreground disabled:opacity-50"
+                className="rounded-btn border border-border px-3 py-1.5 text-xs text-secondary transition-colors hover:text-foreground disabled:opacity-50"
               >
                 取消
               </button>

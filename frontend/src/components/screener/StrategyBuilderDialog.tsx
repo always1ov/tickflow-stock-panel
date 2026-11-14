@@ -527,10 +527,10 @@ export function StrategyBuilderDialog({ open, onClose, onSavedId, mode = 'create
           <div className="grid grid-cols-[1fr_auto_1fr] items-center px-5 py-2.5 border-b border-border/50">
             {/* 左侧：Tab 切换 */}
             <div className="flex rounded-card bg-elevated p-0.5 w-fit">
-              <button onClick={() => { setTab('ai'); if (mode === 'create') setSource('ai') }} className={cn('px-3 py-1 rounded-btn text-xs font-medium transition-ui cursor-pointer', tab === 'ai' ? 'bg-warning/15 text-warning' : 'text-muted hover:text-foreground')}>
+              <button onClick={() => { setTab('ai'); if (mode === 'create') setSource('ai') }} className={cn('px-3 py-1 rounded-btn text-xs font-medium transition-ui cursor-pointer', tab === 'ai' ? 'bg-warning/15 text-warning' : 'text-secondary hover:text-foreground')}>
                 <Sparkles className="h-3 w-3 inline mr-1" />AI 生成
               </button>
-              <button onClick={() => { setTab('custom'); if (mode === 'create') { setSource('custom'); if (!code) setCode(templates[executionBackend]) } }} className={cn('px-3 py-1 rounded-btn text-xs font-medium transition-ui cursor-pointer', tab === 'custom' ? 'bg-accent/15 text-accent' : 'text-muted hover:text-foreground')}>
+              <button onClick={() => { setTab('custom'); if (mode === 'create') { setSource('custom'); if (!code) setCode(templates[executionBackend]) } }} className={cn('px-3 py-1 rounded-btn text-xs font-medium transition-ui cursor-pointer', tab === 'custom' ? 'bg-accent/15 text-accent' : 'text-secondary hover:text-foreground')}>
                 <FileText className="h-3 w-3 inline mr-1" />自定义编写
               </button>
             </div>
@@ -592,16 +592,16 @@ export function StrategyBuilderDialog({ open, onClose, onSavedId, mode = 'create
                   <span className="text-micro text-muted/50 uppercase tracking-wider mb-1.5 block">选股方向</span>
                   <div className="flex gap-1">
                     {DIRECTIONS.map(d => (
-                      <button key={d.value} onClick={() => setDirection(d.value)} className={'px-2.5 py-1 rounded-btn text-xs font-medium border transition-colors ' + (direction === d.value ? 'border-warning/40 bg-warning/10 text-warning' : 'border-border bg-base text-muted hover:border-warning/30')}>{d.label}</button>
+                      <button key={d.value} onClick={() => setDirection(d.value)} className={'px-2.5 py-1 rounded-btn text-xs font-medium border transition-colors ' + (direction === d.value ? 'border-warning/40 bg-warning/10 text-warning' : 'border-border bg-base text-secondary hover:border-warning/30')}>{d.label}</button>
                     ))}
                   </div>
                 </div>
                 <div>
                   <span className="text-micro text-muted/50 uppercase tracking-wider mb-1.5 block">执行后端</span>
                   <div className="flex flex-wrap gap-1">
-                    <button type="button" aria-pressed={executionBackend === 'polars_expr'} onClick={() => selectExecutionBackend('polars_expr')} className={'px-2.5 py-1 rounded-btn text-micro font-medium border transition-colors ' + (executionBackend === 'polars_expr' ? 'border-warning/40 bg-warning/10 text-warning' : 'border-border bg-base text-muted hover:border-warning/30')}>Polars 表达式</button>
-                    <button type="button" aria-pressed={executionBackend === 'matrix_native'} onClick={() => selectExecutionBackend('matrix_native')} className={'px-2.5 py-1 rounded-btn text-micro font-medium border transition-colors ' + (executionBackend === 'matrix_native' ? 'border-warning/40 bg-warning/10 text-warning' : 'border-border bg-base text-muted hover:border-warning/30')}>矩阵原生</button>
-                    <button type="button" aria-pressed={executionBackend === 'minute_filter'} onClick={() => selectExecutionBackend('minute_filter')} className={'px-2.5 py-1 rounded-btn text-micro font-medium border transition-colors focus-visible:ring-2 focus-visible:ring-accent ' + (executionBackend === 'minute_filter' ? 'border-warning/40 bg-warning/10 text-warning' : 'border-border bg-base text-muted hover:border-warning/30')}>一分钟策略</button>
+                    <button type="button" aria-pressed={executionBackend === 'polars_expr'} onClick={() => selectExecutionBackend('polars_expr')} className={'px-2.5 py-1 rounded-btn text-micro font-medium border transition-colors ' + (executionBackend === 'polars_expr' ? 'border-warning/40 bg-warning/10 text-warning' : 'border-border bg-base text-secondary hover:border-warning/30')}>Polars 表达式</button>
+                    <button type="button" aria-pressed={executionBackend === 'matrix_native'} onClick={() => selectExecutionBackend('matrix_native')} className={'px-2.5 py-1 rounded-btn text-micro font-medium border transition-colors ' + (executionBackend === 'matrix_native' ? 'border-warning/40 bg-warning/10 text-warning' : 'border-border bg-base text-secondary hover:border-warning/30')}>矩阵原生</button>
+                    <button type="button" aria-pressed={executionBackend === 'minute_filter'} onClick={() => selectExecutionBackend('minute_filter')} className={'px-2.5 py-1 rounded-btn text-micro font-medium border transition-colors focus-visible:ring-2 focus-visible:ring-accent ' + (executionBackend === 'minute_filter' ? 'border-warning/40 bg-warning/10 text-warning' : 'border-border bg-base text-secondary hover:border-warning/30')}>一分钟策略</button>
                   </div>
                 </div>
                 <div>
@@ -642,8 +642,8 @@ export function StrategyBuilderDialog({ open, onClose, onSavedId, mode = 'create
                 {/* Tab 切换 */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-0.5">
-                    <button onClick={() => setPreviewTab('params')} className={'px-3 py-1 rounded-btn text-xs font-medium transition-colors ' + (previewTab === 'params' ? 'bg-warning/15 text-warning' : 'text-muted hover:text-secondary')}>参数</button>
-                    <button onClick={() => setPreviewTab('code')} className={'px-3 py-1 rounded-btn text-xs font-medium transition-colors ' + (previewTab === 'code' ? 'bg-warning/15 text-warning' : 'text-muted hover:text-secondary')}>代码</button>
+                    <button onClick={() => setPreviewTab('params')} className={'px-3 py-1 rounded-btn text-xs font-medium transition-colors ' + (previewTab === 'params' ? 'bg-warning/15 text-warning' : 'text-secondary hover:text-secondary')}>参数</button>
+                    <button onClick={() => setPreviewTab('code')} className={'px-3 py-1 rounded-btn text-xs font-medium transition-colors ' + (previewTab === 'code' ? 'bg-warning/15 text-warning' : 'text-secondary hover:text-secondary')}>代码</button>
                   </div>
                 </div>
 
@@ -788,9 +788,9 @@ export function StrategyBuilderDialog({ open, onClose, onSavedId, mode = 'create
                 </div>
                 <div className="flex flex-wrap items-center gap-1">
                   <span className="mr-2 text-micro text-muted/50 uppercase tracking-wider">执行后端</span>
-                  <button type="button" aria-pressed={executionBackend === 'polars_expr'} onClick={() => selectExecutionBackend('polars_expr')} className={'px-2.5 py-1 rounded-btn text-micro font-medium border transition-colors ' + (executionBackend === 'polars_expr' ? 'border-accent/40 bg-accent/10 text-accent' : 'border-border bg-base text-muted')}>Polars 表达式</button>
-                  <button type="button" aria-pressed={executionBackend === 'matrix_native'} onClick={() => selectExecutionBackend('matrix_native')} className={'px-2.5 py-1 rounded-btn text-micro font-medium border transition-colors ' + (executionBackend === 'matrix_native' ? 'border-accent/40 bg-accent/10 text-accent' : 'border-border bg-base text-muted')}>矩阵原生</button>
-                  <button type="button" aria-pressed={executionBackend === 'minute_filter'} onClick={() => selectExecutionBackend('minute_filter')} className={'px-2.5 py-1 rounded-btn text-micro font-medium border transition-colors focus-visible:ring-2 focus-visible:ring-accent ' + (executionBackend === 'minute_filter' ? 'border-accent/40 bg-accent/10 text-accent' : 'border-border bg-base text-muted')}>一分钟策略</button>
+                  <button type="button" aria-pressed={executionBackend === 'polars_expr'} onClick={() => selectExecutionBackend('polars_expr')} className={'px-2.5 py-1 rounded-btn text-micro font-medium border transition-colors ' + (executionBackend === 'polars_expr' ? 'border-accent/40 bg-accent/10 text-accent' : 'border-border bg-base text-secondary')}>Polars 表达式</button>
+                  <button type="button" aria-pressed={executionBackend === 'matrix_native'} onClick={() => selectExecutionBackend('matrix_native')} className={'px-2.5 py-1 rounded-btn text-micro font-medium border transition-colors ' + (executionBackend === 'matrix_native' ? 'border-accent/40 bg-accent/10 text-accent' : 'border-border bg-base text-secondary')}>矩阵原生</button>
+                  <button type="button" aria-pressed={executionBackend === 'minute_filter'} onClick={() => selectExecutionBackend('minute_filter')} className={'px-2.5 py-1 rounded-btn text-micro font-medium border transition-colors focus-visible:ring-2 focus-visible:ring-accent ' + (executionBackend === 'minute_filter' ? 'border-accent/40 bg-accent/10 text-accent' : 'border-border bg-base text-secondary')}>一分钟策略</button>
                 </div>
                 <div className="rounded-dialog border border-border/40 bg-elevated/50 p-4 space-y-2.5">
                   <div className="flex items-center justify-between gap-2">
@@ -800,7 +800,7 @@ export function StrategyBuilderDialog({ open, onClose, onSavedId, mode = 'create
                       {validated && <span className="text-micro text-emerald-400">已校验</span>}
                     </div>
                     <button onClick={() => { navigator.clipboard.writeText(code || templates[executionBackend]); setCustomCopied(true); setTimeout(() => setCustomCopied(false), 2000) }}
-                      className={cn('inline-flex items-center gap-1 px-2 py-1 rounded-btn text-micro font-medium transition-ui cursor-pointer', customCopied ? 'bg-emerald-400/10 text-emerald-400' : 'bg-elevated text-muted hover:text-foreground hover:bg-accent/10')}>
+                      className={cn('inline-flex items-center gap-1 px-2 py-1 rounded-btn text-micro font-medium transition-ui cursor-pointer', customCopied ? 'bg-emerald-400/10 text-emerald-400' : 'bg-surface border border-border text-foreground hover:text-foreground hover:bg-accent/10')}>
                       {customCopied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
                       {customCopied ? '已复制' : '复制代码'}
                     </button>

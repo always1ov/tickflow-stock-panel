@@ -136,7 +136,7 @@ export function StockAnalysisDialog({ task, mode, minimized }: Props) {
               <div className="flex items-center gap-1 shrink-0">
                 {content && !isWorking && (
                   <button onClick={handleCopy} title="复制全文"
-                    className="p-1.5 rounded-btn hover:bg-elevated text-muted hover:text-foreground transition-colors">
+                    className="p-1.5 rounded-btn hover:bg-elevated text-secondary hover:text-foreground transition-colors">
                     {copied ? <Check className="h-4 w-4 text-bear" /> : <Copy className="h-4 w-4" />}
                   </button>
                 )}
@@ -144,19 +144,19 @@ export function StockAnalysisDialog({ task, mode, minimized }: Props) {
                   <button
                     onClick={() => { deleteReport(task.id); toast('报告已删除', 'success'); closeDialog() }}
                     title="删除这份报告"
-                    className="p-1.5 rounded-btn hover:bg-danger/10 text-muted hover:text-danger transition-colors">
+                    className="p-1.5 rounded-btn hover:bg-danger/10 text-secondary hover:text-danger transition-colors">
                     <Trash2 className="h-4 w-4" />
                   </button>
                 )}
                 {!isHistory && isWorking && (
                   <button onClick={minimizeDialog} title="最小化为气泡,后台继续生成"
-                    className="p-1.5 rounded-btn hover:bg-elevated text-muted hover:text-foreground transition-colors">
+                    className="p-1.5 rounded-btn hover:bg-elevated text-secondary hover:text-foreground transition-colors">
                     <Minimize2 className="h-4 w-4" />
                   </button>
                 )}
                 {(!isWorking || isHistory) && (
                   <button onClick={closeDialog} title="关闭"
-                    className="p-1.5 rounded-btn hover:bg-elevated text-muted hover:text-foreground transition-colors">
+                    className="p-1.5 rounded-btn hover:bg-elevated text-secondary hover:text-foreground transition-colors">
                     <X className="h-4 w-4" />
                   </button>
                 )}

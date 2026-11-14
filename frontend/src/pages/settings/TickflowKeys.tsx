@@ -132,7 +132,7 @@ export function TickflowKeys() {
                 </span>
               ))}
             <button type="button" onClick={() => setRows(list.filter((_, j) => j !== i))}
-              title="删掉这个 key" className="shrink-0 p-1 text-muted transition-colors hover:text-danger">
+              title="删掉这个 key" className="shrink-0 p-1 text-secondary transition-colors hover:text-danger">
               <Trash2 className="h-3.5 w-3.5" />
             </button>
           </div>

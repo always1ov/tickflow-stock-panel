@@ -473,7 +473,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
       <div className="rounded-card border border-border bg-surface p-5 space-y-4">
         <div className="flex items-center justify-between gap-3">
           <h3 className={TYPE.section}>{editing ? '编辑监控' : '加入监控'}</h3>
-          <button onClick={onClose} className="rounded-btn p-1 text-muted hover:bg-elevated hover:text-foreground cursor-pointer">
+          <button onClick={onClose} className="rounded-btn p-1 text-secondary hover:bg-elevated hover:text-foreground cursor-pointer">
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -530,7 +530,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
                       {operators.map(op => <option key={op} value={op}>{op}</option>)}
                     </select>
                     <input type="number" value={c.value ?? 0} onChange={e => updateCond(realIdx, { value: parseFloat(e.target.value) })} step="any" className="w-24 h-7 px-1.5 rounded-btn bg-base border border-border text-xs font-mono text-foreground text-center focus:outline-none focus:border-accent/50" />
-                    <button onClick={() => removeCond(realIdx)} className="p-1 rounded-btn text-muted hover:text-danger hover:bg-danger/10 cursor-pointer">
+                    <button onClick={() => removeCond(realIdx)} className="p-1 rounded-btn text-secondary hover:text-danger hover:bg-danger/10 cursor-pointer">
                       <X className="h-3.5 w-3.5" />
                     </button>
                   </div>
@@ -548,7 +548,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
         {error && <div className="rounded-btn border border-danger/30 bg-danger/5 px-3 py-2 text-xs text-danger">{error}</div>}
 
         <div className="flex justify-end gap-2">
-          <button onClick={onClose} className="px-4 py-1.5 rounded-btn bg-elevated text-secondary text-xs cursor-pointer">取消</button>
+          <button onClick={onClose} className="px-4 py-1.5 rounded-btn bg-surface border border-border text-foreground text-xs cursor-pointer">取消</button>
           <button onClick={() => save.mutate()} disabled={save.isPending} className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-btn bg-accent text-white text-xs font-medium disabled:opacity-50 cursor-pointer">
             <Save className="h-3.5 w-3.5" />加入监控
           </button>
@@ -565,7 +565,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
           <h3 className={TYPE.section}>{editing ? '编辑监控规则' : '新建监控规则'}</h3>
           <p className="mt-1 text-xs text-muted">规则标识自动生成,描述为可选。</p>
         </div>
-        <button onClick={onClose} className="rounded-btn p-1 text-muted hover:bg-elevated hover:text-foreground cursor-pointer">
+        <button onClick={onClose} className="rounded-btn p-1 text-secondary hover:bg-elevated hover:text-foreground cursor-pointer">
           <X className="h-4 w-4" />
         </button>
       </div>
@@ -597,7 +597,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
                   setStrategyCategory('all')
                 }}
                 className={`h-full px-4 text-xs font-medium transition-colors cursor-pointer
-                  ${assetType === t ? 'bg-accent/10 text-accent' : 'text-muted hover:text-foreground'}`}
+                  ${assetType === t ? 'bg-accent/10 text-accent' : 'text-secondary hover:text-foreground'}`}
               >
                 {t === 'stock' ? '股票' : t === 'etf' ? 'ETF' : '指数'}
               </button>
@@ -709,7 +709,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
                       setDraft(d => ({ ...d, sector_targets: [] }))
                     }}
                     className={`px-3 text-xs transition-colors cursor-pointer ${
-                      industryLevel === level ? 'bg-accent/10 text-accent' : 'text-muted hover:text-foreground'
+                      industryLevel === level ? 'bg-accent/10 text-accent' : 'text-secondary hover:text-foreground'
                     }`}
                   >
                     {level}级
@@ -798,7 +798,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
                     aria-pressed={(draft.sector_trigger ?? 'change_pct') === key}
                     onClick={() => setDraft(d => ({ ...d, sector_trigger: key }))}
                     className={`text-xs font-medium transition-colors cursor-pointer ${
-                      (draft.sector_trigger ?? 'change_pct') === key ? 'bg-accent/10 text-accent' : 'text-muted hover:text-foreground'
+                      (draft.sector_trigger ?? 'change_pct') === key ? 'bg-accent/10 text-accent' : 'text-secondary hover:text-foreground'
                     }`}
                   >
                     {label}
@@ -819,7 +819,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
                     aria-pressed={draft.direction === key}
                     onClick={() => setDraft(d => ({ ...d, direction: key }))}
                     className={`text-xs font-medium transition-colors cursor-pointer ${
-                      draft.direction === key ? 'bg-accent/10 text-accent' : 'text-muted hover:text-foreground'
+                      draft.direction === key ? 'bg-accent/10 text-accent' : 'text-secondary hover:text-foreground'
                     }`}
                   >
                     {label}
@@ -900,7 +900,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
                     aria-pressed={(draft.direction ?? 'both') === key}
                     onClick={() => setDraft(d => ({ ...d, direction: key }))}
                     className={`text-xs font-medium transition-colors cursor-pointer ${
-                      (draft.direction ?? 'both') === key ? 'bg-accent/10 text-accent' : 'text-muted hover:text-foreground'
+                      (draft.direction ?? 'both') === key ? 'bg-accent/10 text-accent' : 'text-secondary hover:text-foreground'
                     }`}
                   >
                     {label}
@@ -924,7 +924,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
                   aria-pressed={(draft.abnormal_window ?? 'any') === key}
                   onClick={() => setDraft(d => ({ ...d, abnormal_window: key }))}
                   className={`text-xs font-medium transition-colors cursor-pointer ${
-                    (draft.abnormal_window ?? 'any') === key ? 'bg-accent/10 text-accent' : 'text-muted hover:text-foreground'
+                    (draft.abnormal_window ?? 'any') === key ? 'bg-accent/10 text-accent' : 'text-secondary hover:text-foreground'
                   }`}
                 >
                   {label}
@@ -957,7 +957,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
                     aria-pressed={(draft.metric ?? 'volume') === key}
                     onClick={() => setDraft(d => ({ ...d, metric: key }))}
                     className={`text-xs font-medium transition-colors cursor-pointer ${
-                      (draft.metric ?? 'volume') === key ? 'bg-accent/10 text-accent' : 'text-muted hover:text-foreground'
+                      (draft.metric ?? 'volume') === key ? 'bg-accent/10 text-accent' : 'text-secondary hover:text-foreground'
                     }`}
                   >
                     {label}
@@ -1135,7 +1135,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
                       <button
                         type="button"
                         onClick={() => setDraft(d => ({ ...d, symbols: [] }))}
-                        className="inline-flex items-center gap-0.5 text-micro text-muted transition-colors hover:text-warning cursor-pointer"
+                        className="inline-flex items-center gap-0.5 text-micro text-secondary transition-colors hover:text-warning cursor-pointer"
                         title="移除全部标的"
                       >
                         <Eraser className="h-3 w-3" />清空
@@ -1143,7 +1143,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
                       <button
                         type="button"
                         onClick={() => setSymbolsExpanded(false)}
-                        className="inline-flex items-center gap-0.5 text-micro text-muted transition-colors hover:text-foreground cursor-pointer"
+                        className="inline-flex items-center gap-0.5 text-micro text-secondary transition-colors hover:text-foreground cursor-pointer"
                       >
                         收起<ChevronUp className="h-3 w-3" />
                       </button>
@@ -1160,7 +1160,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
                           <span className="font-mono text-micro tabular-nums text-muted">{sym}</span>
                           <button
                             onClick={() => setDraft(d => ({ ...d, symbols: d.symbols.filter(s => s !== sym) }))}
-                            className="text-muted transition-colors hover:text-danger cursor-pointer"
+                            className="text-secondary transition-colors hover:text-danger cursor-pointer"
                             title={name ? `移除 ${name}` : `移除 ${sym}`}
                           >
                             <X className="h-2.5 w-2.5" />
@@ -1315,7 +1315,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
                       {operators.map(op => <option key={op} value={op}>{op}</option>)}
                     </select>
                     <input type="number" value={c.value ?? 0} onChange={e => updateCond(realIdx, { value: parseFloat(e.target.value) })} step="any" className="w-24 h-7 px-1.5 rounded-btn bg-base border border-border text-xs font-mono text-foreground text-center focus:outline-none focus:border-accent/50" />
-                    <button onClick={() => removeCond(realIdx)} className="p-1 rounded-btn text-muted hover:text-danger hover:bg-danger/10 cursor-pointer">
+                    <button onClick={() => removeCond(realIdx)} className="p-1 rounded-btn text-secondary hover:text-danger hover:bg-danger/10 cursor-pointer">
                       <X className="h-3 w-3" />
                     </button>
                   </div>
@@ -1357,8 +1357,8 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
                   onClick={() => setStrategyCategory(category.key)}
                   className={`flex h-7 min-w-0 items-center justify-center gap-1 rounded-btn px-1 text-micro font-medium transition-colors cursor-pointer ${
                     strategyCategory === category.key
-                      ? 'bg-elevated text-foreground'
-                      : 'text-muted hover:text-secondary'
+                      ? 'bg-surface border border-border text-foreground'
+                      : 'text-foreground hover:text-secondary'
                   }`}
                 >
                   <span className="truncate">{category.label}</span>
@@ -1635,7 +1635,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
       {error && <div className="rounded-btn border border-danger/30 bg-danger/5 px-3 py-2 text-xs text-danger">{error}</div>}
 
       <div className="flex justify-end gap-2">
-        <button onClick={onClose} className="px-4 py-1.5 rounded-btn bg-elevated text-secondary text-xs cursor-pointer">取消</button>
+        <button onClick={onClose} className="px-4 py-1.5 rounded-btn bg-surface border border-border text-foreground text-xs cursor-pointer">取消</button>
         <button onClick={() => save.mutate()} disabled={save.isPending} className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-btn bg-accent text-white text-xs font-medium disabled:opacity-50 cursor-pointer">
           <Save className="h-3.5 w-3.5" />保存
         </button>

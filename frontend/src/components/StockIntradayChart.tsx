@@ -111,7 +111,7 @@ export function StockIntradayChart({
               <div className="text-xs text-muted">{minuteEmptyText('该日', true)}</div>
               <button
                 onClick={() => { setAttemptDate(date); fetchMinute.mutate() }}
-                className="px-4 py-1.5 rounded-btn bg-elevated text-secondary text-xs font-medium hover:bg-elevated/80 transition-colors duration-hover"
+                className="px-4 py-1.5 rounded-btn bg-surface border border-border text-foreground text-xs font-medium hover:bg-elevated/80 transition-colors duration-hover"
               >
                 重新获取
               </button>
@@ -138,7 +138,7 @@ export function StockIntradayChart({
                 </button>
                 <button
                   onClick={() => setMinuteDismissed(true)}
-                  className="px-4 py-1.5 rounded-btn bg-elevated text-secondary text-xs hover:bg-elevated/80 transition-colors duration-hover"
+                  className="px-4 py-1.5 rounded-btn bg-surface border border-border text-foreground text-xs hover:bg-elevated/80 transition-colors duration-hover"
                 >
                   取消
                 </button>

@@ -133,7 +133,7 @@ export function ExtDataStatCard({ config, onDelete, deleting, onEdit }: {
         <button
           onClick={() => setSettingsOpen(v => !v)}
           aria-label={`${config.label}设置`}
-          className="shrink-0 p-1.5 rounded-btn hover:bg-elevated/70 transition-colors text-muted hover:text-secondary"
+          className="shrink-0 p-1.5 rounded-btn hover:bg-elevated/70 transition-colors text-secondary hover:text-secondary"
         >
           <Settings className="h-3.5 w-3.5" />
         </button>
@@ -173,7 +173,7 @@ export function ExtDataStatCard({ config, onDelete, deleting, onEdit }: {
           {fieldsExpanded && fieldsOverflow && (
             <button
               onClick={() => setFieldsExpanded(false)}
-              className="w-full flex items-center justify-center pt-1.5 text-muted hover:text-secondary transition-colors"
+              className="w-full flex items-center justify-center pt-1.5 text-secondary hover:text-secondary transition-colors"
               title="收起字段"
             >
               <ChevronUp className="h-3 w-3" />
@@ -183,7 +183,7 @@ export function ExtDataStatCard({ config, onDelete, deleting, onEdit }: {
         {fieldsOverflow && !fieldsExpanded && (
           <button
             onClick={() => setFieldsExpanded(true)}
-            className="mx-auto mt-1 flex items-center rounded-full border border-border/60 bg-elevated/60 px-2.5 py-0.5 text-muted hover:text-secondary hover:border-border transition-colors"
+            className="mx-auto mt-1 flex items-center rounded-full border border-border/60 bg-elevated/60 px-2.5 py-0.5 text-foreground hover:text-secondary hover:border-border transition-colors"
             title="展开全部字段"
           >
             <ChevronDown className="h-3 w-3" />
@@ -245,7 +245,7 @@ export function ExtDataStatCard({ config, onDelete, deleting, onEdit }: {
                   <button
                     onClick={() => setIngestTab('pull')}
                     className={`inline-flex items-center justify-center gap-1.5 h-9 rounded-card text-xs font-medium transition-all ${
-                      ingestTab === 'pull' ? 'bg-surface text-foreground shadow-sm' : 'text-muted hover:text-secondary hover:bg-elevated/40'
+                      ingestTab === 'pull' ? 'bg-surface text-foreground shadow-sm' : 'text-secondary hover:text-secondary hover:bg-elevated/40'
                     }`}
                   >
                     <RefreshCw className="h-3.5 w-3.5" />拉取
@@ -253,7 +253,7 @@ export function ExtDataStatCard({ config, onDelete, deleting, onEdit }: {
                   <button
                     onClick={() => setIngestTab('api')}
                     className={`inline-flex items-center justify-center gap-1.5 h-9 rounded-card text-xs font-medium transition-all ${
-                      ingestTab === 'api' ? 'bg-surface text-foreground shadow-sm' : 'text-muted hover:text-secondary hover:bg-elevated/40'
+                      ingestTab === 'api' ? 'bg-surface text-foreground shadow-sm' : 'text-secondary hover:text-secondary hover:bg-elevated/40'
                     }`}
                   >
                     <Code className="h-3.5 w-3.5" />推送
@@ -261,7 +261,7 @@ export function ExtDataStatCard({ config, onDelete, deleting, onEdit }: {
                   <button
                     onClick={() => setIngestTab('file')}
                     className={`inline-flex items-center justify-center gap-1.5 h-9 rounded-card text-xs font-medium transition-all ${
-                      ingestTab === 'file' ? 'bg-surface text-foreground shadow-sm' : 'text-muted hover:text-secondary hover:bg-elevated/40'
+                      ingestTab === 'file' ? 'bg-surface text-foreground shadow-sm' : 'text-secondary hover:text-secondary hover:bg-elevated/40'
                     }`}
                   >
                     <Upload className="h-3.5 w-3.5" />上传
@@ -328,7 +328,7 @@ export function ExtDataStatCard({ config, onDelete, deleting, onEdit }: {
                     <button
                       onClick={() => { setSettingsOpen(false); onEdit() }}
                       title="编辑名称、描述与字段定义"
-                      className="inline-flex items-center gap-1 h-7 px-2.5 rounded-card text-micro text-muted hover:text-foreground hover:bg-elevated focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-colors"
+                      className="inline-flex items-center gap-1 h-7 px-2.5 rounded-card text-micro text-secondary hover:text-foreground hover:bg-elevated focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-colors"
                     >
                       <Pencil className="h-3 w-3" />
                       编辑配置
@@ -344,7 +344,7 @@ export function ExtDataStatCard({ config, onDelete, deleting, onEdit }: {
                       })
                     }}
                     title="历史数据 symbol 列缺交易所后缀时批量补全 (600000 → 600000.SH)"
-                    className="inline-flex items-center gap-1 h-7 px-2.5 rounded-card text-micro text-muted hover:text-foreground hover:bg-elevated focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-colors"
+                    className="inline-flex items-center gap-1 h-7 px-2.5 rounded-card text-micro text-secondary hover:text-foreground hover:bg-elevated focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-colors"
                   >
                     <Tag className="h-3 w-3" />
                     修复代码格式
@@ -400,7 +400,7 @@ export function ExtDataStatCard({ config, onDelete, deleting, onEdit }: {
                 <button
                   onClick={() => setShowDelete(false)}
                   disabled={deleting}
-                  className="px-3 py-1.5 rounded-btn bg-elevated text-secondary hover:bg-elevated/80 text-sm transition-colors disabled:opacity-50"
+                  className="px-3 py-1.5 rounded-btn bg-surface border border-border text-foreground hover:bg-elevated/80 text-sm transition-colors disabled:opacity-50"
                 >
                   取消
                 </button>

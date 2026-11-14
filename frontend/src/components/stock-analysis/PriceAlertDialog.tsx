@@ -302,7 +302,7 @@ export function PriceAlertDialog({
             { key: 'create', label: '新建提醒' },
             { key: 'existing', label: `已有提醒 ${pointRules.length}` },
           ] as const).map(item => (
-            <button key={item.key} onClick={() => setTab(item.key)} className={`relative px-4 text-xs font-medium transition-colors ${tab === item.key ? 'text-sky-400' : 'text-muted hover:text-foreground'}`}>
+            <button key={item.key} onClick={() => setTab(item.key)} className={`relative px-4 text-xs font-medium transition-colors ${tab === item.key ? 'text-sky-400' : 'text-secondary hover:text-foreground'}`}>
               {item.label}
               {tab === item.key && <span className="absolute inset-x-2 bottom-0 h-0.5 bg-sky-400" />}
             </button>
@@ -315,10 +315,10 @@ export function PriceAlertDialog({
               <div className="space-y-1.5">
                 <span className="text-xs text-muted">触发方向</span>
                 <div className="grid h-9 grid-cols-2 overflow-hidden rounded-btn border border-border bg-base">
-                  <button onClick={() => setDirection('up')} className={`inline-flex items-center justify-center gap-1 text-xs font-medium transition-colors ${direction === 'up' ? 'bg-bull/10 text-bull' : 'text-muted hover:text-foreground'}`}>
+                  <button onClick={() => setDirection('up')} className={`inline-flex items-center justify-center gap-1 text-xs font-medium transition-colors ${direction === 'up' ? 'bg-bull/10 text-bull' : 'text-secondary hover:text-foreground'}`}>
                     <ArrowUp className="h-3.5 w-3.5" />涨至
                   </button>
-                  <button onClick={() => setDirection('down')} className={`inline-flex items-center justify-center gap-1 border-l border-border text-xs font-medium transition-colors ${direction === 'down' ? 'bg-bear/10 text-bear' : 'text-muted hover:text-foreground'}`}>
+                  <button onClick={() => setDirection('down')} className={`inline-flex items-center justify-center gap-1 border-l border-border text-xs font-medium transition-colors ${direction === 'down' ? 'bg-bear/10 text-bear' : 'text-secondary hover:text-foreground'}`}>
                     <ArrowDown className="h-3.5 w-3.5" />跌至
                   </button>
                 </div>
@@ -369,7 +369,7 @@ export function PriceAlertDialog({
                         channels.includes(c.key)
                           ? 'border-sky-400/50 bg-sky-400/15 text-sky-300 cursor-pointer'
                           : c.configured
-                            ? 'border-border/60 bg-surface text-muted hover:text-foreground cursor-pointer'
+                            ? 'border-border/60 bg-surface text-secondary hover:text-foreground cursor-pointer'
                             : 'border-border/40 text-muted/40 cursor-not-allowed'
                       }`}
                     >
@@ -508,13 +508,13 @@ export function PriceAlertDialog({
                         <span className="block truncate text-xs text-foreground">{rule.name}</span>
                         <span className="mt-0.5 block font-mono text-micro text-muted">{isUp ? '涨至' : '跌至'} {fmtAssetPrice(alert.target, assetType)} · {COOLDOWNS.find(item => item.value === rule.cooldown_seconds)?.label ?? `${rule.cooldown_seconds} 秒`}</span>
                       </span>
-                      <button role="switch" aria-checked={rule.enabled} onClick={() => toggle.mutate(rule)} disabled={toggle.isPending} className={`relative h-5 w-9 shrink-0 rounded-full transition-colors ${rule.enabled ? 'bg-sky-500' : 'bg-elevated'}`} title={rule.enabled ? '停用' : '启用'}>
+                      <button role="switch" aria-checked={rule.enabled} onClick={() => toggle.mutate(rule)} disabled={toggle.isPending} className={`relative h-5 w-9 shrink-0 rounded-full transition-colors ${rule.enabled ? 'bg-sky-500' : 'bg-surface border border-border'}`} title={rule.enabled ? '停用' : '启用'}>
                         <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${rule.enabled ? 'translate-x-[18px]' : 'translate-x-0.5'}`} />
                       </button>
                       {confirmDelete === rule.id ? (
                         <button onClick={() => remove.mutate(rule.id)} disabled={remove.isPending} className="h-7 rounded-btn border border-danger/30 bg-danger/10 px-2 text-micro text-danger">确认</button>
                       ) : (
-                        <button onClick={() => setConfirmDelete(rule.id)} className="rounded-btn p-1.5 text-muted hover:bg-danger/10 hover:text-danger" title="删除">
+                        <button onClick={() => setConfirmDelete(rule.id)} className="rounded-btn p-1.5 text-secondary hover:bg-danger/10 hover:text-danger" title="删除">
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
                       )}

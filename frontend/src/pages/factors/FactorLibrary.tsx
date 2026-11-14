@@ -207,7 +207,7 @@ export function FactorLibrary({ onInspect, onEdit }: { onInspect: (factorId: str
                         type="button"
                         onClick={event => { event.stopPropagation(); setArchived.mutate({ id: item.id, archived: !item.archived }) }}
                         disabled={setArchived.isPending}
-                        className={buttonClass({ variant: 'ghost', size: 'xs' }, 'ml-1 gap-1 text-muted disabled:opacity-40')}
+                        className={buttonClass({ variant: 'ghost', size: 'xs' }, 'ml-1 gap-1 text-secondary disabled:opacity-40')}
                         title={item.archived ? '恢复到因子库 (归档可逆, 不影响计算)' : '归档到档案库 (可恢复, 不删除因子)'}
                       >
                         {item.archived ? <><ArchiveRestore className="h-3 w-3" />恢复</> : <><Archive className="h-3 w-3" />归档</>}

@@ -113,7 +113,7 @@ export function LightweightIntraday({ symbol, assetType, data, sessions: supplie
           disabled={option === 'limit' && !limits} title={option === 'adaptive'
             ? scale?.centered ? '以昨收为中轴，按最大涨跌幅对称适配' : '按分时最高、最低点自动适配'
             : !limits ? '当日无有效涨跌停价格' : undefined}
-          onClick={() => setYMode(option)} className={`rounded-btn px-2 py-0.5 text-micro transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 disabled:cursor-not-allowed disabled:opacity-40 ${mode === option ? 'bg-accent/15 text-accent' : 'text-muted hover:text-foreground'}`}>
+          onClick={() => setYMode(option)} className={`rounded-btn px-2 py-0.5 text-micro transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 disabled:cursor-not-allowed disabled:opacity-40 ${mode === option ? 'bg-accent/15 text-accent' : 'text-secondary hover:text-foreground'}`}>
           {option === 'adaptive' ? '自适应' : '涨跌停'}
         </button>)}
       </div>}

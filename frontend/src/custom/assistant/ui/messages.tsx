@@ -332,7 +332,7 @@ export const NoticeMessage = memo(function NoticeMessage({
     <button
       type="button"
       onClick={onRetry}
-      className="mx-auto block text-center text-xs text-muted hover:text-accent cursor-pointer transition-colors"
+      className="mx-auto block text-center text-xs text-secondary hover:text-accent cursor-pointer transition-colors"
     >
       {content}
     </button>

@@ -220,7 +220,7 @@ function SortableActiveCol({ col, onRemove, onConfig, configOpen, extTableLabel,
             className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-btn text-micro transition-colors shrink-0 ${
               col.standalone
                 ? 'text-accent bg-accent/10'
-                : 'text-muted hover:text-secondary opacity-0 group-hover:opacity-100'
+                : 'text-secondary hover:text-secondary opacity-0 group-hover:opacity-100'
             }`}
             title={col.standalone ? '取消单独显示' : '单独一行显示'}
           >
@@ -230,7 +230,7 @@ function SortableActiveCol({ col, onRemove, onConfig, configOpen, extTableLabel,
         {hasConfig && (
           <button
             onClick={() => onConfig(configOpen ? null : col.id)}
-            className={`shrink-0 p-1 rounded-btn transition-colors ${configOpen ? 'text-accent bg-accent/10' : 'text-muted hover:text-accent hover:bg-elevated'}`}
+            className={`shrink-0 p-1 rounded-btn transition-colors ${configOpen ? 'text-accent bg-accent/10' : 'text-secondary hover:text-accent hover:bg-elevated'}`}
             title={configOpen ? '收起配置' : '配置'}
           >
             <Settings2 className="h-3.5 w-3.5" />
@@ -238,7 +238,7 @@ function SortableActiveCol({ col, onRemove, onConfig, configOpen, extTableLabel,
         )}
         <button
           onClick={() => onRemove(col.id)}
-          className="shrink-0 p-1 rounded-btn text-muted hover:text-danger hover:bg-elevated transition-colors"
+          className="shrink-0 p-1 rounded-btn text-secondary hover:text-danger hover:bg-elevated transition-colors"
           title="移出列表"
         >
           <X className="h-3.5 w-3.5" />
@@ -607,7 +607,7 @@ function extGranularityOf(
                       updateExtDisplay(col.id, { hiddenIndices: next.length ? next : undefined })
                     }}
                     className={`w-6 h-6 rounded-btn text-micro font-medium transition-colors ${
-                      hidden ? 'bg-elevated text-muted line-through' : 'bg-accent/15 text-accent'
+                      hidden ? 'bg-surface border border-border text-foreground line-through' : 'bg-accent/15 text-accent'
                     }`}
                   >
                     {i + 1}
@@ -625,14 +625,14 @@ function extGranularityOf(
                 onClick={() => updateExtDisplay(col.id, { tagLayout: 'horizontal' })}
                 className={`px-3 py-1 text-xs transition-colors ${
                   (col.extDisplay?.tagLayout ?? 'horizontal') === 'horizontal'
-                    ? 'bg-accent/15 text-accent' : 'bg-elevated text-secondary hover:text-foreground'
+                    ? 'bg-accent/15 text-accent' : 'bg-surface border border-border text-foreground hover:text-foreground'
                 }`}
               >横向</button>
               <button
                 onClick={() => updateExtDisplay(col.id, { tagLayout: 'vertical' })}
                 className={`px-3 py-1 text-xs transition-colors border-l border-border ${
                   col.extDisplay?.tagLayout === 'vertical'
-                    ? 'bg-accent/15 text-accent' : 'bg-elevated text-secondary hover:text-foreground'
+                    ? 'bg-accent/15 text-accent' : 'bg-surface text-foreground hover:text-foreground'
                 }`}
               >竖向</button>
             </div>
@@ -772,7 +772,7 @@ function extGranularityOf(
                 type="button"
                 onClick={() => updateExtDisplay(col.id, { thousandSeparator: !col.extDisplay?.thousandSeparator })}
                 className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors duration-200 cursor-pointer ${
-                  col.extDisplay?.thousandSeparator ? 'bg-accent' : 'bg-elevated'
+                  col.extDisplay?.thousandSeparator ? 'bg-accent' : 'bg-surface border border-border'
                 }`}
                 aria-pressed={!!col.extDisplay?.thousandSeparator}
               >
@@ -811,7 +811,7 @@ function extGranularityOf(
         )}
         {col.extDisplay && (
           <div className="flex justify-end pt-1">
-            <button onClick={() => resetExtDisplay(col.id)} className="text-micro text-muted hover:text-foreground transition-colors">
+            <button onClick={() => resetExtDisplay(col.id)} className="text-micro text-secondary hover:text-foreground transition-colors">
               恢复默认
             </button>
           </div>
@@ -859,7 +859,7 @@ function extGranularityOf(
                       updateExtDisplay(col.id, { hiddenIndices: next.length ? next : undefined })
                     }}
                     className={`w-6 h-6 rounded-btn text-micro font-medium transition-colors ${
-                      hidden ? 'bg-elevated text-muted line-through' : 'bg-accent/15 text-accent'
+                      hidden ? 'bg-surface border border-border text-foreground line-through' : 'bg-accent/15 text-accent'
                     }`}
                   >
                     {i + 1}
@@ -876,21 +876,21 @@ function extGranularityOf(
               onClick={() => updateExtDisplay(col.id, { tagLayout: 'horizontal' })}
               className={`px-3 py-1 text-xs transition-colors ${
                 (col.extDisplay?.tagLayout ?? 'horizontal') === 'horizontal'
-                  ? 'bg-accent/15 text-accent' : 'bg-elevated text-secondary hover:text-foreground'
+                  ? 'bg-accent/15 text-accent' : 'bg-surface border border-border text-foreground hover:text-foreground'
               }`}
             >横向</button>
             <button
               onClick={() => updateExtDisplay(col.id, { tagLayout: 'vertical' })}
               className={`px-3 py-1 text-xs transition-colors border-l border-border ${
                 col.extDisplay?.tagLayout === 'vertical'
-                  ? 'bg-accent/15 text-accent' : 'bg-elevated text-secondary hover:text-foreground'
+                  ? 'bg-accent/15 text-accent' : 'bg-surface text-foreground hover:text-foreground'
               }`}
             >竖向</button>
           </div>
         </label>
         {col.extDisplay && (
           <div className="flex justify-end pt-1">
-            <button onClick={() => resetExtDisplay(col.id)} className="text-micro text-muted hover:text-foreground transition-colors">
+            <button onClick={() => resetExtDisplay(col.id)} className="text-micro text-secondary hover:text-foreground transition-colors">
               恢复默认
             </button>
           </div>
@@ -1033,7 +1033,7 @@ function extGranularityOf(
             <button
               type="button"
               onClick={() => updateCandleConfig(col.id, { volume: !cfg.volume })}
-              className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors duration-200 cursor-pointer ${cfg.volume ? 'bg-accent' : 'bg-elevated'}`}
+              className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors duration-200 cursor-pointer ${cfg.volume ? 'bg-accent' : 'bg-surface border border-border'}`}
               aria-pressed={cfg.volume}
               aria-label="显示成交量副图"
             >
@@ -1057,7 +1057,7 @@ function extGranularityOf(
           </div>
           {col.candleConfig && (
             <div className="flex justify-end pt-1">
-              <button onClick={() => resetCandleConfig(col.id)} className="text-micro text-muted hover:text-foreground transition-colors">
+              <button onClick={() => resetCandleConfig(col.id)} className="text-micro text-secondary hover:text-foreground transition-colors">
                 恢复默认
               </button>
             </div>
@@ -1189,7 +1189,7 @@ function extGranularityOf(
             <button
               type="button"
               onClick={() => updateIntradayConfig(col.id, { volume: !cfg.volume })}
-              className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors duration-200 cursor-pointer ${cfg.volume ? 'bg-accent' : 'bg-elevated'}`}
+              className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors duration-200 cursor-pointer ${cfg.volume ? 'bg-accent' : 'bg-surface border border-border'}`}
               aria-pressed={cfg.volume}
               aria-label="显示成交量副图"
             >
@@ -1207,7 +1207,7 @@ function extGranularityOf(
               type="button"
               onClick={() => updateAuction({ enabled: !auction?.enabled })}
               className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors duration-200 cursor-pointer ${
-                auction?.enabled ? 'bg-accent' : 'bg-elevated'
+                auction?.enabled ? 'bg-accent' : 'bg-surface border border-border'
               }`}
               aria-pressed={!!auction?.enabled}
               aria-label="显示集合竞价窄栏"
@@ -1257,7 +1257,7 @@ function extGranularityOf(
                           onClick={() => updateAuction({ width: v })}
                           className={`px-3 py-1 text-xs transition-colors ${i > 0 ? 'border-l border-border' : ''} ${
                             cfg.auctionWidth === v
-                              ? 'bg-accent/15 text-accent' : 'bg-elevated text-secondary hover:text-foreground'
+                              ? 'bg-accent/15 text-accent' : 'bg-surface text-foreground hover:text-foreground'
                           }`}
                         >{text}</button>
                       ))}
@@ -1280,7 +1280,7 @@ function extGranularityOf(
                             className={`px-2 py-1 rounded-btn border text-micro transition-colors cursor-pointer ${
                               c.added
                                 ? 'bg-accent/15 border-accent/40 text-accent'
-                                : 'bg-elevated border-border text-secondary hover:text-foreground'
+                                : 'bg-surface border-border text-foreground hover:text-foreground'
                             }`}
                             aria-pressed={c.added}
                           >
@@ -1316,7 +1316,7 @@ function extGranularityOf(
 
           {col.intradayConfig && (
             <div className="flex justify-end pt-1">
-              <button onClick={() => resetIntradayConfig(col.id)} className="text-micro text-muted hover:text-foreground transition-colors">
+              <button onClick={() => resetIntradayConfig(col.id)} className="text-micro text-secondary hover:text-foreground transition-colors">
                 恢复默认
               </button>
             </div>
@@ -1351,7 +1351,7 @@ function extGranularityOf(
           className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-btn text-micro transition-colors shrink-0 ${
             col.standalone
               ? 'text-accent bg-accent/10'
-              : 'text-muted hover:text-secondary'
+              : 'text-secondary hover:text-secondary'
           }`}
           title={col.standalone ? '取消单独显示' : '单独一行显示'}
         >
@@ -1410,13 +1410,13 @@ function extGranularityOf(
               {baselineStore && (
                 <button
                   onClick={saveAsBaseline}
-                  className="ml-auto sm:ml-0 shrink-0 h-7 px-2.5 rounded-btn bg-elevated border border-border text-micro text-secondary hover:text-foreground hover:border-accent/50 transition-colors"
+                  className="ml-auto sm:ml-0 shrink-0 h-7 px-2.5 rounded-btn bg-surface border border-border text-micro text-foreground hover:text-foreground hover:border-accent/50 transition-colors"
                   title="把当前列配置存为默认方案；之后「恢复默认」回到这份设置"
                 >
                   {baselineSavedAt && Date.now() - baselineSavedAt < 2000 ? '✓ 已保存' : '保存为默认方案'}
                 </button>
               )}
-              <button onClick={onClose} aria-label="关闭列设置" className="p-1 rounded-btn hover:bg-elevated text-muted hover:text-foreground transition-colors shrink-0">
+              <button onClick={onClose} aria-label="关闭列设置" className="p-1 rounded-btn hover:bg-elevated text-secondary hover:text-foreground transition-colors shrink-0">
                 <X className="h-4 w-4" />
               </button>
             </div>
@@ -1545,7 +1545,7 @@ function extGranularityOf(
                     <span className="text-micro text-muted tabular-nums">{activeCols.length} 列</span>
                     <button
                       onClick={() => setConfirmReset(true)}
-                      className="text-micro text-muted hover:text-foreground transition-colors"
+                      className="text-micro text-secondary hover:text-foreground transition-colors"
                     >
                       恢复默认
                     </button>
@@ -1603,7 +1603,7 @@ function extGranularityOf(
                   <div className="flex justify-end gap-2 mt-3.5">
                     <button
                       onClick={() => setConfirmReset(false)}
-                      className="px-3 py-1.5 rounded-btn bg-elevated text-secondary hover:bg-elevated/80 text-xs transition-colors"
+                      className="px-3 py-1.5 rounded-btn bg-surface border border-border text-foreground hover:bg-elevated/80 text-xs transition-colors"
                     >
                       取消
                     </button>

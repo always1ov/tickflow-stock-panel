@@ -111,7 +111,7 @@ export function ConditionEditor({ conditions, onChange, options, max = 8, title,
               )}
 
               {(conditions.length > 1 || allowEmpty) && (
-                <button onClick={() => removeCond(i)} aria-label="删除条件" className="p-1 rounded-btn text-muted hover:text-danger hover:bg-danger/10 cursor-pointer">
+                <button onClick={() => removeCond(i)} aria-label="删除条件" className="p-1 rounded-btn text-secondary hover:text-danger hover:bg-danger/10 cursor-pointer">
                   <X className="h-3 w-3" />
                 </button>
               )}
@@ -181,7 +181,7 @@ function FieldPicker({ value, fields, groups, onChange }: {
                 <div className="p-3 border-b border-border/50 space-y-2.5">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-medium text-foreground">选择字段</span>
-                    <button onClick={() => setOpen(false)} className="rounded-btn p-1 text-muted hover:bg-elevated hover:text-foreground transition-colors">
+                    <button onClick={() => setOpen(false)} className="rounded-btn p-1 text-secondary hover:bg-elevated hover:text-foreground transition-colors">
                       <X className="h-3.5 w-3.5" />
                     </button>
                   </div>
@@ -194,7 +194,7 @@ function FieldPicker({ value, fields, groups, onChange }: {
                       placeholder="搜索字段…"
                       className="flex-1 bg-transparent text-xs text-foreground focus:outline-none"
                     />
-                    {query && <button onClick={() => setQuery('')} className="text-muted hover:text-foreground"><X className="h-3 w-3" /></button>}
+                    {query && <button onClick={() => setQuery('')} className="text-secondary hover:text-foreground"><X className="h-3 w-3" /></button>}
                   </div>
                 </div>
                 {/* 分组列表 */}
@@ -251,7 +251,7 @@ function DaysInput({ value, max, onChange }: { value: number; max: number; onCha
         type="button"
         onClick={() => onChange(1)}
         title="点击切换为「前N日」(取 N 个交易日前的值)"
-        className="h-7 px-2 rounded-btn bg-base border border-border text-micro text-muted hover:text-accent hover:border-accent/50 transition-colors shrink-0 cursor-pointer"
+        className="h-7 px-2 rounded-btn bg-base border border-border text-micro text-secondary hover:text-accent hover:border-accent/50 transition-colors shrink-0 cursor-pointer"
       >
         最新
       </button>
@@ -278,7 +278,7 @@ function DaysInput({ value, max, onChange }: { value: number; max: number; onCha
         type="button"
         onClick={() => onChange(0)}
         title="切回「最新」"
-        className="pr-1.5 pl-0.5 text-micro text-muted hover:text-accent transition-colors cursor-pointer"
+        className="pr-1.5 pl-0.5 text-micro text-secondary hover:text-accent transition-colors cursor-pointer"
       >
         日
       </button>
@@ -310,7 +310,7 @@ function RightValueInput({ cond, fields, groups, maxDays, hideDays, onChangeRigh
         <>
           {!hideDays && <DaysInput value={cond.rightDays ?? 0} max={maxDays} onChange={onChangeDays} />}
           <FieldPicker value={fieldValue} fields={fields} groups={groups} onChange={v => onChangeRight(`field:${v}`)} />
-          <button onClick={() => onChangeRight('0')} title="切换为数字" className="p-0.5 rounded-btn text-muted hover:text-accent cursor-pointer shrink-0">
+          <button onClick={() => onChangeRight('0')} title="切换为数字" className="p-0.5 rounded-btn text-secondary hover:text-accent cursor-pointer shrink-0">
             <ArrowRight className="h-3 w-3 rotate-90" />
           </button>
         </>
@@ -320,7 +320,7 @@ function RightValueInput({ cond, fields, groups, maxDays, hideDays, onChangeRigh
           {!hideDays && <div className="shrink-0" style={{ width: 44 }} />}
           <input type="number" value={numValue} onChange={e => onChangeRight(e.target.value)} step="any"
             className="flex-1 min-w-0 h-7 px-1.5 rounded-btn bg-base border border-border text-micro font-mono text-foreground text-center focus:outline-none focus:border-accent/50" />
-          <button onClick={() => onChangeRight('field:close')} title="切换为字段" className="p-0.5 rounded-btn text-muted hover:text-accent cursor-pointer shrink-0">
+          <button onClick={() => onChangeRight('field:close')} title="切换为字段" className="p-0.5 rounded-btn text-secondary hover:text-accent cursor-pointer shrink-0">
             <ArrowRight className="h-3 w-3 -rotate-90" />
           </button>
         </>

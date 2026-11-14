@@ -217,7 +217,7 @@ export function Analysis() {
                     <button
                       key={f.name}
                       onClick={() => setSelectedColumns(cols => active ? cols.filter(c => c !== f.name) : [...cols, f.name])}
-                      className={`rounded-full border px-3 py-1 text-micro transition-colors ${active ? 'border-accent/40 bg-accent/10 text-accent' : 'border-border bg-elevated/40 text-secondary hover:bg-elevated'}`}
+                      className={`rounded-full border px-3 py-1 text-micro transition-colors ${active ? 'border-accent/40 bg-accent/10 text-accent' : 'border-border bg-elevated/40 text-foreground hover:bg-elevated'}`}
                     >
                       {f.label || f.name}
                     </button>
@@ -229,7 +229,7 @@ export function Analysis() {
             {error && <div className="rounded-btn border border-danger/30 bg-danger/5 px-3 py-2 text-xs text-danger">{error}</div>}
 
             <div className="flex justify-end gap-2">
-              <button onClick={() => setShowCreate(false)} className="px-4 py-1.5 rounded-btn bg-elevated text-secondary text-xs">取消</button>
+              <button onClick={() => setShowCreate(false)} className="px-4 py-1.5 rounded-btn bg-surface border border-border text-foreground text-xs">取消</button>
               <button onClick={() => save.mutate()} disabled={save.isPending} className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-btn bg-accent/90 text-white text-xs font-medium disabled:opacity-50">
                 <Save className="h-3.5 w-3.5" />保存
               </button>
@@ -249,7 +249,7 @@ export function Analysis() {
                   <button
                     onClick={() => moveMenu(idx, -1)}
                     disabled={idx === 0 || reorder.isPending}
-                    className="p-1 rounded-btn text-muted hover:text-accent hover:bg-accent/10 disabled:opacity-30"
+                    className="p-1 rounded-btn text-secondary hover:text-accent hover:bg-accent/10 disabled:opacity-30"
                     title="上移"
                   >
                     <ChevronUp className="h-3.5 w-3.5" />
@@ -257,7 +257,7 @@ export function Analysis() {
                   <button
                     onClick={() => moveMenu(idx, 1)}
                     disabled={idx === menuItems.length - 1 || reorder.isPending}
-                    className="p-1 rounded-btn text-muted hover:text-accent hover:bg-accent/10 disabled:opacity-30"
+                    className="p-1 rounded-btn text-secondary hover:text-accent hover:bg-accent/10 disabled:opacity-30"
                     title="下移"
                   >
                     <ChevronDown className="h-3.5 w-3.5" />
@@ -265,7 +265,7 @@ export function Analysis() {
                   {menu.builtin ? (
                     <span className="rounded-btn bg-accent/10 px-1.5 py-0.5 text-micro text-accent">默认</span>
                   ) : (
-                    <button onClick={() => del.mutate(menu.id)} disabled={del.isPending} className="p-1 rounded-btn text-muted hover:text-danger hover:bg-danger/10">
+                    <button onClick={() => del.mutate(menu.id)} disabled={del.isPending} className="p-1 rounded-btn text-secondary hover:text-danger hover:bg-danger/10">
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   )}

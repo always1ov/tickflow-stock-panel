@@ -50,7 +50,7 @@ export function GroupStatsSettings({
         className={`inline-flex h-5 w-5 items-center justify-center rounded-btn transition-colors ${
           open
             ? 'text-accent bg-accent/10'
-            : 'text-muted hover:text-foreground hover:bg-elevated'
+            : 'text-secondary hover:text-foreground hover:bg-elevated'
         }`}
       >
         <SlidersHorizontal className="h-3 w-3" />
@@ -68,7 +68,7 @@ export function GroupStatsSettings({
                 className={`px-2 py-0.5 rounded-btn text-micro transition-colors ${
                   config.metric === m.id
                     ? 'bg-accent/15 text-accent'
-                    : 'bg-elevated text-secondary hover:text-foreground hover:bg-elevated/80'
+                    : 'bg-surface border border-border text-foreground hover:text-foreground hover:bg-elevated/80'
                 }`}
               >
                 {m.label}
@@ -85,7 +85,7 @@ export function GroupStatsSettings({
                 className={`px-2 py-0.5 rounded-btn text-micro transition-colors ${
                   config.sort === s.id
                     ? 'bg-accent/15 text-accent'
-                    : 'bg-elevated text-secondary hover:text-foreground hover:bg-elevated/80'
+                    : 'bg-surface border border-border text-foreground hover:text-foreground hover:bg-elevated/80'
                 }`}
               >
                 {s.label}
@@ -101,7 +101,7 @@ export function GroupStatsSettings({
                   aria-label="减少卡片显示条数"
                   disabled={config.cardTopN <= GROUP_CARD_TOP_N_MIN}
                   onClick={() => onChange({ cardTopN: config.cardTopN - 1 })}
-                  className="inline-flex h-5 w-5 items-center justify-center rounded-btn bg-elevated text-secondary transition-colors hover:text-foreground hover:bg-elevated/80 disabled:cursor-not-allowed disabled:opacity-40"
+                  className="inline-flex h-5 w-5 items-center justify-center rounded-btn bg-surface border border-border text-foreground transition-colors hover:text-foreground hover:bg-elevated/80 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   <Minus className="h-3 w-3" />
                 </button>
@@ -113,7 +113,7 @@ export function GroupStatsSettings({
                   aria-label="增加卡片显示条数"
                   disabled={config.cardTopN >= GROUP_CARD_TOP_N_MAX}
                   onClick={() => onChange({ cardTopN: config.cardTopN + 1 })}
-                  className="inline-flex h-5 w-5 items-center justify-center rounded-btn bg-elevated text-secondary transition-colors hover:text-foreground hover:bg-elevated/80 disabled:cursor-not-allowed disabled:opacity-40"
+                  className="inline-flex h-5 w-5 items-center justify-center rounded-btn bg-surface border border-border text-foreground transition-colors hover:text-foreground hover:bg-elevated/80 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   <Plus className="h-3 w-3" />
                 </button>
@@ -128,7 +128,7 @@ export function GroupStatsSettings({
                     aria-label="切换卡片头部颜色"
                     onClick={() => onChange({ cardColorBar: !config.cardColorBar })}
                     className={`relative h-4 w-7 shrink-0 rounded-full transition-colors ${
-                      config.cardColorBar ? 'bg-accent/60' : 'bg-elevated hover:bg-elevated/80'
+                      config.cardColorBar ? 'bg-accent/60' : 'bg-surface border border-border hover:bg-elevated/80'
                     }`}
                   >
                     <span
@@ -147,7 +147,7 @@ export function GroupStatsSettings({
                     aria-label="切换卡片序号显示"
                     onClick={() => onChange({ cardRank: !config.cardRank })}
                     className={`relative h-4 w-7 shrink-0 rounded-full transition-colors ${
-                      config.cardRank ? 'bg-accent/60' : 'bg-elevated hover:bg-elevated/80'
+                      config.cardRank ? 'bg-accent/60' : 'bg-surface border border-border hover:bg-elevated/80'
                     }`}
                   >
                     <span

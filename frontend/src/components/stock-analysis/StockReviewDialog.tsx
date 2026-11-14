@@ -232,7 +232,7 @@ export function StockReviewPanel({ symbol, tab: initialTab, days: daysProp, onDa
                 key={k}
                 onClick={() => setTab(k)}
                 className={`px-2.5 py-1 text-micro transition-colors cursor-pointer ${
-                  tab === k ? 'bg-sky-400/15 text-sky-300' : 'text-muted hover:text-foreground'}`}
+                  tab === k ? 'bg-sky-400/15 text-sky-300' : 'text-secondary hover:text-foreground'}`}
               >
                 {label}
               </button>
@@ -244,7 +244,7 @@ export function StockReviewPanel({ symbol, tab: initialTab, days: daysProp, onDa
                 key={n}
                 onClick={() => setDays(n)}
                 className={`px-2 py-1 text-micro transition-colors cursor-pointer ${
-                  days === n ? 'bg-sky-400/15 text-sky-300' : 'text-muted hover:text-foreground'}`}
+                  days === n ? 'bg-sky-400/15 text-sky-300' : 'text-secondary hover:text-foreground'}`}
               >
                 {n}日
               </button>
@@ -361,7 +361,7 @@ function TrendView({ d, rows, onlyMarked, onToggleMarked }: {
           onClick={onToggleMarked}
           title="只留下有涨跌停、或趋势翻转的那些天 —— 其余日子状态没变, 复盘时没有信息"
           className={`rounded-btn border px-2 py-1 text-micro transition-colors cursor-pointer ${
-            onlyMarked ? 'border-sky-400/40 bg-sky-400/15 text-sky-300' : 'border-border/60 text-muted hover:text-foreground'}`}
+            onlyMarked ? 'border-sky-400/40 bg-sky-400/15 text-sky-300' : 'border-border/60 text-secondary hover:text-foreground'}`}
         >
           只看有事的日子
         </button>
@@ -697,7 +697,7 @@ function VerdictView({ d, segments }: {
           onClick={() => setOnlyMarked((v) => !v)}
           title="只留下档位换过的那些天 —— 其余日子档位没变, 复盘时没有信息"
           className={`rounded-btn border px-2 py-1 text-micro transition-colors cursor-pointer ${
-            onlyMarked ? 'border-sky-400/40 bg-sky-400/15 text-sky-300' : 'border-border/60 text-muted hover:text-foreground'}`}
+            onlyMarked ? 'border-sky-400/40 bg-sky-400/15 text-sky-300' : 'border-border/60 text-secondary hover:text-foreground'}`}
         >
           只看换档的日子
         </button>

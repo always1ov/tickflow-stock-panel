@@ -31,7 +31,7 @@ export function ExtConfigExportButton({ id, label }: { id: string; label: string
   }
   return <button type="button" onClick={exportConfig} disabled={busy}
     aria-label={`导出${label}配置`} title="导出单表配置（不含 Key 和数据）"
-    className="inline-flex h-7 shrink-0 items-center gap-1 rounded-card px-2.5 text-micro text-muted transition-colors hover:bg-elevated hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-50">
+    className="inline-flex h-7 shrink-0 items-center gap-1 rounded-card px-2.5 text-micro text-secondary transition-colors hover:bg-elevated hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-50">
     {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />}
     {busy ? '导出中…' : '导出配置'}
   </button>

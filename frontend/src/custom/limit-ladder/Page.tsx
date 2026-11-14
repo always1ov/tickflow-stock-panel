@@ -277,7 +277,7 @@ const StockCard = React.memo(function StockCard({ stock, extFields, direction, s
         }}
         title={monitored ? '封单监控已开启' : '开启封单监控'}
         className={`absolute top-1 right-1 z-20 p-0.5 rounded-btn transition-opacity cursor-pointer ${
-          monitored ? 'opacity-100 text-warning' : 'opacity-0 group-hover:opacity-70 text-muted hover:!opacity-100'
+          monitored ? 'opacity-100 text-warning' : 'opacity-0 group-hover:opacity-70 text-secondary hover:!opacity-100'
         }`}
       >
         {monitored ? <Bell className="h-3 w-3" /> : <BellOff className="h-3 w-3" />}
@@ -531,7 +531,7 @@ function MonitorMenu({ stock, direction, sealMode, monitorRule, anchorRect, hasD
             <Bell className="h-3.5 w-3.5 text-warning shrink-0" />
             <span className="font-medium text-foreground truncate">{stock.name ?? stock.symbol}</span>
           </div>
-          <button onClick={onClose} className="text-muted hover:text-foreground shrink-0"><X className="h-3.5 w-3.5" /></button>
+          <button onClick={onClose} className="text-secondary hover:text-foreground shrink-0"><X className="h-3.5 w-3.5" /></button>
         </div>
 
         {/* [R60] 统一页面留白 */}
@@ -550,11 +550,11 @@ function MonitorMenu({ stock, direction, sealMode, monitorRule, anchorRect, hasD
             <div className="flex gap-0.5 flex-1 bg-elevated/50 rounded-btn p-0.5">
               <button
                 onClick={() => switchMetric('sealed_vol')}
-                className={`flex-1 px-2 py-1 rounded-btn text-xs transition-colors ${metric === 'sealed_vol' ? 'bg-surface text-foreground shadow-sm' : 'text-muted hover:text-secondary'}`}
+                className={`flex-1 px-2 py-1 rounded-btn text-xs transition-colors ${metric === 'sealed_vol' ? 'bg-surface text-foreground shadow-sm' : 'text-secondary hover:text-secondary'}`}
               >封单量</button>
               <button
                 onClick={() => switchMetric('sealed_amount')}
-                className={`flex-1 px-2 py-1 rounded-btn text-xs transition-colors ${metric === 'sealed_amount' ? 'bg-surface text-foreground shadow-sm' : 'text-muted hover:text-secondary'}`}
+                className={`flex-1 px-2 py-1 rounded-btn text-xs transition-colors ${metric === 'sealed_amount' ? 'bg-surface text-foreground shadow-sm' : 'text-secondary hover:text-secondary'}`}
               >封单额</button>
             </div>
           </div>
@@ -601,7 +601,7 @@ function MonitorMenu({ stock, direction, sealMode, monitorRule, anchorRect, hasD
                     className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-colors border cursor-pointer ${
                       on
                         ? 'bg-foreground text-surface border-foreground'
-                        : 'bg-elevated/40 text-muted border-border hover:text-secondary'
+                        : 'bg-elevated/40 text-foreground border-border hover:text-secondary'
                     }`}
                   >
                     <span className={`w-1.5 h-1.5 rounded-full ${on ? 'bg-accent' : 'bg-muted/50'}`} />
@@ -627,7 +627,7 @@ function MonitorMenu({ stock, direction, sealMode, monitorRule, anchorRect, hasD
             <button
               onClick={handleRemove}
               disabled={saving || !hasDepth}
-              className="shrink-0 h-7 px-2.5 rounded-btn text-xs text-muted hover:text-danger hover:bg-danger/5 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
+              className="shrink-0 h-7 px-2.5 rounded-btn text-xs text-secondary hover:text-danger hover:bg-danger/5 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
             >关闭监控</button>
           )}
           <button
@@ -1278,8 +1278,8 @@ function ExtFieldSection({ item, onChange, options }: {
           <div className="flex items-center gap-2">
             <span className="text-xs text-secondary shrink-0 w-16">显示模式</span>
             <div className="flex flex-1 min-w-0 rounded-btn overflow-hidden border border-border">
-              <button onClick={() => updateDisplay({ displayMode: 'tag' })} className={`flex-1 py-1 text-xs transition-colors ${displayMode === 'tag' ? 'bg-foreground font-medium text-surface' : 'bg-elevated text-secondary'}`}>标签</button>
-              <button onClick={() => updateDisplay({ displayMode: 'text' })} className={`flex-1 py-1 text-xs transition-colors border-l border-border ${displayMode === 'text' ? 'bg-foreground font-medium text-surface' : 'bg-elevated text-secondary'}`}>文本</button>
+              <button onClick={() => updateDisplay({ displayMode: 'tag' })} className={`flex-1 py-1 text-xs transition-colors ${displayMode === 'tag' ? 'bg-foreground font-medium text-surface' : 'bg-surface border border-border text-foreground'}`}>标签</button>
+              <button onClick={() => updateDisplay({ displayMode: 'text' })} className={`flex-1 py-1 text-xs transition-colors border-l border-border ${displayMode === 'text' ? 'bg-foreground font-medium text-surface' : 'bg-surface text-foreground'}`}>文本</button>
             </div>
           </div>
           {displayMode === 'tag' && (
@@ -1328,7 +1328,7 @@ function ExtFieldSection({ item, onChange, options }: {
                         const next = hidden ? cur.filter(x => x !== i) : [...cur, i]
                         updateDisplay({ hiddenIndices: next.length ? next : undefined })
                       }}
-                      className={`w-6 h-6 rounded-btn text-micro font-medium transition-colors ${hidden ? 'bg-elevated text-muted line-through' : 'bg-foreground font-medium text-surface'}`}
+                      className={`w-6 h-6 rounded-btn text-micro font-medium transition-colors ${hidden ? 'bg-surface border border-border text-foreground line-through' : 'bg-foreground font-medium text-surface'}`}
                     >{i + 1}</button>
                   )
                 })}
@@ -1339,13 +1339,13 @@ function ExtFieldSection({ item, onChange, options }: {
             <div className="flex items-center gap-2">
               <span className="text-xs text-secondary shrink-0 w-16">排列方向</span>
               <div className="flex flex-1 min-w-0 rounded-btn overflow-hidden border border-border">
-                <button onClick={() => updateDisplay({ tagLayout: 'horizontal' })} className={`flex-1 py-1 text-xs transition-colors ${(cfg?.tagLayout ?? 'horizontal') === 'horizontal' ? 'bg-foreground font-medium text-surface' : 'bg-elevated text-secondary'}`}>横</button>
-                <button onClick={() => updateDisplay({ tagLayout: 'vertical' })} className={`flex-1 py-1 text-xs transition-colors border-l border-border ${cfg?.tagLayout === 'vertical' ? 'bg-foreground font-medium text-surface' : 'bg-elevated text-secondary'}`}>竖</button>
+                <button onClick={() => updateDisplay({ tagLayout: 'horizontal' })} className={`flex-1 py-1 text-xs transition-colors ${(cfg?.tagLayout ?? 'horizontal') === 'horizontal' ? 'bg-foreground font-medium text-surface' : 'bg-surface border border-border text-foreground'}`}>横</button>
+                <button onClick={() => updateDisplay({ tagLayout: 'vertical' })} className={`flex-1 py-1 text-xs transition-colors border-l border-border ${cfg?.tagLayout === 'vertical' ? 'bg-foreground font-medium text-surface' : 'bg-surface text-foreground'}`}>竖</button>
               </div>
             </div>
           )}
           <div className="flex justify-end">
-            <button onClick={() => onChange({ field, display: { displayMode: 'tag' } })} className="text-micro text-muted hover:text-foreground">恢复默认</button>
+            <button onClick={() => onChange({ field, display: { displayMode: 'tag' } })} className="text-micro text-secondary hover:text-foreground">恢复默认</button>
           </div>
         </>
       )}
@@ -1425,7 +1425,7 @@ function ExtConfigDialog({ fields, onSave, onClose }: {
         {/* 头部 */}
         <div className="flex items-center justify-between px-4 pt-3 pb-1">
           <span className="text-sm font-medium">配置</span>
-          <button onClick={onClose} className="p-0.5 text-muted hover:text-foreground"><X className="h-4 w-4" /></button>
+          <button onClick={onClose} className="p-0.5 text-secondary hover:text-foreground"><X className="h-4 w-4" /></button>
         </div>
         {/* 三列平铺 */}
         <div className="flex gap-0 border-b border-border px-2 overflow-hidden">
@@ -1645,7 +1645,7 @@ export function LimitUpLadder() {
                 className={`flex items-center gap-1 px-2.5 h-7 rounded-btn text-xs tabular-nums transition-ui ${
                   direction === 'up'
                     ? 'bg-bull/15 text-bull font-semibold'
-                    : 'text-muted hover:text-bull/70'
+                    : 'text-secondary hover:text-bull/70'
                 }`}
               >
                 <span>涨停</span>
@@ -1656,7 +1656,7 @@ export function LimitUpLadder() {
                 className={`flex items-center gap-1 px-2.5 h-7 rounded-btn text-xs tabular-nums transition-ui ${
                   direction === 'down'
                     ? 'bg-bear/15 text-bear font-semibold'
-                    : 'text-muted hover:text-bear/70'
+                    : 'text-secondary hover:text-bear/70'
                 }`}
               >
                 <span>跌停</span>
@@ -1681,7 +1681,7 @@ export function LimitUpLadder() {
                       className={`flex items-center px-2 py-1 rounded-btn text-xs transition-ui ${
                         sealMode === m
                           ? 'bg-foreground text-surface font-medium'
-                          : 'text-muted hover:text-secondary'
+                          : 'text-secondary hover:text-secondary'
                       }`}
                     >
                       {m === 'vol' ? '封单量' : '封单额'}
@@ -1751,7 +1751,7 @@ export function LimitUpLadder() {
             <div className="w-px h-4 bg-border mx-1" />
             <button
               onClick={() => setShowExtConfig(true)}
-              className="p-1.5 hover:bg-surface text-muted hover:text-accent"
+              className="p-1.5 hover:bg-surface text-secondary hover:text-accent"
               title="配置"
             >
               <Settings2 className="h-3.5 w-3.5" />
@@ -1759,7 +1759,7 @@ export function LimitUpLadder() {
             <button
               onClick={() => refetch()}
               disabled={isFetching}
-              className="p-1.5 hover:bg-surface text-muted disabled:opacity-50"
+              className="p-1.5 hover:bg-surface text-secondary disabled:opacity-50"
             >
               <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
             </button>

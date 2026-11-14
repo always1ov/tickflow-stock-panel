@@ -162,7 +162,7 @@ export function FinancialSyncPanel() {
                 disabled={syncing}
                 title={syncing ? '正在同步…' : `仅更新${TABLE_LABELS[key]}`}
                 aria-label={`仅更新${TABLE_LABELS[key]}`}
-                className="shrink-0 rounded-btn p-1 text-muted transition-colors hover:bg-elevated hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 disabled:cursor-not-allowed disabled:opacity-30"
+                className="shrink-0 rounded-btn p-1 text-secondary transition-colors hover:bg-elevated hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 disabled:cursor-not-allowed disabled:opacity-30"
               >
                 {thisSyncing
                   ? <Loader2 className="h-3.5 w-3.5 animate-spin" />

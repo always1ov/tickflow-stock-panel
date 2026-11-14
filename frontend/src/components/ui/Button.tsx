@@ -15,7 +15,7 @@
  *              主色实心主按钮」, 指的就是这一档
  *   outline    `border border-border bg-base text-muted hover:text-foreground`
  *              —— 现状最常见的一种, 工具条按钮几乎都是它
- *   secondary  `bg-elevated text-secondary`
+ *   secondary  与 outline 同形(描边 + 面板底 + 正文色) —— 灰底按钮读起来像禁用
  *   ghost      无边框无底, 只有 hover 才显形 —— 表格行内那些图标按钮
  *   danger     outline 的红色 hover 变体(删除/清空)
  *
@@ -49,11 +49,13 @@ export const OUTLINE = 'border border-border bg-surface text-foreground hover:bg
 
 const VARIANT: Record<ButtonVariant, string> = {
   primary: 'bg-accent font-medium text-on-accent hover:bg-accent/90',
-  secondary: 'bg-elevated text-secondary hover:bg-elevated/70 hover:text-foreground',
+  // [R645] 原来 `bg-elevated text-secondary` 读起来像禁用态; 改用描边 + 正文色
+  secondary: 'border border-border bg-surface text-foreground hover:bg-elevated',
   // [R449] 与个股弹窗的按钮同一套(原 `stock-preview/pill.ts` 的 PILL_IDLE): 实底、
   // 正常字色 —— 原来的灰字按钮在大字号下反而像被禁用了
   outline: OUTLINE,
-  ghost: 'text-muted hover:bg-elevated hover:text-foreground',
+  // [R645] 灰字在密集看盘界面看不清, 无边框按钮也用正文色
+  ghost: 'text-secondary hover:bg-elevated hover:text-foreground',
   danger: 'border border-border bg-surface text-foreground hover:border-danger/40 hover:text-danger',
 }
 

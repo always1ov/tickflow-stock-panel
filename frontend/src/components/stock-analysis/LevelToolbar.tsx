@@ -116,7 +116,7 @@ export function LevelToolbar({ groups, controls, effLevels, fib2Raw, fib2, onOpe
       {/* [R626] 副图图例说明 —— 原来压在主图上方那一行字, 收进这一个「?」里 */}
       {help && (
         <button type="button" title={help} aria-label="副图图例说明"
-                className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-border/60 bg-base/40 text-micro text-muted transition-colors duration-hover hover:border-border hover:text-foreground">
+                className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-border/60 bg-base/40 text-micro text-secondary transition-colors duration-hover hover:border-border hover:text-foreground">
           ?
         </button>
       )}

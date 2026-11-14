@@ -141,7 +141,7 @@ export function StockMultiDayIntradayChart({
         <button
           type="button"
           onClick={() => { void history.refetch(); void latest.refetch() }}
-          className="inline-flex items-center gap-1.5 rounded-btn border border-border bg-elevated px-3 py-1.5 text-secondary hover:text-foreground"
+          className="inline-flex items-center gap-1.5 rounded-btn border border-border bg-surface px-3 py-1.5 text-foreground hover:text-foreground"
         >
           <RefreshCw className="h-3.5 w-3.5" />
           重新加载

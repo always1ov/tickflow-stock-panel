@@ -67,9 +67,9 @@ function SelectedRow({ id, label, strategy, addedAt, groupName, index, count, di
       {!valid && resolved && <p className="mt-1 text-micro text-danger">失效策略 · 已删除或尚未发布</p>}
     </div>
     <div className="flex shrink-0 items-center gap-0.5">
-      <button type="button" aria-label={`上移：${label}`} title="上移" disabled={disabled || index === 0} onClick={() => onMove(index, -1)} className="inline-flex h-7 w-7 items-center justify-center rounded-btn text-muted hover:bg-elevated hover:text-accent disabled:opacity-25"><ArrowUp className="h-3.5 w-3.5" /></button>
-      <button type="button" aria-label={`下移：${label}`} title="下移" disabled={disabled || index === count - 1} onClick={() => onMove(index, 1)} className="inline-flex h-7 w-7 items-center justify-center rounded-btn text-muted hover:bg-elevated hover:text-accent disabled:opacity-25"><ArrowDown className="h-3.5 w-3.5" /></button>
-      <button type="button" aria-label={`移出策略池：${label}`} title="移出策略池，不删除策略" disabled={disabled} onClick={() => onRemove(id)} className="inline-flex h-7 w-7 items-center justify-center rounded-btn text-muted hover:bg-danger/10 hover:text-danger disabled:opacity-25"><X className="h-3.5 w-3.5" /></button>
+      <button type="button" aria-label={`上移：${label}`} title="上移" disabled={disabled || index === 0} onClick={() => onMove(index, -1)} className="inline-flex h-7 w-7 items-center justify-center rounded-btn text-secondary hover:bg-elevated hover:text-accent disabled:opacity-25"><ArrowUp className="h-3.5 w-3.5" /></button>
+      <button type="button" aria-label={`下移：${label}`} title="下移" disabled={disabled || index === count - 1} onClick={() => onMove(index, 1)} className="inline-flex h-7 w-7 items-center justify-center rounded-btn text-secondary hover:bg-elevated hover:text-accent disabled:opacity-25"><ArrowDown className="h-3.5 w-3.5" /></button>
+      <button type="button" aria-label={`移出策略池：${label}`} title="移出策略池，不删除策略" disabled={disabled} onClick={() => onRemove(id)} className="inline-flex h-7 w-7 items-center justify-center rounded-btn text-secondary hover:bg-danger/10 hover:text-danger disabled:opacity-25"><X className="h-3.5 w-3.5" /></button>
     </div>
   </Reorder.Item>
 }
@@ -97,7 +97,7 @@ function ArchivedRow({ strategy, addedAt, archivedAt, groupName, onRestore, onDi
       </button>
       <button type="button" aria-label={`移出档案库：${strategy.name}`} onClick={() => onDiscard(strategy.id)}
         title="移出档案库记录 (策略本身不受影响)"
-        className="inline-flex h-7 w-7 items-center justify-center rounded-btn text-muted hover:bg-danger/10 hover:text-danger">
+        className="inline-flex h-7 w-7 items-center justify-center rounded-btn text-secondary hover:bg-danger/10 hover:text-danger">
         <X className="h-3.5 w-3.5" />
       </button>
     </div>
@@ -142,7 +142,7 @@ function GroupsManagerModal({ groups, active, onClose, onCreate, onRename, onReo
     panelClassName="flex max-h-[80%] w-[92%] max-w-md flex-col overflow-hidden rounded-card border border-border bg-surface shadow-2xl">
     <header className="flex items-center justify-between border-b border-border px-4 py-3">
       <h3 className="text-sm font-semibold text-foreground">管理分组</h3>
-      <button type="button" aria-label="关闭" onClick={onClose} className="rounded-btn p-1 text-muted hover:bg-elevated hover:text-foreground"><X className="h-4 w-4" /></button>
+      <button type="button" aria-label="关闭" onClick={onClose} className="rounded-btn p-1 text-secondary hover:bg-elevated hover:text-foreground"><X className="h-4 w-4" /></button>
     </header>
     <div className="flex gap-2 border-b border-border px-4 py-3">
       <input value={name} onChange={event => setName(event.target.value)} maxLength={24} placeholder="新分组名称" aria-label="新分组名称"
@@ -163,20 +163,20 @@ function GroupsManagerModal({ groups, active, onClose, onCreate, onRename, onReo
                 onKeyDown={event => { if (event.key === 'Enter') submitRename(group.id); if (event.key === 'Escape') setRenamingId(null) }}
                 className="h-7 min-w-0 flex-1 rounded-btn border border-border bg-base px-2 text-xs focus:border-accent focus:outline-none" />
               <button type="button" onClick={() => submitRename(group.id)} disabled={busy} className="text-micro text-accent disabled:opacity-40">保存</button>
-              <button type="button" onClick={() => setRenamingId(null)} className="text-micro text-muted">取消</button>
+              <button type="button" onClick={() => setRenamingId(null)} className="text-micro text-secondary">取消</button>
             </>
           ) : (
             <>
               <span className="min-w-0 flex-1 truncate text-xs text-foreground" title={group.name}>{group.name}</span>
-              <button type="button" aria-label={`上移分组：${group.name}`} disabled={busy || index === 0} onClick={() => move(index, -1)} title="上移" className="inline-flex h-7 w-7 items-center justify-center rounded-btn text-muted hover:bg-elevated hover:text-accent disabled:opacity-25"><ArrowUp className="h-3 w-3" /></button>
-              <button type="button" aria-label={`下移分组：${group.name}`} disabled={busy || index === groups.length - 1} onClick={() => move(index, 1)} title="下移" className="inline-flex h-7 w-7 items-center justify-center rounded-btn text-muted hover:bg-elevated hover:text-accent disabled:opacity-25"><ArrowDown className="h-3 w-3" /></button>
+              <button type="button" aria-label={`上移分组：${group.name}`} disabled={busy || index === 0} onClick={() => move(index, -1)} title="上移" className="inline-flex h-7 w-7 items-center justify-center rounded-btn text-secondary hover:bg-elevated hover:text-accent disabled:opacity-25"><ArrowUp className="h-3 w-3" /></button>
+              <button type="button" aria-label={`下移分组：${group.name}`} disabled={busy || index === groups.length - 1} onClick={() => move(index, 1)} title="下移" className="inline-flex h-7 w-7 items-center justify-center rounded-btn text-secondary hover:bg-elevated hover:text-accent disabled:opacity-25"><ArrowDown className="h-3 w-3" /></button>
               <button type="button" onClick={() => { setRenamingId(group.id); setRenameDraft(group.name) }} title="重命名" className="rounded-btn px-1.5 py-1 text-micro text-secondary hover:text-accent">改名</button>
               {confirmDeleteId === group.id ? (
                 <button type="button" disabled={busy} onClick={() => { void guard(async () => { await onDelete(group.id); setConfirmDeleteId(null) }) }}
                   className="rounded-btn border border-danger/40 bg-danger/10 px-1.5 py-1 text-micro text-danger disabled:opacity-40">确认删除</button>
               ) : (
                 <button type="button" onClick={() => setConfirmDeleteId(group.id)} title="删除分组 (组内策略保留, 转为未分组)"
-                  className="rounded-btn p-1 text-muted hover:bg-danger/10 hover:text-danger"><Trash2 className="h-3 w-3" /></button>
+                  className="rounded-btn p-1 text-secondary hover:bg-danger/10 hover:text-danger"><Trash2 className="h-3 w-3" /></button>
               )}
             </>
           )}
@@ -336,7 +336,7 @@ export function StrategyPoolDialog({ pool, onAdded, onClose }: Props) {
       panelClassName="strategy-library-dialog flex h-[92%] w-[96%] max-w-wide max-h-[900px] flex-col overflow-hidden rounded-card border border-border bg-surface shadow-2xl">
       <header className="flex shrink-0 items-center justify-between gap-3 border-b border-border px-4 py-2.5 sm:px-5">
         <div className="flex min-w-0 flex-wrap items-baseline gap-x-4 gap-y-1"><h2 className="flex shrink-0 items-center gap-2 text-sm font-semibold text-foreground"><Layers className="h-4 w-4 self-center text-accent" />策略库</h2><p className="text-micro leading-5 text-muted">勾选参与扫描，拖动调整顺序；分组与归档即时生效。</p></div>
-        <button type="button" aria-label="关闭" disabled={!!publishingId} onClick={onClose} className="rounded-btn p-1.5 text-muted hover:bg-elevated hover:text-foreground disabled:opacity-40"><X className="h-4 w-4" /></button>
+        <button type="button" aria-label="关闭" disabled={!!publishingId} onClick={onClose} className="rounded-btn p-1.5 text-secondary hover:bg-elevated hover:text-foreground disabled:opacity-40"><X className="h-4 w-4" /></button>
       </header>
       {loadError && <div role="alert" className="flex shrink-0 items-center gap-3 border-b border-danger/20 bg-danger/5 px-4 py-3 text-xs text-danger"><span className="min-w-0 flex-1 break-words">策略列表加载失败：{loadError}</span><button type="button" onClick={() => void loadStrategies()} className="shrink-0 underline">重试</button></div>}
       {publishError && <p role="alert" className="shrink-0 border-b border-danger/20 bg-danger/5 px-4 py-2 text-xs text-danger">发布失败：{publishError}</p>}
@@ -393,7 +393,7 @@ export function StrategyPoolDialog({ pool, onAdded, onClose }: Props) {
                 })}
                 </div>
                 <button type="button" onClick={() => setShowGroups(true)}
-                  className="inline-flex h-7 shrink-0 items-center gap-1 rounded-btn border border-border px-2 text-micro text-muted transition-colors hover:border-accent/40 hover:text-accent">
+                  className="inline-flex h-7 shrink-0 items-center gap-1 rounded-btn border border-border px-2 text-micro text-secondary transition-colors hover:border-accent/40 hover:text-accent">
                   <FolderPlus className="h-3 w-3" />管理分组
                 </button>
               </div>
@@ -429,7 +429,7 @@ export function StrategyPoolDialog({ pool, onAdded, onClose }: Props) {
                     <button type="button" aria-label={`归档：${strategy.name}`} disabled={disabled}
                       onClick={() => pool.archiveStrategy(strategy.id)}
                       title="归档到档案库 (可恢复, 不删除策略)"
-                      className="inline-flex h-7 w-7 items-center justify-center rounded-btn text-muted hover:bg-warning/10 hover:text-warning disabled:opacity-25">
+                      className="inline-flex h-7 w-7 items-center justify-center rounded-btn text-secondary hover:bg-warning/10 hover:text-warning disabled:opacity-25">
                       <Archive className="h-3.5 w-3.5" />
                     </button>
                   </div>
@@ -466,7 +466,7 @@ export function StrategyPoolDialog({ pool, onAdded, onClose }: Props) {
             </div>
             {clearedPool && poolIds.length === 0
               ? <button type="button" disabled={disabled} onClick={undoClear} className="shrink-0 text-micro text-accent disabled:opacity-40">撤销清空</button>
-              : <button type="button" disabled={disabled || !poolIds.length} onClick={clearSelected} className="shrink-0 text-micro text-muted hover:text-danger disabled:opacity-40">清空所选</button>}
+              : <button type="button" disabled={disabled || !poolIds.length} onClick={clearSelected} className="shrink-0 text-micro text-secondary hover:text-danger disabled:opacity-40">清空所选</button>}
           </div>
           <Reorder.Group as="ol" axis="y" layoutScroll aria-label="已选策略列表" tabIndex={0}
             values={poolIds} onReorder={next => { if (!disabled) pool.reorderPool(next) }}

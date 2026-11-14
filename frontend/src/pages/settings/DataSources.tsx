@@ -326,7 +326,7 @@ function CapabilityRoutingSection() {
           <button
             onClick={() => resetMut.mutate()}
             disabled={resetMut.isPending}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-btn text-xs text-muted hover:text-foreground hover:bg-elevated transition-colors disabled:opacity-50 shrink-0"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-btn text-xs text-secondary hover:text-foreground hover:bg-elevated transition-colors disabled:opacity-50 shrink-0"
           >
             <RefreshCw className={`h-3 w-3 ${resetMut.isPending ? 'animate-spin' : ''}`} />
             恢复默认
@@ -346,7 +346,7 @@ function CapabilityRoutingSection() {
           </div>
           <button
             onClick={() => matrix.refetch()}
-            className="text-xs text-muted hover:text-foreground shrink-0"
+            className="text-xs text-secondary hover:text-foreground shrink-0"
           >
             重试
           </button>
@@ -470,7 +470,7 @@ export function PluginKeyConfig({ plugin }: { plugin: PluginDataSourceItem }) {
           <button
             onClick={() => clear.mutate()}
             disabled={clear.isPending}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-btn bg-elevated text-secondary hover:text-danger text-xs transition-colors duration-hover ease-smooth disabled:opacity-50 shrink-0"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-btn bg-surface border border-border text-foreground hover:text-danger text-xs transition-colors duration-hover ease-smooth disabled:opacity-50 shrink-0"
           >
             <Trash2 className="h-3 w-3" />
             清除
@@ -496,7 +496,7 @@ export function PluginKeyConfig({ plugin }: { plugin: PluginDataSourceItem }) {
           <button
             type="button"
             onClick={() => setRevealing((v) => !v)}
-            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted hover:text-foreground transition-colors duration-hover ease-smooth"
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-secondary hover:text-foreground transition-colors duration-hover ease-smooth"
             tabIndex={-1}
             aria-label={revealing ? '隐藏' : '显示'}
           >
@@ -874,7 +874,7 @@ export function SettingsDataSourcesPanel({ highlight }: { highlight?: string } =
             className={`rounded-btn border border-dashed px-3.5 py-3 transition-ui flex items-center justify-center gap-1.5 text-sm ${
               selected === '__new__'
                 ? 'border-accent/50 bg-accent/5 text-accent'
-                : 'border-border/50 text-muted hover:text-foreground hover:border-border hover:bg-elevated/30'
+                : 'border-border/50 text-secondary hover:text-foreground hover:border-border hover:bg-elevated/30'
             }`}
           >
             <Plus className="h-3.5 w-3.5" />
@@ -972,7 +972,7 @@ export function SettingsDataSourcesPanel({ highlight }: { highlight?: string } =
             <div className="flex items-center justify-end gap-2">
               <button
                 onClick={() => setConfirmDelete(null)}
-                className="px-3 py-1.5 rounded-btn bg-elevated text-secondary hover:bg-elevated/80 text-sm transition-colors"
+                className="px-3 py-1.5 rounded-btn bg-surface border border-border text-foreground hover:bg-elevated/80 text-sm transition-colors"
               >
                 取消
               </button>

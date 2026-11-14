@@ -399,7 +399,7 @@ export function AnalysisKChart({
                 className={`inline-flex shrink-0 whitespace-nowrap items-center gap-1 h-6 px-2 rounded-btn text-micro font-medium border transition-ui disabled:opacity-30 disabled:cursor-not-allowed ${
                   active
                     ? 'text-foreground'
-                    : 'text-muted bg-base/40 border-border/30 hover:border-border/60'
+                    : 'text-secondary bg-base/40 border-border/30 hover:border-border/60'
                 }`}
                 style={active ? { borderColor: LC[group.key] + '66', backgroundColor: LC[group.key] + '1a' } : undefined}
               >
@@ -422,7 +422,7 @@ export function AnalysisKChart({
                   className={`h-6 px-2 rounded-btn text-micro font-mono border transition-ui ${
                     pivotRank === rank
                       ? 'text-foreground'
-                      : 'text-muted bg-base/40 border-border/30 hover:border-border/60'
+                      : 'text-secondary bg-base/40 border-border/30 hover:border-border/60'
                   }`}
                   style={pivotRank === rank
                     ? { borderColor: LC.pivot + '66', backgroundColor: LC.pivot + '26', color: LC.pivot }
@@ -446,7 +446,7 @@ export function AnalysisKChart({
                   className={`h-6 px-2 rounded-btn text-micro border transition-ui whitespace-nowrap ${
                     fib2Grain === key
                       ? 'text-foreground'
-                      : 'text-muted bg-base/40 border-border/30 hover:border-border/60'
+                      : 'text-secondary bg-base/40 border-border/30 hover:border-border/60'
                   }`}
                   style={fib2Grain === key
                     ? { borderColor: LC.fib2 + '66', backgroundColor: LC.fib2 + '26', color: LC.fib2 }
@@ -464,7 +464,7 @@ export function AnalysisKChart({
                 className={`h-6 px-2 rounded-btn text-micro border transition-ui whitespace-nowrap ml-0.5 ${
                   fib2ShowTargets
                     ? 'text-foreground'
-                    : 'text-muted bg-base/40 border-border/30 hover:border-border/60'
+                    : 'text-secondary bg-base/40 border-border/30 hover:border-border/60'
                 }`}
                 style={fib2ShowTargets
                   ? { borderColor: targetColor + '66', backgroundColor: targetColor + '26', color: targetColor }
@@ -476,7 +476,7 @@ export function AnalysisKChart({
                 <button
                   onClick={() => setFib2FitOpen(true)}
                   title={FIB2_BACKTEST_TITLE}
-                  className="ml-0.5 h-6 rounded-btn border border-border/30 bg-base/40 px-2 text-micro text-muted transition-ui hover:border-border/60 hover:text-foreground"
+                  className="ml-0.5 h-6 rounded-btn border border-border/30 bg-base/40 px-2 text-micro text-secondary transition-ui hover:border-border/60 hover:text-foreground"
                 >
                   回测这三档
                 </button>
@@ -488,7 +488,7 @@ export function AnalysisKChart({
             type="button"
             title={subPaneHelp}
             aria-label="副图图例说明"
-            className="ml-auto inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-border/60 bg-base/40 text-micro text-muted transition-ui hover:border-border hover:text-foreground"
+            className="ml-auto inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-border/60 bg-base/40 text-micro text-secondary transition-ui hover:border-border hover:text-foreground"
           >
             ?
           </button>

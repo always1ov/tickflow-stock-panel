@@ -151,7 +151,7 @@ export function SealedBadge({ degraded, hasDepth, isHistorical, sealedReady, sea
                   )}
                   <button
                     onClick={() => { setShowHint(false); navigate('/settings?tab=monitoring&highlight=depth-fix') }}
-                    className={`${hasDepth && !isHistorical ? '' : 'w-full'} px-2 py-1.5 rounded-btn text-xs bg-elevated text-secondary hover:text-foreground transition-colors text-center`}
+                    className={`${hasDepth && !isHistorical ? '' : 'w-full'} px-2 py-1.5 rounded-btn text-xs bg-surface border border-border text-foreground hover:text-foreground transition-colors text-center`}
                   >
                     去设置 →
                   </button>

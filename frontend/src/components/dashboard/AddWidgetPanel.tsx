@@ -92,7 +92,7 @@ export function AddWidgetPanel({
           'inline-flex items-center gap-1 rounded-btn border px-2 py-1 text-micro transition-colors',
           open
             ? 'border-accent/50 bg-accent/10 text-accent'
-            : 'border-border bg-elevated text-secondary hover:text-foreground hover:border-accent/40',
+            : 'border-border bg-surface text-foreground hover:text-foreground hover:border-accent/40',
         )}
       >
         <Plus className="h-3 w-3" />添加组件

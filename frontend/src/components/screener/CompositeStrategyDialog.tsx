@@ -194,7 +194,7 @@ export function CompositeStrategyDialog({ open, onClose, onSavedId, editStrategy
               <span className="text-micro text-muted/60">
                 引用多个子策略, 合并选股与回测信号
               </span>
-              <button onClick={onClose} className="ml-auto text-muted hover:text-foreground">
+              <button onClick={onClose} className="ml-auto text-secondary hover:text-foreground">
                 <X className="h-4 w-4" />
               </button>
             </div>
@@ -370,7 +370,7 @@ export function CompositeStrategyDialog({ open, onClose, onSavedId, editStrategy
             <div className="flex items-center justify-end gap-2 border-t border-border px-4 py-3">
               <button
                 onClick={onClose}
-                className="rounded-btn border border-border px-3 py-1.5 text-xs text-muted hover:text-foreground"
+                className="rounded-btn border border-border px-3 py-1.5 text-xs text-secondary hover:text-foreground"
               >
                 取消
               </button>

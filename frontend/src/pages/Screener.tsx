@@ -968,7 +968,7 @@ export function Screener() {
                   className={`h-full px-2.5 text-xs font-medium transition-colors
                     cursor-pointer ${assetType === t
                       ? 'bg-accent/10 text-accent'
-                      : 'text-muted hover:text-secondary hover:bg-elevated'
+                      : 'text-secondary hover:text-secondary hover:bg-elevated'
                     }`}
                 >
                   {t === 'stock' ? '股票' : 'ETF'}
@@ -988,7 +988,7 @@ export function Screener() {
                   className={`h-full px-2.5 text-xs font-medium transition-colors cursor-pointer
                     ${tfFilter === tf
                       ? 'bg-accent/10 text-accent'
-                      : 'text-muted hover:text-secondary hover:bg-elevated'
+                      : 'text-secondary hover:text-secondary hover:bg-elevated'
                     }`}
                 >
                   {tf === 'all' ? '全部' : tf === '1d' ? '日线' : '分钟'}
@@ -1001,7 +1001,7 @@ export function Screener() {
               disabled={reloadStrategies.isPending}
               title="重新加载策略并运行全部策略，刷新当前符合条件的个股"
               className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-btn
-                border border-border bg-surface text-xs font-medium text-muted
+                border border-border bg-surface text-xs font-medium text-secondary
                 hover:text-accent hover:border-accent/50 transition-colors cursor-pointer
                 disabled:opacity-50 disabled:cursor-wait"
             >
@@ -1023,7 +1023,7 @@ export function Screener() {
               className={`inline-flex items-center justify-center h-7 w-7 rounded-btn border transition-colors cursor-pointer
                 ${showAll
                   ? 'border-accent/50 bg-accent/10 text-accent'
-                  : 'border-border bg-surface text-muted hover:text-secondary hover:border-accent/40'
+                  : 'border-border bg-surface text-secondary hover:text-secondary hover:border-accent/40'
                 }`}
             >
               <Network className="h-3.5 w-3.5" />
@@ -1037,7 +1037,7 @@ export function Screener() {
                   className={`h-full px-2 text-micro font-medium transition-colors cursor-pointer
                     ${cardSize === sz
                       ? 'bg-accent/10 text-accent'
-                      : 'text-muted hover:text-secondary hover:bg-elevated'
+                      : 'text-secondary hover:text-secondary hover:bg-elevated'
                     }`}
                 >
                   {sz === 'hidden' ? '隐藏' : sz === 'mini' ? '紧凑' : sz === 'normal' ? '标准' : '详细'}
@@ -1096,7 +1096,7 @@ export function Screener() {
                 onClick={() => setShowDefaultParams(true)}
                 title="默认基础参数 — 新建策略默认使用的基础过滤配置"
                 className="inline-flex items-center justify-center h-7 w-7 rounded-btn
-                  border border-border bg-surface text-muted
+                  border border-border bg-surface text-secondary
                   hover:text-accent hover:border-accent/50 transition-colors cursor-pointer"
               >
                 <SlidersHorizontal className="h-3.5 w-3.5" />
@@ -1230,7 +1230,7 @@ export function Screener() {
                               if (activeStrategy) filterMap.current.delete(activeStrategy)
                             }}
                             title="清空筛选条件"
-                            className="inline-flex items-center gap-1 px-2 text-muted
+                            className="inline-flex items-center gap-1 px-2 text-secondary
                               hover:bg-danger/10 hover:text-danger transition-colors duration-150 cursor-pointer"
                           >
                             <RotateCcw className="h-3 w-3" />

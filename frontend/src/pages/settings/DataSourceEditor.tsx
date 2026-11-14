@@ -319,7 +319,7 @@ export function DataSourceEditor({
           {!isNew && onDelete && (
             <button
               onClick={onDelete}
-              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-btn text-xs text-muted hover:text-danger hover:bg-danger/10 transition-colors"
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-btn text-xs text-secondary hover:text-danger hover:bg-danger/10 transition-colors"
             >
               <Trash2 className="h-3 w-3" /> 删除
             </button>
@@ -682,7 +682,7 @@ function DatasetDetail({
                 <button
                   onClick={() => test.mutate()}
                   disabled={test.isPending || !cfg.url}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-btn bg-elevated text-secondary hover:text-foreground text-xs disabled:opacity-40 transition-colors"
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-btn bg-surface border border-border text-foreground hover:text-foreground text-xs disabled:opacity-40 transition-colors"
                 >
                   {test.isPending ? '测试中...' : '测试'}
                 </button>
@@ -817,7 +817,7 @@ function FieldMapEditor({
           </select>
           <button
             onClick={() => removeRow(row.id)}
-            className="text-muted hover:text-danger p-0.5 transition-colors"
+            className="text-secondary hover:text-danger p-0.5 transition-colors"
           >
             <X className="h-3 w-3" />
           </button>

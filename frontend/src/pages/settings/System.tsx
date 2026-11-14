@@ -983,7 +983,7 @@ function BatchSymbolsRow({
             </button>
             <button
               onClick={() => { setEditing(false); setHint(null) }}
-              className="px-2 py-1.5 rounded-btn text-xs bg-elevated text-muted hover:text-foreground transition-colors"
+              className="px-2 py-1.5 rounded-btn text-xs bg-surface border border-border text-foreground hover:text-foreground transition-colors"
             >
               取消
             </button>

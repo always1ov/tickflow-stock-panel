@@ -408,7 +408,7 @@ export function CreateExtDialog({ onClose }: { onClose: () => void }) {
                     className={`inline-flex items-center justify-center gap-1.5 rounded-card px-3 py-2 text-xs font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 ${
                       active
                         ? 'bg-surface text-foreground shadow-sm'
-                        : 'text-muted hover:text-secondary hover:bg-elevated/60'
+                        : 'text-secondary hover:text-secondary hover:bg-elevated/60'
                     }`}
                   >
                     <Icon className={`h-3.5 w-3.5 transition-colors ${active ? 'text-warning' : ''}`} />
@@ -581,7 +581,7 @@ export function CreateExtDialog({ onClose }: { onClose: () => void }) {
                   <button
                     onClick={() => { setScheduleMode('interval'); setScheduleTime('') }}
                     className={`h-8 rounded-card text-micro font-medium transition-all ${
-                      scheduleMode === 'interval' ? 'bg-surface text-foreground shadow-sm' : 'text-muted hover:text-secondary hover:bg-elevated/40'
+                      scheduleMode === 'interval' ? 'bg-surface text-foreground shadow-sm' : 'text-secondary hover:text-secondary hover:bg-elevated/40'
                     }`}
                   >
                     按间隔
@@ -589,7 +589,7 @@ export function CreateExtDialog({ onClose }: { onClose: () => void }) {
                   <button
                     onClick={() => setScheduleMode('fixed')}
                     className={`h-8 rounded-card text-micro font-medium transition-all ${
-                      scheduleMode === 'fixed' ? 'bg-surface text-foreground shadow-sm' : 'text-muted hover:text-secondary hover:bg-elevated/40'
+                      scheduleMode === 'fixed' ? 'bg-surface text-foreground shadow-sm' : 'text-secondary hover:text-secondary hover:bg-elevated/40'
                     }`}
                   >
                     固定时刻
@@ -663,7 +663,7 @@ export function CreateExtDialog({ onClose }: { onClose: () => void }) {
                           <button
                             type="button"
                             onClick={() => setScheduleTime('')}
-                            className="h-8 shrink-0 px-2.5 rounded-card border border-border bg-base text-micro text-muted hover:text-foreground hover:bg-elevated focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-colors"
+                            className="h-8 shrink-0 px-2.5 rounded-card border border-border bg-base text-micro text-secondary hover:text-foreground hover:bg-elevated focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-colors"
                           >
                             清除
                           </button>
@@ -766,7 +766,7 @@ export function CreateExtDialog({ onClose }: { onClose: () => void }) {
                     <button
                       onClick={() => detectFileRef.current?.click()}
                       disabled={detecting}
-                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-card text-micro text-muted hover:text-accent hover:bg-accent/[0.06] disabled:opacity-40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-colors"
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-card text-micro text-secondary hover:text-accent hover:bg-accent/[0.06] disabled:opacity-40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-colors"
                     >
                       {detecting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
                       从数据文件识别
@@ -774,7 +774,7 @@ export function CreateExtDialog({ onClose }: { onClose: () => void }) {
                   )}
                   <button
                     onClick={addField}
-                    className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-card text-micro text-muted hover:text-accent hover:bg-accent/[0.06] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-colors"
+                    className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-card text-micro text-secondary hover:text-accent hover:bg-accent/[0.06] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-colors"
                   >
                     <Plus className="h-3 w-3" />
                     添加字段
@@ -813,7 +813,7 @@ export function CreateExtDialog({ onClose }: { onClose: () => void }) {
                   ))}
                   <button
                     onClick={() => setSelectMapping(null)}
-                    className="px-2.5 py-1 rounded-card bg-elevated text-muted text-micro hover:text-secondary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-colors"
+                    className="px-2.5 py-1 rounded-card bg-surface border border-border text-foreground text-micro hover:text-secondary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-colors"
                   >
                     取消
                   </button>
@@ -988,7 +988,7 @@ export function CreateExtDialog({ onClose }: { onClose: () => void }) {
           <div className="flex items-center gap-2 shrink-0">
             <button
               onClick={onClose}
-              className="px-4 py-2 rounded-card bg-elevated text-secondary text-xs hover:bg-elevated/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-colors"
+              className="px-4 py-2 rounded-card bg-surface border border-border text-foreground text-xs hover:bg-elevated/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-colors"
             >
               取消
             </button>

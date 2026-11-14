@@ -157,7 +157,7 @@ export function FilterPanel({ value, onChange, onClose, onReset }: {
               onClick={onReset}
               title="清空全部筛选"
               className="inline-flex items-center gap-1 px-1.5 h-6 rounded-btn text-micro
-                text-muted hover:text-danger hover:bg-danger/10 transition-colors"
+                text-secondary hover:text-danger hover:bg-danger/10 transition-colors"
             >
               <RotateCcw className="h-3 w-3" />
               清空
@@ -185,7 +185,7 @@ export function FilterPanel({ value, onChange, onClose, onReset }: {
               className={`px-2 py-0.5 rounded-btn text-micro transition-colors ${
                 active
                   ? 'bg-accent/15 text-accent'
-                  : 'bg-elevated text-secondary hover:text-foreground hover:bg-elevated/80'
+                  : 'bg-surface border border-border text-foreground hover:text-foreground hover:bg-elevated/80'
               }`}
             >
               {board}
@@ -198,7 +198,7 @@ export function FilterPanel({ value, onChange, onClose, onReset }: {
           className={`px-2 py-0.5 rounded-btn text-micro transition-colors ${
             value.excludeST
               ? 'bg-accent/15 text-accent'
-              : 'bg-elevated text-secondary hover:text-foreground hover:bg-elevated/80'
+              : 'bg-surface border border-border text-foreground hover:text-foreground hover:bg-elevated/80'
           }`}
         >
           排除ST

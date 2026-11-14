@@ -110,7 +110,7 @@ export function DefinitionPicker({ kinds = ['signal', 'factor'], onSelect, selec
                 className={`rounded-full px-2.5 py-1 text-micro transition-colors ${
                   kindFilter === k
                     ? 'bg-accent/15 text-accent'
-                    : 'text-muted hover:bg-elevated hover:text-foreground'
+                    : 'text-secondary hover:bg-elevated hover:text-foreground'
                 }`}
               >
                 {k === 'all' ? `全部 ${counts.signal + counts.factor}` : `${KIND_LABEL[k]} ${counts[k]}`}
@@ -189,7 +189,7 @@ export function DefinitionPicker({ kinds = ['signal', 'factor'], onSelect, selec
                       onClick={(e) => { e.stopPropagation(); smokeM.mutate(it) }}
                       disabled={smoking}
                       title="冒烟: 校验 → 编译 → 依赖可解析 (不跑回测)"
-                      className="inline-flex items-center gap-1 rounded-btn border border-border px-2 py-1 text-micro text-muted transition-colors hover:border-accent/30 hover:text-accent disabled:opacity-50"
+                      className="inline-flex items-center gap-1 rounded-btn border border-border px-2 py-1 text-micro text-secondary transition-colors hover:border-accent/30 hover:text-accent disabled:opacity-50"
                     >
                       {smoking ? <Loader2 className="h-3 w-3 animate-spin" /> : <FlaskConical className="h-3 w-3" />}
                       冒烟

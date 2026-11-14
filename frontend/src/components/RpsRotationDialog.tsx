@@ -270,7 +270,7 @@ export function RpsRotationDialog({ onClose, kind = 'concept' }: Props) {
                   className={cn(
                     'inline-flex items-center gap-1 px-2 py-0.5 rounded-btn text-xs transition-colors cursor-pointer border',
                     analyzing
-                      ? 'opacity-60 cursor-not-allowed border-border text-muted'
+                      ? 'opacity-60 cursor-not-allowed border-border text-secondary'
                       : 'bg-accent/10 text-accent border-accent/30 hover:bg-accent/20',
                   )}
                 >
@@ -330,7 +330,7 @@ export function RpsRotationDialog({ onClose, kind = 'concept' }: Props) {
                 'inline-flex items-center gap-1 px-2 py-1 rounded-btn text-xs transition-colors cursor-pointer border',
                 reversed
                   ? 'border-foreground bg-foreground font-medium text-surface'
-                  : 'border-border text-muted hover:text-secondary hover:bg-elevated',
+                  : 'border-border text-secondary hover:text-secondary hover:bg-elevated',
               )}
               title="翻转排序(高↔低)"
             >

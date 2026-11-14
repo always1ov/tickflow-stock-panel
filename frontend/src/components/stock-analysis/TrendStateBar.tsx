@@ -262,7 +262,7 @@ function TrendBacktestDialog({ symbol, onClose }: { symbol: string; onClose: () 
                             <button
                               onClick={() => apply.mutate({ threshold: r.threshold, source: 'manual' })}
                               disabled={apply.isPending || isCurrent}
-                              className="rounded-btn border border-border px-1.5 py-0.5 text-micro text-muted hover:text-foreground hover:border-accent/50 disabled:opacity-30"
+                              className="rounded-btn border border-border px-1.5 py-0.5 text-micro text-secondary hover:text-foreground hover:border-accent/50 disabled:opacity-30"
                             >
                               用
                             </button>
@@ -333,7 +333,7 @@ function TrendBacktestDialog({ symbol, onClose }: { symbol: string; onClose: () 
           <button
             onClick={() => reset.mutate()}
             disabled={reset.isPending}
-            className="text-micro text-muted hover:text-foreground disabled:opacity-40"
+            className="text-micro text-secondary hover:text-foreground disabled:opacity-40"
             title="清除该票的阈值覆盖,恢复全局默认"
           >
             恢复默认阈值
@@ -342,7 +342,7 @@ function TrendBacktestDialog({ symbol, onClose }: { symbol: string; onClose: () 
             <button
               onClick={() => run.mutate()}
               disabled={run.isPending}
-              className="inline-flex items-center gap-1 rounded-btn border border-border px-3 py-1 text-micro text-muted hover:text-foreground disabled:opacity-40"
+              className="inline-flex items-center gap-1 rounded-btn border border-border px-3 py-1 text-micro text-secondary hover:text-foreground disabled:opacity-40"
             >
               {run.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <FlaskConical className="h-3 w-3" />}
               重新回测

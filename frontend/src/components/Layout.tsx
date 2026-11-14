@@ -1033,7 +1033,7 @@ export function Layout() {
           }}
           onMouseLeave={() => window.clearTimeout(overlayTimer.current)}
           className={cn(
-            'fixed z-30 rounded-btn border border-border bg-surface/90 text-muted shadow-lg backdrop-blur-sm',
+            'fixed z-30 rounded-btn border border-border bg-surface/90 text-secondary shadow-lg backdrop-blur-sm',
             'hover:text-foreground hover:bg-elevated transition-colors duration-150 ease-smooth',
             isDesktop ? 'left-1.5 top-1/2 -translate-y-1/2 p-2' : 'left-3 top-3 p-2',
           )}
@@ -1078,7 +1078,7 @@ export function Layout() {
               <button
                 onClick={toggleNavCollapsed}
                 className={cn(
-                  'flex items-center rounded-btn text-muted hover:text-foreground hover:bg-elevated/60 transition-colors duration-150 ease-smooth',
+                  'flex items-center rounded-btn text-secondary hover:text-foreground hover:bg-elevated/60 transition-colors duration-150 ease-smooth',
                   railMode ? 'justify-center p-1.5' : 'ml-auto p-1.5',
                 )}
                 title={railMode ? '隐藏菜单 (再点击左缘按钮可唤出)' : '收起菜单'}
@@ -1091,7 +1091,7 @@ export function Layout() {
             ) : (
               <button
                 onClick={() => setDrawerOpen(false)}
-                className="ml-auto flex items-center rounded-btn p-1.5 text-muted hover:text-foreground hover:bg-elevated/60 transition-colors duration-150 ease-smooth"
+                className="ml-auto flex items-center rounded-btn p-1.5 text-secondary hover:text-foreground hover:bg-elevated/60 transition-colors duration-150 ease-smooth"
                 title="关闭菜单"
               >
                 <X className="h-4 w-4 shrink-0" />
@@ -1228,7 +1228,7 @@ export function Layout() {
                     'flex h-7 w-7 items-center justify-center rounded-btn transition-colors duration-hover',
                     realtimeAuto
                       ? 'bg-accent/15 text-accent hover:bg-accent/25'
-                      : 'text-muted hover:bg-elevated hover:text-foreground',
+                      : 'text-secondary hover:bg-elevated hover:text-foreground',
                     (toggleRealtimeAuto.isPending || realtimeUnavailable) && 'cursor-not-allowed opacity-50',
                   )}
                 >
@@ -1237,7 +1237,7 @@ export function Layout() {
                 <button
                   onClick={() => navigate('/settings?tab=monitoring&highlight=quotes')}
                   aria-label="打开实时监控设置"
-                  className="flex h-7 w-7 items-center justify-center rounded-btn text-muted transition-colors hover:bg-elevated hover:text-foreground"
+                  className="flex h-7 w-7 items-center justify-center rounded-btn text-secondary transition-colors hover:bg-elevated hover:text-foreground"
                   title="实时监控设置"
                 >
                   <Settings className="h-3.5 w-3.5" />
@@ -1255,7 +1255,7 @@ export function Layout() {
                     'relative inline-flex h-5 w-9 items-center rounded-full border transition-ui duration-expand focus-visible:outline-none focus-ring-custom focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-1 focus-visible:ring-offset-surface',
                     realtimeEnabled
                       ? 'border-accent/50 bg-accent'
-                      : 'border-border bg-elevated hover:border-muted',
+                      : 'border-border bg-surface hover:border-muted',
                     realtimeToggleDisabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
                   )}
                 >

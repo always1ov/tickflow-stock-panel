@@ -126,7 +126,7 @@ export function Auth() {
               <button
                 type="button"
                 onClick={() => setShowPwd(s => !s)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-muted hover:text-foreground"
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-secondary hover:text-foreground"
                 tabIndex={-1}
               >
                 {showPwd ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}

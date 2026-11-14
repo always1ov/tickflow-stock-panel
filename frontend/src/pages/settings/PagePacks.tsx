@@ -145,7 +145,7 @@ export function SettingsPagePacksPanel() {
           <button
             type="button"
             onClick={() => fileRef.current?.click()}
-            className="inline-flex h-9 items-center gap-1.5 rounded-btn border border-border bg-elevated px-3 text-xs text-secondary hover:bg-elevated/80 hover:text-foreground transition-colors"
+            className="inline-flex h-9 items-center gap-1.5 rounded-btn border border-border bg-surface px-3 text-xs text-foreground hover:bg-elevated/80 hover:text-foreground transition-colors"
           >
             <Package className="h-3.5 w-3.5" />
             {fileRef.current?.files?.[0]?.name ?? '选择产物文件'}
@@ -175,7 +175,7 @@ export function SettingsPagePacksPanel() {
           <button
             type="button"
             onClick={() => importFileRef.current?.click()}
-            className="inline-flex h-9 items-center gap-1.5 rounded-btn border border-border bg-elevated px-3 text-xs text-secondary hover:bg-elevated/80 hover:text-foreground transition-colors"
+            className="inline-flex h-9 items-center gap-1.5 rounded-btn border border-border bg-surface px-3 text-xs text-foreground hover:bg-elevated/80 hover:text-foreground transition-colors"
           >
             <FileCode className="h-3.5 w-3.5" />
             {importFileRef.current?.files?.[0]?.name ?? '选择 .tsx 源文件'}
@@ -204,7 +204,7 @@ export function SettingsPagePacksPanel() {
                 type="button"
                 disabled={busyImport || !importNs}
                 onClick={handleImportFromProject}
-                className="inline-flex h-9 items-center gap-1.5 rounded-btn border border-border bg-elevated px-3 text-xs text-secondary hover:bg-elevated/80 hover:text-foreground disabled:opacity-50 transition-colors"
+                className="inline-flex h-9 items-center gap-1.5 rounded-btn border border-border bg-surface px-3 text-xs text-foreground hover:bg-elevated/80 hover:text-foreground disabled:opacity-50 transition-colors"
               >
                 <FolderDown className="h-3.5 w-3.5" />
                 导入
@@ -258,7 +258,7 @@ export function SettingsPagePacksPanel() {
                 disabled={!!p.error}
                 className={cn(
                   'relative h-5 w-9 rounded-full transition-colors',
-                  p.enabled ? 'bg-accent' : 'bg-elevated border border-border',
+                  p.enabled ? 'bg-accent' : 'bg-surface border border-border',
                   p.error && 'cursor-not-allowed opacity-40',
                 )}
                 title={p.error ? '校验失败的包不可启用' : p.enabled ? '停用 (刷新后生效)' : '启用 (刷新后生效)'}
@@ -273,7 +273,7 @@ export function SettingsPagePacksPanel() {
               <button
                 type="button"
                 onClick={() => { if (confirm(`删除页面插件 "${p.label || p.id}"?`)) deleteMut.mutate(p.id) }}
-                className="rounded-btn p-1.5 text-muted hover:bg-danger/10 hover:text-danger transition-colors"
+                className="rounded-btn p-1.5 text-secondary hover:bg-danger/10 hover:text-danger transition-colors"
                 title="删除"
               >
                 <Trash2 className="h-3.5 w-3.5" />

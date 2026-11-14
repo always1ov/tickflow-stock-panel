@@ -211,7 +211,7 @@ function DimensionMembersDialogContent({ target, onClose, onStockClick }: Omit<P
             <Users className="h-3.5 w-3.5 text-muted" />
             {membersQuery.isLoading ? '—' : total}
           </span>
-          <button onClick={onClose} className="inline-flex h-7 w-7 items-center justify-center rounded-btn text-muted hover:bg-elevated hover:text-foreground" title="关闭">
+          <button onClick={onClose} className="inline-flex h-7 w-7 items-center justify-center rounded-btn text-secondary hover:bg-elevated hover:text-foreground" title="关闭">
             <X className="h-4 w-4" />
           </button>
         </div>

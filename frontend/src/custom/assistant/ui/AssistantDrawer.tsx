@@ -244,7 +244,7 @@ function SessionMenu({
             </button>
             <button
               type="button"
-              className="hidden cursor-pointer text-muted transition-colors duration-150 ease-smooth hover:text-danger group-hover:block"
+              className="hidden cursor-pointer text-secondary transition-colors duration-150 ease-smooth hover:text-danger group-hover:block"
               onClick={() => deleteSession(session.id)}
               title="删除会话"
             >
@@ -515,7 +515,7 @@ function InputArea({ sending, blocked }: { sending: boolean; blocked: boolean })
             onClick={stopSending}
             title="停止生成"
             aria-label="停止生成"
-            className="mr-1.5 mb-1.5 flex h-8 w-8 cursor-pointer items-center justify-center rounded-btn bg-elevated text-secondary transition-colors duration-150 ease-smooth hover:text-foreground"
+            className="mr-1.5 mb-1.5 flex h-8 w-8 cursor-pointer items-center justify-center rounded-btn bg-surface border border-border text-foreground transition-colors duration-150 ease-smooth hover:text-foreground"
           >
             <Square className="h-3.5 w-3.5 fill-current" />
           </button>

@@ -638,7 +638,7 @@ function MainlineFilterPanel({ filter, onDone }: {
           onClick={() => setExcludeSt(v => !v)}
           className={cn(
             'relative inline-flex h-4.5 w-8 items-center rounded-full border transition-ui duration-expand',
-            excludeSt ? 'border-accent/50 bg-accent' : 'border-border bg-elevated hover:border-muted',
+            excludeSt ? 'border-accent/50 bg-accent' : 'border-border bg-surface hover:border-muted',
           )}
         >
           <span className={cn(

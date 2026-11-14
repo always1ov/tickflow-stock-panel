@@ -99,7 +99,7 @@ export function AnalysisConfigDialog({
       >
         <div className="flex items-center justify-between px-4 pt-3 pb-2">
           <span className="text-sm font-medium">配置数据源</span>
-          <button onClick={onClose} className="p-0.5 text-muted hover:text-foreground">
+          <button onClick={onClose} className="p-0.5 text-secondary hover:text-foreground">
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -254,7 +254,7 @@ export function DimensionHeatmap({
         <span className="text-xs text-muted">热度分布（按标的覆盖数）</span>
         <button
           onClick={() => setShowAll(v => !v)}
-          className="text-micro text-muted hover:text-foreground flex items-center gap-0.5"
+          className="text-micro text-secondary hover:text-foreground flex items-center gap-0.5"
         >
           {showAll ? '收起' : `展开全部 (${enriched.length})`}
           <ChevronDown className={`h-3 w-3 transition-transform ${showAll ? 'rotate-180' : ''}`} />
@@ -450,7 +450,7 @@ export function ConfigButton({ onClick }: { onClick: () => void }) {
   return (
     <button
       onClick={onClick}
-      className="p-1.5 hover:bg-surface text-muted hover:text-accent transition-colors"
+      className="p-1.5 hover:bg-surface text-secondary hover:text-accent transition-colors"
       title="配置数据源"
     >
       <Settings2 className="h-3.5 w-3.5" />

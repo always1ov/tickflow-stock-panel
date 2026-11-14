@@ -215,7 +215,7 @@ export function ExtDataPullPanel({ config, onSaved }: {
           onClick={() => setShowConfig(true)}
           disabled={!pull?.url}
           title={pull?.url ? undefined : '请先通过「新建扩展数据 → URL」创建拉取配置'}
-          className="inline-flex items-center justify-center gap-1 h-9 rounded-card border border-border bg-elevated text-xs text-foreground hover:bg-border/30 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-colors"
+          className="inline-flex items-center justify-center gap-1 h-9 rounded-card border border-border bg-surface text-xs text-foreground hover:bg-border/30 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-colors"
         >
           <Settings2 className="h-3.5 w-3.5" />
           拉取设置…
@@ -638,7 +638,7 @@ function ExtPullConfigDialog({ config, onSaved, onClose }: {
                 <button
                   onClick={() => { setScheduleMode('interval'); setScheduleTime('') }}
                   className={`h-8 rounded-card text-micro font-medium transition-all ${
-                    scheduleMode === 'interval' ? 'bg-surface text-foreground shadow-sm' : 'text-muted hover:text-secondary hover:bg-elevated/40'
+                    scheduleMode === 'interval' ? 'bg-surface text-foreground shadow-sm' : 'text-secondary hover:text-secondary hover:bg-elevated/40'
                   }`}
                 >
                   按间隔
@@ -646,7 +646,7 @@ function ExtPullConfigDialog({ config, onSaved, onClose }: {
                 <button
                   onClick={() => setScheduleMode('fixed')}
                   className={`h-8 rounded-card text-micro font-medium transition-all ${
-                    scheduleMode === 'fixed' ? 'bg-surface text-foreground shadow-sm' : 'text-muted hover:text-secondary hover:bg-elevated/40'
+                    scheduleMode === 'fixed' ? 'bg-surface text-foreground shadow-sm' : 'text-secondary hover:text-secondary hover:bg-elevated/40'
                   }`}
                 >
                   固定时刻
@@ -742,7 +742,7 @@ function ExtPullConfigDialog({ config, onSaved, onClose }: {
                       {scheduleTime && (
                         <button
                           type="button" onClick={() => setScheduleTime('')}
-                          className="h-8 shrink-0 px-2 rounded-card border border-border bg-base text-micro text-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-colors"
+                          className="h-8 shrink-0 px-2 rounded-card border border-border bg-base text-micro text-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-colors"
                         >
                           清除
                         </button>
@@ -1074,7 +1074,7 @@ function ExtPullConfigDialog({ config, onSaved, onClose }: {
           <button
             onClick={handleTest}
             disabled={testing || !url}
-            className="inline-flex items-center gap-1.5 h-9 px-4 rounded-card border border-border bg-elevated text-xs text-foreground hover:bg-border/30 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-colors"
+            className="inline-flex items-center gap-1.5 h-9 px-4 rounded-card border border-border bg-surface text-xs text-foreground hover:bg-border/30 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-colors"
           >
             {testing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5" />}
             测试

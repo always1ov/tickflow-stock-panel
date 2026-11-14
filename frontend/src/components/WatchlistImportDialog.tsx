@@ -136,7 +136,7 @@ function Dropzone({
           e.preventDefault()
           onPick(e.dataTransfer.files)
         }}
-        className="w-full flex flex-col items-center justify-center gap-2 rounded-btn border border-dashed border-border bg-elevated/40 hover:bg-elevated/70 px-4 py-6 text-secondary transition-colors disabled:opacity-50"
+        className="w-full flex flex-col items-center justify-center gap-2 rounded-btn border border-dashed border-border bg-elevated/40 hover:bg-elevated/70 px-4 py-6 text-foreground transition-colors disabled:opacity-50"
       >
         {busy ? (
           <Loader2 className="h-6 w-6 animate-spin text-accent" />
@@ -697,7 +697,7 @@ export function WatchlistImportDialog({
             <button
               type="button"
               onClick={() => setPasteOpen(true)}
-              className="w-full inline-flex items-center justify-center gap-1.5 rounded-btn border border-dashed border-border bg-elevated/40 px-3 py-2 text-xs text-secondary hover:bg-elevated/70"
+              className="w-full inline-flex items-center justify-center gap-1.5 rounded-btn border border-dashed border-border bg-elevated/40 px-3 py-2 text-xs text-foreground hover:bg-elevated/70"
             >
               <Keyboard className="h-3.5 w-3.5 text-accent" />
               或粘贴证券代码 / 整篇文章
@@ -735,7 +735,7 @@ export function WatchlistImportDialog({
                     disabled={busy || !codesText.trim()}
                     onClick={() => void runCodes()}
                     title="只认六位代码，不调 AI，最快"
-                    className="h-7 px-2.5 rounded-btn text-xs inline-flex items-center gap-1.5 border border-border bg-elevated text-secondary hover:text-foreground disabled:opacity-40"
+                    className="h-7 px-2.5 rounded-btn text-xs inline-flex items-center gap-1.5 border border-border bg-surface text-foreground hover:text-foreground disabled:opacity-40"
                   >
                     <Keyboard className="h-3.5 w-3.5" />
                     解析代码
@@ -799,7 +799,7 @@ export function WatchlistImportDialog({
               <button
                 type="button"
                 onClick={() => setShowSkipped(v => !v)}
-                className="flex items-center gap-1 text-xs text-muted hover:text-secondary"
+                className="flex items-center gap-1 text-xs text-secondary hover:text-secondary"
               >
                 <span className="transition-transform" style={{ transform: showSkipped ? 'rotate(90deg)' : undefined }}>▸</span>
                 已略过 {skippedCount} 个（已在自选/所选分组，或主数据未匹配）
@@ -869,7 +869,7 @@ export function WatchlistImportDialog({
                 className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs transition-colors ${
                   targetGroupIds.length === 0
                     ? 'border-accent/40 bg-accent/10 text-accent'
-                    : 'border-border bg-elevated text-secondary hover:text-foreground'
+                    : 'border-border bg-surface text-foreground hover:text-foreground'
                 }`}
                 title="不加到任何分组，仅新增标的到自选"
               >
@@ -892,7 +892,7 @@ export function WatchlistImportDialog({
                     className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs transition-colors ${
                       active
                         ? `${c.border} ${c.background} ${c.text}`
-                        : 'border-border bg-elevated text-secondary hover:bg-elevated/80 hover:text-foreground'
+                        : 'border-border bg-surface text-foreground hover:bg-elevated/80 hover:text-foreground'
                     }`}
                     title={`${active ? '移出' : '加入'}目标分组「${g.name}」`}
                   >

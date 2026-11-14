@@ -678,7 +678,7 @@ function MetricLabel({ label, metric }: { label: string; metric: MetricHelpKey }
         aria-label={`查看${label}说明`}
         aria-expanded={open}
         title={`查看${label}说明`}
-        className="inline-flex h-3.5 w-3.5 items-center justify-center text-muted transition-colors hover:text-accent"
+        className="inline-flex h-3.5 w-3.5 items-center justify-center text-secondary transition-colors hover:text-accent"
       >
         <HelpCircle className="h-3.5 w-3.5" />
       </button>
@@ -743,7 +743,7 @@ const StrategyParamInput = memo(function StrategyParamInput({ param, value, onCh
           type="button"
           onClick={() => onChange(param.id, !checked)}
           className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 cursor-pointer ${
-            checked ? 'bg-accent' : 'bg-elevated'
+            checked ? 'bg-accent' : 'bg-surface border border-border'
           }`}
           aria-pressed={checked}
         >
@@ -907,7 +907,7 @@ function StockPoolPicker({ value, onChange, assetType = 'stock' }: { value: stri
                     type="button"
                     disabled={added}
                     onClick={() => addSymbol(r.symbol, r.name)}
-                    className={`flex w-full items-center gap-2 px-3 py-2 text-left text-xs transition-colors ${added ? 'cursor-default text-muted' : 'text-foreground hover:bg-elevated'}`}
+                    className={`flex w-full items-center gap-2 px-3 py-2 text-left text-xs transition-colors ${added ? 'cursor-default text-secondary' : 'text-foreground hover:bg-elevated'}`}
                   >
                     <span className="w-[78px] shrink-0 font-mono">{r.symbol}</span>
                     <span className="min-w-0 flex-1 truncate text-secondary">{r.name}</span>
@@ -1746,9 +1746,9 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
                   : '分钟K成交：细化成交价，并为兼容的卖出信号提供下一分钟成交。'
                 }
                 className={`group relative inline-flex h-3.5 w-6 items-center rounded-full shrink-0 transition-colors duration-200 ${
-                  !hasMinuteBatch ? 'bg-elevated opacity-50 cursor-not-allowed'
+                  !hasMinuteBatch ? 'bg-surface border border-border opacity-50 cursor-not-allowed'
                   : highGranularity ? 'bg-warning cursor-pointer'
-                  : 'bg-elevated cursor-pointer'
+                  : 'bg-surface cursor-pointer'
                 }`}
               >
                 <span className={`inline-block h-2.5 w-2.5 rounded-full bg-white shadow-sm transition-transform duration-200 ${
@@ -2253,7 +2253,7 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
               return (
                 <button key={s} onClick={() => setRegimeStates(prev => active ? prev.filter(x => x !== s) : [...prev, s])}
                   className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-btn border text-xs transition-colors cursor-pointer ${
-                    active ? 'border-transparent text-on-accent' : 'border-border text-muted hover:text-secondary'
+                    active ? 'border-transparent text-on-accent' : 'border-border text-secondary hover:text-secondary'
                   }`}
                   style={active ? { backgroundColor: REGIME_STATE_COLORS[s] } : undefined}>
                   <span className="inline-block h-2 w-2 rounded-btn" style={{ backgroundColor: active ? '#fff' : REGIME_STATE_COLORS[s] }} />
@@ -2263,7 +2263,7 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
             })}
             {(regimeStates.length > 0 || regimeMinScore !== '') && (
               <button onClick={() => { setRegimeStates([]); setRegimeMinScore('') }}
-                className="text-micro text-muted hover:text-danger px-1">清除</button>
+                className="text-micro text-secondary hover:text-danger px-1">清除</button>
             )}
           </div>
         </div>
@@ -2964,7 +2964,7 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
                 <button
                   type="button"
                   onClick={() => setSettingsOpen(false)}
-                  className="rounded-btn border border-border bg-surface p-1.5 text-muted transition-colors hover:border-accent/40 hover:text-foreground"
+                  className="rounded-btn border border-border bg-surface p-1.5 text-secondary transition-colors hover:border-accent/40 hover:text-foreground"
                 >
                   <X className="h-4 w-4" />
                 </button>
@@ -3287,7 +3287,7 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
                           type="button"
                           onClick={() => { setAssetType(t); setSelectedStrategy(null); setSymbols('') }}
                           className={`h-full px-3 text-xs font-medium transition-colors cursor-pointer
-                            ${assetType === t ? 'bg-accent/10 text-accent' : 'text-muted hover:text-foreground'}`}
+                            ${assetType === t ? 'bg-accent/10 text-accent' : 'text-secondary hover:text-foreground'}`}
                         >
                           {t === 'stock' ? '股票' : 'ETF'}
                         </button>

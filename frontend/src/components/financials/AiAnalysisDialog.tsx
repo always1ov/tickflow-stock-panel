@@ -139,21 +139,21 @@ export function AiAnalysisDialog({ task, mode, minimized }: Props) {
                 {/* 复制:仅在内容就绪且非生成中显示 */}
                 {content && !isWorking && (
                   <button onClick={handleCopy} title="复制全文"
-                    className="p-1.5 rounded-card hover:bg-elevated text-muted hover:text-foreground transition-colors">
+                    className="p-1.5 rounded-card hover:bg-elevated text-secondary hover:text-foreground transition-colors">
                     {copied ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
                   </button>
                 )}
                 {/* 生成中:仅最小化(后台继续生成),无关闭按钮 */}
                 {!isHistory && isWorking && (
                   <button onClick={minimizeDialog} title="最小化为气泡,后台继续生成"
-                    className="p-1.5 rounded-card hover:bg-elevated text-muted hover:text-foreground transition-colors">
+                    className="p-1.5 rounded-card hover:bg-elevated text-secondary hover:text-foreground transition-colors">
                     <Minimize2 className="h-4 w-4" />
                   </button>
                 )}
                 {/* 完成态/历史报告:显示关闭按钮 */}
                 {(!isWorking || isHistory) && (
                   <button onClick={closeDialog} title="关闭"
-                    className="p-1.5 rounded-card hover:bg-elevated text-muted hover:text-foreground transition-colors">
+                    className="p-1.5 rounded-card hover:bg-elevated text-secondary hover:text-foreground transition-colors">
                     <X className="h-4 w-4" />
                   </button>
                 )}
@@ -187,7 +187,7 @@ export function AiAnalysisDialog({ task, mode, minimized }: Props) {
                 <div className="text-xs text-secondary text-center max-w-md px-4">{error}</div>
                 {error.includes('AI') && (
                   <button onClick={() => { window.location.href = `${import.meta.env.BASE_URL}settings?tab=ai` }}
-                    className="mt-1 inline-flex items-center gap-1.5 h-8 px-3 rounded-card bg-elevated border border-border text-xs text-secondary hover:text-foreground transition-colors">
+                    className="mt-1 inline-flex items-center gap-1.5 h-8 px-3 rounded-card bg-surface border border-border text-xs text-foreground hover:text-foreground transition-colors">
                     <Settings2 className="h-3.5 w-3.5" /> 去配置 AI
                   </button>
                 )}

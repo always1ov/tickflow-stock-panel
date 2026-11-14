@@ -237,7 +237,7 @@ export function Financials() {
                     </div>
                   </div>
                   <button
-                    className="shrink-0 text-muted transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-30"
+                    className="shrink-0 text-secondary transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-30"
                     onClick={() => handleSync(key)}
                     disabled={syncing}
                     title={syncing ? '正在同步…' : `更新${label}`}

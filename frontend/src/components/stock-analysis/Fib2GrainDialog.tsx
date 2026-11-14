@@ -64,7 +64,7 @@ export function Fib2GrainDialog({
               <span className="text-micro text-muted">{r.window_days} 根日线</span>
             )}
           </div>
-          <button onClick={onClose} className="text-muted hover:text-foreground">
+          <button onClick={onClose} className="text-secondary hover:text-foreground">
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -150,7 +150,7 @@ export function Fib2GrainDialog({
                             <button
                               onClick={() => { onPick(row.grain); onClose() }}
                               disabled={row.grain === current}
-                              className="rounded-btn border border-border px-2 py-0.5 font-sans text-micro text-muted hover:border-accent/40 hover:text-accent disabled:opacity-30"
+                              className="rounded-btn border border-border px-2 py-0.5 font-sans text-micro text-secondary hover:border-accent/40 hover:text-accent disabled:opacity-30"
                             >
                               用这档
                             </button>

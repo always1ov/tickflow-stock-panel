@@ -33,7 +33,7 @@ function SortableMenuRow({ node, entry, parentId, groups, hidden, busy, focusNew
       parentId && 'pl-9 sm:pl-10', isDragging && 'z-10 bg-elevated shadow-lg', isOver && 'bg-accent/10', hidden && 'opacity-60')}
     data-nav-id={node.id}>
     <button type="button" {...attributes} {...listeners} disabled={home || busy} aria-label={`拖动${label}`}
-      className="touch-none rounded-btn p-1 text-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-accent/50 disabled:opacity-30">
+      className="touch-none rounded-btn p-1 text-secondary hover:text-foreground focus-visible:ring-2 focus-visible:ring-accent/50 disabled:opacity-30">
       {home ? <LockKeyhole className="h-4 w-4" /> : <GripVertical className="h-4 w-4" />}
     </button>
     <Icon className="h-4 w-4 shrink-0 text-muted" />
@@ -53,16 +53,16 @@ function SortableMenuRow({ node, entry, parentId, groups, hidden, busy, focusNew
     </select>}
     <div className="flex items-center gap-1">
       {node.type === 'group' ? <button type="button" disabled={busy} onClick={() => onDissolve(node.id)} aria-label={`解散${label}`}
-        title="解散分类，子菜单移回顶层" className="rounded-btn p-2 text-muted hover:bg-elevated hover:text-foreground disabled:opacity-40"><FolderMinus className="h-4 w-4" /></button>
+        title="解散分类，子菜单移回顶层" className="rounded-btn p-2 text-secondary hover:bg-elevated hover:text-foreground disabled:opacity-40"><FolderMinus className="h-4 w-4" /></button>
         : <>
           <button type="button" disabled={home || busy} onClick={() => onHide(node.id)} aria-label={`${hidden ? '显示' : '隐藏'}${label}`}
-            className="rounded-btn p-2 text-muted hover:bg-elevated hover:text-accent disabled:opacity-30">{hidden ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button>
+            className="rounded-btn p-2 text-secondary hover:bg-elevated hover:text-accent disabled:opacity-30">{hidden ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button>
           {entry && <Link to={entry.to}
             aria-label={`打开${label}`} className="rounded-btn p-2 text-muted hover:bg-elevated hover:text-accent"><ExternalLink className="h-4 w-4" /></Link>}
           {node.id === '/monitor' && <button type="button" aria-label={badgeEnabled ? '关闭监控数字提示' : '开启监控数字提示'} onClick={onToggleBadge}
-            className="rounded-btn p-2 text-muted hover:bg-elevated hover:text-accent"><Bell className="h-4 w-4" /></button>}
+            className="rounded-btn p-2 text-secondary hover:bg-elevated hover:text-accent"><Bell className="h-4 w-4" /></button>}
           {entry?.extensionId && <button type="button" disabled={busy} onClick={() => onRemove(entry)} aria-label={`删除源码扩展页${label}`}
-            className="rounded-btn p-2 text-muted hover:bg-danger/10 hover:text-danger disabled:opacity-30"><Trash2 className="h-4 w-4" /></button>}
+            className="rounded-btn p-2 text-secondary hover:bg-danger/10 hover:text-danger disabled:opacity-30"><Trash2 className="h-4 w-4" /></button>}
         </>}
     </div>
   </div>

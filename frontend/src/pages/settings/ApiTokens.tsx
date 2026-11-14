@@ -65,7 +65,7 @@ export function SettingsApiTokensPanel() {
           <span className="text-micro text-muted">外部调用方的第二认证通道 — 与面板密码并行, 互不影响</span>
           <button
             onClick={() => setCreating(v => !v)}
-            className="ml-auto flex items-center gap-1 rounded-btn border border-border px-2 py-1 text-micro text-muted transition-colors hover:border-accent/40 hover:text-accent"
+            className="ml-auto flex items-center gap-1 rounded-btn border border-border px-2 py-1 text-micro text-secondary transition-colors hover:border-accent/40 hover:text-accent"
           >
             <Plus className="h-3 w-3" /> 新建 Token
           </button>
@@ -166,7 +166,7 @@ export function SettingsApiTokensPanel() {
                   <button
                     onClick={() => { revokeM.reset(); setRevokeTarget(t) }}
                     disabled={revokeM.isPending}
-                    className={cn('shrink-0 rounded-btn border border-border px-2 py-1 text-micro text-muted transition-colors hover:border-danger/40 hover:text-danger')}
+                    className={cn('shrink-0 rounded-btn border border-border px-2 py-1 text-micro text-secondary transition-colors hover:border-danger/40 hover:text-danger')}
                   >
                     吊销
                   </button>

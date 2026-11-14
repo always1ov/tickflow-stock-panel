@@ -237,7 +237,7 @@ export function WatchlistGroupBar({
             type="button"
             onClick={() => setExpanded(v => !v)}
             aria-expanded={expanded}
-            className="order-1 ml-auto inline-flex h-10 shrink-0 items-center gap-0.5 whitespace-nowrap text-micro text-muted hover:text-accent sm:order-2 sm:ml-1"
+            className="order-1 ml-auto inline-flex h-10 shrink-0 items-center gap-0.5 whitespace-nowrap text-micro text-secondary hover:text-accent sm:order-2 sm:ml-1"
             title={expanded ? '收起分组' : '展开全部分组'}
           >
             {expanded ? '收起' : `全部 ${groups.length} 组`}
@@ -248,7 +248,7 @@ export function WatchlistGroupBar({
         <button
           type="button"
           onClick={() => setManagerOpen(true)}
-          className="order-1 ml-2 inline-flex h-10 w-8 shrink-0 items-center justify-center text-muted hover:text-accent sm:order-2"
+          className="order-1 ml-2 inline-flex h-10 w-8 shrink-0 items-center justify-center text-secondary hover:text-accent sm:order-2"
           title="管理自选分组"
           aria-label="管理自选分组"
         >
@@ -259,7 +259,7 @@ export function WatchlistGroupBar({
           <button
             type="button"
             onClick={() => setConfirmClear(true)}
-            className="order-1 inline-flex h-10 w-8 shrink-0 items-center justify-center text-muted hover:text-warning sm:order-2"
+            className="order-1 inline-flex h-10 w-8 shrink-0 items-center justify-center text-secondary hover:text-warning sm:order-2"
             title="清空当前分组"
             aria-label="清空当前分组"
           >
@@ -449,7 +449,7 @@ function GroupManagerDialog({
           <h2 id="watchlist-groups-title" className={TYPE.section}>管理自选分组</h2>
           <p className="mt-0.5 text-xs text-muted">删除分组不会删除其中的股票</p>
         </div>
-        <button type="button" onClick={onClose} className="h-8 w-8 inline-flex items-center justify-center text-muted hover:text-foreground" aria-label="关闭">
+        <button type="button" onClick={onClose} className="h-8 w-8 inline-flex items-center justify-center text-secondary hover:text-foreground" aria-label="关闭">
           <X className="h-4 w-4" />
         </button>
       </div>
@@ -465,7 +465,7 @@ function GroupManagerDialog({
           onClick={() => void toggleGroupsInNav(!groupsInNav)}
           disabled={navTogglePending}
           className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors duration-expand disabled:opacity-50 ${
-            groupsInNav ? 'bg-accent' : 'bg-elevated'
+            groupsInNav ? 'bg-accent' : 'bg-surface border border-border'
           }`}
           title={groupsInNav ? '已开启 — 点击关闭' : '已关闭 — 点击开启'}
         >
@@ -525,7 +525,7 @@ function GroupManagerDialog({
                   <button type="button" disabled={pending} onClick={() => void rename(group.id)} className={`p-1 ${resolveWatchlistGroupColor(editingColor).text}`} title="保存分组">
                     <Check className="h-3.5 w-3.5" />
                   </button>
-                  <button type="button" onClick={() => setEditingId(null)} className="p-1 text-muted hover:text-foreground" title="取消">
+                  <button type="button" onClick={() => setEditingId(null)} className="p-1 text-secondary hover:text-foreground" title="取消">
                     <X className="h-3.5 w-3.5" />
                   </button>
                 </div>
@@ -546,7 +546,7 @@ function GroupManagerDialog({
                 >
                   确认
                 </button>
-                <button type="button" onClick={() => setDeletingId(null)} className="p-1 text-muted hover:text-foreground" aria-label="取消删除">
+                <button type="button" onClick={() => setDeletingId(null)} className="p-1 text-secondary hover:text-foreground" aria-label="取消删除">
                   <X className="h-3.5 w-3.5" />
                 </button>
               </>
@@ -560,7 +560,7 @@ function GroupManagerDialog({
                       type="button"
                       disabled={pending || index === 0}
                       onClick={() => void move(group.id, -1)}
-                      className="p-1 text-muted hover:text-accent disabled:opacity-30 disabled:hover:text-muted"
+                      className="p-1 text-secondary hover:text-accent disabled:opacity-30 disabled:hover:text-muted"
                       title="上移"
                       aria-label={`上移分组 ${group.name}`}
                     >
@@ -570,7 +570,7 @@ function GroupManagerDialog({
                       type="button"
                       disabled={pending || index === groups.length - 1}
                       onClick={() => void move(group.id, 1)}
-                      className="p-1 text-muted hover:text-accent disabled:opacity-30 disabled:hover:text-muted"
+                      className="p-1 text-secondary hover:text-accent disabled:opacity-30 disabled:hover:text-muted"
                       title="下移"
                       aria-label={`下移分组 ${group.name}`}
                     >
@@ -587,7 +587,7 @@ function GroupManagerDialog({
                     setDeletingId(null)
                     setError('')
                   }}
-                  className="p-1 text-muted hover:text-accent"
+                  className="p-1 text-secondary hover:text-accent"
                   title="编辑分组"
                 >
                   <Pencil className="h-3.5 w-3.5" />
@@ -595,7 +595,7 @@ function GroupManagerDialog({
                 <button
                   type="button"
                   onClick={() => { setDeletingId(group.id); setEditingId(null); setError('') }}
-                  className="p-1 text-muted hover:text-danger"
+                  className="p-1 text-secondary hover:text-danger"
                   title="删除分组"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
@@ -680,7 +680,7 @@ export function WatchlistGroupPicker({ groups, groupIds, symbol, disabled, onTog
         className={`relative inline-flex h-5 w-8 shrink-0 items-center justify-center gap-0.5 rounded-btn border border-transparent transition-colors ${
           memberGroups.length > 0
             ? 'hover:border-accent/30'
-            : 'text-muted hover:border-accent/30 hover:text-accent'
+            : 'text-secondary hover:border-accent/30 hover:text-accent'
         } ${disabled ? 'opacity-40' : ''}`}
         title={memberGroups.length === 0 ? '未分组 — 点击设置分组' : `分组：${titleNames}`}
         aria-label={`${symbol} 的分组`}

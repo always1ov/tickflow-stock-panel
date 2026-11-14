@@ -135,7 +135,7 @@ export function Factors() {
                 <button
                   type="button"
                   onClick={() => patchParams({ edit: null })}
-                  className="ml-2 inline-flex items-center gap-1 rounded-btn px-2 py-1 text-micro text-muted transition-colors hover:bg-elevated hover:text-foreground"
+                  className="ml-2 inline-flex items-center gap-1 rounded-btn px-2 py-1 text-micro text-secondary transition-colors hover:bg-elevated hover:text-foreground"
                   title="退出编辑, 回到新建"
                 >
                   ← 新建因子

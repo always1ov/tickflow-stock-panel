@@ -94,7 +94,7 @@ function renderExtInline(
       {showAll && maxTags > 0 && tags.length > maxTags && (
         <button
           onClick={onToggle}
-          className="inline-block px-1 rounded-btn text-micro leading-tight text-muted hover:text-foreground transition-colors"
+          className="inline-block px-1 rounded-btn text-micro leading-tight text-secondary hover:text-foreground transition-colors"
         >
           收起
         </button>
@@ -322,7 +322,7 @@ export function StockInfoBar({
           )}
           <button
             onClick={() => setCustomizerOpen(true)}
-            className="p-1 rounded-btn text-muted hover:text-foreground hover:bg-elevated transition-colors"
+            className="p-1 rounded-btn text-secondary hover:text-foreground hover:bg-elevated transition-colors"
             title="自定义信息条"
           >
             <Settings2 className="h-3.5 w-3.5" />

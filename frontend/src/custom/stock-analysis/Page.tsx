@@ -250,7 +250,7 @@ function ConfirmModal({ report, onView, onRedo, onClose }: {
         <p className="text-xs text-muted mb-4">可直接查看历史,或重新生成一份新报告。</p>
         <div className="flex gap-2">
           <button onClick={onView}
-            className="flex-1 h-8 rounded-card bg-elevated border border-border text-xs text-secondary hover:text-foreground transition-colors">
+            className="flex-1 h-8 rounded-card bg-surface border border-border text-xs text-foreground hover:text-foreground transition-colors">
             查看历史
           </button>
           <button onClick={onRedo}

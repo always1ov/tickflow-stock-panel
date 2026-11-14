@@ -108,7 +108,7 @@ export function MinuteSyncConfig({ hasCap, onJobStart, onClose }: { hasCap: bool
             aria-selected={tab === key}
             tabIndex={tab === key ? 0 : -1}
             onClick={() => setTab(key)}
-            className={`inline-flex items-center gap-1.5 border-b-2 py-3 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/60 ${tab === key ? 'border-accent text-accent' : 'border-transparent text-muted hover:text-foreground'}`}
+            className={`inline-flex items-center gap-1.5 border-b-2 py-3 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/60 ${tab === key ? 'border-accent text-accent' : 'border-transparent text-secondary hover:text-foreground'}`}
           >
             <Icon className="h-3.5 w-3.5" />{label}
           </button>
@@ -133,7 +133,7 @@ export function MinuteSyncConfig({ hasCap, onJobStart, onClose }: { hasCap: bool
             onClick={handleToggle}
             disabled={!hasMinuteCap}
             className={`tap-target relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-expand shrink-0 ${
-              enabled ? 'bg-accent' : 'bg-elevated'
+              enabled ? 'bg-accent' : 'bg-surface border border-border'
             } ${!hasMinuteCap ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
           >
             <span
@@ -152,7 +152,7 @@ export function MinuteSyncConfig({ hasCap, onJobStart, onClose }: { hasCap: bool
               onClick={() => setDays(localDays - 1)}
               aria-label="减少自动同步天数"
               disabled={!hasMinuteCap || !enabled || localDays <= 1}
-              className="h-6 w-6 flex items-center justify-center rounded-l-btn bg-elevated border border-border text-secondary hover:bg-border/50 disabled:opacity-30 transition-colors text-xs"
+              className="h-6 w-6 flex items-center justify-center rounded-l-btn bg-surface border border-border text-foreground hover:bg-border/50 disabled:opacity-30 transition-colors text-xs"
             >−</button>
             <div className={`h-6 w-8 flex items-center justify-center border-y border-border text-micro font-mono tabular-nums ${enabled ? 'text-foreground bg-base' : 'text-muted bg-elevated/50'}`}>
               {localDays}
@@ -161,7 +161,7 @@ export function MinuteSyncConfig({ hasCap, onJobStart, onClose }: { hasCap: bool
               onClick={() => setDays(localDays + 1)}
               aria-label="增加自动同步天数"
               disabled={!hasMinuteCap || !enabled || localDays >= 30}
-              className="h-6 w-6 flex items-center justify-center rounded-r-btn bg-elevated border border-border text-secondary hover:bg-border/50 disabled:opacity-30 transition-colors text-xs"
+              className="h-6 w-6 flex items-center justify-center rounded-r-btn bg-surface border border-border text-foreground hover:bg-border/50 disabled:opacity-30 transition-colors text-xs"
             >+</button>
           </div>
           <span className="text-micro text-muted">天</span>
@@ -184,7 +184,7 @@ export function MinuteSyncConfig({ hasCap, onJobStart, onClose }: { hasCap: bool
               onClick={() => setSegment(localSegment - 5)}
               aria-label="减小分段大小"
               disabled={!hasMinuteCap || localSegment <= 5}
-              className="h-6 w-6 flex items-center justify-center rounded-l-btn bg-elevated border border-border text-secondary hover:bg-border/50 disabled:opacity-30 transition-colors text-xs"
+              className="h-6 w-6 flex items-center justify-center rounded-l-btn bg-surface border border-border text-foreground hover:bg-border/50 disabled:opacity-30 transition-colors text-xs"
             >−</button>
             <div className="h-6 w-8 flex items-center justify-center border-y border-border text-micro font-mono tabular-nums bg-base text-foreground">
               {localSegment}
@@ -193,7 +193,7 @@ export function MinuteSyncConfig({ hasCap, onJobStart, onClose }: { hasCap: bool
               onClick={() => setSegment(localSegment + 5)}
               aria-label="增大分段大小"
               disabled={!hasMinuteCap || localSegment >= 30}
-              className="h-6 w-6 flex items-center justify-center rounded-r-btn bg-elevated border border-border text-secondary hover:bg-border/50 disabled:opacity-30 transition-colors text-xs"
+              className="h-6 w-6 flex items-center justify-center rounded-r-btn bg-surface border border-border text-foreground hover:bg-border/50 disabled:opacity-30 transition-colors text-xs"
             >+</button>
           </div>
           <span className="text-micro text-muted">交易日/段</span>
@@ -262,7 +262,7 @@ export function MinuteSyncConfig({ hasCap, onJobStart, onClose }: { hasCap: bool
         <Trash2 className="h-3 w-3" />
         清空分钟K数据
       </button>
-      {onClose && <button onClick={onClose} className="rounded-btn border border-border bg-elevated px-4 py-1.5 text-xs text-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60">关闭</button>}
+      {onClose && <button onClick={onClose} className="rounded-btn border border-border bg-surface px-4 py-1.5 text-xs text-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60">关闭</button>}
       </div>
 
       {/* 清空确认弹窗 */}

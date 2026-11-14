@@ -67,7 +67,7 @@ function ScoringRow({ name, label, weight, direction, editing, onWeightChange, o
               onClick={() => onDirectionChange(value)}
               className={`flex items-center justify-center transition-colors ${direction === value
                 ? 'bg-foreground font-medium text-surface'
-                : 'text-muted hover:bg-elevated hover:text-secondary'
+                : 'text-secondary hover:bg-elevated hover:text-secondary'
               }`}
               title={title}
               aria-label={`${label}${title}`}
@@ -104,7 +104,7 @@ function ScoringRow({ name, label, weight, direction, editing, onWeightChange, o
         <button
           type="button"
           onClick={onRemove}
-          className="flex h-7 w-7 items-center justify-center rounded-btn text-muted transition-colors hover:bg-danger/10 hover:text-danger"
+          className="flex h-7 w-7 items-center justify-center rounded-btn text-secondary transition-colors hover:bg-danger/10 hover:text-danger"
           title={`移除${label}`}
           aria-label={`移除评分因子${label}`}
         >
@@ -252,7 +252,7 @@ export function ScoringEditor({ value, directions, onChange, fallbackLabels = {}
             <button
               type="button"
               onClick={cancelEditing}
-              className="flex h-7 w-7 items-center justify-center rounded-btn text-muted transition-colors hover:bg-elevated hover:text-foreground"
+              className="flex h-7 w-7 items-center justify-center rounded-btn text-secondary transition-colors hover:bg-elevated hover:text-foreground"
               title="取消编辑"
               aria-label="取消编辑评分方案"
             >

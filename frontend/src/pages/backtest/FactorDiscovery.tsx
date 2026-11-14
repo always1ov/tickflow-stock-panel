@@ -453,7 +453,7 @@ function BatchDiscovery({
                   <button
                     type="button"
                     onClick={() => toggleGroup(items)}
-                    className="ml-auto text-micro text-muted transition-colors hover:text-accent"
+                    className="ml-auto text-micro text-secondary transition-colors hover:text-accent"
                   >
                     {groupSelected === items.length && items.length > 0 ? '取消' : '全选'}
                   </button>
@@ -503,7 +503,7 @@ function BatchDiscovery({
                     onClick={() => { setAssetType(value); setSymbols('') }}
                     className={`px-2.5 py-1 text-micro font-medium transition-colors ${assetType === value
                       ? 'bg-accent/10 text-accent'
-                      : 'text-muted hover:text-foreground'
+                      : 'text-secondary hover:text-foreground'
                     }`}
                   >
                     {value === 'stock' ? '股票' : 'ETF'}
@@ -557,7 +557,7 @@ function BatchDiscovery({
                   onClick={() => { setStart(monthsAgo(months)); setEnd(TODAY) }}
                   className={`flex-1 rounded-btn px-2 py-1 text-micro transition-colors ${start === monthsAgo(months) && end === TODAY
                     ? 'bg-accent/10 font-medium text-accent'
-                    : 'text-muted hover:bg-elevated hover:text-secondary'
+                    : 'text-secondary hover:bg-elevated hover:text-secondary'
                   }`}
                 >
                   {months === 12 ? '1年' : `${months}个月`}
@@ -806,7 +806,7 @@ function BatchDiscovery({
                             type="button"
                             onClick={() => save.mutate(item)}
                             disabled={!!item.error || save.isPending}
-                            className="flex h-7 w-7 items-center justify-center rounded-btn text-muted transition-colors hover:bg-accent/10 hover:text-accent disabled:opacity-40"
+                            className="flex h-7 w-7 items-center justify-center rounded-btn text-secondary transition-colors hover:bg-accent/10 hover:text-accent disabled:opacity-40"
                             title="保存候选"
                             aria-label={`保存 ${item.label} 为候选`}
                           >
@@ -816,7 +816,7 @@ function BatchDiscovery({
                             type="button"
                             onClick={() => setSignalFrom(item)}
                             disabled={!!item.error}
-                            className="flex h-7 w-7 items-center justify-center rounded-btn text-muted transition-colors hover:bg-warning/10 hover:text-warning disabled:opacity-40"
+                            className="flex h-7 w-7 items-center justify-center rounded-btn text-secondary transition-colors hover:bg-warning/10 hover:text-warning disabled:opacity-40"
                             title="加入信号条件（方向按 IC 预填，阈值给建议值）"
                             aria-label={`把 ${item.label} 加入信号条件`}
                           >
@@ -826,7 +826,7 @@ function BatchDiscovery({
                             type="button"
                             onClick={event => { event.stopPropagation(); onFullscreen(item.factor_name, item.label) }}
                             disabled={!!item.error}
-                            className="flex h-7 w-7 items-center justify-center rounded-btn text-muted transition-colors hover:bg-elevated hover:text-foreground disabled:opacity-40"
+                            className="flex h-7 w-7 items-center justify-center rounded-btn text-secondary transition-colors hover:bg-elevated hover:text-foreground disabled:opacity-40"
                             title="全屏单因子检验（完整配置与图表）"
                             aria-label={`全屏检验 ${item.label}`}
                           >
@@ -1002,7 +1002,7 @@ export function FactorDiscovery({ focusFactor, initialView = 'batch' }: { focusF
           <button
             type="button"
             onClick={collapseIntro}
-            className="shrink-0 rounded-btn px-2 py-0.5 text-micro text-muted transition-colors hover:bg-elevated hover:text-foreground"
+            className="shrink-0 rounded-btn px-2 py-0.5 text-micro text-secondary transition-colors hover:bg-elevated hover:text-foreground"
           >
             知道了
           </button>
@@ -1013,7 +1013,7 @@ export function FactorDiscovery({ focusFactor, initialView = 'batch' }: { focusF
           <button
             type="button"
             onClick={() => setView('batch')}
-            className="mr-2 inline-flex items-center gap-1 rounded-btn px-2 py-1 text-micro text-muted transition-colors hover:bg-elevated hover:text-foreground"
+            className="mr-2 inline-flex items-center gap-1 rounded-btn px-2 py-1 text-micro text-secondary transition-colors hover:bg-elevated hover:text-foreground"
             title="返回批量结果（筛选配置与结果保留）"
           >
             ← 返回批量

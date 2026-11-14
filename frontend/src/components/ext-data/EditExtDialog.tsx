@@ -158,14 +158,14 @@ export function EditExtDialog({ config, onClose }: { config: ExtDataConfig; onCl
                 <button
                   onClick={() => detectFileRef.current?.click()}
                   disabled={detecting}
-                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-card text-micro text-muted hover:text-accent hover:bg-accent/[0.06] disabled:opacity-40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-colors"
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-card text-micro text-secondary hover:text-accent hover:bg-accent/[0.06] disabled:opacity-40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-colors"
                 >
                   {detecting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
                   从文件导入
                 </button>
                 <button
                   onClick={addField}
-                  className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-card text-micro text-muted hover:text-accent hover:bg-accent/[0.06] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-colors"
+                  className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-card text-micro text-secondary hover:text-accent hover:bg-accent/[0.06] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-colors"
                 >
                   <Plus className="h-3 w-3" />
                   添加字段
@@ -193,7 +193,7 @@ export function EditExtDialog({ config, onClose }: { config: ExtDataConfig; onCl
                   ))}
                   <button
                     onClick={() => setSymbolMapping(null)}
-                    className="px-2.5 py-1 rounded-card bg-elevated text-muted text-micro hover:text-secondary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-colors"
+                    className="px-2.5 py-1 rounded-card bg-surface border border-border text-foreground text-micro hover:text-secondary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-colors"
                   >
                     取消
                   </button>
@@ -274,7 +274,7 @@ export function EditExtDialog({ config, onClose }: { config: ExtDataConfig; onCl
         <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-border/50 bg-elevated/30">
           <button
             onClick={onClose}
-            className="px-4 py-2 rounded-card bg-elevated text-secondary text-xs hover:bg-elevated/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-colors"
+            className="px-4 py-2 rounded-card bg-surface border border-border text-foreground text-xs hover:bg-elevated/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-colors"
           >
             取消
           </button>

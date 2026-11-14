@@ -1226,7 +1226,7 @@ function TestSendButton({ test, configured }: {
       onClick={() => test.mutate()}
       disabled={test.isPending || !configured}
       title={!configured ? '请先完成该渠道配置' : '发送测试消息'}
-      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-btn bg-elevated text-secondary hover:text-foreground text-xs disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-btn bg-surface border border-border text-foreground hover:text-foreground text-xs disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
     >
       {test.isPending ? '测试中…' : '测试'}
     </button>

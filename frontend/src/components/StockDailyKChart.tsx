@@ -127,7 +127,7 @@ function ChartPill({
       onClick={onClick}
       title={title}
       className={`px-2 py-0.5 rounded-btn text-micro font-mono cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
-        active ? activeClass : 'bg-elevated text-secondary hover:text-foreground'
+        active ? activeClass : 'bg-surface border border-border text-foreground hover:text-foreground'
       }`}
     >
       {label}
@@ -242,7 +242,7 @@ export function StockDailyKChart({
                 title={volumeCompare.enabled ? '关闭量能对比' : '开启量能对比'}
                 onClick={() => updateVolumeCompare({ enabled: !volumeCompare.enabled })}
                 className={`relative h-3.5 w-6 shrink-0 rounded-full transition-colors ${
-                  volumeCompare.enabled ? 'bg-accent' : 'bg-elevated'
+                  volumeCompare.enabled ? 'bg-accent' : 'bg-surface border border-border'
                 }`}
               >
                 <span className={`absolute left-0 top-0.5 h-2.5 w-2.5 rounded-full bg-white transition-transform ${

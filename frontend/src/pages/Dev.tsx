@@ -459,7 +459,7 @@ export function Dev() {
               onClick={() => setTab('seed')}
               className={cn(
                 'inline-flex items-center gap-1.5 rounded-btn px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer',
-                tab === 'seed' ? 'bg-surface text-foreground shadow-sm' : 'text-muted hover:text-secondary',
+                tab === 'seed' ? 'bg-surface text-foreground shadow-sm' : 'text-secondary hover:text-secondary',
               )}
             >
               <FlaskConical className="h-3.5 w-3.5" />演示数据
@@ -468,7 +468,7 @@ export function Dev() {
               onClick={() => setTab('ladder')}
               className={cn(
                 'inline-flex items-center gap-1.5 rounded-btn px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer',
-                tab === 'ladder' ? 'bg-surface text-foreground shadow-sm' : 'text-muted hover:text-secondary',
+                tab === 'ladder' ? 'bg-surface text-foreground shadow-sm' : 'text-secondary hover:text-secondary',
               )}
             >
               <Bell className="h-3.5 w-3.5" />封单监控
@@ -477,7 +477,7 @@ export function Dev() {
               onClick={() => setTab('minute')}
               className={cn(
                 'inline-flex items-center gap-1.5 rounded-btn px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer',
-                tab === 'minute' ? 'bg-surface text-foreground shadow-sm' : 'text-muted hover:text-secondary',
+                tab === 'minute' ? 'bg-surface text-foreground shadow-sm' : 'text-secondary hover:text-secondary',
               )}
             >
               <Activity className="h-3.5 w-3.5" />分钟K探测

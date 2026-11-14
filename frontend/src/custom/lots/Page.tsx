@@ -361,7 +361,7 @@ function LotDialog({ lot, onClose }: { lot: Lot; onClose: () => void }) {
             <div className="flex items-center gap-2">
               <span className="inline-flex items-center gap-1 rounded-btn bg-elevated px-2 py-1 font-mono text-xs text-secondary">
                 {draft.symbol}
-                <button onClick={() => setDraft(d => ({ ...d, symbol: '' }))} className="text-muted hover:text-danger cursor-pointer"><span className="text-micro">✕</span></button>
+                <button onClick={() => setDraft(d => ({ ...d, symbol: '' }))} className="text-secondary hover:text-danger cursor-pointer"><span className="text-micro">✕</span></button>
               </span>
               <span className="text-micro text-muted">点 ✕ 可重选</span>
             </div>

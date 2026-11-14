@@ -41,7 +41,7 @@ export function DateShortcuts({ value, onChange, options, base }: Props) {
               'rounded-btn px-2 py-1 text-xs leading-none transition-colors cursor-pointer',
               active
                 ? 'bg-accent/15 text-accent border border-accent/30'
-                : 'bg-elevated text-muted border border-transparent hover:text-foreground',
+                : 'bg-surface border border-border text-foreground border border-transparent hover:text-foreground',
             )}
           >
             {opt.label}

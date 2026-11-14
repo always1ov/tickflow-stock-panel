@@ -219,7 +219,7 @@ export function StockFinancialDetail({ symbol, name }: Props) {
               className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap px-3 py-2 text-xs font-medium border-b-2 -mb-px transition-colors ${
                 isActive
                   ? 'border-accent text-accent'
-                  : 'border-transparent text-muted hover:text-secondary'
+                  : 'border-transparent text-secondary hover:text-secondary'
               }`}
             >
               <Icon className="h-3.5 w-3.5" />
@@ -347,7 +347,7 @@ export function StockFinancialDetail({ symbol, name }: Props) {
               <div className="flex items-center justify-end gap-2 mt-5">
                 <button
                   onClick={() => setConfirmReport(null)}
-                  className="px-3 py-1.5 rounded-btn bg-elevated text-secondary hover:bg-elevated/80 text-xs transition-colors"
+                  className="px-3 py-1.5 rounded-btn bg-surface border border-border text-foreground hover:bg-elevated/80 text-xs transition-colors"
                 >
                   取消
                 </button>

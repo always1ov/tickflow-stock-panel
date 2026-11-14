@@ -123,7 +123,7 @@ export function GenerateFactorStrategyDialog({
                 onClick={() => setDirection(value)}
                 className={`rounded-btn border px-2.5 py-1.5 text-xs transition-colors ${direction === value
                   ? SELECTED
-                  : 'border-border bg-base text-muted hover:border-accent/40'}`}
+                  : 'border-border bg-base text-secondary hover:border-accent/40'}`}
               >
                 {label}
               </button>
@@ -137,7 +137,7 @@ export function GenerateFactorStrategyDialog({
       </div>
 
       <div className="flex items-center justify-end gap-2 border-t border-border px-4 py-3">
-        <button type="button" onClick={onClose} className="rounded-btn bg-elevated px-3 py-1.5 text-xs text-secondary transition-colors hover:text-foreground">取消</button>
+        <button type="button" onClick={onClose} className="rounded-btn bg-surface border border-border px-3 py-1.5 text-xs text-foreground transition-colors hover:text-foreground">取消</button>
         <button
           type="button"
           onClick={() => generate.mutate()}

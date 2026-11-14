@@ -1048,7 +1048,7 @@ export function SectorRotationCard({ kind }: { kind: 'concept' | 'industry' }) {
                 onClick={() => onDisplayModeChange(value)}
                 className={cn(
                   'rounded-btn px-2.5 py-0.5 text-micro transition-colors',
-                  displayMode === value ? 'bg-surface font-medium text-accent shadow-sm ring-1 ring-accent/30' : 'text-muted hover:text-foreground',
+                  displayMode === value ? 'bg-surface font-medium text-accent shadow-sm ring-1 ring-accent/30' : 'text-secondary hover:text-foreground',
                 )}
               >
                 {label}
