@@ -37,6 +37,13 @@ interface Props {
   paneReadouts?: AnnotationData['readouts'][]
   /** [R616] 副图里那些原生系列画不出来的图元(按 pane 下标); 不传 = 不画 */
   paneDecor?: (PaneDecorData | undefined)[]
+  /**
+   * [R630] 隐藏副图右侧刻度数字(轴宽仍由主图决定, 图区不会被拉宽)。
+   * 个股分析的「趋势量化 / 量化MACD」按 R423 / R486 的原文约定不写刻度 —— ECharts 时代
+   * 是 `axisLabel: { show: false }`, 换到 lightweight 后默认又冒了出来。
+   * 日K / 分时的成交量 pane 旧图本来就带刻度, 不传即可保持。
+   */
+  hidePaneAxis?: boolean
   linkedPrice?: number | null
   onHover?: (time: string | null) => void
   /** 十字线价格与像素比例(仅主价格 pane)，供价位命中判断使用 */
@@ -278,6 +285,11 @@ export function FinancialPlot(props: Props) {
                 return y != null && anchors.some(anchor => Math.abs(anchor - y) < 20) ? '' : value.toFixed(propsRef.current.pricePrecision ?? 2)
               })
             },
+          } : props.hidePaneAxis && spec.pane > 0 ? {
+            // [R630] 原文副图 `axisLabel: { show: false }`: 刻度数字给空串, 轴宽仍由主图决定,
+            // 图区不会被拉宽(pane 的轴宽取所有 pane 的最大值)。
+            type: 'custom' as const, formatter: () => '',
+            minMove: 10 ** -(spec.precision ?? 2),
           } : { type: 'price' as const, precision: spec.precision ?? (spec.pane === 0 ? props.pricePrecision : undefined) ?? 2,
             minMove: 10 ** -(spec.precision ?? (spec.pane === 0 ? props.pricePrecision : undefined) ?? 2) },
         ...(spec.type === 'Area' ? { lineColor: spec.color, topColor: `${spec.color}${props.intraday ? '52' : '28'}`,
@@ -304,7 +316,10 @@ export function FinancialPlot(props: Props) {
       item.data = spec.data
       if (spec.pane > 0) item.api.priceScale().applyOptions({
         entireTextOnly: !!props.intraday,
-        scaleMargins: spec.id === 'volume' ? { top: props.intraday ? 0.22 : 0.3, bottom: 0 } : { top: 0.28, bottom: 0.08 },
+        // [R630] 个股分析的副图沿用原文版面: 整块高度都给走势(tqYRange 已按像素预算留好字道),
+        // 不再叠加成交量 pane 那套 28% / 8% 边距 —— 否则走势被二次压缩、字道与数据对不上。
+        scaleMargins: spec.id === 'volume' ? { top: props.intraday ? 0.22 : 0.3, bottom: 0 }
+          : props.hidePaneAxis ? { top: 0, bottom: 0 } : { top: 0.28, bottom: 0.08 },
       })
     }
     const primarySpec = props.series.find(s => s.pane === 0 && s.visible !== false && s.priceScaleId !== 'left')

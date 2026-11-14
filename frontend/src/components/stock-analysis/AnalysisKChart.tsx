@@ -523,6 +523,7 @@ export function AnalysisKChart({
         paneTitles={['', trendTitle, quantTitle]}
         paneReadouts={[[], trendReadouts, quantReadouts]}
         paneDecor={paneDecor}
+        hidePaneAxis
         onSelect={date => onDateClick?.(date)}
         onCrosshairMove={point => {
           if (!point) { setHoveredKey(null); return }
@@ -656,6 +657,12 @@ function quantPaneSeries(
       { id: 'qm:scale_yellow', type: 'Line', pane: 2, color: 'transparent', lineWidth: 1, data: valuePoints(dates, data.yellow) },
       { id: 'qm:scale_gold', type: 'Line', pane: 2, color: 'transparent', lineWidth: 1, data: valuePoints(dates, data.gold_icon) },
       { id: 'qm:scale_dead', type: 'Line', pane: 2, color: 'transparent', lineWidth: 1, data: valuePoints(dates, data.dead_icon) },
+      // [R630] 原文纵轴是 `scale: false` —— 0 永远在轴里, 因为每根柱子都从 0 长出来。
+      // lightweight 的 autoscale 只听数据: 一段全是负值(或全是正值)的窗口里 0 会掉出轴外,
+      // DEA 空心框 / 共振黄柱的柱根就被上边缘裁掉(和 R415 注释记录的老问题同一个)。
+      // 补一条透明的 0 值线, 把 0 拉回范围, 等价于原图的 scale: false。
+      { id: 'qm:scale_zero', type: 'Line', pane: 2, color: 'transparent', lineWidth: 1,
+        data: dates.map(time => ({ time, value: 0 })) },
     ],
     decor: { items },
   }

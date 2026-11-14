@@ -552,6 +552,18 @@ it('uses compact intraday price margins and anchors volume at zero while preserv
   expect(native.series.at(-1).priceScale().applyOptions).toHaveBeenLastCalledWith({ entireTextOnly: false, scaleMargins: { top: 0.3, bottom: 0 } })
 })
 
+it('[R630] hidePaneAxis blanks the sub-pane tick labels and leaves the main pane numeric', async () => {
+  const series: PlotSeries[] = [...model, { id: 'tq:scale', type: 'Line', pane: 1, data }]
+  const render = async (hidePaneAxis: boolean) => act(async () => root.render(
+    <FinancialPlot scope="levels" series={series} height={400} paneHeights={[280, 120]} hidePaneAxis={hidePaneAxis} />))
+  await render(true)
+  const opts = native.chart.addSeries.mock.calls.map((call: any[]) => call[1])
+  expect(opts[0].priceFormat.type).toBe('price')
+  expect(opts[1].priceFormat.formatter(12.34)).toBe('')
+  await render(false)
+  expect(native.series[1].applyOptions).toHaveBeenLastCalledWith(expect.objectContaining({ priceFormat: expect.objectContaining({ type: 'price' }) }))
+})
+
 it('links ETF price and percentage scales, including the single-session tab, and removes stale axes on context changes', async () => {
   const row = { datetime: '2026-11-05 09:30:00', open: 0.761, high: 0.762, low: 0.76, close: 0.761, volume: 10, amount: null }
   const render = async (sessions = [{ date: '2026-11-05', prev_close: 0.76 as number | null, rows: [row] }]) => act(async () => root.render(

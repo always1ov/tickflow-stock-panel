@@ -117,6 +117,20 @@ it('highlights the level under the crosshair and clears it when the pointer leav
   expect(hitLine()).toMatchObject({ width: 1, opacity: 0.9 })
 })
 
+it('[R630] 量化MACD 纵轴恒含 0(原文 scale: false), 副图不写刻度', async () => {
+  await renderChart({
+    quantMacd: {
+      symbol: '603083.SH', dates: DATES, diff: [-1.2, -0.8, -0.3], dea: [-1.0, -0.9, -0.6],
+      yellow: [null, -0.2, null], gold_icon: [null, null, null], dead_icon: [null, null, null],
+    },
+  })
+  const plot = lastPlot()
+  const zero = plot.series.find((item: any) => item.id === 'qm:scale_zero')
+  expect(zero).toMatchObject({ pane: 2 })
+  expect(zero.data.map((point: any) => point.value)).toEqual([0, 0, 0])
+  expect(plot.hidePaneAxis).toBe(true)
+})
+
 it('forwards date clicks to the caller', async () => {
   const onDateClick = vi.fn()
   await renderChart({ onDateClick })
