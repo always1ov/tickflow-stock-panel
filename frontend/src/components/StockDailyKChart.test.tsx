@@ -149,6 +149,24 @@ it('[R655] 四条主图均线默认只开 MA20, 每条都能单独关掉再打�
   expect([...host.querySelectorAll('button')].some(button => button.textContent === 'MA5')).toBe(false)
 })
 
+it('[R657] 日K 里指标开关键与价位开关键同一尺寸(跟原来那颗指标胶囊一样)', async () => {
+  await render()
+  const byLabel = (label: string) => [...host.querySelectorAll('button')]
+    .find(button => button.textContent?.trim() === label)!
+  const indicator = byLabel('MACD')
+  const level = host.querySelector('[data-testid="level-toolbar"] button')
+  expect(level).not.toBeNull()
+  for (const button of [indicator, level!]) {
+    expect(button.className).toContain('text-micro')
+    expect(button.className).toContain('px-2')
+    expect(button.className).toContain('py-0.5')
+    // 方按钮那档(h-8/px-2.5/text-xs)不能漏进日K
+    expect(button.className).not.toContain('h-8')
+    expect(button.className).not.toContain('px-2.5')
+    expect(button.className).not.toContain('text-xs')
+  }
+})
+
 it('[R651] 空间不够只压两张分析副图, 主图与指标副图的高度不动', async () => {
   const openPanes = async (options: any) => {
     await render(options)

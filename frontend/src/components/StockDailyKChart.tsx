@@ -149,7 +149,7 @@ function ChartPill({
       onClick={onClick}
       title={title}
       className={`px-2 py-0.5 rounded-btn text-micro font-mono cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
-        active ? activeClass : 'bg-surface border border-border text-foreground hover:text-foreground'
+        active ? activeClass : 'bg-surface ring-1 ring-inset ring-border text-foreground hover:text-foreground'
       }`}
     >
       {label}
@@ -433,6 +433,7 @@ export function StockDailyKChart({
             effLevels={shown.effLevels}
             fib2Raw={shown.fib2Raw}
             fib2={levelsQ.data?.fib2}
+            compact
           />
         </div>
       )}

@@ -27,8 +27,18 @@ const SQ_ON = 'border-foreground bg-foreground text-surface font-medium'
 const CHIP = 'h-7 whitespace-nowrap rounded-btn border px-2 text-micro transition-colors duration-hover'
 const CHIP_IDLE = 'border-border/60 bg-base/40 text-muted hover:border-border hover:text-foreground'
 const SUB = 'inline-flex shrink-0 items-center gap-1 border-l border-border/60 pl-2'
+/**
+ * [R657] 日K 里的紧凑档: 与日K 原来那颗指标胶囊**同尺寸**(`px-2 py-0.5 text-micro`)。
+ * 用 `ring` 而不是 `border` —— ring 是阴影, 不参与盒模型, 开 / 关两态高度才不会差 2px。
+ */
+const PILL = 'inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-btn px-2 py-0.5 text-micro '
+  + 'transition-colors duration-hover disabled:cursor-not-allowed disabled:opacity-40'
+const PILL_IDLE = 'bg-surface text-foreground ring-1 ring-inset ring-border hover:bg-elevated'
+const PILL_ON = 'bg-foreground text-surface font-medium ring-1 ring-inset ring-foreground'
+const PILL_SUB = 'whitespace-nowrap rounded-btn px-2 py-0.5 text-micro transition-colors duration-hover'
+const PILL_SUB_IDLE = 'bg-base/40 text-muted ring-1 ring-inset ring-border/60 hover:text-foreground'
 
-export function LevelToolbar({ groups, controls, effLevels, fib2Raw, fib2, onOpenFit, help }: {
+export function LevelToolbar({ groups, controls, effLevels, fib2Raw, fib2, onOpenFit, help, compact = false }: {
   groups: { key: LevelType; label: string }[]
   controls: LevelControls
   effLevels: Record<LevelType, PriceLevel[]> | undefined
@@ -38,6 +48,8 @@ export function LevelToolbar({ groups, controls, effLevels, fib2Raw, fib2, onOpe
   onOpenFit?: () => void
   /** [R626] 两张副图的长说明 —— 图外那条图例删掉后, 说明挂到最右的「?」上 */
   help?: string
+  /** [R657] 日K 里用紧凑档, 尺寸对齐日K 原来的指标胶囊; 关键价位页保持方按钮 */
+  compact?: boolean
 }) {
   const theme = useTheme()
   const { activeTypes, pivotRank, fib2Grain, fib2ShowTargets } = controls
@@ -48,6 +60,15 @@ export function LevelToolbar({ groups, controls, effLevels, fib2Raw, fib2, onOpe
   const LC_ON = levelColors(theme === 'dark' ? 'light' : 'dark')
   const targetColor = fib2RoleColor(FIB2_ROLE_TARGET, theme)
   const tint = (c: string) => ({ borderColor: c + '66', backgroundColor: c + '26', color: c })
+  // 紧凑档没有 border(那一圈是 ring), 边框色得换成 inset 阴影才画得出来。
+  const chipTint = compact
+    ? (c: string) => ({ backgroundColor: c + '26', color: c, boxShadow: `inset 0 0 0 1px ${c}66` })
+    : tint
+  const box = compact ? PILL : SQ
+  const boxIdle = compact ? PILL_IDLE : SQ_IDLE
+  const boxOn = compact ? PILL_ON : SQ_ON
+  const chip = compact ? PILL_SUB : CHIP
+  const chipIdle = compact ? PILL_SUB_IDLE : CHIP_IDLE
 
   return (
     <div className="mb-2 flex flex-wrap items-center gap-1.5">
@@ -57,7 +78,7 @@ export function LevelToolbar({ groups, controls, effLevels, fib2Raw, fib2, onOpe
         return (
           <button key={g.key} type="button" onClick={() => controls.toggleType(g.key)}
                   disabled={total === 0} aria-pressed={on} title={title}
-                  className={`${SQ} ${on ? SQ_ON : SQ_IDLE}`}>
+                  className={`${box} ${on ? boxOn : boxIdle}`}>
             <span className="h-2 w-2 shrink-0 rounded-full"
                   style={{ backgroundColor: on ? LC_ON[g.key] : LC[g.key] }} />
             {g.label}
@@ -73,8 +94,8 @@ export function LevelToolbar({ groups, controls, effLevels, fib2Raw, fib2, onOpe
           {([1, 2, 3] as const).map(r => (
             <button key={r} type="button" onClick={() => controls.setPivotRank(r)}
                     title={PIVOT_RANK_TITLES[r]} aria-pressed={pivotRank === r}
-                    className={`${CHIP} font-mono ${pivotRank === r ? '' : CHIP_IDLE}`}
-                    style={pivotRank === r ? tint(LC.pivot) : undefined}>
+                    className={`${chip} font-mono ${pivotRank === r ? '' : chipIdle}`}
+                    style={pivotRank === r ? chipTint(LC.pivot) : undefined}>
               {r}
             </button>
           ))}
@@ -88,21 +109,21 @@ export function LevelToolbar({ groups, controls, effLevels, fib2Raw, fib2, onOpe
           {FIB2_GRAINS.map(([k, cn, tip]) => (
             <button key={k} type="button" onClick={() => controls.setFib2Grain(k)}
                     title={tip} aria-pressed={fib2Grain === k}
-                    className={`${CHIP} ${fib2Grain === k ? '' : CHIP_IDLE}`}
-                    style={fib2Grain === k ? tint(LC.fib2) : undefined}>
+                    className={`${chip} ${fib2Grain === k ? '' : chipIdle}`}
+                    style={fib2Grain === k ? chipTint(LC.fib2) : undefined}>
               {cn}
               <span className="ml-1 font-mono opacity-50">{fib2.grain?.[k]?.levels.length ?? 0}</span>
             </button>
           ))}
           <button type="button" onClick={() => controls.setFib2ShowTargets(v => !v)}
                   title={FIB2_TARGETS_TITLE} aria-pressed={fib2ShowTargets}
-                  className={`${CHIP} ${fib2ShowTargets ? '' : CHIP_IDLE}`}
-                  style={fib2ShowTargets ? tint(targetColor) : undefined}>
+                  className={`${chip} ${fib2ShowTargets ? '' : chipIdle}`}
+                  style={fib2ShowTargets ? chipTint(targetColor) : undefined}>
             上攻推算位
           </button>
           {onOpenFit && (
             <button type="button" onClick={onOpenFit} title={FIB2_BACKTEST_TITLE}
-                    className={`${CHIP} ${CHIP_IDLE}`}>
+                    className={`${chip} ${chipIdle}`}>
               回测这三档
             </button>
           )}
@@ -110,7 +131,7 @@ export function LevelToolbar({ groups, controls, effLevels, fib2Raw, fib2, onOpe
       )}
 
       <button type="button" onClick={controls.clearAll} disabled={activeTypes.size === 0}
-              className={`${SQ} ${SQ_IDLE} ml-auto`}>
+              className={`${box} ${boxIdle} ml-auto`}>
         全部清除
       </button>
       {/* [R626] 副图图例说明 —— 原来压在主图上方那一行字, 收进这一个「?」里 */}
