@@ -47,6 +47,9 @@ export interface PaneDecorData {
 
 const EMPTY: PaneDecorData = { items: [] }
 
+/** [R641] 右端名字脚下的半透明底: 压住副图右下角可能挤过来的信号字。 */
+const LABEL_BG = 'rgba(0, 0, 0, 0.55)'
+
 export class PaneDecor implements ISeriesPrimitive<Time> {
   private chart?: IChartApi
   private series?: ISeriesApi<SeriesType>
@@ -177,7 +180,10 @@ export class PaneDecor implements ISeriesPrimitive<Time> {
         ctx.fillStyle = item.color
         ctx.fillText(item.text, x, y)
       }
-      // [R638] 参考线右端名字: 贴右边、纵向对准那条线的值, 同样垫一层黑描边当光晕
+      // [R638] 参考线右端名字: 贴右边、纵向对准那条线的值, 同样垫一层黑描边当光晕。
+      // [R641] 半透明底: 副图右下角常压着字道的信号字(「绝」「底」), 纯描边在字挤到一起时
+      // 仍会串行 —— 先铺一块暗底把底下的笔画盖掉, 再看清名字。底色与副图的黑底同族,
+      // 亮暗主题下都不会突兀。
       if (labels.length) {
         ctx.textAlign = 'right'
         ctx.textBaseline = 'middle'
@@ -187,9 +193,13 @@ export class PaneDecor implements ISeriesPrimitive<Time> {
         for (const label of labels) {
           const y = series.priceToCoordinate(label.value)
           if (y == null) continue
-          ctx.strokeText(label.text, width - 4, y)
+          const x = width - 4
+          const w = ctx.measureText(label.text).width
+          ctx.fillStyle = LABEL_BG
+          ctx.fillRect(x - w - 3, y - LANE_FONT / 2 - 1, w + 6, LANE_FONT + 2)
+          ctx.strokeText(label.text, x, y)
           ctx.fillStyle = label.color
-          ctx.fillText(label.text, width - 4, y)
+          ctx.fillText(label.text, x, y)
         }
       }
       ctx.restore()

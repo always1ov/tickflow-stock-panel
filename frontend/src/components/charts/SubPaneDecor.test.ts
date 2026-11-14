@@ -32,7 +32,7 @@ function makeCanvas() {
     save() {}, restore() {}, beginPath() {}, rect() {}, clip() {},
     translate() {}, fill() {}, stroke() {}, moveTo() {}, lineTo() {}, setLineDash() {},
     measureText: (text: string) => ({ width: text.length * 6 }),
-    fillRect: (...args: unknown[]) => { calls.push({ op: 'fillRect', args }) },
+    fillRect: (...args: unknown[]) => { calls.push({ op: 'fillRect', args, color: ctx.fillStyle }) },
     strokeRect: (...args: unknown[]) => { calls.push({ op: 'strokeRect', args }) },
     fillText(text: string, x: number, y: number) {
       calls.push({
@@ -115,6 +115,16 @@ describe('[R640] PaneDecor 的 label 图元: 贴右边、对准线的高度、�
     expect(stroke.color).toBe(LANE_HALO.stroke)
     expect(stroke.width).toBe(LANE_HALO.lineWidth)
     expect(calls.indexOf(stroke)).toBeLessThan(calls.indexOf(fill))
+  })
+
+  it('[R641] 名字脚下先铺半透明暗底, 让挤过来的信号字不透过来', () => {
+    const calls = draw([{ kind: 'label', value: 3.2, text: '超买', color: '#FFFF00' }])
+    const bgIndex = calls.findIndex(c => c.op === 'fillRect' && c.color === 'rgba(0, 0, 0, 0.55)')
+    expect(bgIndex).toBeGreaterThanOrEqual(0)
+    const bg = calls[bgIndex]!
+    // 右边贴到 width-1, 横向盖住整段文字(两侧各 3px)
+    expect((bg.args[0] as number) + (bg.args[2] as number)).toBeCloseTo(WIDTH - 1)
+    expect(calls.findIndex(c => c.op === 'strokeText')).toBeGreaterThan(bgIndex)
   })
 
   it('这个值画不出来(priceToCoordinate 返回 null)就跳过, 不抛错', () => {
