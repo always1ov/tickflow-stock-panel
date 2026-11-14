@@ -10,6 +10,13 @@ import {
 } from '@/lib/chart-layout'
 import { PANE_HEADER_H } from '@/lib/analysisPanes'
 import { useStockQuantMacd, useStockTrendQuant } from '@/lib/useStockAnalysisPanes'
+import { useShownLevels } from '@/components/stock-analysis/AnalysisKChart'
+import { useStockLevels } from '@/components/stock-analysis/StockLevelsPanel'
+import { DEFAULT_LEVEL_TYPES, useLevelControls } from '@/components/stock-analysis/levelControls'
+import { LevelToolbar } from '@/components/stock-analysis/LevelToolbar'
+import { LEVEL_GROUPS } from '@/components/stock-analysis/analysis-chart-model'
+import { LEVEL_CURVE_COLOR, fib2RoleColor, levelColors, useTheme } from '@/lib/theme'
+import { levelCurveSeries, levelPriceLines } from '@/lib/levelOverlays'
 
 const EChartsCandlestick = lazy(() => import('./EChartsCandlestick').then(m => ({ default: m.EChartsCandlestick })))
 const LightweightDaily = lazy(() => import('./charts/LightweightDaily').then(m => ({ default: m.LightweightDaily })))
@@ -227,6 +234,29 @@ export function StockDailyKChart({
   // [R649] 两张分析副图只在 lightweight 渲染下存在; 数据与关键价位视图同源(同一查询键)。
   const tquantQ = useStockTrendQuant(symbol, showTrendQuant)
   const qmacdQ = useStockQuantMacd(symbol, showQuantMacd)
+
+  // [R653] 关键价位主图那套价位指标并进日K: 取数、档位、开关状态与「关键价位」视图共用同一份
+  // (`QK.stockLevels` + `useLevelControls`), 不新增接口、不另算口径。
+  const theme = useTheme()
+  const levelCtl = useLevelControls(DEFAULT_LEVEL_TYPES)
+  const levelsQ = useStockLevels(symbol, renderer === 'lightweight')
+  const shown = useShownLevels(levelsQ.data?.levels, levelsQ.data?.fib2, kline.data?.rows ?? [],
+    levelCtl.fib2Grain, levelCtl.fib2ShowTargets)
+  const levelColorsByTheme = levelColors(theme)
+  const roleColor = useCallback((role: string) => fib2RoleColor(role, theme), [theme])
+  const levelLines = useMemo(() => renderer !== 'lightweight'
+    ? [] : levelPriceLines(shown.effLevels, levelCtl.activeTypes, levelCtl.pivotRank,
+      { ...levelColorsByTheme, ...LEVEL_CURVE_COLOR }, roleColor),
+  [renderer, shown.effLevels, levelCtl.activeTypes, levelCtl.pivotRank, levelColorsByTheme, roleColor])
+  const levelSeries = useMemo(() => renderer !== 'lightweight'
+    ? [] : levelCurveSeries({
+      rows: kline.data?.rows ?? [],
+      series: levelsQ.data?.series,
+      seriesDates: levelsQ.data?.dates,
+      active: levelCtl.activeTypes,
+      colors: { ...levelColorsByTheme, ...LEVEL_CURVE_COLOR },
+    }),
+  [renderer, kline.data?.rows, levelsQ.data?.series, levelsQ.data?.dates, levelCtl.activeTypes, levelColorsByTheme])
   const analysisPanes = useMemo<DailyAnalysisPane[]>(() => {
     if (renderer !== 'lightweight') return []
     const panes: DailyAnalysisPane[] = []
@@ -379,6 +409,18 @@ export function StockDailyKChart({
           </div>
         </div>
       )}
+      {/* [R653] 价位开关排: 与「关键价位」同一个 LevelToolbar、同一份状态, 切视图不丢 */}
+      {showIndicatorControls && renderer === 'lightweight' && rows.length > 0 && (
+        <div className="flex flex-wrap items-center border-b border-border/50 bg-elevated/10 px-3 pt-1.5" data-testid="level-toolbar">
+          <LevelToolbar
+            groups={LEVEL_GROUPS}
+            controls={levelCtl}
+            effLevels={shown.effLevels}
+            fib2Raw={shown.fib2Raw}
+            fib2={levelsQ.data?.fib2}
+          />
+        </div>
+      )}
       {kline.isLoading && <div className="text-sm text-muted py-4">加载中…</div>}
       {kline.isError && <div className="text-sm text-danger py-2">日K加载失败</div>}
       {!kline.isLoading && !kline.isError && (kline.data?.rows?.length ?? 0) > 0 && rows.length === 0 && (
@@ -408,6 +450,8 @@ export function StockDailyKChart({
           volumeCompare={volumeCompare}
           addedDate={showAddedMark ? addedDate : null}
           analysisPanes={fittedPanes}
+          levelLines={levelLines}
+          levelSeries={levelSeries}
         />
         </Suspense>
       )}

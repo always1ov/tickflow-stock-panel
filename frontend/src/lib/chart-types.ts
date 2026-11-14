@@ -1,5 +1,7 @@
 import type { QuantMacdResult } from './api'
 import type { TrendQuantData } from './trendQuantSeries'
+import type { PlotSeries } from './lightweight-model'
+import type { AnnotationData } from '@/components/charts/ChartAnnotations'
 
 export interface OHLC {
   date: string
@@ -106,6 +108,14 @@ export interface DailyChartProps {
    * 传了就只画列出来的那几条 —— 日K 工具栏的四个均线开关走这条。
    */
   maKeys?: string[]
+  /**
+   * [R653] 关键价位主图那套叠加物（只给 lightweight 用）：
+   *   · `levelSeries` = 通道/带状曲线（26日布林、Keltner 三档、ATR 上下轨、Ⅱ型均线），直接并进主图；
+   *   · `levelLines`  = 价位横线，并进标注层，右侧端点带名字。
+   * 不传时与改版前完全一致。
+   */
+  levelSeries?: PlotSeries[]
+  levelLines?: NonNullable<AnnotationData['priceLines']>
   showInfoBar?: boolean
   showMarkers?: boolean
   markerStyle?: DailyMarkerStyle

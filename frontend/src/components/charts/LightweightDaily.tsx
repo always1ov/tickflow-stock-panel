@@ -56,7 +56,8 @@ const eventTextColor = (event: EventMarker, row: OHLC, theme: Theme) => event.ev
 
 export function LightweightDaily({ data, assetType, symbol = '', height = 480, activeIndicators = [], showMA = true, showInfoBar = true,
   markers = [], ranges, priceLines, showMarkers = true, markerStyle = 'label', volumeCompare = { enabled: true, days: 1 }, addedDate,
-  linkedPrice, onDateClick, onPriceDoubleClick, visibleBars, stockInfo, analysisPanes = [], maKeys }: DailyChartProps) {
+  linkedPrice, onDateClick, onPriceDoubleClick, visibleBars, stockInfo, analysisPanes = [], maKeys,
+  levelSeries = [], levelLines = [] }: DailyChartProps) {
   const rows = useMemo(() => validDailyRows(data), [data])
   const precision = pricePrecision(assetType)
   const theme = useTheme()
@@ -151,7 +152,9 @@ export function LightweightDaily({ data, assetType, symbol = '', height = 480, a
     })
     return { series, decor, titles, readouts, insets, headers, hidden }
   }, [analysisPanes, rows, selected.length, visibleBars, ct.text])
-  const plotSeries = useMemo(() => [...model, ...analysis.series], [model, analysis.series])
+  const plotSeries = useMemo(
+    () => [...model, ...analysis.series, ...levelSeries],
+    [model, analysis.series, levelSeries])
 
   const plotHeight = Math.max(260, height - (showInfoBar ? CHART_LAYOUT.readout : 0))
   const paneHeights = useMemo(() => {
@@ -176,10 +179,11 @@ export function LightweightDaily({ data, assetType, symbol = '', height = 480, a
     }) : [], [markers, showMarkers, rows, markerStyle, theme])
   const annotations = useMemo(() => {
     const addedRow = addedDate ? rows.filter(r => r.date <= addedDate).at(-1) : null
-    return { dates: rows.map(r => r.date), ranges, priceLines,
+    return { dates: rows.map(r => r.date), ranges,
+      priceLines: [...(priceLines ?? []), ...levelLines],
       verticals: addedRow ? [{ time: addedRow.date, label: '自选', color: '#3B82F6' }] : [],
     }
-  }, [rows, ranges, priceLines, addedDate])
+  }, [rows, ranges, priceLines, addedDate, levelLines])
   const volumeLabels = useMemo(() => volumeCompare.enabled ? rows.flatMap((row, idx) => {
     const ratio = volumeRatioAt(rows, idx, volumeCompare.days)
     return ratio == null ? [] : [{ time: row.date, value: row.volume ?? 0, text: `${ratio.toFixed(1)}x` }]

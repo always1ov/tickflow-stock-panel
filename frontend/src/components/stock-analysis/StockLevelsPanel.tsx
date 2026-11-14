@@ -41,11 +41,11 @@ export function useAnalysisKline(symbol: string) {
 }
 
 /** 关键价位本身。[R430] 同上, 右侧价位列表按它数每一类有几条 */
-export function useStockLevels(symbol: string) {
+export function useStockLevels(symbol: string, enabled = true) {
   return useQuery({
     queryKey: QK.stockLevels(symbol),
     queryFn: () => api.stockAnalysisLevels(symbol, 250),
-    enabled: !!symbol,
+    enabled: !!symbol && enabled,
     staleTime: 60_000,
   })
 }
