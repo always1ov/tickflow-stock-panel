@@ -133,14 +133,16 @@ it('[R649] 趋势量化 / 量化MACD 两张副图默认不画, 点开后才追�
   expect([...host.querySelectorAll('button')].some(button => button.textContent === '趋势量化')).toBe(false)
 })
 
-it('[R652] 四条主图均线默认全开, 每条都能单独关掉再打开', async () => {
+it('[R655] 四条主图均线默认只开 MA20, 每条都能单独关掉再打开', async () => {
   await render()
-  expect(props().maKeys).toEqual(['ma5', 'ma10', 'ma20', 'ma60'])
+  expect(props().maKeys).toEqual(['ma20'])
   const pill = (label: string) => [...host.querySelectorAll('button')].find(button => button.textContent === label)!
   await act(async () => pill('MA20').click())
-  expect(props().maKeys).toEqual(['ma5', 'ma10', 'ma60'])
+  expect(props().maKeys).toEqual([])
   await act(async () => pill('MA20').click())
-  expect([...props().maKeys].sort()).toEqual(['ma10', 'ma20', 'ma5', 'ma60'])
+  expect(props().maKeys).toEqual(['ma20'])
+  await act(async () => pill('MA5').click())
+  expect([...props().maKeys].sort()).toEqual(['ma20', 'ma5'])
   // ECharts 画不了单条均线: 不给这四个开关, 仍按 showMA 整组
   await render({ renderer: 'echarts' })
   expect(props().maKeys).toBeUndefined()

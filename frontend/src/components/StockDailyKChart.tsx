@@ -180,8 +180,9 @@ export function StockDailyKChart({
   maxHeight,
 }: Props) {
   const [activeIndicators, setActiveIndicators] = useState<string[]>(['vol'])
-  // [R652] 四条主图均线逐条可控, 默认全开(与改版前一致)。ECharts 渲染器画不了单条, 仍按 showMA 整组。
-  const [maKeys, setMaKeys] = useState<string[]>(() => showMA ? [...MA_KEYS] : [])
+  // [R652] 四条主图均线逐条可控。[R655] 用户要求默认只留 MA20, 其余三条默认关。
+  // ECharts 渲染器画不了单条, 仍按 showMA 整组。
+  const [maKeys, setMaKeys] = useState<string[]>(() => showMA ? ['ma20'] : [])
   // [R649] 关键价位那两张副图并入日K, 默认关闭 —— 与改版前日K一样只留成交量。
   const [showTrendQuant, setShowTrendQuant] = useState(false)
   const [showQuantMacd, setShowQuantMacd] = useState(false)
