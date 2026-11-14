@@ -172,7 +172,9 @@ function ChartPill({
       aria-pressed={active}
       onClick={onClick}
       title={title}
-      className={`inline-flex shrink-0 items-center justify-center whitespace-nowrap px-2 py-0.5 rounded-btn text-micro font-mono cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
+      // [R669] 用户: 「按这个方案统一按钮大小」—— 一排胶囊统一成 65px 宽(最长的「量化MACD」实测 64.8),
+      // 高度 19px 不变; 短标签居中, 不再一颗宽一颗窄。
+      className={`inline-flex w-[65px] shrink-0 items-center justify-center whitespace-nowrap px-2 py-0.5 rounded-btn text-micro font-mono cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
         active ? activeClass : 'bg-surface ring-1 ring-inset ring-border text-foreground hover:text-foreground'
       }`}
     >
