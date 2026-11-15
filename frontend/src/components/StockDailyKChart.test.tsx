@@ -169,12 +169,18 @@ it('[R660] 价位开关状态可用外部那一份(与关键价位共用), 回�
       fib2Grain: 'coarse', setFib2Grain: vi.fn(), fib2ShowTargets: false, setFib2ShowTargets: vi.fn(),
     } as any,
   })
-  const byLabel = (label: string) => [...host.querySelectorAll('[data-testid="level-toolbar"] button')]
+  const byLabel = (label: string) => [...host.querySelectorAll('button')]
     .find(button => button.textContent?.includes(label))!
   expect(byLabel('压力支撑').getAttribute('aria-pressed')).toBe('true')
   expect(byLabel('枢轴点').getAttribute('aria-pressed')).toBe('false')
+  // [R705] 压力支撑/枢轴点/前高前低/整数关口/缺口位挪到主图指标那一行, 不再在这排价位开关里
+  const levelRow = host.querySelector('[data-testid="level-toolbar"]')!
+  expect(levelRow.textContent).not.toContain('压力支撑')
+  expect(levelRow.textContent).toContain('26日布林')
   await render({ showLevelToolbar: false })
   expect(host.querySelector('[data-testid="level-toolbar"]')).toBeNull()
+  expect(host.textContent).not.toContain('压力支撑')
+  expect(host.textContent).not.toContain('26日布林')
 })
 
 it('[R651] 空间不够只压两张分析副图, 主图与指标副图的高度不动', async () => {

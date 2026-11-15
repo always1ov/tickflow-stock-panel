@@ -26,10 +26,11 @@ const LINE_COLORS = {
 } as const
 const maFields = [['ma5', 'gray'], ['ma10', 'blue'], ['ma20', 'orange'], ['ma60', 'plum']] as const
 // [R704] 用户: 「默认开启所有MA价格显示变成只默认开启显示MA20和26日布林轨道的价格」——
-// 换手下一行固定写这三条读数(MA20 + 26日布林上下轨), 与工具栏开关无关;
-// 布林中轨就是 MA20 附近那个数, 不重复写。名称沿用图表里的正名(`CURVE_DEFS.endLabel`)。
+// 换手下一行固定写这三条读数(MA20 + 布林上下轨), 与工具栏开关无关; 布林中轨就是
+// MA20 附近那个数, 不重复写。[R705] 用户: 「换手下一行的『26日布林』都删掉『26日』」——
+// 这一处读数只写「布林上轨 / 布林下轨」; 图上标签(R701 起不显示)与价位开关的按钮文案不动。
 const READOUT_MA = [['ma20', 'orange']] as const
-const READOUT_BOLL = [['boll_upper', '26日布林上轨'], ['boll_lower', '26日布林下轨']] as const
+const READOUT_BOLL = [['boll_upper', '布林上轨'], ['boll_lower', '布林下轨']] as const
 
 const price = (v: number | null | undefined, digits = 2) => v != null && Number.isFinite(v)
   ? (Number(v.toFixed(digits)) === 0 ? 0 : v).toFixed(digits) : '—'

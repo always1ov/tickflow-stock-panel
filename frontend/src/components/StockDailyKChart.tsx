@@ -28,7 +28,7 @@ import {
 } from '@/components/stock-analysis/levelControls'
 import { LevelToolbar } from '@/components/stock-analysis/LevelToolbar'
 import {
-  LEVEL_GROUPS, buildAnalysisChartModel, hitTestAnalysis,
+  LEVEL_GROUPS, buildAnalysisChartModel, hitTestAnalysis, type LevelType,
 } from '@/components/stock-analysis/analysis-chart-model'
 import { fib2Status } from '@/lib/fib2Status'
 import { LEVEL_CURVE_COLOR, fib2RoleColor, levelColors, useChartTheme, useTheme } from '@/lib/theme'
@@ -54,6 +54,17 @@ const MA_DOTS: Record<typeof MA_KEYS[number], { dark: string; light: string }> =
   ma60: DAILY_LINE_COLORS.plum,
 }
 const DEFAULT_VOLUME_COMPARE: VolumeCompareConfig = { enabled: true, days: 1 }
+/**
+ * [R705] 用户: 「压力支撑、枢轴点、前高前低、整数关口、缺口位都放在主图指标 MA 那一行,
+ * 排在 MA60 后面」—— 这五颗最常见的价位开关并进第一行; 其余(布林、量化通道三档、
+ * ATR、斐波那契Ⅰ/Ⅱ型、六态关键点)留在下面那一排。仍然是一个 `LEVEL_GROUPS` 拆两段,
+ * 计数、反相开态、禁用态全走 `LevelToolbar`, 不另写一份。
+ */
+const MAIN_ROW_LEVEL_ORDER: LevelType[] = ['sr', 'pivot', 'extreme', 'round', 'gap']
+const MAIN_ROW_LEVEL_GROUPS = MAIN_ROW_LEVEL_ORDER
+  .map(key => LEVEL_GROUPS.find(group => group.key === key))
+  .filter((group): group is { key: LevelType; label: string } => group != null)
+const SUB_ROW_LEVEL_GROUPS = LEVEL_GROUPS.filter(group => !MAIN_ROW_LEVEL_ORDER.includes(group.key))
 
 function normalizeVolumeCompare(config: VolumeCompareConfig): VolumeCompareConfig {
   return {
@@ -578,6 +589,20 @@ export function StockDailyKChart({
                     />
                   )
                 })}
+                {/* [R705] 五颗价位开关跟在 MA60 之后, 与均线同一行; 计数/开态/禁用态复用 LevelToolbar。
+                    仍受 showLevelToolbar 管: 回测「成交K线」弹窗要把价位开关整排关掉。 */}
+                {showLevelToolbar && (
+                  <LevelToolbar
+                    groups={MAIN_ROW_LEVEL_GROUPS}
+                    controls={levelCtl}
+                    effLevels={shown.effLevels}
+                    fib2Raw={shown.fib2Raw}
+                    fib2={levelsQ.data?.fib2}
+                    showClearAll={false}
+                    compact
+                    inline
+                  />
+                )}
               </div>
               {/* [R653] 价位开关排: 与「关键价位」同一个 LevelToolbar、同一套计数与文案;
                   [R660] 开关/悬停状态由弹窗持有, 切视图保持; 回测「成交K线」弹窗不显示这排;
@@ -588,7 +613,7 @@ export function StockDailyKChart({
                 <div className="flex flex-wrap items-center gap-y-2 pr-3 pl-3 pt-1.5 pb-0 sm:pl-20 [&>div]:mb-0 [&>div]:gap-y-2" data-testid="level-toolbar">
                   {/* [R687] 用户: 「全部清除后面的问号按钮删掉」—— 不传 help, 「?」不在弹窗工具栏出现 */}
                   <LevelToolbar
-                    groups={LEVEL_GROUPS}
+                    groups={SUB_ROW_LEVEL_GROUPS}
                     controls={levelCtl}
                     effLevels={shown.effLevels}
                     fib2Raw={shown.fib2Raw}

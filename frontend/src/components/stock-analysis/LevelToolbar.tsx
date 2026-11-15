@@ -38,7 +38,7 @@ const PILL_ON = 'bg-foreground text-surface font-medium ring-1 ring-inset ring-f
 const PILL_SUB = 'whitespace-nowrap rounded-btn px-2 py-0.5 text-micro transition-colors duration-hover'
 const PILL_SUB_IDLE = 'bg-base/40 text-muted ring-1 ring-inset ring-border/60 hover:text-foreground'
 
-export function LevelToolbar({ groups, controls, effLevels, fib2Raw, fib2, onOpenFit, help, compact = false, showClearAll = true }: {
+export function LevelToolbar({ groups, controls, effLevels, fib2Raw, fib2, onOpenFit, help, compact = false, showClearAll = true, inline = false }: {
   groups: { key: LevelType; label: string }[]
   controls: LevelControls
   effLevels: Record<LevelType, PriceLevel[]> | undefined
@@ -52,6 +52,12 @@ export function LevelToolbar({ groups, controls, effLevels, fib2Raw, fib2, onOpe
   compact?: boolean
   /** [R688] 日K 弹窗把「全部清除」挪到工具栏右端「回测」之后, 这里就不画 */
   showClearAll?: boolean
+  /**
+   * [R705] 用户: 「压力支撑、枢轴点、前高前低、整数关口、缺口位都放在主图指标 MA 那一行,
+   * 排在 MA60 后面」—— 这一份按钮要并进**别的行**的 flex 里, 所以根节点用 `contents`
+   * (盒子消失, 按钮直接成为宿主行的子项, 间距与折行交给宿主行)。
+   */
+  inline?: boolean
 }) {
   const theme = useTheme()
   const { activeTypes, pivotRank, fib2Grain, fib2ShowTargets } = controls
@@ -73,7 +79,7 @@ export function LevelToolbar({ groups, controls, effLevels, fib2Raw, fib2, onOpe
   const chipIdle = compact ? PILL_SUB_IDLE : CHIP_IDLE
 
   return (
-    <div className="mb-2 flex flex-wrap items-center gap-1.5">
+    <div className={inline ? 'contents' : 'mb-2 flex flex-wrap items-center gap-1.5'}>
       {groups.map(g => {
         const on = activeTypes.has(g.key)
         const { count, total, title } = levelGroupStat(g.key, g.label, effLevels, fib2Raw, pivotRank)
@@ -89,8 +95,8 @@ export function LevelToolbar({ groups, controls, effLevels, fib2Raw, fib2, onOpe
         )
       })}
 
-      {/* 枢轴点: 显示到第几档 —— 仅当枢轴点开着 */}
-      {activeTypes.has('pivot') && (effLevels?.pivot?.length ?? 0) > 0 && (
+      {/* 枢轴点: 显示到第几档 —— 仅当枢轴点开着, 且这一份里带枢轴点(拆分到两行时不重复出) */}
+      {groups.some(g => g.key === 'pivot') && activeTypes.has('pivot') && (effLevels?.pivot?.length ?? 0) > 0 && (
         <div className={SUB}>
           <span className="mr-1 text-micro text-muted">档位</span>
           {([1, 2, 3] as const).map(r => (
@@ -104,8 +110,8 @@ export function LevelToolbar({ groups, controls, effLevels, fib2Raw, fib2, onOpe
         </div>
       )}
 
-      {/* 斐波那契二型: 粗细 / 上攻推算位 / 回测这三档 —— 仅当二型开着 */}
-      {activeTypes.has('fib2') && fib2?.grain && (
+      {/* 斐波那契二型: 粗细 / 上攻推算位 / 回测这三档 —— 仅当二型开着, 且这一份里带二型 */}
+      {groups.some(g => g.key === 'fib2') && activeTypes.has('fib2') && fib2?.grain && (
         <div className={SUB}>
           <span className="mr-1 text-micro text-muted">粗细</span>
           {FIB2_GRAINS.map(([k, cn, tip]) => (
