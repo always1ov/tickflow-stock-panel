@@ -123,7 +123,8 @@ export function PreviewHero({
           {HERO_DAYS.map(n => (
             <button key={n} type="button" onClick={() => onDaysChange(n)}
                     aria-pressed={days === n}
-                    className={`${PILL} ${days === n ? PILL_ON : PILL_IDLE}`}>
+                    // [R676] 与左边日K/分时/复盘三个视图按钮统一成 72×32
+                    className={`${PILL} w-[72px] ${days === n ? PILL_ON : PILL_IDLE}`}>
               {n} 日
             </button>
           ))}

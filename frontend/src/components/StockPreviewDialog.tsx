@@ -344,7 +344,9 @@ export function StockPreviewDialog({ symbol, name, onClose, navList: navListSour
       {VIEW_TABS.map(({ key, label, Icon }) => (
         <button key={key} type="button" role="tab" aria-selected={chartView === key}
                 onClick={() => setChartView(key)}
-                className={`inline-flex h-8 items-center gap-1.5 rounded-btn px-3 text-sm transition-colors duration-hover ${
+                // [R676] 用户: 「前三个按钮和后三个按钮一样大小」—— 与右边天数胶囊同宽同字号,
+                // 六个按钮统一 72×32(图标留着, 字从 text-sm 收到 text-xs 才装得下)
+                className={`inline-flex h-8 w-[72px] items-center justify-center gap-1.5 rounded-btn text-xs transition-colors duration-hover ${
                   chartView === key ? 'bg-foreground font-medium text-surface' : 'text-secondary hover:text-foreground'
                 }`}>
           <Icon className="h-3.5 w-3.5" />

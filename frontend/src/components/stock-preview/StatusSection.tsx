@@ -31,7 +31,6 @@ import { cn } from '@/lib/cn'
 import { BAND_CN, POS_FILL } from '@/lib/reviewTimeline'
 import { TrendBacktestButton, TrendSignalBadge, trendPivotTitle, useStockTrend } from '@/components/stock-analysis/TrendStateBar'
 import { pct, useStockReview } from '@/components/stock-analysis/StockReviewDialog'
-import { SectionTitle } from '@/components/ui'
 
 export function StatusSection({ symbol, days, stacked = false }: {
   symbol: string
@@ -43,11 +42,11 @@ export function StatusSection({ symbol, days, stacked = false }: {
   const d = review && !review.error ? review : undefined
   return (
     <section>
-      {/* [R675] 副标题「走到哪一步、在什么位置」删了 —— 用户: 「这句废话不要了」 */}
-      <SectionTitle title="现状" />
-      {/* [R673] 不再套卡框: 弹窗左栏本身已经是一个独立分栏, 再罩一层圆角边框只是白白吃掉
-          p-4 一圈 16px(左右各 16px), 用户: 「左中右里面的内容没必要再套一层框框住, 这样很浪费空间」 */}
-      <div className={cn('mt-3 grid grid-cols-1 items-start gap-x-8 gap-y-5',
+      {/* [R677] 用户: 「『现状 / 走到哪一步、在什么位置』是一整行内容不要」——
+          连标题带副标题整行撤掉, 左栏从「趋势状态 · 六态」直接开始。
+          [R673] 这四格也不再罩卡框: 左栏本身已是独立分栏, 再罩一层圆角边框只是白白
+          吃掉一圈 16px(用户: 「左中右里面的内容没必要再套一层框框住, 这样很浪费空间」) */}
+      <div className={cn('grid grid-cols-1 items-start gap-x-8 gap-y-5',
         !stacked && 'sm:grid-cols-2 lg:grid-cols-4')}>
         <TrendCell symbol={symbol} />
         <ChannelCell d={d} />
