@@ -4,7 +4,7 @@ import { type KlineRow } from '@/lib/api'
 import { klineDailyQueryOptions, klineDateRange } from '@/lib/kline'
 import { storage } from '@/lib/storage'
 import type { ChartMarker, ChartPriceLine, ChartRange, ChartRenderer, DailyAnalysisPane, DailyMarkerStyle, OHLC, VolumeCompareConfig } from '@/lib/chart-types'
-import { SUB_CHART_META } from '@/lib/chart-indicators'
+import { DAILY_LINE_COLORS, SUB_CHART_META } from '@/lib/chart-indicators'
 
 /**
  * [R659] 用户: 「日K 里面的副图 MACD 可以删除了」。MACD 的取数与画法仍是共享的
@@ -40,6 +40,33 @@ const SUB_INFO_H = 16
 const SUB_GAP = 4
 /** [R652] 主图上那四条默认均线 —— 工具栏逐个开关, 顺序与画线顺序一致 */
 const MA_KEYS = ['ma5', 'ma10', 'ma20', 'ma60'] as const
+/**
+ * [R689] 胶囊色点。用户: 「参考压力支撑、枢轴点这种指标的显示方式, 颜色+文字」——
+ * 均线四色与 `LightweightDaily` 画线取同一份(`DAILY_LINE_COLORS`), 点即线上那条线;
+ * 成交量那颗取它副图里 VOL5 均量线的黄, 两张分析副图各取自己最有辨识度的那条线。
+ */
+const MA_DOTS: Record<typeof MA_KEYS[number], { dark: string; light: string }> = {
+  ma5: DAILY_LINE_COLORS.gray,
+  ma10: DAILY_LINE_COLORS.blue,
+  ma20: DAILY_LINE_COLORS.orange,
+  ma60: DAILY_LINE_COLORS.plum,
+}
+const SUB_CHART_DOTS: Record<string, { dark: string; light: string }> = {
+  vol: DAILY_LINE_COLORS.yellow,
+}
+/**
+ * [R689] 两张分析副图的色点。它们各自的图里不止一条线, 取的是那块副图的「招牌色」:
+ * 趋势量化取吸筹那条绿、量化MACD 取 DIFF 的红 —— 这两色与主图四色(灰 / 蓝 / 橙 / 紫)不撞,
+ * 七颗点加起来是灰蓝橙紫 / 黄绿红一整套, 不会有两颗看起来一样。
+ * (趋势量化原本想用平均线的紫 #B84DFF, 与 MA60 的 #8B5CF6 摆在一排时几乎分不出来, 换成绿。)
+ * 副图那两支用的是通达信纯绿 / 纯红(#00FF00 / #FF0000)。8px 的点上那是荧光色, 比旁边
+ * 主图四颗亮一档、整排重心被拽过去 —— 按同一色相压到 500 档(#22C55E / #EF4444), 认得出是
+ * 那块副图的绿和红, 又不刺眼。
+ */
+const PANE_DOTS = {
+  trendQuant: { dark: '#22C55E', light: '#15803D' },
+  quantMacd: { dark: '#EF4444', light: '#DC2626' },
+} as const
 const DEFAULT_VOLUME_COMPARE: VolumeCompareConfig = { enabled: true, days: 1 }
 
 function normalizeVolumeCompare(config: VolumeCompareConfig): VolumeCompareConfig {
@@ -159,28 +186,43 @@ export function getDefaultRange(): { start: string; end: string } {
   return klineDateRange()
 }
 
-/** 工具栏小胶囊开关（指标与标注开关共用一套尺寸/关闭态样式，激活色由调用方给字面量）。 */
+/**
+ * 工具栏小胶囊开关。
+ * [R689] 用户: 「参考压力支撑、枢轴点这种指标的显示方式, 颜色+文字」—— 传了 `color` 的
+ * (主图 / 副图指标) 走价位开关那套: 前面一颗与图上线条同色的点, 开着时整颗反相
+ * (暗色主题白底黑字、亮色主题黑底白字), 色点换成另一套主题的深/亮版, 免得点落在同色底上消失。
+ * 不传 `color` 的 (异动 / 自选) 保持原来的强调色高亮。
+ */
 function ChartPill({
-  active, label, activeClass, title, onClick,
+  active, label, color, activeClass, title, onClick,
 }: {
   active: boolean
   label: string
-  activeClass: string
+  color?: string
+  activeClass?: string
   title?: string
   onClick: () => void
 }) {
+  const dotted = !!color
+  // 同价位开关: 反相时底色与常态相反, 色点得换另一套主题那一档
+  const base = dotted
+    ? `inline-flex w-20 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap px-2 py-0.5 rounded-btn text-micro font-mono cursor-pointer transition-colors duration-hover ring-1 ring-inset focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
+      active ? 'bg-foreground text-surface font-medium ring-foreground' : 'bg-surface text-foreground ring-border hover:bg-elevated'
+    }`
+    // [R669] 用户: 「按这个方案统一按钮大小」—— 一排胶囊统一成 65px 宽(最长的「量化MACD」实测 64.8),
+    // 高度 19px 不变; 短标签居中, 不再一颗宽一颗窄。
+    : `inline-flex w-[65px] shrink-0 items-center justify-center whitespace-nowrap px-2 py-0.5 rounded-btn text-micro font-mono cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
+      active ? activeClass : 'bg-surface ring-1 ring-inset ring-border text-foreground hover:text-foreground'
+    }`
   return (
     <button
       type="button"
       aria-pressed={active}
       onClick={onClick}
       title={title}
-      // [R669] 用户: 「按这个方案统一按钮大小」—— 一排胶囊统一成 65px 宽(最长的「量化MACD」实测 64.8),
-      // 高度 19px 不变; 短标签居中, 不再一颗宽一颗窄。
-      className={`inline-flex w-[65px] shrink-0 items-center justify-center whitespace-nowrap px-2 py-0.5 rounded-btn text-micro font-mono cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
-        active ? activeClass : 'bg-surface ring-1 ring-inset ring-border text-foreground hover:text-foreground'
-      }`}
+      className={base}
     >
+      {color && <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: color }} />}
       {label}
     </button>
   )
@@ -418,15 +460,23 @@ export function StockDailyKChart({
   // 前面都是指标」—— 量比那组是成交量的参数、不是指标, 排到所有指标胶囊之后, 单独跟一条竖线。
   // [R684] 两种渲染器都要用同一份胶囊, 提到 return 之前只写一遍。
   // [R656] 原来的 BOLL 开关撤下 —— 26 日布林改由「主图指标」里那排价位开关的「26日布林」控制。
-  const subIndicatorPills = DAILY_SUB_CHARTS.map(ind => (
-    <ChartPill
-      key={ind.key}
-      active={activeIndicators.includes(ind.key)}
-      label={ind.label}
-      activeClass="bg-accent/20 text-accent"
-      onClick={() => toggleIndicator(ind.key)}
-    />
-  ))
+  // [R689] 色点 = 图上那条线的主色。开着的胶囊反相(白底 / 黑底), 点得换成另一套主题那一档,
+  // 否则暗色主题里那颗近黄的点点在白底上就没了 —— 与价位开关 `LC_ON` 同一个做法。
+  const dotColor = (pal: { dark: string; light: string }, on: boolean) =>
+    on ? pal[theme === 'dark' ? 'light' : 'dark'] : pal[theme]
+
+  const subIndicatorPills = DAILY_SUB_CHARTS.map(ind => {
+    const on = activeIndicators.includes(ind.key)
+    return (
+      <ChartPill
+        key={ind.key}
+        active={on}
+        label={ind.label}
+        color={dotColor(SUB_CHART_DOTS[ind.key] ?? DAILY_LINE_COLORS.gray, on)}
+        onClick={() => toggleIndicator(ind.key)}
+      />
+    )
+  })
 
   // [R683] 「量比」只对成交量生效; [R686] 排位从成交量后面挪到副图指标全部之后。
   const volumeCompareControl = activeIndicators.includes('vol') && (
@@ -467,13 +517,13 @@ export function StockDailyKChart({
       <ChartPill
         active={showTrendQuant}
         label="趋势量化"
-        activeClass="bg-accent/20 text-accent"
+        color={dotColor(PANE_DOTS.trendQuant, showTrendQuant)}
         onClick={() => setShowTrendQuant(value => !value)}
       />
       <ChartPill
         active={showQuantMacd}
         label="量化MACD"
-        activeClass="bg-accent/20 text-accent"
+        color={dotColor(PANE_DOTS.quantMacd, showQuantMacd)}
         onClick={() => setShowQuantMacd(value => !value)}
       />
     </>
@@ -545,16 +595,19 @@ export function StockDailyKChart({
             <>
               <div className="flex flex-wrap items-center gap-x-1 gap-y-2 px-3 pt-2 pb-1">
                 <span className="w-16 shrink-0 text-micro text-muted" title="画在主图上的指标">主图指标</span>
-                {/* [R652] 主图四条均线各自可开关, 默认只开 MA20 */}
-                {MA_KEYS.map(key => (
-                  <ChartPill
-                    key={key}
-                    active={maKeys.includes(key)}
-                    label={key.toUpperCase()}
-                    activeClass="bg-accent/20 text-accent"
-                    onClick={() => toggleMA(key)}
-                  />
-                ))}
+                {/* [R652] 主图四条均线各自可开关, 默认只开 MA20; [R689] 色点即那条均线在图上颜色 */}
+                {MA_KEYS.map(key => {
+                  const on = maKeys.includes(key)
+                  return (
+                    <ChartPill
+                      key={key}
+                      active={on}
+                      label={key.toUpperCase()}
+                      color={dotColor(MA_DOTS[key], on)}
+                      onClick={() => toggleMA(key)}
+                    />
+                  )
+                })}
                 {markerControls}
               </div>
               {/* [R653] 价位开关排: 与「关键价位」同一个 LevelToolbar、同一套计数与文案;

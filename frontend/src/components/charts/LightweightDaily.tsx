@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { SeriesMarker, Time } from 'lightweight-charts'
 import type { ChartMarker, DailyChartProps, OHLC } from '@/lib/chart-types'
-import { SUB_CHART_META, volMaN, volumeRatioAt } from '@/lib/chart-indicators'
+import { DAILY_LINE_COLORS, SUB_CHART_META, volMaN, volumeRatioAt } from '@/lib/chart-indicators'
 import { CHART_COLORS as C, lineData, validDailyRows, type PlotSeries } from '@/lib/lightweight-model'
 import { fmtVolume, fmtPct, pricePrecision } from '@/lib/format'
 import { CHART_LAYOUT, plotPaneHeights } from '@/lib/chart-layout'
@@ -18,13 +18,9 @@ const fields = {
   rsi: [['rsi_6', 'RSI6', 'yellow'], ['rsi_14', 'RSI14', 'blue'], ['rsi_24', 'RSI24', 'plum']],
   kdj: [['kdj_k', 'K', 'yellow'], ['kdj_d', 'D', 'blue'], ['kdj_j', 'J', 'plum']],
 } as const
+// [R689] 均线五色与工具栏胶囊的色点共用同一份(`lib/chart-indicators`), 这里只补涨跌两色
 const LINE_COLORS = {
-  yellow: { dark: '#FACC15', light: '#A16207' },
-  blue: { dark: '#3B82F6', light: '#2563EB' },
-  // [R593] 键名避开 purple 族(守卫按族名查), 色值仍是图表线条色
-  plum: { dark: '#8B5CF6', light: '#7C3AED' },
-  gray: { dark: '#A1A1AA', light: '#71717A' },
-  orange: { dark: '#F97316', light: '#C2410C' },
+  ...DAILY_LINE_COLORS,
   up: { dark: C.up, light: C.up },
   down: { dark: C.down, light: '#15803D' },
 } as const
