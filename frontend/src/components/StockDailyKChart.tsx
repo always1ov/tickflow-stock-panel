@@ -705,6 +705,7 @@ export function StockDailyKChart({
           levelLabels={fib2Overlay.labels}
           levelVerticals={fib2Overlay.verticals}
           levelFuture={fib2Overlay.future}
+          dimLines={hoveredKey != null}
           onCrosshairMove={renderer === 'lightweight' ? handleLevelCrosshair : undefined}
         />
         </Suspense>

@@ -55,7 +55,7 @@ const eventTextColor = (event: EventMarker, row: OHLC, theme: Theme) => event.ev
 export function LightweightDaily({ data, assetType, symbol = '', height = 480, activeIndicators = [], showMA = true, showInfoBar = true,
   markers = [], ranges, priceLines, showMarkers = true, markerStyle = 'candle', volumeCompare = { enabled: true, days: 1 }, addedDate,
   linkedPrice, onDateClick, onPriceDoubleClick, visibleBars, stockInfo, analysisPanes = [], maKeys,
-  readoutExtra,
+  readoutExtra, dimLines = false,
   levelSeries = [], levelLines = [], levelRanges = [], levelLabels = [], levelVerticals = [],
   levelFuture = null, onCrosshairMove }: DailyChartProps) {
   const rows = useMemo(() => validDailyRows(data), [data])
@@ -97,7 +97,9 @@ export function LightweightDaily({ data, assetType, symbol = '', height = 480, a
       options: Pick<PlotSeries, 'range' | 'precision' | 'priceFormat'> = {}) => {
       series.push({ id, type: 'Line', pane, data: values, color, ...options })
     }
-    for (const [key, token] of visibleMA) addLine(key, lineData(rows, key), color(token))
+    // [R709] 用户: 「悬浮的时候MA也在主图显示了」—— 悬停某个价位点位时, 价位线压到 12%,
+    // 均线还是全亮, 对比之下像多画了一条。这里给均线同一档压暗(35%), 退出悬停恢复原色。
+    for (const [key, token] of visibleMA) addLine(key, lineData(rows, key), dimLines ? `${color(token)}59` : color(token))
     selected.forEach((key, offset) => {
       const pane = offset + 1
       if (key === 'vol') {
@@ -118,7 +120,7 @@ export function LightweightDaily({ data, assetType, symbol = '', height = 480, a
       }
     })
     return series
-  }, [rows, visibleMA, selected, activeIndicators, events, markerStyle, showMarkers, theme, volumeMAs])
+  }, [rows, visibleMA, selected, activeIndicators, events, markerStyle, showMarkers, theme, volumeMAs, dimLines])
 
   // [R649] 底部并入的分析副图(趋势量化 / 量化MACD): 排在各指标副图之后, 高度由调用方算好。
   // 与关键价位那张图同一份画法(`lib/analysisPanes.ts`), 这里只负责 pane 下标与版面。

@@ -122,6 +122,8 @@ export interface DailyChartProps {
   levelLabels?: NonNullable<AnnotationData['labels']>
   levelVerticals?: NonNullable<AnnotationData['verticals']>
   levelFuture?: { dates: string[]; labels: string[]; values: number[] } | null
+  /** [R709] 右栏/十字线正悬停某个价位点位时, 均线一起压暗, 只让命中那条线突出 */
+  dimLines?: boolean
   showInfoBar?: boolean
   showMarkers?: boolean
   markerStyle?: DailyMarkerStyle

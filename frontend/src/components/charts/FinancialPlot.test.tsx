@@ -10,6 +10,7 @@ import { LightweightDaily } from './LightweightDaily'
 import { LightweightIntraday } from './LightweightIntraday'
 import { minuteTime, type PlotSeries } from '@/lib/lightweight-model'
 import { CHART_LAYOUT, dailyChartHeight } from '@/lib/chart-layout'
+import { DAILY_LINE_COLORS } from '@/lib/chart-indicators'
 import { ChartAnnotations } from './ChartAnnotations'
 
 const native = vi.hoisted(() => {
@@ -153,6 +154,22 @@ it('centers index extrema on yesterday close, hides invalid averages and clears 
     expect(annotations.axisTicks).toContainEqual(expect.objectContaining({ value: 5211.79, priority: 3 }))
     expect(annotations.axisTicks?.some(tick => tick.priority === 2)).toBe(false)
   } finally { updates.mockRestore() }
+})
+
+it('[R709] 悬停价位点位时, 主图均线跟着价位线一起压暗', async () => {
+  const rows = [{ date: '2026-11-05', open: 10, high: 11, low: 9, close: 10,
+    ma5: 10.2, ma10: 10.1, ma20: 10, ma60: 9.9 }]
+  // 图表只创建一次: 首屏看 addSeries 的初始色, 之后看 applyOptions 最后写进去的那次
+  const ma5Color = () => {
+    const applied = native.series[1].applyOptions.mock.calls
+      .map((call: unknown[]) => (call[0] as { color?: string } | undefined)?.color)
+      .filter(Boolean).at(-1)
+    return applied ?? native.chart.addSeries.mock.calls[1][1].color
+  }
+  await act(async () => root.render(<LightweightDaily data={rows} />))
+  expect(ma5Color()).toBe(DAILY_LINE_COLORS.gray.dark)
+  await act(async () => root.render(<LightweightDaily data={rows} dimLines />))
+  expect(ma5Color()).toBe(`${DAILY_LINE_COLORS.gray.dark}59`)
 })
 
 it('ETF 日K价格、均线和轴刻度为三位, 切换股票后恢复两位', async () => {
