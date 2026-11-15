@@ -296,7 +296,9 @@ export function buildAnalysisChartModel(input: AnalysisChartInput): AnalysisChar
     const hit = hoveredKey === key
     const entry = {
       value: line.value,
-      label: `${line.label} ${line.value.toFixed(precision)}`,
+      // [R701] 用户: 「主图所有指标也不再需要显示标签」—— 画布内不写「压力位 30.82」,
+      // 价格轴也不挂价签, 主图上只留线本身。
+      label: '',
       color: line.color,
       opacity: dimming ? (hit ? 1 : LEVEL_LINE_DIM_OPACITY) : (line.type === 'fib2' ? 1 : LEVEL_LINE_OPACITY),
       width: hit ? LEVEL_LINE_HIT_WIDTH : LEVEL_LINE_WIDTH,
@@ -317,7 +319,8 @@ export function buildAnalysisChartModel(input: AnalysisChartInput): AnalysisChar
     const state = curveState(hoveredKey, def.group)
     lines.push({
       value: lastValue,
-      label: `${def.endLabel} ${lastValue.toFixed(precision)}`,
+      // [R701] 同价位线: 不写「Keltner长上 30.82」, 也不挂价格轴价签。
+      label: '',
       color: curveLabelColor(curveColorOf(def.alignedKey, def.group, input.colors), state),
       noLine: true,
       opacity: 1,

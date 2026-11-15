@@ -76,13 +76,14 @@ describe('buildAnalysisChartModel', () => {
     })
     const horizontal = model.annotations.priceLines!.filter(line => !line.noLine)
     expect(horizontal.map(line => line.value)).toEqual([12.4, 10.2, 10.6, 9.8])
-    expect(horizontal[0]).toMatchObject({ label: '成交密集区 12.40', color: '#F97316', opacity: 0.9, width: 1 })
+    // [R701] 主图指标不再显示标签: 画布内不写文字, 价格轴也不挂价签
+    expect(horizontal[0]).toMatchObject({ label: '', color: '#F97316', opacity: 0.9, width: 1 })
+    expect(horizontal[0].axisLabel).toBeUndefined()
     expect(horizontal.some(line => line.value === 11.1)).toBe(false)
 
     const curveLabels = model.annotations.priceLines!.filter(line => line.noLine)
-    expect(curveLabels.map(line => line.label)).toEqual([
-      '26日布林上轨 12.30', '26日布林下轨 9.30', '26日布林中轨 10.80', 'ATR下轨 9.20', 'ATR上轨 12.70',
-    ])
+    expect(curveLabels.map(line => line.value).sort((a, b) => a - b)).toEqual([9.2, 9.3, 10.8, 12.3, 12.7])
+    expect(curveLabels.every(line => line.label === '' && line.axisLabel === undefined)).toBe(true)
 
     expect(model.series.map(item => item.id)).toEqual([
       'price', 'volume', 'curve:boll_upper', 'curve:boll_lower', 'curve:boll_mid',
@@ -115,7 +116,7 @@ describe('buildAnalysisChartModel', () => {
     expect(lines.find(line => line.value === 12.4)).toMatchObject({ width: 1, opacity: 0.12 })
     expect(model.series.find(item => item.id === 'curve:boll_upper')!.color).toBe('#F973161F')
     const labels = model.annotations.priceLines!.filter(line => line.noLine)
-    expect(labels.find(line => line.label === '26日布林上轨 12.30')!.color).toBe('#F973161F')
+    expect(labels.find(line => line.value === 12.3)!.color).toBe('#F973161F')
     expect(model.annotations.priceLines!.at(-1)).toMatchObject({ value: 10.2, width: 2, labelPriority: 3 })
     expect(lines.find(line => line.value === 12.4)).toMatchObject({ labelPriority: 2 })
     expect(model.hoverKeys.has(hoveredKey)).toBe(true)

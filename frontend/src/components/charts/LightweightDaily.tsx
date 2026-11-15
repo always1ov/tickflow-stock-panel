@@ -233,7 +233,7 @@ export function LightweightDaily({ data, assetType, symbol = '', height = 480, a
         {readoutExtra && <div className="ml-auto flex items-center gap-1.5 pl-2">{readoutExtra}</div>}
       </div>
       <div className="mt-0.5 flex min-h-4 flex-wrap gap-x-4 gap-y-1 text-micro">
-        {visibleMA.map(([field, token]) => <span key={field} style={{ color: color(token) }}>{field.toUpperCase()} {price(current?.[field], precision)}</span>)}
+        {/* [R701] 用户: 「主图所有指标也不再需要显示标签」—— 均线读数不再列出, 只留悬停时的区间涨跌幅 */}
         {index >= 0 && previous && <span className="text-secondary">至今 <span style={{ color: rows.at(-1)!.close >= previous.close ? C.up : C.down }}>{fmtPct(rows.at(-1)!.close / previous.close - 1)}</span> · 周期 {rows.length - index}</span>}
       </div>
     </div>}

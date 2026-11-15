@@ -285,7 +285,8 @@ export function FinancialPlot(props: Props) {
       chart.removeSeries(item.api); seriesRef.current.delete(id)
     }
     for (const spec of props.series) {
-      const options = { ...(spec.color ? { color: spec.color } : {}), lineWidth: spec.lineWidth ?? 1, lastValueVisible: false, priceLineVisible: false,
+      const options = { ...(spec.color ? { color: spec.color } : {}), lineWidth: spec.lineWidth ?? 1,
+        lastValueVisible: false, priceLineVisible: false,
         ...(spec.priceScaleId ? { priceScaleId: spec.priceScaleId, lineVisible: false } : {}),
         crosshairMarkerVisible: false, visible: spec.visible ?? true,
         priceFormat: spec.priceFormat === 'volume' ? { type: 'custom' as const, formatter: fmtBigNum, minMove: 1 }

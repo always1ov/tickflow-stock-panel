@@ -103,7 +103,9 @@ it('switches level groups and pivot ranks from the toolbar', async () => {
   await renderChart()
   await act(async () => button('26日布林3').click())
   expect(lastPlot().series.map((item: any) => item.id)).toContain('curve:boll_upper')
-  expect(lastPlot().annotations.priceLines.map((line: any) => line.label)).toContain('26日布林上轨 12.30')
+  // [R701] 主图指标不再显示标签: 画布内不写「26日布林上轨 12.30」, 价格轴也不挂价签
+  expect(lastPlot().annotations.priceLines.find((line: any) => line.value === 12.3))
+    .toMatchObject({ label: '' })
   await act(async () => button('2').click())
   expect(lastPlot().annotations.priceLines.map((line: any) => line.value)).toContain(11.1)
 })
