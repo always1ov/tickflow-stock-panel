@@ -74,7 +74,10 @@ export function LightweightDaily({ data, assetType, symbol = '', height = 480, a
     }
     return result
   }, [markers])
-  const currentEvent = showMarkers && markerStyle === 'candle' && current ? events.get(current.date) : undefined
+  // [R693] 用户: 「切换圆点和颜色不能导致主图高度有变化」—— 这段读数两种显示方式都出。
+  // 原来只有「颜色」模式才显示, 那一段文字会让读数条在窄窗里多折一行, 整块高度就跟着跳;
+  // 显示方式只该影响图上怎么画, 不该影响读数条的内容。
+  const currentEvent = showMarkers && current ? events.get(current.date) : undefined
   const selected = useMemo(() => activeIndicators.filter(key => SUB_CHART_META.some(d => d.key === key)), [activeIndicators])
   const model = useMemo(() => {
     const series: PlotSeries[] = [{ id: 'price', type: 'Candlestick', pane: 0, data: rows.map(r => {
