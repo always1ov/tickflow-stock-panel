@@ -87,7 +87,8 @@ const INTRADAY_DAY_OPTIONS = [1, 5, 10, 20] as const
 function BacktestEntry({ symbol }: { symbol: string }) {
   const t = useStockTrend(symbol).data
   if (!t || t.error) return null
-  return <TrendBacktestButton symbol={symbol} trend={t} />
+  // [R685] 与「异动 / 自选」同尺寸(65×19), 标签收成「回测 8%」, 阀值来源进悬停
+  return <TrendBacktestButton symbol={symbol} trend={t} compact />
 }
 
 // [R552] 弹窗开合的动效参数(动效评审 R550/R551 四条):

@@ -54,18 +54,37 @@ export function trendPivotTitle(trend: TrendDetail): string {
 }
 
 /** 「回测调参 N%」按钮 + 它打开的弹窗 —— 六态条与个股弹窗「现状」卡共用这一份 */
-export function TrendBacktestButton({ symbol, trend, className }: { symbol: string; trend: TrendDetail; className?: string }) {
+export function TrendBacktestButton({ symbol, trend, className, compact = false }: {
+  symbol: string
+  trend: TrendDetail
+  className?: string
+  /**
+   * [R685] 用户: 「回测调参按钮要和异动自选的大小一样」—— 弹窗工具栏里跟「异动 / 自选」
+   * 同一套胶囊尺寸(65×19、text-micro、font-mono 居中), 标签因此收到「回测 8%」,
+   * 图标与「(已定制)」挪进悬停说明。六态条那边继续用完整写法。
+   */
+  compact?: boolean
+}) {
   const [showBacktest, setShowBacktest] = useState(false)
+  const pct = (trend.threshold * 100).toFixed(0)
+  const customized = trend.threshold_source === 'override'
+  const hint = `按阈值网格回测近 180 个交易日,选择该票的合适回撤/回升阈值${customized ? '(已定制)' : ''}`
   return (
     <>
       <button
         onClick={() => setShowBacktest(true)}
-        className={`inline-flex items-center gap-1 rounded-btn border border-accent/30 bg-accent/10 px-2 py-0.5 text-micro text-accent hover:bg-accent/20 transition-colors cursor-pointer ${className ?? ''}`}
-        title="按阈值网格回测近 180 个交易日,选择该票的合适回撤/回升阈值"
+        className={compact
+          ? `inline-flex w-[65px] shrink-0 items-center justify-center whitespace-nowrap rounded-btn bg-accent/10 px-2 py-0.5 font-mono text-micro text-accent ring-1 ring-inset ring-accent/30 transition-colors cursor-pointer hover:bg-accent/20 ${className ?? ''}`
+          : `inline-flex items-center gap-1 rounded-btn border border-accent/30 bg-accent/10 px-2 py-0.5 text-micro text-accent hover:bg-accent/20 transition-colors cursor-pointer ${className ?? ''}`}
+        title={hint}
       >
-        <FlaskConical className="h-3 w-3" />
-        回测调参 {(trend.threshold * 100).toFixed(0)}%
-        {trend.threshold_source === 'override' && <span className="text-accent/60">(已定制)</span>}
+        {compact ? `回测 ${pct}%` : (
+          <>
+            <FlaskConical className="h-3 w-3" />
+            回测调参 {pct}%
+            {customized && <span className="text-accent/60">(已定制)</span>}
+          </>
+        )}
       </button>
       {showBacktest && (
         <TrendBacktestDialog symbol={symbol} onClose={() => setShowBacktest(false)} />
