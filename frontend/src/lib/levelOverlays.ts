@@ -15,12 +15,6 @@ import type { PlotSeries } from '@/lib/lightweight-model'
 
 export type LevelLine = NonNullable<AnnotationData['priceLines']>[number]
 
-/** 现价贴签：与关键价位那张图一样一条淡线 + 右端「现价 x.xx」，用来量还差多少到位。 */
-export function levelLastPriceLine(close: number | null | undefined, color: string): LevelLine[] {
-  if (close == null || !Number.isFinite(close)) return []
-  return [{ value: close, label: `现价 ${close.toFixed(2)}`, color, opacity: 0.45, labelPriority: 4 }]
-}
-
 export interface LevelFib2Overlay {
   priceLines: LevelLine[]
   ranges: ChartRange[]

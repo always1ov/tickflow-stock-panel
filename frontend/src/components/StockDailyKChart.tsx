@@ -35,7 +35,7 @@ import {
 import { fib2Status } from '@/lib/fib2Status'
 import { LEVEL_CURVE_COLOR, fib2RoleColor, levelColors, useChartTheme, useTheme } from '@/lib/theme'
 import {
-  levelFib2Overlay, levelLastPriceLine, withFib2Future,
+  levelFib2Overlay, withFib2Future,
 } from '@/lib/levelOverlays'
 
 const EChartsCandlestick = lazy(() => import('./EChartsCandlestick').then(m => ({ default: m.EChartsCandlestick })))
@@ -407,11 +407,12 @@ export function StockDailyKChart({
       textColor: ct.text,
     }), [renderer, levelCtl.activeTypes, levelsQ.data?.fib2, shown.fib2Zone, kline.data?.rows,
     lastClose, theme, levelColorsByTheme, ct.text])
+  // [R718] 用户: 「主图上面的现价标签删了」—— 原来这条 lineLastPriceLine 会在右端压一条
+  // 「现价 46.89」的淡线标签, 与头部报价重复; 删掉后主图只剩价位线与曲线自己的标签。
   const levelLines = useMemo(() => renderer !== 'lightweight' ? [] : [
     ...(levelModel?.annotations.priceLines ?? []),
     ...fib2Overlay.priceLines,
-    ...levelLastPriceLine(lastClose, ct.text),
-  ], [renderer, levelModel, fib2Overlay, lastClose, ct.text])
+  ], [renderer, levelModel, fib2Overlay])
   const levelSeries = useMemo(() => renderer !== 'lightweight' || !levelModel
     ? []
     : withFib2Future(levelModel.series.filter(item => item.id.startsWith('curve:')), fib2Overlay.future),

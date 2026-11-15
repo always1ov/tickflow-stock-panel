@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { KlineRow } from '@/lib/api'
 import type { LevelType } from '@/components/stock-analysis/analysis-chart-model'
-import { levelFib2Overlay, levelLastPriceLine, withFib2Future } from '@/lib/levelOverlays'
+import { levelFib2Overlay, withFib2Future } from '@/lib/levelOverlays'
 
 const row = (date: string, close: number): KlineRow => ({
   date, open: close, high: close + 1, low: close - 1, close, volume: 100,
@@ -44,9 +44,5 @@ describe('[R653] 关键价位主图指标并进日K', () => {
       theme: 'dark', fibColor: '#8B5CF6', textColor: '#fff',
     })
     expect(overlay).toEqual({ priceLines: [], ranges: [], labels: [], verticals: [], future: null })
-    expect(levelLastPriceLine(12.345, '#fff')).toEqual([
-      { value: 12.345, label: '现价 12.35', color: '#fff', opacity: 0.45, labelPriority: 4 },
-    ])
-    expect(levelLastPriceLine(null, '#fff')).toEqual([])
   })
 })

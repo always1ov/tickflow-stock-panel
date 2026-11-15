@@ -219,7 +219,8 @@ export function LightweightDaily({ data, assetType, symbol = '', height = 480, a
     }) : [], [markers, showMarkers, rows, markerStyle, theme])
   const annotations = useMemo(() => {
     const addedRow = addedDate ? rows.filter(r => r.date <= addedDate).at(-1) : null
-    const verticals = addedRow ? [{ time: addedRow.date, label: '自选', color: '#3B82F6' }] : []
+    // [R718] 用户: 「自选的字眼放到底下」—— 这条竖线的文字从图顶挪到贴近时间轴那一侧。
+    const verticals = addedRow ? [{ time: addedRow.date, label: '自选', color: '#3B82F6', labelPosition: 'bottom' as const }] : []
     return { dates: [...rows.map(r => r.date), ...(levelFuture?.labels ?? [])],
       ranges: [...(ranges ?? []), ...levelRanges],
       priceLines: [...(priceLines ?? []), ...levelLines],

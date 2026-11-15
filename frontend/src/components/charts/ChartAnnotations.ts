@@ -20,7 +20,8 @@ export interface AnnotationData {
   gridTicks?: number[]
   gridColor?: string
   precision?: number
-  verticals?: { time: Time; label?: string; color?: string }[]
+  // [R718] labelPosition: 'bottom' 把竖线文字画到 pane 底边(「自选」这类标记用), 默认仍在顶上。
+  verticals?: { time: Time; label?: string; color?: string; labelPosition?: 'top' | 'bottom' }[]
   labels?: { time: Time; value: number; text: string; color?: string }[]
   textColor?: string
   title?: string
@@ -176,7 +177,8 @@ export class ChartAnnotations implements ISeriesPrimitive<Time> {
           const textWidth = ctx.measureText(line.label).width
           const left = Math.max(5, Math.min(x + 5, width - textWidth - 5))
           if (left >= verticalLabelRight + 6) {
-            ctx.fillStyle = ctx.strokeStyle; ctx.fillText(line.label, left, 15)
+            ctx.fillStyle = ctx.strokeStyle
+            ctx.fillText(line.label, left, line.labelPosition === 'bottom' ? height - 5 : 15)
             verticalLabelRight = left + textWidth
           }
         }
