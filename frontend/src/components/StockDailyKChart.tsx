@@ -414,51 +414,52 @@ export function StockDailyKChart({
   }, [showIndicatorControls, rows.length, renderer])
   const Chart = renderer === 'lightweight' ? LightweightDaily : EChartsCandlestick
 
-  // [R684] 两种渲染器都要用同一份胶囊, 提到 return 之前只写一遍:
-  // 副图指标胶囊(成交量 / 其后的量比) 与右端标注开关(异动 / 颜色 / 自选 / 回测调参)。
+  // [R686] 用户: 「『成交量 量比 前1日均量 趋势量化 量化MACD』应该这样排列『成交量 趋势量化 量化MACD 量比 前1日均量』,
+  // 前面都是指标」—— 量比那组是成交量的参数、不是指标, 排到所有指标胶囊之后, 单独跟一条竖线。
+  // [R684] 两种渲染器都要用同一份胶囊, 提到 return 之前只写一遍。
   // [R656] 原来的 BOLL 开关撤下 —— 26 日布林改由「主图指标」里那排价位开关的「26日布林」控制。
   const subIndicatorPills = DAILY_SUB_CHARTS.map(ind => (
-    <span key={ind.key} className="contents">
-      <ChartPill
-        active={activeIndicators.includes(ind.key)}
-        label={ind.label}
-        activeClass="bg-accent/20 text-accent"
-        onClick={() => toggleIndicator(ind.key)}
-      />
-      {/* [R683] 「量比」只对成交量生效, 紧跟在它后面 */}
-      {ind.key === 'vol' && activeIndicators.includes('vol') && (
-        <div className="ml-0.5 flex h-5 items-center gap-1.5 border-l border-border/70 pl-2">
-          <span className="text-micro text-muted">量比</span>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={volumeCompare.enabled}
-            aria-label="开启量能对比"
-            title={volumeCompare.enabled ? '关闭量能对比' : '开启量能对比'}
-            onClick={() => updateVolumeCompare({ enabled: !volumeCompare.enabled })}
-            className={`relative h-3.5 w-6 shrink-0 rounded-full transition-colors ${
-              volumeCompare.enabled ? 'bg-accent' : 'bg-surface border border-border'
-            }`}
-          >
-            <span className={`absolute left-0 top-0.5 h-2.5 w-2.5 rounded-full bg-white transition-transform ${
-              volumeCompare.enabled ? 'translate-x-3' : 'translate-x-0.5'
-            }`} />
-          </button>
-          <select
-            aria-label="量能对比周期"
-            value={volumeCompare.days}
-            disabled={!volumeCompare.enabled}
-            onChange={event => updateVolumeCompare({ days: Number(event.target.value) })}
-            className="h-5 rounded-btn border border-border bg-base px-1 text-micro text-secondary outline-none disabled:opacity-40"
-          >
-            {Array.from({ length: 20 }, (_, index) => index + 1).map(days => (
-              <option key={days} value={days}>前{days}日均量</option>
-            ))}
-          </select>
-        </div>
-      )}
-    </span>
+    <ChartPill
+      key={ind.key}
+      active={activeIndicators.includes(ind.key)}
+      label={ind.label}
+      activeClass="bg-accent/20 text-accent"
+      onClick={() => toggleIndicator(ind.key)}
+    />
   ))
+
+  // [R683] 「量比」只对成交量生效; [R686] 排位从成交量后面挪到副图指标全部之后。
+  const volumeCompareControl = activeIndicators.includes('vol') && (
+    <div className="ml-0.5 flex h-5 items-center gap-1.5 border-l border-border/70 pl-2">
+      <span className="text-micro text-muted">量比</span>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={volumeCompare.enabled}
+        aria-label="开启量能对比"
+        title={volumeCompare.enabled ? '关闭量能对比' : '开启量能对比'}
+        onClick={() => updateVolumeCompare({ enabled: !volumeCompare.enabled })}
+        className={`relative h-3.5 w-6 shrink-0 rounded-full transition-colors ${
+          volumeCompare.enabled ? 'bg-accent' : 'bg-surface border border-border'
+        }`}
+      >
+        <span className={`absolute left-0 top-0.5 h-2.5 w-2.5 rounded-full bg-white transition-transform ${
+          volumeCompare.enabled ? 'translate-x-3' : 'translate-x-0.5'
+        }`} />
+      </button>
+      <select
+        aria-label="量能对比周期"
+        value={volumeCompare.days}
+        disabled={!volumeCompare.enabled}
+        onChange={event => updateVolumeCompare({ days: Number(event.target.value) })}
+        className="h-5 rounded-btn border border-border bg-base px-1 text-micro text-secondary outline-none disabled:opacity-40"
+      >
+        {Array.from({ length: 20 }, (_, index) => index + 1).map(days => (
+          <option key={days} value={days}>前{days}日均量</option>
+        ))}
+      </select>
+    </div>
+  )
 
   // [R649] 从「关键价位」并过来的两张副图 —— 固定排在各指标副图之后; ECharts 渲染没有这两张副图, 不给开关。
   const analysisPanePills = (
@@ -578,12 +579,14 @@ export function StockDailyKChart({
                 <span className="w-16 shrink-0 text-micro text-muted" title="画在下方副图里的指标">副图指标</span>
                 {subIndicatorPills}
                 {analysisPanePills}
+                {volumeCompareControl}
               </div>
             </>
           )}
           {renderer !== 'lightweight' && (
             <>
               {subIndicatorPills}
+              {volumeCompareControl}
               {markerControls}
             </>
           )}
