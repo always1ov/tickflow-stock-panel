@@ -42,7 +42,7 @@ const render = async (extra: Partial<Parameters<typeof StockDailyKChart>[0]> = {
 
 it('identifies limit events from existing signals, prioritizing a limit-down close over a broken limit-up', async () => {
   await render({ markers: [{ date: '2026-11-05', kind: 'buy', label: '策略买点' }] })
-  expect((host.querySelector('[aria-label="异动显示方式"]') as HTMLSelectElement).value).toBe('label')
+  expect(host.querySelector('[aria-label="异动显示方式"] [aria-pressed="true"]')!.textContent).toBe('圆点')
   expect(props().markerStyle).toBe('label')
   expect(props().markers).toEqual([
     expect.objectContaining({ label: '策略买点' }),
@@ -83,15 +83,17 @@ it.each([
 
 it('persists the style independently of the existing marker on/off switch', async () => {
   await render()
-  const select = host.querySelector('[aria-label="异动显示方式"]') as HTMLSelectElement
-  expect([...select.options].map(option => [option.value, option.text])).toEqual([['label', '文字'], ['candle', '颜色']])
-  await act(async () => { select.value = 'candle'; select.dispatchEvent(new Event('change', { bubbles: true })) })
+  const group = host.querySelector('[aria-label="异动显示方式"]') as HTMLElement
+  const styles = [...group.querySelectorAll('button')]
+  expect(styles.map(button => [button.getAttribute('aria-pressed'), button.textContent])).toEqual([['true', '圆点'], ['false', '颜色']])
+  const colorButton = styles[1]
+  await act(async () => colorButton.click())
   expect(props().markerStyle).toBe('candle')
   expect(JSON.parse(localStorage.getItem('stock_daily_marker_style')!)).toBe('candle')
   const toggle = [...host.querySelectorAll('button')].find(button => button.textContent === '异动')!
   await act(async () => toggle.click())
   expect(props().showMarkers).toBe(false)
-  expect(select.disabled).toBe(true)
+  expect(styles.every(button => button.disabled)).toBe(true)
   await act(async () => toggle.click())
   expect(props().showMarkers).toBe(true)
   await act(async () => root.unmount())
@@ -100,12 +102,24 @@ it('persists the style independently of the existing marker on/off switch', asyn
   expect(props().markerStyle).toBe('candle')
 })
 
+it('[R693] 切换圆点 / 颜色不改变主图高度', async () => {
+  await render()
+  const group = host.querySelector('[aria-label="异动显示方式"]') as HTMLElement
+  // 分段按钮自身由内联 h-[19px] 定高, 与那一排胶囊同高, 不随选中态变
+  expect(group.className).toContain('h-[19px]')
+  const height = props().height
+  const [, colorButton] = [...group.querySelectorAll('button')]
+  await act(async () => colorButton.click())
+  expect(props().markerStyle).toBe('candle')
+  expect(props().height).toBe(height)
+})
+
 it('falls back from a saved arrow preference to text labels without discarding candle preferences', async () => {
   localStorage.setItem('stock_daily_marker_style', JSON.stringify('arrow'))
   await render()
   expect(props().markerStyle).toBe('label')
-  expect((host.querySelector('[aria-label="异动显示方式"]') as HTMLSelectElement).value).toBe('label')
-  expect(host.querySelector('option[value="arrow"]')).toBeNull()
+  expect(host.querySelector('[aria-label="异动显示方式"] [aria-pressed="true"]')!.textContent).toBe('圆点')
+  expect([...host.querySelectorAll('[aria-label="异动显示方式"] button')].map(button => button.textContent)).toEqual(['圆点', '颜色'])
 })
 
 it('rejects unknown saved styles and leaves legacy ECharts consumers on their existing behavior', async () => {

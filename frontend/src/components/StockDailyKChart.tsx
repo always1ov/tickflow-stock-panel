@@ -12,6 +12,12 @@ import { DAILY_LINE_COLORS, SUB_CHART_META } from '@/lib/chart-indicators'
  * [R684] 用户: 「RSI 和 KDJ 都可以删除了」—— 副图指标只剩成交量, 趋势量化 / 量化MACD 紧跟其后。
  */
 const DAILY_SUB_CHARTS = SUB_CHART_META.filter(def => def.key === 'vol')
+
+/** [R692] 「异动」后面的显示方式 —— 原下拉里的「文字 / 颜色」两颗选项, 改成分段按钮「圆点｜颜色」 */
+const MARKER_STYLES: { value: DailyMarkerStyle; label: string }[] = [
+  { value: 'label', label: '圆点' },
+  { value: 'candle', label: '颜色' },
+]
 import {
   CHART_LAYOUT, SUB_PANE_GAP, dailyChartHeight, fitAnalysisPaneHeights, quantPaneHeight, trendPaneHeight,
 } from '@/lib/chart-layout'
@@ -521,17 +527,29 @@ export function StockDailyKChart({
             activeClass="text-[#FACC15] bg-[#FACC15]/10"
             onClick={() => setShowMarkers(v => !v)}
           />
-          {renderer === 'lightweight' && <select
+          {renderer === 'lightweight' && <div
+            // [R692] 用户: 「异动后面的选项：颜色和文字，改成『圆点｜颜色』」——
+            // 原生下拉换成两颗并排小胶囊, 原「文字」改叫「圆点」(标记本身就是一颗圆点)。
+            role="group"
             aria-label="异动显示方式"
-            title="文字：显示板/炸/跌/翘标记；颜色：涨停为黄，跌停为青蓝；炸板收阳为玫紫、收阴为蓝紫；翘板收阳为薄荷青、收阴为钢蓝。开收同价沿用对应收阴色，影线保留原涨跌色。"
-            value={markerStyle}
-            disabled={!showMarkers}
-            onChange={event => updateMarkerStyle(event.target.value as DailyMarkerStyle)}
-            className="h-5 w-[74px] rounded-btn border border-border bg-base px-1 text-micro text-secondary outline-none focus-visible:ring-2 focus-visible:ring-accent/60 disabled:opacity-40"
+            title="圆点：显示板/炸/跌/翘标记；颜色：涨停为黄，跌停为青蓝；炸板收阳为玫紫、收阴为蓝紫；翘板收阳为薄荷青、收阴为钢蓝。开收同价沿用对应收阴色，影线保留原涨跌色。"
+            className="flex h-[19px] items-center divide-x divide-border/70 overflow-hidden rounded-btn border border-border bg-base"
           >
-            <option value="label">文字</option>
-            <option value="candle">颜色</option>
-          </select>}
+            {MARKER_STYLES.map(({ value, label }) => (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={markerStyle === value}
+                disabled={!showMarkers}
+                onClick={() => updateMarkerStyle(value)}
+                className={`h-full px-1.5 text-micro transition-colors duration-hover disabled:cursor-not-allowed disabled:opacity-40 ${
+                  markerStyle === value ? 'bg-elevated text-foreground' : 'text-muted hover:text-foreground'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>}
         </div>
       )}
       {/* 激活色与图表里的 ADDED_DATE_COLOR 一致; Tailwind 只认字面量类名, 故写死色值 */}
