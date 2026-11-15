@@ -493,7 +493,6 @@ export function EvidencePanel({ ch, edge }: {
   return (
     <ReviewDisclosure
       label={rows > 0 ? `依据 · ${rows} 项读数` : '依据'}
-      note="(上面两条结论就是从这些读数出来的)"
       defaultOpen={open}
       onOpenChange={(v) => { setOpen(v); storage.reviewEvidenceOpen.set(v) }}
     >
