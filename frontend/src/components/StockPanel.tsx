@@ -30,8 +30,6 @@ interface Props {
   headerStats?: boolean
   /** [R680] 图上方工具栏右端、「异动 / 自选」之后的一颗东西(弹窗放「回测调参」) */
   toolbarExtra?: ReactNode
-  /** [R680] 价位开关排默认收起(弹窗里收起, 给图多留一行高) */
-  levelToolbarDefaultOpen?: boolean
   /** [R671] 指标行已在头部 —— 这里只画图 */
   hideInfoBar?: boolean
   /** [R673] 弹窗分栏里不再罩一层卡框(圆角+边框), 图直接铺满分栏 */
@@ -104,7 +102,6 @@ export function StockPanel({
   showQuoteIdentity = true,
   headerStats = false,
   toolbarExtra,
-  levelToolbarDefaultOpen,
   hideInfoBar = false,
   flat = false,
   height = 520,
@@ -324,7 +321,6 @@ export function StockPanel({
           hoveredKey={levelHoveredKey}
           onHoverKey={onLevelHoverKey}
           showLevelToolbar={showLevelToolbar}
-          levelToolbarDefaultOpen={levelToolbarDefaultOpen}
           toolbarExtra={toolbarExtra}
           refreshLive={refreshLive}
         />

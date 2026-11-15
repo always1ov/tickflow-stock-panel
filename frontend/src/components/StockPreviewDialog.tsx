@@ -492,10 +492,8 @@ export function StockPreviewDialog({ symbol, name, onClose, navList: navListSour
                           hideInfoBar
                           // [R673] 中栏本身就是一栏, 不再罩卡框
                           flat
-                          // [R680] 回测调参放进图上方工具栏, 排在「异动 / 自选」之后;
-                          // 价位开关排在弹窗里默认收起, 只留一行「价位 · N 类」
+                          // [R680] 回测调参放进图上方工具栏, 排在「异动 / 自选」之后
                           toolbarExtra={<BacktestEntry symbol={symbol} />}
-                          levelToolbarDefaultOpen={false}
                         />
                       ) : (
                         // [R437] 与旧分时页同一套: 上面一条信息栏(只要信息栏, 不画日 K), 下面多日分时。

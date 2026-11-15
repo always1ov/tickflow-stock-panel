@@ -88,11 +88,6 @@ interface Props {
   onHoverKey?: (key: string | null) => void
   /** [R660] 回测「成交K线」弹窗不需要这排价位开关 */
   showLevelToolbar?: boolean
-  /**
-   * [R680] 个股弹窗: 价位开关排默认收起, 只留一行「价位 · N 类」; 点开才铺开那排胶囊,
-   * 给图多留 30px 高。其它入口不传 = 一直铺开(与原来一致)。
-   */
-  levelToolbarDefaultOpen?: boolean
   /** [R680] 工具栏右端、「异动 / 自选」之后的一颗东西(弹窗放「回测调参」) */
   toolbarExtra?: ReactNode
   /** [R660] 盘中现拉最新一根, 与关键价位视图同口径 */
@@ -215,13 +210,10 @@ export function StockDailyKChart({
   hoveredKey: hoveredKeyProp,
   onHoverKey,
   showLevelToolbar = true,
-  levelToolbarDefaultOpen = true,
   toolbarExtra,
   refreshLive = false,
 }: Props) {
   const [activeIndicators, setActiveIndicators] = useState<string[]>(['vol'])
-  // [R680] 价位开关排的展开状态 —— 弹窗里默认收起, 只占一行
-  const [levelRowOpen, setLevelRowOpen] = useState(levelToolbarDefaultOpen)
   // [R652] 四条主图均线逐条可控。[R655] 用户要求默认只留 MA20, 其余三条默认关。
   // ECharts 渲染器画不了单条, 仍按 showMA 整组。
   const [maKeys, setMaKeys] = useState<string[]>(() => showMA ? ['ma20'] : [])
@@ -427,27 +419,69 @@ export function StockDailyKChart({
     <div className={className} style={{ minHeight: chartHeight }}>
       {showIndicatorControls && rows.length > 0 && (
         <div ref={toolbarRef} className={renderer === 'lightweight' ? 'flex min-h-10 flex-wrap items-center gap-1 border-b border-border/50 bg-elevated/20 px-3 py-1.5' : 'flex items-center gap-1.5 px-1 pb-0.5'}>
-          {renderer === 'lightweight' && <span className="mr-2 shrink-0 text-xs font-semibold text-foreground">日 K</span>}
+          {/* [R683] 用户: 「成交量这个指标前面的『日 K』这两个字也可以删除了」——
+              那颗只是纯文字标签, 不是开关, 删掉。
+              指标按专业术语分两组: 主图指标(画在K线上) / 副图指标(画在下方副图)。 */}
+          {renderer === 'lightweight' && (
+            <>
+              <span className="shrink-0 text-micro text-muted" title="画在主图上的指标">主图指标</span>
+              {/* [R652] 主图四条均线各自可开关, 默认只开 MA20 */}
+              {MA_KEYS.map(key => (
+                <ChartPill
+                  key={key}
+                  active={maKeys.includes(key)}
+                  label={key.toUpperCase()}
+                  activeClass="bg-accent/20 text-accent"
+                  onClick={() => toggleMA(key)}
+                />
+              ))}
+              <span className="mx-1 h-4 w-px shrink-0 bg-border/60" aria-hidden />
+              <span className="shrink-0 text-micro text-muted" title="画在下方副图里的指标">副图指标</span>
+            </>
+          )}
           {DAILY_SUB_CHARTS.map(ind => (
-            <ChartPill
-              key={ind.key}
-              active={activeIndicators.includes(ind.key)}
-              label={ind.label}
-              activeClass="bg-accent/20 text-accent"
-              onClick={() => toggleIndicator(ind.key)}
-            />
+            <span key={ind.key} className="contents">
+              <ChartPill
+                active={activeIndicators.includes(ind.key)}
+                label={ind.label}
+                activeClass="bg-accent/20 text-accent"
+                onClick={() => toggleIndicator(ind.key)}
+              />
+              {/* [R683] 「量比」只对成交量生效, 紧跟在它后面 */}
+              {ind.key === 'vol' && activeIndicators.includes('vol') && (
+                <div className="ml-0.5 flex h-5 items-center gap-1.5 border-l border-border/70 pl-2">
+                  <span className="text-micro text-muted">量比</span>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={volumeCompare.enabled}
+                    aria-label="开启量能对比"
+                    title={volumeCompare.enabled ? '关闭量能对比' : '开启量能对比'}
+                    onClick={() => updateVolumeCompare({ enabled: !volumeCompare.enabled })}
+                    className={`relative h-3.5 w-6 shrink-0 rounded-full transition-colors ${
+                      volumeCompare.enabled ? 'bg-accent' : 'bg-surface border border-border'
+                    }`}
+                  >
+                    <span className={`absolute left-0 top-0.5 h-2.5 w-2.5 rounded-full bg-white transition-transform ${
+                      volumeCompare.enabled ? 'translate-x-3' : 'translate-x-0.5'
+                    }`} />
+                  </button>
+                  <select
+                    aria-label="量能对比周期"
+                    value={volumeCompare.days}
+                    disabled={!volumeCompare.enabled}
+                    onChange={event => updateVolumeCompare({ days: Number(event.target.value) })}
+                    className="h-5 rounded-btn border border-border bg-base px-1 text-micro text-secondary outline-none disabled:opacity-40"
+                  >
+                    {Array.from({ length: 20 }, (_, index) => index + 1).map(days => (
+                      <option key={days} value={days}>前{days}日均量</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </span>
           ))}
           {/* [R656] 原来的 BOLL 开关撤下 —— 26 日布林改由下面「关键价位」那排的「26日布林」控制 */}
-          {/* [R652] 主图四条均线各自可开关 —— 与其它指标同一套胶囊, 默认只开 MA20 */}
-          {renderer === 'lightweight' && MA_KEYS.map(key => (
-            <ChartPill
-              key={key}
-              active={maKeys.includes(key)}
-              label={key.toUpperCase()}
-              activeClass="bg-accent/20 text-accent"
-              onClick={() => toggleMA(key)}
-            />
-          ))}
           {/* [R649] 从「关键价位」并过来的两张副图 —— 固定排在各指标副图之后 */}
           {renderer === 'lightweight' && (
             <>
@@ -464,37 +498,6 @@ export function StockDailyKChart({
                 onClick={() => setShowQuantMacd(value => !value)}
               />
             </>
-          )}
-          {activeIndicators.includes('vol') && (
-            <div className="ml-0.5 flex h-5 items-center gap-1.5 border-l border-border/70 pl-2">
-              <span className="text-micro text-muted">量比</span>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={volumeCompare.enabled}
-                aria-label="开启量能对比"
-                title={volumeCompare.enabled ? '关闭量能对比' : '开启量能对比'}
-                onClick={() => updateVolumeCompare({ enabled: !volumeCompare.enabled })}
-                className={`relative h-3.5 w-6 shrink-0 rounded-full transition-colors ${
-                  volumeCompare.enabled ? 'bg-accent' : 'bg-surface border border-border'
-                }`}
-              >
-                <span className={`absolute left-0 top-0.5 h-2.5 w-2.5 rounded-full bg-white transition-transform ${
-                  volumeCompare.enabled ? 'translate-x-3' : 'translate-x-0.5'
-                }`} />
-              </button>
-              <select
-                aria-label="量能对比周期"
-                value={volumeCompare.days}
-                disabled={!volumeCompare.enabled}
-                onChange={event => updateVolumeCompare({ days: Number(event.target.value) })}
-                className="h-5 rounded-btn border border-border bg-base px-1 text-micro text-secondary outline-none disabled:opacity-40"
-              >
-                {Array.from({ length: 20 }, (_, index) => index + 1).map(days => (
-                  <option key={days} value={days}>前{days}日均量</option>
-                ))}
-              </select>
-            </div>
           )}
           {/* 两个标注开关统一右对齐 */}
           <div className="ml-auto flex items-center gap-1.5">
@@ -538,21 +541,9 @@ export function StockDailyKChart({
           [R660] 开关/悬停状态由弹窗持有, 切视图保持; 回测「成交K线」弹窗不显示这排 */}
       {showIndicatorControls && showLevelToolbar && renderer === 'lightweight' && rows.length > 0 && (
         <>
-          {/* [R680] 收起状态只留这一行开关; 弹窗默认收起(levelToolbarDefaultOpen=false) */}
-          <div className="flex items-center border-b border-border/50 bg-elevated/10 px-3 py-1">
-            <button
-              type="button"
-              aria-expanded={levelRowOpen}
-              onClick={() => setLevelRowOpen(v => !v)}
-              title={levelRowOpen ? '收起价位开关' : '展开价位开关'}
-              className="inline-flex items-center gap-1 rounded-btn px-1.5 py-0.5 text-micro text-secondary transition-colors hover:bg-elevated hover:text-foreground"
-            >
-              价位 · {levelCtl.activeTypes.size} 类
-              <span className={`transition-transform ${levelRowOpen ? 'rotate-180' : ''}`}>▾</span>
-            </button>
-          </div>
-          {levelRowOpen && (
-          <div className="flex flex-wrap items-center border-b border-border/50 bg-elevated/10 px-3 pb-1.5" data-testid="level-toolbar">
+          {/* [R683] 用户: 「我不需要『价位 · 1 类』这样折叠，我喜欢指标都放出来」——
+              R680 那行折叠按钮撤掉, 价位开关恢复常开。 */}
+          <div className="flex flex-wrap items-center border-b border-border/50 bg-elevated/10 px-3 pt-1.5" data-testid="level-toolbar">
             <LevelToolbar
               groups={LEVEL_GROUPS}
               controls={levelCtl}
@@ -564,7 +555,6 @@ export function StockDailyKChart({
               compact
             />
           </div>
-          )}
           {/* [R411] 形态走到哪一步 —— 只报事实, 一个动词都没有; 显示沿用日K 自己的极简行 */}
           {levelCtl.activeTypes.has('fib2') && fib2Line && (
             <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 px-3 pb-1.5 text-micro leading-5">
