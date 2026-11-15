@@ -194,6 +194,14 @@ export function getDefaultRange(): { start: string; end: string } {
 }
 
 /**
+ * [R716] 用户: 「副图指标的按钮在夜间模式下还是灰色」—— 副图指标（成交量 / 主力COME /
+ * 趋势量化 / 量化MACD）原来开着时用 `bg-accent/20 text-accent`, 而暗色 `--accent` 是中性浅灰
+ * (#E4E4E4, R509 去蓝), 20% 铺底就成了灰块配灰字, 开着反而比关着更难认。
+ * 改成与主图均线 / 价位胶囊同一套反相: 暗色白底黑字、亮色黑底白字, 与其他「开」态一致。
+ */
+const INDICATOR_ON = 'bg-foreground text-surface font-medium'
+
+/**
  * 工具栏小胶囊开关。
  * [R689] 用户: 「参考压力支撑、枢轴点这种指标的显示方式, 颜色+文字」—— 传了 `color` 的
  * (主图 / 副图指标) 走价位开关那套: 前面一颗与图上线条同色的点, 开着时整颗反相
@@ -476,7 +484,7 @@ export function StockDailyKChart({
       key={ind.key}
       active={activeIndicators.includes(ind.key)}
       label={ind.label}
-      activeClass="bg-accent/20 text-accent"
+      activeClass={INDICATOR_ON}
       onClick={() => toggleIndicator(ind.key)}
     />
   ))
@@ -520,13 +528,13 @@ export function StockDailyKChart({
       <ChartPill
         active={showTrendQuant}
         label="趋势量化"
-        activeClass="bg-accent/20 text-accent"
+        activeClass={INDICATOR_ON}
         onClick={() => setShowTrendQuant(value => !value)}
       />
       <ChartPill
         active={showQuantMacd}
         label="量化MACD"
-        activeClass="bg-accent/20 text-accent"
+        activeClass={INDICATOR_ON}
         onClick={() => setShowQuantMacd(value => !value)}
       />
     </>
