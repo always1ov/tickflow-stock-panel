@@ -25,16 +25,18 @@ import {
  * `chart.timeScale().timeToCoordinate`; 画之前按 pane 尺寸裁剪。
  */
 export type DecorItem =
-  /** 实心柱: 从 from 画到 to, 宽 = K 线间距 × ratio */
-  | { kind: 'stick'; time: string; from: number; to: number; color: string; ratio: number }
-  /** 空心柱: 只描边, 1 点 1 空点线(DEA 用) */
-  | { kind: 'hollow'; time: string; from: number; to: number; color: string; ratio: number }
+  /** 实心柱: 从 from 画到 to, 宽 = K 线间距 × ratio(或直接给像素宽 widthPx) */
+  | { kind: 'stick'; time: string; from: number; to: number; color: string; ratio?: number; widthPx?: number }
+  /** 空心柱: 只描边, 默认 1 点 1 空点线(DEA 用); dashed:false 是通达信 STICKLINE 的实线空心 */
+  | { kind: 'hollow'; time: string; from: number; to: number; color: string; ratio?: number; widthPx?: number; dashed?: boolean }
   /** 箭头图标: 顶端对准 value、水平居中于那根 K 线 */
   | { kind: 'icon'; time: string; value: number; up: boolean; color: string }
   /** 字道文字: 顶 / 底各三行([R619] 两行装不下密集信号), 按真实像素宽度分行, 横坐标对准它那一天 */
   | { kind: 'text'; time: string; text: string; short?: string; color: string; lane: 'top' | 'bottom' }
   /** [R638] 参考线右端名字(超买 / 超卖): 不跟日期走, 贴着副图右边写在该值的高度上 */
   | { kind: 'label'; value: number; text: string; color: string }
+  /** [R714] 钉在某天某价上的字(通达信 DRAWTEXT): 横坐标对那天, 字底边压在 value 上方 */
+  | { kind: 'note'; time: string; value: number; text: string; color: string }
 
 export interface PaneDecorData {
   items: DecorItem[]
@@ -87,23 +89,27 @@ export class PaneDecor implements ISeriesPrimitive<Time> {
       const texts: (LaneDraft<Extract<DecorItem, { kind: 'text' }>> & { wShort: number })[] = []
       // [R638] 右端名字不挂在某一天上, 没有 x 可算 —— 收起来最后画, 压在最上面
       const labels: Extract<DecorItem, { kind: 'label' }>[] = []
+      // [R714] DRAWTEXT 那种"钉在某天某价上的字": 等柱子和字道画完再写, 保证压在最上层
+      const notes: Extract<DecorItem, { kind: 'note' }>[] = []
       ctx.save()
       ctx.beginPath(); ctx.rect(0, 0, width, height); ctx.clip()
       for (const item of this.data.items) {
         if (item.kind === 'label') { labels.push(item); continue }
+        if (item.kind === 'note') { notes.push(item); continue }
         const x = ts.timeToCoordinate(item.time as Time)
         if (x == null || x < -24 || x > width + 24) continue
         if (item.kind === 'stick' || item.kind === 'hollow') {
           const a = series.priceToCoordinate(item.from)
           const b = series.priceToCoordinate(item.to)
           if (a == null || b == null) continue
-          const w = Math.max(1, barSpacing * item.ratio)
+          const w = Math.max(1, item.widthPx ?? barSpacing * (item.ratio ?? 1))
           const top = Math.min(a, b), h = Math.max(1, Math.abs(a - b))
           if (item.kind === 'stick') {
             ctx.fillStyle = item.color
             ctx.fillRect(x - w / 2, top, w, h)
           } else {
-            ctx.strokeStyle = item.color; ctx.lineWidth = 1; ctx.setLineDash(HOLLOW_DASH)
+            ctx.strokeStyle = item.color; ctx.lineWidth = 1
+            ctx.setLineDash(item.dashed === false ? [] : HOLLOW_DASH)
             ctx.strokeRect(x - w / 2 + 0.5, top + 0.5, Math.max(1, w - 1), Math.max(1, h - 1))
             ctx.setLineDash([])
           }
@@ -200,6 +206,22 @@ export class PaneDecor implements ISeriesPrimitive<Time> {
           ctx.strokeText(label.text, x, y)
           ctx.fillStyle = label.color
           ctx.fillText(label.text, x, y)
+        }
+      }
+      // [R714] 通达信 DRAWTEXT(cond, 60, '主力COME'): 字底边压在 60 那条高度线上, 水平居中于当天。
+      if (notes.length) {
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'bottom'
+        ctx.font = `${LANE_FONT}px "JetBrains Mono", monospace`
+        ctx.lineWidth = LANE_HALO.lineWidth
+        ctx.strokeStyle = LANE_HALO.stroke
+        for (const note of notes) {
+          const x = ts.timeToCoordinate(note.time as Time)
+          const y = series.priceToCoordinate(note.value)
+          if (x == null || y == null) continue
+          ctx.strokeText(note.text, x, y - 1)
+          ctx.fillStyle = note.color
+          ctx.fillText(note.text, x, y - 1)
         }
       }
       ctx.restore()

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { SeriesMarker, Time } from 'lightweight-charts'
 import type { ChartMarker, DailyChartProps, OHLC } from '@/lib/chart-types'
-import { DAILY_LINE_COLORS, SUB_CHART_META, volMaN, volumeRatioAt } from '@/lib/chart-indicators'
+import { DAILY_LINE_COLORS, SUB_CHART_META, computeInstitutionSeries, volMaN, volumeRatioAt } from '@/lib/chart-indicators'
 import { CHART_COLORS as C, lineData, validDailyRows, type PlotSeries } from '@/lib/lightweight-model'
 import { fmtVolume, fmtPct, pricePrecision } from '@/lib/format'
 import { CHART_LAYOUT, plotPaneHeights } from '@/lib/chart-layout'
@@ -11,7 +11,7 @@ import {
 import { LEVEL_PALETTE, useChartTheme, useTheme, type Theme } from '@/lib/theme'
 import { FinancialPlot } from './FinancialPlot'
 import type { AnnotationData } from './ChartAnnotations'
-import type { PaneDecorData } from './SubPaneDecor'
+import type { PaneDecorData, DecorItem } from './SubPaneDecor'
 
 const fields = {
   macd: [['macd_dif', 'DIF', 'yellow'], ['macd_dea', 'DEA', 'plum']],
@@ -31,6 +31,8 @@ const maFields = [['ma5', 'gray'], ['ma10', 'blue'], ['ma20', 'orange'], ['ma60'
 // [R713] 用户: 「MA们都放到布林轨前面」—— 四条均线全写出来, 排在上/下轨之前, 顺序 MA5 → MA60。
 const READOUT_MA = maFields
 const READOUT_BOLL = [['boll_upper', '布林上轨'], ['boll_lower', '布林下轨']] as const
+/** [R714] 通达信 COLOr 常量按 BGR 排: COLOR0000FF = 红, COLOR00FF00 = 绿, COLORWHITE = 白。 */
+const INST_COLORS = { up: '#FF0000', down: '#00FF00', text: '#FFFFFF' } as const
 
 const price = (v: number | null | undefined, digits = 2) => v != null && Number.isFinite(v)
   ? (Number(v.toFixed(digits)) === 0 ? 0 : v).toFixed(digits) : '—'
@@ -68,6 +70,30 @@ export function LightweightDaily({ data, assetType, symbol = '', height = 480, a
     () => maKeys ? maFields.filter(([key]) => maKeys.includes(key)) : showMA ? maFields : [],
     [maKeys, showMA])
   const volumeMAs = useMemo(() => ({ 5: volMaN(rows, 5), 10: volMaN(rows, 10) }), [rows])
+  // [R714] 主力COME: 数值按通达信公式算, 画法(红空心柱/绿实心柱/红主力柱/白字)见下面 instDecor
+  const instSeries = useMemo(() => computeInstitutionSeries(rows), [rows])
+  const instDecor = useMemo<PaneDecorData>(() => {
+    const items: DecorItem[] = []
+    rows.forEach((row, idx) => {
+      const point = instSeries[idx]
+      if (point.inst > point.trend) {
+        // STICKLINE(机构线-机构趋势>0, 机构线, 机构趋势, 3, 1), COLOR0000FF —— 空心
+        items.push({ kind: 'hollow', time: row.date, from: point.trend, to: point.inst, color: INST_COLORS.up, widthPx: 3, dashed: false })
+      } else if (point.inst < point.trend) {
+        // STICKLINE(机构线-机构趋势<0, 机构线, 机构趋势, 3, 0), COLOR00FF00 —— 实心
+        items.push({ kind: 'stick', time: row.date, from: point.trend, to: point.inst, color: INST_COLORS.down, widthPx: 3 })
+      }
+    })
+    // STICKLINE(主力, 0, 50, 3, 0), COLORRED —— 画在上面那组之后, 与公式顺序一致
+    rows.forEach((row, idx) => {
+      if (instSeries[idx].mainForce) items.push({ kind: 'stick', time: row.date, from: 0, to: 50, color: INST_COLORS.up, widthPx: 3 })
+    })
+    // DRAWTEXT(主力信号, 60, '主力COME'), COLORWHITE
+    rows.forEach((row, idx) => {
+      if (instSeries[idx].mainSignal) items.push({ kind: 'note', time: row.date, value: 60, text: '主力COME', color: INST_COLORS.text })
+    })
+    return { items }
+  }, [rows, instSeries])
   const scope = `${symbol}:${rows[0]?.date ?? ''}:${ranges?.map(range => `${range.start}:${range.end}`).join(';') ?? ''}`
   const [hover, setHover] = useState<{ scope: string; time: string } | null>(null)
   const index = hover?.scope === scope ? rows.findIndex(d => d.date === hover.time) : -1
@@ -110,6 +136,9 @@ export function LightweightDaily({ data, assetType, symbol = '', height = 480, a
           const ma = volumeMAs[n]
           addLine(`vol${n}`, rows.map((r, i) => ma[i] == null ? { time: r.date } : { time: r.date, value: ma[i]! }), color(token), pane, { priceFormat: 'volume' })
         }
+      } else if (key === 'inst') {
+        // 公式里 机构线 / 机构趋势 都是 `:=` 变量、不画线; 只留一条透明线把副图刻度钉在 0~100
+        addLine('inst_scale', rows.map(r => ({ time: r.date, value: 50 })), 'rgba(0,0,0,0)', pane, { range: { min: 0, max: 100 } })
       } else {
         const lines = fields[key as keyof typeof fields]
         for (const [field, label, token] of lines) addLine(label, lineData(rows, field), color(token), pane,
@@ -213,13 +242,19 @@ export function LightweightDaily({ data, assetType, symbol = '', height = 480, a
         const ratio = volumeRatioAt(rows, i, volumeCompare.days)
         result.push({ text: `量比 ${ratio == null ? '—' : `${ratio.toFixed(2)}x`}` })
       }
+    } else if (key === 'inst') {
+      // 通达信不显示这两条线的数值, 这里沿用副图读数习惯补上, 方便对照柱子
+      const point = instSeries[i]
+      result.push({ text: `机构线 ${price(point?.inst, 1)}` })
+      result.push({ text: `趋势 ${price(point?.trend, 1)}` })
+      if (point?.mainForce) result.push({ text: '主力', color: INST_COLORS.up })
     } else {
       for (const [field, label, token] of fields[key as keyof typeof fields]) result.push({ text: `${label} ${price(current?.[field], key === 'macd' ? 3 : 1)}`, color: color(token) })
       if (key === 'macd') result.push({ text: `MACD ${price(current?.macd_hist, 3)}`,
         color: current?.macd_hist == null || !Number.isFinite(current.macd_hist) ? undefined : color(current.macd_hist >= 0 ? 'up' : 'down') })
     }
     return result
-  }), ...analysis.readouts], [selected, current, rows, i, volumeCompare.days, volumeCompare.enabled, theme, volumeMAs, analysis.readouts])
+  }), ...analysis.readouts], [selected, current, rows, i, volumeCompare.days, volumeCompare.enabled, theme, volumeMAs, instSeries, analysis.readouts])
   const change = previous?.close ? current.close / previous.close - 1 : null
   const turnover = stockInfo?.float_shares && current?.volume != null ? current.volume * 100 / stockInfo.float_shares : null
 
@@ -252,7 +287,7 @@ export function LightweightDaily({ data, assetType, symbol = '', height = 480, a
     <FinancialPlot scope={scope} series={plotSeries} height={plotHeight} paneHeights={paneHeights} pricePrecision={precision}
       paneTopInsets={[0, ...selected.map(() => 0), ...analysis.insets]}
       paneHeaderHeights={[0, ...selected.map(() => 0), ...analysis.headers]}
-      paneDecor={[undefined, ...selected.map(() => undefined), ...analysis.decor]}
+      paneDecor={[undefined, ...selected.map(key => key === 'inst' ? instDecor : undefined), ...analysis.decor]}
       hidePaneAxis={analysis.hidden.length ? analysis.hidden : undefined}
       markers={chartMarkers} annotations={annotations} volumeLabels={volumeLabels} paneTitles={paneTitles} paneReadouts={paneReadouts}
       linkedPrice={linkedPrice} visibleBars={visibleBars} currentPrice={rows.at(-1)?.close}

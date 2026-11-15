@@ -1,0 +1,56 @@
+import { describe, expect, it } from 'vitest'
+import { computeInstitutionSeries, tdxEma, tdxSma } from './chart-indicators'
+import type { OHLC } from './chart-types'
+
+const row = (i: number, close: number, high = close + 0.5, low = close - 0.5): OHLC => ({
+  date: `2026-${String(Math.floor(i / 28) + 1).padStart(2, '0')}-${String((i % 28) + 1).padStart(2, '0')}`,
+  open: close, high, low, close,
+})
+
+describe('[R714] 通达信公式的最小实现', () => {
+  it('SMA(X,N,M) 是加权递推, 不是简单均线', () => {
+    expect(tdxSma([10, 20], 3, 1)).toEqual([10, (20 + 2 * 10) / 3])
+  })
+
+  it('EMA(X,N) 首值取 X, α=2/(N+1)', () => {
+    const out = tdxEma([1, 2, 3], 3)
+    expect(out[0]).toBe(1)
+    expect(out[1]).toBeCloseTo(1.5)
+    expect(out[2]).toBeCloseTo(2.25)
+  })
+
+  it('价格不动时振幅为 0, 按通达信的 0 处理, 不产生 NaN', () => {
+    const points = computeInstitutionSeries(Array.from({ length: 60 }, (_, i) => row(i, 10, 10, 10)))
+    expect(points).toHaveLength(60)
+    for (const point of points) {
+      expect(Number.isFinite(point.inst)).toBe(true)
+      expect(Number.isFinite(point.trend)).toBe(true)
+      expect(point.mainForce).toBe(false)
+      expect(point.mainSignal).toBe(false)
+    }
+  })
+
+  it('机构线/机构趋势落在 0~100, 且趋势是机构线的 EMA', () => {
+    const rows = Array.from({ length: 120 }, (_, i) => row(i, 10 + i * 0.2 + Math.sin(i / 3)))
+    const points = computeInstitutionSeries(rows)
+    for (const point of points) {
+      expect(point.inst).toBeGreaterThanOrEqual(0)
+      expect(point.inst).toBeLessThanOrEqual(100)
+      expect(point.trend).toBeGreaterThanOrEqual(0)
+      expect(point.trend).toBeLessThanOrEqual(100)
+    }
+    expect(points[0].trend).toBeCloseTo(points[0].inst)
+  })
+
+  it('暴跌后单日急拉触发主力, FILTER(主力,10) 保证 10 天内只报一次', () => {
+    const rows: OHLC[] = []
+    for (let i = 0; i < 90; i++) rows.push(row(i, 100 - i * 0.6))
+    for (let i = 0; i < 6; i++) rows.push(row(90 + i, 46 + i * 4))
+    const points = computeInstitutionSeries(rows)
+    const signals = points.flatMap((point, i) => point.mainSignal ? [i] : [])
+    expect(points.some(point => point.mainForce)).toBe(true)
+    expect(signals.length).toBeGreaterThan(0)
+    for (let k = 1; k < signals.length; k++) expect(signals[k] - signals[k - 1]).toBeGreaterThanOrEqual(10)
+    for (const point of points) if (point.mainSignal) expect(point.mainForce).toBe(true)
+  })
+})
