@@ -36,10 +36,10 @@ interface Props {
   /** 加入自选日 (北京时间 YYYY-MM-DD); 有值时在自定义信息条按钮左侧显示「自选于」标注 */
   addedDate?: string | null
   /**
-   * [R670] 报价行瘦身: 弹窗头部已单独展示代码/名称/现价/涨跌/自选/监控 ——
-   * 信息条只留指标行与右侧「外链 / 自选于 / 信息条配置」, 不再把同一份报价印第二遍。
+   * [R671] 并进弹窗头部: 只渲染指标那一行, 不要报价行、不要外链/自选/监控,
+   * 也不自带内边距 —— 头部那一行已经负责认票与操作。
    */
-  compactQuote?: boolean
+  headerMode?: boolean
 }
 
 /**
@@ -125,7 +125,7 @@ export function StockInfoBar({
   onRemoveFromWatchlist,
   watchlistPending,
   addedDate,
-  compactQuote = false,
+  headerMode = false,
 }: Props) {
   // 弹窗开关：纯本地状态，与数据/配置无关，放早期 return 之前
   const [customizerOpen, setCustomizerOpen] = useState(false)
@@ -146,18 +146,46 @@ export function StockInfoBar({
   const inlineFields = visibleFields.filter(f => !f.standalone)
   const standaloneFields = visibleFields.filter(f => f.standalone)
 
+  // 信息条配置弹窗 —— 两种版式共用一份, 避免配置入口分裂成两套
+  const customizer = (
+    <ListColumnCustomizer
+      columns={fields}
+      groups={INFO_GROUPS}
+      onChange={onFieldsChange}
+      open={customizerOpen}
+      onClose={() => setCustomizerOpen(false)}
+      title="信息条指标"
+      builtinSectionLabel="可选指标"
+      extColumnAlign="left"
+      showStandaloneToggle
+      disableBackdropBlur
+      baselineStore={{
+        get: () => storage.stockInfoBarFieldsBaseline.get(null) as ColumnConfig[] | null,
+        set: cols => storage.stockInfoBarFieldsBaseline.set(cols),
+      }}
+    />
+  )
+
   // 无数据时保持信息条挂载 (切股/首次加载): 只留 symbol+名称+小 spinner 作为加载态,
   // 不渲染假占位值; 数据到位后价格/市值等原位填充, 避免整行消失造成布局跳动。
   // 同时按字段配置预留与完整态相同的行数, 切股瞬间弹窗整体高度不塌陷 (不抖动)。
   if (rows.length === 0) {
+    // 头部版式只有一行指标, 加载态不要撑出报价行的高度
+    if (headerMode) {
+      return (
+        <div className="flex h-4 items-center font-mono text-xs text-muted select-none">
+          <span className="inline-block h-2.5 w-2.5 animate-spin rounded-full border-[1.5px] border-current border-t-transparent" />
+        </div>
+      )
+    }
     const reserveLines = (inlineFields.length > 0 ? 1 : 0) + standaloneFields.length
     return (
       <div className="px-2 pb-3 font-mono text-xs select-none space-y-1">
         {/* 首行 min-h-7 对齐完整态的 text-lg 价格行高, 加载中不整体变矮 */}
         <div className={`flex items-baseline gap-x-3 flex-wrap ${showIdentity ? 'min-h-7' : 'min-h-8'}`}>
-          {!compactQuote && showIdentity && <span className="text-foreground font-bold text-sm tracking-wide">{symbol}</span>}
-          {!compactQuote && showIdentity && name && <span className="text-secondary font-medium">{name}</span>}
-          {!compactQuote && <QuoteFreshnessBadge freshness={freshness} />}
+          {showIdentity && <span className="text-foreground font-bold text-sm tracking-wide">{symbol}</span>}
+          {showIdentity && name && <span className="text-secondary font-medium">{name}</span>}
+          <QuoteFreshnessBadge freshness={freshness} />
           <span className="ml-auto self-center text-muted">
             <span className="inline-block h-2.5 w-2.5 animate-spin rounded-full border-[1.5px] border-current border-t-transparent" />
           </span>
@@ -257,27 +285,52 @@ export function StockInfoBar({
 
   const extUrl = buildStockExternalUrl(loadStockExternalTemplate(), symbol)
 
+  // [R671] 头部版式: 只有指标那一行 + 右侧「自选于 / 自定义信息条」。
+  // 代码/名称/现价/涨跌/自选/监控/外链都在头部第一行, 这里一个都不重复。
+  if (headerMode) {
+    return (
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-xs text-muted select-none">
+        {inlineFields.map(renderField)}
+        {standaloneFields.map(f => renderField(f))}
+        <div className="ml-auto flex items-center gap-1">
+          {addedDate && (
+            <span
+              className="shrink-0 font-mono text-micro text-muted"
+              title="加入自选日 (北京时间); 该日无K线时不画竖线"
+            >
+              自选于 {addedDate}
+            </span>
+          )}
+          <button
+            onClick={() => setCustomizerOpen(true)}
+            className="rounded-btn p-1 text-secondary transition-colors hover:bg-elevated hover:text-foreground"
+            title="自定义信息条"
+          >
+            <Settings2 className="h-3.5 w-3.5" />
+          </button>
+        </div>
+        {customizer}
+      </div>
+    )
+  }
+
   return (
     <div className="px-2 pb-3 font-mono text-xs select-none space-y-1">
-      {/* Row 1: 报价行。[R670] `compactQuote`(个股弹窗)只留右侧操作 —— 代码/名称/现价/涨跌
-          与头部那行逐字重复, 自选/监控也已在头部; 信息条从此只负责指标行。 */}
+      {/* Row 1: 报价行(代码/名称/现价/涨跌) + 右侧操作(外链/自选/监控/自选于/信息条配置)。
+          [R671] 个股弹窗走 headStats 版式, 整个报价行都不渲染 —— 那些都在弹窗头部。 */}
       <div className="flex items-baseline gap-x-3 flex-wrap">
-        {!compactQuote && (
-          <>
-            {showIdentity && <span className="text-foreground font-bold text-sm tracking-wide">{symbol}</span>}
-            {showIdentity && <span className="text-secondary font-medium">{displayName}</span>}
-            <span style={{ color: clr }} className={`${showIdentity ? 'text-lg' : 'text-2xl tracking-tight'} font-bold tabular-nums`}>
-              {fmtAssetPrice(close, assetType)}
-            </span>
-            <span style={{ color: clr }} className="tabular-nums">
-              {isUp ? '+' : ''}{fmtAssetPrice(chg, assetType)}
-            </span>
-            <span style={{ color: clr }} className="tabular-nums">
-              {isUp ? '+' : ''}{fmtPrice(chgPct)}%
-            </span>
-            <QuoteFreshnessBadge freshness={freshness} />
-          </>
-        )}
+        {showIdentity && <span className="text-foreground font-bold text-sm tracking-wide">{symbol}</span>}
+        {showIdentity && <span className="text-secondary font-medium">{displayName}</span>}
+        <span style={{ color: clr }} className={`${showIdentity ? 'text-lg' : 'text-2xl tracking-tight'} font-bold tabular-nums`}>
+          {fmtAssetPrice(close, assetType)}
+        </span>
+        <span style={{ color: clr }} className="tabular-nums">
+          {isUp ? '+' : ''}{fmtAssetPrice(chg, assetType)}
+        </span>
+        <span style={{ color: clr }} className="tabular-nums">
+          {isUp ? '+' : ''}{fmtPrice(chgPct)}%
+        </span>
+        <QuoteFreshnessBadge freshness={freshness} />
         {/* 右侧操作按钮：外链 + 加自选 + 加监控 + 信息条配置 */}
         <div className="ml-auto self-center flex items-center gap-1">
           {extUrl && (
@@ -291,39 +344,35 @@ export function StockInfoBar({
               <ExternalLink className="h-3.5 w-3.5" />
             </a>
           )}
-          {!compactQuote && (
-            <>
-              {inWatchlist && onRemoveFromWatchlist ? (
-                <button
-                  type="button"
-                  onClick={onRemoveFromWatchlist}
-                  disabled={watchlistPending}
-                  className="rounded-btn p-1 text-[#FACC15] transition-colors cursor-pointer hover:bg-elevated disabled:opacity-50"
-                  title="移出自选"
-                  aria-label={`将 ${symbol} 移出自选`}
-                >
-                  <Star className="h-3.5 w-3.5" />
-                </button>
-              ) : !inWatchlist && onAddToWatchlist ? (
-                <WatchlistAddMenu
-                  onSelect={onAddToWatchlist}
-                  disabled={watchlistPending}
-                  triggerClassName="rounded-btn p-1 text-muted transition-colors cursor-pointer hover:bg-elevated hover:text-foreground disabled:opacity-50"
-                  ariaLabel={`将 ${symbol} 加入自选`}
-                >
-                  <Star className="h-3.5 w-3.5" />
-                </WatchlistAddMenu>
-              ) : null}
-              {onMonitor && (
-                <button
-                  onClick={onMonitor}
-                  className="p-1 rounded-btn text-warning hover:bg-warning/10 transition-colors cursor-pointer"
-                  title="加监控"
-                >
-                  <RadioTower className="h-3.5 w-3.5" />
-                </button>
-              )}
-            </>
+          {inWatchlist && onRemoveFromWatchlist ? (
+            <button
+              type="button"
+              onClick={onRemoveFromWatchlist}
+              disabled={watchlistPending}
+              className="rounded-btn p-1 text-[#FACC15] transition-colors cursor-pointer hover:bg-elevated disabled:opacity-50"
+              title="移出自选"
+              aria-label={`将 ${symbol} 移出自选`}
+            >
+              <Star className="h-3.5 w-3.5" />
+            </button>
+          ) : !inWatchlist && onAddToWatchlist ? (
+            <WatchlistAddMenu
+              onSelect={onAddToWatchlist}
+              disabled={watchlistPending}
+              triggerClassName="rounded-btn p-1 text-muted transition-colors cursor-pointer hover:bg-elevated hover:text-foreground disabled:opacity-50"
+              ariaLabel={`将 ${symbol} 加入自选`}
+            >
+              <Star className="h-3.5 w-3.5" />
+            </WatchlistAddMenu>
+          ) : null}
+          {onMonitor && (
+            <button
+              onClick={onMonitor}
+              className="p-1 rounded-btn text-warning hover:bg-warning/10 transition-colors cursor-pointer"
+              title="加监控"
+            >
+              <RadioTower className="h-3.5 w-3.5" />
+            </button>
           )}
           {/* 加入自选日标注 (常显): 弹窗不知道区间内哪天是交易日, 常显既避免错误的
               区间判断, 也覆盖「区间外」与「周末加入」两种情况 */}
@@ -363,22 +412,7 @@ export function StockInfoBar({
         )
       })}
 
-      <ListColumnCustomizer
-        columns={fields}
-        groups={INFO_GROUPS}
-        onChange={onFieldsChange}
-        open={customizerOpen}
-        onClose={() => setCustomizerOpen(false)}
-        title="信息条指标"
-        builtinSectionLabel="可选指标"
-        extColumnAlign="left"
-        showStandaloneToggle
-        disableBackdropBlur
-        baselineStore={{
-          get: () => storage.stockInfoBarFieldsBaseline.get(null) as ColumnConfig[] | null,
-          set: cols => storage.stockInfoBarFieldsBaseline.set(cols),
-        }}
-      />
+      {customizer}
     </div>
   )
 }

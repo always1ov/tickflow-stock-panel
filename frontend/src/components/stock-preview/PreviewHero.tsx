@@ -40,7 +40,7 @@ export const HERO_DAYS_DEFAULT = 120
 
 export function PreviewHero({
   symbol, name, days, onDaysChange, inWatchlist, watchBusy, onWatchAdd, onWatchRemove,
-  onAiAnalyze, aiBusy = false, onRefresh, onAddMonitor, viewControls,
+  onAiAnalyze, aiBusy = false, onRefresh, onAddMonitor, viewControls, stats,
 }: {
   symbol: string
   name?: string
@@ -58,6 +58,11 @@ export function PreviewHero({
   onAddMonitor?: () => void
   /** [R658] 视图切换那一行(区间提示 / 分时天数 + 日K / 分时 / 关键价位 / 复盘), 排在天数左边 */
   viewControls?: ReactNode
+  /**
+   * [R671] 指标行(市值 / 流通值 / 换手 / 自定义字段 + 自选于 + 信息条配置)。
+   * 原来压在图上第一行, 用户: 「市值那一行也融入到顶部去」—— 现在占头部第二行。
+   */
+  stats?: ReactNode
 }) {
   // 与关键价位页同一份日 K(同一个查询键, 不多发请求)
   const kline = useAnalysisKline(symbol)
@@ -136,6 +141,10 @@ export function PreviewHero({
           </button>
         </div>
       </div>
+
+      {/* [R671] 第二行: 指标行。市值 / 流通值 / 换手 / 自定义字段 + 自选于 + 信息条配置,
+          与头部同一套字号与左边界, 不再在图上方单独占一条。 */}
+      {stats && <div className="mt-2 min-w-0">{stats}</div>}
     </div>
   )
 }

@@ -404,6 +404,16 @@ export function StockPreviewDialog({ symbol, name, onClose, navList: navListSour
                 onRefresh={handleRefresh}
                 onAddMonitor={() => setShowMonitorEditor(true)}
                 viewControls={viewControls}
+                // [R671] 指标行并进头部第二行 —— 与中栏那张图同一份取数(同查询键, 不多发请求)
+                stats={(
+                  <StockPanel
+                    symbol={symbol}
+                    dateRange={heroRange}
+                    headerStats
+                    prefetchSymbols={prefetchSymbols}
+                    addedDate={addedDate}
+                  />
+                )}
               />
             )}
 
@@ -472,22 +482,12 @@ export function StockPreviewDialog({ symbol, name, onClose, navList: navListSour
                           levelHoveredKey={levelHover}
                           onLevelHoverKey={setLevelHover}
                           refreshLive
-                          // [R670] 头部已印报价与自选/监控, 信息条只留指标行
-                          compactQuote
+                          // [R671] 指标行已并进头部, 这里只画图
+                          hideInfoBar
                         />
                       ) : (
                         // [R437] 与旧分时页同一套: 上面一条信息栏(只要信息栏, 不画日 K), 下面多日分时。
-                        // 区间与新日 K 同一个(同一份缓存, 不多发请求)
-                        <div className="flex flex-col gap-3">
-                        <StockPanel
-                          symbol={symbol}
-                          dateRange={heroRange}
-                          infoBarOnly
-                          compactQuote
-                          prefetchSymbols={prefetchSymbols}
-                          intradayDays={effectiveIntradayDays}
-                          addedDate={addedDate}
-                        />
+                        // [R671] 信息栏已并进头部第二行, 这里只剩多日分时。
                         <StockMultiDayIntradayChart
                           symbol={symbol}
                           days={effectiveIntradayDays}
@@ -496,7 +496,6 @@ export function StockPreviewDialog({ symbol, name, onClose, navList: navListSour
                           priceLines={monitorPriceLines}
                           onPriceDoubleClick={openPriceAlert}
                         />
-                        </div>
                       )}
                     </ChartLevelsSection>
                   )}

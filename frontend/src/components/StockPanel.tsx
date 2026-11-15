@@ -26,8 +26,10 @@ interface Props {
   renderer?: ChartRenderer
   /** 详情顶栏已有名称时可隐藏报价条的重复身份；独立面板默认保留。 */
   showQuoteIdentity?: boolean
-  /** [R670] 个股弹窗头部已展示报价与自选/监控 —— 信息条只留指标行, 报价行不再重复 */
-  compactQuote?: boolean
+  /** [R671] 头部模式: 只输出指标那一行, 由 PreviewHero 嵌进弹窗头部 */
+  headerStats?: boolean
+  /** [R671] 指标行已在头部 —— 这里只画图 */
+  hideInfoBar?: boolean
   height?: number
   /**
    * [R650] 整块面板(报价条 + 图)最多能占多高 —— 弹窗右栏是滚动容器, 传进来后
@@ -94,7 +96,8 @@ export function StockPanel({
   onAssetType,
   renderer = 'echarts',
   showQuoteIdentity = true,
-  compactQuote = false,
+  headerStats = false,
+  hideInfoBar = false,
   height = 520,
   showIntraday = true,
   className,
@@ -262,13 +265,14 @@ export function StockPanel({
 
   return (
     <div className={className}>
+      {!hideInfoBar && (
       <div ref={infoBarRef}>
       <StockInfoBar
         freshness={kline.data?.quote_freshness}
         assetType={kline.data?.asset_type}
         symbol={symbol}
         showIdentity={showQuoteIdentity}
-        compactQuote={compactQuote}
+        headerMode={headerStats}
         name={name}
         stockInfo={stockInfo}
         rows={rawRows}
@@ -283,8 +287,9 @@ export function StockPanel({
         addedDate={addedDate}
       />
       </div>
+      )}
 
-      {infoBarOnly ? null : (
+      {infoBarOnly || headerStats ? null : (
       <div className={renderer === 'lightweight'
         ? `grid min-w-0 grid-cols-1 items-start overflow-hidden rounded-card border border-border/70 ${intradayVisible && !collapseIntraday ? 'xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]' : ''}`
         : 'flex gap-3 items-start'}>
