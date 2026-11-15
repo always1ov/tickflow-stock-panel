@@ -611,7 +611,8 @@ export function StockDailyKChart({
                   ))}
                 </div>
               )}
-              <div className="flex flex-wrap items-center gap-x-1 gap-y-2 px-3 pt-1.5 pb-1">
+              {/* [R699] 用户: 「把副图行的 pb 改回 2px，让上下对称」—— 下沿只留 2px, 与上沿 4px 基本对称(差的 3px 来自下拉本身的高度) */}
+              <div className="flex flex-wrap items-center gap-x-1 gap-y-2 px-3 pt-1.5 pb-0.5">
                 <span className="w-16 shrink-0 text-micro text-muted" title="画在下方副图里的指标">副图指标</span>
                 {subIndicatorPills}
                 {analysisPanePills}
