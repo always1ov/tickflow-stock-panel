@@ -217,8 +217,8 @@ export function LightweightDaily({ data, assetType, symbol = '', height = 480, a
         text: m.label ?? '', ...appearance,
       }
     }) : [], [markers, showMarkers, rows, markerStyle, theme])
-  // [R720] 只有真的画得出「自选」竖线时才留右缘带, 没有自选日的图不加空白
-  const addedMarkVisible = !!addedDate && rows.some(row => row.date <= addedDate)
+  // [R721] 用户: 「自选字眼恢复原来的左侧」—— R720 加的 32px 右缘带一并撤掉,
+  // 日K恢复原来的右缘贴合, 不再为标签让位。
   const annotations = useMemo(() => {
     const addedRow = addedDate ? rows.filter(r => r.date <= addedDate).at(-1) : null
     // [R718] 用户: 「自选的字眼放到底下」—— 这条竖线的文字从图顶挪到贴近时间轴那一侧。
@@ -289,10 +289,6 @@ export function LightweightDaily({ data, assetType, symbol = '', height = 480, a
       </div>
     </div>}
     <FinancialPlot scope={scope} series={plotSeries} height={plotHeight} paneHeights={paneHeights} pricePrecision={precision}
-      // [R720] 用户: 「自选字眼显示在虚线右侧」—— 自选日通常就是最后一根, 虚线贴在画布右缘,
-      // 右侧没有画字的地方。给它留一条 32px 的右缘带(与关键价位那张图的标签带同一做法),
-      // 虚线连同「自选」二字一起向里收, 文字才落在线的右侧。
-      rightOffsetPixels={addedMarkVisible ? 32 : undefined}
       paneTopInsets={[0, ...selected.map(() => 0), ...analysis.insets]}
       paneHeaderHeights={[0, ...selected.map(() => 0), ...analysis.headers]}
       paneDecor={[undefined, ...selected.map(key => key === 'inst' ? instDecor : undefined), ...analysis.decor]}
