@@ -30,6 +30,8 @@ interface Props {
   headerStats?: boolean
   /** [R671] 指标行已在头部 —— 这里只画图 */
   hideInfoBar?: boolean
+  /** [R673] 弹窗分栏里不再罩一层卡框(圆角+边框), 图直接铺满分栏 */
+  flat?: boolean
   height?: number
   /**
    * [R650] 整块面板(报价条 + 图)最多能占多高 —— 弹窗右栏是滚动容器, 传进来后
@@ -98,6 +100,7 @@ export function StockPanel({
   showQuoteIdentity = true,
   headerStats = false,
   hideInfoBar = false,
+  flat = false,
   height = 520,
   showIntraday = true,
   className,
@@ -291,7 +294,7 @@ export function StockPanel({
 
       {infoBarOnly || headerStats ? null : (
       <div className={renderer === 'lightweight'
-        ? `grid min-w-0 grid-cols-1 items-start overflow-hidden rounded-card border border-border/70 ${intradayVisible && !collapseIntraday ? 'xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]' : ''}`
+        ? `grid min-w-0 grid-cols-1 items-start overflow-hidden ${flat ? '' : 'rounded-card border border-border/70'} ${intradayVisible && !collapseIntraday ? 'xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]' : ''}`
         : 'flex gap-3 items-start'}>
         <StockDailyKChart
           symbol={symbol}

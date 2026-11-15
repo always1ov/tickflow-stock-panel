@@ -92,7 +92,8 @@ function DailyCard({ d }: { d: StockReview }) {
   }, [d, onlyMarked])
 
   return (
-    <div className="rounded-card border border-border bg-surface">
+    // [R673] 不再罩卡框 —— 中栏本身已经是一栏, 卡片只多出一道边框和一整圈 p-4
+    <div>
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-4 py-3">
         <span className={TYPE.card}>逐日复盘</span>
         {/* 旧「趋势状态」页页头那一句 */}
@@ -211,7 +212,8 @@ function SummaryCard({ d }: { d: StockReview }) {
     // 逐日表里通道那一笔笔动作不动 —— 那是旧「通道档位」表的原有内容(R440)
   ]
   return (
-    <div className="rounded-card border border-border bg-surface p-4">
+    // [R673] 同上: 统计表直接贴在中栏里
+    <div>
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-border/60 text-micro text-muted">

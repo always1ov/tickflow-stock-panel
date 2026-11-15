@@ -21,6 +21,8 @@ interface Props {
   refetchIntervalMs?: number
   onPriceDoubleClick?: (price: number, currentPrice: number) => void
   priceLines?: { value: number; label?: string; color?: string }[]
+  /** [R673] 弹窗分栏里不罩卡框 —— 图直接铺满分栏 */
+  flat?: boolean
 }
 
 export function StockMultiDayIntradayChart({
@@ -31,6 +33,7 @@ export function StockMultiDayIntradayChart({
   refetchIntervalMs,
   onPriceDoubleClick,
   priceLines,
+  flat = false,
 }: Props) {
   const queryClient = useQueryClient()
   const history = useQuery({
@@ -187,7 +190,7 @@ export function StockMultiDayIntradayChart({
   }
 
   return (
-    <div className={renderer === 'lightweight' ? 'min-w-0 overflow-hidden rounded-card border border-border/70 bg-base/20' : undefined} style={{ height: renderer === 'lightweight' ? undefined : height, minHeight: height }}>
+    <div className={renderer === 'lightweight' ? `min-w-0 overflow-hidden bg-base/20 ${flat ? '' : 'rounded-card border border-border/70'}` : undefined} style={{ height: renderer === 'lightweight' ? undefined : height, minHeight: height }}>
       {(showCoverage || (syncMinute.isPending && !isIndex)) && (
         <div className="flex h-8 items-center justify-between gap-3 border-b border-border/60 bg-elevated/40 px-3 text-xs">
           {syncMinute.isPending ? (

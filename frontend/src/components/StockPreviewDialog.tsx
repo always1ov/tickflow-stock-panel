@@ -478,6 +478,8 @@ export function StockPreviewDialog({ symbol, name, onClose, navList: navListSour
                           refreshLive
                           // [R671] 指标行已并进头部, 这里只画图
                           hideInfoBar
+                          // [R673] 中栏本身就是一栏, 不再罩卡框
+                          flat
                         />
                       ) : (
                         // [R437] 与旧分时页同一套: 上面一条信息栏(只要信息栏, 不画日 K), 下面多日分时。
@@ -489,6 +491,7 @@ export function StockPreviewDialog({ symbol, name, onClose, navList: navListSour
                           refetchIntervalMs={intradayRefetchMs}
                           priceLines={monitorPriceLines}
                           onPriceDoubleClick={openPriceAlert}
+                          flat
                         />
                       )}
                     </ChartLevelsSection>
