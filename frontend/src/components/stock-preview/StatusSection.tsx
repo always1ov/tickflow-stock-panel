@@ -7,7 +7,9 @@
  *
  *   趋势状态      六态(`useStockTrend`)。[R551] 图上方原来还有一条六态条, 与这一格逐字重复
  *                 (用户圈出「重复了」), 已撤; 它独有的回测调参入口、转折信号搬到这一格,
- *                 操作建议与关键点参考数放进状态名的悬停
+ *                 操作建议与关键点参考数放进状态名的悬停。
+ *                 [R679] 回测调参再往上搬一层到弹窗头部(自选于左边) —— 用户:
+ *                 「左里面的回测调参按钮放到上里面的自选于的前面」。
  *   跌破转弱 / 站上转强   同上, 距离是后端给的带符号的数
  *   通道阶段      上升中 / 下跌中 / 横盘中 …(`channel.phase.cn`)
  *   三档位置      短 / 中 / 长期各在自己通道的上轨 / 中轨 / 下轨哪一格, 色与时间轴
@@ -29,7 +31,7 @@ import type { ReactNode } from 'react'
 import type { StockReview } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import { BAND_CN, POS_FILL } from '@/lib/reviewTimeline'
-import { TrendBacktestButton, TrendSignalBadge, trendPivotTitle, useStockTrend } from '@/components/stock-analysis/TrendStateBar'
+import { TrendSignalBadge, trendPivotTitle, useStockTrend } from '@/components/stock-analysis/TrendStateBar'
 import { pct, useStockReview } from '@/components/stock-analysis/StockReviewDialog'
 
 export function StatusSection({ symbol, days, stacked = false }: {
@@ -89,8 +91,8 @@ function TrendCell({ symbol }: { symbol: string }) {
         <div className="mt-0.5 text-micro text-muted">
           自 {t.since}{t.entered_from_cn && <> 由「{t.entered_from_cn}」转入</>}
         </div>
-        {/* [R551] 回测调参的入口从图上方的六态条搬来(那条与这一格重复, 已撤) */}
-        <TrendBacktestButton symbol={symbol} trend={t} className="mt-2" />
+        {/* [R679] 「回测调参 N%」搬去弹窗头部(自选于左边), 用户: 「左里面的回测调参按钮
+            放到上里面的自选于的前面」。这一格只留六态本身。 */}
       </Cell>
       <div className="flex flex-wrap gap-x-8 gap-y-5">
         {t.flip_down != null && (

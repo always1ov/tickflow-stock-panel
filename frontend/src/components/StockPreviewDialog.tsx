@@ -12,6 +12,7 @@ import { StockMultiDayIntradayChart } from '@/components/StockMultiDayIntradayCh
 import { RuleEditor } from '@/components/monitor/RuleEditor'
 import { PriceAlertDialog } from '@/components/stock-analysis/PriceAlertDialog'
 import { hasOverviewLevels, LevelOverview, useShownLevels } from '@/components/stock-analysis/AnalysisKChart'
+import { TrendBacktestButton, useStockTrend } from '@/components/stock-analysis/TrendStateBar'
 import { useAnalysisKline, useStockLevels } from '@/components/stock-analysis/StockLevelsPanel'
 import { useLevelControls } from '@/components/stock-analysis/levelControls'
 import { HERO_DAYS_DEFAULT, PreviewHero } from '@/components/stock-preview/PreviewHero'
@@ -77,6 +78,17 @@ interface PriceAlertDraft {
   currentPrice: number
 }
 const INTRADAY_DAY_OPTIONS = [1, 5, 10, 20] as const
+
+/**
+ * [R679] 头部第二行右端的「回测调参」—— 用户: 「左里面的回测调参按钮放到上里面的
+ * 自选于的前面」。六态还在「现状」那一栏, 这里只借同一份 `useStockTrend` 缓存出阈值;
+ * 趋势没取到 (或报错) 时不渲染, 头部不会出现一颗点了没数的按钮。
+ */
+function HeaderBacktest({ symbol }: { symbol: string }) {
+  const t = useStockTrend(symbol).data
+  if (!t || t.error) return null
+  return <TrendBacktestButton symbol={symbol} trend={t} />
+}
 
 // [R552] 弹窗开合的动效参数(动效评审 R550/R551 四条):
 //   · 遮罩与面板同一条有力的 ease-out(--ease-out-strong), 原来遮罩吃 framer 默认的软曲线, 两者不同步;
@@ -339,15 +351,15 @@ export function StockPreviewDialog({ symbol, name, onClose, navList: navListSour
   // [R670] 那句提示撤了: 头部本来就印着「起 ~ 止 · N 个交易日」, 再说一遍「区间跟上面的天数走」
   // 是把同一件事写两次。复盘视图同理, 它的卡片头自己带日期与交易日数(还有六态阈值来源)。
   const viewControls = (
-    <div role="tablist" aria-label="图表视图"
-         className="inline-flex shrink-0 items-center gap-1 rounded-btn border border-border bg-elevated/60 p-1">
+    // [R679] 用户: 「日K、分时、复盘 没有后面的 60日/120日/250日 的按钮大小一样」——
+    // 那三颗原来装在一个带边距的分段容器里(容器 p-1 + 边框把它们整体撑大), 现在拆成
+    // 和天数胶囊同一套独立按钮: 同样的边框/底色/选中样式、同样的 72×32。
+    <div role="tablist" aria-label="图表视图" className="inline-flex shrink-0 items-center gap-2">
       {VIEW_TABS.map(({ key, label, Icon }) => (
         <button key={key} type="button" role="tab" aria-selected={chartView === key}
                 onClick={() => setChartView(key)}
-                // [R676] 用户: 「前三个按钮和后三个按钮一样大小」—— 与右边天数胶囊同宽同字号,
-                // 六个按钮统一 72×32(图标留着, 字从 text-sm 收到 text-xs 才装得下)
-                className={`inline-flex h-8 w-[72px] items-center justify-center gap-1.5 rounded-btn text-xs transition-colors duration-hover ${
-                  chartView === key ? 'bg-foreground font-medium text-surface' : 'text-secondary hover:text-foreground'
+                className={`inline-flex h-8 w-[72px] shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-btn border text-xs transition-colors duration-hover ${
+                  chartView === key ? PILL_ON : PILL_IDLE
                 }`}>
           <Icon className="h-3.5 w-3.5" />
           {label}
@@ -410,6 +422,8 @@ export function StockPreviewDialog({ symbol, name, onClose, navList: navListSour
                     headerStats
                     prefetchSymbols={prefetchSymbols}
                     addedDate={addedDate}
+                    // [R679] 回测调参从「现状」搬进头部, 排在「自选于」前面
+                    headerExtra={<HeaderBacktest symbol={symbol} />}
                   />
                 )}
               />

@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
+import { useEffect, useState, useCallback, useRef, useMemo, type ReactNode } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { X } from 'lucide-react'
 import { type KlineRow, type FinancialMetricRecord } from '@/lib/api'
@@ -28,6 +28,8 @@ interface Props {
   showQuoteIdentity?: boolean
   /** [R671] 头部模式: 只输出指标那一行, 由 PreviewHero 嵌进弹窗头部 */
   headerStats?: boolean
+  /** [R679] 头部指标行右端、自选于之前的一颗东西(弹窗放「回测调参」) */
+  headerExtra?: ReactNode
   /** [R671] 指标行已在头部 —— 这里只画图 */
   hideInfoBar?: boolean
   /** [R673] 弹窗分栏里不再罩一层卡框(圆角+边框), 图直接铺满分栏 */
@@ -99,6 +101,7 @@ export function StockPanel({
   renderer = 'echarts',
   showQuoteIdentity = true,
   headerStats = false,
+  headerExtra,
   hideInfoBar = false,
   flat = false,
   height = 520,
@@ -276,6 +279,7 @@ export function StockPanel({
         symbol={symbol}
         showIdentity={showQuoteIdentity}
         headerMode={headerStats}
+        headerExtra={headerExtra}
         name={name}
         stockInfo={stockInfo}
         rows={rawRows}
