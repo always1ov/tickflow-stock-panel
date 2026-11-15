@@ -6,7 +6,7 @@ import type { ECharts, EChartsOption } from 'echarts'
 
 import type { OHLC, ChartMarker, ChartRange, ChartPriceLine, VolumeCompareConfig, DailyChartProps } from '@/lib/chart-types'
 export type { OHLC, ChartMarker, ChartRange, ChartPriceLine, StockInfo, VolumeCompareConfig } from '@/lib/chart-types'
-import { volMaN, volumeRatioAt, SUB_CHART_META } from '@/lib/chart-indicators'
+import { volumeRatioAt, SUB_CHART_META } from '@/lib/chart-indicators'
 
 interface SubChartContext {
   compact: boolean
@@ -44,8 +44,6 @@ export const SUB_CHARTS: SubChartDef[] = [
     ...SUB_CHART_META[0],
     yAxisConfig: { min: 0 },
     buildSeries: (data, context) => {
-      const ma5Data = volMaN(data, 5)
-      const ma10Data = volMaN(data, 10)
       const compareDays = context.volumeCompare.days
       return [
         {
@@ -73,22 +71,6 @@ export const SUB_CHARTS: SubChartDef[] = [
           },
           labelLayout: { hideOverlap: true },
           animation: false,
-        },
-        {
-          name: 'VOL5',
-          type: 'line',
-          data: ma5Data,
-          smooth: true, symbol: 'none', animation: false,
-          lineStyle: { width: 1, color: '#FACC15' },
-          itemStyle: { color: '#FACC15' },
-        },
-        {
-          name: 'VOL10',
-          type: 'line',
-          data: ma10Data,
-          smooth: true, symbol: 'none', animation: false,
-          lineStyle: { width: 1, color: '#8B5CF6' },
-          itemStyle: { color: '#8B5CF6' },
         },
       ]
     },
@@ -268,16 +250,6 @@ function buildSubInfoGraphics(
 
     const items = def.buildInfo(d)
     if (def.key === 'vol' && d) {
-      const calcVolMa = (n: number) => {
-        if (infoIdx < n - 1) return null
-        let sum = 0
-        for (let j = infoIdx - n + 1; j <= infoIdx; j++) sum += data[j].volume ?? 0
-        return sum / n
-      }
-      const vol5 = calcVolMa(5)
-      const vol10 = calcVolMa(10)
-      items.push({ label: 'VOL5', color: '#FACC15', value: fmtVol(vol5) })
-      items.push({ label: 'VOL10', color: '#8B5CF6', value: fmtVol(vol10) })
       if (volumeCompare.enabled) {
         const ratio = volumeRatioAt(data, infoIdx, volumeCompare.days)
         items.push({

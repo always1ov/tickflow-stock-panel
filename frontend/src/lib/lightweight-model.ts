@@ -18,7 +18,10 @@ export interface PlotSeries {
   /** 线宽(默认 1)；悬浮高亮时加粗 */
   lineWidth?: 1 | 2 | 3 | 4
   priceFormat?: 'price' | 'volume' | 'percent'
-  priceScaleId?: 'left'
+  /** [R723] 'atr' = 叠在成交量 pane 里的隐形 overlay 刻度(只分配纵向, 不显示轴) */
+  priceScaleId?: 'left' | 'atr'
+  /** [R723] 这只 pane 的自绘图元挂在这条 series 上(默认挂 pane 的第一条) */
+  decorHost?: boolean
   axisTicks?: PlotAxisTick[]
   baseValue?: number
   precision?: number

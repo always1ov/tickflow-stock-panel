@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { SeriesMarker, Time } from 'lightweight-charts'
 import type { ChartMarker, DailyChartProps, OHLC } from '@/lib/chart-types'
-import { ATR_BAND_COLORS, DAILY_LINE_COLORS, SUB_CHART_META, computeAtrBandSeries, computeInstitutionSeries, volMaN, volumeRatioAt } from '@/lib/chart-indicators'
+import { ATR_BAND_COLORS, DAILY_LINE_COLORS, SUB_CHART_META, computeAtrBandSeries, computeInstitutionSeries, volumeRatioAt } from '@/lib/chart-indicators'
 import { CHART_COLORS as C, lineData, validDailyRows, type PlotSeries } from '@/lib/lightweight-model'
 import { fmtVolume, fmtPct, pricePrecision } from '@/lib/format'
 import { CHART_LAYOUT, plotPaneHeights } from '@/lib/chart-layout'
@@ -70,7 +70,6 @@ export function LightweightDaily({ data, assetType, symbol = '', height = 480, a
   const visibleMA = useMemo(
     () => maKeys ? maFields.filter(([key]) => maKeys.includes(key)) : showMA ? maFields : [],
     [maKeys, showMA])
-  const volumeMAs = useMemo(() => ({ 5: volMaN(rows, 5), 10: volMaN(rows, 10) }), [rows])
   // [R714] 主力COME: 数值按通达信公式算, 画法(红空心柱/绿实心柱/红主力柱/白字)见下面 instDecor
   const instSeries = useMemo(() => computeInstitutionSeries(rows), [rows])
   const instDecor = useMemo<PaneDecorData>(() => {
@@ -132,7 +131,7 @@ export function LightweightDaily({ data, assetType, symbol = '', height = 480, a
       }
     }) }]
     const addLine = (id: string, values: ReturnType<typeof lineData>, color: string, pane = 0,
-      options: Pick<PlotSeries, 'range' | 'precision' | 'priceFormat' | 'lineWidth'> = {}) => {
+      options: Pick<PlotSeries, 'range' | 'precision' | 'priceFormat' | 'lineWidth' | 'priceScaleId' | 'decorHost'> = {}) => {
       series.push({ id, type: 'Line', pane, data: values, color, ...options })
     }
     // [R709] 用户: 「悬浮的时候MA也在主图显示了」—— 悬停某个价位点位时, 价位线压到 12%,
@@ -144,24 +143,22 @@ export function LightweightDaily({ data, assetType, symbol = '', height = 480, a
         series.push({ id: 'volume', type: 'Volume', pane, priceFormat: 'volume', data: rows.map(r => ({
           time: r.date, value: r.volume ?? 0, color: r.close >= r.open ? 'rgba(199,64,64,0.55)' : 'rgba(45,155,101,0.55)',
         })) })
-        for (const [n, token] of [[5, 'yellow'], [10, 'plum']] as const) {
-          const ma = volumeMAs[n]
-          addLine(`vol${n}`, rows.map((r, i) => ma[i] == null ? { time: r.date } : { time: r.date, value: ma[i]! }), color(token), pane, { priceFormat: 'volume' })
-        }
-      } else if (key === 'inst') {
-        // 公式里 机构线 / 机构趋势 都是 `:=` 变量、不画线; 只留一条透明线把副图刻度钉在 0~100
-        addLine('inst_scale', rows.map(r => ({ time: r.date, value: 50 })), 'rgba(0,0,0,0)', pane, { range: { min: 0, max: 100 } })
-      } else if (key === 'atr_band') {
-        // [R722] 五条线照公式画: S/BASIS/UPPER/LOWER 是 LINETHICK2, REFMID 是 LINETHICK1
+        // [R723] 用户: 「把副图指标成交量里面的两根线删掉, 然后刚刚的『ATR原始』叠加到成交量上去」——
+        // 原来的 VOL5 / VOL10 均量线撤掉; ATR 五条线改画在成交量这只 pane 里。
+        // 成交量是千万级、ATR 只有几十, 同一条刻度上会被压成贴着底边的直线 —— 所以给 ATR
+        // 单独一只 overlay 刻度(`priceScaleId: 'atr'`, 不显示、只负责纵向分配), 柱子高度不受影响。
         const band = (field: 'atr' | 'basis' | 'upper' | 'lower' | 'refMid') => rows.map((r, idx) => {
           const value = atrBand[idx][field]
           return typeof value === 'number' ? { time: r.date, value } : { time: r.date }
         })
-        addLine('atr_s', band('atr'), ATR_BAND_COLORS.atr[theme], pane, { lineWidth: 2 })
-        addLine('atr_basis', band('basis'), ATR_BAND_COLORS.basis[theme], pane, { lineWidth: 2 })
-        addLine('atr_upper', band('upper'), ATR_BAND_COLORS.band[theme], pane, { lineWidth: 2 })
-        addLine('atr_lower', band('lower'), ATR_BAND_COLORS.band[theme], pane, { lineWidth: 2 })
-        addLine('atr_refmid', band('refMid'), ATR_BAND_COLORS.refMid[theme], pane, { lineWidth: 1 })
+        addLine('atr_s', band('atr'), ATR_BAND_COLORS.atr[theme], pane, { lineWidth: 2, priceScaleId: 'atr', decorHost: true })
+        addLine('atr_basis', band('basis'), ATR_BAND_COLORS.basis[theme], pane, { lineWidth: 2, priceScaleId: 'atr' })
+        addLine('atr_upper', band('upper'), ATR_BAND_COLORS.band[theme], pane, { lineWidth: 2, priceScaleId: 'atr' })
+        addLine('atr_lower', band('lower'), ATR_BAND_COLORS.band[theme], pane, { lineWidth: 2, priceScaleId: 'atr' })
+        addLine('atr_refmid', band('refMid'), ATR_BAND_COLORS.refMid[theme], pane, { lineWidth: 1, priceScaleId: 'atr' })
+      } else if (key === 'inst') {
+        // 公式里 机构线 / 机构趋势 都是 `:=` 变量、不画线; 只留一条透明线把副图刻度钉在 0~100
+        addLine('inst_scale', rows.map(r => ({ time: r.date, value: 50 })), 'rgba(0,0,0,0)', pane, { range: { min: 0, max: 100 } })
       } else {
         const lines = fields[key as keyof typeof fields]
         for (const [field, label, token] of lines) addLine(label, lineData(rows, field), color(token), pane,
@@ -172,7 +169,7 @@ export function LightweightDaily({ data, assetType, symbol = '', height = 480, a
       }
     })
     return series
-  }, [rows, visibleMA, selected, activeIndicators, events, markerStyle, showMarkers, theme, volumeMAs, dimLines, atrBand])
+  }, [rows, visibleMA, selected, activeIndicators, events, markerStyle, showMarkers, theme, dimLines, atrBand])
 
   // [R649] 底部并入的分析副图(趋势量化 / 量化MACD): 排在各指标副图之后, 高度由调用方算好。
   // 与关键价位那张图同一份画法(`lib/analysisPanes.ts`), 这里只负责 pane 下标与版面。
@@ -263,10 +260,19 @@ export function LightweightDaily({ data, assetType, symbol = '', height = 480, a
     const result: NonNullable<AnnotationData['readouts']> = []
     if (key === 'vol') {
       result.push({ text: `量 ${volume(current?.volume)}`, color: current ? color(current.close >= current.open ? 'up' : 'down') : undefined })
-      for (const [n, token] of [[5, 'yellow'], [10, 'plum']] as const) result.push({ text: `VOL${n} ${volume(volumeMAs[n][i])}`, color: color(token) })
       if (volumeCompare.enabled) {
         const ratio = volumeRatioAt(rows, i, volumeCompare.days)
         result.push({ text: `量比 ${ratio == null ? '—' : `${ratio.toFixed(2)}x`}` })
+      }
+      // [R723] ATR原始 叠在这只副图上, 读数并进同一行; 数据不足 20 根时不出值, 也不摆一排「—」
+      const point = atrBand[i]
+      if (point?.atr != null) {
+        result.push({ text: `S ${price(point.atr)}`, color: ATR_BAND_COLORS.atr[theme] })
+        result.push({ text: `BASIS ${price(point.basis)}`, color: ATR_BAND_COLORS.basis[theme] })
+        result.push({ text: `UPPER ${price(point.upper)}`, color: ATR_BAND_COLORS.band[theme] })
+        result.push({ text: `LOWER ${price(point.lower)}`, color: ATR_BAND_COLORS.band[theme] })
+        result.push({ text: `REFMID ${price(point.refMid)}`, color: ATR_BAND_COLORS.refMid[theme] })
+        if (point.crossUp) result.push({ text: '上穿', color: ATR_BAND_COLORS.icon[theme] })
       }
     } else if (key === 'inst') {
       // 通达信不显示这两条线的数值, 这里沿用副图读数习惯补上, 方便对照柱子
@@ -274,22 +280,13 @@ export function LightweightDaily({ data, assetType, symbol = '', height = 480, a
       result.push({ text: `机构线 ${price(point?.inst, 1)}` })
       result.push({ text: `趋势 ${price(point?.trend, 1)}` })
       if (point?.mainForce) result.push({ text: '主力', color: INST_COLORS.up })
-    } else if (key === 'atr_band') {
-      // [R722] 通达信副图读数: S / BASIS / UPPER / LOWER / REFMID, 上穿那一格补一个「上穿」
-      const point = atrBand[i]
-      result.push({ text: `S ${price(point?.atr)}`, color: ATR_BAND_COLORS.atr[theme] })
-      result.push({ text: `BASIS ${price(point?.basis)}`, color: ATR_BAND_COLORS.basis[theme] })
-      result.push({ text: `UPPER ${price(point?.upper)}`, color: ATR_BAND_COLORS.band[theme] })
-      result.push({ text: `LOWER ${price(point?.lower)}`, color: ATR_BAND_COLORS.band[theme] })
-      result.push({ text: `REFMID ${price(point?.refMid)}`, color: ATR_BAND_COLORS.refMid[theme] })
-      if (point?.crossUp) result.push({ text: '上穿', color: ATR_BAND_COLORS.icon[theme] })
     } else {
       for (const [field, label, token] of fields[key as keyof typeof fields]) result.push({ text: `${label} ${price(current?.[field], key === 'macd' ? 3 : 1)}`, color: color(token) })
       if (key === 'macd') result.push({ text: `MACD ${price(current?.macd_hist, 3)}`,
         color: current?.macd_hist == null || !Number.isFinite(current.macd_hist) ? undefined : color(current.macd_hist >= 0 ? 'up' : 'down') })
     }
     return result
-  }), ...analysis.readouts], [selected, current, rows, i, volumeCompare.days, volumeCompare.enabled, theme, volumeMAs, instSeries, atrBand, analysis.readouts])
+  }), ...analysis.readouts], [selected, current, rows, i, volumeCompare.days, volumeCompare.enabled, theme, instSeries, atrBand, analysis.readouts])
   const change = previous?.close ? current.close / previous.close - 1 : null
   const turnover = stockInfo?.float_shares && current?.volume != null ? current.volume * 100 / stockInfo.float_shares : null
 
@@ -322,7 +319,7 @@ export function LightweightDaily({ data, assetType, symbol = '', height = 480, a
     <FinancialPlot scope={scope} series={plotSeries} height={plotHeight} paneHeights={paneHeights} pricePrecision={precision}
       paneTopInsets={[0, ...selected.map(() => 0), ...analysis.insets]}
       paneHeaderHeights={[0, ...selected.map(() => 0), ...analysis.headers]}
-      paneDecor={[undefined, ...selected.map(key => key === 'inst' ? instDecor : key === 'atr_band' ? atrDecor : undefined), ...analysis.decor]}
+      paneDecor={[undefined, ...selected.map(key => key === 'inst' ? instDecor : key === 'vol' ? atrDecor : undefined), ...analysis.decor]}
       hidePaneAxis={analysis.hidden.length ? analysis.hidden : undefined}
       markers={chartMarkers} annotations={annotations} volumeLabels={volumeLabels} paneTitles={paneTitles} paneReadouts={paneReadouts}
       linkedPrice={linkedPrice} visibleBars={visibleBars} currentPrice={rows.at(-1)?.close}

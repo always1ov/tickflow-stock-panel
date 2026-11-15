@@ -14,8 +14,10 @@ import { DAILY_LINE_COLORS, SUB_CHART_META } from '@/lib/chart-indicators'
  * 渲染器里有画法(ECharts 那条老渲染器不接), 入口在下面按 renderer 过滤。
  * [R722] 用户: 「新增一个副图指标……先解读这个通达信指标『ATR 原始版 - 副图』, 再完美复刻」——
  * 同样只在 lightweight 里有画法。
+ * [R723] 用户: 「刚刚的『ATR原始』叠加到成交量上去」—— 它不再是自己一只副图, 五条线
+ * 由 `LightweightDaily` 画进成交量 pane, 所以这里没有它的胶囊。
  */
-const DAILY_SUB_CHARTS = SUB_CHART_META.filter(def => def.key === 'vol' || def.key === 'inst' || def.key === 'atr_band')
+const DAILY_SUB_CHARTS = SUB_CHART_META.filter(def => def.key === 'vol' || def.key === 'inst')
 
 /** [R694] 用户: 「不搞圆点和颜色切换了，异动这个按钮就直接控制，效果以后只有颜色这一种显示方式」——
  *  「圆点 / 颜色」两个显示方式撤掉, 「异动」只剩开关一个职责, 图上固定按颜色画。 */
@@ -484,8 +486,8 @@ export function StockDailyKChart({
     on ? pal[theme === 'dark' ? 'light' : 'dark'] : pal[theme]
 
   const subIndicatorPills = DAILY_SUB_CHARTS
-    // [R722] ATR原始 与 主力COME 一样只有 lightweight 画法, ECharts 不提供入口
-    .filter(ind => renderer === 'lightweight' || (ind.key !== 'inst' && ind.key !== 'atr_band'))
+    // [R722] 主力COME 只有 lightweight 画法, ECharts 不提供入口
+    .filter(ind => renderer === 'lightweight' || ind.key !== 'inst')
     .map(ind => (
     <ChartPill
       key={ind.key}

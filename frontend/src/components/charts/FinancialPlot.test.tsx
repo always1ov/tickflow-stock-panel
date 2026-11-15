@@ -263,7 +263,7 @@ it('daily hover uses the previous close for 至今, preserves indicator panes an
   expect(host.textContent).not.toContain('至今')
 })
 
-it('shows every indicator readout at the hovered date, including MACD histogram and both volume averages', async () => {
+it('shows every indicator readout at the hovered date, including MACD histogram and volume ratio', async () => {
   const updates = vi.spyOn(ChartAnnotations.prototype, 'update')
   try {
     const rows = Array.from({ length: 12 }, (_, i) => ({ date: new Date(Date.UTC(2026, 9, i + 1)).toISOString().slice(0, 10),
@@ -276,7 +276,7 @@ it('shows every indicator readout at the hovered date, including MACD histogram 
     const readouts = (title: string) => [...updates.mock.calls].reverse().find(([d]) => d.title === title)![0].readouts!
     await render()
     expect(readouts('MACD').map(d => d.text)).toEqual(['DIF 0.001', 'DEA 0.000', 'MACD -0.002'])
-    expect(readouts('成交量').map(d => d.text)).toEqual(['量 12.00万', 'VOL5 10.00万', 'VOL10 7.50万', '量比 1.09x'])
+    expect(readouts('成交量').map(d => d.text)).toEqual(['量 12.00万', '量比 1.09x'])
     expect(readouts('RSI').map(d => d.text)).toEqual(['RSI6 56.7', 'RSI14 48.3', 'RSI24 —'])
     expect(readouts('KDJ').map(d => d.text)).toEqual(['K 70.3', 'D 45.3', 'J 120.3'])
     const dif = native.chart.addSeries.mock.calls.findIndex(call => call[2] === 2 && call[0] === 'Line')
@@ -285,11 +285,27 @@ it('shows every indicator readout at the hovered date, including MACD histogram 
     expect(readouts('MACD')[2].color).toBe('#2D9B65')
     await act(async () => native.handlers.hover({ time: rows[3].date, paneIndex: 2 }))
     expect(readouts('MACD')[2].text).toBe('MACD 0.006')
-    expect(readouts('成交量').map(d => d.text)).toEqual(['量 4.00万', 'VOL5 —', 'VOL10 —', '量比 1.33x'])
+    expect(readouts('成交量').map(d => d.text)).toEqual(['量 4.00万', '量比 1.33x'])
     native.appearance.theme = 'light'
     await render()
     expect(readouts('MACD')[0].color).toBe(native.series[dif].applyOptions.mock.calls.at(-1)![0].color)
     expect(readouts('MACD')[0].color).toBe('#A16207')
+  } finally { updates.mockRestore() }
+})
+
+it('[R723] 成交量副图不再画均量线, ATR 五条线叠在同一只 pane 的隐形刻度上', async () => {
+  const updates = vi.spyOn(ChartAnnotations.prototype, 'update')
+  try {
+    const rows = Array.from({ length: 60 }, (_, i) => ({ date: new Date(Date.UTC(2026, 5, i + 1)).toISOString().slice(0, 10),
+      open: 10, high: 11, low: 9, close: 10, volume: 1_000_000 }))
+    await act(async () => root.render(<LightweightDaily symbol="A" data={rows} activeIndicators={['vol']} />))
+    const overlay = native.chart.addSeries.mock.calls.filter(call => call[1]?.priceScaleId === 'atr')
+    expect(overlay).toHaveLength(5)
+    expect(overlay.every(call => call[2] === 1)).toBe(true)
+    const readouts = [...updates.mock.calls].reverse().find(([d]) => d.title === '成交量')![0].readouts!
+    expect(readouts.map(d => d.text)).toContain('S 2.00')
+    expect(readouts.map(d => d.text)).toContain('REFMID 2.00')
+    expect(readouts.some(d => d.text.startsWith('VOL'))).toBe(false)
   } finally { updates.mockRestore() }
 })
 

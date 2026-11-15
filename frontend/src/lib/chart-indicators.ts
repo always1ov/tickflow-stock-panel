@@ -21,8 +21,8 @@ export const SUB_CHART_META = [
   { key: 'kdj', label: 'KDJ', height: 72 },
   // [R714] 用户: 「新增一个副图指标, 再完美复刻」—— 通达信「主力COME」, 只有柱和字, 见下面计算。
   { key: 'inst', label: '主力COME', height: 96 },
-  // [R722] 用户: 「新增一个副图指标……先解读这个通达信指标『ATR 原始版 - 副图』, 再完美复刻」
-  { key: 'atr_band', label: 'ATR原始', height: 96 },
+  // [R723] 用户: 「刚刚的『ATR原始』叠加到成交量上去」—— 它不再单独占一只副图, 五条线
+  // 画进成交量那只 pane(见 LightweightDaily), 所以这里下掉它的注册项与入口胶囊。
 ]
 
 /** [R714] 通达信 SMA(X,N,M): Y=(M·X+(N-M)·Y')/N, 首值取 X —— 不是简单均线, 不能拿 rolling mean 顶替。 */

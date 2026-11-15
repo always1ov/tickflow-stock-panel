@@ -287,7 +287,10 @@ export function FinancialPlot(props: Props) {
     for (const spec of props.series) {
       const options = { ...(spec.color ? { color: spec.color } : {}), lineWidth: spec.lineWidth ?? 1,
         lastValueVisible: false, priceLineVisible: false,
-        ...(spec.priceScaleId ? { priceScaleId: spec.priceScaleId, lineVisible: false } : {}),
+        // [R723] 这个 `lineVisible: false` 是**线系列的「不画线」开关**, 不是刻度轴的边框开关。
+        // 分时那条挂左轴的百分比线本来就是透明色, 留着无妨; ATR 五条线要真画出来,
+        // 所以只有 `left` 保留这个开关, `atr` 不能带 —— 一带上去整条线就没了。
+        ...(spec.priceScaleId ? { priceScaleId: spec.priceScaleId, ...(spec.priceScaleId === 'left' ? { lineVisible: false } : {}) } : {}),
         crosshairMarkerVisible: false, visible: spec.visible ?? true,
         // [R717] 用户: 「成交量副图的资金列默认任何个股都要显示完整」——成交量 pane 只有 95px 高,
         // 自动刻度最高那一档可能正好压在 pane 顶边、被裁掉上半截(实测只剩半个「60万」)。
@@ -357,6 +360,7 @@ export function FinancialPlot(props: Props) {
           // [R630] 个股分析的副图沿用原文版面: 整块高度都给走势(tqYRange 已按像素预算留好字道),
           // 不再叠加成交量 pane 那套 28% / 8% 边距 —— 否则走势被二次压缩、字道与数据对不上。
           scaleMargins: spec.id === 'volume' ? { top: props.intraday ? 0.22 : 0.3, bottom: 0 }
+            : spec.priceScaleId === 'atr' ? { top: 0.16, bottom: 0.06 }
             : hidesAxis(spec.pane) ? { top: topMargin, bottom: 0 } : { top: 0.28, bottom: 0.08 },
         })
       }
@@ -378,9 +382,13 @@ export function FinancialPlot(props: Props) {
         paneAnnotations.current.set(pane, { api, annotation, volume: spec.id === 'volume' })
       }
       // [R616] 副图补画的图元与标注挂在同一条 series 上(同一张 pane)
-      if (paneDecorRef.current.get(pane)?.api !== api) {
-        const decor = new PaneDecor(); api.attachPrimitive(decor)
-        paneDecorRef.current.set(pane, { api, decor })
+      // [R723] ATR 叠在成交量 pane 里, 它的箭头要用 overlay 刻度(atr_s)换算纵向坐标;
+      // 仍挂到成交量柱那条 series 就会按千万级的量级去算, 箭头全落到底边。
+      const decorSpec = props.series.find(s => s.pane === pane && s.decorHost) ?? spec
+      const decorApi = seriesRef.current.get(decorSpec.id)!.api
+      if (paneDecorRef.current.get(pane)?.api !== decorApi) {
+        const decor = new PaneDecor(); decorApi.attachPrimitive(decor)
+        paneDecorRef.current.set(pane, { api: decorApi, decor })
       }
     }
     props.paneHeights.forEach((value, i) => chart.panes()[i]?.setStretchFactor(value))
