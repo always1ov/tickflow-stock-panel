@@ -18,8 +18,7 @@ import { useLevelControls } from '@/components/stock-analysis/levelControls'
 import { HERO_DAYS_DEFAULT, PreviewHero } from '@/components/stock-preview/PreviewHero'
 import { ChartLevelsSection } from '@/components/stock-preview/ChartLevelsSection'
 import { ReviewSection } from '@/components/stock-preview/ReviewSection'
-import { BandsCell, StatusSection } from '@/components/stock-preview/StatusSection'
-import { useStockReview } from '@/components/stock-analysis/StockReviewDialog'
+import { StatusSection } from '@/components/stock-preview/StatusSection'
 import { PILL, PILL_IDLE, PILL_ON } from '@/components/stock-preview/pill'
 import { buildMonitorPriceLines } from '@/lib/price-alerts'
 import { usePreferences } from '@/lib/useSharedQueries'
@@ -327,9 +326,6 @@ export function StockPreviewDialog({ symbol, name, onClose, navList: navListSour
   // 起点取关键价位那份日 K 倒数第 N 根的日子 —— 与头部那行「起 ~ 止 · N 个交易日」
   // 是同一个数。日 K 还没到时先用旧的默认区间顶着。
   const heroRows = useAnalysisKline(symbol ?? '').data?.rows ?? []
-  // [R680] 右栏顶部的三档位置与左栏「趋势状态」同源, 共用同一份复盘查询
-  const rightReviewData = useStockReview(symbol ?? '', reviewDays, !!symbol).data
-  const rightReview = rightReviewData && !rightReviewData.error ? rightReviewData : undefined
   const heroStart = heroRows.length ? String((heroRows.at(-reviewDays) ?? heroRows[0]).date).slice(0, 10) : null
   const heroRange = heroStart ? { start: heroStart, end: new Date().toISOString().slice(0, 10) } : dateRange
 
@@ -525,30 +521,27 @@ export function StockPreviewDialog({ symbol, name, onClose, navList: navListSour
                   [R670] 当前价回头部唯一提供。
                   [R672] 这一栏常驻: 用户要「时刻显示右侧价位那部分」, 通道三档也回列
                   (左栏格子回答「在哪一格」, 这里回答「具体多少」)。
-                  [R680] 方案 A: 三档位置从左栏搬到这栏顶部(位置类归位置栏), 价位列表改成
-                  阶梯 —— 压力在上、现价居中、支撑在下, 每条带距离。 */}
+                  [R680] 方案 A: 价位列表改成阶梯 —— 压力在上、现价居中、支撑在下, 每条带距离。
+                  [R681] 用户: 「左里面恢复以前的布局」—— 三档位置搬回左栏, 这一栏只留价位阶梯。 */}
               <div className="border-t border-border/60 px-4 py-4 sm:px-6 xl:min-h-0 xl:overflow-y-auto xl:border-t-0 xl:border-l">
-                <BandsCell d={rightReview} />
-                <div className="mt-4">
-                  {!shownLevels.effLevels ? (
-                    <div className="text-xs text-muted">…</div>
-                  ) : levelPanelEmpty ? (
-                    <div className="text-xs text-muted">未开启价位 —— 在图上方「价位」开关里打开</div>
-                  ) : (
-                    <LevelOverview
-                      levels={shownLevels.effLevels}
-                      activeTypes={levelCtl.activeTypes}
-                      pivotRank={levelCtl.pivotRank}
-                      close={heroRows.at(-1)?.close}
-                      hoveredKey={levelHover}
-                      onHover={setLevelHover}
-                      stacked
-                      ladder
-                      // [R674] 右栏本身就是一栏, 不再在栏里罩一层圆角框
-                      flat
-                    />
-                  )}
-                </div>
+                {!shownLevels.effLevels ? (
+                  <div className="text-xs text-muted">…</div>
+                ) : levelPanelEmpty ? (
+                  <div className="text-xs text-muted">未开启价位 —— 在图上方「价位」开关里打开</div>
+                ) : (
+                  <LevelOverview
+                    levels={shownLevels.effLevels}
+                    activeTypes={levelCtl.activeTypes}
+                    pivotRank={levelCtl.pivotRank}
+                    close={heroRows.at(-1)?.close}
+                    hoveredKey={levelHover}
+                    onHover={setLevelHover}
+                    stacked
+                    ladder
+                    // [R674] 右栏本身就是一栏, 不再在栏里罩一层圆角框
+                    flat
+                  />
+                )}
               </div>
             </div>
 

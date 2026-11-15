@@ -47,10 +47,14 @@ export function StatusSection({ symbol, days }: {
           [R673] 这四格也不再罩卡框: 左栏本身已是独立分栏, 再罩一层圆角边框只是白白
           吃掉一圈 16px(用户: 「左中右里面的内容没必要再套一层框框住, 这样很浪费空间」)
           [R680] 五段竖排压成三段(方案 A): 趋势状态 / 跌破·站上并列 / 通道阶段;
-          三档位置搬到右栏, 和价位梯队放在一起(位置类归位置栏)。 */}
-      <div className="flex flex-col gap-5">
+          三档位置搬到右栏, 和价位梯队放在一起(位置类归位置栏)。
+          [R681] 用户: 「左里面恢复以前的布局, 但样式保持现在」——
+          回到 R680 之前的一列五段(趋势状态 / 跌破 / 站上 / 通道阶段 / 三档位置),
+          无标题、无卡框的样式照旧; 右栏只留价位阶梯。 */}
+      <div className="grid grid-cols-1 items-start gap-y-5">
         <TrendCell symbol={symbol} />
         <ChannelCell d={d} />
+        <BandsCell d={d} />
       </div>
     </section>
   )
@@ -76,7 +80,7 @@ function TrendCell({ symbol }: { symbol: string }) {
   }
   const bull = t.side === '多头'
   return (
-    <div className="min-w-0">
+    <>
       <Cell label={<>趋势状态 · 六态{t.intraday && <span className="ml-1.5 text-warning" title="实时价参与了六态判定, 收盘价可能改变结论 —— 定稿以收盘为准">盘中口径</span>}</>}>
         <div className="flex items-baseline gap-2">
           {/* [R551] 悬停: 操作建议 + 两条翻转价背后的参考数 —— 原来印在图上方六态条里, 那条已撤 */}
@@ -93,7 +97,8 @@ function TrendCell({ symbol }: { symbol: string }) {
             放到上里面的自选于的前面」。这一格只留六态本身。
             [R680] 再按用户「还是放到中里面的『异动 颜色 自选』的自选的后面」搬进中栏工具栏。 */}
       </Cell>
-      <div className="mt-3 grid grid-cols-2 gap-4">
+      {/* [R681] 回到以前各占一行(不再并排两列) */}
+      <div className="mt-3 flex flex-wrap gap-x-8 gap-y-5">
         {t.flip_down != null && (
           <FlipCell label="跌破转弱" price={t.flip_down} dist={t.flip_down_distance_pct} tone="bear" />
         )}
@@ -101,7 +106,7 @@ function TrendCell({ symbol }: { symbol: string }) {
           <FlipCell label="站上转强" price={t.flip_up} dist={t.flip_up_distance_pct} tone="bull" />
         )}
       </div>
-    </div>
+    </>
   )
 }
 
@@ -134,10 +139,10 @@ function ChannelCell({ d }: { d?: StockReview }) {
   )
 }
 
-// ── 三档位置([R680] 搬到右栏, 与价位梯队放一起) ──
+// ── 三档位置 ──
 const SLOT: Record<string, 0 | 1 | 2> = { above: 0, near_upper: 0, inside: 1, near_lower: 2, below: 2 }
 
-export function BandsCell({ d }: { d?: StockReview }) {
+function BandsCell({ d }: { d?: StockReview }) {
   const bands = d?.rows[0]?.bands
   if (!bands) return null
   return (
