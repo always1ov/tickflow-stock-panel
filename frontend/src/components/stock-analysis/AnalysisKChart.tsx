@@ -554,9 +554,32 @@ export function nextBusinessDates(last: string, count: number): string[] {
   return out
 }
 
+/**
+ * [R670] 右栏有没有东西可列 —— 与 `LevelOverview` 同一套过滤(开启的类型 / 排除项 / 枢轴档位)。
+ * 弹窗用它决定第三栏要不要占位: 只剩通道三档时(它们已由左栏格子回答), 这一栏就是空的。
+ */
+export function hasOverviewLevels(
+  levels: Record<LevelType, PriceLevel[]> | undefined,
+  activeTypes: Set<LevelType>,
+  pivotRank: 1 | 2 | 3,
+  excludeTypes?: LevelType[],
+): boolean {
+  if (!levels) return false
+  for (const group of LEVEL_GROUPS) {
+    if (!activeTypes.has(group.key)) continue
+    if (excludeTypes?.includes(group.key)) continue
+    for (const point of levels[group.key] ?? []) {
+      if (point.type === 'pivot' && point.rank !== undefined && point.rank > pivotRank) continue
+      return true
+    }
+  }
+  return false
+}
+
 // ===== 价位统计面板(默认在图表下方, 结构化文本展示; [R615] 弹窗里挪到左栏) =====
 export function LevelOverview({
   levels, activeTypes, pivotRank, close, hoveredKey, onHover, stacked = false,
+  hideClose = false, excludeTypes,
 }: {
   levels: Record<LevelType, PriceLevel[]>
   activeTypes: Set<LevelType>
@@ -566,6 +589,10 @@ export function LevelOverview({
   onHover: (key: string | null) => void
   /** [R615] 塞进 300~340px 的窄栏时一列到底 —— `sm:grid-cols-2` 按视口断点, 窄栏里会挤成两列 */
   stacked?: boolean
+  /** [R670] 个股弹窗: 现价由头部唯一提供, 这里只算相对百分比, 不再印第二遍 */
+  hideClose?: boolean
+  /** [R670] 个股弹窗: 通道三档由左栏「三档位置」格子回答, 右栏不再列同一组曲线的上下轨 */
+  excludeTypes?: LevelType[]
 }) {
   const theme = useTheme()
   const ct = useChartTheme()
@@ -574,6 +601,7 @@ export function LevelOverview({
   const visible: PriceLevel[] = []
   for (const group of LEVEL_GROUPS) {
     if (!activeTypes.has(group.key)) continue
+    if (excludeTypes?.includes(group.key)) continue
     for (const point of levels[group.key] ?? []) {
       if (point.type === 'pivot' && point.rank !== undefined && point.rank > pivotRank) continue
       visible.push(point)
@@ -622,11 +650,13 @@ export function LevelOverview({
 
   return (
     <div className={`mt-3 grid grid-cols-1 gap-x-6 gap-y-1 rounded-card border border-border/40 bg-base/20 px-3 py-2 ${stacked ? '' : 'sm:grid-cols-2'}`}>
-      {/* 当前价 */}
-      <div className={`flex items-center gap-2 pb-1 border-b border-border/30 mb-0.5 ${stacked ? '' : 'sm:col-span-2'}`}>
-        <span className="text-micro text-muted">当前价</span>
-        <span className="text-xs font-mono font-medium text-foreground">{cur.toFixed(2)}</span>
-      </div>
+      {/* 当前价 —— [R670] 弹窗里头部已印, 这里只留压力/支撑 */}
+      {!hideClose && (
+        <div className={`flex items-center gap-2 pb-1 border-b border-border/30 mb-0.5 ${stacked ? '' : 'sm:col-span-2'}`}>
+          <span className="text-micro text-muted">当前价</span>
+          <span className="text-xs font-mono font-medium text-foreground">{cur.toFixed(2)}</span>
+        </div>
+      )}
       {/* 压力位(从近到远,即从低到高)倒序展示:最高的在最上 */}
       {resistances.length > 0 && (
         <div>

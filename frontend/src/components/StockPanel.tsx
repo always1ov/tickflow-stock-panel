@@ -26,6 +26,8 @@ interface Props {
   renderer?: ChartRenderer
   /** 详情顶栏已有名称时可隐藏报价条的重复身份；独立面板默认保留。 */
   showQuoteIdentity?: boolean
+  /** [R670] 个股弹窗头部已展示报价与自选/监控 —— 信息条只留指标行, 报价行不再重复 */
+  compactQuote?: boolean
   height?: number
   /**
    * [R650] 整块面板(报价条 + 图)最多能占多高 —— 弹窗右栏是滚动容器, 传进来后
@@ -92,6 +94,7 @@ export function StockPanel({
   onAssetType,
   renderer = 'echarts',
   showQuoteIdentity = true,
+  compactQuote = false,
   height = 520,
   showIntraday = true,
   className,
@@ -265,6 +268,7 @@ export function StockPanel({
         assetType={kline.data?.asset_type}
         symbol={symbol}
         showIdentity={showQuoteIdentity}
+        compactQuote={compactQuote}
         name={name}
         stockInfo={stockInfo}
         rows={rawRows}

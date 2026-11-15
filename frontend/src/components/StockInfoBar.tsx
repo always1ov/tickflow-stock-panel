@@ -35,6 +35,11 @@ interface Props {
   watchlistPending?: boolean
   /** 加入自选日 (北京时间 YYYY-MM-DD); 有值时在自定义信息条按钮左侧显示「自选于」标注 */
   addedDate?: string | null
+  /**
+   * [R670] 报价行瘦身: 弹窗头部已单独展示代码/名称/现价/涨跌/自选/监控 ——
+   * 信息条只留指标行与右侧「外链 / 自选于 / 信息条配置」, 不再把同一份报价印第二遍。
+   */
+  compactQuote?: boolean
 }
 
 /**
@@ -120,6 +125,7 @@ export function StockInfoBar({
   onRemoveFromWatchlist,
   watchlistPending,
   addedDate,
+  compactQuote = false,
 }: Props) {
   // 弹窗开关：纯本地状态，与数据/配置无关，放早期 return 之前
   const [customizerOpen, setCustomizerOpen] = useState(false)
@@ -149,9 +155,9 @@ export function StockInfoBar({
       <div className="px-2 pb-3 font-mono text-xs select-none space-y-1">
         {/* 首行 min-h-7 对齐完整态的 text-lg 价格行高, 加载中不整体变矮 */}
         <div className={`flex items-baseline gap-x-3 flex-wrap ${showIdentity ? 'min-h-7' : 'min-h-8'}`}>
-          {showIdentity && <span className="text-foreground font-bold text-sm tracking-wide">{symbol}</span>}
-          {showIdentity && name && <span className="text-secondary font-medium">{name}</span>}
-          <QuoteFreshnessBadge freshness={freshness} />
+          {!compactQuote && showIdentity && <span className="text-foreground font-bold text-sm tracking-wide">{symbol}</span>}
+          {!compactQuote && showIdentity && name && <span className="text-secondary font-medium">{name}</span>}
+          {!compactQuote && <QuoteFreshnessBadge freshness={freshness} />}
           <span className="ml-auto self-center text-muted">
             <span className="inline-block h-2.5 w-2.5 animate-spin rounded-full border-[1.5px] border-current border-t-transparent" />
           </span>
@@ -253,20 +259,25 @@ export function StockInfoBar({
 
   return (
     <div className="px-2 pb-3 font-mono text-xs select-none space-y-1">
-      {/* Row 1: code, name, price, change, change% */}
+      {/* Row 1: 报价行。[R670] `compactQuote`(个股弹窗)只留右侧操作 —— 代码/名称/现价/涨跌
+          与头部那行逐字重复, 自选/监控也已在头部; 信息条从此只负责指标行。 */}
       <div className="flex items-baseline gap-x-3 flex-wrap">
-        {showIdentity && <span className="text-foreground font-bold text-sm tracking-wide">{symbol}</span>}
-        {showIdentity && <span className="text-secondary font-medium">{displayName}</span>}
-        <span style={{ color: clr }} className={`${showIdentity ? 'text-lg' : 'text-2xl tracking-tight'} font-bold tabular-nums`}>
-          {fmtAssetPrice(close, assetType)}
-        </span>
-        <span style={{ color: clr }} className="tabular-nums">
-          {isUp ? '+' : ''}{fmtAssetPrice(chg, assetType)}
-        </span>
-        <span style={{ color: clr }} className="tabular-nums">
-          {isUp ? '+' : ''}{fmtPrice(chgPct)}%
-        </span>
-        <QuoteFreshnessBadge freshness={freshness} />
+        {!compactQuote && (
+          <>
+            {showIdentity && <span className="text-foreground font-bold text-sm tracking-wide">{symbol}</span>}
+            {showIdentity && <span className="text-secondary font-medium">{displayName}</span>}
+            <span style={{ color: clr }} className={`${showIdentity ? 'text-lg' : 'text-2xl tracking-tight'} font-bold tabular-nums`}>
+              {fmtAssetPrice(close, assetType)}
+            </span>
+            <span style={{ color: clr }} className="tabular-nums">
+              {isUp ? '+' : ''}{fmtAssetPrice(chg, assetType)}
+            </span>
+            <span style={{ color: clr }} className="tabular-nums">
+              {isUp ? '+' : ''}{fmtPrice(chgPct)}%
+            </span>
+            <QuoteFreshnessBadge freshness={freshness} />
+          </>
+        )}
         {/* 右侧操作按钮：外链 + 加自选 + 加监控 + 信息条配置 */}
         <div className="ml-auto self-center flex items-center gap-1">
           {extUrl && (
@@ -280,35 +291,39 @@ export function StockInfoBar({
               <ExternalLink className="h-3.5 w-3.5" />
             </a>
           )}
-          {inWatchlist && onRemoveFromWatchlist ? (
-            <button
-              type="button"
-              onClick={onRemoveFromWatchlist}
-              disabled={watchlistPending}
-              className="rounded-btn p-1 text-[#FACC15] transition-colors cursor-pointer hover:bg-elevated disabled:opacity-50"
-              title="移出自选"
-              aria-label={`将 ${symbol} 移出自选`}
-            >
-              <Star className="h-3.5 w-3.5" />
-            </button>
-          ) : !inWatchlist && onAddToWatchlist ? (
-            <WatchlistAddMenu
-              onSelect={onAddToWatchlist}
-              disabled={watchlistPending}
-              triggerClassName="rounded-btn p-1 text-muted transition-colors cursor-pointer hover:bg-elevated hover:text-foreground disabled:opacity-50"
-              ariaLabel={`将 ${symbol} 加入自选`}
-            >
-              <Star className="h-3.5 w-3.5" />
-            </WatchlistAddMenu>
-          ) : null}
-          {onMonitor && (
-            <button
-              onClick={onMonitor}
-              className="p-1 rounded-btn text-warning hover:bg-warning/10 transition-colors cursor-pointer"
-              title="加监控"
-            >
-              <RadioTower className="h-3.5 w-3.5" />
-            </button>
+          {!compactQuote && (
+            <>
+              {inWatchlist && onRemoveFromWatchlist ? (
+                <button
+                  type="button"
+                  onClick={onRemoveFromWatchlist}
+                  disabled={watchlistPending}
+                  className="rounded-btn p-1 text-[#FACC15] transition-colors cursor-pointer hover:bg-elevated disabled:opacity-50"
+                  title="移出自选"
+                  aria-label={`将 ${symbol} 移出自选`}
+                >
+                  <Star className="h-3.5 w-3.5" />
+                </button>
+              ) : !inWatchlist && onAddToWatchlist ? (
+                <WatchlistAddMenu
+                  onSelect={onAddToWatchlist}
+                  disabled={watchlistPending}
+                  triggerClassName="rounded-btn p-1 text-muted transition-colors cursor-pointer hover:bg-elevated hover:text-foreground disabled:opacity-50"
+                  ariaLabel={`将 ${symbol} 加入自选`}
+                >
+                  <Star className="h-3.5 w-3.5" />
+                </WatchlistAddMenu>
+              ) : null}
+              {onMonitor && (
+                <button
+                  onClick={onMonitor}
+                  className="p-1 rounded-btn text-warning hover:bg-warning/10 transition-colors cursor-pointer"
+                  title="加监控"
+                >
+                  <RadioTower className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </>
           )}
           {/* 加入自选日标注 (常显): 弹窗不知道区间内哪天是交易日, 常显既避免错误的
               区间判断, 也覆盖「区间外」与「周末加入」两种情况 */}
