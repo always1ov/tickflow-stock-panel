@@ -98,6 +98,20 @@ it('keeps all day separators but skips overlapping date labels', () => {
   expect(ctx.fillText).toHaveBeenCalledTimes(2)
 })
 
+it('[R726] fills the fib2 future slots and keeps a top "未来" label next to a bottom one', () => {
+  const { ctx, painted, draw } = setup({
+    dates,
+    futureZone: { start: dates[1], count: 3, fill: 'rgba(255,255,255,0.10)' },
+    verticals: [
+      { time: dates[1], label: '自选', color: '#3B82F6', labelPosition: 'bottom' },
+      { time: dates[1], label: '未来', color: '#E4E4E7' },
+    ],
+  })
+  draw()
+  expect(ctx.fillRect).toHaveBeenCalledExactlyOnceWith(10, 0, 60, 200)
+  expect(painted.map(item => item.text)).toEqual(expect.arrayContaining(['自选', '未来']))
+})
+
 it('pins the previous-close number to its dashed line on the outer price axis and follows scale changes', () => {
   const { annotation, ctx, draw, priceToCoordinate } = setup({ dates, priceLines: [
     { value: 10, color: '#A1A1AA', axisLabel: true }, { value: 12, label: '价格提醒' },

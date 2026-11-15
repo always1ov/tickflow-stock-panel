@@ -101,10 +101,21 @@ export function levelFib2Overlay(input: {
   return result
 }
 
-/** 把「未来」那三个位移均线值接到曲线上（其余曲线原样返回）。 */
+/** 把「未来」那三个位移均线值接到曲线上（历史曲线原样保留，未来段单画一条加粗线）。 */
 export function withFib2Future(curves: PlotSeries[], future: LevelFib2Overlay['future']): PlotSeries[] {
   if (!future) return curves
-  return curves.map(item => item.id === 'curve:fib2_dma3'
-    ? { ...item, data: [...item.data, ...future.values.map((value, index) => ({ time: future.dates[index], value }))] }
-    : item)
+  const source = curves.find(item => item.id === 'curve:fib2_dma3')
+  if (!source) return curves
+  const points = source.data as { time: string; value?: number }[]
+  const last = [...points].reverse().find(point => point.value != null)
+  // [R726] 未来段和 R565 前一致: 2.2px 加粗、实色 —— 不再和历史段共用 1px + CC 透明度。
+  const color = source.color && source.color.length === 9 ? source.color.slice(0, 7) : source.color
+  return [...curves, {
+    id: 'curve:fib2_dma3_future', type: 'Line', pane: source.pane, color, lineWidth: 2,
+    precision: source.precision,
+    data: [
+      ...(last?.value != null ? [{ time: last.time, value: last.value }] : []),
+      ...future.values.map((value, index) => ({ time: future.dates[index], value })),
+    ],
+  }]
 }

@@ -12,6 +12,7 @@ import {
 } from '@/lib/analysisPanes'
 import type { Fib2Grain, Fib2Overlay, KlineRow, LevelSeries, QuantMacdResult } from '@/lib/api'
 import type { PlotSeries } from '@/lib/lightweight-model'
+import { FUTURE_ZONE } from '@/lib/futureZone'
 import { fib2Status } from '@/lib/fib2Status'
 import { Fib2GrainDialog } from './Fib2GrainDialog'
 import {
@@ -226,27 +227,30 @@ export function AnalysisKChart({
     const main: PlotSeries[] = model.series
       .filter(item => item.id !== 'volume')
       .map(item => {
-        if (!future) return item
-        if (item.id === 'price') {
-          return { ...item, data: [...item.data, ...future.dates.map(time => ({ time }))] }
-        }
-        if (item.id === 'curve:fib2_dma3') {
-          return {
-            ...item,
-            data: [
-              ...item.data,
-              ...future.values.map((value, index) => ({ time: future.dates[index], value })),
-            ],
-          }
-        }
-        return item
+        if (!future || item.id !== 'price') return item
+        return { ...item, data: [...item.data, ...future.dates.map(time => ({ time }))] }
       })
+    // [R726] 未来段位移均线单画一条加粗实线, 与 R565 前一致; 历史段保持 1px + CC 透明度。
+    if (future) {
+      const dma = model.series.find(item => item.id === 'curve:fib2_dma3')
+      const points = (dma?.data ?? []) as { time: string; value?: number }[]
+      const last = [...points].reverse().find(point => point.value != null)
+      if (last?.value != null) {
+        main.push({
+          id: 'curve:fib2_dma3_future', type: 'Line', pane: 0, color: LC.fib2, lineWidth: 2, precision: 2,
+          data: [
+            { time: last.time, value: last.value },
+            ...future.values.map((value, index) => ({ time: future.dates[index], value })),
+          ],
+        })
+      }
+    }
     const quant = quantPaneSeries(model.dates, quantMacd, quantMacdError)
     return {
       chartSeries: [...main, ...quant.series],
       paneDecor: [undefined, quant.decor] as (PaneDecorData | undefined)[],
     }
-  }, [model, future, quantMacd, quantMacdError])
+  }, [model, future, quantMacd, quantMacdError, LC.fib2])
 
   const annotations = useMemo<AnnotationData>(() => {
     const dates = future ? [...model.dates, ...future.labels] : model.dates
@@ -324,6 +328,8 @@ export function AnalysisKChart({
       ...(extraRanges.length ? { ranges: extraRanges } : {}),
       ...(labels.length ? { labels } : {}),
       ...(verticals.length ? { verticals } : {}),
+      // [R726] 二型的未来三格灰底(旧图 R420 的画法); 交界虚线与「未来」字仍走 verticals。
+      ...(future ? { futureZone: { start: future.dates[0], count: future.dates.length, fill: FUTURE_ZONE[theme].fill } } : {}),
     }
   }, [model, future, activeTypes, fib2, fib2Zone, LC.fib2, ct.text, theme])
 

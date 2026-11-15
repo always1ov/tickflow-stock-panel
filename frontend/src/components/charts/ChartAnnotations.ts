@@ -22,6 +22,8 @@ export interface AnnotationData {
   precision?: number
   // [R718] labelPosition: 'bottom' 把竖线文字画到 pane 底边(「自选」这类标记用), 默认仍在顶上。
   verticals?: { time: Time; label?: string; color?: string; labelPosition?: 'top' | 'bottom' }[]
+  /** [R726] 斐波那契Ⅱ型的「未来」区: 从 start 起按 K 线格铺 count 格底色(交界线与「未来」字仍走 verticals)。 */
+  futureZone?: { start: Time; count: number; fill: string }
   labels?: { time: Time; value: number; text: string; color?: string }[]
   textColor?: string
   title?: string
@@ -132,6 +134,20 @@ export class ChartAnnotations implements ISeriesPrimitive<Time> {
         }
         if (row.length) flush()
       }
+      // [R726] 未来区底色: 逐格算在 K 线间距上, 缩放时跟着格子走(旧图 R420 的画法)。
+      const zone = this.data.futureZone
+      if (zone && zone.count > 0) {
+        const x = ts.timeToCoordinate(zone.start)
+        if (x != null) {
+          const step = ts.options().barSpacing
+          const left = Math.max(0, x - step / 2)
+          const right = Math.min(width, x - step / 2 + step * zone.count)
+          if (right > left) {
+            ctx.fillStyle = zone.fill
+            ctx.fillRect(left, 0, right - left, height)
+          }
+        }
+      }
       for (const range of this.data.ranges ?? []) {
         if (!this.data.dates.length || range.start > this.data.dates.at(-1)! || range.end < this.data.dates[0]) continue
         const x1 = coordinate(range.start), x2 = coordinate(range.end, true)
@@ -167,7 +183,9 @@ export class ChartAnnotations implements ISeriesPrimitive<Time> {
         ctx.fillStyle = item.color
         ctx.fillText(item.text, Math.max(5, Math.min(item.end - ctx.measureText(item.text).width - 5, width - 10)), item.y)
       }
-      let verticalLabelRight = -Infinity
+      // [R726] 顶部与底部的竖线标签各自避让: 「自选」在底部不该把顶部的「未来」挤掉。
+      let verticalLabelRightTop = -Infinity
+      let verticalLabelRightBottom = -Infinity
       for (const line of this.data.verticals ?? []) {
         const x = ts.timeToCoordinate(line.time)
         if (x == null || x < 0 || x > width) continue
@@ -178,10 +196,13 @@ export class ChartAnnotations implements ISeriesPrimitive<Time> {
           // [R721] 用户: 「自选字眼恢复原来的左侧」—— 撤销 R720 的「优先右侧」: 自选日就是
           // 最后一根, 虚线贴右缘, 放右边反而挤; 仍按原来的夹取规则, 贴不下就落在线的左侧。
           const left = Math.max(5, Math.min(x + 5, width - textWidth - 5))
-          if (left >= verticalLabelRight + 6) {
+          const bottom = line.labelPosition === 'bottom'
+          const labelRight = bottom ? verticalLabelRightBottom : verticalLabelRightTop
+          if (left >= labelRight + 6) {
             ctx.fillStyle = ctx.strokeStyle
-            ctx.fillText(line.label, left, line.labelPosition === 'bottom' ? height - 5 : 15)
-            verticalLabelRight = left + textWidth
+            ctx.fillText(line.label, left, bottom ? height - 5 : 15)
+            if (bottom) verticalLabelRightBottom = left + textWidth
+            else verticalLabelRightTop = left + textWidth
           }
         }
       }

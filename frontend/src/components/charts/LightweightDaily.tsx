@@ -9,6 +9,7 @@ import {
   quantPaneReadouts, quantPaneSeries, quantPaneTitle,
 } from '@/lib/analysisPanes'
 import { LEVEL_PALETTE, useChartTheme, useTheme, type Theme } from '@/lib/theme'
+import { FUTURE_ZONE } from '@/lib/futureZone'
 import { FinancialPlot } from './FinancialPlot'
 import type { AnnotationData } from './ChartAnnotations'
 import type { PaneDecorData, DecorItem } from './SubPaneDecor'
@@ -105,7 +106,8 @@ export function LightweightDaily({ data, assetType, symbol = '', height = 480, a
         : []
     }),
   }), [rows, atrBand, theme])
-  const scope = `${symbol}:${rows[0]?.date ?? ''}:${ranges?.map(range => `${range.start}:${range.end}`).join(';') ?? ''}`
+  // [R726] 未来格数也算进取景键: 开关二型时时间轴多三格, 要按新长度重新取景。
+  const scope = `${symbol}:${rows[0]?.date ?? ''}:${ranges?.map(range => `${range.start}:${range.end}`).join(';') ?? ''}:${levelFuture?.dates.length ?? 0}`
   const [hover, setHover] = useState<{ scope: string; time: string } | null>(null)
   const index = hover?.scope === scope ? rows.findIndex(d => d.date === hover.time) : -1
   const i = index >= 0 ? index : rows.length - 1
@@ -208,6 +210,10 @@ export function LightweightDaily({ data, assetType, symbol = '', height = 480, a
     [plottedModel, analysis.series, levelSeries])
 
   const plotHeight = Math.max(260, height - (showInfoBar ? CHART_LAYOUT.readout : 0))
+  // [R726] 用户选「120日」时, 未来三格不该吃掉真实的 K 线: 视窗按「选中的根数 + 未来格数」取景。
+  const pickedBars = typeof visibleBars === 'number'
+    ? visibleBars + (levelFuture?.dates.length ?? 0)
+    : visibleBars
   const paneHeights = useMemo(() => {
     const reserved = analysisPanes.reduce((sum, pane) => sum + pane.height, 0)
     return [
@@ -239,8 +245,10 @@ export function LightweightDaily({ data, assetType, symbol = '', height = 480, a
       priceLines: [...(priceLines ?? []), ...levelLines],
       labels: levelLabels,
       verticals: [...verticals, ...levelVerticals],
+      // [R726] 二型的未来三格底面(旧图 R420 的灰底); 交界虚线与「未来」字仍走 levelVerticals。
+      ...(levelFuture ? { futureZone: { start: levelFuture.dates[0], count: levelFuture.dates.length, fill: FUTURE_ZONE[theme].fill } } : {}),
     }
-  }, [rows, ranges, priceLines, addedDate, levelLines, levelRanges, levelLabels, levelVerticals, levelFuture])
+  }, [rows, ranges, priceLines, addedDate, levelLines, levelRanges, levelLabels, levelVerticals, levelFuture, theme])
   const volumeLabels = useMemo(() => volumeCompare.enabled ? rows.flatMap((row, idx) => {
     const ratio = volumeRatioAt(rows, idx, volumeCompare.days)
     return ratio == null ? [] : [{ time: row.date, value: row.volume ?? 0, text: `${ratio.toFixed(1)}x` }]
@@ -314,7 +322,7 @@ export function LightweightDaily({ data, assetType, symbol = '', height = 480, a
       paneDecor={[undefined, ...selected.map(key => key === 'inst' ? instDecor : key === 'vol' ? atrDecor : undefined), ...analysis.decor]}
       hidePaneAxis={analysis.hidden.length ? analysis.hidden : undefined}
       markers={chartMarkers} annotations={annotations} volumeLabels={volumeLabels} paneTitles={paneTitles} paneReadouts={paneReadouts}
-      linkedPrice={linkedPrice} visibleBars={visibleBars} currentPrice={rows.at(-1)?.close}
+      linkedPrice={linkedPrice} visibleBars={pickedBars} currentPrice={rows.at(-1)?.close}
       onCrosshairMove={onCrosshairMove}
       onHover={time => setHover(time ? { scope, time } : null)} onSelect={onDateClick} onPriceDoubleClick={onPriceDoubleClick} />
   </div>
