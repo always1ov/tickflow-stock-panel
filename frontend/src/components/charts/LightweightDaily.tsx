@@ -26,10 +26,10 @@ const LINE_COLORS = {
 } as const
 const maFields = [['ma5', 'gray'], ['ma10', 'blue'], ['ma20', 'orange'], ['ma60', 'plum']] as const
 // [R704] 用户: 「默认开启所有MA价格显示变成只默认开启显示MA20和26日布林轨道的价格」——
-// 换手下一行固定写这三条读数(MA20 + 布林上下轨), 与工具栏开关无关; 布林中轨就是
-// MA20 附近那个数, 不重复写。[R705] 用户: 「换手下一行的『26日布林』都删掉『26日』」——
-// 这一处读数只写「布林上轨 / 布林下轨」; 图上标签(R701 起不显示)与价位开关的按钮文案不动。
-const READOUT_MA = [['ma20', 'orange']] as const
+// 换手下一行是固定读数, 与工具栏开关无关; 布林中轨就是 MA20 附近那个数, 不重复写。
+// [R705] 用户: 「换手下一行的『26日布林』都删掉『26日』」—— 这一处读数只写「布林上轨 / 布林下轨」。
+// [R713] 用户: 「MA们都放到布林轨前面」—— 四条均线全写出来, 排在上/下轨之前, 顺序 MA5 → MA60。
+const READOUT_MA = maFields
 const READOUT_BOLL = [['boll_upper', '布林上轨'], ['boll_lower', '布林下轨']] as const
 
 const price = (v: number | null | undefined, digits = 2) => v != null && Number.isFinite(v)
@@ -243,7 +243,7 @@ export function LightweightDaily({ data, assetType, symbol = '', height = 480, a
       <div className="mt-0.5 flex min-h-4 flex-wrap gap-x-4 gap-y-1 text-micro">
         {/* [R702] 用户: 「不能删除换手下面那一行原来显示的标签……原来日K里面怎么显示就怎么显示」——
             均线读数恢复成原来的「MA5 43.70」格式, 保留在换手下面这一行
-            [R703] 不管有没有开 MA 开关都显示; [R704] 只留 MA20 + 26日布林上下轨。 */}
+            [R703] 不管有没有开 MA 开关都显示; [R704] 固定四条均线 + 布林上下轨; [R713] 均线全体排在布林轨前面。 */}
         {READOUT_MA.map(([field, token]) => <span key={field} style={{ color: color(token) }}>{field.toUpperCase()} {price(current?.[field], precision)}</span>)}
         {READOUT_BOLL.map(([field, label]) => <span key={field} style={{ color: LEVEL_PALETTE.boll[theme] }}>{label} {price(current?.[field], precision)}</span>)}
         {index >= 0 && previous && <span className="text-secondary">至今 <span style={{ color: rows.at(-1)!.close >= previous.close ? C.up : C.down }}>{fmtPct(rows.at(-1)!.close / previous.close - 1)}</span> · 周期 {rows.length - index}</span>}
