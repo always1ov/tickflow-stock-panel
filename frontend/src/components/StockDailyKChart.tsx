@@ -43,15 +43,18 @@ const LightweightDaily = lazy(() => import('./charts/LightweightDaily').then(m =
 
 const SUB_INFO_H = 16
 const SUB_GAP = 4
-/** [R652] 主图上那四条默认均线 —— 工具栏逐个开关, 顺序与画线顺序一致 */
-const MA_KEYS = ['ma5', 'ma10', 'ma20', 'ma60'] as const
 /**
- * [R689] 胶囊色点，只给主图那四条均线用（[R690] 用户：「只有主图指标才会有『颜色+文字』」）。
+ * [R652] 主图上那几条默认均线 —— 工具栏逐个开关, 顺序与画线顺序一致。
+ * [R720] 用户: 「MA5和MA10删掉」—— 短周期两条从工具栏撤掉, 只留 MA20 / MA60;
+ * 状态里默认开的那条本来就是 MA20, 不受影响。图上仍能画 MA5/MA10 的能力留在
+ * `LightweightDaily`(`maKeys` 传了才画), 只是本组件不再提供入口。
+ */
+const MA_KEYS = ['ma20', 'ma60'] as const
+/**
+ * [R689] 胶囊色点，只给主图均线用（[R690] 用户：「只有主图指标才会有『颜色+文字』」）。
  * 四色与 `LightweightDaily` 画线取同一份(`DAILY_LINE_COLORS`), 点即图上那条线。
  */
 const MA_DOTS: Record<typeof MA_KEYS[number], { dark: string; light: string }> = {
-  ma5: DAILY_LINE_COLORS.gray,
-  ma10: DAILY_LINE_COLORS.blue,
   ma20: DAILY_LINE_COLORS.orange,
   ma60: DAILY_LINE_COLORS.plum,
 }

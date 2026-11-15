@@ -175,7 +175,13 @@ export class ChartAnnotations implements ISeriesPrimitive<Time> {
         ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, height); ctx.stroke(); ctx.setLineDash([])
         if (line.label) {
           const textWidth = ctx.measureText(line.label).width
-          const left = Math.max(5, Math.min(x + 5, width - textWidth - 5))
+          // [R720] 用户: 「自选字眼显示在虚线右侧」—— 原来一律先试 x+5, 只有贴着右缘
+          // (自选日=最后一根)时被夹回线的左侧, 读起来像压着虚线。现在显式优先右侧:
+          // 右侧放得下就贴在线的右边; 真放不下才退回线左, 保证文字不被画布裁掉。
+          const right = x + 5
+          const left = right + textWidth <= width - 2
+            ? right
+            : Math.max(5, Math.min(right, width - textWidth - 5))
           if (left >= verticalLabelRight + 6) {
             ctx.fillStyle = ctx.strokeStyle
             ctx.fillText(line.label, left, line.labelPosition === 'bottom' ? height - 5 : 15)

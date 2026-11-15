@@ -136,7 +136,7 @@ it('[R649] 趋势量化 / 量化MACD 两张副图默认不画, 点开后才追�
   expect([...host.querySelectorAll('button')].some(button => button.textContent === '趋势量化')).toBe(false)
 })
 
-it('[R655] 四条主图均线默认只开 MA20, 每条都能单独关掉再打开', async () => {
+it('[R655] 主图均线默认只开 MA20, 留下的每条都能单独关掉再打开', async () => {
   await render()
   expect(props().maKeys).toEqual(['ma20'])
   const pill = (label: string) => [...host.querySelectorAll('button')].find(button => button.textContent === label)!
@@ -144,12 +144,14 @@ it('[R655] 四条主图均线默认只开 MA20, 每条都能单独关掉再打�
   expect(props().maKeys).toEqual([])
   await act(async () => pill('MA20').click())
   expect(props().maKeys).toEqual(['ma20'])
-  await act(async () => pill('MA5').click())
-  expect([...props().maKeys].sort()).toEqual(['ma20', 'ma5'])
-  // ECharts 画不了单条均线: 不给这四个开关, 仍按 showMA 整组
+  // [R720] 用户: 「MA5和MA10删掉」—— 这两颗不再出现, 换成 MA60 验证逐条开关
+  expect([...host.querySelectorAll('button')].some(button => button.textContent === 'MA5' || button.textContent === 'MA10')).toBe(false)
+  await act(async () => pill('MA60').click())
+  expect([...props().maKeys].sort()).toEqual(['ma20', 'ma60'])
+  // ECharts 画不了单条均线: 不给这两个开关, 仍按 showMA 整组
   await render({ renderer: 'echarts' })
   expect(props().maKeys).toBeUndefined()
-  expect([...host.querySelectorAll('button')].some(button => button.textContent === 'MA5')).toBe(false)
+  expect([...host.querySelectorAll('button')].some(button => button.textContent === 'MA60')).toBe(false)
 })
 
 it('[R657] 日K 里指标开关键与价位开关键同一尺寸(跟原来那颗指标胶囊一样)', async () => {
@@ -196,9 +198,10 @@ it('[R660] 价位开关状态可用外部那一份(与关键价位共用), 回�
   expect(host.querySelector('[data-testid="level-toolbar"]')).toBeNull()
   expect(host.textContent).not.toContain('压力支撑')
   expect(host.textContent).not.toContain('26日布林')
-  // [R715] 四条均线胶囊与价位开关解耦: 整排价位关掉, MA5~MA60 仍在(回测弹窗照旧能切均线)
+  // [R715] 均线胶囊与价位开关解耦: 整排价位关掉, 均线仍在(回测弹窗照旧能切均线)
+  // [R720] 用户: 「MA5和MA10删掉」—— 工具栏只剩 MA20 / MA60 两颗
   expect([...host.querySelectorAll('button')].map(button => button.textContent).filter(text => /^MA\d+$/.test(text ?? '')))
-    .toEqual(['MA5', 'MA10', 'MA20', 'MA60'])
+    .toEqual(['MA20', 'MA60'])
 })
 
 it('[R651] 空间不够只压两张分析副图, 主图与指标副图的高度不动', async () => {
