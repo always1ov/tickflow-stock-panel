@@ -32,7 +32,7 @@ import type { StockReview } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import { BAND_CN, POS_FILL } from '@/lib/reviewTimeline'
 import { TrendSignalBadge, trendPivotTitle, useStockTrend } from '@/components/stock-analysis/TrendStateBar'
-import { pct, useStockReview } from '@/components/stock-analysis/StockReviewDialog'
+import { useStockReview } from '@/components/stock-analysis/StockReviewDialog'
 
 export function StatusSection({ symbol, days }: {
   symbol: string
@@ -50,7 +50,9 @@ export function StatusSection({ symbol, days }: {
           三档位置搬到右栏, 和价位梯队放在一起(位置类归位置栏)。
           [R681] 用户: 「左里面恢复以前的布局, 但样式保持现在」——
           回到 R680 之前的一列五段(趋势状态 / 跌破 / 站上 / 通道阶段 / 三档位置),
-          无标题、无卡框的样式照旧; 右栏只留价位阶梯。 */}
+          无标题、无卡框的样式照旧; 右栏只留价位阶梯。
+          [R682] 用户: 「跌破转弱站上转强都不要了, 剩下的趋势六态和通道阶段内容合并到右里面,
+          从此左中右布局变成左右布局」—— 两格翻转价撤掉, 本组件改挂在右栏顶部。 */}
       <div className="grid grid-cols-1 items-start gap-y-5">
         <TrendCell symbol={symbol} />
         <ChannelCell d={d} />
@@ -80,48 +82,18 @@ function TrendCell({ symbol }: { symbol: string }) {
   }
   const bull = t.side === '多头'
   return (
-    <>
-      <Cell label={<>趋势状态 · 六态{t.intraday && <span className="ml-1.5 text-warning" title="实时价参与了六态判定, 收盘价可能改变结论 —— 定稿以收盘为准">盘中口径</span>}</>}>
-        <div className="flex items-baseline gap-2">
-          {/* [R551] 悬停: 操作建议 + 两条翻转价背后的参考数 —— 原来印在图上方六态条里, 那条已撤 */}
-          <span className={cn('text-xl font-semibold', bull ? 'text-bull' : 'text-bear')}
-                title={`${t.action}\n\n${trendPivotTitle(t)}`}>{t.state_cn}</span>
-          {/* [R249] 「已 N 天」—— 与决策台徽标、六态条同一个说法 */}
-          <span className="text-sm text-secondary">已 <span className="font-mono">{t.duration}</span> 天</span>
-          <TrendSignalBadge trend={t} />
-        </div>
-        <div className="mt-0.5 text-micro text-muted">
-          自 {t.since}{t.entered_from_cn && <> 由「{t.entered_from_cn}」转入</>}
-        </div>
-        {/* [R679] 「回测调参 N%」搬去弹窗头部(自选于左边), 用户: 「左里面的回测调参按钮
-            放到上里面的自选于的前面」。这一格只留六态本身。
-            [R680] 再按用户「还是放到中里面的『异动 颜色 自选』的自选的后面」搬进中栏工具栏。 */}
-      </Cell>
-      {/* [R681] 回到以前各占一行(不再并排两列) */}
-      <div className="mt-3 flex flex-wrap gap-x-8 gap-y-5">
-        {t.flip_down != null && (
-          <FlipCell label="跌破转弱" price={t.flip_down} dist={t.flip_down_distance_pct} tone="bear" />
-        )}
-        {t.flip_up != null && (
-          <FlipCell label="站上转强" price={t.flip_up} dist={t.flip_up_distance_pct} tone="bull" />
-        )}
+    <Cell label={<>趋势状态 · 六态{t.intraday && <span className="ml-1.5 text-warning" title="实时价参与了六态判定, 收盘价可能改变结论 —— 定稿以收盘为准">盘中口径</span>}</>}>
+      <div className="flex items-baseline gap-2">
+        {/* [R551] 悬停: 操作建议 + 两条翻转价背后的参考数 —— 原来印在图上方六态条里, 那条已撤。
+            [R682] 「跌破转弱 / 站上转强」两格按用户要求撤掉, 两个翻转价还能从悬停里看到。 */}
+        <span className={cn('text-xl font-semibold', bull ? 'text-bull' : 'text-bear')}
+              title={`${t.action}\n\n${trendPivotTitle(t)}`}>{t.state_cn}</span>
+        {/* [R249] 「已 N 天」—— 与决策台徽标、六态条同一个说法 */}
+        <span className="text-sm text-secondary">已 <span className="font-mono">{t.duration}</span> 天</span>
+        <TrendSignalBadge trend={t} />
       </div>
-    </>
-  )
-}
-
-function FlipCell({ label, price, dist, tone }: {
-  label: string; price: number; dist?: number | null; tone: 'bull' | 'bear'
-}) {
-  return (
-    <Cell label={label}>
-      <div className="flex items-baseline gap-2"
-           title={tone === 'bull' ? '收盘站上这个价转强' : '收盘跌破这个价转弱'}>
-        <span className={cn('font-mono text-xl font-semibold tabular-nums', tone === 'bull' ? 'text-bull' : 'text-bear')}>
-          {price.toFixed(2)}
-        </span>
-        {/* 后端给的是带符号的距离: (线 − 现价) / 现价 */}
-        {dist != null && <span className="font-mono text-sm tabular-nums text-muted">{pct(dist)}</span>}
+      <div className="mt-0.5 text-micro text-muted">
+        自 {t.since}{t.entered_from_cn && <> 由「{t.entered_from_cn}」转入</>}
       </div>
     </Cell>
   )

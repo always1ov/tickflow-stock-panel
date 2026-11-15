@@ -432,14 +432,12 @@ export function StockPreviewDialog({ symbol, name, onClose, navList: navListSour
                 [R665] 用户: 「当前价这部分挪到右边, 最终弹窗里面是左中右布局」——
                 价位块从左边挪到第三栏, 从此是左中右三栏。
                 [R672] 用户: 「始终保持上下布局, 下布局里面始终保持左中右」——
-                上面是头部、下面是三栏, 三栏不再随数据增删(右栏常驻)。 */}
-            <div className="min-h-0 flex-1 overflow-y-auto xl:grid xl:grid-cols-[minmax(240px,290px)_minmax(0,1fr)_minmax(240px,260px)] xl:overflow-hidden">
-              {/* 左栏: 现状(只有现成读数) */}
-              <div className="border-b border-border/60 px-4 py-4 sm:px-6 xl:min-h-0 xl:overflow-y-auto xl:border-b-0 xl:border-r">
-                <StatusSection symbol={symbol} days={reviewDays} />
-              </div>
-
-              {/* 中栏: 一张图 / 复盘([R658] 只有提示文字与四个视图标签搬进头部) */}
+                上面是头部、下面是三栏, 三栏不再随数据增删(右栏常驻)。
+                [R682] 用户: 「跌破转弱站上转强都不要了, 剩下的趋势六态和通道阶段内容合并到
+                右里面, 从此左中右布局变成左右布局」—— 左栏撤掉, 现状整块并进右栏顶部,
+                图上方的宽度全给图。 */}
+            <div className="min-h-0 flex-1 overflow-y-auto xl:grid xl:grid-cols-[minmax(0,1fr)_minmax(250px,300px)] xl:overflow-hidden">
+              {/* 左(原中栏): 一张图 / 复盘([R658] 只有提示文字与四个视图标签搬进头部) */}
               <div className="flex min-h-0 min-w-0 flex-col px-4 py-4 sm:px-6">
                 {/* 分时天数不属于搬走的那句内容, 仍留在图上方 */}
                 {chartView === 'intraday' && (
@@ -517,13 +515,16 @@ export function StockPreviewDialog({ symbol, name, onClose, navList: navListSour
                 </div>
               </div>
 
-              {/* 右栏: 价位 —— [R665] 用户: 「当前价这部分挪到右边」, 从此弹窗是左「现状」/ 中图 / 右「价位」三栏。
+              {/* 右栏: 现状 + 价位 —— [R665] 用户: 「当前价这部分挪到右边」。
                   [R670] 当前价回头部唯一提供。
-                  [R672] 这一栏常驻: 用户要「时刻显示右侧价位那部分」, 通道三档也回列
-                  (左栏格子回答「在哪一格」, 这里回答「具体多少」)。
-                  [R680] 方案 A: 价位列表改成阶梯 —— 压力在上、现价居中、支撑在下, 每条带距离。
-                  [R681] 用户: 「左里面恢复以前的布局」—— 三档位置搬回左栏, 这一栏只留价位阶梯。 */}
+                  [R672] 这一栏常驻: 用户要「时刻显示右侧价位那部分」, 通道三档也回列。
+                  [R680] 价位列表改成阶梯 —— 压力在上、现价居中、支撑在下, 每条带距离。
+                  [R681] 三档位置曾搬回左栏。
+                  [R682] 权限反转: 左栏整块撤掉, 趋势六态 / 通道阶段 / 三档位置并到这一栏顶部,
+                  下面接价位阶梯 —— 三栏变两栏, 用户: 「从此左中右布局变成左右布局」。 */}
               <div className="border-t border-border/60 px-4 py-4 sm:px-6 xl:min-h-0 xl:overflow-y-auto xl:border-t-0 xl:border-l">
+                <StatusSection symbol={symbol} days={reviewDays} />
+                <div className="mt-5">
                 {!shownLevels.effLevels ? (
                   <div className="text-xs text-muted">…</div>
                 ) : levelPanelEmpty ? (
@@ -542,6 +543,7 @@ export function StockPreviewDialog({ symbol, name, onClose, navList: navListSour
                     flat
                   />
                 )}
+                </div>
               </div>
             </div>
 
