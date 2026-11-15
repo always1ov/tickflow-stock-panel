@@ -282,6 +282,8 @@ export function buildAnalysisChartModel(input: AnalysisChartInput): AnalysisChar
       id: `curve:${def.alignedKey}`, type: 'Line', pane: 0,
       color: curveLineColor(baseColor, state),
       lineWidth: state === 'hit' ? 2 : 1,
+      // [R725] 上下沿在 R565 前是虚线, 只有中轨是实线; 换库时这个画法丢了
+      ...(def.dashed ? { dashed: true } : {}),
       precision,
       data: values.map((value, index) => value == null ? { time: dates[index] } : { time: dates[index], value }),
     })

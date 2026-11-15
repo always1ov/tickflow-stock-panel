@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { createChart, CandlestickSeries, LineSeries, AreaSeries, BaselineSeries, HistogramSeries, createSeriesMarkers, ColorType, CrosshairMode,
+import { createChart, CandlestickSeries, LineSeries, AreaSeries, BaselineSeries, HistogramSeries, createSeriesMarkers, ColorType, CrosshairMode, LineStyle,
   type HandleScaleOptions, type HandleScrollOptions, type IChartApi, type ISeriesApi, type ISeriesMarkersPluginApi, type SeriesType,
   type Time, type SeriesMarker, type MouseEventParams } from 'lightweight-charts'
 import { useChartTheme } from '@/lib/theme'
@@ -285,6 +285,9 @@ export function FinancialPlot(props: Props) {
     }
     for (const spec of props.series) {
       const options = { ...(spec.color ? { color: spec.color } : {}), lineWidth: spec.lineWidth ?? 1,
+        // [R725] 曲线虚线: R565 换 lightweight 时丢了 `lineStyle`, 布林/Keltner/ATR 止损的上下沿
+        // 与中轨一样是实线, 图上看不出哪条是中轨。
+        ...(spec.dashed ? { lineStyle: LineStyle.Dashed } : {}),
         lastValueVisible: false, priceLineVisible: false,
         // [R723] 这个 `lineVisible: false` 是**线系列的「不画线」开关**, 不是刻度轴的边框开关。
         // 分时那条挂左轴的百分比线本来就是透明色, 留着无妨; ATR 五条线要真画出来,

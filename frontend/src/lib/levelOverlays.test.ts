@@ -26,10 +26,9 @@ describe('[R653] 关键价位主图指标并进日K', () => {
       textColor: '#E4E4E7',
     })
     expect(overlay.ranges).toEqual([{ start: '2026-11-02', end: '2026-11-06', label: '单边上攻 5 天', color: 'rgba(210,70,59,0.20)' }])
-    expect(overlay.priceLines.map(line => line.label)).toEqual([
-      '回踩密集带下沿 11.50', '回踩密集带上沿 11.80 · 3 条挤在一起',
-    ])
-    expect(overlay.labels).toHaveLength(1)
+    expect(overlay.priceLines.map(line => line.label)).toEqual(['', ''])
+    // [R725] 首次回踩还原成三角, 不再写「首次回踩」四个字(R701 主图不写指标文字)
+    expect(overlay.labels).toEqual([{ time: '2026-11-13', value: 13, text: '▼', color: '#8B5CF6' }])
     expect(overlay.future?.dates).toEqual(['2026-11-16', '2026-11-17', '2026-11-18'])
     expect(overlay.verticals).toEqual([{ time: '2026-11-16', label: '未来', color: '#E4E4E7' }])
     expect(withFib2Future([

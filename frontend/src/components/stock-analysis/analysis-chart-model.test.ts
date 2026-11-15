@@ -92,6 +92,10 @@ describe('buildAnalysisChartModel', () => {
     expect(model.series[0].type).toBe('Candlestick')
     expect(model.series[1]).toMatchObject({ type: 'Volume', pane: 1, priceFormat: 'volume' })
     expect(model.series[2].color).toBe('#F97316CC')
+    // [R725] 上下沿虚线、中轨实线 —— R565 前就是靠这个区分, 换 lightweight 时丢了
+    expect(model.series[2]).toMatchObject({ dashed: true })
+    expect(model.series.find(item => item.id === 'curve:boll_mid')).not.toHaveProperty('dashed')
+    expect(model.series.find(item => item.id === 'curve:atr_stop')).toMatchObject({ dashed: true })
     expect(horizontal[0]).toMatchObject({ labelPriority: 2 })
     expect(curveLabels.every(line => line.labelPriority === 1)).toBe(true)
     expect(model.hitLines.map(line => line.key)).toEqual([

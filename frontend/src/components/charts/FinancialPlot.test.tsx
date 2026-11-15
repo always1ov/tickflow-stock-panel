@@ -46,6 +46,8 @@ vi.mock('lightweight-charts', () => ({
   createChart: native.createChart, createSeriesMarkers: () => native.markers,
   CandlestickSeries: 'Candlestick', LineSeries: 'Line', AreaSeries: 'Area', BaselineSeries: 'Baseline', HistogramSeries: 'Histogram', customSeriesDefaultOptions: {},
   ColorType: { Solid: 'solid' }, CrosshairMode: { Normal: 0 },
+  // [R725] 曲线虚线
+  LineStyle: { Solid: 0, Dotted: 1, Dashed: 2 },
 }))
 vi.mock('@/lib/theme', () => ({
   useTheme: () => native.appearance.theme,
@@ -844,10 +846,16 @@ it('reports the crosshair price and pixel scale for level hit testing', async ()
 })
 
 it('reserves a right label band in pixels and applies per-series line widths', async () => {
-  await act(async () => root.render(<FinancialPlot scope="analysis" series={[{ ...model[0], lineWidth: 2 }]}
+  await act(async () => root.render(<FinancialPlot scope="analysis" series={[
+    { ...model[0], lineWidth: 2 },
+    { id: 'curve:dashed', type: 'Line', pane: 0, data: model[0].data, dashed: true },
+  ]}
     height={400} paneHeights={[300]} rightOffsetPixels={140} />))
   expect(native.createChart.mock.calls[0][1]).toMatchObject({ timeScale: { rightOffset: 0, rightOffsetPixels: 140 } })
   expect(native.chart.addSeries.mock.calls[0][1].lineWidth).toBe(2)
+  // [R725] 声明了 dashed 的曲线要真的画成虚线; 没声明的仍是实线
+  expect(native.chart.addSeries.mock.calls[1][1].lineStyle).toBe(2)
+  expect(native.chart.addSeries.mock.calls[0][1].lineStyle).toBeUndefined()
 })
 
 it('keeps the requested candle count visible while reserving the right label band', async () => {

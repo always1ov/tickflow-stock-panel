@@ -71,16 +71,17 @@ export function levelFib2Overlay(input: {
   const zone = input.fib2Zone
   if (zone && zone.high > 0) {
     const thin = Math.max(0, (input.lastClose ?? zone.high) * 0.003 - (zone.high - zone.low)) / 2
+    // [R701] 主图不再显示指标文字, 这两条线只画线、不留标签(横线本身仍是虚线, 与旧图一致)。
     result.priceLines.push({
       value: Math.max(0, zone.low - thin),
-      label: `回踩密集带下沿 ${zone.low.toFixed(2)}`,
+      label: '',
       color: input.fibColor,
       opacity: 0.9,
       labelPriority: 2,
     })
     result.priceLines.push({
       value: zone.high + thin,
-      label: `回踩密集带上沿 ${zone.high.toFixed(2)} · ${zone.strength} 条挤在一起`,
+      label: '',
       color: input.fibColor,
       opacity: 0.9,
       labelPriority: 2,
@@ -91,7 +92,9 @@ export function levelFib2Overlay(input: {
     const date = normalizeDate(marker.date)
     const index = date ? dateIndex.get(date) : undefined
     if (index == null) continue
-    result.labels.push({ time: rows[index].date, value: rows[index].high, text: marker.label, color: input.fibColor })
+    // [R725] R565 前这里是一颗向下三角(图表 symbol), 换 lightweight 后退化成一行字;
+    // 用户 R701 又要求主图不写指标文字, 所以还原成三角本身, 名字只在悬停读数里给。
+    result.labels.push({ time: rows[index].date, value: rows[index].high, text: '▼', color: input.fibColor })
   }
 
   if (result.future) result.verticals.push({ time: result.future.dates[0], label: '未来', color: input.textColor })

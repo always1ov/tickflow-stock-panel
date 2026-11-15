@@ -17,6 +17,8 @@ export interface PlotSeries {
   color?: string
   /** 线宽(默认 1)；悬浮高亮时加粗 */
   lineWidth?: 1 | 2 | 3 | 4
+  /** [R725] 虚线: 26日布林 / Keltner 三档 / ATR 止损的上下沿在 R565 前就是虚线, 换库时丢了 */
+  dashed?: boolean
   priceFormat?: 'price' | 'volume' | 'percent'
   /** [R723] 'atr' = 叠在成交量 pane 里的隐形 overlay 刻度(只分配纵向, 不显示轴) */
   priceScaleId?: 'left' | 'atr'
