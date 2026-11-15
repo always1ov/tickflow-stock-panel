@@ -519,6 +519,8 @@ export function StockPreviewDialog({ symbol, name, onClose, navList: navListSour
                     onHover={setLevelHover}
                     stacked
                     hideClose
+                    // [R674] 右栏本身就是一栏, 不再在栏里罩一层圆角框
+                    flat
                   />
                 )}
               </div>

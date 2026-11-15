@@ -577,7 +577,7 @@ export function hasOverviewLevels(
 // ===== 价位统计面板(默认在图表下方, 结构化文本展示; [R615] 弹窗里挪到左栏) =====
 export function LevelOverview({
   levels, activeTypes, pivotRank, close, hoveredKey, onHover, stacked = false,
-  hideClose = false,
+  hideClose = false, flat = false,
 }: {
   levels: Record<LevelType, PriceLevel[]>
   activeTypes: Set<LevelType>
@@ -589,6 +589,11 @@ export function LevelOverview({
   stacked?: boolean
   /** [R670] 个股弹窗: 现价由头部唯一提供, 这里只算相对百分比, 不再印第二遍 */
   hideClose?: boolean
+  /**
+   * [R674] 个股弹窗右栏: 这一栏本身已经是一栏(有分栏线、有栏内边距), 再罩一层
+   * 圆角框 + bg-base/20 只是白白吃掉 px-3 / py-2。用户: 「左中右里面的还有框你没处理」。
+   */
+  flat?: boolean
 }) {
   const theme = useTheme()
   const ct = useChartTheme()
@@ -644,7 +649,8 @@ export function LevelOverview({
   }
 
   return (
-    <div className={`mt-3 grid grid-cols-1 gap-x-6 gap-y-1 rounded-card border border-border/40 bg-base/20 px-3 py-2 ${stacked ? '' : 'sm:grid-cols-2'}`}>
+    <div className={`grid grid-cols-1 gap-x-6 gap-y-1 ${stacked ? '' : 'sm:grid-cols-2'} ${
+      flat ? '' : 'mt-3 rounded-card border border-border/40 bg-base/20 px-3 py-2'}`}>
       {/* 当前价 —— [R670] 弹窗里头部已印, 这里只留压力/支撑 */}
       {!hideClose && (
         <div className={`flex items-center gap-2 pb-1 border-b border-border/30 mb-0.5 ${stacked ? '' : 'sm:col-span-2'}`}>
