@@ -58,8 +58,8 @@ it('[R706] 两排价位开关各自按逻辑顺序排列, 合起来正好铺满�
     .filter(Boolean)
   const main = keys([...mainRow.querySelectorAll('button')])
   const sub = keys([...host.querySelector('[data-testid="level-toolbar"]')!.querySelectorAll('button')])
-  expect(main).toEqual(['sr', 'extreme', 'pivot', 'round', 'gap'])
-  expect(sub).toEqual(['boll', 'keltner_s', 'keltner_m', 'keltner_l', 'atr_stop', 'fib', 'fib2', 'livermore'])
+  expect(main).toEqual(['sr', 'extreme', 'pivot', 'round', 'gap', 'fib', 'fib2', 'livermore'])
+  expect(sub).toEqual(['boll', 'keltner_s', 'keltner_m', 'keltner_l', 'atr_stop'])
   // 漏一类那颗按钮就从界面上消失了, 这里守住「不重不漏」
   expect([...main, ...sub].sort()).toEqual(LEVEL_GROUPS.map(group => group.key).sort())
 })

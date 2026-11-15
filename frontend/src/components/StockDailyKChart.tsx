@@ -63,8 +63,10 @@ const DEFAULT_VOLUME_COMPARE: VolumeCompareConfig = { enabled: true, days: 1 }
  * 第一行先结构性横位(成交密集、前高前低), 再计算型(枢轴点、整数关口), 缺口位收尾;
  * 第二行波动带按 布林→通道短/中/长→ATR 连排, 两个斐波那契挨着, 六态独立体系放最后。
  */
-const MAIN_ROW_LEVEL_ORDER: LevelType[] = ['sr', 'extreme', 'pivot', 'round', 'gap']
-const SUB_ROW_LEVEL_ORDER: LevelType[] = ['boll', 'keltner_s', 'keltner_m', 'keltner_l', 'atr_stop', 'fib', 'fib2', 'livermore']
+// [R712] 用户: 「斐波那契开始的后面几个指标都放在缺口位后面」—— 斐波那契Ⅰ型 / Ⅱ型 / 六态关键点
+// 从下面那排挪到主图指标行, 接在缺口位之后; 下面那排只剩波动带那一组。
+const MAIN_ROW_LEVEL_ORDER: LevelType[] = ['sr', 'extreme', 'pivot', 'round', 'gap', 'fib', 'fib2', 'livermore']
+const SUB_ROW_LEVEL_ORDER: LevelType[] = ['boll', 'keltner_s', 'keltner_m', 'keltner_l', 'atr_stop']
 /** 这两张表必须把 `LEVEL_GROUPS` 恰好铺满(测试里有守卫), 漏一类那颗按钮就没了 */
 const pickGroups = (order: LevelType[]) => order
   .map(key => LEVEL_GROUPS.find(group => group.key === key))
