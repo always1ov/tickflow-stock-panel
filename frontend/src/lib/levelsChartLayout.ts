@@ -14,28 +14,21 @@
  *
  *   [16 顶部] [主图] [14 间距] [副图] [26 日期刻度] [22 缩放条] [8 底部]
  *
- * [R486] 主图与量化MACD 之间再插一张「趋势量化」, 与量化MACD 同高。用户: 「在量化macd
- * 上方加个副图」。主图高度仍一像素不动, 多出来的照旧让整张图变长、弹窗往下滚:
+ * [R558] 副图加一条 18px 标题带(名字 + 图例), 副图本身也加高:
  *
- *   [16] [主图] [14] [趋势量化] [14] [量化MACD] [26 日期刻度] [22 缩放条] [8]
+ *   [16] [主图] [14] [18 标题] [量化MACD] [26] [22] [8]
  *
- * [R558] 两张副图各加一条 18px 标题带(名字 + 图例), 副图本身也加高:
- *
- *   [16] [主图] [14] [18 标题] [趋势量化] [14] [18 标题] [量化MACD] [26] [22] [8]
+ * [R724] 用户: 「彻底删掉趋势量化这个指标」—— 主图与量化MACD 之间那张「趋势量化」
+ * 整张拿掉, 版面回到上面这一条, 下面的间距从此只服务量化MACD。
  */
 export const PAD_TOP = 16
 export const GAP_MAIN_SUB = 14      // 主图 ↔ 副图(两边纵轴刻度不上下相撞)
 /**
- * [R558] 每张副图顶上的标题带: 名字与图例写在这里, 不再压在图里。
- * 用户: 「感觉空间有点挤, 有些东西看不清楚了」—— 原来「趋势量化」连同图例写在副图里面
- * 的左上角, 碰上走到顶的柱子与「顶」字就叠在一起。
+ * [R558] 副图顶上的标题带: 名字与图例写在这里, 不再压在图里。
+ * 用户: 「感觉空间有点挤, 有些东西看不清楚了」—— 原来图例写在副图里面的左上角,
+ * 碰上走到顶的柱子与「顶」字就叠在一起。
  */
 export const SUB_HEADER = 18
-/**
- * [R559] 趋势量化比量化MACD 高这么多: 它的八种字挪进了图顶 / 图底两条字道(`trendQuantSeries.ts`
- * 的 `laneLayout`), [R619] 每条道三行、两条字道占掉约 110px, 不加高的话中间的图就被挤扁了。
- */
-export const TREND_LANES_EXTRA = 50
 export const GAP_SUB_SLIDER = 26    // 副图 ↔ 缩放条: 日期刻度在这一段里
 export const SLIDER_H = 22
 export const PAD_BOTTOM = 8
@@ -58,10 +51,7 @@ export function subPaneHeight(mainH: number): number {
 
 export interface LevelsChartLayout {
   mainH: number
-  /** [R486] 趋势量化副图(主图正下方) */
-  trendH: number
-  trendTop: number
-  /** 量化MACD 副图(最下面那张) */
+  /** 量化MACD 副图(主图正下方) */
   subH: number
   subTop: number
   /** 整张图(画布)的高度 —— 比调用方给的 `height` 高, 多出来的靠弹窗滚动 */
@@ -71,9 +61,7 @@ export interface LevelsChartLayout {
 export function levelsChartLayout(height: number): LevelsChartLayout {
   const mainH = height - LEGACY_NON_MAIN
   const subH = subPaneHeight(mainH)
-  const trendH = subH + TREND_LANES_EXTRA
-  const trendTop = PAD_TOP + mainH + GAP_MAIN_SUB + SUB_HEADER
-  const subTop = trendTop + trendH + GAP_MAIN_SUB + SUB_HEADER
+  const subTop = PAD_TOP + mainH + GAP_MAIN_SUB + SUB_HEADER
   const total = subTop + subH + GAP_SUB_SLIDER + SLIDER_H + PAD_BOTTOM
-  return { mainH, trendH, trendTop, subH, subTop, total }
+  return { mainH, subH, subTop, total }
 }

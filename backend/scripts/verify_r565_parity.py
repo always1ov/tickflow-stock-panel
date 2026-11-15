@@ -4,7 +4,7 @@
     .venv/bin/python scripts/verify_r565_parity.py            # 默认对 R565 时点
     .venv/bin/python scripts/verify_r565_parity.py --rev 0b174ac9 --symbols 50
 
-做什么: 从 git 里取出指定时点的 `quant_macd.py` / `trend_quant.py`, 与当前实现喂同一批
+做什么: 从 git 里取出指定时点的 `quant_macd.py`, 与当前实现喂同一批
 K 线(真实库 + 合成序列), 逐字段逐点比较。退出码 0 = 完全一致, 1 = 有差异。
 
 为什么要有它: R566 把图表从 ECharts 换成 lightweight 之后, 「数值是不是还是原来那份」
@@ -87,10 +87,8 @@ def main() -> int:
     sys.path.insert(0, str(BACKEND))
     from app.config import settings
     from app.indicators import quant_macd as new_qm
-    from app.indicators import trend_quant as new_tq
 
     old_qm = load_from_rev(args.rev, 'quant_macd.py', 'old_quant_macd')
-    old_tq = load_from_rev(args.rev, 'trend_quant.py', 'old_trend_quant')
 
     total = {'n': 0, 'max': 0.0}
     problems: list[str] = []
@@ -123,12 +121,9 @@ def main() -> int:
 
     bars = 0
     for symbol, group in frame.group_by('symbol', maintain_order=True):
-        opens, highs, lows, closes, volumes = (
-            group[k].to_list() for k in ('open', 'high', 'low', 'close', 'volume'))
+        closes, volumes = (group[k].to_list() for k in ('close', 'volume'))
         bars += len(closes)
         check('quant_macd', old_qm, new_qm, (closes, volumes), f'{symbol} ({len(closes)}根)')
-        check('trend_quant', old_tq, new_tq,
-              (opens, highs, lows, closes, volumes), f'{symbol} ({len(closes)}根)')
     print(f'真实库: {len(top)} 只 / {bars} 根')
 
     # ---- 合成序列 ----
@@ -145,9 +140,6 @@ def main() -> int:
             close = [fn(i) for i in range(SYNTH_LEN)]
             volumes = [1000.0 + (i * 7) % 5000 for i in range(SYNTH_LEN)]
             check('quant_macd', old_qm, new_qm, (close, volumes), f'合成-{name}')
-            check('trend_quant', old_tq, new_tq,
-                  ([x * 0.999 for x in close], [x * 1.01 for x in close],
-                   [x * 0.99 for x in close], close, volumes), f'合成-{name}')
         print(f'合成序列: {len(shapes)} 组 / {SYNTH_LEN * len(shapes)} 根')
 
     print(f'比较的数值点: {total["n"]:,}')

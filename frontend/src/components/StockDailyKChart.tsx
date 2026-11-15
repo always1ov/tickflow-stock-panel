@@ -9,7 +9,8 @@ import { DAILY_LINE_COLORS, SUB_CHART_META } from '@/lib/chart-indicators'
 /**
  * [R659] 用户: 「日K 里面的副图 MACD 可以删除了」。MACD 的取数与画法仍是共享的
  * (`LightweightDaily` / `EChartsCandlestick` 都还画, 指数页也在用), 这里只撤掉日K 的入口。
- * [R684] 用户: 「RSI 和 KDJ 都可以删除了」—— 副图指标只剩成交量, 趋势量化 / 量化MACD 紧跟其后。
+ * [R684] 用户: 「RSI 和 KDJ 都可以删除了」—— 副图指标只剩成交量, 量化MACD 紧跟其后。
+ * [R724] 用户: 「彻底删掉趋势量化这个指标」—— 原来的趋势量化副图与胶囊一并撤掉。
  * [R714] 用户: 「新增一个副图指标…完美复刻」—— 加回通达信「主力COME」; 它只在 lightweight
  * 渲染器里有画法(ECharts 那条老渲染器不接), 入口在下面按 renderer 过滤。
  * [R722] 用户: 「新增一个副图指标……先解读这个通达信指标『ATR 原始版 - 副图』, 再完美复刻」——
@@ -22,10 +23,10 @@ const DAILY_SUB_CHARTS = SUB_CHART_META.filter(def => def.key === 'vol' || def.k
 /** [R694] 用户: 「不搞圆点和颜色切换了，异动这个按钮就直接控制，效果以后只有颜色这一种显示方式」——
  *  「圆点 / 颜色」两个显示方式撤掉, 「异动」只剩开关一个职责, 图上固定按颜色画。 */
 import {
-  CHART_LAYOUT, SUB_PANE_GAP, dailyChartHeight, fitAnalysisPaneHeights, quantPaneHeight, trendPaneHeight,
+  CHART_LAYOUT, SUB_PANE_GAP, dailyChartHeight, fitAnalysisPaneHeights, quantPaneHeight,
 } from '@/lib/chart-layout'
 import { PANE_HEADER_H } from '@/lib/analysisPanes'
-import { useStockQuantMacd, useStockTrendQuant } from '@/lib/useStockAnalysisPanes'
+import { useStockQuantMacd } from '@/lib/useStockAnalysisPanes'
 import { useShownLevels } from '@/components/stock-analysis/AnalysisKChart'
 import { Fib2GrainDialog } from '@/components/stock-analysis/Fib2GrainDialog'
 import { useStockLevels } from '@/components/stock-analysis/StockLevelsPanel'
@@ -96,7 +97,7 @@ interface Props {
   height?: number
   /**
    * [R651] 卡里给整张图留的高度上限。**主图与指标副图的高度、位置不参与压缩** ——
-   * 只有两张分析副图(趋势量化 / 量化MACD)按剩余空间收, 收到下限 100 就不再压,
+   * 只有「量化MACD」这张分析副图按剩余空间收, 收到下限 100 就不再压,
    * 再放不下就让整张图向下溢出、由外层滚动兜底。
    * ([R650] 曾用它等比压缩整图, 主图被压小, 已按用户「主图位置不能动」改掉。)
    */
@@ -202,7 +203,7 @@ export function getDefaultRange(): { start: string; end: string } {
 
 /**
  * [R716] 用户: 「副图指标的按钮在夜间模式下还是灰色」—— 副图指标（成交量 / 主力COME /
- * 趋势量化 / 量化MACD）原来开着时用 `bg-accent/20 text-accent`, 而暗色 `--accent` 是中性浅灰
+ * 量化MACD）原来开着时用 `bg-accent/20 text-accent`, 而暗色 `--accent` 是中性浅灰
  * (#E4E4E4, R509 去蓝), 20% 铺底就成了灰块配灰字, 开着反而比关着更难认。
  * 改成与主图均线 / 价位胶囊同一套反相: 暗色白底黑字、亮色黑底白字, 与其他「开」态一致。
  */
@@ -282,8 +283,8 @@ export function StockDailyKChart({
   // [R652] 四条主图均线逐条可控。[R655] 用户要求默认只留 MA20, 其余三条默认关。
   // ECharts 渲染器画不了单条, 仍按 showMA 整组。
   const [maKeys, setMaKeys] = useState<string[]>(() => showMA ? ['ma20'] : [])
-  // [R649] 关键价位那两张副图并入日K, 默认关闭 —— 与改版前日K一样只留成交量。
-  const [showTrendQuant, setShowTrendQuant] = useState(false)
+  // [R649] 关键价位那张量化MACD 副图并入日K, 默认关闭 —— 与改版前日K一样只留成交量。
+  // [R724] 用户: 「彻底删掉趋势量化这个指标」—— 原来并排的「趋势量化」整张删除。
   const [showQuantMacd, setShowQuantMacd] = useState(false)
   const [showMarkers, setShowMarkers] = useState(true)
   // 加入自选日标注（与「异动」标记相互独立）
@@ -337,8 +338,7 @@ export function StockDailyKChart({
     .map(key => SUB_CHART_META.find(s => s.key === key))
     .filter((d): d is typeof SUB_CHART_META[number] => !!d)
 
-  // [R649] 两张分析副图只在 lightweight 渲染下存在; 数据与关键价位视图同源(同一查询键)。
-  const tquantQ = useStockTrendQuant(symbol, showTrendQuant)
+  // [R649] 分析副图只在 lightweight 渲染下存在; 数据与关键价位视图同源(同一查询键)。
   const qmacdQ = useStockQuantMacd(symbol, showQuantMacd)
 
   // [R653] 关键价位主图那套价位指标并进日K: 取数(`QK.stockLevels` 同一个键)、价位的收集与画法
@@ -429,9 +429,6 @@ export function StockDailyKChart({
   const analysisPanes = useMemo<DailyAnalysisPane[]>(() => {
     if (renderer !== 'lightweight') return []
     const panes: DailyAnalysisPane[] = []
-    if (showTrendQuant) {
-      panes.push({ kind: 'trend', height: trendPaneHeight(height), data: tquantQ.data, error: tquantQ.isError })
-    }
     if (showQuantMacd) {
       panes.push({
         kind: 'quant', height: quantPaneHeight(height), topInset: SUB_PANE_GAP, headerH: PANE_HEADER_H,
@@ -439,7 +436,7 @@ export function StockDailyKChart({
       })
     }
     return panes
-  }, [renderer, showTrendQuant, showQuantMacd, height, tquantQ.data, tquantQ.isError, qmacdQ.data, qmacdQ.isError])
+  }, [renderer, showQuantMacd, height, qmacdQ.data, qmacdQ.isError])
   // ECharts 渲染器(EChartsCandlestick 自己排版)的副图占位, 与 R650 前一致, 本轮不动。
   let subExtraH = 0
   activeSubDefs.forEach(def => { subExtraH += SUB_INFO_H + def.height })
@@ -477,6 +474,7 @@ export function StockDailyKChart({
 
   // [R686] 用户: 「『成交量 量比 前1日均量 趋势量化 量化MACD』应该这样排列『成交量 趋势量化 量化MACD 量比 前1日均量』,
   // 前面都是指标」—— 量比那组是成交量的参数、不是指标, 排到所有指标胶囊之后, 单独跟一条竖线。
+  // [R724] 趋势量化删掉后, 指标胶囊只剩「量化MACD」。
   // [R684] 两种渲染器都要用同一份胶囊, 提到 return 之前只写一遍。
   // [R656] 原来的 BOLL 开关撤下 —— 26 日布林改由「主图指标」里那排价位开关的「26日布林」控制。
   // [R689] 色点 = 图上那条线的主色。开着的胶囊反相(白底 / 黑底), 点得换成另一套主题那一档,
@@ -531,15 +529,10 @@ export function StockDailyKChart({
     </div>
   )
 
-  // [R649] 从「关键价位」并过来的两张副图 —— 固定排在各指标副图之后; ECharts 渲染没有这两张副图, 不给开关。
+  // [R649] 从「关键价位」并过来的量化MACD 副图 —— 固定排在各指标副图之后; ECharts 渲染没有这张副图, 不给开关。
+  // [R724] 「趋势量化」已彻底删除。
   const analysisPanePills = (
     <>
-      <ChartPill
-        active={showTrendQuant}
-        label="趋势量化"
-        activeClass={INDICATOR_ON}
-        onClick={() => setShowTrendQuant(value => !value)}
-      />
       <ChartPill
         active={showQuantMacd}
         label="量化MACD"

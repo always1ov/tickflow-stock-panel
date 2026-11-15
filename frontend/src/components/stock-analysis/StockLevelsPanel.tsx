@@ -4,7 +4,7 @@ import { AlertTriangle, LineChart, Loader2 } from 'lucide-react'
 import { EmptyState } from '@/components/EmptyState'
 import { api } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
-import { useStockQuantMacd, useStockTrendQuant } from '@/lib/useStockAnalysisPanes'
+import { useStockQuantMacd } from '@/lib/useStockAnalysisPanes'
 import { AnalysisKChart, type LevelType, type PriceLevel } from './AnalysisKChart'
 import type { LevelControls } from './levelControls'
 import { TrendStateBar, useStockTrend } from './TrendStateBar'
@@ -60,10 +60,9 @@ export function StockLevelsPanel({ symbol, height = 480, bare = false, controls,
 
   const levelsQ = useStockLevels(symbol)
 
-  // [R415] 副图的量化MACD / [R486] 上方的「趋势量化」—— 取数搬进 `useStockAnalysisPanes`,
-  // 与日K 视图共用同一份查询键与口径。
+  // [R415] 副图的量化MACD —— 取数搬进 `useStockAnalysisPanes`,
+  // 与日K 视图共用同一份查询键与口径。([R724] 趋势量化已整张删除。)
   const qmacdQ = useStockQuantMacd(symbol)
-  const tquantQ = useStockTrendQuant(symbol)
 
   const trendQ = useStockTrend(symbol)
   const qc = useQueryClient()
@@ -77,7 +76,6 @@ export function StockLevelsPanel({ symbol, height = 480, bare = false, controls,
     qc.invalidateQueries({ queryKey: QK.stockLevels(symbol) })
     // [R415] 副图跟主图同一根实时蜡烛走, 不然盘中两张图差一根
     qc.invalidateQueries({ queryKey: QK.stockQuantMacd(symbol) })
-    qc.invalidateQueries({ queryKey: QK.stockTrendQuant(symbol) })
   }, [klineUpdatedAt, symbol, qc])
 
   const liveRefresh = kline.data?.live_refresh
@@ -137,9 +135,6 @@ export function StockLevelsPanel({ symbol, height = 480, bare = false, controls,
         quantMacd={qmacdQ.data}
         // [R426] 取数失败要说出来 —— 原来失败时副图只剩标题, 看着像"这只票没有信号"
         quantMacdError={qmacdQ.isError}
-        // [R486] 量化MACD 上方的第二张副图
-        trendQuant={tquantQ.data}
-        trendQuantError={tquantQ.isError}
         controls={controls}
         visibleBars={visibleBars}
         height={height}

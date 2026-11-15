@@ -197,10 +197,7 @@ def test_R616_副图按R565画法补画_数据口径不变():
     assert "diffExposed" in chart, "DIFF 只露 DEA 之外那一截的旧规则没了"
 
     # 数据一字不改: 对齐用的字段仍在
-    trend = code_of("lib/trendQuantSeries.ts")
     quant = code_of("lib/quantMacdSeries.ts")
-    for field in ("wave_prev", "stick_up", "xichou_bar", "marks"):
-        assert field in trend, f"趋势量化的数据字段 {field} 被动了"
     for field in ("gold_icon", "dead_icon", "yellow"):
         assert field in quant, f"量化MACD 的数据字段 {field} 被动了"
 

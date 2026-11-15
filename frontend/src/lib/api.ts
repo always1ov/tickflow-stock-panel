@@ -4,7 +4,6 @@
 // Prod:同源(FastAPI 托管前端 dist)
 
 import { toast } from '@/components/Toast'
-import type { TrendQuantData } from '@/lib/trendQuantSeries'   // [R486] 趋势量化的逐根数值
 import type { NavLayout } from './navLayout'
 
 const BASE = ''
@@ -1298,9 +1297,6 @@ export interface QuantMacdResult {
   /** 死叉图标高度 = DEA*1.1 */
   dead_icon: (number | null)[]
 }
-
-/** [R486] 趋势量化: 画得出来的几样(字段含义见 `lib/trendQuantSeries.ts`)。 */
-export type TrendQuantResult = { symbol: string } & TrendQuantData
 
 /** [R412] 一档粗细在这只票上的表现。**全是数得出来的量, 没有一个是收益。** */
 export interface Fib2GrainFit {
@@ -6250,13 +6246,6 @@ export const api = {
   stockQuantMacd: (symbol: string, bars = 400) =>
     request<QuantMacdResult>(
       `/api/stock-analysis/quant-macd?symbol=${encodeURIComponent(symbol)}&bars=${bars}`),
-  /**
-   * [R486] 趋势量化副图的逐根数值。后端取全部历史(「吸筹」要从上市第一根算起)、
-   * 带盘中实时那一根; 返回最近 `bars` 根。
-   */
-  stockTrendQuant: (symbol: string, bars = 400) =>
-    request<TrendQuantResult>(
-      `/api/stock-analysis/trend-quant?symbol=${encodeURIComponent(symbol)}&bars=${bars}`),
 
   // [fork 增强] 今日总览(决策汇聚层)
   todayOverview: () => request<TodayOverview>('/api/today'),

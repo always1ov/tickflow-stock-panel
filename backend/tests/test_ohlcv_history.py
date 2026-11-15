@@ -128,7 +128,7 @@ def _client(monkeypatch, repo):
     return TestClient(app)
 
 
-def test_R490_两张副图共用一次扫描_再开一次也不扫(monkeypatch):
+def test_R490_量化MACD连续两次只扫一次(monkeypatch):
     from app.market_time import cn_today
     n = 900
     d0 = cn_today() - timedelta(days=n)
@@ -136,11 +136,9 @@ def test_R490_两张副图共用一次扫描_再开一次也不扫(monkeypatch):
     repo = _Repo(base)
     cli = _client(monkeypatch, repo)
     a = cli.get("/api/stock-analysis/quant-macd?symbol=600000.SH").json()
-    b = cli.get("/api/stock-analysis/trend-quant?symbol=600000.SH").json()
     cli.get("/api/stock-analysis/quant-macd?symbol=600000.SH")
-    cli.get("/api/stock-analysis/trend-quant?symbol=600000.SH")
     assert len(repo.calls) == 1, repo.calls
-    assert a["dates"] and b["dates"]
+    assert a["dates"]
 
 
 def test_R490_量化MACD只用最近1500天_与原来按区间取的行一模一样(monkeypatch):

@@ -37,7 +37,6 @@ interface Props {
   /**
    * [R634] 该 pane 顶部标题行占的高度(px, 按 pane 下标)。标题/读数画在 `paneTopInsets` 这条
    * 空白带下面, 数据必须再让开这一行 —— R633 只挪了标题没挪数据, 标题仍然压在 MACD 柱子上。
-   * 趋势量化的纵轴范围(`tqYRange`)自己留了字道, 故传 0, 它的版面不受影响。
    */
   paneHeaderHeights?: number[]
   visibleBars?: number | 'all'
@@ -51,12 +50,12 @@ interface Props {
   paneDecor?: (PaneDecorData | undefined)[]
   /**
    * [R630] 隐藏副图右侧刻度数字(轴宽仍由主图决定, 图区不会被拉宽)。
-   * 个股分析的「趋势量化 / 量化MACD」按 R423 / R486 的原文约定不写刻度 —— ECharts 时代
+   * 个股分析的分析副图按 R423 / R486 的原文约定不写刻度 —— ECharts 时代
    * 是 `axisLabel: { show: false }`, 换到 lightweight 后默认又冒了出来。
    * 日K / 分时的成交量 pane 旧图本来就带刻度, 不传即可保持。
    *
    * [R649] 也可以只给某几个 pane 下标 —— 日K 里指标副图(成交量/MACD...)保留刻度,
-   * 只有并入的趋势量化 / 量化MACD 按原文不写数字。
+   * 只有并入的量化MACD 按原文不写数字。
    */
   hidePaneAxis?: boolean | readonly number[]
   linkedPrice?: number | null

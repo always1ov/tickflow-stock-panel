@@ -6,7 +6,7 @@ import { CHART_COLORS as C, lineData, validDailyRows, type PlotSeries } from '@/
 import { fmtVolume, fmtPct, pricePrecision } from '@/lib/format'
 import { CHART_LAYOUT, plotPaneHeights } from '@/lib/chart-layout'
 import {
-  quantPaneReadouts, quantPaneSeries, quantPaneTitle, trendPaneReadouts, trendPaneSeries, trendPaneTitle,
+  quantPaneReadouts, quantPaneSeries, quantPaneTitle,
 } from '@/lib/analysisPanes'
 import { LEVEL_PALETTE, useChartTheme, useTheme, type Theme } from '@/lib/theme'
 import { FinancialPlot } from './FinancialPlot'
@@ -171,12 +171,12 @@ export function LightweightDaily({ data, assetType, symbol = '', height = 480, a
     return series
   }, [rows, visibleMA, selected, activeIndicators, events, markerStyle, showMarkers, theme, dimLines, atrBand])
 
-  // [R649] 底部并入的分析副图(趋势量化 / 量化MACD): 排在各指标副图之后, 高度由调用方算好。
+  // [R649] 底部并入的分析副图(量化MACD): 排在各指标副图之后, 高度由调用方算好。
   // 与关键价位那张图同一份画法(`lib/analysisPanes.ts`), 这里只负责 pane 下标与版面。
+  // [R724] 趋势量化撤掉后只剩量化MACD, `pane.kind` 恒为 'quant'。
   const analysis = useMemo(() => {
     const base = selected.length + 1
     const dates = rows.map(row => row.date)
-    const bars = typeof visibleBars === 'number' ? visibleBars : rows.length
     const series: PlotSeries[] = []
     const decor: PaneDecorData[] = []
     const titles: string[] = []
@@ -189,22 +189,14 @@ export function LightweightDaily({ data, assetType, symbol = '', height = 480, a
       hidden.push(index)
       insets.push(pane.topInset ?? 0)
       headers.push(pane.headerH ?? 0)
-      if (pane.kind === 'trend') {
-        const result = trendPaneSeries(dates, pane.data, !!pane.error, pane.height, bars, index)
-        series.push(...result.series)
-        decor.push(result.decor)
-        titles.push(trendPaneTitle(!!pane.error))
-        readouts.push(trendPaneReadouts(bars, pane.data, !!pane.error, ct.text))
-      } else {
-        const result = quantPaneSeries(dates, pane.data, !!pane.error, index)
-        series.push(...result.series)
-        decor.push(result.decor)
-        titles.push(quantPaneTitle(!!pane.error))
-        readouts.push(quantPaneReadouts(pane.data, !!pane.error, ct.text))
-      }
+      const result = quantPaneSeries(dates, pane.data, !!pane.error, index)
+      series.push(...result.series)
+      decor.push(result.decor)
+      titles.push(quantPaneTitle(!!pane.error))
+      readouts.push(quantPaneReadouts(pane.data, !!pane.error, ct.text))
     })
     return { series, decor, titles, readouts, insets, headers, hidden }
-  }, [analysisPanes, rows, selected.length, visibleBars, ct.text])
+  }, [analysisPanes, rows, selected.length, ct.text])
   // [R654] 二型的「未来」三个空槽: 蜡烛时间轴往后多三格, 末尾三个位移均线值才画得出来。
   const plottedModel = useMemo(() => levelFuture
     ? model.map(item => item.id === 'price'

@@ -1,53 +1,32 @@
 /**
- * [R648] 「趋势量化 / 量化MACD」两张副图的**唯一产地** —— 日K 与关键价位两个入口
+ * [R648] 「量化MACD」分析副图的**唯一产地** —— 日K 与关键价位两个入口
  * 都从这里取系列、读数行与标题, 避免各画一份、口径走散。
  *
  * 数值与颜色怎么算、怎么摆, 全部沿用 R565(还是 ECharts 时)的画法:
- *   · 趋势量化的红绿短柱从**昨值连到今值**、吸筹白柱从 0.53 起, 八种字排进上下两条字道;
- *   · 量化MACD 的 DIFF 实心柱、DEA 空心点线框、金叉 / 死叉箭头、共振黄柱。
- * 数据仍只有一份(后端 `/trend-quant` / `/quant-macd`), 这里算的只是"怎么画"。
+ *   量化MACD 的 DIFF 实心柱、DEA 空心点线框、金叉 / 死叉箭头、共振黄柱。
+ * 数据仍只有一份(后端 `/quant-macd`), 这里算的只是"怎么画"。
+ *
+ * [R724] 用户: 「彻底删掉趋势量化这个指标」—— 上面那张「趋势量化」副图连同它的
+ * 系列、读数、字道一起删除, 这里只剩量化MACD。
  */
 import type { PaneDecorData, DecorItem } from '@/components/charts/SubPaneDecor'
 import type { QuantMacdResult } from '@/lib/api'
 import type { PlotData, PlotSeries } from '@/lib/lightweight-model'
-import { QUANT_MACD_COLORS, TREND_QUANT_COLORS } from '@/lib/theme'
+import { QUANT_MACD_COLORS } from '@/lib/theme'
 import {
   alignQuantMacd, diffExposed, QUANT_MACD_HELP, STICK_RATIO,
 } from '@/lib/quantMacdSeries'
-import {
-  alignTrendQuant, markLabel, TREND_MARKS, TREND_QUANT_HELP,
-  TQ_STICK1, TQ_STICK2, tqYRange, type TrendQuantData,
-} from '@/lib/trendQuantSeries'
 
-/** 副图顶上给 pane 标题留的带(px): R565 的标题画在图外, 现在画在图里, 顶字道从这条带下面起 */
+/** 副图顶上给 pane 标题留的带(px): R565 的标题画在图外, 现在画在图里 */
 export const PANE_HEADER_H = 18
 
-/** [R626] 两张副图的长说明: 图外那条图例删了, 悬停说明挂在开关键排最右的「?」上 */
-export const ANALYSIS_PANE_HELP = `${TREND_QUANT_HELP}\n\n${QUANT_MACD_HELP}`
+/** [R626] 副图的长说明: 图外那条图例删了, 悬停说明挂在开关键排最右的「?」上 */
+export const ANALYSIS_PANE_HELP = QUANT_MACD_HELP
 
 export type PaneReadout = { text: string; color?: string }
 
-export function trendPaneTitle(error: boolean) {
-  return error ? '趋势量化 · 取数失败' : '趋势量化'
-}
-
 export function quantPaneTitle(error: boolean) {
   return error ? '量化MACD · 取数失败' : '量化MACD'
-}
-
-/** 趋势量化副图的读数行(名字与色样; 取数失败 / 未到达时写明状态)。 */
-export function trendPaneReadouts(
-  visibleBars: number, trendQuant: TrendQuantData | undefined, error: boolean, textColor: string,
-): PaneReadout[] {
-  if (error) return [{ text: '取数失败, 稍后刷新重试', color: textColor }]
-  if (!trendQuant) return [{ text: '等待数据', color: textColor }]
-  return [
-    { text: '平均线', color: TREND_QUANT_COLORS.avg },
-    { text: '吸筹', color: TREND_QUANT_COLORS.xichou },
-    { text: '超买 3.2 / 超卖 0.5', color: TREND_QUANT_COLORS.yellow },
-    // [R620] 图上八种信号的对照就摆在副图里, 不用再往上翻总图例（[R621] 与图上同源）
-    ...TREND_MARKS.map(mark => ({ text: markLabel(mark, visibleBars), color: mark.color })),
-  ]
 }
 
 /** 量化MACD 副图的读数行。 */
@@ -66,69 +45,9 @@ export function quantPaneReadouts(
   ]
 }
 
-/** 趋势量化副图的系列 + 补画图元。`pane` = 这张副图在图表里的 pane 下标。 */
-export function trendPaneSeries(
-  dates: string[], trendQuant: TrendQuantData | undefined, error: boolean, paneH: number,
-  visibleBars: number, pane = 1,
-): { series: PlotSeries[]; decor: PaneDecorData } {
-  const empty = () => ({ series: [emptyPaneSeries('tq:empty', pane, dates)], decor: { items: [] } })
-  if (error || !trendQuant || dates.length === 0) return empty()
-  const data = alignTrendQuant(dates, trendQuant)
-  const C = TREND_QUANT_COLORS
-  if (!data.wave.some(value => value != null)) return empty()
-
-  const items: DecorItem[] = []
-  // [R616] 红绿短柱: 原文 STICKLINE(平均线>=昨天, 波动线, 昨天波动线, 2, 0) —— 从昨值连到今值。
-  data.wave.forEach((wave, index) => {
-    const previous = data.wave_prev[index]
-    const up = data.stick_up[index]
-    if (wave == null || previous == null || up == null) return
-    items.push({
-      kind: 'stick', time: dates[index], from: previous, to: wave,
-      color: up === 1 ? C.red : C.green, ratio: TQ_STICK2,
-    })
-  })
-  // [R559] 八种字: 卖出一侧(顶 / 逃 / 下)在图顶字道, 买入一侧在图底字道。
-  for (const mark of TREND_MARKS) {
-    const label = markLabel(mark, visibleBars)
-    data.marks[mark.key].forEach((on, index) => {
-      if (on) {
-        items.push({
-          kind: 'text', time: dates[index], text: label, short: mark.short, color: mark.color, lane: mark.lane,
-        })
-      }
-    })
-  }
-  // 吸筹白柱: 原文 STICKLINE(VAR17, 0.53, 吸筹, 1, 0) —— 比红绿短柱细一半。
-  data.xichou.forEach((xichou, index) => {
-    if (data.xichou_bar[index] !== 1 || xichou == null) return
-    items.push({ kind: 'stick', time: dates[index], from: 0.53, to: xichou, color: C.white, ratio: TQ_STICK1 })
-  })
-  // [R638] 两条黄线的名字写在右端 —— 只写名字不带数值(R557), 与线上那条 3.2 / 0.5 对齐。
-  items.push({ kind: 'label', value: 3.2, text: '超买', color: C.yellow })
-  items.push({ kind: 'label', value: 0.5, text: '超卖', color: C.yellow })
-
-  return {
-    series: [
-      // 透明线只负责纵轴: 原图纵轴按 tqYRange 在 0~4 两头给字道留位, 这里照同一函数取值。
-      // [R616] 它必须是这个 pane 的第一条 series —— 补画图元挂在第一条上, 而
-      // `priceToCoordinate` 在空数据 series 上返回 null(柱子/箭头会整片消失)。
-      {
-        id: 'tq:scale', type: 'Line', pane, color: 'transparent', lineWidth: 1,
-        data: valuePoints(dates, data.wave), range: tqYRange(paneH, PANE_HEADER_H),
-      },
-      { id: 'tq:ref_high', type: 'Line', pane, color: C.yellow, data: dates.map(time => ({ time, value: 3.2 })) },
-      { id: 'tq:ref_low', type: 'Line', pane, color: C.yellow, data: dates.map(time => ({ time, value: 0.5 })) },
-      { id: 'tq:avg', type: 'Line', pane, color: C.avg, lineWidth: 1, data: valuePoints(dates, data.avg) },
-      { id: 'tq:xichou', type: 'Line', pane, color: C.xichou, lineWidth: 1, data: valuePoints(dates, data.xichou) },
-    ],
-    decor: { items, headerH: PANE_HEADER_H },
-  }
-}
-
 /** 量化MACD 副图的系列 + 补画图元。`pane` = 这张副图在图表里的 pane 下标。 */
 export function quantPaneSeries(
-  dates: string[], quantMacd: QuantMacdResult | undefined, error: boolean, pane = 2,
+  dates: string[], quantMacd: QuantMacdResult | undefined, error: boolean, pane = 1,
 ): { series: PlotSeries[]; decor: PaneDecorData } {
   const empty = () => ({ series: [emptyPaneSeries('qm:empty', pane, dates)], decor: { items: [] } })
   if (error || !quantMacd || dates.length === 0) return empty()

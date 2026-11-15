@@ -17,17 +17,8 @@ describe('关键价位图版面', () => {
       const L = levelsChartLayout(h)
       expect(L.total).toBeGreaterThan(h)
       expect(L.total).toBe(L.subTop + L.subH + 26 + 22 + 8)
-      // [R486] 主图下面先是趋势量化, 再是量化MACD。[R558] 每张副图顶上多一条 18px 标题带
-      expect(L.trendTop).toBe(16 + L.mainH + 14 + 18)
-      expect(L.subTop).toBe(L.trendTop + L.trendH + 14 + 18)
-    }
-  })
-
-  it('[R486] 趋势量化比量化MACD 高出两条字道(R559), 主图不因它变矮', () => {
-    for (const h of [320, 520, 720]) {
-      const L = levelsChartLayout(h)
-      expect(L.trendH).toBe(L.subH + 50)
-      expect(L.mainH).toBe(legacyMain(h))
+      // [R724] 主图下面只剩量化MACD。[R558] 副图顶上多一条 18px 标题带
+      expect(L.subTop).toBe(16 + L.mainH + 14 + 18)
     }
   })
 

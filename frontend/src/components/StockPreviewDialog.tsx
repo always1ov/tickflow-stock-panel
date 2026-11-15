@@ -217,14 +217,15 @@ export function StockPreviewDialog({ symbol, name, onClose, navList: navListSour
   //
   // [R612] 双栏只在 ≥1280 生效; 窄屏单列、整页滚, 图高回落到改版前写死的值。
   //
-  // [R612-fix] 关键价位不再被裁: 那张图的画布 = 主图(`height`)+ 趋势量化 + 量化MACD
-  // 两张副图; 改版第一版右栏 overflow-hidden, 画布比右栏高 → 两张副图被整块裁掉。
+  // [R612-fix] 关键价位不再被裁: 那张图的画布 = 主图(`height`)+ 量化MACD 一张副图;
+  // 改版第一版右栏 overflow-hidden, 画布比右栏高 → 副图被整块裁掉。
   //
   // [R614] 用户: 「按这个方案调整副图高度」—— 曾把主图压到「右栏 − 卡片其余部分 − 两张副图」,
   // 让三块一屏装下。
   //
-  // [R616] 用户: 「副图的趋势量化和量化macd没有和我升级到R565之前显示的一样」—— 两张副图
-  // 改回 R565 的比例(主图 48%、限 160~220, 趋势量化再 +50 字道), 一屏装下因此失效:
+  // [R616] 用户: 「副图的趋势量化和量化macd没有和我升级到R565之前显示的一样」—— 副图
+  // 改回 R565 的比例(主图 48%、限 160~220), 一屏装下因此失效:
+  // ([R724] 趋势量化已删, 只剩量化MACD 一张。)
   // 579 高的右栏里画布会比可用空间高约 180px, 由右栏滚动兜底(R613 的兜底保留)。
   // 这里仍按 `height` = 主图高来算, 公式与 R614 相同 —— 日K 的副图数量由图内工具栏决定、
   // 外面算不出来, 维持 420; 分时没有额外副图, 继续跟着右栏放宽。
@@ -303,12 +304,12 @@ export function StockPreviewDialog({ symbol, name, onClose, navList: navListSour
     if (!symbol) return
     if (chartView === 'daily') {
       qc.invalidateQueries({ queryKey: ['kline', symbol] })
-      // [R663] 日K 现在自己画价位与两张分析副图, 刷新要连它们那份数据一起重取
+      // [R663] 日K 现在自己画价位与分析副图, 刷新要连它们那份数据一起重取
+      // ([R724] 趋势量化撤掉后, 日K 只剩量化MACD 这一张分析副图)
       qc.invalidateQueries({ queryKey: QK.analysisKline(symbol) })
       qc.invalidateQueries({ queryKey: QK.stockLevels(symbol) })
       qc.invalidateQueries({ queryKey: QK.stockTrend(symbol) })
       qc.invalidateQueries({ queryKey: QK.stockQuantMacd(symbol) })
-      qc.invalidateQueries({ queryKey: QK.stockTrendQuant(symbol) })
     } else if (chartView === 'intraday') {
       qc.invalidateQueries({ queryKey: ['kline-minute-range', symbol] })
       qc.invalidateQueries({ queryKey: ['kline-minute', symbol] })

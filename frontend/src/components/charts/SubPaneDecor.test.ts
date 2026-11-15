@@ -6,8 +6,10 @@
  * 这里用一个记账版 canvas context 跑真实的 `draw`, 断言真正落到画布上的坐标与顺序。
  */
 import { describe, expect, it } from 'vitest'
-import { LANE_HALO } from '@/lib/trendQuantSeries'
 import { PaneDecor, type DecorItem } from './SubPaneDecor'
+
+/** [R724] 描边光晕的期望值(与 `SubPaneDecor` 内部常量同口径) */
+const LANE_HALO = { stroke: '#000000', lineWidth: 3 }
 
 const WIDTH = 300
 const HEIGHT = 120
@@ -95,17 +97,14 @@ describe('[R640] PaneDecor 的 label 图元: 贴右边、对准线的高度、�
     expect(fill.args[2]).toBe(96)
   })
 
-  it('压在柱子和信号字上面: 先画柱子, 再写名字', () => {
+  it('压在柱子上面: 先画柱子, 再写名字', () => {
     const calls = draw([
       { kind: 'stick', time: '2026-01-05', from: 0.5, to: 3.2, color: '#00FF00', ratio: 0.66 },
-      { kind: 'text', time: '2026-01-05', text: '顶', color: '#FF0000', lane: 'top' },
       { kind: 'label', value: 3.2, text: '超买', color: '#FFFF00' },
     ])
     const stick = calls.findIndex(c => c.op === 'fillRect')
-    const text = calls.findIndex(c => c.op === 'fillText' && c.args[0] === '顶')
     const label = calls.findIndex(c => c.op === 'fillText' && c.args[0] === '超买')
     expect(stick).toBeLessThan(label)
-    expect(text).toBeLessThan(label)
   })
 
   it('垫一层黑描边当光晕(白底黄字才看得见), 描边先于填色', () => {

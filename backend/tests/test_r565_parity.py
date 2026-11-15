@@ -1,7 +1,7 @@
 """[R642] R565 指标对拍进 pytest —— 指标一漂移就自动红, 不再靠人记得手动跑脚本。
 
-`scripts/verify_r565_parity.py` 从 git 里取出 R565 时点的 `quant_macd.py` / `trend_quant.py`,
-与当前实现喂同一批 K 线(真实库 + 5 组合成序列, 约 24 万个数值点)逐点比较。这里把它包成
+`scripts/verify_r565_parity.py` 从 git 里取出 R565 时点的 `quant_macd.py`,
+与当前实现喂同一批 K 线(真实库 + 5 组合成序列)逐点比较。这里把它包成
 一条普通用例(实测约 2 秒): 仓库没有对照提交(浅克隆)或本机没有真实库数据时跳过, 不误报。
 """
 from __future__ import annotations

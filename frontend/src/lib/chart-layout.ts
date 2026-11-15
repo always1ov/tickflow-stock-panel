@@ -20,18 +20,18 @@ export function plotPaneHeights(plotHeight: number, subPaneCount: number) {
 }
 
 /**
- * [R624] 趋势量化 / 量化MACD 两张副图的高度 —— 48% 的比例会让「主次不分」, 回到 R422 用户
+ * [R624] 分析副图(量化MACD)的高度 —— 48% 的比例会让「主次不分」, 回到 R422 用户
  * 认可的「副图 = 主图 40%」, 下限 160→140。
  * [R626] 用户: 「主图和副图还是显得主次不够分明, 两个副图占用的空间还是觉得多」——
  * 40% / 140 在 1000 高的屏上仍是主图 345 vs 两张副图 329, 几乎对半。比例收到 28%、
  * 下限 108、上限 136, 扣除两张副图后主图约 429(占图栈 61%), 副图 162 / 112。
+ * [R724] 用户: 「彻底删掉趋势量化这个指标」—— 现在只剩量化MACD 一张, 这套判据原样保留。
  * 判据只此一处: 画图的 `AnalysisKChart` 与「弹窗要给多高才装得下」的反算 `fitLevelsMainHeight` 都从这里取。
  */
-export const TREND_LANES_EXTRA = 50
 /**
- * [R633] 趋势量化与量化MACD 两张副图之间的空白间隔(px)。
+ * [R633] 分析副图与主图之间的空白间隔(px)。
  * 用户: 「两个副图之间还需要留点空间, 趋势量化不用动, 下面量化macd 往下挪挪」——
- * 间隔记在 MACD pane 顶部(标题与图一起下移), 趋势量化的高度与比例完全不变。
+ * 间隔记在 MACD pane 顶部(标题与图一起下移)。
  * [R637] R636 曾把这段间隔换成两行自绘日期, 用户随即改口「所有副图后面都不需要日期行」——
  * 日期只留最底部那条真时间轴, 这里恢复成 12px 空白间隔。
  */
@@ -55,33 +55,29 @@ export const LEVELS_AXIS_CLIP = 9
  * [R637] R636 曾从这里分走 14px 去画日期行, 现已撤回(见 `SUB_PANE_GAP`), 恢复 25px。
  */
 export const MACD_PANE_EXTRA = 25
-const TREND_SUB_PANE_RATIO = 0.28
-const TREND_SUB_PANE_MIN = 108
-const TREND_SUB_PANE_MAX = 136
+const ANALYSIS_SUB_PANE_RATIO = 0.28
+const ANALYSIS_SUB_PANE_MIN = 108
+const ANALYSIS_SUB_PANE_MAX = 136
 
-export function trendSubPaneHeight(mainHeight: number): number {
+export function analysisSubPaneHeight(mainHeight: number): number {
   const mainPaneH = Math.max(120, mainHeight - CHART_LAYOUT.timeAxis)
-  return Math.round(Math.min(TREND_SUB_PANE_MAX, Math.max(TREND_SUB_PANE_MIN, mainPaneH * TREND_SUB_PANE_RATIO)))
+  return Math.round(Math.min(ANALYSIS_SUB_PANE_MAX, Math.max(ANALYSIS_SUB_PANE_MIN, mainPaneH * ANALYSIS_SUB_PANE_RATIO)))
 }
 
 /**
- * [R649] 日K 并入的两张分析副图高度 —— 与关键价位那张图同一套判据:
- * 趋势量化要多给上下两条字道, 量化MACD 多给副图间隔与 R635 让出的那截。
+ * [R649] 日K 并入的分析副图高度 —— 与关键价位那张图同一套判据:
+ * 量化MACD 多给副图间隔与 R635 让出的那截。
  */
-export function trendPaneHeight(mainHeight: number): number {
-  return trendSubPaneHeight(mainHeight) + TREND_LANES_EXTRA
-}
-
 export function quantPaneHeight(mainHeight: number): number {
-  return trendSubPaneHeight(mainHeight) + SUB_PANE_GAP + MACD_PANE_EXTRA
+  return analysisSubPaneHeight(mainHeight) + SUB_PANE_GAP + MACD_PANE_EXTRA
 }
 
 /** [R651] 分析副图被压缩时的下限: 再挤也要看得见字道与柱体 */
 export const MIN_ANALYSIS_PANE_H = 100
 
 /**
- * [R651] 把「卡里剩下的空间」分给两张分析副图 —— **只压副图, 不动主图**。
- * `natural` 是两张副图各自想要的高度, `room` 是主图与指标副图之外剩下的像素。
+ * [R651] 把「卡里剩下的空间」分给分析副图 —— **只压副图, 不动主图**。
+ * `natural` 是各副图想要的高度, `room` 是主图与指标副图之外剩下的像素。
  * 放得下就原样返回; 放不下就等比压缩, 每张不低于 `MIN_ANALYSIS_PANE_H`。
  * 还不够时宁可让整张图向下溢出滚动, 也不拿主图的高度去换。
  */
@@ -92,14 +88,14 @@ export function fitAnalysisPaneHeights(natural: number[], room: number): number[
   return natural.map(value => Math.max(MIN_ANALYSIS_PANE_H, Math.round(value * scale)))
 }
 
-/** `height` = 主图高时, 关键价位那张图连两张副图、副图间隔与 [R635] 额外让给 MACD 的高度在内的总高(不含卡片里的按钮/图例)。 */
+/** `height` = 主图高时, 关键价位那张图连分析副图、副图间隔与 [R635] 额外让给 MACD 的高度在内的总高(不含卡片里的按钮/图例)。 */
 export function levelsChartTotalHeight(mainHeight: number): number {
-  return mainHeight + 2 * trendSubPaneHeight(mainHeight) + TREND_LANES_EXTRA + SUB_PANE_GAP + MACD_PANE_EXTRA
+  return mainHeight + analysisSubPaneHeight(mainHeight) + SUB_PANE_GAP + MACD_PANE_EXTRA
 }
 
 /**
- * [R623] 在 `available` 高度里求最大的主图高, 让主图 + 两张副图一屏装下。
- * 总高随主图单调不减, 直接二分; 副图有 160 下限, 所以空间不足时先让主图变矮。
+ * [R623] 在 `available` 高度里求最大的主图高, 让主图 + 分析副图一屏装下。
+ * 总高随主图单调不减, 直接二分; 副图有下限, 所以空间不足时先让主图变矮。
  */
 export function fitLevelsMainHeight(available: number): number {
   let lo = 120

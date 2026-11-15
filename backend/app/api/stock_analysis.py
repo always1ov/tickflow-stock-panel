@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import logging
 import math
-from datetime import date, timedelta
+from datetime import timedelta
 from typing import Any
 
 import polars as pl
@@ -551,7 +551,7 @@ def quant_macd(
     repo = request.app.state.repo
     end = cn_today()
     asset_type = repo.resolve_asset_type(symbol)
-    # [R490] 与趋势量化共用一份单票历史缓存(只读 6 列、同一只票只扫一次), 再切出预热窗口 ——
+    # [R490] 单票历史走一份缓存(只读 6 列、同一只票只扫一次), 再切出预热窗口 ——
     # 切出来的行与原来按区间直接取的一模一样。
     df = ohlcv_history.get_history(repo, asset_type, symbol, end)
     if not df.is_empty() and "date" in df.columns:
@@ -594,81 +594,6 @@ def quant_macd(
         "diff": tail(res.diff), "dea": tail(res.dea),
         "yellow": tail(res.yellow),
         "gold_icon": tail(res.gold_icon), "dead_icon": tail(res.dead_icon),
-    }
-
-
-# [R486] 趋势量化要从上市第一根算起: 「吸筹」的柱高 = VAR17 ÷ HHV(VAR17,0)(第一根到今天的
-# 最高值)。取一个早于 A 股开市的起点, 等于「库里有多少就取多少」。其余信号只要最近几百根。
-# [R490] 实际取数改由 `services/ohlcv_history`(起点同为 1990-01-01), 这里留着给守卫对照。
-_TQ_HISTORY_START = date(1990, 1, 1)
-
-
-@router.get("/trend-quant")
-def trend_quant(
-    request: Request,
-    symbol: str = Query(..., description="标的代码,如 000001.SZ"),
-    bars: int = Query(400, ge=30, le=2000, description="返回最近多少根(计算用全部历史)"),
-):
-    """[R486] 用户的「趋势量化」副图 —— 通达信公式逐行复刻, 放在量化MACD 上方。
-
-    与量化MACD 同一个取数方式(带盘中实时那一根), 但**独立计算**
-    (`indicators/trend_quant.py`, 不 import 量化MACD)。只出位置与标记,
-    不进把握分、不推送、不碰六态。
-    """
-    if not symbol:
-        raise HTTPException(400, "symbol 不能为空")
-    from app.api.kline import _maybe_inject_live_candle
-    from app.indicators import trend_quant as tq
-    from app.market_time import cn_today
-
-    empty = {"symbol": symbol, "dates": [], "wave": [], "wave_prev": [], "avg": [],
-             "stick_up": [], "xichou": [], "xichou_bar": [],
-             "marks": {k: [] for k in ("jidi", "sheng", "ding", "xia", "jiancang",
-                                       "tao", "jiandi", "juedi")}}
-    from app.services import ohlcv_history
-
-    repo = request.app.state.repo
-    asset_type = repo.resolve_asset_type(symbol)
-    # [R490] 全部历史走单票缓存: 同一只票只扫一次磁盘, 与量化MACD 共用
-    df = ohlcv_history.get_history(repo, asset_type, symbol, cn_today())
-    if df.is_empty() or not {"date", "close"}.issubset(df.columns):
-        return empty
-    cols = [c for c in ("date", "open", "high", "low", "close", "volume") if c in df.columns]
-    rows = df.select(cols).to_dicts()
-    try:
-        rows = _maybe_inject_live_candle(request, symbol, rows, asset_type)
-    except Exception as e:  # noqa: BLE001
-        logger.debug("trend-quant live candle skipped: %s", e)
-
-    import math
-
-    def finite(x) -> bool:
-        return x is not None and isinstance(x, (int, float)) and math.isfinite(x)
-
-    def col(k: str) -> list:
-        return [float(r[k]) if finite(r.get(k)) else None for r in rows]
-
-    # 与量化MACD 同一条: 收盘价不是数的那一根整根不参与(通达信里没有这种 K 线)
-    rows = [r for r in rows if finite(r.get("close"))]
-    if not rows:
-        return empty
-    res = tq.compute(col("open"), col("high"), col("low"), col("close"), col("volume"))
-
-    def tail(xs: list) -> list:
-        return [round(x, 6) if finite(x) else None for x in xs[-bars:]]
-
-    def flags(xs: list) -> list:
-        return [1 if x else None for x in xs[-bars:]]
-
-    wave_prev = [None] + res.wave[:-1]
-    return {
-        "symbol": symbol,
-        "dates": [str(r["date"])[:10] for r in rows][-bars:],
-        "wave": tail(res.wave), "wave_prev": tail(wave_prev), "avg": tail(res.avg),
-        "stick_up": tail(res.stick_up),
-        "xichou": tail(res.xichou), "xichou_bar": flags(res.xichou_bar),
-        "marks": {k: flags(getattr(res, k)) for k in ("jidi", "sheng", "ding", "xia",
-                                                      "jiancang", "tao", "jiandi", "juedi")},
     }
 
 

@@ -121,18 +121,17 @@ it('[R694] 异动只剩一颗开关: 显示方式固定为颜色, 关掉就不�
   expect(props().markers).toContainEqual(expect.objectContaining({ date: '2026-11-06', event: 'broken_limit_up' }))
 })
 
-it('[R649] 趋势量化 / 量化MACD 两张副图默认不画, 点开后才追加到日K底部', async () => {
+it('[R649] 量化MACD 副图默认不画, 点开后才追加到日K底部', async () => {
   await render()
   expect(props().analysisPanes).toEqual([])
   const pill = (label: string) => [...host.querySelectorAll('button')].find(button => button.textContent === label)!
-  await act(async () => pill('趋势量化').click())
-  expect(props().analysisPanes.map((pane: any) => pane.kind)).toEqual(['trend'])
   await act(async () => pill('量化MACD').click())
-  expect(props().analysisPanes.map((pane: any) => pane.kind)).toEqual(['trend', 'quant'])
+  expect(props().analysisPanes.map((pane: any) => pane.kind)).toEqual(['quant'])
   expect(props().analysisPanes.every((pane: any) => pane.height > 0)).toBe(true)
-  // ECharts 渲染没有这两张副图, 工具栏也不给开关
+  // ECharts 渲染没有这张副图, 工具栏也不给开关
   await render({ renderer: 'echarts' })
   expect(props().analysisPanes).toEqual([])
+  // [R724] 趋势量化已整张删除, 工具栏里不该再有那颗胶囊
   expect([...host.querySelectorAll('button')].some(button => button.textContent === '趋势量化')).toBe(false)
 })
 
@@ -204,13 +203,11 @@ it('[R660] 价位开关状态可用外部那一份(与关键价位共用), 回�
     .toEqual(['MA20', 'MA60'])
 })
 
-it('[R651] 空间不够只压两张分析副图, 主图与指标副图的高度不动', async () => {
+it('[R651] 空间不够只压分析副图, 主图与指标副图的高度不动', async () => {
   const openPanes = async (options: any) => {
     await render(options)
-    for (const label of ['趋势量化', '量化MACD']) {
-      const pill = [...host.querySelectorAll('button')].find(button => button.textContent === label)!
-      await act(async () => pill.click())
-    }
+    const pill = [...host.querySelectorAll('button')].find(button => button.textContent === '量化MACD')!
+    await act(async () => pill.click())
     const panes: any[] = props().analysisPanes
     return {
       heights: panes.map(pane => pane.height),
@@ -219,7 +216,7 @@ it('[R651] 空间不够只压两张分析副图, 主图与指标副图的高度�
     }
   }
   const roomy = await openPanes({ maxHeight: 2400 })
-  const tight = await openPanes({ maxHeight: 700 })
+  const tight = await openPanes({ maxHeight: 600 })
   expect(tight.base).toBe(roomy.base)
   expect(tight.heights.reduce((a, b) => a + b, 0)).toBeLessThan(roomy.heights.reduce((a, b) => a + b, 0))
   expect(Math.min(...tight.heights)).toBeGreaterThanOrEqual(100)

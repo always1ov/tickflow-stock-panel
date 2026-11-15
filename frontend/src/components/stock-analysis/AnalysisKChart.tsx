@@ -2,16 +2,14 @@ import { useEffect, useMemo, useState } from 'react'
 import type { AnnotationData } from '@/components/charts/ChartAnnotations'
 import { FinancialPlot } from '@/components/charts/FinancialPlot'
 import type { PaneDecorData } from '@/components/charts/SubPaneDecor'
-import { CHART_LAYOUT, LEVELS_AXIS_CLIP, MACD_PANE_EXTRA, SUB_PANE_GAP, TREND_LANES_EXTRA, trendSubPaneHeight } from '@/lib/chart-layout'
+import { analysisSubPaneHeight, CHART_LAYOUT, LEVELS_AXIS_CLIP, MACD_PANE_EXTRA, SUB_PANE_GAP } from '@/lib/chart-layout'
 import {
   FIB2_ROLE_TARGET, LEVEL_CURVE_COLOR,
   fib2RoleColor, levelColors, useChartTheme, useLevelColors, useTheme,
 } from '@/lib/theme'
 import {
   ANALYSIS_PANE_HELP, PANE_HEADER_H, quantPaneReadouts, quantPaneSeries, quantPaneTitle,
-  trendPaneReadouts, trendPaneSeries, trendPaneTitle,
 } from '@/lib/analysisPanes'
-import type { TrendQuantData } from '@/lib/trendQuantSeries'
 import type { Fib2Grain, Fib2Overlay, KlineRow, LevelSeries, QuantMacdResult } from '@/lib/api'
 import type { PlotSeries } from '@/lib/lightweight-model'
 import { fib2Status } from '@/lib/fib2Status'
@@ -33,15 +31,17 @@ import {
  * 命中判断抽到 `analysis-chart-model.ts`, 可脱离画布单测。
  *
  * [fork 移植] 在上游 lightweight 渲染之上保留牛来的全部增强:
- *   - 两档副图(pane 1 趋势量化 / pane 2 量化MACD), 取数失败在副图标题与读出处明示
+ *   - 一张副图(pane 1 量化MACD), 取数失败在副图标题与读出处明示
  *   - 斐波那契二型(上攻段 / 回踩密集带 / 首次回踩 / 未来 3 格)
  *   - 六态关键点(livermore)与二型(fib2)两个价位组
  *   - 枢轴档位、二型粗细档 / 上攻推算位 / 粗细档回测、形态状态行、价位统计面板
  *
- * [R616] 两张副图按 R565(还是 ECharts 时)的画法补画完毕 —— 不再是"近似":
- *   - 趋势量化的红绿短柱从**昨值连到今值**、吸筹白柱从 0.53 起, 八种字排进上下两条字道;
- *   - 量化MACD 的 DIFF 实心柱、DEA 空心点线框、金叉 / 死叉箭头、共振黄柱全部照旧代码画。
- *   数据仍只有一份(后端 `/trend-quant` / `/quant-macd`), 这里算的只是"怎么画"。
+ * [R616] 副图按 R565(还是 ECharts 时)的画法补画完毕 —— 不再是"近似":
+ *   量化MACD 的 DIFF 实心柱、DEA 空心点线框、金叉 / 死叉箭头、共振黄柱全部照旧代码画。
+ *   数据仍只有一份(后端 `/quant-macd`), 这里算的只是"怎么画"。
+ *
+ * [R724] 用户: 「彻底删掉趋势量化这个指标」—— 原来 pane 1 的「趋势量化」整张删除,
+ * 量化MACD 上移成 pane 1, 版面与取数都只按这一张算。
  */
 
 export type { ChartMarker, ChartRange, LevelType, PriceLevel }
@@ -99,16 +99,12 @@ interface Props {
   symbol?: string
   /** [R415] 副图「量化MACD」的逐根数值 */
   quantMacd?: QuantMacdResult
-  /** [R426] 量化MACD 取数失败 —— 副图里明说, 不让空白冒充"没有信号" */
+  /** [R724] 量化MACD 取数失败 —— 副图里明说, 不让空白冒充"没有信号" */
   quantMacdError?: boolean
-  /** [R486] 副图「趋势量化」的逐根数值 */
-  trendQuant?: TrendQuantData
-  /** [R486] 趋势量化取数失败 —— 同样在副图里明说 */
-  trendQuantError?: boolean
   /** 预留:点击某根 K 线 */
   onDateClick?: (date: string) => void
   /**
-   * 主图按这个高度算; 两个副图在它之外另加, 所以整张图比它高。
+   * 主图按这个高度算; 副图在它之外另加, 所以整张图比它高。
    * 版面高度走 `plotPaneHeights` / `CHART_LAYOUT`。
    */
   height?: number
@@ -127,10 +123,9 @@ interface Props {
 }
 
 /**
- * [R624] 两张副图的高度(`lib/chart-layout.ts` 的 `trendSubPaneHeight`):
- * [R626] 副图 = 主图的 28%(限 108~136), 趋势量化再 +50 给上下两条字道 ——
- * 主图明显大于两张副图之和。判据挪进 `chart-layout` 是为了让「整张图要多高才装得下」
- * 的弹窗反算同源 —— R616 本地一份、弹窗里再估一份(按每张副图 96), 于是「一屏」从那时起就不成立。
+ * [R624] 副图的高度(`lib/chart-layout.ts` 的 `analysisSubPaneHeight`):
+ * [R626] 副图 = 主图的 28%(限 108~136), 主图明显大于副图。
+ * 判据挪进 `chart-layout` 是为了让「整张图要多高才装得下」的弹窗反算同源。
  */
 export function AnalysisKChart({
   rows,
@@ -147,8 +142,6 @@ export function AnalysisKChart({
   symbol,
   quantMacd,
   quantMacdError = false,
-  trendQuant,
-  trendQuantError = false,
   onDateClick,
   height = 460,
   className,
@@ -208,29 +201,25 @@ export function AnalysisKChart({
     return { dates, labels: futureVals.map((_, index) => `未来${index + 1}`), values: futureVals }
   }, [futureVals, model.dates])
 
-  // 主图 + 两个副图: 主图保持 `height` 的可视高度, 副图按 R565 的比例另加两格。
-  // [R633] 两张副图之间留 `SUB_PANE_GAP`: 间隔算在 MACD pane 的顶部(标题与图一起下移),
-  // 趋势量化 pane 的高度与比例不变。[R637] 副图里不再画日期行, 日期只留最底部那条真时间轴。
+  // 主图 + 一张副图: 主图保持 `height` 的可视高度, 副图按 R565 的比例另加一格。
+  // [R633] 主图与副图之间留 `SUB_PANE_GAP`: 间隔算在 MACD pane 的顶部(标题与图一起下移)。
+  // [R637] 副图里不画日期行, 日期只留最底部那条真时间轴。
   // [R635] 日期轴的高度压不短(库按字号算, 只能抬不能压), 改为由外面的容器裁掉轴底那段空白,
   // 省下的高度连同卡片底部留白一并给量化MACD。
   const mainPaneH = Math.max(120, height - CHART_LAYOUT.timeAxis)
-  const subPaneH = trendSubPaneHeight(height)
-  const trendPaneH = subPaneH + TREND_LANES_EXTRA
+  const subPaneH = analysisSubPaneHeight(height)
   const macdPaneH = subPaneH + SUB_PANE_GAP + MACD_PANE_EXTRA
-  const plotHeight = height + trendPaneH + macdPaneH
+  const plotHeight = height + macdPaneH
   const paneHeights = useMemo(
-    () => [mainPaneH, trendPaneH, macdPaneH],
-    [mainPaneH, trendPaneH, macdPaneH],
+    () => [mainPaneH, macdPaneH],
+    [mainPaneH, macdPaneH],
   )
-  const paneTopInsets = useMemo(() => [0, 0, SUB_PANE_GAP], [])
-  /** [R634] 只有 MACD 这张副图要额外让出一行标题: 趋势量化的纵轴范围已含字道(tqYRange) */
-  const paneHeaderHeights = useMemo(() => [0, 0, PANE_HEADER_H], [])
+  const paneTopInsets = useMemo(() => [0, SUB_PANE_GAP], [])
+  const paneHeaderHeights = useMemo(() => [0, PANE_HEADER_H], [])
 
   // 取数失败 / 尚未到达时, 副图仍保留一块区域并写明状态。
   // [R648] 标题与读数行搬进 `lib/analysisPanes.ts`, 日K 那边用同一份。
-  const trendTitle = trendPaneTitle(trendQuantError)
   const quantTitle = quantPaneTitle(quantMacdError)
-  const trendReadouts = trendPaneReadouts(visibleBars, trendQuant, trendQuantError, ct.text)
   const quantReadouts = quantPaneReadouts(quantMacd, quantMacdError, ct.text)
 
   const { chartSeries, paneDecor } = useMemo(() => {
@@ -252,13 +241,12 @@ export function AnalysisKChart({
         }
         return item
       })
-    const trend = trendPaneSeries(model.dates, trendQuant, trendQuantError, trendPaneH, visibleBars)
     const quant = quantPaneSeries(model.dates, quantMacd, quantMacdError)
     return {
-      chartSeries: [...main, ...trend.series, ...quant.series],
-      paneDecor: [undefined, trend.decor, quant.decor] as (PaneDecorData | undefined)[],
+      chartSeries: [...main, ...quant.series],
+      paneDecor: [undefined, quant.decor] as (PaneDecorData | undefined)[],
     }
-  }, [model, future, trendQuant, trendQuantError, quantMacd, quantMacdError, trendPaneH, visibleBars])
+  }, [model, future, quantMacd, quantMacdError])
 
   const annotations = useMemo<AnnotationData>(() => {
     const dates = future ? [...model.dates, ...future.labels] : model.dates
@@ -507,8 +495,8 @@ export function AnalysisKChart({
           currentPrice={model.rows.at(-1)?.close}
           rightOffsetPixels={ANALYSIS_LABEL_BAND_PX}
           annotations={annotations}
-          paneTitles={['', trendTitle, quantTitle]}
-          paneReadouts={[[], trendReadouts, quantReadouts]}
+          paneTitles={['', quantTitle]}
+          paneReadouts={[[], quantReadouts]}
           paneDecor={paneDecor}
           hidePaneAxis
           onSelect={date => onDateClick?.(date)}

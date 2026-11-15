@@ -52,11 +52,7 @@ vi.mock('@/lib/theme', () => ({
   useChartTheme: () => ({ text: '#888', border: '#333', grid: '#222', crosshair: '#777', crosshairLabelBg: '#111' }),
   // [R704] 读数行里的 26日布林上下轨取价位组色, 这里给真实值(两套主题同色)
   LEVEL_PALETTE: { boll: { light: '#F97316', dark: '#F97316' } },
-  // [R616] FinancialPlot -> SubPaneDecor -> 两张副图的画法常量会连带取主题色, 这里给一组占位值
-  TREND_QUANT_COLORS: {
-    red: '#ff3b30', green: '#00ff00', yellow: '#ffcc00', text: '#888888', lightRed: '#ff8888',
-    white: '#ffffff', avg: '#aa66ff', xichou: '#00dc00', paneBg: '#000000',
-  },
+  // [R616] FinancialPlot -> SubPaneDecor -> 分析副图的画法常量会连带取主题色, 这里给一组占位值
   QUANT_MACD_COLORS: { red: '#ff3b30', green: '#00ff00', darkRed: '#aa0000', yellow: '#ffcc00', icon2: '#00dc00' },
 }))
 
@@ -615,7 +611,7 @@ it('[R633] paneTopInsets 只在指定副图顶部留空白, 其余副图不受�
   await act(async () => root.render(
     <FinancialPlot scope="levels" series={series} height={400} paneHeights={[280, 120, 124]}
       paneTopInsets={[0, 0, 12]} hidePaneAxis />))
-  // 趋势量化 pane 保持 0 边距; MACD pane 把 12px 空白折算成价格刻度上边距(12 / 124)
+  // pane 1 保持 0 边距; pane 2 把 12px 空白折算成价格刻度上边距(12 / 124)
   expect(native.series[1].priceScale().applyOptions).toHaveBeenLastCalledWith({ entireTextOnly: false, scaleMargins: { top: 0, bottom: 0 } })
   expect(native.series[2].priceScale().applyOptions).toHaveBeenLastCalledWith({ entireTextOnly: false, scaleMargins: { top: 12 / 124, bottom: 0 } })
 })
@@ -629,7 +625,7 @@ it('[R634] 标题行的高度也折进上边距, 走势从标题下方开始', a
       paneTopInsets={[0, 0, 12]} paneHeaderHeights={[0, 0, 18]} hidePaneAxis />))
   // MACD: 12px 空白 + 18px 标题行 = 30px, 柱子从标题下面起, 不再压字
   expect(native.series[2].priceScale().applyOptions).toHaveBeenLastCalledWith({ entireTextOnly: false, scaleMargins: { top: 30 / 124, bottom: 0 } })
-  // 趋势量化只动空白带, 标题行传 0 时边距完全不变
+  // 标题行传 0 的那张副图只动空白带, 边距完全不变
   expect(native.series[1].priceScale().applyOptions).toHaveBeenLastCalledWith({ entireTextOnly: false, scaleMargins: { top: 0, bottom: 0 } })
 })
 

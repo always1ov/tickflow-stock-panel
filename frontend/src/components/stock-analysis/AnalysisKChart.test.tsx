@@ -31,7 +31,6 @@ vi.mock('@/lib/theme', () => ({
   LEVEL_CURVE_COLOR: {},
   FIB2_ROLE_TARGET: '#0369A1',
   QUANT_MACD_COLORS: { red: '#FF0000', darkRed: '#CC0000', green: '#00FF00', yellow: '#FFFF00', icon2: '#00DC00', paneBg: '#000000' },
-  TREND_QUANT_COLORS: { red: '#FF0000', green: '#00FF00', yellow: '#FFFF00', white: '#FFFFFF', lightRed: '#FF8080', avg: '#B84DFF', xichou: '#00FF00', text: '#FFFFFF', paneBg: '#000000' },
 }))
 
 import { AnalysisKChart, LevelOverview } from './AnalysisKChart'
@@ -83,18 +82,18 @@ const renderChart = async (props: Partial<Parameters<typeof AnalysisKChart>[0]> 
 const lastPlot = () => plots.current.at(-1)!
 const button = (text: string) => [...host.querySelectorAll('button')].find(item => item.textContent === text)!
 
-it('renders a lightweight plot with candle, two subpanes and the configured level groups', async () => {
+it('renders a lightweight plot with candle, one analysis subpane and the configured level groups', async () => {
   await renderChart()
   const plot = lastPlot()
   expect(plot.series.map((item: any) => item.id)).toEqual([
-    'price', 'curve:keltner_s_upper', 'curve:keltner_s_lower', 'tq:empty', 'qm:empty',
+    'price', 'curve:keltner_s_upper', 'curve:keltner_s_lower', 'qm:empty',
   ])
   // 现价贴签排在最后
   expect(plot.annotations.priceLines.filter((line: any) => !line.noLine).map((line: any) => line.value))
     .toEqual([12.4, 10.2, 10.6, 12.5])
   expect(plot.visibleBars).toBe(120)
   expect(plot.rightOffsetPixels).toBe(148)
-  expect(plot.paneTitles).toEqual(['', '趋势量化', '量化MACD'])
+  expect(plot.paneTitles).toEqual(['', '量化MACD'])
   expect(host.textContent).toContain('当前价')
   expect(host.textContent).toContain('压力位 ↑')
 })
@@ -146,7 +145,7 @@ it('[R630] 量化MACD 纵轴恒含 0(原文 scale: false), 副图不写刻度', 
   })
   const plot = lastPlot()
   const zero = plot.series.find((item: any) => item.id === 'qm:scale_zero')
-  expect(zero).toMatchObject({ pane: 2 })
+  expect(zero).toMatchObject({ pane: 1 })
   expect(zero.data.map((point: any) => point.value)).toEqual([0, 0, 0])
   expect(plot.hidePaneAxis).toBe(true)
 })
