@@ -439,7 +439,9 @@ export function StockPreviewDialog({ symbol, name, onClose, navList: navListSour
                 图上方的宽度全给图。 */}
             <div className="min-h-0 flex-1 overflow-y-auto xl:grid xl:grid-cols-[minmax(0,1fr)_minmax(250px,300px)] xl:overflow-hidden">
               {/* 左(原中栏): 一张图 / 复盘([R658] 只有提示文字与四个视图标签搬进头部) */}
-              <div className="flex min-h-0 min-w-0 flex-col px-4 py-4 sm:px-6">
+              {/* [R700] 用户圈出「市值」那行与「主图指标」那排胶囊之间的空白「太多了」——
+                  原来这里是 py-4(16) + mt-3(12) = 28px, 收到 pt-1(4) + mt-1(4) = 8px。 */}
+              <div className="flex min-h-0 min-w-0 flex-col px-4 pt-1 pb-4 sm:px-6">
                 {/* 分时天数不属于搬走的那句内容, 仍留在图上方 */}
                 {chartView === 'intraday' && (
                   <div className="flex flex-wrap items-center gap-2 pb-1" aria-label="分时周期">
@@ -454,7 +456,7 @@ export function StockPreviewDialog({ symbol, name, onClose, navList: navListSour
                 )}
                 {/* [R612-fix] 一律可滚: 关键价位的画布比这里的可视区高(下面挂着两张副图),
                     裁掉就等于把副图删了 —— 改版前靠弹窗整页滚, 现在是右栏自己滚。 */}
-                <div ref={chartAreaRef} className="mt-3 min-h-0 flex-1 overflow-y-auto">
+                <div ref={chartAreaRef} className="mt-1 min-h-0 flex-1 overflow-y-auto">
                   {chartView === 'review' ? (
                     // [R442] key 跟着票走(换票时「只看有事的日子」复位) —— 与旧复盘页一样
                     <ReviewSection key={symbol} symbol={symbol} days={reviewDays} />
