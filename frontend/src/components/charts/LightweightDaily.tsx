@@ -8,7 +8,7 @@ import { CHART_LAYOUT, plotPaneHeights } from '@/lib/chart-layout'
 import {
   quantPaneReadouts, quantPaneSeries, quantPaneTitle, trendPaneReadouts, trendPaneSeries, trendPaneTitle,
 } from '@/lib/analysisPanes'
-import { useChartTheme, useTheme, type Theme } from '@/lib/theme'
+import { LEVEL_PALETTE, useChartTheme, useTheme, type Theme } from '@/lib/theme'
 import { FinancialPlot } from './FinancialPlot'
 import type { AnnotationData } from './ChartAnnotations'
 import type { PaneDecorData } from './SubPaneDecor'
@@ -25,6 +25,11 @@ const LINE_COLORS = {
   down: { dark: C.down, light: '#15803D' },
 } as const
 const maFields = [['ma5', 'gray'], ['ma10', 'blue'], ['ma20', 'orange'], ['ma60', 'plum']] as const
+// [R704] 用户: 「默认开启所有MA价格显示变成只默认开启显示MA20和26日布林轨道的价格」——
+// 换手下一行固定写这三条读数(MA20 + 26日布林上下轨), 与工具栏开关无关;
+// 布林中轨就是 MA20 附近那个数, 不重复写。名称沿用图表里的正名(`CURVE_DEFS.endLabel`)。
+const READOUT_MA = [['ma20', 'orange']] as const
+const READOUT_BOLL = [['boll_upper', '26日布林上轨'], ['boll_lower', '26日布林下轨']] as const
 
 const price = (v: number | null | undefined, digits = 2) => v != null && Number.isFinite(v)
   ? (Number(v.toFixed(digits)) === 0 ? 0 : v).toFixed(digits) : '—'
@@ -234,8 +239,10 @@ export function LightweightDaily({ data, assetType, symbol = '', height = 480, a
       </div>
       <div className="mt-0.5 flex min-h-4 flex-wrap gap-x-4 gap-y-1 text-micro">
         {/* [R702] 用户: 「不能删除换手下面那一行原来显示的标签……原来日K里面怎么显示就怎么显示」——
-            均线读数恢复成原来的「MA5 43.70」格式, 保留在换手下面这一行 */}
-        {visibleMA.map(([field, token]) => <span key={field} style={{ color: color(token) }}>{field.toUpperCase()} {price(current?.[field], precision)}</span>)}
+            均线读数恢复成原来的「MA5 43.70」格式, 保留在换手下面这一行
+            [R703] 不管有没有开 MA 开关都显示; [R704] 只留 MA20 + 26日布林上下轨。 */}
+        {READOUT_MA.map(([field, token]) => <span key={field} style={{ color: color(token) }}>{field.toUpperCase()} {price(current?.[field], precision)}</span>)}
+        {READOUT_BOLL.map(([field, label]) => <span key={field} style={{ color: LEVEL_PALETTE.boll[theme] }}>{label} {price(current?.[field], precision)}</span>)}
         {index >= 0 && previous && <span className="text-secondary">至今 <span style={{ color: rows.at(-1)!.close >= previous.close ? C.up : C.down }}>{fmtPct(rows.at(-1)!.close / previous.close - 1)}</span> · 周期 {rows.length - index}</span>}
       </div>
     </div>}
