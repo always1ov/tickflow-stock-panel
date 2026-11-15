@@ -11,7 +11,7 @@ import { NavWrapToast } from '@/components/NavPager'
 import { StockMultiDayIntradayChart } from '@/components/StockMultiDayIntradayChart'
 import { RuleEditor } from '@/components/monitor/RuleEditor'
 import { PriceAlertDialog } from '@/components/stock-analysis/PriceAlertDialog'
-import { hasOverviewLevels, LevelOverview, useShownLevels, type LevelType } from '@/components/stock-analysis/AnalysisKChart'
+import { hasOverviewLevels, LevelOverview, useShownLevels } from '@/components/stock-analysis/AnalysisKChart'
 import { useAnalysisKline, useStockLevels } from '@/components/stock-analysis/StockLevelsPanel'
 import { useLevelControls } from '@/components/stock-analysis/levelControls'
 import { HERO_DAYS_DEFAULT, PreviewHero } from '@/components/stock-preview/PreviewHero'
@@ -65,11 +65,6 @@ const VIEW_TABS: { key: PreviewView; label: string; Icon: typeof Clock }[] = [
 
 /** [R612] 图高上限 */
 const CHART_MAX_HEIGHT = 720
-/**
- * [R670] 右栏不再列通道三档 —— 短/中/长期 Keltner 的上下轨与左栏「三档位置」格子是同一组线,
- * 只留格子那边回答「在哪一格」, 数值在图上标签里也有。
- */
-const RIGHT_COLUMN_EXCLUDED_LEVELS: LevelType[] = ['keltner_s', 'keltner_m', 'keltner_l']
 /**
  * [R614] 分时那张卡里, 图以外还要占的高度 —— 1600×913 实测 109:
  * 卡片内边距 32 + 上下边框 2 + 上方天数行 63 + 间距 12。分时没有副图, 减掉它就是一屏。
@@ -328,10 +323,11 @@ export function StockPreviewDialog({ symbol, name, onClose, navList: navListSour
   const levelsQ = useStockLevels(symbol ?? '')
   const shownLevels = useShownLevels(levelsQ.data?.levels, levelsQ.data?.fib2, heroRows,
     levelCtl.fib2Grain, levelCtl.fib2ShowTargets)
-  // [R670] 右栏只列「点位」, 通道三档交给左栏格子。默认只开通道短期时这一栏是空的 ——
-  // 那就别让它白占 260px, 图直接吃满。用户开了压力支撑/枢轴/前高前低, 它自己回来。
-  const showLevelColumn = hasOverviewLevels(shownLevels.effLevels, levelCtl.activeTypes,
-    levelCtl.pivotRank, RIGHT_COLUMN_EXCLUDED_LEVELS)
+  // [R672] 右栏常驻: 用户「时刻显示右侧价位那部分」—— 不再按有无点位收栏,
+  // 三栏结构不随数据变化。只在「所有价位类型都被关掉」时给一句提示, 不留白。
+  const levelPanelEmpty = shownLevels.effLevels
+    ? !hasOverviewLevels(shownLevels.effLevels, levelCtl.activeTypes, levelCtl.pivotRank)
+    : true
 
   const openPriceAlert = (targetPrice: number, currentPrice: number) => {
     setPriceAlertDraft({ id: Date.now(), targetPrice, currentPrice })
@@ -420,12 +416,10 @@ export function StockPreviewDialog({ symbol, name, onClose, navList: navListSour
             {/* [R612] 多栏: 左「现状」/ 中图表与复盘 / 右「当前价·压力位·支撑位」; <1280 单列, 整块一起滚。
                 [R479] 原来挪在新块后面等删的旧顶栏、切换条、信息条和旧内容已删。
                 [R665] 用户: 「当前价这部分挪到右边, 最终弹窗里面是左中右布局」——
-                价位块从左边挪到第三栏, 从此是左中右三栏。 */}
-            <div className={`min-h-0 flex-1 overflow-y-auto xl:grid xl:overflow-hidden ${
-              showLevelColumn
-                ? 'xl:grid-cols-[minmax(240px,290px)_minmax(0,1fr)_minmax(240px,260px)]'
-                : 'xl:grid-cols-[minmax(240px,290px)_minmax(0,1fr)]'
-            }`}>
+                价位块从左边挪到第三栏, 从此是左中右三栏。
+                [R672] 用户: 「始终保持上下布局, 下布局里面始终保持左中右」——
+                上面是头部、下面是三栏, 三栏不再随数据增删(右栏常驻)。 */}
+            <div className="min-h-0 flex-1 overflow-y-auto xl:grid xl:grid-cols-[minmax(240px,290px)_minmax(0,1fr)_minmax(240px,260px)] xl:overflow-hidden">
               {/* 左栏: 现状(只有现成读数) */}
               <div className="border-b border-border/60 px-4 py-4 sm:px-6 xl:min-h-0 xl:overflow-y-auto xl:border-b-0 xl:border-r">
                 <StatusSection symbol={symbol} days={reviewDays} stacked={wide} />
@@ -504,24 +498,27 @@ export function StockPreviewDialog({ symbol, name, onClose, navList: navListSour
 
               {/* 右栏: 压力位 / 支撑位 —— [R665] 用户: 「当前价这部分挪到右边」,
                   从此弹窗是左「现状」/ 中图 / 右「价位」三栏。
-                  [R670] 当前价回头部唯一提供, 通道三档回左栏格子; 这一栏只剩点线可列时才占位。 */}
-              {showLevelColumn && (
-                <div className="border-t border-border/60 px-4 py-4 sm:px-6 xl:min-h-0 xl:overflow-y-auto xl:border-t-0 xl:border-l">
-                  {shownLevels.effLevels && (
-                    <LevelOverview
-                      levels={shownLevels.effLevels}
-                      activeTypes={levelCtl.activeTypes}
-                      pivotRank={levelCtl.pivotRank}
-                      close={heroRows.at(-1)?.close}
-                      hoveredKey={levelHover}
-                      onHover={setLevelHover}
-                      stacked
-                      hideClose
-                      excludeTypes={RIGHT_COLUMN_EXCLUDED_LEVELS}
-                    />
-                  )}
-                </div>
-              )}
+                  [R670] 当前价回头部唯一提供。
+                  [R672] 这一栏常驻: 用户要「时刻显示右侧价位那部分」, 通道三档也回列
+                  (左栏格子回答「在哪一格」, 这里回答「具体多少」)。价位类型全关时给提示。 */}
+              <div className="border-t border-border/60 px-4 py-4 sm:px-6 xl:min-h-0 xl:overflow-y-auto xl:border-t-0 xl:border-l">
+                {!shownLevels.effLevels ? (
+                  <div className="text-xs text-muted">…</div>
+                ) : levelPanelEmpty ? (
+                  <div className="text-xs text-muted">未开启价位 —— 在图上方「价位」开关里打开</div>
+                ) : (
+                  <LevelOverview
+                    levels={shownLevels.effLevels}
+                    activeTypes={levelCtl.activeTypes}
+                    pivotRank={levelCtl.pivotRank}
+                    close={heroRows.at(-1)?.close}
+                    hoveredKey={levelHover}
+                    onHover={setLevelHover}
+                    stacked
+                    hideClose
+                  />
+                )}
+              </div>
             </div>
 
 

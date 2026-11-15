@@ -562,12 +562,10 @@ export function hasOverviewLevels(
   levels: Record<LevelType, PriceLevel[]> | undefined,
   activeTypes: Set<LevelType>,
   pivotRank: 1 | 2 | 3,
-  excludeTypes?: LevelType[],
 ): boolean {
   if (!levels) return false
   for (const group of LEVEL_GROUPS) {
     if (!activeTypes.has(group.key)) continue
-    if (excludeTypes?.includes(group.key)) continue
     for (const point of levels[group.key] ?? []) {
       if (point.type === 'pivot' && point.rank !== undefined && point.rank > pivotRank) continue
       return true
@@ -579,7 +577,7 @@ export function hasOverviewLevels(
 // ===== 价位统计面板(默认在图表下方, 结构化文本展示; [R615] 弹窗里挪到左栏) =====
 export function LevelOverview({
   levels, activeTypes, pivotRank, close, hoveredKey, onHover, stacked = false,
-  hideClose = false, excludeTypes,
+  hideClose = false,
 }: {
   levels: Record<LevelType, PriceLevel[]>
   activeTypes: Set<LevelType>
@@ -591,8 +589,6 @@ export function LevelOverview({
   stacked?: boolean
   /** [R670] 个股弹窗: 现价由头部唯一提供, 这里只算相对百分比, 不再印第二遍 */
   hideClose?: boolean
-  /** [R670] 个股弹窗: 通道三档由左栏「三档位置」格子回答, 右栏不再列同一组曲线的上下轨 */
-  excludeTypes?: LevelType[]
 }) {
   const theme = useTheme()
   const ct = useChartTheme()
@@ -601,7 +597,6 @@ export function LevelOverview({
   const visible: PriceLevel[] = []
   for (const group of LEVEL_GROUPS) {
     if (!activeTypes.has(group.key)) continue
-    if (excludeTypes?.includes(group.key)) continue
     for (const point of levels[group.key] ?? []) {
       if (point.type === 'pivot' && point.rank !== undefined && point.rank > pivotRank) continue
       visible.push(point)
