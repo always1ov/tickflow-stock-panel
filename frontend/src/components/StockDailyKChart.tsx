@@ -560,8 +560,10 @@ export function StockDailyKChart({
             <>
               {/* [R691] 用户: 「主图指标，也就是第一行…距离上下结构分隔线太远了，留白了好多空间」——
                   外边距收到 4px(上) / 6px(下), 三段之间统一 6px 行距, 整块从 119 高降到 107。
-                  [R695] 用户: 「指标这部分往上靠近上下分隔线」—— 再收到 2px(上) / 2px(下), 行间 4px。 */}
-              <div className="flex flex-wrap items-center gap-x-1 gap-y-2 px-3 pt-0.5 pb-0">
+                  [R695] 用户: 「指标这部分往上靠近上下分隔线」—— 再收到 2px(上) / 2px(下), 行间 4px。
+                  [R698] 用户: 「指标部分上下的空间几乎没有了不合理」—— 2px 贴太死, 上下各回到 4px;
+                  「指标部分的内边距也是」—— 三段之间(内) 回到 6px, 外圈仍留 4px。 */}
+              <div className="flex flex-wrap items-center gap-x-1 gap-y-2 px-3 pt-1 pb-0">
                 <span className="w-16 shrink-0 text-micro text-muted" title="画在主图上的指标">主图指标</span>
                 {/* [R652] 主图四条均线各自可开关, 默认只开 MA20; [R689] 色点即那条均线在图上颜色 */}
                 {MA_KEYS.map(key => {
@@ -583,7 +585,7 @@ export function StockDailyKChart({
                   折叠按钮撤掉, 价位开关常开。
                   [R684] 归到「主图指标」组内: 左侧缩进到与均线那排胶囊的左边缘对齐。 */}
               {showLevelToolbar && (
-                <div className="flex flex-wrap items-center gap-y-2 pr-3 pl-3 pt-1 pb-0 sm:pl-20 [&>div]:mb-0 [&>div]:gap-y-2" data-testid="level-toolbar">
+                <div className="flex flex-wrap items-center gap-y-2 pr-3 pl-3 pt-1.5 pb-0 sm:pl-20 [&>div]:mb-0 [&>div]:gap-y-2" data-testid="level-toolbar">
                   {/* [R687] 用户: 「全部清除后面的问号按钮删掉」—— 不传 help, 「?」不在弹窗工具栏出现 */}
                   <LevelToolbar
                     groups={LEVEL_GROUPS}
@@ -609,7 +611,7 @@ export function StockDailyKChart({
                   ))}
                 </div>
               )}
-              <div className="flex flex-wrap items-center gap-x-1 gap-y-2 px-3 pt-1 pb-0.5">
+              <div className="flex flex-wrap items-center gap-x-1 gap-y-2 px-3 pt-1.5 pb-1">
                 <span className="w-16 shrink-0 text-micro text-muted" title="画在下方副图里的指标">副图指标</span>
                 {subIndicatorPills}
                 {analysisPanePills}
