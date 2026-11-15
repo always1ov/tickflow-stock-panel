@@ -15,7 +15,7 @@ const DAILY_SUB_CHARTS = SUB_CHART_META.filter(def => def.key === 'vol')
 import {
   CHART_LAYOUT, SUB_PANE_GAP, dailyChartHeight, fitAnalysisPaneHeights, quantPaneHeight, trendPaneHeight,
 } from '@/lib/chart-layout'
-import { PANE_HEADER_H, ANALYSIS_PANE_HELP } from '@/lib/analysisPanes'
+import { PANE_HEADER_H } from '@/lib/analysisPanes'
 import { useStockQuantMacd, useStockTrendQuant } from '@/lib/useStockAnalysisPanes'
 import { useShownLevels } from '@/components/stock-analysis/AnalysisKChart'
 import { Fib2GrainDialog } from '@/components/stock-analysis/Fib2GrainDialog'
@@ -551,13 +551,13 @@ export function StockDailyKChart({
                   [R684] 归到「主图指标」组内: 左侧缩进到与均线那排胶囊的左边缘对齐。 */}
               {showLevelToolbar && (
                 <div className="flex flex-wrap items-center gap-y-2 pr-3 pl-3 pt-1 pb-0.5 sm:pl-20 [&>div]:mb-0 [&>div]:gap-y-2" data-testid="level-toolbar">
+                  {/* [R687] 用户: 「全部清除后面的问号按钮删掉」—— 不传 help, 「?」不在弹窗工具栏出现 */}
                   <LevelToolbar
                     groups={LEVEL_GROUPS}
                     controls={levelCtl}
                     effLevels={shown.effLevels}
                     fib2Raw={shown.fib2Raw}
                     fib2={levelsQ.data?.fib2}
-                    help={ANALYSIS_PANE_HELP}
                     onOpenFit={symbol ? () => setFib2FitOpen(true) : undefined}
                     compact
                   />
