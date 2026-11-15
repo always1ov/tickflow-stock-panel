@@ -320,17 +320,17 @@ export function LightweightDaily({ data, assetType, symbol = '', height = 480, a
           <span key={name} className="text-muted">{name} <span className="text-secondary">{price(value, precision)}</span></span>)}
         {change != null && <span style={{ color: change >= 0 ? C.up : C.down }}>{fmtPct(change)}</span>}
         {turnover != null && <span className="text-muted">换手 {fmtPct(turnover)}</span>}
-        {/* [R696] 用户: 「异动 / 自选 / 回测 8% / 全部清除挪到换手后面, 保持右对齐」——
-            ml-auto 把它们推到读数条右端, 不跟着「换手」贴在一起。 */}
-        {readoutExtra && <div className="ml-auto flex items-center gap-1.5 pl-2">{readoutExtra}</div>}
       </div>
-      <div className="mt-0.5 flex min-h-4 flex-wrap gap-x-4 gap-y-1 text-micro">
+      <div className="mt-0.5 flex min-h-4 flex-wrap items-center gap-x-4 gap-y-1 text-micro">
         {/* [R702] 用户: 「不能删除换手下面那一行原来显示的标签……原来日K里面怎么显示就怎么显示」——
             均线读数恢复成原来的「MA5 43.70」格式, 保留在换手下面这一行
             [R703] 不管有没有开 MA 开关都显示; [R704] 只留 MA20 + 26日布林上下轨。 */}
         {READOUT_MA.map(([field, token]) => <span key={field} style={{ color: color(token) }}>{field.toUpperCase()} {price(current?.[field], precision)}</span>)}
         {READOUT_BOLL.map(([field, label]) => <span key={field} style={{ color: LEVEL_PALETTE.boll[theme] }}>{label} {price(current?.[field], precision)}</span>)}
         {index >= 0 && previous && <span className="text-secondary">至今 <span style={{ color: rows.at(-1)!.close >= previous.close ? C.up : C.down }}>{fmtPct(rows.at(-1)!.close / previous.close - 1)}</span> · 周期 {rows.length - index}</span>}
+        {/* [R729] 用户: 「鼠标移出主图就会又变成这样」—— 按钮挤在第一行会把 MA/布林那行顶到第三行,
+            看起来像读数跑下去了。挪到这一行右端: MA/布林始终紧跟换手下一行, 按钮仍右对齐。 */}
+        {readoutExtra && <div className="ml-auto flex items-center gap-1.5 pl-2">{readoutExtra}</div>}
       </div>
     </div>}
     <FinancialPlot scope={scope} series={plotSeries} height={plotHeight} paneHeights={paneHeights} pricePrecision={precision}
