@@ -310,8 +310,9 @@ function StateHistory({ d }: { d: StockReview }) {
       </div>
 
       {/* 怎么看: 只指出现在在哪一行、那一行的数 —— 不说该拿该走 */}
+      {/* [R678] 不再套提示框: 用户要「左中右里面不要框」, 这条也只是正文的一段 */}
       {cur && (
-        <p className="mt-3 rounded-btn border border-warning/30 bg-warning/[0.06] px-3 py-2 text-xs leading-5 text-secondary">
+        <p className="mt-3 text-xs leading-5 text-secondary">
           怎么看: 先找到<b className="text-foreground">当前状态那一行</b>(下表高亮的「{cur.label}」)。
           这只票上它出现过 {cur.n} 次、共 {cur.days} 天
           {cur.done > 0 ? (
