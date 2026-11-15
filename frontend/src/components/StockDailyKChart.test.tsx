@@ -161,7 +161,7 @@ it('[R657] 日K 里指标开关键与价位开关键同一尺寸(跟原来那颗
   await render()
   const byLabel = (label: string) => [...host.querySelectorAll('button')]
     .find(button => button.textContent?.trim() === label)!
-  const indicator = byLabel('RSI')
+  const indicator = byLabel('成交量')
   const level = host.querySelector('[data-testid="level-toolbar"] button')
   expect(level).not.toBeNull()
   for (const button of [indicator, level!]) {

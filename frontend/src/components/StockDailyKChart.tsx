@@ -9,8 +9,9 @@ import { SUB_CHART_META } from '@/lib/chart-indicators'
 /**
  * [R659] 用户: 「日K 里面的副图 MACD 可以删除了」。MACD 的取数与画法仍是共享的
  * (`LightweightDaily` / `EChartsCandlestick` 都还画, 指数页也在用), 这里只撤掉日K 的入口。
+ * [R684] 用户: 「RSI 和 KDJ 都可以删除了」—— 副图指标只剩成交量, 趋势量化 / 量化MACD 紧跟其后。
  */
-const DAILY_SUB_CHARTS = SUB_CHART_META.filter(def => def.key !== 'macd')
+const DAILY_SUB_CHARTS = SUB_CHART_META.filter(def => def.key === 'vol')
 import {
   CHART_LAYOUT, SUB_PANE_GAP, dailyChartHeight, fitAnalysisPaneHeights, quantPaneHeight, trendPaneHeight,
 } from '@/lib/chart-layout'
@@ -413,161 +414,180 @@ export function StockDailyKChart({
   }, [showIndicatorControls, rows.length, renderer])
   const Chart = renderer === 'lightweight' ? LightweightDaily : EChartsCandlestick
 
+  // [R684] 两种渲染器都要用同一份胶囊, 提到 return 之前只写一遍:
+  // 副图指标胶囊(成交量 / 其后的量比) 与右端标注开关(异动 / 颜色 / 自选 / 回测调参)。
+  // [R656] 原来的 BOLL 开关撤下 —— 26 日布林改由「主图指标」里那排价位开关的「26日布林」控制。
+  const subIndicatorPills = DAILY_SUB_CHARTS.map(ind => (
+    <span key={ind.key} className="contents">
+      <ChartPill
+        active={activeIndicators.includes(ind.key)}
+        label={ind.label}
+        activeClass="bg-accent/20 text-accent"
+        onClick={() => toggleIndicator(ind.key)}
+      />
+      {/* [R683] 「量比」只对成交量生效, 紧跟在它后面 */}
+      {ind.key === 'vol' && activeIndicators.includes('vol') && (
+        <div className="ml-0.5 flex h-5 items-center gap-1.5 border-l border-border/70 pl-2">
+          <span className="text-micro text-muted">量比</span>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={volumeCompare.enabled}
+            aria-label="开启量能对比"
+            title={volumeCompare.enabled ? '关闭量能对比' : '开启量能对比'}
+            onClick={() => updateVolumeCompare({ enabled: !volumeCompare.enabled })}
+            className={`relative h-3.5 w-6 shrink-0 rounded-full transition-colors ${
+              volumeCompare.enabled ? 'bg-accent' : 'bg-surface border border-border'
+            }`}
+          >
+            <span className={`absolute left-0 top-0.5 h-2.5 w-2.5 rounded-full bg-white transition-transform ${
+              volumeCompare.enabled ? 'translate-x-3' : 'translate-x-0.5'
+            }`} />
+          </button>
+          <select
+            aria-label="量能对比周期"
+            value={volumeCompare.days}
+            disabled={!volumeCompare.enabled}
+            onChange={event => updateVolumeCompare({ days: Number(event.target.value) })}
+            className="h-5 rounded-btn border border-border bg-base px-1 text-micro text-secondary outline-none disabled:opacity-40"
+          >
+            {Array.from({ length: 20 }, (_, index) => index + 1).map(days => (
+              <option key={days} value={days}>前{days}日均量</option>
+            ))}
+          </select>
+        </div>
+      )}
+    </span>
+  ))
+
+  // [R649] 从「关键价位」并过来的两张副图 —— 固定排在各指标副图之后; ECharts 渲染没有这两张副图, 不给开关。
+  const analysisPanePills = (
+    <>
+      <ChartPill
+        active={showTrendQuant}
+        label="趋势量化"
+        activeClass="bg-accent/20 text-accent"
+        onClick={() => setShowTrendQuant(value => !value)}
+      />
+      <ChartPill
+        active={showQuantMacd}
+        label="量化MACD"
+        activeClass="bg-accent/20 text-accent"
+        onClick={() => setShowQuantMacd(value => !value)}
+      />
+    </>
+  )
+
+  // 两个标注开关统一右对齐
+  const markerControls = (
+    <div className="ml-auto flex items-center gap-1.5">
+      {showMarkerToggle && showLimitMarkers && (
+        <div className="flex items-center gap-1">
+          <ChartPill
+            active={showMarkers}
+            label="异动"
+            activeClass="text-[#FACC15] bg-[#FACC15]/10"
+            onClick={() => setShowMarkers(v => !v)}
+          />
+          {renderer === 'lightweight' && <select
+            aria-label="异动显示方式"
+            title="文字：显示板/炸/跌/翘标记；颜色：涨停为黄，跌停为青蓝；炸板收阳为玫紫、收阴为蓝紫；翘板收阳为薄荷青、收阴为钢蓝。开收同价沿用对应收阴色，影线保留原涨跌色。"
+            value={markerStyle}
+            disabled={!showMarkers}
+            onChange={event => updateMarkerStyle(event.target.value as DailyMarkerStyle)}
+            className="h-5 w-[74px] rounded-btn border border-border bg-base px-1 text-micro text-secondary outline-none focus-visible:ring-2 focus-visible:ring-accent/60 disabled:opacity-40"
+          >
+            <option value="label">文字</option>
+            <option value="candle">颜色</option>
+          </select>}
+        </div>
+      )}
+      {/* 激活色与图表里的 ADDED_DATE_COLOR 一致; Tailwind 只认字面量类名, 故写死色值 */}
+      {showMarkerToggle && addedDate && (
+        <ChartPill
+          active={showAddedMark}
+          label="自选"
+          activeClass="text-[#3B82F6] bg-[#3B82F6]/10"
+          title={showAddedMark ? '隐藏K线上的加入自选日标注' : '显示K线上的加入自选日标注'}
+          onClick={() => setShowAddedMark(v => !v)}
+        />
+      )}
+      {/* [R680] 回测调参 —— 用户: 「还是放到中里面的『异动 颜色 自选』的自选的后面」 */}
+      {toolbarExtra}
+    </div>
+  )
+
   if (!symbol) return null
 
   return (
     <div className={className} style={{ minHeight: chartHeight }}>
       {showIndicatorControls && rows.length > 0 && (
-        <div ref={toolbarRef} className={renderer === 'lightweight' ? 'flex min-h-10 flex-wrap items-center gap-1 border-b border-border/50 bg-elevated/20 px-3 py-1.5' : 'flex items-center gap-1.5 px-1 pb-0.5'}>
-          {/* [R683] 用户: 「成交量这个指标前面的『日 K』这两个字也可以删除了」——
-              那颗只是纯文字标签, 不是开关, 删掉。
-              指标按专业术语分两组: 主图指标(画在K线上) / 副图指标(画在下方副图)。 */}
+        <div ref={toolbarRef} className={renderer === 'lightweight' ? 'border-b border-border/50 bg-elevated/20' : 'flex items-center gap-1.5 px-1 pb-0.5'}>
+          {/* [R684] 用户: 「(压力支撑 / 枢轴点 / 前高前低 / 26日布林 / 量化通道短期·中期·长期 /
+              ATR波动通道 / 缺口位 / 斐波那契Ⅰ型 / 整数关口 / 六态关键点)这些都是主图指标」——
+              这些价位开关本来就画在主图上, 和四条均线同属主图指标, 不该自成第三类、还挂不上名字。
+              工具栏因此按专业术语分三段: 主图指标(均线) → 主图指标续(价位开关, 缩进对齐) → 副图指标。 */}
           {renderer === 'lightweight' && (
             <>
-              <span className="shrink-0 text-micro text-muted" title="画在主图上的指标">主图指标</span>
-              {/* [R652] 主图四条均线各自可开关, 默认只开 MA20 */}
-              {MA_KEYS.map(key => (
-                <ChartPill
-                  key={key}
-                  active={maKeys.includes(key)}
-                  label={key.toUpperCase()}
-                  activeClass="bg-accent/20 text-accent"
-                  onClick={() => toggleMA(key)}
-                />
-              ))}
-              <span className="mx-1 h-4 w-px shrink-0 bg-border/60" aria-hidden />
-              <span className="shrink-0 text-micro text-muted" title="画在下方副图里的指标">副图指标</span>
-            </>
-          )}
-          {DAILY_SUB_CHARTS.map(ind => (
-            <span key={ind.key} className="contents">
-              <ChartPill
-                active={activeIndicators.includes(ind.key)}
-                label={ind.label}
-                activeClass="bg-accent/20 text-accent"
-                onClick={() => toggleIndicator(ind.key)}
-              />
-              {/* [R683] 「量比」只对成交量生效, 紧跟在它后面 */}
-              {ind.key === 'vol' && activeIndicators.includes('vol') && (
-                <div className="ml-0.5 flex h-5 items-center gap-1.5 border-l border-border/70 pl-2">
-                  <span className="text-micro text-muted">量比</span>
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={volumeCompare.enabled}
-                    aria-label="开启量能对比"
-                    title={volumeCompare.enabled ? '关闭量能对比' : '开启量能对比'}
-                    onClick={() => updateVolumeCompare({ enabled: !volumeCompare.enabled })}
-                    className={`relative h-3.5 w-6 shrink-0 rounded-full transition-colors ${
-                      volumeCompare.enabled ? 'bg-accent' : 'bg-surface border border-border'
-                    }`}
-                  >
-                    <span className={`absolute left-0 top-0.5 h-2.5 w-2.5 rounded-full bg-white transition-transform ${
-                      volumeCompare.enabled ? 'translate-x-3' : 'translate-x-0.5'
-                    }`} />
-                  </button>
-                  <select
-                    aria-label="量能对比周期"
-                    value={volumeCompare.days}
-                    disabled={!volumeCompare.enabled}
-                    onChange={event => updateVolumeCompare({ days: Number(event.target.value) })}
-                    className="h-5 rounded-btn border border-border bg-base px-1 text-micro text-secondary outline-none disabled:opacity-40"
-                  >
-                    {Array.from({ length: 20 }, (_, index) => index + 1).map(days => (
-                      <option key={days} value={days}>前{days}日均量</option>
-                    ))}
-                  </select>
+              <div className="flex flex-wrap items-center gap-1 px-3 pt-1.5">
+                <span className="w-16 shrink-0 text-micro text-muted" title="画在主图上的指标">主图指标</span>
+                {/* [R652] 主图四条均线各自可开关, 默认只开 MA20 */}
+                {MA_KEYS.map(key => (
+                  <ChartPill
+                    key={key}
+                    active={maKeys.includes(key)}
+                    label={key.toUpperCase()}
+                    activeClass="bg-accent/20 text-accent"
+                    onClick={() => toggleMA(key)}
+                  />
+                ))}
+                {markerControls}
+              </div>
+              {/* [R653] 价位开关排: 与「关键价位」同一个 LevelToolbar、同一套计数与文案;
+                  [R660] 开关/悬停状态由弹窗持有, 切视图保持; 回测「成交K线」弹窗不显示这排;
+                  [R683] 用户: 「我不需要『价位 · 1 类』这样折叠，我喜欢指标都放出来」——
+                  折叠按钮撤掉, 价位开关常开。
+                  [R684] 归到「主图指标」组内: 左侧缩进到与均线那排胶囊的左边缘对齐。 */}
+              {showLevelToolbar && (
+                <div className="flex flex-wrap items-center pr-3 pl-3 sm:pl-20" data-testid="level-toolbar">
+                  <LevelToolbar
+                    groups={LEVEL_GROUPS}
+                    controls={levelCtl}
+                    effLevels={shown.effLevels}
+                    fib2Raw={shown.fib2Raw}
+                    fib2={levelsQ.data?.fib2}
+                    help={ANALYSIS_PANE_HELP}
+                    onOpenFit={symbol ? () => setFib2FitOpen(true) : undefined}
+                    compact
+                  />
                 </div>
               )}
-            </span>
-          ))}
-          {/* [R656] 原来的 BOLL 开关撤下 —— 26 日布林改由下面「关键价位」那排的「26日布林」控制 */}
-          {/* [R649] 从「关键价位」并过来的两张副图 —— 固定排在各指标副图之后 */}
-          {renderer === 'lightweight' && (
-            <>
-              <ChartPill
-                active={showTrendQuant}
-                label="趋势量化"
-                activeClass="bg-accent/20 text-accent"
-                onClick={() => setShowTrendQuant(value => !value)}
-              />
-              <ChartPill
-                active={showQuantMacd}
-                label="量化MACD"
-                activeClass="bg-accent/20 text-accent"
-                onClick={() => setShowQuantMacd(value => !value)}
-              />
+              {/* [R411] 形态走到哪一步 —— 只报事实, 一个动词都没有; 显示沿用日K 自己的极简行 */}
+              {levelCtl.activeTypes.has('fib2') && fib2Line && (
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 px-3 pb-1.5 text-micro leading-5">
+                  <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: levelColorsByTheme.fib2 }} />
+                  {fib2Line.map((segment, index) => (
+                    <span key={segment} className={index === 0 ? 'text-secondary' : 'text-muted'}>
+                      {index > 0 && <span className="mr-2 opacity-40">·</span>}
+                      {segment}
+                    </span>
+                  ))}
+                </div>
+              )}
+              <div className="flex flex-wrap items-center gap-1 px-3 pb-1.5">
+                <span className="w-16 shrink-0 text-micro text-muted" title="画在下方副图里的指标">副图指标</span>
+                {subIndicatorPills}
+                {analysisPanePills}
+              </div>
             </>
           )}
-          {/* 两个标注开关统一右对齐 */}
-          <div className="ml-auto flex items-center gap-1.5">
-            {showMarkerToggle && showLimitMarkers && (
-              <div className="flex items-center gap-1">
-                <ChartPill
-                  active={showMarkers}
-                  label="异动"
-                  activeClass="text-[#FACC15] bg-[#FACC15]/10"
-                  onClick={() => setShowMarkers(v => !v)}
-                />
-                {renderer === 'lightweight' && <select
-                  aria-label="异动显示方式"
-                  title="文字：显示板/炸/跌/翘标记；颜色：涨停为黄，跌停为青蓝；炸板收阳为玫紫、收阴为蓝紫；翘板收阳为薄荷青、收阴为钢蓝。开收同价沿用对应收阴色，影线保留原涨跌色。"
-                  value={markerStyle}
-                  disabled={!showMarkers}
-                  onChange={event => updateMarkerStyle(event.target.value as DailyMarkerStyle)}
-                  className="h-5 w-[74px] rounded-btn border border-border bg-base px-1 text-micro text-secondary outline-none focus-visible:ring-2 focus-visible:ring-accent/60 disabled:opacity-40"
-                >
-                  <option value="label">文字</option>
-                  <option value="candle">颜色</option>
-                </select>}
-              </div>
-            )}
-            {/* 激活色与图表里的 ADDED_DATE_COLOR 一致; Tailwind 只认字面量类名, 故写死色值 */}
-            {showMarkerToggle && addedDate && (
-              <ChartPill
-                active={showAddedMark}
-                label="自选"
-                activeClass="text-[#3B82F6] bg-[#3B82F6]/10"
-                title={showAddedMark ? '隐藏K线上的加入自选日标注' : '显示K线上的加入自选日标注'}
-                onClick={() => setShowAddedMark(v => !v)}
-              />
-            )}
-            {/* [R680] 回测调参 —— 用户: 「还是放到中里面的『异动 颜色 自选』的自选的后面」 */}
-            {toolbarExtra}
-          </div>
-        </div>
-      )}
-      {/* [R653] 价位开关排: 与「关键价位」同一个 LevelToolbar、同一套计数与文案;
-          [R660] 开关/悬停状态由弹窗持有, 切视图保持; 回测「成交K线」弹窗不显示这排 */}
-      {showIndicatorControls && showLevelToolbar && renderer === 'lightweight' && rows.length > 0 && (
-        <>
-          {/* [R683] 用户: 「我不需要『价位 · 1 类』这样折叠，我喜欢指标都放出来」——
-              R680 那行折叠按钮撤掉, 价位开关恢复常开。 */}
-          <div className="flex flex-wrap items-center border-b border-border/50 bg-elevated/10 px-3 pt-1.5" data-testid="level-toolbar">
-            <LevelToolbar
-              groups={LEVEL_GROUPS}
-              controls={levelCtl}
-              effLevels={shown.effLevels}
-              fib2Raw={shown.fib2Raw}
-              fib2={levelsQ.data?.fib2}
-              help={ANALYSIS_PANE_HELP}
-              onOpenFit={symbol ? () => setFib2FitOpen(true) : undefined}
-              compact
-            />
-          </div>
-          {/* [R411] 形态走到哪一步 —— 只报事实, 一个动词都没有; 显示沿用日K 自己的极简行 */}
-          {levelCtl.activeTypes.has('fib2') && fib2Line && (
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 px-3 pb-1.5 text-micro leading-5">
-              <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: levelColorsByTheme.fib2 }} />
-              {fib2Line.map((segment, index) => (
-                <span key={segment} className={index === 0 ? 'text-secondary' : 'text-muted'}>
-                  {index > 0 && <span className="mr-2 opacity-40">·</span>}
-                  {segment}
-                </span>
-              ))}
-            </div>
+          {renderer !== 'lightweight' && (
+            <>
+              {subIndicatorPills}
+              {markerControls}
+            </>
           )}
-        </>
+        </div>
       )}
       {fib2FitOpen && symbol && (
         <Fib2GrainDialog
