@@ -21,6 +21,8 @@ export const SUB_CHART_META = [
   { key: 'kdj', label: 'KDJ', height: 72 },
   // [R714] 用户: 「新增一个副图指标, 再完美复刻」—— 通达信「主力COME」, 只有柱和字, 见下面计算。
   { key: 'inst', label: '主力COME', height: 96 },
+  // [R722] 用户: 「新增一个副图指标……先解读这个通达信指标『ATR 原始版 - 副图』, 再完美复刻」
+  { key: 'atr_band', label: 'ATR原始', height: 96 },
 ]
 
 /** [R714] 通达信 SMA(X,N,M): Y=(M·X+(N-M)·Y')/N, 首值取 X —— 不是简单均线, 不能拿 rolling mean 顶替。 */
@@ -109,8 +111,87 @@ export function computeInstitutionSeries(rows: OHLC[]): InstPoint[] {
     return { inst: inst[i], trend: trend[i], mainForce, mainSignal }
   })
 }
-export function volMaN(data: OHLC[], n: number): (number | null)[] {
-  const result: (number | null)[] = []
+/**
+ * [R722] 通达信「ATR 原始版 - 副图」的配色。**暗色取公式原色**, 亮色换成同色相的深一档
+ * (与 `DAILY_LINE_COLORS` 同一做法), 否则 `#00FF00` 落在白底上几乎看不见。
+ * 公式里 `COLOR0000FF` 按用户自己的说法是「蓝线」(S), `COLORFF8800` 是 BASIS 橙 ——
+ * 这里按 RGB 直读取色; 若按 BGR 读会变成 S 红、BASIS 蓝, 与用户描述对不上。
+ */
+export const ATR_BAND_COLORS = {
+  atr: { dark: '#3B82F6', light: '#2563EB' },
+  basis: { dark: '#FF8800', light: '#C2410C' },
+  band: { dark: '#808080', light: '#6B7280' },
+  refMid: { dark: '#00FF00', light: '#15803D' },
+  icon: { dark: '#EF4444', light: '#DC2626' },
+} as const
+
+export interface AtrBandPoint {
+  /** S = ATR20 */
+  atr: number | null
+  /** BASIS = ATR20 的 34 日简单均线 */
+  basis: number | null
+  upper: number | null
+  lower: number | null
+  /** REFMID = (LOWER + BASIS) / 2 —— 蓝线上穿这条线就是信号 */
+  refMid: number | null
+  /** DRAWICON 的条件: CROSS(S, REFMID) */
+  crossUp: boolean
+}
+
+/**
+ * [R722] 通达信「ATR 原始版 - 副图」的取数, 逐句照抄公式:
+ *
+ *   TR1:=MAX(MAX(H-L,ABS(REF(C,1)-H)),ABS(REF(C,1)-L));
+ *   ATR20:=MA(TR1,20);  SVAL:=ATR20;
+ *   BASISV:=MA(SVAL,34);  DEV:=2.0*STD(SVAL,34);
+ *   UPPERV:=BASISV+DEV;  LOWERV:=BASISV-DEV;
+ *   REFMIDV:=(LOWERV+BASISV)/2;
+ *   DRAWICON(CROSS(SVAL,REFMIDV),REFMIDV,1);
+ *
+ * 三点口径: ①`MA` 是简单均线, 不足 N 根不出值(与 `volMaN` 一致, 通达信也从第 N 根才画);
+ * ②`STD` 是**估算标准差**(除以 N-1), 不是总体标准差; ③首根的 `REF(C,1)` 不存在, TR 取 H-L。
+ *
+ * 用法(用户原话): 出现信号 + 缎带收束 / 长期贴下轨, 说明将有一波单边行情,
+ * 方向另结合 MA/EMA 判断 —— 指标本身不带方向, 全品种通用(可用于做空)。
+ */
+export function computeAtrBandSeries(rows: OHLC[], n = 20, bbLen = 34, bbMult = 2): AtrBandPoint[] {
+  const tr = rows.map((row, i) => {
+    const hl = row.high - row.low
+    const prevClose = i > 0 ? rows[i - 1].close : null
+    return prevClose == null ? hl : Math.max(hl, Math.abs(prevClose - row.high), Math.abs(prevClose - row.low))
+  })
+  const mean = (values: (number | null)[], window: number) => values.map((_, i) => {
+    if (i < window - 1) return null
+    let sum = 0
+    for (let j = i - window + 1; j <= i; j++) {
+      const value = values[j]
+      if (value == null) return null
+      sum += value
+    }
+    return sum / window
+  })
+  const atr = mean(tr, n)
+  const basis = mean(atr, bbLen)
+  const dev = atr.map((value, i) => {
+    if (value == null || i < bbLen - 1) return null
+    let sum = 0
+    for (let j = i - bbLen + 1; j <= i; j++) sum += atr[j]!
+    const avg = sum / bbLen
+    let squares = 0
+    for (let j = i - bbLen + 1; j <= i; j++) squares += (atr[j]! - avg) ** 2
+    return Math.sqrt(squares / (bbLen - 1))
+  })
+  const upper = basis.map((mid, i) => mid == null || dev[i] == null ? null : mid + bbMult * dev[i]!)
+  const lower = basis.map((mid, i) => mid == null || dev[i] == null ? null : mid - bbMult * dev[i]!)
+  const refMid = lower.map((low, i) => low == null || basis[i] == null ? null : (low + basis[i]!) / 2)
+  return rows.map((_, i) => ({
+    atr: atr[i], basis: basis[i], upper: upper[i], lower: lower[i], refMid: refMid[i],
+    crossUp: i > 0 && atr[i] != null && refMid[i] != null && atr[i - 1] != null && refMid[i - 1] != null
+      && atr[i]! > refMid[i]! && atr[i - 1]! <= refMid[i - 1]!,
+  }))
+}
+
+export function volMaN(data: OHLC[], n: number): (number | null)[] {  const result: (number | null)[] = []
   for (let i = 0; i < data.length; i++) {
     if (i < n - 1) { result.push(null); continue }
     let sum = 0

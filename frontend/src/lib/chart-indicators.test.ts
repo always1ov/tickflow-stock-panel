@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { computeInstitutionSeries, tdxEma, tdxSma } from './chart-indicators'
+import { computeAtrBandSeries, computeInstitutionSeries, tdxEma, tdxSma } from './chart-indicators'
 import type { OHLC } from './chart-types'
 
 const row = (i: number, close: number, high = close + 0.5, low = close - 0.5): OHLC => ({
@@ -52,5 +52,29 @@ describe('[R714] 通达信公式的最小实现', () => {
     expect(signals.length).toBeGreaterThan(0)
     for (let k = 1; k < signals.length; k++) expect(signals[k] - signals[k - 1]).toBeGreaterThanOrEqual(10)
     for (const point of points) if (point.mainSignal) expect(point.mainForce).toBe(true)
+  })
+})
+
+describe('[R722] 通达信「ATR 原始版」副图', () => {
+  // H=11 / L=9 / C=10: 每天 TR 恒为 2, 振幅不动时 DEV 为 0、五条线并成一条
+  const flat = (count: number) => Array.from({ length: count }, (_, i) => row(i, 10, 11, 9))
+
+  it('S / BASIS 按 20 / 34 根简单均线, 不足窗口不出值', () => {
+    const points = computeAtrBandSeries(flat(60))
+    expect(points[18].atr).toBeNull()
+    expect(points[19].atr).toBe(2)
+    expect(points[51].basis).toBeNull()
+    expect(points[52].basis).toBe(2)
+    expect(points[52].upper).toBe(2)
+    expect(points[52].lower).toBe(2)
+    expect(points[52].refMid).toBe(2)
+    expect(points.every(point => !point.crossUp)).toBe(true)
+  })
+
+  it('S 上穿 REFMID 的那一根给出信号, 不重复报', () => {
+    const points = computeAtrBandSeries([...flat(60), row(60, 20, 21, 19)])
+    expect(points[60].atr).toBeCloseTo((19 * 2 + 11) / 20)
+    expect(points[60].crossUp).toBe(true)
+    expect(points.filter(point => point.crossUp)).toHaveLength(1)
   })
 })

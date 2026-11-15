@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { SeriesMarker, Time } from 'lightweight-charts'
 import type { ChartMarker, DailyChartProps, OHLC } from '@/lib/chart-types'
-import { DAILY_LINE_COLORS, SUB_CHART_META, computeInstitutionSeries, volMaN, volumeRatioAt } from '@/lib/chart-indicators'
+import { ATR_BAND_COLORS, DAILY_LINE_COLORS, SUB_CHART_META, computeAtrBandSeries, computeInstitutionSeries, volMaN, volumeRatioAt } from '@/lib/chart-indicators'
 import { CHART_COLORS as C, lineData, validDailyRows, type PlotSeries } from '@/lib/lightweight-model'
 import { fmtVolume, fmtPct, pricePrecision } from '@/lib/format'
 import { CHART_LAYOUT, plotPaneHeights } from '@/lib/chart-layout'
@@ -95,6 +95,17 @@ export function LightweightDaily({ data, assetType, symbol = '', height = 480, a
     })
     return { items }
   }, [rows, instSeries])
+  // [R722] 通达信「ATR 原始版」: 蓝=S(ATR20) / 橙=BASIS / 灰=上下轨 / 绿=参考线; 蓝线上穿参考线画向上箭头
+  const atrBand = useMemo(() => computeAtrBandSeries(rows), [rows])
+  const atrDecor = useMemo<PaneDecorData>(() => ({
+    items: rows.flatMap((row, idx) => {
+      const point = atrBand[idx]
+      // DRAWICON(CROSS(SVAL,REFMIDV),REFMIDV,1) —— icon 1 是向上箭头, 钉在参考线那一格
+      return point.crossUp && point.refMid != null
+        ? [{ kind: 'icon' as const, time: row.date, value: point.refMid, up: true, color: ATR_BAND_COLORS.icon[theme] }]
+        : []
+    }),
+  }), [rows, atrBand, theme])
   const scope = `${symbol}:${rows[0]?.date ?? ''}:${ranges?.map(range => `${range.start}:${range.end}`).join(';') ?? ''}`
   const [hover, setHover] = useState<{ scope: string; time: string } | null>(null)
   const index = hover?.scope === scope ? rows.findIndex(d => d.date === hover.time) : -1
@@ -121,7 +132,7 @@ export function LightweightDaily({ data, assetType, symbol = '', height = 480, a
       }
     }) }]
     const addLine = (id: string, values: ReturnType<typeof lineData>, color: string, pane = 0,
-      options: Pick<PlotSeries, 'range' | 'precision' | 'priceFormat'> = {}) => {
+      options: Pick<PlotSeries, 'range' | 'precision' | 'priceFormat' | 'lineWidth'> = {}) => {
       series.push({ id, type: 'Line', pane, data: values, color, ...options })
     }
     // [R709] 用户: 「悬浮的时候MA也在主图显示了」—— 悬停某个价位点位时, 价位线压到 12%,
@@ -140,6 +151,17 @@ export function LightweightDaily({ data, assetType, symbol = '', height = 480, a
       } else if (key === 'inst') {
         // 公式里 机构线 / 机构趋势 都是 `:=` 变量、不画线; 只留一条透明线把副图刻度钉在 0~100
         addLine('inst_scale', rows.map(r => ({ time: r.date, value: 50 })), 'rgba(0,0,0,0)', pane, { range: { min: 0, max: 100 } })
+      } else if (key === 'atr_band') {
+        // [R722] 五条线照公式画: S/BASIS/UPPER/LOWER 是 LINETHICK2, REFMID 是 LINETHICK1
+        const band = (field: 'atr' | 'basis' | 'upper' | 'lower' | 'refMid') => rows.map((r, idx) => {
+          const value = atrBand[idx][field]
+          return typeof value === 'number' ? { time: r.date, value } : { time: r.date }
+        })
+        addLine('atr_s', band('atr'), ATR_BAND_COLORS.atr[theme], pane, { lineWidth: 2 })
+        addLine('atr_basis', band('basis'), ATR_BAND_COLORS.basis[theme], pane, { lineWidth: 2 })
+        addLine('atr_upper', band('upper'), ATR_BAND_COLORS.band[theme], pane, { lineWidth: 2 })
+        addLine('atr_lower', band('lower'), ATR_BAND_COLORS.band[theme], pane, { lineWidth: 2 })
+        addLine('atr_refmid', band('refMid'), ATR_BAND_COLORS.refMid[theme], pane, { lineWidth: 1 })
       } else {
         const lines = fields[key as keyof typeof fields]
         for (const [field, label, token] of lines) addLine(label, lineData(rows, field), color(token), pane,
@@ -150,7 +172,7 @@ export function LightweightDaily({ data, assetType, symbol = '', height = 480, a
       }
     })
     return series
-  }, [rows, visibleMA, selected, activeIndicators, events, markerStyle, showMarkers, theme, volumeMAs, dimLines])
+  }, [rows, visibleMA, selected, activeIndicators, events, markerStyle, showMarkers, theme, volumeMAs, dimLines, atrBand])
 
   // [R649] 底部并入的分析副图(趋势量化 / 量化MACD): 排在各指标副图之后, 高度由调用方算好。
   // 与关键价位那张图同一份画法(`lib/analysisPanes.ts`), 这里只负责 pane 下标与版面。
@@ -252,13 +274,22 @@ export function LightweightDaily({ data, assetType, symbol = '', height = 480, a
       result.push({ text: `机构线 ${price(point?.inst, 1)}` })
       result.push({ text: `趋势 ${price(point?.trend, 1)}` })
       if (point?.mainForce) result.push({ text: '主力', color: INST_COLORS.up })
+    } else if (key === 'atr_band') {
+      // [R722] 通达信副图读数: S / BASIS / UPPER / LOWER / REFMID, 上穿那一格补一个「上穿」
+      const point = atrBand[i]
+      result.push({ text: `S ${price(point?.atr)}`, color: ATR_BAND_COLORS.atr[theme] })
+      result.push({ text: `BASIS ${price(point?.basis)}`, color: ATR_BAND_COLORS.basis[theme] })
+      result.push({ text: `UPPER ${price(point?.upper)}`, color: ATR_BAND_COLORS.band[theme] })
+      result.push({ text: `LOWER ${price(point?.lower)}`, color: ATR_BAND_COLORS.band[theme] })
+      result.push({ text: `REFMID ${price(point?.refMid)}`, color: ATR_BAND_COLORS.refMid[theme] })
+      if (point?.crossUp) result.push({ text: '上穿', color: ATR_BAND_COLORS.icon[theme] })
     } else {
       for (const [field, label, token] of fields[key as keyof typeof fields]) result.push({ text: `${label} ${price(current?.[field], key === 'macd' ? 3 : 1)}`, color: color(token) })
       if (key === 'macd') result.push({ text: `MACD ${price(current?.macd_hist, 3)}`,
         color: current?.macd_hist == null || !Number.isFinite(current.macd_hist) ? undefined : color(current.macd_hist >= 0 ? 'up' : 'down') })
     }
     return result
-  }), ...analysis.readouts], [selected, current, rows, i, volumeCompare.days, volumeCompare.enabled, theme, volumeMAs, instSeries, analysis.readouts])
+  }), ...analysis.readouts], [selected, current, rows, i, volumeCompare.days, volumeCompare.enabled, theme, volumeMAs, instSeries, atrBand, analysis.readouts])
   const change = previous?.close ? current.close / previous.close - 1 : null
   const turnover = stockInfo?.float_shares && current?.volume != null ? current.volume * 100 / stockInfo.float_shares : null
 
@@ -291,7 +322,7 @@ export function LightweightDaily({ data, assetType, symbol = '', height = 480, a
     <FinancialPlot scope={scope} series={plotSeries} height={plotHeight} paneHeights={paneHeights} pricePrecision={precision}
       paneTopInsets={[0, ...selected.map(() => 0), ...analysis.insets]}
       paneHeaderHeights={[0, ...selected.map(() => 0), ...analysis.headers]}
-      paneDecor={[undefined, ...selected.map(key => key === 'inst' ? instDecor : undefined), ...analysis.decor]}
+      paneDecor={[undefined, ...selected.map(key => key === 'inst' ? instDecor : key === 'atr_band' ? atrDecor : undefined), ...analysis.decor]}
       hidePaneAxis={analysis.hidden.length ? analysis.hidden : undefined}
       markers={chartMarkers} annotations={annotations} volumeLabels={volumeLabels} paneTitles={paneTitles} paneReadouts={paneReadouts}
       linkedPrice={linkedPrice} visibleBars={visibleBars} currentPrice={rows.at(-1)?.close}
