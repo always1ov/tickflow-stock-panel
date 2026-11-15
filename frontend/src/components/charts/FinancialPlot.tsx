@@ -289,7 +289,19 @@ export function FinancialPlot(props: Props) {
         lastValueVisible: false, priceLineVisible: false,
         ...(spec.priceScaleId ? { priceScaleId: spec.priceScaleId, lineVisible: false } : {}),
         crosshairMarkerVisible: false, visible: spec.visible ?? true,
-        priceFormat: spec.priceFormat === 'volume' ? { type: 'custom' as const, formatter: fmtBigNum, minMove: 1 }
+        // [R717] 用户: 「成交量副图的资金列默认任何个股都要显示完整」——成交量 pane 只有 95px 高,
+        // 自动刻度最高那一档可能正好压在 pane 顶边、被裁掉上半截(实测只剩半个「60万」)。
+        // `entireTextOnly` 管不到这一档(它只影响刻度避让), 所以在这儿按坐标兜底: 落进顶/底边 10px
+        // 以内的刻度给空串, 留下的每一档金额都是完整的; 副图高度与柱形比例都不动。
+        priceFormat: spec.priceFormat === 'volume' ? { type: 'custom' as const, formatter: fmtBigNum, minMove: 1,
+          tickmarksFormatter: (values: number[]) => {
+            const api = seriesRef.current.get(spec.id)?.api
+            const paneH = props.paneHeights[spec.pane] ?? 0
+            return values.map(value => {
+              const y = api?.priceToCoordinate(value)
+              return y != null && (y < 10 || (paneH > 0 && y > paneH - 10)) ? '' : fmtBigNum(value)
+            })
+          } }
           : props.intraday && spec.pane === 0 ? {
             type: 'custom' as const, minMove: 10 ** -(props.pricePrecision ?? 2),
             formatter: spec.priceFormat === 'percent' ? formatAxisPercent : (value: number) => value.toFixed(props.pricePrecision ?? 2),
