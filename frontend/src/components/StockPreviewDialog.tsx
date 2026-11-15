@@ -437,8 +437,15 @@ export function StockPreviewDialog({ symbol, name, onClose, navList: navListSour
                 [R682] 用户: 「跌破转弱站上转强都不要了, 剩下的趋势六态和通道阶段内容合并到
                 右里面, 从此左中右布局变成左右布局」—— 左栏撤掉, 现状整块并进右栏顶部,
                 图上方的宽度全给图。 */}
-            <div className="min-h-0 flex-1 overflow-y-auto xl:grid xl:grid-cols-[minmax(0,1fr)_minmax(250px,300px)] xl:overflow-hidden">
-              {/* 左(原中栏): 一张图 / 复盘([R658] 只有提示文字与四个视图标签搬进头部) */}
+            <div className="min-h-0 flex-1 overflow-y-auto xl:grid xl:grid-cols-[minmax(240px,290px)_minmax(0,1fr)_minmax(250px,300px)] xl:overflow-hidden">
+              {/* [R707] 用户: 「恢复左中右布局, 左里面放『趋势状态 · 六态』和『通道阶段』」，
+                  随后又补一句「上中下轨也放到左里面」—— 左栏三格齐全, 右栏只留价位阶梯。
+                  宽度沿用 R672–R681 那版 240~290。 */}
+              <div className="border-b border-border/60 px-4 py-4 sm:px-6 xl:min-h-0 xl:overflow-y-auto xl:border-b-0 xl:border-r">
+                <StatusSection symbol={symbol} days={reviewDays} />
+              </div>
+
+              {/* 中(原左): 一张图 / 复盘([R658] 只有提示文字与四个视图标签搬进头部) */}
               {/* [R700] 用户圈出「市值」那行与「主图指标」那排胶囊之间的空白「太多了」——
                   原来这里是 py-4(16) + mt-3(12) = 28px, 收到 pt-1(4) + mt-1(4) = 8px。 */}
               <div className="flex min-h-0 min-w-0 flex-col px-4 pt-1 pb-4 sm:px-6">
@@ -516,16 +523,15 @@ export function StockPreviewDialog({ symbol, name, onClose, navList: navListSour
                 </div>
               </div>
 
-              {/* 右栏: 现状 + 价位 —— [R665] 用户: 「当前价这部分挪到右边」。
+              {/* 右栏: 价位 —— [R665] 用户: 「当前价这部分挪到右边」。
                   [R670] 当前价回头部唯一提供。
                   [R672] 这一栏常驻: 用户要「时刻显示右侧价位那部分」, 通道三档也回列。
                   [R680] 价位列表改成阶梯 —— 压力在上、现价居中、支撑在下, 每条带距离。
                   [R681] 三档位置曾搬回左栏。
-                  [R682] 权限反转: 左栏整块撤掉, 趋势六态 / 通道阶段 / 三档位置并到这一栏顶部,
-                  下面接价位阶梯 —— 三栏变两栏, 用户: 「从此左中右布局变成左右布局」。 */}
+                  [R682] 权限反转: 左栏整块撤掉, 趋势六态 / 通道阶段 / 三档位置并到这一栏顶部。
+                  [R707] 左栏恢复并装回三格, 这一栏回到只放价位阶梯 —— 三栏重新是
+                  「现状 / 图 / 价位」。 */}
               <div className="border-t border-border/60 px-4 py-4 sm:px-6 xl:min-h-0 xl:overflow-y-auto xl:border-t-0 xl:border-l">
-                <StatusSection symbol={symbol} days={reviewDays} />
-                <div className="mt-5">
                 {!shownLevels.effLevels ? (
                   <div className="text-xs text-muted">…</div>
                 ) : levelPanelEmpty ? (
@@ -544,7 +550,6 @@ export function StockPreviewDialog({ symbol, name, onClose, navList: navListSour
                     flat
                   />
                 )}
-                </div>
               </div>
             </div>
 
