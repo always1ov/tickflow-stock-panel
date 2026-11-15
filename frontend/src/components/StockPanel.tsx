@@ -28,8 +28,10 @@ interface Props {
   showQuoteIdentity?: boolean
   /** [R671] 头部模式: 只输出指标那一行, 由 PreviewHero 嵌进弹窗头部 */
   headerStats?: boolean
-  /** [R679] 头部指标行右端、自选于之前的一颗东西(弹窗放「回测调参」) */
-  headerExtra?: ReactNode
+  /** [R680] 图上方工具栏右端、「异动 / 自选」之后的一颗东西(弹窗放「回测调参」) */
+  toolbarExtra?: ReactNode
+  /** [R680] 价位开关排默认收起(弹窗里收起, 给图多留一行高) */
+  levelToolbarDefaultOpen?: boolean
   /** [R671] 指标行已在头部 —— 这里只画图 */
   hideInfoBar?: boolean
   /** [R673] 弹窗分栏里不再罩一层卡框(圆角+边框), 图直接铺满分栏 */
@@ -101,7 +103,8 @@ export function StockPanel({
   renderer = 'echarts',
   showQuoteIdentity = true,
   headerStats = false,
-  headerExtra,
+  toolbarExtra,
+  levelToolbarDefaultOpen,
   hideInfoBar = false,
   flat = false,
   height = 520,
@@ -279,7 +282,6 @@ export function StockPanel({
         symbol={symbol}
         showIdentity={showQuoteIdentity}
         headerMode={headerStats}
-        headerExtra={headerExtra}
         name={name}
         stockInfo={stockInfo}
         rows={rawRows}
@@ -322,6 +324,8 @@ export function StockPanel({
           hoveredKey={levelHoveredKey}
           onHoverKey={onLevelHoverKey}
           showLevelToolbar={showLevelToolbar}
+          levelToolbarDefaultOpen={levelToolbarDefaultOpen}
+          toolbarExtra={toolbarExtra}
           refreshLive={refreshLive}
         />
 

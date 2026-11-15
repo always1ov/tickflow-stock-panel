@@ -40,11 +40,6 @@ interface Props {
    * 也不自带内边距 —— 头部那一行已经负责认票与操作。
    */
   headerMode?: boolean
-  /**
-   * [R679] 头部版式右端、紧挨「自选于」之前的一颗东西(弹窗放「回测调参」)。
-   * 用户: 「左里面的回测调参按钮放到上里面的自选于的前面」。
-   */
-  headerExtra?: ReactNode
 }
 
 /**
@@ -131,7 +126,6 @@ export function StockInfoBar({
   watchlistPending,
   addedDate,
   headerMode = false,
-  headerExtra,
 }: Props) {
   // 弹窗开关：纯本地状态，与数据/配置无关，放早期 return 之前
   const [customizerOpen, setCustomizerOpen] = useState(false)
@@ -299,7 +293,6 @@ export function StockInfoBar({
         {inlineFields.map(renderField)}
         {standaloneFields.map(f => renderField(f))}
         <div className="ml-auto flex items-center gap-1">
-          {headerExtra}
           {addedDate && (
             <span
               className="shrink-0 font-mono text-micro text-muted"

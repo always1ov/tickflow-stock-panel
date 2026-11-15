@@ -34,11 +34,9 @@ import { BAND_CN, POS_FILL } from '@/lib/reviewTimeline'
 import { TrendSignalBadge, trendPivotTitle, useStockTrend } from '@/components/stock-analysis/TrendStateBar'
 import { pct, useStockReview } from '@/components/stock-analysis/StockReviewDialog'
 
-export function StatusSection({ symbol, days, stacked = false }: {
+export function StatusSection({ symbol, days }: {
   symbol: string
   days: number
-  /** [R612] 双栏弹窗的左栏只有 300~340px, 四格并排塞不下 —— 一列到底 */
-  stacked?: boolean
 }) {
   const review = useStockReview(symbol, days).data
   const d = review && !review.error ? review : undefined
@@ -47,12 +45,12 @@ export function StatusSection({ symbol, days, stacked = false }: {
       {/* [R677] 用户: 「『现状 / 走到哪一步、在什么位置』是一整行内容不要」——
           连标题带副标题整行撤掉, 左栏从「趋势状态 · 六态」直接开始。
           [R673] 这四格也不再罩卡框: 左栏本身已是独立分栏, 再罩一层圆角边框只是白白
-          吃掉一圈 16px(用户: 「左中右里面的内容没必要再套一层框框住, 这样很浪费空间」) */}
-      <div className={cn('grid grid-cols-1 items-start gap-x-8 gap-y-5',
-        !stacked && 'sm:grid-cols-2 lg:grid-cols-4')}>
+          吃掉一圈 16px(用户: 「左中右里面的内容没必要再套一层框框住, 这样很浪费空间」)
+          [R680] 五段竖排压成三段(方案 A): 趋势状态 / 跌破·站上并列 / 通道阶段;
+          三档位置搬到右栏, 和价位梯队放在一起(位置类归位置栏)。 */}
+      <div className="flex flex-col gap-5">
         <TrendCell symbol={symbol} />
         <ChannelCell d={d} />
-        <BandsCell d={d} />
       </div>
     </section>
   )
@@ -78,7 +76,7 @@ function TrendCell({ symbol }: { symbol: string }) {
   }
   const bull = t.side === '多头'
   return (
-    <>
+    <div className="min-w-0">
       <Cell label={<>趋势状态 · 六态{t.intraday && <span className="ml-1.5 text-warning" title="实时价参与了六态判定, 收盘价可能改变结论 —— 定稿以收盘为准">盘中口径</span>}</>}>
         <div className="flex items-baseline gap-2">
           {/* [R551] 悬停: 操作建议 + 两条翻转价背后的参考数 —— 原来印在图上方六态条里, 那条已撤 */}
@@ -92,9 +90,10 @@ function TrendCell({ symbol }: { symbol: string }) {
           自 {t.since}{t.entered_from_cn && <> 由「{t.entered_from_cn}」转入</>}
         </div>
         {/* [R679] 「回测调参 N%」搬去弹窗头部(自选于左边), 用户: 「左里面的回测调参按钮
-            放到上里面的自选于的前面」。这一格只留六态本身。 */}
+            放到上里面的自选于的前面」。这一格只留六态本身。
+            [R680] 再按用户「还是放到中里面的『异动 颜色 自选』的自选的后面」搬进中栏工具栏。 */}
       </Cell>
-      <div className="flex flex-wrap gap-x-8 gap-y-5">
+      <div className="mt-3 grid grid-cols-2 gap-4">
         {t.flip_down != null && (
           <FlipCell label="跌破转弱" price={t.flip_down} dist={t.flip_down_distance_pct} tone="bear" />
         )}
@@ -102,7 +101,7 @@ function TrendCell({ symbol }: { symbol: string }) {
           <FlipCell label="站上转强" price={t.flip_up} dist={t.flip_up_distance_pct} tone="bull" />
         )}
       </div>
-    </>
+    </div>
   )
 }
 
@@ -135,10 +134,10 @@ function ChannelCell({ d }: { d?: StockReview }) {
   )
 }
 
-// ── 三档位置 ──
+// ── 三档位置([R680] 搬到右栏, 与价位梯队放一起) ──
 const SLOT: Record<string, 0 | 1 | 2> = { above: 0, near_upper: 0, inside: 1, near_lower: 2, below: 2 }
 
-function BandsCell({ d }: { d?: StockReview }) {
+export function BandsCell({ d }: { d?: StockReview }) {
   const bands = d?.rows[0]?.bands
   if (!bands) return null
   return (

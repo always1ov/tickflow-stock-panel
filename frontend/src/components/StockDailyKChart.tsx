@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { type KlineRow } from '@/lib/api'
 import { klineDailyQueryOptions, klineDateRange } from '@/lib/kline'
@@ -88,6 +88,13 @@ interface Props {
   onHoverKey?: (key: string | null) => void
   /** [R660] 回测「成交K线」弹窗不需要这排价位开关 */
   showLevelToolbar?: boolean
+  /**
+   * [R680] 个股弹窗: 价位开关排默认收起, 只留一行「价位 · N 类」; 点开才铺开那排胶囊,
+   * 给图多留 30px 高。其它入口不传 = 一直铺开(与原来一致)。
+   */
+  levelToolbarDefaultOpen?: boolean
+  /** [R680] 工具栏右端、「异动 / 自选」之后的一颗东西(弹窗放「回测调参」) */
+  toolbarExtra?: ReactNode
   /** [R660] 盘中现拉最新一根, 与关键价位视图同口径 */
   refreshLive?: boolean
 }
@@ -208,9 +215,13 @@ export function StockDailyKChart({
   hoveredKey: hoveredKeyProp,
   onHoverKey,
   showLevelToolbar = true,
+  levelToolbarDefaultOpen = true,
+  toolbarExtra,
   refreshLive = false,
 }: Props) {
   const [activeIndicators, setActiveIndicators] = useState<string[]>(['vol'])
+  // [R680] 价位开关排的展开状态 —— 弹窗里默认收起, 只占一行
+  const [levelRowOpen, setLevelRowOpen] = useState(levelToolbarDefaultOpen)
   // [R652] 四条主图均线逐条可控。[R655] 用户要求默认只留 MA20, 其余三条默认关。
   // ECharts 渲染器画不了单条, 仍按 showMA 整组。
   const [maKeys, setMaKeys] = useState<string[]>(() => showMA ? ['ma20'] : [])
@@ -518,6 +529,8 @@ export function StockDailyKChart({
                 onClick={() => setShowAddedMark(v => !v)}
               />
             )}
+            {/* [R680] 回测调参 —— 用户: 「还是放到中里面的『异动 颜色 自选』的自选的后面」 */}
+            {toolbarExtra}
           </div>
         </div>
       )}
@@ -525,7 +538,21 @@ export function StockDailyKChart({
           [R660] 开关/悬停状态由弹窗持有, 切视图保持; 回测「成交K线」弹窗不显示这排 */}
       {showIndicatorControls && showLevelToolbar && renderer === 'lightweight' && rows.length > 0 && (
         <>
-          <div className="flex flex-wrap items-center border-b border-border/50 bg-elevated/10 px-3 pt-1.5" data-testid="level-toolbar">
+          {/* [R680] 收起状态只留这一行开关; 弹窗默认收起(levelToolbarDefaultOpen=false) */}
+          <div className="flex items-center border-b border-border/50 bg-elevated/10 px-3 py-1">
+            <button
+              type="button"
+              aria-expanded={levelRowOpen}
+              onClick={() => setLevelRowOpen(v => !v)}
+              title={levelRowOpen ? '收起价位开关' : '展开价位开关'}
+              className="inline-flex items-center gap-1 rounded-btn px-1.5 py-0.5 text-micro text-secondary transition-colors hover:bg-elevated hover:text-foreground"
+            >
+              价位 · {levelCtl.activeTypes.size} 类
+              <span className={`transition-transform ${levelRowOpen ? 'rotate-180' : ''}`}>▾</span>
+            </button>
+          </div>
+          {levelRowOpen && (
+          <div className="flex flex-wrap items-center border-b border-border/50 bg-elevated/10 px-3 pb-1.5" data-testid="level-toolbar">
             <LevelToolbar
               groups={LEVEL_GROUPS}
               controls={levelCtl}
@@ -537,6 +564,7 @@ export function StockDailyKChart({
               compact
             />
           </div>
+          )}
           {/* [R411] 形态走到哪一步 —— 只报事实, 一个动词都没有; 显示沿用日K 自己的极简行 */}
           {levelCtl.activeTypes.has('fib2') && fib2Line && (
             <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 px-3 pb-1.5 text-micro leading-5">

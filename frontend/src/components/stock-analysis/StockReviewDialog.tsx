@@ -134,11 +134,13 @@ export const FLIP_BASIS = '转折次日开盘进出 · 转多买入、转空清�
 export const VERDICT_BASIS = '换档次日开盘进出 · 偏买建仓、偏卖与回避清仓(不做空);「拿着」「等着」不动手 —— 口径与作者原话的出入见「说明」'
 
 /** [R431] 复盘数据。个股弹窗「复盘」那一块与本页同一个查询键、同一套选项 */
-export function useStockReview(symbol: string, days: number) {
+export function useStockReview(symbol: string, days: number, enabled = true) {
   return useQuery({
     queryKey: QK.stockReview(symbol, days),
     queryFn: () => api.stockReview(symbol, days),
     staleTime: 5 * 60_000,
+    // [R680] 弹窗 close 动画期间 symbol 可能为空, 别拿空 symbol 去发请求(会弹「symbol 不能为空」)
+    enabled: enabled && !!symbol,
   })
 }
 

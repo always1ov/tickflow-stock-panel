@@ -577,7 +577,7 @@ export function hasOverviewLevels(
 // ===== 价位统计面板(默认在图表下方, 结构化文本展示; [R615] 弹窗里挪到左栏) =====
 export function LevelOverview({
   levels, activeTypes, pivotRank, close, hoveredKey, onHover, stacked = false,
-  hideClose = false, flat = false,
+  hideClose = false, flat = false, ladder = false,
 }: {
   levels: Record<LevelType, PriceLevel[]>
   activeTypes: Set<LevelType>
@@ -594,6 +594,11 @@ export function LevelOverview({
    * 圆角框 + bg-base/20 只是白白吃掉 px-3 / py-2。用户: 「左中右里面的还有框你没处理」。
    */
   flat?: boolean
+  /**
+   * [R680] 方案 A 的价位阶梯: 压力在上 → 现价居中 → 支撑在下, 自上而下价格递减。
+   * 常规模式是「现价一行 + 两组列表」, 两种读法各有场景, 这里只加开关不改旧版式。
+   */
+  ladder?: boolean
 }) {
   const theme = useTheme()
   const ct = useChartTheme()
@@ -651,35 +656,67 @@ export function LevelOverview({
   return (
     <div className={`grid grid-cols-1 gap-x-6 gap-y-1 ${stacked ? '' : 'sm:grid-cols-2'} ${
       flat ? '' : 'mt-3 rounded-card border border-border/40 bg-base/20 px-3 py-2'}`}>
-      {/* 当前价 —— [R670] 弹窗里头部已印, 这里只留压力/支撑 */}
-      {!hideClose && (
-        <div className={`flex items-center gap-2 pb-1 border-b border-border/30 mb-0.5 ${stacked ? '' : 'sm:col-span-2'}`}>
-          <span className="text-micro text-muted">当前价</span>
-          <span className="text-xs font-mono font-medium text-foreground">{cur.toFixed(2)}</span>
-        </div>
-      )}
-      {/* 压力位(从近到远,即从低到高)倒序展示:最高的在最上 */}
-      {resistances.length > 0 && (
-        <div>
-          <div className="text-micro font-medium text-bear mb-0.5">压力位 ↑</div>
-          {[...resistances].reverse().map((point, index) => <Row key={`r-${index}`} point={point} />)}
-        </div>
-      )}
-      {/* 支撑位 + 中性(枢轴位 P) */}
-      <div>
-        {supports.length > 0 && (
-          <>
-            <div className="text-micro font-medium text-bull mb-0.5">支撑位 ↓</div>
-            {supports.map((point, index) => <Row key={`s-${index}`} point={point} />)}
-          </>
-        )}
-        {neutrals.length > 0 && (
-          <div className={supports.length > 0 ? 'mt-2' : ''}>
-            {supports.length === 0 && <div className="text-micro font-medium text-muted mb-0.5">枢轴位</div>}
-            {neutrals.map((point, index) => <Row key={`n-${index}`} point={point} />)}
+      {/* [R680] 阶梯模式: 压力(高)在上 → 现价 → 支撑(低)在下, 一列到底 */}
+      {ladder ? (
+        <>
+          {resistances.length > 0 && (
+            <div>
+              <div className="text-micro font-medium text-bear mb-0.5">压力位 ↑</div>
+              {[...resistances].reverse().map((point, index) => <Row key={`r-${index}`} point={point} />)}
+            </div>
+          )}
+          <div className="flex items-center gap-2 border-y border-border/40 px-1.5 -mx-1.5 py-1">
+            <span className="text-micro text-muted">现价</span>
+            <span className="text-sm font-mono font-semibold tabular-nums text-foreground">{cur.toFixed(2)}</span>
           </div>
-        )}
-      </div>
+          <div>
+            {supports.length > 0 && (
+              <>
+                <div className="text-micro font-medium text-bull mb-0.5">支撑位 ↓</div>
+                {supports.map((point, index) => <Row key={`s-${index}`} point={point} />)}
+              </>
+            )}
+            {neutrals.length > 0 && (
+              <div className={supports.length > 0 ? 'mt-2' : ''}>
+                {supports.length === 0 && <div className="text-micro font-medium text-muted mb-0.5">枢轴位</div>}
+                {neutrals.map((point, index) => <Row key={`n-${index}`} point={point} />)}
+              </div>
+            )}
+          </div>
+        </>
+      ) : (
+        <>
+          {/* 当前价 —— [R670] 弹窗里头部已印, 这里只留压力/支撑 */}
+          {!hideClose && (
+            <div className={`flex items-center gap-2 pb-1 border-b border-border/30 mb-0.5 ${stacked ? '' : 'sm:col-span-2'}`}>
+              <span className="text-micro text-muted">当前价</span>
+              <span className="text-xs font-mono font-medium text-foreground">{cur.toFixed(2)}</span>
+            </div>
+          )}
+          {/* 压力位(从近到远,即从低到高)倒序展示:最高的在最上 */}
+          {resistances.length > 0 && (
+            <div>
+              <div className="text-micro font-medium text-bear mb-0.5">压力位 ↑</div>
+              {[...resistances].reverse().map((point, index) => <Row key={`r-${index}`} point={point} />)}
+            </div>
+          )}
+          {/* 支撑位 + 中性(枢轴位 P) */}
+          <div>
+            {supports.length > 0 && (
+              <>
+                <div className="text-micro font-medium text-bull mb-0.5">支撑位 ↓</div>
+                {supports.map((point, index) => <Row key={`s-${index}`} point={point} />)}
+              </>
+            )}
+            {neutrals.length > 0 && (
+              <div className={supports.length > 0 ? 'mt-2' : ''}>
+                {supports.length === 0 && <div className="text-micro font-medium text-muted mb-0.5">枢轴位</div>}
+                {neutrals.map((point, index) => <Row key={`n-${index}`} point={point} />)}
+              </div>
+            )}
+          </div>
+        </>
+      )}
     </div>
   )
 }
