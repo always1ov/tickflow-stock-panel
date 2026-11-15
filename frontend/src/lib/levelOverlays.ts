@@ -1,7 +1,7 @@
 import type { AnnotationData } from '@/components/charts/ChartAnnotations'
 import type { LevelType } from '@/components/stock-analysis/analysis-chart-model'
 import { nextBusinessDates, normalizeDate } from '@/components/stock-analysis/AnalysisKChart'
-import type { ChartRange } from '@/lib/chart-types'
+import type { ChartPriceBand, ChartRange } from '@/lib/chart-types'
 import type { Fib2Overlay, KlineRow } from '@/lib/api'
 import type { PlotSeries } from '@/lib/lightweight-model'
 
@@ -20,8 +20,18 @@ export interface LevelFib2Overlay {
   ranges: ChartRange[]
   labels: NonNullable<AnnotationData['labels']>
   verticals: NonNullable<AnnotationData['verticals']>
+  /** [R727] 回踩密集带的价格区间底色(基线 markArea 的画法) */
+  bands: ChartPriceBand[]
   /** 位移均线露到最后一根之外的三个值 + 它们的空槽日期 */
   future: { dates: string[]; labels: string[]; values: number[] } | null
+}
+
+/** [R727] `#RRGGBB` / `#RRGGBBAA` → `rgba(r,g,b,a)`; 认不出就原样返回。 */
+function hexToRgba(color: string, alpha: number): string {
+  const match = /^#([0-9a-f]{6})([0-9a-f]{2})?$/i.exec(color)
+  if (!match) return color
+  const value = parseInt(match[1], 16)
+  return `rgba(${(value >> 16) & 255},${(value >> 8) & 255},${value & 255},${alpha})`
 }
 
 /**
@@ -38,7 +48,7 @@ export function levelFib2Overlay(input: {
   fibColor: string
   textColor: string
 }): LevelFib2Overlay {
-  const result: LevelFib2Overlay = { priceLines: [], ranges: [], labels: [], verticals: [], future: null }
+  const result: LevelFib2Overlay = { priceLines: [], ranges: [], labels: [], verticals: [], bands: [], future: null }
   if (!new Set(input.active).has('fib2') || !input.fib2) return result
   const { fib2, rows } = input
   const dates = rows.map(row => normalizeDate(row.date))
@@ -65,12 +75,28 @@ export function levelFib2Overlay(input: {
       end: thrustEnd,
       label: `单边上攻 ${thrust.days} 天`,
       color: input.theme === 'dark' ? 'rgba(210,70,59,0.20)' : 'rgba(210,70,59,0.13)',
+      // [R727] R565 前的画法: 虚线边框 + 红色加粗标签。
+      borderColor: input.theme === 'dark' ? 'rgba(210,70,59,0.45)' : 'rgba(210,70,59,0.32)',
+      borderType: 'dashed',
+      labelColor: '#D2463B',
+      labelBold: true,
     })
   }
 
   const zone = input.fib2Zone
   if (zone && zone.high > 0) {
     const thin = Math.max(0, (input.lastClose ?? zone.high) * 0.003 - (zone.high - zone.low)) / 2
+    // [R727] 基线 markArea 的画法: 底色深浅随重合条数(0.30 起、封顶 0.55) + 0.85 实线边框 + 带内文字。
+    const alpha = Math.min(0.55, 0.30 + 0.12 * Math.max(0, zone.strength - 1))
+    result.bands.push({
+      low: Math.max(0, zone.low - thin),
+      high: zone.high + thin,
+      color: hexToRgba(input.fibColor, alpha),
+      borderColor: hexToRgba(input.fibColor, 0.85),
+      label: `回踩密集带 ${zone.low.toFixed(2)}~${zone.high.toFixed(2)} · ${zone.strength} 条挤在一起`,
+      labelColor: input.fibColor,
+      labelBold: true,
+    })
     // [R701] 主图不再显示指标文字, 这两条线只画线、不留标签(横线本身仍是虚线, 与旧图一致)。
     result.priceLines.push({
       value: Math.max(0, zone.low - thin),

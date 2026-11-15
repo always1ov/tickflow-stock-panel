@@ -48,6 +48,27 @@ export interface ChartRange {
   end: string
   label?: string
   color?: string
+  /** [R727] 竖区间的边框与文字样式 —— R565 前上攻段是虚线红框 + 红色加粗标签。 */
+  borderColor?: string
+  borderType?: 'solid' | 'dashed'
+  labelColor?: string
+  labelBold?: boolean
+}
+
+/**
+ * [R727] 按**价格区间**铺的底色带(横向铺满时间轴)。
+ * R565 前用 ECharts markArea 画, 换 lightweight 后丢了; R726 的未来区已验证可按价格/格铺底。
+ */
+export interface ChartPriceBand {
+  low: number
+  high: number
+  color: string
+  borderColor?: string
+  borderType?: 'solid' | 'dashed'
+  borderWidth?: number
+  label?: string
+  labelColor?: string
+  labelBold?: boolean
 }
 
 export interface ChartPriceLine {
@@ -109,6 +130,8 @@ export interface DailyChartProps {
   levelLines?: NonNullable<AnnotationData['priceLines']>
   /** [R654] 斐波那契Ⅱ型那几块：上攻段底色 / 首次回踩标记 / 未来分隔线 / 末尾三个空槽 */
   levelRanges?: ChartRange[]
+  /** [R727] 二型「回踩密集带」的价格区间底色(基线 markArea 的画法) */
+  levelBands?: ChartPriceBand[]
   levelLabels?: NonNullable<AnnotationData['labels']>
   levelVerticals?: NonNullable<AnnotationData['verticals']>
   levelFuture?: { dates: string[]; labels: string[]; values: number[] } | null

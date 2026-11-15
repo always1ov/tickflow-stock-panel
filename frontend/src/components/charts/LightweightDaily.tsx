@@ -61,7 +61,7 @@ export function LightweightDaily({ data, assetType, symbol = '', height = 480, a
   linkedPrice, onDateClick, onPriceDoubleClick, visibleBars, stockInfo, analysisPanes = [], maKeys,
   readoutExtra, dimLines = false,
   levelSeries = [], levelLines = [], levelRanges = [], levelLabels = [], levelVerticals = [],
-  levelFuture = null, onCrosshairMove }: DailyChartProps) {
+  levelBands = [], levelFuture = null, onCrosshairMove }: DailyChartProps) {
   const rows = useMemo(() => validDailyRows(data), [data])
   const precision = pricePrecision(assetType)
   const theme = useTheme()
@@ -243,12 +243,14 @@ export function LightweightDaily({ data, assetType, symbol = '', height = 480, a
     return { dates: [...rows.map(r => r.date), ...(levelFuture?.labels ?? [])],
       ranges: [...(ranges ?? []), ...levelRanges],
       priceLines: [...(priceLines ?? []), ...levelLines],
+      // [R727] 二型回踩密集带的价格区间底色(基线 markArea 的画法)。
+      priceBands: levelBands,
       labels: levelLabels,
       verticals: [...verticals, ...levelVerticals],
       // [R726] 二型的未来三格底面(旧图 R420 的灰底); 交界虚线与「未来」字仍走 levelVerticals。
       ...(levelFuture ? { futureZone: { start: levelFuture.dates[0], count: levelFuture.dates.length, fill: FUTURE_ZONE[theme].fill } } : {}),
     }
-  }, [rows, ranges, priceLines, addedDate, levelLines, levelRanges, levelLabels, levelVerticals, levelFuture, theme])
+  }, [rows, ranges, priceLines, addedDate, levelLines, levelRanges, levelBands, levelLabels, levelVerticals, levelFuture, theme])
   const volumeLabels = useMemo(() => volumeCompare.enabled ? rows.flatMap((row, idx) => {
     const ratio = volumeRatioAt(rows, idx, volumeCompare.days)
     return ratio == null ? [] : [{ time: row.date, value: row.volume ?? 0, text: `${ratio.toFixed(1)}x` }]

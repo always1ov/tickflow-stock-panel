@@ -402,7 +402,7 @@ export function StockDailyKChart({
   }, [levelModel, hoveredKey, setHoveredKey])
   // [R654] 斐波那契Ⅱ型: 上攻段底色、回踩密集带、首次回踩标记、「未来」分隔线与末尾三个空槽。
   const fib2Overlay = useMemo(() => renderer !== 'lightweight'
-    ? { priceLines: [], ranges: [], labels: [], verticals: [], future: null }
+    ? { priceLines: [], ranges: [], labels: [], verticals: [], bands: [], future: null }
     : levelFib2Overlay({
       active: levelCtl.activeTypes,
       fib2: levelsQ.data?.fib2,
@@ -735,6 +735,7 @@ export function StockDailyKChart({
           levelRanges={fib2Overlay.ranges}
           levelLabels={fib2Overlay.labels}
           levelVerticals={fib2Overlay.verticals}
+          levelBands={fib2Overlay.bands}
           levelFuture={fib2Overlay.future}
           dimLines={hoveredKey != null}
           onCrosshairMove={renderer === 'lightweight' ? handleLevelCrosshair : undefined}

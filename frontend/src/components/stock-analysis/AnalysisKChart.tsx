@@ -52,6 +52,14 @@ export type { LevelControls }
 // ===== 价位类型(与后端 levels.py 的 LEVEL_TYPES 对齐) =====
 // 上游 11 类 + fork 的 livermore / fib2, 单一产地在 analysis-chart-model.ts。
 
+/** [R727] `#RRGGBB` → `rgba(r,g,b,a)`; 认不出就原样返回。 */
+function hexAlpha(color: string, alpha: number): string {
+  const match = /^#([0-9a-f]{6})$/i.exec(color)
+  if (!match) return color
+  const value = parseInt(match[1], 16)
+  return `rgba(${(value >> 16) & 255},${(value >> 8) & 255},${value & 255},${alpha})`
+}
+
 /**
  * 图上**实际画的**那份价位: 二型按选中的粗细档换掉, 再减线。
  *
@@ -255,6 +263,7 @@ export function AnalysisKChart({
   const annotations = useMemo<AnnotationData>(() => {
     const dates = future ? [...model.dates, ...future.labels] : model.dates
     const priceLines = [...(model.annotations.priceLines ?? [])]
+    const priceBands: NonNullable<AnnotationData['priceBands']> = []
     const extraRanges = [...(model.annotations.ranges ?? [])]
     const labels = [...(model.annotations.labels ?? [])]
     const verticals: NonNullable<AnnotationData['verticals']> = []
@@ -282,9 +291,14 @@ export function AnalysisKChart({
           end: thrustEnd,
           label: `单边上攻 ${thrust.days} 天`,
           color: theme === 'dark' ? 'rgba(210,70,59,0.20)' : 'rgba(210,70,59,0.13)',
+          // [R727] R565 前的画法: 虚线边框 + 红色加粗标签。
+          borderColor: theme === 'dark' ? 'rgba(210,70,59,0.45)' : 'rgba(210,70,59,0.32)',
+          borderType: 'dashed',
+          labelColor: '#D2463B',
+          labelBold: true,
         })
       }
-      // 回踩密集带: 两条 priceLines 表示上下沿并带文字(lightweight 不支持价格区间填充)。
+      // 回踩密集带: 上下沿两条 priceLines 带文字挂单价, 底色带另走 priceBands(R727)。
       const zone = fib2Zone
       if (zone && zone.high > 0) {
         const thin = Math.max(0, (lastClose ?? zone.high) * 0.003 - (zone.high - zone.low)) / 2
@@ -301,6 +315,17 @@ export function AnalysisKChart({
           color: LC.fib2,
           opacity: 0.9,
           labelPriority: 2,
+        })
+        // [R727] 基线 markArea 的底色带: 深浅随重合条数(0.30 起、封顶 0.55) + 0.85 实线边框 + 带内文字。
+        const alpha = Math.min(0.55, 0.30 + 0.12 * Math.max(0, zone.strength - 1))
+        priceBands.push({
+          low: Math.max(0, zone.low - thin),
+          high: zone.high + thin,
+          color: hexAlpha(LC.fib2, alpha),
+          borderColor: hexAlpha(LC.fib2, 0.85),
+          label: `回踩密集带 ${zone.low.toFixed(2)}~${zone.high.toFixed(2)} · ${zone.strength} 条挤在一起`,
+          labelColor: LC.fib2,
+          labelBold: true,
         })
       }
       // 首次回踩等标记
@@ -325,6 +350,7 @@ export function AnalysisKChart({
       ...model.annotations,
       dates,
       priceLines,
+      ...(priceBands.length ? { priceBands } : {}),
       ...(extraRanges.length ? { ranges: extraRanges } : {}),
       ...(labels.length ? { labels } : {}),
       ...(verticals.length ? { verticals } : {}),

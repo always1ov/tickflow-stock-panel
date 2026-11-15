@@ -1,5 +1,5 @@
 import type { IChartApi, ISeriesApi, ISeriesPrimitive, IPrimitivePaneView, IPrimitivePaneRenderer, ISeriesPrimitiveAxisView, Logical, SeriesType, Time, SeriesAttachedParameter } from 'lightweight-charts'
-import type { ChartRange, ChartPriceLine } from '@/lib/chart-types'
+import type { ChartRange, ChartPriceLine, ChartPriceBand } from '@/lib/chart-types'
 import type { PlotAxisTick } from '@/lib/lightweight-model'
 
 export interface AnnotationData {
@@ -24,6 +24,8 @@ export interface AnnotationData {
   verticals?: { time: Time; label?: string; color?: string; labelPosition?: 'top' | 'bottom' }[]
   /** [R726] 斐波那契Ⅱ型的「未来」区: 从 start 起按 K 线格铺 count 格底色(交界线与「未来」字仍走 verticals)。 */
   futureZone?: { start: Time; count: number; fill: string }
+  /** [R727] 按价格区间铺的底色带(二型回踩密集带) —— 横向铺满, 纵向按 low/high 夹取。 */
+  priceBands?: ChartPriceBand[]
   labels?: { time: Time; value: number; text: string; color?: string }[]
   textColor?: string
   title?: string
@@ -154,7 +156,44 @@ export class ChartAnnotations implements ISeriesPrimitive<Time> {
         if (x1 == null || x2 == null || x2 < x1) continue
         ctx.fillStyle = range.color ?? 'rgba(59,130,246,0.08)'
         ctx.fillRect(x1, 0, Math.max(1, x2 - x1), height)
-        if (range.label) { ctx.fillStyle = this.data.textColor ?? '#A1A1AA'; ctx.fillText(range.label, Math.max(x1 + 5, 5), 15) }
+        // [R727] R565 前上攻段有虚线边框, 换库后只剩纯色填充; 这里按原样补回。
+        if (range.borderColor) {
+          ctx.strokeStyle = range.borderColor
+          ctx.lineWidth = 1
+          ctx.setLineDash(range.borderType === 'solid' ? [] : [4, 3])
+          ctx.strokeRect(x1 + 0.5, 0.5, Math.max(1, x2 - x1) - 1, height - 1)
+          ctx.setLineDash([])
+        }
+        if (range.label) {
+          ctx.save()
+          ctx.fillStyle = range.labelColor ?? this.data.textColor ?? '#A1A1AA'
+          ctx.font = `${range.labelBold ? 'bold ' : ''}10px "JetBrains Mono", monospace`
+          ctx.fillText(range.label, Math.max(x1 + 5, 5), 15)
+          ctx.restore()
+        }
+      }
+      // [R727] 二型回踩密集带: 按价格区间横向铺满的底色带 + 边框 + 带内文字
+      // (R565 前是 ECharts markArea 的画法, R654 换库时丢成了两条边线)。
+      for (const band of this.data.priceBands ?? []) {
+        const yLow = series.priceToCoordinate(band.low), yHigh = series.priceToCoordinate(band.high)
+        if (yLow == null || yHigh == null) continue
+        const top = Math.min(yLow, yHigh), h = Math.max(1, Math.abs(yLow - yHigh))
+        ctx.fillStyle = band.color
+        ctx.fillRect(0, top, width, h)
+        if (band.borderColor) {
+          ctx.strokeStyle = band.borderColor
+          ctx.lineWidth = band.borderWidth ?? 1
+          ctx.setLineDash(band.borderType === 'dashed' ? [4, 3] : [])
+          ctx.strokeRect(0.5, top + 0.5, width - 1, Math.max(1, h - 1))
+          ctx.setLineDash([])
+        }
+        if (band.label) {
+          ctx.save()
+          ctx.fillStyle = band.labelColor ?? this.data.textColor ?? '#A1A1AA'
+          ctx.font = `${band.labelBold ? 'bold ' : ''}9px "JetBrains Mono", monospace`
+          ctx.fillText(band.label, 5, top + 11)
+          ctx.restore()
+        }
       }
       const pendingLabels: { text: string; end: number; y: number; color: string; priority: number }[] = []
       for (const line of this.data.priceLines ?? []) {
