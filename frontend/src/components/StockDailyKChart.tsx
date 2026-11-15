@@ -529,7 +529,7 @@ export function StockDailyKChart({
               工具栏因此按专业术语分三段: 主图指标(均线) → 主图指标续(价位开关, 缩进对齐) → 副图指标。 */}
           {renderer === 'lightweight' && (
             <>
-              <div className="flex flex-wrap items-center gap-1 px-3 pt-1.5">
+              <div className="flex flex-wrap items-center gap-x-1 gap-y-2 px-3 pt-2 pb-1">
                 <span className="w-16 shrink-0 text-micro text-muted" title="画在主图上的指标">主图指标</span>
                 {/* [R652] 主图四条均线各自可开关, 默认只开 MA20 */}
                 {MA_KEYS.map(key => (
@@ -549,7 +549,7 @@ export function StockDailyKChart({
                   折叠按钮撤掉, 价位开关常开。
                   [R684] 归到「主图指标」组内: 左侧缩进到与均线那排胶囊的左边缘对齐。 */}
               {showLevelToolbar && (
-                <div className="flex flex-wrap items-center pr-3 pl-3 sm:pl-20" data-testid="level-toolbar">
+                <div className="flex flex-wrap items-center gap-y-2 pr-3 pl-3 pt-1 pb-0.5 sm:pl-20 [&>div]:mb-0 [&>div]:gap-y-2" data-testid="level-toolbar">
                   <LevelToolbar
                     groups={LEVEL_GROUPS}
                     controls={levelCtl}
@@ -574,7 +574,7 @@ export function StockDailyKChart({
                   ))}
                 </div>
               )}
-              <div className="flex flex-wrap items-center gap-1 px-3 pb-1.5">
+              <div className="flex flex-wrap items-center gap-x-1 gap-y-2 px-3 pt-1.5 pb-2">
                 <span className="w-16 shrink-0 text-micro text-muted" title="画在下方副图里的指标">副图指标</span>
                 {subIndicatorPills}
                 {analysisPanePills}
