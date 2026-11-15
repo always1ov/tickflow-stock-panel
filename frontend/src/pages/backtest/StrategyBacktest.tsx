@@ -233,7 +233,7 @@ function RegimeRecomputeButton({ from, to, pending, onClick }: {
       <button
         onClick={onClick}
         disabled={pending}
-        className="inline-flex items-center gap-1.5 rounded-btn border border-accent/30 bg-accent/10 px-2.5 py-1 text-xs font-medium text-accent transition-colors hover:bg-accent/15 disabled:cursor-not-allowed disabled:opacity-50"
+        className="inline-flex items-center gap-1.5 rounded-btn border border-border bg-surface px-2.5 py-1 text-xs font-medium text-foreground transition-colors hover:bg-elevated disabled:cursor-not-allowed disabled:opacity-50"
       >
         {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />}
         {pending ? '补算环境数据中…' : '补算环境数据并重跑'}
@@ -3287,7 +3287,7 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
                           type="button"
                           onClick={() => { setAssetType(t); setSelectedStrategy(null); setSymbols('') }}
                           className={`h-full px-3 text-xs font-medium transition-colors cursor-pointer
-                            ${assetType === t ? 'bg-accent/10 text-accent' : 'text-secondary hover:text-foreground'}`}
+                            ${assetType === t ? 'bg-foreground text-surface font-medium' : 'text-secondary hover:text-foreground'}`}
                         >
                           {t === 'stock' ? '股票' : 'ETF'}
                         </button>

@@ -14,7 +14,9 @@ const button = 'inline-flex min-h-11 items-center justify-center gap-1.5 rounded
 
 export function PackageInstaller(_context: FrontendSlotContextMap['settings.data-sources.toolbar']) {
   return <Link to="/settings?tab=import&kind=source"
-    className="inline-flex min-h-8 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-btn border border-accent/20 bg-accent/10 px-3 text-xs font-medium text-blue-700 hover:bg-accent/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent dark:text-blue-400">
+    // [R719] 用户: 「夜间模式下全站都不能有灰色按钮」—— 原来铺 `bg-accent/10` 描 `accent/20`,
+    // 暗色 accent 是中性浅灰, 整颗就是浅灰底; 改成描边档, 与其余次级按钮一致。
+    className="inline-flex min-h-8 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-btn border border-border bg-surface px-3 text-xs font-medium text-foreground hover:bg-elevated focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">
     <Package size={14} aria-hidden="true" />安装插件
   </Link>
 }
@@ -80,7 +82,7 @@ export function InstallDialog({ onClose, onInstalled }: { onClose: () => void; o
       <span>我信任此插件的来源。插件会在本机执行 Python 代码，可访问主程序的数据和凭据。</span></label>
     <div className="flex justify-end gap-2">
       <button className={button} disabled={busy} onClick={onClose}>取消</button>
-      <button className={cn(button, 'bg-accent/10 text-accent')} disabled={busy || !preview || preview.errors.length > 0 || !trusted} onClick={() => void install()}>确认安装</button>
+      <button className={cn(button, 'bg-foreground text-surface border-foreground')} disabled={busy || !preview || preview.errors.length > 0 || !trusted} onClick={() => void install()}>确认安装</button>
     </div>
   </Modal>
 }

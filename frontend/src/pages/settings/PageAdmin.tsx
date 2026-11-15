@@ -39,7 +39,7 @@ export function SettingsPageAdminPanel() {
             className={cn(
               'rounded-card border px-3 py-1.5 text-sm transition-colors',
               section === s.key
-                ? 'border-accent/40 bg-accent/10 text-accent'
+                ? 'border-foreground bg-foreground text-surface font-medium'
                 : 'border-border text-secondary hover:bg-elevated/60',
             )}
           >

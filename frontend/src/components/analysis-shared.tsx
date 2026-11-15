@@ -162,7 +162,7 @@ export function AnalysisConfigDialog({
           <button onClick={onClose} className="px-3 py-1.5 text-xs text-secondary hover:text-foreground">取消</button>
           <button
             onClick={() => { onSave(draft); onClose() }}
-            className="px-3 py-1.5 text-xs bg-accent/15 text-accent rounded-btn hover:bg-accent/25"
+            className="px-3 py-1.5 text-xs bg-foreground text-surface rounded-btn hover:bg-foreground/90"
           >
             保存
           </button>

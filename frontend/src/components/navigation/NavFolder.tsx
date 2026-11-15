@@ -52,7 +52,9 @@ export function NavFolder({ label, active, expanded, rail, popupOpen, onToggle, 
       aria-haspopup={rail ? 'dialog' : undefined}
       title={rail ? label : undefined} onClick={() => rail ? onPopupChange(!popupOpen) : onToggle()}
       className={cn('group flex w-full items-center gap-2.5 rounded-btn py-1.5 text-sm transition-ui duration-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50',
-        rail ? 'justify-center px-0 py-2' : 'px-3', active ? 'bg-accent-soft text-accent font-medium' : 'text-foreground/75 hover:bg-elevated/70 hover:text-foreground')}>
+        // [R719] 用户: 「夜间模式下全站都不能有灰色按钮」—— 组头展开/选中原来铺 `bg-accent-soft`,
+        // 暗色下 accent 是中性浅灰, 铺出来就是灰块; 改成与全站选中态同一套反相。
+        rail ? 'justify-center px-0 py-2' : 'px-3', active ? 'bg-foreground text-surface font-medium' : 'text-foreground/75 hover:bg-elevated/70 hover:text-foreground')}>
       <Icon className="h-4 w-4 shrink-0" />
       {!rail && <><span className="min-w-0 flex-1 truncate text-left">{label}</span>{indicators}
         {open ? <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted" /> : <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted" />}</>}

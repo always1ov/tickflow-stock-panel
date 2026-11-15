@@ -1394,7 +1394,7 @@ function ExtFieldSection({ label, value, onChange, groups, loading }: {
                 key={i}
                 onClick={() => toggleHidden(i)}
                 className={`w-5 h-5 rounded-btn text-micro font-medium transition-colors cursor-pointer ${
-                  hidden.includes(i) ? 'bg-surface border border-border text-foreground line-through' : 'bg-accent/15 text-accent'
+                  hidden.includes(i) ? 'bg-surface border border-border text-foreground line-through' : 'bg-foreground text-surface'
                 }`}
               >{i + 1}</button>
             ))}

@@ -144,7 +144,7 @@ export function SealedBadge({ degraded, hasDepth, isHistorical, sealedReady, sea
                     <button
                       onClick={() => { runFix.mutate(); setShowHint(false) }}
                       disabled={runFix.isPending}
-                      className="flex-1 px-2 py-1.5 rounded-btn text-xs bg-accent/15 text-accent hover:bg-accent/25 transition-colors text-center disabled:opacity-50"
+                      className="flex-1 px-2 py-1.5 rounded-btn text-xs bg-surface border border-border text-foreground hover:bg-elevated transition-colors text-center disabled:opacity-50"
                     >
                       {runFix.isPending ? '修正中…' : '立即修正'}
                     </button>

@@ -186,7 +186,7 @@ export function EditExtDialog({ config, onClose }: { config: ExtDataConfig; onCl
                     <button
                       key={col}
                       onClick={() => handleSymbolMap(col)}
-                      className="px-2.5 py-1 rounded-card bg-accent/10 text-accent text-micro font-medium hover:bg-accent/20 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-colors"
+                      className="px-2.5 py-1 rounded-card bg-surface border border-border text-foreground text-micro font-medium hover:bg-elevated focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-colors"
                     >
                       {col}
                     </button>

@@ -72,7 +72,7 @@ export function ErrorCard({ error, onRetry, homeLink }: {
             <button
               type="button"
               onClick={() => window.location.reload()}
-              className="inline-flex items-center gap-1 rounded-btn border border-accent/40 bg-accent/10 px-2.5 py-1 text-xs text-accent hover:bg-accent/20 transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1 rounded-btn border border-border bg-surface px-2.5 py-1 text-xs text-foreground hover:bg-elevated transition-colors cursor-pointer"
             >
               <RefreshCw className="h-3 w-3" />刷新页面
             </button>

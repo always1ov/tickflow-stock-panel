@@ -118,7 +118,7 @@ function renderTagList(
       {!showAll && hiddenCount > 0 && (
         <button
           onClick={onToggle}
-          className="inline-block px-1.5 py-px rounded-btn text-micro font-medium leading-tight text-accent bg-accent/10 hover:bg-accent/20 transition-colors"
+          className="inline-block px-1.5 py-px rounded-btn text-micro font-medium leading-tight border border-border bg-surface text-foreground hover:bg-elevated transition-colors"
         >
           +{hiddenCount}
         </button>
@@ -309,7 +309,7 @@ export function ScreenerTable({
                     type="button"
                     onClick={() => onRemoveFromWatchlist(r.symbol)}
                     disabled={watchlistPending}
-                    className="shrink-0 inline-flex h-5 w-5 cursor-pointer items-center justify-center rounded-full border border-accent/40 bg-accent/10 text-accent transition-colors disabled:opacity-50"
+                    className="shrink-0 inline-flex h-5 w-5 cursor-pointer items-center justify-center rounded-full border border-border bg-surface text-foreground transition-colors disabled:opacity-50"
                     title="移出自选"
                     aria-label={`将 ${r.symbol} 移出自选`}
                   >
@@ -467,7 +467,7 @@ export function ScreenerTable({
                 onClick={(event) => { event.stopPropagation(); onToggleDailyKChart() }}
                 className={`inline-flex items-center justify-center w-5 h-5 rounded-btn transition-colors ${
                   dailyKChartVisible
-                    ? 'text-accent bg-accent/10 hover:bg-accent/20'
+                    ? 'text-surface bg-foreground hover:bg-foreground/90'
                     : 'text-secondary hover:text-foreground hover:bg-elevated'
                 }`}
                 title={dailyKChartVisible ? '隐藏日k蜡烛' : '显示日k蜡烛'}
@@ -488,7 +488,7 @@ export function ScreenerTable({
                 onClick={(event) => { event.stopPropagation(); onToggleIntradayChart() }}
                 className={`inline-flex items-center justify-center w-5 h-5 rounded-btn transition-colors ${
                   intradayChartVisible
-                    ? 'text-accent bg-accent/10 hover:bg-accent/20'
+                    ? 'text-surface bg-foreground hover:bg-foreground/90'
                     : 'text-secondary hover:text-foreground hover:bg-elevated'
                 }`}
                 title={intradayChartVisible ? '隐藏分时图' : '显示分时图'}
@@ -520,7 +520,7 @@ export function ScreenerTable({
                   onClick={(event) => { event.stopPropagation(); onToggleIntradayYMode() }}
                   className={`inline-flex items-center justify-center h-5 px-1 rounded-btn text-micro whitespace-nowrap transition-colors ${
                     intradayYMode === 'limit'
-                      ? 'text-accent bg-accent/10 hover:bg-accent/20'
+                      ? 'text-surface bg-foreground hover:bg-foreground/90'
                       : 'text-secondary hover:text-foreground hover:bg-elevated'
                   }`}
                   title={intradayYMode === 'limit' ? '纵轴按涨跌停显示 (点击切回自适应)' : '纵轴自适应 (点击按涨跌停显示)'}
@@ -542,7 +542,7 @@ export function ScreenerTable({
                 onClick={(event) => { event.stopPropagation(); handleToggleStrategyTags() }}
                 className={`inline-flex items-center justify-center w-5 h-5 rounded-btn transition-colors ${
                   strategyTagsExpanded
-                    ? 'text-accent bg-accent/10 hover:bg-accent/20'
+                    ? 'text-surface bg-foreground hover:bg-foreground/90'
                     : 'text-secondary hover:text-foreground hover:bg-elevated'
                 }`}
                 title={strategyTagsExpanded ? '收起策略标签（每行仅显示前几个）' : '展开全部策略标签'}

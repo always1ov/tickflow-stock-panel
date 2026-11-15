@@ -1255,7 +1255,7 @@ export function SectorRotationCard({ kind }: { kind: 'concept' | 'industry' }) {
                             onClick={() => toggleCustom(item.name)}
                             className={cn(
                               'flex w-full items-center justify-between gap-2 px-2 py-1 text-left text-micro hover:bg-elevated/50',
-                              selected && 'bg-accent/5 text-accent',
+                              selected && 'bg-foreground text-surface',
                             )}
                           >
                             <span className="truncate">{selected ? '✓ ' : ''}{item.name}</span>

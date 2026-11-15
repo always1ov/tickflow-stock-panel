@@ -530,7 +530,7 @@ export function StrategyBuilderDialog({ open, onClose, onSavedId, mode = 'create
               <button onClick={() => { setTab('ai'); if (mode === 'create') setSource('ai') }} className={cn('px-3 py-1 rounded-btn text-xs font-medium transition-ui cursor-pointer', tab === 'ai' ? 'bg-warning/15 text-warning' : 'text-secondary hover:text-foreground')}>
                 <Sparkles className="h-3 w-3 inline mr-1" />AI 生成
               </button>
-              <button onClick={() => { setTab('custom'); if (mode === 'create') { setSource('custom'); if (!code) setCode(templates[executionBackend]) } }} className={cn('px-3 py-1 rounded-btn text-xs font-medium transition-ui cursor-pointer', tab === 'custom' ? 'bg-accent/15 text-accent' : 'text-secondary hover:text-foreground')}>
+              <button onClick={() => { setTab('custom'); if (mode === 'create') { setSource('custom'); if (!code) setCode(templates[executionBackend]) } }} className={cn('px-3 py-1 rounded-btn text-xs font-medium transition-ui cursor-pointer', tab === 'custom' ? 'bg-foreground text-surface' : 'text-secondary hover:text-foreground')}>
                 <FileText className="h-3 w-3 inline mr-1" />自定义编写
               </button>
             </div>
@@ -788,9 +788,9 @@ export function StrategyBuilderDialog({ open, onClose, onSavedId, mode = 'create
                 </div>
                 <div className="flex flex-wrap items-center gap-1">
                   <span className="mr-2 text-micro text-muted/50 uppercase tracking-wider">执行后端</span>
-                  <button type="button" aria-pressed={executionBackend === 'polars_expr'} onClick={() => selectExecutionBackend('polars_expr')} className={'px-2.5 py-1 rounded-btn text-micro font-medium border transition-colors ' + (executionBackend === 'polars_expr' ? 'border-accent/40 bg-accent/10 text-accent' : 'border-border bg-base text-secondary')}>Polars 表达式</button>
-                  <button type="button" aria-pressed={executionBackend === 'matrix_native'} onClick={() => selectExecutionBackend('matrix_native')} className={'px-2.5 py-1 rounded-btn text-micro font-medium border transition-colors ' + (executionBackend === 'matrix_native' ? 'border-accent/40 bg-accent/10 text-accent' : 'border-border bg-base text-secondary')}>矩阵原生</button>
-                  <button type="button" aria-pressed={executionBackend === 'minute_filter'} onClick={() => selectExecutionBackend('minute_filter')} className={'px-2.5 py-1 rounded-btn text-micro font-medium border transition-colors focus-visible:ring-2 focus-visible:ring-accent ' + (executionBackend === 'minute_filter' ? 'border-accent/40 bg-accent/10 text-accent' : 'border-border bg-base text-secondary')}>一分钟策略</button>
+                  <button type="button" aria-pressed={executionBackend === 'polars_expr'} onClick={() => selectExecutionBackend('polars_expr')} className={'px-2.5 py-1 rounded-btn text-micro font-medium border transition-colors ' + (executionBackend === 'polars_expr' ? 'border-foreground bg-foreground text-surface' : 'border-border bg-base text-secondary')}>Polars 表达式</button>
+                  <button type="button" aria-pressed={executionBackend === 'matrix_native'} onClick={() => selectExecutionBackend('matrix_native')} className={'px-2.5 py-1 rounded-btn text-micro font-medium border transition-colors ' + (executionBackend === 'matrix_native' ? 'border-foreground bg-foreground text-surface' : 'border-border bg-base text-secondary')}>矩阵原生</button>
+                  <button type="button" aria-pressed={executionBackend === 'minute_filter'} onClick={() => selectExecutionBackend('minute_filter')} className={'px-2.5 py-1 rounded-btn text-micro font-medium border transition-colors focus-visible:ring-2 focus-visible:ring-accent ' + (executionBackend === 'minute_filter' ? 'border-foreground bg-foreground text-surface' : 'border-border bg-base text-secondary')}>一分钟策略</button>
                 </div>
                 <div className="rounded-dialog border border-border/40 bg-elevated/50 p-4 space-y-2.5">
                   <div className="flex items-center justify-between gap-2">
@@ -821,7 +821,7 @@ export function StrategyBuilderDialog({ open, onClose, onSavedId, mode = 'create
                       使用模板
                     </button>
                     <button onClick={handleValidateCode} disabled={loading || !code.trim()}
-                      className="h-8 px-3 rounded-card border border-accent/30 bg-accent/10 text-accent text-xs font-medium hover:bg-accent/15 disabled:opacity-40 flex items-center gap-1.5">
+                      className="h-8 px-3 rounded-card border border-border bg-surface text-foreground text-xs font-medium hover:bg-elevated disabled:opacity-40 flex items-center gap-1.5">
                       {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
                       校验代码
                     </button>

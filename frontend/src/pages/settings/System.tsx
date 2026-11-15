@@ -976,8 +976,8 @@ function BatchSymbolsRow({
             <button
               onClick={commit}
               disabled={saving}
-              className="px-2.5 py-1.5 rounded-btn text-xs bg-accent/15 text-accent
-                         hover:bg-accent/25 transition-colors disabled:opacity-50"
+              className="px-2.5 py-1.5 rounded-btn text-xs bg-surface border border-border text-foreground
+                         hover:bg-elevated transition-colors disabled:opacity-50"
             >
               {saving ? '…' : '保存'}
             </button>

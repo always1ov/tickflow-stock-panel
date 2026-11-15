@@ -210,7 +210,7 @@ export function ScoringEditor({ value, directions, onChange, fallbackLabels = {}
             type="button"
             onClick={addFactor}
             disabled={!factorToAdd}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-btn border border-accent/30 bg-accent/10 text-accent transition-colors hover:bg-accent/15 disabled:cursor-not-allowed disabled:opacity-40"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-btn border border-border bg-surface text-foreground transition-colors hover:bg-elevated disabled:cursor-not-allowed disabled:opacity-40"
             title="添加评分因子"
             aria-label="添加评分因子"
           >

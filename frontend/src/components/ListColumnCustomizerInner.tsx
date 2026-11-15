@@ -219,7 +219,7 @@ function SortableActiveCol({ col, onRemove, onConfig, configOpen, extTableLabel,
             onClick={() => onToggleStandalone?.(col.id)}
             className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-btn text-micro transition-colors shrink-0 ${
               col.standalone
-                ? 'text-accent bg-accent/10'
+                ? 'bg-foreground text-surface'
                 : 'text-secondary hover:text-secondary opacity-0 group-hover:opacity-100'
             }`}
             title={col.standalone ? '取消单独显示' : '单独一行显示'}
@@ -230,7 +230,7 @@ function SortableActiveCol({ col, onRemove, onConfig, configOpen, extTableLabel,
         {hasConfig && (
           <button
             onClick={() => onConfig(configOpen ? null : col.id)}
-            className={`shrink-0 p-1 rounded-btn transition-colors ${configOpen ? 'text-accent bg-accent/10' : 'text-secondary hover:text-accent hover:bg-elevated'}`}
+            className={`shrink-0 p-1 rounded-btn transition-colors ${configOpen ? 'bg-foreground text-surface' : 'text-secondary hover:text-accent hover:bg-elevated'}`}
             title={configOpen ? '收起配置' : '配置'}
           >
             <Settings2 className="h-3.5 w-3.5" />
@@ -607,7 +607,7 @@ function extGranularityOf(
                       updateExtDisplay(col.id, { hiddenIndices: next.length ? next : undefined })
                     }}
                     className={`w-6 h-6 rounded-btn text-micro font-medium transition-colors ${
-                      hidden ? 'bg-surface border border-border text-foreground line-through' : 'bg-accent/15 text-accent'
+                      hidden ? 'bg-surface border border-border text-foreground line-through' : 'bg-foreground text-surface'
                     }`}
                   >
                     {i + 1}
@@ -625,14 +625,14 @@ function extGranularityOf(
                 onClick={() => updateExtDisplay(col.id, { tagLayout: 'horizontal' })}
                 className={`px-3 py-1 text-xs transition-colors ${
                   (col.extDisplay?.tagLayout ?? 'horizontal') === 'horizontal'
-                    ? 'bg-accent/15 text-accent' : 'bg-surface border border-border text-foreground hover:text-foreground'
+                    ? 'bg-foreground text-surface' : 'bg-surface border border-border text-foreground hover:text-foreground'
                 }`}
               >横向</button>
               <button
                 onClick={() => updateExtDisplay(col.id, { tagLayout: 'vertical' })}
                 className={`px-3 py-1 text-xs transition-colors border-l border-border ${
                   col.extDisplay?.tagLayout === 'vertical'
-                    ? 'bg-accent/15 text-accent' : 'bg-surface text-foreground hover:text-foreground'
+                    ? 'bg-foreground text-surface' : 'bg-surface text-foreground hover:text-foreground'
                 }`}
               >竖向</button>
             </div>
@@ -859,7 +859,7 @@ function extGranularityOf(
                       updateExtDisplay(col.id, { hiddenIndices: next.length ? next : undefined })
                     }}
                     className={`w-6 h-6 rounded-btn text-micro font-medium transition-colors ${
-                      hidden ? 'bg-surface border border-border text-foreground line-through' : 'bg-accent/15 text-accent'
+                      hidden ? 'bg-surface border border-border text-foreground line-through' : 'bg-foreground text-surface'
                     }`}
                   >
                     {i + 1}
@@ -876,14 +876,14 @@ function extGranularityOf(
               onClick={() => updateExtDisplay(col.id, { tagLayout: 'horizontal' })}
               className={`px-3 py-1 text-xs transition-colors ${
                 (col.extDisplay?.tagLayout ?? 'horizontal') === 'horizontal'
-                  ? 'bg-accent/15 text-accent' : 'bg-surface border border-border text-foreground hover:text-foreground'
+                  ? 'bg-foreground text-surface' : 'bg-surface border border-border text-foreground hover:text-foreground'
               }`}
             >横向</button>
             <button
               onClick={() => updateExtDisplay(col.id, { tagLayout: 'vertical' })}
               className={`px-3 py-1 text-xs transition-colors border-l border-border ${
                 col.extDisplay?.tagLayout === 'vertical'
-                  ? 'bg-accent/15 text-accent' : 'bg-surface text-foreground hover:text-foreground'
+                  ? 'bg-foreground text-surface' : 'bg-surface text-foreground hover:text-foreground'
               }`}
             >竖向</button>
           </div>
@@ -1257,7 +1257,7 @@ function extGranularityOf(
                           onClick={() => updateAuction({ width: v })}
                           className={`px-3 py-1 text-xs transition-colors ${i > 0 ? 'border-l border-border' : ''} ${
                             cfg.auctionWidth === v
-                              ? 'bg-accent/15 text-accent' : 'bg-surface text-foreground hover:text-foreground'
+                              ? 'bg-foreground text-surface' : 'bg-surface text-foreground hover:text-foreground'
                           }`}
                         >{text}</button>
                       ))}
@@ -1279,7 +1279,7 @@ function extGranularityOf(
                             onClick={() => addExtColumn(auction!.configId!, c.field, c.label, c.type)}
                             className={`px-2 py-1 rounded-btn border text-micro transition-colors cursor-pointer ${
                               c.added
-                                ? 'bg-accent/15 border-accent/40 text-accent'
+                                ? 'bg-foreground border-foreground text-surface'
                                 : 'bg-surface border-border text-foreground hover:text-foreground'
                             }`}
                             aria-pressed={c.added}
@@ -1350,7 +1350,7 @@ function extGranularityOf(
           onClick={() => toggleStandalone(col.id)}
           className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-btn text-micro transition-colors shrink-0 ${
             col.standalone
-              ? 'text-accent bg-accent/10'
+              ? 'bg-foreground text-surface'
               : 'text-secondary hover:text-secondary'
           }`}
           title={col.standalone ? '取消单独显示' : '单独一行显示'}

@@ -136,7 +136,7 @@ function Dropzone({
           e.preventDefault()
           onPick(e.dataTransfer.files)
         }}
-        className="w-full flex flex-col items-center justify-center gap-2 rounded-btn border border-dashed border-border bg-elevated/40 hover:bg-elevated/70 px-4 py-6 text-foreground transition-colors disabled:opacity-50"
+        className="w-full flex flex-col items-center justify-center gap-2 rounded-btn border border-dashed border-border bg-surface hover:bg-elevated/70 px-4 py-6 text-foreground transition-colors disabled:opacity-50"
       >
         {busy ? (
           <Loader2 className="h-6 w-6 animate-spin text-accent" />
@@ -697,7 +697,7 @@ export function WatchlistImportDialog({
             <button
               type="button"
               onClick={() => setPasteOpen(true)}
-              className="w-full inline-flex items-center justify-center gap-1.5 rounded-btn border border-dashed border-border bg-elevated/40 px-3 py-2 text-xs text-foreground hover:bg-elevated/70"
+              className="w-full inline-flex items-center justify-center gap-1.5 rounded-btn border border-dashed border-border bg-surface px-3 py-2 text-xs text-foreground hover:bg-elevated/70"
             >
               <Keyboard className="h-3.5 w-3.5 text-accent" />
               或粘贴证券代码 / 整篇文章
@@ -868,7 +868,7 @@ export function WatchlistImportDialog({
                 aria-pressed={targetGroupIds.length === 0}
                 className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs transition-colors ${
                   targetGroupIds.length === 0
-                    ? 'border-accent/40 bg-accent/10 text-accent'
+                    ? 'border-foreground bg-foreground text-surface'
                     : 'border-border bg-surface text-foreground hover:text-foreground'
                 }`}
                 title="不加到任何分组，仅新增标的到自选"
@@ -905,7 +905,7 @@ export function WatchlistImportDialog({
                 <button
                   type="button"
                   onClick={() => setNewGroupOpen(true)}
-                  className="inline-flex items-center gap-1 rounded-full border border-dashed border-border bg-elevated/40 px-2 py-1 text-xs text-accent hover:bg-elevated/70"
+                  className="inline-flex items-center gap-1 rounded-full border border-dashed border-border bg-surface px-2 py-1 text-xs text-foreground hover:bg-elevated/70"
                   title="新建分组接收这批导入"
                 >
                   <Plus className="h-3 w-3" />

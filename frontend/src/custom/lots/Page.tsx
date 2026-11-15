@@ -142,7 +142,7 @@ export function Lots({ embedded = false }: { embedded?: boolean } = {}) {
             <div className="text-xs text-secondary">{lots.length} 个批次</div>
             <button
               onClick={() => setEditing(emptyDraft())}
-              className="inline-flex h-9 items-center gap-1.5 rounded-btn border border-accent/30 bg-accent/10 px-3 text-xs font-medium text-accent transition-colors hover:bg-accent/15 cursor-pointer"
+              className="inline-flex h-9 items-center gap-1.5 rounded-btn border border-border bg-surface px-3 text-xs font-medium text-foreground transition-colors hover:bg-elevated cursor-pointer"
             >
               <Plus className="h-3.5 w-3.5" />新增批次
             </button>

@@ -311,7 +311,7 @@ export function DataSourceEditor({
           {!isNew && !isActive && config.name.trim() && (
             <button
               onClick={() => onActivate(config.name.toLowerCase().trim())}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-btn bg-accent/10 text-accent text-xs font-medium hover:bg-accent/20 transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-btn bg-surface border border-border text-foreground text-xs font-medium hover:bg-elevated transition-colors"
             >
               <Zap className="h-3.5 w-3.5" /> 切换为当前数据源
             </button>
@@ -711,7 +711,7 @@ function DatasetDetail({
             <div className="text-xs text-muted/60">启用后此数据集将由该自定义源提供, 未启用则回退 TickFlow</div>
             <button
               onClick={() => onToggle(true)}
-              className="mt-3 inline-flex items-center gap-1 px-3 py-1.5 rounded-btn bg-accent/10 text-accent text-xs font-medium hover:bg-accent/20 transition-colors"
+              className="mt-3 inline-flex items-center gap-1 px-3 py-1.5 rounded-btn bg-surface border border-border text-foreground text-xs font-medium hover:bg-elevated transition-colors"
             >
               <Plus className="h-3 w-3" /> 启用{DATASET_LABEL[datasetKey]}
             </button>

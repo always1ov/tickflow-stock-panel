@@ -432,7 +432,7 @@ export function CreateExtDialog({ onClose }: { onClose: () => void }) {
                     className={`relative flex items-start gap-3 px-4 py-3.5 rounded-card border text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-warning/40 ${
                       active
                         ? 'border-warning/40 bg-warning/[0.07] shadow-sm shadow-warning/10'
-                        : 'border-border bg-elevated/30 hover:bg-elevated/60 hover:border-border'
+                        : 'border-border bg-surface hover:bg-elevated/60 hover:border-border'
                     }`}
                   >
                     <div className={`mt-0.5 p-1.5 rounded-card transition-colors ${
@@ -460,7 +460,7 @@ export function CreateExtDialog({ onClose }: { onClose: () => void }) {
             </div>
 
             {/* 市场级: 行=全市场一条, 无标的列 (择时状态/情绪指数类) */}
-            <label className="mt-2.5 flex cursor-pointer items-center gap-2.5 rounded-card border border-border/50 bg-elevated/30 px-3 py-2 hover:bg-elevated/50 transition-colors">
+            <label className="mt-2.5 flex cursor-pointer items-center gap-2.5 rounded-card border border-border/50 bg-surface px-3 py-2 hover:bg-elevated/50 transition-colors">
               <input
                 type="checkbox"
                 checked={marketLevel}
@@ -806,7 +806,7 @@ export function CreateExtDialog({ onClose }: { onClose: () => void }) {
                     <button
                       key={f.name}
                       onClick={() => applyManualMapping(f.name)}
-                      className="px-2.5 py-1 rounded-card bg-accent/10 text-accent text-micro font-medium hover:bg-accent/20 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-colors"
+                      className="px-2.5 py-1 rounded-card bg-surface border border-border text-foreground text-micro font-medium hover:bg-elevated focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-colors"
                     >
                       {f.name}
                     </button>

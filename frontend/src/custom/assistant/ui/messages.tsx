@@ -252,7 +252,7 @@ function ConfirmCard({ call }: { call: ToolCallRecord }) {
         <button
           type="button"
           onClick={() => { void decideAction(call.callId, true) }}
-          className="cursor-pointer rounded-btn bg-accent/15 px-2.5 py-1 font-medium text-accent transition-colors duration-150 ease-smooth hover:bg-accent/25"
+          className="cursor-pointer rounded-btn bg-foreground px-2.5 py-1 font-medium text-surface transition-colors duration-150 ease-smooth hover:bg-foreground/90"
         >
           {isRounds ? '继续' : '确认执行'}
         </button>

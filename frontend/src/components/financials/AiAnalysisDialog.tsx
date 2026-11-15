@@ -192,7 +192,7 @@ export function AiAnalysisDialog({ task, mode, minimized }: Props) {
                   </button>
                 )}
                 <button onClick={handleStartNew}
-                  className="mt-1 inline-flex items-center gap-1.5 h-8 px-3 rounded-card bg-accent/15 border border-accent/30 text-xs text-accent hover:bg-accent/20 transition-colors">
+                  className="mt-1 inline-flex items-center gap-1.5 h-8 px-3 rounded-card bg-surface border border-border text-xs text-foreground hover:bg-elevated transition-colors">
                   <RefreshCw className="h-3.5 w-3.5" /> 重试
                 </button>
               </div>
@@ -232,7 +232,7 @@ export function AiAnalysisDialog({ task, mode, minimized }: Props) {
               {isHistory ? (
                 <button
                   onClick={handleStartNew}
-                  className="inline-flex items-center gap-1.5 h-8 px-3 rounded-card bg-accent-soft border border-accent/30 text-xs font-medium text-accent transition-ui shrink-0"
+                  className="inline-flex items-center gap-1.5 h-8 px-3 rounded-card border border-border bg-surface text-xs font-medium text-foreground hover:bg-elevated transition-ui shrink-0"
                   title="以此关注点重新生成新报告"
                 >
                   <RefreshCw className="h-3.5 w-3.5" />重新生成
@@ -241,7 +241,7 @@ export function AiAnalysisDialog({ task, mode, minimized }: Props) {
                 <button
                   onClick={handleStartNew}
                   disabled={isWorking}
-                  className="inline-flex items-center gap-1.5 h-8 px-3 rounded-card bg-accent-soft border border-accent/30 text-xs font-medium text-accent disabled:opacity-40 disabled:cursor-not-allowed transition-ui shrink-0"
+                  className="inline-flex items-center gap-1.5 h-8 px-3 rounded-card border border-border bg-surface text-xs font-medium text-foreground hover:bg-elevated disabled:opacity-40 disabled:cursor-not-allowed transition-ui shrink-0"
                   title={focus.trim() ? '按关注重点重新分析' : '重新分析'}
                 >
                   {isWorking ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : phase === 'done' ? <RefreshCw className="h-3.5 w-3.5" /> : <Send className="h-3.5 w-3.5" />}

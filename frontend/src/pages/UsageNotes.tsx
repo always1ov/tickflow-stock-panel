@@ -190,7 +190,7 @@ function NoteCard({ note, onDigest, digesting }: {
             <button
               onClick={() => update.mutate({ content: draft })}
               disabled={update.isPending || !draft.trim()}
-              className="inline-flex h-7 items-center gap-1 rounded-btn bg-accent/15 px-2 text-xs font-medium text-accent hover:bg-accent/25 transition-colors disabled:opacity-50"
+              className="inline-flex h-7 items-center gap-1 rounded-btn bg-foreground px-2 text-xs font-medium text-surface hover:bg-foreground/90 transition-colors disabled:opacity-50"
             >
               {update.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
               保存

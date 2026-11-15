@@ -323,7 +323,7 @@ export function StockPreviewDialogContent({ symbol, name, onClose, triggerInfo, 
                       aria-controls={panelId}
                       onClick={() => setView(key)}
                       className={`inline-flex h-6 max-w-full items-center gap-1 rounded-btn px-2.5 text-micro transition-colors ${
-                        view === key ? 'bg-accent/20 text-accent font-medium' : 'text-secondary hover:text-secondary hover:bg-elevated/60'
+                        view === key ? 'bg-foreground text-surface font-medium' : 'text-secondary hover:text-secondary hover:bg-elevated/60'
                       }`}
                     >
                       {Icon && <Icon className="h-3 w-3" />}
@@ -348,7 +348,7 @@ export function StockPreviewDialogContent({ symbol, name, onClose, triggerInfo, 
                           }}
                           className={`h-6 shrink-0 whitespace-nowrap rounded-btn px-2.5 text-micro transition-colors cursor-pointer
                             ${isActive
-                              ? 'bg-accent/20 text-accent font-medium'
+                              ? 'bg-foreground text-surface font-medium'
                               : 'text-secondary hover:text-secondary hover:bg-elevated/60'
                             }`}
                         >
@@ -382,7 +382,7 @@ export function StockPreviewDialogContent({ symbol, name, onClose, triggerInfo, 
                           onClick={() => selectIntradayDays(days)}
                           className={`h-6 rounded-btn px-2.5 text-micro transition-colors ${
                             effectiveIntradayDays === days
-                              ? 'bg-accent/20 text-accent font-medium'
+                              ? 'bg-foreground text-surface font-medium'
                               : 'text-secondary hover:text-secondary hover:bg-elevated/60'
                           }`}
                         >

@@ -831,7 +831,7 @@ export function SettingsDataSourcesPanel({ highlight }: { highlight?: string } =
                           <button
                             onClick={(e) => { e.stopPropagation(); installMut.mutate(item.name) }}
                             disabled={installMut.isPending}
-                            className="rounded-btn px-1.5 py-0.5 text-micro font-medium bg-accent/10 text-accent hover:bg-accent/20 transition-colors disabled:opacity-50"
+                            className="rounded-btn px-1.5 py-0.5 text-micro font-medium bg-surface border border-border text-foreground hover:bg-elevated transition-colors disabled:opacity-50"
                           >
                             安装
                           </button>
@@ -842,7 +842,7 @@ export function SettingsDataSourcesPanel({ highlight }: { highlight?: string } =
                         <button
                           onClick={(e) => { e.stopPropagation(); switchProvider.mutate(item.name) }}
                           disabled={switchProvider.isPending}
-                          className="rounded-btn px-1.5 py-0.5 text-micro font-medium bg-accent/10 text-accent hover:bg-accent/20 transition-colors disabled:opacity-50"
+                          className="rounded-btn px-1.5 py-0.5 text-micro font-medium bg-surface border border-border text-foreground hover:bg-elevated transition-colors disabled:opacity-50"
                         >
                           套用
                         </button>
@@ -873,7 +873,7 @@ export function SettingsDataSourcesPanel({ highlight }: { highlight?: string } =
             onClick={() => setSelected('__new__')}
             className={`rounded-btn border border-dashed px-3.5 py-3 transition-ui flex items-center justify-center gap-1.5 text-sm ${
               selected === '__new__'
-                ? 'border-accent/50 bg-accent/5 text-accent'
+                ? 'border-foreground bg-foreground text-surface font-medium'
                 : 'border-border/50 text-secondary hover:text-foreground hover:border-border hover:bg-elevated/30'
             }`}
           >

@@ -91,7 +91,7 @@ export function AddWidgetPanel({
         className={cn(
           'inline-flex items-center gap-1 rounded-btn border px-2 py-1 text-micro transition-colors',
           open
-            ? 'border-accent/50 bg-accent/10 text-accent'
+            ? 'border-foreground bg-foreground text-surface'
             : 'border-border bg-surface text-foreground hover:text-foreground hover:border-accent/40',
         )}
       >
@@ -150,7 +150,7 @@ export function AddWidgetPanel({
               <button
                 type="button"
                 onClick={addExtLink}
-                className="w-full rounded-btn bg-accent/15 px-2 py-1.5 text-xs font-medium text-accent transition-colors hover:bg-accent/25"
+                className="w-full rounded-btn bg-foreground px-2 py-1.5 text-xs font-medium text-surface transition-colors hover:bg-foreground/90"
               >
                 添加到看板
               </button>

@@ -91,7 +91,7 @@ function renderExtInline(
       {!showAll && overflow > 0 && (
         <button
           onClick={onToggle}
-          className="inline-block px-1 rounded-btn text-micro leading-tight text-accent bg-accent/10 hover:bg-accent/20 transition-colors"
+          className="inline-block px-1 rounded-btn text-micro leading-tight bg-surface border border-border text-foreground hover:bg-elevated transition-colors"
         >
           +{overflow}
         </button>

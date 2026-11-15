@@ -114,7 +114,7 @@ export function StockFinancialSearch({ onSelect, assetTypes }: Props) {
                   type="button"
                   onClick={() => handleSelect(r)}
                   className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors duration-press ${
-                    i === activeIdx ? 'bg-accent/10 text-accent' : 'hover:bg-elevated text-foreground'
+                    i === activeIdx ? 'bg-foreground text-surface' : 'hover:bg-elevated text-foreground'
                   }`}
                 >
                   <span className="font-mono shrink-0 text-xs w-[88px]">{r.symbol}</span>

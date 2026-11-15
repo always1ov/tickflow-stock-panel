@@ -183,7 +183,7 @@ export function ExtDataStatCard({ config, onDelete, deleting, onEdit }: {
         {fieldsOverflow && !fieldsExpanded && (
           <button
             onClick={() => setFieldsExpanded(true)}
-            className="mx-auto mt-1 flex items-center rounded-full border border-border/60 bg-elevated/60 px-2.5 py-0.5 text-foreground hover:text-secondary hover:border-border transition-colors"
+            className="mx-auto mt-1 flex items-center rounded-full border border-border/60 bg-surface px-2.5 py-0.5 text-foreground hover:text-secondary hover:border-border transition-colors"
             title="展开全部字段"
           >
             <ChevronDown className="h-3 w-3" />

@@ -217,7 +217,7 @@ export function Analysis() {
                     <button
                       key={f.name}
                       onClick={() => setSelectedColumns(cols => active ? cols.filter(c => c !== f.name) : [...cols, f.name])}
-                      className={`rounded-full border px-3 py-1 text-micro transition-colors ${active ? 'border-accent/40 bg-accent/10 text-accent' : 'border-border bg-elevated/40 text-foreground hover:bg-elevated'}`}
+                      className={`rounded-full border px-3 py-1 text-micro transition-colors ${active ? 'border-foreground bg-foreground text-surface' : 'border-border bg-surface text-foreground hover:bg-elevated'}`}
                     >
                       {f.label || f.name}
                     </button>

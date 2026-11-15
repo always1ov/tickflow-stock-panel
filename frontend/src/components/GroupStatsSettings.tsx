@@ -49,7 +49,7 @@ export function GroupStatsSettings({
         title={ariaLabel}
         className={`inline-flex h-5 w-5 items-center justify-center rounded-btn transition-colors ${
           open
-            ? 'text-accent bg-accent/10'
+            ? 'bg-foreground text-surface'
             : 'text-secondary hover:text-foreground hover:bg-elevated'
         }`}
       >
@@ -67,7 +67,7 @@ export function GroupStatsSettings({
                 onClick={() => onChange({ metric: m.id })}
                 className={`px-2 py-0.5 rounded-btn text-micro transition-colors ${
                   config.metric === m.id
-                    ? 'bg-accent/15 text-accent'
+                    ? 'bg-foreground text-surface font-medium'
                     : 'bg-surface border border-border text-foreground hover:text-foreground hover:bg-elevated/80'
                 }`}
               >
@@ -84,7 +84,7 @@ export function GroupStatsSettings({
                 onClick={() => onChange({ sort: s.id })}
                 className={`px-2 py-0.5 rounded-btn text-micro transition-colors ${
                   config.sort === s.id
-                    ? 'bg-accent/15 text-accent'
+                    ? 'bg-foreground text-surface font-medium'
                     : 'bg-surface border border-border text-foreground hover:text-foreground hover:bg-elevated/80'
                 }`}
               >

@@ -189,7 +189,7 @@ export function StockFinancialDetail({ symbol, name }: Props) {
           <button
             onClick={handleAiClick}
             disabled={checking}
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-btn text-xs font-medium border border-accent/30 bg-accent/10 text-accent hover:bg-accent/20 hover:border-accent/40 transition-ui shrink-0 disabled:opacity-50"
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-btn text-xs font-medium border border-border bg-surface text-foreground hover:bg-elevated hover:border-border transition-ui shrink-0 disabled:opacity-50"
             title="AI 财务分析"
           >
             {checking ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}

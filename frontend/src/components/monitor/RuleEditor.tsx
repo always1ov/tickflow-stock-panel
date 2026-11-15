@@ -597,7 +597,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
                   setStrategyCategory('all')
                 }}
                 className={`h-full px-4 text-xs font-medium transition-colors cursor-pointer
-                  ${assetType === t ? 'bg-accent/10 text-accent' : 'text-secondary hover:text-foreground'}`}
+                  ${assetType === t ? 'bg-foreground text-surface' : 'text-secondary hover:text-foreground'}`}
               >
                 {t === 'stock' ? '股票' : t === 'etf' ? 'ETF' : '指数'}
               </button>
@@ -652,7 +652,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
                 })}
                 className={`inline-flex h-9 items-center justify-center gap-1.5 rounded-btn border px-2 text-xs font-medium transition-colors cursor-pointer ${
                   active
-                    ? 'border-accent/40 bg-accent/12 text-accent'
+                    ? 'border-foreground bg-foreground text-surface'
                     : 'border-border bg-base text-secondary hover:border-accent/25 hover:text-foreground'
                 }`}
               >
@@ -684,7 +684,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
                     aria-pressed={active}
                     onClick={() => selectSectorKind(option.key)}
                     className={`inline-flex h-9 items-center justify-center gap-1.5 rounded-btn border text-xs font-medium transition-colors cursor-pointer ${
-                      active ? 'border-accent/40 bg-accent/10 text-accent' : 'border-border bg-base text-secondary hover:border-accent/25'
+                      active ? 'border-foreground bg-foreground text-surface' : 'border-border bg-base text-secondary hover:border-accent/25'
                     }`}
                   >
                     <Icon className="h-3.5 w-3.5" />
@@ -709,7 +709,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
                       setDraft(d => ({ ...d, sector_targets: [] }))
                     }}
                     className={`px-3 text-xs transition-colors cursor-pointer ${
-                      industryLevel === level ? 'bg-accent/10 text-accent' : 'text-secondary hover:text-foreground'
+                      industryLevel === level ? 'bg-foreground text-surface' : 'text-secondary hover:text-foreground'
                     }`}
                   >
                     {level}级
@@ -768,7 +768,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
                       unavailable
                         ? 'cursor-not-allowed border-border/40 bg-base/40 text-muted/40'
                         : selected
-                          ? 'cursor-pointer border-accent/40 bg-accent/10 text-accent'
+                          ? 'cursor-pointer border-foreground bg-foreground text-surface'
                           : 'cursor-pointer border-border bg-base text-secondary hover:border-accent/25 hover:text-foreground'
                     }`}
                   >
@@ -798,7 +798,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
                     aria-pressed={(draft.sector_trigger ?? 'change_pct') === key}
                     onClick={() => setDraft(d => ({ ...d, sector_trigger: key }))}
                     className={`text-xs font-medium transition-colors cursor-pointer ${
-                      (draft.sector_trigger ?? 'change_pct') === key ? 'bg-accent/10 text-accent' : 'text-secondary hover:text-foreground'
+                      (draft.sector_trigger ?? 'change_pct') === key ? 'bg-foreground text-surface' : 'text-secondary hover:text-foreground'
                     }`}
                   >
                     {label}
@@ -819,7 +819,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
                     aria-pressed={draft.direction === key}
                     onClick={() => setDraft(d => ({ ...d, direction: key }))}
                     className={`text-xs font-medium transition-colors cursor-pointer ${
-                      draft.direction === key ? 'bg-accent/10 text-accent' : 'text-secondary hover:text-foreground'
+                      draft.direction === key ? 'bg-foreground text-surface' : 'text-secondary hover:text-foreground'
                     }`}
                   >
                     {label}
@@ -900,7 +900,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
                     aria-pressed={(draft.direction ?? 'both') === key}
                     onClick={() => setDraft(d => ({ ...d, direction: key }))}
                     className={`text-xs font-medium transition-colors cursor-pointer ${
-                      (draft.direction ?? 'both') === key ? 'bg-accent/10 text-accent' : 'text-secondary hover:text-foreground'
+                      (draft.direction ?? 'both') === key ? 'bg-foreground text-surface' : 'text-secondary hover:text-foreground'
                     }`}
                   >
                     {label}
@@ -924,7 +924,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
                   aria-pressed={(draft.abnormal_window ?? 'any') === key}
                   onClick={() => setDraft(d => ({ ...d, abnormal_window: key }))}
                   className={`text-xs font-medium transition-colors cursor-pointer ${
-                    (draft.abnormal_window ?? 'any') === key ? 'bg-accent/10 text-accent' : 'text-secondary hover:text-foreground'
+                    (draft.abnormal_window ?? 'any') === key ? 'bg-foreground text-surface' : 'text-secondary hover:text-foreground'
                   }`}
                 >
                   {label}
@@ -957,7 +957,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
                     aria-pressed={(draft.metric ?? 'volume') === key}
                     onClick={() => setDraft(d => ({ ...d, metric: key }))}
                     className={`text-xs font-medium transition-colors cursor-pointer ${
-                      (draft.metric ?? 'volume') === key ? 'bg-accent/10 text-accent' : 'text-secondary hover:text-foreground'
+                      (draft.metric ?? 'volume') === key ? 'bg-foreground text-surface' : 'text-secondary hover:text-foreground'
                     }`}
                   >
                     {label}
@@ -1067,7 +1067,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
                     title="从自选 / 自选分组导入当前成员 (一次性拷贝, 后续增删自选不影响本规则); 需要动态跟随分组请把作用范围切到「自选分组」"
                     className={`inline-flex h-7 shrink-0 items-center gap-1 rounded-btn border px-2 text-xs transition-colors cursor-pointer ${
                       watchMenuOpen
-                        ? 'border-accent/40 bg-accent/10 text-accent'
+                        ? 'border-foreground bg-foreground text-surface'
                         : 'border-border bg-base text-secondary hover:border-accent/30 hover:text-foreground'
                     }`}
                   >
@@ -1121,7 +1121,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
                   type="button"
                   onClick={() => setSymbolsExpanded(true)}
                   title="展开管理标的列表"
-                  className="inline-flex items-center gap-1 rounded-btn border border-accent/30 bg-accent/10 px-2 py-0.5 text-micro text-accent transition-colors hover:bg-accent/20 cursor-pointer"
+                  className="inline-flex items-center gap-1 rounded-btn border border-border bg-surface px-2 py-0.5 text-micro text-foreground transition-colors hover:bg-elevated cursor-pointer"
                 >
                   已加入 <span className="font-mono font-semibold tabular-nums">{draft.symbols.length}</span> 只
                   <ChevronDown className="h-3 w-3" />
@@ -1182,7 +1182,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
                   title="选择要监控的自选分组 (动态绑定, 分组内增删标的自动生效)"
                   className={`inline-flex h-7 max-w-full items-center gap-1.5 rounded-btn border px-2 text-xs transition-colors cursor-pointer ${
                     groupMenuOpen
-                      ? 'border-accent/40 bg-accent/10 text-accent'
+                      ? 'border-foreground bg-foreground text-surface'
                       : 'border-border bg-base text-secondary hover:border-accent/30 hover:text-foreground'
                   }`}
                 >

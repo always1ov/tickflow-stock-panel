@@ -241,7 +241,7 @@ function ConfirmModal({ report, onView, onRedo, onClose }: {
             查看历史
           </button>
           <button onClick={onRedo}
-            className="flex-1 h-8 rounded-card bg-accent-soft border border-sky-400/30 text-xs text-sky-300 hover:from-sky-500/30 transition-ui">
+            className="flex-1 h-8 rounded-card bg-surface border border-border text-xs text-foreground hover:bg-elevated transition-colors">
             重新分析
           </button>
         </div>

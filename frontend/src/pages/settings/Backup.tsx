@@ -314,7 +314,7 @@ export function SettingsBackupPanel({ mode = 'all' }: { mode?: 'all' | 'export' 
           <button
             onClick={() => fileRef.current?.click()}
             disabled={inspectM.isPending}
-            className="mt-3 flex w-full flex-col items-center justify-center gap-1.5 rounded-btn border border-dashed border-border bg-elevated/40 px-4 py-6 transition-colors hover:bg-elevated/70 disabled:opacity-50"
+            className="mt-3 flex w-full flex-col items-center justify-center gap-1.5 rounded-btn border border-dashed border-border bg-surface px-4 py-6 transition-colors hover:bg-elevated/70 disabled:opacity-50"
           >
             {inspectM.isPending ? (
               <>

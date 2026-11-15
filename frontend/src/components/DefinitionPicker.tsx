@@ -109,7 +109,7 @@ export function DefinitionPicker({ kinds = ['signal', 'factor'], onSelect, selec
                 onClick={() => setKindFilter(k)}
                 className={`rounded-full px-2.5 py-1 text-micro transition-colors ${
                   kindFilter === k
-                    ? 'bg-accent/15 text-accent'
+                    ? 'bg-foreground text-surface font-medium'
                     : 'text-secondary hover:bg-elevated hover:text-foreground'
                 }`}
               >

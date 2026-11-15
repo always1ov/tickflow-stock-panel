@@ -74,8 +74,8 @@ export function TrendBacktestButton({ symbol, trend, className, compact = false 
       <button
         onClick={() => setShowBacktest(true)}
         className={compact
-          ? `inline-flex w-[65px] shrink-0 items-center justify-center whitespace-nowrap rounded-btn bg-accent/10 px-2 py-0.5 font-mono text-micro text-accent ring-1 ring-inset ring-accent/30 transition-colors cursor-pointer hover:bg-accent/20 ${className ?? ''}`
-          : `inline-flex items-center gap-1 rounded-btn border border-accent/30 bg-accent/10 px-2 py-0.5 text-micro text-accent hover:bg-accent/20 transition-colors cursor-pointer ${className ?? ''}`}
+          ? `inline-flex w-[65px] shrink-0 items-center justify-center whitespace-nowrap rounded-btn bg-surface border border-border px-2 py-0.5 font-mono text-micro text-foreground ring-1 ring-inset ring-border transition-colors cursor-pointer hover:bg-elevated ${className ?? ''}`
+          : `inline-flex items-center gap-1 rounded-btn border border-border bg-surface px-2 py-0.5 text-micro text-foreground hover:bg-elevated transition-colors cursor-pointer ${className ?? ''}`}
         title={hint}
       >
         {compact ? `回测 ${pct}%` : (

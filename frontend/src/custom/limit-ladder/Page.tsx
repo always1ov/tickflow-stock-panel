@@ -601,7 +601,7 @@ function MonitorMenu({ stock, direction, sealMode, monitorRule, anchorRect, hasD
                     className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-colors border cursor-pointer ${
                       on
                         ? 'bg-foreground text-surface border-foreground'
-                        : 'bg-elevated/40 text-foreground border-border hover:text-secondary'
+                        : 'bg-surface text-foreground border-border hover:text-secondary'
                     }`}
                   >
                     <span className={`w-1.5 h-1.5 rounded-full ${on ? 'bg-accent' : 'bg-muted/50'}`} />

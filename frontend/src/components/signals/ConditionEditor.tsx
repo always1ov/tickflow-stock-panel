@@ -208,7 +208,7 @@ function FieldPicker({ value, fields, groups, onChange }: {
                             key={f.key}
                             onClick={() => { onChange(f.key); setOpen(false) }}
                             className={`w-full text-left px-2.5 py-1.5 rounded-btn text-xs transition-colors ${
-                              f.key === value ? 'bg-accent/10 text-accent' : 'text-foreground/80 hover:bg-elevated'
+                              f.key === value ? 'bg-foreground text-surface' : 'text-foreground/80 hover:bg-elevated'
                             }`}
                           >
                             {f.label}
@@ -224,7 +224,7 @@ function FieldPicker({ value, fields, groups, onChange }: {
                         key={f.key}
                         onClick={() => { onChange(f.key); setOpen(false) }}
                         className={`w-full text-left px-2.5 py-1.5 rounded-btn text-xs transition-colors ${
-                          f.key === value ? 'bg-accent/10 text-accent' : 'text-foreground/80 hover:bg-elevated'
+                          f.key === value ? 'bg-foreground text-surface' : 'text-foreground/80 hover:bg-elevated'
                         }`}
                       >
                         {f.label}

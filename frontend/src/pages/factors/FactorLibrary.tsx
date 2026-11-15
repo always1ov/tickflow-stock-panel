@@ -121,7 +121,7 @@ export function FactorLibrary({ onInspect, onEdit }: { onInspect: (factorId: str
         <div className="flex shrink-0 items-center rounded-btn border border-border p-0.5" role="tablist" aria-label="因子库视图">
           {([['library', '因子库'], ['archive', `档案库 ${archivedCount}`]] as const).map(([id, label]) => (
             <button key={id} type="button" role="tab" aria-selected={view === id} onClick={() => setView(id)}
-              className={`rounded-btn px-2 py-1 text-micro transition-colors ${view === id ? 'bg-accent/10 font-medium text-accent' : 'text-secondary hover:text-foreground'}`}>
+              className={`rounded-btn px-2 py-1 text-micro transition-colors ${view === id ? 'bg-foreground font-medium text-surface' : 'text-secondary hover:text-foreground'}`}>
               {label}
             </button>
           ))}

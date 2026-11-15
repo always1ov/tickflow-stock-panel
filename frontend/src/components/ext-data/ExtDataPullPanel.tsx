@@ -206,7 +206,7 @@ export function ExtDataPullPanel({ config, onSaved }: {
         <button
           onClick={handleRun}
           disabled={running || !pull?.url}
-          className="inline-flex items-center justify-center gap-1 h-9 rounded-card bg-accent/15 border border-accent/25 text-accent text-xs font-medium hover:bg-accent/20 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-colors"
+          className="inline-flex items-center justify-center gap-1 h-9 rounded-card bg-foreground border border-foreground text-surface text-xs font-medium hover:bg-foreground/90 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-colors"
         >
           {running ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />}
           立即执行
@@ -1082,7 +1082,7 @@ function ExtPullConfigDialog({ config, onSaved, onClose }: {
           <button
             onClick={handleRun}
             disabled={running || !url}
-            className="inline-flex items-center gap-1.5 h-9 px-4 rounded-card bg-accent/15 border border-accent/25 text-accent text-xs font-medium hover:bg-accent/20 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-colors"
+            className="inline-flex items-center gap-1.5 h-9 px-4 rounded-card bg-foreground border border-foreground text-surface text-xs font-medium hover:bg-foreground/90 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-colors"
           >
             {running ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />}
             立即执行

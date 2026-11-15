@@ -772,7 +772,7 @@ function OrderForm({ acc, holdings = [], onDone }: { acc: string; holdings?: Pap
                 title={t === 'market' ? '盘中按最新快照价成交; ETF 即时单自动转次日开盘' : undefined}
                 className={cn(
                   'flex-1 rounded-btn border py-1 text-micro transition-colors',
-                  orderType === t ? 'border-accent/40 bg-accent/10 text-accent' : 'border-border text-secondary hover:text-secondary',
+                  orderType === t ? 'border-foreground bg-foreground text-surface' : 'border-border text-secondary hover:text-secondary',
                 )}
               >
                 {ORDER_TYPE_LABEL[t]}
@@ -1229,7 +1229,7 @@ function AutoRulesPanel({ acc }: { acc: string }) {
     <div className="rounded-card border border-border bg-surface p-4">
       <div className="flex items-center justify-between">
         <div className="text-sm font-medium">自动跟单规则</div>
-        <button onClick={() => setCreating(true)} className="flex items-center gap-1 rounded-btn bg-accent/10 px-2.5 py-1 text-xs text-accent transition-colors hover:bg-accent/20">
+        <button onClick={() => setCreating(true)} className="flex items-center gap-1 rounded-btn bg-surface border border-border px-2.5 py-1 text-xs text-foreground transition-colors hover:bg-elevated">
           <Plus className="h-3 w-3" /> 新建规则
         </button>
       </div>
@@ -1359,7 +1359,7 @@ function AutoRuleForm({ acc, onDone, onCancel }: { acc: string; onDone: () => vo
             {(['strategy', 'rule', 'flip'] as const).map(k => (
               <button key={k} onClick={() => { setMatchKind(k); setMatchId(''); setSide(s => (k === 'strategy' ? 'auto' : k === 'rule' && s === 'auto' ? 'buy' : s)); if (k === 'flip' && !name.trim()) setName(FLIP_RULE_NAME) }}
                 className={cn('flex-1 rounded-btn border py-1 text-micro transition-colors',
-                  matchKind === k ? 'border-accent/40 bg-accent/10 text-accent' : 'border-border text-secondary hover:text-secondary')}>
+                  matchKind === k ? 'border-foreground bg-foreground text-surface' : 'border-border text-secondary hover:text-secondary')}>
                 {k === 'strategy' ? '跟策略' : k === 'rule' ? '跟监控规则' : '跟六态转折'}
               </button>
             ))}
@@ -1404,9 +1404,9 @@ function AutoRuleForm({ acc, onDone, onCancel }: { acc: string; onDone: () => vo
           <label className="text-micro text-muted">仓位</label>
           <div className="mt-1 flex gap-1.5">
             <button onClick={() => setSizeMode('fixed_amount')}
-              className={cn('flex-1 rounded-btn border py-1 text-micro transition-colors', sizeMode === 'fixed_amount' ? 'border-accent/40 bg-accent/10 text-accent' : 'border-border text-secondary')}>固定金额</button>
+              className={cn('flex-1 rounded-btn border py-1 text-micro transition-colors', sizeMode === 'fixed_amount' ? 'border-foreground bg-foreground text-surface' : 'border-border text-secondary')}>固定金额</button>
             <button onClick={() => setSizeMode('pct_equity')}
-              className={cn('flex-1 rounded-btn border py-1 text-micro transition-colors', sizeMode === 'pct_equity' ? 'border-accent/40 bg-accent/10 text-accent' : 'border-border text-secondary')}>权益 %</button>
+              className={cn('flex-1 rounded-btn border py-1 text-micro transition-colors', sizeMode === 'pct_equity' ? 'border-foreground bg-foreground text-surface' : 'border-border text-secondary')}>权益 %</button>
           </div>
         </div>
         <div>
@@ -1420,7 +1420,7 @@ function AutoRuleForm({ acc, onDone, onCancel }: { acc: string; onDone: () => vo
             {(['next_open', 'close', 'market'] as const).map(t => (
               <button key={t} onClick={() => setOrderType(t)}
                 className={cn('flex-1 rounded-btn border py-1 text-micro transition-colors',
-                  orderType === t ? 'border-accent/40 bg-accent/10 text-accent' : 'border-border text-secondary hover:text-secondary')}>
+                  orderType === t ? 'border-foreground bg-foreground text-surface' : 'border-border text-secondary hover:text-secondary')}>
                 {ORDER_TYPE_LABEL[t]}
               </button>
             ))}
@@ -1976,7 +1976,7 @@ function BatchCreateModal({ onClose, onCreated }: { onClose: () => void; onCreat
               {(['strategy', 'rule'] as const).map(k => (
                 <button key={k} onClick={() => { setQuickKind(k); setQuickId('') }}
                   className={cn('rounded-btn border px-2 py-1 text-micro transition-colors',
-                    quickKind === k ? 'border-accent/40 bg-accent/10 text-accent' : 'border-border text-secondary hover:text-secondary')}>
+                    quickKind === k ? 'border-foreground bg-foreground text-surface' : 'border-border text-secondary hover:text-secondary')}>
                   {k === 'strategy' ? '策略' : '监控规则'}
                 </button>
               ))}
@@ -1998,7 +1998,7 @@ function BatchCreateModal({ onClose, onCreated }: { onClose: () => void; onCreat
             <button
               onClick={() => { const opt = quickOptions[0]; if (opt) { addRow({ name: opt.label, kind: quickKind, matchId: opt.value }); setQuickId('') } }}
               disabled={quickOptions.length === 0}
-              className="rounded-btn bg-accent/10 px-2.5 py-1 text-micro text-accent transition-colors hover:bg-accent/20 disabled:opacity-40"
+              className="rounded-btn bg-surface border border-border px-2.5 py-1 text-micro text-foreground transition-colors hover:bg-elevated disabled:opacity-40"
             >
               添加
             </button>
@@ -2069,9 +2069,9 @@ function BatchCreateModal({ onClose, onCreated }: { onClose: () => void; onCreat
             <label className={labelCls}>仓位模式 (全部来源)</label>
             <div className="mt-1 flex gap-1.5">
               <button onClick={() => setSizeMode('fixed_amount')}
-                className={cn('flex-1 rounded-btn border py-1 text-micro transition-colors', sizeMode === 'fixed_amount' ? 'border-accent/40 bg-accent/10 text-accent' : 'border-border text-secondary')}>固定金额</button>
+                className={cn('flex-1 rounded-btn border py-1 text-micro transition-colors', sizeMode === 'fixed_amount' ? 'border-foreground bg-foreground text-surface' : 'border-border text-secondary')}>固定金额</button>
               <button onClick={() => setSizeMode('pct_equity')}
-                className={cn('flex-1 rounded-btn border py-1 text-micro transition-colors', sizeMode === 'pct_equity' ? 'border-accent/40 bg-accent/10 text-accent' : 'border-border text-secondary')}>权益 %</button>
+                className={cn('flex-1 rounded-btn border py-1 text-micro transition-colors', sizeMode === 'pct_equity' ? 'border-foreground bg-foreground text-surface' : 'border-border text-secondary')}>权益 %</button>
             </div>
           </div>
           <div>
@@ -2084,7 +2084,7 @@ function BatchCreateModal({ onClose, onCreated }: { onClose: () => void; onCreat
               {(['next_open', 'close', 'market'] as const).map(t => (
                 <button key={t} onClick={() => setOrderType(t)}
                   className={cn('flex-1 rounded-btn border py-1 text-micro transition-colors',
-                    orderType === t ? 'border-accent/40 bg-accent/10 text-accent' : 'border-border text-secondary hover:text-secondary')}>
+                    orderType === t ? 'border-foreground bg-foreground text-surface' : 'border-border text-secondary hover:text-secondary')}>
                   {ORDER_TYPE_LABEL[t]}
                 </button>
               ))}

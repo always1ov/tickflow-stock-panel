@@ -470,7 +470,7 @@ function AIConfigBadge({ configured, model }: { configured?: boolean; model?: st
                 disabled={switchTo.isPending}
                 className={cn(
                   'flex w-full items-center gap-2 rounded-btn px-2 py-1.5 text-left text-xs transition-colors disabled:opacity-60',
-                  isPrimary ? 'bg-accent/10 text-accent' : 'text-secondary hover:bg-elevated hover:text-foreground',
+                  isPrimary ? 'bg-foreground text-surface' : 'text-secondary hover:bg-elevated hover:text-foreground',
                 )}
               >
                 <span className="w-3 shrink-0 text-center font-mono text-micro text-muted">{i + 1}</span>
@@ -887,12 +887,14 @@ export function Layout() {
             onClick={() => setWatchlistNavExpanded(v => !v)}
             className={cn(
               'group relative flex w-full items-center gap-2.5 rounded-btn px-3 py-1.5 text-sm transition-ui duration-hover ease-smooth',
+              // [R719] 用户: 「夜间模式下全站都不能有灰色按钮」—— 选中态统一反相,
+              // 不用 `bg-accent-soft`: 暗色 accent 是中性浅灰, 铺底后就是灰块灰字。
               location.pathname === '/watchlist'
-                ? 'bg-accent-soft text-accent font-medium'
+                ? 'bg-foreground text-surface font-medium'
                 : 'text-foreground/75 hover:bg-elevated/70 hover:text-foreground',
             )}
           >
-            <Icon className={cn('h-4 w-4 shrink-0 transition-colors', location.pathname === '/watchlist' ? 'text-accent' : 'text-foreground/60 group-hover:text-foreground/85')} />
+            <Icon className={cn('h-4 w-4 shrink-0 transition-colors', location.pathname === '/watchlist' ? 'text-surface' : 'text-foreground/60 group-hover:text-foreground/85')} />
             <span className="flex-1 text-left">{label}</span>
             {watchlistNavExpanded
               ? <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted" />
@@ -908,15 +910,16 @@ export function Layout() {
               cn(
                 'group relative flex items-center rounded-btn text-sm transition-ui duration-hover ease-smooth',
                 itemRail ? 'justify-center px-0 py-2' : 'gap-2.5 px-3 py-1.5',
+                // [R719] 选中态反相, 与全站其余开关同一套(暗色白底黑字)
                 isActive
-                  ? 'bg-accent-soft text-accent font-medium'
+                  ? 'bg-foreground text-surface font-medium'
                   : 'text-foreground/75 hover:bg-elevated/70 hover:text-foreground',
               )
             }
           >
             {({ isActive }) => (
               <>
-                <Icon className={cn('h-4 w-4 shrink-0 transition-colors', isActive ? 'text-accent' : 'text-foreground/60 group-hover:text-foreground/85')} />
+                <Icon className={cn('h-4 w-4 shrink-0 transition-colors', isActive ? 'text-surface' : 'text-foreground/60 group-hover:text-foreground/85')} />
                 {!itemRail && (
                   <span className="flex min-w-0 flex-1 items-center gap-1.5">
                     <span className="truncate">{label}</span>
@@ -1227,7 +1230,7 @@ export function Layout() {
                     // 状态(状态行那个「自动」), 一屏只出现一次, 也不再挤。
                     'flex h-7 w-7 items-center justify-center rounded-btn transition-colors duration-hover',
                     realtimeAuto
-                      ? 'bg-accent/15 text-accent hover:bg-accent/25'
+                      ? 'bg-foreground text-surface hover:bg-foreground/90'
                       : 'text-secondary hover:bg-elevated hover:text-foreground',
                     (toggleRealtimeAuto.isPending || realtimeUnavailable) && 'cursor-not-allowed opacity-50',
                   )}
@@ -1315,15 +1318,16 @@ export function Layout() {
                 cn(
                   'group relative flex items-center rounded-btn text-sm transition-ui duration-hover ease-smooth',
                   railMode ? 'justify-center px-0 py-2' : 'flex-1 gap-2.5 px-3 py-1.5',
+                  // [R719] 选中态反相, 与全站其余开关同一套(暗色白底黑字)
                   isActive
-                    ? 'bg-accent-soft text-accent font-medium'
+                    ? 'bg-foreground text-surface font-medium'
                     : 'text-foreground/75 hover:bg-elevated/70 hover:text-foreground',
                 )
               }
             >
               {({ isActive }) => (
                 <>
-                  <Settings className={cn('h-4 w-4 shrink-0 transition-colors', isActive ? 'text-accent' : 'text-foreground/60 group-hover:text-foreground/85')} />
+                  <Settings className={cn('h-4 w-4 shrink-0 transition-colors', isActive ? 'text-surface' : 'text-foreground/60 group-hover:text-foreground/85')} />
                   {!railMode && <span className="whitespace-nowrap">设置</span>}
                   {!railMode && version && (
                     <span className="ml-auto font-mono text-micro text-muted/50 select-none shrink-0">

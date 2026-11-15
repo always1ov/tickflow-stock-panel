@@ -418,7 +418,7 @@ function BatchDiscovery({
                   disabled={ids.length === 0}
                   title={preset.hint}
                   className={`inline-flex items-center gap-1 rounded-btn border px-2 py-1 text-micro font-medium transition-colors disabled:pointer-events-none disabled:opacity-40 ${active
-                    ? 'border-accent/60 bg-accent/10 text-accent'
+                    ? 'border-foreground bg-foreground text-surface'
                     : 'border-border bg-surface text-secondary hover:border-accent/40 hover:text-accent'
                   }`}
                 >
@@ -502,7 +502,7 @@ function BatchDiscovery({
                     type="button"
                     onClick={() => { setAssetType(value); setSymbols('') }}
                     className={`px-2.5 py-1 text-micro font-medium transition-colors ${assetType === value
-                      ? 'bg-accent/10 text-accent'
+                      ? 'bg-foreground text-surface'
                       : 'text-secondary hover:text-foreground'
                     }`}
                   >
@@ -556,7 +556,7 @@ function BatchDiscovery({
                   type="button"
                   onClick={() => { setStart(monthsAgo(months)); setEnd(TODAY) }}
                   className={`flex-1 rounded-btn px-2 py-1 text-micro transition-colors ${start === monthsAgo(months) && end === TODAY
-                    ? 'bg-accent/10 font-medium text-accent'
+                    ? 'bg-foreground font-medium text-surface'
                     : 'text-secondary hover:bg-elevated hover:text-secondary'
                   }`}
                 >
@@ -1042,7 +1042,7 @@ export function FactorDiscovery({ focusFactor, initialView = 'batch' }: { focusF
           <button
             type="button"
             onClick={() => setAutoOpen(true)}
-            className="ml-auto mr-1 inline-flex items-center gap-1.5 rounded-btn border border-accent/40 bg-accent/5 px-2.5 py-1.5 text-xs font-medium text-accent transition-colors hover:bg-accent/10"
+            className="ml-auto mr-1 inline-flex items-center gap-1.5 rounded-btn border border-border bg-surface px-2.5 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-elevated"
             title="不知道选什么因子？让系统全量筛选达标因子并自动搜索组合（嵌套样本外验证）"
           >
             <Sparkles className="h-3.5 w-3.5" />

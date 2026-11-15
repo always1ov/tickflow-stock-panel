@@ -40,7 +40,7 @@ export function DateShortcuts({ value, onChange, options, base }: Props) {
             className={cn(
               'rounded-btn px-2 py-1 text-xs leading-none transition-colors cursor-pointer',
               active
-                ? 'bg-accent/15 text-accent border border-accent/30'
+                ? 'bg-foreground text-surface font-medium border border-foreground'
                 : 'bg-surface border border-border text-foreground border border-transparent hover:text-foreground',
             )}
           >

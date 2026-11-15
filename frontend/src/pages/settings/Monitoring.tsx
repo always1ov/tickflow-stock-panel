@@ -347,7 +347,7 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
               onClick={() => runFix.mutate()}
               disabled={runFix.isPending}
               className="inline-flex items-center gap-1 px-2 py-1 rounded-btn text-xs
-                         bg-accent/15 text-accent hover:bg-accent/25 transition-colors
+                         bg-surface border border-border text-foreground hover:bg-elevated transition-colors
                          disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Zap className="h-3 w-3" />

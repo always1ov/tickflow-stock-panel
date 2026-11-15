@@ -366,7 +366,7 @@ export function StrategyPoolDialog({ pool, onAdded, onClose }: Props) {
                 <span className="mr-0.5 text-micro text-muted/80">来源</span>
                 {TABS.map(tab => {
                 const count = allStrategies.filter(strategy => (!strategy.research_only || strategy.source === 'ai') && !archivedSet.has(strategy.id) && (tab.id === 'all' || strategy.source === tab.id)).length
-                return <button type="button" key={tab.id} aria-pressed={activeTab === tab.id} onClick={() => { setActiveTab(tab.id); setGroupFilter('all') }} className={cn('rounded-btn px-2 py-0.5 text-micro transition-colors', activeTab === tab.id ? 'bg-accent/10 font-medium text-accent' : 'text-secondary hover:bg-elevated')}>{tab.label}<span className="ml-1 tabular-nums text-muted">{count}</span></button>
+                return <button type="button" key={tab.id} aria-pressed={activeTab === tab.id} onClick={() => { setActiveTab(tab.id); setGroupFilter('all') }} className={cn('rounded-btn px-2 py-0.5 text-micro transition-colors', activeTab === tab.id ? 'bg-foreground font-medium text-surface' : 'text-secondary hover:bg-elevated')}>{tab.label}<span className="ml-1 tabular-nums text-muted">{count}</span></button>
               })}</div>
               {/* 分组横向铺开: 点名称筛选该分组, 勾选框整组入池/出池 (全选/反选) */}
               <div className="flex items-center gap-2" aria-label="策略分组">

@@ -507,7 +507,7 @@ export function EChartsIntraday({
             onClick={() => setYMode('adaptive')}
             className={`px-2.5 py-0.5 text-xs font-mono cursor-pointer transition-colors ${
               yMode === 'adaptive'
-                ? 'bg-accent/20 text-accent'
+                ? 'bg-foreground text-surface'
                 : 'text-secondary hover:text-secondary'
             }`}
           >
@@ -518,7 +518,7 @@ export function EChartsIntraday({
             onClick={() => setYMode('limit')}
             className={`px-2.5 py-0.5 text-xs font-mono cursor-pointer transition-colors ${
               yMode === 'limit'
-                ? 'bg-accent/20 text-accent'
+                ? 'bg-foreground text-surface'
                 : 'text-secondary hover:text-secondary'
             }`}
           >

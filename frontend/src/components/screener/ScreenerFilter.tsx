@@ -184,7 +184,7 @@ export function FilterPanel({ value, onChange, onClose, onReset }: {
               onClick={() => toggleBoard(board)}
               className={`px-2 py-0.5 rounded-btn text-micro transition-colors ${
                 active
-                  ? 'bg-accent/15 text-accent'
+                  ? 'bg-foreground text-surface font-medium'
                   : 'bg-surface border border-border text-foreground hover:text-foreground hover:bg-elevated/80'
               }`}
             >
@@ -197,7 +197,7 @@ export function FilterPanel({ value, onChange, onClose, onReset }: {
           onClick={() => onChange({ ...value, excludeST: !value.excludeST })}
           className={`px-2 py-0.5 rounded-btn text-micro transition-colors ${
             value.excludeST
-              ? 'bg-accent/15 text-accent'
+              ? 'bg-foreground text-surface font-medium'
               : 'bg-surface border border-border text-foreground hover:text-foreground hover:bg-elevated/80'
           }`}
         >

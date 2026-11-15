@@ -130,7 +130,7 @@ function SignalsBody({ highlight }: { highlight: string }) {
                 role="tab"
                 aria-selected={view === id}
                 onClick={() => setView(id)}
-                className={`rounded-btn px-2 py-0.5 text-micro transition-colors ${view === id ? 'bg-accent/10 font-medium text-accent' : 'text-secondary hover:text-foreground'}`}
+                className={`rounded-btn px-2 py-0.5 text-micro transition-colors ${view === id ? 'bg-foreground font-medium text-surface' : 'text-secondary hover:text-foreground'}`}
               >
                 {label}
               </button>

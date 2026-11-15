@@ -169,7 +169,7 @@ export function ResourceTransferDialog({ kind, initialMode = 'import', exportOnl
               <input ref={fileInput} type="file" multiple accept=".zip,.py,.json" className="hidden" aria-label="选择资源文件" disabled={busy}
                 onChange={event => { const next = Array.from(event.target.files ?? []); event.target.value = ''; void inspectFiles(next) }} />
               <button type="button" onClick={() => fileInput.current?.click()} disabled={busy}
-                className={cn('flex w-full gap-3 rounded-card border border-dashed border-accent/40 bg-accent/5 px-4 transition-colors hover:bg-accent/10 disabled:opacity-60', preview ? 'items-center py-4 text-left' : 'min-h-[150px] flex-col items-center justify-center py-8 text-center')}>
+                className={cn('flex w-full gap-3 rounded-card border border-dashed border-border bg-surface px-4 transition-colors hover:bg-elevated disabled:opacity-60', preview ? 'items-center py-4 text-left' : 'min-h-[150px] flex-col items-center justify-center py-8 text-center')}>
                 {busy && !preview ? <Loader2 className="h-7 w-7 shrink-0 animate-spin text-accent" /> : <FileArchive className={cn('shrink-0 text-accent', preview ? 'h-5 w-5' : 'h-8 w-8')} />}
                 <span className={cn('min-w-0', preview && 'flex-1')}><span className="block text-xs font-medium text-foreground">{files.length ? `${files.length} 个文件 · 点击重新选择` : '选择文件，或将文件拖到这里'}</span><span className="mt-1 block break-words text-micro leading-5 text-muted">{files.length ? files.map(file => file.name).join('、') : '支持策略 .py、因子/信号 .json 或 ZIP，可多选并一起补齐依赖。普通 ZIP 无需清单文件。'}</span></span>
                 {preview && <Upload className="h-4 w-4 shrink-0 text-accent" />}

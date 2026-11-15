@@ -169,7 +169,7 @@ function renderExtValue(
       {!showAll && hiddenCount > 0 && (
         <button
           onClick={onToggle}
-          className="inline-block px-1.5 py-px rounded-btn text-micro font-medium leading-tight text-accent bg-accent/10 hover:bg-accent/20 transition-colors"
+          className="inline-block px-1.5 py-px rounded-btn text-micro font-medium leading-tight bg-surface border border-border text-foreground hover:bg-elevated transition-colors"
         >
           +{hiddenCount}
         </button>
@@ -1177,7 +1177,7 @@ export function Watchlist() {
                 type="button"
                 disabled={preparation.isFetching}
                 onClick={() => { void preparation.refetch() }}
-                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-btn text-micro font-medium bg-muted/15 text-secondary border border-border/50 whitespace-nowrap disabled:cursor-wait"
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-btn text-micro font-medium bg-surface text-foreground border border-border whitespace-nowrap disabled:cursor-wait"
                 title={preparation.isFetching ? '正在按需补齐自选日K，已有数据仍可查看' :
                   `${preparation.data?.filter(r => r.status !== 'ready').map(r => `${r.symbol}：${r.message}`).join('\n') || '日K暂未就绪，请检查数据源配置'}\n点击重试补齐`}
               >
@@ -1284,7 +1284,7 @@ export function Watchlist() {
           aria-pressed={groupStatsOpen}
           className={`inline-flex h-8 items-center gap-1 rounded-btn border px-2.5 text-micro transition-colors duration-150 ease-smooth ${
             groupStatsOpen
-              ? 'border-accent/30 bg-accent/15 text-accent'
+              ? 'border-foreground bg-foreground text-surface font-medium'
               : 'border-border bg-surface text-foreground hover:text-foreground'
           }`}
         >
@@ -1296,7 +1296,7 @@ export function Watchlist() {
           aria-expanded={filterOpen}
           className={`inline-flex h-8 items-center gap-1 rounded-btn border px-2.5 text-micro transition-colors duration-150 ease-smooth ${
             filterOpen || hasActiveFilters
-              ? 'border-accent/30 bg-accent/15 text-accent'
+              ? 'border-foreground bg-foreground text-surface font-medium'
               : 'border-border bg-surface text-foreground hover:text-foreground'
           }`}
         >
@@ -1330,7 +1330,7 @@ export function Watchlist() {
                     onClick={() => toggleBoard(board)}
                     className={`px-2 py-0.5 rounded-btn text-micro transition-colors ${
                       active
-                        ? 'bg-accent/15 text-accent'
+                        ? 'bg-foreground text-surface font-medium'
                         : 'bg-surface border border-border text-foreground hover:text-foreground hover:bg-elevated/80'
                     }`}
                   >
@@ -1348,7 +1348,7 @@ export function Watchlist() {
                 onClick={toggleExcludeST}
                 className={`px-2 py-0.5 rounded-btn text-micro transition-colors ${
                   excludeST
-                    ? 'bg-accent/15 text-accent'
+                    ? 'bg-foreground text-surface font-medium'
                     : 'bg-surface border border-border text-foreground hover:text-foreground hover:bg-elevated/80'
                 }`}
                 title="勾选后隐藏简称含 ST 标记的标的 (ST/*ST/S*ST)"
@@ -1488,7 +1488,7 @@ export function Watchlist() {
                         onClick={(event) => { event.stopPropagation(); toggleDailyKChart() }}
                         className={`inline-flex items-center justify-center w-5 h-5 rounded-btn transition-colors ${
                           dailyKChartVisible
-                            ? 'text-accent bg-accent/10 hover:bg-accent/20'
+                            ? 'text-surface bg-foreground hover:bg-foreground/90'
                             : 'text-secondary hover:text-foreground hover:bg-elevated'
                         }`}
                         title={dailyKChartVisible ? '隐藏日k蜡烛' : '显示日k蜡烛'}
@@ -1509,7 +1509,7 @@ export function Watchlist() {
                         onClick={(event) => { event.stopPropagation(); toggleIntradayChart() }}
                         className={`inline-flex items-center justify-center w-5 h-5 rounded-btn transition-colors ${
                           intradayChartVisible
-                            ? 'text-accent bg-accent/10 hover:bg-accent/20'
+                            ? 'text-surface bg-foreground hover:bg-foreground/90'
                             : 'text-secondary hover:text-foreground hover:bg-elevated'
                         }`}
                         title={intradayChartVisible ? '隐藏分时图' : '显示分时图'}
@@ -1541,7 +1541,7 @@ export function Watchlist() {
                           onClick={(event) => { event.stopPropagation(); toggleIntradayYMode() }}
                           className={`inline-flex items-center justify-center h-5 px-1 rounded-btn text-micro whitespace-nowrap transition-colors ${
                             intradayYMode === 'limit'
-                              ? 'text-accent bg-accent/10 hover:bg-accent/20'
+                              ? 'text-surface bg-foreground hover:bg-foreground/90'
                               : 'text-secondary hover:text-foreground hover:bg-elevated'
                           }`}
                           title={intradayYMode === 'limit' ? '纵轴按涨跌停显示 (点击切回自适应)' : '纵轴自适应 (点击按涨跌停显示)'}

@@ -850,7 +850,7 @@ function ReportPanel({
         <div className="max-w-md text-center text-xs text-secondary">{error || '请检查 AI 配置后重试'}</div>
         <button
           onClick={onRegenerate}
-          className="mt-1 inline-flex items-center gap-1.5 rounded-btn bg-accent/15 px-3 py-1.5 text-xs text-accent transition-colors hover:bg-accent/20"
+          className="mt-1 inline-flex items-center gap-1.5 rounded-btn border border-border bg-surface px-3 py-1.5 text-xs text-foreground transition-colors hover:bg-elevated"
         >
           <RefreshCw className="h-3.5 w-3.5" />重新生成
         </button>
@@ -1110,7 +1110,7 @@ function _DtPill({ item, idx, value, onOpenStock }: {
     <button
       type="button"
       onClick={() => code && onOpenStock(code)}
-      className="group inline-flex items-center gap-1.5 rounded-btn border border-border/60 bg-elevated/40 py-0.5 pl-0.5 pr-2.5 transition-ui hover:border-accent/40 hover:bg-elevated/70"
+      className="group inline-flex items-center gap-1.5 rounded-btn border border-border/60 bg-surface py-0.5 pl-0.5 pr-2.5 transition-ui hover:border-accent/40 hover:bg-elevated/70"
       title={`查看 ${label} · 净买 ${fmtVolume(value ?? null)}`}
     >
       <span className={cn('grid h-[18px] w-[18px] min-w-[18px] place-items-center rounded-full font-mono text-micro font-bold leading-none', _rankCls(idx))}>
@@ -1492,7 +1492,7 @@ export function DragonTigerCard({ date, onOpenStock }: {
                     className={cn(
                       'rounded-btn px-3 py-1 text-xs transition-ui',
                       tab === t.key
-                        ? 'bg-accent/15 font-medium text-accent shadow-sm'
+                        ? 'bg-foreground font-medium text-surface shadow-sm'
                         : 'text-secondary hover:text-foreground',
                     )}
                   >

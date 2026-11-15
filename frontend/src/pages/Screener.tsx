@@ -967,7 +967,7 @@ export function Screener() {
                   onClick={() => { setAssetType(t); setActiveStrategy(null); setResult(null); setShowAll(false) }}
                   className={`h-full px-2.5 text-xs font-medium transition-colors
                     cursor-pointer ${assetType === t
-                      ? 'bg-accent/10 text-accent'
+                      ? 'bg-foreground text-surface font-medium'
                       : 'text-secondary hover:text-secondary hover:bg-elevated'
                     }`}
                 >
@@ -987,7 +987,7 @@ export function Screener() {
                   }}
                   className={`h-full px-2.5 text-xs font-medium transition-colors cursor-pointer
                     ${tfFilter === tf
-                      ? 'bg-accent/10 text-accent'
+                      ? 'bg-foreground text-surface font-medium'
                       : 'text-secondary hover:text-secondary hover:bg-elevated'
                     }`}
                 >
@@ -1022,7 +1022,7 @@ export function Screener() {
               title="显示全部策略个股"
               className={`inline-flex items-center justify-center h-7 w-7 rounded-btn border transition-colors cursor-pointer
                 ${showAll
-                  ? 'border-accent/50 bg-accent/10 text-accent'
+                  ? 'border-foreground bg-foreground text-surface font-medium'
                   : 'border-border bg-surface text-secondary hover:text-secondary hover:border-accent/40'
                 }`}
             >
@@ -1036,7 +1036,7 @@ export function Screener() {
                   onClick={() => { setCardSize(sz); storage.screenerCardSize.set(sz) }}
                   className={`h-full px-2 text-micro font-medium transition-colors cursor-pointer
                     ${cardSize === sz
-                      ? 'bg-accent/10 text-accent'
+                      ? 'bg-foreground text-surface font-medium'
                       : 'text-secondary hover:text-secondary hover:bg-elevated'
                     }`}
                 >
@@ -1061,8 +1061,8 @@ export function Screener() {
             <button
               onClick={() => setShowComposite(true)}
               className="inline-flex items-center gap-1.5 h-7 px-3 rounded-btn
-                text-xs font-medium text-accent border border-accent/20 bg-accent/5
-                hover:bg-accent/15 transition-colors cursor-pointer"
+                text-xs font-medium text-foreground border border-border bg-surface
+                hover:bg-elevated transition-colors cursor-pointer"
             >
               <Layers className="h-3.5 w-3.5" />
               叠加策略
@@ -1149,12 +1149,12 @@ export function Screener() {
           {poolGroupTabs && (
             <div className="mb-2 flex flex-wrap items-center gap-1 border-b border-border/60 pb-2" role="tablist" aria-label="策略分组">
               <button type="button" role="tab" aria-selected={activePoolTab === 'all'} onClick={() => changePoolGroupTab('all')}
-                className={cn('rounded-btn px-2.5 py-1 text-micro transition-colors', activePoolTab === 'all' ? 'bg-accent/10 font-medium text-accent' : 'text-secondary hover:bg-elevated hover:text-foreground')}>
+                className={cn('rounded-btn px-2.5 py-1 text-micro transition-colors', activePoolTab === 'all' ? 'bg-foreground font-medium text-surface' : 'text-secondary hover:bg-elevated hover:text-foreground')}>
                 全部<span className="ml-1 tabular-nums text-muted">{displayPool.length}</span>
               </button>
               {poolGroupTabs.map(tab => (
                 <button key={tab.key} type="button" role="tab" aria-selected={activePoolTab === tab.key} onClick={() => changePoolGroupTab(tab.key)}
-                  className={cn('rounded-btn px-2.5 py-1 text-micro transition-colors', activePoolTab === tab.key ? 'bg-accent/10 font-medium text-accent' : 'text-secondary hover:bg-elevated hover:text-foreground')}>
+                  className={cn('rounded-btn px-2.5 py-1 text-micro transition-colors', activePoolTab === tab.key ? 'bg-foreground font-medium text-surface' : 'text-secondary hover:bg-elevated hover:text-foreground')}>
                   {tab.name}<span className="ml-1 tabular-nums text-muted">{tab.ids.length}</span>
                 </button>
               ))}
@@ -1207,9 +1207,9 @@ export function Screener() {
                         onClick={() => setShowFilter(v => !v)}
                         className={`inline-flex items-center gap-1.5 px-2.5 text-xs font-medium transition-colors duration-150 cursor-pointer
                           ${filterActive(filter)
-                            ? 'bg-accent/15 text-accent'
+                            ? 'bg-foreground text-surface font-medium'
                             : showFilter
-                              ? 'bg-accent/8 text-accent'
+                              ? 'bg-foreground text-surface font-medium'
                               : 'text-secondary hover:bg-elevated hover:text-foreground'
                           }`}
                       >
@@ -1259,7 +1259,7 @@ export function Screener() {
                     title="列表配置"
                     className={`inline-flex items-center justify-center h-7 w-7 rounded-btn border text-xs font-medium transition-colors cursor-pointer
                       ${customizerOpen
-                        ? 'border-accent/50 bg-accent/10 text-accent'
+                        ? 'border-foreground bg-foreground text-surface font-medium'
                         : 'border-border bg-surface text-secondary hover:text-accent hover:border-accent/50'
                       }`}
                   >

@@ -271,7 +271,7 @@ export function RpsRotationDialog({ onClose, kind = 'concept' }: Props) {
                     'inline-flex items-center gap-1 px-2 py-0.5 rounded-btn text-xs transition-colors cursor-pointer border',
                     analyzing
                       ? 'opacity-60 cursor-not-allowed border-border text-secondary'
-                      : 'bg-accent/10 text-accent border-accent/30 hover:bg-accent/20',
+                      : 'bg-surface text-foreground border-border hover:bg-elevated',
                   )}
                 >
                   {analyzing

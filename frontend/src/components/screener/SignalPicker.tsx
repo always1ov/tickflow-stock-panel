@@ -63,7 +63,7 @@ export function SignalPicker({ signals, onChange, kind, options }: Props) {
   // 配色: entry 蓝色 (accent), exit 橙色 (warning/amber)
   const isEntry = kind === 'entry'
   const active = isEntry
-    ? 'border-accent/50 bg-accent/10 text-accent'
+    ? 'border-foreground bg-foreground text-surface'
     : 'border-warning/50 bg-warning/10 text-warning'
   const idle = variant === 'dialog'
     ? 'border-border bg-base text-muted hover:border-accent/40'
