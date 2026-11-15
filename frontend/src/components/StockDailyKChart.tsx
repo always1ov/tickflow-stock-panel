@@ -450,6 +450,11 @@ export function StockDailyKChart({
   }, [showIndicatorControls, rows.length, renderer])
   const Chart = (renderer === 'lightweight' ? LightweightDaily : EChartsCandlestick) as ComponentType<DailyChartProps>
 
+  // [R710] 用户: 窗口变窄时「缺口位」被挤到下一行最左、右边一片空白, 「视觉上不好看, 而且浏览器缩小
+  // 窗口也不能这样突出了」; 随后补一句「这行放不下就换行, 不能突出前面, 类似左对齐」——
+  // 标签单独占一列, 均线与五颗价位同在一个可折行的容器里: 放不下就自然换行, 续行左缘与 MA5 齐平,
+  // 不会再退回到「主图指标」标签前面。纯 CSS, 无测量。
+
   // [R686] 用户: 「『成交量 量比 前1日均量 趋势量化 量化MACD』应该这样排列『成交量 趋势量化 量化MACD 量比 前1日均量』,
   // 前面都是指标」—— 量比那组是成交量的参数、不是指标, 排到所有指标胶囊之后, 单独跟一条竖线。
   // [R684] 两种渲染器都要用同一份胶囊, 提到 return 之前只写一遍。
@@ -580,35 +585,40 @@ export function StockDailyKChart({
                   [R695] 用户: 「指标这部分往上靠近上下分隔线」—— 再收到 2px(上) / 2px(下), 行间 4px。
                   [R698] 用户: 「指标部分上下的空间几乎没有了不合理」—— 2px 贴太死, 上下各回到 4px;
                   「指标部分的内边距也是」—— 三段之间(内) 回到 6px, 外圈仍留 4px。 */}
-              <div className="flex flex-wrap items-center gap-x-1 gap-y-2 px-3 pt-1 pb-0">
-                <span className="w-16 shrink-0 text-micro text-muted" title="画在主图上的指标">主图指标</span>
-                {/* [R652] 主图四条均线各自可开关, 默认只开 MA20; [R689] 色点即那条均线在图上颜色 */}
-                {MA_KEYS.map(key => {
-                  const on = maKeys.includes(key)
-                  return (
-                    <ChartPill
-                      key={key}
-                      active={on}
-                      label={key.toUpperCase()}
-                      color={dotColor(MA_DOTS[key], on)}
-                      onClick={() => toggleMA(key)}
+              <div className="flex items-start gap-x-1 px-3 pt-1 pb-0" data-testid="main-row">
+                <span className="w-16 shrink-0 text-micro leading-[19px] text-muted" title="画在主图上的指标">主图指标</span>
+                {/* [R710] 换行后要跟 MA5 左边对齐 —— 胶囊放在标签右侧的容器里换行, 不能退回到标签前面。 */}
+                <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-1 gap-y-2">
+                  {/* [R652] 主图四条均线各自可开关, 默认只开 MA20; [R689] 色点即那条均线在图上颜色 */}
+                  {MA_KEYS.map(key => {
+                    const on = maKeys.includes(key)
+                    return (
+                      <ChartPill
+                        key={key}
+                        active={on}
+                        label={key.toUpperCase()}
+                        color={dotColor(MA_DOTS[key], on)}
+                        onClick={() => toggleMA(key)}
+                      />
+                    )
+                  })}
+                  {/* [R705] 五颗价位开关跟在 MA60 之后, 与均线同一行; 计数/开态/禁用态复用 LevelToolbar。
+                      仍受 showLevelToolbar 管: 回测「成交K线」弹窗要把价位开关整排关掉。
+                      [R710] 用户: 「压力支撑位这些不是单独一行，是跟着MA后面」—— 不包组、不做整组换行,
+                      跟均线一样是一颗一颗的流内元素, 放不下才自然折行。 */}
+                  {showLevelToolbar && (
+                    <LevelToolbar
+                      groups={MAIN_ROW_LEVEL_GROUPS}
+                      controls={levelCtl}
+                      effLevels={shown.effLevels}
+                      fib2Raw={shown.fib2Raw}
+                      fib2={levelsQ.data?.fib2}
+                      showClearAll={false}
+                      compact
+                      inline
                     />
-                  )
-                })}
-                {/* [R705] 五颗价位开关跟在 MA60 之后, 与均线同一行; 计数/开态/禁用态复用 LevelToolbar。
-                    仍受 showLevelToolbar 管: 回测「成交K线」弹窗要把价位开关整排关掉。 */}
-                {showLevelToolbar && (
-                  <LevelToolbar
-                    groups={MAIN_ROW_LEVEL_GROUPS}
-                    controls={levelCtl}
-                    effLevels={shown.effLevels}
-                    fib2Raw={shown.fib2Raw}
-                    fib2={levelsQ.data?.fib2}
-                    showClearAll={false}
-                    compact
-                    inline
-                  />
-                )}
+                  )}
+                </div>
               </div>
               {/* [R653] 价位开关排: 与「关键价位」同一个 LevelToolbar、同一套计数与文案;
                   [R660] 开关/悬停状态由弹窗持有, 切视图保持; 回测「成交K线」弹窗不显示这排;
