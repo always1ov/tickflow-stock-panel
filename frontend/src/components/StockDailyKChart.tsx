@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { type KlineRow } from '@/lib/api'
 import { klineDailyQueryOptions, klineDateRange } from '@/lib/kline'
 import { storage } from '@/lib/storage'
-import type { ChartMarker, ChartPriceLine, ChartRange, ChartRenderer, DailyAnalysisPane, DailyMarkerStyle, OHLC, VolumeCompareConfig } from '@/lib/chart-types'
+import type { ChartMarker, ChartPriceLine, ChartRange, ChartRenderer, DailyAnalysisPane, OHLC, VolumeCompareConfig } from '@/lib/chart-types'
 import { DAILY_LINE_COLORS, SUB_CHART_META } from '@/lib/chart-indicators'
 
 /**
@@ -13,11 +13,8 @@ import { DAILY_LINE_COLORS, SUB_CHART_META } from '@/lib/chart-indicators'
  */
 const DAILY_SUB_CHARTS = SUB_CHART_META.filter(def => def.key === 'vol')
 
-/** [R692] 「异动」后面的显示方式 —— 原下拉里的「文字 / 颜色」两颗选项, 改成分段按钮「圆点｜颜色」 */
-const MARKER_STYLES: { value: DailyMarkerStyle; label: string }[] = [
-  { value: 'label', label: '圆点' },
-  { value: 'candle', label: '颜色' },
-]
+/** [R694] 用户: 「不搞圆点和颜色切换了，异动这个按钮就直接控制，效果以后只有颜色这一种显示方式」——
+ *  「圆点 / 颜色」两个显示方式撤掉, 「异动」只剩开关一个职责, 图上固定按颜色画。 */
 import {
   CHART_LAYOUT, SUB_PANE_GAP, dailyChartHeight, fitAnalysisPaneHeights, quantPaneHeight, trendPaneHeight,
 } from '@/lib/chart-layout'
@@ -253,10 +250,6 @@ export function StockDailyKChart({
   const [showTrendQuant, setShowTrendQuant] = useState(false)
   const [showQuantMacd, setShowQuantMacd] = useState(false)
   const [showMarkers, setShowMarkers] = useState(true)
-  const [markerStyle, setMarkerStyle] = useState<DailyMarkerStyle>(() => {
-    const saved = storage.stockDailyMarkerStyle.get('label')
-    return saved === 'candle' ? 'candle' : 'label'
-  })
   // 加入自选日标注（与「异动」标记相互独立）
   const [showAddedMark, setShowAddedMark] = useState(true)
   const [volumeCompare, setVolumeCompare] = useState<VolumeCompareConfig>(() =>
@@ -303,11 +296,6 @@ export function StockDailyKChart({
       return next
     })
   }, [])
-
-  const updateMarkerStyle = (style: DailyMarkerStyle) => {
-    setMarkerStyle(style)
-    storage.stockDailyMarkerStyle.set(style)
-  }
 
   const activeSubDefs = activeIndicators
     .map(key => SUB_CHART_META.find(s => s.key === key))
@@ -525,31 +513,9 @@ export function StockDailyKChart({
             active={showMarkers}
             label="异动"
             activeClass="text-[#FACC15] bg-[#FACC15]/10"
+            title={showMarkers ? '隐藏涨停 / 炸板 / 跌停 / 翘板着色' : '显示涨停 / 炸板 / 跌停 / 翘板着色'}
             onClick={() => setShowMarkers(v => !v)}
           />
-          {renderer === 'lightweight' && <div
-            // [R692] 用户: 「异动后面的选项：颜色和文字，改成『圆点｜颜色』」——
-            // 原生下拉换成两颗并排小胶囊, 原「文字」改叫「圆点」(标记本身就是一颗圆点)。
-            role="group"
-            aria-label="异动显示方式"
-            title="圆点：显示板/炸/跌/翘标记；颜色：涨停为黄，跌停为青蓝；炸板收阳为玫紫、收阴为蓝紫；翘板收阳为薄荷青、收阴为钢蓝。开收同价沿用对应收阴色，影线保留原涨跌色。"
-            className="flex h-[19px] items-center divide-x divide-border/70 overflow-hidden rounded-btn border border-border bg-base"
-          >
-            {MARKER_STYLES.map(({ value, label }) => (
-              <button
-                key={value}
-                type="button"
-                aria-pressed={markerStyle === value}
-                disabled={!showMarkers}
-                onClick={() => updateMarkerStyle(value)}
-                className={`h-full px-1.5 text-micro transition-colors duration-hover disabled:cursor-not-allowed disabled:opacity-40 ${
-                  markerStyle === value ? 'bg-elevated text-foreground' : 'text-muted hover:text-foreground'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>}
         </div>
       )}
       {/* 激活色与图表里的 ADDED_DATE_COLOR 一致; Tailwind 只认字面量类名, 故写死色值 */}
@@ -685,7 +651,6 @@ export function StockDailyKChart({
           maKeys={renderer === 'lightweight' ? maKeys : undefined}
           showInfoBar={showInfoBar}
           showMarkers={showMarkers}
-          markerStyle={renderer === 'lightweight' ? markerStyle : undefined}
           stockInfo={stockInfo}
           assetType={kline.data?.asset_type}
           symbol={symbol}

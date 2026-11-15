@@ -42,8 +42,6 @@ const render = async (extra: Partial<Parameters<typeof StockDailyKChart>[0]> = {
 
 it('identifies limit events from existing signals, prioritizing a limit-down close over a broken limit-up', async () => {
   await render({ markers: [{ date: '2026-11-05', kind: 'buy', label: '策略买点' }] })
-  expect(host.querySelector('[aria-label="异动显示方式"] [aria-pressed="true"]')!.textContent).toBe('圆点')
-  expect(props().markerStyle).toBe('label')
   expect(props().markers).toEqual([
     expect.objectContaining({ label: '策略买点' }),
     expect.objectContaining({ date: '2026-11-03', event: 'limit_up', label: '3', color: '#FACC15' }),
@@ -81,63 +79,22 @@ it.each([
   expect(props().markers).toEqual([])
 })
 
-it('persists the style independently of the existing marker on/off switch', async () => {
+it('[R694] 异动只剩一颗开关: 显示方式固定为颜色, 关掉就不画标记', async () => {
   await render()
-  const group = host.querySelector('[aria-label="异动显示方式"]') as HTMLElement
-  const styles = [...group.querySelectorAll('button')]
-  expect(styles.map(button => [button.getAttribute('aria-pressed'), button.textContent])).toEqual([['true', '圆点'], ['false', '颜色']])
-  const colorButton = styles[1]
-  await act(async () => colorButton.click())
-  expect(props().markerStyle).toBe('candle')
-  expect(JSON.parse(localStorage.getItem('stock_daily_marker_style')!)).toBe('candle')
+  // 「圆点 / 颜色」两个显示方式已撤掉: 工具栏里没有那颗分段按钮, 也不再往图表传显示方式
+  expect(host.querySelector('[aria-label="异动显示方式"]')).toBeNull()
+  expect(props().markerStyle).toBeUndefined()
   const toggle = [...host.querySelectorAll('button')].find(button => button.textContent === '异动')!
   await act(async () => toggle.click())
   expect(props().showMarkers).toBe(false)
-  expect(styles.every(button => button.disabled)).toBe(true)
   await act(async () => toggle.click())
   expect(props().showMarkers).toBe(true)
-  await act(async () => root.unmount())
-  root = createRoot(host)
-  await render()
-  expect(props().markerStyle).toBe('candle')
-})
-
-it('[R693] 切换圆点 / 颜色不改变主图高度', async () => {
-  await render()
-  const group = host.querySelector('[aria-label="异动显示方式"]') as HTMLElement
-  // 分段按钮自身由内联 h-[19px] 定高, 与那一排胶囊同高, 不随选中态变
-  expect(group.className).toContain('h-[19px]')
-  const height = props().height
-  const [, colorButton] = [...group.querySelectorAll('button')]
-  await act(async () => colorButton.click())
-  expect(props().markerStyle).toBe('candle')
-  expect(props().height).toBe(height)
-})
-
-it('falls back from a saved arrow preference to text labels without discarding candle preferences', async () => {
-  localStorage.setItem('stock_daily_marker_style', JSON.stringify('arrow'))
-  await render()
-  expect(props().markerStyle).toBe('label')
-  expect(host.querySelector('[aria-label="异动显示方式"] [aria-pressed="true"]')!.textContent).toBe('圆点')
-  expect([...host.querySelectorAll('[aria-label="异动显示方式"] button')].map(button => button.textContent)).toEqual(['圆点', '颜色'])
-})
-
-it('rejects unknown saved styles and leaves legacy ECharts consumers on their existing behavior', async () => {
-  localStorage.setItem('stock_daily_marker_style', JSON.stringify('unsupported'))
-  await render()
-  expect(props().markerStyle).toBe('label')
+  await render({ showMarkerToggle: false })
+  expect([...host.querySelectorAll('button')].some(button => button.textContent === '异动')).toBe(false)
+  // ECharts 那条老路径照旧: 不认异动着色, 只留炸板标记
   await render({ renderer: 'echarts' })
-  expect(host.querySelector('[aria-label="异动显示方式"]')).toBeNull()
-  expect(props().markerStyle).toBeUndefined()
   expect(props().markers.some((marker: { event?: string }) => marker.event === 'limit_down')).toBe(false)
   expect(props().markers).toContainEqual(expect.objectContaining({ date: '2026-11-06', event: 'broken_limit_up' }))
-})
-
-it('hides the style selector wherever the existing event toggle is unavailable', async () => {
-  await render({ showMarkerToggle: false })
-  expect(host.querySelector('[aria-label="异动显示方式"]')).toBeNull()
-  await render({ showLimitMarkers: false })
-  expect(host.querySelector('[aria-label="异动显示方式"]')).toBeNull()
 })
 
 it('[R649] 趋势量化 / 量化MACD 两张副图默认不画, 点开后才追加到日K底部', async () => {

@@ -47,7 +47,7 @@ const eventTextColor = (event: EventMarker, row: OHLC, theme: Theme) => event.ev
   : event.event === 'limit_down' ? EVENT_COLORS.limit_down.label[theme] : eventBodyColor(event, row, theme)
 
 export function LightweightDaily({ data, assetType, symbol = '', height = 480, activeIndicators = [], showMA = true, showInfoBar = true,
-  markers = [], ranges, priceLines, showMarkers = true, markerStyle = 'label', volumeCompare = { enabled: true, days: 1 }, addedDate,
+  markers = [], ranges, priceLines, showMarkers = true, markerStyle = 'candle', volumeCompare = { enabled: true, days: 1 }, addedDate,
   linkedPrice, onDateClick, onPriceDoubleClick, visibleBars, stockInfo, analysisPanes = [], maKeys,
   levelSeries = [], levelLines = [], levelRanges = [], levelLabels = [], levelVerticals = [],
   levelFuture = null, onCrosshairMove }: DailyChartProps) {

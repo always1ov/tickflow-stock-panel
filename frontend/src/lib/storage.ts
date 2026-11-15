@@ -1,5 +1,3 @@
-import type { DailyMarkerStyle } from './chart-types'
-
 /**
  * 集中管理所有 localStorage 持久化。
  *
@@ -97,9 +95,6 @@ export const storage = {
 
   /** 个股日K成交量对比设置 */
   stockVolumeCompare:   kv<{ enabled: boolean; days: number }>('stock_volume_compare'),
-
-  /** 个股详情日K异动显示方式 */
-  stockDailyMarkerStyle: kv<DailyMarkerStyle>('stock_daily_marker_style'),
 
   /** 个股详情多日分时周期 */
   stockPreviewIntradayDays: kv<number>('stock_preview_intraday_days'),
