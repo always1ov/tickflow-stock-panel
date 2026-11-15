@@ -4,6 +4,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import type { KlineRow } from '@/lib/api'
 import { StockDailyKChart } from './StockDailyKChart'
+import { LEVEL_GROUPS } from './stock-analysis/analysis-chart-model'
 
 const fixture = vi.hoisted(() => ({ rows: [
   { date: '2026-11-03', open: 10, high: 11, low: 10, close: 11, volume: 100, signal_limit_up: true, consecutive_limit_ups: 3 },
@@ -47,6 +48,20 @@ afterEach(async () => { await act(async () => root.unmount()); host.remove(); lo
 const props = () => JSON.parse(host.querySelector('output')!.textContent!)
 const render = async (extra: Partial<Parameters<typeof StockDailyKChart>[0]> = {}) => act(async () => {
   root.render(<StockDailyKChart symbol="605365.SH" renderer="lightweight" {...extra} />)
+})
+
+it('[R706] 两排价位开关各自按逻辑顺序排列, 合起来正好铺满所有价位类型', async () => {
+  await render()
+  const mainRow = [...host.querySelectorAll('span')].find(span => span.textContent === '主图指标')!.parentElement!
+  const keys = (buttons: Element[]) => buttons
+    .map(button => LEVEL_GROUPS.find(group => button.textContent!.trim().startsWith(group.label))?.key)
+    .filter(Boolean)
+  const main = keys([...mainRow.querySelectorAll('button')])
+  const sub = keys([...host.querySelector('[data-testid="level-toolbar"]')!.querySelectorAll('button')])
+  expect(main).toEqual(['sr', 'extreme', 'pivot', 'round', 'gap'])
+  expect(sub).toEqual(['boll', 'keltner_s', 'keltner_m', 'keltner_l', 'atr_stop', 'fib', 'fib2', 'livermore'])
+  // 漏一类那颗按钮就从界面上消失了, 这里守住「不重不漏」
+  expect([...main, ...sub].sort()).toEqual(LEVEL_GROUPS.map(group => group.key).sort())
 })
 
 it('identifies limit events from existing signals, prioritizing a limit-down close over a broken limit-up', async () => {

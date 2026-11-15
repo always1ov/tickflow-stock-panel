@@ -59,12 +59,18 @@ const DEFAULT_VOLUME_COMPARE: VolumeCompareConfig = { enabled: true, days: 1 }
  * 排在 MA60 后面」—— 这五颗最常见的价位开关并进第一行; 其余(布林、量化通道三档、
  * ATR、斐波那契Ⅰ/Ⅱ型、六态关键点)留在下面那一排。仍然是一个 `LEVEL_GROUPS` 拆两段,
  * 计数、反相开态、禁用态全走 `LevelToolbar`, 不另写一份。
+ * [R706] 用户: 「指标里面的每行指标重新排序」—— 两段都用显式顺序表:
+ * 第一行先结构性横位(成交密集、前高前低), 再计算型(枢轴点、整数关口), 缺口位收尾;
+ * 第二行波动带按 布林→通道短/中/长→ATR 连排, 两个斐波那契挨着, 六态独立体系放最后。
  */
-const MAIN_ROW_LEVEL_ORDER: LevelType[] = ['sr', 'pivot', 'extreme', 'round', 'gap']
-const MAIN_ROW_LEVEL_GROUPS = MAIN_ROW_LEVEL_ORDER
+const MAIN_ROW_LEVEL_ORDER: LevelType[] = ['sr', 'extreme', 'pivot', 'round', 'gap']
+const SUB_ROW_LEVEL_ORDER: LevelType[] = ['boll', 'keltner_s', 'keltner_m', 'keltner_l', 'atr_stop', 'fib', 'fib2', 'livermore']
+/** 这两张表必须把 `LEVEL_GROUPS` 恰好铺满(测试里有守卫), 漏一类那颗按钮就没了 */
+const pickGroups = (order: LevelType[]) => order
   .map(key => LEVEL_GROUPS.find(group => group.key === key))
   .filter((group): group is { key: LevelType; label: string } => group != null)
-const SUB_ROW_LEVEL_GROUPS = LEVEL_GROUPS.filter(group => !MAIN_ROW_LEVEL_ORDER.includes(group.key))
+const MAIN_ROW_LEVEL_GROUPS = pickGroups(MAIN_ROW_LEVEL_ORDER)
+const SUB_ROW_LEVEL_GROUPS = pickGroups(SUB_ROW_LEVEL_ORDER)
 
 function normalizeVolumeCompare(config: VolumeCompareConfig): VolumeCompareConfig {
   return {
