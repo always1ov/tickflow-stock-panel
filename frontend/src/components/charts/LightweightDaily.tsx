@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { SeriesMarker, Time } from 'lightweight-charts'
 import type { ChartMarker, DailyChartProps, OHLC } from '@/lib/chart-types'
 import { ATR_BAND_COLORS, DAILY_LINE_COLORS, SUB_CHART_META, computeAtrBandSeries, computeInstitutionSeries, volumeRatioAt } from '@/lib/chart-indicators'
@@ -209,7 +209,22 @@ export function LightweightDaily({ data, assetType, symbol = '', height = 480, a
     () => [...plottedModel, ...analysis.series, ...levelSeries],
     [plottedModel, analysis.series, levelSeries])
 
-  const plotHeight = Math.max(260, height - (showInfoBar ? CHART_LAYOUT.readout : 0))
+  // [R728] 读数条不再写死 46px: 弹窗宽度下第一行会换行(异动/自选那排按钮), 内容一高过 46px
+  // 第二行(MA20 + 布林上下轨)就溢出到图上方。这里实测读数条高度, 从图高里扣掉, 保证装得下。
+  const barRef = useRef<HTMLDivElement | null>(null)
+  const [readoutBarHeight, setReadoutBarHeight] = useState(0)
+  useLayoutEffect(() => {
+    const el = barRef.current
+    if (!showInfoBar || !el) return
+    const measure = () => setReadoutBarHeight(el.getBoundingClientRect().height)
+    measure()
+    // 单测 jsdom 没有 ResizeObserver: 量一次就够, 不挂观察器。
+    if (typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(measure)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [showInfoBar])
+  const plotHeight = Math.max(260, height - (showInfoBar ? (readoutBarHeight || CHART_LAYOUT.readout) : 0))
   // [R726] 用户选「120日」时, 未来三格不该吃掉真实的 K 线: 视窗按「选中的根数 + 未来格数」取景。
   const pickedBars = typeof visibleBars === 'number'
     ? visibleBars + (levelFuture?.dates.length ?? 0)
@@ -293,7 +308,7 @@ export function LightweightDaily({ data, assetType, symbol = '', height = 480, a
   const turnover = stockInfo?.float_shares && current?.volume != null ? current.volume * 100 / stockInfo.float_shares : null
 
   return <div className="min-w-0" data-testid="lightweight-daily">
-    {showInfoBar && <div className="min-h-[46px] border-b border-border/50 px-3 py-1 text-micro font-mono tabular-nums xl:h-[46px]">
+    {showInfoBar && <div ref={barRef} className="min-h-[46px] border-b border-border/50 px-3 py-1 text-micro font-mono tabular-nums">
       <div className="flex min-h-5 flex-wrap items-center gap-x-3 gap-y-1">
         <span className="font-medium text-foreground">{current?.date ?? '—'}</span>
         {currentEvent && <span style={{ color: eventTextColor(currentEvent, current, theme) }} title="阴阳按收盘价与开盘价判断，影线保留原来的涨跌色">
