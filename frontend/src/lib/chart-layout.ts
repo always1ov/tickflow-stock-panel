@@ -1,7 +1,8 @@
 // 日 K 与单日分时使用同一套垂直尺寸；额外日 K 指标向下扩展。
 export const CHART_LAYOUT = {
   toolbar: 40,
-  readout: 64,
+  /** [R697] 用户: 「读数条里面的内容整体往上挪, 靠近上下分隔线」—— 日K 与分时两侧同步收到 46 高 */
+  readout: 46,
   timeAxis: 28,
   subPaneSlot: 96,
   separator: 1,

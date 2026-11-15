@@ -216,7 +216,7 @@ export function LightweightDaily({ data, assetType, symbol = '', height = 480, a
   const turnover = stockInfo?.float_shares && current?.volume != null ? current.volume * 100 / stockInfo.float_shares : null
 
   return <div className="min-w-0" data-testid="lightweight-daily">
-    {showInfoBar && <div className="min-h-16 border-b border-border/50 px-3 py-2 text-micro font-mono tabular-nums xl:h-16">
+    {showInfoBar && <div className="min-h-[46px] border-b border-border/50 px-3 py-1 text-micro font-mono tabular-nums xl:h-[46px]">
       <div className="flex min-h-5 flex-wrap items-center gap-x-3 gap-y-1">
         <span className="font-medium text-foreground">{current?.date ?? '—'}</span>
         {currentEvent && <span style={{ color: eventTextColor(currentEvent, current, theme) }} title="阴阳按收盘价与开盘价判断，影线保留原来的涨跌色">
@@ -232,7 +232,7 @@ export function LightweightDaily({ data, assetType, symbol = '', height = 480, a
             ml-auto 把它们推到读数条右端, 不跟着「换手」贴在一起。 */}
         {readoutExtra && <div className="ml-auto flex items-center gap-1.5 pl-2">{readoutExtra}</div>}
       </div>
-      <div className="mt-1 flex min-h-4 flex-wrap gap-x-4 gap-y-1 text-micro">
+      <div className="mt-0.5 flex min-h-4 flex-wrap gap-x-4 gap-y-1 text-micro">
         {visibleMA.map(([field, token]) => <span key={field} style={{ color: color(token) }}>{field.toUpperCase()} {price(current?.[field], precision)}</span>)}
         {index >= 0 && previous && <span className="text-secondary">至今 <span style={{ color: rows.at(-1)!.close >= previous.close ? C.up : C.down }}>{fmtPct(rows.at(-1)!.close / previous.close - 1)}</span> · 周期 {rows.length - index}</span>}
       </div>

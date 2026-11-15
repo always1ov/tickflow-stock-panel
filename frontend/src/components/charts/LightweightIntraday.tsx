@@ -118,7 +118,8 @@ export function LightweightIntraday({ symbol, assetType, data, sessions: supplie
         </button>)}
       </div>}
     </div>
-    <div className="min-h-16 border-b border-border/50 px-3 py-2 font-mono text-micro tabular-nums xl:h-16">
+    {/* [R697] 与日K 读数条同一口径: 上下内边距 8→4px、行间 4→2px、高 64→46, 两侧切标签不跳 */}
+    <div className="min-h-[46px] border-b border-border/50 px-3 py-1 font-mono text-micro tabular-nums xl:h-[46px]">
       <div className="flex min-h-5 flex-wrap items-center gap-x-3 gap-y-1">
         <span className="font-medium text-foreground">{sourceTimes
           ? `${point?.date} ${sourceTimes.join(' / ')}`
@@ -126,7 +127,7 @@ export function LightweightIntraday({ symbol, assetType, data, sessions: supplie
         <span className="text-muted">{sourceTimes ? '午间衔接' : hovered || supplied ? '分钟' : daily ? '日K（前复权）' : '分时汇总'}</span>
         {([['开', ohlc?.open], ['高', ohlc?.high], ['低', ohlc?.low], ['收', ohlc?.close]] as const).map(([label, value]) => <span key={label} className="text-muted">{label} <span className="text-secondary">{fmt(value)}</span></span>)}
       </div>
-      <div className="mt-1 flex min-h-4 flex-wrap items-center gap-x-4 gap-y-1 text-micro">
+      <div className="mt-0.5 flex min-h-4 flex-wrap items-center gap-x-4 gap-y-1 text-micro">
         <span className="text-muted">分时价 <span style={{ color: change == null || change === 0 ? C.flat : change > 0 ? C.up : C.down }}>{fmt(shown?.close)}{change != null && ` ${fmtPct(change)}`}</span></span>
         {showAvgLine && assetType !== 'index' && <span style={{ color: C.average }}>均价 {fmt(point?.average)}</span>}
         <span className="text-muted">量 <span className="text-secondary">{fmtBigNum(shown?.volume)}</span></span>
