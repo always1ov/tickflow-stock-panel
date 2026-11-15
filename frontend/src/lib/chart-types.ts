@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import type { QuantMacdResult } from './api'
 import type { TrendQuantData } from './trendQuantSeries'
 import type { PlotSeries } from './lightweight-model'
@@ -145,6 +146,8 @@ export interface DailyChartProps {
   addedDate?: string | null
   /** [R649] 底部并入的分析副图(趋势量化 / 量化MACD), 按数组顺序排在各指标副图之后 */
   analysisPanes?: DailyAnalysisPane[]
+  /** [R696] 挂在读数条右端的那几颗按钮(异动 / 自选 / 回测 / 全部清除), 由日K 工具栏挪到这里 */
+  readoutExtra?: ReactNode
 }
 
 export type ChartRenderer = 'echarts' | 'lightweight'

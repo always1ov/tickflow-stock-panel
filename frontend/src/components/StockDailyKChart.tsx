@@ -1,9 +1,9 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { type KlineRow } from '@/lib/api'
 import { klineDailyQueryOptions, klineDateRange } from '@/lib/kline'
 import { storage } from '@/lib/storage'
-import type { ChartMarker, ChartPriceLine, ChartRange, ChartRenderer, DailyAnalysisPane, OHLC, VolumeCompareConfig } from '@/lib/chart-types'
+import type { ChartMarker, ChartPriceLine, ChartRange, ChartRenderer, DailyAnalysisPane, DailyChartProps, OHLC, VolumeCompareConfig } from '@/lib/chart-types'
 import { DAILY_LINE_COLORS, SUB_CHART_META } from '@/lib/chart-indicators'
 
 /**
@@ -431,7 +431,7 @@ export function StockDailyKChart({
     ro.observe(el)
     return () => ro.disconnect()
   }, [showIndicatorControls, rows.length, renderer])
-  const Chart = renderer === 'lightweight' ? LightweightDaily : EChartsCandlestick
+  const Chart = (renderer === 'lightweight' ? LightweightDaily : EChartsCandlestick) as ComponentType<DailyChartProps>
 
   // [R686] 用户: 「『成交量 量比 前1日均量 趋势量化 量化MACD』应该这样排列『成交量 趋势量化 量化MACD 量比 前1日均量』,
   // 前面都是指标」—— 量比那组是成交量的参数、不是指标, 排到所有指标胶囊之后, 单独跟一条竖线。
@@ -576,7 +576,6 @@ export function StockDailyKChart({
                     />
                   )
                 })}
-                {markerControls}
               </div>
               {/* [R653] 价位开关排: 与「关键价位」同一个 LevelToolbar、同一套计数与文案;
                   [R660] 开关/悬停状态由弹窗持有, 切视图保持; 回测「成交K线」弹窗不显示这排;
@@ -642,6 +641,8 @@ export function StockDailyKChart({
       )}
       {rows.length > 0 && (
         <Suspense fallback={<div className="flex items-center justify-center text-xs text-muted" style={{ height }}>正在加载图表…</div>}>
+        {/* [R696] 用户: 「异动 自选 回测 8% 全部清除这几个按钮挪到换手后面, 保持右对齐」——
+            这四颗交回读数条右端, 工具栏第一行只剩「主图指标」那四颗均线。 */}
         <Chart
           data={rows}
           markers={allMarkers}
@@ -652,6 +653,7 @@ export function StockDailyKChart({
           maKeys={renderer === 'lightweight' ? maKeys : undefined}
           showInfoBar={showInfoBar}
           showMarkers={showMarkers}
+          readoutExtra={renderer === 'lightweight' && showIndicatorControls && rows.length > 0 ? markerControls : undefined}
           stockInfo={stockInfo}
           assetType={kline.data?.asset_type}
           symbol={symbol}

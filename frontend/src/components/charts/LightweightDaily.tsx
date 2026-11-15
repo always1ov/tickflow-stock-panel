@@ -49,6 +49,7 @@ const eventTextColor = (event: EventMarker, row: OHLC, theme: Theme) => event.ev
 export function LightweightDaily({ data, assetType, symbol = '', height = 480, activeIndicators = [], showMA = true, showInfoBar = true,
   markers = [], ranges, priceLines, showMarkers = true, markerStyle = 'candle', volumeCompare = { enabled: true, days: 1 }, addedDate,
   linkedPrice, onDateClick, onPriceDoubleClick, visibleBars, stockInfo, analysisPanes = [], maKeys,
+  readoutExtra,
   levelSeries = [], levelLines = [], levelRanges = [], levelLabels = [], levelVerticals = [],
   levelFuture = null, onCrosshairMove }: DailyChartProps) {
   const rows = useMemo(() => validDailyRows(data), [data])
@@ -227,6 +228,9 @@ export function LightweightDaily({ data, assetType, symbol = '', height = 480, a
           <span key={name} className="text-muted">{name} <span className="text-secondary">{price(value, precision)}</span></span>)}
         {change != null && <span style={{ color: change >= 0 ? C.up : C.down }}>{fmtPct(change)}</span>}
         {turnover != null && <span className="text-muted">换手 {fmtPct(turnover)}</span>}
+        {/* [R696] 用户: 「异动 / 自选 / 回测 8% / 全部清除挪到换手后面, 保持右对齐」——
+            ml-auto 把它们推到读数条右端, 不跟着「换手」贴在一起。 */}
+        {readoutExtra && <div className="ml-auto flex items-center gap-1.5 pl-2">{readoutExtra}</div>}
       </div>
       <div className="mt-1 flex min-h-4 flex-wrap gap-x-4 gap-y-1 text-micro">
         {visibleMA.map(([field, token]) => <span key={field} style={{ color: color(token) }}>{field.toUpperCase()} {price(current?.[field], precision)}</span>)}

@@ -18,7 +18,16 @@ vi.mock('@tanstack/react-query', () => ({
 vi.mock('@/lib/kline', async importOriginal => ({
   ...await importOriginal<typeof import('@/lib/kline')>(), klineDailyQueryOptions: vi.fn(() => ({})),
 }))
-vi.mock('./charts/LightweightDaily', () => ({ LightweightDaily: (props: any) => <output>{JSON.stringify(props)}</output> }))
+// [R696] 异动 / 自选 / 回测 / 全部清除 已挪到读数条右端, 由图表组件负责挂出来 ——
+// 这里照原样渲染 readoutExtra, 让那几颗按钮仍在 DOM 里可点; JSON 里剔掉它(React 元素没法断言)。
+vi.mock('./charts/LightweightDaily', () => ({
+  LightweightDaily: (props: any) => (
+    <div>
+      <output>{JSON.stringify(props, (key, value) => key === 'readoutExtra' ? undefined : value)}</output>
+      {props.readoutExtra}
+    </div>
+  ),
+}))
 vi.mock('./EChartsCandlestick', () => ({ EChartsCandlestick: (props: any) => <output>{JSON.stringify(props)}</output> }))
 
 let host: HTMLDivElement, root: Root
