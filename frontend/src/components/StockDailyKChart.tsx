@@ -640,9 +640,11 @@ export function StockDailyKChart({
                   />
                 </div>
               )}
-              {/* [R411] 形态走到哪一步 —— 只报事实, 一个动词都没有; 显示沿用日K 自己的极简行 */}
+              {/* [R411] 形态走到哪一步 —— 只报事实, 一个动词都没有; 显示沿用日K 自己的极简行
+                  [R711] 用户: 「斐波那契二型点开后会突出」—— 这行原本 px-3 起排, 比价位胶囊左缘(80px)
+                  多伸出 80px, 跟上面几排不对齐; 跟价位行一样缩进到胶囊左缘。 */}
               {levelCtl.activeTypes.has('fib2') && fib2Line && (
-                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 px-3 pb-1.5 text-micro leading-5">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 pr-3 pl-3 pb-1.5 text-micro leading-5 sm:pl-20">
                   <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: levelColorsByTheme.fib2 }} />
                   {fib2Line.map((segment, index) => (
                     <span key={segment} className={index === 0 ? 'text-secondary' : 'text-muted'}>
