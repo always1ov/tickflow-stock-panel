@@ -186,14 +186,15 @@ it('ETF 日K价格、均线和轴刻度为三位, 切换股票后恢复两位', 
   expect(native.series[0].applyOptions.mock.calls.at(-1)![0].priceFormat).toMatchObject({ precision: 2, minMove: 0.01 })
 })
 
-// [R703/R704] 用户: 「不管我有没有开启MA的按钮, 换手的下一行都要默认显示所有MA的价格」;
-// [R713]「MA们都放到布林轨前面」—— 四条均线全写, 排在上/下轨之前。
-it('[R713] 均线全关时换手下一行仍显示四条均线, 且排在布林上下轨之前', async () => {
+// [R703/R704] 用户: 「不管我有没有开启MA的按钮, 换手的下一行都要默认显示所有MA的价格」→
+// 「默认开启所有MA价格显示变成只默认开启显示MA20和26日布林轨道的价格」。
+// 读数行固定 MA20 + 布林上下轨, 与 MA / 价位开关都无关; [R705] 布林那两条不再带「26日」。
+it('[R704] 均线全关时换手下一行仍显示 MA20 与布林上下轨', async () => {
   const rows = [{ date: '2026-11-05', open: 10, high: 11, low: 9, close: 10.5,
     ma5: 10.1, ma10: 10.2, ma20: 10.3, ma60: 10.4, boll_upper: 11.2, boll_mid: 10.3, boll_lower: 9.4 }]
   await act(async () => root.render(<LightweightDaily symbol="600000.SH" data={rows} maKeys={[]} />))
-  for (const text of ['MA5 10.10', 'MA10 10.20', 'MA20 10.30', 'MA60 10.40', '布林上轨 11.20', '布林下轨 9.40']) expect(host.textContent).toContain(text)
-  expect(host.textContent!.indexOf('MA60 10.40')).toBeLessThan(host.textContent!.indexOf('布林上轨 11.20'))
+  for (const text of ['MA20 10.30', '布林上轨 11.20', '布林下轨 9.40']) expect(host.textContent).toContain(text)
+  for (const text of ['MA5 10.10', 'MA10 10.20', 'MA60 10.40']) expect(host.textContent).not.toContain(text)
   expect(native.chart.addSeries).toHaveBeenCalledTimes(1)
 })
 

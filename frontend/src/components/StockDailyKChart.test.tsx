@@ -196,6 +196,9 @@ it('[R660] 价位开关状态可用外部那一份(与关键价位共用), 回�
   expect(host.querySelector('[data-testid="level-toolbar"]')).toBeNull()
   expect(host.textContent).not.toContain('压力支撑')
   expect(host.textContent).not.toContain('26日布林')
+  // [R715] 四条均线胶囊与价位开关解耦: 整排价位关掉, MA5~MA60 仍在(回测弹窗照旧能切均线)
+  expect([...host.querySelectorAll('button')].map(button => button.textContent).filter(text => /^MA\d+$/.test(text ?? '')))
+    .toEqual(['MA5', 'MA10', 'MA20', 'MA60'])
 })
 
 it('[R651] 空间不够只压两张分析副图, 主图与指标副图的高度不动', async () => {
