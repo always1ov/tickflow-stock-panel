@@ -38,7 +38,7 @@ const PILL_ON = 'bg-foreground text-surface font-medium ring-1 ring-inset ring-f
 const PILL_SUB = 'whitespace-nowrap rounded-btn px-2 py-0.5 text-micro transition-colors duration-hover'
 const PILL_SUB_IDLE = 'bg-base/40 text-muted ring-1 ring-inset ring-border/60 hover:text-foreground'
 
-export function LevelToolbar({ groups, controls, effLevels, fib2Raw, fib2, onOpenFit, help, compact = false }: {
+export function LevelToolbar({ groups, controls, effLevels, fib2Raw, fib2, onOpenFit, help, compact = false, showClearAll = true }: {
   groups: { key: LevelType; label: string }[]
   controls: LevelControls
   effLevels: Record<LevelType, PriceLevel[]> | undefined
@@ -50,6 +50,8 @@ export function LevelToolbar({ groups, controls, effLevels, fib2Raw, fib2, onOpe
   help?: string
   /** [R657] 日K 里用紧凑档, 尺寸对齐日K 原来的指标胶囊; 关键价位页保持方按钮 */
   compact?: boolean
+  /** [R688] 日K 弹窗把「全部清除」挪到工具栏右端「回测」之后, 这里就不画 */
+  showClearAll?: boolean
 }) {
   const theme = useTheme()
   const { activeTypes, pivotRank, fib2Grain, fib2ShowTargets } = controls
@@ -130,10 +132,12 @@ export function LevelToolbar({ groups, controls, effLevels, fib2Raw, fib2, onOpe
         </div>
       )}
 
-      <button type="button" onClick={controls.clearAll} disabled={activeTypes.size === 0}
-              className={`${box} ${boxIdle} ml-auto`}>
-        全部清除
-      </button>
+      {showClearAll && (
+        <button type="button" onClick={controls.clearAll} disabled={activeTypes.size === 0}
+                className={`${box} ${boxIdle} ml-auto`}>
+          全部清除
+        </button>
+      )}
       {/* [R626] 副图图例说明 —— 原来压在主图上方那一行字, 收进这一个「?」里 */}
       {help && (
         <button type="button" title={help} aria-label="副图图例说明"

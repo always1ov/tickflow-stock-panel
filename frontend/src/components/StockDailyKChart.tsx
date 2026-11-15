@@ -515,6 +515,19 @@ export function StockDailyKChart({
       )}
       {/* [R680] 回测调参 —— 用户: 「还是放到中里面的『异动 颜色 自选』的自选的后面」 */}
       {toolbarExtra}
+      {/* [R688] 用户: 「全部清除放到回测按钮的后面」—— 从价位那排挪到工具栏右端。
+          价位开关只在这个渲染器里有, ECharts 那边不画。 */}
+      {renderer === 'lightweight' && (
+        <button
+          type="button"
+          onClick={levelCtl.clearAll}
+          disabled={levelCtl.activeTypes.size === 0}
+          title="清空所有已开启的价位"
+          className="inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-btn bg-surface px-2 py-0.5 text-micro text-secondary ring-1 ring-inset ring-border transition-colors duration-hover cursor-pointer hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          全部清除
+        </button>
+      )}
     </div>
   )
 
@@ -559,6 +572,7 @@ export function StockDailyKChart({
                     fib2Raw={shown.fib2Raw}
                     fib2={levelsQ.data?.fib2}
                     onOpenFit={symbol ? () => setFib2FitOpen(true) : undefined}
+                    showClearAll={false}
                     compact
                   />
                 </div>
