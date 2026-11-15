@@ -63,7 +63,7 @@ const DEFAULT_CURVE_COLORS: Record<string, string> = {
 }
 
 /** 带状曲线指标(按组渲染成曲线，而不是水平价位线) */
-const CURVE_GROUP_TYPES = new Set<LevelType>(['boll', 'keltner_s', 'keltner_m', 'keltner_l', 'atr_stop'])
+export const CURVE_GROUP_TYPES = new Set<LevelType>(['boll', 'keltner_s', 'keltner_m', 'keltner_l', 'atr_stop'])
 
 // 通道曲线元数据(单一数据源):供绘图序列和右侧预留带标签共用。
 //   alignedKey: 与 rows 日期对齐后的 series key

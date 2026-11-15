@@ -22,7 +22,7 @@ import {
 } from './levelControls'
 import { LevelToolbar } from './LevelToolbar'
 import {
-  ANALYSIS_LABEL_BAND_PX, LEVEL_GROUPS, buildAnalysisChartModel, hitTestAnalysis, levelKey,
+  ANALYSIS_LABEL_BAND_PX, CURVE_GROUP_TYPES, LEVEL_GROUPS, buildAnalysisChartModel, hitTestAnalysis, levelKey,
   type ChartMarker, type ChartRange, type LevelType, type PriceLevel,
 } from './analysis-chart-model'
 
@@ -633,7 +633,11 @@ export function LevelOverview({
 
   const Row = ({ point }: { point: PriceLevel }) => {
     const color = (point.color ? fib2RoleColor(point.color, theme) : palette[point.type]) ?? ct.text
-    const key = levelKey(point.type, point.value)
+    // [R708] 用户: 「右里面的所有点位鼠标都要能悬浮, 就像前高前低那样在主图显示出对应的」——
+    // 布林/量化通道三档/ATR 在主图里是**曲线组**, 模型的 hover 键是组名(如 'boll'),
+    // 而这里原来一律拼成 `类型-价格`, 那几个键不在 `hoverKeys` 里, 悬停会被立刻清空,
+    // 主图看着毫无反应。按点的类型分流: 曲线组发组名, 水平价位发 `类型-价格`。
+    const key = CURVE_GROUP_TYPES.has(point.type) ? point.type : levelKey(point.type, point.value)
     const hit = hoveredKey === key
     const dim = hoveredKey != null && !hit
     return (

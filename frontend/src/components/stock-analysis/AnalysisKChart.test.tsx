@@ -34,7 +34,7 @@ vi.mock('@/lib/theme', () => ({
   TREND_QUANT_COLORS: { red: '#FF0000', green: '#00FF00', yellow: '#FFFF00', white: '#FFFFFF', lightRed: '#FF8080', avg: '#B84DFF', xichou: '#00FF00', text: '#FFFFFF', paneBg: '#000000' },
 }))
 
-import { AnalysisKChart } from './AnalysisKChart'
+import { AnalysisKChart, LevelOverview } from './AnalysisKChart'
 
 const DATES = ['2026-10-29', '2026-10-30', '2026-11-02']
 const rows = DATES.map((date, index) => ({
@@ -108,6 +108,24 @@ it('switches level groups and pivot ranks from the toolbar', async () => {
     .toMatchObject({ label: '' })
   await act(async () => button('2').click())
   expect(lastPlot().annotations.priceLines.map((line: any) => line.value)).toContain(11.1)
+})
+
+it('[R708] 右栏曲线组点位悬浮时发组名, 主图上那条曲线才有反应', async () => {
+  const hovered: (string | null)[] = []
+  await act(async () => root.render(
+    <LevelOverview levels={levels} activeTypes={new Set<LevelType>(['sr', 'boll'])} pivotRank={1}
+      close={10.5} hoveredKey={null} onHover={key => hovered.push(key)} stacked ladder />))
+  const row = (text: string) => [...host.querySelectorAll<HTMLElement>('div.cursor-default')]
+    .find(item => (item.textContent ?? '').trim().startsWith(text))!
+  const hover = async (text: string) => act(async () => {
+    row(text).dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
+  })
+  // 布林在主图是曲线组, 模型的悬浮键是组名; 原来发 `boll-12.30` 不在 hoverKeys 里, 悬停会被立刻清空
+  await hover('布林上轨')
+  expect(hovered.at(-1)).toBe('boll')
+  // 水平价位仍然是「类型-价格」
+  await hover('成交密集区')
+  expect(hovered.at(-1)).toBe('sr-12.40')
 })
 
 it('highlights the level under the crosshair and clears it when the pointer leaves', async () => {

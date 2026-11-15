@@ -123,6 +123,17 @@ describe('buildAnalysisChartModel', () => {
     expect(model.hoverKeys.has('boll')).toBe(true)
   })
 
+  it('[R708] 曲线组按组名悬浮时加粗本组曲线、压淡其他', () => {
+    const model = buildAnalysisChartModel({
+      rows, levels: levels(), series, seriesDates: DATES,
+      activeTypes: ['sr', 'boll', 'atr_stop'], hoveredKey: 'boll',
+    })
+    expect(model.series.find(item => item.id === 'curve:boll_upper')).toMatchObject({ color: '#F97316', lineWidth: 2 })
+    expect(model.series.find(item => item.id === 'curve:atr_stop')).toMatchObject({ color: '#EF44441F', lineWidth: 1 })
+    expect(model.annotations.priceLines!.filter(line => !line.noLine).every(line => line.opacity === 0.12)).toBe(true)
+    expect(model.hoverKeys.has('boll')).toBe(true)
+  })
+
   it('maps reserved markers and event ranges into annotations without mutating rows', () => {
     const input = [
       rows[2],
