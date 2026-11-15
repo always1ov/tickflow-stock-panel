@@ -233,7 +233,9 @@ export function LightweightDaily({ data, assetType, symbol = '', height = 480, a
         {readoutExtra && <div className="ml-auto flex items-center gap-1.5 pl-2">{readoutExtra}</div>}
       </div>
       <div className="mt-0.5 flex min-h-4 flex-wrap gap-x-4 gap-y-1 text-micro">
-        {/* [R701] 用户: 「主图所有指标也不再需要显示标签」—— 均线读数不再列出, 只留悬停时的区间涨跌幅 */}
+        {/* [R702] 用户: 「不能删除换手下面那一行原来显示的标签……原来日K里面怎么显示就怎么显示」——
+            均线读数恢复成原来的「MA5 43.70」格式, 保留在换手下面这一行 */}
+        {visibleMA.map(([field, token]) => <span key={field} style={{ color: color(token) }}>{field.toUpperCase()} {price(current?.[field], precision)}</span>)}
         {index >= 0 && previous && <span className="text-secondary">至今 <span style={{ color: rows.at(-1)!.close >= previous.close ? C.up : C.down }}>{fmtPct(rows.at(-1)!.close / previous.close - 1)}</span> · 周期 {rows.length - index}</span>}
       </div>
     </div>}

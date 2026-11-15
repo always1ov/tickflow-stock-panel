@@ -159,9 +159,8 @@ it('ETF 日K价格、均线和轴刻度为三位, 切换股票后恢复两位', 
   await act(async () => root.render(<LightweightDaily assetType="etf" data={rows} />))
   expect(host.textContent).toContain('开 0.751')
   expect(host.textContent).toContain('收 0.827')
-  // [R701] 主图指标不再显示标签: 均线读数整段不再列出
-  expect(host.textContent).not.toContain('MA5')
-  expect(host.textContent).not.toContain('0.801')
+  // [R702] 换手下面那一行的均线标签保持原样(名称 + 价格)
+  expect(host.textContent).toContain('MA5 0.801')
   expect(native.chart.addSeries.mock.calls[0][1].priceFormat).toMatchObject({ precision: 3, minMove: 0.001 })
   await act(async () => root.render(<LightweightDaily assetType="stock" data={rows} />))
   expect(host.textContent).toContain('收 0.83')
