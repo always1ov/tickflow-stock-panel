@@ -380,7 +380,7 @@ it('[R753] 能量惯性实现逻辑: 五段位置/正负取色/零轴箭头/输�
     const overlay = native.chart.addSeries.mock.calls.filter(call => call[1]?.priceScaleId === 'atr')
     expect(overlay).toHaveLength(5)
     expect(overlay.every(call => call[2] === 1)).toBe(true)
-    const readouts = [...updates.mock.calls].reverse().find(([d]) => d.title === '能量惯性')![0].readouts!
+    const readouts = [...updates.mock.calls].reverse().find(([d]) => d.title === '量能惯性+ATR趋势')![0].readouts!
     expect(readouts.map(d => d.text).slice(0, 2).every(text => /^(能量|惯性) /.test(text))).toBe(true)
     expect(readouts.map(d => d.text)).toContain('S 2.00')
     expect(readouts.map(d => d.text)).toContain('REFMID 2.00')

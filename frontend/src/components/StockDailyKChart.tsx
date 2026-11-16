@@ -211,7 +211,7 @@ const INDICATOR_ON = 'bg-foreground text-surface font-medium'
  * 不传 `color` 的 (异动 / 自选) 保持原来的强调色高亮。
  */
 function ChartPill({
-  active, label, color, activeClass, title, onClick,
+  active, label, color, activeClass, title, onClick, wide = false,
 }: {
   active: boolean
   label: string
@@ -219,6 +219,8 @@ function ChartPill({
   activeClass?: string
   title?: string
   onClick: () => void
+  /** [R754] 名字长到 65px 装不下时(如「量能惯性+ATR趋势」)按内容撑开, 不硬塞 */
+  wide?: boolean
 }) {
   const dotted = !!color
   // 同价位开关: 反相时底色与常态相反, 色点得换另一套主题那一档
@@ -228,7 +230,7 @@ function ChartPill({
     }`
     // [R669] 用户: 「按这个方案统一按钮大小」—— 一排胶囊统一成 65px 宽(最长的「量化MACD」实测 64.8),
     // 高度 19px 不变; 短标签居中, 不再一颗宽一颗窄。
-    : `inline-flex w-[65px] shrink-0 items-center justify-center whitespace-nowrap px-2 py-0.5 rounded-btn text-micro font-mono cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
+    : `inline-flex ${wide ? 'w-auto min-w-[65px]' : 'w-[65px]'} shrink-0 items-center justify-center whitespace-nowrap px-2 py-0.5 rounded-btn text-micro font-mono cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
       active ? activeClass : 'bg-surface ring-1 ring-inset ring-border text-foreground hover:text-foreground'
     }`
   return (
@@ -480,6 +482,7 @@ export function StockDailyKChart({
       key={ind.key}
       active={activeIndicators.includes(ind.key)}
       label={ind.label}
+      wide={ind.key === 'energy'}
       activeClass={INDICATOR_ON}
       onClick={() => toggleIndicator(ind.key)}
     />

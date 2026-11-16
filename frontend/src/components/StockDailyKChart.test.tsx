@@ -140,7 +140,8 @@ it('[R649/R751] 量化MACD 副图默认就画, 点一下收起', async () => {
 it('[R753] 能量惯性接过成交量: 默认打开, 成交量胶囊不再出现', async () => {
   await render()
   expect(props().activeIndicators).toEqual(['energy', 'inst'])
-  const pill = [...host.querySelectorAll('button')].find(button => button.textContent === '能量惯性')!
+  // [R754] 胶囊名带上叠加的 ATR 五线
+  const pill = [...host.querySelectorAll('button')].find(button => button.textContent === '量能惯性+ATR趋势')!
   expect(pill.getAttribute('aria-pressed')).toBe('true')
   expect([...host.querySelectorAll('button')].some(button => button.textContent === '量能 ATR')).toBe(false)
   await act(async () => pill.click())
@@ -169,7 +170,7 @@ it('[R657] 日K 里指标开关键与价位开关键同一尺寸(跟原来那颗
   await render()
   const byLabel = (label: string) => [...host.querySelectorAll('button')]
     .find(button => button.textContent?.trim() === label)!
-  const indicator = byLabel('能量惯性')
+  const indicator = byLabel('量能惯性+ATR趋势')
   const level = host.querySelector('[data-testid="level-toolbar"] button')
   expect(level).not.toBeNull()
   for (const button of [indicator, level!]) {
